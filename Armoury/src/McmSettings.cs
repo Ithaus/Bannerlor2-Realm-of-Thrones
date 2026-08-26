@@ -780,6 +780,14 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public float HideoutHearNight { get; set; } = 20f;
 
+        [SettingPropertyBool("Hideout Alarm Relay", HintText = "a woken man shouts too: the alarm leaps man to man while each next stands within scream range of the last - never across the whole camp at once")]
+        [SettingPropertyGroup("A night's rest")]
+        public bool HideoutAlarmRelay { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Hideout Noise Per Armor Kg", 0.00f, 1.60f, "0.00", HintText = "every kilogram of worn armour adds this many meters to a RUNNING man's noise - plate thunders, leather whispers")]
+        [SettingPropertyGroup("A night's rest")]
+        public float HideoutNoisePerArmorKg { get; set; } = 0.4f;
+
         [SettingPropertyBool("Sight Cycle Enabled", HintText = "eyes follow the sun: every party sees further by day and shorter after dark")]
         [SettingPropertyGroup("A night's rest")]
         public bool SightCycleEnabled { get; set; } = true;
@@ -1086,6 +1094,8 @@ namespace Armoury
             s.HideoutNoiseEnabled = HideoutNoiseEnabled;
             s.HideoutHearDay = HideoutHearDay;
             s.HideoutHearNight = HideoutHearNight;
+            s.HideoutAlarmRelay = HideoutAlarmRelay;
+            s.HideoutNoisePerArmorKg = HideoutNoisePerArmorKg;
             s.SightCycleEnabled = SightCycleEnabled;
             s.DaySightFactor = DaySightFactor;
             s.NightSightFactor = NightSightFactor;

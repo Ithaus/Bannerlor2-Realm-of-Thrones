@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
 namespace Armoury
@@ -54,7 +56,7 @@ namespace Armoury
                 // pada od TEGO ciosu - o alarmie zdecyduja swiadkowie (OnAgentRemoved)
                 if (affectedAgent.Health <= 0f) return;
 
-                AlarmAround(affectedAgent, s.HideoutAlarmScreamRadius);
+                AlarmAround(affectedAgent, s.HideoutAlarmScreamRadius, s.HideoutAlarmScreamRadius);
             }
             catch (Exception e) { Log.Error("HideoutAlarm.OnAgentHit", e); }
         }
@@ -70,8 +72,9 @@ namespace Armoury
                 if (affectedAgent.Team == null || affectorAgent.Team == null) return;
                 if (!affectedAgent.Team.IsEnemyOf(affectorAgent.Team)) return;
 
-                // czysta likwidacja: tylko swiadkowie przy ciele; nikogo = cisza
-                AlarmAround(affectedAgent, s.HideoutAlarmWitnessRadius);
+                // czysta likwidacja: tylko swiadkowie przy ciele; nikogo = cisza,
+                // ale SWIADEK krzyczy juz pelnym glosem i uruchamia sztafete
+                AlarmAround(affectedAgent, s.HideoutAlarmWitnessRadius, s.HideoutAlarmScreamRadius);
             }
             catch (Exception e) { Log.Error("HideoutAlarm.OnAgentRemoved", e); }
         }
@@ -104,32 +107,84 @@ namespace Armoury
                     if (a == null || !a.IsHuman || !a.IsActive()) continue;
                     if (a.Team == null || (a.Team != m.PlayerTeam && !a.Team.IsPlayerAlly)) continue;
                     if (a.Velocity.Length < 3.5f) continue;    // marsz i skradanie sa ciche
-                    AlarmAround(a, radius);
+                    // plyta dudni, skora szepcze: waga pancerza dokladana do halasu
+                    float kg = 0f;
+                    try { kg = a.SpawnEquipment.GetTotalWeightOfArmor(true); } catch { }
+                    CautionAround(a, radius + kg * MathF.Max(0f, s.HideoutNoisePerArmorKg));
                 }
             }
             catch (Exception e) { Log.Error("HideoutAlarm.Noise", e); }
         }
 
-        /// <summary>Budzi obsade kryjowki (wrogow gracza) w promieniu od ofiary.</summary>
-        private void AlarmAround(Agent victim, float radius)
+        /// <summary>
+        /// ZANIEPOKOJENIE (Jeff: "najpierw idzie sprawdzic, alarm dopiero jak
+        /// cos zobaczy"). Kroki przechodnia nie stawiaja obozu na nogi -
+        /// patrolujacy w zasiegu przechodzi w Cautious (bron w dloni, rozglada
+        /// sie, silnik sam go poprowadzi); pelny alarm robi dopiero walka
+        /// albo to, co zobaczy na wlasne oczy (natywny wzrok).
+        /// </summary>
+        private void CautionAround(Agent noisy, float radius)
         {
             try
             {
                 var m = Mission;
                 if (m == null || m.PlayerTeam == null || radius <= 0f) return;
-                var point = victim.Position;
-                int woken = 0;
+                var point = noisy.Position;
                 foreach (var a in m.Agents)
                 {
-                    if (a == null || a == victim || !a.IsHuman || !a.IsActive()) continue;
+                    if (a == null || !a.IsHuman || !a.IsActive()) continue;
                     if (a.Team == null || !a.Team.IsEnemyOf(m.PlayerTeam)) continue;
-                    if (a.CurrentWatchState == Agent.WatchState.Alarmed) continue;
+                    if (a.CurrentWatchState != Agent.WatchState.Patrolling) continue;   // czujnego nie cofamy
                     if (a.Position.Distance(point) > radius) continue;
-                    a.SetAlarmState(Agent.AIStateFlag.Alarmed);
-                    woken++;
+                    a.SetAlarmState(Agent.AIStateFlag.Cautious);
+                }
+            }
+            catch (Exception e) { Log.Error("HideoutAlarm.CautionAround", e); }
+        }
+
+        /// <summary>
+        /// SZTAFETA KRZYKU (Jeff: "obudzony tez krzyczy i budzi nastepnych").
+        /// Pierwszy krag budzi sie w firstRadius od zrodla; kazdy OBUDZONY
+        /// krzyczy dalej w relayRadius od SIEBIE - alarm skacze od czlowieka
+        /// do czlowieka, poki lancuch ludzi siega, ale nigdy nie przeskakuje
+        /// pustki wiekszej niz jeden krzyk. Bezpiecznik na 64 kregi.
+        /// </summary>
+        private void AlarmAround(Agent victim, float firstRadius, float relayRadius)
+        {
+            try
+            {
+                var m = Mission;
+                if (m == null || m.PlayerTeam == null || firstRadius <= 0f) return;
+                var s = Settings.Current;
+                bool relay = s != null && s.HideoutAlarmRelay && relayRadius > 0f;
+
+                var wave = new List<TaleWorlds.Library.Vec3> { victim.Position };
+                float radius = firstRadius;
+                int woken = 0, rings = 0;
+                while (wave.Count > 0 && rings < 64)
+                {
+                    rings++;
+                    var next = new List<TaleWorlds.Library.Vec3>();
+                    foreach (var a in m.Agents)
+                    {
+                        if (a == null || a == victim || !a.IsHuman || !a.IsActive()) continue;
+                        if (a.Team == null || !a.Team.IsEnemyOf(m.PlayerTeam)) continue;
+                        if (a.CurrentWatchState == Agent.WatchState.Alarmed) continue;   // juz krzyczal
+                        bool inRange = false;
+                        foreach (var p in wave)
+                            if (a.Position.Distance(p) <= radius) { inRange = true; break; }
+                        if (!inRange) continue;
+                        a.SetAlarmState(Agent.AIStateFlag.Alarmed);
+                        woken++;
+                        if (relay) next.Add(a.Position);
+                    }
+                    if (!relay) break;
+                    wave = next;
+                    radius = relayRadius;
                 }
                 if (woken > 0)
-                    Log.Info("HideoutAlarm: walka obudzila " + woken + " zbojcow (promien " + (int)radius + " m).");
+                    Log.Info("HideoutAlarm: alarm obudzil " + woken + " zbojcow w " + rings + " kregach (start "
+                             + (int)firstRadius + " m, sztafeta " + (int)relayRadius + " m).");
             }
             catch (Exception e) { Log.Error("HideoutAlarm.AlarmAround", e); }
         }
