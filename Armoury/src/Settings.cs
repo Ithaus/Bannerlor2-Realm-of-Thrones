@@ -227,7 +227,8 @@ namespace Armoury
         public float HideoutHearDay = 10f;                 // meters a RUNNING man is heard by day - the camp's own bustle masks a lot
         public float HideoutHearNight = 20f;               // meters a RUNNING man is heard at night - silence carries sound, so sneak at a walk
         public bool HideoutAlarmRelay = true;              // a woken man shouts too: the alarm leaps man to man while each next stands within scream range of the last - never across the whole camp at once
-        public float HideoutNoisePerArmorKg = 0.4f;        // every kilogram of worn armour adds this many meters to a RUNNING man's noise - plate thunders, leather whispers
+        public float HideoutNoisePerArmorKg = 0.2f;        // every kilogram of worn armour adds this many meters to a RUNNING man's noise - plate thunders, leather whispers
+        public bool HideoutAlarmVoice = true;              // the alarm is HEARD: one man in every ring of the relay lets out a real battle yell (the game's own voice line)
         public bool SightCycleEnabled = true;              // eyes follow the sun: every party sees further by day and shorter after dark
         public float DaySightFactor = 1.15f;               // spotting range in daylight, times this
         public float NightSightFactor = 0.65f;             // spotting range at night - the cut is mild, for you HEAR more after dark: a marching column is loud

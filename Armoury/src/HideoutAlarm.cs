@@ -165,6 +165,7 @@ namespace Armoury
                 {
                     rings++;
                     var next = new List<TaleWorlds.Library.Vec3>();
+                    Agent crier = null;
                     foreach (var a in m.Agents)
                     {
                         if (a == null || a == victim || !a.IsHuman || !a.IsActive()) continue;
@@ -176,8 +177,19 @@ namespace Armoury
                         if (!inRange) continue;
                         a.SetAlarmState(Agent.AIStateFlag.Alarmed);
                         woken++;
+                        if (crier == null) crier = a;
                         if (relay) next.Add(a.Position);
                     }
+                    // SLYCHAC ALARM (Jeff: "realny krzyk audio"): jeden czlowiek
+                    // na krag drze sie prawdziwym okrzykiem gry - lancuch
+                    // pojedynczych wrzaskow niesie sie przez oboz, nie chor
+                    if (crier != null && s != null && s.HideoutAlarmVoice)
+                        try
+                        {
+                            crier.MakeVoice(SkinVoiceManager.VoiceType.Yell,
+                                SkinVoiceManager.CombatVoiceNetworkPredictionType.NoPrediction);
+                        }
+                        catch { }
                     if (!relay) break;
                     wave = next;
                     radius = relayRadius;

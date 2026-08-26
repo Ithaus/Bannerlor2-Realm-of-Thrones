@@ -17,6 +17,16 @@
 
 ---
 
+## 2026-08-26 — kryjowka: realny okrzyk alarmu (audio) + halas 0,2 m/kg
+**Mod:** Armoury | **Pliki:** `src/HideoutAlarm.cs`, `src/Settings.cs`
+**Zmiany:** (1) sztafeta alarmu jest SLYSZALNA: jeden czlowiek na kazdy krag fali wydaje
+prawdziwy okrzyk bojowy gry (Agent.MakeVoice, VoiceType.Yell) - lancuch pojedynczych
+wrzaskow niesie sie przez oboz, celowo nie chor wszystkich naraz (lekcja z BrokenMen);
+wylacznik Hideout Alarm Voice (ON). (2) Hideout Noise Per Armor Kg z 0,4 na 0,2 m/kg
+(decyzja Jeffa) - skora ~21,6 m noca, plyta ~26 m.
+**Ryzyko / co sprawdzic:** przy alarmie slychac okrzyki kolejnych ludzi; zadnego chóru.
+**Status:** DO SPRAWDZENIA
+
 ## 2026-08-26 — kryjowka: sztafeta krzyku, zaniepokojenie zamiast alarmu, halas wg wagi pancerza
 **Mod:** Armoury | **Pliki:** `src/HideoutAlarm.cs`, `src/Settings.cs`
 **Zmiany (trzy zamowienia Jeffa):**
