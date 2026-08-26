@@ -76,8 +76,10 @@ namespace Armoury
                 if (__result.Length > 2 && __result[0] == '[') return;      // juz podpisane
                 __result = "[" + Roman(Recipes.Grade(item)) + "] " + __result;
                 // wzor jeszcze nieodkryty - widac go na polce, ale kowadlo go nie przyjmie
-                // (Jeff: "te ktore mozna sa normalnie, a te ktorych nie mozna na szaro")
-                if (!RangedLore.KnownOf(item)) __result += "   - LOCKED";
+                // (Jeff: "te ktore mozna sa normalnie, a te ktorych nie mozna na szaro");
+                // gdy ForgeView wstrzyknal kolorowe warianty wiersza (ArmourListColour),
+                // dopisek jest zbedny - ale zostaje jako zapas, gdyby latka prefabu nie weszla
+                if (!RangedLore.KnownOf(item) && !ColourOn()) __result += "   - LOCKED";
             }
             catch (Exception e) { Log.Error("NamePostfix", e); }
         }
@@ -100,6 +102,27 @@ namespace Armoury
                 case ItemObject.ItemTypeEnum.Horse:         return "Mounts";
                 default:                                    return "Other";
             }
+        }
+
+        // ---- czy ForgeView.ArmourListColour realnie pokolorowal liste (reflection, bez twardej zaleznosci) ----
+        private static FieldInfo _colourApplied;
+        private static bool _colourLooked;
+
+        private static bool ColourOn()
+        {
+            try
+            {
+                if (!_colourLooked)
+                {
+                    _colourLooked = true;
+                    var t = FindType("ForgeView.ArmourListColour");
+                    if (t != null) _colourApplied = t.GetField("Applied", BindingFlags.Public | BindingFlags.Static);
+                }
+                // pole czytane za kazdym razem: Applied ustawia sie dopiero przy pierwszym
+                // zaladowaniu prefabu ArmorCraftingCategory, nie na starcie gry
+                return _colourApplied != null && _colourApplied.GetValue(null) is bool b && b;
+            }
+            catch { return false; }
         }
 
         private static string Roman(int n)
