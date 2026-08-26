@@ -68,18 +68,6 @@ namespace Armoury
         [SettingPropertyGroup("Cost by piece")]
         public float FiddlyStaminaBonus { get; set; } = 0.5f;
 
-        [SettingPropertyFloatingInteger("Legendary Perk Jackpot Bonus", 0.00f, 1.00f, "0.00", HintText = "added chance of a masterpiece from the smithing perks")]
-        [SettingPropertyGroup("Cost by piece")]
-        public float LegendaryPerkJackpotBonus { get; set; } = 0.08f;
-
-        [SettingPropertyFloatingInteger("Shoddy Chance At Zero Margin", 0.00f, 1.40f, "0.00", HintText = "a piece that survives the anvil can still come off SHODDY - this is the chance of that when your Smithing barely meets the recipe (lower stats, lower worth, like a botched blade)")]
-        [SettingPropertyGroup("Cost by piece")]
-        public float ShoddyChanceAtZeroMargin { get; set; } = 0.35f;
-
-        [SettingPropertyFloatingInteger("Shoddy Margin Range", 0.00f, 240.00f, "0.00", HintText = "that chance fades to nothing this far above the recipe's requirement, and grows when you work beneath it")]
-        [SettingPropertyGroup("Cost by piece")]
-        public float ShoddyMarginRange { get; set; } = 60f;
-
         [SettingPropertyFloatingInteger("Charcoal Per Iron", 0.00f, 2.40f, "0.00", HintText = "charcoal burned per unit of iron")]
         [SettingPropertyGroup("Cost by piece")]
         public float CharcoalPerIron { get; set; } = 0.6f;
@@ -339,10 +327,6 @@ namespace Armoury
         [SettingPropertyFloatingInteger("Smelting Skill Bonus", 0.00f, 1.00f, "0.00", HintText = "extra recovery per point of Smithing")]
         [SettingPropertyGroup("Mending it yourself")]
         public float SmeltingSkillBonus { get; set; } = 0.002f;
-
-        [SettingPropertyFloatingInteger("Jackpot Chance", 0.00f, 1.00f, "0.00", HintText = "chance of a masterpiece beyond what your skill would give")]
-        [SettingPropertyGroup("Mending it yourself")]
-        public float JackpotChance { get; set; } = 0.04f;
 
         [SettingPropertyBool("Wear Enabled", HintText = "gear loses condition with use")]
         [SettingPropertyGroup("Wear and tear")]
@@ -884,9 +868,6 @@ namespace Armoury
             s.ClassCostShield = ClassCostShield;
             s.ClassCostRanged = ClassCostRanged;
             s.FiddlyStaminaBonus = FiddlyStaminaBonus;
-            s.LegendaryPerkJackpotBonus = LegendaryPerkJackpotBonus;
-            s.ShoddyChanceAtZeroMargin = ShoddyChanceAtZeroMargin;
-            s.ShoddyMarginRange = ShoddyMarginRange;
             s.CharcoalPerIron = CharcoalPerIron;
             s.StaminaPerTier = StaminaPerTier;
             s.ForgeTakesTime = ForgeTakesTime;
@@ -952,7 +933,6 @@ namespace Armoury
             s.LegendarySkillNeeded = LegendarySkillNeeded;
             s.SmeltingReturnShare = SmeltingReturnShare;
             s.SmeltingSkillBonus = SmeltingSkillBonus;
-            s.JackpotChance = JackpotChance;
             s.WearEnabled = WearEnabled;
             s.ShowConditionPercent = ShowConditionPercent;
             s.ConditionScalesStats = ConditionScalesStats;

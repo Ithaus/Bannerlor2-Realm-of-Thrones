@@ -71,59 +71,142 @@ namespace Armoury
 
         internal static ItemModifier RollQuality(ItemObject item, Recipes.Recipe r, int tempo) { return RollQuality(item, r, tempo, null); }
 
-        /// <summary>Jakosc wyrobu wedle reki kowala, ktory przy nim stal.</summary>
+        /// <summary>
+        /// JAKOSC 1:1 Z BRONIA (plan kuznia-1do1, krok 1). Wierna kopia
+        /// DefaultSmithingModel.GetCraftedWeaponModifier: sigmoidy na roznicy
+        /// (bonus Smithing - trudnosc), perki Experienced/Master/Legendary Smith
+        /// przesuwaja szanse, na koncu losowy modyfikator wylosowanej jakosci
+        /// z grupy PRZEDMIOTU - dla pancerza dziala identycznie jak dla broni,
+        /// tylko nazwy sa pancerne (Battered/Rusty zamiast Dull). Trudnosc =
+        /// SkillNeeded receptury. Tempo (nasze, vanilla go nie ma) przesuwa
+        /// wynik: z dbaloscia +20, w pospiechu ~-17.
+        /// </summary>
         internal static ItemModifier RollQuality(ItemObject item, Recipes.Recipe r, int tempo, Hero who)
         {
             try
             {
-                var s = Settings.Current;
                 var smith = who ?? Hero.MainHero;
                 var group = item.ItemComponent != null ? item.ItemComponent.ItemModifierGroup : null;
                 if (group == null) return null;
 
-                int skill = smith.GetSkillValue(DefaultSkills.Crafting);
-                float margin = skill - r.SkillNeeded;
-
-                // ROBOTA PONIZEJ NORMY (Jeff: "mozesz zepsuc cos i wtedy cechy sa
-                // nizsze"). Wyrob, ktory nie pekl na kowadle, wcale nie musi byc
-                // udany - przy cienkiej wprawie schodzi z niego kruche, zle
-                // hartowane zelastwo o gorszych cechach. Tak samo jak przy broni
-                // w wanilii i przy pancerzach u Banner Kings.
-                var bad = new List<ItemModifier>();
-                foreach (var m in group.ItemModifiers)
-                    if (m != null && m.PriceMultiplier < 1f && m.PriceMultiplier > 0f) bad.Add(m);
-                if (bad.Count > 0)
+                var probs = QualityProbabilities(r.SkillNeeded, smith, tempo);
+                var quality = probs[probs.Count - 1].Q;
+                float roll = MBRandom.RandomFloat;
+                foreach (var qp in probs)
                 {
-                    float slop = MathF.Max(1f, s.ShoddyMarginRange);
-                    float shoddy = MathF.Max(0f, s.ShoddyChanceAtZeroMargin) * (1f - MathF.Max(0f, margin) / slop);
-                    if (margin < 0f) shoddy = MathF.Min(0.9f, shoddy * (1f + (-margin) / slop));
-                    if (shoddy > 0f && MBRandom.RandomFloat < shoddy)
-                    {
-                        bad.Sort((a, b) => b.PriceMultiplier.CompareTo(a.PriceMultiplier));  // najlagodniejszy pierwszy
-                        int worst = margin < -slop ? bad.Count - 1 : 0;                      // dno tylko przy calkowitej niewprawie
-                        return bad[MathF.Min(bad.Count - 1, worst)];
-                    }
+                    if (roll <= qp.P) { quality = qp.Q; break; }
+                    roll -= qp.P;
                 }
-
-                var good = new List<ItemModifier>();
-                foreach (var m in group.ItemModifiers)
-                    if (m != null && m.PriceMultiplier > 1f) good.Add(m);
-                if (good.Count == 0) return null;
-                good.Sort((a, b) => a.PriceMultiplier.CompareTo(b.PriceMultiplier));   // od najslabszego
-
-                // 100 punktow ponad wymog = realna szansa na mistrzowski wyrob
-                float chance = MathF.Min(0.85f, (margin / 200f) * Project.QualityFactor(tempo));
-                float jackpot = s.JackpotChance;
-                if (smith.GetPerkValue(DefaultPerks.Crafting.LegendarySmith)) jackpot += s.LegendaryPerkJackpotBonus;
-                if (MBRandom.RandomFloat < jackpot) return good[good.Count - 1];   // rzecz mistrzowska
-                if (MBRandom.RandomFloat > chance) return null;                 // zwykly wyrob
-
-                int idx = 0;
-                if (margin > 150f && MBRandom.RandomFloat < 0.35f) idx = good.Count - 1;
-                else if (margin > 80f && MBRandom.RandomFloat < 0.5f) idx = MathF.Min(good.Count - 1, 1);
-                return good[idx];
+                quality = CapQualityByTier(quality, Recipes.Grade(item));
+                var mods = group.GetModifiersBasedOnQuality(quality);
+                if (mods == null || mods.Count == 0) return null;
+                return mods.Count == 1 ? mods[0] : mods[MBRandom.RandomInt(0, mods.Count)];
             }
             catch (Exception e) { Log.Error("RollQuality", e); return null; }
+        }
+
+        private struct QP
+        {
+            public ItemQuality Q; public float P;
+            public QP(ItemQuality q, float p) { Q = q; P = p; }
+        }
+
+        private static float Sigmoid(float x, float mean, float k)
+        {
+            double num = Math.Exp(k * (x - mean));
+            return (float)(num / (1.0 + num));
+        }
+
+        /// <summary>Vanillowe szanse jakosci (DefaultSmithingModel.GetModifierQualityProbabilities, co do liczby).</summary>
+        private static List<QP> QualityProbabilities(int difficulty, Hero smith, int tempo)
+        {
+            var en = new ExplainedNumber(-difficulty);
+            Helpers.SkillHelper.AddSkillBonusForCharacter(
+                TaleWorlds.CampaignSystem.DefaultSkillEffects.SmithingLevel,
+                smith.CharacterObject, ref en);
+            en.LimitMin(-300f); en.LimitMax(300f);
+            float x = en.ResultNumber + (Project.QualityFactor(tempo) - 1f) * 20f;
+
+            var list = new List<QP>
+            {
+                new QP(ItemQuality.Poor,       0.36f * (1f - Sigmoid(x, -70f, 0.018f))),
+                new QP(ItemQuality.Inferior,   0.45f * (1f - Sigmoid(x, -55f, 0.018f))),
+                new QP(ItemQuality.Common,     Sigmoid(x, 25f, 0.018f)),
+                new QP(ItemQuality.Fine,       0.36f * Sigmoid(x, 40f, 0.018f)),
+                new QP(ItemQuality.Masterwork, 0.27f * Sigmoid(x, 70f, 0.018f)),
+                new QP(ItemQuality.Legendary,  0.18f * Sigmoid(x, 115f, 0.018f))
+            };
+            Normalize(list);
+
+            var ignore = new List<ItemQuality>();
+            bool exp = smith.GetPerkValue(DefaultPerks.Crafting.ExperiencedSmith);
+            if (exp)
+            {
+                ignore.Add(ItemQuality.Masterwork); ignore.Add(ItemQuality.Legendary);
+                AdjustProbabilities(list, ItemQuality.Fine, DefaultPerks.Crafting.ExperiencedSmith.PrimaryBonus, ignore);
+            }
+            bool master = smith.GetPerkValue(DefaultPerks.Crafting.MasterSmith);
+            if (master)
+            {
+                ignore.Clear(); ignore.Add(ItemQuality.Legendary);
+                if (exp) ignore.Add(ItemQuality.Fine);
+                AdjustProbabilities(list, ItemQuality.Masterwork, DefaultPerks.Crafting.MasterSmith.PrimaryBonus, ignore);
+            }
+            if (smith.GetPerkValue(DefaultPerks.Crafting.LegendarySmith))
+            {
+                ignore.Clear();
+                if (exp) ignore.Add(ItemQuality.Fine);
+                if (master) ignore.Add(ItemQuality.Masterwork);
+                int skillValue = smith.GetSkillValue(DefaultSkills.Crafting);
+                float amount = DefaultPerks.Crafting.LegendarySmith.PrimaryBonus + Math.Max(skillValue - 275, 0f) / 5f * 0.01f;
+                AdjustProbabilities(list, ItemQuality.Legendary, amount, ignore);
+            }
+            return list;
+        }
+
+        private static void Normalize(List<QP> list)
+        {
+            float sum = 0f;
+            for (int i = 0; i < list.Count; i++) sum += list[i].P;
+            if (sum <= 0f) return;
+            for (int i = 0; i < list.Count; i++) list[i] = new QP(list[i].Q, list[i].P / sum);
+        }
+
+        /// <summary>Wierna kopia vanillowego AdjustModifierProbabilities (przesuniecie szans przez perk).</summary>
+        private static void AdjustProbabilities(List<QP> list, ItemQuality target, float amount, List<ItemQuality> ignore)
+        {
+            int payers = list.Count - (ignore.Count + 1);
+            if (payers <= 0) return;
+            float share = amount / payers;
+            float carry = 0f;
+            for (int i = 0; i < list.Count; i++)
+            {
+                var qp = list[i];
+                if (qp.Q == target)
+                {
+                    list[i] = new QP(qp.Q, qp.P + amount);
+                }
+                else if (!ignore.Contains(qp.Q))
+                {
+                    float left = qp.P - (share + carry);
+                    if (left < 0f) { carry = -left; left = 0f; }
+                    else carry = 0f;
+                    list[i] = new QP(qp.Q, left);
+                }
+            }
+            Normalize(list);
+        }
+
+        /// <summary>
+        /// Vanillowy sufit jakosci od tieru: tam srednia tieru CZESCI, u nas tier
+        /// WYROBU (Grade). Tier 5-6 bez limitu, tier 4 najwyzej Masterwork,
+        /// tier 1-3 najwyzej Fine - tak samo sciaga sufity oryginal.
+        /// </summary>
+        private static ItemQuality CapQualityByTier(ItemQuality q, int grade)
+        {
+            if (grade >= 5) return q;
+            if (grade == 4) return q >= ItemQuality.Legendary ? ItemQuality.Masterwork : q;
+            return q >= ItemQuality.Masterwork ? ItemQuality.Fine : q;
         }
 
         /// <summary>Przetapianie pancerza na metal - gra tego nie potrafi, liczymy po swojemu.</summary>

@@ -17,6 +17,26 @@
 
 ---
 
+## 2026-08-26 — kuznia 1:1 krok 1: jakosc pancerzy ta sama formula co bron
+**Mod:** Armoury | **Pliki:** `src/Forge.cs`, `src/Settings.cs`
+**Problem:** jakosc naszych wyrobow (pancerze, luki) chodzila po wlasnej krzywej
+(Shoddy*/Jackpot), innej niz vanilla kucie broni - Jeff kazal zrownac 1:1
+(docs/PLAN-kuznia-1do1.md).
+**Zmiana:** RollQuality to teraz wierna kopia DefaultSmithingModel.GetCraftedWeaponModifier:
+ExplainedNumber(-trudnosc) + bonus Smithing (SkillHelper/DefaultSkillEffects, limit +-300),
+sigmoidy k=0,018 (Poor 0,36/Inferior 0,45/Common/Fine 0,36/Masterwork 0,27/Legendary 0,18
+przy progach -70/-55/25/40/70/115), normalizacja, perki Experienced/Master/Legendary Smith
+przesuwaja szanse jak w oryginale (Legendary + (skill-275)/5 x 1%), sufit od tieru wyrobu
+(1-3 max Fine, 4 max Masterwork, 5-6 bez limitu; vanillowy AdjustQualityRegardingDesignTier
+liczony z tieru WYROBU zamiast sredniej czesci), na koncu GetModifiersBasedOnQuality na
+grupie modyfikatorow przedmiotu. Tempo (nasze): z dbaloscia +20 do wyniku, w pospiechu ~-17.
+Ustawienia ShoddyChanceAtZeroMargin, ShoddyMarginRange, JackpotChance,
+LegendaryPerkJackpotBonus USUNIETE (stare XML-y je zignoruja).
+**Ryzyko / co sprawdzic:** rozklad jakosci wykutych pancerzy ma odpowiadac broni przy tym
+samym marginesie skilla; przy niskim skillu pojawiaja sie Battered/Rusty (odpowiedniki Poor/
+Inferior), przy wysokim Fine/Masterwork/Legendary wedle tieru.
+**Status:** DO SPRAWDZENIA
+
 ## 2026-08-26 — alarm w kryjowce: walka budzi oboz, cichy strzal nie
 **Mod:** Armoury | **Pliki:** `src/HideoutAlarm.cs` (NOWY), `src/SubModuleMain.cs`, `src/Settings.cs`
 **Problem:** w kryjowce zbojcy 10 m od bijatyki udaja, ze nic sie nie dzieje - vanilla budzi

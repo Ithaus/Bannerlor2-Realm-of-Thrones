@@ -25,9 +25,6 @@ namespace Armoury
         public float ClassCostShield = 0.55f;              // shield - timber, hide and a rim of iron
         public float ClassCostRanged = 0.45f;              // bows and bolts - wood, horn and sinew
         public float FiddlyStaminaBonus = 0.5f;            // how much more the fiddly pieces take out of you
-        public float LegendaryPerkJackpotBonus = 0.08f;    // added chance of a masterpiece from the smithing perks
-        public float ShoddyChanceAtZeroMargin = 0.35f;     // a piece that survives the anvil can still come off SHODDY - this is the chance of that when your Smithing barely meets the recipe (lower stats, lower worth, like a botched blade)
-        public float ShoddyMarginRange = 60f;              // that chance fades to nothing this far above the recipe's requirement, and grows when you work beneath it
         public float CharcoalPerIron = 0.6f;               // charcoal burned per unit of iron
         public int StaminaPerTier = 25;                    // crafting stamina burned per tier
         // --- Time at the anvil ---
@@ -98,7 +95,6 @@ namespace Armoury
         public int LegendarySkillNeeded = 250;             // no legend leaves the forge below this Smithing
         public float SmeltingReturnShare = 0.45f;          // share of the metal that comes back when you break a piece down
         public float SmeltingSkillBonus = 0.002f;          // extra recovery per point of Smithing
-        public float JackpotChance = 0.04f;                // chance of a masterpiece beyond what your skill would give
 
         // --- Wear and tear ---
         public bool WearEnabled = true;                    // gear loses condition with use
