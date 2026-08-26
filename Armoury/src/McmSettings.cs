@@ -752,6 +752,10 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public bool CampTentIcon { get; set; } = true;
 
+        [SettingPropertyBool("Camp Battle Props Enabled", HintText = "EXPERIMENTAL: attacked while encamped, the field battle gets your camp dressed on it - tents, fire, torches around your line (unknown prefabs are skipped and logged)")]
+        [SettingPropertyGroup("A night's rest")]
+        public bool CampBattlePropsEnabled { get; set; } = false;
+
         [SettingPropertyBool("Combat Xp Fix Enabled", HintText = "RBM pays the same XP for an arena tap and a battlefield kill - restore the proportions")]
         [SettingPropertyGroup("The worth of a lesson")]
         public bool CombatXpFixEnabled { get; set; } = true;
@@ -1039,6 +1043,7 @@ namespace Armoury
             s.AiNightsAwakeInChase = AiNightsAwakeInChase;
             s.AiCampDangerRadius = AiCampDangerRadius;
             s.CampTentIcon = CampTentIcon;
+            s.CampBattlePropsEnabled = CampBattlePropsEnabled;
             s.CombatXpFixEnabled = CombatXpFixEnabled;
             s.ArenaXpPercent = ArenaXpPercent;
             s.TournamentXpPercent = TournamentXpPercent;

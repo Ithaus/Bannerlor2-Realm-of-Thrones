@@ -78,6 +78,9 @@ namespace Armoury
                     mission.AddMissionBehavior(new GuardMaster());
                 if (Settings.Current.WoundedFleeEnabled && mission != null)
                     mission.AddMissionBehavior(new BrokenMen());
+                if (Settings.Current.CampBattlePropsEnabled && Campaign.Current != null && mission != null
+                    && NightRest.PlayerCamped)
+                    mission.AddMissionBehavior(new CampScene());
             }
             catch (Exception e) { Log.Error("OnMissionBehaviorInitialize", e); }
         }

@@ -29,6 +29,7 @@ namespace Armoury
         // dlug snu 0..5 i przespane godziny biezacej nocy
         internal static int Debt;
         private static float _restTonight;
+        private static bool _credited;                  // dzisiejszy sen juz rozliczony (od reki, nie o swicie)
         private static Vec2 _lastPos;
         private static bool _hadPos;
         private static CampaignTime _sleepUntil = CampaignTime.Zero;
@@ -53,6 +54,7 @@ namespace Armoury
                 var pos = mp.GetPosition2D;
                 bool moved = _hadPos && pos.Distance(_lastPos) > 0.35f;
                 _lastPos = pos; _hadPos = true;
+                if (moved) PlayerCamped = false;   // ruszyl sie = oboz zwinal (takze oboz BK)
 
                 int h = CampaignTime.Now.GetHourOfDay;
                 bool night = h >= 21 || h <= 5;
@@ -63,6 +65,22 @@ namespace Armoury
                 // spac mozna O KAZDEJ porze - noc liczy sie w calosci, dzien slabiej
                 // (gwar obozu, upal, swiatlo); rachunek zamyka sie o swicie
                 if (resting) _restTonight += night ? 1f : MBMath.ClampFloat(s.DayRestFactor, 0.1f, 1f);
+
+                // ROZLICZENIE OD REKI (Jeff: "sen ma byc aktualizowany zaraz po
+                // wypoczynku, nie czekac do przeliczenia") - gdy tylko godziny
+                // snu sie uzbieraja, dlug schodzi natychmiast; swit juz tego
+                // nie liczy drugi raz
+                if (!_credited && _restTonight >= Math.Max(1f, s.SleepHoursNeeded))
+                {
+                    _credited = true;
+                    if (Debt > 0)
+                    {
+                        Debt = Math.Max(0, Debt - 2);   // dobra noc splaca dwie zle
+                        Msg(Debt == 0 ? "Well slept - the men are fresh again."
+                                      : "Some sleep at last, but the men still owe the pillow (" + Debt + ").",
+                            Colors.Green);
+                    }
+                }
 
                 if (h == 6) SettleNight(s);
                 AiNightCamp(s, h);
@@ -181,7 +199,10 @@ namespace Armoury
                 foreach (var mp in MobileParty.All)
                 {
                     if (mp == null || !mp.IsActive || mp == MobileParty.MainParty) continue;
-                    if (!mp.IsLordParty && !mp.IsCaravan) continue;
+                    // bandyci obozuja TYLKO za przelacznikiem (Ai Bandits Camp Too,
+                    // domyslnie OFF) - to wlaczenie ich hurtem polozylo gre 25.08,
+                    // wiec wraca ostroznie i bez namiotow ponad limit
+                    if (!mp.IsLordParty && !mp.IsCaravan && !(s.AiBanditsCampToo && mp.IsBandit)) continue;
                     if (mp.CurrentSettlement != null || mp.MapEvent != null || mp.BesiegerCamp != null) continue;
                     if (mp.IsCurrentlyAtSea) continue;
                     if (mp.Army != null && mp.Army.LeaderParty != mp) continue;   // eskorta idzie za wodzem
@@ -208,7 +229,10 @@ namespace Armoury
                     RememberOrder(mp);              // po co wyszedl - zapisane przed snem
                     mp.Ai.DisableForHours(1);       // spia godzine; nocny tick odnowi
                     mp.SetMoveModeHold();
-                    if (s.CampTentIcon && !_tented.Contains(mp)) { Tent(mp, true); _tented.Add(mp); }
+                    // limit ikon AiTentCap (reszta spi bez obrazka) - wlasnie brak
+                    // tego limitu przy setkach partii konczyl sie CTD
+                    if (s.CampTentIcon && _tented.Count < Math.Max(0, s.AiTentCap) && !_tented.Contains(mp))
+                    { Tent(mp, true); _tented.Add(mp); }
                 }
                 if (s.CampTentIcon) ReassertTents();   // konie nie wracaja na namioty
             }
@@ -216,14 +240,23 @@ namespace Armoury
         }
 
         // ---------------------------------------------------- namiot na mapie
-        private static bool _tentBroken;
+        // ZASADA z CLAUDE.md: licz potkniecia, nie gas funkcji. Stary _tentBroken
+        // gasil namioty CALEMU swiatu po jednej wywrotce na jednej partii
+        // (Jeff: "kiedys dzialalo, potem sie popsulo"). Teraz: 3 wywrotki
+        // Z RZEDU wylaczaja, kazdy sukces zeruje licznik.
+        private static int _tentStrikes;
+        private const int TentStrikesMax = 3;
+
+        /// <summary>Gracz stoi obozem TERAZ - dla bitwy w obozie (CampScene). Stan niezalezny od ikony.</summary>
+        internal static bool PlayerCamped;
 
         internal static void Tent(MobileParty mp, bool on)
         {
             try
             {
+                if (mp != null && mp == MobileParty.MainParty) PlayerCamped = on;
                 var s = Settings.Current;
-                if (_tentBroken || mp == null || s == null || !s.CampTentIcon) return;
+                if (_tentStrikes >= TentStrikesMax || mp == null || s == null || !s.CampTentIcon) return;
                 var tMgr = QuartermasterLaw.FindType("SandBox.View.Map.Managers.MobilePartyVisualManager");
                 var cur = tMgr != null ? tMgr.GetProperty("Current",
                     BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static) : null;
@@ -243,7 +276,7 @@ namespace Armoury
                     // ktora stawia namiot Z CHORAGWIA klanu - wolamy ja wprost.
                     var mTent = vis.GetType().GetMethod("AddTentEntityForParty",
                         BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                    if (mTent == null) { _tentBroken = true; Log.Info("Tent: brak AddTentEntityForParty - namioty wylaczone."); return; }
+                    if (mTent == null) { _tentStrikes = TentStrikesMax; Log.Info("Tent: brak AddTentEntityForParty - namioty wylaczone."); return; }
                     if (removeAll != null) removeAll.Invoke(strat, null);
                     mTent.Invoke(vis, new object[] { strat, mp.Party, false });
                     // figurki jezdzca i konia zyja OSOBNO od ikony - chowamy je,
@@ -263,8 +296,14 @@ namespace Armoury
                         try { mp.Party.SetVisualAsDirty(); } catch { }
                     }
                 }
+                _tentStrikes = 0;   // udalo sie - licznik potkniec od zera
             }
-            catch (Exception e) { _tentBroken = true; Log.Error("Tent", e); }
+            catch (Exception e)
+            {
+                _tentStrikes++;
+                Log.Error("Tent (potkniecie " + _tentStrikes + "/" + TentStrikesMax + ")", e);
+                if (_tentStrikes >= TentStrikesMax) Log.Info("Tent: " + TentStrikesMax + " wywrotki z rzedu - namioty wylaczone do konca sesji.");
+            }
         }
 
         /// <summary>Figurki czlowieka, konia i mulow karawany - widoczne albo nie.</summary>
@@ -321,21 +360,14 @@ namespace Armoury
 
         private static void SettleNight(Settings s)
         {
-            bool slept = _restTonight >= Math.Max(1f, s.SleepHoursNeeded);
+            // splata poszla juz OD REKI (patrz OnHourly); swit tylko zamyka dobe
+            // i dolicza dlug tym, ktorzy nocy nie przespali
+            bool slept = _credited || _restTonight >= Math.Max(1f, s.SleepHoursNeeded);
             _restTonight = 0f;
+            _credited = false;
             if (RotEnlisted()) { Debt = 0; return; }   // w sluzbie spisz, kiedy kaza
 
-            if (slept)
-            {
-                if (Debt > 0)
-                {
-                    Debt = Math.Max(0, Debt - 2);   // dobra noc splaca dwie zle
-                    Msg(Debt == 0 ? "Well slept - the men are fresh again."
-                                  : "Some sleep at last, but the men still owe the pillow (" + Debt + ").",
-                        Colors.Green);
-                }
-                return;
-            }
+            if (slept) return;
             Debt = Math.Min(5, Debt + 1);
             if (Debt == 1) Msg("The men marched through the night. One sleepless night - they bear it.", Colors.Yellow);
             else if (Debt == 2) Msg("Second night without sleep - the column drags its feet (speed -" + SpdPenalty[2] + "%).", Colors.Yellow);
@@ -446,6 +478,7 @@ namespace Armoury
                 var m = t.GetMethod("MakeCamp", BindingFlags.Public | BindingFlags.Instance);
                 if (beh == null || m == null) return false;
                 m.Invoke(beh, new object[] { MobileParty.MainParty });
+                PlayerCamped = true;
                 Msg("You pitch camp.", Colors.White);
                 return true;
             }
@@ -520,7 +553,14 @@ namespace Armoury
         /// </summary>
         private static void LeaveSleep()
         {
-            try { GameMenu.ExitToLast(); }
+            try
+            {
+                // pobudka zwija namiot - chyba ze WLASNY oboz dalej stoi
+                // (wtedy namiot nalezy do obozu, zwinie go "Break camp")
+                if (_sleepReturn != "arm_camp_wait")
+                    Tent(MobileParty.MainParty, false);
+                GameMenu.ExitToLast();
+            }
             catch (Exception e) { Log.Error("NightRest.LeaveSleep", e); }
         }
 
@@ -554,6 +594,11 @@ namespace Armoury
             try
             {
                 SetCampBackground(args);
+                // SEN = NAMIOT NA MAPIE (Jeff: "jak spimy, ikona konia/czlowieka
+                // ma sie zmienic w namiot"). Stawiamy raz, przy wejsciu w sen -
+                // nie co klatke (pulapka wizerunkow z CLAUDE.md)
+                if (MobileParty.MainParty != null && MobileParty.MainParty.CurrentSettlement == null)
+                    Tent(MobileParty.MainParty, true);
                 var s = Settings.Current;
                 float needed = s != null ? Math.Max(1f, s.SleepHoursNeeded) : 5f;
                 _sleepUntil = CampaignTime.HoursFromNow(14f);   // bezpiecznik: nikt nie spi wiecznie
@@ -609,7 +654,8 @@ namespace Armoury
         internal static string Export()
         {
             return Debt.ToString(CultureInfo.InvariantCulture) + ";" +
-                   _restTonight.ToString(CultureInfo.InvariantCulture);
+                   _restTonight.ToString(CultureInfo.InvariantCulture) + ";" +
+                   (_credited ? "1" : "0");
         }
 
         internal static void Import(string data)
@@ -620,6 +666,7 @@ namespace Armoury
                 var parts = data.Split(';');
                 if (parts.Length > 0) int.TryParse(parts[0], NumberStyles.Any, CultureInfo.InvariantCulture, out Debt);
                 if (parts.Length > 1) float.TryParse(parts[1], NumberStyles.Any, CultureInfo.InvariantCulture, out _restTonight);
+                _credited = parts.Length > 2 && parts[2] == "1";   // stary zapis (2 pola) = false
                 Debt = Math.Max(0, Math.Min(5, Debt));
             }
             catch { }

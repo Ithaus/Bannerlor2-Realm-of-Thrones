@@ -219,6 +219,7 @@ namespace Armoury
         public float AiNightsAwakeInChase = 1f;            // days a chasing or fleeing party may push on without sleep before it drops anyway
         public float AiCampDangerRadius = 6f;              // a hostile party this close keeps them marching - pursuit knows no bedtime
         public bool CampTentIcon = true;                   // pitched camps show a tent on the map (yours and theirs)
+        public bool CampBattlePropsEnabled = false;        // EXPERIMENTAL: attacked while encamped, the field battle gets your camp dressed on it - tents, fire, torches around your line (unknown prefabs are skipped and logged)
 
         // --- The worth of a lesson ---
         public bool CombatXpFixEnabled = true;             // RBM pays the same XP for an arena tap and a battlefield kill - restore the proportions
