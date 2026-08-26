@@ -1,0 +1,8 @@
+bin/
+obj/
+out/
+libs/*.dll
+libs/*.pdb
+*.user
+*.suo
+.vs/

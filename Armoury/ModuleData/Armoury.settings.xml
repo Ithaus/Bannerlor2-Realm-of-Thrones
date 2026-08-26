@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Armoury - settings. Changes take effect after a game restart. -->
+<Armoury>
+  <!-- FORGING ARMOUR: you work the anvil yourself, at a town smithy -->
+  <CraftingEnabled>true</CraftingEnabled>
+  <!-- Banner Kings' armour tab in the smithy screen does the forging; this menu keeps repair and smelting -->
+  <ForgeArmourEnabled>false</ForgeArmourEnabled>
+  <!-- real categories (Helmets / Gauntlets / Boots...) and [tier] labels in the Banner Kings armour tab -->
+  <TidyBannerKingsArmourList>true</TidyBannerKingsArmourList>
+  <SmithingSkillPerTier>45</SmithingSkillPerTier>   <!-- (tier-1) x this: tier 1 = 0, tier 2 = 45, tier 5 = 180, tier 6 = 225 -->
+  <IronPerWeightUnit>1.4</IronPerWeightUnit>         <!-- refined iron per pound of armour -->
+  <!-- PIECE CLASS: big plates waste stock, small pieces cost time instead -->
+  <ClassCostBody>1.15</ClassCostBody>
+  <ClassCostLeg>0.85</ClassCostLeg>
+  <ClassCostHead>0.60</ClassCostHead>
+  <ClassCostHand>0.40</ClassCostHand>
+  <ClassCostCape>0.65</ClassCostCape>
+  <ClassCostHorse>1.25</ClassCostHorse>
+  <ClassCostShield>0.55</ClassCostShield>
+  <ClassCostRanged>0.45</ClassCostRanged>
+  <FiddlyStaminaBonus>0.5</FiddlyStaminaBonus>      <!-- helmets and gauntlets take longer at the anvil -->
+  <LegendaryPerkJackpotBonus>0.08</LegendaryPerkJackpotBonus>
+  <CharcoalPerIron>0.6</CharcoalPerIron>
+  <StaminaPerTier>25</StaminaPerTier>                <!-- crafting stamina burned per tier -->
+  <!-- TIME AT THE ANVIL: work advances only on days spent in the settlement -->
+  <ForgeTakesTime>true</ForgeTakesTime>
+  <DaysPerTier>2.0</DaysPerTier>
+  <TempoHastyTime>0.5</TempoHastyTime>
+  <TempoHastyRisk>2.0</TempoHastyRisk>
+  <TempoCarefulTime>1.5</TempoCarefulTime>
+  <TempoCarefulRisk>0.5</TempoCarefulRisk>
+  <TempoCarefulQuality>2.0</TempoCarefulQuality>
+  <!-- EXPERIENCE: earned from difficulty, not from the price of the piece -->
+  <!-- XP is paid for days at the anvil and for difficulty, never for the price of the piece.
+       The game itself already throttles learning above your Learning Limit
+       (Endurance and Smithing focus), so we do not punish high skill a second time. -->
+  <XpPerDayPerTier>100</XpPerDayPerTier>       <!-- tier 5 plate, 10 days = 5000 raw XP -->
+  <XpFullCreditMargin>100</XpFullCreditMargin>
+  <!-- tier 1 needs 0 Smithing, tier 2 needs 45, ... tier 6 needs 225 --> <!-- full credit until you are this far past the recipe -->
+  <XpDiminishingRange>250</XpDiminishingRange> <!-- and only then does it taper off -->
+  <XpFloorFactor>0.25</XpFloorFactor>
+  <XpCapPerTier>1300</XpCapPerTier>            <!-- ceiling per project = this times the tier -->
+  <XpShareWhileWorking>0.4</XpShareWhileWorking>
+  <!-- WEAPONS: native smithing is no longer instant either -->
+  <WeaponCraftingTakesTime>true</WeaponCraftingTakesTime>
+  <WeaponXpFromValueCapped>true</WeaponXpFromValueCapped>  <!-- native weapon XP scales with sale price; cap it -->
+  <WeaponXpCapPerTier>500</WeaponXpCapPerTier>  <!-- matched to armour: 500 raw XP per day per tier -->
+  <WeaponDaysPerTier>1.0</WeaponDaysPerTier>
+  <!-- ORDERS FROM THE LORDS: a lord leaves a commission with a town smith; you take it,
+       forge the piece in the CRAFT tab and deliver it here before the deadline.
+       Pay runs above the market, a missed deadline costs standing with the lord. -->
+  <ArmourOrdersEnabled>true</ArmourOrdersEnabled>
+  <OrderOfferChance>0.5</OrderOfferChance>          <!-- chance a fresh offer waits when you ride in -->
+  <OrderTownCooldownDays>3</OrderTownCooldownDays>
+  <OrderOfferLifeDays>5</OrderOfferLifeDays>        <!-- an untaken offer is withdrawn -->
+  <OrderDeadlineDays>12</OrderDeadlineDays>         <!-- days to deliver once taken -->
+  <OrderPayMultiplier>1.35</OrderPayMultiplier>     <!-- pay above market -->
+  <OrderRelationReward>2</OrderRelationReward>
+  <OrderMissRelationPenalty>2</OrderMissRelationPenalty>
+  <MaxAcceptedOrders>3</MaxAcceptedOrders>
+  <OrderMinTier>2</OrderMinTier>
+  <OrderMaxTier>5</OrderMaxTier>
+  <OrderMaxItemValue>12000</OrderMaxItemValue>
+
+  <!-- FORGE FEE: using someone else's forge is not free -->
+  <ForgeFeeBase>150</ForgeFeeBase>
+  <ForgeFeePerTier>120</ForgeFeePerTier>
+  <!-- SELF REPAIR: metal and sweat instead of coin -->
+  <SelfRepairMaterialFactor>0.25</SelfRepairMaterialFactor>
+  <SelfRepairStaminaFactor>0.4</SelfRepairStaminaFactor>
+  <!-- APPRENTICE: your best smith companion works the bellows -->
+  <CompanionHelperEnabled>true</CompanionHelperEnabled>
+  <HelperStaminaRelief>0.4</HelperStaminaRelief>
+  <HelperTimeRelief>0.3</HelperTimeRelief>
+  <HelperSkillForFullRelief>150</HelperSkillForFullRelief>
+  <FailureChanceAtZeroMargin>0.35</FailureChanceAtZeroMargin>
+  <MarginForNoFailure>60</MarginForNoFailure>        <!-- skill above the requirement that removes all risk -->
+  <MaterialLossOnFailure>0.5</MaterialLossOnFailure>
+  <MaxItemsListed>24</MaxItemsListed>
+  <AllowRangedCrafting>true</AllowRangedCrafting>   <!-- bows, crossbows, arrows and bolts as well -->
+  <!-- SMELTING: the game cannot melt armour down, this does -->
+  <SmeltingReturnShare>0.45</SmeltingReturnShare>
+  <SmeltingSkillBonus>0.002</SmeltingSkillBonus>    <!-- per point of Smithing -->
+  <JackpotChance>0.04</JackpotChance>               <!-- rare masterwork beyond what your skill warrants -->
+
+  <!-- WEAR AND TEAR: gear degrades through the item's own modifier group -->
+  <WearEnabled>true</WearEnabled>
+  <WearPerBattle>6</WearPerBattle>
+  <WearDamageFactor>0.15</WearDamageFactor>        <!-- extra wear per point of health you lost in the fight -->
+  <TierDurabilityFactor>0.22</TierDurabilityFactor> <!-- each armour tier slows wear by this much -->
+  <ThresholdWorn>70</ThresholdWorn>
+  <ThresholdDamaged>45</ThresholdDamaged>
+  <ThresholdRuined>20</ThresholdRuined>
+  <RepairCostFactor>0.5</RepairCostFactor>
+  <BreakAtZeroCondition>false</BreakAtZeroCondition>  <!-- off by default: gear shatters at zero -->
+  <!-- PLUNDER: gear stripped from the dead is not pristine -->
+  <LootArrivesWorn>false</LootArrivesWorn>  <!-- RealisticLoot / Spoils of War already stamps looted gear -->
+  <LootWearBase>45</LootWearBase>
+  <LootWearSpread>25</LootWearSpread>
+
+  <LogEnabled>true</LogEnabled>
+</Armoury>

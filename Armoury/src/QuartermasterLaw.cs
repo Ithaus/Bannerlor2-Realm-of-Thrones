@@ -1,0 +1,418 @@
+using System;
+using System.Collections.Generic;
+using System.Reflection;
+using HarmonyLib;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Inventory;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.Core;
+using TaleWorlds.Library;
+
+namespace Armoury
+{
+    /// <summary>
+    /// PRAWO KWATERMISTRZA. Zbrojownia DTE to szafa mundurowa wojska - a Jeff
+    /// wyniosl z niej WSZYSTKO i sprzedal, po czym lucznicy stali w polu bez
+    /// lukow jak piechota. Odtad kwatermistrz wydaje TYLKO NADWYZKI: bierzemy
+    /// progi potrzeb wprost z DTE (EquipmentAndThresholds - ile sztuk danego
+    /// typu wojsko musi miec na stanie przy tylu ludziach) i kazda proba
+    /// zabrania ponizej progu zostaje odbita z komunikatem. Wkladanie do
+    /// zbrojowni - zawsze wolne.
+    /// </summary>
+    internal static class QuartermasterLaw
+    {
+        private static FieldInfo _fRosters;           // InventoryLogic._rosters
+        private static FieldInfo _fArmory;            // DTE ArmyArmory.Armory (static ItemRoster)
+        private static FieldInfo _fThresholds;        // DTE EveryoneCampaignBehavior.EquipmentAndThresholds
+        private static DateTime _lastShout = DateTime.MinValue;
+
+        internal static ItemRoster DteArmory()
+        {
+            try { return _fArmory != null ? _fArmory.GetValue(null) as ItemRoster : null; }
+            catch { return null; }
+        }
+
+        internal static System.Collections.IDictionary Thresholds()
+        {
+            try { return _fThresholds != null ? _fThresholds.GetValue(null) as System.Collections.IDictionary : null; }
+            catch { return null; }
+        }
+
+        /// <summary>Ilu zolnierzy (bez bohaterow) nosi dzis barwy oddzialu.</summary>
+        internal static int TroopCount()
+        {
+            try
+            {
+                int n = 0;
+                var r = MobileParty.MainParty.MemberRoster;
+                for (int i = 0; i < r.Count; i++)
+                {
+                    var el = r.GetElementCopyAtIndex(i);
+                    if (el.Character != null && !el.Character.IsHero) n += el.Number;
+                }
+                return n;
+            }
+            catch { return 0; }
+        }
+
+        /// <summary>
+        /// REALNY stan noszony, nie magazynowe zachcianki DTE. Formuly DTE to
+        /// max(2x wojsko, wojsko+100) sztuk KAZDEGO typu (broni az 4x+400!) -
+        /// stad "brakuje 127 koni" przy 32 ludziach. My liczymy PO CZLOWIEKU
+        /// I PO FACHU: kto wedle wzorca nosi luk, temu liczymy luk i kolczany;
+        /// kto kusze - kusze i belty; dwureczna tylko tym, ktorzy nia robia.
+        /// </summary>
+        internal sealed class Needs
+        {
+            public int Troops, Mounted, Bows, Xbows, TwoH, Pole, Shields, OneH, Thrown;
+        }
+
+        internal static Needs CountNeeds()
+        {
+            var n = new Needs();
+            try
+            {
+                var r = MobileParty.MainParty.MemberRoster;
+                for (int i = 0; i < r.Count; i++)
+                {
+                    var el = r.GetElementCopyAtIndex(i);
+                    var c = el.Character;
+                    if (c == null || c.IsHero) continue;
+                    int k = el.Number;
+                    n.Troops += k;
+                    if (c.IsMounted) n.Mounted += k;
+                    bool bow = false, xb = false, th = false, twoh = false, pole = false, sh = false, oneh = false;
+                    try
+                    {
+                        var eq = c.Equipment;   // wzorzec bojowy oddzialu - kto CO ma nosic
+                        for (int s = 0; s < 4; s++)
+                        {
+                            var it = eq[(EquipmentIndex)s].Item;
+                            if (it == null) continue;
+                            switch (it.ItemType)
+                            {
+                                case ItemObject.ItemTypeEnum.Bow: bow = true; break;
+                                case ItemObject.ItemTypeEnum.Crossbow: xb = true; break;
+                                case ItemObject.ItemTypeEnum.Thrown: th = true; break;
+                                case ItemObject.ItemTypeEnum.TwoHandedWeapon: twoh = true; break;
+                                case ItemObject.ItemTypeEnum.Polearm: pole = true; break;
+                                case ItemObject.ItemTypeEnum.Shield: sh = true; break;
+                                case ItemObject.ItemTypeEnum.OneHandedWeapon: oneh = true; break;
+                            }
+                        }
+                    }
+                    catch { }
+                    if (bow) n.Bows += k;
+                    if (xb) n.Xbows += k;
+                    if (th) n.Thrown += k;
+                    if (twoh) n.TwoH += k;
+                    if (pole) n.Pole += k;
+                    if (sh) n.Shields += k;
+                    if (oneh) n.OneH += k;
+                }
+            }
+            catch { }
+            return n;
+        }
+
+        internal static int WornFor(ItemObject.ItemTypeEnum type, Needs n)
+        {
+            switch (type)
+            {
+                case ItemObject.ItemTypeEnum.HeadArmor:
+                case ItemObject.ItemTypeEnum.BodyArmor:
+                case ItemObject.ItemTypeEnum.LegArmor:
+                case ItemObject.ItemTypeEnum.HandArmor:
+                case ItemObject.ItemTypeEnum.Cape:
+                    return n.Troops;                                 // sztuka na czlowieka
+                case ItemObject.ItemTypeEnum.OneHandedWeapon:
+                    return n.OneH;                                   // wedle wzorca oddzialu
+                case ItemObject.ItemTypeEnum.Shield:
+                    return n.Shields;
+                case ItemObject.ItemTypeEnum.Polearm:
+                    return n.Pole;
+                case ItemObject.ItemTypeEnum.TwoHandedWeapon:
+                    return n.TwoH;
+                case ItemObject.ItemTypeEnum.Horse:
+                case ItemObject.ItemTypeEnum.HorseHarness:
+                    return n.Mounted;                                // kon na jezdzca, nie na papierze
+                case ItemObject.ItemTypeEnum.Bow:
+                    return n.Bows;
+                case ItemObject.ItemTypeEnum.Crossbow:
+                    return n.Xbows;
+                case ItemObject.ItemTypeEnum.Arrows:
+                    return n.Bows * 2;                               // kolczan i zapasowy na lucznika
+                case ItemObject.ItemTypeEnum.Bolts:
+                    return n.Xbows * 2;
+                case ItemObject.ItemTypeEnum.Thrown:
+                    return n.Thrown * 2;
+                default:
+                    return 0;
+            }
+        }
+
+        private static int NeedFor(ItemObject.ItemTypeEnum type)
+        {
+            return WornFor(type, CountNeeds());
+        }
+
+        internal static readonly ItemObject.ItemTypeEnum[] KitTypes =
+        {
+            ItemObject.ItemTypeEnum.HeadArmor, ItemObject.ItemTypeEnum.BodyArmor,
+            ItemObject.ItemTypeEnum.LegArmor, ItemObject.ItemTypeEnum.HandArmor,
+            ItemObject.ItemTypeEnum.Cape, ItemObject.ItemTypeEnum.OneHandedWeapon,
+            ItemObject.ItemTypeEnum.TwoHandedWeapon, ItemObject.ItemTypeEnum.Polearm,
+            ItemObject.ItemTypeEnum.Shield, ItemObject.ItemTypeEnum.Bow,
+            ItemObject.ItemTypeEnum.Crossbow, ItemObject.ItemTypeEnum.Arrows,
+            ItemObject.ItemTypeEnum.Bolts, ItemObject.ItemTypeEnum.Thrown,
+            ItemObject.ItemTypeEnum.Horse, ItemObject.ItemTypeEnum.HorseHarness
+        };
+
+        /// <summary>Pelna lista brakow "Typ noszone/potrzebne" wzgledem stanu zbrojowni.</summary>
+        internal static List<string> ShortageLines()
+        {
+            var lines = new List<string>();
+            try
+            {
+                if (QuartermasterEscrow.Active) return lines;   // polki wlasnie schowane - nie liczyc na slepo
+                var armory = DteArmory();
+                if (armory == null) return lines;
+                var needs = CountNeeds();
+                foreach (var type in KitTypes)
+                {
+                    int need = WornFor(type, needs);
+                    if (need <= 0) continue;
+                    int have = 0;
+                    for (int i = 0; i < armory.Count; i++)
+                    {
+                        var el = armory[i];
+                        var it = el.EquipmentElement.Item;
+                        if (it != null && it.ItemType == type && el.Amount > 0) have += el.Amount;
+                    }
+                    if (have < need) lines.Add(type + " " + have + "/" + need);
+                }
+            }
+            catch { }
+            return lines;
+        }
+
+        /// <summary>
+        /// Kwatermistrz MELDUJE braki na glos - po bitwie i co rano, nie tylko
+        /// w ekranie zbrojowni ("czemu ja o tym nie wiem!" - Jeff, 2026).
+        /// Zwraca true, gdy bylo co meldowac.
+        /// </summary>
+        internal static bool ShoutShortages(string headline)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || !s.QuartermasterShouts) return false;
+                var lines = ShortageLines();
+                if (lines.Count == 0) return false;
+                InformationManager.DisplayMessage(new InformationMessage(headline, Colors.Red));
+                for (int i = 0; i < lines.Count; i += 5)
+                {
+                    int n = Math.Min(5, lines.Count - i);
+                    InformationManager.DisplayMessage(new InformationMessage(
+                        "  " + string.Join(", ", lines.GetRange(i, n).ToArray()), Colors.Red));
+                }
+                return true;
+            }
+            catch { return false; }
+        }
+
+        /// <summary>Ile sztuk danego typu lezy jeszcze w zbrojowni.</summary>
+        private static int HaveFor(ItemRoster armory, ItemObject.ItemTypeEnum type)
+        {
+            int n = 0;
+            try
+            {
+                for (int i = 0; i < armory.Count; i++)
+                {
+                    var el = armory[i];
+                    var it = el.EquipmentElement.Item;
+                    if (it != null && it.ItemType == type) n += el.Amount;
+                }
+            }
+            catch { }
+            return n;
+        }
+
+        internal static bool Prefix(InventoryLogic __instance, ref TransferCommand transferCommand, ref List<TransferCommandResult> __result)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || !s.ArmouryProtectUsed) return true;
+                if (QuartermasterEscrow.Active) return true;   // lista juz pokazuje tylko nadwyzki
+                if (_fRosters == null || _fArmory == null) return true;
+
+                var rosters = _fRosters.GetValue(__instance) as ItemRoster[];
+                var armory = DteArmory();
+                if (rosters == null || rosters.Length == 0 || armory == null || rosters[0] != armory) return true;
+                if (transferCommand.FromSide != InventoryLogic.InventorySide.OtherInventory) return true;   // wkladasz - wolno zawsze
+
+                var item = transferCommand.ElementToTransfer.EquipmentElement.Item;
+                if (item == null) return true;
+
+                int troops = TroopCount();
+                int need = NeedFor(item.ItemType);
+                if (need <= 0) return true;                                   // typ bez progu - wolny
+                int have = HaveFor(armory, item.ItemType);
+                int take = Math.Max(1, transferCommand.Amount);
+                if (have - take >= need) return true;                          // zostaje zapas - wydaj
+
+                int surplus = Math.Max(0, have - need);
+                if ((DateTime.Now - _lastShout).TotalMilliseconds > 700)
+                {
+                    _lastShout = DateTime.Now;
+                    InformationManager.DisplayMessage(new InformationMessage(
+                        "Quartermaster: the men still use these - " + need + " " + item.ItemType +
+                        " must stay for " + troops + " soldiers (" + (surplus > 0 ? surplus + " spare to take" : "no spares") + ").",
+                        Colors.Red));
+                }
+                __result = new List<TransferCommandResult>();
+                return false;                                                  // sprzet w uzyciu nie wychodzi
+            }
+            catch (Exception e) { Log.Error("QuartermasterLaw", e); return true; }
+        }
+
+        /// <summary>DLL DTE nazywa sie z numerem wersji (v1.4.7) - szukamy typu po WSZYSTKICH zestawach.</summary>
+        internal static Type FindType(string fullName)
+        {
+            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                try { var t = asm.GetType(fullName); if (t != null) return t; } catch { }
+            }
+            return null;
+        }
+
+        internal static void ApplyAll(Harmony h)
+        {
+            try
+            {
+                var tArm = FindType("DynamicTroopEquipmentReupload.ArmyArmory");
+                var tEvery = FindType("DynamicTroopEquipmentReupload.EveryoneCampaignBehavior");
+                if (tArm == null || tEvery == null) { Log.Info("QuartermasterLaw: DTE nieobecne."); return; }
+                _fArmory = AccessTools.Field(tArm, "Armory");
+                _fThresholds = AccessTools.Field(tEvery, "EquipmentAndThresholds");
+                _fRosters = AccessTools.Field(typeof(InventoryLogic), "_rosters");
+                if (_fArmory == null || _fRosters == null)
+                { Log.Info("QuartermasterLaw: brak pol (_rosters/Armory)."); return; }
+
+                var m = AccessTools.Method(typeof(InventoryLogic), "TransferItem");
+                if (m == null) { Log.Info("QuartermasterLaw: brak InventoryLogic.TransferItem."); return; }
+                h.Patch(m, prefix: new HarmonyMethod(typeof(QuartermasterLaw), "Prefix"));
+
+                // PROSCIEJ, jak chcial Jeff: przed otwarciem ekranu zbrojowni sprzet
+                // noszony przez ludzi jest CHOWANY - widzisz tylko wolne nadwyzki.
+                var tBeh = FindType("DynamicTroopEquipmentReupload.ArmyArmoryBehavior");
+                var mOpen = tBeh != null ? AccessTools.Method(tBeh, "OpenArmoryScreen") : null;
+                if (mOpen != null)
+                    h.Patch(mOpen, prefix: new HarmonyMethod(typeof(QuartermasterEscrow), "HoldPrefix"));
+                var tHelp = Type.GetType("Helpers.InventoryScreenHelper, TaleWorlds.CampaignSystem");
+                var mClose = tHelp != null ? AccessTools.Method(tHelp, "CloseInventoryPresentation") : null;
+                if (mClose != null)
+                    h.Patch(mClose, postfix: new HarmonyMethod(typeof(QuartermasterEscrow), "ReleasePostfix"));
+                var mClose2 = tHelp != null ? AccessTools.Method(tHelp, "CloseScreen") : null;
+                if (mClose2 != null)
+                    h.Patch(mClose2, postfix: new HarmonyMethod(typeof(QuartermasterEscrow), "ReleasePostfix"));
+                Log.Info("QuartermasterLaw: ekran zbrojowni pokazuje TYLKO nadwyzki (open=" + (mOpen != null)
+                         + ", close=" + (mClose != null) + "/" + (mClose2 != null) + ").");
+            }
+            catch (Exception e) { Log.Error("QuartermasterLaw.ApplyAll", e); }
+        }
+    }
+
+    /// <summary>
+    /// Depozyt kwatermistrza. Na czas ekranu zbrojowni sprzet NOSZONY przez
+    /// zolnierzy (najlepsze sztuki kazdego typu, wedle progow DTE) jest
+    /// wyjmowany z widoku, a po zamknieciu ekranu wraca na polki. Gracz widzi
+    /// wylacznie wolne nadwyzki - bo luk lucznika nie lezy w magazynie,
+    /// tylko wisi mu na plecach.
+    /// </summary>
+    internal static class QuartermasterEscrow
+    {
+        internal static bool Active;
+        private static readonly List<KeyValuePair<EquipmentElement, int>> _held =
+            new List<KeyValuePair<EquipmentElement, int>>();
+
+        internal static void HoldPrefix() { HoldReserve(); }
+        internal static void ReleasePostfix() { ReleaseReserve(); }
+
+        internal static void HoldReserve()
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || !s.ArmouryProtectUsed || Active) return;
+                var armory = QuartermasterLaw.DteArmory();
+                if (armory == null) return;
+                var needs = QuartermasterLaw.CountNeeds();
+
+                // meldunek brakow PRZED schowaniem polek (pelna lista, z amunicja)
+                bool anyShort = QuartermasterLaw.ShoutShortages("Quartermaster: the men go SHORT (have/need):");
+
+                foreach (var type in QuartermasterLaw.KitTypes)
+                {
+                    // liczymy po ludzku (noszone), nie wg magazynowych norm DTE
+                    int need = QuartermasterLaw.WornFor(type, needs);
+                    if (need <= 0) continue;
+
+                    // ludzie nosza NAJLEPSZE sztuki - te wedruja do depozytu;
+                    // GORSZE zostaja na liscie jako nadwyzki do wziecia
+                    var stacks = new List<ItemRosterElement>();
+                    for (int i = 0; i < armory.Count; i++)
+                    {
+                        var el = armory[i];
+                        var it = el.EquipmentElement.Item;
+                        if (it != null && it.ItemType == type && el.Amount > 0) stacks.Add(el);
+                    }
+                    stacks.Sort((a, b) => b.EquipmentElement.ItemValue.CompareTo(a.EquipmentElement.ItemValue));
+                    int left = need;
+                    foreach (var st in stacks)
+                    {
+                        if (left <= 0) break;
+                        int n = Math.Min(left, st.Amount);
+                        armory.AddToCounts(st.EquipmentElement, -n);
+                        _held.Add(new KeyValuePair<EquipmentElement, int>(st.EquipmentElement, n));
+                        left -= n;
+                    }
+                }
+                Active = _held.Count > 0;
+                if (Active)
+                {
+                    int pieces = 0;
+                    foreach (var kv in _held) pieces += kv.Value;
+                    Log.Info("Kwatermistrz: " + _held.Count + " pozycji (" + pieces + " szt.) na ludziach schowanych przed ekranem zbrojowni.");
+                    // Jeff mysli, ze zbrojownia POZERA wklady - a one wedruja na plecy
+                    // zolnierzy. Mowimy to wprost przy kazdym otwarciu ekranu.
+                    InformationManager.DisplayMessage(new InformationMessage(
+                        "Quartermaster: " + pieces + " pieces are worn by the men and not listed - spares only.",
+                        Colors.Yellow));
+                }
+                if (!anyShort)
+                {
+                    InformationManager.DisplayMessage(new InformationMessage(
+                        "Quartermaster: every man carries his full kit.", Colors.Green));
+                }
+            }
+            catch (Exception e) { Log.Error("Escrow.Hold", e); }
+        }
+
+        internal static void ReleaseReserve()
+        {
+            try
+            {
+                if (!Active && _held.Count == 0) return;
+                var armory = QuartermasterLaw.DteArmory();
+                if (armory != null)
+                    foreach (var kv in _held) armory.AddToCounts(kv.Key, kv.Value);
+                _held.Clear();
+                Active = false;
+            }
+            catch (Exception e) { Log.Error("Escrow.Release", e); }
+        }
+    }
+}

@@ -1,0 +1,11 @@
+<Project>
+  <!--
+    Gdzie leza biblioteki gry. Domyslnie: katalog libs/ w tym repozytorium.
+    Mozesz nadpisac przy budowaniu:
+        dotnet build -c Release -p:GameLibs="C:\...\Bannerlord\bin\Win64_Shipping_Client"
+    albo ustawic zmienna srodowiskowa GameLibs.
+  -->
+  <PropertyGroup>
+    <GameLibs Condition="'$(GameLibs)' == ''">$(MSBuildThisFileDirectory)libs</GameLibs>
+  </PropertyGroup>
+</Project>

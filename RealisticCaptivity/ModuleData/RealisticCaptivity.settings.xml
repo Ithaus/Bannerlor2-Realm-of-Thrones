@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Realistic Captivity - settings. Changes take effect after a game restart. -->
+<RealisticCaptivity>
+  <!-- GEAR: captors strip your war gear; civilian clothes are left on you -->
+  <StripEquipment>true</StripEquipment>
+  <KeepCivilianClothes>true</KeepCivilianClothes>
+  <!-- LeaveInRags: strip civilian clothes too and put the cheapest rags in the game on you -->
+  <LeaveInRags>true</LeaveInRags>
+  <!-- BAGGAGE: what your captors take out of your party inventory and purse -->
+  <LootPartyInventoryPercent>75</LootPartyInventoryPercent>
+  <LootGoldPercent>60</LootGoldPercent>
+  <BuybackEnabled>true</BuybackEnabled>
+  <BuybackPriceMultiplier>1.6</BuybackPriceMultiplier>
+
+  <!-- ESCAPE: no escape at all for the first X days, then a heavily reduced chance -->
+  <MinDaysBeforeEscape>12</MinDaysBeforeEscape>
+  <EscapeChanceMultiplier>0.2</EscapeChanceMultiplier>
+  <FailedEscapeHealthLossPercent>35</FailedEscapeHealthLossPercent>
+  <FailedEscapeRelationPenalty>-8</FailedEscapeRelationPenalty>
+
+  <!-- WORD OF HONOUR: only offered to someone of standing (land, vassalage or renown) -->
+  <ParoleEnabled>true</ParoleEnabled>
+  <ParoleRequiresStatus>true</ParoleRequiresStatus>
+  <ParoleMinRenown>150</ParoleMinRenown>
+  <LowbornRansomDelay>2.0</LowbornRansomDelay>
+  <ParoleRenownLoss>80</ParoleRenownLoss>
+  <ParoleRelationPenalty>-40</ParoleRelationPenalty>
+  <ParoleRansomDiscount>0.75</ParoleRansomDiscount>
+
+  <!-- RANSOM: scales with your renown; capped at 95% of your gold so an offer can always be paid -->
+  <RansomMultiplier>5.0</RansomMultiplier>
+  <RansomRenownFactor>30</RansomRenownFactor>
+  <MinDaysBeforeRansomOffer>4</MinDaysBeforeRansomOffer>
+
+  <!-- BRIGAND LOOT: captured by a party with no lord - your gear is fenced on the nearest town market -->
+  <FenceGearWhenNoLord>true</FenceGearWhenNoLord>
+  <FencePriceMultiplier>1.0</FencePriceMultiplier>
+
+  <!-- STARVATION: slow decay in the dungeon instead of a random death roll -->
+  <StarvationEnabled>true</StarvationEnabled>
+  <StarvationHealthPerDay>4</StarvationHealthPerDay>
+  <StarvationLowbornFactor>1.75</StarvationLowbornFactor>
+  <StarvationParoleFactor>0.4</StarvationParoleFactor>
+  <!-- ATROPHY: idle months in irons waste the body - random loss in a PHYSICAL skill only -->
+  <AtrophyChancePercentPerDay>25</AtrophyChancePercentPerDay>
+  <AtrophyPointsPerHit>1</AtrophyPointsPerHit>
+  <AtrophyMinSkillValue>20</AtrophyMinSkillValue>
+
+  <!-- BEING SOLD: your captor may hand you over to another lord for silver -->
+  <SellPrisonerEnabled>true</SellPrisonerEnabled>
+  <SellChancePercentPerDay>8</SellChancePercentPerDay>
+  <SellMinDays>5</SellMinDays>
+
+  <!-- COMPANIONS captured with you lose their gear too -->
+  <StripCompanions>true</StripCompanions>
+
+  <!-- RANSOM DEBT: released on a written promise when you cannot pay outright -->
+  <RansomDebtEnabled>true</RansomDebtEnabled>
+  <DebtOfferAfterDays>20</DebtOfferAfterDays>
+  <DebtInterest>1.4</DebtInterest>
+  <DebtDailyInstalment>250</DebtDailyInstalment>
+  <DebtGraceDays>60</DebtGraceDays>
+  <DebtDefaultRenownLoss>50</DebtDefaultRenownLoss>
+
+  <!-- ESCAPE needs someone free on the outside to bribe a guard -->
+  <EscapeNeedsHelp>true</EscapeNeedsHelp>
+  <EscapeBribeGold>800</EscapeBribeGold>
+
+  <!-- RESCUE: your clan sends a party to free you or to buy you out -->
+  <RescueEnabled>true</RescueEnabled>
+  <RescueArrivalDistance>3.0</RescueArrivalDistance>
+  <RescueStrengthRatio>1.1</RescueStrengthRatio>
+  <NegotiationMaxDiscount>0.6</NegotiationMaxDiscount>
+  <RescueRetryDays>4</RescueRetryDays>
+
+  <!-- HUMILIATION: released as worthless, without ransom -->
+  <HumiliationEnabled>true</HumiliationEnabled>
+  <HumiliationRenownLoss>15</HumiliationRenownLoss>
+
+  <!-- DIAGNOSTICS -->
+  <LogEnabled>true</LogEnabled>
+</RealisticCaptivity>

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Grand Tourney - settings. Changes take effect after a game restart. -->
+<GrandTourney>
+  <Enabled>true</Enabled>
+
+  <!-- THE SUMMONS -->
+  <GatherDays>4</GatherDays>            <!-- days between the proclamation and the opening of the lists -->
+  <MaxLordsInvited>8</MaxLordsInvited>  <!-- 16 slots exist in total; the rest fill with wanderers and locals -->
+  <InviteRadius>200</InviteRadius>      <!-- how far the heralds ride -->
+  <MinLordsToHold>8</MinLordsToHold>
+  <!-- tourneys started by the game or by other mods answer to the same rule -->
+  <PoliceAllTournaments>true</PoliceAllTournaments>
+  <!-- a realm at war holds no tourneys; war during the gathering cancels it, war after the lists open does not -->
+  <PeaceOnly>true</PeaceOnly>
+  <PlayerNoticeRadius>150</PlayerNoticeRadius>  <!-- word of a tourney beyond this simply does not reach you -->    <!-- fewer knights than this and the tourney is called off -->
+
+  <!-- HOSTING YOUR OWN -->
+  <PlayerHostingEnabled>true</PlayerHostingEnabled>
+  <HostMinRenown>300</HostMinRenown>
+  <HostCooldownDays>365</HostCooldownDays>
+  <HostBaseFee>2000</HostBaseFee>
+  <HostFeeProsperityFactor>0.5</HostFeeProsperityFactor>
+  <PrizeModest>3000</PrizeModest>
+  <PrizeWorthy>8000</PrizeWorthy>
+  <PrizePrincely>15000</PrizePrincely>
+  <PrizeRadiusBonus>0.00008</PrizeRadiusBonus>
+
+  <!-- WHAT THE HOST GAINS -->
+  <HostRenownPerLord>8</HostRenownPerLord>
+  <HostInfluencePerLord>2</HostInfluencePerLord>
+  <HostRelationPerLord>2</HostRelationPerLord>
+  <HostProsperityPerLord>25</HostProsperityPerLord>
+  <HostLoyaltyGain>5</HostLoyaltyGain>
+  <HostSecurityLoss>3</HostSecurityLoss>
+  <HostTakingsPerLord>200</HostTakingsPerLord>
+  <HostTakingsProsperityFactor>0.1</HostTakingsProsperityFactor>
+  <CancelledFeeRefund>0.5</CancelledFeeRefund>
+
+  <LogEnabled>true</LogEnabled>
+</GrandTourney>

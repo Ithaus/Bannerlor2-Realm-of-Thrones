@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Module>
+  <Name value="Realistic Captivity" />
+  <Id value="RealisticCaptivity" />
+  <Version value="v1.7.0" />
+  <SingleplayerModule value="true" />
+  <MultiplayerModule value="false" />
+  <Official value="false" />
+  <ModuleType value="Community" />
+  <DependedModules>
+    <DependedModule Id="Bannerlord.Harmony" />
+    <DependedModule Id="Native" />
+    <DependedModule Id="SandBoxCore" />
+    <DependedModule Id="Sandbox" />
+    <DependedModule Id="StoryMode" />
+  </DependedModules>
+  <DependedModuleMetadatas>
+    <DependedModuleMetadata id="Bannerlord.Harmony" order="LoadBeforeThis" />
+    <DependedModuleMetadata id="Bannerlord.MBOptionScreen" order="LoadBeforeThis" optional="true" />
+    <DependedModuleMetadata id="Native" order="LoadBeforeThis" />
+    <DependedModuleMetadata id="SandBoxCore" order="LoadBeforeThis" />
+    <DependedModuleMetadata id="Sandbox" order="LoadBeforeThis" />
+    <DependedModuleMetadata id="StoryMode" order="LoadBeforeThis" />
+    <DependedModuleMetadata id="CustomBattle" order="LoadBeforeThis" optional="true" />
+    <DependedModuleMetadata id="BetterEconomy" order="LoadBeforeThis" optional="true" />
+    <DependedModuleMetadata id="BannerKings.Redux" order="LoadBeforeThis" optional="true" />
+    <DependedModuleMetadata id="ROT-Core" order="LoadBeforeThis" optional="true" />
+    <DependedModuleMetadata id="ROT-Content" order="LoadBeforeThis" optional="true" />
+    <DependedModuleMetadata id="ROT_Map" order="LoadBeforeThis" optional="true" />
+    <DependedModuleMetadata id="ROT-Dragon" order="LoadBeforeThis" optional="true" />
+    <DependedModuleMetadata id="Bannerlord.Diplomacy" order="LoadBeforeThis" optional="true" />
+    <DependedModuleMetadata id="StrategicCampaignAI145" order="LoadBeforeThis" optional="true" />
+    <DependedModuleMetadata id="RealisticBannerlord" order="LoadBeforeThis" optional="true" />
+    <DependedModuleMetadata id="DynamicReinforcements" order="LoadBeforeThis" optional="true" />
+    <DependedModuleMetadata id="BKROTPatch" order="LoadAfterThis" optional="true" />
+  </DependedModuleMetadatas>
+  <SubModules>
+    <SubModule>
+      <Name value="RealisticCaptivity" />
+      <DLLName value="RealisticCaptivity.dll" />
+      <SubModuleClassType value="RealisticCaptivity.SubModuleMain" />
+      <Tags>
+        <Tag key="DedicatedServerType" value="none" />
+        <Tag key="IsNoRenderModeElement" value="false" />
+      </Tags>
+    </SubModule>
+  </SubModules>
+  <Xmls />
+</Module>

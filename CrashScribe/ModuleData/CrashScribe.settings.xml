@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- CrashScribe - the record keeper. Reports land in:
+     Documents\Mount and Blade II Bannerlord\CrashScribe\session-<date>.log
+     Changes take effect after a game restart. -->
+<CrashScribe>
+  <!-- errors that would otherwise take the game down with them -->
+  <CatchUnhandled>true</CatchUnhandled>
+
+  <!-- errors caught somewhere further up the call chain - very often the real cause,
+       because a swallowed error leaves broken state behind and the crash comes later -->
+  <CatchFirstChance>true</CatchFirstChance>
+  <!-- ...but only report those with a mod in the stack, or the log drowns in engine noise -->
+  <OnlyModdedFirstChance>true</OnlyModdedFirstChance>
+
+  <!-- a Harmony net over every method of the listed mods -->
+  <WrapModMethods>true</WrapModMethods>
+  <!-- caught an error inside one of our mods: write it down and carry on instead of a crash to desktop.
+       Set to false if you would rather the game die loudly at the exact spot. -->
+  <SwallowModErrors>true</SwallowModErrors>
+  <!-- leave empty to net every non-native mod; that is thorough but slows startup a good deal -->
+  <WrapModules>RealisticCaptivity,GrandTourney,Armoury</WrapModules>
+
+  <!-- extra watch over the game's own tournament code - logged, never swallowed -->
+  <WrapCampaignHotspots>true</WrapCampaignHotspots>
+
+  <!-- a short red note on screen when something goes wrong, so you know to look at the log -->
+  <ShowInGame>true</ShowInGame>
+
+  <MaxReportsPerSession>300</MaxReportsPerSession>
+  <KeepSessions>15</KeepSessions>
+</CrashScribe>
