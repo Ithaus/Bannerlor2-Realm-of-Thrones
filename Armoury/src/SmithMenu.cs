@@ -96,6 +96,9 @@ namespace Armoury
                 "{=!}The mending bench. Coin for the smith's hammer, or your own metal and sweat.",
                 OnMenuInit, GameMenu.MenuOverlayType.SettlementWithBoth);
 
+            starter.AddGameMenuOption(MendMenu, "arm_kit_report",
+                "{=!}Muster the men's kit - the quartermaster's report", KitReportCondition, KitReportConsequence, false, 0);
+
             starter.AddGameMenuOption(MendMenu, "arm_mend_pick",
                 "{=!}Pick a damaged piece to mend", MendPickCondition, MendPickConsequence, false, 0);
 
@@ -751,6 +754,79 @@ namespace Armoury
                 Log.Info("Naprawa zbrojowni wojska: " + done + " szt. za " + paid + ", pominieto " + skipped);
             }
             catch (Exception e) { Log.Error("DoMendTroops", e); }
+        }
+
+        // ------------------------------------------------- przeglad sprzetu WOJSKA
+        // Jeff: "gdzie moge sprawdzic ogolny poziom sprzetu wojska - srednia
+        // jakosc helmow, korpusow, nog, broni, lukow, koni". Kwatermistrz
+        // robi przeglad calej zbrojowni: sztuki, braki, sredni stan i tier
+        // per typ, do tego rachunek za naprawe calosci.
+
+        private static bool KitReportCondition(MenuCallbackArgs args)
+        {
+            args.optionLeaveType = GameMenuOption.LeaveType.Trade;
+            if (QuartermasterLaw.DteArmory() == null) return false;
+            args.Tooltip = new TextObject("{=!}Counts, shortages, average condition and grade of every kind of kit the men own.");
+            return true;
+        }
+
+        private static void KitReportConsequence(MenuCallbackArgs args)
+        {
+            try
+            {
+                var armory = QuartermasterLaw.DteArmory();
+                if (armory == null) return;
+                var needs = QuartermasterLaw.CountNeeds();
+                var sb = new System.Text.StringBuilder();
+                foreach (var type in QuartermasterLaw.KitTypes)
+                {
+                    int count = 0, worn = 0;
+                    float condSum = 0f, tierSum = 0f;
+                    bool wearable = false;
+                    for (int i = 0; i < armory.Count; i++)
+                    {
+                        var el = armory.GetElementCopyAtIndex(i);
+                        var it = el.EquipmentElement.Item;
+                        if (it == null || it.ItemType != type || el.Amount <= 0) continue;
+                        count += el.Amount;
+                        tierSum += Recipes.Grade(it) * el.Amount;
+                        if (!ArmouryBehavior.NoWear(it))
+                        {
+                            wearable = true;
+                            var m = el.EquipmentElement.ItemModifier;
+                            float pm = m != null ? m.PriceMultiplier : 1f;
+                            if (pm < 0f) pm = 0f; if (pm > 1f) pm = 1f;
+                            condSum += pm * el.Amount;
+                            if (m != null && pm < 0.999f) worn += el.Amount;
+                        }
+                    }
+                    int need = QuartermasterLaw.WornFor(type, needs);
+                    if (count == 0 && need <= 0) continue;
+                    sb.Append(type).Append(": ").Append(count).Append(" on hand");
+                    if (need > 0) sb.Append(" / ").Append(need).Append(" needed").Append(count < need ? "  SHORT " + (need - count) : "");
+                    if (count > 0)
+                    {
+                        sb.Append(", grade ").Append((tierSum / count).ToString("0.0"));
+                        if (wearable)
+                        {
+                            sb.Append(", condition ").Append((int)(condSum / count * 100f)).Append("%");
+                            if (worn > 0) sb.Append(" (").Append(worn).Append(" worn)");
+                        }
+                    }
+                    sb.Append("\n");
+                }
+                int all, allCost, can, canCost, disc;
+                ScanTroopWorn(out all, out allCost, out can, out canCost, out disc);
+                if (all > 0)
+                    sb.Append("\nThe smith will mend all ").Append(all).Append(" worn pieces for ")
+                      .Append(allCost).Append(" gold (bulk discount ").Append(disc).Append("%).");
+                else
+                    sb.Append("\nEvery piece on the racks is sound.");
+
+                InformationManager.ShowInquiry(new InquiryData("The Quartermaster's Muster",
+                    sb.ToString(), true, false, "Good", "", null, null), true);
+            }
+            catch (Exception e) { Log.Error("KitReportConsequence", e); }
         }
 
         // ------------------------------------------------- zamowienie brakow WOJSKA
