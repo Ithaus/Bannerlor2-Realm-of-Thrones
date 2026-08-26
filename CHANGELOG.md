@@ -17,6 +17,43 @@
 
 ---
 
+## 2026-08-26 — relacje BK: brama na notabli bez osady (zrodlo lawiny NullReference) + jednorazowy pelny slad
+**Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs`
+**Problem:** freez gry o 15:02 po 47 min sesji; log: "Mends: BK relations uratowane (NullReference)"
+12 201 razy, chwilami 700 w 6 s, plus 2500+ powtorek NRE w HeroRelations.GetHeroesToUpdate
+(HeroRelations.cs:115) z DailyTickHero.
+**Przyczyna:** BK HeroRelations.GetHeroesToUpdate w galezi dla notabla bez klanu robi
+Hero.CurrentSettlement.OwnerClan.Heroes bez null-checkow - notabl bez osady (lub z osada
+bez wlasciciela) pada za kazdym razem. Dotychczasowy finalizer SafeRelations lapal tylko
+CalculateModifiers (objaw), a lawina kosztowala tyle, ze mrozila watek glowny.
+**Zmiana:** (1) Harmony prefix RelationsUpdateGate na HeroRelations.UpdateRelations - notabl
+bez klanu i bez osady/wlasciciela jest pomijany w calosci, zanim cokolwiek wybuchnie (log co
+500. pominiecie). (2) SafeRelations przy PIERWSZYM zlapaniu pisze pelny raport ze stosem -
+w sesji z lawina nie bylo ani jednego sladu, ktora linia CalculateModifiers naprawde pada;
+nastepna sesja to pokaze i wtedy zalatamy druga przyczyne.
+**Ryzyko / co sprawdzic:** licznik "BK relations uratowane" powinien przestac rosnac lawinowo
+(pojedyncze zlapania OK); nowy log "relacje BK - pominieto notabla...". Relacje BK dla
+pomijanych notabli nie beda sie aktualizowac - to bohaterowie z uszkodzonymi danymi, ktorych
+BK i tak nie umial policzyc. Sprawdzic tez raport "pelny slad lawiny (jednorazowo)".
+**Status:** WGRANE
+
+## 2026-08-26 — straznik zawieszen: raport HANG osobnym kanalem (hang-*.log), nie przez blokade logu
+**Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Watchdog.cs`, `CrashScribe/src/Scribe.cs`
+**Problem:** freez 26.08 15:02 - gra stala 20 min (132 watki w Wait), a straznik zawieszen
+nie zapisal NIC: ostatnia linia sesji nalezala do Scribe, raportu GAME HANG brak.
+**Przyczyna:** Watchdog.Dump pisal przez Trail.Drop i Scribe.Raw - oba biora wspolne blokady
+(Trail.Gate, Scribe.Gate), ktorych uzywa tez watek glowny. Gdy zamrozony watek glowny trzymal
+blokade, straznik wisial razem z nim i nigdy nie doszedl do zapisu.
+**Zmiana:** Dump pisze do WLASNEGO pliku hang-RRRR-MM-DD_HH-mm-ss.log wprost (File.WriteAllText),
+etapami: naglowek -> stos -> stan gry (najcenniejsze najpierw - gdy ktorys etap utknie,
+poprzednie sa juz na dysku). Trail.Drop usuniety ze sciezki dumpa. Do glownego logu tylko
+PROBA dopisania nowym Scribe.TryRaw (Monitor.TryEnter z limitem 2 s - nigdy nie wisi).
+Prune sprzata tez stare hang-*.log (limit jak sesje).
+**Ryzyko / co sprawdzic:** przy nastepnym freezie w Documents\...\CrashScribe powinien
+pojawic sie hang-*.log ze stosem watku glownego. Watchdog dalej uzywa Suspend/Resume na
+watku glownym - bez zmian wzgledem dotychczasowego zachowania.
+**Status:** WGRANE
+
 ## 2026-08-26 — lista zbroi w CRAFT: zamkniete wzory na czerwono zamiast dopisku "- LOCKED"
 **Mody:** ForgeView, Armoury | **Pliki:** `ForgeView/src/ArmourListColour.cs` (NOWY), `Armoury/src/BkArmourList.cs`, `docs/PLAN-kuznia-1do1.md`
 **Problem:** zamkniete wzory na liscie zbroi mialy tekstowy dopisek "- LOCKED" - malo czytelne,

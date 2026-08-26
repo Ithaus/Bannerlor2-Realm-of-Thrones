@@ -75,7 +75,20 @@ namespace CrashScribe
         {
             try
             {
-                Trail.Drop("HANG", "watek glowny milczy od " + (int)quietSeconds + " s - spisuje stos");
+                // OSOBNY KANAL. Glowny log ma wspolna blokade (Scribe.Gate), a okruchy
+                // wspolna blokade Trail.Gate - obie potrafi trzymac ZAMROZONY watek
+                // glowny (freeze 26.08 15:02: ostatnia linia logu nalezala do Scribe,
+                // raportu HANG nie bylo, bo straznik wisial na tej samej blokadzie).
+                // Dlatego stos idzie najpierw do wlasnego pliku hang-*.log pisanego
+                // wprost, etapami (najcenniejsze dane najpierw); do glownego logu
+                // tylko PROBA dopisania z limitem czasu, na sam koniec.
+                string hangFile = null;
+                try
+                {
+                    hangFile = System.IO.Path.Combine(Scribe.ReportDir,
+                        "hang-" + DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss") + ".log");
+                }
+                catch { }
 
                 var sb = new StringBuilder();
                 sb.AppendLine();
@@ -83,6 +96,7 @@ namespace CrashScribe
                 sb.AppendLine("# GAME HANG   " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") +
                               "   (main thread silent for " + (int)quietSeconds + " s)");
                 sb.AppendLine("#####################################################################");
+                WriteHang(hangFile, sb);
 
                 StackTrace trace = null;
                 try
@@ -118,7 +132,10 @@ namespace CrashScribe
                         }
                     }
                 }
+                WriteHang(hangFile, sb);   // stos juz bezpieczny na dysku
 
+                // stan gry dopiero teraz - czyta obiekty gry, wiec sam moze utknac;
+                // gdyby utknal, stos wyzej juz jest zapisany
                 var ctx = GameState.Describe();
                 if (!string.IsNullOrEmpty(ctx))
                 {
@@ -126,8 +143,19 @@ namespace CrashScribe
                     sb.AppendLine(ctx);
                 }
                 sb.AppendLine("#####################################################################");
-                Scribe.Raw(sb.ToString());
+                WriteHang(hangFile, sb);
+
+                // proba dopisania do glownego logu - z limitem, nigdy na wiszaco
+                Scribe.TryRaw(sb.ToString(), 2000);
             }
+            catch { }
+        }
+
+        /// <summary>Zapis raportu zawieszenia wprost do wlasnego pliku, bez zadnych wspolnych blokad.</summary>
+        private static void WriteHang(string file, StringBuilder sb)
+        {
+            if (file == null) return;
+            try { System.IO.File.WriteAllText(file, sb.ToString(), Encoding.UTF8); }
             catch { }
         }
     }

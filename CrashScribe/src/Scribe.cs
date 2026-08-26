@@ -51,6 +51,22 @@ namespace CrashScribe
             }
         }
 
+        /// <summary>
+        /// Zapis z limitem czekania - dla straznika zawieszen. Gdy Gate trzyma
+        /// zamrozony watek glowny, poddajemy sie po timeoutMs zamiast wisiec
+        /// razem z nim w nieskonczonosc.
+        /// </summary>
+        internal static bool TryRaw(string text, int timeoutMs)
+        {
+            if (!System.Threading.Monitor.TryEnter(Gate, timeoutMs)) return false;
+            try
+            {
+                try { File.AppendAllText(SessionFile, text, Encoding.UTF8); } catch { }
+                return true;
+            }
+            finally { System.Threading.Monitor.Exit(Gate); }
+        }
+
         internal static void Line(string text)
         {
             Raw("[" + DateTime.Now.ToString("HH:mm:ss") + "] " + text + Environment.NewLine);
@@ -201,6 +217,13 @@ namespace CrashScribe
                 files.Sort((a, b) => b.LastWriteTimeUtc.CompareTo(a.LastWriteTimeUtc));
                 for (int i = Config.KeepSessions; i < files.Count; i++)
                 { try { files[i].Delete(); } catch { } }
+
+                // raporty zawieszen ze straznika - osobny wzorzec, ten sam limit
+                var hangs = new List<FileInfo>();
+                foreach (var f in Directory.GetFiles(ReportDir, "hang-*.log")) hangs.Add(new FileInfo(f));
+                hangs.Sort((a, b) => b.LastWriteTimeUtc.CompareTo(a.LastWriteTimeUtc));
+                for (int i = Config.KeepSessions; i < hangs.Count; i++)
+                { try { hangs[i].Delete(); } catch { } }
             }
             catch { }
         }

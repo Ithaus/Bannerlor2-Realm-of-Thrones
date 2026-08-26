@@ -163,6 +163,27 @@ namespace CrashScribe
 
             try
             {
+                // ZRODLO lawiny, nie objaw: HeroRelations.UpdateRelations (DailyTickHero)
+                // wola GetHeroesToUpdate, a ta dla notabla BEZ OSADY (albo z osada
+                // bez wlasciciela) robi Hero.CurrentSettlement.OwnerClan.Heroes
+                // i pada NullReference (HeroRelations.cs:115; sesja 26.08: 2500+
+                // powtorek, wspolnie z SafeRelations 12 tys. zlapan i freez gry).
+                // Notabl bez osady nie ma zadnej listy do aktualizacji - pomijamy
+                // go w calosci, ZANIM cokolwiek wybuchnie.
+                var tHr = Type.GetType("BannerKings.Behaviours.Relations.HeroRelations, BannerKings")
+                          ?? QuietType("HeroRelations");
+                var mUpd = tHr != null ? AccessTools.Method(tHr, "UpdateRelations") : null;
+                if (mUpd != null)
+                {
+                    _hrHeroGet = AccessTools.PropertyGetter(tHr, "Hero");
+                    harmony.Patch(mUpd, prefix: new HarmonyMethod(typeof(Mends), "RelationsUpdateGate"));
+                    Scribe.Line("Mends: relacje BK - notable bez osady pomijani (zrodlo lawiny NullReference).");
+                }
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.Install(relations)", null); } catch { } }
+
+            try
+            {
                 // Westeros zna tylko DLUGA zime i dlugie lato - kalendarzyk por roku
                 // RealisticBannerlord (co 21 dni wiosna/jesien, zamiecie, kary do marszu,
                 // zimowy glod) nie ma tu sensu, a MCM RB i tak nie zapisuje ustawien.
@@ -266,12 +287,49 @@ namespace CrashScribe
             catch { return null; }
         }
 
+        private static System.Reflection.MethodInfo _hrHeroGet;
+        private static int _relSkipped;
+        private static bool _relStackDumped;
+
+        /// <summary>
+        /// Brama na UpdateRelations. Niebezpieczna galaz GetHeroesToUpdate
+        /// (else-if Hero.IsNotable) odpala sie tylko dla notabla bez klanu
+        /// i wtedy CurrentSettlement/OwnerClan bez null-checka klada watek.
+        /// Takiego bohatera pomijamy; cala reszta liczy sie normalnie.
+        /// </summary>
+        public static bool RelationsUpdateGate(object __instance)
+        {
+            try
+            {
+                if (_hrHeroGet == null || __instance == null) return true;
+                var hero = _hrHeroGet.Invoke(__instance, null) as Hero;
+                if (hero == null) return false;
+                if (hero.IsNotable && hero.Clan == null
+                    && (hero.CurrentSettlement == null || hero.CurrentSettlement.OwnerClan == null))
+                {
+                    if (_relSkipped++ % 500 == 0)
+                        try { Scribe.Line("Mends: relacje BK - pominieto notabla bez osady/wlasciciela (" + hero.Name + "), lacznie " + _relSkipped + "."); } catch { }
+                    return false;
+                }
+            }
+            catch { }
+            return true;
+        }
+
         public static Exception SafeRelations(Exception __exception, ref object __result)
         {
             if (__exception == null) return null;
             if (__exception is NullReferenceException || __exception is ArgumentNullException
                 || __exception is System.Collections.Generic.KeyNotFoundException)
             {
+                // pierwszy zlapany dostaje PELNY raport ze stosem - w sesji 26.08
+                // licznik doszedl do 12 tys., a w logu nie bylo ANI JEDNEGO sladu,
+                // KTORA linia CalculateModifiers naprawde pada
+                if (!_relStackDumped)
+                {
+                    _relStackDumped = true;
+                    try { Scribe.Report("CrashScribe", __exception, "BKRelationsModel.CalculateModifiers - pelny slad lawiny (jednorazowo)", null); } catch { }
+                }
                 try
                 {
                     var t = Type.GetType("BannerKings.Managers.Skills.RelationsModifier, BannerKings")
