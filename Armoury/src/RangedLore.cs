@@ -336,6 +336,15 @@ namespace Armoury
                     if (Research[school] < cost) return;            // jeszcze sie ucz
                     Research[school] -= cost;
                     Known.Add(next.StringId);
+                    // baner jak przy vanillowym odblokowaniu czesci broni (kuznia 1:1
+                    // krok 2) + dotychczasowa zielona linijka w dzienniku czatu
+                    try
+                    {
+                        MBInformationManager.AddQuickInformation(new TaleWorlds.Localization.TextObject(
+                            "{=!}New pattern unlocked: " + next.Name), 0, null, null,
+                            "event:/ui/notification/crafting");
+                    }
+                    catch { }
                     InformationManager.DisplayMessage(new InformationMessage(
                         "At the bench you worked out the making of the " + next.Name + " - new pattern unlocked.",
                         Colors.Green));
