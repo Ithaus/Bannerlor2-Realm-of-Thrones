@@ -28,6 +28,7 @@ namespace Armoury
 
         private readonly Dictionary<Agent, Mark> _marks = new Dictionary<Agent, Mark>();
         private float _accum;   // przeglad pola co 0.05 s wystarczy - zamach trwa dziesiec razy dluzej
+        private static int _guards;   // ile ciosow mistrz przejal w tej sesji (do logu)
 
         public override void OnAgentDeleted(Agent affectedAgent)
         {
@@ -119,6 +120,15 @@ namespace Armoury
                     float need = Math.Max(1f, c.AutoParryFullDiff);
                     float chance = MBMath.ClampFloat(lead * (100f / need), 0f, 100f);
                     mark.Auto = MBRandom.RandomFloat * 100f < chance;
+                    // slad zycia w logu (raz na zamach, nie na tick) - "sprawdz,
+                    // czy dziala" bez zgadywania: pierwszy i co 25. przejety cios
+                    if (mark.Auto)
+                    {
+                        _guards++;
+                        if (_guards == 1 || _guards % 25 == 0)
+                            Log.Info("GuardMaster: mistrz przejal blok (" + _guards + ". raz; przewaga "
+                                     + lead + " pkt, szansa " + (int)chance + "%).");
+                    }
                 }
                 if (!mark.Auto) return;                                   // kostka przeciw - celuj sam
 
