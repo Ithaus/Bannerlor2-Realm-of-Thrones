@@ -17,6 +17,56 @@
 
 ---
 
+## 2026-08-26 — CRAFT: skora/len przy kuciu pancerza BK schodza KATEGORIA, nie sztywnym ID
+**Mod:** Armoury | **Pliki:** `Armoury/src/FletchForge.cs`, `Armoury/src/Recipes.cs`
+**Problem:** Jeff: licznik skory/lnu w lewym dolnym rogu ekranu CRAFT "nie zgadza sie
+z iloscia w Armoury".
+**Przyczyna:** rozjazd trzech definicji. Licznik (nasz BkExtraMatPostfix) i BK HasMaterials
+licza CALA kategorie handlowa (leather+hides+fur...), ale BK CraftingMixin.SpendMaterials
+zdejmuje wylacznie item o sztywnym ID "leather"/"linen". Kucie pancerza z samych zamiennikow
+ROT wpychalo do sakw UJEMNE wpisy leather/linen - stany rozjezdzaly sie z kazda sztuka.
+**Zmiana:** prefix BkSpendMaterialsPrefix na CraftingMixin.SpendMaterials - twarde surowce
+1:1 jak oryginal, skora/len przez Recipes.Take (ta sama kategoria co licznik, nigdy na minus).
+Recipes.Take -> internal, nowe wlasciwosci Recipes.SoftLeather/SoftLinen.
+**Ryzyko / co sprawdzic:** wykuc pancerz majac tylko zamienniki (np. hides, bez czystego
+leather) - licznik i ekwipunek maja zejsc spojnie, zadnych ujemnych wpisow w sakwach.
+Gdy rachunku nie da sie odczytac (inna sygnatura BK), prefix oddaje robote oryginalowi.
+**Status:** WGRANE
+
+## 2026-08-26 — nauka wzorow: kucie odkrywa LOSOWO (tier kutego lub wyzej), przetop nieznanego uczy go w calosci
+**Mod:** Armoury | **Pliki:** `Armoury/src/RangedLore.cs`, `Armoury/src/Forge.cs`, `Armoury/src/SmeltTab.cs`
+**Problem:** odkrycia szly sztywna kolejka "najtanszy nieznany" - zero niespodzianki,
+a przetopienie pancerza nie uczylo jego wzoru (Jeff chcial: "przetapiam - ucze sie tego
+dokladnie; kuje - losowo tier lub wyzej, jak przy broniach").
+**Przyczyna:** TryUnlock wybieral deterministycznie najtanszy wzor; przetop dawal tylko
+punkty (Study), Learn byl wylacznie przy rozlozeniu.
+**Zmiana:** (1) TryUnlockRandom(szkola, minTier, maxTier) - losuje kandydata MBRandom-em
+z nieznanych wzorow w zakresie tierow; cena bez zmian (3 x tier), jak nie stac - punkty
+czekaja. (2) Kucie (OnCrafted): zakres [tier kutego..6]. (3) Nowe OnSmelted podpiete
+w obu przetopach (tygiel Armoury i zakladka Smelt): wzor NIEZNANY -> Learn w calosci
++ meldunek; znany -> punkty jak dotad (0.5 x tier) i losowanie [1..tier sztuki].
+(4) Nieudane rozlozenie (Study) losuje w zakresie [1..tier sztuki]. (5) Ledger mowi
+"next pattern: random (cheapest is tier N)" zamiast obiecywac konkretny wzor.
+**Ryzyko / co sprawdzic:** przetop nieznanego pancerza -> komunikat "pattern is yours now"
+i wzor znika z szarych; kucie -> baner "New pattern unlocked" z LOSOWYM wzorem o tierze
+>= kutego. Punkty i zapis (Export/Import) bez zmian - stare sejwy wczytaja sie normalnie.
+**Status:** WGRANE
+
+## 2026-08-26 — CRAFT: nieznany wzor zbroi = caly kafelek wyszarzony (jak czesci broni), nie czerwony napis
+**Mod:** ForgeView | **Pliki:** `ForgeView/src/ArmourListColour.cs`
+**Problem:** Jeff: "nie napis na czerwono, tylko caly kafelek jak w broniach - posiadana
+czesc kolorowa, nieposiadana szara".
+**Przyczyna:** poprzednia wersja podmieniala tylko RichTextWidget nazwy (czerwony tekst).
+**Zmiana:** ArmourListColour przerobiony z Replace wezla nazwy na Append szarej plachty
+(BlankWhiteSquare_9, #141414FF, alpha 0.62, IsVisible=@FvLocked) za ostatnim widgetem
+kafelka - przyciemnia CALY wiersz (portret + napisy) dla nieznanych wzorow; znane zostaja
+w naturalnych barwach. XPath celuje w wiazanie @ItemTypeText (sprawdzone w prefabu
+BK.Redux na dysku). Flaga Applied bez zmian - dopisek "- LOCKED" schodzi jak dotad.
+**Ryzyko / co sprawdzic:** w CRAFT nieznane wzory maja byc przyciemnione calym kafelkiem,
+znane normalne; log ForgeView "kafelki listy zbroi dostaly szara plachte". Jesli XPath
+nie trafi (inny prefab): czerwony komunikat UIExtenderEx i wraca dopisek "- LOCKED".
+**Status:** WGRANE
+
 ## 2026-08-26 — relacje BK: brama na notabli bez osady (zrodlo lawiny NullReference) + jednorazowy pelny slad
 **Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs`
 **Problem:** freez gry o 15:02 po 47 min sesji; log: "Mends: BK relations uratowane (NullReference)"

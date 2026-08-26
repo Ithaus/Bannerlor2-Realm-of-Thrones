@@ -60,6 +60,10 @@ namespace Armoury
 
         private static string Name(ItemObject i) { return i != null ? i.StringId : "(brak)"; }
 
+        // dostep dla FletchForge (zdjecie skory/lnu kategoria przy kuciu pancerzy BK)
+        internal static ItemObject SoftLeather { get { ResolveGoods(); return _leather; } }
+        internal static ItemObject SoftLinen { get { ResolveGoods(); return _linen; } }
+
         /// <summary>
         /// Ile jednostek materialu wart jest ten pancerz - regula Jeffa:
         /// "ile daje pancerza, tyle materialu, plus ktory tier". Suma punktow
@@ -470,7 +474,9 @@ namespace Armoury
             catch (Exception e) { Log.Error("TakePartial", e); }
         }
 
-        private static void Take(ItemRoster roster, ItemObject mat, int need)
+        // internal: FletchForge zdejmuje tedy skore/len takze dla kucia pancerzy
+        // BK-owa droga (SpendMaterials liczyl tylko sztywne ID i schodzil na minus)
+        internal static void Take(ItemRoster roster, ItemObject mat, int need)
         {
             if (mat == null || need <= 0) return;
             if (!SoftGood(mat))

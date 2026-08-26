@@ -153,6 +153,42 @@ namespace Armoury
             catch { }
         }
 
+        /// <summary>
+        /// BK SpendMaterials zdejmuje skore/len TYLKO po sztywnym ID "leather"/
+        /// "linen", a licznik (BkExtraMatPostfix) i BK HasMaterials licza CALA
+        /// kategorie handlowa. Kucie pancerza z samych zamiennikow (futra,
+        /// hides ROT) wpychalo wiec do sakw UJEMNE wpisy leather/linen i liczby
+        /// "sie nie zgadzaly" (Jeff, 26.08). Przejmujemy calosc: twarde surowce
+        /// 1:1 jak oryginal, miekkie przez Recipes.Take - kategoria, nigdy minus.
+        /// </summary>
+        public static bool BkSpendMaterialsPrefix(object __instance)
+        {
+            try
+            {
+                var tr = Traverse.Create(__instance);
+                var ac = tr.Field("armorCrafting").GetValue();
+                if (ac == null) return true;
+                var cur = Traverse.Create(ac).Property("CurrentItem").GetValue();
+                if (cur == null) return true;
+                var item = Traverse.Create(cur).Property("Item").GetValue<ItemObject>();
+                if (item == null) return true;
+
+                var cfg = Traverse.CreateWithType("BannerKings.BannerKingsConfig").Property("Instance").GetValue();
+                var model = cfg != null ? Traverse.Create(cfg).Property("SmithingModel").GetValue() : null;
+                var bill = model != null ? Traverse.Create(model).Method("GetCraftingInputForArmor", item).GetValue<int[]>() : null;
+                if (bill == null || bill.Length < 11) return true;   // nie poznajemy rachunku - niech liczy oryginal
+
+                var roster = TaleWorlds.CampaignSystem.Party.MobileParty.MainParty.ItemRoster;
+                for (int l = 0; l < 9; l++)
+                    if (bill[l] != 0)
+                        roster.AddToCounts(Recipes.MaterialItem((CraftingMaterials)l), -bill[l]);
+                if (bill[9] > 0) Recipes.Take(roster, Recipes.SoftLeather, bill[9]);
+                if (bill[10] > 0) Recipes.Take(roster, Recipes.SoftLinen, bill[10]);
+                return false;
+            }
+            catch (Exception e) { Log.Error("BkSpendMaterials", e); return true; }
+        }
+
         internal static void ApplyAll(Harmony h)
         {
             try
@@ -166,6 +202,12 @@ namespace Armoury
                 var ctorExtra = tExtra != null ? AccessTools.Constructor(tExtra, new[] { typeof(ItemObject) }) : null;
                 if (ctorExtra != null)
                     h.Patch(ctorExtra, postfix: new HarmonyMethod(typeof(FletchForge), "BkExtraMatPostfix"));
+
+                // zdjecie materialow za pancerz BK: kategoria zamiast sztywnego ID
+                var tMixinSpend = QuartermasterLaw.FindType("BannerKings.UI.Extensions.CraftingMixin");
+                var mSpend = tMixinSpend != null ? AccessTools.Method(tMixinSpend, "SpendMaterials") : null;
+                if (mSpend != null)
+                    h.Patch(mSpend, prefix: new HarmonyMethod(typeof(FletchForge), "BkSpendMaterialsPrefix"));
 
                 var tMixin = QuartermasterLaw.FindType("BannerKings.UI.Extensions.CraftingMixin");
                 var mMain = tMixin != null ? AccessTools.Method(tMixin, "ExecuteMainActionBK") : null;
