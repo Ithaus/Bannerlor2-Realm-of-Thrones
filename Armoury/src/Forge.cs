@@ -331,6 +331,37 @@ namespace Armoury
             return s.ForgeFeeBase + s.ForgeFeePerTier * r.Tier;
         }
 
+        /// <summary>
+        /// DOSTAWA broni wykutej po vanillowemu: sukces i jakosc zapadly PRZY
+        /// KOWADLE - projekt "van" tylko oddaje wyrob po czasie. Bez drugiego
+        /// rzutu (Jeff: "klikam, jest wykute, a potem czas mija i miecza nie ma").
+        /// </summary>
+        internal static void Deliver(ItemObject item, string modifierId)
+        {
+            try
+            {
+                if (item == null) return;
+                ItemModifier mod = null;
+                if (!string.IsNullOrEmpty(modifierId))
+                    try { mod = TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObject<ItemModifier>(modifierId); } catch { }
+                MobileParty.MainParty.ItemRoster.AddToCounts(new EquipmentElement(item, mod), 1);
+                Log.Player("The finishing work is done: " + (mod != null ? mod.Name + " " : "") + item.Name + " joins your baggage.");
+                Banner("Finished and delivered: " + item.Name);
+                Log.Info("Dostawa broni: " + item.StringId + " mod=" + (mod != null ? mod.StringId : "brak"));
+            }
+            catch (Exception e) { Log.Error("Deliver", e); }
+        }
+
+        /// <summary>Baner na srodku ekranu - wynik wielodniowej roboty nie moze byc szeptem na czacie.</summary>
+        private static void Banner(string text)
+        {
+            try
+            {
+                MBInformationManager.AddQuickInformation(new TaleWorlds.Localization.TextObject("{=!}" + text));
+            }
+            catch { }
+        }
+
         /// <summary>Zakonczenie roboty - tu zapada wynik.</summary>
         internal static void Finish(ItemObject item, int tempo)
         {
@@ -343,6 +374,7 @@ namespace Armoury
                 {
                     Hero.MainHero.HeroDeveloper.AddSkillXp(DefaultSkills.Crafting, ProjectXp(r) * 0.3f);
                     Log.Player("After all that work, the piece cracked at the quench. Nothing to show for it.", true);
+                    Banner("The " + item.Name + " cracked at the quench - nothing to show for the work.");
                     Log.Info("Kucie nieudane po czasie: " + item.StringId);
                     return;
                 }
@@ -362,6 +394,7 @@ namespace Armoury
 
                 string qname = quality != null ? quality.Name + " " : "";
                 Log.Player("Your work is done: " + (made > 1 ? made + " x " : "") + qname + item.Name + ".");
+                Banner("Your work is done: " + qname + item.Name);
                 Log.Info("Ukonczono: " + item.StringId + " jakosc=" + (quality != null ? quality.StringId : "zwykla"));
             }
             catch (Exception e) { Log.Error("Finish", e); }

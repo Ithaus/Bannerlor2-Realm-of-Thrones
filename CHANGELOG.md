@@ -17,6 +17,26 @@
 
 ---
 
+## 2026-08-26 — znikajacy miecz: dostawa broni BEZ drugiego rzutu + glosne banery
+**Mod:** Armoury | **Pliki:** `src/Project.cs`, `src/ArmouryBehavior.cs`, `src/Forge.cs`
+**Problem (Jeff):** wykul miecz w vanilla kuzni, gra napisala "dodano do ekwipunku",
+po czym miecz zniknal i po czasie nie wrocil. Do tego wynik wielodniowej roboty byl
+cicha linijka na czacie.
+**Przyczyna:** OnNewItemCrafted zabiera wyrob na "wykonczenie" (tier x WeaponDaysPerTier dni)
+i oddaje przez Forge.Finish - ktore rzuca DRUGI RAZ na porazke wedle NASZYCH wymogow skilla
+(vanilla juz osadzila sukces i jakosc przy kowadle). Podwojny osad: przy pechu miecz "pekal
+przy hartowaniu" mimo udanego kucia, a wylosowana przez vanilla jakosc i tak przepadala.
+Projekt do tego stoi, gdy gracz wyjedzie z osady - wyglada na "minal czas i nic".
+**Zmiana:** projekty maja rodzaj: "van" (bron z vanilla kucia) = DOSTAWA przez nowe
+Forge.Deliver - bez rzutu, z TA SAMA jakoscia (modyfikator jedzie w zapisie projektu,
+pola 5-6, stare zapisy kompatybilne). Zabranie wyrobu krzyczy banerem na srodku ekranu
+(ile dni i w KTORYM miescie + "Stay or return to collect it"), dostawa i wyniki projektow
+naszej kuzni (sukces/pekniecie) tez ida banerem.
+**Ryzyko / co sprawdzic:** wykuty miecz ma wrocic po N dniach POBYTU w tym samym miescie,
+z jakoscia z momentu kucia; baner przy zabraniu i przy dostawie. Stare projekty z zapisu
+(sprzed tej zmiany) nie maja znacznika "van" i przejda jeszcze stara sciezka z rzutem.
+**Status:** DO SPRAWDZENIA
+
 ## 2026-08-26 — kuznia 1:1 kroki 2-3: nauka za przetop, pancerze i luki w zakladce Smelt + przeglad sprzetu wojska
 **Mod:** Armoury | **Pliki:** `src/SmeltTab.cs` (NOWY), `src/RangedLore.cs`, `src/Forge.cs`, `src/SmithMenu.cs`, `src/SubModuleMain.cs`
 **Zmiana (krok 2):** przetop uczy wzorow (Study, pol stawki kucia); odblokowanie wzoru

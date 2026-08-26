@@ -189,13 +189,17 @@ namespace Armoury
 
         // ---------------------------------------------------------- robota przy kowadle
         internal void StartProject(ItemObject item, int tempo, float days, Settlement where)
+        { StartProject(item, tempo, days, where, "", ""); }
+
+        internal void StartProject(ItemObject item, int tempo, float days, Settlement where, string kind, string modifierId)
         {
             try
             {
                 var p = new Project
                 {
                     Item = item, DaysLeft = days, Tempo = tempo,
-                    SettlementId = where != null ? where.StringId : ""
+                    SettlementId = where != null ? where.StringId : "",
+                    Kind = kind ?? "", ModifierId = modifierId ?? ""
                 };
                 _projects.Add(p.Serialize());
                 Log.Info("Projekt dodany: " + p.Serialize());
@@ -258,6 +262,7 @@ namespace Armoury
 
                     _projects.Remove(line);
                     if (p.DaysLeft > 0f) _projects.Add(p.Serialize());
+                    else if (p.Kind == "van") Forge.Deliver(p.Item, p.ModifierId);   // sukces zapadl przy kowadle
                     else Forge.Finish(p.Item, p.Tempo);
                 }
             }
@@ -328,8 +333,20 @@ namespace Armoury
                 var el = new EquipmentElement(item, modifier);
                 if (roster.GetItemNumber(item) > 0) roster.AddToCounts(el, -1);
 
-                StartProject(item, 1, days, here);
-                Log.Player("The blade is roughed out. " + days.ToString("0.#") + " days of finishing work remain.");
+                // "van": sukces i jakosc zapadly PRZY KOWADLE (vanilla) - dostawa
+                // po czasie ma NIE rzucac drugi raz (Jeff: "wykulem, a potem fail
+                // i miecza nie ma"). Modyfikator jedzie z projektem i wraca.
+                StartProject(item, 1, days, here, "van", modifier != null ? modifier.StringId : "");
+                Log.Player("The blade is roughed out. " + days.ToString("0.#") + " days of finishing work remain at " + here.Name + ".");
+                // gra przed chwila POKAZALA "dodano do ekwipunku" - bez glosnego
+                // baneru wyglada to na zniknieciecie miecza
+                try
+                {
+                    MBInformationManager.AddQuickInformation(new TaleWorlds.Localization.TextObject(
+                        "{=!}The smith keeps the " + item.Name + " for finishing - " +
+                        days.ToString("0.#") + " days at " + here.Name + ". Stay or return to collect it."));
+                }
+                catch { }
                 Log.Info("Bron w toku: " + item.StringId + " dni=" + days);
             }
             catch (Exception e) { Log.Error("OnNewItemCrafted", e); }
