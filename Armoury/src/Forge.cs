@@ -234,9 +234,9 @@ namespace Armoury
                     sb.Append(p.Count + "x " + p.Item.Name);
                 }
                 Hero.MainHero.HeroDeveloper.AddSkillXp(DefaultSkills.Crafting, ProjectXp(r, false) * 0.5f);
-                // kuznia 1:1 krok 2: przetop tez UCZY wzorow, jak badanie czesci
-                // w vanilla - polowa stawki kucia (rozbiorka odslania budowe)
-                RangedLore.Study(item, MathF.Max(0.5f, Recipes.Grade(item) * 0.5f));
+                // przetop nieznanego wzoru uczy go W CALOSCI; znanego - punkty
+                // (polowa stawki kucia) i losowe odkrycie nie wyzej niz jego tier
+                RangedLore.OnSmelted(item);
 
                 Log.Player("You broke down " + item.Name + " for " + (sb.Length > 0 ? sb.ToString() : "scrap") + ".");
                 Log.Info("Przetop: " + item.StringId + " -> " + sb + " (" + (int)(share * 100) + "%)");

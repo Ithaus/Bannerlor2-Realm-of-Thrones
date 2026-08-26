@@ -95,8 +95,9 @@ namespace Armoury
                 currentCraftingHero.AddSkillXp(DefaultSkills.Crafting, model.GetSkillXpForSmelting(item));
                 int cost = model.GetEnergyCostForSmelting(item, currentCraftingHero);
                 __instance.SetHeroCraftingStamina(currentCraftingHero, __instance.GetHeroCraftingStamina(currentCraftingHero) - cost);
-                // zamiast vanillowych badan czesci: nauka wzorow, jak w naszym tyglu
-                RangedLore.Study(item, MathF.Max(0.5f, Recipes.Grade(item) * 0.5f));
+                // zamiast vanillowych badan czesci: przetop nieznanego wzoru uczy go
+                // w calosci, znanego - punkty i losowe odkrycie nie wyzej niz jego tier
+                RangedLore.OnSmelted(item);
                 Log.Info("Przetop (zakladka Smelt): " + item.StringId);
                 return false;
             }

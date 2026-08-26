@@ -189,7 +189,11 @@ namespace Armoury
             catch (Exception e) { Log.Error("RangedLore.Learn", e); return false; }
         }
 
-        /// <summary>Punkty nauki do wlasciwej szkoly (np. pocieszenie za spartaczone rozlozenie).</summary>
+        /// <summary>
+        /// Punkty nauki z CUDZEJ sztuki (pocieszenie za spartaczone rozlozenie,
+        /// przetop znanego wzoru). Odkrycie losowe, ale NIE WYZEJ niz tier tej
+        /// sztuki - z gotowej rzeczy czlowiek uczy sie najwyzej jej poziomu.
+        /// </summary>
         internal static void Study(ItemObject it, float pts)
         {
             try
@@ -197,12 +201,40 @@ namespace Armoury
                 int sc = BranchTaughtBy(it);
                 if (sc == SchoolNone) return;
                 Research[sc] += pts;
-                TryUnlock(sc);
+                TryUnlockRandom(sc, 1, Math.Max(1, TierOf(it)));
                 var line = Ledger(sc);
                 if (!string.IsNullOrEmpty(line))
                 { Log.Info(line); InformationManager.DisplayMessage(new InformationMessage(line, Colors.Cyan)); }
             }
             catch (Exception e) { Log.Error("RangedLore.Study", e); }
+        }
+
+        /// <summary>
+        /// PRZETOP. Nieznany wzor: rzecz idzie do tygla, ale jej budowa zostaje
+        /// w glowie - wzor wchodzi do ksiegi W CALOSCI (Jeff: "jak przetapiam
+        /// jakis pancerz to ucze sie tego dokladnie"). Znany wzor: punkty jak
+        /// dotad (polowa stawki kucia) i losowe odkrycie nie wyzej niz tier
+        /// przetapianej sztuki.
+        /// </summary>
+        internal static void OnSmelted(ItemObject item)
+        {
+            try
+            {
+                if (item == null) return;
+                int sc = BranchTaughtBy(item);
+                if (sc == SchoolNone) return;
+                if (CanLearnFrom(item))
+                {
+                    if (Learn(item))
+                    {
+                        Log.Player("Melting the " + item.Name + " down laid its making bare - the pattern is yours now.");
+                        ReportSchoolOf(item);
+                    }
+                    return;
+                }
+                Study(item, MathF.Max(0.5f, TierOf(item) * 0.5f));
+            }
+            catch (Exception e) { Log.Error("RangedLore.OnSmelted", e); }
         }
 
         /// <summary>Szkola rzeczy - do meldunku po rozlozeniu.</summary>
@@ -235,8 +267,8 @@ namespace Armoury
                 int known, total;
                 CountSchool(school, out known, out total);
 
-                // najtanszy nieznany wzor = ten, ktory odkryjesz jako nastepny
-                int nextTier = 0; string nextName = null; int bestVal = int.MaxValue;
+                // najtanszy nieznany tier = najnizsza mozliwa cena nastepnego losowania
+                int nextTier = 0;
                 var perTier = new int[8]; var knownTier = new int[8];
                 foreach (var item in MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
                 {
@@ -244,8 +276,7 @@ namespace Armoury
                     int ti = TierOf(item); if (ti < 1) ti = 1; if (ti > 6) ti = 6;
                     perTier[ti]++;
                     if (Known.Contains(item.StringId)) { knownTier[ti]++; continue; }
-                    if (nextTier == 0 || ti < nextTier || (ti == nextTier && item.Value < bestVal))
-                    { nextTier = ti; nextName = item.Name != null ? item.Name.ToString() : item.StringId; bestVal = item.Value; }
+                    if (nextTier == 0 || ti < nextTier) nextTier = ti;
                 }
 
                 var sb = new System.Text.StringBuilder();
@@ -256,9 +287,11 @@ namespace Armoury
                 if (nextTier == 0) sb.Append(", nothing left to learn.");
                 else
                 {
+                    // odkrycia sa losowe - obiecujemy tylko najnizsza mozliwa cene,
+                    // nie konkretny wzor
                     float cost = 3f * nextTier;
                     float miss = cost - pts; if (miss < 0f) miss = 0f;
-                    sb.Append(", next pattern: ").Append(nextName).Append(" (tier ").Append(nextTier)
+                    sb.Append(", next pattern: random (cheapest is tier ").Append(nextTier)
                       .Append(", costs ").Append((int)cost).Append(") - ").Append(miss.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture))
                       .Append(" pts short");
                     int top = 1; for (int t = 6; t >= 1; t--) if (knownTier[t] > 0) { top = t; break; }
@@ -288,10 +321,11 @@ namespace Armoury
         }
 
         /// <summary>
-        /// Po udanej robocie: punkty nauki i proba odkrycia. Kolejny wzor
-        /// kosztuje 3 x jego tier punktow - odkrywa sie zawsze NAJTANSZY
-        /// nieznany (tier, potem wartosc), wiec legendy przychodza ostatnie.
-        /// Strzaly ucza lucznictwa, belty kusznictwa - to ta sama reka.
+        /// Po udanej robocie: punkty nauki i proba odkrycia. Odkrycie jest
+        /// LOSOWE sposrod nieznanych wzorow szkoly o tierze ROWNYM LUB WYZSZYM
+        /// niz wykuta sztuka (Jeff: "jak kuje, moge sie losowo nauczyc tieru
+        /// danej dziedziny lub wyzej, jak przy broniach"). Kolejny wzor kosztuje
+        /// 3 x jego tier punktow. Strzaly ucza lucznictwa, belty kusznictwa.
         /// </summary>
         internal static void OnCrafted(ItemObject item)
         {
@@ -302,7 +336,7 @@ namespace Armoury
                 int sc = BranchTaughtBy(item);
                 if (sc == SchoolNone) return;
                 Research[sc] += pts;
-                TryUnlock(sc);
+                TryUnlockRandom(sc, Math.Max(1, TierOf(item)), 6);
                 // po kazdej robocie mowimy, ile jeszcze do nastepnego wzoru
                 if (sc != SchoolNone)
                 {
@@ -314,24 +348,33 @@ namespace Armoury
             catch (Exception e) { Log.Error("RangedLore.OnCrafted", e); }
         }
 
-        private static void TryUnlock(int school)
+        /// <summary>
+        /// Losowe odkrycie z zakresu tierow [minTier..maxTier]. Losujemy KANDYDATA
+        /// sposrod nieznanych wzorow szkoly w zakresie; jesli punktow starcza na
+        /// jego cene (3 x tier), wchodzi do ksiegi i losujemy dalej; jesli nie -
+        /// punkty zostaja i los odbedzie sie przy nastepnej robocie. MBRandom,
+        /// nie System.Random - spojnie z reszta kampanii.
+        /// </summary>
+        private static void TryUnlockRandom(int school, int minTier, int maxTier)
         {
             try
             {
                 Seed();
+                var pool = new List<ItemObject>();
                 while (true)
                 {
-                    ItemObject next = null;
-                    int bestTier = int.MaxValue; int bestVal = int.MaxValue;
+                    pool.Clear();
                     foreach (var item in MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
                     {
                         if (!Teachable(item) || SchoolOf(item) != school) continue;
                         if (Known.Contains(item.StringId)) continue;
                         int ti = TierOf(item);
-                        if (ti < bestTier || (ti == bestTier && item.Value < bestVal))
-                        { next = item; bestTier = ti; bestVal = item.Value; }
+                        if (ti < minTier || ti > maxTier) continue;
+                        pool.Add(item);
                     }
-                    if (next == null) return;                       // wszystko odkryte
+                    if (pool.Count == 0) return;                    // nic do odkrycia w tym zakresie
+                    var next = pool[MBRandom.RandomInt(pool.Count)];
+                    int bestTier = Math.Max(1, TierOf(next));
                     float cost = 3f * bestTier;
                     if (Research[school] < cost) return;            // jeszcze sie ucz
                     Research[school] -= cost;
@@ -348,10 +391,11 @@ namespace Armoury
                     InformationManager.DisplayMessage(new InformationMessage(
                         "At the bench you worked out the making of the " + next.Name + " - new pattern unlocked.",
                         Colors.Green));
-                    Log.Info("Wiedza: odkryto " + next.StringId + " (" + SchoolName(school) + ", t" + bestTier + ").");
+                    Log.Info("Wiedza: odkryto losowo " + next.StringId + " (" + SchoolName(school) + ", t" + bestTier
+                             + ", zakres " + minTier + "-" + maxTier + ").");
                 }
             }
-            catch (Exception e) { Log.Error("RangedLore.TryUnlock", e); }
+            catch (Exception e) { Log.Error("RangedLore.TryUnlockRandom", e); }
         }
 
         // ---- zapis: "id|id|...;pkt1;pkt2;...;pkt9" (stary format 4-polowy wczytujemy nadal) ----
