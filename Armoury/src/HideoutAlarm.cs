@@ -76,6 +76,40 @@ namespace Armoury
             catch (Exception e) { Log.Error("HideoutAlarm.OnAgentRemoved", e); }
         }
 
+        // ------------------------------------------------- halas krokow
+        // Jeff: "w nocy widac mniej, ale slychac bardziej - w kryjowce".
+        // Wzrok AI w misji to natywna sprawa silnika; SLUCH dokladamy sami:
+        // biegnacy czlowiek (predkosc > prog) budzi zbojcow w promieniu -
+        // noca wiekszym (cisza niesie), za dnia mniejszym (gwar obozu maskuje).
+        // Chod na Left Ctrl (WalkKey) jest wolny, wiec cichy - skradanie dziala.
+        private float _noiseTimer;
+
+        public override void OnMissionTick(float dt)
+        {
+            try
+            {
+                _noiseTimer += dt;
+                if (_noiseTimer < 1f) return;
+                _noiseTimer = 0f;
+                var s = Settings.Current;
+                if (s == null || !s.HideoutAlarmEnabled || !s.HideoutNoiseEnabled) return;
+                var m = Mission;
+                if (m == null || m.PlayerTeam == null) return;
+                int h = TaleWorlds.CampaignSystem.CampaignTime.Now.GetHourOfDay;
+                bool night = h >= 21 || h <= 5;
+                float radius = night ? s.HideoutHearNight : s.HideoutHearDay;
+                if (radius <= 0f) return;
+                foreach (var a in m.Agents)
+                {
+                    if (a == null || !a.IsHuman || !a.IsActive()) continue;
+                    if (a.Team == null || (a.Team != m.PlayerTeam && !a.Team.IsPlayerAlly)) continue;
+                    if (a.Velocity.Length < 3.5f) continue;    // marsz i skradanie sa ciche
+                    AlarmAround(a, radius);
+                }
+            }
+            catch (Exception e) { Log.Error("HideoutAlarm.Noise", e); }
+        }
+
         /// <summary>Budzi obsade kryjowki (wrogow gracza) w promieniu od ofiary.</summary>
         private void AlarmAround(Agent victim, float radius)
         {

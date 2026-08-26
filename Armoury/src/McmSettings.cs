@@ -732,7 +732,7 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public int AiCampSkipPercent { get; set; } = 15;
 
-        [SettingPropertyBool("Bandits Rest By Day", HintText = "bandits are night hunters: most lie low by day (10-16) and prowl after dark - a quarter keep hunting in daylight")]
+        [SettingPropertyBool("Bandits Rest By Day", HintText = "every band has a nature: three in four are night hunters (lie low 10-16), one in four hunts by day and beds down at night (23-5)")]
         [SettingPropertyGroup("A night's rest")]
         public bool BanditsRestByDay { get; set; } = true;
 
@@ -767,6 +767,18 @@ namespace Armoury
         [SettingPropertyBool("Hideout Armoury Gear", HintText = "your men storm hideouts in their ARMOURY kit, same as field battles (opens the gate DTE leaves shut in regular hideouts)")]
         [SettingPropertyGroup("A night's rest")]
         public bool HideoutArmouryGear { get; set; } = true;
+
+        [SettingPropertyBool("Hideout Noise Enabled", HintText = "running feet carry in a hideout: bandits within earshot come alarmed - WALK (Left Ctrl) to move quietly")]
+        [SettingPropertyGroup("A night's rest")]
+        public bool HideoutNoiseEnabled { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Hideout Hear Day", 0.00f, 40.00f, "0.00", HintText = "meters a RUNNING man is heard by day - the camp's own bustle masks a lot")]
+        [SettingPropertyGroup("A night's rest")]
+        public float HideoutHearDay { get; set; } = 10f;
+
+        [SettingPropertyFloatingInteger("Hideout Hear Night", 0.00f, 80.00f, "0.00", HintText = "meters a RUNNING man is heard at night - silence carries sound, so sneak at a walk")]
+        [SettingPropertyGroup("A night's rest")]
+        public float HideoutHearNight { get; set; } = 20f;
 
         [SettingPropertyBool("Sight Cycle Enabled", HintText = "eyes follow the sun: every party sees further by day and shorter after dark")]
         [SettingPropertyGroup("A night's rest")]
@@ -1071,6 +1083,9 @@ namespace Armoury
             s.HideoutAlarmScreamRadius = HideoutAlarmScreamRadius;
             s.HideoutAlarmWitnessRadius = HideoutAlarmWitnessRadius;
             s.HideoutArmouryGear = HideoutArmouryGear;
+            s.HideoutNoiseEnabled = HideoutNoiseEnabled;
+            s.HideoutHearDay = HideoutHearDay;
+            s.HideoutHearNight = HideoutHearNight;
             s.SightCycleEnabled = SightCycleEnabled;
             s.DaySightFactor = DaySightFactor;
             s.NightSightFactor = NightSightFactor;

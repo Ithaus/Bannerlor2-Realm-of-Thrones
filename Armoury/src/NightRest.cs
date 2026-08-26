@@ -90,7 +90,7 @@ namespace Armoury
 
                 if (h == 6) SettleNight(s);
                 AiNightCamp(s, h);
-                AiBanditDayRest(s, h);
+                AiBanditRest(s, h);
             }
             catch (Exception e) { Log.Error("NightRest.OnHourly", e); }
         }
@@ -98,6 +98,48 @@ namespace Armoury
         // ------------------------------------------------------------ swiat tez spi
         private static readonly System.Collections.Generic.List<MobileParty> _tented =
             new System.Collections.Generic.List<MobileParty>();
+        // wszyscy, ktorzy TEJ nocy poszli spac (z namiotem czy bez) - z tej listy
+        // czesty refresh dobiera namioty wokol gracza
+        private static readonly System.Collections.Generic.List<MobileParty> _camping =
+            new System.Collections.Generic.List<MobileParty>();
+        private static DateTime _lastTentRefresh = DateTime.MinValue;
+
+        /// <summary>
+        /// NAMIOTY WOKOL GRACZA, ODSWIEZANE CZESTO (Jeff: "mijam obozy, a stoi
+        /// konik - ma byc namiot"). Stary przydzial szedl raz na godzine GRY,
+        /// wiec podjezdzajac do spiacego obozu w pol godziny widziales figurke.
+        /// Teraz: co ~2 sekundy REALNE zdejmujemy namioty poza zasiegiem
+        /// i obudzonym, a spiacym w zasiegu stawiamy - do limitu AiTentCap.
+        /// Wizerunki ruszamy TYLKO przy zmianie stanu (pulapka z CLAUDE.md).
+        /// </summary>
+        private static void RefreshNearbyTents(Settings s)
+        {
+            try
+            {
+                if (!s.CampTentIcon || MobileParty.MainParty == null) return;
+                var me = MobileParty.MainParty.GetPosition2D;
+                float radius = MathF.Max(5f, s.AiTentRadius);
+                for (int i = _tented.Count - 1; i >= 0; i--)
+                {
+                    var t = _tented[i];
+                    bool drop = t == null || !t.IsActive || t.MapEvent != null
+                                || t.Ai == null || !t.Ai.IsDisabled
+                                || t.GetPosition2D.Distance(me) > radius + 3f;
+                    if (drop) { Tent(t, false); _tented.RemoveAt(i); }
+                }
+                foreach (var mp in _camping)
+                {
+                    if (_tented.Count >= Math.Max(0, s.AiTentCap)) break;
+                    if (mp == null || !mp.IsActive || mp.MapEvent != null) continue;
+                    if (mp.Ai == null || !mp.Ai.IsDisabled) continue;      // obudzony = zadnego namiotu
+                    if (_tented.Contains(mp)) continue;
+                    if (mp.GetPosition2D.Distance(me) > radius) continue;
+                    Tent(mp, true);
+                    _tented.Add(mp);
+                }
+            }
+            catch (Exception e) { Log.Error("RefreshNearbyTents", e); }
+        }
 
         /// <summary>
         /// ROZKAZ ZAPAMIETANY NA NOC. Stare obozowanie wolalo SetMoveModeHold(),
@@ -185,6 +227,7 @@ namespace Armoury
                         foreach (var mp in _tented) Tent(mp, false);
                         _tented.Clear();
                     }
+                    _camping.Clear();
                     // SWIT: kazdy uspiony lord dostaje z powrotem swoj rozkaz
                     if (_orders.Count > 0)
                     {
@@ -234,6 +277,7 @@ namespace Armoury
                     if (danger)
                     {
                         if (_tented.Contains(mp)) { Tent(mp, false); _tented.Remove(mp); }
+                        _camping.Remove(mp);
                         GiveOrderBack(mp);          // alarm w nocy - rozkaz wraca od reki
                         continue;                   // wrog blisko - zwijaja sie i ida
                     }
@@ -241,45 +285,33 @@ namespace Armoury
                     RememberOrder(mp);              // po co wyszedl - zapisane przed snem
                     mp.Ai.DisableForHours(1);       // spia godzine; nocny tick odnowi
                     mp.SetMoveModeHold();
-                    // limit ikon AiTentCap (reszta spi bez obrazka) - wlasnie brak
-                    // tego limitu przy setkach partii konczyl sie CTD; do tego
-                    // namioty TYLKO wokol gracza (Jeff: "tam gdzie ja widze")
-                    if (s.CampTentIcon && _tented.Count < Math.Max(0, s.AiTentCap) && !_tented.Contains(mp)
-                        && MobileParty.MainParty != null
-                        && mp.GetPosition2D.Distance(MobileParty.MainParty.GetPosition2D) <= MathF.Max(5f, s.AiTentRadius))
-                    { Tent(mp, true); _tented.Add(mp); }
+                    if (!_camping.Contains(mp)) _camping.Add(mp);
                 }
-                // gracz odjechal od spiacych - obrazki schodza (partie dalej spia)
-                if (s.CampTentIcon && MobileParty.MainParty != null)
-                {
-                    for (int i = _tented.Count - 1; i >= 0; i--)
-                    {
-                        var t = _tented[i];
-                        if (t == null || !t.IsActive
-                            || t.GetPosition2D.Distance(MobileParty.MainParty.GetPosition2D) > MathF.Max(5f, s.AiTentRadius) + 3f)
-                        { Tent(t, false); _tented.RemoveAt(i); }
-                    }
-                }
+                // namioty wokol gracza (czesciej odswieza je OnTick - tu tylko takt godzinowy)
+                RefreshNearbyTents(s);
                 if (s.CampTentIcon) ReassertTents();   // konie nie wracaja na namioty
             }
             catch (Exception e) { Log.Error("AiNightCamp", e); }
         }
 
         /// <summary>
-        /// NOCNI LOWCY (Jeff: "bandyci glownie grasuja w nocy, ale moga tez
-        /// w dzien"). W dzien (10-16) wieksza czesc band lezy w ukryciu
-        /// (AI wstrzymane na godzine, bez namiotow - oni sie CHOWAJA, nie
-        /// obozuja), cwierc kazdego dnia poluje mimo slonca. Pogon, ucieczka
-        /// i wrogi lord w poblizu uniewazniaja drzemke. Noca banda chodzi
-        /// normalnie - czyli wlasnie wtedy, gdy podroznym spada zasieg wzroku.
+        /// NATURY BAND (Jeff: "niektorzy poluja w dzien, inni w nocy, roznie").
+        /// Kazda banda ma stala nature (z jej Id, nie zmienia sie): trzy na
+        /// cztery to NOCNI lowcy - za dnia (10-16) leza w ukryciu, noca chodza;
+        /// jedna na cztery to DZIENNI - poluja w sloncu, a klada sie noca
+        /// (23-5). Miedzy oknami (swit, wieczor) wszyscy sa na nogach.
+        /// Spoczynek = AI wstrzymane na godzine, bez namiotow (chowaja sie,
+        /// nie obozuja). Pogon, ucieczka i wrogi lord w poblizu uniewazniaja
+        /// drzemke. Nocnym sprzyja krotszy nocny zasieg wzroku podroznych.
         /// </summary>
-        private static void AiBanditDayRest(Settings s, int h)
+        private static void AiBanditRest(Settings s, int h)
         {
             try
             {
                 if (!s.BanditsRestByDay) return;
-                if (h < 10 || h > 16) return;
-                uint dayN = (uint)CampaignTime.Now.ToDays;
+                bool dayWindow = h >= 10 && h <= 16;      // spia nocni lowcy
+                bool nightWindow = h >= 23 || h <= 5;     // spia dzienni lowcy
+                if (!dayWindow && !nightWindow) return;
 
                 var lords = new System.Collections.Generic.List<MobileParty>();
                 foreach (var t in MobileParty.All)
@@ -292,8 +324,9 @@ namespace Armoury
                     if (Undead.Party(mp)) continue;
                     string stb = mp.ShortTermBehavior.ToString();
                     if (stb.StartsWith("Flee") || stb.StartsWith("Engage")) continue;   // pogon nie zna pory
-                    // cwierc band poluje takze za dnia (stale per banda i dzien)
-                    if ((mp.Id.InternalValue + dayN) % 4u == 0u) continue;
+                    bool dayHunter = mp.Id.InternalValue % 4u == 0u;   // stala natura bandy
+                    if (dayWindow && dayHunter) continue;              // dzienny wlasnie poluje
+                    if (nightWindow && !dayHunter) continue;           // nocny wlasnie poluje
                     bool danger = false;
                     foreach (var t in lords)
                         if (mp.GetPosition2D.Distance(t.GetPosition2D) <= s.AiCampDangerRadius) { danger = true; break; }
@@ -302,7 +335,7 @@ namespace Armoury
                     mp.SetMoveModeHold();
                 }
             }
-            catch (Exception e) { Log.Error("AiBanditDayRest", e); }
+            catch (Exception e) { Log.Error("AiBanditRest", e); }
         }
 
         // ---------------------------------------------------- namiot na mapie
@@ -496,6 +529,16 @@ namespace Armoury
                 {
                     Tent(MobileParty.MainParty, false);
                     PlayerCamped = false;
+                }
+
+                // mijane obozy dostaja namiot OD RAZU (refresh co ~2 s realne),
+                // nie dopiero na godzinnym ticku kampanii
+                if (s.AiCampsAtNight && s.CampTentIcon && Campaign.Current != null && _camping.Count > 0
+                    && (DateTime.Now - _lastTentRefresh).TotalSeconds > 2.0)
+                {
+                    _lastTentRefresh = DateTime.Now;
+                    int hh = CampaignTime.Now.GetHourOfDay;
+                    if (hh >= 22 || hh <= 4) RefreshNearbyTents(s);
                 }
 
                 if (!s.QuickCampKey || _askOpen) return;

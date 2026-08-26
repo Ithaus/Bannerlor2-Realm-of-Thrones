@@ -24,10 +24,23 @@ namespace ForgeView
               "IsVisible=\"@IsInArmorMode\"><Children>" +
                 "<Widget WidthSizePolicy=\"CoverChildren\" HeightSizePolicy=\"CoverChildren\" DataSource=\"{ArmorCrafting}\"><Children>" +
                   "<Widget WidthSizePolicy=\"CoverChildren\" HeightSizePolicy=\"CoverChildren\" DataSource=\"{CurrentItem}\"><Children>" +
-                    "<ItemTableauWidget WidthSizePolicy=\"Fixed\" HeightSizePolicy=\"Fixed\" " +
-                    "SuggestedWidth=\"460\" SuggestedHeight=\"460\" HorizontalAlignment=\"Center\" " +
-                    "InitialTiltRotation=\"0.35\" InitialPanRotation=\"0.6\" " +
-                    "StringId=\"@FvItemId\" ItemModifierId=\"@FvModifierId\" BannerCode=\"@FvBannerCode\"/>" +
+                    "<ListPanel WidthSizePolicy=\"CoverChildren\" HeightSizePolicy=\"CoverChildren\" " +
+                    "HorizontalAlignment=\"Center\" StackLayout.LayoutMethod=\"VerticalBottomToTop\"><Children>" +
+                      "<ItemTableauWidget WidthSizePolicy=\"Fixed\" HeightSizePolicy=\"Fixed\" " +
+                      "SuggestedWidth=\"460\" SuggestedHeight=\"460\" HorizontalAlignment=\"Center\" " +
+                      "InitialTiltRotation=\"0.35\" InitialPanRotation=\"0.6\" " +
+                      "StringId=\"@FvItemId\" ItemModifierId=\"@FvModifierId\" BannerCode=\"@FvBannerCode\"/>" +
+                      // stan wzoru jak przy broniach: czerwony = zamkniety, zielony = znany
+                      // (kolor przez Brush.FontColor - ten sam mechanizm co Brush.FontSize w TierBar)
+                      "<TextWidget WidthSizePolicy=\"CoverChildren\" HeightSizePolicy=\"CoverChildren\" " +
+                      "HorizontalAlignment=\"Center\" MarginTop=\"4\" IsVisible=\"@FvLocked\" " +
+                      "Brush=\"Crafting.Tier.Text\" Brush.FontSize=\"26\" Brush.FontColor=\"#D65252FF\" " +
+                      "Text=\"PATTERN NOT LEARNED\"/>" +
+                      "<TextWidget WidthSizePolicy=\"CoverChildren\" HeightSizePolicy=\"CoverChildren\" " +
+                      "HorizontalAlignment=\"Center\" MarginTop=\"4\" IsVisible=\"@FvKnown\" " +
+                      "Brush=\"Crafting.Tier.Text\" Brush.FontSize=\"26\" Brush.FontColor=\"#8FBF71FF\" " +
+                      "Text=\"PATTERN KNOWN\"/>" +
+                    "</Children></ListPanel>" +
                   "</Children></Widget>" +
                 "</Children></Widget>" +
               "</Children></Widget>";

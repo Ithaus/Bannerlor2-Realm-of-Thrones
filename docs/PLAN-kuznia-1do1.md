@@ -42,3 +42,20 @@ Status (26.08, po zgodzie Jeffa "ok rob"):
   InjectRanged + FletchForge); kroki 1-3 ujednolicily im reszte.
 - Krok 5 (popup wyboru klas jak przy broni) - NIEZROBIONY, do decyzji po
   testach 1-3 (ForgeView ma juz filtr kategorii, ktory czesciowo to zalatwia).
+
+## ZADANIE DLA CLAUDE NA WINDOWS: kolor wierszy listy zbroi (locked = szary/czerwony)
+
+Jeff chce, zeby na liscie zbroi w CRAFT zamkniete wzory byly wyszarzone/czerwone jak
+zablokowane czesci broni, zamiast dopisku "- LOCKED" (Armoury/BkArmourList.NamePostfix).
+Z Maca NIE DA SIE tego skonczyc: wiersze renderuje prefab Banner Kings, ktorego XML
+lezy w plikach MODULU na maszynie z gra (Modules\BannerKings\GUI\Prefabs\..., w DLL
+go nie ma - sprawdzone). Na Windows:
+1. Znajdz prefab z lista (grep po "Armors" albo "ArmorItemVM" w GUI/Prefabs BK).
+2. ArmorItemVM ma juz z naszej strony [DataSourceProperty] FvLocked / FvKnown
+   (ForgeView/ArmourItemMixin) - w prefabie wystarczy na TextWidget nazwy dodac
+   drugi wariant z Brush.FontColor="#D65252FF" IsVisible="@FvLocked" (i normalny
+   z IsVisible="@FvKnown"), wzorzec kolorow jak w naszym TableauExtension.
+3. Prefabu BK NIE edytowac w jego module (nadpisze update) - zrobic PrefabExtension
+   w ForgeView celujacy w ten wezel (sciezke odczytac z pliku) i wtedy usunac dopisek
+   "- LOCKED" z BkArmourList.NamePostfix.
+Kolorowy stan wzoru pod podgladem 3D (PATTERN KNOWN / NOT LEARNED) juz dziala z Maca.
