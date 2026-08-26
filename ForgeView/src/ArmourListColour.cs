@@ -6,32 +6,33 @@ using Bannerlord.UIExtenderEx.Prefabs2;
 namespace ForgeView
 {
     /// <summary>
-    /// Wiersze listy zbroi w zakladce CRAFT: wzor nieodkryty na czerwono, znany normalnie -
-    /// jak zablokowane czesci broni, zamiast dopisku "- LOCKED" (docs/PLAN-kuznia-1do1.md).
-    /// Podmiana (Replace) wezla nazwy na DWA warianty przelaczane IsVisible - zadnego
-    /// SetAttribute, bo ten wieszal ekran (patrz komentarz w MaterialRowExtension).
-    /// XPath celuje w wiazanie @ItemName, nie w strukture drzewa - przezyje drobne
-    /// roznice ukladu miedzy BK z githuba a BK.Redux u Jeffa. Wzor wezla przepisany
-    /// ze zrodel BK: GUI/Prefabs/Crafting/ArmorCraftingCategory.xml (RichTextWidget
-    /// w ItemTemplate listy SmeltableItemList, DataSource {Armors} = ArmorItemVM).
+    /// Wiersze listy zbroi w zakladce CRAFT: wzor NIEODKRYTY dostaje szara plachte
+    /// przyciemniajaca CALY kafelek (portret + napisy) - jak nieposiadane czesci
+    /// broni w kuzni; znany wzor zostaje w naturalnych barwach. Wczesniejsza wersja
+    /// barwila tylko napis nazwy na czerwono - Jeff chcial caly kafelek.
+    /// Append za ostatnim widgetem kafelka (rodzenstwo, nie SetAttribute - ten
+    /// wieszal ekran, patrz komentarz w MaterialRowExtension), wiec plachta
+    /// renderuje sie NA WIERZCHU wszystkich dzieci ButtonWidgeta.
+    /// XPath celuje w wiazanie @ItemTypeText (ostatnie dziecko kafelka w prefabu
+    /// BK ArmorCraftingCategory.xml na dysku Jeffa - sprawdzone w pliku modulu).
     /// </summary>
-    [PrefabExtension("ArmorCraftingCategory", "descendant::*[@Text='@ItemName']")]
+    [PrefabExtension("ArmorCraftingCategory", "descendant::*[@Text='@ItemTypeText']")]
     internal sealed class ArmourListColour : PrefabExtensionInsertPatch
     {
         /// <summary>
-        /// True dopiero, gdy XPath trafil i warianty NAPRAWDE weszly do prefabu
+        /// True dopiero, gdy XPath trafil i plachta NAPRAWDE weszla do prefabu
         /// (getter Nodes biegnie po udanym SelectSingleNode - sprawdzone w zrodlach
         /// UIExtenderEx, PrefabComponent.RegisterPatch). Armoury.BkArmourList czyta
         /// to pole przez reflection i tylko wtedy zdejmuje dopisek "- LOCKED";
-        /// jak latka nie wejdzie (inny prefab w Redux), dopisek zostaje.
+        /// jak latka nie wejdzie (inny prefab), dopisek zostaje jako zapas.
         /// </summary>
         public static bool Applied;
 
         private readonly List<XmlNode> _nodes;
 
-        // 2 = Replace w Prefabs2 (Prepend 0, ReplaceKeepChildren 1, Replace 2, Child 3, Append 4);
-        // pierwszy wezel podmienia cel, drugi wchodzi ZA nim jako rodzenstwo
-        public override InsertType Type => (InsertType)2;
+        // 4 = Append w Prefabs2 (Prepend 0, ReplaceKeepChildren 1, Replace 2, Child 3, Append 4);
+        // wezel wchodzi ZA celem jako rodzenstwo - zostaje ostatnim dzieckiem kafelka
+        public override InsertType Type => (InsertType)4;
 
         [PrefabExtensionXmlNodes]
         public IEnumerable<XmlNode> Nodes
@@ -41,7 +42,7 @@ namespace ForgeView
                 if (!Applied)
                 {
                     Applied = true;
-                    Log.Info("ArmourListColour: wiersze listy zbroi dostaly warianty known/locked.");
+                    Log.Info("ArmourListColour: kafelki listy zbroi dostaly szara plachte dla nieznanych wzorow.");
                 }
                 return _nodes;
             }
@@ -49,25 +50,13 @@ namespace ForgeView
 
         public ArmourListColour()
         {
-            _nodes = new List<XmlNode>
-            {
-                Row("@FvKnown", null),
-                Row("@FvLocked", "#D65252FF")     // czerwien jak PATTERN NOT LEARNED w TableauExtension
-            };
-        }
-
-        /// <summary>Kopia oryginalnego wezla nazwy z prefabu BK + IsVisible i ew. kolor.</summary>
-        private static XmlNode Row(string visible, string colour)
-        {
             var xml =
-              "<RichTextWidget IsDisabled=\"true\" DoNotAcceptEvents=\"true\" WidthSizePolicy=\"Fixed\" " +
-              "HeightSizePolicy=\"StretchToParent\" SuggestedWidth=\"150\" HorizontalAlignment=\"Left\" " +
-              "VerticalAlignment=\"Center\" MarginLeft=\"180\" Brush=\"Smelting.Tuple.Text\" " +
-              (colour != null ? "Brush.FontColor=\"" + colour + "\" " : "") +
-              "Text=\"@ItemName\" Brush.TextHorizontalAlignment=\"Left\" IsVisible=\"" + visible + "\"/>";
+              "<Widget DoNotAcceptEvents=\"true\" IsDisabled=\"true\" WidthSizePolicy=\"StretchToParent\" " +
+              "HeightSizePolicy=\"StretchToParent\" Sprite=\"BlankWhiteSquare_9\" Color=\"#141414FF\" " +
+              "AlphaFactor=\"0.62\" IsVisible=\"@FvLocked\"/>";
             var doc = new XmlDocument();
             doc.LoadXml(xml);
-            return doc.DocumentElement;
+            _nodes = new List<XmlNode> { doc.DocumentElement };
         }
     }
 }
