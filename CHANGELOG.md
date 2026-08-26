@@ -17,6 +17,21 @@
 
 ---
 
+## 2026-08-26 — naprawa sprzetu WOJSKA u kowala (zbrojownia DTE)
+**Mod:** Armoury | **Pliki:** `src/SmithMenu.cs`, `src/QuartermasterLaw.cs`, `src/Settings.cs`
+**Problem:** zbrojownia DTE trzyma modyfikatory stanu, a ConditionScaling skaluje pancerz
+KAZDEGO noszacego - zolnierz w kirysie 3% ma realnie ~11% ochrony (krzywa: 1% ~ -89%).
+Nie bylo ZADNEJ drogi naprawy polek wojska ani informacji, ze taka potrzeba istnieje.
+**Przyczyna:** opcje kowala obejmowaly tylko sakwy i grzbiet gracza.
+**Zmiana:** nowa opcja "Send the men's worn gear to the smith" w Work the forge: skan zbrojowni
+DTE, stawka HURTOWA (Troop Mend Cost Factor, domyslnie 50% ceny naprawy wlasnej sztuki),
+najtansze najpierw, pelny koszt wypisany Z GORY w podpowiedzi, robota max Troop Mend Max Hours
+(24 h). Kwatermistrz przy otwarciu zbrojowni melduje na zolto ile sztuk jest zuzytych i ze
+kowal je naprawi. 3 nowe ustawienia MCM (grupa The men's gear).
+**Ryzyko / co sprawdzic:** tooltip z kwotami na zdrowym rozsadku; po naprawie polki maja czyste
+przedmioty (bez stanu) w tej samej liczbie; zloto schodzi dokladnie o wypisana kwote.
+**Status:** DO SPRAWDZENIA
+
 ## 2026-08-26 — luczarnia: pamiec ostatniej polki + stamina i ryzyko jak przy broni
 **Mod:** Armoury | **Pliki:** `src/SmithMenu.cs`, `src/Recipes.cs`, `src/Forge.cs`, `src/Settings.cs`, `tools/gen_mcm.py`
 **Problem:** (1) wejscie w luki wymaga za kazdym razem klikania typ->tier od nowa;

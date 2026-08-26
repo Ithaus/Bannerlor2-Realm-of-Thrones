@@ -68,6 +68,9 @@ namespace Armoury
             starter.AddGameMenuOption(Menu, "arm_mend_loot",
                 "{=!}Restore ALL battle-worn loot from your bags", MendLootCondition, MendLootConsequence, false, 6);
 
+            starter.AddGameMenuOption(Menu, "arm_mend_troops",
+                "{=!}Send the men's worn gear to the smith", MendTroopsCondition, MendTroopsConsequence, false, 6);
+
             // robota wymaga czasu: jedno wspolne menu oczekiwania dla napraw i przetopu
             starter.AddWaitGameMenu("arm_work_wait",
                 "{=!}{ARM_WORK_TEXT}",
@@ -555,6 +558,131 @@ namespace Armoury
                 Log.Info("Naprawa sztuki: " + ee.Item.StringId + (bySmith ? " kowal " + gold : " wlasna"));
             }
             catch (Exception e) { Log.Error("DoMendOne", e); }
+        }
+
+        // ------------------------------------------------- naprawa sprzetu WOJSKA
+        // Jeff: "zolnierz w pancerzu 3% biega prawie golym - musi byc info,
+        // ze u kowala naprawisz sprzet wojska, i logiczny koszt, nie majatek".
+        // Zbrojownia DTE trzyma modyfikatory stanu, a nasz ConditionScaling
+        // skaluje pancerz KAZDEGO, kto nosi zuzyta sztuke - takze zolnierza.
+        // Kowal bierze polki hurtem: stawka TroopMendCostFactor od ceny
+        // naprawy, najtansze najpierw, koszt wypisany Z GORY w podpowiedzi.
+
+        private static int TroopPieceCost(EquipmentElement el)
+        {
+            float f = MathF.Max(0.05f, Settings.Current.TroopMendCostFactor);
+            return Math.Max(1, (int)(PieceCost(el) * f));
+        }
+
+        /// <summary>Ile zuzytych sztuk lezy w zbrojowni wojska i ile kosztuje naprawa (calosc / na ile stac).</summary>
+        private static void ScanTroopWorn(out int pieces, out int cost, out int canPieces, out int canCost)
+        {
+            pieces = 0; cost = 0; canPieces = 0; canCost = 0;
+            try
+            {
+                var armory = QuartermasterLaw.DteArmory();
+                if (armory == null || QuartermasterEscrow.Active) return;
+                var costs = new List<int>();
+                for (int i = 0; i < armory.Count; i++)
+                {
+                    var el = armory.GetElementCopyAtIndex(i);
+                    var ee = el.EquipmentElement;
+                    if (ee.Item == null || !IsBattleWorn(ee.Item, ee.ItemModifier)) continue;
+                    int per = TroopPieceCost(ee);
+                    for (int k = 0; k < el.Amount; k++) costs.Add(per);
+                }
+                costs.Sort();
+                int gold = Hero.MainHero.Gold;
+                foreach (var c in costs)
+                {
+                    pieces++; cost += c;
+                    if (canCost + c <= gold) { canPieces++; canCost += c; }
+                }
+            }
+            catch (Exception e) { Log.Error("ScanTroopWorn", e); }
+        }
+
+        private static bool MendTroopsCondition(MenuCallbackArgs args)
+        {
+            try
+            {
+                args.optionLeaveType = GameMenuOption.LeaveType.Trade;
+                var s = Settings.Current;
+                if (s == null || !s.TroopMendEnabled) return false;
+                if (QuartermasterLaw.DteArmory() == null) return false;      // bez DTE nie ma zbrojowni
+                int all, allCost, can, canCost;
+                ScanTroopWorn(out all, out allCost, out can, out canCost);
+                if (all == 0)
+                { args.IsEnabled = false; args.Tooltip = new TextObject("{=!}The men's racks hold nothing worn - every piece is sound."); return true; }
+                if (can == 0)
+                { args.IsEnabled = false; args.Tooltip = new TextObject("{=!}{ALL} worn pieces on the racks, {COST} gold for the lot at the bulk rate - you cannot afford even the cheapest.").SetTextVariable("ALL", all).SetTextVariable("COST", allCost); return true; }
+                if (can < all)
+                    args.Tooltip = new TextObject("{=!}{ALL} worn pieces on the men's racks ({COST} gold for the lot, bulk rate). For your purse the smith will mend the {CAN} cheapest for {CANCOST}.")
+                        .SetTextVariable("ALL", all).SetTextVariable("COST", allCost).SetTextVariable("CAN", can).SetTextVariable("CANCOST", canCost);
+                else
+                    args.Tooltip = new TextObject("{=!}{ALL} worn pieces on the men's racks. The smith and his apprentices will make them whole for {COST} gold (bulk rate).")
+                        .SetTextVariable("ALL", all).SetTextVariable("COST", allCost);
+                return true;
+            }
+            catch (Exception e) { Log.Error("MendTroopsCondition", e); return false; }
+        }
+
+        private static void MendTroopsConsequence(MenuCallbackArgs args)
+        {
+            try
+            {
+                var s = Settings.Current;
+                int all, allCost, can, canCost;
+                ScanTroopWorn(out all, out allCost, out can, out canCost);
+                if (can == 0) return;
+                float hours = Math.Min(MathF.Max(1f, s.TroopMendMaxHours), can * s.MendLootHoursPerPiece);
+                StartTimedWork(hours,
+                    "The smith clears his benches and sets every apprentice on the men's gear.",
+                    delegate { DoMendTroops(); });
+            }
+            catch (Exception e) { Log.Error("MendTroopsConsequence", e); }
+        }
+
+        private static void DoMendTroops()
+        {
+            try
+            {
+                var armory = QuartermasterLaw.DteArmory();
+                if (armory == null) return;
+                var worn = new List<ItemRosterElement>();
+                for (int i = 0; i < armory.Count; i++)
+                {
+                    var el = armory.GetElementCopyAtIndex(i);
+                    var ee = el.EquipmentElement;
+                    if (ee.Item != null && IsBattleWorn(ee.Item, ee.ItemModifier)) worn.Add(el);
+                }
+                if (worn.Count == 0) return;
+                worn.Sort((a, b) => TroopPieceCost(a.EquipmentElement).CompareTo(TroopPieceCost(b.EquipmentElement)));
+                int paid = 0, done = 0, skipped = 0;
+                foreach (var el in worn)
+                {
+                    int per = TroopPieceCost(el.EquipmentElement);
+                    int fix2 = 0;
+                    for (int k = 0; k < el.Amount; k++)
+                    {
+                        if (Hero.MainHero.Gold - paid - per < 0) { skipped += el.Amount - k; break; }
+                        paid += per; fix2++;
+                    }
+                    if (fix2 > 0)
+                    {
+                        armory.AddToCounts(el.EquipmentElement, -fix2);
+                        armory.AddToCounts(new EquipmentElement(el.EquipmentElement.Item), fix2);
+                        done += fix2;
+                    }
+                }
+                if (done == 0) { Log.Player("You cannot pay for even the cheapest mend.", true); return; }
+                GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, null, paid);
+                Log.Player(skipped > 0
+                    ? "The men's " + done + " cheapest pieces are whole again for " + paid + " gold. " + skipped + " await a fuller purse."
+                    : "The men's racks are mended: " + done + " pieces made whole for " + paid + " gold.");
+                Log.Info("Naprawa zbrojowni wojska: " + done + " szt. za " + paid + ", pominieto " + skipped);
+            }
+            catch (Exception e) { Log.Error("DoMendTroops", e); }
         }
 
         private static bool OrdersCondition(MenuCallbackArgs args)

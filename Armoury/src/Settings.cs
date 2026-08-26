@@ -226,6 +226,11 @@ namespace Armoury
         public float TournamentXpPercent = 50f;            // tournament bouts teach this share of the battle rate (vanilla 33, RBM 100)
         public bool BattleXpScalesWithDamage = true;       // real battles: XP follows the damage dealt and a kill pays double - not a flat fee per swing
 
+        // --- The men's gear ---
+        public bool TroopMendEnabled = true;               // the town smith mends the worn gear on the troop armoury's racks - his apprentices work at a bulk rate
+        public float TroopMendCostFactor = 0.5f;           // the bulk rate: this share of what mending your own piece would cost (per piece, cheapest first)
+        public float TroopMendMaxHours = 24f;              // the whole job never takes longer than this - the smith puts every hand he has on it
+
         // --- Time at the forge ---
         public float SmithRepairHoursPerPiece = 1.5f;      // hours the smith needs per worn piece of your harness
         public float SelfRepairHoursPerPiece = 2.5f;       // hours you need per piece working the anvil yourself

@@ -354,6 +354,26 @@ namespace Armoury
                 // meldunek brakow PRZED schowaniem polek (pelna lista, z amunicja)
                 bool anyShort = QuartermasterLaw.ShoutShortages("Quartermaster: the men go SHORT (have/need):");
 
+                // info Jeffa: zuzyte sztuki na polkach naprawia kowal w miescie
+                // (liczone PRZED depozytem - ludzie nosza najlepsze, takze zuzyte)
+                if (s.TroopMendEnabled)
+                {
+                    int wornPieces = 0;
+                    for (int i = 0; i < armory.Count; i++)
+                    {
+                        var el = armory[i];
+                        var it = el.EquipmentElement.Item;
+                        var m = el.EquipmentElement.ItemModifier;
+                        if (it != null && el.Amount > 0 && !ArmouryBehavior.NoWear(it)
+                            && m != null && m.PriceMultiplier < 0.999f && m.PriceMultiplier > 0f)
+                            wornPieces += el.Amount;
+                    }
+                    if (wornPieces > 0)
+                        InformationManager.DisplayMessage(new InformationMessage(
+                            "Quartermaster: " + wornPieces + " pieces of the men's kit are battle-worn - a worn piece protects far less. The town smith will mend them (Work the forge).",
+                            Colors.Yellow));
+                }
+
                 foreach (var type in QuartermasterLaw.KitTypes)
                 {
                     // liczymy po ludzku (noszone), nie wg magazynowych norm DTE

@@ -768,6 +768,18 @@ namespace Armoury
         [SettingPropertyGroup("The worth of a lesson")]
         public bool BattleXpScalesWithDamage { get; set; } = true;
 
+        [SettingPropertyBool("Troop Mend Enabled", HintText = "the town smith mends the worn gear on the troop armoury's racks - his apprentices work at a bulk rate")]
+        [SettingPropertyGroup("The men's gear")]
+        public bool TroopMendEnabled { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Troop Mend Cost Factor", 0.00f, 2.00f, "0.00", HintText = "the bulk rate: this share of what mending your own piece would cost (per piece, cheapest first)")]
+        [SettingPropertyGroup("The men's gear")]
+        public float TroopMendCostFactor { get; set; } = 0.5f;
+
+        [SettingPropertyFloatingInteger("Troop Mend Max Hours", 0.00f, 96.00f, "0.00", HintText = "the whole job never takes longer than this - the smith puts every hand he has on it")]
+        [SettingPropertyGroup("The men's gear")]
+        public float TroopMendMaxHours { get; set; } = 24f;
+
         [SettingPropertyFloatingInteger("Smith Repair Hours Per Piece", 0.00f, 6.00f, "0.00", HintText = "hours the smith needs per worn piece of your harness")]
         [SettingPropertyGroup("Time at the forge")]
         public float SmithRepairHoursPerPiece { get; set; } = 1.5f;
@@ -1015,6 +1027,9 @@ namespace Armoury
             s.ArenaXpPercent = ArenaXpPercent;
             s.TournamentXpPercent = TournamentXpPercent;
             s.BattleXpScalesWithDamage = BattleXpScalesWithDamage;
+            s.TroopMendEnabled = TroopMendEnabled;
+            s.TroopMendCostFactor = TroopMendCostFactor;
+            s.TroopMendMaxHours = TroopMendMaxHours;
             s.SmithRepairHoursPerPiece = SmithRepairHoursPerPiece;
             s.SelfRepairHoursPerPiece = SelfRepairHoursPerPiece;
             s.MendLootHoursPerPiece = MendLootHoursPerPiece;
