@@ -17,6 +17,22 @@
 
 ---
 
+## 2026-08-26 — liczniki surowcow i staminy w ekranie kuzni odswiezaja sie na zywo
+**Mod:** Armoury | **Pliki:** `src/FletchForge.cs`
+**Problem:** po wykuciu (np. luku) w zakladce CRAFT panel dolny dalej pokazywal stara ilosc
+drewna/zelaza/wegla i stara stamine - trzeba bylo sie przeklikac miedzy zakladkami.
+**Przyczyna:** vanilla przelicza panel (CraftingVM.UpdateAll: materialy, stamina, skille,
+dostepnosc przycisku) tylko po WLASNYCH akcjach; nasze Forge.Smith zdejmuje materialy wprost
+z sakw, wiec ekran nie wiedzial. Stary refresh w prefixie robil tylko stamine bohatera i
+OnRefresh mixina BK - za malo.
+**Zmiana:** RefreshCraftScreen wolany z postfixa ExecuteMainActionBK (postfix biegnie TAKZE
+gdy prefix przejal robote strzelecka, i przy pancerzach BK): CraftingVM.UpdateAll przez
+reflection + OnRefresh mixina. Podwojny refresh z prefixa usuniety.
+**Ryzyko / co sprawdzic:** po wykuciu luku licznik drewna/zelaza i stamina maja zejsc OD RAZU;
+to samo po pancerzu z zakladki BK. UpdateAll jest prywatne - jesli nazwa sie kiedys zmieni,
+Traverse zwroci null i zostanie stary objaw (bez crasha).
+**Status:** DO SPRAWDZENIA
+
 ## 2026-08-26 — tansza naprawa wojska: wrak max 10% wartosci + rabat hurtowy
 **Mod:** Armoury | **Pliki:** `src/SmithMenu.cs`, `src/Settings.cs`
 **Problem:** Jeff po obejrzeniu przykladow: wrak (1%) placony ~12,5% wartosci to za drogo,

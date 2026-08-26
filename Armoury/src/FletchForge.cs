@@ -73,8 +73,7 @@ namespace Armoury
                 catch { }
 
                 Forge.Smith(item, smith);                 // nasze zasady od poczatku do konca
-                try { if (heroVm != null) Traverse.Create(heroVm).Method("RefreshStamina").GetValue(); } catch { }
-                try { tr.Method("OnRefresh").GetValue(); } catch { }
+                // liczniki odswieza postfix (biegnie takze przy prefixie false)
                 return false;
             }
             catch (Exception e) { Log.Error("FletchForge.BkCraft", e); return true; }
@@ -108,12 +107,35 @@ namespace Armoury
         }
 
         /// <summary>
+        /// LICZNIKI NA ZYWO (Jeff: "w kuzni nie odswieza sie ilosc surowcow
+        /// i stamina, musze sie przeklikac"). Vanilla przelicza panel dolny
+        /// (zelazo, drewno, wegiel, stamina) TYLKO po wlasnych akcjach -
+        /// nasze kucie schodzi z sakw bezposrednio, wiec ekran nie wiedzial.
+        /// CraftingVM.UpdateAll robi caly komplet: materialy, stamina,
+        /// umiejetnosci, dostepnosc przycisku.
+        /// </summary>
+        private static void RefreshCraftScreen(object mixin)
+        {
+            try
+            {
+                var tr = Traverse.Create(mixin);
+                var craftingVm = tr.Field("crafting").GetValue();
+                if (craftingVm != null)
+                    try { Traverse.Create(craftingVm).Method("UpdateAll").GetValue(); } catch { }
+                try { tr.Method("OnRefresh").GetValue(); } catch { }
+            }
+            catch (Exception e) { Log.Error("RefreshCraftScreen", e); }
+        }
+
+        /// <summary>
         /// Pancerz wykuty droga Banner Kings tez UCZY. Bez tego platnerz nigdy
         /// nie odkrylby wzoru tieru 2, bo punkty nauki zbieralo tylko nasze
-        /// wlasne kucie. Postfix biegnie po udanej robocie BK.
+        /// wlasne kucie. Postfix biegnie po KAZDEJ robocie (takze gdy prefix
+        /// przejal strzeleckie) - tu tez odswiezamy liczniki ekranu.
         /// </summary>
         public static void BkCraftPostfix(object __instance)
         {
+            RefreshCraftScreen(__instance);
             try
             {
                 var tr = Traverse.Create(__instance);
