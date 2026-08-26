@@ -780,6 +780,14 @@ namespace Armoury
         [SettingPropertyGroup("The men's gear")]
         public float TroopMendMaxHours { get; set; } = 24f;
 
+        [SettingPropertyBool("Troop Order Enabled", HintText = "order missing kit for the men from the town smith - plain pieces of the tier you ask, straight onto the racks")]
+        [SettingPropertyGroup("The men's gear")]
+        public bool TroopOrderEnabled { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Troop Order Markup", 0.00f, 4.60f, "0.00", HintText = "the smith's fee: each procured piece costs its market worth times this")]
+        [SettingPropertyGroup("The men's gear")]
+        public float TroopOrderMarkup { get; set; } = 1.15f;
+
         [SettingPropertyFloatingInteger("Smith Repair Hours Per Piece", 0.00f, 6.00f, "0.00", HintText = "hours the smith needs per worn piece of your harness")]
         [SettingPropertyGroup("Time at the forge")]
         public float SmithRepairHoursPerPiece { get; set; } = 1.5f;
@@ -1030,6 +1038,8 @@ namespace Armoury
             s.TroopMendEnabled = TroopMendEnabled;
             s.TroopMendCostFactor = TroopMendCostFactor;
             s.TroopMendMaxHours = TroopMendMaxHours;
+            s.TroopOrderEnabled = TroopOrderEnabled;
+            s.TroopOrderMarkup = TroopOrderMarkup;
             s.SmithRepairHoursPerPiece = SmithRepairHoursPerPiece;
             s.SelfRepairHoursPerPiece = SelfRepairHoursPerPiece;
             s.MendLootHoursPerPiece = MendLootHoursPerPiece;

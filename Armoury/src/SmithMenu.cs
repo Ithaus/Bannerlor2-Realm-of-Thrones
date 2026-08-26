@@ -71,6 +71,9 @@ namespace Armoury
             starter.AddGameMenuOption(Menu, "arm_mend_troops",
                 "{=!}Send the men's worn gear to the smith", MendTroopsCondition, MendTroopsConsequence, false, 6);
 
+            starter.AddGameMenuOption(Menu, "arm_order_kit",
+                "{=!}Order kit for the men - the smith procures it", OrderKitCondition, OrderKitConsequence, false, 6);
+
             // robota wymaga czasu: jedno wspolne menu oczekiwania dla napraw i przetopu
             starter.AddWaitGameMenu("arm_work_wait",
                 "{=!}{ARM_WORK_TEXT}",
@@ -683,6 +686,180 @@ namespace Armoury
                 Log.Info("Naprawa zbrojowni wojska: " + done + " szt. za " + paid + ", pominieto " + skipped);
             }
             catch (Exception e) { Log.Error("DoMendTroops", e); }
+        }
+
+        // ------------------------------------------------- zamowienie brakow WOJSKA
+        // Jeff: "mam info ze brakuje wojsku np. throw - czy moge zamowic u kowala
+        // brakujace rzeczy za oplata rynkowa, tier 1 tyle, tier 2 tyle". Kowal
+        // sprowadza PROSTE sztuki wybranego typu i tieru wprost na polki zbrojowni;
+        // cena = wartosc rynkowa x jego marza, wypisana przy kazdym tierze.
+
+        private static bool OrderKitCondition(MenuCallbackArgs args)
+        {
+            try
+            {
+                args.optionLeaveType = GameMenuOption.LeaveType.Trade;
+                var s = Settings.Current;
+                if (s == null || !s.TroopOrderEnabled) return false;
+                if (QuartermasterLaw.DteArmory() == null) return false;
+                var shortages = QuartermasterLaw.ShortageLines();
+                args.Tooltip = shortages.Count > 0
+                    ? new TextObject("{=!}The men go short: {LIST}. The smith will procure plain pieces of any tier for market worth plus his fee.")
+                        .SetTextVariable("LIST", string.Join(", ", shortages.ToArray()))
+                    : new TextObject("{=!}No shortages today - but the smith will procure spare kit all the same.");
+                return true;
+            }
+            catch (Exception e) { Log.Error("OrderKitCondition", e); return false; }
+        }
+
+        private static void OrderKitConsequence(MenuCallbackArgs args)
+        {
+            try
+            {
+                var armory = QuartermasterLaw.DteArmory();
+                if (armory == null) return;
+                var needs = QuartermasterLaw.CountNeeds();
+                var elements = new List<InquiryElement>();
+                foreach (var type in QuartermasterLaw.KitTypes)
+                {
+                    int need = QuartermasterLaw.WornFor(type, needs);
+                    if (need <= 0) continue;
+                    int have = QuartermasterLaw.HaveFor(armory, type);
+                    bool horse = type == ItemObject.ItemTypeEnum.Horse;
+                    string label = type + "   (racks " + have + " / need " + need + ")"
+                                 + (have < need ? "  - SHORT " + (need - have) : "");
+                    elements.Add(new InquiryElement(type, label, null, !horse,
+                        horse ? "The smith does not deal in horseflesh - see the stables."
+                              : (have < need ? "The men lack " + (need - have) + " of these." : "Fully stocked - spares never hurt.")));
+                }
+                if (elements.Count == 0) { Log.Player("The men need nothing - there is no one to outfit.", true); return; }
+
+                MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData(
+                    "The Order Ledger", "What shall the smith procure for the men? Racks / need counts what the armoury holds against what they carry.",
+                    elements, true, 1, 1, "Choose", "Leave",
+                    delegate (List<InquiryElement> sel)
+                    {
+                        if (sel == null || sel.Count == 0) return;
+                        var type = (ItemObject.ItemTypeEnum)sel[0].Identifier;
+                        int shortage = Math.Max(0, QuartermasterLaw.WornFor(type, QuartermasterLaw.CountNeeds())
+                                                   - QuartermasterLaw.HaveFor(QuartermasterLaw.DteArmory(), type));
+                        OrderKitTiers(type, shortage);
+                    },
+                    delegate (List<InquiryElement> _) { }), true);
+            }
+            catch (Exception e) { Log.Error("OrderKitConsequence", e); }
+        }
+
+        /// <summary>Najtansza KUPNA sztuka danego typu i tieru - prosty, zolnierski wyrob.</summary>
+        private static ItemObject CheapestOf(ItemObject.ItemTypeEnum type, int tier)
+        {
+            ItemObject best = null;
+            try
+            {
+                foreach (var item in MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
+                {
+                    if (item == null || item.ItemType != type || item.NotMerchandise) continue;
+                    if (item.Value <= 0) continue;
+                    if (Recipes.Grade(item) != tier) continue;
+                    string sId = (item.StringId ?? "").ToLowerInvariant();
+                    if (sId.Contains("practice") || sId.Contains("tournament") || sId.Contains("dummy")
+                        || sId.Contains("test_") || sId.Contains("_test") || sId.Contains("siege")) continue;
+                    if (best == null || item.Value < best.Value) best = item;
+                }
+            }
+            catch (Exception e) { Log.Error("CheapestOf", e); }
+            return best;
+        }
+
+        private static int OrderPieceCost(ItemObject item)
+        {
+            float mk = MathF.Max(1f, Settings.Current.TroopOrderMarkup);
+            return Math.Max(1, (int)(item.Value * mk));
+        }
+
+        private static void OrderKitTiers(ItemObject.ItemTypeEnum type, int shortage)
+        {
+            try
+            {
+                var elements = new List<InquiryElement>();
+                for (int t = 1; t <= 6; t++)
+                {
+                    var item = CheapestOf(type, t);
+                    if (item == null) continue;
+                    int per = OrderPieceCost(item);
+                    elements.Add(new InquiryElement(item, "Tier " + t + " - " + item.Name + ", " + per + " gold apiece",
+                        ItemPic(item), true, "The plainest sound piece of its grade. Market worth plus the smith's fee."));
+                }
+                if (elements.Count == 0) { Log.Player("No such kit is traded at any market the smith knows.", true); return; }
+
+                MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData(
+                    "The Order Ledger", "Which grade of " + type + "?" + (shortage > 0 ? " The men are short " + shortage + "." : ""),
+                    elements, true, 1, 1, "Choose", "Back",
+                    delegate (List<InquiryElement> sel)
+                    {
+                        if (sel == null || sel.Count == 0) return;
+                        var item = sel[0].Identifier as ItemObject;
+                        if (item != null) OrderKitCount(item, shortage);
+                    },
+                    delegate (List<InquiryElement> _) { }), true);
+            }
+            catch (Exception e) { Log.Error("OrderKitTiers", e); }
+        }
+
+        private static void OrderKitCount(ItemObject item, int shortage)
+        {
+            try
+            {
+                int per = OrderPieceCost(item);
+                int gold = Hero.MainHero.Gold;
+                var counts = new List<int> { 1, 5, 10 };
+                if (shortage > 0 && !counts.Contains(shortage)) counts.Add(shortage);
+                counts.Sort();
+                var elements = new List<InquiryElement>();
+                foreach (var n in counts)
+                {
+                    int total = per * n;
+                    string label = n + " x " + item.Name + " - " + total + " gold"
+                                 + (n == shortage ? "  (fills the shortage)" : "");
+                    elements.Add(new InquiryElement(n, label, null, gold >= total,
+                        gold >= total ? "Straight onto the men's racks." : "Your purse comes up short."));
+                }
+
+                MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData(
+                    item.Name.ToString(), per + " gold apiece. The smith sends boys round the markets and the pieces land on the armoury racks.",
+                    elements, true, 1, 1, "Order", "Back",
+                    delegate (List<InquiryElement> sel)
+                    {
+                        try
+                        {
+                            if (sel == null || sel.Count == 0) return;
+                            int n = (int)sel[0].Identifier;
+                            int total = per * n;
+                            float hours = Math.Min(24f, 1f + n * 0.2f);
+                            StartTimedWork(hours,
+                                "The smith takes your coin and sends his boys round the markets.",
+                                delegate { DoOrderKit(item, n, total); });
+                        }
+                        catch (Exception ex) { Log.Error("OrderKitCount.Selected", ex); }
+                    },
+                    delegate (List<InquiryElement> _) { }), true);
+            }
+            catch (Exception e) { Log.Error("OrderKitCount", e); }
+        }
+
+        private static void DoOrderKit(ItemObject item, int n, int total)
+        {
+            try
+            {
+                var armory = QuartermasterLaw.DteArmory();
+                if (armory == null) { Log.Player("The armoury wagons are nowhere to be found.", true); return; }
+                if (Hero.MainHero.Gold < total) { Log.Player("Your purse came up short.", true); return; }
+                GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, null, total);
+                armory.AddToCounts(item, n);
+                Log.Player(n + " x " + item.Name + " delivered to the men's racks for " + total + " gold.");
+                Log.Info("Zamowienie dla wojska: " + n + "x " + item.StringId + " za " + total);
+            }
+            catch (Exception e) { Log.Error("DoOrderKit", e); }
         }
 
         private static bool OrdersCondition(MenuCallbackArgs args)

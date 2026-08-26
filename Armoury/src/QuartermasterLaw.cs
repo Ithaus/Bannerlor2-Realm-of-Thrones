@@ -223,7 +223,7 @@ namespace Armoury
         }
 
         /// <summary>Ile sztuk danego typu lezy jeszcze w zbrojowni.</summary>
-        private static int HaveFor(ItemRoster armory, ItemObject.ItemTypeEnum type)
+        internal static int HaveFor(ItemRoster armory, ItemObject.ItemTypeEnum type)
         {
             int n = 0;
             try

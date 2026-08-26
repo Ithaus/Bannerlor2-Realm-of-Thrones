@@ -17,6 +17,20 @@
 
 ---
 
+## 2026-08-26 — zamawianie brakujacego sprzetu wojska u kowala
+**Mod:** Armoury | **Pliki:** `src/SmithMenu.cs`, `src/QuartermasterLaw.cs`, `src/Settings.cs`
+**Problem:** kwatermistrz melduje "brakuje Thrown 5/24", ale nie bylo JAK dokupic brakow -
+trzeba bylo biegac po kramach i zgadywac.
+**Przyczyna:** brak takiej funkcji.
+**Zmiana:** opcja "Order kit for the men - the smith procures it": lista typow ze stanem
+polki/potrzeba (braki podswietlone), wybor tieru 1-6 z najtansza kupna sztuka i cena od
+sztuki (wartosc rynkowa x Troop Order Markup, domyslnie 1,15), ilosc 1/5/10/uzupelnij brak;
+dostawa wprost na polki zbrojowni DTE po 1 h + 0,2 h na sztuke (max 24 h). Konie celowo
+wylaczone (od tego stajnie). 2 nowe ustawienia MCM.
+**Ryzyko / co sprawdzic:** ceny przy tierach maja wygladac rynkowo; po odbiorze zloto schodzi
+o wypisana kwote, a sztuki laduja w zbrojowni (DTE sam ubiera ludzi).
+**Status:** DO SPRAWDZENIA
+
 ## 2026-08-26 — naprawa sprzetu WOJSKA u kowala (zbrojownia DTE)
 **Mod:** Armoury | **Pliki:** `src/SmithMenu.cs`, `src/QuartermasterLaw.cs`, `src/Settings.cs`
 **Problem:** zbrojownia DTE trzyma modyfikatory stanu, a ConditionScaling skaluje pancerz
