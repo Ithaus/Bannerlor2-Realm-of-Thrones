@@ -33,4 +33,12 @@ ale UI/UX, wybor, odkrywanie, przetop i jakosc (dull itd.) identyczne".
 5. **Wybor klas jak przy broni**: popup klas (kirysy/helmy/nogawice/rekawice/plaszcze/
    tarcze/kropierze) przez ForgeView (wstrzykniecie Gauntlet).
 
-Status: NIC nie wdrozone - Jeff kazal najpierw sprawdzic. Wrocic tu po zgodzie.
+Status (26.08, po zgodzie Jeffa "ok rob"):
+- Krok 1 (jakosc 1:1) - ZROBIONE (commit "Kuznia 1:1 krok 1").
+- Krok 2 (nauka za przetop + vanilla baner) - ZROBIONE (commit "krok 2").
+- Krok 3 (zakladka Smelt przyjmuje pancerze i luki) - ZROBIONE (SmeltTab.cs);
+  stary tygiel w menu miasta ZOSTAJE do czasu potwierdzenia w grze.
+- Krok 4 (luki/kusze w trybie CRAFT) - BYL JUZ zrobiony wczesniej (ForgeView
+  InjectRanged + FletchForge); kroki 1-3 ujednolicily im reszte.
+- Krok 5 (popup wyboru klas jak przy broni) - NIEZROBIONY, do decyzji po
+  testach 1-3 (ForgeView ma juz filtr kategorii, ktory czesciowo to zalatwia).

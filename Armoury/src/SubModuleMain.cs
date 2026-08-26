@@ -59,6 +59,7 @@ namespace Armoury
                 Stables.ApplyAll(_harmony);
                 MarchPace.ApplyAll(_harmony);
                 FletchForge.ApplyAll(_harmony);
+                SmeltTab.ApplyAll(_harmony);
                 DressCode.ApplyAll(_harmony);
                 BkArmourList.ApplyAll(_harmony);
                 BowStats.ApplyAll(_harmony);

@@ -17,6 +17,25 @@
 
 ---
 
+## 2026-08-26 — kuznia 1:1 kroki 2-3: nauka za przetop, pancerze i luki w zakladce Smelt + przeglad sprzetu wojska
+**Mod:** Armoury | **Pliki:** `src/SmeltTab.cs` (NOWY), `src/RangedLore.cs`, `src/Forge.cs`, `src/SmithMenu.cs`, `src/SubModuleMain.cs`
+**Zmiana (krok 2):** przetop uczy wzorow (Study, pol stawki kucia); odblokowanie wzoru
+pokazuje vanillowy baner (MBInformationManager.AddQuickInformation) obok zielonej linijki.
+**Zmiana (krok 3):** zakladka Smelt ekranu kuzni przyjmuje metalowe pancerze/tarcze i
+luki/kusze: postfix SmeltingVM.RefreshList (doklada pozycje tym samym SmeltingItemVM,
+delegaty do prywatnych callbackow), postfix GetSmeltingOutputForItem we wszystkich modelach
+SmithingModel (wyjscie z naszej receptury SmeltYield), prefix DoSmelting dla przedmiotow
+bez WeaponDesign (oryginal walil w item.WeaponDesign.Template = NullReference; nasza
+sciezka: materialy, XP, stamina, nauka wzorow). Stary tygiel w menu miasta ZOSTAJE.
+**Zmiana (przeglad):** nowa opcja "Muster the men's kit" w The mending bench (Jeff: "gdzie
+sprawdze srednia jakosc sprzetu wojska") - per typ: sztuki na stanie / potrzebne, braki,
+sredni tier, sredni stan %, ile zuzytych; na dole rachunek naprawy calosci z rabatem.
+**Ryzyko / co sprawdzic:** zakladka Smelt - pancerz na liscie, wyjscie materialow sie
+zgadza, przetop nie crashuje (NullReference by byl bez prefixa); baner przy odblokowaniu;
+przeglad kwatermistrza pokazuje sensowne srednie. UWAGA: BK/RBM moga podmieniac SmithingModel
+- patch lapie wszystkie pochodne (log "wyjscie w N modelach").
+**Status:** DO SPRAWDZENIA
+
 ## 2026-08-26 — kuznia 1:1 krok 1: jakosc pancerzy ta sama formula co bron
 **Mod:** Armoury | **Pliki:** `src/Forge.cs`, `src/Settings.cs`
 **Problem:** jakosc naszych wyrobow (pancerze, luki) chodzila po wlasnej krzywej
