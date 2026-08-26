@@ -66,6 +66,8 @@ def gen(module_dir, ns, display):
     open(path,'w',encoding='utf-8').write("\n".join(out))
     print("%s: %d ustawien -> %s" % (ns, len(props), path))
 
-gen('/home/claude/rc', 'RealisticCaptivity', 'Realistic Captivity')
-gen('/home/claude/gt', 'GrandTourney', 'Grand Tourney')
-gen('/home/claude/ar', 'Armoury', 'The Armoury')
+# sciezki wzgledem korzenia repo - skrypt wolac z katalogu glownego
+root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+gen(os.path.join(root, 'RealisticCaptivity'), 'RealisticCaptivity', 'Realistic Captivity')
+gen(os.path.join(root, 'GrandTourney'), 'GrandTourney', 'Grand Tourney')
+gen(os.path.join(root, 'Armoury'), 'Armoury', 'The Armoury')

@@ -979,17 +979,37 @@ namespace Armoury
             return Settings.Current.CraftingEnabled && Settings.Current.AllowRangedCrafting;
         }
 
+        // ostatnia polka strzelecka (typ + tier) - Jeff: "jak wchodze w luki,
+        // niech pamieta gdzie ostatnio bylem, zebym nie klikal w kolko"
+        private static ItemObject.ItemTypeEnum _lastRangedType;
+        private static int _lastRangedTier;
+        private static bool _hasLastRanged;
+
+        private static string TypeLabel(ItemObject.ItemTypeEnum t)
+        {
+            switch (t)
+            {
+                case ItemObject.ItemTypeEnum.Bow: return "Bows";
+                case ItemObject.ItemTypeEnum.Crossbow: return "Crossbows";
+                case ItemObject.ItemTypeEnum.Arrows: return "Arrows";
+                case ItemObject.ItemTypeEnum.Bolts: return "Bolts";
+                default: return t.ToString();
+            }
+        }
+
         private static void FletcherConsequence(MenuCallbackArgs args)
         {
             try
             {
-                var slots = new List<InquiryElement>
-                {
-                    new InquiryElement(ItemObject.ItemTypeEnum.Bow,      "Bows", null, true, "Warbows and hunting bows - wood, sinew and a good eye"),
-                    new InquiryElement(ItemObject.ItemTypeEnum.Crossbow, "Crossbows", null, true, "Crossbows and windlasses - an iron lock in a wooden stock"),
-                    new InquiryElement(ItemObject.ItemTypeEnum.Arrows,   "Arrows", null, true, "Fletched in batches - one job yields several sheaves"),
-                    new InquiryElement(ItemObject.ItemTypeEnum.Bolts,    "Bolts", null, true, "Quarrels in batches - one job yields several cases")
-                };
+                var slots = new List<InquiryElement>();
+                if (_hasLastRanged)
+                    slots.Add(new InquiryElement("last",
+                        "Back to the bench you left - " + TypeLabel(_lastRangedType) + ", tier " + _lastRangedTier,
+                        null, true, "Straight to the shelf you last worked at."));
+                slots.Add(new InquiryElement(ItemObject.ItemTypeEnum.Bow,      "Bows", null, true, "Warbows and hunting bows - wood, sinew and a good eye"));
+                slots.Add(new InquiryElement(ItemObject.ItemTypeEnum.Crossbow, "Crossbows", null, true, "Crossbows and windlasses - an iron lock in a wooden stock"));
+                slots.Add(new InquiryElement(ItemObject.ItemTypeEnum.Arrows,   "Arrows", null, true, "Fletched in batches - one job yields several sheaves"));
+                slots.Add(new InquiryElement(ItemObject.ItemTypeEnum.Bolts,    "Bolts", null, true, "Quarrels in batches - one job yields several cases"));
 
                 MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData(
                     "The Bowyer's Bench", "Wood, horn and sinew. Your Smithing decides what you can attempt - and your stores pay for it.",
@@ -997,6 +1017,8 @@ namespace Armoury
                     delegate (List<InquiryElement> sel)
                     {
                         if (sel == null || sel.Count == 0) return;
+                        if (sel[0].Identifier is string)
+                        { ShowItems(_lastRangedType, false, _lastRangedTier); return; }
                         ShowRangedTiers((ItemObject.ItemTypeEnum)sel[0].Identifier, false);
                     },
                     delegate (List<InquiryElement> _) { }), true);
@@ -1069,6 +1091,8 @@ namespace Armoury
                 int skill = Hero.MainHero.GetSkillValue(DefaultSkills.Crafting);
                 bool rangedKit = type == ItemObject.ItemTypeEnum.Bow || type == ItemObject.ItemTypeEnum.Crossbow
                               || type == ItemObject.ItemTypeEnum.Arrows || type == ItemObject.ItemTypeEnum.Bolts;
+                if (rangedKit && tierFilter > 0)
+                { _lastRangedType = type; _lastRangedTier = tierFilter; _hasLastRanged = true; }
                 var candidates = new List<ItemObject>();
                 foreach (var item in MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
                 {
@@ -1153,7 +1177,12 @@ namespace Armoury
                             if (sel == null || sel.Count == 0) return;
                             var item = sel[0].Identifier as ItemObject;
                             if (item == null) return;
-                            if (instant) Forge.Smith(item);
+                            if (instant)
+                            {
+                                Forge.Smith(item);
+                                // zostajemy na tej samej polce - bez klikania od nowa
+                                ShowItems(type, true, tierFilter);
+                            }
                             else AskTempo(item);
                         }
                         catch (Exception ex) { Log.Error("ShowItems.Selected", ex); }

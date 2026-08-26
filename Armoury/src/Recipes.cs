@@ -25,6 +25,7 @@ namespace Armoury
             public int Stamina;
             public int SkillNeeded;
             public int Tier;
+            public bool Ranged;      // luk/kusza/amunicja - lzejsze ryzyko i stamina niz platnerka
         }
 
         // --- surowce miekkie: szukamy po ID, bo ROT moze miec swoje ---
@@ -225,10 +226,13 @@ namespace Armoury
                         Add(r, MaterialItem(IronForTier(tier)), 1);                     // groty wg tieru
                     }
                     bool ammo = tt == ItemObject.ItemTypeEnum.Arrows || tt == ItemObject.ItemTypeEnum.Bolts;
-                    // wiazka strzal to nie kirys: 10x mniej staminy niz stara stawka (Jeff)
+                    // wiazka strzal to nie kirys: 10x mniej staminy niz stara stawka (Jeff);
+                    // luki i kusze: stary mnoznik 0.8 pozwalal wykuc 2 luki na sesje -
+                    // luczarnia ma byc lekka jak kuznia broni (Jeff), stad wlasny mnoznik
+                    r.Ranged = true;
                     r.Stamina = ammo
                         ? MathF.Max(2, (int)(tier * s.StaminaPerTier * 0.05f))
-                        : MathF.Max(4, (int)(tier * s.StaminaPerTier * 0.8f));
+                        : MathF.Max(4, (int)(tier * s.StaminaPerTier * MathF.Max(0.05f, s.RangedStaminaFactor)));
                     r.SkillNeeded = MathF.Max(0, (tier - 1) * s.SmithingSkillPerTier - 10);
                     return r;
                 }

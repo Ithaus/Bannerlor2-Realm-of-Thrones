@@ -91,6 +91,8 @@ namespace Armoury
         public int MaxItemsListed = 24;                    // how many pieces the forge menu lists at once
         public bool AllowRangedCrafting = true;            // bows, crossbows, arrows and bolts as well
         public int AmmoBatchStacks = 3;                    // one fletching job yields this many sheaves of arrows or cases of bolts
+        public float RangedStaminaFactor = 0.35f;          // bows and crossbows cost tier x stamina-per-tier x this - bowyery is lighter work than plate, as at the weapon bench
+        public float RangedFailureFactor = 0.5f;           // ruin-risk multiplier for bows, crossbows and ammunition - wood forgives more than a quench
         public float LegendaryValueFloor = 25000f;         // an unbuyable piece worth at least this much is a LEGEND - legendary bills and the one-of-a-kind rule apply
         public float LegendaryMaterialFactor = 4f;         // a legend's bill: every material count multiplied by this, plus the noblest steel on top
         public int LegendarySkillNeeded = 250;             // no legend leaves the forge below this Smithing

@@ -58,8 +58,12 @@ namespace Armoury
             float margin = skill - r.SkillNeeded;
             float risk = Project.RiskFactor(tempo);
             if (margin >= s.MarginForNoFailure) return 0f;
-            if (margin <= 0f) return MathF.Min(0.9f, s.FailureChanceAtZeroMargin * risk);
-            return MathF.Min(0.9f, s.FailureChanceAtZeroMargin * risk * (1f - margin / s.MarginForNoFailure));
+            float chance = margin <= 0f
+                ? s.FailureChanceAtZeroMargin * risk
+                : s.FailureChanceAtZeroMargin * risk * (1f - margin / s.MarginForNoFailure);
+            // luczarnia wybacza wiecej niz hartowanie plachy - Jeff: "luki zawsze 50%, bez sensu"
+            if (r.Ranged) chance *= MathF.Max(0f, s.RangedFailureFactor);
+            return MathF.Min(0.9f, chance);
         }
 
         /// <summary>Jakosc wyrobu - modyfikator z wlasnej grupy przedmiotu.</summary>

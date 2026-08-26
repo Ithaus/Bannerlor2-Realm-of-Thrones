@@ -312,6 +312,14 @@ namespace Armoury
         [SettingPropertyGroup("Mending it yourself")]
         public int AmmoBatchStacks { get; set; } = 3;
 
+        [SettingPropertyFloatingInteger("Ranged Stamina Factor", 0.00f, 1.40f, "0.00", HintText = "bows and crossbows cost tier x stamina-per-tier x this - bowyery is lighter work than plate, as at the weapon bench")]
+        [SettingPropertyGroup("Mending it yourself")]
+        public float RangedStaminaFactor { get; set; } = 0.35f;
+
+        [SettingPropertyFloatingInteger("Ranged Failure Factor", 0.00f, 2.00f, "0.00", HintText = "ruin-risk multiplier for bows, crossbows and ammunition - wood forgives more than a quench")]
+        [SettingPropertyGroup("Mending it yourself")]
+        public float RangedFailureFactor { get; set; } = 0.5f;
+
         [SettingPropertyFloatingInteger("Legendary Value Floor", 0.00f, 100000.00f, "0.00", HintText = "an unbuyable piece worth at least this much is a LEGEND - legendary bills and the one-of-a-kind rule apply")]
         [SettingPropertyGroup("Mending it yourself")]
         public float LegendaryValueFloor { get; set; } = 25000f;
@@ -893,6 +901,8 @@ namespace Armoury
             s.MaxItemsListed = MaxItemsListed;
             s.AllowRangedCrafting = AllowRangedCrafting;
             s.AmmoBatchStacks = AmmoBatchStacks;
+            s.RangedStaminaFactor = RangedStaminaFactor;
+            s.RangedFailureFactor = RangedFailureFactor;
             s.LegendaryValueFloor = LegendaryValueFloor;
             s.LegendaryMaterialFactor = LegendaryMaterialFactor;
             s.LegendarySkillNeeded = LegendarySkillNeeded;

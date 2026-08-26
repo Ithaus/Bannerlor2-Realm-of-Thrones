@@ -17,6 +17,24 @@
 
 ---
 
+## 2026-08-26 — luczarnia: pamiec ostatniej polki + stamina i ryzyko jak przy broni
+**Mod:** Armoury | **Pliki:** `src/SmithMenu.cs`, `src/Recipes.cs`, `src/Forge.cs`, `src/Settings.cs`, `tools/gen_mcm.py`
+**Problem:** (1) wejscie w luki wymaga za kazdym razem klikania typ->tier od nowa;
+(2) luk kosztowal tier x 25 x 0,8 staminy (t5 = 100 - DWA luki i koniec sesji), a ryzyko
+zepsucia bylo takie samo jak przy hartowaniu plachy ("zawsze 50%, bez sensu" - Jeff);
+kuznia broni pozwala kuc duzo wiecej.
+**Przyczyna:** mnoznik 0.8 zaszyty w BuildRecipe; FailureChance nie odroznia luczarni od platnerki;
+brak pamieci nawigacji.
+**Zmiana:** (1) menu luczarni pamieta ostatni typ+tier i pokazuje na gorze "Back to the bench
+you left"; po kuciu natychmiastowym (zakladka CRAFT) lista zostaje otwarta na tej samej polce.
+(2) nowe ustawienia: Ranged Stamina Factor (0,35 - t5 luk = 43 staminy, 4-5 lukow na sesje)
+i Ranged Failure Factor (0,5 - ryzyko lukow/kusz/amunicji o polowe nizsze). Flaga Ranged w
+recepturze. PRZY OKAZJI: gen_mcm.py mial zaszyte sciezki /home/claude ze starego komputera -
+teraz liczy sciezki wzgledem repo.
+**Ryzyko / co sprawdzic:** procent ryzyka na polce lukow (ma byc ~polowa dawnego), ile lukow
+schodzi na jednej stamince, czy "Back to the bench" wraca na wlasciwa polke.
+**Status:** DO SPRAWDZENIA
+
 ## 2026-08-26 — miniatury 3D w listach rozbiorki, naprawy i tygla
 **Mod:** Armoury | **Pliki:** `src/SmithMenu.cs`
 **Problem:** w listach "Take a piece apart", "Pick a damaged piece to mend" i "Break metal down"
