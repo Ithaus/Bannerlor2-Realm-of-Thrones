@@ -144,13 +144,10 @@ namespace Armoury
                 }
             }
             catch { }
+            // wykladniczy mnoznik Endurance - ta sama krzywa co BattleWind
+            // (2^((END-2.5)/co_ile)); NPC bez bohatera zostaje na x1
             st.EndBonus = 1f;
-            try
-            {
-                if (hero != null)
-                    st.EndBonus = 1f + hero.GetAttributeValue(TaleWorlds.Core.DefaultCharacterAttributes.Endurance)
-                                     * Math.Max(0f, c.StaminaEndurancePerPoint) / 100f;
-            }
+            try { if (hero != null) st.EndBonus = BattleWind.EnduranceMul(hero); }
             catch { }
             float w = 0f;
             try { w = agent.SpawnEquipment.GetTotalWeightOfArmor(true); } catch { }
@@ -452,11 +449,13 @@ namespace Armoury
                                 float maxStam = _rbmMaxStamina != null ? (float)_rbmMaxStamina.GetValue(stance) : 1000f;
                                 if (maxStam < 1f) maxStam = 1000f;
 
-                                // Endurance bohatera powieksza pule RBM - raz, przy pierwszym zetknieciu
+                                // Endurance bohatera powieksza pule RBM - raz, przy pierwszym
+                                // zetknieciu. Gdy BattleWind zalatwil to juz w InitializeStamina
+                                // (Active), NIE dokladamy drugi raz.
                                 if (!st.EnduranceApplied)
                                 {
                                     st.EnduranceApplied = true;
-                                    if (st.EndBonus > 1.001f && _rbmMaxStamina != null)
+                                    if (!BattleWind.Active && st.EndBonus > 1.001f && _rbmMaxStamina != null)
                                     {
                                         maxStam *= st.EndBonus;
                                         stam *= st.EndBonus;
@@ -484,12 +483,14 @@ namespace Armoury
                                     if (stam < 0f) stam = 0f;
                                     _rbmStamina.SetValue(stance, stam);
                                 }
-                                else if (st.SprintDebt > 0.01f && stam < maxStam)
+                                else if (st.SprintDebt > 0.01f && stam < maxStam && !BattleWind.Manages(stance))
                                 {
                                     // ODDECH SPRINTERA: to, co zabral bieg, wraca tempem
                                     // biegacza (25/s x Atletyka x Endurance) - ale TYLKO
                                     // dlug sprintu. Koszty ciosow RBM oddaja sie dalej po
                                     // ich staremu (~1/s), zeby nie zepsuc tempa melee.
+                                    // Bohaterow z BattleWind pomijamy - ich regen RBM juz
+                                    // jest tempem biegacza i oddalby dlug PODWOJNIE.
                                     float back = Math.Min(st.SprintDebt, st.RegenPerSec * step);
                                     if (back > maxStam - stam) back = maxStam - stam;
                                     stam += back;

@@ -480,9 +480,25 @@ namespace Armoury
         [SettingPropertyGroup("Flesh and wind")]
         public float FatigueFreeArmorKg { get; set; } = 0f;
 
-        [SettingPropertyFloatingInteger("Stamina Endurance Per Point", 0.00f, 16.00f, "0.00", HintText = "heroes: each point of Endurance grows the stamina pool AND its regeneration by this percent")]
+        [SettingPropertyBool("Battle Stamina Enabled", HintText = "heroes: Endurance reshapes RBM battle stamina and posture - pools double every few points, breath returns fast but winded men pant")]
         [SettingPropertyGroup("Flesh and wind")]
-        public float StaminaEndurancePerPoint { get; set; } = 4f;
+        public bool BattleStaminaEnabled { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Battle End Double Every", 0.00f, 10.00f, "0.00", HintText = "pool doubles every this many Endurance points (END 2.5 = x1, END 5 = x2, END 10 = x8)")]
+        [SettingPropertyGroup("Flesh and wind")]
+        public float BattleEndDoubleEvery { get; set; } = 2.5f;
+
+        [SettingPropertyFloatingInteger("Battle Regen At End1", 0.00f, 40.00f, "0.00", HintText = "stamina regained per second at Endurance 1 (Athletics adds its share on top)")]
+        [SettingPropertyGroup("Flesh and wind")]
+        public float BattleRegenAtEnd1 { get; set; } = 10f;
+
+        [SettingPropertyFloatingInteger("Battle Regen At End10", 0.00f, 800.00f, "0.00", HintText = "stamina regained per second at Endurance 10 - the curve between is exponential, not a straight line")]
+        [SettingPropertyGroup("Flesh and wind")]
+        public float BattleRegenAtEnd10 { get; set; } = 200f;
+
+        [SettingPropertyFloatingInteger("Battle Winded Floor", 0.00f, 1.00f, "0.00", HintText = "share of regen left with an empty bar - the emptier the lungs the slower they fill")]
+        [SettingPropertyGroup("Flesh and wind")]
+        public float BattleWindedFloor { get; set; } = 0.25f;
 
         [SettingPropertyFloatingInteger("Stamina Regen Per Second", 0.00f, 100.00f, "0.00", HintText = "without RBM: points regained each second of easing off (with RBM its own regen rules)")]
         [SettingPropertyGroup("Flesh and wind")]
@@ -1023,7 +1039,11 @@ namespace Armoury
             s.SprintDrainPerSecond = SprintDrainPerSecond;
             s.SprintDrainPerKg = SprintDrainPerKg;
             s.FatigueFreeArmorKg = FatigueFreeArmorKg;
-            s.StaminaEndurancePerPoint = StaminaEndurancePerPoint;
+            s.BattleStaminaEnabled = BattleStaminaEnabled;
+            s.BattleEndDoubleEvery = BattleEndDoubleEvery;
+            s.BattleRegenAtEnd1 = BattleRegenAtEnd1;
+            s.BattleRegenAtEnd10 = BattleRegenAtEnd10;
+            s.BattleWindedFloor = BattleWindedFloor;
             s.StaminaRegenPerSecond = StaminaRegenPerSecond;
             s.TiredSpeedFactor = TiredSpeedFactor;
             s.WoundedPenaltiesEnabled = WoundedPenaltiesEnabled;

@@ -139,7 +139,11 @@ namespace Armoury
         public float SprintDrainPerSecond = 4f;            // stamina points one second of flat-out sprint costs, before the armour is weighed
         public float SprintDrainPerKg = 1f;                // extra points per second for every kilogram of armour carried
         public float FatigueFreeArmorKg = 0f;              // armour up to this weight costs no extra stamina
-        public float StaminaEndurancePerPoint = 4f;        // heroes: each point of Endurance grows the stamina pool AND its regeneration by this percent
+        public bool BattleStaminaEnabled = true;           // heroes: Endurance reshapes RBM battle stamina and posture - pools double every few points, breath returns fast but winded men pant
+        public float BattleEndDoubleEvery = 2.5f;          // pool doubles every this many Endurance points (END 2.5 = x1, END 5 = x2, END 10 = x8)
+        public float BattleRegenAtEnd1 = 10f;              // stamina regained per second at Endurance 1 (Athletics adds its share on top)
+        public float BattleRegenAtEnd10 = 200f;            // stamina regained per second at Endurance 10 - the curve between is exponential, not a straight line
+        public float BattleWindedFloor = 0.25f;            // share of regen left with an empty bar - the emptier the lungs the slower they fill
         public float StaminaRegenPerSecond = 25f;          // without RBM: points regained each second of easing off (with RBM its own regen rules)
         public float TiredSpeedFactor = 0.78f;             // top speed of a man whose pool has run dry
         public bool WoundedPenaltiesEnabled = true;        // hurt men move and swing slower, the worse the wound the worse the arm
