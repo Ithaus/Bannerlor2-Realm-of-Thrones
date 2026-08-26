@@ -16,6 +16,31 @@ namespace Armoury
     internal static class SmithMenu
     {
         private const string Menu = "armoury_forge";
+        private const string MendMenu = "armoury_mend";
+
+        /// <summary>Wejscie do warsztatu naprawczego - w podpowiedzi od razu stan calego dobytku.</summary>
+        private static bool MendBenchCondition(MenuCallbackArgs args)
+        {
+            try
+            {
+                args.optionLeaveType = GameMenuOption.LeaveType.Craft;
+                int bags, bagsCost; ScanBattleWorn(out bags, out bagsCost);
+                int worn = 0;
+                try
+                {
+                    var eq = Hero.MainHero.BattleEquipment;
+                    for (int i = 0; i < 12; i++)
+                        if (eq[i].Item != null && IsBattleWorn(eq[i].Item, eq[i].ItemModifier)) worn++;
+                }
+                catch { }
+                int racks = 0, racksCost, cp, cc;
+                if (Settings.Current.TroopMendEnabled) ScanTroopWorn(out racks, out racksCost, out cp, out cc);
+                args.Tooltip = new TextObject("{=!}Worn: {W} on your back, {B} in your bags, {R} on the men's racks.")
+                    .SetTextVariable("W", worn).SetTextVariable("B", bags).SetTextVariable("R", racks);
+                return true;
+            }
+            catch (Exception e) { Log.Error("MendBenchCondition", e); return true; }
+        }
 
         internal static void Add(CampaignGameStarter starter)
         {
@@ -50,11 +75,12 @@ namespace Armoury
                 "{=!}Stay at the forge until the work is done", ProjWaitCondition,
                 delegate (MenuCallbackArgs a) { GameMenu.SwitchToMenu("arm_project_wait"); }, false, 1);
 
-            starter.AddGameMenuOption(Menu, "arm_selfrepair",
-                "{=!}Mend a piece yourself at the anvil", SelfRepairCondition, SelfRepairConsequence, false, 2);
-
-            starter.AddGameMenuOption(Menu, "arm_repair",
-                "{=!}Pay the smith to mend your harness", RepairCondition, RepairConsequence, false, 3);
+            // JEDNO wejscie dla wszystkich napraw (Jeff: "sprawdz czy opcje maja
+            // sens i czy czegos nie wywalic" - piec pozycji naprawczych na glownym
+            // menu mylilo, teraz siedza pod warsztatem)
+            starter.AddGameMenuOption(Menu, "arm_mend_bench",
+                "{=!}The mending bench - your gear and the men's", MendBenchCondition,
+                delegate (MenuCallbackArgs a) { GameMenu.SwitchToMenu(MendMenu); }, false, 2);
 
             starter.AddGameMenuOption(Menu, "arm_smelt",
                 "{=!}Break metal down at the crucible", SmeltCondition, SmeltConsequence, false, 4);
@@ -62,17 +88,32 @@ namespace Armoury
             starter.AddGameMenuOption(Menu, "arm_takeapart",
                 "{=!}Take a piece apart to copy its pattern", TakeApartCondition, TakeApartConsequence, false, 4);
 
-            starter.AddGameMenuOption(Menu, "arm_mend_pick",
-                "{=!}Pick a damaged piece to mend", MendPickCondition, MendPickConsequence, false, 5);
-
-            starter.AddGameMenuOption(Menu, "arm_mend_loot",
-                "{=!}Restore ALL battle-worn loot from your bags", MendLootCondition, MendLootConsequence, false, 6);
-
-            starter.AddGameMenuOption(Menu, "arm_mend_troops",
-                "{=!}Send the men's worn gear to the smith", MendTroopsCondition, MendTroopsConsequence, false, 6);
-
             starter.AddGameMenuOption(Menu, "arm_order_kit",
                 "{=!}Order kit for the men - the smith procures it", OrderKitCondition, OrderKitConsequence, false, 6);
+
+            // ---- warsztat naprawczy ----
+            starter.AddGameMenu(MendMenu,
+                "{=!}The mending bench. Coin for the smith's hammer, or your own metal and sweat.",
+                OnMenuInit, GameMenu.MenuOverlayType.SettlementWithBoth);
+
+            starter.AddGameMenuOption(MendMenu, "arm_mend_pick",
+                "{=!}Pick a damaged piece to mend", MendPickCondition, MendPickConsequence, false, 0);
+
+            starter.AddGameMenuOption(MendMenu, "arm_selfrepair",
+                "{=!}Mend everything you wear - your own hands", SelfRepairCondition, SelfRepairConsequence, false, 1);
+
+            starter.AddGameMenuOption(MendMenu, "arm_repair",
+                "{=!}Mend everything you wear - the smith's price", RepairCondition, RepairConsequence, false, 1);
+
+            starter.AddGameMenuOption(MendMenu, "arm_mend_loot",
+                "{=!}Restore ALL battle-worn loot from your bags", MendLootCondition, MendLootConsequence, false, 2);
+
+            starter.AddGameMenuOption(MendMenu, "arm_mend_troops",
+                "{=!}Send the men's worn gear to the smith", MendTroopsCondition, MendTroopsConsequence, false, 3);
+
+            starter.AddGameMenuOption(MendMenu, "arm_mend_back",
+                "{=!}Back to the forge", LeaveCondition,
+                delegate (MenuCallbackArgs a) { GameMenu.SwitchToMenu(Menu); }, true, 9);
 
             // robota wymaga czasu: jedno wspolne menu oczekiwania dla napraw i przetopu
             starter.AddWaitGameMenu("arm_work_wait",

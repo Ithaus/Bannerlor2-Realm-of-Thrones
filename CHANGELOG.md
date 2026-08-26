@@ -17,6 +17,20 @@
 
 ---
 
+## 2026-08-26 — porzadek w menu kuzni: naprawy pod jednym wejsciem
+**Mod:** Armoury | **Pliki:** `src/SmithMenu.cs`
+**Problem:** menu Work the forge uroslo do 12 pozycji, z czego 5 to rozne odmiany naprawy -
+nie bylo widac, ktora do czego (Jeff: "sprawdz czy opcje maja sens i czy czegos nie wywalic").
+**Przyczyna:** kazda nowa funkcja dokladala wlasny wiersz do glownego menu.
+**Zmiana:** nowe podmenu "The mending bench - your gear and the men's" (armoury_mend), a w nim:
+wybor sztuki, naprawa calego rynsztunku wlasnorecznie / u kowala, lupy z sakw hurtem, sprzet
+wojska. Podpowiedz wejscia od razu liczy: ile zuzytych na grzbiecie / w sakwach / na polkach
+wojska. Glowne menu ma teraz 8 pozycji. Nic nie wylecialo - wszystkie funkcje zostaly,
+zmienilo sie tylko ulozenie. Po skonczonej robocie wracasz do glownego menu kuzni.
+**Ryzyko / co sprawdzic:** wejscie i wyjscie z podmenu (SwitchToMenu miedzy zwyklymi menu,
+NIE z menu oczekiwania - pulapka CTD nie dotyczy); wszystkie 5 opcji dziala jak przedtem.
+**Status:** DO SPRAWDZENIA
+
 ## 2026-08-26 — zamawianie brakujacego sprzetu wojska u kowala
 **Mod:** Armoury | **Pliki:** `src/SmithMenu.cs`, `src/QuartermasterLaw.cs`, `src/Settings.cs`
 **Problem:** kwatermistrz melduje "brakuje Thrown 5/24", ale nie bylo JAK dokupic brakow -
