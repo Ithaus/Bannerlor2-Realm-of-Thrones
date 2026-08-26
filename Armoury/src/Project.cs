@@ -63,5 +63,18 @@ namespace Armoury
             var s = Settings.Current;
             return tempo == 0 ? 0.15f : (tempo == 2 ? s.TempoCarefulQuality : 1f);
         }
+
+        /// <summary>
+        /// JEDNA etykieta czasu dla calej kuzni (Jeff: "raz 2,5 dnia, raz 7,5
+        /// godziny - czasy sie nie zgadzaja"). Ponizej dwoch dob mowimy
+        /// godzinami (tak jak menu czekania), wyzej dniami z godzinami.
+        /// Zegar tyka TYLKO w osadzie projektu - etykieta o tym przypomina.
+        /// </summary>
+        internal static string TimeLabel(float days)
+        {
+            float hrs = days * 24f;
+            if (hrs < 48f) return ((int)Math.Ceiling(hrs)) + " hours";
+            return days.ToString("0.#", CultureInfo.InvariantCulture) + " days (" + ((int)Math.Ceiling(hrs)) + " hours)";
+        }
     }
 }

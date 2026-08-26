@@ -54,7 +54,13 @@ namespace Armoury
                 var pos = mp.GetPosition2D;
                 bool moved = _hadPos && pos.Distance(_lastPos) > 0.35f;
                 _lastPos = pos; _hadPos = true;
-                if (moved) PlayerCamped = false;   // ruszyl sie = oboz zwinal (takze oboz BK)
+                if (moved && PlayerCamped)
+                {
+                    // ruszyl sie = oboz zwinal (takze oboz BK); namiot NIE moze
+                    // jechac po mapie (Jeff to widzial) - schodzi wizerunek, nie tylko flaga
+                    Tent(mp, false);
+                    PlayerCamped = false;
+                }
 
                 int h = CampaignTime.Now.GetHourOfDay;
                 bool night = h >= 21 || h <= 5;
@@ -84,6 +90,7 @@ namespace Armoury
 
                 if (h == 6) SettleNight(s);
                 AiNightCamp(s, h);
+                AiBanditDayRest(s, h);
             }
             catch (Exception e) { Log.Error("NightRest.OnHourly", e); }
         }
@@ -204,6 +211,11 @@ namespace Armoury
                     // wiec wraca ostroznie i bez namiotow ponad limit
                     if (!mp.IsLordParty && !mp.IsCaravan && !(s.AiBanditsCampToo && mp.IsBandit)) continue;
                     if (mp.CurrentSettlement != null || mp.MapEvent != null || mp.BesiegerCamp != null) continue;
+                    // nie kazda kolumna staje - czesc maszeruje przez cala noc
+                    // (deterministycznie per partia i noc, zeby nie migotalo co godzine)
+                    if (s.AiCampSkipPercent > 0 &&
+                        (mp.Id.InternalValue + (uint)CampaignTime.Now.ToDays) % 100u
+                            < (uint)Math.Max(0, Math.Min(95, s.AiCampSkipPercent))) continue;
                     if (mp.IsCurrentlyAtSea) continue;
                     if (mp.Army != null && mp.Army.LeaderParty != mp) continue;   // eskorta idzie za wodzem
                     if (Undead.Party(mp)) continue;                               // Inni maszeruja noca
@@ -230,13 +242,67 @@ namespace Armoury
                     mp.Ai.DisableForHours(1);       // spia godzine; nocny tick odnowi
                     mp.SetMoveModeHold();
                     // limit ikon AiTentCap (reszta spi bez obrazka) - wlasnie brak
-                    // tego limitu przy setkach partii konczyl sie CTD
-                    if (s.CampTentIcon && _tented.Count < Math.Max(0, s.AiTentCap) && !_tented.Contains(mp))
+                    // tego limitu przy setkach partii konczyl sie CTD; do tego
+                    // namioty TYLKO wokol gracza (Jeff: "tam gdzie ja widze")
+                    if (s.CampTentIcon && _tented.Count < Math.Max(0, s.AiTentCap) && !_tented.Contains(mp)
+                        && MobileParty.MainParty != null
+                        && mp.GetPosition2D.Distance(MobileParty.MainParty.GetPosition2D) <= MathF.Max(5f, s.AiTentRadius))
                     { Tent(mp, true); _tented.Add(mp); }
+                }
+                // gracz odjechal od spiacych - obrazki schodza (partie dalej spia)
+                if (s.CampTentIcon && MobileParty.MainParty != null)
+                {
+                    for (int i = _tented.Count - 1; i >= 0; i--)
+                    {
+                        var t = _tented[i];
+                        if (t == null || !t.IsActive
+                            || t.GetPosition2D.Distance(MobileParty.MainParty.GetPosition2D) > MathF.Max(5f, s.AiTentRadius) + 3f)
+                        { Tent(t, false); _tented.RemoveAt(i); }
+                    }
                 }
                 if (s.CampTentIcon) ReassertTents();   // konie nie wracaja na namioty
             }
             catch (Exception e) { Log.Error("AiNightCamp", e); }
+        }
+
+        /// <summary>
+        /// NOCNI LOWCY (Jeff: "bandyci glownie grasuja w nocy, ale moga tez
+        /// w dzien"). W dzien (10-16) wieksza czesc band lezy w ukryciu
+        /// (AI wstrzymane na godzine, bez namiotow - oni sie CHOWAJA, nie
+        /// obozuja), cwierc kazdego dnia poluje mimo slonca. Pogon, ucieczka
+        /// i wrogi lord w poblizu uniewazniaja drzemke. Noca banda chodzi
+        /// normalnie - czyli wlasnie wtedy, gdy podroznym spada zasieg wzroku.
+        /// </summary>
+        private static void AiBanditDayRest(Settings s, int h)
+        {
+            try
+            {
+                if (!s.BanditsRestByDay) return;
+                if (h < 10 || h > 16) return;
+                uint dayN = (uint)CampaignTime.Now.ToDays;
+
+                var lords = new System.Collections.Generic.List<MobileParty>();
+                foreach (var t in MobileParty.All)
+                    if (t != null && t.IsActive && t.IsLordParty) lords.Add(t);
+
+                foreach (var mp in MobileParty.All)
+                {
+                    if (mp == null || !mp.IsActive || !mp.IsBandit) continue;
+                    if (mp.CurrentSettlement != null || mp.MapEvent != null) continue;
+                    if (Undead.Party(mp)) continue;
+                    string stb = mp.ShortTermBehavior.ToString();
+                    if (stb.StartsWith("Flee") || stb.StartsWith("Engage")) continue;   // pogon nie zna pory
+                    // cwierc band poluje takze za dnia (stale per banda i dzien)
+                    if ((mp.Id.InternalValue + dayN) % 4u == 0u) continue;
+                    bool danger = false;
+                    foreach (var t in lords)
+                        if (mp.GetPosition2D.Distance(t.GetPosition2D) <= s.AiCampDangerRadius) { danger = true; break; }
+                    if (danger) continue;
+                    mp.Ai.DisableForHours(1);
+                    mp.SetMoveModeHold();
+                }
+            }
+            catch (Exception e) { Log.Error("AiBanditDayRest", e); }
         }
 
         // ---------------------------------------------------- namiot na mapie
@@ -254,7 +320,11 @@ namespace Armoury
         {
             try
             {
-                if (mp != null && mp == MobileParty.MainParty) PlayerCamped = on;
+                if (mp != null && mp == MobileParty.MainParty)
+                {
+                    PlayerCamped = on;
+                    if (on) _campPos = mp.GetPosition2D;
+                }
                 var s = Settings.Current;
                 if (_tentStrikes >= TentStrikesMax || mp == null || s == null || !s.CampTentIcon) return;
                 var tMgr = QuartermasterLaw.FindType("SandBox.View.Map.Managers.MobilePartyVisualManager");
@@ -410,12 +480,25 @@ namespace Armoury
         private static bool _keyDown;
         private static bool _askOpen;
 
+        private static Vec2 _campPos;
+
         internal static void OnTick(float dt)
         {
             try
             {
                 var s = Settings.Current;
-                if (s == null || !s.QuickCampKey || _askOpen) return;
+                if (s == null) return;
+
+                // straznik co klatke: namiot nie jezdzi po mapie - gracz ruszyl,
+                // wizerunek schodzi od reki (tick godzinowy bywal o godzine za pozno)
+                if (PlayerCamped && Campaign.Current != null && MobileParty.MainParty != null
+                    && MobileParty.MainParty.GetPosition2D.Distance(_campPos) > 0.25f)
+                {
+                    Tent(MobileParty.MainParty, false);
+                    PlayerCamped = false;
+                }
+
+                if (!s.QuickCampKey || _askOpen) return;
                 bool down = Input.IsKeyDown(InputKey.O);
                 bool pressed = down && !_keyDown;
                 _keyDown = down;

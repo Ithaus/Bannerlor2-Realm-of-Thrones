@@ -61,6 +61,7 @@ namespace Armoury
                 FletchForge.ApplyAll(_harmony);
                 SmeltTab.ApplyAll(_harmony);
                 DressCode.ApplyAll(_harmony);
+                SightRange.ApplyAll(_harmony);
                 BkArmourList.ApplyAll(_harmony);
                 BowStats.ApplyAll(_harmony);
                 BattlefieldLaw.ApplyAll(_harmony);
@@ -85,6 +86,13 @@ namespace Armoury
                 if (Settings.Current.HideoutAlarmEnabled && Campaign.Current != null && mission != null
                     && HideoutAlarm.IsHideout(mission))
                     mission.AddMissionBehavior(new HideoutAlarm());
+                if (Settings.Current.HideoutArmouryGear && Campaign.Current != null && mission != null
+                    && HideoutAlarm.IsHideout(mission)
+                    && mission.GetMissionBehavior<IMissionAgentSpawnLogic>() == null)
+                {
+                    mission.AddMissionBehavior(new HideoutSpawnShim());
+                    Log.Info("HideoutSpawnShim: brama DTE otwarta - wojsko idzie do kryjowki w sprzecie z magazynu.");
+                }
             }
             catch (Exception e) { Log.Error("OnMissionBehaviorInitialize", e); }
         }

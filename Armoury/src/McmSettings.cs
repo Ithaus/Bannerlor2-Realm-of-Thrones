@@ -724,6 +724,18 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public int AiTentCap { get; set; } = 40;
 
+        [SettingPropertyFloatingInteger("Ai Tent Radius", 0.00f, 140.00f, "0.00", HintText = "tent icons appear only this close to your party - the world beyond still sleeps, just without the picture")]
+        [SettingPropertyGroup("A night's rest")]
+        public float AiTentRadius { get; set; } = 35f;
+
+        [SettingPropertyInteger("Ai Camp Skip Percent", 0, 60, "0", HintText = "this share of lord columns press on through any given night - not everyone pitches camp")]
+        [SettingPropertyGroup("A night's rest")]
+        public int AiCampSkipPercent { get; set; } = 15;
+
+        [SettingPropertyBool("Bandits Rest By Day", HintText = "bandits are night hunters: most lie low by day (10-16) and prowl after dark - a quarter keep hunting in daylight")]
+        [SettingPropertyGroup("A night's rest")]
+        public bool BanditsRestByDay { get; set; } = true;
+
         [SettingPropertyFloatingInteger("Ai Nights Awake In Chase", 0.00f, 4.00f, "0.00", HintText = "days a chasing or fleeing party may push on without sleep before it drops anyway")]
         [SettingPropertyGroup("A night's rest")]
         public float AiNightsAwakeInChase { get; set; } = 1f;
@@ -751,6 +763,22 @@ namespace Armoury
         [SettingPropertyFloatingInteger("Hideout Alarm Witness Radius", 0.00f, 48.00f, "0.00", HintText = "a CLEAN one-blow kill alarms only enemies this close to the body - no witnesses, no alarm")]
         [SettingPropertyGroup("A night's rest")]
         public float HideoutAlarmWitnessRadius { get; set; } = 12f;
+
+        [SettingPropertyBool("Hideout Armoury Gear", HintText = "your men storm hideouts in their ARMOURY kit, same as field battles (opens the gate DTE leaves shut in regular hideouts)")]
+        [SettingPropertyGroup("A night's rest")]
+        public bool HideoutArmouryGear { get; set; } = true;
+
+        [SettingPropertyBool("Sight Cycle Enabled", HintText = "eyes follow the sun: every party sees further by day and shorter after dark")]
+        [SettingPropertyGroup("A night's rest")]
+        public bool SightCycleEnabled { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Day Sight Factor", 0.00f, 4.60f, "0.00", HintText = "spotting range in daylight, times this")]
+        [SettingPropertyGroup("A night's rest")]
+        public float DaySightFactor { get; set; } = 1.15f;
+
+        [SettingPropertyFloatingInteger("Night Sight Factor", 0.00f, 2.60f, "0.00", HintText = "spotting range at night - the cut is mild, for you HEAR more after dark: a marching column is loud")]
+        [SettingPropertyGroup("A night's rest")]
+        public float NightSightFactor { get; set; } = 0.65f;
 
         [SettingPropertyBool("Combat Xp Fix Enabled", HintText = "RBM pays the same XP for an arena tap and a battlefield kill - restore the proportions")]
         [SettingPropertyGroup("The worth of a lesson")]
@@ -1032,6 +1060,9 @@ namespace Armoury
             s.AiCampsAtNight = AiCampsAtNight;
             s.AiBanditsCampToo = AiBanditsCampToo;
             s.AiTentCap = AiTentCap;
+            s.AiTentRadius = AiTentRadius;
+            s.AiCampSkipPercent = AiCampSkipPercent;
+            s.BanditsRestByDay = BanditsRestByDay;
             s.AiNightsAwakeInChase = AiNightsAwakeInChase;
             s.AiCampDangerRadius = AiCampDangerRadius;
             s.CampTentIcon = CampTentIcon;
@@ -1039,6 +1070,10 @@ namespace Armoury
             s.HideoutAlarmEnabled = HideoutAlarmEnabled;
             s.HideoutAlarmScreamRadius = HideoutAlarmScreamRadius;
             s.HideoutAlarmWitnessRadius = HideoutAlarmWitnessRadius;
+            s.HideoutArmouryGear = HideoutArmouryGear;
+            s.SightCycleEnabled = SightCycleEnabled;
+            s.DaySightFactor = DaySightFactor;
+            s.NightSightFactor = NightSightFactor;
             s.CombatXpFixEnabled = CombatXpFixEnabled;
             s.ArenaXpPercent = ArenaXpPercent;
             s.TournamentXpPercent = TournamentXpPercent;

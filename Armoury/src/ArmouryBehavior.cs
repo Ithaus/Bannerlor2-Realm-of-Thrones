@@ -218,7 +218,7 @@ namespace Armoury
                     var p = Project.Parse(line);
                     if (p.Item == null) continue;
                     if (sb.Length > 0) sb.Append("\n");
-                    sb.Append(p.Item.Name + " - " + p.DaysLeft.ToString("0.#") + " days left, worked " + p.TempoName);
+                    sb.Append(p.Item.Name + " - " + Project.TimeLabel(p.DaysLeft) + " of work left (clock runs only while you stay there), worked " + p.TempoName);
                 }
                 return sb.ToString();
             }
@@ -337,14 +337,14 @@ namespace Armoury
                 // po czasie ma NIE rzucac drugi raz (Jeff: "wykulem, a potem fail
                 // i miecza nie ma"). Modyfikator jedzie z projektem i wraca.
                 StartProject(item, 1, days, here, "van", modifier != null ? modifier.StringId : "");
-                Log.Player("The blade is roughed out. " + days.ToString("0.#") + " days of finishing work remain at " + here.Name + ".");
+                Log.Player("The blade is roughed out. " + Project.TimeLabel(days) + " of finishing work remain at " + here.Name + ".");
                 // gra przed chwila POKAZALA "dodano do ekwipunku" - bez glosnego
                 // baneru wyglada to na zniknieciecie miecza
                 try
                 {
                     MBInformationManager.AddQuickInformation(new TaleWorlds.Localization.TextObject(
                         "{=!}The smith keeps the " + item.Name + " for finishing - " +
-                        days.ToString("0.#") + " days at " + here.Name + ". Stay or return to collect it."));
+                        Project.TimeLabel(days) + " at " + here.Name + ". Stay or return to collect it."));
                 }
                 catch { }
                 Log.Info("Bron w toku: " + item.StringId + " dni=" + days);

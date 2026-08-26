@@ -17,6 +17,33 @@
 
 ---
 
+## 2026-08-26 — paczka uwag Jeffa: wzrok dzien/noc, namioty przy graczu, bandyci noca, brama DTE w kryjowce, wspolne etykiety czasu
+**Mod:** Armoury | **Pliki:** `src/SightRange.cs` (NOWY), `src/HideoutSpawnShim.cs` (NOWY), `src/NightRest.cs`, `src/Project.cs`, `src/ArmouryBehavior.cs`, `src/SmithMenu.cs`, `src/SubModuleMain.cs`, `src/Settings.cs`
+**Zmiany:**
+1. WZROK ZA SLONCEM: zasieg wykrywania partii za dnia x1,15, w nocy x0,65 (lagodnie,
+   bo w nocy slychac wiecej); postfix na GetPartySpottingRange we wszystkich modelach.
+2. WEDRUJACY NAMIOT naprawiony: straznik CO KLATKE zdejmuje wizerunek namiotu gracza,
+   gdy partia sie ruszy (stary kod gasil tylko flage raz na godzine - namiot jechal po mapie).
+3. NAMIOTY TYLKO WOKOL GRACZA: ikona namiotu AI tylko w promieniu Ai Tent Radius (35)
+   od gracza; po odjezdzie obrazki schodza (partie dalej spia). Limit AiTentCap bez zmian.
+4. NIE KAZDY OBOZUJE: Ai Camp Skip Percent (15%) kolumn maszeruje przez cala noc
+   (deterministycznie per partia i noc); pogon/ucieczka/wrog w poblizu jak dotad nie spia.
+5. BANDYCI NOCNI LOWCY (Bandits Rest By Day, ON): w dzien 10-16 wieksza czesc band lezy
+   w ukryciu (AI stoi, bez namiotow), cwierc poluje mimo slonca; noca normalnie - razem
+   z krotszym wzrokiem nocnym robi sie ich pora.
+6. BRAMA DTE W KRYJOWCE (Hideout Armoury Gear, ON): patch spawnu DTE wymaga
+   IMissionAgentSpawnLogic, ktorego zwykla kryjowka nie ma (zasadzke wyjatkowali) - stad
+   wojsko szlo we wzorcowym rynsztunku zamiast magazynowego. HideoutSpawnShim implementuje
+   interfejs pusto (DTE uzywa go TYLKO jako testu obecnosci, silnik w kryjowce nie wola) -
+   przydzial z magazynu dziala jak w polu. Log "HideoutSpawnShim: brama DTE otwarta".
+7. JEDNA ETYKIETA CZASU (Jeff: "raz 2,5 dnia, raz 7,5 godziny"): Project.TimeLabel -
+   ponizej 2 dob godziny, wyzej dni+godziny; uzyta w tempie kucia, komunikacie wykonczenia
+   broni, banerze i podsumowaniu projektow (z dopiskiem, ze zegar tyka tylko w tej osadzie).
+**Ryzyko / co sprawdzic:** kryjowka - wojsko w sprzecie z magazynu (i log bramy); namiot
+gracza znika w chwili ruszenia; w nocy krotszy zasieg wykrywania (tooltip predkosci
+"Darkness"); bandyci rzadsi za dnia; obce namioty widac tylko blisko gracza.
+**Status:** DO SPRAWDZENIA
+
 ## 2026-08-26 — znikajacy miecz: dostawa broni BEZ drugiego rzutu + glosne banery
 **Mod:** Armoury | **Pliki:** `src/Project.cs`, `src/ArmouryBehavior.cs`, `src/Forge.cs`
 **Problem (Jeff):** wykul miecz w vanilla kuzni, gra napisala "dodano do ekwipunku",

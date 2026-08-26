@@ -1047,11 +1047,11 @@ namespace Armoury
 
                 var opts = new List<InquiryElement>
                 {
-                    new InquiryElement(0, "Hastily - " + (baseDays * s.TempoHastyTime).ToString("0.#") + " days", null, true,
+                    new InquiryElement(0, "Hastily - " + Project.TimeLabel(baseDays * s.TempoHastyTime), null, true,
                         "Half the time. Double the risk of ruining it, and almost no chance of fine work."),
-                    new InquiryElement(1, "At a steady pace - " + baseDays.ToString("0.#") + " days", null, true,
+                    new InquiryElement(1, "At a steady pace - " + Project.TimeLabel(baseDays), null, true,
                         "The honest way."),
-                    new InquiryElement(2, "With care - " + (baseDays * s.TempoCarefulTime).ToString("0.#") + " days", null, true,
+                    new InquiryElement(2, "With care - " + Project.TimeLabel(baseDays * s.TempoCarefulTime), null, true,
                         "Half again as long. Half the risk, and twice the chance of a fine piece.")
                 };
 
@@ -1069,8 +1069,8 @@ namespace Armoury
                             float days;
                             if (!Forge.Begin(item, tempo, out days)) return;
                             ArmouryBehavior.Instance.StartProject(item, tempo, days, Settlement.CurrentSettlement);
-                            Log.Player("You set to work on " + item.Name + ". " + days.ToString("0.#") +
-                                       " days at the anvil, and you must stay here to see it through.");
+                            Log.Player("You set to work on " + item.Name + ". " + Project.TimeLabel(days) +
+                                       " at the anvil, and you must stay here to see it through.");
                         }
                         catch (Exception ex) { Log.Error("AskTempo.Selected", ex); }
                     },
