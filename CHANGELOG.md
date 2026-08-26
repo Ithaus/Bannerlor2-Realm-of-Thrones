@@ -17,6 +17,21 @@
 
 ---
 
+## 2026-08-26 — tansza naprawa wojska: wrak max 10% wartosci + rabat hurtowy
+**Mod:** Armoury | **Pliki:** `src/SmithMenu.cs`, `src/Settings.cs`
+**Problem:** Jeff po obejrzeniu przykladow: wrak (1%) placony ~12,5% wartosci to za drogo,
+i ma byc "jeszcze taniej jesli hurtowo naprawiamy".
+**Przyczyna:** stara stawka liczona jako polowa ceny naprawy wlasnej sztuki.
+**Zmiana:** cena sztuki wojska liczy sie teraz WPROST od wartosci: wrak (1%) = Troop Mend
+Wreck Share (10%) wartosci, lzejsze zuzycie liniowo mniej (stan 60% = 4% wartosci). Do tego
+rabat hurtowy z calej roboty: kazda sztuka -0,5% z rachunku (Troop Mend Bulk Discount PP),
+pulap 30% (Max). Rabat w podpowiedzi i przy placeniu liczony z tej samej liczby sztuk.
+Ustawienie Troop Mend Cost Factor USUNIETE (zastapione przez Wreck Share); stare XML-e je
+zignoruja.
+**Ryzyko / co sprawdzic:** kwoty w podpowiedzi (np. kolczuga 2000 przy 3%: bylo 242, ma byc
+~194 minus rabat); przy pelnych polkach rabat do 30%.
+**Status:** DO SPRAWDZENIA
+
 ## 2026-08-26 — porzadek w menu kuzni: naprawy pod jednym wejsciem
 **Mod:** Armoury | **Pliki:** `src/SmithMenu.cs`
 **Problem:** menu Work the forge uroslo do 12 pozycji, z czego 5 to rozne odmiany naprawy -

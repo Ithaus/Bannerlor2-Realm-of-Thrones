@@ -33,8 +33,8 @@ namespace Armoury
                         if (eq[i].Item != null && IsBattleWorn(eq[i].Item, eq[i].ItemModifier)) worn++;
                 }
                 catch { }
-                int racks = 0, racksCost, cp, cc;
-                if (Settings.Current.TroopMendEnabled) ScanTroopWorn(out racks, out racksCost, out cp, out cc);
+                int racks = 0, racksCost, cp, cc, dd;
+                if (Settings.Current.TroopMendEnabled) ScanTroopWorn(out racks, out racksCost, out cp, out cc, out dd);
                 args.Tooltip = new TextObject("{=!}Worn: {W} on your back, {B} in your bags, {R} on the men's racks.")
                     .SetTextVariable("W", worn).SetTextVariable("B", bags).SetTextVariable("R", racks);
                 return true;
@@ -612,29 +612,50 @@ namespace Armoury
         // Kowal bierze polki hurtem: stawka TroopMendCostFactor od ceny
         // naprawy, najtansze najpierw, koszt wypisany Z GORY w podpowiedzi.
 
-        private static int TroopPieceCost(EquipmentElement el)
+        /// <summary>
+        /// Cena naprawy JEDNEJ sztuki wojska: wrak (1%) = TroopMendWreckShare
+        /// wartosci (Jeff: "max 10%"), lzejsze zuzycie proporcjonalnie mniej;
+        /// discount to rabat hurtowy juz policzony z calej roboty.
+        /// </summary>
+        private static int TroopPieceCost(EquipmentElement el, float discount)
         {
-            float f = MathF.Max(0.05f, Settings.Current.TroopMendCostFactor);
-            return Math.Max(1, (int)(PieceCost(el) * f));
+            float pm = el.ItemModifier != null ? el.ItemModifier.PriceMultiplier : 1f;
+            if (pm < 0f) pm = 0f; if (pm > 1f) pm = 1f;
+            float share = MathF.Max(0.01f, Settings.Current.TroopMendWreckShare);
+            return Math.Max(1, (int)(el.Item.Value * (1f - pm) * share * (1f - discount)));
+        }
+
+        /// <summary>Rabat hurtowy: kazda sztuka na robocie zbija procent z rachunku, do pulapu.</summary>
+        private static float TroopBulkDiscount(int pieces)
+        {
+            var s = Settings.Current;
+            float pct = MathF.Min(MathF.Max(0f, s.TroopMendBulkDiscountMax),
+                                  pieces * MathF.Max(0f, s.TroopMendBulkDiscountPP));
+            return MBMath.ClampFloat(pct / 100f, 0f, 0.9f);
         }
 
         /// <summary>Ile zuzytych sztuk lezy w zbrojowni wojska i ile kosztuje naprawa (calosc / na ile stac).</summary>
-        private static void ScanTroopWorn(out int pieces, out int cost, out int canPieces, out int canCost)
+        private static void ScanTroopWorn(out int pieces, out int cost, out int canPieces, out int canCost, out int discountPct)
         {
-            pieces = 0; cost = 0; canPieces = 0; canCost = 0;
+            pieces = 0; cost = 0; canPieces = 0; canCost = 0; discountPct = 0;
             try
             {
                 var armory = QuartermasterLaw.DteArmory();
                 if (armory == null || QuartermasterEscrow.Active) return;
-                var costs = new List<int>();
+                var worn = new List<EquipmentElement>();
+                int total = 0;
                 for (int i = 0; i < armory.Count; i++)
                 {
                     var el = armory.GetElementCopyAtIndex(i);
                     var ee = el.EquipmentElement;
                     if (ee.Item == null || !IsBattleWorn(ee.Item, ee.ItemModifier)) continue;
-                    int per = TroopPieceCost(ee);
-                    for (int k = 0; k < el.Amount; k++) costs.Add(per);
+                    for (int k = 0; k < el.Amount; k++) worn.Add(ee);
+                    total += el.Amount;
                 }
+                float discount = TroopBulkDiscount(total);
+                discountPct = (int)(discount * 100f);
+                var costs = new List<int>();
+                foreach (var ee in worn) costs.Add(TroopPieceCost(ee, discount));
                 costs.Sort();
                 int gold = Hero.MainHero.Gold;
                 foreach (var c in costs)
@@ -654,18 +675,18 @@ namespace Armoury
                 var s = Settings.Current;
                 if (s == null || !s.TroopMendEnabled) return false;
                 if (QuartermasterLaw.DteArmory() == null) return false;      // bez DTE nie ma zbrojowni
-                int all, allCost, can, canCost;
-                ScanTroopWorn(out all, out allCost, out can, out canCost);
+                int all, allCost, can, canCost, disc;
+                ScanTroopWorn(out all, out allCost, out can, out canCost, out disc);
                 if (all == 0)
                 { args.IsEnabled = false; args.Tooltip = new TextObject("{=!}The men's racks hold nothing worn - every piece is sound."); return true; }
                 if (can == 0)
-                { args.IsEnabled = false; args.Tooltip = new TextObject("{=!}{ALL} worn pieces on the racks, {COST} gold for the lot at the bulk rate - you cannot afford even the cheapest.").SetTextVariable("ALL", all).SetTextVariable("COST", allCost); return true; }
+                { args.IsEnabled = false; args.Tooltip = new TextObject("{=!}{ALL} worn pieces on the racks, {COST} gold for the lot (bulk discount {D}%) - you cannot afford even the cheapest.").SetTextVariable("ALL", all).SetTextVariable("COST", allCost).SetTextVariable("D", disc); return true; }
                 if (can < all)
-                    args.Tooltip = new TextObject("{=!}{ALL} worn pieces on the men's racks ({COST} gold for the lot, bulk rate). For your purse the smith will mend the {CAN} cheapest for {CANCOST}.")
-                        .SetTextVariable("ALL", all).SetTextVariable("COST", allCost).SetTextVariable("CAN", can).SetTextVariable("CANCOST", canCost);
+                    args.Tooltip = new TextObject("{=!}{ALL} worn pieces on the men's racks ({COST} gold for the lot, bulk discount {D}%). For your purse the smith will mend the {CAN} cheapest for {CANCOST}.")
+                        .SetTextVariable("ALL", all).SetTextVariable("COST", allCost).SetTextVariable("CAN", can).SetTextVariable("CANCOST", canCost).SetTextVariable("D", disc);
                 else
-                    args.Tooltip = new TextObject("{=!}{ALL} worn pieces on the men's racks. The smith and his apprentices will make them whole for {COST} gold (bulk rate).")
-                        .SetTextVariable("ALL", all).SetTextVariable("COST", allCost);
+                    args.Tooltip = new TextObject("{=!}{ALL} worn pieces on the men's racks. The smith and his apprentices will make them whole for {COST} gold (bulk discount {D}%).")
+                        .SetTextVariable("ALL", all).SetTextVariable("COST", allCost).SetTextVariable("D", disc);
                 return true;
             }
             catch (Exception e) { Log.Error("MendTroopsCondition", e); return false; }
@@ -676,8 +697,8 @@ namespace Armoury
             try
             {
                 var s = Settings.Current;
-                int all, allCost, can, canCost;
-                ScanTroopWorn(out all, out allCost, out can, out canCost);
+                int all, allCost, can, canCost, disc;
+                ScanTroopWorn(out all, out allCost, out can, out canCost, out disc);
                 if (can == 0) return;
                 float hours = Math.Min(MathF.Max(1f, s.TroopMendMaxHours), can * s.MendLootHoursPerPiece);
                 StartTimedWork(hours,
@@ -694,18 +715,21 @@ namespace Armoury
                 var armory = QuartermasterLaw.DteArmory();
                 if (armory == null) return;
                 var worn = new List<ItemRosterElement>();
+                int total = 0;
                 for (int i = 0; i < armory.Count; i++)
                 {
                     var el = armory.GetElementCopyAtIndex(i);
                     var ee = el.EquipmentElement;
-                    if (ee.Item != null && IsBattleWorn(ee.Item, ee.ItemModifier)) worn.Add(el);
+                    if (ee.Item != null && IsBattleWorn(ee.Item, ee.ItemModifier)) { worn.Add(el); total += el.Amount; }
                 }
                 if (worn.Count == 0) return;
-                worn.Sort((a, b) => TroopPieceCost(a.EquipmentElement).CompareTo(TroopPieceCost(b.EquipmentElement)));
+                // rabat liczony z CALEJ roboty - ta sama liczba co w podpowiedzi
+                float discount = TroopBulkDiscount(total);
+                worn.Sort((a, b) => TroopPieceCost(a.EquipmentElement, discount).CompareTo(TroopPieceCost(b.EquipmentElement, discount)));
                 int paid = 0, done = 0, skipped = 0;
                 foreach (var el in worn)
                 {
-                    int per = TroopPieceCost(el.EquipmentElement);
+                    int per = TroopPieceCost(el.EquipmentElement, discount);
                     int fix2 = 0;
                     for (int k = 0; k < el.Amount; k++)
                     {

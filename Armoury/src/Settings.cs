@@ -228,7 +228,9 @@ namespace Armoury
 
         // --- The men's gear ---
         public bool TroopMendEnabled = true;               // the town smith mends the worn gear on the troop armoury's racks - his apprentices work at a bulk rate
-        public float TroopMendCostFactor = 0.5f;           // the bulk rate: this share of what mending your own piece would cost (per piece, cheapest first)
+        public float TroopMendWreckShare = 0.10f;          // a WRECK (1%) costs this share of the piece's worth - lighter wear costs proportionally less (60% condition = 4% of worth)
+        public float TroopMendBulkDiscountPP = 0.5f;       // every piece on the job knocks this many percent off the whole bill - the more racks, the better the rate
+        public float TroopMendBulkDiscountMax = 30f;       // the bulk discount never grows past this percent
         public float TroopMendMaxHours = 24f;              // the whole job never takes longer than this - the smith puts every hand he has on it
         public bool TroopOrderEnabled = true;              // order missing kit for the men from the town smith - plain pieces of the tier you ask, straight onto the racks
         public float TroopOrderMarkup = 1.15f;             // the smith's fee: each procured piece costs its market worth times this

@@ -772,9 +772,17 @@ namespace Armoury
         [SettingPropertyGroup("The men's gear")]
         public bool TroopMendEnabled { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Troop Mend Cost Factor", 0.00f, 2.00f, "0.00", HintText = "the bulk rate: this share of what mending your own piece would cost (per piece, cheapest first)")]
+        [SettingPropertyFloatingInteger("Troop Mend Wreck Share", 0.00f, 1.00f, "0.00", HintText = "a WRECK (1%) costs this share of the piece's worth - lighter wear costs proportionally less (60% condition = 4% of worth)")]
         [SettingPropertyGroup("The men's gear")]
-        public float TroopMendCostFactor { get; set; } = 0.5f;
+        public float TroopMendWreckShare { get; set; } = 0.10f;
+
+        [SettingPropertyFloatingInteger("Troop Mend Bulk Discount P P", 0.00f, 2.00f, "0.00", HintText = "every piece on the job knocks this many percent off the whole bill - the more racks, the better the rate")]
+        [SettingPropertyGroup("The men's gear")]
+        public float TroopMendBulkDiscountPP { get; set; } = 0.5f;
+
+        [SettingPropertyFloatingInteger("Troop Mend Bulk Discount Max", 0.00f, 120.00f, "0.00", HintText = "the bulk discount never grows past this percent")]
+        [SettingPropertyGroup("The men's gear")]
+        public float TroopMendBulkDiscountMax { get; set; } = 30f;
 
         [SettingPropertyFloatingInteger("Troop Mend Max Hours", 0.00f, 96.00f, "0.00", HintText = "the whole job never takes longer than this - the smith puts every hand he has on it")]
         [SettingPropertyGroup("The men's gear")]
@@ -1036,7 +1044,9 @@ namespace Armoury
             s.TournamentXpPercent = TournamentXpPercent;
             s.BattleXpScalesWithDamage = BattleXpScalesWithDamage;
             s.TroopMendEnabled = TroopMendEnabled;
-            s.TroopMendCostFactor = TroopMendCostFactor;
+            s.TroopMendWreckShare = TroopMendWreckShare;
+            s.TroopMendBulkDiscountPP = TroopMendBulkDiscountPP;
+            s.TroopMendBulkDiscountMax = TroopMendBulkDiscountMax;
             s.TroopMendMaxHours = TroopMendMaxHours;
             s.TroopOrderEnabled = TroopOrderEnabled;
             s.TroopOrderMarkup = TroopOrderMarkup;
