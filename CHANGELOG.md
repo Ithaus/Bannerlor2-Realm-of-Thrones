@@ -17,6 +17,16 @@
 
 ---
 
+## 2026-08-26 — miniatury 3D w listach rozbiorki, naprawy i tygla
+**Mod:** Armoury | **Pliki:** `src/SmithMenu.cs`
+**Problem:** w listach "Take a piece apart", "Pick a damaged piece to mend" i "Break metal down"
+po samym opisie nie widac, co to za przedmiot - lista kucia miala obrazek, te trzy nie.
+**Przyczyna:** InquiryElement dostawal `null` zamiast ItemImageIdentifier.
+**Zmiana:** wspolny pomocnik `ItemPic(item)` (ItemImageIdentifier w try/catch), uzyty we
+wszystkich czterech listach (kucie tez przepiete na niego).
+**Ryzyko / co sprawdzic:** czy miniatury sie renderuja i nic nie wywala przy otwieraniu list.
+**Status:** DO SPRAWDZENIA
+
 ## 2026-08-25 — wyjscie ze snu przez ExitToLast (naprawa CTD)
 **Mod:** Armoury | **Pliki:** `src/NightRest.cs`
 **Problem:** klikniecie **"Rouse the men early"** w menu snu wywalalo gre. Log:

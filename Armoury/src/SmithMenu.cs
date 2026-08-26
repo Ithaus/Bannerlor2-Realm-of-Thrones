@@ -140,6 +140,13 @@ namespace Armoury
             return Settings.Current.CraftingEnabled;
         }
 
+        /// <summary>Miniatura 3D przedmiotu do list wyboru - po opisie nie widac, co to za sztuka.</summary>
+        internal static TaleWorlds.Core.ImageIdentifiers.ImageIdentifier ItemPic(ItemObject item)
+        {
+            try { return item != null ? new TaleWorlds.Core.ImageIdentifiers.ItemImageIdentifier(item) : null; }
+            catch { return null; }
+        }
+
         // ------------------------------------------------- naprawa lupow bitewnych
         // KAZDY przedmiot ze stanem obnizajacym wartosc - lupy Spoils (rl_looted_*),
         // wraki, rdza, pekniecia, nasze zuzycie - kowal doprowadza do stanu fabrycznego.
@@ -395,7 +402,7 @@ namespace Armoury
                                    " (yours " + Hero.MainHero.GetSkillValue(DefaultSkills.Crafting) + ")";
                     found.Add(ee0); slots.Add(slot);
                     elements.Add(new InquiryElement(found.Count - 1,
-                        "[EQUIPPED] " + ee0.GetModifiedItemName(), null, true, hint0));
+                        "[EQUIPPED] " + ee0.GetModifiedItemName(), ItemPic(ee0.Item), true, hint0));
                 }
 
                 for (int i = 0; i < roster.Count; i++)
@@ -421,7 +428,7 @@ namespace Armoury
                                   " (yours " + Hero.MainHero.GetSkillValue(DefaultSkills.Crafting) + ")";
                     found.Add(ee); slots.Add(-1);
                     elements.Add(new InquiryElement(found.Count - 1,
-                        ee.GetModifiedItemName() + "  x" + el.Amount, null, true, hint));
+                        ee.GetModifiedItemName() + "  x" + el.Amount, ItemPic(ee.Item), true, hint));
                     if (elements.Count >= Settings.Current.MaxItemsListed) break;
                 }
                 if (elements.Count == 0) { Log.Player("Nothing damaged on your back or in your bags.", true); return; }
@@ -652,7 +659,7 @@ namespace Armoury
                     var y = Recipes.SmeltYield(r, share);
                     var sb = new System.Text.StringBuilder();
                     foreach (var p in y) { if (sb.Length > 0) sb.Append(", "); sb.Append(p.Count + "x " + p.Item.Name); }
-                    elements.Add(new InquiryElement(item, item.Name + "  (x" + el.Amount + ")", null, true,
+                    elements.Add(new InquiryElement(item, item.Name + "  (x" + el.Amount + ")", ItemPic(item), true,
                         "Yields about " + (sb.Length > 0 ? sb.ToString() : "scrap") +
                         "\nStamina " + (r.Stamina / 2)));
                 }
@@ -720,7 +727,7 @@ namespace Armoury
                     int need, have; float chance;
                     ApartOdds(item, out need, out have, out chance);
                     int tier = Recipes.Grade(item);
-                    elements.Add(new InquiryElement(item, item.Name + "  (x" + el.Amount + ")", null, true,
+                    elements.Add(new InquiryElement(item, item.Name + "  (x" + el.Amount + ")", ItemPic(item), true,
                         "Tier " + tier + " pattern"
                         + "\nSmithing wanted " + need + ", you have " + have
                         + "\nChance to read the pattern: " + ((int)(chance * 100f)) + "%"
@@ -1132,9 +1139,7 @@ namespace Armoury
                                   (legendLocked ? "\n" + legendWhy : "");
                     string label = (legend ? "LEGEND - " : "") + item.Name + "   (tier " + RangedLore.TierOf(item) + ")" +
                                    (unknown ? "  - pattern unknown" : (locked ? "  - needs Smithing " + r.SkillNeeded : ""));
-                    TaleWorlds.Core.ImageIdentifiers.ImageIdentifier pic = null;
-                    try { pic = new TaleWorlds.Core.ImageIdentifiers.ItemImageIdentifier(item); } catch { }
-                    elements.Add(new InquiryElement(item, label, pic,
+                    elements.Add(new InquiryElement(item, label, ItemPic(item),
                         !locked && hasMats && hasStamina && !legendLocked && !unknown, hint));
                 }
 
