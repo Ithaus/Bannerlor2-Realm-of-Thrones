@@ -23,12 +23,21 @@ namespace Armoury
     {
         public override MissionBehaviorType BehaviorType { get { return MissionBehaviorType.Other; } }
 
-        private readonly HashSet<Agent> _pushed = new HashSet<Agent>();
+        // ZAPETLONY KRZYK (Jeff): Retreat() bywa cofany przez model morale
+        // (RBM StopRetreating zeruje flagi), a stary kod pchal czlowieka OD NOWA
+        // co pol sekundy - kazde pchniecie gralo wrzask od poczatku, na siebie
+        // nawzajem ("jakby ktos puszczal kilka nagran naraz"), a czlowiek stal
+        // w miejscu szarpany tam i nazad. Teraz: proby z rosnacym odstepem
+        // (3/6/9 s), po trzech nieudanych dajemy mu spokoj na 20 s - albo
+        // odchodzi, albo morale go pozbieralo i walczy dalej. Zaden dzwiek
+        // nie nachodzi na poprzedni.
+        private readonly Dictionary<Agent, float> _nextTry = new Dictionary<Agent, float>();
+        private readonly Dictionary<Agent, int> _tries = new Dictionary<Agent, int>();
         private float _accum;
 
         public override void OnAgentDeleted(Agent affectedAgent)
         {
-            try { _pushed.Remove(affectedAgent); } catch { }
+            try { _nextTry.Remove(affectedAgent); _tries.Remove(affectedAgent); } catch { }
         }
 
         public override void OnMissionTick(float dt)
@@ -69,18 +78,17 @@ namespace Armoury
 
                     var ai = a.CommonAIComponent;
                     if (ai == null) continue;
-                    if (ai.IsRetreating) continue;                   // juz idzie
+                    if (ai.IsRetreating) { _tries.Remove(a); _nextTry.Remove(a); continue; }   // juz idzie
 
-                    if (!_pushed.Contains(a))
-                    {
-                        _pushed.Add(a);
-                        ai.Panic();                                  // normalna droga: handler odeslie go na tyly
-                    }
-                    else
-                    {
-                        // panika poszla, a on dalej stoi (czyjs model morale ja zjadl) - wprost
-                        ai.Retreat();
-                    }
+                    float now = mission.CurrentTime;
+                    float next;
+                    if (_nextTry.TryGetValue(a, out next) && now < next) continue;
+                    int tries;
+                    _tries.TryGetValue(a, out tries);
+                    if (tries == 0) ai.Panic();                      // normalna droga: handler odeslie go na tyly
+                    else ai.Retreat();                               // panika zjedzona przez model morale - wprost
+                    _tries[a] = tries + 1;
+                    _nextTry[a] = now + (tries >= 3 ? 20f : 3f + 3f * tries);
                 }
             }
             catch (Exception e) { Log.Error("BrokenMen.OnMissionTick", e); }

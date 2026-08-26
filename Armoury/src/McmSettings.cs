@@ -756,6 +756,18 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public bool CampBattlePropsEnabled { get; set; } = false;
 
+        [SettingPropertyBool("Hideout Alarm Enabled", HintText = "a fight in a hideout wakes the camp: bandits within earshot come running - no more men ignoring a brawl ten paces away")]
+        [SettingPropertyGroup("A night's rest")]
+        public bool HideoutAlarmEnabled { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Hideout Alarm Scream Radius", 0.00f, 160.00f, "0.00", HintText = "a wounded man's cry and the ring of steel carry this many meters - bandits inside come at you, further ones sleep on")]
+        [SettingPropertyGroup("A night's rest")]
+        public float HideoutAlarmScreamRadius { get; set; } = 40f;
+
+        [SettingPropertyFloatingInteger("Hideout Alarm Witness Radius", 0.00f, 48.00f, "0.00", HintText = "a CLEAN one-blow kill alarms only enemies this close to the body - no witnesses, no alarm")]
+        [SettingPropertyGroup("A night's rest")]
+        public float HideoutAlarmWitnessRadius { get; set; } = 12f;
+
         [SettingPropertyBool("Combat Xp Fix Enabled", HintText = "RBM pays the same XP for an arena tap and a battlefield kill - restore the proportions")]
         [SettingPropertyGroup("The worth of a lesson")]
         public bool CombatXpFixEnabled { get; set; } = true;
@@ -1044,6 +1056,9 @@ namespace Armoury
             s.AiCampDangerRadius = AiCampDangerRadius;
             s.CampTentIcon = CampTentIcon;
             s.CampBattlePropsEnabled = CampBattlePropsEnabled;
+            s.HideoutAlarmEnabled = HideoutAlarmEnabled;
+            s.HideoutAlarmScreamRadius = HideoutAlarmScreamRadius;
+            s.HideoutAlarmWitnessRadius = HideoutAlarmWitnessRadius;
             s.CombatXpFixEnabled = CombatXpFixEnabled;
             s.ArenaXpPercent = ArenaXpPercent;
             s.TournamentXpPercent = TournamentXpPercent;

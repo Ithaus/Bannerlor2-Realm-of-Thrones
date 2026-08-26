@@ -220,6 +220,9 @@ namespace Armoury
         public float AiCampDangerRadius = 6f;              // a hostile party this close keeps them marching - pursuit knows no bedtime
         public bool CampTentIcon = true;                   // pitched camps show a tent on the map (yours and theirs)
         public bool CampBattlePropsEnabled = false;        // EXPERIMENTAL: attacked while encamped, the field battle gets your camp dressed on it - tents, fire, torches around your line (unknown prefabs are skipped and logged)
+        public bool HideoutAlarmEnabled = true;            // a fight in a hideout wakes the camp: bandits within earshot come running - no more men ignoring a brawl ten paces away
+        public float HideoutAlarmScreamRadius = 40f;       // a wounded man's cry and the ring of steel carry this many meters - bandits inside come at you, further ones sleep on
+        public float HideoutAlarmWitnessRadius = 12f;      // a CLEAN one-blow kill alarms only enemies this close to the body - no witnesses, no alarm
 
         // --- The worth of a lesson ---
         public bool CombatXpFixEnabled = true;             // RBM pays the same XP for an arena tap and a battlefield kill - restore the proportions

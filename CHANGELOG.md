@@ -17,6 +17,37 @@
 
 ---
 
+## 2026-08-26 — alarm w kryjowce: walka budzi oboz, cichy strzal nie
+**Mod:** Armoury | **Pliki:** `src/HideoutAlarm.cs` (NOWY), `src/SubModuleMain.cs`, `src/Settings.cs`
+**Problem:** w kryjowce zbojcy 10 m od bijatyki udaja, ze nic sie nie dzieje - vanilla budzi
+tylko zaczepiona grupke.
+**Zmiana:** nowy MissionBehavior (tylko misje z HideoutMissionController): kazde wrogie
+trafienie, ktore NIE zabija, budzi wrogow w promieniu Scream Radius (40 m) od ofiary
+(ranny krzyczy); zabojstwo JEDNYM ciosem budzi tylko swiadkow w Witness Radius (12 m)
+od ciala - bez swiadkow oboz spi (cicha likwidacja lukiem dziala). Ci 200 m dalej nie
+slysza nic. Budzenie publicznym Agent.SetAlarmState(Alarmed) - ten sam stan co vanilla;
+lancuch niesie sie sam (obudzeni dobiegaja, walka przy nich budzi nastepnych). 3 ustawienia
+MCM, Hideout Alarm Enabled domyslnie ON.
+**Ryzyko / co sprawdzic:** wejsc do kryjowki, strzelic w goscia przy grupce - grupka ma
+ruszyc (log "HideoutAlarm: walka obudzila N"); zabic samotnego jedna strzala - cisza.
+UWAGA: mod Blackmamba's Hideout Overhaul rusza te same mechanizmy - nie laczyc bez testu.
+**Status:** DO SPRAWDZENIA
+
+## 2026-08-26 — ranni przestaja zapetlac krzyk (BrokenMen z odstepem prob)
+**Mod:** Armoury | **Pliki:** `src/BrokenMen.cs`
+**Problem:** zolnierz ponizej progu ucieczki stal w miejscu i krzyczal ZAPETLONYM, nakladajacym
+sie na siebie glosem ("jakby ktos puszczal kilka nagran naraz nie czekajac konca") i czasem
+wcale sie nie wycofywal.
+**Przyczyna:** model morale (RBM) potrafi cofnac Retreat (StopRetreating zeruje flagi), a nasz
+kod pchal czlowieka od nowa CO POL SEKUNDY - kazde pchniecie odpalalo wrzask od poczatku,
+a czlowiek szarpany tam i nazad stal w miejscu.
+**Zmiana:** proby z rosnacym odstepem: Panic, potem Retreat po 3 s, 6 s, 9 s; po trzech
+nieudanych 20 s spokoju (albo odejdzie, albo morale go pozbieralo i walczy dalej). Zaden
+krzyk nie nachodzi na poprzedni. Slowniki czyszczone w OnAgentDeleted.
+**Ryzyko / co sprawdzic:** ranni schodza z pola plynnie, krzyk pojedynczy; przy RBM patrzec,
+czy ktos nie zostaje w wiecznym tam-i-nazad (wtedy zwiekszyc odstepy).
+**Status:** DO SPRAWDZENIA
+
 ## 2026-08-26 — oboz i sen: namiot przy spaniu, rozliczenie od reki, bandyci za przelacznikiem, bitwa w obozie (eksperyment)
 **Mod:** Armoury | **Pliki:** `src/NightRest.cs`, `src/CampScene.cs` (NOWY), `src/SubModuleMain.cs`, `src/Settings.cs`
 **Problem:** (1) ikona gracza nie zmieniala sie w namiot przy spaniu ("kiedys dzialalo") -

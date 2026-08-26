@@ -81,6 +81,9 @@ namespace Armoury
                 if (Settings.Current.CampBattlePropsEnabled && Campaign.Current != null && mission != null
                     && NightRest.PlayerCamped)
                     mission.AddMissionBehavior(new CampScene());
+                if (Settings.Current.HideoutAlarmEnabled && Campaign.Current != null && mission != null
+                    && HideoutAlarm.IsHideout(mission))
+                    mission.AddMissionBehavior(new HideoutAlarm());
             }
             catch (Exception e) { Log.Error("OnMissionBehaviorInitialize", e); }
         }
