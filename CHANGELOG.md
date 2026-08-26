@@ -17,6 +17,23 @@
 
 ---
 
+## 2026-08-26 — goli zolnierze w kryjowce: DressCode dopelnia KAZDY pusty slot
+**Mod:** Armoury | **Pliki:** `src/DressCode.cs`
+**Problem:** zolnierze gracza stoja nadzy podczas walki w kryjowce rozbojnikow (w polu OK).
+**Przyczyna (ze ZRODEL DTE, github tategotoazarasi/Bannerlord.DynamicTroop):** (1) DTE
+druzynie gracza CELOWO nie dopelnia pustych slotow (kara underequipped) - zolnierz dostaje
+tylko to, co magazyn ma; (2) awaryjne ubranie DTE, ktore ratuje w polu, jest w kryjowkach
+WYLACZONE; (3) nasz stary DressCode odpuszczal, gdy byla CHOC JEDNA czesc pancerza (same
+buty = "ubrany"), i modyfikowal wspoldzielony Equipment przydzialu DTE, co moglo falszowac
+zdejmowanie sztuk z polek magazynu w postfixie DTE.
+**Zmiana:** DressCode dopelnia kazdy pusty slot pancerza Z OSOBNA (glowa/korpus/nogi/rece/
+peleryna) ubraniem ze wzorca oddzialu, na KLONIE ekwipunku - przydzial DTE nietkniety,
+rozliczenie magazynu bez zmian. Prefix dalej Priority.Last (po prefixie DTE).
+**Ryzyko / co sprawdzic:** kryjowka - nikt nagi; w logu linie "DressCode: ... pustych slotow
+pancerza"; po bitwie polowej stan magazynu DTE bez dziwnych ubytkow. Kara morale
+underequipped DTE dalej dziala (to tylko ubranie, nie pancerz z magazynu).
+**Status:** DO SPRAWDZENIA
+
 ## 2026-08-26 — liczniki surowcow i staminy w ekranie kuzni odswiezaja sie na zywo
 **Mod:** Armoury | **Pliki:** `src/FletchForge.cs`
 **Problem:** po wykuciu (np. luku) w zakladce CRAFT panel dolny dalej pokazywal stara ilosc

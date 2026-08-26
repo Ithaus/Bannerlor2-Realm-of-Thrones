@@ -6,17 +6,26 @@ using TaleWorlds.MountAndBlade;
 namespace Armoury
 {
     /// <summary>
-    /// GOLI WOJACY (Jeff, kryjowka): DTE ubiera kazda strone bitwy z JEJ
-    /// wlasnego magazynu - a zbojnicy z kryjowki zadnego magazynu nie maja.
-    /// Na dodatek awaryjne ubranie DTE jest w kryjowkach CELOWO wylaczone
-    /// (wczesny return w ApplyEmergencyLoadout). Efekt: banda w gaciach
-    /// z dzidami. Latka na Mission.SpawnAgent: czlowiek, ktoremu przydzial
-    /// zostawil WSZYSTKIE sloty pancerza puste, wklada wlasne ubranie ze
-    /// swojego wzorca (glowa, korpus, nogi, rece, peleryna). Nikt nie
-    /// walczy nago - ani wrog, ani nasi, w zadnej misji.
+    /// GOLI WOJACY (Jeff, kryjowka): DTE ubiera z magazynu, ale druzynie
+    /// gracza CELOWO nie dopelnia pustych slotow (kara "underequipped"),
+    /// a jego awaryjne ubranie jest w kryjowkach wylaczone (wczesny return
+    /// w ApplyEmergencyLoadout) - w polu ratowalo, w kryjowce nie. Efekt:
+    /// nasi w gaciach wsrod zbojcow. Latka na Mission.SpawnAgent (prefix
+    /// Priority.Last, czyli PO prefixie DTE): KAZDY pusty slot pancerza
+    /// z osobna dostaje ubranie ze wzorca oddzialu. Robimy to na KLONIE
+    /// ekwipunku - przydzial DTE zostaje nietkniety, wiec jego rozliczenie
+    /// magazynu (postfix zdejmuje przydzielone sztuki z polek) nie widzi
+    /// naszych dolozek i niczego nie gubi. Nikt nie walczy nago - ani
+    /// wrog, ani nasi, w zadnej misji.
     /// </summary>
     internal static class DressCode
     {
+        private static readonly EquipmentIndex[] ArmourSlots =
+        {
+            EquipmentIndex.Head, EquipmentIndex.Body, EquipmentIndex.Leg,
+            EquipmentIndex.Gloves, EquipmentIndex.Cape
+        };
+
         public static void Prefix(AgentBuildData agentBuildData)
         {
             try
@@ -26,13 +35,6 @@ namespace Armoury
                 if (eq == null) return;                                   // bez nadpisu vanilla ubierze sama
                 var ch = agentBuildData.AgentCharacter;
                 if (ch == null || ch.IsHero) return;
-
-                bool anyArmour =
-                       !eq[EquipmentIndex.Head].IsEmpty
-                    || !eq[EquipmentIndex.Body].IsEmpty
-                    || !eq[EquipmentIndex.Leg].IsEmpty
-                    || !eq[EquipmentIndex.Gloves].IsEmpty;
-                if (anyArmour) return;                                    // ubrany choc czesciowo - nie ruszamy
 
                 Equipment tpl = null;                                     // wzorzec bojowy oddzialu
                 try
@@ -47,22 +49,28 @@ namespace Armoury
                 }
                 catch { }
                 if (tpl == null) return;
+
+                // czy w ogole jest co dopelniac? (nie klonujemy po proznicy)
+                bool needAny = false;
+                foreach (var sl in ArmourSlots)
+                    if (eq[sl].IsEmpty && tpl[sl].Item != null) { needAny = true; break; }
+                if (!needAny) return;
+
+                var dressed = eq.Clone();
                 int given = 0;
-                EquipmentIndex[] slots =
+                foreach (var sl in ArmourSlots)
                 {
-                    EquipmentIndex.Head, EquipmentIndex.Body, EquipmentIndex.Leg,
-                    EquipmentIndex.Gloves, EquipmentIndex.Cape
-                };
-                foreach (var sl in slots)
-                {
-                    if (!eq[sl].IsEmpty) continue;
+                    if (!dressed[sl].IsEmpty) continue;
                     var it = tpl[sl].Item;
                     if (it == null) continue;
-                    eq[sl] = new EquipmentElement(it);
+                    dressed[sl] = new EquipmentElement(it);
                     given++;
                 }
                 if (given > 0)
-                    Log.Info("DressCode: goly " + ch.Name + " dostal " + given + " czesci ubrania ze wzorca.");
+                {
+                    agentBuildData.Equipment(dressed);
+                    Log.Info("DressCode: " + ch.Name + " mial " + given + " pustych slotow pancerza - dostal ubranie ze wzorca.");
+                }
             }
             catch { }
         }
