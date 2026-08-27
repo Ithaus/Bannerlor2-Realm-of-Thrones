@@ -17,6 +17,27 @@
 
 ---
 
+## 2026-08-27 — panika: nieumarli bez strachu, koniec zapetlonych krzykow przy rozbiciu; nauka wzorow naprawde losowa
+**Mod:** Armoury | **Pliki:** `Armoury/src/BrokenMen.cs`, `Armoury/src/RangedLore.cs`
+**Problem:** Jeff: (1) "krzyki zapetlone paniki na mapie bitwy jak jest ucieczka";
+(2) "nieumarli nie wpadaja w panike - trzeba zaznaczyc"; (3) "pancerze odkrywane
+od samego dolu jeden po drugim, a powinny byc losowo w danym tierze i kategorii".
+**Przyczyna:** (1) BrokenMen patrzyl tylko na IsRetreating - przy ROZBICIU armii
+ludzie biegna vanillowa ucieczka (IsRunningAway, IsRetreating=false) i pchalismy
+Panic() w kolko, a kazde pchniecie gralo wrzask od nowa. (2) BrokenMen nie filtrowal
+wightow (FieldCraft juz filtrowal). (3) TryUnlockRandom liczyl cene od WYLOSOWANEGO
+wzoru - przy malych punktach przechodzily tylko najtansze trafienia i odkrycia szly
+sekwencyjnie od dolu.
+**Zmiana:** (1) BrokenMen pomija agentow z IsRunningAway (i czysci ich liczniki).
+(2) BrokenMen pomija Undead.Character. (3) TryUnlockRandom: cena = 3 x tier sztuki,
+PRZY KTOREJ sie uczysz (kucie: los z [tier..6] za 3xTier kutego; przetop/rozlozenie:
+los z [1..tier] za 3xTier sztuki) - kazdy wzor w zakresie ma rowna szanse. Ledger
+opisuje nowa cene.
+**Ryzyko / co sprawdzic:** rozbita armia ucieka bez chorusu wrzaskow; wighci walcza
+do konca; odkrycia wzorow skacza po tierach i pozycjach listy losowo. Kucie t1 moze
+odkryc t6 za 3 pkt - zamierzone (Jeff: "losowo, tier lub wyzej, jak przy broniach").
+**Status:** WGRANE (albo czeka, jesli gra otwarta)
+
 ## 2026-08-27 — martwy dialog preachera: rejestracja ducha w religii BK przy rozmowie + kontekst lawiny relacji
 **Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs`
 **Problem:** Jeff: "jak sie wejdzie w preachera i klika click to continue, nic sie

@@ -66,6 +66,8 @@ namespace Armoury
                     if (!a.IsAIControlled) continue;                 // gracza nikt nie zmusi do ucieczki
                     if (a == mission.MainAgent) continue;
                     if (a.IsHero && !c.WoundedFleeHeroes) continue;  // dowodcy trzymaja sie do konca
+                    // trup nie zna strachu - wight bije sie do konca (Jeff 27.08)
+                    if (Undead.Character(a.Character)) continue;
 
                     // tylko swoi gracza albo wszyscy - wedle ustawienia
                     if (c.WoundedFleeEnemiesOnly && mission.MainAgent != null
@@ -78,7 +80,13 @@ namespace Armoury
 
                     var ai = a.CommonAIComponent;
                     if (ai == null) continue;
-                    if (ai.IsRetreating) { _tries.Remove(a); _nextTry.Remove(a); continue; }   // juz idzie
+                    // JUZ UCIEKA - jakakolwiek droga (nasz odwrot, vanillowa
+                    // panika morale, masowa ucieczka po zlamaniu armii). Stary
+                    // warunek patrzyl tylko na IsRetreating, wiec przy ROZBICIU
+                    // wojska (wszyscy biegna vanillowa ucieczka, IsRetreating
+                    // false) pchalismy Panic() w kolko - i kazde pchniecie gralo
+                    // wrzask od nowa (Jeff 27.08: "krzyki zapetlone przy ucieczce").
+                    if (ai.IsRetreating || a.IsRunningAway) { _tries.Remove(a); _nextTry.Remove(a); continue; }
 
                     float now = mission.CurrentTime;
                     float next;

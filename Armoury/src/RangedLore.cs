@@ -201,7 +201,8 @@ namespace Armoury
                 int sc = BranchTaughtBy(it);
                 if (sc == SchoolNone) return;
                 Research[sc] += pts;
-                TryUnlockRandom(sc, 1, Math.Max(1, TierOf(it)));
+                int tIt = Math.Max(1, TierOf(it));
+                TryUnlockRandom(sc, 1, tIt, tIt);
                 var line = Ledger(sc);
                 if (!string.IsNullOrEmpty(line))
                 { Log.Info(line); InformationManager.DisplayMessage(new InformationMessage(line, Colors.Cyan)); }
@@ -287,12 +288,12 @@ namespace Armoury
                 if (nextTier == 0) sb.Append(", nothing left to learn.");
                 else
                 {
-                    // odkrycia sa losowe - obiecujemy tylko najnizsza mozliwa cene,
-                    // nie konkretny wzor
+                    // odkrycia sa losowe, cena = 3 x tier sztuki, przy ktorej
+                    // pracujesz - obiecujemy tylko najnizsza mozliwa cene
                     float cost = 3f * nextTier;
                     float miss = cost - pts; if (miss < 0f) miss = 0f;
-                    sb.Append(", next pattern: random (cheapest is tier ").Append(nextTier)
-                      .Append(", costs ").Append((int)cost).Append(") - ").Append(miss.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture))
+                    sb.Append(", next pattern: random, unlock costs 3 x the tier you work (cheapest ")
+                      .Append((int)cost).Append(") - ").Append(miss.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture))
                       .Append(" pts short");
                     int top = 1; for (int t = 6; t >= 1; t--) if (knownTier[t] > 0) { top = t; break; }
                     int per = top < 1 ? 1 : top;
@@ -336,7 +337,8 @@ namespace Armoury
                 int sc = BranchTaughtBy(item);
                 if (sc == SchoolNone) return;
                 Research[sc] += pts;
-                TryUnlockRandom(sc, Math.Max(1, TierOf(item)), 6);
+                int tThis = Math.Max(1, TierOf(item));
+                TryUnlockRandom(sc, tThis, 6, tThis);
                 // po kazdej robocie mowimy, ile jeszcze do nastepnego wzoru
                 if (sc != SchoolNone)
                 {
@@ -349,20 +351,23 @@ namespace Armoury
         }
 
         /// <summary>
-        /// Losowe odkrycie z zakresu tierow [minTier..maxTier]. Losujemy KANDYDATA
-        /// sposrod nieznanych wzorow szkoly w zakresie; jesli punktow starcza na
-        /// jego cene (3 x tier), wchodzi do ksiegi i losujemy dalej; jesli nie -
-        /// punkty zostaja i los odbedzie sie przy nastepnej robocie. MBRandom,
-        /// nie System.Random - spojnie z reszta kampanii.
+        /// Losowe odkrycie z zakresu tierow [minTier..maxTier]. CENA za kazde
+        /// losowanie liczy sie od sztuki, PRZY KTOREJ sie uczysz (kutej albo
+        /// przetapianej: 3 x costTier) - nie od wylosowanego wzoru. Stara cena
+        /// wg wylosowanego przepuszczala tylko najtansze trafienia i odkrycia
+        /// szly "od dolu jeden po drugim" (Jeff 27.08); teraz kazdy wzor
+        /// z zakresu ma ROWNA szanse. MBRandom, spojnie z reszta kampanii.
         /// </summary>
-        private static void TryUnlockRandom(int school, int minTier, int maxTier)
+        private static void TryUnlockRandom(int school, int minTier, int maxTier, int costTier)
         {
             try
             {
                 Seed();
+                float cost = 3f * Math.Max(1, costTier);
                 var pool = new List<ItemObject>();
                 while (true)
                 {
+                    if (Research[school] < cost) return;            // jeszcze sie ucz
                     pool.Clear();
                     foreach (var item in MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
                     {
@@ -375,8 +380,6 @@ namespace Armoury
                     if (pool.Count == 0) return;                    // nic do odkrycia w tym zakresie
                     var next = pool[MBRandom.RandomInt(pool.Count)];
                     int bestTier = Math.Max(1, TierOf(next));
-                    float cost = 3f * bestTier;
-                    if (Research[school] < cost) return;            // jeszcze sie ucz
                     Research[school] -= cost;
                     Known.Add(next.StringId);
                     // baner jak przy vanillowym odblokowaniu czesci broni (kuznia 1:1
