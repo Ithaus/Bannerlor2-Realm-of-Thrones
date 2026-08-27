@@ -17,6 +17,29 @@
 
 ---
 
+## 2026-08-27 — namiot gracza wraca po odbudowie wizerunku + zuzycie sprzetu WOJSKA po bitwach
+**Mod:** Armoury | **Pliki:** `Armoury/src/NightRest.cs`, `Armoury/src/ArmouryBehavior.cs`, `Armoury/src/Settings.cs`, `Armoury/src/McmSettings.cs` (gen)
+**Problem:** Jeff: (1) "jak jest oboz, to nie ma ikony namiotu"; (2) "muster kwatermistrza:
+zolnierze zawsze maja 100%, jakby sprzet sie nie psul, nawet jak dostaja zepsute rzeczy".
+**Przyczyna:** (1) namiot stawiany RAZ przy rozbiciu obozu, a silnik mapy przy
+odswiezeniach widoku (menu, pauza, wczytanie) odbudowuje wizerunek partii - namiot
+znika, wraca konik; zadnego mechanizmu przywracania (w logu zero potkniec Tent).
+(2) Zuzycie (ApplyWear/ApplyWearPerSlot) tykalo WYLACZNIE Hero.MainHero.BattleEquipment -
+zbrojownia DTE zyla wiecznie nowa, wiec muster uczciwie pokazywal 100%.
+**Zmiana:** (1) ReassertPlayerTent w OnTick (raz na 5 s, nie co klatke - pulapka
+z CLAUDE.md): odcisk palca = liczba dzieci StrategicEntity zapisana przy stawianiu;
+gdy sie zmieni, namiot staje od nowa (log "silnik odbudowal wizerunek").
+(2) WearTheTroops po kazdej bitwie: dla kazdego typu sprzetu TroopWearPercent (12%)
+sztuk W UZYCIU (wg WornFor/CountNeeds) schodzi o JEDEN stopien drabinki modyfikatorow
+(ta sama co lupy; sztuki na dnie drabinki zostaja). 2 nowe ustawienia MCM
+(Troop Wear Enabled/Percent). Naprawa istniejacym "Mend the men's kit".
+**Ryzyko / co sprawdzic:** namiot obozu widoczny takze po wejsciu/wyjsciu z menu
+i wczytaniu; po bitwie komunikat "The battle wore the men's kit - N pieces...",
+muster pokazuje kondycje < 100% i rosnaca liczbe "worn". Sztuki wkladane recznie
+przez NIEKTORE sciezki DTE (AddItemToArmory po ItemObject) gubia modyfikator -
+to uproszczenie DTE, nie nasze; nasz system i tak ubrudzi magazyn po bitwach.
+**Status:** WGRANE (albo czeka, jesli gra otwarta)
+
 ## 2026-08-27 — kuznia: kowal pracuje bez ciebie, gotowy wyrob czeka na odbior
 **Mod:** Armoury | **Pliki:** `Armoury/src/ArmouryBehavior.cs`, `Armoury/src/Settings.cs`
 **Problem:** Jeff: "wykulem miecz, odczekalem dlugo i przepadl". Log 13:44:54 "Projekt

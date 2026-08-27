@@ -336,6 +336,14 @@ namespace Armoury
         [SettingPropertyGroup("Mending it yourself")]
         public float SmeltingSkillBonus { get; set; } = 0.002f;
 
+        [SettingPropertyBool("Troop Wear Enabled", HintText = "the men's kit wears with every battle: a share of pieces in use drops one condition step - mend it at the smith")]
+        [SettingPropertyGroup("Wear and tear")]
+        public bool TroopWearEnabled { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Troop Wear Percent", 0.00f, 48.00f, "0.00", HintText = "this share of pieces IN USE takes one step of wear per battle")]
+        [SettingPropertyGroup("Wear and tear")]
+        public float TroopWearPercent { get; set; } = 12f;
+
         [SettingPropertyBool("Wear Enabled", HintText = "gear loses condition with use")]
         [SettingPropertyGroup("Wear and tear")]
         public bool WearEnabled { get; set; } = true;
@@ -1035,6 +1043,8 @@ namespace Armoury
             s.LegendarySkillNeeded = LegendarySkillNeeded;
             s.SmeltingReturnShare = SmeltingReturnShare;
             s.SmeltingSkillBonus = SmeltingSkillBonus;
+            s.TroopWearEnabled = TroopWearEnabled;
+            s.TroopWearPercent = TroopWearPercent;
             s.WearEnabled = WearEnabled;
             s.ShowConditionPercent = ShowConditionPercent;
             s.ConditionScalesStats = ConditionScalesStats;

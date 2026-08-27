@@ -357,6 +357,12 @@ namespace Armoury
         // Z RZEDU wylaczaja, kazdy sukces zeruje licznik.
         private static int _tentStrikes;
         private const int TentStrikesMax = 3;
+        // ile dzieci mial wizerunek gracza tuz po postawieniu namiotu - gdy
+        // silnik mapy odbuduje figurke (menu, pauza, odswiezenie widoku),
+        // liczba sie zmienia i namiot trzeba postawic OD NOWA (Jeff 27.08:
+        // "jak jest oboz, to nie ma ikony namiotu")
+        private static int _tentChildren = -1;
+        private static DateTime _lastTentAssert = DateTime.MinValue;
 
         /// <summary>Gracz stoi obozem TERAZ - dla bitwy w obozie (CampScene). Stan niezalezny od ikony.</summary>
         internal static bool PlayerCamped;
@@ -397,9 +403,14 @@ namespace Armoury
                     // figurki jezdzca i konia zyja OSOBNO od ikony - chowamy je,
                     // zeby kon nie stal na namiocie (tak samo robi oboz BK)
                     ShowAgentFigures(vis, false);
+                    // odcisk palca: po tej liczbie dzieci straznik w OnTick poznaje,
+                    // ze silnik odbudowal wizerunek i namiot zniknal
+                    if (mp == MobileParty.MainParty)
+                        _tentChildren = ChildCountOf(strat);
                 }
                 else
                 {
+                    if (mp == MobileParty.MainParty) _tentChildren = -1;
                     ShowAgentFigures(vis, true);
                     // wlasciwy reset silnika: czysci ikone i kaze odbudowac figurke
                     var mClear = vis.GetType().GetMethod("ClearVisualMemory",
@@ -419,6 +430,55 @@ namespace Armoury
                 Log.Error("Tent (potkniecie " + _tentStrikes + "/" + TentStrikesMax + ")", e);
                 if (_tentStrikes >= TentStrikesMax) Log.Info("Tent: " + TentStrikesMax + " wywrotki z rzedu - namioty wylaczone do konca sesji.");
             }
+        }
+
+        private static int ChildCountOf(object strat)
+        {
+            try
+            {
+                var p = strat.GetType().GetProperty("ChildCount");
+                if (p != null) return (int)p.GetValue(strat, null);
+                var m = strat.GetType().GetMethod("GetChildCount");
+                if (m != null) return (int)m.Invoke(strat, null);
+            }
+            catch { }
+            return -1;
+        }
+
+        /// <summary>
+        /// STRAZNIK NAMIOTU GRACZA. Silnik mapy przy odswiezeniach widoku (menu,
+        /// pauza, wczytanie) potrafi odbudowac wizerunek partii - namiot znika,
+        /// wraca konik. Co pare sekund sprawdzamy odcisk palca (liczbe dzieci
+        /// encji) i gdy sie nie zgadza, stawiamy namiot od nowa. To NIE jest
+        /// robota co klatke (pulapka z CLAUDE.md) - raz na 5 s i tylko przy
+        /// realnej zmianie.
+        /// </summary>
+        internal static void ReassertPlayerTent()
+        {
+            try
+            {
+                if (!PlayerCamped || _tentChildren < 0) return;
+                var s = Settings.Current;
+                if (s == null || !s.CampTentIcon || _tentStrikes >= TentStrikesMax) return;
+                if ((DateTime.Now - _lastTentAssert).TotalSeconds < 5.0) return;
+                _lastTentAssert = DateTime.Now;
+
+                var tMgr = QuartermasterLaw.FindType("SandBox.View.Map.Managers.MobilePartyVisualManager");
+                var cur = tMgr != null ? tMgr.GetProperty("Current",
+                    BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static) : null;
+                object mgr = cur != null ? cur.GetValue(null, null) : null;
+                if (mgr == null) return;
+                var getVis = mgr.GetType().GetMethod("GetPartyVisual");
+                object vis = getVis != null ? getVis.Invoke(mgr, new object[] { MobileParty.MainParty.Party }) : null;
+                var pStrat = vis != null ? vis.GetType().GetProperty("StrategicEntity") : null;
+                object strat = pStrat != null ? pStrat.GetValue(vis, null) : null;
+                if (strat == null) return;
+                int now = ChildCountOf(strat);
+                if (now == _tentChildren) return;   // namiot stoi - nic nie ruszamy
+                Log.Info("Tent: silnik odbudowal wizerunek (dzieci " + _tentChildren + " -> " + now + ") - stawiam namiot od nowa.");
+                Tent(MobileParty.MainParty, true);
+            }
+            catch { }
         }
 
         /// <summary>Figurki czlowieka, konia i mulow karawany - widoczne albo nie.</summary>
@@ -543,6 +603,9 @@ namespace Armoury
                     Tent(MobileParty.MainParty, false);
                     PlayerCamped = false;
                 }
+
+                // namiot gracza wraca, gdy silnik odbuduje wizerunek (raz na 5 s)
+                if (PlayerCamped && Campaign.Current != null) ReassertPlayerTent();
 
                 // mijane obozy dostaja namiot OD RAZU (refresh co ~2 s realne),
                 // nie dopiero na godzinnym ticku kampanii

@@ -99,6 +99,8 @@ namespace Armoury
         public float SmeltingSkillBonus = 0.002f;          // extra recovery per point of Smithing
 
         // --- Wear and tear ---
+        public bool TroopWearEnabled = true;               // the men's kit wears with every battle: a share of pieces in use drops one condition step - mend it at the smith
+        public float TroopWearPercent = 12f;               // this share of pieces IN USE takes one step of wear per battle
         public bool WearEnabled = true;                    // gear loses condition with use
         public bool ShowConditionPercent = true;           // damaged gear carries its state in the name - (100%) is mint, (1%) is a wreck
         public bool ConditionScalesStats = true;           // Jeff's rule: protection and edge follow condition - light wear costs little, heavy wear costs dearly

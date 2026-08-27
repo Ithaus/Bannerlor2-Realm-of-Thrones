@@ -475,6 +475,7 @@ namespace Armoury
                 _hpBeforeBattle = -1;
 
                 if (Settings.Current.LootArrivesWorn) WearTheLoot(damage);
+                if (Settings.Current.TroopWearEnabled) WearTheTroops();
 
                 // Zuzycie CELOWANE: FieldCraft spisal w misji, gdzie padaly ciosy
                 // (zbroja tam, gdzie trafiono; bron za celne uderzenia; tarcza za bloki).
@@ -524,6 +525,90 @@ namespace Armoury
         }
 
         /// <summary>Sprzet zdarty z poleglych nie jest nieskazitelny. Ktos w nim wlasnie zginal.</summary>
+        /// <summary>
+        /// ZUZYCIE SPRZETU WOJSKA (Jeff 27.08: "zolnierze zawsze maja 100%,
+        /// jakby sprzet sie nie psul"). Zuzycie tykalo dotad WYLACZNIE sprzet
+        /// bohatera - zbrojownia DTE zyla wiecznie nowa i muster kwatermistrza
+        /// klamal. Po kazdej bitwie czesc sztuk W UZYCIU (wg liczby zolnierzy
+        /// noszacych dany typ) schodzi o JEDEN stopien drabinki modyfikatorow -
+        /// ta sama, ktora brudzi lupy. Naprawa: "Mend the men's kit" u kowala.
+        /// </summary>
+        private void WearTheTroops()
+        {
+            try
+            {
+                var s = Settings.Current;
+                var armory = QuartermasterLaw.DteArmory();
+                if (armory == null) return;
+                var needs = QuartermasterLaw.CountNeeds();
+                float share = MBMath.ClampFloat(s.TroopWearPercent, 0f, 100f) / 100f;
+                if (share <= 0f) return;
+                int worn = 0;
+
+                foreach (var type in QuartermasterLaw.KitTypes)
+                {
+                    int inUse = QuartermasterLaw.WornFor(type, needs);
+                    if (inUse <= 0) continue;
+                    int hits = (int)MathF.Ceiling(inUse * share);
+
+                    // kandydaci: sztuki tego typu podlegajace zuzyciu
+                    var idx = new List<int>();
+                    for (int i = 0; i < armory.Count; i++)
+                    {
+                        var el = armory.GetElementCopyAtIndex(i);
+                        var it = el.EquipmentElement.Item;
+                        if (it == null || it.ItemType != type || el.Amount <= 0) continue;
+                        if (NoWear(it) || it.ItemComponent == null || it.ItemComponent.ItemModifierGroup == null) continue;
+                        idx.Add(i);
+                    }
+                    if (idx.Count == 0) continue;
+
+                    for (int n = 0; n < hits; n++)
+                    {
+                        var el = armory.GetElementCopyAtIndex(idx[MBRandom.RandomInt(idx.Count)]).EquipmentElement;
+                        var group = el.Item.ItemComponent.ItemModifierGroup;
+                        var bad = new List<ItemModifier>();
+                        foreach (var m in group.ItemModifiers)
+                            if (m != null && m.PriceMultiplier < 1f) bad.Add(m);
+                        if (bad.Count == 0) continue;
+                        bad.Sort((x, y) => x.PriceMultiplier.CompareTo(y.PriceMultiplier));   // [0] = najgorszy
+
+                        ItemModifier next;
+                        var cur = el.ItemModifier;
+                        if (cur == null) next = bad[bad.Count - 1];               // pierwsza rysa: najlzejszy zly stan
+                        else
+                        {
+                            next = null;                                          // nastepny gorszy od obecnego
+                            for (int b = bad.Count - 1; b >= 0; b--)
+                                if (bad[b].PriceMultiplier < cur.PriceMultiplier) { next = bad[b]; break; }
+                            if (next == null) continue;                           // juz na dnie drabinki
+                        }
+                        armory.AddToCounts(el, -1);
+                        armory.AddToCounts(new EquipmentElement(el.Item, next), 1);
+                        worn++;
+                        // indeksy moga sie przesunac po podmianie - odswiez liste raz na sztuke
+                        idx.Clear();
+                        for (int i = 0; i < armory.Count; i++)
+                        {
+                            var e2 = armory.GetElementCopyAtIndex(i);
+                            var it2 = e2.EquipmentElement.Item;
+                            if (it2 == null || it2.ItemType != type || e2.Amount <= 0) continue;
+                            if (NoWear(it2) || it2.ItemComponent == null || it2.ItemComponent.ItemModifierGroup == null) continue;
+                            idx.Add(i);
+                        }
+                        if (idx.Count == 0) break;
+                    }
+                }
+
+                if (worn > 0)
+                {
+                    Log.Info("Zuzycie wojska: " + worn + " sztuk zeszlo o stopien.");
+                    Log.Player("The battle wore the men's kit - " + worn + " pieces the worse for it.", true);
+                }
+            }
+            catch (Exception e) { Log.Error("WearTheTroops", e); }
+        }
+
         private void WearTheLoot(int damageTaken)
         {
             try
