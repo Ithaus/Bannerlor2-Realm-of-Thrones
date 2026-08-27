@@ -131,6 +131,14 @@ namespace Armoury
         public int AleSupplyWineFloor = 8;                 // wine amphorae a town market is topped up to (mead, where it exists, gets half this)
         public int AleSupplyPerDay = 10;                   // at most this many casks brewed per town per day - a trickle, not a flood
 
+        // --- The hideout purge ---
+        public bool HideoutPurgeEnabled = true;            // a cleared hideout must be SEARCHED: the plundered gold, renown and the gratitude of the district wait behind one more step
+        public int HideoutGoldBase = 150;                  // gold hidden in any den before counting its bands
+        public int HideoutGoldPerBand = 120;               // each raiding band that lived there stashed about this much loot from the district
+        public float HideoutRenown = 5f;                   // renown for purging a hideout - the realm hears of it
+        public int HideoutRepMax = 5;                      // relation gained with notables right next to the den, fading to zero at the edge of the district
+        public float HideoutRepRadius = 50f;               // the district: map-distance within which settlements care about the purge
+
         // --- Loot from the field ---
         public bool LootArrivesWorn = true;                // gear stripped from the fallen comes to you already used
         public float LootWearBase = 45f;                   // the condition of an average piece of loot

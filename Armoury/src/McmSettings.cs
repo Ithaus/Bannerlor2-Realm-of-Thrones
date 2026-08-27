@@ -448,6 +448,30 @@ namespace Armoury
         [SettingPropertyGroup("The town brewery")]
         public int AleSupplyPerDay { get; set; } = 10;
 
+        [SettingPropertyBool("Hideout Purge Enabled", HintText = "a cleared hideout must be SEARCHED: the plundered gold, renown and the gratitude of the district wait behind one more step")]
+        [SettingPropertyGroup("The hideout purge")]
+        public bool HideoutPurgeEnabled { get; set; } = true;
+
+        [SettingPropertyInteger("Hideout Gold Base", 0, 600, "0", HintText = "gold hidden in any den before counting its bands")]
+        [SettingPropertyGroup("The hideout purge")]
+        public int HideoutGoldBase { get; set; } = 150;
+
+        [SettingPropertyInteger("Hideout Gold Per Band", 0, 480, "0", HintText = "each raiding band that lived there stashed about this much loot from the district")]
+        [SettingPropertyGroup("The hideout purge")]
+        public int HideoutGoldPerBand { get; set; } = 120;
+
+        [SettingPropertyFloatingInteger("Hideout Renown", 0.00f, 20.00f, "0.00", HintText = "renown for purging a hideout - the realm hears of it")]
+        [SettingPropertyGroup("The hideout purge")]
+        public float HideoutRenown { get; set; } = 5f;
+
+        [SettingPropertyInteger("Hideout Rep Max", 0, 20, "0", HintText = "relation gained with notables right next to the den, fading to zero at the edge of the district")]
+        [SettingPropertyGroup("The hideout purge")]
+        public int HideoutRepMax { get; set; } = 5;
+
+        [SettingPropertyFloatingInteger("Hideout Rep Radius", 0.00f, 200.00f, "0.00", HintText = "the district: map-distance within which settlements care about the purge")]
+        [SettingPropertyGroup("The hideout purge")]
+        public float HideoutRepRadius { get; set; } = 50f;
+
         [SettingPropertyBool("Loot Arrives Worn", HintText = "gear stripped from the fallen comes to you already used")]
         [SettingPropertyGroup("Loot from the field")]
         public bool LootArrivesWorn { get; set; } = true;
@@ -1071,6 +1095,12 @@ namespace Armoury
             s.AleSupplyBeerFloor = AleSupplyBeerFloor;
             s.AleSupplyWineFloor = AleSupplyWineFloor;
             s.AleSupplyPerDay = AleSupplyPerDay;
+            s.HideoutPurgeEnabled = HideoutPurgeEnabled;
+            s.HideoutGoldBase = HideoutGoldBase;
+            s.HideoutGoldPerBand = HideoutGoldPerBand;
+            s.HideoutRenown = HideoutRenown;
+            s.HideoutRepMax = HideoutRepMax;
+            s.HideoutRepRadius = HideoutRepRadius;
             s.LootArrivesWorn = LootArrivesWorn;
             s.LootWearBase = LootWearBase;
             s.LootWearSpread = LootWearSpread;
