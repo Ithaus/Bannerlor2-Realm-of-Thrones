@@ -17,6 +17,38 @@
 
 ---
 
+## 2026-08-27 — przetrzebiona kryjowka: przeszukanie po zwyciestwie, zrabowane zloto, renown i wdziecznosc okolicy
+**Mod:** Armoury | **Pliki:** `Armoury/src/HideoutPurge.cs` (NOWY), `Armoury/src/Settings.cs`, `Armoury/src/SubModuleMain.cs`, `Armoury/src/McmSettings.cs` (gen)
+**Problem:** Jeff: "jak pokonam kryjowke, nie od razu nagroda - musze ja przeszukac,
+jak po bitwie; w kryjowce powinno byc zrabowane zloto z okolicznych napasci; renown
+powinien pojsc i reputacja w poblizu, im blizej tym wiecej. To big deal."
+**Zmiana:** behavior HideoutPurge: po zwycieskiej bitwie w kryjowce
+(OnHideoutBattleCompleted, endState=Victory, gracz wygral) na czystej mapie otwiera
+sie menu "Search the hideout / Leave without searching". Przeszukanie daje:
+(1) zloto = HideoutGoldBase(150) + HideoutGoldPerBand(120) x liczba rozbitych band
+(kazda banda zyla z rozboju okolicy) +-25%; (2) renown HideoutRenown(5);
+(3) relacje z notablami wiosek/miast/zamkow w okregu HideoutRepRadius(50):
+od HideoutRepMax(5) przy samej kryjowce malejaco do 0 na skraju. Vanillowy lup
+przedmiotowy bez zmian - nasze lezy "glebiej". 6 ustawien MCM (The hideout purge).
+**Ryzyko / co sprawdzic:** po kryjowce menu przeszukania; komunikaty o zlocie
+i "Word of the purge spreads"; log "HideoutPurge: ...". Menu aktywuje sie tylko
+na czystej mapie (wzorzec z klawisza O). Save miedzy bitwa a menu = nagroda przepada
+(swiadomie - stan nie jedzie w save).
+**Status:** WGRANE (albo czeka, jesli gra otwarta)
+
+## 2026-08-27 — menu kowala: luczarnia wypada (dublowala zakladke CRAFT)
+**Mod:** Armoury | **Pliki:** `Armoury/src/SmithMenu.cs`
+**Problem:** Jeff: "wywal z forge kucie lukow i strzal - kucie jest w smithy;
+te opcje sie dubluja".
+**Zmiana:** opcja "String bows and fletch arrows" (arm_fletcher) zdjeta z menu
+Work the forge - luki/kusze/strzaly/belty kuje sie w zakladce CRAFT (ForgeView
+wstrzykuje je na liste, FletchForge przejmuje robote). Kod Fletchera zostaje,
+CRAFT z niego korzysta. Reszta opcji (pancerze na zamowienie, naprawy, przetop,
+rozkladanie wzorow, zamowienia dla wojska) NIE dubluje CRAFT i zostaje.
+**Ryzyko / co sprawdzic:** w menu kuzni brak opcji luczarni; kucie strzeleckie
+w CRAFT dziala jak dotad.
+**Status:** WGRANE (albo czeka, jesli gra otwarta)
+
 ## 2026-08-27 — kolumna marszowa: czapka predkosci WIDOCZNA w rozpisce (z nazwana przyczyna)
 **Mod:** Armoury | **Pliki:** `Armoury/src/MarchPace.cs`
 **Problem:** Jeff: "cos jest nie tak z mechanika predkosci na mapie". Czapka kolumny

@@ -58,8 +58,11 @@ namespace Armoury
 
             // luczarnia na widoku (Jeff: "dodaj do forge rzeczy strzeleckie") -
             // luki, kusze i amunicja maja WLASNE wejscie, nie schowane w zbrojach
-            starter.AddGameMenuOption(Menu, "arm_fletcher",
-                "{=!}String bows and fletch arrows", FletcherCondition, FletcherConsequence, false, 0);
+            // luczarnia WYPADLA z tego menu (Jeff 27.08: "wywal z forge kucie
+            // lukow i strzal - kucie jest w smithy"): luki, kusze, strzaly
+            // i belty kuje sie w zakladce CRAFT (ForgeView wstrzykuje je na
+            // liste, FletchForge przejmuje robote) - opcja tutaj dublowala to.
+            // Kod Fletchera zostaje - CRAFT z niego korzysta.
 
             starter.AddGameMenuOption(Menu, "arm_orders",
                 "{=!}The order book - commissions from the lords", OrdersCondition,
