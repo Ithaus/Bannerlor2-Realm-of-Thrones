@@ -187,9 +187,41 @@ namespace Armoury
             Log.Info("Wegiel drzewny: waga " + coal.Weight + " kg/szt.");
         }
 
+        /// <summary>
+        /// SANACJA SAKW. Ujemny stos w ItemRoster (pozostalosc po bledzie
+        /// przetopu z 27.08 - AddToCounts(-1) na nieistniejacym wpisie) wywraca
+        /// caly ekran ekwipunku: kazda kategoria swieci pustka. Przy kazdym
+        /// wczytaniu zerujemy takie wpisy w sakwach i w zbrojowni DTE.
+        /// </summary>
+        private static void CleanseNegativeStacks()
+        {
+            int fixedTotal = 0;
+            foreach (var roster in new[] { MobileParty.MainParty != null ? MobileParty.MainParty.ItemRoster : null,
+                                           QuartermasterLaw.DteArmory() })
+            {
+                if (roster == null) continue;
+                try
+                {
+                    for (int i = roster.Count - 1; i >= 0; i--)
+                    {
+                        var el = roster.GetElementCopyAtIndex(i);
+                        if (el.Amount >= 0) continue;
+                        roster.AddToCounts(el.EquipmentElement, -el.Amount);   // do zera
+                        fixedTotal++;
+                        Log.Info("Sanacja sakw: " + (el.EquipmentElement.Item != null ? el.EquipmentElement.Item.StringId : "?")
+                                 + " mial stan " + el.Amount + " - wyzerowany.");
+                    }
+                }
+                catch (Exception e) { Log.Error("CleanseNegativeStacks", e); }
+            }
+            if (fixedTotal > 0)
+                Log.Player("The quartermaster set the ledgers straight - " + fixedTotal + " ruined entries struck out.", true);
+        }
+
         private void OnSessionLaunched(CampaignGameStarter starter)
         {
             try { FixCharcoalWeight(); } catch (Exception e) { Log.Error("FixCharcoalWeight", e); }
+            try { CleanseNegativeStacks(); } catch (Exception e) { Log.Error("CleanseNegativeStacks", e); }
             try { SmithMenu.Add(starter); Log.Info("Menu kowala dodane."); }
             catch (Exception e) { Log.Error("OnSessionLaunched", e); }
             try { CleanseAmmo(); } catch (Exception e) { Log.Error("CleanseAmmo", e); }

@@ -88,6 +88,20 @@ namespace Armoury
 
                 var model = Campaign.Current.Models.SmithingModel;
                 var roster = MobileParty.MainParty.ItemRoster;
+
+                // STRAZNIK UJEMNYCH SAKW (Jeff 27.08: "discarduje armour i znika
+                // caly ekwipunek"). Bez eventu przetopu (nizej) lista Smelt nie
+                // odswiezala sie i po zdjeciu OSTATNIEJ sztuki pozycja dalej
+                // byla klikalna - AddToCounts(-1) na nieistniejacym wpisie robil
+                // UJEMNY stos, a ekran ekwipunku z takim rosterem pokazuje pustke
+                // we WSZYSTKICH kategoriach. Nie ma sztuki = nie ma przetopu.
+                int idx = roster.FindIndexOfElement(equipmentElement);
+                if (idx < 0 || roster.GetElementNumber(idx) <= 0)
+                {
+                    Log.Info("Przetop (Smelt): pozycji " + item.StringId + " juz nie ma w sakwach - klik zignorowany.");
+                    return false;
+                }
+
                 var outp = model.GetSmeltingOutputForItem(item);
                 for (int i = 8; i >= 0; i--)
                     if (outp[i] != 0) roster.AddToCounts(model.GetCraftingMaterialItem((CraftingMaterials)i), outp[i]);
@@ -98,6 +112,15 @@ namespace Armoury
                 // zamiast vanillowych badan czesci: przetop nieznanego wzoru uczy go
                 // w calosci, znanego - punkty i losowe odkrycie nie wyzej niz jego tier
                 RangedLore.OnSmelted(item);
+                // event jak w vanilli - na nim UI odswieza liste przetopu
+                // (bez niego martwe pozycje zostawaly klikalne)
+                try
+                {
+                    var disp = CampaignEventDispatcher.Instance;
+                    var mEv = AccessTools.Method(disp.GetType(), "OnEquipmentSmeltedByHero");
+                    if (mEv != null) mEv.Invoke(disp, new object[] { currentCraftingHero, equipmentElement });
+                }
+                catch { }
                 Log.Info("Przetop (zakladka Smelt): " + item.StringId);
                 return false;
             }

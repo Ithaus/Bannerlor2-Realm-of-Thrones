@@ -17,6 +17,26 @@
 
 ---
 
+## 2026-08-27 — ZNIKAJACY EKWIPUNEK: przetop bez eventu robil ujemne stosy w sakwach (fix + sanacja save)
+**Mod:** Armoury | **Pliki:** `Armoury/src/SmeltTab.cs`, `Armoury/src/ArmouryBehavior.cs`
+**Problem:** Jeff: "discarduje armour zeby dostac XP [przetop w Smelt] i potem znika
+CALY ekwipunek - kazda kategoria". 
+**Przyczyna:** vanilla DoSmelting konczy sie eventem OnEquipmentSmeltedByHero, na ktorym
+UI odswieza liste przetopu. Nasz DoSmeltingPrefix (pancerze/luki bez WeaponDesign)
+NIE odpalal eventu - po zdjeciu OSTATNIEJ sztuki pozycja zostawala klikalna, drugi
+klik robil AddToCounts(-1) na nieistniejacym wpisie i w sakwach powstawal stos
+o stanie -1. ItemRoster z ujemnym wpisem wywraca caly ekran ekwipunku (pustka we
+wszystkich kategoriach). Rzeczy NIE gina - sa w rosterze, tylko ekran ich nie udzwignie.
+**Zmiana:** (1) straznik: pozycji nie ma w sakwach -> klik zignorowany, zero zdjec.
+(2) po przetopie leci OnEquipmentSmeltedByHero (przez refleksje - dispatcher moze
+byc internal) - UI odswieza liste jak w vanilli. (3) CleanseNegativeStacks przy
+kazdym wczytaniu: ujemne stosy w sakwach i zbrojowni DTE zerowane, komunikat
+"The quartermaster set the ledgers straight...".
+**Ryzyko / co sprawdzic:** po wczytaniu save z "pustym" ekwipunkiem wszystko wraca
+(sanacja + log "Sanacja sakw: ..."); przetop wielu sztuk tej samej pozycji dziala,
+lista odswieza sie po kazdej sztuce.
+**Status:** WGRANE (albo czeka, jesli gra otwarta)
+
 ## 2026-08-27 — depozyt kwatermistrza NIE wchodzi do save'a + pasek przeszukania kryjowki + tygiel wypada z menu
 **Mod:** Armoury | **Pliki:** `Armoury/src/ArmouryBehavior.cs`, `Armoury/src/HideoutPurge.cs`, `Armoury/src/SmithMenu.cs`, `Armoury/src/Settings.cs`, `Armoury/src/McmSettings.cs` (gen)
 **Problem:** (1) Jeff: "zniknal mi caly ekwipunek!" - FALSZYWY ALARM: ekran zbrojowni
