@@ -17,6 +17,21 @@
 
 ---
 
+## 2026-08-26 — korona Sansy: reszta pancerza na zero + jednorazowy zwrot z ekwipunku gracza
+**Mod:** Armoury | **Pliki:** `Armoury/src/Uniques.cs`
+**Problem:** Jeff: "sansa crown body armor 0, usun z mojego ekwipunku i oddaj kase".
+**Przyczyna:** korony ROT maja material "plate"; poza glowa nic nie powinny chronic.
+Jeff kupil korone jako helm-75 za pelna cene targowa - przed nerfem.
+**Zmiana:** (1) wszystkie korony: body/leg/arm armor = 0 (head jak dotad wg ustawienia).
+(2) RefundSansa (raz na kampanie, flaga w save): korona Sansy schodzi z sakw ORAZ
+z zalozonych slotow (bojowych i cywilnych) gracza, zwrot = pelna wartosc SPRZED nerfa
+(odczytana zanim staty zeszly) x liczba sztuk; komunikat "Sansa's Crown returns to
+the realm - N denars refunded".
+**Ryzyko / co sprawdzic:** po wczytaniu save zielony komunikat o zwrocie i zloto
+na koncie; korony brak w ekwipunku. Flaga armouryUniquesSansaRefunded jedzie w save -
+korona zlupiona w przyszlosci z lorda NIE zostanie zabrana.
+**Status:** WGRANE (DLL czeka na zamkniecie gry)
+
 ## 2026-08-26 — CRAFT: znane wzory ZAWSZE na gorze listy (takze po sortowaniu BK)
 **Mod:** ForgeView | **Pliki:** `ForgeView/src/SortKnownFirst.cs` (NOWY), `ForgeView/src/ArmourFilterMixin.cs`
 **Problem:** Jeff: "lista pokazuje najpierw niedostepne - najpierw dostepne, zeby nie
