@@ -41,6 +41,7 @@ namespace Armoury
         private static bool _sleeping;
         private static float _menuRest;
         private static float _menuTarget = 5f;
+        private static float _menuBase;   // stan _restTonight w chwili polozenia sie
 
         private static readonly int[] SpdPenalty = { 0, 0, 5, 15, 25, 30 };   // % za dlug 0..5
         private static readonly int[] MorPenalty = { 0, 0, 3, 8, 12, 15 };
@@ -83,23 +84,27 @@ namespace Armoury
                 // wypoczynku, nie czekac do przeliczenia") - gdy tylko godziny
                 // snu sie uzbieraja, dlug schodzi natychmiast; swit juz tego
                 // nie liczy drugi raz
-                if (!_credited && _restTonight >= Math.Max(1f, s.SleepHoursNeeded))
-                {
-                    _credited = true;
-                    if (Debt > 0)
-                    {
-                        Debt = Math.Max(0, Debt - 2);   // dobra noc splaca dwie zle
-                        Msg(Debt == 0 ? "Well slept - the men are fresh again."
-                                      : "Some sleep at last, but the men still owe the pillow (" + Debt + ").",
-                            Colors.Green);
-                    }
-                }
+                CreditRest(s);
 
                 if (h == 6) SettleNight(s);
                 AiNightCamp(s, h);
                 AiBanditRest(s, h);
             }
             catch (Exception e) { Log.Error("NightRest.OnHourly", e); }
+        }
+
+        /// <summary>Splata dlugu od reki, gdy dzisiejsze godziny snu sie uzbieraly.</summary>
+        private static void CreditRest(Settings s)
+        {
+            if (_credited || _restTonight < Math.Max(1f, s.SleepHoursNeeded)) return;
+            _credited = true;
+            if (Debt > 0)
+            {
+                Debt = Math.Max(0, Debt - 2);   // dobra noc splaca dwie zle
+                Msg(Debt == 0 ? "Well slept - the men are fresh again."
+                              : "Some sleep at last, but the men still owe the pillow (" + Debt + ").",
+                    Colors.Green);
+            }
         }
 
         // ------------------------------------------------------------ swiat tez spi
@@ -694,6 +699,16 @@ namespace Armoury
             try
             {
                 _sleeping = false;
+                // PASEK JEST PRAWDA O TYM SNIE. Rachunek doby (_restTonight)
+                // nalicza sie pelnymi godzinnymi tickami i gubi brzegi (pierwsza
+                // godzina po przyjezdzie pada na regule "moved", niepelne godziny
+                // nie istnieja w tickach) - pasek mowil "wyspani", a swit liczyl
+                // 4/5 i dawal dlug (Jeff 27.08: "przespalem noc i rano mam, ze
+                // men nie spali"). Po pobudce dopisujemy przespane godziny
+                // i od razu splacamy dlug.
+                _restTonight = Math.Max(_restTonight, _menuBase + _menuRest);
+                var s = Settings.Current;
+                if (s != null) CreditRest(s);
                 // pobudka zwija namiot - chyba ze WLASNY oboz dalej stoi
                 // (wtedy namiot nalezy do obozu, zwinie go "Break camp")
                 if (_sleepReturn != "arm_camp_wait")
@@ -743,6 +758,7 @@ namespace Armoury
                 _sleepUntil = CampaignTime.HoursFromNow(14f);   // bezpiecznik: nikt nie spi wiecznie
                 _sleeping = true;
                 _menuRest = 0f;
+                _menuBase = _restTonight;
                 // cel snu: ile jeszcze brakuje DO wyspania - pasek liczy wlasne
                 // godziny i NIE cofa sie, gdy swit wyzeruje rachunek doby
                 _menuTarget = Math.Max(0.5f, needed - _restTonight);

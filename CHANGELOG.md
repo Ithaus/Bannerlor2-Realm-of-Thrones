@@ -17,6 +17,23 @@
 
 ---
 
+## 2026-08-27 — sen: pasek jest prawda - pobudka dopisuje przespane godziny do rachunku doby
+**Mod:** Armoury | **Pliki:** `Armoury/src/NightRest.cs`
+**Problem:** Jeff: "rozbilem oboz w nocy, przespalem noc (wake rested) i rano mam,
+ze men nie spali" - swit doliczyl dlug snu mimo ukonczonego paska.
+**Przyczyna:** dwie ksiegowosci. Pasek snu (od wczoraj wlasny licznik z dt) liczy czas
+ciagly, a rachunek doby (_restTonight) nalicza sie tylko pelnymi godzinowymi tickami
+OnHourly - pierwsza godzina po przyjezdzie na miejsce przepada (regula moved), brzegowe
+niepelne godziny nie istnieja. Pasek: 5,0 h "wyspani"; rachunek: 4/5; swit: Debt++.
+**Zmiana:** SleepInit zapamietuje stan doby (_menuBase); LeaveSleep po pobudce robi
+_restTonight = max(_restTonight, _menuBase + _menuRest) i od razu splaca dlug wspolnym
+CreditRest (wydzielone z OnHourly - ta sama splata "od reki" w obu miejscach).
+**Ryzyko / co sprawdzic:** po przespanej nocy zadnego "The men marched through the
+night" o swicie; splata dlugu ("Well slept...") przychodzi najpozniej przy pobudce.
+Sen przechodzacy przez swit daje niewielki kredyt godzin na nowa dobe - zamierzone
+(czlowiek dospal swoje po swicie).
+**Status:** WGRANE (albo czeka, jesli gra otwarta)
+
 ## 2026-08-26 — korona Sansy: reszta pancerza na zero + jednorazowy zwrot z ekwipunku gracza
 **Mod:** Armoury | **Pliki:** `Armoury/src/Uniques.cs`
 **Problem:** Jeff: "sansa crown body armor 0, usun z mojego ekwipunku i oddaj kase".
