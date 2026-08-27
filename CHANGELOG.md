@@ -17,6 +17,26 @@
 
 ---
 
+## 2026-08-27 — martwy dialog preachera: rejestracja ducha w religii BK przy rozmowie + kontekst lawiny relacji
+**Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs`
+**Problem:** Jeff: "jak sie wejdzie w preachera i klika click to continue, nic sie
+nie dzieje" - dialog utyka bez zadnej opcji.
+**Przyczyna:** powitanie BK (bk_preacher_introduction) i WSZYSTKIE opcje preachera maja
+warunek ReligionsManager.IsPreacher. Preacher bez wpisu w menedzerze religii (ROT-owe
+osady czesto nie maja religii, wiec CleanClergymen BK go nie rejestruje - rejestruje
+tylko przy istniejacej religii osady) wypada z wlasnego dialogu: gra pokazuje cudze
+powitanie, po ktorym nie ma ZADNEJ linii do przejscia. W logach cisza - BK lyka.
+**Zmiana:** (1) prefix RegisterStrayPreacher na OnConditionClergymanGreeting: preacher
+nieznany menedzerowi dostaje wpis do religii (wlasnej, a gdy brak - GetIdealReligion
+dla jego kultury) przez Religion.AddClergyman - dialog wstaje w TEJ SAMEJ rozmowie.
+Gdy nie ma religii/osady - log i odpuszczamy. (2) SafeRelations: jednorazowy raport
+lawiny dostaje KONTEKST (hero/target: kultura/klan/osada, co jest NULL) - slad z 27.08
+pokazal tylko ramke inline, nastepny nazwie null po imieniu.
+**Ryzyko / co sprawdzic:** rozmowa z preacherem daje opcje (What are you preaching itd.);
+log "Mends: preacher X dopisany do religii - dialog ozyl". Preacher moze dostac religie
+kultury zamiast "wlasciwej" ROT-owo - lepsze to niz martwy dialog.
+**Status:** WGRANE (albo czeka, jesli gra otwarta)
+
 ## 2026-08-27 — namiot gracza wraca po odbudowie wizerunku + zuzycie sprzetu WOJSKA po bitwach
 **Mod:** Armoury | **Pliki:** `Armoury/src/NightRest.cs`, `Armoury/src/ArmouryBehavior.cs`, `Armoury/src/Settings.cs`, `Armoury/src/McmSettings.cs` (gen)
 **Problem:** Jeff: (1) "jak jest oboz, to nie ma ikony namiotu"; (2) "muster kwatermistrza:

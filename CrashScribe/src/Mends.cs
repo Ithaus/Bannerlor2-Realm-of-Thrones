@@ -184,6 +184,26 @@ namespace CrashScribe
 
             try
             {
+                // MARTWY DIALOG DUCHOWNEGO (Jeff 27.08: "click to continue i nic
+                // sie nie dzieje"). Powitanie BK i WSZYSTKIE opcje preachera maja
+                // warunek ReligionsManager.IsPreacher - a preacher bez wpisu
+                // w menedzerze (ROT-owe osady czesto nie maja religii, wiec
+                // CleanClergymen BK go nie rejestruje) wypada z wlasnego dialogu:
+                // gra pokazuje cudze powitanie, po ktorym nie ma ZADNEJ opcji.
+                // Tuz przed warunkiem powitania dopisujemy go do religii.
+                var tRelB = Type.GetType("BannerKings.Behaviours.BKReligionsBehavior, BannerKings")
+                            ?? QuietType("BKReligionsBehavior");
+                var mGreet = tRelB != null ? AccessTools.Method(tRelB, "OnConditionClergymanGreeting") : null;
+                if (mGreet != null)
+                {
+                    harmony.Patch(mGreet, prefix: new HarmonyMethod(typeof(Mends), "RegisterStrayPreacher"));
+                    Scribe.Line("Mends: preacher bez rejestru religii dostaje wpis przy rozmowie (martwy dialog).");
+                }
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.Install(preacher)", null); } catch { } }
+
+            try
+            {
                 // Westeros zna tylko DLUGA zime i dlugie lato - kalendarzyk por roku
                 // RealisticBannerlord (co 21 dni wiosna/jesien, zamiecie, kary do marszu,
                 // zimowy glod) nie ma tu sensu, a MCM RB i tak nie zapisuje ustawien.
@@ -297,6 +317,60 @@ namespace CrashScribe
         /// i wtedy CurrentSettlement/OwnerClan bez null-checka klada watek.
         /// Takiego bohatera pomijamy; cala reszta liczy sie normalnie.
         /// </summary>
+        /// <summary>Wizytowka bohatera do diagnozy nulli: co ma, czego mu brak.</summary>
+        private static string Describe(Hero h)
+        {
+            try
+            {
+                if (h == null) return "(null)";
+                return h.Name + " [" + (h.IsLord ? "lord" : h.IsNotable ? "notabl" : "inny")
+                       + ", kultura=" + (h.Culture != null ? h.Culture.StringId : "NULL")
+                       + ", klan=" + (h.Clan != null ? h.Clan.StringId : "NULL")
+                       + ", osada=" + (h.CurrentSettlement != null ? h.CurrentSettlement.StringId : "NULL") + "]";
+            }
+            catch { return "(blad opisu)"; }
+        }
+
+        private static int _strayPreachersFixed;
+
+        /// <summary>
+        /// Preacher-duch: notabl z zawodem kaplana, ktorego menedzer religii BK
+        /// nie zna. Dopisujemy go do religii (wlasnej, a gdy brak - idealnej dla
+        /// jego kultury) TUZ PRZED warunkiem powitania - dialog wstaje w tej
+        /// samej rozmowie. Wszystko refleksja, zero twardej zaleznosci od BK.
+        /// </summary>
+        public static void RegisterStrayPreacher()
+        {
+            try
+            {
+                var hero = Hero.OneToOneConversationHero;
+                if (hero == null || !hero.IsPreacher) return;
+                var cfgT = AccessTools.TypeByName("BannerKings.BannerKingsConfig");
+                var cfgP = cfgT != null ? AccessTools.Property(cfgT, "Instance") : null;
+                object cfg = cfgP != null ? cfgP.GetValue(null, null) : null;
+                object mgr = cfg != null ? Traverse.Create(cfg).Property("ReligionsManager").GetValue() : null;
+                if (mgr == null) return;
+                var tr = Traverse.Create(mgr);
+                if (tr.Method("IsPreacher", hero).GetValue<bool>()) return;   // zna go - nic do roboty
+
+                object rel = tr.Method("GetHeroReligion", hero).GetValue();
+                if (rel == null)
+                {
+                    try { rel = tr.Method("GetIdealReligion", hero.Culture).GetValue(); } catch { }
+                }
+                var sett = hero.CurrentSettlement;
+                if (rel == null || sett == null)
+                {
+                    Scribe.Line("Mends: preacher " + hero.Name + " bez religii/osady - dialogu nie ozywie.");
+                    return;
+                }
+                Traverse.Create(rel).Method("AddClergyman", sett, hero).GetValue();
+                _strayPreachersFixed++;
+                Scribe.Line("Mends: preacher " + hero.Name + " (" + sett.Name + ") dopisany do religii - dialog ozyl (lacznie " + _strayPreachersFixed + ").");
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "RegisterStrayPreacher", null); } catch { } }
+        }
+
         public static bool RelationsUpdateGate(object __instance)
         {
             try
@@ -316,7 +390,7 @@ namespace CrashScribe
             return true;
         }
 
-        public static Exception SafeRelations(Exception __exception, ref object __result)
+        public static Exception SafeRelations(Exception __exception, ref object __result, object heroRelations, Hero target)
         {
             if (__exception == null) return null;
             if (__exception is NullReferenceException || __exception is ArgumentNullException
@@ -328,7 +402,17 @@ namespace CrashScribe
                 if (!_relStackDumped)
                 {
                     _relStackDumped = true;
-                    try { Scribe.Report("CrashScribe", __exception, "BKRelationsModel.CalculateModifiers - pelny slad lawiny (jednorazowo)", null); } catch { }
+                    // slad 27.08 pokazal tylko ramke Patch1 (inline) - dokladamy
+                    // KONTEKST bohaterow, zeby nazwac null po imieniu
+                    string ctx = null;
+                    try
+                    {
+                        Hero hero = null;
+                        try { hero = _hrHeroGet != null && heroRelations != null ? _hrHeroGet.Invoke(heroRelations, null) as Hero : null; } catch { }
+                        ctx = "hero=" + Describe(hero) + " | target=" + Describe(target);
+                    }
+                    catch { }
+                    try { Scribe.Report("CrashScribe", __exception, "BKRelationsModel.CalculateModifiers - pelny slad lawiny (jednorazowo)", ctx); } catch { }
                 }
                 try
                 {
