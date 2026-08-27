@@ -230,6 +230,19 @@ namespace Armoury
                         Add(r, MaterialItem(IronForTier(tier)), 1);                     // groty wg tieru
                     }
                     bool ammo = tt == ItemObject.ItemTypeEnum.Arrows || tt == ItemObject.ItemTypeEnum.Bolts;
+                    // szczyt rzemiosla kosztuje: luki i kusze tieru 5-6 zra
+                    // wielokrotnosc materialow (Jeff 26.08: "za latwo sie tworzy,
+                    // daj x2 zasobow"). Amunicji nie dotyczy.
+                    if (!ammo && tier >= 5)
+                    {
+                        float f = MathF.Max(1f, s.RangedHighTierCostFactor);
+                        for (int i = 0; i < r.Parts.Count; i++)
+                        {
+                            var p = r.Parts[i];
+                            p.Count = MathF.Max(1, MathF.Ceiling(p.Count * f));
+                            r.Parts[i] = p;
+                        }
+                    }
                     // wiazka strzal to nie kirys: 10x mniej staminy niz stara stawka (Jeff);
                     // luki i kusze: stary mnoznik 0.8 pozwalal wykuc 2 luki na sesje -
                     // luczarnia ma byc lekka jak kuznia broni (Jeff), stad wlasny mnoznik
