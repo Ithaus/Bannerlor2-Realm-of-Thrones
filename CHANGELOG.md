@@ -17,6 +17,21 @@
 
 ---
 
+## 2026-08-27 — kolumna marszowa: czapka predkosci WIDOCZNA w rozpisce (z nazwana przyczyna)
+**Mod:** Armoury | **Pliki:** `Armoury/src/MarchPace.cs`
+**Problem:** Jeff: "cos jest nie tak z mechanika predkosci na mapie". Czapka kolumny
+(LimitMax 4.0/4.2/6.5) ciela tempo BEZ SLADU w tooltipie - partia wlecze sie 4.0
+i nie wiadomo czemu (starczy jeden pieszy jeniec bez luzaka).
+**Przyczyna:** goly LimitMax nie zostawia pozycji w ExplainedNumber.
+**Zmiana:** gdy czapka realnie tnie, do rozpiski predkosci wchodzi UJEMNY wpis
+z przyczyna: "Marching column: N afoot" / "baggage train" / "all riders";
+LimitMax zostaje jako pas bezpieczenstwa. Arytmetyka bez zmian.
+**Ryzyko / co sprawdzic:** tooltip predkosci pokazuje pozycje "Marching column..."
+z ujemna wartoscia; suma = czapka. Zasady: ktos pieszo (zolnierz/jeniec bez luzaka)
+-> 4.0; wszyscy konno z taborem ponad 1 juczne/4 ludzi -> 4.2; czysta jazda -> 6.5.
+Do tego kary snu (dlug >=2) i vanilla kary terenu licza sie PRZED czapka.
+**Status:** WGRANE (albo czeka, jesli gra otwarta)
+
 ## 2026-08-27 — panika: nieumarli bez strachu, koniec zapetlonych krzykow przy rozbiciu; nauka wzorow naprawde losowa
 **Mod:** Armoury | **Pliki:** `Armoury/src/BrokenMen.cs`, `Armoury/src/RangedLore.cs`
 **Problem:** Jeff: (1) "krzyki zapetlone paniki na mapie bitwy jak jest ucieczka";

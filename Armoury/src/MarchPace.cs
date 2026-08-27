@@ -77,18 +77,36 @@ namespace Armoury
                 int walkers = (foot - ridingFoot) + Math.Max(0, prisoners - mountsLeft);
 
                 float cap;
+                TextObject why;
                 if (walkers > 0)
                 {
                     cap = c.MarchFootPace;                              // ktos idzie - wszyscy ida
+                    why = new TextObject("{=!}Marching column: {N} afoot").SetTextVariable("N", walkers);
                 }
                 else
                 {
                     // piechota na luzakach zostaje przy vanilla polowie premii
                     // kawalerii (+15% vs +30%) - piechur nie jezdzi jak jezdziec
                     int allowance = (int)Math.Ceiling(men * Math.Max(0f, c.MarchPackAllowance));
-                    cap = train > allowance ? c.MarchTrainPace : c.MarchRiderPace;
+                    if (train > allowance)
+                    {
+                        cap = c.MarchTrainPace;
+                        why = new TextObject("{=!}Marching column: baggage train");
+                    }
+                    else
+                    {
+                        cap = c.MarchRiderPace;
+                        why = new TextObject("{=!}Marching column: all riders");
+                    }
                 }
-                if (cap > 0.5f) __result.LimitMax(cap);
+                if (cap <= 0.5f) return;
+                // czapka WIDOCZNA w rozpisce predkosci: gole LimitMax cielo tempo
+                // bez zadnego sladu i gracz nie wiedzial, CZEMU wlecze sie 4.0
+                // (Jeff 27.08: "cos jest nie tak z mechanika predkosci").
+                // Ujemny wpis z nazwana przyczyna + LimitMax jako pas bezpieczenstwa.
+                float current = __result.ResultNumber;
+                if (current > cap) __result.Add(cap - current, why);
+                __result.LimitMax(cap);
             }
             catch { }
         }
