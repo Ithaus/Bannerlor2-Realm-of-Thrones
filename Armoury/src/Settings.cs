@@ -28,6 +28,7 @@ namespace Armoury
         public float CharcoalPerIron = 0.6f;               // charcoal burned per unit of iron
         public int StaminaPerTier = 25;                    // crafting stamina burned per tier
         // --- Time at the anvil ---
+        public bool ForgeWorksWithoutYou = true;           // the smith and his lads keep at your project while you ride - the finished piece waits at that forge for collection; off = the clock only runs while you stay in that settlement
         public bool ForgeTakesTime = true;                 // armour is not finished the moment you order it
         public float DaysPerTier = 2f;                     // days per tier - 2 means a tier 5 plate takes ten days
         public float TempoHastyTime = 0.5f;                // in haste: this share of the time

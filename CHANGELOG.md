@@ -17,6 +17,25 @@
 
 ---
 
+## 2026-08-27 — kuznia: kowal pracuje bez ciebie, gotowy wyrob czeka na odbior
+**Mod:** Armoury | **Pliki:** `Armoury/src/ArmouryBehavior.cs`, `Armoury/src/Settings.cs`
+**Problem:** Jeff: "wykulem miecz, odczekalem dlugo i przepadl". Log 13:44:54 "Projekt
+dodany: crafted_item_101|3.02|1|ROT_town3|van|" i potem w kolko "Projekt stoi - gracz
+poza osada" - czekal na mapie obok miasta, a zegar projektu tykal TYLKO gdy gracz
+stal w osadzie kuzni. Miecz nie przepadl - wisi w kolejce, ale nigdy sie nie konczyl.
+**Przyczyna:** AdvanceProjects: `atForge = Settlement.CurrentSettlement == projekt` -
+bez tego zero postepu; zadnego komunikatu na ekranie, tylko log.
+**Zmiana:** nowe ustawienie ForgeWorksWithoutYou (domyslnie ON): robota idzie ZAWSZE,
+XP "za prace w trakcie" tylko gdy gracz na miejscu (jego rece). Wyrob ukonczony pod
+nieobecnosc: zostaje w kolejce z DaysLeft=0 i komunikat "The smith has finished your X -
+collect it at Y"; wydanie przy wejsciu do osady (CollectReadyProjects w OnGameMenuOpened,
+takze na godzinnym ticku na miejscu). ProjectSummary pokazuje "READY, waiting for
+collection". Stary tryb (zegar tylko na miejscu) zostaje pod wylacznikiem.
+**Ryzyko / co sprawdzic:** wiszacy miecz Jeffa (crafted_item_101 w ROT_town3) dokonczy
+sie sam po wgraniu; komunikat o ukonczeniu i odbior przy wejsciu do ROT_town3.
+Stare projekty w kolejce ruszaja z miejsca.
+**Status:** WGRANE (albo czeka, jesli gra otwarta)
+
 ## 2026-08-27 — sen: pasek jest prawda - pobudka dopisuje przespane godziny do rachunku doby
 **Mod:** Armoury | **Pliki:** `Armoury/src/NightRest.cs`
 **Problem:** Jeff: "rozbilem oboz w nocy, przespalem noc (wake rested) i rano mam,

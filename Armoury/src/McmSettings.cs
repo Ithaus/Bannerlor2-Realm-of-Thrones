@@ -76,6 +76,10 @@ namespace Armoury
         [SettingPropertyGroup("Cost by piece")]
         public int StaminaPerTier { get; set; } = 25;
 
+        [SettingPropertyBool("Forge Works Without You", HintText = "the smith and his lads keep at your project while you ride - the finished piece waits at that forge for collection; off = the clock only runs while you stay in that settlement")]
+        [SettingPropertyGroup("Time at the anvil")]
+        public bool ForgeWorksWithoutYou { get; set; } = true;
+
         [SettingPropertyBool("Forge Takes Time", HintText = "armour is not finished the moment you order it")]
         [SettingPropertyGroup("Time at the anvil")]
         public bool ForgeTakesTime { get; set; } = true;
@@ -966,6 +970,7 @@ namespace Armoury
             s.FiddlyStaminaBonus = FiddlyStaminaBonus;
             s.CharcoalPerIron = CharcoalPerIron;
             s.StaminaPerTier = StaminaPerTier;
+            s.ForgeWorksWithoutYou = ForgeWorksWithoutYou;
             s.ForgeTakesTime = ForgeTakesTime;
             s.DaysPerTier = DaysPerTier;
             s.TempoHastyTime = TempoHastyTime;

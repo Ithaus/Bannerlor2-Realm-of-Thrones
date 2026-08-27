@@ -122,6 +122,8 @@ namespace Armoury
         {
             try
             {
+                // gotowe wyroby z kuzni wydaja sie od progu, bez czekania na tick
+                try { CollectReadyProjects(); } catch { }
                 var gm = args != null && args.MenuContext != null ? args.MenuContext.GameMenu : null;
                 if (gm != null && gm.StringId == "bannerkings_wait_crafting")
                 {
@@ -218,7 +220,12 @@ namespace Armoury
                     var p = Project.Parse(line);
                     if (p.Item == null) continue;
                     if (sb.Length > 0) sb.Append("\n");
-                    sb.Append(p.Item.Name + " - " + Project.TimeLabel(p.DaysLeft) + " of work left (clock runs only while you stay there), worked " + p.TempoName);
+                    if (p.DaysLeft <= 0f)
+                        sb.Append(p.Item.Name + " - READY, waiting for collection at the forge");
+                    else
+                        sb.Append(p.Item.Name + " - " + Project.TimeLabel(p.DaysLeft) + " of work left"
+                                  + (Settings.Current.ForgeWorksWithoutYou ? "" : " (clock runs only while you stay there)")
+                                  + ", worked " + p.TempoName);
                 }
                 return sb.ToString();
             }
@@ -227,12 +234,25 @@ namespace Armoury
 
         internal bool HasProjects { get { return _projects.Count > 0; } }
 
+        private static void HandOver(Project p)
+        {
+            if (p.Kind == "van") Forge.Deliver(p.Item, p.ModifierId);   // sukces zapadl przy kowadle
+            else Forge.Finish(p.Item, p.Tempo);
+        }
+
         private void AdvanceProjects()
         {
             try
             {
                 if (_projects.Count == 0) return;
                 var here = Settlement.CurrentSettlement;
+                // KOWAL PRACUJE, KIEDY TY JEDZIESZ (Jeff 27.08: "wykulem miecz,
+                // odczekalem dlugo i przepadl" - stary zegar tykal TYLKO, gdy
+                // gracz stal w osadzie projektu, a on czekal na mapie obok).
+                // Teraz robota idzie zawsze; XP za prace w trakcie dostajesz
+                // tylko na miejscu (to twoje rece), a GOTOWY wyrob lezy
+                // w warsztacie i czeka na odbior przy wejsciu do osady.
+                bool remote = Settings.Current.ForgeWorksWithoutYou;
                 var copy = new List<string>(_projects);
                 bool idleWarned = false;
                 foreach (var line in copy)
@@ -241,7 +261,15 @@ namespace Armoury
                     if (p.Item == null) { _projects.Remove(line); continue; }
 
                     bool atForge = here != null && here.StringId == p.SettlementId;
-                    if (!atForge)
+
+                    if (p.DaysLeft <= 0f)
+                    {
+                        // gotowy wyrob lezy w warsztacie - wydanie na miejscu
+                        if (atForge) { _projects.Remove(line); HandOver(p); }
+                        continue;
+                    }
+
+                    if (!atForge && !remote)
                     {
                         if (!idleWarned && Today - _lastIdleLogDay > 0.99f)
                         {
@@ -257,16 +285,45 @@ namespace Armoury
                     p.DaysLeft -= 1f / 24f;
                     var rr = Recipes.For(p.Item);
                     float totalDays = MathF.Max(1f, rr.Tier * Settings.Current.DaysPerTier * Project.TimeFactor(p.Tempo));
-                    Hero.MainHero.HeroDeveloper.AddSkillXp(DefaultSkills.Crafting,
-                        Forge.ProjectXp(rr) * Settings.Current.XpShareWhileWorking / totalDays / 24f);
+                    if (atForge)   // XP tylko za wlasna prace przy kowadle
+                        Hero.MainHero.HeroDeveloper.AddSkillXp(DefaultSkills.Crafting,
+                            Forge.ProjectXp(rr) * Settings.Current.XpShareWhileWorking / totalDays / 24f);
 
                     _projects.Remove(line);
                     if (p.DaysLeft > 0f) _projects.Add(p.Serialize());
-                    else if (p.Kind == "van") Forge.Deliver(p.Item, p.ModifierId);   // sukces zapadl przy kowadle
-                    else Forge.Finish(p.Item, p.Tempo);
+                    else if (atForge) HandOver(p);
+                    else
+                    {
+                        // skonczone pod twoja nieobecnosc: wyrob czeka na polce
+                        p.DaysLeft = 0f;
+                        _projects.Add(p.Serialize());
+                        var s = Settlement.Find(p.SettlementId);
+                        Log.Player("The smith has finished your " + p.Item.Name + " - collect it at "
+                                   + (s != null ? s.Name.ToString() : p.SettlementId) + ".");
+                    }
                 }
             }
             catch (Exception e) { Log.Error("AdvanceProjects", e); }
+        }
+
+        /// <summary>Odbior gotowych wyrobow zaraz przy wejsciu do osady - bez czekania na tick godzinowy.</summary>
+        internal void CollectReadyProjects()
+        {
+            try
+            {
+                if (_projects.Count == 0) return;
+                var here = Settlement.CurrentSettlement;
+                if (here == null) return;
+                var copy = new List<string>(_projects);
+                foreach (var line in copy)
+                {
+                    var p = Project.Parse(line);
+                    if (p.Item == null) { _projects.Remove(line); continue; }
+                    if (p.DaysLeft <= 0f && p.SettlementId == here.StringId)
+                    { _projects.Remove(line); HandOver(p); }
+                }
+            }
+            catch (Exception e) { Log.Error("CollectReadyProjects", e); }
         }
 
         private void OnDailyTick()
