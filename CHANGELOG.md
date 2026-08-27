@@ -17,6 +17,20 @@
 
 ---
 
+## 2026-08-26 — CRAFT: znane wzory ZAWSZE na gorze listy (takze po sortowaniu BK)
+**Mod:** ForgeView | **Pliki:** `ForgeView/src/SortKnownFirst.cs` (NOWY), `ForgeView/src/ArmourFilterMixin.cs`
+**Problem:** Jeff: "lista pokazuje najpierw niedostepne - najpierw dostepne, zeby nie
+zjezdzac na dol i nie szukac".
+**Przyczyna:** nasz filtr (ArmourFilterMixin.Apply) ustawia znane przed zamknietymi,
+ale sortownik BK (ArmorCraftingSortController.SortByCurrentState - przyciski
+Type/Name/Yield) sortuje cala liste od nowa i miesza grupy.
+**Zmiana:** Harmony postfix na SortByCurrentState: po kazdym sortowaniu BK stabilne
+przegrupowanie - znane najpierw, porzadek sortowania zachowany w obrebie obu grup.
+Known() z mixina otwarte jako internal.
+**Ryzyko / co sprawdzic:** po kliknieciu sortowania Type/Name/Yield znane wzory
+zostaja na gorze; szare (nieznane) zawsze pod nimi.
+**Status:** WGRANE
+
 ## 2026-08-26 — nocleg: oboz BK nie znika w klatke, pasek snu bez podwojnego liczenia, swit nie karze spiacego
 **Mod:** Armoury | **Pliki:** `Armoury/src/NightRest.cs`
 **Problem:** Jeff: (1) "czasami nie tworzy sie namiot podczas postoju", (2) "postoj nie

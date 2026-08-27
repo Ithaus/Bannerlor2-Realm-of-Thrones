@@ -175,7 +175,8 @@ namespace ForgeView
         private static System.Reflection.MethodInfo _knownOf;
         private static bool _knownLooked;
 
-        private static bool Known(ItemObject it)
+        // internal: SortKnownFirst przegrupowuje lista po sortowaniu BK ta sama miarka
+        internal static bool Known(ItemObject it)
         {
             try
             {
