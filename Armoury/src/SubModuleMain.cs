@@ -109,6 +109,8 @@ namespace Armoury
                 // dlugosc roku MUSI wejsc, zanim gra przeliczy swoj zegar
                 LongYearTimeModel.Install(gameStarterObject);
                 starter.AddBehavior(new ArmouryBehavior());
+                starter.AddBehavior(new AleSupply());
+                starter.AddBehavior(new Uniques());
                 Log.Info("Behavior dodany do kampanii.");
             }
             catch (Exception e) { Log.Error("OnGameStart", e); }

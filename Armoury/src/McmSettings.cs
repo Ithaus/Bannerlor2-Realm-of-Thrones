@@ -304,6 +304,10 @@ namespace Armoury
         [SettingPropertyGroup("Mending it yourself")]
         public float RangedStaminaFactor { get; set; } = 0.35f;
 
+        [SettingPropertyFloatingInteger("Ranged High Tier Cost Factor", 0.00f, 8.00f, "0.00", HintText = "bows and crossbows of tier 5-6 eat this many times the materials - masterworks are not massed out of a sack of sticks")]
+        [SettingPropertyGroup("Mending it yourself")]
+        public float RangedHighTierCostFactor { get; set; } = 2f;
+
         [SettingPropertyFloatingInteger("Ranged Failure Factor", 0.00f, 2.00f, "0.00", HintText = "ruin-risk multiplier for bows, crossbows and ammunition - wood forgives more than a quench")]
         [SettingPropertyGroup("Mending it yourself")]
         public float RangedFailureFactor { get; set; } = 0.5f;
@@ -407,6 +411,30 @@ namespace Armoury
         [SettingPropertyBool("Break At Zero Condition", HintText = "at zero the piece finally breaks and is gone for good")]
         [SettingPropertyGroup("Wear and tear")]
         public bool BreakAtZeroCondition { get; set; } = false;
+
+        [SettingPropertyBool("Unique Crowns Enabled", HintText = "crowns of kings and queens are unique regalia: sane armour, out of the shops, impossible to forge - the pieces already in play become the only ones")]
+        [SettingPropertyGroup("Crown jewels")]
+        public bool UniqueCrownsEnabled { get; set; } = true;
+
+        [SettingPropertyInteger("Unique Crown Head Armor", 0, 40, "0", HintText = "head armour of a crown - it is jewellery, not a helmet (ROT ships every crown at 75)")]
+        [SettingPropertyGroup("Crown jewels")]
+        public int UniqueCrownHeadArmor { get; set; } = 10;
+
+        [SettingPropertyBool("Ale Supply Enabled", HintText = "town markets restock beer and wine daily up to a floor - Banner Kings parties drink the realm dry and the morale fine stays with no cask to buy")]
+        [SettingPropertyGroup("The town brewery")]
+        public bool AleSupplyEnabled { get; set; } = true;
+
+        [SettingPropertyInteger("Ale Supply Beer Floor", 0, 60, "0", HintText = "beer casks a town market is topped up to")]
+        [SettingPropertyGroup("The town brewery")]
+        public int AleSupplyBeerFloor { get; set; } = 15;
+
+        [SettingPropertyInteger("Ale Supply Wine Floor", 0, 32, "0", HintText = "wine amphorae a town market is topped up to (mead, where it exists, gets half this)")]
+        [SettingPropertyGroup("The town brewery")]
+        public int AleSupplyWineFloor { get; set; } = 8;
+
+        [SettingPropertyInteger("Ale Supply Per Day", 0, 40, "0", HintText = "at most this many casks brewed per town per day - a trickle, not a flood")]
+        [SettingPropertyGroup("The town brewery")]
+        public int AleSupplyPerDay { get; set; } = 10;
 
         [SettingPropertyBool("Loot Arrives Worn", HintText = "gear stripped from the fallen comes to you already used")]
         [SettingPropertyGroup("Loot from the field")]
@@ -995,6 +1023,7 @@ namespace Armoury
             s.AllowRangedCrafting = AllowRangedCrafting;
             s.AmmoBatchStacks = AmmoBatchStacks;
             s.RangedStaminaFactor = RangedStaminaFactor;
+            s.RangedHighTierCostFactor = RangedHighTierCostFactor;
             s.RangedFailureFactor = RangedFailureFactor;
             s.LegendaryValueFloor = LegendaryValueFloor;
             s.LegendaryMaterialFactor = LegendaryMaterialFactor;
@@ -1021,6 +1050,12 @@ namespace Armoury
             s.ThresholdRuined = ThresholdRuined;
             s.RepairCostFactor = RepairCostFactor;
             s.BreakAtZeroCondition = BreakAtZeroCondition;
+            s.UniqueCrownsEnabled = UniqueCrownsEnabled;
+            s.UniqueCrownHeadArmor = UniqueCrownHeadArmor;
+            s.AleSupplyEnabled = AleSupplyEnabled;
+            s.AleSupplyBeerFloor = AleSupplyBeerFloor;
+            s.AleSupplyWineFloor = AleSupplyWineFloor;
+            s.AleSupplyPerDay = AleSupplyPerDay;
             s.LootArrivesWorn = LootArrivesWorn;
             s.LootWearBase = LootWearBase;
             s.LootWearSpread = LootWearSpread;

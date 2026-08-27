@@ -89,6 +89,7 @@ namespace Armoury
         public bool AllowRangedCrafting = true;            // bows, crossbows, arrows and bolts as well
         public int AmmoBatchStacks = 3;                    // one fletching job yields this many sheaves of arrows or cases of bolts
         public float RangedStaminaFactor = 0.35f;          // bows and crossbows cost tier x stamina-per-tier x this - bowyery is lighter work than plate, as at the weapon bench
+        public float RangedHighTierCostFactor = 2f;        // bows and crossbows of tier 5-6 eat this many times the materials - masterworks are not massed out of a sack of sticks
         public float RangedFailureFactor = 0.5f;           // ruin-risk multiplier for bows, crossbows and ammunition - wood forgives more than a quench
         public float LegendaryValueFloor = 25000f;         // an unbuyable piece worth at least this much is a LEGEND - legendary bills and the one-of-a-kind rule apply
         public float LegendaryMaterialFactor = 4f;         // a legend's bill: every material count multiplied by this, plus the noblest steel on top
@@ -117,6 +118,16 @@ namespace Armoury
         public int ThresholdRuined = 20;                   // below this it is barely worth carrying
         public float RepairCostFactor = 0.5f;              // share of item value for a full repair
         public bool BreakAtZeroCondition = false;          // at zero the piece finally breaks and is gone for good
+        // --- Crown jewels ---
+        public bool UniqueCrownsEnabled = true;            // crowns of kings and queens are unique regalia: sane armour, out of the shops, impossible to forge - the pieces already in play become the only ones
+        public int UniqueCrownHeadArmor = 10;              // head armour of a crown - it is jewellery, not a helmet (ROT ships every crown at 75)
+
+        // --- The town brewery ---
+        public bool AleSupplyEnabled = true;               // town markets restock beer and wine daily up to a floor - Banner Kings parties drink the realm dry and the morale fine stays with no cask to buy
+        public int AleSupplyBeerFloor = 15;                // beer casks a town market is topped up to
+        public int AleSupplyWineFloor = 8;                 // wine amphorae a town market is topped up to (mead, where it exists, gets half this)
+        public int AleSupplyPerDay = 10;                   // at most this many casks brewed per town per day - a trickle, not a flood
+
         // --- Loot from the field ---
         public bool LootArrivesWorn = true;                // gear stripped from the fallen comes to you already used
         public float LootWearBase = 45f;                   // the condition of an average piece of loot

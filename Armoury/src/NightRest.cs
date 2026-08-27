@@ -34,6 +34,13 @@ namespace Armoury
         private static bool _hadPos;
         private static CampaignTime _sleepUntil = CampaignTime.Zero;
         private static string _sleepReturn = "camp";
+        // sen w menu: WLASNY licznik, niezalezny od _restTonight - swit zeruje
+        // _restTonight o 6:00 i pasek snu startowal OD NOWA w srodku nocy
+        // (Jeff: "pasek raz i za chwile ponownie"); do tego flaga, zeby swit
+        // nie doliczal dlugu komus, kto wlasnie spi
+        private static bool _sleeping;
+        private static float _menuRest;
+        private static float _menuTarget = 5f;
 
         private static readonly int[] SpdPenalty = { 0, 0, 5, 15, 25, 30 };   // % za dlug 0..5
         private static readonly int[] MorPenalty = { 0, 0, 3, 8, 12, 15 };
@@ -464,8 +471,9 @@ namespace Armoury
         private static void SettleNight(Settings s)
         {
             // splata poszla juz OD REKI (patrz OnHourly); swit tylko zamyka dobe
-            // i dolicza dlug tym, ktorzy nocy nie przespali
-            bool slept = _credited || _restTonight >= Math.Max(1f, s.SleepHoursNeeded);
+            // i dolicza dlug tym, ktorzy nocy nie przespali. KTO WLASNIE SPI
+            // (_sleeping), ten dlugu nie dostaje - dospi swoje po swicie
+            bool slept = _sleeping || _credited || _restTonight >= Math.Max(1f, s.SleepHoursNeeded);
             _restTonight = 0f;
             _credited = false;
             if (RotEnlisted()) { Debt = 0; return; }   // w sluzbie spisz, kiedy kaza
@@ -604,7 +612,11 @@ namespace Armoury
                 var m = t.GetMethod("MakeCamp", BindingFlags.Public | BindingFlags.Instance);
                 if (beh == null || m == null) return false;
                 m.Invoke(beh, new object[] { MobileParty.MainParty });
-                PlayerCamped = true;
+                // przez Tent(), nie gola flage: Tent ustawia TAKZE _campPos.
+                // Stare `PlayerCamped = true` zostawialo _campPos z POPRZEDNIEGO
+                // obozu i straznik w OnTick (dystans > 0.25) zwijal namiot
+                // W NASTEPNEJ KLATCE - Jeff: "czasami nie tworzy sie namiot".
+                Tent(MobileParty.MainParty, true);
                 Msg("You pitch camp.", Colors.White);
                 return true;
             }
@@ -681,6 +693,7 @@ namespace Armoury
         {
             try
             {
+                _sleeping = false;
                 // pobudka zwija namiot - chyba ze WLASNY oboz dalej stoi
                 // (wtedy namiot nalezy do obozu, zwinie go "Break camp")
                 if (_sleepReturn != "arm_camp_wait")
@@ -728,6 +741,11 @@ namespace Armoury
                 var s = Settings.Current;
                 float needed = s != null ? Math.Max(1f, s.SleepHoursNeeded) : 5f;
                 _sleepUntil = CampaignTime.HoursFromNow(14f);   // bezpiecznik: nikt nie spi wiecznie
+                _sleeping = true;
+                _menuRest = 0f;
+                // cel snu: ile jeszcze brakuje DO wyspania - pasek liczy wlasne
+                // godziny i NIE cofa sie, gdy swit wyzeruje rachunek doby
+                _menuTarget = Math.Max(0.5f, needed - _restTonight);
                 int h = CampaignTime.Now.GetHourOfDay;
                 bool night = h >= 21 || h <= 5;
                 MBTextManager.SetTextVariable("ARM_SLEEP_TEXT",
@@ -744,14 +762,19 @@ namespace Armoury
             try
             {
                 var s = Settings.Current;
-                float needed = s != null ? Math.Max(1f, s.SleepHoursNeeded) : 5f;
-                if (_restTonight >= needed || (float)(_sleepUntil - CampaignTime.Now).ToHours <= 0.02f)
+                // wlasne godziny snu: noc pelna stawka, dzien slabiej - te same
+                // zasady co rachunek doby w OnHourly, ale bez jego zerowania
+                int h = CampaignTime.Now.GetHourOfDay;
+                bool night = h >= 21 || h <= 5;
+                float day = s != null ? MBMath.ClampFloat(s.DayRestFactor, 0.1f, 1f) : 0.5f;
+                _menuRest += (float)dt.ToHours * (night ? 1f : day);
+                if (_menuRest >= _menuTarget || (float)(_sleepUntil - CampaignTime.Now).ToHours <= 0.02f)
                 {
                     Msg("The men wake rested and the camp stirs.", Colors.White);
                     LeaveSleep();
                     return;
                 }
-                args.MenuContext.GameMenu.SetProgressOfWaitingInMenu(Math.Min(1f, _restTonight / needed));
+                args.MenuContext.GameMenu.SetProgressOfWaitingInMenu(Math.Min(1f, _menuRest / _menuTarget));
             }
             catch (Exception e) { Log.Error("NightRest.SleepTick", e); }
         }

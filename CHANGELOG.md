@@ -17,6 +17,71 @@
 
 ---
 
+## 2026-08-26 — nocleg: oboz BK nie znika w klatke, pasek snu bez podwojnego liczenia, swit nie karze spiacego
+**Mod:** Armoury | **Pliki:** `Armoury/src/NightRest.cs`
+**Problem:** Jeff: (1) "czasami nie tworzy sie namiot podczas postoju", (2) "postoj nie
+zawsze lapie zakonczenie spania i wyspanie", (3) "czasami liczy podwojnie - pasek snu
+raz i za chwile ponownie".
+**Przyczyna:** (1) sciezka obozu BannerKings (TryBkCamp) ustawiala gola flage
+PlayerCamped=true BEZ Tent() - _campPos zostawalo z poprzedniego obozu i straznik
+w OnTick (dystans > 0.25) zwijal oboz W NASTEPNEJ KLATCE. (2+3) pasek snu liczyl sie
+z _restTonight, a SettleNight o 6:00 ZERUJE _restTonight - sen przez swit: pasek spadal
+do zera i startowal od nowa, a swit doliczal dlug "nieprzespanej nocy" komus, kto spal.
+**Zmiana:** (1) TryBkCamp idzie przez Tent(true) - ustawia i namiot, i _campPos.
+(2) Sen w menu ma WLASNY licznik (_menuRest/_menuTarget, cel = ile brakuje do wyspania),
+nalicza z dt ticku menu (noc pelna stawka, dzien wg DayRestFactor), pasek monotoniczny.
+(3) Nowa flaga _sleeping (SleepInit/LeaveSleep); SettleNight traktuje spiacego jak
+wyspanego - zadnego dlugu w polowie snu.
+**Ryzyko / co sprawdzic:** oboz z klawisza O stoi (namiot widoczny takze przy obozie BK),
+pasek snu plynie raz od 0 do konca takze gdy sen przechodzi przez 6:00; po wyspaniu
+"The men wake rested". Rozliczenie dlugu bez zmian poza switem w trakcie snu.
+**Status:** WGRANE
+
+## 2026-08-26 — klejnoty koronne: korony unikatowe (pancerz 10, poza handlem i kuznia, polki oprozniane)
+**Mod:** Armoury | **Pliki:** `Armoury/src/Uniques.cs` (NOWY), `Armoury/src/Settings.cs`, `Armoury/src/SubModuleMain.cs`
+**Problem:** Jeff kupil korone Sansy na targu: "takie rzeczy musza byc unikatowe, czemu
+ona daje tyle pancerza - to tylko korona!".
+**Przyczyna:** ROT daje KAZDEJ koronie head_armor=75 (jak pelny helm) i 7 z 8 koron
+zostawia jako towar (tylko cersei_crown ma is_merchandise=false). Nazwane miecze
+(Longclaw, Ice, Oathkeeper...) ROT juz trzyma poza handlem - koron nie.
+**Zmiana:** behavior Uniques (OnSessionLaunched): itemy *_crown dostaja pancerz glowy
+UniqueCrownHeadArmor (10), NotMerchandise=true (znikaja z zaopatrzenia sklepow;
+przez regule Teachable "pancerz spoza kramow to legenda" nie da sie ich wykuc ani
+poznac ich wzoru), zalegajace korony schodza z polek miast i zamkow. Egzemplarze
+w rekach bohaterow (kupiona korona Sansy) zostaja jedynymi. 2 ustawienia MCM.
+**Ryzyko / co sprawdzic:** log Armoury "Uniques: ... pancerz 75 -> 10, poza handlem"
+i "zdjeto z polek N szt."; korona Sansy w ekwipunku ma pancerz 10; koron nie ma
+w sklepach ani na liscie kucia. Backing-fieldy (<HeadArmor>k__BackingField) sprawdzone
+w TaleWorlds.Core 1.4.8 - gdy nie pasuja, behavior loguje i odpuszcza.
+**Status:** WGRANE
+
+## 2026-08-26 — browar miejski: targi utrzymuja piwo i wino (BK wypija krolestwo do dna)
+**Mod:** Armoury | **Pliki:** `Armoury/src/AleSupply.cs` (NOWY), `Armoury/src/Settings.cs`, `Armoury/src/SubModuleMain.cs`
+**Problem:** Jeff: "nie ma nigdzie alkoholu, zjechalem mase miast - kara do morale jest,
+a kupic nie ma czego".
+**Przyczyna:** BannerKings PartySupplies kaze KAZDEJ partii kupowac alkohol na 10 dni
+zapasu (kategorie wine/beer/mead, BuyItems co tick zaopatrzenia) - setki partii
+ogolacaja targi szybciej, niz vanillowa produkcja odrasta. Itemy beer/wine istnieja
+(SandBoxCore), ROT ich nie wycina - po prostu popyt BK zjada cala podaz.
+**Zmiana:** behavior AleSupply (DailyTickSettlement): kazde miasto co dzien dowarza
+piwo i wino do progu (beer 15, wine 8, mead polowa wina - jesli item istnieje),
+w granicach dziennej warki (10 szt./miasto). 4 ustawienia MCM.
+**Ryzyko / co sprawdzic:** po paru dniach gry piwo/wino sa do kupienia w miastach,
+kara morale za brak alkoholu schodzi; log "AleSupply: <miasto> dowarzyl ...".
+Podaz to strumyk, nie potop - ceny nie powinny sie zawalic (MarketGlut czuwa).
+**Status:** WGRANE
+
+## 2026-08-26 — luczarnia: luki i kusze tieru 5-6 kosztuja x2 materialow
+**Mod:** Armoury | **Pliki:** `Armoury/src/Recipes.cs`, `Armoury/src/Settings.cs`
+**Problem:** Jeff: "luki i kusze 5 i 6 tieru za latwo sie tworzy, daj x2 zasobow".
+**Przyczyna:** receptura luczarni liczyla materialy plasko od wagi/tieru - mistrzowski
+luk kosztowal ledwie wiecej niz prosty.
+**Zmiana:** dla lukow i kusz tieru >= 5 caly rachunek materialowy x RangedHighTierCostFactor
+(nowe ustawienie MCM, domyslnie 2.0, zaokraglenie w gore). Amunicji nie dotyczy.
+**Ryzyko / co sprawdzic:** receptura luku t5/t6 w menu kuzni pokazuje podwojone ilosci;
+t1-t4 bez zmian.
+**Status:** WGRANE
+
 ## 2026-08-26 — BattleWind: oddech bitewny bohaterow wg Endurance (pula wykladniczo, regen 10-200 pkt/s, zadyszka)
 **Mod:** Armoury | **Pliki:** `Armoury/src/BattleWind.cs` (NOWY), `Armoury/src/FieldCraft.cs`, `Armoury/src/Settings.cs`, `Armoury/src/McmSettings.cs` (gen), `Armoury/src/SubModuleMain.cs`
 **Problem:** Jeff: "po 10 machnieciach nie mam sily przy 150 atletyki". Postura RBM przy
