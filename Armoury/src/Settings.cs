@@ -138,6 +138,7 @@ namespace Armoury
         public float HideoutRenown = 5f;                   // renown for purging a hideout - the realm hears of it
         public int HideoutRepMax = 5;                      // relation gained with notables right next to the den, fading to zero at the edge of the district
         public float HideoutRepRadius = 50f;               // the district: map-distance within which settlements care about the purge
+        public float HideoutSearchHours = 2f;              // hours the men spend turning the den over before the finds surface
 
         // --- Loot from the field ---
         public bool LootArrivesWorn = true;                // gear stripped from the fallen comes to you already used

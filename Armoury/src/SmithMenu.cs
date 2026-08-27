@@ -85,8 +85,9 @@ namespace Armoury
                 "{=!}The mending bench - your gear and the men's", MendBenchCondition,
                 delegate (MenuCallbackArgs a) { GameMenu.SwitchToMenu(MendMenu); }, false, 2);
 
-            starter.AddGameMenuOption(Menu, "arm_smelt",
-                "{=!}Break metal down at the crucible", SmeltCondition, SmeltConsequence, false, 4);
+            // tygiel WYPADL z tego menu (Jeff 27.08: "smelt mozna robic
+            // w smithy") - przetop zyje w zakladce Smelt ekranu kuzni
+            // (SmeltTab z nasza nauka wzorow). Kod zostaje na zapas.
 
             starter.AddGameMenuOption(Menu, "arm_takeapart",
                 "{=!}Take a piece apart to copy its pattern", TakeApartCondition, TakeApartConsequence, false, 4);

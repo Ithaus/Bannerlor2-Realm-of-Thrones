@@ -17,6 +17,25 @@
 
 ---
 
+## 2026-08-27 — depozyt kwatermistrza NIE wchodzi do save'a + pasek przeszukania kryjowki + tygiel wypada z menu
+**Mod:** Armoury | **Pliki:** `Armoury/src/ArmouryBehavior.cs`, `Armoury/src/HideoutPurge.cs`, `Armoury/src/SmithMenu.cs`, `Armoury/src/Settings.cs`, `Armoury/src/McmSettings.cs` (gen)
+**Problem:** (1) Jeff: "zniknal mi caly ekwipunek!" - FALSZYWY ALARM: ekran zbrojowni
+pokazuje tylko nadwyzki (depozyt kwatermistrza schowal 1177 szt. noszonych; wszystko
+wraca po zamknieciu ekranu, a save 16:33 byl SPRZED schowania). ALE dziura realna:
+schowane sztuki zyja w RAM poza rosterem - zapis gry w tym oknie utrwalilby save
+BEZ nich. (2) Jeff: po kryjowce "pasek ile to zajmie, jak po bitwie". (3) Jeff:
+"Break metal down at crucible niepotrzebne - smelt jest w smithy".
+**Zmiana:** (1) OnBeforeSaveEvent -> ReleaseReserve (przed KAZDYM zapisem depozyt
+wraca na polki); samonaprawa w OnGameMenuOpened (menu gry = nie ekran zbrojowni ->
+oddaj, gdyby Release przy zamykaniu nie odpalil). ReleaseReserve jest idempotentne.
+(2) "Search the hideout" przelacza w wait-menu z paskiem (AddWaitGameMenu, wzorzec
+snu): HideoutSearchHours (2 h), nagrody DOPIERO po dojechaniu paska; "Call the search
+off" wraca do wyboru. (3) opcja tygla zdjeta z menu kuzni - przetop w zakladce Smelt.
+**Ryzyko / co sprawdzic:** zbrojownia po wczytaniu save 16:33 kompletna; przy zapisie
+w trakcie otwartego ekranu zbrojowni nic nie ginie; po kryjowce pasek 2 h i dopiero
+lup; w menu kuzni brak opcji tygla.
+**Status:** WGRANE (albo czeka, jesli gra otwarta)
+
 ## 2026-08-27 — przetrzebiona kryjowka: przeszukanie po zwyciestwie, zrabowane zloto, renown i wdziecznosc okolicy
 **Mod:** Armoury | **Pliki:** `Armoury/src/HideoutPurge.cs` (NOWY), `Armoury/src/Settings.cs`, `Armoury/src/SubModuleMain.cs`, `Armoury/src/McmSettings.cs` (gen)
 **Problem:** Jeff: "jak pokonam kryjowke, nie od razu nagroda - musze ja przeszukac,

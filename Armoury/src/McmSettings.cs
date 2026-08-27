@@ -472,6 +472,10 @@ namespace Armoury
         [SettingPropertyGroup("The hideout purge")]
         public float HideoutRepRadius { get; set; } = 50f;
 
+        [SettingPropertyFloatingInteger("Hideout Search Hours", 0.00f, 8.00f, "0.00", HintText = "hours the men spend turning the den over before the finds surface")]
+        [SettingPropertyGroup("The hideout purge")]
+        public float HideoutSearchHours { get; set; } = 2f;
+
         [SettingPropertyBool("Loot Arrives Worn", HintText = "gear stripped from the fallen comes to you already used")]
         [SettingPropertyGroup("Loot from the field")]
         public bool LootArrivesWorn { get; set; } = true;
@@ -1101,6 +1105,7 @@ namespace Armoury
             s.HideoutRenown = HideoutRenown;
             s.HideoutRepMax = HideoutRepMax;
             s.HideoutRepRadius = HideoutRepRadius;
+            s.HideoutSearchHours = HideoutSearchHours;
             s.LootArrivesWorn = LootArrivesWorn;
             s.LootWearBase = LootWearBase;
             s.LootWearSpread = LootWearSpread;

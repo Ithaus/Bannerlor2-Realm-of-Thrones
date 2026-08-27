@@ -97,6 +97,9 @@ namespace Armoury
             catch (Exception e) { Log.Error("HideoutPurge.OnTick", e); _pending = false; }
         }
 
+        private static CampaignTime _searchDone = CampaignTime.Zero;
+        private static float _searchTotal = 2f;
+
         private void AddMenus(CampaignGameStarter starter)
         {
             try
@@ -107,13 +110,55 @@ namespace Armoury
                 starter.AddGameMenuOption("arm_hideout_search", "arm_hideout_do_search",
                     "{=!}Search the hideout",
                     delegate (MenuCallbackArgs a) { a.optionLeaveType = GameMenuOption.LeaveType.Continue; return true; },
-                    delegate (MenuCallbackArgs a) { DoSearch(); GameMenu.ExitToLast(); }, false, 0);
+                    delegate (MenuCallbackArgs a) { GameMenu.SwitchToMenu("arm_hideout_search_wait"); }, false, 0);
                 starter.AddGameMenuOption("arm_hideout_search", "arm_hideout_leave",
                     "{=!}Leave without searching",
                     delegate (MenuCallbackArgs a) { a.optionLeaveType = GameMenuOption.LeaveType.Leave; return true; },
                     delegate (MenuCallbackArgs a) { GameMenu.ExitToLast(); }, true, 1);
+
+                // PASEK PRZESZUKANIA jak po bitwie (Jeff 27.08: "nie od razu
+                // rzeczy - pasek ile to zajmie, wykorzystaj ten mechanizm").
+                // Ten sam AddWaitGameMenu co sen w obozie; nagrody dopiero
+                // po dojechaniu paska do konca.
+                starter.AddWaitGameMenu("arm_hideout_search_wait",
+                    "{=!}The men turn the hideout over - bedrolls, false floors, the cold ashes of the fire pits.",
+                    SearchInit, delegate (MenuCallbackArgs a) { return true; }, null, SearchTick,
+                    GameMenu.MenuAndOptionType.WaitMenuShowProgressAndHoursOption);
+                starter.AddGameMenuOption("arm_hideout_search_wait", "arm_hideout_search_stop",
+                    "{=!}Call the search off",
+                    delegate (MenuCallbackArgs a) { a.optionLeaveType = GameMenuOption.LeaveType.Leave; return true; },
+                    delegate (MenuCallbackArgs a) { GameMenu.SwitchToMenu("arm_hideout_search"); }, true, 9);
             }
             catch (Exception e) { Log.Error("HideoutPurge.AddMenus", e); }
+        }
+
+        private static void SearchInit(MenuCallbackArgs args)
+        {
+            try
+            {
+                var c = Settings.Current;
+                _searchTotal = Math.Max(0.5f, c != null ? c.HideoutSearchHours : 2f);
+                _searchDone = CampaignTime.HoursFromNow(_searchTotal);
+                args.MenuContext.GameMenu.StartWait();
+            }
+            catch (Exception e) { Log.Error("HideoutPurge.SearchInit", e); }
+        }
+
+        private static void SearchTick(MenuCallbackArgs args, CampaignTime dt)
+        {
+            try
+            {
+                float left = (float)(_searchDone - CampaignTime.Now).ToHours;
+                if (left <= 0.01f)
+                {
+                    DoSearch();
+                    GameMenu.ExitToLast();
+                    return;
+                }
+                args.MenuContext.GameMenu.SetProgressOfWaitingInMenu(
+                    MathF.Clamp(1f - left / _searchTotal, 0f, 1f));
+            }
+            catch (Exception e) { Log.Error("HideoutPurge.SearchTick", e); }
         }
 
         private static void DoSearch()

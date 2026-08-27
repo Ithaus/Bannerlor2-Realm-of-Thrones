@@ -73,6 +73,13 @@ namespace Armoury
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, OnMapEventEnded);
             CampaignEvents.MapEventStarted.AddNonSerializedListener(this, OnMapEventStarted);
             CampaignEvents.OnNewItemCraftedEvent.AddNonSerializedListener(this, OnNewItemCrafted);
+            // DEPOZYT KWATERMISTRZA NIE MA PRAWA WEJSC DO SAVE'A: schowane
+            // na czas ekranu zbrojowni sztuki zyja poza rosterem - zapis gry
+            // w tym oknie utrwalilby save BEZ nich (27.08 bylo o wlos: save
+            // 16:33, schowanie 1177 szt. o 16:34). Przed kazdym zapisem
+            // wszystko wraca na polki.
+            CampaignEvents.OnBeforeSaveEvent.AddNonSerializedListener(this,
+                delegate { try { QuartermasterEscrow.ReleaseReserve(); } catch { } });
             // jeniec wziety po bitwie zostaje obszukany - jego rynsztunek idzie do sakw
             CampaignEvents.OnPrisonerTakenEvent.AddNonSerializedListener(this, OnPrisonerTaken);
             // klawisz O na mapie: szybki oboz (BannerKings) bez klikania przez ekrany
@@ -124,6 +131,10 @@ namespace Armoury
             {
                 // gotowe wyroby z kuzni wydaja sie od progu, bez czekania na tick
                 try { CollectReadyProjects(); } catch { }
+                // samonaprawa depozytu: otwarte menu gry = na pewno NIE ekran
+                // zbrojowni; jesli cokolwiek wisi w depozycie (Release nie
+                // odpalil przy zamykaniu ekranu), wraca na polki teraz
+                try { QuartermasterEscrow.ReleaseReserve(); } catch { }
                 var gm = args != null && args.MenuContext != null ? args.MenuContext.GameMenu : null;
                 if (gm != null && gm.StringId == "bannerkings_wait_crafting")
                 {
