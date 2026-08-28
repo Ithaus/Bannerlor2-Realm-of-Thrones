@@ -17,6 +17,23 @@
 
 ---
 
+## 2026-08-27 — kryjowka: czas przeszukania od liczby rak + ODWET okolicznych band (3:1 = tchorza)
+**Mod:** Armoury | **Pliki:** `Armoury/src/HideoutPurge.cs`, `Armoury/src/Settings.cs`, `Armoury/src/McmSettings.cs` (gen)
+**Problem:** Jeff: przeszukanie ma zalezec od ludzi ("sam - caly dzien, minus 0.5 h
+za czlowieka, minimum 2 h"), a okoliczni bandyci maja sie zebrac i odbic kryjowke
+w trakcie grzebania - chyba ze przewaga gracza 3:1, wtedy podchodza i uciekaja.
+**Zmiana:** (1) czas = max(HideoutSearchMinHours, HideoutSearchSoloHours - 
+HideoutSearchPerManHours x (ludzie-1)); domyslnie 24h solo, -0.5h/czlowiek, min 2h
+(stare HideoutSearchHours zastapione trzema pokretlami). (2) Reprisal przy starcie
+przeszukania: bandyckie partie w promieniu HideoutReprisalRadius (20) sumuja sile
+(EstimatedStrength); gracz >= HideoutReprisalFleeOdds (3.0) x ich sila -> meldunek
+"one look at your line and they melt away"; ponizej -> SetInitiative(2.0, 24h)
+na kazda bande - natywna smialosc ataku gry, spotkanie przerwie przeszukanie.
+**Ryzyko / co sprawdzic:** czas przeszukania w meldunku logu zalezy od wielkosci
+partii; przy malych silach gracza bandy z okolicy ida na niego w trakcie paska.
+SetInitiative to sugestia dla AI, nie rozkaz - starcie zalezy od ich wlasnej oceny.
+**Status:** WGRANE (albo czeka, jesli gra otwarta)
+
 ## 2026-08-27 — ZNIKAJACY EKWIPUNEK, przyczyna wlasciwa: ekran zbrojowni DTE traktowany jak SMIETNIK przy discard-za-XP
 **Mod:** Armoury | **Pliki:** `Armoury/src/QuartermasterLaw.cs`
 **Problem:** Jeff doprecyzowal: "wchodze w inventory, zakladka pancerzy, discarduje

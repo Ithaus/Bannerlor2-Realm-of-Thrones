@@ -472,9 +472,29 @@ namespace Armoury
         [SettingPropertyGroup("The hideout purge")]
         public float HideoutRepRadius { get; set; } = 50f;
 
-        [SettingPropertyFloatingInteger("Hideout Search Hours", 0.00f, 8.00f, "0.00", HintText = "hours the men spend turning the den over before the finds surface")]
+        [SettingPropertyFloatingInteger("Hideout Search Solo Hours", 0.00f, 96.00f, "0.00", HintText = "searching the den alone takes this long - a lone man turns every bedroll himself")]
         [SettingPropertyGroup("The hideout purge")]
-        public float HideoutSearchHours { get; set; } = 2f;
+        public float HideoutSearchSoloHours { get; set; } = 24f;
+
+        [SettingPropertyFloatingInteger("Hideout Search Per Man Hours", 0.00f, 2.00f, "0.00", HintText = "every soldier in the party cuts the search by this many hours")]
+        [SettingPropertyGroup("The hideout purge")]
+        public float HideoutSearchPerManHours { get; set; } = 0.5f;
+
+        [SettingPropertyFloatingInteger("Hideout Search Min Hours", 0.00f, 8.00f, "0.00", HintText = "the search never drops below this many hours - some stones only come up slowly")]
+        [SettingPropertyGroup("The hideout purge")]
+        public float HideoutSearchMinHours { get; set; } = 2f;
+
+        [SettingPropertyBool("Hideout Reprisal Enabled", HintText = "nearby bands mass to take their den back while you dig - unless your line scares them off")]
+        [SettingPropertyGroup("The hideout purge")]
+        public bool HideoutReprisalEnabled { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Hideout Reprisal Radius", 0.00f, 80.00f, "0.00", HintText = "map-distance within which bandit parties join the reprisal")]
+        [SettingPropertyGroup("The hideout purge")]
+        public float HideoutReprisalRadius { get; set; } = 20f;
+
+        [SettingPropertyFloatingInteger("Hideout Reprisal Flee Odds", 0.00f, 12.00f, "0.00", HintText = "at this strength advantage (yours vs theirs) the reprisal loses its nerve and melts away")]
+        [SettingPropertyGroup("The hideout purge")]
+        public float HideoutReprisalFleeOdds { get; set; } = 3f;
 
         [SettingPropertyBool("Loot Arrives Worn", HintText = "gear stripped from the fallen comes to you already used")]
         [SettingPropertyGroup("Loot from the field")]
@@ -1105,7 +1125,12 @@ namespace Armoury
             s.HideoutRenown = HideoutRenown;
             s.HideoutRepMax = HideoutRepMax;
             s.HideoutRepRadius = HideoutRepRadius;
-            s.HideoutSearchHours = HideoutSearchHours;
+            s.HideoutSearchSoloHours = HideoutSearchSoloHours;
+            s.HideoutSearchPerManHours = HideoutSearchPerManHours;
+            s.HideoutSearchMinHours = HideoutSearchMinHours;
+            s.HideoutReprisalEnabled = HideoutReprisalEnabled;
+            s.HideoutReprisalRadius = HideoutReprisalRadius;
+            s.HideoutReprisalFleeOdds = HideoutReprisalFleeOdds;
             s.LootArrivesWorn = LootArrivesWorn;
             s.LootWearBase = LootWearBase;
             s.LootWearSpread = LootWearSpread;

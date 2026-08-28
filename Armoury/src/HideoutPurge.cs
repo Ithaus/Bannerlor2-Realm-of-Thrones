@@ -137,11 +137,67 @@ namespace Armoury
             try
             {
                 var c = Settings.Current;
-                _searchTotal = Math.Max(0.5f, c != null ? c.HideoutSearchHours : 2f);
+                // czas od liczby rak (Jeff): sam grzebiesz caly dzien, kazdy
+                // czlowiek zdejmuje pol godziny, ale ponizej minimum nie zejdzie
+                int men = 1;
+                try { men = Math.Max(1, MobileParty.MainParty.MemberRoster.TotalManCount); } catch { }
+                float solo = Math.Max(2f, c != null ? c.HideoutSearchSoloHours : 24f);
+                float perMan = Math.Max(0f, c != null ? c.HideoutSearchPerManHours : 0.5f);
+                float min = Math.Max(0.5f, c != null ? c.HideoutSearchMinHours : 2f);
+                _searchTotal = MathF.Max(min, solo - perMan * (men - 1));
                 _searchDone = CampaignTime.HoursFromNow(_searchTotal);
                 args.MenuContext.GameMenu.StartWait();
+                Log.Info("HideoutPurge: przeszukanie " + _searchTotal.ToString("0.#") + " h (" + men + " ludzi).");
+
+                // ODWET: pladrujesz ich skarbiec - okoliczne bandy ida odbic
+                // kryjowke. Przy przewadze gracza >= 3:1 podchodza i uciekaja
+                // (tylko meldunek), ponizej - SetMoveEngageParty na gracza
+                // i mechanizm spotkan gry robi reszte (przerwie przeszukanie).
+                Reprisal();
             }
             catch (Exception e) { Log.Error("HideoutPurge.SearchInit", e); }
+        }
+
+        private static void Reprisal()
+        {
+            try
+            {
+                var c = Settings.Current;
+                if (c == null || !c.HideoutReprisalEnabled || !_pendingHasPos) return;
+                float radius = Math.Max(1f, c.HideoutReprisalRadius);
+                float fleeOdds = Math.Max(1f, c.HideoutReprisalFleeOdds);
+                float mine = 0f;
+                try { mine = MobileParty.MainParty.Party.EstimatedStrength; } catch { }
+
+                var pack = new System.Collections.Generic.List<MobileParty>();
+                float theirs = 0f;
+                foreach (var mp in MobileParty.All)
+                {
+                    if (mp == null || !mp.IsBandit || !mp.IsActive) continue;
+                    if (mp.CurrentSettlement != null) continue;          // siedza w innej kryjowce
+                    if (mp.MapEvent != null) continue;
+                    if (mp.GetPosition2D.Distance(_pendingPos.ToVec2()) > radius) continue;
+                    pack.Add(mp);
+                    try { theirs += mp.Party.EstimatedStrength; } catch { }
+                }
+                if (pack.Count == 0) return;
+
+                if (mine >= theirs * fleeOdds)
+                {
+                    Log.Player("Bandits circle the ridge to take their den back - one look at your line and they melt away.", true);
+                    Log.Info("HideoutPurge: odwet stchorzyl (" + pack.Count + " band, sila " + (int)theirs + " vs " + (int)mine + ").");
+                    return;
+                }
+                foreach (var mp in pack)
+                {
+                    // mechanizm gry: podbita smialosc ataku na dobe - banda sama
+                    // rusza na gracza, a spotkanie przerwie przeszukanie
+                    try { mp.Ai.SetInitiative(2f, 0.05f, 24f); } catch { }
+                }
+                Log.Player("The scattered bands are massing - they mean to take the den back while your men dig!", true);
+                Log.Info("HideoutPurge: odwet rusza (" + pack.Count + " band, sila " + (int)theirs + " vs " + (int)mine + ").");
+            }
+            catch (Exception e) { Log.Error("HideoutPurge.Reprisal", e); }
         }
 
         private static void SearchTick(MenuCallbackArgs args, CampaignTime dt)

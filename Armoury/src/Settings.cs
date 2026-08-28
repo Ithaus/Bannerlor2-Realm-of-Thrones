@@ -138,7 +138,12 @@ namespace Armoury
         public float HideoutRenown = 5f;                   // renown for purging a hideout - the realm hears of it
         public int HideoutRepMax = 5;                      // relation gained with notables right next to the den, fading to zero at the edge of the district
         public float HideoutRepRadius = 50f;               // the district: map-distance within which settlements care about the purge
-        public float HideoutSearchHours = 2f;              // hours the men spend turning the den over before the finds surface
+        public float HideoutSearchSoloHours = 24f;         // searching the den alone takes this long - a lone man turns every bedroll himself
+        public float HideoutSearchPerManHours = 0.5f;      // every soldier in the party cuts the search by this many hours
+        public float HideoutSearchMinHours = 2f;           // the search never drops below this many hours - some stones only come up slowly
+        public bool HideoutReprisalEnabled = true;         // nearby bands mass to take their den back while you dig - unless your line scares them off
+        public float HideoutReprisalRadius = 20f;          // map-distance within which bandit parties join the reprisal
+        public float HideoutReprisalFleeOdds = 3f;         // at this strength advantage (yours vs theirs) the reprisal loses its nerve and melts away
 
         // --- Loot from the field ---
         public bool LootArrivesWorn = true;                // gear stripped from the fallen comes to you already used
