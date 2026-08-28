@@ -1,5 +1,22 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-28 — odwod przed bitwa: wybierasz KIM walczysz (jak przy hideout)
+**Mod:** Armoury | **Pliki:** `Armoury/src/BattleMuster.cs` (nowy), `Armoury/src/SubModuleMain.cs`
+**Problem:** Jeff: "jak dolaczam do czyjejs/wspolnej bitwy, chce wybrac jakie
+wojsko wystawiam - jak przy hideout".
+**Zmiana:** nowa opcja w menu potyczki ("encounter" i "join_encounter"):
+"Hand-pick who fights (the rest wait in reserve)". Otwiera ekran party
+(PartyScreenHelper.OpenScreenWithCondition) - na LEWA strone ("Reserve") odsylasz
+tych, ktorzy maja przeczekac. Mechanizm bez patchowania misji: odwod na czas
+bitwy liczy sie jako RANNI (gra nie wystawia rannych ani na scenie, ani w
+autoresolve), po bitwie (MapEventEnded) wstaje zdrowy. Zapisywane w SyncData +
+self-heal przy wczytaniu (gra padla w bitwie = odwod tez wraca). Faktycznie
+rannych nie dotykamy (clamp do stanu sprzed i po).
+**Ryzyko / co sprawdzic:** licznik rannych w party ROSNIE na czas bitwy o odwod
+- to zamierzone; komunikaty "The reserve stands down/falls back in". Sprawdzic,
+ze po bitwie liczba rannych wraca do prawdy.
+**Status:** WGRANE
+
 ## 2026-08-28 — DragonUnmount: wyjatek dla Daenerys i gracza
 **Mod:** Armoury | **Pliki:** `Armoury/src/DragonUnmount.cs`
 **Problem:** Jeff: "smoki ma tylko Daenerys, ona ma trzy! Inni maja nie miec.
