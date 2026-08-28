@@ -59,7 +59,7 @@ namespace Armoury
         [ThreadStatic] private static int _refOutWant;
         [ThreadStatic] private static int _refOutBefore;
 
-        internal static void RefinePrefix(Hero hero, TaleWorlds.CampaignSystem.Crafting.RefiningFormula refineFormula)
+        internal static void RefinePrefix(Hero hero, Crafting.RefiningFormula refineFormula)
         {
             try
             {
