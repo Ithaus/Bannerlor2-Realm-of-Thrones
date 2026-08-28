@@ -1,5 +1,21 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-28 — TRZECI crash w bitwie: pulapka na pierwotny wyjatek (przed reporterem BLSE)
+**Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs` (CrashCallerTattle + Install)
+**Problem:** trzeci crash przy wejsciu w te sama bitwe (14:17, pozycja identyczna
+z 14:08). Imiona kultur zalatane NA PEWNO ("dziurawych zostalo 0" w logu 14:17:01),
+a crash wrocil - czyli to INNY blad. W logu za kazdym razem tylko wtorne bledy
+reportera BLSE (Silk.NET/AsmResolver); pierwotny wyjatek byl powtorka wczesniejszego
+i dedup Scribe.Report polykal go bez sladu (drukuje tylko #5, #25, #250...).
+Ostatnie zycie przed smiercia: Armoury.log 14:17:51 DressCode ubiera Forest Bandit/
+NW Ranger Recruit/Highwayman + BattleWind init - czyli pada w trakcie SPAWNU misji.
+**Zmiana:** prefix na BLSE ExceptionInterceptorFeature.HandleException - pelny
+pierwotny wyjatek (typ, message, stos, inner do 5 poziomow) laduje BEZ DEDUPU
+w Documents\...\CrashScribe\crash-original-*.log, zanim reporter cokolwiek zrobi.
+**Ryzyko / co sprawdzic:** Jeff wchodzi w te bitwe raz jeszcze; po crashu czytamy
+crash-original-*.log i naprawiamy w punkt. Zero wplywu na rozgrywke.
+**Status:** WGRANE
+
 ## 2026-08-28 — DRUGI crash w bitwie: karmienie imion mialo dziure (zenskie listy) + bezpiecznik + PROFILER x3
 **Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs`, `CrashScribe/src/Sampler.cs` (nowy), `CrashScribe/src/SubModuleMain.cs`
 **Problem:** Jeff: drugi crash przy wejsciu w bitwe (14:08), mimo karmienia kultur.
