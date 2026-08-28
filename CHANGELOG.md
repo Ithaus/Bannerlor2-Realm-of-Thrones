@@ -1,5 +1,23 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-28 — wybor skladu jak w hideoucie (OpenTroopSelection), koniec triku z rannymi
+**Mod:** Armoury | **Pliki:** `Armoury/src/BattleMuster.cs` (przepisany)
+**Problem:** Jeff: "po co kombinowac z rannymi - jest gotowy widok jak przy
+hideout, lista wojska i klikam ktorych biore; tylko powiekszyc limit z 15 na
+tyle slotow ile mam w tej bitwie".
+**Zmiana:** dokladnie wzorzec hideoutu: args.MenuContext.OpenTroopSelection(
+roster, preselekcja GetStrongestAndPriorTroops, CanChange, OnPicked, max, 1).
+Limit = szacowane sloty gracza: GetRealBattleSize()/2 * (nasi zdrowi / zdrowi
+calej naszej strony), clamp [1, nasi]. Po zatwierdzeniu wybrane ODDZIALY ida
+na gore rosteru (zdjecie i dolozenie stackow nie-bohaterow, XP wraca ze
+stackiem) - scena spawnuje od gory, wiec wybrani wchodza w sloty PIERWSI,
+reszta czeka jako posilki. Zero rannych, zero SyncData, zero przywracania.
+Warunek bez zmian: po stronie gracza walczy ktos poza jego partia.
+**Ryzyko / co sprawdzic:** kolejnosc jednostek w ekranie party zmienia sie po
+wyborze (wybrani na gorze) - to zamierzone. Sloty to estymata - dokladny
+przydzial i tak robi silnik przy spawnie.
+**Status:** WGRANE (watcher - gra dzialala przy buildzie)
+
 ## 2026-08-28 — odwod przy WSPOLNEJ bitwie (druga korekta warunku)
 **Mod:** Armoury | **Pliki:** `Armoury/src/BattleMuster.cs`
 **Problem:** Jeff (po pierwszej korekcie "tylko join_encounter"): "moze tez byc

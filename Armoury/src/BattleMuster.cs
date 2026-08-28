@@ -2,53 +2,41 @@ using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameMenus;
-using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
-using TaleWorlds.Localization;
 
 namespace Armoury
 {
     /// <summary>
-    /// ODWOD PRZED BITWA. Jeff 28.08: "jak dolaczam do wspolnej bitwy, chce
-    /// wybrac KIM bede walczyl - tak jak przy hideout". Opcja w menu potyczki
-    /// otwiera ekran party: na LEWO odsylasz tych, ktorzy maja przeczekac.
-    /// Trick bez grzebania w misji: odwod na czas bitwy liczy sie jako RANNI
-    /// (gra sama nie wystawia rannych - ani na scenie, ani w symulacji),
-    /// po bitwie wstaje zdrowy. Faktycznie rannych nie dotykamy - odejmujemy
-    /// dokladnie tyle, ile sami dodalismy, z clampem do stanu rostera.
+    /// WYBOR SKLADU DO WSPOLNEJ BITWY - dokladnie ten sam widok co przy
+    /// hideoucie (MenuContext.OpenTroopSelection, lista z licznikiem x/N),
+    /// tylko limit = szacowane sloty gracza na scenie zamiast 15.
+    /// Jeff 28.08: "jest gotowy widok jak wybieram 15 do hideout - zastosowac
+    /// ten sam modul, tylko powiekszyc limit".
+    /// Egzekucja bez zadnych trikow: wybrane ODDZIALY ida na GORE rosteru,
+    /// a scena spawnuje od gory - wybrani wchodza w sloty pierwsi, reszta
+    /// czeka w kolejce posilkow. Opcja tylko gdy po stronie gracza walczy
+    /// ktos wiecej niz jego wlasna partia.
     /// </summary>
     internal sealed class BattleMuster : CampaignBehaviorBase
     {
-        // characterId -> ilu zdrowych odeslalismy do odwodu (jako "rannych")
-        private Dictionary<string, int> _benched = new Dictionary<string, int>();
-
         public override void RegisterEvents()
         {
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this, OnSession);
-            CampaignEvents.MapEventEnded.AddNonSerializedListener(this, OnMapEventEnded);
         }
 
-        public override void SyncData(IDataStore dataStore)
-        {
-            dataStore.SyncData("armouryBattleMusterBenched", ref _benched);
-        }
+        public override void SyncData(IDataStore dataStore) { }
 
         private void OnSession(CampaignGameStarter starter)
         {
-            // WSPOLNA bitwa = po stronie gracza walczy ktos wiecej niz on sam
-            // (Jeff: "moze tez byc moja bitwa, gdy po mojej stronie walczy wiecej
-            // niz tylko ja"). Sam na sam - bez opcji, wystawiasz wszystkich.
             try { AddOption(starter, "join_encounter"); } catch (Exception e) { Log.Error("BattleMuster.menu join_encounter", e); }
             try { AddOption(starter, "encounter"); } catch (Exception e) { Log.Error("BattleMuster.menu encounter", e); }
-            // gra padla w trakcie bitwy - odwod wstaje przy wczytaniu
-            try { RestoreBench("wczytanie zapisu"); } catch (Exception e) { Log.Error("BattleMuster.OnSession", e); }
         }
 
         private void AddOption(CampaignGameStarter starter, string menuId)
         {
             starter.AddGameMenuOption(menuId, "arm_muster_" + menuId,
-                "Hand-pick who fights (the rest wait in reserve)",
+                "Hand-pick who takes the field",
                 MusterCondition, MusterConsequence, false, 1, false);
         }
 
@@ -58,8 +46,7 @@ namespace Armoury
             var main = MobileParty.MainParty;
             if (main == null || main.MemberRoster == null || main.MemberRoster.TotalManCount <= 1) return false;
 
-            // jestesmy juz w bitwie: opcja tylko, gdy po NASZEJ stronie walczy
-            // wiecej partii niz nasza wlasna
+            // wspolna bitwa = po naszej stronie walczy wiecej partii niz nasza
             var me = main.MapEvent;
             if (me != null)
             {
@@ -71,8 +58,7 @@ namespace Armoury
                 }
                 catch { return false; }
             }
-            // jeszcze nie w MapEvencie: menu dolaczenia do TRWAJACEJ bitwy
-            // z definicji oznacza wspolna walke
+            // jeszcze nie w MapEvencie: menu dolaczenia do trwajacej bitwy
             return args != null && args.MenuContext != null
                 && args.MenuContext.GameMenu != null
                 && args.MenuContext.GameMenu.StringId == "join_encounter";
@@ -82,99 +68,99 @@ namespace Armoury
         {
             try
             {
-                Helpers.PartyScreenHelper.OpenScreenWithCondition(
-                    Transferable, DoneCondition, Done, null,
-                    PartyScreenLogic.TransferState.Transferable,
-                    PartyScreenLogic.TransferState.NotTransferable,
-                    new TextObject("{=armMusterReserve}Reserve - they sit this one out", null),
-                    MobileParty.MainParty.MemberRoster.TotalManCount,
-                    false, false);
+                var main = MobileParty.MainParty;
+                int slots = EstimateSlots(main);
+                // preselekcja jak w hideoucie: najmocniejsi i priorytetowi
+                var pre = TroopRoster.CreateDummyTroopRoster();
+                try { pre.Add(Helpers.MobilePartyHelper.GetStrongestAndPriorTroops(main, slots, true)); }
+                catch (Exception e) { Log.Error("BattleMuster.preselect", e); }
+                args.MenuContext.OpenTroopSelection(main.MemberRoster, pre,
+                    CanChangeStatusOfTroop, OnPicked, slots, 1);
             }
             catch (Exception e) { Log.Error("BattleMuster.Consequence", e); }
         }
 
-        private static bool Transferable(CharacterObject character, PartyScreenLogic.TroopType type,
-            PartyScreenLogic.PartyRosterSide side, PartyBase leftOwnerParty)
+        private static bool CanChangeStatusOfTroop(CharacterObject character)
         {
             return character != null && !character.IsPlayerCharacter;
         }
 
-        private static Tuple<bool, TextObject> DoneCondition(TroopRoster l, TroopRoster lp,
-            TroopRoster r, TroopRoster rp, int leftLimit, int rightLimit)
+        /// <summary>Ile miejsc na scenie dostanie partia gracza - udzial liczebny
+        /// w polowie Battle Size przypadajacej na nasza strone.</summary>
+        private static int EstimateSlots(MobileParty main)
         {
-            return new Tuple<bool, TextObject>(true, null);
+            int mine = main.MemberRoster.TotalHealthyCount;
+            if (mine < 1) mine = 1;
+            int total = 0;
+            try { total = TaleWorlds.MountAndBlade.BannerlordConfig.GetRealBattleSize(); } catch { }
+            if (total <= 0) return mine;
+
+            var me = main.MapEvent;
+            if (me == null) return mine;   // dopiero dolaczamy - pelny wybor
+            try
+            {
+                var side = me.PlayerSide == TaleWorlds.Core.BattleSideEnum.Attacker
+                    ? me.AttackerSide : me.DefenderSide;
+                if (side == null || side.Parties == null) return mine;
+                int sideHealthy = 0;
+                foreach (var p in side.Parties)
+                {
+                    if (p == null || p.Party == null) continue;
+                    sideHealthy += p.Party.NumberOfHealthyMembers;
+                }
+                if (sideHealthy <= 0) return mine;
+                int slots = (int)Math.Round(total * 0.5 * mine / (double)sideHealthy);
+                if (slots < 1) slots = 1;
+                if (slots > mine) slots = mine;
+                return slots;
+            }
+            catch { return mine; }
         }
 
-        private bool Done(TroopRoster leftMembers, TroopRoster leftPrison, TroopRoster rightMembers,
-            TroopRoster rightPrison, FlattenedTroopRoster taken, FlattenedTroopRoster released,
-            bool isForced, PartyBase leftParty, PartyBase rightParty)
+        /// <summary>Wybrane oddzialy na gore rosteru - scena spawnuje od gory,
+        /// wiec wchodza w sloty pierwsi. Zdejmujemy i dokladamy tylko
+        /// NIE-bohaterow (herosi i tak zawsze wchodza); XP stacka wraca z nim.</summary>
+        private static void OnPicked(TroopRoster picked)
         {
             try
             {
-                RestoreBench("nowy wybor");   // stary odwod wstaje, liczymy od zera
                 var roster = MobileParty.MainParty.MemberRoster;
-                int total = 0;
-                for (int i = 0; i < leftMembers.Count; i++)
-                {
-                    var el = leftMembers.GetElementCopyAtIndex(i);
-                    if (el.Character == null || el.Number <= 0) continue;
-                    if (el.Character.IsPlayerCharacter) continue;
-                    int idx = roster.FindIndexOfTroop(el.Character);
-                    if (idx < 0) continue;
-                    var cur = roster.GetElementCopyAtIndex(idx);
-                    int healthy = cur.Number - cur.WoundedNumber;
-                    int bench = Math.Min(el.Number, healthy);
-                    if (bench <= 0) continue;
-                    roster.AddToCounts(el.Character, 0, false, bench);   // "ranny" na czas bitwy
-                    var id = el.Character.StringId;
-                    _benched[id] = (_benched.ContainsKey(id) ? _benched[id] : 0) + bench;
-                    total += bench;
-                }
-                if (total > 0)
-                    Log.Player("The reserve stands down - " + total + " men will sit this battle out.", true);
-                return true;
-            }
-            catch (Exception e) { Log.Error("BattleMuster.Done", e); return true; }
-        }
 
-        private void OnMapEventEnded(MapEvent mapEvent)
-        {
-            try
-            {
-                if (mapEvent == null || !mapEvent.IsPlayerMapEvent) return;
-                RestoreBench("bitwa skonczona");
-            }
-            catch (Exception e) { Log.Error("BattleMuster.OnMapEventEnded", e); }
-        }
+                var chosen = new List<CharacterObject>();
+                int chosenMen = 0;
+                for (int i = 0; i < picked.Count; i++)
+                {
+                    var el = picked.GetElementCopyAtIndex(i);
+                    if (el.Character == null || el.Character.IsHero || el.Number <= 0) continue;
+                    if (!chosen.Contains(el.Character)) chosen.Add(el.Character);
+                    chosenMen += el.Number;
+                }
 
-        private void RestoreBench(string why)
-        {
-            if (_benched == null || _benched.Count == 0) return;
-            try
-            {
-                var roster = MobileParty.MainParty != null ? MobileParty.MainParty.MemberRoster : null;
-                if (roster == null) { _benched.Clear(); return; }
-                int total = 0;
-                foreach (var kv in _benched)
+                var stacks = new List<TroopRosterElement>();
+                for (int i = 0; i < roster.Count; i++)
                 {
-                    var ch = TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObject<CharacterObject>(kv.Key);
-                    if (ch == null) continue;
-                    int idx = roster.FindIndexOfTroop(ch);
-                    if (idx < 0) continue;
-                    var cur = roster.GetElementCopyAtIndex(idx);
-                    int heal = Math.Min(kv.Value, cur.WoundedNumber);
-                    if (heal <= 0) continue;
-                    roster.AddToCounts(ch, 0, false, -heal);
-                    total += heal;
+                    var el = roster.GetElementCopyAtIndex(i);
+                    if (el.Character == null || el.Character.IsHero) continue;
+                    stacks.Add(el);
                 }
-                _benched.Clear();
-                if (total > 0)
-                {
-                    Log.Info("BattleMuster: odwod wraca do szeregu (" + why + "): " + total + " ludzi.");
-                    Log.Player("The reserve falls back in - " + total + " men return to the line.", true);
-                }
+
+                // zdejmij wszystkie stacki szeregowych...
+                foreach (var el in stacks)
+                    roster.AddToCounts(el.Character, -el.Number, false, -el.WoundedNumber);
+
+                // ...i doloz od nowa: najpierw wybrane typy (w kolejnosci wyboru), potem reszta
+                foreach (var ch in chosen)
+                    foreach (var el in stacks)
+                        if (el.Character == ch)
+                            roster.AddToCounts(el.Character, el.Number, false, el.WoundedNumber, el.Xp);
+                foreach (var el in stacks)
+                    if (!chosen.Contains(el.Character))
+                        roster.AddToCounts(el.Character, el.Number, false, el.WoundedNumber, el.Xp);
+
+                Log.Info("BattleMuster: szyk ustawiony - " + chosen.Count + " typow (" + chosenMen + " ludzi) na czole kolumny.");
+                Log.Player("The battle line is formed - your picked men take the field first.", true);
             }
-            catch (Exception e) { Log.Error("BattleMuster.RestoreBench", e); }
+            catch (Exception e) { Log.Error("BattleMuster.OnPicked", e); }
         }
     }
 }
