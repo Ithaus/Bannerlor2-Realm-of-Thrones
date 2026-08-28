@@ -41,6 +41,20 @@ namespace Armoury
                 var item = horse.Item;
                 if (item == null || item.StringId == null) return;
                 if (!item.StringId.StartsWith("dragon_")) return;
+                // Jeff: smoki ma TYLKO Daenerys (lord_1_14) - jej trojki nie ruszamy;
+                // gracz tez moze miec smoka (quest). Cala reszta to przebierancy
+                // z wylosowanego szablonu albo lupow DTE - schodza.
+                try
+                {
+                    var rider = agentBuildData.AgentData.AgentCharacter;
+                    if (rider != null)
+                    {
+                        if (rider.IsPlayerCharacter) return;
+                        var rid = rider.StringId ?? "";
+                        if (rid == "lord_1_14" || rid.StartsWith("lord_1_14_")) return;
+                    }
+                }
+                catch { }
                 eq[(EquipmentIndex)10] = new EquipmentElement(null);   // kon precz
                 eq[(EquipmentIndex)11] = new EquipmentElement(null);   // rzad konski tez
                 string who = "?";
