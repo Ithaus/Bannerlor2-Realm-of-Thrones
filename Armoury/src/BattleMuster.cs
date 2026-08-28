@@ -36,10 +36,11 @@ namespace Armoury
 
         private void OnSession(CampaignGameStarter starter)
         {
-            // TYLKO dolaczanie do cudzej/wspolnej bitwy (Jeff: "jak sam walcze,
-            // wystawiam wszystkich - po co wybierac; przy wspolnej jest duzo
-            // wiecej wojska i nie wszyscy wchodza")
+            // WSPOLNA bitwa = po stronie gracza walczy ktos wiecej niz on sam
+            // (Jeff: "moze tez byc moja bitwa, gdy po mojej stronie walczy wiecej
+            // niz tylko ja"). Sam na sam - bez opcji, wystawiasz wszystkich.
             try { AddOption(starter, "join_encounter"); } catch (Exception e) { Log.Error("BattleMuster.menu join_encounter", e); }
+            try { AddOption(starter, "encounter"); } catch (Exception e) { Log.Error("BattleMuster.menu encounter", e); }
             // gra padla w trakcie bitwy - odwod wstaje przy wczytaniu
             try { RestoreBench("wczytanie zapisu"); } catch (Exception e) { Log.Error("BattleMuster.OnSession", e); }
         }
@@ -54,8 +55,27 @@ namespace Armoury
         private bool MusterCondition(MenuCallbackArgs args)
         {
             args.optionLeaveType = GameMenuOption.LeaveType.Manage;
-            var r = MobileParty.MainParty != null ? MobileParty.MainParty.MemberRoster : null;
-            return r != null && r.TotalManCount > 1;
+            var main = MobileParty.MainParty;
+            if (main == null || main.MemberRoster == null || main.MemberRoster.TotalManCount <= 1) return false;
+
+            // jestesmy juz w bitwie: opcja tylko, gdy po NASZEJ stronie walczy
+            // wiecej partii niz nasza wlasna
+            var me = main.MapEvent;
+            if (me != null)
+            {
+                try
+                {
+                    var side = me.PlayerSide == TaleWorlds.Core.BattleSideEnum.Attacker
+                        ? me.AttackerSide : me.DefenderSide;
+                    return side != null && side.Parties != null && side.Parties.Count > 1;
+                }
+                catch { return false; }
+            }
+            // jeszcze nie w MapEvencie: menu dolaczenia do TRWAJACEJ bitwy
+            // z definicji oznacza wspolna walke
+            return args != null && args.MenuContext != null
+                && args.MenuContext.GameMenu != null
+                && args.MenuContext.GameMenu.StringId == "join_encounter";
         }
 
         private void MusterConsequence(MenuCallbackArgs args)
