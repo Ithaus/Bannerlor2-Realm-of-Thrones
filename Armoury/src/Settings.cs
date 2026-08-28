@@ -132,6 +132,7 @@ namespace Armoury
         public int AleSupplyPerDay = 10;                   // at most this many casks brewed per town per day - a trickle, not a flood
         public int TannerySupplyLeatherFloor = 12;         // leather a town market is topped up to (hides get half this) - game and woods are everywhere, so should hide and leather be
         public int BkSupplyDaysCap = 4;                    // AI parties stock this many days of Banner Kings supplies instead of 10 - hundreds of hoarding lords were stripping every market bare (0 = off)
+        public int BkSupplyMaxPieces = 15;                 // hard ceiling: an AI party never stockpiles more than this many pieces of any one supply - repairs need a few hides, not a warehouse (0 = off)
 
         // --- The hideout purge ---
         public bool HideoutPurgeEnabled = true;            // a cleared hideout must be SEARCHED: the plundered gold, renown and the gratitude of the district wait behind one more step
