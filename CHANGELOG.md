@@ -1,5 +1,25 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-28 — MULENIE GRY: lawina BK relations odcieta brama PRZED metoda (Essos bez tytulow)
+**Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs` (EssosTitleGate + Install)
+**Problem:** Jeff: "strasznie muli gra". Log sesji 10:43-11:00: "BK relations uratowane
+(NullReference), lacznie 12901 razy" w 17 minut = ~13 wyjatkow NA SEKUNDE. Finalizer
+ratowal przed crashem, ale samo rzucanie i lapanie tylu wyjatkow muli gre.
+**Przyczyna:** jednorazowy pelny slad (uzbrojony 27.08) nazwal null po imieniu:
+hero=Rhogaro of Tolarra (notabl, qartheen, osada ROT_town37_village3), target=Daario
+(lord). W galezi notabl->lord BKRelationsModel.CalculateModifiers robi
+GetTitle(hero.CurrentSettlement).DeFacto - a pol Essos NIE MA tytulow feudalnych
+w BK, wiec GetTitle daje null i kazda para (essoski notabl x lord) pada codziennie.
+**Zmiana:** prefix EssosTitleGate na CalculateModifiers: notabl bez osady albo
+z osada bez tytulu -> pusta lista modyfikatorow (to samo, co po wywrotce oddawal
+finalizer) i pominiecie oryginalu - zero wyjatkow. Finalizer SafeRelations zostaje
+na nieznane przypadki. Log "odciete N razy" co 2000.
+**Ryzyko / co sprawdzic:** licznik "BK relations uratowane" ma przestac rosnac
+(albo prawie); w zamian rzadkie "relacje notabl-lord bez tytulu osady (Essos) -
+odciete". Relacje notabli essoskich z lordami traca modyfikatory BK - i tak ich
+nie mialy (wyjatek ucinal metode w tym samym miejscu).
+**Status:** WGRANE (gra byla zamknieta, DLL juz w grze)
+
 ## 2026-08-28 — smok w bitwie PO STRONIE GRACZA: czystka smokow z sakw i magazynu DTE
 **Mod:** Armoury | **Pliki:** `Armoury/src/ArmouryBehavior.cs` (CleanseDragonStables)
 **Problem:** Jeff: "mialem smoka w bitwie po mojej stronie, wywal go". Smoki z lupow

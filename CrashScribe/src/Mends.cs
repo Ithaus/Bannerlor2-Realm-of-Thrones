@@ -155,8 +155,26 @@ namespace CrashScribe
                 var mRel = tRel != null ? AccessTools.Method(tRel, "CalculateModifiers") : null;
                 if (mRel != null)
                 {
-                    harmony.Patch(mRel, finalizer: new HarmonyMethod(typeof(Mends), "SafeRelations"));
-                    Scribe.Line("Mends: BK CalculateModifiers zabezpieczone (freez od lawiny NullReference).");
+                    // slad 28.08 nazwal null po imieniu: notabl w osadzie BEZ TYTULU
+                    // feudalnego (Essos, np. Tolarra) -> GetTitle(osada) daje null,
+                    // a BK robi title.DeFacto = NullReference. 13 wyjatkow NA SEKUNDE
+                    // (12,9 tys. w 17 minut) - kazdy lapany, ale samo rzucanie MULI gre.
+                    // Brama PRZED metoda wycina znany przypadek bez wyjatku;
+                    // finalizer zostaje na wszystko inne.
+                    try
+                    {
+                        var tCfg = Type.GetType("BannerKings.BannerKingsConfig, BannerKings") ?? QuietType("BannerKingsConfig");
+                        _bkCfgInstanceGet = tCfg != null ? AccessTools.PropertyGetter(tCfg, "Instance") : null;
+                        _bkCfgTitleMgrGet = tCfg != null ? AccessTools.PropertyGetter(tCfg, "TitleManager") : null;
+                        var tTm = _bkCfgTitleMgrGet != null ? _bkCfgTitleMgrGet.ReturnType : null;
+                        _bkGetTitle = tTm != null ? AccessTools.Method(tTm, "GetTitle", new[] { typeof(Settlement) }) : null;
+                    }
+                    catch { _bkGetTitle = null; }
+                    harmony.Patch(mRel,
+                        prefix: new HarmonyMethod(typeof(Mends), "EssosTitleGate"),
+                        finalizer: new HarmonyMethod(typeof(Mends), "SafeRelations"));
+                    Scribe.Line("Mends: BK CalculateModifiers zabezpieczone (brama Essos przed metoda + finalizer)."
+                                + (_bkGetTitle == null ? " UWAGA: GetTitle nieznaleziony - brama spi, zostal sam finalizer." : ""));
                 }
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.Install(relations)", null); } catch { } }
@@ -308,6 +326,47 @@ namespace CrashScribe
         }
 
         private static System.Reflection.MethodInfo _hrHeroGet;
+        private static System.Reflection.MethodInfo _bkCfgInstanceGet, _bkCfgTitleMgrGet, _bkGetTitle;
+        private static Type _tListRelMod;
+        private static int _essosGated;
+
+        /// <summary>
+        /// Notabl w osadzie bez tytulu feudalnego (pol Essos w ROT) to w BK
+        /// GWARANTOWANY NullReference (title.DeFacto na null). Oddajemy pusta
+        /// liste modyfikatorow - DOKLADNIE to, co po wywrotce oddawal finalizer -
+        /// tylko bez rzucania wyjatku, ktory przy 13/s mulil gre.
+        /// </summary>
+        public static bool EssosTitleGate(object heroRelations, Hero target, ref object __result)
+        {
+            try
+            {
+                if (_bkGetTitle == null || _hrHeroGet == null) return true;
+                var hero = heroRelations != null ? _hrHeroGet.Invoke(heroRelations, null) as Hero : null;
+                if (hero == null || target == null) return true;
+                if (!hero.IsNotable || !target.IsLord) return true;   // pada tylko galaz notabl->lord
+                var st = hero.CurrentSettlement;
+                if (st != null)
+                {
+                    var cfg = _bkCfgInstanceGet != null ? _bkCfgInstanceGet.Invoke(null, null) : null;
+                    var tm = cfg != null && _bkCfgTitleMgrGet != null ? _bkCfgTitleMgrGet.Invoke(cfg, null) : null;
+                    var title = tm != null ? _bkGetTitle.Invoke(tm, new object[] { st }) : null;
+                    if (title != null) return true;   // osada ma tytul - normalna droga BK
+                }
+                if (_tListRelMod == null)
+                {
+                    var t = Type.GetType("BannerKings.Managers.Skills.RelationsModifier, BannerKings")
+                            ?? QuietType("RelationsModifier");
+                    if (t == null) return true;
+                    _tListRelMod = typeof(System.Collections.Generic.List<>).MakeGenericType(t);
+                }
+                __result = Activator.CreateInstance(_tListRelMod);
+                _essosGated++;
+                if (_essosGated == 1 || _essosGated % 2000 == 0)
+                    try { Scribe.Line("Mends: relacje notabl-lord bez tytulu osady (Essos) - odciete " + _essosGated + " razy, zero wyjatkow."); } catch { }
+                return false;
+            }
+            catch { return true; }
+        }
         private static int _relSkipped;
         private static bool _relStackDumped;
 
