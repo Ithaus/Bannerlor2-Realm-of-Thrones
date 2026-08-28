@@ -142,7 +142,7 @@ namespace Armoury
         public float HideoutSearchPerManHours = 0.5f;      // every soldier in the party cuts the search by this many hours
         public float HideoutSearchMinHours = 4f;           // the search never drops below this many hours - some stones only come up slowly
         public bool HideoutReprisalEnabled = true;         // nearby bands mass to take their den back while you dig - unless your line scares them off
-        public float HideoutReprisalRadius = 20f;          // map-distance within which bandit parties join the reprisal
+        public float HideoutReprisalRadius = 40f;          // map-distance within which bandit parties join the reprisal
         public float HideoutReprisalFleeOdds = 3f;         // at this strength advantage (yours vs theirs) the reprisal loses its nerve and melts away
         public float HideoutReprisalHours = 48f;           // the horde hunts you this long - then gives up and drifts back to its old ways
 

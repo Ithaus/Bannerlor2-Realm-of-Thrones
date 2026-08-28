@@ -488,9 +488,9 @@ namespace Armoury
         [SettingPropertyGroup("The hideout purge")]
         public bool HideoutReprisalEnabled { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Hideout Reprisal Radius", 0.00f, 80.00f, "0.00", HintText = "map-distance within which bandit parties join the reprisal")]
+        [SettingPropertyFloatingInteger("Hideout Reprisal Radius", 0.00f, 160.00f, "0.00", HintText = "map-distance within which bandit parties join the reprisal")]
         [SettingPropertyGroup("The hideout purge")]
-        public float HideoutReprisalRadius { get; set; } = 20f;
+        public float HideoutReprisalRadius { get; set; } = 40f;
 
         [SettingPropertyFloatingInteger("Hideout Reprisal Flee Odds", 0.00f, 12.00f, "0.00", HintText = "at this strength advantage (yours vs theirs) the reprisal loses its nerve and melts away")]
         [SettingPropertyGroup("The hideout purge")]
