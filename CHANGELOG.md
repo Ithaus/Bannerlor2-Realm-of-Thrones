@@ -17,6 +17,25 @@
 
 ---
 
+## 2026-08-27 — ZNIKAJACY EKWIPUNEK, przyczyna wlasciwa: ekran zbrojowni DTE traktowany jak SMIETNIK przy discard-za-XP
+**Mod:** Armoury | **Pliki:** `Armoury/src/QuartermasterLaw.cs`
+**Problem:** Jeff doprecyzowal: "wchodze w inventory, zakladka pancerzy, discarduje
+pancerz za XP dla wojska (perk) - i znika pozostaly ekwipunek, kazda kategoria".
+Wczorajsza hipoteza przetopowa byla NIETRAFIONA (fix i sanacja zostaja - ujemne
+stosy naprawiaja sie same przy wczytaniu).
+**Przyczyna:** ekran zbrojowni DTE otwiera sie w trybie, w ktorym vanilla ustawia
+CanGainXpFromDiscarding=true (Default bez OtherParty). Wtedy: XP z donacji liczy sie
+od _rosters[0] - czyli od CALEJ ZBROJOWNI - a przy zatwierdzeniu ekranu
+OnItemsDiscardedByPlayer(_rosters[0]) leci z calym magazynem wojska jako stosem
+porzuconych rzeczy. Stad kosmiczne XP "za jeden pancerz" i znikajacy magazyn.
+**Zmiana:** postfix na InventoryLogic.InitializeXpGainFromDonations: gdy lewa strona
+ekranu to zbrojownia DTE, CanGainXpFromDiscarding gasnie (backing field). XP za
+discard dziala dalej na ekranach lupow - tam lewa strona to prawdziwy smietnik.
+**Ryzyko / co sprawdzic:** na ekranie zbrojowni discard nie daje XP (i nie kasuje
+magazynu); na ekranie lupow po bitwie discard-za-XP dziala normalnie. Log
+"QuartermasterLaw: ekran zbrojowni - XP za discard zgaszone".
+**Status:** WGRANE (albo czeka, jesli gra otwarta)
+
 ## 2026-08-27 — ZNIKAJACY EKWIPUNEK: przetop bez eventu robil ujemne stosy w sakwach (fix + sanacja save)
 **Mod:** Armoury | **Pliki:** `Armoury/src/SmeltTab.cs`, `Armoury/src/ArmouryBehavior.cs`
 **Problem:** Jeff: "discarduje armour zeby dostac XP [przetop w Smelt] i potem znika

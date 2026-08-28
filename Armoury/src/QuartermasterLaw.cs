@@ -239,6 +239,35 @@ namespace Armoury
             return n;
         }
 
+        /// <summary>
+        /// ZBROJOWNIA TO NIE SMIETNIK (Jeff 27.08: "discarduje pancerz za XP
+        /// i znika CALY ekwipunek"). Ekran zbrojowni DTE otwiera sie w trybie,
+        /// w ktorym vanilla wlacza CanGainXpFromDiscarding - a wtedy przy
+        /// zatwierdzeniu _rosters[0] (czyli CALA zbrojownia!) leci eventem
+        /// OnItemsDiscardedByPlayer jako stos porzuconych rzeczy: XP liczy sie
+        /// od wszystkiego, a magazyn potrafi wyparowac. Po kazdym przeliczeniu
+        /// donacji gasimy flage, gdy lewa strona to zbrojownia. XP za discard
+        /// dziala dalej na ekranach lupow - tam lewa strona to prawdziwy smietnik.
+        /// </summary>
+        public static void XpDonationsPostfix(InventoryLogic __instance)
+        {
+            try
+            {
+                if (_fRosters == null) return;
+                var rosters = _fRosters.GetValue(__instance) as ItemRoster[];
+                var armory = DteArmory();
+                if (rosters == null || rosters.Length == 0 || armory == null || rosters[0] != armory) return;
+                if (!__instance.CanGainXpFromDiscarding) return;
+                var f = AccessTools.Field(typeof(InventoryLogic), "<CanGainXpFromDiscarding>k__BackingField");
+                if (f != null)
+                {
+                    f.SetValue(__instance, false);
+                    Log.Info("QuartermasterLaw: ekran zbrojowni - XP za discard zgaszone (magazyn to nie smietnik).");
+                }
+            }
+            catch (Exception e) { Log.Error("XpDonationsPostfix", e); }
+        }
+
         internal static bool Prefix(InventoryLogic __instance, ref TransferCommand transferCommand, ref List<TransferCommandResult> __result)
         {
             try
@@ -304,6 +333,12 @@ namespace Armoury
                 var m = AccessTools.Method(typeof(InventoryLogic), "TransferItem");
                 if (m == null) { Log.Info("QuartermasterLaw: brak InventoryLogic.TransferItem."); return; }
                 h.Patch(m, prefix: new HarmonyMethod(typeof(QuartermasterLaw), "Prefix"));
+
+                // zbrojownia to nie smietnik: po kazdym przeliczeniu donacji
+                // gasimy XP-za-discard, gdy lewa strona ekranu to magazyn DTE
+                var mXp = AccessTools.Method(typeof(InventoryLogic), "InitializeXpGainFromDonations");
+                if (mXp != null)
+                    h.Patch(mXp, postfix: new HarmonyMethod(typeof(QuartermasterLaw), "XpDonationsPostfix"));
 
                 // PROSCIEJ, jak chcial Jeff: przed otwarciem ekranu zbrojowni sprzet
                 // noszony przez ludzi jest CHOWANY - widzisz tylko wolne nadwyzki.
