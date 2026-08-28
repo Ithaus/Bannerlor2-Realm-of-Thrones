@@ -1,5 +1,20 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-28 — smok w bitwie PO STRONIE GRACZA: czystka smokow z sakw i magazynu DTE
+**Mod:** Armoury | **Pliki:** `Armoury/src/ArmouryBehavior.cs` (CleanseDragonStables)
+**Problem:** Jeff: "mialem smoka w bitwie po mojej stronie, wywal go". Smoki z lupow
+lezaly nie tylko w sakwach - takze w magazynie DTE (ArmyArmory), a DTE ubiera
+kawalerzystow z magazynu, wiec zolnierz wyjechal do bitwy NA SMOKU.
+**Przyczyna:** stare lupy (sprzed filtra CleanseDragons) zdazyly wpasc do sakw
+i do zbrojowni DTE; zaden sanitizer ich stamtad nie wymiatal.
+**Zmiana:** CleanseDragonStables - usuwa wszystkie dragon_* (typ Horse) z sakw
+MainParty i z QuartermasterLaw.DteArmory(); wolane przy SessionLaunched ORAZ przy
+kazdym otwarciu menu mapy (po bitwie menu zawsze sie otwiera, wiec smok wylatuje
+zanim DTE go znowu osiodla). Komunikat graczowi tylko gdy cos usunieto.
+**Ryzyko / co sprawdzic:** trzy smoki z sakw ZNIKNA przy nastepnym wczytaniu
+(decyzja Jeffa: "wywal"). W logu szukac "Smocza stajnia: dragon_black x..".
+**Status:** WGRANE (DLL czeka na zamkniecie gry - watcher)
+
 ## 2026-08-28 — smoki w sakwach: zrodlo znalezione + druga dziura zatkana (jency)
 **Mod:** Armoury | **Pliki:** `Armoury/src/ArmouryBehavior.cs` (TryStripNewCaptives)
 **Problem:** Jeff: "jakim cudem w moim ekwipunku mam trzy smoki" + "ja nie pokonalem

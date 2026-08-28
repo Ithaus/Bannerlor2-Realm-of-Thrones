@@ -131,6 +131,8 @@ namespace Armoury
             {
                 // gotowe wyroby z kuzni wydaja sie od progu, bez czekania na tick
                 try { CollectReadyProjects(); } catch { }
+                // po kazdej bitwie menu sie otwiera - smok wyleci zanim DTE go osiodla
+                try { CleanseDragonStables(true); } catch { }
                 // samonaprawa depozytu: otwarte menu gry = na pewno NIE ekran
                 // zbrojowni; jesli cokolwiek wisi w depozycie (Release nie
                 // odpalil przy zamykaniu ekranu), wraca na polki teraz
@@ -218,10 +220,39 @@ namespace Armoury
                 Log.Player("The quartermaster set the ledgers straight - " + fixedTotal + " ruined entries struck out.", true);
         }
 
+        /// <summary>Smoki precz z sakw i magazynu DTE - inaczej DTE wsadza kawalerzyste na smoka w bitwie.</summary>
+        internal static void CleanseDragonStables(bool shout)
+        {
+            int gone = 0;
+            foreach (var roster in new[] { MobileParty.MainParty != null ? MobileParty.MainParty.ItemRoster : null,
+                                           QuartermasterLaw.DteArmory() })
+            {
+                if (roster == null) continue;
+                try
+                {
+                    for (int i = roster.Count - 1; i >= 0; i--)
+                    {
+                        var el = roster.GetElementCopyAtIndex(i);
+                        var it = el.EquipmentElement.Item;
+                        if (it == null || it.StringId == null || el.Amount <= 0) continue;
+                        if (!it.StringId.StartsWith("dragon_")) continue;
+                        if (it.ItemType != ItemObject.ItemTypeEnum.Horse) continue;
+                        roster.AddToCounts(el.EquipmentElement, -el.Amount);
+                        gone += el.Amount;
+                        Log.Info("Smocza stajnia: " + it.StringId + " x" + el.Amount + " usuniety z zapasow.");
+                    }
+                }
+                catch (Exception e) { Log.Error("CleanseDragonStables", e); }
+            }
+            if (gone > 0 && shout)
+                Log.Player("The dragons were never yours to stable - " + gone + " struck from the rolls.", true);
+        }
+
         private void OnSessionLaunched(CampaignGameStarter starter)
         {
             try { FixCharcoalWeight(); } catch (Exception e) { Log.Error("FixCharcoalWeight", e); }
             try { CleanseNegativeStacks(); } catch (Exception e) { Log.Error("CleanseNegativeStacks", e); }
+            try { CleanseDragonStables(true); } catch (Exception e) { Log.Error("CleanseDragonStables", e); }
             try { SmithMenu.Add(starter); Log.Info("Menu kowala dodane."); }
             catch (Exception e) { Log.Error("OnSessionLaunched", e); }
             try { CleanseAmmo(); } catch (Exception e) { Log.Error("CleanseAmmo", e); }
