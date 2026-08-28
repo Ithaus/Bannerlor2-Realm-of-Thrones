@@ -298,6 +298,11 @@ namespace Armoury
                 bool remote = Settings.Current.ForgeWorksWithoutYou;
                 var copy = new List<string>(_projects);
                 bool idleWarned = false;
+                // JEDNA LINIA CZASU U KOWALA (Jeff 28.08: "wytapiam miecze,
+                // a moge dolozyc nastepne i ida rownolegle"). W kazdej osadzie
+                // tyka TYLKO najstarszy niegotowy projekt - reszta czeka na
+                // swoja kolej. Rozne miasta = rozni kowale, pracuja niezaleznie.
+                var busyForge = new HashSet<string>();
                 foreach (var line in copy)
                 {
                     var p = Project.Parse(line);
@@ -311,6 +316,9 @@ namespace Armoury
                         if (atForge) { _projects.Remove(line); HandOver(p); }
                         continue;
                     }
+
+                    // kowal tej osady juz kuje wczesniejszy projekt - ten czeka
+                    if (!busyForge.Add(p.SettlementId)) continue;
 
                     if (!atForge && !remote)
                     {
@@ -797,6 +805,9 @@ namespace Armoury
                             if (!s.CaptiveSpoilsIncludeMounts && slot >= 10) continue;   // kon i rzad konski
                             var item = eq[(EquipmentIndex)slot].Item;
                             if (item == null || item.ItemType == ItemObject.ItemTypeEnum.Banner) continue;
+                            // smoka nie poprowadzisz na powrozie - zadnych dragon_* w sakwach
+                            if (item.StringId != null && item.StringId.StartsWith("dragon_")
+                                && item.ItemType == ItemObject.ItemTypeEnum.Horse) continue;
                             bag.AddToCounts(new EquipmentElement(item, PickWornModifier(item)), 1);
                             pieces++;
                         }
