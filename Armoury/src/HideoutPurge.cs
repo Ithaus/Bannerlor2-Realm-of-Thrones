@@ -1,10 +1,12 @@
 using System;
+using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
@@ -35,6 +37,13 @@ namespace Armoury
         private static string _pendingName = "";
         private static CampaignVec2 _pendingPos;
         private static bool _pendingHasPos;   // bez osady nie ma okregu wdziecznosci
+        // odwet: bandom odnawiamy rozkaz pogoni, bo AI co chwile przemysliwa
+        private static readonly System.Collections.Generic.List<MobileParty> _reprisalPack =
+            new System.Collections.Generic.List<MobileParty>();
+        private static CampaignTime _reprisalUntil = CampaignTime.Zero;
+        private static DateTime _lastReprisalRefresh = DateTime.MinValue;
+        // lup przedmiotowy - ekran jak po bitwie, otwierany na czystej mapie
+        private static ItemRoster _lootRoster;
 
         public override void RegisterEvents()
         {
@@ -75,28 +84,103 @@ namespace Armoury
                 _pendingGold = (int)MathF.Max(0f,
                     (Math.Max(0, c.HideoutGoldBase) + Math.Max(0, c.HideoutGoldPerBand) * bands) * spread);
                 _pending = true;
+                BuildLoot(bands);
                 Log.Info("HideoutPurge: zwyciestwo w " + _pendingName + ", band " + bands + ", lup " + _pendingGold + " zlota czeka na przeszukanie.");
+                // odwet rusza JUZ TERAZ - przy duzej partii przeszukanie trwa
+                // ledwie pare godzin gry i bandy musza wyjsc w droge od razu
+                Reprisal();
             }
             catch (Exception e) { Log.Error("HideoutPurge.OnHideoutBattle", e); }
+        }
+
+        /// <summary>
+        /// Lup przedmiotowy kryjowki: proste zelastwo i lachy bandyckiej hordy -
+        /// tier 1-3, rzeczy z kramow, po kilka sztuk na bande. Do tego czasem
+        /// beczka czegos mocniejszego. Pokazywany ekranem lupow jak po bitwie.
+        /// </summary>
+        private static void BuildLoot(int bands)
+        {
+            try
+            {
+                var pool = new System.Collections.Generic.List<ItemObject>();
+                foreach (var it in TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
+                {
+                    if (it == null || it.NotMerchandise) continue;
+                    if (!it.HasWeaponComponent && !it.HasArmorComponent) continue;
+                    int g = Recipes.Grade(it);
+                    if (g < 1 || g > 3) continue;
+                    if (it.Value < 20 || it.Value > 800) continue;
+                    var id = (it.StringId ?? "").ToLowerInvariant();
+                    if (id.Contains("practice") || id.Contains("tournament") || id.Contains("siege")
+                        || id.Contains("ballista") || id.Contains("dummy") || id.Contains("test")) continue;
+                    pool.Add(it);
+                }
+                _lootRoster = new ItemRoster();
+                if (pool.Count == 0) return;
+                int pieces = 3 + bands + MBRandom.RandomInt(bands + 1);
+                for (int i = 0; i < pieces; i++)
+                    _lootRoster.AddToCounts(pool[MBRandom.RandomInt(pool.Count)], 1);
+                var beer = TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObject<ItemObject>("beer");
+                if (beer != null) _lootRoster.AddToCounts(beer, 1 + MBRandom.RandomInt(2));
+                Log.Info("HideoutPurge: lup przedmiotowy przygotowany (" + _lootRoster.Count + " pozycji).");
+            }
+            catch (Exception e) { Log.Error("HideoutPurge.BuildLoot", e); _lootRoster = null; }
         }
 
         private void OnTick(float dt)
         {
             try
             {
-                if (!_pending || Campaign.Current == null) return;
-                // menu dopiero na CZYSTEJ mapie - nigdy w srodku cudzego menu
-                // ani rozliczania bitwy (lekcja z klawisza O w NightRest)
+                if (Campaign.Current == null) return;
+                // rozkaz pogoni odnawiany co ~3 s realne, dopoki odwet trwa
+                if (_reprisalPack.Count > 0 && (DateTime.Now - _lastReprisalRefresh).TotalSeconds > 3.0)
+                {
+                    _lastReprisalRefresh = DateTime.Now;
+                    DriveReprisal();
+                }
+
                 var st = Game.Current != null && Game.Current.GameStateManager != null
                     ? Game.Current.GameStateManager.ActiveState as TaleWorlds.CampaignSystem.GameState.MapState : null;
-                if (st == null || st.AtMenu) return;
-                if (PlayerEncounter.Current != null || MobileParty.MainParty.MapEvent != null) return;
+                bool cleanMap = st != null && !st.AtMenu
+                    && PlayerEncounter.Current == null && MobileParty.MainParty.MapEvent == null;
+
+                // ekran lupow jak po bitwie - po przeszukaniu, na czystej mapie
+                if (!_pending && _lootRoster != null && _lootRoster.Count > 0 && cleanMap)
+                {
+                    var roster = _lootRoster; _lootRoster = null;
+                    var dict = new System.Collections.Generic.Dictionary<PartyBase, ItemRoster>
+                    { { PartyBase.MainParty, roster } };
+                    Helpers.InventoryScreenHelper.OpenScreenAsLoot(dict);
+                    return;
+                }
+
+                if (!_pending || !cleanMap) return;
+                // menu dopiero na CZYSTEJ mapie - nigdy w srodku cudzego menu
+                // ani rozliczania bitwy (lekcja z klawisza O w NightRest).
                 // _pending NIE gasnie tutaj: gdy odwet przerwie przeszukanie
                 // walka konczy sie na mapie i menu wraca samo - do lupu wraca
                 // sie po bitwie (Jeff). Gasi je dopiero DoSearch albo Leave.
                 GameMenu.ActivateGameMenu("arm_hideout_search");
             }
             catch (Exception e) { Log.Error("HideoutPurge.OnTick", e); _pending = false; }
+        }
+
+        /// <summary>Tlo menu: grafika kultury gracza, zapasowo ogolna - zadnych czerwonych TEMP.</summary>
+        private static void SetSceneBackground(MenuCallbackArgs args)
+        {
+            try
+            {
+                string mesh = null;
+                try
+                {
+                    var f = Hero.MainHero != null ? Hero.MainHero.MapFaction : null;
+                    if (f != null && f.Culture != null) mesh = f.Culture.EncounterBackgroundMesh;
+                }
+                catch { }
+                if (string.IsNullOrEmpty(mesh)) mesh = "wait_fallback";
+                args.MenuContext.SetBackgroundMeshName(mesh);
+            }
+            catch { try { args.MenuContext.SetBackgroundMeshName("wait_fallback"); } catch { } }
         }
 
         private static CampaignTime _searchDone = CampaignTime.Zero;
@@ -108,7 +192,7 @@ namespace Armoury
             {
                 starter.AddGameMenu("arm_hideout_search",
                     "{=!}The hideout lies quiet. Smoke drifts from the fires the bandits will not need again. Their den has not given up everything yet.",
-                    null);
+                    delegate (MenuCallbackArgs a) { SetSceneBackground(a); });
                 starter.AddGameMenuOption("arm_hideout_search", "arm_hideout_do_search",
                     "{=!}Search the hideout",
                     delegate (MenuCallbackArgs a) { a.optionLeaveType = GameMenuOption.LeaveType.Continue; return true; },
@@ -138,6 +222,7 @@ namespace Armoury
         {
             try
             {
+                SetSceneBackground(args);
                 var c = Settings.Current;
                 // czas od liczby rak (Jeff): sam grzebiesz caly dzien, kazdy
                 // czlowiek zdejmuje pol godziny, ale ponizej minimum nie zejdzie
@@ -190,16 +275,94 @@ namespace Armoury
                     Log.Info("HideoutPurge: odwet stchorzyl (" + pack.Count + " band, sila " + (int)theirs + " vs " + (int)mine + ").");
                     return;
                 }
+                // POLACZENIE W JEDEN ODDZIAL (Jeff: "pojedynczo nie maja przewagi
+                // i uciekaja"): pack scala sie w najwieksza bande - ludzie, jency
+                // i dobytek przechodza, oproznione bandy znikaja ze swiata.
+                // Jedna horda z suma sil idzie po swoje zloto.
+                MobileParty boss = null;
                 foreach (var mp in pack)
+                    if (mp.MapEvent == null && (boss == null || mp.MemberRoster.TotalManCount > boss.MemberRoster.TotalManCount))
+                        boss = mp;
+                int merged = 0;
+                if (boss != null)
                 {
-                    // mechanizm gry: podbita smialosc ataku na dobe - banda sama
-                    // rusza na gracza, a spotkanie przerwie przeszukanie
-                    try { mp.Ai.SetInitiative(2f, 0.05f, 24f); } catch { }
+                    foreach (var mp in pack)
+                    {
+                        if (mp == boss || mp.MapEvent != null) continue;
+                        try
+                        {
+                            var mr = mp.MemberRoster;
+                            for (int i = 0; i < mr.Count; i++)
+                            {
+                                var el = mr.GetElementCopyAtIndex(i);
+                                if (el.Character != null && el.Number > 0)
+                                    boss.MemberRoster.AddToCounts(el.Character, el.Number, false, el.WoundedNumber);
+                            }
+                            var pr = mp.PrisonRoster;
+                            for (int i = 0; i < pr.Count; i++)
+                            {
+                                var el = pr.GetElementCopyAtIndex(i);
+                                if (el.Character != null && el.Number > 0)
+                                    boss.PrisonRoster.AddToCounts(el.Character, el.Number, false, el.WoundedNumber);
+                            }
+                            var ir = mp.ItemRoster;
+                            for (int i = 0; i < ir.Count; i++)
+                            {
+                                var el = ir.GetElementCopyAtIndex(i);
+                                if (el.Amount > 0) boss.ItemRoster.AddToCounts(el.EquipmentElement, el.Amount);
+                            }
+                            mp.MemberRoster.Clear();
+                            DestroyPartyAction.Apply(null, mp);
+                            merged++;
+                        }
+                        catch (Exception e) { Log.Error("HideoutPurge.Merge", e); }
+                    }
                 }
-                Log.Player("The scattered bands are massing - they mean to take the den back while your men dig!", true);
-                Log.Info("HideoutPurge: odwet rusza (" + pack.Count + " band, sila " + (int)theirs + " vs " + (int)mine + ").");
+                _reprisalPack.Clear();
+                if (boss != null) _reprisalPack.Add(boss); else _reprisalPack.AddRange(pack);
+                _reprisalUntil = CampaignTime.HoursFromNow(24f);
+                DriveReprisal();
+                Log.Player("The scattered bands mass into one warband - they want their gold back and they will chase you for it!", true);
+                Log.Info("HideoutPurge: odwet rusza JEDNA HORDA (" + (merged + 1) + " band scalono, "
+                         + (boss != null ? boss.MemberRoster.TotalManCount : 0) + " ludzi, sila " + (int)theirs + " vs " + (int)mine + ").");
             }
             catch (Exception e) { Log.Error("HideoutPurge.Reprisal", e); }
+        }
+
+        /// <summary>
+        /// TWARDY ROZKAZ POGONI, odnawiany. SetInitiative to tylko sugestia -
+        /// AI widzi przewage gracza i zawraca (test Jeffa: "wojska sie nie
+        /// zebraly i mnie nie scigaly"). EngageParty z celem-graczem to rozkaz;
+        /// poniewaz AiPartyThinkBehavior co chwile przemysliwa, ponawiamy go
+        /// co pare sekund przez cala dobe odwetu - takze PO spladrowaniu,
+        /// bo oni chca swojego zlota z powrotem.
+        /// </summary>
+        private static System.Reflection.MethodInfo _mSetAiBehavior;
+
+        private static void DriveReprisal()
+        {
+            try
+            {
+                if (_reprisalPack.Count == 0 || CampaignTime.Now >= _reprisalUntil) { _reprisalPack.Clear(); return; }
+                if (_mSetAiBehavior == null)
+                    _mSetAiBehavior = AccessTools.Method(typeof(MobilePartyAi), "SetAiBehavior");
+                var me = MobileParty.MainParty;
+                for (int i = _reprisalPack.Count - 1; i >= 0; i--)
+                {
+                    var mp = _reprisalPack[i];
+                    if (mp == null || !mp.IsActive || mp.MemberRoster == null || mp.MemberRoster.TotalManCount <= 0)
+                    { _reprisalPack.RemoveAt(i); continue; }
+                    if (mp.MapEvent != null || mp.CurrentSettlement != null) continue;
+                    try
+                    {
+                        mp.Ai.SetInitiative(2f, 0.05f, 48f);
+                        if (_mSetAiBehavior != null)
+                            _mSetAiBehavior.Invoke(mp.Ai, new object[] { AiBehavior.EngageParty, me.Party, me.Position });
+                    }
+                    catch { }
+                }
+            }
+            catch (Exception e) { Log.Error("HideoutPurge.DriveReprisal", e); }
         }
 
         private static void SearchTick(MenuCallbackArgs args, CampaignTime dt)

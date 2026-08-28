@@ -480,9 +480,9 @@ namespace Armoury
         [SettingPropertyGroup("The hideout purge")]
         public float HideoutSearchPerManHours { get; set; } = 0.5f;
 
-        [SettingPropertyFloatingInteger("Hideout Search Min Hours", 0.00f, 8.00f, "0.00", HintText = "the search never drops below this many hours - some stones only come up slowly")]
+        [SettingPropertyFloatingInteger("Hideout Search Min Hours", 0.00f, 16.00f, "0.00", HintText = "the search never drops below this many hours - some stones only come up slowly")]
         [SettingPropertyGroup("The hideout purge")]
-        public float HideoutSearchMinHours { get; set; } = 2f;
+        public float HideoutSearchMinHours { get; set; } = 4f;
 
         [SettingPropertyBool("Hideout Reprisal Enabled", HintText = "nearby bands mass to take their den back while you dig - unless your line scares them off")]
         [SettingPropertyGroup("The hideout purge")]

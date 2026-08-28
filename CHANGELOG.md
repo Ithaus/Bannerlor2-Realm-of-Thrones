@@ -17,6 +17,38 @@
 
 ---
 
+## 2026-08-27 — odwet kryjowki NAPRAWDE goni + ekran lupow po przeszukaniu + min 4h + koniec czerwonych TEMP
+**Mod:** Armoury | **Pliki:** `Armoury/src/HideoutPurge.cs`, `Armoury/src/Settings.cs`, `Armoury/src/McmSettings.cs` (gen)
+**Problem:** Jeff: "wojska sie nie zebraly i mnie nie scigaly". Log 17:52: odwet ruszyl
+(15 band, 160 vs 245), ale przeszukanie przy 132 ludziach trwalo 2 h gry = 2 SEKUNDY
+realne - bandy nie mialy kiedy dojsc, a SetInitiative to sugestia, ktora AI odrzuca
+widzac przewage gracza. Plus: po przeszukaniu ma byc ekran lupow jak po bitwie,
+minimum 4 h zamiast 2, i zadnych czerwonych TEMP w tlach menu.
+**Zmiana:** (1) odwet rusza JUZ przy zwyciestwie (OnHideoutBattle), nie przy starcie
+paska. (2) TWARDY ROZKAZ: MobilePartyAi.SetAiBehavior(EngageParty, gracz) przez
+refleksje (internal) + SetInitiative(2.0, 48h), PONAWIANY co ~3 s realne przez cala
+dobe odwetu - takze po spladrowaniu (chca swojego zlota; pack czyszczony z martwych).
+(3) BuildLoot: lup przedmiotowy kryjowki (tier 1-3 z kramow, 3+bandy+los sztuk,
+czasem beczka piwa) pokazywany ekranem lupow jak po bitwie
+(InventoryScreenHelper.OpenScreenAsLoot) na czystej mapie po przeszukaniu.
+(4) HideoutSearchMinHours 2 -> 4. (5) SetSceneBackground na obu menu kryjowki
+(grafika kultury gracza, fallback wait_fallback) - koniec czerwonych TEMP.
+**Ryzyko / co sprawdzic:** bandy ida na gracza w trakcie i PO przeszukaniu (do 24 h);
+po pasku ekran lupow z przedmiotami; tla menu normalne. SetAiBehavior przez refleksje -
+gdy sygnatura sie nie zgadza, pogon dziala tylko na inicjatywie (log bez bledow).
+**Status:** WGRANE (albo czeka, jesli gra otwarta)
+
+## 2026-08-27 — odwet: bandy SCALAJA sie w jedna horde (Jeff: "pojedynczo nie maja przewagi i uciekaja")
+**Mod:** Armoury | **Pliki:** `Armoury/src/HideoutPurge.cs`
+**Zmiana:** przy odwecie caly pack scala sie w najwieksza bande: MemberRoster,
+PrisonRoster i ItemRoster przechodza do bossa, oproznione bandy znikaja
+(DestroyPartyAction). Jedna horda z suma sil dostaje rozkaz pogoni. Log
+"odwet rusza JEDNA HORDA (N band scalono, M ludzi...)".
+**Ryzyko / co sprawdzic:** po kryjowce na mapie pojawia sie jedna duza banda
+zamiast rozsypanych; horda przekracza limit wielkosci bandy - to zamierzone
+(nie rekrutuje, tylko goni). Bandy w trakcie wlasnych bitew nie sa scalane.
+**Status:** WGRANE (albo czeka, jesli gra otwarta)
+
 ## 2026-08-27 — kryjowka: czas przeszukania od liczby rak + ODWET okolicznych band (3:1 = tchorza)
 **Mod:** Armoury | **Pliki:** `Armoury/src/HideoutPurge.cs`, `Armoury/src/Settings.cs`, `Armoury/src/McmSettings.cs` (gen)
 **Problem:** Jeff: przeszukanie ma zalezec od ludzi ("sam - caly dzien, minus 0.5 h
