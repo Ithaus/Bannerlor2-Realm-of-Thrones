@@ -448,6 +448,10 @@ namespace Armoury
         [SettingPropertyGroup("The town brewery")]
         public int AleSupplyPerDay { get; set; } = 10;
 
+        [SettingPropertyInteger("Tannery Supply Leather Floor", 0, 48, "0", HintText = "leather a town market is topped up to (hides get half this) - game and woods are everywhere, so should hide and leather be")]
+        [SettingPropertyGroup("The town brewery")]
+        public int TannerySupplyLeatherFloor { get; set; } = 12;
+
         [SettingPropertyBool("Hideout Purge Enabled", HintText = "a cleared hideout must be SEARCHED: the plundered gold, renown and the gratitude of the district wait behind one more step")]
         [SettingPropertyGroup("The hideout purge")]
         public bool HideoutPurgeEnabled { get; set; } = true;
@@ -1123,6 +1127,7 @@ namespace Armoury
             s.AleSupplyBeerFloor = AleSupplyBeerFloor;
             s.AleSupplyWineFloor = AleSupplyWineFloor;
             s.AleSupplyPerDay = AleSupplyPerDay;
+            s.TannerySupplyLeatherFloor = TannerySupplyLeatherFloor;
             s.HideoutPurgeEnabled = HideoutPurgeEnabled;
             s.HideoutGoldBase = HideoutGoldBase;
             s.HideoutGoldPerBand = HideoutGoldPerBand;

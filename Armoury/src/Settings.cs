@@ -130,6 +130,7 @@ namespace Armoury
         public int AleSupplyBeerFloor = 15;                // beer casks a town market is topped up to
         public int AleSupplyWineFloor = 8;                 // wine amphorae a town market is topped up to (mead, where it exists, gets half this)
         public int AleSupplyPerDay = 10;                   // at most this many casks brewed per town per day - a trickle, not a flood
+        public int TannerySupplyLeatherFloor = 12;         // leather a town market is topped up to (hides get half this) - game and woods are everywhere, so should hide and leather be
 
         // --- The hideout purge ---
         public bool HideoutPurgeEnabled = true;            // a cleared hideout must be SEARCHED: the plundered gold, renown and the gratitude of the district wait behind one more step
