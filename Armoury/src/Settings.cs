@@ -144,6 +144,7 @@ namespace Armoury
         public bool HideoutReprisalEnabled = true;         // nearby bands mass to take their den back while you dig - unless your line scares them off
         public float HideoutReprisalRadius = 20f;          // map-distance within which bandit parties join the reprisal
         public float HideoutReprisalFleeOdds = 3f;         // at this strength advantage (yours vs theirs) the reprisal loses its nerve and melts away
+        public float HideoutReprisalHours = 48f;           // the horde hunts you this long - then gives up and drifts back to its old ways
 
         // --- Loot from the field ---
         public bool LootArrivesWorn = true;                // gear stripped from the fallen comes to you already used

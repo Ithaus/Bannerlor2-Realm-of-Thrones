@@ -47,6 +47,7 @@ namespace Armoury
 
         public override void RegisterEvents()
         {
+            CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this, _ => OneShotVendetta());
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this, AddMenus);
             CampaignEvents.OnHideoutBattleCompletedEvent.AddNonSerializedListener(this, OnHideoutBattle);
             CampaignEvents.TickEvent.AddNonSerializedListener(this, OnTick);
@@ -186,6 +187,76 @@ namespace Armoury
         private static CampaignTime _searchDone = CampaignTime.Zero;
         private static float _searchTotal = 2f;
 
+        /// <summary>
+        /// JEDNORAZOWA VENDETTA (narzedzie naprawcze). Jesli w folderze modulu
+        /// lezy plik "vendetta.now", przy wczytaniu save'a bandy w promieniu 30
+        /// od gracza scalaja sie w jedna horde i dostaja rozkaz pogoni - bez
+        /// progu 3:1. Plik jest kasowany po wykonaniu: odpala sie RAZ.
+        /// Uzyte 27.08: odwet z kryjowki Jeffa przepadl na starym DLL-u.
+        /// </summary>
+        private static void OneShotVendetta()
+        {
+            try
+            {
+                string marker = System.IO.Path.Combine(
+                    TaleWorlds.Engine.Utilities.GetBasePath() ?? "", "Modules", "Armoury", "vendetta.now");
+                if (!System.IO.File.Exists(marker)) return;
+                try { System.IO.File.Delete(marker); } catch { }
+
+                var me = MobileParty.MainParty;
+                if (me == null) return;
+                // tylko okolica kryjowki (gracz stoi przy niej) - ten sam promien
+                // co odwet, ZADNEGO zbierania band z calej mapy
+                float vr = Math.Max(1f, Settings.Current != null ? Settings.Current.HideoutReprisalRadius : 20f);
+                var pack = new System.Collections.Generic.List<MobileParty>();
+                foreach (var mp in MobileParty.All)
+                {
+                    if (mp == null || !mp.IsBandit || !mp.IsActive) continue;
+                    if (mp.CurrentSettlement != null || mp.MapEvent != null) continue;
+                    if (mp.GetPosition2D.Distance(me.GetPosition2D) > vr) continue;
+                    pack.Add(mp);
+                }
+                if (pack.Count == 0) { Log.Info("Vendetta: brak band w okolicy - nic do scalenia."); return; }
+
+                MobileParty boss = null;
+                foreach (var mp in pack)
+                    if (boss == null || mp.MemberRoster.TotalManCount > boss.MemberRoster.TotalManCount) boss = mp;
+                int merged = 0;
+                foreach (var mp in pack)
+                {
+                    if (mp == boss) continue;
+                    try
+                    {
+                        var mr = mp.MemberRoster;
+                        for (int i = 0; i < mr.Count; i++)
+                        {
+                            var el = mr.GetElementCopyAtIndex(i);
+                            if (el.Character != null && el.Number > 0)
+                                boss.MemberRoster.AddToCounts(el.Character, el.Number, false, el.WoundedNumber);
+                        }
+                        var ir = mp.ItemRoster;
+                        for (int i = 0; i < ir.Count; i++)
+                        {
+                            var el = ir.GetElementCopyAtIndex(i);
+                            if (el.Amount > 0) boss.ItemRoster.AddToCounts(el.EquipmentElement, el.Amount);
+                        }
+                        mp.MemberRoster.Clear();
+                        DestroyPartyAction.Apply(null, mp);
+                        merged++;
+                    }
+                    catch { }
+                }
+                _reprisalPack.Clear();
+                _reprisalPack.Add(boss);
+                float hrs = Math.Max(1f, Settings.Current != null ? Settings.Current.HideoutReprisalHours : 48f);
+                _reprisalUntil = CampaignTime.HoursFromNow(hrs);
+                DriveReprisal();
+                Log.Player("The bands you wronged have found each other - one warband now, and it is coming for you.", true);
+                Log.Info("Vendetta: scalono " + (merged + 1) + " band w horde " + boss.MemberRoster.TotalManCount + " ludzi - pogon " + hrs + " h.");
+            }
+            catch (Exception e) { Log.Error("HideoutPurge.OneShotVendetta", e); }
+        }
+
         private void AddMenus(CampaignGameStarter starter)
         {
             try
@@ -320,7 +391,7 @@ namespace Armoury
                 }
                 _reprisalPack.Clear();
                 if (boss != null) _reprisalPack.Add(boss); else _reprisalPack.AddRange(pack);
-                _reprisalUntil = CampaignTime.HoursFromNow(24f);
+                _reprisalUntil = CampaignTime.HoursFromNow(Math.Max(1f, c.HideoutReprisalHours));
                 DriveReprisal();
                 Log.Player("The scattered bands mass into one warband - they want their gold back and they will chase you for it!", true);
                 Log.Info("HideoutPurge: odwet rusza JEDNA HORDA (" + (merged + 1) + " band scalono, "
@@ -343,7 +414,16 @@ namespace Armoury
         {
             try
             {
-                if (_reprisalPack.Count == 0 || CampaignTime.Now >= _reprisalUntil) { _reprisalPack.Clear(); return; }
+                if (_reprisalPack.Count == 0) return;
+                if (CampaignTime.Now >= _reprisalUntil)
+                {
+                    // nie zlapali - zapal gasnie, rozchodza sie do swoich spraw
+                    foreach (var mp in _reprisalPack)
+                        try { if (mp != null && mp.IsActive) mp.Ai.SetInitiative(1f, 1f, 1f); } catch { }
+                    _reprisalPack.Clear();
+                    Log.Info("HideoutPurge: pogon wygasla - horda daje za wygrana.");
+                    return;
+                }
                 if (_mSetAiBehavior == null)
                     _mSetAiBehavior = AccessTools.Method(typeof(MobilePartyAi), "SetAiBehavior");
                 var me = MobileParty.MainParty;

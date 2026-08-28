@@ -496,6 +496,10 @@ namespace Armoury
         [SettingPropertyGroup("The hideout purge")]
         public float HideoutReprisalFleeOdds { get; set; } = 3f;
 
+        [SettingPropertyFloatingInteger("Hideout Reprisal Hours", 0.00f, 192.00f, "0.00", HintText = "the horde hunts you this long - then gives up and drifts back to its old ways")]
+        [SettingPropertyGroup("The hideout purge")]
+        public float HideoutReprisalHours { get; set; } = 48f;
+
         [SettingPropertyBool("Loot Arrives Worn", HintText = "gear stripped from the fallen comes to you already used")]
         [SettingPropertyGroup("Loot from the field")]
         public bool LootArrivesWorn { get; set; } = true;
@@ -1131,6 +1135,7 @@ namespace Armoury
             s.HideoutReprisalEnabled = HideoutReprisalEnabled;
             s.HideoutReprisalRadius = HideoutReprisalRadius;
             s.HideoutReprisalFleeOdds = HideoutReprisalFleeOdds;
+            s.HideoutReprisalHours = HideoutReprisalHours;
             s.LootArrivesWorn = LootArrivesWorn;
             s.LootWearBase = LootWearBase;
             s.LootWearSpread = LootWearSpread;
