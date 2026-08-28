@@ -125,12 +125,7 @@ namespace Armoury
         public bool UniqueCrownsEnabled = true;            // crowns of kings and queens are unique regalia: sane armour, out of the shops, impossible to forge - the pieces already in play become the only ones
         public int UniqueCrownHeadArmor = 10;              // head armour of a crown - it is jewellery, not a helmet (ROT ships every crown at 75)
 
-        // --- The town brewery ---
-        public bool AleSupplyEnabled = true;               // town markets restock beer and wine daily up to a floor - Banner Kings parties drink the realm dry and the morale fine stays with no cask to buy
-        public int AleSupplyBeerFloor = 15;                // beer casks a town market is topped up to
-        public int AleSupplyWineFloor = 8;                 // wine amphorae a town market is topped up to (mead, where it exists, gets half this)
-        public int AleSupplyPerDay = 10;                   // at most this many casks brewed per town per day - a trickle, not a flood
-        public int TannerySupplyLeatherFloor = 12;         // leather a town market is topped up to (hides get half this) - game and woods are everywhere, so should hide and leather be
+        // --- The lean quartermasters ---
         public int BkSupplyDaysCap = 1;                    // AI parties stock ONE day of Banner Kings supplies instead of 10 - they buy as they go and ride to market when they run out (0 = off)
         public int BkSupplyMaxPieces = 12;                 // hard ceiling: an AI party never stockpiles more than this many pieces of any one supply - repairs need a few hides, not a warehouse (0 = off)
 

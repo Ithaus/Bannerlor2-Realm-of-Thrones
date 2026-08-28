@@ -1,5 +1,18 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-28 — COFNIETE: browar i garbarnia miejska (dosypki podazy); zostaje ciecie popytu AI
+**Mod:** Armoury | **Pliki:** `Armoury/src/BkSupplyTemper.cs` (z AleSupply.cs), `Armoury/src/SubModuleMain.cs`, `Armoury/src/Settings.cs`, `Armoury/src/McmSettings.cs` (gen)
+**Powod:** Jeff 28.08: "USUN te dodatkowe browary i garbarnie" - po scieciu popytu AI
+(1 dzien zapasu + sufit 12 sztuk na dobro) sztuczna podaz jest zbedna, vanillowa
+produkcja ma wystarczyc. Behavior AleSupply usuniety w calosci (dosypki beer/wine/
+mead/leather/hides), ustawienia AleSupply*/TannerySupply* wyleciely z MCM.
+Zostal BkSupplyTemper (BkSupplyDaysCap=1, BkSupplyMaxPieces=12) - sekcja MCM
+"The lean quartermasters".
+**Co sprawdzic:** po paru dniach gry targi maja miec alkohol i skore z SAMEGO
+spadku popytu; jesli dalej pustynia - wracamy do rozmowy o podazy.
+**Status:** COFNIETE (dosypki) / WGRANE (ciecie popytu)
+
+
 > **ZASADA OBOWIAZKOWA DLA KAZDEGO CLAUDE (kazde konto, kazdy komputer):**
 > po **kazdej** zmianie w kodzie dopisz wpis na GORZE tej listy i zrob commit + push.
 > Dzieki temu drugie konto zawsze wie, co sie stalo, bez czytania calej rozmowy.

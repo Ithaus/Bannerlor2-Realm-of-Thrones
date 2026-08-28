@@ -432,32 +432,12 @@ namespace Armoury
         [SettingPropertyGroup("Crown jewels")]
         public int UniqueCrownHeadArmor { get; set; } = 10;
 
-        [SettingPropertyBool("Ale Supply Enabled", HintText = "town markets restock beer and wine daily up to a floor - Banner Kings parties drink the realm dry and the morale fine stays with no cask to buy")]
-        [SettingPropertyGroup("The town brewery")]
-        public bool AleSupplyEnabled { get; set; } = true;
-
-        [SettingPropertyInteger("Ale Supply Beer Floor", 0, 60, "0", HintText = "beer casks a town market is topped up to")]
-        [SettingPropertyGroup("The town brewery")]
-        public int AleSupplyBeerFloor { get; set; } = 15;
-
-        [SettingPropertyInteger("Ale Supply Wine Floor", 0, 32, "0", HintText = "wine amphorae a town market is topped up to (mead, where it exists, gets half this)")]
-        [SettingPropertyGroup("The town brewery")]
-        public int AleSupplyWineFloor { get; set; } = 8;
-
-        [SettingPropertyInteger("Ale Supply Per Day", 0, 40, "0", HintText = "at most this many casks brewed per town per day - a trickle, not a flood")]
-        [SettingPropertyGroup("The town brewery")]
-        public int AleSupplyPerDay { get; set; } = 10;
-
-        [SettingPropertyInteger("Tannery Supply Leather Floor", 0, 48, "0", HintText = "leather a town market is topped up to (hides get half this) - game and woods are everywhere, so should hide and leather be")]
-        [SettingPropertyGroup("The town brewery")]
-        public int TannerySupplyLeatherFloor { get; set; } = 12;
-
         [SettingPropertyInteger("Bk Supply Days Cap", 0, 10, "0", HintText = "AI parties stock ONE day of Banner Kings supplies instead of 10 - they buy as they go and ride to market when they run out (0 = off)")]
-        [SettingPropertyGroup("The town brewery")]
+        [SettingPropertyGroup("The lean quartermasters")]
         public int BkSupplyDaysCap { get; set; } = 1;
 
         [SettingPropertyInteger("Bk Supply Max Pieces", 0, 48, "0", HintText = "hard ceiling: an AI party never stockpiles more than this many pieces of any one supply - repairs need a few hides, not a warehouse (0 = off)")]
-        [SettingPropertyGroup("The town brewery")]
+        [SettingPropertyGroup("The lean quartermasters")]
         public int BkSupplyMaxPieces { get; set; } = 12;
 
         [SettingPropertyBool("Hideout Purge Enabled", HintText = "a cleared hideout must be SEARCHED: the plundered gold, renown and the gratitude of the district wait behind one more step")]
@@ -1131,11 +1111,6 @@ namespace Armoury
             s.BreakAtZeroCondition = BreakAtZeroCondition;
             s.UniqueCrownsEnabled = UniqueCrownsEnabled;
             s.UniqueCrownHeadArmor = UniqueCrownHeadArmor;
-            s.AleSupplyEnabled = AleSupplyEnabled;
-            s.AleSupplyBeerFloor = AleSupplyBeerFloor;
-            s.AleSupplyWineFloor = AleSupplyWineFloor;
-            s.AleSupplyPerDay = AleSupplyPerDay;
-            s.TannerySupplyLeatherFloor = TannerySupplyLeatherFloor;
             s.BkSupplyDaysCap = BkSupplyDaysCap;
             s.BkSupplyMaxPieces = BkSupplyMaxPieces;
             s.HideoutPurgeEnabled = HideoutPurgeEnabled;
