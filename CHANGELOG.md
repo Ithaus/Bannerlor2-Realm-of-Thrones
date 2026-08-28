@@ -1,5 +1,25 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-28 — CRASH przy wejsciu w bitwe: kultura bez list imion zabija NameGenerator
+**Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs` (FeedNamelessCultures), `CrashScribe/src/WarReport.cs`
+**Problem:** Jeff: "crash jak wszedlem do bitwy". Log 11:11:48: ArgumentNullException
+w NameGenerator.GetNameListForCulture <- HeroCreator.CreateSpecialHero <- BannerKings
+Religion.GenerateClergymanHero (BKSettlementBehavior.TickSettlementData). O 11:15:58
+wyjatek wyszedl na ApplicationTick i BLSE otworzyl crash-reporter (jego wtorne bledy
+Silk.NET/AsmResolver zaslonily pierwotny slad). Moment bitwy = przypadek, bomba
+tykala w tle na kazdym dziennym ticku osad.
+**Przyczyna:** kultura (ROT-owy preset wiary) bez wpisow male_names/female_names
+w XML ma MaleNameList/FemaleNameList = null; vanilla GetNameListForCulture robi
+na null IsEmpty() -> ArgumentNullException. Pada tworzenie KAZDEGO bohatera takiej
+kultury: duchowni BK, dzieci, wedrowcy.
+**Zmiana:** Mends.FeedNamelessCultures przy OnSessionLaunched: kultury z null/pusta
+lista imion (meskie/zenskie/klanowe) dostaja referencje list od najbogatszej kultury.
+Log wypisze KTORE kultury byly dziurawe ("kultura X nie miala list imion").
+**Ryzyko / co sprawdzic:** imiona nowych bohaterow dziurawych kultur beda obce
+(kulture duchownego i tak prostuje latka "kaplan jest stad"). W logu po wczytaniu
+szukac "kultur bez imion nakarmione" - lista pokaze, co ROT ma zepsute.
+**Status:** WGRANE
+
 ## 2026-08-28 — MULENIE GRY: lawina BK relations odcieta brama PRZED metoda (Essos bez tytulow)
 **Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs` (EssosTitleGate + Install)
 **Problem:** Jeff: "strasznie muli gra". Log sesji 10:43-11:00: "BK relations uratowane

@@ -325,6 +325,59 @@ namespace CrashScribe
             catch { return null; }
         }
 
+        /// <summary>
+        /// KULTURA BEZ IMION ZABIJA GRE. Kultura bez wpisow male_names/female_names
+        /// w XML ma MaleNameList/FemaleNameList = null, a NameGenerator robi na tym
+        /// IsEmpty() -> ArgumentNullException przy tworzeniu KAZDEGO bohatera tej
+        /// kultury. Dowod 28.08 11:11: BK generowal duchownego (Religion.
+        /// GenerateClergymanHero -> CreateSpecialHero -> GetNameListForCulture),
+        /// FirstChance lecial seriami, a o 11:15 gra padla na ApplicationTick przy
+        /// wejsciu Jeffa w bitwe. Raz na sesje pozyczamy listy od najbogatszej
+        /// kultury - imie bedzie obce, ale gra zyje (kulture duchownego i tak
+        /// zaraz prostuje nasza latka "kaplan jest stad").
+        /// </summary>
+        internal static void FeedNamelessCultures()
+        {
+            try
+            {
+                var mgr = TaleWorlds.ObjectSystem.MBObjectManager.Instance;
+                var all = mgr != null ? mgr.GetObjectTypeList<CultureObject>() : null;
+                if (all == null) return;
+                var fMale = AccessTools.Field(typeof(CultureObject), "_maleNameList");
+                var fFem = AccessTools.Field(typeof(CultureObject), "_femaleNameList");
+                var fClan = AccessTools.Field(typeof(CultureObject), "_clanNameList");
+                if (fMale == null || fFem == null || fClan == null) return;
+
+                CultureObject donor = null; int best = 0;
+                foreach (var c in all)
+                {
+                    if (c == null) continue;
+                    int score = (c.MaleNameList != null ? c.MaleNameList.Count : 0)
+                              + (c.FemaleNameList != null ? c.FemaleNameList.Count : 0);
+                    if (score > best) { best = score; donor = c; }
+                }
+                if (donor == null) return;
+
+                int fed = 0;
+                foreach (var c in all)
+                {
+                    if (c == null || c == donor) continue;
+                    bool hungry = false;
+                    if (c.MaleNameList == null || c.MaleNameList.Count == 0) { fMale.SetValue(c, fMale.GetValue(donor)); hungry = true; }
+                    if (c.FemaleNameList == null || c.FemaleNameList.Count == 0) { fFem.SetValue(c, fFem.GetValue(donor)); hungry = true; }
+                    if (c.ClanNameList == null || c.ClanNameList.Count == 0) { fClan.SetValue(c, fClan.GetValue(donor)); hungry = true; }
+                    if (hungry)
+                    {
+                        fed++;
+                        Scribe.Line("Mends: kultura " + c.StringId + " nie miala list imion - pozyczone od " + donor.StringId + ".");
+                    }
+                }
+                if (fed > 0)
+                    Scribe.Line("Mends: " + fed + " kultur bez imion nakarmione (crash NameGenerator przy tworzeniu bohatera).");
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.FeedNamelessCultures", null); } catch { } }
+        }
+
         private static System.Reflection.MethodInfo _hrHeroGet;
         private static System.Reflection.MethodInfo _bkCfgInstanceGet, _bkCfgTitleMgrGet, _bkGetTitle;
         private static Type _tListRelMod;

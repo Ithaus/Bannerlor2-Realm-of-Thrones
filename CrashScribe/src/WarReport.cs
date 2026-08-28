@@ -18,7 +18,7 @@ namespace CrashScribe
         public override void RegisterEvents()
         {
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this,
-                delegate (TaleWorlds.CampaignSystem.CampaignGameStarter s) { Report("po wczytaniu"); Mends.LocalLevies(); });
+                delegate (TaleWorlds.CampaignSystem.CampaignGameStarter s) { Mends.FeedNamelessCultures(); Report("po wczytaniu"); Mends.LocalLevies(); });
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, delegate { Report("dzien"); Mends.LocalLevies(); });
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, WatchArmy);
             CampaignEvents.SettlementEntered.AddNonSerializedListener(this, OnEntered);
