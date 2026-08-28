@@ -202,6 +202,20 @@ namespace CrashScribe
 
             try
             {
+                // KULTURA BEZ IMION: bezpiecznik na NameGenerator.GetNameListForCulture
+                // (crash 28.08 przy tworzeniu duchownego BK; szczegoly przy
+                // FeedNamelessCultures i NameListSafety)
+                var mNames = AccessTools.Method(typeof(TaleWorlds.CampaignSystem.NameGenerator), "GetNameListForCulture");
+                if (mNames != null)
+                {
+                    harmony.Patch(mNames, prefix: new HarmonyMethod(typeof(Mends), "NameListSafety"));
+                    Scribe.Line("Mends: NameGenerator z bezpiecznikiem na kultury bez list imion.");
+                }
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.Install(namelist)", null); } catch { } }
+
+            try
+            {
                 // MARTWY DIALOG DUCHOWNEGO (Jeff 27.08: "click to continue i nic
                 // sie nie dzieje"). Powitanie BK i WSZYSTKIE opcje preachera maja
                 // warunek ReligionsManager.IsPreacher - a preacher bez wpisu
@@ -336,6 +350,51 @@ namespace CrashScribe
         /// kultury - imie bedzie obce, ale gra zyje (kulture duchownego i tak
         /// zaraz prostuje nasza latka "kaplan jest stad").
         /// </summary>
+        private static TaleWorlds.Library.MBReadOnlyList<TaleWorlds.Localization.TextObject> _spareMale, _spareFemale;
+        private static int _nameSaves;
+
+        /// <summary>
+        /// BEZPIECZNIK NA SAMEJ METODZIE IMION. FeedNamelessCultures lata dane
+        /// przy starcie sesji, ale gdyby jakas kultura przemknela (dograna pozniej,
+        /// spoza object managera), NameGenerator dalej robilby IsEmpty() na null.
+        /// Prefix: kultura zdrowa -> normalna droga; dziura -> oddajemy zapasowa
+        /// liste najbogatszej kultury i pomijamy oryginal. Zero wyjatkow.
+        /// </summary>
+        public static bool NameListSafety(CultureObject npcCulture, bool isFemale,
+            ref TaleWorlds.Library.MBReadOnlyList<TaleWorlds.Localization.TextObject> __result)
+        {
+            try
+            {
+                if (npcCulture != null)
+                {
+                    var list = isFemale ? npcCulture.FemaleNameList : npcCulture.MaleNameList;
+                    if (list != null && list.Count > 0) return true;   // zdrowa - niech gra wybiera sama
+                }
+                if (_spareMale == null || _spareFemale == null)
+                {
+                    var mgr = TaleWorlds.ObjectSystem.MBObjectManager.Instance;
+                    var all = mgr != null ? mgr.GetObjectTypeList<CultureObject>() : null;
+                    if (all == null) return true;
+                    int bM = 0, bF = 0;
+                    foreach (var c in all)
+                    {
+                        if (c == null) continue;
+                        if (c.MaleNameList != null && c.MaleNameList.Count > bM) { bM = c.MaleNameList.Count; _spareMale = c.MaleNameList; }
+                        if (c.FemaleNameList != null && c.FemaleNameList.Count > bF) { bF = c.FemaleNameList.Count; _spareFemale = c.FemaleNameList; }
+                    }
+                }
+                var spare = isFemale ? _spareFemale : _spareMale;
+                if (spare == null || spare.Count == 0) return true;   // nie mamy czym ratowac
+                __result = spare;
+                _nameSaves++;
+                if (_nameSaves == 1 || _nameSaves % 50 == 0)
+                    try { Scribe.Line("Mends: kultura bez imion (" + (npcCulture != null ? npcCulture.StringId : "null")
+                        + ", " + (isFemale ? "zenskie" : "meskie") + ") dostala liste zapasowa - lacznie " + _nameSaves + "."); } catch { }
+                return false;
+            }
+            catch { return true; }
+        }
+
         internal static void FeedNamelessCultures()
         {
             try
@@ -348,32 +407,45 @@ namespace CrashScribe
                 var fClan = AccessTools.Field(typeof(CultureObject), "_clanNameList");
                 if (fMale == null || fFem == null || fClan == null) return;
 
-                CultureObject donor = null; int best = 0;
+                // dawca OSOBNO dla kazdej listy - pierwsza wersja brala jednego
+                // dawce po sumie (wygral... looters) i gdy ten nie mial listy
+                // ZENSKIEJ, nakarmione kultury dalej mialy tam null - crash
+                // wracal przy duchownej-kobiecie (Jeff 28.08 14:08, druga bitwa)
+                CultureObject dM = null, dF = null, dC = null; int bM = 0, bF = 0, bC = 0;
                 foreach (var c in all)
                 {
                     if (c == null) continue;
-                    int score = (c.MaleNameList != null ? c.MaleNameList.Count : 0)
-                              + (c.FemaleNameList != null ? c.FemaleNameList.Count : 0);
-                    if (score > best) { best = score; donor = c; }
+                    if (c.MaleNameList != null && c.MaleNameList.Count > bM) { bM = c.MaleNameList.Count; dM = c; }
+                    if (c.FemaleNameList != null && c.FemaleNameList.Count > bF) { bF = c.FemaleNameList.Count; dF = c; }
+                    if (c.ClanNameList != null && c.ClanNameList.Count > bC) { bC = c.ClanNameList.Count; dC = c; }
                 }
-                if (donor == null) return;
+                if (dM == null && dF == null && dC == null) return;
 
-                int fed = 0;
+                int fed = 0, holes = 0;
                 foreach (var c in all)
                 {
-                    if (c == null || c == donor) continue;
-                    bool hungry = false;
-                    if (c.MaleNameList == null || c.MaleNameList.Count == 0) { fMale.SetValue(c, fMale.GetValue(donor)); hungry = true; }
-                    if (c.FemaleNameList == null || c.FemaleNameList.Count == 0) { fFem.SetValue(c, fFem.GetValue(donor)); hungry = true; }
-                    if (c.ClanNameList == null || c.ClanNameList.Count == 0) { fClan.SetValue(c, fClan.GetValue(donor)); hungry = true; }
-                    if (hungry)
+                    if (c == null) continue;
+                    var got = "";
+                    if ((c.MaleNameList == null || c.MaleNameList.Count == 0) && dM != null && c != dM)
+                    { fMale.SetValue(c, fMale.GetValue(dM)); got += " meskie<-" + dM.StringId; }
+                    if ((c.FemaleNameList == null || c.FemaleNameList.Count == 0) && dF != null && c != dF)
+                    { fFem.SetValue(c, fFem.GetValue(dF)); got += " zenskie<-" + dF.StringId; }
+                    if ((c.ClanNameList == null || c.ClanNameList.Count == 0) && dC != null && c != dC)
+                    { fClan.SetValue(c, fClan.GetValue(dC)); got += " klanowe<-" + dC.StringId; }
+                    if (got.Length > 0)
                     {
                         fed++;
-                        Scribe.Line("Mends: kultura " + c.StringId + " nie miala list imion - pozyczone od " + donor.StringId + ".");
+                        Scribe.Line("Mends: kultura " + c.StringId + " bez imion:" + got + ".");
                     }
+                    // samokontrola: czy po karmieniu COKOLWIEK zostalo dziurawe
+                    if (c.MaleNameList == null || c.MaleNameList.Count == 0
+                        || c.FemaleNameList == null || c.FemaleNameList.Count == 0)
+                    { holes++; Scribe.Line("Mends: UWAGA kultura " + c.StringId + " DALEJ bez imion (m="
+                        + (c.MaleNameList == null ? "null" : c.MaleNameList.Count.ToString())
+                        + " z=" + (c.FemaleNameList == null ? "null" : c.FemaleNameList.Count.ToString()) + ")."); }
                 }
                 if (fed > 0)
-                    Scribe.Line("Mends: " + fed + " kultur bez imion nakarmione (crash NameGenerator przy tworzeniu bohatera).");
+                    Scribe.Line("Mends: " + fed + " kultur bez imion nakarmione, dziurawych zostalo " + holes + ".");
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.FeedNamelessCultures", null); } catch { } }
         }

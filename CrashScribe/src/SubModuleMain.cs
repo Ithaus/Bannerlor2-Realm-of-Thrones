@@ -91,6 +91,7 @@ namespace CrashScribe
                 Fabula.Install(_harmony);
                 Scribe.Line("Net ready.");
                 Watchdog.Start();
+                Sampler.Start(System.Threading.Thread.CurrentThread);   // profiler fast-forward (Jeff: x3 muli)
                 if (Config.ShowInGame)
                     InformationManager.DisplayMessage(new InformationMessage(
                         "CrashScribe is watching. Reports: Documents\\Mount and Blade II Bannerlord\\CrashScribe", Colors.Cyan));

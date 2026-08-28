@@ -1,5 +1,27 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-28 — DRUGI crash w bitwie: karmienie imion mialo dziure (zenskie listy) + bezpiecznik + PROFILER x3
+**Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs`, `CrashScribe/src/Sampler.cs` (nowy), `CrashScribe/src/SubModuleMain.cs`
+**Problem:** Jeff: drugi crash przy wejsciu w bitwe (14:08), mimo karmienia kultur.
+Log 14:03:41: TEN SAM ArgumentNullException NameGenerator - PO nakarmieniu 14 kultur.
+Plus Jeff: "ogromny spadek FPS na forward x3, nie da sie grac - sprawdz to".
+**Przyczyna:** (1) karmienie bralo JEDNEGO dawce po sumie imion - wygral looters;
+jesli dawca sam nie ma ktorejs listy (zenskie u bandytow!), biorcy dalej mieli
+tam null i duchowna-kobieta wywalala jak przedtem. (2) FPS: nikt nie mierzyl,
+w czyim kodzie stoi watek glowny na przyspieszeniu.
+**Zmiana:** (1) dawca OSOBNO dla listy meskiej/zenskiej/klanowej + samokontrola
+w logu ("dziurawych zostalo N"). (2) bezpiecznik: prefix na NameGenerator.
+GetNameListForCulture - kultura z null/pusta lista dostaje liste zapasowa
+najbogatszej kultury, zero wyjatkow, nawet dla kultur spoza object managera.
+(3) Sampler.cs: TYLKO na fast-forwardzie poza misja co 0.5 s zdejmuje stos watku
+glownego (mechanizm straznika zawieszen) i co ~30 s pisze do logu "PROFIL
+FAST-FORWARD: NN% ramka <mod>" - po paru minutach gry na x3 log powie, kto zre.
+**Ryzyko / co sprawdzic:** po wczytaniu w logu "dziurawych zostalo 0"; po grze
+na x3 wpisy "PROFIL FAST-FORWARD" - przeslac mi. Suspend watku raz na 0.5 s
+tylko na przyspieszeniu - koszt pomijalny, ale gdyby cokolwiek dziwnego, wylaczyc
+mozna przez usuniecie linii Sampler.Start w SubModuleMain.
+**Status:** WGRANE
+
 ## 2026-08-28 — CRASH przy wejsciu w bitwe: kultura bez list imion zabija NameGenerator
 **Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs` (FeedNamelessCultures), `CrashScribe/src/WarReport.cs`
 **Problem:** Jeff: "crash jak wszedlem do bitwy". Log 11:11:48: ArgumentNullException
