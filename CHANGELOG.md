@@ -1,5 +1,41 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-28 — smoki w sakwach: zrodlo znalezione + druga dziura zatkana (jency)
+**Mod:** Armoury | **Pliki:** `Armoury/src/ArmouryBehavior.cs` (TryStripNewCaptives)
+**Problem:** Jeff: "jakim cudem w moim ekwipunku mam trzy smoki" + "ja nie pokonalem
+zadnych smokow". Grep po WSZYSTKICH modulach: jedyny przedmiot dragon_* w wyposazeniu
+to `ghi_bat_template_dany` w ROT_sandboxcore_equipment_sets.xml (szablon lorda,
+culture=neutral_culture, slot Horse = Item.dragon_black). Zaden zwykly troop nie ma
+smoka.
+**Przyczyna:** vanilla dorzuca do puli lupow wierzchowce pokonanych BOHATEROW - takze
+w bitwach auto-rozstrzyganych, gdzie smoka nie widac na oczy. Lord z wylosowanym
+szablonem Dany w pokonanej armii = smok w lupach. Filtr CleanseDragons byl juz
+napisany, ale DLL czekal na zamkniecie gry - kolejne bitwy dosypywaly.
+Druga dziura: TryStripNewCaptives (obszukiwanie jencow) tez bierze sloty konskie
+(CaptiveSpoilsIncludeMounts=true) i NIE przechodzi przez CleanseDragons.
+**Zmiana:** w petli slotow obszukiwania jenca pominiecie dragon_* typu Horse -
+"smoka nie poprowadzisz na powrozie". Lupy bitewne filtruje CleanseDragons (juz
+w kodzie), jency filtrowani u zrodla.
+**Ryzyko / co sprawdzic:** trzy smoki JUZ w sakwach zostaja (nic ich nie usuwa) -
+Jeff decyduje: usunac czy zostawic. Nowe smoki nie maja prawa wejsc zadna sciezka.
+**Status:** WGRANE
+
+## 2026-08-28 — kuznia: JEDNA linia czasu u kowala (projekty w kolejce, nie rownolegle)
+**Mod:** Armoury | **Pliki:** `Armoury/src/ArmouryBehavior.cs` (AdvanceProjects)
+**Problem:** Jeff: "jestem w trakcie wytapiania mieczy a moge znowu wejsc do kuzni
+i wytapiac... powinna byc jedna linia czasu, dopoki nie zakoncze wytapiac tamtych".
+Kazdy zlecony projekt tykal ROWNOLEGLE - kowal w jednej osadzie robil piec rzeczy
+naraz.
+**Przyczyna:** AdvanceProjects odejmowal DaysLeft kazdemu projektowi w kazdej osadzie
+bez zadnej kolejnosci.
+**Zmiana:** HashSet busyForge po SettlementId - w danej osadzie tyka TYLKO najstarszy
+niedokonczony projekt; reszta czeka w kolejce (gotowe do odbioru wydaja sie normalnie).
+Zlecac mozna dalej ile wlezie - ale kowal kuje po kolei.
+**Ryzyko / co sprawdzic:** wiszace projekty z wielu osad tykaja niezaleznie (kazda
+osada = wlasny kowal, wlasna kolejka). Czas oddania zlecen zlozonych "na raz" liczy
+sie teraz szeregowo.
+**Status:** WGRANE
+
 ## 2026-08-28 — COFNIETE: browar i garbarnia miejska (dosypki podazy); zostaje ciecie popytu AI
 **Mod:** Armoury | **Pliki:** `Armoury/src/BkSupplyTemper.cs` (z AleSupply.cs), `Armoury/src/SubModuleMain.cs`, `Armoury/src/Settings.cs`, `Armoury/src/McmSettings.cs` (gen)
 **Powod:** Jeff 28.08: "USUN te dodatkowe browary i garbarnie" - po scieciu popytu AI
