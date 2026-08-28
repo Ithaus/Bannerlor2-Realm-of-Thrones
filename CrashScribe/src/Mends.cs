@@ -202,6 +202,24 @@ namespace CrashScribe
 
             try
             {
+                // PULAPKA NA PIERWOTNY WYJATEK CRASHA. Trzy crashe przy wejsciu
+                // w bitwe (28.08) i w logu ZA KAZDYM RAZEM tylko wnetrze reportera
+                // BLSE - pierwotny wyjatek byl powtorka i dedup go polknal.
+                // Prefix na BLSE HandleException: pelny wyjatek + stos, bez dedupu,
+                // do wlasnego pliku crash-original-*.log ZANIM reporter cokolwiek zrobi.
+                var tIcept = AccessTools.TypeByName("Bannerlord.BLSE.Features.ExceptionInterceptor.ExceptionInterceptorFeature");
+                var mHandle = tIcept != null ? AccessTools.Method(tIcept, "HandleException") : null;
+                if (mHandle != null)
+                {
+                    harmony.Patch(mHandle, prefix: new HarmonyMethod(typeof(Mends), "CrashCallerTattle"));
+                    Scribe.Line("Mends: pulapka na pierwotny wyjatek crasha zalozona (przed reporterem BLSE).");
+                }
+                else Scribe.Line("Mends: UWAGA nie znalazlem BLSE HandleException - pulapki crasha brak.");
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.Install(crashtrap)", null); } catch { } }
+
+            try
+            {
                 // KULTURA BEZ IMION: bezpiecznik na NameGenerator.GetNameListForCulture
                 // (crash 28.08 przy tworzeniu duchownego BK; szczegoly przy
                 // FeedNamelessCultures i NameListSafety)
@@ -350,6 +368,43 @@ namespace CrashScribe
         /// kultury - imie bedzie obce, ale gra zyje (kulture duchownego i tak
         /// zaraz prostuje nasza latka "kaplan jest stad").
         /// </summary>
+        /// <summary>
+        /// Pelny zapis wyjatku, ktory za chwile ubije gre - bez dedupu, do wlasnego
+        /// pliku, zanim reporter BLSE zacznie miec (jego wlasne bledy zaslanialy
+        /// pierwotny slad trzy razy z rzedu 28.08).
+        /// </summary>
+        public static void CrashCallerTattle(Exception exception)
+        {
+            try
+            {
+                if (exception == null) return;
+                var sb = new System.Text.StringBuilder();
+                sb.AppendLine();
+                sb.AppendLine("#####################################################################");
+                sb.AppendLine("# PIERWOTNY WYJATEK CRASHA   " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+                sb.AppendLine("# (przechwycony przed reporterem BLSE, bez dedupu)");
+                sb.AppendLine("#####################################################################");
+                var e = exception; int depth = 0;
+                while (e != null && depth++ < 5)
+                {
+                    sb.AppendLine("TYPE    : " + e.GetType().FullName);
+                    sb.AppendLine("MESSAGE : " + e.Message);
+                    sb.AppendLine(e.StackTrace ?? "(brak stosu)");
+                    e = e.InnerException;
+                    if (e != null) sb.AppendLine("--- INNER ---");
+                }
+                try
+                {
+                    System.IO.File.WriteAllText(System.IO.Path.Combine(Scribe.ReportDir,
+                        "crash-original-" + DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss") + ".log"),
+                        sb.ToString(), System.Text.Encoding.UTF8);
+                }
+                catch { }
+                Scribe.TryRaw(sb.ToString(), 3000);
+            }
+            catch { }
+        }
+
         private static TaleWorlds.Library.MBReadOnlyList<TaleWorlds.Localization.TextObject> _spareMale, _spareFemale;
         private static int _nameSaves;
 
