@@ -91,7 +91,9 @@ namespace Armoury
                     ? Game.Current.GameStateManager.ActiveState as TaleWorlds.CampaignSystem.GameState.MapState : null;
                 if (st == null || st.AtMenu) return;
                 if (PlayerEncounter.Current != null || MobileParty.MainParty.MapEvent != null) return;
-                _pending = false;
+                // _pending NIE gasnie tutaj: gdy odwet przerwie przeszukanie
+                // walka konczy sie na mapie i menu wraca samo - do lupu wraca
+                // sie po bitwie (Jeff). Gasi je dopiero DoSearch albo Leave.
                 GameMenu.ActivateGameMenu("arm_hideout_search");
             }
             catch (Exception e) { Log.Error("HideoutPurge.OnTick", e); _pending = false; }
@@ -114,7 +116,7 @@ namespace Armoury
                 starter.AddGameMenuOption("arm_hideout_search", "arm_hideout_leave",
                     "{=!}Leave without searching",
                     delegate (MenuCallbackArgs a) { a.optionLeaveType = GameMenuOption.LeaveType.Leave; return true; },
-                    delegate (MenuCallbackArgs a) { GameMenu.ExitToLast(); }, true, 1);
+                    delegate (MenuCallbackArgs a) { _pending = false; GameMenu.ExitToLast(); }, true, 1);
 
                 // PASEK PRZESZUKANIA jak po bitwie (Jeff 27.08: "nie od razu
                 // rzeczy - pasek ile to zajmie, wykorzystaj ten mechanizm").
@@ -222,6 +224,7 @@ namespace Armoury
             try
             {
                 var c = Settings.Current;
+                _pending = false;   // lup zebrany - koniec sprawy
                 if (_pendingGold > 0)
                 {
                     Hero.MainHero.ChangeHeroGold(_pendingGold);
