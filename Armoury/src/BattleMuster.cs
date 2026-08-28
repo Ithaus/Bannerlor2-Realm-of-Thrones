@@ -36,8 +36,9 @@ namespace Armoury
 
         private void OnSession(CampaignGameStarter starter)
         {
-            // kazde menu osobno - gdyby ktores nie istnialo, reszta ma zyc
-            try { AddOption(starter, "encounter"); } catch (Exception e) { Log.Error("BattleMuster.menu encounter", e); }
+            // TYLKO dolaczanie do cudzej/wspolnej bitwy (Jeff: "jak sam walcze,
+            // wystawiam wszystkich - po co wybierac; przy wspolnej jest duzo
+            // wiecej wojska i nie wszyscy wchodza")
             try { AddOption(starter, "join_encounter"); } catch (Exception e) { Log.Error("BattleMuster.menu join_encounter", e); }
             // gra padla w trakcie bitwy - odwod wstaje przy wczytaniu
             try { RestoreBench("wczytanie zapisu"); } catch (Exception e) { Log.Error("BattleMuster.OnSession", e); }

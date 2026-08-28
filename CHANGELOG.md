@@ -1,5 +1,13 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-28 — odwod TYLKO przy dolaczaniu do cudzej bitwy (korekta)
+**Mod:** Armoury | **Pliki:** `Armoury/src/BattleMuster.cs`
+**Problem:** Jeff: "bez sensu przy wlasnej bitwie - sam walcze, wystawiam
+wszystkich; przy wspolnej jest duzo wiecej wojska i nie wszyscy wchodza".
+**Zmiana:** opcja wyboru skladu zostaje wylacznie w menu "join_encounter"
+(dolaczenie do trwajacej bitwy); z menu "encounter" (wlasna potyczka) usunieta.
+**Status:** WGRANE (watcher - gra dzialala przy buildzie)
+
 ## 2026-08-28 — odwod przed bitwa: wybierasz KIM walczysz (jak przy hideout)
 **Mod:** Armoury | **Pliki:** `Armoury/src/BattleMuster.cs` (nowy), `Armoury/src/SubModuleMain.cs`
 **Problem:** Jeff: "jak dolaczam do czyjejs/wspolnej bitwy, chce wybrac jakie
