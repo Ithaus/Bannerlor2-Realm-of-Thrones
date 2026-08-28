@@ -452,13 +452,13 @@ namespace Armoury
         [SettingPropertyGroup("The town brewery")]
         public int TannerySupplyLeatherFloor { get; set; } = 12;
 
-        [SettingPropertyInteger("Bk Supply Days Cap", 0, 16, "0", HintText = "AI parties stock this many days of Banner Kings supplies instead of 10 - hundreds of hoarding lords were stripping every market bare (0 = off)")]
+        [SettingPropertyInteger("Bk Supply Days Cap", 0, 10, "0", HintText = "AI parties stock ONE day of Banner Kings supplies instead of 10 - they buy as they go and ride to market when they run out (0 = off)")]
         [SettingPropertyGroup("The town brewery")]
-        public int BkSupplyDaysCap { get; set; } = 4;
+        public int BkSupplyDaysCap { get; set; } = 1;
 
-        [SettingPropertyInteger("Bk Supply Max Pieces", 0, 60, "0", HintText = "hard ceiling: an AI party never stockpiles more than this many pieces of any one supply - repairs need a few hides, not a warehouse (0 = off)")]
+        [SettingPropertyInteger("Bk Supply Max Pieces", 0, 48, "0", HintText = "hard ceiling: an AI party never stockpiles more than this many pieces of any one supply - repairs need a few hides, not a warehouse (0 = off)")]
         [SettingPropertyGroup("The town brewery")]
-        public int BkSupplyMaxPieces { get; set; } = 15;
+        public int BkSupplyMaxPieces { get; set; } = 12;
 
         [SettingPropertyBool("Hideout Purge Enabled", HintText = "a cleared hideout must be SEARCHED: the plundered gold, renown and the gratitude of the district wait behind one more step")]
         [SettingPropertyGroup("The hideout purge")]
