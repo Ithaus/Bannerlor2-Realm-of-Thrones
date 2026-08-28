@@ -66,6 +66,7 @@ namespace Armoury
                 BowStats.ApplyAll(_harmony);
                 BattlefieldLaw.ApplyAll(_harmony);
                 BattleWind.ApplyAll(_harmony);
+                BkSupplyTemper.ApplyAll(_harmony);
             }
             catch (Exception e) { Log.Error("OnBeforeInitialModuleScreenSetAsRoot", e); }
         }

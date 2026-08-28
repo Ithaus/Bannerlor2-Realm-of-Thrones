@@ -16,6 +16,51 @@ namespace Armoury
     /// wyprawia skory do progu (ograniczone dzienna praca) - podaz zyje,
     /// mechanika BK dalej dziala, ale rynek przestaje byc pustynia.
     /// </summary>
+    /// <summary>
+    /// MNIEJSZE SAKWY AI (Jeff 28.08: "moze za duzo kupuja?"). Banner Kings
+    /// kaze kazdej partii AI trzymac 10 DNI zapasu kazdego dobra (alkohol,
+    /// skory, tkaniny, narzedzia...) - setki partii x 10 dni = wykupione targi.
+    /// Postfix na PartySupplies.PostInitialize sciaga AI do BkSupplyDaysCap
+    /// dni (gracz kupuje recznie - jego nie ruszamy). Popyt maleje u zrodla,
+    /// browar i garbarnia lataja reszte od strony podazy.
+    /// </summary>
+    internal static class BkSupplyTemper
+    {
+        private static int _tempered;
+
+        public static void PostInitPostfix(object __instance)
+        {
+            try
+            {
+                var c = Settings.Current;
+                if (c == null || c.BkSupplyDaysCap <= 0) return;
+                var tr = HarmonyLib.Traverse.Create(__instance);
+                bool auto = false;
+                try { auto = tr.Property("AutoBuying").GetValue<bool>(); } catch { }
+                if (!auto) return;   // gracz zaopatruje sie sam
+                int days = tr.Property("DaysOfProvision").GetValue<int>();
+                if (days <= c.BkSupplyDaysCap) return;
+                tr.Property("DaysOfProvision").SetValue(c.BkSupplyDaysCap);
+                if (++_tempered == 1)
+                    Log.Info("BkSupplyTemper: zapasy AI sciete do " + c.BkSupplyDaysCap + " dni (BK chcial " + days + ").");
+            }
+            catch { }
+        }
+
+        internal static void ApplyAll(HarmonyLib.Harmony h)
+        {
+            try
+            {
+                var t = QuartermasterLaw.FindType("BannerKings.Behaviours.PartyNeeds.PartySupplies");
+                var m = t != null ? HarmonyLib.AccessTools.Method(t, "PostInitialize") : null;
+                if (m == null) { Log.Info("BkSupplyTemper: BK PartySupplies nieobecne."); return; }
+                h.Patch(m, postfix: new HarmonyLib.HarmonyMethod(typeof(BkSupplyTemper), "PostInitPostfix"));
+                Log.Info("BkSupplyTemper: sakwy AI ograniczone (BkSupplyDaysCap=" + (Settings.Current != null ? Settings.Current.BkSupplyDaysCap : 4) + " dni).");
+            }
+            catch (Exception e) { Log.Error("BkSupplyTemper.ApplyAll", e); }
+        }
+    }
+
     internal sealed class AleSupply : CampaignBehaviorBase
     {
         private ItemObject _beer, _wine, _mead, _leather, _hides;
