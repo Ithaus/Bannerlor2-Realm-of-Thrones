@@ -1,5 +1,24 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-28 — smoki-wierzchowce schodza przy spawnie misji (crash/hang wielkiej bitwy)
+**Mod:** Armoury | **Pliki:** `Armoury/src/DragonUnmount.cs` (nowy), `Armoury/src/SubModuleMain.cs`
+**Problem:** Jeff wszedl w koncu w te bitwe (3000+ wojska): "sa dwa smoki na polu
+bitwy, czyje to smoki?" i hang w trakcie (hang-14-28-20: watek glowny "deep in
+native"). Wczesniej trzy crashe przy wejsciu w TE SAMA bitwe.
+**Przyczyna:** ktos w tej bitwie ma smoka (dragon_*) w SLOCIE WIERZCHOWCA -
+zrodla: ROT-owy szablon lorda ghi_bat_template_dany (dragon_black) i/lub wirtualne
+magazyny DTE band (bandyci lupia pokonanych; DTE ekwipuje AI). Silnik krztusi sie
+smokiem jako zwyklym koniem w polowej bitwie. Do tego skala: 3000 agentow +
+DTE RandomizeNonHeroLedAiPartiesArmor=true (losowanie pancerzy AI przy spawnie).
+**Zmiana:** DragonUnmount - prefix na Mission.SpawnAgent: dragon_* w slocie konia
+(10) zdjety PRZED spawnem (+ rzad konski, slot 11), jednostka idzie pieszo.
+Log "DragonUnmount: dragon_X zdjety przy spawnie z: <nazwa>" powie CZYJ byl smok.
+Smoki spawnowane przez ROT jako osobne stwory - nietkniete.
+**Ryzyko / co sprawdzic:** wejsc w te bitwe raz jeszcze; w Armoury.log szukac
+"DragonUnmount:". Hang od samej skali 3000 moze zostac - to limit silnika,
+osobna rozmowa (Battle Size w opcjach gry).
+**Status:** WGRANE
+
 ## 2026-08-28 — TRZECI crash w bitwie: pulapka na pierwotny wyjatek (przed reporterem BLSE)
 **Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs` (CrashCallerTattle + Install)
 **Problem:** trzeci crash przy wejsciu w te sama bitwe (14:17, pozycja identyczna
