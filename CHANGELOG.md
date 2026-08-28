@@ -1,5 +1,16 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-28 — DragonUnmount: wyjatek dla Daenerys i gracza
+**Mod:** Armoury | **Pliki:** `Armoury/src/DragonUnmount.cs`
+**Problem:** Jeff: "smoki ma tylko Daenerys, ona ma trzy! Inni maja nie miec.
+Chyba ze gracz z questa." Pierwsza wersja patcha zdejmowala smoka KAZDEMU.
+**Zmiana:** przy spawnie przepuszczamy smoka, gdy jezdzcem jest Daenerys
+(StringId lord_1_14, ROT-Content lords.xslt) albo postac gracza. Cala reszta
+(wylosowane szablony, lupy DTE u band) traci wierzchowca jak dotad.
+**Ryzyko / co sprawdzic:** bitwa z Dany - jej smok ma zostac; log "DragonUnmount:"
+dalej wypisuje kazde zdjecie z nazwa jednostki.
+**Status:** WGRANE
+
 ## 2026-08-28 — smoki-wierzchowce schodza przy spawnie misji (crash/hang wielkiej bitwy)
 **Mod:** Armoury | **Pliki:** `Armoury/src/DragonUnmount.cs` (nowy), `Armoury/src/SubModuleMain.cs`
 **Problem:** Jeff wszedl w koncu w te bitwe (3000+ wojska): "sa dwa smoki na polu
