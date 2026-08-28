@@ -236,10 +236,39 @@ namespace Armoury
                 }
                 ShareQueue.Clear();
                 int wrecks = AppendWrecks(__result);
+                CleanseDragons(__result);
                 Log.Info("BattlefieldLaw: ekran Spoils podmieniony na " + __result.Count + " pozycji prawdziwego lupu"
                          + (wrecks > 0 ? " (w tym " + wrecks + " wrakow)" : "") + ".");
             }
             catch (Exception e) { Log.Error("AfterGenerateLoot", e); }
+        }
+
+        /// <summary>
+        /// SMOK TO NIE CHABETA (Jeff 28.08: "jakim cudem mam trzy smoki
+        /// w ekwipunku?!"). ROT daje jednostkom Targaryenow wierzchowce
+        /// dragon_* (Type=Horse), a gra wrzuca mounty pokonanych do lupu jak
+        /// kazdego konia - is_merchandise=false przed tym nie chroni. Smoki
+        /// sa fabularne: wycinamy je z KAZDEGO lupu bitewnego.
+        /// </summary>
+        private static void CleanseDragons(ItemRoster roster)
+        {
+            try
+            {
+                if (roster == null) return;
+                int cut = 0;
+                for (int i = roster.Count - 1; i >= 0; i--)
+                {
+                    var el = roster.GetElementCopyAtIndex(i);
+                    var it = el.EquipmentElement.Item;
+                    if (it == null || it.StringId == null) continue;
+                    if (!it.StringId.StartsWith("dragon_")) continue;
+                    if (it.ItemType != ItemObject.ItemTypeEnum.Horse) continue;
+                    roster.AddToCounts(el.EquipmentElement, -el.Amount);
+                    cut += el.Amount;
+                }
+                if (cut > 0) Log.Info("BattlefieldLaw: " + cut + " smokow wycietych z lupu - smoki nie leza w workach.");
+            }
+            catch (Exception e) { Log.Error("CleanseDragons", e); }
         }
 
         /// <summary>Dzialka gracza z tego, co druzyna sciagnela z zabitych (DTE) - wyjeta z magazynu, do kolejki na ekran.</summary>
@@ -347,6 +376,7 @@ namespace Armoury
                     ShareQueue.Clear();
                 }
                 AppendWrecks(gainedLoots);
+                CleanseDragons(gainedLoots);
                 if (!Settings.Current.LootArrivesBattleWorn || _applyDamage == null || gainedLoots.Count == 0) return;
                 var damaged = _applyDamage.Invoke(null, new object[] { gainedLoots, 0f }) as ItemRoster;
                 if (damaged == null || ReferenceEquals(damaged, gainedLoots)) return;
