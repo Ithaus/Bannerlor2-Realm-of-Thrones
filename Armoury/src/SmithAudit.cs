@@ -51,13 +51,30 @@ namespace Armoury
         }
 
         // ---------------------------------------------------------------- refine
-        internal static void RefinePrefix(Hero hero)
+        // DIAGNOZA THAMASKENE (Jeff 27.08: "przekuwam, ale sie nie dodaje"):
+        // kazda rafinacja zapisuje formule i stan wyniku w sakwach PRZED i PO -
+        // log rozstrzyga, czy DoRefinement w ogole biegnie, czy dodaje,
+        // i czy ktos zjada wynik po nas.
+        [ThreadStatic] private static ItemObject _refOutItem;
+        [ThreadStatic] private static int _refOutWant;
+        [ThreadStatic] private static int _refOutBefore;
+
+        internal static void RefinePrefix(Hero hero, TaleWorlds.CampaignSystem.Crafting.RefiningFormula refineFormula)
         {
             try
             {
                 var b = Beh();
                 _tracking = b != null && hero != null;
                 if (_tracking) _before = b.GetHeroCraftingStamina(hero);
+                _refOutItem = null;
+                var model = Campaign.Current != null ? Campaign.Current.Models.SmithingModel : null;
+                if (model != null)
+                {
+                    _refOutItem = model.GetCraftingMaterialItem(refineFormula.Output);
+                    _refOutWant = refineFormula.OutputCount;
+                    _refOutBefore = _refOutItem != null
+                        ? TaleWorlds.CampaignSystem.Party.MobileParty.MainParty.ItemRoster.GetItemNumber(_refOutItem) : -1;
+                }
             }
             catch { _tracking = false; }
         }
@@ -65,6 +82,15 @@ namespace Armoury
         internal static void RefinePostfix(Hero hero)
         {
             Settle(hero, "Refining", delegate { return 6; });
+            try
+            {
+                if (_refOutItem == null) { Log.Info("Rafinacja: model nie dal itemu wyniku (NULL) - to jest blad."); return; }
+                int after = TaleWorlds.CampaignSystem.Party.MobileParty.MainParty.ItemRoster.GetItemNumber(_refOutItem);
+                Log.Info("Rafinacja: " + _refOutItem.StringId + " x" + _refOutWant
+                         + " | w sakwach " + _refOutBefore + " -> " + after
+                         + (after <= _refOutBefore ? "  <-- WYNIK NIE DOSZEDL!" : ""));
+            }
+            catch (Exception e) { Log.Error("RefinePostfix.Diag", e); }
         }
 
         // ---------------------------------------------------------------- forge
