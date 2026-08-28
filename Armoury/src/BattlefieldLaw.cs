@@ -237,10 +237,55 @@ namespace Armoury
                 ShareQueue.Clear();
                 int wrecks = AppendWrecks(__result);
                 CleanseDragons(__result);
+                CleanseTrash(__result);
                 Log.Info("BattlefieldLaw: ekran Spoils podmieniony na " + __result.Count + " pozycji prawdziwego lupu"
-                         + (wrecks > 0 ? " (w tym " + wrecks + " wrakow)" : "") + ".");
+                         + (wrecks > 0 ? " (w tym " + wrecks + " wrakow przed przesianiem)" : "") + ".");
             }
             catch (Exception e) { Log.Error("AfterGenerateLoot", e); }
+        }
+
+        /// <summary>
+        /// SMIEC I LEGENDA NIE LEZA W WORKACH (Jeff 28.08). Smiec: sprzet zbity
+        /// ponizej LootMinConditionPercent wartosci jest ZNISZCZONY - nie ma
+        /// czego niesc (tnie tez zalew wrakow na 3%). Legenda: nazwane klingi
+        /// ROT (Brightroar, Widow's Wail... value 100k+, po kilkadziesiat sztuk
+        /// u elitarnych jednostek) nie moga lezec masowo w lupach - "unikat"
+        /// ma byc unikatem.
+        /// </summary>
+        private static void CleanseTrash(ItemRoster roster)
+        {
+            try
+            {
+                if (roster == null) return;
+                var s = Settings.Current;
+                int trash = 0, legends = 0;
+                for (int i = roster.Count - 1; i >= 0; i--)
+                {
+                    var el = roster.GetElementCopyAtIndex(i);
+                    var it = el.EquipmentElement.Item;
+                    if (it == null || el.Amount <= 0) continue;
+                    if (s.LegendaryLootValueFloor > 0 && it.HasWeaponComponent
+                        && it.Value >= s.LegendaryLootValueFloor)
+                    {
+                        roster.AddToCounts(el.EquipmentElement, -el.Amount);
+                        legends += el.Amount;
+                        continue;
+                    }
+                    if (s.LootMinConditionPercent > 0)
+                    {
+                        var mod = el.EquipmentElement.ItemModifier;
+                        if (mod != null && mod.PriceMultiplier * 100f <= s.LootMinConditionPercent + 0.01f)
+                        {
+                            roster.AddToCounts(el.EquipmentElement, -el.Amount);
+                            trash += el.Amount;
+                        }
+                    }
+                }
+                if (trash > 0 || legends > 0)
+                    Log.Info("BattlefieldLaw: lup przesiany - " + trash + " szt. zniszczonych (<=" +
+                             s.LootMinConditionPercent + "%) i " + legends + " legendarnych klng odpadlo.");
+            }
+            catch (Exception e) { Log.Error("CleanseTrash", e); }
         }
 
         /// <summary>
@@ -377,6 +422,7 @@ namespace Armoury
                 }
                 AppendWrecks(gainedLoots);
                 CleanseDragons(gainedLoots);
+                CleanseTrash(gainedLoots);
                 if (!Settings.Current.LootArrivesBattleWorn || _applyDamage == null || gainedLoots.Count == 0) return;
                 var damaged = _applyDamage.Invoke(null, new object[] { gainedLoots, 0f }) as ItemRoster;
                 if (damaged == null || ReferenceEquals(damaged, gainedLoots)) return;
@@ -509,6 +555,16 @@ namespace Armoury
             {
                 if (Wrecks.Count == 0) return 0;
                 var mod = WreckModifier();
+                // wraki zbite ponizej progu zniszczenia w ogole nie wchodza
+                // (Jeff 28.08: "<=3% = zniszczone, nie pojawia sie w loocie")
+                if (mod != null && Settings.Current.LootMinConditionPercent > 0
+                    && mod.PriceMultiplier * 100f <= Settings.Current.LootMinConditionPercent + 0.01f)
+                {
+                    int junked = Wrecks.Count;
+                    Wrecks.Clear();
+                    Log.Info("BattlefieldLaw: " + junked + " wrakow ponizej progu zniszczenia - zostaly na polu.");
+                    return 0;
+                }
                 foreach (var item in Wrecks)
                 {
                     if (item == null) continue;

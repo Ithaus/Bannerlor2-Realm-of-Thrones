@@ -1,5 +1,32 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-28 — cztery zlecenia Jeffa: wolny zaciag, wolne gojenie, smieci/legendy poza lupem, slonie w kwarantannie
+**Mod:** Armoury | **Pliki:** `SlowMuster.cs` (nowy), `SlowHealing.cs` (nowy), `ElephantQuarantine.cs` (nowy), `BattlefieldLaw.cs` (CleanseTrash + prog wrakow), `ArmouryBehavior.cs` (tick sloni), `Settings.cs` + `McmSettings.cs` (gen), `SubModuleMain.cs`
+**Problem (Jeff):** (1) "straty nie sa odczuwalne, zaraz sa nowi rycerze i rekruci";
+(2) "regeneracja zdrowia na mapie za szybka, ma byc dwa razy dluzsza, perki niech
+dzialaja"; (3) sakwy pelne legendarnych mieczy na 3% (Brightroar x12, Brightroar
+Silver x46, Widow's Wail...) - "czy to nie unikaty?!" + "wszystko ponizej 3%
+uznajemy za zniszczone, nie pojawia sie w loocie"; (4) "moge kupic slonia
+w Winterfell - zrob cos!".
+**Zmiany:** (1) SlowMuster: postfix na BKVolunteerModel.GetDailyVolunteerProduction
+Probability x VolunteerRegenPercent (50%) - lordowie i gracz rowno. (2) SlowHealing:
+postfix AddFactor -50% na GetDailyHealingForRegulars/HpForHeroes (HealingRegen
+Percent=50) - perki licza sie normalnie, wynik ciety na koncu. (3) BattlefieldLaw.
+CleanseTrash w obu sciezkach lupu: modifier <= LootMinConditionPercent (3%) =
+zniszczone; bron o value >= LegendaryLootValueFloor (100k - wszystkie nazwane
+klingi ROT, np. brightroar value=300000) nie leza w workach; AppendWrecks nie
+wpuszcza wrakow ponizej progu (WreckModifier "heavy" = te 3% z ekranu Jeffa).
+(4) ElephantQuarantine: slon (elephant, rot_elephant_*) schodzi z targu osad
+o innej kulturze niz przedmiot (volantine) - DailyTickSettlement + wejscie gracza.
+**Zrodlo legend w sakwach:** ROT daje nazwane miecze elitarnym JEDNOSTKOM w ich
+szablonach (brightroar w equipment setach), a DTE sciaga je z zabitych - stad
+46 sztuk "unikatu". Sztuki JUZ w sakwach Jeffa zostaja (jego decyzja co z nimi).
+**Ryzyko / co sprawdzic:** wraki na 3% znikaja z lupow CALKIEM (WreckSalvage
+de facto wygaszony przy progu 3 - obnizenie progu w MCM je przywraca); komunikat
+"lup przesiany - N zniszczonych, M legendarnych odpadlo" w logu. Gojenie: wpis
+"Wounds knit slowly" w rozpisce leczenia.
+**Status:** WGRANE (watcher 4h - gra dzialala przy buildzie)
+
 ## 2026-08-28 — wybor skladu jak w hideoucie (OpenTroopSelection), koniec triku z rannymi
 **Mod:** Armoury | **Pliki:** `Armoury/src/BattleMuster.cs` (przepisany)
 **Problem:** Jeff: "po co kombinowac z rannymi - jest gotowy widok jak przy

@@ -440,6 +440,18 @@ namespace Armoury
         [SettingPropertyGroup("The lean quartermasters")]
         public int BkSupplyMaxPieces { get; set; } = 12;
 
+        [SettingPropertyInteger("Volunteer Regen Percent", 0, 200, "0", HintText = "notables refill their volunteer slots at this percent of the normal daily chance - losses should STING, for lords and player alike (100 = vanilla, 0 = off)")]
+        [SettingPropertyGroup("The slow muster")]
+        public int VolunteerRegenPercent { get; set; } = 50;
+
+        [SettingPropertyInteger("Healing Regen Percent", 0, 200, "0", HintText = "wounded men and heroes heal on the map at this percent of the normal daily rate - medicine perks still count on top (100 = vanilla)")]
+        [SettingPropertyGroup("The slow mending")]
+        public int HealingRegenPercent { get; set; } = 50;
+
+        [SettingPropertyBool("Elephant Quarantine Enabled", HintText = "elephants and their barding sell only in settlements of their own culture - no war beasts wintering in Winterfell")]
+        [SettingPropertyGroup("The menagerie")]
+        public bool ElephantQuarantineEnabled { get; set; } = true;
+
         [SettingPropertyBool("Hideout Purge Enabled", HintText = "a cleared hideout must be SEARCHED: the plundered gold, renown and the gratitude of the district wait behind one more step")]
         [SettingPropertyGroup("The hideout purge")]
         public bool HideoutPurgeEnabled { get; set; } = true;
@@ -531,6 +543,14 @@ namespace Armoury
         [SettingPropertyBool("Wreck Salvage Enabled", HintText = "the piece smashed by the killing blow is not lost - it lands in the loot as a wreck to mend at the forge")]
         [SettingPropertyGroup("The law of the battlefield")]
         public bool WreckSalvageEnabled { get; set; } = true;
+
+        [SettingPropertyInteger("Loot Min Condition Percent", 0, 12, "0", HintText = "gear battered down to this percent of its worth or less is DESTROYED - it never reaches the loot screen (0 = off)")]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public int LootMinConditionPercent { get; set; } = 3;
+
+        [SettingPropertyInteger("Legendary Loot Value Floor", 0, 400000, "0", HintText = "weapons worth this much clean (the named blades of the realm) never lie in the common loot sacks (0 = off)")]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public int LegendaryLootValueFloor { get; set; } = 100000;
 
         [SettingPropertyInteger("Min Sell Percent Of Value", 0, 20, "0", HintText = "merchants never pay less than this share of an item's clean value - scrap is still metal and leather (0 = off)")]
         [SettingPropertyGroup("The law of the battlefield")]
@@ -1113,6 +1133,9 @@ namespace Armoury
             s.UniqueCrownHeadArmor = UniqueCrownHeadArmor;
             s.BkSupplyDaysCap = BkSupplyDaysCap;
             s.BkSupplyMaxPieces = BkSupplyMaxPieces;
+            s.VolunteerRegenPercent = VolunteerRegenPercent;
+            s.HealingRegenPercent = HealingRegenPercent;
+            s.ElephantQuarantineEnabled = ElephantQuarantineEnabled;
             s.HideoutPurgeEnabled = HideoutPurgeEnabled;
             s.HideoutGoldBase = HideoutGoldBase;
             s.HideoutGoldPerBand = HideoutGoldPerBand;
@@ -1136,6 +1159,8 @@ namespace Armoury
             s.SimBattleFullDrop = SimBattleFullDrop;
             s.PlayerLootSharePercent = PlayerLootSharePercent;
             s.WreckSalvageEnabled = WreckSalvageEnabled;
+            s.LootMinConditionPercent = LootMinConditionPercent;
+            s.LegendaryLootValueFloor = LegendaryLootValueFloor;
             s.MinSellPercentOfValue = MinSellPercentOfValue;
             s.EnlistedSoldierNoLooting = EnlistedSoldierNoLooting;
             s.FieldCraftEnabled = FieldCraftEnabled;

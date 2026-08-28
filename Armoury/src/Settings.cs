@@ -129,6 +129,15 @@ namespace Armoury
         public int BkSupplyDaysCap = 1;                    // AI parties stock ONE day of Banner Kings supplies instead of 10 - they buy as they go and ride to market when they run out (0 = off)
         public int BkSupplyMaxPieces = 12;                 // hard ceiling: an AI party never stockpiles more than this many pieces of any one supply - repairs need a few hides, not a warehouse (0 = off)
 
+        // --- The slow muster ---
+        public int VolunteerRegenPercent = 50;             // notables refill their volunteer slots at this percent of the normal daily chance - losses should STING, for lords and player alike (100 = vanilla, 0 = off)
+
+        // --- The slow mending ---
+        public int HealingRegenPercent = 50;               // wounded men and heroes heal on the map at this percent of the normal daily rate - medicine perks still count on top (100 = vanilla)
+
+        // --- The menagerie ---
+        public bool ElephantQuarantineEnabled = true;      // elephants and their barding sell only in settlements of their own culture - no war beasts wintering in Winterfell
+
         // --- The hideout purge ---
         public bool HideoutPurgeEnabled = true;            // a cleared hideout must be SEARCHED: the plundered gold, renown and the gratitude of the district wait behind one more step
         public int HideoutGoldBase = 150;                  // gold hidden in any den before counting its bands
@@ -156,6 +165,8 @@ namespace Armoury
         public bool SimBattleFullDrop = true;              // auto-resolved battles ignore the hidden per-tier drop multipliers
         public int PlayerLootSharePercent = 40;            // your cut of what the party strips from the dead; the rest stays in the army armoury (a lone wanderer takes all)
         public bool WreckSalvageEnabled = true;            // the piece smashed by the killing blow is not lost - it lands in the loot as a wreck to mend at the forge
+        public int LootMinConditionPercent = 3;            // gear battered down to this percent of its worth or less is DESTROYED - it never reaches the loot screen (0 = off)
+        public int LegendaryLootValueFloor = 100000;       // weapons worth this much clean (the named blades of the realm) never lie in the common loot sacks (0 = off)
         public int MinSellPercentOfValue = 5;              // merchants never pay less than this share of an item's clean value - scrap is still metal and leather (0 = off)
         public bool EnlistedSoldierNoLooting = true;       // serving in a lord's army: the quartermasters strip the field - one soldier does not pocket the army's loot and gold
 

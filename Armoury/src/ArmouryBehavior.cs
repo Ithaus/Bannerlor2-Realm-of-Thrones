@@ -89,7 +89,10 @@ namespace Armoury
                 {
                     try { Orders.OnSettlementEntered(mp, st); } catch { }
                     try { Stables.OnSettlementEntered(mp, st); } catch { }
+                    try { if (mp == MobileParty.MainParty) ElephantQuarantine.Sweep(st); } catch { }
                 });
+            CampaignEvents.DailyTickSettlementEvent.AddNonSerializedListener(this,
+                delegate (Settlement st) { try { ElephantQuarantine.Sweep(st); } catch { } });
             // menu kucia otwarte JAKAKOLWIEK droga (takze wznowione z save'a,
             // z pominieciem StartCraftingMenu) - dniowka kupuje sie od razu
             CampaignEvents.GameMenuOpened.AddNonSerializedListener(this, OnGameMenuOpened);
