@@ -1,5 +1,19 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-28 — kuznia nie powiela legend: dedykowane czesci ukryte w projektowniku
+**Mod:** Armoury | **Pliki:** `Armoury/src/LegendaryLaw.cs` (LockLegendPieces)
+**Problem:** Jeff: "jak wykuje legende, to moze byc wiecej niz jedna - popraw to".
+ROT daje czesci legend (brightroar_blade/guard/handle/pommel...) z is_default=true -
+kazdy kowal mogl zlozyc legende od reki i mnozyc unikaty.
+**Zmiana:** przy wczytaniu czesci skladowe legendarnych klng dostaja
+IsHiddenOnDesigner=true - znikaja z projektownika kuzni. Bez klingi Brightroara
+nie zlozysz Brightroara. Czesci WSPOLDZIELONE ze zwykla bronia zostaja widoczne
+(normalne kucie nietkniete) - wystarczy jedna ukryta dedykowana czesc.
+**Ryzyko / co sprawdzic:** log "N dedykowanych czesci legend ukrytych w kuzni";
+w smithingu nie widac czesci typu Brightroar Blade; zwykle wzory kuja sie
+jak dotad.
+**Status:** WGRANE (watcher - gra dzialala przy buildzie)
+
 ## 2026-08-28 — legendy precz TAKZE z magazynow armii AI + prawda o "atletyce pancerzy"
 **Mod:** Armoury | **Pliki:** `Armoury/src/LegendaryLaw.cs` (SweepAiArmories)
 **Problem:** Jeff: "usun z innych armii AI unikatowe bronie - moze byc jedna

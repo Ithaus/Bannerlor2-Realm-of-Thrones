@@ -56,6 +56,49 @@ namespace Armoury
             catch (Exception e) { Log.Error("LegendaryLaw.Cull", e); }
             try { SweepAiArmories("wczytanie"); } catch (Exception e) { Log.Error("LegendaryLaw.SweepAiArmories", e); }
             try { SweepWorld(); } catch (Exception e) { Log.Error("LegendaryLaw.SweepWorld", e); }
+            try { LockLegendPieces(); } catch (Exception e) { Log.Error("LegendaryLaw.LockLegendPieces", e); }
+        }
+
+        /// <summary>KUZNIA NIE POWIELA LEGEND (Jeff: "jak wykuje, to moze byc
+        /// wiecej niz jedna - popraw to"). Czesci skladowe legendarnych klng
+        /// (brightroar_blade itd.) znikaja z projektownika kuzni - bez klingi
+        /// Brightroara nie zlozysz Brightroara. Czesc WSPOLDZIELONA ze zwykla
+        /// bronia zostaje widoczna (nie psujemy normalnego kucia) - wystarczy,
+        /// ze choc jedna dedykowana czesc legendy jest ukryta.</summary>
+        private static void LockLegendPieces()
+        {
+            var fHide = AccessTools.Field(typeof(CraftingPiece), "<IsHiddenOnDesigner>k__BackingField");
+            if (fHide == null) { Log.Info("LegendaryLaw: brak pola IsHiddenOnDesigner - kucia nie blokuje."); return; }
+
+            // czesci uzywane przez ZWYKLE przedmioty - tych nie wolno ukryc
+            var common = new HashSet<CraftingPiece>();
+            foreach (var it in MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
+            {
+                if (it == null || IsLegend(it) || it.WeaponDesign == null) continue;
+                var used = it.WeaponDesign.UsedPieces;
+                if (used == null) continue;
+                foreach (var el in used)
+                    if (el != null && el.CraftingPiece != null) common.Add(el.CraftingPiece);
+            }
+
+            int locked = 0, shared = 0;
+            foreach (var it in MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
+            {
+                if (!IsLegend(it) || it.WeaponDesign == null) continue;
+                var used = it.WeaponDesign.UsedPieces;
+                if (used == null) continue;
+                foreach (var el in used)
+                {
+                    var p = el != null ? el.CraftingPiece : null;
+                    if (p == null || p.IsHiddenOnDesigner) continue;
+                    if (common.Contains(p)) { shared++; continue; }
+                    fHide.SetValue(p, true);
+                    locked++;
+                }
+            }
+            if (locked > 0)
+                Log.Info("LegendaryLaw: " + locked + " dedykowanych czesci legend ukrytych w kuzni (wspoldzielonych pominieto "
+                         + shared + ") - legend NIE da sie wykuc.");
         }
 
         /// <summary>ZERO NA START (Jeff: "wyzeruj start i save'a - wykuc mozna,
