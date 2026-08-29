@@ -1,5 +1,18 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-29 — puste okno rekrutacji: diagnostyka licznikow ochotnikow
+**Mod:** CrashScribe | **Pliki:** `CrashScribe/src/WarReport.cs`
+**Problem (Jeff + screen):** okno REKRUTACJI w Barrow puste ("Recruit All (0)",
+zero wierszy, glowki notabli wystaja nad panelem). W logach ZERO wyjatkow
+z tego momentu - okno nie crashuje, tylko buduje zero pozycji. Dwie mozliwosci:
+(a) STAN: wszyscy notable maja 0/6 ochotnikow (wolny zaciag 50% + wojna
+wysysa rekrutow) i BK-ekran nie renderuje pustych; (b) BUG UI w ekranie BK.
+**Zmiana:** spis OSADA przy wejsciu gracza wypisuje teraz per notabl
+"ochotnicy n/6" - nastepne wejscie do wioski rozstrzygnie miedzy (a) i (b).
+**Test dla Jeffa:** inna wioska + proba rekrutacji przez DIALOG notabla
+(sciezka vanilla) - jesli dialog daje rekrutow, a okno puste, to (b).
+**Status:** WGRANE (watcher - gra dzialala przy buildzie)
+
 ## 2026-08-29 — ZBIERAMY POLEGLYCH: rynsztunek wlasnych zabitych wraca na wozy (dla gracza)
 **Mod:** Armoury | **Pliki:** `Armoury/src/ArmouryBehavior.cs` (SnapshotOwnRanks/GatherFallen)
 **Problem (Jeff):** "polegli mi zolnierze i ich ekwipunek zniknal - ma zasilac
