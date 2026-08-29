@@ -72,6 +72,7 @@ namespace Armoury
                 SlowHealing.ApplyAll(_harmony);
                 SkillsDecide.ApplyAll(_harmony);
                 MusterOut.ApplyAll(_harmony);
+                CraftPopup.ApplyAll(_harmony);
             }
             catch (Exception e) { Log.Error("OnBeforeInitialModuleScreenSetAsRoot", e); }
         }

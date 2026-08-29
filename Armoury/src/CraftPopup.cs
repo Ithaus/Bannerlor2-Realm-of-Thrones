@@ -21,6 +21,47 @@ namespace Armoury
     /// </summary>
     internal static class CraftPopup
     {
+        /// <summary>Vanillowy RefreshUsages pada na _crafting==null (nasze
+        /// popupy nie ida przez projektanta broni). Prefix: bez craftingu
+        /// budujemy zakladki uzyc wprost z przedmiotu; vanilla - po staremu.</summary>
+        internal static void ApplyAll(HarmonyLib.Harmony h)
+        {
+            try
+            {
+                var m = HarmonyLib.AccessTools.Method(typeof(WeaponDesignResultPopupVM), "RefreshUsages");
+                if (m == null) { Log.Info("CraftPopup: brak RefreshUsages - panel moze padac na fallback."); return; }
+                h.Patch(m, prefix: new HarmonyLib.HarmonyMethod(typeof(CraftPopup), "RefreshUsagesPrefix"));
+                Log.Info("CraftPopup: panel wyniku kucia uzbrojony (usages bez craftingu).");
+            }
+            catch (Exception e) { Log.Error("CraftPopup.ApplyAll", e); }
+        }
+
+        public static bool RefreshUsagesPrefix(WeaponDesignResultPopupVM __instance)
+        {
+            try
+            {
+                var tr = HarmonyLib.Traverse.Create(__instance);
+                if (tr.Field("_crafting").GetValue() != null) return true;   // vanilla droga
+                var item = tr.Field("_craftedItem").GetValue<ItemObject>();
+                var sel = __instance.SecondaryUsageSelector;
+                if (sel == null) return false;
+                sel.ItemList.Clear();
+                int shown = 0;
+                var weapons = item != null ? item.Weapons : null;
+                if (weapons != null)
+                    for (int i = 0; i < weapons.Count; i++)
+                    {
+                        if (!TaleWorlds.CampaignSystem.ViewModelCollection.CampaignUIHelper.IsItemUsageApplicable(weapons[i])) continue;
+                        var name = GameTexts.FindText("str_weapon_usage", weapons[i].WeaponDescriptionId);
+                        sel.AddItem(new CraftingSecondaryUsageItemVM(name, shown, i, sel));
+                        shown++;
+                    }
+                sel.SelectedIndex = shown > 0 ? 0 : -1;
+                return false;
+            }
+            catch (Exception e) { Log.Error("CraftPopup.RefreshUsagesPrefix", e); return false; }
+        }
+
         private sealed class RootVM : ViewModel
         {
             private WeaponDesignResultPopupVM _popup;
@@ -61,6 +102,9 @@ namespace Armoury
                     visual,
                     new MBBindingList<TaleWorlds.CampaignSystem.ViewModelCollection.Inventory.ItemFlagVM>(),
                     props, delegate { });
+
+                // pancerz nie ma zakladek uzyc - liste statow ustawiamy wprost
+                try { popup.DesignResultPropertyList = BuildProps(item, mod); } catch { }
 
                 _root = new RootVM(popup);
                 _layer = new GauntletLayer("GauntletLayer", 4500);
