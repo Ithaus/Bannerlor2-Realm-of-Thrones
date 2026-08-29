@@ -31,7 +31,14 @@ namespace Armoury
                 var m = HarmonyLib.AccessTools.Method(typeof(WeaponDesignResultPopupVM), "RefreshUsages");
                 if (m == null) { Log.Info("CraftPopup: brak RefreshUsages - panel moze padac na fallback."); return; }
                 h.Patch(m, prefix: new HarmonyLib.HarmonyMethod(typeof(CraftPopup), "RefreshUsagesPrefix"));
-                Log.Info("CraftPopup: panel wyniku kucia uzbrojony (usages bez craftingu).");
+                // Done na panelu wola ExecuteFinalizeCrafting, ktore od razu robi
+                // _crafting.SetCraftedWeaponName - u nas _crafting==null -> NRE
+                // i CTD (crash-original 29.08 14:54, dowod w stacku). Prefix:
+                // bez craftingu tylko zamykamy panel.
+                var fin = HarmonyLib.AccessTools.Method(typeof(WeaponDesignResultPopupVM), "ExecuteFinalizeCrafting");
+                if (fin != null)
+                    h.Patch(fin, prefix: new HarmonyLib.HarmonyMethod(typeof(CraftPopup), "FinalizePrefix"));
+                Log.Info("CraftPopup: panel wyniku kucia uzbrojony (usages + Done bez craftingu).");
             }
             catch (Exception e) { Log.Error("CraftPopup.ApplyAll", e); }
         }
@@ -62,6 +69,19 @@ namespace Armoury
             catch (Exception e) { Log.Error("CraftPopup.RefreshUsagesPrefix", e); return false; }
         }
 
+        public static bool FinalizePrefix(WeaponDesignResultPopupVM __instance)
+        {
+            try
+            {
+                var tr = HarmonyLib.Traverse.Create(__instance);
+                if (tr.Field("_crafting").GetValue() != null) return true;   // vanilla droga
+                var onFin = tr.Field("_onFinalize").GetValue<Action>();
+                if (onFin != null) onFin();   // nasze Close()
+            }
+            catch (Exception e) { Log.Error("CraftPopup.FinalizePrefix", e); Close(); }
+            return false;
+        }
+
         private sealed class RootVM : ViewModel
         {
             private WeaponDesignResultPopupVM _popup;
@@ -83,6 +103,9 @@ namespace Armoury
             try
             {
                 if (item == null || !Settings.Current.CraftResultPopup) return;
+                // odglos kucia jak w vanilla (Jeff 29.08: "nie bylo odglosu kucia")
+                // - sciezka BK nie idzie przez vanillowy ekran, ktory go gra
+                try { TaleWorlds.Engine.SoundEvent.PlaySound2D("event:/ui/crafting/craft_success"); } catch { }
                 if (!ShowGauntlet(item, mod)) ShowInquiry(item, mod, made);
             }
             catch (Exception e) { Log.Error("CraftPopup.Show", e); }
@@ -104,7 +127,12 @@ namespace Armoury
                     props, delegate { });
 
                 // pancerz nie ma zakladek uzyc - liste statow ustawiamy wprost
-                try { popup.DesignResultPropertyList = BuildProps(item, mod); } catch { }
+                try
+                {
+                    popup.DesignResultPropertyList = BuildProps(item, mod);
+                    Log.Info("CraftPopup: panel dla " + item.StringId + " - statow " + popup.DesignResultPropertyList.Count + ".");
+                }
+                catch { }
 
                 _root = new RootVM(popup);
                 _layer = new GauntletLayer("GauntletLayer", 4500);

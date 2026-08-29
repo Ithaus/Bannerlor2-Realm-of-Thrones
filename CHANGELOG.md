@@ -1,5 +1,23 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-29 — CTD po Done na panelu kucia + brak odglosu kucia
+**Mod:** Armoury | **Pliki:** `Armoury/src/CraftPopup.cs`
+**Problem:** Jeff wykul Ravens' Teeth Longbow - panel z modelem 3D SIE POKAZAL,
+ale klik Done = CTD. Dowod (crash-original 14:54): NullReferenceException w
+`WeaponDesignResultPopupVM.ExecuteFinalizeCrafting()`. Do tego brak dzwieku kucia.
+**Przyczyna:** Done wola ExecuteFinalizeCrafting, ktore w pierwszej linii robi
+`_crafting.SetCraftedWeaponName(...)` - u nas _crafting==null (panel bez
+projektanta broni) -> NRE. Dzwiek: `event:/ui/crafting/craft_success` gra
+vanillowy GauntletCraftingScreen, a sciezka BK go omija.
+**Zmiana:** (1) prefix na ExecuteFinalizeCrafting - gdy _crafting==null tylko
+`_onFinalize` (zamkniecie panelu), vanilla nietknieta; (2) w Show()
+`SoundEvent.PlaySound2D("event:/ui/crafting/craft_success")`; (3) log
+"panel dla X - statow N" (na screenie stat-lista wygladala pusto, ale
+zaslanialo ja okno crasha - log rozstrzygnie).
+**Ryzyko / co sprawdzic:** wykuc luk/pancerz -> dzwiek + panel + Done bez crasha;
+w logu "statow N" (luk powinien miec 4: Missile Damage/Speed/Accuracy/Weight).
+**Status:** WGRANE (gra byla zamknieta po crashu)
+
 ## 2026-08-29 — SAVE GUBI STANY MAGAZYNU (intuicja Jeffa trafna): wlasna ksiega zuzycia
 **Mod:** Armoury | **Pliki:** `Armoury/src/ArmouryBehavior.cs` (arm_armory_wear)
 **Problem:** Jeff: "wydaje mi sie, ze load automatycznie naprawia sprzet
