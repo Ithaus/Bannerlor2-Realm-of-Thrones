@@ -1,5 +1,28 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-28 — PRAWO LEGEND: nazwane klingi wracaja do unikatowosci
+**Mod:** Armoury | **Pliki:** `Armoury/src/LegendaryLaw.cs` (nowy), `Armoury/src/DragonUnmount.cs`, `Armoury/src/SubModuleMain.cs`
+**Problem:** Jeff: "legendarne bronie sa unikatowe, nie moga wszyscy wojacy w nich
+biegac - wywalic nadwyzki u mnie i u wszystkich. Moga miec zwykla klinge t5/t6.
+Tak bylo w oryginalnym ROT??" TAK - zrodlo w danych ROT 8.1.8: szablony wladcow
+(vla_bat_template_tywin z Item.brightroar, value=300000) maja culture=
+neutral_culture + IsLordTemplate, wiec gra LOSUJE je przypadkowym bohaterom;
+polegli oddaja klingi do magazynow DTE, DTE ubiera w nie szeregowych - stad
+46x "Brightroar Silver" w sakwach po wielkiej bitwie. Nikt ich nie kul.
+**Zmiana (LegendaryLaw, prog value >= LegendaryLootValueFloor 100k):**
+(1) SweepTemplates przy kazdym wczytaniu: legendy znikaja z szablonow JEDNOSTEK
+(nie-bohaterow) ORAZ z losowanych rosterow szablonowych (MBEquipmentRoster) -
+zamiast nich najlepszy ZWYKLY odpowiednik tej samej klasy broni, tier <= legendy.
+Istniejacy wladcy (Tywin itd.) trzymaja swoje kopie w save - bohaterow nie tykamy.
+(2) Siatka przy spawnie misji (w DragonUnmount): szeregowy z legenda (np. z
+magazynu DTE) dostaje zamiennik na polu. (3) Jednorazowa czystka sakw gracza
+(SyncData armouryLegendsCulled): z kazdej klingi zostaje JEDEN egzemplarz
+w najlepszym stanie, nadwyzki znikaja.
+**Ryzyko / co sprawdzic:** log "LegendaryLaw:" - ile zdjeto z szablonow, jaki
+zamiennik za co ("zamiennik dla brightroar -> ..."), ile nadwyzek usunieto
+("The named blades are one of a kind again"). Wladca w bitwie MA swoja klinge.
+**Status:** WGRANE (gra byla zamknieta, DLL 16:59)
+
 ## 2026-08-28 — cztery zlecenia Jeffa: wolny zaciag, wolne gojenie, smieci/legendy poza lupem, slonie w kwarantannie
 **Mod:** Armoury | **Pliki:** `SlowMuster.cs` (nowy), `SlowHealing.cs` (nowy), `ElephantQuarantine.cs` (nowy), `BattlefieldLaw.cs` (CleanseTrash + prog wrakow), `ArmouryBehavior.cs` (tick sloni), `Settings.cs` + `McmSettings.cs` (gen), `SubModuleMain.cs`
 **Problem (Jeff):** (1) "straty nie sa odczuwalne, zaraz sa nowi rycerze i rekruci";

@@ -37,6 +37,27 @@ namespace Armoury
                 if (agentBuildData == null || agentBuildData.AgentData == null) return;
                 var eq = agentBuildData.AgentData.AgentOverridenEquipment;
                 if (eq == null) return;
+                // PRAWO LEGEND przy spawnie: szeregowy z nazwana klinga (np. DTE
+                // ubral go z magazynu pelnego lupow) dostaje zwykly odpowiednik;
+                // bohaterowie nosza swoje legendy dalej
+                try
+                {
+                    var soldier = agentBuildData.AgentData.AgentCharacter;
+                    if (soldier != null && !soldier.IsHero)
+                        for (int slot = 0; slot < 4; slot++)
+                        {
+                            var w = eq[(EquipmentIndex)slot].Item;
+                            if (w == null || !w.HasWeaponComponent) continue;
+                            if (Settings.Current.LegendaryLootValueFloor <= 0
+                                || w.Value < Settings.Current.LegendaryLootValueFloor) continue;
+                            var repl = LegendaryLaw.ReplacementFor(w);
+                            eq[(EquipmentIndex)slot] = repl != null
+                                ? new EquipmentElement(repl) : new EquipmentElement(null);
+                            Log.Info("LegendaryLaw: " + w.StringId + " zdjety przy spawnie z szeregowego ("
+                                     + soldier.StringId + ").");
+                        }
+                }
+                catch { }
                 var horse = eq[(EquipmentIndex)10];          // slot wierzchowca
                 var item = horse.Item;
                 if (item == null || item.StringId == null) return;
