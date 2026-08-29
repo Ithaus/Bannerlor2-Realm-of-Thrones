@@ -1,5 +1,20 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-29 — panel kucia NAPRAWIONY: NRE w RefreshUsages przy _crafting=null
+**Mod:** Armoury | **Pliki:** `Armoury/src/CraftPopup.cs` (ApplyAll + prefix), `SubModuleMain.cs`
+**Problem (Jeff + screen):** przy kuciu luku dalej wyskakiwalo tekstowe
+okienko (fallback). Dowod z logu 14:21:33: NullReferenceException
+w WeaponDesignResultPopupVM.RefreshUsages - vanillowy VM siega po
+_crafting.GetCurrentCraftedItemObject(), a nasze popupy nie ida przez
+projektanta broni (crafting=null).
+**Zmiana:** Harmony-prefix na RefreshUsages: gdy _crafting==null (tylko nasze
+popupy), zakladki uzyc buduja sie wprost z item.Weapons (z filtrem
+IsItemUsageApplicable); vanilla sciezka nietknieta. Dla pancerzy (zero uzyc)
+DesignResultPropertyList ustawiane wprost po utworzeniu VM. Fallback tekstowy
+zostaje na kazdy przyszly zgrzyt.
+**Status:** WGRANE (watcher - gra dzialala przy buildzie); test = wykuc luk,
+ma byc PELNY panel z modelem, nie okienko.
+
 ## 2026-08-29 — puste okno rekrutacji: diagnostyka licznikow ochotnikow
 **Mod:** CrashScribe | **Pliki:** `CrashScribe/src/WarReport.cs`
 **Problem (Jeff + screen):** okno REKRUTACJI w Barrow puste ("Recruit All (0)",
