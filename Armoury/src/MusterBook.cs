@@ -184,6 +184,22 @@ namespace Armoury
             }
         }
 
+        /// <summary>Wymogi przedmiotu vs umiejetnosc jednostki - ponad stan
+        /// pozycja jest WYSZARZONA (Jeff: "nie moge dac luku ponad wymogi").</summary>
+        private static bool MeetsReq(CharacterObject ch, ItemObject it, out string why)
+        {
+            why = null;
+            try
+            {
+                if (it.RelevantSkill == null || it.Difficulty <= 0) return true;
+                int have = ch.GetSkillValue(it.RelevantSkill);
+                if (have >= it.Difficulty) return true;
+                why = "Requires " + it.RelevantSkill.Name + " " + it.Difficulty + " - this troop has " + have + ".";
+                return false;
+            }
+            catch { return true; }
+        }
+
         private static void OpenSlot(CharacterObject ch, int slot)
         {
             try
@@ -199,8 +215,9 @@ namespace Armoury
                         var el = armory.GetElementCopyAtIndex(i);
                         var it = el.EquipmentElement.Item;
                         if (it == null || el.Amount <= 0 || !Fits(it, slot) || !seen.Add(it)) continue;
+                        string why; bool ok = MeetsReq(ch, it, out why);
                         rows.Add(new InquiryElement(it, it.Name + "  x" + el.Amount + "  (t" + ((int)it.Tier + 1) + ")",
-                            SmithMenu.ItemPic(it), true, "In the stores: " + el.Amount + " pieces."));
+                            SmithMenu.ItemPic(it), ok, ok ? "In the stores: " + el.Amount + " pieces." : why));
                     }
                 // TWOJE SAKWY TEZ (Jeff 29.08: "nie widzi lukow, ktore wykulem") -
                 // wybor takiej sztuki PRZENOSI ja na stan magazynu, bo kwatermistrz
@@ -212,9 +229,10 @@ namespace Armoury
                         var el = bags.GetElementCopyAtIndex(i);
                         var it = el.EquipmentElement.Item;
                         if (it == null || el.Amount <= 0 || !Fits(it, slot) || !seen.Add(it)) continue;
+                        string why2; bool ok2 = MeetsReq(ch, it, out why2);
                         rows.Add(new InquiryElement(it, it.Name + "  x" + el.Amount + "  (t" + ((int)it.Tier + 1) + ")  [YOUR BAGGAGE]",
-                            SmithMenu.ItemPic(it), true,
-                            "In YOUR baggage: " + el.Amount + " pieces - assigning moves them to the company stores."));
+                            SmithMenu.ItemPic(it), ok2,
+                            ok2 ? "In YOUR baggage: " + el.Amount + " pieces - assigning moves them to the company stores." : why2));
                     }
                 MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData(
                     ch.Name + " - " + SlotName(slot),

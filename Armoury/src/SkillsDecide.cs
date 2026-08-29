@@ -128,21 +128,33 @@ namespace Armoury
                 }
 
                 // KSIEGA MUSZTRY: reczne przypisania gracza maja pierwszenstwo
-                // przed nasza logika skilli (bron sloty 0-3)
+                // przed nasza logika skilli (bron sloty 0-3) - ale WYMAGANIA
+                // przedmiotu sa swiete (Jeff: "nie moge dac luku ponad wymogi,
+                // opcja wyszarzona"): pin ponad skill jednostki jest pomijany
                 while (slots.Count < 4) slots.Add(null);
                 for (int s = 0; s < 4; s++)
                 {
                     var pin = MusterBook.PinFor(ch, s);
-                    if (pin != null) slots[s] = pin;
+                    if (pin == null) continue;
+                    if (pin.RelevantSkill != null && ch.GetSkillValue(pin.RelevantSkill) < pin.Difficulty) continue;
+                    slots[s] = pin;
                 }
                 for (int i = 0; i < 4; i++)
                     reference[(EquipmentIndex)i] = i < slots.Count && slots[i] != null
                         ? new EquipmentElement(slots[i]) : new EquipmentElement(null);
-                // pancerz z przypisu: sloty 5-9 referencji dostaja pin wprost
+                // PANCERZ CELUJE W GORE (Jeff 29.08: "czy AI nie zacznie rozbierac
+                // lucznikow do bazowego wzorca?"): DTE co bitwe dobiera sprzet
+                // NAJBLIZSZY wzorcowi - bazowy szablon t3 sciagalby zolnierzy
+                // w dol mimo t6 w magazynie. Wzorzec pancerza to od teraz
+                // NAJLEPSZA sztuka danego typu w grze: "najblizsze wzorcowi"
+                // znaczy wtedy "najlepsze, co magazyn ma". Pin gracza wygrywa.
                 for (int s = 5; s <= 9; s++)
                 {
                     var pin = MusterBook.PinFor(ch, s);
-                    if (pin != null) reference[(EquipmentIndex)s] = new EquipmentElement(pin);
+                    if (pin != null) { reference[(EquipmentIndex)s] = new EquipmentElement(pin); continue; }
+                    if (reference[(EquipmentIndex)s].Item == null) continue;   // szablon nie ubiera slotu - nie my
+                    var top = TopArmor(SlotArmorType(s));
+                    if (top != null) reference[(EquipmentIndex)s] = new EquipmentElement(top);
                 }
             }
             catch (Exception e) { Log.Error("SkillsDecide.RearmBySkill", e); }
@@ -174,6 +186,41 @@ namespace Armoury
                 default: type = ItemObject.ItemTypeEnum.Thrown; break;
             }
             AddPattern(slots, type, skill);
+        }
+
+        private static ItemObject.ItemTypeEnum SlotArmorType(int slot)
+        {
+            switch (slot)
+            {
+                case 5: return ItemObject.ItemTypeEnum.HeadArmor;
+                case 6: return ItemObject.ItemTypeEnum.BodyArmor;
+                case 7: return ItemObject.ItemTypeEnum.LegArmor;
+                case 8: return ItemObject.ItemTypeEnum.HandArmor;
+                default: return ItemObject.ItemTypeEnum.Cape;
+            }
+        }
+
+        private static readonly Dictionary<ItemObject.ItemTypeEnum, ItemObject> TopArmorCache
+            = new Dictionary<ItemObject.ItemTypeEnum, ItemObject>();
+
+        /// <summary>Najlepsza sztuka pancerza danego typu w calej grze - cel,
+        /// do ktorego DTE ma zblizac przydzial ("closest" = najlepsze na stanie).</summary>
+        private static ItemObject TopArmor(ItemObject.ItemTypeEnum type)
+        {
+            ItemObject best;
+            if (TopArmorCache.TryGetValue(type, out best)) return best;
+            try
+            {
+                foreach (var it in MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
+                {
+                    if (it == null || it.ItemType != type || !it.HasArmorComponent) continue;
+                    if (it.StringId != null && it.StringId.EndsWith("_crown")) continue;   // korony to regalia
+                    if (best == null || it.Effectiveness > best.Effectiveness) best = it;
+                }
+            }
+            catch (Exception e) { Log.Error("SkillsDecide.TopArmor", e); }
+            TopArmorCache[type] = best;
+            return best;
         }
 
         /// <summary>Wzorzec klasy: najlepsza bron (Effectiveness), ktorej

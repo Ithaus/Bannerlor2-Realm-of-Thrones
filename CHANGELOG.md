@@ -1,5 +1,21 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-29 — ZASADA NADRZEDNA: wymogi umiejetnosci swiete + pancerz celuje w gore
+**Mod:** Armoury | **Pliki:** `Armoury/src/SkillsDecide.cs`, `Armoury/src/MusterBook.cs`
+**Zlecenia Jeffa:** (1) "nie moge dac luku ponad wymagania - opcja wyszarzona,
+nie da sie go dac" + "zasada umiejetnosci jest NADRZEDNA: jesli ich nie masz,
+nie mozesz uzywac". (2) "czy AI nie zacznie rozbierac lucznikow do bazowego
+wzorca pancerza?" - zasadne: DTE co bitwe dobiera sprzet NAJBLIZSZY wzorcowi,
+a wzorzec pancerza byl bazowym szablonem (t3 sciagaloby w dol mimo t6 na stanie).
+**Zmiany:** (1) MusterBook: pozycje ponad wymogi jednostki (RelevantSkill/
+Difficulty) WYSZARZONE z podpowiedzia "Requires Bow 150 - this troop has 90"
+(magazyn i sakwy); SkillsDecide pomija pin ponad wymogi (stare piny tez).
+(2) SkillsDecide: wzorzec pancerza (sloty 5-9 bez pinu, gdy szablon ubiera slot)
+= NAJLEPSZA sztuka danego typu w grze (TopArmor, bez koron) - "najblizsze
+wzorcowi" znaczy odtad "najlepsze, co magazyn ma"; degradacja do szablonu
+niemozliwa. Zasada zapisana w pamieci projektu (skill-rule-supreme).
+**Status:** WGRANE (gra byla zamknieta)
+
 ## 2026-08-29 — ksiega musztry v1.1: sakwy gracza na liscie, przeniesienie do Manage Armoury
 **Mod:** Armoury | **Pliki:** `Armoury/src/MusterBook.cs`
 **Zgloszenia Jeffa po pierwszym tescie:**
