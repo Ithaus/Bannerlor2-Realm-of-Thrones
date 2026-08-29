@@ -53,6 +53,73 @@ namespace Armoury
             catch { }
         }
 
+        // STANY MAGAZYNU PRZEZYWAJA SAVE (Jeff 29.08: "load automatycznie
+        // naprawia sprzet wojska!" - DOWOD: DTE zapisuje magazyn jako
+        // Dictionary<string,int> = id -> liczba, BEZ modifierow; kazdy load
+        // odtwarzal wszystko czyste). My dopisujemy wlasna ksiege stanow:
+        // przy zapisie zrzut "itemId|modifierId|ile", przy wczytaniu zbite
+        // sztuki wracaja na miejsce czystych.
+        private List<string> _armoryWear = new List<string>();
+        private bool _wearRestorePending;
+
+        private List<string> BuildArmoryWearSnapshot()
+        {
+            var list = new List<string>();
+            try
+            {
+                var armory = QuartermasterLaw.DteArmory();
+                if (armory == null) return list;
+                for (int i = 0; i < armory.Count; i++)
+                {
+                    var el = armory.GetElementCopyAtIndex(i);
+                    var it = el.EquipmentElement.Item;
+                    var mod = el.EquipmentElement.ItemModifier;
+                    if (it == null || mod == null || el.Amount <= 0) continue;
+                    list.Add(it.StringId + "|" + mod.StringId + "|" + el.Amount);
+                }
+            }
+            catch (Exception e) { Log.Error("BuildArmoryWearSnapshot", e); }
+            return list;
+        }
+
+        private void TryRestoreArmoryWear(string why)
+        {
+            try
+            {
+                if (!_wearRestorePending) return;
+                var armory = QuartermasterLaw.DteArmory();
+                if (armory == null || armory.Count == 0) return;   // DTE jeszcze nie odtworzyl - czekamy
+                _wearRestorePending = false;
+                int restored = 0;
+                foreach (var line in _armoryWear)
+                {
+                    var parts = (line ?? "").Split('|');
+                    if (parts.Length != 3) continue;
+                    var it = TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObject<ItemObject>(parts[0]);
+                    var mod = TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObject<ItemModifier>(parts[1]);
+                    int n; if (!int.TryParse(parts[2], out n) || n <= 0) continue;
+                    if (it == null || mod == null) continue;
+                    // ile czystych sztuk tego itemu jest do "zbicia" z powrotem
+                    int clean = 0;
+                    for (int i = 0; i < armory.Count; i++)
+                    {
+                        var el = armory.GetElementCopyAtIndex(i);
+                        if (el.EquipmentElement.Item == it && el.EquipmentElement.ItemModifier == null)
+                        { clean = el.Amount; break; }
+                    }
+                    int take = Math.Min(n, clean);
+                    if (take <= 0) continue;
+                    armory.AddToCounts(new EquipmentElement(it), -take);
+                    armory.AddToCounts(new EquipmentElement(it, mod), take);
+                    restored += take;
+                }
+                _armoryWear.Clear();
+                if (restored > 0)
+                    Log.Info("ArmoryWear (" + why + "): odtworzono stany " + restored + " szt. magazynu (save DTE gubi modifiery).");
+            }
+            catch (Exception e) { Log.Error("TryRestoreArmoryWear", e); }
+        }
+
         internal static void StockWithdraw(string id, int n)
         {
             try
@@ -76,6 +143,9 @@ namespace Armoury
                 dataStore.SyncData("arm_condition", ref _condition);
                 dataStore.SyncData("arm_projects", ref _projects);
                 dataStore.SyncData("arm_player_stock", ref _playerStock);
+                if (dataStore.IsSaving) _armoryWear = BuildArmoryWearSnapshot();
+                dataStore.SyncData("arm_armory_wear", ref _armoryWear);
+                if (dataStore.IsLoading && _armoryWear != null && _armoryWear.Count > 0) _wearRestorePending = true;
                 dataStore.SyncData("arm_orders", ref Orders.Board);
                 dataStore.SyncData("arm_order_cooldowns", ref Orders.Cooldowns);
                 // dniowka w kuzni MUSI przezyc save/load - inaczej po wczytaniu
@@ -183,6 +253,9 @@ namespace Armoury
             {
                 // gotowe wyroby z kuzni wydaja sie od progu, bez czekania na tick
                 try { CollectReadyProjects(); } catch { }
+                // stany magazynu wracaja PRZED czystkami (DTE odtwarza roster
+                // dopiero po sesji - lapiemy pierwszy moment, gdy juz jest)
+                try { TryRestoreArmoryWear("menu"); } catch { }
                 // po kazdej bitwie menu sie otwiera - smok wyleci zanim DTE go osiodla
                 try { CleanseDragonStables(true); } catch { }
                 // ...a smieci <=3% i slonie-towar zaraz za nim (Spoils naklada
@@ -507,6 +580,7 @@ namespace Armoury
             try { FixCharcoalWeight(); } catch (Exception e) { Log.Error("FixCharcoalWeight", e); }
             try { WearGroups.Fix(); } catch (Exception e) { Log.Error("WearGroups.Fix", e); }
             try { CleanseNegativeStacks(); } catch (Exception e) { Log.Error("CleanseNegativeStacks", e); }
+            try { TryRestoreArmoryWear("sesja"); } catch (Exception e) { Log.Error("TryRestoreArmoryWear", e); }
             try { CleanseDragonStables(true); } catch (Exception e) { Log.Error("CleanseDragonStables", e); }
             try { CleanseTrashInBags(); } catch (Exception e) { Log.Error("CleanseTrashInBags", e); }
             try { QualityRich.Enrich(); } catch (Exception e) { Log.Error("QualityRich.Enrich", e); }

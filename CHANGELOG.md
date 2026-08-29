@@ -1,5 +1,23 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-29 — SAVE GUBI STANY MAGAZYNU (intuicja Jeffa trafna): wlasna ksiega zuzycia
+**Mod:** Armoury | **Pliki:** `Armoury/src/ArmouryBehavior.cs` (arm_armory_wear)
+**Problem:** Jeff: "wydaje mi sie, ze load automatycznie naprawia sprzet
+wojska - save nie trzyma stanu rzeczy". DOWOD z dekompilacji DTE
+(ArmyArmoryBehavior.Data): magazyn zapisywany jako Dictionary<string,int> =
+itemId -> liczba, BEZ MODIFIEROW. Kazdy save splaszczal zbite sztuki,
+kazdy load odtwarzal je CZYSTE - darmowa naprawa calego magazynu. To takze
+wspol-przyczyna "pustej listy pancerzy" (zuzyte wczoraj = czyste dzisiaj).
+**Zmiana:** wlasna ksiega stanow (arm_armory_wear w SyncData): przy zapisie
+zrzut "itemId|modifierId|ile" wszystkich zbitych sztuk magazynu; przy
+wczytaniu (gdy DTE juz odtworzy roster - proba przy sesji i przy kazdym menu
+do skutku) czyste sztuki sa z powrotem "zbijane" do zapisanych stanow
+(clamp do dostepnych czystych). Log "ArmoryWear: odtworzono stany N szt.".
+**Ryzyko / co sprawdzic:** save -> load -> Mending Bench: zbite pancerze
+maja NADAL byc zbite. TroopSelfMend znow ma sens (naprawa nie jest juz
+darmowa loadem).
+**Status:** WGRANE (watcher - gra dzialala przy buildzie)
+
 ## 2026-08-29 — pancerze na liscie naprawy NAPRAWDE: parytet typow przy limicie
 **Mod:** Armoury | **Pliki:** `Armoury/src/SmithMenu.cs`, `Armoury/src/ArmouryBehavior.cs`
 **Problem (Jeff, trzeci raz, slusznie wsciekly):** pancerzy dalej nie bylo
