@@ -127,6 +127,45 @@ namespace Armoury
             catch (Exception e) { Log.Error("SmeltTab.DoSmelting", e); return true; }
         }
 
+        /// <summary>
+        /// ROZEBRANA LEGENDA ODDAJE KOMPLET SWOICH CZESCI (Jeff 29.08: "musze
+        /// moc smelt Brightroar i dostac od razu wszystkie czesci, bo jest
+        /// jedna na swiecie - zeby nie bylo, ze czesci nie dostane i nie zloze").
+        /// Czesci legend sa ukryte w projektowniku (LegendaryLaw.LockLegendPieces),
+        /// wiec jedyna droga do odkucia legendy to POSIADAC i rozebrac oryginal:
+        /// wtedy wszystkie jej czesci zostaja odkryte i odblokowane.
+        /// </summary>
+        public static void DoSmeltingPostfix(CraftingCampaignBehavior __instance, Hero currentCraftingHero, EquipmentElement equipmentElement)
+        {
+            try
+            {
+                var item = equipmentElement.Item;
+                if (item == null || item.WeaponDesign == null) return;
+                if (!LegendaryLaw.IsLegend(item)) return;
+                var design = item.WeaponDesign;
+                var template = AccessTools.Field(typeof(WeaponDesign), "Template").GetValue(design) as CraftingTemplate;
+                var fHide = AccessTools.Field(typeof(CraftingPiece), "<IsHiddenOnDesigner>k__BackingField");
+                var mOpen = AccessTools.Method(typeof(CraftingCampaignBehavior), "OpenPart");
+                int opened = 0;
+                foreach (var el in design.UsedPieces)
+                {
+                    var piece = el != null ? el.CraftingPiece : null;
+                    if (piece == null) continue;
+                    if (fHide != null && piece.IsHiddenOnDesigner) fHide.SetValue(piece, false);
+                    if (mOpen != null && template != null)
+                        try { mOpen.Invoke(__instance, new object[] { piece, template, true }); } catch { }
+                    opened++;
+                }
+                if (opened > 0)
+                {
+                    Log.Player("The " + item.Name + " is broken down to its bones - all " + opened
+                               + " parts are yours, and yours alone, to reforge.", true);
+                    Log.Info("SmeltTab: legenda " + item.StringId + " rozebrana - " + opened + " czesci odkrytych i odblokowanych.");
+                }
+            }
+            catch (Exception e) { Log.Error("SmeltTab.DoSmeltingPostfix", e); }
+        }
+
         /// <summary>Lista przetopu: za vanillowymi broniami dokladamy nasze pancerze i luki.</summary>
         public static void RefreshListPostfix(object __instance)
         {
@@ -186,7 +225,8 @@ namespace Armoury
 
                 var mDo = AccessTools.Method(typeof(CraftingCampaignBehavior), "DoSmelting");
                 if (mDo != null)
-                    h.Patch(mDo, prefix: new HarmonyMethod(typeof(SmeltTab), "DoSmeltingPrefix"));
+                    h.Patch(mDo, prefix: new HarmonyMethod(typeof(SmeltTab), "DoSmeltingPrefix"),
+                                 postfix: new HarmonyMethod(typeof(SmeltTab), "DoSmeltingPostfix"));
 
                 // wyjscie przetopu: kazdy model dziedziczacy po SmithingModel (RBM/BK moga podmieniac)
                 int outs = 0;

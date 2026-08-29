@@ -1,5 +1,31 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-29 — FREEZE od naszego profilera (COFNIETY) + porzadek w godzinach kuzni + smelt legend oddaje komplet czesci
+**Mod:** CrashScribe + Armoury | **Pliki:** `CrashScribe/src/SubModuleMain.cs` (Sampler off), `Armoury/src/ArmouryBehavior.cs`, `Armoury/src/SmithMenu.cs`, `Armoury/src/SmeltTab.cs`
+**Problem 1 (FREEZE 08:06, gra wisi na glucho):** nasz Sampler (profiler FF)
+robil Suspend+StackTrace na watku glownym co 0.5 s; zlapanie watku w srodku
+locka (profil: 17% Monitor.Enter) = zakleszczenie gry NA STALE. COFNIETE -
+Sampler wylaczony na twardo (dane zebrane: FF muli od Campaign.RealTick,
+czyli symulacji silnika, nie od modow). Straznik zawieszen zostaje (Suspend
+tylko przy realnym hangu, rzadko).
+**Problem 2 (Jeff: "straszny balagan z godzinami kuzni"):** trzy rozne liczby
+z trzech zrodel: BK liczy godziny PRZY kowadle, nasz komunikat po wykuciu mowi
+o dodatkowych godzinach WYKANCZANIA u kowala (np. 33h dla Albion IV), a menu
+czekania w kuzni pokazuje SUME wszystkich zlecen w osadzie. Do tego XP projektu
+"van" liczylo sie z pancerzowego przelicznika (DaysPerTier zamiast
+WeaponDaysPerTier). Zmiany: komunikaty mowia wprost CZYJA to praca i CO znaczy
+liczba ("the SMITH'S finishing work - he works it himself, wherever you ride";
+wait-menu: "about N hours until ALL your work here is done, he needs no
+watching"); XP "van" z wlasciwego przelicznika. Zasada bez zmian: kowal konczy
+sam (ForgeWorksWithoutYou), czekanie w zamku liczy sie CELOWO.
+**Problem 3 (Jeff: "smelt Brightroar musi dac wszystkie czesci"):** czesci
+legend sa ukryte w projektowniku, wiec posiadacz oryginalu nie mialby jak go
+odkuc po rozbiorce. DoSmeltingPostfix: przetop LEGENDY odkrywa (IsHiddenOn
+Designer=false) i odblokowuje (OpenPart) WSZYSTKIE jej czesci - jedyna droga
+do odkucia legendy to miec i rozebrac oryginal. Dziala dla kazdej legendy.
+**Status:** WGRANE (oba DLL; watcher wgral 08:10 po ubiciu gry, Armoury
+dograne recznie z ostatnim buildem)
+
 ## 2026-08-28 — kuznia nie powiela legend: dedykowane czesci ukryte w projektowniku
 **Mod:** Armoury | **Pliki:** `Armoury/src/LegendaryLaw.cs` (LockLegendPieces)
 **Problem:** Jeff: "jak wykuje legende, to moze byc wiecej niz jedna - popraw to".

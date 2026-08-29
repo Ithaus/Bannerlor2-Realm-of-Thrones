@@ -369,7 +369,12 @@ namespace Armoury
                     // doczekiwania do polnocy (blad, ktory wkurzyl Jeffa przy mieczu)
                     p.DaysLeft -= 1f / 24f;
                     var rr = Recipes.For(p.Item);
-                    float totalDays = MathF.Max(1f, rr.Tier * Settings.Current.DaysPerTier * Project.TimeFactor(p.Tempo));
+                    // XP liczy sie od WLASCIWEGO czasu projektu: bron "van" ma swoj
+                    // przelicznik (WeaponDaysPerTier), pancerze swoj (Jeff 29.08:
+                    // "balagan z godzinami" - to byl jeden z rozjazdow)
+                    float totalDays = p.Kind == "van"
+                        ? MathF.Max(0.5f, Recipes.Grade(p.Item) * Settings.Current.WeaponDaysPerTier)
+                        : MathF.Max(1f, rr.Tier * Settings.Current.DaysPerTier * Project.TimeFactor(p.Tempo));
                     if (atForge)   // XP tylko za wlasna prace przy kowadle
                         Hero.MainHero.HeroDeveloper.AddSkillXp(DefaultSkills.Crafting,
                             Forge.ProjectXp(rr) * Settings.Current.XpShareWhileWorking / totalDays / 24f);
@@ -479,7 +484,8 @@ namespace Armoury
                 // po czasie ma NIE rzucac drugi raz (Jeff: "wykulem, a potem fail
                 // i miecza nie ma"). Modyfikator jedzie z projektem i wraca.
                 StartProject(item, 1, days, here, "van", modifier != null ? modifier.StringId : "");
-                Log.Player("The blade is roughed out. " + Project.TimeLabel(days) + " of finishing work remain at " + here.Name + ".");
+                Log.Player("The blade is roughed out. " + Project.TimeLabel(days) + " of the SMITH'S finishing work remain at "
+                           + here.Name + " - he works it himself, wherever you ride.");
                 // gra przed chwila POKAZALA "dodano do ekwipunku" - bez glosnego
                 // baneru wyglada to na zniknieciecie miecza
                 try

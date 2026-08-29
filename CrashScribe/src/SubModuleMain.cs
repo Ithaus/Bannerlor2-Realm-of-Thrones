@@ -91,7 +91,12 @@ namespace CrashScribe
                 Fabula.Install(_harmony);
                 Scribe.Line("Net ready.");
                 Watchdog.Start();
-                Sampler.Start(System.Threading.Thread.CurrentThread);   // profiler fast-forward (Jeff: x3 muli)
+                // Sampler WYLACZONY 29.08: Suspend+StackTrace co 0.5 s na FF potrafi
+                // zakleszczyc watek glowny zlapany w srodku locka (freeze Jeffa 08:06,
+                // profil pokazywal 17% Monitor.Enter). Dane zebrane: FF muli od
+                // Campaign.RealTick (silnik), nie od modow. Straznik zawieszen zostaje
+                // (robi Suspend rzadko, tylko przy realnym hangu).
+                // Sampler.Start(System.Threading.Thread.CurrentThread);
                 if (Config.ShowInGame)
                     InformationManager.DisplayMessage(new InformationMessage(
                         "CrashScribe is watching. Reports: Documents\\Mount and Blade II Bannerlord\\CrashScribe", Colors.Cyan));

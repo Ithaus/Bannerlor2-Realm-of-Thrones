@@ -164,9 +164,13 @@ namespace Armoury
             {
                 var b = ArmouryBehavior.Instance;
                 _projInitialHours = b != null ? Math.Max(1f, b.ProjectHoursLeftHere(Settlement.CurrentSettlement)) : 1f;
+                // JEDNA PRAWDA GODZIN (Jeff 29.08: "inne godziny w smith, inne jak
+                // czekam - balagan"): to jest SUMA wszystkich zlecen u tego kowala
+                // (pracuje po kolei), a robota idzie takze bez ciebie
                 MBTextManager.SetTextVariable("ARM_PROJ_TEXT",
-                    "You keep to the forge while the work is finished. About " +
-                    ((int)Math.Ceiling(_projInitialHours)) + " hours of labour remain.");
+                    "The smith works the jobs one by one - about " +
+                    ((int)Math.Ceiling(_projInitialHours)) + " hours until ALL your work here is done. " +
+                    "He needs no watching: leave, and the clock still runs.");
                 args.MenuContext.GameMenu.StartWait();
             }
             catch (Exception e) { Log.Error("ProjWaitInit", e); }
