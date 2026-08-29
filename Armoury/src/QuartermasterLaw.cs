@@ -517,14 +517,36 @@ namespace Armoury
         /// nie sa wydawane. Bez gorszej sztuki - wklad zostaje wkladem gracza
         /// (mozna cofnac przy nastepnym otwarciu).
         /// </summary>
+        /// <summary>Czy ktokolwiek w kompanii udzwignie ten przedmiot
+        /// (zasada nadrzedna). Wypluwa tez najlepszy posiadany skill.</summary>
+        private static bool AnyoneCanUse(ItemObject item, out int bestSkill, out string skillName)
+        {
+            bestSkill = 0; skillName = "";
+            try
+            {
+                var skill = item.RelevantSkill;
+                if (skill == null && item.HasArmorComponent) skill = TaleWorlds.Core.DefaultSkills.Athletics;
+                if (skill == null || item.Difficulty <= 0) return true;
+                skillName = skill.Name.ToString();
+                var roster = TaleWorlds.CampaignSystem.Party.MobileParty.MainParty.MemberRoster;
+                for (int i = 0; i < roster.Count; i++)
+                {
+                    var el = roster.GetElementCopyAtIndex(i);
+                    if (el.Character == null || el.Character.IsHero || el.Number <= 0) continue;
+                    int have = el.Character.GetSkillValue(skill);
+                    if (have > bestSkill) bestSkill = have;
+                }
+                return bestSkill >= item.Difficulty;
+            }
+            catch { return true; }
+        }
+
         private static void ProcessSwaps(ItemRoster armory)
         {
             try
             {
                 if (_pendingSwaps.Count == 0) return;
-                var bags = TaleWorlds.CampaignSystem.Party.MobileParty.MainParty != null
-                    ? TaleWorlds.CampaignSystem.Party.MobileParty.MainParty.ItemRoster : null;
-                if (armory == null || bags == null) { _pendingSwaps.Clear(); return; }
+                if (armory == null) { _pendingSwaps.Clear(); return; }
 
                 int given = 0;
                 foreach (var dep in _pendingSwaps)
@@ -532,6 +554,19 @@ namespace Armoury
                     var newItem = dep.Key;
                     int count = dep.Value.Key;
                     int newVal = dep.Value.Value;
+
+                    // NIKT NIE UDZWIGNIE = zadnej wymiany, wklad zostaje twoj,
+                    // a kwatermistrz mowi wprost czemu (Jeff: "jak nie wymienili,
+                    // to znaczy ze nie ma skilli - i dostaje komunikat")
+                    int bestSkill; string skillName;
+                    if (!AnyoneCanUse(newItem, out bestSkill, out skillName))
+                    {
+                        Log.Player("Quartermaster: no man of the company can handle the " + newItem.Name
+                                   + " (needs " + skillName + " " + newItem.Difficulty + "; the best of them has "
+                                   + bestSkill + "). It stays on YOUR shelf.", true);
+                        continue;
+                    }
+
                     for (int k = 0; k < count; k++)
                     {
                         // najgorsza wojskowa sztuka tego samego typu, gorsza od wkladu
@@ -552,18 +587,20 @@ namespace Armoury
                         }
                         if (bestIdx < 0) break;
                         var old = armory[bestIdx].EquipmentElement;
-                        armory.AddToCounts(old, -1);
-                        bags.AddToCounts(old, 1);
-                        ArmouryBehavior.StockWithdraw(newItem.StringId, 1);          // wklad przeszedl na wojsko
+                        // stara sztuka zostaje w magazynie, ale PRZECHODZI NA
+                        // GRACZA (ksiega +1) - przy nastepnym otwarciu lezy na
+                        // jego liscie ZAMIAST wkladu; wklad idzie na wojsko
+                        ArmouryBehavior.StockDeposit(old.Item != null ? old.Item.StringId : "", 1);
+                        ArmouryBehavior.StockWithdraw(newItem.StringId, 1);
                         given++;
                     }
                 }
                 _pendingSwaps.Clear();
                 if (given > 0)
                 {
-                    Log.Info("Kwatermistrz: wymiana barterowa - " + given + " starych sztuk wydano graczowi za lepsze wklady.");
+                    Log.Info("Kwatermistrz: wymiana barterowa - " + given + " starych sztuk przeksiegowano na gracza.");
                     Log.Player("Quartermaster's exchange: the men take your better gear - " + given
-                               + " of their old pieces are yours to sell.", true);
+                               + " of their old pieces now lie on YOUR shelf (open the armoury to take them).", true);
                 }
             }
             catch (Exception e) { Log.Error("Escrow.ProcessSwaps", e); }
