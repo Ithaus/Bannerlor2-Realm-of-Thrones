@@ -274,12 +274,30 @@ namespace Armoury
             {
                 var s = Settings.Current;
                 if (s == null || !s.ArmouryProtectUsed) return true;
-                if (QuartermasterEscrow.Active) return true;   // lista juz pokazuje tylko nadwyzki
                 if (_fRosters == null || _fArmory == null) return true;
 
                 var rosters = _fRosters.GetValue(__instance) as ItemRoster[];
                 var armory = DteArmory();
                 if (rosters == null || rosters.Length == 0 || armory == null || rosters[0] != armory) return true;
+
+                // KSIEGA WKLADOW: kazdy ruch na ekranie zbrojowni ksiegowany -
+                // wkladasz = twoje rosnie, wyjmujesz = twoje maleje (ekran
+                // i tak pokazuje tylko twoje, wiec wyjecie cudzych niemozliwe)
+                try
+                {
+                    var itL = transferCommand.ElementToTransfer.EquipmentElement.Item;
+                    if (itL != null && itL.StringId != null)
+                    {
+                        int nL = Math.Max(1, transferCommand.Amount);
+                        if (transferCommand.FromSide == InventoryLogic.InventorySide.OtherInventory)
+                            ArmouryBehavior.StockWithdraw(itL.StringId, nL);
+                        else if (transferCommand.ToSide == InventoryLogic.InventorySide.OtherInventory)
+                            ArmouryBehavior.StockDeposit(itL.StringId, nL);
+                    }
+                }
+                catch { }
+
+                if (QuartermasterEscrow.Active) return true;   // lista juz pokazuje tylko wklady gracza
                 if (transferCommand.FromSide != InventoryLogic.InventorySide.OtherInventory) return true;   // wkladasz - wolno zawsze
 
                 var item = transferCommand.ElementToTransfer.EquipmentElement.Item;
@@ -409,42 +427,34 @@ namespace Armoury
                             Colors.Yellow));
                 }
 
-                foreach (var type in QuartermasterLaw.KitTypes)
+                // NOWY LAD (Jeff 29.08): lupy 60% to WLASNOSC WOJSKA - dla oczu
+                // gracza CALY skarbiec wojskowy znika; na liscie zostaja
+                // WYLACZNIE sztuki z ksiegi wkladow gracza (to, co sam wrzucil,
+                // moze zabrac z powrotem - reszty nie tyka)
+                var allowance = new Dictionary<string, int>();
+                for (int i = armory.Count - 1; i >= 0; i--)
                 {
-                    // liczymy po ludzku (noszone), nie wg magazynowych norm DTE
-                    int need = QuartermasterLaw.WornFor(type, needs);
-                    if (need <= 0) continue;
-
-                    // ludzie nosza NAJLEPSZE sztuki - te wedruja do depozytu;
-                    // GORSZE zostaja na liscie jako nadwyzki do wziecia
-                    var stacks = new List<ItemRosterElement>();
-                    for (int i = 0; i < armory.Count; i++)
-                    {
-                        var el = armory[i];
-                        var it = el.EquipmentElement.Item;
-                        if (it != null && it.ItemType == type && el.Amount > 0) stacks.Add(el);
-                    }
-                    stacks.Sort((a, b) => b.EquipmentElement.ItemValue.CompareTo(a.EquipmentElement.ItemValue));
-                    int left = need;
-                    foreach (var st in stacks)
-                    {
-                        if (left <= 0) break;
-                        int n = Math.Min(left, st.Amount);
-                        armory.AddToCounts(st.EquipmentElement, -n);
-                        _held.Add(new KeyValuePair<EquipmentElement, int>(st.EquipmentElement, n));
-                        left -= n;
-                    }
+                    var el = armory[i];
+                    var it = el.EquipmentElement.Item;
+                    if (it == null || el.Amount <= 0) continue;
+                    string id = it.StringId ?? "";
+                    int allowLeft;
+                    if (!allowance.TryGetValue(id, out allowLeft)) allowLeft = ArmouryBehavior.StockOf(id);
+                    int visible = Math.Min(el.Amount, Math.Max(0, allowLeft));
+                    allowance[id] = allowLeft - visible;
+                    int hide = el.Amount - visible;
+                    if (hide <= 0) continue;
+                    armory.AddToCounts(el.EquipmentElement, -hide);
+                    _held.Add(new KeyValuePair<EquipmentElement, int>(el.EquipmentElement, hide));
                 }
                 Active = _held.Count > 0;
                 if (Active)
                 {
                     int pieces = 0;
                     foreach (var kv in _held) pieces += kv.Value;
-                    Log.Info("Kwatermistrz: " + _held.Count + " pozycji (" + pieces + " szt.) na ludziach schowanych przed ekranem zbrojowni.");
-                    // Jeff mysli, ze zbrojownia POZERA wklady - a one wedruja na plecy
-                    // zolnierzy. Mowimy to wprost przy kazdym otwarciu ekranu.
+                    Log.Info("Kwatermistrz: skarbiec wojskowy (" + pieces + " szt.) schowany - na liscie tylko wklady gracza.");
                     InformationManager.DisplayMessage(new InformationMessage(
-                        "Quartermaster: " + pieces + " pieces are worn by the men and not listed - spares only.",
+                        "Quartermaster: the company war-chest is the men's, not yours - your own deposits only are listed.",
                         Colors.Yellow));
                 }
                 if (!anyShort)

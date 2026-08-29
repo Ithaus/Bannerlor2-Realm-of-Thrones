@@ -1,5 +1,28 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-29 — SKARBIEC WOJSKA: lupy 60% niewidoczne, gracz rusza TYLKO wlasne wklady, starocie znikaja
+**Mod:** Armoury | **Pliki:** `ArmouryBehavior.cs` (ksiega wkladow + TrimWarStores), `QuartermasterLaw.cs` (escrow + ledger), `MusterBook.cs` (IsPinnedItem + depozyty)
+**Model Jeffa (jego projekt, wprost):** "po bitwie wojsko przezbraja sie, ale
+lupy 60% NIE sa widoczne dla mnie w Armoury; widze tylko to, co sam wrzucilem
+(dam im lepsze - moge ruszac swoje); sprzet wymieniony po prostu znika".
+**Zmiany:** (1) Ksiega wkladow gracza (arm_player_stock, SyncData): kazdy ruch
+na ekranie zbrojowni ksiegowany (wkladasz + / wyjmujesz -), przenosiny
+z ksiegi musztry (sakwy/worn -> stores) tez licza sie jako wklad. (2) Escrow
+ekranu zbrojowni przebudowany: zamiast chowac "noszone", chowa CALY skarbiec
+wojskowy - lista pokazuje wylacznie sztuki do wysokosci wkladu gracza
+(komunikat "the company war-chest is the men's, not yours"). (3) TrimWarStores
+po kazdej swiezej bitwie (okno spoils): wojskowa czesc magazynu trzyma per typ
+najwyzej tylu sztuk, ilu ludzi (amunicja x2) - najgorsze nadwyzki znikaja
+("wymienione znika"); wklady gracza i itemy przypisane w ksiedze NIETYKALNE.
+**Co NIE zmienione:** przydzial DTE (ubiera z calosci), MendingBench [STORES]
+(naprawa sluzy wojsku), ksiega musztry (rozkazy widza caly stan).
+**Ryzyko / co sprawdzic:** stare sztuki sprzed ksiegi wkladow beda NIEWIDOCZNE
+(ksiega startuje pusta) - to zgodne z modelem (to lupy wojska); jesli Jeff mial
+w magazynie COS wloznego wczesniej recznie, odzyska przez ponowne wlozenie
+czegokolwiek?... NIE - stare wklady przepadly na rzecz wojska (jednorazowy
+koszt wdrozenia). Ekran zbrojowni po bitwie: lista krotka = poprawne.
+**Status:** WGRANE (gra byla zamknieta)
+
 ## 2026-08-29 — SKAD SLONIE NA POLNOCY (nasza stajnia!) + audyt podzialu lupow 60/40
 **Mod:** Armoury | **Pliki:** `Armoury/src/Stables.cs`, `Armoury/src/BattlefieldLaw.cs`
 **Problem (Jeff):** (1) "skad slonie na polnocy?"; (2) "sprawdz, czy nie ma

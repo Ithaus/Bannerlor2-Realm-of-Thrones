@@ -25,6 +25,46 @@ namespace Armoury
         private CampaignTime _shortageShoutDue = CampaignTime.Zero;   // meldunek brakow PO odebraniu lupow
         // legendy wykute raz na zawsze (StringId) - drugiej takiej swiat nie ujrzy
         internal static readonly List<string> Legends = new List<string>();
+        // KSIEGA WKLADOW GRACZA (Jeff 29.08: "w Armoury widze i ruszam TYLKO to,
+        // co sam wrzucilem - lupy 60% to wlasnosc wojska"): itemId -> ile sztuk
+        // nalezy do gracza; ekran zbrojowni pokazuje wylacznie te sztuki
+        private Dictionary<string,int> _playerStock = new Dictionary<string,int>();
+
+        internal static int StockOf(string id)
+        {
+            try
+            {
+                var self = Instance;
+                if (self == null || string.IsNullOrEmpty(id)) return 0;
+                int v; return self._playerStock.TryGetValue(id, out v) ? v : 0;
+            }
+            catch { return 0; }
+        }
+
+        internal static void StockDeposit(string id, int n)
+        {
+            try
+            {
+                var self = Instance;
+                if (self == null || string.IsNullOrEmpty(id) || n <= 0) return;
+                int v; self._playerStock.TryGetValue(id, out v);
+                self._playerStock[id] = v + n;
+            }
+            catch { }
+        }
+
+        internal static void StockWithdraw(string id, int n)
+        {
+            try
+            {
+                var self = Instance;
+                if (self == null || string.IsNullOrEmpty(id) || n <= 0) return;
+                int v; self._playerStock.TryGetValue(id, out v);
+                v -= n;
+                if (v <= 0) self._playerStock.Remove(id); else self._playerStock[id] = v;
+            }
+            catch { }
+        }
         private Dictionary<string,int> _prisonerBaseline;
 
         public ArmouryBehavior() { Instance = this; }
@@ -35,6 +75,7 @@ namespace Armoury
             {
                 dataStore.SyncData("arm_condition", ref _condition);
                 dataStore.SyncData("arm_projects", ref _projects);
+                dataStore.SyncData("arm_player_stock", ref _playerStock);
                 dataStore.SyncData("arm_orders", ref Orders.Board);
                 dataStore.SyncData("arm_order_cooldowns", ref Orders.Cooldowns);
                 // dniowka w kuzni MUSI przezyc save/load - inaczej po wczytaniu
@@ -62,6 +103,7 @@ namespace Armoury
                 }
                 if (_projects == null) _projects = new List<string>();
                 if (_condition == null) _condition = new List<string>();
+                if (_playerStock == null) _playerStock = new Dictionary<string,int>();
             }
             catch (Exception e) { Log.Error("SyncData", e); }
         }
@@ -143,6 +185,8 @@ namespace Armoury
                 // ...a smieci <=3% i slonie-towar zaraz za nim (Spoils naklada
                 // stany PO naszym filtrze lupow - tu wymiatamy je od reki)
                 try { CleanseTrashInBags(); } catch { }
+                // po swiezej bitwie starocie wojskowe ida w niepamiec
+                try { if (CampaignTime.Now <= _spoilsWindow) TrimWarStores(); } catch { }
                 // samonaprawa depozytu: otwarte menu gry = na pewno NIE ekran
                 // zbrojowni; jesli cokolwiek wisi w depozycie (Release nie
                 // odpalil przy zamykaniu ekranu), wraca na polki teraz
@@ -270,6 +314,71 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Log.Error("CleanseTrashInBags", e); }
+        }
+
+        /// <summary>
+        /// WYMIENIONY SPRZET ZNIKA (Jeff 29.08: "wojsko przezbraja sie w lupy,
+        /// a starocie po prostu znikaja"). Wojskowa czesc magazynu (ponad wklady
+        /// gracza) trzyma per TYP najwyzej tylu sztuk, ilu ludzi w kompanii
+        /// (amunicja x2) - najlepsze zostaja, gorsza nadwyzka idzie w niepamiec.
+        /// Wklady gracza i sztuki przypisane w ksiedze - nietykalne.
+        /// </summary>
+        internal void TrimWarStores()
+        {
+            try
+            {
+                var armory = QuartermasterLaw.DteArmory();
+                var roster = MobileParty.MainParty != null ? MobileParty.MainParty.MemberRoster : null;
+                if (armory == null || roster == null) return;
+                int men = 0;
+                for (int i = 0; i < roster.Count; i++)
+                {
+                    var e = roster.GetElementCopyAtIndex(i);
+                    if (e.Character != null && !e.Character.IsHero) men += e.Number;
+                }
+                if (men <= 0) men = 1;
+
+                var byType = new Dictionary<ItemObject.ItemTypeEnum, List<ItemRosterElement>>();
+                for (int i = 0; i < armory.Count; i++)
+                {
+                    var el = armory[i];
+                    var it = el.EquipmentElement.Item;
+                    if (it == null || el.Amount <= 0) continue;
+                    List<ItemRosterElement> list;
+                    if (!byType.TryGetValue(it.ItemType, out list))
+                        byType[it.ItemType] = list = new List<ItemRosterElement>();
+                    list.Add(el);
+                }
+
+                int trimmed = 0;
+                foreach (var kv in byType)
+                {
+                    int keep = kv.Key == ItemObject.ItemTypeEnum.Arrows || kv.Key == ItemObject.ItemTypeEnum.Bolts
+                        ? men * 2 : men;
+                    // najgorsze na poczatek - te wylatuja pierwsze
+                    kv.Value.Sort((a, b) => a.EquipmentElement.ItemValue.CompareTo(b.EquipmentElement.ItemValue));
+                    int total = 0;
+                    foreach (var el in kv.Value) total += el.Amount;
+                    int over = total - keep;
+                    if (over <= 0) continue;
+                    foreach (var el in kv.Value)
+                    {
+                        if (over <= 0) break;
+                        var it = el.EquipmentElement.Item;
+                        var id = it.StringId ?? "";
+                        int protectedHere = Math.Min(el.Amount, StockOf(id));      // wklad gracza swiety
+                        if (MusterBook.IsPinnedItem(id)) protectedHere = el.Amount; // rozkaz z ksiegi swiety
+                        int cuttable = el.Amount - protectedHere;
+                        if (cuttable <= 0) continue;
+                        int cut = Math.Min(cuttable, over);
+                        armory.AddToCounts(el.EquipmentElement, -cut);
+                        over -= cut; trimmed += cut;
+                    }
+                }
+                if (trimmed > 0)
+                    Log.Info("TrimWarStores: " + trimmed + " staroci wojskowych poszlo w niepamiec (wymienione znika).");
+            }
+            catch (Exception e) { Log.Error("TrimWarStores", e); }
         }
 
         /// <summary>Smoki precz z sakw i magazynu DTE - inaczej DTE wsadza kawalerzyste na smoka w bitwie.</summary>

@@ -37,6 +37,21 @@ namespace Armoury
             dataStore.SyncData("armouryMusterBookPins", ref _pins);
         }
 
+        /// <summary>Czy item jest gdziekolwiek przypisany rozkazem z ksiegi
+        /// (taki sprzet jest swiety dla przycinania magazynu).</summary>
+        internal static bool IsPinnedItem(string itemId)
+        {
+            try
+            {
+                var self = Instance;
+                if (self == null || string.IsNullOrEmpty(itemId)) return false;
+                foreach (var v in self._pins.Values)
+                    if (v == itemId) return true;
+                return false;
+            }
+            catch { return false; }
+        }
+
         internal static ItemObject PinFor(CharacterObject troop, int slot)
         {
             try
@@ -324,6 +339,7 @@ namespace Armoury
                                 {
                                     var store2 = QuartermasterLaw.DteArmory();
                                     if (store2 != null) store2.AddToCounts(ee, 1);
+                                    ArmouryBehavior.StockDeposit(ee.Item.StringId, 1);   // wklad gracza
                                     beq[ws] = new EquipmentElement(null);
                                     self._pins[key] = ee.Item.StringId;
                                     Log.Player(ee.Item.Name + " goes from your back to the company stores - "
@@ -355,7 +371,10 @@ namespace Armoury
                                         moved += el.Amount;
                                     }
                                     if (moved > 0)
+                                    {
+                                        ArmouryBehavior.StockDeposit(it.StringId, moved);   // wklad gracza - moze cofnac
                                         Log.Player(moved + " x " + it.Name + " moved from your baggage to the company stores.", true);
+                                    }
                                 }
                             }
                             catch (Exception e2) { Log.Error("MusterBook.moveToStores", e2); }
