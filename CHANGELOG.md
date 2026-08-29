@@ -1,5 +1,27 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-29 — SKAD SLONIE NA POLNOCY (nasza stajnia!) + audyt podzialu lupow 60/40
+**Mod:** Armoury | **Pliki:** `Armoury/src/Stables.cs`, `Armoury/src/BattlefieldLaw.cs`
+**Problem (Jeff):** (1) "skad slonie na polnocy?"; (2) "sprawdz, czy nie ma
+podwojnego otrzymywania lupow i czy 60% dla wojska / 40% dla mnie jest
+respektowane".
+**Ustalenie (1):** lancuch sloni domkniety - ROT daje sloniowi is_merchandise
++ item_category="horse", wiec: (a) ekonomia rozwozila go po targach calej mapy
+(Winterfell!), (b) NASZA Stajnia AI kupowala lordom slonie JAKO KONIE na
+awanse kawalerii (IsPlainMount przepuszczal kategorie horse) - stad slonie
+w bagazach partii Polnocy i w lupach Jeffa. FIX: IsPlainMount wyklucza
+elephant/rot_elephant_*/dragon_*.
+**Audyt (2), przeplyw lupow:** podzial jest FIZYCZNY i pojedynczy: DTE znosi
+sprzet zabitych do magazynu wojska; nasz postfix WYJMUJE z magazynu 40%
+(PlayerLootSharePercent) do kolejki gracza - wojsko zatrzymuje 60%, nic nie
+istnieje w dwoch miejscach. Bagaze pokonanych to OSOBNA pula (idzie do gracza
+w calosci przez ekran). Jency - osobna (zywi, nie zabici). Symulacje - vanilla.
+ZNALEZIONA I DOMKNIETA szczelina: gdy ekran lupow przyszedl PO flushu
+godzinowym (kolejka juz oddana do sakw), na ekranie zostawala VANILLOWA
+LOTERIA = druga nagroda. Teraz realna bitwa zawsze czysci ekran do zera
+przed wsypka naszej dzialki.
+**Status:** WGRANE (gra byla zamknieta)
+
 ## 2026-08-29 — lupy: 3% wciskane przez Spoils PO filtrze + slonie z bagazy pokonanych
 **Mod:** Armoury | **Pliki:** `BattlefieldLaw.cs` (CleanseTrash), `ArmouryBehavior.cs` (CleanseTrashInBags + menu-hak), `LegendaryLaw.cs` (SweepWorld bagaze)
 **Problem (Jeff po bitwie):** (1) "dostalem ekwipunek z 3% zuzycia" - Spoils

@@ -318,6 +318,11 @@ namespace Armoury
             try
             {
                 if (it == null || it.ItemType != ItemObject.ItemTypeEnum.Horse) return false;
+                // ROT daje sloniowi item_category="horse" - stajnia kupowala
+                // lordom SLONIE jako zwykle konie i tak trafialy na Polnoc
+                // (Jeff 29.08: "skad slonie na polnocy?!"). Smoki tak samo.
+                var id = it.StringId ?? "";
+                if (id == "elephant" || id.StartsWith("rot_elephant") || id.StartsWith("dragon_")) return false;
                 var hc = it.HorseComponent;
                 if (hc == null || !hc.IsMount) return false;
                 var cat = it.ItemCategory;

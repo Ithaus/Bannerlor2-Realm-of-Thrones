@@ -226,9 +226,13 @@ namespace Armoury
                 if (!Settings.Current.BattlefieldLawEnabled) return;
                 if (RotEnlisted()) { ShareQueue.Clear(); Wrecks.Clear(); return; }
                 if (!RealFoughtBattle()) return;         // symulacje: zostaje loteria Spoils (odbramkowana)
-                if (ShareQueue.Count == 0 && Wrecks.Count == 0) return;
                 if (__result == null) __result = new ItemRoster();
+                // AUDYT LUPOW (Jeff 29.08: "czy nie ma podwojnego otrzymywania?"):
+                // realna bitwa NIGDY nie zostawia vanillowej loterii na ekranie -
+                // nawet gdy kolejka jest pusta (np. flush godzinowy juz oddal
+                // dzialke do sakw; loteria na wierzchu bylaby DRUGA nagroda)
                 __result.Clear();
+                if (ShareQueue.Count == 0 && Wrecks.Count == 0) return;
                 for (int i = 0; i < ShareQueue.Count; i++)
                 {
                     var el = ShareQueue.GetElementCopyAtIndex(i);
