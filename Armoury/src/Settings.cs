@@ -146,6 +146,7 @@ namespace Armoury
         public int TroopSelfMendPerDay = 10;               // how many pieces a day the men can afford to have mended
 
         // --- Skills rule the gear ---
+        public bool TroopSkillAutoFit = true;              // troops are audited on load: any skill below the demands of their OWN template gear (armour->Athletics, mount->Riding, weapons->their class) is raised to match - the elite keeps its heavy plate because it has earned the muscles
         public bool SkillsDecideEnabled = true;            // no more "default tier +2": troops use ANY gear their stats allow, main weapon follows their best skill, the backup their second best (an archer carries bow, two quivers and a sidearm of his second skill)
 
         // --- The menagerie ---

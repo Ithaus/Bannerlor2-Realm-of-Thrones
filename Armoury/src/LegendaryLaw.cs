@@ -57,6 +57,9 @@ namespace Armoury
             try { SweepAiArmories("wczytanie"); } catch (Exception e) { Log.Error("LegendaryLaw.SweepAiArmories", e); }
             try { SweepWorld(); } catch (Exception e) { Log.Error("LegendaryLaw.SweepWorld", e); }
             try { LockLegendPieces(); } catch (Exception e) { Log.Error("LegendaryLaw.LockLegendPieces", e); }
+            // wyrownanie skilli jednostek MUSI isc PO sweepie legend - inaczej
+            // policzyloby wymogi z klingi, ktora za chwile znika z szablonu
+            try { TroopFit.Run(); } catch (Exception e) { Log.Error("TroopFit.Run", e); }
         }
 
         /// <summary>KUZNIA NIE POWIELA LEGEND (Jeff: "jak wykuje, to moze byc

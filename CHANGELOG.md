@@ -1,5 +1,22 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-29 — TroopFit: jednostki dostaja skille do WLASNEGO szablonu (audyt + wyrownanie)
+**Mod:** Armoury | **Pliki:** `Armoury/src/TroopFit.cs` (nowy), `LegendaryLaw.cs` (wywolanie po sweepie), `Settings.cs` + `McmSettings.cs` (gen; 261)
+**Zlecenie Jeffa:** "przejrzyj jednostki - czy maja umiejetnosci do noszonego
+pancerza, koni i broni, aby na swoim tierze niesc swoj tier sprzetu".
+**Zmiana:** przy kazdym wczytaniu (PO sweepie legend, zeby nie liczyc wymogow
+z klingi, ktora znika): dla kazdej jednostki liczymy najwyzszy wymog kazdego
+skilla w JEJ szablonie (bron wg klasy, kon wg Riding, pancerz wg Athletics
+z difficulty ROT) i podnosimy skill DO wymogu (nigdy w dol; SetPropertyValue
+na DefaultCharacterSkills przez reflection). Efekt: elita ma miesnie do swojej
+plyty - zasada nadrzedna nikogo nie rozbiera z ZAMIERZONEGO sprzetu, a dalej
+broni przed absurdem (rekrut nie udzwignie zbroi elity z magazynu).
+Raport do logu: liczba wyrownanych + top 15 deficytow ("TroopFit: ...").
+**Ryzyko / co sprawdzic:** log po wczytaniu - skala deficytow ROT; jesli
+jakis skill-set jest wspoldzielony miedzy jednostkami, podniesienie w gore
+moglo podniesc tez blizniacze (nieszkodliwe kierunkowo).
+**Status:** WGRANE (gra byla zamknieta)
+
 ## 2026-08-29 — CALY EKWIPUNEK pod zasada skilla (konie=Riding, pancerz=Athletics) + AUDYT calosci
 **Mod:** Armoury | **Pliki:** `ItemReq.cs` (nowy), `SkillsDecide.cs`, `MusterBook.cs`, `MusterOut.cs`, `DragonUnmount.cs`
 **Zlecenie Jeffa:** "Konie i pancerze tez! Caly ekwipunek!" + "przejrzyj wszystkie

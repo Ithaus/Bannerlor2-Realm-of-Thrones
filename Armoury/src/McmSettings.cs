@@ -472,6 +472,10 @@ namespace Armoury
         [SettingPropertyGroup("The finished piece")]
         public int TroopSelfMendPerDay { get; set; } = 10;
 
+        [SettingPropertyBool("Troop Skill Auto Fit", HintText = "troops are audited on load: any skill below the demands of their OWN template gear (armour->Athletics, mount->Riding, weapons->their class) is raised to match - the elite keeps its heavy plate because it has earned the muscles")]
+        [SettingPropertyGroup("Skills rule the gear")]
+        public bool TroopSkillAutoFit { get; set; } = true;
+
         [SettingPropertyBool("Skills Decide Enabled", HintText = "no more 'default tier +2': troops use ANY gear their stats allow, main weapon follows their best skill, the backup their second best (an archer carries bow, two quivers and a sidearm of his second skill)")]
         [SettingPropertyGroup("Skills rule the gear")]
         public bool SkillsDecideEnabled { get; set; } = true;
@@ -1169,6 +1173,7 @@ namespace Armoury
             s.RichQualityModifiers = RichQualityModifiers;
             s.TroopSelfMendEnabled = TroopSelfMendEnabled;
             s.TroopSelfMendPerDay = TroopSelfMendPerDay;
+            s.TroopSkillAutoFit = TroopSkillAutoFit;
             s.SkillsDecideEnabled = SkillsDecideEnabled;
             s.ElephantQuarantineEnabled = ElephantQuarantineEnabled;
             s.HideoutPurgeEnabled = HideoutPurgeEnabled;
