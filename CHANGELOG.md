@@ -1,5 +1,22 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-29 — lista naprawy: limit ucinal pancerze (zbierz->sortuj->tnij) + czystka starych 3%
+**Mod:** Armoury | **Pliki:** `Armoury/src/SmithMenu.cs`, `Armoury/src/ArmouryBehavior.cs`
+**Problem (Jeff, slusznie wsciekly):** "pancerze SA uszkodzone i chce je
+naprawic, a lista ich nie ma!". Przyczyna: MendPickConsequence cielo liste
+limitem MaxItemsListed W TRAKCIE iteracji rosteru - masa zbitych broni z
+wielkich bitew zapychala limit, a pancerze z dalszej czesci sakw nie wchodzily
+WCALE; sort (dodany pozniej) dzialal juz po cieciu. Stad "kiedys bylo widac"
+(mniej broni w sakwach), teraz nie.
+**Zmiana:** (1) zbierz WSZYSTKIE zbite sztuki (grzbiet + sakwy + [STORES]),
+kazda w osobnym try (jedna zla sztuka nie ucina reszty), POTEM sort po typach,
+NA KONCU limit ekranu (min 10; log ile przycieto). (2) Na polecenie Jeffa
+("usun jednak te 3%"): CleanseTrashInBags przy kazdym wczytaniu wyrzuca
+z sakw i magazynu DTE sztuki o stanie <= LootMinConditionPercent (stare wraki
+sprzed progu; nowych prog nie wpuszcza) - komunikat "The ruined scraps are
+thrown out".
+**Status:** WGRANE (gra byla zamknieta)
+
 ## 2026-08-29 — 999 pancerzy ROT bez modifier_group: pancerz NIGDY nie mial stanu (WearGroups)
 **Mod:** Armoury | **Pliki:** `Armoury/src/WearGroups.cs` (nowy), `ArmouryBehavior.cs`
 **Problem (Jeff + screeny):** "mam mase rzeczy w ekwipunku, a na liscie naprawy

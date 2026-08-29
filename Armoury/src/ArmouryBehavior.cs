@@ -227,6 +227,39 @@ namespace Armoury
                 Log.Player("The quartermaster set the ledgers straight - " + fixedTotal + " ruined entries struck out.", true);
         }
 
+        /// <summary>Smieci ponizej progu zniszczenia precz z sakw i magazynu
+        /// (Jeff 29.08: "usun jednak te 3%, to nie ma sensu") - stare wraki
+        /// sprzed progu; nowych prog nie wpuszcza do lupow.</summary>
+        internal static void CleanseTrashInBags()
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || s.LootMinConditionPercent <= 0) return;
+                int cut = 0;
+                foreach (var roster in new[] { MobileParty.MainParty != null ? MobileParty.MainParty.ItemRoster : null,
+                                               QuartermasterLaw.DteArmory() })
+                {
+                    if (roster == null) continue;
+                    for (int i = roster.Count - 1; i >= 0; i--)
+                    {
+                        var el = roster.GetElementCopyAtIndex(i);
+                        var mod = el.EquipmentElement.ItemModifier;
+                        if (el.Amount <= 0 || mod == null) continue;
+                        if (mod.PriceMultiplier * 100f > s.LootMinConditionPercent + 0.01f) continue;
+                        roster.AddToCounts(el.EquipmentElement, -el.Amount);
+                        cut += el.Amount;
+                    }
+                }
+                if (cut > 0)
+                {
+                    Log.Info("CleanseTrashInBags: " + cut + " szt. ponizej progu zniszczenia wyrzucono z sakw/magazynu.");
+                    Log.Player("The ruined scraps are thrown out - " + cut + " pieces past any mending.", true);
+                }
+            }
+            catch (Exception e) { Log.Error("CleanseTrashInBags", e); }
+        }
+
         /// <summary>Smoki precz z sakw i magazynu DTE - inaczej DTE wsadza kawalerzyste na smoka w bitwie.</summary>
         internal static void CleanseDragonStables(bool shout)
         {
@@ -261,6 +294,7 @@ namespace Armoury
             try { WearGroups.Fix(); } catch (Exception e) { Log.Error("WearGroups.Fix", e); }
             try { CleanseNegativeStacks(); } catch (Exception e) { Log.Error("CleanseNegativeStacks", e); }
             try { CleanseDragonStables(true); } catch (Exception e) { Log.Error("CleanseDragonStables", e); }
+            try { CleanseTrashInBags(); } catch (Exception e) { Log.Error("CleanseTrashInBags", e); }
             try { QualityRich.Enrich(); } catch (Exception e) { Log.Error("QualityRich.Enrich", e); }
             try { SmithMenu.Add(starter); Log.Info("Menu kowala dodane."); }
             catch (Exception e) { Log.Error("OnSessionLaunched", e); }

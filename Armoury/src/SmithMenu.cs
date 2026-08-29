@@ -505,58 +505,66 @@ namespace Armoury
                         "[EQUIPPED] " + ee0.GetModifiedItemName(), ItemPic(ee0.Item), true, hint0));
                 }
 
+                // NAJPIERW ZBIERZ WSZYSTKO, POTEM SORTUJ, NA KONCU TNIJ (Jeff
+                // 29.08: "pancerze SA uszkodzone a lista ich nie ma!" - limit
+                // MaxItemsListed ucinal roster ZANIM sort podniosl pancerze,
+                // wiec masa zbitych broni z wielkich bitew zapychala liste).
+                // Kazdy item w osobnym try - jedna zla sztuka nie ucina reszty.
                 for (int i = 0; i < roster.Count; i++)
                 {
-                    var el = roster.GetElementCopyAtIndex(i);
-                    if (el.EquipmentElement.Item == null || !IsBattleWorn(el.EquipmentElement.Item, el.EquipmentElement.ItemModifier)) continue;
-                    var ee = el.EquipmentElement;
-                    int pct = Math.Max(1, (int)Math.Round(ee.ItemModifier.PriceMultiplier * 100f));
-                    int smith = PieceCost(ee);
-                    var mats = SelfMendParts(ee);
-                    var sb = new System.Text.StringBuilder();
-                    foreach (var p in mats)
+                    try
                     {
-                        if (p.Item == null) continue;
-                        if (sb.Length > 0) sb.Append(", ");
-                        sb.Append(p.Count + "x " + p.Item.Name + " (" + Recipes.CountInInventory(p.Item) + ")");
+                        var el = roster.GetElementCopyAtIndex(i);
+                        if (el.EquipmentElement.Item == null || !IsBattleWorn(el.EquipmentElement.Item, el.EquipmentElement.ItemModifier)) continue;
+                        var ee = el.EquipmentElement;
+                        int pct = Math.Max(1, (int)Math.Round(ee.ItemModifier.PriceMultiplier * 100f));
+                        int smith = PieceCost(ee);
+                        var mats = SelfMendParts(ee);
+                        var sb = new System.Text.StringBuilder();
+                        foreach (var p in mats)
+                        {
+                            if (p.Item == null) continue;
+                            if (sb.Length > 0) sb.Append(", ");
+                            sb.Append(p.Count + "x " + p.Item.Name + " (" + Recipes.CountInInventory(p.Item) + ")");
+                        }
+                        string hint = "Condition " + pct + "%" +
+                                      "\nSmith: " + smith + " gold, " + Settings.Current.MendLootHoursPerPiece.ToString("0.#") + "h" +
+                                      "\nYourself: " + (sb.Length > 0 ? sb.ToString() : "no materials") +
+                                      "\n  + stamina " + SelfMendStamina(ee) + " (you have " + Forge.Stamina() + ")" +
+                                      ", Smithing " + SelfMendSkill(ee) +
+                                      " (yours " + Hero.MainHero.GetSkillValue(DefaultSkills.Crafting) + ")";
+                        found.Add(ee); slots.Add(-1);
+                        elements.Add(new InquiryElement(found.Count - 1,
+                            ee.GetModifiedItemName() + "  x" + el.Amount, ItemPic(ee.Item), true, hint));
                     }
-                    string hint = "Condition " + pct + "%" +
-                                  "\nSmith: " + smith + " gold, " + Settings.Current.MendLootHoursPerPiece.ToString("0.#") + "h" +
-                                  "\nYourself: " + (sb.Length > 0 ? sb.ToString() : "no materials") +
-                                  "\n  + stamina " + SelfMendStamina(ee) + " (you have " + Forge.Stamina() + ")" +
-                                  ", Smithing " + SelfMendSkill(ee) +
-                                  " (yours " + Hero.MainHero.GetSkillValue(DefaultSkills.Crafting) + ")";
-                    found.Add(ee); slots.Add(-1);
-                    elements.Add(new InquiryElement(found.Count - 1,
-                        ee.GetModifiedItemName() + "  x" + el.Amount, ItemPic(ee.Item), true, hint));
-                    if (elements.Count >= Settings.Current.MaxItemsListed) break;
+                    catch (Exception exi) { Log.Error("MendPick.bagItem", exi); }
                 }
 
-                // MAGAZYN WOJSKA (Jeff 29.08: "nie moge naprawic calego ekwipunku,
-                // widze tylko bron") - zbite pancerze zolnierzy leza w magazynie
-                // DTE, nie w sakwach; teraz sa na liscie z [STORES] (slot=-2),
-                // naprawa wraca na stan wojska
+                // MAGAZYN WOJSKA - zbite sztuki zolnierzy ([STORES], slot=-2)
                 var armory = QuartermasterLaw.DteArmory();
                 if (armory != null)
                     for (int i = 0; i < armory.Count; i++)
                     {
-                        if (elements.Count >= Settings.Current.MaxItemsListed) break;
-                        var el = armory.GetElementCopyAtIndex(i);
-                        var ee = el.EquipmentElement;
-                        if (ee.Item == null || el.Amount <= 0 || !IsBattleWorn(ee.Item, ee.ItemModifier)) continue;
-                        int pct2 = Math.Max(1, (int)Math.Round(ee.ItemModifier.PriceMultiplier * 100f));
-                        int smith2 = PieceCost(ee);
-                        string hint2 = "COMPANY STORES - the men's kit.\nCondition " + pct2 + "%" +
-                                       "\nSmith: " + smith2 + " gold, " + Settings.Current.MendLootHoursPerPiece.ToString("0.#") + "h";
-                        found.Add(ee); slots.Add(-2);
-                        elements.Add(new InquiryElement(found.Count - 1,
-                            "[STORES] " + ee.GetModifiedItemName() + "  x" + el.Amount, ItemPic(ee.Item), true, hint2));
+                        try
+                        {
+                            var el = armory.GetElementCopyAtIndex(i);
+                            var ee = el.EquipmentElement;
+                            if (ee.Item == null || el.Amount <= 0 || !IsBattleWorn(ee.Item, ee.ItemModifier)) continue;
+                            int pct2 = Math.Max(1, (int)Math.Round(ee.ItemModifier.PriceMultiplier * 100f));
+                            int smith2 = PieceCost(ee);
+                            string hint2 = "COMPANY STORES - the men's kit.\nCondition " + pct2 + "%" +
+                                           "\nSmith: " + smith2 + " gold, " + Settings.Current.MendLootHoursPerPiece.ToString("0.#") + "h";
+                            found.Add(ee); slots.Add(-2);
+                            elements.Add(new InquiryElement(found.Count - 1,
+                                "[STORES] " + ee.GetModifiedItemName() + "  x" + el.Amount, ItemPic(ee.Item), true, hint2));
+                        }
+                        catch (Exception exi) { Log.Error("MendPick.storeItem", exi); }
                     }
 
                 if (elements.Count == 0) { Log.Player("Nothing damaged on your back, in your bags or in the stores.", true); return; }
 
-                // sort po typach: luki razem, strzaly razem... (indeksy found/slots
-                // jada w Identifier, wiec kolejnosc elements mozna przestawiac swobodnie)
+                // sort po typach: luki razem, strzaly razem, PANCERZE dalej -
+                // wszystko jeszcze przed cieciem limitu
                 elements.Sort((a, b) =>
                 {
                     var ia = found[(int)a.Identifier].Item; var ib = found[(int)b.Identifier].Item;
@@ -566,6 +574,14 @@ namespace Armoury
                     if (r != 0) return r;
                     return string.CompareOrdinal(ia.StringId, ib.StringId);
                 });
+
+                // dopiero teraz limit ekranu
+                int cap = Math.Max(10, Settings.Current.MaxItemsListed);
+                if (elements.Count > cap)
+                {
+                    Log.Info("MendPick: lista " + elements.Count + " pozycji przycieta do " + cap + " (MaxItemsListed).");
+                    elements.RemoveRange(cap, elements.Count - cap);
+                }
 
                 MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData(
                     "The Mending Bench", "Every piece has its price - in coin at the smith's rate, or in your own metal and sweat.",
