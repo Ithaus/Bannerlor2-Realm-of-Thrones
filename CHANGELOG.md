@@ -1,5 +1,29 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-28 — AUDYT LEGEND: mlot Roberta (x6!) i persony bez value + czystka totalna sakw
+**Mod:** Armoury | **Pliki:** `Armoury/src/LegendaryLaw.cs`, `Armoury/src/DragonUnmount.cs`
+**Problem:** Jeff: "mam 6 mlotow Roberta Baratheona - jest JEDEN na swiecie!
+Usun wszystkie unikaty u mnie (mlot tez), zrob pelny audyt przedmiotow".
+**Audyt (ROTassets.xml, 1197 itemow):** wszystkie klasyczne legendy maja value
+150k-350k (Ice 350k, Widow's Wail/Oathkeeper/Dawn/Longclaw/Blackfyre/Dark Sister
+300k, valyriany 200k, Renly 180k, Gregor 175k, Skull 150k) - prog 100k je lapie.
+ALE bronie-persony jako CraftedItem BEZ wpisanego value (wartosc liczona z czesci,
+kilka tys.): baratheon_hammer (Robert!), needle (igla Aryi), gendry_hammer -
+prog ich nie lapal. Do tego ROT ma masowa jednostke "Baratheon Hammerman"
+(ROT-Troops.xml) - mloty Roberta sypaly sie z kazdej bitwy ze Stormlands.
+**Zmiana:** (1) LegendIds - jawna lista person (baratheon_hammer, needle,
+gendry_hammer); IsLegend = lista LUB value>=prog; uzywana wszedzie (sweep
+szablonow, rostery losowane, spawn, lupy przez CleanseTrash NIE - tam tylko
+prog... UWAGA: CleanseTrash w BattlefieldLaw filtruje po floor - ale legendy
+z listy maja niska wartosc i nie wpadna do progu; sweep szablonow i spawn-net
+je tna u zrodla, wiec do lupu nie maja skad wpasc). (2) Czystka sakw gracza
+v2 (klucz armouryLegendsCulledAll): WSZYSTKIE legendy znikaja co do sztuki -
+takze zostawione wczesniej kolekcjonerskie po 1.
+**Ryzyko / co sprawdzic:** log "LegendaryLaw: sakwy gracza - N legendarnych
+broni usunieto CO DO SZTUKI" + "The stolen legends are gone from your packs";
+Baratheon Hammerman w bitwie ma zwykly mlot t5.
+**Status:** WGRANE (gra byla zamknieta)
+
 ## 2026-08-28 — PRAWO LEGEND: nazwane klingi wracaja do unikatowosci
 **Mod:** Armoury | **Pliki:** `Armoury/src/LegendaryLaw.cs` (nowy), `Armoury/src/DragonUnmount.cs`, `Armoury/src/SubModuleMain.cs`
 **Problem:** Jeff: "legendarne bronie sa unikatowe, nie moga wszyscy wojacy w nich

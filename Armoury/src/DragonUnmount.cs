@@ -47,9 +47,7 @@ namespace Armoury
                         for (int slot = 0; slot < 4; slot++)
                         {
                             var w = eq[(EquipmentIndex)slot].Item;
-                            if (w == null || !w.HasWeaponComponent) continue;
-                            if (Settings.Current.LegendaryLootValueFloor <= 0
-                                || w.Value < Settings.Current.LegendaryLootValueFloor) continue;
+                            if (!LegendaryLaw.IsLegend(w)) continue;   // prog 100k + lista person (mlot Roberta...)
                             var repl = LegendaryLaw.ReplacementFor(w);
                             eq[(EquipmentIndex)slot] = repl != null
                                 ? new EquipmentElement(repl) : new EquipmentElement(null);

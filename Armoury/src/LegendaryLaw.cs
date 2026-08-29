@@ -22,8 +22,19 @@ namespace Armoury
     /// </summary>
     internal sealed class LegendaryLaw : CampaignBehaviorBase
     {
-        private bool _playerCulled;
+        private bool _playerCulledAll;
         private static readonly Dictionary<ItemObject, ItemObject> Repl = new Dictionary<ItemObject, ItemObject>();
+
+        // bronie-persony BEZ wpisanego value (CraftedItem liczy wartosc z czesci,
+        // wiec prog 100k ich nie lapal - stad 6 mlotow Roberta u Jeffa; audyt
+        // 28.08 po ROTassets.xml). Reszta legend ma value 150k-350k i lapie sie
+        // progiem.
+        private static readonly HashSet<string> LegendIds = new HashSet<string>
+        {
+            "baratheon_hammer",   // Robert Baratheon's Hammer - jest JEDEN na swiecie
+            "needle",             // Needle - igla Aryi
+            "gendry_hammer"       // Gendry's Hammer
+        };
 
         public override void RegisterEvents()
         {
@@ -32,20 +43,22 @@ namespace Armoury
 
         public override void SyncData(IDataStore dataStore)
         {
-            dataStore.SyncData("armouryLegendsCulled", ref _playerCulled);
+            dataStore.SyncData("armouryLegendsCulledAll", ref _playerCulledAll);
         }
 
         private void OnSession(CampaignGameStarter starter)
         {
             try { SweepTemplates(); } catch (Exception e) { Log.Error("LegendaryLaw.SweepTemplates", e); }
-            try { if (!_playerCulled) { CullPlayerDuplicates(); _playerCulled = true; } }
+            try { if (!_playerCulledAll) { CullPlayerAll(); _playerCulledAll = true; } }
             catch (Exception e) { Log.Error("LegendaryLaw.Cull", e); }
         }
 
-        private static bool IsLegend(ItemObject it)
+        internal static bool IsLegend(ItemObject it)
         {
+            if (it == null || !it.HasWeaponComponent || it.StringId == null) return false;
+            if (LegendIds.Contains(it.StringId)) return true;
             var floor = Settings.Current.LegendaryLootValueFloor;
-            return floor > 0 && it != null && it.HasWeaponComponent && it.Value >= floor;
+            return floor > 0 && it.Value >= floor;
         }
 
         /// <summary>Najlepszy ZWYKLY odpowiednik legendy: ta sama klasa broni,
@@ -141,50 +154,26 @@ namespace Armoury
                 Log.Info("LegendaryLaw: " + setSwapped + " legend zdjetych z LOSOWANYCH szablonow bohaterow (zrodlo mnozenia).");
         }
 
-        /// <summary>Sakwy gracza: z kazdej legendy zostaje jeden egzemplarz
-        /// (najlepszy stan), reszta znika. Jednorazowo (SyncData).</summary>
-        private static void CullPlayerDuplicates()
+        /// <summary>Sakwy gracza: WSZYSTKIE legendy znikaja co do sztuki
+        /// (Jeff 28.08: "usun wszystkie unikatowe miecze u mnie tez i mlot
+        /// Roberta - gra totalnie stracila sens"). Jednorazowo (SyncData).</summary>
+        private static void CullPlayerAll()
         {
             var roster = MobileParty.MainParty != null ? MobileParty.MainParty.ItemRoster : null;
             if (roster == null) return;
-
-            // najlepszy stan kazdej legendy
-            var bestOf = new Dictionary<ItemObject, float>();
-            for (int i = 0; i < roster.Count; i++)
-            {
-                var el = roster.GetElementCopyAtIndex(i);
-                var it = el.EquipmentElement.Item;
-                if (!IsLegend(it) || el.Amount <= 0) continue;
-                var mod = el.EquipmentElement.ItemModifier;
-                float cond = mod != null ? mod.PriceMultiplier : 1f;
-                float known;
-                if (!bestOf.TryGetValue(it, out known) || cond > known) bestOf[it] = cond;
-            }
-            if (bestOf.Count == 0) return;
-
-            int cut = 0, kept = 0;
+            int cut = 0;
             for (int i = roster.Count - 1; i >= 0; i--)
             {
                 var el = roster.GetElementCopyAtIndex(i);
                 var it = el.EquipmentElement.Item;
                 if (!IsLegend(it) || el.Amount <= 0) continue;
-                var mod = el.EquipmentElement.ItemModifier;
-                float cond = mod != null ? mod.PriceMultiplier : 1f;
-                int keepHere = 0;
-                float best;
-                if (bestOf.TryGetValue(it, out best) && Math.Abs(cond - best) < 0.0001f)
-                {
-                    keepHere = 1;          // najlepszy stack tej klingi - jeden zostaje
-                    bestOf.Remove(it);     // kolejne stacki tej samej juz bez ochrony
-                    kept++;
-                }
-                int remove = el.Amount - keepHere;
-                if (remove > 0) { roster.AddToCounts(el.EquipmentElement, -remove); cut += remove; }
+                roster.AddToCounts(el.EquipmentElement, -el.Amount);
+                cut += el.Amount;
             }
             if (cut > 0)
             {
-                Log.Info("LegendaryLaw: sakwy gracza - " + cut + " nadwyzek legend usunieto, " + kept + " klng zostalo po jednej.");
-                Log.Player("The named blades are one of a kind again - " + kept + " kept, " + cut + " copies gone.", true);
+                Log.Info("LegendaryLaw: sakwy gracza - " + cut + " legendarnych broni usunieto CO DO SZTUKI.");
+                Log.Player("The stolen legends are gone from your packs - " + cut + " named weapons struck out.", true);
             }
         }
     }
