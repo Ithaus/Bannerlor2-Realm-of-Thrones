@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
@@ -39,6 +40,8 @@ namespace Armoury
         public override void RegisterEvents()
         {
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this, OnSession);
+            CampaignEvents.DailyTickEvent.AddNonSerializedListener(this,
+                delegate { try { SweepAiArmories("dzien"); } catch { } });
         }
 
         public override void SyncData(IDataStore dataStore)
@@ -51,6 +54,101 @@ namespace Armoury
             try { SweepTemplates(); } catch (Exception e) { Log.Error("LegendaryLaw.SweepTemplates", e); }
             try { if (!_playerCulledAll) { CullPlayerAll(); _playerCulledAll = true; } }
             catch (Exception e) { Log.Error("LegendaryLaw.Cull", e); }
+            try { SweepAiArmories("wczytanie"); } catch (Exception e) { Log.Error("LegendaryLaw.SweepAiArmories", e); }
+            try { SweepWorld(); } catch (Exception e) { Log.Error("LegendaryLaw.SweepWorld", e); }
+        }
+
+        /// <summary>ZERO NA START (Jeff: "wyzeruj start i save'a - wykuc mozna,
+        /// kupic nie: nie da sie kupic 5 mieczy Aryi"). Przy kazdym wczytaniu:
+        /// (1) kazda legenda dostaje NotMerchandise - nigdy wiecej w zaopatrzeniu
+        /// sklepow (kucie wlasnorecznie w kuzni ZOSTAJE dozwolone);
+        /// (2) targi wszystkich osad czyszczone z zalegajacych legend;
+        /// (3) bagaze partii AI czyszczone (u gracza robi to CullPlayerAll).</summary>
+        private static void SweepWorld()
+        {
+            int flagged = 0, offShelves = 0, offBags = 0;
+            try
+            {
+                var fMerch = AccessTools.Field(typeof(ItemObject), "<NotMerchandise>k__BackingField");
+                if (fMerch != null)
+                    foreach (var it in MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
+                        if (IsLegend(it) && !it.NotMerchandise) { fMerch.SetValue(it, true); flagged++; }
+            }
+            catch (Exception e) { Log.Error("LegendaryLaw.flag", e); }
+            try
+            {
+                foreach (var st in TaleWorlds.CampaignSystem.Settlements.Settlement.All)
+                {
+                    var roster = st != null ? st.ItemRoster : null;
+                    if (roster == null) continue;
+                    for (int i = roster.Count - 1; i >= 0; i--)
+                    {
+                        var el = roster.GetElementCopyAtIndex(i);
+                        if (!IsLegend(el.EquipmentElement.Item) || el.Amount <= 0) continue;
+                        roster.AddToCounts(el.EquipmentElement, -el.Amount);
+                        offShelves += el.Amount;
+                    }
+                }
+            }
+            catch (Exception e) { Log.Error("LegendaryLaw.shelves", e); }
+            try
+            {
+                foreach (var mp in MobileParty.All)
+                {
+                    if (mp == null || mp == MobileParty.MainParty || mp.ItemRoster == null) continue;
+                    var roster = mp.ItemRoster;
+                    for (int i = roster.Count - 1; i >= 0; i--)
+                    {
+                        var el = roster.GetElementCopyAtIndex(i);
+                        if (!IsLegend(el.EquipmentElement.Item) || el.Amount <= 0) continue;
+                        roster.AddToCounts(el.EquipmentElement, -el.Amount);
+                        offBags += el.Amount;
+                    }
+                }
+            }
+            catch (Exception e) { Log.Error("LegendaryLaw.bags", e); }
+            if (flagged > 0 || offShelves > 0 || offBags > 0)
+                Log.Info("LegendaryLaw: swiat wyzerowany - " + flagged + " legend poza handlem, "
+                         + offShelves + " szt. z targow, " + offBags + " szt. z bagazy AI.");
+        }
+
+        /// <summary>Wirtualne magazyny DTE partii AI (EveryoneCampaignBehavior.
+        /// PartyArmories) - tam lezal recykling setek legend z poleglych.
+        /// Jeff: "usun z innych armii AI te unikatowe bronie - moze byc jedna
+        /// na swiecie i ktos ja nosi, ale nie ze polowa armii ja ma".
+        /// Bohaterow nie tykamy - noszone klingi zostaja przy wlascicielach.</summary>
+        private static void SweepAiArmories(string why)
+        {
+            try
+            {
+                var t = AccessTools.TypeByName("DynamicTroopEquipmentReupload.EveryoneCampaignBehavior");
+                var f = t != null ? AccessTools.Field(t, "PartyArmories") : null;
+                var map = f != null ? f.GetValue(null) as System.Collections.IDictionary : null;
+                if (map == null) return;
+                int cut = 0, parties = 0;
+                foreach (System.Collections.DictionaryEntry e in map)
+                {
+                    var inner = e.Value as System.Collections.IDictionary;
+                    if (inner == null) continue;
+                    List<object> kill = null;
+                    foreach (System.Collections.DictionaryEntry kv in inner)
+                    {
+                        var it = kv.Key as ItemObject;
+                        if (it == null || !IsLegend(it)) continue;
+                        if (kill == null) kill = new List<object>();
+                        kill.Add(kv.Key);
+                        try { cut += Convert.ToInt32(kv.Value); } catch { cut++; }
+                    }
+                    if (kill != null)
+                    {
+                        parties++;
+                        foreach (var k in kill) inner.Remove(k);
+                    }
+                }
+                if (cut > 0)
+                    Log.Info("LegendaryLaw: magazyny AI (" + why + ") - " + cut + " legend przepadlo z " + parties + " partii.");
+            }
+            catch (Exception e) { Log.Error("LegendaryLaw.SweepAiArmories", e); }
         }
 
         internal static bool IsLegend(ItemObject it)

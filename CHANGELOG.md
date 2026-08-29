@@ -1,5 +1,25 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-28 — legendy precz TAKZE z magazynow armii AI + prawda o "atletyce pancerzy"
+**Mod:** Armoury | **Pliki:** `Armoury/src/LegendaryLaw.cs` (SweepAiArmories)
+**Problem:** Jeff: "usun z innych armii AI unikatowe bronie - moze byc jedna
+na swiecie i ktos ja nosi, ale nie ze polowa armii ja ma". Wirtualne magazyny
+DTE partii AI (EveryoneCampaignBehavior.PartyArmories, public static
+Dictionary<MBGUID, Dictionary<ItemObject,int>>) byly pelne legend z recyklingu.
+**Zmiana:** SweepAiArmories przy kazdym wczytaniu + raz dziennie: klucze
+IsLegend wypadaja ze wszystkich magazynow partii AI. Bohaterowie NOSZACY
+swoje klingi - nietykani (ich egzemplarz siedzi w equipmencie w save).
+**Ustalenie (dekompilacja, nie zgadywanie):** pancerze NIE maja wymogu
+umiejetnosci w silniku - ItemObject.RelevantSkill zwraca skill tylko dla
+broni (klasa broni) i koni (Riding), dla zbroi null; CanUseItem sprawdza
+wymog tylko przy RelevantSkill != null; UI (ItemMenuVM) pokazuje wymog tez
+tylko wtedy. "Athletics" przy pancerzu w tooltipie to perk FormFittingArmor
+(ZMNIEJSZA WAGE zbroi), nie wymog zalozenia. ROT wpisuje difficulty w XML
+pancerzy (np. 200), ale silnik tego dla zbroi nie egzekwuje.
+**Ryzyko / co sprawdzic:** log "LegendaryLaw: magazyny AI - N legend przepadlo
+z M partii" po wczytaniu.
+**Status:** WGRANE (gra byla zamknieta)
+
 ## 2026-08-28 — STATYSTYKI RZADZA SPRZETEM: koniec limitu tier+2, bronie wg umiejetnosci
 **Mod:** Armoury | **Pliki:** `Armoury/src/SkillsDecide.cs` (nowy), `Settings.cs` + `McmSettings.cs` (gen), `SubModuleMain.cs`
 **Problem:** Jeff: "max 2 tiery wyzej jest bezsensowne - wojsko moze uzywac
