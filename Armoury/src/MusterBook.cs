@@ -197,11 +197,37 @@ namespace Armoury
             return ItemReq.Meets(ch, it, out why);
         }
 
+        /// <summary>Ilu ludzi liczy kompania tego typu w partii gracza.</summary>
+        private static int MenOf(CharacterObject ch)
+        {
+            try
+            {
+                var roster = MobileParty.MainParty.MemberRoster;
+                int n = 0;
+                for (int i = 0; i < roster.Count; i++)
+                {
+                    var el = roster.GetElementCopyAtIndex(i);
+                    if (el.Character == ch) n += el.Number;
+                }
+                return n;
+            }
+            catch { return 0; }
+        }
+
+        private static string SupplyLine(int have, int men)
+        {
+            if (men <= 0) return "In the stores: " + have + " pieces.";
+            return have >= men
+                ? "In the stores: " + have + " for " + men + " men - enough for ALL."
+                : "In the stores: " + have + " for " + men + " men - " + (men - have) + " SHORT.";
+        }
+
         private static void OpenSlot(CharacterObject ch, int slot)
         {
             try
             {
                 var armory = QuartermasterLaw.DteArmory();
+                int men = MenOf(ch);
                 var rows = new List<InquiryElement>();
                 rows.Add(new InquiryElement("CLEAR", "(company pattern - clear the assignment)", null, true,
                     "Back to whatever the pattern and the stores decide."));
@@ -213,9 +239,30 @@ namespace Armoury
                         var it = el.EquipmentElement.Item;
                         if (it == null || el.Amount <= 0 || !Fits(it, slot) || !seen.Add(it)) continue;
                         string why; bool ok = MeetsReq(ch, it, out why);
-                        rows.Add(new InquiryElement(it, it.Name + "  x" + el.Amount + "  (t" + ((int)it.Tier + 1) + ")",
-                            SmithMenu.ItemPic(it), ok, ok ? "In the stores: " + el.Amount + " pieces." : why));
+                        rows.Add(new InquiryElement(it,
+                            it.Name + "  x" + el.Amount + "/" + men + "  (t" + ((int)it.Tier + 1) + ")",
+                            SmithMenu.ItemPic(it), ok, ok ? SupplyLine(el.Amount, men) : why));
                     }
+                // BRON I PANCERZ NA TWOIM GRZBIECIE (Jeff: "mialem ten luk u siebie
+                // i nie moge go wybrac") - zalozone sztuki nie leza w sakwach;
+                // wybor zdejmuje sztuke z ciebie i oddaje na stan magazynu
+                try
+                {
+                    var beq = TaleWorlds.CampaignSystem.Hero.MainHero.BattleEquipment;
+                    for (int ws = 0; ws < 12; ws++)
+                    {
+                        var ee = beq[ws];
+                        if (ee.Item == null || !Fits(ee.Item, slot) || !seen.Add(ee.Item)) continue;
+                        string whyW; bool okW = MeetsReq(ch, ee.Item, out whyW);
+                        rows.Add(new InquiryElement(1000 + ws,
+                            ee.Item.Name + "  x1/" + men + "  (t" + ((int)ee.Item.Tier + 1) + ")  [WORN BY YOU]",
+                            SmithMenu.ItemPic(ee.Item), okW,
+                            okW ? "You wear this now - assigning takes it OFF your back into the stores. "
+                                  + SupplyLine(1, men)
+                                : whyW));
+                    }
+                }
+                catch { }
                 // TWOJE SAKWY TEZ (Jeff 29.08: "nie widzi lukow, ktore wykulem") -
                 // wybor takiej sztuki PRZENOSI ja na stan magazynu, bo kwatermistrz
                 // wydaje tylko to, co ma na stanie
@@ -227,15 +274,25 @@ namespace Armoury
                         var it = el.EquipmentElement.Item;
                         if (it == null || el.Amount <= 0 || !Fits(it, slot) || !seen.Add(it)) continue;
                         string why2; bool ok2 = MeetsReq(ch, it, out why2);
-                        rows.Add(new InquiryElement(it, it.Name + "  x" + el.Amount + "  (t" + ((int)it.Tier + 1) + ")  [YOUR BAGGAGE]",
+                        rows.Add(new InquiryElement(it,
+                            it.Name + "  x" + el.Amount + "/" + men + "  (t" + ((int)it.Tier + 1) + ")  [YOUR BAGGAGE]",
                             SmithMenu.ItemPic(it), ok2,
-                            ok2 ? "In YOUR baggage: " + el.Amount + " pieces - assigning moves them to the company stores." : why2));
+                            ok2 ? "In YOUR baggage - assigning moves them to the stores. " + SupplyLine(el.Amount, men) : why2));
                     }
                 // sort po typach (Jeff: "wszystkie luki razem, potem strzaly"),
                 // w typie tier malejaco; wiersz "(company pattern)" zostaje na gorze
+                Func<object, ItemObject> itemOf = delegate (object id)
+                {
+                    var io = id as ItemObject;
+                    if (io != null) return io;
+                    if (id is int code && code >= 1000)
+                        try { return TaleWorlds.CampaignSystem.Hero.MainHero.BattleEquipment[code - 1000].Item; }
+                        catch { return null; }
+                    return null;   // "CLEAR" zostaje na gorze
+                };
                 rows.Sort((a, b) =>
                 {
-                    var ia = a.Identifier as ItemObject; var ib = b.Identifier as ItemObject;
+                    var ia = itemOf(a.Identifier); var ib = itemOf(b.Identifier);
                     if (ia == null && ib == null) return 0;
                     if (ia == null) return -1;
                     if (ib == null) return 1;
@@ -255,6 +312,28 @@ namespace Armoury
                         if (picked == null || picked.Count == 0) return;
                         var self = Instance; if (self == null) return;
                         string key = ch.StringId + "|" + slot;
+                        // [WORN BY YOU]: sztuka schodzi z twojego grzbietu na stan
+                        if (picked[0].Identifier is int wornCode && wornCode >= 1000)
+                        {
+                            try
+                            {
+                                int ws = wornCode - 1000;
+                                var beq = TaleWorlds.CampaignSystem.Hero.MainHero.BattleEquipment;
+                                var ee = beq[ws];
+                                if (ee.Item != null)
+                                {
+                                    var store2 = QuartermasterLaw.DteArmory();
+                                    if (store2 != null) store2.AddToCounts(ee, 1);
+                                    beq[ws] = new EquipmentElement(null);
+                                    self._pins[key] = ee.Item.StringId;
+                                    Log.Player(ee.Item.Name + " goes from your back to the company stores - "
+                                               + ch.Name + ": " + SlotName(slot) + " assigned.", true);
+                                }
+                            }
+                            catch (Exception e3) { Log.Error("MusterBook.wornAssign", e3); }
+                            OpenTroop(ch);
+                            return;
+                        }
                         if (picked[0].Identifier is ItemObject it)
                         {
                             self._pins[key] = it.StringId;

@@ -1,5 +1,28 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-29 — KONFLIKT DWOCH PRAW LEGEND naprawiony (drogie luki wracaja do kucia) + liczniki zapasow + [WORN BY YOU] + diagnostyka sortu CRAFT
+**Mod:** Armoury + ForgeView | **Pliki:** `LegendaryLaw.cs` (BuildLegendSet), `MusterBook.cs` (MenOf/SupplyLine/worn), `ForgeView/src/SortKnownFirst.cs` (log)
+**Problem (Jeff):** (1) "wykulem 3x Ravens' Teeth, leza w sakwach - ksiega ich
+nie widzi"; (2) "dragon war bow nosze, nie moge wykuc nowego - info LEGENDARY,
+mialo byc odblokowane"; (3) "brakuje info ile lukow juz maja, ile brakuje";
+(4) "dostepne wzory CRAFT na dole listy zamiast na gorze".
+**Przyczyna (1)(2):** kolizja dwoch systemow legend: nowy prog 100k (Legendary
+Law) lapal tez DROGIE LUKI -> SweepWorld nadawal im NotMerchandise -> stara
+regula kuzni (Recipes.IsLegendary = NotMerchandise + wartosc => "legenda moze
+byc tylko JEDNA") blokowala kucie, a Fits ksiegi je odfiltrowywal.
+**Zmiana:** BuildLegendSet RAZ na proces, PRZED SweepWorld: legenda = bron
+z FABRYCZNYM is_merchandise=false i wartoscia 100k+ (wszystkie klingi lore
+maja te flage w XML) plus lista person. Drogie luki i seryjne valyriany
+(fabrycznie kupowalne) wypadaja spod prawa legend - kuwalne bez limitu,
+widoczne w ksiedze, nieruszane przez sweepy. (3) ksiega: liczniki "x12/25"
+i "In the stores: 12 for 25 men - 13 SHORT" (magazyn, sakwy, worn).
+(4) zrodlo [WORN BY YOU]: zalozona sztuka schodzi z grzbietu na stan przy
+przypisie. ForgeView: log "SortKnownFirst: znane N na gore" - jesli ekran
+dalej pokazuje odwrotnie, ktos sortuje PO nas (do namierzenia z logu).
+**WYMOG:** flagi itemow zyja w RAM procesu - zeby odswiezyc fabryczne,
+Jeff MUSI zrobic PELNY restart gry (do pulpitu), nie sam load save'a.
+**Status:** WGRANE (gra byla zamknieta)
+
 ## 2026-08-29 — Mending Bench widzi MAGAZYN wojska + sort po typach na obu listach
 **Mod:** Armoury | **Pliki:** `Armoury/src/SmithMenu.cs`, `Armoury/src/MusterBook.cs`
 **Problem (Jeff + screenshot):** "nie moge naprawic calego ekwipunku, widze tylko

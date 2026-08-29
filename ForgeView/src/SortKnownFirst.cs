@@ -36,6 +36,11 @@ namespace ForgeView
                 list.Clear();
                 foreach (var vm in open) list.Add(vm);
                 foreach (var vm in shut) list.Add(vm);
+                // Jeff 29.08 zglasza, ze na ekranie dostepne laduja na DOLE -
+                // ten log powie, czy nasze przegrupowanie w ogole biega i ile
+                // trafia do ktorej grupy (jesli biega, a ekran klamie - ktos
+                // sortuje PO nas)
+                Log.Info("SortKnownFirst: znane " + open.Count + " na gore, zamkniete " + shut.Count + " pod nimi.");
             }
             catch (Exception e) { Log.Error("SortKnownFirst", e); }
         }

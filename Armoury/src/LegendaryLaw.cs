@@ -51,6 +51,7 @@ namespace Armoury
 
         private void OnSession(CampaignGameStarter starter)
         {
+            try { BuildLegendSet(); } catch (Exception e) { Log.Error("LegendaryLaw.BuildLegendSet", e); }
             try { SweepTemplates(); } catch (Exception e) { Log.Error("LegendaryLaw.SweepTemplates", e); }
             try { if (!_playerCulledAll) { CullPlayerAll(); _playerCulledAll = true; } }
             catch (Exception e) { Log.Error("LegendaryLaw.Cull", e); }
@@ -197,12 +198,41 @@ namespace Armoury
             catch (Exception e) { Log.Error("LegendaryLaw.SweepAiArmories", e); }
         }
 
+        // FABRYCZNY zbior legend (Jeff 29.08: drogi LUK wpadl pod prog 100k,
+        // dostal od nas NotMerchandise i stara regula kuzni zablokowala kucie -
+        // "mam info legendary"). Legenda lore ma is_merchandise=false JUZ W XML
+        // (Ice, Brightroar, mloty person...); drogie luki i seryjne valyriany
+        // NIE maja - i maja zostac zwyklym (drogim) sprzetem. Zbior budujemy
+        // RAZ na proces, ZANIM SweepWorld cokolwiek poustawia.
+        private static HashSet<ItemObject> _legendSet;
+
+        internal static void BuildLegendSet()
+        {
+            if (_legendSet != null) return;
+            var set = new HashSet<ItemObject>();
+            try
+            {
+                var floor = Settings.Current.LegendaryLootValueFloor;
+                foreach (var it in MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
+                {
+                    if (it == null || !it.HasWeaponComponent || it.StringId == null) continue;
+                    if (LegendIds.Contains(it.StringId)) { set.Add(it); continue; }
+                    if (floor > 0 && it.Value >= floor && it.NotMerchandise) set.Add(it);
+                }
+                Log.Info("LegendaryLaw: zbior legend zbudowany - " + set.Count
+                         + " broni (fabryczne NotMerchandise 100k+ oraz lista person).");
+            }
+            catch (Exception e) { Log.Error("LegendaryLaw.BuildLegendSet", e); }
+            _legendSet = set;
+        }
+
         internal static bool IsLegend(ItemObject it)
         {
             if (it == null || !it.HasWeaponComponent || it.StringId == null) return false;
+            if (_legendSet != null) return _legendSet.Contains(it);
             if (LegendIds.Contains(it.StringId)) return true;
             var floor = Settings.Current.LegendaryLootValueFloor;
-            return floor > 0 && it.Value >= floor;
+            return floor > 0 && it.Value >= floor && it.NotMerchandise;
         }
 
         /// <summary>Najlepszy ZWYKLY odpowiednik legendy: ta sama klasa broni,
