@@ -231,6 +231,21 @@ namespace Armoury
                             SmithMenu.ItemPic(it), ok2,
                             ok2 ? "In YOUR baggage: " + el.Amount + " pieces - assigning moves them to the company stores." : why2));
                     }
+                // sort po typach (Jeff: "wszystkie luki razem, potem strzaly"),
+                // w typie tier malejaco; wiersz "(company pattern)" zostaje na gorze
+                rows.Sort((a, b) =>
+                {
+                    var ia = a.Identifier as ItemObject; var ib = b.Identifier as ItemObject;
+                    if (ia == null && ib == null) return 0;
+                    if (ia == null) return -1;
+                    if (ib == null) return 1;
+                    int r = SmithMenu.TypeRank(ia).CompareTo(SmithMenu.TypeRank(ib));
+                    if (r != 0) return r;
+                    r = ib.Tier.CompareTo(ia.Tier);
+                    if (r != 0) return r;
+                    return string.CompareOrdinal(ia.StringId, ib.StringId);
+                });
+
                 MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData(
                     ch.Name + " - " + SlotName(slot),
                     "The quartermaster will issue the assigned piece to every man of this troop (as stores allow).",

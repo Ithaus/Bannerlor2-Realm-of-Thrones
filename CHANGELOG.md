@@ -1,5 +1,20 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-29 — Mending Bench widzi MAGAZYN wojska + sort po typach na obu listach
+**Mod:** Armoury | **Pliki:** `Armoury/src/SmithMenu.cs`, `Armoury/src/MusterBook.cs`
+**Problem (Jeff + screenshot):** "nie moge naprawic calego ekwipunku, widze tylko
+bron". Przyczyna: zbite PANCERZE wojska leza w magazynie DTE (zuzycie WearThe
+Troops dziala na stanie kompanii), a lista "Pick a damaged piece" czytala tylko
+sakwy i grzbiet gracza - tam faktycznie leza glownie zbite bronie z lupow.
+Plus: "sortuj rzeczy po typach - wszystkie luki, potem strzaly, straszny chaos".
+**Zmiana:** (1) trzecie zrodlo naprawy [STORES]: zbite sztuki z magazynu DTE
+na liscie (slot=-2), naprawa (kowal za zloto albo wlasne rece) wraca CZYSTA
+sztuka na stan wojska; licznik w podpowiedzi opcji ("N in bags, W on back,
+S in the company stores"). (2) wspolny TypeRank (luki, strzaly, kusze, belty,
+1H, 2H, drzewce, oszczepy, tarcze, helm->plaszcz, kon, rzad; w typie tier
+malejaco) - sortuje liste naprawy ORAZ liste przypisania w ksiedze musztry.
+**Status:** WGRANE (watcher - gra dzialala przy buildzie)
+
 ## 2026-08-29 — TroopFit: jednostki dostaja skille do WLASNEGO szablonu (audyt + wyrownanie)
 **Mod:** Armoury | **Pliki:** `Armoury/src/TroopFit.cs` (nowy), `LegendaryLaw.cs` (wywolanie po sweepie), `Settings.cs` + `McmSettings.cs` (gen; 261)
 **Zlecenie Jeffa:** "przejrzyj jednostki - czy maja umiejetnosci do noszonego

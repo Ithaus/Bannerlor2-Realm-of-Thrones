@@ -209,6 +209,35 @@ namespace Armoury
         // KAZDY przedmiot ze stanem obnizajacym wartosc - lupy Spoils (rl_looted_*),
         // wraki, rdza, pekniecia, nasze zuzycie - kowal doprowadza do stanu fabrycznego.
 
+        /// <summary>Porzadek typow na listach (Jeff 29.08: "sortuj po typach -
+        /// wszystkie luki, potem strzaly, zeby nie szukac wszedzie"): luki,
+        /// strzaly, kusze, belty, bron reczna, tarcze, pancerz od helmu w dol,
+        /// kon, rzad.</summary>
+        internal static int TypeRank(ItemObject it)
+        {
+            if (it == null) return 99;
+            switch (it.ItemType)
+            {
+                case ItemObject.ItemTypeEnum.Bow: return 0;
+                case ItemObject.ItemTypeEnum.Arrows: return 1;
+                case ItemObject.ItemTypeEnum.Crossbow: return 2;
+                case ItemObject.ItemTypeEnum.Bolts: return 3;
+                case ItemObject.ItemTypeEnum.OneHandedWeapon: return 4;
+                case ItemObject.ItemTypeEnum.TwoHandedWeapon: return 5;
+                case ItemObject.ItemTypeEnum.Polearm: return 6;
+                case ItemObject.ItemTypeEnum.Thrown: return 7;
+                case ItemObject.ItemTypeEnum.Shield: return 8;
+                case ItemObject.ItemTypeEnum.HeadArmor: return 9;
+                case ItemObject.ItemTypeEnum.BodyArmor: return 10;
+                case ItemObject.ItemTypeEnum.LegArmor: return 11;
+                case ItemObject.ItemTypeEnum.HandArmor: return 12;
+                case ItemObject.ItemTypeEnum.Cape: return 13;
+                case ItemObject.ItemTypeEnum.Horse: return 14;
+                case ItemObject.ItemTypeEnum.HorseHarness: return 15;
+                default: return 20;
+            }
+        }
+
         private static bool IsBattleWorn(ItemObject it, ItemModifier m)
         {
             if (ArmouryBehavior.NoWear(it)) return false;   // strzaly/belty poza systemem zuzycia
@@ -418,10 +447,23 @@ namespace Armoury
                         if (eq[i].Item != null && IsBattleWorn(eq[i].Item, eq[i].ItemModifier)) worn++;
                 }
                 catch { }
-                if (n + worn == 0)
-                { args.IsEnabled = false; args.Tooltip = new TextObject("{=!}Nothing damaged on your back or in your bags."); return true; }
-                args.Tooltip = new TextObject("{=!}{N} damaged in your bags, {W} on your back. Choose one - the smith's price or your own hands.")
-                    .SetTextVariable("N", n).SetTextVariable("W", worn);
+                int stores = 0;
+                try
+                {
+                    var st = QuartermasterLaw.DteArmory();
+                    if (st != null)
+                        for (int i = 0; i < st.Count; i++)
+                        {
+                            var e2 = st.GetElementCopyAtIndex(i);
+                            if (e2.Amount > 0 && e2.EquipmentElement.Item != null
+                                && IsBattleWorn(e2.EquipmentElement.Item, e2.EquipmentElement.ItemModifier)) stores += e2.Amount;
+                        }
+                }
+                catch { }
+                if (n + worn + stores == 0)
+                { args.IsEnabled = false; args.Tooltip = new TextObject("{=!}Nothing damaged on your back, in your bags or in the stores."); return true; }
+                args.Tooltip = new TextObject("{=!}{N} damaged in your bags, {W} on your back, {S} in the company stores. Choose one - the smith's price or your own hands.")
+                    .SetTextVariable("N", n).SetTextVariable("W", worn).SetTextVariable("S", stores);
                 return true;
             }
             catch (Exception e) { Log.Error("MendPickCondition", e); return false; }
@@ -489,7 +531,41 @@ namespace Armoury
                         ee.GetModifiedItemName() + "  x" + el.Amount, ItemPic(ee.Item), true, hint));
                     if (elements.Count >= Settings.Current.MaxItemsListed) break;
                 }
-                if (elements.Count == 0) { Log.Player("Nothing damaged on your back or in your bags.", true); return; }
+
+                // MAGAZYN WOJSKA (Jeff 29.08: "nie moge naprawic calego ekwipunku,
+                // widze tylko bron") - zbite pancerze zolnierzy leza w magazynie
+                // DTE, nie w sakwach; teraz sa na liscie z [STORES] (slot=-2),
+                // naprawa wraca na stan wojska
+                var armory = QuartermasterLaw.DteArmory();
+                if (armory != null)
+                    for (int i = 0; i < armory.Count; i++)
+                    {
+                        if (elements.Count >= Settings.Current.MaxItemsListed) break;
+                        var el = armory.GetElementCopyAtIndex(i);
+                        var ee = el.EquipmentElement;
+                        if (ee.Item == null || el.Amount <= 0 || !IsBattleWorn(ee.Item, ee.ItemModifier)) continue;
+                        int pct2 = Math.Max(1, (int)Math.Round(ee.ItemModifier.PriceMultiplier * 100f));
+                        int smith2 = PieceCost(ee);
+                        string hint2 = "COMPANY STORES - the men's kit.\nCondition " + pct2 + "%" +
+                                       "\nSmith: " + smith2 + " gold, " + Settings.Current.MendLootHoursPerPiece.ToString("0.#") + "h";
+                        found.Add(ee); slots.Add(-2);
+                        elements.Add(new InquiryElement(found.Count - 1,
+                            "[STORES] " + ee.GetModifiedItemName() + "  x" + el.Amount, ItemPic(ee.Item), true, hint2));
+                    }
+
+                if (elements.Count == 0) { Log.Player("Nothing damaged on your back, in your bags or in the stores.", true); return; }
+
+                // sort po typach: luki razem, strzaly razem... (indeksy found/slots
+                // jada w Identifier, wiec kolejnosc elements mozna przestawiac swobodnie)
+                elements.Sort((a, b) =>
+                {
+                    var ia = found[(int)a.Identifier].Item; var ib = found[(int)b.Identifier].Item;
+                    int r = TypeRank(ia).CompareTo(TypeRank(ib));
+                    if (r != 0) return r;
+                    r = ib.Tier.CompareTo(ia.Tier);
+                    if (r != 0) return r;
+                    return string.CompareOrdinal(ia.StringId, ib.StringId);
+                });
 
                 MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData(
                     "The Mending Bench", "Every piece has its price - in coin at the smith's rate, or in your own metal and sweat.",
@@ -577,6 +653,35 @@ namespace Armoury
         {
             try
             {
+                // slot -2 = magazyn wojska: naprawa zdejmuje zbita sztuke ze stanu
+                // i odklada czysta na stan (zolnierze dostana ja przy przydziale)
+                if (slot == -2)
+                {
+                    var store = QuartermasterLaw.DteArmory();
+                    if (store == null || store.FindIndexOfElement(ee) < 0)
+                    { Log.Player("The piece is no longer in the stores.", true); return; }
+                    if (bySmith)
+                    {
+                        if (Hero.MainHero.Gold < gold) { Log.Player("Your purse came up short.", true); return; }
+                        GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, null, gold);
+                    }
+                    else
+                    {
+                        foreach (var p in mats)
+                            if (p.Item != null && Recipes.CountInInventory(p.Item) < p.Count)
+                            { Log.Player("Your materials ran short before the work was done.", true); return; }
+                        foreach (var p in mats)
+                            if (p.Item != null) MobileParty.MainParty.ItemRoster.AddToCounts(p.Item, -p.Count);
+                        Forge.SpendStamina(stamina);
+                        Hero.MainHero.AddSkillXp(DefaultSkills.Crafting, 30 + 20 * Recipes.Grade(ee.Item));
+                    }
+                    store.AddToCounts(ee, -1);
+                    store.AddToCounts(new EquipmentElement(ee.Item), 1);
+                    Log.Player(ee.Item.Name + " is whole again and back in the company stores.");
+                    Log.Info("Naprawa sztuki (magazyn): " + ee.Item.StringId + (bySmith ? " kowal " + gold : " wlasna"));
+                    return;
+                }
+
                 var roster = MobileParty.MainParty.ItemRoster;
                 if (slot < 0 && roster.FindIndexOfElement(ee) < 0) { Log.Player("The piece is no longer in your bags.", true); return; }
                 if (slot >= 0)
