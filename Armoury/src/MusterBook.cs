@@ -229,12 +229,22 @@ namespace Armoury
             catch { return 0; }
         }
 
-        private static string SupplyLine(int have, int men)
+        private static string SupplyLine(int have, int need)
         {
-            if (men <= 0) return "In the stores: " + have + " pieces.";
-            return have >= men
-                ? "In the stores: " + have + " for " + men + " men - enough for ALL."
-                : "In the stores: " + have + " for " + men + " men - " + (men - have) + " SHORT.";
+            if (need <= 0) return "In the stores: " + have + " pieces.";
+            return have >= need
+                ? "In the stores: " + have + " of " + need + " needed - enough for ALL."
+                : "In the stores: " + have + " of " + need + " needed - " + (need - have) + " SHORT.";
+        }
+
+        /// <summary>Zapotrzebowanie na sztuki danego typu: lucznik nosi
+        /// 2 kolczany (RearmBySkill), wiec strzaly/belty licza sie x2 na
+        /// glowe (Jeff 29.08: "czemu mam 49/214 arrow?" - prawda bylo 49/428).</summary>
+        private static int NeedFor(ItemObject it, int men)
+        {
+            return (it != null && (it.ItemType == ItemObject.ItemTypeEnum.Arrows
+                                   || it.ItemType == ItemObject.ItemTypeEnum.Bolts))
+                ? men * 2 : men;
         }
 
         private static void OpenSlot(CharacterObject ch, int slot)
@@ -254,9 +264,10 @@ namespace Armoury
                         var it = el.EquipmentElement.Item;
                         if (it == null || el.Amount <= 0 || !Fits(it, slot) || !seen.Add(it)) continue;
                         string why; bool ok = MeetsReq(ch, it, out why);
+                        int needA = NeedFor(it, men);
                         rows.Add(new InquiryElement(it,
-                            it.Name + "  x" + el.Amount + "/" + men + "  (t" + ((int)it.Tier + 1) + ")",
-                            SmithMenu.ItemPic(it), ok, ok ? SupplyLine(el.Amount, men) : why));
+                            it.Name + "  x" + el.Amount + "/" + needA + "  (t" + ((int)it.Tier + 1) + ")",
+                            SmithMenu.ItemPic(it), ok, ok ? SupplyLine(el.Amount, needA) : why));
                     }
                 // BRON I PANCERZ NA TWOIM GRZBIECIE (Jeff: "mialem ten luk u siebie
                 // i nie moge go wybrac") - zalozone sztuki nie leza w sakwach;
@@ -269,11 +280,12 @@ namespace Armoury
                         var ee = beq[ws];
                         if (ee.Item == null || !Fits(ee.Item, slot) || !seen.Add(ee.Item)) continue;
                         string whyW; bool okW = MeetsReq(ch, ee.Item, out whyW);
+                        int needW = NeedFor(ee.Item, men);
                         rows.Add(new InquiryElement(1000 + ws,
-                            ee.Item.Name + "  x1/" + men + "  (t" + ((int)ee.Item.Tier + 1) + ")  [WORN BY YOU]",
+                            ee.Item.Name + "  x1/" + needW + "  (t" + ((int)ee.Item.Tier + 1) + ")  [WORN BY YOU]",
                             SmithMenu.ItemPic(ee.Item), okW,
                             okW ? "You wear this now - assigning takes it OFF your back into the stores. "
-                                  + SupplyLine(1, men)
+                                  + SupplyLine(1, needW)
                                 : whyW));
                     }
                 }
@@ -289,10 +301,11 @@ namespace Armoury
                         var it = el.EquipmentElement.Item;
                         if (it == null || el.Amount <= 0 || !Fits(it, slot) || !seen.Add(it)) continue;
                         string why2; bool ok2 = MeetsReq(ch, it, out why2);
+                        int needB = NeedFor(it, men);
                         rows.Add(new InquiryElement(it,
-                            it.Name + "  x" + el.Amount + "/" + men + "  (t" + ((int)it.Tier + 1) + ")  [YOUR BAGGAGE]",
+                            it.Name + "  x" + el.Amount + "/" + needB + "  (t" + ((int)it.Tier + 1) + ")  [YOUR BAGGAGE]",
                             SmithMenu.ItemPic(it), ok2,
-                            ok2 ? "In YOUR baggage - assigning moves them to the stores. " + SupplyLine(el.Amount, men) : why2));
+                            ok2 ? "In YOUR baggage - assigning moves them to the stores. " + SupplyLine(el.Amount, needB) : why2));
                     }
                 // sort po typach (Jeff: "wszystkie luki razem, potem strzaly"),
                 // w typie tier malejaco; wiersz "(company pattern)" zostaje na gorze

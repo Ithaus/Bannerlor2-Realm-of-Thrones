@@ -1,5 +1,21 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-29 — Kwatermistrz nie przyjmowal strzal + licznik amunicji klamal
+**Mod:** Armoury | **Pliki:** `Armoury/src/QuartermasterLaw.cs`, `Armoury/src/MusterBook.cs`
+**Problem:** Jeff: "mam 49/214 arrow i nie przyjmuje mi kwatermistrz strzal
+tier 6". W logu bartery szly (39/24/23 szt.), o strzalach ani sladu.
+**Przyczyna:** (1) NoteDeposit CELOWO wykluczal Arrows/Bolts z wymiany
+barterowej - wklad strzal lezal bez rozliczenia i bez komunikatu;
+(2) licznik ksiegi musztry liczyl amunicje 1:1 na glowe, a lucznik nosi
+2 kolczany (RearmBySkill) - "49/214" zamiast prawdziwego "49/428".
+**Zmiana:** (1) strzaly i belty wchodza do wymiany jak kazda bron
+(wrzucasz lepsze -> wojsko bierze, oddaje najgorsze swoje); (2) NeedFor:
+Arrows/Bolts licza sie x2 na glowe, tekst podpowiedzi "X of Y needed".
+**Ryzyko / co sprawdzic:** wrzucic strzaly t6 kwatermistrzowi, zamknac okno
+-> stare strzaly wojska na liscie gracza (log "wymiana barterowa"); karta
+strzal w ksiedze pokazuje /men*2.
+**Status:** WGRANE (gra byla zamknieta)
+
 ## 2026-08-29 — "Awans wycina sprzet z magazynu?" — diagnostyka
 **Mod:** Armoury | **Pliki:** `Armoury/src/ArmouryBehavior.cs`
 **Problem:** Jeff: uzupelnil sprzet u kwatermistrza, po awansach jednostek

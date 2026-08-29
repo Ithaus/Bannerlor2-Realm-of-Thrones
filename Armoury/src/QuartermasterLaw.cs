@@ -483,9 +483,10 @@ namespace Armoury
             try
             {
                 if (item == null || n <= 0) return;
-                bool weaponish = item.HasWeaponComponent
-                    && item.ItemType != ItemObject.ItemTypeEnum.Arrows
-                    && item.ItemType != ItemObject.ItemTypeEnum.Bolts;
+                // strzaly i belty TEZ podlegaja wymianie (Jeff 29.08: "nie
+                // przyjmuje mi kwatermistrz strzal tier 6" - wykluczenie
+                // amunicji zostawialo wklad bez rozliczenia i bez komunikatu)
+                bool weaponish = item.HasWeaponComponent;
                 if (!weaponish && !item.HasArmorComponent) return;
                 _pendingSwaps.Add(new KeyValuePair<ItemObject, KeyValuePair<int, int>>(
                     item, new KeyValuePair<int, int>(n, value)));
