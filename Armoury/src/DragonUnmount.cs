@@ -57,9 +57,23 @@ namespace Armoury
                                          + soldier.StringId + ").");
                                 continue;
                             }
-                            // ZASADA NADRZEDNA na scenie: bron ponad skill schodzi
-                            if (w != null && !ItemReq.Meets(soldier, w))
-                                eq[(EquipmentIndex)slot] = new EquipmentElement(null);
+                            // ZASADA NADRZEDNA na scenie: bron ponad skill schodzi,
+                            // ale zolnierz dostaje najlepsza W RAMACH swojego skilla
+                            // (nie wchodzi golym slotem) - i log mowi wprost CZEMU
+                            // (Jeff 29.08: "kwatermistrz nie przyjal lukow?!")
+                            if (w != null)
+                            {
+                                string whyNot;
+                                if (!ItemReq.Meets(soldier, w, out whyNot))
+                                {
+                                    int sk = w.RelevantSkill != null ? soldier.GetSkillValue(w.RelevantSkill) : 0;
+                                    var swap = SkillsDecide.PatternFor(w.ItemType, sk);
+                                    eq[(EquipmentIndex)slot] = swap != null
+                                        ? new EquipmentElement(swap) : new EquipmentElement(null);
+                                    Log.Info("ItemReq: " + soldier.StringId + " nie udzwignie " + w.StringId
+                                             + " (" + whyNot + ") - dostaje " + (swap != null ? swap.StringId : "goly slot") + ".");
+                                }
+                            }
                         }
                         // pancerz ponad atletyke -> najlepszy dozwolony; kon ponad
                         // Riding -> najlepszy dozwolony (albo pieszo)

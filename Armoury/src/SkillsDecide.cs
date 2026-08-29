@@ -216,6 +216,15 @@ namespace Armoury
             AddPattern(slots, type, skill);
         }
 
+        /// <summary>Najlepsza bron danego typu W RAMACH skilla - do podmian
+        /// przy spawnie (zolnierz nie wchodzi golym slotem).</summary>
+        internal static ItemObject PatternFor(ItemObject.ItemTypeEnum type, int skill)
+        {
+            var tmp = new List<ItemObject>();
+            AddPattern(tmp, type, skill);
+            return tmp.Count > 0 ? tmp[0] : null;
+        }
+
         private static void FillFree(List<ItemObject> slots, ItemObject.ItemTypeEnum ammo)
         {
             for (int i = 0; i < 4 && i < slots.Count; i++)
