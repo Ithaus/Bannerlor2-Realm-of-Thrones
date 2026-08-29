@@ -1,5 +1,20 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-29 — wymiana barterowa v2: NATYCHMIAST, warunkiem czlowiek ze skillem, stare na LISTE gracza
+**Mod:** Armoury | **Pliki:** `Armoury/src/QuartermasterLaw.cs` (AnyoneCanUse + ProcessSwaps)
+**Korekta Jeffa (scenariusz 1:1):** "wkladam 4 luki t6 i zamykam okno: jesli sa
+lucznicy z Bow 150 - biora OD RAZU, otwieram i zamiast moich lukow leza
+wymienione (gorsze); jesli nikt nie ma skilla - otwieram i sa te same luki
+plus komunikat, ze ponad poziom jednostek". Zadnego czekania na bitwe.
+**Zmiana:** (1) warunek wymiany: AnyoneCanUse - w kompanii musi byc jednostka
+spelniajaca wymogi wkladu (bron wg skilla, pancerz wg atletyki); jak nie ma:
+zero wymiany, wklad zostaje na liscie gracza, komunikat "no man of the company
+can handle the X (needs Bow 150; the best of them has Y)". (2) wydawane stare
+sztuki NIE ida do sakw - zostaja w magazynie PRZEKSIEGOWANE na gracza
+(ksiega wkladow +stare/-nowe): otwierasz ponownie i na liscie zamiast twoich
+t6 leza stare do zabrania/sprzedania.
+**Status:** WGRANE (gra byla zamknieta)
+
 ## 2026-08-29 — WYMIANA BARTEROWA kwatermistrza + zamiennik za-skill przy spawnie
 **Mod:** Armoury | **Pliki:** `QuartermasterLaw.cs` (NoteDeposit/ProcessSwaps), `SkillsDecide.cs` (PatternFor), `DragonUnmount.cs` (log + swap)
 **Zlecenie Jeffa:** "wrzucam luki t6 do armii - lucznicy maja je wziac, a MNIE
