@@ -157,6 +157,12 @@ namespace Armoury
             return WornFor(type, CountNeeds());
         }
 
+        /// <summary>To samo dla escrow: ile sztuk tego typu potrzebuje kompania.</summary>
+        internal static int NeedForType(ItemObject.ItemTypeEnum type)
+        {
+            return NeedFor(type);
+        }
+
         internal static readonly ItemObject.ItemTypeEnum[] KitTypes =
         {
             ItemObject.ItemTypeEnum.HeadArmor, ItemObject.ItemTypeEnum.BodyArmor,
@@ -555,6 +561,26 @@ namespace Armoury
                     var newItem = dep.Key;
                     int count = dep.Value.Key;
                     int newVal = dep.Value.Value;
+
+                    // WYMIANA TYLKO Z NADWYZKI (Jeff 29.08: "wrzucam strzaly,
+                    // dostaje stare, zabieram je i znowu mam 49/214"). Barter
+                    // oddaje sztuke za sztuke, wiec przy BRAKACH nigdy nie
+                    // podnosil stanu - wklad wchodzil, stara wychodzila, bilans
+                    // zero. Gdy wojsku brakuje tego typu, wklad ZOSTAJE na
+                    // uzupelnienie i nikt nic nie oddaje.
+                    int haveT = QuartermasterLaw.HaveFor(armory, newItem.ItemType);
+                    int needT = QuartermasterLaw.NeedForType(newItem.ItemType);
+                    int surplus = needT > 0 ? haveT - needT : int.MaxValue;
+                    if (surplus <= 0)
+                    {
+                        Log.Player("Quartermaster: the men are still SHORT of " + newItem.Name
+                                   + " (" + haveT + " of " + needT + " needed) - your gift fills the gaps. "
+                                   + "Nothing goes back on your shelf until they have a full set.", true);
+                        Log.Info("Kwatermistrz: brak nadwyzki " + newItem.ItemType + " (" + haveT + "/" + needT
+                                 + ") - wklad " + count + " szt. uzupelnia braki, bez wymiany.");
+                        continue;
+                    }
+                    if (count > surplus) count = surplus;
 
                     // NIKT NIE UDZWIGNIE = zadnej wymiany, wklad zostaje twoj,
                     // a kwatermistrz mowi wprost czemu (Jeff: "jak nie wymienili,

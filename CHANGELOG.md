@@ -1,5 +1,26 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-29 — Barter zjadal kazde uzupelnienie: wymiana TYLKO z nadwyzki
+**Mod:** Armoury | **Pliki:** `Armoury/src/QuartermasterLaw.cs`
+**Problem:** Jeff: "wrzucam strzaly, kwatermistrz przyjmuje i wydaje mi
+wymienione stare, zabieram je do siebie - i znowu 49/214". Uzupelnianie
+amunicji bylo NIEMOZLIWE, licznik nigdy nie rosl.
+**Przyczyna (arytmetyka, nie wyswietlanie):** ProcessSwaps wymienia sztuke
+za sztuke BEZ sprawdzania, czy wojsku brakuje. Bilans: +30 nowych do
+magazynu, -30 starych przeksiegowanych na gracza i przez niego zabranych
+= 49 jak bylo. Barter to wymiana JAKOSCI, a Jeff probowal nim uzupelnic
+ILOSC. Licznik "have" (ShortageLines:186-192) liczy cala zawartosc magazynu
+poprawnie - to nie on klamal.
+**Zmiana:** wymiana rusza dopiero, gdy magazyn ma NADWYZKE danego typu
+(have - need > 0), i nie wieksza niz ta nadwyzka. Przy brakach wklad
+zostaje u wojska, a kwatermistrz mowi wprost: "the men are still SHORT of X
+(N of M needed) - your gift fills the gaps. Nothing goes back on your shelf
+until they have a full set."
+**Ryzyko / co sprawdzic:** wrzucic strzaly przy brakach -> licznik ma
+WZROSNAC, komunikat o brakach zamiast wymiany; wrzucic luki t6 przy pelnym
+stanie lukow -> wymiana dziala jak dotad.
+**Status:** WGRANE (gra zamknieta)
+
 ## 2026-08-29 — Kwatermistrz nie przyjmowal strzal + licznik amunicji klamal
 **Mod:** Armoury | **Pliki:** `Armoury/src/QuartermasterLaw.cs`, `Armoury/src/MusterBook.cs`
 **Problem:** Jeff: "mam 49/214 arrow i nie przyjmuje mi kwatermistrz strzal
