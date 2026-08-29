@@ -140,6 +140,9 @@ namespace Armoury
                 try { CollectReadyProjects(); } catch { }
                 // po kazdej bitwie menu sie otwiera - smok wyleci zanim DTE go osiodla
                 try { CleanseDragonStables(true); } catch { }
+                // ...a smieci <=3% i slonie-towar zaraz za nim (Spoils naklada
+                // stany PO naszym filtrze lupow - tu wymiatamy je od reki)
+                try { CleanseTrashInBags(); } catch { }
                 // samonaprawa depozytu: otwarte menu gry = na pewno NIE ekran
                 // zbrojowni; jesli cokolwiek wisi w depozycie (Release nie
                 // odpalil przy zamykaniu ekranu), wraca na polki teraz
@@ -244,8 +247,17 @@ namespace Armoury
                     for (int i = roster.Count - 1; i >= 0; i--)
                     {
                         var el = roster.GetElementCopyAtIndex(i);
+                        var it = el.EquipmentElement.Item;
+                        if (el.Amount <= 0 || it == null) continue;
+                        // slonie-towar precz (Jeff: "slonie ma Zlota Kompania")
+                        if (it.StringId != null && (it.StringId == "elephant" || it.StringId.StartsWith("rot_elephant")))
+                        {
+                            roster.AddToCounts(el.EquipmentElement, -el.Amount);
+                            cut += el.Amount;
+                            continue;
+                        }
                         var mod = el.EquipmentElement.ItemModifier;
-                        if (el.Amount <= 0 || mod == null) continue;
+                        if (mod == null) continue;
                         if (mod.PriceMultiplier * 100f > s.LootMinConditionPercent + 0.01f) continue;
                         roster.AddToCounts(el.EquipmentElement, -el.Amount);
                         cut += el.Amount;

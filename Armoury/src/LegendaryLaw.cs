@@ -147,7 +147,14 @@ namespace Armoury
                     for (int i = roster.Count - 1; i >= 0; i--)
                     {
                         var el = roster.GetElementCopyAtIndex(i);
-                        if (!IsLegend(el.EquipmentElement.Item) || el.Amount <= 0) continue;
+                        var it2 = el.EquipmentElement.Item;
+                        if (it2 == null || el.Amount <= 0) continue;
+                        // slonie-towar w bagazach AI tez precz (Jeff 29.08:
+                        // "slonie ma Zlota Kompania" - jej bojowe zyja
+                        // w szablonach, nie w workach)
+                        bool elephant = it2.StringId != null
+                            && (it2.StringId == "elephant" || it2.StringId.StartsWith("rot_elephant"));
+                        if (!elephant && !IsLegend(it2)) continue;
                         roster.AddToCounts(el.EquipmentElement, -el.Amount);
                         offBags += el.Amount;
                     }

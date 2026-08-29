@@ -264,8 +264,17 @@ namespace Armoury
                     var el = roster.GetElementCopyAtIndex(i);
                     var it = el.EquipmentElement.Item;
                     if (it == null || el.Amount <= 0) continue;
-                    if (s.LegendaryLootValueFloor > 0 && it.HasWeaponComponent
-                        && it.Value >= s.LegendaryLootValueFloor)
+                    // SLON NIE LEZY W WORKACH (Jeff 29.08: "w bitwie nie bylo
+                    // sloni, a po pladrowaniu mam slonie - wywal!"): pokonani
+                    // wozili slonie w bagazach; bojowe slonie Zlotej Kompanii
+                    // zyja w szablonach i ich nie ruszamy
+                    if (it.StringId != null && (it.StringId == "elephant" || it.StringId.StartsWith("rot_elephant")))
+                    {
+                        roster.AddToCounts(el.EquipmentElement, -el.Amount);
+                        trash += el.Amount;
+                        continue;
+                    }
+                    if (LegendaryLaw.IsLegend(it))
                     {
                         roster.AddToCounts(el.EquipmentElement, -el.Amount);
                         legends += el.Amount;

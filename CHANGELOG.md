@@ -1,5 +1,22 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-29 — lupy: 3% wciskane przez Spoils PO filtrze + slonie z bagazy pokonanych
+**Mod:** Armoury | **Pliki:** `BattlefieldLaw.cs` (CleanseTrash), `ArmouryBehavior.cs` (CleanseTrashInBags + menu-hak), `LegendaryLaw.cs` (SweepWorld bagaze)
+**Problem (Jeff po bitwie):** (1) "dostalem ekwipunek z 3% zuzycia" - Spoils
+naklada stany NA KONCU, po naszym CleanseTrash w AfterGenerateLoot, wiec prog
+nie mial jak ich zlapac. (2) "w bitwie nie bylo sloni, a po pladrowaniu mam
+slonie - slonie ma Zlota Kompania, wywal!" - pokonane partie wozily slonie
+W BAGAZACH (nakupione przed kwarantanna targow); loot bagazy = slonie.
+**Zmiana:** (1) CleanseTrashInBags wolane TAKZE przy kazdym otwarciu menu
+mapy (po bitwie zawsze) - smieci <=progu i slonie-towar wylatuja z sakw
+i magazynu od reki, zanim gracz je zobaczy w ekwipunku. (2) filtr lupow
+(CleanseTrash) tnie elephant/rot_elephant_* niezaleznie od stanu; przy okazji
+warunek legend w lupach przelaczony na LegendaryLaw.IsLegend (zbior fabryczny -
+spojnosc z fixem lukow). (3) SweepWorld przy wczytaniu czysci slonie takze
+z bagazy WSZYSTKICH partii AI (zrodlo wysycha). Bojowe slonie Zlotej Kompanii
+zyja w szablonach jednostek - NIETKNIETE.
+**Status:** WGRANE (watcher - gra dzialala przy buildzie)
+
 ## 2026-08-29 — lista naprawy: limit ucinal pancerze (zbierz->sortuj->tnij) + czystka starych 3%
 **Mod:** Armoury | **Pliki:** `Armoury/src/SmithMenu.cs`, `Armoury/src/ArmouryBehavior.cs`
 **Problem (Jeff, slusznie wsciekly):** "pancerze SA uszkodzone i chce je
