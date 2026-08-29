@@ -258,6 +258,7 @@ namespace Armoury
         private void OnSessionLaunched(CampaignGameStarter starter)
         {
             try { FixCharcoalWeight(); } catch (Exception e) { Log.Error("FixCharcoalWeight", e); }
+            try { WearGroups.Fix(); } catch (Exception e) { Log.Error("WearGroups.Fix", e); }
             try { CleanseNegativeStacks(); } catch (Exception e) { Log.Error("CleanseNegativeStacks", e); }
             try { CleanseDragonStables(true); } catch (Exception e) { Log.Error("CleanseDragonStables", e); }
             try { QualityRich.Enrich(); } catch (Exception e) { Log.Error("QualityRich.Enrich", e); }

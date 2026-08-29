@@ -1,5 +1,26 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-29 — 999 pancerzy ROT bez modifier_group: pancerz NIGDY nie mial stanu (WearGroups)
+**Mod:** Armoury | **Pliki:** `Armoury/src/WearGroups.cs` (nowy), `ArmouryBehavior.cs`
+**Problem (Jeff + screeny):** "mam mase rzeczy w ekwipunku, a na liscie naprawy
+TYLKO bron!". Lista naprawy filtruje po stanie (<100%), a pancerze zawsze 100%.
+**Przyczyna (twardy dowod z danych):** ROTassets.xml: 999 itemow pancernych,
+0 z modifier_group. Bez grupy gra nie umie nadac stanu (dented/rusty/...),
+wiec CALY lancuch zuzycia pancerzy byl martwy od poczatku: WearTheTroops,
+loot-wear, obszukiwanie jencow, [STORES] - wszystko dzialalo tylko na
+vanillowych broniach (te maja grupy). RBM MA ujemne stany pancerne
+(dented 60%, rusty 30%, damage_50 10%) - lezaly niepodpiete.
+**Zmiana:** WearGroups.Fix przy kazdym wczytaniu: item pancerny bez grupy
+dostaje grupe wg materialu (Plate->plate, Chainmail->chain, Leather->leather,
+reszta->cloth); luki/kusze bez grupy -> bow/crossbow. Backing field
+ItemComponent.<ItemModifierGroup>.
+**Ryzyko / co sprawdzic:** log "WearGroups: nadano grupy ... pancerzom";
+OD TERAZ pancerze zaczna sie zuzywac (WearTheTroops 12%/bitwa!) i pojawiac
+na liscie naprawy oraz w [STORES]; stare sztuki w sakwach pozostaja czyste
+(stan nadaje sie przy zdarzeniach, nie wstecz). Ceny lupow pancernych spadna
+(stany < 100%) - to zamierzone.
+**Status:** WGRANE (watcher - gra dzialala przy buildzie)
+
 ## 2026-08-29 — KONFLIKT DWOCH PRAW LEGEND naprawiony (drogie luki wracaja do kucia) + liczniki zapasow + [WORN BY YOU] + diagnostyka sortu CRAFT
 **Mod:** Armoury + ForgeView | **Pliki:** `LegendaryLaw.cs` (BuildLegendSet), `MusterBook.cs` (MenOf/SupplyLine/worn), `ForgeView/src/SortKnownFirst.cs` (log)
 **Problem (Jeff):** (1) "wykulem 3x Ravens' Teeth, leza w sakwach - ksiega ich
