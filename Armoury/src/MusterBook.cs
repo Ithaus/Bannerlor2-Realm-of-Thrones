@@ -52,20 +52,21 @@ namespace Armoury
 
         private void OnSession(CampaignGameStarter starter)
         {
-            foreach (var menu in new[] { "town", "village", "armoury_forge" })
-                try
-                {
-                    starter.AddGameMenuOption(menu, "arm_muster_book_" + menu,
-                        "Open the muster book",
-                        delegate (MenuCallbackArgs a)
-                        {
-                            a.optionLeaveType = GameMenuOption.LeaveType.Manage;
-                            var r = MobileParty.MainParty != null ? MobileParty.MainParty.MemberRoster : null;
-                            return Settings.Current.MusterBookEnabled && r != null && r.TotalRegulars > 0;
-                        },
-                        delegate (MenuCallbackArgs a) { OpenBook(); }, false, 4, false);
-                }
-                catch (Exception e) { Log.Error("MusterBook.menu " + menu, e); }
+            // KSIEGA MIESZKA W "MANAGE ARMOURY" (Jeff 29.08: "muster book powinno
+            // byc w manage armoury - przeniesc") - submenu magazynu DTE w miescie
+            try
+            {
+                starter.AddGameMenuOption("army_armory_submenu", "arm_muster_book",
+                    "Open the muster book",
+                    delegate (MenuCallbackArgs a)
+                    {
+                        a.optionLeaveType = GameMenuOption.LeaveType.Manage;
+                        var r = MobileParty.MainParty != null ? MobileParty.MainParty.MemberRoster : null;
+                        return Settings.Current.MusterBookEnabled && r != null && r.TotalRegulars > 0;
+                    },
+                    delegate (MenuCallbackArgs a) { OpenBook(); }, false, 1, false);
+            }
+            catch (Exception e) { Log.Error("MusterBook.menu army_armory_submenu", e); }
         }
 
         // ------------------------------------------------------------ ekran 1: oddzialy
@@ -201,6 +202,20 @@ namespace Armoury
                         rows.Add(new InquiryElement(it, it.Name + "  x" + el.Amount + "  (t" + ((int)it.Tier + 1) + ")",
                             SmithMenu.ItemPic(it), true, "In the stores: " + el.Amount + " pieces."));
                     }
+                // TWOJE SAKWY TEZ (Jeff 29.08: "nie widzi lukow, ktore wykulem") -
+                // wybor takiej sztuki PRZENOSI ja na stan magazynu, bo kwatermistrz
+                // wydaje tylko to, co ma na stanie
+                var bags = MobileParty.MainParty != null ? MobileParty.MainParty.ItemRoster : null;
+                if (bags != null)
+                    for (int i = 0; i < bags.Count; i++)
+                    {
+                        var el = bags.GetElementCopyAtIndex(i);
+                        var it = el.EquipmentElement.Item;
+                        if (it == null || el.Amount <= 0 || !Fits(it, slot) || !seen.Add(it)) continue;
+                        rows.Add(new InquiryElement(it, it.Name + "  x" + el.Amount + "  (t" + ((int)it.Tier + 1) + ")  [YOUR BAGGAGE]",
+                            SmithMenu.ItemPic(it), true,
+                            "In YOUR baggage: " + el.Amount + " pieces - assigning moves them to the company stores."));
+                    }
                 MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData(
                     ch.Name + " - " + SlotName(slot),
                     "The quartermaster will issue the assigned piece to every man of this troop (as stores allow).",
@@ -213,6 +228,28 @@ namespace Armoury
                         if (picked[0].Identifier is ItemObject it)
                         {
                             self._pins[key] = it.StringId;
+                            // sztuki z sakw ida na stan magazynu - kwatermistrz
+                            // wydaje tylko to, co ma na stanie
+                            try
+                            {
+                                var bags2 = MobileParty.MainParty.ItemRoster;
+                                var store = QuartermasterLaw.DteArmory();
+                                if (bags2 != null && store != null)
+                                {
+                                    int moved = 0;
+                                    for (int i = bags2.Count - 1; i >= 0; i--)
+                                    {
+                                        var el = bags2.GetElementCopyAtIndex(i);
+                                        if (el.EquipmentElement.Item != it || el.Amount <= 0) continue;
+                                        store.AddToCounts(el.EquipmentElement, el.Amount);
+                                        bags2.AddToCounts(el.EquipmentElement, -el.Amount);
+                                        moved += el.Amount;
+                                    }
+                                    if (moved > 0)
+                                        Log.Player(moved + " x " + it.Name + " moved from your baggage to the company stores.", true);
+                                }
+                            }
+                            catch (Exception e2) { Log.Error("MusterBook.moveToStores", e2); }
                             Log.Player(ch.Name + ": " + SlotName(slot) + " assigned - " + it.Name + ".", true);
                         }
                         else

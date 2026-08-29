@@ -1,5 +1,25 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-29 — ksiega musztry v1.1: sakwy gracza na liscie, przeniesienie do Manage Armoury
+**Mod:** Armoury | **Pliki:** `Armoury/src/MusterBook.cs`
+**Zgloszenia Jeffa po pierwszym tescie:**
+(1) "nie widzi lukow, ktore wykulem i mam w ekwipunku" -> lista przypisania
+pokazuje teraz MAGAZYN + TWOJE SAKWY (pozycje z dopiskiem [YOUR BAGGAGE]);
+wybor sztuki z sakw PRZENOSI wszystkie jej egzemplarze na stan magazynu
+(kwatermistrz wydaje tylko ze stanu). (2) "muster book powinno byc w manage
+armoury" -> opcja przeniesiona z menu miasta/wioski/kuzni DO submenu magazynu
+DTE (army_armory_submenu, tuz pod wejsciem w ekran magazynu). (3) Pytania
+wyjasnione: przypis to WZORZEC dla calego typu - 1 luk na stanie = dostaje go
+1 zolnierz, reszta bierze najblizsze z magazynu; karta jednostki pokazuje
+WZORZEC (szablon + [ASSIGNED]), nie aktualnie noszone sztuki (te roznia sie
+per zolnierz wedle zapasow); wymieniony stary sprzet zostaje na stanie
+magazynu i mozna go odebrac w Manage Armoury (mechanika DTE). Ravens' Teeth
+Longbow to zwykly item (nie legenda) - nie bylo go na liscie, bo lezal poza
+magazynem; po tej zmianie widac go, gdy jest w sakwach albo na stanie.
+UWAGA: ma difficulty=150 (wymog Bow 150) - autodobor go unika u slabszych,
+ale pin gracza wymusza.
+**Status:** WGRANE (watcher - gra dzialala przy buildzie)
+
 ## 2026-08-29 — COFNIETE: oddawanie sprzetu przez zwalnianych (Jeff: MA BYC ODWROTNIE)
 **Mod:** Armoury | **Pliki:** `Armoury/src/MusterOut.cs` (przepisany), `Settings.cs` + `McmSettings.cs` (gen; 260)
 **Powod:** Jeff wprost: "MA NIE ODDAWAC - zwalniany zolnierz odchodzi ZE SWOIM
