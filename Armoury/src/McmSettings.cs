@@ -452,6 +452,10 @@ namespace Armoury
         [SettingPropertyGroup("The tidy muster")]
         public bool AutoSortParty { get; set; } = true;
 
+        [SettingPropertyBool("Muster Book Enabled", HintText = "the muster book in town, village and forge menus: inspect any troop (experience, full kit) and ASSIGN which piece from the stores the whole company of that troop must wear")]
+        [SettingPropertyGroup("The tidy muster")]
+        public bool MusterBookEnabled { get; set; } = true;
+
         [SettingPropertyBool("Craft Result Popup", HintText = "forging armour, bows or ammo ends with a result window: every stat, with the quality bonus or the botch penalty spelled out - same rule as weapons")]
         [SettingPropertyGroup("The finished piece")]
         public bool CraftResultPopup { get; set; } = true;
@@ -1164,6 +1168,7 @@ namespace Armoury
             s.VolunteerRegenPercent = VolunteerRegenPercent;
             s.HealingRegenPercent = HealingRegenPercent;
             s.AutoSortParty = AutoSortParty;
+            s.MusterBookEnabled = MusterBookEnabled;
             s.CraftResultPopup = CraftResultPopup;
             s.RichQualityModifiers = RichQualityModifiers;
             s.DismissedLeaveGear = DismissedLeaveGear;

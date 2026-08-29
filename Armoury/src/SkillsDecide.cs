@@ -127,9 +127,23 @@ namespace Armoury
                     else if (second == "xbow" && slots.Count < 4) AddPattern(slots, ItemObject.ItemTypeEnum.Bolts, 0);
                 }
 
+                // KSIEGA MUSZTRY: reczne przypisania gracza maja pierwszenstwo
+                // przed nasza logika skilli (bron sloty 0-3)
+                while (slots.Count < 4) slots.Add(null);
+                for (int s = 0; s < 4; s++)
+                {
+                    var pin = MusterBook.PinFor(ch, s);
+                    if (pin != null) slots[s] = pin;
+                }
                 for (int i = 0; i < 4; i++)
                     reference[(EquipmentIndex)i] = i < slots.Count && slots[i] != null
                         ? new EquipmentElement(slots[i]) : new EquipmentElement(null);
+                // pancerz z przypisu: sloty 5-9 referencji dostaja pin wprost
+                for (int s = 5; s <= 9; s++)
+                {
+                    var pin = MusterBook.PinFor(ch, s);
+                    if (pin != null) reference[(EquipmentIndex)s] = new EquipmentElement(pin);
+                }
             }
             catch (Exception e) { Log.Error("SkillsDecide.RearmBySkill", e); }
         }

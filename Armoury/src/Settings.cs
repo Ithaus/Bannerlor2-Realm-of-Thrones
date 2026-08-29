@@ -137,6 +137,7 @@ namespace Armoury
 
         // --- The tidy muster ---
         public bool AutoSortParty = true;                  // the party roster keeps itself in order: cavalry, horse archers, infantry, archers - each arm by tier, best first (no more dragging rows by hand)
+        public bool MusterBookEnabled = true;              // the muster book in town, village and forge menus: inspect any troop (experience, full kit) and ASSIGN which piece from the stores the whole company of that troop must wear
 
         // --- The finished piece ---
         public bool CraftResultPopup = true;               // forging armour, bows or ammo ends with a result window: every stat, with the quality bonus or the botch penalty spelled out - same rule as weapons

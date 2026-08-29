@@ -119,6 +119,7 @@ namespace Armoury
                 starter.AddBehavior(new HideoutPurge());
                 starter.AddBehavior(new BattleMuster());
                 starter.AddBehavior(new LegendaryLaw());
+                starter.AddBehavior(new MusterBook());
                 Log.Info("Behavior dodany do kampanii.");
             }
             catch (Exception e) { Log.Error("OnGameStart", e); }

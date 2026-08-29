@@ -1,5 +1,25 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-29 — KSIEGA MUSZTRY: podglad jednostek i przypisywanie sprzetu z magazynu
+**Mod:** Armoury | **Pliki:** `Armoury/src/MusterBook.cs` (nowy), `SkillsDecide.cs` (piny), `SubModuleMain.cs`, `Settings.cs` + `McmSettings.cs` (gen; 261)
+**Zlecenie Jeffa:** "klikam grupe -> popup jednostki: doswiadczenie do awansu,
+pelne uzbrojenie, i przypisuje jaki pancerz/bron maja nosic - pojedynczo lub
+dla calej grupy".
+**Zmiana:** opcja "Open the muster book" w menu miasta, wioski i naszej kuzni.
+Lancuch okien z portretami/miniaturami: (1) lista oddzialow [formacja tX] nazwa
+xN z XP do awansu w podpowiedzi; (2) karta jednostki: 9 slotow (4 bronie,
+helm/korpus/buty/rekawice/plaszcz) z aktualna sztuka i znacznikiem [ASSIGNED];
+(3) wybor przedmiotu Z MAGAZYNU DTE pasujacego do slotu (+ opcja powrotu do
+wzorca kompanii). Pin zapisuje sie w save (armouryMusterBookPins) i dziala na
+CALY stack tego typu: SkillsDecide wstrzykuje pin do referencji zolnierza
+przed rozdaniem sprzetu (bron sloty 0-3 nadpisuje logike skilli; pancerz 5-9
+wprost). Legendy i smoki nie do przypisania.
+**Ryzyko / co sprawdzic:** przydzial faktyczny zalezy od zapasow magazynu
+(kwatermistrz wydaje "as stores allow"); pin broni obchodzi dobor wg skilli -
+to swiadoma decyzja gracza. Sprawdzic, ze [ASSIGNED] sztuki laduja na
+zolnierzach w bitwie.
+**Status:** WGRANE (gra byla zamknieta)
+
 ## 2026-08-29 — pakiet armii: popup wyniku kucia, pelne modyfikatory jakosci, zwalniani oddaja sprzet, samonaprawa wojska, auto-sort partii
 **Mod:** Armoury | **Pliki:** `CraftPopup.cs` (nowy), `QualityRich.cs` (nowy), `MusterOut.cs` (nowy), `TroopSelfMend.cs` (nowy), `Forge.cs`, `ArmouryBehavior.cs`, `SubModuleMain.cs`, `Settings.cs` + `McmSettings.cs` (gen; 260 ustawien)
 **Zlecenia Jeffa 29.08:**
