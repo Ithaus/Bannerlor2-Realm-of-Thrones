@@ -124,7 +124,7 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ ekran 2: jednostka
-        private static readonly int[] Slots = { 0, 1, 2, 3, 5, 6, 7, 8, 9 };
+        private static readonly int[] Slots = { 0, 1, 2, 3, 5, 6, 7, 8, 9, 10, 11 };
         private static string SlotName(int s)
         {
             switch (s)
@@ -133,7 +133,8 @@ namespace Armoury
                 case 2: return "Weapon 3"; case 3: return "Weapon 4";
                 case 5: return "Helmet"; case 6: return "Body armour";
                 case 7: return "Boots"; case 8: return "Gloves";
-                default: return "Cape";
+                case 9: return "Cape";
+                case 10: return "Mount"; default: return "Horse harness";
             }
         }
 
@@ -177,6 +178,10 @@ namespace Armoury
                 case 7: return it.ItemType == ItemObject.ItemTypeEnum.LegArmor;
                 case 8: return it.ItemType == ItemObject.ItemTypeEnum.HandArmor;
                 case 9: return it.ItemType == ItemObject.ItemTypeEnum.Cape;
+                case 10:
+                    return it.ItemType == ItemObject.ItemTypeEnum.Horse
+                           && (it.StringId == null || !it.StringId.StartsWith("dragon_"));
+                case 11: return it.ItemType == ItemObject.ItemTypeEnum.HorseHarness;
                 default:
                     return it.HasWeaponComponent && it.ItemType != ItemObject.ItemTypeEnum.Banner
                            && !LegendaryLaw.IsLegend(it)
@@ -185,19 +190,11 @@ namespace Armoury
         }
 
         /// <summary>Wymogi przedmiotu vs umiejetnosc jednostki - ponad stan
-        /// pozycja jest WYSZARZONA (Jeff: "nie moge dac luku ponad wymogi").</summary>
+        /// pozycja jest WYSZARZONA. CALY ekwipunek: bron/kon wg swojego skilla,
+        /// pancerz wg ATLETYKI (ItemReq - zasada nadrzedna Jeffa).</summary>
         private static bool MeetsReq(CharacterObject ch, ItemObject it, out string why)
         {
-            why = null;
-            try
-            {
-                if (it.RelevantSkill == null || it.Difficulty <= 0) return true;
-                int have = ch.GetSkillValue(it.RelevantSkill);
-                if (have >= it.Difficulty) return true;
-                why = "Requires " + it.RelevantSkill.Name + " " + it.Difficulty + " - this troop has " + have + ".";
-                return false;
-            }
-            catch { return true; }
+            return ItemReq.Meets(ch, it, out why);
         }
 
         private static void OpenSlot(CharacterObject ch, int slot)

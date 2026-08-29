@@ -42,18 +42,46 @@ namespace Armoury
                 // bohaterowie nosza swoje legendy dalej
                 try
                 {
-                    var soldier = agentBuildData.AgentData.AgentCharacter;
+                    var soldier = agentBuildData.AgentData.AgentCharacter as TaleWorlds.CampaignSystem.CharacterObject;
                     if (soldier != null && !soldier.IsHero)
+                    {
                         for (int slot = 0; slot < 4; slot++)
                         {
                             var w = eq[(EquipmentIndex)slot].Item;
-                            if (!LegendaryLaw.IsLegend(w)) continue;   // prog 100k + lista person (mlot Roberta...)
-                            var repl = LegendaryLaw.ReplacementFor(w);
-                            eq[(EquipmentIndex)slot] = repl != null
-                                ? new EquipmentElement(repl) : new EquipmentElement(null);
-                            Log.Info("LegendaryLaw: " + w.StringId + " zdjety przy spawnie z szeregowego ("
-                                     + soldier.StringId + ").");
+                            if (LegendaryLaw.IsLegend(w))   // prog 100k + lista person
+                            {
+                                var repl = LegendaryLaw.ReplacementFor(w);
+                                eq[(EquipmentIndex)slot] = repl != null
+                                    ? new EquipmentElement(repl) : new EquipmentElement(null);
+                                Log.Info("LegendaryLaw: " + w.StringId + " zdjety przy spawnie z szeregowego ("
+                                         + soldier.StringId + ").");
+                                continue;
+                            }
+                            // ZASADA NADRZEDNA na scenie: bron ponad skill schodzi
+                            if (w != null && !ItemReq.Meets(soldier, w))
+                                eq[(EquipmentIndex)slot] = new EquipmentElement(null);
                         }
+                        // pancerz ponad atletyke -> najlepszy dozwolony; kon ponad
+                        // Riding -> najlepszy dozwolony (albo pieszo)
+                        int ath = soldier.GetSkillValue(TaleWorlds.Core.DefaultSkills.Athletics);
+                        for (int slot = 5; slot <= 9; slot++)
+                        {
+                            var a = eq[(EquipmentIndex)slot].Item;
+                            if (a == null || ItemReq.Meets(soldier, a)) continue;
+                            var top = SkillsDecide.TopArmor(a.ItemType, ath);
+                            eq[(EquipmentIndex)slot] = top != null
+                                ? new EquipmentElement(top) : new EquipmentElement(null);
+                        }
+                        var mnt = eq[(EquipmentIndex)10].Item;
+                        if (mnt != null && !ItemReq.Meets(soldier, mnt))
+                        {
+                            var topM = SkillsDecide.TopMount(
+                                soldier.GetSkillValue(TaleWorlds.Core.DefaultSkills.Riding));
+                            eq[(EquipmentIndex)10] = topM != null
+                                ? new EquipmentElement(topM) : new EquipmentElement(null);
+                            if (topM == null) eq[(EquipmentIndex)11] = new EquipmentElement(null);
+                        }
+                    }
                 }
                 catch { }
                 var horse = eq[(EquipmentIndex)10];          // slot wierzchowca

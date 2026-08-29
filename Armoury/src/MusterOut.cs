@@ -56,8 +56,12 @@ namespace Armoury
             try
             {
                 if (!Settings.Current.AutoSortParty) return;
-                var roster = MobileParty.MainParty != null ? MobileParty.MainParty.MemberRoster : null;
+                var main = MobileParty.MainParty;
+                var roster = main != null ? main.MemberRoster : null;
                 if (roster == null) return;
+                // AUDYT 29.08: w trakcie potyczki kolejnosc rosteru to WYBOR
+                // SKLADU do bitwy (BattleMuster) - sortowanie by go skasowalo
+                if (main.MapEvent != null) return;
 
                 var stacks = new List<TaleWorlds.CampaignSystem.Roster.TroopRosterElement>();
                 for (int i = 0; i < roster.Count; i++)

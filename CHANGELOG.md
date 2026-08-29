@@ -1,5 +1,31 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-29 — CALY EKWIPUNEK pod zasada skilla (konie=Riding, pancerz=Athletics) + AUDYT calosci
+**Mod:** Armoury | **Pliki:** `ItemReq.cs` (nowy), `SkillsDecide.cs`, `MusterBook.cs`, `MusterOut.cs`, `DragonUnmount.cs`
+**Zlecenie Jeffa:** "Konie i pancerze tez! Caly ekwipunek!" + "przejrzyj wszystkie
+zmiany, zrob audyt czy nic sie nie wyklucza".
+**Zmiany:** (1) ItemReq - jeden egzekutor wymagan: bron/kon wg RelevantSkill+
+Difficulty, PANCERZ wg ATLETYKI (ROT wpisuje difficulty pancerzom - od teraz
+obowiazuje). (2) MusterBook: sloty konia i rzedu (10/11) w karcie jednostki;
+wyszarzanie wg ItemReq wszedzie. (3) SkillsDecide: TopArmor liczone w RAMACH
+atletyki jednostki (kubelki 25); wzorzec konia = najlepszy kon w ramach Riding
+(smoki i slonie poza wzorcem, pin moze slonia gdy Riding pozwala); piny
+wszystkich slotow przez ItemReq. (4) Spawn-net (DragonUnmount): na scenie
+bron ponad skill schodzi, pancerz ponad atletyke -> najlepszy dozwolony,
+kon ponad Riding -> najlepszy dozwolony albo pieszo.
+**AUDYT - kolizje znalezione i NAPRAWIONE w tym buildzie:**
+(a) AutoSort partii kasowal wybor skladu do bitwy (BattleMuster) - teraz sort
+NIE dziala w trakcie MapEventu; (b) pin luku/kuszy bez amunicji w slotach -
+FillFree doklada wzorcowy kolczan/sajdak; (c) dobor DTE mogl wydac sztuke
+ponad wymogi (wzorzec ograniczony, ale "closest" z magazynu nie) - domkniete
+spawn-netem.
+**AUDYT - swiadome konsekwencje (bez zmian):** prog lupu 3% de facto wygasza
+wraki (decyzja Jeffa); NAJWAZNIEJSZE: zasada atletyki moze ROZEBRAC elitarne
+jednostki z najciezszych zbroi szablonowych (difficulty 140-200 vs ich
+Athletics) - to wprost wynika z zasady nadrzednej; obserwowac w bitwach,
+w razie przegiec dostroimy.
+**Status:** WGRANE (gra byla zamknieta)
+
 ## 2026-08-29 — ZASADA NADRZEDNA: wymogi umiejetnosci swiete + pancerz celuje w gore
 **Mod:** Armoury | **Pliki:** `Armoury/src/SkillsDecide.cs`, `Armoury/src/MusterBook.cs`
 **Zlecenia Jeffa:** (1) "nie moge dac luku ponad wymagania - opcja wyszarzona,

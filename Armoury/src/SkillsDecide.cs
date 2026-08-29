@@ -135,10 +135,23 @@ namespace Armoury
                 for (int s = 0; s < 4; s++)
                 {
                     var pin = MusterBook.PinFor(ch, s);
-                    if (pin == null) continue;
-                    if (pin.RelevantSkill != null && ch.GetSkillValue(pin.RelevantSkill) < pin.Difficulty) continue;
+                    if (pin == null || !ItemReq.Meets(ch, pin)) continue;
                     slots[s] = pin;
                 }
+                // AUDYT 29.08: pin luku/kuszy nie moze zostac bez amunicji -
+                // dokladamy wzorcowy kolczan/sajdak w wolny slot
+                bool hasBow = false, hasXbow = false, hasArrows = false, hasBolts = false;
+                foreach (var it0 in slots)
+                {
+                    if (it0 == null) continue;
+                    if (it0.ItemType == ItemObject.ItemTypeEnum.Bow) hasBow = true;
+                    else if (it0.ItemType == ItemObject.ItemTypeEnum.Crossbow) hasXbow = true;
+                    else if (it0.ItemType == ItemObject.ItemTypeEnum.Arrows) hasArrows = true;
+                    else if (it0.ItemType == ItemObject.ItemTypeEnum.Bolts) hasBolts = true;
+                }
+                if (hasBow && !hasArrows) FillFree(slots, ItemObject.ItemTypeEnum.Arrows);
+                if (hasXbow && !hasBolts) FillFree(slots, ItemObject.ItemTypeEnum.Bolts);
+
                 for (int i = 0; i < 4; i++)
                     reference[(EquipmentIndex)i] = i < slots.Count && slots[i] != null
                         ? new EquipmentElement(slots[i]) : new EquipmentElement(null);
@@ -148,14 +161,29 @@ namespace Armoury
                 // w dol mimo t6 w magazynie. Wzorzec pancerza to od teraz
                 // NAJLEPSZA sztuka danego typu w grze: "najblizsze wzorcowi"
                 // znaczy wtedy "najlepsze, co magazyn ma". Pin gracza wygrywa.
+                int athletics = ch.GetSkillValue(DefaultSkills.Athletics);
                 for (int s = 5; s <= 9; s++)
                 {
                     var pin = MusterBook.PinFor(ch, s);
-                    if (pin != null) { reference[(EquipmentIndex)s] = new EquipmentElement(pin); continue; }
+                    if (pin != null && ItemReq.Meets(ch, pin))
+                    { reference[(EquipmentIndex)s] = new EquipmentElement(pin); continue; }
                     if (reference[(EquipmentIndex)s].Item == null) continue;   // szablon nie ubiera slotu - nie my
-                    var top = TopArmor(SlotArmorType(s));
+                    var top = TopArmor(SlotArmorType(s), athletics);
                     if (top != null) reference[(EquipmentIndex)s] = new EquipmentElement(top);
                 }
+                // KON I RZAD (Jeff: "konie i pancerze tez, CALY ekwipunek!"):
+                // pin gracza (w ramach Jezdziectwa) wygrywa; bez pinu jezdziec
+                // celuje w najlepszego konia, na jakiego pozwala mu Riding
+                var pinHorse = MusterBook.PinFor(ch, 10);
+                if (pinHorse != null && ItemReq.Meets(ch, pinHorse))
+                    reference[(EquipmentIndex)10] = new EquipmentElement(pinHorse);
+                else if (reference[(EquipmentIndex)10].Item != null)
+                {
+                    var topH = TopMount(ch.GetSkillValue(DefaultSkills.Riding));
+                    if (topH != null) reference[(EquipmentIndex)10] = new EquipmentElement(topH);
+                }
+                var pinHar = MusterBook.PinFor(ch, 11);
+                if (pinHar != null) reference[(EquipmentIndex)11] = new EquipmentElement(pinHar);
             }
             catch (Exception e) { Log.Error("SkillsDecide.RearmBySkill", e); }
         }
@@ -188,6 +216,18 @@ namespace Armoury
             AddPattern(slots, type, skill);
         }
 
+        private static void FillFree(List<ItemObject> slots, ItemObject.ItemTypeEnum ammo)
+        {
+            for (int i = 0; i < 4 && i < slots.Count; i++)
+                if (slots[i] == null)
+                {
+                    var tmp = new List<ItemObject>();
+                    AddPattern(tmp, ammo, 0);
+                    if (tmp.Count > 0) slots[i] = tmp[0];
+                    return;
+                }
+        }
+
         private static ItemObject.ItemTypeEnum SlotArmorType(int slot)
         {
             switch (slot)
@@ -200,26 +240,55 @@ namespace Armoury
             }
         }
 
-        private static readonly Dictionary<ItemObject.ItemTypeEnum, ItemObject> TopArmorCache
-            = new Dictionary<ItemObject.ItemTypeEnum, ItemObject>();
+        private static readonly Dictionary<string, ItemObject> TopArmorCache = new Dictionary<string, ItemObject>();
+        private static readonly Dictionary<int, ItemObject> TopMountCache = new Dictionary<int, ItemObject>();
 
-        /// <summary>Najlepsza sztuka pancerza danego typu w calej grze - cel,
-        /// do ktorego DTE ma zblizac przydzial ("closest" = najlepsze na stanie).</summary>
-        private static ItemObject TopArmor(ItemObject.ItemTypeEnum type)
+        /// <summary>Najlepsza sztuka pancerza danego typu, ktorej WYMOG ATLETYKI
+        /// (ItemReq: difficulty) jednostka udzwignie - cel przydzialu
+        /// ("closest" = najlepsze dozwolone na stanie). Kubelki co 25 pkt.</summary>
+        internal static ItemObject TopArmor(ItemObject.ItemTypeEnum type, int athletics)
         {
+            int bucket = Math.Max(0, Math.Min(12, athletics / 25));
+            string key = type + "|" + bucket;
             ItemObject best;
-            if (TopArmorCache.TryGetValue(type, out best)) return best;
+            if (TopArmorCache.TryGetValue(key, out best)) return best;
+            int cap = bucket * 25 + 24;
             try
             {
                 foreach (var it in MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
                 {
                     if (it == null || it.ItemType != type || !it.HasArmorComponent) continue;
+                    if (it.Difficulty > cap) continue;                                     // atletyka rzadzi
                     if (it.StringId != null && it.StringId.EndsWith("_crown")) continue;   // korony to regalia
                     if (best == null || it.Effectiveness > best.Effectiveness) best = it;
                 }
             }
             catch (Exception e) { Log.Error("SkillsDecide.TopArmor", e); }
-            TopArmorCache[type] = best;
+            TopArmorCache[key] = best;
+            return best;
+        }
+
+        /// <summary>Najlepszy KON w ramach Jezdziectwa jednostki. Smoki i slonie
+        /// poza wzorcem (pin gracza moze slonia, jesli Riding pozwala).</summary>
+        internal static ItemObject TopMount(int riding)
+        {
+            int bucket = Math.Max(0, Math.Min(12, riding / 25));
+            ItemObject best;
+            if (TopMountCache.TryGetValue(bucket, out best)) return best;
+            int cap = bucket * 25 + 24;
+            try
+            {
+                foreach (var it in MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
+                {
+                    if (it == null || it.ItemType != ItemObject.ItemTypeEnum.Horse) continue;
+                    if (it.Difficulty > cap) continue;
+                    var id = it.StringId ?? "";
+                    if (id.StartsWith("dragon_") || id == "elephant") continue;
+                    if (best == null || it.Effectiveness > best.Effectiveness) best = it;
+                }
+            }
+            catch (Exception e) { Log.Error("SkillsDecide.TopMount", e); }
+            TopMountCache[bucket] = best;
             return best;
         }
 
