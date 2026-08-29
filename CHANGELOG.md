@@ -1,5 +1,24 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-29 — WYMIANA BARTEROWA kwatermistrza + zamiennik za-skill przy spawnie
+**Mod:** Armoury | **Pliki:** `QuartermasterLaw.cs` (NoteDeposit/ProcessSwaps), `SkillsDecide.cs` (PatternFor), `DragonUnmount.cs` (log + swap)
+**Zlecenie Jeffa:** "wrzucam luki t6 do armii - lucznicy maja je wziac, a MNIE
+wydac 4 gorsze luki, ktore sprzedam". Plus diagnoza "kwatermistrz nie przyjal":
+przyjal (wklady widoczne na liscie - tak dziala skarbiec), tylko od wrzucenia
+NIE BYLO bitwy (wydanie = spawn), a jedynym ryzykiem jest wymog Bow 150 tego
+200-funtowego luku.
+**Zmiany:** (1) wymiana barterowa: wklady tej sesji ekranu (bronie bez amunicji
++ pancerze) rejestrowane; przy ZAMKNIECIU ekranu za kazda wlozona sztuke
+kwatermistrz wydaje DO SAKW najgorsza wojskowa sztuke TEGO SAMEGO typu
+o nizszej wartosci (piny z ksiegi i wklady gracza nietykalne), a wklad
+przechodzi na wlasnosc wojska (ksiega -1). Komunikat "Quartermaster's
+exchange: ... N of their old pieces are yours to sell". Bez gorszej sztuki -
+wklad zostaje wkladem (mozna cofnac). (2) spawn za-skill: bron ponad
+umiejetnosci NIE zostawia golego slotu - zolnierz dostaje najlepsza bron
+W RAMACH skilla (PatternFor), a log "ItemReq: <troop> nie udzwignie <item>
+(Requires ...) - dostaje <swap>" mowi wprost, czemu np. luk 150 nie poszedl.
+**Status:** WGRANE (gra byla zamknieta)
+
 ## 2026-08-29 — okno wyniku kucia TAKZE dla lukow z CRAFT i pancerzy BK
 **Mod:** Armoury | **Pliki:** `Armoury/src/Forge.cs` (Smith), `Armoury/src/FletchForge.cs` (BkCraftPostfix)
 **Problem (Jeff):** "wykulem luk i nie pojawilo sie okienko ze statystykami -

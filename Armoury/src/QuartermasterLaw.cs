@@ -292,7 +292,14 @@ namespace Armoury
                         if (transferCommand.FromSide == InventoryLogic.InventorySide.OtherInventory)
                             ArmouryBehavior.StockWithdraw(itL.StringId, nL);
                         else if (transferCommand.ToSide == InventoryLogic.InventorySide.OtherInventory)
+                        {
                             ArmouryBehavior.StockDeposit(itL.StringId, nL);
+                            // wklad zapisany do WYMIANY BARTEROWEJ (rozliczy sie
+                            // przy zamknieciu ekranu - Jeff: "wrzucam t6 luki,
+                            // maja mi wydac gorsze, ktore sprzedam")
+                            QuartermasterEscrow.NoteDeposit(itL, nL,
+                                transferCommand.ElementToTransfer.EquipmentElement.ItemValue);
+                        }
                     }
                 }
                 catch { }
@@ -402,6 +409,7 @@ namespace Armoury
                 if (s == null || !s.ArmouryProtectUsed || Active) return;
                 var armory = QuartermasterLaw.DteArmory();
                 if (armory == null) return;
+                _pendingSwaps.Clear();   // swieza sesja ekranu = swiezy rejestr wymian
                 var needs = QuartermasterLaw.CountNeeds();
 
                 // meldunek brakow PRZED schowaniem polek (pelna lista, z amunicja)
@@ -466,6 +474,25 @@ namespace Armoury
             catch (Exception e) { Log.Error("Escrow.Hold", e); }
         }
 
+        // wklady tej sesji ekranu - kandydaci do wymiany barterowej
+        private static readonly List<KeyValuePair<ItemObject, KeyValuePair<int, int>>> _pendingSwaps =
+            new List<KeyValuePair<ItemObject, KeyValuePair<int, int>>>();   // item -> (ile, wartosc szt.)
+
+        internal static void NoteDeposit(ItemObject item, int n, int value)
+        {
+            try
+            {
+                if (item == null || n <= 0) return;
+                bool weaponish = item.HasWeaponComponent
+                    && item.ItemType != ItemObject.ItemTypeEnum.Arrows
+                    && item.ItemType != ItemObject.ItemTypeEnum.Bolts;
+                if (!weaponish && !item.HasArmorComponent) return;
+                _pendingSwaps.Add(new KeyValuePair<ItemObject, KeyValuePair<int, int>>(
+                    item, new KeyValuePair<int, int>(n, value)));
+            }
+            catch { }
+        }
+
         internal static void ReleaseReserve()
         {
             try
@@ -476,8 +503,70 @@ namespace Armoury
                     foreach (var kv in _held) armory.AddToCounts(kv.Key, kv.Value);
                 _held.Clear();
                 Active = false;
+                ProcessSwaps(armory);
             }
             catch (Exception e) { Log.Error("Escrow.Release", e); }
+        }
+
+        /// <summary>
+        /// WYMIANA BARTEROWA (Jeff 29.08: "wrzucam luki t6, lucznicy je biora,
+        /// a mnie wydaja gorsze luki, ktore sprzedam"). Za kazda wlozona sztuke
+        /// LEPSZA od najgorszej wojskowej tego samego TYPU kwatermistrz wydaje
+        /// graczowi te najgorsza DO SAKW - a wklad przechodzi na wlasnosc
+        /// wojska (ksiega wkladow -1). Sztuki przypisane w ksiedze musztry
+        /// nie sa wydawane. Bez gorszej sztuki - wklad zostaje wkladem gracza
+        /// (mozna cofnac przy nastepnym otwarciu).
+        /// </summary>
+        private static void ProcessSwaps(ItemRoster armory)
+        {
+            try
+            {
+                if (_pendingSwaps.Count == 0) return;
+                var bags = TaleWorlds.CampaignSystem.Party.MobileParty.MainParty != null
+                    ? TaleWorlds.CampaignSystem.Party.MobileParty.MainParty.ItemRoster : null;
+                if (armory == null || bags == null) { _pendingSwaps.Clear(); return; }
+
+                int given = 0;
+                foreach (var dep in _pendingSwaps)
+                {
+                    var newItem = dep.Key;
+                    int count = dep.Value.Key;
+                    int newVal = dep.Value.Value;
+                    for (int k = 0; k < count; k++)
+                    {
+                        // najgorsza wojskowa sztuka tego samego typu, gorsza od wkladu
+                        int bestIdx = -1; int bestVal = int.MaxValue;
+                        for (int i = 0; i < armory.Count; i++)
+                        {
+                            var el = armory[i];
+                            var it = el.EquipmentElement.Item;
+                            if (it == null || el.Amount <= 0 || it.ItemType != newItem.ItemType) continue;
+                            if (it == newItem) continue;
+                            var id = it.StringId ?? "";
+                            if (MusterBook.IsPinnedItem(id)) continue;               // rozkaz z ksiegi swiety
+                            int warPart = el.Amount - Math.Min(el.Amount, ArmouryBehavior.StockOf(id));
+                            if (warPart <= 0) continue;                              // to wklady gracza
+                            int v = el.EquipmentElement.ItemValue;
+                            if (v >= newVal) continue;                               // wydajemy tylko GORSZE
+                            if (v < bestVal) { bestVal = v; bestIdx = i; }
+                        }
+                        if (bestIdx < 0) break;
+                        var old = armory[bestIdx].EquipmentElement;
+                        armory.AddToCounts(old, -1);
+                        bags.AddToCounts(old, 1);
+                        ArmouryBehavior.StockWithdraw(newItem.StringId, 1);          // wklad przeszedl na wojsko
+                        given++;
+                    }
+                }
+                _pendingSwaps.Clear();
+                if (given > 0)
+                {
+                    Log.Info("Kwatermistrz: wymiana barterowa - " + given + " starych sztuk wydano graczowi za lepsze wklady.");
+                    Log.Player("Quartermaster's exchange: the men take your better gear - " + given
+                               + " of their old pieces are yours to sell.", true);
+                }
+            }
+            catch (Exception e) { Log.Error("Escrow.ProcessSwaps", e); }
         }
     }
 }
