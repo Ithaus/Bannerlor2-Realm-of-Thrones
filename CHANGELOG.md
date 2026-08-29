@@ -1,5 +1,21 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-29 — ZBIERAMY POLEGLYCH: rynsztunek wlasnych zabitych wraca na wozy (dla gracza)
+**Mod:** Armoury | **Pliki:** `Armoury/src/ArmouryBehavior.cs` (SnapshotOwnRanks/GatherFallen)
+**Problem (Jeff):** "polegli mi zolnierze i ich ekwipunek zniknal - ma zasilac
+armoury i moge go zabrac".
+**Zmiana:** snapshot skladu przy starcie bitwy gracza; po MapEventEnded roznica
+liczebnosci per typ = polegli (ranni nie ubywaja z Number, wiec nie klamie).
+Za kazdego poleglego jego rynsztunek wedle szablonu (sloty bez choragwi,
+smokow i legend; stan bojowy PickWornModifier) wraca do magazynu
+i jest PRZEKSIEGOWANY NA GRACZA (StockDeposit) - lezy na TWOJEJ liscie
+w Manage Armoury, do zabrania lub oddania wojsku. Komunikat "The fallen are
+gathered - N pieces ... yours to claim".
+**Ryzyko / co sprawdzic:** przy przegranej tez zbiera (fabularnie ok);
+gdyby DTE kiedys sam zwracal sprzet wlasnych poleglych, byłby nadmiar -
+obserwacja Jeffa mowi, ze nie zwraca ("znika"), wiec dubla nie ma.
+**Status:** WGRANE (gra byla zamknieta)
+
 ## 2026-08-29 — okno kucia 1:1 z bronia: vanillowy panel NewCraftedWeaponPopup dla lukow i pancerzy
 **Mod:** Armoury | **Pliki:** `Armoury/src/CraftPopup.cs` (przepisany na Gauntlet), `Armoury.csproj` (+5 referencji UI), `libs/` (+5 dll)
 **Zlecenie Jeffa (screeny):** "nie tekstowe okienko - IDENTYCZNY panel jak

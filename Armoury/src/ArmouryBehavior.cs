@@ -114,6 +114,9 @@ namespace Armoury
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, OnDailyTick);
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, OnMapEventEnded);
             CampaignEvents.MapEventStarted.AddNonSerializedListener(this, OnMapEventStarted);
+            // polegli oddaja rynsztunek na wozy zaraz po bitwie
+            CampaignEvents.MapEventEnded.AddNonSerializedListener(this,
+                delegate (MapEvent me) { try { if (me != null && me.IsPlayerMapEvent) GatherFallen(); } catch { } });
             CampaignEvents.OnNewItemCraftedEvent.AddNonSerializedListener(this, OnNewItemCrafted);
             // DEPOZYT KWATERMISTRZA NIE MA PRAWA WEJSC DO SAVE'A: schowane
             // na czas ekranu zbrojowni sztuki zyja poza rosterem - zapis gry
@@ -314,6 +317,88 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Log.Error("CleanseTrashInBags", e); }
+        }
+
+        // sklad wlasnej partii na progu bitwy - roznica po bitwie = polegli
+        private Dictionary<CharacterObject, int> _fallenSnapshot;
+
+        internal void SnapshotOwnRanks()
+        {
+            try
+            {
+                var roster = MobileParty.MainParty != null ? MobileParty.MainParty.MemberRoster : null;
+                if (roster == null) { _fallenSnapshot = null; return; }
+                var map = new Dictionary<CharacterObject, int>();
+                for (int i = 0; i < roster.Count; i++)
+                {
+                    var el = roster.GetElementCopyAtIndex(i);
+                    if (el.Character == null || el.Character.IsHero) continue;
+                    int v; map.TryGetValue(el.Character, out v);
+                    map[el.Character] = v + el.Number;
+                }
+                _fallenSnapshot = map;
+            }
+            catch { _fallenSnapshot = null; }
+        }
+
+        /// <summary>
+        /// ZBIERAMY POLEGLYCH (Jeff 29.08: "zabici zolnierze MOJEJ armii -
+        /// ich ekwipunek ma zasilic armoury i moge go zabrac; teraz znika").
+        /// Po bitwie roznica skladu = polegli; za kazdego jego rynsztunek
+        /// (wedle szablonu, ze stanem bojowym, bez choragwi/smokow/legend)
+        /// wraca na wozy i jest PRZEKSIEGOWANY NA GRACZA - dowodca dysponuje
+        /// sprzetem poleglych, jak w kazdej kompanii tamtych czasow.
+        /// </summary>
+        internal void GatherFallen()
+        {
+            try
+            {
+                if (_fallenSnapshot == null) return;
+                var before = _fallenSnapshot; _fallenSnapshot = null;
+                var roster = MobileParty.MainParty != null ? MobileParty.MainParty.MemberRoster : null;
+                var armory = QuartermasterLaw.DteArmory();
+                if (roster == null || armory == null) return;
+
+                var now = new Dictionary<CharacterObject, int>();
+                for (int i = 0; i < roster.Count; i++)
+                {
+                    var el = roster.GetElementCopyAtIndex(i);
+                    if (el.Character == null || el.Character.IsHero) continue;
+                    int v; now.TryGetValue(el.Character, out v);
+                    now[el.Character] = v + el.Number;
+                }
+
+                int men = 0, pieces = 0;
+                foreach (var kv in before)
+                {
+                    int left; now.TryGetValue(kv.Key, out left);
+                    int fallen = kv.Value - left;
+                    for (int m = 0; m < fallen; m++)
+                    {
+                        Equipment eq = null; int n = 0;
+                        foreach (var e in kv.Key.BattleEquipments) { n++; if (MBRandom.RandomInt(n) == 0) eq = e; }
+                        if (eq == null) continue;
+                        men++;
+                        for (int slot = 0; slot < 12; slot++)
+                        {
+                            if (slot == 4) continue;
+                            var item = eq[(EquipmentIndex)slot].Item;
+                            if (item == null || item.ItemType == ItemObject.ItemTypeEnum.Banner) continue;
+                            if (item.StringId != null && item.StringId.StartsWith("dragon_")) continue;
+                            if (LegendaryLaw.IsLegend(item)) continue;
+                            armory.AddToCounts(new EquipmentElement(item, PickWornModifier(item)), 1);
+                            StockDeposit(item.StringId, 1);   // dowodca dysponuje sprzetem poleglych
+                            pieces++;
+                        }
+                    }
+                }
+                if (pieces > 0)
+                {
+                    Log.Info("GatherFallen: " + men + " poleglych oddalo " + pieces + " sztuk na wozy (przeksiegowane na gracza).");
+                    Log.Player("The fallen are gathered - " + pieces + " pieces of their kit come back on the wagons, yours to claim.", true);
+                }
+            }
+            catch (Exception e) { Log.Error("GatherFallen", e); }
         }
 
         /// <summary>
@@ -669,6 +754,7 @@ namespace Armoury
                 if (mapEvent == null || !mapEvent.IsPlayerMapEvent) return;
                 _hpBeforeBattle = Hero.MainHero.HitPoints;
                 _lootSnapshot = SnapshotBaggage();
+                SnapshotOwnRanks();   // roznica po bitwie = polegli (GatherFallen)
                 _prisonerBaseline = SnapshotPrisoners();
             }
             catch (Exception e) { Log.Error("OnMapEventStarted", e); }
