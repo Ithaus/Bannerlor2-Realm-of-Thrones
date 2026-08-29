@@ -33,5 +33,11 @@
     <Reference Include="TaleWorlds.MountAndBlade"><HintPath>$(GameLibs)/TaleWorlds.MountAndBlade.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="TaleWorlds.SaveSystem"><HintPath>$(GameLibs)/TaleWorlds.SaveSystem.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="TaleWorlds.Engine"><HintPath>$(GameLibs)/TaleWorlds.Engine.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="TaleWorlds.ScreenSystem"><HintPath>$(GameLibs)/TaleWorlds.ScreenSystem.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="TaleWorlds.GauntletUI"><HintPath>$(GameLibs)/TaleWorlds.GauntletUI.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="TaleWorlds.GauntletUI.Data"><HintPath>$(GameLibs)/TaleWorlds.GauntletUI.Data.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="TaleWorlds.Engine.GauntletUI"><HintPath>$(GameLibs)/TaleWorlds.Engine.GauntletUI.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="TaleWorlds.Core.ViewModelCollection"><HintPath>$(GameLibs)/TaleWorlds.Core.ViewModelCollection.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="TaleWorlds.CampaignSystem.ViewModelCollection"><HintPath>$(GameLibs)/TaleWorlds.CampaignSystem.ViewModelCollection.dll</HintPath><Private>false</Private></Reference>
   </ItemGroup>
 </Project>

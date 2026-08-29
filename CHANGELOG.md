@@ -1,5 +1,22 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-29 — okno kucia 1:1 z bronia: vanillowy panel NewCraftedWeaponPopup dla lukow i pancerzy
+**Mod:** Armoury | **Pliki:** `Armoury/src/CraftPopup.cs` (przepisany na Gauntlet), `Armoury.csproj` (+5 referencji UI), `libs/` (+5 dll)
+**Zlecenie Jeffa (screeny):** "nie tekstowe okienko - IDENTYCZNY panel jak
+Weapon Crafted! przy mieczach: model przedmiotu, tabela statow z roznicami".
+**Zmiana:** CraftPopup laduje VANILLOWY prefab NewCraftedWeaponPopup wlasna
+warstwa GauntletLayer, z vanillowym WeaponDesignResultPopupVM: ItemCollection
+ElementViewModel daje podglad 3D sztuki (z modifierem), nasza funkcja
+BuildProps podaje liste WeaponDesignResultPropertyItemVM (wartosc + roznica
+od jakosci: pancerz per czesc, luk dmg/speed/accuracy, tarcza HP, melee
+komplet, waga) - kolory plusow/minusow robi prefab. Done zdejmuje warstwe.
+Stare okienko tekstowe zostalo jako KOLO ZAPASOWE (kazdy zgrzyt Gauntleta
+-> fallback, log "CraftPopup.Gauntlet").
+**Ryzyko / co sprawdzic:** pierwszy popup po wykuciu luku/pancerza - czy
+panel wyglada jak przy mieczu i czy Done zamyka czysto; jesli wyskoczy
+tekstowe okienko zamiast panelu, w logu bedzie blad Gauntleta do naprawy.
+**Status:** WGRANE (watcher - gra dzialala przy buildzie)
+
 ## 2026-08-29 — wymiana barterowa v2: NATYCHMIAST, warunkiem czlowiek ze skillem, stare na LISTE gracza
 **Mod:** Armoury | **Pliki:** `Armoury/src/QuartermasterLaw.cs` (AnyoneCanUse + ProcessSwaps)
 **Korekta Jeffa (scenariusz 1:1):** "wkladam 4 luki t6 i zamykam okno: jesli sa
