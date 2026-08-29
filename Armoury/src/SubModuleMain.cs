@@ -70,6 +70,7 @@ namespace Armoury
                 DragonUnmount.ApplyAll(_harmony);
                 SlowMuster.ApplyAll(_harmony);
                 SlowHealing.ApplyAll(_harmony);
+                SkillsDecide.ApplyAll(_harmony);
             }
             catch (Exception e) { Log.Error("OnBeforeInitialModuleScreenSetAsRoot", e); }
         }

@@ -448,6 +448,10 @@ namespace Armoury
         [SettingPropertyGroup("The slow mending")]
         public int HealingRegenPercent { get; set; } = 50;
 
+        [SettingPropertyBool("Skills Decide Enabled", HintText = "no more 'default tier +2': troops use ANY gear their stats allow, main weapon follows their best skill, the backup their second best (an archer carries bow, two quivers and a sidearm of his second skill)")]
+        [SettingPropertyGroup("Skills rule the gear")]
+        public bool SkillsDecideEnabled { get; set; } = true;
+
         [SettingPropertyBool("Elephant Quarantine Enabled", HintText = "elephants and their barding sell only in settlements of their own culture - no war beasts wintering in Winterfell")]
         [SettingPropertyGroup("The menagerie")]
         public bool ElephantQuarantineEnabled { get; set; } = true;
@@ -1135,6 +1139,7 @@ namespace Armoury
             s.BkSupplyMaxPieces = BkSupplyMaxPieces;
             s.VolunteerRegenPercent = VolunteerRegenPercent;
             s.HealingRegenPercent = HealingRegenPercent;
+            s.SkillsDecideEnabled = SkillsDecideEnabled;
             s.ElephantQuarantineEnabled = ElephantQuarantineEnabled;
             s.HideoutPurgeEnabled = HideoutPurgeEnabled;
             s.HideoutGoldBase = HideoutGoldBase;

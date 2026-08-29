@@ -1,5 +1,27 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-28 — STATYSTYKI RZADZA SPRZETEM: koniec limitu tier+2, bronie wg umiejetnosci
+**Mod:** Armoury | **Pliki:** `Armoury/src/SkillsDecide.cs` (nowy), `Settings.cs` + `McmSettings.cs` (gen), `SubModuleMain.cs`
+**Problem:** Jeff: "max 2 tiery wyzej jest bezsensowne - wojsko moze uzywac
+czego chce, jesli statystyki pozwalaja. Glowna bron = najwyzsza umiejetnosc,
+zapasowa = druga. Lucznik: luk + 2 kolczany + bron z drugiego skilla".
+**Zmiana (SkillsDecideEnabled, MCM "Skills rule the gear"):**
+(1) prefix na DTE PartyEquipmentDistributor.GetMaxAllowedTier -> zawsze 6
+(limit "domyslny tier +2" zdjety). (2) postfix na ctor DTE Assignment:
+ReferenceEquipment (PRYWATNA kopia per zolnierz - Assignment robi Clone,
+szablony nietkniete) dostaje sloty broni wg skilli jednostki: glowna klasa =
+najwyzszy skill; zapas = najwyzszy z pozostalych (po glownej strzeleckiej
+zapas musi byc reczny); luk/kusza dostaja 2 kolczany/2 sajdaki; tarcza
+z szablonu zostaje przy broni jednorecznej. Wzorzec kazdej klasy = najlepsza
+bron, ktorej Difficulty <= skill jednostki (kubelki co 25 pkt, cache) -
+DTE dobiera potem z magazynu "najblizsze wzorcowi", wiec wymagania
+statystyczne steruja doborem. Legendy i smoki poza wzorcami.
+**Ryzyko / co sprawdzic:** sklad broni jednostek w bitwie ma odpowiadac ich
+skillom (lucznik z mieczem zamiast wloczni przy wyzszym OneHanded); konie
+i pancerze bez zmian logiki (pancerze nie maja wymagan w grze). Gdyby armia
+wygladala dziwnie - wylacznik SkillsDecideEnabled w MCM.
+**Status:** WGRANE (gra byla zamknieta)
+
 ## 2026-08-28 — AUDYT LEGEND: mlot Roberta (x6!) i persony bez value + czystka totalna sakw
 **Mod:** Armoury | **Pliki:** `Armoury/src/LegendaryLaw.cs`, `Armoury/src/DragonUnmount.cs`
 **Problem:** Jeff: "mam 6 mlotow Roberta Baratheona - jest JEDEN na swiecie!

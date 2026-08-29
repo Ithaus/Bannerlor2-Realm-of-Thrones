@@ -135,6 +135,9 @@ namespace Armoury
         // --- The slow mending ---
         public int HealingRegenPercent = 50;               // wounded men and heroes heal on the map at this percent of the normal daily rate - medicine perks still count on top (100 = vanilla)
 
+        // --- Skills rule the gear ---
+        public bool SkillsDecideEnabled = true;            // no more "default tier +2": troops use ANY gear their stats allow, main weapon follows their best skill, the backup their second best (an archer carries bow, two quivers and a sidearm of his second skill)
+
         // --- The menagerie ---
         public bool ElephantQuarantineEnabled = true;      // elephants and their barding sell only in settlements of their own culture - no war beasts wintering in Winterfell
 
