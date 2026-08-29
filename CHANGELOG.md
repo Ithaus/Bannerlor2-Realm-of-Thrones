@@ -1,5 +1,23 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-29 — pancerze na liscie naprawy NAPRAWDE: parytet typow przy limicie
+**Mod:** Armoury | **Pliki:** `Armoury/src/SmithMenu.cs`, `Armoury/src/ArmouryBehavior.cs`
+**Problem (Jeff, trzeci raz, slusznie wsciekly):** pancerzy dalej nie bylo
+na liscie naprawy. LANCUCH trzech przyczyn, kazda kolejna maskowana przez
+poprzednia: (1) 999 pancerzy ROT bez grup modyfikatorow (naprawione wczoraj -
+WearGroups, 361 sztuk dostalo grupy przy tym wczytaniu); (2) limit ucinal
+roster przed sortem (naprawione); (3) FINALNA: sort uklada BRONIE PRZED
+pancerzami, a limit MaxItemsListed=24 (preset MCM Jeffa) ucinal KONIEC listy -
+przy dziesiatkach zbitych broni ze [STORES] pancerze zawsze wypadaly za burte,
+mimo ze zuzycie juz je tyka ("Zuzycie wojska: 234 sztuk" 14:32).
+**Zmiana:** limit z GWARANCJA PARYTETU TYPOW: kazdy obecny typ dostaje pule
+max(4, cap/liczba_typow) miejsc (grupami, w kolejnosci typow), nadwyzki
+dobieraja wolne miejsca; cap min. 24. Log "pokazane N (po X/typ)".
+Bonus ze screena: [STORES] Lady Forlorn = legendy zalegajace w magazynie
+GRACZA z dawnych lupow - CleanseTrashInBags tnie teraz takze IsLegend
+(magazyn i sakwy, przy kazdym menu).
+**Status:** WGRANE (gra byla zamknieta)
+
 ## 2026-08-29 — panel kucia NAPRAWIONY: NRE w RefreshUsages przy _crafting=null
 **Mod:** Armoury | **Pliki:** `Armoury/src/CraftPopup.cs` (ApplyAll + prefix), `SubModuleMain.cs`
 **Problem (Jeff + screen):** przy kuciu luku dalej wyskakiwalo tekstowe
