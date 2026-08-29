@@ -1,5 +1,24 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-29 — "Awans wycina sprzet z magazynu?" — diagnostyka
+**Mod:** Armoury | **Pliki:** `Armoury/src/ArmouryBehavior.cs`
+**Problem:** Jeff: uzupelnil sprzet u kwatermistrza, po awansach jednostek
+"nagle brakuje sprzetu ktorego wczesniej nie brakowalo".
+**Ustalenia (kod, nie zgadywanie):** awansow NIKT nie slucha - DTE nie ma
+handlera OnTroopUpgraded (sprawdzone dekompilacja EveryoneCampaignBehavior
+i ArmyArmoryBehavior), nasz kod tez nie, a wymog konia przy awansie DTE
+wylacza (GetUpgradeRequiresItemFromCategoryPatch zwraca null). Awans nie ma
+zadnej sciezki do magazynu. Najpewniejsze wyjasnienie: po awansie jednostka
+to INNY typ z INNYM wzorcem - karta w muster book pokazuje nowe pozycje
+(lepsze luki/pancerze), ktorych stary tier nie potrzebowal, stad "SHORT"
+na rzeczach "ktorych wczesniej nie brakowalo".
+**Zmiana:** log diagnostyczny: przy kazdym awansie jednostek gracza wpis
+"AWANS: X -> Y xN | magazyn: S szt." - jesli S spada miedzy kolejnymi
+awansami, zlodziej istnieje i bedzie w logu widoczny; jesli stoi, potwierdza
+sie zmiana wzorca.
+**Ryzyko / co sprawdzic:** Jeff robi serie awansow -> czytamy sumy.
+**Status:** WGRANE (watcher - gra dzialala przy buildzie)
+
 ## 2026-08-29 — CTD po Done na panelu kucia + brak odglosu kucia
 **Mod:** Armoury | **Pliki:** `Armoury/src/CraftPopup.cs`
 **Problem:** Jeff wykul Ravens' Teeth Longbow - panel z modelem 3D SIE POKAZAL,

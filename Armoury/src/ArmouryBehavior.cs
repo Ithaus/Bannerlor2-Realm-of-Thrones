@@ -62,6 +62,20 @@ namespace Armoury
         private List<string> _armoryWear = new List<string>();
         private bool _wearRestorePending;
 
+        private void OnPlayerUpgradedTroops(CharacterObject from, CharacterObject to, int num)
+        {
+            try
+            {
+                var armory = QuartermasterLaw.DteArmory();
+                int total = 0;
+                if (armory != null)
+                    for (int i = 0; i < armory.Count; i++) total += armory.GetElementCopyAtIndex(i).Amount;
+                Log.Info("AWANS: " + (from != null ? from.StringId : "?") + " -> "
+                    + (to != null ? to.StringId : "?") + " x" + num + " | magazyn: " + total + " szt.");
+            }
+            catch (Exception e) { Log.Error("OnPlayerUpgradedTroops", e); }
+        }
+
         private List<string> BuildArmoryWearSnapshot()
         {
             var list = new List<string>();
@@ -197,6 +211,11 @@ namespace Armoury
                 delegate { try { QuartermasterEscrow.ReleaseReserve(); } catch { } });
             // jeniec wziety po bitwie zostaje obszukany - jego rynsztunek idzie do sakw
             CampaignEvents.OnPrisonerTakenEvent.AddNonSerializedListener(this, OnPrisonerTaken);
+            // DIAGNOSTYKA (Jeff 29.08: "awans wycina sprzet z magazynu?") -
+            // ani DTE, ani my nie sluchamy awansow, wiec logujemy sume
+            // magazynu przy kazdym awansie: jak suma spada miedzy wpisami,
+            // zlodziej istnieje; jak stoi - to zmiana wzorca po awansie.
+            CampaignEvents.PlayerUpgradedTroopsEvent.AddNonSerializedListener(this, OnPlayerUpgradedTroops);
             // klawisz O na mapie: szybki oboz (BannerKings) bez klikania przez ekrany
             CampaignEvents.TickEvent.AddNonSerializedListener(this, delegate (float dt) { NightRest.OnTick(dt); });
             CampaignEvents.SettlementEntered.AddNonSerializedListener(this,
