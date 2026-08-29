@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-29 — okno wyniku kucia TAKZE dla lukow z CRAFT i pancerzy BK
+**Mod:** Armoury | **Pliki:** `Armoury/src/Forge.cs` (Smith), `Armoury/src/FletchForge.cs` (BkCraftPostfix)
+**Problem (Jeff):** "wykulem luk i nie pojawilo sie okienko ze statystykami -
+miales to zrobic dla lukow i pancerzy!". CraftPopup byl podpiety tylko w
+Forge.Finish/Deliver (projekty z naszego menu kuzni), a luk kuty w zakladce
+CRAFT (BK) idzie natychmiastowa sciezka Forge.Smith - bez okna.
+**Zmiana:** CraftPopup.Show w Forge.Smith (luki/kusze/pancerze robione od reki;
+amunicja bez popupu - seryjna, spam) oraz w BkCraftPostfix dla pancerzy kutych
+droga BK (jakosc odczytana z OSTATNIEGO stacka itemu w sakwach - swieze
+laduje na koncu rosteru).
+**Status:** WGRANE (gra byla zamknieta)
+
 ## 2026-08-29 — DUBEL WYKRYTY PRZEZ JEFFA: jency z bitwy nie sa juz obszukiwani
 **Mod:** Armoury | **Pliki:** `Armoury/src/ArmouryBehavior.cs` (OnPrisonerTaken)
 **Problem (Jeff, celne):** "zbieram lupy po bitwie, potem biore jencow i sa
@@ -1543,3 +1555,4 @@ Ekran rekrutacji ma byc pelny.
 - **Rozrusznik fabuly ROT** + dziennik kolejki (`Fabula.cs`).
 - **Spis notabli** przy wejsciu do osady (`WarReport.cs`).
 **Status:** WGRANE
+
