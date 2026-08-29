@@ -50,9 +50,19 @@ namespace CrashScribe
                     foreach (var h in list)
                     {
                         if (h == null) continue;
+                        // ochotnicy w slotach - rozstrzyga "puste okno rekrutacji":
+                        // stan (0/6 wszedzie) czy zepsute UI (sloty pelne, okno puste)
+                        int vols = 0, slots = 0;
+                        try
+                        {
+                            var vt = h.VolunteerTypes;
+                            if (vt != null) { slots = vt.Length; foreach (var v in vt) if (v != null) vols++; }
+                        }
+                        catch { }
                         sb.Append(" [").Append(h.Name).Append(" / ")
                           .Append(h.Culture != null ? h.Culture.StringId : "?").Append(" / ")
                           .Append(h.CharacterObject != null ? h.CharacterObject.Occupation.ToString() : "?")
+                          .Append(" / ochotnicy ").Append(vols).Append("/").Append(slots)
                           .Append("]");
                     }
                 Scribe.Line(sb.ToString());
