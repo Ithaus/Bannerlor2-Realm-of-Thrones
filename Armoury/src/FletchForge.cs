@@ -149,6 +149,23 @@ namespace Armoury
                 var item = Traverse.Create(cur).Property("Item").GetValue<ItemObject>();
                 if (item == null || RangedType(item)) return;      // strzeleckie licza sie w Forge.Smith
                 RangedLore.OnCrafted(item);
+                // okno wyniku takze dla pancerza kutego w BK CRAFT: jakosc
+                // czytamy z OSTATNIEGO stacka tego itemu w sakwach (rostery
+                // dokladaja swieze na koniec)
+                try
+                {
+                    ItemModifier freshMod = null;
+                    var bag = TaleWorlds.CampaignSystem.Party.MobileParty.MainParty.ItemRoster;
+                    for (int i = bag.Count - 1; i >= 0; i--)
+                    {
+                        var el = bag.GetElementCopyAtIndex(i);
+                        if (el.EquipmentElement.Item != item) continue;
+                        freshMod = el.EquipmentElement.ItemModifier;
+                        break;
+                    }
+                    CraftPopup.Show(item, freshMod, 1);
+                }
+                catch { }
             }
             catch { }
         }

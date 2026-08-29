@@ -502,6 +502,11 @@ namespace Armoury
                 int made = (item.ItemType == ItemObject.ItemTypeEnum.Arrows || item.ItemType == ItemObject.ItemTypeEnum.Bolts)
                     ? MathF.Max(1, Settings.Current.AmmoBatchStacks) : 1;
                 MobileParty.MainParty.ItemRoster.AddToCounts(new EquipmentElement(item, quality), made);
+                // okno wyniku jak przy mieczach (Jeff 29.08: "wykulem luk i nie
+                // pojawilo sie okienko!") - amunicja bez popupu, bo seryjna
+                if (item.ItemType != ItemObject.ItemTypeEnum.Arrows
+                    && item.ItemType != ItemObject.ItemTypeEnum.Bolts)
+                    CraftPopup.Show(item, quality, made);
                 if (Recipes.IsLegendary(item) && !ArmouryBehavior.Legends.Contains(item.StringId))
                     ArmouryBehavior.Legends.Add(item.StringId);
                 RangedLore.OnCrafted(item);
