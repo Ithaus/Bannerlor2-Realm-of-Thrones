@@ -575,12 +575,40 @@ namespace Armoury
                     return string.CompareOrdinal(ia.StringId, ib.StringId);
                 });
 
-                // dopiero teraz limit ekranu
-                int cap = Math.Max(10, Settings.Current.MaxItemsListed);
+                // limit z GWARANCJA PARYTETU TYPOW (Jeff x3: "nie moge naprawic
+                // pancerzy!" - zwykly limit ucinal koniec listy, a pancerze
+                // sortuja sie ZA broniami, wiec zawsze wypadaly). Kazdy obecny
+                // typ dostaje swoja pule miejsc; dopiero reszta idzie nadwyzkom.
+                int cap = Math.Max(24, Settings.Current.MaxItemsListed);
                 if (elements.Count > cap)
                 {
-                    Log.Info("MendPick: lista " + elements.Count + " pozycji przycieta do " + cap + " (MaxItemsListed).");
-                    elements.RemoveRange(cap, elements.Count - cap);
+                    var byRank = new Dictionary<int, List<InquiryElement>>();
+                    var rankOrder = new List<int>();
+                    foreach (var el in elements)
+                    {
+                        int rank = TypeRank(found[(int)el.Identifier].Item);
+                        List<InquiryElement> g;
+                        if (!byRank.TryGetValue(rank, out g)) { byRank[rank] = g = new List<InquiryElement>(); rankOrder.Add(rank); }
+                        g.Add(el);
+                    }
+                    int perType = Math.Max(4, cap / Math.Max(1, rankOrder.Count));
+                    var final = new List<InquiryElement>();
+                    foreach (var r in rankOrder)
+                    {
+                        var g = byRank[r];
+                        for (int i = 0; i < g.Count && i < perType && final.Count < cap; i++) final.Add(g[i]);
+                    }
+                    // wolne miejsca dobieramy nadwyzkami w kolejnosci typow
+                    foreach (var r in rankOrder)
+                    {
+                        if (final.Count >= cap) break;
+                        var g = byRank[r];
+                        for (int i = perType; i < g.Count && final.Count < cap; i++) final.Add(g[i]);
+                    }
+                    Log.Info("MendPick: lista " + elements.Count + " pozycji, pokazane " + final.Count
+                             + " (po " + perType + "/typ, typow " + rankOrder.Count + ").");
+                    elements.Clear();
+                    elements.AddRange(final);
                 }
 
                 MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData(

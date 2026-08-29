@@ -303,6 +303,14 @@ namespace Armoury
                             cut += el.Amount;
                             continue;
                         }
+                        // legendy zalegajace z dawnych lupow w NASZYM magazynie
+                        // (screen Jeffa: [STORES] Lady Forlorn) - precz
+                        if (LegendaryLaw.IsLegend(it))
+                        {
+                            roster.AddToCounts(el.EquipmentElement, -el.Amount);
+                            cut += el.Amount;
+                            continue;
+                        }
                         var mod = el.EquipmentElement.ItemModifier;
                         if (mod == null) continue;
                         if (mod.PriceMultiplier * 100f > s.LootMinConditionPercent + 0.01f) continue;
