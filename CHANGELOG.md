@@ -1,5 +1,20 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-29 — DUBEL WYKRYTY PRZEZ JEFFA: jency z bitwy nie sa juz obszukiwani
+**Mod:** Armoury | **Pliki:** `Armoury/src/ArmouryBehavior.cs` (OnPrisonerTaken)
+**Problem (Jeff, celne):** "zbieram lupy po bitwie, potem biore jencow i sa
+rozbierani do naga - czy to nie podwojne liczenie?". TAK, BYL DUBEL: sprzet
+pokonanych JUZ trafia do lupow po kazdej bitwie (realna - DTE zbiera z pola;
+symulowana - pelny drop przez SimBattleFullDrop), a jeniec z bitwy to jeden
+z pokonanych - obszukanie dokladalo DRUGI komplet (szablonowy) za ten sam
+rynsztunek.
+**Zmiana:** OnPrisonerTaken sprawdza, czy jeniec przyszedl Z BITWY (PlayerMapEvent
+/ PlayerEncounter.Battle zyje). Z bitwy -> tylko aktualizacja ksiegi jencow
+(zeby hourly/menu ich pozniej nie "doszukalo"), ZERO obszukiwania. Obszukiwanie
+zostaje wylacznie dla kapitulantow bez walki (dialog na mapie, poddanie band) -
+tam zaden lup z pola nie padl, wiec rozbieranie jest jedyna zdobycza.
+**Status:** WGRANE (watcher - gra dzialala przy buildzie)
+
 ## 2026-08-29 — SKARBIEC WOJSKA: lupy 60% niewidoczne, gracz rusza TYLKO wlasne wklady, starocie znikaja
 **Mod:** Armoury | **Pliki:** `ArmouryBehavior.cs` (ksiega wkladow + TrimWarStores), `QuartermasterLaw.cs` (escrow + ledger), `MusterBook.cs` (IsPinnedItem + depozyty)
 **Model Jeffa (jego projekt, wprost):** "po bitwie wojsko przezbraja sie, ale

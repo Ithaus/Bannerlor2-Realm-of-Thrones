@@ -934,10 +934,27 @@ namespace Armoury
         /// </summary>
         private void OnPrisonerTaken(TaleWorlds.CampaignSystem.Roster.FlattenedTroopRoster roster)
         {
-            // PODDANIE SIE BEZ BITWY (Jeff): kapitulacja z dialogu na mapie nie
-            // przechodzi przez MapEventEnded, wiec okno pobitewne bylo zamkniete
-            // i jency wchodzili NIEOBSZUKANI. Wziecie jenca SAMO otwiera okno -
-            // to zdarzenie strzela wylacznie, gdy to GRACZ bierze jencow.
+            // KONIEC PODWOJNEGO LICZENIA (Jeff 29.08: "lupy po bitwie, a potem
+            // jeszcze rozbieram jencow - czy to nie dubel?"). BYL DUBEL: sprzet
+            // pokonanych JUZ idzie do lupow po KAZDEJ bitwie (realna - DTE
+            // zbiera z pola; symulowana - pelny drop), a jeniec z bitwy to jeden
+            // z pokonanych. Obszukanie go byloby DRUGA nagroda za ten sam
+            // rynsztunek. Jency z bitwy: tylko aktualizacja ksiegi (zeby
+            // hourly/menu ich pozniej nie "doszukalo"). Obszukiwanie zostaje
+            // WYLACZNIE dla kapitulantow bez walki (dialog na mapie, poddanie
+            // band) - tam zaden lup z pola nie padl.
+            bool fromBattle = false;
+            try
+            {
+                fromBattle = MapEvent.PlayerMapEvent != null
+                    || TaleWorlds.CampaignSystem.Encounters.PlayerEncounter.Battle != null;
+            }
+            catch { }
+            if (fromBattle)
+            {
+                try { _prisonerBaseline = SnapshotPrisoners(); } catch { }
+                return;
+            }
             try
             {
                 var half = CampaignTime.HoursFromNow(0.5f);
