@@ -142,7 +142,6 @@ namespace Armoury
         // --- The finished piece ---
         public bool CraftResultPopup = true;               // forging armour, bows or ammo ends with a result window: every stat, with the quality bonus or the botch penalty spelled out - same rule as weapons
         public bool RichQualityModifiers = true;           // fine/masterwork/legendary touch MORE than one stat (RBM strips them to bare damage): melee gains speed, ranged gains missile speed, botched work loses both
-        public bool DismissedLeaveGear = true;             // a man you dismiss hands his weapons and armour back to the quartermaster before he walks - the kit belongs to the company
         public bool TroopSelfMendEnabled = true;           // each day in a town the men pay the smith from their own wages to mend the worst pieces in the company stores
         public int TroopSelfMendPerDay = 10;               // how many pieces a day the men can afford to have mended
 

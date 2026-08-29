@@ -1,5 +1,16 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-29 — COFNIETE: oddawanie sprzetu przez zwalnianych (Jeff: MA BYC ODWROTNIE)
+**Mod:** Armoury | **Pliki:** `Armoury/src/MusterOut.cs` (przepisany), `Settings.cs` + `McmSettings.cs` (gen; 260)
+**Powod:** Jeff wprost: "MA NIE ODDAWAC - zwalniany zolnierz odchodzi ZE SWOIM
+ekwipunkiem, tak ma byc! Masz to zmienic, ma byc odwrotnie". Wczesniejsza
+interpretacja jego zgloszenia byla bledna.
+**Zmiana:** mechanika oddawania rynsztunku do magazynu przy zwolnieniu USUNIETA
+w calosci (kod + ustawienie DismissedLeaveGear). Zwalniany odchodzi po staremu
+(vanilla), magazyn kwatermistrza nietkniety. AutoSort partii ZOSTAJE (patch
+tylko na PartyScreenLogic.Initialize).
+**Status:** COFNIETE (dismissal) / WGRANE (auto-sort bez zmian)
+
 ## 2026-08-29 — KSIEGA MUSZTRY: podglad jednostek i przypisywanie sprzetu z magazynu
 **Mod:** Armoury | **Pliki:** `Armoury/src/MusterBook.cs` (nowy), `SkillsDecide.cs` (piny), `SubModuleMain.cs`, `Settings.cs` + `McmSettings.cs` (gen; 261)
 **Zlecenie Jeffa:** "klikam grupe -> popup jednostki: doswiadczenie do awansu,

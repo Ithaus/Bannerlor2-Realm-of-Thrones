@@ -464,10 +464,6 @@ namespace Armoury
         [SettingPropertyGroup("The finished piece")]
         public bool RichQualityModifiers { get; set; } = true;
 
-        [SettingPropertyBool("Dismissed Leave Gear", HintText = "a man you dismiss hands his weapons and armour back to the quartermaster before he walks - the kit belongs to the company")]
-        [SettingPropertyGroup("The finished piece")]
-        public bool DismissedLeaveGear { get; set; } = true;
-
         [SettingPropertyBool("Troop Self Mend Enabled", HintText = "each day in a town the men pay the smith from their own wages to mend the worst pieces in the company stores")]
         [SettingPropertyGroup("The finished piece")]
         public bool TroopSelfMendEnabled { get; set; } = true;
@@ -1171,7 +1167,6 @@ namespace Armoury
             s.MusterBookEnabled = MusterBookEnabled;
             s.CraftResultPopup = CraftResultPopup;
             s.RichQualityModifiers = RichQualityModifiers;
-            s.DismissedLeaveGear = DismissedLeaveGear;
             s.TroopSelfMendEnabled = TroopSelfMendEnabled;
             s.TroopSelfMendPerDay = TroopSelfMendPerDay;
             s.SkillsDecideEnabled = SkillsDecideEnabled;
