@@ -92,7 +92,11 @@ namespace Armoury
                     try { if (mp == MobileParty.MainParty) ElephantQuarantine.Sweep(st); } catch { }
                 });
             CampaignEvents.DailyTickSettlementEvent.AddNonSerializedListener(this,
-                delegate (Settlement st) { try { ElephantQuarantine.Sweep(st); } catch { } });
+                delegate (Settlement st)
+                {
+                    try { ElephantQuarantine.Sweep(st); } catch { }
+                    try { TroopSelfMend.Run(st); } catch { }
+                });
             // menu kucia otwarte JAKAKOLWIEK droga (takze wznowione z save'a,
             // z pominieciem StartCraftingMenu) - dniowka kupuje sie od razu
             CampaignEvents.GameMenuOpened.AddNonSerializedListener(this, OnGameMenuOpened);
@@ -256,6 +260,7 @@ namespace Armoury
             try { FixCharcoalWeight(); } catch (Exception e) { Log.Error("FixCharcoalWeight", e); }
             try { CleanseNegativeStacks(); } catch (Exception e) { Log.Error("CleanseNegativeStacks", e); }
             try { CleanseDragonStables(true); } catch (Exception e) { Log.Error("CleanseDragonStables", e); }
+            try { QualityRich.Enrich(); } catch (Exception e) { Log.Error("QualityRich.Enrich", e); }
             try { SmithMenu.Add(starter); Log.Info("Menu kowala dodane."); }
             catch (Exception e) { Log.Error("OnSessionLaunched", e); }
             try { CleanseAmmo(); } catch (Exception e) { Log.Error("CleanseAmmo", e); }

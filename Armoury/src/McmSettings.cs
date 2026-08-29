@@ -448,6 +448,30 @@ namespace Armoury
         [SettingPropertyGroup("The slow mending")]
         public int HealingRegenPercent { get; set; } = 50;
 
+        [SettingPropertyBool("Auto Sort Party", HintText = "the party roster keeps itself in order: cavalry, horse archers, infantry, archers - each arm by tier, best first (no more dragging rows by hand)")]
+        [SettingPropertyGroup("The tidy muster")]
+        public bool AutoSortParty { get; set; } = true;
+
+        [SettingPropertyBool("Craft Result Popup", HintText = "forging armour, bows or ammo ends with a result window: every stat, with the quality bonus or the botch penalty spelled out - same rule as weapons")]
+        [SettingPropertyGroup("The finished piece")]
+        public bool CraftResultPopup { get; set; } = true;
+
+        [SettingPropertyBool("Rich Quality Modifiers", HintText = "fine/masterwork/legendary touch MORE than one stat (RBM strips them to bare damage): melee gains speed, ranged gains missile speed, botched work loses both")]
+        [SettingPropertyGroup("The finished piece")]
+        public bool RichQualityModifiers { get; set; } = true;
+
+        [SettingPropertyBool("Dismissed Leave Gear", HintText = "a man you dismiss hands his weapons and armour back to the quartermaster before he walks - the kit belongs to the company")]
+        [SettingPropertyGroup("The finished piece")]
+        public bool DismissedLeaveGear { get; set; } = true;
+
+        [SettingPropertyBool("Troop Self Mend Enabled", HintText = "each day in a town the men pay the smith from their own wages to mend the worst pieces in the company stores")]
+        [SettingPropertyGroup("The finished piece")]
+        public bool TroopSelfMendEnabled { get; set; } = true;
+
+        [SettingPropertyInteger("Troop Self Mend Per Day", 0, 40, "0", HintText = "how many pieces a day the men can afford to have mended")]
+        [SettingPropertyGroup("The finished piece")]
+        public int TroopSelfMendPerDay { get; set; } = 10;
+
         [SettingPropertyBool("Skills Decide Enabled", HintText = "no more 'default tier +2': troops use ANY gear their stats allow, main weapon follows their best skill, the backup their second best (an archer carries bow, two quivers and a sidearm of his second skill)")]
         [SettingPropertyGroup("Skills rule the gear")]
         public bool SkillsDecideEnabled { get; set; } = true;
@@ -1139,6 +1163,12 @@ namespace Armoury
             s.BkSupplyMaxPieces = BkSupplyMaxPieces;
             s.VolunteerRegenPercent = VolunteerRegenPercent;
             s.HealingRegenPercent = HealingRegenPercent;
+            s.AutoSortParty = AutoSortParty;
+            s.CraftResultPopup = CraftResultPopup;
+            s.RichQualityModifiers = RichQualityModifiers;
+            s.DismissedLeaveGear = DismissedLeaveGear;
+            s.TroopSelfMendEnabled = TroopSelfMendEnabled;
+            s.TroopSelfMendPerDay = TroopSelfMendPerDay;
             s.SkillsDecideEnabled = SkillsDecideEnabled;
             s.ElephantQuarantineEnabled = ElephantQuarantineEnabled;
             s.HideoutPurgeEnabled = HideoutPurgeEnabled;

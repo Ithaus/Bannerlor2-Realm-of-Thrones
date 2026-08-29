@@ -347,6 +347,7 @@ namespace Armoury
                 MobileParty.MainParty.ItemRoster.AddToCounts(new EquipmentElement(item, mod), 1);
                 Log.Player("The finishing work is done: " + (mod != null ? mod.Name + " " : "") + item.Name + " joins your baggage.");
                 Banner("Finished and delivered: " + item.Name);
+                CraftPopup.Show(item, mod, 1);
                 Log.Info("Dostawa broni: " + item.StringId + " mod=" + (mod != null ? mod.StringId : "brak"));
             }
             catch (Exception e) { Log.Error("Deliver", e); }
@@ -384,6 +385,7 @@ namespace Armoury
                 int made = (item.ItemType == ItemObject.ItemTypeEnum.Arrows || item.ItemType == ItemObject.ItemTypeEnum.Bolts)
                     ? MathF.Max(1, Settings.Current.AmmoBatchStacks) : 1;
                 MobileParty.MainParty.ItemRoster.AddToCounts(new EquipmentElement(item, quality), made);
+                CraftPopup.Show(item, quality, made);
                 if (Recipes.IsLegendary(item) && !ArmouryBehavior.Legends.Contains(item.StringId))
                     ArmouryBehavior.Legends.Add(item.StringId);
                 RangedLore.OnCrafted(item);

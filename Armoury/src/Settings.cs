@@ -135,6 +135,16 @@ namespace Armoury
         // --- The slow mending ---
         public int HealingRegenPercent = 50;               // wounded men and heroes heal on the map at this percent of the normal daily rate - medicine perks still count on top (100 = vanilla)
 
+        // --- The tidy muster ---
+        public bool AutoSortParty = true;                  // the party roster keeps itself in order: cavalry, horse archers, infantry, archers - each arm by tier, best first (no more dragging rows by hand)
+
+        // --- The finished piece ---
+        public bool CraftResultPopup = true;               // forging armour, bows or ammo ends with a result window: every stat, with the quality bonus or the botch penalty spelled out - same rule as weapons
+        public bool RichQualityModifiers = true;           // fine/masterwork/legendary touch MORE than one stat (RBM strips them to bare damage): melee gains speed, ranged gains missile speed, botched work loses both
+        public bool DismissedLeaveGear = true;             // a man you dismiss hands his weapons and armour back to the quartermaster before he walks - the kit belongs to the company
+        public bool TroopSelfMendEnabled = true;           // each day in a town the men pay the smith from their own wages to mend the worst pieces in the company stores
+        public int TroopSelfMendPerDay = 10;               // how many pieces a day the men can afford to have mended
+
         // --- Skills rule the gear ---
         public bool SkillsDecideEnabled = true;            // no more "default tier +2": troops use ANY gear their stats allow, main weapon follows their best skill, the backup their second best (an archer carries bow, two quivers and a sidearm of his second skill)
 

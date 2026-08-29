@@ -1,5 +1,30 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-29 — pakiet armii: popup wyniku kucia, pelne modyfikatory jakosci, zwalniani oddaja sprzet, samonaprawa wojska, auto-sort partii
+**Mod:** Armoury | **Pliki:** `CraftPopup.cs` (nowy), `QualityRich.cs` (nowy), `MusterOut.cs` (nowy), `TroopSelfMend.cs` (nowy), `Forge.cs`, `ArmouryBehavior.cs`, `SubModuleMain.cs`, `Settings.cs` + `McmSettings.cs` (gen; 260 ustawien)
+**Zlecenia Jeffa 29.08:**
+(1) "kucie pancerza/luku ma otwierac popup ze statami jak przy broniach, plusy
+przy master, minusy przy fuszerce" -> CraftPopup.Show w Forge.Finish i Deliver:
+kazda stata z wartoscia po modyfikatorze i roznica w nawiasie.
+(2) "masterwork dotyka tylko jeden wskaznik, w vanilli bylo wiecej" -> winowajca
+RBM (RBMCombat_item_modifiers.xml: legendary_sword = SAM damage 20). QualityRich
+przy wczytaniu dopisuje brakujace staty TYLKO gdy pole==0: bron reczna Speed
++2/+4/+6 (fine/master/legendary), strzelecka MissileSpeed +3/+6/+9, fuszerka
+na minus (inferior/poor).
+(3) "zwalniani odchodza z bronia i pancerzem - zabrac" -> MusterOut: snapshot
+skladu przy otwarciu ekranu partii, diff przy zamknieciu; ubytek niepokryty
+awansem (UpgradeTargets) = zwolnieni; ich wyposazenie wg szablonu (ze stanem
+bojowym, bez choragwi/smokow/legend) wraca do magazynu DTE.
+(4) "wojsko ma naprawiac ze swojego zoldu" -> TroopSelfMend: kazdego dnia
+w MIESCIE do TroopSelfMendPerDay (10) najgorszych sztuk z magazynu wraca do
+stanu czystego - z kieszeni wojska, gracz nie placi. Reszta - recznie jak dotad.
+(5) "jednostki maja sie same segregowac: kawaleria, konni lucznicy, piechota,
+strzelcy, po tierze" -> AutoSort przy kazdym otwarciu ekranu partii (rebuild
+rosteru, XP jedzie ze stackiem, herosi na gorze).
+**Nastepny krok (zapowiedziany):** ksiega musztry - podglad i przypisywanie
+sprzetu per jednostka/grupa (pin do ReferenceEquipment w SkillsDecide).
+**Status:** WGRANE (gra byla zamknieta)
+
 ## 2026-08-29 — FREEZE od naszego profilera (COFNIETY) + porzadek w godzinach kuzni + smelt legend oddaje komplet czesci
 **Mod:** CrashScribe + Armoury | **Pliki:** `CrashScribe/src/SubModuleMain.cs` (Sampler off), `Armoury/src/ArmouryBehavior.cs`, `Armoury/src/SmithMenu.cs`, `Armoury/src/SmeltTab.cs`
 **Problem 1 (FREEZE 08:06, gra wisi na glucho):** nasz Sampler (profiler FF)
