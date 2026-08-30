@@ -194,6 +194,48 @@ namespace Armoury
             }
             catch { }
         }
+
+        /// <summary>
+        /// KSIEGA-DUCH. Sztuki gracza schodza z polek roznymi drzwiami bez
+        /// StockWithdraw: DTE zdejmuje kolczan przy spawnie lucznika,
+        /// wystrzelany do zera przepada, CleanseTrashInBags i sanacja tna
+        /// stosy. Ksiega puchnie ponad polki, a wtedy WarOwnedOf zaniza stan
+        /// wojska i HoldReserve pokazuje graczowi cudze sztuki jako wlasne.
+        /// Przed kazdym otwarciem zbrojowni przycinamy ksiege per id do tego,
+        /// co NAPRAWDE lezy na polkach.
+        /// </summary>
+        internal static void ReconcileStock(string why)
+        {
+            try
+            {
+                var self = Instance;
+                var armory = QuartermasterLaw.DteArmory();
+                if (self == null || armory == null || QuartermasterEscrow.Active) return;
+                var shelf = new Dictionary<string, int>();
+                for (int i = 0; i < armory.Count; i++)
+                {
+                    var el = armory.GetElementCopyAtIndex(i);
+                    var it = el.EquipmentElement.Item;
+                    if (it == null || it.StringId == null || el.Amount <= 0) continue;
+                    int v; shelf.TryGetValue(it.StringId, out v);
+                    shelf[it.StringId] = v + el.Amount;
+                }
+                int ghost = 0;
+                var ids = new List<string>(self._playerStock.Keys);
+                foreach (var id in ids)
+                {
+                    int book = self._playerStock[id];
+                    int have; shelf.TryGetValue(id, out have);
+                    if (book <= have) continue;
+                    ghost += book - have;
+                    if (have <= 0) self._playerStock.Remove(id); else self._playerStock[id] = have;
+                }
+                if (ghost > 0)
+                    Log.Info("ReconcileStock(" + why + "): ksiega gracza przycieta o " + ghost
+                             + " szt. ducha (ubytki z polek poza ekranem zbrojowni).");
+            }
+            catch (Exception e) { Log.Error("ReconcileStock", e); }
+        }
         private Dictionary<string,int> _prisonerBaseline;
 
         public ArmouryBehavior() { Instance = this; }

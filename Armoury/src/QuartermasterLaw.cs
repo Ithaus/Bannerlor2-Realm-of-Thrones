@@ -461,6 +461,9 @@ namespace Armoury
                 if (s == null || !s.ArmouryProtectUsed || Active) return;
                 var armory = QuartermasterLaw.DteArmory();
                 if (armory == null) return;
+                // najpierw ksiega-duch: przytnij ksiege gracza do realnych
+                // polek, zanim policzymy co chowac i co pokazac
+                ArmouryBehavior.ReconcileStock("armoury-open");
                 _pendingSwaps.Clear();   // swieza sesja ekranu = swiezy rejestr wymian
                 var needs = QuartermasterLaw.CountNeeds();
 

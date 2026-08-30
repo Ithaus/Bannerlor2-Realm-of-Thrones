@@ -1,5 +1,22 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-30 — Audyt: ksiega-duch przycinana do realnych polek
+**Mod:** Armoury | **Pliki:** `Armoury/src/ArmouryBehavior.cs`, `Armoury/src/QuartermasterLaw.cs`
+**Problem:** znalezisko audytu: sztuki zaksiegowane na gracza znikaja z polek
+drzwiami, ktore NIE ida przez StockWithdraw - DTE zdejmuje kolczan przy
+spawnie lucznika, kolczan wystrzelany do zera przepada, CleanseTrashInBags
+(dzis 1533+3612 szt.) i sanacja ujemnych stosow tna magazyn. Ksiega gracza
+puchla ponad polki: WarOwnedOf zanizal stan wojska (za duzo wkladow "do
+kompletu"), a HoldReserve pokazywal graczowi cudze sztuki jako wlasne.
+**Przyczyna:** brak rekonsyliacji ksiegi z polkami.
+**Zmiana:** ArmouryBehavior.ReconcileStock(why): per id clamp ksiegi do sumy
+el.Amount na polkach, z logiem "przycieta o N szt. ducha"; wolane na poczatku
+HoldReserve (przed schowaniem skarbca), gdy escrow nieaktywny.
+**Ryzyko / co sprawdzic:** po bitwie z lucznikami otworzyc zbrojownie -
+w logu moze pojawic sie linia ReconcileStock; liczniki na liscie gracza
+nie moga przekraczac tego, co fizycznie lezy.
+**Status:** DO WGRANIA (pakiet poprawek audytu 30.08)
+
 ## 2026-08-30 — Audyt: uczciwa ksiega wkladow (ksiegowanie PO transferze + wycofanie kasuje wymiane)
 **Mod:** Armoury | **Pliki:** `Armoury/src/QuartermasterLaw.cs`
 **Problem:** dwa znaleziska audytu o tej samej ksiedze: (1) Prefix na
