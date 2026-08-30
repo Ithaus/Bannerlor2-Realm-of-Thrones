@@ -286,8 +286,13 @@ namespace Armoury
                     delegate (MenuCallbackArgs a) { a.optionLeaveType = GameMenuOption.LeaveType.Leave; return true; },
                     // flaga -> SearchTick przelaczy z powrotem na arm_hideout_search
                     // (SwitchToMenu z ticka to wzorzec vanilla; z opcji wait-menu
-                    // ZAKAZ - CTD, a ExitToLast niszczy MenuContext)
-                    delegate (MenuCallbackArgs a) { _searchLeave = true; }, true, 9);
+                    // ZAKAZ - CTD, a ExitToLast niszczy MenuContext). Zegar
+                    // ruszamy sami - ratunek z deadlocka po load w srodku menu
+                    delegate (MenuCallbackArgs a)
+                    {
+                        _searchLeave = true;
+                        try { Campaign.Current.TimeControlMode = CampaignTimeControlMode.StoppablePlay; a.MenuContext.GameMenu.StartWait(); } catch { }
+                    }, true, 9);
             }
             catch (Exception e) { Log.Error("HideoutPurge.AddMenus", e); }
         }

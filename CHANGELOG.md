@@ -1,5 +1,26 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-30 — RATUNEK: opcje wyjscia z wait-menu ruszaja zegar (deadlock White Harbor)
+**Mody:** Armoury, RealisticCaptivity | **Pliki:** `SmithMenu.cs`,
+`HideoutPurge.cs`, `Work.cs`
+**Problem:** Jeff ze screenem (White Harbor, kolejka kowala 185h): "zawislo
+sie - nie moge uruchomic czasu i nie moge Step away". Diagnoza: po
+WCZYTANIU SAVE'A w srodku wait-menu init menu (z StartWait) nie biegnie -
+czas stoi na Stop i nie daje sie odpauzowac, a nasze opcje wyjscia z
+korekty ExitToLast czekaja na TICK, ktory bez plynacego czasu nigdy nie
+tyknie. Deadlock: ani czekac, ani wyjsc. (Armoury.log bez bledow - tick
+zdrowy, tylko uspiony.)
+**Zmiana:** wszystkie 4 opcje wyjscia (Put the work aside / Step away /
+Call the search off / Enough of this toil) oprocz flagi RUSZAJA ZEGAR
+same: TimeControlMode = StoppablePlay + GameMenu.StartWait() w try/catch.
+Tick budzi sie w nastepnej klatce i przelacza jak w korekcie.
+**Ryzyko / co sprawdzic:** wczytac save zrobiony w srodku czekania u
+kowala -> klik "Step away" wychodzi (najpierw ruszy czas na ulamek
+sekundy); zwykle wyjscia bez zmian. Jesli po load ktos chce CZEKAC dalej:
+wyjsc opcja i wejsc ponownie (init ze StartWait naprawi zegar).
+**Status:** ZBUDOWANE - watcher wgra po zamknieciu gry (Jeff: ESC ->
+Save & Exit, watcher wgrywa, wczytaj - klik zadziala)
+
 ## 2026-08-30 — TroopSelfMend: procent uszkodzen dziennie zamiast plaskich 10 sztuk
 **Mod:** Armoury | **Pliki:** `Armoury/src/TroopSelfMend.cs`, `Settings.cs`, `McmSettings.cs` (gen)
 **Problem:** Jeff: "10 sztuk dziennie to bez sensu - niech naprawiaja

@@ -177,8 +177,13 @@ namespace RealisticCaptivity
                     // to wzorzec vanilla, tak robi juz StillSafe). Z opcji
                     // wait-menu SwitchToMenu ZAKAZANE (CTD), a ExitToLast
                     // niszczy MenuContext: we wsi zostawia gracza BEZ menu
-                    // z wiszacym PlayerEncounter, w miescie laduje w town_outside
-                    delegate (MenuCallbackArgs a) { _stopWork = true; }, true, 9);
+                    // z wiszacym PlayerEncounter, w miescie laduje w town_outside.
+                    // Zegar ruszamy sami - ratunek z deadlocka po load w menu
+                    delegate (MenuCallbackArgs a)
+                    {
+                        _stopWork = true;
+                        try { Campaign.Current.TimeControlMode = CampaignTimeControlMode.StoppablePlay; a.MenuContext.GameMenu.StartWait(); } catch { }
+                    }, true, 9);
             }
         }
 

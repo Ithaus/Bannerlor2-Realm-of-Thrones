@@ -134,8 +134,16 @@ namespace Armoury
                 // ZAKAZ SwitchToMenu z opcji menu OCZEKIWANIA (CTD, CLAUDE.md),
                 // a ExitToLast NISZCZY MenuContext (stosu menu nie ma - w miescie
                 // laduje sie w town_outside). Opcja tylko podnosi flage,
-                // przelacza WorkTick - SwitchToMenu z ticka to wzorzec vanilla
-                delegate (MenuCallbackArgs a) { _workApply = null; _workLeave = true; }, true, 9);
+                // przelacza WorkTick - SwitchToMenu z ticka to wzorzec vanilla.
+                // RATUNEK Z DEADLOCKA (Jeff 30.08, White Harbor): po wczytaniu
+                // save'a w srodku wait-menu init ze StartWait nie biegnie,
+                // czas stoi na Stop i flaga czekalaby na tick w nieskonczonosc
+                // - ruszamy zegar sami, tick przelaczy w nastepnej klatce
+                delegate (MenuCallbackArgs a)
+                {
+                    _workApply = null; _workLeave = true;
+                    try { Campaign.Current.TimeControlMode = CampaignTimeControlMode.StoppablePlay; a.MenuContext.GameMenu.StartWait(); } catch { }
+                }, true, 9);
 
             starter.AddGameMenuOption(Menu, "arm_leave",
                 "{=!}Wipe your hands and step out", LeaveCondition,
@@ -151,8 +159,13 @@ namespace Armoury
                 delegate (MenuCallbackArgs a) { a.optionLeaveType = GameMenuOption.LeaveType.Leave; return true; },
                 // flaga -> ProjWaitTick przelaczy na Menu (SwitchToMenu z ticka
                 // to wzorzec vanilla; z opcji wait-menu ZAKAZ, a ExitToLast
-                // niszczy MenuContext i laduje w town_outside)
-                delegate (MenuCallbackArgs a) { _projLeave = true; }, true, 9);
+                // niszczy MenuContext i laduje w town_outside). Zegar ruszamy
+                // sami - ratunek z deadlocka po load w srodku menu (White Harbor)
+                delegate (MenuCallbackArgs a)
+                {
+                    _projLeave = true;
+                    try { Campaign.Current.TimeControlMode = CampaignTimeControlMode.StoppablePlay; a.MenuContext.GameMenu.StartWait(); } catch { }
+                }, true, 9);
         }
 
         // ------------------------------------------------- czekanie przy projektach
