@@ -211,6 +211,10 @@ namespace Armoury
                     else if (item.ItemType == ItemObject.ItemTypeEnum.Bow || item.ItemType == ItemObject.ItemTypeEnum.Crossbow)
                     {
                         AddProp(list, "Missile Damage", w.MissileDamage, mod != null ? mod.ModifyDamage(w.MissileDamage) : w.MissileDamage);
+                        // Fire Rate = SwingSpeed luku; to TU siedzi bonus jakosci
+                        // w swiecie RBM (legendary_bow: speed=+15, damage=0) -
+                        // bez tego wiersza legendarny luk nie mial ani plusa
+                        AddProp(list, "Fire Rate", w.SwingSpeed, mod != null ? mod.ModifySpeed(w.SwingSpeed) : w.SwingSpeed);
                         AddProp(list, "Missile Speed", w.MissileSpeed, mod != null ? mod.ModifyMissileSpeed(w.MissileSpeed) : w.MissileSpeed);
                         AddProp(list, "Accuracy", w.Accuracy, w.Accuracy);
                     }

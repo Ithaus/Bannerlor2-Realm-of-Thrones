@@ -1,5 +1,43 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-30 — Legendarny luk bez plusow: RBM chowal bonus w Fire Rate, ktorego nie pokazywalismy
+**Mod:** Armoury | **Pliki:** `Armoury/src/CraftPopup.cs`, `Armoury/src/QualityRich.cs`
+**Problem:** Jeff ze screenem (Legendary Ravens' Teeth Longbow): "wykulem
+legendary luk i w ogole nie ma plusow na zielono, plus jest wiecej statystyk
+niz te". Log dowodzi, ze modyfikator BYL (jakosc=legendary_bow) - ale RBM
+NADPISUJE item_modifiers i lukom daje damage=0, missile_speed=0, a caly
+bonus jakosci wsadza w speed=+15 (szybkostrzelnosc) i hit_points=+30.
+Nasz popup pokazywal dla luku akurat te staty, ktorych RBM nie rusza
+(Missile Damage/Speed, Accuracy) - stad zero plusow przy dzialajacym modzie.
+Do tego nasz QualityRich (dopisywanie brakujacych statow po RBM) mial
+bramke `Damage==0 -> to nie bron` - RBM-owe luki (damage=0) wypadaly
+z wzbogacenia w calosci.
+**Zmiana:** (1) popup dla lukow/kusz pokazuje tez **Fire Rate**
+(SwingSpeed + ModifySpeed) - tam siedzi glowny bonus jakosci w swiecie
+RBM; (2) bramka QualityRich poznaje modyfikator broni po JAKIMKOLWIEK
+polu bojowym (Damage/Speed/MissileSpeed/HitPoints), wiec luki i kusze
+dostaja brakujacy MissileSpeed wedle stopnia jakosci jak reszta broni.
+**Ryzyko / co sprawdzic:** wykuc luk z jakoscia - popup ma 5 wierszy,
+Fire Rate z zielonym plusem (legendary +15), Missile Speed z plusem od
+QualityRich; log "QualityRich: N modyfikatorow wzbogaconych" ma urosnac.
+**Status:** ZBUDOWANE - do wgrania z pakietem
+
+## 2026-08-30 — Rycerstwo: najwyzszy tier przyjmuje WAR **LUB** NOBLE Mount
+**Mod:** Armoury | **Pliki:** `Armoury/src/Stables.cs`
+**Problem:** Jeff ze screenem ("Upgrade to Northern Mounted Warlord -
+Required: Noble Mount (You have none)" przy 39 koniach): "rycerstwo na
+ostatni tier wymaga War Mount lub Noble Mount". Twarde `tier>=6 -> tylko
+NobleHorse` blokowalo awanse na ostatni tier, gdy w taborze staly same
+konie bojowe.
+**Zmiana:** nowa zasada RequiredMountFor: t6+ siada na SZLACHETNYM, jesli
+stajnia go ma, a gdy nie ma - wystarczy porzadny kon BOJOWY (war);
+t4-5 jak dotad war; nizej zwykly. Getter (ekran gracza, vanilla sam
+zdejmuje konia) liczy po taborze gracza; sciezki AI (FilterTargets/
+PayInHorses) licza po taborze WLASNEJ partii, nie gracza.
+**Ryzyko / co sprawdzic:** awans t6 z samymi war horse - przechodzi
+i zdejmuje konia bojowego; z noble w taborze - zdejmuje szlachetnego.
+**Status:** ZBUDOWANE - do wgrania z pakietem
+
 ## 2026-08-30 — Panel kucia: TYLKO RAZ, martwe Done ubite, jakosc takze dla zlecen "van"
 **Mod:** Armoury | **Pliki:** `Armoury/src/CraftPopup.cs`, `Armoury/src/ArmouryBehavior.cs`
 **Problem:** Jeff ze screenem (seria Albion I-IV): "po co drugi raz popup

@@ -33,12 +33,30 @@ namespace Armoury
                 var c = Settings.Current;
                 if (c == null || !c.CavalryNeedsMounts) return;
                 if (__instance == null || __instance.IsHero || !__instance.IsMounted) return;
-                int tier = (int)__instance.Tier;
-                if (tier >= c.NobleHorseFromTier) __result = DefaultItemCategories.NobleHorse;
-                else if (tier >= c.WarHorseFromTier) __result = DefaultItemCategories.WarHorse;
-                else __result = DefaultItemCategories.Horse;
+                // getter nie zna partii - vanilla pyta o niego przy awansach
+                // GRACZA (ekran druzyny), wiec heurystyka wg taboru gracza;
+                // AI idzie przez RequiredMountFor (Filter/Pay), nie tedy
+                __result = RequiredMountFor(TaleWorlds.CampaignSystem.Party.PartyBase.MainParty, __instance);
             }
             catch { }
+        }
+
+        /// <summary>
+        /// NAJWYZSZY TIER: WAR LUB NOBLE (Jeff 30.08, screen "Required: Noble
+        /// Mount (You have none)" przy 39 koniach): rycerstwo t6+ siada na
+        /// szlachetnym rumaku, JESLI stajnia go ma - a gdy nie ma, wystarczy
+        /// porzadny kon bojowy. Twarde "tylko noble" blokowalo awanse na
+        /// ostatni tier calymi tygodniami.
+        /// </summary>
+        internal static ItemCategory RequiredMountFor(PartyBase party, CharacterObject target)
+        {
+            var c = Settings.Current;
+            int tier = (int)target.Tier;
+            if (tier >= c.NobleHorseFromTier)
+                return (party != null && CountInRoster(party, DefaultItemCategories.NobleHorse) > 0)
+                    ? DefaultItemCategories.NobleHorse : DefaultItemCategories.WarHorse;
+            if (tier >= c.WarHorseFromTier) return DefaultItemCategories.WarHorse;
+            return DefaultItemCategories.Horse;
         }
 
         private static int CountInRoster(PartyBase party, ItemCategory cat)
@@ -106,7 +124,8 @@ namespace Armoury
                     var target = tr.Field("UpgradeTarget").GetValue<CharacterObject>();
                     if (target == null) continue;
                     ItemCategory cat = null;
-                    try { cat = target.UpgradeRequiresItemFromCategory; } catch { }
+                    // wprost po TABORZE TEJ partii (getter mierzy stajnia gracza)
+                    try { cat = target.IsMounted && !target.IsHero ? RequiredMountFor(party, target) : target.UpgradeRequiresItemFromCategory; } catch { }
                     if (cat == null) continue;
                     int have = CountInRoster(party, cat);
                     if (have <= 0) { list.RemoveAt(i); continue; }
@@ -147,7 +166,8 @@ namespace Armoury
                 var target = tr.Field("UpgradeTarget").GetValue<CharacterObject>();
                 if (target == null) return true;
                 ItemCategory cat = null;
-                try { cat = target.UpgradeRequiresItemFromCategory; } catch { }
+                // wprost po TABORZE TEJ partii (getter mierzy stajnia gracza)
+                try { cat = target.IsMounted && !target.IsHero ? RequiredMountFor(party, target) : target.UpgradeRequiresItemFromCategory; } catch { }
                 if (cat == null) return true;
                 int need = tr.Field("PossibleUpgradeCount").GetValue<int>();
                 if (need <= 0) return true;

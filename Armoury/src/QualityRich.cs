@@ -32,7 +32,12 @@ namespace Armoury
                     if (m == null) continue;
                     int grade = Grade(m.ItemQuality);
                     if (grade == 0) continue;
-                    if (m.Damage == 0) continue;   // to nie modyfikator broni
+                    // modyfikator BRONI poznajemy po JAKIMKOLWIEK polu bojowym,
+                    // nie po samym Damage - RBM daje lukom damage=0, speed=15
+                    // (jakosc = szybkostrzelnosc) i stara bramka wycinala
+                    // wszystkie luki/kusze z wzbogacenia (Jeff 30.08:
+                    // legendarny luk bez jednego plusa)
+                    if (m.Damage == 0 && m.Speed == 0 && m.MissileSpeed == 0 && m.HitPoints == 0) continue;
 
                     string id = m.StringId ?? "";
                     bool ranged = id.Contains("bow") || id.Contains("crossbow");
