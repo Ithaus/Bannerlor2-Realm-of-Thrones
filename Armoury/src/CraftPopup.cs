@@ -103,6 +103,17 @@ namespace Armoury
             try
             {
                 if (item == null || !Settings.Current.CraftResultPopup) return;
+                // TYLKO RAZ (Jeff 30.08, seria Albion I-IV: "po co drugi raz
+                // popup - i Done nie dziala"). Odbior kilku wyrobow naraz
+                // wolal Show per sztuka: kazdy kolejny NADPISYWAL warstwe
+                // poprzedniego bez jej zamkniecia - martwe warstwy trzymaly
+                // input i Done klikalo w proznie. Panel juz otwarty = kolejne
+                // wyroby ida bez okna (i bez dzwieku), sa w komunikatach i logu.
+                if (_layer != null)
+                {
+                    Log.Info("CraftPopup: panel juz otwarty - " + item.StringId + " wydany bez okna.");
+                    return;
+                }
                 // odglos kucia jak w vanilla (Jeff 29.08: "nie bylo odglosu kucia")
                 // - sciezka BK nie idzie przez vanillowy ekran, ktory go gra
                 try { TaleWorlds.Engine.SoundEvent.PlaySound2D("event:/ui/crafting/craft_success"); } catch { }
@@ -115,13 +126,18 @@ namespace Armoury
         {
             try
             {
+                Close();   // pas bezpieczenstwa: nigdy dwoch warstw naraz
                 var visual = new ItemCollectionElementViewModel();
                 try { visual.FillFrom(new EquipmentElement(item, mod), null); }
                 catch { visual = new ItemCollectionElementViewModel(); }
 
                 Func<CraftingSecondaryUsageItemVM, MBBindingList<WeaponDesignResultPropertyItemVM>> props =
                     delegate { return BuildProps(item, mod); };
-                var popup = new WeaponDesignResultPopupVM(item, item.Name, Close, null, null,
+                // tytul z JAKOSCIA jak w vanilla ("Fine Albion IV", nie "Albion IV")
+                var title = mod != null
+                    ? new TextObject("{=!}" + mod.Name + " " + item.Name, null)
+                    : item.Name;
+                var popup = new WeaponDesignResultPopupVM(item, title, Close, null, null,
                     visual,
                     new MBBindingList<TaleWorlds.CampaignSystem.ViewModelCollection.Inventory.ItemFlagVM>(),
                     props, delegate { });

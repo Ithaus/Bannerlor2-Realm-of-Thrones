@@ -386,6 +386,13 @@ namespace Armoury
                     ? MathF.Max(1, Settings.Current.AmmoBatchStacks) : 1;
                 MobileParty.MainParty.ItemRoster.AddToCounts(new EquipmentElement(item, quality), made);
                 CraftPopup.Show(item, quality, made);
+                // czeladnik uczy sie przez caly projekt, nie tylko przy
+                // rozpaleniu: podloga 15% (terminator ze skillem 0 tez cos
+                // wynosi - Jeff: "ona uczy sie kowalstwa"), reszta za wklad
+                var doneHelper = Helper.Find();
+                float doneRel = Helper.Relief(doneHelper);
+                if (doneHelper != null)
+                    Helper.GiveXp(doneHelper, ProjectXp(r) * (0.15f + 0.4f * doneRel));
                 if (Recipes.IsLegendary(item) && !ArmouryBehavior.Legends.Contains(item.StringId))
                     ArmouryBehavior.Legends.Add(item.StringId);
                 RangedLore.OnCrafted(item);

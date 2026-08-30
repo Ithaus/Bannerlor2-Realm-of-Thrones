@@ -1,5 +1,49 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-30 — Panel kucia: TYLKO RAZ, martwe Done ubite, jakosc takze dla zlecen "van"
+**Mod:** Armoury | **Pliki:** `Armoury/src/CraftPopup.cs`, `Armoury/src/ArmouryBehavior.cs`
+**Problem:** Jeff ze screenem (seria Albion I-IV): "po co drugi raz popup
+z wykuciem - to juz bylo, i nie dziala Done" oraz "popup nie pokazuje
++1/-1 przy lukach/pancerzach, nie ma Legendary ani spartaczonych".
+Dwie przyczyny: (1) odbior KILKU wyrobow naraz wolal Show per sztuka -
+kazdy kolejny popup NADPISYWAL warstwe Gauntlet poprzedniego bez jej
+zamkniecia; martwe warstwy trzymaly restrykcje inputu i Done klikalo
+w proznie. (2) vanillowe CreateCraftedWeaponInFreeBuildMode przyjmuje
+modyfikator jakosci Z ZEWNATRZ (domyslnie null) - nasza sciezka zlecen
+"van" dostawala golego, wiec kazdy wyrob wychodzil pospolity bez rzutu,
+a popup nie mial czego pokazac (mod=null => zero roznic, tytul bez jakosci).
+**Zmiana:** (1) panel otwarty = kolejne wyroby ida BEZ okna i bez dzwieku
+(sa w komunikatach i logu); pas bezpieczenstwa Close() przed kazdym
+otwarciem - nigdy dwoch warstw; (2) jakosc "van" rzucana RAZ, PRZY
+KOWADLE (nasza wierna formula vanilla z kuznia-1do1 krok 1), jedzie
+z projektem i wraca przy dostawie - zadnego drugiego rzutu; (3) tytul
+panelu z jakoscia ("Fine Albion IV"), roznice +/- licza sie od modyfikatora.
+**Ryzyko / co sprawdzic:** wykuc bron po vanillowemu -> po dostawie panel
+z jakoscia w tytule i roznicami; odebrac KILKA zlecen naraz -> JEDEN
+panel, Done dziala, reszta wyrobow w komunikatach.
+**Status:** ZBUDOWANE - watcher wgra po zamknieciu gry
+
+## 2026-08-30 — Czeladnik przy miechu: WYBOR postaci + nauka kowalstwa
+**Mod:** Armoury | **Pliki:** `Armoury/src/SmithMenu.cs`, `Helper.cs`,
+`Forge.cs`, `ArmouryBehavior.cs`
+**Problem:** Jeff: "trzeba dac opcje w forge: wybierz pomocnika kowala,
+wybieram postac, ona uczy sie kowalstwa, dostaje XP i mi pomaga" -
+dotad pomocnik byl dobierany automatycznie (najlepszy kowal druzyny,
+prog 20 skilla) i nie dalo sie go wskazac.
+**Zmiana:** (1) nowa opcja w menu kuzni "Choose your helper at the
+bellows" - okno wyboru (MultiSelectionInquiry): Best available (auto) /
+Work alone / lista towarzyszy z ich Smithing (aktualny oznaczony
+[current]); wybor zapisywany w save (arm_smith_helper). (2) Helper.Find
+honoruje wybor: wskazana postac pomaga BEZ progu skilla (terminator od
+zera), "none" = sam, auto = po staremu; wskazanego nieobecnego zastepuje
+auto. (3) nauka: XP przy rozpoczeciu (bylo) + XP za caly projekt przy
+Finish: ProjectXp * (15% podlogi terminatora + 40% * wklad-ulga).
+Ulgi bez zmian: do -40% staminy i -30% czasu przy skillu 150.
+**Ryzyko / co sprawdzic:** opcja widoczna gdy masz towarzysza; wybrac
+nowicjusza -> po ukonczeniu projektu jego Smithing rosnie (log
+"Pomocnik:"); ulgi liczone od jego skilla.
+**Status:** ZBUDOWANE - watcher wgra po zamknieciu gry
+
 ## 2026-08-30 — RATUNEK: opcje wyjscia z wait-menu ruszaja zegar (deadlock White Harbor)
 **Mody:** Armoury, RealisticCaptivity | **Pliki:** `SmithMenu.cs`,
 `HideoutPurge.cs`, `Work.cs`

@@ -17,15 +17,23 @@ namespace Armoury
                 if (!Settings.Current.CompanionHelperEnabled) return null;
                 var party = MobileParty.MainParty;
                 if (party == null) return null;
+                // WYBOR JEFFA (menu kuzni): konkretna postac uczy sie fachu
+                // przy miechu, nawet ze skillem 0; "none" = pracuje sam;
+                // ""/"auto" = najlepszy kowal z druzyny (min. 20, jak dotad)
+                var pick = ArmouryBehavior.SmithHelperId;
+                if (pick == "none") return null;
+                bool manual = !string.IsNullOrEmpty(pick) && pick != "auto";
                 Hero best = null;
                 int bestSkill = 0;
                 foreach (var m in party.MemberRoster.GetTroopRoster())
                 {
                     var h = m.Character != null ? m.Character.HeroObject : null;
                     if (h == null || h == Hero.MainHero || !h.IsAlive || h.IsWounded) continue;
+                    if (manual && h.StringId == pick) return h;   // wskazany palcem - bez progu
                     int sk = h.GetSkillValue(DefaultSkills.Crafting);
                     if (sk > bestSkill) { bestSkill = sk; best = h; }
                 }
+                // wskazanego nie ma w druzynie (ranny/odszedl) - auto robi za zapas
                 return bestSkill >= 20 ? best : null;
             }
             catch (Exception e) { Log.Error("Helper.Find", e); return null; }

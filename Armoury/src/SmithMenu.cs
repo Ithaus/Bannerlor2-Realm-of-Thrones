@@ -145,6 +145,12 @@ namespace Armoury
                     try { Campaign.Current.TimeControlMode = CampaignTimeControlMode.StoppablePlay; a.MenuContext.GameMenu.StartWait(); } catch { }
                 }, true, 9);
 
+            // WYBOR CZELADNIKA (Jeff 30.08: "wybieram postac, ona uczy sie
+            // kowalstwa, dostaje XP i mi pomaga") - dotad pomocnik byl
+            // dobierany automatycznie (najlepszy kowal druzyny)
+            starter.AddGameMenuOption(Menu, "arm_helper_pick",
+                "{=!}Choose your helper at the bellows", HelperPickCondition, HelperPickConsequence, false, 8);
+
             starter.AddGameMenuOption(Menu, "arm_leave",
                 "{=!}Wipe your hands and step out", LeaveCondition,
                 delegate (MenuCallbackArgs a) { GameMenu.SwitchToMenu("town"); }, true, 9);
@@ -166,6 +172,70 @@ namespace Armoury
                     _projLeave = true;
                     try { Campaign.Current.TimeControlMode = CampaignTimeControlMode.StoppablePlay; a.MenuContext.GameMenu.StartWait(); } catch { }
                 }, true, 9);
+        }
+
+        // ------------------------------------------------- czeladnik przy miechu
+        private static bool HelperPickCondition(MenuCallbackArgs args)
+        {
+            try
+            {
+                args.optionLeaveType = GameMenuOption.LeaveType.Conversation;
+                if (!Settings.Current.CompanionHelperEnabled) return false;
+                var roster = MobileParty.MainParty != null ? MobileParty.MainParty.MemberRoster : null;
+                if (roster == null) return false;
+                for (int i = 0; i < roster.Count; i++)
+                {
+                    var h = roster.GetElementCopyAtIndex(i).Character;
+                    if (h != null && h.IsHero && h.HeroObject != Hero.MainHero) return true;
+                }
+                return false;
+            }
+            catch { return false; }
+        }
+
+        private static void HelperPickConsequence(MenuCallbackArgs args)
+        {
+            try
+            {
+                var cur = ArmouryBehavior.SmithHelperId;
+                var list = new System.Collections.Generic.List<TaleWorlds.Core.InquiryElement>();
+                list.Add(new TaleWorlds.Core.InquiryElement("auto",
+                    "Best available (auto)" + (string.IsNullOrEmpty(cur) || cur == "auto" ? "  [current]" : ""), null));
+                list.Add(new TaleWorlds.Core.InquiryElement("none",
+                    "Work alone - no helper" + (cur == "none" ? "  [current]" : ""), null));
+                var roster = MobileParty.MainParty.MemberRoster;
+                for (int i = 0; i < roster.Count; i++)
+                {
+                    var c = roster.GetElementCopyAtIndex(i).Character;
+                    var h = c != null ? c.HeroObject : null;
+                    if (h == null || h == Hero.MainHero || !h.IsAlive) continue;
+                    int sk = h.GetSkillValue(TaleWorlds.Core.DefaultSkills.Crafting);
+                    list.Add(new TaleWorlds.Core.InquiryElement(h.StringId,
+                        h.Name + " (Smithing " + sk + ")" + (cur == h.StringId ? "  [current]" : "")
+                        + (h.IsWounded ? "  [wounded]" : ""), null));
+                }
+                MBInformationManager.ShowMultiSelectionInquiry(new TaleWorlds.Core.MultiSelectionInquiryData(
+                    "The helper at the bellows",
+                    "Who works the forge with you? An apprentice learns the craft from every job; a skilled smith spares your arms and shortens the work.",
+                    list, true, 1, 1, "Choose", "Back",
+                    delegate (System.Collections.Generic.List<TaleWorlds.Core.InquiryElement> picked)
+                    {
+                        try
+                        {
+                            if (picked == null || picked.Count == 0) return;
+                            var id = picked[0].Identifier as string ?? "auto";
+                            ArmouryBehavior.SmithHelperId = id;
+                            string who = id == "auto" ? "the best smith available"
+                                       : id == "none" ? "no one - you work alone"
+                                       : (Hero.FindFirst(x => x.StringId == id) != null
+                                          ? Hero.FindFirst(x => x.StringId == id).Name.ToString() : id);
+                            Log.Player("At the bellows from now on: " + who + ".", true);
+                            Log.Info("Czeladnik wybrany: " + id);
+                        }
+                        catch (Exception e) { Log.Error("HelperPick.Affirm", e); }
+                    }, null), true);
+            }
+            catch (Exception e) { Log.Error("HelperPickConsequence", e); }
         }
 
         // ------------------------------------------------- czekanie przy projektach

@@ -25,6 +25,10 @@ namespace Armoury
         private CampaignTime _shortageShoutDue = CampaignTime.Zero;   // meldunek brakow PO odebraniu lupow
         // legendy wykute raz na zawsze (StringId) - drugiej takiej swiat nie ujrzy
         internal static readonly List<string> Legends = new List<string>();
+        // wybrany pomocnik kowala (Jeff 30.08: "wybieram postac, ona sie uczy
+        // i mi pomaga"): "" / "auto" = najlepszy z druzyny, "none" = pracuje
+        // sam, inaczej StringId bohatera
+        internal static string SmithHelperId = "";
         // KSIEGA WKLADOW GRACZA (Jeff 29.08: "w Armoury widze i ruszam TYLKO to,
         // co sam wrzucilem - lupy 60% to wlasnosc wojska"): itemId -> ile sztuk
         // nalezy do gracza; ekran zbrojowni pokazuje wylacznie te sztuki
@@ -303,6 +307,7 @@ namespace Armoury
                 if (dataStore.IsSaving) _armoryWear = BuildArmoryWearSnapshot();
                 dataStore.SyncData("arm_armory_wear", ref _armoryWear);
                 if (dataStore.IsLoading && _armoryWear != null && _armoryWear.Count > 0) _wearRestorePending = true;
+                dataStore.SyncData("arm_smith_helper", ref SmithHelperId);
                 dataStore.SyncData("arm_orders", ref Orders.Board);
                 dataStore.SyncData("arm_order_cooldowns", ref Orders.Cooldowns);
                 // dniowka w kuzni MUSI przezyc save/load - inaczej po wczytaniu
@@ -974,8 +979,24 @@ namespace Armoury
                 float days = MathF.Max(0.5f, tier * s.WeaponDaysPerTier);
 
                 var roster = MobileParty.MainParty.ItemRoster;
-                var el = new EquipmentElement(item, modifier);
+                var el = new EquipmentElement(item, modifier);   // takim lezy w sakwach
                 if (roster.GetItemNumber(item) > 0) roster.AddToCounts(el, -1);
+
+                // JAKOSC PRZY KOWADLE (Jeff 30.08, seria Albion: "popup nie
+                // pokazuje +1/-1, nie ma Legendary ani spartaczonych"):
+                // vanillowe CreateCraftedWeaponInFreeBuildMode przyjmuje
+                // modyfikator Z ZEWNATRZ (domyslnie null) i nasza sciezka
+                // dostawala golego - kazdy "van" wychodzil pospolity BEZ
+                // rzutu. Rzucamy nasza wierna formula vanilla (kuznia-1do1
+                // krok 1) RAZ, tutaj - dostawa po czasie tylko oddaje wynik.
+                if (modifier == null)
+                    try
+                    {
+                        modifier = Forge.RollQuality(item, Recipes.For(item));
+                        if (modifier != null)
+                            Log.Info("Jakosc przy kowadle: " + item.StringId + " -> " + modifier.StringId);
+                    }
+                    catch (Exception qe) { Log.Error("VanQuality", qe); }
 
                 // "van": sukces i jakosc zapadly PRZY KOWADLE (vanilla) - dostawa
                 // po czasie ma NIE rzucac drugi raz (Jeff: "wykulem, a potem fail
