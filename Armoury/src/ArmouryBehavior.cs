@@ -211,6 +211,10 @@ namespace Armoury
                 var self = Instance;
                 var armory = QuartermasterLaw.DteArmory();
                 if (self == null || armory == null || QuartermasterEscrow.Active) return;
+                // pusty magazyn = DTE jeszcze nie odtworzyl rostera po load
+                // (por. TryRestoreArmoryWear) - przyciecie teraz wyzerowaloby
+                // CALA ksiege gracza; czekamy na prawdziwe polki
+                if (armory.Count == 0) return;
                 var shelf = new Dictionary<string, int>();
                 for (int i = 0; i < armory.Count; i++)
                 {
