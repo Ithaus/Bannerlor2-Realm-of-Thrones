@@ -1,5 +1,21 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-30 — Audyt: kolejnosc prefiksow na DoSmelting jawna (Priority.High)
+**Mod:** Armoury | **Pliki:** `Armoury/src/SmithAudit.cs`
+**Problem:** znalezisko audytu: CraftingCampaignBehavior.DoSmelting patchuja
+dwa nasze prefiksy - SmithAudit.SmeltPrefix (pomiar staminy "przed") i
+SmeltTab.DoSmeltingPrefix (przetop pancerzy nasza sciezka, sam pobiera
+stamine i zwraca false). Poprawnosc wisiala na NIEJAWNEJ kolejnosci
+rejestracji w SubModuleMain (SmithAudit przed SmeltTab): przy odwroceniu
+Settle mierzylby stamine juz PO pobraniu, widzial drop=0 i wymuszal koszt
+DRUGI raz [enforced].
+**Przyczyna:** rowne priorytety Harmony = kolejnosc rejestracji.
+**Zmiana:** prefiksy SmithAudit dostaja Priority.High (pomiar zawsze
+pierwszy), niezaleznie od kolejnosci ApplyAll.
+**Ryzyko / co sprawdzic:** przetop pancerza z zakladki Smelt - stamina
+schodzi RAZ (komunikat "Smelting: -N stamina" bez [enforced]).
+**Status:** DO WGRANIA (pakiet poprawek audytu 30.08)
+
 ## 2026-08-30 — Audyt: dwa martwe okruchy Watch naprawione
 **Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Watch.cs`
 **Problem:** znaleziska audytu: (1) prefix ScreenPopped(ScreenBase screen)

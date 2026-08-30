@@ -195,8 +195,13 @@ namespace Armoury
                 {
                     var m = AccessTools.Method(t, p.M);
                     if (m == null) { Log.Info("SmithAudit: brak " + p.M); continue; }
+                    // Priority.High: pomiar staminy "przed" MUSI biec przed
+                    // prefixem SmeltTab (nasza sciezka przetopu pancerzy sama
+                    // pobiera stamine) - przy odwrotnej kolejnosci Settle
+                    // widzialby drop=0 i wymuszal koszt DRUGI raz [enforced].
+                    // Dotad trzymala to tylko kolejnosc ApplyAll w SubModuleMain.
                     h.Patch(m,
-                        prefix: new HarmonyMethod(typeof(SmithAudit).GetMethod(p.Pre, BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Public)),
+                        prefix: new HarmonyMethod(typeof(SmithAudit).GetMethod(p.Pre, BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Public)) { priority = Priority.High },
                         postfix: new HarmonyMethod(typeof(SmithAudit).GetMethod(p.Post, BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Public)));
                     done++;
                 }
