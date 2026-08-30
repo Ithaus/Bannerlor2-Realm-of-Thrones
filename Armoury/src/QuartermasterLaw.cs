@@ -613,19 +613,17 @@ namespace Armoury
                         given++; swapped++;
                     }
 
-                    // RESZTA WKLADU TEZ JEST PRZYJETA (Jeff: "wrzucilem czerwone
-                    // i ich nie przyjmuje"). Gdy wojsko nie ma juz nic gorszego
-                    // do oddania, sztuki i tak przechodza na ich stan - inaczej
-                    // zostawaly na polce gracza i wygladalo to na odmowe.
+                    // COFNIETE 29.08 (Jeff: "teraz pozera kazda ilosc strzal!").
+                    // Probowalem tu oddawac wojsku niewymieniona reszte wkladu -
+                    // skutek byl taki, ze wszystko wrzucone znikalo z polki
+                    // gracza bezpowrotnie i nie dostawal NIC w zamian.
+                    // ZASADA: wymiana jest 1:1 albo jej nie ma. Czego wojsko
+                    // nie odkupilo swoim starym sprzetem, ZOSTAJE WLASNOSCIA
+                    // GRACZA i moze to w kazdej chwili wyjac.
                     int kept = count - swapped;
                     if (kept > 0)
-                    {
-                        ArmouryBehavior.StockWithdraw(newItem.StringId, kept);
-                        Log.Player("Quartermaster: the men take your " + kept + " " + newItem.Name
-                                   + " into the company stores - they had nothing worse of that kind to hand back.", true);
                         Log.Info("Kwatermistrz: " + kept + " szt. " + newItem.StringId
-                                 + " przejete przez wojsko (brak gorszych sztuk do wydania).");
-                    }
+                                 + " bez pary do wymiany - zostaje na polce gracza.");
                 }
                 _pendingSwaps.Clear();
                 if (given > 0)

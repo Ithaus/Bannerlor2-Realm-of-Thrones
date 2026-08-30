@@ -1,5 +1,27 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-29 — COFNIETE: kwatermistrz pozeral wklad + zwrot 104 kolczanow
+**Mod:** Armoury | **Pliki:** `Armoury/src/QuartermasterLaw.cs`, `Armoury/src/ArmouryBehavior.cs`
+**Problem:** Jeff: "teraz pozera kazda ilosc strzal!". Build z 17:07 oddawal
+wojsku KAZDA niewymieniona sztuke wkladu - gracz wrzucal strzaly, znikaly
+z jego polki bezpowrotnie i nie dostawal nic w zamian. Dowod w logu:
+"1 + 82 + 4 szt. ravens_teeth_arrows, 12 blunt_arrows, 5 range_arrows
+przejete przez wojsko" = 104 kolczany.
+**Przyczyna:** dopisalem blok przekazujacy reszte wkladu na stan wojska
+(StockWithdraw), zeby "kwatermistrz zawsze przyjmowal". Prawdziwa przyczyna
+odmowy przy strzalach byla inna i juz naprawiona - warunek `it == newItem`
+pomijal ten sam przedmiot w gorszym stanie. Ten blok byl nadmiarem.
+**Zmiana:** (1) blok COFNIETY - zasada wraca do "wymiana 1:1 albo nic",
+czego wojsko nie odkupilo swoim starym sprzetem, zostaje wlasnoscia gracza;
+(2) jednorazowy zwrot 87 ravens_teeth + 12 blunt + 5 range kolczanow do
+ksiegi gracza (flaga arm_ammo_refund_v1, clamp do tego, co realnie lezy
+na polkach) - sztuki nigdy nie zniknely fizycznie, przepadl tylko zapis
+wlasnosci.
+**Ryzyko / co sprawdzic:** po wejsciu do gry komunikat "a miscount is set
+right - N quivers are back on YOUR shelf"; wrzucone strzaly maja od teraz
+zostawac na liscie gracza, gdy nie ma czym ich wymienic.
+**Status:** WGRANE (gra zamknieta)
+
 ## 2026-08-29 — Kwatermistrz ZAWSZE przyjmuje wklad (jak z pancerzem)
 **Mod:** Armoury | **Pliki:** `Armoury/src/QuartermasterLaw.cs`
 **Problem:** Jeff: "wrzucilem czerwone i ich nie przyjmuje mimo ze licznik

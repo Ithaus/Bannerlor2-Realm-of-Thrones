@@ -62,6 +62,54 @@ namespace Armoury
         private List<string> _armoryWear = new List<string>();
         private bool _wearRestorePending;
 
+        // ZWROT PO MOIM BLEDZIE (29.08, Jeff: "teraz pozera kazda ilosc
+        // strzal!"). Przez jeden build kwatermistrz przejmowal na wojsko
+        // kazdy wklad, ktorego nie mial czym wymienic - sztuki zostawaly
+        // fizycznie w magazynie, ale znikaly z ksiegi gracza. Log podaje
+        // dokladne ilosci; oddajemy je raz, po czym flaga gasi zwrot.
+        private bool _ammoRefundDone;
+        private static readonly string[][] AmmoRefund =
+        {
+            new[] { "ravens_teeth_arrows", "87" },
+            new[] { "blunt_arrows", "12" },
+            new[] { "range_arrows", "5" },
+        };
+
+        private void RefundSeizedAmmo()
+        {
+            try
+            {
+                if (_ammoRefundDone) return;
+                _ammoRefundDone = true;
+                var armory = QuartermasterLaw.DteArmory();
+                if (armory == null) { return; }
+                int back = 0;
+                foreach (var row in AmmoRefund)
+                {
+                    int n; if (!int.TryParse(row[1], out n) || n <= 0) continue;
+                    // nie oddajemy wiecej, niz naprawde lezy na polkach
+                    int onShelf = 0;
+                    for (int i = 0; i < armory.Count; i++)
+                    {
+                        var el = armory.GetElementCopyAtIndex(i);
+                        var it = el.EquipmentElement.Item;
+                        if (it != null && it.StringId == row[0]) onShelf += el.Amount;
+                    }
+                    int give = Math.Min(n, Math.Max(0, onShelf - StockOf(row[0])));
+                    if (give <= 0) continue;
+                    StockDeposit(row[0], give);
+                    back += give;
+                }
+                if (back > 0)
+                {
+                    Log.Info("Zwrot amunicji przejetej przez blad: " + back + " szt. wrocilo do ksiegi gracza.");
+                    Log.Player("Quartermaster: a miscount is set right - " + back
+                               + " quivers are back on YOUR shelf, yours to take.", true);
+                }
+            }
+            catch (Exception e) { Log.Error("RefundSeizedAmmo", e); }
+        }
+
         private void OnPlayerUpgradedTroops(CharacterObject from, CharacterObject to, int num)
         {
             try
@@ -157,6 +205,7 @@ namespace Armoury
                 dataStore.SyncData("arm_condition", ref _condition);
                 dataStore.SyncData("arm_projects", ref _projects);
                 dataStore.SyncData("arm_player_stock", ref _playerStock);
+                dataStore.SyncData("arm_ammo_refund_v1", ref _ammoRefundDone);
                 if (dataStore.IsSaving) _armoryWear = BuildArmoryWearSnapshot();
                 dataStore.SyncData("arm_armory_wear", ref _armoryWear);
                 if (dataStore.IsLoading && _armoryWear != null && _armoryWear.Count > 0) _wearRestorePending = true;
@@ -275,6 +324,7 @@ namespace Armoury
                 // stany magazynu wracaja PRZED czystkami (DTE odtwarza roster
                 // dopiero po sesji - lapiemy pierwszy moment, gdy juz jest)
                 try { TryRestoreArmoryWear("menu"); } catch { }
+                try { RefundSeizedAmmo(); } catch { }
                 // po kazdej bitwie menu sie otwiera - smok wyleci zanim DTE go osiodla
                 try { CleanseDragonStables(true); } catch { }
                 // ...a smieci <=3% i slonie-towar zaraz za nim (Spoils naklada
