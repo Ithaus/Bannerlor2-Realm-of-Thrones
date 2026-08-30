@@ -64,7 +64,7 @@ namespace Armoury
 
                 int mySkill = SkillOf(me, myWeap.Item);
 
-                // najblizszy wrog, ktory wlasnie skladа sie do ciosu na wyciagniecie broni
+                // najblizszy wrog, ktory wlasnie sklada sie do ciosu na wyciagniecie broni
                 Agent foe = null; float best = 30f;   // ~5.5 m - dalej i tak nie siegnie
                 Vec2 my2 = me.Position.AsVec2;
                 foreach (var a in Mission.Agents)

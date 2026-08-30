@@ -15,7 +15,7 @@ namespace RealisticCaptivity
     /// jesli CALA druzyna gracza jest konna, a POSCIG nie ma ani jednego konia,
     /// ucieczka z pola bitwy jest czysta - kara dezorganizacji znika, a ta
     /// konkretna banda nie moze wszczac starcia przez kilka godzin.
-    /// Konny poscig lapie normalnie - koń przed koniem nie ucieknie za darmo.
+    /// Konny poscig lapie normalnie - kon przed koniem nie ucieknie za darmo.
     /// </summary>
     internal static class CleanBreak
     {
@@ -156,7 +156,7 @@ namespace RealisticCaptivity
                 // ODSKOK NALEZY SIE TEMU, KTO UCIEKL - i nikomu innemu.
                 // Pierwsza wersja pytala "czy jestes ranny", a to bez sensu:
                 // uciekinier tez bywa poobijany, wiec konny, ktory dal drapaka,
-                // ladowal w lochu ("uciekłem konno, a mnie złapali" - Jeff).
+                // ladowal w lochu ("ucieklem konno, a mnie zlapali" - Jeff).
                 // Liczy sie JEDYNA rzecz, ktora te dwa przypadki rozdziela:
                 // czy odwrot w ogole nastapil. Padles na polu - lapia. Zwiales - nie.
                 if (c.CleanBreakNeedsStanding && !JustFled())

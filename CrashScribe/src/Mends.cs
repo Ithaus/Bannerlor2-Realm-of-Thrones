@@ -49,7 +49,7 @@ namespace CrashScribe
                 //   -> BannerKingsConfig.Initialize() nie dochodzi do konca
                 //   -> menedzery BK (dwor, relacje, rekruci) zostaja niekompletne
                 //   -> tysiace NullReference przy kazdym odwolaniu (u Jeffa 6000
-                //      w kilkanascie minut) i PUSTE EKRANY tam, gdzie BK dokłada
+                //      w kilkanascie minut) i PUSTE EKRANY tam, gdzie BK doklada
                 //      swoje rozszerzenia - miedzy innymi ekran REKRUTACJI
                 //      (BannerKings.UI.Extensions.VolunteerRecruitmentMixin).
                 // Finalizer: wywrotka lataczki -> oddajemy robote ORYGINALNEJ

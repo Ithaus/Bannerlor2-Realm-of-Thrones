@@ -4,7 +4,7 @@ using HarmonyLib;
 namespace RealisticCaptivity
 {
     /// <summary>
-    /// Uczciwe rany w sluzbie. ROT po KAZDEJ bitwie zaciezного leczy do pelna
+    /// Uczciwe rany w sluzbie. ROT po KAZDEJ bitwie zacieznego leczy do pelna
     /// (HealEnlistedHeroes(100)) - wychodzisz ledwo zywy, a masz 100% zdrowia.
     /// U nas: po bitwie tylko opatrunek polowy (kilka HP), dzienna opieka
     /// medyka obozowego tez przycieta. Reszta goi sie jak u ludzi - odpoczynkiem.

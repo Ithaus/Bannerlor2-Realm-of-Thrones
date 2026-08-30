@@ -963,7 +963,7 @@ namespace Armoury
                 // PRZEGRANA ALBO UCIECZKA = NIC Z POLA. Wraki zbierane w trakcie
                 // misji lezaly w kolejce niezaleznie od wyniku i po godzinie
                 // wsypywaly sie do sakw - takze wtedy, gdy gracz uciekl z pola
-                // ("jak uciekam, to nie zdobywam gearu, przeciez uciekłem" - Jeff).
+                // ("jak uciekam, to nie zdobywam gearu, przeciez ucieklem" - Jeff).
                 bool won = false;
                 try { won = mapEvent.WinningSide == mapEvent.PlayerSide; } catch { }
                 if (!won)

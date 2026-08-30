@@ -14,7 +14,7 @@ namespace Armoury
     ///    ScreamRadius (40 m) od ofiary ida do walki; ci 200 m dalej
     ///    nie slysza nic - odleglosc robi robote;
     ///  - CZYSTE zabojstwo jednym ciosem budzi tylko swiadkow w promieniu
-    ///    WitnessRadius (12 m) od ciala - bez swiadkow obóz spi dalej
+    ///    WitnessRadius (12 m) od ciala - bez swiadkow oboz spi dalej
     ///    (Jeff: "chyba ze zastrzelilem goscia jedna strzala");
     ///  - bijatyka przy graczu tez halasuje - kazde wrogie trafienie
     ///    budzi wrogow wokol miejsca ciosu.

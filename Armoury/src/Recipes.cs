@@ -295,7 +295,7 @@ namespace Armoury
 
                 float fiddly = IsFiddly(item.ItemType) ? (1f + s.FiddlyStaminaBonus) : 1f;
                 r.Stamina = MathF.Max(5, (int)(tier * s.StaminaPerTier * fiddly));
-                r.SkillNeeded = (tier - 1) * s.SmithingSkillPerTier;   // tier 1 od zera - zaczynasz od podkówek, nie od plach
+                r.SkillNeeded = (tier - 1) * s.SmithingSkillPerTier;   // tier 1 od zera - zaczynasz od podkowek, nie od plach
             }
             catch (Exception e) { Log.Error("Recipes.For", e); }
             return r;
@@ -516,7 +516,7 @@ namespace Armoury
             }
         }
 
-        /// <summary>Co wraca z przetopu - tylko metal, i to nie cały.</summary>
+        /// <summary>Co wraca z przetopu - tylko metal, i to nie caly.</summary>
         internal static List<Part> SmeltYield(Recipe r, float share)
         {
             var list = new List<Part>();

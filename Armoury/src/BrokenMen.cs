@@ -12,7 +12,7 @@ namespace Armoury
     /// Vanilla lamie ludzi tylko przez MORALE calego szyku (BattleMoraleModel),
     /// a pojedynczy ranny stoi i przyjmuje ciosy, dopoki szyk sie trzyma - przy
     /// RBM, ktore przelicza morale po swojemu, tym bardziej. My patrzymy na
-    /// CZLOWIEKA, nie na chorągiew: komu zostalo mniej niz WoundedFleePercent
+    /// CZLOWIEKA, nie na choragiew: komu zostalo mniej niz WoundedFleePercent
     /// zdrowia, ten panikuje (CommonAIComponent.Panic) i odchodzi na tyly.
     /// Jesli sam odwrot sie nie zaczal - popychamy go jeszcze raz, wprost.
     ///

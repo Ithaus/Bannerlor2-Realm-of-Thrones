@@ -23,7 +23,7 @@ namespace Armoury
     /// i jencow. Piechota na luzakach jedzie z vanilla POLOWA premii
     /// kawalerii - "nie jezdza tak dobrze jak jezdzcy" (Jeff).
     /// Czapka tylko OBNIZA - nigdy nie przyspiesza ponizej naturalnej predkosci.
-    /// Statki plyna po swojemu (morze wylaczone), wieśniacy i karawany
+    /// Statki plyna po swojemu (morze wylaczone), wiesniacy i karawany
     /// chodza swoim rytmem.
     /// </summary>
     internal static class MarchPace

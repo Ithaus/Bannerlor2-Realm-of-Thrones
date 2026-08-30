@@ -1,5 +1,20 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-30 — Audyt: kosmetyka - naglowek Armoury.log + diakrytyki/cyrylica precz
+**Mody:** Armoury, RealisticCaptivity, CrashScribe | **Pliki:** `Armoury/src/Log.cs`
++ 9 plikow z komentarzami
+**Problem:** znaleziska audytu: (1) naglowek Armoury.log podpisany
+"=== Realistic Captivity ===" (kopiuj-wklej w Log.Init); (2) 15 miejsc
+z polskimi diakrytykami w komentarzach wbrew CLAUDE.md sekcja 1, w tym
+DWA znaki cyrylicy udajace lacinskie (GuardMaster.cs "skladа",
+EnlistedWounds.cs "zaciezного").
+**Zmiana:** naglowek na "=== Armoury ==="; wszystkie diakrytyki i cyrylica
+zamienione na ASCII (ucieklem, choragiew, oboz, wiesniacy, podkowek, caly,
+bral, kon, doklada, zlapali, zacieznego, jukow). Repo przechodzi czysty
+grep na diakrytyki.
+**Ryzyko / co sprawdzic:** zadne (same komentarze + naglowek logu).
+**Status:** DO WGRANIA (pakiet poprawek audytu 30.08)
+
 ## 2026-08-30 — Ranni w armiach AI: przyczyna GLOD; leczenie AI wraca do vanilla + czynnik nie tnie kar
 **Mod:** Armoury | **Pliki:** `Armoury/src/SlowHealing.cs`, `Armoury/src/Settings.cs`, `Armoury/src/McmSettings.cs` (gen)
 **Problem:** Jeff: "Ramsay Bolton i sasiedni lord - sami ranni, zdrowi tylko

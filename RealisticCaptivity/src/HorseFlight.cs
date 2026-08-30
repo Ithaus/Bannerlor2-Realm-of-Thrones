@@ -14,7 +14,7 @@ namespace RealisticCaptivity
     /// ("Try to get away") dopiero od DZIEWIECIU zdrowych szeregowych - bo cala
     /// mechanika opiera sie na zostawieniu strazy tylnej. Jezdziec z jednym
     /// pachotkiem slyszy "You don't have enough men!" i musi stanac do bitwy
-    /// z pietnastoma zbojami (Jeff: "uciekłem z pola walki to czemu nie moge
+    /// z pietnastoma zbojami (Jeff: "ucieklem z pola walki to czemu nie moge
     /// uciec, zostal zolnierz").
     ///
     /// Nasza zasada jest prostsza i uczciwsza: JESLI CALY ODDZIAL SIEDZI
@@ -26,7 +26,7 @@ namespace RealisticCaptivity
     /// </summary>
     internal sealed class HorseFlightModel : DefaultTroopSacrificeModel
     {
-        /// <summary>Ilu ludzi w oddziale gracza ma pod soba konia (wliczajac luzaki z juków).</summary>
+        /// <summary>Ilu ludzi w oddziale gracza ma pod soba konia (wliczajac luzaki z jukow).</summary>
         private static bool AllMounted()
         {
             try

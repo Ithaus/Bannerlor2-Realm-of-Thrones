@@ -14,7 +14,7 @@ namespace Armoury
             try
             {
                 _path = Path.Combine(moduleDir, "Armoury.log");
-                File.WriteAllText(_path, "=== Realistic Captivity " + DateTime.Now + " ===" + Environment.NewLine);
+                File.WriteAllText(_path, "=== Armoury " + DateTime.Now + " ===" + Environment.NewLine);
             }
             catch { _path = null; }
         }

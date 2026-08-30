@@ -199,7 +199,7 @@ namespace Armoury
                 // PO CO TE KONIE? Wylacznie po to, zeby awansowac ludzi, ktorzy
                 // WLASNIE czekaja na awans na jezdnego - z wysluzonym
                 // doswiadczeniem i bez rumaka w taborze. Pierwsza wersja kupowala
-                // procent STANU OSOBOWEGO, wiec lord z pieciuset piechurami brał
+                // procent STANU OSOBOWEGO, wiec lord z pieciuset piechurami bral
                 // sto koni "na zapas", odsprzedawal je jako zwykly towar
                 // i kupowal znowu. Teraz liczymy glowy, nie procenty: nikt nie
                 // czeka na awans - nikt nie kupuje ani jednego konia.
@@ -355,7 +355,7 @@ namespace Armoury
             return Math.Max(1, el.Item != null ? el.Item.Value : 1);
         }
 
-        /// <summary>Najtanszy koń pod siodlo, jakiego zna swiat - z kultury osady, jak sie da.</summary>
+        /// <summary>Najtanszy kon pod siodlo, jakiego zna swiat - z kultury osady, jak sie da.</summary>
         private static ItemObject _cheapAny;
 
         private static ItemObject CheapestMount(TaleWorlds.CampaignSystem.Settlements.Settlement st)
