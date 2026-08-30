@@ -131,9 +131,11 @@ namespace Armoury
             starter.AddGameMenuOption("arm_work_wait", "arm_work_stop",
                 "{=!}Put the work aside (nothing finished, nothing paid)",
                 delegate (MenuCallbackArgs a) { a.optionLeaveType = GameMenuOption.LeaveType.Leave; return true; },
-                // ZAKAZ SwitchToMenu z opcji menu OCZEKIWANIA (CTD w GameMenuVM
-                // .OnFrameTick - patrz NightRest.LeaveSleep); wychodzimy krok wstecz
-                delegate (MenuCallbackArgs a) { _workApply = null; GameMenu.ExitToLast(); }, true, 9);
+                // ZAKAZ SwitchToMenu z opcji menu OCZEKIWANIA (CTD, CLAUDE.md),
+                // a ExitToLast NISZCZY MenuContext (stosu menu nie ma - w miescie
+                // laduje sie w town_outside). Opcja tylko podnosi flage,
+                // przelacza WorkTick - SwitchToMenu z ticka to wzorzec vanilla
+                delegate (MenuCallbackArgs a) { _workApply = null; _workLeave = true; }, true, 9);
 
             starter.AddGameMenuOption(Menu, "arm_leave",
                 "{=!}Wipe your hands and step out", LeaveCondition,
@@ -147,12 +149,15 @@ namespace Armoury
             starter.AddGameMenuOption("arm_project_wait", "arm_proj_wait_stop",
                 "{=!}Step away - the work can wait",
                 delegate (MenuCallbackArgs a) { a.optionLeaveType = GameMenuOption.LeaveType.Leave; return true; },
-                // wait-menu: zadnego SwitchToMenu z opcji (CTD) - krok wstecz
-                delegate (MenuCallbackArgs a) { GameMenu.ExitToLast(); }, true, 9);
+                // flaga -> ProjWaitTick przelaczy na Menu (SwitchToMenu z ticka
+                // to wzorzec vanilla; z opcji wait-menu ZAKAZ, a ExitToLast
+                // niszczy MenuContext i laduje w town_outside)
+                delegate (MenuCallbackArgs a) { _projLeave = true; }, true, 9);
         }
 
         // ------------------------------------------------- czekanie przy projektach
         private static float _projInitialHours;
+        private static bool _projLeave;   // opcja "Step away" podnosi, ProjWaitTick przelacza
 
         private static bool ProjWaitCondition(MenuCallbackArgs args)
         {
@@ -165,6 +170,7 @@ namespace Armoury
         {
             try
             {
+                _projLeave = false;
                 var b = ArmouryBehavior.Instance;
                 _projInitialHours = b != null ? Math.Max(1f, b.ProjectHoursLeftHere(Settlement.CurrentSettlement)) : 1f;
                 // JEDNA PRAWDA GODZIN (Jeff 29.08: "inne godziny w smith, inne jak
@@ -183,6 +189,7 @@ namespace Armoury
         {
             try
             {
+                if (_projLeave) { _projLeave = false; GameMenu.SwitchToMenu(Menu); return; }
                 var b = ArmouryBehavior.Instance;
                 float left = b != null ? b.ProjectHoursLeftHere(Settlement.CurrentSettlement) : 0f;
                 if (left <= 0.01f)
@@ -1453,11 +1460,13 @@ namespace Armoury
         // ------------------------------------------------- praca wymaga czasu
         private static float _workTarget, _workDone;
         private static Action _workApply;
+        private static bool _workLeave;   // opcja "Put the work aside" podnosi, WorkTick przelacza
 
         private static void StartTimedWork(float hours, string label, Action apply)
         {
             _workTarget = Math.Max(0.25f, hours);
             _workDone = 0f;
+            _workLeave = false;
             _workApply = apply;
             MBTextManager.SetTextVariable("ARM_WORK_TEXT",
                 label + " It will take about " + string.Format("{0:0.#}", _workTarget) + " hours of work.");
@@ -1480,6 +1489,7 @@ namespace Armoury
         {
             try
             {
+                if (_workLeave) { _workLeave = false; GameMenu.SwitchToMenu(Menu); return; }
                 if (_workApply == null) return;
                 _workDone += (float)dt.ToHours;
                 if (_workDone < _workTarget) return;

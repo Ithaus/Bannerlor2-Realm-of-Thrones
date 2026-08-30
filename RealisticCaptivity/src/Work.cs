@@ -29,6 +29,7 @@ namespace RealisticCaptivity
         private static string _cameFrom = "town";
         private static float _hours;                       // narosle godziny w biezacej robocie
         private static bool _fedToday;
+        private static bool _stopWork;                     // opcja "Enough of this toil" podnosi, tick przelacza
 
         private static Settlement Here { get { return Settlement.CurrentSettlement; } }
         private static int Today { get { return (int)CampaignTime.Now.ToDays; } }
@@ -172,10 +173,12 @@ namespace RealisticCaptivity
                 starter.AddGameMenuOption(id, id + "_stop",
                     "{=!}Enough of this toil (stop working)",
                     delegate (MenuCallbackArgs a) { a.optionLeaveType = GameMenuOption.LeaveType.Leave; return true; },
-                    // ZAKAZ SwitchToMenu z opcji menu OCZEKIWANIA (CTD "Rouse the
-                    // men early" - CLAUDE.md); ExitToLast wraca tam, skad weszlismy
-                    // (_cameFrom), bo praca zawsze startuje z town/village
-                    delegate (MenuCallbackArgs a) { GameMenu.ExitToLast(); }, true, 9);
+                    // flaga -> tick przelaczy na _cameFrom (SwitchToMenu z ticka
+                    // to wzorzec vanilla, tak robi juz StillSafe). Z opcji
+                    // wait-menu SwitchToMenu ZAKAZANE (CTD), a ExitToLast
+                    // niszczy MenuContext: we wsi zostawia gracza BEZ menu
+                    // z wiszacym PlayerEncounter, w miescie laduje w town_outside
+                    delegate (MenuCallbackArgs a) { _stopWork = true; }, true, 9);
             }
         }
 
@@ -238,6 +241,7 @@ namespace RealisticCaptivity
         {
             try
             {
+                _stopWork = false;
                 if (Here != null && Here.SettlementComponent != null &&
                     !string.IsNullOrEmpty(Here.SettlementComponent.WaitMeshName))
                     args.MenuContext.SetBackgroundMeshName(Here.SettlementComponent.WaitMeshName);
@@ -268,6 +272,7 @@ namespace RealisticCaptivity
         {
             try
             {
+                if (_stopWork) { _stopWork = false; GameMenu.SwitchToMenu(_cameFrom); return; }
                 if (!StillSafe(args)) return;
                 _hours += (float)dt.ToHours;
                 if (_hours < 24f) return;
@@ -294,6 +299,7 @@ namespace RealisticCaptivity
         {
             try
             {
+                if (_stopWork) { _stopWork = false; GameMenu.SwitchToMenu(_cameFrom); return; }
                 if (!StillSafe(args)) return;
                 _hours += (float)dt.ToHours;
                 if (_hours < 24f) return;

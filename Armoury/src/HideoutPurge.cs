@@ -284,18 +284,21 @@ namespace Armoury
                 starter.AddGameMenuOption("arm_hideout_search_wait", "arm_hideout_search_stop",
                     "{=!}Call the search off",
                     delegate (MenuCallbackArgs a) { a.optionLeaveType = GameMenuOption.LeaveType.Leave; return true; },
-                    // wait-menu: zadnego SwitchToMenu z opcji (CTD w GameMenuVM
-                    // .OnFrameTick); ExitToLast wraca do arm_hideout_search,
-                    // bo stamtad tu weszlismy
-                    delegate (MenuCallbackArgs a) { GameMenu.ExitToLast(); }, true, 9);
+                    // flaga -> SearchTick przelaczy z powrotem na arm_hideout_search
+                    // (SwitchToMenu z ticka to wzorzec vanilla; z opcji wait-menu
+                    // ZAKAZ - CTD, a ExitToLast niszczy MenuContext)
+                    delegate (MenuCallbackArgs a) { _searchLeave = true; }, true, 9);
             }
             catch (Exception e) { Log.Error("HideoutPurge.AddMenus", e); }
         }
+
+        private static bool _searchLeave;   // opcja "Call the search off" podnosi, SearchTick przelacza
 
         private static void SearchInit(MenuCallbackArgs args)
         {
             try
             {
+                _searchLeave = false;
                 SetSceneBackground(args);
                 var c = Settings.Current;
                 // czas od liczby rak (Jeff): sam grzebiesz caly dzien, kazdy
@@ -452,6 +455,7 @@ namespace Armoury
         {
             try
             {
+                if (_searchLeave) { _searchLeave = false; GameMenu.SwitchToMenu("arm_hideout_search"); return; }
                 float left = (float)(_searchDone - CampaignTime.Now).ToHours;
                 if (left <= 0.01f)
                 {
