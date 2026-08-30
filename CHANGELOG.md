@@ -1,5 +1,40 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-30 — Ranni w armiach AI: przyczyna GLOD; leczenie AI wraca do vanilla + czynnik nie tnie kar
+**Mod:** Armoury | **Pliki:** `Armoury/src/SlowHealing.cs`, `Armoury/src/Settings.cs`, `Armoury/src/McmSettings.cs` (gen)
+**Problem:** Jeff: "Ramsay Bolton i sasiedni lord - sami ranni, zdrowi tylko
+dowodcy; w dwoch oddzialach obok siebie to wyglada na bug". Sledztwo
+(4 rownolegle tropy, dekompilacja calego stacku): jedyny kod zamieniajacy
+zdrowych szeregowych AI w rannych poza bitwa to UJEMNE dzienne leczenie
+konsumowane przez PartyHealCampaignBehavior.ReduceHpMemberRegulars (filtr
+IsRegular - BOHATEROWIE NIGDY, oni osobnym torem traca HP i dlugo wygladaja
+na zdrowych). Ujemne robi sie wylacznie z glodu: vanilla Starving -25%
+skladu/dzien (DefaultPartyHealingModel:132-146), BannerKings -10%/dzien
+w OBLEGANEJ glodujacej osadzie (VanillaModelTweakPatches:719-740), NavalDLC
+-25%/dzien w dryfie. Ranni od glodu NIE umieraja - stan zatrzymuje sie
+DOKLADNIE na "100% szeregowych rannych, lord zdrowy". Dwie sasiednie partie
+= wspolny glodujacy teatr wojny (zima 1087, 13 wojen, targi puste - AI
+kupuje jedzenie tylko ponizej 120 denarow). NASZ WKLAD w objaw: (1) wspolne
+-50% wydluzalo wyjscie z dolka do tygodni (AI leczy 2.5-5.5 ludzi/dzien);
+(2) paradoks: czynnik -50% na ujemnym wyniku LAGODZIL kare glodowa o polowe;
+(3) SlowMuster dlawi doplyw swiezych zdrowych; (4) BkSupplyTemper tnie
+zywnosc z sakw BK (mieso/ser/ryby z 10 dni do 1 dnia) - przyspiesza glod
+o 2-4 dni (zboz nie tyka). RBM dodatkowo podbija odsetek rannych zamiast
+zabitych w bitwach AI (usuwa vanillowe tlumienie x0.25 bonusu chirurga).
+**Przyczyna:** patch bez rozrozniania gracz/AI i bez rozrozniania
+leczenie/kara.
+**Zmiana:** (1) nowe pokretlo AiHealingRegenPercent (MCM "The slow mending",
+domyslnie 100 = vanilla) - AI leczy sie normalnie, gracz zostaje na 50;
+(2) czynnik stosowany tylko przy wyniku DODATNIM - kary glodowe biegna
+pelna vanilla sila takze u gracza; (3) log startowy pokazuje oba procenty.
+**Ryzyko / co sprawdzic:** test z tropu: najechac na partie Ramsaya, odczekac
+1 dzien gry bez bitwy - jesli zdrowi ubywaja ~25%/dzien, to AKTYWNY glod
+(sprawdzic targ: jest jedzenie < 120 denarow?); jesli stoja i ranni powoli
+schodza ~5-8/dzien - to juz tylko zdrowienie po glodzie w tempie vanilla.
+U gracza: glod rani teraz PELNA stawka (bez -50% ulgi) - zgodnie z "kary
+maja bolec".
+**Status:** DO WGRANIA (pakiet poprawek audytu 30.08)
+
 ## 2026-08-30 — Audyt: kolejnosc prefiksow na DoSmelting jawna (Priority.High)
 **Mod:** Armoury | **Pliki:** `Armoury/src/SmithAudit.cs`
 **Problem:** znalezisko audytu: CraftingCampaignBehavior.DoSmelting patchuja

@@ -134,6 +134,7 @@ namespace Armoury
 
         // --- The slow mending ---
         public int HealingRegenPercent = 50;               // wounded men and heroes heal on the map at this percent of the normal daily rate - medicine perks still count on top (100 = vanilla)
+        public int AiHealingRegenPercent = 100;            // AI parties heal at this percent of the normal daily rate - 100 keeps vanilla tempo for lords, so their wounded do not pile up for weeks after a famine or a battle
 
         // --- The tidy muster ---
         public bool AutoSortParty = true;                  // the party roster keeps itself in order: cavalry, horse archers, infantry, archers - each arm by tier, best first (no more dragging rows by hand)

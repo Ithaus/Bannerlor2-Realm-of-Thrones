@@ -448,6 +448,10 @@ namespace Armoury
         [SettingPropertyGroup("The slow mending")]
         public int HealingRegenPercent { get; set; } = 50;
 
+        [SettingPropertyInteger("Ai Healing Regen Percent", 0, 400, "0", HintText = "AI parties heal at this percent of the normal daily rate - 100 keeps vanilla tempo for lords, so their wounded do not pile up for weeks after a famine or a battle")]
+        [SettingPropertyGroup("The slow mending")]
+        public int AiHealingRegenPercent { get; set; } = 100;
+
         [SettingPropertyBool("Auto Sort Party", HintText = "the party roster keeps itself in order: cavalry, horse archers, infantry, archers - each arm by tier, best first (no more dragging rows by hand)")]
         [SettingPropertyGroup("The tidy muster")]
         public bool AutoSortParty { get; set; } = true;
@@ -1167,6 +1171,7 @@ namespace Armoury
             s.BkSupplyMaxPieces = BkSupplyMaxPieces;
             s.VolunteerRegenPercent = VolunteerRegenPercent;
             s.HealingRegenPercent = HealingRegenPercent;
+            s.AiHealingRegenPercent = AiHealingRegenPercent;
             s.AutoSortParty = AutoSortParty;
             s.MusterBookEnabled = MusterBookEnabled;
             s.CraftResultPopup = CraftResultPopup;
