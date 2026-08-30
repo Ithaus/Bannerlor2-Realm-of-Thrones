@@ -667,7 +667,9 @@ namespace Armoury
                         // Wszystko ponad komplet zostaje wlasnoscia gracza.
                         int needT = QuartermasterLaw.NeedForType(newItem.ItemType);
                         int warHave = QuartermasterLaw.WarOwnedOf(armory, newItem.ItemType);
-                        int room = needT > 0 ? Math.Max(0, needT - warHave) : kept;
+                        // komplet 0 (nikt w kompanii nie nosi tego typu) = wojsko
+                        // nie bierze NIC; galaz ": kept" pozerala caly wklad
+                        int room = Math.Max(0, needT - warHave);
                         int take = Math.Min(kept, room);
                         if (take > 0)
                         {

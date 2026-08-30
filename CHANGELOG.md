@@ -1,5 +1,19 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-30 — Audyt: komplet 0 = wojsko nie bierze NIC
+**Mod:** Armoury | **Pliki:** `Armoury/src/QuartermasterLaw.cs`
+**Problem:** znalezisko audytu (33 agentow, potwierdzone adwersaryjnie): gdy
+kompania nie ma ani jednego nosiciela typu (np. strzaly przy zerze lucznikow),
+`room = needT > 0 ? ... : kept` oddawal wojsku CALY wklad. Model Jeffa mowi
+odwrotnie: wojsko bierze najwyzej do kompletu, komplet 0 = bierze 0.
+**Przyczyna:** galaz `: kept` w QuartermasterLaw.ProcessSwaps - relikt zasady
+"kwatermistrz zawsze przyjmuje" sprzed wpisu o komplecie.
+**Zmiana:** `room = Math.Max(0, needT - warHave)` bez galezi; nadwyzka zostaje
+graczowi z istniejacym komunikatem "spare stays on YOUR shelf".
+**Ryzyko / co sprawdzic:** wrzucic strzaly nie majac lucznikow -> zostaja na
+liscie gracza (moze poza wymiana barterowa, jesli wojsko ma gorsze kolczany).
+**Status:** DO WGRANIA (pakiet poprawek audytu 30.08)
+
 ## 2026-08-30 — Wojsko bierze najwyzej do KOMPLETU, nadwyzka zostaje graczowi
 **Mod:** Armoury | **Pliki:** `Armoury/src/QuartermasterLaw.cs`
 **Problem:** Jeff (po potwierdzeniu, ze wklad juz znika): "skoro lucznicy
