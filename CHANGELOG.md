@@ -1,5 +1,27 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-29 — Kwatermistrz ZAWSZE przyjmuje wklad (jak z pancerzem)
+**Mod:** Armoury | **Pliki:** `Armoury/src/QuartermasterLaw.cs`
+**Problem:** Jeff: "wrzucilem czerwone i ich nie przyjmuje mimo ze licznik
+sie zwiekszyl. Czy to nie moze dzialac tak jak z pancerzem - wrzucam lepszy,
+znika, dostaje w zamian starszy?". Na zrzucie: 4 pozycje strzal Ravens' Teeth
+(30+15+4+38) LEZA na polce gracza po zamknieciu i otwarciu ekranu.
+**Przyczyna - dwie, obie moje:** (1) prog nadwyzki dodany godzine wczesniej
+blokowal wymiane przy brakach, a wklad zostawal wtedy WLASNOSCIA gracza -
+stad "nie przyjmuje"; ten sam prog zepsulby tez pancerze (244/246 = braki);
+(2) w petli wymiany warunek `it == newItem` pomijal ten sam przedmiot
+w gorszym stanie - przy amunicji, gdzie wojsko ma te same strzaly bez
+modyfikatora, nie bylo NIC do wydania i wklad zostawal na polce.
+**Zmiana:** prog nadwyzki USUNIETY (wymiana jak przy pancerzu, bez warunkow);
+`it == newItem` usuniete - ten sam przedmiot w gorszym stanie jest legalna
+wymiana (prog v<newVal i tak odsiewa rowne i lepsze); reszta wkladu, ktorej
+nie ma za co wymienic, PRZECHODZI NA STAN WOJSKA i znika z polki gracza
++ komunikat "they had nothing worse of that kind to hand back".
+**Ryzyko / co sprawdzic:** wrzucic strzaly -> po ponownym otwarciu ekranu
+NIE MA ich na liscie gracza; jesli wojsko mialo gorsze, leza w zamian stare.
+Pancerze maja dzialac jak dotad.
+**Status:** WGRANE (watcher - gra dzialala przy buildzie)
+
 ## 2026-08-29 — Barter zjadal kazde uzupelnienie: wymiana TYLKO z nadwyzki
 **Mod:** Armoury | **Pliki:** `Armoury/src/QuartermasterLaw.cs`
 **Problem:** Jeff: "wrzucam strzaly, kwatermistrz przyjmuje i wydaje mi

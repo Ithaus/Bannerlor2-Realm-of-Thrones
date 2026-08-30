@@ -562,25 +562,14 @@ namespace Armoury
                     int count = dep.Value.Key;
                     int newVal = dep.Value.Value;
 
-                    // WYMIANA TYLKO Z NADWYZKI (Jeff 29.08: "wrzucam strzaly,
-                    // dostaje stare, zabieram je i znowu mam 49/214"). Barter
-                    // oddaje sztuke za sztuke, wiec przy BRAKACH nigdy nie
-                    // podnosil stanu - wklad wchodzil, stara wychodzila, bilans
-                    // zero. Gdy wojsku brakuje tego typu, wklad ZOSTAJE na
-                    // uzupelnienie i nikt nic nie oddaje.
-                    int haveT = QuartermasterLaw.HaveFor(armory, newItem.ItemType);
-                    int needT = QuartermasterLaw.NeedForType(newItem.ItemType);
-                    int surplus = needT > 0 ? haveT - needT : int.MaxValue;
-                    if (surplus <= 0)
-                    {
-                        Log.Player("Quartermaster: the men are still SHORT of " + newItem.Name
-                                   + " (" + haveT + " of " + needT + " needed) - your gift fills the gaps. "
-                                   + "Nothing goes back on your shelf until they have a full set.", true);
-                        Log.Info("Kwatermistrz: brak nadwyzki " + newItem.ItemType + " (" + haveT + "/" + needT
-                                 + ") - wklad " + count + " szt. uzupelnia braki, bez wymiany.");
-                        continue;
-                    }
-                    if (count > surplus) count = surplus;
+                    // JAK Z PANCERZEM (Jeff 29.08: "wrzucam lepszy, znika,
+                    // dostaje w zamian starszy"). Zaden prog nadwyzki - wklad
+                    // ZAWSZE przechodzi na wojsko i znika z polki gracza,
+                    // a w zamian wyjezdzaja najgorsze sztuki tego typu, ile
+                    // ich wojsko ma. Wczesniejszy prog blokowal wymiane przy
+                    // brakach - a wtedy strzaly zostawaly na polce gracza
+                    // i wygladalo, ze kwatermistrz ich nie przyjmuje.
+                    int swapped = 0;
 
                     // NIKT NIE UDZWIGNIE = zadnej wymiany, wklad zostaje twoj,
                     // a kwatermistrz mowi wprost czemu (Jeff: "jak nie wymienili,
@@ -603,7 +592,9 @@ namespace Armoury
                             var el = armory[i];
                             var it = el.EquipmentElement.Item;
                             if (it == null || el.Amount <= 0 || it.ItemType != newItem.ItemType) continue;
-                            if (it == newItem) continue;
+                            // ten sam przedmiot w GORSZYM stanie tez jest wymiana
+                            // (zwykle strzaly za "Balanced" - prog v<newVal nizej
+                            // i tak odsieje sztuki identyczne albo lepsze)
                             var id = it.StringId ?? "";
                             if (MusterBook.IsPinnedItem(id)) continue;               // rozkaz z ksiegi swiety
                             int warPart = el.Amount - Math.Min(el.Amount, ArmouryBehavior.StockOf(id));
@@ -619,7 +610,21 @@ namespace Armoury
                         // jego liscie ZAMIAST wkladu; wklad idzie na wojsko
                         ArmouryBehavior.StockDeposit(old.Item != null ? old.Item.StringId : "", 1);
                         ArmouryBehavior.StockWithdraw(newItem.StringId, 1);
-                        given++;
+                        given++; swapped++;
+                    }
+
+                    // RESZTA WKLADU TEZ JEST PRZYJETA (Jeff: "wrzucilem czerwone
+                    // i ich nie przyjmuje"). Gdy wojsko nie ma juz nic gorszego
+                    // do oddania, sztuki i tak przechodza na ich stan - inaczej
+                    // zostawaly na polce gracza i wygladalo to na odmowe.
+                    int kept = count - swapped;
+                    if (kept > 0)
+                    {
+                        ArmouryBehavior.StockWithdraw(newItem.StringId, kept);
+                        Log.Player("Quartermaster: the men take your " + kept + " " + newItem.Name
+                                   + " into the company stores - they had nothing worse of that kind to hand back.", true);
+                        Log.Info("Kwatermistrz: " + kept + " szt. " + newItem.StringId
+                                 + " przejete przez wojsko (brak gorszych sztuk do wydania).");
                     }
                 }
                 _pendingSwaps.Clear();
