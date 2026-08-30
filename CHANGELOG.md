@@ -1,5 +1,42 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-30 — Tabor Spoils (Baggage Train) wyciety patchem na stale
+**Mod:** Armoury | **Pliki:** `Armoury/src/BattlefieldLaw.cs`
+**Problem:** uzupelnienie prawa zachowania lupu; Jeff wybral Droge 2
+("robimy to"). Spoils of War robi WLASNY, drugi ekran bagazy ze zdjecia
+zawartosci wozow wroga z POCZATKU bitwy - rownolegle vanilla dzieli TE SAME
+wozy miedzy zwyciezcow wg wkladu. Te same rzeczy wpadaly dwa razy, bez
+ogladania na sojusznikow. Checkbox "Enable baggage train looting" w MCM
+Spoils wraca ON przy kazdym presecie/resecie.
+**Zmiana:** postfix na getter RealisticLoot.Settings.MCMSettings
+.EnableBaggageTrain -> zawsze false (gdy BattlefieldLawEnabled). Caly kod
+taboru Spoils spi u zrodla; wozy pokonanych dzieli wylacznie vanilla.
+**Ryzyko / co sprawdzic:** po bitwie NIE pojawia sie drugi ekran
+"przeszukujesz tabor"; w logu "tabor Spoils (Baggage Train) wyciety na
+stale". Wylaczenie naszego BattlefieldLaw w MCM przywraca Spoilsowi
+wlasnosc checkboxa.
+**Status:** ZBUDOWANE - watcher wgra po zamknieciu gry
+
+## 2026-08-30 — CaptiveRags: jency w podgladzie druzyny stoja w LACHMANACH
+**Mod:** Armoury | **Pliki:** `Armoury/src/CaptiveRags.cs` (nowy),
+`Settings.cs`, `McmSettings.cs` (gen), `SubModuleMain.cs`
+**Problem:** Jeff: "jak klikne na jenca w panelu party, stoi w pelnej
+zbroi - a przeciez obrobilismy go ze sprzetu. Ikony zostawiamy, ale po
+klikniecu pokazujemy w lachmanach, tylko w wersji jeniec". Panel druzyny
+buduje podglad 3D z SZABLONU jednostki (PartyCharacterVM.GetCharacterCode
+-> character.Equipment), wiec obszukany jeniec pozowal w rynsztunku.
+**Zmiana:** postfix na GetCharacterCode: dla wierszy typu Prisoner
+(szeregowi; bohaterowie i zwykli zolnierze nietkniete) kod wygladu
+budowany z PUSTEGO ekwipunku + najtansze lachmany na grzbiet (ta sama
+heurystyka co GiveRags w RealisticCaptivity: rag/burlap/sack/peasant/
+beggar, cache). Twarz/cialo/kultura bez zmian. Ikony listy bez zmian.
+Pokretlo MCM CaptiveRagsPreview (ON), aktywne tylko przy wlaczonym
+CaptiveSpoilsEnabled (pokazujemy golych TYLKO gdy naprawde rozbieramy).
+Czysto wizualne - zero wplywu na walke/ekonomie.
+**Ryzyko / co sprawdzic:** panel druzyny -> sekcja jencow -> klik na typ:
+model w lachmanach; wlasni zolnierze i bohaterowie-jency po staremu.
+**Status:** ZBUDOWANE - watcher wgra po zamknieciu gry
+
 ## 2026-08-30 — PRAWO ZACHOWANIA LUPU: koniec podwojnego liczenia sprzetu wroga
 **Mod:** Armoury | **Pliki:** `Armoury/src/BattlefieldLaw.cs`, `Armoury/src/ArmouryBehavior.cs`
 **Problem:** Jeff (w trakcie gry): "walczyly tez inne partie, a ja dostalem

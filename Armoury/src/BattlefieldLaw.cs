@@ -160,6 +160,21 @@ namespace Armoury
                     }
                 }
 
+                // TABOR SPOILS WYCIETY NA STALE (Jeff 30.08: "robimy to").
+                // Spoils robi WLASNY, drugi ekran bagazy ze zdjecia z POCZATKU
+                // bitwy - rownolegle do vanillowego podzialu wozow wg wkladu:
+                // te same rzeczy wpadaly dwa razy, bez ogladania na sojusznikow.
+                // Checkbox w MCM wraca przy kazdym presecie/resecie (kazdy
+                // preset ma ON), wiec gasimy u zrodla: getter ustawienia
+                // odpowiada false, caly kod taboru Spoils spi.
+                var mcmType = Type.GetType("RealisticLoot.Settings.MCMSettings, RealisticLoot");
+                var gBag = mcmType != null ? AccessTools.PropertyGetter(mcmType, "EnableBaggageTrain") : null;
+                if (gBag != null)
+                {
+                    h.Patch(gBag, postfix: new HarmonyMethod(typeof(BattlefieldLaw), "NoBaggageTrain"));
+                    Log.Info("BattlefieldLaw: tabor Spoils (Baggage Train) wyciety na stale - wozy dzieli vanilla wg wkladu.");
+                }
+
                 if (dmgType != null) _applyDamage = AccessTools.Method(dmgType, "ApplyDamageToLoot");
                 var dispatcher = AccessTools.Method(typeof(CampaignEventDispatcher), "OnCollectLootItems");
                 if (dispatcher != null)
@@ -507,6 +522,13 @@ namespace Armoury
                 return b != null && ReferenceEquals(b.GetValue(origin, null), PartyBase.MainParty);
             }
             catch { return false; }
+        }
+
+        /// <summary>Tabor Spoils zawsze OFF - wozy pokonanych dzieli vanilla
+        /// wg wkladu, drugi ekran bagazy to byl dubel materii.</summary>
+        public static void NoBaggageTrain(ref bool __result)
+        {
+            try { if (Settings.Current.BattlefieldLawEnabled) __result = false; } catch { }
         }
 
         /// <summary>Symulacje: trup mial sprzet, to sprzet jest - bez zaszytego x0.10-0.58.</summary>

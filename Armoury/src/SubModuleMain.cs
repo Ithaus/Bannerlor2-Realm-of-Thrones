@@ -61,6 +61,7 @@ namespace Armoury
                 FletchForge.ApplyAll(_harmony);
                 SmeltTab.ApplyAll(_harmony);
                 DressCode.ApplyAll(_harmony);
+                CaptiveRags.ApplyAll(_harmony);
                 SightRange.ApplyAll(_harmony);
                 BkArmourList.ApplyAll(_harmony);
                 BowStats.ApplyAll(_harmony);

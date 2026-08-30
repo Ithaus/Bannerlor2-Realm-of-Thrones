@@ -564,6 +564,10 @@ namespace Armoury
         [SettingPropertyGroup("Loot from the field")]
         public bool CaptiveSpoilsIncludeMounts { get; set; } = true;
 
+        [SettingPropertyBool("Captive Rags Preview", HintText = "the party screen shows your captives the way you actually keep them: stripped to rags, not in the full armour you already took (icons stay, only the 3D preview changes)")]
+        [SettingPropertyGroup("Loot from the field")]
+        public bool CaptiveRagsPreview { get; set; } = true;
+
         [SettingPropertyBool("Battlefield Law Enabled", HintText = "battles you fight yourself: the dead drop their real gear (DTE), Spoils of War steps aside")]
         [SettingPropertyGroup("The law of the battlefield")]
         public bool BattlefieldLawEnabled { get; set; } = true;
@@ -1204,6 +1208,7 @@ namespace Armoury
             s.LootWearSpread = LootWearSpread;
             s.CaptiveSpoilsEnabled = CaptiveSpoilsEnabled;
             s.CaptiveSpoilsIncludeMounts = CaptiveSpoilsIncludeMounts;
+            s.CaptiveRagsPreview = CaptiveRagsPreview;
             s.BattlefieldLawEnabled = BattlefieldLawEnabled;
             s.LootArrivesBattleWorn = LootArrivesBattleWorn;
             s.SimBattleFullDrop = SimBattleFullDrop;

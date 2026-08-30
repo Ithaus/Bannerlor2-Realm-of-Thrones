@@ -176,6 +176,7 @@ namespace Armoury
         public float LootWearSpread = 25f;                 // how widely that varies
         public bool CaptiveSpoilsEnabled = true;           // a man you take captive is stripped at the rope: his whole kit lands in your baggage, battle-worn
         public bool CaptiveSpoilsIncludeMounts = true;     // his horse and harness are seized too
+        public bool CaptiveRagsPreview = true;             // the party screen shows your captives the way you actually keep them: stripped to rags, not in the full armour you already took (icons stay, only the 3D preview changes)
         // --- The law of the battlefield ---
         public bool BattlefieldLawEnabled = true;          // battles you fight yourself: the dead drop their real gear (DTE), Spoils of War steps aside
         public bool LootArrivesBattleWorn = true;          // loot-screen items from fought battles arrive battle-worn but keep their worth
