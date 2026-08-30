@@ -1,5 +1,28 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-30 — KOREKTA CaptiveRags: lachmany w DUZYM podgladzie 3D, ikony przywrocone
+**Mod:** Armoury | **Pliki:** `Armoury/src/CaptiveRags.cs`
+**Problem:** Jeff ze screenem: "zmieniles ich ikony na takie same, ale
+widok 3D zostal w pancerzu - a mi chodzilo, aby widok 3D byl w lachmanach".
+Pierwsza wersja patcha celowala w PartyCharacterVM.GetCharacterCode -
+a to zrodlo MINIATUREK wierszy (CharacterImageIdentifierVM Code), nie
+duzego modelu. Efekt dokladnie odwrotny do zamowionego.
+**Przyczyna:** duzy podglad to CharacterTableauWidget w PartyScreen.xml
+z DataSource={SelectedCharacter} (HeroViewModel na PartyVM), wypelniany
+przez PartyVM.RefreshCurrentCharacterInformation (FillFrom + SetEquipment
+z SZABLONU jednostki) - zupelnie inna sciezka niz ikony.
+**Zmiana:** postfix przeniesiony na PartyVM.RefreshCurrentCharacter
+Information: gdy CurrentCharacter to JENIEC-szeregowy, po wypelnieniu
+modelu podmieniamy mu ekwipunek (SelectedCharacter.SetEquipment) na puste
+sloty + najtansze lachmany. GetCharacterCode NIETKNIETE - ikony listy
+wracaja do oryginalnych portretow w zbrojach.
+**Ryzyko / co sprawdzic:** klik na typ jenca -> DUZY model w lachmanach,
+ikona wiersza po staremu (w pancerzu); zwykli zolnierze i bohaterowie-
+jency bez zmian.
+**Status:** ZBUDOWANE - watcher wgra po zamknieciu gry (biezaca sesja
+Jeffa chodzi na wersji z podmienionymi IKONAMI - po restarcie wroci
+porzadek)
+
 ## 2026-08-30 — Tabor Spoils (Baggage Train) wyciety patchem na stale
 **Mod:** Armoury | **Pliki:** `Armoury/src/BattlefieldLaw.cs`
 **Problem:** uzupelnienie prawa zachowania lupu; Jeff wybral Droge 2

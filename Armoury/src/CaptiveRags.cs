@@ -1,24 +1,24 @@
 using System;
 using HarmonyLib;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.ViewModelCollection.Party;
 using TaleWorlds.Core;
-using TaleWorlds.Library;
 
 namespace Armoury
 {
     /// <summary>
-    /// JENIEC W LACHMANACH (Jeff 30.08: "jency nie stoja w zbroi, tylko
-    /// w lachmanach, bo tak ich przeciez obrobilismy - ikony zostawiamy,
-    /// po klikniecu pokazujemy ich w lachmanach, tylko w wersji jeniec").
-    /// Panel druzyny buduje podglad 3D jednostki z jej SZABLONU
-    /// (PartyCharacterVM.GetCharacterCode -> character.Equipment), wiec
-    /// obszukany do naga jeniec dalej pozowal w pelnym rynsztunku.
-    /// Postfix podmienia KOD WYGLADU wylacznie dla wierszy typu Prisoner
-    /// (szeregowi, nie bohaterowie): cialo i twarz zostaja, na grzbiecie
-    /// najtansze lachmany (ta sama heurystyka co GiveRags w Realistic
-    /// Captivity). Czysto wizualne - zadnego wplywu na walke i ekonomie.
+    /// JENIEC W LACHMANACH (Jeff 30.08: "ikony zostawiamy tak jak sa, ale
+    /// po klikniecu w ikone pokazujemy ich w lachmanach - tylko w wersji
+    /// jeniec"). DUZY podglad 3D w panelu druzyny to CharacterTableauWidget
+    /// karmiony przez PartyVM.SelectedCharacter (HeroViewModel), ktorego
+    /// wypelnia RefreshCurrentCharacterInformation z SZABLONU jednostki -
+    /// dlatego obszukany do naga jeniec pozowal w pelnym rynsztunku.
+    /// Postfix po tej metodzie podmienia SAM ekwipunek modelu (SetEquipment)
+    /// na najtansze lachmany, wylacznie gdy klikniety wiersz to JENIEC-
+    /// szeregowy. Ikony listy (PartyCharacterVM.Code) NIETKNIETE - pierwsza
+    /// wersja patcha celowala wlasnie w nie i Jeff od razu to wylapal.
+    /// Heurystyka lachmanow ta sama co GiveRags w RealisticCaptivity.
+    /// Czysto wizualne - zadnego wplywu na walke i ekonomie.
     /// </summary>
     internal static class CaptiveRags
     {
@@ -46,28 +46,22 @@ namespace Armoury
             return _rags;
         }
 
-        public static void Postfix(CharacterObject character, PartyScreenLogic.TroopType type, ref CharacterCode __result)
+        public static void Postfix(PartyVM __instance)
         {
             try
             {
                 var s = Settings.Current;
                 if (s == null || !s.CaptiveRagsPreview || !s.CaptiveSpoilsEnabled) return;
-                if (type != PartyScreenLogic.TroopType.Prisoner) return;
-                if (character == null || character.IsHero) return;
+                var cur = __instance != null ? __instance.CurrentCharacter : null;
+                if (cur == null || cur.Type != PartyScreenLogic.TroopType.Prisoner) return;
+                if (cur.Character == null || cur.Character.IsHero) return;
+                var model = __instance.SelectedCharacter;
+                if (model == null) return;
 
                 var eq = new Equipment();
                 var rags = Rags();
                 if (rags != null) eq[EquipmentIndex.Body] = new EquipmentElement(rags);
-                uint color = Color.White.ToUnsignedInteger();
-                uint color2 = Color.White.ToUnsignedInteger();
-                if (character.Culture != null)
-                {
-                    color = character.Culture.Color;
-                    color2 = character.Culture.Color2;
-                }
-                __result = CharacterCode.CreateFrom(eq.CalculateEquipmentCode(),
-                    character.GetBodyProperties(character.Equipment), character.IsFemale, character.IsHero,
-                    color, color2, character.DefaultFormationClass, character.Race);
+                model.SetEquipment(eq);
             }
             catch (Exception e) { Log.Error("CaptiveRags", e); }
         }
@@ -78,10 +72,10 @@ namespace Armoury
             {
                 var s = Settings.Current;
                 if (s == null || !s.CaptiveRagsPreview) { Log.Info("CaptiveRags: wylaczone."); return; }
-                var m = AccessTools.Method(typeof(PartyCharacterVM), "GetCharacterCode");
-                if (m == null) { Log.Info("CaptiveRags: brak PartyCharacterVM.GetCharacterCode - patch spi."); return; }
+                var m = AccessTools.Method(typeof(PartyVM), "RefreshCurrentCharacterInformation");
+                if (m == null) { Log.Info("CaptiveRags: brak PartyVM.RefreshCurrentCharacterInformation - patch spi."); return; }
                 h.Patch(m, postfix: new HarmonyMethod(typeof(CaptiveRags), "Postfix"));
-                Log.Info("CaptiveRags: jency w podgladzie druzyny stoja w lachmanach (tak, jak ich trzymamy).");
+                Log.Info("CaptiveRags: jeniec w DUZYM podgladzie druzyny stoi w lachmanach (ikony listy nietkniete).");
             }
             catch (Exception e) { Log.Error("CaptiveRags.ApplyAll", e); }
         }
