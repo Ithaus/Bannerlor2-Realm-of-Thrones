@@ -1,5 +1,28 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-30 — SkillSinew: wlasny mundur kazdy umie nosic (sufit wg tieru) - zastepuje GiantSinew
+**Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs`
+**Problem:** Jeff po spisie docs/ROT-rozjazdy-skilli.md (548 rozjazdow,
+169 jednostek: milicje z Atletyka 0 przy zbroi 70-120, Zlote Plaszcze bez
+prawa do wlasnych plaszczy, tully_knight 110 vs 140): "jednym ruchem -
+ale z logika: tier 1 nosi slabe pancerze i jego Atletyka nie bedzie 150;
+tier 6/7 moze miec pod tier 6/7; tier 2 nie moze miec Atletyki tieru 6".
+**Zmiana:** GiantSinew zastapiony ogolnym Mends.SkillSinew (OnSessionLaunched):
+kazdej jednostce (nie-hero) Atletyka podbijana do najwyzszego difficulty
+pancerza z JEJ WLASNEGO wzorca, ale nie wyzej niz SUFIT TIERU:
+20 + 30 * tier (t1=50, t2=80, t3=110, t4=140, t5=170, t6=200). Jednostka,
+ktorej ROT wpisal mundur ponad sufit tieru, dalej go nie uniesie -
+degradacja zostaje (wina danych, nie skilla). Giganci (wysoki tier)
+dostaja z reguly dokladnie swoje 150 - efekt GiantSinew zachowany.
+Zasada nadrzedna bez zmian gryzie przy przydziale CUDZEGO sprzetu
+(magazyn DTE, ksiega musztry, kwatermistrz).
+**Ryzyko / co sprawdzic:** log CrashScribe przy starcie sesji:
+"Mends: SkillSinew - Atletyka podbita N jednostkom ... M przypadkow
+zostalo ponizej munduru"; wpisy per jednostka tylko dla rozjazdow >=50.
+Zlote Plaszcze: goldcloak_armor 120 vs milicja niskiego tieru - nadal
+degradowane (sufit), zgodnie z logika Jeffa.
+**Status:** WGRANE (30.08, gra zamknieta)
+
 ## 2026-08-30 — Mendy: giganci nosza wlasna skore (Atletyka 150) + martwy widget DTE uspiony (A6)
 **Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs`, `CrashScribe/src/SubModuleMain.cs`
 **Problem:** (1) Jeff: "czemu gigant ma atletyke 40?" - dane ROT: jednostki

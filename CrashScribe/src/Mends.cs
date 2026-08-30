@@ -26,43 +26,72 @@ namespace CrashScribe
         internal static bool SkipDteMapWidget() { return false; }
 
         /// <summary>
-        /// GIGANCI Z WATY (decyzja Jeffa 30.08, ERRORS A-dane): ROT daje
-        /// gigantom pancerze difficulty 120-150 (giant_garb/giant_boots),
-        /// a samym jednostkom Atletyke 20-40 - vanilla tego nie sprawdza,
-        /// nasza zasada nadrzedna tak, wiec egzekutor rozbieral gigantow
-        /// z wlasnej skory. Podbijamy Atletyke gigantow do 150. Chirurgicznie:
-        /// tylko id zaczynajace sie od "giant" albo zawierajace "_giant".
-        /// Reszta z 548 rozjazdow danych ROT zostaje jak byla.
+        /// WLASNY MUNDUR KAZDY UMIE NOSIC (Jeff 30.08, po spisie
+        /// docs/ROT-rozjazdy-skilli.md: 548 rozjazdow, 169 jednostek).
+        /// ROT wpisuje jednostkom pancerze z difficulty, ale skille "na
+        /// odczepnego" (milicje maja Atletyke 0 przy zbroi 120!) - vanilla
+        /// tego nie sprawdza, nasza zasada nadrzedna tak, wiec egzekutor
+        /// degradowal wlasne mundury (giganci bez skory, Zlote Plaszcze
+        /// bez plaszczy). Podbijamy Atletyke jednostki do najwyzszego
+        /// difficulty pancerza z JEJ WLASNEGO wzorca - ale z SUFITEM WEDLE
+        /// TIERU (Jeff: "tier 2 nie moze miec Atletyki na poziom tieru 6"):
+        /// sufit = 20 + 30 * tier (t1=50, t2=80, t3=110, t4=140, t5=170,
+        /// t6=200). Rekrut z wpisana zbroja 120 nadal jej NIE uniesie -
+        /// degradacja zostaje, bo to juz wina danych ROT, nie skilla.
+        /// Zasada nadrzedna dalej gryzie przy przydziale CUDZEGO sprzetu.
+        /// (Zastepuje wczesniejszy mend GiantSinew - giganci, level 26 =
+        /// wysoki tier, dostaja z tej reguly dokladnie swoje 150.)
         /// </summary>
-        internal static void GiantSinew()
+        internal static void SkillSinew()
         {
             try
             {
-                int fixedN = 0;
+                int fixedN = 0, capped = 0;
                 foreach (var co in TaleWorlds.ObjectSystem.MBObjectManager.Instance
                              .GetObjectTypeList<CharacterObject>())
                 {
                     if (co == null || co.IsHero) continue;
-                    var id = co.StringId ?? "";
-                    if (!id.StartsWith("giant") && !id.Contains("_giant")) continue;
+                    int maxDiff = 0;
+                    try
+                    {
+                        foreach (var eq in co.BattleEquipments)
+                        {
+                            if (eq == null) continue;
+                            for (int s = 5; s <= 9; s++)     // Head/Body/Leg/Gloves/Cape
+                            {
+                                var it = eq[(EquipmentIndex)s].Item;
+                                if (it != null && it.Difficulty > maxDiff) maxDiff = it.Difficulty;
+                            }
+                        }
+                    }
+                    catch { }
+                    if (maxDiff <= 0) continue;
                     int ath = co.GetSkillValue(DefaultSkills.Athletics);
-                    if (ath >= 150) continue;
+                    if (ath >= maxDiff) continue;
+                    int cap = 20 + 30 * Math.Max(0, co.Tier);
+                    int target = Math.Min(maxDiff, cap);
+                    if (target <= ath) { capped++; continue; }   // sufit tieru nizej niz mundur - zostaje degradacja
                     var skills = co.GetDefaultCharacterSkills();
                     var owner = skills != null ? skills.Skills : null;
                     var mSet = owner != null ? AccessTools.Method(owner.GetType(), "SetPropertyValue") : null;
                     if (mSet == null)
                     {
-                        Scribe.Line("Mends: GiantSinew - brak Skills/SetPropertyValue na " + id + ", mend spi.");
+                        Scribe.Line("Mends: SkillSinew - brak Skills/SetPropertyValue na " + co.StringId + ", mend spi.");
                         return;
                     }
-                    mSet.Invoke(owner, new object[] { DefaultSkills.Athletics, 150 });
+                    mSet.Invoke(owner, new object[] { DefaultSkills.Athletics, target });
                     fixedN++;
-                    Scribe.Line("Mends: gigant " + id + " - Atletyka " + ath + " -> 150 (nosi wlasna skore).");
+                    if (maxDiff - ath >= 50)
+                        Scribe.Line("Mends: " + co.StringId + " (tier " + co.Tier + ") - Atletyka "
+                                    + ath + " -> " + target + " (mundur difficulty " + maxDiff
+                                    + (target < maxDiff ? ", sufit tieru " + cap : "") + ").");
+                    if (target < maxDiff) capped++;
                 }
-                if (fixedN == 0)
-                    Scribe.Line("Mends: GiantSinew - zadnych gigantow do podbicia.");
+                Scribe.Line("Mends: SkillSinew - Atletyka podbita " + fixedN
+                            + " jednostkom do poziomu wlasnego munduru (sufit 20+30*tier); "
+                            + capped + " przypadkow zostalo ponizej munduru (sufit tieru).");
             }
-            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.GiantSinew", null); } catch { } }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.SkillSinew", null); } catch { } }
         }
 
         internal static void Install(Harmony harmony)
@@ -1072,7 +1101,7 @@ namespace CrashScribe
         public override void RegisterEvents()
         {
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this,
-                delegate (CampaignGameStarter s) { Mends.GiantSinew(); });
+                delegate (CampaignGameStarter s) { Mends.SkillSinew(); });
         }
 
         public override void SyncData(IDataStore dataStore) { }
