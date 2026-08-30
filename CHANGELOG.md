@@ -1,5 +1,21 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-30 — Audyt: Armoury ma wlasny definer save (Dictionary<string,int>)
+**Mod:** Armoury | **Pliki:** `Armoury/src/SaveDefiner.cs` (nowy)
+**Problem:** znalezisko audytu: Armoury zapisuje Dictionary<string,int>
+(arm_player_stock) bez wlasnego SaveableTypeDefiner - zapis dzialal tylko
+dzieki definicji ROT-a (HeroRaceMapSaveableTypeDefiner) albo RC
+(RcSaveDefiner przy braku ROT). Granie samym Armoury = "Cannot create
+save data".
+**Przyczyna:** kontener zdefiniowany "u kogos", nigdy u nas.
+**Zmiana:** ArmSaveDefiner (base id 928371600, rozlaczne z RC 928371500)
+definiuje kontener TYLKO gdy nie ma ani ROT-a, ani RC - podwojna definicja
+wywala kolekcje typow rownie skutecznie jak jej brak.
+**Ryzyko / co sprawdzic:** w biezacej kampanii (ROT obecny) definer nie
+robi nic - save/load bez zmian; zabezpiecza wylacznie konfiguracje bez
+ROT i RC.
+**Status:** DO WGRANIA (pakiet poprawek audytu 30.08)
+
 ## 2026-08-30 — Audyt: uwolnienie towarzysza NIE rozbiera go drugi raz
 **Mod:** RealisticCaptivity | **Pliki:** `RealisticCaptivity/src/CaptivityBehavior.cs`
 **Problem:** znalezisko audytu; Jeff potwierdzil intencje "z niewoli
