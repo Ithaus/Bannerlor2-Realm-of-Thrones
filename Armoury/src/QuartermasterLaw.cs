@@ -583,9 +583,15 @@ namespace Armoury
                 if (item == null || n <= 0) return;
                 // strzaly i belty TEZ podlegaja wymianie (Jeff 29.08: "nie
                 // przyjmuje mi kwatermistrz strzal tier 6" - wykluczenie
-                // amunicji zostawialo wklad bez rozliczenia i bez komunikatu)
+                // amunicji zostawialo wklad bez rozliczenia i bez komunikatu).
+                // KONIE tak samo (Jeff 30.08: "wrzucam konie, kwatermistrz
+                // mowi ze zielono, a jak zabieram - ze brakuje; to samo co
+                // z lukami") - kon nie ma weapon/armor component i wypadal
+                // z rejestru: wklad konski nie szedl ani do wymiany, ani
+                // do kompletu, wisial wiecznie jako wlasnosc gracza
                 bool weaponish = item.HasWeaponComponent;
-                if (!weaponish && !item.HasArmorComponent) return;
+                bool mounty = item.HasHorseComponent;
+                if (!weaponish && !item.HasArmorComponent && !mounty) return;
                 _pendingSwaps.Add(new KeyValuePair<ItemObject, KeyValuePair<int, int>>(
                     item, new KeyValuePair<int, int>(n, value)));
             }

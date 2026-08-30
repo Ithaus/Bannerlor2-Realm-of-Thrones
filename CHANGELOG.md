@@ -1,5 +1,26 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-30 — Kwatermistrz przyjmuje tez KONIE (ten sam blad co ze strzalami)
+**Mod:** Armoury | **Pliki:** `Armoury/src/QuartermasterLaw.cs`
+**Problem:** Jeff ze screenem ("Horse 52/83"): "wrzucam konie, kwatermistrz
+mowi ze wszystko na zielono, a jak zabieram - ze brakuje; to samo co
+z lukami wczesniej". Ta sama bramka, ktora 29.08 wycinala amunicje:
+NoteDeposit przyjmowal wylacznie itemy z weapon/armor componentem -
+KON (HorseComponent) wypadal z rejestru wymian, wiec wklad konski nie
+szedl ani do wymiany za gorsze, ani do przyjecia do kompletu (need =
+jezdzcy). Wisial wiecznie jako wlasnosc gracza: polki pelne (meldunek
+zielony), ksiega gracza pelna (po zabraniu - znow braki).
+**Przyczyna:** bramka `!weapon && !armor -> return` w NoteDeposit.
+**Zmiana:** konie (HasHorseComponent) wchodza do rejestru jak wszystko
+inne: wymiana za gorszego konia (tier/wartosc), reszta do kompletu
+(need = liczba jezdzcow), nadwyzka zostaje graczowi. Uprzeze juz
+wchodzily (maja ArmorComponent). Zasada skilli dziala (Riding przez
+AnyoneCanUse, gdy kon ma Difficulty).
+**Ryzyko / co sprawdzic:** wrzucic konie przy brakach 52/83 -> po
+zamknieciu ekranu znikaja z listy gracza, licznik rosnie do kompletu,
+komunikat "go to the men"; nadwyzka ponad 83 zostaje na liscie.
+**Status:** ZBUDOWANE - watcher wgra po zamknieciu gry
+
 ## 2026-08-30 — PRAWO PRZEPRAWY: The Twins nie przepuszczaja wrogow (nowy CrossingLaw)
 **Mod:** Armoury | **Pliki:** `Armoury/src/CrossingLaw.cs` (nowy),
 `Settings.cs`, `McmSettings.cs` (gen), `ArmouryBehavior.cs`
