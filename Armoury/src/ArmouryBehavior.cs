@@ -324,7 +324,8 @@ namespace Armoury
                 // stany magazynu wracaja PRZED czystkami (DTE odtwarza roster
                 // dopiero po sesji - lapiemy pierwszy moment, gdy juz jest)
                 try { TryRestoreArmoryWear("menu"); } catch { }
-                try { RefundSeizedAmmo(); } catch { }
+                // ZWROT WYLACZONY 30.08 - Jeff wyjasnil, ze wklad MA przechodzic
+                // do wojska; oddawanie kolczanow na polke gracza byloby wbrew temu
                 // po kazdej bitwie menu sie otwiera - smok wyleci zanim DTE go osiodla
                 try { CleanseDragonStables(true); } catch { }
                 // ...a smieci <=3% i slonie-towar zaraz za nim (Spoils naklada

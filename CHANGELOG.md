@@ -1,5 +1,26 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-30 — Jeff gral na STARYM DLL; zwrot kolczanow wylaczony
+**Mod:** Armoury | **Pliki:** `Armoury/src/ArmouryBehavior.cs`
+**Problem:** Jeff pokazal krok po kroku: 49 strzal -> wrzuca 86 -> zamyka
+i otwiera ekran -> strzaly NADAL na jego liscie (licznik 135), a po ich
+zabraniu znow 49. Objaw identyczny jak przed poprawka.
+**Przyczyna (dowod, nie hipoteza):** wgrany plik miał date 17:17 i 413184
+bajtow, a zbudowana poprawka 17:25 i 413696 bajtow - gra chodzila na
+buildzie SPRZED naprawy. Watcher czekal na zamkniecie gry, ktore nie
+nastapilo, wiec poprawka "wklad znika z polki" nigdy nie trafila do gry.
+Sama logika ksiegowa jest kompletna: QuartermasterLaw.cs:626 (za kazda
+wymiane) + :638 (reszta) zdejmuja CALY wklad z ksiegi gracza.
+**Zmiana:** (1) wgrany wlasciwy plik; (2) jednorazowy zwrot 104 kolczanow
+(RefundSeizedAmmo) WYLACZONY - Jeff wyjasnil, ze wklad MA przechodzic do
+wojska, wiec oddawanie kolczanow na jego polke dzialaloby przeciw temu,
+czego chce. Metoda zostaje w kodzie, ale nikt jej nie wola.
+**Ryzyko / co sprawdzic:** wrzucic strzaly, zamknac i otworzyc ekran -
+listy maja byc PUSTE, licznik podniesiony. Jesli wklad dalej zostaje,
+w logu bedzie linia "brak gorszej sztuki ... kandydatow wojskowych: N"
+albo komunikat o braku umiejetnosci - to wskaze gałąź, ktora go zatrzymala.
+**Status:** WGRANE (gra zamknieta, plik zweryfikowany co do rozmiaru)
+
 ## 2026-08-29 — Wklad ZNIKA z polki, wymiana szuka po TIERZE (nie po cenie)
 **Mod:** Armoury | **Pliki:** `Armoury/src/QuartermasterLaw.cs`
 **Problem:** Jeff (trzecie tlumaczenie, dosadne): "wrzucam strzaly, one maja
