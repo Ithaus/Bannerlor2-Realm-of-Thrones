@@ -1,5 +1,22 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-30 — Audyt: dwa martwe okruchy Watch naprawione
+**Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Watch.cs`
+**Problem:** znaleziska audytu: (1) prefix ScreenPopped(ScreenBase screen)
+celowal w bezparametrowe ScreenManager.PopScreen() - co sesje 8x wyjatek
+"Parameter screen not found" przy ladowaniu, okruch "closed screen" nigdy
+nie dzialal; (2) okruch menu celowal w GameMenuManager.SwitchToMenu,
+ktorego w 1.4.8 nie ma (log: "brak metody") - slad przelaczen menu martwy.
+**Przyczyna:** sygnatury spisane z innej wersji gry.
+**Zmiana:** (1) ScreenPopped() bez parametrow, zamykany ekran czytany
+z ScreenManager.TopScreen (prefix biegnie przed zdjeciem); (2) cel
+przeniesiony na statyczny TaleWorlds.CampaignSystem.GameMenus.GameMenu
+.SwitchToMenu(menuId) - sygnatura potwierdzona dekompilacja.
+**Ryzyko / co sprawdzic:** w trail.txt maja pojawic sie okruchy
+"screen: closed ..." i "menu: <id>"; przy ladowaniu ma zniknac 8x
+"Parameter screen not found".
+**Status:** DO WGRANIA (pakiet poprawek audytu 30.08)
+
 ## 2026-08-30 — Audyt: Armoury ma wlasny definer save (Dictionary<string,int>)
 **Mod:** Armoury | **Pliki:** `Armoury/src/SaveDefiner.cs` (nowy)
 **Problem:** znalezisko audytu: Armoury zapisuje Dictionary<string,int>

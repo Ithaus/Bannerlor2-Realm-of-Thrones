@@ -22,7 +22,9 @@ namespace CrashScribe
             Try(h, typeof(ScreenManager), "PopScreen", "ScreenPopped");
             TryByName(h, "MCM.Implementation.DefaultSettingsProvider", "SaveSettings", "McmSave");
             TryByName(h, "MCM.Implementation.DefaultSettingsProvider", "ResetSettings", "McmReset");
-            TryByName(h, "TaleWorlds.CampaignSystem.GameMenus.GameMenuManager", "SwitchToMenu", "Menu");
+            // 1.4.8: menu przelacza statyczny GameMenu.SwitchToMenu(menuId);
+            // GameMenuManager.SwitchToMenu nie istnieje (okruch byl martwy)
+            TryByName(h, "TaleWorlds.CampaignSystem.GameMenus.GameMenu", "SwitchToMenu", "Menu");
             TryByName(h, "TaleWorlds.MountAndBlade.Mission", "AfterStart", "MissionStart");
         }
 
@@ -30,8 +32,12 @@ namespace CrashScribe
         internal static void ScreenPushed(ScreenBase screen)
         { Trail.Drop("screen", "opened " + Name(screen)); }
 
-        internal static void ScreenPopped(ScreenBase screen)
-        { Trail.Drop("screen", "closed " + Name(screen)); }
+        // PopScreen() nie ma parametrow - stary prefix z (ScreenBase screen)
+        // nie pasowal i co sesje sypal 8x "Parameter screen not found",
+        // a okruch nigdy nie dzialal. Prefix biegnie PRZED zdjeciem, wiec
+        // zamykany ekran to TopScreen.
+        internal static void ScreenPopped()
+        { Trail.Drop("screen", "closed " + Name(ScreenManager.TopScreen)); }
 
         internal static void McmSave(object __instance)
         { Trail.Drop("MCM", "SAVED settings: " + SettingsName(__instance)); }
