@@ -583,27 +583,41 @@ namespace Armoury
                         continue;
                     }
 
+                    int newTier = (int)newItem.Tier;
                     for (int k = 0; k < count; k++)
                     {
                         // najgorsza wojskowa sztuka tego samego typu, gorsza od wkladu
-                        int bestIdx = -1; int bestVal = int.MaxValue;
+                        int bestIdx = -1; int bestVal = int.MaxValue; int cand = 0;
                         for (int i = 0; i < armory.Count; i++)
                         {
                             var el = armory[i];
                             var it = el.EquipmentElement.Item;
                             if (it == null || el.Amount <= 0 || it.ItemType != newItem.ItemType) continue;
                             // ten sam przedmiot w GORSZYM stanie tez jest wymiana
-                            // (zwykle strzaly za "Balanced" - prog v<newVal nizej
-                            // i tak odsieje sztuki identyczne albo lepsze)
                             var id = it.StringId ?? "";
                             if (MusterBook.IsPinnedItem(id)) continue;               // rozkaz z ksiegi swiety
                             int warPart = el.Amount - Math.Min(el.Amount, ArmouryBehavior.StockOf(id));
                             if (warPart <= 0) continue;                              // to wklady gracza
+                            cand++;
                             int v = el.EquipmentElement.ItemValue;
-                            if (v >= newVal) continue;                               // wydajemy tylko GORSZE
+                            // GORSZE = nizszy tier ALBO ten sam tier i mniejsza
+                            // wartosc. Sama cena nie wystarczala: strzaly tego
+                            // samego rodzaju maja identyczna cene bazowa, wiec
+                            // nic nigdy nie przechodzilo progu (Jeff: "dostaje
+                            // 10 sztuk gorszy tier")
+                            int t = (int)it.Tier;
+                            bool worse = t < newTier || (t == newTier && v < newVal);
+                            if (!worse) continue;
                             if (v < bestVal) { bestVal = v; bestIdx = i; }
                         }
-                        if (bestIdx < 0) break;
+                        if (bestIdx < 0)
+                        {
+                            if (k == 0)
+                                Log.Info("Kwatermistrz: brak gorszej sztuki " + newItem.ItemType
+                                         + " od " + newItem.StringId + " (t" + (newTier + 1) + ", " + newVal
+                                         + ") - kandydatow wojskowych: " + cand + ".");
+                            break;
+                        }
                         var old = armory[bestIdx].EquipmentElement;
                         // stara sztuka zostaje w magazynie, ale PRZECHODZI NA
                         // GRACZA (ksiega +1) - przy nastepnym otwarciu lezy na
@@ -613,17 +627,20 @@ namespace Armoury
                         given++; swapped++;
                     }
 
-                    // COFNIETE 29.08 (Jeff: "teraz pozera kazda ilosc strzal!").
-                    // Probowalem tu oddawac wojsku niewymieniona reszte wkladu -
-                    // skutek byl taki, ze wszystko wrzucone znikalo z polki
-                    // gracza bezpowrotnie i nie dostawal NIC w zamian.
-                    // ZASADA: wymiana jest 1:1 albo jej nie ma. Czego wojsko
-                    // nie odkupilo swoim starym sprzetem, ZOSTAJE WLASNOSCIA
-                    // GRACZA i moze to w kazdej chwili wyjac.
+                    // WKLAD ZNIKA Z POLKI GRACZA - ZAWSZE (Jeff 29.08, trzeci
+                    // raz i dosadnie: "MAJA ZNIKNAC BO kwatermistrz je PRZYJAL,
+                    // a pokazuja sie tylko rzeczy, ktore zostaly wymienione").
+                    // Kwatermistrz przyjmuje cala dostawe; na liscie gracza
+                    // zostaje wylacznie to, co wojsko oddalo w zamian.
                     int kept = count - swapped;
                     if (kept > 0)
+                    {
+                        ArmouryBehavior.StockWithdraw(newItem.StringId, kept);
+                        Log.Player("Quartermaster: " + kept + " " + newItem.Name
+                                   + " taken into the company stores - the men had nothing worse of that kind to trade back.", true);
                         Log.Info("Kwatermistrz: " + kept + " szt. " + newItem.StringId
-                                 + " bez pary do wymiany - zostaje na polce gracza.");
+                                 + " przyjete na stan wojska (nie bylo gorszych do wymiany).");
+                    }
                 }
                 _pendingSwaps.Clear();
                 if (given > 0)

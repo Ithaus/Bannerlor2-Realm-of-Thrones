@@ -1,5 +1,28 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-29 — Wklad ZNIKA z polki, wymiana szuka po TIERZE (nie po cenie)
+**Mod:** Armoury | **Pliki:** `Armoury/src/QuartermasterLaw.cs`
+**Problem:** Jeff (trzecie tlumaczenie, dosadne): "wrzucam strzaly, one maja
+ZNIKNAC, bo kwatermistrz je przyjal, a na liscie maja sie pokazywac TYLKO
+rzeczy wymienione - byl komplet, wrzucam 10 lepszych, 10 lepszych znika,
+dostaje 10 gorszego tieru". Na zrzucie: 86 kolczanow lezy dalej na polce
+gracza, a po zabraniu ich licznik spada z 135 na 49.
+**Przyczyna:** (1) po cofnieciu z 17:20 wklad zostawal wlasnoscia gracza -
+czyli nie znikal; (2) GLOWNE: warunek "gorsze" patrzyl WYLACZNIE na cene
+(v < newVal). Strzaly tego samego rodzaju maja identyczna cene bazowa 550,
+wiec zaden kolczan wojska nigdy nie przechodzil progu i wymiana nie miala
+czego wydac - stad "brak gorszych sztuk" w logu przy 49 kolczanach wojska
+na polkach.
+**Zmiana:** (1) wklad ZAWSZE przechodzi na stan wojska i znika z listy
+gracza - na liscie zostaje wylacznie to, co wojsko oddalo w zamian;
+(2) "gorsze" = NIZSZY TIER albo ten sam tier i nizsza wartosc; (3) log
+diagnostyczny "brak gorszej sztuki X - kandydatow wojskowych: N".
+**Ryzyko / co sprawdzic:** wrzucic 10 lepszych strzal przy komplecie ->
+znikaja, na liscie 10 kolczanow nizszego tieru; wrzucic przy brakach ->
+znikaja, komunikat "nothing worse to trade back". Pancerze bez zmian
+(tam wymiana i tak znajdowala gorsze).
+**Status:** WGRANE (watcher - gra dzialala przy buildzie)
+
 ## 2026-08-29 — COFNIETE: kwatermistrz pozeral wklad + zwrot 104 kolczanow
 **Mod:** Armoury | **Pliki:** `Armoury/src/QuartermasterLaw.cs`, `Armoury/src/ArmouryBehavior.cs`
 **Problem:** Jeff: "teraz pozera kazda ilosc strzal!". Build z 17:07 oddawal
