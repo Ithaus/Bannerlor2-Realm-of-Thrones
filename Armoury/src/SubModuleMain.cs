@@ -70,6 +70,7 @@ namespace Armoury
                 DragonUnmount.ApplyAll(_harmony);
                 SlowMuster.ApplyAll(_harmony);
                 SlowHealing.ApplyAll(_harmony);
+                HungerLaw.ApplyAll(_harmony);
                 SkillsDecide.ApplyAll(_harmony);
                 MusterOut.ApplyAll(_harmony);
                 CraftPopup.ApplyAll(_harmony);

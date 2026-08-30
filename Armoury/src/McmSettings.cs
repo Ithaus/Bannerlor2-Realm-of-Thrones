@@ -440,6 +440,10 @@ namespace Armoury
         [SettingPropertyGroup("The lean quartermasters")]
         public int BkSupplyMaxPieces { get; set; } = 12;
 
+        [SettingPropertyBool("Ai Starving Buys Any Price", HintText = "a STARVING AI party buys the cheapest food it can afford at ANY price - hunger does not haggle (vanilla and Banner Kings refuse anything above 120 denars, so lords starve on a full market in wartime)")]
+        [SettingPropertyGroup("The lean quartermasters")]
+        public bool AiStarvingBuysAnyPrice { get; set; } = true;
+
         [SettingPropertyInteger("Volunteer Regen Percent", 0, 200, "0", HintText = "notables refill their volunteer slots at this percent of the normal daily chance - losses should STING, for lords and player alike (100 = vanilla, 0 = off)")]
         [SettingPropertyGroup("The slow muster")]
         public int VolunteerRegenPercent { get; set; } = 50;
@@ -1169,6 +1173,7 @@ namespace Armoury
             s.UniqueCrownHeadArmor = UniqueCrownHeadArmor;
             s.BkSupplyDaysCap = BkSupplyDaysCap;
             s.BkSupplyMaxPieces = BkSupplyMaxPieces;
+            s.AiStarvingBuysAnyPrice = AiStarvingBuysAnyPrice;
             s.VolunteerRegenPercent = VolunteerRegenPercent;
             s.HealingRegenPercent = HealingRegenPercent;
             s.AiHealingRegenPercent = AiHealingRegenPercent;

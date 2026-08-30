@@ -1,5 +1,31 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-30 — HungerLaw: glodna partia AI kupuje jedzenie BEZ limitu ceny
+**Mod:** Armoury | **Pliki:** `Armoury/src/HungerLaw.cs` (nowy), `Settings.cs`,
+`McmSettings.cs` (gen), `SubModuleMain.cs`
+**Problem:** Jeff (po diagnozie glodu): "jak gloduja, to cena nie gra roli -
+kupuja, bo sa glodni". Vanilla (DefaultPartyFoodBuyingModel:37) i BannerKings
+(BKPartyBuyingFoodModel:35) odmawiaja AI zakupu jedzenia od 120 denarow
+wzwyz - w wojennej drozyznie lord stoi na PELNYM targu i gloduje, a glod
+zamienia 25% szeregowych dziennie w rannych. ROT-owy model tylko deleguje
+do BK, wiec limit obowiazywal wszedzie.
+**Przyczyna:** twardy prog 120 w obu implementacjach FindItemToBuy.
+**Zmiana:** postfix na KAZDA zadeklarowana implementacje
+PartyFoodBuyingModel.FindItemToBuy (petla po zaladowanych typach, kazda
+latka w osobnym try): gdy model nie wybral nic, a partia AI (nie gracz)
+GLODUJE - wybieramy najtansza sztuke jedzenia, na ktora ja stac (zloto
+lorda, jak w BK), bez limitu. Parametry Harmony po indeksach __0..__3,
+bo ROT nazywa out-parametr inaczej niz vanilla/BK. Pokretlo MCM
+AiStarvingBuysAnyPrice (The lean quartermasters, domyslnie ON).
+Syty targuje sie po staremu - postfix nie rusza udanych wyborow modelu.
+**Ryzyko / co sprawdzic:** w logu linia "HungerLaw: ... modeli zakupu
+jedzenia zalatanych" (powinno byc >=2: Default+BK; ROT deleguje) oraz
+z czasem "glodne partie kupily juz N szt. ponad limit 120". Na mapie:
+glodujace armie AI stojace w osadach powinny w 1-2 dni przestac glodowac
+(o ile targ ma COKOLWIEK i lorda stac); ranni zaczna schodzic w tempie
+vanilla (AiHealingRegenPercent=100).
+**Status:** DO WGRANIA (pakiet poprawek audytu 30.08)
+
 ## 2026-08-30 — WPIS UZUPELNIAJACY: commity 27-28.08 bez wpisow (naruszenie sekcji 9)
 **Mod:** Armoury | **Pliki:** rozne (patrz commity)
 **Problem:** audyt wykazal 10 commitow kodu z okna 27.08 wieczor - 28.08 rano

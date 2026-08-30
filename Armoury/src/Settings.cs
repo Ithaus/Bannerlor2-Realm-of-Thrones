@@ -129,6 +129,8 @@ namespace Armoury
         public int BkSupplyDaysCap = 1;                    // AI parties stock ONE day of Banner Kings supplies instead of 10 - they buy as they go and ride to market when they run out (0 = off)
         public int BkSupplyMaxPieces = 12;                 // hard ceiling: an AI party never stockpiles more than this many pieces of any one supply - repairs need a few hides, not a warehouse (0 = off)
 
+        public bool AiStarvingBuysAnyPrice = true;         // a STARVING AI party buys the cheapest food it can afford at ANY price - hunger does not haggle (vanilla and Banner Kings refuse anything above 120 denars, so lords starve on a full market in wartime)
+
         // --- The slow muster ---
         public int VolunteerRegenPercent = 50;             // notables refill their volunteer slots at this percent of the normal daily chance - losses should STING, for lords and player alike (100 = vanilla, 0 = off)
 
