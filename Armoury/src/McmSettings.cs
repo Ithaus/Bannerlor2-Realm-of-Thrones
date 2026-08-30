@@ -444,9 +444,9 @@ namespace Armoury
         [SettingPropertyGroup("The lean quartermasters")]
         public bool AiStarvingBuysAnyPrice { get; set; } = true;
 
-        [SettingPropertyInteger("Volunteer Regen Percent", 0, 200, "0", HintText = "notables refill their volunteer slots at this percent of the normal daily chance - losses should STING, for lords and player alike (100 = vanilla, 0 = off)")]
+        [SettingPropertyInteger("Volunteer Regen Percent", 0, 100, "0", HintText = "notables refill their volunteer slots at this percent of the normal daily chance - losses should STING, for lords and player alike (100 = vanilla, 0 = off; Jeff 30.08: halved again, the towns still teemed with recruits)")]
         [SettingPropertyGroup("The slow muster")]
-        public int VolunteerRegenPercent { get; set; } = 50;
+        public int VolunteerRegenPercent { get; set; } = 25;
 
         [SettingPropertyInteger("Healing Regen Percent", 0, 200, "0", HintText = "wounded men and heroes heal on the map at this percent of the normal daily rate - medicine perks still count on top (100 = vanilla)")]
         [SettingPropertyGroup("The slow mending")]

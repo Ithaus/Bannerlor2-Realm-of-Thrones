@@ -1,5 +1,20 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-30 — SlowMuster: odnawianie ochotnikow sciete z 50% na 25%
+**Mod:** Armoury | **Pliki:** `Armoury/src/Settings.cs`, `McmSettings.cs` (gen)
+**Problem:** Jeff: "obnizamy dostepnych poborowych jeszcze o 50% - caly
+czas za duzo jest wojska do poboru w miastach i wioskach".
+**Zmiana:** domyslne VolunteerRegenPercent 50 -> 25 (cwierc vanillowego
+tempa dziennego odnawiania slotow u notabli). Zapis MCM Jeffa NIE zawiera
+tego klucza (sprawdzone w Armoury.json), wiec nowy default wchodzi u niego
+od nastepnego startu gry.
+**Ryzyko / co sprawdzic:** UWAGA na nature pokretla: to TEMPO odnawiania,
+nie wielkosc puli - sloty (do 6/notabla) nadal Z CZASEM dojda do pelna,
+tylko 4x wolniej niz vanilla. Jesli po kilku dniach gry miasta wciaz
+pekaja od rekrutow, nastepny krok to CAP samej puli (np. polowa slotow
+zawsze pusta) - osobna zmiana, na haslo.
+**Status:** WGRANE (30.08, gra zamknieta)
+
 ## 2026-08-30 — KOREKTA CaptiveRags: lachmany w DUZYM podgladzie 3D, ikony przywrocone
 **Mod:** Armoury | **Pliki:** `Armoury/src/CaptiveRags.cs`
 **Problem:** Jeff ze screenem: "zmieniles ich ikony na takie same, ale

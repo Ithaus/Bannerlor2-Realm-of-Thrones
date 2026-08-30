@@ -132,7 +132,7 @@ namespace Armoury
         public bool AiStarvingBuysAnyPrice = true;         // a STARVING AI party buys the cheapest food it can afford at ANY price - hunger does not haggle (vanilla and Banner Kings refuse anything above 120 denars, so lords starve on a full market in wartime)
 
         // --- The slow muster ---
-        public int VolunteerRegenPercent = 50;             // notables refill their volunteer slots at this percent of the normal daily chance - losses should STING, for lords and player alike (100 = vanilla, 0 = off)
+        public int VolunteerRegenPercent = 25;             // notables refill their volunteer slots at this percent of the normal daily chance - losses should STING, for lords and player alike (100 = vanilla, 0 = off; Jeff 30.08: halved again, the towns still teemed with recruits)
 
         // --- The slow mending ---
         public int HealingRegenPercent = 50;               // wounded men and heroes heal on the map at this percent of the normal daily rate - medicine perks still count on top (100 = vanilla)
