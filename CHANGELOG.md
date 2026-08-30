@@ -1,5 +1,24 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-30 — Audyt: uwolnienie towarzysza NIE rozbiera go drugi raz
+**Mod:** RealisticCaptivity | **Pliki:** `RealisticCaptivity/src/CaptivityBehavior.cs`
+**Problem:** znalezisko audytu; Jeff potwierdzil intencje "z niewoli
+wychodzisz nagi - sprzet jest zabierany, tak ma byc". Zabieranie dziala
+przy POJMANIU (StripCompanionGear w OnHeroPrisonerTaken, sprzet do ksiegi
+_companionGear + cena odkupu). Ale OnHeroPrisonerReleased woLal
+StripCompanionGear DRUGI raz - kopiuj-wklej z pojmania. Zwykle no-op
+(towarzysz i tak juz goly), ale gdy gracz wyszedl z niewoli wczesniej
+(RestoreCompanionGear przywraca wtedy sprzet wszystkim towarzyszom, takze
+uwiezionym), pozniejsze uwolnienie towarzysza rozbieralo go PONOWNIE:
+sprzet wracal do ksiegi-limbo i sztucznie podbijal cene odkupu.
+**Przyczyna:** skopiowany blok z OnHeroPrisonerTaken.
+**Zmiana:** przy uwolnieniu towarzysza nie robimy NIC (nagi wychodzi -
+zgodnie z intencja; rozbieranie zostaje wylacznie przy pojmaniu).
+**Ryzyko / co sprawdzic:** pojmany towarzysz nadal traci sprzet (komunikat
+"was stripped of gear as well"); po wykupieniu/uwolnieniu wraca goly,
+cena odkupu bez podwojnych pozycji.
+**Status:** DO WGRANIA (pakiet poprawek audytu 30.08)
+
 ## 2026-08-30 — Audyt: DressCode dostaje bramke ItemReq (zasada nadrzedna skilli)
 **Mod:** Armoury | **Pliki:** `Armoury/src/DressCode.cs`
 **Problem:** znalezisko audytu: DressCode (dopelnianie pustych slotow pancerza

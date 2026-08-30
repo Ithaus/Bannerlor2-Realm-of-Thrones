@@ -555,8 +555,12 @@ namespace RealisticCaptivity
             {
                 if (prisoner != Hero.MainHero)
                 {
-                    if (Settings.Current.StripCompanions && prisoner != null && prisoner.Clan == Clan.PlayerClan)
-                        StripCompanionGear(prisoner);
+                    // rozbieranie jest TYLKO przy pojmaniu (z niewoli wychodzi
+                    // sie nago - sprzet trzyma porywacz, ksiega odkupu pamieta).
+                    // Wczesniej kopiuj-wklej z OnHeroPrisonerTaken rozbieral
+                    // towarzysza DRUGI raz przy uwolnieniu: sprzet przywrocony
+                    // mu po wyjsciu gracza wracal do ksiegi-limbo i sztucznie
+                    // podbijal cene odkupu.
                     return;
                 }
                 OnCaptivityEnded();
