@@ -312,30 +312,6 @@ namespace Armoury
                 var armory = DteArmory();
                 if (rosters == null || rosters.Length == 0 || armory == null || rosters[0] != armory) return true;
 
-                // KSIEGA WKLADOW: kazdy ruch na ekranie zbrojowni ksiegowany -
-                // wkladasz = twoje rosnie, wyjmujesz = twoje maleje (ekran
-                // i tak pokazuje tylko twoje, wiec wyjecie cudzych niemozliwe)
-                try
-                {
-                    var itL = transferCommand.ElementToTransfer.EquipmentElement.Item;
-                    if (itL != null && itL.StringId != null)
-                    {
-                        int nL = Math.Max(1, transferCommand.Amount);
-                        if (transferCommand.FromSide == InventoryLogic.InventorySide.OtherInventory)
-                            ArmouryBehavior.StockWithdraw(itL.StringId, nL);
-                        else if (transferCommand.ToSide == InventoryLogic.InventorySide.OtherInventory)
-                        {
-                            ArmouryBehavior.StockDeposit(itL.StringId, nL);
-                            // wklad zapisany do WYMIANY BARTEROWEJ (rozliczy sie
-                            // przy zamknieciu ekranu - Jeff: "wrzucam t6 luki,
-                            // maja mi wydac gorsze, ktore sprzedam")
-                            QuartermasterEscrow.NoteDeposit(itL, nL,
-                                transferCommand.ElementToTransfer.EquipmentElement.ItemValue);
-                        }
-                    }
-                }
-                catch { }
-
                 if (QuartermasterEscrow.Active) return true;   // lista juz pokazuje tylko wklady gracza
                 if (transferCommand.FromSide != InventoryLogic.InventorySide.OtherInventory) return true;   // wkladasz - wolno zawsze
 
@@ -364,6 +340,49 @@ namespace Armoury
             catch (Exception e) { Log.Error("QuartermasterLaw", e); return true; }
         }
 
+        /// <summary>
+        /// KSIEGA WKLADOW - ksiegowanie PO wykonanym transferze. W prefixie
+        /// ksiega rosla/malala nawet wtedy, gdy sam transfer zaraz potem
+        /// blokowal nasz wlasny return false albo prefix DTE (CommandersGreed) -
+        /// w Harmony 2 wszystkie prefiksy biegna takze po czyims false.
+        /// __runOriginal mowi wprost, czy ruch sprzetu naprawde sie odbyl.
+        /// </summary>
+        public static void BookPostfix(InventoryLogic __instance, ref TransferCommand transferCommand, bool __runOriginal)
+        {
+            try
+            {
+                if (!__runOriginal) return;                     // transfer zablokowany - nic sie nie stalo
+                var s = Settings.Current;
+                if (s == null || !s.ArmouryProtectUsed) return;
+                if (_fRosters == null || _fArmory == null) return;
+                var rosters = _fRosters.GetValue(__instance) as ItemRoster[];
+                var armory = DteArmory();
+                if (rosters == null || rosters.Length == 0 || armory == null || rosters[0] != armory) return;
+
+                var it = transferCommand.ElementToTransfer.EquipmentElement.Item;
+                if (it == null || it.StringId == null) return;
+                int n = Math.Max(1, transferCommand.Amount);
+                if (transferCommand.FromSide == InventoryLogic.InventorySide.OtherInventory)
+                {
+                    ArmouryBehavior.StockWithdraw(it.StringId, n);
+                    // wycofanie wkladu w TEJ samej sesji ekranu kasuje tez
+                    // jego wpis w rejestrze wymian - inaczej przy zamknieciu
+                    // kwatermistrz rozliczy wklad, ktorego juz nie ma
+                    QuartermasterEscrow.NoteWithdraw(it, n);
+                }
+                else if (transferCommand.ToSide == InventoryLogic.InventorySide.OtherInventory)
+                {
+                    ArmouryBehavior.StockDeposit(it.StringId, n);
+                    // wklad zapisany do WYMIANY BARTEROWEJ (rozliczy sie
+                    // przy zamknieciu ekranu - Jeff: "wrzucam t6 luki,
+                    // maja mi wydac gorsze, ktore sprzedam")
+                    QuartermasterEscrow.NoteDeposit(it, n,
+                        transferCommand.ElementToTransfer.EquipmentElement.ItemValue);
+                }
+            }
+            catch (Exception e) { Log.Error("BookPostfix", e); }
+        }
+
         /// <summary>DLL DTE nazywa sie z numerem wersji (v1.4.7) - szukamy typu po WSZYSTKICH zestawach.</summary>
         internal static Type FindType(string fullName)
         {
@@ -389,7 +408,8 @@ namespace Armoury
 
                 var m = AccessTools.Method(typeof(InventoryLogic), "TransferItem");
                 if (m == null) { Log.Info("QuartermasterLaw: brak InventoryLogic.TransferItem."); return; }
-                h.Patch(m, prefix: new HarmonyMethod(typeof(QuartermasterLaw), "Prefix"));
+                h.Patch(m, prefix: new HarmonyMethod(typeof(QuartermasterLaw), "Prefix"),
+                        postfix: new HarmonyMethod(typeof(QuartermasterLaw), "BookPostfix"));
 
                 // zbrojownia to nie smietnik: po kazdym przeliczeniu donacji
                 // gasimy XP-za-discard, gdy lewa strona ekranu to magazyn DTE
@@ -522,6 +542,32 @@ namespace Armoury
                 if (!weaponish && !item.HasArmorComponent) return;
                 _pendingSwaps.Add(new KeyValuePair<ItemObject, KeyValuePair<int, int>>(
                     item, new KeyValuePair<int, int>(n, value)));
+            }
+            catch { }
+        }
+
+        /// <summary>Gracz wycofal wklad w tej samej sesji ekranu: zdejmij
+        /// ilosc z rejestru wymian (od najnowszych wpisow). Bez tego przy
+        /// zamknieciu ProcessSwaps rozliczal wklad, ktorego juz nie bylo -
+        /// wydawal gorsze sztuki wojska za nic albo zdejmowal z ksiegi
+        /// gracza sztuki dawno zabrane.</summary>
+        internal static void NoteWithdraw(ItemObject item, int n)
+        {
+            try
+            {
+                if (item == null || n <= 0 || _pendingSwaps.Count == 0) return;
+                string id = item.StringId ?? "";
+                for (int i = _pendingSwaps.Count - 1; i >= 0 && n > 0; i--)
+                {
+                    var kv = _pendingSwaps[i];
+                    if (kv.Key == null || (kv.Key.StringId ?? "") != id) continue;
+                    int cut = Math.Min(kv.Value.Key, n);
+                    n -= cut;
+                    int left = kv.Value.Key - cut;
+                    if (left <= 0) _pendingSwaps.RemoveAt(i);
+                    else _pendingSwaps[i] = new KeyValuePair<ItemObject, KeyValuePair<int, int>>(
+                        kv.Key, new KeyValuePair<int, int>(left, kv.Value.Value));
+                }
             }
             catch { }
         }

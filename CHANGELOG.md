@@ -1,5 +1,26 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-30 — Audyt: uczciwa ksiega wkladow (ksiegowanie PO transferze + wycofanie kasuje wymiane)
+**Mod:** Armoury | **Pliki:** `Armoury/src/QuartermasterLaw.cs`
+**Problem:** dwa znaleziska audytu o tej samej ksiedze: (1) Prefix na
+InventoryLogic.TransferItem ksiegowal ruch ZANIM transfer mogl zostac
+zablokowany (nasz wlasny return false przy progu need/have albo prefix DTE
+CommandersGreed - w Harmony 2 wszystkie prefiksy biegna po czyims false);
+ksiega rozjezdzala sie z faktycznym ruchem sprzetu. (2) Wycofanie wkladu
+w TEJ samej sesji ekranu nie kasowalo wpisu w _pendingSwaps - przy
+zamknieciu kwatermistrz rozliczal wklad, ktorego juz nie bylo (wydawal
+gorsze sztuki za nic albo zdejmowal z ksiegi sztuki dawno zabrane).
+**Przyczyna:** ksiegowanie w prefixie bez wiedzy, czy oryginal pobiegl;
+NoteDeposit bez lustrzanego NoteWithdraw.
+**Zmiana:** (1) ksiegowanie przeniesione do BookPostfix z wstrzykiwanym
+__runOriginal (Harmony 2.4) - ksiega rusza sie tylko po REALNYM transferze;
+(2) nowy QuartermasterEscrow.NoteWithdraw zdejmuje wycofane sztuki z
+rejestru wymian od najnowszych wpisow, wolany z BookPostfix przy wyjeciu.
+**Ryzyko / co sprawdzic:** wrzucic i od razu wyjac te same strzaly, zamknac
+ekran -> zadnej wymiany, zadnych komunikatow kwatermistrza; sprobowac wyjac
+sprzet ponizej progu (odbity komunikatem) -> licznik wkladow bez zmian.
+**Status:** DO WGRANIA (pakiet poprawek audytu 30.08)
+
 ## 2026-08-30 — Audyt: komplet 0 = wojsko nie bierze NIC
 **Mod:** Armoury | **Pliki:** `Armoury/src/QuartermasterLaw.cs`
 **Problem:** znalezisko audytu (33 agentow, potwierdzone adwersaryjnie): gdy
