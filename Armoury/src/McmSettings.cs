@@ -580,9 +580,9 @@ namespace Armoury
         [SettingPropertyGroup("The law of the battlefield")]
         public bool SimBattleFullDrop { get; set; } = true;
 
-        [SettingPropertyInteger("Player Loot Share Percent", 0, 160, "0", HintText = "your cut of what the party strips from the dead; the rest stays in the army armoury (a lone wanderer takes all)")]
+        [SettingPropertyInteger("Player Loot Share Percent", 0, 120, "0", HintText = "your cut of what the party strips from the dead; the rest stays in the army armoury (a lone wanderer takes all) - 30 = the historical captain's third (Jeff 30.08)")]
         [SettingPropertyGroup("The law of the battlefield")]
-        public int PlayerLootSharePercent { get; set; } = 40;
+        public int PlayerLootSharePercent { get; set; } = 30;
 
         [SettingPropertyBool("Wreck Salvage Enabled", HintText = "the piece smashed by the killing blow is not lost - it lands in the loot as a wreck to mend at the forge")]
         [SettingPropertyGroup("The law of the battlefield")]

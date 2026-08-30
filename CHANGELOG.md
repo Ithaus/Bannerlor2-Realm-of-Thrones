@@ -1,5 +1,16 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-30 — Dzialka kapitanska 40% -> 30% (historyczne "thirds")
+**Mod:** Armoury | **Pliki:** `Armoury/src/Settings.cs`, `McmSettings.cs` (gen)
+**Problem:** Jeff po rozmowie o realiach kompanii najemnych ("to dajemy
+30%"): dzialka gracza z lupow zdjetych przez wojsko z zabitych ma
+odpowiadac sredniowiecznej trzeciej czesci kapitana.
+**Zmiana:** domyslne PlayerLootSharePercent 40 -> 30. Zapis MCM Jeffa
+nie zawiera klucza (sprawdzone), default wchodzi od nastepnego startu.
+**Ryzyko / co sprawdzic:** log kwatermistrza po bitwie: "N szt. (30%)
+z magazynu wojska czeka na ekran lupow".
+**Status:** WGRANE (30.08, gra zamknieta)
+
 ## 2026-08-30 — SlowMuster: odnawianie ochotnikow sciete z 50% na 25%
 **Mod:** Armoury | **Pliki:** `Armoury/src/Settings.cs`, `McmSettings.cs` (gen)
 **Problem:** Jeff: "obnizamy dostepnych poborowych jeszcze o 50% - caly

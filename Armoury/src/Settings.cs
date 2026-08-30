@@ -181,7 +181,7 @@ namespace Armoury
         public bool BattlefieldLawEnabled = true;          // battles you fight yourself: the dead drop their real gear (DTE), Spoils of War steps aside
         public bool LootArrivesBattleWorn = true;          // loot-screen items from fought battles arrive battle-worn but keep their worth
         public bool SimBattleFullDrop = true;              // auto-resolved battles ignore the hidden per-tier drop multipliers
-        public int PlayerLootSharePercent = 40;            // your cut of what the party strips from the dead; the rest stays in the army armoury (a lone wanderer takes all)
+        public int PlayerLootSharePercent = 30;            // your cut of what the party strips from the dead; the rest stays in the army armoury (a lone wanderer takes all) - 30 = the historical captain's third (Jeff 30.08)
         public bool WreckSalvageEnabled = true;            // the piece smashed by the killing blow is not lost - it lands in the loot as a wreck to mend at the forge
         public int LootMinConditionPercent = 3;            // gear battered down to this percent of its worth or less is DESTROYED - it never reaches the loot screen (0 = off)
         public int LegendaryLootValueFloor = 100000;       // weapons worth this much clean (the named blades of the realm) never lie in the common loot sacks (0 = off)
