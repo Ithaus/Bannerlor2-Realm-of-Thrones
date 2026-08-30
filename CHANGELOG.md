@@ -1,5 +1,26 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-30 — Audyt: 4 opcje wait-menu schodza z zakazanego SwitchToMenu (znany CTD)
+**Mody:** Armoury, RealisticCaptivity | **Pliki:** `Armoury/src/SmithMenu.cs`,
+`Armoury/src/HideoutPurge.cs`, `RealisticCaptivity/src/Work.cs`
+**Problem:** znalezisko audytu: cztery opcje menu OCZEKIWANIA wolaly
+GameMenu.SwitchToMenu z wnetrza konsekwencji opcji - dokladnie wzorzec,
+ktory dal CTD "Rouse the men early" (NRE w GameMenuVM.OnFrameTick,
+CLAUDE.md sekcja 7) i zostal naprawiony w NightRest, a te miejsca zostaly:
+arm_work_wait "Put the work aside", arm_project_wait "Step away",
+arm_hideout_search_wait "Call the search off", rc_work_* "Enough of this toil".
+**Przyczyna:** kod starszy niz odkrycie pulapki; nikt nie wrocil z poprawka.
+**Zmiana:** wszystkie cztery na GameMenu.ExitToLast() wzorem NightRest.
+ExitToLast wraca do menu, z ktorego sie weszlo (kuznia/warsztat, kryjowka,
+town/village) - czyli tam, gdzie i tak celowal SwitchToMenu. Wywolania
+SwitchToMenu z TICKOW wait-menu (SmithMenu:187/1485, Work:344) zostaja -
+to wzorzec vanillowy, sam w sobie nie crashowal.
+**Ryzyko / co sprawdzic:** kliknac kazda z 4 opcji w trakcie czekania -
+powrot do poprzedniego menu bez crasha; "Put the work aside" z warsztatu
+naprawy wraca teraz do MENDMENU (krok wstecz), nie do glownego menu kuzni -
+jesli to przeszkadza, mozna przelaczyc w nastepnym ticku.
+**Status:** DO WGRANIA (pakiet poprawek audytu 30.08)
+
 ## 2026-08-30 — Audyt: magazyn w calosci gracza (Active=false) dziala jak nalezy
 **Mod:** Armoury | **Pliki:** `Armoury/src/QuartermasterLaw.cs`
 **Problem:** znalezisko audytu: gdy CALY magazyn nalezy do gracza, HoldReserve

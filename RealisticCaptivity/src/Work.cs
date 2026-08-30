@@ -172,7 +172,10 @@ namespace RealisticCaptivity
                 starter.AddGameMenuOption(id, id + "_stop",
                     "{=!}Enough of this toil (stop working)",
                     delegate (MenuCallbackArgs a) { a.optionLeaveType = GameMenuOption.LeaveType.Leave; return true; },
-                    delegate (MenuCallbackArgs a) { GameMenu.SwitchToMenu(_cameFrom); }, true, 9);
+                    // ZAKAZ SwitchToMenu z opcji menu OCZEKIWANIA (CTD "Rouse the
+                    // men early" - CLAUDE.md); ExitToLast wraca tam, skad weszlismy
+                    // (_cameFrom), bo praca zawsze startuje z town/village
+                    delegate (MenuCallbackArgs a) { GameMenu.ExitToLast(); }, true, 9);
             }
         }
 

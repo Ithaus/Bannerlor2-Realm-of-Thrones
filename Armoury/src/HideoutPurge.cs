@@ -284,7 +284,10 @@ namespace Armoury
                 starter.AddGameMenuOption("arm_hideout_search_wait", "arm_hideout_search_stop",
                     "{=!}Call the search off",
                     delegate (MenuCallbackArgs a) { a.optionLeaveType = GameMenuOption.LeaveType.Leave; return true; },
-                    delegate (MenuCallbackArgs a) { GameMenu.SwitchToMenu("arm_hideout_search"); }, true, 9);
+                    // wait-menu: zadnego SwitchToMenu z opcji (CTD w GameMenuVM
+                    // .OnFrameTick); ExitToLast wraca do arm_hideout_search,
+                    // bo stamtad tu weszlismy
+                    delegate (MenuCallbackArgs a) { GameMenu.ExitToLast(); }, true, 9);
             }
             catch (Exception e) { Log.Error("HideoutPurge.AddMenus", e); }
         }

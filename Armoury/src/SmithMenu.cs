@@ -131,7 +131,9 @@ namespace Armoury
             starter.AddGameMenuOption("arm_work_wait", "arm_work_stop",
                 "{=!}Put the work aside (nothing finished, nothing paid)",
                 delegate (MenuCallbackArgs a) { a.optionLeaveType = GameMenuOption.LeaveType.Leave; return true; },
-                delegate (MenuCallbackArgs a) { _workApply = null; GameMenu.SwitchToMenu(Menu); }, true, 9);
+                // ZAKAZ SwitchToMenu z opcji menu OCZEKIWANIA (CTD w GameMenuVM
+                // .OnFrameTick - patrz NightRest.LeaveSleep); wychodzimy krok wstecz
+                delegate (MenuCallbackArgs a) { _workApply = null; GameMenu.ExitToLast(); }, true, 9);
 
             starter.AddGameMenuOption(Menu, "arm_leave",
                 "{=!}Wipe your hands and step out", LeaveCondition,
@@ -145,7 +147,8 @@ namespace Armoury
             starter.AddGameMenuOption("arm_project_wait", "arm_proj_wait_stop",
                 "{=!}Step away - the work can wait",
                 delegate (MenuCallbackArgs a) { a.optionLeaveType = GameMenuOption.LeaveType.Leave; return true; },
-                delegate (MenuCallbackArgs a) { GameMenu.SwitchToMenu(Menu); }, true, 9);
+                // wait-menu: zadnego SwitchToMenu z opcji (CTD) - krok wstecz
+                delegate (MenuCallbackArgs a) { GameMenu.ExitToLast(); }, true, 9);
         }
 
         // ------------------------------------------------- czekanie przy projektach
