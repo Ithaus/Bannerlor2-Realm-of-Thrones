@@ -57,12 +57,18 @@ namespace Armoury
                 if (!needAny) return;
 
                 var dressed = eq.Clone();
+                var troop = ch as TaleWorlds.CampaignSystem.CharacterObject;
                 int given = 0;
                 foreach (var sl in ArmourSlots)
                 {
                     if (!dressed[sl].IsEmpty) continue;
                     var it = tpl[sl].Item;
                     if (it == null) continue;
+                    // ZASADA NADRZEDNA (Jeff, ksiega musztry): bez skilla nie
+                    // uzywasz - takze przy dopelnianiu ze wzorca. Slot, ktory
+                    // chwile temu oproznil egzekutor skilli (DragonUnmount),
+                    // nie moze dostac tej samej sztuki tylnymi drzwiami.
+                    if (troop != null && !ItemReq.Meets(troop, it)) continue;
                     dressed[sl] = new EquipmentElement(it);
                     given++;
                 }

@@ -1,5 +1,24 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-30 — Audyt: DressCode dostaje bramke ItemReq (zasada nadrzedna skilli)
+**Mod:** Armoury | **Pliki:** `Armoury/src/DressCode.cs`
+**Problem:** znalezisko audytu: DressCode (dopelnianie pustych slotow pancerza
+ze wzorca oddzialu, prefix Priority.Last na Mission.SpawnAgent) ubieral
+zolnierza BEZ sprawdzenia ItemReq - mogl wlozyc hełm difficulty 140 ponad
+Athletics jednostki, w tym sztuke, ktora chwile wczesniej zdjal egzekutor
+skilli w DragonUnmount (bo biegnie OSTATNI). Jedyna dziura w zasadzie
+"bez skilla nie uzywasz" (SkillsDecide/DragonUnmount/kwatermistrz/GrandTourney
+egzekwuja ja wszedzie indziej).
+**Przyczyna:** DressCode powstal do golych zbojcow w kryjowkach, przed
+domknieciem zasady nadrzednej.
+**Zmiana:** kazda dokladana sztuka przechodzi ItemReq.Meets(CharacterObject,
+item); bez skilla slot zostaje pusty (kara underequipped DTE i tak liczona
+z przydzialu, nie z naszych dolozek).
+**Ryzyko / co sprawdzic:** kryjowka z niskotierowymi zbojcami - dalej maja
+byc ubrani (ich wzorce maja niskie difficulty); log "DressCode: ... dostal
+ubranie ze wzorca" moze pokazywac mniejsze liczby przy elitarnych wzorcach.
+**Status:** DO WGRANIA (pakiet poprawek audytu 30.08)
+
 ## 2026-08-30 — Audyt: 4 opcje wait-menu schodza z zakazanego SwitchToMenu (znany CTD)
 **Mody:** Armoury, RealisticCaptivity | **Pliki:** `Armoury/src/SmithMenu.cs`,
 `Armoury/src/HideoutPurge.cs`, `RealisticCaptivity/src/Work.cs`
