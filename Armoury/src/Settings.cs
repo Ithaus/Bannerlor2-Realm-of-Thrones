@@ -131,6 +131,10 @@ namespace Armoury
 
         public bool AiStarvingBuysAnyPrice = true;         // a STARVING AI party buys the cheapest food it can afford at ANY price - hunger does not haggle (vanilla and Banner Kings refuse anything above 120 denars, so lords starve on a full market in wartime)
 
+        // --- The crossing law ---
+        public bool CrossingLawEnabled = true;             // fortified crossings (The Twins) bar their bridge to ENEMIES of the holder - allies and neutrals pass; take the castle, make peace, or go by sea
+        public float CrossingRadius = 3f;                  // how far the bridge watch reaches around the crossing castle
+
         // --- The slow muster ---
         public int VolunteerRegenPercent = 25;             // notables refill their volunteer slots at this percent of the normal daily chance - losses should STING, for lords and player alike (100 = vanilla, 0 = off; Jeff 30.08: halved again, the towns still teemed with recruits)
 

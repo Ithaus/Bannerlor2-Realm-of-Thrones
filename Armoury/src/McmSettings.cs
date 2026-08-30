@@ -444,6 +444,14 @@ namespace Armoury
         [SettingPropertyGroup("The lean quartermasters")]
         public bool AiStarvingBuysAnyPrice { get; set; } = true;
 
+        [SettingPropertyBool("Crossing Law Enabled", HintText = "fortified crossings (The Twins) bar their bridge to ENEMIES of the holder - allies and neutrals pass; take the castle, make peace, or go by sea")]
+        [SettingPropertyGroup("The crossing law")]
+        public bool CrossingLawEnabled { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Crossing Radius", 0.00f, 12.00f, "0.00", HintText = "how far the bridge watch reaches around the crossing castle")]
+        [SettingPropertyGroup("The crossing law")]
+        public float CrossingRadius { get; set; } = 3f;
+
         [SettingPropertyInteger("Volunteer Regen Percent", 0, 100, "0", HintText = "notables refill their volunteer slots at this percent of the normal daily chance - losses should STING, for lords and player alike (100 = vanilla, 0 = off; Jeff 30.08: halved again, the towns still teemed with recruits)")]
         [SettingPropertyGroup("The slow muster")]
         public int VolunteerRegenPercent { get; set; } = 25;
@@ -1178,6 +1186,8 @@ namespace Armoury
             s.BkSupplyDaysCap = BkSupplyDaysCap;
             s.BkSupplyMaxPieces = BkSupplyMaxPieces;
             s.AiStarvingBuysAnyPrice = AiStarvingBuysAnyPrice;
+            s.CrossingLawEnabled = CrossingLawEnabled;
+            s.CrossingRadius = CrossingRadius;
             s.VolunteerRegenPercent = VolunteerRegenPercent;
             s.HealingRegenPercent = HealingRegenPercent;
             s.AiHealingRegenPercent = AiHealingRegenPercent;

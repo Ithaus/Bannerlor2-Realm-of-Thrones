@@ -365,7 +365,11 @@ namespace Armoury
             // zlodziej istnieje; jak stoi - to zmiana wzorca po awansie.
             CampaignEvents.PlayerUpgradedTroopsEvent.AddNonSerializedListener(this, OnPlayerUpgradedTroops);
             // klawisz O na mapie: szybki oboz (BannerKings) bez klikania przez ekrany
-            CampaignEvents.TickEvent.AddNonSerializedListener(this, delegate (float dt) { NightRest.OnTick(dt); });
+            CampaignEvents.TickEvent.AddNonSerializedListener(this, delegate (float dt)
+            {
+                NightRest.OnTick(dt);
+                try { CrossingLaw.OnTick(dt); } catch { }
+            });
             CampaignEvents.SettlementEntered.AddNonSerializedListener(this,
                 delegate (MobileParty mp, Settlement st, Hero h)
                 {

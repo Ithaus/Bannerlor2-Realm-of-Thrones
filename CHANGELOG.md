@@ -1,5 +1,32 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-30 — PRAWO PRZEPRAWY: The Twins nie przepuszczaja wrogow (nowy CrossingLaw)
+**Mod:** Armoury | **Pliki:** `Armoury/src/CrossingLaw.cs` (nowy),
+`Settings.cs`, `McmSettings.cs` (gen), `ArmouryBehavior.cs`
+**Problem:** Jeff ze screenem spod Twins: "jak to mozliwe, ze jako wroga
+armia moge przejsc przez Twins?! Ten, kto ma zamek, przepuszcza
+sojusznikow, a wrogow nie!". Bliznaki (ROT_town3) to JEDYNY most przez
+Zielona Galaz - Freyowie zyli z bramkowania przeprawy, a gra traktuje
+most jak zwykly teren przechodni.
+**Zmiana:** nowy CrossingLaw (tick co 0.5 s): partia GRACZA w stanie
+WOJNY z wlascicielem przeprawy nie wjedzie w jej strefe (CrossingRadius,
+domyslnie 3) - straz mostu wypycha ja SetMoveGoToPoint na ostatnia
+bezpieczna pozycje (zero teleportow, naturalny ruch; po wczytaniu save'a
+w strefie - odepchniecie prosto od zamku). Sojusznicy, neutralni i
+wlasna frakcja przechodza. Komunikat: "The Twins bar the crossing...
+Take the castle, make peace, or go by sea" (throttle 5 s). Pomijane:
+gracz w osadzie, w bitwie, w cudzej armii (decyduje jej dowodca).
+Pokretla MCM: Crossing Law Enabled, Crossing Radius. Lista przepraw
+w kodzie (na razie The Twins; kolejne mosty-warownie do dopisania).
+ETAP 1 CELOWO TYLKO GRACZ: wypychanie wrogich armii AI grozi zapetleniem
+ich pathfindingu (armia klinuje sie o strefe w nieskonczonosc) - decyzja
+po testach.
+**Ryzyko / co sprawdzic:** podjechac pod Twins bedac w wojnie z
+wlascicielem -> partia zawraca sama, komunikat; po pokoju/zdobyciu -
+przejazd wolny; strefa nie moze lapac za rzeka (jesli promien 3 za
+szeroki/waski - suwak w MCM).
+**Status:** ZBUDOWANE - watcher wgra po zamknieciu gry
+
 ## 2026-08-30 — Legendarny luk bez plusow: RBM chowal bonus w Fire Rate, ktorego nie pokazywalismy
 **Mod:** Armoury | **Pliki:** `Armoury/src/CraftPopup.cs`, `Armoury/src/QualityRich.cs`
 **Problem:** Jeff ze screenem (Legendary Ravens' Teeth Longbow): "wykulem
