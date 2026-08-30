@@ -318,11 +318,16 @@ namespace Armoury
                 var item = transferCommand.ElementToTransfer.EquipmentElement.Item;
                 if (item == null) return true;
 
+                int take = Math.Max(1, transferCommand.Amount);
+                // WLASNE sztuki zawsze do odebrania: gdy caly magazyn nalezy
+                // do gracza, escrow nie startuje (Active=false) i prog
+                // need/have blokowal odbior wlasnego wkladu
+                if (ArmouryBehavior.StockOf(item.StringId) >= take) return true;
+
                 int troops = TroopCount();
                 int need = NeedFor(item.ItemType);
                 if (need <= 0) return true;                                   // typ bez progu - wolny
                 int have = HaveFor(armory, item.ItemType);
-                int take = Math.Max(1, transferCommand.Amount);
                 if (have - take >= need) return true;                          // zostaje zapas - wydaj
 
                 int surplus = Math.Max(0, have - need);
@@ -579,7 +584,10 @@ namespace Armoury
         {
             try
             {
-                if (!Active && _held.Count == 0) return;
+                // _pendingSwaps tez trzyma otwarta sprawe: gdy CALY magazyn
+                // nalezy do gracza, nic nie bylo schowane (Active=false),
+                // a wklady z sesji i tak musza sie rozliczyc przy zamknieciu
+                if (!Active && _held.Count == 0 && _pendingSwaps.Count == 0) return;
                 var armory = QuartermasterLaw.DteArmory();
                 if (armory != null)
                     foreach (var kv in _held) armory.AddToCounts(kv.Key, kv.Value);

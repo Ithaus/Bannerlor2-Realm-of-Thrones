@@ -1,5 +1,23 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-30 — Audyt: magazyn w calosci gracza (Active=false) dziala jak nalezy
+**Mod:** Armoury | **Pliki:** `Armoury/src/QuartermasterLaw.cs`
+**Problem:** znalezisko audytu: gdy CALY magazyn nalezy do gracza, HoldReserve
+nie ma czego chowac (Active=false) i wtedy (1) prog need/have potrafil
+ZABLOKOWAC odbior WLASNYCH sztuk gracza ("the men still use these"), a
+(2) ReleaseReserve wychodzil wczesnym returnem i wymiana barterowa wkladow
+z tej sesji w ogole nie startowala - wklady wisialy w _pendingSwaps do
+nastepnego otwarcia, gdzie kasowal je swiezy Clear().
+**Przyczyna:** prog pisany z mysla o sztukach wojska; early-return Release
+zawiazany na _held, nie na sprawy do rozliczenia.
+**Zmiana:** (1) w Prefixie: sztuki pokryte ksiega gracza (StockOf >= take)
+zawsze przechodza; (2) ReleaseReserve nie wychodzi, gdy _pendingSwaps ma
+wpisy - ProcessSwaps biegnie takze przy pustym depozycie.
+**Ryzyko / co sprawdzic:** swiezy magazyn zlozony tylko z wkladow gracza:
+wszystko da sie wyjac bez komunikatow; wrzucone wklady rozliczaja sie przy
+zamknieciu (przyjecie do kompletu / nadwyzka zostaje).
+**Status:** DO WGRANIA (pakiet poprawek audytu 30.08)
+
 ## 2026-08-30 — Audyt: ksiega-duch przycinana do realnych polek
 **Mod:** Armoury | **Pliki:** `Armoury/src/ArmouryBehavior.cs`, `Armoury/src/QuartermasterLaw.cs`
 **Problem:** znalezisko audytu: sztuki zaksiegowane na gracza znikaja z polek
