@@ -1,5 +1,49 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-30 — Mendy: giganci nosza wlasna skore (Atletyka 150) + martwy widget DTE uspiony (A6)
+**Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs`, `CrashScribe/src/SubModuleMain.cs`
+**Problem:** (1) Jeff: "czemu gigant ma atletyke 40?" - dane ROT: jednostki
+giant/giant_archer/giant_rider maja Atletyke 20-40 (ROT-Troops.xml), a ich
+wlasne pancerze difficulty 120-150 (giant_garb 150, giant_boots 120 w
+ROTassets.xml). Vanilla difficulty sprawdza tylko GRACZOWI, wiec autorzy ROT
+wpisali skille jednostek na odczepnego; nasza zasada nadrzedna egzekwuje je
+takze jednostkom - egzekutor rozbieral gigantow z wlasnej skory i wsadzal
+w ludzkie kaftany. (2) A6 z ERRORS.md: martwy wskaznik gotowosci zbrojowni
+DTE na pasku mapy (nigdy sie nie wyswietla - pada w inicjalizacji na 1.4.8)
+rzucal AmbiguousMatchException przy KAZDYM odswiezeniu paska: 604/sesje.
+Jeff potwierdzil, ze zadnego paska nie widzi.
+**Zmiana (decyzje Jeffa: "NAPRAWIC" + mend za darmo):** (1) Mends.GiantSinew
+(nowy MendsBehavior, OnSessionLaunched): jednostkom o id giant*/*_giant
+Atletyka podbita do 150 przez PropertyOwner.SetPropertyValue - chirurgicznie,
+reszta z 548 rozjazdow danych ROT nietknieta; log per gigant. (2) prefix
+return-false na MapArmoryReadinessMixin.OnRefresh - odswiezanie uspione,
+przycisk otwierania zbrojowni zostaje (osobna droga).
+**Ryzyko / co sprawdzic:** w logu CrashScribe przy starcie sesji linie
+"Mends: gigant ... Atletyka 20 -> 150" i "martwy wskaznik ... uspiony";
+w SUMMARY sesji AmbiguousMatchException ma zniknac (bylo 604/8); giganci
+w bitwie znow w garbach.
+**Status:** WGRANE (30.08, gra zamknieta)
+
+## 2026-08-30 — Stajnie AI: wielblady i rydwany tylko u swoich + id ras w logu
+**Mod:** Armoury | **Pliki:** `Armoury/src/Stables.cs`
+**Problem:** Jeff: "czemu rydwany i camels sa w armiach AI na POLNOCY
+i dostepne do zakupu? kamele w zimowym srodowisku?!". Nasze stajnie AI
+kupowaly wierzchowce dwoma drogami bez patrzenia na klimat: (1) z targu
+osady - najtanszy IsPlainMount, wiec zawleczony handlem/lupami wielblad
+w Winterfell szedl prosto pod siodlo Boltonow; (2) u hodowcy (CheapestMount)
+- fallback "najtanszy kon, jakiego zna swiat" mogl globalnie wybrac
+wielblada/rydwan (ROT ma chariot1-4 jako wierzchowce). Log nie zapisywal
+CO kupiono, wiec nie bylo jak tego wysledzic.
+**Przyczyna:** brak filtra kulturowego dla ras egzotycznych.
+**Zmiana:** obie sciezki pomijaja itemy o id zawierajacym camel/chariot,
+gdy kultura itemu != kulturze osady (u Dornijczykow/Essos kupuja jak dotad);
+log zakupu podaje teraz id ras: "kupil N koni [id1,id2] w ...".
+**Ryzyko / co sprawdzic:** w Armoury.log wpisy "Stajnia AI: ... [sumpter_horse]
+w Karhold" - zadnych camel/chariot poza poludniem; DRUGA sciezka zawleczenia
+(lupy DTE po bitwach z poludniem - magazyn partii przydziela jezdzcom co ma)
+zostaje - to inna mechanika, do decyzji osobno.
+**Status:** WGRANE (30.08, gra zamknieta)
+
 ## 2026-08-30 — KOREKTA po przegladzie: wyjscie z wait-menu przez TICK (ExitToLast byl bledny)
 **Mody:** Armoury, RealisticCaptivity | **Pliki:** `Armoury/src/SmithMenu.cs`,
 `Armoury/src/HideoutPurge.cs`, `RealisticCaptivity/src/Work.cs`

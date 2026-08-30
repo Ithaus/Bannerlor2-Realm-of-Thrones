@@ -22,8 +22,71 @@ namespace CrashScribe
     /// </summary>
     internal static class Mends
     {
+        /// <summary>Prefix usypiajacy odswiezanie martwego widgetu DTE (A6).</summary>
+        internal static bool SkipDteMapWidget() { return false; }
+
+        /// <summary>
+        /// GIGANCI Z WATY (decyzja Jeffa 30.08, ERRORS A-dane): ROT daje
+        /// gigantom pancerze difficulty 120-150 (giant_garb/giant_boots),
+        /// a samym jednostkom Atletyke 20-40 - vanilla tego nie sprawdza,
+        /// nasza zasada nadrzedna tak, wiec egzekutor rozbieral gigantow
+        /// z wlasnej skory. Podbijamy Atletyke gigantow do 150. Chirurgicznie:
+        /// tylko id zaczynajace sie od "giant" albo zawierajace "_giant".
+        /// Reszta z 548 rozjazdow danych ROT zostaje jak byla.
+        /// </summary>
+        internal static void GiantSinew()
+        {
+            try
+            {
+                int fixedN = 0;
+                foreach (var co in TaleWorlds.ObjectSystem.MBObjectManager.Instance
+                             .GetObjectTypeList<CharacterObject>())
+                {
+                    if (co == null || co.IsHero) continue;
+                    var id = co.StringId ?? "";
+                    if (!id.StartsWith("giant") && !id.Contains("_giant")) continue;
+                    int ath = co.GetSkillValue(DefaultSkills.Athletics);
+                    if (ath >= 150) continue;
+                    var skills = co.GetDefaultCharacterSkills();
+                    var owner = skills != null ? skills.Skills : null;
+                    var mSet = owner != null ? AccessTools.Method(owner.GetType(), "SetPropertyValue") : null;
+                    if (mSet == null)
+                    {
+                        Scribe.Line("Mends: GiantSinew - brak Skills/SetPropertyValue na " + id + ", mend spi.");
+                        return;
+                    }
+                    mSet.Invoke(owner, new object[] { DefaultSkills.Athletics, 150 });
+                    fixedN++;
+                    Scribe.Line("Mends: gigant " + id + " - Atletyka " + ath + " -> 150 (nosi wlasna skore).");
+                }
+                if (fixedN == 0)
+                    Scribe.Line("Mends: GiantSinew - zadnych gigantow do podbicia.");
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.GiantSinew", null); } catch { } }
+        }
+
         internal static void Install(Harmony harmony)
         {
+            try
+            {
+                // ===== A6: MARTWY WIDGET DTE NA PASKU MAPY =====
+                // MapArmoryReadinessMixin (wskaznik gotowosci zbrojowni przy
+                // zegarze mapy) pada na 1.4.8 w inicjalizacji swojej bazy
+                // (AmbiguousMatch w UIExtenderEx) i KAZDE odswiezenie paska
+                // rzuca od nowa - 604 wyjatki w sesji 29.08, a wskaznika
+                // i tak nie widac. Usypiamy samo odswiezanie; przycisk
+                // otwierania zbrojowni ma osobna droge i zostaje.
+                var tMix = QuietType("MapArmoryReadinessMixin");
+                var mRef = tMix != null ? AccessTools.Method(tMix, "OnRefresh") : null;
+                if (mRef != null)
+                {
+                    harmony.Patch(mRef, prefix: new HarmonyMethod(typeof(Mends), "SkipDteMapWidget"));
+                    Scribe.Line("Mends: martwy wskaznik gotowosci DTE na pasku mapy uspiony (bylo 604 wyjatki/sesje).");
+                }
+                else Scribe.Line("Mends: MapArmoryReadinessMixin nieobecny - nic do usypiania.");
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.Install(dteWidget)", null); } catch { } }
+
             try
             {
                 // Zaciezny w bitwie przy oblezeniu (wycieczka obroncow, "continue_siege
@@ -1000,5 +1063,18 @@ namespace CrashScribe
                 return false;   // lepiej pominac skutek niz polozyc gre
             }
         }
+    }
+
+    /// <summary>Mendy na DANYCH gry (nie na kodzie) musza czekac, az swiat
+    /// wstanie - obiekty jednostek istnieja dopiero po starcie sesji.</summary>
+    internal sealed class MendsBehavior : CampaignBehaviorBase
+    {
+        public override void RegisterEvents()
+        {
+            CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this,
+                delegate (CampaignGameStarter s) { Mends.GiantSinew(); });
+        }
+
+        public override void SyncData(IDataStore dataStore) { }
     }
 }

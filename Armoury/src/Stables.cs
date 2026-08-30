@@ -217,6 +217,7 @@ namespace Armoury
                 if (budget < 50) return;
 
                 int bought = 0, paid = 0;
+                string what = null;   // id kupionych ras do logu (diagnoza "skad kamele")
                 // 1. z targu osady - najtansze najpierw
                 var shelf = settlement.ItemRoster;
                 while (need > 0 && shelf != null)
@@ -227,6 +228,12 @@ namespace Armoury
                         var el = shelf[i];
                         var it = el.EquipmentElement.Item;
                         if (it == null || el.Amount <= 0 || !IsPlainMount(it)) continue;
+                        // KLIMAT (Jeff 30.08: "kamele w zimowym srodowisku?!"):
+                        // wielblad/rydwan schodzi z targu tylko u swoich -
+                        // lord Polnocy nie wsadzi jazdy na dromadery
+                        var iid = it.StringId ?? "";
+                        if ((iid.Contains("camel") || iid.Contains("chariot"))
+                            && (settlement.Culture == null || it.Culture != settlement.Culture)) continue;
                         int price = PriceOf(settlement, el.EquipmentElement);
                         if (price < bestPrice) { bestPrice = price; best = i; }
                     }
@@ -238,6 +245,8 @@ namespace Armoury
                     shelf.AddToCounts(chosen.EquipmentElement, -take);
                     party.ItemRoster.AddToCounts(chosen.EquipmentElement, take);
                     paid += take * bestPrice; bought += take; need -= take;
+                    var cid = chosen.EquipmentElement.Item != null ? chosen.EquipmentElement.Item.StringId : "?";
+                    if (what == null) what = cid; else if (!what.Contains(cid)) what += "," + cid;
                 }
 
                 // 2. targ pusty, a lord potrzebuje - zamawia u hodowcy (narzut za fatyge)
@@ -252,13 +261,16 @@ namespace Armoury
                             party.ItemRoster.AddToCounts(nag, 1);
                             paid += price; bought++; need--;
                         }
+                        var nid = nag.StringId ?? "?";
+                        if (what == null) what = nid; else if (!what.Contains(nid)) what += "," + nid;
                     }
                 }
 
                 if (bought <= 0) return;
                 _lastBuy[pid] = today;
                 TaleWorlds.CampaignSystem.Actions.GiveGoldAction.ApplyForCharacterToSettlement(lord, settlement, paid);
-                Log.Info("Stajnia AI: " + lord.Name + " kupil " + bought + " koni w " + settlement.Name
+                Log.Info("Stajnia AI: " + lord.Name + " kupil " + bought + " koni ["
+                         + (what ?? "?") + "] w " + settlement.Name
                          + " za " + paid + " (czekalo na awans " + (want - Math.Max(0, c.AiMountSpareBuffer))
                          + ", mial " + have + ").");
             }
@@ -367,6 +379,12 @@ namespace Armoury
                 {
                     if (!IsPlainMount(it) || it.NotMerchandise || it.Value <= 0) continue;
                     if (it.ItemCategory != DefaultItemCategories.Horse) continue;      // hodowca ma zwykle konie
+                    // KLIMAT (Jeff 30.08: "kamele w zimowym srodowisku?!"):
+                    // wielblady i rydwany kupuje sie WYLACZNIE tam, gdzie to
+                    // miejscowa rasa - hodowca w Winterfell nie trzyma dromadera
+                    var iid = it.StringId ?? "";
+                    if ((iid.Contains("camel") || iid.Contains("chariot"))
+                        && (st.Culture == null || it.Culture != st.Culture)) continue;
                     if (any == null || it.Value < any.Value) any = it;
                     if (st.Culture != null && it.Culture == st.Culture
                         && (local == null || it.Value < local.Value)) local = it;
