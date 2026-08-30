@@ -44,21 +44,36 @@ ROT odpala wydarzenia serialowe po dacie kampanii. Problemy, ktore rozwiazuje `F
 - wydarzenie, ktoremu swiat odjechal, jest omijane po 6 dniach na czele kolejki
 - os czasu jest mnozona przez `FabulaTimeScale` (2.0), bo rok wydluzylismy do 168 dni
 
-## Stan swiata (dla orientacji, 25.08.2026)
+## Stan swiata (dla orientacji, 30.08.2026)
 
-- kampania: **dzien ~195**, Summer 1085
-- odpalone: Ned, RiverlandsDeclareWar, HarrenhalSiegeNotification, HarrenhalSiege, Harrenhal
-- **Nocny Krol zyje**, ale w jeden dzien gry stracil armie z **828 do 72** trupow
-- **0 osad za Murem** — do inwazji brakuje mu wszystkich 25; Mur jest bezpieczny
-- trwa wojna **Free Folk vs Nights Watch**, Polnoc bije sie z Krolewska Przystania i Zelaznymi Wyspami
+- kampania: **dzien ~597**, Winter 1087; **13 rownoczesnych wojen** (KRONIKA
+  WOJEN w logu) — przez to targi bywaja puste i armie AI gloduja (glod rani
+  25% szeregowych dziennie; bohaterowie tylko traca HP, stad lordowie
+  "zdrowi" wsrod samych rannych)
+- fabula ROT: odpalone m.in. WallSiege i Wall (pelna lista w logu "FABULA
+  ROT odpalone")
+- **Nocny Krol zyje i odbudowuje sie po kazdej przegranej** (pila w logach:
+  836 -> 212 -> 796; 30.08 rano 759 -> 834). Klan niewybijalny przed inwazja
+  (CanHeroDie=false), nekromancja wskrzesza po kazdej bitwie
+- **0/25 osad za Murem od 594 dni** — prog oblezenia (>=500 zdrowych w JEDNEJ
+  bandzie, realnie ~1000-1500 przez warunki przewagi i limit rosnacy
+  +3/dzien) jest poza zasiegiem band po ~200 trupow. Inwazja mechanicznie
+  mozliwa, praktycznie zamrozona balansem ROT. Dzwignia:
+  `OthersNecromancyMultiplier` w MCM ROT (sekcja Others, domyslnie 1.0)
 
 ## Rzeczy niedokonczone / do decyzji
 
-- **Namiot obozu** — mechanizm cofniety po CTD; do zrobienia od nowa, ostroznie
-  (bez globalnego wylacznika, bez dotykania wizerunkow co klatke).
-- **Obozowanie bandytow** — Jeff tego chcial, zostalo cofniete razem z reszta. Wrocic
-  osobno, z limitem ikon i testem po kazdym kroku.
-- **Dlug snu w pogoni** — jw.
-- **BK `GetHeroesToUpdate`** — 37 601 wyjatkow na sesje, latka zaproponowana, czeka na zgode.
+- **Namiot obozu, obozowanie bandytow, dlug snu** — ODBUDOWANE 26-27.08
+  (wpisy w CHANGELOG); dzialaja, pilnowac tylko zasad z CLAUDE.md przy
+  zmianach (zadnych globalnych wylacznikow, zadnych wizerunkow co klatke).
+- **BK relacje (dawne 37 601 NRE)** — zalatane bramami RelationsUpdateGate
+  + EssosTitleGate; 30.08 zero wyjatkow. Szczegoly: ERRORS.md A4.
+- **DTE AmbiguousMatchException na pasku mapy** — najwiekszy zywy generator
+  wyjatkow (604/sesje), udokumentowane jako ERRORS.md A6, mend do decyzji.
+- **Panel wyniku kucia (CraftPopup)** — WGRANE, wciaz NIEZWERYFIKOWANE przez
+  Jeffa (dzwiek + Done bez crasha).
 - **Pokretla, ktorych Jeff nie ustawil**: `SmithingSkillPerTier` 45→35,
-  `DurabilityPerArmorPoint` 20→6-8, `MinSellPercentOfValue` 5→2-3, tempa marszu.
+  `DurabilityPerArmorPoint` 20→6-8, `MinSellPercentOfValue` 5→2-3, tempa
+  marszu; po sledztwie glodu takze `BkSupplyDaysCap` 1→3-4 (nasz temper
+  tnie zywnosc z sakw BK i przyspiesza glod AI o 2-4 dni).
+- **PLAN-kuznia-1do1 krok 5** (popup wyboru klas pancerza) — bez decyzji.

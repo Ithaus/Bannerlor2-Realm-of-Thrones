@@ -56,25 +56,25 @@ czyli polnocne wsie wystawialy **wolny lud** i **Westerlands Noble Youth**.
 kulture notabla do kultury osady i zerujemy obce sloty ochotnikow. W logu:
 `Mends: <imie> w <osada> byl freefolk, jest battania (Preacher).`
 
-### A4. BannerKings: 37 601 NullReference na sesje — NIENAPRAWIONE (do decyzji)
+### A4. BannerKings: lawina NullReference w relacjach — ZALATANE BRAMAMI (30.08: zero wyjatkow)
 
-`BannerKings.Behaviours.Relations.HeroRelations.GetHeroesToUpdate()`:
+Historycznie 37 601 NRE na sesje z okolic `HeroRelations`/`BKRelationsModel`.
+Dwie galezie, obie juz obstawione (wpisy w CHANGELOG 26.08 i 28.08):
 
-```csharp
-foreach (Kingdom k in Kingdom.All)
-    hashSet.Add(k.Leader);          // <-- linia 115
-```
+- **RelationsUpdateGate** (prefix na `HeroRelations.UpdateRelations`): odcina
+  notabli bez osady/wlasciciela, zanim poleci NRE.
+- **EssosTitleGate** (prefix na `BKRelationsModel.CalculateModifiers`): odcina
+  bohaterow Essos bez tytulu osady.
 
-`Kingdom.Leader` = `RulingClan.Leader`. Krolestwo bez klanu rzadzacego (zniszczone,
-swiezo zbuntowane) → getter rzuca NullReference. Leci to **dla kazdego bohatera**,
-a kazdy przelatuje **wszystkie krolestwa**. Jedno zepsute krolestwo = tysiace wyjatkow
-na godzine. Koszt: budowa sladu stosu przy kazdym rzucie.
+Dowod z logu 30.08 (session-2026-08-30_07-11-12.log): "relacje notabl-lord bez
+tytulu osady (Essos) - odciete 4000 razy, zero wyjatkow" oraz "pominieto
+notabla bez osady/wlasciciela, lacznie 1501". **Sesja bez ani jednego NRE
+z tego zrodla.**
 
-Nasz `Mends.SafeRelations` lapie skutek dalej (`BKRelationsModel.CalculateModifiers`),
-ale rzut i tak nastepuje.
-
-**Proponowana naprawa**: latka na `GetHeroesToUpdate`, ktora pomija krolestwa bez wladcy
-i raz loguje, ktore to jest. **Nie zrobiona — czeka na zgode Jeffa.**
+Potencjalnie otwarta pozostaje trzecia galaz: `Kingdom.Leader` =
+`RulingClan.Leader` rzuca NRE dla krolestwa bez klanu rzadzacego (linia 115
+w `GetHeroesToUpdate`). Dzis NIE wystepuje (zadne krolestwo nie jest w tym
+stanie); gdyby wrocila, latka to pominiecie krolestw bez wladcy w petli.
 
 ### A5. BKROTPatch: dwie latki bez celu — NIESZKODLIWE, nie ruszac
 
@@ -85,6 +85,23 @@ i raz loguje, ktore to jest. **Nie zrobiona — czeka na zgode Jeffa.**
   po nazwie tekstowej — mod nieobecny → `Undefined target method`.
 
 ~20 wyjatkow raz, przy ladowaniu. Zero kosztu w grze.
+
+### A6. DTE: AmbiguousMatchException na ticku UI mapy — NIENAPRAWIONE (do decyzji)
+
+`DynamicTroopEquipmentReupload.GUIExtensions.MapArmoryReadinessMixin` (widget
+gotowosci zbrojowni na pasku mapy) -> `UIExtenderEx BaseViewModelMixin<MapBarVM>`
+cctor -> `AccessTools2.Method` -> `Type.GetMethod` konczy sie
+**AmbiguousMatchException** na 1.4.8 (niejednoznaczna metoda na MapBarVM).
+Cctor pada raz, po czym KAZDE odswiezenie paska mapy (MapBarVM.Tick) rzuca
+ponownie: **604 wyjatki w sesji 29.08 (session-2026-08-29_15-09-41.log:467),
+8 w krotkiej sesji 30.08** — to obecnie najwiekszy zywy generator wyjatkow,
+koszt budowy sladu stosu na ticku UI.
+
+Gra nie pada (UIExtenderEx lapie), ale widget gotowosci najpewniej martwy.
+**Ewentualny mend** (do decyzji Jeffa): wylaczyc odswiezanie tego jednego
+mixina DTE — kosztem widgetu na pasku (przycisk otwierania zbrojowni ma
+osobna droge). Ostroznie: ForgeView tez zyje na UIExtenderEx, mend nie moze
+dotykac cudzych mixinow.
 
 ---
 

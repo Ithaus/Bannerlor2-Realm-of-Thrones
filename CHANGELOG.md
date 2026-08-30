@@ -1,5 +1,24 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-30 — WPIS UZUPELNIAJACY: commity 27-28.08 bez wpisow (naruszenie sekcji 9)
+**Mod:** Armoury | **Pliki:** rozne (patrz commity)
+**Problem:** audyt wykazal 10 commitow kodu z okna 27.08 wieczor - 28.08 rano
+BEZ zadnego wpisu w dzienniku - drugie konto Claude nie mialo skad o nich
+wiedziec, a ostatni wpis o odwecie kryjowki podawal wartosci sprzeczne
+z kodem (promien 20 i pogon 24h vs realne 40 i 48h).
+**Uzupelnienie (stan koncowy w kodzie):**
+- `ef0891b` GuardMaster: slad zycia w logu.
+- `bc3aa52` + `ce577bb` SmithAudit: diagnoza rafinacji (formula i stan
+  wyniku w sakwach przed/po - lapanie "Thamaskene sie nie dodaje").
+- `4dc6bbc` + `2d778a0` + `cc267f5` odwet kryjowki, stan koncowy:
+  walka przerywa pladrowanie, vendetta JEDNORAZOWA, pogon **48h**,
+  promien odwetu **40** (nie 20/24h jak mowil wczesniejszy wpis).
+- `60f75e1` garbarnia miejska.
+- `c823bc6` + `708f6b4` + `fdbf05e` BkSupplyTemper, stan koncowy: zapasy
+  BK partii AI ciete do **1 dnia / 12 sztuk** na kategorie.
+- `57cdf23` CleanseDragons takze w lupach.
+**Status:** WGRANE (od 28.08; wpis czysto dokumentacyjny)
+
 ## 2026-08-30 — Audyt: kosmetyka - naglowek Armoury.log + diakrytyki/cyrylica precz
 **Mody:** Armoury, RealisticCaptivity, CrashScribe | **Pliki:** `Armoury/src/Log.cs`
 + 9 plikow z komentarzami
