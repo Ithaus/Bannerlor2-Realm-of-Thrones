@@ -163,6 +163,32 @@ namespace Armoury
             return NeedFor(type);
         }
 
+        /// <summary>Ile sztuk tego typu jest WLASNOSCIA WOJSKA (calosc polek
+        /// minus ksiega wkladow gracza). Po tym liczymy, ile jeszcze uniosa
+        /// na sobie - Jeff 30.08: "max znika 214, bo tyle jest na ludziach".</summary>
+        internal static int WarOwnedOf(ItemRoster armory, ItemObject.ItemTypeEnum type)
+        {
+            int war = 0;
+            try
+            {
+                var allowance = new Dictionary<string, int>();
+                for (int i = 0; i < armory.Count; i++)
+                {
+                    var el = armory[i];
+                    var it = el.EquipmentElement.Item;
+                    if (it == null || el.Amount <= 0 || it.ItemType != type) continue;
+                    string id = it.StringId ?? "";
+                    int left;
+                    if (!allowance.TryGetValue(id, out left)) left = ArmouryBehavior.StockOf(id);
+                    int mine = Math.Min(el.Amount, Math.Max(0, left));
+                    allowance[id] = left - mine;
+                    war += el.Amount - mine;
+                }
+            }
+            catch { }
+            return war;
+        }
+
         internal static readonly ItemObject.ItemTypeEnum[] KitTypes =
         {
             ItemObject.ItemTypeEnum.HeadArmor, ItemObject.ItemTypeEnum.BodyArmor,
@@ -635,11 +661,31 @@ namespace Armoury
                     int kept = count - swapped;
                     if (kept > 0)
                     {
-                        ArmouryBehavior.StockWithdraw(newItem.StringId, kept);
-                        Log.Player("Quartermaster: " + kept + " " + newItem.Name
-                                   + " taken into the company stores - the men had nothing worse of that kind to trade back.", true);
-                        Log.Info("Kwatermistrz: " + kept + " szt. " + newItem.StringId
-                                 + " przyjete na stan wojska (nie bylo gorszych do wymiany).");
+                        // WOJSKO BIERZE TYLKO TYLE, ILE UNIESIE NA SOBIE
+                        // (Jeff 30.08: "skoro lucznicy potrzebuja 214 sztuk,
+                        // to max znika 214, bo tyle jest na ludziach").
+                        // Wszystko ponad komplet zostaje wlasnoscia gracza.
+                        int needT = QuartermasterLaw.NeedForType(newItem.ItemType);
+                        int warHave = QuartermasterLaw.WarOwnedOf(armory, newItem.ItemType);
+                        int room = needT > 0 ? Math.Max(0, needT - warHave) : kept;
+                        int take = Math.Min(kept, room);
+                        if (take > 0)
+                        {
+                            ArmouryBehavior.StockWithdraw(newItem.StringId, take);
+                            Log.Player("Quartermaster: " + take + " " + newItem.Name
+                                       + " go to the men (" + (warHave + take) + " of " + needT
+                                       + " now in hand) - they had nothing worse of that kind to trade back.", true);
+                            Log.Info("Kwatermistrz: " + take + " szt. " + newItem.StringId
+                                     + " na stan wojska (mieli " + warHave + ", potrzeba " + needT + ").");
+                        }
+                        int spare = kept - take;
+                        if (spare > 0)
+                        {
+                            Log.Player("Quartermaster: the men are at full kit for " + newItem.Name
+                                       + " - the spare " + spare + " stays on YOUR shelf.", true);
+                            Log.Info("Kwatermistrz: nadwyzka " + spare + " szt. " + newItem.StringId
+                                     + " zostaje graczowi (komplet " + needT + " osiagniety).");
+                        }
                     }
                 }
                 _pendingSwaps.Clear();

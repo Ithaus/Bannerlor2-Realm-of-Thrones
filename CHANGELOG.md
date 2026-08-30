@@ -1,5 +1,49 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-30 — Wojsko bierze najwyzej do KOMPLETU, nadwyzka zostaje graczowi
+**Mod:** Armoury | **Pliki:** `Armoury/src/QuartermasterLaw.cs`
+**Problem:** Jeff (po potwierdzeniu, ze wklad juz znika): "skoro lucznicy
+potrzebuja 214 sztuk, to max znika 214 - bo tyle jest na ludziach".
+Kwatermistrz zabieral CALY wklad bez gornej granicy.
+**Przyczyna:** blok `kept` oddawal wojsku wszystko, czego nie wymieniono,
+nie patrzac na zapotrzebowanie kompanii.
+**Zmiana:** (1) nowy pomocnik `WarOwnedOf(armory, type)` - ile sztuk danego
+typu nalezy do WOJSKA (calosc polek minus ksiega wkladow gracza, liczona
+per id z uwzglednieniem wielu stosow); (2) wojsko przyjmuje najwyzej
+`need - warHave` sztuk, reszta ZOSTAJE wlasnoscia gracza; (3) dwa jasne
+komunikaty: "N go to the men (X of Y now in hand)" oraz "the men are at
+full kit - the spare N stays on YOUR shelf".
+**Ryzyko / co sprawdzic:** wrzucic wiecej kolczanow niz brakuje do 214 ->
+znika tylko brakujaca czesc, nadwyzka widoczna na liscie gracza.
+**Status:** WGRANE (plik zweryfikowany przez cmp; GRA WYMAGA RESTARTU -
+przy wgrywaniu w pamieci byly 2 procesy Bannerlorda)
+
+## STAN SPRAWY "AMUNICJA" NA 30.08 (dla drugiego konta Claude)
+Model docelowy, potwierdzony przez Jeffa punkt po punkcie:
+1. Gracz wrzuca sprzet do zbrojowni -> po zamknieciu ekranu wklad ZNIKA
+   z jego listy, bo kwatermistrz go przyjal. Na liscie gracza pokazuje sie
+   WYLACZNIE to, co wojsko oddalo w zamian.
+2. Wymiana: za sztuke lepsza wojsko oddaje swoja NAJGORSZA tego samego typu.
+   "Gorsza" = nizszy tier, a przy rownym tierze nizsza wartosc. Porownanie
+   po samej cenie NIE dziala dla amunicji (wszystkie strzaly danego rodzaju
+   maja identyczna cene bazowa 550) - to byl glowny blad.
+3. Wojsko bierze najwyzej do kompletu (need = Bows*2 dla strzal, liczone
+   z lucznikow). Nadwyzka zostaje graczowi.
+Naprawione po drodze: strzaly/belty wpuszczone do wymiany (byly celowo
+wykluczone w NoteDeposit); licznik amunicji x2 na glowe w ksiedze musztry.
+COFNIETE jako bledne: prog nadwyzki blokujacy wymiane przy brakach;
+jednorazowy zwrot 104 kolczanow (RefundSeizedAmmo - metoda zostaje w kodzie,
+nikt jej nie wola).
+WAZNE Z AUDYTU DTE (20 agentow, potwierdzone w zdekompilowanym kodzie):
+- licznik "have" liczy CALA zawartosc polek, razem z wkladem gracza;
+- jednostka to KOLCZAN, nie strzala (49/214 = kolczany, ~20-30 strzal kazdy);
+- DTE odejmuje kolczan z magazynu przy spawnie zolnierza, a po bitwie
+  zwraca go TYLKO gdy zostala w nim choc jedna strzala. Kolczan wystrzelany
+  do zera przepada na trwale - to jest naturalne zrodlo ubytku amunicji,
+  nie blad naszego kodu.
+NIEZWERYFIKOWANE PRZEZ JEFFA: panel wyniku kucia (dzwiek + Done bez crasha),
+ksiega stanow magazynu przez save (arm_armory_wear), log "AWANS ... magazyn".
+
 ## 2026-08-30 — Jeff gral na STARYM DLL; zwrot kolczanow wylaczony
 **Mod:** Armoury | **Pliki:** `Armoury/src/ArmouryBehavior.cs`
 **Problem:** Jeff pokazal krok po kroku: 49 strzal -> wrzuca 86 -> zamyka
