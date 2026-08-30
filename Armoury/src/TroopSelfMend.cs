@@ -9,10 +9,13 @@ namespace Armoury
     /// <summary>
     /// WOJSKO SAMO LATA SWOJ SPRZET (Jeff 29.08: "dostaja zold i czesc lupow,
     /// niech za to naprawiaja; jak im nie starczy, to ja moge"). Kazdego dnia
-    /// w MIESCIE (jest kowal) zolnierze oddaja do naprawy do N najgorszych
-    /// sztuk z magazynu kwatermistrza - placa ze swojego zoldu, gracz nie
-    /// wydaje ani grosza. Reszta czeka na nastepny dzien albo na reke gracza
-    /// w kuzni (jak dotad).
+    /// w MIESCIE (jest kowal) zolnierze oddaja do naprawy najgorsze sztuki
+    /// z magazynu kwatermistrza - placa ze swojego zoldu, gracz nie wydaje
+    /// ani grosza. Po przerobce 30.08 (Jeff: "10 szt./dzien to bez sensu,
+    /// niech naprawiaja PROCENT uszkodzen") dzienna robota to PROCENT calej
+    /// puli zuzytych sztuk (min. 3, zeby ogon nie wisial wiecznie) - pelny
+    /// remont trwa ~100/procent dni postoju NIEZALEZNIE od wielkosci armii.
+    /// Kto sie spieszy, placi kowalowi (Send the men's worn gear...).
     /// </summary>
     internal static class TroopSelfMend
     {
@@ -21,7 +24,7 @@ namespace Armoury
             try
             {
                 var s = Settings.Current;
-                if (s == null || !s.TroopSelfMendEnabled || s.TroopSelfMendPerDay <= 0) return;
+                if (s == null || !s.TroopSelfMendEnabled || s.TroopSelfMendPercentPerDay <= 0) return;
                 var main = MobileParty.MainParty;
                 if (main == null || st == null || main.CurrentSettlement != st) return;
                 if (!st.IsTown) return;   // naprawa wymaga kowala z prawdziwym warsztatem
@@ -43,7 +46,11 @@ namespace Armoury
                 worn.Sort((a, b) => a.EquipmentElement.ItemModifier.PriceMultiplier
                     .CompareTo(b.EquipmentElement.ItemModifier.PriceMultiplier));
 
-                int budget = s.TroopSelfMendPerDay, mended = 0;
+                int wornTotal = 0;
+                foreach (var el in worn) wornTotal += el.Amount;
+                int budget = Math.Max(3, (int)Math.Round(wornTotal * s.TroopSelfMendPercentPerDay / 100.0));
+                if (budget > wornTotal) budget = wornTotal;
+                int mended = 0;
                 foreach (var el in worn)
                 {
                     if (budget <= 0) break;

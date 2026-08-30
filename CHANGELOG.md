@@ -1,5 +1,22 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-30 — TroopSelfMend: procent uszkodzen dziennie zamiast plaskich 10 sztuk
+**Mod:** Armoury | **Pliki:** `Armoury/src/TroopSelfMend.cs`, `Settings.cs`, `McmSettings.cs` (gen)
+**Problem:** Jeff: "10 sztuk dziennie to bez sensu - niech naprawiaja
+procent uszkodzen, calosc trwa ~10 dni, a jak chce szybciej, place sam".
+Plaska liczba nie skalowala sie: przy 250 wojska i setkach zuzytych sztuk
+samonaprawa trwala wiecznosc, przy malej druzynie byla ekspresem.
+**Zmiana:** pokretlo TroopSelfMendPerDay (sztuki) zastapione
+TroopSelfMendPercentPerDay (domyslnie 10): kazdego dnia postoju w MIESCIE
+wojsko naprawia 10% CALEJ puli zuzytych sztuk magazynu (min. 3 szt., zeby
+ogon nie wisial wiecznie), z wlasnego zoldu. Pelny remont = ~100/procent
+dni postoju NIEZALEZNIE od wielkosci armii. Platny kowal ("Send the men's
+worn gear to the smith") bez zmian = natychmiast za zloto gracza.
+Stare pole usuniete (zapis MCM Jeffa nie zawieral klucza - sprawdzone).
+**Ryzyko / co sprawdzic:** log "TroopSelfMend: wojsko naprawilo N sztuk"
+- N ma rosnac z wielkoscia zaleglosci (10% puli), nie stac na 10.
+**Status:** WGRANE (30.08, gra zamknieta)
+
 ## 2026-08-30 — Dzialka kapitanska 40% -> 30% (historyczne "thirds")
 **Mod:** Armoury | **Pliki:** `Armoury/src/Settings.cs`, `McmSettings.cs` (gen)
 **Problem:** Jeff po rozmowie o realiach kompanii najemnych ("to dajemy

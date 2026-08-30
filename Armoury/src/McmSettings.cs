@@ -476,9 +476,9 @@ namespace Armoury
         [SettingPropertyGroup("The finished piece")]
         public bool TroopSelfMendEnabled { get; set; } = true;
 
-        [SettingPropertyInteger("Troop Self Mend Per Day", 0, 40, "0", HintText = "how many pieces a day the men can afford to have mended")]
+        [SettingPropertyInteger("Troop Self Mend Percent Per Day", 0, 40, "0", HintText = "the men mend this PERCENT of all battle-worn pieces in the stores each day in town (at least 3 pieces) - a full refit takes about 100/percent days of rest; pay the smith yourself to skip the wait")]
         [SettingPropertyGroup("The finished piece")]
-        public int TroopSelfMendPerDay { get; set; } = 10;
+        public int TroopSelfMendPercentPerDay { get; set; } = 10;
 
         [SettingPropertyBool("Troop Skill Auto Fit", HintText = "troops are audited on load: any skill below the demands of their OWN template gear (armour->Athletics, mount->Riding, weapons->their class) is raised to match - the elite keeps its heavy plate because it has earned the muscles")]
         [SettingPropertyGroup("Skills rule the gear")]
@@ -1186,7 +1186,7 @@ namespace Armoury
             s.CraftResultPopup = CraftResultPopup;
             s.RichQualityModifiers = RichQualityModifiers;
             s.TroopSelfMendEnabled = TroopSelfMendEnabled;
-            s.TroopSelfMendPerDay = TroopSelfMendPerDay;
+            s.TroopSelfMendPercentPerDay = TroopSelfMendPercentPerDay;
             s.TroopSkillAutoFit = TroopSkillAutoFit;
             s.SkillsDecideEnabled = SkillsDecideEnabled;
             s.ElephantQuarantineEnabled = ElephantQuarantineEnabled;
