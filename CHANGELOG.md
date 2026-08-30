@@ -1,5 +1,26 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-30 — Panel kucia: naprawiona semantyka wiersza statow (+N jak przy mieczach) + diagnoza
+**Mod:** Armoury | **Pliki:** `Armoury/src/CraftPopup.cs`
+**Problem:** Jeff (Balanced Ravens' Teeth): "mam balanced, ale nie mam
+graficznego +2 jak w mieczach". Dekompilacja widgetu wiersza
+(CraftedWeaponDesignResultListPanel) pokazala SEMANTYKE: InitValue ma byc
+BAZA, ChangeAmount roznica - widget sam animuje baze -> baza+roznica
+i pokazuje zielone "+N". My podawalismy InitValue = wartosc JUZ
+z bonusem - przy niezerowej roznicy widget doliczalby bonus DRUGI raz,
+a wyswietlana wartosc startowa byla zmodyfikowana (bez animacji plusa
+z bazy). Ustalone tez po drodze: RBM patchuje ModifyDamage (Damage
+dziala u niego PROCENTOWO), ModifySpeed/MissileSpeed zostawia vanilla -
+wiec Balanced (+5 speed wg RBM XML) MA dawac widoczny plus przy Fire Rate.
+**Zmiana:** (1) AddProp podaje (baza, roznica) zgodnie z widgetem;
+(2) twarda linia diagnostyczna w logu przy KAZDYM popupie: "CraftPopup
+diag: mod=<id> dmg= spd= msl= hp= pm= | Stat base->mod; ..." - nastepne
+kucie Jeffa rozstrzygnie na liczbach, gdyby plusy dalej nie wchodzily.
+**Ryzyko / co sprawdzic:** wykuc luk z jakoscia -> Fire Rate startuje od
+bazy i po chwili animuje sie w gore z zielonym +N; w Armoury.log linia
+"CraftPopup diag" z polami modyfikatora.
+**Status:** ZBUDOWANE - watcher wgra po zamknieciu gry
+
 ## 2026-08-30 — Kwatermistrz przyjmuje tez KONIE (ten sam blad co ze strzalami)
 **Mod:** Armoury | **Pliki:** `Armoury/src/QuartermasterLaw.cs`
 **Problem:** Jeff ze screenem ("Horse 52/83"): "wrzucam konie, kwatermistrz

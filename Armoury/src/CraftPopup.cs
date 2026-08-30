@@ -186,15 +186,32 @@ namespace Armoury
             string label, int baseVal, int modVal)
         {
             if (baseVal <= 0 && modVal <= 0) return;
+            // SEMANTYKA WIDGETU (CraftedWeaponDesignResultListPanel):
+            // InitValue = BAZA, ChangeAmount = roznica; widget sam animuje
+            // baze -> baza+roznica i pokazuje zielone "+N". Wczesniej
+            // podawalismy modVal jako InitValue - przy niezerowej roznicy
+            // widget doliczalby bonus DRUGI raz.
             list.Add(new WeaponDesignResultPropertyItemVM(
-                new TextObject("{=!}" + label, null), modVal, modVal - baseVal, false));
+                new TextObject("{=!}" + label, null), baseVal, modVal - baseVal, false));
+            _lastDiag.Append(label).Append(' ').Append(baseVal).Append("->").Append(modVal).Append("; ");
         }
+
+        private static readonly StringBuilder _lastDiag = new StringBuilder();
 
         private static MBBindingList<WeaponDesignResultPropertyItemVM> BuildProps(ItemObject item, ItemModifier mod)
         {
             var list = new MBBindingList<WeaponDesignResultPropertyItemVM>();
             try
             {
+                // DIAGNOZA PLUSOW (Jeff 30.08: "balanced bez +2"): jedna linia
+                // prawdy o modyfikatorze i kazdej stacie - bez zgadywania
+                _lastDiag.Length = 0;
+                if (mod != null)
+                    _lastDiag.Append("mod=").Append(mod.StringId)
+                        .Append(" dmg=").Append(mod.Damage).Append(" spd=").Append(mod.Speed)
+                        .Append(" msl=").Append(mod.MissileSpeed).Append(" hp=").Append(mod.HitPoints)
+                        .Append(" pm=").Append(mod.PriceMultiplier.ToString("0.00")).Append(" | ");
+                else _lastDiag.Append("mod=NULL | ");
                 if (item.HasArmorComponent)
                 {
                     var a = item.ArmorComponent;
@@ -233,6 +250,7 @@ namespace Armoury
                 }
                 list.Add(new WeaponDesignResultPropertyItemVM(
                     new TextObject("{=!}Weight", null), item.Weight, 0f, true));
+                Log.Info("CraftPopup diag: " + _lastDiag);
             }
             catch (Exception e) { Log.Error("CraftPopup.BuildProps", e); }
             return list;
