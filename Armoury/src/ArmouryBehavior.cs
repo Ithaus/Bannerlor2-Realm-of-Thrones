@@ -631,7 +631,11 @@ namespace Armoury
                             if (item == null || item.ItemType == ItemObject.ItemTypeEnum.Banner) continue;
                             if (item.StringId != null && item.StringId.StartsWith("dragon_")) continue;
                             if (LegendaryLaw.IsLegend(item)) continue;
-                            armory.AddToCounts(new EquipmentElement(item, PickWornModifier(item)), 1);
+                            // PRAWO ZACHOWANIA LUPU (audyt 30.08): FIZYCZNE sztuki
+                            // poleglych zwraca juz DTE (ItemsToRecover -> magazyn) -
+                            // dosypywanie szablonu bylo DRUGIM kompletem tej samej
+                            // zbroi. My tylko PRZEKSIEGOWUJEMY na gracza; gdyby DTE
+                            // czegos nie zwrocil, ksiege-ducha przytnie ReconcileStock.
                             StockDeposit(item.StringId, 1);   // dowodca dysponuje sprzetem poleglych
                             pieces++;
                         }
@@ -639,7 +643,8 @@ namespace Armoury
                 }
                 if (pieces > 0)
                 {
-                    Log.Info("GatherFallen: " + men + " poleglych oddalo " + pieces + " sztuk na wozy (przeksiegowane na gracza).");
+                    Log.Info("GatherFallen: " + men + " poleglych - " + pieces
+                             + " sztuk przeksiegowanych na gracza (fizyczne sztuki zwraca DTE, bez dosypywania).");
                     Log.Player("The fallen are gathered - " + pieces + " pieces of their kit come back on the wagons, yours to claim.", true);
                 }
             }
@@ -1282,18 +1287,23 @@ namespace Armoury
                     || TaleWorlds.CampaignSystem.Encounters.PlayerEncounter.Battle != null;
             }
             catch { }
-            if (fromBattle)
+            if (fromBattle && !BattlefieldLaw.CasualtyLootCut)
             {
+                // stary lad (bez prawa zachowania lupu): vanilla loteria juz
+                // zaplacila za rannych - obszukanie byloby DRUGA nagroda
                 try { _prisonerBaseline = SnapshotPrisoners(); } catch { }
                 return;
             }
+            // PRAWO ZACHOWANIA LUPU: loteria szablonowa wycieta, wiec jeniec
+            // z bitwy placi FIZYCZNIE przy obszukaniu - raz i do naga
+            // (Jeff 30.08: "jak biore jencow, rozbieramy ich do naga")
             try
             {
                 var half = CampaignTime.HoursFromNow(0.5f);
                 if (_spoilsWindow < half) _spoilsWindow = half;
             }
             catch { }
-            TryStripNewCaptives("OnPrisonerTaken");
+            TryStripNewCaptives(fromBattle ? "bitwa" : "OnPrisonerTaken");
         }
 
         private Dictionary<string,int> SnapshotPrisoners()

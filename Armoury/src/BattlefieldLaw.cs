@@ -8,6 +8,7 @@ using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
+using TaleWorlds.MountAndBlade;
 
 namespace Armoury
 {
@@ -33,6 +34,10 @@ namespace Armoury
         private static PropertyInfo _vanillaHandledSetter;
         private static MethodInfo _applyDamage;
         private static bool _rlPresent;
+        // PRAWO ZACHOWANIA LUPU aktywne: vanilla loteria szablonowa za
+        // poleglych/rannych wycieta w bitwach osobistych (DTE + jency
+        // placa fizycznie) - czytane przez ArmouryBehavior przy jencach
+        internal static bool CasualtyLootCut;
 
         // dzialka gracza wyjeta z magazynu DTE, czekajaca na ekran lupow
         private static readonly ItemRoster ShareQueue = new ItemRoster();
@@ -190,6 +195,22 @@ namespace Armoury
                     }
                 }
 
+                // PRAWO ZACHOWANIA LUPU (Jeff 30.08: "nie mozemy dostac NIC
+                // ponad to, co ma wroga armia"). W bitwie STOCZONEJ OSOBISCIE
+                // sprzet wroga placi sie fizycznie: zabity - DTE zdejmuje go
+                // ze sceny do magazynu partii ZABOJCY; ranny wziety do niewoli -
+                // obszukanie jenca; ranny, ktory uciekl - nic (uciekl w swoim).
+                // Vanilla ROWNOLEGLE generowala DRUGI komplet z SZABLONOW za
+                // kazdego zabitego I rannego pokonanych (LootDefeatedParty
+                // Casualties) - czysta inflacja materii. Wycinamy ja w bitwach
+                // osobistych; symulacje ida po staremu.
+                var mCas = AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyCasualties");
+                if (mCas != null)
+                {
+                    h.Patch(mCas, prefix: new HarmonyMethod(typeof(BattlefieldLaw), "CutCasualtyLootPrefix"));
+                    Log.Info("BattlefieldLaw: prawo zachowania lupu - szablonowa loteria za poleglych wycieta w bitwach osobistych.");
+                }
+
                 // dzialka gracza z tego, co DTE sciagnal z zabitych
                 var dteMission = FindType("DynamicTroopEquipmentReupload.DynamicTroopMissionLogic");
                 var dteRecord = FindType("DynamicTroopEquipmentReupload.PartyBattleRecord");
@@ -203,8 +224,12 @@ namespace Armoury
                     if (handle != null && _dteRecords != null && _dteLootedItems != null && _dteArmory != null)
                     {
                         h.Patch(handle, postfix: new HarmonyMethod(typeof(BattlefieldLaw), "AfterDtePartyItems"));
+                        // prawo zachowania lupu dziala tylko, gdy DTE realnie
+                        // placi za zabitych - bez DTE vanilla loteria zostaje
+                        CasualtyLootCut = mCas != null;
                         Log.Info("BattlefieldLaw: dzialka gracza z lupow DTE trafia na ekran (solo 100%, z druzyna "
-                                 + Settings.Current.PlayerLootSharePercent + "%).");
+                                 + Settings.Current.PlayerLootSharePercent + "%)."
+                                 + (CasualtyLootCut ? " Jency z bitew ida pod obszukanie (placa fizycznie za rannych)." : ""));
                     }
                     else Log.Info("BattlefieldLaw: nie znalazlem wnetrza DTE - dzialka gracza nieaktywna.");
                 }
@@ -449,6 +474,41 @@ namespace Armoury
             catch (Exception e) { Log.Error("AfterCollectLoot", e); }
         }
 
+        /// <summary>
+        /// Prefix na MapEvent.LootDefeatedPartyCasualties: w bitwie osobistej
+        /// z DTE szablonowa loteria NIE biegnie (dla zadnej partii - sojusznicy
+        /// AI dostaja swoje fizycznie przez rekordy DTE). Symulacje i bitwy
+        /// bez DTE: vanilla po staremu.
+        /// </summary>
+        public static bool CutCasualtyLootPrefix()
+        {
+            try
+            {
+                if (!CasualtyLootCut || !Settings.Current.BattlefieldLawEnabled) return true;
+                if (!RealFoughtBattle()) return true;
+                Log.Info("BattlefieldLaw: szablonowa loteria za poleglych/rannych pominieta (placi scena DTE i jency).");
+                return false;
+            }
+            catch { return true; }
+        }
+
+        /// <summary>Czy agent nalezy do partii gracza (po Origin, przez refleksje -
+        /// typy originow roznia sie miedzy trybami misji).</summary>
+        private static bool IsMainPartyAgent(Agent agent)
+        {
+            try
+            {
+                var origin = agent != null ? agent.Origin : null;
+                if (origin == null) return false;
+                var p = origin.GetType().GetProperty("Party");
+                var party = p != null ? p.GetValue(origin, null) as PartyBase : null;
+                if (party != null) return party == PartyBase.MainParty;
+                var b = origin.GetType().GetProperty("BattleCombatant");
+                return b != null && ReferenceEquals(b.GetValue(origin, null), PartyBase.MainParty);
+            }
+            catch { return false; }
+        }
+
         /// <summary>Symulacje: trup mial sprzet, to sprzet jest - bez zaszytego x0.10-0.58.</summary>
         public static void FullTierMultiplier(ref float __result)
         {
@@ -464,13 +524,17 @@ namespace Armoury
             try { _lastPick = __result as ItemObject; } catch { _lastPick = null; }
         }
 
-        /// <summary>Po usunieciu agenta: rozbita czesc idzie do worka z wrakami.</summary>
-        public static void QueueWreck()
+        /// <summary>Po usunieciu agenta: rozbita czesc idzie do worka z wrakami -
+        /// ale TYLKO gdy zabojca byl z PARTII GRACZA (Jeff 30.08: przy
+        /// sojusznikach zbieralismy wraki z CALEGO pola, takze z cudzych
+        /// zabojstw - kazdemu jego lup).</summary>
+        public static void QueueWreck(Agent affectorAgent)
         {
             try
             {
                 if (_lastPick != null && Settings.Current.WreckSalvageEnabled &&
-                    Settings.Current.BattlefieldLawEnabled && Wrecks.Count < 400)
+                    Settings.Current.BattlefieldLawEnabled && Wrecks.Count < 400 &&
+                    IsMainPartyAgent(affectorAgent))
                     Wrecks.Add(_lastPick);
             }
             catch { }

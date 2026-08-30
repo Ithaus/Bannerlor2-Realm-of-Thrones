@@ -1,5 +1,48 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-30 — PRAWO ZACHOWANIA LUPU: koniec podwojnego liczenia sprzetu wroga
+**Mod:** Armoury | **Pliki:** `Armoury/src/BattlefieldLaw.cs`, `Armoury/src/ArmouryBehavior.cs`
+**Problem:** Jeff (w trakcie gry): "walczyly tez inne partie, a ja dostalem
+100% loot - bez sensu! [...] nie mozemy dostac NIC ponad to, co ma wroga
+armia". Log 09:57: dzialka DTE ledwie 29 szt. (40%), a ekran lupow dostal
+464 pozycje. Przesledzenie CALEGO potoku lupu (dekompilacja MapEvent, DTE,
+Spoils of War) wykazalo, ze sprzet wroga w bitwie osobistej liczyl sie
+WIELOKROTNIE:
+(1) zabity placi RAZ fizycznie na scenie (DTE -> magazyn partii ZABOJCY)
+i DRUGI raz szablonowo w vanilla MapEvent.LootDefeatedPartyCasualties
+(loteria "z szablonu" za kazdego DiedInBattle ORAZ WoundedInBattle,
+dzielona wg wkladu);
+(2) NASI polegli: DTE zwraca ich fizyczny sprzet do magazynu
+(ItemsToRecover), a nasz GatherFallen DOSYPYWAL drugi komplet z szablonu;
+(3) wraki (czesc rozbita ciosem) zbieralismy z CALEGO pola, takze z
+zabojstw sojusznikow;
+(4) jency z bitwy od 29.08 NIE byli obszukiwani (bramka anty-dubel z
+vanilla loteria) - sluszne wtedy, zbedne po wycieciu loterii.
+**Zmiana (model docelowy - kazda sztuka wroga placi DOKLADNIE RAZ):**
+- zabity wrog -> scena DTE (magazyn partii zabojcy; gracz widzi swoja
+  dzialke PlayerLootSharePercent);
+- ranny wziety do niewoli -> obszukanie jenca (przywrocone dla bitew,
+  "do naga", fizycznie raz);
+- ranny, ktory uciekl -> NIC (uciekl w swoim);
+- bagaze pokonanych -> vanilla podzial wg wkladu (jak dotad);
+- nasi polegli -> fizyczne sztuki zwraca DTE, GatherFallen JUZ TYLKO
+  przeksiegowuje na gracza (zero dosypywania; ducha przytnie
+  ReconcileStock);
+- wraki -> tylko z zabojstw PARTII GRACZA (Agent.Origin -> Party);
+- vanilla LootDefeatedPartyCasualties -> prefix return-false w bitwie
+  osobistej z DTE (flaga CasualtyLootCut; symulacje i stack bez DTE
+  ida po staremu).
+**Ryzyko / co sprawdzic:** po bitwie z sojusznikami ekran lupow ma byc
+WYRAZNIE chudszy (Twoja dzialka, nie cale pole); po wzieciu jencow
+komunikat "The captives are stripped at the rope"; w logu linie
+"szablonowa loteria za poleglych/rannych pominieta". UWAGA - Spoils of
+War ma WLASNY "Baggage Train" (drugi ekran bagazy ze snapshotu z POCZATKU
+bitwy) - to potencjalny dubel bagazy POZA naszym kodem: wylaczyc
+"Enable Baggage Train" w MCM Spoils of War.
+**Status:** ZBUDOWANE - CZEKA NA ZAMKNIECIE GRY (watcher wgra DLL
+automatycznie po wyjsciu z gry; do tego czasu gra chodzi na starym
+buildzie!)
+
 ## 2026-08-30 — SkillSinew: wlasny mundur kazdy umie nosic (sufit wg tieru) - zastepuje GiantSinew
 **Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs`
 **Problem:** Jeff po spisie docs/ROT-rozjazdy-skilli.md (548 rozjazdow,
