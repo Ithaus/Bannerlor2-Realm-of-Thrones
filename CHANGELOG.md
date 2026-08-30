@@ -22,7 +22,7 @@ wait-menu pozostaje zakazane (CLAUDE.md).
 pakietem; UWAGA: klik przy CALKOWICIE zapauzowanym czasie zadziala dopiero
 po odpauzowaniu (tick musi tyknac) - jesli to bedzie wkurzac, dorobimy
 odpauzowanie w opcji.
-**Status:** DO WGRANIA (pakiet poprawek audytu 30.08)
+**Status:** WGRANE (30.08 ~08:52, gra zamknieta, 4 DLL-e zweryfikowane hashem)
 
 ## 2026-08-30 — Naprawy po przegladzie podwojnym: Reset/Cancel ekranu, degradacja DressCode i domkniecia
 **Mody:** Armoury, GrandTourney | **Pliki:** `QuartermasterLaw.cs`,
@@ -66,7 +66,7 @@ cala ksiege gracza).
 zamknac -> zero komunikatow wymiany, licznik wkladow jak przed otwarciem;
 kryjowka: zbojcy ubrani (w gorszy pancerz zamiast zadnego); w logu
 ewentualne "ReconcileStock: ... odlozona" przy egzotycznych itemach.
-**Status:** DO WGRANIA (pakiet poprawek audytu 30.08)
+**Status:** WGRANE (30.08 ~08:52, gra zamknieta, 4 DLL-e zweryfikowane hashem)
 
 ## 2026-08-30 — HungerLaw: glodna partia AI kupuje jedzenie BEZ limitu ceny
 **Mod:** Armoury | **Pliki:** `Armoury/src/HungerLaw.cs` (nowy), `Settings.cs`,
@@ -92,7 +92,7 @@ z czasem "glodne partie kupily juz N szt. ponad limit 120". Na mapie:
 glodujace armie AI stojace w osadach powinny w 1-2 dni przestac glodowac
 (o ile targ ma COKOLWIEK i lorda stac); ranni zaczna schodzic w tempie
 vanilla (AiHealingRegenPercent=100).
-**Status:** DO WGRANIA (pakiet poprawek audytu 30.08)
+**Status:** WGRANE (30.08 ~08:52, gra zamknieta, 4 DLL-e zweryfikowane hashem)
 
 ## 2026-08-30 — WPIS UZUPELNIAJACY: commity 27-28.08 bez wpisow (naruszenie sekcji 9)
 **Mod:** Armoury | **Pliki:** rozne (patrz commity)
@@ -126,7 +126,7 @@ zamienione na ASCII (ucieklem, choragiew, oboz, wiesniacy, podkowek, caly,
 bral, kon, doklada, zlapali, zacieznego, jukow). Repo przechodzi czysty
 grep na diakrytyki.
 **Ryzyko / co sprawdzic:** zadne (same komentarze + naglowek logu).
-**Status:** DO WGRANIA (pakiet poprawek audytu 30.08)
+**Status:** WGRANE (30.08 ~08:52, gra zamknieta, 4 DLL-e zweryfikowane hashem)
 
 ## 2026-08-30 — Ranni w armiach AI: przyczyna GLOD; leczenie AI wraca do vanilla + czynnik nie tnie kar
 **Mod:** Armoury | **Pliki:** `Armoury/src/SlowHealing.cs`, `Armoury/src/Settings.cs`, `Armoury/src/McmSettings.cs` (gen)
@@ -161,7 +161,7 @@ pelna vanilla sila takze u gracza; (3) log startowy pokazuje oba procenty.
 schodza ~5-8/dzien - to juz tylko zdrowienie po glodzie w tempie vanilla.
 U gracza: glod rani teraz PELNA stawka (bez -50% ulgi) - zgodnie z "kary
 maja bolec".
-**Status:** DO WGRANIA (pakiet poprawek audytu 30.08)
+**Status:** WGRANE (30.08 ~08:52, gra zamknieta, 4 DLL-e zweryfikowane hashem)
 
 ## 2026-08-30 — Audyt: kolejnosc prefiksow na DoSmelting jawna (Priority.High)
 **Mod:** Armoury | **Pliki:** `Armoury/src/SmithAudit.cs`
@@ -177,7 +177,7 @@ DRUGI raz [enforced].
 pierwszy), niezaleznie od kolejnosci ApplyAll.
 **Ryzyko / co sprawdzic:** przetop pancerza z zakladki Smelt - stamina
 schodzi RAZ (komunikat "Smelting: -N stamina" bez [enforced]).
-**Status:** DO WGRANIA (pakiet poprawek audytu 30.08)
+**Status:** WGRANE (30.08 ~08:52, gra zamknieta, 4 DLL-e zweryfikowane hashem)
 
 ## 2026-08-30 — Audyt: dwa martwe okruchy Watch naprawione
 **Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Watch.cs`
@@ -194,7 +194,7 @@ przeniesiony na statyczny TaleWorlds.CampaignSystem.GameMenus.GameMenu
 **Ryzyko / co sprawdzic:** w trail.txt maja pojawic sie okruchy
 "screen: closed ..." i "menu: <id>"; przy ladowaniu ma zniknac 8x
 "Parameter screen not found".
-**Status:** DO WGRANIA (pakiet poprawek audytu 30.08)
+**Status:** WGRANE (30.08 ~08:52, gra zamknieta, 4 DLL-e zweryfikowane hashem)
 
 ## 2026-08-30 — Audyt: Armoury ma wlasny definer save (Dictionary<string,int>)
 **Mod:** Armoury | **Pliki:** `Armoury/src/SaveDefiner.cs` (nowy)
@@ -210,7 +210,7 @@ wywala kolekcje typow rownie skutecznie jak jej brak.
 **Ryzyko / co sprawdzic:** w biezacej kampanii (ROT obecny) definer nie
 robi nic - save/load bez zmian; zabezpiecza wylacznie konfiguracje bez
 ROT i RC.
-**Status:** DO WGRANIA (pakiet poprawek audytu 30.08)
+**Status:** WGRANE (30.08 ~08:52, gra zamknieta, 4 DLL-e zweryfikowane hashem)
 
 ## 2026-08-30 — Audyt: uwolnienie towarzysza NIE rozbiera go drugi raz
 **Mod:** RealisticCaptivity | **Pliki:** `RealisticCaptivity/src/CaptivityBehavior.cs`
@@ -229,7 +229,7 @@ zgodnie z intencja; rozbieranie zostaje wylacznie przy pojmaniu).
 **Ryzyko / co sprawdzic:** pojmany towarzysz nadal traci sprzet (komunikat
 "was stripped of gear as well"); po wykupieniu/uwolnieniu wraca goly,
 cena odkupu bez podwojnych pozycji.
-**Status:** DO WGRANIA (pakiet poprawek audytu 30.08)
+**Status:** WGRANE (30.08 ~08:52, gra zamknieta, 4 DLL-e zweryfikowane hashem)
 
 ## 2026-08-30 — Audyt: DressCode dostaje bramke ItemReq (zasada nadrzedna skilli)
 **Mod:** Armoury | **Pliki:** `Armoury/src/DressCode.cs`
@@ -248,7 +248,7 @@ z przydzialu, nie z naszych dolozek).
 **Ryzyko / co sprawdzic:** kryjowka z niskotierowymi zbojcami - dalej maja
 byc ubrani (ich wzorce maja niskie difficulty); log "DressCode: ... dostal
 ubranie ze wzorca" moze pokazywac mniejsze liczby przy elitarnych wzorcach.
-**Status:** DO WGRANIA (pakiet poprawek audytu 30.08)
+**Status:** WGRANE (30.08 ~08:52, gra zamknieta, 4 DLL-e zweryfikowane hashem)
 
 ## 2026-08-30 — Audyt: 4 opcje wait-menu schodza z zakazanego SwitchToMenu (znany CTD)
 **Mody:** Armoury, RealisticCaptivity | **Pliki:** `Armoury/src/SmithMenu.cs`,
@@ -269,7 +269,7 @@ to wzorzec vanillowy, sam w sobie nie crashowal.
 powrot do poprzedniego menu bez crasha; "Put the work aside" z warsztatu
 naprawy wraca teraz do MENDMENU (krok wstecz), nie do glownego menu kuzni -
 jesli to przeszkadza, mozna przelaczyc w nastepnym ticku.
-**Status:** DO WGRANIA (pakiet poprawek audytu 30.08)
+**Status:** WGRANE (30.08 ~08:52, gra zamknieta, 4 DLL-e zweryfikowane hashem)
 
 ## 2026-08-30 — Audyt: magazyn w calosci gracza (Active=false) dziala jak nalezy
 **Mod:** Armoury | **Pliki:** `Armoury/src/QuartermasterLaw.cs`
@@ -287,7 +287,7 @@ wpisy - ProcessSwaps biegnie takze przy pustym depozycie.
 **Ryzyko / co sprawdzic:** swiezy magazyn zlozony tylko z wkladow gracza:
 wszystko da sie wyjac bez komunikatow; wrzucone wklady rozliczaja sie przy
 zamknieciu (przyjecie do kompletu / nadwyzka zostaje).
-**Status:** DO WGRANIA (pakiet poprawek audytu 30.08)
+**Status:** WGRANE (30.08 ~08:52, gra zamknieta, 4 DLL-e zweryfikowane hashem)
 
 ## 2026-08-30 — Audyt: ksiega-duch przycinana do realnych polek
 **Mod:** Armoury | **Pliki:** `Armoury/src/ArmouryBehavior.cs`, `Armoury/src/QuartermasterLaw.cs`
@@ -304,7 +304,7 @@ HoldReserve (przed schowaniem skarbca), gdy escrow nieaktywny.
 **Ryzyko / co sprawdzic:** po bitwie z lucznikami otworzyc zbrojownie -
 w logu moze pojawic sie linia ReconcileStock; liczniki na liscie gracza
 nie moga przekraczac tego, co fizycznie lezy.
-**Status:** DO WGRANIA (pakiet poprawek audytu 30.08)
+**Status:** WGRANE (30.08 ~08:52, gra zamknieta, 4 DLL-e zweryfikowane hashem)
 
 ## 2026-08-30 — Audyt: uczciwa ksiega wkladow (ksiegowanie PO transferze + wycofanie kasuje wymiane)
 **Mod:** Armoury | **Pliki:** `Armoury/src/QuartermasterLaw.cs`
@@ -325,7 +325,7 @@ rejestru wymian od najnowszych wpisow, wolany z BookPostfix przy wyjeciu.
 **Ryzyko / co sprawdzic:** wrzucic i od razu wyjac te same strzaly, zamknac
 ekran -> zadnej wymiany, zadnych komunikatow kwatermistrza; sprobowac wyjac
 sprzet ponizej progu (odbity komunikatem) -> licznik wkladow bez zmian.
-**Status:** DO WGRANIA (pakiet poprawek audytu 30.08)
+**Status:** WGRANE (30.08 ~08:52, gra zamknieta, 4 DLL-e zweryfikowane hashem)
 
 ## 2026-08-30 — Audyt: komplet 0 = wojsko nie bierze NIC
 **Mod:** Armoury | **Pliki:** `Armoury/src/QuartermasterLaw.cs`
@@ -339,7 +339,7 @@ odwrotnie: wojsko bierze najwyzej do kompletu, komplet 0 = bierze 0.
 graczowi z istniejacym komunikatem "spare stays on YOUR shelf".
 **Ryzyko / co sprawdzic:** wrzucic strzaly nie majac lucznikow -> zostaja na
 liscie gracza (moze poza wymiana barterowa, jesli wojsko ma gorsze kolczany).
-**Status:** DO WGRANIA (pakiet poprawek audytu 30.08)
+**Status:** WGRANE (30.08 ~08:52, gra zamknieta, 4 DLL-e zweryfikowane hashem)
 
 ## 2026-08-30 — Wojsko bierze najwyzej do KOMPLETU, nadwyzka zostaje graczowi
 **Mod:** Armoury | **Pliki:** `Armoury/src/QuartermasterLaw.cs`
