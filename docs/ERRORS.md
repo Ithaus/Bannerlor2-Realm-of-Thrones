@@ -1,6 +1,6 @@
 # Bledy — nasze, cudze i te, ktore sami lapiemy
 
-Stan na 25.08.2026. Wszystko ponizej jest **potwierdzone w kodzie albo w logu**,
+Stan na 30.08.2026. Wszystko ponizej jest **potwierdzone w kodzie albo w logu**,
 nie zgadywane.
 
 ---

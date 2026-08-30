@@ -31,7 +31,7 @@ namespace Armoury
             try
             {
                 var s = Settings.Current;
-                if (s.HealingRegenPercent >= 100 && s.AiHealingRegenPercent >= 100)
+                if (s.HealingRegenPercent == 100 && s.AiHealingRegenPercent == 100)
                 { Log.Info("SlowHealing: 100%/100% - vanilla tempo, patch spi."); return; }
                 var t = typeof(DefaultPartyHealingModel);
                 var m1 = AccessTools.Method(t, "GetDailyHealingForRegulars");
@@ -53,7 +53,7 @@ namespace Armoury
                 if (s == null) return;
                 bool player = party != null && party == PartyBase.MainParty;
                 int pct = player ? s.HealingRegenPercent : s.AiHealingRegenPercent;
-                if (pct >= 100 || pct < 0) return;
+                if (pct == 100 || pct < 0) return;         // >100 = szybsze gojenie, tez dozwolone
                 if (__result.ResultNumber <= 0f) return;   // kara (glod itp.) - nie lagodzic
                 __result.AddFactor(pct / 100f - 1f, new TextObject("{=armSlowMend}Wounds knit slowly", null));
             }

@@ -1,5 +1,73 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-30 — KOREKTA po przegladzie: wyjscie z wait-menu przez TICK (ExitToLast byl bledny)
+**Mody:** Armoury, RealisticCaptivity | **Pliki:** `Armoury/src/SmithMenu.cs`,
+`Armoury/src/HideoutPurge.cs`, `RealisticCaptivity/src/Work.cs`
+**Problem:** wpis "4 opcje wait-menu schodza z zakazanego SwitchToMenu" opisal
+zachowanie, ktorego kod nie mial. Przeglad adwersaryjny (dekompilacja
+GameMenuManager/MapState): ExitToLast NISZCZY MenuContext - stosu menu NIE MA,
+a menu po zniszczeniu dobiera Campaign.Tick z GetGenericStateMenu(). Skutki
+starej "poprawki": w MIESCIE opcje ladowaly w town_outside (menu bram) zamiast
+w kuzni; we WSI ("Enough of this toil") gracz zostawal BEZ ZADNEGO menu
+z wiszacym PlayerEncounter (model nie ma przypadku dla partii w srodku wioski) -
+regresja BLOKUJACA.
+**Przyczyna:** falszywy model mentalny "krok wstecz"; NightRest.ExitToLast
+dziala, bo sen konczy sie na mapie, nie w osadzie.
+**Zmiana:** wzorzec vanilla (uzywany juz w SmithMenu.WorkTick): opcja podnosi
+FLAGE, a SwitchToMenu wykonuje TICK wait-menu w nastepnej klatce - cel
+dokladnie jak w oryginale (Menu kuzni / arm_hideout_search / _cameFrom).
+Flagi zerowane w initach. SwitchToMenu z ticka jest legalne; z opcji
+wait-menu pozostaje zakazane (CLAUDE.md).
+**Ryzyko / co sprawdzic:** kazda z 4 opcji wraca tam, gdzie wracala przed
+pakietem; UWAGA: klik przy CALKOWICIE zapauzowanym czasie zadziala dopiero
+po odpauzowaniu (tick musi tyknac) - jesli to bedzie wkurzac, dorobimy
+odpauzowanie w opcji.
+**Status:** DO WGRANIA (pakiet poprawek audytu 30.08)
+
+## 2026-08-30 — Naprawy po przegladzie podwojnym: Reset/Cancel ekranu, degradacja DressCode i domkniecia
+**Mody:** Armoury, GrandTourney | **Pliki:** `QuartermasterLaw.cs`,
+`ArmouryBehavior.cs`, `DressCode.cs`, `SlowHealing.cs`, `Settings.cs`,
+`SaveDefiner.cs`, `GrandTourney/src/Log.cs`
+**Problem (znaleziska przegladu adwersaryjnego, 5 recenzentow):**
+(1) POWAZNE: InventoryLogic.Reset/Cancel przywraca rostery HURTEM bez
+TransferItem - ksiega wkladow i rejestr wymian zostawaly ze stanem sprzed:
+wklad + Reset + zamkniecie = "wymiana widma" (darmowy sprzet wojska),
+wyjecie + Reset = strata ksiegi. (2) POWAZNE: bramka ItemReq w DressCode
+zostawiala GOLY slot, a wzorce ROT lamia wlasne wymogi w ~548 miejscach
+(giganci ath 20-40 vs pancerz 120-150 itd.) - czesciowy powrot "golych
+wojakow". (3) drobne: pasy bezpieczenstwa mogly rozliczyc wymiany przy
+ekranie otwartym przez moda-save; ReconcileStock mogl przyciac wklad
+wiszacy w NIEROZWIAZANYCH pozycjach DTE; komunikat "full kit" klamal
+przy komplecie 0; komentarz o prefiksach Harmony byl falszywy (bool-prefix
+NIE biegnie po czyims false; void biegna zawsze); GrandTourney.log mial
+naglowek "Realistic Captivity"; ArmSaveDefiner nie pokrywal
+Dictionary<string,string> (piny MusterBook); suwak AiHealingRegenPercent
+mial martwy zakres 101-400.
+**Zmiana:** (1) migawka ksiegi przy otwarciu ekranu + postfix na
+InventoryLogic.Reset cofa ksiege i rejestr do migawki (flaga sesji
+_screenOpen); (2) DressCode degraduje jak DragonUnmount: sztuka ponad
+skill -> SkillsDecide.TopArmor w ramach Atletyki, nie goly slot;
+(3) SafetyRelease dla pasow (wymiany rozliczane tylko po realnym
+zamknieciu ekranu), ReconcileStock odklada sie przy nierozwiazanych
+pozycjach DTE, osobny komunikat "no man of the company carries...",
+poprawiony komentarz, naglowek GT, definicja <string,string> przy braku
+ROT, procenty >100 przyspieszaja gojenie (gracz i AI).
+**Sprostowania do wczesniejszych wpisow (bez ich edycji):** commitow bez
+wpisu z okna 27-28.08 bylo 11 (nie 10, jeden z 26.08); kosmetyka objela
+11 plikow (nie 9), a "czysty grep" dotyczy KODU (dokumenty i dziennik
+zawieraja polskie znaki z natury); kara -25% "w dryfie" siedzi w kodzie
+CampaignSystem (integracja morska), nie w samym NavalDLC.dll; opis
+SlowHealing z 28.08 "wynik ciety na koncu" byl nieprecyzyjny - AddFactor
+jest addytywny z medycyna (prostowal juz wpis "Ranni AI", tu formalnie).
+Wpis zalegly: commit 0174744 dodal guard ReconcileStock na PUSTY magazyn
+(DTE po load odtwarza roster z opoznieniem - przyciecie wtedy wyzerowaloby
+cala ksiege gracza).
+**Ryzyko / co sprawdzic:** wrzucic sprzet, kliknac Reset na ekranie,
+zamknac -> zero komunikatow wymiany, licznik wkladow jak przed otwarciem;
+kryjowka: zbojcy ubrani (w gorszy pancerz zamiast zadnego); w logu
+ewentualne "ReconcileStock: ... odlozona" przy egzotycznych itemach.
+**Status:** DO WGRANIA (pakiet poprawek audytu 30.08)
+
 ## 2026-08-30 — HungerLaw: glodna partia AI kupuje jedzenie BEZ limitu ceny
 **Mod:** Armoury | **Pliki:** `Armoury/src/HungerLaw.cs` (nowy), `Settings.cs`,
 `McmSettings.cs` (gen), `SubModuleMain.cs`

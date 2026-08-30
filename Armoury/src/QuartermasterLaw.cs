@@ -348,9 +348,11 @@ namespace Armoury
         /// <summary>
         /// KSIEGA WKLADOW - ksiegowanie PO wykonanym transferze. W prefixie
         /// ksiega rosla/malala nawet wtedy, gdy sam transfer zaraz potem
-        /// blokowal nasz wlasny return false albo prefix DTE (CommandersGreed) -
-        /// w Harmony 2 wszystkie prefiksy biegna takze po czyims false.
-        /// __runOriginal mowi wprost, czy ruch sprzetu naprawde sie odbyl.
+        /// blokowal nasz wlasny return false - a gdy blokowal prefix DTE
+        /// (CommandersGreed) biegnacy przed nami, nasz bool-prefix bywal
+        /// w ogole POMIJANY (Harmony 2.4: bool-prefix nie biegnie po czyims
+        /// false, void-prefixy biegna zawsze) i ruch zostawal niezaksiegowany.
+        /// Postfix z __runOriginal widzi prawde w kazdym uporzadkowaniu.
         /// </summary>
         public static void BookPostfix(InventoryLogic __instance, ref TransferCommand transferCommand, bool __runOriginal)
         {
@@ -388,6 +390,29 @@ namespace Armoury
             catch (Exception e) { Log.Error("BookPostfix", e); }
         }
 
+        /// <summary>
+        /// RESET/CANCEL EKRANU (znalezisko przegladu): InventoryLogic.Reset
+        /// przywraca rostery HURTEM z kopii zapasowej, BEZ TransferItem -
+        /// BookPostfix nie widzi cofniecia i ksiega z rejestrem wymian
+        /// zostaja ze stanem sprzed. Skutek: wymiana widma przy zamknieciu
+        /// (darmowy sprzet wojska) albo strata wkladu. Cofamy ksiege
+        /// do migawki z otwarcia ekranu i czyscimy rejestr.
+        /// </summary>
+        public static void ResetPostfix(InventoryLogic __instance)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || !s.ArmouryProtectUsed) return;
+                if (_fRosters == null || _fArmory == null) return;
+                var rosters = _fRosters.GetValue(__instance) as ItemRoster[];
+                var armory = DteArmory();
+                if (rosters == null || rosters.Length == 0 || armory == null || rosters[0] != armory) return;
+                QuartermasterEscrow.OnScreenReset();
+            }
+            catch (Exception e) { Log.Error("ResetPostfix", e); }
+        }
+
         /// <summary>DLL DTE nazywa sie z numerem wersji (v1.4.7) - szukamy typu po WSZYSTKICH zestawach.</summary>
         internal static Type FindType(string fullName)
         {
@@ -415,6 +440,12 @@ namespace Armoury
                 if (m == null) { Log.Info("QuartermasterLaw: brak InventoryLogic.TransferItem."); return; }
                 h.Patch(m, prefix: new HarmonyMethod(typeof(QuartermasterLaw), "Prefix"),
                         postfix: new HarmonyMethod(typeof(QuartermasterLaw), "BookPostfix"));
+
+                // Reset/Cancel ekranu cofa rostery bez TransferItem - ksiega
+                // musi cofnac sie razem z nimi
+                var mReset = AccessTools.Method(typeof(InventoryLogic), "Reset");
+                if (mReset != null)
+                    h.Patch(mReset, postfix: new HarmonyMethod(typeof(QuartermasterLaw), "ResetPostfix"));
 
                 // zbrojownia to nie smietnik: po kazdym przeliczeniu donacji
                 // gasimy XP-za-discard, gdy lewa strona ekranu to magazyn DTE
@@ -454,6 +485,11 @@ namespace Armoury
         internal static bool Active;
         private static readonly List<KeyValuePair<EquipmentElement, int>> _held =
             new List<KeyValuePair<EquipmentElement, int>>();
+        // sesja ekranu zbrojowni trwa (miedzy OpenArmoryScreen a zamknieciem);
+        // pasy bezpieczenstwa nie rozliczaja wymian, poki ekran wisi
+        private static bool _screenOpen;
+        // migawka ksiegi z otwarcia - Reset/Cancel ekranu cofa do niej
+        private static Dictionary<string, int> _stockAtOpen;
 
         internal static void HoldPrefix() { HoldReserve(); }
         internal static void ReleasePostfix() { ReleaseReserve(); }
@@ -469,6 +505,8 @@ namespace Armoury
                 // najpierw ksiega-duch: przytnij ksiege gracza do realnych
                 // polek, zanim policzymy co chowac i co pokazac
                 ArmouryBehavior.ReconcileStock("armoury-open");
+                _screenOpen = true;
+                _stockAtOpen = ArmouryBehavior.StockSnapshot();
                 _pendingSwaps.Clear();   // swieza sesja ekranu = swiezy rejestr wymian
                 var needs = QuartermasterLaw.CountNeeds();
 
@@ -580,10 +618,21 @@ namespace Armoury
             catch { }
         }
 
-        internal static void ReleaseReserve()
+        /// <summary>Prawdziwe zamkniecie ekranu zbrojowni: oddaj depozyt
+        /// i rozlicz wymiany tej sesji.</summary>
+        internal static void ReleaseReserve() { ReleaseCore(true); }
+
+        /// <summary>Pas bezpieczenstwa (save/hourly/menu): oddaj depozyt,
+        /// ale wymian NIE rozliczaj, poki ekran zbrojowni realnie wisi
+        /// (np. mod zapisujacy gre spod otwartego ekranu) - inaczej sesja
+        /// gracza rozliczylaby sie w polowie klikania.</summary>
+        internal static void SafetyRelease() { ReleaseCore(false); }
+
+        private static void ReleaseCore(bool fromScreenClose)
         {
             try
             {
+                if (fromScreenClose) _screenOpen = false;
                 // _pendingSwaps tez trzyma otwarta sprawe: gdy CALY magazyn
                 // nalezy do gracza, nic nie bylo schowane (Active=false),
                 // a wklady z sesji i tak musza sie rozliczyc przy zamknieciu
@@ -593,9 +642,24 @@ namespace Armoury
                     foreach (var kv in _held) armory.AddToCounts(kv.Key, kv.Value);
                 _held.Clear();
                 Active = false;
-                ProcessSwaps(armory);
+                if (!_screenOpen) ProcessSwaps(armory);
             }
             catch (Exception e) { Log.Error("Escrow.Release", e); }
+        }
+
+        /// <summary>Reset/Cancel ekranu: rostery wrocily hurtem do kopii
+        /// zapasowej, wiec ksiega i rejestr wymian cofaja sie do migawki
+        /// z otwarcia.</summary>
+        internal static void OnScreenReset()
+        {
+            try
+            {
+                if (!_screenOpen) return;
+                ArmouryBehavior.StockRestore(_stockAtOpen);
+                _pendingSwaps.Clear();
+                Log.Info("Kwatermistrz: Reset ekranu - ksiega wkladow i rejestr wymian cofniete do stanu z otwarcia.");
+            }
+            catch (Exception e) { Log.Error("Escrow.OnScreenReset", e); }
         }
 
         /// <summary>
@@ -740,10 +804,22 @@ namespace Armoury
                         int spare = kept - take;
                         if (spare > 0)
                         {
-                            Log.Player("Quartermaster: the men are at full kit for " + newItem.Name
-                                       + " - the spare " + spare + " stays on YOUR shelf.", true);
-                            Log.Info("Kwatermistrz: nadwyzka " + spare + " szt. " + newItem.StringId
-                                     + " zostaje graczowi (komplet " + needT + " osiagniety).");
+                            if (needT <= 0)
+                            {
+                                // komplet 0 = nikt w kompanii nie nosi typu;
+                                // "full kit" byloby klamstwem
+                                Log.Player("Quartermaster: no man of the company carries " + newItem.Name
+                                           + " - all " + spare + " stay on YOUR shelf.", true);
+                                Log.Info("Kwatermistrz: nikt nie nosi " + newItem.StringId
+                                         + " - " + spare + " szt. zostaje graczowi.");
+                            }
+                            else
+                            {
+                                Log.Player("Quartermaster: the men are at full kit for " + newItem.Name
+                                           + " - the spare " + spare + " stays on YOUR shelf.", true);
+                                Log.Info("Kwatermistrz: nadwyzka " + spare + " szt. " + newItem.StringId
+                                         + " zostaje graczowi (komplet " + needT + " osiagniety).");
+                            }
                         }
                     }
                 }

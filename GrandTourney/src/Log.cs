@@ -14,7 +14,7 @@ namespace GrandTourney
             try
             {
                 _path = Path.Combine(moduleDir, "GrandTourney.log");
-                File.WriteAllText(_path, "=== Realistic Captivity " + DateTime.Now + " ===" + Environment.NewLine);
+                File.WriteAllText(_path, "=== Grand Tourney " + DateTime.Now + " ===" + Environment.NewLine);
             }
             catch { _path = null; }
         }

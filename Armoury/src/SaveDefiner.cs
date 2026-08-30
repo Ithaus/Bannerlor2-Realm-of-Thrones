@@ -23,6 +23,11 @@ namespace Armoury
             bool rc = Type.GetType("RealisticCaptivity.RcSaveDefiner, RealisticCaptivity") != null;
             if (!rot && !rc)
                 ConstructContainerDefinition(typeof(Dictionary<string, int>));
+            // MusterBook zapisuje tez Dictionary<string,string> (piny ksiegi
+            // musztry) - dotad wisial wylacznie na definicji ROT-a (RC go
+            // nie definiuje), wiec tu wystarczy brak samego ROT-a
+            if (!rot)
+                ConstructContainerDefinition(typeof(Dictionary<string, string>));
         }
     }
 }

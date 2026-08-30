@@ -58,6 +58,8 @@ namespace Armoury
 
                 var dressed = eq.Clone();
                 var troop = ch as TaleWorlds.CampaignSystem.CharacterObject;
+                int ath = 0;
+                try { if (troop != null) ath = troop.GetSkillValue(TaleWorlds.Core.DefaultSkills.Athletics); } catch { }
                 int given = 0;
                 foreach (var sl in ArmourSlots)
                 {
@@ -65,10 +67,16 @@ namespace Armoury
                     var it = tpl[sl].Item;
                     if (it == null) continue;
                     // ZASADA NADRZEDNA (Jeff, ksiega musztry): bez skilla nie
-                    // uzywasz - takze przy dopelnianiu ze wzorca. Slot, ktory
-                    // chwile temu oproznil egzekutor skilli (DragonUnmount),
-                    // nie moze dostac tej samej sztuki tylnymi drzwiami.
-                    if (troop != null && !ItemReq.Meets(troop, it)) continue;
+                    // uzywasz - takze przy dopelnianiu ze wzorca. Ale jak
+                    // w DragonUnmount: sztuka ponad skill NIE zostawia golego
+                    // slotu, tylko schodzi do najlepszej W RAMACH Atletyki
+                    // (wzorce ROT lamia wlasne wymogi w setkach miejsc -
+                    // czysty continue rozbieralby pol krolestwa).
+                    if (troop != null && !ItemReq.Meets(troop, it))
+                    {
+                        it = SkillsDecide.TopArmor(it.ItemType, ath);
+                        if (it == null) continue;
+                    }
                     dressed[sl] = new EquipmentElement(it);
                     given++;
                 }

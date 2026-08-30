@@ -195,6 +195,30 @@ namespace Armoury
             catch { }
         }
 
+        /// <summary>Kopia ksiegi wkladow (na czas sesji ekranu zbrojowni -
+        /// Reset/Cancel ekranu cofa rostery hurtem bez TransferItem, wiec
+        /// ksiege trzeba umiec cofnac razem z nimi).</summary>
+        internal static Dictionary<string, int> StockSnapshot()
+        {
+            try
+            {
+                var self = Instance;
+                return self != null ? new Dictionary<string, int>(self._playerStock) : null;
+            }
+            catch { return null; }
+        }
+
+        internal static void StockRestore(Dictionary<string, int> snap)
+        {
+            try
+            {
+                var self = Instance;
+                if (self == null || snap == null) return;
+                self._playerStock = new Dictionary<string, int>(snap);
+            }
+            catch { }
+        }
+
         /// <summary>
         /// KSIEGA-DUCH. Sztuki gracza schodza z polek roznymi drzwiami bez
         /// StockWithdraw: DTE zdejmuje kolczan przy spawnie lucznika,
@@ -215,6 +239,30 @@ namespace Armoury
                 // (por. TryRestoreArmoryWear) - przyciecie teraz wyzerowaloby
                 // CALA ksiege gracza; czekamy na prawdziwe polki
                 if (armory.Count == 0) return;
+                // DTE trzyma tez pozycje NIEROZWIAZANE (id, ktorych nie umial
+                // znalezc przy load) i doklada je na polki dopiero pozniej
+                // (RestoreReadyArmoryItems) - poki cos wisi, ksiegi nie tykamy,
+                // zeby nie przycinac wkladu, ktory za chwile wroci
+                try
+                {
+                    var tBeh = QuartermasterLaw.FindType("DynamicTroopEquipmentReupload.ArmyArmoryBehavior");
+                    if (tBeh != null)
+                    {
+                        object beh = null;
+                        var mGet = typeof(Campaign).GetMethod("GetCampaignBehavior");
+                        if (mGet != null && Campaign.Current != null)
+                            beh = mGet.MakeGenericMethod(tBeh).Invoke(Campaign.Current, null);
+                        var fU = beh != null ? HarmonyLib.AccessTools.Field(tBeh, "_unresolvedArmoryItemCounts") : null;
+                        var dict = fU != null ? fU.GetValue(beh) as System.Collections.IDictionary : null;
+                        if (dict != null && dict.Count > 0)
+                        {
+                            Log.Info("ReconcileStock(" + why + "): DTE ma " + dict.Count
+                                     + " nierozwiazanych pozycji - rekonsyliacja odlozona.");
+                            return;
+                        }
+                    }
+                }
+                catch { }
                 var shelf = new Dictionary<string, int>();
                 for (int i = 0; i < armory.Count; i++)
                 {
@@ -303,7 +351,7 @@ namespace Armoury
             // 16:33, schowanie 1177 szt. o 16:34). Przed kazdym zapisem
             // wszystko wraca na polki.
             CampaignEvents.OnBeforeSaveEvent.AddNonSerializedListener(this,
-                delegate { try { QuartermasterEscrow.ReleaseReserve(); } catch { } });
+                delegate { try { QuartermasterEscrow.SafetyRelease(); } catch { } });
             // jeniec wziety po bitwie zostaje obszukany - jego rynsztunek idzie do sakw
             CampaignEvents.OnPrisonerTakenEvent.AddNonSerializedListener(this, OnPrisonerTaken);
             // DIAGNOSTYKA (Jeff 29.08: "awans wycina sprzet z magazynu?") -
@@ -334,7 +382,7 @@ namespace Armoury
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this,
                 delegate
                 {
-                    try { QuartermasterEscrow.ReleaseReserve(); } catch { }
+                    try { QuartermasterEscrow.SafetyRelease(); } catch { }
                     try { AdvanceProjects(); } catch (Exception e) { Log.Error("AdvanceProjects(h)", e); }
                     try { TryStripNewCaptives("hourly"); } catch { }
                     try { NightRest.OnHourly(); } catch { }
@@ -382,7 +430,7 @@ namespace Armoury
                 // samonaprawa depozytu: otwarte menu gry = na pewno NIE ekran
                 // zbrojowni; jesli cokolwiek wisi w depozycie (Release nie
                 // odpalil przy zamykaniu ekranu), wraca na polki teraz
-                try { QuartermasterEscrow.ReleaseReserve(); } catch { }
+                try { QuartermasterEscrow.SafetyRelease(); } catch { }
                 var gm = args != null && args.MenuContext != null ? args.MenuContext.GameMenu : null;
                 if (gm != null && gm.StringId == "bannerkings_wait_crafting")
                 {
