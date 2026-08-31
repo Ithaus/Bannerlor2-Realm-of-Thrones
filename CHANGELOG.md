@@ -1,5 +1,33 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-30 — Valyrianska zasada T6: Wedrowcy i Nocny Krol odporni na zwykla stal
+**Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs`
+**Problem:** Jeff: "Biali Wedrowcy i Nocny Krol maja odpornosc na bron,
+ktora nie jest valyrianska stala - u nas bron T6; kazda bron ponizej
+powinna zadawac mocno ograniczone obrazenia". Dotad kazdy chlop z widlami
+ranil Wedrowca jak czlowieka.
+**Przyczyna:** ROT nie ma zadnej mechaniki odpornosci Innych.
+**Zmiana:** mend ValyrianWard - prefix (Priority.High) na
+Agent.RegisterBlow, jedyne gardlo wszystkich obrazen (melee, pociski,
+taranowanie koniem; takze dodatkowe rejestracje RBM z cleave). Cel:
+TYLKO Wedrowcy (jednostki whitewalker2/3/4, szablon
+ROTuniqueleader_whitewalker) i bohaterowie kultury whitewalker (Nocny
+Krol; takze gracz-Other - spojnie w obie strony). Zwykle wighty padaja
+od wszystkiego jak dotad. Tier ciosu: melee = przedmiot ze slotu
+atakujacego (Blow niesie slot, nie item; PULAPKA (int)Tier+1), pocisk =
+bron miotajaca w rece strzelca (luk/kusza/oszczep - strzaly nie bywaja
+valyrianskie, liczy sie narzedzie), piesc/kopyto/upadek = tier 0.
+T6+ bije normalnie; ponizej zostaje 15% obrazen (min 1).
+**Ryzyko / co sprawdzic:** w bitwie z horda Wedrowiec przyjmuje grad
+ciosow T3-T5 niemal bez szwanku, a bron T6 (np. kuta w naszej kuzni)
+tnie go normalnie; log CrashScribe: "Mends: valyrianska zasada T6...".
+Uwaga 1: smoczy ogien ROT (jesli zadaje obrazenia bez broni) tez
+zostanie ograniczony do 15% - lore mowi inaczej, ale Jeff gra Polnoca;
+do poprawki, gdy smok wejdzie do gry. Uwaga 2: autokalkulacja bitew
+NIE zna tej odpornosci (symulacja liczy statystyki) - z Wedrowcami
+walczyc recznie.
+**Status:** WGRANE
+
 ## 2026-08-30 — Umarli nie znaja zmeczenia: stamina i postura RBM bez dna dla wightow
 **Mod:** Armoury | **Pliki:** `Armoury/src/BattleWind.cs`
 **Problem:** Jeff: "i nie maja staminy oraz nie musza spac w nocy?".

@@ -45,6 +45,76 @@ namespace CrashScribe
                 __result = false;
         }
 
+        /// <summary>Bialy Wedrowiec albo Nocny Krol - NIE zwykly wight.
+        /// Wedrowcy to jednostki whitewalker2/3/4 i szablon ROTuniqueleader_whitewalker;
+        /// NK w bitwie to bohater kultury whitewalker (tak samo bohater-Other gracza).</summary>
+        private static bool WalkerBlood(BasicCharacterObject c)
+        {
+            try
+            {
+                if (c == null) return false;
+                var id = c.StringId ?? "";
+                if (id.StartsWith("whitewalker") || id.Contains("uniqueleader_whitewalker")) return true;
+                if (!c.IsHero) return false;             // zwykly wight (xxx_wight) odpada
+                return c.Culture != null && c.Culture.StringId == "whitewalker";
+            }
+            catch { return false; }
+        }
+
+        /// <summary>
+        /// VALYRIANSKA ZASADA T6 (Jeff 30.08): "Biali Wedrowcy i Nocny Krol maja
+        /// odpornosc na bron, ktora nie jest valyrianska stala - u nas bron T6.
+        /// Kazda bron ponizej T6 - mocno ograniczone obrazenia." Prefix na
+        /// Agent.RegisterBlow - jedyne gardlo, przez ktore przechodzi kazdy cios
+        /// (melee, pocisk, taran; takze dodatkowe rejestracje RBM). Tier broni:
+        /// dla melee przedmiot ze slotu atakujacego (WeaponRecord niesie slot,
+        /// nie item), dla pocisku bron miotajaca w rece strzelca (luk/kusza/
+        /// oszczep - strzaly nie maja tierow z valyrianskiej stali, liczy sie
+        /// narzedzie). Piesc, kopyto konia i upadek NIE przebijaja lodu: tier 0.
+        /// Bron T6+ bije normalnie; reszta zadaje 15% (min 1). PULAPKA TIEROW:
+        /// ItemTiers.Tier1 == 0, wiec wyswietlany tier = (int)Tier + 1.
+        /// </summary>
+        public static void ValyrianWard(TaleWorlds.MountAndBlade.Agent __instance,
+                                        ref TaleWorlds.MountAndBlade.Blow blow)
+        {
+            try
+            {
+                if (blow.InflictedDamage <= 1 || blow.IsFallDamage) return;
+                var v = __instance;
+                if (v == null || !v.IsHuman || !WalkerBlood(v.Character)) return;
+
+                int tier = 0;                                    // gole rece / kopyto = zadna stal
+                var rec = blow.WeaponRecord;
+                var mission = TaleWorlds.MountAndBlade.Mission.Current;
+                var att = mission != null ? mission.FindAgentWithIndex(blow.OwnerId) : null;
+                if (rec.HasWeapon() && att != null)
+                {
+                    ItemObject it = null;
+                    if (!rec.IsMissile)
+                    {
+                        int slot = rec.AffectorWeaponSlotOrMissileIndex;
+                        if (slot >= 0 && slot < 5)
+                        {
+                            var mw = att.Equipment[(EquipmentIndex)slot];
+                            if (!mw.IsEmpty) it = mw.Item;
+                        }
+                    }
+                    else
+                    {
+                        var mw = att.WieldedWeapon;
+                        if (!mw.IsEmpty) it = mw.Item;
+                    }
+                    if (it != null) tier = (int)it.Tier + 1;
+                }
+                if (tier >= 6) return;                           // rownowaznik valyrianskiej stali
+
+                int cut = blow.InflictedDamage * 15 / 100;
+                if (cut < 1) cut = 1;
+                blow.InflictedDamage = cut;
+            }
+            catch { }                                            // per-cios: zadnego raportowania
+        }
+
         /// <summary>
         /// WLASNY MUNDUR KAZDY UMIE NOSIC (Jeff 30.08, po spisie
         /// docs/ROT-rozjazdy-skilli.md: 548 rozjazdow, 169 jednostek).
@@ -168,6 +238,21 @@ namespace CrashScribe
                             + deadPatched + " implementacji modelu morale).");
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.Install(deadPanic)", null); } catch { } }
+
+            try
+            {
+                // ===== VALYRIANSKA ZASADA T6 =====
+                // Bron ponizej T6 ledwie drasnie Wedrowca i Nocnego Krola
+                // (patrz ValyrianWard). Zwykle wighty padaja od wszystkiego.
+                var mBlow = AccessTools.Method(typeof(TaleWorlds.MountAndBlade.Agent), "RegisterBlow");
+                if (mBlow != null)
+                {
+                    harmony.Patch(mBlow, prefix: new HarmonyMethod(typeof(Mends), "ValyrianWard") { priority = Priority.High });
+                    Scribe.Line("Mends: valyrianska zasada T6 - bron ponizej tieru 6 zadaje Bialym Wedrowcom i Nocnemu Krolowi 15% obrazen.");
+                }
+                else Scribe.Line("Mends: Agent.RegisterBlow nieznaleziony - valyrianska zasada spi.");
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.Install(valyrian)", null); } catch { } }
 
             try
             {
