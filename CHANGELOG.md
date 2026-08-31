@@ -1,5 +1,25 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-31 — Zegarek snu v2 (godzina i pora dnia) + kara snu tnie realna predkosc kolumny
+**Mod:** Armoury | **Pliki:** `Armoury/src/NightRest.cs`, `Armoury/src/SubModuleMain.cs`
+**Problem:** Jeff: "dodaj godzine i pore dnia i ile spalismy" oraz
+"przyjrzyj sie predkosci ruchu, czy ma to sens". Audyt stosu predkosci:
+vanilla trzyma twarde minimum 1.0 (ujemna niemozliwa), BannerKings
+predkosci nie rusza, ROT dodaje +20% tylko partii, w ktorej gracz
+sluzy. JEDEN nonsens: kara snu (AddFactor od bazy) biegla PRZED
+sufitem kolumny MarchPace - w wolnej, objuczonej kolumnie -25% bywalo
+NIEWIDOCZNE (baza 8 -> kara 6 -> sufit 4 = dalej 4).
+**Zmiana:** (1) pobudka melduje godzine i pore dnia: "It is 6:00, dawn.
+You slept 8.5h of sound night sleep." (pory: dawn/morning/midday/
+afternoon/dusk/night); (2) NightRest.ApplyAll przeniesione ZA
+MarchPace.ApplyAll i kara liczona od WYNIKU (Add(-Result*k) zamiast
+AddFactor) - zmeczenie tnie realna predkosc kolumny po wszystkich
+sufitach; minimum 1.0 vanilla nadal chroni przed absurdem.
+**Ryzyko / co sprawdzic:** tooltip predkosci: "Sleepless nights"
+odejmuje widoczna wartosc takze przy wolnej kolumnie; pobudka z godzina
+i pora dnia.
+**Status:** WGRANE
+
 ## 2026-08-31 — Zegarek snu: pobudka mowi ile spales i jak dobrze
 **Mod:** Armoury | **Pliki:** `Armoury/src/NightRest.cs`
 **Problem:** Jeff: "budze sie i chce wiedziec ile spalem, plus jakosc

@@ -52,13 +52,15 @@ namespace Armoury
                 ThrownWobblePatch.ApplyAll(_harmony);
                 FairXpPatch.ApplyAll(_harmony);
                 ChargeTemperPatch.ApplyAll(_harmony);
-                NightRest.ApplyAll(_harmony);
                 ValyrianSteel.ApplyAll(_harmony);
                 SmithAudit.ApplyAll(_harmony);
                 QuartermasterLaw.ApplyAll(_harmony);
                 MarketGlut.ApplyAll(_harmony);
                 Stables.ApplyAll(_harmony);
                 MarchPace.ApplyAll(_harmony);
+                // NightRest PO MarchPace: kara snu ma ciac REALNA predkosc
+                // kolumny (po suficie marszu), nie teoretyczna baze
+                NightRest.ApplyAll(_harmony);
                 FletchForge.ApplyAll(_harmony);
                 SmeltTab.ApplyAll(_harmony);
                 DressCode.ApplyAll(_harmony);

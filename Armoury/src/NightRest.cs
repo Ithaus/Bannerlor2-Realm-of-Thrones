@@ -56,6 +56,17 @@ namespace Armoury
         private static readonly int[] SpdPenalty = { 0, 25, 40, 90 };
         private static readonly int[] MorPenalty = { 0, 25, 40, 95 };
 
+        /// <summary>Pora dnia po angielsku - do zegarka snu.</summary>
+        private static string DayPart(int h)
+        {
+            if (h >= 5 && h < 7) return "dawn";
+            if (h >= 7 && h < 11) return "morning";
+            if (h >= 11 && h < 14) return "midday";
+            if (h >= 14 && h < 18) return "afternoon";
+            if (h >= 18 && h < 21) return "dusk";
+            return "night";
+        }
+
         /// <summary>Ile godzin snu zamyka rachunek przy biezacym dlugu:
         /// baza + 3*(2*dlug-1) odsetek (dlug 1: +3h, dlug 2: +9h, dlug 3: +15h).</summary>
         internal static float NeededHours()
@@ -613,7 +624,11 @@ namespace Armoury
                 var s = Settings.Current;
                 if (s == null || !s.NightRestEnabled || Debt < 1) return;
                 if (mobileParty == null || mobileParty != MobileParty.MainParty) return;
-                __result.AddFactor(-SpdPenalty[Math.Min(3, Debt)] / 100f, _txtSleepless);
+                // kara od WYNIKU (po suficie kolumny MarchPace - nasz postfix
+                // biegnie ostatni), nie od bazy: -25% ma byc widoczne takze
+                // w wolnej, objuczonej kolumnie. Vanillowy LimitMin(1) trzyma.
+                float cut = __result.ResultNumber * SpdPenalty[Math.Min(3, Debt)] / 100f;
+                if (cut > 0f) __result.Add(-cut, _txtSleepless);
             }
             catch { }
         }
@@ -832,19 +847,21 @@ namespace Armoury
                 {
                     float clockH = (float)(CampaignTime.Now - _sleepStart).ToHours;
                     float effH = _menuRest;
+                    int hh = CampaignTime.Now.GetHourOfDay;
+                    string when = "It is " + hh + ":00, " + DayPart(hh) + ". ";
                     if (clockH < 0.5f)
-                        Msg("You barely closed your eyes - no rest to speak of.", Colors.White);
+                        Msg(when + "You barely closed your eyes - no rest to speak of.", Colors.White);
                     else
                     {
                         float q = clockH > 0.1f ? MBMath.ClampFloat(effH / clockH, 0f, 1f) : 1f;
                         string line;
                         if (q >= 0.9f)
-                            line = "You wake after " + clockH.ToString("0.#") + "h of sound night sleep.";
+                            line = when + "You slept " + clockH.ToString("0.#") + "h of sound night sleep.";
                         else if (q >= 0.7f)
-                            line = "You wake after " + clockH.ToString("0.#") + "h - fair rest, part of it by daylight ("
+                            line = when + "You slept " + clockH.ToString("0.#") + "h - fair rest, part of it by daylight ("
                                  + effH.ToString("0.#") + "h counted).";
                         else
-                            line = "You wake after " + clockH.ToString("0.#") + "h of fitful daylight sleep - it counted for "
+                            line = when + "You slept " + clockH.ToString("0.#") + "h of fitful daylight sleep - it counted for "
                                  + effH.ToString("0.#") + "h.";
                         if (Debt > 0)
                             line += " Old weariness lingers - a full rest takes " + (int)Math.Ceiling(NeededHours()) + "h.";
