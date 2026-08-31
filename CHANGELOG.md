@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-30 — Sen: korekta Jeffa - juz pierwsza zarwana noc karze (-25%/-25%)
+**Mod:** Armoury | **Pliki:** `Armoury/src/NightRest.cs`
+**Problem:** Jeff dopowiedzial do nowej zasady snu: pierwsza nieprzespana
+noc NIE uchodzi na sucho - "morale -25% i predkosc -25%".
+**Zmiana:** tabele kar {0,25,40,90}% predkosci i {0,25,40,95}% morale;
+kary naliczane juz od dlugu 1 (bylo od 2); komunikat pierwszej nocy
+podaje kary. Reszta zasady (baza 6 h, splata 9/15/21 h, zapasc przy 3)
+bez zmian.
+**Ryzyko / co sprawdzic:** po jednej zarwanej nocy tooltip predkosci
+pokazuje "Sleepless nights -25%".
+**Status:** WGRANE
+
 ## 2026-08-30 — Sen: eskalacja dlugu (1 noc wolno, 2 lamie, 3 usypia kolumne)
 **Mod:** Armoury | **Pliki:** `Armoury/src/NightRest.cs`, `Armoury/src/Settings.cs` (+McmSettings wygenerowane)
 **Problem:** Jeff podal nowa zasade snu: "nieprzespanie jednej nocy jest

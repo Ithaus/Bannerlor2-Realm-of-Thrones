@@ -18,7 +18,7 @@ namespace Armoury
     /// <summary>
     /// NOCLEG. Jeff (30.08, nowa zasada): wojsko ma SPAC - baza 6 godzin na dobe
     /// (w obozie, pod dachem, na postoju). Dlug snu eskaluje:
-    ///   1 zarwana noc  - uchodzi na sucho, ale odespanie kosztuje 6+3 = 9 h;
+    ///   1 zarwana noc  - predkosc -25%, morale -25%; odespanie 6+3 = 9 h;
     ///   2 zarwane noce - kolumna sie slania (predkosc -40%, morale -40%),
     ///                    odespanie kosztuje 6+9 = 15 h;
     ///   3 zarwane noce - wojsko ZASYPIA gdzie stoi (partia staje, predkosc -90%,
@@ -50,10 +50,10 @@ namespace Armoury
         private static float _menuTarget = 5f;
         private static float _menuBase;   // stan _restTonight w chwili polozenia sie
 
-        // kary % za dlug 0..3 (dlug 1 = bez kar, "jedna noc mozna"; morale
-        // procentowo przez AddFactor - "morale spada o 95%", nie o 95 punktow)
-        private static readonly int[] SpdPenalty = { 0, 0, 40, 90 };
-        private static readonly int[] MorPenalty = { 0, 0, 40, 95 };
+        // kary % za dlug 0..3 (Jeff 30.08: juz PIERWSZA zarwana noc boli -25%;
+        // morale procentowo przez AddFactor - "spada o 95%", nie o 95 punktow)
+        private static readonly int[] SpdPenalty = { 0, 25, 40, 90 };
+        private static readonly int[] MorPenalty = { 0, 25, 40, 95 };
 
         /// <summary>Ile godzin snu zamyka rachunek przy biezacym dlugu:
         /// baza + 3*(2*dlug-1) odsetek (dlug 1: +3h, dlug 2: +9h, dlug 3: +15h).</summary>
@@ -573,8 +573,8 @@ namespace Armoury
 
             Debt = Math.Min(3, Debt + 1);
             if (Debt == 1)
-                Msg("The men marched through the night. One sleepless night - they bear it, but paying it back will take "
-                    + (int)Math.Ceiling(NeededHours()) + " hours of rest.", Colors.Yellow);
+                Msg("The men marched through the night. One sleepless night - speed -" + SpdPenalty[1] + "%, morale -"
+                    + MorPenalty[1] + "%; paying it back will take " + (int)Math.Ceiling(NeededHours()) + " hours of rest.", Colors.Yellow);
             else if (Debt == 2)
                 Msg("Second night without sleep - the column staggers (speed -" + SpdPenalty[2] + "%, morale -"
                     + MorPenalty[2] + "%). A full rest now takes " + (int)Math.Ceiling(NeededHours()) + " hours.", Colors.Red);
@@ -606,7 +606,7 @@ namespace Armoury
             try
             {
                 var s = Settings.Current;
-                if (s == null || !s.NightRestEnabled || Debt < 2) return;
+                if (s == null || !s.NightRestEnabled || Debt < 1) return;
                 if (mobileParty == null || mobileParty != MobileParty.MainParty) return;
                 __result.AddFactor(-SpdPenalty[Math.Min(3, Debt)] / 100f, _txtSleepless);
             }
@@ -618,7 +618,7 @@ namespace Armoury
             try
             {
                 var s = Settings.Current;
-                if (s == null || !s.NightRestEnabled || Debt < 2) return;
+                if (s == null || !s.NightRestEnabled || Debt < 1) return;
                 if (mobileParty == null || mobileParty != MobileParty.MainParty) return;
                 // procentowo ("morale spada o 95%"), nie punktowo - przy zapasci
                 // z bazowego ~50 zostaje ~2-3, ponizej progu dezercji: spiacego
