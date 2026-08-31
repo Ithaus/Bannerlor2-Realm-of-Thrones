@@ -178,6 +178,44 @@ namespace Armoury
                 }, true, 9);
         }
 
+        // ------------------------------------------------- rytm doby przy kowadle
+        // (Jeff 31.08: "nie moge pracowac 33 godzin - 18h pracy, potem sen
+        // 6h albo wiecej przy dlugu; musi byc info ze spie"). Czekanie przy
+        // projekcie liczy zmiany: po AnvilShiftHours pracy kowal klade sie
+        // na NightRest.NeededHours() - w tym czasie stamina regeneruje po
+        // obozowemu (wyjatek w NoRestAtWork), a rachunek snu nalicza sie sam
+        // (postoj w osadzie). Po pobudce wraca do mlota.
+        internal static bool AnvilSleeping { get { return _anvilAsleep > 0f; } }
+        private static float _anvilAwake;
+        private static float _anvilAsleep;
+
+        private static void AnvilShift(float hours)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || !s.AnvilShiftEnabled || hours <= 0f) return;
+                if (_anvilAsleep > 0f)
+                {
+                    _anvilAsleep -= hours;
+                    if (_anvilAsleep <= 0f)
+                    {
+                        _anvilAwake = 0f;
+                        Log.Player("You wake and return to the anvil.", false);
+                    }
+                    return;
+                }
+                _anvilAwake += hours;
+                if (_anvilAwake >= Math.Max(6f, s.AnvilShiftHours))
+                {
+                    _anvilAsleep = NightRest.NeededHours();
+                    Log.Player(((int)s.AnvilShiftHours) + " hours at the anvil - you bed down by the forge ("
+                               + _anvilAsleep.ToString("0.#") + "h of sleep" + (NightRest.Debt > 0 ? ", paying off the debt" : "") + ").", true);
+                }
+            }
+            catch (Exception e) { Log.Error("AnvilShift", e); }
+        }
+
         // ------------------------------------------------- czeladnik przy miechu
         private static bool HelperPickCondition(MenuCallbackArgs args)
         {
@@ -257,6 +295,7 @@ namespace Armoury
         {
             try
             {
+                _anvilAwake = 0f; _anvilAsleep = 0f;
                 _projLeave = false;
                 var b = ArmouryBehavior.Instance;
                 _projInitialHours = b != null ? Math.Max(1f, b.ProjectHoursLeftHere(Settlement.CurrentSettlement)) : 1f;
@@ -276,6 +315,7 @@ namespace Armoury
         {
             try
             {
+                AnvilShift((float)dt.ToHours);
                 if (_projLeave) { _projLeave = false; GameMenu.SwitchToMenu(Menu); return; }
                 var b = ArmouryBehavior.Instance;
                 float left = b != null ? b.ProjectHoursLeftHere(Settlement.CurrentSettlement) : 0f;

@@ -344,7 +344,12 @@ namespace Armoury
             {
                 var s = Settings.Current;
                 if (s == null || hero != Hero.MainHero) return;
-                if (s.ForgeWorkNoRest && InForgeMenu()) { __result = 0; return; }
+                if (s.ForgeWorkNoRest && InForgeMenu())
+                {
+                    // rytm doby: kowal SPI przy kuzni - stamina wraca po obozowemu
+                    if (SmithMenu.AnvilSleeping) { if (__result < (int)s.ForgeStaminaCampRate) __result = (int)s.ForgeStaminaCampRate; return; }
+                    __result = 0; return;
+                }
 
                 // odpoczynek w obozie liczy sie jak kwatera w osadzie
                 if (InCampMenu() && __result < 5) __result = 5;

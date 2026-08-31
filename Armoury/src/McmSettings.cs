@@ -1052,6 +1052,14 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public bool NightfallPromptEnabled { get; set; } = true;
 
+        [SettingPropertyBool("Anvil Shift Enabled", HintText = "waiting at the forge runs in day shifts: after AnvilShiftHours of work the smith beds down for his needed sleep (6h, more with sleep debt), then returns to the hammer")]
+        [SettingPropertyGroup("A night's rest")]
+        public bool AnvilShiftEnabled { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Anvil Shift Hours", 0.00f, 72.00f, "0.00", HintText = "hours of work at the anvil before the smith must sleep")]
+        [SettingPropertyGroup("A night's rest")]
+        public float AnvilShiftHours { get; set; } = 18f;
+
         [SettingPropertyBool("Camp Battle Props Enabled", HintText = "EXPERIMENTAL: attacked while encamped, the field battle gets your camp dressed on it - tents, fire, torches around your line (unknown prefabs are skipped and logged)")]
         [SettingPropertyGroup("A night's rest")]
         public bool CampBattlePropsEnabled { get; set; } = false;
@@ -1470,6 +1478,8 @@ namespace Armoury
             s.CampTentIcon = CampTentIcon;
             s.CoursePlotterEnabled = CoursePlotterEnabled;
             s.NightfallPromptEnabled = NightfallPromptEnabled;
+            s.AnvilShiftEnabled = AnvilShiftEnabled;
+            s.AnvilShiftHours = AnvilShiftHours;
             s.CampBattlePropsEnabled = CampBattlePropsEnabled;
             s.HideoutAlarmEnabled = HideoutAlarmEnabled;
             s.HideoutAlarmScreamRadius = HideoutAlarmScreamRadius;

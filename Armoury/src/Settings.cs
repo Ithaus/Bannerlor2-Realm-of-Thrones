@@ -315,6 +315,8 @@ namespace Armoury
         public bool CampTentIcon = true;                   // pitched camps show a tent on the map (yours and theirs)
         public bool CoursePlotterEnabled = true;           // clicking a destination reports the route: kilometres, hours in the saddle and days on the road, and flags a settlement target on the map
         public bool NightfallPromptEnabled = true;         // at dusk a marching column is asked to make camp; the popup lets you set always-camp or never-ask (choice lives in the save)
+        public bool AnvilShiftEnabled = true;              // waiting at the forge runs in day shifts: after AnvilShiftHours of work the smith beds down for his needed sleep (6h, more with sleep debt), then returns to the hammer
+        public float AnvilShiftHours = 18f;                // hours of work at the anvil before the smith must sleep
         public bool CampBattlePropsEnabled = false;        // EXPERIMENTAL: attacked while encamped, the field battle gets your camp dressed on it - tents, fire, torches around your line (unknown prefabs are skipped and logged)
         public bool HideoutAlarmEnabled = true;            // a fight in a hideout wakes the camp: bandits within earshot come running - no more men ignoring a brawl ten paces away
         public float HideoutAlarmScreamRadius = 40f;       // a wounded man's cry and the ring of steel carry this many meters - bandits inside come at you, further ones sleep on

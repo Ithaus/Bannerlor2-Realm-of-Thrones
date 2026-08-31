@@ -1,5 +1,26 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-31 — Rytm doby przy kowadle: 18h pracy, potem sen (6h albo splata dlugu) z meldunkiem
+**Mod:** Armoury | **Pliki:** `Armoury/src/SmithMenu.cs`, `Patches.cs`, `Settings.cs` (+McmSettings)
+**Problem:** Jeff: "przy kuciu/naprawach nie moge pracowac 33 godzin -
+pracuje 18h, potem sen 6h (przy dlugu 9h itd.); musi byc info, ze
+spie". Czekanie przy projekcie (arm_project_wait) lecialo jednym
+ciagiem bez snu.
+**Zmiana:** AnvilShift w ticku czekania przy projekcie: po
+AnvilShiftHours (dom. 18) pracy meldunek "18 hours at the anvil - you
+bed down by the forge (Xh of sleep)" i faza snu = NightRest.
+NeededHours() (6h bez dlugu, 9/15/21 przy dlugu; dopisek "paying off
+the debt"); po niej "You wake and return to the anvil" i nowa zmiana.
+W czasie snu STAMINA regeneruje po obozowemu (wyjatek w NoRestAtWork
+mimo ForgeWorkNoRest); rachunek snu nalicza sie sam (postoj w osadzie),
+wiec dlug realnie schodzi. Projekt idzie dalej (czeladz kuje wg
+ForgeWorksWithoutYou - sen kowala to jego potrzeba, nie pauza swiata).
+Cykl zeruje sie przy kazdym wejsciu w czekanie. Dwa suwaki MCM.
+**Ryzyko / co sprawdzic:** dluga robota (np. T5, 10 dni): co ~18h
+meldunek snu, stamina rosnie w czasie snu, swit melduje sen z czapka;
+"Step away" dziala jak dotad.
+**Status:** WGRANE (gra byla zamknieta - najnowszy build w Modules)
+
 ## 2026-08-31 — Fix zegarka switu: dzien pracy w miescie to nie 18h snu
 **Mod:** Armoury | **Pliki:** `Armoury/src/NightRest.cs`
 **Problem:** Jeff (screen z Riverrun, day labour BK): "pracuje
