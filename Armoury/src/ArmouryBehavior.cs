@@ -943,6 +943,7 @@ namespace Armoury
 
         private void OnDailyTick()
         {
+            try { CampFever.OnDaily(); } catch (Exception e) { Log.Error("CampFever", e); }
             try { Orders.DailyTick(); }
             catch (Exception e) { Log.Error("OnDailyTick", e); }
             try { MarketGlut.DailyDigest(); }

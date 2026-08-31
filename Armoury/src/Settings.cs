@@ -257,6 +257,13 @@ namespace Armoury
         public bool MarchPaceEnabled = true;               // a column moves at the pace of its slowest man: any soldier or prisoner on foot holds the whole party to walking speed
         public int WorldPacePercent = 50;                  // base map speed of EVERY party - 50% matches the doubled year: Winterfell to King's Landing takes a lore-true month of the 168-day calendar
         public int SiegePacePercent = 50;                  // siege engine construction speed - 50% makes sieges last twice as long, so starving a fortress out matters again
+        public bool SiegeSicknessEnabled = true;           // camp fever: long sieges breed dysentery - the sick go down as wounded, some die; medicine is the shield
+        public int SiegeSicknessIncubationDays = 9;        // clean-camp grace period before the fever wakes
+        public float SiegeSicknessBasePercent = 0.6f;      // daily share of healthy men falling sick once the fever wakes (before ramp, crowding and medicine)
+        public int SiegeSicknessRampPercent = 15;          // the daily rate grows by this much for every day past incubation - time is a weapon
+        public int SiegeSicknessDefenderFactor = 40;       // defenders behind walls catch this share of the besiegers' rate; famine doubles it
+        public int SiegeSicknessDeathShare = 10;           // share of the sick who die instead of joining the wounded (Siege Medic halves this)
+        public int SiegeSicknessMedicineMax = 50;          // ceiling of the surgeon's risk reduction (0.25% per Medicine point up to this cap)
         public bool MarchPaceAiToo = true;                 // the same law binds lords, bandits and patrols (villagers and caravans keep their own pace either way)
         public float MarchFootPace = 4.0f;                 // map speed cap while anyone walks - footmen without a spare mount, or prisoners on the rope
         public float MarchTrainPace = 4.2f;                // map speed cap for an all-riding party that still drags a baggage train (pack animals, livestock)

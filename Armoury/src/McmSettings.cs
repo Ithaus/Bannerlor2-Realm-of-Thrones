@@ -836,6 +836,34 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public int SiegePacePercent { get; set; } = 50;
 
+        [SettingPropertyBool("Siege Sickness Enabled", HintText = "camp fever: long sieges breed dysentery - the sick go down as wounded, some die; medicine is the shield")]
+        [SettingPropertyGroup("The marching column")]
+        public bool SiegeSicknessEnabled { get; set; } = true;
+
+        [SettingPropertyInteger("Siege Sickness Incubation Days", 0, 36, "0", HintText = "clean-camp grace period before the fever wakes")]
+        [SettingPropertyGroup("The marching column")]
+        public int SiegeSicknessIncubationDays { get; set; } = 9;
+
+        [SettingPropertyFloatingInteger("Siege Sickness Base Percent", 0.00f, 2.40f, "0.00", HintText = "daily share of healthy men falling sick once the fever wakes (before ramp, crowding and medicine)")]
+        [SettingPropertyGroup("The marching column")]
+        public float SiegeSicknessBasePercent { get; set; } = 0.6f;
+
+        [SettingPropertyInteger("Siege Sickness Ramp Percent", 0, 60, "0", HintText = "the daily rate grows by this much for every day past incubation - time is a weapon")]
+        [SettingPropertyGroup("The marching column")]
+        public int SiegeSicknessRampPercent { get; set; } = 15;
+
+        [SettingPropertyInteger("Siege Sickness Defender Factor", 0, 160, "0", HintText = "defenders behind walls catch this share of the besiegers' rate; famine doubles it")]
+        [SettingPropertyGroup("The marching column")]
+        public int SiegeSicknessDefenderFactor { get; set; } = 40;
+
+        [SettingPropertyInteger("Siege Sickness Death Share", 0, 40, "0", HintText = "share of the sick who die instead of joining the wounded (Siege Medic halves this)")]
+        [SettingPropertyGroup("The marching column")]
+        public int SiegeSicknessDeathShare { get; set; } = 10;
+
+        [SettingPropertyInteger("Siege Sickness Medicine Max", 0, 200, "0", HintText = "ceiling of the surgeon's risk reduction (0.25% per Medicine point up to this cap)")]
+        [SettingPropertyGroup("The marching column")]
+        public int SiegeSicknessMedicineMax { get; set; } = 50;
+
         [SettingPropertyBool("March Pace Ai Too", HintText = "the same law binds lords, bandits and patrols (villagers and caravans keep their own pace either way)")]
         [SettingPropertyGroup("The marching column")]
         public bool MarchPaceAiToo { get; set; } = true;
@@ -1300,6 +1328,13 @@ namespace Armoury
             s.MarchPaceEnabled = MarchPaceEnabled;
             s.WorldPacePercent = WorldPacePercent;
             s.SiegePacePercent = SiegePacePercent;
+            s.SiegeSicknessEnabled = SiegeSicknessEnabled;
+            s.SiegeSicknessIncubationDays = SiegeSicknessIncubationDays;
+            s.SiegeSicknessBasePercent = SiegeSicknessBasePercent;
+            s.SiegeSicknessRampPercent = SiegeSicknessRampPercent;
+            s.SiegeSicknessDefenderFactor = SiegeSicknessDefenderFactor;
+            s.SiegeSicknessDeathShare = SiegeSicknessDeathShare;
+            s.SiegeSicknessMedicineMax = SiegeSicknessMedicineMax;
             s.MarchPaceAiToo = MarchPaceAiToo;
             s.MarchFootPace = MarchFootPace;
             s.MarchTrainPace = MarchTrainPace;

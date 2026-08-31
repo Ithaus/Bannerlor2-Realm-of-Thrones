@@ -1,5 +1,32 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-31 — Prawo Zarazy Obozowej: dlugie oblezenia rodza dyzenterie, medycyna jest tarcza
+**Mod:** Armoury | **Pliki:** `Armoury/src/CampFever.cs` (nowy), `ArmouryBehavior.cs`, `Settings.cs` (+McmSettings)
+**Problem:** Jeff ("rob" po projekcie): historycznie choroby zabijaly
+wiecej wojska niz zelazo, a u nas armia stala pod murami pol roku
+bez jednego kichniecia - czekanie bylo darmowe.
+**Zmiana:** dzienny tick po wszystkich oblezeniach swiata:
+(1) inkubacja 9 dni (sprawne oblezenie nic nie odczuje); potem
+zachorowania: baza 0.6%/dzien x narastanie +15%/dzien x TLOK
+(sqrt(ludzi/500), 0.6-2.5 - doomstacki gnija najszybciej);
+(2) chorzy ida W RANNYCH (wracaja naszym powolnym leczeniem - armia
+zmielona jeszcze tygodnie po oblezeniu), co dziesiaty umiera;
+(3) obroncy lapia 40% tempa oblegajacych, ale GLOD (pusty spichlerz)
+podwaja ich tempo - wyscig spichlerza z latrynami; (4) MEDYCYNA:
+skill chirurga partii -0.25%/pkt (cap -50% przy 200; kazda partia
+armii liczy SWOJEGO medyka), perk Preventive Medicine -15%, Siege
+Medic smiertelnosc /2, Pristine Streets gubernatora -30% za murami
+i glod boli o polowe mniej; Walk It Off/Good Lodging/Triage/Sledges
+dzialaja same, bo chorzy sa rannymi; (5) bohaterowie nie choruja
+z ticka; UMARLI nie choruja wcale - horda NK oblega bez zegara;
+(6) komunikaty gracza (ostrzezenie przy wejsciu zarazy + dzienne
+zniwo), sumaryczna linia w logu per oblezenie AI. Siedem suwakow MCM.
+**Ryzyko / co sprawdzic:** przy oblezeniu >9 dni komunikat "Camp fever
+stirs..."; w logu "CampFever: <osada> dzien N - oblegajacy X/Y...";
+armia 1200 przez 25 dni traci ~15-18% w chorych. Wydajnosc: tick raz
+DZIENNIE po aktywnych oblezeniach - pomijalna.
+**Status:** WGRANE
+
 ## 2026-08-31 — Nawigator kursu (km, godziny, dni + flaga celu) i namioty v2 (promien 100)
 **Mod:** Armoury | **Pliki:** `Armoury/src/Wayfinder.cs` (nowy), `NightRest.cs`, `Settings.cs`, `SubModuleMain.cs` (+McmSettings)
 **Problem:** Jeff: (1) "klikam gdzie jechac - niech pokaze znaczek na
