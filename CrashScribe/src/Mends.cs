@@ -409,14 +409,111 @@ namespace CrashScribe
             {
                 var setter = AccessTools.PropertySetter(typeof(CraftingPiece), "IsGivenByDefault");
                 if (setter == null) { Scribe.Line("Mends: CraftingPiece.IsGivenByDefault bez settera - brama kucia spi."); return; }
-                int gated = 0;
+
+                // prog z suwaka MCM Armoury: darmowe zostaja czesci o tierze
+                // MNIEJSZYM niz prog (2 = tylko T1 za darmo, 5 = stan z 30.08,
+                // 7 = brama praktycznie otwarta). Dziala od zaladowania sesji.
+                int prog = 2;
+                try
+                {
+                    foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+                    {
+                        if (asm.GetName().Name != "Armoury") continue;
+                        var ts = asm.GetType("Armoury.Settings");
+                        var cur = ts != null ? ts.GetField("Current", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static) : null;
+                        var so = cur != null ? cur.GetValue(null) : null;
+                        var fld = so != null ? so.GetType().GetField("ForgePartsFreeBelowTier") : null;
+                        if (fld != null) prog = (int)fld.GetValue(so);
+                        break;
+                    }
+                }
+                catch { }
+                if (prog < 2 || prog > 7) prog = 2;
+
+                var tpls = TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObjectTypeList<CraftingTemplate>();
+                if (tpls == null)
+                { Scribe.Line("Mends: brama kucia - brak listy szablonow kucia, brama SPI (bezpiecznik)."); return; }
+                int tplCount = 0;
+                foreach (var t in tpls) if (t != null) tplCount++;
+                if (tplCount == 0)
+                { Scribe.Line("Mends: brama kucia - zero szablonow kucia w pamieci, brama SPI (bezpiecznik)."); return; }
+
+                // ---- PRZEBIEG 1: PODLOGA CRAFTU ----
+                // Bez niej prog 2 zostawia 10 slotow w 9 szablonach BEZ ani jednej
+                // darmowej czesci (np. TwoHandedSword.Handle - 0 ze 100), a wtedy
+                // vanilla gasi przycisk "Kuj" na amen (HaveUnlockedAllSelectedPieces)
+                // i kuznia wyglada na zepsuta. W kazdym WYMAGANYM slocie zostawiamy
+                // CALE najnizsze pasmo dzisiejszych czesci domyslnych (cale, bo
+                // LegendaryLaw.LockLegendPieces moze pojedyncza sztuke ukryc -
+                // oba mendy wisza na tym samym evencie bez ustalonej kolejnosci).
+                // Zbior darmowych czesci po zmianie jest zawsze PODZBIOREM
+                // dzisiejszego - podloga NICZEGO nie otwiera.
+                var keep = new System.Collections.Generic.HashSet<string>();
+                foreach (var tpl in tpls)
+                {
+                    if (tpl == null || tpl.Pieces == null || tpl.BuildOrders == null) continue;
+                    foreach (var bo in tpl.BuildOrders)
+                    {
+                        var slot = bo.PieceType;
+                        int best = int.MaxValue;
+                        foreach (var p in tpl.Pieces)
+                        {
+                            if (p == null || p.PieceType != slot) continue;
+                            if (!p.IsGivenByDefault || p.IsHiddenOnDesigner) continue;
+                            if (p.PieceTier < best) best = p.PieceTier;
+                        }
+                        if (best == int.MaxValue) continue;   // slot bez darmowych JUZ DZIS - nie nasza regresja
+                        if (best < prog) continue;            // najnizsze pasmo i tak przechodzi brame
+                        foreach (var p in tpl.Pieces)
+                            if (p != null && p.PieceType == slot && p.IsGivenByDefault
+                                && !p.IsHiddenOnDesigner && p.PieceTier == best)
+                                keep.Add(p.StringId);
+                    }
+                }
+
+                // ---- PRZEBIEG 2: ODEBRANIE DARMOWOSCI ----
+                var gatedPieces = new System.Collections.Generic.List<CraftingPiece>();
                 foreach (var cp in TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObjectTypeList<CraftingPiece>())
                 {
-                    if (cp == null || !cp.IsGivenByDefault || cp.PieceTier < 5) continue;
+                    if (cp == null || !cp.IsGivenByDefault || cp.PieceTier < prog) continue;
+                    if (keep.Contains(cp.StringId)) continue;
                     setter.Invoke(cp, new object[] { false });
-                    gated++;
+                    gatedPieces.Add(cp);
                 }
-                Scribe.Line("Mends: brama kucia - " + gated + " czesci T5+ (w tym klingi imienne) przestalo byc darmowych; odblokowuja sie kuciem od dolu.");
+
+                // ---- PRZEBIEG 3: SAMOKONTROLA ----
+                // Gdyby mimo podlogi ktorys wymagany slot zostal bez darmowej
+                // czesci, PRZYWRACAMY jego najnizsze pasmo i krzyczymy w logu -
+                // martwy przycisk "Kuj" w kuzni jest gorszy niz otwarta brama.
+                int rescued = 0;
+                var broken = new System.Collections.Generic.List<string>();
+                foreach (var tpl in tpls)
+                {
+                    if (tpl == null || tpl.Pieces == null || tpl.BuildOrders == null) continue;
+                    foreach (var bo in tpl.BuildOrders)
+                    {
+                        var slot = bo.PieceType;
+                        bool anyFree = false, anyAtAll = false;
+                        int best = int.MaxValue;
+                        foreach (var p in tpl.Pieces)
+                        {
+                            if (p == null || p.PieceType != slot || p.IsHiddenOnDesigner) continue;
+                            if (p.IsGivenByDefault) { anyFree = true; break; }
+                            if (gatedPieces.Contains(p)) { anyAtAll = true; if (p.PieceTier < best) best = p.PieceTier; }
+                        }
+                        if (anyFree || !anyAtAll || best == int.MaxValue) continue;
+                        foreach (var p in tpl.Pieces)
+                            if (p != null && p.PieceType == slot && !p.IsHiddenOnDesigner
+                                && p.PieceTier == best && gatedPieces.Contains(p))
+                            { setter.Invoke(p, new object[] { true }); rescued++; }
+                        broken.Add(tpl.StringId + "." + slot);
+                    }
+                }
+
+                Scribe.Line("Mends: brama kucia - prog T" + prog + "; odebrano darmowosc " + gatedPieces.Count
+                            + " czesciom, podloga ocalila " + keep.Count + " (ostatnie darmowe czesci wymaganych slotow)"
+                            + (rescued > 0 ? ", SAMOKONTROLA przywrocila " + rescued + " w slotach: " + string.Join(", ", broken.ToArray()) : "")
+                            + ". Reszta odblokowuje sie kuciem i przetopem, od najnizszego tieru.");
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.LoreForgeGate", null); } catch { } }
         }

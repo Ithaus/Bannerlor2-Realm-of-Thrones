@@ -1220,8 +1220,12 @@ namespace Armoury
         [SettingPropertyGroup("Companion at the bellows")]
         public int HelperSkillForFullRelief { get; set; } = 150;
 
+        [SettingPropertyInteger("Forge Parts Free Below Tier", 0, 10, "0", HintText = "only crafting parts BELOW this tier are free at the forge from the start; everything above is unlocked by forging and smelting, lowest tier first (2 = only tier 1 free, 5 = named lore blades locked only, 7 = gate off). A safety floor always keeps one band of parts per required slot, so the Craft button never dies. Applied when a session loads")]
+        [SettingPropertyGroup("The forge gate")]
+        public int ForgePartsFreeBelowTier { get; set; } = 2;
+
         [SettingPropertyBool("Log Enabled", HintText = "write a log file in the module folder")]
-        [SettingPropertyGroup("Companion at the bellows")]
+        [SettingPropertyGroup("The forge gate")]
         public bool LogEnabled { get; set; } = true;
 
         public void ApplyTo(Settings s)
@@ -1528,6 +1532,7 @@ namespace Armoury
             s.HelperStaminaRelief = HelperStaminaRelief;
             s.HelperTimeRelief = HelperTimeRelief;
             s.HelperSkillForFullRelief = HelperSkillForFullRelief;
+            s.ForgePartsFreeBelowTier = ForgePartsFreeBelowTier;
             s.LogEnabled = LogEnabled;
         }
 

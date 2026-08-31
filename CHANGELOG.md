@@ -1,5 +1,49 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-31 — Brama kucia zacisnieta do tieru 1 (z podloga craftu i samokontrola)
+**Mod:** CrashScribe + Armoury | **Pliki:** `CrashScribe/src/Mends.cs`, `Armoury/src/Settings.cs` (+McmSettings)
+**Problem:** Jeff (screen kuzni, Free Build, "Yitish Blade" T4 difficulty 200
+przy jego Smithing 17): "dlaczego moge wykuc te IV-poziomowe miecze? mialo
+byc od I poziomu, a wyzsze dopiero jak zdobede miecze i je przekuje".
+Nasza brama z 30.08 odbierala darmowosc TYLKO tierom >= 5 - ROT rozdaje
+121 czesci T4 (i 141 T5) jako domyslne, wiec T4 stalo otworem od startu.
+**Analiza (workflow 4-agentowy, dane + dekompilacja):** rozklad
+is_default po tierach to T1 23 / T2 4 / T3 1 / T4 121 / T5 141 - miedzy
+T1 a T4 jest lacznie 5 darmowych czesci, wiec progi 2/3/4 daja niemal
+identyczny efekt; prog 2 realizuje zyczenie doslownie. ALE prog 2 BEZ
+zabezpieczenia lamie 9 z 15 szablonow (10 slotow bez ani jednej darmowej
+czesci, m.in. TwoHandedSword.Handle - 0 ze 100), a vanilla nie ma wtedy
+zadnego fallbacku: gasnie przycisk "Kuj" (HaveUnlockedAllSelectedPieces).
+Ustalono tez, ze ROT-owy crafting_templates.xslt DOKLADA czesci do
+szablonow (7 blokow z apply-templates), a nie podmienia - drabinka T1->T5
+istnieje.
+**Zmiana:** LoreForgeGate przepisany na trzy przebiegi, liczone na ZYWYCH
+obiektach (nie na tabelce): (1) PODLOGA - w kazdym wymaganym slocie kazdego
+szablonu zostaje CALE najnizsze pasmo dzisiejszych czesci domyslnych (cale,
+bo LegendaryLaw.LockLegendPieces wisi na tym samym evencie bez ustalonej
+kolejnosci i moze ukryc pojedyncza sztuke); (2) odebranie darmowosci
+czesciom o tierze >= prog spoza podlogi; (3) SAMOKONTROLA - jesli mimo
+wszystko slot zostalby bez darmowej czesci, mend PRZYWRACA jego najnizsze
+pasmo i wypisuje w logu, ktore sloty ratowal. Bezpiecznik: pusta lista
+szablonow = brama w ogole nie rusza. Gwarancja formalna: zbior darmowych
+czesci jest zawsze PODZBIOREM dzisiejszego - podloga niczego nie otwiera,
+zadna klinga imienna nie moze sie tedy wyslizgnac. Prog to suwak MCM
+Armoury ForgePartsFreeBelowTier (dom. 2 = darmowy tylko T1; 5 = stan
+z 30.08; 7 = brama otwarta), czytany refleksja jak KgPerAthleticsPoint.
+**Ryzyko / co sprawdzic:** log CrashScribe "Mends: brama kucia - prog T2;
+odebrano darmowosc N czesciom, podloga ocalila M..." - jesli pojawi sie
+czlon "SAMOKONTROLA przywrocila", to znaczy, ze dane ROT mialy slot bez
+pokrycia (nazwy w logu). W grze: otworzyc kuznie na kilku szablonach
+i sprawdzic, ze przycisk "Kuj" swieci. Cofniecie bez rebuildu: suwak na 5.
+ZNANE, NIE NAPRAWIANE TU: (a) zamowienia lordow nie znaja IsOpened, wiec
+moga wpadac projekty z czesci, ktorych gracz nie ma - osobne zadanie;
+(b) OneHandedSwordDual ma CALA pule klng na T4-T5, wiec podloga ocali tam
+32 klingi T4 - to wymaga zmiany DANYCH, nie kodu; (c) ROT_ThrowingAxe.Handle
+nie ma darmowej czesci na zadnym tierze - zepsuty przed nasza brama;
+(d) Free Build NIE MA gate'u skill-vs-difficulty (wykucie ponad skill jest
+mozliwe, kara siedzi w jakosci: przy roznicy -145 to ~91% zlomu).
+**Status:** WGRANE
+
 ## 2026-08-31 — Degradacja przestaje lamac zasade nadrzedna: prog dokladny, bez unikatow, cache nie do zatrucia
 **Mod:** Armoury | **Pliki:** `Armoury/src/SkillsDecide.cs`
 **Problem:** trzy usterki wykryte audytem, wszystkie w mechanizmie, ktory
