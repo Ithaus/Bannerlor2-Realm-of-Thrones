@@ -47,10 +47,16 @@ namespace Armoury
                 if (_restitution0831) return;
                 _restitution0831 = true;
                 int given = 0;
+                // 3 wlasne sztuki znane z logu + lupy z 19 Broken Men
+                // (Jeff: "12 i potem 7 osob") - reprezentatywny sprzet looterow
                 var back = new[] {
                     new[] { "battania_civil_cape", "ripped_cloth_unarmoured" },
                     new[] { "bandit_saddle_steppe", "ripped_cloth" },
-                    new[] { "sturgia_sword_1_t2", "rusty_sword" }
+                    new[] { "sturgia_sword_1_t2", "rusty_sword" },
+                    new[] { "leather_tunic", null }, new[] { "leather_tunic", null }, new[] { "leather_tunic", null },
+                    new[] { "bandit_envelope_dress_v1", null }, new[] { "bandit_envelope_dress_v1", null }, new[] { "bandit_envelope_dress_v1", null },
+                    new[] { "leather_studdedhelm_over_thinhide", null }, new[] { "leather_studdedhelm_over_thinhide", null },
+                    new[] { "wrapped_shoes", null }, new[] { "wrapped_shoes", null }, new[] { "wrapped_shoes", null }
                 };
                 var ro = MobileParty.MainParty != null ? MobileParty.MainParty.ItemRoster : null;
                 if (ro == null) return;
@@ -58,7 +64,7 @@ namespace Armoury
                 {
                     var it = TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObject<ItemObject>(pair[0]);
                     if (it == null) continue;
-                    var mod = TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObject<ItemModifier>(pair[1]);
+                    var mod = pair[1] != null ? TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObject<ItemModifier>(pair[1]) : null;
                     ro.AddToCounts(new EquipmentElement(it, mod), 1);
                     given++;
                 }
