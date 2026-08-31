@@ -1,5 +1,26 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-31 — Fix: czystka sakw nie zjada juz wzietych lupow (znikajacy pancerz)
+**Mod:** Armoury | **Pliki:** `Armoury/src/ArmouryBehavior.cs`
+**Problem:** Jeff: "ostatnie dwie bitwy - biore pancerz, wchodze
+w inventory i pancerz znika". Log: po obu bitwach
+"CleanseTrashInBags: 21/18 szt. ponizej progu zniszczenia wyrzucono
+z sakw" - czystka wyrzucala KAZDY item z kondycja ponizej
+LootMinConditionPercent, w tym swiezo wziete lupy (stany 35-41)
+i WLASNY sprzet wojska zuzyty w walce (rusty_sword stan 6).
+**Przyczyna:** drugi prog kondycji NA SAKWACH dublowal prog wrakow
+na polu i nadpisywal decyzje gracza; zuzyty sprzet to u nas surowiec
+do NAPRAWY (mending), nie smiec.
+**Zmiana:** prog kondycji WYCIETY z CleanseTrashInBags - czystka
+zostawia tylko swoje dwie stare reguly (slonie-towar, zalegle
+legendy). Prawdziwy zlom nadal odsiewa prog wrakow NA POLU
+(BattlefieldLaw, LootMinConditionPercent) zanim cokolwiek trafi na
+ekran lupow.
+**Ryzyko / co sprawdzic:** wziety z lupow pancerz LEZY w inventory
+po bitwie; zuzyte sztuki mozna naprawiac; smieci na polu dalej
+odpadaja przed ekranem. DLL wgra watcher po zamknieciu gry.
+**Status:** ZBUDOWANE - watcher wgra po zamknieciu gry
+
 ## 2026-08-31 — Czeladz tez spi: warsztat stoi noca 23-5
 **Mod:** Armoury | **Pliki:** `Armoury/src/ArmouryBehavior.cs`, `Settings.cs` (+McmSettings)
 **Problem:** Jeff do rytmu kowadla: "czeladz tez musi spac!" - projekt

@@ -576,16 +576,18 @@ namespace Armoury
                             cut += el.Amount;
                             continue;
                         }
-                        var mod = el.EquipmentElement.ItemModifier;
-                        if (mod == null) continue;
-                        if (mod.PriceMultiplier * 100f > s.LootMinConditionPercent + 0.01f) continue;
-                        roster.AddToCounts(el.EquipmentElement, -el.Amount);
-                        cut += el.Amount;
+                        // PROG KONDYCJI WYCIETY (Jeff 31.08: "wzialem pancerz
+                        // z bitwy i znika w inventory"). Zuzyty lup to surowiec
+                        // do NAPRAWY, nie smiec - a czystka zjadala tez WLASNY
+                        // sprzet wojska zuzyty w walce (rusty_sword stan 6).
+                        // Prawdziwy zlom odsiewa prog wrakow NA POLU, zanim
+                        // cokolwiek trafi na ekran lupow. Decyzji gracza
+                        // ("biore") nikt nie nadpisuje.
                     }
                 }
                 if (cut > 0)
                 {
-                    Log.Info("CleanseTrashInBags: " + cut + " szt. ponizej progu zniszczenia wyrzucono z sakw/magazynu.");
+                    Log.Info("CleanseTrashInBags: " + cut + " szt. (slonie-towar, zalegle legendy) wyrzucono z sakw/magazynu.");
                     Log.Player("The ruined scraps are thrown out - " + cut + " pieces past any mending.", true);
                 }
             }
