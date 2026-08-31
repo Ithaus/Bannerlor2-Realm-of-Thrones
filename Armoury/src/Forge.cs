@@ -447,6 +447,12 @@ namespace Armoury
             try
             {
                 if (!Recipes.IsLegendary(item)) return true;
+                // OPANOWANY WZOR UNIKATU (Jeff 30.08: "moge kuc wiecej niz
+                // jeden, jak juz opanuje") - legendarny KOSZT zostaje
+                // (materialy wielokrotne, Valyrian Steel, prog skilla),
+                // znika tylko regula jedynej sztuki
+                if (ArmouryBehavior.UniqueLore != null && ArmouryBehavior.UniqueLore.Contains(item.StringId))
+                    return true;
                 if (ArmouryBehavior.Legends.Contains(item.StringId))
                 { why = "You have forged this legend once already - there can be only one."; return false; }
                 var roster = MobileParty.MainParty.ItemRoster;

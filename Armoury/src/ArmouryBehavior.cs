@@ -41,7 +41,7 @@ namespace Armoury
             {
                 if (it == null || UniqueLore.Contains(it.StringId)) return;
                 UniqueLore.Add(it.StringId);
-                Log.Player("You have studied the make of " + it.Name + ". The forge can now reproduce it.");
+                Log.Player("You have studied the make of " + it.Name + " - the CRAFT bench can now reproduce it, and your men may wear it.");
                 Log.Info("UniqueLore: nauczono " + it.StringId + " (razem " + UniqueLore.Count + ").");
             }
             catch (Exception e) { Log.Error("LearnUnique", e); }

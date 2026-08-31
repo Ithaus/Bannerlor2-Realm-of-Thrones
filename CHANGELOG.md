@@ -1,5 +1,31 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-30 — Unikaty: bez limitu sztuk po opanowaniu; nauka TYLKO z egzemplarza (dwie drogi)
+**Mod:** Armoury | **Pliki:** `Forge.cs`, `RangedLore.cs`, `SmeltTab.cs`, `ArmouryBehavior.cs`, `FletchForge.cs`
+**Problem:** Jeff: (1) "moge kuc wiecej niz jeden, jak juz opanuje";
+(2) "kucie pancerzy NIE odblokowuje receptur unikatow - musze zdobyc
+i albo przetopic, albo nauczyc sie patternu u kowala"; (3) "w CRAFT
+pancerze maja sie odblokowywac losowo w kategorii, jak przy broni".
+Audyt: punkt (3) JUZ DZIALA od dawna (szkoly RangedLore: helmy, korpusy,
+nogi, rece, plaszcze, tarcze, kropierze; Seed tieru 1, kazde wykucie
+uczy i losowo odkrywa nastepne wzory w szkole, kowadlo milczy przy
+nieznanym wzorze). Unikaty przypadkiem juz NIE wpadaly z losowan
+(Teachable odrzuca NotMerchandise) - zostaly szwy.
+**Zmiana:** (1) Forge.LegendAllowed: wzor z UniqueLore wolny od reguly
+"tylko jedna sztuka" - legendarny KOSZT zostaje (materialy wielokrotne,
+Valyrian Steel, prog skilla); (2) RangedLore.Learn i CanLearnFrom znaja
+unikaty: rozbiorka u kowala ("Take a piece apart to copy its pattern")
+uczy unikatu tak samo jak przetop (obie drogi -> ArmouryBehavior.
+LearnUnique; dubel nauki w SmeltTab usuniety - idzie jedna sciezka
+OnSmelted -> Learn); (3) kowadlo przy nieopanowanym unikacie mowi
+wprost: "Seize the original and study it - melt it down, or take it
+apart at the smith" zamiast mylacego "the craft itself will teach you".
+**Ryzyko / co sprawdzic:** zdobyc unikat -> rozbiorka u kowala uczy
+(komunikat "You have studied the make of X"); wykuc DWA egzemplarze
+nauczonego unikatu - drugi nie moze byc zablokowany "there can be
+only one"; zwykle pancerze odkrywaja sie kuciem jak dotad.
+**Status:** WGRANE
+
 ## 2026-08-30 — Nauczone unikaty kuje sie w CRAFT (nie w menu), a wojsko moze je nosic
 **Mod:** Armoury + ForgeView + CrashScribe | **Pliki:** `Armoury/src/RangedLore.cs`, `Armoury/src/SmithMenu.cs`, `ForgeView/src/ArmourFilterMixin.cs`, `CrashScribe/src/Mends.cs`
 **Problem:** Jeff do wersji z opcja menu: "nie, po co - kucie jest

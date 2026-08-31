@@ -111,9 +111,7 @@ namespace Armoury
                 __instance.SetHeroCraftingStamina(currentCraftingHero, __instance.GetHeroCraftingStamina(currentCraftingHero) - cost);
                 // zamiast vanillowych badan czesci: przetop nieznanego wzoru uczy go
                 // w calosci, znanego - punkty i losowe odkrycie nie wyzej niz jego tier
-                RangedLore.OnSmelted(item);
-                // przetopienie zdobytego unikatu uczy kuznie go odtwarzac
-                if (UniqueGear.Is(item)) ArmouryBehavior.LearnUnique(item);
+                RangedLore.OnSmelted(item);   // unikaty tez: OnSmelted -> Learn -> LearnUnique
                 // event jak w vanilli - na nim UI odswieza liste przetopu
                 // (bez niego martwe pozycje zostawaly klikalne)
                 try

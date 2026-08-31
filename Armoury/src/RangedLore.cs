@@ -170,7 +170,14 @@ namespace Armoury
         /// <summary>Czy z tej rzeczy da sie jeszcze zdjac wzor (znamy = nie ma po co).</summary>
         internal static bool CanLearnFrom(ItemObject it)
         {
-            try { return it != null && Teachable(it) && !KnownOf(it); }
+            try
+            {
+                if (it == null) return false;
+                // unikat imienny: nauczalny ze zdobytego egzemplarza, poki nieopanowany
+                if (UniqueGear.Is(it))
+                    return ArmouryBehavior.UniqueLore == null || !ArmouryBehavior.UniqueLore.Contains(it.StringId);
+                return Teachable(it) && !KnownOf(it);
+            }
             catch { return false; }
         }
 
@@ -183,7 +190,17 @@ namespace Armoury
         {
             try
             {
-                if (it == null || !Teachable(it)) return false;
+                if (it == null) return false;
+                // unikat imienny idzie do WLASNEJ ksiegi (UniqueLore) - obie
+                // drogi Jeffa: przetop (OnSmelted) i rozbiorka u kowala
+                // (TakeApart) trafiaja tutaj
+                if (UniqueGear.Is(it))
+                {
+                    if (ArmouryBehavior.UniqueLore != null && ArmouryBehavior.UniqueLore.Contains(it.StringId)) return false;
+                    ArmouryBehavior.LearnUnique(it);
+                    return true;
+                }
+                if (!Teachable(it)) return false;
                 Seed();
                 if (Known.Contains(it.StringId)) return false;
                 Known.Add(it.StringId);

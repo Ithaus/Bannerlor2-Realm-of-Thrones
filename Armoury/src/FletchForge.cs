@@ -52,6 +52,13 @@ namespace Armoury
                 // zamknietego wzoru nie wykujesz zadna droga.
                 if (!RangedLore.KnownOf(item))
                 {
+                    // unikat imienny NIE wpada z nauki przy kowadle - trzeba
+                    // zdobyc oryginal i go rozlozyc albo przetopic
+                    if (UniqueGear.Is(item))
+                    {
+                        Log.Player("This famed piece cannot be worked out at the anvil. Seize the original and study it - melt it down, or take it apart at the smith.", true);
+                        return false;
+                    }
                     int school = RangedLore.SchoolOf(item);
                     int kn, tot; RangedLore.CountSchool(school, out kn, out tot);
                     Log.Player("You have not worked out this pattern yet - the craft itself will teach you. ("
