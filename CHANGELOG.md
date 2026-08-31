@@ -1,5 +1,19 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-31 — Handel jencami wedle geografii: Westeros paser 20%, Essos pelna cena
+**Mod:** RealisticCaptivity | **Pliki:** `RealisticCaptivity/src/FairRansom.cs`, `Settings.cs` (+McmSettings)
+**Problem:** Jeff ("robimy jencow"): w Westeros niewolnictwo jest
+zakazane - sprzedaz jencow wszedzie po tej samej stawce nie miala
+sensu swiata.
+**Zmiana:** w postfixie FairRansom (po podlodze ceny): sprzedaz GRACZA
+w osadzie z X <= 770 na mapie (Westeros; granica po Waskim Morzu -
+Sunspear 689, Braavos 857) placi WesterosFencePercent (dom. 20%) stawki;
+osady Essos placa pelna. Wyceny AI w tle i okupy bohaterow nietkniete.
+Ustawienia: PrisonerGeoSale (on), WesterosFencePercent (20).
+**Ryzyko / co sprawdzic:** sprzedaz tego samego jenca w King's Landing
+vs Pentos - ~5x roznica; okupy lordow bez zmian.
+**Status:** WGRANE
+
 ## 2026-08-31 — Rozbiorka unikatu: Smithing 200 i nauka pewna (jedyna sztuka nie plonie)
 **Mod:** Armoury | **Pliki:** `Armoury/src/SmithMenu.cs`
 **Problem:** Jeff: "unikat przy rozbiorce uczy zawsze - NAPRAW, ale

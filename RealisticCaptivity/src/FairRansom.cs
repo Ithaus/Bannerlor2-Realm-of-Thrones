@@ -31,6 +31,24 @@ namespace RealisticCaptivity
                 int floor = (int)(recruit * 0.25f * Math.Max(0f, s.PrisonerSaleFloorFactor));
                 if (floor < 1) floor = 1;
                 if (__result < floor) __result = floor;
+
+                // GEOGRAFIA HANDLU ZYWYM TOWAREM (Jeff 31.08: "robimy jencow").
+                // W Westeros niewolnictwo jest ZAKAZANE - jenca kupi tylko paser
+                // za ulamek ceny; w Essos (za Waskim Morzem) targi niewolnikow
+                // placa pelna stawke. Granica po mapie: X > 770 = Essos
+                // (Sunspear 689, Braavos 857 - miedzy nimi Waskie Morze).
+                // Tylko sprzedaz GRACZA w osadzie; wyceny AI w tle nietkniete.
+                if (s.PrisonerGeoSale && TaleWorlds.CampaignSystem.Settlements.Settlement.CurrentSettlement != null
+                    && (sellerHero == null || sellerHero == Hero.MainHero))
+                {
+                    var st = TaleWorlds.CampaignSystem.Settlements.Settlement.CurrentSettlement;
+                    bool essos = st.GetPosition2D.X > 770f;
+                    if (!essos)
+                    {
+                        int cut = (int)(__result * Math.Max(0, Math.Min(100, s.WesterosFencePercent)) / 100f);
+                        __result = Math.Max(1, cut);
+                    }
+                }
             }
             catch { }
         }

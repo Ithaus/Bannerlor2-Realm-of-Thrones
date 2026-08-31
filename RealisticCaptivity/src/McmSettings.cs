@@ -100,6 +100,14 @@ namespace RealisticCaptivity
         [SettingPropertyGroup("Selling prisoners")]
         public bool PrisonerSaleFloor { get; set; } = true;
 
+        [SettingPropertyBool("Prisoner Geo Sale", HintText = "slavery is outlawed in Westeros: selling captives there pays a fence's cut, while Essosi slave markets pay in full")]
+        [SettingPropertyGroup("Selling prisoners")]
+        public bool PrisonerGeoSale { get; set; } = true;
+
+        [SettingPropertyInteger("Westeros Fence Percent", 0, 80, "0", HintText = "what a Westerosi fence pays for a captive, as percent of the full Essosi price")]
+        [SettingPropertyGroup("Selling prisoners")]
+        public int WesterosFencePercent { get; set; } = 20;
+
         [SettingPropertyFloatingInteger("Prisoner Sale Floor Factor", 0.00f, 4.00f, "0.00", HintText = "times the vanilla broker rate (a quarter of the man's recruitment cost)")]
         [SettingPropertyGroup("Selling prisoners")]
         public float PrisonerSaleFloorFactor { get; set; } = 1f;
@@ -396,6 +404,8 @@ namespace RealisticCaptivity
             s.RansomRenownFactor = RansomRenownFactor;
             s.MinDaysBeforeRansomOffer = MinDaysBeforeRansomOffer;
             s.PrisonerSaleFloor = PrisonerSaleFloor;
+            s.PrisonerGeoSale = PrisonerGeoSale;
+            s.WesterosFencePercent = WesterosFencePercent;
             s.PrisonerSaleFloorFactor = PrisonerSaleFloorFactor;
             s.FenceGearWhenNoLord = FenceGearWhenNoLord;
             s.FencePriceMultiplier = FencePriceMultiplier;

@@ -40,6 +40,8 @@ namespace RealisticCaptivity
 
         // --- Selling prisoners ---
         public bool PrisonerSaleFloor = true;              // BannerKings pays the local slave price for common prisoners - in a slave-glutted town that is zero; guarantee at least the old broker rate
+        public bool PrisonerGeoSale = true;                // slavery is outlawed in Westeros: selling captives there pays a fence's cut, while Essosi slave markets pay in full
+        public int WesterosFencePercent = 20;              // what a Westerosi fence pays for a captive, as percent of the full Essosi price
         public float PrisonerSaleFloorFactor = 1f;         // times the vanilla broker rate (a quarter of the man's recruitment cost)
 
         // --- Bandit plunder ---
