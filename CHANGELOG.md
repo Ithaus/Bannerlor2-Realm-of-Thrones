@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-31 — Panel obozowy pod klawiszem O: nocna polityka zmienialna w kazdej chwili
+**Mod:** Armoury | **Pliki:** `Armoury/src/NightRest.cs`
+**Problem:** Jeff: "moge zmienic zdanie - Never ask nie moze byc stale".
+**Zmiana:** pytajka klawisza O zamieniona w PANEL OBOZOWY: (0) Make
+camp here; (1/2/3) Nightfall orders: ask / always camp / never ask -
+aktualny tryb oznaczony "(current)", wybor przestawia CampPromptMode
+od reki (zapis w save jak dotad). Decyzja ze zmierzchowego popupu
+przestala byc wiazaca - O otwiera zmiane w 2 klikniecia.
+**Ryzyko / co sprawdzic:** O na mapie pokazuje 4 pozycje z markerem
+biezacego trybu; zmiana dziala natychmiast i przezywa save/load.
+**Status:** WGRANE
+
 ## 2026-08-31 — Zmierzchowy popup: "Night Falls - make camp?" z auto-obozem i wylacznikiem
 **Mod:** Armoury | **Pliki:** `Armoury/src/NightRest.cs`, `Settings.cs` (+McmSettings)
 **Problem:** Jeff: "jak jade i zapada noc, powinien byc popup czy

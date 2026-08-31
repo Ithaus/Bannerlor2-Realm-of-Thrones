@@ -791,24 +791,43 @@ namespace Armoury
                 // tykal w pol zbudowanego kontekstu). Pytajka jak w decyzji BK:
                 // jej callback biegnie bezpieczna sciezka UI, ta sama co u nich.
                 _askOpen = true;
-                InformationManager.ShowInquiry(new InquiryData(
-                    new TextObject("{=!}Make Camp").ToString(),
-                    new TextObject("{=!}Pitch your tents here? Breaking camp will leave the party disorganized for a while.").ToString(),
-                    true, true,
-                    GameTexts.FindText("str_accept").ToString(),
-                    GameTexts.FindText("str_cancel").ToString(),
-                    delegate
+                // PANEL OBOZOWY (Jeff 31.08: "moge zmienic zdanie - to nie moze
+                // byc stale"): klawisz O poza rozbiciem obozu przestawia nocna
+                // polityke W KAZDEJ CHWILI - aktualny tryb oznaczony.
+                string cur0 = CampPromptMode == 0 ? " (current)" : "";
+                string cur1 = CampPromptMode == 1 ? " (current)" : "";
+                string cur2 = CampPromptMode == 2 ? " (current)" : "";
+                var copts = new System.Collections.Generic.List<InquiryElement>
+                {
+                    new InquiryElement(0, "Make camp here", null, true,
+                        "Pitch the tents on this spot. Breaking camp leaves the party disorganized for a while."),
+                    new InquiryElement(1, "Nightfall orders: ask me at dusk" + cur0, null, true,
+                        "Each night on the march the column asks whether to make camp."),
+                    new InquiryElement(2, "Nightfall orders: always make camp" + cur1, null, true,
+                        "At dusk the column camps on its own - no questions."),
+                    new InquiryElement(3, "Nightfall orders: never ask" + cur2, null, true,
+                        "March freely at night; camp only when you press O.")
+                };
+                MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData(
+                    "Camp", "Pitch the tents - or set the standing orders for nightfall.",
+                    copts, true, 1, 1, "Choose", GameTexts.FindText("str_cancel").ToString(),
+                    delegate (System.Collections.Generic.List<InquiryElement> sel)
                     {
                         _askOpen = false;
                         try
                         {
-                            // BK Redux u Jeffa NIE rejestruje swojego obozu - wtedy
-                            // staje NASZ oboz (to samo menu czekania, spanie w srodku)
-                            MakeCampNow();
+                            if (sel == null || sel.Count == 0) return;
+                            switch ((int)sel[0].Identifier)
+                            {
+                                case 0: MakeCampNow(); break;
+                                case 1: CampPromptMode = 0; Msg("Nightfall orders: the column will ask at dusk.", Colors.White); break;
+                                case 2: CampPromptMode = 1; Msg("Nightfall orders: the column will camp at dusk on its own.", Colors.White); break;
+                                case 3: CampPromptMode = 2; Msg("Nightfall orders: no questions - march at will.", Colors.White); break;
+                            }
                         }
-                        catch (Exception e) { Log.Error("NightRest.CampAccept", e); }
+                        catch (Exception e) { Log.Error("NightRest.CampPanel", e); }
                     },
-                    delegate { _askOpen = false; }));
+                    delegate (System.Collections.Generic.List<InquiryElement> _) { _askOpen = false; }));
             }
             catch { }
         }
