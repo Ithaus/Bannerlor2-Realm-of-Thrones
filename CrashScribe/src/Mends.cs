@@ -740,11 +740,11 @@ namespace CrashScribe
         /// wysoki tier, dostaja z tej reguly dokladnie swoje 150.)
         /// </summary>
         /// <summary>
-        /// PRAWO WAGI (Jeff 31.08, korekta: "daj 0.2 kg na punkt" - kazdy punkt
-        /// Atletyki niesie 0.2 kg pancerza: 100 to 20 kg, 200 to 40 kg).
+        /// PRAWO WAGI (Jeff 31.08; finalnie 0.25 kg/pkt, SUWAK w MCM Armoury:
+        /// KgPerAthleticsPoint - 100 Atletyki niesie 25 kg, 200 niesie 50 kg).
         /// Audyt: 46% z 1841 pancerzy mialo difficulty 0, w tym 105 CIEZKICH
         /// plyt >=8 kg bez zadnych wymagan (Volantene Heavy 31 kg za darmo).
-        /// Odtad wymaganie = max(stare, waga x 5) - podnosimy tylko W GORE,
+        /// Odtad wymaganie = max(stare, waga / kg-na-punkt) - tylko W GORE,
         /// wiec celowe blokady person (zbroja NK 250, suknie Daenerys 200)
         /// zostaja. Wagi sa wspolne dla XML i gry (RBM przelicza OCHRONE,
         /// wagi nie rusza). Biega PRZED SkillSinew, zeby mundury jednostek
@@ -756,6 +756,24 @@ namespace CrashScribe
             {
                 var setter = AccessTools.PropertySetter(typeof(ItemObject), "Difficulty");
                 if (setter == null) { Scribe.Line("Mends: ItemObject.Difficulty bez settera - prawo wagi spi."); return; }
+                // wspolczynnik z suwaka MCM Armoury (KgPerAthleticsPoint,
+                // dom. 0.25) - Jeff stroi bez rebuildu; dziala od startu sesji
+                float kg = 0.25f;
+                try
+                {
+                    foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+                    {
+                        if (asm.GetName().Name != "Armoury") continue;
+                        var ts = asm.GetType("Armoury.Settings");
+                        var cur = ts != null ? ts.GetField("Current", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static) : null;
+                        var so = cur != null ? cur.GetValue(null) : null;
+                        var fld = so != null ? so.GetType().GetField("KgPerAthleticsPoint") : null;
+                        if (fld != null) kg = (float)fld.GetValue(so);
+                        break;
+                    }
+                }
+                catch { }
+                if (kg < 0.05f || kg > 2f) kg = 0.25f;
                 int raised = 0;
                 foreach (var it in TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
                 {
@@ -764,12 +782,12 @@ namespace CrashScribe
                     if (ty != ItemObject.ItemTypeEnum.HeadArmor && ty != ItemObject.ItemTypeEnum.BodyArmor
                         && ty != ItemObject.ItemTypeEnum.LegArmor && ty != ItemObject.ItemTypeEnum.HandArmor
                         && ty != ItemObject.ItemTypeEnum.Cape) continue;
-                    int want = (int)Math.Round(it.Weight * 5f);
+                    int want = (int)Math.Round(it.Weight / kg);
                     if (want <= it.Difficulty) continue;
                     setter.Invoke(it, new object[] { want });
                     raised++;
                 }
-                Scribe.Line("Mends: prawo wagi - Atletyka niesie 0.25 kg/pkt; wymagania podniesione " + raised + " pancerzom (max(stare, waga x 5) = 0.2 kg/pkt).");
+                Scribe.Line("Mends: prawo wagi - Atletyka niesie 0.25 kg/pkt; wymagania podniesione " + raised + " pancerzom (" + kg.ToString("0.##") + " kg na punkt Atletyki).");
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.WeightLaw", null); } catch { } }
         }

@@ -1064,6 +1064,10 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public bool WorkshopNightRest { get; set; } = true;
 
+        [SettingPropertyFloatingInteger("Kg Per Athletics Point", 0.00f, 1.00f, "0.00", HintText = "Weight Law: kilograms of armour one Athletics point can carry (difficulty = weight / this); applied at session start")]
+        [SettingPropertyGroup("A night's rest")]
+        public float KgPerAthleticsPoint { get; set; } = 0.25f;
+
         [SettingPropertyBool("Camp Battle Props Enabled", HintText = "EXPERIMENTAL: attacked while encamped, the field battle gets your camp dressed on it - tents, fire, torches around your line (unknown prefabs are skipped and logged)")]
         [SettingPropertyGroup("A night's rest")]
         public bool CampBattlePropsEnabled { get; set; } = false;
@@ -1485,6 +1489,7 @@ namespace Armoury
             s.AnvilShiftEnabled = AnvilShiftEnabled;
             s.AnvilShiftHours = AnvilShiftHours;
             s.WorkshopNightRest = WorkshopNightRest;
+            s.KgPerAthleticsPoint = KgPerAthleticsPoint;
             s.CampBattlePropsEnabled = CampBattlePropsEnabled;
             s.HideoutAlarmEnabled = HideoutAlarmEnabled;
             s.HideoutAlarmScreamRadius = HideoutAlarmScreamRadius;

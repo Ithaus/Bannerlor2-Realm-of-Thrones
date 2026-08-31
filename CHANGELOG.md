@@ -1,5 +1,18 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-31 — Prawo Wagi: finalnie 0.25 kg/pkt, wspolczynnik jako SUWAK w MCM
+**Mod:** Armoury + CrashScribe | **Pliki:** `Armoury/src/Settings.cs` (+McmSettings), `CrashScribe/src/Mends.cs`, `docs/pancerze-waga-atletyka.md`
+**Problem:** Jeff stroil wspolczynnik (0.25 -> 0.2 -> 0.3 -> "zostaw
+0.25") - jasny sygnal, ze to ma byc suwak, nie stala.
+**Zmiana:** KgPerAthleticsPoint w MCM Armoury (dom. 0.25); WeightLaw
+w CrashScribe czyta go przez reflection przy starcie sesji (fallback
+0.25, clamp 0.05-2). Common Armor 20 kg -> Athletics 80. Tabela docs
+przeliczona na 0.25. UWAGA: zmiana suwaka dziala od NASTEPNEGO
+wczytania (prawo biega raz, na starcie sesji).
+**Ryzyko / co sprawdzic:** log "prawo wagi ... (0.25 kg na punkt)";
+suwak w MCM Armoury sekcja przy WorkshopNightRest.
+**Status:** WGRANE
+
 ## 2026-08-31 — Prawo Wagi zaostrzone: 0.2 kg na punkt Atletyki (waga x 5)
 **Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs`, `docs/pancerze-waga-atletyka.md`
 **Problem:** Jeff: "daj jednak 0.2 kg / 1 atletyka".
