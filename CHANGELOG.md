@@ -1,5 +1,22 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-31 — Zapasowa zbroja Nocnego Krola jedzie w jego taborze
+**Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs`
+**Problem:** Jeff do wpisu nizej: "Nocny Krol moze ja miec, zapasowa
+zbroje, w swoim ekwipunku" - nightking_armor (wariant bez kolcow) byl
+celowo poza obiegiem.
+**Zmiana:** nowy tryb "bag" w kaskadzie DressTheNamesakes: sztuka
+trafia do TABORU partii wlasciciela (ItemRoster). nightking_armor
+wjezdza do taboru Nocnego Krola - wypadnie z lupow dopiero temu, kto
+rozbije jego partie. NK bez partii przy starcie sesji (przed inwazja)
+= akcja czeka i ponawia sie kazda sesje, az wlasciciel sie pojawi.
+DTE jej wightom nie zalozy (UniqueWard), czystka targow jej nie tknie
+(lezy w partii, nie w miescie).
+**Ryzyko / co sprawdzic:** log "Mends: Night King Armor wjezdza do
+taboru Night King jako zapas" (albo "czeka na wlasciciela", poki NK
+nie wstanie); po rozbiciu partii NK zbroja w lupach.
+**Status:** WGRANE
+
 ## 2026-08-31 — Kazdy unikat ma dom: imiennicy ubrani, spadki rozdane, relikwie na targach
 **Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs`
 **Problem:** analiza wykazala 34 BEZPANSKIE unikaty (nikt ich nie nosi,

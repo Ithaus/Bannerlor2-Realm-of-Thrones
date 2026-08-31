@@ -183,9 +183,11 @@ namespace CrashScribe
         // to trofea znad Tridentu w Krolewskiej Przystani, bo Aegon nosi juz
         // Blackfyre'a; Aemon Smoczy Rycerz lezy w Dragonstone - CELOWO bez
         // imienia, zeby nie ubrac 100-letniego maestera Aemona z Muru).
-        // nightking_armor (wariant bez kolcow) ZOSTAJE poza obiegiem -
-        // trupami sie nie handluje, NK nosi wersje z kolcami.
+        // Tryb "bag" (Jeff 31.08): sztuka wjezdza do TABORU partii wlasciciela
+        // jako zapas - nightking_armor (wariant bez kolcow) wozi sam Nocny Krol
+        // i wypada z lupow dopiero po rozbiciu jego partii.
         private static readonly string[] NamesakeGear = {
+            "nightking_armor|Night King||||bag",
             "ramsay_armor|Ramsay||Barrowton|B|bat",
             "ramsay_helmet|Ramsay||Barrowton|H|bat",
             "ramsay_gloves|Ramsay||Barrowton|G|bat",
@@ -248,6 +250,24 @@ namespace CrashScribe
                     if (UniqueHomesDone.Contains(id)) continue;
                     var item = TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObject<ItemObject>(id);
                     if (item == null) { skipped++; continue; }
+
+                    if (mode == "bag")
+                    {
+                        // zapas w taborze partii wlasciciela; wlasciciel bez
+                        // partii (np. NK przed inwazja) = czekamy do nastepnej sesji
+                        var carrier = FindAliveHero(owner);
+                        var pr = carrier != null && carrier.PartyBelongedTo != null
+                            ? carrier.PartyBelongedTo.ItemRoster : null;
+                        if (pr != null)
+                        {
+                            pr.AddToCounts(item, 1);
+                            UniqueHomesDone.Add(id);
+                            placed++;
+                            Scribe.Line("Mends: " + item.Name + " (" + id + ") wjezdza do taboru " + carrier.Name + " jako zapas.");
+                        }
+                        else { skipped++; Scribe.Line("Mends: " + owner + " bez partii - " + id + " czeka na wlasciciela."); }
+                        continue;
+                    }
 
                     Hero wearer = FindAliveHero(owner);
                     if (wearer == null) wearer = FindAliveHero(heir);
