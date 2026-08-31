@@ -115,6 +115,53 @@ namespace CrashScribe
             catch { }                                            // per-cios: zadnego raportowania
         }
 
+        /// <summary>
+        /// WIELBLADY NIE DLA POLNOCY (Jeff 30.08: "nie moge patrzec jak kawaleria
+        /// polnocy jezdzi na wielbladach"). DTE zbiera do przydzialu WSZYSTKIE
+        /// konie z taboru partii - takze wielblady/rydwany/slonie z lupow po
+        /// poludniowcach - i sadza na nie jezdzcow bez pytania o kulture.
+        /// Postfix na PartyEquipmentDistributor.GenerateHorseAndHarnessList:
+        /// wycinamy z listy przydzialu egzotyki (camel/chariot/elephant w id),
+        /// ktorych kultura (aserai=Dorne, volantine=Essos) nie zgadza sie
+        /// z kultura partii. Zwierze NIE znika - zostaje w taborze jako towar
+        /// na sprzedaz (karawany moga handlowac); po prostu nikt nie wsiada.
+        /// </summary>
+        public static void CamelCulling(object __instance)
+        {
+            try
+            {
+                var tr = Traverse.Create(__instance);
+                var party = tr.Field("_party").GetValue() as MobileParty;
+                var list = tr.Field("_horseAndHarnesses").GetValue() as System.Collections.IList;
+                if (party == null || list == null || list.Count == 0) return;
+                string pc = PartyCultureId(party);
+                for (int i = list.Count - 1; i >= 0; i--)
+                {
+                    var horse = Traverse.Create(list[i]).Property("Horse").GetValue();
+                    var item = horse != null ? Traverse.Create(horse).Property("Item").GetValue() as ItemObject : null;
+                    if (item == null) continue;
+                    var id = (item.StringId ?? "").ToLowerInvariant();
+                    if (!id.Contains("camel") && !id.Contains("chariot") && !id.Contains("elephant")) continue;
+                    var ic = item.Culture != null ? item.Culture.StringId : null;
+                    if (ic == null || ic == pc) continue;   // wlasna kultura (albo bezpanski) - wolno
+                    list.RemoveAt(i);
+                }
+            }
+            catch { }
+        }
+
+        private static string PartyCultureId(MobileParty p)
+        {
+            try
+            {
+                if (p.LeaderHero != null && p.LeaderHero.Culture != null) return p.LeaderHero.Culture.StringId;
+                var f = p.MapFaction;
+                if (f != null && f.Culture != null) return f.Culture.StringId;
+            }
+            catch { }
+            return "";
+        }
+
         /// <summary>Najwyzszy tier broni z wzorcow bojowych jednostki (tarcze
         /// nie sa stala bojowa i nie licza sie). PULAPKA: ItemTiers.Tier1 == 0.</summary>
         private static int BestWeaponTier(CharacterObject c)
@@ -325,6 +372,32 @@ namespace CrashScribe
                 else Scribe.Line("Mends: DefaultCombatSimulationModel.SimulateHit nieznaleziony - symulacja bez zasady T6.");
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.Install(valyrianSim)", null); } catch { } }
+
+            try
+            {
+                // ===== WIELBLADY NIE DLA POLNOCY =====
+                // DTE sadza jezdzcow na kazdym zlupionym zwierzeciu; egzotyki
+                // obcej kultury schodza z listy przydzialu (patrz CamelCulling).
+                Type tDist = null;
+                foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+                {
+                    try
+                    {
+                        if (!asm.GetName().Name.StartsWith("DynamicTroop")) continue;
+                        tDist = asm.GetType("DynamicTroopEquipmentReupload.PartyEquipmentDistributor");
+                        if (tDist != null) break;
+                    }
+                    catch { }
+                }
+                var mGen = tDist != null ? AccessTools.Method(tDist, "GenerateHorseAndHarnessList") : null;
+                if (mGen != null)
+                {
+                    harmony.Patch(mGen, postfix: new HarmonyMethod(typeof(Mends), "CamelCulling"));
+                    Scribe.Line("Mends: egzotyczne wierzchowce (wielblady, rydwany, slonie) tylko dla wlasnej kultury - DTE nie sadza na nich obcych.");
+                }
+                else Scribe.Line("Mends: DTE PartyEquipmentDistributor nieznaleziony - egzotyki bez straznika.");
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.Install(camels)", null); } catch { } }
 
             try
             {

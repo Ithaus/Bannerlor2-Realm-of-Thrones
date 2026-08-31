@@ -1,5 +1,26 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-30 — Egzotyczne wierzchowce tylko dla wlasnej kultury (koniec kawalerii Polnocy na wielbladach)
+**Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs`
+**Problem:** Jeff: "wielblady, rydwany, slonie - nie moga na nich jezdzic
+wojskowi np. Polnocy; karawany okej, moga sprzedac". Zrodlo: DTE
+(PartyEquipmentDistributor.GenerateHorseAndHarnessList) zbiera do
+przydzialu WSZYSTKIE konie z taboru - takze wielblady z lupow po
+poludniowcach - i sadza na nie jezdzcow bez pytania o kulture. Nasze
+Stables juz wczesniej blokowaly ZAKUP egzotykow poza kultura; zostala
+droga lupow.
+**Zmiana:** mend CamelCulling - postfix na GenerateHorseAndHarnessList:
+z listy przydzialu schodza wierzchowce o id zawierajacym
+camel/chariot/elephant, ktorych kultura itemu (dane ROT: wielblady
+i rydwany = aserai/Dorne, slonie = volantine/Essos) rozni sie od kultury
+partii (lider -> frakcja). Zwierze zostaje w taborze jako towar -
+mozna sprzedac, nikt nie wsiada. Dotyczy i AI, i gracza (partia Starka
+nie posadzi ludzi na wielbladach; Dornijczycy u siebie jezdza normalnie).
+**Ryzyko / co sprawdzic:** log CrashScribe "Mends: egzotyczne
+wierzchowce... DTE nie sadza na nich obcych"; po bitwie z poludniowcami
+kawaleria Polnocy zostaje na koniach, wielblady leza w lupach.
+**Status:** WGRANE
+
 ## 2026-08-30 — Sen: korekta Jeffa - juz pierwsza zarwana noc karze (-25%/-25%)
 **Mod:** Armoury | **Pliki:** `Armoury/src/NightRest.cs`
 **Problem:** Jeff dopowiedzial do nowej zasady snu: pierwsza nieprzespana
