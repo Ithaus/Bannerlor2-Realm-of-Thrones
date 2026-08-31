@@ -1,5 +1,31 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-31 — Prawo Wagi: Atletyka niesie 0.25 kg pancerza na punkt (+ pelna tabela pancerzy)
+**Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs`, `docs/pancerze-waga-atletyka.md` (nowy)
+**Problem:** Jeff: "zrob tabele wszystkich pancerzy - waga vs wymagana
+atletyka; te wymagania sa z dupy. Powinno byc: kazdy punkt Atletyki
+pozwala nosic 0.25 kg (100 -> 25 kg, 200 -> 50 kg)". Audyt 1841
+pancerzy: 46% (857) mialo difficulty ZERO, w tym 105 ciezkich plyt
+>= 8 kg calkiem bez wymagan (Volantene Heavy 31 kg, Braavosi Curiass
+28 kg - za darmo). Osobno wyjasnione: wartosci OCHRONY w grze sa
+wyzsze niz w XML (Common Armor 42 -> 100), bo RBM przelicza pancerze
+w locie - WAGI i difficulty sie zgadzaja i to na nich stoi regula.
+**Zmiana:** mend WeightLaw (przed SkillSinew, zeby mundury jednostek
+dostaly atletyke pod nowe progi): difficulty = max(stare, waga x 4)
+dla wszystkich pancerzy (Head/Body/Leg/Hand/Cape). Podnosimy TYLKO
+w gore - celowe blokady person (zbroja NK 250, suknie Daenerys 200)
+zostaja. Skutki: Common Armor 20 kg z prog 30 -> 80; looterzy
+(Ath ~20-30) NATURALNIE traca plyty przez DTE SkillLawWard - problem
+"band w plytach" rozwiazany fizyka, bez klasowych regul; gracz tez
+musi miec Atletyke pod ciezar. Pelna tabela (1841 wierszy, bylo/jest)
+w docs/pancerze-waga-atletyka.md.
+**Ryzyko / co sprawdzic:** log "Mends: prawo wagi - wymagania
+podniesione N pancerzom"; tooltip Common Armor pokaze Athletics 80;
+jednostki w mundurach dostana atletyke wg nowych progow (SkillSinew
+z sufitem tieru); wlasna partia gracza - kwatermistrz zdejmie plyty
+ponad skill.
+**Status:** ZBUDOWANE - watcher (rozszerzony na 5 modow) wgra po zamknieciu gry
+
 ## 2026-08-31 — Restytucja po czystce: znane sztuki wracaja do sakw
 **Mod:** Armoury | **Pliki:** `Armoury/src/ArmouryBehavior.cs`
 **Problem:** Jeff: "oddaj mi zbroje, ktore zdobylem". Czystka (przed

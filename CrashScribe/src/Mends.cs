@@ -739,6 +739,41 @@ namespace CrashScribe
         /// (Zastepuje wczesniejszy mend GiantSinew - giganci, level 26 =
         /// wysoki tier, dostaja z tej reguly dokladnie swoje 150.)
         /// </summary>
+        /// <summary>
+        /// PRAWO WAGI (Jeff 31.08: "kazdy punkt Atletyki pozwala nosic 0.25 kg
+        /// pancerza - 100 to 25 kg, 200 to 50 kg; obecne wymagania sa z dupy").
+        /// Audyt: 46% z 1841 pancerzy mialo difficulty 0, w tym 105 CIEZKICH
+        /// plyt >=8 kg bez zadnych wymagan (Volantene Heavy 31 kg za darmo).
+        /// Odtad wymaganie = max(stare, waga x 4) - podnosimy tylko W GORE,
+        /// wiec celowe blokady person (zbroja NK 250, suknie Daenerys 200)
+        /// zostaja. Wagi sa wspolne dla XML i gry (RBM przelicza OCHRONE,
+        /// wagi nie rusza). Biega PRZED SkillSinew, zeby mundury jednostek
+        /// dostaly atletyke pod NOWE wymagania.
+        /// </summary>
+        internal static void WeightLaw()
+        {
+            try
+            {
+                var setter = AccessTools.PropertySetter(typeof(ItemObject), "Difficulty");
+                if (setter == null) { Scribe.Line("Mends: ItemObject.Difficulty bez settera - prawo wagi spi."); return; }
+                int raised = 0;
+                foreach (var it in TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
+                {
+                    if (it == null) continue;
+                    var ty = it.ItemType;
+                    if (ty != ItemObject.ItemTypeEnum.HeadArmor && ty != ItemObject.ItemTypeEnum.BodyArmor
+                        && ty != ItemObject.ItemTypeEnum.LegArmor && ty != ItemObject.ItemTypeEnum.HandArmor
+                        && ty != ItemObject.ItemTypeEnum.Cape) continue;
+                    int want = (int)Math.Round(it.Weight * 4f);
+                    if (want <= it.Difficulty) continue;
+                    setter.Invoke(it, new object[] { want });
+                    raised++;
+                }
+                Scribe.Line("Mends: prawo wagi - Atletyka niesie 0.25 kg/pkt; wymagania podniesione " + raised + " pancerzom (max(stare, waga x 4)).");
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.WeightLaw", null); } catch { } }
+        }
+
         internal static bool SinewApplied;
 
         internal static void SkillSinew()
@@ -1939,7 +1974,7 @@ namespace CrashScribe
         {
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this,
                 delegate (CampaignGameStarter s)
-                { Mends.SkillSinew(); Mends.UniqueWares(); Mends.LoreForgeGate(); Mends.DressTheNamesakes(); });
+                { Mends.WeightLaw(); Mends.SkillSinew(); Mends.UniqueWares(); Mends.LoreForgeGate(); Mends.DressTheNamesakes(); });
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this,
                 delegate (TaleWorlds.CampaignSystem.MapEvents.MapEvent m) { Mends.MeltDeadLoot(m); });
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this,
