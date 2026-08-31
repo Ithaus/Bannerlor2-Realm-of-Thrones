@@ -58,6 +58,8 @@ namespace Armoury
                 MarketGlut.ApplyAll(_harmony);
                 Stables.ApplyAll(_harmony);
                 WorldPace.ApplyAll(_harmony);
+                WinterBite.ApplyAll(_harmony);
+                ScorchedEarth.ApplyAll(_harmony);
                 Wayfinder.ApplyAll(_harmony);
                 MarchPace.ApplyAll(_harmony);
                 // NightRest PO MarchPace: kara snu ma ciac REALNA predkosc

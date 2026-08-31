@@ -864,6 +864,90 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public int SiegeSicknessMedicineMax { get; set; } = 50;
 
+        [SettingPropertyBool("Winter Bite Enabled", HintText = "winter with teeth: armies eat more, villages yield less, town granaries drain faster - the north bites hardest")]
+        [SettingPropertyGroup("The marching column")]
+        public bool WinterBiteEnabled { get; set; } = true;
+
+        [SettingPropertyInteger("Winter Party Food Bonus Percent", 0, 200, "0", HintText = "extra food a party consumes in winter (scaled by how far north it stands)")]
+        [SettingPropertyGroup("The marching column")]
+        public int WinterPartyFoodBonusPercent { get; set; } = 50;
+
+        [SettingPropertyInteger("Winter Village Output Cut Percent", 0, 200, "0", HintText = "village production lost in winter - food prices rise on their own as supply dries up")]
+        [SettingPropertyGroup("The marching column")]
+        public int WinterVillageOutputCutPercent { get; set; } = 50;
+
+        [SettingPropertyFloatingInteger("Winter Town Appetite Per1000", 0.00f, 2.00f, "0.00", HintText = "extra daily food-stock drain per 1000 town prosperity in winter")]
+        [SettingPropertyGroup("The marching column")]
+        public float WinterTownAppetitePer1000 { get; set; } = 0.5f;
+
+        [SettingPropertyFloatingInteger("Autumn Stock Multiplier", 0.00f, 8.00f, "0.00", HintText = "in autumn the AI supply cap (BkSupplyDaysCap) is multiplied by this - stock up or starve")]
+        [SettingPropertyGroup("The marching column")]
+        public float AutumnStockMultiplier { get; set; } = 2f;
+
+        [SettingPropertyInteger("North Gradient Percent", 0, 100, "0", HintText = "how much harder winter bites in the far north (and softer in Dorne)")]
+        [SettingPropertyGroup("The marching column")]
+        public int NorthGradientPercent { get; set; } = 25;
+
+        [SettingPropertyBool("Long Night With N K", HintText = "while the Night King marches, EVERY day counts as winter - the Others bring the cold with them")]
+        [SettingPropertyGroup("The marching column")]
+        public bool LongNightWithNK { get; set; } = true;
+
+        [SettingPropertyBool("Scorched Earth Enabled", HintText = "war leaves scars: enemy armies forage villages on the march, and plundered villages heal slowly")]
+        [SettingPropertyGroup("The marching column")]
+        public bool ScorchedEarthEnabled { get; set; } = true;
+
+        [SettingPropertyInteger("Forage Min Men", 0, 400, "0", HintText = "armies at least this large live off enemy land")]
+        [SettingPropertyGroup("The marching column")]
+        public int ForageMinMen { get; set; } = 100;
+
+        [SettingPropertyFloatingInteger("Forage Radius", 0.00f, 12.00f, "0.00", HintText = "map range within which a passing army drains a hostile village")]
+        [SettingPropertyGroup("The marching column")]
+        public float ForageRadius { get; set; } = 3f;
+
+        [SettingPropertyFloatingInteger("Forage Hearth Per Day", 0.00f, 3.20f, "0.00", HintText = "hearths a 500-man army drains per day (scales with army size)")]
+        [SettingPropertyGroup("The marching column")]
+        public float ForageHearthPerDay { get; set; } = 0.8f;
+
+        [SettingPropertyInteger("Forage Floor", 0, 100, "0", HintText = "marching armies can never drain a village below this - true ruin takes a real raid")]
+        [SettingPropertyGroup("The marching column")]
+        public int ForageFloor { get; set; } = 25;
+
+        [SettingPropertyInteger("Scar Threshold Hearth", 0, 600, "0", HintText = "below this many hearths a village counts as scarred and heals slowly")]
+        [SettingPropertyGroup("The marching column")]
+        public int ScarThresholdHearth { get; set; } = 150;
+
+        [SettingPropertyInteger("Scar Regen Percent", 0, 100, "0", HintText = "share of normal hearth growth a scarred village keeps (vanilla springs back at +4/day)")]
+        [SettingPropertyGroup("The marching column")]
+        public int ScarRegenPercent { get; set; } = 25;
+
+        [SettingPropertyInteger("Refugee Floor Hearth", 0, 160, "0", HintText = "below this the refugees trickle home (+0.5/day flat) - regions never die for good")]
+        [SettingPropertyGroup("The marching column")]
+        public int RefugeeFloorHearth { get; set; } = 40;
+
+        [SettingPropertyBool("Wages Due Enabled", HintText = "unpaid wages: vanilla already cuts morale - we add desertion, the best-paid men first")]
+        [SettingPropertyGroup("The marching column")]
+        public bool WagesDueEnabled { get; set; } = true;
+
+        [SettingPropertyInteger("Wages Grace Days", 0, 10, "0", HintText = "days of unpaid wages the men will stomach before walking")]
+        [SettingPropertyGroup("The marching column")]
+        public int WagesGraceDays { get; set; } = 2;
+
+        [SettingPropertyFloatingInteger("Wages Desert Percent Per Day", 0.00f, 2.00f, "0.00", HintText = "share of the party deserting per day past grace, growing with every unpaid day (AI suffers half)")]
+        [SettingPropertyGroup("The marching column")]
+        public float WagesDesertPercentPerDay { get; set; } = 0.5f;
+
+        [SettingPropertyBool("Sack Scar Enabled", HintText = "a settlement taken by siege loses prosperity and loyalty - conquest is a ruin you must rebuild")]
+        [SettingPropertyGroup("The marching column")]
+        public bool SackScarEnabled { get; set; } = true;
+
+        [SettingPropertyInteger("Sack Prosperity Cut Percent", 0, 60, "0", HintText = "prosperity lost when a settlement falls to siege")]
+        [SettingPropertyGroup("The marching column")]
+        public int SackProsperityCutPercent { get; set; } = 15;
+
+        [SettingPropertyInteger("Sack Loyalty Hit", 0, 60, "0", HintText = "loyalty lost when a settlement falls to siege")]
+        [SettingPropertyGroup("The marching column")]
+        public int SackLoyaltyHit { get; set; } = 15;
+
         [SettingPropertyBool("March Pace Ai Too", HintText = "the same law binds lords, bandits and patrols (villagers and caravans keep their own pace either way)")]
         [SettingPropertyGroup("The marching column")]
         public bool MarchPaceAiToo { get; set; } = true;
@@ -1335,6 +1419,27 @@ namespace Armoury
             s.SiegeSicknessDefenderFactor = SiegeSicknessDefenderFactor;
             s.SiegeSicknessDeathShare = SiegeSicknessDeathShare;
             s.SiegeSicknessMedicineMax = SiegeSicknessMedicineMax;
+            s.WinterBiteEnabled = WinterBiteEnabled;
+            s.WinterPartyFoodBonusPercent = WinterPartyFoodBonusPercent;
+            s.WinterVillageOutputCutPercent = WinterVillageOutputCutPercent;
+            s.WinterTownAppetitePer1000 = WinterTownAppetitePer1000;
+            s.AutumnStockMultiplier = AutumnStockMultiplier;
+            s.NorthGradientPercent = NorthGradientPercent;
+            s.LongNightWithNK = LongNightWithNK;
+            s.ScorchedEarthEnabled = ScorchedEarthEnabled;
+            s.ForageMinMen = ForageMinMen;
+            s.ForageRadius = ForageRadius;
+            s.ForageHearthPerDay = ForageHearthPerDay;
+            s.ForageFloor = ForageFloor;
+            s.ScarThresholdHearth = ScarThresholdHearth;
+            s.ScarRegenPercent = ScarRegenPercent;
+            s.RefugeeFloorHearth = RefugeeFloorHearth;
+            s.WagesDueEnabled = WagesDueEnabled;
+            s.WagesGraceDays = WagesGraceDays;
+            s.WagesDesertPercentPerDay = WagesDesertPercentPerDay;
+            s.SackScarEnabled = SackScarEnabled;
+            s.SackProsperityCutPercent = SackProsperityCutPercent;
+            s.SackLoyaltyHit = SackLoyaltyHit;
             s.MarchPaceAiToo = MarchPaceAiToo;
             s.MarchFootPace = MarchFootPace;
             s.MarchTrainPace = MarchTrainPace;

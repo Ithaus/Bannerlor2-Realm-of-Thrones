@@ -1,5 +1,35 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-31 — Spalona ziemia + Ksiega Wojny: foraging i blizny wiosek, dezercje za zold, krater po szturmie
+**Mod:** Armoury | **Pliki:** `Armoury/src/ScorchedEarth.cs` (nowy), `Armoury/src/WarLedger.cs` (nowy), `Settings.cs`, `SubModuleMain.cs`, `ArmouryBehavior.cs` (+McmSettings)
+**Problem:** Jeff ("rob 3" + "4: nie ma kasy - dezercja i minus morale;
+miasto wziete szturmem - minus do prosperity"). Fakty z kodu: wioska
+<300 palenisk odrasta +4/dzien (po rabunku "jak nowa" w tygodnie);
+vanilla JUZ karze morale za niewyplacony zold (HasUnpaidWages) - wiec
+morale nie dublujemy, dokladamy dezercje.
+**Zmiana:** SPALONA ZIEMIA: (1) foraging - wroga armia lordowska
+(>=100 ludzi, promien 3) drenuje wioske ~0.8 paleniska/dzien na 500
+ludzi i bierze zboze do taboru ("The men live off the enemy's land");
+PODLOGA 25 palenisk - marsz uszczupla, nie zabija; jedna wioska
+dziennie na partie; umarli nie zeruja; (2) blizna - wioska <150
+palenisk odbudowuje sie w 25% tempa (z +4 do +1/dzien; sezon-dwa
+zamiast tygodni), a <40 palenisk "uchodzcy wracaja" +0.5/dzien flat -
+regiony nigdy nie umieraja na stale; postfix Priority.Last PO
+modyfikatorach BK; JEDNA os kary (paleniska) - produkcja/rekruci/
+podatki spadaja emergentnie, zero spirali. KSIEGA WOJNY: (3) zold -
+po 2 dniach laski dezercje 0.5%/dzien narastajaco za kazdy dzien
+zwloki, ELITY PIERWSZE (najwyzszy tier); AI placi polowe stawki
+(biedni lordowie BK nie moga stopniec globalnie); garnizony i umarli
+poza prawem; (4) osada wzieta OBLEZENIEM (BySiege - szturm i poddanie
+po oblezeniu): prosperity -15%, lojalnosc -15; komunikat zdobywcy-
+graczowi "Rebuild what you broke". Suwaki MCM na wszystko.
+**Ryzyko / co sprawdzic:** po przemarszu wrogiej armii wioski w logu
+chudna do podlogi; zlupiona wioska w rozpisce ma wpis "War scars";
+gracz bez zlota widzi ostrzezenie, po 3. dniu dezercje elit; zdobycie
+miasta obleczeniem tnie prosperity (log "WarLedger"). AI-safety:
+polowa stawki dezercji + cap dzienny; obserwowac pierwsze tygodnie.
+**Status:** WGRANE
+
 ## 2026-08-31 — Zima z zebami + Dluga Noc: sezon glodu, gradient Polnocy, jesienne spichrze
 **Mod:** Armoury | **Pliki:** `Armoury/src/WinterBite.cs` (nowy), `BkSupplyTemper.cs`, `Settings.cs`, `SubModuleMain.cs`, `ArmouryBehavior.cs` (+McmSettings)
 **Problem:** Jeff ("rob 2"): zima w ROT byla kosmetyczna (snieg i tyle),

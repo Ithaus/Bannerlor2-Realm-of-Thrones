@@ -362,6 +362,7 @@ namespace Armoury
         {
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this, OnSessionLaunched);
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, OnDailyTick);
+            CampaignEvents.OnSettlementOwnerChangedEvent.AddNonSerializedListener(this, WarLedger.OnOwnerChanged);
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, OnMapEventEnded);
             CampaignEvents.MapEventStarted.AddNonSerializedListener(this, OnMapEventStarted);
             // polegli oddaja rynsztunek na wozy zaraz po bitwie
@@ -944,6 +945,9 @@ namespace Armoury
         private void OnDailyTick()
         {
             try { CampFever.OnDaily(); } catch (Exception e) { Log.Error("CampFever", e); }
+            try { WinterBite.OnDaily(); } catch (Exception e) { Log.Error("WinterBite", e); }
+            try { ScorchedEarth.OnDaily(); } catch (Exception e) { Log.Error("ScorchedEarth", e); }
+            try { WarLedger.OnDaily(); } catch (Exception e) { Log.Error("WarLedger", e); }
             try { Orders.DailyTick(); }
             catch (Exception e) { Log.Error("OnDailyTick", e); }
             try { MarketGlut.DailyDigest(); }
