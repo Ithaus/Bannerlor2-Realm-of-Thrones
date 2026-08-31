@@ -57,6 +57,7 @@ namespace Armoury
                 QuartermasterLaw.ApplyAll(_harmony);
                 MarketGlut.ApplyAll(_harmony);
                 Stables.ApplyAll(_harmony);
+                WorldPace.ApplyAll(_harmony);
                 MarchPace.ApplyAll(_harmony);
                 // NightRest PO MarchPace: kara snu ma ciac REALNA predkosc
                 // kolumny (po suficie marszu), nie teoretyczna baze

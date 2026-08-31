@@ -99,7 +99,11 @@ namespace Armoury
                         why = new TextObject("{=!}Marching column: all riders");
                     }
                 }
-                if (cap <= 0.5f) return;
+                // sufity kolumny zyja w jednostkach mapy - przy zwolnionym
+                // swiecie (WorldPacePercent) skaluja sie tym samym mnoznikiem
+                int pace = Math.Max(5, Math.Min(100, c.WorldPacePercent));
+                cap *= pace / 100f;
+                if (cap <= 0.25f) return;
                 // czapka WIDOCZNA w rozpisce predkosci: gole LimitMax cielo tempo
                 // bez zadnego sladu i gracz nie wiedzial, CZEMU wlecze sie 4.0
                 // (Jeff 27.08: "cos jest nie tak z mechanika predkosci").

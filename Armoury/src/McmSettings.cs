@@ -828,6 +828,14 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public bool MarchPaceEnabled { get; set; } = true;
 
+        [SettingPropertyInteger("World Pace Percent", 0, 200, "0", HintText = "base map speed of EVERY party - 50% matches the doubled year: Winterfell to King's Landing takes a lore-true month of the 168-day calendar")]
+        [SettingPropertyGroup("The marching column")]
+        public int WorldPacePercent { get; set; } = 50;
+
+        [SettingPropertyInteger("Siege Pace Percent", 0, 200, "0", HintText = "siege engine construction speed - 50% makes sieges last twice as long, so starving a fortress out matters again")]
+        [SettingPropertyGroup("The marching column")]
+        public int SiegePacePercent { get; set; } = 50;
+
         [SettingPropertyBool("March Pace Ai Too", HintText = "the same law binds lords, bandits and patrols (villagers and caravans keep their own pace either way)")]
         [SettingPropertyGroup("The marching column")]
         public bool MarchPaceAiToo { get; set; } = true;
@@ -1286,6 +1294,8 @@ namespace Armoury
             s.LongYearEnabled = LongYearEnabled;
             s.WeeksPerSeason = WeeksPerSeason;
             s.MarchPaceEnabled = MarchPaceEnabled;
+            s.WorldPacePercent = WorldPacePercent;
+            s.SiegePacePercent = SiegePacePercent;
             s.MarchPaceAiToo = MarchPaceAiToo;
             s.MarchFootPace = MarchFootPace;
             s.MarchTrainPace = MarchTrainPace;

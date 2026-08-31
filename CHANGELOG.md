@@ -1,5 +1,35 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-31 — Tempo swiata 50%: marsz i oblezenia w skali podwojonego roku
+**Mod:** Armoury | **Pliki:** `Armoury/src/WorldPace.cs` (nowy), `MarchPace.cs`, `Settings.cs`, `SubModuleMain.cs` (+McmSettings)
+**Problem:** Jeff: "ile dziennie moze maszerowac armia? nasz czas leci
+x2 wzgledem zwyklego (bylo x4, wydluzylismy rok); oblezenia powinny
+trwac x2, wszystko trzeba uwzglednic". Pomiar z mapy ROT i lore
+(Mur->Sunspear = 1012 jedn. = ~3000 mil z ksiazek => ~4.75 km/jedn.;
+kontrola: Winterfell->KP 465 jedn. = ~2200 km, zgadza sie z lore):
+armia (speed ~4, ~18 h marszu po naszym snie) robila ~340 km NA DZIEN
+GRY - Winterfell->Krolewska Przystan w 6.5 dnia zamiast ksiazkowego
+miesiaca; oblezenia konczyly sie w 3-5 dni ze 168-dniowego roku.
+**Zmiana:** dwa suwaki MCM, oba domyslnie 50%: (1) WorldPacePercent -
+postfix na CalculateBaseSpeed WSZYSTKICH modeli predkosci: baza kazdej
+partii (gracz, AI, karawany, wiesniacy - swiat jednym rytmem) x50%;
+teren, ladunek, kary snu i sufity licza sie dalej od wolniejszej bazy;
+sufity kolumny MarchPace przeskalowane tym samym mnoznikiem. Efekt:
+Winterfell->KP ~13 dni ze 168-dniowego roku = lore'owy miesiac jako
+ulamek kalendarza; (2) SiegePacePercent - postfix na
+GetConstructionProgressPerHour wszystkich modeli oblezen: budowa machin
+x50% => oblezenia ~2x dluzsze, glodzenie twierdzy wraca do gry (zapasy
+miasta topnieja przez dluzsze tygodnie).
+Systemy juz w skali (bez zmian): rok 168 dni, kucie 2 dni/tier, regen
+ochotnikow 25%, samonaprawa 10%/dzien, sen 6 h/dobe. Do obserwacji
+w nowej kampanii: tempo leczenia rannych i plodnosc/starzenie (vanilla
+dni - przy wolniejszym swiecie relatywnie szybsze; decyzja po testach).
+**Ryzyko / co sprawdzic:** rozpiska predkosci pokazuje wpis "World
+pace"; podroz White Harbor->Winterfell ~3 dni (bylo ~1.5); AI dalej
+dziala normalnie (to mnoznik bazy, zadnych nowych regul); oblezenie
+buduje machiny 2x wolniej - patrz pasek budowy.
+**Status:** WGRANE
+
 ## 2026-08-31 — Smoki ma TYLKO Daenerys (plus gracz z questa); zapasy AI na 4 dni
 **Mod:** CrashScribe + Armoury | **Pliki:** `CrashScribe/src/Mends.cs`, `Armoury/src/Settings.cs` (+McmSettings)
 **Problem:** Jeff: "smoki ma TYLKO Daenerys! plus gracz, jesli wykona
