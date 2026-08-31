@@ -1,5 +1,21 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-31 — Fix: oboz zatrzymuje marsz (koniec spania w biegu)
+**Mod:** Armoury | **Pliki:** `Armoury/src/NightRest.cs`
+**Problem:** Jeff: "maly bug - przy auto-obozie sen startuje, czas
+leci, a ludzik dalej idzie po mapie do zaznaczonego celu; spimy
+i idziemy jednoczesnie". MakeCampNow/SleepInit nie zdejmowaly rozkazu
+ruchu - menu snu (StartWait, czas plynie) nie blokuje marszu partii.
+**Zmiana:** (1) MakeCampNow: SetMoveModeHold PRZED rozbiciem obozu -
+kazda sciezka (auto-zmierzch, popup, klawisz O) najpierw zatrzymuje
+kolumne; (2) SleepInit: to samo przy kladzeniu sie poza osada.
+Po pobudce partia stoi - gracz sam wskazuje dalsza droge (Wayfinder
+melduje kurs od reki).
+**Ryzyko / co sprawdzic:** auto-oboz o 21 w marszu: kolumna staje,
+namiot, pasek snu - ludzik NIE przesuwa sie po mapie; rano stoi tam,
+gdzie zasnal.
+**Status:** WGRANE
+
 ## 2026-08-31 — Analiza logow pierwszej sesji nowej kampanii + fix SkillSinew na nowej grze
 **Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs`
 **Problem:** Jeff: "czy z logow gry wyczytales bledy - czy cos sie

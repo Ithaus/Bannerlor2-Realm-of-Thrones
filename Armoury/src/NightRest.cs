@@ -874,7 +874,15 @@ namespace Armoury
         /// <summary>Jedna sciezka obozu: BK jesli jest, inaczej nasz wlasny.</summary>
         internal static void MakeCampNow()
         {
-            try { if (!TryBkCamp()) OwnCamp(); }
+            try
+            {
+                // OBOZ = STOP (Jeff 31.08: "spimy i idziemy jednoczesnie - bug").
+                // Auto-oboz wchodzil w sen bez zdjecia rozkazu ruchu i ludzik
+                // maszerowal przez cala noc z paskiem snu na ekranie.
+                var mp = MobileParty.MainParty;
+                if (mp != null) mp.SetMoveModeHold();
+                if (!TryBkCamp()) OwnCamp();
+            }
             catch (Exception e) { Log.Error("MakeCampNow", e); }
         }
 
@@ -1065,7 +1073,10 @@ namespace Armoury
                 // ma sie zmienic w namiot"). Stawiamy raz, przy wejsciu w sen -
                 // nie co klatke (pulapka wizerunkow z CLAUDE.md)
                 if (MobileParty.MainParty != null && MobileParty.MainParty.CurrentSettlement == null)
+                {
+                    MobileParty.MainParty.SetMoveModeHold();   // sen = postoj, zaden marsz w tle
                     Tent(MobileParty.MainParty, true);
+                }
                 var s = Settings.Current;
                 float needed = NeededHours();                  // baza + odsetki dlugu (do 21 h)
                 // bezpiecznik: nikt nie spi wiecznie - ale przy dlugu snu suma
