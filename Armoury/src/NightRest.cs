@@ -16,13 +16,20 @@ using TaleWorlds.Localization;
 namespace Armoury
 {
     /// <summary>
-    /// NOCLEG. Jeff: wojsko ma SPAC - 5 cichych godzin miedzy zmierzchem a switem
-    /// (w obozie, pod dachem, na postoju). Mozna zarywac noce, ale dlug rosnie:
-    /// pierwsza nieprzespana noc uchodzi na sucho, druga meczy, trzecia i dalsze
-    /// lamia kolumne (predkosc do -30%, morale do -15). Dobra noc splaca dwie zle.
+    /// NOCLEG. Jeff (30.08, nowa zasada): wojsko ma SPAC - baza 6 godzin na dobe
+    /// (w obozie, pod dachem, na postoju). Dlug snu eskaluje:
+    ///   1 zarwana noc  - uchodzi na sucho, ale odespanie kosztuje 6+3 = 9 h;
+    ///   2 zarwane noce - kolumna sie slania (predkosc -40%, morale -40%),
+    ///                    odespanie kosztuje 6+9 = 15 h;
+    ///   3 zarwane noce - wojsko ZASYPIA gdzie stoi (partia staje, predkosc -90%,
+    ///                    morale -95%), odespanie 6+15 = 21 h (wzor odsetek:
+    ///                    3*(2*dlug-1) godzin ponad baze).
+    /// Dlug spada do ZERA dopiero po przespaniu calej sumy (baza + odsetki);
+    /// przespanie samej bazy nie dolicza nowego dlugu, ale stary zostaje.
     /// Do tego szybki oboz: klawisz O na mapie stawia oboz BannerKings od reki,
     /// a w menu obozu jest "Bed down until dawn" - spisz do switu z paskiem.
     /// W sluzbie ROT (SLUZBA) dlugu nie liczymy - o marszach decyduje lord.
+    /// Umarli (Undead) dlugu nie znaja wcale.
     /// </summary>
     internal static class NightRest
     {
@@ -43,8 +50,19 @@ namespace Armoury
         private static float _menuTarget = 5f;
         private static float _menuBase;   // stan _restTonight w chwili polozenia sie
 
-        private static readonly int[] SpdPenalty = { 0, 0, 5, 15, 25, 30 };   // % za dlug 0..5
-        private static readonly int[] MorPenalty = { 0, 0, 3, 8, 12, 15 };
+        // kary % za dlug 0..3 (dlug 1 = bez kar, "jedna noc mozna"; morale
+        // procentowo przez AddFactor - "morale spada o 95%", nie o 95 punktow)
+        private static readonly int[] SpdPenalty = { 0, 0, 40, 90 };
+        private static readonly int[] MorPenalty = { 0, 0, 40, 95 };
+
+        /// <summary>Ile godzin snu zamyka rachunek przy biezacym dlugu:
+        /// baza + 3*(2*dlug-1) odsetek (dlug 1: +3h, dlug 2: +9h, dlug 3: +15h).</summary>
+        internal static float NeededHours()
+        {
+            var s = Settings.Current;
+            float baza = s != null ? Math.Max(1f, s.SleepHoursNeeded) : 6f;
+            return baza + (Debt > 0 ? 3f * (2 * Debt - 1) : 0f);
+        }
 
         // ------------------------------------------------------------ rachunek nocy
         internal static void OnHourly()
@@ -93,17 +111,16 @@ namespace Armoury
             catch (Exception e) { Log.Error("NightRest.OnHourly", e); }
         }
 
-        /// <summary>Splata dlugu od reki, gdy dzisiejsze godziny snu sie uzbieraly.</summary>
+        /// <summary>Splata dlugu od reki - dopiero gdy uzbiera sie CALA suma
+        /// (baza + odsetki wg NeededHours); wtedy dlug schodzi do zera.</summary>
         private static void CreditRest(Settings s)
         {
-            if (_credited || _restTonight < Math.Max(1f, s.SleepHoursNeeded)) return;
+            if (_credited || _restTonight < NeededHours()) return;
             _credited = true;
             if (Debt > 0)
             {
-                Debt = Math.Max(0, Debt - 2);   // dobra noc splaca dwie zle
-                Msg(Debt == 0 ? "Well slept - the men are fresh again."
-                              : "Some sleep at last, but the men still owe the pillow (" + Debt + ").",
-                    Colors.Green);
+                Debt = 0;   // odespali baze i wszystkie odsetki naraz
+                Msg("The debt is paid in full - the men wake fresh again.", Colors.Green);
             }
         }
 
@@ -535,19 +552,47 @@ namespace Armoury
 
         private static void SettleNight(Settings s)
         {
-            // splata poszla juz OD REKI (patrz OnHourly); swit tylko zamyka dobe
-            // i dolicza dlug tym, ktorzy nocy nie przespali. KTO WLASNIE SPI
-            // (_sleeping), ten dlugu nie dostaje - dospi swoje po swicie
-            bool slept = _sleeping || _credited || _restTonight >= Math.Max(1f, s.SleepHoursNeeded);
+            // splata calego dlugu idzie OD REKI (CreditRest, prog NeededHours);
+            // swit zamyka dobe: kto nie przespal nawet BAZY, temu rosnie dlug.
+            // KTO WLASNIE SPI (_sleeping), ten dlugu nie dostaje - dospi po swicie.
+            // Przespana baza przy niesplaconych odsetkach: dlug STOI w miejscu.
+            float baza = Math.Max(1f, s.SleepHoursNeeded);
+            bool sleptBase = _sleeping || _restTonight >= baza;
+            bool paidInFull = _credited;
             _restTonight = 0f;
             _credited = false;
             if (RotEnlisted()) { Debt = 0; return; }   // w sluzbie spisz, kiedy kaza
 
-            if (slept) return;
-            Debt = Math.Min(5, Debt + 1);
-            if (Debt == 1) Msg("The men marched through the night. One sleepless night - they bear it.", Colors.Yellow);
-            else if (Debt == 2) Msg("Second night without sleep - the column drags its feet (speed -" + SpdPenalty[2] + "%).", Colors.Yellow);
-            else Msg(Debt + " sleepless nights - the men stumble half-dreaming (speed -" + SpdPenalty[Debt] + "%, morale -" + MorPenalty[Debt] + ").", Colors.Red);
+            if (sleptBase)
+            {
+                if (Debt > 0 && !paidInFull)
+                    Msg("The men slept, but old weariness lingers - a full rest takes "
+                        + (int)Math.Ceiling(NeededHours()) + " hours.", Colors.Yellow);
+                return;
+            }
+
+            Debt = Math.Min(3, Debt + 1);
+            if (Debt == 1)
+                Msg("The men marched through the night. One sleepless night - they bear it, but paying it back will take "
+                    + (int)Math.Ceiling(NeededHours()) + " hours of rest.", Colors.Yellow);
+            else if (Debt == 2)
+                Msg("Second night without sleep - the column staggers (speed -" + SpdPenalty[2] + "%, morale -"
+                    + MorPenalty[2] + "%). A full rest now takes " + (int)Math.Ceiling(NeededHours()) + " hours.", Colors.Red);
+            else
+            {
+                Msg("Third sleepless night - the company collapses where it stands (speed -" + SpdPenalty[3]
+                    + "%, morale -" + MorPenalty[3] + "%). They need " + (int)Math.Ceiling(NeededHours())
+                    + " hours of rest.", Colors.Red);
+                // wojsko ZASYPIA: kolumna staje w miejscu (raz, przy zapasci -
+                // jesli gracz mimo to pogna dalej, powlecze sie na 10% predkosci)
+                try
+                {
+                    var mp = MobileParty.MainParty;
+                    if (mp != null && mp.CurrentSettlement == null && mp.MapEvent == null)
+                        mp.SetMoveModeHold();
+                }
+                catch { }
+            }
         }
 
         private static void Msg(string t, Color c)
@@ -563,7 +608,7 @@ namespace Armoury
                 var s = Settings.Current;
                 if (s == null || !s.NightRestEnabled || Debt < 2) return;
                 if (mobileParty == null || mobileParty != MobileParty.MainParty) return;
-                __result.AddFactor(-SpdPenalty[Math.Min(5, Debt)] / 100f, _txtSleepless);
+                __result.AddFactor(-SpdPenalty[Math.Min(3, Debt)] / 100f, _txtSleepless);
             }
             catch { }
         }
@@ -575,7 +620,10 @@ namespace Armoury
                 var s = Settings.Current;
                 if (s == null || !s.NightRestEnabled || Debt < 2) return;
                 if (mobileParty == null || mobileParty != MobileParty.MainParty) return;
-                __result.Add(-MorPenalty[Math.Min(5, Debt)], _txtSleepless);
+                // procentowo ("morale spada o 95%"), nie punktowo - przy zapasci
+                // z bazowego ~50 zostaje ~2-3, ponizej progu dezercji: spiacego
+                // wojska pilnowac trzeba jak ognia
+                __result.AddFactor(-MorPenalty[Math.Min(3, Debt)] / 100f, _txtSleepless);
             }
             catch { }
         }
@@ -817,8 +865,10 @@ namespace Armoury
                 if (MobileParty.MainParty != null && MobileParty.MainParty.CurrentSettlement == null)
                     Tent(MobileParty.MainParty, true);
                 var s = Settings.Current;
-                float needed = s != null ? Math.Max(1f, s.SleepHoursNeeded) : 5f;
-                _sleepUntil = CampaignTime.HoursFromNow(14f);   // bezpiecznik: nikt nie spi wiecznie
+                float needed = NeededHours();                  // baza + odsetki dlugu (do 21 h)
+                // bezpiecznik: nikt nie spi wiecznie - ale przy dlugu snu suma
+                // godzin ZEGARA bywa wieksza niz godzin SNU (dzien liczy sie slabiej)
+                _sleepUntil = CampaignTime.HoursFromNow(Math.Max(14f, needed * 1.8f + 2f));
                 _sleeping = true;
                 _menuRest = 0f;
                 _menuBase = _restTonight;
@@ -895,7 +945,7 @@ namespace Armoury
                 if (parts.Length > 0) int.TryParse(parts[0], NumberStyles.Any, CultureInfo.InvariantCulture, out Debt);
                 if (parts.Length > 1) float.TryParse(parts[1], NumberStyles.Any, CultureInfo.InvariantCulture, out _restTonight);
                 _credited = parts.Length > 2 && parts[2] == "1";   // stary zapis (2 pola) = false
-                Debt = Math.Max(0, Math.Min(5, Debt));
+                Debt = Math.Max(0, Math.Min(3, Debt));   // stara skala szla do 5 - przytnij
             }
             catch { }
         }

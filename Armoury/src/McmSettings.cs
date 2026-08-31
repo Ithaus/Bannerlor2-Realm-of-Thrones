@@ -868,9 +868,9 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public bool NightRestEnabled { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Sleep Hours Needed", 0.00f, 20.00f, "0.00", HintText = "this many hours of sleep settle the day's account - whenever taken")]
+        [SettingPropertyFloatingInteger("Sleep Hours Needed", 0.00f, 24.00f, "0.00", HintText = "base hours of sleep per day; sleep debt adds interest on top (1 night owed: +3h, 2: +9h, 3: +15h) and only the full sum clears it")]
         [SettingPropertyGroup("A night's rest")]
-        public float SleepHoursNeeded { get; set; } = 5f;
+        public float SleepHoursNeeded { get; set; } = 6f;
 
         [SettingPropertyFloatingInteger("Day Rest Factor", 0.00f, 2.40f, "0.00", HintText = "sleep by daylight counts at this rate (camp noise, heat, light) - night hours count in full")]
         [SettingPropertyGroup("A night's rest")]

@@ -1,5 +1,33 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-30 — Sen: eskalacja dlugu (1 noc wolno, 2 lamie, 3 usypia kolumne)
+**Mod:** Armoury | **Pliki:** `Armoury/src/NightRest.cs`, `Armoury/src/Settings.cs` (+McmSettings wygenerowane)
+**Problem:** Jeff podal nowa zasade snu: "nieprzespanie jednej nocy jest
+mozliwe; drugiej - bardzo powazny minus do morale i predkosci; trzeciej -
+wojsko zasypia i zatrzymuje sie tam gdzie jest, predkosc -90%, morale
+-95%. Jedna zarwana noc = trzeba przespac 6+3 h, dwie zarwane = 6+9 h."
+Stary system: dlug 0..5, kary lagodne (predkosc do -30%, morale do -15
+pkt), dobra noc splacala dwie zle, baza snu 5 h.
+**Zmiana:** (1) baza snu 6 h (SleepHoursNeeded 5->6); (2) dlug 0..3;
+(3) odsetki wg wzoru 3*(2*dlug-1): pelna splata wymaga 9 / 15 / 21 h
+snu JEDNYM rachunkiem (CreditRest zeruje dlug dopiero przy pelnej
+sumie; przespanie samej bazy nie dodaje dlugu, ale stary stoi);
+(4) kary: dlug 1 = nic, dlug 2 = predkosc -40% i morale -40%, dlug 3 =
+predkosc -90% i morale -95% (morale teraz PROCENTOWO przez AddFactor,
+nie punktowo); (5) przy wejsciu w dlug 3 partia gracza staje w miejscu
+(SetMoveModeHold, raz - poza osada i bitwa); (6) pasek snu w menu obozu
+celuje w pelna sume (bezpiecznik snu wydluzony, bo 21 h snu to wiecej
+godzin zegara przy dziennym snie); (7) stare save'y z dlugiem 4-5
+przycinane do 3.
+**Ryzyko / co sprawdzic:** przy zapasci morale ~2-3 = PONIZEJ progu
+dezercji (10) - wojsko bedzie dezerterowac, poki nie odespane (swiadome,
+Jeff podal -95%); sluzba ROT nadal bez dlugu; umarli bez dlugu; AI bez
+zmian (lordowie i tak obozuja nocami). Test: zarwac 2 noce -> zolty
+komunikat przy 1., czerwony przy 2. (kary widoczne w tooltipie predkosci
+"Sleepless nights"), 3. noc -> kolumna staje, sen w obozie przez ~21 h
+czysci wszystko ("The debt is paid in full").
+**Status:** WGRANE
+
 ## 2026-08-30 — Valyrianska zasada T6 takze w autokalkulacji bitew
 **Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs`
 **Problem:** Jeff: "AI walczy z AI na zasadzie autokalkulacji - trzeba
