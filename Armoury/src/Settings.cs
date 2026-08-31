@@ -278,13 +278,14 @@ namespace Armoury
         public bool SleepAtSeaFree = true;                 // crews sleep in watches - sailing through the night builds no sleep debt
         public bool AiCampsAtNight = true;                 // the world sleeps too: lord parties and caravans halt for the night (22-4) unless chased or in action
         public bool AiBanditsCampToo = false;               // brigands sleep as well - hideout by day, their own fire in the field by night
-        public int AiTentCap = 40;                         // at most this many AI camps get a tent icon on the map - the rest still sleep, just without the picture
-        public float AiTentRadius = 35f;                   // tent icons appear only this close to your party - the world beyond still sleeps, just without the picture
+        public int AiTentCap = 60;                         // at most this many AI camps get a tent icon on the map - the rest still sleep, just without the picture
+        public float AiTentRadius = 100f;                   // tent icons appear only this close to your party - the world beyond still sleeps, just without the picture
         public int AiCampSkipPercent = 15;                 // this share of lord columns press on through any given night - not everyone pitches camp
         public bool BanditsRestByDay = true;               // every band has a nature: three in four are night hunters (lie low 10-16), one in four hunts by day and beds down at night (23-5)
         public float AiNightsAwakeInChase = 1f;            // days a chasing or fleeing party may push on without sleep before it drops anyway
         public float AiCampDangerRadius = 6f;              // a hostile party this close keeps them marching - pursuit knows no bedtime
         public bool CampTentIcon = true;                   // pitched camps show a tent on the map (yours and theirs)
+        public bool CoursePlotterEnabled = true;           // clicking a destination reports the route: kilometres, hours in the saddle and days on the road, and flags a settlement target on the map
         public bool CampBattlePropsEnabled = false;        // EXPERIMENTAL: attacked while encamped, the field battle gets your camp dressed on it - tents, fire, torches around your line (unknown prefabs are skipped and logged)
         public bool HideoutAlarmEnabled = true;            // a fight in a hideout wakes the camp: bandits within earshot come running - no more men ignoring a brawl ten paces away
         public float HideoutAlarmScreamRadius = 40f;       // a wounded man's cry and the ring of steel carry this many meters - bandits inside come at you, further ones sleep on

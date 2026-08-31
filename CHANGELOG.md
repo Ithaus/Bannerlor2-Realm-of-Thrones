@@ -1,5 +1,33 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-31 — Nawigator kursu (km, godziny, dni + flaga celu) i namioty v2 (promien 100)
+**Mod:** Armoury | **Pliki:** `Armoury/src/Wayfinder.cs` (nowy), `NightRest.cs`, `Settings.cs`, `SubModuleMain.cs` (+McmSettings)
+**Problem:** Jeff: (1) "klikam gdzie jechac - niech pokaze znaczek na
+mapie i ile to km i godzin marszu"; (2) "namioty glupio wygladaja: moj
+czasami sie nie uruchamia, a spiace AI stoi jako konik/piechur jakby
+nic - promien ~100 ode mnie".
+**Zmiana:** (1) Wayfinder - postfix na SetMoveGoToPoint/Settlement
+partii gracza: meldunek kursu z dystansem PO TRASIE (MapDistanceModel),
+kilometrami w skali lore (4.75 km/jedn.), godzinami w siodle i dniami
+drogi (uwzglednia 6 h snu); cel-osada dostaje vanillowa FLAGE sledzenia
+(te od questow) + strzalke kompasu - flaga schodzi po dotarciu lub
+przy nowym kursie; questowych flag nie ruszamy (CheckTracked). Kreski
+trasy silnik nie narysuje bez grzebania w renderze mapy - flaga +
+meldunek. Throttle 2 s na powtorzony klik. Ustawienie
+CoursePlotterEnabled. (2) Namioty: gracz dostaje namiot AUTOMATYCZNIE
+na kazdym nocnym postoju w polu (nie tylko z menu/klawisza O); noca
+namiot dostaje tez KAZDA stojaca kolumna lorda/karawany w zasiegu -
+takze te zatrzymane przez vanilla AI, nie tylko nasi spiacy (test
+bezruchu: pozycja niezmieniona miedzy odswiezeniami co ~2 s realne;
+umarli nie obozuja); AiTentRadius 35 -> 100, AiTentCap 40 -> 60.
+Wizerunki wciaz ruszane TYLKO przy zmianie stanu (pulapka z CLAUDE.md).
+**Ryzyko / co sprawdzic:** klik w miasto -> meldunek "Course set for...
+~N km - about H h in the saddle, D days on the road" + flaga na mapie
+i kompasie, schodzi po wjezdzie; nocny postoj = namiot od reki; spiace
+kolumny w promieniu 100 wygladaja jak obozy. Wydajnosc: petla nocna po
+partiach co ~2 s realne z twardym capem 60 namiotow.
+**Status:** WGRANE
+
 ## 2026-08-31 — Tempo swiata 50%: marsz i oblezenia w skali podwojonego roku
 **Mod:** Armoury | **Pliki:** `Armoury/src/WorldPace.cs` (nowy), `MarchPace.cs`, `Settings.cs`, `SubModuleMain.cs` (+McmSettings)
 **Problem:** Jeff: "ile dziennie moze maszerowac armia? nasz czas leci

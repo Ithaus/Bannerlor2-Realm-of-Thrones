@@ -904,13 +904,13 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public bool AiBanditsCampToo { get; set; } = false;
 
-        [SettingPropertyInteger("Ai Tent Cap", 0, 160, "0", HintText = "at most this many AI camps get a tent icon on the map - the rest still sleep, just without the picture")]
+        [SettingPropertyInteger("Ai Tent Cap", 0, 240, "0", HintText = "at most this many AI camps get a tent icon on the map - the rest still sleep, just without the picture")]
         [SettingPropertyGroup("A night's rest")]
-        public int AiTentCap { get; set; } = 40;
+        public int AiTentCap { get; set; } = 60;
 
-        [SettingPropertyFloatingInteger("Ai Tent Radius", 0.00f, 140.00f, "0.00", HintText = "tent icons appear only this close to your party - the world beyond still sleeps, just without the picture")]
+        [SettingPropertyFloatingInteger("Ai Tent Radius", 0.00f, 400.00f, "0.00", HintText = "tent icons appear only this close to your party - the world beyond still sleeps, just without the picture")]
         [SettingPropertyGroup("A night's rest")]
-        public float AiTentRadius { get; set; } = 35f;
+        public float AiTentRadius { get; set; } = 100f;
 
         [SettingPropertyInteger("Ai Camp Skip Percent", 0, 60, "0", HintText = "this share of lord columns press on through any given night - not everyone pitches camp")]
         [SettingPropertyGroup("A night's rest")]
@@ -931,6 +931,10 @@ namespace Armoury
         [SettingPropertyBool("Camp Tent Icon", HintText = "pitched camps show a tent on the map (yours and theirs)")]
         [SettingPropertyGroup("A night's rest")]
         public bool CampTentIcon { get; set; } = true;
+
+        [SettingPropertyBool("Course Plotter Enabled", HintText = "clicking a destination reports the route: kilometres, hours in the saddle and days on the road, and flags a settlement target on the map")]
+        [SettingPropertyGroup("A night's rest")]
+        public bool CoursePlotterEnabled { get; set; } = true;
 
         [SettingPropertyBool("Camp Battle Props Enabled", HintText = "EXPERIMENTAL: attacked while encamped, the field battle gets your camp dressed on it - tents, fire, torches around your line (unknown prefabs are skipped and logged)")]
         [SettingPropertyGroup("A night's rest")]
@@ -1320,6 +1324,7 @@ namespace Armoury
             s.AiNightsAwakeInChase = AiNightsAwakeInChase;
             s.AiCampDangerRadius = AiCampDangerRadius;
             s.CampTentIcon = CampTentIcon;
+            s.CoursePlotterEnabled = CoursePlotterEnabled;
             s.CampBattlePropsEnabled = CampBattlePropsEnabled;
             s.HideoutAlarmEnabled = HideoutAlarmEnabled;
             s.HideoutAlarmScreamRadius = HideoutAlarmScreamRadius;

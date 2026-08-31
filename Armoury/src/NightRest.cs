@@ -110,6 +110,16 @@ namespace Armoury
                 // (gwar obozu, upal, swiatlo); rachunek zamyka sie o swicie
                 if (resting) _restTonight += night ? 1f : MBMath.ClampFloat(s.DayRestFactor, 0.1f, 1f);
 
+                // NAMIOT SAM SIE STAWIA (Jeff 31.08: "jak spie, to czasami sie
+                // nie uruchamia") - nocny postoj w polu to oboz, takze bez menu
+                if (night && resting && !PlayerCamped && s.CampTentIcon
+                    && mp.CurrentSettlement == null && mp.MapEvent == null
+                    && mp.AttachedTo == null && !mp.IsCurrentlyAtSea)
+                {
+                    Tent(mp, true);
+                    PlayerCamped = true;
+                }
+
                 // ROZLICZENIE OD REKI (Jeff: "sen ma byc aktualizowany zaraz po
                 // wypoczynku, nie czekac do przeliczenia") - gdy tylko godziny
                 // snu sie uzbieraja, dlug schodzi natychmiast; swit juz tego
@@ -160,11 +170,15 @@ namespace Armoury
                 if (!s.CampTentIcon || MobileParty.MainParty == null) return;
                 var me = MobileParty.MainParty.GetPosition2D;
                 float radius = MathF.Max(5f, s.AiTentRadius);
+                int hh = CampaignTime.Now.GetHourOfDay;
+                bool nightNow = hh >= 21 || hh <= 5;
                 for (int i = _tented.Count - 1; i >= 0; i--)
                 {
                     var t = _tented[i];
+                    bool asleep = t != null && t.Ai != null && t.Ai.IsDisabled;
+                    bool still = t != null && nightNow && IsStill(t);
                     bool drop = t == null || !t.IsActive || t.MapEvent != null
-                                || t.Ai == null || !t.Ai.IsDisabled
+                                || (!asleep && !still)
                                 || t.GetPosition2D.Distance(me) > radius + 3f;
                     if (drop) { Tent(t, false); _tented.RemoveAt(i); }
                 }
@@ -178,8 +192,61 @@ namespace Armoury
                     Tent(mp, true);
                     _tented.Add(mp);
                 }
+                // NOCA kazda STOJACA kolumna w zasiegu wyglada jak oboz (Jeff
+                // 31.08: "inni stoja konik lub piechur jakby nic; promien ~100")
+                // - takze te, ktore zatrzymalo vanilla AI, nie nasz nocleg
+                if (nightNow)
+                {
+                    foreach (var mp in MobileParty.All)
+                    {
+                        if (_tented.Count >= Math.Max(0, s.AiTentCap)) break;
+                        if (mp == null || !mp.IsActive || mp == MobileParty.MainParty) continue;
+                        if (!mp.IsLordParty && !mp.IsCaravan) continue;
+                        if (mp.CurrentSettlement != null || mp.MapEvent != null || mp.BesiegerCamp != null) continue;
+                        if (mp.AttachedTo != null || mp.IsCurrentlyAtSea) continue;
+                        if (_tented.Contains(mp)) continue;
+                        if (mp.GetPosition2D.Distance(me) > radius) continue;
+                        if (!IsStill(mp)) continue;
+                        if (Undead.Party(mp)) continue;                    // umarli nie obozuja
+                        Tent(mp, true);
+                        _tented.Add(mp);
+                    }
+                }
+                PruneStill(me, radius);
             }
             catch (Exception e) { Log.Error("RefreshNearbyTents", e); }
+        }
+
+        // czy partia stoi w miejscu: porownanie z pozycja z poprzedniego
+        // odswiezenia namiotow (co ~2 s realne) - zadnych dodatkowych tickow
+        private static readonly System.Collections.Generic.Dictionary<MobileParty, Vec2> _stillPos =
+            new System.Collections.Generic.Dictionary<MobileParty, Vec2>();
+
+        private static bool IsStill(MobileParty mp)
+        {
+            try
+            {
+                var pos = mp.GetPosition2D;
+                Vec2 prev;
+                bool known = _stillPos.TryGetValue(mp, out prev);
+                _stillPos[mp] = pos;
+                return known && prev.Distance(pos) < 0.08f;
+            }
+            catch { return false; }
+        }
+
+        private static void PruneStill(Vec2 me, float radius)
+        {
+            try
+            {
+                if (_stillPos.Count < 400) return;
+                var drop = new System.Collections.Generic.List<MobileParty>();
+                foreach (var kv in _stillPos)
+                    if (kv.Key == null || !kv.Key.IsActive || kv.Key.GetPosition2D.Distance(me) > radius * 2f)
+                        drop.Add(kv.Key);
+                foreach (var k in drop) _stillPos.Remove(k);
+            }
+            catch { }
         }
 
         /// <summary>
