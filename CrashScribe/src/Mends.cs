@@ -739,11 +739,13 @@ namespace CrashScribe
         /// (Zastepuje wczesniejszy mend GiantSinew - giganci, level 26 =
         /// wysoki tier, dostaja z tej reguly dokladnie swoje 150.)
         /// </summary>
+        internal static bool SinewApplied;
+
         internal static void SkillSinew()
         {
             try
             {
-                int fixedN = 0, capped = 0;
+                int fixedN = 0, capped = 0, seen = 0;
                 foreach (var co in TaleWorlds.ObjectSystem.MBObjectManager.Instance
                              .GetObjectTypeList<CharacterObject>())
                 {
@@ -763,6 +765,7 @@ namespace CrashScribe
                     }
                     catch { }
                     if (maxDiff <= 0) continue;
+                    seen++;
                     int ath = co.GetSkillValue(DefaultSkills.Athletics);
                     if (ath >= maxDiff) continue;
                     int cap = 20 + 30 * Math.Max(0, co.Tier);
@@ -784,7 +787,14 @@ namespace CrashScribe
                                     + (target < maxDiff ? ", sufit tieru " + cap : "") + ").");
                     if (target < maxDiff) capped++;
                 }
-                Scribe.Line("Mends: SkillSinew - Atletyka podbita " + fixedN
+                // NOWA GRA (31.08): na swiezej kampanii SessionLaunched biegnie
+                // ZANIM ekwipunki jednostek sie zmaterializuja - wtedy seen == 0
+                // i mend powtarza sie z pierwszym tickiem dnia (save'y mialy 169)
+                SinewApplied = seen > 0;
+                if (seen == 0)
+                    Scribe.Line("Mends: SkillSinew - ekwipunki jeszcze niezaladowane (nowa gra), powtorze z pierwszym dniem.");
+                else
+                    Scribe.Line("Mends: SkillSinew - Atletyka podbita " + fixedN
                             + " jednostkom do poziomu wlasnego munduru (sufit 20+30*tier); "
                             + capped + " przypadkow zostalo ponizej munduru (sufit tieru).");
             }
@@ -1935,7 +1945,7 @@ namespace CrashScribe
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this,
                 delegate (CampaignGameStarter s) { Mends.DragonPurge(true); });
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this,
-                delegate { Mends.DragonPurge(false); });
+                delegate { Mends.DragonPurge(false); if (!Mends.SinewApplied) Mends.SkillSinew(); });
         }
 
         public override void SyncData(IDataStore dataStore)

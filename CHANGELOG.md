@@ -1,5 +1,31 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-31 — Analiza logow pierwszej sesji nowej kampanii + fix SkillSinew na nowej grze
+**Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs`
+**Problem:** Jeff: "czy z logow gry wyczytales bledy - czy cos sie
+wysypalo?". Analiza sesji 31.08 11:32 (nowa kampania, ~30 min):
+(1) W TRAKCIE GRY CZYSTO - zero bledow po wejsciu do kampanii;
+wszystkie 20+ mendow zainicjowanych, wszystkie nowe prawa wstaly
+(WorldPace 4 modele predkosci + 2 oblezen, WinterBite, ScorchedEarth,
+Wayfinder, kary snu 6/3 modeli, panika 4 modele morale, T6 pole+sym,
+unikaty: 39 itemow z handlu, 1 kopia z targow); (2) wyjatki TYLKO
+startowe first-chance, wszystkie ZLAPANE - glownie martwe patche
+cudzego BKROTPatch (DynamicPartySizePerformancePatch,
+RebellionsGameEntityInstantiatePatch celuja w inna wersje gry;
+Harmony je raportuje i jedzie dalej - nieszkodliwe, znane zjawisko);
+(3) JEDNA REGRESJA: "SkillSinew - podbita 0 jednostkom" - na NOWEJ
+grze SessionLaunched biegnie zanim ekwipunki jednostek sie
+zmaterializuja (wszystkie maxDiff=0 -> petla pusta); na save'ach
+dzialal (169 podbic w logach 30.08).
+**Zmiana:** SkillSinew liczy `seen` (jednostki z realnym ekwipunkiem);
+seen == 0 -> flaga SinewApplied zostaje false i mend POWTARZA SIE
+z pierwszym tickiem dnia, az ekwipunki beda (log: "ekwipunki jeszcze
+niezaladowane (nowa gra), powtorze z pierwszym dniem").
+**Ryzyko / co sprawdzic:** w biezacej kampanii Jeffa po pierwszym
+przeskoku dnia log "SkillSinew - Atletyka podbita N jednostkom"
+z N ~169; kontrola w grze: encyklopedia -> Giant -> Athletics 150.
+**Status:** WGRANE
+
 ## 2026-08-31 — Panel obozowy pod klawiszem O: nocna polityka zmienialna w kazdej chwili
 **Mod:** Armoury | **Pliki:** `Armoury/src/NightRest.cs`
 **Problem:** Jeff: "moge zmienic zdanie - Never ask nie moze byc stale".
