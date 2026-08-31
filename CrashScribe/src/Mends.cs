@@ -468,7 +468,7 @@ namespace CrashScribe
                 var list = Traverse.Create(__instance).Property("Assignments").GetValue() as System.Collections.IEnumerable;
                 if (list == null) list = Traverse.Create(__instance).Field("Assignments").GetValue() as System.Collections.IEnumerable;
                 if (list == null) return;
-                int stripped = 0;
+                int stripped = 0, kept = 0;
                 foreach (var a in list)
                 {
                     var tr = Traverse.Create(a);
@@ -476,18 +476,43 @@ namespace CrashScribe
                     var eq = tr.Property("Equipment").GetValue() as Equipment;
                     if (eq == null) eq = tr.Field("Equipment").GetValue() as Equipment;
                     if (co == null || eq == null || co.IsHero) continue;
+
+                    // NAJPIERW ZBIERZ, co ma zejsc - dopiero potem zdejmuj. Inaczej
+                    // zolnierz, ktoremu KAZDA bron przekracza skill, wychodzi na pole
+                    // z golymi rekami: awaryjki DTE (AssignWeaponToUnarmed,
+                    // ApplyEmergencyLoadout) przebiegly JUZ przed naszym postfixem,
+                    // a DressCode uzupelnia wylacznie pancerz. Podloga sprzetu
+                    // (Jeff 31.08): najlzejsza bron zostaje w rece.
+                    var doomed = new System.Collections.Generic.List<int>();
+                    int weaponsHeld = 0, weakestSlot = -1, weakestDiff = int.MaxValue;
                     for (int s = 0; s <= 11; s++)
                     {
                         ItemObject it;
                         try { it = eq[(EquipmentIndex)s].Item; } catch { continue; }
-                        if (it == null || it.Difficulty <= 0 || it.RelevantSkill == null) continue;
+                        if (it == null) continue;
+                        bool isWeapon = s <= 4;
+                        if (isWeapon) weaponsHeld++;
+                        if (it.Difficulty <= 0 || it.RelevantSkill == null) continue;
                         if (co.GetSkillValue(it.RelevantSkill) >= it.Difficulty) continue;
+                        doomed.Add(s);
+                        if (isWeapon && it.Difficulty < weakestDiff) { weakestDiff = it.Difficulty; weakestSlot = s; }
+                    }
+                    int doomedWeapons = 0;
+                    for (int i = 0; i < doomed.Count; i++) if (doomed[i] <= 4) doomedWeapons++;
+                    if (weaponsHeld > 0 && doomedWeapons >= weaponsHeld && weakestSlot >= 0)
+                    { doomed.Remove(weakestSlot); kept++; }
+
+                    for (int i = 0; i < doomed.Count; i++)
+                    {
+                        int s = doomed[i];
                         try { tr.Method("SetEquipment", (EquipmentIndex)s, default(EquipmentElement)).GetValue(); stripped++; }
                         catch { try { eq[(EquipmentIndex)s] = default(EquipmentElement); stripped++; } catch { } }
                     }
                 }
-                if (stripped > 0)
-                    Scribe.Line("Mends: swieta zasada skilli w DTE - zdjeto " + stripped + " sztuk ponad umiejetnosci jednostek.");
+                if (stripped > 0 || kept > 0)
+                    Scribe.Line("Mends: swieta zasada skilli w DTE - zdjeto " + stripped
+                                + " sztuk ponad umiejetnosci jednostek"
+                                + (kept > 0 ? ", " + kept + " razy ostatnia bron zostala w rece (podloga)" : "") + ".");
             }
             catch { }
         }

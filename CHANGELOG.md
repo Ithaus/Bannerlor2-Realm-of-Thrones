@@ -1,5 +1,32 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-31 — PODLOGA SPRZETU: nikt nie wyjdzie nagi ani bez broni (audyt wielo-agentowy)
+**Mod:** Armoury + CrashScribe | **Pliki:** `Armoury/src/DragonUnmount.cs`, `CrashScribe/src/Mends.cs`
+**Problem:** Jeff po Prawie Wagi: "tylko zeby nadzy nie wyszli". Audyt
+(4 rownolegle analizy kodu + symulacja na 1062 jednostkach ROT) wykazal,
+ze ryzyko golizny jest NISKIE, ale galaz null jest ZYWYM kodem:
+`DragonUnmount.cs` w trzech miejscach wpisywal `new EquipmentElement(null)`,
+gdy nie znalazl lzejszego zamiennika - jedyne miejsce w repo zerujace slot
+pancerza (logowalo to nawet wprost: "goly slot"). Drugi, powazniejszy
+wynik: `SkillLawWard` (DTE) zdejmuje takze BRONIE bez zadnego fallbacku,
+a awaryjki DTE (AssignWeaponToUnarmed, ApplyEmergencyLoadout) przebiegaja
+PRZED naszym postfixem i juz sie nie powtorza - w druzynie gracza mogl
+powstac zolnierz z golymi rekami. DressCode uzupelnia wylacznie pancerz
+(5 slotow), broni nie tyka.
+**Zmiana:** (1) DragonUnmount - trzy podlogi: legenda schodzi zawsze, ale
+zolnierz dostaje zamiennik -> wzorzec klasy -> dopiero nic; bron ponad
+skill bez zamiennika ZOSTAJE przy swoim (bezbronny gorszy niz
+przepakowany); pancerz ponad Atletyke bez lzejszej sztuki ZOSTAJE na
+grzbiecie. Meldunki throttlowane (pierwsze 20 na sesje). (2) SkillLawWard
+- zbiera liste do zdjecia, a jesli zeszlyby WSZYSTKIE bronie jednostki,
+najlzejsza (najnizsze Difficulty) zostaje w rece; log rozroznia zdjete
+od zostawionych.
+**Ryzyko / co sprawdzic:** log "Mends: swieta zasada skilli w DTE -
+zdjeto N sztuk..., M razy ostatnia bron zostala w rece"; w Armoury.log
+linie "ItemReq: ... zostaje w swoim". Zasada nadrzedna dziala jak dotad -
+podloga odpala sie WYLACZNIE tam, gdzie alternatywa jest goly slot.
+**Status:** WGRANE
+
 ## 2026-08-31 — Prawo Wagi: finalnie 0.25 kg/pkt, wspolczynnik jako SUWAK w MCM
 **Mod:** Armoury + CrashScribe | **Pliki:** `Armoury/src/Settings.cs` (+McmSettings), `CrashScribe/src/Mends.cs`, `docs/pancerze-waga-atletyka.md`
 **Problem:** Jeff stroil wspolczynnik (0.25 -> 0.2 -> 0.3 -> "zostaw

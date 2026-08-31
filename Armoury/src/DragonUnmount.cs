@@ -18,6 +18,11 @@ namespace Armoury
     /// </summary>
     internal static class DragonUnmount
     {
+        /// <summary>Licznik meldunkow o PODLODZE sprzetu (Jeff 31.08: "tylko
+        /// zeby nadzy nie wyszli") - logujemy pierwsze 20 przypadkow na sesje,
+        /// zeby nie zalac logu przy kazdym spawnie kazdej bitwy.</summary>
+        private static int _floorLog;
+
         internal static void ApplyAll(Harmony harmony)
         {
             try
@@ -50,11 +55,19 @@ namespace Armoury
                             var w = eq[(EquipmentIndex)slot].Item;
                             if (LegendaryLaw.IsLegend(w))   // prog 100k + lista person
                             {
+                                // legenda schodzi ZAWSZE, ale zolnierz nie idzie z golym
+                                // slotem: zamiennik -> wzorzec klasy -> dopiero nic
                                 var repl = LegendaryLaw.ReplacementFor(w);
+                                if (repl == null)
+                                {
+                                    int skl = w.RelevantSkill != null ? soldier.GetSkillValue(w.RelevantSkill) : 0;
+                                    repl = SkillsDecide.PatternFor(w.ItemType, skl);
+                                }
                                 eq[(EquipmentIndex)slot] = repl != null
                                     ? new EquipmentElement(repl) : new EquipmentElement(null);
                                 Log.Info("LegendaryLaw: " + w.StringId + " zdjety przy spawnie z szeregowego ("
-                                         + soldier.StringId + ").");
+                                         + soldier.StringId + ") - dostaje "
+                                         + (repl != null ? repl.StringId : "goly slot") + ".");
                                 continue;
                             }
                             // ZASADA NADRZEDNA na scenie: bron ponad skill schodzi,
@@ -68,10 +81,18 @@ namespace Armoury
                                 {
                                     int sk = w.RelevantSkill != null ? soldier.GetSkillValue(w.RelevantSkill) : 0;
                                     var swap = SkillsDecide.PatternFor(w.ItemType, sk);
-                                    eq[(EquipmentIndex)slot] = swap != null
-                                        ? new EquipmentElement(swap) : new EquipmentElement(null);
-                                    Log.Info("ItemReq: " + soldier.StringId + " nie udzwignie " + w.StringId
-                                             + " (" + whyNot + ") - dostaje " + (swap != null ? swap.StringId : "goly slot") + ".");
+                                    // PODLOGA SPRZETU (Jeff 31.08): degradacja owszem,
+                                    // ale gdy NIE MA czym podmienic - zolnierz zostaje
+                                    // przy swoim. Bezbronny jest gorszy niz przepakowany.
+                                    if (swap != null)
+                                    {
+                                        eq[(EquipmentIndex)slot] = new EquipmentElement(swap);
+                                        Log.Info("ItemReq: " + soldier.StringId + " nie udzwignie " + w.StringId
+                                                 + " (" + whyNot + ") - dostaje " + swap.StringId + ".");
+                                    }
+                                    else if (_floorLog++ < 20)
+                                        Log.Info("ItemReq: " + soldier.StringId + " nie udzwignie " + w.StringId
+                                                 + " (" + whyNot + "), ale nie ma lzejszej broni - zostaje przy swojej.");
                                 }
                             }
                         }
@@ -83,8 +104,15 @@ namespace Armoury
                             var a = eq[(EquipmentIndex)slot].Item;
                             if (a == null || ItemReq.Meets(soldier, a)) continue;
                             var top = SkillsDecide.TopArmor(a.ItemType, ath);
-                            eq[(EquipmentIndex)slot] = top != null
-                                ? new EquipmentElement(top) : new EquipmentElement(null);
+                            // PODLOGA SPRZETU (Jeff 31.08: "tylko zeby nadzy nie
+                            // wyszli"): brak lzejszej sztuki = zolnierz zostaje
+                            // w swoim pancerzu. Zla statystyka jest mniejszym zlem
+                            // niz goly korpus - to JEDYNE miejsce w repo, ktore
+                            // potrafilo wpisac null do slotu pancerza.
+                            if (top != null) eq[(EquipmentIndex)slot] = new EquipmentElement(top);
+                            else if (_floorLog++ < 20)
+                                Log.Info("ItemReq: " + soldier.StringId + " - brak lzejszego pancerza ("
+                                         + a.ItemType + ") w ramach Atletyki " + ath + "; zostaje w swoim.");
                         }
                         var mnt = eq[(EquipmentIndex)10].Item;
                         if (mnt != null && !ItemReq.Meets(soldier, mnt))
