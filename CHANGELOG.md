@@ -1,5 +1,22 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-31 — Zegarek snu: pobudka mowi ile spales i jak dobrze
+**Mod:** Armoury | **Pliki:** `Armoury/src/NightRest.cs`
+**Problem:** Jeff: "budze sie i chce wiedziec ile spalem, plus jakosc
+snu - podepnijmy ten zegarek". Pobudka mowila tylko "The men wake
+rested", bez liczb.
+**Zmiana:** (1) sen w menu zapamietuje godzine polozenia sie; pobudka
+(takze przerwana) melduje: godziny ZEGARA, godziny NALICZONE (dzien
+liczy sie slabiej wg DayRestFactor) i jakosc: >=90% nocnych = "sound
+night sleep", >=70% = "fair rest, part of it by daylight", nizej =
+"fitful daylight sleep - it counted for Xh"; przy wiszacym dlugu
+dopisek ile godzin kosztuje pelna splata; (2) spanie BEZ menu (postoj
+noca): swit melduje "The night gave the men about Xh of sleep".
+**Ryzyko / co sprawdzic:** polozyc sie w obozie wieczorem -> rano
+komunikat z liczbami; przespac noc stojac na mapie -> o 6:00 melduje
+godziny nocy.
+**Status:** WGRANE
+
 ## 2026-08-31 — Zapasowa zbroja Nocnego Krola jedzie w jego taborze
 **Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs`
 **Problem:** Jeff do wpisu nizej: "Nocny Krol moze ja miec, zapasowa

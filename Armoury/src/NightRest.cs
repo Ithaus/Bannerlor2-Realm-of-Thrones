@@ -46,6 +46,7 @@ namespace Armoury
         // (Jeff: "pasek raz i za chwile ponownie"); do tego flaga, zeby swit
         // nie doliczal dlugu komus, kto wlasnie spi
         private static bool _sleeping;
+        private static CampaignTime _sleepStart = CampaignTime.Zero;
         private static float _menuRest;
         private static float _menuTarget = 5f;
         private static float _menuBase;   // stan _restTonight w chwili polozenia sie
@@ -557,6 +558,7 @@ namespace Armoury
             // KTO WLASNIE SPI (_sleeping), ten dlugu nie dostaje - dospi po swicie.
             // Przespana baza przy niesplaconych odsetkach: dlug STOI w miejscu.
             float baza = Math.Max(1f, s.SleepHoursNeeded);
+            float sleptH = _restTonight;
             bool sleptBase = _sleeping || _restTonight >= baza;
             bool paidInFull = _credited;
             _restTonight = 0f;
@@ -565,6 +567,9 @@ namespace Armoury
 
             if (sleptBase)
             {
+                // zegarek dla spiacych BEZ menu (postoj noca): ile nocy przespane
+                if (!_sleeping && sleptH >= 1f)
+                    Msg("The night gave the men about " + sleptH.ToString("0.#") + "h of sleep.", Colors.White);
                 if (Debt > 0 && !paidInFull)
                     Msg("The men slept, but old weariness lingers - a full rest takes "
                         + (int)Math.Ceiling(NeededHours()) + " hours.", Colors.Yellow);
@@ -820,6 +825,33 @@ namespace Armoury
                 _restTonight = Math.Max(_restTonight, _menuBase + _menuRest);
                 var s = Settings.Current;
                 if (s != null) CreditRest(s);
+                // ZEGAREK SNU (Jeff 31.08): po pobudce liczby - ile zegara
+                // uplynelo, ile snu sie NALICZYLO (dzien liczy sie slabiej)
+                // i jaka byla jakosc; do tego przypomnienie o wiszacym dlugu
+                try
+                {
+                    float clockH = (float)(CampaignTime.Now - _sleepStart).ToHours;
+                    float effH = _menuRest;
+                    if (clockH < 0.5f)
+                        Msg("You barely closed your eyes - no rest to speak of.", Colors.White);
+                    else
+                    {
+                        float q = clockH > 0.1f ? MBMath.ClampFloat(effH / clockH, 0f, 1f) : 1f;
+                        string line;
+                        if (q >= 0.9f)
+                            line = "You wake after " + clockH.ToString("0.#") + "h of sound night sleep.";
+                        else if (q >= 0.7f)
+                            line = "You wake after " + clockH.ToString("0.#") + "h - fair rest, part of it by daylight ("
+                                 + effH.ToString("0.#") + "h counted).";
+                        else
+                            line = "You wake after " + clockH.ToString("0.#") + "h of fitful daylight sleep - it counted for "
+                                 + effH.ToString("0.#") + "h.";
+                        if (Debt > 0)
+                            line += " Old weariness lingers - a full rest takes " + (int)Math.Ceiling(NeededHours()) + "h.";
+                        Msg(line, Debt > 0 ? Colors.Yellow : Colors.White);
+                    }
+                }
+                catch { }
                 // pobudka zwija namiot - chyba ze WLASNY oboz dalej stoi
                 // (wtedy namiot nalezy do obozu, zwinie go "Break camp")
                 if (_sleepReturn != "arm_camp_wait")
@@ -870,6 +902,7 @@ namespace Armoury
                 // godzin ZEGARA bywa wieksza niz godzin SNU (dzien liczy sie slabiej)
                 _sleepUntil = CampaignTime.HoursFromNow(Math.Max(14f, needed * 1.8f + 2f));
                 _sleeping = true;
+                _sleepStart = CampaignTime.Now;
                 _menuRest = 0f;
                 _menuBase = _restTonight;
                 // cel snu: ile jeszcze brakuje DO wyspania - pasek liczy wlasne
@@ -899,7 +932,6 @@ namespace Armoury
                 _menuRest += (float)dt.ToHours * (night ? 1f : day);
                 if (_menuRest >= _menuTarget || (float)(_sleepUntil - CampaignTime.Now).ToHours <= 0.02f)
                 {
-                    Msg("The men wake rested and the camp stirs.", Colors.White);
                     LeaveSleep();
                     return;
                 }
