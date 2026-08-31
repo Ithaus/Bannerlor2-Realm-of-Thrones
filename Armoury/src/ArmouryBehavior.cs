@@ -29,6 +29,23 @@ namespace Armoury
         // i mi pomaga"): "" / "auto" = najlepszy z druzyny, "none" = pracuje
         // sam, inaczej StringId bohatera
         internal static string SmithHelperId = "";
+
+        /// <summary>Nauczone wzory unikatow (id itemow) - przetopienie zdobytego
+        /// egzemplarza uczy kuznie go odtwarzac (Jeff 30.08).</summary>
+        internal static System.Collections.Generic.List<string> UniqueLore =
+            new System.Collections.Generic.List<string>();
+
+        internal static void LearnUnique(ItemObject it)
+        {
+            try
+            {
+                if (it == null || UniqueLore.Contains(it.StringId)) return;
+                UniqueLore.Add(it.StringId);
+                Log.Player("You have studied the make of " + it.Name + ". The forge can now reproduce it.");
+                Log.Info("UniqueLore: nauczono " + it.StringId + " (razem " + UniqueLore.Count + ").");
+            }
+            catch (Exception e) { Log.Error("LearnUnique", e); }
+        }
         // KSIEGA WKLADOW GRACZA (Jeff 29.08: "w Armoury widze i ruszam TYLKO to,
         // co sam wrzucilem - lupy 60% to wlasnosc wojska"): itemId -> ile sztuk
         // nalezy do gracza; ekran zbrojowni pokazuje wylacznie te sztuki
@@ -308,6 +325,7 @@ namespace Armoury
                 dataStore.SyncData("arm_armory_wear", ref _armoryWear);
                 if (dataStore.IsLoading && _armoryWear != null && _armoryWear.Count > 0) _wearRestorePending = true;
                 dataStore.SyncData("arm_smith_helper", ref SmithHelperId);
+                dataStore.SyncData("arm_uniq_lore", ref UniqueLore);
                 dataStore.SyncData("arm_orders", ref Orders.Board);
                 dataStore.SyncData("arm_order_cooldowns", ref Orders.Cooldowns);
                 // dniowka w kuzni MUSI przezyc save/load - inaczej po wczytaniu

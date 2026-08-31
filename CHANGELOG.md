@@ -1,5 +1,28 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-30 — Przetop unikatu uczy kuznie go odtwarzac ("Forge a studied masterwork")
+**Mod:** Armoury | **Pliki:** `Armoury/src/UniqueGear.cs` (nowy), `ArmouryBehavior.cs`, `SmeltTab.cs`, `SmithMenu.cs`
+**Problem:** Jeff: "jesli pokonam bohatera i przekuje jego pancerz, to
+moge potem go tworzyc - inaczej nie da sie tego nauczyc". Unikaty
+zeszly z handlu (wpis wyzej), wiec potrzebna legalna droga do ich
+wytwarzania.
+**Zmiana:** (1) UniqueGear - kopia listy prefiksow unikatow z
+CrashScribe/Mends (komentarz krzyzowy: aktualizowac razem);
+(2) przetop unikatu w zakladce Smelt uczy wzoru: id trafia do
+ArmouryBehavior.UniqueLore (save: "arm_uniq_lore"), komunikat "You have
+studied the make of X"; (3) nowa opcja menu kuzni "Forge a studied
+masterwork" (nad ksiega zamowien): lista nauczonych wzorow z oplata
+kuzienna, wybor -> normalny przeplyw kucia (AskTempo -> materialy,
+stamina, czas, jakosc) - unikat kuje sie jak kazda rzecz jego tieru.
+Opcja wyszarzona z podpowiedzia, poki niczego nie nauczono. Jeff gra
+NOWA GRE - zgodnosc ze starymi save'ami niewymagana (pole i tak
+bezpieczne przy braku wpisu).
+**Ryzyko / co sprawdzic:** pokonac bohatera z imiennym sprzetem, wziac
+pancerz, przetopic w Smelt -> komunikat nauki; w menu kuzni opcja
+aktywna, kucie startuje projekt jak zwykle. Egzemplarz ZUZYWA sie przy
+nauce (przetop!) - swiadomy koszt.
+**Status:** WGRANE
+
 ## 2026-08-30 — Valyrianska stal: nazwa, wytop 2x drozszy, przetop 50%/25%
 **Mod:** Armoury | **Pliki:** `Armoury/src/ValyrianSteel.cs` (nowy), `Armoury/src/Recipes.cs`, `SubModuleMain.cs`, `ArmouryBehavior.cs`
 **Problem:** Jeff: "melting pancerzy koni daje za duzo thamaskene steel
