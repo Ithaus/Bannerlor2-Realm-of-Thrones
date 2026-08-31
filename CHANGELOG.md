@@ -1,5 +1,28 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-31 — Swieta zasada skilli w DTE + sprzet umarlych niszczony + smoczy ogien pali Innych w polu
+**Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs`
+**Problem:** Jeff: (1) "DTE lamie swieta zasade skilli - NAPRAW";
+(2) "lodowych broni Wedrowcow ludzie nie moga uzywac, niszczone zawsze;
+martwe konie ABSOLUTNIE nie dla ludzi - nic martwego!"; (3) smoczy
+ogien w bitwie recznej podlegal cieciu T6.
+**Zmiana:** (1) SkillLawWard - postfix na DTE DoAssignAsync: po
+przydziale kazdy slot (bron, zbroja, kon) z Difficulty ponad
+GetSkillValue(RelevantSkill) jednostki schodzi z grzbietu; sztuka NIE
+przepada (pula DTE to odbicie taboru); (2) IsDeadGear (kultury
+wights/whitewalker + ice_*/wight_*/nightking_blade/white_walker_saddle):
+wypada z puli DTE bez wyjatkow, a po kazdej bitwie gracza lupy z lodu
+i martwego ciala ROZPUSZCZAJA SIE (listener MapEventEnded, komunikat
+"The ice of the Others melts..."); partia gracza-Othera zachowuje
+swoje. UWAGA: nightking_blade przez to NIE do nauczenia (bron lodowa) -
+zbroje NK pozostaja zdobywalne; (3) ValyrianWard: cios agenta-smoka
+(Monster.MonsterUsage zawiera "dragon") nie podlega cieciu T6 - ogien
+pali Innych pelnia takze w polu (w symulacji juz dzialal przez ROT).
+**Ryzyko / co sprawdzic:** log "swieta zasada skilli w DTE - zdjeto N";
+po bitwie z Wedrowcami komunikat o topnieniu; rekrut nie biega w plycie
+z taboru.
+**Status:** WGRANE
+
 ## 2026-08-31 — Zegarek snu v2 (godzina i pora dnia) + kara snu tnie realna predkosc kolumny
 **Mod:** Armoury | **Pliki:** `Armoury/src/NightRest.cs`, `Armoury/src/SubModuleMain.cs`
 **Problem:** Jeff: "dodaj godzine i pore dnia i ile spalismy" oraz

@@ -87,6 +87,17 @@ namespace CrashScribe
                 var rec = blow.WeaponRecord;
                 var mission = TaleWorlds.MountAndBlade.Mission.Current;
                 var att = mission != null ? mission.FindAgentWithIndex(blow.OwnerId) : null;
+                // SMOCZY OGIEN pali Innych pelnia takze w polu (Jeff 31.08) -
+                // cios od agenta-smoka nie podlega cieciu T6
+                if (att != null && !att.IsHuman)
+                {
+                    try
+                    {
+                        var mu = att.Monster != null ? (att.Monster.MonsterUsage ?? "") : "";
+                        if (mu.IndexOf("dragon", StringComparison.OrdinalIgnoreCase) >= 0) return;
+                    }
+                    catch { }
+                }
                 if (rec.HasWeapon() && att != null)
                 {
                     ItemObject it = null;
@@ -427,9 +438,105 @@ namespace CrashScribe
                 foreach (System.Collections.DictionaryEntry kv in dic)
                 {
                     var item = Traverse.Create(kv.Key).Property("Item").GetValue() as ItemObject;
-                    if (item != null && IsUniqueGear(item) && !LearnedUnique(item.StringId)) drop.Add(kv.Key);
+                    if (item == null) continue;
+                    // sprzet umarlych NIGDY dla zywych (Jeff: "nic martwego nie
+                    // moze byc uzywane przez ludzi") - bez wyjatku nauki
+                    if (IsDeadGear(item)) { drop.Add(kv.Key); continue; }
+                    if (IsUniqueGear(item) && !LearnedUnique(item.StringId)) drop.Add(kv.Key);
                 }
                 for (int i = 0; i < drop.Count; i++) dic.Remove(drop[i]);
+            }
+            catch { }
+        }
+
+        /// <summary>
+        /// SWIETA ZASADA SKILLI TAKZE W DTE (Jeff 31.08: "NAPRAW"). DTE ubiera
+        /// szeregowych z limitem tierowym, ale BEZ ogladania Difficulty vs
+        /// umiejetnosc jednostki - regula nadrzedna repo byla lamanina obok
+        /// kwatermistrza. Postfix na DoAssignAsync: po przydziale kazdy slot
+        /// z przedmiotem ponad umiejetnosc (vanillowe kryterium: Difficulty >
+        /// GetSkillValue(RelevantSkill)) schodzi z grzbietu - jednostka idzie
+        /// bez tej sztuki, a sztuka NIE przepada (pula DTE to odbicie taboru,
+        /// nie magazyn - tabor zostaje nietkniety).
+        /// </summary>
+        public static void SkillLawWard(object __instance)
+        {
+            try
+            {
+                var list = Traverse.Create(__instance).Property("Assignments").GetValue() as System.Collections.IEnumerable;
+                if (list == null) list = Traverse.Create(__instance).Field("Assignments").GetValue() as System.Collections.IEnumerable;
+                if (list == null) return;
+                int stripped = 0;
+                foreach (var a in list)
+                {
+                    var tr = Traverse.Create(a);
+                    var co = tr.Property("Character").GetValue() as CharacterObject;
+                    var eq = tr.Property("Equipment").GetValue() as Equipment;
+                    if (eq == null) eq = tr.Field("Equipment").GetValue() as Equipment;
+                    if (co == null || eq == null || co.IsHero) continue;
+                    for (int s = 0; s <= 11; s++)
+                    {
+                        ItemObject it;
+                        try { it = eq[(EquipmentIndex)s].Item; } catch { continue; }
+                        if (it == null || it.Difficulty <= 0 || it.RelevantSkill == null) continue;
+                        if (co.GetSkillValue(it.RelevantSkill) >= it.Difficulty) continue;
+                        try { tr.Method("SetEquipment", (EquipmentIndex)s, default(EquipmentElement)).GetValue(); stripped++; }
+                        catch { try { eq[(EquipmentIndex)s] = default(EquipmentElement); stripped++; } catch { } }
+                    }
+                }
+                if (stripped > 0)
+                    Scribe.Line("Mends: swieta zasada skilli w DTE - zdjeto " + stripped + " sztuk ponad umiejetnosci jednostek.");
+            }
+            catch { }
+        }
+
+        /// <summary>Sprzet umarlych: lodowe bronie Innych i martwe wierzchowce.
+        /// Zywi tego nie tkna - lod topnieje, martwe ciało sie rozpada.</summary>
+        internal static bool IsDeadGear(ItemObject it)
+        {
+            try
+            {
+                if (it == null) return false;
+                var cu = it.Culture != null ? (it.Culture.StringId ?? "") : "";
+                if (cu == "wights" || cu == "whitewalker") return true;
+                var id = it.StringId ?? "";
+                return id.StartsWith("ice_", StringComparison.Ordinal)
+                    || id.StartsWith("wight_", StringComparison.Ordinal)
+                    || id == "nightking_blade" || id == "white_walker_saddle";
+            }
+            catch { return false; }
+        }
+
+        /// <summary>Po bitwie z udzialem gracza: lupy z lodu i martwego ciala
+        /// ROZPUSZCZAJA SIE (Jeff: "niszczone jest zawsze"). Partia gracza-Othera
+        /// zachowuje swoje - umarli moga nosic umarle.</summary>
+        public static void MeltDeadLoot(TaleWorlds.CampaignSystem.MapEvents.MapEvent mapEvent)
+        {
+            try
+            {
+                var main = MobileParty.MainParty;
+                if (main == null || mapEvent == null) return;
+                bool involved = main.MapEvent == mapEvent
+                    || (Hero.MainHero != null && mapEvent.InvolvedParties != null
+                        && System.Linq.Enumerable.Contains(mapEvent.InvolvedParties, main.Party));
+                if (!involved) return;
+                var cu = Hero.MainHero != null && Hero.MainHero.Culture != null ? Hero.MainHero.Culture.StringId : "";
+                if (cu == "whitewalker" || cu == "wights") return;
+                var ro = main.ItemRoster;
+                if (ro == null) return;
+                int melted = 0;
+                for (int i = ro.Count - 1; i >= 0; i--)
+                {
+                    var it = ro.GetItemAtIndex(i);
+                    if (it == null || !IsDeadGear(it)) continue;
+                    int n = ro.GetElementNumber(i);
+                    melted += n;
+                    ro.AddToCounts(ro.GetElementCopyAtIndex(i).EquipmentElement, -n);
+                }
+                if (melted > 0)
+                    InformationManager.DisplayMessage(new InformationMessage(
+                        "The ice of the Others melts and dead flesh crumbles - " + melted + " trophies turn to nothing in your hands.",
+                        Colors.Cyan));
             }
             catch { }
         }
@@ -717,8 +824,10 @@ namespace CrashScribe
                 var mAssign = tDist != null ? AccessTools.Method(tDist, "DoAssignAsync") : null;
                 if (mAssign != null)
                 {
-                    harmony.Patch(mAssign, prefix: new HarmonyMethod(typeof(Mends), "UniqueWard"));
+                    harmony.Patch(mAssign, prefix: new HarmonyMethod(typeof(Mends), "UniqueWard"),
+                                  postfix: new HarmonyMethod(typeof(Mends), "SkillLawWard"));
                     Scribe.Line("Mends: sprzet imiennych bohaterow poza pula przydzialu DTE - piechota nie zalozy pancerza Brienny.");
+                    Scribe.Line("Mends: swieta zasada skilli obowiazuje w DTE - Difficulty ponad umiejetnosc schodzi z grzbietu.");
                 }
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.Install(camels)", null); } catch { } }
@@ -1710,6 +1819,8 @@ namespace CrashScribe
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this,
                 delegate (CampaignGameStarter s)
                 { Mends.SkillSinew(); Mends.UniqueWares(); Mends.LoreForgeGate(); Mends.DressTheNamesakes(); });
+            CampaignEvents.MapEventEnded.AddNonSerializedListener(this,
+                delegate (TaleWorlds.CampaignSystem.MapEvents.MapEvent m) { Mends.MeltDeadLoot(m); });
         }
 
         public override void SyncData(IDataStore dataStore)
