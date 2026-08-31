@@ -1,5 +1,28 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-30 — Valyrianska stal: nazwa, wytop 2x drozszy, przetop 50%/25%
+**Mod:** Armoury | **Pliki:** `Armoury/src/ValyrianSteel.cs` (nowy), `Armoury/src/Recipes.cs`, `SubModuleMain.cs`, `ArmouryBehavior.cs`
+**Problem:** Jeff: "melting pancerzy koni daje za duzo thamaskene steel
+[= najwyzsza stal kuzni]; zmienmy nazwe na Valyrian Steel; smelting ma
+dawac o polowe mniej niz produkcja, valyrianska DODATKOWO przez 2
+(18/18/18 -> 9/9/4); wytop valyrianskiej 2x drozszy - ma byc bardzo
+trudna do stworzenia".
+**Zmiana:** (1) item Iron6 ("Thamaskene Steel") przemianowany w runtime
+na "Valyrian Steel" - widac wszedzie w UI; (2) Recipes.SmeltYield:
+udzial zwrotu przyciety twardo do 50% (koniec z 90% przy wysokim
+Smithing; dotyczy tygla SmeltTab, przetopu w menu kowala i odzysku
+TakeApartSalvage), a Iron6 po przycieciu dzielony jeszcze przez 2 -
+przyklad Jeffa daje dokladnie 9/9/4; (3) postfix na
+DefaultSmithingModel.GetRefiningFormulas: formula z wyjsciem Iron6
+pobiera PODWOJNE wsady (bylo 2x Iron5 + 1x wegiel, jest 4x + 2x).
+BannerKings nie nadpisuje GetRefiningFormulas (sprawdzone) - patch
+na modelu bazowym jest jedyna sciezka, bez podwojnego mnozenia.
+**Ryzyko / co sprawdzic:** log Armoury "ValyrianSteel: ... przemianowana"
+i "wytop 2x drozszy"; w kuzni zakladka Refine pokazuje 4x stal + 2x
+wegiel za 1x Valyrian Steel; przetop uprzezy konskiej pokazuje polowki.
+Ustawienie SmeltingReturnShare dziala dalej, ale sufit to teraz 50%.
+**Status:** WGRANE
+
 ## 2026-08-30 — Brama kucia: klingi lore (Needle, Dark Sister...) juz nie od startu
 **Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs`
 **Problem:** Jeff: "troszke bez sensu, ze moge kuc miecz Nocnego Krola

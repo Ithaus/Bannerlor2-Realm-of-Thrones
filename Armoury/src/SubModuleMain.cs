@@ -53,6 +53,7 @@ namespace Armoury
                 FairXpPatch.ApplyAll(_harmony);
                 ChargeTemperPatch.ApplyAll(_harmony);
                 NightRest.ApplyAll(_harmony);
+                ValyrianSteel.ApplyAll(_harmony);
                 SmithAudit.ApplyAll(_harmony);
                 QuartermasterLaw.ApplyAll(_harmony);
                 MarketGlut.ApplyAll(_harmony);
