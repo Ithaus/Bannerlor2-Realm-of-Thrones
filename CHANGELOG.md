@@ -1,5 +1,32 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-30 — Umarli nie znaja strachu: panika wylaczona armii Nocnego Krola
+**Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs`
+**Problem:** Jeff (po analizie taktyk AI Innych): "nieumarli nie moga
+panikowac, sa nieumarli - trzeba wylaczyc panike dla nich". ROT nie ma
+ZADNEGO wlasnego kodu bitewnego dla kultury whitewalker - wighty
+(angry_wight, level 11, bez tarcz) uzywaly vanillowego morale i przy
+stratach panikowaly i uciekaly z pola jak chlopi.
+**Przyczyna:** brak latki w ROT; silnik pyta
+BattleMoraleModel.CanPanicDueToMorale(agent) (CommonAIComponent.CanPanic,
+pierwsza linia) i dla wightow dostawal true jak dla kazdego chlopa.
+**Zmiana:** mend DeadDontPanic - postfix na KAZDA zaladowana
+implementacje CanPanicDueToMorale (skan assembly po potomkach
+BattleMoraleModel; SandboxBattleMoraleModel, CustomBattle, ewentualne
+modowe podmiany; RBM modelu nie podmienia - sprawdzone w zrodlach).
+Agent kultury whitewalker nigdy nie dostaje prawa do paniki - silnik
+wtedy trzyma morale na 0.01 i jednostka walczy do konca (ta sama
+sciezka, ktorej vanilla uzywa dla perka Loyalty and Honor). Dziala
+takze dla wightow w armii gracza, gdyby Jeff gral po stronie Innych.
+Wskrzeszania W TRAKCIE bitwy nadal nie ma (i nie bylo w ROT) -
+nekromancja pozostaje mechanika mapy kampanii.
+**Ryzyko / co sprawdzic:** bitwa z horda NK - wighty nie rzucaja sie
+do ucieczki mimo strat (bitwy beda dluzsze i krwawsze, do ostatniego
+trupa); w logu CrashScribe linia "Mends: umarli nie znaja strachu -
+panika wylaczona kulturze whitewalker (N implementacji modelu morale)"
+z N >= 2. Zolnierze ZYWI panikuja po staremu.
+**Status:** WGRANE
+
 ## 2026-08-30 — Panel kucia: naprawiona semantyka wiersza statow (+N jak przy mieczach) + diagnoza
 **Mod:** Armoury | **Pliki:** `Armoury/src/CraftPopup.cs`
 **Problem:** Jeff (Balanced Ravens' Teeth): "mam balanced, ale nie mam

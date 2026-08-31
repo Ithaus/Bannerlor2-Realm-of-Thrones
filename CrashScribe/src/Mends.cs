@@ -26,6 +26,26 @@ namespace CrashScribe
         internal static bool SkipDteMapWidget() { return false; }
 
         /// <summary>
+        /// UMARLI NIE ZNAJA STRACHU (Jeff 30.08). ROT nie rusza morale
+        /// bitewnego, wiec wighty panikowaly i uciekaly z pola jak chlopi
+        /// (angry_wight to level 11 - fala zalamian przy stratach).
+        /// Postfix na CanPanicDueToMorale: agent kultury whitewalker nigdy
+        /// nie dostaje prawa do paniki. Silnik (CommonAIComponent.OnTickParallel)
+        /// przy odmowie trzyma morale na 0.01 i jednostka bije sie do konca -
+        /// ta sama sciezka, ktorej vanilla uzywa dla perka Loyalty and Honor.
+        /// Parametr przez __0, bo implementacje moga rozne nazywac agenta.
+        /// </summary>
+        public static void DeadDontPanic(TaleWorlds.MountAndBlade.Agent __0, ref bool __result)
+        {
+            if (!__result) return;                       // ktos juz odmowil paniki - nie ruszamy
+            var a = __0;
+            if (a == null || !a.IsHuman) return;
+            var ch = a.Character;
+            if (ch != null && ch.Culture != null && ch.Culture.StringId == "whitewalker")
+                __result = false;
+        }
+
+        /// <summary>
         /// WLASNY MUNDUR KAZDY UMIE NOSIC (Jeff 30.08, po spisie
         /// docs/ROT-rozjazdy-skilli.md: 548 rozjazdow, 169 jednostek).
         /// ROT wpisuje jednostkom pancerze z difficulty, ale skille "na
@@ -115,6 +135,39 @@ namespace CrashScribe
                 else Scribe.Line("Mends: MapArmoryReadinessMixin nieobecny - nic do usypiania.");
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.Install(dteWidget)", null); } catch { } }
+
+            try
+            {
+                // ===== UMARLI NIE ZNAJA STRACHU =====
+                // Panika wylaczona kulturze whitewalker (patrz DeadDontPanic).
+                // Patchujemy KAZDA zaladowana implementacje BattleMoraleModel
+                // (Sandbox, CustomBattle, ewentualne modowe podmiany), zeby
+                // mend przezyl kazda konfiguracje modeli misji.
+                int deadPatched = 0;
+                var tBase = typeof(TaleWorlds.MountAndBlade.ComponentInterfaces.BattleMoraleModel);
+                foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+                {
+                    Type[] types;
+                    try { types = asm.GetTypes(); } catch { continue; }
+                    foreach (var t in types)
+                    {
+                        try
+                        {
+                            if (t == null || t.IsAbstract || !tBase.IsAssignableFrom(t)) continue;
+                            var mPanic = t.GetMethod("CanPanicDueToMorale",
+                                System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic |
+                                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.DeclaredOnly);
+                            if (mPanic == null) continue;    // nie deklaruje wlasnej - dziedziczy juz zalatana
+                            harmony.Patch(mPanic, postfix: new HarmonyMethod(typeof(Mends), "DeadDontPanic"));
+                            deadPatched++;
+                        }
+                        catch { }
+                    }
+                }
+                Scribe.Line("Mends: umarli nie znaja strachu - panika wylaczona kulturze whitewalker ("
+                            + deadPatched + " implementacji modelu morale).");
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.Install(deadPanic)", null); } catch { } }
 
             try
             {
