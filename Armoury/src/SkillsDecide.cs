@@ -257,23 +257,32 @@ namespace Armoury
         /// ("closest" = najlepsze dozwolone na stanie). Kubelki co 25 pkt.</summary>
         internal static ItemObject TopArmor(ItemObject.ItemTypeEnum type, int athletics)
         {
-            int bucket = Math.Max(0, Math.Min(12, athletics / 25));
-            string key = type + "|" + bucket;
+            // PROG DOKLADNY, nie kubelek co 25 (audyt 31.08): stare
+            // cap = bucket*25+24 oddawalo jednostce sztuke do 24 pkt PONAD jej
+            // Atletyke - sam mechanizm pilnujacy zasady nadrzednej lamal ja.
+            // Klucz cache tez musi byc dokladny, inaczej Atletyka 10 dostaje
+            // z cache wpis wygrzany przez Atletyke 24.
+            if (athletics < 0) athletics = 0;
+            string key = type + "|" + athletics;
             ItemObject best;
             if (TopArmorCache.TryGetValue(key, out best)) return best;
-            int cap = bucket * 25 + 24;
+            bool ok = true;
             try
             {
                 foreach (var it in MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
                 {
                     if (it == null || it.ItemType != type || !it.HasArmorComponent) continue;
-                    if (it.Difficulty > cap) continue;                                     // atletyka rzadzi
+                    if (it.Difficulty > athletics) continue;                               // atletyka rzadzi
+                    if (it.NotMerchandise) continue;                                       // unikaty imienne i itemy testowe (dummy_armor_*)
                     if (it.StringId != null && it.StringId.EndsWith("_crown")) continue;   // korony to regalia
                     if (best == null || it.Effectiveness > best.Effectiveness) best = it;
                 }
             }
-            catch (Exception e) { Log.Error("SkillsDecide.TopArmor", e); }
-            TopArmorCache[key] = best;
+            catch (Exception e) { ok = false; Log.Error("SkillsDecide.TopArmor", e); }
+            // cachujemy TAKZE null (uczciwe "nic nie ma"), ale WYLACZNIE po
+            // udanym przebiegu - jeden wyjatek nie moze zgasic typu do konca
+            // procesu (wzorzec _tentBroken z CLAUDE.md p.7)
+            if (ok) TopArmorCache[key] = best;
             return best;
         }
 
@@ -281,23 +290,23 @@ namespace Armoury
         /// poza wzorcem (pin gracza moze slonia, jesli Riding pozwala).</summary>
         internal static ItemObject TopMount(int riding)
         {
-            int bucket = Math.Max(0, Math.Min(12, riding / 25));
+            if (riding < 0) riding = 0;
             ItemObject best;
-            if (TopMountCache.TryGetValue(bucket, out best)) return best;
-            int cap = bucket * 25 + 24;
+            if (TopMountCache.TryGetValue(riding, out best)) return best;
+            bool ok = true;
             try
             {
                 foreach (var it in MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
                 {
                     if (it == null || it.ItemType != ItemObject.ItemTypeEnum.Horse) continue;
-                    if (it.Difficulty > cap) continue;
+                    if (it.Difficulty > riding) continue;                    // prog dokladny, jak przy pancerzu
                     var id = it.StringId ?? "";
                     if (id.StartsWith("dragon_") || id == "elephant") continue;
                     if (best == null || it.Effectiveness > best.Effectiveness) best = it;
                 }
             }
-            catch (Exception e) { Log.Error("SkillsDecide.TopMount", e); }
-            TopMountCache[bucket] = best;
+            catch (Exception e) { ok = false; Log.Error("SkillsDecide.TopMount", e); }
+            if (ok) TopMountCache[riding] = best;
             return best;
         }
 
@@ -307,22 +316,27 @@ namespace Armoury
         private static void AddPattern(List<ItemObject> slots, ItemObject.ItemTypeEnum type, int skill)
         {
             if (slots.Count >= 4) return;
-            int bucket = Math.Max(0, Math.Min(12, skill / 25));
-            string key = type + "|" + bucket;
+            if (skill < 0) skill = 0;
+            string key = type + "|" + skill;          // prog dokladny, jak przy pancerzu
             ItemObject best;
             if (!Pattern.TryGetValue(key, out best))
             {
-                int cap = bucket * 25 + 24;
-                var all = MBObjectManager.Instance.GetObjectTypeList<ItemObject>();
-                foreach (var it in all)
+                bool ok = true;
+                try
                 {
-                    if (it == null || it.ItemType != type || !it.HasWeaponComponent) continue;
-                    if (it.Difficulty > cap) continue;                       // statystyki rzadza
-                    if (LegendaryLaw.IsLegend(it)) continue;                 // legendy nie sa wzorcem
-                    if (it.StringId != null && it.StringId.StartsWith("dragon_")) continue;
-                    if (best == null || it.Effectiveness > best.Effectiveness) best = it;
+                    var all = MBObjectManager.Instance.GetObjectTypeList<ItemObject>();
+                    foreach (var it in all)
+                    {
+                        if (it == null || it.ItemType != type || !it.HasWeaponComponent) continue;
+                        if (it.Difficulty > skill) continue;                     // statystyki rzadza
+                        if (LegendaryLaw.IsLegend(it)) continue;                 // legendy nie sa wzorcem
+                        if (it.NotMerchandise) continue;                         // unikaty imienne i itemy testowe
+                        if (it.StringId != null && it.StringId.StartsWith("dragon_")) continue;
+                        if (best == null || it.Effectiveness > best.Effectiveness) best = it;
+                    }
                 }
-                Pattern[key] = best;
+                catch (Exception e) { ok = false; Log.Error("SkillsDecide.AddPattern", e); }
+                if (ok) Pattern[key] = best;
             }
             if (best != null) slots.Add(best);
         }

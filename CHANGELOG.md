@@ -1,5 +1,34 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-31 — Degradacja przestaje lamac zasade nadrzedna: prog dokladny, bez unikatow, cache nie do zatrucia
+**Mod:** Armoury | **Pliki:** `Armoury/src/SkillsDecide.cs`
+**Problem:** trzy usterki wykryte audytem, wszystkie w mechanizmie, ktory
+ma PILNOWAC zasady skilli: (1) `cap = bucket * 25 + 24` - degradacja
+oddawala jednostce sztuke do 24 pkt PONAD jej umiejetnosc (po Prawie Wagi
+to 6 kg pancerza), czyli straznik lamal wlasna regule; (2) `TopArmorCache
+[key] = best` wykonywalo sie TAKZE po wyjatku, z best == null - jeden
+potkniety przebieg gasil caly typ pancerza do konca procesu gry i od tej
+chwili sloty leciały na zero (dokladnie wzorzec `_tentBroken` zakazany
+w CLAUDE.md p.7); to samo w TopMount i AddPattern; (3) pula degradacji
+nie miala filtra NotMerchandise - wybierala po Effectiveness sposrod
+WSZYSTKICH itemow, wiec elita mogla dostac itemy testowe
+(`dummy_armor_max`, 40 kg) albo sprzet imiennych bohaterow, obchodzac
+nasze wlasne prawo unikatow.
+**Zmiana:** (1) prog DOKLADNY zamiast kubelka - `it.Difficulty > skill`
+zamiast `> cap`, a klucz cache to dokladna wartosc umiejetnosci (inaczej
+Atletyka 10 dostawalaby wpis wygrzany przez Atletyke 24); dotyczy
+TopArmor, TopMount i AddPattern; (2) flaga `ok` rozdziela "przebieg nic
+nie znalazl" (cachujemy null - uczciwa odpowiedz) od "przebieg sie
+wywrocil" (NIE cachujemy - nastepny agent sprobuje od nowa);
+(3) `if (it.NotMerchandise) continue;` w TopArmor i AddPattern - unikaty
+imienne, regalia i itemy testowe poza pula degradacji. Cache rosnie z 65
+do kilkuset wpisow (grzeje sie raz na wartosc skilla) - koszt pomijalny.
+**Ryzyko / co sprawdzic:** degradowany zolnierz nie dostaje juz sztuki
+ponad swoj skill (tooltip w podgladzie jednostki); zaden szeregowy nie
+paraduje w "Dummy Max Armor" ani w pancerzu Brienny; po wyjatku w
+SkillsDecide (log "SkillsDecide.TopArmor") sciezka odzywa sama.
+**Status:** WGRANE
+
 ## 2026-08-31 — PODLOGA SPRZETU: nikt nie wyjdzie nagi ani bez broni (audyt wielo-agentowy)
 **Mod:** Armoury + CrashScribe | **Pliki:** `Armoury/src/DragonUnmount.cs`, `CrashScribe/src/Mends.cs`
 **Problem:** Jeff po Prawie Wagi: "tylko zeby nadzy nie wyszli". Audyt
