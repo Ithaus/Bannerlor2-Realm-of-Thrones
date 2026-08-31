@@ -1,5 +1,37 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-31 — Kazdy unikat ma dom: imiennicy ubrani, spadki rozdane, relikwie na targach
+**Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs`
+**Problem:** analiza wykazala 34 BEZPANSKIE unikaty (nikt ich nie nosi,
+a po zdjeciu z handlu staly sie niezdobywalne): pelne zestawy Ramsaya,
+Cersei, Stannisa, Daenerys, Renly'ego, Rhaegara, Aemona, korony
+(Robert/Joffrey/Euron/Renly) i inne. Jeff: "ubierz postacie ktore
+istnieja; nie zyja - spadkobiercom; nie ma ich - jedna sztuka lezy
+w miescie historycznie poprawnym".
+**Zmiana:** mend DressTheNamesakes (start sesji, kaskada per item):
+(1) zywy wlasciciel po imieniu -> zaklada (battle lub civilian slot -
+korony ida w stroj cywilny, krol w polu nosi helm); (2) inaczej zywy
+spadkobierca: korona Roberta -> STANNIS (prawowity; imie wlasciciela
+celowo scisle "Robert Baratheon", zeby nie ubrac Roberta Arryna),
+korona Joffreya -> Tommen w odwodzie; (3) inaczej JEDNA sztuka na targ
+miasta z sensem: zestaw Rhaegara -> King's Landing (trofea znad
+Tridentu; Aegon, formalny dziedzic, nosi juz Blackfyre'a), zestaw
+Aemona Smoczego Rycerza -> Dragonstone (imie celowo PUSTE, zeby nie
+ubrac plyty na 100-letniego maestera Aemona z Muru), wariant zbroi
+Brienne -> Storm's End, houndskull -> Lannisport, zapasowy naramiennik
+Ramsaya -> Barrowton, czerwona suknia Cersei -> King's Landing.
+nightking_armor (wariant bez kolcow) CELOWO poza obiegiem - trupami
+sie nie handluje. Akcje jednorazowe per kampania (save
+"cs_uniq_homes"); czystka targow (UniqueWares) omija relikwie
+(RelicIds), zeby nie zjadac ich co sesje. Fallbacky odporne: brak
+zywego bohatera -> polka; brak miasta -> log "relikwia czeka".
+**Ryzyko / co sprawdzic:** log CrashScribe "Mends: kazdy unikat ma dom
+- ubrano N, polozono na targach M"; Ramsay w bitwie w swoim pancerzu
+ze skora na naramiennikach; w King's Landing na targu lezy po 1 szt.
+zestawu Rhaegara. Kupiona relikwia = zwykly zdobyty unikat (przetop/
+rozbiorka -> nauka -> kucie).
+**Status:** WGRANE
+
 ## 2026-08-30 — Unikaty: bez limitu sztuk po opanowaniu; nauka TYLKO z egzemplarza (dwie drogi)
 **Mod:** Armoury | **Pliki:** `Forge.cs`, `RangedLore.cs`, `SmeltTab.cs`, `ArmouryBehavior.cs`, `FletchForge.cs`
 **Problem:** Jeff: (1) "moge kuc wiecej niz jeden, jak juz opanuje";

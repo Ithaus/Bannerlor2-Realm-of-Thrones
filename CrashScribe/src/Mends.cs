@@ -173,6 +173,159 @@ namespace CrashScribe
             return false;
         }
 
+        // ===== KAZDY UNIKAT MA DOM (Jeff 31.08: "ubierz postacie ktore
+        // istnieja; nie zyja - spadkobiercom; nie ma ich - jedna sztuka lezy
+        // w miescie historycznie poprawnym") =====
+        // Wpis: item|wlasciciel|spadkobierca|miasto|slot(H/B/L/G/C)|bat/civ
+        // Kaskada: zywy wlasciciel -> zywy spadkobierca -> polka wskazanego
+        // miasta (1 szt.). Puste imie = od razu polka (wariant zapasowy albo
+        // wlasciciel dawno martwy bez wolnego dziedzica - np. zestaw Rhaegara
+        // to trofea znad Tridentu w Krolewskiej Przystani, bo Aegon nosi juz
+        // Blackfyre'a; Aemon Smoczy Rycerz lezy w Dragonstone - CELOWO bez
+        // imienia, zeby nie ubrac 100-letniego maestera Aemona z Muru).
+        // nightking_armor (wariant bez kolcow) ZOSTAJE poza obiegiem -
+        // trupami sie nie handluje, NK nosi wersje z kolcami.
+        private static readonly string[] NamesakeGear = {
+            "ramsay_armor|Ramsay||Barrowton|B|bat",
+            "ramsay_helmet|Ramsay||Barrowton|H|bat",
+            "ramsay_gloves|Ramsay||Barrowton|G|bat",
+            "ramsay_boots|Ramsay||Barrowton|L|bat",
+            "ramsay_shoulders2|Ramsay||Barrowton|C|bat",
+            "ramsay_shoulders|||Barrowton||",
+            "cersei_armor|Cersei||King's Landing|B|bat",
+            "cersei_crown|Cersei||King's Landing|H|civ",
+            "cersei_dress|Cersei||King's Landing|B|civ",
+            "cersei_red_dress|||King's Landing||",
+            "stannis_armor|Stannis||Dragonstone|B|bat",
+            "stannis_cape|Stannis||Dragonstone|C|bat",
+            "baratheon_crown|Robert Baratheon|Stannis|Dragonstone|H|civ",
+            "dany_dress|Daenerys||Pentos|B|bat",
+            "dany_sash|Daenerys||Pentos|C|bat",
+            "dany_boots|Daenerys||Pentos|L|bat",
+            "dany_hair|Daenerys||Pentos|H|bat",
+            "joffrey_crown|Joffrey|Tommen|King's Landing|H|civ",
+            "renly_armor|Renly||Storm's End|B|bat",
+            "renly_shoulders_cloak|Renly||Storm's End|C|bat",
+            "renly_crown|Renly||Storm's End|H|civ",
+            "euron_crown|Euron||Pyke|H|civ",
+            "rhaegar_plate|||King's Landing||",
+            "rhaegar_helmet|||King's Landing||",
+            "rhaegar_gauntlets|||King's Landing||",
+            "rhaegar_boots|||King's Landing||",
+            "rhaegar_pauldrons|||King's Landing||",
+            "aemon_armor|||Dragonstone||",
+            "aemon_helmet|||Dragonstone||",
+            "aemon_gauntlets|||Dragonstone||",
+            "aemon_boots|||Dragonstone||",
+            "aemon_pauldrons|||Dragonstone||",
+            "brienne_armor|||Storm's End||",
+            "houndskull|||Lannisport||"
+        };
+
+        /// <summary>Id relikwii kierowanych na polki miast - czystka targow
+        /// (UniqueWares) MUSI je omijac, inaczej zjadalaby je co sesje.</summary>
+        internal static readonly System.Collections.Generic.HashSet<string> RelicIds = BuildRelicIds();
+        private static System.Collections.Generic.HashSet<string> BuildRelicIds()
+        {
+            var h = new System.Collections.Generic.HashSet<string>();
+            foreach (var row in NamesakeGear) h.Add(row.Split('|')[0]);
+            return h;
+        }
+
+        /// <summary>Jednorazowe akcje (per kampania) - ubrania i polozenia; save w MendsBehavior.</summary>
+        internal static System.Collections.Generic.List<string> UniqueHomesDone =
+            new System.Collections.Generic.List<string>();
+
+        internal static void DressTheNamesakes()
+        {
+            try
+            {
+                int dressed = 0, placed = 0, skipped = 0;
+                foreach (var row in NamesakeGear)
+                {
+                    var p = row.Split('|');
+                    string id = p[0], owner = p[1], heir = p[2], townName = p[3], slotS = p[4], mode = p[5];
+                    if (UniqueHomesDone.Contains(id)) continue;
+                    var item = TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObject<ItemObject>(id);
+                    if (item == null) { skipped++; continue; }
+
+                    Hero wearer = FindAliveHero(owner);
+                    if (wearer == null) wearer = FindAliveHero(heir);
+                    if (wearer != null && slotS.Length > 0)
+                    {
+                        int slot = SlotOf(slotS);
+                        var eq = mode == "civ" ? wearer.CivilianEquipment : wearer.BattleEquipment;
+                        if (slot >= 0 && eq != null)
+                        {
+                            eq[(EquipmentIndex)slot] = new EquipmentElement(item);
+                            UniqueHomesDone.Add(id);
+                            dressed++;
+                            Scribe.Line("Mends: " + wearer.Name + " zaklada " + item.Name + " (" + id + ").");
+                            continue;
+                        }
+                    }
+                    // nikt zywy nie nosi - jedna sztuka na polke wskazanego miasta
+                    var town = FindTown(townName);
+                    if (town != null && town.Owner != null && town.Owner.ItemRoster != null)
+                    {
+                        town.Owner.ItemRoster.AddToCounts(item, 1);
+                        UniqueHomesDone.Add(id);
+                        placed++;
+                        Scribe.Line("Mends: " + item.Name + " (" + id + ") lezy na targu w " + town.Name + " - 1 sztuka.");
+                    }
+                    else { skipped++; Scribe.Line("Mends: brak miasta '" + townName + "' dla " + id + " - relikwia czeka."); }
+                }
+                Scribe.Line("Mends: kazdy unikat ma dom - ubrano " + dressed + ", polozono na targach "
+                            + placed + (skipped > 0 ? ", pominieto " + skipped : "") + ".");
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.DressTheNamesakes", null); } catch { } }
+        }
+
+        private static Hero FindAliveHero(string namePart)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(namePart)) return null;
+                foreach (var h in Hero.AllAliveHeroes)
+                {
+                    if (h == null || h.IsDead) continue;
+                    var n = h.Name != null ? h.Name.ToString() : "";
+                    if (n.IndexOf(namePart, StringComparison.OrdinalIgnoreCase) >= 0) return h;
+                }
+            }
+            catch { }
+            return null;
+        }
+
+        private static Town FindTown(string namePart)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(namePart)) return null;
+                foreach (var s in Settlement.All)
+                {
+                    if (s == null || s.Town == null || s.Town.IsCastle) continue;
+                    var n = s.Name != null ? s.Name.ToString() : "";
+                    if (n.IndexOf(namePart, StringComparison.OrdinalIgnoreCase) >= 0) return s.Town;
+                }
+            }
+            catch { }
+            return null;
+        }
+
+        private static int SlotOf(string s)
+        {
+            switch (s)
+            {
+                case "H": return 5;   // Head
+                case "B": return 6;   // Body
+                case "L": return 7;   // Leg
+                case "G": return 8;   // Gloves
+                case "C": return 9;   // Cape
+                default: return -1;
+            }
+        }
+
         /// <summary>Przy starcie sesji: unikaty schodza z handlu (NotMerchandise,
         /// wiec targi przestaja je LOSOWAC) i znikaja z polek istniejacych miast.
         /// Ekwipunek bohaterow, stash i sakwy gracza - nietykane: zdobyty
@@ -197,6 +350,7 @@ namespace CrashScribe
                     {
                         var it = ro.GetItemAtIndex(i);
                         if (it == null || !IsUniqueGear(it)) continue;
+                        if (RelicIds.Contains(it.StringId)) continue;   // relikwie polozone celowo - nie zjadac
                         int n = ro.GetElementNumber(i);
                         purged += n;
                         ro.AddToCounts(ro.GetElementCopyAtIndex(i).EquipmentElement, -n);
@@ -1534,9 +1688,13 @@ namespace CrashScribe
         public override void RegisterEvents()
         {
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this,
-                delegate (CampaignGameStarter s) { Mends.SkillSinew(); Mends.UniqueWares(); Mends.LoreForgeGate(); });
+                delegate (CampaignGameStarter s)
+                { Mends.SkillSinew(); Mends.UniqueWares(); Mends.LoreForgeGate(); Mends.DressTheNamesakes(); });
         }
 
-        public override void SyncData(IDataStore dataStore) { }
+        public override void SyncData(IDataStore dataStore)
+        {
+            try { dataStore.SyncData("cs_uniq_homes", ref Mends.UniqueHomesDone); } catch { }
+        }
     }
 }
