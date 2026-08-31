@@ -115,6 +115,56 @@ namespace CrashScribe
             catch { }                                            // per-cios: zadnego raportowania
         }
 
+        /// <summary>Najwyzszy tier broni z wzorcow bojowych jednostki (tarcze
+        /// nie sa stala bojowa i nie licza sie). PULAPKA: ItemTiers.Tier1 == 0.</summary>
+        private static int BestWeaponTier(CharacterObject c)
+        {
+            try
+            {
+                if (c == null) return 0;
+                int best = 0;
+                foreach (var eq in c.BattleEquipments)
+                {
+                    if (eq == null) continue;
+                    for (int s = 0; s <= 3; s++)                 // sloty broni Weapon0..Weapon3
+                    {
+                        var it = eq[(EquipmentIndex)s].Item;
+                        if (it == null || it.WeaponComponent == null) continue;
+                        var pw = it.WeaponComponent.PrimaryWeapon;
+                        if (pw != null && pw.IsShield) continue;
+                        int t = (int)it.Tier + 1;
+                        if (t > best) best = t;
+                    }
+                }
+                return best;
+            }
+            catch { return 0; }
+        }
+
+        /// <summary>
+        /// VALYRIANSKA ZASADA T6 W AUTOKALKULACJI (Jeff 30.08: "AI walczy z AI
+        /// na zasadzie autokalkulacji - trzeba te przewage zaznaczyc"). Postfix
+        /// (Priority.Last, po faktorach BannerKings) TYLKO na bazowym
+        /// DefaultCombatSimulationModel.SimulateHit - ROT-owy model deleguje
+        /// do bazowego, wiec latanie obu cieloby podwojnie (15% x 15%).
+        /// Cios jednostki bez broni T6+ w Wedrowca/Nocnego Krola tnie sie do
+        /// 15% jak w polu. Smoki celowo NIE sa ciete: ROT nadpisuje ich wynik
+        /// PO nas (DragonDamageScaling) - smoczy ogien pali Innych, jak w lore.
+        /// </summary>
+        public static void ValyrianWardSim(CharacterObject __0, CharacterObject __1, ref ExplainedNumber __result)
+        {
+            try
+            {
+                if (__result.ResultNumber <= 1f) return;
+                if (!WalkerBlood(__1)) return;                   // __1 = trafiany
+                if (BestWeaponTier(__0) >= 6) return;            // __0 = bijacy
+                float cut = __result.ResultNumber * 0.15f;
+                if (cut < 1f) cut = 1f;
+                __result = new ExplainedNumber(cut);
+            }
+            catch { }
+        }
+
         /// <summary>
         /// WLASNY MUNDUR KAZDY UMIE NOSIC (Jeff 30.08, po spisie
         /// docs/ROT-rozjazdy-skilli.md: 548 rozjazdow, 169 jednostek).
@@ -253,6 +303,28 @@ namespace CrashScribe
                 else Scribe.Line("Mends: Agent.RegisterBlow nieznaleziony - valyrianska zasada spi.");
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.Install(valyrian)", null); } catch { } }
+
+            try
+            {
+                // ===== VALYRIANSKA ZASADA T6 W AUTOKALKULACJI =====
+                // Bitwy AI vs AI (i "Send Troops") ida przez symulacje - bez
+                // tego Wedrowcy padali tam od zwyklej stali (patrz ValyrianWardSim).
+                var tDef = typeof(TaleWorlds.CampaignSystem.GameComponents.DefaultCombatSimulationModel);
+                System.Reflection.MethodInfo mSim = null;
+                foreach (var m in tDef.GetMethods())
+                {
+                    if (m.Name != "SimulateHit") continue;
+                    var ps = m.GetParameters();
+                    if (ps.Length > 0 && ps[0].ParameterType == typeof(CharacterObject)) { mSim = m; break; }
+                }
+                if (mSim != null)
+                {
+                    harmony.Patch(mSim, postfix: new HarmonyMethod(typeof(Mends), "ValyrianWardSim") { priority = Priority.Last });
+                    Scribe.Line("Mends: valyrianska zasada T6 dziala tez w autokalkulacji bitew (symulacja tnie do 15% jak pole).");
+                }
+                else Scribe.Line("Mends: DefaultCombatSimulationModel.SimulateHit nieznaleziony - symulacja bez zasady T6.");
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.Install(valyrianSim)", null); } catch { } }
 
             try
             {

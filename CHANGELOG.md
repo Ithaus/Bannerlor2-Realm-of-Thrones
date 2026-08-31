@@ -1,5 +1,33 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-30 — Valyrianska zasada T6 takze w autokalkulacji bitew
+**Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs`
+**Problem:** Jeff: "AI walczy z AI na zasadzie autokalkulacji - trzeba
+te przewage zaznaczyc". Poprzedni mend (ValyrianWard) dzialal tylko na
+polu bitwy; w symulacji (bitwy AI vs AI, "Send Troops", poscig)
+Wedrowcy i Nocny Krol nadal padali od zwyklej stali.
+**Przyczyna:** symulacja liczy obrazenia w CombatSimulationModel.
+SimulateHit, z pominieciem Agent.RegisterBlow.
+**Zmiana:** mend ValyrianWardSim - postfix (Priority.Last, PO faktorach
+BannerKings) WYLACZNIE na bazowym DefaultCombatSimulationModel.
+SimulateHit (landowy overload). ROTCombatSimulationModel deleguje do
+bazowego, wiec latanie obu cieloby PODWOJNIE (15% x 15% = 2%) - stad
+jeden punkt. Warunek: trafiany = Wedrowiec/NK (WalkerBlood), bijacy
+bez broni T6+ we wzorcach bojowych (BestWeaponTier: max tier broni
+z BattleEquipments, tarcze pominiete, pulapka (int)Tier+1) -> wynik
+ciety do 15% (min 1). Smoki celowo wolne od ciecia: ROT nadpisuje ich
+wynik PO naszym postfixie (DragonDamageScaling) - smoczy ogien pali
+Innych takze w symulacji, zgodnie z lore.
+**Ryzyko / co sprawdzic:** kronika wojen CrashScribe - armie zywych
+lordow przestaja wygrywac z horda przez sama mase w autokalku (jesli
+nie maja elit z bronia T6); gracz tez nie wezmie NK "za darmo" przez
+Send Troops. Log: "Mends: valyrianska zasada T6 dziala tez w
+autokalkulacji...". Zalozenie: kazdy aktywny model symulacji deleguje
+do Default (ROT tak robi; BK tez tylko postfixuje Default) - gdyby
+przyszly mod podmienil model bez delegacji, zasada zniknie z symulacji
+(log przy starcie zdradzi, ze patch wszedl, ale warto pamietac).
+**Status:** WGRANE
+
 ## 2026-08-30 — Valyrianska zasada T6: Wedrowcy i Nocny Krol odporni na zwykla stal
 **Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs`
 **Problem:** Jeff: "Biali Wedrowcy i Nocny Krol maja odpornosc na bron,
