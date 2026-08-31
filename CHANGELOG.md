@@ -1,5 +1,22 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-31 — Audyt spojnosci przed nowa kampania: 0 konfliktow, 1 falszywy alarm
+**Mod:** — (dokumentacja) | **Pliki:** `docs/AUDYT-2026-08-31.md` (nowy)
+**Problem:** Jeff: "zrob audyt naszych zmian - czy nic sie nie gryzie,
+nie ma konfliktow, sprzecznosci ani bugow".
+**Zmiana:** przeglad kodu wszystkich praw sesji 30-31.08 w parach
+ryzyka + weryfikacja w zrodlach ROT/BK/RBM/DTE/RC. WYNIK: zero
+konfliktow krytycznych; jedyny alarm (nocleg AI mogacy usypiac
+oblegajacych) okazal sie FALSZYWY - wykluczenie BesiegerCamp juz
+istnialo. Macierz ~20 par z werdyktami w docs/AUDYT-2026-08-31.md;
+cztery pozycje do OBSERWACJI (strojenie suwakow, nie bledy): tempo
+dezercji AI, zimowa kaskada glodu, wydajnosc petli dziennych, leczenie
+w skali czasu. Spisana zasada spojnosci swiata (umarli bez potrzeb;
+wszyscy zywi rowno; kary od wyniku; suwak + wpis na kazde prawo).
+**Ryzyko / co sprawdzic:** pierwsza sesja nowej kampanii = test calosci;
+przyslac sekcje "Mends:" z logu CrashScribe i zajrzec w Armoury.log.
+**Status:** ZAMKNIETE
+
 ## 2026-08-31 — Spalona ziemia + Ksiega Wojny: foraging i blizny wiosek, dezercje za zold, krater po szturmie
 **Mod:** Armoury | **Pliki:** `Armoury/src/ScorchedEarth.cs` (nowy), `Armoury/src/WarLedger.cs` (nowy), `Settings.cs`, `SubModuleMain.cs`, `ArmouryBehavior.cs` (+McmSettings)
 **Problem:** Jeff ("rob 3" + "4: nie ma kasy - dezercja i minus morale;
