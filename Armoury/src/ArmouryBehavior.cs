@@ -891,6 +891,16 @@ namespace Armoury
                         continue;
                     }
 
+                    // CZELADZ TEZ SPI (Jeff 31.08): warsztat stoi noca 23-5 -
+                    // zadnego postepu przez szesc ciemnych godzin. "Dni pracy"
+                    // projektu to dni PRZY KOWADLE, wiec robota trwa realnie
+                    // ~1/3 dluzej kalendarza - jak w prawdziwej kuzni.
+                    if (Settings.Current.WorkshopNightRest)
+                    {
+                        int hh = CampaignTime.Now.GetHourOfDay;
+                        if (hh >= 23 || hh < 5) continue;
+                    }
+
                     // KROK GODZINOWY: zegar konczy sie DOKLADNIE z robota, bez
                     // doczekiwania do polnocy (blad, ktory wkurzyl Jeffa przy mieczu)
                     p.DaysLeft -= 1f / 24f;

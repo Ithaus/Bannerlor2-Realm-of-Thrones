@@ -1,5 +1,19 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-31 — Czeladz tez spi: warsztat stoi noca 23-5
+**Mod:** Armoury | **Pliki:** `Armoury/src/ArmouryBehavior.cs`, `Settings.cs` (+McmSettings)
+**Problem:** Jeff do rytmu kowadla: "czeladz tez musi spac!" - projekt
+tykal 24h/dobe niezaleznie od pory.
+**Zmiana:** AdvanceProjects pomija krok godzinowy miedzy 23:00 a 5:00
+(WorkshopNightRest, dom. wlaczone) - szesc ciemnych godzin bez postepu
+i bez XP. "Dni pracy" projektu = dni PRZY KOWADLE: robota trwa realnie
+~1/3 dluzej kalendarza. Spina sie z rytmem kowala-gracza (18h zmiana +
+sen wg rachunku) i z calym prawem nocy.
+**Ryzyko / co sprawdzic:** pasek czekania przy projekcie noca stoi
+w miejscu (6h ciszy), rano rusza; wyrob konczy sie pozniej niz
+w starym zegarze - zgodnie z intencja.
+**Status:** WGRANE
+
 ## 2026-08-31 — Rytm doby przy kowadle: 18h pracy, potem sen (6h albo splata dlugu) z meldunkiem
 **Mod:** Armoury | **Pliki:** `Armoury/src/SmithMenu.cs`, `Patches.cs`, `Settings.cs` (+McmSettings)
 **Problem:** Jeff: "przy kuciu/naprawach nie moge pracowac 33 godzin -
