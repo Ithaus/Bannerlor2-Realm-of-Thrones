@@ -1,5 +1,26 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-30 — Brama kucia: klingi lore (Needle, Dark Sister...) juz nie od startu
+**Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs`
+**Problem:** Jeff: "troszke bez sensu, ze moge kuc miecz Nocnego Krola
+czy inne rzeczy od poczatku; wylaczmy kucie T5/T6, kuj od T1 az sie
+udostepnia". Zrodlo: ROT daje is_default="true" 140 czesciom tieru 5 -
+w tym klingom imiennym (Needle, Lightbringer, Widow's Wail, Dark
+Sister, Tempest) - kazdy swiezy kowal mogl je skladac od pierwszego
+dnia (stad tez "50 mieczy Aryi" w obiegu).
+**Zmiana:** mend LoreForgeGate (start sesji): czesci PieceTier >= 5
+traca IsGivenByDefault - trzeba je odblokowac normalna nauka kowalska.
+Vanilla otwiera nowe czesci od NAJNIZSZEGO dostepnego tieru, wiec
+klingi lore wypadaja na samym koncu progresji. Czesci T4- zostaja
+darmowe jak w ROT (w tym valyrianskie T4 - te ograniczy drozszy wytop
+stali, osobny wpis).
+**Ryzyko / co sprawdzic:** log "Mends: brama kucia - 140 czesci T5+
+przestalo byc darmowych"; w kuzni free-build lista klingow T5 pusta
+do czasu odblokowan; czesci JUZ otwarte recznie przez gracza
+(_openedPartsDictionary w save) pozostaja otwarte. Zapisane projekty
+kutych mieczy nie znikaja (gotowe itemy nietykane).
+**Status:** WGRANE
+
 ## 2026-08-30 — Unikaty sa unikatowe: sprzet imiennych bohaterow poza handlem i przydzialem
 **Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs`
 **Problem:** Jeff: "kazdy piechur biegal z mieczami/pancerzami bohaterow;

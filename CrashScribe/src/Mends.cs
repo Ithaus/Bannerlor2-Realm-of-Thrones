@@ -208,6 +208,34 @@ namespace CrashScribe
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.UniqueWares", null); } catch { } }
         }
 
+        /// <summary>
+        /// BRAMA KUCIA LORE (Jeff 30.08: "troszke bez sensu, ze moge kuc miecz
+        /// Nocnego Krola od poczatku"). ROT rozdaje za darmo (is_default) 140
+        /// czesci tieru 5 - w tym klingi imienne: Needle, Lightbringer, Widow's
+        /// Wail, Dark Sister, Tempest... Odbieramy im darmowosc: czesci T5+
+        /// trzeba ODBLOKOWAC kuciem, a vanilla otwiera czesci od NAJNIZSZEGO
+        /// dostepnego tieru - wiec klingi lore wypadna na samym koncu progresji,
+        /// dokladnie jak chcial Jeff ("kuj od T1, w koncu sie udostepnia").
+        /// Czesci T4 i nizsze zostaja darmowe jak w ROT.
+        /// </summary>
+        internal static void LoreForgeGate()
+        {
+            try
+            {
+                var setter = AccessTools.PropertySetter(typeof(CraftingPiece), "IsGivenByDefault");
+                if (setter == null) { Scribe.Line("Mends: CraftingPiece.IsGivenByDefault bez settera - brama kucia spi."); return; }
+                int gated = 0;
+                foreach (var cp in TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObjectTypeList<CraftingPiece>())
+                {
+                    if (cp == null || !cp.IsGivenByDefault || cp.PieceTier < 5) continue;
+                    setter.Invoke(cp, new object[] { false });
+                    gated++;
+                }
+                Scribe.Line("Mends: brama kucia - " + gated + " czesci T5+ (w tym klingi imienne) przestalo byc darmowych; odblokowuja sie kuciem od dolu.");
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.LoreForgeGate", null); } catch { } }
+        }
+
         /// <summary>Prefix na DTE DoAssignAsync: unikaty imienne nie wchodza do
         /// puli przydzialu - zaden szeregowy nie dostanie pancerza Brienny,
         /// chocby lezal w taborze. Bohaterom DTE i tak sprzetu nie rusza.</summary>
@@ -1470,7 +1498,7 @@ namespace CrashScribe
         public override void RegisterEvents()
         {
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this,
-                delegate (CampaignGameStarter s) { Mends.SkillSinew(); Mends.UniqueWares(); });
+                delegate (CampaignGameStarter s) { Mends.SkillSinew(); Mends.UniqueWares(); Mends.LoreForgeGate(); });
         }
 
         public override void SyncData(IDataStore dataStore) { }
