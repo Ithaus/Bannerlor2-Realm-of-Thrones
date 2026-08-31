@@ -115,11 +115,15 @@ namespace Armoury
             catch (Exception e) { Log.Error("RangedLore.Seed", e); }
         }
 
-        /// <summary>Czy gracz zna ten wzor. Amunicja i bron biala - zawsze.</summary>
+        /// <summary>Czy gracz zna ten wzor. Amunicja i bron biala - zawsze.
+        /// Unikaty imienne (UniqueGear): znane WYLACZNIE po przetopieniu
+        /// zdobytego egzemplarza (ArmouryBehavior.UniqueLore).</summary>
         internal static bool KnownOf(ItemObject it)
         {
             try
             {
+                if (UniqueGear.Is(it))
+                    return ArmouryBehavior.UniqueLore != null && ArmouryBehavior.UniqueLore.Contains(it.StringId);
                 if (!IsProgressClass(it)) return true;
                 Seed();
                 return Known.Contains(it.StringId);

@@ -1,5 +1,26 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-30 — Nauczone unikaty kuje sie w CRAFT (nie w menu), a wojsko moze je nosic
+**Mod:** Armoury + ForgeView + CrashScribe | **Pliki:** `Armoury/src/RangedLore.cs`, `Armoury/src/SmithMenu.cs`, `ForgeView/src/ArmourFilterMixin.cs`, `CrashScribe/src/Mends.cs`
+**Problem:** Jeff do wersji z opcja menu: "nie, po co - kucie jest
+w kuzni, a dokladnie w CRAFT"; oraz: "jak zdobede pancerz Brienny
+i sie go naucze, to DTE moze go wykorzystac".
+**Zmiana:** (1) opcja "Forge a studied masterwork" USUNIETA z menu
+kowala; (2) ForgeView doklada nauczone unikaty (Armoury.UniqueLore,
+przez reflection) na liste zakladki CRAFT - BK sam je odrzuca, bo maja
+NotMerchandise; (3) RangedLore.KnownOf: unikat znany WYLACZNIE po
+przetopieniu egzemplarza - nauczone laduja w znanych, gotowe do kucia;
+(4) CrashScribe UniqueWard przepuszcza nauczone wzory do puli DTE -
+wykute egzemplarze wolno nosic wojsku (DTE rozdaje tylko FIZYCZNE
+sztuki, kopie z powietrza nie istnieja). BONUS spostrzezenie: unikaty
+maja NotMerchandise i wysoka wartosc, wiec Recipes.IsLegendary lapie
+je automatycznie - kuja sie jako LEGENDY (materialy wielokrotnie,
+Valyrian Steel obowiazkowo, mistrzowski prog skilla, jedna naraz).
+**Ryzyko / co sprawdzic:** przetopic unikat -> pojawia sie na liscie
+CRAFT jako znany (log ForgeView "Nauczone unikaty na polce CRAFT: +N");
+wykuty egzemplarz po bitwie moze wyladowac na zolnierzu (DTE).
+**Status:** WGRANE (Armoury, ForgeView, CrashScribe)
+
 ## 2026-08-30 — Przetop unikatu uczy kuznie go odtwarzac ("Forge a studied masterwork")
 **Mod:** Armoury | **Pliki:** `Armoury/src/UniqueGear.cs` (nowy), `ArmouryBehavior.cs`, `SmeltTab.cs`, `SmithMenu.cs`
 **Problem:** Jeff: "jesli pokonam bohatera i przekuje jego pancerz, to

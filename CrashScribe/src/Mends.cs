@@ -238,7 +238,11 @@ namespace CrashScribe
 
         /// <summary>Prefix na DTE DoAssignAsync: unikaty imienne nie wchodza do
         /// puli przydzialu - zaden szeregowy nie dostanie pancerza Brienny,
-        /// chocby lezal w taborze. Bohaterom DTE i tak sprzetu nie rusza.</summary>
+        /// chocby lezal w taborze. Bohaterom DTE i tak sprzetu nie rusza.
+        /// WYJATEK (Jeff 30.08): wzor NAUCZONY w kuzni (przetopiony unikat,
+        /// Armoury.UniqueLore) jest odblokowany - gracz go kuje, wiec wykute
+        /// egzemplarze wolno nosic wojsku. DTE nadal rozdaje tylko FIZYCZNE
+        /// sztuki z taboru - zadna kopia nie bierze sie z powietrza.</summary>
         public static void UniqueWard(object __instance)
         {
             try
@@ -249,11 +253,43 @@ namespace CrashScribe
                 foreach (System.Collections.DictionaryEntry kv in dic)
                 {
                     var item = Traverse.Create(kv.Key).Property("Item").GetValue() as ItemObject;
-                    if (item != null && IsUniqueGear(item)) drop.Add(kv.Key);
+                    if (item != null && IsUniqueGear(item) && !LearnedUnique(item.StringId)) drop.Add(kv.Key);
                 }
                 for (int i = 0; i < drop.Count; i++) dic.Remove(drop[i]);
             }
             catch { }
+        }
+
+        private static System.Reflection.FieldInfo _fUniqueLore;
+        private static bool _uniqueLoreResolved;
+
+        /// <summary>Czy gracz opanowal wzor unikatu (Armoury.ArmouryBehavior.UniqueLore
+        /// przez reflection - CrashScribe nie referencuje Armoury; brak Armoury = nic
+        /// nie nauczono).</summary>
+        private static bool LearnedUnique(string itemId)
+        {
+            try
+            {
+                if (!_uniqueLoreResolved)
+                {
+                    _uniqueLoreResolved = true;
+                    foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+                    {
+                        try
+                        {
+                            if (asm.GetName().Name != "Armoury") continue;
+                            var t = asm.GetType("Armoury.ArmouryBehavior");
+                            _fUniqueLore = t != null ? AccessTools.Field(t, "UniqueLore") : null;
+                            break;
+                        }
+                        catch { }
+                    }
+                }
+                var list = _fUniqueLore != null
+                    ? _fUniqueLore.GetValue(null) as System.Collections.Generic.List<string> : null;
+                return list != null && list.Contains(itemId);
+            }
+            catch { return false; }
         }
 
         private static string PartyCultureId(MobileParty p)

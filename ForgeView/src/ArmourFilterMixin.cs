@@ -108,6 +108,7 @@ namespace ForgeView
             {
                 if (_all.Count == 0) Snapshot();
                 InjectRanged();
+                InjectMasterworks();
                 var counts = new int[CatNames.Length];
                 foreach (var vm in _all)
                     if (vm != null && vm.Item != null) counts[CatOf(vm.Item)]++;
@@ -237,6 +238,68 @@ namespace ForgeView
             catch (Exception e) { Log.Error("InjectRanged", e); }
         }
 
+        private readonly HashSet<string> _mwInjected = new HashSet<string>();
+        private static System.Reflection.FieldInfo _fLore;
+        private static bool _loreLooked;
+
+        /// <summary>Nauczone wzory unikatow z Armoury (przetopione egzemplarze) -
+        /// przez reflection, bo ForgeView nie referencuje Armoury.</summary>
+        private static List<string> LearnedLore()
+        {
+            try
+            {
+                if (!_loreLooked)
+                {
+                    _loreLooked = true;
+                    foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+                    {
+                        var t = asm.GetType("Armoury.ArmouryBehavior");
+                        if (t == null) continue;
+                        _fLore = t.GetField("UniqueLore",
+                            System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic
+                            | System.Reflection.BindingFlags.Static);
+                        break;
+                    }
+                }
+                return _fLore != null ? _fLore.GetValue(null) as List<string> : null;
+            }
+            catch { return null; }
+        }
+
+        /// <summary>
+        /// NAUCZONE UNIKATY NA POLCE CRAFT (Jeff 30.08: "kucie jest w kuzni,
+        /// a dokladnie w craft"). BK odrzuca z listy itemy NotMerchandise -
+        /// a unikaty imienne wlasnie takie sa (mend CrashScribe). Dokladamy
+        /// wiec wylacznie te NAUCZONE (przetopiony egzemplarz w Smelt);
+        /// RangedLore.KnownOf otwiera je, wiec laduja w znanych, gotowe do kucia.
+        /// </summary>
+        private void InjectMasterworks()
+        {
+            try
+            {
+                if (ViewModel == null) return;
+                var lore = LearnedLore();
+                if (lore == null || lore.Count == 0) return;
+                int added = 0;
+                for (int i = 0; i < lore.Count; i++)
+                {
+                    var id = lore[i];
+                    if (id == null || _mwInjected.Contains(id)) continue;
+                    var item = TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObject<ItemObject>(id);
+                    if (item == null) continue;
+                    try
+                    {
+                        _all.Add(new ArmorItemVM(ViewModel, item, ViewModel.GetItemType(item)));
+                        _mwInjected.Add(id);
+                        added++;
+                    }
+                    catch { }
+                }
+                if (added > 0) Log.Info("Nauczone unikaty na polce CRAFT: +" + added + ".");
+            }
+            catch (Exception e) { Log.Error("InjectMasterworks", e); }
+        }
+
         /// <summary>Po kazdym odswiezeniu panelu zapamietujemy pelna liste i nakladamy filtr na nowo.</summary>
         public override void OnRefresh()
         {
@@ -244,6 +307,7 @@ namespace ForgeView
             {
                 Snapshot();
                 InjectRanged();
+                InjectMasterworks();
                 Apply(_tier);
             }
             catch (Exception e) { Log.Error("OnRefresh", e); }
@@ -259,6 +323,7 @@ namespace ForgeView
             _all.Clear();
             foreach (var vm in list) _all.Add(vm);
             _rangedInjected = false;   // nowa pelna lista - luczarnia do dolozenia od nowa
+            _mwInjected.Clear();       // ... i nauczone unikaty tez
             Log.Info("Zapamietano pelna liste zbroi: " + _all.Count);
         }
 

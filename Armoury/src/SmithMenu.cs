@@ -64,10 +64,9 @@ namespace Armoury
             // liste, FletchForge przejmuje robote) - opcja tutaj dublowala to.
             // Kod Fletchera zostaje - CRAFT z niego korzysta.
 
-            // kucie NAUCZONYCH unikatow (Jeff 30.08: "pokonam, przekuje pancerz,
-            // to moge potem go tworzyc") - lista zdobyta przetopem w SmeltTab
-            starter.AddGameMenuOption(Menu, "arm_masterworks",
-                "{=!}Forge a studied masterwork", MasterworkCondition, MasterworkConsequence, false, 0);
+            // kucie NAUCZONYCH unikatow poszlo do zakladki CRAFT (Jeff 30.08:
+            // "kucie jest w kuzni, a dokladnie w craft") - ForgeView doklada
+            // nauczone wzory na liste, RangedLore.KnownOf je otwiera
 
             starter.AddGameMenuOption(Menu, "arm_orders",
                 "{=!}The order book - commissions from the lords", OrdersCondition,
@@ -1292,58 +1291,6 @@ namespace Armoury
         }
 
         // ---------------------------------------------------------- tempo pracy
-        // ---- nauczone unikaty ----
-        private static bool MasterworkCondition(MenuCallbackArgs args)
-        {
-            try
-            {
-                args.optionLeaveType = GameMenuOption.LeaveType.Craft;
-                var lore = ArmouryBehavior.UniqueLore;
-                if (lore == null || lore.Count == 0)
-                {
-                    args.IsEnabled = false;
-                    args.Tooltip = new TextObject("{=!}Defeat a hero, take their famed gear and melt it down - the forge learns what it unmakes.", null);
-                    return true;
-                }
-                args.Tooltip = new TextObject("{=!}Patterns studied: " + lore.Count + ". The forge can reproduce them.", null);
-                return true;
-            }
-            catch { return false; }
-        }
-
-        private static void MasterworkConsequence(MenuCallbackArgs args)
-        {
-            try
-            {
-                var opts = new List<InquiryElement>();
-                foreach (var id in ArmouryBehavior.UniqueLore)
-                {
-                    var it = TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObject<ItemObject>(id);
-                    if (it == null) continue;
-                    var r = Recipes.For(it);
-                    opts.Add(new InquiryElement(id, it.Name.ToString() + "  (fee " + Forge.ForgeFee(r) + ")", null, true,
-                        "Tier " + Recipes.Grade(it) + ". Materials, stamina and time as any piece of its rank."));
-                }
-                if (opts.Count == 0) { Log.Player("The forge has no studied patterns yet."); return; }
-                MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData(
-                    "Studied masterworks",
-                    "Famed gear you have unmade and learned. The forge will reproduce it - for a price.",
-                    opts, true, 1, 1, "Forge it", "Step back",
-                    delegate (List<InquiryElement> sel)
-                    {
-                        try
-                        {
-                            if (sel == null || sel.Count == 0) return;
-                            var it = TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObject<ItemObject>((string)sel[0].Identifier);
-                            if (it != null) AskTempo(it);
-                        }
-                        catch (Exception ex) { Log.Error("Masterwork.Selected", ex); }
-                    },
-                    delegate (List<InquiryElement> _) { }), true);
-            }
-            catch (Exception e) { Log.Error("MasterworkConsequence", e); }
-        }
-
         private static void AskTempo(ItemObject item)
         {
             try
