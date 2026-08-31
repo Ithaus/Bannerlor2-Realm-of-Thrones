@@ -1,5 +1,19 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-31 — Rozbiorka unikatu: Smithing 200 i nauka pewna (jedyna sztuka nie plonie)
+**Mod:** Armoury | **Pliki:** `Armoury/src/SmithMenu.cs`
+**Problem:** Jeff: "unikat przy rozbiorce uczy zawsze - NAPRAW, ale
+rozebrac mozesz tylko przy Smithing minimum 200". Dotad rzut na
+porazke mogl SPALIC jedyny egzemplarz bez nauki.
+**Zmiana:** TakeApartApply, sciezka unikatow: Smithing < 200 = odmowa
+i sztuka ZOSTAJE w sakwach ("This famed piece is beyond your hands...");
+przy 200+ zadnego rzutu - sztuka przepada jak przy kazdej rozbiorce,
+wzor wchodzi do ksiegi ZAWSZE, XP 20/tier. Zwykle wzory: stary rzut
+bez zmian.
+**Ryzyko / co sprawdzic:** rozbiorka unikatu przy niskim Smithing nie
+niszczy przedmiotu; przy 200+ komunikat "with a master's care".
+**Status:** WGRANE
+
 ## 2026-08-31 — Swieta zasada skilli w DTE + sprzet umarlych niszczony + smoczy ogien pali Innych w polu
 **Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs`
 **Problem:** Jeff: (1) "DTE lamie swieta zasade skilli - NAPRAW";

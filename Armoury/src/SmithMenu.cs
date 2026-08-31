@@ -1475,6 +1475,25 @@ namespace Armoury
                 int tier = Recipes.Grade(item);
                 var s = Settings.Current;
 
+                // UNIKAT (Jeff 31.08): jedyna sztuka na swiecie nie moze splonac
+                // w partactwie. Rozbiorka wymaga Smithing 200 - ponizej progu
+                // NIC sie nie dzieje (sztuka zostaje w sakwach); mistrz uczy sie
+                // ZAWSZE (zadnego rzutu), sztuka przepada jak przy kazdej rozbiorce.
+                if (UniqueGear.Is(item))
+                {
+                    int smithing = Hero.MainHero.GetSkillValue(DefaultSkills.Crafting);
+                    if (smithing < 200)
+                    {
+                        Log.Player("This famed piece is beyond your hands - Smithing 200 is needed before you dare take it apart (yours: " + smithing + ").");
+                        return;
+                    }
+                    roster.AddToCounts(item, -1);
+                    if (RangedLore.Learn(item))
+                        Log.Player("You take the " + item.Name + " apart with a master's care - its making is yours now.");
+                    Hero.MainHero.AddSkillXp(DefaultSkills.Crafting, Math.Max(20, tier * 20));
+                    return;
+                }
+
                 roster.AddToCounts(item, -1);   // rozlozona sztuka przepada tak czy siak
 
                 // odzysk materialu, jesli Jeff wlaczy (domyslnie nic - to nie tygiel)
