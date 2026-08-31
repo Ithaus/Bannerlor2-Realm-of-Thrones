@@ -1,5 +1,32 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-30 — Umarli nie znaja zmeczenia: stamina i postura RBM bez dna dla wightow
+**Mod:** Armoury | **Pliki:** `Armoury/src/BattleWind.cs`
+**Problem:** Jeff: "i nie maja staminy oraz nie musza spac w nocy?".
+Audyt wykazal: sen juz zalatwiony (Undead.Party w NightRest, 27.08),
+nasza zadyszka/rany/krwawienie tez (FieldCraft/BrokenMen), jedzenie
+zalatwia sam ROT (DoesPartyConsumeFood=false dla klanow Wedrowcow -
+nie gloduja, nie dezerteruja). Zostala JEDNA luka: pula staminy
+i postury z RBM (RBMAI.Stance) - liczona z Atletyki dla KAZDEGO agenta.
+Wight z Atletyka 50 lapal zadyszke i staggery po zbitej posturze jak
+zywy chlop; BattleWind zarzadzal tylko bohaterami.
+**Przyczyna:** StaminaInitPostfix/PostureInitPostfix wychodzily przy
+hero == null - szeregowi (i bohaterowie-umarli dopiero po nich) szli
+czystym RBM.
+**Zmiana:** w obu postfixach, PRZED logika bohaterow: agent umarly
+(Undead.Character - kultura klanu ROTclan_126 lub sito nazw) dostaje
+stamina/postura = max = 1 000 000, regen 1000/tick; zadnego Profile,
+wiec tick regen idzie oryginalem RBM. Obejmuje tez Nocnego Krola
+i Bialych Wedrowcow (dotad jechali na puli z Endurance jak zwykli
+bohaterowie). Konie bez zmian.
+**Ryzyko / co sprawdzic:** dziala tylko przy wlaczonym Battle Stamina
+w MCM Armoury (caly BattleWind jest za ta bramka) - wylaczenie
+mechaniki wylacza tez wyjatek umarlych, co jest spojne (bez naszej
+mechaniki zostaje czysty RBM). W bitwie z horda: wighty nie zwalniaja
+atakow po dlugiej wymianie, nie da sie ich zmeczyc w klinczu; zywi
+lapia zadyszke po staremu.
+**Status:** WGRANE
+
 ## 2026-08-30 — Umarli nie znaja strachu: panika wylaczona armii Nocnego Krola
 **Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs`
 **Problem:** Jeff (po analizie taktyk AI Innych): "nieumarli nie moga

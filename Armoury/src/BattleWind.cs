@@ -115,13 +115,24 @@ namespace Armoury
 
         // ---- patche ----
 
-        /// <summary>Po RBM-owym przeliczeniu puli staminy: bohater dostaje pule x END i nasz regen.</summary>
+        /// <summary>Po RBM-owym przeliczeniu puli staminy: bohater dostaje pule x END i nasz regen.
+        /// Umarly (wight, Wedrowiec, Nocny Krol) dostaje pule bez dna - trup nie zna zmeczenia.</summary>
         public static void StaminaInitPostfix(Agent agent, object stance)
         {
             try
             {
+                if (agent == null || stance == null) return;
+                if (Undead.Character(agent.Character))
+                {
+                    // zadnego Profile: tick idzie oryginalem RBM, a pasek i tak nie drgnie
+                    _fMaxStamina.SetValue(stance, 1000000f);
+                    _fStamina.SetValue(stance, 1000000f);
+                    _fStaminaRegen.SetValue(stance, 1000f);
+                    Profile drop; if (Managed.TryGetValue(stance, out drop)) Managed.Remove(stance);
+                    return;
+                }
                 var hero = HeroOf(agent);
-                if (hero == null || stance == null) return;
+                if (hero == null) return;
                 float mul = EnduranceMul(hero);
                 float max = (float)_fMaxStamina.GetValue(stance) * mul;
                 _fMaxStamina.SetValue(stance, max);
@@ -148,8 +159,18 @@ namespace Armoury
         {
             try
             {
+                if (agent == null || stance == null) return;
+                if (Undead.Character(agent.Character))
+                {
+                    // trupa nie zmeczysz w klinczu - postura bez dna (RBM liczy
+                    // ja od zera przy kazdej zmianie broni, my za kazdym razem tez)
+                    _fMaxPosture.SetValue(stance, 1000000f);
+                    _fPosture.SetValue(stance, 1000000f);
+                    _fPostureRegen.SetValue(stance, 1000f);
+                    return;
+                }
                 var hero = HeroOf(agent);
-                if (hero == null || stance == null) return;
+                if (hero == null) return;
                 float mul = EnduranceMul(hero);
                 _fMaxPosture.SetValue(stance, (float)_fMaxPosture.GetValue(stance) * mul);
                 _fPosture.SetValue(stance, (float)_fPosture.GetValue(stance) * mul);
