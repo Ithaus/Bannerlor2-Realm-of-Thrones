@@ -53,10 +53,14 @@ namespace Armoury
                     new[] { "battania_civil_cape", "ripped_cloth_unarmoured" },
                     new[] { "bandit_saddle_steppe", "ripped_cloth" },
                     new[] { "sturgia_sword_1_t2", "rusty_sword" },
-                    new[] { "leather_tunic", null }, new[] { "leather_tunic", null }, new[] { "leather_tunic", null },
-                    new[] { "bandit_envelope_dress_v1", null }, new[] { "bandit_envelope_dress_v1", null }, new[] { "bandit_envelope_dress_v1", null },
-                    new[] { "leather_studdedhelm_over_thinhide", null }, new[] { "leather_studdedhelm_over_thinhide", null },
-                    new[] { "wrapped_shoes", null }, new[] { "wrapped_shoes", null }, new[] { "wrapped_shoes", null }
+                    // Jeff: "oni mieli COMMON ARMOUR, plytowe" - DTE ubral bande
+                    // w pospolite plyty ROT (diff 30-70); oddajemy wlasnie te
+                    new[] { "common_armor", null }, new[] { "common_armor", null }, new[] { "common_armor", null },
+                    new[] { "common_barbute", null }, new[] { "common_barbute", null },
+                    new[] { "common_kettle", null }, new[] { "common_spangen", null },
+                    new[] { "common_pauldrons", null },
+                    new[] { "common_boots", null }, new[] { "common_boots", null },
+                    new[] { "common_bracers", null }, new[] { "common_gloves", null }
                 };
                 var ro = MobileParty.MainParty != null ? MobileParty.MainParty.ItemRoster : null;
                 if (ro == null) return;
