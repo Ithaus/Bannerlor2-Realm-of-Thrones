@@ -666,9 +666,16 @@ namespace Armoury
 
             if (sleptBase)
             {
-                // zegarek dla spiacych BEZ menu (postoj noca): ile nocy przespane
+                // zegarek dla spiacych BEZ menu (postoj noca): ile nocy przespane.
+                // CZAPKA DO POTRZEBY (Jeff 31.08: "pracuje w miescie, a on mysli
+                // ze spalem 18h") - caly dzien w osadzie naliczal sie jak sen;
+                // czlowiek spi ile trzeba (baza+odsetki), reszta doby to zycie
+                // i praca, nie drzemka. Dlug i splata licza sie jak dotad.
                 if (!_sleeping && sleptH >= 1f)
-                    Msg("The night gave the men about " + sleptH.ToString("0.#") + "h of sleep.", Colors.White);
+                {
+                    float shown = Math.Min(sleptH, NeededHours());
+                    Msg("The night gave the men about " + shown.ToString("0.#") + "h of sleep.", Colors.White);
+                }
                 if (Debt > 0 && !paidInFull)
                     Msg("The men slept, but old weariness lingers - a full rest takes "
                         + (int)Math.Ceiling(NeededHours()) + " hours.", Colors.Yellow);

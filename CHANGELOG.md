@@ -1,5 +1,22 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-31 — Fix zegarka switu: dzien pracy w miescie to nie 18h snu
+**Mod:** Armoury | **Pliki:** `Armoury/src/NightRest.cs`
+**Problem:** Jeff (screen z Riverrun, day labour BK): "pracuje
+w miescie za 38 stag, a on mysli ze spalem 18 godzin - spalem 6".
+Postoj w osadzie nalicza odpoczynek CALA dobe (noc 1.0/h + dzien
+x DayRestFactor), a swit raportowal sume jako sen. Mechanika dlugu
+byla poprawna (splata i tak ograniczona do NeededHours) - klamal
+tylko komunikat.
+**Zmiana:** raport switu z CZAPKA do realnej potrzeby:
+min(naliczone, NeededHours) - przy dlugu 0 najwyzej "about 6h of
+sleep", wiecej tylko przy odsypianiu dlugu (9/15/21h). Atletyka za
+prace fizyczna JUZ dziala - to BannerKings daje skill za day labour
+(screen: +1 Athletics), nic nie dokladamy.
+**Ryzyko / co sprawdzic:** dzien pracy najemnej w miescie -> swit
+melduje ~6h, nie 18. DLL wgra watcher po zamknieciu gry (gra dziala).
+**Status:** ZBUDOWANE - watcher wgra po zamknieciu gry
+
 ## 2026-08-31 — Fix: oboz zatrzymuje marsz (koniec spania w biegu)
 **Mod:** Armoury | **Pliki:** `Armoury/src/NightRest.cs`
 **Problem:** Jeff: "maly bug - przy auto-obozie sen startuje, czas
