@@ -133,6 +133,7 @@ namespace Armoury
 
         // --- The crossing law ---
         public bool CrossingLawEnabled = true;             // fortified crossings (The Twins) bar their bridge to ENEMIES of the holder - allies and neutrals pass; take the castle, make peace, or go by sea
+        public bool CrossingLawAi = true;                  // the bridge watch also turns back hostile AI lord parties (they get a fallback point and a 3h cooldown so their pathfinding never jams)
         public float CrossingRadius = 3f;                  // how far the bridge watch reaches around the crossing castle
 
         // --- The slow muster ---

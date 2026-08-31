@@ -1,5 +1,25 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-31 — Prawo Przeprawy etap 2: straz zawraca wrogie armie AI; Moat Cailin i Bloody Gate strzezone
+**Mod:** Armoury | **Pliki:** `Armoury/src/CrossingLaw.cs`, `Settings.cs` (+McmSettings)
+**Problem:** Jeff: "Crossing law - robimy, tylko sprawdz, czy AI sie
+nie zablokuje i bedzie wiedzial, o co chodzi".
+**Zmiana:** (1) przeprawy: The Twins + Moat Cailin (castle_B1) +
+Bloody Gate (castle_EN2); (2) wrogie PARTIE LORDOW AI w strefie sa
+zawracane. Zabezpieczenie przed zapetleniem pathfindingu: odbita
+partia dostaje CEL-ODWROT (punkt po swojej stronie strefy, wiec ma
+dokad isc) i osobisty cooldown 3 h, w ktorym straz jej nie tyka -
+zero wibrowania na granicy; po cooldownie ewentualnie znow. Oblezenie
+przeprawy LEGALNE (BesiegerCamp skip) - AI, ktore chce na druga
+strone, moze zdobyc warownie; eskorty ida za wodzem (AttachedTo skip).
+Meldunki o zawracaniu AI ograniczone do 3/dobe. Nowe ustawienie
+CrossingLawAi (on). AI nie "zrozumie" prawa (vanilla pathfinding go
+nie zna) - ale nigdy nie zamarza: zawsze ma cel i wolna decyzje.
+**Ryzyko / co sprawdzic:** pod Twins wrogowie Freyow krecia sie po
+swojej stronie/oblegaja zamiast przenikac; watch log "CrossingLaw: AI
+... zawrocone"; wydajnosc ticku (skan partii co ~2 s realne).
+**Status:** WGRANE
+
 ## 2026-08-31 — Handel jencami wedle geografii: Westeros paser 20%, Essos pelna cena
 **Mod:** RealisticCaptivity | **Pliki:** `RealisticCaptivity/src/FairRansom.cs`, `Settings.cs` (+McmSettings)
 **Problem:** Jeff ("robimy jencow"): w Westeros niewolnictwo jest

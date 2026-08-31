@@ -448,6 +448,10 @@ namespace Armoury
         [SettingPropertyGroup("The crossing law")]
         public bool CrossingLawEnabled { get; set; } = true;
 
+        [SettingPropertyBool("Crossing Law Ai", HintText = "the bridge watch also turns back hostile AI lord parties (they get a fallback point and a 3h cooldown so their pathfinding never jams)")]
+        [SettingPropertyGroup("The crossing law")]
+        public bool CrossingLawAi { get; set; } = true;
+
         [SettingPropertyFloatingInteger("Crossing Radius", 0.00f, 12.00f, "0.00", HintText = "how far the bridge watch reaches around the crossing castle")]
         [SettingPropertyGroup("The crossing law")]
         public float CrossingRadius { get; set; } = 3f;
@@ -1187,6 +1191,7 @@ namespace Armoury
             s.BkSupplyMaxPieces = BkSupplyMaxPieces;
             s.AiStarvingBuysAnyPrice = AiStarvingBuysAnyPrice;
             s.CrossingLawEnabled = CrossingLawEnabled;
+            s.CrossingLawAi = CrossingLawAi;
             s.CrossingRadius = CrossingRadius;
             s.VolunteerRegenPercent = VolunteerRegenPercent;
             s.HealingRegenPercent = HealingRegenPercent;
