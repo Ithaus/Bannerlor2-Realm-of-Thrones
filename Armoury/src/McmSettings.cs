@@ -1048,6 +1048,10 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public bool CoursePlotterEnabled { get; set; } = true;
 
+        [SettingPropertyBool("Nightfall Prompt Enabled", HintText = "at dusk a marching column is asked to make camp; the popup lets you set always-camp or never-ask (choice lives in the save)")]
+        [SettingPropertyGroup("A night's rest")]
+        public bool NightfallPromptEnabled { get; set; } = true;
+
         [SettingPropertyBool("Camp Battle Props Enabled", HintText = "EXPERIMENTAL: attacked while encamped, the field battle gets your camp dressed on it - tents, fire, torches around your line (unknown prefabs are skipped and logged)")]
         [SettingPropertyGroup("A night's rest")]
         public bool CampBattlePropsEnabled { get; set; } = false;
@@ -1465,6 +1469,7 @@ namespace Armoury
             s.AiCampDangerRadius = AiCampDangerRadius;
             s.CampTentIcon = CampTentIcon;
             s.CoursePlotterEnabled = CoursePlotterEnabled;
+            s.NightfallPromptEnabled = NightfallPromptEnabled;
             s.CampBattlePropsEnabled = CampBattlePropsEnabled;
             s.HideoutAlarmEnabled = HideoutAlarmEnabled;
             s.HideoutAlarmScreamRadius = HideoutAlarmScreamRadius;

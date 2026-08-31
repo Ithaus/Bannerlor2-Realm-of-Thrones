@@ -1,5 +1,28 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-31 — Zmierzchowy popup: "Night Falls - make camp?" z auto-obozem i wylacznikiem
+**Mod:** Armoury | **Pliki:** `Armoury/src/NightRest.cs`, `Settings.cs` (+McmSettings)
+**Problem:** Jeff: "jak jade i zapada noc, powinien byc popup czy
+rozbijamy oboz - i moge zaznaczyc auto-oboz na kazda noc albo
+wylaczyc pytanie".
+**Zmiana:** o 21:00 kolumna GRACZA w ruchu na czystej mapie (nie
+w osadzie/bitwie/armii/na morzu/w sluzbie ROT, nie spiaca, nie
+w obozie) dostaje wybor: (1) Make camp - ta sama sciezka co klawisz O
+(oboz BK albo nasz, namiot, menu z "Bed down"); (2) March on - dlug
+snu robi swoje; (3) Always make camp at nightfall - odtad auto-oboz
+o zmierzchu bez pytania ("Night falls - the column makes camp");
+(4) Never ask again - marsz nocny bez pytan (klawisz O nadal dziala).
+Wybor trybu (pytaj/zawsze/nigdy) zyje W SAVE (rachunek snu, pole 4);
+pytanie najwyzej raz na dobe; master-wylacznik w MCM
+(NightfallPromptEnabled). Refaktor: wspolna sciezka MakeCampNow()
+dla klawisza O i popupu.
+**Ryzyko / co sprawdzic:** o 21:00 w marszu wyskakuje "Night Falls";
+wybor "Always" stawia oboz kazdego zmierzchu automatycznie; "Never"
+ucisza na stale (w tej kampanii); popup NIE wyskakuje w armii lorda
+ani na morzu. Inquiry z hourly ticku - ta sama bezpieczna sciezka co
+pytajka klawisza O.
+**Status:** WGRANE
+
 ## 2026-08-31 — Audyt spojnosci przed nowa kampania: 0 konfliktow, 1 falszywy alarm
 **Mod:** — (dokumentacja) | **Pliki:** `docs/AUDYT-2026-08-31.md` (nowy)
 **Problem:** Jeff: "zrob audyt naszych zmian - czy nic sie nie gryzie,

@@ -47,6 +47,9 @@ namespace Armoury
         // nie doliczal dlugu komus, kto wlasnie spi
         private static bool _sleeping;
         private static CampaignTime _sleepStart = CampaignTime.Zero;
+        // POPUP ZMIERZCHU (Jeff 31.08): 0 = pytaj, 1 = zawsze oboz, 2 = nie pytaj
+        internal static int CampPromptMode;
+        private static int _promptDay = -1;
         private static float _menuRest;
         private static float _menuTarget = 5f;
         private static float _menuBase;   // stan _restTonight w chwili polozenia sie
@@ -125,6 +128,24 @@ namespace Armoury
                 // snu sie uzbieraja, dlug schodzi natychmiast; swit juz tego
                 // nie liczy drugi raz
                 CreditRest(s);
+
+                // ZMIERZCH (Jeff 31.08: "jade i zapada noc - popup czy rozbijamy
+                // oboz, z auto-obozem albo wylaczeniem"). Pytamy TYLKO kolumne
+                // w ruchu na czystej mapie; wybor trybu zyje w save.
+                if (h == 21 && moved && _promptDay != (int)CampaignTime.Now.ToDays
+                    && s.NightfallPromptEnabled && CampPromptMode != 2 && !_sleeping && !PlayerCamped
+                    && mp.CurrentSettlement == null && mp.MapEvent == null
+                    && mp.AttachedTo == null && !mp.IsCurrentlyAtSea
+                    && PlayerEncounter.Current == null && !RotEnlisted())
+                {
+                    _promptDay = (int)CampaignTime.Now.ToDays;
+                    if (CampPromptMode == 1)
+                    {
+                        Msg("Night falls - the column makes camp.", Colors.White);
+                        MakeCampNow();
+                    }
+                    else NightfallAsk();
+                }
 
                 if (h == 6) SettleNight(s);
                 AiNightCamp(s, h);
@@ -783,13 +804,59 @@ namespace Armoury
                         {
                             // BK Redux u Jeffa NIE rejestruje swojego obozu - wtedy
                             // staje NASZ oboz (to samo menu czekania, spanie w srodku)
-                            if (!TryBkCamp()) OwnCamp();
+                            MakeCampNow();
                         }
                         catch (Exception e) { Log.Error("NightRest.CampAccept", e); }
                     },
                     delegate { _askOpen = false; }));
             }
             catch { }
+        }
+
+        private static void NightfallAsk()
+        {
+            try
+            {
+                var opts = new System.Collections.Generic.List<InquiryElement>
+                {
+                    new InquiryElement(0, "Make camp", null, true,
+                        "Pitch the tents here and bed down for the night."),
+                    new InquiryElement(1, "March on", null, true,
+                        "Ride through the darkness - the sleep debt will follow."),
+                    new InquiryElement(2, "Always make camp at nightfall", null, true,
+                        "From now on the column camps at dusk on its own - no more asking."),
+                    new InquiryElement(3, "Never ask again", null, true,
+                        "March freely at night; you can still camp with the O key.")
+                };
+                MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData(
+                    "Night Falls",
+                    "Darkness gathers over the column and the road ahead disappears. Make camp?",
+                    opts, true, 1, 1, "Choose", "Later",
+                    delegate (System.Collections.Generic.List<InquiryElement> sel)
+                    {
+                        try
+                        {
+                            if (sel == null || sel.Count == 0) return;
+                            switch ((int)sel[0].Identifier)
+                            {
+                                case 0: MakeCampNow(); break;
+                                case 2: CampPromptMode = 1; MakeCampNow(); break;
+                                case 3: CampPromptMode = 2;
+                                        Msg("The nightfall question will trouble you no more.", Colors.White); break;
+                            }
+                        }
+                        catch (Exception ex) { Log.Error("NightfallAsk.Selected", ex); }
+                    },
+                    delegate (System.Collections.Generic.List<InquiryElement> _) { }), true);
+            }
+            catch (Exception e) { Log.Error("NightfallAsk", e); }
+        }
+
+        /// <summary>Jedna sciezka obozu: BK jesli jest, inaczej nasz wlasny.</summary>
+        internal static void MakeCampNow()
+        {
+            try { if (!TryBkCamp()) OwnCamp(); }
+            catch (Exception e) { Log.Error("MakeCampNow", e); }
         }
 
         /// <summary>Wlasny oboz Armoury - gdy oboz BannerKings nie istnieje w tej kampanii.</summary>
@@ -1049,7 +1116,8 @@ namespace Armoury
         {
             return Debt.ToString(CultureInfo.InvariantCulture) + ";" +
                    _restTonight.ToString(CultureInfo.InvariantCulture) + ";" +
-                   (_credited ? "1" : "0");
+                   (_credited ? "1" : "0") + ";" +
+                   CampPromptMode.ToString(CultureInfo.InvariantCulture);
         }
 
         internal static void Import(string data)
@@ -1061,6 +1129,9 @@ namespace Armoury
                 if (parts.Length > 0) int.TryParse(parts[0], NumberStyles.Any, CultureInfo.InvariantCulture, out Debt);
                 if (parts.Length > 1) float.TryParse(parts[1], NumberStyles.Any, CultureInfo.InvariantCulture, out _restTonight);
                 _credited = parts.Length > 2 && parts[2] == "1";   // stary zapis (2 pola) = false
+                CampPromptMode = 0;
+                if (parts.Length > 3) int.TryParse(parts[3], NumberStyles.Any, CultureInfo.InvariantCulture, out CampPromptMode);
+                if (CampPromptMode < 0 || CampPromptMode > 2) CampPromptMode = 0;
                 Debt = Math.Max(0, Math.Min(3, Debt));   // stara skala szla do 5 - przytnij
             }
             catch { }
