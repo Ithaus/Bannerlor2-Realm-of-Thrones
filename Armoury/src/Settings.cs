@@ -126,7 +126,7 @@ namespace Armoury
         public int UniqueCrownHeadArmor = 10;              // head armour of a crown - it is jewellery, not a helmet (ROT ships every crown at 75)
 
         // --- The lean quartermasters ---
-        public int BkSupplyDaysCap = 1;                    // AI parties stock ONE day of Banner Kings supplies instead of 10 - they buy as they go and ride to market when they run out (0 = off)
+        public int BkSupplyDaysCap = 4;                    // AI parties stock this many days of Banner Kings supplies instead of 10 - healthier logistics than living hand to mouth (0 = off; Jeff 31.08: "daj na 4")
         public int BkSupplyMaxPieces = 12;                 // hard ceiling: an AI party never stockpiles more than this many pieces of any one supply - repairs need a few hides, not a warehouse (0 = off)
 
         public bool AiStarvingBuysAnyPrice = true;         // a STARVING AI party buys the cheapest food it can afford at ANY price - hunger does not haggle (vanilla and Banner Kings refuse anything above 120 denars, so lords starve on a full market in wartime)

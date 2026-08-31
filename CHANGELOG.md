@@ -1,5 +1,32 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-31 — Smoki ma TYLKO Daenerys (plus gracz z questa); zapasy AI na 4 dni
+**Mod:** CrashScribe + Armoury | **Pliki:** `CrashScribe/src/Mends.cs`, `Armoury/src/Settings.cs` (+McmSettings)
+**Problem:** Jeff: "smoki ma TYLKO Daenerys! plus gracz, jesli wykona
+questa - wszystkie inne wywal, nie da sie ich zdobyc!". Zrodla smokow
+w ROT: Daenerys (kod ROT, odzysk po niewoli), quest Valyrian Thief
+(gracz dostaje dragon_red), dialog ganku "Your dragon will fight for
+me now" (zabieranie smoka pokonanym) i lupy -> DTE (kawalerzysta na
+smoku). Osobno: "BkSupplyDaysCap daj na 4".
+**Zmiana:** mend DragonLaw: (1) DragonPurge (sesja + co dzien):
+bohaterom spoza klanu gracza i sponad Daenerys smok schodzi z siodla;
+rostery partii AI i targi miast wymiatane ze smokow; wszystkie itemy
+smocze poza handel (NotMerchandise); (2) pula DTE: smok nigdy nie
+trafia pod szeregowego; (3) dialog ganku smoka ZABLOKOWANY (prefix na
+ROTGankBehavior.CanTakeDragon) - jedyna droga gracza to quest;
+(4) NIETKNIETE: Daenerys (jej smok + odzysk po niewoli dziala), klan
+gracza (questowy dragon_red zostaje), quest Valyrian Thief.
+Nasz starszy CleanseDragonStables dalej czysci tabor gracza ze smokow
+zlupionych. Do tego BkSupplyDaysCap 1 -> 4 (zdrowsza logistyka AI,
+mniej sztucznych glodowek). Decyzje Jeffa odnotowane: cap ochotnikow
+ODPUSZCZONY; Zlote Plaszcze BEZ wyjatku mundurowego (tier 2 nosi
+zwykle zbroje).
+**Ryzyko / co sprawdzic:** log "Mends: smoki tylko dla Daenerys -
+zdjeto z siodel N, wymieciono M"; dialog zabrania smoka nie pojawia
+sie u pokonanych; Daenerys lata jak latala; po quescie ValyrianThief
+gracz zatrzymuje czerwonego smoka.
+**Status:** WGRANE
+
 ## 2026-08-31 — Prawo Przeprawy etap 2: straz zawraca wrogie armie AI; Moat Cailin i Bloody Gate strzezone
 **Mod:** Armoury | **Pliki:** `Armoury/src/CrossingLaw.cs`, `Settings.cs` (+McmSettings)
 **Problem:** Jeff: "Crossing law - robimy, tylko sprawdz, czy AI sie

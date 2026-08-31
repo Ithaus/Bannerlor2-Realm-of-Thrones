@@ -442,6 +442,8 @@ namespace CrashScribe
                     // sprzet umarlych NIGDY dla zywych (Jeff: "nic martwego nie
                     // moze byc uzywane przez ludzi") - bez wyjatku nauki
                     if (IsDeadGear(item)) { drop.Add(kv.Key); continue; }
+                    // smoki nie dla szeregowych - NIGDY (Jeff: "smoki ma tylko Daenerys")
+                    if (IsDragonMount(item)) { drop.Add(kv.Key); continue; }
                     if (IsUniqueGear(item) && !LearnedUnique(item.StringId)) drop.Add(kv.Key);
                 }
                 for (int i = 0; i < drop.Count; i++) dic.Remove(drop[i]);
@@ -489,6 +491,91 @@ namespace CrashScribe
             }
             catch { }
         }
+
+        // ===== SMOKI TYLKO DLA DAENERYS (Jeff 31.08: "smoki ma TYLKO Daenerys!
+        // plus gracz, jesli wykona questa; wszystkie inne wywal - nie ma smokow
+        // i nie da sie ich zdobyc!") =====
+        // Zrodla smokow w ROT: Daenerys (kod ROT + odzysk po niewoli), quest
+        // Valyrian Thief (gracz dostaje dragon_red - ZOSTAJE), dialog "Your
+        // dragon will fight for me now" (zabieranie smoka pokonanym - BLOKUJEMY),
+        // lupy po bitwie -> DTE sadza kawalerzyste na smoku (BLOKUJEMY+CZYSCIMY).
+
+        internal static bool IsDragonMount(ItemObject it)
+        {
+            try
+            {
+                if (it == null) return false;
+                var id = it.StringId ?? "";
+                if (id.StartsWith("dragon_", StringComparison.Ordinal) && it.ItemType == ItemObject.ItemTypeEnum.Horse) return true;
+                var mu = it.HorseComponent != null && it.HorseComponent.Monster != null
+                    ? (it.HorseComponent.Monster.MonsterUsage ?? "") : "";
+                return mu == "dragon" || mu == "dragonfly";
+            }
+            catch { return false; }
+        }
+
+        /// <summary>Czystka smokow: bohaterom spoza klanu gracza i sponad Daenerys
+        /// smok schodzi z siodla; rostery partii AI i targi miast czyszczone;
+        /// itemy smocze poza handel. Wolane na sesji i co dzien (bitwy w tle
+        /// przenosza smoki jako lup).</summary>
+        internal static void DragonPurge(bool shout)
+        {
+            try
+            {
+                var dany = FindAliveHero("Daenerys");
+                int unsaddled = 0, swept = 0;
+                foreach (var h in Hero.AllAliveHeroes)
+                {
+                    if (h == null || h == dany || h.Clan == Clan.PlayerClan) continue;
+                    var eq = h.BattleEquipment;
+                    if (eq == null) continue;
+                    var it = eq[(EquipmentIndex)10].Item;      // ArmorItemEndSlot = kon
+                    if (it == null || !IsDragonMount(it)) continue;
+                    eq[(EquipmentIndex)10] = default(EquipmentElement);
+                    unsaddled++;
+                    Scribe.Line("Mends: smok " + it.StringId + " zdjety spod " + h.Name + " - smoki ma tylko Daenerys.");
+                }
+                foreach (var mp in MobileParty.All)
+                {
+                    if (mp == null || mp == MobileParty.MainParty || mp.ItemRoster == null) continue;
+                    var ro = mp.ItemRoster;
+                    for (int i = ro.Count - 1; i >= 0; i--)
+                    {
+                        var it = ro.GetItemAtIndex(i);
+                        if (it == null || !IsDragonMount(it)) continue;
+                        int n = ro.GetElementNumber(i);
+                        swept += n;
+                        ro.AddToCounts(ro.GetElementCopyAtIndex(i).EquipmentElement, -n);
+                    }
+                }
+                foreach (var st in Settlement.All)
+                {
+                    var t = st.Town;
+                    var ro = (t != null && t.Owner != null) ? t.Owner.ItemRoster : null;
+                    if (ro == null) continue;
+                    for (int i = ro.Count - 1; i >= 0; i--)
+                    {
+                        var it = ro.GetItemAtIndex(i);
+                        if (it == null || !IsDragonMount(it)) continue;
+                        int n = ro.GetElementNumber(i);
+                        swept += n;
+                        ro.AddToCounts(ro.GetElementCopyAtIndex(i).EquipmentElement, -n);
+                    }
+                }
+                var setter = AccessTools.PropertySetter(typeof(ItemObject), "NotMerchandise");
+                if (setter != null)
+                    foreach (var it in TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
+                        if (IsDragonMount(it) && !it.NotMerchandise) setter.Invoke(it, new object[] { true });
+                if (shout || unsaddled + swept > 0)
+                    Scribe.Line("Mends: smoki tylko dla Daenerys - zdjeto z siodel " + unsaddled
+                                + ", wymieciono z obiegu " + swept + " (quest gracza nietkniety).");
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.DragonPurge", null); } catch { } }
+        }
+
+        /// <summary>Blokada dialogu zabierania smoka pokonanym ("Your dragon
+        /// will fight for me now") - jedyna droga gracza do smoka to quest.</summary>
+        public static bool NoDragonGank(ref bool __result) { __result = false; return false; }
 
         /// <summary>Sprzet umarlych: lodowe bronie Innych i martwe wierzchowce.
         /// Zywi tego nie tkna - lod topnieje, martwe ciało sie rozpada.</summary>
@@ -758,6 +845,30 @@ namespace CrashScribe
                             + deadPatched + " implementacji modelu morale).");
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.Install(deadPanic)", null); } catch { } }
+
+            try
+            {
+                // ===== SMOKI TYLKO DLA DAENERYS: dialog ganku zablokowany =====
+                Type tGank = null;
+                foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+                {
+                    try
+                    {
+                        if (asm.GetName().Name != "ROT") continue;
+                        tGank = asm.GetType("ROT.CampaignBehaviors.ROTGankBehavior");
+                        break;
+                    }
+                    catch { }
+                }
+                var mCan = tGank != null ? AccessTools.Method(tGank, "CanTakeDragon") : null;
+                if (mCan != null)
+                {
+                    harmony.Patch(mCan, prefix: new HarmonyMethod(typeof(Mends), "NoDragonGank"));
+                    Scribe.Line("Mends: zabieranie smoka pokonanym zablokowane - do smoka prowadzi tylko quest.");
+                }
+                else Scribe.Line("Mends: ROTGankBehavior.CanTakeDragon nieznaleziony - gank bez blokady.");
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.Install(dragonGank)", null); } catch { } }
 
             try
             {
@@ -1821,6 +1932,10 @@ namespace CrashScribe
                 { Mends.SkillSinew(); Mends.UniqueWares(); Mends.LoreForgeGate(); Mends.DressTheNamesakes(); });
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this,
                 delegate (TaleWorlds.CampaignSystem.MapEvents.MapEvent m) { Mends.MeltDeadLoot(m); });
+            CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this,
+                delegate (CampaignGameStarter s) { Mends.DragonPurge(true); });
+            CampaignEvents.DailyTickEvent.AddNonSerializedListener(this,
+                delegate { Mends.DragonPurge(false); });
         }
 
         public override void SyncData(IDataStore dataStore)
