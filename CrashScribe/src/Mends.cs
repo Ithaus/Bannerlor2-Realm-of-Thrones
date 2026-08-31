@@ -740,11 +740,11 @@ namespace CrashScribe
         /// wysoki tier, dostaja z tej reguly dokladnie swoje 150.)
         /// </summary>
         /// <summary>
-        /// PRAWO WAGI (Jeff 31.08: "kazdy punkt Atletyki pozwala nosic 0.25 kg
-        /// pancerza - 100 to 25 kg, 200 to 50 kg; obecne wymagania sa z dupy").
+        /// PRAWO WAGI (Jeff 31.08, korekta: "daj 0.2 kg na punkt" - kazdy punkt
+        /// Atletyki niesie 0.2 kg pancerza: 100 to 20 kg, 200 to 40 kg).
         /// Audyt: 46% z 1841 pancerzy mialo difficulty 0, w tym 105 CIEZKICH
         /// plyt >=8 kg bez zadnych wymagan (Volantene Heavy 31 kg za darmo).
-        /// Odtad wymaganie = max(stare, waga x 4) - podnosimy tylko W GORE,
+        /// Odtad wymaganie = max(stare, waga x 5) - podnosimy tylko W GORE,
         /// wiec celowe blokady person (zbroja NK 250, suknie Daenerys 200)
         /// zostaja. Wagi sa wspolne dla XML i gry (RBM przelicza OCHRONE,
         /// wagi nie rusza). Biega PRZED SkillSinew, zeby mundury jednostek
@@ -764,12 +764,12 @@ namespace CrashScribe
                     if (ty != ItemObject.ItemTypeEnum.HeadArmor && ty != ItemObject.ItemTypeEnum.BodyArmor
                         && ty != ItemObject.ItemTypeEnum.LegArmor && ty != ItemObject.ItemTypeEnum.HandArmor
                         && ty != ItemObject.ItemTypeEnum.Cape) continue;
-                    int want = (int)Math.Round(it.Weight * 4f);
+                    int want = (int)Math.Round(it.Weight * 5f);
                     if (want <= it.Difficulty) continue;
                     setter.Invoke(it, new object[] { want });
                     raised++;
                 }
-                Scribe.Line("Mends: prawo wagi - Atletyka niesie 0.25 kg/pkt; wymagania podniesione " + raised + " pancerzom (max(stare, waga x 4)).");
+                Scribe.Line("Mends: prawo wagi - Atletyka niesie 0.25 kg/pkt; wymagania podniesione " + raised + " pancerzom (max(stare, waga x 5) = 0.2 kg/pkt).");
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.WeightLaw", null); } catch { } }
         }

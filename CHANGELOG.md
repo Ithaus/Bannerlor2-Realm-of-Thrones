@@ -1,5 +1,15 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-31 — Prawo Wagi zaostrzone: 0.2 kg na punkt Atletyki (waga x 5)
+**Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs`, `docs/pancerze-waga-atletyka.md`
+**Problem:** Jeff: "daj jednak 0.2 kg / 1 atletyka".
+**Zmiana:** wspolczynnik 4 -> 5 (100 Atletyki niesie 20 kg, 200 niesie
+40 kg). Common Armor 20 kg wymaga teraz Athletics 100; Volantene Heavy
+31 kg -> 155. Tabela w docs przeliczona.
+**Ryzyko / co sprawdzic:** tooltip Common Armor: Athletics 100;
+najciezsze plyty (28-31 kg) na progu 140-155 - tylko dla wytrenowanych.
+**Status:** WGRANE
+
 ## 2026-08-31 — Prawo Wagi: Atletyka niesie 0.25 kg pancerza na punkt (+ pelna tabela pancerzy)
 **Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs`, `docs/pancerze-waga-atletyka.md` (nowy)
 **Problem:** Jeff: "zrob tabele wszystkich pancerzy - waga vs wymagana
