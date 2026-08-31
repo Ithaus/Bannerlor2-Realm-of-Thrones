@@ -34,10 +34,11 @@ namespace Armoury
                 try { auto = tr.Property("AutoBuying").GetValue<bool>(); } catch { }
                 if (!auto) return;   // gracz zaopatruje sie sam
                 int days = tr.Property("DaysOfProvision").GetValue<int>();
-                if (days <= c.BkSupplyDaysCap) return;
-                tr.Property("DaysOfProvision").SetValue(c.BkSupplyDaysCap);
+                int capNow = WinterBite.SupplyDaysCapNow();
+                if (days <= capNow) return;
+                tr.Property("DaysOfProvision").SetValue(capNow);
                 if (++_tempered == 1)
-                    Log.Info("BkSupplyTemper: zapasy AI sciete do " + c.BkSupplyDaysCap + " dni (BK chcial " + days + ").");
+                    Log.Info("BkSupplyTemper: zapasy AI sciete do " + capNow + " dni (BK chcial " + days + "; jesienia cap rosnie).");
             }
             catch { }
         }

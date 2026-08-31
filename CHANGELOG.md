@@ -1,5 +1,28 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-31 — Zima z zebami + Dluga Noc: sezon glodu, gradient Polnocy, jesienne spichrze
+**Mod:** Armoury | **Pliki:** `Armoury/src/WinterBite.cs` (nowy), `BkSupplyTemper.cs`, `Settings.cs`, `SubModuleMain.cs`, `ArmouryBehavior.cs` (+McmSettings)
+**Problem:** Jeff ("rob 2"): zima w ROT byla kosmetyczna (snieg i tyle),
+a w lore to kryzys egzystencjalny. Fakty z kodu: ROT ma zwykle 4 pory
+roku; nasz kalendarz daje zime 42 dni/rok; vanilla juz tnie marsz na
+sniegu (-10%), wiec predkosci nie ruszamy.
+**Zmiana:** (1) konsumpcja partii zima +50% (patch TYLKO na modelu
+bazowym - ROT deleguje, a dla umarlych w ogole nie deleguje, wiec horda
+NK nie placi); (2) produkcja wiosek -50% zima - ceny zywnosci rosna
+emergentnie z podazy; (3) spichlerze miast topnieja szybciej (skala
+z prosperity) - zimowe oblezenie + glod + zaraza to trojca lamiaca
+twierdze; (4) jesienia cap zapasow AI x2 (BkSupplyTemper przycina
+teraz do sezonowego capu - Jeffowa poprawka: cap jesienny faktycznie
+WYZSZY, nie tylko prog); (5) GRADIENT POLNOCY +-25% po osi Y mapy -
+pod Winterfell przednowek, w Dorne lagodnie; (6) DLUGA NOC: gdy zywy
+bohater kultury whitewalker jest w polu, KAZDY dzien liczy sie jak
+zimowy ("The Long Night falls - winter marches with the dead");
+komunikaty sezonowe. Siedem suwakow MCM.
+**Ryzyko / co sprawdzic:** wejscie zimy -> komunikat i wpisy "Winter"
+w rozpiskach jedzenia/produkcji; jesienia AI woze 8 dni zapasow;
+podczas inwazji NK zima nie konczy sie ze zmiana sezonu.
+**Status:** WGRANE
+
 ## 2026-08-31 — Prawo Zarazy Obozowej: dlugie oblezenia rodza dyzenterie, medycyna jest tarcza
 **Mod:** Armoury | **Pliki:** `Armoury/src/CampFever.cs` (nowy), `ArmouryBehavior.cs`, `Settings.cs` (+McmSettings)
 **Problem:** Jeff ("rob" po projekcie): historycznie choroby zabijaly
