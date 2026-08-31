@@ -1,5 +1,20 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-31 — Restytucja po czystce: znane sztuki wracaja do sakw
+**Mod:** Armoury | **Pliki:** `Armoury/src/ArmouryBehavior.cs`
+**Problem:** Jeff: "oddaj mi zbroje, ktore zdobylem". Czystka (przed
+fixem) zjadla lupy z dwoch bitew - log NIE zapisal id zdobycznych
+pancerzy (tylko liczby 21/18 szt.), wiec pelne odtworzenie niemozliwe
+bez zgadywania.
+**Zmiana:** jednorazowa restytucja (flaga w save): trzy sztuki znane
+z logu co do id i stanu wracaja do sakw z modifierami zuzycia
+(battania_civil_cape/ripped, bandit_saddle_steppe/ripped,
+sturgia_sword_1_t2/rusty). Zdobyczne pancerze: Jeff wypisze nazwy
+z pamieci -> dolozymy imiennie ta sama droga.
+**Ryzyko / co sprawdzic:** przy nastepnym uruchomieniu komunikat
+"The quartermaster returns what the purge wrongly burned - 3 pieces".
+**Status:** ZBUDOWANE - watcher wgra po zamknieciu gry
+
 ## 2026-08-31 — Fix: czystka sakw nie zjada juz wzietych lupow (znikajacy pancerz)
 **Mod:** Armoury | **Pliki:** `Armoury/src/ArmouryBehavior.cs`
 **Problem:** Jeff: "ostatnie dwie bitwy - biore pancerz, wchodze

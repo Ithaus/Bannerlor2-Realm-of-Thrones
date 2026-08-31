@@ -35,6 +35,39 @@ namespace Armoury
         internal static System.Collections.Generic.List<string> UniqueLore =
             new System.Collections.Generic.List<string>();
 
+        private static bool _restitution0831;
+
+        /// <summary>RESTYTUCJA 31.08: czystka sakw zjadla wziete lupy i wlasny
+        /// zuzyty sprzet, zanim wycielismy jej prog kondycji. Trzy sztuki znane
+        /// z logu wracaja do sakw - raz na kampanie.</summary>
+        private static void Restitution0831()
+        {
+            try
+            {
+                if (_restitution0831) return;
+                _restitution0831 = true;
+                int given = 0;
+                var back = new[] {
+                    new[] { "battania_civil_cape", "ripped_cloth_unarmoured" },
+                    new[] { "bandit_saddle_steppe", "ripped_cloth" },
+                    new[] { "sturgia_sword_1_t2", "rusty_sword" }
+                };
+                var ro = MobileParty.MainParty != null ? MobileParty.MainParty.ItemRoster : null;
+                if (ro == null) return;
+                foreach (var pair in back)
+                {
+                    var it = TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObject<ItemObject>(pair[0]);
+                    if (it == null) continue;
+                    var mod = TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObject<ItemModifier>(pair[1]);
+                    ro.AddToCounts(new EquipmentElement(it, mod), 1);
+                    given++;
+                }
+                if (given > 0)
+                    Log.Player("The quartermaster returns what the purge wrongly burned - " + given + " pieces back in your bags.");
+            }
+            catch (Exception e) { Log.Error("Restitution0831", e); }
+        }
+
         internal static void LearnUnique(ItemObject it)
         {
             try
@@ -326,6 +359,7 @@ namespace Armoury
                 if (dataStore.IsLoading && _armoryWear != null && _armoryWear.Count > 0) _wearRestorePending = true;
                 dataStore.SyncData("arm_smith_helper", ref SmithHelperId);
                 dataStore.SyncData("arm_uniq_lore", ref UniqueLore);
+                dataStore.SyncData("arm_restitution_0831", ref _restitution0831);
                 dataStore.SyncData("arm_orders", ref Orders.Board);
                 dataStore.SyncData("arm_order_cooldowns", ref Orders.Cooldowns);
                 // dniowka w kuzni MUSI przezyc save/load - inaczej po wczytaniu
@@ -784,6 +818,7 @@ namespace Armoury
             try { CleanseTrashInBags(); } catch (Exception e) { Log.Error("CleanseTrashInBags", e); }
             try { QualityRich.Enrich(); } catch (Exception e) { Log.Error("QualityRich.Enrich", e); }
             try { ValyrianSteel.Rename(); } catch (Exception e) { Log.Error("ValyrianSteel.Rename", e); }
+            try { Restitution0831(); } catch (Exception e) { Log.Error("Restitution0831", e); }
             try { SmithMenu.Add(starter); Log.Info("Menu kowala dodane."); }
             catch (Exception e) { Log.Error("OnSessionLaunched", e); }
             try { CleanseAmmo(); } catch (Exception e) { Log.Error("CleanseAmmo", e); }
