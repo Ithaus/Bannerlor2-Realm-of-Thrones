@@ -150,6 +150,84 @@ namespace CrashScribe
             catch { }
         }
 
+        // ===== UNIKATY SA UNIKATOWE (Jeff 30.08: "nie moze byc 25 pancerzy
+        // Brienny; maja je tylko te postacie i nikt inny") =====
+        // Sprzet imiennych bohaterow lore, wyznaczony analiza danych ROT
+        // (docs: itemy noszone wylacznie przez lordow, nigdy przez jednostki).
+        // Prefiksy id - "jaime_leather" i mundury domow (Baratheon/Valyrian...)
+        // CELOWO poza lista: nosza je cale oddzialy, to uniformy, nie unikaty.
+        private static readonly string[] UniquePrefixes = {
+            "aemon_", "baelish_", "blackfyre_", "brienne_", "cersei_", "dany_",
+            "euron_crown", "hound_", "houndskull", "joffrey_crown", "robb_crown",
+            "baratheon_crown", "renly_crown", "renly_armor", "renly_shoulders",
+            "melisandre_", "nightking_", "ramsay_", "rhaegar_", "stannis_",
+            "tyrion_", "varys_", "bull_helmet"
+        };
+
+        internal static bool IsUniqueGear(ItemObject it)
+        {
+            if (it == null) return false;
+            var id = it.StringId ?? "";
+            for (int i = 0; i < UniquePrefixes.Length; i++)
+                if (id.StartsWith(UniquePrefixes[i], StringComparison.Ordinal)) return true;
+            return false;
+        }
+
+        /// <summary>Przy starcie sesji: unikaty schodza z handlu (NotMerchandise,
+        /// wiec targi przestaja je LOSOWAC) i znikaja z polek istniejacych miast.
+        /// Ekwipunek bohaterow, stash i sakwy gracza - nietykane: zdobyty
+        /// egzemplarz pozostaje jedyny na swiecie.</summary>
+        internal static void UniqueWares()
+        {
+            try
+            {
+                int flagged = 0, purged = 0;
+                var setter = AccessTools.PropertySetter(typeof(ItemObject), "NotMerchandise");
+                foreach (var it in TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
+                {
+                    if (it == null || !IsUniqueGear(it) || it.NotMerchandise) continue;
+                    if (setter != null) { setter.Invoke(it, new object[] { true }); flagged++; }
+                }
+                foreach (var st in Settlement.All)
+                {
+                    var t = st.Town;
+                    var ro = (t != null && t.Owner != null) ? t.Owner.ItemRoster : null;
+                    if (ro == null) continue;
+                    for (int i = ro.Count - 1; i >= 0; i--)
+                    {
+                        var it = ro.GetItemAtIndex(i);
+                        if (it == null || !IsUniqueGear(it)) continue;
+                        int n = ro.GetElementNumber(i);
+                        purged += n;
+                        ro.AddToCounts(ro.GetElementCopyAtIndex(i).EquipmentElement, -n);
+                    }
+                }
+                Scribe.Line("Mends: unikaty imienne - " + flagged + " itemow zeszlo z handlu, "
+                            + purged + " kopii zdjetych z targow miast.");
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.UniqueWares", null); } catch { } }
+        }
+
+        /// <summary>Prefix na DTE DoAssignAsync: unikaty imienne nie wchodza do
+        /// puli przydzialu - zaden szeregowy nie dostanie pancerza Brienny,
+        /// chocby lezal w taborze. Bohaterom DTE i tak sprzetu nie rusza.</summary>
+        public static void UniqueWard(object __instance)
+        {
+            try
+            {
+                var dic = Traverse.Create(__instance).Field("_equipmentToAssign").GetValue() as System.Collections.IDictionary;
+                if (dic == null || dic.Count == 0) return;
+                var drop = new System.Collections.Generic.List<object>();
+                foreach (System.Collections.DictionaryEntry kv in dic)
+                {
+                    var item = Traverse.Create(kv.Key).Property("Item").GetValue() as ItemObject;
+                    if (item != null && IsUniqueGear(item)) drop.Add(kv.Key);
+                }
+                for (int i = 0; i < drop.Count; i++) dic.Remove(drop[i]);
+            }
+            catch { }
+        }
+
         private static string PartyCultureId(MobileParty p)
         {
             try
@@ -396,6 +474,14 @@ namespace CrashScribe
                     Scribe.Line("Mends: egzotyczne wierzchowce (wielblady, rydwany, slonie) tylko dla wlasnej kultury - DTE nie sadza na nich obcych.");
                 }
                 else Scribe.Line("Mends: DTE PartyEquipmentDistributor nieznaleziony - egzotyki bez straznika.");
+
+                // ===== UNIKATY NIE DLA SZEREGOWYCH =====
+                var mAssign = tDist != null ? AccessTools.Method(tDist, "DoAssignAsync") : null;
+                if (mAssign != null)
+                {
+                    harmony.Patch(mAssign, prefix: new HarmonyMethod(typeof(Mends), "UniqueWard"));
+                    Scribe.Line("Mends: sprzet imiennych bohaterow poza pula przydzialu DTE - piechota nie zalozy pancerza Brienny.");
+                }
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.Install(camels)", null); } catch { } }
 
@@ -1384,7 +1470,7 @@ namespace CrashScribe
         public override void RegisterEvents()
         {
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this,
-                delegate (CampaignGameStarter s) { Mends.SkillSinew(); });
+                delegate (CampaignGameStarter s) { Mends.SkillSinew(); Mends.UniqueWares(); });
         }
 
         public override void SyncData(IDataStore dataStore) { }

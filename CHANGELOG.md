@@ -1,5 +1,31 @@
 # DZIENNIK ZMIAN
 
+## 2026-08-30 — Unikaty sa unikatowe: sprzet imiennych bohaterow poza handlem i przydzialem
+**Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs`
+**Problem:** Jeff: "kazdy piechur biegal z mieczami/pancerzami bohaterow;
+nie moze byc 25 pancerzy Brienny - maja je tylko te postacie!". Analiza
+danych ROT: sprzet imienny (Brienne, Ramsay, Rhaegar, Cersei, Stannis,
+Hound, Blackfyre, Nocny Krol...) w wiekszosci NIE mial flagi
+is_merchandise=false - targi miast LOSOWALY go jak zwykly towar,
+a DTE ubieral w niego szeregowych z lupow.
+**Zmiana:** mend UniqueWares (start sesji): (1) lista prefiksow id
+sprzetu imiennego (z analizy: itemy noszone wylacznie przez lordow,
+nigdy przez jednostki; mundury domow typu Baratheon/Valyrian CELOWO
+poza lista - to uniformy oddzialow); (2) NotMerchandise=true - targi
+przestaja je losowac; (3) jednorazowa czystka polek wszystkich miast
+z istniejacych kopii. Do tego prefix UniqueWard na DTE DoAssignAsync:
+unikaty nie wchodza do puli przydzialu - zaden szeregowy ich nie
+zalozy. NIETYKANE: ekwipunek bohaterow (Brienne nosi swoje - DTE
+bohaterom sprzetu nie rusza), stash i sakwy gracza (zdobyczny
+egzemplarz zostaje, mozna nosic samemu / dac towarzyszowi RECZNIE).
+**Ryzyko / co sprawdzic:** log "Mends: unikaty imienne - N itemow
+zeszlo z handlu, M kopii zdjetych z targow"; w sklepach nie ma juz
+pancerzy Brienny/Ramsaya; po bitwie z bohaterem jego sprzet w lupach
+zostaje, ale piechota go nie wklada. Bronie lore (Needle itd.) nie
+istnieja w ROT jako itemy - sa KUTE z czesci; ograniczenie kucia
+T5/T6 idzie osobnym wpisem.
+**Status:** WGRANE
+
 ## 2026-08-30 — Egzotyczne wierzchowce tylko dla wlasnej kultury (koniec kawalerii Polnocy na wielbladach)
 **Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs`
 **Problem:** Jeff: "wielblady, rydwany, slonie - nie moga na nich jezdzic
