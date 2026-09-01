@@ -132,8 +132,12 @@ namespace Armoury
                 // ZMIERZCH (Jeff 31.08: "jade i zapada noc - popup czy rozbijamy
                 // oboz, z auto-obozem albo wylaczeniem"). Pytamy TYLKO kolumne
                 // w ruchu na czystej mapie; wybor trybu zyje w save.
+                // JENIEC NIE DOWODZI (Jeff 01.09: "jako jeniec decydowalem
+                // o noclegu bandytow - to nie moja sprawa") - w niewoli zero
+                // pytan o oboz i zero auto-obozu
                 if (h == 21 && moved && _promptDay != (int)CampaignTime.Now.ToDays
                     && s.NightfallPromptEnabled && CampPromptMode != 2 && !_sleeping && !PlayerCamped
+                    && !TaleWorlds.CampaignSystem.PlayerCaptivity.IsCaptive
                     && mp.CurrentSettlement == null && mp.MapEvent == null
                     && mp.AttachedTo == null && !mp.IsCurrentlyAtSea
                     && PlayerEncounter.Current == null && !RotEnlisted())

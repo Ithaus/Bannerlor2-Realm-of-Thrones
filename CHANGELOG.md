@@ -1,5 +1,28 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-01 — Jeniec nie dowodzi + dziennik zlota w niewoli + jeden kwit pancerzy w BK
+**Mod:** Armoury + RealisticCaptivity | **Pliki:** `Armoury/src/NightRest.cs`, `Armoury/src/FletchForge.cs`, `RealisticCaptivity/src/CaptivityBehavior.cs`
+**Problem (Jeff, wczorajsza gra):** (1) "zostalem pojmany i jako jeniec
+decydowalem o tym, czy bandyci maja zrobic nocleg" - popup Night Falls
+pytal jenca; (2) "co jakis czas mam minus 200 zlota - TYLKO w niewoli";
+(3) z audytu kwitow: zakladka CRAFT BK liczyla pancerze WLASNYM wzorem
+(90/10 z jednej puli, tier progami Tierf, T3 i nizej dostawal Iron3) -
+dwa cenniki na ten sam pancerz.
+**Zmiana:** (1) NightRest: zmierzchowy popup i auto-oboz wylaczone, gdy
+PlayerCaptivity.IsCaptive - jeniec nie dowodzi kolumna; (2) RC w niewoli
+zlota NIE bierze (sprawdzone - brak takiego kodu; rata dlugu 250 i placi
+sie dopiero PO uwolnieniu), wiec -200 nalicza vanilla/BK zold klanu -
+dodany dziennik "NIEWOLA zloto: X -> Y (zmiana D)" dzien po dniu, zeby
+nastepna niewola wskazala platnika zanim cokolwiek zamrozimy;
+(3) FletchForge.BkArmorBillPostfix podmienia wynik
+BKSmithingModel.GetCraftingInputForArmor na kwit z Recipes.For (Prawo
+Wagi) - wyswietlacz, "czy stac" i zdjecie materialow widza jedna liczbe;
+patch dziala niezaleznie od AllowRangedCrafting.
+**Ryzyko / co sprawdzic:** w niewoli zadnego popupu obozu; po niewoli
+w logu RC linie "NIEWOLA zloto" z kwotami; kwit pancerza w zakladce CRAFT
+BK = kwit z naszego menu (np. 20 kg T5: 32 iron5 + 8 iron4 + 1 skora).
+**Status:** WGRANE (gra zamknieta)
+
 ## 2026-09-01 — Peleryna tez bez skory
 **Mod:** Armoury | **Pliki:** `Armoury/src/Recipes.cs`
 **Problem:** Jeff: "przy pelerynie tez nie" (dodatki miekkie).

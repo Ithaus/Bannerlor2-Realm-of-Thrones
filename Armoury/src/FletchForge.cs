@@ -213,11 +213,57 @@ namespace Armoury
             catch (Exception e) { Log.Error("BkSpendMaterials", e); return true; }
         }
 
+        /// <summary>
+        /// JEDEN KWIT NA CALA KUZNIE (Jeff 01.09: "sprawdz wszystkie pancerze,
+        /// moze gdzies przeoczyles"): zakladka CRAFT BK liczyla pancerze
+        /// WLASNYM wzorem (90/10 z jednej puli, tier progami Tierf - T3 i nizej
+        /// dostawal Iron3, skora/len wg wlasnego widzimisie). Dwa cenniki na
+        /// ten sam pancerz = kucie taniej u BK. Podmieniamy wynik na nasze
+        /// Prawo Wagi - wyswietlacz, "czy stac" i zdjecie materialow
+        /// (BkSpendMaterialsPrefix czyta te sama metode) widza jedna liczbe.
+        /// </summary>
+        public static void BkArmorBillPostfix(ItemObject item, ref int[] __result)
+        {
+            try
+            {
+                if (item == null || __result == null || __result.Length < 11) return;
+                if (!item.HasArmorComponent) return;   // bron biala liczy sie po staremu
+                var r = Recipes.For(item);
+                if (r.Parts == null || r.Parts.Count == 0) return;
+                var bill = new int[11];
+                foreach (var p in r.Parts)
+                {
+                    if (p.Item == null || p.Count <= 0) continue;
+                    bool hit = false;
+                    for (int m = 0; m < 9 && m < bill.Length; m++)
+                        if (Recipes.MaterialItem((CraftingMaterials)m) == p.Item)
+                        { bill[m] += p.Count; hit = true; break; }
+                    if (hit) continue;
+                    if (p.Item == Recipes.SoftLeather) bill[9] += p.Count;
+                    else if (p.Item == Recipes.SoftLinen) bill[10] += p.Count;
+                }
+                __result = bill;
+            }
+            catch (Exception e) { Log.Error("BkArmorBill", e); }
+        }
+
         internal static void ApplyAll(Harmony h)
         {
             try
             {
                 var c = Settings.Current;
+                // kwit pancerzy BK ma byc spojny z Prawem Wagi NIEZALEZNIE od
+                // tego, czy luczarnia jest wlaczona - patch przed gatingiem
+                if (c != null && c.CraftingEnabled)
+                {
+                    var tModel = QuartermasterLaw.FindType("BannerKings.Models.Vanilla.BKSmithingModel");
+                    var mBill = tModel != null ? AccessTools.Method(tModel, "GetCraftingInputForArmor") : null;
+                    if (mBill != null)
+                    {
+                        h.Patch(mBill, postfix: new HarmonyMethod(typeof(FletchForge), "BkArmorBillPostfix"));
+                        Log.Info("FletchForge: kwit pancerzy BK podmieniony na Prawo Wagi.");
+                    }
+                }
                 if (c == null || !c.CraftingEnabled || !c.AllowRangedCrafting)
                 { Log.Info("FletchForge: wylaczone."); return; }
 

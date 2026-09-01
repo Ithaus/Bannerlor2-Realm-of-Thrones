@@ -25,6 +25,7 @@ namespace RealisticCaptivity
         private bool _lowborn;
         private List<string> _companionGear = new List<string>();   // "heroId|slot|item|mod"
         private int _ransomDebt;
+        private int _captiveGoldYesterday = -1;   // dziennik zlota jenca (diagnostyka, nie w save)
         private int _debtDaysUnpaid;
         private bool _debtOffered;
         private string _rescuerLeaderId = "";
@@ -241,7 +242,22 @@ namespace RealisticCaptivity
             try
             {
                 PayDebt();
-                if (!PlayerCaptivity.IsCaptive) return;
+                if (!PlayerCaptivity.IsCaptive) { _captiveGoldYesterday = -1; return; }
+
+                // DZIENNIK ZLOTA JENCA (Jeff 01.09: "co jakis czas mam minus
+                // 200 w niewoli"). RC w niewoli zlota NIE bierze (dowod: brak
+                // takiego kodu) - ubytek nalicza vanilla/BK (zold klanu idzie
+                // dalej). Log dzien po dniu pokaze kwote i pozwoli wskazac
+                // platnika, zanim cokolwiek zaczniemy mrozic.
+                try
+                {
+                    int g = Hero.MainHero.Gold;
+                    if (_captiveGoldYesterday >= 0 && g != _captiveGoldYesterday)
+                        Log.Info("NIEWOLA zloto: " + _captiveGoldYesterday + " -> " + g
+                                 + " (zmiana " + (g - _captiveGoldYesterday) + ") - RC nic nie pobral.");
+                    _captiveGoldYesterday = g;
+                }
+                catch { }
 
                 CaptivityExtras.DailyStarvation(_lowborn, _onParole);
 
