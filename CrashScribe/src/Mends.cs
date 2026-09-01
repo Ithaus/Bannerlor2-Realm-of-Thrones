@@ -449,12 +449,41 @@ namespace CrashScribe
                 // Zbior darmowych czesci po zmianie jest zawsze PODZBIOREM
                 // dzisiejszego - podloga NICZEGO nie otwiera.
                 var keep = new System.Collections.Generic.HashSet<string>();
+                int opened = 0;
                 foreach (var tpl in tpls)
                 {
                     if (tpl == null || tpl.Pieces == null || tpl.BuildOrders == null) continue;
                     foreach (var bo in tpl.BuildOrders)
                     {
                         var slot = bo.PieceType;
+
+                        // NAJPIERW CALA PULA SLOTU (Jeff 01.09, screeny: "caly
+                        // czas tier 4 widac" - w TwoHandedSword podloga ocalila
+                        // darmowa klinge VALYRIAN T4, bo darmowe klingi ROT
+                        // zaczynaja sie od T4, chociaz w puli LEZY klinga T1,
+                        // tylko nie byla domyslna). Jesli slot ma czesci
+                        // PONIZEJ progu, nadajemy darmowosc temu najnizszemu
+                        // pasmu - a wysokie pasma ida pod brame normalnie.
+                        // Legendy chroni IsHiddenOnDesigner i to, ze imienne
+                        // klingi nie siedza na tierze 1.
+                        int bestAll = int.MaxValue;
+                        foreach (var p in tpl.Pieces)
+                        {
+                            if (p == null || p.PieceType != slot || p.IsHiddenOnDesigner) continue;
+                            if (p.PieceTier < bestAll) bestAll = p.PieceTier;
+                        }
+                        if (bestAll != int.MaxValue && bestAll < prog)
+                        {
+                            foreach (var p in tpl.Pieces)
+                                if (p != null && p.PieceType == slot && !p.IsHiddenOnDesigner
+                                    && p.PieceTier == bestAll && !p.IsGivenByDefault)
+                                { setter.Invoke(p, new object[] { true }); opened++; }
+                            continue;   // pasmo pod progiem istnieje - brama go nie ruszy
+                        }
+
+                        // pula slotu zaczyna sie NAD progiem (np. Dual - klingi
+                        // od T4): stara podloga - zostaje najnizsze pasmo
+                        // dzisiejszych darmowych, zeby "Kuj" nie zgasl
                         int best = int.MaxValue;
                         foreach (var p in tpl.Pieces)
                         {

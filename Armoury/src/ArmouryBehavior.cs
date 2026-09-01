@@ -132,6 +132,27 @@ namespace Armoury
         // fizycznie w magazynie, ale znikaly z ksiegi gracza. Log podaje
         // dokladne ilosci; oddajemy je raz, po czym flaga gasi zwrot.
         private bool _ammoRefundDone;
+        private bool _lorePurged;
+
+        /// <summary>SANACJA WIEDZY (Jeff 01.09: swieza kampania znala 26/26
+        /// wzorow lukow T6 - statyczna lista przeciekla ze starej kampanii
+        /// w tym samym procesie i sie ZAPISALA). Jednorazowo: mloda kampania
+        /// (do 30 dni) ze wzorami T4+ w ksiedze = przeciek; reset do tieru 1.
+        /// Starych, uczciwie wygranych kampanii nie tykamy.</summary>
+        private void LorePurgeOnce()
+        {
+            try
+            {
+                if (_lorePurged) return;
+                _lorePurged = true;
+                if (CampaignTime.Now.ToDays >= 30) return;
+                if (!RangedLore.HasHighTierKnowledge(4)) return;
+                RangedLore.ResetToVirgin();
+                Log.Player("The bowyer's ledger was found forged - patterns above tier 1 are struck out. Learn them anew: smelt or study captured pieces.", true);
+                Log.Info("Sanacja wiedzy: mloda kampania znala wzory T4+ (przeciek miedzy kampaniami) - reset do T1.");
+            }
+            catch (Exception e) { Log.Error("LorePurgeOnce", e); }
+        }
         private static readonly string[][] AmmoRefund =
         {
             new[] { "ravens_teeth_arrows", "87" },
@@ -364,6 +385,7 @@ namespace Armoury
                 dataStore.SyncData("arm_projects", ref _projects);
                 dataStore.SyncData("arm_player_stock", ref _playerStock);
                 dataStore.SyncData("arm_ammo_refund_v1", ref _ammoRefundDone);
+                dataStore.SyncData("arm_lore_purge_v1", ref _lorePurged);
                 if (dataStore.IsSaving) _armoryWear = BuildArmoryWearSnapshot();
                 dataStore.SyncData("arm_armory_wear", ref _armoryWear);
                 if (dataStore.IsLoading && _armoryWear != null && _armoryWear.Count > 0) _wearRestorePending = true;
@@ -824,6 +846,7 @@ namespace Armoury
             try { WearGroups.Fix(); } catch (Exception e) { Log.Error("WearGroups.Fix", e); }
             try { CleanseNegativeStacks(); } catch (Exception e) { Log.Error("CleanseNegativeStacks", e); }
             try { TryRestoreArmoryWear("sesja"); } catch (Exception e) { Log.Error("TryRestoreArmoryWear", e); }
+            try { LorePurgeOnce(); } catch (Exception e) { Log.Error("LorePurgeOnce", e); }
             try { CleanseDragonStables(true); } catch (Exception e) { Log.Error("CleanseDragonStables", e); }
             try { CleanseTrashInBags(); } catch (Exception e) { Log.Error("CleanseTrashInBags", e); }
             try { QualityRich.Enrich(); } catch (Exception e) { Log.Error("QualityRich.Enrich", e); }

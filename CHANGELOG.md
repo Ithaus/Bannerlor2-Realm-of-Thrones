@@ -1,5 +1,35 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-01 — Tier 4 wciaz w kuzni: trzy zrodla, trzy fixy (podloga, przeciek wiedzy, crude iron)
+**Mod:** CrashScribe + Armoury | **Pliki:** `CrashScribe/src/Mends.cs`, `Armoury/src/RangedLore.cs`, `Armoury/src/ArmouryBehavior.cs`, `Armoury/src/Recipes.cs`
+**Problem (Jeff, screeny):** (1) Free Build: cala siatka kling IV, w tym
+darmowa VALYRIAN STEEL BLADE T4 w mieczu dwurecznym - mimo bramy T1
+(log: "prog T2; odebrano 207, podloga ocalila 60"); (2) zakladka CRAFT:
+swieza kampania (Smithing 11-14) zna 26/26 wzorow lukow, PATTERN KNOWN
+na [VI] Ravens' Teeth; (3) kwit Brigandine Vest T1 bral -16 CRUDE IRON.
+**Przyczyny:** (1) podloga bramy brala najnizsze pasmo sposrod czesci
+DOMYSLNYCH - a ROT rozdaje darmowe klingi dopiero od T4, choc w puli
+slotu leza klingi T1 (niedomyslne) -> podloga ocalala cale pasmo T4;
+(2) RangedLore.Known to STATYK procesu, a Import przy pustych danych
+robil wczesny return bez czyszczenia -> nowa kampania zalozona w tym
+samym procesie dziedziczyla wiedze starej i ja ZAPISYWALA; (3) Prawo Wagi
+mapowalo T1 -> Iron1 (crude), a crude to surowka do rafinacji, nie metal
+wyrobu.
+**Zmiany:** (1) podloga NAJPIERW patrzy na CALA pule slotu: jesli sa
+czesci ponizej progu, nadaje darmowosc temu najnizszemu pasmu (legendy
+chroni IsHiddenOnDesigner + imienne klingi nie siedza na T1), a wysokie
+pasma ida pod brame; stara podloga zostaje tylko dla slotow, ktorych pula
+zaczyna sie NAD progiem (Dual, ThrowingAxe - dane); (2) Import przy
+pustych danych robi ResetToVirgin (Clear + Seed T1) + SANACJA jednorazowa
+(arm_lore_purge_v1): mloda kampania (<30 dni) ze wzorami T4+ = przeciek,
+reset do T1 z komunikatem; starych kampanii nie tykamy; (3) IronForTier:
+T1 i T2 dziela Iron2 (wrought), crude wykluczony z kwitow.
+**Ryzyko / co sprawdzic:** po restarcie log "brama kucia" powinien miec
+duzo wiecej odebranych i wpis o otwartym najnizszym pasmie; Free Build
+mieczy: klingi I zamiast IV, valyrian ZNIKA z darmowych; CRAFT lukow:
+"PATTERN KNOWN" tylko T1, reszta do nauki; kwit T1 bez crude.
+**Status:** ZBUDOWANE - watcher wgra po zamknieciu gry (gra dzialala)
+
 ## 2026-09-01 — Jeniec nie dowodzi + dziennik zlota w niewoli + jeden kwit pancerzy w BK
 **Mod:** Armoury + RealisticCaptivity | **Pliki:** `Armoury/src/NightRest.cs`, `Armoury/src/FletchForge.cs`, `RealisticCaptivity/src/CaptivityBehavior.cs`
 **Problem (Jeff, wczorajsza gra):** (1) "zostalem pojmany i jako jeniec

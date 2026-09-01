@@ -413,7 +413,10 @@ namespace Armoury
             if (tier < 1) tier = 1;
             switch (tier)
             {
-                case 1: return CraftingMaterials.Iron1;
+                // Iron1 (crude) to SUROWKA - z niej dopiero rafinuje sie metal,
+                // do wyrobu nie wchodzi (Jeff 01.09: "wrought iron to tier 1");
+                // wyroby T1 i T2 dziela wrought iron
+                case 1: return CraftingMaterials.Iron2;
                 case 2: return CraftingMaterials.Iron2;
                 case 3: return CraftingMaterials.Iron3;
                 case 4: return CraftingMaterials.Iron4;

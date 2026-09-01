@@ -435,11 +435,43 @@ namespace Armoury
             catch { return ""; }
         }
 
+        /// <summary>Czysty stan wiedzy (nowa kampania / save sprzed systemu):
+        /// tylko wzory tieru 1 z Seed. Bez tego statyczna lista PRZECIEKALA
+        /// miedzy kampaniami w jednym procesie gry (Jeff 01.09: swieza
+        /// kampania znala 26/26 wzorow lukow z poprzedniej).</summary>
+        internal static void ResetToVirgin()
+        {
+            try
+            {
+                Known.Clear();
+                for (int i = 1; i < SchoolCount; i++) Research[i] = 0f;
+                Seed();
+            }
+            catch (Exception e) { Log.Error("RangedLore.Reset", e); }
+        }
+
+        /// <summary>Czy ksiega zna jakikolwiek wzor o tierze >= minTier
+        /// (do wykrycia przecieku na swiezej kampanii).</summary>
+        internal static bool HasHighTierKnowledge(int minTier)
+        {
+            try
+            {
+                foreach (var id in Known)
+                {
+                    if (id == SeedMark) continue;
+                    var it = MBObjectManager.Instance.GetObject<ItemObject>(id);
+                    if (it != null && TierOf(it) >= minTier) return true;
+                }
+            }
+            catch { }
+            return false;
+        }
+
         internal static void Import(string data)
         {
             try
             {
-                if (string.IsNullOrEmpty(data)) return;
+                if (string.IsNullOrEmpty(data)) { ResetToVirgin(); return; }
                 var ci = System.Globalization.CultureInfo.InvariantCulture;
                 var nf = System.Globalization.NumberStyles.Float;
                 var parts = data.Split(';');
