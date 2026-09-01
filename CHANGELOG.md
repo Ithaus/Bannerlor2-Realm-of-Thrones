@@ -1,5 +1,32 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-01 — Prawo Rozsadku Pancerza + zalozone na gorze lawy + dziennik trafien
+**Mod:** CrashScribe + Armoury | **Pliki:** `CrashScribe/src/Mends.cs` (ArmorSanity), `Armoury/src/Settings.cs`, `Armoury/src/SmithMenu.cs`, `Armoury/src/HitScribe.cs` (nowy), `Armoury/src/SubModuleMain.cs`
+**Problem (Jeff, screeny):** (1) "Dothraki Chaps 4 kg daja 55 pancerza -
+wiecej niz plyta! dostosuj takie glupoty"; (2) lawa naprawcza: "pierwsze
+na liscie maja byc moje przedmioty equipped, potem wedlug typu";
+(3) "musze wywalic kilka strzal w glowe zeby zabic bandyte - sprawdz
+logi bitwy" - a gra zadnych obrazen nie loguje; (4) pytanie o tooltip:
+Condition 3/100 vs Durability 122/4080 - NIE gryza sie, to ta sama
+wielkosc w procencie i punktach (122/4080 = 3%).
+**Zmiany:** (1) ArmorSanity (mend, przed WeightLaw): suma punktow ochrony
+pancerza nie moze przekroczyc waga x punkty-na-kg materialu (suwaki MCM:
+plate 3.2, chain 2.6, leather 2.0, cloth 1.4, wlacznik ArmorSanityEnabled);
+ponad sufit - skladowe skalowane proporcjonalnie; unikaty imienne
+i ladry konskie nietykane; log podaje liczbe przycietych i najgorszy
+absurd. Chapsy 4 kg leca z ~77 pkt do ~8. (2) sort lawy: [EQUIPPED]
+w kolejnosci slotow na gorze, reszta po typach jak dotad. (3) HitScribe
+(nowy MissionBehavior, wlacznik HitScribeEnabled): kazde trafienie
+pociskiem do Armoury.log - klasa broni, ofiara, czesc ciala, dmg,
+wchloniete przez pancerz, HP po, dystans; limit 150 wpisow na misje.
+Podejrzenie do zweryfikowania logiem: wczoraj bandyci byli goli (1 strzala),
+dzis maja helmy po naprawie ubioru - RBM kaze strzalom odbijac sie od
+metalu; log rozstrzygnie, czy to realizm RBM czy blad.
+**Ryzyko / co sprawdzic:** log "prawo rozsadku pancerza - przyciete N";
+tooltip chapsow po restarcie ~8 pkt; lawa z [EQUIPPED] na gorze;
+po bitwie wpisy "HIT ..." w Armoury.log - przynies je.
+**Status:** ZBUDOWANE - watcher wgra po zamknieciu gry
+
 ## 2026-09-01 — Bandyci: gole klaty i klony wygladu (sufit Atletyki + deterministyczny TopArmor)
 **Mod:** CrashScribe + Armoury | **Pliki:** `CrashScribe/src/Mends.cs` (SkillSinew), `Armoury/src/SkillsDecide.cs` (TopArmor)
 **Problem (Jeff):** po Prawie Wagi bandyci (Broken Men i ogolnie) biegaja

@@ -901,6 +901,98 @@ namespace CrashScribe
         /// wagi nie rusza). Biega PRZED SkillSinew, zeby mundury jednostek
         /// dostaly atletyke pod NOWE wymagania.
         /// </summary>
+        /// <summary>Odczyt pola float z ustawien Armoury (suwaki MCM) refleksja
+        /// - wspolny wzorzec dla praw kuzni.</summary>
+        private static float ArmouryFloat(string field, float def)
+        {
+            try
+            {
+                foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+                {
+                    if (asm.GetName().Name != "Armoury") continue;
+                    var ts = asm.GetType("Armoury.Settings");
+                    var cur = ts != null ? ts.GetField("Current", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static) : null;
+                    var so = cur != null ? cur.GetValue(null) : null;
+                    var fld = so != null ? so.GetType().GetField(field) : null;
+                    if (fld != null)
+                    {
+                        var v = fld.GetValue(so);
+                        if (v is float f) return f;
+                        if (v is bool b) return b ? 1f : 0f;
+                        if (v is int n) return n;
+                    }
+                    break;
+                }
+            }
+            catch { }
+            return def;
+        }
+
+        /// <summary>
+        /// PRAWO ROZSADKU PANCERZA (Jeff 01.09: "Dothraki Chaps 4 kg daja 55
+        /// pancerza - wiecej niz plyta! dostosuj takie glupoty"). ROT ma
+        /// pancerze z ochrona oderwana od wagi. Sufit: suma punktow ochrony
+        /// (Head+Body+Leg+Arm) nie moze przekroczyc waga x punkty-na-kg
+        /// wedle materialu (plyta niesie najwiecej na kg, tkanina najmniej).
+        /// Ponad sufit - wszystkie skladowe skalowane w dol proporcjonalnie.
+        /// Unikaty imienne (NotMerchandise) i ladry konskie nietykane.
+        /// </summary>
+        internal static void ArmorSanity()
+        {
+            try
+            {
+                if (ArmouryFloat("ArmorSanityEnabled", 1f) < 0.5f)
+                { Scribe.Line("Mends: prawo rozsadku pancerza wylaczone suwakiem."); return; }
+                float perPlate = ArmouryFloat("ArmorPointsPerKgPlate", 3.2f);
+                float perChain = ArmouryFloat("ArmorPointsPerKgChain", 2.6f);
+                float perLeather = ArmouryFloat("ArmorPointsPerKgLeather", 2.0f);
+                float perCloth = ArmouryFloat("ArmorPointsPerKgCloth", 1.4f);
+
+                var tArm = typeof(TaleWorlds.Core.ArmorComponent);
+                var fHead = AccessTools.Field(tArm, "<HeadArmor>k__BackingField");
+                var fBody = AccessTools.Field(tArm, "<BodyArmor>k__BackingField");
+                var fLeg = AccessTools.Field(tArm, "<LegArmor>k__BackingField");
+                var fArm = AccessTools.Field(tArm, "<ArmArmor>k__BackingField");
+                if (fHead == null || fBody == null || fLeg == null || fArm == null)
+                { Scribe.Line("Mends: ArmorComponent bez backing fields - prawo rozsadku spi."); return; }
+
+                int trimmed = 0; string worst = ""; float worstRatio = 1f;
+                foreach (var it in TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
+                {
+                    if (it == null || !it.HasArmorComponent || it.NotMerchandise) continue;
+                    var ty = it.ItemType;
+                    if (ty != ItemObject.ItemTypeEnum.HeadArmor && ty != ItemObject.ItemTypeEnum.BodyArmor
+                        && ty != ItemObject.ItemTypeEnum.LegArmor && ty != ItemObject.ItemTypeEnum.HandArmor
+                        && ty != ItemObject.ItemTypeEnum.Cape) continue;
+                    var a = it.ArmorComponent;
+                    int total = a.HeadArmor + a.BodyArmor + a.LegArmor + a.ArmArmor;
+                    if (total <= 0) continue;
+                    float perKg;
+                    switch (a.MaterialType)
+                    {
+                        case TaleWorlds.Core.ArmorComponent.ArmorMaterialTypes.Plate: perKg = perPlate; break;
+                        case TaleWorlds.Core.ArmorComponent.ArmorMaterialTypes.Chainmail: perKg = perChain; break;
+                        case TaleWorlds.Core.ArmorComponent.ArmorMaterialTypes.Leather: perKg = perLeather; break;
+                        default: perKg = perCloth; break;
+                    }
+                    float cap = Math.Max(1f, it.Weight) * perKg;
+                    if (total <= cap) continue;
+                    float scale = cap / total;
+                    fHead.SetValue(a, (int)Math.Round(a.HeadArmor * scale));
+                    fBody.SetValue(a, (int)Math.Round(a.BodyArmor * scale));
+                    fLeg.SetValue(a, (int)Math.Round(a.LegArmor * scale));
+                    fArm.SetValue(a, (int)Math.Round(a.ArmArmor * scale));
+                    trimmed++;
+                    if (scale < worstRatio) { worstRatio = scale; worst = it.StringId + " (" + total + " pkt przy " + it.Weight.ToString("0.#") + " kg)"; }
+                }
+                Scribe.Line("Mends: prawo rozsadku pancerza - przyciete " + trimmed
+                            + " sztuk ponad sufit wagi (plate " + perPlate + "/kg, chain " + perChain
+                            + ", leather " + perLeather + ", cloth " + perCloth + ")"
+                            + (trimmed > 0 ? "; najgorszy absurd: " + worst : "") + ".");
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.ArmorSanity", null); } catch { } }
+        }
+
         internal static void WeightLaw()
         {
             try
@@ -2145,7 +2237,7 @@ namespace CrashScribe
         {
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this,
                 delegate (CampaignGameStarter s)
-                { Mends.WeightLaw(); Mends.SkillSinew(); Mends.UniqueWares(); Mends.LoreForgeGate(); Mends.DressTheNamesakes(); });
+                { Mends.ArmorSanity(); Mends.WeightLaw(); Mends.SkillSinew(); Mends.UniqueWares(); Mends.LoreForgeGate(); Mends.DressTheNamesakes(); });
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this,
                 delegate (TaleWorlds.CampaignSystem.MapEvents.MapEvent m) { Mends.MeltDeadLoot(m); });
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this,

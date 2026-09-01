@@ -1068,6 +1068,30 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public float KgPerAthleticsPoint { get; set; } = 0.25f;
 
+        [SettingPropertyBool("Hit Scribe Enabled", HintText = "battle log: every missile hit written to Armoury.log (weapon, victim, body part, damage, armor absorbed) - capped per mission")]
+        [SettingPropertyGroup("A night's rest")]
+        public bool HitScribeEnabled { get; set; } = true;
+
+        [SettingPropertyBool("Armor Sanity Enabled", HintText = "Armour Sense Law: total protection capped by weight x points-per-kg of the material - no more 4 kg chaps outarmouring plate")]
+        [SettingPropertyGroup("A night's rest")]
+        public bool ArmorSanityEnabled { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Armor Points Per Kg Plate", 0.00f, 12.80f, "0.00", HintText = "Armour Sense Law: protection points one kg of PLATE may carry")]
+        [SettingPropertyGroup("A night's rest")]
+        public float ArmorPointsPerKgPlate { get; set; } = 3.2f;
+
+        [SettingPropertyFloatingInteger("Armor Points Per Kg Chain", 0.00f, 10.40f, "0.00", HintText = "Armour Sense Law: protection points one kg of CHAINMAIL may carry")]
+        [SettingPropertyGroup("A night's rest")]
+        public float ArmorPointsPerKgChain { get; set; } = 2.6f;
+
+        [SettingPropertyFloatingInteger("Armor Points Per Kg Leather", 0.00f, 8.00f, "0.00", HintText = "Armour Sense Law: protection points one kg of LEATHER may carry")]
+        [SettingPropertyGroup("A night's rest")]
+        public float ArmorPointsPerKgLeather { get; set; } = 2.0f;
+
+        [SettingPropertyFloatingInteger("Armor Points Per Kg Cloth", 0.00f, 5.60f, "0.00", HintText = "Armour Sense Law: protection points one kg of CLOTH may carry")]
+        [SettingPropertyGroup("A night's rest")]
+        public float ArmorPointsPerKgCloth { get; set; } = 1.4f;
+
         [SettingPropertyBool("Camp Battle Props Enabled", HintText = "EXPERIMENTAL: attacked while encamped, the field battle gets your camp dressed on it - tents, fire, torches around your line (unknown prefabs are skipped and logged)")]
         [SettingPropertyGroup("A night's rest")]
         public bool CampBattlePropsEnabled { get; set; } = false;
@@ -1494,6 +1518,12 @@ namespace Armoury
             s.AnvilShiftHours = AnvilShiftHours;
             s.WorkshopNightRest = WorkshopNightRest;
             s.KgPerAthleticsPoint = KgPerAthleticsPoint;
+            s.HitScribeEnabled = HitScribeEnabled;
+            s.ArmorSanityEnabled = ArmorSanityEnabled;
+            s.ArmorPointsPerKgPlate = ArmorPointsPerKgPlate;
+            s.ArmorPointsPerKgChain = ArmorPointsPerKgChain;
+            s.ArmorPointsPerKgLeather = ArmorPointsPerKgLeather;
+            s.ArmorPointsPerKgCloth = ArmorPointsPerKgCloth;
             s.CampBattlePropsEnabled = CampBattlePropsEnabled;
             s.HideoutAlarmEnabled = HideoutAlarmEnabled;
             s.HideoutAlarmScreamRadius = HideoutAlarmScreamRadius;

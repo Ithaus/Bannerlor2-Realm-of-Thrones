@@ -700,10 +700,16 @@ namespace Armoury
 
                 if (elements.Count == 0) { Log.Player("Nothing damaged on your back, in your bags or in the stores.", true); return; }
 
-                // sort po typach: luki razem, strzaly razem, PANCERZE dalej -
-                // wszystko jeszcze przed cieciem limitu
+                // NAJPIERW ZALOZONE (Jeff 01.09: "pierwsze na liscie moje
+                // przedmioty equipped, potem dopiero wedlug wzoru i typu") -
+                // [EQUIPPED] w kolejnosci slotow na gorze; reszta po typach:
+                // luki razem, strzaly razem, PANCERZE dalej
                 elements.Sort((a, b) =>
                 {
+                    int sa = slots[(int)a.Identifier], sb = slots[(int)b.Identifier];
+                    bool wa = sa >= 0, wb = sb >= 0;
+                    if (wa != wb) return wa ? -1 : 1;
+                    if (wa) return sa.CompareTo(sb);
                     var ia = found[(int)a.Identifier].Item; var ib = found[(int)b.Identifier].Item;
                     int r = TypeRank(ia).CompareTo(TypeRank(ib));
                     if (r != 0) return r;

@@ -93,6 +93,8 @@ namespace Armoury
             {
                 if (Settings.Current.FieldCraftEnabled && Campaign.Current != null && mission != null)
                     mission.AddMissionBehavior(new FieldCraft());
+                if (Settings.Current.HitScribeEnabled && mission != null)
+                    mission.AddMissionBehavior(new HitScribe());
                 if (Settings.Current.AutoParryEnabled && mission != null)
                     mission.AddMissionBehavior(new GuardMaster());
                 if (Settings.Current.WoundedFleeEnabled && mission != null)

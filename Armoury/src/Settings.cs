@@ -319,6 +319,12 @@ namespace Armoury
         public float AnvilShiftHours = 18f;                // hours of work at the anvil before the smith must sleep
         public bool WorkshopNightRest = true;              // the apprentices sleep too: forge projects make no progress between 23:00 and 5:00 - a day of work is a day at the anvil
         public float KgPerAthleticsPoint = 0.25f;          // Weight Law: kilograms of armour one Athletics point can carry (difficulty = weight / this); applied at session start
+        public bool HitScribeEnabled = true;             // battle log: every missile hit written to Armoury.log (weapon, victim, body part, damage, armor absorbed) - capped per mission
+        public bool ArmorSanityEnabled = true;             // Armour Sense Law: total protection capped by weight x points-per-kg of the material - no more 4 kg chaps outarmouring plate
+        public float ArmorPointsPerKgPlate = 3.2f;         // Armour Sense Law: protection points one kg of PLATE may carry
+        public float ArmorPointsPerKgChain = 2.6f;         // Armour Sense Law: protection points one kg of CHAINMAIL may carry
+        public float ArmorPointsPerKgLeather = 2.0f;       // Armour Sense Law: protection points one kg of LEATHER may carry
+        public float ArmorPointsPerKgCloth = 1.4f;         // Armour Sense Law: protection points one kg of CLOTH may carry
         public bool CampBattlePropsEnabled = false;        // EXPERIMENTAL: attacked while encamped, the field battle gets your camp dressed on it - tents, fire, torches around your line (unknown prefabs are skipped and logged)
         public bool HideoutAlarmEnabled = true;            // a fight in a hideout wakes the camp: bandits within earshot come running - no more men ignoring a brawl ten paces away
         public float HideoutAlarmScreamRadius = 40f;       // a wounded man's cry and the ring of steel carry this many meters - bandits inside come at you, further ones sleep on
