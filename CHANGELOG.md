@@ -1,5 +1,22 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-01 — DIAGNOZA OSTATECZNA: dysk C zuzyty (5% zycia, ponad petabajt zapisow)
+**Mod:** (sprzet) | **Pliki:** brak
+**Dowod (CrystalDiskInfo, screen Jeffa):** PNY CS3140 2TB (C:) -
+Health Status "Caution", Remaining Life 5%, Total Host Writes
+1 036 233 GB (~1 PB), 14389 h pracy. NAND u kresu - dysk gubi ostatnie
+klastry zapisu przy wylaczeniu. To wyjasnia CALA dzisiejsza serie:
+wyzerowane zrodla i git w repo, zepsuty Armoury.dll, dziura w configu
+RBM, wyzerowany manifest Steama (War Sails), oraz wczesniejsze awarie
+26.08 (LauncherData, mody kryjowek) i BSOD-y. Dysk D: ten sam model,
+status Good.
+**Plan:** (1) wymiana C na nowy NVMe + klon jak najszybciej;
+(2) do tego czasu backup 1:1 na D: (tools/backup-bannerlord.ps1,
+zadanie Backup-Bannerlord przy logowaniu, graveyard 21 dni);
+(3) zero wylaczania przyciskiem; (4) po sesji grania mozna recznie
+odpalic skrypt backupu.
+**Status:** ZDIAGNOZOWANE - czeka na wymiane dysku
+
 ## 2026-09-01 — "Nie moge zrobic load" (save chce War Sails): wyzerowany manifest Steama, nie launcher
 **Mod:** (Steam) | **Pliki:** `Steam\steamapps\appmanifest_261550.acf`, `steamapps\workshop\appworkshop_3450310.acf`
 **Problem (Jeff, screen):** ekran SAVED CAMPAIGNS, tooltip "This save file
