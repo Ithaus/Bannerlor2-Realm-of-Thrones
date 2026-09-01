@@ -998,7 +998,7 @@ namespace CrashScribe
 
                 // przebieg 2: rownanie wystajacych do sufitu grupy
                 int trimmed = 0; string worst = ""; float worstRatio = 1f;
-                var cuts = new System.Collections.Generic.List<KeyValuePair<float, string>>();
+                var cuts = new System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<float, string>>();
                 foreach (var it in TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
                 {
                     if (!Wanted(it)) continue;
@@ -1014,7 +1014,7 @@ namespace CrashScribe
                     fArm.SetValue(a, (int)Math.Round(a.ArmArmor * scale));
                     trimmed++;
                     if (scale < worstRatio) { worstRatio = scale; worst = it.StringId + " (" + total + " pkt, norma grupy " + ((int)cap) + ")"; }
-                    cuts.Add(new KeyValuePair<float, string>(total / cap,
+                    cuts.Add(new System.Collections.Generic.KeyValuePair<float, string>(total / cap,
                         it.StringId + " " + total + "->" + ((int)cap) + " (t" + ((int)it.Tier + 1) + ")"));
                 }
                 Scribe.Line("Mends: prawo rozsadku pancerza (percentyl " + ((int)pct) + " x" + tol.ToString("0.##")
