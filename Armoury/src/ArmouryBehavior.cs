@@ -1167,6 +1167,9 @@ namespace Armoury
                 // zwyklym przekladaniu jencow z lochu czy garnizonu)
                 _spoilsWindow = CampaignTime.HoursFromNow(2f);
 
+                // wdzieczne wioski: wygrana z bandytami cieszy okolice
+                BanditCheer.AfterVictory(mapEvent);
+
                 // KRYJOWKA: zaden ekran lupow nie przyjdzie - dzialka gracza
                 // z kolejki BattlefieldLaw idzie prosto do sakw, a jency
                 // (bandyci poddani po walce) sa obszukiwani od reki

@@ -1060,10 +1060,23 @@ namespace CrashScribe
                            && it.PrimaryWeapon != null;
                 }
 
+                // OGNISTA AMUNICJA (Jeff 01.09, druga runda: "burning arrows to
+                // zwykle strzaly, daj im 1-10 piercing"). Percentyl nie ucial
+                // burning_arrows 150, bo ognistych jest w tierze kilka naraz
+                // i wspolnie zawyzaly norme grupy. Wiec: ogniste NIE licza sie
+                // do statystyk grupy, a ich obrazenia schodza do MEDIANY
+                // zwyklych strzal swojego (typu, tieru) - ogien (fire damage)
+                // to osobny mechanizm i zostaje.
+                bool IsIncendiary(ItemObject it)
+                {
+                    var s = (it.StringId ?? "").ToLowerInvariant();
+                    return s.Contains("burning") || s.Contains("flaming");
+                }
+
                 var groups = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.List<int>>();
                 foreach (var it in TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
                 {
-                    if (!IsAmmoItem(it)) continue;
+                    if (!IsAmmoItem(it) || IsIncendiary(it)) continue;
                     int d = it.PrimaryWeapon.MissileDamage;
                     if (d <= 0) continue;
                     string g = it.ItemType + "|" + (int)it.Tier;
@@ -1072,10 +1085,12 @@ namespace CrashScribe
                     l.Add(d);
                 }
                 var caps = new System.Collections.Generic.Dictionary<string, float>();
+                var medians = new System.Collections.Generic.Dictionary<string, int>();
                 foreach (var kv in groups)
                 {
-                    if (kv.Value.Count < 5) continue;
                     kv.Value.Sort();
+                    medians[kv.Key] = kv.Value[kv.Value.Count / 2];
+                    if (kv.Value.Count < 5) continue;
                     int idx = Math.Min(kv.Value.Count - 1, (int)(kv.Value.Count * 0.75f));
                     caps[kv.Key] = kv.Value[idx] * 1.3f;
                 }
@@ -1085,9 +1100,16 @@ namespace CrashScribe
                 foreach (var it in TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
                 {
                     if (!IsAmmoItem(it)) continue;
-                    float cap;
-                    if (!caps.TryGetValue(it.ItemType + "|" + (int)it.Tier, out cap)) continue;
                     var w = it.PrimaryWeapon;
+                    string g = it.ItemType + "|" + (int)it.Tier;
+                    float cap;
+                    if (IsIncendiary(it))
+                    {
+                        // ognista: sufit = mediana zwyklych; brak grupy = 10
+                        int med;
+                        cap = medians.TryGetValue(g, out med) ? med : 10;
+                    }
+                    else if (!caps.TryGetValue(g, out cap)) continue;
                     if (w.MissileDamage <= cap) continue;
                     if (cuts.Count < 12) cuts.Add(it.StringId + " " + w.MissileDamage + "->" + ((int)cap));
                     fThrust.SetValue(w, (int)cap);

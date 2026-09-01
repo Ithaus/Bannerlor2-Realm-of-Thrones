@@ -1,5 +1,35 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-01 — Burning Arrows do konca (mediana zamiast percentyla) + Wdzieczne Wioski (relacje za bicie bandytow)
+**Mod:** CrashScribe + Armoury | **Pliki:** `CrashScribe/src/Mends.cs` (AmmoSanity), `Armoury/src/BanditCheer.cs` (nowy), `Armoury/src/ArmouryBehavior.cs`, `Armoury/src/Settings.cs`
+**Problem (Jeff, screeny):** (1) po wczytaniu gry Burning Arrows dalej
+150 Pierce - log: AmmoSanity przycial tylko giant_arrows 200->175;
+percentyl grupy nie zlapal ognistych, bo burning_arrows/bolts (RBM_WS
+i NavalDLC po 150) siedza w tierze 1 GRUPOWO i same zawyzaly norme
+p75 x1.3 ponad 150. Jeff: "to zwykle strzaly, daj im 1-10 piercing".
+(2) Nowa prosba: wygrana z banda zbojow blisko wioski (np. promien 50)
+ma poprawiac relacje z jej ludzmi o 2-3, "bo ludzie sie ciesza".
+**Zmiany:** (1) AmmoSanity: amunicja ognista (id z "burning"/"flaming")
+NIE liczy sie do statystyk grupy, a jej obrazenia schodza do MEDIANY
+zwyklych strzal/beltow swojego (typu, tieru) - wyjdzie ~8-9 Pierce jak
+zwykle strzaly (fallback 10, gdy grupa pusta); fire damage zostaje -
+podpalanie to osobny mechanizm. Percentyl dalej pilnuje reszty.
+(2) Armoury/BanditCheer (sekcja MCM "Grateful villages"):
+BanditCheerEnabled (domyslnie ON), BanditCheerRadius (50),
+BanditCheerRelation (+2 na notabla). Po wygranej gracza z partia
+frakcji bandyckiej kazda WIOSKA w promieniu od pola bitwy dodaje
+relacje ze wszystkimi zywymi notablami (ChangeRelationAction,
+z powiadomieniem). Wpiete w OnMapEventEnded po stwierdzeniu wygranej.
+gen_mcm przeszedl (Armoury 311 ustawien).
+**Ryzyko / co sprawdzic:** po restarcie log "prawo rozsadku amunicji"
+ma wymienic burning_arrows 150->~8 i burning_bolts; tooltip w ekwipunku
+~8 Pierce. Po wygranej z bandytami przy wioskach: dymki "+2" i wpis
+"BanditCheer: ... wiosek ucieszonych" w Armoury.log. Jesli +2 na
+KAZDEGO notabla wioski to za duzo (4 notabli = +8 laczne), przykrecic
+suwak w MCM. UWAGA: "110" z prosby odczytane jako "1-10" - jesli
+Jeff naprawde chcial 110 Pierce, zmieniamy jedna stala.
+**Status:** ZBUDOWANE - watcher wgra po zamknieciu gry
+
 ## 2026-09-01 — DIAGNOZA OSTATECZNA: dysk C zuzyty (5% zycia, ponad petabajt zapisow)
 **Mod:** (sprzet) | **Pliki:** brak
 **Dowod (CrystalDiskInfo, screen Jeffa):** PNY CS3140 2TB (C:) -

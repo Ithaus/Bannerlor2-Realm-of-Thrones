@@ -1240,8 +1240,20 @@ namespace Armoury
         [SettingPropertyGroup("The forge gate")]
         public int ForgePartsFreeBelowTier { get; set; } = 2;
 
+        [SettingPropertyBool("Bandit Cheer Enabled", HintText = "villages near your victory over bandits thank you - relations with their notables improve")]
+        [SettingPropertyGroup("Grateful villages")]
+        public bool BanditCheerEnabled { get; set; } = true;
+
+        [SettingPropertyInteger("Bandit Cheer Radius", 0, 200, "0", HintText = "how far from the battlefield a village still hears the good news (map distance)")]
+        [SettingPropertyGroup("Grateful villages")]
+        public int BanditCheerRadius { get; set; } = 50;
+
+        [SettingPropertyInteger("Bandit Cheer Relation", 0, 10, "0", HintText = "relation gained with each notable of those villages")]
+        [SettingPropertyGroup("Grateful villages")]
+        public int BanditCheerRelation { get; set; } = 2;
+
         [SettingPropertyBool("Log Enabled", HintText = "write a log file in the module folder")]
-        [SettingPropertyGroup("The forge gate")]
+        [SettingPropertyGroup("Grateful villages")]
         public bool LogEnabled { get; set; } = true;
 
         public void ApplyTo(Settings s)
@@ -1553,6 +1565,9 @@ namespace Armoury
             s.HelperTimeRelief = HelperTimeRelief;
             s.HelperSkillForFullRelief = HelperSkillForFullRelief;
             s.ForgePartsFreeBelowTier = ForgePartsFreeBelowTier;
+            s.BanditCheerEnabled = BanditCheerEnabled;
+            s.BanditCheerRadius = BanditCheerRadius;
+            s.BanditCheerRelation = BanditCheerRelation;
             s.LogEnabled = LogEnabled;
         }
 

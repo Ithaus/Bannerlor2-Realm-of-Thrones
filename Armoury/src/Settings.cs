@@ -373,6 +373,11 @@ namespace Armoury
         // --- The forge gate ---
         public int ForgePartsFreeBelowTier = 2;            // only crafting parts BELOW this tier are free at the forge from the start; everything above is unlocked by forging and smelting, lowest tier first (2 = only tier 1 free, 5 = named lore blades locked only, 7 = gate off). A safety floor always keeps one band of parts per required slot, so the Craft button never dies. Applied when a session loads
 
+        // --- Grateful villages ---
+        public bool BanditCheerEnabled = true;             // villages near your victory over bandits thank you - relations with their notables improve
+        public int BanditCheerRadius = 50;                 // how far from the battlefield a village still hears the good news (map distance)
+        public int BanditCheerRelation = 2;                // relation gained with each notable of those villages
+
         public bool LogEnabled = true;                     // write a log file in the module folder
 
         public static void Load(string moduleDataDir)
