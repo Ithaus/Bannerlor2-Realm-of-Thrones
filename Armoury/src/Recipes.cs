@@ -230,14 +230,13 @@ namespace Armoury
                         int lo = MathF.Max(1, MathF.Ceiling(weight * 0.2f / IngotKg(tier - 1)));
                         Add(r, MaterialItem(IronForTier(tier - 1)), lo);
                     }
-                    // podpinka: 1 skora TYLKO przy korpusie, pelerynie i ladrach;
-                    // rekawice, helmy i buty BEZ miekkich dodatkow (Jeff 01.09:
-                    // "przy rekawicach, helmach, butach nie dajemy lnu, skory,
-                    // velvet") - sam metal
+                    // podpinka: 1 skora TYLKO przy korpusie i ladrach konskich;
+                    // rekawice, helmy, buty I PELERYNA bez miekkich dodatkow
+                    // (Jeff 01.09: "nie dajemy lnu, skory, velvet" + "przy
+                    // pelerynie tez nie") - sam metal
                     var tp = item.ItemType;
-                    if (tp != ItemObject.ItemTypeEnum.HandArmor
-                        && tp != ItemObject.ItemTypeEnum.HeadArmor
-                        && tp != ItemObject.ItemTypeEnum.LegArmor)
+                    if (tp == ItemObject.ItemTypeEnum.BodyArmor
+                        || tp == ItemObject.ItemTypeEnum.HorseHarness)
                         Add(r, _leather, 1);
                     float fidA = IsFiddly(item.ItemType) ? (1f + s.FiddlyStaminaBonus) : 1f;
                     r.Stamina = MathF.Max(5, (int)(tier * s.StaminaPerTier * fidA));

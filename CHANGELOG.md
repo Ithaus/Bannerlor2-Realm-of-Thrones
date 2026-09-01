@@ -1,5 +1,16 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-01 — Peleryna tez bez skory
+**Mod:** Armoury | **Pliki:** `Armoury/src/Recipes.cs`
+**Problem:** Jeff: "przy pelerynie tez nie" (dodatki miekkie).
+**Zmiana:** w Prawie Wagi 1 skora zostaje WYLACZNIE przy korpusie
+(BodyArmor) i ladrach konskich (HorseHarness); Cape dolacza do
+rekawic/helmow/butow - sam metal 80/20. Warunek odwrocony na biala
+liste dwoch typow.
+**Ryzyko / co sprawdzic:** kwit metalowej peleryny bez skory;
+napiersnik i ladry dalej z 1 skora.
+**Status:** WGRANE (gra zamknieta, cmp zgodny)
+
 ## 2026-09-01 — Rekawice, helmy i buty bez miekkich dodatkow
 **Mod:** Armoury | **Pliki:** `Armoury/src/Recipes.cs`
 **Problem:** moje rozstrzygniecie "len przy oslonach do 3 kg" odrzucone.
