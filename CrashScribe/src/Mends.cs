@@ -998,6 +998,7 @@ namespace CrashScribe
 
                 // przebieg 2: rownanie wystajacych do sufitu grupy
                 int trimmed = 0; string worst = ""; float worstRatio = 1f;
+                var cuts = new System.Collections.Generic.List<KeyValuePair<float, string>>();
                 foreach (var it in TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
                 {
                     if (!Wanted(it)) continue;
@@ -1013,10 +1014,22 @@ namespace CrashScribe
                     fArm.SetValue(a, (int)Math.Round(a.ArmArmor * scale));
                     trimmed++;
                     if (scale < worstRatio) { worstRatio = scale; worst = it.StringId + " (" + total + " pkt, norma grupy " + ((int)cap) + ")"; }
+                    cuts.Add(new KeyValuePair<float, string>(total / cap,
+                        it.StringId + " " + total + "->" + ((int)cap) + " (t" + ((int)it.Tier + 1) + ")"));
                 }
                 Scribe.Line("Mends: prawo rozsadku pancerza (percentyl " + ((int)pct) + " x" + tol.ToString("0.##")
                             + ") - zrownane " + trimmed + " wystajacych sztuk"
                             + (trimmed > 0 ? "; najgorszy absurd: " + worst : "") + ".");
+                // PELNA ROZNICA przed->po dla Jeffa ("pokaz roznice wzgledem
+                // tego co bylo") - top 15 najmocniej przycietych, wprost w logu
+                if (cuts.Count > 0)
+                {
+                    cuts.Sort((x, y) => y.Key.CompareTo(x.Key));
+                    int show = Math.Min(15, cuts.Count);
+                    var sb = new System.Text.StringBuilder("Mends: rozsadek pancerza - najwieksze ciecia: ");
+                    for (int i = 0; i < show; i++) { if (i > 0) sb.Append(", "); sb.Append(cuts[i].Value); }
+                    Scribe.Line(sb.ToString());
+                }
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.ArmorSanity", null); } catch { } }
         }
