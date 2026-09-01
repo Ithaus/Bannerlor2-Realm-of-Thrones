@@ -1,5 +1,30 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-01 — Crash przy starcie po naprawie DLL: dziura z zer w configu RBM, zalatana wartosciami domyslnymi
+**Mod:** (cudzy config) | **Pliki:** `Documents\...\Configs\RBM\config.xml`
+**Problem (Jeff, screen):** po podmianie Armoury.dll gra dochodzi dalej,
+ale BLSE pokazuje "Intercepted an exception" i gra sie zamyka.
+**Dowod (session-2026-09-01_13-53-43.log):** pierwszy wyjatek to
+XmlException "hexadecimal value 0x00 ... Line 161" w RBMConfig.LoadConfig
+-> RBM.SubModule.OnSubModuleLoad. Config RBM byl caly do DOKLADNIE
+8192 bajtu, dalej 391 zer do konca pliku - dysk zgubil ostatni klaster
+zapisu z 13:12 (ta sama awaria co reszta; skan "calych zer" tego nie
+zlapal, bo plik byl wyzerowany czesciowo). Urwane w polowie sekcji
+SlingStone + tagi zamykajace.
+**Zmiana:** kopia jako config.xml.uszkodzony-2026-09-01; koncowka
+odtworzona wartosciami DOMYSLNYMI RBM z dekompilacji RBMConfig.Utilities
+(SlingStone: 0.3/0.35/1/6/10/1) - zasadne, bo ta sekcja i tak szla
+z domyslnych po naprawie z 26.08 (wtedy identyczna awaria ucieta na
+4096 B). XML waliduje sie, 16 typow broni, wersja 2, zero NUL.
+Rzetelny skan NUL-run>=16 po Documents + dzisiejszych plikach Modules:
+uszkodzone zostaly TYLKO logi (nieszkodliwe).
+**Ryzyko / co sprawdzic:** gra startuje do menu bez okna BLSE; RBM
+nadpisze config przy starcie - jesli znow wstanie krzywo, dysk gubi
+zapisy dalej -> chkdsk. UWAGA wzorzec awarii dysku: plik caly do
+wielokrotnosci 4096, dalej zera - przy kazdym nastepnym "zepsute"
+najpierw szukac dziury z zer.
+**Status:** ZALATANE - DO SPRAWDZENIA (start gry)
+
 ## 2026-09-01 — "Cannot load Armoury.dll" przy starcie: kopia w grze uszkodzona przez dysk, podmieniona
 **Mod:** Armoury (bez zmian w kodzie) | **Pliki:** `Modules\Armoury\bin\Win64_Shipping_Client\Armoury.dll`
 **Problem (Jeff, screen):** okno ERROR "Cannot load: ..\..\Modules\Armoury\
