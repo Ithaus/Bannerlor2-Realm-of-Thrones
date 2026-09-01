@@ -249,7 +249,7 @@ namespace Armoury
             }
         }
 
-        private static readonly Dictionary<string, ItemObject> TopArmorCache = new Dictionary<string, ItemObject>();
+
         private static readonly Dictionary<int, ItemObject> TopMountCache = new Dictionary<int, ItemObject>();
 
         /// <summary>Najlepsza sztuka pancerza danego typu, ktorej WYMOG ATLETYKI
@@ -264,27 +264,47 @@ namespace Armoury
             // z cache wpis wygrzany przez Atletyke 24.
             if (athletics < 0) athletics = 0;
             string key = type + "|" + athletics;
-            ItemObject best;
-            if (TopArmorCache.TryGetValue(key, out best)) return best;
-            bool ok = true;
-            try
+            // ROZNORODNOSC W RAMACH TIERU (Jeff 01.09: "wszyscy biegaja 1:1,
+            // glupio wyglada... losowo rozne ubrania, ten sam poziom pancerza").
+            // Jeden najlepszy item klonowal wyglad calych hord - teraz cache
+            // trzyma CALE pasmo najwyzszego osiagalnego tieru, a kazde wywolanie
+            // (= kazdy zolnierz przy spawnie) losuje z niego sztuke.
+            List<ItemObject> band;
+            if (!TopArmorBandCache.TryGetValue(key, out band))
             {
-                foreach (var it in MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
+                bool ok = true;
+                var pool = new List<ItemObject>();
+                try
                 {
-                    if (it == null || it.ItemType != type || !it.HasArmorComponent) continue;
-                    if (it.Difficulty > athletics) continue;                               // atletyka rzadzi
-                    if (it.NotMerchandise) continue;                                       // unikaty imienne i itemy testowe (dummy_armor_*)
-                    if (it.StringId != null && it.StringId.EndsWith("_crown")) continue;   // korony to regalia
-                    if (best == null || it.Effectiveness > best.Effectiveness) best = it;
+                    foreach (var it in MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
+                    {
+                        if (it == null || it.ItemType != type || !it.HasArmorComponent) continue;
+                        if (it.Difficulty > athletics) continue;                               // atletyka rzadzi
+                        if (it.NotMerchandise) continue;                                       // unikaty imienne i itemy testowe (dummy_armor_*)
+                        if (it.StringId != null && it.StringId.EndsWith("_crown")) continue;   // korony to regalia
+                        pool.Add(it);
+                    }
                 }
+                catch (Exception e) { ok = false; Log.Error("SkillsDecide.TopArmor", e); }
+                band = null;
+                if (pool.Count > 0)
+                {
+                    int topTier = int.MinValue;
+                    foreach (var it in pool) if ((int)it.Tier > topTier) topTier = (int)it.Tier;
+                    band = new List<ItemObject>();
+                    foreach (var it in pool) if ((int)it.Tier == topTier) band.Add(it);
+                }
+                // cachujemy TAKZE null (uczciwe "nic nie ma"), ale WYLACZNIE po
+                // udanym przebiegu - jeden wyjatek nie moze zgasic typu do konca
+                // procesu (wzorzec _tentBroken z CLAUDE.md p.7)
+                if (ok) TopArmorBandCache[key] = band;
             }
-            catch (Exception e) { ok = false; Log.Error("SkillsDecide.TopArmor", e); }
-            // cachujemy TAKZE null (uczciwe "nic nie ma"), ale WYLACZNIE po
-            // udanym przebiegu - jeden wyjatek nie moze zgasic typu do konca
-            // procesu (wzorzec _tentBroken z CLAUDE.md p.7)
-            if (ok) TopArmorCache[key] = best;
-            return best;
+            if (band == null || band.Count == 0) return null;
+            return band[TaleWorlds.Core.MBRandom.RandomInt(band.Count)];
         }
+
+        private static readonly Dictionary<string, List<ItemObject>> TopArmorBandCache =
+            new Dictionary<string, List<ItemObject>>();
 
         /// <summary>Najlepszy KON w ramach Jezdziectwa jednostki. Smoki i slonie
         /// poza wzorcem (pin gracza moze slonia, jesli Riding pozwala).</summary>

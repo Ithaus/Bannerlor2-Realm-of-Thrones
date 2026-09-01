@@ -949,7 +949,7 @@ namespace CrashScribe
         {
             try
             {
-                int fixedN = 0, capped = 0, seen = 0;
+                int fixedN = 0, seen = 0;
                 foreach (var co in TaleWorlds.ObjectSystem.MBObjectManager.Instance
                              .GetObjectTypeList<CharacterObject>())
                 {
@@ -972,9 +972,12 @@ namespace CrashScribe
                     seen++;
                     int ath = co.GetSkillValue(DefaultSkills.Athletics);
                     if (ath >= maxDiff) continue;
-                    int cap = 20 + 30 * Math.Max(0, co.Tier);
-                    int target = Math.Min(maxDiff, cap);
-                    if (target <= ath) { capped++; continue; }   // sufit tieru nizej niz mundur - zostaje degradacja
+                    // SUFIT TIERU USUNIETY (Jeff 01.09: bandyci "biegaja z golymi
+                    // klatami" - sufit 20+30*tier blokowal im WLASNE mundury po
+                    // Prawie Wagi, a degradacja klonowala wyglad). Dyrektywa
+                    // Jeffa: jednostka dostaje skill DO SWOJEGO sprzetu - raise,
+                    // never lower, bez wyjatkow.
+                    int target = maxDiff;
                     var skills = co.GetDefaultCharacterSkills();
                     var owner = skills != null ? skills.Skills : null;
                     var mSet = owner != null ? AccessTools.Method(owner.GetType(), "SetPropertyValue") : null;
@@ -988,8 +991,8 @@ namespace CrashScribe
                     if (maxDiff - ath >= 50)
                         Scribe.Line("Mends: " + co.StringId + " (tier " + co.Tier + ") - Atletyka "
                                     + ath + " -> " + target + " (mundur difficulty " + maxDiff
-                                    + (target < maxDiff ? ", sufit tieru " + cap : "") + ").");
-                    if (target < maxDiff) capped++;
+                                    + ").");
+
                 }
                 // NOWA GRA (31.08): na swiezej kampanii SessionLaunched biegnie
                 // ZANIM ekwipunki jednostek sie zmaterializuja - wtedy seen == 0
@@ -999,8 +1002,7 @@ namespace CrashScribe
                     Scribe.Line("Mends: SkillSinew - ekwipunki jeszcze niezaladowane (nowa gra), powtorze z pierwszym dniem.");
                 else
                     Scribe.Line("Mends: SkillSinew - Atletyka podbita " + fixedN
-                            + " jednostkom do poziomu wlasnego munduru (sufit 20+30*tier); "
-                            + capped + " przypadkow zostalo ponizej munduru (sufit tieru).");
+                            + " jednostkom do poziomu wlasnego munduru (bez sufitu - raise, never lower).");
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.SkillSinew", null); } catch { } }
         }

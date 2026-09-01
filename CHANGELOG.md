@@ -1,5 +1,31 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-01 — Bandyci: gole klaty i klony wygladu (sufit Atletyki + deterministyczny TopArmor)
+**Mod:** CrashScribe + Armoury | **Pliki:** `CrashScribe/src/Mends.cs` (SkillSinew), `Armoury/src/SkillsDecide.cs` (TopArmor)
+**Problem (Jeff):** po Prawie Wagi bandyci (Broken Men i ogolnie) biegaja
+"z golymi klatami", a ci ubrani wygladaja IDENTYCZNIE 1:1; do tego strzaly
+w gola klate robia male obrazenia.
+**Sledztwo:** bandyci NIE ida przez DTE (dystrybutor tylko dla partii
+z LeaderHero - dekompilacja TryInitializeDistributors), ubiera ich vanilla
+z 18 zestawow szablonu (roznorodnosc W DANYCH JEST). Rozbieral ich nasz
+lancuch: SkillSinew mial SUFIT Atletyki 20+30*tier - po Prawie Wagi
+mundur przekraczal sufit, jednostka zostawala ze slabym skillem,
+a StripDragonMount degradowal pancerz przez TopArmor, ktory zwracal
+JEDNA najlepsza sztuke w ramach skilla - cala horda w tym samym lachu,
+a tam gdzie nic nie znalazl, zostawala golizna sprzed podlogi 31.08.
+**Zmiany:** (1) sufit tieru USUNIETY - Atletyka podnoszona do poziomu
+WLASNEGO munduru bez wyjatkow (dyrektywa "raise, never lower"); jednostki
+wracaja do swoich szablonowych pancerzy, degradacja przestaje ich tykac;
+(2) TopArmor: cache trzyma cale pasmo najwyzszego osiagalnego tieru,
+kazdy zolnierz przy spawnie LOSUJE z niego sztuke (MBRandom) - degradacja,
+gdy juz musi, daje roznorodnosc w ramach TEGO SAMEGO tieru (elita nie
+dostaje lachmanow). Stary jednoelementowy TopArmorCache usuniety.
+**Ryzyko / co sprawdzic:** bandyci po restarcie w pancerzach i ROZNI
+(18 zestawow z danych); zadnych golych klat; obrazenia strzal ocenic
+PO ubraniu (moglo byc pochodna braku pancerza w RBM). W logu CrashScribe
+"SkillSinew - Atletyka podbita N jednostkom ... (bez sufitu)".
+**Status:** WGRANE (gra zamknieta)
+
 ## 2026-09-01 — Tier 4 wciaz w kuzni: trzy zrodla, trzy fixy (podloga, przeciek wiedzy, crude iron)
 **Mod:** CrashScribe + Armoury | **Pliki:** `CrashScribe/src/Mends.cs`, `Armoury/src/RangedLore.cs`, `Armoury/src/ArmouryBehavior.cs`, `Armoury/src/Recipes.cs`
 **Problem (Jeff, screeny):** (1) Free Build: cala siatka kling IV, w tym
