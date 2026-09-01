@@ -1,5 +1,37 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-01 — Przyczyna "crashu" 13:17 + lista modow launchera odtworzona z naglowka zapisu
+**Mod:** (brak zmian w kodzie) | **Pliki:** `Documents\...\Configs\LauncherData.xml`, `Configs\DynamicReinforcements.cfg`
+**Problem (Jeff):** "wywalilo liste modow, przywroc liste modow!" - launcher
+po restarcie zapisal LauncherData.xml z WSZYSTKIM odznaczonym (poprzedni plik
+byl wyzerowany).
+**Przyczyna wylaczenia (dziennik Windows, nie zgadywanie):** to NIE byl BSOD
+ani zanik zasilania. 13:17:09 `winlogon.exe` w imieniu SYSTEM zlecil
+"power off" (kod 0x500ff) - tak wyglada fizyczny przycisk zasilania /
+sygnal ACPI; Twoje zwykle wylaczenia (24-31.08) ida przez Explorer.EXE
+w imieniu GAME. Gra dzialala do konca (CrashScribe 13:16:13 Mudgrave).
+Wylaczenie bylo "czyste" wg Kernel-Boot, a mimo to dysk C (PNY CS3140
+NVMe, fw CS314210) STRACIL zapisy z ~12:44-13:17: 101 plikow w calosci
+z zer (repo, DLL, cache Edge, konfigi gry), NTFS zglosil uszkodzony indeks
+(event 55) i zada chkdsk /scan. To samo bylo 26.08 (LauncherData
+i kryjowki wyzerowane po twardym wylaczeniu przyciskiem). Do tego 25.08
+BSOD 0xE6 (DRIVER_VERIFIER_DMA_VIOLATION) i 4.08 seria BSOD - komputer
+ma problem sprzetowy/sterownikowy z dyskiem lub pamiecia.
+**Zmiana:** LauncherData.xml: zaznaczone dokladnie 35 modow z naglowka
+zapisu IronmanPEh4X2ByGArW.sav (12:42, identyczne jak w zapisie z 30.08),
+kolejnosc launchera zgodna z zapisem; wylaczone zostaja:
+BetterExceptionWindow, StoryMode, CCsBanners, PrisonIsNotFun, ScoutingFog,
+MoreBloodPoolMod, FastMode. Kopia: LauncherData.xml.bak-2026-09-01-po-resecie.
+Wyzerowany DynamicReinforcements.cfg odlozony jako *.zeroed-2026-09-01
+(mod zrobi domyslny; ustawienia DR do ponownego wyklikania). trail.txt
+CrashScribe z zer - nieszkodliwy.
+**Ryzyko / co sprawdzic:** launcher pokazuje 35 zaznaczonych w tej
+kolejnosci; zapis Ironman wczytuje sie bez ostrzezenia o brakujacych
+modach; ustawienia DynamicReinforcements sprawdzic w MCM. Jeff: uruchomic
+`chkdsk C: /scan` jako admin i NIE wylaczac komputera przyciskiem przy
+dzialajacej grze/buildzie.
+**Status:** ZROBIONE - DO SPRAWDZENIA w launcherze
+
 ## 2026-09-01 — Crash komputera: repo git uszkodzone, 6 plikow wyzerowanych; odzyskane + Prawo Rozsadku Amunicji (Burning Arrows 150 dmg)
 **Mod:** CrashScribe (+ repo) | **Pliki:** `CrashScribe/src/Mends.cs` (AmmoSanity), `.git` (naprawa)
 **Problem:** komputer padl ok. 13:17 (sesja Claude urwana w trakcie builda
