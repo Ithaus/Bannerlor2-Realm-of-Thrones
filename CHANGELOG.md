@@ -1,5 +1,16 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-01 — Rekawice, helmy i buty bez miekkich dodatkow
+**Mod:** Armoury | **Pliki:** `Armoury/src/Recipes.cs`
+**Problem:** moje rozstrzygniecie "len przy oslonach do 3 kg" odrzucone.
+Jeff: "przy rekawicach, helmach, butach nie dajemy lnu, skory, velvet".
+**Zmiana:** w Prawie Wagi kuzni miekki dodatek (1 skora) zostaje TYLKO
+przy korpusie (BodyArmor), pelerynie (Cape) i ladrach konskich
+(HorseHarness); HandArmor/HeadArmor/LegArmor = sam metal 80/20.
+**Ryzyko / co sprawdzic:** kwit helmu/rekawic/butow bez pozycji skora/len;
+kwit napiersnika dalej z 1 skora.
+**Status:** WGRANE (gra zamknieta, cmp zgodny)
+
 ## 2026-09-01 — PRAWO WAGI KUZNI: materialy z wagi wyrobu (pancerze, luki, kusze, amunicja)
 **Mod:** Armoury | **Pliki:** `Armoury/src/Recipes.cs`
 **Problem:** Jeff: "znalazlem blad w kuciu - trzeba inaczej przypisac
