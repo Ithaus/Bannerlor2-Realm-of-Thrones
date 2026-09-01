@@ -1,5 +1,27 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-01 — "Cannot load Armoury.dll" przy starcie: kopia w grze uszkodzona przez dysk, podmieniona
+**Mod:** Armoury (bez zmian w kodzie) | **Pliki:** `Modules\Armoury\bin\Win64_Shipping_Client\Armoury.dll`
+**Problem (Jeff, screen):** okno ERROR "Cannot load: ..\..\Modules\Armoury\
+bin\Win64_Shipping_Client\Armoury.dll" zaraz po launcherze; BLSE LauncherEx
+pada (Application Error 13:43:44); gra nie dochodzi do CrashScribe (brak
+nowego session-*.log).
+**Dowod:** `Assembly.LoadFile` na kopii z gry: "The module was expected to
+contain an assembly manifest" (HRESULT 0x80131018); ta sama DLL z repo
+(`Armoury/bin/Release`) laduje sie poprawnie; roznica to 221 bajtow -
+dysk stracil fragment zapisu z 12:50:27 (ten sam mechanizm co wyzerowane
+zrodla). Przeglad wszystkich 332 DLL w Modules: uszkodzona TYLKO ta jedna
+(BewNativeCodeCrashTest.dll to natywna DLL testowa, w porzadku).
+Wczesniejsza ocena "kopia w grze cala" byla bledna - porownanie bajtow
+z buildem bylo prawie zgodne, ale pare bajtow trafilo w metadane.
+**Zmiana:** stara kopia odlozona jako `Armoury.dll.corrupt-2026-09-01`,
+wgrany build z repo (zrodla = HEAD, Settings.cs z 12:50 po przywroceniu),
+`cmp` zgodny, LoadFile OK.
+**Ryzyko / co sprawdzic:** gra startuje bez okna ERROR; w Armoury.log
+normalny start; jesli dysk znow zgubi zapis - objaw wroci i trzeba
+powtorzyc kopiowanie po `chkdsk C: /scan`.
+**Status:** WGRANE (gra zamknieta) - DO SPRAWDZENIA
+
 ## 2026-09-01 — Przyczyna "crashu" 13:17 + lista modow launchera odtworzona z naglowka zapisu
 **Mod:** (brak zmian w kodzie) | **Pliki:** `Documents\...\Configs\LauncherData.xml`, `Configs\DynamicReinforcements.cfg`
 **Problem (Jeff):** "wywalilo liste modow, przywroc liste modow!" - launcher
