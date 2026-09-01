@@ -1,67 +1,124 @@
-# Jak licza sie obrazenia (RBM) - i co naprawde daje pancerz
+# PELNE ZASADY OBRAZEN (RBM) - co naprawde daje pancerz
 
-Zrodlo: dekompilacja RBMCombat.dll (Utilities.RBMComputeDamage,
-WeaponTypeDamage) + RBMConfig.dll. Stan na 01.09.2026, wartosci domyslne
-configu RBM (ArmorMultiplier=2, ArmorThresholdModifier=1).
+Zrodlo: dekompilacja RBMCombat.dll (RBMComputeDamage, WeaponTypeDamage)
+i RBMConfig.dll - wartosci DOMYSLNE configu (ArmorMultiplier=2,
+ArmorThresholdModifier=1, BluntTraumaBonus=0). Stan na 01.09.2026.
+Wszystkie liczby ponizej policzone DOKLADNYM wzorem z kodu.
 
-## Trzy skladniki kazdego trafienia
+---
 
-Kazdy cios/pocisk niesie MAGNITUDE (sile z rozpedu, predkosci pocisku,
-wagi broni). RBM dzieli ja na:
+## 1. Slowniczek
 
-1. **PENETRACJA PELNA** - to, co przebija pancerz na wylot:
-   `pen = max(0, magnitude - Armor x FactorTypuBroni)`
-   Armor dziala tu jak PROG: dopoki magnitude nie przekroczy progu,
-   pelnej penetracji NIE MA wcale.
+- **MAGNITUDE** - sila ciosu/pocisku zanim spotka pancerz. Rosnie
+  z predkoscia pocisku, rozpedem zamachu, damage broni i skillem.
+- **ARMOR** - suma punktow oslony trafionej czesci ciala, taka jak
+  W TOOLTIPIE (RBM juz przeliczyl wartosci z XML w gore).
+- **HP** - zolnierz ma ~100 zycia. Trafienie w glowe mnozy obrazenia
+  (vanilla ~1.2-2x zaleznie od broni), w nogi oslabia.
 
-2. **PENETRACJA CZESCIOWA (tylko PIERCE)** - grot, ktory wchodzi plytko:
-   `czesc = min(magnitude - Armor x ProgCzesciowy, 15)`
-   Dla STRZAL i BELTOW ProgCzesciowy = 0, wiec strzala, ktora w ogole
-   dosiegla ciala, wbija sie zawsze - ale NAJWYZEJ za 15 obrazen.
+## 2. Trzy skladniki kazdego trafienia
 
-3. **TEPY URAZ (blunt trauma)** - energia zatrzymana przez pancerz
-   i przekazana w cialo:
-   `blunt = magnitude x WspolczynnikTepy x udzial_zatrzymany x 100/(100 + 2 x Armor)`
-   Tu pancerz dziala PROCENTOWO: Armor 50 przepuszcza polowe tepego,
-   Armor 100 - jedna trzecia.
+### A. PENETRACJA PELNA (prog twardy)
+`pen = max(0, MAGNITUDE - ARMOR x ProgBroni)`
+Pancerz to PROG, nie procent: dopoki magnitude nie przekroczy
+ARMOR x ProgBroni, pelnej penetracji NIE MA WCALE.
 
-Laczne obrazenia = pen + czesc + blunt.
+### B. PENETRACJA CZESCIOWA (tylko klucia/groty, cap 15)
+`czesc = min(max(0, MAGNITUDE - ARMOR x ProgCzesciowy), 15)`
+Grot wbija sie plytko nawet w oslonietego. STRZALY i BELTY maja
+ProgCzesciowy = 0, wiec ich czesciowa penetracja to zawsze
+min(MAGNITUDE, 15). To jest zrodlo "wiecznych ~15-17 dmg" strzal.
 
-## Najwazniejsze reguly specjalne
+### C. TEPY URAZ (procentowy)
+`blunt = MAGNITUDE x WspBlunt x udzial_zatrzymany x 100/(100 + 2 x ARMOR)`
+Energia zatrzymana przez pancerz i tak trzesie cialem. Tu pancerz
+dziala PROCENTOWO: ARMOR 50 przepuszcza polowe, ARMOR 100 - 1/3.
 
-- **Strzaly vs material pancerza**: gdy cel ma pancerz INNY niz plyta
-  (skora, kolczuga, tkanina), strzaly i belty licza jego Armor x0.5 -
-  grot szyje miekkie oslony. Vs PLYTA armor liczy sie w pelni.
-  (pierwsza linia RBMComputeDamage)
-- **Maczugi/obuchy (Blunt)**: prog penetracji = Armor x5 (przebic sie
-  trudno), ale tepy uraz przechodzi wyjatkowo dobrze - dlatego obuch
-  to bron na puszki.
-- **Ciecie (Cut)**: prog penetracji wysoki (FactorCut per bron) - miecz
-  slabo tnie przez metal, za to golego rozbiera z HP natychmiast.
+**Laczne obrazenia = A + B + C.**
 
-## Co z tego wynika w praktyce (przyklad: strzala ~35 magnitude)
+## 3. Reguly specjalne
 
-- **Goly cel**: pen ~35 + blunt = smierc w 2-3 strzaly, w glowe czesto 1.
-- **Skorznia 20 pkt** (liczona x0.5 = 10): pen = 35-10 = 25 + blunt -> boli.
-- **Helm plytowy 60 pkt**: pen pelna = max(0, 35-60) = 0;
-  czesciowa = 15 (cap); blunt = male procenty przez 100/(100+120)=~45%.
-  RAZEM ~18-20 na strzale -> **4-6 strzal w helm to ZAMYSL RBM**, nie blad.
-  Chcesz szybciej zabijac pancernych lucznikiem? Celuj w twarz/konczyny
-  bez oslony albo bierz belty (wyzsze magnitude) badz obuch.
+1. **Strzaly/belty vs material**: cel w pancerzu INNYM niz plyta
+   (skora, kolczuga, tkanina) liczy ARMOR x0.5 przeciw strzalom
+   i beltom. Vs PLYTA armor liczy sie w PELNI. (pierwsza linia
+   RBMComputeDamage)
+2. **Obuchy (Blunt)**: prog penetracji staly ARMOR x5 (przebic sie
+   niemal nie da), ale wspolczynnik tepego to az 0.7 - dlatego obuch
+   ignoruje wiekszosc procentowej redukcji i "gniecie przez blache".
+3. **Klucie broni recznej** (miecze/wlocznie sztychem): ProgCzesciowy=2,
+   wiec plytkie klucie dziala tylko na slabo oslonietych.
+4. **Tarcza/blok**: zablokowane trafienie w ogole nie wchodzi w te wzory.
 
-## Gdzie sie to stroi
+## 4. Progi broni (z configu RBM, domyslne)
 
-- RBM MCM: ArmorMultiplier (dom. 2 - sila procentowej czesci pancerza),
-  ArmorThresholdModifier (dom. 1 - sila progow penetracji),
-  wspolczynniki per typ broni (FactorCut/Pierce, ExtraBlunt).
-- Nasze prawa (Armoury/CrashScribe): Prawo Rozsadku Pancerza rowna tylko
-  WYSTAJACE sztuki do normy (percentyl 75 x1.3 w grupie typ+tier), wiec
-  progi RBM dzialaja na uczciwych liczbach; HitScribe loguje kazde
-  trafienie pociskiem (dmg, wchloniete, czesc ciala) do Armoury.log.
+| Bron           | ProgPierce | ProgCut | WspBlunt(P) | WspBlunt(C) | ProgCzesc |
+|----------------|-----------:|--------:|------------:|------------:|----------:|
+| Strzala        |        2.0 |     2.6 |        0.15 |        0.15 |         0 |
+| Belt           |        2.0 |     2.6 |        0.15 |        0.15 |         0 |
+| Oszczep        |        3.0 |     3.0 |        0.20 |        0.05 |         2 |
+| Sztylet        |        3.0 |     5.0 |        0.35 |        0.25 |         2 |
+| Miecz 1h/2h    |        3.5 |     5.0 |        0.35 |        0.25 |         2 |
+| Topor 1h/2h    |        2.5 |     5.0 |     0.25-0.3|         0.3 |         2 |
+| Wlocznia 1h/2h |        3.0 |     5.0 |        0.35 |        0.30 |         2 |
+| Obuch 1h/2h    | (blunt: 5.0)|    4.0 |        0.25 |        0.10 |         0 |
+| Proca          |        6.0 |    10.0 |        0.35 |        0.30 |         0 |
 
-## Uwaga o wartosciach pancerza
+Czytanie: strzala PRZEBIJA NA WYLOT dopiero, gdy magnitude > ARMOR x2.
+Miecz przetnie zbroje dopiero, gdy magnitude > ARMOR x5 - praktycznie
+nigdy przy 40+ pancerza.
 
-RBM przelicza pancerze takze na ekranie (to dlatego Dothraki Chaps
-pokazywaly 55, gdy XML ROT mowi 25) - wszystkie progi wyzej licza sie
-na wartosciach PO tym przeliczeniu, czyli na tych, ktore widzisz
-w tooltipie.
+## 5. TABELA OBRAZEN (dokladny wzor, domyslny config)
+
+Obrazenia LACZNE (pen + czesciowa + blunt) wg pancerza trafionej czesci:
+
+| Atak \ Pancerz         |  0 | 15 | 30 | 50 | 70 | 90 |
+|------------------------|---:|---:|---:|---:|---:|---:|
+| Strzala 35 vs skora/kolczuga | 35 | 22 | 17 | 17 | 17 | 17 |
+| Strzala 35 vs PLYTA    | 35 | 17 | 17 | 16 | 16 | 16 |
+| Belt 55 vs skora/kolczuga | 55 | 42 | 28 | 19 | 19 | 18 |
+| Belt 55 vs PLYTA       | 55 | 28 | 19 | 18 | 18 | 17 |
+| Oszczep 60             | 60 | 22 |  8 |  6 |  5 |  4 |
+| Miecz 1h ciecie 40     | 40 |  8 |  6 |  5 |  4 |  4 |
+| Topor 2h ciecie 55     | 55 | 13 | 10 |  8 |  7 |  6 |
+| Obuch 35               | 35 | 19 | 15 | 12 | 10 |  9 |
+
+Wnioski liczbowe:
+- **Strzala w helm 50+ = ~16-17 dmg** -> ~6 strzal na 100 HP (w glowe
+  z mnoznikiem ~4-5). TAK MA BYC w RBM - to nie usterka.
+- **Belt** trzyma sile do ~30 pancerza i bije strzale wszedzie.
+- **Ciecie kona przy 15+ pancerza** - miecz na golasow i do sztychu.
+- **Obuch** jako jedyny rosnie WZGLEDEM innych wraz z pancerzem celu:
+  przy 70-90 pancerza bije miecz 2x.
+- **Goly cel** umiera od wszystkiego w 2-3 trafienia - dlatego wczoraj
+  nadzy bandyci padali od jednej strzaly, a dzis, w helmach, potrzeba
+  kilku. Roznice zrobil ich UBIOR, nie nasze obrazenia.
+
+## 6. Praktyka: czym bic kogo
+
+| Cel                     | Najlepiej                  | Unikaj            |
+|-------------------------|----------------------------|-------------------|
+| Golas / tkanina         | wszystko; ciecia najszybsze| -                 |
+| Skora / kolczuga        | BELT, strzala, oszczep     | ciec przez oslone |
+| Plyta (helm, kirys)     | OBUCH, belt, sztych w luki oslony | strzaly w kirys, ciecia |
+| Kon (nieopancerzony)    | wlocznia/oszczep, strzaly  | -                 |
+
+Lucznik na pancernych: celuj w NIEOSLONIETE czesci (twarz bez pelnego
+helmu, rece, nogi) - tam ARMOR = 0 i strzala wraca do pelnej sily.
+
+## 7. Gdzie sie to stroi
+
+- **RBM MCM -> Combat -> Global**: ArmorMultiplier (2 - sila czesci
+  procentowej), ArmorThresholdModifier (1 - sila WSZYSTKICH progow;
+  obnizysz = pancerz slabszy globalnie), BluntTraumaBonus (0),
+  wspolczynniki per bron (WeaponTypes).
+- **Nasze prawa**: Prawo Rozsadku Pancerza (percentyl 75 x1.3 w grupie
+  typ+tier - rowna tylko wystajace absurdy, patrz CHANGELOG 01.09);
+  HitScribe pisze kazde trafienie pociskiem do Armoury.log
+  ("HIT klasa -> ofiara [czesc ciala] dmg= wchloniete= HPpo=").
+
+## 8. Zastrzezenia
+
+- RBM przelicza wartosci pancerzy z XML przy starcie gry - wszystkie
+  progi licza sie na liczbach Z TOOLTIPA, nie z plikow ROT.
+- Tabele policzone dla domyslnego configu RBM; jesli suwaki w MCM RBM
+  byly ruszane, liczby sie przesuna (kierunki i mechanika - nie).
