@@ -149,6 +149,26 @@ namespace Armoury
             return r;
         }
 
+        /// <summary>Waga sztuki metalu danego tieru z zywych danych gry
+        /// (Jeff 01.09: "jeden iron wazy 0.5") - fallback 0.5, gdyby item
+        /// nie mial wagi.</summary>
+        private static float IngotKg(int tier)
+        {
+            try
+            {
+                var it = MaterialItem(IronForTier(tier));
+                return it != null && it.Weight > 0.01f ? it.Weight : 0.5f;
+            }
+            catch { return 0.5f; }
+        }
+
+        /// <summary>Waga sztuki drewna (Jeff: "drewno wazy akurat 10").</summary>
+        private static float WoodKg()
+        {
+            try { return _wood != null && _wood.Weight > 0.01f ? _wood.Weight : 10f; }
+            catch { return 10f; }
+        }
+
         private static Recipe BuildRecipe(ItemObject item)
         {
             ResolveGoods();
@@ -175,7 +195,7 @@ namespace Armoury
                     int soft = Math.Min(u, softCap);
                     Add(r, _linen, soft);
                     if (u - soft > 0) Add(r, MaterialItem(IronForTier(tier)), u - soft);   // okucia, nity, sprzaczki
-                    if (tier >= 5) Add(r, _velvet, MathF.Max(1, MathF.Ceiling(soft * 0.3f)));
+                    // velvet wypadl (Jeff 01.09: "pancerze nie potrzebuja velvet, to nie suknia")
                     r.Stamina = MathF.Max(3, (int)(tier * s.StaminaPerTier * 0.4f));
                     r.SkillNeeded = MathF.Max(0, (tier - 1) * s.SmithingSkillPerTier - 20);
                     return r;
@@ -194,6 +214,30 @@ namespace Armoury
                     return r;
                 }
 
+                // --- PRAWO WAGI KUZNI (Jeff 01.09): pancerz metalowy liczy sie
+                // Z WAGI, nie z punktow ochrony. 80% wagi w metalu SWOJEGO
+                // tieru + 20% wagi w metalu o tier nizej (T1: wszystko w T1),
+                // sztuki wedle realnej wagi ingota (0.5 kg); do tego zawsze
+                // 1 skora albo 1 len na podpinke. Bez velvet i bez wegla -
+                // kwit plytnerza, nie huty. Przyklad Jeffa: 20 kg T5 =
+                // 32x iron5 + 8x iron4 + 1 skora. ---
+                if (item.HasArmorComponent)
+                {
+                    int hi = MathF.Max(1, MathF.Ceiling(weight * 0.8f / IngotKg(tier)));
+                    Add(r, MaterialItem(IronForTier(tier)), hi);
+                    if (tier >= 2)
+                    {
+                        int lo = MathF.Max(1, MathF.Ceiling(weight * 0.2f / IngotKg(tier - 1)));
+                        Add(r, MaterialItem(IronForTier(tier - 1)), lo);
+                    }
+                    // podpinka: skora, a dla lekkich oslon len (do 3 kg)
+                    Add(r, weight <= 3f && _linen != null ? _linen : _leather, 1);
+                    float fidA = IsFiddly(item.ItemType) ? (1f + s.FiddlyStaminaBonus) : 1f;
+                    r.Stamina = MathF.Max(5, (int)(tier * s.StaminaPerTier * fidA));
+                    r.SkillNeeded = (tier - 1) * s.SmithingSkillPerTier;
+                    return r;
+                }
+
                 // --- LUCZARNIA (Jeff: "dodaj do forge tworzenie kuszy lukow strzal boltow"):
                 // luk to DREWNO, rog i sciegno - zelazo tylko na okucia, zamki i groty.
                 // Stary przepis liczyl luki jak plachy metalu, stad bzdurne kwity. ---
@@ -205,29 +249,32 @@ namespace Armoury
                     // nie do kupienia), starczy rzemien ze skory (sciegno)
                     var bowstring = ((_linen == null || CountInInventory(_linen) <= 0)
                                      && _leather != null && CountInInventory(_leather) > 0) ? _leather : _linen;
-                    if (tt == ItemObject.ItemTypeEnum.Bow)
+                    if (tt == ItemObject.ItemTypeEnum.Bow || tt == ItemObject.ItemTypeEnum.Crossbow)
                     {
-                        Add(r, _wood, MathF.Max(2, MathF.Ceiling(weight * 2f)));
-                        Add(r, bowstring, 1);
-                        // okucia ROSNA Z TIEREM 1:1 (Jeff: "luk tier 6 = stal tier 6")
-                        if (tier >= 3) Add(r, MaterialItem(IronForTier(tier)), 1);
-                        if (tier >= 4) Add(r, _leather, 1);                             // owijka chwytu
-                    }
-                    else if (tt == ItemObject.ItemTypeEnum.Crossbow)
-                    {
-                        Add(r, _wood, MathF.Max(2, MathF.Ceiling(weight * 1.2f)));
+                        // PRAWO WAGI (Jeff 01.09): 75% wagi w drewnie, 25% wagi
+                        // w metalu SWOJEGO tieru ("t6 = iron6"), kazdy skladnik
+                        // minimum 1 sztuka. Kusza liczy sie tak samo.
+                        Add(r, _wood, MathF.Max(1, MathF.Ceiling(weight * 0.75f / WoodKg())));
                         Add(r, MaterialItem(IronForTier(tier)),
-                            MathF.Max(1, MathF.Ceiling(baseIron * 0.5f)));              // zamek, orzech, strzemie - stal wg tieru
-                        Add(r, MaterialItem(CraftingMaterials.Charcoal), 1);
+                            MathF.Max(1, MathF.Ceiling(weight * 0.25f / IngotKg(tier))));
                         Add(r, bowstring, 1);
                     }
                     else
                     {
-                        // strzaly i belty: DREWNO i GROTY, nic wiecej - lotki
-                        // strugasz z piora znalezionego po drodze, nie z beli lnu.
-                        // Groty rosna z tierem: strzaly t6 = stal thamaskenska.
-                        Add(r, _wood, 2);                                               // promienie i brzechwy
-                        Add(r, MaterialItem(IronForTier(tier)), 1);                     // groty wg tieru
+                        // PRAWO WAGI dla amunicji (Jeff 01.09, rachunek na
+                        // Ravens' Teeth: 40 g x 30 strzal = 1.2 kg -> 2 zelaza,
+                        // seria x3 -> 6): masa kolczana = waga strzaly x stack,
+                        // zelazo tieru strzaly = masa / waga ingota (W DOL,
+                        // min 1) x kolczany w serii; drewno 1 na cala serie
+                        // (sztuka drewna wazy 10 kg - starcza z zapasem).
+                        float perShaft = MathF.Max(0.01f, item.Weight);
+                        int stack = item.PrimaryWeapon != null
+                            ? Math.Max(1, (int)item.PrimaryWeapon.MaxDataValue) : 30;
+                        float quiverKg = perShaft * stack;
+                        int batch = Math.Max(1, s.AmmoBatchStacks);
+                        int heads = Math.Max(1, (int)MathF.Floor(quiverKg / IngotKg(tier))) * batch;
+                        Add(r, MaterialItem(IronForTier(tier)), heads);
+                        Add(r, _wood, 1);
                     }
                     bool ammo = tt == ItemObject.ItemTypeEnum.Arrows || tt == ItemObject.ItemTypeEnum.Bolts;
                     // szczyt rzemiosla kosztuje: luki i kusze tieru 5-6 zra

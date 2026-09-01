@@ -1,5 +1,33 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-01 — PRAWO WAGI KUZNI: materialy z wagi wyrobu (pancerze, luki, kusze, amunicja)
+**Mod:** Armoury | **Pliki:** `Armoury/src/Recipes.cs`
+**Problem:** Jeff: "znalazlem blad w kuciu - trzeba inaczej przypisac
+materialy". Stary kwit liczyl pancerze z punktow ochrony (ArmourUnits),
+luki mnoznikami od wagi, strzaly ryczaltem 2 drewna + 1 zelazo.
+**Zmiana (model Jeffa, doslownie):**
+- PANCERZ metalowy (Plate/Chain, tez ladry konskie): 80% wagi w metalu
+  SWOJEGO tieru + 20% wagi w metalu o tier nizej (T1: calosc w T1),
+  sztuki wg realnej wagi ingota z danych gry (0.5 kg; helper IngotKg
+  z fallbackiem) + zawsze 1 skora (len przy wadze <=3 kg). BEZ velvet
+  ("to nie suknia") i bez wegla. Przyklad: 20 kg T5 = 32x iron5 + 8x iron4
+  + 1 skora.
+- LUK i KUSZA: 75% wagi w drewnie, 25% wagi w metalu SWOJEGO tieru,
+  kazdy skladnik minimum 1; cieciwa (len/skora) zostaje. Mnoznik
+  RangedHighTierCostFactor dla T5+ dziala jak dotad NA wyniku.
+- STRZALY i BELTY: masa kolczana = waga strzaly x stack (Ravens' Teeth:
+  0.041 kg x 33 = ~1.35 kg); zelazo tieru strzaly = masa / waga ingota
+  W DOL (min 1) x kolczany w serii (AmmoBatchStacks=3); drewno 1 na serie
+  (sztuka drewna 10 kg). Rachunek Jeffa: 1.2 kg -> 2 zelaza, x3 = 6.
+- Tkaniny (Cloth): velvet usuniety takze tam.
+Bron biala, tarcze, stamina, progi skilla — bez zmian. Legendize dalej
+mnozy wynik formuly.
+**Ryzyko / co sprawdzic:** kwit pancerza 20 kg T5 ma pokazac 32+8+1;
+luk ~0.5 kg T6 = 1 drewno + 1 iron6 + cieciwa (x2 od mnoznika T5+);
+seria strzal t6 = 6x iron6 + 1 drewno. Smelt (odzysk) NIE byl ruszany -
+sprawdzic, czy odzysk nie przewyzsza nowego kwitu (ryzyko dojenia).
+**Status:** WGRANE (gra zamknieta, cmp zgodny)
+
 ## 2026-08-31 — Brama kucia zacisnieta do tieru 1 (z podloga craftu i samokontrola)
 **Mod:** CrashScribe + Armoury | **Pliki:** `CrashScribe/src/Mends.cs`, `Armoury/src/Settings.cs` (+McmSettings)
 **Problem:** Jeff (screen kuzni, Free Build, "Yitish Blade" T4 difficulty 200
