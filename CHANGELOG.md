@@ -1,5 +1,36 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-01 — Audyt pancerzy: model wagowy COFNIETY, percentylowy w zamian + filtr kultury degradacji
+**Mod:** CrashScribe + Armoury | **Pliki:** `CrashScribe/src/Mends.cs` (ArmorSanity), `Armoury/src/Settings.cs`, `Armoury/src/SkillsDecide.cs`, `Armoury/src/DragonUnmount.cs`, `Armoury/src/DressCode.cs`, `docs/ZASADY-OBRAZEN-RBM.md` (nowy)
+**Problem (Jeff):** "zrob audyt pancerzy - nie mozemy za bardzo obnizyc,
+zeby nie zniszczyc balansu frakcji; Dothrakowie MAJA byc slabo opancerzeni;
+i jakim cudem bandyci w Riverrun biegaja w dothrackich pancerzach!"
+**Audyt (skrypt na danych ROT+vanilla, 1600+ pancerzy):** model wagowy
+z rana przycinalby 82-100% pancerzy KAZDEJ frakcji do srednio ~30%
+wartosci (Polnoc: 89% cietych do 28%) - ROT celowo daje lekkie wagi przy
+wysokiej ochronie, wiec sufit od kg to rzez balansu. COFNIETY po kilku
+godzinach zycia.
+**Zmiany:** (1) ArmorSanity = model PERCENTYLOWY: norma grupy (typ, tier)
+to percentyl 75 sumy punktow, sufit = norma x1.3 (suwaki
+ArmorOutlierPercentile/Tolerance; stare per-kg usuniete z MCM); rownane
+sa tylko WYSTAJACE absurdy (valyrian_surcoat 396 pkt, chapsy, szlacheckie
+sukienki 32 pkt na 0.4 kg), grupy <5 sztuk nietykane; Dothrakowie sa
+ponizej median - nie tracą nic. (2) TopArmor z FILTREM KULTURY: pula
+degradacji = itemy kultury jednostki + bezkulturowe; pusta pula kulturowa
+dopiero wtedy otwiera swiat. (3) Dothrackie pancerze na bandytach to DANE
+ROT: steppe_bandits sa celowo przeskinowani na dothrackich maruderow
+(bandits.xslt: dothraki_armor8 + face fighter_dothraki, kultura khuzait)
+- wedruja po Riverlands jak kazdy bandyta; nie ruszane bez decyzji.
+(4) docs/ZASADY-OBRAZEN-RBM.md: pelny wzor obrazen z dekompilacji
+(penetracja progowa, czesciowa do 15 dla strzal, blunt przez
+100/(100+2xArmor), strzaly licza pol pancerza vs nie-plyta, pelny vs
+plyta) + przyklady i werdykt: 4-6 strzal w helm plytowy to zamysl RBM.
+**Ryzyko / co sprawdzic:** log "prawo rozsadku (percentyl 75 x1.3) -
+zrownane N" - spodziewane KILKADZIESIAT sztuk, nie setki; chapsy w
+tooltipie po restarcie wyraznie nizej; bandyci przy Riverrun w dothrackim
+to steppe bandits (dane), reszta degradacji juz kulturowa.
+**Status:** WGRANE (gra byla zamknieta)
+
 ## 2026-09-01 — Prawo Rozsadku Pancerza + zalozone na gorze lawy + dziennik trafien
 **Mod:** CrashScribe + Armoury | **Pliki:** `CrashScribe/src/Mends.cs` (ArmorSanity), `Armoury/src/Settings.cs`, `Armoury/src/SmithMenu.cs`, `Armoury/src/HitScribe.cs` (nowy), `Armoury/src/SubModuleMain.cs`
 **Problem (Jeff, screeny):** (1) "Dothraki Chaps 4 kg daja 55 pancerza -

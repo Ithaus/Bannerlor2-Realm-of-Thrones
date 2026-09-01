@@ -74,7 +74,7 @@ namespace Armoury
                     // czysty continue rozbieralby pol krolestwa).
                     if (troop != null && !ItemReq.Meets(troop, it))
                     {
-                        it = SkillsDecide.TopArmor(it.ItemType, ath);
+                        it = SkillsDecide.TopArmor(it.ItemType, ath, troop != null ? troop.Culture : null);
                         if (it == null) continue;
                     }
                     dressed[sl] = new EquipmentElement(it);

@@ -103,7 +103,7 @@ namespace Armoury
                         {
                             var a = eq[(EquipmentIndex)slot].Item;
                             if (a == null || ItemReq.Meets(soldier, a)) continue;
-                            var top = SkillsDecide.TopArmor(a.ItemType, ath);
+                            var top = SkillsDecide.TopArmor(a.ItemType, ath, soldier.Culture);
                             // PODLOGA SPRZETU (Jeff 31.08: "tylko zeby nadzy nie
                             // wyszli"): brak lzejszej sztuki = zolnierz zostaje
                             // w swoim pancerzu. Zla statystyka jest mniejszym zlem

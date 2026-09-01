@@ -943,10 +943,19 @@ namespace CrashScribe
             {
                 if (ArmouryFloat("ArmorSanityEnabled", 1f) < 0.5f)
                 { Scribe.Line("Mends: prawo rozsadku pancerza wylaczone suwakiem."); return; }
-                float perPlate = ArmouryFloat("ArmorPointsPerKgPlate", 3.2f);
-                float perChain = ArmouryFloat("ArmorPointsPerKgChain", 2.6f);
-                float perLeather = ArmouryFloat("ArmorPointsPerKgLeather", 2.0f);
-                float perCloth = ArmouryFloat("ArmorPointsPerKgCloth", 1.4f);
+                // MODEL PERCENTYLOWY (audyt 01.09 zabil model wagowy: ROT daje
+                // celowo lekkie wagi przy wysokiej ochronie, wiec sufit od kg
+                // przycinalby 82-100% pancerzy KAZDEJ frakcji do ~30% wartosci
+                // - rzez balansu, przed ktora Jeff wprost ostrzegal). Zamiast
+                // tego swiat sam wyznacza norme: percentyl P sumy punktow w
+                // grupie (typ, tier), sufit = P x tolerancja. Rowna sie tylko
+                // WYSTAJACE absurdy (chapsy 55 pkt, surcoat 396 pkt), a caly
+                // rozklad frakcji zostaje jak byl. Dothrakowie sa ponizej
+                // median - nie tracą nic.
+                float pct = ArmouryFloat("ArmorOutlierPercentile", 75f);
+                float tol = ArmouryFloat("ArmorOutlierTolerance", 1.30f);
+                if (pct < 50f || pct > 99f) pct = 75f;
+                if (tol < 1f || tol > 3f) tol = 1.30f;
 
                 var tArm = typeof(TaleWorlds.Core.ArmorComponent);
                 var fHead = AccessTools.Field(tArm, "<HeadArmor>k__BackingField");
@@ -956,26 +965,46 @@ namespace CrashScribe
                 if (fHead == null || fBody == null || fLeg == null || fArm == null)
                 { Scribe.Line("Mends: ArmorComponent bez backing fields - prawo rozsadku spi."); return; }
 
-                int trimmed = 0; string worst = ""; float worstRatio = 1f;
-                foreach (var it in TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
+                bool Wanted(ItemObject it)
                 {
-                    if (it == null || !it.HasArmorComponent || it.NotMerchandise) continue;
+                    if (it == null || !it.HasArmorComponent || it.NotMerchandise) return false;
                     var ty = it.ItemType;
                     if (ty != ItemObject.ItemTypeEnum.HeadArmor && ty != ItemObject.ItemTypeEnum.BodyArmor
                         && ty != ItemObject.ItemTypeEnum.LegArmor && ty != ItemObject.ItemTypeEnum.HandArmor
-                        && ty != ItemObject.ItemTypeEnum.Cape) continue;
+                        && ty != ItemObject.ItemTypeEnum.Cape) return false;
+                    var a0 = it.ArmorComponent;
+                    return a0.HeadArmor + a0.BodyArmor + a0.LegArmor + a0.ArmArmor > 0;
+                }
+
+                // przebieg 1: normy grup (typ, tier)
+                var groups = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.List<int>>();
+                foreach (var it in TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
+                {
+                    if (!Wanted(it)) continue;
+                    var a = it.ArmorComponent;
+                    string g = it.ItemType + "|" + (int)it.Tier;
+                    System.Collections.Generic.List<int> l;
+                    if (!groups.TryGetValue(g, out l)) groups[g] = l = new System.Collections.Generic.List<int>();
+                    l.Add(a.HeadArmor + a.BodyArmor + a.LegArmor + a.ArmArmor);
+                }
+                var caps = new System.Collections.Generic.Dictionary<string, float>();
+                foreach (var kv in groups)
+                {
+                    if (kv.Value.Count < 5) continue;   // za mala grupa = brak normy, nie tykamy
+                    kv.Value.Sort();
+                    int idx = Math.Min(kv.Value.Count - 1, (int)(kv.Value.Count * pct / 100f));
+                    caps[kv.Key] = kv.Value[idx] * tol;
+                }
+
+                // przebieg 2: rownanie wystajacych do sufitu grupy
+                int trimmed = 0; string worst = ""; float worstRatio = 1f;
+                foreach (var it in TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
+                {
+                    if (!Wanted(it)) continue;
+                    float cap;
+                    if (!caps.TryGetValue(it.ItemType + "|" + (int)it.Tier, out cap)) continue;
                     var a = it.ArmorComponent;
                     int total = a.HeadArmor + a.BodyArmor + a.LegArmor + a.ArmArmor;
-                    if (total <= 0) continue;
-                    float perKg;
-                    switch (a.MaterialType)
-                    {
-                        case TaleWorlds.Core.ArmorComponent.ArmorMaterialTypes.Plate: perKg = perPlate; break;
-                        case TaleWorlds.Core.ArmorComponent.ArmorMaterialTypes.Chainmail: perKg = perChain; break;
-                        case TaleWorlds.Core.ArmorComponent.ArmorMaterialTypes.Leather: perKg = perLeather; break;
-                        default: perKg = perCloth; break;
-                    }
-                    float cap = Math.Max(1f, it.Weight) * perKg;
                     if (total <= cap) continue;
                     float scale = cap / total;
                     fHead.SetValue(a, (int)Math.Round(a.HeadArmor * scale));
@@ -983,11 +1012,10 @@ namespace CrashScribe
                     fLeg.SetValue(a, (int)Math.Round(a.LegArmor * scale));
                     fArm.SetValue(a, (int)Math.Round(a.ArmArmor * scale));
                     trimmed++;
-                    if (scale < worstRatio) { worstRatio = scale; worst = it.StringId + " (" + total + " pkt przy " + it.Weight.ToString("0.#") + " kg)"; }
+                    if (scale < worstRatio) { worstRatio = scale; worst = it.StringId + " (" + total + " pkt, norma grupy " + ((int)cap) + ")"; }
                 }
-                Scribe.Line("Mends: prawo rozsadku pancerza - przyciete " + trimmed
-                            + " sztuk ponad sufit wagi (plate " + perPlate + "/kg, chain " + perChain
-                            + ", leather " + perLeather + ", cloth " + perCloth + ")"
+                Scribe.Line("Mends: prawo rozsadku pancerza (percentyl " + ((int)pct) + " x" + tol.ToString("0.##")
+                            + ") - zrownane " + trimmed + " wystajacych sztuk"
                             + (trimmed > 0 ? "; najgorszy absurd: " + worst : "") + ".");
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.ArmorSanity", null); } catch { } }

@@ -168,7 +168,7 @@ namespace Armoury
                     if (pin != null && ItemReq.Meets(ch, pin))
                     { reference[(EquipmentIndex)s] = new EquipmentElement(pin); continue; }
                     if (reference[(EquipmentIndex)s].Item == null) continue;   // szablon nie ubiera slotu - nie my
-                    var top = TopArmor(SlotArmorType(s), athletics);
+                    var top = TopArmor(SlotArmorType(s), athletics, ch.Culture);
                     if (top != null) reference[(EquipmentIndex)s] = new EquipmentElement(top);
                 }
                 // KON I RZAD (Jeff: "konie i pancerze tez, CALY ekwipunek!"):
@@ -255,7 +255,7 @@ namespace Armoury
         /// <summary>Najlepsza sztuka pancerza danego typu, ktorej WYMOG ATLETYKI
         /// (ItemReq: difficulty) jednostka udzwignie - cel przydzialu
         /// ("closest" = najlepsze dozwolone na stanie). Kubelki co 25 pkt.</summary>
-        internal static ItemObject TopArmor(ItemObject.ItemTypeEnum type, int athletics)
+        internal static ItemObject TopArmor(ItemObject.ItemTypeEnum type, int athletics, TaleWorlds.CampaignSystem.CultureObject culture = null)
         {
             // PROG DOKLADNY, nie kubelek co 25 (audyt 31.08): stare
             // cap = bucket*25+24 oddawalo jednostce sztuke do 24 pkt PONAD jej
@@ -263,17 +263,23 @@ namespace Armoury
             // Klucz cache tez musi byc dokladny, inaczej Atletyka 10 dostaje
             // z cache wpis wygrzany przez Atletyke 24.
             if (athletics < 0) athletics = 0;
-            string key = type + "|" + athletics;
+            var cult = culture;
+            string key = type + "|" + athletics + "|" + (cult != null ? cult.StringId : "-");
             // ROZNORODNOSC W RAMACH TIERU (Jeff 01.09: "wszyscy biegaja 1:1,
             // glupio wyglada... losowo rozne ubrania, ten sam poziom pancerza").
             // Jeden najlepszy item klonowal wyglad calych hord - teraz cache
             // trzyma CALE pasmo najwyzszego osiagalnego tieru, a kazde wywolanie
             // (= kazdy zolnierz przy spawnie) losuje z niego sztuke.
+            // FILTR KULTURY (Jeff 01.09: "nie beda biegac w ciuchach Dorn...
+            // jakim cudem bandyci w Riverrun w dothrackich pancerzach!"):
+            // pula = itemy kultury JEDNOSTKI + bezkulturowe wspolne. Gdy pula
+            // kulturowa pusta, dopiero wtedy caly swiat (lepsze obce niz golizna).
             List<ItemObject> band;
             if (!TopArmorBandCache.TryGetValue(key, out band))
             {
                 bool ok = true;
                 var pool = new List<ItemObject>();
+                var poolAny = new List<ItemObject>();
                 try
                 {
                     foreach (var it in MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
@@ -282,8 +288,10 @@ namespace Armoury
                         if (it.Difficulty > athletics) continue;                               // atletyka rzadzi
                         if (it.NotMerchandise) continue;                                       // unikaty imienne i itemy testowe (dummy_armor_*)
                         if (it.StringId != null && it.StringId.EndsWith("_crown")) continue;   // korony to regalia
-                        pool.Add(it);
+                        poolAny.Add(it);
+                        if (cult == null || it.Culture == null || it.Culture == cult) pool.Add(it);
                     }
+                    if (pool.Count == 0) pool = poolAny;
                 }
                 catch (Exception e) { ok = false; Log.Error("SkillsDecide.TopArmor", e); }
                 band = null;
