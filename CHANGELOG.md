@@ -1,5 +1,32 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-01 — "Nie moge zrobic load" (save chce War Sails): wyzerowany manifest Steama, nie launcher
+**Mod:** (Steam) | **Pliki:** `Steam\steamapps\appmanifest_261550.acf`, `steamapps\workshop\appworkshop_3450310.acf`
+**Problem (Jeff, screen):** ekran SAVED CAMPAIGNS, tooltip "This save file
+was created with the War Sails module, which has been removed from the
+game"; Jeff: "war sail nie wlaczyles".
+**Sledztwo:** launcher NIE jest winny - LauncherData.xml mial NavalDLC
+zaznaczony (wpis #13). NavalDLC (War Sails) to OFICJALNE DLC
+(ModuleType OfficialOptional) - silnik przy starcie pyta Steam API
+o posiadanie i INSTALACJE; manifest Bannerlorda w Steamie
+(appmanifest_261550.acf, 1291 B) byl W CALOSCI z zer - zapisany
+13:17:07, dwie sekundy przed padem komputera. Steam po restarcie
+uznal gre+DLC za niezainstalowane -> silnik wycinal NavalDLC z kazdej
+sesji. Dwa "crashe" BLSE LauncherEx (13:43, 13:54) to NIE osobny
+problem - BLSE odpala gre w tym samym procesie, wiec to byly nasze
+znane incydenty (zepsuty Armoury.dll i konfig RBM). Drobiazg: launcher
+przy 13:59 sam dolaczyl StoryMode (DefaultModule) - nieszkodliwe.
+**Zmiana:** zeroed manifesty odlozone jako *.zeroed-2026-09-01;
+podlozony minimalny appmanifest_261550.acf (appid, installdir,
+StateFlags 2 = weryfikacja) - Steam przy starcie wykrywa istniejace
+pliki i odbudowuje manifest bez pobierania gry. Steam zamykal Jeff
+(klasyfikator nie pozwolil mi ubic procesu).
+**Ryzyko / co sprawdzic:** po starcie Steama krotka weryfikacja
+Bannerlorda (NIE pelne pobieranie); potem War Sails na liscie modulow
+sesji i load Ironmana przechodzi. Jesli Steam chce pobierac dziesiatki
+GB - STOP i wracamy.
+**Status:** ZROBIONE - DO SPRAWDZENIA (start Steama + load)
+
 ## 2026-09-01 — Crash przy starcie po naprawie DLL: dziura z zer w configu RBM, zalatana wartosciami domyslnymi
 **Mod:** (cudzy config) | **Pliki:** `Documents\...\Configs\RBM\config.xml`
 **Problem (Jeff, screen):** po podmianie Armoury.dll gra dochodzi dalej,
