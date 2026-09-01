@@ -1034,6 +1034,72 @@ namespace CrashScribe
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.ArmorSanity", null); } catch { } }
         }
 
+        /// <summary>
+        /// PRAWO ROZSADKU AMUNICJI (Jeff 01.09, screen: Burning Arrows T1,
+        /// cena 3, "Bonus Damage: 150 Pierce" - "no bez przesady, to normalne
+        /// strzaly"). NavalDLC/RBM_WS daja strzalom zapalajacym thrust_damage
+        /// 150 (zwykle strzaly maja 1-10); ogien (fire_damage) zostaje - to
+        /// jego rola. Ten sam mechanizm co pancerze: norma = percentyl 75
+        /// obrazen w grupie (klasa pocisku, tier), sufit = norma x1.3,
+        /// wystajace przyciete. Grupy < 5 sztuk nietykane.
+        /// </summary>
+        internal static void AmmoSanity()
+        {
+            try
+            {
+                if (ArmouryFloat("ArmorSanityEnabled", 1f) < 0.5f) return;   // wspolny wlacznik praw rozsadku
+                var fThrust = AccessTools.Field(typeof(TaleWorlds.Core.WeaponComponentData), "<ThrustDamage>k__BackingField");
+                if (fThrust == null)
+                { Scribe.Line("Mends: WeaponComponentData bez pola ThrustDamage - rozsadek amunicji spi."); return; }
+
+                bool IsAmmoItem(ItemObject it)
+                {
+                    return it != null && !it.NotMerchandise
+                           && (it.ItemType == ItemObject.ItemTypeEnum.Arrows
+                               || it.ItemType == ItemObject.ItemTypeEnum.Bolts)
+                           && it.PrimaryWeapon != null;
+                }
+
+                var groups = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.List<int>>();
+                foreach (var it in TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
+                {
+                    if (!IsAmmoItem(it)) continue;
+                    int d = it.PrimaryWeapon.MissileDamage;
+                    if (d <= 0) continue;
+                    string g = it.ItemType + "|" + (int)it.Tier;
+                    System.Collections.Generic.List<int> l;
+                    if (!groups.TryGetValue(g, out l)) groups[g] = l = new System.Collections.Generic.List<int>();
+                    l.Add(d);
+                }
+                var caps = new System.Collections.Generic.Dictionary<string, float>();
+                foreach (var kv in groups)
+                {
+                    if (kv.Value.Count < 5) continue;
+                    kv.Value.Sort();
+                    int idx = Math.Min(kv.Value.Count - 1, (int)(kv.Value.Count * 0.75f));
+                    caps[kv.Key] = kv.Value[idx] * 1.3f;
+                }
+
+                int trimmed = 0;
+                var cuts = new System.Collections.Generic.List<string>();
+                foreach (var it in TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
+                {
+                    if (!IsAmmoItem(it)) continue;
+                    float cap;
+                    if (!caps.TryGetValue(it.ItemType + "|" + (int)it.Tier, out cap)) continue;
+                    var w = it.PrimaryWeapon;
+                    if (w.MissileDamage <= cap) continue;
+                    if (cuts.Count < 12) cuts.Add(it.StringId + " " + w.MissileDamage + "->" + ((int)cap));
+                    fThrust.SetValue(w, (int)cap);
+                    trimmed++;
+                }
+                if (trimmed > 0)
+                    Scribe.Line("Mends: prawo rozsadku amunicji - przyciete " + trimmed
+                                + " pociskow ponad norme grupy: " + string.Join(", ", cuts.ToArray()) + ".");
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.AmmoSanity", null); } catch { } }
+        }
+
         internal static void WeightLaw()
         {
             try
@@ -2278,7 +2344,7 @@ namespace CrashScribe
         {
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this,
                 delegate (CampaignGameStarter s)
-                { Mends.ArmorSanity(); Mends.WeightLaw(); Mends.SkillSinew(); Mends.UniqueWares(); Mends.LoreForgeGate(); Mends.DressTheNamesakes(); });
+                { Mends.ArmorSanity(); Mends.AmmoSanity(); Mends.WeightLaw(); Mends.SkillSinew(); Mends.UniqueWares(); Mends.LoreForgeGate(); Mends.DressTheNamesakes(); });
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this,
                 delegate (TaleWorlds.CampaignSystem.MapEvents.MapEvent m) { Mends.MeltDeadLoot(m); });
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this,

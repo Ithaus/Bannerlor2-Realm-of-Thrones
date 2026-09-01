@@ -1,5 +1,38 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-01 — Crash komputera: repo git uszkodzone, 6 plikow wyzerowanych; odzyskane + Prawo Rozsadku Amunicji (Burning Arrows 150 dmg)
+**Mod:** CrashScribe (+ repo) | **Pliki:** `CrashScribe/src/Mends.cs` (AmmoSanity), `.git` (naprawa)
+**Problem:** komputer padl ok. 13:17 (sesja Claude urwana w trakcie builda
+CrashScribe). Po restarcie: `git status` -> "index file corrupt", `git fsck`
+-> 3 uszkodzone luzne obiekty (m.in. blob CHANGELOG.md z HEAD). Na dysku
+6 plikow zrodlowych W CALOSCI wypelnionych zerami (NTFS po crashu):
+`Armoury/src/DragonUnmount.cs`, `Armoury/src/Settings.cs`,
+`CrashScribe/src/Mends.cs`, `GrandTourney/src/McmSettings.cs`,
+`RealisticCaptivity/src/McmSettings.cs`, `docs/ZASADY-OBRAZEN-RBM.md`.
+CHANGELOG.md i reszta repo nietkniete.
+**Odzyskanie:** (1) HEAD (3c270d0) = origin, wiec 3 uszkodzone obiekty
+przepisane ze swiezego klona GitHuba (te same hashe), index odbudowany
+(`git reset`, drzewo robocze nietkniete), fsck czysty; (2) 5 wyzerowanych
+plikow = wersje z HEAD (przywrocone `git checkout`); (3) Mends.cs mial
+NIEZACOMMITOWANA prace z 13:16 - odtworzona 1:1 z transkryptu urwanej
+sesji (edycja + sed z podpieciem), build daje DLL tego samego rozmiaru
+co ten z 13:16:53.
+**Odzyskana zmiana (Jeff, screen 13:14: "burning arrows piercing maja 150
+bo sa burning, no bez przesady, to normalne strzaly"):** AmmoSanity -
+ten sam mechanizm co ArmorSanity: dla strzal/beltow (handlowych) norma
+grupy (typ, tier) = percentyl 75 obrazen pocisku, sufit = norma x1.3,
+wystajace (Burning Arrows T1 z thrust 150 z NavalDLC/RBM_WS) przyciete
+do sufitu przez pole `<ThrustDamage>k__BackingField`; ogien (fire_damage)
+zostaje; grupy <5 sztuk nietykane; wspolny wlacznik ArmorSanityEnabled.
+Podpiete obok ArmorSanity przed WeightLaw.
+**Ryzyko / co sprawdzic:** w logu CrashScribe "Mends: prawo rozsadku
+amunicji - przyciete N pociskow ponad norme grupy: ..." (spodziewane
+kilka sztuk, w tym burning arrows 150->~10); tooltip Burning Arrows po
+restarcie bez "150 Pierce". Jesli log milczy - sprawdzic czy pole
+ThrustDamage istnieje ("rozsadek amunicji spi"). Po crashu warto tez
+zerknac, czy Windows nie wyzerowal czegos poza repo (save'y gry!).
+**Status:** WGRANE (gra byla zamknieta) - DO SPRAWDZENIA w logu
+
 ## 2026-09-01 — Audyt pancerzy: model wagowy COFNIETY, percentylowy w zamian + filtr kultury degradacji
 **Mod:** CrashScribe + Armoury | **Pliki:** `CrashScribe/src/Mends.cs` (ArmorSanity), `Armoury/src/Settings.cs`, `Armoury/src/SkillsDecide.cs`, `Armoury/src/DragonUnmount.cs`, `Armoury/src/DressCode.cs`, `docs/ZASADY-OBRAZEN-RBM.md` (nowy)
 **Problem (Jeff):** "zrob audyt pancerzy - nie mozemy za bardzo obnizyc,
