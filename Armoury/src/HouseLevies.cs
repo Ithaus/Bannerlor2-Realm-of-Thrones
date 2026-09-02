@@ -51,6 +51,12 @@ namespace Armoury
                 if (settlement == null || settlement.Notables == null) return;
                 var owner = settlement.OwnerClan;
                 if (owner == null || owner == Clan.PlayerClan || owner.DefaultPartyTemplate == null) return;
+                // TYLKO WLASNA ZIEMIA (02.09, screen Jeffa: puste, zamkniete sloty):
+                // ludzie rodu maja kulture rodu, a Mends.LocalLevies wyrzuca
+                // ochotnikow obcej kultury niz osada - dom z Westerlands trzymajacy
+                // wioske Riverlands wstawial swoich, latka ich kasowala i zostawal
+                // pusty slot. Ziemia rodzi ludzi rodu tylko tam, gdzie rod jest u siebie.
+                if (settlement.Culture == null || owner.Culture != settlement.Culture) return;
                 var tree = TreeOf(owner);
                 if (tree == null || tree.Count == 0) return;
 
@@ -63,7 +69,7 @@ namespace Armoury
                         var troop = slots[i];
                         if (troop == null || troop.IsHero || tree.Contains(troop)) continue;
                         if (!IsElite(troop)) continue;                    // tylko szlacheckie sloty - ta sama zasada co elity
-                        var repl = Pick(tree, troop.Tier);
+                        var repl = Pick(tree, troop.Tier, settlement.Culture);
                         if (repl == null || repl == troop) continue;
                         slots[i] = repl;
                         _swappedToday++;
@@ -136,13 +142,13 @@ namespace Armoury
         }
 
         /// <summary>Czlowiek rodu tego samego tieru (albo o jeden nizej/wyzej), losowo z pasujacych.</summary>
-        private static CharacterObject Pick(List<CharacterObject> tree, int tier)
+        private static CharacterObject Pick(List<CharacterObject> tree, int tier, CultureObject culture)
         {
             for (int spread = 0; spread <= 1; spread++)
             {
                 var cands = new List<CharacterObject>();
                 foreach (var c in tree)
-                    if (!c.IsHero && Math.Abs(c.Tier - tier) == spread) cands.Add(c);
+                    if (!c.IsHero && c.Culture == culture && Math.Abs(c.Tier - tier) == spread) cands.Add(c);
                 if (cands.Count > 0) return cands[MBRandom.RandomInt(cands.Count)];
             }
             return null;

@@ -723,6 +723,7 @@ namespace Armoury
                 var s = Settings.Current;
                 if (s == null || !s.NightRestEnabled || Debt < 1) return;
                 if (mobileParty == null || mobileParty != MobileParty.MainParty) return;
+                if (!SpeedDepth.OutermostFinal) return;          // lancuch modeli (ROT->RB->vanilla): kara tylko raz
                 // kara od WYNIKU (po suficie kolumny MarchPace - nasz postfix
                 // biegnie ostatni), nie od bazy: -25% ma byc widoczne takze
                 // w wolnej, objuczonej kolumnie. Vanillowy LimitMin(1) trzyma.
@@ -739,6 +740,7 @@ namespace Armoury
                 var s = Settings.Current;
                 if (s == null || !s.NightRestEnabled || Debt < 1) return;
                 if (mobileParty == null || mobileParty != MobileParty.MainParty) return;
+                if (!SpeedDepth.OutermostMorale) return;         // lancuch modeli morale: kara tylko raz
                 // procentowo ("morale spada o 95%"), nie punktowo - przy zapasci
                 // z bazowego ~50 zostaje ~2-3, ponizej progu dezercji: spiacego
                 // wojska pilnowac trzeba jak ognia

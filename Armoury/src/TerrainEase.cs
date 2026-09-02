@@ -33,11 +33,15 @@ namespace Armoury
     /// </summary>
     internal static class TerrainEase
     {
-        private static readonly TextObject _uForest = new TextObject("{=!}Forest (vanilla undone)");
-        private static readonly TextObject _uFord = new TextObject("{=!}Fording (vanilla undone)");
-        private static readonly TextObject _uDesert = new TextObject("{=!}Desert (vanilla undone)");
-        private static readonly TextObject _uSnow = new TextObject("{=!}Snow (vanilla undone)");
-        private static readonly TextObject _uNight = new TextObject("{=!}Night (vanilla undone)");
+        // JEDNA LINIA W ROZPISCE (Jeff 02.09: "po co tyle pozycji"): wpisy o tej
+        // samej nazwie ExplainedNumber SUMUJE, wiec cofniecie vanilli i nasza
+        // kara nazywaja sie tak samo jak wpis vanilli ("Night", "Forest"...) -
+        // w dymku zostaje jedna pozycja z wartoscia netto, np. "Night -0.5".
+        private static readonly TextObject _uForest = new TextObject("{=!}Forest");
+        private static readonly TextObject _uFord = new TextObject("{=!}Fording");
+        private static readonly TextObject _uDesert = new TextObject("{=!}Desert");
+        private static readonly TextObject _uSnow = new TextObject("{=!}Snow");
+        private static readonly TextObject _uNight = new TextObject("{=!}Night");
         private static readonly TextObject _aForest = new TextObject("{=!}Forest");
         private static readonly TextObject _aFord = new TextObject("{=!}Fording");
         private static readonly TextObject _aDesert = new TextObject("{=!}Desert");
@@ -60,6 +64,9 @@ namespace Armoury
                 if (c == null || !c.TerrainEaseEnabled) return;
                 var mp = __0;
                 if (mp == null || Campaign.Current == null) return;
+                // LANCUCH MODELI (ROT -> RealisticBannerlord -> vanilla): latamy kazdy,
+                // wiec bez tego bezpiecznika kara szla 2-3 razy ("Night -1" u Jeffa)
+                if (!SpeedDepth.OutermostFinal) return;
 
                 bool atSea = mp.IsCurrentlyAtSea;
                 TerrainType tt = TerrainType.Plain;

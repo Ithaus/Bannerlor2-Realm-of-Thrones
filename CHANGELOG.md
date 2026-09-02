@@ -1,5 +1,43 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-02 — Puste sloty werbunku (zaciag rodowy vs werbunek miejscowy) + kary predkosci liczone 2-3x (lancuch modeli)
+**Mod:** Armoury | **Pliki:** `Armoury/src/HouseLevies.cs`, `Armoury/src/SpeedDepth.cs` (nowy), `Armoury/src/TerrainEase.cs`, `Armoury/src/WorldPace.cs`, `Armoury/src/NightRest.cs`, `Armoury/src/SubModuleMain.cs`
+**Problem (Jeff, screeny):** (1) rekrutacja: mnostwo pustych, zamknietych
+slotow z napisem "You have 5. You need 0" (to vanillowy tekst pustego
+slotu, nie relacje); (2) tooltip predkosci: "Night -0.75 | Night
+(vanilla undone) +1.5 | Night -1" - dwa razy za duzo, "po co tyle
+pozycji"; prosba o audyt poruszania.
+**Przyczyny (logi):** (1) HouseLevies wstawial ludzi rodu takze tam,
+gdzie rod wlada OBCA ziemia (dom z Westerlands w wiosce Riverlands) -
+ludzie rodu maja kulture rodu, a Mends.LocalLevies (CrashScribe) co
+tick kasuje ochotnikow o kulturze innej niz osada: log "wyrzuconych
+obcych ochotnikow 18/14/11..." vs "HouseLevies: 104/94/71 zamienionych".
+(2) modele predkosci to LANCUCH: ROT.CalculateFinalSpeed ->
+RealisticBannerlord -> vanilla Default; latamy KAZDA zadeklarowana
+metode, wiec postfix TerrainEase biegl 2-3x (ta sama wada grozila
+NightRest - kara snu - i WorldPace na CalculateBaseSpeed przez
+ROT.CalculateBaseSpeed -> previous). ExplainedNumber SUMUJE wpisy o tej
+samej nazwie, stad jedna podwojona linia.
+**Zmiany:** (1) HouseLevies: tylko gdy owner.Culture == settlement.
+Culture i kandydat tej kultury (ziemia rodzi ludzi rodu tylko tam, gdzie
+rod jest u siebie) - zero kolizji z LocalLevies. Sloty juz wyzerowane
+w zapisie zapelnia gra sama ("after some time"). (2) NOWY SpeedDepth:
+prefix (Priority.First) + finalizer na kazdym CalculateFinalSpeed,
+CalculateBaseSpeed i GetEffectivePartyMorale licza zagniezdzenie
+([ThreadStatic]); TerrainEase, WorldPace i NightRest (predkosc i morale)
+dzialaja tylko na poziomie najbardziej zewnetrznym. (3) TerrainEase:
+cofniecie vanilli i nasza kara nazywaja sie jak wpis vanilli ("Night",
+"Forest"...) -> ExplainedNumber laczy je w JEDNA linie netto ("Night
+-0.5"). Audyt: "Slower Parties setting -0.59" to RealisticBannerlord -
+NAKLADA SIE z naszym World pace 50%; do decyzji Jeffa (wylaczyc suwak
+RB w jego MCM albo podniesc nasz WorldPacePercent).
+**Ryzyko / co sprawdzic:** tooltip w nocy: jedna linia "Night -0.5"
+(bez "vanilla undone"), w lesie "Forest -0.25"; sloty u notabli na
+ziemiach rodu WE WLASNEJ kulturze - ludzie rodu, na obcej - zwykli;
+log CrashScribe "wyrzuconych obcych ochotnikow" spada do zera/kilku;
+NightRest przy dlugu snu: kara -25% raz, nie -44%.
+**Status:** ZBUDOWANE - wgrane / watcher (patrz log)
+
 ## 2026-09-02 — HouseLevies v2: ta sama zasada co dla elit (bez wlasnego losowania)
 **Mod:** Armoury | **Pliki:** `Armoury/src/HouseLevies.cs`, `Armoury/src/Settings.cs`
 **Jeff:** "szansa wszedzie taka sama, tak jak w North czy Nocna Straz -

@@ -57,6 +57,7 @@ namespace Armoury
                 QuartermasterLaw.ApplyAll(_harmony);
                 MarketGlut.ApplyAll(_harmony);
                 Stables.ApplyAll(_harmony);
+                SpeedDepth.ApplyAll(_harmony);   // licznik zagniezdzenia - PRZED wszystkimi latkami predkosci/morale
                 WorldPace.ApplyAll(_harmony);
                 WinterBite.ApplyAll(_harmony);
                 ScorchedEarth.ApplyAll(_harmony);

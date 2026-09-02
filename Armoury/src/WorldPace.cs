@@ -31,6 +31,7 @@ namespace Armoury
         {
             try
             {
+                if (!SpeedDepth.OutermostBase) return;          // lancuch modeli: tylko raz
                 var s = Settings.Current;
                 int p = s != null ? s.WorldPacePercent : 100;
                 if (p >= 100 || p < 5) return;
