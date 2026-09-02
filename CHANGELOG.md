@@ -1,5 +1,50 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-02 — Zawieszka 13:43 = ROT Harrenhal bez Roose'a (straznik), kary terenu plaskie (-0.25/-0.5), amunicja pod szkolami wiedzy
+**Mod:** CrashScribe + Armoury | **Pliki:** `CrashScribe/src/Mends.cs` (HarrenhalGuard/HarrenhalSafe), `Armoury/src/TerrainEase.cs`, `Armoury/src/RangedLore.cs`, `Armoury/src/Settings.cs`
+**Problem (Jeff):** (1) "gra sie zawiesila" - 13:43 w Fairmarket, menu
+czekania; (2) "za duze kary w lesie -1.45, mialo byc -0.25, pustynia
+-0.5, snieg -0.5"; (3) "strzaly i belty nie moga byc od razu wszystkie
+do kucia - od tieru I, losowo sie odkrywaja"; (4) "drogi na mapie -
+da sie po nich jezdzic szybciej?".
+**Przyczyny:** (1) CrashScribe zlapal PIERWOTNY wyjatek 13:43:14:
+ROT.Events.HarrenhalSiegeEvent.SetupSiegeAttackers -> GatherArmyAction
+-> GatherArmyLogEntry..ctor NullReference; ROT bierze na sztywno partie
+Roose'a Boltona, kaze Polnocy stworzyc mu armie i gdy gra jej nie
+utworzy (Roose w niewoli / poza Polnoca / bez partii / nie dowodzi),
+zbiera PUSTA armie; potem reporter BLSE (AsmResolver) dobija proces
+natywnie 0xc0000005 (13:43:23, Application Error). Powtarzalne co
+godzine gry = crash zaraz po wczytaniu. (2) pierwsza wersja ulgi
+terenu (rano) czytala rozpiske GetLines, a gra liczy ruch BEZ opisow -
+dzialalo tylko w tooltipie; poza tym Jeff chce liczb bezwzglednych,
+nie procentu. (3) RangedLore.SchoolOf nie znal Arrows/Bolts ->
+IsProgressClass false -> KnownOf zawsze true. (4) TerrainType silnika
+nie ma "drogi" (Plain/Steppe/Forest/Desert/Snow/Fording/Bridge/...) -
+drogi to dekale graficzne, w kodzie nie istnieja.
+**Zmiany:** (1) Mends: prefix HarrenhalGuard sprawdza Roose'a (zywy,
+wolny, ma partie, dowodzi nia, klan w Polnocy, nie w bitwie) - gdy nie,
+ODKLADA probe (ROT ponowi co godzine) i pisze w logu CZEGO brakuje
+(raz na dzien gry); finalizer HarrenhalSafe polyka inne wyjatki tej
+metody (Scribe.Report raz). (2) TerrainEase przepisany: liczy teren jak
+vanilla (pole nawigacji, pogoda, noc), ODDAJE vanillowy procent
+(wpis "Forest (vanilla undone)") i doklada plaska kare (wpis "Forest");
+MCM: TerrainEaseEnabled, Forest 0.25, Desert 0.5, Snow 0.5, Ford 0.5,
+Night 0.5 (jednostki mapy; TerrainPenaltyPercent USUNIETY); audyt
+predkosci przez SpeedExplained (z opisami, bezpiecznik rekurencji).
+(3) RangedLore.SchoolOf: Arrows -> szkola lukow, Bolts -> kusz; Seed
+z migracja SeedMarkAmmo (stara kampania dostaje T1 amunicji raz);
+reszta odkrywa sie kuciem/przetopem jak luki. gen_mcm: 324 ustawien.
+**Ryzyko / co sprawdzic:** po wczytaniu log CrashScribe "oblezenie
+Harrenhal ODLOZONE - <powod>" zamiast crasha - PRZYNIESC ten powod
+(Jeff pytal "dlaczego brakuje"); tooltip predkosci w lesie: "Forest
+(vanilla undone) +1.45" i "Forest -0.25"; Armoury.log "Audyt
+predkosci (dzien N, teren Forest): ..." z pelna rozpiska; CRAFT
+amunicji: T1 znane, wyzsze do odkrycia; jesli FletchForge/CRAFT lukow
+liczy "znane/wszystkie" - w szkole lukow dochodza kolczany (liczby
+w naglowku wzrosna). Perki zwiadowcy (ForestKin itp.) dostaja lekka
+nadwyzke - swiadomie.
+**Status:** WGRANE (gra zamknieta) - DO SPRAWDZENIA
+
 ## 2026-09-02 — Strzaly t6 bandytow (amunicja pod Prawem Tieru), ulga terenu 50% + audyt predkosci, gra w oknie bez ramki
 **Mod:** CrashScribe + Armoury | **Pliki:** `CrashScribe/src/Mends.cs` (WeaponTierLaw, DTE ward), `Armoury/src/ItemReq.cs` (SkillFor), `Armoury/src/SkillsDecide.cs`, `Armoury/src/TroopFit.cs`, `Armoury/src/QuartermasterLaw.cs`, `Armoury/src/DragonUnmount.cs`, `Armoury/src/TerrainEase.cs` (nowy), `Armoury/src/SubModuleMain.cs`, `Armoury/src/Settings.cs`; poza repo: `Documents\...\Configs\engine_config.txt`
 **Problem (Jeff):** (1) "strzal tier 6 bandyci tez nie moga miec, chyba

@@ -147,6 +147,67 @@ namespace CrashScribe
         /// roster, sprzet z jego stanem przepisujemy 1:1, towarowi zdejmujemy
         /// modyfikator. Nazwy modyfikatorow rl_looted* rozpoznajemy po id.
         /// </summary>
+        private static Type _rotLords, _rotKingdoms;
+        private static double _harrenhalLastLog = -1;
+        private static bool _harrenhalSaved;
+
+        /// <summary>
+        /// Prefix na ROT HarrenhalSiegeEvent.SetupSiegeAttackers: ROT zaklada,
+        /// ze Roose Bolton zyje, jest wolny, dowodzi wlasna partia i sluzy
+        /// Polnocy - inaczej Kingdom.CreateArmy nic nie tworzy, a GatherArmy
+        /// z pusta armia wali NullReference i gra ginie (02.09 13:43). Gdy
+        /// ktorys warunek nie trzyma, probe ODKLADAMY (false) i piszemy CZEGO
+        /// brakuje - raz na dzien gry, zeby nie zalac logu.
+        /// </summary>
+        public static bool HarrenhalGuard(object __instance)
+        {
+            try
+            {
+                Hero roose = null;
+                try { roose = _rotLords != null ? Traverse.Create(_rotLords).Property("RooseBolton").GetValue() as Hero : null; } catch { }
+                Kingdom north = null;
+                try { north = _rotKingdoms != null ? Traverse.Create(_rotKingdoms).Property("TheNorth").GetValue() as Kingdom : null; } catch { }
+                string why = null;
+                if (roose == null) why = "brak bohatera Roose Bolton w tej kampanii";
+                else if (!roose.IsAlive) why = "Roose Bolton nie zyje";
+                else if (roose.IsPrisoner) why = "Roose Bolton w niewoli"
+                    + (roose.PartyBelongedToAsPrisoner != null ? " u " + roose.PartyBelongedToAsPrisoner.Name : "");
+                else if (roose.PartyBelongedTo == null) why = "Roose Bolton bez wlasnej partii";
+                else if (roose.PartyBelongedTo.LeaderHero != roose) why = "Roose Bolton nie dowodzi swoja partia (jedzie z "
+                    + (roose.PartyBelongedTo.LeaderHero != null ? roose.PartyBelongedTo.LeaderHero.Name.ToString() : "?") + ")";
+                else if (roose.Clan == null || roose.Clan.Kingdom == null) why = "Roose Bolton bez krolestwa (klan "
+                    + (roose.Clan != null ? roose.Clan.Name.ToString() : "?") + ")";
+                else if (north != null && roose.Clan.Kingdom != north) why = "Roose Bolton sluzy " + roose.Clan.Kingdom.Name + ", nie Polnocy";
+                else if (roose.PartyBelongedTo.MapEvent != null) why = "Roose Bolton w bitwie";
+                if (why == null) return true;
+                double now = CampaignTime.Now.ToDays;
+                if (_harrenhalLastLog < 0 || now - _harrenhalLastLog >= 1.0)
+                {
+                    _harrenhalLastLog = now;
+                    Scribe.Line("Mends: oblezenie Harrenhal ODLOZONE - " + why + " (ROT ponowi za godzine gry).");
+                }
+                return false;
+            }
+            catch { return true; }
+        }
+
+        public static Exception HarrenhalSafe(Exception __exception)
+        {
+            if (__exception == null) return null;
+            try
+            {
+                if (!_harrenhalSaved)
+                {
+                    _harrenhalSaved = true;
+                    Scribe.Report("ROT HarrenhalSiegeEvent.SetupSiegeAttackers wywrocil sie - wyjatek polkniety, gra zyje",
+                                  __exception, "HarrenhalSiegeEvent.SetupSiegeAttackers", null);
+                }
+                Scribe.Line("Mends: oblezenie Harrenhal - wyjatek ROT (" + __exception.GetType().Name + ") polkniety, proba za godzine.");
+            }
+            catch { }
+            return null;
+        }
+
         public static void GoodsUnlooted(TaleWorlds.CampaignSystem.Roster.ItemRoster __result)
         {
             try
@@ -1559,6 +1620,41 @@ namespace CrashScribe
                 }
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.Install(camels)", null); } catch { } }
+
+            try
+            {
+                // ===== OBLEZENIE HARRENHAL BEZ ROOSE'A = CRASH (Jeff 02.09) =====
+                // ROT.Events.HarrenhalSiegeEvent.SetupSiegeAttackers bierze na sztywno
+                // partie Roose'a Boltona, kaze Polnocy stworzyc mu armie i - gdy gra
+                // jej nie utworzy (Roose w niewoli, poza Polnoca, bez partii, nie
+                // dowodzi) - wola GatherArmyAction z pusta armia: NullReference
+                // w GatherArmyLogEntry, potem reporter BLSE dobija proces natywnie
+                // (13:43:14 -> 13:43:23). Prefix sprawdza Roose'a i ODKLADA probe
+                // (wydarzenie ponowi co godzine), wypisujac w logu, czego brakuje;
+                // finalizer lapie reszte, zeby zadna inna dziura ROT nie zabila gry.
+                Type tHar = null, tLords = null, tKing = null;
+                foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+                {
+                    try
+                    {
+                        if (!asm.GetName().Name.StartsWith("ROT")) continue;
+                        if (tHar == null) tHar = asm.GetType("ROT.Events.HarrenhalSiegeEvent");
+                        if (tLords == null) tLords = asm.GetType("ROT.Misc.ROTLords");
+                        if (tKing == null) tKing = asm.GetType("ROT.Misc.ROTKingdoms");
+                    }
+                    catch { }
+                }
+                _rotLords = tLords; _rotKingdoms = tKing;
+                var mSetup = tHar != null ? AccessTools.Method(tHar, "SetupSiegeAttackers") : null;
+                if (mSetup != null)
+                {
+                    harmony.Patch(mSetup, prefix: new HarmonyMethod(typeof(Mends), "HarrenhalGuard"),
+                                          finalizer: new HarmonyMethod(typeof(Mends), "HarrenhalSafe"));
+                    Scribe.Line("Mends: oblezenie Harrenhal (ROT) zabezpieczone - bez zdolnego Roose'a Boltona proba jest odkladana, nie wywala gry.");
+                }
+                else Scribe.Line("Mends: ROT HarrenhalSiegeEvent.SetupSiegeAttackers nieznaleziony - oblezenie Harrenhal bez straznika.");
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.Install(harrenhal)", null); } catch { } }
 
             try
             {

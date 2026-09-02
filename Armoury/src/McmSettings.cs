@@ -840,9 +840,29 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public int WorldPacePercent { get; set; } = 50;
 
-        [SettingPropertyInteger("Terrain Penalty Percent", 0, 200, "0", HintText = "how much of the game's terrain and night speed penalties (forest, snow, desert, fording, night) still applies - 50 halves them, 100 = untouched; the rest comes back as a named 'eased' line in the speed tooltip")]
+        [SettingPropertyBool("Terrain Ease Enabled", HintText = "replace the game's percentage terrain and night penalties with the flat map-speed penalties below (the vanilla share is shown undone in the tooltip, then ours applied)")]
         [SettingPropertyGroup("The marching column")]
-        public int TerrainPenaltyPercent { get; set; } = 50;
+        public bool TerrainEaseEnabled { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Forest Speed Penalty", 0.00f, 1.00f, "0.00", HintText = "flat speed lost in forest (vanilla: 30% of your speed)")]
+        [SettingPropertyGroup("The marching column")]
+        public float ForestSpeedPenalty { get; set; } = 0.25f;
+
+        [SettingPropertyFloatingInteger("Desert Speed Penalty", 0.00f, 2.00f, "0.00", HintText = "flat speed lost in desert and dunes (vanilla: 10%)")]
+        [SettingPropertyGroup("The marching column")]
+        public float DesertSpeedPenalty { get; set; } = 0.5f;
+
+        [SettingPropertyFloatingInteger("Snow Speed Penalty", 0.00f, 2.00f, "0.00", HintText = "flat speed lost in snowfall or blizzard (vanilla: 10%)")]
+        [SettingPropertyGroup("The marching column")]
+        public float SnowSpeedPenalty { get; set; } = 0.5f;
+
+        [SettingPropertyFloatingInteger("Ford Speed Penalty", 0.00f, 2.00f, "0.00", HintText = "flat speed lost fording rivers and crossing bridges (vanilla: 30%)")]
+        [SettingPropertyGroup("The marching column")]
+        public float FordSpeedPenalty { get; set; } = 0.5f;
+
+        [SettingPropertyFloatingInteger("Night Speed Penalty", 0.00f, 2.00f, "0.00", HintText = "flat speed lost at night on land (vanilla: 25%)")]
+        [SettingPropertyGroup("The marching column")]
+        public float NightSpeedPenalty { get; set; } = 0.5f;
 
         [SettingPropertyBool("Speed Audit Enabled", HintText = "once a day the full speed breakdown of your party is written to Armoury.log (before the marching-column cap and sleep debt)")]
         [SettingPropertyGroup("The marching column")]
@@ -1497,7 +1517,12 @@ namespace Armoury
             s.WeeksPerSeason = WeeksPerSeason;
             s.MarchPaceEnabled = MarchPaceEnabled;
             s.WorldPacePercent = WorldPacePercent;
-            s.TerrainPenaltyPercent = TerrainPenaltyPercent;
+            s.TerrainEaseEnabled = TerrainEaseEnabled;
+            s.ForestSpeedPenalty = ForestSpeedPenalty;
+            s.DesertSpeedPenalty = DesertSpeedPenalty;
+            s.SnowSpeedPenalty = SnowSpeedPenalty;
+            s.FordSpeedPenalty = FordSpeedPenalty;
+            s.NightSpeedPenalty = NightSpeedPenalty;
             s.SpeedAuditEnabled = SpeedAuditEnabled;
             s.SiegePacePercent = SiegePacePercent;
             s.SiegeSicknessEnabled = SiegeSicknessEnabled;

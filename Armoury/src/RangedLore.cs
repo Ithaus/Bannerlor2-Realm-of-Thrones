@@ -65,6 +65,12 @@ namespace Armoury
             {
                 case ItemObject.ItemTypeEnum.Bow: return SchoolBow;
                 case ItemObject.ItemTypeEnum.Crossbow: return SchoolXbow;
+                // AMUNICJA JAK LUKI (Jeff 02.09: "strzaly i belty nie moga byc od
+                // razu wszystkie do kucia - zaczynam od tieru I i losowo sie
+                // odkrywaja"): kolczany naleza do szkoly lucznictwa, sajdaki do
+                // kusznictwa - Seed rozdaje T1, reszta odkrywa sie kuciem/przetopem
+                case ItemObject.ItemTypeEnum.Arrows: return SchoolBow;
+                case ItemObject.ItemTypeEnum.Bolts: return SchoolXbow;
                 case ItemObject.ItemTypeEnum.HeadArmor: return SchoolHelm;
                 case ItemObject.ItemTypeEnum.BodyArmor: return SchoolBody;
                 case ItemObject.ItemTypeEnum.LegArmor: return SchoolLegs;
@@ -97,20 +103,38 @@ namespace Armoury
             return !SmithMenu.BannedRanged(it);
         }
 
+        private const string SeedMarkAmmo = "__seed_ammo_v1";   // migracja: kampanie sprzed 02.09 dostaja T1 amunicji
+
         private static void Seed()
         {
             try
             {
-                if (Known.Contains(SeedMark)) return;
-                Known.Add(SeedMark);
-                int n = 0;
-                foreach (var item in MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
+                if (!Known.Contains(SeedMark))
                 {
-                    if (!Teachable(item)) continue;
-                    if (TierOf(item) != 1) continue;
-                    if (!Known.Contains(item.StringId)) { Known.Add(item.StringId); n++; }
+                    Known.Add(SeedMark);
+                    int n = 0;
+                    foreach (var item in MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
+                    {
+                        if (!Teachable(item)) continue;
+                        if (TierOf(item) != 1) continue;
+                        if (!Known.Contains(item.StringId)) { Known.Add(item.StringId); n++; }
+                    }
+                    Log.Info("Wiedza rzemieslnicza: rozdano wzory tieru 1 (" + n + " sztuk).");
                 }
-                Log.Info("Wiedza rzemieslnicza: rozdano wzory tieru 1 (" + n + " sztuk).");
+                // amunicja weszla do szkol 02.09 - stara kampania ma juz SeedMark,
+                // wiec kolczany/sajdaki T1 trzeba jej rozdac osobno (raz)
+                if (!Known.Contains(SeedMarkAmmo))
+                {
+                    Known.Add(SeedMarkAmmo);
+                    int a = 0;
+                    foreach (var item in MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
+                    {
+                        if (item == null || (item.ItemType != ItemObject.ItemTypeEnum.Arrows && item.ItemType != ItemObject.ItemTypeEnum.Bolts)) continue;
+                        if (!Teachable(item) || TierOf(item) != 1) continue;
+                        if (!Known.Contains(item.StringId)) { Known.Add(item.StringId); a++; }
+                    }
+                    Log.Info("Wiedza rzemieslnicza: amunicja pod szkolami - rozdano kolczany/sajdaki tieru 1 (" + a + " sztuk), reszta do odkrycia.");
+                }
             }
             catch (Exception e) { Log.Error("RangedLore.Seed", e); }
         }
