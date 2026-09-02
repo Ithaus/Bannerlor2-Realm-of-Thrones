@@ -1,5 +1,22 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-02 — HouseLevies v2: ta sama zasada co dla elit (bez wlasnego losowania)
+**Mod:** Armoury | **Pliki:** `Armoury/src/HouseLevies.cs`, `Armoury/src/Settings.cs`
+**Jeff:** "szansa wszedzie taka sama, tak jak w North czy Nocna Straz -
+daj ta sama zasade".
+**Zmiana:** zamiast wlasnej szansy 20%/slot: sloty, w ktorych gra
+(vanilla/BK, wedle mocy notabla i relacji) wystawila rekruta linii
+SZLACHECKIEJ, na ziemi rodu z wlasnym szablonem staja sie ludzmi tego
+rodu tego samego tieru (+-1). Zwykle sloty nietkniete, zadnych kostek
+po naszej stronie - czestotliwosc rowna czestotliwosci elit wszedzie.
+Przeglad: raz dziennie per osada + natychmiast przy wjezdzie gracza do
+osady (SettlementEntered). HouseLevyChancePercent USUNIETY z MCM.
+gen_mcm: 328.
+**Co sprawdzic:** w wioskach Blackwoodow/Tullych tam, gdzie dotad byl
+"Riverlord's Son", jest teraz np. "Blackwood Recruit"/"Tully Footman";
+log Armoury "HouseLevies: dzien N - K szlacheckich ochotnikow ...".
+**Status:** WGRANE (gra zamknieta) - DO SPRAWDZENIA
+
 ## 2026-09-02 — Zaciag rodowy: ochotnicy u notabli na ziemiach rodu czasem sa ludzmi tego rodu (HouseLevies)
 **Mod:** Armoury | **Pliki:** `Armoury/src/HouseLevies.cs` (nowy), `Armoury/src/SubModuleMain.cs`, `Armoury/src/Settings.cs`
 **Problem (Jeff):** "gdzie najac najlepszych lucznikow, jezdze po

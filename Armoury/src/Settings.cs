@@ -393,8 +393,7 @@ namespace Armoury
         public int HideoutFlagDays = 3;                    // how many days the flag stays on the map
 
         // --- House levies ---
-        public bool HouseLeviesEnabled = true;             // in settlements owned by a house with its own troop line (Blackwood, Tully, Karstark, Lannister...) some of the notables' volunteers turn into that house's men of the same tier - the lines ROT otherwise gives only to AI lords
-        public int HouseLevyChancePercent = 20;            // daily chance, per volunteer slot, that a culture recruit in such a settlement becomes a house recruit
+        public bool HouseLeviesEnabled = true;             // in settlements owned by a house with its own troop line (Blackwood, Tully, Karstark, Lannister...) the NOBLE volunteers the game already offers are that house's men of the same tier - same rule and frequency as noble recruits anywhere, no extra dice
 
         // --- Northern fare ---
         public bool NorthernFareEnabled = true;            // vineyards in the North and at the Wall (Farsfog, Tumbledown, Olden Oak, Queenscrown) become fishers, cattle and swine farms - grapes do not grow in snow; wine presses in Winterfell and Castle Black turn into breweries. Applied at session start

@@ -1,52 +1,58 @@
 using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 
 namespace Armoury
 {
     /// <summary>
-    /// ZACIAG RODOWY (Jeff 02.09: "tak samo jak na Polnocy i w Nocnej Strazy -
-    /// w grze czasami pojawiaja sie rekruci elitarni"). W danych ROT z osad
-    /// wychodzi TYLKO drzewo kultury (zwykle + szlacheckie); linie rodowe
-    /// (Blackwood -> Ravens' Teeth, Karstark, Bolton, Lannister...) zyja
-    /// wylacznie w szablonach klanow: lord werbuje zwyklego rekruta, a ROT
-    /// (ROTTroopRecruiter) podmienia mu go na czlowieka rodu - gracz jest
-    /// z tego wylaczony. Nocna Straz rodow nie ma, wiec tam cale drzewo
-    /// jest do zwerbowania - stad wrazenie roznicy.
-    /// Nasza zasada: raz dziennie, w osadzie NALEZACEJ do rodu z wlasnym
-    /// szablonem, kazdy ochotnik u notabla, ktory jest zwyklym zolnierzem
-    /// kultury, z szansa HouseLevyChancePercent zamienia sie w zolnierza
-    /// TEGO rodu tego samego tieru i tej samej szlacheckosci. Zamieniony
-    /// zostaje w slocie, az go zwerbujesz (vanilla dopelnia tylko puste
-    /// sloty). Ziemia Blackwoodow rodzi ludzi Blackwoodow - czasem.
+    /// ZACIAG RODOWY (Jeff 02.09: "tak samo jak na Polnocy i w Nocnej Strazy
+    /// czasami pojawiaja sie rekruci elitarni" -> "szansa wszedzie taka sama,
+    /// daj ta sama zasade"). W danych ROT z osad wychodzi TYLKO drzewo
+    /// kultury (zwykle + szlacheckie); linie rodowe (Blackwood -> Ravens'
+    /// Teeth, Karstark, Bolton, Lannister...) zyja w szablonach klanow: lord
+    /// werbuje zwyklego rekruta, a ROT (ROTTroopRecruiter) podmienia mu go
+    /// na czlowieka rodu - gracz jest z tego wylaczony. Nocna Straz rodow
+    /// nie ma, wiec tam cale drzewo jest do zwerbowania.
+    /// TA SAMA ZASADA CO DLA ELIT: sami nic nie losujemy. Gra (vanilla/BK)
+    /// wystawia u notabli rekrutow linii SZLACHECKIEJ wedle wlasnych regul
+    /// (moc notabla, relacje) - i to jest czestotliwosc "elit" znana z Polnocy.
+    /// My tylko mowimy: na ziemi rodu z wlasnym szablonem szlachecki ochotnik
+    /// jest czlowiekiem TEGO rodu tego samego tieru (ziemia Blackwoodow rodzi
+    /// ludzi Blackwoodow). Zwykle sloty zostaja zwykle. Przeglad raz dziennie
+    /// per osada + natychmiast, gdy gracz wjezdza do osady.
     /// </summary>
     internal sealed class HouseLevies : CampaignBehaviorBase
     {
         private readonly Dictionary<Clan, List<CharacterObject>> _trees = new Dictionary<Clan, List<CharacterObject>>();
+        private readonly Dictionary<CharacterObject, bool> _eliteCache = new Dictionary<CharacterObject, bool>();
         private int _swappedToday;
         private int _lastLogDay = -1;
 
         public override void RegisterEvents()
         {
-            CampaignEvents.DailyTickSettlementEvent.AddNonSerializedListener(this, OnDailySettlement);
+            CampaignEvents.DailyTickSettlementEvent.AddNonSerializedListener(this, st => Convert(st));
+            CampaignEvents.SettlementEntered.AddNonSerializedListener(this, (party, st, hero) =>
+            {
+                if (party != null && party == MobileParty.MainParty) Convert(st);
+            });
         }
 
         public override void SyncData(IDataStore dataStore) { }
 
-        private void OnDailySettlement(Settlement settlement)
+        private void Convert(Settlement settlement)
         {
             try
             {
                 var s = Settings.Current;
-                if (s == null || !s.HouseLeviesEnabled || s.HouseLevyChancePercent <= 0) return;
+                if (s == null || !s.HouseLeviesEnabled) return;
                 if (settlement == null || settlement.Notables == null) return;
                 var owner = settlement.OwnerClan;
                 if (owner == null || owner == Clan.PlayerClan || owner.DefaultPartyTemplate == null) return;
                 var tree = TreeOf(owner);
                 if (tree == null || tree.Count == 0) return;
-                float chance = Math.Min(100, s.HouseLevyChancePercent) / 100f;
 
                 foreach (var notable in settlement.Notables)
                 {
@@ -56,9 +62,8 @@ namespace Armoury
                     {
                         var troop = slots[i];
                         if (troop == null || troop.IsHero || tree.Contains(troop)) continue;
-                        if (MBRandom.RandomFloat >= chance) continue;
-                        bool elite = IsElite(troop);
-                        var repl = Pick(tree, troop.Tier, elite) ?? Pick(tree, troop.Tier, !elite);
+                        if (!IsElite(troop)) continue;                    // tylko szlacheckie sloty - ta sama zasada co elity
+                        var repl = Pick(tree, troop.Tier);
                         if (repl == null || repl == troop) continue;
                         slots[i] = repl;
                         _swappedToday++;
@@ -69,7 +74,7 @@ namespace Armoury
                 if (day != _lastLogDay)
                 {
                     if (_swappedToday > 0)
-                        Log.Info("HouseLevies: dzien " + day + " - " + _swappedToday + " ochotnikow u notabli zamienionych na ludzi rodow (ziemie z wlasna linia).");
+                        Log.Info("HouseLevies: dzien " + day + " - " + _swappedToday + " szlacheckich ochotnikow na ziemiach rodow to teraz ludzie rodu.");
                     _lastLogDay = day; _swappedToday = 0;
                 }
             }
@@ -104,33 +109,40 @@ namespace Armoury
         }
 
         /// <summary>Szlachecki = siedzi w drzewie elite_basic_troop swojej kultury (jak ROT IsEliteTroop).</summary>
-        private static bool IsElite(CharacterObject troop)
+        private bool IsElite(CharacterObject troop)
         {
+            bool v;
+            if (_eliteCache.TryGetValue(troop, out v)) return v;
+            v = false;
             try
             {
                 var cult = troop.Culture;
-                if (cult == null || cult.EliteBasicTroop == null) return false;
-                var stack = new Stack<CharacterObject>(); var seen = new HashSet<CharacterObject>();
-                stack.Push(cult.EliteBasicTroop);
-                while (stack.Count > 0)
+                if (cult != null && cult.EliteBasicTroop != null)
                 {
-                    var c = stack.Pop();
-                    if (c == null || !seen.Add(c)) continue;
-                    if (c == troop) return true;
-                    if (c.UpgradeTargets != null) foreach (var u in c.UpgradeTargets) stack.Push(u);
+                    var stack = new Stack<CharacterObject>(); var seen = new HashSet<CharacterObject>();
+                    stack.Push(cult.EliteBasicTroop);
+                    while (stack.Count > 0)
+                    {
+                        var c = stack.Pop();
+                        if (c == null || !seen.Add(c)) continue;
+                        if (c == troop) { v = true; break; }
+                        if (c.UpgradeTargets != null) foreach (var u in c.UpgradeTargets) stack.Push(u);
+                    }
                 }
             }
             catch { }
-            return false;
+            _eliteCache[troop] = v;
+            return v;
         }
 
-        private static CharacterObject Pick(List<CharacterObject> tree, int tier, bool elite)
+        /// <summary>Czlowiek rodu tego samego tieru (albo o jeden nizej/wyzej), losowo z pasujacych.</summary>
+        private static CharacterObject Pick(List<CharacterObject> tree, int tier)
         {
             for (int spread = 0; spread <= 1; spread++)
             {
                 var cands = new List<CharacterObject>();
                 foreach (var c in tree)
-                    if (!c.IsHero && Math.Abs(c.Tier - tier) == spread && IsElite(c) == elite) cands.Add(c);
+                    if (!c.IsHero && Math.Abs(c.Tier - tier) == spread) cands.Add(c);
                 if (cands.Count > 0) return cands[MBRandom.RandomInt(cands.Count)];
             }
             return null;
