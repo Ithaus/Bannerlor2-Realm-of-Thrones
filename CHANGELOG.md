@@ -1,5 +1,24 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-02 — "Damaged Grapes": Spoils of War psul stan takze towarom, nie tylko sprzetowi
+**Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs` (GoodsUnlooted)
+**Problem (Jeff, screen MISC):** zdobyte winogrona jako "Damaged Grapes";
+"jak zdobywam rzeczy w MISC to nie sa damaged, sa po prostu rzeczami".
+**Przyczyna (dekompilacja RealisticLoot):** Spoils of War v1.8.4 -
+EquipmentDamageModel.ApplyDamageToLoot przypina modyfikator rl_looted*
+(Mangled/Battered/Damaged/Plundered) KAZDEJ pozycji lupu w petli bez
+sprawdzania typu itemu - winogronom, futrom, zbozu tez.
+**Zmiana:** postfix Mends.GoodsUnlooted na ApplyDamageToLoot: po ich
+robocie przechodzi zwrocony roster i pozycjom, ktore NIE sa broni ani
+pancerzem (HasWeaponComponent/HasArmorComponent), zdejmuje modyfikator
+rl_looted* (rebuild rostera, sprzet 1:1 ze stanem, towar bez stanu).
+Bron i pancerz dalej moga byc "Damaged" - to zamysl Spoils of War.
+**Ryzyko / co sprawdzic:** po restarcie zdobyte winogrona/futra/zboze
+bez slowa "Damaged"; bron i pancerz z lupu dalej moga miec stan; log
+"Mends: towar ... nie dostaje juz stanu Damaged". Jesli Spoils of War
+zmieni nazwe metody/klasy - log powie "nieznaleziony".
+**Status:** ZBUDOWANE - watcher wgra po zamknieciu gry
+
 ## 2026-09-02 — Brama kucia: darmowe pasmo IV w mieczu do pary ZAMKNIETE (podloga zdjeta ze slotow od T4)
 **Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs` (LoreForgeGate)
 **Problem (Jeff, screen kuzni):** klasa "Off-hand Sword, Duel Wield" ma

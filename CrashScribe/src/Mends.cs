@@ -137,6 +137,54 @@ namespace CrashScribe
         /// z kultura partii. Zwierze NIE znika - zostaje w taborze jako towar
         /// na sprzedaz (karawany moga handlowac); po prostu nikt nie wsiada.
         /// </summary>
+        /// <summary>
+        /// TOWAR TO NIE LUP BITEWNY (Jeff 02.09: "co to znaczy damaged grapes,
+        /// jak zdobywam rzeczy w MISC to nie sa damaged, sa po prostu rzeczami").
+        /// Spoils of War (RealisticLoot.EquipmentDamageModel.ApplyDamageToLoot)
+        /// przypina modyfikator "Damaged/Battered/Plundered" KAZDEJ pozycji lupu
+        /// bez patrzenia na typ - takze winogronom, futrom, zbozu. Postfix czysci
+        /// modyfikator z pozycji, ktore nie sa broni ani pancerzem: budujemy nowy
+        /// roster, sprzet z jego stanem przepisujemy 1:1, towarowi zdejmujemy
+        /// modyfikator. Nazwy modyfikatorow rl_looted* rozpoznajemy po id.
+        /// </summary>
+        public static void GoodsUnlooted(TaleWorlds.CampaignSystem.Roster.ItemRoster __result)
+        {
+            try
+            {
+                var roster = __result;  // TaleWorlds.CampaignSystem.Roster.ItemRoster
+                if (roster == null) return;
+                var rebuilt = new TaleWorlds.CampaignSystem.Roster.ItemRoster();
+                bool changed = false;
+                for (int i = 0; i < roster.Count; i++)
+                {
+                    var el = roster.GetElementCopyAtIndex(i);
+                    var ee = el.EquipmentElement;
+                    var item = ee.Item;
+                    int amount = el.Amount;
+                    if (item == null) { continue; }
+                    var mod = ee.ItemModifier;
+                    bool looted = mod != null && mod.StringId != null && mod.StringId.StartsWith("rl_looted");
+                    bool gear = item.HasWeaponComponent || item.HasArmorComponent;
+                    if (looted && !gear)
+                    {
+                        rebuilt.AddToCounts(new EquipmentElement(item, null), amount);
+                        changed = true;
+                    }
+                    else rebuilt.AddToCounts(ee, amount);
+                }
+                if (changed)
+                {
+                    roster.Clear();
+                    for (int i = 0; i < rebuilt.Count; i++)
+                    {
+                        var el = rebuilt.GetElementCopyAtIndex(i);
+                        roster.AddToCounts(el.EquipmentElement, el.Amount);
+                    }
+                }
+            }
+            catch { }   // per-lup: cicho, zeby nie zasypac logu
+        }
+
         public static void CamelCulling(object __instance)
         {
             try
@@ -1364,6 +1412,30 @@ namespace CrashScribe
                 }
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.Install(camels)", null); } catch { } }
+
+            try
+            {
+                // ===== TOWAR TO NIE LUP BITEWNY (Damaged Grapes) =====
+                Type tDmg = null;
+                foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+                {
+                    try
+                    {
+                        if (!asm.GetName().Name.StartsWith("RealisticLoot")) continue;
+                        tDmg = asm.GetType("RealisticLoot.Models.EquipmentDamageModel");
+                        if (tDmg != null) break;
+                    }
+                    catch { }
+                }
+                var mDmg = tDmg != null ? AccessTools.Method(tDmg, "ApplyDamageToLoot") : null;
+                if (mDmg != null)
+                {
+                    harmony.Patch(mDmg, postfix: new HarmonyMethod(typeof(Mends), "GoodsUnlooted"));
+                    Scribe.Line("Mends: towar (winogrona, futra, zboze) nie dostaje juz stanu 'Damaged' z lupow Spoils of War - tylko bron i pancerz.");
+                }
+                else Scribe.Line("Mends: RealisticLoot ApplyDamageToLoot nieznaleziony - Damaged Grapes bez straznika.");
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.Install(goods)", null); } catch { } }
 
             try
             {
