@@ -134,6 +134,7 @@ namespace Armoury
                 starter.AddBehavior(new LegendaryLaw());
                 starter.AddBehavior(new MusterBook());
                 starter.AddBehavior(new HideoutSpotter());
+                starter.AddBehavior(new HouseLevies());
                 Log.Info("Behavior dodany do kampanii.");
             }
             catch (Exception e) { Log.Error("OnGameStart", e); }

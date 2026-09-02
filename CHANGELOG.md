@@ -1,5 +1,38 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-02 — Zaciag rodowy: ochotnicy u notabli na ziemiach rodu czasem sa ludzmi tego rodu (HouseLevies)
+**Mod:** Armoury | **Pliki:** `Armoury/src/HouseLevies.cs` (nowy), `Armoury/src/SubModuleMain.cs`, `Armoury/src/Settings.cs`
+**Problem (Jeff):** "gdzie najac najlepszych lucznikow, jezdze po
+Riverlands i nie moge ich znalezc" -> "no to jak ich zdobywaja
+lordowie, musza ich gdzies rekrutowac" -> "dodajmy, ze tak jak na
+Polnocy i w Nocnej Strazy czasami pojawiaja sie rekruci elitarni".
+**Ustalenia (dane + dekompilacja ROT):** z osad wychodzi TYLKO drzewo
+kultury (zwykle + szlacheckie: Riverlands 18/74 jednostek, Polnoc
+20/117, Westerlands 19/70, Reach 17/51...). Linie rodowe (Blackwood ->
+Ravens' Teeth 260 Bow, Tully Longbowman, Karstark, Bolton, Lannister
+Prideknight...) zyja tylko w szablonach klanow: ROTTroopRecruiter.
+OnTroopRecruited podmienia lordowi zwyklego rekruta na czlowieka jego
+rodu tego samego tieru, a IsHeroManageable wyklucza gracza i jego
+klan. Nocna Straz nie ma rodow -> cale drzewo (14/18) z werbunku, stad
+wrazenie "u nich mozna". Wrazenie "elity na Polnocy" = linia
+szlachecka (Northern Noble Youth -> Northern Mounted Warlord T6) -
+Riverlands ma taka sama (Riverlord's Son -> Riverlands Admiral).
+**Zmiana:** HouseLevies (CampaignBehavior, DailyTickSettlement): w osadzie
+NALEZACEJ do rodu z DefaultPartyTemplate kazdy ochotnik u notabla bedacy
+zwyklym zolnierzem kultury z szansa HouseLevyChancePercent (dom. 20%/
+dzien/slot) zamienia sie w zolnierza rodu tego samego tieru i tej samej
+szlacheckosci (drzewo szablonu jak ROT TraverseTree; IsElite = drzewo
+elite_basic_troop kultury). Zamiana trwa w slocie do werbunku (vanilla
+dopelnia tylko puste sloty). Log Armoury raz dziennie: ile slotow
+zamieniono. MCM "House levies": wlacznik + szansa. gen_mcm: 329.
+**Ryzyko / co sprawdzic:** w wioskach Raventree Hall/Riverrun po dniu-
+-dwoch u notabli pojawiaja sie Blackwood/Tully Recruit (i wyzsze tiery
+u mocnych notabli); log "HouseLevies: dzien N - K ochotnikow ...".
+Jesli za czesto/rzadko - suwak. Osady rodow bez szablonu (Mooton itp.)
+bez zmian. Jeff: "wyjasnij najpierw" - wyjasnione, wersja "czasami"
+wybrana przez Jeffa zamiast podmiany przy werbunku.
+**Status:** WGRANE (gra zamknieta) - DO SPRAWDZENIA
+
 ## 2026-09-02 — Przeglad armii do PDF (tools/army_report.py) + zrzut przedmiotow z gry (Mends.ItemDump)
 **Mod:** CrashScribe + narzedzia | **Pliki:** `tools/army_report.py` (nowy), `docs/ROT-armie-przeglad.pdf` (nowy, generowany), `CrashScribe/src/Mends.cs` (ItemDump)
 **Prosba (Jeff):** "pdf z tabelka i opisami kazdej armii z dokladnymi
