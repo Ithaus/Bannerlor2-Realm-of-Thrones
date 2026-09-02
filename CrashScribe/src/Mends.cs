@@ -1197,6 +1197,76 @@ namespace CrashScribe
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.WeightLaw", null); } catch { } }
         }
 
+        /// <summary>
+        /// PRAWO TIERU BRONI (Jeff 02.09, screen: Stark Arming Sword tier 6
+        /// "Requires One Handed 30", Broken Men biegaja z tier 6: "jak masz
+        /// tier 6 miecza, to z umiejetnosci musi byc minimum x - jak miecz
+        /// tier 6 moze miec skilla 30!"). Dane ROT wpisuja broniom wymog
+        /// oderwany od tieru, a caly nasz dobor (AddPattern, ItemReq, DTE,
+        /// kwatermistrz, TroopFit) ufa temu wymogowi - wiec bandyta z One
+        /// Handed 30 dostawal elitarny miecz jako "najlepszy dozwolony".
+        /// Tak jak WeightLaw dla pancerzy: podnosimy Difficulty U ZRODLA,
+        /// przy starcie sesji, do minimum wynikajacego z tieru:
+        /// (tier - 1) x WeaponSkillPerTier (MCM Armoury, dom. 35 ->
+        /// t2 35, t3 70, t4 105, t5 140, t6 175). Tylko w gore, nigdy w dol.
+        /// Bron, tarcze, oszczepy - tak; amunicja i konie - nie (amunicja
+        /// nie ma wymogu uzycia, konie maja Riding z danych).
+        /// Skutek zamierzony: jednostki z takim mieczem W SZABLONIE dostana
+        /// od TroopFit skill do niego (elita), reszta - bron swojego skilla.
+        /// Log = audyt: ile broni podbito per tier i najgorsze rozjazdy.
+        /// PULAPKA TIEROW: ItemTiers.Tier1 == 0, wyswietlany = (int)Tier + 1.
+        /// </summary>
+        internal static void WeaponTierLaw()
+        {
+            try
+            {
+                var setter = AccessTools.PropertySetter(typeof(ItemObject), "Difficulty");
+                if (setter == null) { Scribe.Line("Mends: ItemObject.Difficulty bez settera - prawo tieru broni spi."); return; }
+                float step = ArmouryFloat("WeaponSkillPerTier", 35f);
+                if (step < 0.5f) { Scribe.Line("Mends: prawo tieru broni wylaczone (WeaponSkillPerTier 0)."); return; }
+                if (step > 100f) step = 100f;
+
+                int raised = 0;
+                var perTier = new int[7];
+                var perTierAll = new int[7];
+                var worst = new System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<int, string>>();
+                foreach (var it in TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
+                {
+                    if (it == null || !it.HasWeaponComponent) continue;
+                    var ty = it.ItemType;
+                    if (ty == ItemObject.ItemTypeEnum.Arrows || ty == ItemObject.ItemTypeEnum.Bolts
+                        || ty == ItemObject.ItemTypeEnum.Banner || ty == ItemObject.ItemTypeEnum.Horse
+                        || ty == ItemObject.ItemTypeEnum.HorseHarness) continue;
+                    int grade = (int)it.Tier + 1;
+                    if (grade < 1) grade = 1;
+                    if (grade > 6) grade = 6;
+                    perTierAll[grade]++;
+                    int want = (int)Math.Round((grade - 1) * step);
+                    if (want <= it.Difficulty) continue;
+                    worst.Add(new System.Collections.Generic.KeyValuePair<int, string>(
+                        want - it.Difficulty, it.StringId + " t" + grade + " " + it.Difficulty + "->" + want));
+                    setter.Invoke(it, new object[] { want });
+                    perTier[grade]++;
+                    raised++;
+                }
+                var sb = new System.Text.StringBuilder();
+                sb.Append("Mends: prawo tieru broni - ").Append(step.ToString("0.#")).Append(" skilla na tier; wymog podniesiony ")
+                  .Append(raised).Append(" broniom (per tier: ");
+                for (int t = 2; t <= 6; t++) sb.Append("t").Append(t).Append(" ").Append(perTier[t]).Append("/").Append(perTierAll[t]).Append(t < 6 ? ", " : "");
+                sb.Append(").");
+                Scribe.Line(sb.ToString());
+                if (worst.Count > 0)
+                {
+                    worst.Sort((a, b) => b.Key.CompareTo(a.Key));
+                    int show = Math.Min(15, worst.Count);
+                    var sb2 = new System.Text.StringBuilder("Mends: tier broni - najwieksze rozjazdy danych (wymog z XML -> po prawie): ");
+                    for (int i = 0; i < show; i++) { if (i > 0) sb2.Append(", "); sb2.Append(worst[i].Value); }
+                    Scribe.Line(sb2.ToString());
+                }
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.WeaponTierLaw", null); } catch { } }
+        }
+
         internal static bool SinewApplied;
 
         internal static void SkillSinew()
@@ -2423,7 +2493,7 @@ namespace CrashScribe
         {
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this,
                 delegate (CampaignGameStarter s)
-                { Mends.ArmorSanity(); Mends.AmmoSanity(); Mends.WeightLaw(); Mends.SkillSinew(); Mends.UniqueWares(); Mends.LoreForgeGate(); Mends.DressTheNamesakes(); });
+                { Mends.ArmorSanity(); Mends.AmmoSanity(); Mends.WeightLaw(); Mends.WeaponTierLaw(); Mends.SkillSinew(); Mends.UniqueWares(); Mends.LoreForgeGate(); Mends.DressTheNamesakes(); });
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this,
                 delegate (TaleWorlds.CampaignSystem.MapEvents.MapEvent m) { Mends.MeltDeadLoot(m); });
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this,

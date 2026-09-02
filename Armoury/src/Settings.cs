@@ -156,6 +156,7 @@ namespace Armoury
         // --- Skills rule the gear ---
         public bool TroopSkillAutoFit = true;              // troops are audited on load: any skill below the demands of their OWN template gear (armour->Athletics, mount->Riding, weapons->their class) is raised to match - the elite keeps its heavy plate because it has earned the muscles
         public bool SkillsDecideEnabled = true;            // no more "default tier +2": troops use ANY gear their stats allow, main weapon follows their best skill, the backup their second best (an archer carries bow, two quivers and a sidearm of his second skill)
+        public int WeaponSkillPerTier = 35;                // Weapon Tier Law: a weapon or shield needs at least (tier - 1) x this in its skill, whatever the data says - a tier 6 blade wants 175, so a One Handed 30 bandit never 'qualifies' for it; 0 turns the law off. Applied at session start
 
         // --- The menagerie ---
         public bool ElephantQuarantineEnabled = true;      // elephants and their barding sell only in settlements of their own culture - no war beasts wintering in Winterfell

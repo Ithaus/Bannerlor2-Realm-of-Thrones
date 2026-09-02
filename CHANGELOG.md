@@ -1,5 +1,47 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-02 — PRAWO TIERU BRONI: sens uzbrajania naprawiony u zrodla (Broken Men z tier 6, lucznicy z ogniem)
+**Mod:** CrashScribe + Armoury | **Pliki:** `CrashScribe/src/Mends.cs` (WeaponTierLaw), `Armoury/src/Settings.cs`, `Armoury/src/SkillsDecide.cs` (AddPattern)
+**Problem (Jeff, screeny + "napraw sens i logike uzbrajania"):**
+(1) bandyci Broken Men z mieczami tier 6 (Stark Arming Sword);
+(2) lucznicy bandytow z plonacymi strzalami; (3) "jak masz tier 6
+miecza, to z umiejetnosci musi byc minimum x - jak miecz tier 6 moze
+miec skilla 30!"; (4) prosba o audyt pancerzy, mieczy i wszystkiego.
+**Sledztwo:** northern_sword (tier 6) w danych ROT ma difficulty="30"
+i w SZABLONACH nosza go TYLKO Starkowie (stark_soldier/houseguard/
+swornsword) - zaden bandyta. Do Broken Menow trafial NASZYM lancuchem:
+AddPattern (dobor "najlepszej dozwolonej" broni) filtruje po
+it.Difficulty <= skill i bierze max Effectiveness - dla One Handed >= 30
+zwracal elitarny tier 6 jako wzorzec; ItemReq.Meets tez ufa
+difficulty z danych, wiec degradacja go nie zdejmowala. Ta sama wada
+dawala lucznikom burning_arrows (najwyzsze Effectiveness).
+**Zmiany:** (1) Mends.WeaponTierLaw (po WeightLaw, przy starcie
+sesji): kazdej broni/tarczy/oszczepowi Difficulty = max(z danych,
+(tier-1) x WeaponSkillPerTier); amunicja i konie poza prawem; tylko
+w gore. Skutek: WSZYSTKIE sciezki (AddPattern, ItemReq, DTE, kwatermistrz,
+TroopFit, tooltip gracza, kuznia) widza ten sam wymog. (2) nowe
+ustawienie MCM Armoury "Skills rule the gear" -> WeaponSkillPerTier
+= 35 (t2 35, t3 70, t4 105, t5 140, t6 175; 0 = prawo wylaczone);
+gen_mcm: 312 ustawien. (3) AddPattern dla Arrows/Bolts wyklucza
+id z burning/flaming - lucznicy dostaja zwykle strzaly. (4) AUDYT
+w logu przy starcie: "prawo tieru broni - ... podniesiony N broniom
+(per tier: t2 a/b, ...)" + "najwieksze rozjazdy danych" top 15;
+pancerze maja swoj audyt z 31.08 (ArmorSanity/WeightLaw w tym samym logu).
+**Skutek zamierzony (dyrektywa "raise, never lower"):** jednostki z tier-6
+bronia W SZABLONIE (elita Starkow) dostana od TroopFit skill do niej
+(One Handed 175) - elita zostaje przy swoim; Broken Men bez takiej
+broni w szablonie dostaja wzorzec swojego skilla. Kolejnosc: CrashScribe
+MendsBehavior (modul #6) rejestruje OnSessionLaunched przed Armoury
+LegendaryLaw.OnSession (#28) -> prawo leci przed TroopFit.
+Gracz: tier 6 miecz "Requires One Handed 175" - Jeff tego chcial.
+**Ryzyko / co sprawdzic:** log CrashScribe: linia prawa tieru z liczbami
+per tier + rozjazdy (northern_sword t6 30->175 na czele); bandyci
+w bitwie z bronia t1-t2, lucznicy bez ognia; Starkowie dalej ze swoim
+mieczem; Armoury.log TroopFit z podbiciami One Handed. Jesli 35 za
+ostro (za duzo elity z t1) - suwak w MCM. Nastepne w kolejce (osobno):
+lamanie strzal po bitwie wg tieru, oszczepy nie tkwia w ciele gracza.
+**Status:** WGRANE (gra byla zamknieta) - DO SPRAWDZENIA
+
 ## 2026-09-02 — "Damaged Grapes": Spoils of War psul stan takze towarom, nie tylko sprzetowi
 **Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs` (GoodsUnlooted)
 **Problem (Jeff, screen MISC):** zdobyte winogrona jako "Damaged Grapes";

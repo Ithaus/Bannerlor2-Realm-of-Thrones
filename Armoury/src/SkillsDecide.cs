@@ -357,6 +357,14 @@ namespace Armoury
                     {
                         if (it == null || it.ItemType != type || !it.HasWeaponComponent) continue;
                         if (it.Difficulty > skill) continue;                     // statystyki rzadza
+                        // OGNISTA AMUNICJA NIE JEST WZORCEM (Jeff 02.09: "lucznicy
+                        // biegaja z plonacymi strzalami, daj im normalne strzaly
+                        // ich tieru") - burning/flaming to specjal okretowy, nie
+                        // kolczan piechoty; Effectiveness i tak ja faworyzuje
+                        if ((type == ItemObject.ItemTypeEnum.Arrows || type == ItemObject.ItemTypeEnum.Bolts)
+                            && it.StringId != null
+                            && (it.StringId.IndexOf("burning", StringComparison.OrdinalIgnoreCase) >= 0
+                                || it.StringId.IndexOf("flaming", StringComparison.OrdinalIgnoreCase) >= 0)) continue;
                         if (LegendaryLaw.IsLegend(it)) continue;                 // legendy nie sa wzorcem
                         if (it.NotMerchandise) continue;                         // unikaty imienne i itemy testowe
                         if (it.StringId != null && it.StringId.StartsWith("dragon_")) continue;

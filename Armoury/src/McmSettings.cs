@@ -500,6 +500,10 @@ namespace Armoury
         [SettingPropertyGroup("Skills rule the gear")]
         public bool SkillsDecideEnabled { get; set; } = true;
 
+        [SettingPropertyInteger("Weapon Skill Per Tier", 0, 140, "0", HintText = "Weapon Tier Law: a weapon or shield needs at least (tier - 1) x this in its skill, whatever the data says - a tier 6 blade wants 175, so a One Handed 30 bandit never 'qualifies' for it; 0 turns the law off. Applied at session start")]
+        [SettingPropertyGroup("Skills rule the gear")]
+        public int WeaponSkillPerTier { get; set; } = 35;
+
         [SettingPropertyBool("Elephant Quarantine Enabled", HintText = "elephants and their barding sell only in settlements of their own culture - no war beasts wintering in Winterfell")]
         [SettingPropertyGroup("The menagerie")]
         public bool ElephantQuarantineEnabled { get; set; } = true;
@@ -1380,6 +1384,7 @@ namespace Armoury
             s.TroopSelfMendPercentPerDay = TroopSelfMendPercentPerDay;
             s.TroopSkillAutoFit = TroopSkillAutoFit;
             s.SkillsDecideEnabled = SkillsDecideEnabled;
+            s.WeaponSkillPerTier = WeaponSkillPerTier;
             s.ElephantQuarantineEnabled = ElephantQuarantineEnabled;
             s.HideoutPurgeEnabled = HideoutPurgeEnabled;
             s.HideoutGoldBase = HideoutGoldBase;
