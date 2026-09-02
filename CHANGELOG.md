@@ -1,5 +1,37 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-02 — Kryjowka wskazana palcem (flaga + kierunek) i Strawa Polnocy (winnice -> ryby/bydlo/swinie)
+**Mod:** Armoury + CrashScribe | **Pliki:** `Armoury/src/HideoutSpotter.cs` (nowy), `Armoury/src/SubModuleMain.cs`, `Armoury/src/Settings.cs`, `CrashScribe/src/Mends.cs` (NorthernFare)
+**Problem (Jeff, screen):** (1) "Hideout spotted i nic nie widze!" -
+napis jest vanillowy (SandBox std_action_strings), ikona kryjowki bywa
+poza ekranem/miedzy drzewami; (2) "na Polnocy mamy grapes - jak mozna
+wydobywac winogrona w Nocnej Strazy? zamiast grapes fish, cos co
+pasuje, i zeby nie zabic zywnosci".
+**Dane:** winnice w sniegu sa 4 (ROT-Map settlements.xml): Farsfog
+(Moat Cailin, battania), Tumbledown (Winterfell, battania), Olden Oak
+(Shadow Tower, nightswatch), Queenscrown (Castle Black, nightswatch).
+Vanilla produkcje: vineyard 11 winogron; fisherman 28 ryb; cattle_farm
+2 krowy + 4 maslo + 4 ser; swine_farm 8 swin + 2 maslo + 2 ser.
+**Zmiany:** (1) HideoutSpotter (CampaignBehavior, tick godzinny): swiezo
+wypatrzona kryjowka (Hideout.IsSpotted) dostaje flage na mapie
+(VisualTrackerManager, jak cel Wayfindera) na HideoutFlagDays (3) dni
+i meldunek EN: "Hideout spotted: <frakcja> lair ~N km to the <strona
+swiata>, near <osada> (M km)"; po wczytaniu juz wypatrzone ida do
+pamieci bez meldunku. MCM "Hideout spotted": HideoutFlagEnabled,
+HideoutFlagDays. (2) Mends.NorthernFare (start sesji, po
+DressTheNamesakes): Farsfog i Queenscrown -> fisherman, Tumbledown ->
+cattle_farm, Olden Oak -> swine_farm (Village.VillageType to pole -
+refleksja; produkcja od nastepnego dnia); prasy do wina w Winterfell
+i Czarnym Zamku -> browary (Workshop.ChangeWorkshopProduction);
+idempotentne; MCM NorthernFareEnabled. Zywnosci przybywa (28 ryb vs
+11 winogron), wiec ekonomia zywnosci nie cierpi.
+**Ryzyko / co sprawdzic:** po wczytaniu log CrashScribe "Mends: strawa
+Polnocy - Farsfog: winnica -> Fishers; ..."; w wioskach po dniu ryby/
+maslo/ser zamiast winogron; w Winterfell/Czarnym Zamku browar zamiast
+prasy (jesli byla); przy nowej wypatrzonej kryjowce flaga + meldunek
+z km i kierunkiem. Ikony wiosek na mapie moga zostac stare (kosmetyka).
+**Status:** WGRANE (gra zamknieta) - DO SPRAWDZENIA
+
 ## 2026-09-02 — Harrenhal: zastepczy dowodca zamiast odkladania; HungerLaw - audyt (nie wyciek), czytelniejszy log
 **Mod:** CrashScribe + Armoury | **Pliki:** `CrashScribe/src/Mends.cs` (HarrenhalGuard + HarrenhalPickSubstitute + HarrenhalSetupWith), `Armoury/src/HungerLaw.cs`
 **Problem (Jeff):** (1) "dajemy innego dowodce, jak tamten w niewoli -

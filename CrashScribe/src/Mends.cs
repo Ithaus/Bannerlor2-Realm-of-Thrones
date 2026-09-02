@@ -1404,6 +1404,72 @@ namespace CrashScribe
         /// do niego, bandyta zostaje przy swoim tierze. Log = audyt per tier.
         /// PULAPKA TIEROW: ItemTiers.Tier1 == 0, wyswietlany = (int)Tier + 1.
         /// </summary>
+        /// <summary>
+        /// STRAWA POLNOCY (Jeff 02.09: "na Polnocy mamy grapes - jak mozna
+        /// wydobywac winogrona w Nocnej Strazy i na Polnocy? zamiast grapes
+        /// powinno byc fish, cos co pasuje, i zeby nie zabic zywnosci").
+        /// Dane ROT daja winnice czterem wioskom w sniegu: Farsfog (Moat
+        /// Cailin, Przesmyk - woda), Tumbledown (Winterfell), Olden Oak
+        /// (Wieza Cieni), Queenscrown (Czarny Zamek, nad Dlugim Jeziorem).
+        /// Mapa po nazwie: Farsfog i Queenscrown -> rybacy (28 ryb > 11
+        /// winogron), Tumbledown -> bydlo (maslo+ser+krowy), Olden Oak ->
+        /// swinie (wieprze+maslo+ser). Zywnosci przybywa, nie ubywa.
+        /// Prasy do wina w Winterfell i Czarnym Zamku (vanilla dobiera
+        /// warsztaty pod wioski) staja sie browarami (zboze z farm Polnocy).
+        /// Village.VillageType to pole - ustawiane refleksja; produkcja
+        /// przelicza sie od nastepnego dnia. Idempotentne (juz zamienione
+        /// pomija).
+        /// </summary>
+        internal static void NorthernFare()
+        {
+            try
+            {
+                if (ArmouryFloat("NorthernFareEnabled", 1f) < 0.5f) return;
+                var map = new System.Collections.Generic.Dictionary<string, string>
+                {
+                    { "castle_village_B1_1", "fisherman" },    // Farsfog
+                    { "village_B5_3", "fisherman" },           // Queenscrown
+                    { "village_B2_1", "cattle_farm" },         // Tumbledown
+                    { "castle_village_B7_2", "swine_farm" }    // Olden Oak
+                };
+                var fld = AccessTools.Field(typeof(Village), "VillageType")
+                          ?? AccessTools.Field(typeof(Village), "<VillageType>k__BackingField");
+                if (fld == null) { Scribe.Line("Mends: Village.VillageType bez pola - strawa Polnocy spi."); return; }
+                var done = new System.Collections.Generic.List<string>();
+                var towns = new System.Collections.Generic.HashSet<Settlement>();
+                foreach (var kv in map)
+                {
+                    var st = Settlement.Find(kv.Key);
+                    if (st == null || st.Village == null) { Scribe.Line("Mends: strawa Polnocy - brak wioski " + kv.Key + " w tej kampanii."); continue; }
+                    var cur = st.Village.VillageType;
+                    if (cur != null && cur.StringId == kv.Value) { if (st.Village.Bound != null) towns.Add(st.Village.Bound); continue; }
+                    if (cur == null || cur.StringId != "vineyard") { continue; }   // ktos juz zmienil na cos innego - nie ruszamy
+                    var vt = TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObject<VillageType>(kv.Value);
+                    if (vt == null) { Scribe.Line("Mends: strawa Polnocy - brak typu wioski " + kv.Value + "."); continue; }
+                    fld.SetValue(st.Village, vt);
+                    done.Add(st.Name + ": winnica -> " + vt.ShortName);
+                    if (st.Village.Bound != null) towns.Add(st.Village.Bound);
+                }
+                int presses = 0;
+                var brewery = TaleWorlds.CampaignSystem.Settlements.Workshops.WorkshopType.Find("brewery");
+                foreach (var town in towns)
+                {
+                    if (town == null || town.Town == null || brewery == null) continue;
+                    foreach (var ws in town.Town.Workshops)
+                    {
+                        if (ws == null || ws.WorkshopType == null || ws.WorkshopType.StringId != "wine_press") continue;
+                        try { ws.ChangeWorkshopProduction(brewery); presses++; done.Add(town.Name + ": prasa do wina -> browar"); }
+                        catch (Exception e) { Scribe.Report("CrashScribe", e, "Mends.NorthernFare(workshop)", null); }
+                    }
+                }
+                if (done.Count > 0)
+                    Scribe.Line("Mends: strawa Polnocy - " + string.Join("; ", done.ToArray()) + ".");
+                else
+                    Scribe.Line("Mends: strawa Polnocy - wioski Polnocy juz bez winnic (nic do zmiany).");
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.NorthernFare", null); } catch { } }
+        }
+
         internal static void ArmorTierLaw()
         {
             try
@@ -2770,7 +2836,7 @@ namespace CrashScribe
         {
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this,
                 delegate (CampaignGameStarter s)
-                { Mends.ArmorSanity(); Mends.AmmoSanity(); Mends.WeightLaw(); Mends.ArmorTierLaw(); Mends.WeaponTierLaw(); Mends.SkillSinew(); Mends.UniqueWares(); Mends.LoreForgeGate(); Mends.DressTheNamesakes(); });
+                { Mends.ArmorSanity(); Mends.AmmoSanity(); Mends.WeightLaw(); Mends.ArmorTierLaw(); Mends.WeaponTierLaw(); Mends.SkillSinew(); Mends.UniqueWares(); Mends.LoreForgeGate(); Mends.DressTheNamesakes(); Mends.NorthernFare(); });
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this,
                 delegate (TaleWorlds.CampaignSystem.MapEvents.MapEvent m) { Mends.MeltDeadLoot(m); });
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this,

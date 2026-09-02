@@ -388,6 +388,13 @@ namespace Armoury
         // --- The forge gate ---
         public int ForgePartsFreeBelowTier = 2;            // only crafting parts BELOW this tier are free at the forge from the start; everything above is unlocked by forging and smelting, lowest tier first (2 = only tier 1 free, 5 = named lore blades locked only, 7 = gate off). A safety floor always keeps one band of parts per required slot, so the Craft button never dies. Applied when a session loads
 
+        // --- Hideout spotted ---
+        public bool HideoutFlagEnabled = true;             // a freshly spotted hideout gets a flag on the map and a report: distance, direction, nearest settlement, who nests there
+        public int HideoutFlagDays = 3;                    // how many days the flag stays on the map
+
+        // --- Northern fare ---
+        public bool NorthernFareEnabled = true;            // vineyards in the North and at the Wall (Farsfog, Tumbledown, Olden Oak, Queenscrown) become fishers, cattle and swine farms - grapes do not grow in snow; wine presses in Winterfell and Castle Black turn into breweries. Applied at session start
+
         // --- Grateful villages ---
         public bool BanditCheerEnabled = true;             // villages near your victory over bandits thank you - relations with their notables improve
         public int BanditCheerRadius = 50;                 // how far from the battlefield a village still hears the good news (map distance)

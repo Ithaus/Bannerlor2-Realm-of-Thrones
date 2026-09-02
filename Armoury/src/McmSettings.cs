@@ -1292,6 +1292,18 @@ namespace Armoury
         [SettingPropertyGroup("The forge gate")]
         public int ForgePartsFreeBelowTier { get; set; } = 2;
 
+        [SettingPropertyBool("Hideout Flag Enabled", HintText = "a freshly spotted hideout gets a flag on the map and a report: distance, direction, nearest settlement, who nests there")]
+        [SettingPropertyGroup("Hideout spotted")]
+        public bool HideoutFlagEnabled { get; set; } = true;
+
+        [SettingPropertyInteger("Hideout Flag Days", 0, 12, "0", HintText = "how many days the flag stays on the map")]
+        [SettingPropertyGroup("Hideout spotted")]
+        public int HideoutFlagDays { get; set; } = 3;
+
+        [SettingPropertyBool("Northern Fare Enabled", HintText = "vineyards in the North and at the Wall (Farsfog, Tumbledown, Olden Oak, Queenscrown) become fishers, cattle and swine farms - grapes do not grow in snow; wine presses in Winterfell and Castle Black turn into breweries. Applied at session start")]
+        [SettingPropertyGroup("Northern fare")]
+        public bool NorthernFareEnabled { get; set; } = true;
+
         [SettingPropertyBool("Bandit Cheer Enabled", HintText = "villages near your victory over bandits thank you - relations with their notables improve")]
         [SettingPropertyGroup("Grateful villages")]
         public bool BanditCheerEnabled { get; set; } = true;
@@ -1630,6 +1642,9 @@ namespace Armoury
             s.HelperTimeRelief = HelperTimeRelief;
             s.HelperSkillForFullRelief = HelperSkillForFullRelief;
             s.ForgePartsFreeBelowTier = ForgePartsFreeBelowTier;
+            s.HideoutFlagEnabled = HideoutFlagEnabled;
+            s.HideoutFlagDays = HideoutFlagDays;
+            s.NorthernFareEnabled = NorthernFareEnabled;
             s.BanditCheerEnabled = BanditCheerEnabled;
             s.BanditCheerRadius = BanditCheerRadius;
             s.BanditCheerRelation = BanditCheerRelation;
