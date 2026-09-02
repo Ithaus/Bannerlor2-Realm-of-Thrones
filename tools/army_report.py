@@ -232,7 +232,8 @@ doc = SimpleDocTemplate(OUT, pagesize=landscape(A4), leftMargin=8*mm, rightMargi
                         title="Realm of Thrones - przeglad armii", author="CrashScribe/Armoury tools")
 story = []
 story.append(Paragraph("Realm of Thrones 8.1.8 - pelny przeglad armii", H1))
-story.append(Paragraph(("Zrodlo: ZRZUT Z GRY (items-dump.csv z CrashScribe - wartosci jak w grze, po RBM i naszych prawach) + drzewa jednostek z XML. " if DUMP_USED else "Zrodlo: dane XML modow (ROT-Troops, items ROT/Native/War Sails, nadpisania pancerzy RBM). ")
+src_txt = ("Zrodlo: ZRZUT Z GRY (items-dump.csv z CrashScribe - wartosci jak w grze, po RBM i naszych prawach) + drzewa jednostek z XML. " if DUMP_USED else "Zrodlo: dane XML modow (ROT-Troops, items ROT/Native/War Sails, nadpisania pancerzy RBM). ")
+story.append(Paragraph(src_txt +
                        "Wartosci pancerza i obrazen sa Z DANYCH - w grze RBM przelicza je w locie, a nasze prawa "
                        "(Prawo Rozsadku Pancerza, Prawo Wagi, Prawo Tieru) podnosza wymagania i tna odstajace sztuki. "
                        "Tier = (poziom-1)/5. Obrazenia broni: c = ciecie (swing), p = pchniecie (thrust); "
