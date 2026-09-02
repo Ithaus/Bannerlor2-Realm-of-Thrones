@@ -1,5 +1,45 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-02 — Harrenhal: zastepczy dowodca zamiast odkladania; HungerLaw - audyt (nie wyciek), czytelniejszy log
+**Mod:** CrashScribe + Armoury | **Pliki:** `CrashScribe/src/Mends.cs` (HarrenhalGuard + HarrenhalPickSubstitute + HarrenhalSetupWith), `Armoury/src/HungerLaw.cs`
+**Problem (Jeff):** (1) "dajemy innego dowodce, jak tamten w niewoli -
+nawet gdyby byl w niewoli, kto inny by dowodzil"; (2) "HungerLaw: 1500
+szt. ponad limit 120 - sprawdz teraz".
+**Ustalenia:** (1) dekompilacja HarrenhalSiegeEvent: warunek startu
+(SiegeLeaderReadyToAttackTarget) SAM uwalnia Roose'a z niewoli
+(EndCaptivityAction.ApplyByEscape) i sprawdza, ze dowodzi partia - ale
+NIE sprawdza, czy rod Boltonow wciaz sluzy Polnocy; jesli Boltonowie
+odeszli z Polnocy (dyplomacja/BK), Kingdom.CreateArmy(TheNorth, Roose)
+nic nie tworzy -> pusta armia -> NRE. Po rozstawieniu reszta wydarzenia
+uzywa tylko SiegeLeaderParty (nie Roose'a), wiec podmiana dowodcy jest
+bezpieczna. (2) HungerLaw: petla vanilli (PartiesBuyFoodCampaignBehavior)
+kupuje TYLKO numberOfFoodItemsNeededToBuy sztuk, z kontrola zlota - nasz
+postfix wypelnia jedynie przypadek "model nic nie wybral"; ROT-owy model
+lancuchowo wola poprzedni (BK/vanilla), ale nasz postfix na wyzszym
+poziomie widzi juz wybrany item i wychodzi - bez podwojnego liczenia.
+1500 szt. = suma po setkach glodnych partii AI w wojennej drozyznie
+(ceny 123-302 > sufit 120 vanilli). NIE wyciek. "limit 120" w logu to
+sufit vanilli, nie nasz - napis byl mylacy.
+**Zmiany:** (1) HarrenhalGuard: gdy Roose niezdolny (log CZEGO brakuje),
+wybiera najsilniejsza wolna partie lorda Polnocy (bez Robba, jak u ROT)
+i wykonuje port SetupSiegeAttackers z nim: LeaveSettlement, Disband
+starej armii, pozycja = brama Harrenhal, TheNorth.CreateArmy(Besieger),
+dolaczenie wolnych lordow Polnocy (Position/IsCurrentlyAtSea/Army),
+GatherArmyAction, SetMoveModeHold, SetDoNotMakeNewDecisions; pola
+SiegeLeaderParty/SiegeArmy/SetupSiegeArmy przez Traverse. Gdy Polnoc
+nie utworzy armii nawet zastepcy albo nikt wolny - ODKLADA (log).
+Wyjatek naszego kodu -> Scribe.Report i NIE oddaje ROT-owi (jego
+sciezka crashuje). Bez obslugi "gracz zaciezny w partii dolaczajacej"
+(ROT przenosi tez gracza) - rzadkie, pominiete swiadomie.
+(2) HungerLaw: log "glodne partie AI dokupily juz N szt. jedzenia
+DROZSZEGO niz vanillowy sufit 120" + komentarz w kodzie.
+**Ryzyko / co sprawdzic:** po wczytaniu log CrashScribe: albo cisza
+(Roose zdolny, ROT robi swoje), albo "oblezenie Harrenhal - <powod>;
+dowodztwo przejmuje X (klan), dolaczylo N partii" - przyniesc powod;
+armia Polnocy pod Harrenhal, po przygotowaniach szturm o 20:00 jak
+u ROT. Jesli zastepca zawiedzie - Scribe.Report w logu, gra zyje.
+**Status:** WGRANE (gra zamknieta) - DO SPRAWDZENIA
+
 ## 2026-09-02 — Zawieszka 13:43 = ROT Harrenhal bez Roose'a (straznik), kary terenu plaskie (-0.25/-0.5), amunicja pod szkolami wiedzy
 **Mod:** CrashScribe + Armoury | **Pliki:** `CrashScribe/src/Mends.cs` (HarrenhalGuard/HarrenhalSafe), `Armoury/src/TerrainEase.cs`, `Armoury/src/RangedLore.cs`, `Armoury/src/Settings.cs`
 **Problem (Jeff):** (1) "gra sie zawiesila" - 13:43 w Fairmarket, menu

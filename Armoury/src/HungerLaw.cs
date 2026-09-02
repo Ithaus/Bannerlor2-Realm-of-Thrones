@@ -56,9 +56,13 @@ namespace Armoury
                 __2 = settlement.ItemRoster.GetElementCopyAtIndex(bestIdx);
                 __3 = bestPrice;
                 _bought++;
+                // licznik SZTUK po calym swiecie (nie partii); "120" to sufit ceny
+                // vanilli/BK, ponizej ktorego AI kupuje samo - my dokupujemy TYLKO
+                // to, czego petla zakupow potrzebuje (numberOfFoodItemsNeededToBuy),
+                // wiec 1500 sztuk na sesje = glod wojenny w setkach partii, nie wyciek
                 if (_bought == 1 || _bought % 100 == 0)
-                    Log.Info("HungerLaw: glodne partie kupily juz " + _bought
-                             + " szt. jedzenia ponad limit 120 (ostatnio "
+                    Log.Info("HungerLaw: glodne partie AI dokupily juz " + _bought
+                             + " szt. jedzenia DROZSZEGO niz vanillowy sufit 120 (ostatnio "
                              + (__2.EquipmentElement.Item != null ? __2.EquipmentElement.Item.StringId : "?")
                              + " za " + bestPrice + " w " + settlement.Name + ").");
             }

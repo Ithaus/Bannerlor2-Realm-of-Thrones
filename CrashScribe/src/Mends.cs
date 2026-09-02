@@ -179,16 +179,119 @@ namespace CrashScribe
                     + (roose.Clan != null ? roose.Clan.Name.ToString() : "?") + ")";
                 else if (north != null && roose.Clan.Kingdom != north) why = "Roose Bolton sluzy " + roose.Clan.Kingdom.Name + ", nie Polnocy";
                 else if (roose.PartyBelongedTo.MapEvent != null) why = "Roose Bolton w bitwie";
-                if (why == null) return true;
-                double now = CampaignTime.Now.ToDays;
-                if (_harrenhalLastLog < 0 || now - _harrenhalLastLog >= 1.0)
+                if (why == null) return true;                     // Roose zdolny - ROT robi swoje
+
+                // ZASTEPCA (Jeff 02.09: "dajemy innego dowodce, jak tamten w niewoli
+                // - nawet gdyby byl w niewoli, kto inny by dowodzil"): najsilniejsza
+                // wolna partia lorda Polnocy prowadzi oblezenie ta sama sekwencja,
+                // ktora ROT robi dla Roose'a. Po rozstawieniu reszta wydarzenia
+                // patrzy tylko na SiegeLeaderParty, nie na Roose'a - bezpieczne.
+                Settlement harrenhal = null;
+                try { harrenhal = _rotSettlements != null ? Traverse.Create(_rotSettlements).Property("Harrenhal").GetValue() as Settlement : null; } catch { }
+                Hero robb = null;
+                try { robb = _rotLords != null ? Traverse.Create(_rotLords).Property("RobbStark").GetValue() as Hero : null; } catch { }
+                if (north == null || harrenhal == null)
                 {
-                    _harrenhalLastLog = now;
-                    Scribe.Line("Mends: oblezenie Harrenhal ODLOZONE - " + why + " (ROT ponowi za godzine gry).");
+                    HarrenhalPostponed(why + "; brak ROTKingdoms.TheNorth/ROTSettlements.Harrenhal - zastepca niemozliwy");
+                    return false;
                 }
+                var sub = HarrenhalPickSubstitute(north, robb);
+                if (sub == null) { HarrenhalPostponed(why + "; zaden lord Polnocy nie jest wolny"); return false; }
+                HarrenhalSetupWith(__instance, sub, north, harrenhal, robb, why);
                 return false;
             }
-            catch { return true; }
+            catch (Exception e)
+            {
+                // nasz zastepca sie wywrocil - NIE oddajemy ROT-owi (jego sciezka crashuje)
+                try { Scribe.Report("CrashScribe", e, "Mends.HarrenhalGuard", null); } catch { }
+                return false;
+            }
+        }
+
+        private static Type _rotSettlements;
+
+        private static void HarrenhalPostponed(string why)
+        {
+            double now = CampaignTime.Now.ToDays;
+            if (_harrenhalLastLog < 0 || now - _harrenhalLastLog >= 1.0)
+            {
+                _harrenhalLastLog = now;
+                Scribe.Line("Mends: oblezenie Harrenhal ODLOZONE - " + why + " (ROT ponowi za godzine gry).");
+            }
+        }
+
+        private static MobileParty HarrenhalPickSubstitute(Kingdom north, Hero robb)
+        {
+            MobileParty best = null; float bestStr = -1f;
+            foreach (var clan in north.Clans)
+            {
+                if (clan == null || clan.WarPartyComponents == null) continue;
+                foreach (var wpc in clan.WarPartyComponents)
+                {
+                    var mp = wpc != null ? wpc.MobileParty : null;
+                    if (mp == null || mp.IsMainParty || !mp.IsActive || !mp.IsLordParty) continue;
+                    var h = mp.LeaderHero;
+                    if (h == null || !h.IsAlive || h.IsPrisoner || h == robb) continue;
+                    if (mp.MapEvent != null || mp.SiegeEvent != null) continue;
+                    float str = mp.Party != null ? mp.Party.TotalStrength : 0f;
+                    if (str > bestStr) { bestStr = str; best = mp; }
+                }
+            }
+            return best;
+        }
+
+        /// <summary>Port SetupSiegeAttackers z ROT (dekompilacja 02.09) z innym dowodca.</summary>
+        private static void HarrenhalSetupWith(object ev, MobileParty sub, Kingdom north, Settlement harrenhal, Hero robb, string why)
+        {
+            var tr = Traverse.Create(ev);
+            tr.Field("SetupSiegeArmy").SetValue(false);
+            tr.Field("SiegeLeaderParty").SetValue(sub);
+            if (sub.CurrentSettlement != null) LeaveSettlementAction.ApplyForParty(sub);
+            bool fresh = sub.SiegeEvent == null || sub.SiegeEvent != harrenhal.SiegeEvent;
+            if (fresh)
+            {
+                if (sub.Army != null) DisbandArmyAction.ApplyByUnknownReason(sub.Army);
+                sub.Position = harrenhal.GatePosition;
+                sub.IsCurrentlyAtSea = false;
+                north.CreateArmy(sub.LeaderHero, harrenhal, Army.ArmyTypes.Besieger, null);
+            }
+            tr.Field("SiegeArmy").SetValue(sub.Army);
+            if (!fresh) return;
+            if (sub.Army == null)
+            {
+                HarrenhalPostponed(why + "; Polnoc nie utworzyla armii nawet dla " + sub.LeaderHero.Name);
+                return;
+            }
+            int joined = 0;
+            foreach (var clan in north.Clans)
+            {
+                if (clan == null || clan.WarPartyComponents == null) continue;
+                foreach (var wpc in clan.WarPartyComponents)
+                {
+                    var mp = wpc != null ? wpc.MobileParty : null;
+                    if (mp == null || mp.IsMainParty || mp == sub || !mp.IsActive || !mp.IsLordParty
+                        || mp.LeaderHero == null || mp.MapEvent != null || mp.SiegeEvent != null || mp.LeaderHero == robb) continue;
+                    if (mp.Army != null)
+                    {
+                        if (mp.Army != sub.Army)
+                        {
+                            if (mp.Army.LeaderParty != null && mp.Army.LeaderParty.CurrentSettlement != null)
+                                LeaveSettlementAction.ApplyForParty(mp.Army.LeaderParty);
+                            DisbandArmyAction.ApplyByUnknownReason(mp.Army);
+                        }
+                    }
+                    else if (mp.CurrentSettlement != null) LeaveSettlementAction.ApplyForParty(mp);
+                    mp.Position = harrenhal.GatePosition;
+                    mp.IsCurrentlyAtSea = false;
+                    mp.Army = sub.Army;
+                    joined++;
+                }
+            }
+            GatherArmyAction.Apply(sub, (TaleWorlds.CampaignSystem.Map.IMapPoint)sub);
+            sub.SetMoveModeHold();
+            sub.Ai.SetDoNotMakeNewDecisions(true);
+            Scribe.Line("Mends: oblezenie Harrenhal - " + why + "; dowodztwo przejmuje " + sub.LeaderHero.Name
+                        + " (" + sub.LeaderHero.Clan.Name + "), dolaczylo " + joined + " partii Polnocy.");
         }
 
         public static Exception HarrenhalSafe(Exception __exception)
@@ -1632,7 +1735,7 @@ namespace CrashScribe
                 // (13:43:14 -> 13:43:23). Prefix sprawdza Roose'a i ODKLADA probe
                 // (wydarzenie ponowi co godzine), wypisujac w logu, czego brakuje;
                 // finalizer lapie reszte, zeby zadna inna dziura ROT nie zabila gry.
-                Type tHar = null, tLords = null, tKing = null;
+                Type tHar = null, tLords = null, tKing = null, tSet = null;
                 foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
                 {
                     try
@@ -1641,10 +1744,11 @@ namespace CrashScribe
                         if (tHar == null) tHar = asm.GetType("ROT.Events.HarrenhalSiegeEvent");
                         if (tLords == null) tLords = asm.GetType("ROT.Misc.ROTLords");
                         if (tKing == null) tKing = asm.GetType("ROT.Misc.ROTKingdoms");
+                        if (tSet == null) tSet = asm.GetType("ROT.Misc.ROTSettlements");
                     }
                     catch { }
                 }
-                _rotLords = tLords; _rotKingdoms = tKing;
+                _rotLords = tLords; _rotKingdoms = tKing; _rotSettlements = tSet;
                 var mSetup = tHar != null ? AccessTools.Method(tHar, "SetupSiegeAttackers") : null;
                 if (mSetup != null)
                 {
