@@ -1,5 +1,48 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-02 — Strzaly t6 bandytow (amunicja pod Prawem Tieru), ulga terenu 50% + audyt predkosci, gra w oknie bez ramki
+**Mod:** CrashScribe + Armoury | **Pliki:** `CrashScribe/src/Mends.cs` (WeaponTierLaw, DTE ward), `Armoury/src/ItemReq.cs` (SkillFor), `Armoury/src/SkillsDecide.cs`, `Armoury/src/TroopFit.cs`, `Armoury/src/QuartermasterLaw.cs`, `Armoury/src/DragonUnmount.cs`, `Armoury/src/TerrainEase.cs` (nowy), `Armoury/src/SubModuleMain.cs`, `Armoury/src/Settings.cs`; poza repo: `Documents\...\Configs\engine_config.txt`
+**Problem (Jeff):** (1) "strzal tier 6 bandyci tez nie moga miec, chyba
+ze sa tieru 6 - co najwyzej lider bandy w kryjowce"; (2) "ograniczenia
+podrozy forest/snow/desert za duze - daj -0.5 zamiast -1; zaudytuj
+poruszanie"; (3) sterownik grafiki znow padl przy alt-tab.
+**Przyczyny:** (1) Prawo Tieru Broni omijalo amunicje, a strzaly nie maja
+w danych RelevantSkill ani Difficulty -> AddPattern dla kolczanow bral
+skill 0 i "najlepsza w grze" (Effectiveness) = t6 u KAZDEGO lucznika,
+takze bandyty; ItemReq/TroopFit/kwatermistrz/DTE-ward pomijaly amunicje.
+(2) vanilla liczy teren PROCENTEM od bazy (las -30%, snieg/pustynia -10%,
+noc -25%, brod -30%) - po WorldPace 50% liczba zmalala, proporcja nie.
+(3) zwisy GPU od 8.08 (jeszcze na sterowniku z 24.07), powtorzone na
+17.08 i dzis - nie jeden sterownik; alt-tab z PELNEGO ekranu to
+najczestszy wyzwalacz.
+**Zmiany:** (1) WeaponTierLaw obejmuje Arrows/Bolts (wymog (tier-1)x35);
+NOWE ItemReq.SkillFor(item) = jedno zrodlo prawdy: RelevantSkill, pancerz
+-> Atletyka, strzaly -> Bow, belty -> Crossbow; uzyte w ItemReq.Meets,
+TroopFit (elita/boss z t6 strzalami W SZABLONIE dostaje Bow do nich),
+QuartermasterLaw.AnyoneCanUse, DragonUnmount (skill do PatternFor),
+Mends DTE-ward (mapowanie Arrows/Bolts); SkillsDecide: wzorzec amunicji
+po skillu strzelca (SkillFor(ch,"bow"/"xbow")) zamiast 0, FillFree
+z skillem. Skutek: lucznik z Bow 60 dostaje strzaly t2, boss z Bow 150
+t5, elita z t6 w szablonie zostaje przy swoim. (2) Armoury/TerrainEase:
+postfix (Priority.Normal, przed sufitem MarchPace) czyta rozpiske
+(ExplainedNumber.GetLines) i kazdej ujemnej pozycji Forest/Snow/Desert/
+Night/Fording oddaje (100-TerrainPenaltyPercent)% jako nazwany wpis
+"Forest (eased)"; MCM TerrainPenaltyPercent=50, SpeedAuditEnabled:
+raz na dzien gry pelna rozpiska predkosci glownej partii w Armoury.log
+("Audyt predkosci (dzien N): Base +x | Cavalry +y | Forest -z | Forest
+(eased) +w ... => wynik"). gen_mcm: 319 ustawien. (3) engine_config.txt:
+display_mode 1 -> 2 (okno bez ramki), max_framerate 200 -> 120 (kopia
+.bak-2026-09-02).
+**Ryzyko / co sprawdzic:** log CrashScribe "prawo tieru broni" ma teraz
+wiecej podbitych (dochodza strzaly/belty); bandyci-lucznicy w strzalach
+niskiego tieru, boss kryjowki w lepszych; WLASNI lucznicy gracza: DTE
+przydzieli im strzaly wedle Bow - jesli nagle strzelaja t1, to ward DTE
+zdjal t6 ponad skill (zamysl); tooltip predkosci w lesie: "Forest -x"
+i "Forest (eased) +x/2"; Armoury.log wpis "Audyt predkosci" raz na dzien;
+gra startuje w oknie bez ramki (jesli rozdzielczosc/skalowanie zle -
+opcje wideo, tryb "Windowed Fullscreen").
+**Status:** WGRANE (gra zamknieta) - DO SPRAWDZENIA
+
 ## 2026-09-02 — Prawo tieru PANCERZA: Atletyka = max(Prawo Wagi, (tier-1)x35) - koniec bandytow w butach Clegane'a
 **Mod:** CrashScribe + Armoury | **Pliki:** `CrashScribe/src/Mends.cs` (ArmorTierLaw), `Armoury/src/Settings.cs`
 **Problem (Jeff, screen):** bandyci w Clegane Boots t4 - "Requires

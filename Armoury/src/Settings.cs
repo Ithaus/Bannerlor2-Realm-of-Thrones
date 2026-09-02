@@ -258,6 +258,8 @@ namespace Armoury
         // --- The marching column ---
         public bool MarchPaceEnabled = true;               // a column moves at the pace of its slowest man: any soldier or prisoner on foot holds the whole party to walking speed
         public int WorldPacePercent = 50;                  // base map speed of EVERY party - 50% matches the doubled year: Winterfell to King's Landing takes a lore-true month of the 168-day calendar
+        public int TerrainPenaltyPercent = 50;             // how much of the game's terrain and night speed penalties (forest, snow, desert, fording, night) still applies - 50 halves them, 100 = untouched; the rest comes back as a named 'eased' line in the speed tooltip
+        public bool SpeedAuditEnabled = true;              // once a day the full speed breakdown of your party is written to Armoury.log (before the marching-column cap and sleep debt)
         public int SiegePacePercent = 50;                  // siege engine construction speed - 50% makes sieges last twice as long, so starving a fortress out matters again
         public bool SiegeSicknessEnabled = true;           // camp fever: long sieges breed dysentery - the sick go down as wounded, some die; medicine is the shield
         public int SiegeSicknessIncubationDays = 9;        // clean-camp grace period before the fever wakes

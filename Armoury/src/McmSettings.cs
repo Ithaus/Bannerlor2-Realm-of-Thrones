@@ -840,6 +840,14 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public int WorldPacePercent { get; set; } = 50;
 
+        [SettingPropertyInteger("Terrain Penalty Percent", 0, 200, "0", HintText = "how much of the game's terrain and night speed penalties (forest, snow, desert, fording, night) still applies - 50 halves them, 100 = untouched; the rest comes back as a named 'eased' line in the speed tooltip")]
+        [SettingPropertyGroup("The marching column")]
+        public int TerrainPenaltyPercent { get; set; } = 50;
+
+        [SettingPropertyBool("Speed Audit Enabled", HintText = "once a day the full speed breakdown of your party is written to Armoury.log (before the marching-column cap and sleep debt)")]
+        [SettingPropertyGroup("The marching column")]
+        public bool SpeedAuditEnabled { get; set; } = true;
+
         [SettingPropertyInteger("Siege Pace Percent", 0, 200, "0", HintText = "siege engine construction speed - 50% makes sieges last twice as long, so starving a fortress out matters again")]
         [SettingPropertyGroup("The marching column")]
         public int SiegePacePercent { get; set; } = 50;
@@ -1489,6 +1497,8 @@ namespace Armoury
             s.WeeksPerSeason = WeeksPerSeason;
             s.MarchPaceEnabled = MarchPaceEnabled;
             s.WorldPacePercent = WorldPacePercent;
+            s.TerrainPenaltyPercent = TerrainPenaltyPercent;
+            s.SpeedAuditEnabled = SpeedAuditEnabled;
             s.SiegePacePercent = SiegePacePercent;
             s.SiegeSicknessEnabled = SiegeSicknessEnabled;
             s.SiegeSicknessIncubationDays = SiegeSicknessIncubationDays;

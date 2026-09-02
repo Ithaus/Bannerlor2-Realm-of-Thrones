@@ -651,8 +651,15 @@ namespace CrashScribe
                         if (it == null) continue;
                         bool isWeapon = s <= 4;
                         if (isWeapon) weaponsHeld++;
-                        if (it.Difficulty <= 0 || it.RelevantSkill == null) continue;
-                        if (co.GetSkillValue(it.RelevantSkill) >= it.Difficulty) continue;
+                        // amunicja nie ma RelevantSkill w danych - mapujemy jak ItemReq.SkillFor
+                        var rs = it.RelevantSkill;
+                        if (rs == null)
+                        {
+                            if (it.ItemType == ItemObject.ItemTypeEnum.Arrows) rs = TaleWorlds.Core.DefaultSkills.Bow;
+                            else if (it.ItemType == ItemObject.ItemTypeEnum.Bolts) rs = TaleWorlds.Core.DefaultSkills.Crossbow;
+                        }
+                        if (it.Difficulty <= 0 || rs == null) continue;
+                        if (co.GetSkillValue(rs) >= it.Difficulty) continue;
                         doomed.Add(s);
                         if (isWeapon && it.Difficulty < weakestDiff) { weakestDiff = it.Difficulty; weakestSlot = s; }
                     }
@@ -1302,8 +1309,10 @@ namespace CrashScribe
                 {
                     if (it == null || !it.HasWeaponComponent) continue;
                     var ty = it.ItemType;
-                    if (ty == ItemObject.ItemTypeEnum.Arrows || ty == ItemObject.ItemTypeEnum.Bolts
-                        || ty == ItemObject.ItemTypeEnum.Banner || ty == ItemObject.ItemTypeEnum.Horse
+                    // AMUNICJA TEZ (Jeff 02.09: "strzal tier 6 bandyci nie moga
+                    // miec, chyba ze sa tieru 6") - strzaly/belty dostaja wymog
+                    // Bow/Crossbow po tierze, a ItemReq.SkillFor mapuje im skill
+                    if (ty == ItemObject.ItemTypeEnum.Banner || ty == ItemObject.ItemTypeEnum.Horse
                         || ty == ItemObject.ItemTypeEnum.HorseHarness) continue;
                     int grade = (int)it.Tier + 1;
                     if (grade < 1) grade = 1;

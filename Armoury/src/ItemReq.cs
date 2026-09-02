@@ -22,8 +22,7 @@ namespace Armoury
             {
                 if (ch == null || it == null) return true;
                 if (it.Difficulty <= 0) return true;
-                SkillObject skill = it.RelevantSkill;
-                if (skill == null && it.HasArmorComponent) skill = DefaultSkills.Athletics;
+                SkillObject skill = SkillFor(it);
                 if (skill == null) return true;
                 int have = ch.GetSkillValue(skill);
                 if (have >= it.Difficulty) return true;
@@ -36,6 +35,26 @@ namespace Armoury
         internal static bool Meets(CharacterObject ch, ItemObject it)
         {
             string why; return Meets(ch, it, out why);
+        }
+
+        /// <summary>
+        /// JEDNO ZRODLO PRAWDY o tym, ktory skill pilnuje przedmiotu: bron
+        /// i kon maja RelevantSkill z danych; pancerz - Atletyka (Prawo Wagi
+        /// i Prawo Tieru wpisuja mu Difficulty); AMUNICJA nie ma skilla
+        /// w danych, a Prawo Tieru daje jej wymog - wiec strzaly pilnuje
+        /// Bow, belty Crossbow (Jeff 02.09: "strzal t6 bandyci nie moga
+        /// miec"). Wszystkie miejsca doboru (ItemReq, TroopFit, kwatermistrz,
+        /// DragonUnmount, warta DTE w CrashScribe) maja uzywac tego.
+        /// </summary>
+        internal static SkillObject SkillFor(ItemObject it)
+        {
+            if (it == null) return null;
+            var skill = it.RelevantSkill;
+            if (skill != null) return skill;
+            if (it.HasArmorComponent) return DefaultSkills.Athletics;
+            if (it.ItemType == ItemObject.ItemTypeEnum.Arrows) return DefaultSkills.Bow;
+            if (it.ItemType == ItemObject.ItemTypeEnum.Bolts) return DefaultSkills.Crossbow;
+            return null;
         }
     }
 }

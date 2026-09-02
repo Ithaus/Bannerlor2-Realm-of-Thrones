@@ -62,6 +62,7 @@ namespace Armoury
                 ScorchedEarth.ApplyAll(_harmony);
                 Wayfinder.ApplyAll(_harmony);
                 MarchPace.ApplyAll(_harmony);
+                TerrainEase.ApplyAll(_harmony);
                 // NightRest PO MarchPace: kara snu ma ciac REALNA predkosc
                 // kolumny (po suficie marszu), nie teoretyczna baze
                 NightRest.ApplyAll(_harmony);

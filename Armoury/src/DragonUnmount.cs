@@ -60,7 +60,8 @@ namespace Armoury
                                 var repl = LegendaryLaw.ReplacementFor(w);
                                 if (repl == null)
                                 {
-                                    int skl = w.RelevantSkill != null ? soldier.GetSkillValue(w.RelevantSkill) : 0;
+                                    var rsk = ItemReq.SkillFor(w);
+                                    int skl = rsk != null ? soldier.GetSkillValue(rsk) : 0;
                                     repl = SkillsDecide.PatternFor(w.ItemType, skl);
                                 }
                                 eq[(EquipmentIndex)slot] = repl != null
@@ -79,7 +80,8 @@ namespace Armoury
                                 string whyNot;
                                 if (!ItemReq.Meets(soldier, w, out whyNot))
                                 {
-                                    int sk = w.RelevantSkill != null ? soldier.GetSkillValue(w.RelevantSkill) : 0;
+                                    var rsk2 = ItemReq.SkillFor(w);
+                                    int sk = rsk2 != null ? soldier.GetSkillValue(rsk2) : 0;
                                     var swap = SkillsDecide.PatternFor(w.ItemType, sk);
                                     // PODLOGA SPRZETU (Jeff 31.08): degradacja owszem,
                                     // ale gdy NIE MA czym podmienic - zolnierz zostaje

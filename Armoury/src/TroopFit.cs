@@ -47,8 +47,7 @@ namespace Armoury
                         {
                             var it = eq[(EquipmentIndex)slot].Item;
                             if (it == null || it.Difficulty <= 0) continue;
-                            var skill = it.RelevantSkill;
-                            if (skill == null && it.HasArmorComponent) skill = DefaultSkills.Athletics;
+                            var skill = ItemReq.SkillFor(it);   // pancerz -> Atletyka, strzaly -> Bow, belty -> Crossbow
                             if (skill == null) continue;
                             int cur;
                             if (!need.TryGetValue(skill, out cur) || it.Difficulty > cur)

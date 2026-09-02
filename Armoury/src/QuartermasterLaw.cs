@@ -684,8 +684,7 @@ namespace Armoury
             bestSkill = 0; skillName = "";
             try
             {
-                var skill = item.RelevantSkill;
-                if (skill == null && item.HasArmorComponent) skill = TaleWorlds.Core.DefaultSkills.Athletics;
+                var skill = ItemReq.SkillFor(item);
                 if (skill == null || item.Difficulty <= 0) return true;
                 skillName = skill.Name.ToString();
                 var roster = TaleWorlds.CampaignSystem.Party.MobileParty.MainParty.MemberRoster;

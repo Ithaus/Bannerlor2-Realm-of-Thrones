@@ -116,15 +116,19 @@ namespace Armoury
 
                 var slots = new List<ItemObject>();
                 AddWeaponFor(slots, main, SkillFor(ch, main));
-                if (main == "bow") { AddPattern(slots, ItemObject.ItemTypeEnum.Arrows, 0); AddPattern(slots, ItemObject.ItemTypeEnum.Arrows, 0); }
-                else if (main == "xbow") { AddPattern(slots, ItemObject.ItemTypeEnum.Bolts, 0); AddPattern(slots, ItemObject.ItemTypeEnum.Bolts, 0); }
+                // AMUNICJA WEDLE SKILLA (Jeff 02.09: "strzal t6 bandyci nie moga
+                // miec"): Prawo Tieru daje strzalom/beltom wymog Bow/Crossbow,
+                // wiec wzorzec amunicji dobieramy po skillu strzelca, nie po zerze
+                // (zero = "najlepsza w grze", stad t6 u kazdego lucznika)
+                if (main == "bow") { AddPattern(slots, ItemObject.ItemTypeEnum.Arrows, SkillFor(ch, "bow")); AddPattern(slots, ItemObject.ItemTypeEnum.Arrows, SkillFor(ch, "bow")); }
+                else if (main == "xbow") { AddPattern(slots, ItemObject.ItemTypeEnum.Bolts, SkillFor(ch, "xbow")); AddPattern(slots, ItemObject.ItemTypeEnum.Bolts, SkillFor(ch, "xbow")); }
                 else if (main == "thr") AddWeaponFor(slots, "thr", sThr);   // drugi pek oszczepow
                 if (shield != null && main != "two" && main != "pole" && slots.Count < 4) slots.Add(shield);
                 if (second != null && slots.Count < 4)
                 {
                     AddWeaponFor(slots, second, SkillFor(ch, second));
-                    if (second == "bow" && slots.Count < 4) AddPattern(slots, ItemObject.ItemTypeEnum.Arrows, 0);
-                    else if (second == "xbow" && slots.Count < 4) AddPattern(slots, ItemObject.ItemTypeEnum.Bolts, 0);
+                    if (second == "bow" && slots.Count < 4) AddPattern(slots, ItemObject.ItemTypeEnum.Arrows, SkillFor(ch, "bow"));
+                    else if (second == "xbow" && slots.Count < 4) AddPattern(slots, ItemObject.ItemTypeEnum.Bolts, SkillFor(ch, "xbow"));
                 }
 
                 // KSIEGA MUSZTRY: reczne przypisania gracza maja pierwszenstwo
@@ -149,8 +153,8 @@ namespace Armoury
                     else if (it0.ItemType == ItemObject.ItemTypeEnum.Arrows) hasArrows = true;
                     else if (it0.ItemType == ItemObject.ItemTypeEnum.Bolts) hasBolts = true;
                 }
-                if (hasBow && !hasArrows) FillFree(slots, ItemObject.ItemTypeEnum.Arrows);
-                if (hasXbow && !hasBolts) FillFree(slots, ItemObject.ItemTypeEnum.Bolts);
+                if (hasBow && !hasArrows) FillFree(slots, ItemObject.ItemTypeEnum.Arrows, SkillFor(ch, "bow"));
+                if (hasXbow && !hasBolts) FillFree(slots, ItemObject.ItemTypeEnum.Bolts, SkillFor(ch, "xbow"));
 
                 for (int i = 0; i < 4; i++)
                     reference[(EquipmentIndex)i] = i < slots.Count && slots[i] != null
@@ -225,13 +229,13 @@ namespace Armoury
             return tmp.Count > 0 ? tmp[0] : null;
         }
 
-        private static void FillFree(List<ItemObject> slots, ItemObject.ItemTypeEnum ammo)
+        private static void FillFree(List<ItemObject> slots, ItemObject.ItemTypeEnum ammo, int skill)
         {
             for (int i = 0; i < 4 && i < slots.Count; i++)
                 if (slots[i] == null)
                 {
                     var tmp = new List<ItemObject>();
-                    AddPattern(tmp, ammo, 0);
+                    AddPattern(tmp, ammo, skill);
                     if (tmp.Count > 0) slots[i] = tmp[0];
                     return;
                 }
