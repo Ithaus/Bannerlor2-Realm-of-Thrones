@@ -1470,6 +1470,56 @@ namespace CrashScribe
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.NorthernFare", null); } catch { } }
         }
 
+        /// <summary>
+        /// ZRZUT PRZEDMIOTOW (Jeff 02.09: "pdf z dokladnymi tabelkami: pancerz,
+        /// uzbrojenie, obrazenia"). Bron ROT to CraftedItem - w XML nie ma jej
+        /// obrazen, liczy je gra z czesci. Wiec raz na sesje, PO naszych prawach,
+        /// zrzucamy wszystkie przedmioty do CSV (Documents\...\CrashScribe\
+        /// items-dump.csv): id, nazwa, typ, tier, waga, wymog, pancerz per slot,
+        /// klasa broni, ciecie/pchniecie z typem, predkosc pocisku, dlugosc,
+        /// czy kuty, wartosc. tools/army_report.py bierze ten plik zamiast XML.
+        /// </summary>
+        internal static void ItemDump()
+        {
+            try
+            {
+                string dir = null;
+                try { dir = System.IO.Path.GetDirectoryName(Scribe.SessionFile); } catch { }
+                if (string.IsNullOrEmpty(dir)) return;
+                var path = System.IO.Path.Combine(dir, "items-dump.csv");
+                var sb = new System.Text.StringBuilder();
+                sb.AppendLine("id;name;type;tier;weight;difficulty;head;body;arm;leg;wclass;swing;swing_t;thrust;thrust_t;missile_speed;length;crafted;value;merchandise");
+                int n = 0;
+                var ci = System.Globalization.CultureInfo.InvariantCulture;
+                foreach (var it in TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
+                {
+                    if (it == null) continue;
+                    int h = 0, b = 0, a = 0, l = 0;
+                    if (it.HasArmorComponent && it.ArmorComponent != null)
+                    { h = it.ArmorComponent.HeadArmor; b = it.ArmorComponent.BodyArmor; a = it.ArmorComponent.ArmArmor; l = it.ArmorComponent.LegArmor; }
+                    string wc = "", st = "", tt = ""; int sw = 0, th = 0, ms = 0, len = 0;
+                    if (it.HasWeaponComponent && it.PrimaryWeapon != null)
+                    {
+                        var w = it.PrimaryWeapon;
+                        wc = w.WeaponClass.ToString(); sw = w.SwingDamage; th = w.ThrustDamage;
+                        st = w.SwingDamageType.ToString(); tt = w.ThrustDamageType.ToString();
+                        ms = w.MissileSpeed; len = w.WeaponLength;
+                    }
+                    string name = it.Name != null ? it.Name.ToString().Replace(';', ',') : it.StringId;
+                    sb.Append(it.StringId).Append(';').Append(name).Append(';').Append(it.ItemType).Append(';')
+                      .Append(((int)it.Tier + 1)).Append(';').Append(it.Weight.ToString("0.00", ci)).Append(';').Append(it.Difficulty).Append(';')
+                      .Append(h).Append(';').Append(b).Append(';').Append(a).Append(';').Append(l).Append(';')
+                      .Append(wc).Append(';').Append(sw).Append(';').Append(st).Append(';').Append(th).Append(';').Append(tt).Append(';')
+                      .Append(ms).Append(';').Append(len).Append(';').Append(it.IsCraftedWeapon ? 1 : 0).Append(';').Append(it.Value).Append(';')
+                      .Append(it.NotMerchandise ? 0 : 1).AppendLine();
+                    n++;
+                }
+                System.IO.File.WriteAllText(path, sb.ToString(), System.Text.Encoding.UTF8);
+                Scribe.Line("Mends: zrzut przedmiotow - " + n + " sztuk do " + path + " (dla tools/army_report.py).");
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.ItemDump", null); } catch { } }
+        }
+
         internal static void ArmorTierLaw()
         {
             try
@@ -2836,7 +2886,7 @@ namespace CrashScribe
         {
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this,
                 delegate (CampaignGameStarter s)
-                { Mends.ArmorSanity(); Mends.AmmoSanity(); Mends.WeightLaw(); Mends.ArmorTierLaw(); Mends.WeaponTierLaw(); Mends.SkillSinew(); Mends.UniqueWares(); Mends.LoreForgeGate(); Mends.DressTheNamesakes(); Mends.NorthernFare(); });
+                { Mends.ArmorSanity(); Mends.AmmoSanity(); Mends.WeightLaw(); Mends.ArmorTierLaw(); Mends.WeaponTierLaw(); Mends.SkillSinew(); Mends.UniqueWares(); Mends.LoreForgeGate(); Mends.DressTheNamesakes(); Mends.NorthernFare(); Mends.ItemDump(); });
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this,
                 delegate (TaleWorlds.CampaignSystem.MapEvents.MapEvent m) { Mends.MeltDeadLoot(m); });
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this,

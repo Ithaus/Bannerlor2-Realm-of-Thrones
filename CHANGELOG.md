@@ -1,5 +1,33 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-02 — Przeglad armii do PDF (tools/army_report.py) + zrzut przedmiotow z gry (Mends.ItemDump)
+**Mod:** CrashScribe + narzedzia | **Pliki:** `tools/army_report.py` (nowy), `docs/ROT-armie-przeglad.pdf` (nowy, generowany), `CrashScribe/src/Mends.cs` (ItemDump)
+**Prosba (Jeff):** "pdf z tabelka i opisami kazdej armii z dokladnymi
+tabelkami: pancerz, skille, uzbrojenie, obrazenia; na ostatniej stronie
+top 10 najlepszych jednostek kazdego typu (konne, lucznicy, piechota)".
+**Zmiany:** (1) tools/army_report.py (py -3, reportlab): parsuje
+SandBoxCore spnpccharacters + ROT-Troops (866 jednostek, 24 kultury),
+przedmioty z SandBoxCore/items, NavalDLC, ROT items/ROTassets, nadpisania
+RBM (RBMCombat_*.xml) i RBM_WS; liczy pancerz per slot, skille, bron
+z obrazeniami (c=ciecie/p=pchniecie, C/P/B), kon, korzen drzewa
+("wies/miasto" = werbunek z osad kultury; "rod/lordowie" = linia rodowa
+tylko w partiach lordow/garnizonach); sekcja per kultura z opisem
+(najlepsza piechota/strzelec/jazda) i tabela; na koncu TOP 10 piechoty,
+strzelcow, jazdy i konnych lucznikow z JAWNYMI wzorami. 54 strony A4
+poziomo. (2) Mends.ItemDump: raz na sesje, po wszystkich prawach, zrzut
+WSZYSTKICH przedmiotow do Documents\...\CrashScribe\items-dump.csv
+(id, nazwa, typ, tier, waga, wymog, pancerz h/b/a/l, klasa broni,
+ciecie/pchniecie+typ, predkosc pocisku, dlugosc, kuty, wartosc) - bo
+bron ROT to CraftedItem i w XML nie ma jej obrazen; raport wybiera CSV,
+gdy istnieje (naglowek PDF mowi, ktore zrodlo). (3) czyszczenie nazw
+{=id} i {@Plural}...{\@}.
+**Ryzyko / co sprawdzic:** po nastepnym starcie gry log "Mends: zrzut
+przedmiotow - N sztuk do ..." i plik items-dump.csv; potem
+`py -3 tools/army_report.py` daje PDF z prawdziwymi obrazeniami broni
+kutej (dzis w PDF stoi "[kuty ...]" bez liczb). Wzory TOP 10 sa
+umowne - do dyskusji z Jeffem.
+**Status:** WGRANE (watcher po zamknieciu gry) - PDF v1 z XML w docs/
+
 ## 2026-09-02 — Kryjowka wskazana palcem (flaga + kierunek) i Strawa Polnocy (winnice -> ryby/bydlo/swinie)
 **Mod:** Armoury + CrashScribe | **Pliki:** `Armoury/src/HideoutSpotter.cs` (nowy), `Armoury/src/SubModuleMain.cs`, `Armoury/src/Settings.cs`, `CrashScribe/src/Mends.cs` (NorthernFare)
 **Problem (Jeff, screen):** (1) "Hideout spotted i nic nie widze!" -
