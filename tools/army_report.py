@@ -18,8 +18,8 @@ MODS = r"C:\Program Files (x86)\Steam\steamapps\common\Mount & Blade II Bannerlo
 OUT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(__file__), "..", "docs", "ROT-armie-przeglad.pdf")
 
 def clean(name):
-    s = re.sub(r"^\{=[^}]*\}", "", name or "")
-    s = re.sub(r"\{@Plural\}.*?\{\@\}", "", s)     # {@Plural}...{\@} to warianty liczby mnogiej
+    s = re.sub(r"^\{\{?=[^}]*\}\}?", "", name or "")          # {=id} albo {{=id}} (w XSLT)
+    s = re.sub(r"\{@Plural\}[^}]*\}", "", s)                 # warianty liczby mnogiej koni: {@Plural}...{\@}
     return s.strip()
 
 def parse_xml(path):
@@ -114,14 +114,15 @@ for f in [os.path.join(MODS, "ROT-Content", "ModuleData", "spcultures.xml")]:
             "elite": (c.get("elite_basic_troop") or "").replace("NPCCharacter.", ""),
             "bandit": c.get("is_bandit") == "true",
         }
-CULTURE_PL = {"battania": "The North (Polnoc)", "vlandia": "Westerlands", "river": "Riverlands",
-              "sturgia": "Iron Islands", "aserai": "Dorne", "khuzait": "Dothraki", "empire": "Crownlands"}
+CULTURE_PL = {}
 
 # ---------------- TROOPS ----------------
 troops = {}
 SKILLS = ["OneHanded", "TwoHanded", "Polearm", "Bow", "Crossbow", "Throwing", "Riding", "Athletics"]
 troop_files = [os.path.join(MODS, "SandBoxCore", "ModuleData", "spnpccharacters.xml"),
+               os.path.join(MODS, "ROT-Content", "ModuleData", "spnpccharacters.xslt"),   # ROT PODMIENIA 294 vanillowe jednostki
                os.path.join(MODS, "ROT-Content", "ModuleData", "ROT-Troops.xml")]
+rot_authored = set()
 troop_files += [f for f in glob.glob(os.path.join(MODS, "ROT-Content", "ModuleData", "*.xml"))
                 if "troop" in os.path.basename(f).lower() and f not in troop_files]
 for f in troop_files:
@@ -148,10 +149,23 @@ for f in troop_files:
                 for e in r.findall("equipment"):
                     d["eq"].setdefault(e.get("slot"), e.get("id", "").replace("Item.", ""))
                 if d["eq"]: break
-        if d["culture"]: troops[tid] = d
-print("Jednostki:", len(troops))
+        if d["culture"]:
+            troops[tid] = d
+            if "ROT" in os.path.basename(f): rot_authored.add(tid)
+print("Jednostki (surowo):", len(troops))
 
 def tier(level): return max(0, min(7, (level - 1) // 5))
+
+# vanillowe jednostki, ktorych ROT nie podmienil i do ktorych nie prowadzi zadne
+# drzewo kultury ROT (np. Imperial Cataphract), nie istnieja w swiecie ROT - won
+reach = set()
+stack = [c[k] for c in cultures.values() for k in ("basic", "elite") if c.get(k)]
+while stack:
+    t = stack.pop()
+    if t in reach or t not in troops: continue
+    reach.add(t); stack.extend(troops[t]["upgrades"])
+troops = {k: v for k, v in troops.items() if k in rot_authored or k in reach}
+print("Jednostki (w swiecie ROT):", len(troops))
 
 # pancerz per slot (sumy jak w grze: kazdy element dodaje swoje wartosci)
 def armor_of(d):
