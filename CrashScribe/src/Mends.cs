@@ -233,7 +233,7 @@ namespace CrashScribe
                     var h = mp.LeaderHero;
                     if (h == null || !h.IsAlive || h.IsPrisoner || h == robb) continue;
                     if (mp.MapEvent != null || mp.SiegeEvent != null) continue;
-                    float str = mp.Party != null ? mp.Party.TotalStrength : 0f;
+                    float str = mp.Party != null ? mp.Party.EstimatedStrength : 0f;
                     if (str > bestStr) { bestStr = str; best = mp; }
                 }
             }
