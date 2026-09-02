@@ -1076,6 +1076,10 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public float KgPerAthleticsPoint { get; set; } = 0.25f;
 
+        [SettingPropertyInteger("Armor Athletics Per Tier", 0, 140, "0", HintText = "Armour Tier Law: any piece of armour (helmet, body, boots, gloves, cape) needs at least (tier - 1) x this Athletics, whatever its weight says - tier 4 boots want 105, so a low-Athletics bandit never 'qualifies' for them; 0 turns the law off. Applied at session start, after the Weight Law (the higher of the two wins)")]
+        [SettingPropertyGroup("A night's rest")]
+        public int ArmorAthleticsPerTier { get; set; } = 35;
+
         [SettingPropertyBool("Hit Scribe Enabled", HintText = "battle log: every missile hit written to Armoury.log (weapon, victim, body part, damage, armor absorbed) - capped per mission")]
         [SettingPropertyGroup("A night's rest")]
         public bool HitScribeEnabled { get; set; } = true;
@@ -1544,6 +1548,7 @@ namespace Armoury
             s.AnvilShiftHours = AnvilShiftHours;
             s.WorkshopNightRest = WorkshopNightRest;
             s.KgPerAthleticsPoint = KgPerAthleticsPoint;
+            s.ArmorAthleticsPerTier = ArmorAthleticsPerTier;
             s.HitScribeEnabled = HitScribeEnabled;
             s.ArmorSanityEnabled = ArmorSanityEnabled;
             s.ArmorOutlierPercentile = ArmorOutlierPercentile;

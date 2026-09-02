@@ -1216,6 +1216,74 @@ namespace CrashScribe
         /// Log = audyt: ile broni podbito per tier i najgorsze rozjazdy.
         /// PULAPKA TIEROW: ItemTiers.Tier1 == 0, wyswietlany = (int)Tier + 1.
         /// </summary>
+        /// <summary>
+        /// PRAWO TIERU PANCERZA (Jeff 02.09, screen: bandyci w Clegane Boots
+        /// t4 - "Requires Athletics 30"; "jak mamy tier 4, to nie patrzymy
+        /// wymagan po wadze, tylko po tierze, bo inaczej body armour beda
+        /// mieli okay, a zaraz sie okaze, ze biegaja w t6 butach, rekawicach,
+        /// helmach"). Blizniak WeaponTierLaw: Prawo Wagi daje lekkim czesciom
+        /// (buty 1.7 kg = 7 Atletyki) smieszny wymog niezaleznie od tieru,
+        /// a caly dobor (TopArmor, ItemReq, DTE) ufa temu wymogowi. Wiec
+        /// KAZDA sztuka pancerza (helm, korpus, nogi, rece, peleryna) dostaje
+        /// u zrodla Difficulty = max(dotychczasowy po Prawie Wagi,
+        /// (tier - 1) x ArmorAthleticsPerTier) - dom. 35: t2 35, t3 70,
+        /// t4 105, t5 140, t6 175. Tylko w gore. Ladry konskie poza prawem
+        /// (Riding). Musi biec PO WeightLaw i PRZED SkillSinew - elita
+        /// z takim pancerzem W SZABLONIE dostanie od SkillSinew Atletyke
+        /// do niego, bandyta zostaje przy swoim tierze. Log = audyt per tier.
+        /// PULAPKA TIEROW: ItemTiers.Tier1 == 0, wyswietlany = (int)Tier + 1.
+        /// </summary>
+        internal static void ArmorTierLaw()
+        {
+            try
+            {
+                var setter = AccessTools.PropertySetter(typeof(ItemObject), "Difficulty");
+                if (setter == null) { Scribe.Line("Mends: ItemObject.Difficulty bez settera - prawo tieru pancerza spi."); return; }
+                float step = ArmouryFloat("ArmorAthleticsPerTier", 35f);
+                if (step < 0.5f) { Scribe.Line("Mends: prawo tieru pancerza wylaczone (ArmorAthleticsPerTier 0)."); return; }
+                if (step > 100f) step = 100f;
+
+                int raised = 0;
+                var perTier = new int[7];
+                var perTierAll = new int[7];
+                var worst = new System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<int, string>>();
+                foreach (var it in TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
+                {
+                    if (it == null || !it.HasArmorComponent) continue;
+                    var ty = it.ItemType;
+                    if (ty != ItemObject.ItemTypeEnum.HeadArmor && ty != ItemObject.ItemTypeEnum.BodyArmor
+                        && ty != ItemObject.ItemTypeEnum.LegArmor && ty != ItemObject.ItemTypeEnum.HandArmor
+                        && ty != ItemObject.ItemTypeEnum.Cape) continue;      // ladry konskie: Riding, nie Atletyka
+                    int grade = (int)it.Tier + 1;
+                    if (grade < 1) grade = 1;
+                    if (grade > 6) grade = 6;
+                    perTierAll[grade]++;
+                    int want = (int)Math.Round((grade - 1) * step);
+                    if (want <= it.Difficulty) continue;
+                    worst.Add(new System.Collections.Generic.KeyValuePair<int, string>(
+                        want - it.Difficulty, it.StringId + " t" + grade + " " + it.Difficulty + "->" + want));
+                    setter.Invoke(it, new object[] { want });
+                    perTier[grade]++;
+                    raised++;
+                }
+                var sb = new System.Text.StringBuilder();
+                sb.Append("Mends: prawo tieru pancerza - ").Append(step.ToString("0.#")).Append(" Atletyki na tier; wymog podniesiony ")
+                  .Append(raised).Append(" sztukom (per tier: ");
+                for (int t = 2; t <= 6; t++) sb.Append("t").Append(t).Append(" ").Append(perTier[t]).Append("/").Append(perTierAll[t]).Append(t < 6 ? ", " : "");
+                sb.Append(").");
+                Scribe.Line(sb.ToString());
+                if (worst.Count > 0)
+                {
+                    worst.Sort((a, b) => b.Key.CompareTo(a.Key));
+                    int show = Math.Min(15, worst.Count);
+                    var sb2 = new System.Text.StringBuilder("Mends: tier pancerza - najwieksze rozjazdy (wymog po Prawie Wagi -> po prawie tieru): ");
+                    for (int i = 0; i < show; i++) { if (i > 0) sb2.Append(", "); sb2.Append(worst[i].Value); }
+                    Scribe.Line(sb2.ToString());
+                }
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.ArmorTierLaw", null); } catch { } }
+        }
+
         internal static void WeaponTierLaw()
         {
             try
@@ -2493,7 +2561,7 @@ namespace CrashScribe
         {
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this,
                 delegate (CampaignGameStarter s)
-                { Mends.ArmorSanity(); Mends.AmmoSanity(); Mends.WeightLaw(); Mends.WeaponTierLaw(); Mends.SkillSinew(); Mends.UniqueWares(); Mends.LoreForgeGate(); Mends.DressTheNamesakes(); });
+                { Mends.ArmorSanity(); Mends.AmmoSanity(); Mends.WeightLaw(); Mends.ArmorTierLaw(); Mends.WeaponTierLaw(); Mends.SkillSinew(); Mends.UniqueWares(); Mends.LoreForgeGate(); Mends.DressTheNamesakes(); });
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this,
                 delegate (TaleWorlds.CampaignSystem.MapEvents.MapEvent m) { Mends.MeltDeadLoot(m); });
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this,

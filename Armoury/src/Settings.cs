@@ -321,6 +321,7 @@ namespace Armoury
         public float AnvilShiftHours = 18f;                // hours of work at the anvil before the smith must sleep
         public bool WorkshopNightRest = true;              // the apprentices sleep too: forge projects make no progress between 23:00 and 5:00 - a day of work is a day at the anvil
         public float KgPerAthleticsPoint = 0.25f;          // Weight Law: kilograms of armour one Athletics point can carry (difficulty = weight / this); applied at session start
+        public int ArmorAthleticsPerTier = 35;             // Armour Tier Law: any piece of armour (helmet, body, boots, gloves, cape) needs at least (tier - 1) x this Athletics, whatever its weight says - tier 4 boots want 105, so a low-Athletics bandit never 'qualifies' for them; 0 turns the law off. Applied at session start, after the Weight Law (the higher of the two wins)
         public bool HitScribeEnabled = true;             // battle log: every missile hit written to Armoury.log (weapon, victim, body part, damage, armor absorbed) - capped per mission
         public bool ArmorSanityEnabled = true;             // Armour Sense Law: outliers get levelled to the norm of their type and tier - no more 4 kg chaps outarmouring plate; the world's balance stays put
         public float ArmorOutlierPercentile = 75f;         // Armour Sense Law: the norm is this percentile of total protection within (type, tier)

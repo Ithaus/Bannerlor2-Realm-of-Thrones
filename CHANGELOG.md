@@ -1,5 +1,32 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-02 — Prawo tieru PANCERZA: Atletyka = max(Prawo Wagi, (tier-1)x35) - koniec bandytow w butach Clegane'a
+**Mod:** CrashScribe + Armoury | **Pliki:** `CrashScribe/src/Mends.cs` (ArmorTierLaw), `Armoury/src/Settings.cs`
+**Problem (Jeff, screen):** bandyci w Clegane Boots t4 - "Requires
+Athletics 30"; "pancerz tez zrob podobna zasade: jak mamy tier 4, to nie
+patrzymy wymagan po wadze, tylko po tierze, bo inaczej body armour beda
+mieli okay, a zaraz sie okaze, ze biegaja w t6 butach, rekawicach,
+helmach".
+**Przyczyna:** Prawo Wagi liczy wymog z kilogramow (0.25 kg/pkt) - buty
+1.7 kg = 7 Atletyki, rekawice/helm podobnie - wiec lekkie sztuki
+wysokiego tieru sa "dozwolone" kazdemu, a caly dobor (TopArmor,
+ItemReq, DTE) ufa temu wymogowi.
+**Zmiana:** Mends.ArmorTierLaw - blizniak WeaponTierLaw: kazda sztuka
+pancerza (helm, korpus, nogi, rece, peleryna; ladry konskie poza)
+dostaje u zrodla Difficulty = max(po Prawie Wagi, (tier-1) x
+ArmorAthleticsPerTier), dom. 35: t2 35, t3 70, t4 105, t5 140, t6 175.
+Biegnie PO WeightLaw i PRZED SkillSinew (elita z takim pancerzem
+w szablonie dostaje Atletyke do niego - "raise never lower"; bandyta
+zostaje przy swoim tierze). Suwak MCM ArmorAthleticsPerTier (0 = off).
+Log = audyt: "prawo tieru pancerza - ... podniesiony N sztukom (per
+tier ...)" + 15 najwiekszych rozjazdow.
+**Ryzyko / co sprawdzic:** po restarcie log CrashScribe z audytem
+pancerza; bandyci (Broken Men itp.) bez butow/rekawic/helmow t4+;
+elita (Starkowie, Gwardia) dalej w swoim - jesli ktoras elita nagle
+biega w lachmanach, to SkillSinew nie nadazyl z Atletyka -> przyniesc
+log. Gracz z niska Atletyka zobaczy czerwone wymogi na t4+ (zamysl).
+**Status:** WGRANE (gra zamknieta) - DO SPRAWDZENIA
+
 ## 2026-09-02 — Strzaly sie lamia po bitwie (wg tieru) + oszczep nie tkwi w ciele ponizej 80 obrazen
 **Mod:** Armoury | **Pliki:** `Armoury/src/AmmoAttrition.cs` (nowy), `Armoury/src/ArmouryBehavior.cs`, `Armoury/src/FieldCraft.cs`, `Armoury/src/Settings.cs`
 **Problem (Jeff):** (1) "strzaly w armii sie nie koncza - po wystrzelaniu
