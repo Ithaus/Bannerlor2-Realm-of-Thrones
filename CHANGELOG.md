@@ -1,5 +1,38 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-02 — Strzaly sie lamia po bitwie (wg tieru) + oszczep nie tkwi w ciele ponizej 80 obrazen
+**Mod:** Armoury | **Pliki:** `Armoury/src/AmmoAttrition.cs` (nowy), `Armoury/src/ArmouryBehavior.cs`, `Armoury/src/FieldCraft.cs`, `Armoury/src/Settings.cs`
+**Problem (Jeff):** (1) "strzaly w armii sie nie koncza - po wystrzelaniu
+kolczanu od nowa mozna ich uzywac, zbieraja po polu; ustalmy niewielki
+procent straconych, im wyzszy tier tym mniej sie lamia, jak wyjdzie 5%
+to 5% kolczanow/beltow znika i trzeba uzupelniac, rozne tiery -
+losowanie, najnizsze najbardziej"; (2) "jak dostaje wlocznia rzucana,
+nie rob tak ze tkwi w moim ciele - wlocznie tkwia jak zabijesz kogos
+lub obrazenia sa powyzej 80".
+**Zmiany:** (1) AmmoAttrition.AfterBattle - wolane na poczatku
+OnMapEventEnded (kazda bitwa gracza, wygrana czy nie): kazdy kolczan/
+belt w sakwach partii (ItemRoster) I w magazynie oddzialu (DTE armory
+przez QuartermasterLaw.DteArmory) rzuca kostka: szansa =
+AmmoBreakPercent x (1 + (3 - tier) x AmmoBreakTierStep/100), min x0.1;
+przy domyslnych 5% / 25: t1 7.5%, t2 6.25%, t3 5%, t4 3.75%, t5 2.5%,
+t6 1.25%. Pekniete schodza z rostera; log Armoury "Amunicja: po bitwie
+peklo N ..." z rozbiciem per item/tier/miejsce + komunikat dla gracza
+(EN). Kolczany NOSZONE przez bohaterow nietkniete (ekwipunek, nie
+zapas). MCM sekcja "Arrows break": AmmoBreakEnabled, AmmoBreakPercent,
+AmmoBreakTierStep. (2) FieldCraft.OnAgentHit (istniejacy "jez ze
+strzal" - ArrowUnstickEnabled): dla WeaponClass Javelin/ThrowingAxe/
+ThrowingKnife prog tkwienia to JavelinStickMinDamage (MCM, dom. 80)
+zamiast ArrowStickMinDamage (8); zabity zostaje z pociskiem sam
+z siebie (martwy agent nie wchodzi do odpinania). Dotyczy kazdego
+czlowieka na polu, nie tylko gracza. gen_mcm: 316 ustawien.
+**Ryzyko / co sprawdzic:** po bitwie komunikat "N quivers ... broke"
+i wpis w Armoury.log; liczba kolczanow w sakwach/magazynie spada
+o kilka procent; przy duzych zapasach (setki kolczanow) 5% to
+kilkanascie sztuk na bitwe - suwak. Oszczep trafiajacy za <80 odbija
+sie (odpiety tick pozniej), za >=80 albo smiertelny - tkwi; strzaly
+bez zmian (prog 8). Jesli DteArmory() null (DTE nieobecny) - tylko sakwy.
+**Status:** ZBUDOWANE - watcher wgra po zamknieciu gry
+
 ## 2026-09-02 — PRAWO TIERU BRONI: sens uzbrajania naprawiony u zrodla (Broken Men z tier 6, lucznicy z ogniem)
 **Mod:** CrashScribe + Armoury | **Pliki:** `CrashScribe/src/Mends.cs` (WeaponTierLaw), `Armoury/src/Settings.cs`, `Armoury/src/SkillsDecide.cs` (AddPattern)
 **Problem (Jeff, screeny + "napraw sens i logike uzbrajania"):**

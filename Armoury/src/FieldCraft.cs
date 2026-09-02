@@ -349,7 +349,21 @@ namespace Armoury
                 if (!c.ArrowUnstickEnabled || affectedAgent == null || !affectedAgent.IsHuman) return;
                 if (!blow.IsMissile) return;
                 if (attackCollisionData.AttackBlockedWithShield) return;      // w tarczy strzaly zostaja
-                if (blow.InflictedDamage >= c.ArrowStickMinDamage) return;    // weszla naprawde - tkwi
+                // OSZCZEP TO NIE STRZALA (Jeff 02.09: "jak dostaje wlocznia
+                // rzucana, nie rob tak, ze tkwi w moim ciele - wlocznie tkwia,
+                // jak zabijesz kogos albo obrazenia sa powyzej 80"): bron
+                // miotana (oszczep, topor, noz) ma wlasny, wysoki prog;
+                // zabity zostaje z pociskiem sam z siebie (martwy agent nie
+                // wchodzi do odpinania w ticku).
+                bool thrown = false;
+                try
+                {
+                    var wc = (!affectorWeapon.IsEmpty && affectorWeapon.CurrentUsageItem != null) ? affectorWeapon.CurrentUsageItem.WeaponClass : WeaponClass.Undefined;
+                    thrown = wc == WeaponClass.Javelin || wc == WeaponClass.ThrowingAxe || wc == WeaponClass.ThrowingKnife;
+                }
+                catch { }
+                int minStick = thrown ? c.JavelinStickMinDamage : c.ArrowStickMinDamage;
+                if (blow.InflictedDamage >= minStick) return;                  // weszla naprawde - tkwi
                 _unstick.Add(new KeyValuePair<Agent, int>(affectedAgent, 0));
             }
             catch { }

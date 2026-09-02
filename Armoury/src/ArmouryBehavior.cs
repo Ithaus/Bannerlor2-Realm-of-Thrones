@@ -1146,6 +1146,9 @@ namespace Armoury
             {
                 if (mapEvent == null || !mapEvent.IsPlayerMapEvent) return;
 
+                // strzaly i belty lamia sie w kazdej bitwie - wygranej czy nie
+                AmmoAttrition.AfterBattle();
+
                 // PRZEGRANA ALBO UCIECZKA = NIC Z POLA. Wraki zbierane w trakcie
                 // misji lezaly w kolejce niezaleznie od wyniku i po godzinie
                 // wsypywaly sie do sakw - takze wtedy, gdy gracz uciekl z pola

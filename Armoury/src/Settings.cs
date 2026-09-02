@@ -217,6 +217,7 @@ namespace Armoury
         public bool AiFleeWhenNearDeath = true;            // AI soldiers below the bleeding threshold break and run for their lives
         public bool ArrowUnstickEnabled = true;            // arrows the armour stopped do not stay stuck in a man (shields keep theirs)
         public int ArrowStickMinDamage = 8;                // an arrow must deal at least this to lodge in flesh
+        public int JavelinStickMinDamage = 80;             // a thrown javelin, axe or knife stays in a man only when it kills him or deals at least this much - anything less bounces off
         public bool WalkKeyEnabled = true;                 // hold Left Ctrl on foot to walk instead of run - the wind comes back as you stroll
         public float WalkSpeedShare = 0.42f;               // walking pace as a share of full speed
         public bool HorseDeathPermanent = true;            // your mount killed in a real battle is truly gone - the slot empties, only the harness comes off the corpse
@@ -353,6 +354,11 @@ namespace Armoury
         public float TroopMendMaxHours = 24f;              // the whole job never takes longer than this - the smith puts every hand he has on it
         public bool TroopOrderEnabled = true;              // order missing kit for the men from the town smith - plain pieces of the tier you ask, straight onto the racks
         public float TroopOrderMarkup = 1.15f;             // the smith's fee: each procured piece costs its market worth times this
+
+        // --- Arrows break ---
+        public bool AmmoBreakEnabled = true;               // after every battle a share of the quivers and bolt cases in the baggage and the troop armoury is lost to breakage - restock at merchants or the fletcher's bench
+        public int AmmoBreakPercent = 5;                   // chance, in percent, that a tier-3 quiver breaks in a battle
+        public int AmmoBreakTierStep = 25;                 // every tier below 3 adds this many percent to the chance, every tier above takes it away (25: tier 1 breaks 1.5x as often, tier 6 only 0.25x)
 
         // --- Time at the forge ---
         public float SmithRepairHoursPerPiece = 1.5f;      // hours the smith needs per worn piece of your harness
