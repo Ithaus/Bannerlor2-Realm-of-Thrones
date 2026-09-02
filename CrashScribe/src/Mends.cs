@@ -482,21 +482,12 @@ namespace CrashScribe
                         }
 
                         // pula slotu zaczyna sie NAD progiem (np. Dual - klingi
-                        // od T4): stara podloga - zostaje najnizsze pasmo
-                        // dzisiejszych darmowych, zeby "Kuj" nie zgasl
-                        int best = int.MaxValue;
-                        foreach (var p in tpl.Pieces)
-                        {
-                            if (p == null || p.PieceType != slot) continue;
-                            if (!p.IsGivenByDefault || p.IsHiddenOnDesigner) continue;
-                            if (p.PieceTier < best) best = p.PieceTier;
-                        }
-                        if (best == int.MaxValue) continue;   // slot bez darmowych JUZ DZIS - nie nasza regresja
-                        if (best < prog) continue;            // najnizsze pasmo i tak przechodzi brame
-                        foreach (var p in tpl.Pieces)
-                            if (p != null && p.PieceType == slot && p.IsGivenByDefault
-                                && !p.IsHiddenOnDesigner && p.PieceTier == best)
-                                keep.Add(p.StringId);
+                        // od T4): ZADNEJ podlogi (Jeff 01.09 wieczorem, screen
+                        // z darmowym pasmem IV w mieczu do pary: "umawialismy
+                        // sie ze sie je ODBLOKOWUJE"). Taka klasa broni jest
+                        // po prostu zamknieta - przycisk Kuj dla niej gasnie,
+                        // az gracz odblokuje czesci przetopem; inne klasy
+                        // maja swoje pasma pod progiem i dzialaja normalnie.
                     }
                 }
 
@@ -510,11 +501,12 @@ namespace CrashScribe
                     gatedPieces.Add(cp);
                 }
 
-                // ---- PRZEBIEG 3: SAMOKONTROLA ----
-                // Gdyby mimo podlogi ktorys wymagany slot zostal bez darmowej
-                // czesci, PRZYWRACAMY jego najnizsze pasmo i krzyczymy w logu -
-                // martwy przycisk "Kuj" w kuzni jest gorszy niz otwarta brama.
-                int rescued = 0;
+                // ---- PRZEBIEG 3: SPIS ZAMKNIETYCH KLAS ----
+                // Sloty bez zadnej darmowej czesci NIE dostaja ratunku (decyzja
+                // Jeffa 01.09: klasy z pula od T4 w gore, jak miecz do pary,
+                // maja byc zamkniete do odblokowania przetopem) - tylko
+                // wypisujemy je w logu, zeby martwy przycisk Kuj nie byl
+                // zagadka.
                 var broken = new System.Collections.Generic.List<string>();
                 foreach (var tpl in tpls)
                 {
@@ -522,26 +514,19 @@ namespace CrashScribe
                     foreach (var bo in tpl.BuildOrders)
                     {
                         var slot = bo.PieceType;
-                        bool anyFree = false, anyAtAll = false;
-                        int best = int.MaxValue;
+                        bool anyFree = false;
                         foreach (var p in tpl.Pieces)
                         {
                             if (p == null || p.PieceType != slot || p.IsHiddenOnDesigner) continue;
                             if (p.IsGivenByDefault) { anyFree = true; break; }
-                            if (gatedPieces.Contains(p)) { anyAtAll = true; if (p.PieceTier < best) best = p.PieceTier; }
                         }
-                        if (anyFree || !anyAtAll || best == int.MaxValue) continue;
-                        foreach (var p in tpl.Pieces)
-                            if (p != null && p.PieceType == slot && !p.IsHiddenOnDesigner
-                                && p.PieceTier == best && gatedPieces.Contains(p))
-                            { setter.Invoke(p, new object[] { true }); rescued++; }
-                        broken.Add(tpl.StringId + "." + slot);
+                        if (!anyFree) broken.Add(tpl.StringId + "." + slot);
                     }
                 }
 
                 Scribe.Line("Mends: brama kucia - prog T" + prog + "; odebrano darmowosc " + gatedPieces.Count
                             + " czesciom, podloga ocalila " + keep.Count + " (ostatnie darmowe czesci wymaganych slotow)"
-                            + (rescued > 0 ? ", SAMOKONTROLA przywrocila " + rescued + " w slotach: " + string.Join(", ", broken.ToArray()) : "")
+                            + (broken.Count > 0 ? "; klasy zamkniete do odblokowania przetopem: " + string.Join(", ", broken.ToArray()) : "")
                             + ". Reszta odblokowuje sie kuciem i przetopem, od najnizszego tieru.");
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.LoreForgeGate", null); } catch { } }

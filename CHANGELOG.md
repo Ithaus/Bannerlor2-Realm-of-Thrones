@@ -1,5 +1,28 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-02 — Brama kucia: darmowe pasmo IV w mieczu do pary ZAMKNIETE (podloga zdjeta ze slotow od T4)
+**Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs` (LoreForgeGate)
+**Problem (Jeff, screen kuzni):** klasa "Off-hand Sword, Duel Wield" ma
+cale pasmo kling IV darmowe od reki - "umawialismy sie ze sie je
+ODBLOKOWUJE, to sa dodatkowe klingi z ROT".
+**Przyczyna:** dane ROT daja klingi do miecza w parze DOPIERO od T4,
+a brama miala dwie awaryjne podlogi dla slotow zaczynajacych sie nad
+progiem: (1) "stara podloga" zostawiala najnizsze darmowe pasmo,
+(2) SAMOKONTROLA przywracala pasmo slotom bez darmowej czesci. Obie
+z obawy o zgaszony przycisk Kuj - i obie otwieraly T4.
+**Zmiana:** obie podlogi ZDJETE dla slotow z pula od progu w gore:
+taka klasa broni jest zamknieta (Kuj zgaszony DLA NIEJ), az gracz
+odblokuje czesci przetopem/kuciem; inne klasy maja pasma pod progiem
+i dzialaja jak dotad. Przebieg 3 zamiast ratowania wypisuje w logu
+"klasy zamkniete do odblokowania przetopem: ..." - martwy przycisk
+nie jest zagadka. Podloga dla slotow z czescami PONIZEJ progu bez zmian.
+**Ryzyko / co sprawdzic:** po restarcie w Free Build miecza do pary
+klingi IV pod klodka, przycisk Kuj dla tej klasy zgaszony do czasu
+przetopienia zdobycznego miecza; log "brama kucia" z lista zamknietych
+klas (spodziewane Dual, ThrowingAxe). Sprawdzic, czy inne klasy kuja
+sie normalnie - gdyby ktoras niespodziewanie zgasla, jest w tej liscie.
+**Status:** ZBUDOWANE - watcher wgra po zamknieciu gry
+
 ## 2026-09-01 — Burning Arrows do konca (mediana zamiast percentyla) + Wdzieczne Wioski (relacje za bicie bandytow)
 **Mod:** CrashScribe + Armoury | **Pliki:** `CrashScribe/src/Mends.cs` (AmmoSanity), `Armoury/src/BanditCheer.cs` (nowy), `Armoury/src/ArmouryBehavior.cs`, `Armoury/src/Settings.cs`
 **Problem (Jeff, screeny):** (1) po wczytaniu gry Burning Arrows dalej
