@@ -1,5 +1,35 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-03 — Martwa rozmowa z kaplanem (BK religia): wyjscie awaryjne + zabezpieczenie tekstow + diagnostyka
+**Mod:** CrashScribe | **Pliki:** `CrashScribe/src/DialogEscape.cs` (nowy), `CrashScribe/src/Mends.cs`, `CrashScribe/src/SubModuleMain.cs`
+**Problem (Jeff):** "wchodzisz w rozmowe z preacherem, klikasz continue
+i nic sie nie dzieje, nie ma sciezek dialogowych, nie da sie wyjsc -
+musialem recznie wylaczyc gre; religia jest zepsuta".
+**Ustalenia:** w logach 02-03.09 ZERO wyjatkow przy rozmowie i zero
+sladow naszego mendu z 27.08 ("dopisany do religii"/"nie ozywie") -
+czyli powitanie BK przeszlo (kaplan w rejestrze), a po nim ze stanu
+lord_start zaden wiersz NPC nie pasuje -> pusty ekran z "continue".
+Dekompilacja BKReligionsBehavior: InitializePreacherTexts dereferencja
+clergymanReligion.Faith bez sprawdzenia nulla (pusta religia = NRE
+w warunku), a wszystkie opcje kaplana maja warunek IsPreacher.
+Przyczyny zrodlowej (czemu religia pusta) log jeszcze nie zna.
+**Zmiany:** (1) DialogEscape (CampaignBehavior): wiersze GRACZA
+"Let us talk." (-> hero_main_options) i "Farewell." (-> close_window)
+w stanach lord_start, lord_introduction, lord_pretalk i stanach kaplana
+BK - pokazuja sie TYLKO, gdy zaden wiersz NPC nie pasuje (tak dziala
+silnik rozmow), wiec normalnych dialogow nie tykaja; log przy uzyciu.
+(2) Finalizer PreacherGreetingSafe na OnConditionClergymanGreeting
+(wyjatek -> warunek false, Scribe.Report raz) i PreacherTextsSafe na
+InitializePreacherTexts (wyjatek -> teksty zastepcze "The gods are
+silent here, traveller.", Scribe.Report raz). (3) DIAGNOSTYKA przy
+kazdej rozmowie z kaplanem: "rozmowa z kaplanem X (osada, kultura):
+w rejestrze=?, clergyman=?, religia duchownego=?, religia bohatera=?"
+- to powie, czy religia BK w ogole zna kaplanow ROT.
+**Co sprawdzic:** rozmowa z septonem: powitanie i opcje BK albo nasze
+"Let us talk"/"Farewell" - juz bez zawieszki; w logu CrashScribe wpis
+"rozmowa z kaplanem ..." - PRZYNIESC (klucz do naprawy religii u zrodla).
+**Status:** WGRANE (gra zamknieta) - DO SPRAWDZENIA
+
 
 ## 2026-09-02 — Harrenhal v3: ROT wywracal sie mimo "zdolnego" Roose'a (104 NRE/sesje) - po pierwszym upadku rozstawiamy sami; PDF armii v2 ze zrzutu gry
 **Mod:** CrashScribe + docs | **Pliki:** `CrashScribe/src/Mends.cs` (HarrenhalGuard/HarrenhalSafe/HarrenhalSetupWith), `docs/ROT-armie-przeglad.pdf`
