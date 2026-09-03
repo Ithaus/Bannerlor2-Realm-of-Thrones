@@ -14,11 +14,11 @@ namespace Armoury
     /// <summary>
     /// PRZETOP W ZAKLADCE SMELT (kuznia 1:1, krok 3). Vanilla lista przetopu
     /// pokazuje tylko bron z projektem (IsCraftedWeapon), a wyjscie liczy
-    /// z WeaponDesign - pancerz i luk nie mialy tam wstepu, u nas zyl osobny
+    /// z WeaponDesign - pancerz nie mial tam wstepu, u nas zyl osobny
     /// tygiel w menu miasta. Trzy latki daja jeden wspolny przetop:
     ///  - SmeltingVM.RefreshList (postfix): dokladamy metalowe pancerze/tarcze
-    ///    i luki/kusze z sakw do listy (ten sam SmeltingItemVM, te same
-    ///    callbacki VM przez delegaty);
+    ///    z sakw do listy (ten sam SmeltingItemVM, te same callbacki VM przez
+    ///    delegaty); luki/kusze wyjete 03.09 - drewna sie nie przetapia;
     ///  - SmithingModel.GetSmeltingOutputForItem (postfix): dla przedmiotu
     ///    bez WeaponDesign wyjscie liczy nasza receptura (SmeltYield, udzial
     ///    rosnie ze Smithing) - panel materialow pokazuje prawde;
@@ -29,17 +29,19 @@ namespace Armoury
     /// </summary>
     internal static class SmeltTab
     {
-        /// <summary>Nasz kandydat do tygla: metalowy pancerz/tarcza albo luk/kusza, z niepustym odzyskiem.</summary>
+        /// <summary>Nasz kandydat do tygla: metalowy pancerz/tarcza z niepustym odzyskiem (luki/kusze wyjete - drewno).</summary>
         internal static bool OurSmeltable(ItemObject it)
         {
             try
             {
                 if (it == null || it.WeaponDesign != null) return false;   // bron z projektem robi vanilla
+                // LUKI/KUSZE POZA TYGLEM (Jeff 03.09: "lukow i kusz nie da sie
+                // melted, to przeciez drewno!") - drewna sie nie przetapia.
+                // Nauka wzorow luków zostaje droga rozbiorki u kowala (TakeApart),
+                // a SmeltYield i tak oddawal z nich tylko zelazne okucia.
                 bool armour = (it.HasArmorComponent || it.ItemType == ItemObject.ItemTypeEnum.Shield)
                               && Recipes.IsMetalwork(it);
-                bool ranged = it.ItemType == ItemObject.ItemTypeEnum.Bow
-                              || it.ItemType == ItemObject.ItemTypeEnum.Crossbow;
-                if (!armour && !ranged) return false;
+                if (!armour) return false;
                 return YieldFor(it).Count > 0;
             }
             catch { return false; }
@@ -205,7 +207,7 @@ namespace Armoury
                     list.Add(ctor.Invoke(new object[] { el.EquipmentElement, dSel, dLock, locked, el.Amount }));
                     added++;
                 }
-                if (added > 0) Log.Info("SmeltTab: dolozono " + added + " pozycji (pancerze/luki) do listy przetopu.");
+                if (added > 0) Log.Info("SmeltTab: dolozono " + added + " pozycji (pancerze) do listy przetopu.");
             }
             catch (Exception e) { Log.Error("SmeltTab.RefreshList", e); }
         }

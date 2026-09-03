@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-03 — Luki i kusze wyjete z zakladki Smelt (drewna sie nie przetapia)
+**Mod:** Armoury | **Plik:** `Armoury/src/SmeltTab.cs`
+**Problem (Jeff):** "lukow i kusz nie da sie melted, to przeciez drewno!" -
+sami dolozylismy luki/kusze do listy przetopu (kuznia 1:1), a to bez sensu
+fabularnie; SmeltYield i tak oddawal z nich tylko zelazne okucia.
+**Zmiana:** OurSmeltable nie przyjmuje juz Bow/Crossbow - w zakladce Smelt
+zostaja metalowe pancerze i tarcze. Nauka wzorow lukow bez zmian: rozbiorka
+u kowala (TakeApart) i kucie.
+**Ryzyko / co sprawdzic:** czy luki znikly z listy Smelt, a pancerze zostaly;
+czy rozbiorka u kowala dalej uczy wzorow.
+**Status:** ZBUDOWANE - watcher wgra po zamknieciu gry; DO SPRAWDZENIA
+
 ## 2026-09-03 — Pelny ekran z powrotem (display_mode 0 -> 1) na zyczenie Jeffa
 **Plik:** `Documents\...\Configs\engine_config.txt` (kopia `.bak-2026-09-03-fullscreen`)
 Gra chodzila w oknie (gra sama przepisala config na display_mode=0; nasze
