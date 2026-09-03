@@ -1,5 +1,13 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-03 — Pelny ekran z powrotem (display_mode 0 -> 1) na zyczenie Jeffa
+**Plik:** `Documents\...\Configs\engine_config.txt` (kopia `.bak-2026-09-03-fullscreen`)
+Gra chodzila w oknie (gra sama przepisala config na display_mode=0; nasze
+antyczarne 2 z 02.09 nie przetrwalo). Jeff: "musi byc pelny ekran".
+**Ryzyko:** pelny ekran exclusive byl podejrzany przy zwisach sterownika
+AMD (czarne ekrany) - jesli wroca, wracamy do trybu okna bez ramki (2).
+**Status:** WGRANE (gra zamknieta) - DO SPRAWDZENIA
+
 ## 2026-09-03 — Glos Fish "dretwy": temperature 0 -> 0.9 w FishConfig.json
 **Mod:** cudzy: VoiceActingPatchRemake | **Plik:** `Modules\VoiceActingPatchRemake\FishConfig.json` (kopia `.bak-2026-09-03`)
 **Problem (Jeff):** "jest glos ale brzmi dretwo". Wczesniej TTS w ogole nie
