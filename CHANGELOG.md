@@ -1,5 +1,29 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-02 — Harrenhal v3: ROT wywracal sie mimo "zdolnego" Roose'a (104 NRE/sesje) - po pierwszym upadku rozstawiamy sami; PDF armii v2 ze zrzutu gry
+**Mod:** CrashScribe + docs | **Pliki:** `CrashScribe/src/Mends.cs` (HarrenhalGuard/HarrenhalSafe/HarrenhalSetupWith), `docs/ROT-armie-przeglad.pdf`
+**Problem (log sesji 14:36):** straznik przepuscil ROT (Roose zywy,
+wolny, dowodzi, klan w Polnocy), a ROT i tak rzucil NullReference
+w GatherArmyLogEntry - 104 razy (co godzine gry, finalizer polykal),
+oblezenie nie ruszylo, log zasypany.
+**Przyczyna:** Kingdom.CreateArmy(TheNorth, Roose) nie tworzy armii
+z powodu, ktorego nasze warunki nie lapia (do ustalenia diagnostyka).
+**Zmiany:** (1) po PIERWSZYM polknietym wyjatku flaga _harrenhalRotFailed:
+od nastepnej godziny nie oddajemy ROT-owi sterow - HarrenhalGuard
+rozstawia sam: najpierw z Roose'em (nasz port SetupSiegeAttackers ma
+kontrole army==null), gdy Polnoc i jemu nie da armii - z zastepca.
+(2) HarrenhalSetupWith zwraca bool; gdy armii brak, log ODLOZONE
+z DIAGNOSTYKA: klan, krolestwo, czy Polnoc wojuje z wlascicielem
+Harrenhal (north.IsAtWarWith), liczebnosc, czy w osadzie - to odpowie
+Jeffowi "dlaczego brakuje". (3) log polkniecia raz na dzien gry, nie
+co godzine. (4) PDF przegenerowany ze zrzutu items-dump.csv (3580
+przedmiotow): obrazenia broni kutej i pancerz jak w grze.
+**Co sprawdzic:** log CrashScribe po godzinie gry: "oblezenie Harrenhal
+- ...; rozstawione, dowodzi X" ALBO "ODLOZONE - ... Polnoc nie utworzyla
+armii dla X [klan..., krolestwo..., Polnoc wojuje z ...: True/False...]"
+- przyniesc ten nawias.
+**Status:** WGRANE (gra zamknieta) - DO SPRAWDZENIA
+
 ## 2026-09-02 — Puste sloty werbunku (zaciag rodowy vs werbunek miejscowy) + kary predkosci liczone 2-3x (lancuch modeli)
 **Mod:** Armoury | **Pliki:** `Armoury/src/HouseLevies.cs`, `Armoury/src/SpeedDepth.cs` (nowy), `Armoury/src/TerrainEase.cs`, `Armoury/src/WorldPace.cs`, `Armoury/src/NightRest.cs`, `Armoury/src/SubModuleMain.cs`
 **Problem (Jeff, screeny):** (1) rekrutacja: mnostwo pustych, zamknietych

@@ -179,7 +179,12 @@ namespace CrashScribe
                     + (roose.Clan != null ? roose.Clan.Name.ToString() : "?") + ")";
                 else if (north != null && roose.Clan.Kingdom != north) why = "Roose Bolton sluzy " + roose.Clan.Kingdom.Name + ", nie Polnocy";
                 else if (roose.PartyBelongedTo.MapEvent != null) why = "Roose Bolton w bitwie";
-                if (why == null) return true;                     // Roose zdolny - ROT robi swoje
+                // ROT juz raz sie wywrocil mimo "zdolnego" Roose'a (02.09 14:43: 104 NRE
+                // w GatherArmy - Kingdom.CreateArmy nie dal armii) -> od tej chwili NIE
+                // oddajemy mu sterow: sami rozstawiamy, najpierw z Roose'em, a gdy
+                // Polnoc i jemu nie da armii - z zastepca
+                if (why == null && !_harrenhalRotFailed) return true;   // Roose zdolny, ROT jeszcze nie zawiodl - ROT robi swoje
+                if (why == null) why = "ROT nie zdolal rozstawic oblezenia z Roose'em (NullReference w GatherArmy)";
 
                 // ZASTEPCA (Jeff 02.09: "dajemy innego dowodce, jak tamten w niewoli
                 // - nawet gdyby byl w niewoli, kto inny by dowodzil"): najsilniejsza
@@ -195,6 +200,11 @@ namespace CrashScribe
                     HarrenhalPostponed(why + "; brak ROTKingdoms.TheNorth/ROTSettlements.Harrenhal - zastepca niemozliwy");
                     return false;
                 }
+                // najpierw sam Roose (jesli zdolny) nasza bezpieczna sciezka, potem zastepca
+                if (roose != null && roose.IsAlive && !roose.IsPrisoner && roose.PartyBelongedTo != null
+                    && roose.PartyBelongedTo.LeaderHero == roose && roose.PartyBelongedTo.MapEvent == null
+                    && HarrenhalSetupWith(__instance, roose.PartyBelongedTo, north, harrenhal, robb, why))
+                    return false;
                 var sub = HarrenhalPickSubstitute(north, robb);
                 if (sub == null) { HarrenhalPostponed(why + "; zaden lord Polnocy nie jest wolny"); return false; }
                 HarrenhalSetupWith(__instance, sub, north, harrenhal, robb, why);
@@ -209,6 +219,8 @@ namespace CrashScribe
         }
 
         private static Type _rotSettlements;
+        private static bool _harrenhalRotFailed;
+        private static double _harrenhalSwallowLog = -1;
 
         private static void HarrenhalPostponed(string why)
         {
@@ -240,8 +252,9 @@ namespace CrashScribe
             return best;
         }
 
-        /// <summary>Port SetupSiegeAttackers z ROT (dekompilacja 02.09) z innym dowodca.</summary>
-        private static void HarrenhalSetupWith(object ev, MobileParty sub, Kingdom north, Settlement harrenhal, Hero robb, string why)
+        /// <summary>Port SetupSiegeAttackers z ROT (dekompilacja 02.09) z dowolnym dowodca.
+        /// Zwraca true, gdy armia stoi (rozstawione), false gdy Polnoc jej nie dala.</summary>
+        private static bool HarrenhalSetupWith(object ev, MobileParty sub, Kingdom north, Settlement harrenhal, Hero robb, string why)
         {
             var tr = Traverse.Create(ev);
             tr.Field("SetupSiegeArmy").SetValue(false);
@@ -256,11 +269,22 @@ namespace CrashScribe
                 north.CreateArmy(sub.LeaderHero, harrenhal, Army.ArmyTypes.Besieger, null);
             }
             tr.Field("SiegeArmy").SetValue(sub.Army);
-            if (!fresh) return;
+            if (!fresh) return true;
             if (sub.Army == null)
             {
-                HarrenhalPostponed(why + "; Polnoc nie utworzyla armii nawet dla " + sub.LeaderHero.Name);
-                return;
+                // diagnostyka, CZEMU krolestwo nie daje armii (Jeff: "dlaczego brakuje?")
+                string diag = "";
+                try
+                {
+                    diag = " [klan " + (sub.LeaderHero.Clan != null ? sub.LeaderHero.Clan.Name.ToString() : "?")
+                           + ", krolestwo " + (sub.LeaderHero.Clan != null && sub.LeaderHero.Clan.Kingdom != null ? sub.LeaderHero.Clan.Kingdom.Name.ToString() : "brak")
+                           + ", Polnoc wojuje z wlascicielem Harrenhal (" + (harrenhal.MapFaction != null ? harrenhal.MapFaction.Name.ToString() : "?") + "): "
+                           + (harrenhal.MapFaction != null && north.IsAtWarWith(harrenhal.MapFaction))
+                           + ", partia " + sub.Party.NumberOfAllMembers + " ludzi, w osadzie: " + (sub.CurrentSettlement != null) + "]";
+                }
+                catch { }
+                HarrenhalPostponed(why + "; Polnoc nie utworzyla armii dla " + sub.LeaderHero.Name + diag);
+                return false;
             }
             int joined = 0;
             foreach (var clan in north.Clans)
@@ -290,8 +314,9 @@ namespace CrashScribe
             GatherArmyAction.Apply(sub, (TaleWorlds.CampaignSystem.Map.IMapPoint)sub);
             sub.SetMoveModeHold();
             sub.Ai.SetDoNotMakeNewDecisions(true);
-            Scribe.Line("Mends: oblezenie Harrenhal - " + why + "; dowodztwo przejmuje " + sub.LeaderHero.Name
+            Scribe.Line("Mends: oblezenie Harrenhal - " + why + "; rozstawione, dowodzi " + sub.LeaderHero.Name
                         + " (" + sub.LeaderHero.Clan.Name + "), dolaczylo " + joined + " partii Polnocy.");
+            return true;
         }
 
         public static Exception HarrenhalSafe(Exception __exception)
@@ -299,13 +324,19 @@ namespace CrashScribe
             if (__exception == null) return null;
             try
             {
+                _harrenhalRotFailed = true;              // od teraz rozstawiamy sami (patrz HarrenhalGuard)
                 if (!_harrenhalSaved)
                 {
                     _harrenhalSaved = true;
                     Scribe.Report("ROT HarrenhalSiegeEvent.SetupSiegeAttackers wywrocil sie - wyjatek polkniety, gra zyje",
                                   __exception, "HarrenhalSiegeEvent.SetupSiegeAttackers", null);
                 }
-                Scribe.Line("Mends: oblezenie Harrenhal - wyjatek ROT (" + __exception.GetType().Name + ") polkniety, proba za godzine.");
+                double now = CampaignTime.Now.ToDays;
+                if (_harrenhalSwallowLog < 0 || now - _harrenhalSwallowLog >= 1.0)   // raz na dzien gry, nie co godzine
+                {
+                    _harrenhalSwallowLog = now;
+                    Scribe.Line("Mends: oblezenie Harrenhal - wyjatek ROT (" + __exception.GetType().Name + ") polkniety; od nastepnej godziny rozstawiamy sami.");
+                }
             }
             catch { }
             return null;
