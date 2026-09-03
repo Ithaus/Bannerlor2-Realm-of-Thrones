@@ -1510,6 +1510,91 @@ namespace CrashScribe
         /// klasa broni, ciecie/pchniecie z typem, predkosc pocisku, dlugosc,
         /// czy kuty, wartosc. tools/army_report.py bierze ten plik zamiast XML.
         /// </summary>
+        /// <summary>
+        /// AUDYT RELIGII (Jeff 03.09: "a mozemy to wlaczyc i naprawic?"). Zamiast
+        /// czekac na rozmowe z septonem: raz na sesje liczymy, ile religii BK
+        /// wstalo, ile osad ma duchownego, ilu lordow/notabli ma wiare, ilu jest
+        /// "bez wiary", ilu kaplanow-notabli BK w ogole zna i jaka wiare ma gracz.
+        /// Wszystko refleksja przez BannerKingsConfig.Instance.ReligionsManager.
+        /// Jesli swiat jest w wiekszosci "bez wiary" - wina cache/stagger
+        /// BKROTPatch, do zdjecia jak A1/A2.
+        /// </summary>
+        internal static void ReligionAudit()
+        {
+            try
+            {
+                var cfgT = AccessTools.TypeByName("BannerKings.BannerKingsConfig");
+                var cfgP = cfgT != null ? AccessTools.Property(cfgT, "Instance") : null;
+                object cfg = cfgP != null ? cfgP.GetValue(null, null) : null;
+                object mgr = cfg != null ? Traverse.Create(cfg).Property("ReligionsManager").GetValue() : null;
+                if (mgr == null) { Scribe.Line("AUDYT RELIGII: BK ReligionsManager NULL - religia nie wstala wcale."); return; }
+                var tr = Traverse.Create(mgr);
+                var rels = tr.Property("Religions").GetValue() as System.Collections.IEnumerable;
+                var sb = new System.Text.StringBuilder();
+                int nRel = 0, clergyTotal = 0;
+                if (rels != null)
+                {
+                    foreach (var rel in rels)
+                    {
+                        if (rel == null) continue;
+                        nRel++;
+                        string name = "?";
+                        try
+                        {
+                            var faith = Traverse.Create(rel).Property("Faith").GetValue();
+                            var fn = faith != null ? Traverse.Create(faith).Method("GetFaithName").GetValue() : null;
+                            name = fn != null ? fn.ToString() : (faith != null ? faith.GetType().Name : "brak Faith");
+                        }
+                        catch { }
+                        int clergy = 0;
+                        try { var cl = Traverse.Create(rel).Property("Clergy").GetValue() as System.Collections.ICollection; clergy = cl != null ? cl.Count : 0; } catch { }
+                        clergyTotal += clergy;
+                        if (sb.Length > 0) sb.Append(", ");
+                        sb.Append(name).Append(" (duchownych ").Append(clergy).Append(')');
+                    }
+                }
+                int settlements = 0;
+                foreach (var st in Settlement.All) if (st != null && (st.IsTown || st.IsVillage || st.IsCastle)) settlements++;
+                int lords = 0, lordsFaith = 0, notables = 0, notablesFaith = 0, preachers = 0, preachersKnown = 0, preachersFaith = 0;
+                foreach (var h in Hero.AllAliveHeroes)
+                {
+                    if (h == null) continue;
+                    if (h.IsLord)
+                    {
+                        lords++;
+                        try { if (tr.Method("GetHeroReligion", h).GetValue() != null) lordsFaith++; } catch { }
+                    }
+                    else if (h.IsNotable)
+                    {
+                        notables++;
+                        bool hasFaith = false;
+                        try { hasFaith = tr.Method("GetHeroReligion", h).GetValue() != null; } catch { }
+                        if (hasFaith) notablesFaith++;
+                        if (h.IsPreacher)
+                        {
+                            preachers++;
+                            if (hasFaith) preachersFaith++;
+                            try { if (tr.Method("IsPreacher", h).GetValue<bool>()) preachersKnown++; } catch { }
+                        }
+                    }
+                }
+                string player = "NULL";
+                try
+                {
+                    var pr = tr.Method("GetHeroReligion", Hero.MainHero).GetValue();
+                    if (pr != null) { var f = Traverse.Create(pr).Property("Faith").GetValue(); var fn = f != null ? Traverse.Create(f).Method("GetFaithName").GetValue() : null; player = fn != null ? fn.ToString() : "jest"; }
+                }
+                catch { }
+                Scribe.Line("AUDYT RELIGII: religii " + nRel + ", duchownych w rejestrze " + clergyTotal + " na " + settlements + " osad; lordowie z wiara "
+                            + lordsFaith + "/" + lords + "; notable z wiara " + notablesFaith + "/" + notables + "; kaplani-notable " + preachers
+                            + " (BK zna jako duchownych " + preachersKnown + ", z wiara " + preachersFaith + "); gracz: " + player + ".");
+                if (nRel > 0) Scribe.Line("AUDYT RELIGII: " + sb);
+                if (preachers > 0 && preachersKnown < preachers)
+                    Scribe.Line("AUDYT RELIGII: " + (preachers - preachersKnown) + " kaplanow BEZ wpisu duchownego - to oni maja martwy dialog (mend dopisze ich przy rozmowie).");
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.ReligionAudit", null); } catch { } }
+        }
+
         internal static void ItemDump()
         {
             try
@@ -2989,7 +3074,7 @@ namespace CrashScribe
         {
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this,
                 delegate (CampaignGameStarter s)
-                { Mends.ArmorSanity(); Mends.AmmoSanity(); Mends.WeightLaw(); Mends.ArmorTierLaw(); Mends.WeaponTierLaw(); Mends.SkillSinew(); Mends.UniqueWares(); Mends.LoreForgeGate(); Mends.DressTheNamesakes(); Mends.NorthernFare(); Mends.ItemDump(); });
+                { Mends.ArmorSanity(); Mends.AmmoSanity(); Mends.WeightLaw(); Mends.ArmorTierLaw(); Mends.WeaponTierLaw(); Mends.SkillSinew(); Mends.UniqueWares(); Mends.LoreForgeGate(); Mends.DressTheNamesakes(); Mends.NorthernFare(); Mends.ItemDump(); Mends.ReligionAudit(); });
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this,
                 delegate (TaleWorlds.CampaignSystem.MapEvents.MapEvent m) { Mends.MeltDeadLoot(m); });
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this,

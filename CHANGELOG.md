@@ -1,5 +1,21 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-03 — AUDYT RELIGII przy starcie sesji (Mends.ReligionAudit)
+**Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs`
+**Jeff:** "a mozemy to wlaczyc i naprawic?" (religia BK w ROT).
+**Zmiana:** raz na sesje, po wszystkich mendach, log CrashScribe
+"AUDYT RELIGII: religii N, duchownych w rejestrze K na S osad; lordowie
+z wiara a/b; notable z wiara c/d; kaplani-notable p (BK zna jako
+duchownych q, z wiara r); gracz: <wiara>" + lista religii z liczba
+duchownych + ostrzezenie o kaplanach bez wpisu. Refleksja przez
+BannerKingsConfig.Instance.ReligionsManager (Religions, GetHeroReligion,
+IsPreacher, Religion.Clergy, Faith.GetFaithName).
+**Po co:** decyzja, ktore latki BKROTPatch zdjac (HeroNoFaithCache,
+DailyTick/HeroTick stagger, GetHeroReligionCache) - jesli swiat jest
+w wiekszosci "bez wiary", to one; jesli tylko pojedynczy kaplani -
+wystarczy mend z rozmowy.
+**Status:** WGRANE (gra zamknieta) - DO SPRAWDZENIA (przyniesc linie AUDYT RELIGII)
+
 ## 2026-09-03 — Religia w ROT: jest (BKROTPatch, 22 wiary, 30 kultur); pulapka 24h cache "brak wiary" - nasz mend teraz ja uniewaznia
 **Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs` (RegisterStrayPreacher)
 **Pytanie (Jeff):** "czemu w ogole religia nie jest wlaczona w Banner
