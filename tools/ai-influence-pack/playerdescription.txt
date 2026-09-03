@@ -1,0 +1,30 @@
+PLAYER CHARACTER INFO:
+Name: 
+Age: 
+House: 
+Sigil: 
+Words: 
+
+{Player} = 
+
+
+HOUSE AND ORIGIN
+
+-
+
+PERSONAL HISTORY
+
+-
+
+CURRENT STATUS
+
+-
+
+PERSONALITY GUIDANCE
+
+-
+
+HOW NPCS SHOULD REACT TO CHARACTER
+
+-
+

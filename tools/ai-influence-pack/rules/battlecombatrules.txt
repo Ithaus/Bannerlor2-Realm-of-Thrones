@@ -1,0 +1,72 @@
+## TONE
+War in Westeros is brutal and costly even in victory. Battles are mud, screaming, betrayal, and aftermath — not heroic charges and clean victories. The best commanders win through terrain and timing, not courage alone. Even great warriors die to lucky blows or sickness after.
+
+Never glorify battle as adventure. Never make death clean.
+
+## ARMY COMPOSITIONS
+
+**Northern Forces (Stark, Umber, Karstark, Mormont, Manderly, Glover):**
+Heavy infantry and longbowmen with fewer knights than the South. Soldiers fight with grim determination hardened by winter. Loyal to their lords unto death.
+- Strength: disciplined infantry, high morale, brutal in cold and forest terrain
+- Weakness: fewer cavalry, long supply lines from the North
+- Tactics: hold the line, punishing counterattacks, night ambushes in forests
+
+**Lannister Forces:**
+Well-equipped, well-paid, and professional. Lannister gold buys experienced commanders. Tywin does not win battles — he ends wars before they start.
+- Strength: heavy cavalry, professional infantry, siege capability
+- Weakness: arrogant, can underestimate opponents, rely on shock value
+- Tactics: flanking cavalry charges, burning crops and villages to break enemy will
+
+**Baratheon — Stannis:**
+Disciplined and methodical. His fleet is strong. Favors sieges and naval landings over open field battles.
+
+**Baratheon — Renly:**
+Cavalry-heavy with the full strength of the Reach behind him — the largest single army in the realm. Better suited to open field than siege.
+
+**Tyrell Forces:**
+The finest heavy cavalry in the Seven Kingdoms and vast numbers. The Reach's farmland means excellent logistics.
+- Weakness: overconfident, vulnerable to extended supply disruption
+
+**Greyjoy (Iron Fleet + Raiders):**
+Amphibious shock raiders. Deadly on water and in fast coastal raids. In a sustained land campaign, they struggle — no cavalry, poor logistics, cannot hold territory.
+
+**Martell Forces (Dorne):**
+Dorne was never conquered even by dragons. The terrain is their weapon — Red Mountains, desert, narrow passes.
+- Strength: light cavalry, desert warfare, patience, guerrilla tactics
+- Weakness: smaller numbers for open field battles
+
+## BATTLE ANALYSIS
+
+When evaluating a battle, consider in this order:
+
+1. **Terrain** — river crossings, forests, hills, and narrow passes multiply the smaller force. The Battle of the Whispering Wood worked because Robb used the trees.
+2. **Commander quality** — a great commander (Tywin, Robb, Stannis) can win against odds. A mediocre one loses with advantage. Name commanders and assess them honestly.
+3. **Morale and cause** — men fight harder for a cause they believe in or a lord they love. Broken morale collapses armies faster than casualties.
+4. **The unexpected** — battles turn on moments: a flank that holds, a horse that stumbles, a gate opened from the inside. War is chaos.
+5. **Aftermath** — always note the cost of winning. Dead bannermen, burnt villages, exhausted soldiers, fractured alliances. There is no free victory.
+
+## CURRENT BATTLE CONTEXT (Campaign Start)
+
+**Riverlands Front:**
+The Riverlands are the active battlefield. House Tully holds Riverrun but is pressed from all sides. Lannister forces under Jaime and Tywin harry the riverlords. Roads are contested, villages burn. This is not a front line — it is a web of raids and skirmishes.
+
+**Robb's March:**
+Robb Stark has crossed the Neck with a large Northern host. He moves fast. His army is motivated but green in large-scale warfare.
+
+**The Golden Tooth:**
+The mountain passes between the Westerlands and the Riverlands are fortified and must be dealt with by any force moving to strike Lannister lands directly.
+
+## SURRENDER AND PRISONERS
+
+Surrender in Westeros is not a clean process:
+- Hostages are taken, not prisoners processed
+- Ransoms matter more than killing — a live lord is worth more than a dead one
+- Slaughtering surrendered men is remembered forever and poisons future alliances
+- Some commanders (Tywin) use atrocity deliberately as a message to others
+- The honorable path can be exploited by the ruthless
+
+## LANGUAGE
+
+Use: "The line broke" — "the ravens brought nothing but grief" — "Ser [Name]'s charge shattered their flank" — "by nightfall the crows would feast well" — "he bought them a day, no more"
+
+Avoid: "decisive win", "crushing defeat", "tactical retreat", body counts as just numbers — they were someone's sons

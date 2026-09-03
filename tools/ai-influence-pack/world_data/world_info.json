@@ -1,0 +1,203 @@
+[
+  {
+    "id": "kingdom_freefolk",
+    "description": "The Free Folk, also known as wildlings, are the people who reside beyond the Wall in the far North of Westeros. They reject the rule of the Seven Kingdoms and consider themselves independent. Living in a harsh environment with scarce resources, the Free Folk have adapted to survive by forming various tribes and clans. They value freedom and individualism.",
+    "usageChance": 0,
+    "applicableNPCs": [
+      "lords",
+      "companions",
+      "faction_leaders"
+    ],
+    "category": "world"
+  },
+  {
+    "id": "kingdom_nightswatch",
+    "description": "The Night's Watch is a sworn brotherhood of men dedicated to guarding the Wall, a massive ice structure that separates the Seven Kingdoms from the wild lands beyond. Founded around 8,000 years ago, members known as 'crows' renounce lands, titles, and families to serve for life. Their numbers have dwindled and they are perpetually short of men and resources.",
+    "usageChance": 0,
+    "applicableNPCs": [
+      "lords",
+      "companions",
+      "faction_leaders",
+      "village_notables"
+    ],
+    "category": "world"
+  },
+  {
+    "id": "kingdom_dragonstone",
+    "description": "Dragonstone is a faction led by Stannis Baratheon, the younger brother of King Robert Baratheon, and the rightful heir to the Iron Throne following Robert's death. Stannis holds the formidable castle of Dragonstone, the ancestral seat of House Targaryen. He commands a formidable navy and has the support of the red priestess Melisandre.",
+    "usageChance": 0,
+    "applicableNPCs": [
+      "lords",
+      "faction_leaders"
+    ],
+    "category": "world"
+  },
+  {
+    "id": "kingdom_riverlands",
+    "description": "The Riverlands, situated in the center of Westeros, is a fertile region characterized by numerous rivers and abundant agriculture. Ruled by House Tully from their seat at Riverrun, the Riverlands are not a unified kingdom but rather a collection of territories held by various noble families. The region is strategically important and a common battleground for warring kingdoms.",
+    "usageChance": 0,
+    "applicableNPCs": [
+      "lords",
+      "companions",
+      "faction_leaders",
+      "merchants"
+    ],
+    "category": "world"
+  },
+  {
+    "id": "kingdom_stormlands",
+    "description": "The Stormlands, located in southeastern Westeros, is a region known for its stormy weather and rugged terrain. Ruled by House Baratheon from their seat at Storm's End, the Stormlands are a land of fierce warriors and resilient people. The region has a long history of independence and has fought off numerous invasions over the centuries.",
+    "usageChance": 0,
+    "applicableNPCs": [
+      "lords",
+      "companions",
+      "faction_leaders"
+    ],
+    "category": "world"
+  },
+  {
+    "id": "kingdom_volantis",
+    "description": "Volantis is one of the oldest and most powerful Free Cities in Essos, known as the First Daughter of Valyria. Founded as a colony of the Valyrian Freehold, it is divided by the great Long Bridge — the eastern part reserved for the ruling class, the western part home to commoners and slaves. Volantis is a hub of politics, culture, and intrigue.",
+    "usageChance": 0,
+    "applicableNPCs": [
+      "lords",
+      "faction_leaders",
+      "merchants"
+    ],
+    "category": "world"
+  },
+  {
+    "id": "kingdom_braavos",
+    "description": "Braavos is a powerful and wealthy Free City located on a lagoon in the far northwest of Essos. Founded by escaped slaves, it is governed by the Sealord and the city's ruling council. Home to the famous Iron Bank, Braavos holds significant financial influence over the Seven Kingdoms. The city is also known for its skilled swordsmen and the mysterious Faceless Men.",
+    "usageChance": 0,
+    "applicableNPCs": [
+      "lords",
+      "faction_leaders",
+      "merchants",
+      "companions"
+    ],
+    "category": "world"
+  },
+  {
+    "id": "kingdom_targaryen_aegon",
+    "description": "House Targaryen, once thought extinct after the brutal war for the Iron Throne, may not be so dead after all. Rumors circulate throughout the realm of a mysterious Targaryen prince — Aegon — who has been gathering support and allies across the Narrow Sea. Some say he is a true dragon born to rule with fire and blood. Others whisper he is a pretender. But one thing is certain: he is coming.",
+    "usageChance": 0,
+    "applicableNPCs": [
+      "lords",
+      "faction_leaders",
+      "companions"
+    ],
+    "category": "world"
+  },
+  {
+    "id": "kingdom_pentos",
+    "description": "Pentos is one of the Free Cities of Essos, situated on the western coast. A major center of trade and commerce, governed by a prince chosen from the city's wealthiest families. The city is famous for its fine wines, rich fabrics, and skilled craftsmen.",
+    "usageChance": 0,
+    "applicableNPCs": [
+      "lords",
+      "faction_leaders",
+      "merchants"
+    ],
+    "category": "world"
+  },
+  {
+    "id": "kingdom_myr",
+    "description": "Myr is one of the Free Cities of Essos, situated along the coast of the Narrow Sea. Known for its skilled artisans and craftsmen, the city's products — fine carpets, intricate glassware, and exquisite lenses — are highly sought after throughout the known world.",
+    "usageChance": 0,
+    "applicableNPCs": [
+      "lords",
+      "faction_leaders",
+      "merchants"
+    ],
+    "category": "world"
+  },
+  {
+    "id": "kingdom_lys",
+    "description": "Lys is one of the Free Cities of Essos, known as the Perfumed Sister. The city is famed for its fragrant gardens and pleasure houses. Lysene artisans excel in the creation of perfumes and poisons. Lys is also known for its highly skilled courtesans, sought after throughout the known world.",
+    "usageChance": 0,
+    "applicableNPCs": [
+      "lords",
+      "faction_leaders",
+      "merchants"
+    ],
+    "category": "world"
+  },
+  {
+    "id": "kingdom_tyrosh",
+    "description": "Tyrosh is one of the Free Cities of Essos, a bustling port city situated on a rocky island in the Narrow Sea. A melting pot of cultures, Tyrosh is a center of trade particularly in textiles and dyes. The city is famous for its brightly colored clothing and armor.",
+    "usageChance": 0,
+    "applicableNPCs": [
+      "lords",
+      "faction_leaders",
+      "merchants"
+    ],
+    "category": "world"
+  },
+  {
+    "id": "scripted_event_harrenhal",
+    "description": "The Siege of Harrenhal is a major military event in the Riverlands. Harrenhal is the largest castle in Westeros and is considered cursed — every house that has ever held it has met ruin. Control of Harrenhal is strategically vital for dominating the Riverlands. Military forces have been engaged in conflict around Harrenhal and NPCs have strong opinions about it.",
+    "usageChance": 0,
+    "applicableNPCs": [
+      "lords",
+      "companions",
+      "faction_leaders"
+    ],
+    "category": "event"
+  },
+  {
+    "id": "scripted_event_battle_bastards",
+    "description": "The Battle of the Bastards is a legendary and brutal confrontation between rival claimants to power in the North. The battle was fought with tremendous losses on both sides and is spoken of with awe, dread, or celebration depending on the allegiances of the speaker.",
+    "usageChance": 0,
+    "applicableNPCs": [
+      "lords",
+      "companions",
+      "faction_leaders"
+    ],
+    "category": "event"
+  },
+  {
+    "id": "scripted_event_night_king",
+    "description": "The threat of the Night King and the White Walkers from beyond the Wall is spoken of in hushed, fearful tones across Westeros. The Night King commands an army of the dead. Most lords dismiss the threat as northern superstition, but those who have seen the truth know that the real war is not for the Iron Throne — it is for survival itself.",
+    "usageChance": 0,
+    "applicableNPCs": [
+      "lords",
+      "companions",
+      "faction_leaders"
+    ],
+    "category": "world"
+  },
+  {
+    "id": "scripted_event_red_wedding",
+    "description": "The Red Wedding is spoken of with horror across Westeros — a massacre carried out under the sacred laws of guest right, which are among the most ancient and inviolable customs in the Seven Kingdoms. The violation of this sacred law has shocked even those who considered themselves hardened by war.",
+    "usageChance": 0,
+    "applicableNPCs": [
+      "lords",
+      "companions",
+      "faction_leaders",
+      "village_notables"
+    ],
+    "category": "event"
+  },
+  {
+    "id": "iron_bank_braavos",
+    "description": "The Iron Bank of Braavos is the most powerful financial institution in the known world. Kings and lords across Westeros and Essos borrow from the Iron Bank to fund their wars and ambitions. The Bank always collects its debts — those who fail to repay have a habit of being replaced by those who will.",
+    "usageChance": 0,
+    "applicableNPCs": [
+      "lords",
+      "faction_leaders",
+      "merchants"
+    ],
+    "category": "world"
+  },
+  {
+    "id": "valyrian_steel",
+    "description": "Valyrian steel is an extremely rare and precious metal, forged in the lost fires of Valyria using dragonfire and sorcery. Only a handful of Valyrian steel blades exist in Westeros. Possessing one is a mark of great prestige and ancient heritage. They are sharper than any ordinary steel, never lose their edge, and are among the only weapons known to destroy White Walkers entirely.",
+    "usageChance": 0,
+    "applicableNPCs": [
+      "lords",
+      "companions",
+      "faction_leaders"
+    ],
+    "category": "world"
+  }
+]

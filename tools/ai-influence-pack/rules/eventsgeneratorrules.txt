@@ -1,0 +1,77 @@
+## PURPOSE
+Generate dynamic world events for Westeros that feel organic — not content spawning but the natural churn of a living, dangerous world two days before the execution of Eddard Stark.
+
+## CORE PHILOSOPHY
+
+**The world does not wait for the player.**
+Events happen because lords have agendas, smallfolk suffer, weather turns, and ravens carry lies.
+
+**No event is purely good or purely bad.**
+A Lannister victory is a disaster for riverlords and an opportunity for anyone willing to offer them refuge. A failed Northern harvest makes Robb's campaign harder — but also makes his soldiers more desperate and dangerous. Every event has multiple stakeholders.
+
+**Scale matters — mix deliberately:**
+- 60% local or regional (a lord's heir captured; a harvest fails; a road is cut)
+- 30% realm-wide (a great house changes sides; a king makes a statement)
+- 10% mysterious or supernatural (use sparingly — it should feel rare and unsettling)
+
+## ACTIVE FAULT LINES
+
+Draw events from these tensions naturally:
+
+**The Succession Question:** Is Joffrey Robert's true son? Events that add fuel to this whisper — or appear to suppress it — are explosive.
+
+**The North Mobilizing:** Robb's army is marching. Supply lines, scouting, Lannister responses, riverlord decisions about which side to join — all generate events.
+
+**The Riverlands Burning:** Lannister foragers are already burning villages. This generates refugee flows, smallfolk unrest, and hard decisions for lesser lords.
+
+**Stannis and Melisandre:** A foreign priestess on Dragonstone speaks of a god of light. His maester is troubled. His bannermen whisper. Religious tension is building.
+
+**The Iron Islands:** Balon Greyjoy watches the mainland tear itself apart and sees opportunity. Theon rides with Robb — a hostage turned almost-friend. Something is stirring on Pyke.
+
+**Beyond the Wall:** The Night's Watch is undermanned and ignored. Dead men walk. Wildlings mass under Mance Rayder. Generate occasional events from the far north that lords dismiss as ranger paranoia.
+
+## EVENT TEMPLATES
+
+**Military:**
+- A Lannister raiding party burns [village/sept/mill] in the Riverlands
+- A Stark outrider column is ambushed near [location]
+- A riverlord's castle changes hands — by siege, betrayal, or negotiation
+- Deserters from [army] arrive carrying news (accurate or not)
+- A supply convoy is intercepted — by bandits, enemies, or someone playing both sides
+
+**Social:**
+- A septon preaches that Joffrey's reign is cursed — the Gold Cloaks arrest him
+- Refugees from the burning Riverlands flood a city or castle, straining resources
+- A failed harvest forces a lord to choose between feeding his people and feeding his army
+- Smallfolk riots break out in [town] — sparked by taxation, hunger, or rumor
+
+**Personal:**
+- A lord's heir is taken prisoner in a skirmish
+- A knight of renown is killed in single combat — by someone surprising
+- A lord receives a raven from his captured liege — dictated under duress, clearly not freely written
+- A lord discovers his castellan has been corresponding with the enemy
+
+**Mysterious (use sparingly):**
+- A Night's Watch raven arrives at [castle] — the message half-burned, the ranger's name unknown
+- Villagers in [northern location] report their dead did not stay dead
+- A red comet is seen in the sky — every faction interprets it as a sign for themselves
+- A woods witch tells a lord something she could not have known — and is right
+
+## GENERATION RULES
+
+**Causality chain:** When possible, make events follow from previous ones. If a Lannister raid burned a village last week, generate the lord's response this week.
+
+**Named characters matter:** Use known characters when plausible. For minor events, invent named minor lords and knights — Westeros is full of them.
+
+**Stakes must be clear:** "A bridge was repaired" is not an event. "The bridge at [location] has been repaired — now Lannister cavalry can cross in half a day" is an event.
+
+**Do not resolve:** Present the situation, the parties, and the pressure. Let the game and the player determine the outcome. The event is the setup, not the ending.
+
+## OUTPUT FORMAT
+
+**Title:** Short and evocative — e.g. "Ravens From a Burning Village" / "A Sword Sworn to a New Lord"
+**Type:** military / social / personal / mysterious
+**Importance:** 1–10
+**Description:** 2–4 sentences written as a maester might record it — factual but aware of implication
+**Kingdoms involved:** List relevant factions
+**Ripple potential:** One sentence on what this makes more likely if left unaddressed

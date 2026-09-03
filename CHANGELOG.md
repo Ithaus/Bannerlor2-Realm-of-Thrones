@@ -1,5 +1,47 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-03 — AI Influence 6.0.2 + Voice Acting Patch (Fish Audio) + ROT compat wgrane; paczka swiata/NPC ROT czeka na folder kampanii
+**Mod:** cudze: AIInfluence, VoiceActingPatchRemake, ROT_AIInfluence_Compat | **Pliki:** `tools/ai-influence-pack.ps1` (nowy), `tools/ai-influence-pack/` (Nexus 11008: world_data 4, rules 5, npc 222), `Documents\...\Configs\LauncherData.xml` (kopia `.bak-2026-09-03-ai`)
+**Jeff:** "daj mi przepis jak aktywowac AI voice acting i AI odpowiedzi ... instrukcje mi daj jak mam to wgrac i gdzie".
+**Ustalenia (dekompilacja/refleksja przed wgraniem):**
+- AIInfluence.dll 6.0.2 jest zaciemniony (ILSpy: "Illegal tables in compressed
+  metadata"); refleksja .NET Framework widzi 2609 typow. Klucz LLM = MCM
+  "API Settings / OpenRouter Settings" -> "OpenRouter API Key" + "OpenRouter
+  AI Model"; alternatywne backendy DeepSeek/Ollama/KoboldCpp/Player2.
+- ROT_AIInfluence_Compat v0.2.0 pisany pod AIInfluence 5.0.x: po stronie AI
+  szuka po pelnej nazwie klas, ktorych w 6.0.2 NIE MA (AIInfluenceBehavior,
+  SiegeSettlementAction, DiplomacyManager, DynamicEventsManager,
+  WorldEventsWindowViewModel, FollowPlayerAction, DynamicEventsAnalyzer);
+  sa tylko AIActionManager, DiplomacyPatches, DynamicEvent. Czyli tlumienie
+  oblezen/dyplomacji AI przez compat w 6.0.2 najpewniej martwe. Jego latki
+  po stronie ROT (prefix/finalizer na StartEvent/TickEvent/SetupSiegeAttackers,
+  EnforceWars, Enlist) sa void/obserwacyjne - nie pomijaja oryginalu, nie
+  gryza sie z HarrenhalGuard (prefix+finalizer na SetupSiegeAttackers) ani
+  z Fabula (prefix ConditionsMet, postfix StartEvent). Weryfikacja po
+  starcie: `Modules\ROT_AIInfluence_Compat\logs\compat.log`
+  ("PatchesApplied" / "Failed to apply").
+- Voice Acting Patch Remake 1.8: patchuje ConversationManager.ProcessSentence/
+  EndConversation, szuka AIInfluence.Services.TtsLipSyncService (JEST w 6.0.2).
+  Bundlowal 0Harmony 2.3.3 (gra ma 2.4.2) - odstawiony do
+  `bin\_unused_old_harmony_2.3.3\`. Klucz Fish Audio:
+  `Modules\VoiceActingPatchRemake\FishConfig.json` pole "ApiKey".
+- "Npc Expansion 4" (11008) wymaga modow Family Expansion - nie ma ich
+  w Modules, pominieta. "RoT AI Influence Base" (11014) to starsza, mniejsza
+  wersja paczki 11008 - pominieta.
+- AI Influence 6.x trzyma swiat PER KAMPANIA: `save_data\<UniqueGameId>\
+  prompts\world_data`, `prompts\rules`, NPC json w korzeniu; folder powstaje
+  przy pierwszym wczytaniu zapisu -> skrypt `tools\ai-influence-pack.ps1`
+  (bierze najnowsza kampanie, kopie nadpisanych w `_before_rot_pack`).
+**Kolejnosc launchera:** AIInfluence i VoiceActingPatch tuz za ROT-Dragon,
+ROT_AIInfluence_Compat na samym koncu.
+**Ryzyko / co sprawdzic:** README paczki 11008: dyplomacja AI Influence gryzie
+sie ze skryptowanymi oblezeniami ROT (Harrenhal) -> MCM "Enable Diplomacy
+System" WYLACZYC do czasu przejscia Harrenhal. Po pierwszym starcie:
+CrashScribe (wyjatki z AIInfluence/VoiceActingPatch), compat.log,
+`AIInfluence\logs\mod_log.txt` ("Created save directory").
+**Status:** WGRANE (moduly + launcher, gra zamknieta) - DO SPRAWDZENIA;
+paczka swiata/NPC DO WGRANIA skryptem po pierwszym wczytaniu zapisu.
+
 ## 2026-09-03 — AUDYT RELIGII przy starcie sesji (Mends.ReligionAudit)
 **Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs`
 **Jeff:** "a mozemy to wlaczyc i naprawic?" (religia BK w ROT).

@@ -1,0 +1,214 @@
+# PLAYER DESCRIPTION GUIDE
+# ROT AI Influence Community Pack
+# ================================
+
+## WHAT IS playerdescription.txt?
+
+The playerdescription.txt file lets you tell the AI who your character is.
+Everything you write here will be known to ALL NPCs in every conversation.
+
+Think of it as your character's permanent identity card — not your current
+campaign status (the mod handles that automatically), but who your character
+IS as a person: their name, house, background, personality, and how the world
+should react to them.
+
+The file is hot-reloaded automatically. No restart needed after saving.
+
+
+## WHAT GOES HERE vs. WHAT GOES ELSEWHERE
+
+playerdescription.txt  →  Your character's identity, background, personality,
+                           house history, and how NPCs should react to them.
+
+world_info.json        →  Public facts about your house that ALL NPCs might
+                           know as world knowledge (optional, for advanced users).
+
+world_secrets.json     →  Hidden secrets connected to your character or house
+                           that only certain NPCs might discover (optional).
+
+world.txt              →  Do NOT add character info here. This file is for
+                           world lore only. Editing it affects all NPCs globally.
+
+
+## HOW TO USE
+
+1. Create a new file called exactly:  playerdescription.txt
+2. Place it in your AIInfluence mod folder (same folder as world.txt)
+3. Fill it in using the template below — in English
+4. Save the file. It will be loaded automatically on the next dialogue.
+
+You do not need to fill in every section.
+Leave a section blank or delete it entirely if you prefer the AI to discover
+that aspect of your character through conversation instead.
+
+
+## TIPS FOR GOOD RESULTS
+
+- Be specific rather than vague. "A calculating lord who prefers diplomacy
+  but is capable of ruthlessness when necessary" works better than "smart."
+
+- Write the NPC reaction section carefully. This is where you shape how the
+  world treats your character — it has a strong effect on immersion.
+
+- Keep it honest to how you actually play. If you change your playstyle
+  mid-campaign, update the file.
+
+- You can update the file at any time. Changes take effect on the next dialogue.
+
+- Do not write things the AI already knows from game data — your current
+  kingdom, your fiefs, your troops. Focus on personality and backstory.
+
+
+================================================================================
+## TEMPLATE — COPY THIS AND FILL IT IN
+================================================================================
+
+PLAYER CHARACTER INFO:
+Name: [Full Name]
+Age: [Age]
+House: [House Name and region, e.g. "House Crane of the Reach"]
+Sigil: [Brief description of your house sigil/banner]
+House Words: [Your house motto, if you have one]
+
+{Player} = [Full Name]
+
+
+--- HOUSE AND ORIGIN ---
+
+[Describe your house or family and where it comes from. How old is the house?
+What is it known for? Is it powerful, minor, ancient, newly risen?
+Where is your ancestral seat or home — a castle in Westeros, a villa in one
+of the Free Cities of Essos, a khalasar on the Dothraki Sea, or elsewhere?
+What is your house or family's reputation among lords, merchants, or smallfolk
+in your region of the world?]
+
+
+--- PERSONAL HISTORY ---
+
+[Describe your character's background. Where did they grow up?
+What significant events shaped them? Have they experienced loss, war,
+exile, or great fortune? What drives them forward?
+Keep it grounded — specific details work better than grand summaries.]
+
+
+--- NOTABLE POSSESSIONS ---
+
+[List anything notable your character carries or owns that NPCs might
+recognize or react to — a Valyrian steel sword, a famous horse, a
+signet ring, a maester's chain, etc. Include the name and a brief
+description of its significance.]
+
+
+--- CURRENT STATUS ---
+
+[Describe your character's current situation in the game world.
+Do they serve a great house? Are they a free agent? A wandering knight?
+A lord without lands? An exile seeking restoration?
+This gives NPCs context for how to place your character politically.]
+
+
+--- PERSONALITY ---
+
+[Describe how your character thinks and behaves. Are they honorable,
+calculating, impulsive, patient, cruel, generous, ambitious?
+What do they want? What do they fear? What are they willing to do
+and what are they not willing to do?
+This shapes how NPCs read your character in conversation.]
+
+
+--- HOW NPCS SHOULD REACT ---
+
+[This is one of the most important sections. Describe specifically how
+different types of NPCs should respond to your character.
+
+Examples of what to cover:
+- Do lords of a certain region know your house? How do they feel about it?
+- Does your character have a reputation — good or bad — that precedes them?
+- Are there people who owe your character something, or who have a grudge?
+- How should strangers treat your character on first meeting?
+- Is there anything about your character that NPCs would find unusual,
+  impressive, suspicious, or unsettling?]
+
+
+================================================================================
+## EXAMPLE — EDWARD RAVEN (for reference) This is my own but still AI generated.
+================================================================================
+
+PLAYER CHARACTER INFO:
+
+Name: Edward Raven
+Age: 20
+House: House Raven of Brandybottom, The Reach
+Sigil: A black raven with a red eye on a white field
+House Words: We Remember Beneath Fair Skies
+
+{Player} = Edward Raven
+
+
+--- HOUSE AND ORIGIN ---
+
+House Raven was a noble house of The Reach, with their ancestral seat at
+Brandybottom — a modest but beloved holdfast in the fertile lands of the
+Reach, not far from Highgarden. As bannermen of House Tyrell, they were
+widely regarded as one of the most honorable and good-hearted houses in
+the Reach. The lords of Raven were known for their generosity to the
+smallfolk, their fairness in judgment, and their long memories — both for
+debts owed and favors given. Their name was known as far as King's Landing
+and spoken of in some of the Free Cities through trade and diplomacy.
+
+
+--- PERSONAL HISTORY ---
+
+Eight years ago, when Edward was only eight years old, Brandybottom burned
+to the ground in a devastating fire. His entire family perished — his father
+Harwin, his mother Eleonora, his brothers Tomard and Domeric, and his sister
+Edwyna. Edward alone survived. He has been alone since childhood, carrying
+his family's memory and the responsibility of being the last of his line.
+
+
+--- NOTABLE POSSESSIONS ---
+
+Beak — the ancestral Valyrian steel sword of House Raven, named after a
+raven's beak. The blade is dark as midnight, razor-sharp, and never loses
+its edge. It has been passed down through the Raven family for generations.
+Edward carries it always. Many powerful lords covet such a blade.
+
+
+--- CURRENT STATUS ---
+
+Edward Raven serves no kingdom and has sworn fealty to no great house.
+He is a free agent in the politics of Westeros — which some will find
+useful and others will find suspicious.
+
+
+--- PERSONALITY ---
+
+Edward carries his family's values — honesty, fairness, long memory — but
+the world has also taught him that goodness alone does not guarantee survival.
+He is not naive, but he is not yet cynical. He does not talk about his family
+easily, but when he does, it matters. He is young and still finding his place,
+but those who underestimate him do so at their own risk.
+
+
+--- HOW NPCS SHOULD REACT ---
+
+- NPCs from the Reach or who knew House Raven will speak warmly of the family's
+  legendary reputation. Many will mourn the tragedy of Brandybottom. Some who
+  knew his father Harwin personally may be visibly moved to meet his son.
+
+- NPCs who notice the sword Beak will recognize it as Valyrian steel. Reactions
+  range from admiration and respect to barely concealed covetousness.
+
+- Lords and rulers may see Edward as an opportunity — a loyal sword arm carrying
+  a Valyrian steel blade, without powerful allies to protect him. Some will try
+  to recruit him, some to use him, some to take what he carries.
+
+- Merchants and travelers from Essos may have heard the Raven name through trade
+  and may react with recognition.
+
+- NPCs should treat Edward's youth with nuance — he is 20, not a child, but
+  clearly still finding his place. His genuine decency and quiet grief underneath
+  it should be perceptible to those who pay attention.
+____________________________________________________
+
+BTW i am not an expert at this, so there can be somethings i am wrong about. i have tested this myself. most of this is AI Generated
