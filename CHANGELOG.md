@@ -1,5 +1,22 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-03 — Czystka magazynu DTE po bitwie WYLACZONA (nic nie znika, wymiana 1:1)
+**Mod:** Armoury | **Plik:** `Armoury/src/ArmouryBehavior.cs`
+**Problem (Jeff):** "goscie zalozyli szmaty, mieli pancerze takie jak ja teraz,
+powinienem miec trzy takie pancerze, a 2 zniknely - luka czy bug?"
+**Przyczyna:** TrimWarStores (z 29.08, "starocie po przezbrojeniu znikaja")
+po kazdej bitwie przycinal magazyn DTE do LICZBY ZOLNIERZY sztuk na typ
+(amunicja x2), najgorsze pierwsze. Jeff ma 2 szeregowych -> limit 2 pancerze
+korpusu na caly oddzial; zdjety z wojska dobry pancerz ponad limit szedl
+w niepamiec. Zdjety sprzet i tak nigdy nie trafia do sakw, tylko do magazynu
+DTE (osobny schowek) - stad "nie widac ich w Party".
+**Zmiana:** wywolanie TrimWarStores w OnGameMenuOpened zakomentowane; funkcja
+zostaje martwa. Magazyn DTE trzyma wszystko, co wojsko zdejmie.
+**Ryzyko / co sprawdzic:** magazyn DTE bedzie rosl o szmaty po kazdym
+przezbrojeniu (to Jeff swiadomie wybral: "nic nie znika"); sprawdzic po
+bitwie, czy zdjete pancerze siedza w magazynie DTE w komplecie.
+**Status:** ZBUDOWANE - gra chodzi, watcher wgra po zamknieciu; DO SPRAWDZENIA
+
 ## 2026-09-03 — Suwaki MCM Armoury dzialaja na zywo + tempo swiata 75% wpisane za Jeffa
 **Mod:** Armoury | **Pliki:** `Armoury/src/ArmouryBehavior.cs`, `Documents\...\ModSettings\Global\Armoury\Armoury.json` (kopia `.bak-2026-09-03`)
 **Problem (Jeff):** "predkosc za wolna, zwieksz o 50% dla calego swiata",

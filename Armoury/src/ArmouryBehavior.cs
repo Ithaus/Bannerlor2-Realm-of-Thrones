@@ -527,8 +527,12 @@ namespace Armoury
                 // ...a smieci <=3% i slonie-towar zaraz za nim (Spoils naklada
                 // stany PO naszym filtrze lupow - tu wymiatamy je od reki)
                 try { CleanseTrashInBags(); } catch { }
-                // po swiezej bitwie starocie wojskowe ida w niepamiec
-                try { if (CampaignTime.Now <= _spoilsWindow) TrimWarStores(); } catch { }
+                // CZYSTKA MAGAZYNU WYLACZONA (Jeff 03.09: "nie ma byc wymiana 1:1,
+                // nic nie znika" - 2 z 3 zdobytych pancerzy przepadly, bo limit
+                // TrimWarStores = liczba zolnierzy, a mial 2 ludzi). Zdjety sprzet
+                // zostaje w magazynie DTE w calosci; TrimWarStores zostaje w kodzie
+                // jako martwy na wypadek powrotu do pomyslu z 29.08.
+                // try { if (CampaignTime.Now <= _spoilsWindow) TrimWarStores(); } catch { }
                 // samonaprawa depozytu: otwarte menu gry = na pewno NIE ekran
                 // zbrojowni; jesli cokolwiek wisi w depozycie (Release nie
                 // odpalil przy zamykaniu ekranu), wraca na polki teraz
@@ -756,6 +760,8 @@ namespace Armoury
         }
 
         /// <summary>
+        /// MARTWE OD 03.09 (Jeff: "nie ma byc wymiana 1:1, nic nie znika") - nie
+        /// wolane nigdzie; zostawione na wypadek powrotu do pomyslu z 29.08.
         /// WYMIENIONY SPRZET ZNIKA (Jeff 29.08: "wojsko przezbraja sie w lupy,
         /// a starocie po prostu znikaja"). Wojskowa czesc magazynu (ponad wklady
         /// gracza) trzyma per TYP najwyzej tylu sztuk, ilu ludzi w kompanii
