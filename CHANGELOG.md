@@ -1,5 +1,20 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-03 — Glos Fish "dretwy": temperature 0 -> 0.9 w FishConfig.json
+**Mod:** cudzy: VoiceActingPatchRemake | **Plik:** `Modules\VoiceActingPatchRemake\FishConfig.json` (kopia `.bak-2026-09-03`)
+**Problem (Jeff):** "jest glos ale brzmi dretwo". Wczesniej TTS w ogole nie
+szedl - HTTP 402: kredyt API Fish jest ODDZIELNY od 8000 darmowych kredytow
+platformy; Jeff doladowal 10 USD i glos ruszyl.
+**Przyczyna:** dekompilacja FishTtsClient/MiniMsgPack: do Fish ida tylko
+volume i temperature (speed/top_p hardcoded null); w dostarczonym configu
+`temperature: 0` = najbardziej monotonna dykcja.
+**Zmiana:** temperature 0.9 (standard Fish dla ekspresyjnego czytania).
+Config czytany raz przy starcie sesji - wymaga restartu gry.
+**Ryzyko / co sprawdzic:** przy 0.9 glosy moga miec wieksza zmiennosc miedzy
+kwestiami; jesli dalej dretwo, nastepny krok to wymiana konkretnych voice ID
+w PoolMale/PoolFemale/CultureVoicePools.
+**Status:** WGRANE (config; zadziala od nastepnego uruchomienia gry) - DO SPRAWDZENIA
+
 ## 2026-09-03 — AI Influence 6.0.2 + Voice Acting Patch (Fish Audio) + ROT compat wgrane; paczka swiata/NPC ROT czeka na folder kampanii
 **Mod:** cudze: AIInfluence, VoiceActingPatchRemake, ROT_AIInfluence_Compat | **Pliki:** `tools/ai-influence-pack.ps1` (nowy), `tools/ai-influence-pack/` (Nexus 11008: world_data 4, rules 5, npc 222), `Documents\...\Configs\LauncherData.xml` (kopia `.bak-2026-09-03-ai`)
 **Jeff:** "daj mi przepis jak aktywowac AI voice acting i AI odpowiedzi ... instrukcje mi daj jak mam to wgrac i gdzie".
