@@ -2572,6 +2572,17 @@ namespace CrashScribe
                     return;
                 }
                 Traverse.Create(rel).Method("AddClergyman", sett, hero).GetValue();
+                // BKROTPatch trzyma "brak wiary" bohatera w cache na 24 h gry
+                // (HeroNoFaithCache) i uniewaznia go tylko przez ExecuteAddToReligion/
+                // InitializeHeroFaith - nasze AddClergyman tego nie robi, wiec bez
+                // recznego Invalidate kaplan przez dobe dalej "nie ma religii"
+                try
+                {
+                    var tCache = AccessTools.TypeByName("BKROTPatch.Patches.HeroNoFaithCache");
+                    var mInv = tCache != null ? AccessTools.Method(tCache, "Invalidate") : null;
+                    if (mInv != null) mInv.Invoke(null, new object[] { hero });
+                }
+                catch { }
                 _strayPreachersFixed++;
                 Scribe.Line("Mends: preacher " + hero.Name + " (" + sett.Name + ") dopisany do religii - dialog ozyl (lacznie " + _strayPreachersFixed + ").");
             }

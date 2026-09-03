@@ -1,5 +1,26 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-03 — Religia w ROT: jest (BKROTPatch, 22 wiary, 30 kultur); pulapka 24h cache "brak wiary" - nasz mend teraz ja uniewaznia
+**Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs` (RegisterStrayPreacher)
+**Pytanie (Jeff):** "czemu w ogole religia nie jest wlaczona w Banner
+Kings dla ROT?" - JEST: BKROTPatch.Religions.ROTReligions definiuje
+22 religie (Siedmiu, Starzy Bogowie, Utopiony Bog, R'hllor, Czarna
+Koza, Czternascie Plomieni, Wielki Ogier, Zlote Ogrody, Brodaty Bog,
+Boash, Vhugyahar, Perlowe Bostwa, Odcienie Triosa, Laski Ksiecia...)
+i przypisuje wiare 30 kulturom ROT (river/reach/vale/stormlands/
+crownlands -> Siedmiu; battania/nightswatch/freefolk/skagosi -> Starzy
+Bogowie; sturgia -> Utopiony; volantine/dragonstone -> R'hllor itd.);
+DefaultReligionsInitializePatch wylacza religie vanilli BK. Zepsuta
+jest hydraulika BKROTPatch: dwie latki juz zdjelismy (A1 duchowni,
+A2 style zycia), a trzecia to HeroNoFaithCache - "brak wiary" bohatera
+trzymany 24 h GRY, uniewazniany tylko przez ExecuteAddToReligion/
+InitializeHeroFaith/RefreshCaches.
+**Zmiana:** RegisterStrayPreacher po AddClergyman wola refleksja
+BKROTPatch.Patches.HeroNoFaithCache.Invalidate(hero) - dopisany kaplan
+nie jest juz przez dobe "bez religii". Reszta diagnozy czeka na wpis
+"rozmowa z kaplanem ..." z logu (03.09 rano).
+**Status:** WGRANE (gra zamknieta) - DO SPRAWDZENIA
+
 ## 2026-09-03 — Martwa rozmowa z kaplanem (BK religia): wyjscie awaryjne + zabezpieczenie tekstow + diagnostyka
 **Mod:** CrashScribe | **Pliki:** `CrashScribe/src/DialogEscape.cs` (nowy), `CrashScribe/src/Mends.cs`, `CrashScribe/src/SubModuleMain.cs`
 **Problem (Jeff):** "wchodzisz w rozmowe z preacherem, klikasz continue
