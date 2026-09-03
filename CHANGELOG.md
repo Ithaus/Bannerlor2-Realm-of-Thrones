@@ -39,8 +39,28 @@ sie ze skryptowanymi oblezeniami ROT (Harrenhal) -> MCM "Enable Diplomacy
 System" WYLACZYC do czasu przejscia Harrenhal. Po pierwszym starcie:
 CrashScribe (wyjatki z AIInfluence/VoiceActingPatch), compat.log,
 `AIInfluence\logs\mod_log.txt` ("Created save directory").
-**Status:** WGRANE (moduly + launcher, gra zamknieta) - DO SPRAWDZENIA;
-paczka swiata/NPC DO WGRANIA skryptem po pierwszym wczytaniu zapisu.
+**Po pierwszym uruchomieniu (03.09, 06:01-06:04, Jeff wczytal zapis i wyszedl):**
+- Trzy moduly zaladowane, zero UNHANDLED/DEATH. compat.log: "PatchesApplied,
+  Mode=Broader" (log lezy w `bin\Win64_Shipping_Client\logs\compat.log`,
+  nie w korzeniu modulu); compat widzi oblezenie Harrenhal jako AKTYWNE
+  (IsActive=True, SetupSiegeAttackers wolane co ~25 tickow).
+- AI Influence: 4 wyjatki pierwszej szansy, wszystkie polkniete: TargetException
+  w SubModule.OnGameStart (jedna z jego latek Harmony nie weszla, ktora - nie
+  wiadomo, DLL zaciemniony), CreateDelegate "Cannot bind" w
+  WorldInfoManager.RegisterEvents (jakis listener nie podpiety), "Collection
+  was modified" w ResolveNpcFilePath (wyscig kolejki zapisu), ArgumentNull
+  w DelayedTaskManager.Tick. Do tego seria SocketException: domyslny backend
+  to Player2 (lokalna aplikacja) - zniknie po przelaczeniu na OpenRouter.
+- Paczka wgrana skryptem do `save_data\PEh4X2ByGArW` (world_data 4, rules 5,
+  npc 222). Mod zdazyl sam wygenerowac 31 pustych plikow NPC (krolowie, nazwy
+  z tytulami i podkresleniami); 13 z nich mialo ten sam string_id co plik
+  z paczki -> odstawione do `_before_rot_pack\generated_duplicates\`
+  (wg README paczki wygenerowane pliki maja zniknac przed wgraniem).
+- Fish: `FishPatch.log` "ApiKeyLen=23" = nadal placeholder WRITE_YOUR_API_KEY_HERE.
+**Status:** WGRANE (moduly, launcher, paczka w kampanii) - DO SPRAWDZENIA:
+klucze wpisuje Jeff sam (MCM AI Influence: "API Settings / Main Settings /
+AI Backend" -> OpenRouter, "OpenRouter Settings / OpenRouter API Key";
+Fish: FishConfig.json), potem pierwsza rozmowa.
 
 ## 2026-09-03 — AUDYT RELIGII przy starcie sesji (Mends.ReligionAudit)
 **Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs`
