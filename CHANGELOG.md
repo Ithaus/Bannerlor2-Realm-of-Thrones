@@ -1,5 +1,25 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-03 — Suwaki MCM Armoury dzialaja na zywo + tempo swiata 75% wpisane za Jeffa
+**Mod:** Armoury | **Pliki:** `Armoury/src/ArmouryBehavior.cs`, `Documents\...\ModSettings\Global\Armoury\Armoury.json` (kopia `.bak-2026-09-03`)
+**Problem (Jeff):** "predkosc za wolna, zwieksz o 50% dla calego swiata",
+potem "nadal 1 predkosc, o co chodzi" - kazalem mu przestawic World Pace
+Percent w MCM i sie nie dalo.
+**Przyczyna (dwie):** (1) McmSettings.Apply() bylo wolane TYLKO w OnGameStart,
+wiec zmiana suwaka w trakcie sesji nie trafiala do Settings.Current az do
+restartu - moja wczesniejsza obietnica "dziala od reki" byla bledna;
+(2) w Armoury.json w ogole nie bylo wpisu WorldPacePercent (Jeff nie zapisal
+zmiany albo jej nie znalazl), tooltip dalej pokazywal World pace -1.98 (50%).
+**Zmiana:** (1) HourlyTickEvent w ArmouryBehavior przepisuje McmSettings ->
+Settings.Current co godzine gry - kazdy suwak MCM wchodzi po paru sekundach
+grania; (2) WorldPacePercent: 75 dopisany do Armoury.json (z 50; +50% tempa
+bazowego dla WSZYSTKICH partii swiata, zgodnie z zyczeniem).
+**Ryzyko / co sprawdzic:** tooltip predkosci - World pace ma zejsc do okolo
+-1.0 przy tej samej bazie; z audytu Jeffowi zostaja spowalniacze poza nami:
+Slower Parties -0.78 (RealisticBannerlord) i Disease -0.51 (AI Influence).
+**Status:** ZBUDOWANE - watcher wgra po zamknieciu gry; json juz zmieniony;
+DO SPRAWDZENIA po restarcie
+
 ## 2026-09-03 — Luki i kusze wyjete z zakladki Smelt (drewna sie nie przetapia)
 **Mod:** Armoury | **Plik:** `Armoury/src/SmeltTab.cs`
 **Problem (Jeff):** "lukow i kusz nie da sie melted, to przeciez drewno!" -

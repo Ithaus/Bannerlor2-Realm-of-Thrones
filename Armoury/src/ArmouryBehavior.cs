@@ -428,6 +428,14 @@ namespace Armoury
         {
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this, OnSessionLaunched);
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, OnDailyTick);
+            // SUWAKI MCM NA ZYWO (Jeff 03.09: "nadal 1 predkosc, o co chodzi" -
+            // World Pace Percent przestawiony w grze nie dzialal). McmSettings.Apply()
+            // szlo TYLKO w OnGameStart, wiec kazda zmiana w Mod Options czekala
+            // na restart. Nasze pola MCM to zwykle auto-property bez powiadomien,
+            // wiec zamiast zgadywac zdarzenia MCM przepisujemy wartosci co godzine
+            // gry - tanie (kilkaset przypisan), a suwak wchodzi po paru sekundach.
+            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this,
+                delegate { try { McmSettings.Apply(); } catch { } });
             CampaignEvents.OnSettlementOwnerChangedEvent.AddNonSerializedListener(this, WarLedger.OnOwnerChanged);
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, OnMapEventEnded);
             CampaignEvents.MapEventStarted.AddNonSerializedListener(this, OnMapEventStarted);
