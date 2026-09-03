@@ -123,6 +123,7 @@ namespace CrashScribe
                 var cgs = gameStarterObject as TaleWorlds.CampaignSystem.CampaignGameStarter;
                 if (cgs != null) cgs.AddBehavior(new WarReportBehavior());
                 if (cgs != null) cgs.AddBehavior(new MendsBehavior());
+                if (cgs != null) cgs.AddBehavior(new DialogEscape());
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "OnGameStart.WarReport", null); } catch { } }
         }

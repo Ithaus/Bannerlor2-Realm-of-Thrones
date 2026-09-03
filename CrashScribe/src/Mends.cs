@@ -2153,8 +2153,18 @@ namespace CrashScribe
                 var mGreet = tRelB != null ? AccessTools.Method(tRelB, "OnConditionClergymanGreeting") : null;
                 if (mGreet != null)
                 {
-                    harmony.Patch(mGreet, prefix: new HarmonyMethod(typeof(Mends), "RegisterStrayPreacher"));
+                    harmony.Patch(mGreet, prefix: new HarmonyMethod(typeof(Mends), "RegisterStrayPreacher"),
+                                          finalizer: new HarmonyMethod(typeof(Mends), "PreacherGreetingSafe"));
                     Scribe.Line("Mends: preacher bez rejestru religii dostaje wpis przy rozmowie (martwy dialog).");
+                }
+                // 03.09: teksty kaplana (InitializePreacherTexts) dereferencja religie bez
+                // sprawdzenia - pusta religia = NullReference w warunku dialogu = rozmowa
+                // bez sciezek. Finalizer polyka i podklada teksty zastepcze.
+                var mTexts = tRelB != null ? AccessTools.Method(tRelB, "InitializePreacherTexts") : null;
+                if (mTexts != null)
+                {
+                    harmony.Patch(mTexts, finalizer: new HarmonyMethod(typeof(Mends), "PreacherTextsSafe"));
+                    Scribe.Line("Mends: teksty kaplana BK zabezpieczone (pusta religia nie urywa rozmowy).");
                 }
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.Install(preacher)", null); } catch { } }
@@ -2485,6 +2495,44 @@ namespace CrashScribe
         /// jego kultury) TUZ PRZED warunkiem powitania - dialog wstaje w tej
         /// samej rozmowie. Wszystko refleksja, zero twardej zaleznosci od BK.
         /// </summary>
+        private static bool _preacherGreetSaved, _preacherTextsSaved;
+
+        /// <summary>Finalizer powitania BK: wyjatek w warunku = warunek false (vanilla pokaze swoje), log raz.</summary>
+        public static Exception PreacherGreetingSafe(Exception __exception, ref bool __result)
+        {
+            if (__exception == null) return null;
+            try
+            {
+                __result = false;
+                if (!_preacherGreetSaved)
+                {
+                    _preacherGreetSaved = true;
+                    Scribe.Report("BK OnConditionClergymanGreeting wywrocil sie - warunek false, rozmowa zyje", __exception, "OnConditionClergymanGreeting", null);
+                }
+            }
+            catch { }
+            return null;
+        }
+
+        /// <summary>Finalizer tekstow kaplana BK: pusta religia -> teksty zastepcze zamiast NullReference.</summary>
+        public static Exception PreacherTextsSafe(Exception __exception)
+        {
+            if (__exception == null) return null;
+            try
+            {
+                foreach (var key in new[] { "CLERGYMAN_GREETING", "CLERGYMAN_PREACHING", "CLERGYMAN_PREACHING_LAST", "CLERGYMAN_FAITH", "CLERGYMAN_FAITH_LAST",
+                                            "CLERGYMAN_FAITH_FORBIDDEN", "CLERGYMAN_FAITH__FORBIDDEN_LAST", "CLERGYMAN_INDUCTION", "CLERGYMAN_INDUCTION_LAST", "CLERGYMAN_BLESSING_ACTION" })
+                    TaleWorlds.Localization.MBTextManager.SetTextVariable(key, "The gods are silent here, traveller.", false);
+                if (!_preacherTextsSaved)
+                {
+                    _preacherTextsSaved = true;
+                    Scribe.Report("BK InitializePreacherTexts wywrocil sie (religia kaplana pusta?) - teksty zastepcze", __exception, "InitializePreacherTexts", null);
+                }
+            }
+            catch { }
+            return null;
+        }
+
         public static void RegisterStrayPreacher()
         {
             try
@@ -2495,8 +2543,21 @@ namespace CrashScribe
                 var cfgP = cfgT != null ? AccessTools.Property(cfgT, "Instance") : null;
                 object cfg = cfgP != null ? cfgP.GetValue(null, null) : null;
                 object mgr = cfg != null ? Traverse.Create(cfg).Property("ReligionsManager").GetValue() : null;
-                if (mgr == null) return;
+                if (mgr == null) { Scribe.Line("Mends: preacher " + hero.Name + " - BK ReligionsManager NULL (religia w ogole nie wstala)."); return; }
                 var tr = Traverse.Create(mgr);
+                // DIAGNOSTYKA (Jeff 03.09: "religia jest zepsuta") - co BK wie o tym kaplanie
+                try
+                {
+                    bool known = tr.Method("IsPreacher", hero).GetValue<bool>();
+                    object cl = tr.Method("GetClergymanFromHeroHero", hero).GetValue();
+                    object relOf = cl != null ? tr.Method("GetClergymanReligion", cl).GetValue() : null;
+                    object heroRel = tr.Method("GetHeroReligion", hero).GetValue();
+                    Scribe.Line("Mends: rozmowa z kaplanem " + hero.Name + " (" + (hero.CurrentSettlement != null ? hero.CurrentSettlement.Name.ToString() : "?")
+                                + ", kultura " + (hero.Culture != null ? hero.Culture.StringId : "?") + "): w rejestrze=" + known
+                                + ", clergyman=" + (cl != null) + ", religia duchownego=" + (relOf != null ? Traverse.Create(relOf).Property("Faith").Property("GetFaithName").GetValue()?.ToString() ?? relOf.ToString() : "NULL")
+                                + ", religia bohatera=" + (heroRel != null ? "jest" : "NULL") + ".");
+                }
+                catch (Exception de) { Scribe.Line("Mends: rozmowa z kaplanem " + hero.Name + " - diagnostyka BK padla: " + de.GetType().Name + " " + de.Message); }
                 if (tr.Method("IsPreacher", hero).GetValue<bool>()) return;   // zna go - nic do roboty
 
                 object rel = tr.Method("GetHeroReligion", hero).GetValue();

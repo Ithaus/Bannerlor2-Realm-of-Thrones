@@ -1,5 +1,6 @@
 # DZIENNIK ZMIAN
 
+
 ## 2026-09-02 — Harrenhal v3: ROT wywracal sie mimo "zdolnego" Roose'a (104 NRE/sesje) - po pierwszym upadku rozstawiamy sami; PDF armii v2 ze zrzutu gry
 **Mod:** CrashScribe + docs | **Pliki:** `CrashScribe/src/Mends.cs` (HarrenhalGuard/HarrenhalSafe/HarrenhalSetupWith), `docs/ROT-armie-przeglad.pdf`
 **Problem (log sesji 14:36):** straznik przepuscil ROT (Roose zywy,
