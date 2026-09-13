@@ -1,5 +1,55 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-13 - Kon za awans na jezdzca byl placony DWA RAZY - naprawione
+**Mod:** Armoury | **Plik:** `Armoury/src/Stables.cs`
+**Zgloszenie (Jeff, trafne co do joty):** "awansowalem piechote na jezdzca,
+kosztowalo mnie to konia, kon zniknal, a potem w Armoury pokazuje, ze brakuje mi
+konia - jak moze brakowac konia, skoro wlasnie awansujac go dostal? Czy to nie
+jest podwojne liczenie konia na awans?" TAK BYLO.
+**Przyczyna - dwa mody, dwie filozofie, nikt nie pilnowal styku:**
+ - DTE kasuje vanillowy koszt awansu (prefix na getterze
+   `CharacterObject.UpgradeRequiresItemFromCategory` ustawia `__result = null`),
+   bo w jego zamysle konie placi sie WYLACZNIE ze zbrojowni oddzialu;
+ - my ten koszt przywracamy (`Stables.RanksNeedHorses`, Priority.Last), bo Jeff
+   chcial, zeby jazda nie rodzila sie z powietrza.
+RACHUNEK 1: vanilla `PartyScreenLogic.UpgradeTroop` -> `RemoveItemFromItemRoster`
+robi `RightOwnerParty.ItemRoster.AddToCounts(item, -n)` i NIC WIECEJ - kon znika
+z taboru bez miejsca docelowego (`UsedUpgradeHorsesHistory` sluzy tylko do cofania
+i jest czyszczona w DoneLogic przy zatwierdzeniu).
+RACHUNEK 2: swiezo awansowany jest juz `IsMounted`, wiec nasz kwatermistrz
+(`QuartermasterLaw.cs:84` i `:137-139`) podnosi zapotrzebowanie zbrojowni o konia
+I o kropierz. Dwa rumaki na jednego czlowieka, z czego pierwszy spalony.
+**Czemu "Horse 6/7" przy 41 wierzchowcach w sakwach:** kwatermistrz liczy
+WYLACZNIE zbrojownie DTE (`QuartermasterLaw.cs:211 DteArmory()`), bo to jedyna
+pula, z ktorej DTE sadza ludzi na koniach w bitwie. Tabor to osobny worek.
+Dodatkowo DTE nie dopisuje do zbrojowni NICZEGO za rekrutacje i awanse u gracza
+(`EveryoneCampaignBehavior.OnTroopRecruited` wychodzi na `IsValid()`, ktore dla
+partii gracza zwraca false) - zbrojownia rosnie tylko z lupow i recznych wplat.
+**Zmiana:** prefix+postfix na `PartyScreenLogic.DoneLogic`. Prefix kopiuje
+`CurrentData.UsedUpgradeHorsesHistory` (DoneLogic czysci ja przed zwrotem),
+postfix - tylko gdy `__result == true` ORAZ `RightOwnerParty == PartyBase.MainParty`
+- dopisuje te konie do zbrojowni DTE. Jeden kon, jedna zaplata, i to dokladnie ten
+kon, ktorego DTE uzyje w bitwie.
+**Czemu w DoneLogic, a nie przy samym awansie:** tabor traci konia juz przy
+kliknieciu strzalki, ale ANULOWANIE ekranu go zwraca (`PartyScreenData.ResetUsing`
+odtwarza roster ze zrzutu). Ksiegowanie przy awansie bilooby konia z powietrza
+po kazdym Cancel.
+**Ryzyko / co sprawdzic:** log "Stajnia: awans gracza - N koni z taboru przeszlo
+do zbrojowni". NIE dziala wstecz - jezdzcy awansowani wczesniej pozostaja
+niepokryci, wiec linia niedoboru nie spadnie od razu do zera; Jeff moze raz
+przerzucic konie z taboru do zbrojowni recznie (DTE otwiera ja jako skrytke).
+**Osobne, NIE naprawione (do decyzji Jeffa):**
+ - `HorseHarness 5/7` zostanie - kwatermistrz liczy kropierz dla KAZDEGO konnego
+   (`QuartermasterLaw.cs:138`), niezaleznie od szablonu jednostki, a nic w grze
+   ani u nas nigdy kropierzy nie doklada.
+ - Strona HAVE liczy po TYPIE przedmiotu (`:223`), a w tej instalacji Mule,
+   Sumpter Horse i Work Horse tez maja Type="Horse" - juczne zwierze w zbrojowni
+   po cichu "pokrywa" rycerza, wiec licznik moze wygladac zdrowo, gdy jazda
+   i tak wstaje piesza.
+**NIE ROBIC:** nie zdejmowac naszego postfixa z gettera - to przywrocilo by
+darmowa jazde, czyli dokladnie odwrotnosc tego, o co Jeff prosil.
+**Status:** ZBUDOWANE - DO SPRAWDZENIA
+
 ## 2026-09-13 - Predkosc marszu: audyt klamal od dwoch tygodni, nowe kary terenu, bagno, posrednie tempo kolumny
 **Mod:** Armoury | **Pliki:** `Armoury/src/TerrainEase.cs`, `Armoury/src/MarchPace.cs`, `Armoury/src/ArmouryBehavior.cs`, `Armoury/src/Settings.cs`, `Armoury/src/McmSettings.cs`
 **Jeff 13.09:** "caly czas zle jest pokazywana predkosc marszu, daj mi logike";

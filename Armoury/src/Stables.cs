@@ -22,6 +22,73 @@ namespace Armoury
     internal static class Stables
     {
         /// <summary>
+        /// PODWOJNY RACHUNEK ZA JEDNEGO JEZDZCA (Jeff 13.09: "awansowalem piechote
+        /// na jezdzca, kosztowalo mnie to konia, kon zniknal, a potem Armoury
+        /// pokazuje, ze brakuje mi konia - czy nie jest to podwojne liczenie?").
+        /// BYLO, i Jeff mial racje. Dwa mody mialy dwie filozofie:
+        ///  - DTE kasuje vanillowy koszt awansu (getter UpgradeRequiresItemFromCategory
+        ///    zwraca null), bo chce, zeby konie placilo sie WYLACZNIE ze zbrojowni;
+        ///  - my ten koszt przywracamy (RanksNeedHorses), bo Jeff chcial, zeby jazda
+        ///    nie rodzila sie z powietrza.
+        /// Skutek: vanilla przy awansie kasowala konia z TABORU (PartyScreenLogic
+        /// -> RemoveItemFromItemRoster robi AddToCounts(-n) i nic wiecej - kon
+        /// przepada bez sladu), a zaraz potem swiezy jezdziec podnosil zapotrzebowanie
+        /// zbrojowni DTE o kolejnego konia. Dwa rumaki na jednego czlowieka,
+        /// z czego jeden spalony.
+        /// TERAZ: konie zaplacone za awans GRACZA laduja w zbrojowni DTE - tej samej,
+        /// z ktorej DTE sadza jezdzca na koniu w bitwie. Jeden kon, jedna zaplata.
+        /// CZEMU W DoneLogic, A NIE PRZY SAMYM AWANSIE: tabor traci konia juz przy
+        /// kliknieciu strzalki, ale ANULOWANIE ekranu go zwraca (PartyScreenData
+        /// .ResetUsing odtwarza roster ze zrzutu). Ksiegowanie przy awansie bilooby
+        /// konia z powietrza po kazdym Cancel. DoneLogic z wynikiem true to jedyny
+        /// punkt, w ktorym zmiana jest naprawde zatwierdzona. Liste trzeba zlapac
+        /// w PREFIXIE, bo DoneLogic czysci ja przed zwroceniem wartosci.
+        /// </summary>
+        public static void GrabPaidHorses(PartyScreenLogic __instance, ref object __state)
+        {
+            __state = null;
+            try
+            {
+                var c = Settings.Current;
+                if (c == null || !c.CavalryNeedsMounts) return;
+                if (__instance == null || __instance.CurrentData == null) return;
+                var hist = __instance.CurrentData.UsedUpgradeHorsesHistory;
+                if (hist == null || hist.Count == 0) return;
+                // kopia, nie referencja - oryginal zaraz zostanie podmieniony na pusty
+                __state = new System.Collections.Generic.List<Tuple<EquipmentElement, int>>(hist);
+            }
+            catch { __state = null; }
+        }
+
+        /// <summary>Po ZATWIERDZONYM ekranie druzyny gracza: zaplacone konie ida na polke zbrojowni.</summary>
+        public static void BankPaidHorses(PartyScreenLogic __instance, bool __result, object __state)
+        {
+            try
+            {
+                if (!__result) return;                                   // anulowane - tabor dostal konie z powrotem
+                var paid = __state as System.Collections.Generic.List<Tuple<EquipmentElement, int>>;
+                if (paid == null || paid.Count == 0) return;
+                if (__instance == null || __instance.RightOwnerParty != PartyBase.MainParty) return;  // nie cudze garnizony
+                var armory = QuartermasterLaw.DteArmory();
+                if (armory == null) return;
+
+                int moved = 0;
+                foreach (var pair in paid)
+                {
+                    if (pair == null || pair.Item2 <= 0 || pair.Item1.Item == null) continue;
+                    armory.AddToCounts(pair.Item1, pair.Item2);
+                    moved += pair.Item2;
+                }
+                if (moved > 0)
+                {
+                    Log.Info("Stajnia: awans gracza - " + moved + " koni z taboru przeszlo do zbrojowni (zamiast przepasc).");
+                    Log.Player(moved + (moved == 1 ? " horse goes" : " horses go") + " from the baggage to the troop armoury - the new riders will find them there.", true);
+                }
+            }
+            catch (Exception e) { Log.Error("Stables.BankPaidHorses", e); }
+        }
+
+        /// <summary>
         /// Getter CharacterObject.UpgradeRequiresItemFromCategory: DTE zeruje go
         /// prefixem, my dopisujemy postfixem (postfix biegnie PO prefiksach),
         /// wiec ostatnie slowo nalezy do stajni.
@@ -428,6 +495,13 @@ namespace Armoury
                 var g = AccessTools.PropertyGetter(typeof(CharacterObject), "UpgradeRequiresItemFromCategory");
                 if (g == null) { Log.Info("Stables: brak gettera UpgradeRequiresItemFromCategory."); return; }
                 h.Patch(g, postfix: new HarmonyMethod(typeof(Stables), "RanksNeedHorses") { priority = Priority.Last });
+
+                // KON ZA AWANS TRAFIA DO ZBROJOWNI, A NIE W NICOSC (Jeff 13.09)
+                var mDone = AccessTools.Method(typeof(PartyScreenLogic), "DoneLogic");
+                if (mDone != null)
+                    h.Patch(mDone, prefix: new HarmonyMethod(typeof(Stables), "GrabPaidHorses"),
+                                   postfix: new HarmonyMethod(typeof(Stables), "BankPaidHorses"));
+                else Log.Info("Stables: brak PartyScreenLogic.DoneLogic - konie z awansow beda przepadac.");
 
                 var tU = typeof(TaleWorlds.CampaignSystem.CampaignBehaviors.PartyUpgraderCampaignBehavior);
                 var mList = AccessTools.Method(tU, "GetPossibleUpgradeTargets");
