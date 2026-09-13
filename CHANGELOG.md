@@ -1,5 +1,44 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-13 - Choroby: kaszel przestaje spowalniac, powazne o polowe slabiej, plus dzienny meldunek "jestes chory"
+**Mody:** cudzy AIInfluence (dane) + Armoury (nowy `PlagueWatch`) | **Pliki:** `Modules\AIInfluence\save_data\PEh4X2ByGArW\diseases.json` (kopia `.bak-2026-09-13`), `Armoury/src/PlagueWatch.cs` (nowy), `Armoury/src/ArmouryBehavior.cs`, `Armoury/src/Settings.cs`, `Armoury/src/McmSettings.cs`
+**Jeff:** "modyfikatory predkosci powinny byc dwa razy slabsze, kurwa kaszel nie obniza
+predkosci, tylko powazne choroby; skad mam wiedziec, ze to ja jestem chory?"
+**1. KARY DO PREDKOSCI (dane AIInfluence, 74 choroby):**
+ - severity 1 (42 choroby: Common cold, Sore throat, Seasonal malaise, Autumn cold...)
+   mnoznik 0.9 -> 1.00, czyli kara 10% -> ZERO. Kaszel i katar nie spowalniaja wcale.
+ - severity 2 (29 chorob: Mild fever, Bronchitis, Winter cold...) 0.8 -> 0.9, kara 20% -> 10%.
+ - severity 3 (3 choroby: Grey Plague) 0.75 -> 0.875, kara 25% -> 12%.
+ Wzor: powazne dostaly dokladnie polowe dotychczasowej kary, lekkie zero.
+ UWAGA: plik siedzi w folderze KAMPANII (save_data\<UniqueGameId>). Nowa kampania
+ dostanie swiezy plik z domyslnymi wartosciami moda i trzeba bedzie powtorzyc.
+**2. DZIENNY MELDUNEK O CHOROBIE (nasz nowy `PlagueWatch`).** AI Influence nie mowi
+graczowi NIC: dowiadujesz sie dopiero w miejskim szpitalu albo z dymka predkosci,
+ktory pokazuje sama linie "Disease" bez slowa o tym, kto choruje. Raz na dzien
+wypisujemy nazwe choroby, jej postep i stan kuracji, z rada dopasowana do sytuacji.
+Refleksja po `AIInfluence.Diseases.DiseaseManager.Instance.GetHeroDiseases(Hero)`
+i polach `DiseaseInstance` (DiseaseName / DiseaseProgress / IsTreated /
+PostTreatmentDaysRemaining / IsRecovered) - typy sa czytelne mimo zaciemnienia DLL.
+Bez AI Influence modul spi. Wylacznik w MCM: "Plague Watch Enabled".
+**MECHANIKA, dla pamieci (wyliczona z 150 tys. linii diseases.log):** liczba przy
+chorobie to POSTEP CHOROBY, nie leczenia - 0% znaczy zdrowy. Nieleczona rosnie
++0.95%/dzien do sufitu ~91.5% i sama nie przechodzi (poza przypadkami oflagowanymi
+jako samoistne juz przy zarazeniu). Kuracja trwa 7 dni z gasnaca sila (7/7, 6/7, ...),
+potem 7 dni darmowej fazy poleczenia. Sila leku = baza 2.3 x jakosc szpitala
+x trudnosc, gdzie trudnosc = 2 - postep/50 - czyli lek dziala NAJMOCNIEJ przy niskim
+postepie (x2.00 przy 0%, x1.20 przy 40%, x0.64 przy 68%). Jedna kuracja jest warta
+~30-35 punktow przy jakosci x1.7. Stad zasada: leczyc przy 10-20%, nigdy powyzej 30%.
+Rzut na powodzenie to ~84% u bohatera - to NIE jest przyczyna wrazenia "leczenie nic
+nie daje". Gracz zaraza wlasnych zolnierzy (15 linii "Leader spread ... to 1 troops"),
+wiec placenie za wojsko przed wlasnym wyleczeniem to wyrzucone pieniadze; po zejsciu
+do 0% jest 21 dni odpornosci.
+**Ryzyko / co sprawdzic:** linia "Disease" ma zniknac z dymka predkosci przy samym
+kaszlu i byc o polowe mniejsza przy gorsztych chorobach; raz dziennie ma sie pojawiac
+komunikat "You are ill: ...". Jesli Jeff zechce, zeby leczenie bilo przyrost takze
+przy wysokim postepie, jedyna galka to `DiseaseRecoveryMultiplier` 1.0 -> 2.0 w MCM
+AI Influence (NIE zmieniona).
+**Status:** ZBUDOWANE (Armoury) + DANE ZMIENIONE (diseases.json) - DO SPRAWDZENIA
+
 ## 2026-09-13 - Mul, kon juczny i pociagowy nie licza sie juz jako wierzchowce
 **Mod:** Armoury | **Pliki:** `Armoury/src/QuartermasterLaw.cs`, `Armoury/src/Stables.cs`, `Armoury/src/SmithMenu.cs`
 **Jeff:** "czy mozemy konie juczne i pociagowe zmienic, aby nie byly traktowane

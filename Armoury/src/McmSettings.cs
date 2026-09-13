@@ -876,6 +876,10 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public float NightSpeedPenalty { get; set; } = 0.5f;
 
+        [SettingPropertyBool("Plague Watch Enabled", HintText = "a daily word when YOU are the one who is ill - the disease mod tells the player nothing outside a town hospital")]
+        [SettingPropertyGroup("The marching column")]
+        public bool PlagueWatchEnabled { get; set; } = true;
+
         [SettingPropertyBool("Speed Audit Enabled", HintText = "once a day the full speed breakdown of your party is written to Armoury.log (before the marching-column cap and sleep debt)")]
         [SettingPropertyGroup("The marching column")]
         public bool SpeedAuditEnabled { get; set; } = true;
@@ -1558,6 +1562,7 @@ namespace Armoury
             s.SwampSpeedPenalty = SwampSpeedPenalty;
             s.FordSpeedPenalty = FordSpeedPenalty;
             s.NightSpeedPenalty = NightSpeedPenalty;
+            s.PlagueWatchEnabled = PlagueWatchEnabled;
             s.SpeedAuditEnabled = SpeedAuditEnabled;
             s.SiegePacePercent = SiegePacePercent;
             s.SiegeSicknessEnabled = SiegeSicknessEnabled;

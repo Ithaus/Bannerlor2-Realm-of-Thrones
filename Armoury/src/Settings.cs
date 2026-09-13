@@ -267,6 +267,7 @@ namespace Armoury
         public float SwampSpeedPenalty = 0.30f;            // flat speed lost crossing swamp and marshland (vanilla: nothing at all)
         public float FordSpeedPenalty = 0.5f;              // flat speed lost fording rivers and crossing bridges (vanilla: 30%)
         public float NightSpeedPenalty = 0.5f;             // flat speed lost at night on land (vanilla: 25%)
+        public bool PlagueWatchEnabled = true;             // a daily word when YOU are the one who is ill - the disease mod tells the player nothing outside a town hospital
         public bool SpeedAuditEnabled = true;              // once a day the full speed breakdown of your party is written to Armoury.log (before the marching-column cap and sleep debt)
         public int SiegePacePercent = 50;                  // siege engine construction speed - 50% makes sieges last twice as long, so starving a fortress out matters again
         public bool SiegeSicknessEnabled = true;           // camp fever: long sieges breed dysentery - the sick go down as wounded, some die; medicine is the shield
