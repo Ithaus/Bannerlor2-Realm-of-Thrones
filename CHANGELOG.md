@@ -1,5 +1,25 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-13 - Martwe ustawienie "Fence Price Multiplier" usuniete z MCM
+**Mod:** RealisticCaptivity | **Pliki:** `RealisticCaptivity/src/Settings.cs`, `RealisticCaptivity/src/McmSettings.cs`
+**Problem (Jeff):** "nie wiem, co to za ustawienie Fence Price".
+**Ustalenie:** bo ono NIC NIE ROBILO. Pole bylo zadeklarowane w Settings.cs:49
+i McmSettings.cs:119-121, kopiowane przez ApplyTo (linia 407) - i na tym koniec.
+Repo-wide grep: zero czytelnikow. `FenceGear()` nigdy go nie czytal, a cena
+odkupu liczy sie z zupelnie innego, DZIALAJACEGO ustawienia:
+`_gearBuybackPrice = (int)(value * Settings.Current.BuybackPriceMultiplier)`
+(CaptivityBehavior.cs:191, "Buyback Price Multiplier", domyslnie 1.6).
+Czyli w MCM staly obok siebie dwa podobnie brzmiace suwaki od ceny sprzetu:
+jeden dzialajacy i jeden atrapa - stad zamieszanie.
+**Zmiana:** atrapa usunieta z obu plikow. Zaden kod jej nie uzywal, wiec nic
+sie nie zmienia poza tym, ze znika z menu. MCM ignoruje nadmiarowy klucz
+w zapisanym jsonie, wiec stare configi wczytaja sie bez bledu.
+**Uwaga:** `gen_mcm.py` NIE byl uruchamiany - usunalem pole recznie w obu
+plikach, zeby nie regenerowac calego McmSettings.cs.
+**Ryzyko / co sprawdzic:** w MCM RealisticCaptivity, grupa "Bandit plunder",
+ma zostac juz tylko "Fence Gear When No Lord".
+**Status:** ZBUDOWANE - straznik wgra po zamknieciu gry; DO SPRAWDZENIA
+
 ## 2026-09-13 - Dziura w dzisiejszej poprawce: WLASNA odsiecz rodu tez oddaje rynsztunek
 **Mod:** RealisticCaptivity | **Pliki:** `RealisticCaptivity/src/CaptivityBehavior.cs`, `RealisticCaptivity/src/Rescue.cs`
 **Problem:** wyszlo przy przegladzie reszty audytu (Jeff: "zobacz, co jeszcze

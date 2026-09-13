@@ -46,7 +46,6 @@ namespace RealisticCaptivity
 
         // --- Bandit plunder ---
         public bool FenceGearWhenNoLord = true;            // bandits sell your gear at the nearest market
-        public float FencePriceMultiplier = 1.0f;          // what the fence charges (1.0 = market price)
 
 
         // --- Hunger in the cells ---

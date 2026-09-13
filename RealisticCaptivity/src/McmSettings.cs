@@ -116,10 +116,6 @@ namespace RealisticCaptivity
         [SettingPropertyGroup("Bandit plunder")]
         public bool FenceGearWhenNoLord { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Fence Price Multiplier", 0.00f, 4.00f, "0.00", HintText = "what the fence charges (1.0 = market price)")]
-        [SettingPropertyGroup("Bandit plunder")]
-        public float FencePriceMultiplier { get; set; } = 1.0f;
-
         [SettingPropertyBool("Starvation Enabled", HintText = "poor food and cold cells wear a prisoner down")]
         [SettingPropertyGroup("Hunger in the cells")]
         public bool StarvationEnabled { get; set; } = true;
@@ -408,7 +404,6 @@ namespace RealisticCaptivity
             s.WesterosFencePercent = WesterosFencePercent;
             s.PrisonerSaleFloorFactor = PrisonerSaleFloorFactor;
             s.FenceGearWhenNoLord = FenceGearWhenNoLord;
-            s.FencePriceMultiplier = FencePriceMultiplier;
             s.StarvationEnabled = StarvationEnabled;
             s.StarvationHealthPerDay = StarvationHealthPerDay;
             s.StarvationLowbornFactor = StarvationLowbornFactor;
