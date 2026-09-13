@@ -48,6 +48,7 @@ namespace Armoury
             public bool RbmChecked;
             public float RbmRecheck;        // RBM zaklada stance PO spawnie - ponawiamy szukanie
             public float SprintDebt;        // ile MY zabralismy z puli RBM sprintem - tyle oddajemy szybko
+            public float BleedDebt;         // uzbierany ulamek krwawienia - silnik przyjmuje tylko pelne punkty
         }
 
         // ---- most do staminy RBM: sprint pije z TEGO SAMEGO paska, ktory widac w walce ----
@@ -598,16 +599,28 @@ namespace Armoury
                     {
                         if (bleeding && c.BleedPerSecond > 0f)
                         {
-                            float nh = agent.Health - c.BleedPerSecond * step;
-                            if (nh <= 0f)
+                            // ZAOKRAGLANIE SILNIKA (13.09, audyt): setter Agent.Health robi
+                            // MathF.Ceiling na kazdym zapisie, wiec strata 0.1 HP na takt
+                            // (0.5/s x 0.2 s) zaokraglala sie z powrotem w gore i NIGDY sie
+                            // nie zapisywala - krwawienie bylo martwym kodem, nikt nigdy
+                            // nie wykrwawil sie na polu. Zbieramy ulamki w dlugu i zdejmujemy
+                            // dopiero PELNE punkty, ktore silnik przyjmuje.
+                            st.BleedDebt += c.BleedPerSecond * step;
+                            int lose = (int)st.BleedDebt;
+                            if (lose > 0)
                             {
-                                var b = new Blow(agent.Index);
-                                b.DamageType = DamageTypes.Cut;
-                                b.InflictedDamage = (int)agent.Health + 1;
-                                b.GlobalPosition = agent.Position;
-                                agent.Die(b, Agent.KillInfo.Invalid);
+                                st.BleedDebt -= lose;
+                                float nh = agent.Health - lose;
+                                if (nh <= 0f)
+                                {
+                                    var b = new Blow(agent.Index);
+                                    b.DamageType = DamageTypes.Cut;
+                                    b.InflictedDamage = (int)agent.Health + 1;
+                                    b.GlobalPosition = agent.Position;
+                                    agent.Die(b, Agent.KillInfo.Invalid);
+                                }
+                                else agent.Health = nh;
                             }
-                            else agent.Health = nh;
                         }
                         if (broken && c.AiFleeWhenNearDeath && !agent.IsMainAgent && agent.IsAIControlled && !st.Panicked)
                         {

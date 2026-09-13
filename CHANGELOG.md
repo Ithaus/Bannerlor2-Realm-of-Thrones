@@ -1,5 +1,28 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-13 - Krwawienie na polu bitwy bylo martwym kodem - naprawione (dlug ulamkowy)
+**Mod:** Armoury | **Plik:** `Armoury/src/FieldCraft.cs`
+**Problem:** znalezione przy audycie regeneracji HP, Jeff: "i napraw krwawienie".
+Ciezko ranni (ponizej BleedBelowHp = 10 HP) mieli sie wykrwawiac po
+BleedPerSecond = 0.5 HP/s, ale NIKT nigdy nie stracil z tego ani jednego punktu
+ani nie wykrwawil sie na smierc.
+**Przyczyna:** setter `Agent.Health` w silniku robi `MathF.Ceiling` na kazdym
+zapisie (zweryfikowane w zdekompilowanym TaleWorlds.MountAndBlade). Nasza petla
+chodzi co 0.2 s, wiec zdejmowala 0.5 x 0.2 = 0.1 HP; `Ceiling(H - 0.1) == H`,
+setter widzial brak zmiany i ulamek przepadal, zamiast sie kumulowac. Zeby
+cokolwiek zdjac, potrzebne bylo >= 1 HP na jeden takt. Sciezka smierci
+(`agent.Die` przy nh <= 0) tym samym tez nigdy nie odpalala.
+**Zmiana:** nowe pole `State.BleedDebt` zbiera ulamki krwawienia per agent;
+zdejmujemy dopiero PELNE punkty (`int lose = (int)st.BleedDebt`), reszta zostaje
+w dlugu do nastepnego taktu. Przy domyslnych 0.5 HP/s to 1 HP co 2 sekundy.
+**Ryzyko / co sprawdzic:** krwawienie zaczyna REALNIE dzialac po raz pierwszy -
+ranni ponizej 10 HP (takze gracz) beda tracic 1 HP co 2 s i moga sie wykrwawic
+na smierc. To byla pierwotna intencja, ale efekt w grze jest NOWY. Uwaga na
+sprzezenie z leczeniem RBM (+1 HP / 10 s): przy pelnym pasku staminy RBM leczy
+wolniej niz krwawienie zabiera, wiec ranny i tak schodzi. Jesli okaze sie za
+ostre, MCM: "Bleed Per Second" w dol albo "Bleed Below Hp" na 0.
+**Status:** ZBUDOWANE - DO SPRAWDZENIA
+
 ## 2026-09-13 - Regeneracja wytrzymalosci bohaterow o polowe wolniej (x4 -> x2 wzgledem RBM)
 **Mod:** Armoury | **Pliki:** `Armoury/src/Settings.cs`, `Armoury/src/McmSettings.cs`
 **Problem (Jeff):** "czemu regeneruje mi sie zdrowie podczas bitwy?" - audyt 229 agentow
