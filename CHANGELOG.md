@@ -1,5 +1,39 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-13 - Wybor skladu do bitwy (BattleMuster) NIE dziala i ZOSTAJE tak - decyzja Jeffa
+**Mod:** Armoury | **Plik:** `Armoury/src/BattleMuster.cs` - BEZ ZMIAN
+**Problem (Jeff):** "wybor wojska do bitwy nie dziala, ustawilem ze tylko ja
+walcze, a i tak wystawiono do bitwy wszystkich".
+**Ustalenie (audyt, wysoka pewnosc):** to nie usterka, tylko funkcja pomyslana
+tak, ze dzialac nie moze. BattleMuster PRZESTAWIA wybrane oddzialy na gore
+rosteru i liczy, ze scena spawnuje od gory - NIGDZIE nie ogranicza LICZBY.
+Repo-wide grep za czymkolwiek, co limituje spawn (GetRealBattleSize,
+MaxNumberOfTroops, SpawnTroop, MissionAgentSpawn, BattleSize) daje tylko
+BattleMuster.cs:95, gdzie GetRealBattleSize sluzy WYLACZNIE do policzenia
+EstimateSlots jako sufitu LISTY w okienku wyboru (i jest jeszcze przycinany do
+wielkosci druzyny), oraz HideoutSpawnShim, ktory dotyczy tylko kryjowek.
+Skutek: przy 20 ludziach i 800 slotach sceny wchodza wszyscy, niezaleznie od
+kolejnosci - przestawianie zmienia tylko to, KTO ginie pierwszy.
+**Jak wygladalaby prawdziwa naprawa (gdyby kiedys wrocic):** silnik ma na to
+jedno przewidziane miejsce - delegat `customAllocationConditions` na
+`PartyGroupTroopSupplier`, ktorego vanilla przy zwyklych bitwach przekazuje
+jako null (SandBox.SandBoxMissions.CreateCampaignMissionAgentSpawnLogic,
+prywatna statyczna). Vanilla sama dowodzi, ze to dziala, w
+OpenSiegeLordsHallFightMission, gdzie podaje predykat odcinajacy strzelcow
+ponad limit. Trzeba by prefixowac te metode i zbudowac dostawce z wlasnym
+predykatem odrzucajacym odstawione CharacterObject. Druga, lagodniejsza droga
+(wlasny TroopSupplierProbabilityModel) tylko PRZESTAWIA i tak samo nie
+ograniczy. Uwaga przy ewentualnym podejsciu: RBM podmienia
+SandBoxBattleMissionSpawnHandler.AfterStart (inny cel, nie koliduje) i wymusza
+stronie broniacej rowno 50% slotow.
+**DECYZJA JEFFA (13.09):** zostawiamy jak jest - opcja 3 z trzech
+przedstawionych (wpiac sie w silnik / wyrzucic opcje / zostawic). Powod:
+zmiana dotykalaby KAZDEJ bitwy w grze.
+**Dla drugiego konta Claude: NIE NAPRAWIAC tego bez wyraznej prosby Jeffa.**
+Jesli zapyta ponownie "czemu wybor skladu nie dziala" - odpowiedz jest tutaj,
+a nie w kolejnym audycie. Kto chce walczyc sam, zostawia ludzi w garnizonie.
+**Status:** ZOSTAWIONE SWIADOMIE (bez zmian w kodzie)
+
 ## 2026-09-13 - Strzaly przestaja rozwalac tarcze (1% zamiast 150% RBM)
 **Mod:** Armoury | **Pliki:** `Armoury/src/ShieldGuard.cs` (nowy), `Armoury/src/FieldCraft.cs`, `Armoury/src/SubModuleMain.cs`, `Armoury/src/Settings.cs`, `Armoury/src/McmSettings.cs`
 **Jeff:** "strzaly maja nie rozwalac tarczy, albo uszkodzenia strzal i beltow tarczy ustaw na 1%".
