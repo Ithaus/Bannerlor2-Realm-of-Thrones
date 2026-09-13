@@ -654,11 +654,11 @@ namespace Armoury
 
         [SettingPropertyFloatingInteger("Battle Regen At End1", 0.00f, 40.00f, "0.00", HintText = "stamina regained per second at Endurance 1 (Athletics adds its share on top)")]
         [SettingPropertyGroup("Flesh and wind")]
-        public float BattleRegenAtEnd1 { get; set; } = 10f;
+        public float BattleRegenAtEnd1 { get; set; } = 5f;
 
         [SettingPropertyFloatingInteger("Battle Regen At End10", 0.00f, 800.00f, "0.00", HintText = "stamina regained per second at Endurance 10 - the curve between is exponential, not a straight line")]
         [SettingPropertyGroup("Flesh and wind")]
-        public float BattleRegenAtEnd10 { get; set; } = 200f;
+        public float BattleRegenAtEnd10 { get; set; } = 100f;
 
         [SettingPropertyFloatingInteger("Battle Winded Floor", 0.00f, 1.00f, "0.00", HintText = "share of regen left with an empty bar - the emptier the lungs the slower they fill")]
         [SettingPropertyGroup("Flesh and wind")]

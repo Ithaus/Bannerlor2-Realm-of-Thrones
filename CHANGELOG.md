@@ -1,5 +1,28 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-13 - Regeneracja wytrzymalosci bohaterow o polowe wolniej (x4 -> x2 wzgledem RBM)
+**Mod:** Armoury | **Pliki:** `Armoury/src/Settings.cs`, `Armoury/src/McmSettings.cs`
+**Problem (Jeff):** "czemu regeneruje mi sie zdrowie podczas bitwy?" - audyt 229 agentow
+ustalil, ze leczy RBM, nie my: `RBMAI.StanceLogic.OnMissionTick` daje KAZDEMU
+agentowi-czlowiekowi +0.9 HP co 10 s, o ile jego pasek wytrzymalosci stoi
+powyzej 85% max (silnik zaokragla w gore, wiec realnie +1 HP / 10 s = ~6 HP/min).
+To jedyny zapis do Agent.Health w calym RBMAI.dll (124 typy przeskanowane).
+**Przyczyna naszego udzialu:** `BattleWind.StaminaInitPostfix` podmienia bohaterom
+regeneracje staminy RBM na wlasna, duzo szybsza (u Jeffa 34 pkt/s na puli 5124
+= 0.66%/s wobec ~0.15%/s RBM), a warunek leczenia RBM to STOSUNEK stamina/max.
+Szybciej napelniany pasek prawie zawsze stoi ponad progiem 85%, wiec leczenie
+trafia gracza przy niemal kazdym sprawdzeniu.
+**Zmiana (na zyczenie Jeffa: "chce miec stamine, ale zmniejsz z x4 na x2"):**
+BattleRegenAtEnd1 10 -> 5, BattleRegenAtEnd10 200 -> 100 (w Settings.cs
+i McmSettings.cs; w zapisanym jsonie MCM tych kluczy nie bylo, wiec licza sie
+domyslne z kodu). System wytrzymalosci RBM zostaje WLACZONY, zgodnie z zyczeniem.
+**Ryzyko / co sprawdzic:** pasek bedzie sie napelnial dwa razy wolniej, wiec
+sprint i ciezka walka beda bardziej meczyc; leczenie RBM ma trafiac rzadziej,
+ale NIE zniknie (dopoki pasek bywa ponad 85%). Jesli Jeff chce je wylaczyc
+calkiem: `Configs\RBM\config.xml` -> `<StaminaEnabled>0</StaminaEnabled>`
+(gasi caly system staminy) albo Mend na `StanceLogic.timeToCalcStaminaHealth`.
+**Status:** ZBUDOWANE - DO SPRAWDZENIA
+
 ## 2026-09-03 — Czystka magazynu DTE po bitwie WYLACZONA (nic nie znika, wymiana 1:1)
 **Mod:** Armoury | **Plik:** `Armoury/src/ArmouryBehavior.cs`
 **Problem (Jeff):** "goscie zalozyli szmaty, mieli pancerze takie jak ja teraz,

@@ -203,8 +203,8 @@ namespace Armoury
         public float FatigueFreeArmorKg = 0f;              // armour up to this weight costs no extra stamina
         public bool BattleStaminaEnabled = true;           // heroes: Endurance reshapes RBM battle stamina and posture - pools double every few points, breath returns fast but winded men pant
         public float BattleEndDoubleEvery = 2.5f;          // pool doubles every this many Endurance points (END 2.5 = x1, END 5 = x2, END 10 = x8)
-        public float BattleRegenAtEnd1 = 10f;              // stamina regained per second at Endurance 1 (Athletics adds its share on top)
-        public float BattleRegenAtEnd10 = 200f;            // stamina regained per second at Endurance 10 - the curve between is exponential, not a straight line
+        public float BattleRegenAtEnd1 = 5f;               // stamina regained per second at Endurance 1 (Athletics adds its share on top)
+        public float BattleRegenAtEnd10 = 100f;            // stamina regained per second at Endurance 10 - the curve between is exponential, not a straight line
         public float BattleWindedFloor = 0.25f;            // share of regen left with an empty bar - the emptier the lungs the slower they fill
         public float StaminaRegenPerSecond = 25f;          // without RBM: points regained each second of easing off (with RBM its own regen rules)
         public float TiredSpeedFactor = 0.78f;             // top speed of a man whose pool has run dry
