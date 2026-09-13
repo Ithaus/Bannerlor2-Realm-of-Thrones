@@ -215,13 +215,7 @@ namespace Armoury
                 {
                     int need = WornFor(type, needs);
                     if (need <= 0) continue;
-                    int have = 0;
-                    for (int i = 0; i < armory.Count; i++)
-                    {
-                        var el = armory[i];
-                        var it = el.EquipmentElement.Item;
-                        if (it != null && it.ItemType == type && el.Amount > 0) have += el.Amount;
-                    }
+                    int have = HaveFor(armory, type);   // juczne nie licza sie jako wierzchowce
                     if (have < need) lines.Add(type + " " + have + "/" + need);
                 }
             }
@@ -255,6 +249,23 @@ namespace Armoury
         }
 
         /// <summary>Ile sztuk danego typu lezy jeszcze w zbrojowni.</summary>
+        /// <summary>
+        /// MUL TO NIE RUMAK (Jeff 13.09: "czy mozemy konie juczne i pociagowe zmienic,
+        /// aby nie byly traktowane do jazdy? i mul"). W tej instalacji mul, kon juczny
+        /// i pociagowy maja ItemType = Horse, wiec liczenie po samym typie wpisywalo je
+        /// jako wierzchowce: juczne zwierze w zbrojowni po cichu "pokrywalo" rycerza,
+        /// licznik pokazywal komplet, a jazda i tak wstawala piesza.
+        /// Odsiewamy tak samo jak stajnie (Stables.IsPlainMount): musi miec
+        /// HorseComponent.IsMount ORAZ kategorie Horse/WarHorse/NobleHorse - juczne
+        /// siedza w kategorii sumpter_horse i wypadaja. Slonie i smoki tez.
+        /// </summary>
+        internal static bool CountsAsKit(ItemObject it, ItemObject.ItemTypeEnum type)
+        {
+            if (it == null || it.ItemType != type) return false;
+            if (type != ItemObject.ItemTypeEnum.Horse) return true;
+            return Stables.IsPlainMount(it);
+        }
+
         internal static int HaveFor(ItemRoster armory, ItemObject.ItemTypeEnum type)
         {
             int n = 0;
@@ -263,8 +274,7 @@ namespace Armoury
                 for (int i = 0; i < armory.Count; i++)
                 {
                     var el = armory[i];
-                    var it = el.EquipmentElement.Item;
-                    if (it != null && it.ItemType == type) n += el.Amount;
+                    if (CountsAsKit(el.EquipmentElement.Item, type)) n += el.Amount;
                 }
             }
             catch { }

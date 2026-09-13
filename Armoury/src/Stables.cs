@@ -412,7 +412,8 @@ namespace Armoury
         }
 
         /// <summary>Wierzchowiec pod siodlo - nie juczny mul i nie bydlo.</summary>
-        private static bool IsPlainMount(ItemObject it)
+        /// <summary>Prawdziwy wierzchowiec: nie mul, nie kon juczny/pociagowy, nie slon, nie smok.</summary>
+        internal static bool IsPlainMount(ItemObject it)
         {
             try
             {

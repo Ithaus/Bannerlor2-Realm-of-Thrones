@@ -1087,7 +1087,7 @@ namespace Armoury
                     {
                         var el = armory.GetElementCopyAtIndex(i);
                         var it = el.EquipmentElement.Item;
-                        if (it == null || it.ItemType != type || el.Amount <= 0) continue;
+                        if (el.Amount <= 0 || !QuartermasterLaw.CountsAsKit(it, type)) continue;
                         count += el.Amount;
                         tierSum += Recipes.Grade(it) * el.Amount;
                         if (!ArmouryBehavior.NoWear(it))

@@ -1,5 +1,29 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-13 - Mul, kon juczny i pociagowy nie licza sie juz jako wierzchowce
+**Mod:** Armoury | **Pliki:** `Armoury/src/QuartermasterLaw.cs`, `Armoury/src/Stables.cs`, `Armoury/src/SmithMenu.cs`
+**Jeff:** "czy mozemy konie juczne i pociagowe zmienic, aby nie byly traktowane
+do jazdy? i mul".
+**Problem:** kwatermistrz liczyl stan zbrojowni po SAMYM `ItemType`, a w tej
+instalacji mul, Sumpter Horse i Work Horse maja `ItemType = Horse` (mul ma
+`item_category="sumpter_horse"`, ale typ ten sam). Juczne zwierze lezace
+w zbrojowni po cichu "pokrywalo" rycerza: licznik pokazywal komplet, a DTE
+i tak nie mialo czym posadzic go na koniu, wiec jazda wstawala piesza.
+**Zmiana:** nowy `QuartermasterLaw.CountsAsKit(item, type)` - dla typu Horse
+przepuszcza tylko to, co uznaja juz stajnie (`Stables.IsPlainMount`, zmieniony
+z private na internal): musi miec `HorseComponent.IsMount` ORAZ kategorie
+Horse / WarHorse / NobleHorse. Juczne siedza w sumpter_horse i wypadaja; slonie
+ROT i smoki tez byly tam wyciete wczesniej. Filtr wpiety w jedno miejsce
+(`HaveFor`) i uzyty przez wszystkie trzy ekrany: linia niedoboru kwatermistrza
+(`ShortageLines`, ktora teraz wola `HaveFor` zamiast wlasnej petli), podsumowanie
+zbrojowni w kuzni (`SmithMenu`) i lista brakow.
+**Ryzyko / co sprawdzic:** licznik koni MOZE SPASC po tej zmianie - to poprawne,
+bo wczesniej zawyzaly go muly. Jesli Jeff zobaczy nagle wiekszy niedobor koni
+niz wczoraj, to jest wlasnie ta poprawka, a nie nowy blad.
+**NIE ZMIENIONE:** zuzycie sprzetu (`ArmouryBehavior.cs:1289`) dalej moze wybrac
+mula jako sztuke typu Horse do zuzycia - nieszkodliwe, mul tez sie zdziera.
+**Status:** ZBUDOWANE - DO SPRAWDZENIA
+
 ## 2026-09-13 - Kon za awans na jezdzca byl placony DWA RAZY - naprawione
 **Mod:** Armoury | **Plik:** `Armoury/src/Stables.cs`
 **Zgloszenie (Jeff, trafne co do joty):** "awansowalem piechote na jezdzca,
