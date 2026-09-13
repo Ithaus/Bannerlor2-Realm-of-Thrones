@@ -1,5 +1,38 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-13 - Odbicie z niewoli oddaje rynsztunek za darmo (bylo: na targ paserowi)
+**Mod:** RealisticCaptivity | **Plik:** `RealisticCaptivity/src/CaptivityBehavior.cs`
+**Problem (Jeff):** "przegralem bitwe i bylem w niewoli, ale uratowala mnie armia
+jakiegos lorda - skoro pokonali bandytow i mnie uwolnili, moj sprzet powinien byc
+odzyskany?" Odpowiedz z audytu: tak, powinien, i nie byl.
+**Dowod z logu (sesja 13.09, plik juz nadpisany, cytaty z audytu + korroboracja
+w CrashScribe\session-2026-09-13_04-58-16.log "Hero: Ithauser (prisoner: True)"):**
+`[05:07:01] Gracz pojmany przez: (bez lorda)` / `[05:07:01] Zabrano 11 przedmiotow,
+wartosc 43196, odkup za 69113` / `[05:10:27] Niewola zakonczona` / `[05:10:27]
+Rynsztunek (11 szt.) wystawiony na targu: The Eyrie`.
+**Przyczyna:** w `OnHeroPrisonerReleased` towarzysze dostawali swoje rzeczy
+z powrotem ZA DARMO i bezwarunkowo (`RestoreCompanionGear`, linia 584), a gracz
+trzy linie nizej dostawal odwrotnosc: `FenceGear()` wyrzucal caly jego rynsztunek
+na targ najblizszego miasta. `RestoreGear()` - jedyna funkcja oddajaca sprzet
+graczowi - miala w calym modzie JEDEN wywolujacy: platny odkup. Zadna droga
+wyjscia z niewoli (odbicie, ucieczka, okup) nie oddawala sprzetu za darmo.
+Do tego przy porywaczu-bandycie `_captorHeroId` jest pusty, wiec `GetCaptorHero()`
+zwraca null: warunek fence jest ZAWSZE prawdziwy, a dialog odkupu jest
+matematycznie nieosiagalny (wymaga bohatera o pustym StringId).
+**Zmiana:** nowa galaz przed fence: gdy `detail == EndCaptivityDetail.ReleasedAfterBattle`
+(silnik uzywa go, gdy oddzial porywacza zostal rozbity), wolamy `RestoreGear()`
+i mowimy graczowi po angielsku, ze sprzet wrocil. Fence zostaje dla pozostalych
+przypadkow (np. porywacz zyje i sam cie wypuscil).
+**Ryzyko / co sprawdzic:** ReleasedAfterBattle pada takze wtedy, gdy oddzial
+porywacza zniknal z mapy bez cudzej odsieczy (rozproszyl sie) - wtedy sprzet tez
+wroci. Swiadomie: lepsze niz utrata calego rynsztunku. Sprawdzic w logu linie
+"Rynsztunek przywrocony." zamiast "wystawiony na targu".
+**Nie naprawione (do decyzji Jeffa):** ta sama funkcja nadal liczy odbicie jako
+zniewage i zabiera 15 reputacji (`Captivity2.cs:196` traktuje ReleasedAfterBattle
+tak samo jak "wypuscili cie jak psa").
+**Status:** ZBUDOWANE - DO SPRAWDZENIA. Stare 11 sztuk Jeffa zostaje na targu
+w The Eyrie - ta zmiana nie dziala wstecz.
+
 ## 2026-09-13 - Krwawienie na polu bitwy bylo martwym kodem - naprawione (dlug ulamkowy)
 **Mod:** Armoury | **Plik:** `Armoury/src/FieldCraft.cs`
 **Problem:** znalezione przy audycie regeneracji HP, Jeff: "i napraw krwawienie".

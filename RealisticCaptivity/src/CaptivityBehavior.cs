@@ -583,7 +583,20 @@ namespace RealisticCaptivity
                 CaptivityExtras.ApplyHumiliation(detail);
                 RestoreCompanionGear();
                 var captor = GetCaptorHero();
-                if (HasStoredGear && Settings.Current.FenceGearWhenNoLord && (captor == null || !captor.IsAlive))
+                // ODBICIE ODDAJE RYNSZTUNEK (Jeff 13.09: "skoro pokonali bandytow
+                // i mnie uwolnili, moj sprzet powinien byc odzyskany"). Dotad gracz
+                // byl jedynym, ktory wychodzil z niewoli nago: towarzysze dostawali
+                // swoje wyzej (RestoreCompanionGear) za darmo i bezwarunkowo, a jego
+                // rynsztunek szedl na targ najblizszego miasta (FenceGear) - 13.09
+                // 11 sztuk za 43196 wyladowalo w The Eyrie. ReleasedAfterBattle to
+                // detal, ktorego silnik uzywa, gdy oddzial zdobywcy zostal rozbity:
+                // obozowisko pada razem z lupem, wiec zabieramy swoje z powrotem.
+                if (HasStoredGear && detail == EndCaptivityDetail.ReleasedAfterBattle)
+                {
+                    RestoreGear();
+                    Log.Player("Your captors are broken, and your war gear is back on your shoulders.", true);
+                }
+                else if (HasStoredGear && Settings.Current.FenceGearWhenNoLord && (captor == null || !captor.IsAlive))
                     FenceGear();
             }
             catch (Exception e) { Log.Error("OnHeroPrisonerReleased", e); }
