@@ -124,10 +124,20 @@ namespace Armoury
                 if (agent == null || stance == null) return;
                 if (Undead.Character(agent.Character))
                 {
+                    // TRUP NIE ZNA ZMECZENIA, ALE TEZ SIE NIE LECZY (13.09, audyt
+                    // 229 agentow). RBM (RBMAI.StanceLogic.OnMissionTick) daje +0.9 HP
+                    // co 10 s KAZDEMU, czyj pasek staminy stoi POWYZEJ 85% maksimum.
+                    // Nasza pelna pula (1000000/1000000 = 1.00) trzymala kazdego wighta,
+                    // Wedrowca i Nocnego Krola nad tym progiem przez cala bitwe, wiec
+                    // umarli regenerowali ~6 HP/min bez konca - nasza wpadka, nie RBM.
+                    // Pula zostaje ogromna (trupa nie zmeczysz), ale STOSUNEK siedzi
+                    // pod progiem leczenia, a regen 0 pilnuje, zeby do niego nie dorosl.
+                    // Progi RBM sprawdzone w dekompilacji StanceLogic: 0.85 leczenie,
+                    // 0.7 szybki regen na postoju, zadnych kar bojowych od staminy.
                     // zadnego Profile: tick idzie oryginalem RBM, a pasek i tak nie drgnie
                     _fMaxStamina.SetValue(stance, 1000000f);
-                    _fStamina.SetValue(stance, 1000000f);
-                    _fStaminaRegen.SetValue(stance, 1000f);
+                    _fStamina.SetValue(stance, 800000f);      // 0.80 - pod progiem leczenia 0.85
+                    _fStaminaRegen.SetValue(stance, 0f);
                     Profile drop; if (Managed.TryGetValue(stance, out drop)) Managed.Remove(stance);
                     return;
                 }

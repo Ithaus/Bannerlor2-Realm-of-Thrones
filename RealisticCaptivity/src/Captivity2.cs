@@ -193,7 +193,13 @@ namespace RealisticCaptivity
             {
                 var s = Settings.Current;
                 if (!s.HumiliationEnabled) return;
-                if (detail != EndCaptivityDetail.ReleasedByChoice && detail != EndCaptivityDetail.ReleasedAfterBattle) return;
+                // ODBICIE TO NIE ZNIEWAGA (Jeff 13.09). ReleasedAfterBattle pada wtedy,
+                // gdy oddzial porywacza zostal ROZBITY - wychodzisz, bo ktos po ciebie
+                // przyszedl i wybil twoich strazniki, a nie dlatego, ze uznali cie za
+                // niewartego karmienia. Dotad odsiecz kosztowala tyle samo reputacji
+                // co wyrzucenie za brame. Zostaje sama ReleasedByChoice: wypuscili
+                // cie z wlasnej woli - i to boli.
+                if (detail != EndCaptivityDetail.ReleasedByChoice) return;
                 var clan = Clan.PlayerClan;
                 if (clan == null) return;
                 clan.Renown = Math.Max(0f, clan.Renown - s.HumiliationRenownLoss);

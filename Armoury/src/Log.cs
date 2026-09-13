@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using TaleWorlds.Library;
 
@@ -8,15 +9,41 @@ namespace Armoury
     {
         private static string _path;
         private static readonly object Gate = new object();
+        private const int KeepLogs = 12;      // ile ostatnich sesji trzymamy
 
+        /// <summary>
+        /// PLIK NA SESJE (Jeff 13.09: "logi gina, zanim zdazysz o bledzie powiedziec").
+        /// Init robil File.WriteAllText na STALEJ nazwie, wiec kazde odpalenie gry
+        /// kasowalo dowody z poprzedniej sesji. 13.09 przepadl przez to caly zapis
+        /// niewoli, w ktorej Jeff stracil rynsztunek - uratowalo nas tylko to, ze
+        /// audyt przeczytal plik przed jego restartem. Teraz jak w CrashScribe:
+        /// osobny plik ze znacznikiem czasu, stare kasujemy dopiero powyzej KeepLogs.
+        /// </summary>
         internal static void Init(string moduleDir)
         {
             try
             {
-                _path = Path.Combine(moduleDir, "Armoury.log");
+                _path = Path.Combine(moduleDir, "Armoury-" + DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss") + ".log");
                 File.WriteAllText(_path, "=== Armoury " + DateTime.Now + " ===" + Environment.NewLine);
+                // stary plik o stalej nazwie nigdy juz nie dostanie ani linii - znika,
+                // zeby nikt (ani Jeff, ani Claude) nie czytal za rok zamrozonych bzdur
+                try { var legacy = Path.Combine(moduleDir, "Armoury.log"); if (File.Exists(legacy)) File.Delete(legacy); } catch { }
+                Prune(moduleDir);
             }
             catch { _path = null; }
+        }
+
+        /// <summary>Zostawia KeepLogs najnowszych logow sesji, reszte kasuje.</summary>
+        private static void Prune(string dir)
+        {
+            try
+            {
+                var files = new List<FileInfo>();
+                foreach (var f in Directory.GetFiles(dir, "Armoury-*.log")) files.Add(new FileInfo(f));
+                files.Sort(delegate (FileInfo a, FileInfo b) { return b.CreationTimeUtc.CompareTo(a.CreationTimeUtc); });
+                for (int i = KeepLogs; i < files.Count; i++) { try { files[i].Delete(); } catch { } }
+            }
+            catch { }
         }
 
         internal static void Info(string msg)

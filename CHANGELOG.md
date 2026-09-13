@@ -1,5 +1,47 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-13 - Trzy naprawy z audytu: umarli przestaja sie leczyc, odbicie to nie zniewaga, logi per sesja
+**Mody:** Armoury, RealisticCaptivity | **Pliki:** `Armoury/src/BattleWind.cs`,
+`Armoury/src/Log.cs`, `RealisticCaptivity/src/Captivity2.cs`, `RealisticCaptivity/src/Log.cs`
+**Jeff:** "napraw wszystkie" (trzy sprawy wyciagniete z audytu 229 agentow).
+
+**1. UMARLI LECZYLI SIE PRZEZ CALA BITWE (nasza wpadka, nie RBM).**
+RBM `RBMAI.StanceLogic.OnMissionTick` daje +0.9 HP co 10 s kazdemu agentowi,
+czyj pasek staminy stoi POWYZEJ 85% maksimum (silnik zaokragla w gore = +1 HP).
+Nasz `BattleWind.StaminaInitPostfix` ustawial upiorom `stamina = maxStamina =
+1000000`, czyli stosunek rowno 1.00 - nad progiem PRZEZ CALA BITWE, wiec kazdy
+wight, Wedrowiec i Nocny Krol regenerowal ~6 HP/min bez konca.
+Zmiana: pula zostaje 1000000 (trupa nie zmeczysz), ale `stamina = 800000`
+(stosunek 0.80, pod progiem 0.85) i `staminaRegen = 0`, zeby nigdy do progu nie
+dorosl. Progi RBM zweryfikowane w dekompilacji `StanceLogic`: 0.85 leczenie,
+0.7 szybki regen na postoju, ZERO kar bojowych zaleznych od staminy - wiec
+zejscie do 0.80 nie oslabia upiorow w walce.
+
+**2. ODBICIE Z NIEWOLI LICZYLO SIE JAKO ZNIEWAGA (-15 reputacji).**
+`Captivity2.ApplyHumiliation` karala zarowno `ReleasedByChoice` (wypuscili cie
+jak psa) jak i `ReleasedAfterBattle` - a ten drugi detal silnik daje wtedy, gdy
+oddzial porywacza zostal ROZBITY. Odsiecz kosztowala tyle samo reputacji co
+wyrzucenie za brame (log 13.09: "Zniewaga: -15 reputacji" przy uwolnieniu).
+Zmiana: warunek to teraz sama `ReleasedByChoice`.
+
+**3. NASZE LOGI KASOWALY SIE PRZY KAZDYM STARCIE GRY.**
+`Log.Init` w Armoury i RealisticCaptivity robil `File.WriteAllText` na stalej
+nazwie, wiec kazde odpalenie gry kasowalo dowody z poprzedniej sesji. 13.09
+przepadl przez to caly zapis niewoli (11 sztuk za 43196, targ w The Eyrie) -
+uratowalo nas tylko to, ze agenci audytu przeczytali plik przed restartem Jeffa;
+przeszukanie calego dysku po fakcie nie znalazlo juz ani jednej z tych linii.
+Zmiana: plik na sesje ze znacznikiem czasu, jak w CrashScribe
+(`Armoury-2026-09-13_18-30-00.log`), 12 ostatnich trzymanych, starsze kasowane;
+stary plik o stalej nazwie usuwany raz, zeby nikt nie czytal zamrozonych bzdur.
+**UWAGA DLA DRUGIEGO KONTA CLAUDE:** logi to teraz `Armoury-*.log`
+i `RealisticCaptivity-*.log` (glob, najnowszy = ostatnia sesja), NIE `Armoury.log`.
+Podpowiedzi MCM wspominajace "Armoury.log" zostaly niezmienione (kosmetyka).
+
+**Ryzyko / co sprawdzic:** (1) czy upiory nadal nie meczą się w klinczu, a ich HP
+stoi w miejscu miedzy ciosami; (2) czy po odbiciu nie ma juz wpisu "Zniewaga";
+(3) czy w folderach modow pojawiaja sie pliki z data i czy nie rosna bez konca.
+**Status:** ZBUDOWANE - DO SPRAWDZENIA
+
 ## 2026-09-13 - Odbicie z niewoli oddaje rynsztunek za darmo (bylo: na targ paserowi)
 **Mod:** RealisticCaptivity | **Plik:** `RealisticCaptivity/src/CaptivityBehavior.cs`
 **Problem (Jeff):** "przegralem bitwe i bylem w niewoli, ale uratowala mnie armia
