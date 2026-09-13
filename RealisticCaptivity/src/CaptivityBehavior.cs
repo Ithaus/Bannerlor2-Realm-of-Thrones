@@ -31,8 +31,19 @@ namespace RealisticCaptivity
         private string _rescuerLeaderId = "";
         private int _rescueCooldown;
 
+        // ODBICIE SILA, ALE NIE PRZEZ SILNIK (13.09): wlasna odsiecz rodu konczy
+        // niewole przez ApplyByEscape (Rescue.cs:76), a nie ReleasedAfterBattle -
+        // sam detal by jej nie zlapal i rynsztunek poszedlby na targ mimo tego,
+        // ze ludzie Jeffa wlasnie wybili straznikow. Flaga zyje jedna klatke,
+        // od wywolania w Rescue do naszego OnHeroPrisonerReleased - do save'a
+        // nie ma po co trafiac.
+        private bool _rescuedByForce;
+
         public bool OnParole { get { return _onParole; } }
         public bool HasStoredGear { get { return _storedGear != null && _storedGear.Count > 0; } }
+
+        /// <summary>Wlasna odsiecz wlasnie przecina wiezy - rynsztunek ma wrocic, nie isc na targ.</summary>
+        internal void MarkRescuedByForce() { _rescuedByForce = true; }
 
         public CaptivityBehavior() { Instance = this; }
 
@@ -591,7 +602,12 @@ namespace RealisticCaptivity
                 // 11 sztuk za 43196 wyladowalo w The Eyrie. ReleasedAfterBattle to
                 // detal, ktorego silnik uzywa, gdy oddzial zdobywcy zostal rozbity:
                 // obozowisko pada razem z lupem, wiec zabieramy swoje z powrotem.
-                if (HasStoredGear && detail == EndCaptivityDetail.ReleasedAfterBattle)
+                // ...a takze gdy wyciagneli cie WLASNI ludzie: Rescue.TryFightRescue
+                // konczy niewole przez ApplyByEscape, wiec detal jest "ucieczka"
+                // mimo ze to byla regularna bitwa o twoja skore - stad flaga.
+                bool freedByForce = detail == EndCaptivityDetail.ReleasedAfterBattle || _rescuedByForce;
+                _rescuedByForce = false;
+                if (HasStoredGear && freedByForce)
                 {
                     RestoreGear();
                     Log.Player("Your captors are broken, and your war gear is back on your shoulders.", true);

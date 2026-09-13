@@ -1,5 +1,22 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-13 - Dziura w dzisiejszej poprawce: WLASNA odsiecz rodu tez oddaje rynsztunek
+**Mod:** RealisticCaptivity | **Pliki:** `RealisticCaptivity/src/CaptivityBehavior.cs`, `RealisticCaptivity/src/Rescue.cs`
+**Problem:** wyszlo przy przegladzie reszty audytu (Jeff: "zobacz, co jeszcze
+sprawdzalo 200 agentow"). Dzisiejsza galaz zwrotu sprzetu byla zawieszona na
+`detail == ReleasedAfterBattle`, ale NASZA WLASNA odsiecz (`Rescue.TryFightRescue`)
+konczy niewole przez `EndCaptivityAction.ApplyByEscape` (Rescue.cs:76), czyli
+detal "ucieczka". Czyli: bandyci gina z reki twojego rodu, a rynsztunek i tak
+szedl na targ paserowi. Poprawka zalatana kilka godzin wczesniej mijala sie
+z najwazniejszym przypadkiem.
+**Zmiana:** nowa, nieserializowana flaga `_rescuedByForce` + `MarkRescuedByForce()`.
+`Rescue.TryFightRescue` podnosi ja tuz przed ApplyByEscape; `OnHeroPrisonerReleased`
+liczy `freedByForce = ReleasedAfterBattle || _rescuedByForce` i od razu ja gasi.
+Flaga zyje jedna klatke, wiec nie ma jej po co zapisywac w save.
+**Ryzyko / co sprawdzic:** log ma pokazac "Rynsztunek przywrocony." takze wtedy,
+gdy w logu wyzej stoi "Odbicie sila: X vs Y - sukces."
+**Status:** ZBUDOWANE - DO SPRAWDZENIA
+
 ## 2026-09-13 - Trzy naprawy z audytu: umarli przestaja sie leczyc, odbicie to nie zniewaga, logi per sesja
 **Mody:** Armoury, RealisticCaptivity | **Pliki:** `Armoury/src/BattleWind.cs`,
 `Armoury/src/Log.cs`, `RealisticCaptivity/src/Captivity2.cs`, `RealisticCaptivity/src/Log.cs`

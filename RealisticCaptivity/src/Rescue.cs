@@ -73,6 +73,9 @@ namespace RealisticCaptivity
                 {
                     Log.Info("Odbicie sila: " + mine + " vs " + theirs + " - sukces.");
                     Log.Player(leader.Name + " rode the brigands down and cut you loose. (" + mine + " against " + theirs + ")");
+                    // to byla bitwa o ciebie, nie ucieczka - rynsztunek wraca na ciebie,
+                    // nie na targ paserowi (silnik da tu detal Escaped, wiec mowimy wprost)
+                    if (CaptivityBehavior.Instance != null) CaptivityBehavior.Instance.MarkRescuedByForce();
                     EndCaptivityAction.ApplyByEscape(Hero.MainHero, leader);
                     return true;
                 }
