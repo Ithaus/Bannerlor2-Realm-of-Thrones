@@ -854,15 +854,19 @@ namespace Armoury
 
         [SettingPropertyFloatingInteger("Forest Speed Penalty", 0.00f, 1.00f, "0.00", HintText = "flat speed lost in forest (vanilla: 30% of your speed)")]
         [SettingPropertyGroup("The marching column")]
-        public float ForestSpeedPenalty { get; set; } = 0.25f;
+        public float ForestSpeedPenalty { get; set; } = 0.10f;
 
-        [SettingPropertyFloatingInteger("Desert Speed Penalty", 0.00f, 2.00f, "0.00", HintText = "flat speed lost in desert and dunes (vanilla: 10%)")]
+        [SettingPropertyFloatingInteger("Desert Speed Penalty", 0.00f, 1.00f, "0.00", HintText = "flat speed lost in desert and dunes (vanilla: 10%)")]
         [SettingPropertyGroup("The marching column")]
-        public float DesertSpeedPenalty { get; set; } = 0.5f;
+        public float DesertSpeedPenalty { get; set; } = 0.20f;
 
-        [SettingPropertyFloatingInteger("Snow Speed Penalty", 0.00f, 2.00f, "0.00", HintText = "flat speed lost in snowfall or blizzard (vanilla: 10%)")]
+        [SettingPropertyFloatingInteger("Snow Speed Penalty", 0.00f, 1.00f, "0.00", HintText = "flat speed lost in snowfall or blizzard (vanilla: 10%)")]
         [SettingPropertyGroup("The marching column")]
-        public float SnowSpeedPenalty { get; set; } = 0.5f;
+        public float SnowSpeedPenalty { get; set; } = 0.20f;
+
+        [SettingPropertyFloatingInteger("Swamp Speed Penalty", 0.00f, 1.20f, "0.00", HintText = "flat speed lost crossing swamp and marshland (vanilla: nothing at all)")]
+        [SettingPropertyGroup("The marching column")]
+        public float SwampSpeedPenalty { get; set; } = 0.30f;
 
         [SettingPropertyFloatingInteger("Ford Speed Penalty", 0.00f, 2.00f, "0.00", HintText = "flat speed lost fording rivers and crossing bridges (vanilla: 30%)")]
         [SettingPropertyGroup("The marching column")]
@@ -1003,6 +1007,10 @@ namespace Armoury
         [SettingPropertyFloatingInteger("March Train Pace", 0.00f, 16.80f, "0.00", HintText = "map speed cap for an all-riding party that still drags a baggage train (pack animals, livestock)")]
         [SettingPropertyGroup("The marching column")]
         public float MarchTrainPace { get; set; } = 4.2f;
+
+        [SettingPropertyFloatingInteger("March Foot Rider Pace", 0.00f, 20.00f, "0.00", HintText = "map speed cap when footmen ride spare horses - a man in the saddle is not a horseman born")]
+        [SettingPropertyGroup("The marching column")]
+        public float MarchFootRiderPace { get; set; } = 5.0f;
 
         [SettingPropertyFloatingInteger("March Rider Pace", 0.00f, 26.00f, "0.00", HintText = "map speed cap for a clean column of riders - every man horsed, no train")]
         [SettingPropertyGroup("The marching column")]
@@ -1547,6 +1555,7 @@ namespace Armoury
             s.ForestSpeedPenalty = ForestSpeedPenalty;
             s.DesertSpeedPenalty = DesertSpeedPenalty;
             s.SnowSpeedPenalty = SnowSpeedPenalty;
+            s.SwampSpeedPenalty = SwampSpeedPenalty;
             s.FordSpeedPenalty = FordSpeedPenalty;
             s.NightSpeedPenalty = NightSpeedPenalty;
             s.SpeedAuditEnabled = SpeedAuditEnabled;
@@ -1582,6 +1591,7 @@ namespace Armoury
             s.MarchPaceAiToo = MarchPaceAiToo;
             s.MarchFootPace = MarchFootPace;
             s.MarchTrainPace = MarchTrainPace;
+            s.MarchFootRiderPace = MarchFootRiderPace;
             s.MarchRiderPace = MarchRiderPace;
             s.MarchPackAllowance = MarchPackAllowance;
             s.MarketGlutEnabled = MarketGlutEnabled;

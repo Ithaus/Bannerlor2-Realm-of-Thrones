@@ -20,8 +20,9 @@ namespace Armoury
     ///    -> tempo taboru (MarchTrainPace),
     ///  - czysta kolumna jezdzcow -> tempo jazdy (MarchRiderPace).
     /// Luzaki (konie wierzchowe w sakwach) NIE sa taborem - niosa piechote
-    /// i jencow. Piechota na luzakach jedzie z vanilla POLOWA premii
-    /// kawalerii - "nie jezdza tak dobrze jak jezdzcy" (Jeff).
+    /// i jencow. Piechota na luzakach ma WLASNY, posredni sufit
+    /// (MarchFootRiderPace) - "chyba ze piechota jest na koniach" (Jeff 13.09):
+    /// jedzie szybciej niz idzie, ale nigdy tak szybko jak prawdziwa jazda.
     /// Czapka tylko OBNIZA - nigdy nie przyspiesza ponizej naturalnej predkosci.
     /// Statki plyna po swojemu (morze wylaczone), wiesniacy i karawany
     /// chodza swoim rytmem.
@@ -66,6 +67,10 @@ namespace Armoury
                 if (mp.IsCurrentlyAtSea) return;                        // okrety plyna prawami morza
                 if (mp.IsVillager || mp.IsCaravan || mp.IsGarrison || mp.IsMilitia) return;
                 if (!c.MarchPaceAiToo && mp != MobileParty.MainParty) return;
+                // LANCUCH MODELI - liczymy RAZ, na najbardziej zewnetrznym poziomie
+                // (13.09: TerrainEase mial ten bezpiecznik od poczatku, my nie, wiec
+                // czapka zakladala sie na kazdym poziomie lancucha)
+                if (!SpeedDepth.OutermostFinal) return;
 
                 int men, foot, mounts, train, prisoners;
                 CountColumn(mp, out men, out foot, out mounts, out train, out prisoners);
@@ -85,18 +90,26 @@ namespace Armoury
                 }
                 else
                 {
-                    // piechota na luzakach zostaje przy vanilla polowie premii
-                    // kawalerii (+15% vs +30%) - piechur nie jezdzi jak jezdziec
+                    // NIKT NIE IDZIE PIESZO - ale to jeszcze nie znaczy "kawaleria".
+                    // Do 13.09 kazda kolumna bez piechurow dostawala PELNY sufit jazdy,
+                    // wiec banda lotrow, ktora zrabowala dosc koni, maszerowala tak
+                    // szybko jak prawdziwi jezdzcy (Jeff: "widze bandytow, ktorzy maja
+                    // piechote, a biegaja jak konnica"). Klasowy komentarz obiecywal
+                    // polowe premii kawalerii, ale kod nigdy tego nie robil.
+                    // Teraz wygrywa sufit NAJNIZSZY z pasujacych, z wlasna nazwa przyczyny:
+                    // piechur w siodle jedzie wolniej niz czlowiek, ktory sie w nim urodzil.
+                    cap = c.MarchRiderPace;
+                    why = new TextObject("{=!}Marching column: all riders");
+                    if (ridingFoot > 0 && c.MarchFootRiderPace < cap)
+                    {
+                        cap = c.MarchFootRiderPace;
+                        why = new TextObject("{=!}Marching column: {N} footmen on spare horses").SetTextVariable("N", ridingFoot);
+                    }
                     int allowance = (int)Math.Ceiling(men * Math.Max(0f, c.MarchPackAllowance));
-                    if (train > allowance)
+                    if (train > allowance && c.MarchTrainPace < cap)
                     {
                         cap = c.MarchTrainPace;
                         why = new TextObject("{=!}Marching column: baggage train");
-                    }
-                    else
-                    {
-                        cap = c.MarchRiderPace;
-                        why = new TextObject("{=!}Marching column: all riders");
                     }
                 }
                 // sufity kolumny zyja w jednostkach mapy - przy zwolnionym
@@ -109,7 +122,16 @@ namespace Armoury
                 // (Jeff 27.08: "cos jest nie tak z mechanika predkosci").
                 // Ujemny wpis z nazwana przyczyna + LimitMax jako pas bezpieczenstwa.
                 float current = __result.ResultNumber;
-                if (current > cap) __result.Add(cap - current, why);
+                // Add() doklada do BAZY, ktora jest potem mnozona przez (1 + suma
+                // wspolczynnikow) - wiec zeby zdjac X jednostek MAPY, trzeba wpisac
+                // X podzielone przez ten mnoznik. Bez tego wpis w rozpisce klamal
+                // (pokazywal wiecej, niz faktycznie schodzilo), a LimitMax i tak
+                // docinal reszte po cichu. 13.09.
+                if (current > cap)
+                {
+                    float f = 1f + __result.SumOfFactors;
+                    __result.Add(f > 0.01f ? (cap - current) / f : (cap - current), why);
+                }
                 __result.LimitMax(cap);
             }
             catch { }

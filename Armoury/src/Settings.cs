@@ -261,9 +261,10 @@ namespace Armoury
         public bool MarchPaceEnabled = true;               // a column moves at the pace of its slowest man: any soldier or prisoner on foot holds the whole party to walking speed
         public int WorldPacePercent = 50;                  // base map speed of EVERY party - 50% matches the doubled year: Winterfell to King's Landing takes a lore-true month of the 168-day calendar
         public bool TerrainEaseEnabled = true;             // replace the game's percentage terrain and night penalties with the flat map-speed penalties below (the vanilla share is shown undone in the tooltip, then ours applied)
-        public float ForestSpeedPenalty = 0.25f;           // flat speed lost in forest (vanilla: 30% of your speed)
-        public float DesertSpeedPenalty = 0.5f;            // flat speed lost in desert and dunes (vanilla: 10%)
-        public float SnowSpeedPenalty = 0.5f;              // flat speed lost in snowfall or blizzard (vanilla: 10%)
+        public float ForestSpeedPenalty = 0.10f;           // flat speed lost in forest (vanilla: 30% of your speed)
+        public float DesertSpeedPenalty = 0.20f;           // flat speed lost in desert and dunes (vanilla: 10%)
+        public float SnowSpeedPenalty = 0.20f;             // flat speed lost in snowfall or blizzard (vanilla: 10%)
+        public float SwampSpeedPenalty = 0.30f;            // flat speed lost crossing swamp and marshland (vanilla: nothing at all)
         public float FordSpeedPenalty = 0.5f;              // flat speed lost fording rivers and crossing bridges (vanilla: 30%)
         public float NightSpeedPenalty = 0.5f;             // flat speed lost at night on land (vanilla: 25%)
         public bool SpeedAuditEnabled = true;              // once a day the full speed breakdown of your party is written to Armoury.log (before the marching-column cap and sleep debt)
@@ -299,6 +300,7 @@ namespace Armoury
         public bool MarchPaceAiToo = true;                 // the same law binds lords, bandits and patrols (villagers and caravans keep their own pace either way)
         public float MarchFootPace = 4.0f;                 // map speed cap while anyone walks - footmen without a spare mount, or prisoners on the rope
         public float MarchTrainPace = 4.2f;                // map speed cap for an all-riding party that still drags a baggage train (pack animals, livestock)
+        public float MarchFootRiderPace = 5.0f;            // map speed cap when footmen ride spare horses - a man in the saddle is not a horseman born
         public float MarchRiderPace = 6.5f;                // map speed cap for a clean column of riders - every man horsed, no train
         public float MarchPackAllowance = 0.25f;           // this many pack animals PER MAN count as field supply, not a train (0.25 = a mule per four men rides free)
 

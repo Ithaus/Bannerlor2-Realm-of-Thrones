@@ -27,16 +27,19 @@ namespace Armoury
     /// pelny procent, wiec wychodza odrobine na plus; swiadomie. Biegnie
     /// PRZED sufitem kolumny (MarchPace ma Priority.Last), czapka trzyma.
     /// Kara 0 w MCM = teren tego typu w ogole nie spowalnia.
-    /// AUDYT (Jeff: "zaudytuj poruszanie sie"): raz na dzien gry pelna
-    /// rozpiska predkosci glownej partii (SpeedExplained, z opisami) do
-    /// Armoury.log, z bezpiecznikiem przed rekurencja.
+    /// AUDYT (Jeff: "zaudytuj poruszanie sie"): raz na dzien gry pelna rozpiska
+    /// predkosci glownej partii do logu - ale z DZIENNEGO TICKU (DailyAudit nizej),
+    /// nie stad. Wolany z postfixa klamal przez dwa tygodnie, patrz komentarz tam.
     /// </summary>
     internal static class TerrainEase
     {
-        // JEDNA LINIA W ROZPISCE (Jeff 02.09: "po co tyle pozycji"): wpisy o tej
-        // samej nazwie ExplainedNumber SUMUJE, wiec cofniecie vanilli i nasza
-        // kara nazywaja sie tak samo jak wpis vanilli ("Night", "Forest"...) -
-        // w dymku zostaje jedna pozycja z wartoscia netto, np. "Night -0.5".
+        // NAZWY JAK U VANILLI (Jeff 02.09: "po co tyle pozycji"). ZASTRZEZENIE
+        // z 13.09: ExplainedNumber scala wpisy tylko wtedy, gdy zgadza sie NAZWA
+        // *I* RODZAJ dzialania - a my cofamy procentem (AddFactor) i dokladamy
+        // plasko (Add), wiec te dwa wpisy nigdy sie nie zleja. W dymku beda DWIE
+        // pozycje "Forest": zwrot ~+0% i nasza plaska kara. To poprawne
+        // i jest DOWODEM, ze zamiana zadziala - jedna pozycja "Forest -1.08"
+        // oznaczalaby, ze nasz postfix w ogole nie wszedl.
         private static readonly TextObject _uForest = new TextObject("{=!}Forest");
         private static readonly TextObject _uFord = new TextObject("{=!}Fording");
         private static readonly TextObject _uDesert = new TextObject("{=!}Desert");
@@ -47,8 +50,8 @@ namespace Armoury
         private static readonly TextObject _aDesert = new TextObject("{=!}Desert");
         private static readonly TextObject _aSnow = new TextObject("{=!}Snow");
         private static readonly TextObject _aNight = new TextObject("{=!}Night");
+        private static readonly TextObject _aSwamp = new TextObject("{=!}Swamp");   // vanilla nie karze bagna - nie ma _uSwamp, bo nie ma czego cofac
         private static int _lastAuditDay = -1;
-        private static bool _auditing;
 
         private static void Swap(ref ExplainedNumber r, float vanillaFactor, TextObject undo, float ours, TextObject name)
         {
@@ -79,6 +82,14 @@ namespace Armoury
                     Swap(ref __result, 0.3f, _uFord, c.FordSpeedPenalty, _aFord);
                 else if (tt == TerrainType.Desert || tt == TerrainType.Dune)
                     Swap(ref __result, 0.1f, _uDesert, c.DesertSpeedPenalty, _aDesert);
+                // BAGNO (Jeff 13.09: "bagna 0.3, jesli sa bagna"). Vanilla nie liczy
+                // bagnu ZADNEJ kary - w DefaultPartySpeedCalculatingModel branch terenu
+                // obsluguje tylko Forest, brody i Desert/Dune, reszta nie dostaje nic.
+                // Nie ma wiec czego zwracac: sam Add, bez Swap.
+                else if (tt == TerrainType.Swamp)
+                {
+                    if (c.SwampSpeedPenalty > 0.0005f) __result.Add(-c.SwampSpeedPenalty, _aSwamp);
+                }
 
                 try
                 {
@@ -91,33 +102,54 @@ namespace Armoury
                 if (!atSea && Campaign.Current.IsNight)
                     Swap(ref __result, 0.25f, _uNight, c.NightSpeedPenalty, _aNight);
 
-                // audyt raz na dzien gry - tylko glowna partia, z opisami
-                if (c.SpeedAuditEnabled && !_auditing && mp == MobileParty.MainParty)
-                {
-                    int day = (int)CampaignTime.Now.ToDays;
-                    if (day != _lastAuditDay)
-                    {
-                        _lastAuditDay = day;
-                        _auditing = true;
-                        try
-                        {
-                            var ex = MobileParty.MainParty.SpeedExplained;
-                            var lines = ex.GetLines();
-                            var sb = new System.Text.StringBuilder("Audyt predkosci (dzien " + day + ", teren " + tt + "): ");
-                            for (int i = 0; i < lines.Count; i++)
-                            {
-                                if (i > 0) sb.Append(" | ");
-                                sb.Append(lines[i].name).Append(' ').Append(lines[i].number.ToString("+0.00;-0.00"));
-                            }
-                            sb.Append(" => ").Append(ex.ResultNumber.ToString("0.00"));
-                            Log.Info(sb.ToString());
-                        }
-                        catch (Exception e) { Log.Error("TerrainEase.Audit", e); }
-                        finally { _auditing = false; }
-                    }
-                }
             }
             catch { }
+        }
+
+        /// <summary>
+        /// AUDYT PREDKOSCI - RAZ DZIENNIE, Z DZIENNEGO TICKU (nie z postfixa!).
+        /// Jeff 13.09: "caly czas zle jest pokazywana predkosc marszu" - i mial
+        /// racje, tyle ze klamal POMIAR, nie mechanika. Audyt siedzial w srodku
+        /// SpeedPostfix i wolal MobileParty.SpeedExplained, ktore NIE czyta cache,
+        /// tylko PONOWNIE przepuszcza partie przez caly lancuch modeli. To wejscie
+        /// zaczynalo sie o poziom glebiej (_final == 2, a w vanilli 3), wiec KAZDY
+        /// poziom audytowanego przebiegu wypadal na bezpieczniku z linii 69
+        /// i nie zdazyl podmienic kar terenu. W logu ladowaly wiec gole liczby
+        /// vanilli: "Forest -1.08" to rowno 30% z bazy 3.60, "Snow -0.36" to 10%.
+        /// Nasza zamiana dzialala w prawdziwym przebiegu (glebokosc 1), ale nikt
+        /// jej nie widzial. Przy okazji SpeedExplained ZAPISUJE wynik z powrotem
+        /// do MobileParty._lastCalculatedSpeed, wiec raz na dobe zatruwalo cache
+        /// predkosci glownej partii wartoscia bez naszych ulg.
+        /// Z dziennego ticku zaden model nie stoi na stosie (_final == 0), wiec
+        /// rozpiska pokazuje to, co gracz naprawde ma - i cache dostaje to samo.
+        /// </summary>
+        internal static void DailyAudit()
+        {
+            try
+            {
+                var c = Settings.Current;
+                if (c == null || !c.SpeedAuditEnabled) return;
+                var mp = MobileParty.MainParty;
+                if (mp == null || Campaign.Current == null) return;
+                int day = (int)CampaignTime.Now.ToDays;
+                if (day == _lastAuditDay) return;
+                _lastAuditDay = day;
+
+                TerrainType tt = TerrainType.Plain;
+                try { tt = Campaign.Current.MapSceneWrapper.GetFaceTerrainType(mp.CurrentNavigationFace); } catch { }
+
+                var ex = mp.SpeedExplained;
+                var lines = ex.GetLines();
+                var sb = new System.Text.StringBuilder("Audyt predkosci (dzien " + day + ", teren " + tt + "): ");
+                for (int i = 0; i < lines.Count; i++)
+                {
+                    if (i > 0) sb.Append(" | ");
+                    sb.Append(lines[i].name).Append(' ').Append(lines[i].number.ToString("+0.00;-0.00"));
+                }
+                sb.Append(" => ").Append(ex.ResultNumber.ToString("0.00"));
+                Log.Info(sb.ToString());
+            }
+            catch (Exception e) { Log.Error("TerrainEase.DailyAudit", e); }
         }
 
         internal static void ApplyAll(Harmony h)

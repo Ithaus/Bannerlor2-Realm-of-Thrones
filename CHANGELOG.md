@@ -1,5 +1,84 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-13 - Predkosc marszu: audyt klamal od dwoch tygodni, nowe kary terenu, bagno, posrednie tempo kolumny
+**Mod:** Armoury | **Pliki:** `Armoury/src/TerrainEase.cs`, `Armoury/src/MarchPace.cs`, `Armoury/src/ArmouryBehavior.cs`, `Armoury/src/Settings.cs`, `Armoury/src/McmSettings.cs`
+**Jeff 13.09:** "caly czas zle jest pokazywana predkosc marszu, daj mi logike";
+nowe kary: snieg 0.2, las 0.1, pustynia 0.2, bagno 0.3; "jesli mamy choc jednego
+piechura bez konia to predkosc wynosi predkosc piechura"; "widze bandytow, ktorzy
+maja piechote, a biegaja jak konnica, chyba ze piechota jest na koniach".
+
+**1. AUDYT KLAMAL - i to on byl zrodlem "zle pokazywanej predkosci". NASZ BLAD.**
+Objaw: w logu `teren Forest ... Forest -1.08 | Snow -0.36` przy ustawieniach
+las 0.25 i snieg 0.5. -1.08 to rowno 30% z bazy 3.60, -0.36 to rowno 10% - czyli
+GOLE liczby vanilli, jakby TerrainEase nie istnial.
+PRZYCZYNA (nie ta, ktora obstawilem na poczatku): mechanika DZIALALA, klamal
+POMIAR. Audyt siedzial w srodku `TerrainEase.SpeedPostfix` i wolal
+`MobileParty.SpeedExplained`, ktore NIE czyta cache, tylko ponownie przepuszcza
+partie przez caly lancuch modeli. To wejscie zaczynalo sie o poziom glebiej
+(_final == 2, w vanilli 3), wiec kazdy poziom audytowanego przebiegu wypadal na
+bezpieczniku `if (!SpeedDepth.OutermostFinal) return;` (TerrainEase.cs:69) przed
+podmiana kar. WorldPace przezywal te sama rekurencje, bo pilnuje sie
+`OutermostBase`, a prawdziwe CalculateBaseSpeed juz sie skonczylo i jego
+finalizer wyzerowal licznik - stad "World pace -0.90" bylo prawdziwe, a teren nie.
+SZKODA REALNA, nie tylko kosmetyczna: `SpeedExplained` ZAPISUJE wynik z powrotem
+do `MobileParty._lastCalculatedSpeed`, wiec raz na dobe zatruwalismy cache
+predkosci glownej partii wartoscia bez wlasnych ulg.
+ZMIANA: audyt wyjety z postfixa do `TerrainEase.DailyAudit()`, wolanego
+z `ArmouryBehavior.OnDailyTick`. Przy dziennym ticku zaden model nie stoi na
+stosie, wiec rozpiska pokazuje prawde i cache dostaje to samo.
+**JAK SPRAWDZIC, ZE DZIALA:** w lesie log ma teraz pokazac DWIE pozycje "Forest"
+(zwrot procentowy ~+1.08 i nasza plaska kara -0.10), a nie jedna -1.08.
+ExplainedNumber scala wpisy tylko przy zgodnej NAZWIE *I* rodzaju dzialania,
+a my cofamy procentem (AddFactor) i dokladamy plasko (Add) - to sie nigdy nie
+zleje. Jedna pozycja "Forest -1.08" oznaczalaby, ze postfix naprawde jest martwy.
+Stary komentarz w TerrainEase obiecywal scalanie w jedna linie - byl BLEDNY, poprawiony.
+
+**2. NOWE KARY TERENU (Settings.cs:264-268).** las 0.25 -> 0.10, snieg 0.5 -> 0.20,
+pustynia 0.5 -> 0.20, brod i noc bez zmian (0.5). Nowe `SwampSpeedPenalty = 0.30`.
+UWAGA KALIBRACYJNA: `Add()` doklada do BAZY, ktora jest potem mnozona przez
+(1 + suma wspolczynnikow) - przy typowym stosie kar 0.10 w lesie kosztuje okolo
+0.10 jednostki mapy, ale 0.20 sniegu tylko okolo 0.16. To beda ODCZUWALNIE
+lzejsze kary niz dotad; jesli okaza sie za lekkie, suwaki sa w MCM.
+
+**3. BAGNO (TerrainEase, nowa galaz).** Vanilla nie liczy bagnu ZADNEJ kary -
+`DefaultPartySpeedCalculatingModel.CalculateFinalSpeed` obsluguje wylacznie Forest,
+brody (Water/River/UnderBridge/Bridge/Fording) i Desert/Dune; reszta typow terenu,
+Swamp i Mountain wlacznie, nie dostaje nic. Dlatego sam `Add`, bez zwrotu.
+**NIEZWERYFIKOWANE:** czy mapa ROT w ogole maluje TerrainType.Swamp. We wszystkich
+naszych logach audyt widzial dotad tylko `teren Forest` i `teren Plain`. Po tej
+zmianie audyt chodzi codziennie - przejsc przez Przesmyk i poszukac `teren Swamp`
+zanim uznamy suwak za dzialajacy.
+
+**4. PIECHOTA NA LUZAKACH MA WLASNE, POSREDNIE TEMPO** (nowy `MarchFootRiderPace = 5.0`,
+miedzy pieszym 4.0 a jazda 6.5). Dotad kazda kolumna bez piechurow dostawala PELNY
+sufit jazdy, wiec banda lotrow, ktora zrabowala dosc koni, maszerowala jak prawdziwa
+kawaleria - dokladnie to, co Jeff widzial. Komentarz klasy obiecywal "polowe premii
+kawalerii" od zawsze, ale kod nigdy tego nie robil. Teraz wygrywa sufit NAJNIZSZY
+z pasujacych (jazda / piechota w siodle / tabor), z wlasna nazwa przyczyny w rozpisce.
+Regula "choc jeden piechur bez konia -> tempo piechura" dzialala juz wczesniej
+i zostaje bez zmian.
+
+**5. DWA CICHE BLEDY W MarchPace, oba potwierdzone:**
+ - brakowalo `if (!SpeedDepth.OutermostFinal) return;` - czapka zakladala sie na
+   KAZDYM poziomie lancucha modeli (TerrainEase mial ten bezpiecznik od poczatku);
+ - widoczny wpis czapki klamal: `Add()` idzie do bazy mnozonej przez
+   (1 + suma wspolczynnikow), wiec teraz dzielimy przez ten mnoznik. LimitMax
+   docinal reszte po cichu, dlatego nikt tego nie zauwazyl.
+
+**NIE ZMIENIONE, do decyzji Jeffa (znalezione przy tej okazji):**
+ - JENCY LICZA SIE JAKO PIESI (MarchPace.cs:82) - branie jencow w pogoni zrzuca
+   gracza na tempo piechura dokladnie wtedy, gdy wygrywa. To byla WCZESNIEJSZA
+   prosba Jeffa ("jeniec na sznurze"), wiec zostawiam.
+ - PODLOGA 1.0 (vanilla `MinimumSpeed` + wlasny `LimitMin(1f)` BannerKings) jest
+   absolutna - zadna kara nie zejdzie ponizej, wiec gdy scigajacy i scigany oba
+   siedza na podlodze, dystans nie zmienia sie nigdy. To glowny powod, dla ktorego
+   bandyci uciekaja w nieskonczonosc. Nie da sie tego ruszyc bez latania BK.
+ - PLASKIE KARY ZNIOSLY VANILLOWY WYROWNYWACZ POSCIGU: procent zabieral szybszemu
+   WIECEJ w liczbach bezwzglednych, wiec las i noc zblizaly scigajacego do sciganego.
+   Plaska kara odejmuje obu tyle samo i zachowuje dystans. To cena, ktora placimy
+   za liczby bezwzgledne, o ktore Jeff prosil 02.09.
+**Status:** ZBUDOWANE - straznik wgra po zamknieciu gry; DO SPRAWDZENIA
+
 ## 2026-09-13 - Wybor skladu do bitwy (BattleMuster) NIE dziala i ZOSTAJE tak - decyzja Jeffa
 **Mod:** Armoury | **Plik:** `Armoury/src/BattleMuster.cs` - BEZ ZMIAN
 **Problem (Jeff):** "wybor wojska do bitwy nie dziala, ustawilem ze tylko ja
