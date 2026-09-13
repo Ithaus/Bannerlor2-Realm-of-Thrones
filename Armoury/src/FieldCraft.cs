@@ -319,7 +319,15 @@ namespace Armoury
                                 }
                             }
                             catch { }
-                            if (sh >= 0) WearLedger[sh] += raw * c.WearDamageFactor * Math.Max(0f, c.WearShieldFactor);
+                            // TA SAMA ULGA CO W BITWIE (Jeff 13.09): tarcza zatrzymujaca
+                            // strzale liczyla PELNE zuzycie, bez znizki dla pociskow, ktora
+                            // dostaje pancerz linijke nizej - a przy wlaczonym "Break At Zero
+                            // Condition" dojechana do zera tarcza znika z ekwipunku na zawsze.
+                            // Strzaly zuzywaja tarcze w tym samym procencie, w jakim ja lupia.
+                            float shieldMissile = blow.IsMissile
+                                ? Math.Max(0f, Math.Min(100f, c.MissileShieldDamagePercent)) / 100f
+                                : 1f;
+                            if (sh >= 0) WearLedger[sh] += raw * c.WearDamageFactor * Math.Max(0f, c.WearShieldFactor) * shieldMissile;
                         }
                         else
                         {

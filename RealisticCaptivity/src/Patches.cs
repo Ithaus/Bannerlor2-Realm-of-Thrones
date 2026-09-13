@@ -59,6 +59,22 @@ namespace RealisticCaptivity
                     b.OnFailedEscape();
                     return false;
                 }
+                // LOCH NIE MA DRUGIEGO WYJSCIA (Jeff 13.09: "popraw przeniesienie
+                // do lochu niewola"). W miejskim lochu silnik daje PEWNA ucieczke
+                // mniej wiecej od osmego dnia - i tylko ja, bo blok z oferta okupu
+                // w CheckCaptivityChange stoi ZA returnem z galezi ucieczki i przy
+                // pewnosci 1.0 nigdy nie zostaje osiagniety. Kasowanie tej jednej
+                // szansy kostka (20%) i wymogiem pomocnika z zewnatrz zamykalo gracza
+                // w lochu NA ZAWSZE, z codziennym ubytkiem zdrowia. Po odsiedzeniu
+                // swojego przepuszczamy wiec ucieczke z lochu bez losowania.
+                bool inDungeon = false;
+                try { var cp = PlayerCaptivity.CaptorParty; inDungeon = cp != null && cp.IsSettlement; }
+                catch { }
+                if (inDungeon)
+                {
+                    Log.Info("Loch: ucieczka przepuszczona po " + days + " dniach - za murami to jedyne wyjscie.");
+                    return true;
+                }
                 if (MBRandom.RandomFloat > s.EscapeChanceMultiplier)
                 {
                     Log.Info("Ucieczka nieudana (rzut).");

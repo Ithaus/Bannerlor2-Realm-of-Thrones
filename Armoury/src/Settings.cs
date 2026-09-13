@@ -113,6 +113,8 @@ namespace Armoury
         public float DurabilityPerArmorPoint = 20f;        // Jeff's pool: every point of protection gives this much durability, times the tier - 61 armor at tier 3 = 61 x 20 x 3 = 3660 points, and damage taken subtracts one for one
         public float WearWeaponPerHit = 0.6f;              // wear on your weapon for every blow you land (bows wear per arrow that strikes home)
         public float WearShieldFactor = 0.3f;              // shields are built to take it - blocked damage wears them at this share
+        public bool ShieldMissileGuardEnabled = true;      // a shield is not there to be shot to pieces - arrows and bolts barely mark it
+        public float MissileShieldDamagePercent = 1f;      // percent of the arrow or bolt damage a shield actually takes, both in the fight and as wear (RBM counts 150%, the bare game 15%)
         public int BowUsesAtTier1 = 2500;                  // a tier-1 bow survives this many shots; each tier multiplies (tier 3 = x3, tier 6 = x6)
         public float BowSkillBonusPercentPerPoint = 1f;    // every point of Bow/Crossbow skill adds this percent more shots - a trained hand spares the weapon
         public float TierDurabilityFactor = 0.22f;         // each tier of the piece slows the wear by this much

@@ -1,5 +1,69 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-13 - Strzaly przestaja rozwalac tarcze (1% zamiast 150% RBM)
+**Mod:** Armoury | **Pliki:** `Armoury/src/ShieldGuard.cs` (nowy), `Armoury/src/FieldCraft.cs`, `Armoury/src/SubModuleMain.cs`, `Armoury/src/Settings.cs`, `Armoury/src/McmSettings.cs`
+**Jeff:** "strzaly maja nie rozwalac tarczy, albo uszkodzenia strzal i beltow tarczy ustaw na 1%".
+**Przyczyna (dwie, obie potwierdzone w dekompilacji):**
+1. RBM podmienia silnikowe liczenie obrazen tarczy - prefix na
+   `MissionCombatMechanicsHelper.ComputeBlowDamageOnShield` zwracajacy false -
+   i mnozy trafienie strzala x1.5, beltem x1.5, podczas gdy goly silnik liczy
+   strzale x0.15. Dziesiec razy wiecej w tym samym miejscu; dla porownania
+   pchniecie wloczni to u RBM x0.09, czyli strzala robi tarczy ~16x to, co
+   wloczni. W konfiguracji RBM NIE MA na to zadnego pokretla (jedyny klucz
+   z "shield" to PassiveShoulderShields, o czym innym) - mnozniki sa wpisane
+   na sztywno w RBMCombat.dll.
+2. Nasze zuzycie liczylo tarczy PELNA stawke za zablokowana strzale, bez znizki
+   dla pociskow, ktora dostaje pancerz (MissileArmorWearPercent 10%) - a przy
+   wlaczonym "Break At Zero Condition" (w zapisanym configu Jeffa: true) tarcza
+   dojechana do zera znika z ekwipunku BEZPOWROTNIE (ArmouryBehavior.cs:1692).
+**Zmiana:** nowy `ShieldGuard` - postfix na METODZIE SILNIKA (postfixy Harmony
+biegna takze wtedy, gdy czyjs prefix pominal cialo, wiec lapie i wersje RBM,
+i vanillowa), tnacy obrazenia tarczy WYLACZNIE dla pociskow do
+`MissileShieldDamagePercent` (domyslnie 1%). Bron biala bez zmian - topory
+i maczugi lupia tarcze dalej. Ta sama znizka zalozona na nasze zuzycie
+(FieldCraft.cs, galaz AttackBlockedWithShield).
+**BEZPIECZENSTWO (sprawdzone w MCMH linia 208-209):** wywolujacy zaraz po nas
+robi `AbsorbedByArmor = InflictedDamage`, wiec obie liczby maleja RAZEM
+i zablokowany cios dalej NIE dosiega czlowieka - scieta liczba nie przecieka
+strzalem w gracza.
+**Ryzyko / co sprawdzic:** w logu Armoury linia "Tarcze: strzaly i belty robia
+1% obrazen tarczy"; tarcza ma przezywac ostrzal, ale nadal padac od toporow.
+Suwaki w MCM: "Shield Missile Guard Enabled", "Missile Shield Damage Percent".
+**Status:** ZBUDOWANE - straznik wgra po zamknieciu gry; DO SPRAWDZENIA
+
+## 2026-09-13 - Niewola w miejskim lochu: trzy usterki naprawione
+**Mod:** RealisticCaptivity | **Pliki:** `RealisticCaptivity/src/Patches.cs`, `RealisticCaptivity/src/CaptivityBehavior.cs`
+**Jeff:** "popraw przeniesienie do lochu niewola".
+**1. GRACZ SIEDZIAL W LOCHU BEZ WYJSCIA - najgorsza z trzech.**
+Silnik w lochu daje szanse ucieczki rosnaca do PEWNOSCI okolo osmego dnia
+(`num5 = ((CountOfOffers+1)/8)` do kwadratu dla osady) - i tylko ja, bo blok
+z oferta okupu w `CheckCaptivityChange` stoi ZA returnem z galezi ucieczki,
+wiec przy pewnosci 1.0 nigdy nie zostaje osiagniety. Nasz prefix na
+`GameMenu.SwitchToMenu` kasowal `menu_captivity_end_prison_escape`: najpierw
+przez 12 dni (MinDaysBeforeEscape, POZNIEJ niz vanillowa pewnosc z dnia 8),
+potem kostka 20% (EscapeChanceMultiplier) plus wymog pomocnika z zewnatrz.
+Efekt od okolo dnia 8: jedna gwarantowana szansa dziennie, kasowana za kazdym
+razem, zadnej oferty okupu, i `OnFailedEscape()` zabierajacy zdrowie codziennie.
+Zmiana: gdy porywaczem jest OSADA (loch), po MinDaysBeforeEscape przepuszczamy
+ucieczke bez losowania i bez pomocnika.
+**2. NIE WIEDZIELISMY, KTO CIE TRZYMA.** `_captorHeroId` zapisywany raz, przy
+pojmaniu w polu; przeniesienie do lochu podmienia `PlayerCaptivity.CaptorParty`
+na party osady, a my dalej pamietalismy lorda, ktory odjechal (albo nikogo, po
+bandytach). Przez to wlasciciel miasta nie mogl odsprzedac rynsztunku
+(CanBuyBackFrom porownuje StringId), "Dlug honorowy" byl martwy (OfferDebtDeal
+wychodzi przy captor == null), a przy wyjsciu z lochu warunek fence widzial
+pustke i wyrzucal sprzet na targ. Zmiana: raz dziennie przepisujemy trzymajacego
+na wlasciciela osady.
+**3. ODSIECZ SZTURMOWALA GARNIZON ZAMIAST ROZMAWIAC.** Party osady nie ma
+LeaderHero, wiec `RunRescueMission` zawsze szedl sciezka silowa i porownywal
+garstke ludzi rodu z calym garnizonem miasta - warunek nie do spelnienia.
+Zmiana: dla lochu bierzemy wlasciciela osady jako rozmowce i idziemy w negocjacje.
+**Ryzyko / co sprawdzic:** w logu "Loch <miasto>: trzyma cie teraz <lord>",
+"Loch: ucieczka przepuszczona po N dniach", "Odsiecz: loch w <miasto> -
+rozmawiamy z <lord>". Uwaga: ucieczka z lochu jest teraz PEWNA po
+MinDaysBeforeEscape (12 dni) - jesli to za latwo, podnies ten suwak w MCM.
+**Status:** ZBUDOWANE - straznik wgra po zamknieciu gry; DO SPRAWDZENIA
+
 ## 2026-09-13 - Martwe ustawienie "Fence Price Multiplier" usuniete z MCM
 **Mod:** RealisticCaptivity | **Pliki:** `RealisticCaptivity/src/Settings.cs`, `RealisticCaptivity/src/McmSettings.cs`
 **Problem (Jeff):** "nie wiem, co to za ustawienie Fence Price".

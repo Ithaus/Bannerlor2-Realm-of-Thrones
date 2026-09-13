@@ -270,6 +270,30 @@ namespace RealisticCaptivity
                 }
                 catch { }
 
+                // KTO CIE TERAZ TRZYMA (Jeff 13.09: "popraw przeniesienie do lochu").
+                // _captorHeroId zapisywalismy RAZ, przy pojmaniu w polu. Gdy silnik
+                // przekazywal gracza do miejskiego lochu (CheckCaptivityChange podmienia
+                // PlayerCaptivity.CaptorParty na party osady), my nadal pamietalismy
+                // lorda, ktory dawno odjechal - albo, po bandytach, nikogo. Skutki:
+                // wlasciciel miasta stojacy przed toba nie mogl odsprzedac ci rynsztunku
+                // (CanBuyBackFrom porownuje StringId), "Dlug honorowy" nie mial komu byc
+                // zaproponowany (OfferDebtDeal wychodzi przy captor == null), a przy
+                // wyjsciu z lochu warunek fence widzial pustke i wyrzucal sprzet na targ.
+                try
+                {
+                    var cp = PlayerCaptivity.CaptorParty;
+                    if (cp != null && cp.IsSettlement && cp.Settlement != null)
+                    {
+                        var holder = cp.Settlement.OwnerClan != null ? cp.Settlement.OwnerClan.Leader : null;
+                        if (holder != null && holder.StringId != _captorHeroId)
+                        {
+                            _captorHeroId = holder.StringId;
+                            Log.Info("Loch " + cp.Settlement.Name + ": trzyma cie teraz " + holder.Name + " - ksiega odkupu przepisana.");
+                        }
+                    }
+                }
+                catch { }
+
                 CaptivityExtras.DailyStarvation(_lowborn, _onParole);
 
                 if (CaptivityExtras.TryBanditDump((int)PlayerCaptivity.CaptivityStartTime.ElapsedDaysUntilNow)) return;
@@ -325,7 +349,19 @@ namespace RealisticCaptivity
 
                 if (!Rescue.DriveTowardCaptor(rescuer, captor)) return;   // jeszcze w drodze
 
+                // Z LOCHEM SIE ROZMAWIA, NIE SZTURMUJE GO (Jeff 13.09). Party osady
+                // nie ma LeaderHero (to nie MobileParty), wiec po przeniesieniu gracza
+                // do miejskiego lochu odsiecz zawsze szla sciezka SILOWA i porownywala
+                // garstke ludzi rodu z CALYM garnizonem miasta - warunek nie do spelnienia,
+                // wiec kazda proba konczyla sie tylko przestojem. A przeciez miasto ma
+                // wlasciciela, z ktorym da sie targowac o okup.
                 var captorLord = captor.LeaderHero;
+                if (captorLord == null && captor.IsSettlement && captor.Settlement != null)
+                {
+                    captorLord = captor.Settlement.OwnerClan != null ? captor.Settlement.OwnerClan.Leader : null;
+                    if (captorLord != null)
+                        Log.Info("Odsiecz: loch w " + captor.Settlement.Name + " - rozmawiamy z " + captorLord.Name + " zamiast szturmowac garnizon.");
+                }
                 if (captorLord == null)
                 {
                     if (!Rescue.TryFightRescue(rescuer, captor))
