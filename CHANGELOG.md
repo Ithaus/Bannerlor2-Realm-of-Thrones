@@ -1,5 +1,38 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-13 - Znikajace strzaly: licznik diagnostyczny (przyczyna NIEUSTALONA, piec podejrzanych wykluczonych)
+**Mod:** Armoury | **Pliki:** `Armoury/src/AmmoTracer.cs` (nowy), `Armoury/src/ArmouryBehavior.cs`, `Armoury/src/Settings.cs`, `Armoury/src/McmSettings.cs`
+**Zgloszenie (Jeff):** "wrzucilem im strzaly, mialy 29/30, a po chwili znowu im cos
+zzarlo"; potem 14/30 i 11/30. Oskarzyl o to moja wczorajsza latke na kolczany.
+**CO ZOSTALO WYKLUCZONE, kazde z dowodem:**
+ 1. NASZA LATKA NA DTE (Mends.QuiversComeBack) - `Global.IsAmmoAndEmpty` ma
+    DOKLADNIE JEDEN punkt wywolania w calym DTE (Global.cs:320, bramka oddawania
+    sprzetu po bitwie), a nasz postfix moze tam wylacznie SPOWODOWAC ODDANIE
+    kolczana. Nie ma sciezki, ktora by cokolwiek odejmowala. Latka byla zywa
+    w tej sesji (CrashScribe 15:25:24).
+ 2. NASZ AmmoAttrition - w calym logu sesji ZERO wpisow "Amunicja: po bitwie peklo".
+ 3. ZLOMOWANIE DTE (`ArmyArmoryBehavior.OnDailyTick` -> `ScrapArmyArmoryByCategory`,
+    co 3 dni gdy CommandersGreed jest wylaczone) - tnie dopiero POWYZEJ
+    `ScrapCapPerCategory` = 600 sztuk NA KATEGORIE (domyslna z kodu; w zapisanym
+    `bannerlord.dynamictroop.json` jest tylko 9 kluczy i tego nie ma). Jeff ma
+    kilkanascie. Nie ta droga.
+ 4. `ArmyArmory.SanitizeInPlace` (dziennie) - czysci i odbudowuje roster, ale
+    wyrzuca tylko pozycje, ktorych `TryResolveArmoryItem` nie rozwiaze; modyfikator
+    nierozpoznany jest ZEROWANY, nie kasuje sztuki. Strzaly rozwiazuja sie normalnie.
+ 5. `RestoreReadyArmoryItems` - tylko DODAJE nierozwiazane wczesniej pozycje.
+**CZEGO NIE USTALILEM:** co realnie zdejmuje te sztuki. Najmocniejsza pozostala
+hipoteza: liczba w linii kwatermistrza to `HaveFor(DteArmory, type)`, czyli sztuki
+LEZACE NA POLCE - a kolczany przydzielone lucznikom sa z polki zdejmowane
+(`ArmyArmory.AssignEquipment` -> `Armory.AddToCounts(el, -1)` przy spawnie agenta).
+Wtedy zapotrzebowanie (luki x 2) jest z definicji nieosiagalne, bo polowa kolczanow
+zawsze siedzi na ludziach. To ten sam wzorzec co przy koniach 13.09. NIEPOTWIERDZONE.
+**Zmiana:** czysto diagnostyczny `AmmoTracer` - co godzine gry czyta stan zbrojowni
+DTE dla Arrows/Bolts/HorseHarness i loguje KAZDA zmiane z data, miejscem pobytu
+i flaga, czy otwarty jest ekran zbrojowni. Nic nie zmienia w rozgrywce.
+Szukac w logu linii "SLED AMUNICJI:".
+**Do usuniecia po zlapaniu sprawcy** - to rusztowanie, nie funkcja.
+**Status:** ZBUDOWANE - DIAGNOSTYKA, przyczyna nadal nieznana
+
 ## 2026-09-13 - Wystrzelany kolczan przepadal - DTE oddaje go juz z powrotem
 **Mod:** CrashScribe (latka na cudzy mod) | **Plik:** `CrashScribe/src/Mends.cs`
 **Zgloszenie (Jeff, znowu trafne):** "strzaly mialy sie nie konczyc lucznikom,

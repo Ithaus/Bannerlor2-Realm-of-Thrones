@@ -876,6 +876,10 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public float NightSpeedPenalty { get; set; } = 0.5f;
 
+        [SettingPropertyBool("Ammo Tracer Enabled", HintText = "diagnostic: log every change in the troop armoury's stock of arrows, bolts and harnesses, with time and place")]
+        [SettingPropertyGroup("The marching column")]
+        public bool AmmoTracerEnabled { get; set; } = true;
+
         [SettingPropertyBool("Plague Watch Enabled", HintText = "a daily word when YOU are the one who is ill - the disease mod tells the player nothing outside a town hospital")]
         [SettingPropertyGroup("The marching column")]
         public bool PlagueWatchEnabled { get; set; } = true;
@@ -1562,6 +1566,7 @@ namespace Armoury
             s.SwampSpeedPenalty = SwampSpeedPenalty;
             s.FordSpeedPenalty = FordSpeedPenalty;
             s.NightSpeedPenalty = NightSpeedPenalty;
+            s.AmmoTracerEnabled = AmmoTracerEnabled;
             s.PlagueWatchEnabled = PlagueWatchEnabled;
             s.SpeedAuditEnabled = SpeedAuditEnabled;
             s.SiegePacePercent = SiegePacePercent;

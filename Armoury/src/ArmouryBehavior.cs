@@ -435,7 +435,7 @@ namespace Armoury
             // wiec zamiast zgadywac zdarzenia MCM przepisujemy wartosci co godzine
             // gry - tanie (kilkaset przypisan), a suwak wchodzi po paru sekundach.
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this,
-                delegate { try { McmSettings.Apply(); } catch { } });
+                delegate { try { McmSettings.Apply(); } catch { } try { AmmoTracer.HourlyCheck(); } catch { } });
             CampaignEvents.OnSettlementOwnerChangedEvent.AddNonSerializedListener(this, WarLedger.OnOwnerChanged);
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, OnMapEventEnded);
             CampaignEvents.MapEventStarted.AddNonSerializedListener(this, OnMapEventStarted);
