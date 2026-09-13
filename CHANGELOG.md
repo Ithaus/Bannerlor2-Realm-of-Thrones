@@ -1,5 +1,46 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-13 - Wystrzelany kolczan przepadal - DTE oddaje go juz z powrotem
+**Mod:** CrashScribe (latka na cudzy mod) | **Plik:** `CrashScribe/src/Mends.cs`
+**Zgloszenie (Jeff, znowu trafne):** "strzaly mialy sie nie konczyc lucznikom,
+sprawdz, czy po wystrzeleniu wszystkich strzal usuwany jest kolczan - ma dzialac
+tak jak u gracza, ze sie odnawia po bitwie". Linia kwatermistrza: Arrows 9/30.
+**Przyczyna - DTE, i to nie zamierzona.** Sciezka jednego kolczana:
+ 1. SPAWN: `Patches.SpawnAgentPatch.Postfix` -> `ArmyArmory.AssignEquipment` robi
+    `Armory.AddToCounts(el, -1)` - polka traci sztuke na pewno.
+ 2. BITWA: silnik nie czysci slotu, `MissionWeapon.Amount` schodzi do 0, ale
+    `IsEmpty` (czyli CurrentUsageItem == null) pozostaje FALSZEM.
+ 3. KONIEC MISJI: `DynamicTroopMissionLogic.ReturnEquipmentFromAgents` ->
+    `Global.ProcessAgentEquipment`. Tam bramka (Global, linia 320) dla ItemType
+    5 (Arrows), 6 (Bolts) i 12 (Thrown) oddaje sztuke tylko gdy
+    `!IsEmpty && !IsAmmoAndEmpty(...)`. A `Global.IsAmmoAndEmpty` zwraca PRAWDE
+    dokladnie wtedy, gdy `Amount == 0` i `IsAnyAmmo()` (albo Item.IsThrowing()).
+    Amount 0 -> nie wraca -> kolczan zniszczony, bez logu.
+ 4. Ta sama bramka obsluguje POLEGLYCH (`OnAgentRemoved` -> AddItemToRecover),
+    wiec lucznik, ktory wystrzelal kolczan i padl, traci go podwojnie pewnie.
+ 5. Kolczan z JEDNA strzala wraca - i wraca PELNY, bo polka nie pamieta liczby
+    strzal (`AddItemToArmory` dopisuje sam ItemObject, a przy nastepnym spawnie
+    MissionWeapon rodzi sie z `_modifiedMaxDataValue`).
+**Strata jest wiec ZERO-JEDYNKOWA i uderza w NAJLEPSZYCH lucznikow**, bo to oni
+strzelaja do konca. Stad 9/30 w jeden dzien gry, podczas gdy nasz 5-procentowy
+rzut AmmoAttrition zdejmowal w tym samym dniu srednio 2,9 stosu na bitwe.
+**To NIE jest projektowany koszt:** DTE nie ma zadnego ustawienia zuzycia amunicji,
+a ten sam warunek odrzuca tarcze o zerowej wytrzymalosci (ItemType 8) - amunicja
+wpadla pod niego przy okazji.
+**Zmiana:** postfix na `DynamicTroopEquipmentReupload.Global.IsAmmoAndEmpty`
+(prywatna statyczna, `MissionWeapon?`) gasi wynik WYLACZNIE dla prawdziwej
+amunicji (`mw.IsAnyAmmo()`). Nowy helper `Mends.FullType` szuka typu po PELNEJ
+nazwie po wszystkich modach - `QuietType("Global")` trafiloby w cudzy typ,
+bo "Global" nosi pol modlisty.
+**GALEZI IsThrowing NIE RUSZAMY:** oszczepy i toporki maja zostawac na polu,
+zgodnie z wczesniejsza decyzja Jeffa. `IsAnyAmmo()` to consumable BEZ flag broni,
+wiec sam z siebie ich nie lapie - dlatego DTE ma tam osobny warunek.
+**Ryzyko / co sprawdzic:** linia startowa "Mends: DTE oddaje juz wystrzelane
+kolczany i belty". Po bitwie linia kwatermistrza nie ma spadac bardziej, niz mowi
+wpis "Amunicja: po bitwie peklo N kolczanow" w Armoury.log. Tarcze o zerowej
+wytrzymalosci DALEJ przepadaja - osobna sprawa, nie ruszana.
+**Status:** ZBUDOWANE - DO SPRAWDZENIA
+
 ## 2026-09-13 - Choroby: kaszel przestaje spowalniac, powazne o polowe slabiej, plus dzienny meldunek "jestes chory"
 **Mody:** cudzy AIInfluence (dane) + Armoury (nowy `PlagueWatch`) | **Pliki:** `Modules\AIInfluence\save_data\PEh4X2ByGArW\diseases.json` (kopia `.bak-2026-09-13`), `Armoury/src/PlagueWatch.cs` (nowy), `Armoury/src/ArmouryBehavior.cs`, `Armoury/src/Settings.cs`, `Armoury/src/McmSettings.cs`
 **Jeff:** "modyfikatory predkosci powinny byc dwa razy slabsze, kurwa kaszel nie obniza

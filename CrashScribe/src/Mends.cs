@@ -8,6 +8,7 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
+using TaleWorlds.MountAndBlade;
 
 namespace CrashScribe
 {
@@ -1828,6 +1829,25 @@ namespace CrashScribe
 
             try
             {
+                // ===== KOLCZANY WRACAJA Z POLA (Jeff 13.09) =====
+                // Szczegoly przy metodzie QuiversComeBack. W skrocie: DTE nie oddaje
+                // do zbrojowni slotu amunicji o Amount == 0, wiec wystrzelany kolczan
+                // przepada, a ten z jedna strzala wraca pelny.
+                var tDte = FullType("DynamicTroopEquipmentReupload.Global");
+                var mAmmo = tDte != null
+                    ? AccessTools.Method(tDte, "IsAmmoAndEmpty", new[] { typeof(MissionWeapon?) })
+                    : null;
+                if (mAmmo != null)
+                {
+                    harmony.Patch(mAmmo, postfix: new HarmonyMethod(typeof(Mends), "QuiversComeBack"));
+                    Scribe.Line("Mends: DTE oddaje juz wystrzelane kolczany i belty - jedyna trwala strata amunicji to nasz rzut AmmoAttrition.");
+                }
+                else Scribe.Line("Mends: DTE Global.IsAmmoAndEmpty nieznalezione - kolczany przepadaja po staremu.");
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.Install(dteAmmo)", null); } catch { } }
+
+            try
+            {
                 // ===== UMARLI NIE ZNAJA STRACHU =====
                 // Panika wylaczona kulturze whitewalker (patrz DeadDontPanic).
                 // Patchujemy KAZDA zaladowana implementacje BattleMoraleModel
@@ -2868,6 +2888,52 @@ namespace CrashScribe
                 return false;
             }
             catch { return true; }
+        }
+
+        /// <summary>Typ po PELNEJ nazwie, po wszystkich zaladowanych modach. Nie mylic
+        /// z QuietType, ktory szuka po nazwie krotkiej wylacznie w BannerKings -
+        /// "Global" nosi pol modlisty i trafiloby sie w cudzy typ.</summary>
+        private static Type FullType(string fullName)
+        {
+            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                try
+                {
+                    var t = asm.GetType(fullName, false);
+                    if (t != null) return t;
+                }
+                catch { }
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// KOLCZANY WRACAJA Z POLA (Jeff 13.09: "strzaly mialy sie nie konczyc
+        /// lucznikom - sprawdz, czy po wystrzeleniu wszystkich strzal usuwany jest
+        /// kolczan; ma dzialac tak jak u gracza, ze sie odnawia po bitwie").
+        /// Mial racje. DTE przy zbieraniu sprzetu po bitwie (Global.ProcessAgentEquipment)
+        /// oddaje do zbrojowni tylko te sloty amunicji, dla ktorych IsAmmoAndEmpty
+        /// jest falszem - a ta zwraca PRAWDE dokladnie wtedy, gdy Amount == 0.
+        /// Kolczan wystrzelany do zera przepada bez sladu i bez logu, a kolczan
+        /// z JEDNA strzala wraca i sam sie napelnia (polka nie pamieta liczby strzal).
+        /// Strata jest wiec zero-jedynkowa i uderza w NAJLEPSZYCH lucznikow, bo to
+        /// oni strzelaja do konca. To nie jest zamierzony koszt: DTE nie ma zadnego
+        /// ustawienia zuzycia amunicji, a ten sam warunek odrzuca tarcze o zerowej
+        /// wytrzymalosci - amunicja wpadla pod niego przy okazji.
+        /// Gasimy tylko galaz PRAWDZIWEJ amunicji (IsAnyAmmo). Galezi IsThrowing
+        /// NIE ruszamy: oszczepy i toporki maja zostawac na polu, bo tak chcial Jeff.
+        /// Jedyna trwala strata amunicji zostaje nasz rzut AmmoAttrition (5% na kolczan).
+        /// </summary>
+        public static void QuiversComeBack(MissionWeapon? __0, ref bool __result)
+        {
+            try
+            {
+                if (!__result || !__0.HasValue) return;
+                var mw = __0.Value;
+                if (mw.IsEmpty) return;
+                if (mw.IsAnyAmmo()) __result = false;      // kolczan i belty wracaja na polke
+            }
+            catch { }
         }
 
         /// <summary>Typ RelationsModifier bywa w roznych przestrzeniach BK - szukamy po nazwie.</summary>
