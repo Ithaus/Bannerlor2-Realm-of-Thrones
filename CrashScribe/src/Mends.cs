@@ -343,6 +343,187 @@ namespace CrashScribe
             return null;
         }
 
+        // ===== OBLEZENIE MURU BEZ MANCE'A = CRASH (Jeff 14.09) =====
+        // Ten sam wzorzec co Harrenhal: ROT.Events.WallSiegeEvent.SetupSiegeAttackers
+        // bierze na sztywno partie Mance'a Raydera, kaze Wolnym Ludziom stworzyc
+        // mu armie i - gdy gra jej nie da (Mance nieaktywny, bez partii, nie
+        // dowodzi, w niewoli) - wola GatherArmyAction z pusta armia:
+        // NullReference, a finalizer ROT_AIInfluence_Compat przepisuje wyjatek
+        // i sciera slad (10:06:09, "HourlyTickEvent_Patch1"). Prefix sprawdza
+        // Mance'a; gdy ROT raz zawiedzie, rozstawiamy sami - z Mance'em albo
+        // z zastepca sposrod wolnych lordow Wolnych Ludzi.
+        private static bool _wallRotFailed, _wallSaved;
+        private static double _wallLastLog = -1, _wallSwallowLog = -1;
+
+        public static bool WallGuard(object __instance)
+        {
+            try
+            {
+                Hero mance = null;
+                try { mance = _rotLords != null ? Traverse.Create(_rotLords).Property("ManceRayder").GetValue() as Hero : null; } catch { }
+                Kingdom freeFolk = null;
+                try { freeFolk = _rotKingdoms != null ? Traverse.Create(_rotKingdoms).Property("FreeFolk").GetValue() as Kingdom : null; } catch { }
+                Settlement wall = null;
+                try { wall = _rotSettlements != null ? Traverse.Create(_rotSettlements).Property("TheWall").GetValue() as Settlement : null; } catch { }
+                string why = null;
+                if (mance == null) why = "brak bohatera Mance Rayder w tej kampanii";
+                else if (!mance.IsAlive) why = "Mance Rayder nie zyje";
+                else if (mance.IsPrisoner) why = "Mance Rayder w niewoli"
+                    + (mance.PartyBelongedToAsPrisoner != null ? " u " + mance.PartyBelongedToAsPrisoner.Name : "");
+                else if (!mance.IsActive) why = "Mance Rayder nieaktywny (stan " + mance.HeroState + ")";
+                else if (mance.PartyBelongedTo == null) why = "Mance Rayder bez wlasnej partii";
+                else if (mance.PartyBelongedTo.LeaderHero != mance) why = "Mance Rayder nie dowodzi swoja partia (jedzie z "
+                    + (mance.PartyBelongedTo.LeaderHero != null ? mance.PartyBelongedTo.LeaderHero.Name.ToString() : "?") + ")";
+                else if (mance.Clan == null || mance.Clan.Kingdom == null) why = "Mance Rayder bez krolestwa (klan "
+                    + (mance.Clan != null ? mance.Clan.Name.ToString() : "?") + ")";
+                else if (freeFolk != null && mance.Clan.Kingdom != freeFolk) why = "Mance Rayder sluzy " + mance.Clan.Kingdom.Name + ", nie Wolnym Ludziom";
+                else if (mance.PartyBelongedTo.MapEvent != null) why = "Mance Rayder w bitwie";
+                if (why == null && !_wallRotFailed) return true;   // Mance zdolny, ROT jeszcze nie zawiodl - ROT robi swoje
+                if (why == null) why = "ROT nie zdolal rozstawic oblezenia z Mance'em (wyjatek w SetupSiegeAttackers)";
+
+                if (freeFolk == null || wall == null)
+                {
+                    WallPostponed(why + "; brak ROTKingdoms.FreeFolk/ROTSettlements.TheWall - zastepca niemozliwy");
+                    return false;
+                }
+                if (mance != null && mance.IsAlive && !mance.IsPrisoner && mance.IsActive && mance.PartyBelongedTo != null
+                    && mance.PartyBelongedTo.LeaderHero == mance && mance.PartyBelongedTo.MapEvent == null
+                    && WallSetupWith(__instance, mance.PartyBelongedTo, freeFolk, wall, why))
+                    return false;
+                var sub = WallPickSubstitute(freeFolk);
+                if (sub == null) { WallPostponed(why + "; zaden lord Wolnych Ludzi nie jest wolny"); return false; }
+                WallSetupWith(__instance, sub, freeFolk, wall, why);
+                return false;
+            }
+            catch (Exception e)
+            {
+                try { Scribe.Report("CrashScribe", e, "Mends.WallGuard", null); } catch { }
+                return false;
+            }
+        }
+
+        private static void WallPostponed(string why)
+        {
+            double now = CampaignTime.Now.ToDays;
+            if (_wallLastLog < 0 || now - _wallLastLog >= 1.0)
+            {
+                _wallLastLog = now;
+                Scribe.Line("Mends: oblezenie Muru ODLOZONE - " + why + " (ROT ponowi za godzine gry).");
+            }
+        }
+
+        private static MobileParty WallPickSubstitute(Kingdom freeFolk)
+        {
+            MobileParty best = null; float bestStr = -1f;
+            foreach (var clan in freeFolk.Clans)
+            {
+                if (clan == null || clan.WarPartyComponents == null) continue;
+                foreach (var wpc in clan.WarPartyComponents)
+                {
+                    var mp = wpc != null ? wpc.MobileParty : null;
+                    if (mp == null || mp.IsMainParty || !mp.IsActive || !mp.IsLordParty) continue;
+                    var h = mp.LeaderHero;
+                    if (h == null || !h.IsAlive || h.IsPrisoner) continue;
+                    if (mp.MapEvent != null || mp.SiegeEvent != null) continue;
+                    float str = mp.Party != null ? mp.Party.EstimatedStrength : 0f;
+                    if (str > bestStr) { bestStr = str; best = mp; }
+                }
+            }
+            return best;
+        }
+
+        /// <summary>Port SetupSiegeAttackers z ROT WallSiegeEvent (dekompilacja 14.09)
+        /// z dowolnym dowodca. Zbiorka dolaczajacych partii w punkcie ROT
+        /// (475.9, 1102 - za Murem), dowodca pod brama. true = armia stoi.</summary>
+        private static bool WallSetupWith(object ev, MobileParty sub, Kingdom freeFolk, Settlement wall, string why)
+        {
+            var tr = Traverse.Create(ev);
+            tr.Field("SetupSiegeArmy").SetValue(false);
+            tr.Field("SiegeLeaderParty").SetValue(sub);
+            if (sub.CurrentSettlement != null) LeaveSettlementAction.ApplyForParty(sub);
+            bool fresh = sub.SiegeEvent == null || sub.SiegeEvent != wall.SiegeEvent;
+            if (fresh)
+            {
+                if (sub.Army != null) DisbandArmyAction.ApplyByUnknownReason(sub.Army);
+                sub.Position = wall.GatePosition;
+                sub.IsCurrentlyAtSea = false;
+                freeFolk.CreateArmy(sub.LeaderHero, wall, Army.ArmyTypes.Besieger, null);
+            }
+            tr.Field("SiegeArmy").SetValue(sub.Army);
+            if (!fresh) return true;
+            if (sub.Army == null)
+            {
+                string diag = "";
+                try
+                {
+                    diag = " [klan " + (sub.LeaderHero.Clan != null ? sub.LeaderHero.Clan.Name.ToString() : "?")
+                           + ", krolestwo " + (sub.LeaderHero.Clan != null && sub.LeaderHero.Clan.Kingdom != null ? sub.LeaderHero.Clan.Kingdom.Name.ToString() : "brak")
+                           + ", aktywny: " + sub.LeaderHero.IsActive
+                           + ", Wolni Ludzie wojuja z wlascicielem Muru (" + (wall.MapFaction != null ? wall.MapFaction.Name.ToString() : "?") + "): "
+                           + (wall.MapFaction != null && freeFolk.IsAtWarWith(wall.MapFaction))
+                           + ", partia " + sub.Party.NumberOfAllMembers + " ludzi, w osadzie: " + (sub.CurrentSettlement != null) + "]";
+                }
+                catch { }
+                WallPostponed(why + "; Wolni Ludzie nie utworzyli armii dla " + sub.LeaderHero.Name + diag);
+                return false;
+            }
+            var gather = new TaleWorlds.CampaignSystem.CampaignVec2(new TaleWorlds.Library.Vec2(475.885f, 1102f), true);
+            int joined = 0;
+            foreach (var clan in freeFolk.Clans)
+            {
+                if (clan == null || clan.WarPartyComponents == null) continue;
+                foreach (var wpc in clan.WarPartyComponents)
+                {
+                    var mp = wpc != null ? wpc.MobileParty : null;
+                    if (mp == null || mp.IsMainParty || mp == sub || !mp.IsActive || !mp.IsLordParty
+                        || mp.LeaderHero == null || mp.MapEvent != null || mp.SiegeEvent != null) continue;
+                    if (mp.Army != null)
+                    {
+                        if (mp.Army != sub.Army)
+                        {
+                            if (mp.Army.LeaderParty != null && mp.Army.LeaderParty.CurrentSettlement != null)
+                                LeaveSettlementAction.ApplyForParty(mp.Army.LeaderParty);
+                            DisbandArmyAction.ApplyByUnknownReason(mp.Army);
+                        }
+                    }
+                    else if (mp.CurrentSettlement != null) LeaveSettlementAction.ApplyForParty(mp);
+                    mp.Position = gather;
+                    mp.IsCurrentlyAtSea = false;
+                    mp.Army = sub.Army;
+                    joined++;
+                }
+            }
+            GatherArmyAction.Apply(sub, (TaleWorlds.CampaignSystem.Map.IMapPoint)sub);
+            sub.SetMoveModeHold();
+            sub.Ai.SetDoNotMakeNewDecisions(true);
+            Scribe.Line("Mends: oblezenie Muru - " + why + "; rozstawione, dowodzi " + sub.LeaderHero.Name
+                        + " (" + sub.LeaderHero.Clan.Name + "), dolaczylo " + joined + " partii Wolnych Ludzi.");
+            return true;
+        }
+
+        public static Exception WallSafe(Exception __exception)
+        {
+            if (__exception == null) return null;
+            try
+            {
+                _wallRotFailed = true;              // od teraz rozstawiamy sami (patrz WallGuard)
+                if (!_wallSaved)
+                {
+                    _wallSaved = true;
+                    Scribe.Report("ROT WallSiegeEvent.SetupSiegeAttackers wywrocil sie - wyjatek polkniety, gra zyje",
+                                  __exception, "WallSiegeEvent.SetupSiegeAttackers", null);
+                }
+                double now = CampaignTime.Now.ToDays;
+                if (_wallSwallowLog < 0 || now - _wallSwallowLog >= 1.0)
+                {
+                    _wallSwallowLog = now;
+                    Scribe.Line("Mends: oblezenie Muru - wyjatek ROT (" + __exception.GetType().Name + ") polkniety; od nastepnej godziny rozstawiamy sami.");
+                }
+            }
+            catch { }
+            return null;
+        }
+
         public static void GoodsUnlooted(TaleWorlds.CampaignSystem.Roster.ItemRoster __result)
         {
             try
@@ -2098,6 +2279,25 @@ namespace CrashScribe
                 else Scribe.Line("Mends: ROT HarrenhalSiegeEvent.SetupSiegeAttackers nieznaleziony - oblezenie Harrenhal bez straznika.");
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.Install(harrenhal)", null); } catch { } }
+
+            try
+            {
+                // ===== OBLEZENIE MURU BEZ MANCE'A (Jeff 14.09) - patrz WallGuard =====
+                Type tWall = null;
+                foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+                {
+                    try { if (asm.GetName().Name.StartsWith("ROT") && tWall == null) tWall = asm.GetType("ROT.Events.WallSiegeEvent"); } catch { }
+                }
+                var mWall = tWall != null ? AccessTools.Method(tWall, "SetupSiegeAttackers") : null;
+                if (mWall != null)
+                {
+                    harmony.Patch(mWall, prefix: new HarmonyMethod(typeof(Mends), "WallGuard"),
+                                         finalizer: new HarmonyMethod(typeof(Mends), "WallSafe"));
+                    Scribe.Line("Mends: oblezenie Muru (ROT) zabezpieczone - bez zdolnego Mance'a Raydera proba jest odkladana albo dowodzi zastepca, nie wywala gry.");
+                }
+                else Scribe.Line("Mends: ROT WallSiegeEvent.SetupSiegeAttackers nieznaleziony - oblezenie Muru bez straznika.");
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.Install(wall)", null); } catch { } }
 
             try
             {

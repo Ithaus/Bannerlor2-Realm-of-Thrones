@@ -1,5 +1,37 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-14 - CRASH po "Mance Rayder attacks the Wall": straznik oblezenia Muru (wzor Harrenhal)
+**Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs` (WallGuard/WallSafe/WallSetupWith)
+**Problem:** Jeff: po popupie "Freefolk Attack The Wall" i kliknieciu
+Continue - CTD. crash-original 10:06:09: NullReferenceException
+w `ROT.Events.WallSiegeEvent.HourlyTickEvent_Patch1`, stos uciety do
+tej ramki (finalizer ROT_AIInfluence_Compat.ScriptedSiegeScopedFinalizer
+zwraca wyjatek dalej - `return __exception` - i sciera ramki wewnetrzne).
+Nasz rozrusznik fabuly NIE wymusil startu (GatePrefix konczy `return
+true`, warunki ROT decydowaly).
+**Przyczyna:** (dekompilacja ROT.dll) HourlyTickEvent -> SetupSiegeAttackers:
+`SiegeLeaderParty = ROTLords.ManceRayder.PartyBelongedTo` bez null-checka,
+potem `FreeFolk.CreateArmy(Mance, TheWall, ...)` - vanilla Kingdom.
+CreateArmy NIE tworzy armii gdy `!armyLeader.IsActive` albo partia bez
+LeaderHero - i ROT wola `GatherArmyAction.Apply` z pusta armia ->
+NullReference w GatherArmyLogEntry. Identyczny mechanizm jak przy
+Harrenhal (02.09, Roose Bolton).
+**Zmiana:** prefix WallGuard na WallSiegeEvent.SetupSiegeAttackers:
+sprawdza Mance'a (zywy, wolny, aktywny, ma partie i nia dowodzi, sluzy
+Wolnym Ludziom, nie w bitwie); gdy zdolny i ROT jeszcze nie zawiodl -
+ROT robi swoje; inaczej rozstawiamy SAMI portem SetupSiegeAttackers
+(z Mance'em, a gdy niezdolny - najsilniejszy wolny lord Wolnych Ludzi;
+zbiorka w punkcie ROT 475.9/1102 za Murem), z diagnoza w logu, czemu
+krolestwo nie dalo armii. Finalizer WallSafe polyka wyjatek ROT (raport
+z PELNYM stosem do CrashScribe - nasz finalizer siedzi wewnatrz tego z
+AIInfluence), ustawia _wallRotFailed. ROT sam ponawia probe co godzine
+(TickEvent: Army == null -> SetupSiegeArmy = true), wiec nic nie wisi.
+**Ryzyko / co sprawdzic:** wczytac save sprzed dnia 534 (albo po
+crashu): po Continue w logu "Mends: oblezenie Muru - ... rozstawione,
+dowodzi X" albo "ODLOZONE - <powod>"; jesli ROT raz jeszcze padnie -
+"wyjatek ROT (...) polkniety" + raport ze stosem, gra zyje.
+**Status:** ZBUDOWANE - watcher wgra po zamknieciu gry
+
 ## 2026-09-14 - Czas kucia o polowe: pancerze 1 dzien/tier, bronie 0.5 dnia/tier (domyslne) + MCM Jeffa
 **Mod:** Armoury | **Pliki:** `Armoury/src/Settings.cs` (+McmSettings)
 **Problem:** Jeff: "zmniejsz czas wykuwania broni/mieczy o polowe, zbroi tez
