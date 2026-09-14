@@ -42,8 +42,10 @@ bylaby martwa; patchujemy w `OnSubModuleLoad`, czyli przed pierwszym JIT-em
 wiersz "Mends: kontrakt najemny nie obciaza juz gracza...". (2) Po wejsciu wplywu
 na plus linia `Mercenary Contract` ma wrocic jako DODATNIA - jesli zniknie na stale,
 to znaczy, ze prefiks lapie za szeroko.
-**Status:** ZBUDOWANE, NIEWGRANE (launcher BLSE trzymal plik) - do podmiany przy
-zamknietym launcherze.
+**Status:** WGRANE 2026-09-14 (md5 5520941c1c146dfb4f239336055ce09e, repo i gra zgodne).
+DO SPRAWDZENIA w logu po najblizszym wczytaniu: wiersz "Mends: kontrakt najemny nie
+obciaza juz gracza przy ujemnym wplywie..." oraz zniknieciu ujemnej linii
+"Mercenary Contract" z dymka EXPECTED CHANGE.
 
 
 ## 2026-09-13 - Znikajace strzaly: licznik diagnostyczny (przyczyna NIEUSTALONA, piec podejrzanych wykluczonych)
