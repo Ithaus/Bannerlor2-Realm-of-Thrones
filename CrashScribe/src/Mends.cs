@@ -3412,16 +3412,24 @@ namespace CrashScribe
                 var eq = _fAsgEquipment.GetValue(__instance) as Equipment;
                 if (eq == null) return;
                 var tpl = _pAsgReference != null ? _pAsgReference.GetValue(__instance, null) as Equipment : null;
+                CharacterObject co = null;
+                try { co = Traverse.Create(__instance).Property("Character").GetValue() as CharacterObject; } catch { }
 
                 for (int slot = (int)EquipmentIndex.Head; slot <= (int)EquipmentIndex.Cape; slot++)
                 {
                     var si = (EquipmentIndex)slot;
                     var it = eq[si].Item;
                     if (it == null) continue;
-                    if (!IsUniqueGear(it) && !IsDeadGear(it)) continue;
+                    // AI POD TA SAMA ZASADA (Jeff 14.09): dopelnienie z losowej puli
+                    // ponad Atletyke zolnierza tez schodzi - wraca wzorzec oddzialu,
+                    // a gdy i on ponad skill, slot zostaje pusty (DressCode przy
+                    // spawnie dobierze pancerz w ramach skilla)
+                    bool overSkill = co != null && !co.IsHero && !CanUse(co, it);
+                    if (!IsUniqueGear(it) && !IsDeadGear(it) && !overSkill) continue;
 
                     var sub = tpl != null ? tpl[si].Item : null;
                     if (sub != null && (IsUniqueGear(sub) || IsDeadGear(sub))) sub = null;   // wzorzec tez skazony
+                    if (sub != null && co != null && !co.IsHero && !CanUse(co, sub)) sub = null;   // wzorzec ponad skill
                     _mAsgSetEquipment.Invoke(__instance, new object[]
                     {
                         si, sub != null ? new EquipmentElement(sub) : default(EquipmentElement)

@@ -217,6 +217,55 @@ namespace Armoury
                                 Log.Info("GiantGear: " + w.StringId + " zdjety z bohatera " + soldier.StringId
                                          + " - dostaje " + (gswap != null ? gswap.StringId : "goly slot") + ".");
                         }
+                        // ZASADA NADRZEDNA U BOHATEROW (Jeff 14.09: "AI ma miec takie same
+                        // ograniczenia, nie tylko gracz - sprzet dostosowany do umiejetnosci").
+                        // Lord AI, kompan i gracz walcza tym, co udzwigna: bron ponad skill
+                        // -> wzorzec klasy w ramach skilla, pancerz ponad Atletyke -> najlepszy
+                        // dozwolony, kon ponad Riding -> najlepszy dozwolony (albo pieszo).
+                        // NAZWANE klingi i zbroje person (legendy, unikaty) zostaja - to lore,
+                        // nie lup. Gdy nie ma czym podmienic, bohater zostaje przy swoim
+                        // (lorda nie rozbrajamy). Tylko na scenie - ekwipunek w save nietkniety.
+                        for (int slot = 0; slot < 4; slot++)
+                        {
+                            var w = eq[(EquipmentIndex)slot].Item;
+                            if (w == null || LegendaryLaw.IsLegend(w) || UniqueGear.Is(w) || GiantGear.Is(w)) continue;
+                            string whyNot;
+                            if (ItemReq.Meets(soldier, w, out whyNot)) continue;
+                            var rsk = ItemReq.SkillFor(w);
+                            int sk = rsk != null ? soldier.GetSkillValue(rsk) : 0;
+                            var swap = SkillsDecide.PatternFor(w.ItemType, sk);
+                            if (swap == null) continue;
+                            eq[(EquipmentIndex)slot] = new EquipmentElement(swap);
+                            if (_floorLog++ < 20)
+                                Log.Info("ItemReq: bohater " + soldier.StringId + " nie udzwignie " + w.StringId
+                                         + " (" + whyNot + ") - dostaje " + swap.StringId + ".");
+                        }
+                        for (int slot = 5; slot <= 9; slot++)
+                        {
+                            var a = eq[(EquipmentIndex)slot].Item;
+                            if (a == null || UniqueGear.Is(a) || GiantGear.Is(a) || a.NotMerchandise) continue;   // zbroje person zostaja
+                            if (ItemReq.Meets(soldier, a)) continue;
+                            var top = SkillsDecide.TopArmor(a.ItemType, hath, soldier.Culture);
+                            if (top == null) continue;
+                            eq[(EquipmentIndex)slot] = new EquipmentElement(top);
+                            if (_floorLog++ < 20)
+                                Log.Info("ItemReq: bohater " + soldier.StringId + " nie udzwignie " + a.StringId
+                                         + " (Atletyka " + hath + " < " + a.Difficulty + ") - dostaje " + top.StringId + ".");
+                        }
+                        var hm2 = eq[(EquipmentIndex)10].Item;
+                        if (hm2 != null && !hm2.StringId.StartsWith("dragon_") && !ItemReq.Meets(soldier, hm2))
+                        {
+                            var htop2 = SkillsDecide.TopMount(soldier.GetSkillValue(TaleWorlds.Core.DefaultSkills.Riding));
+                            eq[(EquipmentIndex)10] = htop2 != null ? new EquipmentElement(htop2) : new EquipmentElement(null);
+                            var hh2 = eq[(EquipmentIndex)11].Item;
+                            var hmc2 = htop2 != null && htop2.HorseComponent != null ? htop2.HorseComponent.Monster : null;
+                            if (htop2 == null || (hh2 != null && hh2.ArmorComponent != null && hmc2 != null
+                                                  && hh2.ArmorComponent.FamilyType != hmc2.FamilyType))
+                                eq[(EquipmentIndex)11] = new EquipmentElement(null);
+                            if (_floorLog++ < 20)
+                                Log.Info("ItemReq: bohater " + soldier.StringId + " nie udzwignie " + hm2.StringId
+                                         + " (Riding) - " + (htop2 != null ? "dostaje " + htop2.StringId : "idzie pieszo") + ".");
+                        }
                     }
                 }
                 catch { }

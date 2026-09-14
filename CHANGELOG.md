@@ -1,5 +1,33 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-14 - AI pod ta sama zasada skilli: lordowie/kompani przy spawnie i dopelnianie pancerza u AI
+**Mod:** Armoury + CrashScribe | **Pliki:** `Armoury/src/DragonUnmount.cs` (galaz bohatera), `CrashScribe/src/Mends.cs` (ArmourWard)
+**Problem:** Jeff: "AI ma miec takie same ograniczenia, nie tylko gracz -
+sprzet ma byc dostosowany do umiejetnosci jednostek". Stan przed:
+straze w DTE (SuitableWard, SkillLawWard) dzialaly juz dla OBU stron
+(log 12:38: linia wroga "35 sztuk wrocilo na polke, 298 slotow pustych"),
+ale zostaly dwie luki: (a) DTE dopelnia AI puste sloty PANCERZA po naszym
+postfixie (FillEmptySlots - losowa pula po tierze, bez skilla; ArmourWard
+sprawdzal tylko unikaty/sprzet umarlych); (b) BOHATEROWIE (lordowie AI,
+kompani, gracz) byli wylaczeni ze wszystkich straz - lord z Lukiem 20
+wjezdzal z lukiem T6.
+**Zmiana:** (1) ArmourWard: dopelnienie ponad Atletyke zolnierza AI schodzi
+- wraca wzorzec oddzialu, a gdy i on ponad skill, slot pusty (DressCode
+przy spawnie dobiera pancerz w ramach skilla - dla kazdej strony).
+(2) DragonUnmount, galaz bohatera: bron ponad skill -> wzorzec klasy
+w ramach skilla, pancerz ponad Atletyke -> najlepszy dozwolony (TopArmor,
+kultura), kon ponad Riding -> najlepszy dozwolony albo pieszo (uprzaz
+dopasowana). WYJATKI: nazwane klingi (legendy), zbroje person (UniqueGear,
+NotMerchandise), smoki (osobne prawo) - lore zostaje przy wlascicielu.
+Gdy nie ma czym podmienic, bohater zostaje przy swoim (lordow nie
+rozbrajamy). Tylko na scenie - ekwipunek w save nietkniety. Dotyczy tez
+gracza (jego ekwipunek i tak blokuje UI vanilla - no-op).
+**Ryzyko / co sprawdzic:** Armoury.log: "ItemReq: bohater X nie udzwignie
+Y (...) - dostaje Z" u lordow wroga; "Straz unikatow: ... sztuk pancerza
+cofnietych do wzorca" rosnie o przypadki ponad skill u AI. Lordowie ROT
+z lore (Longclaw, Ice, Oathkeeper, zbroje Stannisa...) - bez zmian.
+**Status:** WGRANE (gra zamknieta) / watcher
+
 ## 2026-09-14 - Skarbiec trzyma tylko to, co ludzie nosza; reszta laduje na liscie gracza w stash
 **Mod:** Armoury | **Pliki:** `Armoury/src/QuartermasterLaw.cs` (Fit.Unworn, PurgeUnusable), `Settings.cs` (+McmSettings)
 **Problem:** Jeff (screen zbrojowni, pusty stash): "nic nie mam w DTE,
