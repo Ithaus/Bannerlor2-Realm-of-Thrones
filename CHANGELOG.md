@@ -1,5 +1,42 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-14 - COFNIETE: latka na ujemny zold najemnika wywracala wczytywanie zapisu
+**Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs`
+**Objaw (Jeff):** "crash gry, nie moge wczytac savea".
+**Dowod - PIERWOTNY WYJATEK CRASHA z `session-2026-09-14_09-19-27.log` (09:20:39):**
+```
+TypeInitializationException: The type initializer for
+  'TaleWorlds.CampaignSystem.GameComponents.DefaultClanFinanceModel' threw an exception
+   at DefaultClanFinanceModel.AddMercenaryIncome_Patch1(...)
+   at DefaultClanFinanceModel.CalculateClanIncomeInternal(...)
+   at DefaultClanFinanceModel.CalculateClanGoldChange_Patch3(...)
+   at BannerKings.Models.Vanilla.BKClanFinanceModel.CalculateClanGoldChange (BKClanFinanceModel.cs:102)
+   at ROT.Models.ROTClanFinanceModel.CalculateClanGoldChange
+   at NavalDLC MapInfoVM.UpdatePlayerInfo -> NavalMapInfoVM..ctor -> MapBarVM.Initialize
+   at SandBox.View.Map.MapScreen..ctor(MapState)
+ INNER: NullReferenceException at DefaultClanFinanceModel..cctor() IL+0x0028
+```
+**Przyczyna.** `DefaultClanFinanceModel` ma komplet pol statycznych inicjowanych przez
+`Game.Current.GameTextManager.FindText(...)` (`DefaultClanFinanceModel.cs:50-77`,
+m.in. `_mercenaryText`, `_tributeExpensesText`, `_kingdomBudgetText`). Wejscie w metode
+przez wrapper Harmony'ego (`_Patch1`) odpala konstruktor statyczny WCZESNIEJ niz robi to
+oryginalne cialo. Na tej sciezce ekran mapy powstaje bardzo wczesnie
+(`ROT.RealmOfThronesGameModeManagerPatch.Prefix` -> `GameStateManager.CreateState`),
+`Game.Current` jeszcze nie stoi, cctor rzuca NullReference, a .NET zapamietuje typ jako
+martwy NA STALE - kazdy kolejny dostep do modelu finansow rzuca juz tylko
+`TypeInitializationException`. Wczytywanie zapisu pada.
+**Zmiana:** zdjety `harmony.Patch` na `AddMercenaryIncome`. Metoda `MercenaryWageFloor`
+zostaje w pliku (gotowa tresc poprawki) wraz z pelnym opisem, dlaczego tak nie wolno.
+**WNIOSEK DO `docs/ERRORS.md`:** nie patchujemy metod klasy, ktorej konstruktor statyczny
+zaglada do `Game.Current`, dopoki nie mamy pewnosci, ze typ jest juz zainicjowany.
+Bezpieczne drogi: inne miejsce zaczepienia albo `RuntimeHelpers.RunClassConstructor`
+w chwili, gdy `Game.Current` ISTNIEJE (np. `OnSessionLaunched`).
+**Co ZOSTAJE wgrane (nie ruszam, bo nie ma ich w sladzie crasha):** straz klng lore
+i `ArmourWard` w CrashScribe, `InfluenceWatch` i regula rumaka w Armoury.
+**Status:** COFNIETE I WGRANE 2026-09-14 (md5 e185031fd9c5d1eef6d9489c56a8917f, repo i gra zgodne).
+Ujemny zold najemnika WRACA jako blad - do zrobienia inaczej.
+
+
 ## 2026-09-14 - Awans kawalerii nie kosztuje juz rumaka (kon tylko wtedy, gdy awans realnie sadza w siodle)
 **Mod:** Armoury | **Pliki:** `Armoury/src/Stables.cs`, `Armoury/src/ArmouryBehavior.cs`
 **Zgloszenie (Jeff):** zrzut z ekranu druzyny, "Upgrade to Mallister Eagle Knight /

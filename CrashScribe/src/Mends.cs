@@ -1885,12 +1885,30 @@ namespace CrashScribe
                 var mMerc = AccessTools.Method(
                     typeof(TaleWorlds.CampaignSystem.GameComponents.DefaultClanFinanceModel),
                     "AddMercenaryIncome");
+                // ===== COFNIETE 14.09: TA LATKA WYWRACALA WCZYTYWANIE SAVE'A =====
+                // Dowod (session-2026-09-14_09-19-27.log, PIERWOTNY WYJATEK CRASHA):
+                //   TypeInitializationException: The type initializer for
+                //   'DefaultClanFinanceModel' threw an exception
+                //     at DefaultClanFinanceModel.AddMercenaryIncome_Patch1(...)
+                //     at DefaultClanFinanceModel.CalculateClanIncomeInternal(...)
+                //     at BKClanFinanceModel.CalculateClanGoldChange -> ROTClanFinanceModel
+                //     at NavalDLC MapInfoVM..ctor -> MapScreen..ctor
+                //   INNER: NullReferenceException at DefaultClanFinanceModel..cctor() IL+0x0028
+                // PRZYCZYNA: cala ta klasa ma statyczne pola inicjowane przez
+                //   Game.Current.GameTextManager.FindText(...) (DefaultClanFinanceModel.cs:50-77).
+                //   Wejscie w metode przez wrapper Harmony'ego (_Patch1) odpala konstruktor
+                //   statyczny WCZESNIEJ niz robi to oryginalne cialo - a na tej sciezce
+                //   (ROT tworzy ekran mapy z RealmOfThronesGameModeManagerPatch.Prefix)
+                //   Game.Current jeszcze nie stoi. Cctor rzuca, .NET zapamietuje typ jako
+                //   martwy NA STALE, i caly model finansow klanu przestaje istniec -
+                //   wczytywanie zapisu pada.
+                // WNIOSEK NA PRZYSZLOSC: nie patchujemy metod klasy, ktorej konstruktor
+                //   statyczny zaglada do Game.Current, dopoki nie mamy pewnosci, ze typ
+                //   jest juz zainicjowany. Bezpieczna droga to albo inne miejsce zaczepienia,
+                //   albo wymuszenie RunClassConstructor w chwili, gdy Game.Current ISTNIEJE.
+                // Metoda MercenaryWageFloor zostaje w pliku jako gotowa tresc poprawki.
                 if (mMerc != null)
-                {
-                    harmony.Patch(mMerc, prefix: new HarmonyMethod(typeof(Mends), "MercenaryWageFloor"));
-                    Scribe.Line("Mends: kontrakt najemny nie obciaza juz gracza przy ujemnym wplywie (przeoczenie TaleWorlds: w rozmowie jest Max(0,..), w ksiegach dziennych nie bylo).");
-                }
-                else Scribe.Line("Mends: DefaultClanFinanceModel.AddMercenaryIncome nieznalezione - ujemny zold najemnika zostaje.");
+                    Scribe.Line("Mends: latka na ujemny zold najemnika COFNIETA 14.09 (wywracala wczytywanie save'a przez cctor DefaultClanFinanceModel).");
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.Install(mercWage)", null); } catch { } }
 

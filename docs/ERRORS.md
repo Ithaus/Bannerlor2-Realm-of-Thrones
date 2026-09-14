@@ -147,3 +147,22 @@ for f in session-*.log; do echo "$f : $(grep -c 'SZUKANA_SYGNATURA' "$f")"; done
 
 Tak wlasnie ustalilismy, ze crash w `GameMenuVM.OnFrameTick` byl nasz: zero w 21 starych
 sesjach, dwie w tych po zmianie.
+
+## Pulapka: Harmony na klasie, ktorej cctor zaglada do Game.Current (14.09.2026)
+
+`DefaultClanFinanceModel` inicjuje pola statyczne przez
+`Game.Current.GameTextManager.FindText(...)`. Zalozenie latki Harmony na JAKAKOLWIEK
+jej metode sprawia, ze wejscie przez wrapper `_Patch1` odpala konstruktor statyczny
+wczesniej niz robi to oryginalne cialo. Na sciezce wczytywania zapisu ROT tworzy ekran
+mapy zanim `Game.Current` stoi (`RealmOfThronesGameModeManagerPatch.Prefix` ->
+`GameStateManager.CreateState` -> `MapScreen..ctor` -> NavalDLC `MapInfoVM`), cctor
+rzuca `NullReferenceException`, a .NET zapamietuje typ jako martwy na stale.
+Skutek: `TypeInitializationException` przy kazdym dostepie i CTD przy wczytywaniu.
+
+Kosztowalo: jedna sesje Jeffa (14.09). Pelny slad w CHANGELOG.md pod haslem
+"COFNIETE: latka na ujemny zold najemnika".
+
+Regula: zanim zalatasz metode cudzej/vanillowej klasy, sprawdz jej konstruktor
+statyczny. Jesli siega do `Game.Current`, `Campaign.Current` albo menedzerow gry -
+albo znajdz inne miejsce zaczepienia, albo wymus `RuntimeHelpers.RunClassConstructor`
+w chwili, gdy te obiekty NA PEWNO istnieja (`OnSessionLaunched`).
