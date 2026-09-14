@@ -1,5 +1,24 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-14 - LegendaryLaw: nasz wlasny log klamal ("zrodlo mnozenia")
+**Mod:** Armoury | **Pliki:** `Armoury/src/LegendaryLaw.cs:335`
+**Problem:** linia `"N legend zdjetych z LOSOWANYCH szablonow bohaterow (zrodlo mnozenia)"`
+byla nieprawda i kosztowala pol sledztwa w sprawie "miliona mieczy valyrianskich" -
+brzmiala jak przyznanie sie do mnozenia sprzetu.
+**Przyczyna:** (1) `SweepTemplates` robi PODMIANE W SLOCIE (`LegendaryLaw.cs:294-295`
+i `:326-327`: `eq[(EquipmentIndex)slot] = repl != null ? new EquipmentElement(repl)
+: new EquipmentElement(null);`) - liczba sztuk sie nie zmienia, zmienia sie id.
+(2) Wszystkie 19 rosterow niosacych legendy w `ROT_sandboxcore_equipment_sets.xml`
+maja `culture="Culture.neutral_culture"`, a jedyny konsument tych rosterow,
+`DefaultEquipmentSelectionModel.GetSuitableEquipmentSet`, wymaga DOKLADNEJ rownosci
+kultur. Zaden bohater, klan ani krolestwo w calym zestawie modow nie ma neutral_culture.
+Te rostery sa martwe.
+**Zmiana:** nowa tresc komunikatu plus komentarz w kodzie mowiacy wprost, czemu stara
+byla mylaca. Zero zmiany zachowania.
+**Ryzyko:** zadne - podmieniony napis.
+**Status:** WGRANE 2026-09-14 (md5 w commicie).
+
+
 ## 2026-09-14 - Zalew unikatow: straz byla slepa na klingi lore i mialo sie ja za plecami (DTE FillEmptySlots)
 **Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs`
 **Zgloszenie (Jeff):** "znowu mamy milion mieczy valyrianskich, pancerze unikatowe np

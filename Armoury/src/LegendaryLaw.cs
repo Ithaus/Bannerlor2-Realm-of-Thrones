@@ -332,7 +332,14 @@ namespace Armoury
             }
             catch (Exception e) { Log.Error("LegendaryLaw.SweepRosters", e); }
             if (setSwapped > 0)
-                Log.Info("LegendaryLaw: " + setSwapped + " legend zdjetych z LOSOWANYCH szablonow bohaterow (zrodlo mnozenia).");
+                // UWAGA 14.09: dawna etykieta brzmiala "(zrodlo mnozenia)" i BYLA NIEPRAWDA.
+                // To podmiana W SLOCIE - liczba sztuk sie nie zmienia. Do tego wszystkie
+                // rostery niosace legendy maja culture="Culture.neutral_culture",
+                // a DefaultEquipmentSelectionModel.GetSuitableEquipmentSet wymaga rownosci
+                // kultur; zaden bohater w calym zestawie modow neutral_culture nie ma,
+                // wiec te rostery sa MARTWE. Ten napis wyslal cale sledztwo w sprawie
+                // "miliona mieczy valyrianskich" w slepa uliczke - stad nowa tresc.
+                Log.Info("LegendaryLaw: " + setSwapped + " legend podmienionych w losowanych szablonach bohaterow (podmiana w slocie, nie dodanie; rostery neutral_culture sa w praktyce nieuzywane).");
         }
 
         /// <summary>Sakwy gracza: WSZYSTKIE legendy znikaja co do sztuki
