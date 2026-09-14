@@ -884,6 +884,10 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public bool PlagueWatchEnabled { get; set; } = true;
 
+        [SettingPropertyBool("Influence Watch Enabled", HintText = "diagnostic: log the full daily breakdown of your clan influence - the game itself never shows it anywhere")]
+        [SettingPropertyGroup("The marching column")]
+        public bool InfluenceWatchEnabled { get; set; } = true;
+
         [SettingPropertyBool("Speed Audit Enabled", HintText = "once a day the full speed breakdown of your party is written to Armoury.log (before the marching-column cap and sleep debt)")]
         [SettingPropertyGroup("The marching column")]
         public bool SpeedAuditEnabled { get; set; } = true;
@@ -1568,6 +1572,7 @@ namespace Armoury
             s.NightSpeedPenalty = NightSpeedPenalty;
             s.AmmoTracerEnabled = AmmoTracerEnabled;
             s.PlagueWatchEnabled = PlagueWatchEnabled;
+            s.InfluenceWatchEnabled = InfluenceWatchEnabled;
             s.SpeedAuditEnabled = SpeedAuditEnabled;
             s.SiegePacePercent = SiegePacePercent;
             s.SiegeSicknessEnabled = SiegeSicknessEnabled;

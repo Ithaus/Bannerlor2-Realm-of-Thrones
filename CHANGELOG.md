@@ -1,5 +1,46 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-14 - Ujemny wplyw: gra nie mowi graczowi NIC, wiec my mowimy (InfluenceWatch)
+**Mod:** Armoury | **Pliki:** `Armoury/src/InfluenceWatch.cs` (nowy), `Armoury/src/Settings.cs`,
+`Armoury/src/ArmouryBehavior.cs`, `Armoury/src/McmSettings.cs`
+**Zgloszenie (Jeff):** "i czemu mam wplyw na minusie, to bez sensu" - po wykryciu, ze
+ujemny wplyw obciazal go na 4320 zlota dziennie (wpis wyzej).
+**Ustalenia z kodu (wszystkie zweryfikowane w zdekompilowanej vanilli):**
+ 1. GRA TEGO NIE POKAZUJE. `Clan.InfluenceChangeExplained` (Clan.cs:207) buduje pelne
+    rozbicie z `includeDescriptions: true`, ale NIKT go nie czyta: jedyne miejsca
+    wolajace `CalculateInfluenceChange` to `Clan.cs` i `ClanVariablesCampaignBehavior.cs:425`,
+    ktory bierze sama `ResultNumber`. Zaden vanillowy widok nie renderuje tych linii.
+    Gracz widzi skutek i nigdy przyczyny.
+ 2. NIC NIE PRZYCINA WPLYWU DO ZERA. `ChangeClanInfluenceAction.Apply` to w calosci
+    `clan.Influence += amount` (plus event) - bez klamry. Setter `Clan.Influence`
+    (Clan.cs:191-203) tez nie klamruje, tylko notuje wydatek dla SkillLevelingManager.
+    Wydatki, ktore moga zejsc pod zero: `Army.cs:278` (tworzenie armii),
+    `DisbandArmyAction.cs:14`, `Kingdom.cs:702` (wniosek w krolestwie),
+    `Clan.cs:1302` (poparcie innego rodu), `LordConversationsCampaignBehavior.cs:2635`
+    (proszenie lorda do armii), `CharacterRelationCampaignBehavior.cs:460`
+    (utrata lenna: -50 miasto / -25 zamek), `PayForCrimeAction.cs:20`.
+ 3. NAJEMNIK MA PRAWIE ZERO DOCHODU Z WPLYWU. `DefaultClanPoliticsModel` jawnie pomija
+    mu polityki krolestwa (`if (clan.Kingdom != null && !clan.IsUnderMercenaryService)`),
+    lenn nie ma, notabli-stronnikow nie ma. Zostaja bitwy i udzial w cudzej armii.
+    A sam kontrakt zjada 20% wplywu dziennie (`-Ceiling(Influence*0.2)`).
+ 4. ODBICIE SPOD ZERA JEST SAMOOGRANICZAJACE. Ten sam czlon przy ujemnym wplywie
+    dziala na plus, ale gasnie: symulacja -84 -> -68 -> -55 -> -44 -> -36 -> -29 ->
+    -24 -> -20 -> -16 -> -13 -> -11 -> -9 -> -8 -> -7 -> -6 -> -5 -> -4 i STOP,
+    bo `MathF.Ceiling(-0.8f) = 0` (TaleWorlds.Library.MathF.Ceiling to `(int)Math.Ceiling`).
+    Czyli latka na zold NIE tworzy darmowego wplywu: odbicie zatrzymuje sie tuz pod zerem
+    i nigdy nie przechodzi na plus. Na plusie czlon odwraca sie w drenaz 20% na dobe.
+**Zmiana:** `InfluenceWatch.DailyReport()` - raz na dzien gry wypisuje do logu Armoury
+stan wplywu i KAZDA linie dziennej zmiany (`ExplainedNumber.GetLines()`), a graczowi
+raz na wejscie pod kreske mowi "Your clan influence is N - below zero...".
+Wzorzec skopiowany z `PlagueWatch` (ta sama choroba: cudzy system nie melduje niczego).
+Nowy przelacznik MCM `InfluenceWatchEnabled` (domyslnie wlaczony).
+**Ryzyko / co sprawdzic:** modul niczego nie zmienia, tylko czyta i pisze.
+`InfluenceChangeExplained` wola caly lancuch modeli (BannerKings nadpisuje
+`CalculateInfluenceChange`) - raz na dzien, wiec kosztu nie widac. Do sprawdzenia
+w logu wiersz "WPLYW: stan ..., dzienna zmiana ... | <linie>".
+**Status:** WGRANE 2026-09-14 (md5 bae3ccf111ec6df94fae3fe7c4289cce, repo i gra zgodne).
+
+
 ## 2026-09-13 - "Mercenary Contract -4320": zold najemnika szedl W DRUGA STRONE (blad TaleWorlds)
 **Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs`
 **Zgloszenie (Jeff):** zrzut z paska "EXPECTED CHANGE": `Mercenary Contract -4320`,

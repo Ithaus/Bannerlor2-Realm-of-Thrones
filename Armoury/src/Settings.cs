@@ -269,6 +269,7 @@ namespace Armoury
         public float NightSpeedPenalty = 0.5f;             // flat speed lost at night on land (vanilla: 25%)
         public bool AmmoTracerEnabled = true;              // diagnostic: log every change in the troop armoury's stock of arrows, bolts and harnesses, with time and place
         public bool PlagueWatchEnabled = true;             // a daily word when YOU are the one who is ill - the disease mod tells the player nothing outside a town hospital
+        public bool InfluenceWatchEnabled = true;          // diagnostic: log the full daily breakdown of your clan influence - the game itself never shows it anywhere
         public bool SpeedAuditEnabled = true;              // once a day the full speed breakdown of your party is written to Armoury.log (before the marching-column cap and sleep debt)
         public int SiegePacePercent = 50;                  // siege engine construction speed - 50% makes sieges last twice as long, so starving a fortress out matters again
         public bool SiegeSicknessEnabled = true;           // camp fever: long sieges breed dysentery - the sick go down as wounded, some die; medicine is the shield
