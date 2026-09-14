@@ -1,5 +1,36 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-14 - Kuznia BK: "pelny pasek, a kaze odpoczac" - koszt staminy pancerzy byl nieosiagalny
+**Mod:** Armoury | **Pliki:** `Armoury/src/Patches.cs` (TrueArmourCost.RangedStamina)
+**Problem:** Jeff (screen CRAFT, [VI] Stark Knight Armor: "298 Stamina",
+pasek staminy 100%): przycisk Craft zgaszony z hintem "You must rest and
+spend time before you can do this action". Log Armoury bez bledow -
+to nie awaria, tylko arytmetyka.
+**Przyczyna:** (dekompilacja BK + vanilla) brama BK to
+`CraftingMixin.HasEnergy(): CurrentStamina >= CalculateArmorStamina(item)`.
+BK liczy koszt pancerza jako waga*5 + tier*5 + dodatki (typ, material),
+sufit 300 - Stark Knight Armor wychodzi 298. Maks staminy to vanilla
+`CraftingCampaignBehavior.GetMaxHeroCraftingStamina = 100 + Smithing/2`
+(BK go NIE nadpisuje): przy Smithing 235 = 218, przy 300 = 250. Pelny
+pasek (218/218) < 298 - ciezka plyta byla nieosiagalna dla KAZDEGO
+ponizej Smithing 396. Nasz postfix na CalculateArmorStamina podmienial
+koszt na nasza recepture TYLKO dla lukow/kusz/amunicji; pancerze szly
+wzorem BK. Trudnosc (300) NIE blokuje - wplywa tylko na szanse
+spartaczenia (CalculateBotchingChance).
+**Zmiana:** postfix RangedStamina obejmuje takze Head/Body/Leg/Hand
+Armor, Cape i HorseHarness -> koszt = Recipes.For(item).Stamina, czyli
+tier x StaminaPerTier (25), x1.5 dla drobnej roboty (helmy, rekawice) -
+ta sama regula co przy naszym kowadle. T6 korpus = 150 (miesci sie
+w 218), T6 helm/rekawice = 225 (wymaga Smithing >= 250 - swiadomie,
+jak w naszej kuzni).
+**Ryzyko / co sprawdzic:** w CRAFT tooltip Stark Knight Armor pokaze
+150 Stamina, przycisk Craft aktywny przy pelnym pasku; helm T6 nadal
+"rest" ponizej Smithing 250 - to regula, nie bug. Trudnosc BK (300)
+zostaje - ewentualna podmiana na nasza (tier-1)*SmithingSkillPerTier
+to OSOBNA decyzja (zmienia szanse spartaczenia). DLL czeka na
+zamkniecie gry.
+**Status:** ZBUDOWANE - watcher wgra po zamknieciu gry
+
 ## 2026-09-14 - COFNIETE: latka na ujemny zold najemnika wywracala wczytywanie zapisu
 **Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs`
 **Objaw (Jeff):** "crash gry, nie moge wczytac savea".

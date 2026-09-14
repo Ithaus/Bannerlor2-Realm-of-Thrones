@@ -253,7 +253,13 @@ namespace Armoury
             catch { }
         }
 
-        /// <summary>Stamina strzeleckich w zakladce BK = nasza receptura.</summary>
+        /// <summary>Stamina strzeleckich I PANCERZY w zakladce BK = nasza receptura.
+        /// (Jeff 14.09: "pelny pasek, a kaze odpoczac"). Wzor BK to
+        /// waga*5 + tier*5 + dodatki z sufitem 300, a maks staminy (vanilla,
+        /// BK go nie rusza) to 100 + Smithing/2 = 250 przy skillu 300 - ciezka
+        /// plyta (Stark Knight Armor: 298) byla NIEOSIAGALNA dla kogokolwiek.
+        /// Od teraz jedna regula dla calej kuzni: tier x StaminaPerTier,
+        /// x1.5 dla drobnej roboty (helmy, rekawice) - jak przy naszym kowadle.</summary>
         internal static void RangedStamina(ItemObject __0, ref int __result)
         {
             try
@@ -261,8 +267,12 @@ namespace Armoury
                 var item = __0;
                 if (item == null) return;
                 var t = item.ItemType;
-                if (t != ItemObject.ItemTypeEnum.Bow && t != ItemObject.ItemTypeEnum.Crossbow
-                    && t != ItemObject.ItemTypeEnum.Arrows && t != ItemObject.ItemTypeEnum.Bolts) return;
+                bool ranged = t == ItemObject.ItemTypeEnum.Bow || t == ItemObject.ItemTypeEnum.Crossbow
+                           || t == ItemObject.ItemTypeEnum.Arrows || t == ItemObject.ItemTypeEnum.Bolts;
+                bool armour = t == ItemObject.ItemTypeEnum.HeadArmor || t == ItemObject.ItemTypeEnum.BodyArmor
+                           || t == ItemObject.ItemTypeEnum.LegArmor || t == ItemObject.ItemTypeEnum.HandArmor
+                           || t == ItemObject.ItemTypeEnum.Cape || t == ItemObject.ItemTypeEnum.HorseHarness;
+                if (!ranged && !armour) return;
                 __result = Recipes.For(item).Stamina;
             }
             catch { }
