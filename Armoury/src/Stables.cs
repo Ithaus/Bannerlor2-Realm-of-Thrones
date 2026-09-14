@@ -515,6 +515,12 @@ namespace Armoury
                 if (id == "elephant" || id.StartsWith("rot_elephant") || id.StartsWith("dragon_")) return false;
                 var hc = it.HorseComponent;
                 if (hc == null || !hc.IsMount) return false;
+                // MAMUT MA item_category=horse (14.09: "Stajnia AI: Barristan Selmy
+                // kupil 9 koni [mammoth]") - zwykly wierzchowiec to tylko rodzina
+                // konia (Monster horse/horse_2); wielblady, rydwany, mamuty, slonie
+                // rzadzi MountLaw, nie stajnia
+                var mon = hc.Monster;
+                if (mon == null || mon.StringId == null || !mon.StringId.StartsWith("horse")) return false;
                 var cat = it.ItemCategory;
                 return cat == DefaultItemCategories.Horse || cat == DefaultItemCategories.WarHorse
                     || cat == DefaultItemCategories.NobleHorse;

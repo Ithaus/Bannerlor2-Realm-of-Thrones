@@ -15,8 +15,8 @@ namespace Armoury
     /// i kazda bitwa wysypuje je do lupu. Regula patrzy na NOSZACEGO, nie na
     /// przedmiot: wolno go miec temu, kto nosi go z WLASNEGO szablonu (olbrzymy,
     /// olbrzymi notabl i wedrowiec ROT). Czlowiek - nigdy, gracz tez.
-    /// Tylko BRON i amunicja (giant_club, giant_bow, giant_arrows) - pancerze
-    /// olbrzymow zostaja pod Prawem Wagi jak kazdy inny (osobna decyzja).
+    /// Bron, amunicja i pancerze (giant_club, giant_bow, giant_arrows,
+    /// giant_garb, giant_boots, giant_handwraps) - Jeff 14.09: "pancerze tez".
     /// </summary>
     internal static class GiantGear
     {
@@ -24,7 +24,8 @@ namespace Armoury
 
         internal static bool Is(ItemObject it)
         {
-            if (it == null || it.StringId == null || !it.HasWeaponComponent) return false;
+            // bron, amunicja I PANCERZ olbrzymow (Jeff 14.09: "pancerze tez zrob")
+            if (it == null || it.StringId == null || (!it.HasWeaponComponent && !it.HasArmorComponent)) return false;
             return it.StringId.StartsWith("giant_", StringComparison.Ordinal);
         }
 
@@ -40,7 +41,7 @@ namespace Armoury
                 foreach (var eq in co.BattleEquipments)
                 {
                     if (eq == null) continue;
-                    for (int s = 0; s <= 3; s++)
+                    for (int s = 0; s <= 9; s++)
                         if (Is(eq[(EquipmentIndex)s].Item)) { ok = true; break; }
                     if (ok) break;
                 }

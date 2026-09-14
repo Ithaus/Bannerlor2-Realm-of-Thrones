@@ -61,7 +61,7 @@ namespace Armoury
         {
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this, OnSession);
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this,
-                delegate { try { SweepAiArmories("dzien"); } catch { } });
+                delegate { try { SweepAiArmories("dzien"); } catch { } try { SweepMarkets("dzien"); } catch { } });
         }
 
         public override void SyncData(IDataStore dataStore)
@@ -158,6 +158,7 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Log.Error("LegendaryLaw.shelves", e); }
+            try { SweepMarkets("wczytanie"); } catch (Exception e) { Log.Error("LegendaryLaw.SweepMarkets", e); }
             try
             {
                 foreach (var mp in MobileParty.All)
@@ -186,6 +187,33 @@ namespace Armoury
                          + offShelves + " szt. z targow, " + offBags + " szt. z bagazy AI.");
         }
 
+        /// <summary>GEOGRAFIA WIERZCHOWCOW na targach (Jeff 14.09): mamut nigdzie,
+        /// wielblad w Dorne i Qarth, rydwan w Essos, slon w Volantis - reszta
+        /// schodzi z polek, bo stamtad kupowala je nasza stajnia AI.</summary>
+        private static void SweepMarkets(string why)
+        {
+            int off = 0;
+            try
+            {
+                foreach (var st in TaleWorlds.CampaignSystem.Settlements.Settlement.All)
+                {
+                    var roster = st != null ? st.ItemRoster : null;
+                    if (roster == null) continue;
+                    for (int i = roster.Count - 1; i >= 0; i--)
+                    {
+                        var el = roster.GetElementCopyAtIndex(i);
+                        var it = el.EquipmentElement.Item;
+                        if (it == null || el.Amount <= 0 || !MountLaw.IsExotic(it)) continue;
+                        if (MountLaw.AllowedForSettlement(st, it)) continue;
+                        roster.AddToCounts(el.EquipmentElement, -el.Amount);
+                        off += el.Amount;
+                    }
+                }
+            }
+            catch (Exception e) { Log.Error("LegendaryLaw.SweepMarkets", e); }
+            if (off > 0) Log.Info("LegendaryLaw: targi (" + why + ") - " + off + " egzotycznych wierzchowcow zdjetych z polek nie u swoich.");
+        }
+
         /// <summary>Wirtualne magazyny DTE partii AI (EveryoneCampaignBehavior.
         /// PartyArmories) - tam lezal recykling setek legend z poleglych.
         /// Jeff: "usun z innych armii AI te unikatowe bronie - moze byc jedna
@@ -199,7 +227,7 @@ namespace Armoury
                 var f = t != null ? AccessTools.Field(t, "PartyArmories") : null;
                 var map = f != null ? f.GetValue(null) as System.Collections.IDictionary : null;
                 if (map == null) return;
-                int cut = 0, parties = 0, clubs = 0;
+                int cut = 0, parties = 0, clubs = 0, mounts = 0;
                 foreach (System.Collections.DictionaryEntry e in map)
                 {
                     var inner = e.Value as System.Collections.IDictionary;
@@ -208,9 +236,9 @@ namespace Armoury
                     // precz - a partia z olbrzymami zostawia go swoim (DTE zbroi
                     // z magazynu, wiec czystka rozbroilaby olbrzymow)
                     bool giants = true;
+                    MobileParty owner = null;
                     try
                     {
-                        MobileParty owner = null;
                         if (e.Key is MBGUID) owner = MBObjectManager.Instance.GetObject((MBGUID)e.Key) as MobileParty;
                         if (owner != null) giants = GiantGear.PartyHasGiants(owner);
                     }
@@ -227,6 +255,15 @@ namespace Armoury
                             try { clubs += Convert.ToInt32(kv.Value); } catch { clubs++; }
                             continue;
                         }
+                        // GEOGRAFIA WIERZCHOWCOW (Jeff 14.09): mamut/wielblad/rydwan/slon
+                        // w magazynie partii, ktorej sie nie naleza - precz
+                        if (owner != null && MountLaw.IsExotic(it) && !MountLaw.AllowedForParty(owner, it))
+                        {
+                            if (kill == null) kill = new List<object>();
+                            kill.Add(kv.Key);
+                            try { mounts += Convert.ToInt32(kv.Value); } catch { mounts++; }
+                            continue;
+                        }
                         if (!IsLegend(it)) continue;
                         if (kill == null) kill = new List<object>();
                         kill.Add(kv.Key);
@@ -238,9 +275,10 @@ namespace Armoury
                         foreach (var k in kill) inner.Remove(k);
                     }
                 }
-                if (cut > 0 || clubs > 0)
+                if (cut > 0 || clubs > 0 || mounts > 0)
                     Log.Info("LegendaryLaw: magazyny AI (" + why + ") - " + cut + " legend przepadlo z " + parties + " partii"
-                             + (clubs > 0 ? ", " + clubs + " szt. sprzetu olbrzymow z partii bez olbrzymow" : "") + ".");
+                             + (clubs > 0 ? ", " + clubs + " szt. sprzetu olbrzymow z partii bez olbrzymow" : "")
+                             + (mounts > 0 ? ", " + mounts + " egzotycznych wierzchowcow nie u swoich" : "") + ".");
             }
             catch (Exception e) { Log.Error("LegendaryLaw.SweepAiArmories", e); }
         }

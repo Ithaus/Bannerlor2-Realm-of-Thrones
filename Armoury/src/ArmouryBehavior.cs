@@ -667,7 +667,8 @@ namespace Armoury
                         }
                         // sprzet olbrzymow w ludzkich sakwach/magazynie (Jeff 14.09) -
                         // precz, chyba ze w kompanii sluza olbrzymy
-                        if (GiantGear.Is(it) && !GiantGear.PartyHasGiants(MobileParty.MainParty))
+                        if ((GiantGear.Is(it) && !GiantGear.PartyHasGiants(MobileParty.MainParty))
+                            || (MountLaw.IsExotic(it) && !MountLaw.AllowedForParty(MobileParty.MainParty, it)))
                         {
                             roster.AddToCounts(el.EquipmentElement, -el.Amount);
                             cut += el.Amount;

@@ -326,7 +326,8 @@ namespace Armoury
                     }
                     // sprzet olbrzymow (Jeff 14.09): czlowiek go nie uzywa, wiec
                     // nie leci do worka - chyba ze gracz prowadzi olbrzymow
-                    if (GiantGear.Is(it) && !GiantGear.PartyHasGiants(MobileParty.MainParty))
+                    if ((GiantGear.Is(it) && !GiantGear.PartyHasGiants(MobileParty.MainParty))
+                        || (MountLaw.IsExotic(it) && !MountLaw.AllowedForParty(MobileParty.MainParty, it)))
                     {
                         roster.AddToCounts(el.EquipmentElement, -el.Amount);
                         legends += el.Amount;

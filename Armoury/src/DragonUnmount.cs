@@ -117,7 +117,19 @@ namespace Armoury
                         for (int slot = 5; slot <= 9; slot++)
                         {
                             var a = eq[(EquipmentIndex)slot].Item;
-                            if (a == null || ItemReq.Meets(soldier, a)) continue;
+                            if (a == null) continue;
+                            // PANCERZ OLBRZYMA NA CZLOWIEKU (Jeff 14.09): schodzi zawsze,
+                            // wchodzi najlepszy zwykly w ramach Atletyki
+                            if (GiantGear.Is(a) && !GiantGear.MayWear(soldier))
+                            {
+                                var gtop = SkillsDecide.TopArmor(a.ItemType, ath, soldier.Culture);
+                                eq[(EquipmentIndex)slot] = gtop != null ? new EquipmentElement(gtop) : new EquipmentElement(null);
+                                if (_floorLog++ < 20)
+                                    Log.Info("GiantGear: " + a.StringId + " zdjety z " + soldier.StringId
+                                             + " - dostaje " + (gtop != null ? gtop.StringId : "goly slot") + ".");
+                                continue;
+                            }
+                            if (ItemReq.Meets(soldier, a)) continue;
                             var top = SkillsDecide.TopArmor(a.ItemType, ath, soldier.Culture);
                             // PODLOGA SPRZETU (Jeff 31.08: "tylko zeby nadzy nie
                             // wyszli"): brak lzejszej sztuki = zolnierz zostaje
@@ -130,7 +142,10 @@ namespace Armoury
                                          + a.ItemType + ") w ramach Atletyki " + ath + "; zostaje w swoim.");
                         }
                         var mnt = eq[(EquipmentIndex)10].Item;
-                        if (mnt != null && !ItemReq.Meets(soldier, mnt))
+                        // GEOGRAFIA WIERZCHOWCOW (Jeff 14.09): mamut/wielblad/rydwan/slon
+                        // nie u swoich schodzi tak samo jak kon ponad Riding
+                        bool geo = mnt != null && !MountLaw.Allowed(soldier, mnt);
+                        if (mnt != null && (geo || !ItemReq.Meets(soldier, mnt)))
                         {
                             var topM = SkillsDecide.TopMount(
                                 soldier.GetSkillValue(TaleWorlds.Core.DefaultSkills.Riding));
@@ -148,13 +163,47 @@ namespace Armoury
                                     && hr.ArmorComponent.FamilyType != mc.FamilyType)
                                     eq[(EquipmentIndex)11] = new EquipmentElement(null);
                                 if (_floorLog++ < 20)
-                                    Log.Info("ItemReq: " + soldier.StringId + " nie udzwignie " + mnt.StringId
-                                             + " (Riding) - dostaje " + topM.StringId + ".");
+                                    Log.Info((geo ? "MountLaw: " : "ItemReq: ") + soldier.StringId
+                                             + (geo ? " nie ma prawa do " : " nie udzwignie ") + mnt.StringId
+                                             + (geo ? " (" + MountLaw.Name(MountLaw.FamilyOf(mnt)) + " nie u swoich)" : " (Riding)")
+                                             + " - dostaje " + topM.StringId + ".");
                             }
+                            if (topM == null && _floorLog++ < 20)
+                                Log.Info((geo ? "MountLaw: " : "ItemReq: ") + soldier.StringId + " traci " + mnt.StringId
+                                         + (geo ? " (" + MountLaw.Name(MountLaw.FamilyOf(mnt)) + " nie u swoich)" : " (Riding)") + " - idzie pieszo.");
                         }
                     }
                     else if (soldier != null && soldier.IsHero)
                     {
+                        // GEOGRAFIA WIERZCHOWCOW u bohatera (gracz tez): lord Polnocy
+                        // nie wjezdza w bitwe na wielbladzie ani mamucie
+                        var hm = eq[(EquipmentIndex)10].Item;
+                        if (hm != null && !MountLaw.Allowed(soldier, hm))
+                        {
+                            var htop = SkillsDecide.TopMount(soldier.GetSkillValue(TaleWorlds.Core.DefaultSkills.Riding));
+                            eq[(EquipmentIndex)10] = htop != null ? new EquipmentElement(htop) : new EquipmentElement(null);
+                            var hh = eq[(EquipmentIndex)11].Item;
+                            var hmc = htop != null && htop.HorseComponent != null ? htop.HorseComponent.Monster : null;
+                            if (htop == null || (hh != null && hh.ArmorComponent != null && hmc != null
+                                                 && hh.ArmorComponent.FamilyType != hmc.FamilyType))
+                                eq[(EquipmentIndex)11] = new EquipmentElement(null);
+                            if (_floorLog++ < 20)
+                                Log.Info("MountLaw: bohater " + soldier.StringId + " nie ma prawa do " + hm.StringId
+                                         + " (" + MountLaw.Name(MountLaw.FamilyOf(hm)) + " nie u swoich) - "
+                                         + (htop != null ? "dostaje " + htop.StringId : "idzie pieszo") + ".");
+                        }
+                        // pancerz olbrzyma na bohaterze: czlowiek go nie nosi
+                        int hath = soldier.GetSkillValue(TaleWorlds.Core.DefaultSkills.Athletics);
+                        for (int slot = 5; slot <= 9; slot++)
+                        {
+                            var a = eq[(EquipmentIndex)slot].Item;
+                            if (!GiantGear.Is(a) || GiantGear.MayWear(soldier)) continue;
+                            var gtop = SkillsDecide.TopArmor(a.ItemType, hath, soldier.Culture);
+                            eq[(EquipmentIndex)slot] = gtop != null ? new EquipmentElement(gtop) : new EquipmentElement(null);
+                            if (_floorLog++ < 20)
+                                Log.Info("GiantGear: " + a.StringId + " zdjety z bohatera " + soldier.StringId
+                                         + " - dostaje " + (gtop != null ? gtop.StringId : "goly slot") + ".");
+                        }
                         // bohater (gracz tez) z maczuga olbrzyma: czlowiek jej nie
                         // uzywa - wchodzi zwykla bron w ramach jego skilla
                         for (int slot = 0; slot < 4; slot++)

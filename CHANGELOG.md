@@ -1,5 +1,48 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-14 - Geografia wierzchowcow: mamuty tylko giganci, wielblady Dorne, rydwany Essos, reszta na konie (+ pancerze olbrzymow)
+**Mod:** Armoury | **Pliki:** `Armoury/src/MountLaw.cs` (nowy), `Stables.cs` (IsPlainMount), `DragonUnmount.cs`, `LegendaryLaw.cs` (SweepAiArmories, nowe SweepMarkets), `BattlefieldLaw.cs`, `ArmouryBehavior.cs`, `GiantGear.cs`, `SkillsDecide.cs`
+**Problem:** Jeff: "wywal mamuty - maja je tylko Wolni Ludzie i jezdza na nich
+giganci, nie ludzie; wielblady tylko Dorne; rydwany tylko armie na wschodzie,
+nie w Westeros; usun je wszystkie i daj zamienniki konie, bo wkurza mnie ten
+burdel" + "pancerze olbrzymow tez zrob".
+**Przyczyna (dane ROT, audyt 14.09):** mammoth ma kulture freefolk
+i item_category=horse - nasza STAJNIA AI kupowala go lordom jako zwyklego
+konia (log 14.09: "Stajnia AI: Barristan Selmy kupil 9 koni [mammoth]",
+Howland Reed, Stannis...), a potem szly do magazynow DTE i na ludzi;
+w szablonie ma go JEDEN oddzial (Mammoth Riding Giant). Wielblady: kultura
+aserai (Dorne), szablony Dornijczykow i Qartheen; rydwany: kultura aserai,
+ZERO szablonow - zyly tylko w losowych pulach DTE, na targach i w stajni;
+slonie: Volantis. Dotychczasowa straz DTE (CamelCulling) patrzyla tylko
+na kulture ITEMU vs partii - przepuszczala mamuty ludziom Wolnych Ludzi
+i rydwany Dornijczykom.
+**Zmiana:** MountLaw - regula wg NOSZACEGO: KON zawsze; MAMUT tylko ten, kto
+ma go we wlasnym szablonie (giganci); WIELBLAD kultura aserai albo wlasny
+szablon (Qartheen zostaja przy swoich - ich wlasne oddzialy ROT); RYDWAN
+wylacznie kultury Essos (lista 19 kultur z audytu); SLON Volantis albo wlasny
+szablon. Egzekucja: (1) Stables.IsPlainMount wymaga rodziny konia
+(Monster horse/horse_2) - stajnia AI, kwatermistrz i TopMount nigdy nie
+sadzaja nikogo na mamucie/wielbladzie/rydwanie; (2) DragonUnmount przy
+spawnie: szeregowy I bohater (gracz tez) bez prawa do zwierzecia dostaje
+konia w ramach Riding (TopMount) z dopasowana uprzezia albo idzie pieszo -
+log "MountLaw: X nie ma prawa do Y (mamut nie u swoich) - dostaje Z";
+(3) SweepAiArmories: egzotyka z magazynow DTE partii, ktorej sie nie
+nalezy - precz (co dzien + wczytanie); (4) NOWE SweepMarkets: targi - mamut
+nigdzie, wielblad tylko Dorne/Qarth, rydwan tylko Essos, slon Volantis (co
+dzien + wczytanie); (5) lup gracza i czystka sakw: egzotyka nie dla kultury
+gracza znika (Polnoc: wszystko). PANCERZE OLBRZYMOW: GiantGear.Is obejmuje
+teraz giant_garb/boots/handwraps; MayWear sprawdza sloty 0-9; przy spawnie
+czlowiek dostaje najlepszy zwykly pancerz w ramach Atletyki (TopArmor, ktory
+tez ich nie wybiera); magazyny/lupy/sakwy jak przy maczugach.
+**Ryzyko / co sprawdzic:** Armoury.log przy wczytaniu: "LegendaryLaw: targi
+(wczytanie) - N egzotycznych wierzchowcow zdjetych" i "magazyny AI ... N
+egzotycznych wierzchowcow nie u swoich"; w bitwie linie "MountLaw: ..."
+i "GiantGear: ... zdjety". Stajnia AI od teraz kupuje TYLKO konie (koniec
+"kupil 9 koni [mammoth]"). Dornijczycy zachowuja wielblady, Qartheen
+swoje, Zlota Kompania slonie, giganci mamuty. Gracz Polnocy: wielblad/rydwan/
+mamut w sakwach znika przy nastepnej czystce po bitwie.
+**Status:** WGRANE
+
 ## 2026-09-14 - CRASH przy rozstawianiu bitwy (AccessViolation w AddMountMesh): uprzaz musi pasowac do wierzchowca
 **Mod:** Armoury | **Pliki:** `Armoury/src/MountMeshGuard.cs` (nowy), `SkillsDecide.cs` (TopMount), `DragonUnmount.cs`, `SubModuleMain.cs`
 **Problem:** Jeff: CTD 11:17:58 tuz po "mission start" (bitwa polowa, 183 ludzi,

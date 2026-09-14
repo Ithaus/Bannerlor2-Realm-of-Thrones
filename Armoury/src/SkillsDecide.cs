@@ -291,6 +291,7 @@ namespace Armoury
                         if (it == null || it.ItemType != type || !it.HasArmorComponent) continue;
                         if (it.Difficulty > athletics) continue;                               // atletyka rzadzi
                         if (it.NotMerchandise) continue;                                       // unikaty imienne i itemy testowe (dummy_armor_*)
+                        if (GiantGear.Is(it)) continue;                                        // pancerz olbrzymow nie jest wzorcem (Jeff 14.09)
                         if (it.StringId != null && it.StringId.EndsWith("_crown")) continue;   // korony to regalia
                         poolAny.Add(it);
                         if (cult == null || it.Culture == null || it.Culture == cult) pool.Add(it);
