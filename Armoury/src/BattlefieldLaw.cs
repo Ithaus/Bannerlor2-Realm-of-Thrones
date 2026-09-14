@@ -324,6 +324,14 @@ namespace Armoury
                         legends += el.Amount;
                         continue;
                     }
+                    // sprzet olbrzymow (Jeff 14.09): czlowiek go nie uzywa, wiec
+                    // nie leci do worka - chyba ze gracz prowadzi olbrzymow
+                    if (GiantGear.Is(it) && !GiantGear.PartyHasGiants(MobileParty.MainParty))
+                    {
+                        roster.AddToCounts(el.EquipmentElement, -el.Amount);
+                        legends += el.Amount;
+                        continue;
+                    }
                     if (s.LootMinConditionPercent > 0)
                     {
                         var mod = el.EquipmentElement.ItemModifier;

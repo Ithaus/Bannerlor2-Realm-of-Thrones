@@ -199,16 +199,35 @@ namespace Armoury
                 var f = t != null ? AccessTools.Field(t, "PartyArmories") : null;
                 var map = f != null ? f.GetValue(null) as System.Collections.IDictionary : null;
                 if (map == null) return;
-                int cut = 0, parties = 0;
+                int cut = 0, parties = 0, clubs = 0;
                 foreach (System.Collections.DictionaryEntry e in map)
                 {
                     var inner = e.Value as System.Collections.IDictionary;
                     if (inner == null) continue;
+                    // SPRZET OLBRZYMOW (Jeff 14.09): z magazynu partii BEZ olbrzymow
+                    // precz - a partia z olbrzymami zostawia go swoim (DTE zbroi
+                    // z magazynu, wiec czystka rozbroilaby olbrzymow)
+                    bool giants = true;
+                    try
+                    {
+                        MobileParty owner = null;
+                        if (e.Key is MBGUID) owner = MBObjectManager.Instance.GetObject((MBGUID)e.Key) as MobileParty;
+                        if (owner != null) giants = GiantGear.PartyHasGiants(owner);
+                    }
+                    catch { }
                     List<object> kill = null;
                     foreach (System.Collections.DictionaryEntry kv in inner)
                     {
                         var it = kv.Key as ItemObject;
-                        if (it == null || !IsLegend(it)) continue;
+                        if (it == null) continue;
+                        if (!giants && GiantGear.Is(it))
+                        {
+                            if (kill == null) kill = new List<object>();
+                            kill.Add(kv.Key);
+                            try { clubs += Convert.ToInt32(kv.Value); } catch { clubs++; }
+                            continue;
+                        }
+                        if (!IsLegend(it)) continue;
                         if (kill == null) kill = new List<object>();
                         kill.Add(kv.Key);
                         try { cut += Convert.ToInt32(kv.Value); } catch { cut++; }
@@ -219,8 +238,9 @@ namespace Armoury
                         foreach (var k in kill) inner.Remove(k);
                     }
                 }
-                if (cut > 0)
-                    Log.Info("LegendaryLaw: magazyny AI (" + why + ") - " + cut + " legend przepadlo z " + parties + " partii.");
+                if (cut > 0 || clubs > 0)
+                    Log.Info("LegendaryLaw: magazyny AI (" + why + ") - " + cut + " legend przepadlo z " + parties + " partii"
+                             + (clubs > 0 ? ", " + clubs + " szt. sprzetu olbrzymow z partii bez olbrzymow" : "") + ".");
             }
             catch (Exception e) { Log.Error("LegendaryLaw.SweepAiArmories", e); }
         }

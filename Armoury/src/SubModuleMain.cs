@@ -71,6 +71,7 @@ namespace Armoury
                 FletchForge.ApplyAll(_harmony);
                 SmeltTab.ApplyAll(_harmony);
                 DressCode.ApplyAll(_harmony);
+                MountMeshGuard.ApplyAll(_harmony);   // uprzaz z cudzej rodziny = natywny crash w AddMountMesh
                 CaptiveRags.ApplyAll(_harmony);
                 SightRange.ApplyAll(_harmony);
                 BkArmourList.ApplyAll(_harmony);

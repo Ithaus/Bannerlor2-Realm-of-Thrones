@@ -1,5 +1,67 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-14 - CRASH przy rozstawianiu bitwy (AccessViolation w AddMountMesh): uprzaz musi pasowac do wierzchowca
+**Mod:** Armoury | **Pliki:** `Armoury/src/MountMeshGuard.cs` (nowy), `SkillsDecide.cs` (TopMount), `DragonUnmount.cs`, `SubModuleMain.cs`
+**Problem:** Jeff: CTD 11:17:58 tuz po "mission start" (bitwa polowa, 183 ludzi,
+Autumn 11). crash-original: System.AccessViolationException w
+TaleWorlds.MountAndBlade.View.MountVisualCreator.AddMountMesh(agentVisual,
+mountItem, harnessItem, ...) <- OnEquipItemsFromSpawnEquipment <- SpawnAgent
+<- DeploymentMissionController.SetupTeams. To natywny blad silnika (siatka
+uprzezy budowana na szkielecie wierzchowca), zadne catch go nie lapie.
+**Przyczyna (najprawdopodobniej nasza):** DragonUnmount podmienia jednostce
+wierzchowiec ponad jej Riding na SkillsDecide.TopMount(riding) = najlepszy
+(Effectiveness) mount o Difficulty <= Riding, a UPRZAZ zostaje ta z szablonu.
+TopMount wykluczal tylko dragon_ i elephant - w puli zostawaly wielblady
+(camel/war_camel/noble_camel, rodzina 2), mamut (Monster.elephant, 10),
+rydwany, wight_horse, jednorozce. Dzisiejsza zmiana progu z kubelka
+(bucket*25+24) na dokladny przesunela wybor: np. Riding 80 -> dawniej sufit
+99 (szlachetne konie), dzis 80 -> noble_camel (80) wygrywa Effectiveness ->
+konska uprzaz na wielbladzie -> AV. Bez logu podmiany konia nie widac -
+DragonUnmount logowal tylko bron.
+**Zmiana:** (1) TopMount: tylko zwykle konie - Stables.IsPlainMount,
+Monster.StringId zaczynajace sie od "horse", bez NotMerchandise, bez
+wight_/unicorn/zorse/dragon_/elephant; (2) DragonUnmount: po podmianie
+wierzchowca uprzaz z innej rodziny (ArmorComponent.FamilyType !=
+Monster.FamilyType) schodzi; podmiana konia LOGOWANA (pierwsze 20/sesje:
+"ItemReq: X nie udzwignie Y (Riding) - dostaje Z"); (3) MountMeshGuard -
+prefix na samym AddMountMesh (typ po nazwie, __1/__2 pozycyjnie): uprzaz
+spoza rodziny wierzchowca = null przed budowa siatki, log (20/sesje). Straznik
+lapie KAZDE zrodlo niedopasowania (DTE, BK, ROT, kwatermistrz), nie tylko nasze.
+**Ryzyko / co sprawdzic:** przy starcie Armoury.log: "MountMeshGuard: uprzaz
+spoza rodziny wierzchowca schodzi..." (jesli "nieznaleziony - straznik spi" -
+zglosic); wczytac save sprzed tej bitwy i wejsc w nia ponownie - w logu linie
+"MountMeshGuard: ..." albo "ItemReq: ... (Riding) - dostaje ..." pokaza sprawce.
+Jezdzcy ze zle dobrana uprzezia jada bez niej (statystyka, nie crash).
+**Status:** WGRANE
+
+## 2026-09-14 - Sprzet olbrzymow tylko dla olbrzymow: maczugi/luki gigantow schodza z ludzi, magazynow i lupow
+**Mod:** Armoury | **Pliki:** `Armoury/src/GiantGear.cs` (nowy), `DragonUnmount.cs`, `LegendaryLaw.cs`, `BattlefieldLaw.cs`, `ArmouryBehavior.cs`, `SkillsDecide.cs`
+**Problem:** Jeff: "maczugi gigantow maja miec tylko giganci, ludzie nimi nie
+walcza - debilnie wyglada; usun je wszystkim armiom, ze skladow, z magazynow,
+wszedzie". Dzisiejszy wpis "Zalew unikatow" swiadomie zostawil giant_club /
+giant_bow poza lista, bo straz wyrzuca przedmiot z puli dla WSZYSTKICH,
+a to sa legalne bronie 4 oddzialow rasy giant (ROT-Troops.xml) + olbrzymiego
+notabla i wedrowca; DTE (Assignment.Equipment startuje PUSTE, bron idzie
+z magazynu partii) rozdawalo je kazdemu z odpowiednim skillem.
+**Zmiana:** regula patrzy na NOSZACEGO: GiantGear.Is (giant_* z komponentem
+broni: giant_club, giant_bow, giant_arrows) i GiantGear.MayWear(char) = wlasny
+szablon jednostki ma taki sprzet (cache). (1) DragonUnmount przy spawnie:
+czlowiek (szeregowy I bohater, gracz tez) z maczuga dostaje zwykla bron
+w ramach skilla (SkillsDecide.PatternFor), log 20/sesje; (2) SweepAiArmories:
+sprzet olbrzymow znika z magazynow DTE partii BEZ olbrzymow (partia
+z olbrzymami zostawia go swoim - inaczej DTE by ich rozbroilo); klucz mapy
+MBGUID -> MobileParty przez MBObjectManager; (3) BattlefieldLaw: nie leci do
+lupu gracza, chyba ze gracz prowadzi olbrzymow; (4) CleanseTrashInBags:
+z sakw i magazynu gracza precz (ten sam wyjatek na olbrzymow w kompanii);
+(5) ksiega wkladow go nie ksieguje; (6) AddPattern: nie jest wzorcem.
+Pancerze olbrzymow (giant_garb itd.) NIE objete - zostaja pod Prawem Wagi;
+osobna decyzja.
+**Ryzyko / co sprawdzic:** log "GiantGear: giant_club zdjety z X - dostaje Y";
+"LegendaryLaw: magazyny AI ... N szt. sprzetu olbrzymow z partii bez olbrzymow";
+olbrzymy Wolnych Ludzi nadal walcza maczugami; po bitwie z olbrzymami
+w lupie brak maczug (chyba ze masz olbrzymow w partii).
+**Status:** WGRANE
+
 ## 2026-09-14 - Valyrianska stal jest unikatowa: seryjne klingi ROT wchodza do prawa legend (ODWROCENIE decyzji z 29.08)
 **Mod:** Armoury | **Pliki:** `Armoury/src/LegendaryLaw.cs`
 **Problem:** Jeff (screen sakw: 25 sztuk "Valyrian Steel Sword Blue/Red/type

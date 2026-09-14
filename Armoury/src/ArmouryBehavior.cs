@@ -665,6 +665,14 @@ namespace Armoury
                             cut += el.Amount;
                             continue;
                         }
+                        // sprzet olbrzymow w ludzkich sakwach/magazynie (Jeff 14.09) -
+                        // precz, chyba ze w kompanii sluza olbrzymy
+                        if (GiantGear.Is(it) && !GiantGear.PartyHasGiants(MobileParty.MainParty))
+                        {
+                            roster.AddToCounts(el.EquipmentElement, -el.Amount);
+                            cut += el.Amount;
+                            continue;
+                        }
                         // PROG KONDYCJI WYCIETY (Jeff 31.08: "wzialem pancerz
                         // z bitwy i znika w inventory"). Zuzyty lup to surowiec
                         // do NAPRAWY, nie smiec - a czystka zjadala tez WLASNY
@@ -749,7 +757,7 @@ namespace Armoury
                             var item = eq[(EquipmentIndex)slot].Item;
                             if (item == null || item.ItemType == ItemObject.ItemTypeEnum.Banner) continue;
                             if (item.StringId != null && item.StringId.StartsWith("dragon_")) continue;
-                            if (LegendaryLaw.IsLegend(item)) continue;
+                            if (LegendaryLaw.IsLegend(item) || GiantGear.Is(item)) continue;
                             // PRAWO ZACHOWANIA LUPU (audyt 30.08): FIZYCZNE sztuki
                             // poleglych zwraca juz DTE (ItemsToRecover -> magazyn) -
                             // dosypywanie szablonu bylo DRUGIM kompletem tej samej

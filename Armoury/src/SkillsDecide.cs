@@ -333,7 +333,17 @@ namespace Armoury
                     if (it == null || it.ItemType != ItemObject.ItemTypeEnum.Horse) continue;
                     if (it.Difficulty > riding) continue;                    // prog dokladny, jak przy pancerzu
                     var id = it.StringId ?? "";
-                    if (id.StartsWith("dragon_") || id == "elephant") continue;
+                    // TYLKO ZWYKLY KON (Jeff 14.09, crash 11:17:58): zamiennik
+                    // wchodzi pod ISTNIEJACA uprzaz jednostki - wielblad,
+                    // mamut, rydwan czy slon pod konska uprzezia to natywny
+                    // AccessViolation w AddMountMesh. Do tego zadnych trupow,
+                    // jednorozcow i unikatow na szeregowym.
+                    if (!Stables.IsPlainMount(it)) continue;
+                    var mon = it.HorseComponent != null ? it.HorseComponent.Monster : null;
+                    if (mon == null || mon.StringId == null || !mon.StringId.StartsWith("horse")) continue;
+                    if (it.NotMerchandise) continue;
+                    if (id.StartsWith("dragon_") || id == "elephant" || id.StartsWith("wight_")
+                        || id.StartsWith("unicorn") || id.StartsWith("zorse")) continue;
                     if (best == null || it.Effectiveness > best.Effectiveness) best = it;
                 }
             }
@@ -370,6 +380,7 @@ namespace Armoury
                             && (it.StringId.IndexOf("burning", StringComparison.OrdinalIgnoreCase) >= 0
                                 || it.StringId.IndexOf("flaming", StringComparison.OrdinalIgnoreCase) >= 0)) continue;
                         if (LegendaryLaw.IsLegend(it)) continue;                 // legendy nie sa wzorcem
+                        if (GiantGear.Is(it)) continue;                          // maczugi olbrzymow tez nie (Jeff 14.09)
                         if (it.NotMerchandise) continue;                         // unikaty imienne i itemy testowe
                         if (it.StringId != null && it.StringId.StartsWith("dragon_")) continue;
                         if (best == null || it.Effectiveness > best.Effectiveness) best = it;

@@ -53,6 +53,19 @@ namespace Armoury
                         for (int slot = 0; slot < 4; slot++)
                         {
                             var w = eq[(EquipmentIndex)slot].Item;
+                            // SPRZET OLBRZYMOW NA CZLOWIEKU (Jeff 14.09): schodzi ZAWSZE,
+                            // w reke wchodzi zwykla bron w ramach skilla - a gdy nie ma
+                            // czym, lepiej goly slot niz mamut z maczuga w ludzkiej dloni
+                            if (GiantGear.Is(w) && !GiantGear.MayWear(soldier))
+                            {
+                                int gs = w.RelevantSkill != null ? soldier.GetSkillValue(w.RelevantSkill) : 0;
+                                var gswap = SkillsDecide.PatternFor(w.ItemType, gs);
+                                eq[(EquipmentIndex)slot] = gswap != null ? new EquipmentElement(gswap) : new EquipmentElement(null);
+                                if (_floorLog++ < 20)
+                                    Log.Info("GiantGear: " + w.StringId + " zdjety z " + soldier.StringId
+                                             + " - dostaje " + (gswap != null ? gswap.StringId : "goly slot") + ".");
+                                continue;
+                            }
                             if (LegendaryLaw.IsLegend(w))   // prog 100k + lista person
                             {
                                 // legenda schodzi ZAWSZE, ale zolnierz nie idzie z golym
@@ -124,6 +137,36 @@ namespace Armoury
                             eq[(EquipmentIndex)10] = topM != null
                                 ? new EquipmentElement(topM) : new EquipmentElement(null);
                             if (topM == null) eq[(EquipmentIndex)11] = new EquipmentElement(null);
+                            else
+                            {
+                                // UPRZAZ MUSI PASOWAC DO NOWEGO KONIA (Jeff 14.09, crash
+                                // 11:17:58): rodzina inna niz wierzchowca = natywny
+                                // AccessViolation w AddMountMesh - wtedy bez uprzezy
+                                var hr = eq[(EquipmentIndex)11].Item;
+                                var mc = topM.HorseComponent != null ? topM.HorseComponent.Monster : null;
+                                if (hr != null && hr.ArmorComponent != null && mc != null
+                                    && hr.ArmorComponent.FamilyType != mc.FamilyType)
+                                    eq[(EquipmentIndex)11] = new EquipmentElement(null);
+                                if (_floorLog++ < 20)
+                                    Log.Info("ItemReq: " + soldier.StringId + " nie udzwignie " + mnt.StringId
+                                             + " (Riding) - dostaje " + topM.StringId + ".");
+                            }
+                        }
+                    }
+                    else if (soldier != null && soldier.IsHero)
+                    {
+                        // bohater (gracz tez) z maczuga olbrzyma: czlowiek jej nie
+                        // uzywa - wchodzi zwykla bron w ramach jego skilla
+                        for (int slot = 0; slot < 4; slot++)
+                        {
+                            var w = eq[(EquipmentIndex)slot].Item;
+                            if (!GiantGear.Is(w) || GiantGear.MayWear(soldier)) continue;
+                            int gs = w.RelevantSkill != null ? soldier.GetSkillValue(w.RelevantSkill) : 0;
+                            var gswap = SkillsDecide.PatternFor(w.ItemType, gs);
+                            eq[(EquipmentIndex)slot] = gswap != null ? new EquipmentElement(gswap) : new EquipmentElement(null);
+                            if (_floorLog++ < 20)
+                                Log.Info("GiantGear: " + w.StringId + " zdjety z bohatera " + soldier.StringId
+                                         + " - dostaje " + (gswap != null ? gswap.StringId : "goly slot") + ".");
                         }
                     }
                 }
