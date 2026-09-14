@@ -1,5 +1,41 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-14 - Valyrianska stal jest unikatowa: seryjne klingi ROT wchodza do prawa legend (ODWROCENIE decyzji z 29.08)
+**Mod:** Armoury | **Pliki:** `Armoury/src/LegendaryLaw.cs`
+**Problem:** Jeff (screen sakw: 25 sztuk "Valyrian Steel Sword Blue/Red/type
+2-8", Orphanmaker x2, Skull Sword x3, wszystkie 3%): "czemu valyrianska stal
+jest powszechna, jakby kazdy na rogu mogl walczyc elitarna bronia; przejrzyj
+armie i zabierz taka bron wszystkim - to ma byc unikatowe".
+**Przyczyna:** (items-dump.csv + ROTassets.xml) val_steel_sword_*, koa_sword_*,
+whyt_sword (Orphanmaker), skull_sword to przedmioty KUTE ROT: value 200-250k,
+tier 6, difficulty 175-200 - ale `is_merchandise=true`. Prawo legend lapie
+"value >= 100k AND NotMerchandise", wiec te klingi przechodzily jako zwykly
+drogi towar: lezaly w workach z lupem (BattlefieldLaw odsiewa tylko legendy),
+w magazynach DTE partii AI (SweepAiArmories je omijal), DTE rozdawalo je elicie
+T5/T6 (skill 175-200 wystarcza), a po bitwie wracaly do gracza jako lup.
+W szablonach jednostek ROT NIE ma ich wcale (tylko 2 wedrowcy specjalni) - caly
+zalew to obieg DTE + lupy. Decyzja z 29.08 w naszym kodzie ("seryjne
+valyriany maja zostac zwyklym drogim sprzetem") - dzis ODWROCONA.
+**Zmiana:** LegendPrefixes {val_steel_sword_, koa_sword_, whyt_sword,
+skull_sword} (ta sama lista co CrashScribe.Mends.BladePrefixes) wchodza do
+zbioru legend niezaleznie od NotMerchandise (BuildLegendSet + IsLegend).
+Dzieki temu istniejaca maszyneria obejmuje je automatycznie przy kazdym
+wczytaniu i co dzien: SweepWorld (NotMerchandise + czystka targow i bagazy
+AI), SweepAiArmories (magazyny DTE), SweepTemplates (szablony jednostek -
+tu i tak pusto), DragonUnmount (podmiana przy spawnie na zwykly odpowiednik),
+BattlefieldLaw (nie leza w lupach), LockLegendPieces (dedykowane czesci
+znikaja z kuzni; nauka przez przetop legendy zostaje jak dotad), SkillsDecide
+(nie sa wzorcem). Bohaterowie (lordowie, wedrowcy) nosza swoje dalej.
+**Ryzyko / co sprawdzic:** log "LegendaryLaw: zbior legend zbudowany - N broni
+(... seryjne klingi valyrianskie)" z N wyraznie wyzszym niz dotad; "magazyny AI
+(wczytanie) - X legend przepadlo z Y partii"; po bitwie ZERO valyrianow w lupie.
+UWAGA DLA JEFFA: 25 sztuk w jego sakwach to teraz legendy - CleanseTrashInBags
+(rozliczenie po bitwie) usuwa legendy z sakw i magazynu DTE gracza, wiec
+znikna przy pierwszej bitwie; przetop w Smelt ZANIM to nastapi daje stal
+valyrianska i nauke czesci. Chce inaczej (jedna sztuka z typu zostaje) -
+osobna decyzja.
+**Status:** ZBUDOWANE - watcher wgra po zamknieciu gry
+
 ## 2026-09-14 - CRASH po "Mance Rayder attacks the Wall": straznik oblezenia Muru (wzor Harrenhal)
 **Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs` (WallGuard/WallSafe/WallSetupWith)
 **Problem:** Jeff: po popupie "Freefolk Attack The Wall" i kliknieciu

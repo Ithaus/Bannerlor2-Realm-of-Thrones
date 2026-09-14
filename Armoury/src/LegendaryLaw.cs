@@ -37,6 +37,26 @@ namespace Armoury
             "gendry_hammer"       // Gendry's Hammer
         };
 
+        // SERYJNE KLINGI VALYRIANSKIE (Jeff 14.09: "czemu valyrianska stal jest
+        // powszechna, jakby kazdy na rogu mogl walczyc elitarna bronia - to ma
+        // byc unikatowe"). ROTassets.xml daje im value 200k, tier 6, ale
+        // is_merchandise=TRUE - wiec prog "100k + NotMerchandise" je przepuszczal
+        // i lezaly w workach z lupem, magazynach DTE i rekach szeregowych
+        // (screen 14.09: 25 sztuk po 3% w sakwach). Decyzja z 29.08 ("maja
+        // zostac zwyklym drogim sprzetem") ODWROCONA na zyczenie Jeffa.
+        // Ta sama lista co CrashScribe.Mends.BladePrefixes - trzymac w zgodzie.
+        private static readonly string[] LegendPrefixes = {
+            "val_steel_sword_", "koa_sword_", "whyt_sword", "skull_sword"
+        };
+
+        private static bool HasLegendPrefix(string id)
+        {
+            if (id == null) return false;
+            for (int i = 0; i < LegendPrefixes.Length; i++)
+                if (id.StartsWith(LegendPrefixes[i], StringComparison.Ordinal)) return true;
+            return false;
+        }
+
         public override void RegisterEvents()
         {
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this, OnSession);
@@ -223,11 +243,11 @@ namespace Armoury
                 foreach (var it in MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
                 {
                     if (it == null || !it.HasWeaponComponent || it.StringId == null) continue;
-                    if (LegendIds.Contains(it.StringId)) { set.Add(it); continue; }
+                    if (LegendIds.Contains(it.StringId) || HasLegendPrefix(it.StringId)) { set.Add(it); continue; }
                     if (floor > 0 && it.Value >= floor && it.NotMerchandise) set.Add(it);
                 }
                 Log.Info("LegendaryLaw: zbior legend zbudowany - " + set.Count
-                         + " broni (fabryczne NotMerchandise 100k+ oraz lista person).");
+                         + " broni (fabryczne NotMerchandise 100k+, lista person, seryjne klingi valyrianskie).");
             }
             catch (Exception e) { Log.Error("LegendaryLaw.BuildLegendSet", e); }
             _legendSet = set;
@@ -237,7 +257,7 @@ namespace Armoury
         {
             if (it == null || !it.HasWeaponComponent || it.StringId == null) return false;
             if (_legendSet != null) return _legendSet.Contains(it);
-            if (LegendIds.Contains(it.StringId)) return true;
+            if (LegendIds.Contains(it.StringId) || HasLegendPrefix(it.StringId)) return true;
             var floor = Settings.Current.LegendaryLootValueFloor;
             return floor > 0 && it.Value >= floor && it.NotMerchandise;
         }
