@@ -30,7 +30,7 @@ namespace Armoury
         // --- Time at the anvil ---
         public bool ForgeWorksWithoutYou = true;           // the smith and his lads keep at your project while you ride - the finished piece waits at that forge for collection; off = the clock only runs while you stay in that settlement
         public bool ForgeTakesTime = true;                 // armour is not finished the moment you order it
-        public float DaysPerTier = 2f;                     // days per tier - 2 means a tier 5 plate takes ten days
+        public float DaysPerTier = 1f;                     // days per tier - 1 means a tier 5 plate takes five days (Jeff 14.09: halved)
         public float TempoHastyTime = 0.5f;                // in haste: this share of the time
         public float TempoHastyRisk = 2f;                  // in haste: this many times the risk
         public float TempoCarefulTime = 1.5f;              // with care: this many times longer
@@ -44,7 +44,7 @@ namespace Armoury
         public int XpCapPerTier = 1300;                    // ceiling per project = this times the tier
         public float XpShareWhileWorking = 0.4f;           // share paid out as you work, the rest on completion
         public bool WeaponCraftingTakesTime = true;        // native weapon smithing is not instant either
-        public float WeaponDaysPerTier = 1.0f;             // weapons come faster than armour, but not at once
+        public float WeaponDaysPerTier = 0.5f;             // weapons come faster than armour, but not at once (Jeff 14.09: halved)
         public bool WeaponXpFromValueCapped = true;        // native weapon XP follows the sale price - cap it
         public int WeaponXpCapPerTier = 500;               // ceiling per weapon = this times the tier
         // --- Orders from the lords ---

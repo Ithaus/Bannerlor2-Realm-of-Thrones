@@ -84,9 +84,9 @@ namespace Armoury
         [SettingPropertyGroup("Time at the anvil")]
         public bool ForgeTakesTime { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Days Per Tier", 0.00f, 8.00f, "0.00", HintText = "days per tier - 2 means a tier 5 plate takes ten days")]
+        [SettingPropertyFloatingInteger("Days Per Tier", 0.00f, 4.00f, "0.00", HintText = "days per tier - 1 means a tier 5 plate takes five days (Jeff 14.09: halved)")]
         [SettingPropertyGroup("Time at the anvil")]
-        public float DaysPerTier { get; set; } = 2f;
+        public float DaysPerTier { get; set; } = 1f;
 
         [SettingPropertyFloatingInteger("Tempo Hasty Time", 0.00f, 2.00f, "0.00", HintText = "in haste: this share of the time")]
         [SettingPropertyGroup("Time at the anvil")]
@@ -136,9 +136,9 @@ namespace Armoury
         [SettingPropertyGroup("Experience")]
         public bool WeaponCraftingTakesTime { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Weapon Days Per Tier", 0.00f, 4.00f, "0.00", HintText = "weapons come faster than armour, but not at once")]
+        [SettingPropertyFloatingInteger("Weapon Days Per Tier", 0.00f, 2.00f, "0.00", HintText = "weapons come faster than armour, but not at once (Jeff 14.09: halved)")]
         [SettingPropertyGroup("Experience")]
-        public float WeaponDaysPerTier { get; set; } = 1.0f;
+        public float WeaponDaysPerTier { get; set; } = 0.5f;
 
         [SettingPropertyBool("Weapon Xp From Value Capped", HintText = "native weapon XP follows the sale price - cap it")]
         [SettingPropertyGroup("Experience")]

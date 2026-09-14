@@ -1,5 +1,21 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-14 - Czas kucia o polowe: pancerze 1 dzien/tier, bronie 0.5 dnia/tier (domyslne) + MCM Jeffa
+**Mod:** Armoury | **Pliki:** `Armoury/src/Settings.cs` (+McmSettings)
+**Problem:** Jeff: "zmniejsz czas wykuwania broni/mieczy o polowe, zbroi tez
+o polowe (w dniach)".
+**Zmiana:** domyslne DaysPerTier 2 -> 1 i WeaponDaysPerTier 1.0 -> 0.5.
+UWAGA: MCM Jeffa ma wlasne wartosci w Armoury.json (DaysPerTier 2.0,
+WeaponDaysPerTier 0.5037 - juz wczesniej sciete), wiec zmiana domyslnych
+sama nic nie zmieni w biezacej kampanii; osobny watcher (mcm-patch.ps1)
+po zamknieciu gry wpisuje do Armoury.json DaysPerTier=1.0 i
+WeaponDaysPerTier=0.25 (polowa obecnych). Wszystkie liczniki dni czytaja
+te dwa suwaki (Forge.cs, SmithMenu.cs, ArmouryBehavior.AdvanceProjects),
+wiec biezace projekty tez przyspiesza od nastepnego ticku.
+**Ryzyko / co sprawdzic:** w MCM Armoury suwaki Days Per Tier = 1,
+Weapon Days Per Tier = 0.25; T5 plyta = 5 dni, miecz T5 = 1.25 dnia.
+**Status:** ZBUDOWANE - watchery wgraja po zamknieciu gry
+
 ## 2026-09-14 - Kuznia BK: "pelny pasek, a kaze odpoczac" - koszt staminy pancerzy byl nieosiagalny
 **Mod:** Armoury | **Pliki:** `Armoury/src/Patches.cs` (TrueArmourCost.RangedStamina)
 **Problem:** Jeff (screen CRAFT, [VI] Stark Knight Armor: "298 Stamina",
