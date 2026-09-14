@@ -1848,6 +1848,22 @@ namespace CrashScribe
 
             try
             {
+                // ===== ZOLD NAJEMNIKA NIE MOZE BYC UJEMNY (Jeff 13.09) =====
+                // Szczegoly przy metodzie MercenaryWageFloor.
+                var mMerc = AccessTools.Method(
+                    typeof(TaleWorlds.CampaignSystem.GameComponents.DefaultClanFinanceModel),
+                    "AddMercenaryIncome");
+                if (mMerc != null)
+                {
+                    harmony.Patch(mMerc, prefix: new HarmonyMethod(typeof(Mends), "MercenaryWageFloor"));
+                    Scribe.Line("Mends: kontrakt najemny nie obciaza juz gracza przy ujemnym wplywie (przeoczenie TaleWorlds: w rozmowie jest Max(0,..), w ksiegach dziennych nie bylo).");
+                }
+                else Scribe.Line("Mends: DefaultClanFinanceModel.AddMercenaryIncome nieznalezione - ujemny zold najemnika zostaje.");
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.Install(mercWage)", null); } catch { } }
+
+            try
+            {
                 // ===== UMARLI NIE ZNAJA STRACHU =====
                 // Panika wylaczona kulturze whitewalker (patrz DeadDontPanic).
                 // Patchujemy KAZDA zaladowana implementacje BattleMoraleModel
@@ -2934,6 +2950,51 @@ namespace CrashScribe
                 if (mw.IsAnyAmmo()) __result = false;      // kolczan i belty wracaja na polke
             }
             catch { }
+        }
+
+        private static bool _mercFloorLogged;
+
+        /// <summary>
+        /// ZOLD NAJEMNIKA NIE MOZE BYC UJEMNY (Jeff 13.09: "dlaczego mam Mercenary
+        /// Contract -4k, kurwa place za to, ze walcze dla kogos jako najemnik").
+        /// Mial racje, i to nie jest wina zadnego moda - to przeoczenie TaleWorlds.
+        /// Kontrakt najemny to zamiana wplywow na zloto. DefaultClanFinanceModel
+        /// .AddMercenaryIncome liczy
+        ///     Ceiling(Influence * 1/RevenueSmoothenFraction()) * MercenaryAwardMultiplier
+        /// (RevenueSmoothenFraction() = 5, czyli Influence/5), a blizniacza linia
+        /// w DefaultClanPoliticsModel o tyle samo OBNIZA wplywy - placa idzie z wplywow.
+        /// Przy dodatnich wplywach wszystko gra. Przy UJEMNYCH oba czlony zmieniaja
+        /// znak: wplywy rosna, a zold leci z kieszeni gracza do skarbca krolestwa
+        /// (MercenaryWallet -= num przy ujemnym num go POWIEKSZA).
+        /// Ze to niezamierzone, widac w samym kodzie gry: sciezka rozmowy z sierzantem
+        /// (LordConversationsCampaignBehavior, trzy miejsca) liczy to samo przez
+        /// MathF.Max(0, (int)Influence) * MercenaryAwardMultiplier - tam zabezpieczenie
+        /// JEST, w ksiegach dziennych go zapomniano. BannerKings tej linii nie dotyka,
+        /// BKClanFinanceModel oddaje ja bazie.
+        /// U Jeffa: wplyw -84 -> Ceiling(-16.8) = -16, mnoznik kontraktu 270 -> -4320 na dobe.
+        /// Gasimy wiec sama linie ZLOTA przy ujemnym wplywie: zadnej wyplaty, ale tez
+        /// zadnej doplaty. Strony politycznej NIE ruszamy - dzieki niej ujemny wplyw
+        /// sam wraca do zera (przy -84 to +16 na dobe), wiec kontrakt wychodzi z dolka
+        /// o wlasnych silach i po kilku dniach znowu placi normalnie.
+        /// </summary>
+        public static bool MercenaryWageFloor(Clan __0)
+        {
+            try
+            {
+                var clan = __0;
+                if (clan == null || !clan.IsUnderMercenaryService) return true;
+                if (clan.Influence >= 0f) return true;
+                if (clan == Clan.PlayerClan && !_mercFloorLogged)
+                {
+                    _mercFloorLogged = true;
+                    Scribe.Line("Mends: zold najemnika wstrzymany - wplyw " + clan.Influence.ToString("0.#")
+                                + " jest ujemny, wiec vanilla obciazylaby gracza na "
+                                + (MathF.Ceiling(clan.Influence * 0.2f) * clan.MercenaryAwardMultiplier)
+                                + " zlota dziennie. Linia skasowana; wplyw odrasta sam i placa wroci.");
+                }
+                return false;
+            }
+            catch { return true; }
         }
 
         /// <summary>Typ RelationsModifier bywa w roznych przestrzeniach BK - szukamy po nazwie.</summary>

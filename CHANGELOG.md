@@ -1,5 +1,51 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-13 - "Mercenary Contract -4320": zold najemnika szedl W DRUGA STRONE (blad TaleWorlds)
+**Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs`
+**Zgloszenie (Jeff):** zrzut z paska "EXPECTED CHANGE": `Mercenary Contract -4320`,
+`Total: -4831`. "place za to, ze walcze dla kogos jako najemnik, to jest bez sensu".
+**Przyczyna - vanilla, nie mod.** Linia nazywa sie `str_finance_mercenary`
+(`{=qcaaJLhx}Mercenary Contract`) i pochodzi z `TaleWorlds.CampaignSystem.dll`
+(potwierdzone: id stringa jest TYLKO w tym pliku, zaden mod nie lata
+`AddMercenaryIncome`, `BKClanFinanceModel` oddaje ta czesc bazie przez
+`((DefaultClanFinanceModel)this).CalculateClanGoldChange(...)`).
+Kontrakt najemny to ZAMIANA WPLYWOW NA ZLOTO, dwie blizniacze linie:
+ - `DefaultClanFinanceModel.AddMercenaryIncome`:
+   `num = MathF.Ceiling(Influence * (1f / RevenueSmoothenFraction())) * MercenaryAwardMultiplier;`
+   `Kingdom.MercenaryWallet -= num; goldChange.Add(num, _mercenaryText);`
+ - `DefaultClanPoliticsModel.CalculateInfluenceChangeInternal`:
+   `if (clan.IsUnderMercenaryService) influenceChange.Add(-Ceiling(Influence * 0.2f), _mercenaryStr);`
+`RevenueSmoothenFraction()` = 5f, czyli `Influence/5`. Przy DODATNIM wplywie:
+wplyw maleje, zloto rosnie - tak ma byc. Przy UJEMNYM oba czlony zmieniaja znak:
+wplyw rosnie, a zold leci Z KIESZENI GRACZA do skarbca krolestwa (`MercenaryWallet -= num`
+przy ujemnym `num` ten skarbiec POWIEKSZA). Ani `Clan.Influence` (setter bez klamry),
+ani `ChangeClanInfluenceAction.Apply`, ani dzienne `ClanVariablesCampaignBehavior`
+nie przycinaja wplywu do zera, wiec stan ujemny utrzymuje sie dniami.
+**Dowod, ze to przeoczenie, a nie zamysl:** ta sama formula w sciezce rozmowy
+(`LordConversationsCampaignBehavior`, wiersze ~2478, ~2485, ~2499) jest pisana jako
+`MathF.Max(0, (int)Clan.Influence) * MercenaryAwardMultiplier` - w dialogu klamra
+JEST, w ksiegach dziennych jej zapomniano.
+**Rachunek Jeffa:** wplyw -84 (widoczny na pasku) -> `Ceiling(-84 * 0.2) = Ceiling(-16.8) = -16`,
+mnoznik kontraktu 270 (`GetMercenaryAwardFactorToJoinKingdom` zwraca wielokrotnosc 10
+z zakresu 10-800) -> `-16 * 270 = -4320`. Zgadza sie co do zlotowki.
+**Zmiana:** prefiks `Mends.MercenaryWageFloor` na prywatnej
+`DefaultClanFinanceModel.AddMercenaryIncome` - przy `IsUnderMercenaryService`
+i `Influence < 0` pomija oryginal w calosci (zadna linia nie powstaje: ani wyplata,
+ani doplata, ani ruch na `MercenaryWallet`). Strony POLITYCZNEJ nie ruszamy celowo -
+to ona przy ujemnym wplywie dziala na korzysc gracza (+16/dobe przy -84), wiec
+kontrakt sam wychodzi z dolka i po kilku dniach znowu placi normalnie.
+Log jednorazowy (`_mercFloorLogged`), bo model finansowy jest wolany co klatke przy
+otwartym dymku - logowanie w tej sciezce zalalo by plik.
+**Ryzyko / co sprawdzic:** (1) metoda jest prywatna - gdyby JIT ja wkleil, latka
+bylaby martwa; patchujemy w `OnSubModuleLoad`, czyli przed pierwszym JIT-em
+`CalculateClanIncomeInternal`, i metoda jest za duza na inline. Sprawdzic w logu
+wiersz "Mends: kontrakt najemny nie obciaza juz gracza...". (2) Po wejsciu wplywu
+na plus linia `Mercenary Contract` ma wrocic jako DODATNIA - jesli zniknie na stale,
+to znaczy, ze prefiks lapie za szeroko.
+**Status:** ZBUDOWANE, NIEWGRANE (launcher BLSE trzymal plik) - do podmiany przy
+zamknietym launcherze.
+
+
 ## 2026-09-13 - Znikajace strzaly: licznik diagnostyczny (przyczyna NIEUSTALONA, piec podejrzanych wykluczonych)
 **Mod:** Armoury | **Pliki:** `Armoury/src/AmmoTracer.cs` (nowy), `Armoury/src/ArmouryBehavior.cs`, `Armoury/src/Settings.cs`, `Armoury/src/McmSettings.cs`
 **Zgloszenie (Jeff):** "wrzucilem im strzaly, mialy 29/30, a po chwili znowu im cos
