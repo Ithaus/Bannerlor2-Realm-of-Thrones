@@ -1,5 +1,31 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-14 - Skarbiec trzyma tylko to, co ludzie nosza; reszta laduje na liscie gracza w stash
+**Mod:** Armoury | **Pliki:** `Armoury/src/QuartermasterLaw.cs` (Fit.Unworn, PurgeUnusable), `Settings.cs` (+McmSettings)
+**Problem:** Jeff (screen zbrojowni, pusty stash): "nic nie mam w DTE,
+a pokazuje, ze nie moze tego i tamtego - jak nie moze, to ma rozebrac
+zolnierza i ma sie pokazac w stash, zebym wiedzial". Poprzedni krok
+oddawal graczowi TYLKO sztuki, ktorych nie udzwignie nikt; sztuki ponad
+skill 11 lucznikow (ale w zasiegu elity) i cala nadwyzka (214 tarcz przy
+90 potrzebnych, 187 strzal przy 172) zostawaly w ukrytym skarbcu wojska -
+raport mowil "11 men cannot use them", a na liscie gracza nie bylo nic.
+**Zmiana:** FitFor zwraca tez `Unworn` - wszystko, co po dopasowaniu
+ludzi do sztuk (po skillu, od najzdolniejszego) zostalo na polce: ponad
+skill ALBO ponad potrzebe. PurgeUnusable przy kazdym otwarciu zbrojowni
+przeksiegowuje CALE Unworn na liste gracza (ArmouryBehavior.StockDeposit -
+ksiega wkladow), wiec escrow pokazuje je w stash jako jego, do zabrania
+i sprzedania; fizycznie zostaja na polce (DTE korzysta z nich, gdy komus
+sie przydadza). Skarbiec wojska = dokladnie to, co ludzie realnie nosza.
+Piny z ksiegi musztry nietykane. Komunikat: "N pieces the men cannot use
+or do not need are now on YOUR list (...)"; log z rozbiciem po typach.
+Poprzednie fizyczne przenoszenie do sakw zastapione ksiegowaniem.
+**Ryzyko / co sprawdzic:** po otwarciu zbrojowni stash pokazuje wszystko,
+czego ludzie nie nosza (u Jeffa: setki sztuk); "komplet" w wymianie
+(WarUsableOf) liczy tylko noszone, wiec nowe strzaly T1-T3 ida do ludzi.
+Ksiega gracza rosnie skokowo - ReconcileStock przycina ja do polek przy
+kazdym otwarciu, wiec nic nie wisi.
+**Status:** ZBUDOWANE - watcher wgra po zamknieciu gry
+
 ## 2026-09-14 - Porzadek w skarbcu: kwatermistrz liczy UZYTECZNE sztuki, oddaje graczowi to, czego nikt nie udzwignie, i mowi po bitwie o pustych slotach
 **Mod:** Armoury + CrashScribe | **Pliki:** `Armoury/src/QuartermasterLaw.cs` (Fit/FitFor/WarUsableOf/PurgeUnusable, ShortageLines, ProcessSwaps, HoldReserve), `Settings.cs` (+McmSettings), `CrashScribe/src/Mends.cs` (SkillLawWard: komunikat)
 **Problem:** Jeff (screen): "stoja bez kolczanow, a info mowi, ze wszystko

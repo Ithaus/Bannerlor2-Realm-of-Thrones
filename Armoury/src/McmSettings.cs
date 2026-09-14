@@ -248,7 +248,7 @@ namespace Armoury
         [SettingPropertyGroup("Forge fee")]
         public bool QuartermasterShouts { get; set; } = true;
 
-        [SettingPropertyBool("Quartermaster Purge Unusable", HintText = "on every armoury visit the quartermaster hands back to you every piece no man of the company can use (skill law) - keep the war-chest honest")]
+        [SettingPropertyBool("Quartermaster Purge Unusable", HintText = "on every armoury visit the war-chest keeps only what the men actually wear (skill law); every other piece - beyond their skill or beyond their need - moves to YOUR list in the stash so you can see and sell it")]
         [SettingPropertyGroup("Forge fee")]
         public bool QuartermasterPurgeUnusable { get; set; } = true;
 

@@ -181,6 +181,7 @@ namespace Armoury
             public int UnfitMaxSkill = -1;   // najwyzszy skill wsrod nich (co kupic)
             public string SkillName = "";
             public List<KeyValuePair<EquipmentElement, int>> Dead = new List<KeyValuePair<EquipmentElement, int>>();   // nie do uzycia przez nikogo
+            public List<KeyValuePair<EquipmentElement, int>> Unworn = new List<KeyValuePair<EquipmentElement, int>>(); // NIE na ludziach: ponad skill albo ponad potrzebe
         }
 
         private static bool NeedsType(CharacterObject c, ItemObject.ItemTypeEnum type)
@@ -251,7 +252,7 @@ namespace Armoury
                     int war = el.Amount - mine;
                     if (war > 0) supply.Add(new KeyValuePair<EquipmentElement, int>(el.EquipmentElement, war));
                 }
-                if (men.Count == 0) { f.Dead.AddRange(supply); return f; }
+                if (men.Count == 0) { f.Dead.AddRange(supply); f.Unworn.AddRange(supply); return f; }
                 // skill kanoniczny typu - do sortowania (po pierwszej wojskowej sztuce)
                 SkillObject skill = null;
                 foreach (var kv in supply) { skill = ItemReq.SkillFor(kv.Key.Item); if (skill != null) break; }
@@ -284,6 +285,11 @@ namespace Armoury
                         if (sk > f.UnfitMaxSkill) f.UnfitMaxSkill = sk;
                     }
                 }
+                // NIE NA LUDZIACH (Jeff 14.09: "jak nie moze uzyc, to rozebrac
+                // zolnierza i pokazac w stash"): wszystko, co po dopasowaniu
+                // zostalo na polce - ponad skill albo ponad potrzebe
+                for (int i = 0; i < supply.Count; i++)
+                    if (left2[i] > 0) f.Unworn.Add(new KeyValuePair<EquipmentElement, int>(supply[i].Key, left2[i]));
                 // martwe sztuki: nikt z potrzebujacych ich nie udzwignie
                 for (int i = 0; i < supply.Count; i++)
                 {
@@ -303,9 +309,14 @@ namespace Armoury
             return FitFor(armory, type).Usable;
         }
 
-        /// <summary>PORZADEK: sztuki wojskowe, ktorych nie udzwignie nikt
-        /// w kompanii, wracaja do sakw gracza (sprzedaj albo daj ludziom,
-        /// ktorzy je uniosa). Zwraca liczbe sztuk.</summary>
+        /// <summary>PORZADEK (Jeff 14.09: "jak nie moze uzyc, to ma rozebrac
+        /// zolnierza i ma sie pokazac w stash, zebym wiedzial"): skarbiec wojska
+        /// trzyma WYLACZNIE to, co ludzie realnie nosza (dopasowanie po
+        /// skillu); kazda inna wojskowa sztuka - ponad skill albo ponad potrzebe -
+        /// przechodzi na LISTE GRACZA (ksiega wkladow), wiec przy otwartym
+        /// ekranie lezy w stash, widoczna i do zabrania. Fizycznie zostaje na
+        /// polce (DTE i tak z niej korzysta, gdy komus sie przyda). Rozkazy
+        /// z ksiegi musztry nietykane. Zwraca liczbe sztuk.</summary>
         internal static int PurgeUnusable(ItemRoster armory)
         {
             int moved = 0;
@@ -313,27 +324,30 @@ namespace Armoury
             {
                 var s = Settings.Current;
                 if (s == null || !s.QuartermasterPurgeUnusable || armory == null) return 0;
-                var bags = MobileParty.MainParty.ItemRoster;
                 var names = new List<string>();
+                var perType = new List<string>();
                 foreach (var type in KitTypes)
                 {
                     var f = FitFor(armory, type);
-                    foreach (var kv in f.Dead)
+                    int here = 0;
+                    foreach (var kv in f.Unworn)
                     {
-                        if (kv.Value <= 0 || kv.Key.Item == null) continue;
-                        if (MusterBook.IsPinnedItem(kv.Key.Item.StringId ?? "")) continue;   // rozkaz z ksiegi swiety
-                        armory.AddToCounts(kv.Key, -kv.Value);
-                        bags.AddToCounts(kv.Key, kv.Value);
-                        moved += kv.Value;
-                        if (names.Count < 6) names.Add(kv.Value + "x " + kv.Key.Item.Name);
+                        var it = kv.Key.Item;
+                        if (kv.Value <= 0 || it == null) continue;
+                        if (MusterBook.IsPinnedItem(it.StringId ?? "")) continue;   // rozkaz z ksiegi swiety
+                        ArmouryBehavior.StockDeposit(it.StringId, kv.Value);          // -> lista gracza
+                        moved += kv.Value; here += kv.Value;
+                        if (names.Count < 6) names.Add(kv.Value + "x " + it.Name);
                     }
+                    if (here > 0) perType.Add(type + " " + here);
                 }
                 if (moved > 0)
                 {
-                    Log.Player("Quartermaster: " + moved + " pieces no man of the company can use were handed back to you ("
+                    Log.Player("Quartermaster: " + moved + " pieces the men cannot use or do not need are now on YOUR list ("
                                + string.Join(", ", names.ToArray()) + (names.Count >= 6 ? ", ..." : "")
-                               + "). Sell them or bring men who can carry them.", true);
-                    Log.Info("Kwatermistrz: porzadek w skarbcu - " + moved + " szt. nie do uzycia przez nikogo wrocilo do sakw gracza.");
+                               + "). Sell them, or bring gear within the men's skill.", true);
+                    Log.Info("Kwatermistrz: porzadek w skarbcu - " + moved + " szt. nie na ludziach przeksiegowano na gracza ["
+                             + string.Join(", ", perType.ToArray()) + "].");
                 }
             }
             catch (Exception e) { Log.Error("QuartermasterLaw.PurgeUnusable", e); }

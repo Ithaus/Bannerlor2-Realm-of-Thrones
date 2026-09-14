@@ -74,7 +74,7 @@ namespace Armoury
         public int RefineXpCap = 60;                       // refining one batch teaches at most this much Smithing
         public bool ArmouryProtectUsed = true;             // the quartermaster hands out only SURPLUS - gear your soldiers still use cannot leave the troop armoury
         public bool QuartermasterShouts = true;            // the quartermaster reports missing kit OUT LOUD after every battle and each morning - not only in the armoury screen
-        public bool QuartermasterPurgeUnusable = true;     // on every armoury visit the quartermaster hands back to you every piece no man of the company can use (skill law) - keep the war-chest honest
+        public bool QuartermasterPurgeUnusable = true;     // on every armoury visit the war-chest keeps only what the men actually wear (skill law); every other piece - beyond their skill or beyond their need - moves to YOUR list in the stash so you can see and sell it
         public float CharcoalWeight = 0.5f;                // a lump of charcoal weighs this much (vanilla hauls 5 kg bricks; 0 = leave alone)                   // the day's hire costs this many hours at the smith's rate (~200 gold in an average town)
         public bool BkTrueMaterials = true;                // Banner Kings armour crafting uses the honest material rule below instead of its own token amounts
         public float ArmorPointsPerMaterial = 10f;         // one unit of material per this many points of total protection on the piece
