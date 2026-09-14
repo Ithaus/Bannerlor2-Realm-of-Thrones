@@ -1,5 +1,29 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-14 - Dopasowanie liczy CALA polke (takze liste gracza); skarbiec = noszone, stash = nienoszone; wskazowka "bring X for skill <= min"
+**Mod:** Armoury | **Pliki:** `Armoury/src/QuartermasterLaw.cs` (Fit/FitFor/PurgeUnusable/ShortageLines)
+**Problem:** Jeff (screen): "mowi przynies luk 140 lub mniej, a te luki
+(11x Weirwood, Bow 140) leza tu w stash - czy to dziala?". Dwa bledy:
+(1) FitFor liczylo podaz TYLKO z czesci wojskowej polki - sztuki z listy
+gracza (wczesniejsze przeksiegowania, w tym te 11 lukow) byly niewidoczne
+dla dopasowania, choc DTE w bitwie rozdaje wszystko z polki; (2) wskazowka
+brala NAJWYZSZY skill wsrod niedoposazonych (140) zamiast najnizszego -
+zakup "140 or less" pokrylby jednego czlowieka, nie 20.
+**Zmiana:** FitFor dopasowuje ludzi do WSZYSTKICH sztuk na polce (wojskowe
++ lista gracza) i zwraca korekty ksiegi: docelowo gracz ma DOKLADNIE to,
+czego nikt nie nosi (delta > 0: StockDeposit - nienoszone na liste gracza;
+delta < 0: StockWithdraw - sztuki gracza, ktore ludzie nosza, na stan
+wojska, "wojsko bierze tyle, ile uniesie"). PurgeUnusable przy otwarciu
+stosuje obie korekty (piny nietykane) z komunikatami "N pieces ... on
+YOUR list" i "M of your pieces went to the men". ShortageLines: "(20 men
+have nothing they can use - their Bow is 60-140; bring Bow for Bow 60 or
+less to cover all)". WarUsableOf (komplet w wymianie) = dopasowani z calej
+polki.
+**Ryzyko / co sprawdzic:** po otwarciu zbrojowni Weirwood 140 znikaja z listy
+gracza (ida do ludzi z Bow >= 140), raport "Bow" spada do realnych brakow
+z rozrzutem skilla; kolejne otwarcie bez zmian (stabilny punkt).
+**Status:** ZBUDOWANE - watcher wgra po zamknieciu gry
+
 ## 2026-09-14 - AI pod ta sama zasada skilli: lordowie/kompani przy spawnie i dopelnianie pancerza u AI
 **Mod:** Armoury + CrashScribe | **Pliki:** `Armoury/src/DragonUnmount.cs` (galaz bohatera), `CrashScribe/src/Mends.cs` (ArmourWard)
 **Problem:** Jeff: "AI ma miec takie same ograniczenia, nie tylko gracz -

@@ -164,25 +164,28 @@ namespace Armoury
         }
 
         // ===== PORZADEK W SKARBCU (Jeff 14.09: "lucznicy stoja bez kolczanow,
-        // a info mowi, ze wszystko okay; przy kazdym otwarciu DTE przelec,
-        // czy jednostka ma sprzet, ktorego nie moze uzyc, i uporzadkuj caly
-        // sprzet wojska") =====
-        // Dotad kwatermistrz liczyl SZTUKI: 172 strzal na polce = komplet, choc
-        // to same T4-T6 (wymog Luku 105/140/175), a tanie strzaly T1 szly do
-        // gracza jako "nadwyzka". Od teraz liczy sie DOPASOWANIE: kazdy czlowiek
-        // potrzebujacy typu dostaje na papierze najlepsza sztuke, ktora
-        // UDZWIGNIE (ItemReq - zasada nadrzedna); ile ludzi ma cos uzytecznego,
-        // tyle "mamy"; sztuki, ktorych nie udzwignie NIKT, wracaja do sakw gracza.
+        // a info mowi, ze wszystko okay; jak nie moze uzyc, to rozebrac
+        // zolnierza i pokazac w stash") =====
+        // Kwatermistrz liczyl SZTUKI po typie: 172 strzal T4-T6 = "komplet",
+        // a tanie strzaly szly do gracza jako nadwyzka. Od teraz liczy sie
+        // DOPASOWANIE po skillu (ItemReq - zasada nadrzedna) na WSZYSTKIM, co
+        // lezy na polce (wojskowe I z listy gracza - DTE w bitwie rozdaje jedno
+        // i drugie; Jeff 14.09 v2: "te luki maja Bow 140, a mowi przynies 140").
+        // Po dopasowaniu ksiega jest wyrownywana tak, ze SKARBIEC WOJSKA =
+        // dokladnie to, co ludzie nosza, a LISTA GRACZA (stash) = dokladnie to,
+        // czego nikt nie nosi (ponad skill albo ponad potrzebe).
         internal sealed class Fit
         {
-            public int Need;            // ilu ludzi nosi ten typ
-            public int Usable;          // ilu z nich ma na polce cos, co udzwignie
-            public int UnfitMen;        // ilu zostaje bez uzytecznej sztuki
-            public int UnfitMaxSkill = -1;   // najwyzszy skill wsrod nich (co kupic)
+            public int Need;                 // ilu ludzi nosi ten typ
+            public int Usable;               // ilu ma cos, co udzwignie
+            public int UnfitMen;             // ilu zostaje bez uzytecznej sztuki
+            public int UnfitMinSkill = -1, UnfitMaxSkill = -1;   // rozrzut ich skilla (co kupic: <= min)
             public string SkillName = "";
-            public List<KeyValuePair<EquipmentElement, int>> Dead = new List<KeyValuePair<EquipmentElement, int>>();   // nie do uzycia przez nikogo
-            public List<KeyValuePair<EquipmentElement, int>> Unworn = new List<KeyValuePair<EquipmentElement, int>>(); // NIE na ludziach: ponad skill albo ponad potrzebe
+            // korekty ksiegi: +n = sztuki nie na ludziach na liste gracza, -n = sztuki gracza, ktore ludzie nosza, na stan wojska
+            public List<KeyValuePair<EquipmentElement, int>> Adjust = new List<KeyValuePair<EquipmentElement, int>>();
         }
+
+        private sealed class Sup { public EquipmentElement El; public int Total, Own, Used; }
 
         private static bool NeedsType(CharacterObject c, ItemObject.ItemTypeEnum type)
         {
@@ -215,17 +218,16 @@ namespace Armoury
             return false;
         }
 
-        /// <summary>Dopasowanie ludzi do WOJSKOWYCH sztuk tego typu: kazdy
+        /// <summary>Dopasowanie ludzi do sztuk tego typu na CALEJ polce: kazdy
         /// (od najzdolniejszego) bierze na papierze najlepsza sztuke, ktora
-        /// udzwignie. Zwraca ilu ma cos uzytecznego, ilu nic, i sztuki
-        /// nie do uzycia przez nikogo.</summary>
+        /// udzwignie. Zwraca ilu ma cos uzytecznego, ilu nic (z rozrzutem
+        /// skilla) i korekty ksiegi (noszone -> wojsko, nienoszone -> gracz).</summary>
         internal static Fit FitFor(ItemRoster armory, ItemObject.ItemTypeEnum type)
         {
             var f = new Fit();
             try
             {
                 if (armory == null) return f;
-                // popyt: ludzie potrzebujacy typu (bez bohaterow)
                 var men = new List<CharacterObject>();
                 var r = MobileParty.MainParty.MemberRoster;
                 for (int i = 0; i < r.Count; i++)
@@ -236,8 +238,8 @@ namespace Armoury
                     for (int k = 0; k < el.Number; k++) men.Add(c);
                 }
                 f.Need = men.Count;
-                // podaz: czesc WOJSKOWA polek (bez wkladow gracza), tylko to, co liczy sie jako kit
-                var supply = new List<KeyValuePair<EquipmentElement, int>>();
+                // podaz: CALA polka (wojskowe + z listy gracza), tylko to, co liczy sie jako kit
+                var supply = new List<Sup>();
                 var allowance = new Dictionary<string, int>();
                 for (int i = 0; i < armory.Count; i++)
                 {
@@ -247,79 +249,66 @@ namespace Armoury
                     string id = it.StringId ?? "";
                     int left;
                     if (!allowance.TryGetValue(id, out left)) left = ArmouryBehavior.StockOf(id);
-                    int mine = Math.Min(el.Amount, Math.Max(0, left));
-                    allowance[id] = left - mine;
-                    int war = el.Amount - mine;
-                    if (war > 0) supply.Add(new KeyValuePair<EquipmentElement, int>(el.EquipmentElement, war));
+                    int own = Math.Min(el.Amount, Math.Max(0, left));
+                    allowance[id] = left - own;
+                    supply.Add(new Sup { El = el.EquipmentElement, Total = el.Amount, Own = own, Used = 0 });
                 }
-                if (men.Count == 0) { f.Dead.AddRange(supply); f.Unworn.AddRange(supply); return f; }
-                // skill kanoniczny typu - do sortowania (po pierwszej wojskowej sztuce)
                 SkillObject skill = null;
-                foreach (var kv in supply) { skill = ItemReq.SkillFor(kv.Key.Item); if (skill != null) break; }
+                foreach (var sp in supply) { skill = ItemReq.SkillFor(sp.El.Item); if (skill != null) break; }
                 f.SkillName = skill != null ? skill.Name.ToString() : "";
-                if (skill != null) men.Sort((a, b) => b.GetSkillValue(skill).CompareTo(a.GetSkillValue(skill)));
-                // najlepsze sztuki pierwsze: wyzszy wymog = wyzsza klasa, potem Effectiveness
-                supply.Sort((a, b) =>
+                if (men.Count > 0)
                 {
-                    int d = b.Key.Item.Difficulty.CompareTo(a.Key.Item.Difficulty);
-                    return d != 0 ? d : b.Key.Item.Effectiveness.CompareTo(a.Key.Item.Effectiveness);
-                });
-                var left2 = new int[supply.Count];
-                for (int i = 0; i < supply.Count; i++) left2[i] = supply[i].Value;
-                var usedByAnyone = new bool[supply.Count];
-                foreach (var man in men)
-                {
-                    int pick = -1;
-                    for (int i = 0; i < supply.Count; i++)
+                    if (skill != null) men.Sort((a, b) => b.GetSkillValue(skill).CompareTo(a.GetSkillValue(skill)));
+                    supply.Sort((a, b) =>
                     {
-                        if (left2[i] <= 0 && usedByAnyone[i]) continue;
-                        if (!ItemReq.Meets(man, supply[i].Key.Item)) continue;
-                        usedByAnyone[i] = true;
-                        if (left2[i] > 0) { pick = i; break; }
-                    }
-                    if (pick >= 0) { left2[pick]--; f.Usable++; }
-                    else
+                        int d = b.El.Item.Difficulty.CompareTo(a.El.Item.Difficulty);
+                        return d != 0 ? d : b.El.Item.Effectiveness.CompareTo(a.El.Item.Effectiveness);
+                    });
+                    foreach (var man in men)
                     {
-                        f.UnfitMen++;
-                        int sk = skill != null ? man.GetSkillValue(skill) : 0;
-                        if (sk > f.UnfitMaxSkill) f.UnfitMaxSkill = sk;
+                        int pick = -1;
+                        for (int i = 0; i < supply.Count; i++)
+                        {
+                            if (supply[i].Used >= supply[i].Total) continue;
+                            if (!ItemReq.Meets(man, supply[i].El.Item)) continue;
+                            pick = i; break;
+                        }
+                        if (pick >= 0) { supply[pick].Used++; f.Usable++; }
+                        else
+                        {
+                            f.UnfitMen++;
+                            int sk = skill != null ? man.GetSkillValue(skill) : 0;
+                            if (f.UnfitMinSkill < 0 || sk < f.UnfitMinSkill) f.UnfitMinSkill = sk;
+                            if (sk > f.UnfitMaxSkill) f.UnfitMaxSkill = sk;
+                        }
                     }
                 }
-                // NIE NA LUDZIACH (Jeff 14.09: "jak nie moze uzyc, to rozebrac
-                // zolnierza i pokazac w stash"): wszystko, co po dopasowaniu
-                // zostalo na polce - ponad skill albo ponad potrzebe
-                for (int i = 0; i < supply.Count; i++)
-                    if (left2[i] > 0) f.Unworn.Add(new KeyValuePair<EquipmentElement, int>(supply[i].Key, left2[i]));
-                // martwe sztuki: nikt z potrzebujacych ich nie udzwignie
-                for (int i = 0; i < supply.Count; i++)
+                // korekty ksiegi: docelowo gracz ma DOKLADNIE to, czego nikt nie nosi
+                foreach (var sp in supply)
                 {
-                    if (usedByAnyone[i]) continue;
-                    bool anyone = false;
-                    foreach (var man in men) if (ItemReq.Meets(man, supply[i].Key.Item)) { anyone = true; break; }
-                    if (!anyone) f.Dead.Add(supply[i]);
+                    int targetOwn = sp.Total - sp.Used;
+                    int delta = targetOwn - sp.Own;
+                    if (delta != 0) f.Adjust.Add(new KeyValuePair<EquipmentElement, int>(sp.El, delta));
                 }
             }
             catch (Exception e) { Log.Error("QuartermasterLaw.FitFor", e); }
             return f;
         }
 
-        /// <summary>Ile sztuk tego typu wojsko REALNIE obsadzi (dopasowanie po skillu).</summary>
+        /// <summary>Ile sztuk tego typu wojsko REALNIE obsadzi (dopasowanie po skillu, cala polka).</summary>
         internal static int WarUsableOf(ItemRoster armory, ItemObject.ItemTypeEnum type)
         {
             return FitFor(armory, type).Usable;
         }
 
-        /// <summary>PORZADEK (Jeff 14.09: "jak nie moze uzyc, to ma rozebrac
-        /// zolnierza i ma sie pokazac w stash, zebym wiedzial"): skarbiec wojska
-        /// trzyma WYLACZNIE to, co ludzie realnie nosza (dopasowanie po
-        /// skillu); kazda inna wojskowa sztuka - ponad skill albo ponad potrzebe -
-        /// przechodzi na LISTE GRACZA (ksiega wkladow), wiec przy otwartym
-        /// ekranie lezy w stash, widoczna i do zabrania. Fizycznie zostaje na
-        /// polce (DTE i tak z niej korzysta, gdy komus sie przyda). Rozkazy
-        /// z ksiegi musztry nietykane. Zwraca liczbe sztuk.</summary>
+        /// <summary>PORZADEK przy kazdym otwarciu zbrojowni: ksiega wyrownana do
+        /// dopasowania - sztuki nie na ludziach (ponad skill albo ponad potrzebe)
+        /// na liste gracza (widoczne w stash, do zabrania), sztuki gracza, ktore
+        /// ludzie nosza - na stan wojska ("wojsko bierze tyle, ile uniesie").
+        /// Rozkazy z ksiegi musztry nietykane. Zwraca liczbe sztuk oddanych graczowi.</summary>
         internal static int PurgeUnusable(ItemRoster armory)
         {
-            int moved = 0;
+            int toPlayer = 0, toMen = 0;
             try
             {
                 var s = Settings.Current;
@@ -329,29 +318,40 @@ namespace Armoury
                 foreach (var type in KitTypes)
                 {
                     var f = FitFor(armory, type);
-                    int here = 0;
-                    foreach (var kv in f.Unworn)
+                    int here = 0, taken = 0;
+                    foreach (var kv in f.Adjust)
                     {
                         var it = kv.Key.Item;
-                        if (kv.Value <= 0 || it == null) continue;
+                        if (kv.Value == 0 || it == null) continue;
                         if (MusterBook.IsPinnedItem(it.StringId ?? "")) continue;   // rozkaz z ksiegi swiety
-                        ArmouryBehavior.StockDeposit(it.StringId, kv.Value);          // -> lista gracza
-                        moved += kv.Value; here += kv.Value;
-                        if (names.Count < 6) names.Add(kv.Value + "x " + it.Name);
+                        if (kv.Value > 0)
+                        {
+                            ArmouryBehavior.StockDeposit(it.StringId, kv.Value);     // nie na ludziach -> lista gracza
+                            toPlayer += kv.Value; here += kv.Value;
+                            if (names.Count < 6) names.Add(kv.Value + "x " + it.Name);
+                        }
+                        else
+                        {
+                            ArmouryBehavior.StockWithdraw(it.StringId, -kv.Value);   // noszone -> stan wojska
+                            toMen += -kv.Value; taken += -kv.Value;
+                        }
                     }
-                    if (here > 0) perType.Add(type + " " + here);
+                    if (here > 0 || taken > 0) perType.Add(type + " +" + here + "/-" + taken);
                 }
-                if (moved > 0)
+                if (toPlayer > 0 || toMen > 0)
                 {
-                    Log.Player("Quartermaster: " + moved + " pieces the men cannot use or do not need are now on YOUR list ("
-                               + string.Join(", ", names.ToArray()) + (names.Count >= 6 ? ", ..." : "")
-                               + "). Sell them, or bring gear within the men's skill.", true);
-                    Log.Info("Kwatermistrz: porzadek w skarbcu - " + moved + " szt. nie na ludziach przeksiegowano na gracza ["
-                             + string.Join(", ", perType.ToArray()) + "].");
+                    if (toPlayer > 0)
+                        Log.Player("Quartermaster: " + toPlayer + " pieces the men cannot use or do not need are on YOUR list ("
+                                   + string.Join(", ", names.ToArray()) + (names.Count >= 6 ? ", ..." : "")
+                                   + "). Sell them, or bring gear within the men's skill.", true);
+                    if (toMen > 0)
+                        Log.Player("Quartermaster: " + toMen + " of your pieces went to the men - they can use them.", true);
+                    Log.Info("Kwatermistrz: porzadek w skarbcu - " + toPlayer + " szt. na liste gracza, " + toMen
+                             + " szt. na stan wojska [" + string.Join(", ", perType.ToArray()) + "].");
                 }
             }
             catch (Exception e) { Log.Error("QuartermasterLaw.PurgeUnusable", e); }
-            return moved;
+            return toPlayer;
         }
 
         /// <summary>Ile sztuk tego typu jest WLASNOSCIA WOJSKA (calosc polek
@@ -412,9 +412,10 @@ namespace Armoury
                     if (have < need)
                     {
                         string line = type + " " + have + "/" + need;
-                        if (raw >= need && fit.UnfitMen > 0)
-                            line += " (on the shelf " + raw + ", but " + fit.UnfitMen + " men cannot use them - bring "
-                                    + type + " for " + fit.SkillName + " " + Math.Max(0, fit.UnfitMaxSkill) + " or less)";
+                        if (fit.UnfitMen > 0 && fit.UnfitMinSkill >= 0)
+                            line += " (" + fit.UnfitMen + " men have nothing they can use - their " + fit.SkillName + " is "
+                                    + fit.UnfitMinSkill + (fit.UnfitMaxSkill > fit.UnfitMinSkill ? "-" + fit.UnfitMaxSkill : "")
+                                    + "; bring " + type + " for " + fit.SkillName + " " + fit.UnfitMinSkill + " or less to cover all)";
                         lines.Add(line);
                     }
                 }
