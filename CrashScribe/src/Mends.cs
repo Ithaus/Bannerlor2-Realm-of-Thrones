@@ -428,6 +428,37 @@ namespace CrashScribe
             return false;
         }
 
+        /// <summary>
+        /// KLINGI LORE ROT (Jeff 14.09: "znowu mamy milion mieczy valyrianskich").
+        /// UniquePrefixes celowo omija mundury domow, ale przy okazji wypuscilo
+        /// SAME KLINGI valyrianskie - nie zaczynaja sie od zadnego imienia, wiec
+        /// straznik ich nie widzial i DTE rozdawalo je szeregowym. To sprzet za
+        /// 150-250 tysiecy denarow (items-dump.csv), a nie zwykla stal.
+        /// OSOBNA tablica, nie dopisek do UniquePrefixes: tamta ma trzech
+        /// konsumentow, w tym UniqueWares, ktore ustawia NotMerchandise - a to
+        /// przewrocilo by nasze wlasne prawo legend w Armoury.
+        /// CZEGO TU NIE MA I DLACZEGO: giant_club i giant_bow to LEGALNY rynsztunek
+        /// czterech oddzialow rasy giant (ROT-Troops.xml). Straznik wyrzuca przedmiot
+        /// z puli dla WSZYSTKICH, wiec wpisanie ich tutaj rozbroiloby olbrzymow.
+        /// To osobna decyzja - patrz CHANGELOG.
+        /// </summary>
+        private static readonly string[] BladePrefixes = {
+            "val_steel_sword_", "koa_sword_", "whyt_sword", "skull_sword"
+        };
+
+        internal static bool IsLoreBlade(ItemObject it)
+        {
+            if (it == null) return false;
+            var id = it.StringId ?? "";
+            for (int i = 0; i < BladePrefixes.Length; i++)
+                if (id.StartsWith(BladePrefixes[i], StringComparison.Ordinal)) return true;
+            return false;
+        }
+
+        // liczniki obu strazy - raport zbiorczy po bitwie (WardReport), nigdy per sztuka:
+        // UniqueWard i ArmourWard biegna dla kazdego agenta kazdej partii AI
+        internal static int WardBlades, WardArmour, WardStumbles;
+
         // ===== KAZDY UNIKAT MA DOM (Jeff 31.08: "ubierz postacie ktore
         // istnieja; nie zyja - spadkobiercom; nie ma ich - jedna sztuka lezy
         // w miescie historycznie poprawnym") =====
@@ -799,7 +830,8 @@ namespace CrashScribe
                     if (IsDeadGear(item)) { drop.Add(kv.Key); continue; }
                     // smoki nie dla szeregowych - NIGDY (Jeff: "smoki ma tylko Daenerys")
                     if (IsDragonMount(item)) { drop.Add(kv.Key); continue; }
-                    if (IsUniqueGear(item) && !LearnedUnique(item.StringId)) drop.Add(kv.Key);
+                    if ((IsUniqueGear(item) || IsLoreBlade(item)) && !LearnedUnique(item.StringId))
+                    { drop.Add(kv.Key); WardBlades++; }
                 }
                 for (int i = 0; i < drop.Count; i++) dic.Remove(drop[i]);
             }
@@ -1989,6 +2021,27 @@ namespace CrashScribe
                     Scribe.Line("Mends: sprzet imiennych bohaterow poza pula przydzialu DTE - piechota nie zalozy pancerza Brienny.");
                     Scribe.Line("Mends: swieta zasada skilli obowiazuje w DTE - Difficulty ponad umiejetnosc schodzi z grzbietu.");
                 }
+
+                // ===== DRUGA MENNICA DTE: FillEmptySlots (Jeff 14.09) =====
+                // Szczegoly przy metodzie ArmourWard. W skrocie: DTE dopelnia sloty
+                // pancerza z globalnej puli JUZ PO DoAssignAsync, wiec obie nasze
+                // straze sa wtedy po robocie i niczego nie widza.
+                var tAsg = FullType("DynamicTroopEquipmentReupload.Assignment");
+                var mFill = tAsg != null ? AccessTools.Method(tAsg, "FillEmptySlots") : null;
+                if (mFill != null)
+                {
+                    _fAsgEquipment = AccessTools.Field(tAsg, "Equipment");
+                    _pAsgReference = AccessTools.Property(tAsg, "ReferenceEquipment");
+                    _mAsgSetEquipment = AccessTools.Method(tAsg, "SetEquipment",
+                        new[] { typeof(EquipmentIndex), typeof(EquipmentElement) });
+                    if (_fAsgEquipment != null && _mAsgSetEquipment != null)
+                    {
+                        harmony.Patch(mFill, postfix: new HarmonyMethod(typeof(Mends), "ArmourWard"));
+                        Scribe.Line("Mends: druga mennica DTE zamknieta - FillEmptySlots nie ubierze juz szeregowego w unikat ani w sprzet umarlych.");
+                    }
+                    else Scribe.Line("Mends: DTE Assignment bez pol Equipment/SetEquipment - druga mennica zostaje otwarta.");
+                }
+                else Scribe.Line("Mends: DTE Assignment.FillEmptySlots nieznalezione - druga mennica zostaje otwarta.");
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.Install(camels)", null); } catch { } }
 
@@ -2997,6 +3050,72 @@ namespace CrashScribe
             catch { return true; }
         }
 
+        // uchwyty do DTE Assignment - szukane raz, przy wpieciu latki
+        private static System.Reflection.FieldInfo _fAsgEquipment;
+        private static System.Reflection.PropertyInfo _pAsgReference;
+        private static System.Reflection.MethodInfo _mAsgSetEquipment;
+
+        /// <summary>
+        /// DRUGA MENNICA DTE (Jeff 14.09: "pancerze unikatowe np. Stannisa sa pomnozone").
+        /// UniqueWard i SkillLawWard wisza na DoAssignAsync - jeden przed, drugi po.
+        /// Ale DTE ubiera zolnierza JESZCZE RAZ, juz po tej metodzie:
+        /// Assignment.FillEmptySlots() dopelnia sloty PANCERZA losem z globalnej puli
+        /// (Cache.GetItemsByTypeTierAndCulture), a ta pula nie ma ZADNEGO filtru tresci -
+        /// ani NotMerchandise, ani wartosci, ani listy unikatow. Wywolywana jest
+        /// bezwarunkowo dla kazdego nie-bohatera kazdej partii AI przy spawnie
+        /// (SpawnAgentPatch) oraz w petli przy autorozstrzygnieciu (PartyEquipmentDistributor).
+        /// Obie nasze straze juz wtedy DAWNO sie wykonaly - to nie kwestia listy
+        /// prefiksow, tylko KOLEJNOSCI. Dlatego zbroja Stannisa mogla wyjsc na kazdym
+        /// szeregowym, ile razy chciala.
+        /// Postfix: unikat albo sprzet umarlych w slocie pancerza schodzi i wraca sztuka
+        /// ZE WZORCA TEGO ODDZIALU (ReferenceEquipment). Podmiana, nie zerowanie - zerowanie
+        /// oddaloby robote naszemu DressCode i ten zalewalby log setkami linii.
+        /// Metoda biegnie w goracej sciezce i bywa na watku roboczym: zero alokacji poza
+        /// podmiana, zero logowania per sztuka (raport zbiorczy w WardReport), a catch
+        /// LICZY potkniecia zamiast gasic funkcje - pulapka _tentBroken z CLAUDE.md pkt 7.
+        /// </summary>
+        public static void ArmourWard(object __instance)
+        {
+            try
+            {
+                if (__instance == null || _fAsgEquipment == null || _mAsgSetEquipment == null) return;
+                var eq = _fAsgEquipment.GetValue(__instance) as Equipment;
+                if (eq == null) return;
+                var tpl = _pAsgReference != null ? _pAsgReference.GetValue(__instance, null) as Equipment : null;
+
+                for (int slot = (int)EquipmentIndex.Head; slot <= (int)EquipmentIndex.Cape; slot++)
+                {
+                    var si = (EquipmentIndex)slot;
+                    var it = eq[si].Item;
+                    if (it == null) continue;
+                    if (!IsUniqueGear(it) && !IsDeadGear(it)) continue;
+
+                    var sub = tpl != null ? tpl[si].Item : null;
+                    if (sub != null && (IsUniqueGear(sub) || IsDeadGear(sub))) sub = null;   // wzorzec tez skazony
+                    _mAsgSetEquipment.Invoke(__instance, new object[]
+                    {
+                        si, sub != null ? new EquipmentElement(sub) : default(EquipmentElement)
+                    });
+                    WardArmour++;
+                }
+            }
+            catch { WardStumbles++; }
+        }
+
+        /// <summary>Raport zbiorczy obu strazy - raz na bitwe, nie raz na sztuke.</summary>
+        internal static void WardReport()
+        {
+            try
+            {
+                if (WardBlades == 0 && WardArmour == 0 && WardStumbles == 0) return;
+                Scribe.Line("Straz unikatow: " + WardBlades + " klng/unikatow zdjetych z przydzialu DTE, "
+                            + WardArmour + " sztuk pancerza cofnietych do wzorca oddzialu, "
+                            + WardStumbles + " potkniec.");
+                WardBlades = 0; WardArmour = 0; WardStumbles = 0;
+            }
+            catch { }
+        }
+
         /// <summary>Typ RelationsModifier bywa w roznych przestrzeniach BK - szukamy po nazwie.</summary>
         private static Type QuietType(string shortName)
         {
@@ -3203,7 +3322,7 @@ namespace CrashScribe
                 delegate (CampaignGameStarter s)
                 { Mends.ArmorSanity(); Mends.AmmoSanity(); Mends.WeightLaw(); Mends.ArmorTierLaw(); Mends.WeaponTierLaw(); Mends.SkillSinew(); Mends.UniqueWares(); Mends.LoreForgeGate(); Mends.DressTheNamesakes(); Mends.NorthernFare(); Mends.ItemDump(); Mends.ReligionAudit(); });
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this,
-                delegate (TaleWorlds.CampaignSystem.MapEvents.MapEvent m) { Mends.MeltDeadLoot(m); });
+                delegate (TaleWorlds.CampaignSystem.MapEvents.MapEvent m) { Mends.MeltDeadLoot(m); Mends.WardReport(); });
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this,
                 delegate (CampaignGameStarter s) { Mends.DragonPurge(true); });
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this,

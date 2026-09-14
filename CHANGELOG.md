@@ -1,5 +1,81 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-14 - Zalew unikatow: straz byla slepa na klingi lore i mialo sie ja za plecami (DTE FillEmptySlots)
+**Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs`
+**Zgloszenie (Jeff):** "znowu mamy milion mieczy valyrianskich, pancerze unikatowe np
+Stannisa sa pomnozone, jakies wielkie maczugi z kosci walcza zolnierze, jeden wielki
+burdel ze sprzetem".
+**Przyczyna 1 - straz nie znala ani jednej klingi valyrianskiej.** `Mends.IsUniqueGear`
+dziala wylacznie po prefiksach z `UniquePrefixes` (23 pozycje, same imiona: cersei_,
+stannis_, rhaegar_ ...). NIE MA tam `val_steel_sword_`, `koa_sword_`, `whyt_sword`
+ani `skull_sword`. `UniqueWard` przepuszczal je wiec do `_equipmentToAssign` i DTE
+rozdawalo szeregowym bron za 150-250 tys. denarow (items-dump.csv: koa_sword_tier_5
+200000, whyt_sword/Orphanmaker 250000, val_steel_sword_* 200000, skull_sword 150000).
+Druga bramka, `SkillLawWard`, tez ich nie zatrzymuje: Difficulty klng to 175-200,
+a elita T5/T6 w ROT-Troops.xml ma taki skill (66 definicji ma OneHanded >= 200).
+Dowod z logu Jeffa: `Armoury-2026-09-13_22-01-47.log [23:26:55] "Kwatermistrz: brak
+gorszej sztuki TwoHandedWeapon od val_steel_sword_8"` - ta linia drukuje sie DOPIERO
+po przejsciu bramki `AnyoneCanUse` (QuartermasterLaw.cs:740), czyli ktos tego uzywal.
+**Przyczyna 2 - DTE ubiera zolnierza JESZCZE RAZ, po naszej strazy.**
+`Assignment.FillEmptySlots()` dopelnia sloty PANCERZA losem z globalnej puli
+`Cache.GetItemsByTypeTierAndCulture`, a ta pula nie ma zadnego filtru tresci: ani
+NotMerchandise, ani wartosci, ani listy unikatow. Wolana jest bezwarunkowo dla kazdego
+nie-bohatera kazdej partii AI przy spawnie (`SpawnAgentPatch`: `if (!flag)
+assignment2.FillEmptySlots();`, flag = partia gracza) oraz w petli przy
+autorozstrzygnieciu (`PartyEquipmentDistributor`). `UniqueWard` to PREFIKS, a
+`SkillLawWard` POSTFIX na `DoAssignAsync` - obie wykonaly sie DAWNO, zanim ten kod
+cokolwiek zalozyl. To nie byla kwestia listy prefiksow, tylko KOLEJNOSCI.
+Stad "pancerze Stannisa sa pomnozone".
+**Zmiana:** (1) osobna tablica `BladePrefixes` + `IsLoreBlade`, uzywana WYLACZNIE przez
+`UniqueWard` - swiadomie NIE dopisana do `UniquePrefixes`, bo tamta ma trzech
+konsumentow, w tym `UniqueWares`, ktore ustawia `NotMerchandise` i przewrociloby nasze
+wlasne prawo legend w Armoury. (2) nowy postfix `ArmourWard` na
+`DTE Assignment.FillEmptySlots`: unikat albo sprzet umarlych w slocie pancerza schodzi
+i wraca sztuka ZE WZORCA TEGO ODDZIALU (`ReferenceEquipment`); podmiana, nie zerowanie,
+bo zerowanie oddaloby robote `DressCode` i zalaloby log. (3) raport zbiorczy
+`WardReport()` raz na bitwe (MapEventEnded) - obie straze biegna dla kazdego agenta
+kazdej partii AI, wiec logowanie per sztuka jest wykluczone.
+**CZEGO SWIADOMIE NIE ZROBILEM:** `giant_club` i `giant_bow` NIE sa na liscie.
+To legalny rynsztunek czterech oddzialow rasy giant (ROT-Troops.xml:564/598/632/666),
+a straz wyrzuca przedmiot z puli dla WSZYSTKICH - wpisanie ich rozbroiloby olbrzymow.
+Zolnierze dostaja giant_club z tej samej bezkulturowej puli DTE; wlasciwa poprawka
+musi patrzec na NOSZACEGO, nie na przedmiot. Decyzja dla Jeffa.
+**WYKLUCZENI PODEJRZANI (kazdy z dowodem, zeby nikt nie szukal tam drugi raz):**
+ 1. `Armoury.LegendaryLaw.ReplacementFor` - to PODMIANA W SLOCIE
+    (`LegendaryLaw.cs:294-295, :326-327`), liczba sztuk sie nie zmienia. Do tego
+    wszystkie 19 rosterow z legendami maja `culture="Culture.neutral_culture"`,
+    a `DefaultEquipmentSelectionModel.GetSuitableEquipmentSet` wymaga rownosci kultur -
+    zaden bohater w calym zestawie modow nie ma neutral_culture. To martwe dane.
+    NASZ WLASNY LOG KLAMAL: linia `LegendaryLaw.cs:334 "(zrodlo mnozenia)"` wyslala
+    cale sledztwo w slepa uliczke - do poprawienia osobno.
+ 2. DTE `DistributeLootRandomly` kopiuje zbrojownie przegranego bez odjecia -
+    ALE vanilla usuwa przegrana partie w `MapEvent.CaptureDefeatedPartyMembers`
+    (MapEvent.cs:2027, poza warunkiem CanTroopBeTakenPrisoner), a DTE kasuje magazyn
+    w `OnMobilePartyDestroyed`. To przeniesienie, nie kreacja.
+ 3. `CommandersGreed` / `ScrapArmyArmoryByCategory` - sortuje ROSNACO po ItemValue
+    i kasuje od najtanszych (DTE_ArmyArmoryBehavior.cs:466-499), wiec nawet wlaczony
+    nie usunalby ANI JEDNEGO valyriana.
+ 4. `AddItemToArmory` gubi ItemModifier - parametrem jest `ItemObject`, nie
+    `EquipmentElement`; nie ma czego gubic, zero sztuk stworzonych.
+ 5. `DistributePlayerSimulationLoot` - wisi na `mapEvent.IsPlayerSimulation`, czyli na
+    przycisku "Send Troops". Policzone w logach: 31 bitew misyjnych, 0 automatycznych
+    (ArmouryBehavior.cs:1231 kontra :1238). Jeff nie autorozstrzyga.
+**POZOSTAJE OTWARTE:** DTE `Cache.GetItemsByTierAndCulture` +
+`MobilePartyExtension.GetRandomEquipmentsFromClan` CODZIENNIE dosypuje kazdej partii AI
+losowy sprzet z globalnej puli bez filtru unikatow, a klingi valyrianskie nie maja
+atrybutu `culture` w XML, wiec `item.Culture == null` przepuszcza je dla KAZDEJ kultury.
+Straz zalozona dzis nie pozwoli tego NOSIC, ale kran naplywu do magazynow AI zostaje
+odkrecony. Nastepny krok, osobno.
+**Ryzyko / co sprawdzic:** `ArmourWard` biegnie w goracej sciezce i bywa na watku
+roboczym - zero alokacji poza podmiana, zero logowania per sztuka, `catch` LICZY
+potkniecia zamiast gasic funkcje (pulapka `_tentBroken`, CLAUDE.md pkt 7).
+Po bitwie w logu ma stac linia "Straz unikatow: N klng/unikatow zdjetych z przydzialu
+DTE, M sztuk pancerza cofnietych do wzorca oddzialu, K potkniec." Jesli K rosnie -
+cofnac. Sprawdzic tez, czy szeregowi nie chodza NADZY: gdy wzorzec oddzialu tez jest
+skazony, slot zostaje pusty i dopelnia go dopiero nasz `DressCode`.
+**Status:** WGRANE 2026-09-14 (md5 d8ec4d24a8695b10a47e86518ef36bfe, repo i gra zgodne).
+
+
 ## 2026-09-14 - Ujemny wplyw: gra nie mowi graczowi NIC, wiec my mowimy (InfluenceWatch)
 **Mod:** Armoury | **Pliki:** `Armoury/src/InfluenceWatch.cs` (nowy), `Armoury/src/Settings.cs`,
 `Armoury/src/ArmouryBehavior.cs`, `Armoury/src/McmSettings.cs`
