@@ -203,8 +203,19 @@ namespace Armoury
                 int total = 0;
                 if (armory != null)
                     for (int i = 0; i < armory.Count; i++) total += armory.GetElementCopyAtIndex(i).Amount;
+                // od 14.09 dopisujemy, CZY ten awans w ogole mial kosztowac rumaka -
+                // inaczej "kon przy awansie kawalerii" jest hipoteza, nie pomiarem
+                string mount;
+                try
+                {
+                    bool srcMounted = from != null && !from.IsHero && from.IsMounted;
+                    var cat = to != null ? to.UpgradeRequiresItemFromCategory : null;
+                    mount = " | zrodlo konne: " + srcMounted
+                          + ", wymog celu: " + (cat != null ? cat.StringId : "brak");
+                }
+                catch { mount = ""; }
                 Log.Info("AWANS: " + (from != null ? from.StringId : "?") + " -> "
-                    + (to != null ? to.StringId : "?") + " x" + num + " | magazyn: " + total + " szt.");
+                    + (to != null ? to.StringId : "?") + " x" + num + " | magazyn: " + total + " szt." + mount);
             }
             catch (Exception e) { Log.Error("OnPlayerUpgradedTroops", e); }
         }
@@ -856,6 +867,7 @@ namespace Armoury
 
         private void OnSessionLaunched(CampaignGameStarter starter)
         {
+            try { Stables.BuildRiderMap(); } catch (Exception e) { Log.Error("Stables.BuildRiderMap", e); }
             try { FixCharcoalWeight(); } catch (Exception e) { Log.Error("FixCharcoalWeight", e); }
             try { WearGroups.Fix(); } catch (Exception e) { Log.Error("WearGroups.Fix", e); }
             try { CleanseNegativeStacks(); } catch (Exception e) { Log.Error("CleanseNegativeStacks", e); }

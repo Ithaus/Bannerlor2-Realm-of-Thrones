@@ -1,5 +1,62 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-14 - Awans kawalerii nie kosztuje juz rumaka (kon tylko wtedy, gdy awans realnie sadza w siodle)
+**Mod:** Armoury | **Pliki:** `Armoury/src/Stables.cs`, `Armoury/src/ArmouryBehavior.cs`
+**Zgloszenie (Jeff):** zrzut z ekranu druzyny, "Upgrade to Mallister Eagle Knight /
+Required: War Mount / Cost: 100". "Dlaczego musze ponownie tracic konia na kazdy awans
+kawalerii, przeciez on juz dostal konia, siedzi na bojowym koniu".
+**Przyczyna - NASZ kod, nie vanilla.** Wymog wierzchowca to wlasciwosc CELU awansu
+(`CharacterObject.UpgradeRequiresItemFromCategory`). Zadne miejsce, ktore ja czyta,
+nie zna ZRODLA: `PartyScreenLogic.ValidateCommand:666` (bramka przycisku),
+`PartyScreenLogic.UpgradeTroop:923-925` (faktyczna zaplata przez
+`RemoveItemFromItemRoster`), `DefaultPartyTroopUpgradeModel.DoesPartyHaveRequiredItemsForUpgrade:107`
+(model AI). Sam getter tez nie ma jak - to zwykla wlasciwosc instancji.
+DTE ten wymog ZERUJE (chce, zeby konie szly wylacznie ze zbrojowni), a my go
+PRZYWRACAMY postfiksem `Stables.RanksNeedHorses` (Jeff 30.08: "jak awansuje na
+konnice, to musi byc kon"). Skutek: postfix traktowal identycznie piechura
+wsiadajacego pierwszy raz na konia i rycerza, ktory juz siedzi w siodle.
+Zapotrzebowanie zbrojowni DTE liczy sie PER JEZDZIEC i przy awansie konny->konny nie
+rosnie ani o sztuke - czyli pobranie rumaka bylo czystym podwojnym rachunkiem.
+Ten sam blad co 13.09 (kon dwa razy policzony), tylko pietro wyzej.
+**Zmiana - wariant "RiderOnlyTarget".** Raz, po wczytaniu kampanii
+(`ArmouryBehavior.OnSessionLaunched` -> `Stables.BuildRiderMap`), przechodzimy cale
+drzewko awansow (`CharacterObject.All` -> `UpgradeTargets`) i dla kazdego celu
+zapamietujemy, czy WSZYSTKIE prowadzace do niego zrodla sa juz konne. Getter
+(`RanksNeedHorses`) dla takiego celu zwraca `null` - awans nie kosztuje rumaka.
+Cel o nieznanym zrodle (korzen linii) zostaje platny: ostroznie, nie hojnie.
+Sciezki AI (`FilterTargets`, `PayInHorses`) maja ZRODLO wprost w polu `Target`
+boxed struktury, wiec tam pytamy o nie bezposrednio - dokladniej niz przez mape.
+**CZEMU MAPA, A NIE PORTOWNANIE KLASY RUMAKA (odrzucony wariant "wymiana"):**
+`UpgradeRequirementsVM.SetItemRequirement` ma cale cialo pod `if (category != null)`,
+nie ma sciezki czyszczacej i jest wolane DOKLADNIE RAZ, w konstruktorze
+`UpgradeTargetVM` - ikona i napis "Requirement" sa ZATRZASKIWANE na czas zycia
+ekranu. Na dodatek latka ROT `DisableUpgradeIfOnlyDragons` gasi na ich podstawie
+strzalke awansu. Odpowiedz gettera dla danego celu MUSI wiec byc stala w obrebie
+sesji ekranu. Wariant "wymiana" opieral sie na `RequiredMountFor`, a ta przy
+najwyzszym tierze zaglada do TABORU (`Stables.cs:120-124`) - kategoria zmieniala by
+sie w trakcie ekranu, dymek gasl, a przycisk zostawal martwy. Zmierzone na
+ROT-Troops.xml: 22 z 96 par jezdziec->jezdziec flipowaloby z darmowej na platna
+w zaleznosci od zawartosci bagazu.
+**SWIADOMA CENA:** cala linia werbowana od razu jako konna (np. `casterly_squire`)
+jest darmowa na calej dlugosci - i u gracza, i u AI - bo ten czlowiek dostal konia
+przy WERBUNKU, nie przy awansie, i zbrojownia juz go policzyla. Skutkiem ubocznym
+lordowie kupia mniej koni w osadach. Jesli Jeff uzna to za zbyt tanie, wlasciwa
+odpowiedz to osobna regula dla PIERWSZEGO konnego szczebla w linii.
+**Diagnostyka:** `OnPlayerUpgradedTroops` dopisuje teraz do wiersza AWANS
+"zrodlo konne: True/False, wymog celu: <id/brak>", a `BuildRiderMap` loguje liczbe
+oddzialow, celow i celow darmowych. Bez tego caly opis objawu bylby hipoteza.
+**Ryzyko / co sprawdzic:** (1) w logu po wczytaniu ma stac "Stajnia: spis awansow
+zbudowany - N oddzialow ..."; jesli N jest podejrzanie male, spis jest niepelny
+i zacementowalby sie na cala gre. (2) `_riderMapBuilt` ustawiane jest PRZED przelotem,
+wiec wyjatek nie zamieni goracego gettera w skan po tysiacach obiektow. (3) awans
+piechur->jezdziec ma NADAL kosztowac rumaka - sprawdzic na jednym takim awansie.
+**CZEGO NIE RUSZYLEM (osobny blad, osobny commit):** `Stables.NeedForUpgrades:396`
+czyta getter, ktory dla mnoznika tieru mierzy TABOR GRACZA
+(`RanksNeedHorses` -> `PartyBase.MainParty`, `Stables.cs:106`) - wiec zakupy koni
+przez lordow AI sa wymiarowane zawartoscia sakwy Jeffa. Bez zwiazku z tym objawem.
+**Status:** WGRANE 2026-09-14 (md5 0964fa8acb097b8a48f36545859f788f, repo i gra zgodne).
+
+
 ## 2026-09-14 - LegendaryLaw: nasz wlasny log klamal ("zrodlo mnozenia")
 **Mod:** Armoury | **Pliki:** `Armoury/src/LegendaryLaw.cs:335`
 **Problem:** linia `"N legend zdjetych z LOSOWANYCH szablonow bohaterow (zrodlo mnozenia)"`

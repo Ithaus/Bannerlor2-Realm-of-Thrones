@@ -100,12 +100,96 @@ namespace Armoury
                 var c = Settings.Current;
                 if (c == null || !c.CavalryNeedsMounts) return;
                 if (__instance == null || __instance.IsHero || !__instance.IsMounted) return;
+                // juz siedzi w siodle - awans nie sadza go na koniu drugi raz
+                if (RiderOnlyTarget(__instance)) { __result = null; return; }
                 // getter nie zna partii - vanilla pyta o niego przy awansach
                 // GRACZA (ekran druzyny), wiec heurystyka wg taboru gracza;
                 // AI idzie przez RequiredMountFor (Filter/Pay), nie tedy
                 __result = RequiredMountFor(TaleWorlds.CampaignSystem.Party.PartyBase.MainParty, __instance);
             }
             catch { }
+        }
+
+        // ---------------------------------------------------------- mapa jezdzcow
+        // cel awansu -> czy KAZDE zrodlo prowadzace do niego jest juz konne
+        private static System.Collections.Generic.Dictionary<CharacterObject, bool> _riderOnly;
+        private static bool _riderMapBuilt;
+
+        /// <summary>
+        /// KON TYLKO WTEDY, GDY AWANS REALNIE SADZA W SIODLE (Jeff 14.09: "dlaczego
+        /// musze ponownie tracic konia na kazdy awans kawalerii, przeciez on juz
+        /// dostal konia, siedzi na bojowym koniu").
+        /// Mial racje. Wymog wierzchowca to wlasciwosc CELU awansu
+        /// (CharacterObject.UpgradeRequiresItemFromCategory) i ZADNE vanillowe miejsce,
+        /// ktore ja czyta, nie zna ZRODLA: ani bramka w PartyScreenLogic.ValidateCommand
+        /// (:666), ani zaplata w UpgradeTroop (:923-925), ani model
+        /// DefaultPartyTroopUpgradeModel.DoesPartyHaveRequiredItemsForUpgrade (:107).
+        /// Sam getter tez nie ma jak - to zwykla wlasciwosc instancji. Wiec nasz postfix
+        /// RanksNeedHorses traktowal tak samo piechura wsiadajacego pierwszy raz na konia
+        /// i rycerza, ktory juz od dawna siedzi w siodle. Kazdy awans w obrebie kawalerii
+        /// kasowal kolejnego rumaka, a zapotrzebowanie zbrojowni DTE liczy sie PER JEZDZIEC
+        /// i przy awansie konny->konny nie rosnie ani o sztuke. Czysty podwojny rachunek -
+        /// ten sam blad co 13.09 z podwojnym koniem, tylko pietro wyzej.
+        /// ROZWIAZANIE: raz, po wczytaniu kampanii, przechodzimy CALE drzewko awansow
+        /// i dla kazdego celu zapamietujemy, czy WSZYSTKIE prowadzace do niego zrodla sa
+        /// juz konne. Jesli tak - awans na ten cel nie potrzebuje rumaka.
+        /// Cel o nieznanym zrodle (korzen linii) zostaje platny - ostroznie, nie hojnie.
+        /// CZEMU MAPA, A NIE ODCZYT STANU TABORU: odpowiedz gettera dla danego celu MUSI
+        /// byc STALA w obrebie sesji ekranu druzyny. UpgradeRequirementsVM.SetItemRequirement
+        /// ma cale cialo pod "if (category != null)" i nie ma sciezki czyszczacej, a wolane
+        /// jest DOKLADNIE RAZ, w konstruktorze UpgradeTargetVM - ikona i napis "Requirement"
+        /// sa wiec ZATRZASKIWANE. Na dodatek latka ROT DisableUpgradeIfOnlyDragons gasi na
+        /// ich podstawie strzalke awansu. Kategoria zmienna w trakcie ekranu = martwy przycisk.
+        /// Mapa liczona z samego drzewka jest deterministyczna i nie zaglada do rostera.
+        /// SWIADOMA CENA: cala linia werbowana od razu jako konna (np. casterly_squire)
+        /// jest darmowa na calej dlugosci - i u gracza, i u AI. Ten czlowiek dostal konia
+        /// przy werbunku, nie przy awansie, wiec zbrojownia juz go policzyla.
+        /// </summary>
+        internal static bool RiderOnlyTarget(CharacterObject target)
+        {
+            if (target == null) return false;
+            if (!_riderMapBuilt) BuildRiderMap();
+            var map = _riderOnly;
+            bool v;
+            return map != null && map.TryGetValue(target, out v) && v;
+        }
+
+        /// <summary>Jeden przelot po spisie jednostek; wolany po wczytaniu kampanii.</summary>
+        internal static void BuildRiderMap()
+        {
+            _riderMapBuilt = true;          // ZAWSZE, takze gdy ponizej rzuci - inaczej
+                                            // kazde wywolanie gettera bilo by pelny przelot
+            var map = new System.Collections.Generic.Dictionary<CharacterObject, bool>();
+            int troops = 0, freeTargets = 0;
+            try
+            {
+                var all = CharacterObject.All;
+                if (all != null)
+                {
+                    for (int i = 0; i < all.Count; i++)
+                    {
+                        var src = all[i];
+                        if (src == null || src.IsHero) continue;
+                        var targets = src.UpgradeTargets;
+                        if (targets == null || targets.Length == 0) continue;
+                        troops++;
+                        bool srcMounted = src.IsMounted;
+                        for (int t = 0; t < targets.Length; t++)
+                        {
+                            var tg = targets[t];
+                            if (tg == null) continue;
+                            bool had;
+                            map[tg] = map.TryGetValue(tg, out had) ? (had && srcMounted) : srcMounted;
+                        }
+                    }
+                    foreach (var kv in map) if (kv.Value) freeTargets++;
+                }
+            }
+            catch (Exception e) { Log.Error("Stables.BuildRiderMap", e); }
+            _riderOnly = map;
+            Log.Info("Stajnia: spis awansow zbudowany - " + troops + " oddzialow z awansem, "
+                     + map.Count + " celow, w tym " + freeTargets
+                     + " osiagalnych wylacznie z siodla (te nie kosztuja juz rumaka).");
         }
 
         /// <summary>
@@ -190,6 +274,9 @@ namespace Armoury
                     var tr = Traverse.Create(boxed);
                     var target = tr.Field("UpgradeTarget").GetValue<CharacterObject>();
                     if (target == null) continue;
+                    // zrodlo juz konne = awans niczego nie sadza w siodle, wiec za darmo
+                    var srcT = tr.Field("Target").GetValue<CharacterObject>();
+                    if (srcT != null && !srcT.IsHero && srcT.IsMounted) continue;
                     ItemCategory cat = null;
                     // wprost po TABORZE TEJ partii (getter mierzy stajnia gracza)
                     try { cat = target.IsMounted && !target.IsHero ? RequiredMountFor(party, target) : target.UpgradeRequiresItemFromCategory; } catch { }
@@ -232,6 +319,9 @@ namespace Armoury
                 var tr = Traverse.Create(upgradeArgs);
                 var target = tr.Field("UpgradeTarget").GetValue<CharacterObject>();
                 if (target == null) return true;
+                // zrodlo juz konne - patrz RiderOnlyTarget; awans bez kosztu rumaka
+                var srcP = tr.Field("Target").GetValue<CharacterObject>();
+                if (srcP != null && !srcP.IsHero && srcP.IsMounted) return true;
                 ItemCategory cat = null;
                 // wprost po TABORZE TEJ partii (getter mierzy stajnia gracza)
                 try { cat = target.IsMounted && !target.IsHero ? RequiredMountFor(party, target) : target.UpgradeRequiresItemFromCategory; } catch { }
