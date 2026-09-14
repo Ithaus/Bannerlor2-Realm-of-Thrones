@@ -1,5 +1,29 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-14 - Kwatermistrz: najpierw braki, potem wymiana (jedno dopasowanie calej polki) + krotkie komunikaty
+**Mod:** Armoury + CrashScribe | **Pliki:** `Armoury/src/QuartermasterLaw.cs` (ProcessSwaps przepisany, komunikaty), `CrashScribe/src/Mends.cs` (komunikat)
+**Problem:** Jeff: "wrzucam strzaly na Archery 105 - nie przyjmuje: zabral
+nowe, wydal stare; w pierwszej kolejnosci ma uzupelniac BRAKI, a jak wszyscy
+maja, dopiero wymieniac na lepsze - dla wszystkich przedmiotow" oraz "pisz
+skrotami, bo jak duzo tekstu, to nie widac". Stary ProcessSwaps robil za
+kazda wlozona sztuke wymiane 1:1 "nowa za najgorsza wojskowa" - LICZBA
+sztuk na ludziach sie nie zmieniala, luki (Arrows 86/172) zostawaly.
+**Zmiana:** ProcessSwaps = (1) wklad, ktorego nikt nie udzwignie, zostaje
+gracza (krotki komunikat); (2) jedno dopasowanie CALEJ polki (PurgeUnusable
+/FitFor): wklad idzie do ludzi wszedzie tam, gdzie go nosza - kto nie mial
+nic, dostaje pierwszy; wyparte gorsze sztuki wracaja na liste gracza dopiero,
+gdy wszyscy obsadzeni. Dotyczy kazdego typu (KitTypes). Komunikaty skrocone:
+"QM short (have/need): Arrows 86/172 (29 men Bow 60-100, bring <=60)",
+"QM: N pcs no man wears -> your list (...)", "QM: N of your pcs -> the men.",
+"QM: N pcs battle-worn - the smith mends them", "QM: every man fully kitted.",
+po bitwie "QM: N slots EMPTY in battle (K quivers) - nothing usable".
+**Ryzyko / co sprawdzic:** wlozyc strzaly w zasiegu skilla lucznikow ->
+"QM: N of your pcs -> the men" i raport Arrows rosnie; wlozyc lepsze niz
+noszone przy pelnym komplecie -> ida do najzdolniejszych, ich stare wracaja
+na liste. Wylaczenie QuartermasterPurgeUnusable wylacza tez rozliczanie
+wkladow (zostaja na liscie gracza; DTE i tak ich uzywa).
+**Status:** ZBUDOWANE (wgrane, jesli gra zamknieta; inaczej watcher)
+
 ## 2026-09-14 - Dopasowanie liczy CALA polke (takze liste gracza); skarbiec = noszone, stash = nienoszone; wskazowka "bring X for skill <= min"
 **Mod:** Armoury | **Pliki:** `Armoury/src/QuartermasterLaw.cs` (Fit/FitFor/PurgeUnusable/ShortageLines)
 **Problem:** Jeff (screen): "mowi przynies luk 140 lub mniej, a te luki

@@ -1184,8 +1184,8 @@ namespace CrashScribe
                     try { who = tr.Field("_party").GetValue() as MobileParty; } catch { }
                     if (who != null && who == MobileParty.MainParty)
                         InformationManager.DisplayMessage(new InformationMessage(
-                            "Quartermaster: " + (kept + keptAmmo) + " of your men's slots went EMPTY - the war-chest holds nothing they can use"
-                            + (keptAmmo > 0 ? " (" + keptAmmo + " quivers)" : "") + ". Stock gear within their skill.",
+                            "QM: " + (kept + keptAmmo) + " slots EMPTY in battle" + (keptAmmo > 0 ? " (" + keptAmmo + " quivers)" : "")
+                            + " - nothing usable in the war-chest.",
                             Colors.Yellow));
                 }
             }

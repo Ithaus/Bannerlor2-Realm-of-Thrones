@@ -328,7 +328,7 @@ namespace Armoury
                         {
                             ArmouryBehavior.StockDeposit(it.StringId, kv.Value);     // nie na ludziach -> lista gracza
                             toPlayer += kv.Value; here += kv.Value;
-                            if (names.Count < 6) names.Add(kv.Value + "x " + it.Name);
+                            if (names.Count < 3) names.Add(kv.Value + "x " + it.Name);
                         }
                         else
                         {
@@ -341,11 +341,10 @@ namespace Armoury
                 if (toPlayer > 0 || toMen > 0)
                 {
                     if (toPlayer > 0)
-                        Log.Player("Quartermaster: " + toPlayer + " pieces the men cannot use or do not need are on YOUR list ("
-                                   + string.Join(", ", names.ToArray()) + (names.Count >= 6 ? ", ..." : "")
-                                   + "). Sell them, or bring gear within the men's skill.", true);
+                        Log.Player("QM: " + toPlayer + " pcs no man wears -> your list ("
+                                   + string.Join(", ", names.ToArray()) + (names.Count >= 3 ? ", ..." : "") + ").", true);
                     if (toMen > 0)
-                        Log.Player("Quartermaster: " + toMen + " of your pieces went to the men - they can use them.", true);
+                        Log.Player("QM: " + toMen + " of your pcs -> the men.", true);
                     Log.Info("Kwatermistrz: porzadek w skarbcu - " + toPlayer + " szt. na liste gracza, " + toMen
                              + " szt. na stan wojska [" + string.Join(", ", perType.ToArray()) + "].");
                 }
@@ -412,10 +411,11 @@ namespace Armoury
                     if (have < need)
                     {
                         string line = type + " " + have + "/" + need;
+                        // KROTKO (Jeff 14.09: "pisz skrotami, bo jak duzo tekstu, to nie widac")
                         if (fit.UnfitMen > 0 && fit.UnfitMinSkill >= 0)
-                            line += " (" + fit.UnfitMen + " men have nothing they can use - their " + fit.SkillName + " is "
-                                    + fit.UnfitMinSkill + (fit.UnfitMaxSkill > fit.UnfitMinSkill ? "-" + fit.UnfitMaxSkill : "")
-                                    + "; bring " + type + " for " + fit.SkillName + " " + fit.UnfitMinSkill + " or less to cover all)";
+                            line += " (" + fit.UnfitMen + " men " + fit.SkillName + " " + fit.UnfitMinSkill
+                                    + (fit.UnfitMaxSkill > fit.UnfitMinSkill ? "-" + fit.UnfitMaxSkill : "")
+                                    + ", bring <=" + fit.UnfitMinSkill + ")";
                         lines.Add(line);
                     }
                 }
@@ -724,7 +724,7 @@ namespace Armoury
                 var needs = QuartermasterLaw.CountNeeds();
 
                 // meldunek brakow PRZED schowaniem polek (pelna lista, z amunicja)
-                bool anyShort = QuartermasterLaw.ShoutShortages("Quartermaster: the men go SHORT (have/need):");
+                bool anyShort = QuartermasterLaw.ShoutShortages("QM short (have/need):");
 
                 // info Jeffa: zuzyte sztuki na polkach naprawia kowal w miescie
                 // (liczone PRZED depozytem - ludzie nosza najlepsze, takze zuzyte)
@@ -742,7 +742,7 @@ namespace Armoury
                     }
                     if (wornPieces > 0)
                         InformationManager.DisplayMessage(new InformationMessage(
-                            "Quartermaster: " + wornPieces + " pieces of the men's kit are battle-worn - a worn piece protects far less. The town smith will mend them (Work the forge).",
+                            "QM: " + wornPieces + " pcs battle-worn - the smith mends them (Work the forge).",
                             Colors.Yellow));
                 }
 
@@ -773,13 +773,13 @@ namespace Armoury
                     foreach (var kv in _held) pieces += kv.Value;
                     Log.Info("Kwatermistrz: skarbiec wojskowy (" + pieces + " szt.) schowany - na liscie tylko wklady gracza.");
                     InformationManager.DisplayMessage(new InformationMessage(
-                        "Quartermaster: the company war-chest is the men's, not yours - your own deposits only are listed.",
+                        "QM: listed = what no man wears; the men's kit stays hidden.",
                         Colors.Yellow));
                 }
                 if (!anyShort)
                 {
                     InformationManager.DisplayMessage(new InformationMessage(
-                        "Quartermaster: every man carries his full kit.", Colors.Green));
+                        "QM: every man fully kitted.", Colors.Green));
                 }
             }
             catch (Exception e) { Log.Error("Escrow.Hold", e); }
@@ -915,143 +915,32 @@ namespace Armoury
 
         private static void ProcessSwaps(ItemRoster armory)
         {
+            // NAJPIERW BRAKI, POTEM WYMIANA (Jeff 14.09: "wrzucam strzaly 105,
+            // zabral nowe, wydal stare - a w pierwszej kolejnosci powinien
+            // uzupelniac braki; jak wszyscy maja, dopiero wymienia na lepsze;
+            // dotyczy wszystkich przedmiotow"). Stara wymiana 1:1 "nowe za
+            // najgorsze" nie zmieniala LICZBY sztuk na ludziach - luki zostawaly.
+            // Teraz: jedno dopasowanie CALEJ polki (FitFor) - wklad idzie do
+            // ludzi wszedzie tam, gdzie go nosza (kto nie mial nic, dostaje),
+            // a wyparte gorsze sztuki wracaja na liste gracza dopiero, gdy
+            // wszyscy sa obsadzeni. Wklad, ktorego nikt nie udzwignie, zostaje
+            // gracza - z krotkim komunikatem.
             try
             {
-                if (_pendingSwaps.Count == 0) return;
                 if (armory == null) { _pendingSwaps.Clear(); return; }
-
-                int given = 0;
                 foreach (var dep in _pendingSwaps)
                 {
-                    var newItem = dep.Key;
-                    int count = dep.Value.Key;
-                    int newVal = dep.Value.Value;
-
-                    // JAK Z PANCERZEM (Jeff 29.08: "wrzucam lepszy, znika,
-                    // dostaje w zamian starszy"). Zaden prog nadwyzki - wklad
-                    // ZAWSZE przechodzi na wojsko i znika z polki gracza,
-                    // a w zamian wyjezdzaja najgorsze sztuki tego typu, ile
-                    // ich wojsko ma. Wczesniejszy prog blokowal wymiane przy
-                    // brakach - a wtedy strzaly zostawaly na polce gracza
-                    // i wygladalo, ze kwatermistrz ich nie przyjmuje.
-                    int swapped = 0;
-
-                    // NIKT NIE UDZWIGNIE = zadnej wymiany, wklad zostaje twoj,
-                    // a kwatermistrz mowi wprost czemu (Jeff: "jak nie wymienili,
-                    // to znaczy ze nie ma skilli - i dostaje komunikat")
+                    var it = dep.Key;
+                    if (it == null) continue;
                     int bestSkill; string skillName;
-                    if (!AnyoneCanUse(newItem, out bestSkill, out skillName))
-                    {
-                        Log.Player("Quartermaster: no man of the company can handle the " + newItem.Name
-                                   + " (needs " + skillName + " " + newItem.Difficulty + "; the best of them has "
-                                   + bestSkill + "). It stays on YOUR shelf.", true);
-                        continue;
-                    }
-
-                    int newTier = (int)newItem.Tier;
-                    for (int k = 0; k < count; k++)
-                    {
-                        // najgorsza wojskowa sztuka tego samego typu, gorsza od wkladu
-                        int bestIdx = -1; int bestVal = int.MaxValue; int cand = 0;
-                        for (int i = 0; i < armory.Count; i++)
-                        {
-                            var el = armory[i];
-                            var it = el.EquipmentElement.Item;
-                            if (it == null || el.Amount <= 0 || it.ItemType != newItem.ItemType) continue;
-                            // ten sam przedmiot w GORSZYM stanie tez jest wymiana
-                            var id = it.StringId ?? "";
-                            if (MusterBook.IsPinnedItem(id)) continue;               // rozkaz z ksiegi swiety
-                            int warPart = el.Amount - Math.Min(el.Amount, ArmouryBehavior.StockOf(id));
-                            if (warPart <= 0) continue;                              // to wklady gracza
-                            cand++;
-                            int v = el.EquipmentElement.ItemValue;
-                            // GORSZE = nizszy tier ALBO ten sam tier i mniejsza
-                            // wartosc. Sama cena nie wystarczala: strzaly tego
-                            // samego rodzaju maja identyczna cene bazowa, wiec
-                            // nic nigdy nie przechodzilo progu (Jeff: "dostaje
-                            // 10 sztuk gorszy tier")
-                            int t = (int)it.Tier;
-                            bool worse = t < newTier || (t == newTier && v < newVal);
-                            if (!worse) continue;
-                            if (v < bestVal) { bestVal = v; bestIdx = i; }
-                        }
-                        if (bestIdx < 0)
-                        {
-                            if (k == 0)
-                                Log.Info("Kwatermistrz: brak gorszej sztuki " + newItem.ItemType
-                                         + " od " + newItem.StringId + " (t" + (newTier + 1) + ", " + newVal
-                                         + ") - kandydatow wojskowych: " + cand + ".");
-                            break;
-                        }
-                        var old = armory[bestIdx].EquipmentElement;
-                        // stara sztuka zostaje w magazynie, ale PRZECHODZI NA
-                        // GRACZA (ksiega +1) - przy nastepnym otwarciu lezy na
-                        // jego liscie ZAMIAST wkladu; wklad idzie na wojsko
-                        ArmouryBehavior.StockDeposit(old.Item != null ? old.Item.StringId : "", 1);
-                        ArmouryBehavior.StockWithdraw(newItem.StringId, 1);
-                        given++; swapped++;
-                    }
-
-                    // WKLAD ZNIKA Z POLKI GRACZA - ZAWSZE (Jeff 29.08, trzeci
-                    // raz i dosadnie: "MAJA ZNIKNAC BO kwatermistrz je PRZYJAL,
-                    // a pokazuja sie tylko rzeczy, ktore zostaly wymienione").
-                    // Kwatermistrz przyjmuje cala dostawe; na liscie gracza
-                    // zostaje wylacznie to, co wojsko oddalo w zamian.
-                    int kept = count - swapped;
-                    if (kept > 0)
-                    {
-                        // WOJSKO BIERZE TYLKO TYLE, ILE UNIESIE NA SOBIE
-                        // (Jeff 30.08: "skoro lucznicy potrzebuja 214 sztuk,
-                        // to max znika 214, bo tyle jest na ludziach").
-                        // Wszystko ponad komplet zostaje wlasnoscia gracza.
-                        int needT = QuartermasterLaw.NeedForType(newItem.ItemType);
-                        // komplet po UZYTECZNYCH sztukach (Jeff 14.09): 172 strzal T6 na polce
-                        // to nie komplet, gdy lucznicy maja Luk 60 - tanie strzaly ida do ludzi
-                        int warHave = QuartermasterLaw.WarUsableOf(armory, newItem.ItemType);
-                        // komplet 0 (nikt w kompanii nie nosi tego typu) = wojsko
-                        // nie bierze NIC; galaz ": kept" pozerala caly wklad
-                        int room = Math.Max(0, needT - warHave);
-                        int take = Math.Min(kept, room);
-                        if (take > 0)
-                        {
-                            ArmouryBehavior.StockWithdraw(newItem.StringId, take);
-                            Log.Player("Quartermaster: " + take + " " + newItem.Name
-                                       + " go to the men (" + (warHave + take) + " of " + needT
-                                       + " now in hand) - they had nothing worse of that kind to trade back.", true);
-                            Log.Info("Kwatermistrz: " + take + " szt. " + newItem.StringId
-                                     + " na stan wojska (mieli " + warHave + ", potrzeba " + needT + ").");
-                        }
-                        int spare = kept - take;
-                        if (spare > 0)
-                        {
-                            if (needT <= 0)
-                            {
-                                // komplet 0 = nikt w kompanii nie nosi typu;
-                                // "full kit" byloby klamstwem
-                                Log.Player("Quartermaster: no man of the company carries " + newItem.Name
-                                           + " - all " + spare + " stay on YOUR shelf.", true);
-                                Log.Info("Kwatermistrz: nikt nie nosi " + newItem.StringId
-                                         + " - " + spare + " szt. zostaje graczowi.");
-                            }
-                            else
-                            {
-                                Log.Player("Quartermaster: the men are at full kit for " + newItem.Name
-                                           + " - the spare " + spare + " stays on YOUR shelf.", true);
-                                Log.Info("Kwatermistrz: nadwyzka " + spare + " szt. " + newItem.StringId
-                                         + " zostaje graczowi (komplet " + needT + " osiagniety).");
-                            }
-                        }
-                    }
+                    if (!AnyoneCanUse(it, out bestSkill, out skillName))
+                        Log.Player("QM: no man can use " + it.Name + " (needs " + skillName + " " + it.Difficulty
+                                   + ", best " + bestSkill + ") - stays yours.", true);
                 }
-                _pendingSwaps.Clear();
-                if (given > 0)
-                {
-                    Log.Info("Kwatermistrz: wymiana barterowa - " + given + " starych sztuk przeksiegowano na gracza.");
-                    Log.Player("Quartermaster's exchange: the men take your better gear - " + given
-                               + " of their old pieces now lie on YOUR shelf (open the armoury to take them).", true);
-                }
+                QuartermasterLaw.PurgeUnusable(armory);
             }
             catch (Exception e) { Log.Error("Escrow.ProcessSwaps", e); }
+            finally { _pendingSwaps.Clear(); }
         }
     }
 }

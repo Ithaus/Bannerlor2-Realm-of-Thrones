@@ -515,7 +515,7 @@ namespace Armoury
                         if (_shortageShoutDue != CampaignTime.Zero && CampaignTime.Now > _shortageShoutDue)
                         {
                             _shortageShoutDue = CampaignTime.Zero;
-                            QuartermasterLaw.ShoutShortages("Quartermaster after the battle - the men go SHORT (have/need):");
+                            QuartermasterLaw.ShoutShortages("QM short (have/need):");
                         }
                     }
                     catch { }
@@ -1076,7 +1076,7 @@ namespace Armoury
             {
                 // poranny meldunek: braki wykrzyczane na glos, zeby Jeff WIEDZIAL
                 // bez otwierania zbrojowni ("czemu ja o tym nie wiem!")
-                QuartermasterLaw.ShoutShortages("Quartermaster's morning report - the men go SHORT (have/need):");
+                QuartermasterLaw.ShoutShortages("QM morning: short (have/need):");
             }
             catch (Exception e) { Log.Error("MorningReport", e); }
         }
