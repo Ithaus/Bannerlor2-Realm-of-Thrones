@@ -1,5 +1,32 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-14 - Glod rani powoli: 5% skladu dziennie zamiast vanillowych 25% (armie samych rannych zima)
+**Mod:** Armoury | **Pliki:** `Armoury/src/SlowHealing.cs` (StarvePostfix), `Settings.cs` (+McmSettings)
+**Problem:** Jeff (screen, Winter 5): "czy to bug - czemu wszyscy maja rannych?"
+- partia Velaryonow 0 zdrowych / 207 rannych, podobnie inne.
+**Przyczyna:** (dekompilacja DefaultPartyHealingModel.GetDailyHealingForRegulars)
+partia GLODUJACA w polu dostaje leczenie `-TotalRegulars * 0.25` DZIENNIE -
+ujemne leczenie zamienia zolnierzy w rannych: cala armia ranna w 4 dni.
+Zima to wyzwala masowo: WinterBite +50% jedzenia (x gradient polnocy),
+drozyzna (HungerLaw: AI dokupilo 1800 szt. ponad sufit ceny w jednej
+sesji), cap zapasow AI 4 dni (BkSupplyDaysCap, decyzja Jeffa) - partie
+w polu i w oblezeniu gloduja, a RB InfectionBehavior dobija 5% rannych
+dziennie (zima gorzej). To dokladnie "zimowa kaskada glodu" z audytu
+31.08 (pozycja "OBSERWOWAC"). Wykluczone: RB SiegeAttrition ZABIJA (nie
+rani), pogoda RB wylaczona, CampFever tylko w oblezeniu (122 chorych
+lacznie), choroby AIInfluence dotycza bohaterow. NIE bug kodu - vanilla
+brutalnosc pomnozona przez nasza zime.
+**Zmiana:** StarvePostfix (Priority.Last, po BK, ktory doklada kare za glod
+w oblezeniu): ujemne leczenie glodujacej partii w polu skalowane z 25%/dzien
+do suwaka StarvationWoundPercent (dom. 5; 25 = vanilla, 0 = bez kary),
+minimum 1 ranny/dzien. Garnizony (-10%) i morale z glodu bez zmian. Gracz
+i AI rowno. Instalowane niezaleznie od suwakow tempa gojenia.
+**Ryzyko / co sprawdzic:** Armoury.log przy starcie "SlowHealing: glod rani
+5% skladu dziennie"; po kilku dniach zimy partie AI maja rannych, ale nie
+"0 zdrowych"; glod nadal boli (morale, 5%/dzien). Jesli za lagodnie -
+suwak w gore (10-15).
+**Status:** ZBUDOWANE (wgrane, jesli gra zamknieta; inaczej watcher)
+
 ## 2026-09-14 - Kwatermistrz: najpierw braki, potem wymiana (jedno dopasowanie calej polki) + krotkie komunikaty
 **Mod:** Armoury + CrashScribe | **Pliki:** `Armoury/src/QuartermasterLaw.cs` (ProcessSwaps przepisany, komunikaty), `CrashScribe/src/Mends.cs` (komunikat)
 **Problem:** Jeff: "wrzucam strzaly na Archery 105 - nie przyjmuje: zabral

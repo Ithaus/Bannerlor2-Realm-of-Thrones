@@ -480,6 +480,10 @@ namespace Armoury
         [SettingPropertyGroup("The slow mending")]
         public int AiHealingRegenPercent { get; set; } = 100;
 
+        [SettingPropertyInteger("Starvation Wound Percent", 0, 20, "0", HintText = "a STARVING party in the field loses this share of its regulars to wounds per day (vanilla 25 - a whole army wounded in four days; 0 = off, 25 = vanilla). Player and AI alike")]
+        [SettingPropertyGroup("The slow mending")]
+        public int StarvationWoundPercent { get; set; } = 5;
+
         [SettingPropertyBool("Auto Sort Party", HintText = "the party roster keeps itself in order: cavalry, horse archers, infantry, archers - each arm by tier, best first (no more dragging rows by hand)")]
         [SettingPropertyGroup("The tidy muster")]
         public bool AutoSortParty { get; set; } = true;
@@ -1475,6 +1479,7 @@ namespace Armoury
             s.VolunteerRegenPercent = VolunteerRegenPercent;
             s.HealingRegenPercent = HealingRegenPercent;
             s.AiHealingRegenPercent = AiHealingRegenPercent;
+            s.StarvationWoundPercent = StarvationWoundPercent;
             s.AutoSortParty = AutoSortParty;
             s.MusterBookEnabled = MusterBookEnabled;
             s.CraftResultPopup = CraftResultPopup;
