@@ -1029,71 +1029,155 @@ namespace CrashScribe
         /// bez tej sztuki, a sztuka NIE przepada (pula DTE to odbicie taboru,
         /// nie magazyn - tabor zostaje nietkniety).
         /// </summary>
+        // ---- STRAZ SKILLI W PRZYDZIALE DTE (Jeff 14.09: "niech nie przyjmuja
+        // strzal, ktorych nie moga uzyc - z polki schodzi tylko to, do czego
+        // ludzie maja skill") ----
+        private static SkillObject ReqSkill(ItemObject it)
+        {
+            if (it == null) return null;
+            var rs = it.RelevantSkill;
+            if (rs != null) return rs;
+            if (it.ItemType == ItemObject.ItemTypeEnum.Arrows) return DefaultSkills.Bow;       // RBM: 105/140/175
+            if (it.ItemType == ItemObject.ItemTypeEnum.Bolts) return DefaultSkills.Crossbow;
+            if (it.HasArmorComponent) return DefaultSkills.Athletics;                           // Prawo Wagi
+            return null;
+        }
+
+        internal static bool CanUse(CharacterObject co, ItemObject it)
+        {
+            try
+            {
+                if (co == null || it == null || it.Difficulty <= 0) return true;
+                var rs = ReqSkill(it);
+                if (rs == null) return true;
+                return co.GetSkillValue(rs) >= it.Difficulty;
+            }
+            catch { return true; }
+        }
+
+        /// <summary>Postfix na DTE PartyEquipmentDistributor.IsWeaponSuitable(equipment,
+        /// referenceWeapon, assignment, strict): sztuka ponad skill TEGO zolnierza
+        /// jest "nieodpowiednia" - DTE bierze nastepna z polki, a T6 luk czeka na
+        /// elite, zamiast trafic do nowicjusza i zejsc po fakcie.</summary>
+        public static void SuitableWard(EquipmentElement equipment, object assignment, ref bool __result)
+        {
+            try
+            {
+                if (!__result || assignment == null) return;
+                var co = Traverse.Create(assignment).Property("Character").GetValue() as CharacterObject;
+                if (co == null || co.IsHero) return;
+                if (!CanUse(co, equipment.Item)) __result = false;
+            }
+            catch { }
+        }
+
+        /// <summary>Postfix na DoAssignAsync: co DTE i tak wcisnelo ponad skill
+        /// (strzaly/belty z AssignExtra*, pancerz z AssignEquipmentType, kon,
+        /// awaryjna bron) WRACA NA POLKE, a zolnierz dostaje z polki najlepsza
+        /// sztuke tego samego typu (i klasy broni), ktorej umie uzyc. Gdy na
+        /// polce nie ma nic uzytecznego - slot zostaje PUSTY (Jeff 14.09: "jak
+        /// nic nie pasuje, to nic nie zaklada - trzeba wlozyc do DTE sprzet,
+        /// ktorego moze uzyc"). Zadnej podlogi w przydziale.</summary>
         public static void SkillLawWard(object __instance)
         {
             try
             {
-                var list = Traverse.Create(__instance).Property("Assignments").GetValue() as System.Collections.IEnumerable;
-                if (list == null) list = Traverse.Create(__instance).Field("Assignments").GetValue() as System.Collections.IEnumerable;
+                var tr = Traverse.Create(__instance);
+                var list = tr.Property("Assignments").GetValue() as System.Collections.IEnumerable;
+                if (list == null) list = tr.Field("Assignments").GetValue() as System.Collections.IEnumerable;
                 if (list == null) return;
-                int stripped = 0, kept = 0;
+                var pool = tr.Field("_equipmentToAssign").GetValue() as System.Collections.IDictionary;
+                int swapped = 0, kept = 0, keptAmmo = 0;
                 foreach (var a in list)
                 {
-                    var tr = Traverse.Create(a);
-                    var co = tr.Property("Character").GetValue() as CharacterObject;
-                    var eq = tr.Property("Equipment").GetValue() as Equipment;
-                    if (eq == null) eq = tr.Field("Equipment").GetValue() as Equipment;
+                    var ta = Traverse.Create(a);
+                    var co = ta.Property("Character").GetValue() as CharacterObject;
+                    var eq = ta.Property("Equipment").GetValue() as Equipment;
+                    if (eq == null) eq = ta.Field("Equipment").GetValue() as Equipment;
                     if (co == null || eq == null || co.IsHero) continue;
-
-                    // NAJPIERW ZBIERZ, co ma zejsc - dopiero potem zdejmuj. Inaczej
-                    // zolnierz, ktoremu KAZDA bron przekracza skill, wychodzi na pole
-                    // z golymi rekami: awaryjki DTE (AssignWeaponToUnarmed,
-                    // ApplyEmergencyLoadout) przebiegly JUZ przed naszym postfixem,
-                    // a DressCode uzupelnia wylacznie pancerz. Podloga sprzetu
-                    // (Jeff 31.08): najlzejsza bron zostaje w rece.
-                    var doomed = new System.Collections.Generic.List<int>();
-                    int weaponsHeld = 0, weakestSlot = -1, weakestDiff = int.MaxValue;
                     for (int s = 0; s <= 11; s++)
                     {
-                        ItemObject it;
-                        try { it = eq[(EquipmentIndex)s].Item; } catch { continue; }
-                        if (it == null) continue;
-                        // KOLCZAN NIE PODLEGA STRAZY (Jeff 14.09: "lucznicy nie
-                        // strzelaja i nie maja kolczanow"). RBM wpisuje strzalom
-                        // wymog Luku 105/140/175 (52 z 71 kolczanow), DTE daje
-                        // lucznikom NAJLEPSZE z magazynu, a mapowanie amunicji na
-                        // Bow/Crossbow (13.09) kazalo strazy zdejmowac kolczan ponad
-                        // skill i NIC nie dawac w zamian - luk zostawal (podloga),
-                        // strzaly znikaly. Bramka skilla siedzi w LUKU; strzaly
-                        // ponad skill podmienia przy spawnie DragonUnmount na
-                        // wzorzec w ramach skilla - lucznik zawsze ma czym strzelac.
-                        if (it.ItemType == ItemObject.ItemTypeEnum.Arrows || it.ItemType == ItemObject.ItemTypeEnum.Bolts) continue;
-                        bool isWeapon = s <= 4;
-                        if (isWeapon) weaponsHeld++;
-                        var rs = it.RelevantSkill;
-                        if (it.Difficulty <= 0 || rs == null) continue;
-                        if (co.GetSkillValue(rs) >= it.Difficulty) continue;
-                        doomed.Add(s);
-                        if (isWeapon && it.Difficulty < weakestDiff) { weakestDiff = it.Difficulty; weakestSlot = s; }
-                    }
-                    int doomedWeapons = 0;
-                    for (int i = 0; i < doomed.Count; i++) if (doomed[i] <= 4) doomedWeapons++;
-                    if (weaponsHeld > 0 && doomedWeapons >= weaponsHeld && weakestSlot >= 0)
-                    { doomed.Remove(weakestSlot); kept++; }
+                        EquipmentElement el; ItemObject it;
+                        try { el = eq[(EquipmentIndex)s]; it = el.Item; } catch { continue; }
+                        if (it == null || CanUse(co, it)) continue;
 
-                    for (int i = 0; i < doomed.Count; i++)
-                    {
-                        int s = doomed[i];
-                        try { tr.Method("SetEquipment", (EquipmentIndex)s, default(EquipmentElement)).GetValue(); stripped++; }
-                        catch { try { eq[(EquipmentIndex)s] = default(EquipmentElement); stripped++; } catch { } }
+                        // najlepsza UZYTECZNA sztuka tego typu (i klasy broni) na polce
+                        EquipmentElement best = default(EquipmentElement);
+                        bool found = false; float bestEff = float.MinValue;
+                        if (pool != null)
+                        {
+                            var wc = it.PrimaryWeapon != null ? it.PrimaryWeapon.WeaponClass : WeaponClass.Undefined;
+                            foreach (System.Collections.DictionaryEntry kv in pool)
+                            {
+                                int cnt; try { cnt = Convert.ToInt32(kv.Value); } catch { continue; }
+                                if (cnt <= 0 || !(kv.Key is EquipmentElement)) continue;
+                                var cand = (EquipmentElement)kv.Key;
+                                var ci = cand.Item;
+                                if (ci == null || ci.ItemType != it.ItemType) continue;
+                                if (wc != WeaponClass.Undefined && (ci.PrimaryWeapon == null || ci.PrimaryWeapon.WeaponClass != wc)) continue;
+                                if (!CanUse(co, ci)) continue;
+                                if (IsDeadGear(ci) || IsUniqueGear(ci) || IsLoreBlade(ci)) continue;
+                                if (ci.Effectiveness > bestEff) { bestEff = ci.Effectiveness; best = cand; found = true; }
+                            }
+                        }
+                        // BEZ PODLOGI (Jeff 14.09: "jak nic nie pasuje, to nic nie
+                        // zaklada - wtedy trzeba wlozyc do DTE sprzet, ktorego moze
+                        // uzyc"): sztuka ponad skill ZAWSZE wraca na polke; slot
+                        // zostaje pusty, gdy polka nie ma nic uzytecznego
+                        try { tr.Method("AddEquipmentToAssign", el, 1).GetValue(); } catch { }        // zwrot na polke
+                        if (!found)
+                        {
+                            try { ta.Method("SetEquipment", (EquipmentIndex)s, default(EquipmentElement)).GetValue(); }
+                            catch { try { eq[(EquipmentIndex)s] = default(EquipmentElement); } catch { } }
+                            if (it.ItemType == ItemObject.ItemTypeEnum.Arrows || it.ItemType == ItemObject.ItemTypeEnum.Bolts) keptAmmo++;
+                            else kept++;
+                            if (s == 10)
+                            {
+                                // kon wrocil na polke - uprzaz tez, nie zostaje sama
+                                try
+                                {
+                                    var hel0 = eq[(EquipmentIndex)11];
+                                    if (hel0.Item != null)
+                                    {
+                                        try { tr.Method("AddEquipmentToAssign", hel0, 1).GetValue(); } catch { }
+                                        try { ta.Method("SetEquipment", (EquipmentIndex)11, default(EquipmentElement)).GetValue(); }
+                                        catch { try { eq[(EquipmentIndex)11] = default(EquipmentElement); } catch { } }
+                                    }
+                                }
+                                catch { }
+                            }
+                            continue;
+                        }
+                        try { ta.Method("SetEquipment", (EquipmentIndex)s, best).GetValue(); }
+                        catch { try { eq[(EquipmentIndex)s] = best; } catch { } }
+                        try { tr.Method("ConsumeEquipmentToAssign", best).GetValue(); } catch { }
+                        swapped++;
+                        if (s == 10)
+                        {
+                            // kon podmieniony: uprzaz z innej rodziny wraca na polke
+                            // (uprzaz konska na wielbladzie = AccessViolation w AddMountMesh)
+                            try
+                            {
+                                var hel = eq[(EquipmentIndex)11];
+                                var hh = hel.Item;
+                                var mc = best.Item != null && best.Item.HorseComponent != null ? best.Item.HorseComponent.Monster : null;
+                                if (hh != null && hh.ArmorComponent != null && mc != null && hh.ArmorComponent.FamilyType != mc.FamilyType)
+                                {
+                                    try { tr.Method("AddEquipmentToAssign", hel, 1).GetValue(); } catch { }
+                                    try { ta.Method("SetEquipment", (EquipmentIndex)11, default(EquipmentElement)).GetValue(); }
+                                    catch { try { eq[(EquipmentIndex)11] = default(EquipmentElement); } catch { } }
+                                }
+                            }
+                            catch { }
+                        }
                     }
                 }
-                if (stripped > 0 || kept > 0)
-                    Scribe.Line("Mends: swieta zasada skilli w DTE - zdjeto " + stripped
-                                + " sztuk ponad umiejetnosci jednostek"
-                                + (kept > 0 ? ", " + kept + " razy ostatnia bron zostala w rece (podloga)" : "") + ".");
+                if (swapped > 0 || kept > 0 || keptAmmo > 0)
+                    Scribe.Line("Mends: swieta zasada skilli w DTE - " + swapped + " sztuk ponad skill wrocilo na polke (w zamian najlepsze uzyteczne); "
+                                + (kept + keptAmmo) + " slotow zostalo PUSTYCH, bo polka nie miala nic uzytecznego"
+                                + (keptAmmo > 0 ? " (w tym " + keptAmmo + " kolczanow - wloz do DTE strzaly, ktorych ludzie umieja uzyc)" : "") + ".");
             }
-            catch { }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.SkillLawWard", null); } catch { } }
         }
 
         // ===== SMOKI TYLKO DLA DAENERYS (Jeff 31.08: "smoki ma TYLKO Daenerys!
@@ -2222,8 +2306,20 @@ namespace CrashScribe
                     harmony.Patch(mAssign, prefix: new HarmonyMethod(typeof(Mends), "UniqueWard"),
                                   postfix: new HarmonyMethod(typeof(Mends), "SkillLawWard"));
                     Scribe.Line("Mends: sprzet imiennych bohaterow poza pula przydzialu DTE - piechota nie zalozy pancerza Brienny.");
-                    Scribe.Line("Mends: swieta zasada skilli obowiazuje w DTE - Difficulty ponad umiejetnosc schodzi z grzbietu.");
+                    Scribe.Line("Mends: swieta zasada skilli w DTE - sztuka ponad skill wraca na polke, zolnierz bierze najlepsza uzyteczna (nic nie schodzi do pustki).");
                 }
+                try
+                {
+                    // wybor PRZED przydzialem: DTE sam pomija bron ponad skill zolnierza
+                    var mSuit = tDist != null ? AccessTools.Method(tDist, "IsWeaponSuitable") : null;
+                    if (mSuit != null)
+                    {
+                        harmony.Patch(mSuit, postfix: new HarmonyMethod(typeof(Mends), "SuitableWard"));
+                        Scribe.Line("Mends: DTE dobiera zolnierzowi tylko bron, ktorej umie uzyc (IsWeaponSuitable) - T6 czeka na elite.");
+                    }
+                    else Scribe.Line("Mends: DTE IsWeaponSuitable nieznaleziony - dobor przed przydzialem bez strazy (zostaje straz po przydziale).");
+                }
+                catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.Install(suitable)", null); } catch { } }
 
                 // ===== DRUGA MENNICA DTE: FillEmptySlots (Jeff 14.09) =====
                 // Szczegoly przy metodzie ArmourWard. W skrocie: DTE dopelnia sloty

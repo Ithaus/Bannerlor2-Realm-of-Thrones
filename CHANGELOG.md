@@ -1,5 +1,39 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-14 - Zasada skilli W PRZYDZIALE DTE: z polki schodzi tylko to, czego zolnierz umie uzyc; nic pasujacego = pusty slot
+**Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs` (SuitableWard, SkillLawWard przepisany, CanUse/ReqSkill)
+**Problem:** Jeff po poprzednim wpisie (kolczany): "bez sensu - niech nie
+przyjmuja strzal, ktorych nie moga uzyc; z DTE maja znikac tylko rzeczy,
+ktore wchodza do przydzialu, bo ludzie maja skill; jak nic nie pasuje, to
+nic nie zaklada - wtedy trzeba wlozyc do DTE sprzet, ktorego moga uzyc".
+Dotychczas: straz ZDEJMOWALA sztuke ponad skill po przydziale (do pustki,
+z podloga "ostatnia bron"), a przy spawnie DragonUnmount dokladal wzorzec
+z powietrza - sztuka byla "zuzyta" z magazynu, a zolnierz i tak jej nie
+uzywal.
+**Zmiana:** dwa haki na DTE PartyEquipmentDistributor (dekompilacja 14.09):
+(1) postfix SuitableWard na IsWeaponSuitable(equipment, referenceWeapon,
+assignment, strict) - bron ponad skill TEGO zolnierza jest dla DTE
+"nieodpowiednia", wiec DTE bierze nastepna z polki (T6 luk czeka na elite
+zamiast trafic do nowicjusza); (2) SkillLawWard (postfix DoAssignAsync)
+przepisany: kazda sztuka ponad skill (bron, strzaly/belty -> Bow/Crossbow,
+pancerz -> Atletyka, kon -> Riding) WRACA NA POLKE (AddEquipmentToAssign),
+a w zamian zolnierz dostaje z polki NAJLEPSZA uzyteczna sztuke tego samego
+typu i klasy broni (ConsumeEquipmentToAssign); gdy polka nie ma nic
+uzytecznego - slot zostaje PUSTY (przy koniu uprzaz tez wraca na polke;
+przy podmianie konia uprzaz z innej rodziny wraca na polke). Zero
+zdejmowania do pustki "po cichu" - log mowi, ile slotow zostalo pustych
+i ze trzeba wlozyc do DTE strzaly/bron w zasiegu skilli ludzi.
+Poprzedni wyjatek "amunicja poza straza" (d5e4409) zastapiony ta regula.
+**Ryzyko / co sprawdzic:** log "Mends: swieta zasada skilli w DTE - N sztuk
+ponad skill wrocilo na polke (w zamian najlepsze uzyteczne); M slotow
+zostalo PUSTYCH..."; przy starcie "DTE dobiera zolnierzowi tylko bron,
+ktorej umie uzyc (IsWeaponSuitable)" - jesli zamiast tego "nieznaleziony"
+albo raport Mends.Install(suitable) - zglosic (Harmony a parametr typu
+object). Lucznicy: kazdy z kolczanem, jesli w magazynie sa strzaly w ich
+zasiegu (T1-T3 maja wymog 0 - warto trzymac zapas). DLL wgra watcher po
+zamknieciu gry.
+**Status:** ZBUDOWANE - watcher wgra po zamknieciu gry
+
 ## 2026-09-14 - Lucznicy bez kolczanow: straz skilli w DTE zdejmowala strzaly ponad wymog Luku i nic nie dawala w zamian
 **Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs` (SkillLawWard)
 **Problem:** Jeff (screen bitwy): "lucznicy nie strzelaja i nie maja kolczanow,
