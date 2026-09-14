@@ -248,6 +248,10 @@ namespace Armoury
         [SettingPropertyGroup("Forge fee")]
         public bool QuartermasterShouts { get; set; } = true;
 
+        [SettingPropertyBool("Quartermaster Purge Unusable", HintText = "on every armoury visit the quartermaster hands back to you every piece no man of the company can use (skill law) - keep the war-chest honest")]
+        [SettingPropertyGroup("Forge fee")]
+        public bool QuartermasterPurgeUnusable { get; set; } = true;
+
         [SettingPropertyFloatingInteger("Charcoal Weight", 0.00f, 2.00f, "0.00", HintText = "a lump of charcoal weighs this much (vanilla hauls 5 kg bricks; 0 = leave alone)                   // the day's hire costs this many hours at the smith's rate (~200 gold in an average town)")]
         [SettingPropertyGroup("Forge fee")]
         public float CharcoalWeight { get; set; } = 0.5f;
@@ -1413,6 +1417,7 @@ namespace Armoury
             s.RefineXpCap = RefineXpCap;
             s.ArmouryProtectUsed = ArmouryProtectUsed;
             s.QuartermasterShouts = QuartermasterShouts;
+            s.QuartermasterPurgeUnusable = QuartermasterPurgeUnusable;
             s.CharcoalWeight = CharcoalWeight;
             s.BkTrueMaterials = BkTrueMaterials;
             s.ArmorPointsPerMaterial = ArmorPointsPerMaterial;

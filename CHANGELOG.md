@@ -1,5 +1,40 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-14 - Porzadek w skarbcu: kwatermistrz liczy UZYTECZNE sztuki, oddaje graczowi to, czego nikt nie udzwignie, i mowi po bitwie o pustych slotach
+**Mod:** Armoury + CrashScribe | **Pliki:** `Armoury/src/QuartermasterLaw.cs` (Fit/FitFor/WarUsableOf/PurgeUnusable, ShortageLines, ProcessSwaps, HoldReserve), `Settings.cs` (+McmSettings), `CrashScribe/src/Mends.cs` (SkillLawWard: komunikat)
+**Problem:** Jeff (screen): "stoja bez kolczanow, a info mowi, ze wszystko
+okay; przy kazdym otwarciu DTE przelec i zdejmij sprzet, ktorego jednostka
+nie moze uzyc - uporzadkuj caly sprzet wojska". Log CrashScribe z tej
+bitwy: "186 slotow zostalo PUSTYCH, w tym 53 kolczanow - polka nie miala
+nic uzytecznego". Straz w DTE dzialala poprawnie - to SKARBIEC byl zly.
+**Przyczyna:** kwatermistrz liczyl SZTUKI po typie: 172 strzal na polce =
+"komplet" i "every man carries his full kit", choc to same T4-T6 (wymog Luku
+105/140/175, poza zasiegiem lucznikow), a tanie strzaly T1 (wymog 0)
+odsylal graczowi jako NADWYZKE (log: "nadwyzka 9 szt. default_arrows
+zostaje graczowi (komplet 172 osiagniety)"). Wojsko mialo pelen skarbiec
+rzeczy, ktorych nie umialo uzyc.
+**Zmiana:** (1) FitFor(typ): dopasowanie ludzi do wojskowych sztuk po
+skillu (ItemReq.Meets - zasada nadrzedna) - kazdy potrzebujacy, od
+najzdolniejszego, bierze na papierze najlepsza sztuke, ktora udzwignie;
+wynik: ilu ma cos uzytecznego, ilu nic (i ich najwyzszy skill), oraz sztuki
+nie do uzycia przez NIKOGO. (2) Raport brakow: "have" = dopasowani, z
+dopiskiem "on the shelf 172, but 13 men cannot use them - bring Arrows for
+Bow 60 or less". (3) PurgeUnusable przy KAZDYM otwarciu zbrojowni (w
+HoldReserve, przed schowaniem skarbca): sztuki wojskowe nie do uzycia przez
+nikogo wracaja do sakw gracza z komunikatem (piny z ksiegi musztry
+nietykane); suwak QuartermasterPurgeUnusable. (4) Komplet w wymianie
+barterowej liczony po UZYTECZNYCH (WarUsableOf) - tanie uzyteczne strzaly
+ida do ludzi, nie do gracza. (5) CrashScribe: po przydziale dla partii
+GRACZA komunikat na ekranie "N of your men's slots went EMPTY - the
+war-chest holds nothing they can use (K quivers)".
+**Ryzyko / co sprawdzic:** przy otwarciu zbrojowni komunikat "Quartermaster:
+N pieces no man of the company can use were handed back to you (...)" -
+u Jeffa wroca m.in. strzaly T5-T6; raport brakow pokaze "Arrows X/186 (on
+the shelf ..., bring Arrows for Bow <= ...)"; po zakupie strzal T1-T3
+lucznicy wychodza z kolczanami. Koszt FitFor: 16 typow x (ludzie x sztuki)
+przy otwarciu ekranu/raporcie - pomijalny.
+**Status:** ZBUDOWANE (wgrane, jesli gra byla zamknieta; inaczej watcher)
+
 ## 2026-09-14 - Zasada skilli W PRZYDZIALE DTE: z polki schodzi tylko to, czego zolnierz umie uzyc; nic pasujacego = pusty slot
 **Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs` (SuitableWard, SkillLawWard przepisany, CanUse/ReqSkill)
 **Problem:** Jeff po poprzednim wpisie (kolczany): "bez sensu - niech nie

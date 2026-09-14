@@ -1176,6 +1176,18 @@ namespace CrashScribe
                     Scribe.Line("Mends: swieta zasada skilli w DTE - " + swapped + " sztuk ponad skill wrocilo na polke (w zamian najlepsze uzyteczne); "
                                 + (kept + keptAmmo) + " slotow zostalo PUSTYCH, bo polka nie miala nic uzytecznego"
                                 + (keptAmmo > 0 ? " (w tym " + keptAmmo + " kolczanow - wloz do DTE strzaly, ktorych ludzie umieja uzyc)" : "") + ".");
+                // GRACZ MA TO WIDZIEC NA EKRANIE (Jeff 14.09: "info mowi, ze wszystko
+                // okay, a stoja bez kolczanow") - tylko dla jego wlasnej partii
+                if (kept + keptAmmo > 0)
+                {
+                    MobileParty who = null;
+                    try { who = tr.Field("_party").GetValue() as MobileParty; } catch { }
+                    if (who != null && who == MobileParty.MainParty)
+                        InformationManager.DisplayMessage(new InformationMessage(
+                            "Quartermaster: " + (kept + keptAmmo) + " of your men's slots went EMPTY - the war-chest holds nothing they can use"
+                            + (keptAmmo > 0 ? " (" + keptAmmo + " quivers)" : "") + ". Stock gear within their skill.",
+                            Colors.Yellow));
+                }
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.SkillLawWard", null); } catch { } }
         }

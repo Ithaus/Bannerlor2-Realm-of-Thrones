@@ -163,6 +163,183 @@ namespace Armoury
             return NeedFor(type);
         }
 
+        // ===== PORZADEK W SKARBCU (Jeff 14.09: "lucznicy stoja bez kolczanow,
+        // a info mowi, ze wszystko okay; przy kazdym otwarciu DTE przelec,
+        // czy jednostka ma sprzet, ktorego nie moze uzyc, i uporzadkuj caly
+        // sprzet wojska") =====
+        // Dotad kwatermistrz liczyl SZTUKI: 172 strzal na polce = komplet, choc
+        // to same T4-T6 (wymog Luku 105/140/175), a tanie strzaly T1 szly do
+        // gracza jako "nadwyzka". Od teraz liczy sie DOPASOWANIE: kazdy czlowiek
+        // potrzebujacy typu dostaje na papierze najlepsza sztuke, ktora
+        // UDZWIGNIE (ItemReq - zasada nadrzedna); ile ludzi ma cos uzytecznego,
+        // tyle "mamy"; sztuki, ktorych nie udzwignie NIKT, wracaja do sakw gracza.
+        internal sealed class Fit
+        {
+            public int Need;            // ilu ludzi nosi ten typ
+            public int Usable;          // ilu z nich ma na polce cos, co udzwignie
+            public int UnfitMen;        // ilu zostaje bez uzytecznej sztuki
+            public int UnfitMaxSkill = -1;   // najwyzszy skill wsrod nich (co kupic)
+            public string SkillName = "";
+            public List<KeyValuePair<EquipmentElement, int>> Dead = new List<KeyValuePair<EquipmentElement, int>>();   // nie do uzycia przez nikogo
+        }
+
+        private static bool NeedsType(CharacterObject c, ItemObject.ItemTypeEnum type)
+        {
+            switch (type)
+            {
+                case ItemObject.ItemTypeEnum.HeadArmor:
+                case ItemObject.ItemTypeEnum.BodyArmor:
+                case ItemObject.ItemTypeEnum.LegArmor:
+                case ItemObject.ItemTypeEnum.HandArmor:
+                case ItemObject.ItemTypeEnum.Cape:
+                    return true;
+                case ItemObject.ItemTypeEnum.Horse:
+                case ItemObject.ItemTypeEnum.HorseHarness:
+                    return c.IsMounted;
+            }
+            try
+            {
+                var eq = c.Equipment;
+                for (int s = 0; s < 4; s++)
+                {
+                    var it = eq[(EquipmentIndex)s].Item;
+                    if (it == null) continue;
+                    var tt = it.ItemType;
+                    if (tt == type) return true;
+                    if (type == ItemObject.ItemTypeEnum.Arrows && tt == ItemObject.ItemTypeEnum.Bow) return true;
+                    if (type == ItemObject.ItemTypeEnum.Bolts && tt == ItemObject.ItemTypeEnum.Crossbow) return true;
+                }
+            }
+            catch { }
+            return false;
+        }
+
+        /// <summary>Dopasowanie ludzi do WOJSKOWYCH sztuk tego typu: kazdy
+        /// (od najzdolniejszego) bierze na papierze najlepsza sztuke, ktora
+        /// udzwignie. Zwraca ilu ma cos uzytecznego, ilu nic, i sztuki
+        /// nie do uzycia przez nikogo.</summary>
+        internal static Fit FitFor(ItemRoster armory, ItemObject.ItemTypeEnum type)
+        {
+            var f = new Fit();
+            try
+            {
+                if (armory == null) return f;
+                // popyt: ludzie potrzebujacy typu (bez bohaterow)
+                var men = new List<CharacterObject>();
+                var r = MobileParty.MainParty.MemberRoster;
+                for (int i = 0; i < r.Count; i++)
+                {
+                    var el = r.GetElementCopyAtIndex(i);
+                    var c = el.Character;
+                    if (c == null || c.IsHero || el.Number <= 0 || !NeedsType(c, type)) continue;
+                    for (int k = 0; k < el.Number; k++) men.Add(c);
+                }
+                f.Need = men.Count;
+                // podaz: czesc WOJSKOWA polek (bez wkladow gracza), tylko to, co liczy sie jako kit
+                var supply = new List<KeyValuePair<EquipmentElement, int>>();
+                var allowance = new Dictionary<string, int>();
+                for (int i = 0; i < armory.Count; i++)
+                {
+                    var el = armory[i];
+                    var it = el.EquipmentElement.Item;
+                    if (it == null || el.Amount <= 0 || it.ItemType != type || !CountsAsKit(it, type)) continue;
+                    string id = it.StringId ?? "";
+                    int left;
+                    if (!allowance.TryGetValue(id, out left)) left = ArmouryBehavior.StockOf(id);
+                    int mine = Math.Min(el.Amount, Math.Max(0, left));
+                    allowance[id] = left - mine;
+                    int war = el.Amount - mine;
+                    if (war > 0) supply.Add(new KeyValuePair<EquipmentElement, int>(el.EquipmentElement, war));
+                }
+                if (men.Count == 0) { f.Dead.AddRange(supply); return f; }
+                // skill kanoniczny typu - do sortowania (po pierwszej wojskowej sztuce)
+                SkillObject skill = null;
+                foreach (var kv in supply) { skill = ItemReq.SkillFor(kv.Key.Item); if (skill != null) break; }
+                f.SkillName = skill != null ? skill.Name.ToString() : "";
+                if (skill != null) men.Sort((a, b) => b.GetSkillValue(skill).CompareTo(a.GetSkillValue(skill)));
+                // najlepsze sztuki pierwsze: wyzszy wymog = wyzsza klasa, potem Effectiveness
+                supply.Sort((a, b) =>
+                {
+                    int d = b.Key.Item.Difficulty.CompareTo(a.Key.Item.Difficulty);
+                    return d != 0 ? d : b.Key.Item.Effectiveness.CompareTo(a.Key.Item.Effectiveness);
+                });
+                var left2 = new int[supply.Count];
+                for (int i = 0; i < supply.Count; i++) left2[i] = supply[i].Value;
+                var usedByAnyone = new bool[supply.Count];
+                foreach (var man in men)
+                {
+                    int pick = -1;
+                    for (int i = 0; i < supply.Count; i++)
+                    {
+                        if (left2[i] <= 0 && usedByAnyone[i]) continue;
+                        if (!ItemReq.Meets(man, supply[i].Key.Item)) continue;
+                        usedByAnyone[i] = true;
+                        if (left2[i] > 0) { pick = i; break; }
+                    }
+                    if (pick >= 0) { left2[pick]--; f.Usable++; }
+                    else
+                    {
+                        f.UnfitMen++;
+                        int sk = skill != null ? man.GetSkillValue(skill) : 0;
+                        if (sk > f.UnfitMaxSkill) f.UnfitMaxSkill = sk;
+                    }
+                }
+                // martwe sztuki: nikt z potrzebujacych ich nie udzwignie
+                for (int i = 0; i < supply.Count; i++)
+                {
+                    if (usedByAnyone[i]) continue;
+                    bool anyone = false;
+                    foreach (var man in men) if (ItemReq.Meets(man, supply[i].Key.Item)) { anyone = true; break; }
+                    if (!anyone) f.Dead.Add(supply[i]);
+                }
+            }
+            catch (Exception e) { Log.Error("QuartermasterLaw.FitFor", e); }
+            return f;
+        }
+
+        /// <summary>Ile sztuk tego typu wojsko REALNIE obsadzi (dopasowanie po skillu).</summary>
+        internal static int WarUsableOf(ItemRoster armory, ItemObject.ItemTypeEnum type)
+        {
+            return FitFor(armory, type).Usable;
+        }
+
+        /// <summary>PORZADEK: sztuki wojskowe, ktorych nie udzwignie nikt
+        /// w kompanii, wracaja do sakw gracza (sprzedaj albo daj ludziom,
+        /// ktorzy je uniosa). Zwraca liczbe sztuk.</summary>
+        internal static int PurgeUnusable(ItemRoster armory)
+        {
+            int moved = 0;
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || !s.QuartermasterPurgeUnusable || armory == null) return 0;
+                var bags = MobileParty.MainParty.ItemRoster;
+                var names = new List<string>();
+                foreach (var type in KitTypes)
+                {
+                    var f = FitFor(armory, type);
+                    foreach (var kv in f.Dead)
+                    {
+                        if (kv.Value <= 0 || kv.Key.Item == null) continue;
+                        if (MusterBook.IsPinnedItem(kv.Key.Item.StringId ?? "")) continue;   // rozkaz z ksiegi swiety
+                        armory.AddToCounts(kv.Key, -kv.Value);
+                        bags.AddToCounts(kv.Key, kv.Value);
+                        moved += kv.Value;
+                        if (names.Count < 6) names.Add(kv.Value + "x " + kv.Key.Item.Name);
+                    }
+                }
+                if (moved > 0)
+                {
+                    Log.Player("Quartermaster: " + moved + " pieces no man of the company can use were handed back to you ("
+                               + string.Join(", ", names.ToArray()) + (names.Count >= 6 ? ", ..." : "")
+                               + "). Sell them or bring men who can carry them.", true);
+                    Log.Info("Kwatermistrz: porzadek w skarbcu - " + moved + " szt. nie do uzycia przez nikogo wrocilo do sakw gracza.");
+                }
+            }
+            catch (Exception e) { Log.Error("QuartermasterLaw.PurgeUnusable", e); }
+            return moved;
+        }
+
         /// <summary>Ile sztuk tego typu jest WLASNOSCIA WOJSKA (calosc polek
         /// minus ksiega wkladow gracza). Po tym liczymy, ile jeszcze uniosa
         /// na sobie - Jeff 30.08: "max znika 214, bo tyle jest na ludziach".</summary>
@@ -215,8 +392,17 @@ namespace Armoury
                 {
                     int need = WornFor(type, needs);
                     if (need <= 0) continue;
-                    int have = HaveFor(armory, type);   // juczne nie licza sie jako wierzchowce
-                    if (have < need) lines.Add(type + " " + have + "/" + need);
+                    int raw = HaveFor(armory, type);    // juczne nie licza sie jako wierzchowce
+                    var fit = FitFor(armory, type);
+                    int have = Math.Min(raw, fit.Usable);   // liczy sie to, co ludzie UDZWIGNA (Jeff 14.09)
+                    if (have < need)
+                    {
+                        string line = type + " " + have + "/" + need;
+                        if (raw >= need && fit.UnfitMen > 0)
+                            line += " (on the shelf " + raw + ", but " + fit.UnfitMen + " men cannot use them - bring "
+                                    + type + " for " + fit.SkillName + " " + Math.Max(0, fit.UnfitMaxSkill) + " or less)";
+                        lines.Add(line);
+                    }
                 }
             }
             catch { }
@@ -515,6 +701,8 @@ namespace Armoury
                 // najpierw ksiega-duch: przytnij ksiege gracza do realnych
                 // polek, zanim policzymy co chowac i co pokazac
                 ArmouryBehavior.ReconcileStock("armoury-open");
+                // PORZADEK W SKARBCU (Jeff 14.09): co nikt nie udzwignie - do sakw gracza
+                QuartermasterLaw.PurgeUnusable(armory);
                 _screenOpen = true;
                 _stockAtOpen = ArmouryBehavior.StockSnapshot();
                 _pendingSwaps.Clear();   // swieza sesja ekranu = swiezy rejestr wymian
@@ -802,7 +990,9 @@ namespace Armoury
                         // to max znika 214, bo tyle jest na ludziach").
                         // Wszystko ponad komplet zostaje wlasnoscia gracza.
                         int needT = QuartermasterLaw.NeedForType(newItem.ItemType);
-                        int warHave = QuartermasterLaw.WarOwnedOf(armory, newItem.ItemType);
+                        // komplet po UZYTECZNYCH sztukach (Jeff 14.09): 172 strzal T6 na polce
+                        // to nie komplet, gdy lucznicy maja Luk 60 - tanie strzaly ida do ludzi
+                        int warHave = QuartermasterLaw.WarUsableOf(armory, newItem.ItemType);
                         // komplet 0 (nikt w kompanii nie nosi tego typu) = wojsko
                         // nie bierze NIC; galaz ": kept" pozerala caly wklad
                         int room = Math.Max(0, needT - warHave);
