@@ -1,5 +1,33 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-14 - Lucznicy bez kolczanow: straz skilli w DTE zdejmowala strzaly ponad wymog Luku i nic nie dawala w zamian
+**Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs` (SkillLawWard)
+**Problem:** Jeff (screen bitwy): "lucznicy nie strzelaja i nie maja kolczanow,
+a Armoury pokazuje, ze wszyscy maja kolczany i nic nie brakuje".
+**Przyczyna:** (items-dump.csv) RBM/ROT wpisuje amunicji WYMOG SKILLA:
+T4 = 105, T5 = 140, T6 = 175 (52 z 71 kolczanow/beltow); w magazynie Jeffa
+leza glownie T4-T6 (Ravens' Teeth 175, hartowane 140/105 - SLED AMUNICJI:
+187-194 szt., komplet 172). DTE przydziela lucznikom NAJLEPSZE strzaly
+z magazynu, a SkillLawWard (13.09: "amunicja nie ma RelevantSkill - mapujemy
+jak ItemReq.SkillFor" - Arrows->Bow, Bolts->Crossbow) zdejmowal kolczan
+ponad Bow jednostki i NIC nie wkladal w zamian; luk zostawal (podloga
+"ostatnia bron"), strzaly znikaly - lucznik z lukiem bez kolczanu. Log
+CrashScribe z tej bitwy: "zdjeto 431 sztuk ponad umiejetnosci, 56 razy
+ostatnia bron zostala w rece". Kwatermistrz mowil prawde - kolczany BYLY
+w magazynie, znikaly dopiero w przydziale.
+**Zmiana:** amunicja (Arrows/Bolts) wylaczona ze strazy DTE - bramka skilla
+siedzi w LUKU/KUSZY; strzaly ponad skill podmienia przy spawnie istniejaca
+sciezka DragonUnmount/ItemReq (wzorzec strzal w ramach skilla, PatternFor -
+zawsze cos jest: 19 kolczanow ma wymog 0). Podloga "ostatnia bron" liczy
+odtad tylko bron, nie kolczany (luk z lukiem i strzalami nie moze zostac
+samym kolczanem).
+**Ryzyko / co sprawdzic:** w bitwie lucznicy z kolczanami i strzelaja;
+w CrashScribe liczba "zdjeto N sztuk" wyraznie spada (bylo 277-431 na
+przydzial); w Armoury.log "ItemReq: X nie udzwignie ravens_teeth_arrows
+(Requires Bow 175 ...) - dostaje <strzaly T3>" dla slabszych lucznikow.
+DLL czeka na zamkniecie gry (watcher 12:24).
+**Status:** ZBUDOWANE - watcher wgra po zamknieciu gry
+
 ## 2026-09-14 - Geografia wierzchowcow: mamuty tylko giganci, wielblady Dorne, rydwany Essos, reszta na konie (+ pancerze olbrzymow)
 **Mod:** Armoury | **Pliki:** `Armoury/src/MountLaw.cs` (nowy), `Stables.cs` (IsPlainMount), `DragonUnmount.cs`, `LegendaryLaw.cs` (SweepAiArmories, nowe SweepMarkets), `BattlefieldLaw.cs`, `ArmouryBehavior.cs`, `GiantGear.cs`, `SkillsDecide.cs`
 **Problem:** Jeff: "wywal mamuty - maja je tylko Wolni Ludzie i jezdza na nich

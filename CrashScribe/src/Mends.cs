@@ -1058,15 +1058,19 @@ namespace CrashScribe
                         ItemObject it;
                         try { it = eq[(EquipmentIndex)s].Item; } catch { continue; }
                         if (it == null) continue;
+                        // KOLCZAN NIE PODLEGA STRAZY (Jeff 14.09: "lucznicy nie
+                        // strzelaja i nie maja kolczanow"). RBM wpisuje strzalom
+                        // wymog Luku 105/140/175 (52 z 71 kolczanow), DTE daje
+                        // lucznikom NAJLEPSZE z magazynu, a mapowanie amunicji na
+                        // Bow/Crossbow (13.09) kazalo strazy zdejmowac kolczan ponad
+                        // skill i NIC nie dawac w zamian - luk zostawal (podloga),
+                        // strzaly znikaly. Bramka skilla siedzi w LUKU; strzaly
+                        // ponad skill podmienia przy spawnie DragonUnmount na
+                        // wzorzec w ramach skilla - lucznik zawsze ma czym strzelac.
+                        if (it.ItemType == ItemObject.ItemTypeEnum.Arrows || it.ItemType == ItemObject.ItemTypeEnum.Bolts) continue;
                         bool isWeapon = s <= 4;
                         if (isWeapon) weaponsHeld++;
-                        // amunicja nie ma RelevantSkill w danych - mapujemy jak ItemReq.SkillFor
                         var rs = it.RelevantSkill;
-                        if (rs == null)
-                        {
-                            if (it.ItemType == ItemObject.ItemTypeEnum.Arrows) rs = TaleWorlds.Core.DefaultSkills.Bow;
-                            else if (it.ItemType == ItemObject.ItemTypeEnum.Bolts) rs = TaleWorlds.Core.DefaultSkills.Crossbow;
-                        }
                         if (it.Difficulty <= 0 || rs == null) continue;
                         if (co.GetSkillValue(rs) >= it.Difficulty) continue;
                         doomed.Add(s);
