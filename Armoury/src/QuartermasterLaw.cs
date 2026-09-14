@@ -181,8 +181,11 @@ namespace Armoury
             public int UnfitMen;             // ilu zostaje bez uzytecznej sztuki
             public int UnfitMinSkill = -1, UnfitMaxSkill = -1;   // rozrzut ich skilla (co kupic: <= min)
             public string SkillName = "";
+            public SkillObject Skill;
             // korekty ksiegi: +n = sztuki nie na ludziach na liste gracza, -n = sztuki gracza, ktore ludzie nosza, na stan wojska
             public List<KeyValuePair<EquipmentElement, int>> Adjust = new List<KeyValuePair<EquipmentElement, int>>();
+            // KTO KONKRETNIE nie ma czym (Jeff 14.09: "czemu nie akceptuja tych strzal?!")
+            public Dictionary<CharacterObject, int> UnfitByTroop = new Dictionary<CharacterObject, int>();
         }
 
         private sealed class Sup { public EquipmentElement El; public int Total, Own, Used; }
@@ -235,7 +238,12 @@ namespace Armoury
                     var el = r.GetElementCopyAtIndex(i);
                     var c = el.Character;
                     if (c == null || c.IsHero || el.Number <= 0 || !NeedsType(c, type)) continue;
-                    for (int k = 0; k < el.Number; k++) men.Add(c);
+                    // JAK WornFor (Jeff 14.09, screen "Arrows 86/172"): kolczan + zapasowy
+                    // na lucznika, to samo belty i oszczepy - inaczej drugi kolczan
+                    // wygladal na "nienoszony" i wracal na liste gracza
+                    int mult = (type == ItemObject.ItemTypeEnum.Arrows || type == ItemObject.ItemTypeEnum.Bolts
+                                || type == ItemObject.ItemTypeEnum.Thrown) ? 2 : 1;
+                    for (int k = 0; k < el.Number * mult; k++) men.Add(c);
                 }
                 f.Need = men.Count;
                 // podaz: CALA polka (wojskowe + z listy gracza), tylko to, co liczy sie jako kit
@@ -256,6 +264,7 @@ namespace Armoury
                 SkillObject skill = null;
                 foreach (var sp in supply) { skill = ItemReq.SkillFor(sp.El.Item); if (skill != null) break; }
                 f.SkillName = skill != null ? skill.Name.ToString() : "";
+                f.Skill = skill;
                 if (men.Count > 0)
                 {
                     if (skill != null) men.Sort((a, b) => b.GetSkillValue(skill).CompareTo(a.GetSkillValue(skill)));
@@ -280,6 +289,7 @@ namespace Armoury
                             int sk = skill != null ? man.GetSkillValue(skill) : 0;
                             if (f.UnfitMinSkill < 0 || sk < f.UnfitMinSkill) f.UnfitMinSkill = sk;
                             if (sk > f.UnfitMaxSkill) f.UnfitMaxSkill = sk;
+                            int cnt; f.UnfitByTroop.TryGetValue(man, out cnt); f.UnfitByTroop[man] = cnt + 1;
                         }
                     }
                 }
@@ -319,20 +329,30 @@ namespace Armoury
                 {
                     var f = FitFor(armory, type);
                     int here = 0, taken = 0;
+                    // KSIEGA JEST PER ID, dopasowanie per sztuka (modyfikator!) - sumujemy
+                    // korekty per id, inaczej "Balanced X" vs "X" robily ping-pong +1/-1
+                    var perId = new Dictionary<string, int>();
+                    var nameOf = new Dictionary<string, string>();
                     foreach (var kv in f.Adjust)
                     {
                         var it = kv.Key.Item;
                         if (kv.Value == 0 || it == null) continue;
-                        if (MusterBook.IsPinnedItem(it.StringId ?? "")) continue;   // rozkaz z ksiegi swiety
+                        string id = it.StringId ?? "";
+                        if (MusterBook.IsPinnedItem(id)) continue;   // rozkaz z ksiegi swiety
+                        int acc; perId.TryGetValue(id, out acc); perId[id] = acc + kv.Value;
+                        nameOf[id] = it.Name.ToString();
+                    }
+                    foreach (var kv in perId)
+                    {
                         if (kv.Value > 0)
                         {
-                            ArmouryBehavior.StockDeposit(it.StringId, kv.Value);     // nie na ludziach -> lista gracza
+                            ArmouryBehavior.StockDeposit(kv.Key, kv.Value);     // nie na ludziach -> lista gracza
                             toPlayer += kv.Value; here += kv.Value;
-                            if (names.Count < 3) names.Add(kv.Value + "x " + it.Name);
+                            if (names.Count < 3) names.Add(kv.Value + "x " + nameOf[kv.Key]);
                         }
-                        else
+                        else if (kv.Value < 0)
                         {
-                            ArmouryBehavior.StockWithdraw(it.StringId, -kv.Value);   // noszone -> stan wojska
+                            ArmouryBehavior.StockWithdraw(kv.Key, -kv.Value);   // noszone -> stan wojska
                             toMen += -kv.Value; taken += -kv.Value;
                         }
                     }
@@ -412,10 +432,27 @@ namespace Armoury
                     {
                         string line = type + " " + have + "/" + need;
                         // KROTKO (Jeff 14.09: "pisz skrotami, bo jak duzo tekstu, to nie widac")
+                        // + KTO: dwa najliczniejsze oddzialy bez uzytecznej sztuki i ich skill
                         if (fit.UnfitMen > 0 && fit.UnfitMinSkill >= 0)
-                            line += " (" + fit.UnfitMen + " men " + fit.SkillName + " " + fit.UnfitMinSkill
-                                    + (fit.UnfitMaxSkill > fit.UnfitMinSkill ? "-" + fit.UnfitMaxSkill : "")
-                                    + ", bring <=" + fit.UnfitMinSkill + ")";
+                        {
+                            var who = new List<KeyValuePair<CharacterObject, int>>(fit.UnfitByTroop);
+                            who.Sort((a, b) => b.Value.CompareTo(a.Value));
+                            var parts = new List<string>();
+                            var full = new List<string>();
+                            for (int w = 0; w < who.Count; w++)
+                            {
+                                var co = who[w].Key;
+                                int lvl = 0;
+                                try { lvl = fit.Skill != null ? co.GetSkillValue(fit.Skill) : 0; } catch { }
+                                string s1 = who[w].Value + "x " + co.Name + " " + lvl;
+                                full.Add(s1);
+                                if (w < 2) parts.Add(s1);
+                            }
+                            line += " (no fit: " + string.Join(", ", parts.ToArray()) + (who.Count > 2 ? ", ..." : "")
+                                    + " - bring " + fit.SkillName + " <=" + fit.UnfitMinSkill + ")";
+                            Log.Info("Kwatermistrz: " + type + " " + have + "/" + need + " - bez uzytecznej sztuki: "
+                                     + string.Join(", ", full.ToArray()) + " (" + fit.SkillName + ").");
+                        }
                         lines.Add(line);
                     }
                 }
