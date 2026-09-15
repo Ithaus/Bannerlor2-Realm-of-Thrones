@@ -1071,13 +1071,72 @@ namespace CrashScribe
             catch { }
         }
 
-        /// <summary>Postfix na DoAssignAsync: co DTE i tak wcisnelo ponad skill
-        /// (strzaly/belty z AssignExtra*, pancerz z AssignEquipmentType, kon,
-        /// awaryjna bron) WRACA NA POLKE, a zolnierz dostaje z polki najlepsza
-        /// sztuke tego samego typu (i klasy broni), ktorej umie uzyc. Gdy na
-        /// polce nie ma nic uzytecznego - slot zostaje PUSTY (Jeff 14.09: "jak
-        /// nic nie pasuje, to nic nie zaklada - trzeba wlozyc do DTE sprzet,
-        /// ktorego moze uzyc"). Zadnej podlogi w przydziale.</summary>
+        private sealed class WardDemand
+        {
+            public Traverse Ta; public CharacterObject Co; public int Slot; public EquipmentElement Held; public bool Gap;
+            public string Group; public string Type; public bool Mounted; public int Skill; public int Order; public int Pick = -1;
+        }
+        private sealed class WardSup
+        {
+            public EquipmentElement El; public int Count; public bool FromPool; public int Taken;
+        }
+        private static System.Reflection.MethodInfo _mIsTemp;
+
+        /// <summary>Grupa dopasowania: typ + klasa broni (miecz za miecz, strzaly za strzaly, helm za helm).</summary>
+        private static string WardGroup(ItemObject it)
+        {
+            var wc = it.PrimaryWeapon != null ? it.PrimaryWeapon.WeaponClass : WeaponClass.Undefined;
+            return (int)it.ItemType + "/" + (int)wc;
+        }
+
+        /// <summary>Luki dopelniamy tylko w strzeleckim (luk, kusza, kolczan, belty, oszczepy):
+        /// tam klasa jest jednoznaczna. Bron biala zostawiamy DTE (AssignWeaponToUnarmed).</summary>
+        private static bool WardGapType(ItemObject it)
+        {
+            var ty = it.ItemType;
+            return ty == ItemObject.ItemTypeEnum.Bow || ty == ItemObject.ItemTypeEnum.Crossbow
+                || ty == ItemObject.ItemTypeEnum.Arrows || ty == ItemObject.ItemTypeEnum.Bolts
+                || ty == ItemObject.ItemTypeEnum.Thrown;
+        }
+
+        /// <summary>Jak DTE ItemObjectExtension.IsSuitableForMount: bron bez uzycia
+        /// "RequiresNoMount" i bez flagi "CantReloadOnHorseback" - jezdziec nie dostanie
+        /// dlugiego luku ani kuszy nie do przeladowania z siodla.</summary>
+        private static bool MountOk(ItemObject it)
+        {
+            try
+            {
+                if (it == null || !it.HasWeaponComponent || it.Weapons == null) return true;
+                foreach (var w in it.Weapons)
+                {
+                    if (w == null) continue;
+                    if (MBItem.GetItemUsageSetFlags(w.ItemUsage).HasAnyFlag((ItemObject.ItemUsageSetFlags)2)) return false;   // RequiresNoMount
+                    if (w.WeaponFlags.HasAnyFlag(WeaponFlags.CantReloadOnHorseback)) return false;
+                }
+            }
+            catch { }
+            return true;
+        }
+
+        /// <summary>Postfix na DoAssignAsync: JEDNO DOPASOWANIE CALEJ PARTII - ten sam
+        /// algorytm co kwatermistrz (QuartermasterLaw.FitFor): najsilniejszy pierwszy,
+        /// najtrudniejsza uzyteczna sztuka pierwsza. Dlaczego nie per zolnierz (stara
+        /// wersja): DTE rozdaje "extra" strzaly/belty/tarcze najlepsze-najpierw wedle
+        /// TIERU oddzialu bez sprawdzenia skilla (AssignExtraEquipment), a bron glowna
+        /// dobiera "najblizsza wzorcowi" z sufitem tieru wzorzec+2. Log 15.09: straz
+        /// per zolnierz zdejmowala T6 strzaly (175) z lucznikow Bow 140 i nic nie
+        /// znajdowala, bo uzyteczne kolczany zjedli juz nastepni w kolejce - "151/258
+        /// slotow PUSTYCH (20 kolczanow)", a kwatermistrz mowil "wszystko pasuje".
+        /// Teraz dla kazdej grupy (typ + klasa broni) bierzemy WSZYSTKIE sztuki
+        /// (noszone + polka), ludzi sortujemy po skillu, sztuki po wymogu, i kazdy
+        /// dostaje najtrudniejsza, ktorej umie uzyc - dokladnie to, co pokazuje
+        /// kwatermistrz. LUKI tez: gdy wzorzec oddzialu ma luk/kolczan/oszczep albo
+        /// pancerz, a DTE nic nie dal (sufit tieru wzorzec+2, kolejnosc), slot dostaje
+        /// popyt i sztuke z polki wedle skilla. Bez podlogi: gdy nie ma nic uzytecznego,
+        /// slot zostaje PUSTY (Jeff 14.09). Kon (slot 10) osobno jak dotad. Sloty
+        /// tymczasowe DTE (emergency loadout) nietykane - nie sa z polki. Ksiegowosc
+        /// polki: najpierw zwroty (AddEquipmentToAssign), potem pobrania (Consume ma
+        /// podloge 0).</summary>
         public static void SkillLawWard(object __instance)
         {
             try
@@ -1087,7 +1146,15 @@ namespace CrashScribe
                 if (list == null) list = tr.Field("Assignments").GetValue() as System.Collections.IEnumerable;
                 if (list == null) return;
                 var pool = tr.Field("_equipmentToAssign").GetValue() as System.Collections.IDictionary;
-                int swapped = 0, kept = 0, keptAmmo = 0;
+                MobileParty who = null;
+                try { who = tr.Field("_party").GetValue() as MobileParty; } catch { }
+
+                int moved = 0, filled = 0, kept = 0, keptAmmo = 0;
+                var emptyByType = new System.Collections.Generic.Dictionary<string, int>();
+
+                // ---- 1. POPYT: zajete sloty 0-9 nie-bohatera + luki wedle wzorca (kon i uprzaz osobno) ----
+                var demands = new System.Collections.Generic.List<WardDemand>();
+                var riders = new System.Collections.Generic.List<Traverse>();
                 foreach (var a in list)
                 {
                     var ta = Traverse.Create(a);
@@ -1095,98 +1162,230 @@ namespace CrashScribe
                     var eq = ta.Property("Equipment").GetValue() as Equipment;
                     if (eq == null) eq = ta.Field("Equipment").GetValue() as Equipment;
                     if (co == null || eq == null || co.IsHero) continue;
-                    for (int s = 0; s <= 11; s++)
+                    riders.Add(ta);
+                    bool mounted = false;
+                    try { mounted = ta.Property("IsMounted").GetValue<bool>(); } catch { }
+                    Equipment tpl = null;
+                    try { tpl = ta.Property("ReferenceEquipment").GetValue() as Equipment; } catch { }
+                    if (_mIsTemp == null) { try { _mIsTemp = AccessTools.Method(a.GetType(), "IsTemporarySlot"); } catch { } }
+
+                    var heldGroups = new System.Collections.Generic.Dictionary<string, int>();   // grupy broni na czlowieku
+                    var freeSlots = new System.Collections.Generic.List<int>();
+                    for (int s = 0; s <= 9; s++)
                     {
+                        if (s == 4) continue;                                   // sztandar
                         EquipmentElement el; ItemObject it;
                         try { el = eq[(EquipmentIndex)s]; it = el.Item; } catch { continue; }
-                        if (it == null || CanUse(co, it)) continue;
-
-                        // najlepsza UZYTECZNA sztuka tego typu (i klasy broni) na polce
-                        EquipmentElement best = default(EquipmentElement);
-                        bool found = false; float bestEff = float.MinValue;
-                        if (pool != null)
+                        if (it == null)
                         {
-                            var wc = it.PrimaryWeapon != null ? it.PrimaryWeapon.WeaponClass : WeaponClass.Undefined;
-                            foreach (System.Collections.DictionaryEntry kv in pool)
-                            {
-                                int cnt; try { cnt = Convert.ToInt32(kv.Value); } catch { continue; }
-                                if (cnt <= 0 || !(kv.Key is EquipmentElement)) continue;
-                                var cand = (EquipmentElement)kv.Key;
-                                var ci = cand.Item;
-                                if (ci == null || ci.ItemType != it.ItemType) continue;
-                                if (wc != WeaponClass.Undefined && (ci.PrimaryWeapon == null || ci.PrimaryWeapon.WeaponClass != wc)) continue;
-                                if (!CanUse(co, ci)) continue;
-                                if (IsDeadGear(ci) || IsUniqueGear(ci) || IsLoreBlade(ci)) continue;
-                                if (ci.Effectiveness > bestEff) { bestEff = ci.Effectiveness; best = cand; found = true; }
-                            }
-                        }
-                        // BEZ PODLOGI (Jeff 14.09: "jak nic nie pasuje, to nic nie
-                        // zaklada - wtedy trzeba wlozyc do DTE sprzet, ktorego moze
-                        // uzyc"): sztuka ponad skill ZAWSZE wraca na polke; slot
-                        // zostaje pusty, gdy polka nie ma nic uzytecznego
-                        try { tr.Method("AddEquipmentToAssign", el, 1).GetValue(); } catch { }        // zwrot na polke
-                        if (!found)
-                        {
-                            try { ta.Method("SetEquipment", (EquipmentIndex)s, default(EquipmentElement)).GetValue(); }
-                            catch { try { eq[(EquipmentIndex)s] = default(EquipmentElement); } catch { } }
-                            if (it.ItemType == ItemObject.ItemTypeEnum.Arrows || it.ItemType == ItemObject.ItemTypeEnum.Bolts) keptAmmo++;
-                            else kept++;
-                            if (s == 10)
-                            {
-                                // kon wrocil na polke - uprzaz tez, nie zostaje sama
-                                try
+                            if (s <= 3) { freeSlots.Add(s); continue; }
+                            // LUKA W PANCERZU: wzorzec ma sztuke, przydzial nie dal - popyt bez noszonej sztuki
+                            ItemObject rit = null; try { rit = tpl != null ? tpl[(EquipmentIndex)s].Item : null; } catch { }
+                            var rsk = rit != null ? ReqSkill(rit) : null;
+                            if (rit != null && rsk != null)
+                                demands.Add(new WardDemand
                                 {
-                                    var hel0 = eq[(EquipmentIndex)11];
-                                    if (hel0.Item != null)
-                                    {
-                                        try { tr.Method("AddEquipmentToAssign", hel0, 1).GetValue(); } catch { }
-                                        try { ta.Method("SetEquipment", (EquipmentIndex)11, default(EquipmentElement)).GetValue(); }
-                                        catch { try { eq[(EquipmentIndex)11] = default(EquipmentElement); } catch { } }
-                                    }
-                                }
-                                catch { }
-                            }
+                                    Ta = ta, Co = co, Slot = s, Gap = true, Group = WardGroup(rit), Type = rit.ItemType.ToString(),
+                                    Mounted = mounted, Skill = co.GetSkillValue(rsk), Order = demands.Count
+                                });
                             continue;
                         }
-                        try { ta.Method("SetEquipment", (EquipmentIndex)s, best).GetValue(); }
-                        catch { try { eq[(EquipmentIndex)s] = best; } catch { } }
-                        try { tr.Method("ConsumeEquipmentToAssign", best).GetValue(); } catch { }
-                        swapped++;
-                        if (s == 10)
+                        if (s <= 3) { int hc; string hg = WardGroup(it); heldGroups.TryGetValue(hg, out hc); heldGroups[hg] = hc + 1; }
+                        bool temp = false;
+                        try { temp = _mIsTemp != null && (bool)_mIsTemp.Invoke(a, new object[] { (EquipmentIndex)s, it }); } catch { }
+                        if (temp) continue;                                     // awaryjny przydzial DTE - nie z polki
+                        if (IsUniqueGear(it) || IsLoreBlade(it) || IsDeadGear(it)) continue;   // to sprawa strazy unikatow
+                        var skill = ReqSkill(it);
+                        if (skill == null) continue;                            // typ bez wymogu - nie ma czego pilnowac
+                        demands.Add(new WardDemand
                         {
-                            // kon podmieniony: uprzaz z innej rodziny wraca na polke
-                            // (uprzaz konska na wielbladzie = AccessViolation w AddMountMesh)
-                            try
+                            Ta = ta, Co = co, Slot = s, Held = el, Group = WardGroup(it), Type = it.ItemType.ToString(),
+                            Mounted = mounted, Skill = co.GetSkillValue(skill), Order = demands.Count
+                        });
+                    }
+                    // LUKI W STRZELECKIM: wzorzec ma luk/kolczan/oszczep, ktorego DTE nie dal
+                    // (sufit tieru wzorzec+2, kolejnosc) - popyt na wolny slot, sztuka z polki wedle skilla
+                    if (tpl != null && freeSlots.Count > 0)
+                    {
+                        var refItem = new System.Collections.Generic.Dictionary<string, ItemObject>();
+                        var refCount = new System.Collections.Generic.Dictionary<string, int>();
+                        for (int s = 0; s <= 3; s++)
+                        {
+                            ItemObject rit = null; try { rit = tpl[(EquipmentIndex)s].Item; } catch { }
+                            if (rit == null || !WardGapType(rit) || ReqSkill(rit) == null) continue;
+                            string g = WardGroup(rit); int rc; refCount.TryGetValue(g, out rc); refCount[g] = rc + 1; refItem[g] = rit;
+                        }
+                        int fi = 0;
+                        foreach (var kv in refCount)
+                        {
+                            int hc; heldGroups.TryGetValue(kv.Key, out hc);
+                            for (int k = hc; k < kv.Value && fi < freeSlots.Count; k++, fi++)
                             {
-                                var hel = eq[(EquipmentIndex)11];
-                                var hh = hel.Item;
-                                var mc = best.Item != null && best.Item.HorseComponent != null ? best.Item.HorseComponent.Monster : null;
-                                if (hh != null && hh.ArmorComponent != null && mc != null && hh.ArmorComponent.FamilyType != mc.FamilyType)
+                                var rit = refItem[kv.Key];
+                                demands.Add(new WardDemand
                                 {
-                                    try { tr.Method("AddEquipmentToAssign", hel, 1).GetValue(); } catch { }
-                                    try { ta.Method("SetEquipment", (EquipmentIndex)11, default(EquipmentElement)).GetValue(); }
-                                    catch { try { eq[(EquipmentIndex)11] = default(EquipmentElement); } catch { } }
-                                }
+                                    Ta = ta, Co = co, Slot = freeSlots[fi], Gap = true, Group = kv.Key, Type = rit.ItemType.ToString(),
+                                    Mounted = mounted, Skill = co.GetSkillValue(ReqSkill(rit)), Order = demands.Count
+                                });
                             }
-                            catch { }
                         }
                     }
                 }
-                if (swapped > 0 || kept > 0 || keptAmmo > 0)
-                    Scribe.Line("Mends: swieta zasada skilli w DTE - " + swapped + " sztuk ponad skill wrocilo na polke (w zamian najlepsze uzyteczne); "
-                                + (kept + keptAmmo) + " slotow zostalo PUSTYCH, bo polka nie miala nic uzytecznego"
-                                + (keptAmmo > 0 ? " (w tym " + keptAmmo + " kolczanow - wloz do DTE strzaly, ktorych ludzie umieja uzyc)" : "") + ".");
-                // GRACZ MA TO WIDZIEC NA EKRANIE (Jeff 14.09: "info mowi, ze wszystko
-                // okay, a stoja bez kolczanow") - tylko dla jego wlasnej partii
-                if (kept + keptAmmo > 0)
+
+                // ---- 2. PODAZ per grupa: sztuki noszone (po jednej) + polka ----
+                var byGroup = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.List<WardSup>>();
+                foreach (var d in demands)
                 {
-                    MobileParty who = null;
-                    try { who = tr.Field("_party").GetValue() as MobileParty; } catch { }
-                    if (who != null && who == MobileParty.MainParty)
-                        InformationManager.DisplayMessage(new InformationMessage(
-                            "QM: " + (kept + keptAmmo) + " slots EMPTY in battle" + (keptAmmo > 0 ? " (" + keptAmmo + " quivers)" : "")
-                            + " - nothing usable in the war-chest.",
-                            Colors.Yellow));
+                    System.Collections.Generic.List<WardSup> sup;
+                    if (!byGroup.TryGetValue(d.Group, out sup)) { sup = new System.Collections.Generic.List<WardSup>(); byGroup[d.Group] = sup; }
+                    if (!d.Gap) sup.Add(new WardSup { El = d.Held, Count = 1, FromPool = false });
+                }
+                if (pool != null)
+                {
+                    foreach (System.Collections.DictionaryEntry kv in pool)
+                    {
+                        int cnt; try { cnt = Convert.ToInt32(kv.Value); } catch { continue; }
+                        if (cnt <= 0 || !(kv.Key is EquipmentElement)) continue;
+                        var cand = (EquipmentElement)kv.Key;
+                        var ci = cand.Item;
+                        if (ci == null || IsDeadGear(ci) || IsUniqueGear(ci) || IsLoreBlade(ci)) continue;
+                        System.Collections.Generic.List<WardSup> sup;
+                        if (!byGroup.TryGetValue(WardGroup(ci), out sup)) continue;   // nikt tego nie potrzebuje - nie ruszamy
+                        sup.Add(new WardSup { El = cand, Count = cnt, FromPool = true });
+                    }
+                }
+
+                // ---- 3. DOPASOWANIE: najsilniejszy pierwszy, najtrudniejsza uzyteczna pierwsza ----
+                demands.Sort((x, y) => { int c = y.Skill.CompareTo(x.Skill); return c != 0 ? c : x.Order.CompareTo(y.Order); });
+                foreach (var g in byGroup.Values)
+                    g.Sort((x, y) =>
+                    {
+                        int c = y.El.Item.Difficulty.CompareTo(x.El.Item.Difficulty);
+                        if (c != 0) return c;
+                        c = y.El.Item.Effectiveness.CompareTo(x.El.Item.Effectiveness);
+                        if (c != 0) return c;
+                        return x.FromPool.CompareTo(y.FromPool);               // przy rownych: noszona zostaje na ludziach
+                    });
+                foreach (var d in demands)
+                {
+                    var sup = byGroup[d.Group];
+                    for (int i = 0; i < sup.Count; i++)
+                    {
+                        var s = sup[i];
+                        if (s.Taken >= s.Count) continue;
+                        var ci = s.El.Item;
+                        if (!CanUse(d.Co, ci)) continue;
+                        if (d.Mounted && d.Slot <= 3 && !MountOk(ci)) continue;
+                        s.Taken++; d.Pick = i; break;
+                    }
+                }
+
+                // ---- 4. ZAPIS: zwroty na polke, potem pobrania, potem sloty ----
+                foreach (var g in byGroup.Values)
+                    foreach (var s in g)
+                        if (!s.FromPool && s.Taken == 0) { try { tr.Method("AddEquipmentToAssign", s.El, 1).GetValue(); } catch { } }
+                foreach (var g in byGroup.Values)
+                    foreach (var s in g)
+                        if (s.FromPool) for (int k = 0; k < s.Taken; k++) { try { tr.Method("ConsumeEquipmentToAssign", s.El).GetValue(); } catch { } }
+                foreach (var d in demands)
+                {
+                    if (d.Pick < 0)
+                    {
+                        // nic uzytecznego: sztuka ponad skill juz wrocila na polke (krok wyzej), slot pusty
+                        if (!d.Gap) { try { d.Ta.Method("SetEquipment", (EquipmentIndex)d.Slot, default(EquipmentElement)).GetValue(); } catch { } }
+                        if (d.Type == "Arrows" || d.Type == "Bolts") keptAmmo++; else kept++;
+                        int n; emptyByType.TryGetValue(d.Type, out n); emptyByType[d.Type] = n + 1;
+                        continue;
+                    }
+                    var el = byGroup[d.Group][d.Pick].El;
+                    if (!d.Gap && el.Equals(d.Held)) continue;                  // ta sama sztuka - nic do roboty
+                    try { d.Ta.Method("SetEquipment", (EquipmentIndex)d.Slot, el).GetValue(); } catch { }
+                    if (d.Gap) filled++; else moved++;
+                }
+
+                // ---- 5. KON (slot 10) jak dotad: per zolnierz, uprzaz idzie za koniem ----
+                foreach (var ta in riders)
+                {
+                    var co = ta.Property("Character").GetValue() as CharacterObject;
+                    var eq = ta.Property("Equipment").GetValue() as Equipment;
+                    if (eq == null) eq = ta.Field("Equipment").GetValue() as Equipment;
+                    if (co == null || eq == null) continue;
+                    EquipmentElement el; ItemObject it;
+                    try { el = eq[(EquipmentIndex)10]; it = el.Item; } catch { continue; }
+                    if (it == null || CanUse(co, it)) continue;
+                    EquipmentElement best = default(EquipmentElement);
+                    bool found = false; float bestEff = float.MinValue;
+                    if (pool != null)
+                    {
+                        foreach (System.Collections.DictionaryEntry kv in pool)
+                        {
+                            int cnt; try { cnt = Convert.ToInt32(kv.Value); } catch { continue; }
+                            if (cnt <= 0 || !(kv.Key is EquipmentElement)) continue;
+                            var cand = (EquipmentElement)kv.Key;
+                            var ci = cand.Item;
+                            if (ci == null || ci.ItemType != it.ItemType || !CanUse(co, ci)) continue;
+                            if (IsDeadGear(ci) || IsUniqueGear(ci) || IsLoreBlade(ci)) continue;
+                            if (ci.Effectiveness > bestEff) { bestEff = ci.Effectiveness; best = cand; found = true; }
+                        }
+                    }
+                    try { tr.Method("AddEquipmentToAssign", el, 1).GetValue(); } catch { }        // zwrot na polke
+                    if (!found)
+                    {
+                        try { ta.Method("SetEquipment", (EquipmentIndex)10, default(EquipmentElement)).GetValue(); }
+                        catch { try { eq[(EquipmentIndex)10] = default(EquipmentElement); } catch { } }
+                        kept++;
+                        int n; emptyByType.TryGetValue("Horse", out n); emptyByType["Horse"] = n + 1;
+                        try
+                        {
+                            var hel0 = eq[(EquipmentIndex)11];                  // kon wrocil - uprzaz tez, nie zostaje sama
+                            if (hel0.Item != null)
+                            {
+                                try { tr.Method("AddEquipmentToAssign", hel0, 1).GetValue(); } catch { }
+                                try { ta.Method("SetEquipment", (EquipmentIndex)11, default(EquipmentElement)).GetValue(); }
+                                catch { try { eq[(EquipmentIndex)11] = default(EquipmentElement); } catch { } }
+                            }
+                        }
+                        catch { }
+                        continue;
+                    }
+                    try { ta.Method("SetEquipment", (EquipmentIndex)10, best).GetValue(); }
+                    catch { try { eq[(EquipmentIndex)10] = best; } catch { } }
+                    try { tr.Method("ConsumeEquipmentToAssign", best).GetValue(); } catch { }
+                    moved++;
+                    try
+                    {
+                        // kon podmieniony: uprzaz z innej rodziny wraca na polke
+                        // (uprzaz konska na wielbladzie = AccessViolation w AddMountMesh)
+                        var hel = eq[(EquipmentIndex)11];
+                        var hh = hel.Item;
+                        var mc = best.Item != null && best.Item.HorseComponent != null ? best.Item.HorseComponent.Monster : null;
+                        if (hh != null && hh.ArmorComponent != null && mc != null && hh.ArmorComponent.FamilyType != mc.FamilyType)
+                        {
+                            try { tr.Method("AddEquipmentToAssign", hel, 1).GetValue(); } catch { }
+                            try { ta.Method("SetEquipment", (EquipmentIndex)11, default(EquipmentElement)).GetValue(); }
+                            catch { try { eq[(EquipmentIndex)11] = default(EquipmentElement); } catch { } }
+                        }
+                    }
+                    catch { }
+                }
+
+                if (moved > 0 || filled > 0 || kept > 0 || keptAmmo > 0)
+                {
+                    string types = "";
+                    foreach (var kv in emptyByType) types += (types.Length > 0 ? ", " : "") + kv.Key + " " + kv.Value;
+                    Scribe.Line("Mends: swieta zasada skilli w DTE [" + (who != null ? who.Name.ToString() : "?") + ", " + demands.Count
+                                + " slotow]: " + moved + " sztuk przelozonych wedle skilla (najsilniejszy pierwszy), " + filled
+                                + " luk zapelnionych z polki, " + (kept + keptAmmo) + " slotow PUSTYCH - nic uzytecznego na polce"
+                                + (types.Length > 0 ? " (" + types + ")" : "") + ".");
+                }
+                // GRACZ MA TO WIDZIEC NA EKRANIE (Jeff 14.09: "info mowi, ze wszystko
+                // okay, a stoja bez kolczanow") - krotko, tylko jego partia
+                if (kept + keptAmmo > 0 && who != null && who == MobileParty.MainParty)
+                {
+                    string top = ""; int shown = 0;
+                    foreach (var kv in emptyByType) { if (shown++ >= 3) break; top += (top.Length > 0 ? ", " : "") + kv.Key + " " + kv.Value; }
+                    InformationManager.DisplayMessage(new InformationMessage(
+                        "QM: " + (kept + keptAmmo) + " EMPTY in battle (" + top + ") - nothing usable in the war-chest.", Colors.Yellow));
                 }
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.SkillLawWard", null); } catch { } }

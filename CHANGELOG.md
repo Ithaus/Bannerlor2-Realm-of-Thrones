@@ -1,5 +1,51 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-15 - Straz skilli w DTE: jedno dopasowanie calej partii (najsilniejszy pierwszy) + dopelnianie luk - koniec pustych kolczanow przy "wszystko pasuje"
+**Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs` (SkillLawWard przepisany; + WardDemand, WardSup, WardGroup, WardGapType, MountOk)
+**Problem:** Jeff: "znowu sa w jednostkach jako lucznicy osoby bez lukow i bez
+kolczanow" i "10 raz to poprawiasz". CrashScribe session 15.09 02:11, bitwa
+02:29:21: "swieta zasada skilli w DTE - 4 sztuk ponad skill wrocilo na polke;
+151 slotow PUSTYCH (w tym 20 kolczanow)" oraz "24 / 258 (9 kolczanow)" -
+a kwatermistrz o 02:28:53 nie zglaszal braku Bow/Arrows (tylko OneHanded
+175/183, Polearm 89/97).
+**Przyczyna:** (dekompilacja DTE PartyEquipmentDistributor, nie zgadywanie)
+1) AssignExtraEquipment rozdaje strzaly/belty/tarcze/oszczepy posortowane
+TIER malejaco kolejnym Assignments (tier oddzialu malejaco) BEZ sprawdzenia
+skilla - nasz SuitableWard siedzi tylko na IsWeaponSuitable (bron glowna).
+Lucznik T5 z Bow 140 dostawal kolczan T6 (wymog 175); stara straz per
+zolnierz zdejmowala go i szukala na polce, ale uzyteczne kolczany (105/140)
+zjedli juz nastepni w kolejce - slot zostawal pusty. 2) Bron glowna DTE
+dobiera "najblizsza wzorcowi" z SUFITEM tieru wzorzec+2 (GetMaxAllowedTier),
+nie po skillu - lucznik z wzorcem T2 nie dostanie luku T5, choc skill
+pozwala, i zostaje bez luku. Kwatermistrz liczy dopasowanie optymalne
+(najsilniejszy pierwszy, najtrudniejsza uzyteczna pierwsza, tylko skill) -
+stad rozjazd "pasuje" vs "stoja bez". Poprzednie 9 poprawek lataly
+kwatermistrza (raport), nie przydzial DTE (rzeczywistosc).
+**Zmiana:** SkillLawWard = jedno dopasowanie calej partii per grupa (typ +
+klasa broni; sloty 0-9, bez konia): wszystkie sztuki (noszone + polka),
+ludzie po skillu malejaco, sztuki po wymogu malejaco (potem skutecznosc;
+przy rownych noszona zostaje na czlowieku) - kazdy dostaje najtrudniejsza,
+ktorej umie uzyc, dokladnie jak liczy kwatermistrz. LUKI tez dostaja popyt:
+pusty slot pancerza, gdy wzorzec ma sztuke, i brak luku/kuszy/kolczanu/
+beltow/oszczepow wedle wzorca (wolny slot broni) - sztuka z polki wedle
+skilla, bez sufitu tieru DTE. Jezdziec dostaje tylko bron do uzycia z siodla
+(jak DTE IsSuitableForMount). Bez podlogi: slot pusty, gdy nic uzytecznego.
+Sloty tymczasowe DTE (emergency loadout), unikaty, klingi legend i sprzet
+umarlych nietykane. Ksiegowosc polki: zwroty (AddEquipmentToAssign) przed
+pobraniami (Consume ma podloge 0). Kon (slot 10) jak dotad, uprzaz za
+koniem. Log z nazwa partii, liczba slotow, przelozonymi, zapelnionymi lukami
+i rozbiciem pustych po typach; na ekranie krotko: "QM: N EMPTY in battle
+(Arrows 8, Cape 4) - nothing usable in the war-chest."
+**Ryzyko / co sprawdzic:** log "Mends: swieta zasada skilli w DTE [partia,
+N slotow]: X przelozonych, F luk zapelnionych, Y PUSTYCH (typ n, ...)" -
+dla partii gracza Y przy Arrows/Bow ma byc 0, gdy kwatermistrz nie zglasza
+braku; lucznicy w bitwie z lukiem i dwoma kolczanami. Petla D x S per grupa
+raz na przydzial - pomijalne. Jesli AI wychodzi bez broni, to polka AI nie
+ma nic po skillu - patrzec na Y u partii AI w logu. Sprzet po bitwie: polka
+DTE liczona z pobran/zwrotow - liczby sztuk w Armoury nie moga rosnac
+ani znikac (porownac "skarbiec wojskowy (N szt.)" przed i po bitwie).
+**Status:** WGRANE (gra zamknieta, DLL podmieniony, MD5 zgodne)
+
 ## 2026-09-15 - FieldCraft: tik bitwy po kopii listy agentow (wykrwawienie zabijalo agenta w trakcie petli)
 **Mod:** Armoury | **Pliki:** `Armoury/src/FieldCraft.cs` (OnMissionTick)
 **Problem:** CrashScribe session-2026-09-15_02-11-08: "Collection was modified;
