@@ -840,6 +840,30 @@ namespace Armoury
                 ArmouryBehavior.ReconcileStock("armoury-open");
                 // PORZADEK W SKARBCU (Jeff 14.09): co nikt nie udzwignie - do sakw gracza
                 QuartermasterLaw.PurgeUnusable(armory);
+                // LISTA WYKLUCZONYCH (Jeff 15.09: "daj mi liste, co to byly za przedmioty"):
+                // wszystko, czego straz bitewna nie wyda (unikaty, klingi lore, sprzet umarlych),
+                // po id i ilosci - raz na otwarcie, do logu
+                try
+                {
+                    var barred = new Dictionary<string, int>();
+                    int barredTotal = 0;
+                    for (int i = 0; i < armory.Count; i++)
+                    {
+                        var el = armory[i];
+                        var it = el.EquipmentElement.Item;
+                        if (it == null || el.Amount <= 0 || !QuartermasterLaw.BarredInBattle(it)) continue;
+                        int v; barred.TryGetValue(it.StringId, out v); barred[it.StringId] = v + el.Amount;
+                        barredTotal += el.Amount;
+                    }
+                    if (barredTotal > 0)
+                    {
+                        var parts = new List<string>();
+                        foreach (var kv in barred) { if (parts.Count >= 60) { parts.Add("..."); break; } parts.Add(kv.Key + " x" + kv.Value); }
+                        Log.Info("Kwatermistrz: WYKLUCZONE z wydawania (" + barredTotal + " szt., " + barred.Count + " id): "
+                                 + string.Join(", ", parts.ToArray()) + ".");
+                    }
+                }
+                catch { }
                 _screenOpen = true;
                 _stockAtOpen = ArmouryBehavior.StockSnapshot();
                 _pendingSwaps.Clear();   // swieza sesja ekranu = swiezy rejestr wymian

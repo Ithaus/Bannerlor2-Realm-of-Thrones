@@ -1592,8 +1592,54 @@ namespace CrashScribe
                     InformationManager.DisplayMessage(new InformationMessage(
                         "The ice of the Others melts and dead flesh crumbles - " + melted + " trophies turn to nothing in your hands.",
                         Colors.Cyan));
+                MeltDeadArmory("po bitwie");
             }
             catch { }
+        }
+
+        /// <summary>
+        /// SPRZET UMARLYCH W ZBROJOWNI (Jeff 15.09: "te rzeczy nieumarle skad sie tam
+        /// wziely?"). MeltDeadLoot czysci WYLACZNIE tabor partii gracza (main.ItemRoster)
+        /// po bitwie. Tymczasem DTE po kazdej bitwie wrzuca rynsztunek pokonanych PROSTO
+        /// do zbrojowni wojska (EveryoneCampaignBehavior.OnMapEventEnded ->
+        /// DistributeLootRandomly -> ArmyArmory.AddItemToArmory), z pominieciem taboru
+        /// i ekranu lupu - wiec lod Innych i skory upiorow omijaly topnienie i lezaly
+        /// na polkach wojska latami. Straz bitewna ich nie wydawala (IsDeadGear), ale
+        /// kwatermistrz liczyl je jako podaz (do 15.09). Tu topi sie to samo, co w taborze:
+        /// po kazdej bitwie z udzialem gracza i raz po wczytaniu (zalegly stos).
+        /// Lista topionych sztuk idzie do logu - to jest odpowiedz na "co to bylo".
+        /// </summary>
+        internal static void MeltDeadArmory(string why)
+        {
+            try
+            {
+                var cu = Hero.MainHero != null && Hero.MainHero.Culture != null ? Hero.MainHero.Culture.StringId : "";
+                if (cu == "whitewalker" || cu == "wights") return;
+                var tArm = FullType("DynamicTroopEquipmentReupload.ArmyArmory");
+                var fArm = tArm != null ? AccessTools.Field(tArm, "Armory") : null;
+                var armory = fArm != null ? fArm.GetValue(null) as TaleWorlds.CampaignSystem.Roster.ItemRoster : null;
+                if (armory == null) return;
+                int melted = 0;
+                var what = new System.Collections.Generic.List<string>();
+                for (int i = armory.Count - 1; i >= 0; i--)
+                {
+                    var el = armory.GetElementCopyAtIndex(i);
+                    var it = el.EquipmentElement.Item;
+                    if (it == null || el.Amount <= 0 || !IsDeadGear(it)) continue;
+                    melted += el.Amount;
+                    if (what.Count < 40) what.Add(it.StringId + " x" + el.Amount);
+                    armory.AddToCounts(el.EquipmentElement, -el.Amount);
+                }
+                if (melted > 0)
+                {
+                    Scribe.Line("Mends: sprzet umarlych w ZBROJOWNI (" + why + ") - stopiono " + melted + " szt.: "
+                                + string.Join(", ", what.ToArray()) + (what.Count >= 40 ? ", ..." : "") + ".");
+                    InformationManager.DisplayMessage(new InformationMessage(
+                        "The ice of the Others melts in the war-chest too - " + melted + " dead trophies turn to nothing.",
+                        Colors.Cyan));
+                }
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.MeltDeadArmory", null); } catch { } }
         }
 
         private static System.Reflection.FieldInfo _fUniqueLore;
@@ -3947,7 +3993,7 @@ namespace CrashScribe
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this,
                 delegate (TaleWorlds.CampaignSystem.MapEvents.MapEvent m) { Mends.MeltDeadLoot(m); Mends.WardReport(); });
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this,
-                delegate (CampaignGameStarter s) { Mends.DragonPurge(true); });
+                delegate (CampaignGameStarter s) { Mends.DragonPurge(true); Mends.MeltDeadArmory("po wczytaniu"); });
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this,
                 delegate { Mends.DragonPurge(false); if (!Mends.SinewApplied) Mends.SkillSinew(); });
         }

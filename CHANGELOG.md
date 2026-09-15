@@ -1,5 +1,31 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-15 - Sprzet umarlych lezal w zbrojowni wojska: DTE wrzuca lupy prosto na polki, omijajac topnienie
+**Mod:** CrashScribe + Armoury | **Pliki:** `CrashScribe/src/Mends.cs` (MeltDeadArmory),
+`Armoury/src/QuartermasterLaw.cs` (HoldReserve - lista wykluczonych)
+**Zgloszenie (Jeff):** "te rzeczy nieumarle skad sie tam wziely i daj mi liste, co to byly
+za typy przedmiotow".
+**Przyczyna:** `Mends.MeltDeadLoot` (MapEventEnded) topi lod Innych i sprzet upiorow
+WYLACZNIE w taborze partii gracza (`main.ItemRoster`). DTE po kazdej wygranej bitwie
+przekazuje rynsztunek pokonanych PROSTO do zbrojowni wojska
+(`EveryoneCampaignBehavior.OnMapEventEnded` -> `DistributeLootRandomly` ->
+`ArmyArmory.AddItemToArmory`, dte_everyone.cs:561/772/810), z pominieciem taboru i ekranu
+lupu. Kazda bitwa z Wedrowcami/upiorami zostawiala wiec ich kit na polkach - straz bitewna
+go nie wydawala (`IsDeadGear`: kultura wights/whitewalker, id `ice_*`, `wight_*`,
+`nightking_blade`, `white_walker_saddle`), ale kwatermistrz do 15.09 liczyl go jako podaz.
+**Zmiana:** (1) `Mends.MeltDeadArmory(why)` - topi sprzet umarlych takze w
+`ArmyArmory.Armory` (refleksja po statycznym polu `Armory`), wolane z `MeltDeadLoot`
+po kazdej bitwie z udzialem gracza i raz po wczytaniu (zalegly stos); lista topionych
+sztuk `id xN` idzie do logu CrashScribe ("sprzet umarlych w ZBROJOWNI (...) - stopiono N szt.: ...").
+(2) `HoldReserve`: przy kazdym otwarciu zbrojowni jedna linia "WYKLUCZONE z wydawania
+(N szt., M id): id xN, ..." - pelna lista unikatow/lore/umarlych na polkach (do 60 id).
+**Ryzyko / co sprawdzic:** unikaty i klingi lore NIE sa topione (zostaja na liscie gracza
+do sprzedania) - topi sie wylacznie to, co lapie `IsDeadGear`. Po wczytaniu w logu
+CrashScribe wiersz "stopiono N szt.: ..." i komunikat "The ice of the Others melts in the
+war-chest too". Zero Harmony, refleksja tylko do pola statycznego DTE.
+**Status:** WGRANE 2026-09-15 (CrashScribe md5 8578036853ea9f5a7769fbed45aa7d2f, Armoury md5 9f79c8a739604db4610ffb16b5b568a2, repo i gra zgodne).
+
+
 ## 2026-09-15 - "45 EMPTY w bitwie, zbrojownia zero" ROZSTRZYGNIETE: papier liczyl unikaty, straz liczyla dodatki DTE jako puste
 **Mod:** Armoury + CrashScribe | **Pliki:** `Armoury/src/QuartermasterLaw.cs` (Fit/FitFor/ShortageLines),
 `CrashScribe/src/Mends.cs` (SkillLawWard)
