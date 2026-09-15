@@ -178,6 +178,8 @@ namespace Armoury
         {
             public int Need;                 // ilu ludzi nosi ten typ
             public int Usable;               // ilu ma cos, co udzwignie
+            public int Stock;                // sztuki, ktore bitwa W OGOLE moze wydac (bez unikatow/lore/umarlych)
+            public int Barred;               // sztuki, ktorych straz bitewna nigdy nie wyda (unikaty, klingi lore, sprzet umarlych)
             public int UnfitMen;             // ilu zostaje bez uzytecznej sztuki
             public int UnfitMinSkill = -1, UnfitMaxSkill = -1;   // rozrzut ich skilla (co kupic: <= min)
             public string SkillName = "";
@@ -188,7 +190,60 @@ namespace Armoury
             public Dictionary<CharacterObject, int> UnfitByTroop = new Dictionary<CharacterObject, int>();
         }
 
-        private sealed class Sup { public EquipmentElement El; public int Total, Own, Used; }
+        private sealed class Sup { public EquipmentElement El; public int Total, Own, Used; public bool Barred; }
+
+        // ---------------------------------------------------- co bitwa wyklucza
+        // PAPIER LICZY TO SAMO CO BITWA (Jeff 15.09, dwa zrzuty: bitwa "45 EMPTY
+        // (HandArmor 14, ...)", zbrojownia chwile pozniej: zero brakow pancerza).
+        // Diagnostyka z obu stron dala liczby: papier HandArmor polka 199 / udzwigna 199,
+        // bitwa podaz grupy HandArmor 182 - 17 sztuk mniej. Straz bitewna (CrashScribe:
+        // UniqueWard + SkillLawWard) wyrzuca z puli unikaty, klingi lore i sprzet
+        // umarlych, a FitFor liczyl je jako pelnoprawna podaz. Stad "na papierze komplet,
+        // w polu 14 ludzi z golymi rekami". Pytamy wiec straz o TE SAME trzy listy
+        // (refleksja - CrashScribe moze nie byc zaladowany; wtedy nic nie wykluczamy).
+        private static bool _barredLooked;
+        private static MethodInfo _mUnique, _mLore, _mDead;
+        internal static bool BarredInBattle(ItemObject it)
+        {
+            if (it == null) return false;
+            if (!_barredLooked)
+            {
+                _barredLooked = true;
+                try
+                {
+                    Type t = null;
+                    foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+                    {
+                        try
+                        {
+                            if (asm.GetName().Name != "CrashScribe") continue;
+                            foreach (var ty in asm.GetTypes()) if (ty.Name == "Mends") { t = ty; break; }
+                        }
+                        catch { }
+                        if (t != null) break;
+                    }
+                    if (t != null)
+                    {
+                        var bf = BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
+                        _mUnique = t.GetMethod("IsUniqueGear", bf, null, new[] { typeof(ItemObject) }, null);
+                        _mLore = t.GetMethod("IsLoreBlade", bf, null, new[] { typeof(ItemObject) }, null);
+                        _mDead = t.GetMethod("IsDeadGear", bf, null, new[] { typeof(ItemObject) }, null);
+                    }
+                    Log.Info("Kwatermistrz: listy strazy bitewnej " + (_mUnique != null && _mDead != null ? "podpiete" : "NIEDOSTEPNE")
+                             + " - papier " + (_mUnique != null ? "wyklucza" : "NIE wyklucza") + " unikatow/lore/umarlych.");
+                }
+                catch (Exception e) { Log.Error("QuartermasterLaw.BarredInBattle", e); }
+            }
+            try
+            {
+                var a = new object[] { it };
+                if (_mUnique != null && (bool)_mUnique.Invoke(null, a)) return true;
+                if (_mLore != null && (bool)_mLore.Invoke(null, a)) return true;
+                if (_mDead != null && (bool)_mDead.Invoke(null, a)) return true;
+            }
+            catch { }
+            return false;
+        }
 
         private static bool NeedsType(CharacterObject c, ItemObject.ItemTypeEnum type)
         {
@@ -259,7 +314,9 @@ namespace Armoury
                     if (!allowance.TryGetValue(id, out left)) left = ArmouryBehavior.StockOf(id);
                     int own = Math.Min(el.Amount, Math.Max(0, left));
                     allowance[id] = left - own;
-                    supply.Add(new Sup { El = el.EquipmentElement, Total = el.Amount, Own = own, Used = 0 });
+                    bool barred = BarredInBattle(it);
+                    if (barred) f.Barred += el.Amount; else f.Stock += el.Amount;
+                    supply.Add(new Sup { El = el.EquipmentElement, Total = el.Amount, Own = own, Used = 0, Barred = barred });
                 }
                 SkillObject skill = null;
                 foreach (var sp in supply) { skill = ItemReq.SkillFor(sp.El.Item); if (skill != null) break; }
@@ -278,6 +335,7 @@ namespace Armoury
                         int pick = -1;
                         for (int i = 0; i < supply.Count; i++)
                         {
+                            if (supply[i].Barred) continue;                 // bitwa tego nie wyda - papier tez nie
                             if (supply[i].Used >= supply[i].Total) continue;
                             if (!ItemReq.Meets(man, supply[i].El.Item)) continue;
                             pick = i; break;
@@ -437,8 +495,8 @@ namespace Armoury
                 {
                     int need = WornFor(type, needs);
                     if (need <= 0) continue;
-                    int raw = HaveFor(armory, type);    // juczne nie licza sie jako wierzchowce
                     var fit = FitFor(armory, type);
+                    int raw = fit.Stock;                    // polka BEZ unikatow/lore/umarlych - jak w bitwie (15.09)
                     int have = Math.Min(raw, fit.Usable);   // liczy sie to, co ludzie UDZWIGNA (Jeff 14.09)
                     // 15.09 DIAGNOSTYKA: bitwa (SkillLawWard) melduje puste sloty pancerza,
                     // a ten raport nie widzi braku - zapisujemy wynik dopasowania dla KAZDEGO
@@ -447,7 +505,8 @@ namespace Armoury
                         || type == ItemObject.ItemTypeEnum.LegArmor || type == ItemObject.ItemTypeEnum.HandArmor
                         || type == ItemObject.ItemTypeEnum.Cape)
                         Log.Info("Kwatermistrz: papier " + type + ": potrzeba " + need + " (dopasowanie liczy " + fit.Need
-                                 + "), polka " + raw + ", udzwigna " + fit.Usable + ", bez sztuki " + fit.UnfitMen + ".");
+                                 + "), polka " + raw + " (+" + fit.Barred + " wykluczonych: unikaty/lore/umarli), udzwigna "
+                                 + fit.Usable + ", bez sztuki " + fit.UnfitMen + ".");
                     if (have < need)
                     {
                         string line = type + " " + have + "/" + need;

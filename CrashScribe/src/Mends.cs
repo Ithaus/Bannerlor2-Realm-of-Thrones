@@ -1075,6 +1075,7 @@ namespace CrashScribe
         {
             public Traverse Ta; public CharacterObject Co; public int Slot; public EquipmentElement Held; public bool Gap;
             public string Group; public string Type; public bool Mounted; public int Skill; public int Order; public int Pick = -1;
+            public bool Extra;   // bron, ktorej wzorzec oddzialu w tej grupie NIE MA - dodatek DTE (AssignExtraEquipments)
         }
         private sealed class WardSup
         {
@@ -1149,7 +1150,7 @@ namespace CrashScribe
                 MobileParty who = null;
                 try { who = tr.Field("_party").GetValue() as MobileParty; } catch { }
 
-                int moved = 0, filled = 0, kept = 0, keptAmmo = 0;
+                int moved = 0, filled = 0, kept = 0, keptAmmo = 0, extras = 0;
                 var emptyByType = new System.Collections.Generic.Dictionary<string, int>();
 
                 // ---- 1. POPYT: zajete sloty 0-9 nie-bohatera + luki wedle wzorca (kon i uprzaz osobno) ----
@@ -1197,10 +1198,32 @@ namespace CrashScribe
                         if (IsUniqueGear(it) || IsLoreBlade(it) || IsDeadGear(it)) continue;   // to sprawa strazy unikatow
                         var skill = ReqSkill(it);
                         if (skill == null) continue;                            // typ bez wymogu - nie ma czego pilnowac
+                        // DODATKI DTE (Jeff 15.09: "Polearm 67, Thrown 25 EMPTY" - to byly piki
+                        // i oszczepy, ktore DTE doklada w wolny slot ludziom, ktorych wzorzec ich
+                        // NIE MA: konny z pika, rycerz z oszczepem przy Throwing 10). Straz slusznie
+                        // je zdejmuje, ale liczyla jako "puste sloty" i straszyla gracza brakiem,
+                        // ktorego nie ma. Bron w grupie nieobecnej we wzorcu = dodatek: zdjac cicho.
+                        // REGULA ILOSCIOWA, nie "czy grupa jest we wzorcu": lanca rycerza i pika
+                        // z dodatku DTE to ta sama klasa (TwoHandedPolearm) - dodatkiem jest kazda
+                        // sztuka grupy PONAD liczbe, jaka ma wzorzec (DTE klade wzorzec pierwszy,
+                        // dodatki w wolne sloty, wiec nadwyzka wypada na pozniejszych slotach)
+                        bool extra = false;
+                        if (s <= 3 && tpl != null)
+                        {
+                            string g0 = WardGroup(it);
+                            int inTpl = 0;
+                            for (int q = 0; q <= 3; q++)
+                            {
+                                ItemObject ti = null; try { ti = tpl[(EquipmentIndex)q].Item; } catch { }
+                                if (ti != null && WardGroup(ti) == g0) inTpl++;
+                            }
+                            int heldNow; heldGroups.TryGetValue(g0, out heldNow);   // juz policzona ta sztuka
+                            extra = heldNow > inTpl;
+                        }
                         demands.Add(new WardDemand
                         {
                             Ta = ta, Co = co, Slot = s, Held = el, Group = WardGroup(it), Type = it.ItemType.ToString(),
-                            Mounted = mounted, Skill = co.GetSkillValue(skill), Order = demands.Count
+                            Mounted = mounted, Skill = co.GetSkillValue(skill), Order = demands.Count, Extra = extra
                         });
                     }
                     // LUKI W STRZELECKIM: wzorzec ma luk/kolczan/oszczep, ktorego DTE nie dal
@@ -1300,6 +1323,7 @@ namespace CrashScribe
                     {
                         // nic uzytecznego: sztuka ponad skill juz wrocila na polke (krok wyzej), slot pusty
                         if (!d.Gap) { try { d.Ta.Method("SetEquipment", (EquipmentIndex)d.Slot, default(EquipmentElement)).GetValue(); } catch { } }
+                        if (d.Extra) { extras++; continue; }                    // dodatek DTE spoza wzorca - nie "pusty"
                         if (d.Type == "Arrows" || d.Type == "Bolts") keptAmmo++; else kept++;
                         int n; emptyByType.TryGetValue(d.Type, out n); emptyByType[d.Type] = n + 1;
                         if (diagParty)
@@ -1414,14 +1438,14 @@ namespace CrashScribe
                     }
                     catch { }
                 }
-                if (moved > 0 || filled > 0 || kept > 0 || keptAmmo > 0)
+                if (moved > 0 || filled > 0 || kept > 0 || keptAmmo > 0 || extras > 0)
                 {
                     string types = "";
                     foreach (var kv in emptyByType) types += (types.Length > 0 ? ", " : "") + kv.Key + " " + kv.Value;
                     Scribe.Line("Mends: swieta zasada skilli w DTE [" + (who != null ? who.Name.ToString() : "?") + ", " + demands.Count
                                 + " slotow]: " + moved + " sztuk przelozonych wedle skilla (najsilniejszy pierwszy), " + filled
                                 + " luk zapelnionych z polki, " + (kept + keptAmmo) + " slotow PUSTYCH - nic uzytecznego na polce"
-                                + (types.Length > 0 ? " (" + types + ")" : "") + ".");
+                                + (types.Length > 0 ? " (" + types + ")" : "") + ", " + extras + " dodatkow DTE spoza wzorca zdjetych cicho.");
                 }
                 // GRACZ MA TO WIDZIEC NA EKRANIE (Jeff 14.09: "info mowi, ze wszystko
                 // okay, a stoja bez kolczanow") - krotko, tylko jego partia

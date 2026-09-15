@@ -1,5 +1,51 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-15 - "45 EMPTY w bitwie, zbrojownia zero" ROZSTRZYGNIETE: papier liczyl unikaty, straz liczyla dodatki DTE jako puste
+**Mod:** Armoury + CrashScribe | **Pliki:** `Armoury/src/QuartermasterLaw.cs` (Fit/FitFor/ShortageLines),
+`CrashScribe/src/Mends.cs` (SkillLawWard)
+**Dowod z diagnostyki obu stron (sesja 12:50, ta sama partia, ta sama polka):**
+```
+papier  HandArmor: potrzeba 199 (dopasowanie 199), polka 199, udzwigna 199, bez sztuki 0
+bitwa   PUSTE HandArmor: 11x Riverlands Ranger 120, 3x Bolton Hunter 120 | podaz grupy: 182 szt., Difficulty 105-140
+papier  LegArmor:  polka 199 / udzwigna 199          bitwa: podaz 191, 8 pustych
+papier  Cape:      polka 217 / udzwigna 199          bitwa: podaz 197, 1 pusty
+bitwa   PUSTE Polearm: 3x Mallister Eagle Knight 240, 2x Riverrun Captain 230, ... | podaz 57, Difficulty 140-175
+bitwa   PUSTE Thrown: 25x Mallister Eagle Knight 10 | podaz 9, Difficulty 35
+```
+**Przyczyna A (pancerz) - papier liczyl to, czego bitwa nigdy nie wyda.** Straz bitewna
+(`UniqueWard` prefix + `SkillLawWard`) wyrzuca z puli unikaty, klingi lore i sprzet
+umarlych; `FitFor` liczyl je jako pelnoprawna podaz. Bitwa: 182 rekawic; papier: 199.
+17 najslabszych ludzi (Atletyka 120) przegrywa wyscig o resztke i staje z golymi rekami,
+a raport mowi "komplet". `WardReport` z tej bitwy: "15 klng/unikatow zdjetych" - to liczba
+POZYCJI, nie sztuk (licznik per klucz slownika), wiec 45 sztuk sie miesci.
+**Przyczyna B (Polearm 67, Thrown 25) - to nie byly braki, tylko dodatki DTE.** DTE ma
+wlaczone `AssignExtraEquipments` (DynamicTroopSettings.json) i doklada w wolny slot
+oszczepy (`AssignExtraThrownWeapon`) i piki (`AssignExtraTwoHandedWeaponOrPolearms`)
+ludziom, ktorych wzorzec ich nie ma. Rycerz z Throwing 10 dostaje oszczep (Difficulty 35),
+konny dostaje pike z `RequiresNoMount` (flaga 2 - sprawdzona w TaleWorlds.Core:
+`RequiresMount=1, RequiresNoMount=2`; `MountOk` dziala dobrze). Straz slusznie je zdejmuje,
+ale liczyla jako "sloty PUSTE" i pisala graczowi "115 EMPTY". Lanca Eagle Knighta
+(`sturgia_lance_2_t5`, RBM) to ta sama klasa co pika (TwoHandedPolearm), wiec grupa
+nie wystarcza do rozroznienia - regula jest ILOSCIOWA: dodatek = sztuka grupy ponad
+liczbe, jaka ma wzorzec.
+**Zmiana:**
+ 1. `QuartermasterLaw.BarredInBattle(item)` - przez refleksje pyta `CrashScribe.Mends`
+    o `IsUniqueGear/IsLoreBlade/IsDeadGear` (bez CrashScribe: nic nie wyklucza, wpis w logu).
+    `FitFor`: takie sztuki nie sa dopasowywane (Used=0 -> trafiaja na liste gracza jako
+    "nikt nie nosi"), nowe pola `Fit.Stock`/`Fit.Barred`; `ShortageLines` liczy polke
+    jako `Stock`. Papier = bitwa.
+ 2. `SkillLawWard`: `WardDemand.Extra` - noszona bron ponad liczbe wzorca w tej grupie.
+    Odrzucony dodatek schodzi cicho (licznik "dodatkow DTE spoza wzorca zdjetych cicho"),
+    nie wchodzi do "PUSTYCH" ani do komunikatu gracza.
+**Ryzyko / co sprawdzic:** (1) po otwarciu zbrojowni wiersz "papier HandArmor: polka 182
+(+17 wykluczonych...)" i NOWE braki pancerza w raporcie (Riverlands Ranger 120 - to prawda,
+nie regres); (2) po bitwie "N dodatkow DTE spoza wzorca zdjetych cicho" i komunikat EMPTY
+tylko z realnymi brakami; (3) jesli knight nadal "pusty" na Polearm - to jego WLASNA lanca
+ma RequiresNoMount (RBM) i to osobna sprawa. Zero Harmony w nowym kodzie, zero klas
+z konstruktorem statycznym; refleksja tylko do naszego wlasnego moda.
+**Status:** ZBUDOWANE, NIEWGRANE (gra otwarta) - oba DLL do podmiany.
+
+
 ## 2026-09-15 - Predkosc marszu 1.84 przy pelnej konnicy: World pace cofnal sie do 50%, Slower Parties (BK) na 20%
 **Mod:** konfiguracja (MCM), bez zmian w kodzie | **Pliki:**
 `Documents\...\Configs\ModSettings\Global\Armoury\Armoury.json`,
