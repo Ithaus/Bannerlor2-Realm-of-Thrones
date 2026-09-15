@@ -1,5 +1,27 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-15 - Stajnia AI nie ogolaca targow: lord bierze z polki najwyzej 25% i nigdy ostatnich 4 koni, reszte zamawia u hodowcy
+**Mod:** Armoury | **Pliki:** `Armoury/src/Stables.cs` (AiBuy), `Settings.cs` (+McmSettings: AiMountMarketSharePercent, AiMountShelfFloor)
+**Problem:** Jeff: "praktycznie nigdzie nie ma koni do kupienia, o co chodzi?"
+**Przyczyna:** (Armoury.log) nasze stajnie AI: lord kupuje konie na awanse
+z targu osady - najtansze najpierw, CALE stosy, do 10 sztuk na wizyte,
+cooldown 4 dni, bez zadnej podlogi polki. Sesja 14.09 14:08: 676 koni
+w 235 zakupach (wczesniejsze sesje 112/46/203/45/227). Przy ~150 lordach
+i 71 ranczach na 572 wioski ROT (20 europe, 15 desert, 13 steppe,
+10 vlandian, 7 sturgian, 6 battanian) plus zima tnaca hodowle o polowe
+(WinterBite) popyt AI zjada cala podaz - gracz widzi puste stajnie.
+Hodowca (AiMountBreederFallback) tworzyl konie z niczego dopiero, gdy
+polka byla juz pusta - czyli ZAWSZE po ogoloceniu targu.
+**Zmiana:** AiBuy: z targu schodzi najwyzej AiMountMarketSharePercent
+(dom. 25%) koni z polki i nigdy ponizej AiMountShelfFloor (dom. 4 sztuki
+zostaja); reszta potrzeby idzie do hodowcy (nie drenuje targu, zloto
+i tak plynie do osady). Log "Stajnia AI: ... z targu X przy polce Y".
+**Ryzyko / co sprawdzic:** Armoury.log, linie "Stajnia AI": "z targu" ma
+byc <= 25% polki i polka nie schodzi ponizej 4. Lordowie nadal dostaja
+konie (hodowca), wiec awanse kawalerii bez zmian. Puste juz polki
+odbuduja sie dopiero z produkcja wiosek (zima wolniej).
+**Status:** WGRANE (gra zamknieta, DLL podmieniony, MD5 zgodne)
+
 ## 2026-09-14 - Glod rani powoli: 5% skladu dziennie zamiast vanillowych 25% (armie samych rannych zima)
 **Mod:** Armoury | **Pliki:** `Armoury/src/SlowHealing.cs` (StarvePostfix), `Settings.cs` (+McmSettings)
 **Problem:** Jeff (screen, Winter 5): "czy to bug - czemu wszyscy maja rannych?"

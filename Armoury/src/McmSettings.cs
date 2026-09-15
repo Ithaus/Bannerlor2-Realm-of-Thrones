@@ -840,6 +840,14 @@ namespace Armoury
         [SettingPropertyGroup("A knight needs a horse")]
         public float AiMountBreederMarkup { get; set; } = 1.3f;
 
+        [SettingPropertyInteger("Ai Mount Market Share Percent", 0, 100, "0", HintText = "a lord may take at most this share of the horses on a town's shelf in one visit - the rest he orders from the breeder, so markets are not stripped bare (Jeff 15.09: no horses to buy anywhere)")]
+        [SettingPropertyGroup("A knight needs a horse")]
+        public int AiMountMarketSharePercent { get; set; } = 25;
+
+        [SettingPropertyInteger("Ai Mount Shelf Floor", 0, 16, "0", HintText = "and never buys the last few: this many head always stay on the shelf for other buyers")]
+        [SettingPropertyGroup("A knight needs a horse")]
+        public int AiMountShelfFloor { get; set; } = 4;
+
         [SettingPropertyBool("Long Year Enabled", HintText = "stretch the year so the world stops racing: children grow, lords age and seasons turn at a pace a long campaign can live with")]
         [SettingPropertyGroup("The turning year")]
         public bool LongYearEnabled { get; set; } = true;
@@ -1569,6 +1577,8 @@ namespace Armoury
             s.AiMountBuyCooldownDays = AiMountBuyCooldownDays;
             s.AiMountBreederFallback = AiMountBreederFallback;
             s.AiMountBreederMarkup = AiMountBreederMarkup;
+            s.AiMountMarketSharePercent = AiMountMarketSharePercent;
+            s.AiMountShelfFloor = AiMountShelfFloor;
             s.LongYearEnabled = LongYearEnabled;
             s.WeeksPerSeason = WeeksPerSeason;
             s.MarchPaceEnabled = MarchPaceEnabled;

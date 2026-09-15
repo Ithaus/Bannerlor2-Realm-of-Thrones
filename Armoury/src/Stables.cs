@@ -395,9 +395,27 @@ namespace Armoury
 
                 int bought = 0, paid = 0;
                 string what = null;   // id kupionych ras do logu (diagnoza "skad kamele")
-                // 1. z targu osady - najtansze najpierw
+                // TARG NIE JEST STAJNIA LORDA (Jeff 15.09: "praktycznie nigdzie nie ma
+                // koni do kupienia"). Log 14.09: 676 koni w 235 zakupach w JEDNEJ
+                // sesji - lordowie zdejmowali z polek wszystko, po 10 sztuk na
+                // wizyte, co 4 dni, a zima tnie hodowle o polowe. Od teraz z targu
+                // schodzi najwyzej CZESC polki (dom. 25%) i nigdy ostatnie sztuki
+                // (dom. 4 zostaja); reszte lord zamawia u hodowcy - ta sciezka
+                // nie drenuje targu, a gold i tak plynie do osady.
                 var shelf = settlement.ItemRoster;
-                while (need > 0 && shelf != null)
+                int shelfMounts = 0;
+                if (shelf != null)
+                    for (int i = 0; i < shelf.Count; i++)
+                    {
+                        var e0 = shelf[i];
+                        if (e0.EquipmentElement.Item != null && e0.Amount > 0 && IsPlainMount(e0.EquipmentElement.Item)) shelfMounts += e0.Amount;
+                    }
+                int marketAllow = (int)(shelfMounts * MBMath.ClampFloat(c.AiMountMarketSharePercent / 100f, 0f, 1f));
+                marketAllow = Math.Min(marketAllow, Math.Max(0, shelfMounts - Math.Max(0, c.AiMountShelfFloor)));
+                int fromMarket = Math.Min(need, marketAllow);
+                int needMarket = fromMarket;
+                // 1. z targu osady - najtansze najpierw (w granicach dozwolonej czesci polki)
+                while (needMarket > 0 && shelf != null)
                 {
                     int best = -1, bestPrice = int.MaxValue;
                     for (int i = 0; i < shelf.Count; i++)
@@ -416,12 +434,12 @@ namespace Armoury
                     }
                     if (best < 0 || bestPrice > budget - paid) break;
                     var chosen = shelf[best];
-                    int take = Math.Min(need, chosen.Amount);
+                    int take = Math.Min(needMarket, chosen.Amount);
                     if (take * bestPrice > budget - paid) take = Math.Max(1, (budget - paid) / Math.Max(1, bestPrice));
                     if (take <= 0) break;
                     shelf.AddToCounts(chosen.EquipmentElement, -take);
                     party.ItemRoster.AddToCounts(chosen.EquipmentElement, take);
-                    paid += take * bestPrice; bought += take; need -= take;
+                    paid += take * bestPrice; bought += take; need -= take; needMarket -= take;
                     var cid = chosen.EquipmentElement.Item != null ? chosen.EquipmentElement.Item.StringId : "?";
                     if (what == null) what = cid; else if (!what.Contains(cid)) what += "," + cid;
                 }
@@ -449,7 +467,7 @@ namespace Armoury
                 Log.Info("Stajnia AI: " + lord.Name + " kupil " + bought + " koni ["
                          + (what ?? "?") + "] w " + settlement.Name
                          + " za " + paid + " (czekalo na awans " + (want - Math.Max(0, c.AiMountSpareBuffer))
-                         + ", mial " + have + ").");
+                         + ", mial " + have + "; z targu " + fromMarket + " przy polce " + shelfMounts + ").");
             }
             catch (Exception e) { Log.Error("Stables.AiBuy", e); }
         }

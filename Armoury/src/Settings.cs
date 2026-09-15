@@ -254,6 +254,8 @@ namespace Armoury
         public float AiMountBuyCooldownDays = 4f;          // days before that same party restocks again: without a pause the AI resold the horses as ordinary goods and bought them back, pumping millions through the market
         public bool AiMountBreederFallback = true;         // market empty? he orders from the local breeder instead of riding away horseless
         public float AiMountBreederMarkup = 1.3f;          // the breeder charges this much over the plain worth for the trouble
+        public int AiMountMarketSharePercent = 25;        // a lord may take at most this share of the horses on a town's shelf in one visit - the rest he orders from the breeder, so markets are not stripped bare (Jeff 15.09: no horses to buy anywhere)
+        public int AiMountShelfFloor = 4;                  // and never buys the last few: this many head always stay on the shelf for other buyers
 
         // --- The turning year ---
         public bool LongYearEnabled = true;                // stretch the year so the world stops racing: children grow, lords age and seasons turn at a pace a long campaign can live with
