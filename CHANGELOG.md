@@ -1,5 +1,20 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-15 - FieldCraft: tik bitwy po kopii listy agentow (wykrwawienie zabijalo agenta w trakcie petli)
+**Mod:** Armoury | **Pliki:** `Armoury/src/FieldCraft.cs` (OnMissionTick)
+**Problem:** CrashScribe session-2026-09-15_02-11-08: "Collection was modified;
+enumeration operation may not execute" w `FieldCraft.OnMissionTick`, powtorka x25
+w bitwie polowej (Winter 6, 1087). Nie crash (nasz catch), ale kazdy taki tik
+urywal petle - reszta ludzi nie dostawala zadyszki/krwawienia w tym tiku.
+**Przyczyna:** petla `foreach (var agent in Mission.Agents)` wola `agent.Die()`
+przy wykrwawieniu do zera - silnik od razu zdejmuje agenta z Mission.Agents,
+enumerator rzuca.
+**Zmiana:** iteracja po kopii listy (`new List<Agent>(Mission.Agents)`), raz na
+0.2 s - koszt pomijalny.
+**Ryzyko / co sprawdzic:** w CrashScribe brak "Collection was modified" z
+FieldCraft; krwawienie nadal dobija (linie HIT/wykrwawienie bez zmian).
+**Status:** WGRANE (gra zamknieta, DLL podmieniony, MD5 zgodne)
+
 ## 2026-09-15 - Stajnia AI nie ogolaca targow: lord bierze z polki najwyzej 25% i nigdy ostatnich 4 koni, reszte zamawia u hodowcy
 **Mod:** Armoury | **Pliki:** `Armoury/src/Stables.cs` (AiBuy), `Settings.cs` (+McmSettings: AiMountMarketSharePercent, AiMountShelfFloor)
 **Problem:** Jeff: "praktycznie nigdzie nie ma koni do kupienia, o co chodzi?"

@@ -401,7 +401,10 @@ namespace Armoury
                 if (_accum < 0.2f) return;                    // reszta co 0.2 s wystarczy
                 float step = _accum; _accum = 0f;
 
-                foreach (var agent in Mission.Agents)
+                // MIGAWKA LISTY (log 15.09: "Collection was modified" x25 w OnMissionTick):
+                // agent.Die() przy wykrwawieniu usuwa agenta z Mission.Agents W TRAKCIE
+                // tej petli - reszta ludzi nie dostawala tiku. Iterujemy po kopii.
+                foreach (var agent in new System.Collections.Generic.List<Agent>(Mission.Agents))
                 {
                     if (agent == null || !agent.IsActive() || !agent.IsHuman) continue;
                     // wight nie zna zadyszki, ran, krwawienia ani strachu - trup
