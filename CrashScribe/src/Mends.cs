@@ -1287,6 +1287,13 @@ namespace CrashScribe
                 foreach (var g in byGroup.Values)
                     foreach (var s in g)
                         if (s.FromPool) for (int k = 0; k < s.Taken; k++) { try { tr.Method("ConsumeEquipmentToAssign", s.El).GetValue(); } catch { } }
+                // 15.09 DIAGNOSTYKA (Jeff: "bitwa mowi 45 pustych, zbrojownia nie widzi braku"):
+                // dla partii gracza zapisujemy per typ KTO zostal pusty (oddzial x ile, skill)
+                // i JAKA byla podaz tej grupy (ile sztuk, najnizsza Difficulty) - inaczej nie
+                // da sie porownac z raportem kwatermistrza, ktory liczy te same polki na papierze
+                var emptyWho = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.Dictionary<string, int>>();
+                var emptyGroupOf = new System.Collections.Generic.Dictionary<string, string>();
+                bool diagParty = who != null && who == MobileParty.MainParty;
                 foreach (var d in demands)
                 {
                     if (d.Pick < 0)
@@ -1295,6 +1302,18 @@ namespace CrashScribe
                         if (!d.Gap) { try { d.Ta.Method("SetEquipment", (EquipmentIndex)d.Slot, default(EquipmentElement)).GetValue(); } catch { } }
                         if (d.Type == "Arrows" || d.Type == "Bolts") keptAmmo++; else kept++;
                         int n; emptyByType.TryGetValue(d.Type, out n); emptyByType[d.Type] = n + 1;
+                        if (diagParty)
+                        {
+                            try
+                            {
+                                System.Collections.Generic.Dictionary<string, int> whoMap;
+                                if (!emptyWho.TryGetValue(d.Type, out whoMap)) { whoMap = new System.Collections.Generic.Dictionary<string, int>(); emptyWho[d.Type] = whoMap; }
+                                string key = (d.Co != null ? d.Co.Name.ToString() : "?") + " " + d.Skill;
+                                int c; whoMap.TryGetValue(key, out c); whoMap[key] = c + 1;
+                                emptyGroupOf[d.Type] = d.Group;
+                            }
+                            catch { }
+                        }
                         continue;
                     }
                     var el = byGroup[d.Group][d.Pick].El;
@@ -1369,6 +1388,32 @@ namespace CrashScribe
                     catch { }
                 }
 
+                if (diagParty && emptyWho.Count > 0)
+                {
+                    try
+                    {
+                        foreach (var kv in emptyWho)
+                        {
+                            var parts = new System.Collections.Generic.List<string>();
+                            foreach (var w in kv.Value) { if (parts.Count >= 6) { parts.Add("..."); break; } parts.Add(w.Value + "x " + w.Key); }
+                            int supCount = 0, minDiff = int.MaxValue, maxDiff = 0;
+                            System.Collections.Generic.List<WardSup> g;
+                            string grp; emptyGroupOf.TryGetValue(kv.Key, out grp);
+                            if (grp != null && byGroup.TryGetValue(grp, out g))
+                                foreach (var sp in g)
+                                {
+                                    supCount += sp.Count;
+                                    int df = sp.El.Item != null ? sp.El.Item.Difficulty : 0;
+                                    if (df < minDiff) minDiff = df;
+                                    if (df > maxDiff) maxDiff = df;
+                                }
+                            Scribe.Line("Mends: PUSTE " + kv.Key + " u gracza: " + string.Join(", ", parts.ToArray())
+                                        + " | podaz grupy: " + supCount + " szt., Difficulty " + (minDiff == int.MaxValue ? 0 : minDiff)
+                                        + "-" + maxDiff + " (noszone + pula DTE).");
+                        }
+                    }
+                    catch { }
+                }
                 if (moved > 0 || filled > 0 || kept > 0 || keptAmmo > 0)
                 {
                     string types = "";

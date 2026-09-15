@@ -1,5 +1,38 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-15 - Bitwa melduje "45 EMPTY", zbrojownia nie widzi braku pancerza - diagnostyka po OBU stronach
+**Mod:** CrashScribe + Armoury | **Pliki:** `CrashScribe/src/Mends.cs` (SkillLawWard),
+`Armoury/src/QuartermasterLaw.cs` (ShortageLines)
+**Zgloszenie (Jeff, dwa zrzuty):** mapa po bitwie: `QM: 45 EMPTY in battle (HandArmor 14,
+Cape 13, HeadArmor 9) - nothing usable in the war-chest`; chwile pozniej ekran zbrojowni:
+`QM short: Thrown 33/36` i NIC o pancerzu. "Nadal pokazuje, ze brakuje, a jak wchodze,
+to nie pokazuje, ze empty".
+**Co wiadomo z logu (sesja 12:27):** nowy SkillSinew wczytany ("2534 jednostkom podbito
+4821 umiejetnosci"), a bitwa o 12:32 i tak: "45 slotow PUSTYCH (HandArmor 14, Cape 13,
+HeadArmor 9, LegArmor 8, BodyArmor 1)". Otwarcie zbrojowni o 12:33: zero brakow pancerza,
+lista gracza pusta, skarbiec 1880 szt.
+**Co sprawdzilem w kodzie i NIE tlumaczy rozjazdu:** (1) pula bitewna DTE
+`_equipmentToAssign` to CALA `ArmyArmory.Armory` po normalizacji, bez filtra tieru
+(dte_dist.cs, `AddEquipmentToAssign` = blacklist + normalize); (2) obie strony uzywaja tej
+samej reguly: `Mends.CanUse` i `ItemReq.Meets` = `GetSkillValue(ReqSkill) >= Difficulty`,
+`ReqSkill` i `ItemReq.SkillFor` identyczne; (3) ci sami CharacterObject po obu stronach.
+Na papierze straznik bitewny (demands = noszone + luki, podaz = noszone + pula) powinien
+dac NIE WIECEJ pustych niz FitFor na calej polce. Daje 45 kontra 0. Czegos w modelu
+nie widze i nie zgaduje (CLAUDE.md 8.1).
+**Zmiana - wylacznie diagnostyka, zero zmiany zachowania, zero Harmony:**
+ 1. `SkillLawWard` (tylko partia gracza): per typ pustego slotu wiersz
+    `Mends: PUSTE HandArmor u gracza: 9x Northern Warlord 105, ... | podaz grupy: N szt.,
+    Difficulty min-max (noszone + pula DTE)` - KTO stoi pusty, z jakim skillem, i co bylo
+    w podazy tej grupy.
+ 2. `ShortageLines`: dla KAZDEGO typu pancerza, takze bez braku, wiersz
+    `Kwatermistrz: papier HandArmor: potrzeba N (dopasowanie liczy M), polka R, udzwigna U,
+    bez sztuki K` - druga strona tego samego rachunku.
+**Ryzyko / co sprawdzic:** jedna bitwa + jedno otwarcie zbrojowni. Porownac
+"PUSTE <typ>" z "papier <typ>" dla tego samego typu: rozne liczby ludzi (potrzeba vs
+dopasowanie liczy), rozna podaz, albo rozny skill tych samych oddzialow - jedno z trojga.
+**Status:** ZBUDOWANE, NIEWGRANE (gra otwarta) - do podmiany obu DLL przy zamknietej grze.
+
+
 ## 2026-09-15 - Kucie: Done od razu - nazwa wyrobu zgodna z regula vanilli (bez podwojnej spacji, do 50 znakow)
 **Mod:** Armoury | **Pliki:** `Armoury/src/CraftPopup.cs`
 **Zgloszenie (Jeff):** "jak wykuwam miecz, luk etc. i tworze wersje lepsza lub gorsza,

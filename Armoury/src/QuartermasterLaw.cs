@@ -440,6 +440,14 @@ namespace Armoury
                     int raw = HaveFor(armory, type);    // juczne nie licza sie jako wierzchowce
                     var fit = FitFor(armory, type);
                     int have = Math.Min(raw, fit.Usable);   // liczy sie to, co ludzie UDZWIGNA (Jeff 14.09)
+                    // 15.09 DIAGNOSTYKA: bitwa (SkillLawWard) melduje puste sloty pancerza,
+                    // a ten raport nie widzi braku - zapisujemy wynik dopasowania dla KAZDEGO
+                    // typu pancerza, takze gdy brak nie wychodzi, zeby dalo sie porownac obie strony
+                    if (type == ItemObject.ItemTypeEnum.HeadArmor || type == ItemObject.ItemTypeEnum.BodyArmor
+                        || type == ItemObject.ItemTypeEnum.LegArmor || type == ItemObject.ItemTypeEnum.HandArmor
+                        || type == ItemObject.ItemTypeEnum.Cape)
+                        Log.Info("Kwatermistrz: papier " + type + ": potrzeba " + need + " (dopasowanie liczy " + fit.Need
+                                 + "), polka " + raw + ", udzwigna " + fit.Usable + ", bez sztuki " + fit.UnfitMen + ".");
                     if (have < need)
                     {
                         string line = type + " " + have + "/" + need;
