@@ -1,5 +1,35 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-15 - "Durne strzaly od razu mnie zabily": to dwa belty z kuszy (RBM), dziennik trafien mowi teraz kto, z czego i jak szybko
+**Mod:** Armoury | **Pliki:** `Armoury/src/HitScribe.cs`
+**Zgloszenie (Jeff):** "co to sa za durne strzaly, co zadaja takie obrazenia, od razu mnie zabily".
+**Log (Armoury-2026-09-15_13-59-00, 14:07):**
+```
+HIT Bolt -> main_hero [Chest] dmg=68 wchloniete=71  HPpo=67/135 dyst=128
+HIT Bolt -> main_hero [Neck]  dmg=67 wchloniete=201 HPpo=0/135  dyst=143
+```
+Dwa BELTY (nie strzaly) w ciagu sekundy; surowe ~139 i ~268. Rozklad z 2 dni
+(41 beltow / 1062 strzal): belty mediana 100 surowych, p90 171, max 268 (ten);
+strzaly mediana 80, p90 162, max 401 - najciezsze prawie zawsze w glowe/szyje.
+**Przyczyna (cudza, nie nasza):** RBM. `RBMCombat_ranged.xml`: crossbow_a 100 dmg /
+predkosc 120, crossbow_b 100 / 160 (vanilla: 67/60, 82/80); belty RBM 100-135 dmg
+(`RBMCombat_arrow_visuals.xml`). Do tego mnoznik czesci ciala: vanilla
+(`CustomAgentApplyDamageModel.GetDamageMultiplierForBodyPart`) dla POCISKU klutego
+w glowe x2.0, szyja - patrz wpis nizej; RBM ma wlasny `DamageRework.GetEntityDamageMultiplier`.
+Nasze QualityRich dopisuje modyfikatorom jakosci +3/+6/+9 predkosci pocisku
+(Fine/Masterwork/Legendary) TYLKO gdy vanilla nie dala nic - to najwyzej +20% energii,
+nie x2. Zaden nasz kod nie mnozy obrazen pociskow (ShieldGuard tnie obrazenia TARCZY,
+Charge tnie szarze konia).
+**Zmiana - diagnostyka:** HitScribe zapisuje teraz tez `surowe=` (dmg + wchloniete),
+`od <oddzial> [<kusza>(<modyfikator>)] skill=<Crossbow>` i `v=<predkosc pocisku> m/s`
+z `AttackCollisionData.MissileVelocity`; "CriticalBodyPartsBegin" wypisuje jako "Head".
+Nastepny taki strzal bedzie mial pelny podpis - wtedy rozstrzygniemy, czy strzelec mial
+Masterwork/Legendary kusze (nasz dopalacz) czy zwykla (czysty RBM).
+**Ryzyko / co sprawdzic:** jedna linia logu na trafienie pociskiem, limit 150 na misje
+bez zmian. `MissileVelocity` w try/catch.
+**Status:** WGRANE 2026-09-15 (md5 72661e6be01feb9d2b8b9e928a9625e6, repo i gra zgodne).
+
+
 ## 2026-09-15 - Sprzet umarlych lezal w zbrojowni wojska: DTE wrzuca lupy prosto na polki, omijajac topnienie
 **Mod:** CrashScribe + Armoury | **Pliki:** `CrashScribe/src/Mends.cs` (MeltDeadArmory),
 `Armoury/src/QuartermasterLaw.cs` (HoldReserve - lista wykluczonych)

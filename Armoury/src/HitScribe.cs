@@ -40,13 +40,49 @@ namespace Armoury
                 float armor = 0f;
                 try { armor = collisionData.AbsorbedByArmor; } catch { }
                 string part = "?";
-                try { part = collisionData.VictimHitBodyPart.ToString(); } catch { }
+                try
+                {
+                    part = collisionData.VictimHitBodyPart.ToString();
+                    if (part == "CriticalBodyPartsBegin") part = "Head";     // enum: Head == 0 == poczatek czesci krytycznych
+                }
+                catch { }
+                // 15.09 (Jeff: "co to za durne strzaly, od razu mnie zabily"): KTO strzelal,
+                // Z CZEGO (id + modyfikator jakosci), z jakim skillem i jaka predkoscia
+                // pocisk doszedl - bez tego nie da sie rozdzielic RBM od naszego dopalania
+                // modyfikatorow (QualityRich) i od jakosci sztuki u strzelca
+                string shooter = "";
+                try
+                {
+                    if (affectorAgent != null)
+                    {
+                        var sc = affectorAgent.Character;
+                        shooter = " od " + (sc != null ? (sc.StringId ?? sc.Name.ToString()) : "?");
+                        try
+                        {
+                            var mw = affectorAgent.WieldedWeapon;
+                            if (!mw.IsEmpty && mw.Item != null)
+                            {
+                                shooter += " [" + mw.Item.StringId
+                                           + (mw.ItemModifier != null ? "(" + mw.ItemModifier.StringId + ")" : "") + "]";
+                                if (sc != null)
+                                {
+                                    var rs = mw.Item.RelevantSkill;
+                                    if (rs != null) shooter += " skill=" + sc.GetSkillValue(rs);
+                                }
+                            }
+                        }
+                        catch { }
+                    }
+                    try { shooter += " v=" + ((int)collisionData.MissileVelocity.Length) + "m/s"; } catch { }
+                }
+                catch { }
 
                 _written++;
                 Log.Info("HIT " + arrow + " -> " + victim + " [" + part + "]"
                          + " dmg=" + ((int)damagedHp) + " wchloniete=" + ((int)armor)
+                         + " surowe=" + ((int)(damagedHp + armor))
                          + " HPpo=" + ((int)affectedAgent.Health) + "/" + ((int)affectedAgent.HealthLimit)
-                         + (isBlocked ? " BLOK" : "") + " dyst=" + ((int)hitDistance));
+                         + (isBlocked ? " BLOK" : "") + " dyst=" + ((int)hitDistance) + shooter);
                 if (_written == MaxLines)
                     Log.Info("HitScribe: limit " + MaxLines + " wpisow tej misji osiagniety - reszta pominieta.");
             }
