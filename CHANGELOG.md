@@ -43,7 +43,7 @@ nie regres); (2) po bitwie "N dodatkow DTE spoza wzorca zdjetych cicho" i komuni
 tylko z realnymi brakami; (3) jesli knight nadal "pusty" na Polearm - to jego WLASNA lanca
 ma RequiresNoMount (RBM) i to osobna sprawa. Zero Harmony w nowym kodzie, zero klas
 z konstruktorem statycznym; refleksja tylko do naszego wlasnego moda.
-**Status:** ZBUDOWANE, NIEWGRANE (gra otwarta) - oba DLL do podmiany.
+**Status:** WGRANE 2026-09-15 (CrashScribe md5 97082964eb3d861e8152e2c4a9f319bf, Armoury md5 e1b19e2f8ec48d81fd4bfbc9d92c5009, repo i gra zgodne).
 
 
 ## 2026-09-15 - Predkosc marszu 1.84 przy pelnej konnicy: World pace cofnal sie do 50%, Slower Parties (BK) na 20%
