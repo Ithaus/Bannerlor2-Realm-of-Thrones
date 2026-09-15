@@ -122,6 +122,59 @@ namespace Armoury
             catch (Exception e) { Log.Error("CraftPopup.Show", e); }
         }
 
+        /// <summary>
+        /// NAZWA ZGODNA Z REGULA VANILLI (Jeff 15.09: "jak tworze lepsza lub gorsza
+        /// wersje, musze recznie kasowac nazwe - za dluga, nie moze byc spacji").
+        /// CampaignUIHelper.IsStringApplicableForItemName zada: 3-50 znakow, tylko
+        /// litery/cyfry/biale/interpunkcja, bez "{" i "}", bez spacji na brzegach
+        /// i BEZ PODWOJNYCH SPACJI. Nazwa vanillowego modyfikatora to szablon
+        /// z placeholderem "{ITEMNAME}" ("Masterwork {ITEMNAME}") - sklejane dotad
+        /// mod.Name + " " + item.Name zostawialo placeholder pusty, wiec wychodzilo
+        /// "Masterwork  Albion" z DWIEMA spacjami, a dlugie nazwy lukow ROT
+        /// ("Masterwork 200 Pound Ravens' Teeth Longbow (60%)") przekraczaly 50.
+        /// Robimy to jak vanilla: podstawiamy placeholder, scalamy biale znaki,
+        /// wycinamy nawiasy klamrowe, przycinamy do 50 na granicy slowa.
+        /// </summary>
+        internal static string CleanName(ItemObject item, ItemModifier mod)
+        {
+            string baseName = item != null && item.Name != null ? item.Name.ToString() : "";
+            string name = baseName;
+            try
+            {
+                if (mod != null && mod.Name != null)
+                {
+                    var t = mod.Name.CopyTextObject();
+                    t.SetTextVariable("ITEMNAME", baseName);
+                    string withMod = t.ToString();
+                    // modyfikator bez placeholdera (cudze mody) - doklejamy po staremu
+                    name = withMod.Contains(baseName) ? withMod : (mod.Name.ToString() + " " + baseName);
+                }
+            }
+            catch { name = baseName; }
+            try
+            {
+                var sb = new StringBuilder(name.Length);
+                bool lastSpace = true;                                   // tnie tez spacje wiodace
+                foreach (char ch in name)
+                {
+                    if (ch == '{' || ch == '}') continue;
+                    bool ws = char.IsWhiteSpace(ch);
+                    if (ws && lastSpace) continue;
+                    sb.Append(ws ? ' ' : ch);
+                    lastSpace = ws;
+                }
+                name = sb.ToString().Trim();
+                if (name.Length > 50)
+                {
+                    int cut = name.LastIndexOf(' ', 49);
+                    name = (cut >= 20 ? name.Substring(0, cut) : name.Substring(0, 50)).Trim();
+                }
+                if (name.Length < 3) name = baseName.Length >= 3 ? baseName : "Crafted item";
+            }
+            catch { }
+            return name;
+        }
+
         private static bool ShowGauntlet(ItemObject item, ItemModifier mod)
         {
             try
@@ -133,14 +186,23 @@ namespace Armoury
 
                 Func<CraftingSecondaryUsageItemVM, MBBindingList<WeaponDesignResultPropertyItemVM>> props =
                     delegate { return BuildProps(item, mod); };
-                // tytul z JAKOSCIA jak w vanilla ("Fine Albion IV", nie "Albion IV")
-                var title = mod != null
-                    ? new TextObject("{=!}" + mod.Name + " " + item.Name, null)
-                    : item.Name;
+                // tytul z JAKOSCIA jak w vanilla ("Fine Albion IV", nie "Albion IV") -
+                // ale ZGODNY z regula nazw vanilli, patrz CleanName
+                string clean = CleanName(item, mod);
+                var title = new TextObject("{=!}" + clean, null);
                 var popup = new WeaponDesignResultPopupVM(item, title, Close, null, null,
                     visual,
                     new MBBindingList<TaleWorlds.CampaignSystem.ViewModelCollection.Inventory.ItemFlagVM>(),
                     props, delegate { });
+                // DONE OD RAZU (Jeff 15.09: "musze recznie kasowac nazwe, bo jest za dluga
+                // i nie moze byc spacji, nie moge kliknac Done"). Konstruktor vanilli
+                // jeszcze raz owija tytul biezacym modyfikatorem z vanillowego craftingu
+                // (GetCurrentItemModifier - stan po OSTATNIM vanillowym kuciu, dla nas
+                // przypadkowy), a setter ItemName liczy CanConfirm przez
+                // CampaignUIHelper.IsStringApplicableForItemName. Nadpisujemy nazwe czysta
+                // wersja i odblokowujemy przycisk wprost - nasz FinalizePrefix i tak nazwy
+                // nie uzywa (przedmiot juz lezy w sakwach pod wlasna nazwa).
+                try { popup.ItemName = clean; popup.CanConfirm = true; } catch { }
 
                 // pancerz nie ma zakladek uzyc - liste statow ustawiamy wprost
                 try
@@ -267,7 +329,7 @@ namespace Armoury
                     sb.AppendLine(p.PropertyLbl + ": " + p.InitialValue
                                   + (Math.Abs(p.ChangeAmount) > 0.01f ? " (" + (p.ChangeAmount > 0 ? "+" : "") + p.ChangeAmount + ")" : ""));
                 if (made > 1) sb.AppendLine().Append("Made in a batch of " + made + ".");
-                string title = (mod != null ? mod.Name + " " : "") + item.Name;
+                string title = CleanName(item, mod);
                 InformationManager.ShowInquiry(new InquiryData(title, sb.ToString(),
                     true, false, "Take it", null, null, null), true);
             }

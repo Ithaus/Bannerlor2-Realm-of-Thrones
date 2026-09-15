@@ -1,5 +1,36 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-15 - Kucie: Done od razu - nazwa wyrobu zgodna z regula vanilli (bez podwojnej spacji, do 50 znakow)
+**Mod:** Armoury | **Pliki:** `Armoury/src/CraftPopup.cs`
+**Zgloszenie (Jeff):** "jak wykuwam miecz, luk etc. i tworze wersje lepsza lub gorsza,
+musze recznie kasowac nazwe, bo jest za dluga i nie moze byc spacji, nie moge kliknac
+od razu Done".
+**Przyczyna (nasz kod):** panel wyniku kucia to vanillowy `WeaponDesignResultPopupVM`.
+Jego setter `ItemName` liczy `CanConfirm` (stan przycisku Done) przez
+`CampaignUIHelper.IsStringApplicableForItemName` (ViewModelCollection, dekompilat):
+3-50 znakow, bez "{" "}", bez spacji na brzegach i **bez dwoch spacji pod rzad**.
+Nazwa vanillowego modyfikatora jakosci to SZABLON z placeholderem "{ITEMNAME}"
+("Masterwork {ITEMNAME}") - konstruktor vanilli robi `SetTextVariable("ITEMNAME", ...)`.
+Nasz `CraftPopup.ShowGauntlet` sklejal `mod.Name + " " + item.Name`: placeholder
+zostawal pusty, wychodzilo "Masterwork  Albion" z DWIEMA spacjami -> "cannot contain
+consecutive white spaces" -> Done wygaszony. Dlugie nazwy lukow ROT
+("Masterwork 200 Pound Ravens' Teeth Longbow") dodatkowo przekraczaly 50. Do tego
+konstruktor owijal nasz tytul JESZCZE RAZ biezacym modyfikatorem vanillowego craftingu
+(`GetCurrentItemModifier` - stan po ostatnim vanillowym kuciu, dla nas przypadkowy).
+Nasz `FinalizePrefix` nazwy w ogole nie uzywa (wyrob juz lezy w sakwach), wiec gracz
+poprawial recznie tekst, ktory nigdzie nie szedl.
+**Zmiana:** nowy `CraftPopup.CleanName(item, mod)` buduje nazwe jak vanilla (placeholder
+podstawiony; modyfikator bez placeholdera - doklejony po staremu), scala biale znaki,
+wycina nawiasy klamrowe, przycina do 50 na granicy slowa. Po zbudowaniu panelu
+nadpisujemy `popup.ItemName` czysta nazwa i ustawiamy `popup.CanConfirm = true` wprost
+(publiczny setter) - Done klikalne od razu. Ta sama nazwa idzie do okienka zapasowego.
+**Ryzyko / co sprawdzic:** dotyczy TYLKO naszych paneli (`_crafting == null`); vanillowe
+kucie z projektanta broni idzie po staremu. Zaden Harmony, zadna klasa z konstruktorem
+statycznym. Sprawdzic: wykuc cokolwiek z jakoscia - tytul "Masterwork X" z jedna spacja,
+Done aktywne bez dotykania pola.
+**Status:** WGRANE 2026-09-15 (md5 491365d9c4bf9f31afb6fd9c86a3a7e8, repo i gra zgodne).
+
+
 ## 2026-09-15 - Rekrut oddawal swoj sprzet po werbunku: SkillSinew podbija teraz KAZDA umiejetnosc, nie tylko Atletyke
 **Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs` (SkillSinew)
 **Zgloszenie (Jeff):** "jak werbuje wojsko z wioski, to po werbunku oddaje mi swoj
