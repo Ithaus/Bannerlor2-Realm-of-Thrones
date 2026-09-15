@@ -1,5 +1,58 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-15 - Kwatermistrz: "wrzucam pancerz, brak znika; wyjmuje, wraca" - dwa mechanizmy potwierdzone, jeden NIE, diagnostyka do rozstrzygniecia
+**Mod:** Armoury | **Pliki:** `Armoury/src/QuartermasterLaw.cs`
+**Zgloszenie (Jeff):** "jak wrzucam pancerz, to pokazuje, ze nie ma brakow; jak go
+wyjmuje, to pokazuje, ze sa. Skoro akceptuje, powinien go wlozyc na zolnierza i zniknac
+ze stash, i nie moge go zabrac - lub pancerz ma za wysokie wymagania i jest konflikt".
+**Sprawdzone na nowo od zera (Fable), sciezka jednej sztuki:**
+ 1. Wklad: `BookPostfix` (QuartermasterLaw.cs:605) -> `StockDeposit` (ksiega PER ID,
+    slepa na modyfikator) + `NoteDeposit`.
+ 2. Zamkniecie: `ReleaseCore(true)` -> `ProcessSwaps` -> `PurgeUnusable` (hook zamkniecia
+    ZYWY: log "close=True/True"). Otwarcie: `HoldReserve` -> `ReconcileStock` ->
+    `PurgeUnusable` -> `ShoutShortages` -> schowanie skarbca. Wlasnosc przechodzi wiec
+    na wojsko przy KAZDYM otwarciu i zamknieciu - to dziala, log to pokazuje ("-N na stan wojska").
+ 3. `FitFor` (:228): ludzie po skillu malejaco, sztuki po Difficulty malejaco, kazdy bierze
+    pierwsza, ktora udzwignie. `Adjust` per wpis, sumowane per id w `PurgeUnusable`:
+    delta_id = (polka_id - noszone_id) - ksiega_id. Regula: GRACZ MA DOKLADNIE TO, CZEGO
+    NIKT NIE NOSI (Jeff 30.08: "wojsko bierze tyle, ile uniesie, reszta zostaje Twoja").
+**POTWIERDZONE (A) - symetria "+33/-33" to zamierzona WYMIANA, nie ping-pong.** Liczba
+noszonych sztuk typu = liczba ludzi (stala). Wklad lepszych sztuk -> ludzie je biora (-N
+na wojsko), a wyparte gorsze staja sie "nienoszone" -> lista gracza (+N). Liczba sztuk
+u gracza sie nie zmienia, jakosc rosnie. Dokladnie to widac w logu przy kazdym otwarciu
+po wkladzie (`porzadek w skarbcu - 47/47 [HeadArmor +10/-10, LegArmor +33/-33 ...]`).
+**POTWIERDZONE (B) - "za wysokie wymagania" JEST realne dla pancerzy.** Nasz ArmorTierLaw
+nadaje pancerzom Difficulty i wiaze z Atletyka (`ItemReq.SkillFor`: `HasArmorComponent ->
+Athletics`). Log tej sesji:
+`[09:48:08] BodyArmor 189/191 - bez uzytecznej sztuki: 1x Tully Rider 105, 1x Bolton
+Veteran Archer 105 (Athletics)` (to samo LegArmor, Cape). Dwoch ludzi z Atletyka 105 nie
+udzwignelo ZADNEJ sztuki na polce. Wklad lekkiego pancerza (Difficulty <= 105) -> biora go
+-> brak znika. To jest polowa objawu i jest zgodna z projektem.
+**POTWIERDZONE (C) - iluzja "wklad nie znika ze stash".** Ksiega jest per id, a po
+purge = liczba NIENOSZONYCH sztuk tego id, wliczajac NADWYZKE WOJSKA tej samej nazwy.
+Widocznosc w `HoldReserve` (:783-796) idzie KOLEJNOSCIA ROSTERA, `visible =
+min(Amount, allowLeft)` - wiec na liscie gracza moga wyladowac INNE fizycznie sztuki
+(np. wpis "(30%)" zamiast wlozonego "(100%)"). Gracz widzi te sama nazwe w stash i mysli,
+ze jego wklad nie zostal wziety - a zostal; to, co widzi, to gorsze kopie tej samej nazwy,
+ktore wojsko oddalo. Raport brakow (`ShortageLines`, `have = min(HaveFor, FitFor.Usable)`)
+liczy przy tym CALA polke, nie pytajac, czyja jest sztuka.
+**NIE POTWIERDZONE - "wyjmuje, brak WRACA".** Na papierze dopasowanie jest stabilne:
+wyjecie sztuk, ktorych nikt nie nosi, nie zmienia `Usable`. Nie znalazlem w kodzie sciezki,
+ktora by to dawala, a log NIE MOGL tego pokazac, bo brak czysto ilosciowy (bez ludzi "bez
+uzytecznej sztuki") w ogole nie trafial do logu - `Log.Info` siedzial tylko w galezi
+`UnfitMen > 0` (:436-445). Zgodnie z CLAUDE.md 8.1: bez dowodu nie ma poprawki.
+**Zmiana - wylacznie diagnostyka, zero zmiany zachowania, zero Harmony:**
+ 1. `ShortageLines`: kazdy brak ilosciowy do logu ("brak ilosciowy (polka N, udzwigna M)").
+ 2. `PurgeUnusable`: rozbicie porzadku PER ID ("porzadek LegArmor: id +3, id2 -3") - rozstrzyga
+    wymiane od dopisania nadwyzki tej samej nazwy.
+ 3. `HoldReserve`: pelna widoczna lista gracza po schowaniu skarbca (id, modyfikator, ile) -
+    pokazuje, czy Jeff dostaje do reki inne sztuki niz wlozyl.
+**Ryzyko / co sprawdzic:** tylko wpisy w logu. Po jednej sesji "wrzuc - zamknij - otworz -
+wyjmij - zamknij - otworz" bedzie widac: (a) czy brak wraca i JAKI, (b) czyje sztuki
+Jeff widzi na liscie, (c) czy purge dopisuje mu nadwyzke wojska. Wtedy poprawka.
+**Status:** WGRANE 2026-09-15 (md5 7b58390dc84b4d450fe875ab0a8361ad, repo i gra zgodne).
+
+
 ## 2026-09-15 - Dlugi marsz, dlugie racje: zuzycie jedzenia -40% dla gracza i AI
 **Mod:** Armoury | **Pliki:** `Armoury/src/Rations.cs` (nowy), `Settings.cs` (+McmSettings: FoodConsumptionCutPercent), `SubModuleMain.cs`
 **Problem:** Jeff: "zuzycie jedzenia w grze obniz, bo jest za szybko zuzywane -

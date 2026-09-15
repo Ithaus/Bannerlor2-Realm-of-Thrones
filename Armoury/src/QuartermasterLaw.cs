@@ -356,7 +356,19 @@ namespace Armoury
                             toMen += -kv.Value; taken += -kv.Value;
                         }
                     }
-                    if (here > 0 || taken > 0) perType.Add(type + " +" + here + "/-" + taken);
+                    if (here > 0 || taken > 0)
+                    {
+                        perType.Add(type + " +" + here + "/-" + taken);
+                        // 15.09: rozbicie PER ID - inaczej "+33/-33" nie mowi, czy to wymiana
+                        // (lepsze do ludzi, gorsze na liste gracza) czy nadwyzka wojska tej samej
+                        // nazwy dopisana graczowi obok jego wkladu
+                        var det = new List<string>();
+                        foreach (var kv in perId)
+                            if (kv.Value != 0 && det.Count < 10)
+                                det.Add(kv.Key + (kv.Value > 0 ? " +" : " ") + kv.Value);
+                        Log.Info("Kwatermistrz: porzadek " + type + ": " + string.Join(", ", det.ToArray())
+                                 + (perId.Count > 10 ? ", ..." : ""));
+                    }
                 }
                 if (toPlayer > 0 || toMen > 0)
                 {
@@ -453,6 +465,12 @@ namespace Armoury
                             Log.Info("Kwatermistrz: " + type + " " + have + "/" + need + " - bez uzytecznej sztuki: "
                                      + string.Join(", ", full.ToArray()) + " (" + fit.SkillName + ").");
                         }
+                        // 15.09: brak CZYSTO ILOSCIOWY (nikt nie jest "bez uzytecznej sztuki",
+                        // po prostu sztuk jest mniej niz ludzi) dotad NIE trafial do logu -
+                        // wpis wyzej powstaje tylko w galezi UnfitMen. Przez to nie dalo sie
+                        // z logu odtworzyc "wrzucam - brak znika, wyjmuje - wraca" (Jeff 15.09).
+                        else Log.Info("Kwatermistrz: " + type + " " + have + "/" + need
+                                      + " - brak ilosciowy (polka " + raw + ", udzwigna " + fit.Usable + ").");
                         lines.Add(line);
                     }
                 }
@@ -809,6 +827,24 @@ namespace Armoury
                     int pieces = 0;
                     foreach (var kv in _held) pieces += kv.Value;
                     Log.Info("Kwatermistrz: skarbiec wojskowy (" + pieces + " szt.) schowany - na liscie tylko wklady gracza.");
+                    // 15.09: WIDOCZNA lista per wpis rostera (id + modyfikator + ile) - ksiega jest
+                    // per id i slepa na modyfikator, a widocznosc idzie kolejnoscia rostera,
+                    // wiec gracz moze dostac do reki INNE fizycznie sztuki niz wlozyl
+                    try
+                    {
+                        var vis = new List<string>();
+                        for (int i = 0; i < armory.Count && vis.Count < 20; i++)
+                        {
+                            var el = armory[i];
+                            var it = el.EquipmentElement.Item;
+                            if (it == null || el.Amount <= 0) continue;
+                            var m = el.EquipmentElement.ItemModifier;
+                            vis.Add(it.StringId + (m != null ? "(" + m.StringId + ")" : "") + " x" + el.Amount);
+                        }
+                        Log.Info("Kwatermistrz: na liscie gracza: " + (vis.Count > 0 ? string.Join(", ", vis.ToArray()) : "(pusto)")
+                                 + (armory.Count > 20 ? ", ..." : ""));
+                    }
+                    catch { }
                     InformationManager.DisplayMessage(new InformationMessage(
                         "QM: listed = what no man wears; the men's kit stays hidden.",
                         Colors.Yellow));
