@@ -133,6 +133,7 @@ namespace Armoury
         public int BkSupplyMaxPieces = 12;                 // hard ceiling: an AI party never stockpiles more than this many pieces of any one supply - repairs need a few hides, not a warehouse (0 = off)
 
         public bool AiStarvingBuysAnyPrice = true;         // a STARVING AI party buys the cheapest food it can afford at ANY price - hunger does not haggle (vanilla and Banner Kings refuse anything above 120 denars, so lords starve on a full market in wartime)
+        public int FoodConsumptionCutPercent = 40;         // a party eats this much LESS per day, player and AI alike (0 = vanilla). The world marches slower now (world pace, long year), so the same road costs more days - rations must stretch to match
 
         // --- The crossing law ---
         public bool CrossingLawEnabled = true;             // fortified crossings (The Twins) bar their bridge to ENEMIES of the holder - allies and neutrals pass; take the castle, make peace, or go by sea

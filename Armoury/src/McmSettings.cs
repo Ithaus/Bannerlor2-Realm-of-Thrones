@@ -456,6 +456,10 @@ namespace Armoury
         [SettingPropertyGroup("The lean quartermasters")]
         public bool AiStarvingBuysAnyPrice { get; set; } = true;
 
+        [SettingPropertyInteger("Food Consumption Cut Percent", 0, 160, "0", HintText = "a party eats this much LESS per day, player and AI alike (0 = vanilla). The world marches slower now (world pace, long year), so the same road costs more days - rations must stretch to match")]
+        [SettingPropertyGroup("The lean quartermasters")]
+        public int FoodConsumptionCutPercent { get; set; } = 40;
+
         [SettingPropertyBool("Crossing Law Enabled", HintText = "fortified crossings (The Twins) bar their bridge to ENEMIES of the holder - allies and neutrals pass; take the castle, make peace, or go by sea")]
         [SettingPropertyGroup("The crossing law")]
         public bool CrossingLawEnabled { get; set; } = true;
@@ -1481,6 +1485,7 @@ namespace Armoury
             s.BkSupplyDaysCap = BkSupplyDaysCap;
             s.BkSupplyMaxPieces = BkSupplyMaxPieces;
             s.AiStarvingBuysAnyPrice = AiStarvingBuysAnyPrice;
+            s.FoodConsumptionCutPercent = FoodConsumptionCutPercent;
             s.CrossingLawEnabled = CrossingLawEnabled;
             s.CrossingLawAi = CrossingLawAi;
             s.CrossingRadius = CrossingRadius;

@@ -1,5 +1,35 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-15 - Dlugi marsz, dlugie racje: zuzycie jedzenia -40% dla gracza i AI
+**Mod:** Armoury | **Pliki:** `Armoury/src/Rations.cs` (nowy), `Settings.cs` (+McmSettings: FoodConsumptionCutPercent), `SubModuleMain.cs`
+**Problem:** Jeff: "zuzycie jedzenia w grze obniz, bo jest za szybko zuzywane -
+ruch obnizylismy, wiec wszystko porusza sie wolniej, a jedzenie zostalo na
+starym torze; obniz zuzycie dla gracza i AI o 40%".
+**Przyczyna:** nasze prawa predkosci (WorldPace, MarchPace, TerrainEase) i dlugi
+rok (Calendar, 168 dni) rozciagnely kazda trase na wiecej DNI, a jedzenie
+schodzi na dzien - ta sama droga kosztuje teraz kilka razy wiecej zapasu.
+Stad glodujace partie w polu i kaskada ran (patrz wpis 14.09 o glodzie).
+**Zmiana:** nowy Rations: postfix (Priority.Last) na
+`CalculateDailyFoodConsumptionf` - jedyna brama dziennego zuzycia partii
+(MobileParty.FoodChange). Wynik mnozony przez (1 - FoodConsumptionCutPercent/100),
+dom. 40%, gracz i AI rowno. Sufity modelu (vanilla LimitMax -0.01, BK 0)
+dzialaja dalej, dymek z rozpiska zachowany (dokladamy czynnik
+-(cut/100)*(1+SumOfFactors), bo ExplainedNumber liczy Base*(1+F)).
+Zapasy osad, produkcja wiosek i spichlerze miast NIETKNIETE.
+**Uwaga o modelu:** BannerKings podstawia wlasny model (BKPartyConsumptionModel
+dziedziczy po DefaultMobilePartyFoodConsumptionModel i NADPISUJE te metode bez
+wolania base) - latka na klasie vanilli bylaby martwa. Dlatego skan typow jak
+w HungerLaw, ale tylko LISCIE hierarchii (typ deklarujacy metode, po ktorym nie
+dziedziczy inny deklarujacy) - ciecie nie nalozy sie dwa razy, gdyby czyjs model
+jednak wolal base.
+**Ryzyko / co sprawdzic:** Armoury.log przy starcie: "Rations: zuzycie jedzenia
+-40% dla gracza i AI ... zalatane modele: BKPartyConsumptionModel" (jesli
+"BRAK" - model nieznaleziony, zglosic). W grze: dymek nad zapasem jedzenia
+partii ma pokazywac "Rations stretched" i dzienne zuzycie 0.6 dawnego.
+Zima nadal boli (+50% liczone przed cieciem). Jesli AI przestanie kupowac
+jedzenie i zacznie je gromadzic ponad miare - patrzec na BkSupplyDaysCap.
+**Status:** ZBUDOWANE - gra byla odpalona, watcher podmieni DLL po jej zamknieciu (sprawdzic dll-watcher.log: "Armoury.dll wgrane, cmp=IDENTYCZNE")
+
 ## 2026-09-15 - Straz skilli w DTE: jedno dopasowanie calej partii (najsilniejszy pierwszy) + dopelnianie luk - koniec pustych kolczanow przy "wszystko pasuje"
 **Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs` (SkillLawWard przepisany; + WardDemand, WardSup, WardGroup, WardGapType, MountOk)
 **Problem:** Jeff: "znowu sa w jednostkach jako lucznicy osoby bez lukow i bez

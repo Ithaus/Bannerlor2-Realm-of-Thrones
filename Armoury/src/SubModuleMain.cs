@@ -61,6 +61,7 @@ namespace Armoury
                 SpeedDepth.ApplyAll(_harmony);   // licznik zagniezdzenia - PRZED wszystkimi latkami predkosci/morale
                 WorldPace.ApplyAll(_harmony);
                 WinterBite.ApplyAll(_harmony);
+                Rations.ApplyAll(_harmony);      // dlugi marsz, dlugie racje - zuzycie jedzenia w dol (gracz i AI)
                 ScorchedEarth.ApplyAll(_harmony);
                 Wayfinder.ApplyAll(_harmony);
                 MarchPace.ApplyAll(_harmony);
