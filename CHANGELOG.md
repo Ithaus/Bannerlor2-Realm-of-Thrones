@@ -1,5 +1,31 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-15 - Predkosc marszu 1.84 przy pelnej konnicy: World pace cofnal sie do 50%, Slower Parties (BK) na 20%
+**Mod:** konfiguracja (MCM), bez zmian w kodzie | **Pliki:**
+`Documents\...\Configs\ModSettings\Global\Armoury\Armoury.json`,
+`Documents\...\Configs\ModSettings\Global\BannerKings\BannerKings.json` (oba z kopia `.bak-2026-09-15`)
+**Zgloszenie (Jeff, zrzut dymka PARTY SPEED):** Total +1.84 przy "wszyscy maja konie, wiecej
+koni niz ludzi, mam konnice". Dymek: Base +3.03, Cavalry +0.38, Footmen on horses +0.26,
+... World pace -1.5, Slower Parties setting -0.59.
+**Przyczyna 1 (nasza):** `WorldPace.BasePostfix` robi `AddFactor(p/100 - 1)` na bazie;
+w MCM `WorldPacePercent` = 50 -> -50% z 3.03 = -1.5. 13.09 Jeff prosil o +50% i stalo 75,
+ale od 13.09 `McmSettings.Apply()` biegnie co godzine i nadpisuje Settings wartosciami
+z MCM (`GlobalSettings<McmSettings>.Instance`), a plik MCM zostal zapisany 14.09 10:24
+z powrotem z 50 (regeneracja McmSettings / zapis MCM). Zadne inne zrodlo juz nie obowiazuje.
+**Przyczyna 2 (BannerKings):** `SlowerParties: 0.1958` w BannerKings.json -> -20% z bazy
+= -0.59 (`BKPartySpeedTweakPatches`, linia "Slower Parties setting").
+Bez obu hamulcow: 3.93. `Herding -0.04` to vanillowa kara za nadmiar zwierzat (drobne).
+**Zmiana (na prosbe Jeffa "wgraj i zeruj slower parties"):** `WorldPacePercent` 50 -> 75,
+`SlowerParties` 0.1958 -> 0.0. Edycja przy ZAMKNIETEJ grze (MCM nadpisuje pliki przy
+wyjsciu). Oczekiwany Total po wczytaniu w tych samych warunkach: ok. 3.2
+(3.93 - 0.76 z World pace 75%).
+**Ryzyko / co sprawdzic:** dymek PARTY SPEED - "World pace" ok. -0.76, brak linii
+"Slower Parties setting". Jesli MCM przy pierwszym otwarciu ekranu ustawien znow zapisze
+50 - to znaczy, ze wartosc domyslna w McmSettings.cs (z Settings.cs: 50) wygrywa z plikiem
+i trzeba podniesc domyslna w Settings.cs.
+**Status:** WGRANE 2026-09-15 (pliki podmienione, kopie .bak-2026-09-15).
+
+
 ## 2026-09-15 - Bitwa melduje "45 EMPTY", zbrojownia nie widzi braku pancerza - diagnostyka po OBU stronach
 **Mod:** CrashScribe + Armoury | **Pliki:** `CrashScribe/src/Mends.cs` (SkillLawWard),
 `Armoury/src/QuartermasterLaw.cs` (ShortageLines)
@@ -30,7 +56,7 @@ nie widze i nie zgaduje (CLAUDE.md 8.1).
 **Ryzyko / co sprawdzic:** jedna bitwa + jedno otwarcie zbrojowni. Porownac
 "PUSTE <typ>" z "papier <typ>" dla tego samego typu: rozne liczby ludzi (potrzeba vs
 dopasowanie liczy), rozna podaz, albo rozny skill tych samych oddzialow - jedno z trojga.
-**Status:** ZBUDOWANE, NIEWGRANE (gra otwarta) - do podmiany obu DLL przy zamknietej grze.
+**Status:** WGRANE 2026-09-15 (CrashScribe md5 bbeb6c8643ad8d67ee1ab968bb754ad4, Armoury md5 858b39c49a160b4a9f4da77fc3ab82a7, repo i gra zgodne).
 
 
 ## 2026-09-15 - Kucie: Done od razu - nazwa wyrobu zgodna z regula vanilli (bez podwojnej spacji, do 50 znakow)
