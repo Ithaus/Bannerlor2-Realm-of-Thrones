@@ -2259,35 +2259,43 @@ namespace CrashScribe
         {
             try
             {
-                int fixedN = 0, seen = 0;
+                int fixedN = 0, seen = 0, fixedSkills = 0;
                 foreach (var co in TaleWorlds.ObjectSystem.MBObjectManager.Instance
                              .GetObjectTypeList<CharacterObject>())
                 {
                     if (co == null || co.IsHero) continue;
-                    int maxDiff = 0;
+                    // KAZDY SLOT, KAZDA UMIEJETNOSC (Jeff 15.09: "po werbunku oddaje mi
+                    // swoj sprzet, bo nie spelnia wymagan - nie zmieniaj sprzetu, podnies
+                    // umiejetnosci, zeby DEFAULTOWY sprzet spelnial wymagania i postac
+                    // wygladala jak w defaulcie"). Dotad podbijalismy WYLACZNIE Atletyke
+                    // pod pancerz (sloty 5-9). Straznik w bitwie (SkillLawWard) sprawdza
+                    // tymczasem sloty 0-9 i kon - bron, luk, kolczan, rumak - tym samym
+                    // ReqSkill/CanUse. Rekrut z mieczem ponad swoj OneHanded albo lukiem
+                    // ponad Bow tracil go w pierwszej bitwie, a sztuka szla na polke
+                    // i na liste gracza. Teraz: dla kazdej umiejetnosci osobno maksimum
+                    // Difficulty z WLASNYCH wzorcow bojowych, i raise-never-lower.
+                    var needBySkill = new System.Collections.Generic.Dictionary<SkillObject, int>();
                     try
                     {
                         foreach (var eq in co.BattleEquipments)
                         {
                             if (eq == null) continue;
-                            for (int s = 5; s <= 9; s++)     // Head/Body/Leg/Gloves/Cape
+                            for (int s = 0; s <= 11; s++)
                             {
-                                var it = eq[(EquipmentIndex)s].Item;
-                                if (it != null && it.Difficulty > maxDiff) maxDiff = it.Difficulty;
+                                if (s == 4) continue;                      // sztandar
+                                ItemObject it;
+                                try { it = eq[(EquipmentIndex)s].Item; } catch { continue; }
+                                if (it == null || it.Difficulty <= 0) continue;
+                                var rs = ReqSkill(it);
+                                if (rs == null) continue;
+                                int cur; needBySkill.TryGetValue(rs, out cur);
+                                if (it.Difficulty > cur) needBySkill[rs] = it.Difficulty;
                             }
                         }
                     }
                     catch { }
-                    if (maxDiff <= 0) continue;
+                    if (needBySkill.Count == 0) continue;
                     seen++;
-                    int ath = co.GetSkillValue(DefaultSkills.Athletics);
-                    if (ath >= maxDiff) continue;
-                    // SUFIT TIERU USUNIETY (Jeff 01.09: bandyci "biegaja z golymi
-                    // klatami" - sufit 20+30*tier blokowal im WLASNE mundury po
-                    // Prawie Wagi, a degradacja klonowala wyglad). Dyrektywa
-                    // Jeffa: jednostka dostaje skill DO SWOJEGO sprzetu - raise,
-                    // never lower, bez wyjatkow.
-                    int target = maxDiff;
                     var skills = co.GetDefaultCharacterSkills();
                     var owner = skills != null ? skills.Skills : null;
                     var mSet = owner != null ? AccessTools.Method(owner.GetType(), "SetPropertyValue") : null;
@@ -2296,13 +2304,22 @@ namespace CrashScribe
                         Scribe.Line("Mends: SkillSinew - brak Skills/SetPropertyValue na " + co.StringId + ", mend spi.");
                         return;
                     }
-                    mSet.Invoke(owner, new object[] { DefaultSkills.Athletics, target });
-                    fixedN++;
-                    if (maxDiff - ath >= 50)
-                        Scribe.Line("Mends: " + co.StringId + " (tier " + co.Tier + ") - Atletyka "
-                                    + ath + " -> " + target + " (mundur difficulty " + maxDiff
-                                    + ").");
-
+                    bool touched = false;
+                    foreach (var kv in needBySkill)
+                    {
+                        int have = co.GetSkillValue(kv.Key);
+                        if (have >= kv.Value) continue;
+                        // SUFIT TIERU USUNIETY (Jeff 01.09: bandyci "biegaja z golymi
+                        // klatami" - sufit 20+30*tier blokowal im WLASNE mundury po
+                        // Prawie Wagi). Dyrektywa Jeffa: jednostka dostaje skill DO
+                        // SWOJEGO sprzetu - raise, never lower, bez wyjatkow.
+                        mSet.Invoke(owner, new object[] { kv.Key, kv.Value });
+                        fixedSkills++; touched = true;
+                        if (kv.Value - have >= 50)
+                            Scribe.Line("Mends: " + co.StringId + " (tier " + co.Tier + ") - " + kv.Key.Name
+                                        + " " + have + " -> " + kv.Value + " (wlasny sprzet difficulty " + kv.Value + ").");
+                    }
+                    if (touched) fixedN++;
                 }
                 // NOWA GRA (31.08): na swiezej kampanii SessionLaunched biegnie
                 // ZANIM ekwipunki jednostek sie zmaterializuja - wtedy seen == 0
@@ -2311,8 +2328,8 @@ namespace CrashScribe
                 if (seen == 0)
                     Scribe.Line("Mends: SkillSinew - ekwipunki jeszcze niezaladowane (nowa gra), powtorze z pierwszym dniem.");
                 else
-                    Scribe.Line("Mends: SkillSinew - Atletyka podbita " + fixedN
-                            + " jednostkom do poziomu wlasnego munduru (bez sufitu - raise, never lower).");
+                    Scribe.Line("Mends: SkillSinew - " + fixedN + " jednostkom podbito " + fixedSkills
+                            + " umiejetnosci do poziomu WLASNEGO sprzetu (wszystkie sloty, bez sufitu - raise, never lower).");
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.SkillSinew", null); } catch { } }
         }

@@ -1,5 +1,32 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-15 - Rekrut oddawal swoj sprzet po werbunku: SkillSinew podbija teraz KAZDA umiejetnosc, nie tylko Atletyke
+**Mod:** CrashScribe | **Pliki:** `CrashScribe/src/Mends.cs` (SkillSinew)
+**Zgloszenie (Jeff):** "jak werbuje wojsko z wioski, to po werbunku oddaje mi swoj
+sprzet, bo nie spelnia wymagan. Nie zmieniaj sprzetu - podnies umiejetnosci, zeby
+DEFAULTOWY sprzet spelnial wymagania i postac wygladala jak w defaulcie".
+**Przyczyna (nasz kod):** `Mends.SkillSinew` podbijal jednostkom WYLACZNIE Atletyke,
+i tylko pod pancerz (sloty 5-9). Tymczasem straznik w bitwie `Mends.SkillLawWard`
+(postfix na DTE `DoAssignAsync`) sprawdza sloty 0-9 i konia tym samym `ReqSkill`/`CanUse`:
+miecz -> OneHanded, luk -> Bow, kolczan -> Bow, rumak -> Riding. Rekrut, ktorego wzorcowy
+miecz/luk/kon mial Difficulty ponad jego skill, tracil go w pierwszej bitwie: sztuka
+wracala na polke (`AddEquipmentToAssign`), a przy porzadku w skarbcu ladowala na liscie
+gracza jako "nikt nie nosi". Skala z dzisiejszego logu, partia gracza:
+`swieta zasada skilli w DTE [Ithauser's Party, 1586 slotow]: 1148 sztuk przelozonych
+wedle skilla, 104 luk zapelnionych z polki, 69 slotow PUSTYCH`.
+**Zmiana:** `SkillSinew` liczy dla kazdej jednostki maksimum Difficulty z JEJ WLASNYCH
+wzorcow bojowych osobno per umiejetnosc (sloty 0-11 bez sztandaru, `ReqSkill`) i podnosi
+kazda brakujaca umiejetnosc do tego poziomu. Raise-never-lower, bez sufitu tieru
+(dyrektywa Jeffa 01.09). Sprzet jednostek NIETKNIETY.
+**Ryzyko / co sprawdzic:** (1) jednostki ROT z bronia "na wyrost" dostana wyzsze skille
+bojowe - to zamierzone (Jeff: "podnies umiejetnosci"), ale bedzie widac w sile jednostek;
+(2) po wczytaniu w logu CrashScribe wiersz "Mends: SkillSinew - N jednostkom podbito M
+umiejetnosci ..." oraz wpisy per jednostka przy skoku >= 50; (3) w bitwie liczba
+"slotow PUSTYCH" i "przelozonych" powinna wyraznie spasc. Straznik nadal PRZEKLADA sprzet
+miedzy ludzmi wedle skilla (najsilniejszy pierwszy) - to osobna regula z 14.09, nie ruszona.
+**Status:** WGRANE 2026-09-15 (md5 2d6a34a2e74fbb6af7eb7f28d455aa39, repo i gra zgodne).
+
+
 ## 2026-09-15 - Kwatermistrz: "wrzucam pancerz, brak znika; wyjmuje, wraca" - dwa mechanizmy potwierdzone, jeden NIE, diagnostyka do rozstrzygniecia
 **Mod:** Armoury | **Pliki:** `Armoury/src/QuartermasterLaw.cs`
 **Zgloszenie (Jeff):** "jak wrzucam pancerz, to pokazuje, ze nie ma brakow; jak go
