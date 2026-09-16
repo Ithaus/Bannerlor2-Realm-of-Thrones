@@ -52,6 +52,38 @@ namespace Armoury
             catch { return false; }
         }
 
+        /// <summary>Do logu (16.09): wszystkie rozkazy "jednostka|slot=item", max n.</summary>
+        internal static string DescribePins(int max)
+        {
+            try
+            {
+                var self = Instance;
+                if (self == null || self._pins.Count == 0) return "";
+                var parts = new List<string>();
+                foreach (var kv in self._pins)
+                {
+                    if (parts.Count >= max) { parts.Add("... (" + self._pins.Count + " razem)"); break; }
+                    string troop = kv.Key, slotName = "?";
+                    int bar = kv.Key.LastIndexOf('|');
+                    if (bar > 0)
+                    {
+                        troop = kv.Key.Substring(0, bar);
+                        int sl;
+                        if (int.TryParse(kv.Key.Substring(bar + 1), out sl)) slotName = SlotName(sl);
+                        try
+                        {
+                            var ch = TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObject<CharacterObject>(troop);
+                            if (ch != null) troop = ch.Name.ToString();
+                        }
+                        catch { }
+                    }
+                    parts.Add(troop + "|" + slotName + "=" + kv.Value);
+                }
+                return string.Join(", ", parts.ToArray());
+            }
+            catch { return "?"; }
+        }
+
         internal static ItemObject PinFor(CharacterObject troop, int slot)
         {
             try

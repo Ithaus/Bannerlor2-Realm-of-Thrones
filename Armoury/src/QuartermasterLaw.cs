@@ -415,6 +415,15 @@ namespace Armoury
                 if (s == null || !s.QuartermasterPurgeUnusable || armory == null) return 0;
                 var names = new List<string>();
                 var perType = new List<string>();
+                // 16.09: rozkazy z ksiegi musztry do logu - dotad nie bylo po nich sladu
+                var pinnedWorn = new List<string>();
+                int pinnedKept = 0;
+                try
+                {
+                    string pins = MusterBook.DescribePins(12);
+                    if (pins.Length > 0) Log.Info("Kwatermistrz: rozkazy z ksiegi musztry: " + pins + ".");
+                }
+                catch { }
                 foreach (var type in KitTypes)
                 {
                     var f = FitFor(armory, type);
@@ -428,7 +437,20 @@ namespace Armoury
                         var it = kv.Key.Item;
                         if (kv.Value == 0 || it == null) continue;
                         string id = it.StringId ?? "";
-                        if (MusterBook.IsPinnedItem(id)) continue;   // rozkaz z ksiegi swiety
+                        // ROZKAZ Z KSIEGI (Jeff 16.09: "wrzucilem 54 Weirwood i 38 Ravens Teeth,
+                        // zamknalem i otworzylem stash - nie zniknely"): dotad CALA pozycja
+                        // z rozkazem byla tu pomijana, wiec wklad gracza z rozkazem nigdy nie
+                        // schodzil na stan wojska - papier 11:44 "weirwood_bow uzyte=54/54
+                        // (gracza 54)", a w porzadku Bow same plusy; escrow pokazywal je dalej
+                        // jako jego. Od teraz sztuki NOSZONE (delta ujemna) przechodza na stan
+                        // wojska jak kazde inne i znikaja z listy gracza. Rozkaz chroni tylko
+                        // "nienoszone" przed oddaniem na liste gracza (czekaja w magazynie na
+                        // ludzi z rozkazem) - i jak dawniej przed przycinaniem (TrimWarStores).
+                        if (MusterBook.IsPinnedItem(id))
+                        {
+                            if (kv.Value > 0) { pinnedKept += kv.Value; continue; }
+                            if (!pinnedWorn.Contains(id)) pinnedWorn.Add(id);
+                        }
                         int acc; perId.TryGetValue(id, out acc); perId[id] = acc + kv.Value;
                         nameOf[id] = it.Name.ToString();
                     }
@@ -460,6 +482,10 @@ namespace Armoury
                                  + (perId.Count > 10 ? ", ..." : ""));
                     }
                 }
+                if (pinnedWorn.Count > 0 || pinnedKept > 0)
+                    Log.Info("Kwatermistrz: rozkazy - noszone z rozkazem na stan wojska: "
+                             + (pinnedWorn.Count > 0 ? string.Join(", ", pinnedWorn.ToArray()) : "(brak)")
+                             + "; nienoszone z rozkazem zostaja na stanie: " + pinnedKept + " szt.");
                 if (toPlayer > 0 || toMen > 0)
                 {
                     if (toPlayer > 0)
