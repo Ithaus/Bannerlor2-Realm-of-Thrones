@@ -68,7 +68,18 @@ przywrocic 433 i odlozyc 194, czy zostawic i patrzec, co AIInfluence zrobi przy 
 ogony ostatnich zapisow przed wyjsciem z gry (wszystkie dzisiejsze ofiary maja mtime 15.09 12:49-17:29) - kazde
 wyjscie z gry to loteria, backup na D: robic PRZED uruchomieniem gry, nie po; (d) stary klon
 `C:\Users\GAME\westeros-mods` (26.08) tez ma zepsuty obiekt - nieuzywany, zostawiony.
-**Status:** DO SPRAWDZENIA - czeka na start gry przez Jeffa.
+**Status:** WGRANE - gra WSTALA 16.09 05:23. Dowod: `session-2026-09-16_05-23-05.log` bez `XmlException`, RBM
+przepisal swoj `config.xml` o 05:24 (8583 B, XML OK, md5 ec8ef284), kampania IronmanPEh4X2ByGArW wczytana 05:25,
+kronika/fabula 05:29, Armoury i stajnie AI pisza 05:30. Trzy wyjatki BKROTPatch
+(`DynamicPartySizePerformancePatch::TargetMethod` null) to stary szum - sa w sesjach 14-15.09.
+NOWE (skutek dysku, nie crash): 8x `Newtonsoft.Json.JsonReaderException` z AIInfluence -
+`CampaignDiplomacyPersistence.LoadBundle` pada na pozycji 4096 (obciety `aiinfluence_campaign_diplomacy.json`),
+`LoadAllNPCsForEvent`/`LoadNPCContext` na pozycjach 4096/8194/13265/28673/32773 (obciete pliki lordow). Mod je
+lapie i gra idzie dalej, ale przy wczytaniu zrobil auto-restore z WLASNEGO snapshotu (tez uszkodzonego: 301 z 391
+plikow z ogonem zer) i 84 lordow dostalo pusty rekord `Unknown_NPC`. Decyzja Jeffa jak w (b). Procedura, jesli
+przywracac: gra ZAMKNIETA, zdrowe kopie z graveyard 04-04 wgrac do OBU folderow (`save_data\PEh4X2ByGArW\` i
+`save_snapshots\IronmanPEh4X2ByGArW\`), bo mod przy kazdym wczytaniu nadpisuje root snapshotem, a przy kazdym
+zapisie gry robi nowy snapshot z roota.
 
 
 ## 2026-09-16 - Crash przy starcie po chkdsk: Claude zdalny bez dostepu do dysku C - skrypt diagnostyczny + ustalenia z repo
