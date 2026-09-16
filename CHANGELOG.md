@@ -7,7 +7,7 @@
 **Czego z logu NIE widac:** papier byl wypisywany tylko dla pancerzy - dla lukow nie ma linii "potrzeba/polka/udzwigna" ani tego, KTORE luki poszly do ludzi i z jakim wymogiem. Nie da sie rozstrzygnac, czy Weirwood przegrywa z longbowami na skutecznosc, czy nikt nie ma 140.
 **Zmiana (tylko log):** `ShortageLines` wypisuje `Kwatermistrz: papier <typ>: potrzeba/polka/udzwigna/bez sztuki` dla KAZDEGO typu kitu (dotad 5 typow pancerza), a dla broni strzeleckiej (Bow, Crossbow, Arrows, Bolts, Thrown) dodatkowo rozklad skilla ludzi (`Skill Bow ludzi: 12x140 3x130 ...`) i druga linie z podaza w kolejnosci wyboru: `id(mod) wymog=140 skut=87 t5 uzyte=0/56 (gracza 56), ...` (do 14 pozycji). Zero zmian w logice przydzialu.
 **Ryzyko / co sprawdzic:** dwie-trzy linie wiecej na otwarcie zbrojowni. Po nastepnym otwarciu zbrojowni przez Jeffa: linia `papier Bow` pokaze wymog Weirwood po prawie tieru, skutecznosc obok longbowow RBM i ilu ludzi ma 140. Dopiero wtedy decyzja: zmiana kolejnosci wyboru (tier/wartosc przed skutecznoscia RBM) albo pin w ksiedze musztry.
-**Status:** ZBUDOWANE (Armoury.dll md5 16ba7dd69f0fcd94144602cd89aefcac), DO WGRANIA po zamknieciu gry.
+**Status:** WGRANE 2026-09-16 (Armoury.dll md5 16ba7dd69f0fcd94144602cd89aefcac, repo i gra zgodne; poprzedni DLL obok jako `Armoury.dll.bak-2026-09-16-przed-papierem`). DO SPRAWDZENIA: linia `Kwatermistrz: papier Bow` po otwarciu zbrojowni.
 
 
 ## 2026-09-16 - Zew Nocnego Krola: bandy Innych zlewaja trupy w jedna, zeby przekroczyc prog oblezenia ROT (500 zdrowych); premia limitu hordy przycieta
