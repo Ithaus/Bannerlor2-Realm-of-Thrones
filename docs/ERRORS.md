@@ -166,3 +166,27 @@ Regula: zanim zalatasz metode cudzej/vanillowej klasy, sprawdz jej konstruktor
 statyczny. Jesli siega do `Game.Current`, `Campaign.Current` albo menedzerow gry -
 albo znajdz inne miejsce zaczepienia, albo wymus `RuntimeHelpers.RunClassConstructor`
 w chwili, gdy te obiekty NA PEWNO istnieja (`OnSessionLaunched`).
+
+---
+
+## Zachowania cudzych modow, ktore wygladaja na bledy, a NIE sa (16.09.2026)
+
+### Karawana Tyriona "nic nie zarabia" - Banner Kings Redux, ustawienie Realistic Caravan Income
+
+`BannerKings.Patches.EconomyPatches.AddIncomeFromPartyPrefix`: dla partii `IsCaravan` zwraca
+`!RealisticCaravanIncome`, czyli przy wlaczonym ustawieniu (Jeff: `BannerKings.json` ->
+`"RealisticCaravanIncome": true`) vanillowy dzienny dochod z karawany
+(`(PartyTradeGold - 10000) / 10`) jest CALKOWICIE pomijany. Opis ustawienia w BK: "caravan
+profits will only be added when they enter a settlement owned by their owner, or where they are
+situated (ie, notables)" - rod bez wlasnego miasta nie zobaczy z karawany ani grosza.
+`BKClanFinanceModel.CalculateOwnerIncomeFromCaravan` tez zwraca 0 w tym trybie.
+Wyjscie: MCM -> Banner Kings -> Economy -> Realistic Caravan Income = OFF (RequireRestart=false),
+wtedy wraca dzienny dochod vanilla, gdy zloto handlowe karawany przekroczy 10000.
+
+### "Blad" przy propozycji malzenstwa Jonowi Snow - to przysiega Nocnej Strazy z ROT
+
+`ROT.dll`, tekst `{=ROTVxjbPNMV6N}`: "I shall take no wife, hold no lands, father no children.
+I shall wear no crowns and win no glory. I shall live and die at my post." - ROT tak odmawia
+malzenstwa czlonkom Nocnej Strazy. Po tej linii ROT nie ma dalszej sciezki dialogu, wiec nasz
+CrashScribe.DialogEscape wystawia "Let us talk" / "Farewell" (log 16.09 08:18-08:21: "rozmowa
+uratowana (1)..(3)"). Nie ma tu wyjatku w logach - to zamierzone zachowanie ROT.

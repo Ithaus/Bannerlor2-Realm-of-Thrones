@@ -9,7 +9,7 @@ ALE: `UniqueLaw: magazyny AI (wczytanie) - 11134 szt. unikatow zamienionych na z
 1. `FindParty(MBGUID)`: slownik `MobileParty.All` po `Id`, odswiezany przy chybieniu - uzywany w sweepie magazynow AI, w naborze (`IntakeAi`) i w przebraniu.
 2. `RedressAiArmories()` JEDNORAZOWO (flaga `armouryUniqueLawAiRedress` w save): w kazdym magazynie AI z rozpoznana partia zamienniki "bez kultury" (zbior = `StandInFor(unikat, null)` dla kazdego unikatu: bandit_hybrid_armor_*, tacky_bandit, arryn_chausses, padded_vambrace) ida jeszcze raz przez `StandInFor` z kultura partii; podmiana TYLKO gdy wynik jest w kulturze partii. Skutek uboczny: zwykle bandyckie sztuki tych id w magazynach lordow tez staja sie rodowe - na plus.
 **Ryzyko / co sprawdzic:** po wczytaniu w Armoury.log `UniqueLaw: przebranie magazynow AI po pierwszym wczytaniu - N szt. w M partiach ...` (spodziewane ~11 tys.) i zamienniki z kultura partii zamiast `(-)`. Raport dzienny `UniqueLaw (dzien)` u AI - juz z kultura. Jesli jakas partia nadal `(-)` = partia zniszczona, jej magazyn DTE sprzata co tydzien.
-**Status:** ZBUDOWANE (Armoury.dll md5 9afab885a65d3434468165bdfaa2a532), DO WGRANIA po zamknieciu gry.
+**Status:** WGRANE 2026-09-16 (Armoury.dll md5 9afab885a65d3434468165bdfaa2a532, repo i gra zgodne; poprzedni DLL obok jako `Armoury.dll.bak-2026-09-16-v1-unikaty`). DO SPRAWDZENIA po wczytaniu: linia `UniqueLaw: przebranie magazynow AI po pierwszym wczytaniu`.
 
 
 ## 2026-09-16 - Kucie broni o 80% krocej: 0.1 dnia na tier, minimum 0.1 dnia (bylo pol dnia); plik MCM z 14.09 mial jeszcze 0.5 dnia/tier
@@ -18,7 +18,7 @@ ALE: `UniqueLaw: magazyny AI (wczytanie) - 11134 szt. unikatow zamienionych na z
 **Przyczyna:** (1) przywrocony dzis z graveyard `Armoury.json` (wersja 14.09 10:24) ma `WeaponDaysPerTier: 0.5`, a wpis z 14.09 zapowiadal 0.25 (watcher po zamknieciu gry) - wersja z 15.09 przepadla na dysku, wiec dzis bronie kuly sie 2x dluzej niz wczoraj; (2) kowal pracuje 5:00-23:00 i JEDNA sztuka naraz w osadzie (Jeff 28.08), wiec cztery miecze T3-T4 po 1.5-2 dnia roboczego = ~170 godzin realnych; (3) w kodzie sztywne minimum `MathF.Max(0.5f, tier * WeaponDaysPerTier)` w dwoch miejscach - przy 0.1 dnia/tier pol dnia podlogi zjadloby cala obnizke.
 **Zmiana:** domyslne `WeaponDaysPerTier` 0.5 -> 0.1; podloga 0.5 -> 0.1 dnia (`ArmouryBehavior.AdvanceProjects` i start projektu broni); `Armoury.json`: `WeaponDaysPerTier` 0.5 -> 0.1 (kopia `.bak-2026-09-16-kucie` przed zmiana, po zamknieciu gry). Miecz T4 = 0.4 dnia = ok. 10 godzin przy kowadle; cztery miecze = ok. 2 dni gry zamiast 7. Pancerze (`DaysPerTier` 1.0) bez zmian - Jeff mowil o mieczach.
 **Ryzyko / co sprawdzic:** w MCM Armoury suwak Weapon Days Per Tier = 0.1; biezace projekty w kolejce licza `DaysLeft` juz odjete - nowa wartosc dziala od nastepnego zlecenia (zegar tyka 1/24 dnia na godzine niezaleznie od suwaka). XP za kucie liczy sie od totalDays, wiec krotszy czas = mniej XP "w trakcie", reszta na koniec bez zmian.
-**Status:** ZBUDOWANE (Armoury.dll md5 9afab885a65d3434468165bdfaa2a532), DO WGRANIA po zamknieciu gry razem z Armoury.json.
+**Status:** WGRANE 2026-09-16 (ten sam Armoury.dll co wyzej; `Armoury.json` WeaponDaysPerTier 0.5 -> 0.1, kopia `Armoury.json.bak-2026-09-16-kucie`, JSON sprawdzony). DO SPRAWDZENIA: nowe zlecenie miecza w kuzni.
 
 
 ## 2026-09-16 - "Polowa wojska w pancerzu Ramsaya i Gory": unikaty imienne maja jednego wlasciciela - kopie zamieniane na sprzet wlasnej kultury, nabor do magazynow DTE zatkany u zrodla
