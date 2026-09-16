@@ -1,5 +1,44 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-16 - Crash przy starcie po chkdsk: Claude zdalny bez dostepu do dysku C - skrypt diagnostyczny + ustalenia z repo
+**Mod:** (narzedzie) | **Pliki:** `tools/diag-start-crash.ps1` (NOWY, tylko czyta)
+**Problem (Jeff):** po naprawie indeksow NTFS (`chkdsk /spotfix`, 0 bad sectors) LauncherData.xml
+zresetowany do 0 zaznaczonych; przywrocony z `.bak-2026-09-03-ai` (36) + AIInfluence,
+ROT_AIInfluence_Compat, VoiceActingPatch dopisane NA KONCU (45 wpisow, 39 zaznaczonych; kopia
+stanu po chkdsk: `.bak-2026-09-16-po-chkdsk`). Gra crashuje przy starcie/wczytaniu (okno BUTR
+"Bannerlord has encountered a problem"). Raportu crasha Claude zdalny NIE widzial.
+**Ustalenia z repo (sesja zdalna, bez dostepu do maszyny z gra):**
+1. Latka na ujemny zold najemnika (`Mends.MercenaryWageFloor`) w OSTATNIM wypchnietym stanie
+   (a416562, 15.09) jest WYLACZONA od 14.09 (520396d) - to wlasnie ona wywracala wczytywanie
+   zapisu (`TypeInitializationException` w `DefaultClanFinanceModel`, cctor siega do
+   `Game.Current`). Kazdy build CrashScribe z 15.09 ma w dzienniku md5 zgodne z gra. Jesli 16.09
+   byla sesja, ktora ja wlaczyla ponownie i zrobila commit - NIE MA go na GitHubie (na Windows:
+   `git log -3`, `git status`, md5 DLL gra vs repo - sekcja 9 skryptu).
+2. Kolejnosc z 03.09 (wpis "AI Influence 6.0.2"): AIInfluence i VoiceActingPatch TUZ ZA
+   ROT-Dragon, ROT_AIInfluence_Compat na samym koncu. Kopia `.bak-2026-09-03-ai` byla robiona
+   PRZED dopisaniem tych trzech, wiec dzisiejsze dopisanie na koncu to inna kolejnosc niz 03.09.
+3. Dysk C (PNY CS3140, 5% zycia) od 01.09 gubi ogony zapisow: plik w calosci z zer albo zera od
+   granicy 4096 B. 26.08 i 01.09 to samo dalo "Cannot load Armoury.dll" i dziure w configu RBM.
+   Dzisiejsze uszkodzenie indeksow NTFS to ten sam dysk - NAJPIERW szukac dziur z zer w DLL,
+   SubModule.xml i Configs, dopiero potem kolejnosci modow. Mirror na `D:\Backup-Bannerlord`
+   (tools/backup-bannerlord.ps1) ma dobre kopie do podmiany.
+**Zmiana:** `tools/diag-start-crash.ps1` - jeden przebieg, jeden plik raportu
+(`Documents\...\CrashScribe\diag-start-<data>.txt`): raporty BUTR html/zip (wyjatek, Involved
+Modules, Enhanced Stacktrace), ogon rgl_log, ModLogs od dzis, session-*.log CrashScribe,
+Armoury.log, LauncherData (kolejnosc/zaznaczenia/kopie/zera), SubModule.xml WSZYSTKICH modulow
+z kontrola: zaznaczony ma folder? zaleznosci wlaczone? kolejnosc LoadBefore/After? DLL z
+<SubModules> istnieje? plus reguly z 16.09 (latki ROT po ROT, Compat po AIInfluence); skan zer
+w DLL zaznaczonych modow / SubModule.xml / Configs / plikach Modules z ostatnich 3 dni
+(z informacja, czy kopia jest na D:); md5 naszych 5 DLL gra vs repo + git log/status;
+dziennik Windows (NTFS 55/98/130/140, bledy aplikacji Bannerlord/.NET).
+**Ryzyko / co sprawdzic:** skrypt NIC nie zmienia; uruchamiac przy zamknietym launcherze:
+`powershell -ExecutionPolicy Bypass -File tools\diag-start-crash.ps1`. NIE byl uruchomiony na
+Windows (kontener zdalny nie ma PowerShella) - pierwsze odpalenie moze wymagac poprawki skladni.
+**Galaz:** `claude/brave-meitner-rhef41` = czubek `claude/bannerlord-rot-setup-o75kvo` (a416562)
++ ten wpis. Cala praca 13-15.09 jest TYLKO na tej drugiej galezi; `main` stoi na 26.08.
+**Status:** DO SPRAWDZENIA (skrypt do uruchomienia przez Jeffa; naprawa dopiero po raporcie)
+
+
 ## 2026-09-15 - "Durne strzaly od razu mnie zabily": to dwa belty z kuszy (RBM), dziennik trafien mowi teraz kto, z czego i jak szybko
 **Mod:** Armoury | **Pliki:** `Armoury/src/HitScribe.cs`
 **Zgloszenie (Jeff):** "co to sa za durne strzaly, co zadaja takie obrazenia, od razu mnie zabily".
