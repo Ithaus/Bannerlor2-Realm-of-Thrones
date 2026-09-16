@@ -136,25 +136,71 @@ namespace Armoury
                 // przedmiotu sa swiete (Jeff: "nie moge dac luku ponad wymogi,
                 // opcja wyszarzona"): pin ponad skill jednostki jest pomijany
                 while (slots.Count < 4) slots.Add(null);
+                var pinned = new bool[4];
+                bool anyPin = false;
                 for (int s = 0; s < 4; s++)
                 {
                     var pin = MusterBook.PinFor(ch, s);
                     if (pin == null || !ItemReq.Meets(ch, pin)) continue;
-                    slots[s] = pin;
+                    slots[s] = pin; pinned[s] = true; anyPin = true;
                 }
-                // AUDYT 29.08: pin luku/kuszy nie moze zostac bez amunicji -
-                // dokladamy wzorcowy kolczan/sajdak w wolny slot
-                bool hasBow = false, hasXbow = false, hasArrows = false, hasBolts = false;
+                // ROZKAZ ZASTEPUJE LUK WZORCA, NIE DOKLADA (Jeff 16.09: "QM: 52 empty battle
+                // bow"). Ksiega musztry pokazuje sloty z szablonu XML (river_ranger:
+                // Weapon 2 = lowland longbow), a wzorzec tutaj klade luk w slocie 0,
+                // kolczany w 1-2, miecz w 3. Rozkaz "Weapon 2 = weirwood_bow" trafial wiec
+                // OBOK luku wzorca, na miejsce kolczanu: [luk, weirwood, strzaly, miecz] -
+                // dwa luki, jeden kolczan. Straz skilli (CrashScribe, 12:14-12:30) liczyla
+                // drugi luk jako pusty slot ("PUSTE Bow: 11x Tully Longbowman, 28x Riverlands
+                // Ranger, 16x Mallister Elite Archer" = wszyscy ludzie trzech oddzialow
+                // z rozkazem), a DTE wydawal dwa luki jednemu. Rozkaz na luk/kusze czysci
+                // inny, nie-rozkazany luk/kusze; wolne sloty dopelniamy amunicja do dwoch
+                // kolczanow, potem bronia boczna wzorca. Bez rozkazu - jak dawniej.
+                if (anyPin)
+                {
+                    for (int s = 0; s < 4; s++)
+                    {
+                        if (!pinned[s] || slots[s] == null) continue;
+                        var tp = slots[s].ItemType;
+                        if (tp != ItemObject.ItemTypeEnum.Bow && tp != ItemObject.ItemTypeEnum.Crossbow) continue;
+                        for (int q = 0; q < 4; q++)
+                        {
+                            if (q == s || pinned[q] || slots[q] == null) continue;
+                            var tq = slots[q].ItemType;
+                            if (tq == ItemObject.ItemTypeEnum.Bow || tq == ItemObject.ItemTypeEnum.Crossbow) slots[q] = null;
+                        }
+                    }
+                }
+                // AUDYT 29.08: pin luku/kuszy nie moze zostac bez amunicji - dokladamy
+                // wzorcowy kolczan/sajdak w wolny slot (16.09: przy rozkazie do DWOCH,
+                // tyle daje wzorzec; bez rozkazu jak dawniej - tylko gdy nie ma zadnego)
+                bool hasBow = false, hasXbow = false; int nArrows = 0, nBolts = 0;
                 foreach (var it0 in slots)
                 {
                     if (it0 == null) continue;
                     if (it0.ItemType == ItemObject.ItemTypeEnum.Bow) hasBow = true;
                     else if (it0.ItemType == ItemObject.ItemTypeEnum.Crossbow) hasXbow = true;
-                    else if (it0.ItemType == ItemObject.ItemTypeEnum.Arrows) hasArrows = true;
-                    else if (it0.ItemType == ItemObject.ItemTypeEnum.Bolts) hasBolts = true;
+                    else if (it0.ItemType == ItemObject.ItemTypeEnum.Arrows) nArrows++;
+                    else if (it0.ItemType == ItemObject.ItemTypeEnum.Bolts) nBolts++;
                 }
-                if (hasBow && !hasArrows) FillFree(slots, ItemObject.ItemTypeEnum.Arrows, SkillFor(ch, "bow"));
-                if (hasXbow && !hasBolts) FillFree(slots, ItemObject.ItemTypeEnum.Bolts, SkillFor(ch, "xbow"));
+                int wantAmmo = anyPin ? 2 : 1;
+                for (int k = nArrows; hasBow && k < wantAmmo; k++) FillFree(slots, ItemObject.ItemTypeEnum.Arrows, SkillFor(ch, "bow"));
+                for (int k = nBolts; hasXbow && k < wantAmmo; k++) FillFree(slots, ItemObject.ItemTypeEnum.Bolts, SkillFor(ch, "xbow"));
+                // wolny slot po rozkazie: bron boczna wzorca (miecz lucznika), gdy zadnej nie ma
+                if (anyPin && second != null && slots.Contains(null))
+                {
+                    bool melee = false;
+                    foreach (var it0 in slots)
+                        if (it0 != null && (it0.ItemType == ItemObject.ItemTypeEnum.OneHandedWeapon
+                                            || it0.ItemType == ItemObject.ItemTypeEnum.TwoHandedWeapon
+                                            || it0.ItemType == ItemObject.ItemTypeEnum.Polearm)) melee = true;
+                    if (!melee)
+                    {
+                        var tmp = new List<ItemObject>();
+                        AddWeaponFor(tmp, second, SkillFor(ch, second));
+                        int free = slots.IndexOf(null);
+                        if (tmp.Count > 0 && tmp[0] != null && free >= 0) slots[free] = tmp[0];
+                    }
+                }
 
                 for (int i = 0; i < 4; i++)
                     reference[(EquipmentIndex)i] = i < slots.Count && slots[i] != null
