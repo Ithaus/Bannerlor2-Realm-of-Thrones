@@ -330,10 +330,12 @@ namespace Armoury
                 if (men.Count > 0)
                 {
                     if (skill != null) men.Sort((a, b) => b.GetSkillValue(skill).CompareTo(a.GetSkillValue(skill)));
+                    // 16.09: przy rownym wymogu ranga wg RangedRank (pod RBM naciag z runtime,
+                    // nie stara skutecznosc z XML - patrz RangedRank.cs)
                     supply.Sort((a, b) =>
                     {
                         int d = b.El.Item.Difficulty.CompareTo(a.El.Item.Difficulty);
-                        return d != 0 ? d : b.El.Item.Effectiveness.CompareTo(a.El.Item.Effectiveness);
+                        return d != 0 ? d : RangedRank.Key(b.El.Item).CompareTo(RangedRank.Key(a.El.Item));
                     });
                     foreach (var man in men)
                     {
@@ -367,7 +369,7 @@ namespace Armoury
                             var it = sp.El.Item;
                             var mod = sp.El.ItemModifier;
                             f.Detail.Add(it.StringId + (mod != null ? "(" + mod.StringId + ")" : "") + " wymog=" + it.Difficulty
-                                         + " skut=" + it.Effectiveness.ToString("0") + " t" + ((int)it.Tier + 1)
+                                         + " " + RangedRank.Describe(it) + " t" + ((int)it.Tier + 1)
                                          + " uzyte=" + sp.Used + "/" + sp.Total + (sp.Barred ? " WYKL" : "") + (sp.Own > 0 ? " (gracza " + sp.Own + ")" : ""));
                         }
                         if (skill != null && men.Count > 0)
@@ -540,7 +542,7 @@ namespace Armoury
                     if (fit.Detail.Count > 0)
                     {
                         var top = fit.Detail.Count > 14 ? fit.Detail.GetRange(0, 14) : fit.Detail;
-                        Log.Info("Kwatermistrz: papier " + type + " po kolei wyboru (wymog malejaco, potem skutecznosc): "
+                        Log.Info("Kwatermistrz: papier " + type + " po kolei wyboru (wymog malejaco, potem " + (RangedRank.RbmLoaded ? "naciag RBM" : "skutecznosc") + "): "
                                  + string.Join(", ", top.ToArray()) + (fit.Detail.Count > 14 ? ", ... (" + fit.Detail.Count + " pozycji)" : "") + ".");
                     }
                     if (have < need)

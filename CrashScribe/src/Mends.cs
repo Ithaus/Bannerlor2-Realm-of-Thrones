@@ -1093,6 +1093,27 @@ namespace CrashScribe
         private static System.Reflection.MethodInfo _mIsTemp;
 
         /// <summary>Grupa dopasowania: typ + klasa broni (miecz za miecz, strzaly za strzaly, helm za helm).</summary>
+        // RANGA LUKU/KUSZY POD RBM (Jeff 16.09) - to samo co Armoury.RangedRank.Key,
+        // trzymac w zgodzie: przy rownym wymogu decyduje NACIAG z runtime
+        // (PrimaryWeapon.MissileSpeed = funty w RBM; ROT nadpisuje swoje luki w locie,
+        // a vanillowe Effectiveness jest liczone raz, ze starych XML), potem dmg,
+        // potem stara skutecznosc. Bez RBM - skutecznosc jak dawniej.
+        private static int _rbmLoaded = -1;
+        private static long RangedKey(ItemObject it)
+        {
+            if (it == null) return long.MinValue;
+            try
+            {
+                if (_rbmLoaded < 0) { try { _rbmLoaded = AccessTools.TypeByName("RBM.SubModule") != null ? 1 : 0; } catch { _rbmLoaded = 0; } }
+                bool bowLike = it.ItemType == ItemObject.ItemTypeEnum.Bow || it.ItemType == ItemObject.ItemTypeEnum.Crossbow;
+                if (_rbmLoaded != 1 || !bowLike || it.PrimaryWeapon == null) return (long)(it.Effectiveness * 100f);
+                var w = it.PrimaryWeapon;
+                float eff = it.Effectiveness; if (eff < 0f) eff = 0f; if (eff > 999f) eff = 999f;
+                return (long)w.MissileSpeed * 1000000L + (long)w.ThrustDamage * 1000L + (long)eff;
+            }
+            catch { return 0; }
+        }
+
         private static string WardGroup(ItemObject it)
         {
             var wc = it.PrimaryWeapon != null ? it.PrimaryWeapon.WeaponClass : WeaponClass.Undefined;
@@ -1294,7 +1315,7 @@ namespace CrashScribe
                     {
                         int c = y.El.Item.Difficulty.CompareTo(x.El.Item.Difficulty);
                         if (c != 0) return c;
-                        c = y.El.Item.Effectiveness.CompareTo(x.El.Item.Effectiveness);
+                        c = RangedKey(y.El.Item).CompareTo(RangedKey(x.El.Item));   // 16.09: naciag RBM zamiast starej skutecznosci
                         if (c != 0) return c;
                         return x.FromPool.CompareTo(y.FromPool);               // przy rownych: noszona zostaje na ludziach
                     });

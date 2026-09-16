@@ -384,7 +384,8 @@ namespace Armoury
                         if (GiantGear.Is(it)) continue;                          // maczugi olbrzymow tez nie (Jeff 14.09)
                         if (it.NotMerchandise) continue;                         // unikaty imienne i itemy testowe
                         if (it.StringId != null && it.StringId.StartsWith("dragon_")) continue;
-                        if (best == null || it.Effectiveness > best.Effectiveness) best = it;
+                        // 16.09: luki/kusze wg RangedRank (pod RBM naciag), reszta jak dawniej
+                        if (best == null || RangedRank.Key(it) > RangedRank.Key(best)) best = it;
                     }
                 }
                 catch (Exception e) { ok = false; Log.Error("SkillsDecide.AddPattern", e); }
