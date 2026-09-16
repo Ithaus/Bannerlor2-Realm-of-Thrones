@@ -1,7 +1,7 @@
 # DZIENNIK ZMIAN
 
 ## 2026-09-16 - Crash przy starcie po chkdsk: Claude zdalny bez dostepu do dysku C - skrypt diagnostyczny + ustalenia z repo
-**Mod:** (narzedzie) | **Pliki:** `tools/diag-start-crash.ps1` (NOWY, tylko czyta)
+**Mod:** (narzedzie) | **Pliki:** `tools/diag-start-crash.ps1` (NOWY, tylko czyta), `docs/ZADANIE-2026-09-16-crash-po-chkdsk.md` (NOWY - pelna tresc zadania A-D dla sesji lokalnej)
 **Problem (Jeff):** po naprawie indeksow NTFS (`chkdsk /spotfix`, 0 bad sectors) LauncherData.xml
 zresetowany do 0 zaznaczonych; przywrocony z `.bak-2026-09-03-ai` (36) + AIInfluence,
 ROT_AIInfluence_Compat, VoiceActingPatch dopisane NA KONCU (45 wpisow, 39 zaznaczonych; kopia
