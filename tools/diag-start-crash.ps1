@@ -35,9 +35,9 @@ if (-not $Out) { $Out = Join-Path $Docs "CrashScribe\diag-start-$stamp.txt" }
 
 $script:lines = New-Object System.Collections.Generic.List[string]
 function W { param([string]$s = '') $script:lines.Add($s); Write-Host $s }
-function H { param([string]$t) W ''; W ('=' * 78); W "== $t"; W ('=' * 78) }
+function Naglowek { param([string]$t) W ''; W ('=' * 78); W "== $t"; W ('=' * 78) }
 function Sekcja { param([string]$title, [scriptblock]$body)
-    H $title
+    Naglowek $title
     try { & $body } catch { W "  !! BLAD sekcji '$title': $($_.Exception.GetType().Name): $($_.Exception.Message)" }
 }
 function Fmt-Time { param($t) if ($t) { return ('{0:yyyy-MM-dd HH:mm:ss}' -f $t) } else { return '?' } }
@@ -321,6 +321,8 @@ Sekcja '7. KONTROLA: zaznaczone mody vs foldery, zaleznosci, kolejnosc, DLL' {
             if ($dp.Ver -and $script:mods.ContainsKey($did)) { $have = $script:mods[$did].Ver; if ($have -and ($dp.Ver -ne $have)) { W "  INFO  #$($o.Idx) $id chce '$did' $($dp.Ver), jest $have (sprawdz, czy to problem)" } }
         }
         foreach ($dll in $r.Dlls) {
+            # DLL platform konsolowych (PS/GDK) nigdy nie ma na PC - to nie blad
+            if ($dll -match '^TaleWorlds\.MountAndBlade\.Platform\.(PS|GDK)\.dll$') { continue }
             $dp1 = Join-Path $r.Path "bin\Win64_Shipping_Client\$dll"
             if (-not (Test-Path -LiteralPath $dp1)) { W "  BLAD  #$($o.Idx) $id : brak DLL $dp1"; $errs++ }
         }

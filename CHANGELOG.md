@@ -1,5 +1,76 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-16 - Crash przy starcie po chkdsk ROZSTRZYGNIETY: dysk wyzerowal naglowek Configs\RBM\config.xml (+4 inne pliki), repo git tez podziurawione - przywrocone z D: i z GitHuba
+**Mod:** (konfiguracja gry + repo + narzedzie) | **Pliki:** `Configs\RBM\config.xml`, `Configs\ModSettings\Global\Armoury\Armoury.json`, `Configs\DynamicReinforcements.cfg`, `Modules\VoiceActingPatchRemake\FishStickyVoices.json`, `tools/diag-start-crash.ps1` (poprawka), 9 plikow `*/src/*.cs` w repo (tresc bez zmian)
+**Problem (dowod z logu):** oba dzisiejsze logi CrashScribe (`session-2026-09-16_04-12-20.log`, `session-2026-09-16_04-13-07.log`) koncza sie tym samym:
+```
+TYPE    : System.Xml.XmlException
+MESSAGE : Root element is missing.
+  at RBMConfig.RBMConfig.LoadConfig() ... RBMConfig.cs:line 76
+  at RBM.SubModule.OnSubModuleLoad()
+  at TaleWorlds.MountAndBlade.Module.InitializeSubModuleBases_Patch1
+```
+Dziennik Windows: `Application Error` dla `Bannerlord.BLSE.LauncherEx.exe` 04:12:35 i 04:13:41, kod 0xe0434352
+(wyjatek .NET) - to jest okno BUTR. Raportu BUTR html/zip nigdzie nie ma (Pulpit/Documents/Downloads),
+`rgl_log_*.txt` tez nie ma (ani w `Documents\...\logs`, ani w `bin` gry). Zadnego `TypeInitializationException`
+ani `DefaultClanFinanceModel` w logach - to NIE jest latka zoldu.
+**Przyczyna:** wzorzec C (dysk). `Configs\RBM\config.xml` (8583 B, mtime 15.09 14:14 = ostatnie wyjscie z gry)
+ma pierwsze 4096 B z zer, RBM czyta go w `OnSubModuleLoad` i wywala sie na pustym XML. Mirror
+`D:\Backup-Bannerlord\Documents` z 04:04 skopiowal juz wersje uszkodzona; zdrowa (md5 ec8ef284, tresc identyczna
+od 01.09) lezala w `graveyard\2026-09-16_04-04-Documents`.
+Skan zer (`tools/diag-start-crash.ps1`, sekcja 8) znalazl tez: `Armoury.json` (MCM, 9875 B SAMYCH zer, tak samo
+`.bak-2026-09-15` i kopia na D:), `DynamicReinforcements.cfg` (1050 B zer), `FishStickyVoices.json` (ogon 4096 B
+zer) i 627 plikow JSON AIInfluence `save_data\PEh4X2ByGArW` z ogonem 4096 B zer (325 zywych + 302 w
+`save_snapshots`, w tym `aiinfluence_campaign_diplomacy.json` 431 KB; mtime 15.09 17:26-17:29). Zapisy gry (6
+najnowszych .sav, w tym `IronmanPEh4X2ByGArW.sav` 15.09 17:29) - bez ciagow zer. DLL zaznaczonych modow i
+wszystkie SubModule.xml - zdrowe.
+Repo git na C: tez oberwalo: `multi-pack-index` i 18 luznych obiektow same zera, najwiekszy pack (2.4 MB) z
+wyzerowanym naglowkiem, jeden obiekt z zepsutym zlib; w drzewie roboczym 9 plikow `.cs` same zera (Armoury:
+CraftPopup, HitScribe, McmSettings, QuartermasterLaw, Rations, Settings, SubModuleMain; GrandTourney i
+RealisticCaptivity: McmSettings) oraz `bin/Release/{Armoury,CrashScribe}.dll` same zera. Lokalnych
+niewypchnietych commitow NIE bylo (reflog konczy sie na a416562 = origin).
+**Zmiana:**
+1. `Configs\RBM\config.xml` <- graveyard 04-04 (XML parsuje sie, root `Config` v2, md5 ec8ef284); stara
+   odlozona jako `config.xml.corrupt-2026-09-16`.
+2. `Armoury.json` <- graveyard 04-04 (wersja z 14.09 10:24, 335 kluczy, JSON OK) + `WorldPacePercent` 50 -> 75
+   zgodnie z wpisem z 15.09 ("World pace 50 -> 75"); wersja z 15.09 12:49 przepadla wszedzie. Stara jako
+   `Armoury.json.corrupt-2026-09-16`.
+3. `DynamicReinforcements.cfg` <- graveyard 04-04 (15.09 02:11); stara `.corrupt-2026-09-16`.
+4. `FishStickyVoices.json` <- graveyard 04-04 (15.09 02:29, 63 wpisow, JSON OK); stara `.corrupt-2026-09-16`.
+   Przypisania glosow zrobione 15.09 po 02:29 przepadly (ogon byl z zer, wiec i tak nie do odzyskania).
+5. Repo: uszkodzone obiekty odlozone do `.git/corrupt-2026-09-16/`, komplet obiektow pobrany na nowo z GitHuba
+   (swiezy pack), `git fsck` czysty, martwe wpisy reflogu (amend z 26.08) wyczyszczone. 9 plikow `.cs`
+   przywroconych z HEAD. PULAPKA: `git checkout`/`checkout-index -f` NIE nadpisuje pliku wyzerowanego w miejscu,
+   bo rozmiar i mtime zgadzaja sie z indeksem - trzeba najpierw `touch`. Stare `.git` w calosci lezy w
+   `C:\Users\GAME\Bannerlor2-Realm-of-Thrones-git-corrupt-2026-09-16`. `dotnet build` Armoury i CrashScribe
+   (Release) przechodzi z 0 bledow - zrodla kompletne; DLL z tego builda NIE sa wgrane do gry.
+6. `tools/diag-start-crash.ps1`: funkcja `H` kolidowala z wbudowanym aliasem `h` (Get-History) i naglowki
+   sekcji nie trafialy do raportu - przemianowana na `Naglowek`; DLL `TaleWorlds.MountAndBlade.Platform.PS/GDK`
+   (konsole, nigdy nie ma ich na PC) nie sa juz zglaszane jako BLAD. Uruchomiony 2x bez bledow PowerShell,
+   raporty: `Documents\...\CrashScribe\diag-start-2026-09-16_04-58-15.txt` i `_05-06-54.txt`.
+7. NIE zmienione: kolejnosc modow w `LauncherData.xml`. Wzgledem `.bak-2026-09-03-ai` launcher sam wstawil
+   AIInfluence na #13 (przed NavalDLC/RBM/ROT - SubModule.xml AIInfluence wymaga tylko Harmony, UIExtenderEx,
+   Native, SandBoxCore, Sandbox, StoryMode, CustomBattle), ROT_AIInfluence_Compat na #37 (po ROT i po AIInfluence),
+   VoiceActingPatch na #39 (ostatni) i zamienil ButterLib/UIExtenderEx. Jedyna uwaga KOLEJ (BetterEconomy po
+   BannerKings.Redux) byla identyczna 03.09 i jest `optional="true"`. Brak dowodu, ze kolejnosc cos psuje.
+8. NIE zmienione (punkt D zadania): `CrashScribe.dll` w grze md5 8578036853ea9f5a7769fbed45aa7d2f = wpis 15.09
+   "Sprzet umarlych" (kopia na D: identyczna), z WYLACZONA latka zoldu - `Mends.cs` w HEAD ma przy `mMerc`
+   tylko komunikat "COFNIETA 14.09", bez `harmony.Patch`. `Armoury.dll` w grze 72661e6be01feb9d2b8b9e928a9625e6 =
+   wpis 15.09 "HitScribe". Repo `bin/Release` bylo z zer, wiec nie bylo czego wgrywac i nic nie wgrano.
+9. Steam: manifest 261550 `LastUpdated` 16.09 05:10:16, foldery `Modules\Native` i `CustomBattle` z mtime 05:10 -
+   Steam w tle zweryfikowal/przepisal pliki gry w trakcie tej sesji (`TaleWorlds.MountAndBlade.dll` dalej z
+   20.08, wersja bez zmian). Przez chwile skrypt nie widzial SubModule.xml CustomBattle/BirthAndDeath - to byl
+   ten przebieg Steama, nie blad kolejnosci.
+**Ryzyko / co sprawdzic:** (a) po starcie gry: nowy `session-*.log` bez `XmlException`, MCM Armoury pokazuje
+World pace 75; (b) AIInfluence: 627 uszkodzonych JSON NIE ruszone - 433 maja zdrowa starsza kopie w graveyard
+04-04 (stan <= 15.09 02:39), 194 nie maja zadnej kopii (powstaly 15.09 po 02:39). Decyzja Jeffa PO starcie gry:
+przywrocic 433 i odlozyc 194, czy zostawic i patrzec, co AIInfluence zrobi przy wczytaniu; (c) dysk C dalej gubi
+ogony ostatnich zapisow przed wyjsciem z gry (wszystkie dzisiejsze ofiary maja mtime 15.09 12:49-17:29) - kazde
+wyjscie z gry to loteria, backup na D: robic PRZED uruchomieniem gry, nie po; (d) stary klon
+`C:\Users\GAME\westeros-mods` (26.08) tez ma zepsuty obiekt - nieuzywany, zostawiony.
+**Status:** DO SPRAWDZENIA - czeka na start gry przez Jeffa.
+
+
 ## 2026-09-16 - Crash przy starcie po chkdsk: Claude zdalny bez dostepu do dysku C - skrypt diagnostyczny + ustalenia z repo
 **Mod:** (narzedzie) | **Pliki:** `tools/diag-start-crash.ps1` (NOWY, tylko czyta), `docs/ZADANIE-2026-09-16-crash-po-chkdsk.md` (NOWY - pelna tresc zadania A-D dla sesji lokalnej)
 **Problem (Jeff):** po naprawie indeksow NTFS (`chkdsk /spotfix`, 0 bad sectors) LauncherData.xml
