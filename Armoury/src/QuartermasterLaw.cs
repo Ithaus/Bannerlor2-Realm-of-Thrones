@@ -188,6 +188,11 @@ namespace Armoury
             public List<KeyValuePair<EquipmentElement, int>> Adjust = new List<KeyValuePair<EquipmentElement, int>>();
             // KTO KONKRETNIE nie ma czym (Jeff 14.09: "czemu nie akceptuja tych strzal?!")
             public Dictionary<CharacterObject, int> UnfitByTroop = new Dictionary<CharacterObject, int>();
+            // SZCZEGOL DOPASOWANIA (Jeff 16.09: "czemu lucznicy nie biora Weirwood?"):
+            // kazda sztuka podazy w kolejnosci wyboru (wymog malejaco, potem skutecznosc)
+            // z liczba uzytych, oraz rozklad skilla ludzi - dla broni strzeleckiej
+            public List<string> Detail = new List<string>();
+            public string SkillHist = "";
         }
 
         private sealed class Sup { public EquipmentElement El; public int Total, Own, Used; public bool Barred; }
@@ -351,6 +356,31 @@ namespace Armoury
                         }
                     }
                 }
+                // szczegol dopasowania dla broni strzeleckiej (patrz Fit.Detail)
+                if (type == ItemObject.ItemTypeEnum.Bow || type == ItemObject.ItemTypeEnum.Crossbow
+                    || type == ItemObject.ItemTypeEnum.Arrows || type == ItemObject.ItemTypeEnum.Bolts || type == ItemObject.ItemTypeEnum.Thrown)
+                {
+                    try
+                    {
+                        foreach (var sp in supply)
+                        {
+                            var it = sp.El.Item;
+                            var mod = sp.El.ItemModifier;
+                            f.Detail.Add(it.StringId + (mod != null ? "(" + mod.StringId + ")" : "") + " wymog=" + it.Difficulty
+                                         + " skut=" + it.Effectiveness.ToString("0") + " t" + ((int)it.Tier + 1)
+                                         + " uzyte=" + sp.Used + "/" + sp.Total + (sp.Barred ? " WYKL" : "") + (sp.Own > 0 ? " (gracza " + sp.Own + ")" : ""));
+                        }
+                        if (skill != null && men.Count > 0)
+                        {
+                            var hist = new SortedDictionary<int, int>();
+                            foreach (var m in men) { int sk = m.GetSkillValue(skill); int c; hist.TryGetValue(sk, out c); hist[sk] = c + 1; }
+                            var parts = new List<string>();
+                            foreach (var kv in hist) parts.Add(kv.Value + "x" + kv.Key);
+                            f.SkillHist = string.Join(" ", parts.ToArray());
+                        }
+                    }
+                    catch { }
+                }
                 // korekty ksiegi: docelowo gracz ma DOKLADNIE to, czego nikt nie nosi
                 foreach (var sp in supply)
                 {
@@ -501,12 +531,18 @@ namespace Armoury
                     // 15.09 DIAGNOSTYKA: bitwa (SkillLawWard) melduje puste sloty pancerza,
                     // a ten raport nie widzi braku - zapisujemy wynik dopasowania dla KAZDEGO
                     // typu pancerza, takze gdy brak nie wychodzi, zeby dalo sie porownac obie strony
-                    if (type == ItemObject.ItemTypeEnum.HeadArmor || type == ItemObject.ItemTypeEnum.BodyArmor
-                        || type == ItemObject.ItemTypeEnum.LegArmor || type == ItemObject.ItemTypeEnum.HandArmor
-                        || type == ItemObject.ItemTypeEnum.Cape)
-                        Log.Info("Kwatermistrz: papier " + type + ": potrzeba " + need + " (dopasowanie liczy " + fit.Need
-                                 + "), polka " + raw + " (+" + fit.Barred + " wykluczonych: unikaty/lore/umarli), udzwigna "
-                                 + fit.Usable + ", bez sztuki " + fit.UnfitMen + ".");
+                    // 16.09: papier dla KAZDEGO typu (dotad tylko pancerze) - Jeff: "czemu lucznicy
+                    // nie biora Weirwood?" i z logu nie dalo sie odpowiedziec
+                    Log.Info("Kwatermistrz: papier " + type + ": potrzeba " + need + " (dopasowanie liczy " + fit.Need
+                             + "), polka " + raw + " (+" + fit.Barred + " wykluczonych: unikaty/lore/umarli), udzwigna "
+                             + fit.Usable + ", bez sztuki " + fit.UnfitMen + "."
+                             + (fit.SkillHist.Length > 0 ? " Skill " + fit.SkillName + " ludzi: " + fit.SkillHist + "." : ""));
+                    if (fit.Detail.Count > 0)
+                    {
+                        var top = fit.Detail.Count > 14 ? fit.Detail.GetRange(0, 14) : fit.Detail;
+                        Log.Info("Kwatermistrz: papier " + type + " po kolei wyboru (wymog malejaco, potem skutecznosc): "
+                                 + string.Join(", ", top.ToArray()) + (fit.Detail.Count > 14 ? ", ... (" + fit.Detail.Count + " pozycji)" : "") + ".");
+                    }
                     if (have < need)
                     {
                         string line = type + " " + have + "/" + need;
