@@ -962,7 +962,7 @@ namespace Armoury
                 for (int i = 0; i < _projects.Count; i++)
                 {
                     var q = Project.Parse(_projects[i]);
-                    if (q == null || q.Item == null || q.Kind != "van") continue;
+                    if (q.Item == null || q.Kind != "van") continue;
                     float cap = MathF.Max(0.1f, Recipes.Grade(q.Item) * Settings.Current.WeaponDaysPerTier);
                     if (q.DaysLeft > cap) { q.DaysLeft = cap; _projects[i] = q.Serialize(); capped++; }
                 }
