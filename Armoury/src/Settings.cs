@@ -44,7 +44,7 @@ namespace Armoury
         public int XpCapPerTier = 1300;                    // ceiling per project = this times the tier
         public float XpShareWhileWorking = 0.4f;           // share paid out as you work, the rest on completion
         public bool WeaponCraftingTakesTime = true;        // native weapon smithing is not instant either
-        public float WeaponDaysPerTier = 0.5f;             // weapons come faster than armour, but not at once (Jeff 14.09: halved)
+        public float WeaponDaysPerTier = 0.1f;             // days per tier of a weapon - 0.1 means a tier 4 sword takes under half a day at the anvil (Jeff 14.09: halved; 16.09: four swords took 169 hours, cut by 80 percent)
         public bool WeaponXpFromValueCapped = true;        // native weapon XP follows the sale price - cap it
         public int WeaponXpCapPerTier = 500;               // ceiling per weapon = this times the tier
         // --- Orders from the lords ---

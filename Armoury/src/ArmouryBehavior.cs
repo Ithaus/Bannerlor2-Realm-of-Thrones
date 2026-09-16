@@ -1013,8 +1013,10 @@ namespace Armoury
                     // XP liczy sie od WLASCIWEGO czasu projektu: bron "van" ma swoj
                     // przelicznik (WeaponDaysPerTier), pancerze swoj (Jeff 29.08:
                     // "balagan z godzinami" - to byl jeden z rozjazdow)
+                    // minimum 0.1 dnia (bylo 0.5 - Jeff 16.09: "kucie miecza za dlugie, -80%";
+                    // przy 0.1 dnia/tier pol dnia podlogi zjadloby cala obnizke)
                     float totalDays = p.Kind == "van"
-                        ? MathF.Max(0.5f, Recipes.Grade(p.Item) * Settings.Current.WeaponDaysPerTier)
+                        ? MathF.Max(0.1f, Recipes.Grade(p.Item) * Settings.Current.WeaponDaysPerTier)
                         : MathF.Max(1f, rr.Tier * Settings.Current.DaysPerTier * Project.TimeFactor(p.Tempo));
                     if (atForge)   // XP tylko za wlasna prace przy kowadle
                         Hero.MainHero.HeroDeveloper.AddSkillXp(DefaultSkills.Crafting,
@@ -1124,7 +1126,7 @@ namespace Armoury
                 if (here == null) return;
 
                 int tier = Recipes.Grade(item);
-                float days = MathF.Max(0.5f, tier * s.WeaponDaysPerTier);
+                float days = MathF.Max(0.1f, tier * s.WeaponDaysPerTier);   // minimum 0.1 dnia (Jeff 16.09: -80%)
 
                 var roster = MobileParty.MainParty.ItemRoster;
                 var el = new EquipmentElement(item, modifier);   // takim lezy w sakwach

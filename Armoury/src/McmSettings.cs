@@ -136,9 +136,9 @@ namespace Armoury
         [SettingPropertyGroup("Experience")]
         public bool WeaponCraftingTakesTime { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Weapon Days Per Tier", 0.00f, 2.00f, "0.00", HintText = "weapons come faster than armour, but not at once (Jeff 14.09: halved)")]
+        [SettingPropertyFloatingInteger("Weapon Days Per Tier", 0.00f, 1.00f, "0.00", HintText = "days per tier of a weapon - 0.1 means a tier 4 sword takes under half a day at the anvil (Jeff 14.09: halved; 16.09: four swords took 169 hours, cut by 80 percent)")]
         [SettingPropertyGroup("Experience")]
-        public float WeaponDaysPerTier { get; set; } = 0.5f;
+        public float WeaponDaysPerTier { get; set; } = 0.1f;
 
         [SettingPropertyBool("Weapon Xp From Value Capped", HintText = "native weapon XP follows the sale price - cap it")]
         [SettingPropertyGroup("Experience")]

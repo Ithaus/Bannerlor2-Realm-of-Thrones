@@ -50,6 +50,32 @@ namespace Armoury
     {
         private static readonly Dictionary<string, ItemObject> Repl = new Dictionary<string, ItemObject>();
         private static int _inPlayer, _inAi, _inGone;      // nabor od ostatniego raportu dziennego
+        private bool _aiRedressed;                         // 16.09: jednorazowe przebranie zamiennikow "bez kultury" (patrz RedressAiArmories)
+
+        // DTE kluczuje magazyny MBGUID partii (MobileParty.Id). PULAPKA (16.09, pierwsze
+        // wczytanie prawa): MBObjectManager.Instance.GetObject(MBGUID) NIE zna partii
+        // kampanii (te zyja w CampaignObjectManager) - 337 partii dostalo zamienniki
+        // "bez kultury". DTE sam szuka przez Campaign.Current.MobileParties (FindActiveParty),
+        // robimy to samo, ze slownikiem odswiezanym przy chybieniu.
+        private static Dictionary<MBGUID, MobileParty> _byId;
+
+        private static MobileParty FindParty(MBGUID id)
+        {
+            try
+            {
+                MobileParty mp;
+                if (_byId != null && _byId.TryGetValue(id, out mp)) return mp;
+                var all = MobileParty.All;
+                if (all == null) return null;
+                if (_byId == null || _byId.Count != all.Count)
+                {
+                    _byId = new Dictionary<MBGUID, MobileParty>();
+                    foreach (var p in all) if (p != null) _byId[p.Id] = p;
+                }
+                return _byId.TryGetValue(id, out mp) ? mp : null;
+            }
+            catch { return null; }
+        }
 
         // Wlasciciele wedle nazwiska - odbicie Mends.NamesakeGear + wedrowcy ROT.
         // Klucz = poczatek id, wartosc = fragmenty imienia rozdzielone '|'.
@@ -83,7 +109,10 @@ namespace Armoury
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, OnDay);
         }
 
-        public override void SyncData(IDataStore dataStore) { }
+        public override void SyncData(IDataStore dataStore)
+        {
+            dataStore.SyncData("armouryUniqueLawAiRedress", ref _aiRedressed);
+        }
 
         private void OnSession(CampaignGameStarter starter)
         {
@@ -110,6 +139,7 @@ namespace Armoury
                 else if (g1 + g2 > 0)
                     Log.Player("The quartermaster struck " + (g1 + g2) + " pieces of named heroes' regalia from your stores - they belong to their owners.");
                 SweepAiArmories("wczytanie");
+                if (!_aiRedressed) { RedressAiArmories(); _aiRedressed = true; }
                 SweepHeroes();
             }
             catch (Exception e) { Log.Error("UniqueLaw.OnSession", e); }
@@ -288,11 +318,7 @@ namespace Armoury
                     if (keys == null) continue;
                     parties++;
                     BasicCultureObject cul = null;
-                    try
-                    {
-                        if (e.Key is MBGUID) cul = PartyCulture(MBObjectManager.Instance.GetObject((MBGUID)e.Key) as MobileParty);
-                    }
-                    catch { }
+                    try { if (e.Key is MBGUID) cul = PartyCulture(FindParty((MBGUID)e.Key)); } catch { }
                     foreach (var k in keys)
                     {
                         int n = 0;
@@ -312,6 +338,70 @@ namespace Armoury
                              + gone + " znikly, w " + parties + " partiach.");
             }
             catch (Exception e) { Log.Error("UniqueLaw.SweepAiArmories", e); }
+        }
+
+        /// <summary>JEDNORAZOWO (16.09): pierwsze wczytanie prawa nie rozpoznalo partii AI
+        /// (patrz FindParty) i 11134 sztuk w 337 magazynach dostalo zamienniki bez kultury
+        /// (bandit_hybrid_*, tacky_bandit, arryn_chausses, padded_vambrace). Tu: w kazdym
+        /// magazynie AI z rozpoznana kultura te wlasnie id (zbior = StandInFor(unikat, null)
+        /// dla kazdego unikatu) ida jeszcze raz przez StandInFor z kultura partii; podmiana
+        /// TYLKO gdy wynik jest w kulturze partii (inaczej nic sie nie zyskuje). Skutek
+        /// uboczny: zwykle bandyckie sztuki tych id w magazynach lordow tez staja sie
+        /// rodowe - na plus. Flaga w save, wiec raz na kampanie.</summary>
+        private static void RedressAiArmories()
+        {
+            try
+            {
+                var neutral = new HashSet<ItemObject>();
+                foreach (var it in MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
+                {
+                    if (it == null || !UniqueGear.Is(it)) continue;
+                    var s = StandInFor(it, null);
+                    if (s != null) neutral.Add(s);
+                }
+                if (neutral.Count == 0) return;
+                var t = AccessTools.TypeByName("DynamicTroopEquipmentReupload.EveryoneCampaignBehavior");
+                var f = t != null ? AccessTools.Field(t, "PartyArmories") : null;
+                var map = f != null ? f.GetValue(null) as System.Collections.IDictionary : null;
+                if (map == null) return;
+                int swapped = 0, parties = 0, noCulture = 0;
+                foreach (System.Collections.DictionaryEntry e in map)
+                {
+                    var inner = e.Value as System.Collections.IDictionary;
+                    if (inner == null) continue;
+                    BasicCultureObject cul = null;
+                    try { if (e.Key is MBGUID) cul = PartyCulture(FindParty((MBGUID)e.Key)); } catch { }
+                    if (cul == null || cul.StringId == null) { noCulture++; continue; }
+                    List<object> keys = null;
+                    foreach (System.Collections.DictionaryEntry kv in inner)
+                    {
+                        var it = kv.Key as ItemObject;
+                        if (it == null || !neutral.Contains(it)) continue;
+                        if (keys == null) keys = new List<object>();
+                        keys.Add(kv.Key);
+                    }
+                    if (keys == null) continue;
+                    bool touched = false;
+                    foreach (var k in keys)
+                    {
+                        var it = (ItemObject)k;
+                        var sub = StandInFor(it, cul);
+                        if (sub == null || sub == it || sub.Culture == null || sub.Culture.StringId != cul.StringId) continue;
+                        int n = 0;
+                        try { n = Convert.ToInt32(inner[k]); } catch { }
+                        inner.Remove(k);
+                        if (n <= 0) continue;
+                        int have = 0;
+                        try { if (inner.Contains(sub)) have = Convert.ToInt32(inner[sub]); } catch { }
+                        inner[sub] = have + n;
+                        swapped += n; touched = true;
+                    }
+                    if (touched) parties++;
+                }
+                Log.Info("UniqueLaw: przebranie magazynow AI po pierwszym wczytaniu - " + swapped + " szt. w " + parties
+                         + " partiach z ubran bez kultury na sprzet rodu" + (noCulture > 0 ? " (" + noCulture + " magazynow bez rozpoznanej partii - pominiete)" : "") + ".");
+            }
+            catch (Exception e) { Log.Error("UniqueLaw.RedressAiArmories", e); }
         }
 
         private static bool Has(Equipment eq, ItemObject it)
@@ -443,9 +533,7 @@ namespace Armoury
             try
             {
                 if (__1 == null || !Settings.Current.UniqueGearLawEnabled || !UniqueGear.Is(__1)) return true;
-                MobileParty mp = null;
-                try { mp = MBObjectManager.Instance.GetObject(__0) as MobileParty; } catch { }
-                var sub = StandInFor(__1, PartyCulture(mp));
+                var sub = StandInFor(__1, PartyCulture(FindParty(__0)));
                 int n = Math.Max(1, __2);
                 if (sub == null) { _inGone += n; return false; }
                 _inAi += n;
