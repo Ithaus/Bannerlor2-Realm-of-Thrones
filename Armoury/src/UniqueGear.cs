@@ -18,13 +18,21 @@ namespace Armoury
             "tyrion_", "varys_", "bull_helmet"
         };
 
+        // ZESTAW GORY (Jeff 16.09: "polowa wojska w pancerzu Clegana lub Mountain").
+        // NIE prefiks "mountain_" - mountain_hunting_bow to zwykly luk 20 kultur.
+        // Dlatego pelne id. Ta sama lista w Mends.UniqueIds - AKTUALIZUJ OBIE RAZEM.
+        private static readonly string[] Ids = {
+            "mountain_armor", "mountain_helmet", "mountain_pauldrons",
+            "mountain_boots", "mountain_gloves", "mountain_gauntlets"
+        };
+
         internal static bool Is(ItemObject it)
         {
             if (it == null) return false;
             var id = it.StringId ?? "";
             for (int i = 0; i < Prefixes.Length; i++)
                 if (id.StartsWith(Prefixes[i], System.StringComparison.Ordinal)) return true;
-            return false;
+            return System.Array.IndexOf(Ids, id) >= 0;
         }
     }
 }

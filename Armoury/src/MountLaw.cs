@@ -36,6 +36,13 @@ namespace Armoury
 
         private static readonly Dictionary<CharacterObject, int> _tplFams = new Dictionary<CharacterObject, int>();
 
+        /// <summary>Czy to kultura zza Waskiego Morza (lista Essos wyzej). Uzywa UniqueLaw
+        /// przy doborze zamiennika - druga strona morza nigdy.</summary>
+        internal static bool IsEssosCulture(string cultureId)
+        {
+            return cultureId != null && Essos.Contains(cultureId);
+        }
+
         internal static Fam FamilyOf(ItemObject it)
         {
             try

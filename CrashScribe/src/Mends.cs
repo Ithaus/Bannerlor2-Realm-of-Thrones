@@ -600,13 +600,21 @@ namespace CrashScribe
             "tyrion_", "varys_", "bull_helmet"
         };
 
+        // ZESTAW GORY (Jeff 16.09: "polowa wojska w pancerzu Clegana lub Mountain").
+        // NIE prefiks "mountain_" - mountain_hunting_bow to zwykly luk 20 kultur.
+        // Dlatego pelne id. Ta sama lista w Armoury.UniqueGear.Ids - AKTUALIZUJ OBIE RAZEM.
+        private static readonly string[] UniqueIds = {
+            "mountain_armor", "mountain_helmet", "mountain_pauldrons",
+            "mountain_boots", "mountain_gloves", "mountain_gauntlets"
+        };
+
         internal static bool IsUniqueGear(ItemObject it)
         {
             if (it == null) return false;
             var id = it.StringId ?? "";
             for (int i = 0; i < UniquePrefixes.Length; i++)
                 if (id.StartsWith(UniquePrefixes[i], StringComparison.Ordinal)) return true;
-            return false;
+            return Array.IndexOf(UniqueIds, id) >= 0;
         }
 
         /// <summary>
@@ -638,7 +646,7 @@ namespace CrashScribe
 
         // liczniki obu strazy - raport zbiorczy po bitwie (WardReport), nigdy per sztuka:
         // UniqueWard i ArmourWard biegna dla kazdego agenta kazdej partii AI
-        internal static int WardBlades, WardArmour, WardStumbles;
+        internal static int WardBlades, WardArmour, WardStumbles, WardForeign;
 
         // ===== KAZDY UNIKAT MA DOM (Jeff 31.08: "ubierz postacie ktore
         // istnieja; nie zyja - spadkobiercom; nie ma ich - jedna sztuka lezy
@@ -991,10 +999,11 @@ namespace CrashScribe
         /// <summary>Prefix na DTE DoAssignAsync: unikaty imienne nie wchodza do
         /// puli przydzialu - zaden szeregowy nie dostanie pancerza Brienny,
         /// chocby lezal w taborze. Bohaterom DTE i tak sprzetu nie rusza.
-        /// WYJATEK (Jeff 30.08): wzor NAUCZONY w kuzni (przetopiony unikat,
-        /// Armoury.UniqueLore) jest odblokowany - gracz go kuje, wiec wykute
-        /// egzemplarze wolno nosic wojsku. DTE nadal rozdaje tylko FIZYCZNE
-        /// sztuki z taboru - zadna kopia nie bierze sie z powietrza.</summary>
+        /// WYJATEK z 30.08 (wzor NAUCZONY w kuzni wolno nosic wojsku) ZNIESIONY 16.09
+        /// (Jeff: "Ramsey Armour jest tylko jeden i nosi go Ramsey" - a polowa wojska
+        /// biegala w nim wlasnie ta furtka: ramsay_armor byl nauczony, log 04:58).
+        /// Nauczony wzor nadal wolno KUC (Forge) i nosic bohaterom - szeregowi nigdy.
+        /// Kopie na polkach zamienia w zamienniki Armoury.UniqueLaw.</summary>
         public static void UniqueWard(object __instance)
         {
             try
@@ -1011,7 +1020,7 @@ namespace CrashScribe
                     if (IsDeadGear(item)) { drop.Add(kv.Key); continue; }
                     // smoki nie dla szeregowych - NIGDY (Jeff: "smoki ma tylko Daenerys")
                     if (IsDragonMount(item)) { drop.Add(kv.Key); continue; }
-                    if ((IsUniqueGear(item) || IsLoreBlade(item)) && !LearnedUnique(item.StringId))
+                    if (IsUniqueGear(item) || IsLoreBlade(item))
                     { drop.Add(kv.Key); WardBlades++; }
                 }
                 for (int i = 0; i < drop.Count; i++) dic.Remove(drop[i]);
@@ -2651,6 +2660,12 @@ namespace CrashScribe
                     Scribe.Line("Mends: sprzet imiennych bohaterow poza pula przydzialu DTE - piechota nie zalozy pancerza Brienny.");
                     Scribe.Line("Mends: swieta zasada skilli w DTE - sztuka ponad skill wraca na polke, zolnierz bierze najlepsza uzyteczna (nic nie schodzi do pustki).");
                 }
+                // ===== WASKIE MORZE DZIELI SPRZET (Jeff 16.09) - szczegoly przy RealmWard =====
+                if (mAssign != null)
+                {
+                    harmony.Patch(mAssign, postfix: new HarmonyMethod(typeof(Mends), "RealmWard"));
+                    Scribe.Line("Mends: Waskie Morze dzieli sprzet - DTE nie zostawi Westerosi arakha ani Dothrakowi plyty z Reach (wraca sztuka ze wzorca).");
+                }
                 try
                 {
                     // wybor PRZED przydzialem: DTE sam pomija bron ponad skill zolnierza
@@ -3771,16 +3786,115 @@ namespace CrashScribe
             catch { WardStumbles++; }
         }
 
-        /// <summary>Raport zbiorczy obu strazy - raz na bitwe, nie raz na sztuke.</summary>
+        // ===== WASKIE MORZE DZIELI SPRZET (Jeff 16.09: "biegaja z mieczami dotrakow,
+        // poustawiaj historyczne zaleznosci i zrob z tym porzadek") =====
+        // DTE przy przydziale z magazynu WOLI sprzet kultury zolnierza
+        // (PartyEquipmentDistributor.IsCultureCompatible), ale ma dwa wyjscia awaryjne:
+        // gdy w kulturze nie ma nic, bierze cokolwiek, a gdy obce jest "duzo blizsze
+        // wzorca" (AssignEquipmentType: num4 > num7*2), tez bierze obce. Stad arakh
+        // (culture=khuzait) u Riverlands Ranger po jednej bitwie z Dothrakami.
+        // Postfix na DoAssignAsync (po SkillLawWard): sztuka z DRUGIEJ strony Waskiego
+        // Morza niz kultura zolnierza schodzi z grzbietu, wraca na polke, a slot dostaje
+        // sztuke ze wzorca (jak ArmourWard) - chyba ze wzorzec zolnierza SAM ja ma
+        // (najemnicy z Essos w Westeros nosza swoje). Bezkulturowe i neutral_culture
+        // przechodza wszedzie. W obrebie jednej strony morza domy dziela sie lupem
+        // (Polnoc w kolczudze z Dorzecza to zwykla wojna) - tego nie tykamy; za Murem
+        // liczy sie jako Westeros. Lista Essos = Armoury.MountLaw.Essos (audyt 14.09)
+        // + steppe_bandits - trzymac w zgodzie.
+        private static readonly System.Collections.Generic.HashSet<string> EssosCultures = new System.Collections.Generic.HashSet<string>
+        {
+            "empire", "ghiscari", "ibbenese", "khuzait", "lyseni", "myrish", "nord", "norvos",
+            "pentoshi", "qartheen", "qohorik", "sarnor", "summer", "tyroshi", "valyrian",
+            "volantine", "yiti", "yiti_bandits", "darshi", "steppe_bandits"
+        };
+
+        private static bool ForeignShore(ItemObject it, CharacterObject co)
+        {
+            try
+            {
+                var ic = it != null && it.Culture != null ? it.Culture.StringId : null;
+                var cc = co != null && co.Culture != null ? co.Culture.StringId : null;
+                if (string.IsNullOrEmpty(ic) || string.IsNullOrEmpty(cc) || ic == "neutral_culture") return false;
+                return EssosCultures.Contains(ic) != EssosCultures.Contains(cc);
+            }
+            catch { return false; }
+        }
+
+        private static readonly System.Collections.Generic.Dictionary<CharacterObject, System.Collections.Generic.HashSet<ItemObject>> _tplItems = new System.Collections.Generic.Dictionary<CharacterObject, System.Collections.Generic.HashSet<ItemObject>>();
+
+        /// <summary>Czy item siedzi we wlasnym szablonie jednostki (wtedy wolno, obcy czy nie).</summary>
+        private static bool TemplateHas(CharacterObject co, ItemObject it)
+        {
+            if (co == null || it == null) return false;
+            System.Collections.Generic.HashSet<ItemObject> set;
+            if (!_tplItems.TryGetValue(co, out set))
+            {
+                set = new System.Collections.Generic.HashSet<ItemObject>();
+                try
+                {
+                    foreach (var eq in co.BattleEquipments)
+                    {
+                        if (eq == null) continue;
+                        for (int s = 0; s < 12; s++) { var x = eq[(EquipmentIndex)s].Item; if (x != null) set.Add(x); }
+                    }
+                }
+                catch { }
+                _tplItems[co] = set;
+            }
+            return set.Contains(it);
+        }
+
+        public static void RealmWard(object __instance)
+        {
+            try
+            {
+                var tr = Traverse.Create(__instance);
+                var list = tr.Property("Assignments").GetValue() as System.Collections.IEnumerable;
+                if (list == null) list = tr.Field("Assignments").GetValue() as System.Collections.IEnumerable;
+                if (list == null) return;
+                foreach (var a in list)
+                {
+                    var ta = Traverse.Create(a);
+                    var co = ta.Property("Character").GetValue() as CharacterObject;
+                    var eq = ta.Property("Equipment").GetValue() as Equipment;
+                    if (eq == null) eq = ta.Field("Equipment").GetValue() as Equipment;
+                    if (co == null || eq == null || co.IsHero) continue;
+                    Equipment tpl = null;
+                    try { tpl = ta.Property("ReferenceEquipment").GetValue() as Equipment; } catch { }
+                    if (_mIsTemp == null) { try { _mIsTemp = AccessTools.Method(a.GetType(), "IsTemporarySlot"); } catch { } }
+                    for (int s = 0; s <= 9; s++)
+                    {
+                        if (s == 4) continue;                                   // sztandar
+                        EquipmentElement el; ItemObject it;
+                        try { el = eq[(EquipmentIndex)s]; it = el.Item; } catch { continue; }
+                        if (it == null || !ForeignShore(it, co) || TemplateHas(co, it)) continue;
+                        bool temp = false;
+                        try { temp = _mIsTemp != null && (bool)_mIsTemp.Invoke(a, new object[] { (EquipmentIndex)s, it }); } catch { }
+                        if (temp) continue;                                     // awaryjny przydzial DTE - nie z polki
+                        ItemObject sub = null;
+                        try { sub = tpl != null ? tpl[(EquipmentIndex)s].Item : null; } catch { }
+                        if (sub != null && (IsUniqueGear(sub) || IsDeadGear(sub) || IsLoreBlade(sub))) sub = null;
+                        if (sub != null && !CanUse(co, sub)) sub = null;
+                        try { ta.Method("SetEquipment", (EquipmentIndex)s, sub != null ? new EquipmentElement(sub) : default(EquipmentElement)).GetValue(); } catch { }
+                        try { tr.Method("AddEquipmentToAssign", el, 1).GetValue(); } catch { }   // sztuka wraca na polke
+                        WardForeign++;
+                    }
+                }
+            }
+            catch { WardStumbles++; }
+        }
+
+        /// <summary>Raport zbiorczy strazy - raz na bitwe, nie raz na sztuke.</summary>
         internal static void WardReport()
         {
             try
             {
-                if (WardBlades == 0 && WardArmour == 0 && WardStumbles == 0) return;
+                if (WardBlades == 0 && WardArmour == 0 && WardStumbles == 0 && WardForeign == 0) return;
                 Scribe.Line("Straz unikatow: " + WardBlades + " klng/unikatow zdjetych z przydzialu DTE, "
                             + WardArmour + " sztuk pancerza cofnietych do wzorca oddzialu, "
+                            + WardForeign + " sztuk zza Waskiego Morza wroconych na polke, "
                             + WardStumbles + " potkniec.");
-                WardBlades = 0; WardArmour = 0; WardStumbles = 0;
+                WardBlades = 0; WardArmour = 0; WardStumbles = 0; WardForeign = 0;
             }
             catch { }
         }

@@ -72,6 +72,7 @@ namespace Armoury
                 FletchForge.ApplyAll(_harmony);
                 SmeltTab.ApplyAll(_harmony);
                 DressCode.ApplyAll(_harmony);
+                UniqueLaw.ApplyAll(_harmony);        // unikaty imienne: nabor do magazynow DTE zamienia kopie na zamienniki
                 MountMeshGuard.ApplyAll(_harmony);   // uprzaz z cudzej rodziny = natywny crash w AddMountMesh
                 CaptiveRags.ApplyAll(_harmony);
                 SightRange.ApplyAll(_harmony);
@@ -136,6 +137,7 @@ namespace Armoury
                 starter.AddBehavior(new HideoutPurge());
                 starter.AddBehavior(new BattleMuster());
                 starter.AddBehavior(new LegendaryLaw());
+                starter.AddBehavior(new UniqueLaw());
                 starter.AddBehavior(new MusterBook());
                 starter.AddBehavior(new HideoutSpotter());
                 starter.AddBehavior(new HouseLevies());

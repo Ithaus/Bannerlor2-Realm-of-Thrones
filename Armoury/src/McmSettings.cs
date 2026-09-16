@@ -632,6 +632,10 @@ namespace Armoury
         [SettingPropertyGroup("The law of the battlefield")]
         public int LegendaryLootValueFloor { get; set; } = 100000;
 
+        [SettingPropertyBool("Unique Gear Law Enabled", HintText = "named heroes' gear (Ramsay, the Hound, the Mountain, Brienne, Renly...) belongs to its owner alone: copies in armouries, packs and on other heroes become same-tier gear of the wearer's own culture, and DTE swaps them on the way into any armoury")]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool UniqueGearLawEnabled { get; set; } = true;
+
         [SettingPropertyInteger("Min Sell Percent Of Value", 0, 20, "0", HintText = "merchants never pay less than this share of an item's clean value - scrap is still metal and leather (0 = off)")]
         [SettingPropertyGroup("The law of the battlefield")]
         public int MinSellPercentOfValue { get; set; } = 5;
@@ -1529,6 +1533,7 @@ namespace Armoury
             s.WreckSalvageEnabled = WreckSalvageEnabled;
             s.LootMinConditionPercent = LootMinConditionPercent;
             s.LegendaryLootValueFloor = LegendaryLootValueFloor;
+            s.UniqueGearLawEnabled = UniqueGearLawEnabled;
             s.MinSellPercentOfValue = MinSellPercentOfValue;
             s.EnlistedSoldierNoLooting = EnlistedSoldierNoLooting;
             s.FieldCraftEnabled = FieldCraftEnabled;
