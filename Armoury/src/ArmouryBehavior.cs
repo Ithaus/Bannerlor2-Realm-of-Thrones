@@ -953,6 +953,20 @@ namespace Armoury
             try
             {
                 if (_projects.Count == 0) return;
+                // SUFIT Z SUWAKA (Jeff 16.09: "czekam na cztery miecze ponad 169 godzin"):
+                // zlecenie broni zlozone przy starym przeliczniku ma DaysLeft policzone
+                // raz, przy starcie - obnizka WeaponDaysPerTier sama go nie skroci.
+                // Kazdy tick przycina wiec DaysLeft broni do nowego wzoru (ten sam co
+                // przy starcie: max(0.1, tier * WeaponDaysPerTier)). Pancerze bez zmian.
+                int capped = 0;
+                for (int i = 0; i < _projects.Count; i++)
+                {
+                    var q = Project.Parse(_projects[i]);
+                    if (q == null || q.Item == null || q.Kind != "van") continue;
+                    float cap = MathF.Max(0.1f, Recipes.Grade(q.Item) * Settings.Current.WeaponDaysPerTier);
+                    if (q.DaysLeft > cap) { q.DaysLeft = cap; _projects[i] = q.Serialize(); capped++; }
+                }
+                if (capped > 0) Log.Info("Kuznia: " + capped + " zlecen broni w kolejce skrocono do nowego przelicznika (WeaponDaysPerTier " + Settings.Current.WeaponDaysPerTier + ").");
                 var here = Settlement.CurrentSettlement;
                 // KOWAL PRACUJE, KIEDY TY JEDZIESZ (Jeff 27.08: "wykulem miecz,
                 // odczekalem dlugo i przepadl" - stary zegar tykal TYLKO, gdy
