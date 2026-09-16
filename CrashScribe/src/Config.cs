@@ -28,6 +28,13 @@ namespace CrashScribe
         public static int FabulaPaceDays = 4;          // najwyzej jedno wydarzenie fabularne na tyle dni
         public static float FabulaTimeScale = 2.0f;    // rozciagniecie calej osi fabuly: 1.0 = daty ROT bez zmian, 2.0 = wszystko dwa razy dalej (przy dluzszym roku, zeby lata zgadzaly sie z serialem)
 
+        // --- Zew Nocnego Krola (patrz NightKingCall.cs) ---
+        public static bool NightKingCallEnabled = true;   // trupy z mniejszych band Innych ida do najsilniejszej, az ta dobije do progu oblezenia ROT
+        public static int NightKingCallTarget = 520;      // tyle ZDROWYCH trupow w jednej bandzie (ROT oblega od 500; zapas na rannych)
+        public static int NightKingCallKeep = 40;         // tyle zdrowych zostaje kazdemu dawcy
+        public static int NightKingCallKeepNk = 120;      // tyle zostaje Nocnemu Krolowi, gdy oddaje
+        public static float NightKingCallFullness = 0.85f; // najsilniejsza banda pelna w tylu procentach limitu (ROT: oblezenie przy >= 0.8)
+
         internal static void Load(string moduleDataDir)
         {
             try
@@ -58,6 +65,11 @@ namespace CrashScribe
                         case "FabulaPacerEnabled": FabulaPacerEnabled = B(v); break;
                         case "FabulaPaceDays": FabulaPaceDays = I(v, FabulaPaceDays); break;
                         case "FabulaTimeScale": FabulaTimeScale = F(v, FabulaTimeScale); break;
+                        case "NightKingCallEnabled": NightKingCallEnabled = B(v); break;
+                        case "NightKingCallTarget": NightKingCallTarget = I(v, NightKingCallTarget); break;
+                        case "NightKingCallKeep": NightKingCallKeep = I(v, NightKingCallKeep); break;
+                        case "NightKingCallKeepNk": NightKingCallKeepNk = I(v, NightKingCallKeepNk); break;
+                        case "NightKingCallFullness": NightKingCallFullness = F(v, NightKingCallFullness); break;
                     }
                 }
             }

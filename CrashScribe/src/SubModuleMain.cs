@@ -124,6 +124,7 @@ namespace CrashScribe
                 if (cgs != null) cgs.AddBehavior(new WarReportBehavior());
                 if (cgs != null) cgs.AddBehavior(new MendsBehavior());
                 if (cgs != null) cgs.AddBehavior(new DialogEscape());
+                if (cgs != null) cgs.AddBehavior(new NightKingCall());   // Zew Nocnego Krola (Jeff 16.09)
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "OnGameStart.WarReport", null); } catch { } }
         }

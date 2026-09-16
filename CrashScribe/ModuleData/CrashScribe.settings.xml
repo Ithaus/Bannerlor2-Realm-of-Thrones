@@ -28,4 +28,15 @@
 
   <MaxReportsPerSession>300</MaxReportsPerSession>
   <KeepSessions>15</KeepSessions>
+
+  <!-- The Night King's Call: the Others' bands pool their wights into the strongest band until it
+       reaches ROT's siege threshold (500 healthy), and the horde's party size bonus is kept so that
+       band sits at NightKingCallFullness of its limit (ROT besieges at 80%+). Everything else -
+       targets, 2.5x odds, AI shackles, the invasion after all 25 settlements beyond the Wall -
+       stays in ROT's hands. Set NightKingCallEnabled to false to switch it off. -->
+  <NightKingCallEnabled>true</NightKingCallEnabled>
+  <NightKingCallTarget>520</NightKingCallTarget>
+  <NightKingCallKeep>40</NightKingCallKeep>
+  <NightKingCallKeepNk>120</NightKingCallKeepNk>
+  <NightKingCallFullness>0.85</NightKingCallFullness>
 </CrashScribe>
