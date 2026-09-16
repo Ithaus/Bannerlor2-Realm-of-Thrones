@@ -17,7 +17,7 @@
 4. Targow NIE tykamy (Mends.UniqueWares czysci je co sesje, relikwie NamesakeGear leza po 1 szt. celowo).
 5. Raport dzienny w Armoury.log, ile unikatow zamieniono przy naborze (gracz / AI / znikniete).
 **Ryzyko / co sprawdzic:** po wczytaniu w Armoury.log: `UniqueLaw: nabor do magazynow DTE gracza / AI - ...`, `UniqueLaw (wczytanie): magazyn DTE gracza - N szt. zamienionych...`, `UniqueLaw: zamiennik dla ramsay_gloves (battania) -> ...`, `UniqueLaw: bohaterowie - ...`; w grze komunikat kwatermistrza. Linia `Kwatermistrz: WYKLUCZONE` powinna zniknac albo skurczyc sie do relikwii. Jesli ROT nie ma w danej kulturze pancerza tego tieru, zamiennik schodzi tier nizej ("lub minimalnie mniejszej"). Gracz, jesli sam nosil cudzy unikat, zostanie przebrany - komunikat w grze. Przy pierwszym wczytaniu sweep bohaterow moze wypisac duzo linii (jednorazowo). Wylacznik w MCM gasi cale prawo.
-**Status:** ZBUDOWANE, DO WGRANIA po zamknieciu gry (Armoury.dll md5 6616a6a436cd6053bb6f641434a3c0ba; gra byla otwarta w chwili builda).
+**Status:** WGRANE 2026-09-16 (Armoury.dll md5 6616a6a436cd6053bb6f641434a3c0ba, repo i gra zgodne; poprzedni DLL obok jako `Armoury.dll.bak-2026-09-16-przed-unikatami`). DO SPRAWDZENIA w grze przez Jeffa.
 
 
 ## 2026-09-16 - Waskie Morze dzieli sprzet: DTE nie zostawi Westerosi arakha; zestaw Gory na liscie unikatow; koniec furtki "nauczonego wzoru" dla szeregowych
@@ -30,7 +30,7 @@
 3. `UniqueWard`: furtka z 30.08 ("nauczony wzor wolno nosic wojsku") ZNIESIONA - nauczony wzor nadal wolno kuc i nosic bohaterom, szeregowi nigdy. Powod: `ramsay_armor` byl nauczony i to nim biegala polowa wojska.
 4. `WardReport`: nowa liczba "N sztuk zza Waskiego Morza wroconych na polke".
 **Ryzyko / co sprawdzic:** w session log CrashScribe przy starcie `Mends: Waskie Morze dzieli sprzet - ...`; po bitwie `Straz unikatow: ... N sztuk zza Waskiego Morza wroconych na polke`. Oddzialy z Essos w armii Jeffa (najemnicy) zachowuja swoj sprzet (wzorzec). Potkniecia sa liczone, nie gasza funkcji (CLAUDE.md pkt 7).
-**Status:** ZBUDOWANE, DO WGRANIA po zamknieciu gry (CrashScribe.dll md5 166cd3942193aa3e7c066bef4e49287e).
+**Status:** WGRANE 2026-09-16 (CrashScribe.dll md5 166cd3942193aa3e7c066bef4e49287e, repo i gra zgodne; poprzedni DLL obok jako `CrashScribe.dll.bak-2026-09-16-przed-unikatami`). DO SPRAWDZENIA w grze przez Jeffa.
 
 
 ## 2026-09-16 - Crash przy starcie po chkdsk ROZSTRZYGNIETY: dysk wyzerowal naglowek Configs\RBM\config.xml (+4 inne pliki), repo git tez podziurawione - przywrocone z D: i z GitHuba
