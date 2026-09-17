@@ -33,7 +33,10 @@ namespace CrashScribe
         public static int NightKingCallTarget = 520;      // tyle ZDROWYCH trupow w jednej bandzie (ROT oblega od 500; zapas na rannych)
         public static int NightKingCallKeep = 40;         // tyle zdrowych zostaje kazdemu dawcy
         public static int NightKingCallKeepNk = 120;      // tyle zostaje Nocnemu Krolowi, gdy oddaje
-        public static float NightKingCallFullness = 0.85f; // najsilniejsza banda pelna w tylu procentach limitu (ROT: oblezenie przy >= 0.8)
+        public static float NightKingCallFullness = 0.85f;
+
+        // --- Oboz obleniczy (patrz Mends.RbSiegeCampFed) ---
+        public static bool RbSiegeAttritionOnlyStarving = true; // straty obozu z RealisticBannerlord (2-5 dziennie, rosnace) tylko gdy oboz GLODUJE; garnizon - tylko gdy miasto bez zapasow // najsilniejsza banda pelna w tylu procentach limitu (ROT: oblezenie przy >= 0.8)
 
         internal static void Load(string moduleDataDir)
         {
@@ -70,6 +73,7 @@ namespace CrashScribe
                         case "NightKingCallKeep": NightKingCallKeep = I(v, NightKingCallKeep); break;
                         case "NightKingCallKeepNk": NightKingCallKeepNk = I(v, NightKingCallKeepNk); break;
                         case "NightKingCallFullness": NightKingCallFullness = F(v, NightKingCallFullness); break;
+                        case "RbSiegeAttritionOnlyStarving": RbSiegeAttritionOnlyStarving = B(v); break;
                     }
                 }
             }

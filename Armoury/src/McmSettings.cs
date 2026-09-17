@@ -632,6 +632,34 @@ namespace Armoury
         [SettingPropertyGroup("The law of the battlefield")]
         public int LegendaryLootValueFloor { get; set; } = 100000;
 
+        [SettingPropertyBool("Desertion Law Enabled", HintText = "men desert only when party morale falls below THEIR tier's threshold (vanilla: below 10 for everyone); a fed and paid party at high morale loses no one; pay and party-size desertion stay as in vanilla")]
+        [SettingPropertyGroup("Desertion")]
+        public bool DesertionLawEnabled { get; set; } = true;
+
+        [SettingPropertyInteger("Desertion Morale Tier1", 0, 320, "0", HintText = "morale threshold for tier 1 troops - pressed men run at the first chance; every tier above lowers the threshold by Desertion Morale Step Per Tier")]
+        [SettingPropertyGroup("Desertion")]
+        public int DesertionMoraleTier1 { get; set; } = 80;
+
+        [SettingPropertyInteger("Desertion Morale Step Per Tier", 0, 20, "0", HintText = "with tier 1 at 80 and step 5: tier 2 deserts below 75, tier 3 below 70, tier 4 below 65, tier 5 below 60, tier 6 below 55")]
+        [SettingPropertyGroup("Desertion")]
+        public int DesertionMoraleStepPerTier { get; set; } = 5;
+
+        [SettingPropertyInteger("Desertion Morale Floor", 0, 160, "0", HintText = "no threshold drops below this - even the elite leave once morale is broken")]
+        [SettingPropertyGroup("Desertion")]
+        public int DesertionMoraleFloor { get; set; } = 40;
+
+        [SettingPropertyFloatingInteger("Desertion Percent Per Morale Point", 0.00f, 4.00f, "0.00", HintText = "share of a stack (percent) that deserts per day for every morale point below its threshold")]
+        [SettingPropertyGroup("Desertion")]
+        public float DesertionPercentPerMoralePoint { get; set; } = 1.0f;
+
+        [SettingPropertyInteger("Desertion Daily Cap Percent", 0, 100, "0", HintText = "at most this share of a stack deserts in one day")]
+        [SettingPropertyGroup("Desertion")]
+        public int DesertionDailyCapPercent { get; set; } = 25;
+
+        [SettingPropertyBool("Desertion Law For Ai", HintText = "apply the tiered thresholds to AI lords as well (off: AI keeps vanilla desertion below morale 10)")]
+        [SettingPropertyGroup("Desertion")]
+        public bool DesertionLawForAi { get; set; } = false;
+
         [SettingPropertyBool("Unique Gear Law Enabled", HintText = "named heroes' gear (Ramsay, the Hound, the Mountain, Brienne, Renly...) belongs to its owner alone: copies in armouries, packs and on other heroes become same-tier gear of the wearer's own culture, and DTE swaps them on the way into any armoury")]
         [SettingPropertyGroup("The law of the battlefield")]
         public bool UniqueGearLawEnabled { get; set; } = true;
@@ -1533,6 +1561,13 @@ namespace Armoury
             s.WreckSalvageEnabled = WreckSalvageEnabled;
             s.LootMinConditionPercent = LootMinConditionPercent;
             s.LegendaryLootValueFloor = LegendaryLootValueFloor;
+            s.DesertionLawEnabled = DesertionLawEnabled;
+            s.DesertionMoraleTier1 = DesertionMoraleTier1;
+            s.DesertionMoraleStepPerTier = DesertionMoraleStepPerTier;
+            s.DesertionMoraleFloor = DesertionMoraleFloor;
+            s.DesertionPercentPerMoralePoint = DesertionPercentPerMoralePoint;
+            s.DesertionDailyCapPercent = DesertionDailyCapPercent;
+            s.DesertionLawForAi = DesertionLawForAi;
             s.UniqueGearLawEnabled = UniqueGearLawEnabled;
             s.MinSellPercentOfValue = MinSellPercentOfValue;
             s.EnlistedSoldierNoLooting = EnlistedSoldierNoLooting;

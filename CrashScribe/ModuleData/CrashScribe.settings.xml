@@ -39,4 +39,10 @@
   <NightKingCallKeep>40</NightKingCallKeep>
   <NightKingCallKeepNk>120</NightKingCallKeepNk>
   <NightKingCallFullness>0.85</NightKingCallFullness>
+
+  <!-- Siege camps do not rot while fed: RealisticBannerlord's SiegeAttritionBehavior kills 2-5 men
+       of every besieging party each day (escalating) regardless of food and morale. With this on,
+       the camp only suffers those losses while it is STARVING, and a besieged garrison only while
+       the town has no food stocks. Set to false to restore RealisticBannerlord's daily attrition. -->
+  <RbSiegeAttritionOnlyStarving>true</RbSiegeAttritionOnlyStarving>
 </CrashScribe>

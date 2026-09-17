@@ -3107,6 +3107,66 @@ namespace CrashScribe
                 }
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.Install", null); } catch { } }
+
+            try
+            {
+                // ===== OBOZ OBLEZNICZY NIE GNIJE, GDY JEST NAKARMIONY (Jeff 17.09) =====
+                // Szczegoly przy RbSiegeCampFed / RbGarrisonFed.
+                var tAttr = Type.GetType("RealisticBannerlord.Systems.Siege.SiegeAttritionBehavior, RealisticBannerlord");
+                var mParty = tAttr != null ? AccessTools.Method(tAttr, "OnDailyTickParty") : null;
+                var mSett = tAttr != null ? AccessTools.Method(tAttr, "OnDailyTickSettlement") : null;
+                if (tAttr == null) Scribe.Line("Mends: RealisticBannerlord nieobecny - straty oblezenia bez zmian.");
+                else if (!Config.RbSiegeAttritionOnlyStarving) Scribe.Line("Mends: straty obozu RealisticBannerlord zostawione (RbSiegeAttritionOnlyStarving=false).");
+                else
+                {
+                    if (mParty != null) harmony.Patch(mParty, prefix: new HarmonyMethod(typeof(Mends), "RbSiegeCampFed"));
+                    if (mSett != null) harmony.Patch(mSett, prefix: new HarmonyMethod(typeof(Mends), "RbGarrisonFed"));
+                    Scribe.Line("Mends: oboz oblezniczy nie gnije, gdy jest nakarmiony - straty RealisticBannerlord (2-5 dziennie, rosnace) tylko przy glodzie"
+                                + (mParty != null ? "" : " [OnDailyTickParty NIEZNALEZIONE]") + (mSett != null ? ", garnizon tylko bez zapasow miasta." : " [OnDailyTickSettlement NIEZNALEZIONE]."));
+                }
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.Install(rbSiege)", null); } catch { } }
+        }
+
+        // ===== OBOZ OBLEZNICZY NIE GNIJE, GDY JEST NAKARMIONY (Jeff 17.09: "oblegam miasto,
+        // 300 ludzi, pelne wyzywienie, morale 100, tier 5-6 - a trace codziennie wojsko") =====
+        // RealisticBannerlord.Systems.Siege.SiegeAttritionBehavior (dekompilacja 17.09) co dzien
+        // kazdej partii z BesiegerCamp zabija RandomInt(Min, Max+1) szeregowych - MCM Jeffa:
+        // SiegeAttritionMin=2, Max=5, plus +1 za kazde 5 dni oblezenia (do +10); chirurg
+        // z Medicine 100 polowi, 50 - x0.75; minimum 1. Zero zwiazku z jedzeniem i morale,
+        // komunikat "Your siege camp suffered N casualties (day X of siege - attrition is
+        // escalating!)". Garnizon oblezony traci 1-2 dziennie (+1-2 bez zapasow).
+        // Prefix: partia oblegajaca traci ludzi TYLKO, gdy gloduje (Party.IsStarving) -
+        // wtedy straty RB robia za choroby obozowe; garnizon tylko, gdy miasto ma
+        // FoodStocks <= 0. Reszta (vanilla ostrzal balist, dezercja) bez zmian.
+        public static bool RbSiegeCampFed(MobileParty party)
+        {
+            try
+            {
+                if (!Config.RbSiegeAttritionOnlyStarving) return true;
+                if (party == null || party.Party == null || party.BesiegerCamp == null) return true;   // RB sam to odrzuci
+                if (party.Party.IsStarving) return true;                                                // glod: straty zostaja
+                if (party.IsMainParty)
+                {
+                    string where = "?";
+                    try { where = party.BesiegerCamp.SiegeEvent.BesiegedSettlement.Name.ToString(); } catch { }
+                    Scribe.Line("Mends: oboz gracza pod " + where + " nakarmiony (morale " + party.Morale.ToString("0") + ", " + party.MemberRoster.TotalManCount
+                                + " ludzi) - bez strat RealisticBannerlord.");
+                }
+                return false;
+            }
+            catch { return true; }
+        }
+
+        public static bool RbGarrisonFed(Settlement settlement)
+        {
+            try
+            {
+                if (!Config.RbSiegeAttritionOnlyStarving) return true;
+                if (settlement == null || settlement.Town == null || settlement.SiegeEvent == null) return true;
+                return settlement.Town.FoodStocks <= 0f;
+            }
+            catch { return true; }
         }
 
         /// <summary>

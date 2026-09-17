@@ -196,6 +196,16 @@ namespace Armoury
         public bool WreckSalvageEnabled = true;            // the piece smashed by the killing blow is not lost - it lands in the loot as a wreck to mend at the forge
         public int LootMinConditionPercent = 3;            // gear battered down to this percent of its worth or less is DESTROYED - it never reaches the loot screen (0 = off)
         public int LegendaryLootValueFloor = 100000;       // weapons worth this much clean (the named blades of the realm) never lie in the common loot sacks (0 = off)
+        // --- Desertion ---
+        public bool DesertionLawEnabled = true;            // men desert only when party morale falls below THEIR tier's threshold (vanilla: below 10 for everyone); a fed and paid party at high morale loses no one; pay and party-size desertion stay as in vanilla
+        public int DesertionMoraleTier1 = 80;              // morale threshold for tier 1 troops - pressed men run at the first chance; every tier above lowers the threshold by Desertion Morale Step Per Tier
+        public int DesertionMoraleStepPerTier = 5;         // with tier 1 at 80 and step 5: tier 2 deserts below 75, tier 3 below 70, tier 4 below 65, tier 5 below 60, tier 6 below 55
+        public int DesertionMoraleFloor = 40;              // no threshold drops below this - even the elite leave once morale is broken
+        public float DesertionPercentPerMoralePoint = 1.0f; // share of a stack (percent) that deserts per day for every morale point below its threshold
+        public int DesertionDailyCapPercent = 25;          // at most this share of a stack deserts in one day
+        public bool DesertionLawForAi = false;             // apply the tiered thresholds to AI lords as well (off: AI keeps vanilla desertion below morale 10)
+
+        // --- The law of the battlefield ---
         public bool UniqueGearLawEnabled = true;           // named heroes' gear (Ramsay, the Hound, the Mountain, Brienne, Renly...) belongs to its owner alone: copies in armouries, packs and on other heroes become same-tier gear of the wearer's own culture, and DTE swaps them on the way into any armoury
         public int MinSellPercentOfValue = 5;              // merchants never pay less than this share of an item's clean value - scrap is still metal and leather (0 = off)
         public bool EnlistedSoldierNoLooting = true;       // serving in a lord's army: the quartermasters strip the field - one soldier does not pocket the army's loot and gold

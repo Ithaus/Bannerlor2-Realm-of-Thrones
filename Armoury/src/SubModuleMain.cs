@@ -132,12 +132,14 @@ namespace Armoury
                 McmSettings.Apply();
                 // dlugosc roku MUSI wejsc, zanim gra przeliczy swoj zegar
                 LongYearTimeModel.Install(gameStarterObject);
+                TierDesertionModel.Install(starter);   // prawo dezercji (Jeff 17.09) - patrz DesertionLaw.cs
                 starter.AddBehavior(new ArmouryBehavior());
                 starter.AddBehavior(new Uniques());
                 starter.AddBehavior(new HideoutPurge());
                 starter.AddBehavior(new BattleMuster());
                 starter.AddBehavior(new LegendaryLaw());
                 starter.AddBehavior(new UniqueLaw());
+                starter.AddBehavior(new DesertionLaw());
                 starter.AddBehavior(new MusterBook());
                 starter.AddBehavior(new HideoutSpotter());
                 starter.AddBehavior(new HouseLevies());
