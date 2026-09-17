@@ -21,12 +21,14 @@ namespace Armoury
     /// ponad limit dziennie, min. 1). Czyli w vanilla morale 60 nikogo nie rusza,
     /// a morale 9 rozgania wszystkich po rowno.
     ///
-    /// TUTAJ: kazdy tier ma WLASNY prog morale: tier 1 = DesertionMoraleTier1 (80),
-    /// kazdy tier wyzej o DesertionMoraleStepPerTier (5) nizej, nie ponizej
-    /// DesertionMoraleFloor (40): t1 80, t2 75, t3 70, t4 65, t5 60, t6 55, t7 50.
+    /// TUTAJ: kazdy tier ma WLASNY prog morale: tier 1 = DesertionMoraleTier1 (25),
+    /// kazdy tier wyzej o DesertionMoraleStepPerTier (3) nizej, nie ponizej
+    /// DesertionMoraleFloor (10): t1 25, t2 22, t3 19, t4 16, t5 13, t6 10, t7 10.
+    /// (Jeff 17.09 po pierwszej wersji 80/5/40: "za agresywnie - dezercja tylko
+    /// ponizej morale 25 i w dol".) Powyzej 25 nikt nie odchodzi.
     /// Ponizej progu ze stosu odchodzi dziennie DesertionPercentPerMoralePoint (1%)
     /// za kazdy punkt morale ponizej progu, najwyzej DesertionDailyCapPercent (25%).
-    /// Przyklad: rekruci t1 przy morale 60 traca 20% dziennie, elita t6 przy 50 - 5%.
+    /// Przyklad: rekruci t1 przy morale 15 traca 10% dziennie, elita t6 przy 5 - 5%.
     /// Najedzona i oplacona armia (morale wysokie) nie traci nikogo. Glod i brak
     /// zoldu dzialaja jak w vanilla: obnizaja morale (kary z DefaultPartyMoraleModel)
     /// i po progach robia swoje; zold ponad limit wyplat i przepelnienie partii -
@@ -66,9 +68,9 @@ namespace Armoury
         internal static int ThresholdFor(int tier)
         {
             var s = Settings.Current;
-            int t1 = s != null ? s.DesertionMoraleTier1 : 80;
-            int step = s != null ? s.DesertionMoraleStepPerTier : 5;
-            int floor = s != null ? s.DesertionMoraleFloor : 40;
+            int t1 = s != null ? s.DesertionMoraleTier1 : 25;
+            int step = s != null ? s.DesertionMoraleStepPerTier : 3;
+            int floor = s != null ? s.DesertionMoraleFloor : 10;
             if (tier < 1) tier = 1;
             int th = t1 - step * (tier - 1);
             if (th < floor) th = floor;

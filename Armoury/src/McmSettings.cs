@@ -632,21 +632,21 @@ namespace Armoury
         [SettingPropertyGroup("The law of the battlefield")]
         public int LegendaryLootValueFloor { get; set; } = 100000;
 
-        [SettingPropertyBool("Desertion Law Enabled", HintText = "men desert only when party morale falls below THEIR tier's threshold (vanilla: below 10 for everyone); a fed and paid party at high morale loses no one; pay and party-size desertion stay as in vanilla")]
+        [SettingPropertyBool("Desertion Law Enabled", HintText = "men desert only when party morale falls below THEIR tier's threshold (vanilla: below 10 for everyone); a fed and paid party at decent morale loses no one; pay and party-size desertion stay as in vanilla")]
         [SettingPropertyGroup("Desertion")]
         public bool DesertionLawEnabled { get; set; } = true;
 
-        [SettingPropertyInteger("Desertion Morale Tier1", 0, 320, "0", HintText = "morale threshold for tier 1 troops - pressed men run at the first chance; every tier above lowers the threshold by Desertion Morale Step Per Tier")]
+        [SettingPropertyInteger("Desertion Morale Tier1", 0, 100, "0", HintText = "morale threshold for tier 1 troops - pressed men run first; every tier above lowers the threshold by Desertion Morale Step Per Tier; nobody deserts above this morale")]
         [SettingPropertyGroup("Desertion")]
-        public int DesertionMoraleTier1 { get; set; } = 80;
+        public int DesertionMoraleTier1 { get; set; } = 25;
 
-        [SettingPropertyInteger("Desertion Morale Step Per Tier", 0, 20, "0", HintText = "with tier 1 at 80 and step 5: tier 2 deserts below 75, tier 3 below 70, tier 4 below 65, tier 5 below 60, tier 6 below 55")]
+        [SettingPropertyInteger("Desertion Morale Step Per Tier", 0, 12, "0", HintText = "with tier 1 at 25 and step 3: tier 2 deserts below 22, tier 3 below 19, tier 4 below 16, tier 5 below 13, tier 6 below 10 (0 = one threshold for all tiers)")]
         [SettingPropertyGroup("Desertion")]
-        public int DesertionMoraleStepPerTier { get; set; } = 5;
+        public int DesertionMoraleStepPerTier { get; set; } = 3;
 
-        [SettingPropertyInteger("Desertion Morale Floor", 0, 160, "0", HintText = "no threshold drops below this - even the elite leave once morale is broken")]
+        [SettingPropertyInteger("Desertion Morale Floor", 0, 40, "0", HintText = "no threshold drops below this - even the elite leave once morale is broken")]
         [SettingPropertyGroup("Desertion")]
-        public int DesertionMoraleFloor { get; set; } = 40;
+        public int DesertionMoraleFloor { get; set; } = 10;
 
         [SettingPropertyFloatingInteger("Desertion Percent Per Morale Point", 0.00f, 4.00f, "0.00", HintText = "share of a stack (percent) that deserts per day for every morale point below its threshold")]
         [SettingPropertyGroup("Desertion")]

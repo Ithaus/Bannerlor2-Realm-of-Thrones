@@ -197,10 +197,10 @@ namespace Armoury
         public int LootMinConditionPercent = 3;            // gear battered down to this percent of its worth or less is DESTROYED - it never reaches the loot screen (0 = off)
         public int LegendaryLootValueFloor = 100000;       // weapons worth this much clean (the named blades of the realm) never lie in the common loot sacks (0 = off)
         // --- Desertion ---
-        public bool DesertionLawEnabled = true;            // men desert only when party morale falls below THEIR tier's threshold (vanilla: below 10 for everyone); a fed and paid party at high morale loses no one; pay and party-size desertion stay as in vanilla
-        public int DesertionMoraleTier1 = 80;              // morale threshold for tier 1 troops - pressed men run at the first chance; every tier above lowers the threshold by Desertion Morale Step Per Tier
-        public int DesertionMoraleStepPerTier = 5;         // with tier 1 at 80 and step 5: tier 2 deserts below 75, tier 3 below 70, tier 4 below 65, tier 5 below 60, tier 6 below 55
-        public int DesertionMoraleFloor = 40;              // no threshold drops below this - even the elite leave once morale is broken
+        public bool DesertionLawEnabled = true;            // men desert only when party morale falls below THEIR tier's threshold (vanilla: below 10 for everyone); a fed and paid party at decent morale loses no one; pay and party-size desertion stay as in vanilla
+        public int DesertionMoraleTier1 = 25;              // morale threshold for tier 1 troops - pressed men run first; every tier above lowers the threshold by Desertion Morale Step Per Tier; nobody deserts above this morale
+        public int DesertionMoraleStepPerTier = 3;         // with tier 1 at 25 and step 3: tier 2 deserts below 22, tier 3 below 19, tier 4 below 16, tier 5 below 13, tier 6 below 10 (0 = one threshold for all tiers)
+        public int DesertionMoraleFloor = 10;              // no threshold drops below this - even the elite leave once morale is broken
         public float DesertionPercentPerMoralePoint = 1.0f; // share of a stack (percent) that deserts per day for every morale point below its threshold
         public int DesertionDailyCapPercent = 25;          // at most this share of a stack deserts in one day
         public bool DesertionLawForAi = false;             // apply the tiered thresholds to AI lords as well (off: AI keeps vanilla desertion below morale 10)

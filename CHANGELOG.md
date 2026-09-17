@@ -1,5 +1,13 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-17 - Prawo dezercji: progi obnizone (Jeff: "za agresywnie - dezercja tylko ponizej morale 25 i w dol") - t1<25, -3 na tier, podloga 10
+**Mod:** Armoury | **Pliki:** `Armoury/src/Settings.cs` (+McmSettings), `Armoury/src/DesertionLaw.cs` (domyslne i komentarz)
+**Zgloszenie (Jeff 17.09, po wpisie nizej):** progi 80/75/70/65/60/55 to za agresywnie; dezercja ma zaczynac sie dopiero ponizej morale 25 i rosnac w dol.
+**Zmiana:** domyslne `DesertionMoraleTier1` 80 -> 25, `DesertionMoraleStepPerTier` 5 -> 3, `DesertionMoraleFloor` 40 -> 10. Progi: t1<25, t2<22, t3<19, t4<16, t5<13, t6<10, t7<10 - powyzej 25 nikt nie odchodzi. Tempo bez zmian: 1% stosu za kazdy punkt morale ponizej progu, sufit 25%/dzien (rekruci t1 przy morale 15: 10% dziennie; elita t6 przy 5: 5%). Krok 0 w MCM = jeden prog 25 dla wszystkich. Reszta prawa (zold, limit partii, AI przy vanilla, logi) jak we wpisie nizej. MCM json Jeffa (`Armoury.json`, mtime 16.09 08:27) nie mial jeszcze kluczy Desertion - gra nie byla uruchamiana od poprzedniego wgrania - wiec nowe domyslne wchodza bez podmiany pliku.
+**Ryzyko / co sprawdzic:** po wczytaniu w Armoury.log `DesertionLaw: model dodany - progi morale t1<25 t2<22 t3<19 t4<16 t5<13 t6<10 t7<10`. Jesli MCM pokaze w grupie Desertion 80/5/40, to json zapisal stare wartosci - przestawic suwaki na 25/3/10.
+**Status:** WGRANE 2026-09-17 (Armoury.dll md5 975fa127378e4f74e2642d2637afed5f, build rc=0, gra zamknieta; poprzednie DLL obok jako `Armoury.dll.bak-2026-09-17-progi-80`). DO SPRAWDZENIA po wczytaniu.
+
+
 ## 2026-09-17 - "Oblegam miasto, 300 ludzi, pelne wyzywienie, morale 100, elita - a trace codziennie wojsko": winowajca to RealisticBannerlord (2-5 zabitych DZIENNIE w obozie), do tego prawo dezercji po tierach
 **Mod:** Armoury + CrashScribe | **Pliki:** `Armoury/src/DesertionLaw.cs` (NOWY: TierDesertionModel + DesertionLaw), `Armoury/src/Settings.cs` (+McmSettings, grupa Desertion), `Armoury/src/SubModuleMain.cs`, `CrashScribe/src/Mends.cs` (RbSiegeCampFed, RbGarrisonFed), `CrashScribe/src/Config.cs`, `CrashScribe/ModuleData/CrashScribe.settings.xml`
 **Zgloszenie (Jeff 17.09):** "oblegam miasto, mam 300 ludzi, pelne wyzywienie, morale 100, tier 5 i 6 - taka armia nie dezerteruje czy umiera (trace codziennie wojsko). Dezercje wtedy, gdy brak zywnosci albo zoldu, niskie morale: tier 1 przy morale 80 (zaciagnieci sila), tier 2 przy 75 itd. Zrob z tego sensowny system i sprawdz, jak dzialaja oblezenia teraz."
