@@ -59,6 +59,68 @@ namespace Armoury
         }
 
         private static readonly HashSet<string> _siegeLogged = new HashSet<string>();
+        private static int _siegeDayLogged = -1;
+
+        /// <summary>17.09 (Jeff: "buduje onager, nie postepuje ani o 1%"): raz na dzien
+        /// kampanii, strona atakujaca oblezenia gracza - co gra NAPRAWDE buduje
+        /// (ConstructionTick: dopoki przygotowania obozu nie sa gotowe, zadna machina
+        /// nie rusza), postep, sila robocza wedle gry (sqrt zdrowych w obozie), partie
+        /// w obozie, Tools w sakwach i mnoznik, ktory RealisticBannerlord czyta z MCM
+        /// (papier 12:30 i 13:36: "gra 0.55%/h" przed i PO zmianie suwaka 0.4 -> 1.0 -
+        /// cos sie nie zgadza, ta linia ma to rozstrzygnac).</summary>
+        private static void SiegeDaily(SiegeEvent siegeEvent, ISiegeEventSide side)
+        {
+            try
+            {
+                if (side.BattleSide != BattleSideEnum.Attacker) return;
+                int day = (int)CampaignTime.Now.ToDays;
+                if (day == _siegeDayLogged) return;
+                _siegeDayLogged = day;
+                var sb = new System.Text.StringBuilder();
+                sb.Append("WorldPace: oblezenie ").Append(siegeEvent.BesiegedSettlement != null ? siegeEvent.BesiegedSettlement.Name.ToString() : "?")
+                  .Append(" dzien ").Append(day).Append(": ");
+                var prep = side.SiegeEngines != null ? side.SiegeEngines.SiegePreparations : null;
+                if (prep != null) sb.Append("przygotowania obozu ").Append((prep.Progress * 100f).ToString("0.0")).Append("%").Append(prep.IsConstructed ? " (gotowe)" : " (W BUDOWIE - machiny czekaja)").Append("; ");
+                try
+                {
+                    var building = new List<string>();
+                    foreach (var e in side.SiegeEngines.DeployedSiegeEngines)
+                        if (e != null && e.SiegeEngine != null && !e.IsConstructed) building.Add(e.SiegeEngine.StringId + " " + (e.Progress * 100f).ToString("0.0") + "%");
+                    sb.Append("machiny w budowie: ").Append(building.Count > 0 ? string.Join(", ", building.ToArray()) : "(zadna)").Append("; ");
+                }
+                catch { }
+                try
+                {
+                    float mdp = Campaign.Current.Models.SiegeEventModel.GetAvailableManDayPower(side);
+                    sb.Append("sila robocza wg gry ").Append(mdp.ToString("0.0")).Append(" (sqrt zdrowych) -> ~").Append((mdp * mdp).ToString("0")).Append(" zdrowych; ");
+                }
+                catch { }
+                try
+                {
+                    var parts = new List<string>();
+                    foreach (var p in siegeEvent.BesiegerCamp.GetInvolvedPartiesForEventType())
+                        if (p != null) parts.Add(p.Name + " " + p.NumberOfHealthyMembers + "/" + p.NumberOfAllMembers);
+                    sb.Append("partie w obozie: ").Append(string.Join(", ", parts.ToArray())).Append("; ");
+                }
+                catch { }
+                try { sb.Append("Tools w sakwach gracza ").Append(MobileParty.MainParty.ItemRoster.GetItemNumber(DefaultItems.Tools)).Append("; "); } catch { }
+                try
+                {
+                    var tRb = AccessTools.TypeByName("RealisticBannerlord.Settings.RealisticSettings");
+                    var tGs = AccessTools.TypeByName("MCM.Abstractions.Base.Global.GlobalSettings`1");
+                    if (tRb != null && tGs != null)
+                    {
+                        var inst = AccessTools.Property(tGs.MakeGenericType(tRb), "Instance").GetValue(null, null);
+                        var pv = inst != null ? AccessTools.Property(tRb, "SiegeConstructionSpeedMultiplier") : null;
+                        sb.Append("RB mnoznik budowy z MCM = ").Append(inst == null ? "(Instance null -> RB bierze 0.4)" : (pv != null ? Convert.ToSingle(pv.GetValue(inst, null)).ToString("0.00") : "?"));
+                    }
+                    else sb.Append("RB: ").Append(tRb == null ? "typ ustawien nieznaleziony" : "MCM GlobalSettings nieznaleziony");
+                }
+                catch (Exception e) { sb.Append("RB mnoznik: blad ").Append(e.GetType().Name); }
+                Log.Info(sb.ToString());
+            }
+            catch (Exception e) { Log.Error("WorldPace.SiegeDaily", e); }
+        }
 
         public static void SiegePostfix(ref float __result, SiegeEngineType type, SiegeEvent siegeEvent, ISiegeEventSide side)
         {
@@ -73,6 +135,7 @@ namespace Armoury
                 try
                 {
                     if (siegeEvent == null || type == null || side == null || !siegeEvent.IsPlayerSiegeEvent) return;
+                    SiegeDaily(siegeEvent, side);
                     string key = type.StringId + "|" + side.BattleSide;
                     if (_siegeLogged.Contains(key)) return;
                     _siegeLogged.Add(key);
