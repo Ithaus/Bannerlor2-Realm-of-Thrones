@@ -108,7 +108,11 @@ for sk in skins_of(ww_body):
     for blk, rgb in (("skin_color_gradient_points", SKIN_RGB), ("hair_color_gradient_points", HAIR_RGB), ("eye_color_gradient_points", EYE_RGB)):
         cnt = [0, 0]
         def repl(m, blk=blk, rgb=rgb, cnt=cnt):
-            n = len(re.findall(r'point="', m.group(0))); cnt[0] += 1; cnt[1] += n
+            # LICZYC TYLKO PRAWDZIWE PUNKTY: w blokach siedza zakomentowane fragmenty
+            # (<!-- ... -->) z dodatkowymi punktami - policzone jako prawdziwe daly za
+            # duzo realnych punktow i natywny loader padl (Access Violation 17.09 15:43)
+            live = re.sub(r'<!--.*?-->', '', m.group(0), flags=re.S)
+            n = len(re.findall(r'point="', live)); cnt[0] += 1; cnt[1] += n
             return gradient(blk, n, rgb)
         body = re.sub(r'<%s\b[^>]*>.*?</%s>' % (blk, blk), repl, body, flags=re.S)
         if cnt[0] == 0: raise SystemExit("brak bloku %s w %s" % (blk, tag))
