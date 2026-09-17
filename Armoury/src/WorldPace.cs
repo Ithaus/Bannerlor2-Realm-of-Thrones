@@ -1,8 +1,12 @@
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.ComponentInterfaces;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Siege;
+using TaleWorlds.Core;
 using TaleWorlds.Localization;
 
 namespace Armoury
@@ -22,6 +26,20 @@ namespace Armoury
     ///    trwaja ~2x dluzej, wiec glodzenie twierdzy wraca do gry.
     /// Dotyczy WSZYSTKICH rowno (gracz, AI, karawany, wieśniacy) - swiat
     /// zwalnia jednym rytmem.
+    ///
+    /// 17.09 (Jeff: "strasznie wolno trwa oblezenie, taran buduje sie kilka
+    /// dni"): SiegePostfix byl podpiety pod KAZDY model z wlasnym
+    /// GetConstructionProgressPerHour (log: "budowa oblezen 50% (2 modeli)"),
+    /// a RealisticBannerlord.RealisticSiegeEventModel wola w srodku bazowy
+    /// DefaultSiegeEventModel - nasze 50% wchodzilo wiec DWA razy (x0.25),
+    /// do tego RB mnozy przez swoj suwak SiegeConstructionSpeedMultiplier
+    /// (MCM Jeffa 0.4; oblegajacy bez Tools w sakwach jeszcze x0.75).
+    /// Razem 0.5 x 0.4 x 0.75 x 0.5 = 7.5% tempa gry: taran (12 osobodni,
+    /// 300 ludzi -> vanilla ~17 h) budowal sie ~9 dni, przygotowania obozu
+    /// (48 osobodni) ~37 dni. Teraz: licznik SpeedDepth.OutermostSiege -
+    /// suwak liczy sie raz, na najbardziej zewnetrznym poziomie lancucha.
+    /// Do logu (raz na typ machiny i sesje, tylko oblezenie gracza): tempo
+    /// z gry (juz po RB) i po naszym suwaku, w % postepu na godzine.
     /// </summary>
     internal static class WorldPace
     {
@@ -40,14 +58,32 @@ namespace Armoury
             catch { }
         }
 
-        public static void SiegePostfix(ref float __result)
+        private static readonly HashSet<string> _siegeLogged = new HashSet<string>();
+
+        public static void SiegePostfix(ref float __result, SiegeEngineType type, SiegeEvent siegeEvent, ISiegeEventSide side)
         {
             try
             {
+                if (!SpeedDepth.OutermostSiege) return;         // lancuch modeli (RB -> Default): tylko raz
                 var s = Settings.Current;
                 int p = s != null ? s.SiegePacePercent : 100;
-                if (p >= 100 || p < 5) return;
-                __result *= p / 100f;
+                float before = __result;
+                if (p < 100 && p >= 5) __result *= p / 100f;
+                // slad w logu: tylko oblezenie gracza, raz na typ machiny
+                try
+                {
+                    if (siegeEvent == null || type == null || side == null || !siegeEvent.IsPlayerSiegeEvent) return;
+                    string key = type.StringId + "|" + side.BattleSide;
+                    if (_siegeLogged.Contains(key)) return;
+                    _siegeLogged.Add(key);
+                    int men = 0;
+                    try { men = MobileParty.MainParty != null ? MobileParty.MainParty.MemberRoster.TotalHealthyCount : 0; } catch { }
+                    float hoursNow = __result > 0f ? 1f / __result : 0f;
+                    Log.Info("WorldPace: budowa " + type.StringId + " (" + type.ManDayCost + " osobodni, strona " + side.BattleSide + ", zdrowych " + men
+                             + "): gra (z innymi modami) " + (before * 100f).ToString("0.00") + "%/h -> po suwaku " + p + "% " + (__result * 100f).ToString("0.00")
+                             + "%/h = ~" + hoursNow.ToString("0") + " h (" + (hoursNow / 24f).ToString("0.0") + " dnia) od zera.");
+                }
+                catch { }
             }
             catch { }
         }
