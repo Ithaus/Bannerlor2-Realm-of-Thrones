@@ -8,7 +8,7 @@
 **Zmiana:** `SpeedDepth` dostaje czwarty licznik (`SiegePrefix`/`SiegeFinalizer` na kazdym `GetConstructionProgressPerHour`), a `WorldPace.SiegePostfix` dziala tylko na najbardziej zewnetrznym poziomie lancucha (`OutermostSiege`) - suwak 50% liczy sie RAZ. Efekt bez ruszania RB: 0.5 x 0.4 x 0.75 = 0.15 (z Tools 0.2): taran ~4.6 dnia (3.5 z Tools), przygotowania ~18 dni (14). Log przy starcie `SpeedDepth: ... budowa machin 2 modeli`, a w oblezeniu gracza raz na typ machiny: `WorldPace: budowa ram (12 osobodni, strona Attacker, zdrowych N): gra (z innymi modami) X%/h -> po suwaku 50% Y%/h = ~Z h (D dnia) od zera`.
 **Do decyzji Jeffa (nie zmienione):** MCM RealisticBannerlord -> Siege Construction Speed Multiplier 0.4 -> 1.0 daloby z naszym 50%: taran ~1.4-1.9 dnia, przygotowania ~5.5-7.4 dnia; do tego Tools w sakwach (RB: bez nich x0.75) i inzynier z wysoka Inzynieria. Nasz `SiegePacePercent` (MCM Armoury, 50) to decyzja z 31.08 ("oblezenia ~2x dluzej").
 **Ryzyko / co sprawdzic:** po wczytaniu `SpeedDepth: ... budowa machin 2 modeli`; w oblezeniu linia `WorldPace: budowa ...` z tempem - wartosc "po suwaku" ma byc dokladnie 0.5 x "gra". Budowa juz rozpoczeta liczy dalej od zapisanego postepu, tylko szybciej.
-**Status:** ZBUDOWANE (build rc=0, Armoury.dll w repo md5 998cf47667657a448c94ca0c77ef38f7), DO WGRANIA po zamknieciu gry (gra dziala w chwili builda).
+**Status:** WGRANE 2026-09-17 (Armoury.dll md5 998cf47667657a448c94ca0c77ef38f7, build rc=0, gra zamknieta; poprzednie DLL obok jako `Armoury.dll.bak-2026-09-17-przed-tempem-oblezen`). DO SPRAWDZENIA w logu przy oblezeniu.
 
 
 ## 2026-09-17 - Prawo dezercji: progi obnizone (Jeff: "za agresywnie - dezercja tylko ponizej morale 25 i w dol") - t1<25, -3 na tier, podloga 10
