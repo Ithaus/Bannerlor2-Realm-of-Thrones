@@ -1,5 +1,13 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-17 - "Jakie pekanie, wywal to, nic ma nie pekac": pekanie kolczanow po bitwie (AmmoAttrition) USUNIETE; RealisticBannerlord mnoznik budowy machin 0.4 -> 1.0 (Jeff: "ustaw oblezenie na wskaznik 1")
+**Mod:** Armoury + konfiguracja RB | **Pliki:** `Armoury/src/AmmoAttrition.cs` (USUNIETY), `Armoury/src/ArmouryBehavior.cs` (OnMapEventEnded bez wywolania), `Armoury/src/Settings.cs` (+McmSettings: grupa "Arrows break" usunieta), `Configs\ModSettings\Global\RealisticBannerlord\RealisticBannerlord_v2.json`
+**Zgloszenie (Jeff 17.09):** "znowu brakuje arrows, uzupelnilem, nie prowadzilem zadnej bitwy" -> log: `12:40:46 Amunicja: po bitwie peklo 3 kolczanow` (Arrows 222->219), `12:47:26 ... peklo 9` (219->210) - dwie bitwy z kryjowek (sea raiders, mountain bandits); potem +90 ravens_teeth_arrows (t6, wymog 175) - `uzyte=26/113`, Rangersi z Bow 140 nie moga ich wziac, stad dalej `Arrows 213/222, 9x Riverlands Ranger bez sztuki`. Jeff: "nic ma nie pekac, co za glupota" oraz "ustaw oblezenie na wskaznik 1".
+**Zmiana:** (1) regula z 02.09 (5% na kolczan t3, tier +/-25%) wywalona w calosci: plik usuniety, wywolanie `AmmoAttrition.AfterBattle()` po bitwie usuniete, trzy ustawienia (AmmoBreakEnabled/Percent/TierStep) usuniete - klucze w `Armoury.json` MCM zostaja sierotami (MCM je ignoruje). Amunicja ubywa juz TYLKO przez wystrzelanie w polu (DTE oddaje kolczany - Mends QuiversComeBack; tekst logu Mends nadal wspomina AmmoAttrition - kosmetyka). (2) `SiegeConstructionSpeedMultiplier` 0.4 -> 1.0 w json RB (kopia `.bak-2026-09-17-oblezenie-1`, gra zamknieta, JSON sprawdzony); nasz `SiegePacePercent` 50 bez zmian - razem 0.5 tempa gry (x0.75 bez Tools).
+**Ryzyko / co sprawdzic:** po bitwie brak linii `Amunicja: po bitwie peklo`; `SLED AMUNICJI: Arrows` tylko przy wkladaniu/wyjmowaniu; w oblezeniu linia `WorldPace: budowa ...` z "gra" ~2.5x wyzsza niz 0.55%/h. Brak strzal dla Rangersow 140 to nadal brak sztuk t5 lub nizej (bodkin/hardened/GRE) - Ravens Teeth (t6) sa dla 175+.
+**Status:** WGRANE 2026-09-17 (Armoury.dll md5 aa5f59b8dc3fa962af62ca3d98af733c, build rc=0, gra zamknieta; poprzednie DLL obok jako `Armoury.dll.bak-2026-09-17-przed-usunieciem-pekania`). DO SPRAWDZENIA po bitwie.
+
+
 ## 2026-09-17 - "Strasznie wolno trwa oblezenie, taran buduje sie kilka dni": suwak tempa oblezen (50%) wchodzil DWA razy przez lancuch modeli z RealisticBannerlord - razem 7.5% tempa gry
 **Mod:** Armoury | **Pliki:** `Armoury/src/WorldPace.cs` (SiegePostfix: licznik zagniezdzenia + log), `Armoury/src/SpeedDepth.cs` (czwarty licznik: budowa machin)
 **Zgloszenie (Jeff 17.09):** "strasznie wolno trwa oblezenie, jaka jest regula - buduje juz kilka dni battering ram".

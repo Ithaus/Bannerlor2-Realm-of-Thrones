@@ -1202,8 +1202,8 @@ namespace Armoury
             {
                 if (mapEvent == null || !mapEvent.IsPlayerMapEvent) return;
 
-                // strzaly i belty lamia sie w kazdej bitwie - wygranej czy nie
-                AmmoAttrition.AfterBattle();
+                // 17.09: pekanie kolczanow po bitwie (AmmoAttrition, Jeff 02.09) WYWALONE
+                // na zadanie Jeffa ("nic ma nie pekac") - amunicja ubywa tylko w polu
 
                 // PRZEGRANA ALBO UCIECZKA = NIC Z POLA. Wraki zbierane w trakcie
                 // misji lezaly w kolejce niezaleznie od wyniku i po godzinie

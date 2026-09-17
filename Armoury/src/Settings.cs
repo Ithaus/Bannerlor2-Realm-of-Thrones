@@ -386,11 +386,6 @@ namespace Armoury
         public bool TroopOrderEnabled = true;              // order missing kit for the men from the town smith - plain pieces of the tier you ask, straight onto the racks
         public float TroopOrderMarkup = 1.15f;             // the smith's fee: each procured piece costs its market worth times this
 
-        // --- Arrows break ---
-        public bool AmmoBreakEnabled = true;               // after every battle a share of the quivers and bolt cases in the baggage and the troop armoury is lost to breakage - restock at merchants or the fletcher's bench
-        public int AmmoBreakPercent = 5;                   // chance, in percent, that a tier-3 quiver breaks in a battle
-        public int AmmoBreakTierStep = 25;                 // every tier below 3 adds this many percent to the chance, every tier above takes it away (25: tier 1 breaks 1.5x as often, tier 6 only 0.25x)
-
         // --- Time at the forge ---
         public float SmithRepairHoursPerPiece = 1.5f;      // hours the smith needs per worn piece of your harness
         public float SelfRepairHoursPerPiece = 2.5f;       // hours you need per piece working the anvil yourself

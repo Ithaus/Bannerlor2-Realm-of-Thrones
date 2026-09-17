@@ -1304,18 +1304,6 @@ namespace Armoury
         [SettingPropertyGroup("The men's gear")]
         public float TroopOrderMarkup { get; set; } = 1.15f;
 
-        [SettingPropertyBool("Ammo Break Enabled", HintText = "after every battle a share of the quivers and bolt cases in the baggage and the troop armoury is lost to breakage - restock at merchants or the fletcher's bench")]
-        [SettingPropertyGroup("Arrows break")]
-        public bool AmmoBreakEnabled { get; set; } = true;
-
-        [SettingPropertyInteger("Ammo Break Percent", 0, 20, "0", HintText = "chance, in percent, that a tier-3 quiver breaks in a battle")]
-        [SettingPropertyGroup("Arrows break")]
-        public int AmmoBreakPercent { get; set; } = 5;
-
-        [SettingPropertyInteger("Ammo Break Tier Step", 0, 100, "0", HintText = "every tier below 3 adds this many percent to the chance, every tier above takes it away (25: tier 1 breaks 1.5x as often, tier 6 only 0.25x)")]
-        [SettingPropertyGroup("Arrows break")]
-        public int AmmoBreakTierStep { get; set; } = 25;
-
         [SettingPropertyFloatingInteger("Smith Repair Hours Per Piece", 0.00f, 6.00f, "0.00", HintText = "hours the smith needs per worn piece of your harness")]
         [SettingPropertyGroup("Time at the forge")]
         public float SmithRepairHoursPerPiece { get; set; } = 1.5f;
@@ -1729,9 +1717,6 @@ namespace Armoury
             s.TroopMendMaxHours = TroopMendMaxHours;
             s.TroopOrderEnabled = TroopOrderEnabled;
             s.TroopOrderMarkup = TroopOrderMarkup;
-            s.AmmoBreakEnabled = AmmoBreakEnabled;
-            s.AmmoBreakPercent = AmmoBreakPercent;
-            s.AmmoBreakTierStep = AmmoBreakTierStep;
             s.SmithRepairHoursPerPiece = SmithRepairHoursPerPiece;
             s.SelfRepairHoursPerPiece = SelfRepairHoursPerPiece;
             s.MendLootHoursPerPiece = MendLootHoursPerPiece;
