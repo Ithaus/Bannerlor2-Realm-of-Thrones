@@ -3089,6 +3089,26 @@ namespace CrashScribe
 
             try
             {
+                // ===== OVERLAY OBLEZENIA: PARTIA OSADY BEZ MobileParty (crash Jeffa 18.09) =====
+                // Szczegoly przy SafeMenuPartyLink. UWAGA: ten blok MUSI stac przed blokiem
+                // RealisticBannerlord ponizej - tamten ma "return", gdy moda nie ma, wiec
+                // wszystko za nim nie instaluje sie bez RealisticBannerlord.
+                var tMenuItem = AccessTools.TypeByName("TaleWorlds.CampaignSystem.ViewModelCollection.GameMenu.Overlay.GameMenuPartyItemVM");
+                var mLink = tMenuItem != null ? AccessTools.Method(tMenuItem, "GetEncyclopediaPageLink") : null;
+                _fMenuPartyItemParty = tMenuItem != null ? AccessTools.Field(tMenuItem, "Party") : null;
+                if (mLink != null && _fMenuPartyItemParty != null)
+                {
+                    harmony.Patch(mLink, prefix: new HarmonyMethod(typeof(Mends), "SafeMenuPartyLink"));
+                    Scribe.Line("Mends: overlay oblezenia zabezpieczony - partia osady bez MobileParty nie wywroci juz listy obroncow (crash 18.09, menu_siege_strategies).");
+                }
+                else
+                    Scribe.Line("Mends: GameMenuPartyItemVM " + (tMenuItem == null ? "NIEZNALEZIONY" : (mLink == null ? "bez GetEncyclopediaPageLink" : "bez pola Party"))
+                                + " - overlay oblezenia BEZ zabezpieczenia.");
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.Install(siegeOverlay)", null); } catch { } }
+
+            try
+            {
                 if (Type.GetType("RealisticBannerlord.Systems.Espionage.LordSpyBehavior, RealisticBannerlord") == null)
                     return;   // moda nie ma - nie ma czego mostkowac
                 var run = AccessTools.Method(typeof(ConversationSentence), "RunConsequence");
@@ -3167,6 +3187,68 @@ namespace CrashScribe
                 return settlement.Town.FoodStocks <= 0f;
             }
             catch { return true; }
+        }
+
+        // ===== OVERLAY OBLEZENIA: PARTIA OSADY NIE MA MobileParty (crash Jeffa 18.09) =====
+        private static System.Reflection.FieldInfo _fMenuPartyItemParty;
+        private static int _menuPartyLinkSaves;
+
+        /// <summary>
+        /// CRASH (Jeff 18.09 15:21:52: "jak kliknal join to continue the siege, gra zrobila crasha";
+        /// CrashScribe: menu_siege_strategies, NullReferenceException w
+        /// GameMenuPartyItemVM.GetEncyclopediaPageLink -> RefreshProperties -> ..ctor ->
+        /// EncounterMenuOverlayVM.UpdateLists).
+        ///
+        /// WADA JEST W GRZE (dekompilacja 18.09): GetEncyclopediaPageLink ma zepsute strazniki -
+        /// sprawdza "party == null", a zaraz potem luska party.MobileParty.IsCaravan (i tak samo
+        /// IsGarrison, IsMilitia, IsVillager). Dla partii OSADY (Settlement.Party) MobileParty
+        /// JEST null (PartyBase.IsMobile => MobileParty != null), wiec kazdy taki kafelek konczy
+        /// sie NullReference. Do listy obroncow partia osady trafia wprost z vanilli:
+        /// Town.GetDefenderParties oddaje "Settlement.Party" jako PIERWSZA pozycje. W czystej grze
+        /// jej roster jest pusty (garnizon to osobna MobileParty) i pozycja wypada na filtrach
+        /// EncounterMenuOverlayVM (MemberRoster.Count > 0, przy oblezeniu takze TotalHealthyCount > 0) -
+        /// przechodzi dopiero, gdy ktos wsadzil do rostera osady ZYWYCH ludzi. Jedyny taki kod
+        /// znaleziony w tej instalacji: StrategicCampaignAI145.TryReinforceFragileGarrison
+        /// (sypie po 18 ludzi do "settlement.Party.MemberRoster" zamiast do Town.GarrisonParty;
+        /// jego bramka "za duzy garnizon" czyta EstimatedStrength, ktore dla partii niemobilnej
+        /// zawsze wynosi 0, wiec nigdy nie hamuje).
+        ///
+        /// NIE poprawiamy straznikow i NIE wpuszczamy oryginalu: kilkanascie linii dalej czeka
+        /// nieoslonione Party.Owner -> Settlement.OwnerClan.Leader. Dla partii niemobilnej
+        /// podstawiamy link do strony encyklopedii OSADY - dokladnie to, czego gracz oczekuje po
+        /// prawym klikniecu kafelka (wynik idzie do EncyclopediaCursorEffect i ExecuteOpenEncyclopedia).
+        /// Dla partii mobilnych nic sie nie zmienia - oryginal biegnie jak dawniej.
+        /// </summary>
+        public static bool SafeMenuPartyLink(object __instance, ref string __result)
+        {
+            PartyBase pb;
+            try
+            {
+                if (__instance == null || _fMenuPartyItemParty == null) return true;
+                pb = _fMenuPartyItemParty.GetValue(__instance) as PartyBase;
+            }
+            catch { return true; }                                   // nie wiemy nic - oryginal jak dawniej
+            if (pb == null || pb.MobileParty != null) return true;   // partia mobilna - oryginal jest dla niej bezpieczny
+
+            // PARTIA OSADY: od tej chwili oryginalu wpuscic nie wolno
+            __result = "";
+            try
+            {
+                var st = pb.Settlement;
+                if (st != null) __result = st.EncyclopediaLink;
+                _menuPartyLinkSaves++;
+                if (_menuPartyLinkSaves == 1 || _menuPartyLinkSaves % 200 == 0)
+                {
+                    var mr = pb.MemberRoster;
+                    Scribe.Line("Mends: overlay menu - partia osady " + (st != null ? st.Name.ToString() : "(bez osady)")
+                                + " nie ma MobileParty (x" + _menuPartyLinkSaves + "); w jej rosterze "
+                                + (mr != null ? mr.TotalHealthyCount : -1) + " zdrowych z "
+                                + (mr != null ? mr.TotalManCount : -1)
+                                + " - link encyklopedii osady podstawiony, NullReference ominiety.");
+                }
+            }
+            catch { }
+            return false;
         }
 
         /// <summary>
