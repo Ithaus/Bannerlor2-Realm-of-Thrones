@@ -437,22 +437,37 @@ namespace Armoury
                         var it = kv.Key.Item;
                         if (kv.Value == 0 || it == null) continue;
                         string id = it.StringId ?? "";
-                        // ROZKAZ Z KSIEGI (Jeff 16.09: "wrzucilem 54 Weirwood i 38 Ravens Teeth,
-                        // zamknalem i otworzylem stash - nie zniknely"): dotad CALA pozycja
-                        // z rozkazem byla tu pomijana, wiec wklad gracza z rozkazem nigdy nie
-                        // schodzil na stan wojska - papier 11:44 "weirwood_bow uzyte=54/54
-                        // (gracza 54)", a w porzadku Bow same plusy; escrow pokazywal je dalej
-                        // jako jego. Od teraz sztuki NOSZONE (delta ujemna) przechodza na stan
-                        // wojska jak kazde inne i znikaja z listy gracza. Rozkaz chroni tylko
-                        // "nienoszone" przed oddaniem na liste gracza (czekaja w magazynie na
-                        // ludzi z rozkazem) - i jak dawniej przed przycinaniem (TrimWarStores).
-                        if (MusterBook.IsPinnedItem(id))
-                        {
-                            if (kv.Value > 0) { pinnedKept += kv.Value; continue; }
-                            if (!pinnedWorn.Contains(id)) pinnedWorn.Add(id);
-                        }
                         int acc; perId.TryGetValue(id, out acc); perId[id] = acc + kv.Value;
                         nameOf[id] = it.Name.ToString();
+                    }
+                    // ROZKAZ Z KSIEGI (Jeff 16.09: "wrzucilem 54 Weirwood i 38 Ravens Teeth,
+                    // zamknalem i otworzylem stash - nie zniknely"): kiedys CALA pozycja z rozkazem
+                    // byla pomijana, wiec wklad gracza z rozkazem nigdy nie schodzil na stan wojska.
+                    // Od 16.09 sztuki NOSZONE (delta ujemna) przechodza na stan wojska jak kazde inne,
+                    // a rozkaz chroni tylko "nienoszone" przed oddaniem na liste gracza (czekaja
+                    // w magazynie na ludzi z rozkazem) - i jak dawniej przed przycinaniem.
+                    //
+                    // POPRAWKA ZAPADKI (Jeff 19.09: "stash wciagnal wszystko i nic nie wydal"):
+                    // do dzis rozkaz byl sprawdzany na POJEDYNCZYM wpisie rostera, PRZED zsumowaniem
+                    // per id. Dodatnie korekty wpadaly w "continue" i nie dochodzily do sumy, ujemne
+                    // przechodzily - ksiega przypietego id mogla wiec tylko MALEC. Dowod z logu
+                    // 19.09: 14:18:01 i 14:18:02 dwa razy "porzadek w skarbcu - 0 szt. na liste
+                    // gracza, 2 szt. na stan wojska [Bow +0/-2]", podczas gdy prawdziwa suma per id
+                    // wynosila +5; cztery weirwood_bow zeszly graczowi z ksiegi bez rekompensaty.
+                    // Teraz sumujemy NAJPIERW wszystkie korekty danego id, a rozkaz stosujemy
+                    // dopiero do WYNIKU: netto na plus zostaje na stanie wojska, netto na minus
+                    // schodzi z ksiegi gracza tak jak kazde inne noszone sztuki.
+                    if (perId.Count > 0)
+                    {
+                        var pinnedDrop = new List<string>();
+                        foreach (var id2 in new List<string>(perId.Keys))
+                        {
+                            if (!MusterBook.IsPinnedItem(id2)) continue;
+                            int net = perId[id2];
+                            if (net > 0) { pinnedKept += net; pinnedDrop.Add(id2); }
+                            else if (net < 0 && !pinnedWorn.Contains(id2)) pinnedWorn.Add(id2);
+                        }
+                        foreach (var id2 in pinnedDrop) perId.Remove(id2);
                     }
                     foreach (var kv in perId)
                     {
