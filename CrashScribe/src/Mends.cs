@@ -3104,6 +3104,60 @@ namespace CrashScribe
                 else
                     Scribe.Line("Mends: GameMenuPartyItemVM " + (tMenuItem == null ? "NIEZNALEZIONY" : (mLink == null ? "bez GetEncyclopediaPageLink" : "bez pola Party"))
                                 + " - overlay oblezenia BEZ zabezpieczenia.");
+
+                // ===== MINA NR 2 W TYM SAMYM MENU (crash Jeffa 18.09 16:18:20) =====
+                // Latka wyzej przepuscila juz kafelek partii osady przez UpdateLists, ale
+                // konstruktor overlaya zaraz potem wola UpdateProperties, a ta leci petla po
+                // DefenderPartyList i robi "defenderParty.Party.MobileParty.Morale" BEZ zadnego
+                // straznika. Takich dereferencji jest kilkanascie (morale i jedzenie obu stron,
+                // cztery podpowiedzi pod kursorem), wiec nie latamy ich po kolei - zdejmujemy
+                // zrodlo: kafelek partii niemobilnej nie ma prawa stac na liscie stron.
+                var tOverlay = AccessTools.TypeByName("TaleWorlds.CampaignSystem.ViewModelCollection.GameMenu.Overlay.EncounterMenuOverlayVM");
+                var mLists = tOverlay != null ? AccessTools.Method(tOverlay, "UpdateLists") : null;
+                var mProps = tOverlay != null ? AccessTools.Method(tOverlay, "UpdateProperties") : null;
+                _pOvDefList = tOverlay != null ? AccessTools.Property(tOverlay, "DefenderPartyList") : null;
+                _pOvAtkList = tOverlay != null ? AccessTools.Property(tOverlay, "AttackerPartyList") : null;
+                _pOvDefMorale = tOverlay != null ? AccessTools.Property(tOverlay, "DefenderPartyMorale") : null;
+                _pOvAtkMorale = tOverlay != null ? AccessTools.Property(tOverlay, "AttackerPartyMorale") : null;
+                _mMenuPartyItemFinalize = tMenuItem != null ? AccessTools.Method(tMenuItem, "OnFinalize") : null;
+                if (mLists != null && _pOvDefList != null && _pOvAtkList != null && _fMenuPartyItemParty != null)
+                {
+                    harmony.Patch(mLists, postfix: new HarmonyMethod(typeof(Mends), "SafeSiegeOverlayLists"));
+                    Scribe.Line("Mends: overlay oblezenia - listy stron czyszczone z partii bez MobileParty (postfix UpdateLists).");
+                }
+                else
+                    Scribe.Line("Mends: EncounterMenuOverlayVM " + (tOverlay == null ? "NIEZNALEZIONY" : (mLists == null ? "bez UpdateLists" : "bez list stron"))
+                                + " - listy oblezenia BEZ czyszczenia, crash UpdateProperties MOZE WROCIC.");
+                if (mProps != null)
+                {
+                    harmony.Patch(mProps, finalizer: new HarmonyMethod(typeof(Mends), "SafeSiegeOverlayProps"));
+                    Scribe.Line("Mends: overlay oblezenia - UpdateProperties pod finalizerem (pusta lista nie pokaze NaN, wywrotka nie zabije menu).");
+                }
+                // Podpowiedzi stron chodza po tych samych listach i tez nie maja straznikow.
+                // Sa LENIWE (lambdy BasicTooltipViewModel z konstruktora, odpalane dopiero przy
+                // najechaniu mysza), a przy trwajacej BITWIE list nie czyscimy - wtedy finalizer
+                // jest jedyna oslona.
+                int hintsPatched = 0;
+                string[] hintNames = { "GetEncounterSideMoraleTooltip", "GetEncounterSideFoodTooltip",
+                                       "GetEncounterSideTroopsTooltip", "GetEncounterSideShipsTooltip" };
+                for (int hi = 0; tOverlay != null && hi < hintNames.Length; hi++)
+                {
+                    var mh = AccessTools.Method(tOverlay, hintNames[hi]);
+                    if (mh == null) continue;
+                    harmony.Patch(mh, finalizer: new HarmonyMethod(typeof(Mends), "SafeSiegeOverlayHint"));
+                    hintsPatched++;
+                }
+                Scribe.Line("Mends: overlay oblezenia - podpowiedzi stron pod finalizerem (" + hintsPatched + "/4).");
+                // Najechanie mysza na sam kafelek: ExecuteOpenTooltip ma trzy galezie i dla partii
+                // osady wpada w OSTATNIA (Party.MobileParty null, a pole Settlement ustawia tylko
+                // konstruktor "z osady"), czyli luska Character.HeroObject na nullu. Podstawiamy
+                // podpowiedz OSADY - to samo, co robi galaz srodkowa.
+                var mTip = tMenuItem != null ? AccessTools.Method(tMenuItem, "ExecuteOpenTooltip") : null;
+                if (mTip != null && _fMenuPartyItemParty != null)
+                {
+                    harmony.Patch(mTip, prefix: new HarmonyMethod(typeof(Mends), "SafeMenuPartyTooltip"));
+                    Scribe.Line("Mends: overlay menu - hover na kafelku partii bez MobileParty pokaze podpowiedz osady zamiast wywalac gre.");
+                }
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.Install(siegeOverlay)", null); } catch { } }
 
@@ -3245,6 +3299,207 @@ namespace CrashScribe
                                 + (mr != null ? mr.TotalHealthyCount : -1) + " zdrowych z "
                                 + (mr != null ? mr.TotalManCount : -1)
                                 + " - link encyklopedii osady podstawiony, NullReference ominiety.");
+                }
+            }
+            catch { }
+            return false;
+        }
+
+        // ===== OVERLAY OBLEZENIA, MINA NR 2: UpdateProperties I PODPOWIEDZI =====
+        // Przy oblezeniu Moat Cailin w DefenderPartyList stoi kafelek zbudowany z PartyBase
+        // SAMEJ OSADY (18 ludzi wsypanych tam przez StrategicCampaignAI145 - potwierdzone
+        // w logu 18.09 16:18:20). UpdateProperties (petla po liscie obroncow i atakujacych)
+        // oraz cztery podpowiedzi stron luskaja Party.MobileParty bez straznika. Zamiast
+        // latac kazda dereferencje - kafelek partii niemobilnej znika z listy.
+        private static System.Reflection.PropertyInfo _pOvDefList, _pOvAtkList, _pOvDefMorale, _pOvAtkMorale;
+        private static System.Reflection.MethodInfo _mMenuPartyItemFinalize;
+        private static int _siegeTilesDropped;
+        private static bool _siegePropsReported, _siegeHintReported, _siegeMapEventNoted, _siegeTipSaved;
+
+        /// <summary>
+        /// POSTFIX na EncounterMenuOverlayVM.UpdateLists (prywatna, bezparametrowa).
+        /// Biegnie dokladnie miedzy UpdateLists() a UpdateProperties() - i w konstruktorze,
+        /// i przy kazdym odswiezeniu - czyli zawsze przed felerna petla morale.
+        /// Czysci OBIE listy, bo strona atakujacych luska tak samo.
+        /// </summary>
+        public static void SafeSiegeOverlayLists(object __instance)
+        {
+            try
+            {
+                if (__instance == null || _fMenuPartyItemParty == null) return;
+
+                // PRZY TRWAJACEJ BITWIE LIST NIE RUSZAMY: klatkowy tick overlaya porownuje sume
+                // dlugosci obu list z liczba uczestnikow bitwy i przy roznicy przebudowuje je CO
+                // KLATKE - skrocenie listy zapetliloby przebudowe. Crashu tam nie ma, bo
+                // UpdateProperties wychodzi od razu przy braku oblezenia; podpowiedzi pilnuja finalizery.
+                var main = MobileParty.MainParty;
+                if (main != null && main.MapEvent != null)
+                {
+                    if (!_siegeMapEventNoted
+                        && (ScanOverlayTiles(_pOvDefList, __instance, false, "obroncow") > 0
+                            || ScanOverlayTiles(_pOvAtkList, __instance, false, "atakujacych") > 0))
+                    {
+                        _siegeMapEventNoted = true;
+                        Scribe.Line("Mends: overlay bitwy - na liscie stoi partia bez MobileParty, ale trwa bitwa:"
+                                    + " list NIE czyscimy (przebudowa co klatke). Podpowiedzi pilnuja finalizery.");
+                    }
+                    return;
+                }
+
+                ScanOverlayTiles(_pOvDefList, __instance, true, "obroncow");
+                ScanOverlayTiles(_pOvAtkList, __instance, true, "atakujacych");
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.SafeSiegeOverlayLists", null); } catch { } }
+        }
+
+        /// <summary>
+        /// Przeglada liste kafelkow overlaya. MBBindingList dziedziczy Collection i implementuje
+        /// NIEgeneryczny IList, wiec idziemy przez IList - CrashScribe nie referencjonuje
+        /// ViewModelCollection. Zwraca liczbe kafelkow partii NIEMOBILNYCH, a przy remove == true
+        /// zdejmuje je. Idziemy OD KONCA, bo lista sie kurczy. Kafelka WIODACEGO strony
+        /// (Party == null) nie ruszamy - vanilla sama go stamtad zdejmuje, a UpdateProperties
+        /// czyta z niego .Settlement.
+        /// </summary>
+        private static int ScanOverlayTiles(System.Reflection.PropertyInfo listProp, object vm, bool remove, string sideName)
+        {
+            if (listProp == null || vm == null) return 0;
+            System.Collections.IList list = null;
+            try { list = listProp.GetValue(vm, null) as System.Collections.IList; } catch { }
+            if (list == null) return 0;
+
+            int hits = 0;
+            for (int i = list.Count - 1; i >= 0; i--)
+            {
+                object tile = null;
+                try { tile = list[i]; } catch { continue; }
+                if (tile == null) continue;
+                PartyBase pb = null;
+                try { pb = _fMenuPartyItemParty.GetValue(tile) as PartyBase; } catch { continue; }
+                if (pb == null || pb.MobileParty != null) continue;   // kafelek wiodacy albo zwykly - zostaje
+                hits++;
+                if (!remove) continue;
+
+                try { list.RemoveAt(i); } catch { continue; }
+                // kazdy nowy kafelek rejestruje sluchaczy kampanii - zdjety trzeba domknac,
+                // inaczej mnozylyby sie z kazdym odswiezeniem listy
+                try { if (_mMenuPartyItemFinalize != null) _mMenuPartyItemFinalize.Invoke(tile, null); } catch { }
+                _siegeTilesDropped++;
+                if (_siegeTilesDropped == 1 || _siegeTilesDropped % 200 == 0)
+                {
+                    var st = pb.Settlement;
+                    var mr = pb.MemberRoster;
+                    Scribe.Line("Mends: overlay oblezenia - kafelek partii bez MobileParty ("
+                                + (st != null ? st.Name.ToString() : "bez osady") + ", w rosterze "
+                                + (mr != null ? mr.TotalHealthyCount : -1) + " zdrowych z "
+                                + (mr != null ? mr.TotalManCount : -1) + ") zdjety z listy " + sideName
+                                + " (x" + _siegeTilesDropped + ") - UpdateProperties i podpowiedzi nie maja juz czego lusknac.");
+                }
+            }
+            return hits;
+        }
+
+        /// <summary>
+        /// FINALIZER na EncounterMenuOverlayVM.UpdateProperties. Dwie rzeczy:
+        /// 1) gdy lista strony zeszla do zera, vanilla dzieli zero przez zero (zwykly float,
+        ///    wiec NaN bez wyjatku) i wpisuje do okienka napis "NaN" - podmieniamy go na "-";
+        /// 2) gdyby mimo czyszczenia list cos jeszcze rzucilo - polykamy. Lepiej brzydkie liczby
+        ///    w okienku niz wywalona gra. Pierwszy zlapany idzie do logu z pelnym sladem, zeby
+        ///    bylo wiadomo, gdzie siedzi kolejna mina.
+        /// </summary>
+        public static Exception SafeSiegeOverlayProps(Exception __exception, object __instance)
+        {
+            try
+            {
+                FixNaNMorale(_pOvDefList, _pOvDefMorale, __instance);
+                FixNaNMorale(_pOvAtkList, _pOvAtkMorale, __instance);
+            }
+            catch { }
+            if (__exception == null) return null;
+            try
+            {
+                if (!_siegePropsReported)
+                {
+                    _siegePropsReported = true;
+                    Scribe.Report("CrashScribe", __exception,
+                                  "EncounterMenuOverlayVM.UpdateProperties - wyjatek polkniety, menu oblezenia zyje", null);
+                }
+            }
+            catch { }
+            return null;
+        }
+
+        /// <summary>Pusta lista strony = morale policzone jako NaN = w okienku napis "NaN". Dajemy "-".</summary>
+        private static void FixNaNMorale(System.Reflection.PropertyInfo listProp, System.Reflection.PropertyInfo moraleProp, object vm)
+        {
+            if (listProp == null || moraleProp == null || vm == null) return;
+            var list = listProp.GetValue(vm, null) as System.Collections.IList;
+            if (list == null || list.Count > 0) return;          // sa kafelki - vanilla policzyla normalnie
+            var s = moraleProp.GetValue(vm, null) as string;
+            if (string.IsNullOrEmpty(s)) return;
+            float v;
+            bool isNan = s.IndexOf("NaN", StringComparison.OrdinalIgnoreCase) >= 0
+                         || (float.TryParse(s, System.Globalization.NumberStyles.Float,
+                                            System.Globalization.CultureInfo.CurrentCulture, out v) && float.IsNaN(v));
+            if (isNan) moraleProp.SetValue(vm, "-", null);
+        }
+
+        /// <summary>
+        /// FINALIZER na cztery podpowiedzi stron (morale, jedzenie, wojsko, statki). Wszystkie
+        /// leca petla po listach stron i luskaja Party.MobileParty bez straznika, a odpalaja sie
+        /// LENIWIE - dopiero przy najechaniu mysza. Wywrotka daje pusta liste wlasciwosci
+        /// (typ bierzemy z samej metody), a nie wyrzucona gre.
+        /// </summary>
+        public static Exception SafeSiegeOverlayHint(Exception __exception, ref object __result,
+                                                     System.Reflection.MethodBase __originalMethod)
+        {
+            if (__exception == null) return null;
+            try
+            {
+                var mi = __originalMethod as System.Reflection.MethodInfo;
+                if (mi != null && mi.ReturnType != null && !mi.ReturnType.IsAbstract && !mi.ReturnType.IsInterface)
+                    __result = Activator.CreateInstance(mi.ReturnType);   // pusta lista wlasciwosci podpowiedzi
+            }
+            catch { }
+            try
+            {
+                if (!_siegeHintReported)
+                {
+                    _siegeHintReported = true;
+                    Scribe.Report("CrashScribe", __exception,
+                                  "EncounterMenuOverlayVM." + (__originalMethod != null ? __originalMethod.Name : "?")
+                                  + " - podpowiedz oddana pusta zamiast crasha", null);
+                }
+            }
+            catch { }
+            return null;
+        }
+
+        /// <summary>
+        /// PREFIX na GameMenuPartyItemVM.ExecuteOpenTooltip (najechanie mysza na kafelek).
+        /// Vanilla ma trzy galezie: partia mobilna, osada z pola Settlement, a na koncu
+        /// Character.HeroObject. Kafelek partii OSADY nie ma ani MobileParty, ani pola Settlement
+        /// (ustawia je tylko konstruktor "z osady"), wiec wpada w ostatnia galaz i luska null.
+        /// Pokazujemy podpowiedz OSADY - to samo, co robi galaz srodkowa.
+        /// </summary>
+        public static bool SafeMenuPartyTooltip(object __instance)
+        {
+            PartyBase pb;
+            try
+            {
+                if (__instance == null || _fMenuPartyItemParty == null) return true;
+                pb = _fMenuPartyItemParty.GetValue(__instance) as PartyBase;
+            }
+            catch { return true; }
+            if (pb == null || pb.MobileParty != null) return true;   // zwykly kafelek - oryginal jest bezpieczny
+            try
+            {
+                var st = pb.Settlement;
+                if (st != null) InformationManager.ShowTooltip(typeof(Settlement), st);
+                if (!_siegeTipSaved)
+                {
+                    _siegeTipSaved = true;
+                    Scribe.Line("Mends: overlay menu - hover na kafelku partii bez MobileParty obsluzony podpowiedzia osady ("
+                                + (st != null ? st.Name.ToString() : "bez osady") + ").");
                 }
             }
             catch { }
