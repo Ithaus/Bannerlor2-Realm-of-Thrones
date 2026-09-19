@@ -1048,6 +1048,10 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public float WagesDesertPercentPerDay { get; set; } = 0.5f;
 
+        [SettingPropertyInteger("Wages Desert Max Days", 0, 32, "0", HintText = "ceiling on that growth - without it a debt left unpaid for weeks bleeds a tenth of the army every single day")]
+        [SettingPropertyGroup("The marching column")]
+        public int WagesDesertMaxDays { get; set; } = 8;
+
         [SettingPropertyBool("Sack Scar Enabled", HintText = "a settlement taken by siege loses prosperity and loyalty - conquest is a ruin you must rebuild")]
         [SettingPropertyGroup("The marching column")]
         public bool SackScarEnabled { get; set; } = true;
@@ -1653,6 +1657,7 @@ namespace Armoury
             s.WagesDueEnabled = WagesDueEnabled;
             s.WagesGraceDays = WagesGraceDays;
             s.WagesDesertPercentPerDay = WagesDesertPercentPerDay;
+            s.WagesDesertMaxDays = WagesDesertMaxDays;
             s.SackScarEnabled = SackScarEnabled;
             s.SackProsperityCutPercent = SackProsperityCutPercent;
             s.SackLoyaltyHit = SackLoyaltyHit;

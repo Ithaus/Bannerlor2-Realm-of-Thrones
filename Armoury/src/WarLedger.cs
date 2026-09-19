@@ -40,6 +40,26 @@ namespace Armoury
                     if (Undead.Party(mp)) continue;
                     bool unpaid = false;
                     try { unpaid = mp.HasUnpaidWages > 0f; } catch { }
+                    // PLACI TEN, KTO MA CZYM (Jeff 19.09: "czemu znowu ubylo mi 6 ludzi, mialem 320
+                    // i mam 314" - przy ponad 500 tys. zlota w skarbcu). MobileParty.HasUnpaidWages
+                    // to NIE flaga "dzis nie zaplacono", tylko KWOTA zalegosci zapisywana w save
+                    // (public float, SaveableField 1006). Raz niespłacona zostaje niezerowa i przy
+                    // Banner Kings, ktory przejmuje finanse klanu, potrafi wisiec tak na zawsze -
+                    // log 19.09 pokazuje lordow AI na 19, 20, 21, 22 i 23 dniu zwloki z rzedu.
+                    // Nasz licznik rosl bez konca, a stawka 0.5%/dzien x dni siegala 11% skladu
+                    // DZIENNIE. Od teraz pytamy o PIENIADZE, nie o pole: klan, ktory ma w kasie na
+                    // dzienny zold tej partii, dluznikiem nie jest.
+                    if (unpaid)
+                    {
+                        try
+                        {
+                            var payer = mp.ActualClan ?? (mp.LeaderHero != null ? mp.LeaderHero.Clan : null);
+                            int wage = 0;
+                            try { wage = mp.TotalWage; } catch { }
+                            if (payer != null && payer.Gold >= Math.Max(1, wage)) unpaid = false;
+                        }
+                        catch { }
+                    }
                     if (!unpaid) { _unpaidDays.Remove(mp); continue; }
 
                     int d;
@@ -47,6 +67,8 @@ namespace Armoury
                     _unpaidDays[mp] = ++d;
                     seen.Add(mp);
                     int over = d - Math.Max(0, s.WagesGraceDays);
+                    int overCap = Math.Max(1, s.WagesDesertMaxDays);
+                    if (over > overCap) over = overCap;           // bez sufitu dlug sprzed tygodni wykrwawia armie w kilka dni
                     if (over <= 0)
                     {
                         if (mp == MobileParty.MainParty)
@@ -63,10 +85,18 @@ namespace Armoury
                     if (leave <= 0) continue;
 
                     int gone = DesertElitesFirst(mp, leave);
-                    if (gone > 0 && mp == MobileParty.MainParty)
+                    if (gone <= 0) continue;
+                    // KAZDY ubytek do PLIKU, takze u gracza. Do 19.09 strata gracza szla wylacznie
+                    // przez Log.Player, ktory pokazuje komunikat w grze i NIC nie zapisuje - przez to
+                    // w logu nie bylo po niej ani sladu i szukanie winnego trwalo dwa dni.
+                    long purse = -1;
+                    try { var pc = mp.ActualClan ?? (mp.LeaderHero != null ? mp.LeaderHero.Clan : null); if (pc != null) purse = pc.Gold; } catch { }
+                    Log.Info("WarLedger: " + (mp == MobileParty.MainParty ? "PARTIA GRACZA" : mp.StringId)
+                             + " traci " + gone + " ludzi (zold niewyplacony " + d + " dni, liczone jak " + over
+                             + "; zalegosc " + mp.HasUnpaidWages.ToString("0.##") + ", dzienny zold " + mp.TotalWage
+                             + ", kasa klanu " + purse + ").");
+                    if (mp == MobileParty.MainParty)
                         Log.Player("Unpaid and unbound: " + gone + " men desert in the night - the best-paid first.", true);
-                    else if (gone > 0)
-                        Log.Info("WarLedger: " + mp.StringId + " traci " + gone + " ludzi (zold niewyplacony " + d + " dni).");
                 }
                 if (_unpaidDays.Count > seen.Count + 50)
                 {

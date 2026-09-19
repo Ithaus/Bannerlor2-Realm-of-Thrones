@@ -313,6 +313,7 @@ namespace Armoury
         public bool WagesDueEnabled = true;                // unpaid wages: vanilla already cuts morale - we add desertion, the best-paid men first
         public int WagesGraceDays = 2;                     // days of unpaid wages the men will stomach before walking
         public float WagesDesertPercentPerDay = 0.5f;      // share of the party deserting per day past grace, growing with every unpaid day (AI suffers half)
+        public int WagesDesertMaxDays = 8;                 // ceiling on that growth - without it a debt left unpaid for weeks bleeds a tenth of the army every single day
         public bool SackScarEnabled = true;                // a settlement taken by siege loses prosperity and loyalty - conquest is a ruin you must rebuild
         public int SackProsperityCutPercent = 15;          // prosperity lost when a settlement falls to siege
         public int SackLoyaltyHit = 15;                    // loyalty lost when a settlement falls to siege
