@@ -2725,6 +2725,22 @@ namespace CrashScribe
 
             try
             {
+                // ===== NOWY KROL BEZ STROJU = CRASH NA TIKU KLANU (Jeff 19.09) =====
+                // Szczegoly przy metodzie DressedOrNot.
+                var mDress = AccessTools.Method(typeof(global::Helpers.EquipmentHelper),
+                    "AssignHeroEquipmentFromEquipment", new[] { typeof(Hero), typeof(Equipment) });
+                if (mDress != null)
+                {
+                    harmony.Patch(mDress, prefix: new HarmonyMethod(typeof(Mends), "DressedOrNot"));
+                    Scribe.Line("Mends: ubieranie bohatera bez zestawu strojow nie kladzie juz gry - brakujacy szablon"
+                                + " (elekcja krola, narodziny dziecka) zostawia bohatera w jego wlasnym sprzecie.");
+                }
+                else Scribe.Line("Mends: Helpers.EquipmentHelper.AssignHeroEquipmentFromEquipment NIEZNALEZIONE - elekcja krola nadal moze polozyc gre.");
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.Install(robes)", null); } catch { } }
+
+            try
+            {
                 // ===== OBLEZENIE HARRENHAL BEZ ROOSE'A = CRASH (Jeff 02.09) =====
                 // ROT.Events.HarrenhalSiegeEvent.SetupSiegeAttackers bierze na sztywno
                 // partie Roose'a Boltona, kaze Polnocy stworzyc mu armie i - gdy gra
@@ -3504,6 +3520,159 @@ namespace CrashScribe
             }
             catch { }
             return false;
+        }
+
+        // ===== NOWY KROL BEZ STROJU = CRASH (Jeff 19.09, Winter 15 1090, turniej w Barrowton) =====
+        // Helpers.EquipmentHelper.AssignHeroEquipmentFromEquipment (dekompilacja 19.09) nie ma ANI
+        // JEDNEGO straznika: pierwsza instrukcja dotyka equipment.IsStealth, zaraz potem
+        // hero.StealthEquipment / BattleEquipment / CivilianEquipment. Null w ktorymkolwiek
+        // argumencie = NullReferenceException, a ze wolane jest z tiku klanu (PeriodicTickSome,
+        // czyli w dowolnej klatce mapy) - gra pada w locie.
+        //
+        // DROGA DO CRASHU (CrashScribe 19.09 12:14:26): smierc monarchy -> BannerKings
+        // SuccessionHelper -> BKKingElectionDecision -> KingdomDecisionProposalBehavior
+        // .UpdateKingdomDecisions (decyzje bez udzialu gracza rozstrzyga OD RAZU) ->
+        // KingSelectionKingdomDecision.ApplyChosenOutcome -> CampaignEvents.OnRulingClanChanged ->
+        // NPCEquipmentsCampaignBehavior.OnRulingClanChanged (cztery ubierania, zero null-checkow) ->
+        // EquipmentSelectionModel.GetEquipmentsForChangingRuler -> GetSuitableEquipmentSet.
+        // Ten zbiera roster-y o DOKLADNIE rownych flagach (dla kobiety
+        // IsKingdomRulerTemplate|IsFemaleTemplate) i konczy na mBList.GetRandomElement().
+        // Pusta lista daje null, a vanilla wyniku modelu nie sprawdza.
+        //
+        // DZIURA W DANYCH (przeliczone 19.09 po calym ModuleData, 22730 roster-ow): zenskiego
+        // stroju wladcy nie ma ZADNA z 24 kultur ROT (crownlands, dragonstone, freefolk, ghiscari,
+        // ibbenese, lyseni, myrish, nightswatch, norvos, pentoshi, qartheen, qohorik, reach, river,
+        // sarnor, skagosi, stormlands, summer, tyroshi, vale, valyrian, volantine, whitewalker, yiti) -
+        // maja tylko wariant meski. Komplet obu plci maja wylacznie aserai, battania, empire,
+        // khuzait, nord, sturgia i vlandia. Czyli KAZDA kobieta obejmujaca tron w ktorymkolwiek
+        // z westeroskich i essoskich krolestw kladla gre.
+        //
+        // Latamy SAM HELPER, bo to jedyne gardlo (16 wywolan w TaleWorlds.CampaignSystem plus
+        // BannerKings, BKROTPatch i StoryMode) i siedzi PONIZEJ modelu - dziala nawet, gdyby ktos
+        // podmienil EquipmentSelectionModel. Gdy brakuje stroju, bohater zostaje w tym, co ma na
+        // sobie: po tej linii w OnRulingClanChanged nie ma juz nic, wiec elekcja konczy sie
+        // normalnie i krol rzadzi, tylko bez nowej szaty.
+        // Parametry przez __0/__1, zeby nie zalezec od nazw w metadanych.
+        public static bool DressedOrNot(Hero __0, Equipment __1)
+        {
+            if (__0 != null && __1 != null) return true;   // normalna droga - nie dotykamy
+            try { RobesMissing(__0, __1); } catch { }
+            return false;
+        }
+
+        private static readonly System.Collections.Generic.HashSet<string> _robesSeen
+            = new System.Collections.Generic.HashSet<string>();
+        private static int _robesSaves;
+
+        /// <summary>Kazda dziura w danych raz na sesje, z nazwa bohatera, kultura i plcia - zeby
+        /// dalo sie potem dopisac brakujacy roster, a nie tylko zyc z objawem.</summary>
+        private static void RobesMissing(Hero hero, Equipment equipment)
+        {
+            _robesSaves++;
+            string who = "(bohater null)", cult = "?", sex = "?";
+            if (hero != null)
+            {
+                try { who = hero.Name != null ? hero.Name.ToString() : hero.StringId; } catch { }
+                try { cult = hero.Culture != null ? hero.Culture.StringId : "(kultura null)"; } catch { }
+                try { sex = hero.IsFemale ? "kobieta" : "mezczyzna"; } catch { }
+            }
+            string what = equipment == null
+                ? "brak pasujacego zestawu strojow (model oddal null)"
+                : "wolano ubieranie bez bohatera";
+            if (!_robesSeen.Add(cult + "|" + sex + "|" + what)) return;   // ta sama dziura - raz na sesje
+            Scribe.Line("Mends: " + what + " dla " + who + " [kultura " + cult + ", " + sex
+                        + "] - ubieranie POMINIETE, bohater zostaje w swoim sprzecie (bez latki bylby"
+                        + " NullReferenceException w EquipmentHelper i CTD). Uratowanych w tej sesji: "
+                        + _robesSaves + ". Pelna lista brakow: AUDYT STROJOW.");
+        }
+
+        /// <summary>
+        /// AUDYT STROJOW (19.09). Dla kazdej kultury, ktora ma dzis krolestwo albo zywego bohatera
+        /// w klanie, sprawdzamy kombinacje, o ktore pyta DefaultEquipmentSelectionModel:
+        /// wladca / lord / dziecko / nastolatek, w obu plciach. Model porownuje flagi DOKLADNIE
+        /// (EquipmentCategories == customFlags), wiec roster z dwiema flagami naraz nie liczy sie
+        /// do zadnej z nich z osobna. Wladca i lord sa pytani o zestaw bitewny I cywilny, dziecko
+        /// i nastolatek tylko o cywilny - tak wlasnie sprawdzamy, zeby nie robic falszywych alarmow.
+        /// Wolane z OnSessionLaunched, NIE z Install: przy Install Campaign.Current jest jeszcze
+        /// null, a MBEquipmentRosterExtensions.All to Campaign.Current.AllEquipmentRosters.
+        /// </summary>
+        internal static void RulerRobesAudit()
+        {
+            try
+            {
+                var have = new System.Collections.Generic.HashSet<string>();
+                foreach (var roster in TaleWorlds.CampaignSystem.Extensions.MBEquipmentRosterExtensions.All)
+                {
+                    if (roster == null || roster.EquipmentCulture == null) continue;
+                    if (roster.EquipmentCategories == EquipmentCategories.None) continue;
+                    string key = roster.EquipmentCulture.StringId + "|" + (uint)roster.EquipmentCategories + "|";
+                    foreach (var eq in roster.AllEquipments)
+                        if (eq != null) have.Add(key + (int)eq.ItemEquipmentType);
+                }
+
+                var cults = new System.Collections.Generic.List<CultureObject>();
+                foreach (var k in Kingdom.All)
+                    if (k != null && !k.IsEliminated && k.Culture != null && !cults.Contains(k.Culture))
+                        cults.Add(k.Culture);
+                foreach (var h in Hero.AllAliveHeroes)
+                    if (h != null && h.Clan != null && h.Culture != null && !cults.Contains(h.Culture))
+                        cults.Add(h.Culture);
+                if (cults.Count == 0) return;
+
+                var sb = new System.Text.StringBuilder();
+                int nHoles = 0;
+                foreach (var cult in cults)
+                {
+                    string miss = RobesHoles(have, cult.StringId);
+                    if (miss == null) continue;
+                    nHoles++;
+                    if (sb.Length > 0) sb.Append("; ");
+                    sb.Append(cult.StringId).Append(": ").Append(miss);
+                }
+                if (nHoles == 0)
+                    Scribe.Line("AUDYT STROJOW: wszystkie " + cults.Count + " kultur w grze maja komplet szablonow - nic nie grozi.");
+                else
+                    Scribe.Line("AUDYT STROJOW: " + nHoles + " z " + cults.Count + " kultur ma dziury w szablonach"
+                                + " (brak = bohater zostaje w swoim sprzecie zamiast CTD) -> " + sb.ToString());
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.RulerRobesAudit", null); } catch { } }
+        }
+
+        /// <summary>Zwraca opis brakow kultury albo null, gdy komplet.</summary>
+        private static string RobesHoles(System.Collections.Generic.HashSet<string> have, string cult)
+        {
+            var sb = new System.Text.StringBuilder();
+            var R = EquipmentCategories.IsKingdomRulerTemplate;
+            var L = EquipmentCategories.IsLordTemplate;
+            var F = EquipmentCategories.IsFemaleTemplate;
+            var C = EquipmentCategories.IsChildEquipmentTemplate;
+            var T = EquipmentCategories.IsTeenagerEquipmentTemplate;
+            RobesProbe(have, cult, R, true, "wladca", sb);
+            RobesProbe(have, cult, R | F, true, "WLADCZYNI", sb);
+            RobesProbe(have, cult, L, true, "lord", sb);
+            RobesProbe(have, cult, L | F, true, "dama", sb);
+            RobesProbe(have, cult, L | C, false, "dziecko", sb);
+            RobesProbe(have, cult, L | C | F, false, "dziewczynka", sb);
+            RobesProbe(have, cult, L | T, false, "nastolatek", sb);
+            RobesProbe(have, cult, L | T | F, false, "nastolatka", sb);
+            return sb.Length > 0 ? sb.ToString() : null;
+        }
+
+        /// <summary>Jedna kombinacja flag. needBattle=false dla szablonow dziecka i nastolatka -
+        /// model pyta o nie wylacznie w wariancie cywilnym.</summary>
+        private static void RobesProbe(System.Collections.Generic.HashSet<string> have, string cult,
+                                       EquipmentCategories flags, bool needBattle, string label,
+                                       System.Text.StringBuilder sb)
+        {
+            string key = cult + "|" + (uint)flags + "|";
+            bool civ = have.Contains(key + (int)Equipment.EquipmentType.Civilian);
+            bool bat = !needBattle || have.Contains(key + (int)Equipment.EquipmentType.Battle);
+            if (bat && civ) return;
+            if (sb.Length > 0) sb.Append(", ");
+            sb.Append(label);
+            if (!bat && !civ) sb.Append("(bitwa i cywil)");
+            else if (!bat) sb.Append("(bitwa)");
+            else sb.Append("(cywil)");
         }
 
         /// <summary>
@@ -4521,7 +4690,7 @@ namespace CrashScribe
         {
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this,
                 delegate (CampaignGameStarter s)
-                { Mends.ArmorSanity(); Mends.AmmoSanity(); Mends.WeightLaw(); Mends.ArmorTierLaw(); Mends.WeaponTierLaw(); Mends.SkillSinew(); Mends.UniqueWares(); Mends.LoreForgeGate(); Mends.DressTheNamesakes(); Mends.NorthernFare(); Mends.ItemDump(); Mends.ReligionAudit(); });
+                { Mends.ArmorSanity(); Mends.AmmoSanity(); Mends.WeightLaw(); Mends.ArmorTierLaw(); Mends.WeaponTierLaw(); Mends.SkillSinew(); Mends.UniqueWares(); Mends.LoreForgeGate(); Mends.DressTheNamesakes(); Mends.NorthernFare(); Mends.ItemDump(); Mends.ReligionAudit(); Mends.RulerRobesAudit(); });
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this,
                 delegate (TaleWorlds.CampaignSystem.MapEvents.MapEvent m) { Mends.MeltDeadLoot(m); Mends.WardReport(); });
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this,
