@@ -457,17 +457,25 @@ namespace Armoury
                     // Teraz sumujemy NAJPIERW wszystkie korekty danego id, a rozkaz stosujemy
                     // dopiero do WYNIKU: netto na plus zostaje na stanie wojska, netto na minus
                     // schodzi z ksiegi gracza tak jak kazde inne noszone sztuki.
+                    // 19.09 - ZASADA GENERALNA JEFFA, slowo w slowo: "jak wkladam np. 1 luk
+                    // i lucznik go bierze, to luk mi znika; a jak lucznik ma luk, to nastepuje
+                    // wymiana: nowy luk znika w stash, a STARY LUK LUCZNIKA POKAZUJE SIE W STASH".
+                    // Czyli: co wojsko nosi - jest wojska; czego NIE nosi - jest gracza i ma byc
+                    // widoczne. Bez zadnych wyjatkow. Wyjatek "nienoszone z rozkazem zostaja na
+                    // stanie" dopisalem 16.09 z wlasnej glowy i wlasnie on lamal te zasade:
+                    // 115-133 sztuki przypietych lukow i strzal, ktorych nikt nie nosil, siedzialy
+                    // na stanie wojska niewidoczne dla gracza. Rozkaz z ksiegi musztry chroni
+                    // sprzet przed PRZYCINANIEM magazynu (TrimWarStores) i nic wiecej - o wlasnosci
+                    // decyduje wylacznie to, czy ktos to nosi.
                     if (perId.Count > 0)
                     {
-                        var pinnedDrop = new List<string>();
-                        foreach (var id2 in new List<string>(perId.Keys))
+                        foreach (var id2 in perId.Keys)
                         {
                             if (!MusterBook.IsPinnedItem(id2)) continue;
                             int net = perId[id2];
-                            if (net > 0) { pinnedKept += net; pinnedDrop.Add(id2); }
+                            if (net > 0) pinnedKept += net;                                  // tylko do logu - sztuka i tak wraca do gracza
                             else if (net < 0 && !pinnedWorn.Contains(id2)) pinnedWorn.Add(id2);
                         }
-                        foreach (var id2 in pinnedDrop) perId.Remove(id2);
                     }
                     foreach (var kv in perId)
                     {
@@ -500,7 +508,7 @@ namespace Armoury
                 if (pinnedWorn.Count > 0 || pinnedKept > 0)
                     Log.Info("Kwatermistrz: rozkazy - noszone z rozkazem na stan wojska: "
                              + (pinnedWorn.Count > 0 ? string.Join(", ", pinnedWorn.ToArray()) : "(brak)")
-                             + "; nienoszone z rozkazem zostaja na stanie: " + pinnedKept + " szt.");
+                             + "; nienoszone z rozkazem WRACAJA na liste gracza: " + pinnedKept + " szt.");
                 if (toPlayer > 0 || toMen > 0)
                 {
                     if (toPlayer > 0)

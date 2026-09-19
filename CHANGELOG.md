@@ -1,5 +1,16 @@
 # DZIENNIK ZMIAN
 
+## 2026-09-19 (4) - ZASADA GENERALNA: czego wojsko NIE nosi, wraca do gracza - BEZ WYJATKOW. Usuniety moj wyjatek dla rozkazow z ksiegi musztry
+**Mod:** Armoury | **Pliki:** `Armoury/src/QuartermasterLaw.cs` (PurgeUnusable)
+**Zgloszenie (Jeff 19.09, slowo w slowo):** "jak wkladam np. 1 luk i lucznik go bierze to luk mi znika, a jak lucznik ma luk to nastepuje wymiana nowy luk znika w stash a stary luk lucznika pokazuje sie w stash. To tylko przyklad chodzi o generalna zasade."
+**Zasada rozpisana:** R1 - co zolnierz REALNIE nosi, jest wojska; R2 - czego NIKT nie nosi, jest gracza i MUSI byc widoczne; R3 - lepsza sztuka wypiera gorsza, a wyparta natychmiast wraca do gracza; R4 - gracz ma to widziec.
+**Przyczyna:** 16.09, przy naprawie "wrzucilem 54 Weirwood i nie znikaja", dopisalem z wlasnej glowy wyjatek: sztuki z rozkazem ksiegi musztry, ktorych NIKT nie nosi, nie wracaly na liste gracza, tylko "czekaly na stanie wojska na ludzi z rozkazem". Jeff tego nie zamawial i to wprost lamie R2. Skala z logu 19.09: `Kwatermistrz: rozkazy - ... nienoszone z rozkazem zostaja na stanie: 133 szt.` (potem 115, 125, 127) - tyle lukow i strzal, ktorych nikt nie nosil, bylo dla gracza NIEWIDOCZNYCH.
+**Zmiana:** wyjatek usuniety. Rozkaz z ksiegi musztry chroni sprzet WYLACZNIE przed przycinaniem magazynu (`TrimWarStores`) - o wlasnosci decyduje jedynie to, czy ktos to nosi. Linia w logu zmieniona na `nienoszone z rozkazem WRACAJA na liste gracza: N szt.`, zeby bylo widac, ze zasada dziala.
+**Ryzyko / co sprawdzic:** po otwarciu zbrojowni w `porzadek w skarbcu` maja pojawic sie DODATNIE pozycje dla przypietych id (weirwood_bow, ravens_teeth_longbow, ravens_teeth_arrows), a `na liscie gracza` ma je pokazac. Jesli linia `nienoszone z rozkazem WRACAJA na liste gracza: N` pokazuje duze N, to znaczy, ze tyle sztuk wlasnie wrocilo do gracza - to jest oczekiwane.
+**W TOKU (osobny sweep):** szukam wszystkich pozostalych miejsc lamiacych te zasade - typy spoza KitTypes, sztuki odrzucane przez CountsAsKit, sztuki "wykluczone" (unikaty/lore/umarli), mnoznik amunicji x2, widocznosc przy modyfikatorach, oraz podejrzenie, ze wyparta stara sztuka wraca do magazynu dopiero przy przydziale DTE przed bitwa (czyli gracz po zamknieciu stashu jeszcze jej nie widzi).
+**Status:** WGRANE 2026-09-19 (Armoury.dll md5 3c9155d37540fc9052bdf6fb9948bf6a, build rc=0, gra zamknieta; poprzednie DLL obok jako `Armoury.dll.bak-2026-09-19-przed-zasada`). DO SPRAWDZENIA po otwarciu zbrojowni.
+
+
 ## 2026-09-19 (3) - "Stash wciagnal wszystko i nic nie wydal": nic nie przepadlo, ale rozkaz z ksiegi dzialal jak ZAPADKA - ksiega przypietego id mogla tylko malec (poprawka mojego bledu z 16.09)
 **Mod:** Armoury | **Pliki:** `Armoury/src/QuartermasterLaw.cs` (PurgeUnusable - rozkaz stosowany do SUMY per id, nie do pojedynczego wpisu rostera)
 **Zgloszenie (Jeff 19.09):** "Znikal mi caly ekwipunek, stash wciagnal wszystko i nie wydal w zamian... wciagnelo mi wszystko na stash i zniknelo ze stash i nic w zamian nie wydano jako zamiana sprzetu".
