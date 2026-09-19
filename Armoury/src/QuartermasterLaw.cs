@@ -250,6 +250,26 @@ namespace Armoury
             return false;
         }
 
+        /// <summary>Ile slotow broni (0-3) wzorzec tego oddzialu trzyma na ten typ.
+        /// Dla amunicji: tyle kolczanow albo pekow zolnierz realnie nosi. Nigdy mniej niz 1 -
+        /// skoro NeedsType wpuscil go na liste, jeden stos mu sie nalezy (lucznik z lukiem,
+        /// ale bez kolczana we wzorcu, dostaje go od DTE).</summary>
+        private static int SlotsOfType(CharacterObject c, ItemObject.ItemTypeEnum type)
+        {
+            int n = 0;
+            try
+            {
+                var eq = c.Equipment;
+                for (int s = 0; s < 4; s++)
+                {
+                    var it = eq[(EquipmentIndex)s].Item;
+                    if (it != null && it.ItemType == type) n++;
+                }
+            }
+            catch { }
+            return n < 1 ? 1 : n;
+        }
+
         private static bool NeedsType(CharacterObject c, ItemObject.ItemTypeEnum type)
         {
             switch (type)
@@ -281,6 +301,23 @@ namespace Armoury
             return false;
         }
 
+        /// <summary>Jakosc egzemplarza po modyfikatorze (legendarny, popekany).
+        /// Brak modyfikatora = 1.0. Sluzy WYLACZNIE do domkniecia porzadku w FitFor:
+        /// przy identycznych statach lepszy egzemplarz idzie na ludzi, gorszy zostaje
+        /// graczowi - zasada Jeffa z 19.09 ("lepsza idzie na ludzi, wyparta gorsza
+        /// pokazuje sie w stashu").</summary>
+        private static float ModQuality(EquipmentElement el)
+        {
+            try { var m = el.ItemModifier; return m != null ? m.PriceMultiplier : 1f; }
+            catch { return 1f; }
+        }
+
+        private static string ModId(EquipmentElement el)
+        {
+            try { var m = el.ItemModifier; return m != null ? (m.StringId ?? "") : ""; }
+            catch { return ""; }
+        }
+
         /// <summary>Dopasowanie ludzi do sztuk tego typu na CALEJ polce: kazdy
         /// (od najzdolniejszego) bierze na papierze najlepsza sztuke, ktora
         /// udzwignie. Zwraca ilu ma cos uzytecznego, ilu nic (z rozrzutem
@@ -301,8 +338,15 @@ namespace Armoury
                     // JAK WornFor (Jeff 14.09, screen "Arrows 86/172"): kolczan + zapasowy
                     // na lucznika, to samo belty i oszczepy - inaczej drugi kolczan
                     // wygladal na "nienoszony" i wracal na liste gracza
+                    // ILE STOSOW ZOLNIERZ NAPRAWDE NOSI (Jeff 19.09). Sztywne x2 z 14.09 bylo
+                    // zgadywaniem po jednym screenie: lucznicy ROT maja we wzorcu DWA sloty
+                    // kolczanow (tam 2 jest poprawne), ale oszczepnicy maja JEDEN pek - a papier
+                    // liczyl im dwa. Skutek w logu 19.09, szesc przebiegow z rzedu: "papier Thrown:
+                    // potrzeba 156, polka 153, udzwigna 153" - popyt WYZSZY niz polka, wiec kazdy
+                    // oszczep szedl na stan wojska i graczowi nie zostawal ani jeden, NA STALE
+                    // (targetOwn = Total - Used = 0). Liczymy sloty wzorca, nigdy mniej niz 1.
                     int mult = (type == ItemObject.ItemTypeEnum.Arrows || type == ItemObject.ItemTypeEnum.Bolts
-                                || type == ItemObject.ItemTypeEnum.Thrown) ? 2 : 1;
+                                || type == ItemObject.ItemTypeEnum.Thrown) ? SlotsOfType(c, type) : 1;
                     for (int k = 0; k < el.Number * mult; k++) men.Add(c);
                 }
                 f.Need = men.Count;
@@ -332,10 +376,34 @@ namespace Armoury
                     if (skill != null) men.Sort((a, b) => b.GetSkillValue(skill).CompareTo(a.GetSkillValue(skill)));
                     // 16.09: przy rownym wymogu ranga wg RangedRank (pod RBM naciag z runtime,
                     // nie stara skutecznosc z XML - patrz RangedRank.cs)
+                    // PORZADEK CALKOWITY (Jeff 19.09, zasada generalna). Dotad komparator mial
+                    // DWA kryteria i oba czytaly sam ItemObject - slepe na modyfikator. ROT ma cale
+                    // bloki sztuk o IDENTYCZNYCH statach (casterly_heavy_helm / north_heavy_helmet /
+                    // grafton_helmet3: t6, wymog 175, wartosc 24364; szesc par rekawic t5/140;
+                    // rot_horse_saddle2 i rot_horse_saddle4 co do kolumny). Dla nich komparator
+                    // zwracal 0, wiec o tym, KTORE id "nosza ludzie", decydowala kolejnosc wpisow
+                    // w rosterze - a ta zmienia sie przy kazdym chowaniu (od konca) i oddawaniu
+                    // depozytu (na koniec). Skutek w logu 19.09: "porzadek HeadArmor:
+                    // casterly_heavy_helm -9, grafton_helmet3 -3, north_heavy_helmet +11" o 14:08:08
+                    // i DOKLADNA ODWROTNOSC o 14:09:20; "240 szt. na liste gracza, 246 na stan
+                    // wojska [HeadArmor +23/-23, LegArmor +81/-81, HandArmor +79/-79]" - setki
+                    // sztuk przewracalo wlasnosc przy kazdym otwarciu, choc na polce nie drgnela
+                    // ani jedna sztuka. Dla gracza wygladalo to jak ciagle zabieranie i oddawanie
+                    // losowego sprzetu. Sort STABILNY by tego NIE naprawil - stabilny zachowuje
+                    // kolejnosc wejscia, a wejsciem jest wlasnie permutowany roster. Lekarstwem
+                    // jest porzadek CALKOWITY: jakosc modyfikatora (lepsze na ludzi - zasada R3),
+                    // a na koncu alfabet id, czysto po to, zeby wynik NIE zalezal od kolejnosci.
                     supply.Sort((a, b) =>
                     {
                         int d = b.El.Item.Difficulty.CompareTo(a.El.Item.Difficulty);
-                        return d != 0 ? d : RangedRank.Key(b.El.Item).CompareTo(RangedRank.Key(a.El.Item));
+                        if (d != 0) return d;
+                        d = RangedRank.Key(b.El.Item).CompareTo(RangedRank.Key(a.El.Item));
+                        if (d != 0) return d;
+                        d = ModQuality(b.El).CompareTo(ModQuality(a.El));
+                        if (d != 0) return d;
+                        d = string.CompareOrdinal(a.El.Item.StringId ?? "", b.El.Item.StringId ?? "");
+                        if (d != 0) return d;
+                        return string.CompareOrdinal(ModId(a.El), ModId(b.El));
                     });
                     foreach (var man in men)
                     {
@@ -414,6 +482,8 @@ namespace Armoury
                 var s = Settings.Current;
                 if (s == null || !s.QuartermasterPurgeUnusable || armory == null) return 0;
                 var names = new List<string>();
+                var takenNames = new List<string>();   // co ZABRANO - dotad gracz nie dostawal ani jednej nazwy
+                int nameKinds = 0, takenKinds = 0;     // ile ROZNYCH pozycji - wielokropek tylko gdy naprawde obcieto
                 var perType = new List<string>();
                 // 16.09: rozkazy z ksiegi musztry do logu - dotad nie bylo po nich sladu
                 var pinnedWorn = new List<string>();
@@ -483,12 +553,15 @@ namespace Armoury
                         {
                             ArmouryBehavior.StockDeposit(kv.Key, kv.Value);     // nie na ludziach -> lista gracza
                             toPlayer += kv.Value; here += kv.Value;
-                            if (names.Count < 3) names.Add(kv.Value + "x " + nameOf[kv.Key]);
+                            nameKinds++;
+                            if (names.Count < 4) names.Add(kv.Value + "x " + nameOf[kv.Key]);
                         }
                         else if (kv.Value < 0)
                         {
                             ArmouryBehavior.StockWithdraw(kv.Key, -kv.Value);   // noszone -> stan wojska
                             toMen += -kv.Value; taken += -kv.Value;
+                            takenKinds++;
+                            if (takenNames.Count < 4) takenNames.Add((-kv.Value) + "x " + nameOf[kv.Key]);
                         }
                     }
                     if (here > 0 || taken > 0)
@@ -511,13 +584,23 @@ namespace Armoury
                              + "; nienoszone z rozkazem WRACAJA na liste gracza: " + pinnedKept + " szt.");
                 if (toPlayer > 0 || toMen > 0)
                 {
-                    if (toPlayer > 0)
-                        Log.Player("QM: " + toPlayer + " pcs no man wears -> your list ("
-                                   + string.Join(", ", names.ToArray()) + (names.Count >= 3 ? ", ..." : "") + ").", true);
-                    if (toMen > 0)
-                        Log.Player("QM: " + toMen + " of your pcs -> the men.", true);
                     Log.Info("Kwatermistrz: porzadek w skarbcu - " + toPlayer + " szt. na liste gracza, " + toMen
                              + " szt. na stan wojska [" + string.Join(", ", perType.ToArray()) + "].");
+                    // JEDNO ZDANIE O CALEJ WYMIANIE (Jeff 19.09: "nowy luk znika w stash, a STARY
+                    // LUK LUCZNIKA POKAZUJE SIE W STASH"). Dotad szly dwie osobne CZERWONE linie,
+                    // ktorych nic nie wiazalo: ta o zabranych sztukach nie podawala ANI JEDNEJ
+                    // nazwy, wiec gracz nie mial jak sprawdzic, co stracil, a czerwien robila
+                    // alarm z dobrej wiadomosci. Teraz obie strony wymiany w jednym zdaniu,
+                    // z nazwami po obu stronach i w normalnym kolorze.
+                    string took = toMen > 0
+                        ? "the men took " + toMen + " pcs of yours (" + string.Join(", ", takenNames.ToArray())
+                          + (takenKinds > takenNames.Count ? ", ..." : "") + ")"
+                        : "the men took nothing";
+                    string back = toPlayer > 0
+                        ? toPlayer + " pcs no man wears are yours in the stash ("
+                          + string.Join(", ", names.ToArray()) + (nameKinds > names.Count ? ", ..." : "") + ")"
+                        : "nothing was displaced - they had empty hands";
+                    Log.Player("QM: " + took + "; " + back + ".");
                 }
             }
             catch (Exception e) { Log.Error("QuartermasterLaw.PurgeUnusable", e); }
