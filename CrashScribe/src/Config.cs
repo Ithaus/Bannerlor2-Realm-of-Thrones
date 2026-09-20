@@ -35,6 +35,13 @@ namespace CrashScribe
         public static int NightKingCallKeepNk = 120;      // tyle zostaje Nocnemu Krolowi, gdy oddaje
         public static float NightKingCallFullness = 0.85f;
 
+        // --- Pochod Nocnego Krola (patrz NightKingCall.March) ---
+        public static bool NightKingMarchEnabled = true;          // gotowa horda dostaje CEL: osada za Murem, ktorej garnizon zgniecie
+        public static int NightKingMarchMin = 500;                // tylu ZDROWYCH musi miec horda, zanim damy jej cel (prog oblezenia ROT)
+        public static float NightKingMarchOdds = 2.0f;            // ilu naszych na jednego obronce (garnizon + milicja); prog samego ROT to 2.5 i nie przepuszcza nic
+        public static bool NightKingMarchRespectCooldown = true;  // szanujemy 5-dniowa przerwe ROT po kazdym oblezeniu
+        public static bool NightKingMarchVerbose = true;          // raz na dzien wypisz tabelke osad za Murem z garnizonami i stanem wojny
+
         // --- Oboz obleniczy (patrz Mends.RbSiegeCampFed) ---
         public static bool RbSiegeAttritionOnlyStarving = true; // straty obozu z RealisticBannerlord (2-5 dziennie, rosnace) tylko gdy oboz GLODUJE; garnizon - tylko gdy miasto bez zapasow // najsilniejsza banda pelna w tylu procentach limitu (ROT: oblezenie przy >= 0.8)
 
@@ -73,6 +80,11 @@ namespace CrashScribe
                         case "NightKingCallKeep": NightKingCallKeep = I(v, NightKingCallKeep); break;
                         case "NightKingCallKeepNk": NightKingCallKeepNk = I(v, NightKingCallKeepNk); break;
                         case "NightKingCallFullness": NightKingCallFullness = F(v, NightKingCallFullness); break;
+                        case "NightKingMarchEnabled": NightKingMarchEnabled = B(v); break;
+                        case "NightKingMarchMin": NightKingMarchMin = I(v, NightKingMarchMin); break;
+                        case "NightKingMarchOdds": NightKingMarchOdds = F(v, NightKingMarchOdds); break;
+                        case "NightKingMarchRespectCooldown": NightKingMarchRespectCooldown = B(v); break;
+                        case "NightKingMarchVerbose": NightKingMarchVerbose = B(v); break;
                         case "RbSiegeAttritionOnlyStarving": RbSiegeAttritionOnlyStarving = B(v); break;
                     }
                 }

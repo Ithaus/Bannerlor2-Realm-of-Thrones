@@ -40,6 +40,23 @@
   <NightKingCallKeepNk>120</NightKingCallKeepNk>
   <NightKingCallFullness>0.85</NightKingCallFullness>
 
+  <!-- The Night King's March: once the strongest band of the Others has NightKingMarchMin healthy
+       wights, it is handed a target of its own - a fortification beyond the Wall that is not theirs,
+       that they are at war with, and whose garrison plus militia they outnumber at least
+       NightKingMarchOdds to one; of those, the weakest, and the nearest of equals. Realm of Thrones
+       only ever orders a siege at 2.5 to one and has not found a single target in 193 days, while
+       every other order it writes for the Others is silently dropped because their clan has no
+       kingdom - so without this the horde simply stands. The order is given only when the band has
+       no siege order of its own; from then on Realm of Thrones keeps that target itself. The Wall is
+       left alone, and once ROT's invasion flag turns on this stops interfering altogether.
+       Set NightKingMarchEnabled to false to switch it off. -->
+  <NightKingMarchEnabled>true</NightKingMarchEnabled>
+  <NightKingMarchMin>500</NightKingMarchMin>
+  <NightKingMarchOdds>2.0</NightKingMarchOdds>
+  <NightKingMarchRespectCooldown>true</NightKingMarchRespectCooldown>
+  <!-- list every fortification beyond the Wall once a day with its garrison, odds, distance and war state -->
+  <NightKingMarchVerbose>true</NightKingMarchVerbose>
+
   <!-- Siege camps do not rot while fed: RealisticBannerlord's SiegeAttritionBehavior kills 2-5 men
        of every besieging party each day (escalating) regardless of food and morale. With this on,
        the camp only suffers those losses while it is STARVING, and a besieged garrison only while

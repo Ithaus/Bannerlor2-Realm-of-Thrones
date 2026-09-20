@@ -2,8 +2,10 @@ using System;
 using System.Collections.Generic;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace CrashScribe
 {
@@ -44,6 +46,12 @@ namespace CrashScribe
         private static System.Reflection.FieldInfo _fGrowth, _fNk;
         private static bool _greeted;
 
+        // --- Pochod Nocnego Krola (20.09) ---
+        private static System.Reflection.FieldInfo _fToSiege, _fInvasion, _fCooldowns;
+        private static System.Reflection.MethodInfo _mBeyond;
+        private static Settlement _theWall;
+        private static bool _marchGreeted;
+
         public override void RegisterEvents()
         {
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, Daily);
@@ -56,13 +64,21 @@ namespace CrashScribe
             try
             {
                 if (_beh != null && _behCampaign == Campaign.Current) return _beh;
-                _beh = null; _behCampaign = Campaign.Current;
+                _beh = null; _behCampaign = Campaign.Current; _theWall = null; _marchGreeted = false;
                 if (_tOthers == null) _tOthers = Type.GetType("ROT.CampaignBehaviors.ROTOthersCampaignBehavior, ROT");
                 if (_tOthers == null || Campaign.Current == null) return null;
                 var mi = typeof(Campaign).GetMethod("GetCampaignBehavior");
                 if (mi != null) _beh = mi.MakeGenericMethod(_tOthers).Invoke(Campaign.Current, null);
                 if (_fGrowth == null) _fGrowth = AccessTools.Field(_tOthers, "_partySizeGrowth");
                 if (_fNk == null) _fNk = AccessTools.Field(_tOthers, "_nightKing");
+                if (_fToSiege == null) _fToSiege = AccessTools.Field(_tOthers, "_settlementsToSiege");
+                if (_fInvasion == null) _fInvasion = AccessTools.Field(_tOthers, "IsInvasionStarted");
+                if (_fCooldowns == null) _fCooldowns = AccessTools.Field(_tOthers, "_siegeCooldowns");
+                if (_mBeyond == null)
+                {
+                    var tUtil = Type.GetType("ROT.Misc.ROTUtilities, ROT");
+                    _mBeyond = tUtil != null ? AccessTools.Method(tUtil, "IsBeyondTheWall") : null;
+                }
                 return _beh;
             }
             catch { return null; }
@@ -114,6 +130,205 @@ namespace CrashScribe
                 moved += give; allowed -= give; need -= give;
             }
             return moved;
+        }
+
+        /// <summary>Czy osada lezy za Murem - pytamy o to sam ROT (ROT.Misc.ROTUtilities.IsBeyondTheWall),
+        /// tym samym wzorem, ktorego ROT uzywa przy wyborze celu oblezenia (l.513).</summary>
+        private static bool Beyond(Settlement s)
+        {
+            if (_mBeyond == null || s == null) return false;
+            try { return Convert.ToBoolean(_mBeyond.Invoke(null, new object[] { s.GetPosition2D })); }
+            catch { return false; }
+        }
+
+        /// <summary>"Inny" w ROT to KULTURA, nie id klanu (ROT.Misc/Extensions.cs:10).</summary>
+        private static bool IsOthers(Clan c)
+        {
+            try { return c != null && c.Culture != null && c.Culture.StringId == "whitewalker"; }
+            catch { return false; }
+        }
+
+        private static bool Invasion(object beh)
+        {
+            try { return _fInvasion != null && Convert.ToBoolean(_fInvasion.GetValue(beh)); }
+            catch { return false; }
+        }
+
+        /// <summary>Czy ROT trzyma tego dowodce na 5-dniowej przerwie po oblezeniu (_siegeCooldowns,
+        /// ustawiane w SiegeCompletedEvent - takze po PRZEGRANYM szturmie, isWin jest ignorowane).</summary>
+        private static bool Resting(object beh, Hero leader)
+        {
+            try
+            {
+                var d = _fCooldowns != null ? _fCooldowns.GetValue(beh) as System.Collections.IDictionary : null;
+                if (d == null || leader == null || !d.Contains(leader)) return false;
+                return (CampaignTime)d[leader] > CampaignTime.Now;
+            }
+            catch { return false; }
+        }
+
+        /// <summary>Kandydaci na cel: WLASNA lista ROT (_settlementsToSiege - fortyfikacje na zachod
+        /// od Tyrosh minus wyspy i Driftwood Hall), zeby nie wybrac czegos, co ROT z tej wojny wyjal.
+        /// Gdyby ROT jej jeszcze nie zbudowal - bierzemy wszystkie osady i filtrujemy sami.</summary>
+        private static System.Collections.Generic.IEnumerable<Settlement> Candidates(object beh)
+        {
+            try
+            {
+                var list = _fToSiege != null
+                    ? _fToSiege.GetValue(beh) as System.Collections.Generic.IEnumerable<Settlement> : null;
+                if (list != null) return list;
+            }
+            catch { }
+            return Settlement.All;
+        }
+
+        /// <summary>Wybiera osade za Murem, ktora horda ma NAJWIEKSZA przewage (przy remisie - blizsza).
+        /// ROT bierze zawsze najbardziej polnocna, czyli najpierw trzy duze miasta; nam zalezy na
+        /// pierwszej zdobyczy, bo 18 wiosek przechodzi razem ze swoimi siedmioma lennami.</summary>
+        private static Settlement PickTarget(object beh, Clan ww, MobileParty mp, System.Text.StringBuilder table)
+        {
+            int men = mp.MemberRoster.TotalManCount;
+            Settlement best = null; float topOdds = -1f, bestDist = float.MaxValue;
+            foreach (var s in Candidates(beh))
+            {
+                if (s == null || !s.IsFortification || s == _theWall) continue;   // Mur zostaje ROT
+                if (!Beyond(s)) continue;                                         // na poludnie nie idziemy
+                if (IsOthers(s.OwnerClan)) continue;                              // juz nasza
+                int guard = 1;
+                try { guard = s.Town != null ? Math.Max(1, s.Town.GetNumberOfTroops()) : 1; } catch { }
+                float odds = (float)men / guard;
+                float dist = 9999f;
+                try { dist = mp.GetPosition2D.Distance(s.GetPosition2D); } catch { }
+                bool war = false;
+                try { war = FactionManager.IsAtWarAgainstFaction(ww, s.MapFaction); } catch { }
+                bool taken = false;
+                try { taken = s.IsUnderSiege; } catch { }
+                if (table != null)
+                    table.Append("   ").Append(s.Name)
+                         .Append(" (").Append(s.MapFaction != null ? s.MapFaction.Name.ToString() : "?").Append(")")
+                         .Append(": garnizon z milicja ").Append(guard)
+                         .Append(", przewaga ").Append(odds.ToString("0.0"))
+                         .Append("x, dystans ").Append(dist.ToString("0"))
+                         .Append(war ? ", WOJNA" : ", POKOJ")
+                         .Append(taken ? ", juz oblegana" : "")
+                         .Append(Environment.NewLine);
+                if (!war || taken) continue;
+                if (odds < Config.NightKingMarchOdds) continue;
+                if (odds > topOdds + 0.5f) { topOdds = odds; best = s; bestDist = dist; }
+                else if (odds > topOdds - 0.5f)
+                {
+                    if (dist < bestDist) { best = s; bestDist = dist; }
+                    if (odds > topOdds) topOdds = odds;
+                }
+            }
+            return best;
+        }
+
+        /// <summary>
+        /// POCHOD: gotowa horda dostaje CEL wprost. Raz na dzien i tylko wtedy, gdy nie ma juz
+        /// wlasnego rozkazu oblezenia.
+        ///
+        /// DLACZEGO TRZEBA PCHNAC (dekompilacja 20.09):
+        /// - ROT.HarmonyPatches.Core.AIThinkPatch podmienia AiPartyThinkBehavior.PartyHourlyAiTick
+        ///   i przy !(MapFaction is Kingdom) - a klan Innych to minor faction bez krolestwa -
+        ///   zwycieski wynik z willGatherArmy:true NIE JEST W OGOLE NADAWANY. Rajd (l.385, 428),
+        ///   obrona (l.438, 480) i patrol (l.490) maja willGatherArmy:true, wiec jedynym wykonalnym
+        ///   zachowaniem Innych jest OBLEZENIE (l.368, 561 - willGatherArmy:false).
+        /// - Oblezenie ROT wystawia dopiero, gdy jego wlasny filtr znajdzie cel z przewaga 2.5x nad
+        ///   garnizonem i milicja (l.527 i 558-559). Gdy nie znajdzie - goto IL_0402 - horda nie
+        ///   dostaje ZADNEGO rozkazu i stoi. Z naszego logu wiemy, ze druga bramka l.559
+        ///   (PartySizeRatio >= 0.8) jest spelniona: "520 zdrowych z 783 ... limit 921" = 0.85.
+        ///
+        /// PO NADANIU ROZKAZU DALEJ JEDZIE ROT: l.355-372, przy >= 500 zdrowych dopisuje TEMU SAMEMU
+        /// celowi 999 punktow z willGatherArmy:false, a taki wynik latka ROT umie wykonac. Gdy horda
+        /// spadnie ponizej 500, zwycieskie beda rajd/obrona/patrol - czyli nic, co da sie nadac -
+        /// wiec DefaultBehavior zostaje na oblezeniu i marsz trwa dalej.
+        /// </summary>
+        private static void March(object beh, Clan ww, MobileParty mp)
+        {
+            try
+            {
+                if (!Config.NightKingMarchEnabled || beh == null || ww == null) return;
+                if (mp == null || !mp.IsActive || mp.LeaderHero == null || mp.MemberRoster == null) return;
+
+                if (!_marchGreeted)
+                {
+                    _marchGreeted = true;
+                    Scribe.Line("Pochod Nocnego Krola: czynny - od " + Config.NightKingMarchMin
+                                + " zdrowych horda dostaje cel za Murem, przy przewadze co najmniej "
+                                + Config.NightKingMarchOdds.ToString("0.0") + "x nad garnizonem z milicja.");
+                }
+
+                if (Invasion(beh)) return;   // inwazja ruszyla - od tej chwili rzadzi ROT
+
+                int healthy = mp.MemberRoster.TotalHealthyCount;
+                int men = mp.MemberRoster.TotalManCount;
+                int limit = 0;
+                try { limit = mp.Party.PartySizeLimit; } catch { }
+
+                if (Busy(mp))
+                {
+                    string what = "bitwa w polu";
+                    try
+                    {
+                        if (mp.SiegeEvent != null)
+                            what = "OBLEZENIE " + (mp.BesiegedSettlement != null ? mp.BesiegedSettlement.Name.ToString() : "?");
+                    }
+                    catch { }
+                    Scribe.Line("Pochod Nocnego Krola: " + mp.LeaderHero.Name + " zajety (" + what + ", "
+                                + healthy + " zdrowych z " + men + ") - dzis bez rozkazu.");
+                    return;
+                }
+
+                var tgt = mp.TargetSettlement;
+                if (mp.DefaultBehavior == AiBehavior.BesiegeSettlement && tgt != null && !IsOthers(tgt.OwnerClan)
+                    && FactionManager.IsAtWarAgainstFaction(ww, tgt.MapFaction))
+                {
+                    float d = 0f;
+                    try { d = mp.GetPosition2D.Distance(tgt.GetPosition2D); } catch { }
+                    Scribe.Line("Pochod Nocnego Krola: " + mp.LeaderHero.Name + " juz idzie na " + tgt.Name
+                                + " (dystans " + d.ToString("0") + ", " + healthy + " zdrowych z " + men
+                                + ", limit " + limit + ") - rozkazu nie ruszamy.");
+                    return;
+                }
+
+                if (healthy < Config.NightKingMarchMin) return;   // Zew jeszcze zbiera trupy
+
+                if (Config.NightKingMarchRespectCooldown && Resting(beh, mp.LeaderHero))
+                {
+                    Scribe.Line("Pochod Nocnego Krola: " + mp.LeaderHero.Name
+                                + " na 5-dniowej przerwie ROT po oblezeniu - dzis bez rozkazu.");
+                    return;
+                }
+
+                var table = Config.NightKingMarchVerbose ? new System.Text.StringBuilder() : null;
+                var target = PickTarget(beh, ww, mp, table);
+                if (table != null && table.Length > 0)
+                    Scribe.Line("Pochod Nocnego Krola: osady za Murem (horda " + men + " ludzi, limit " + limit + "):"
+                                + Environment.NewLine + table.ToString().TrimEnd());
+
+                if (target == null)
+                {
+                    Scribe.Line("Pochod Nocnego Krola: " + mp.LeaderHero.Name + " ma " + healthy + " zdrowych z " + men
+                                + ", ale zadna osada za Murem nie daje przewagi "
+                                + Config.NightKingMarchOdds.ToString("0.0") + "x (albo jest z nia pokoj).");
+                    return;
+                }
+
+                int guard = 1;
+                try { guard = target.Town != null ? Math.Max(1, target.Town.GetNumberOfTroops()) : 1; } catch { }
+                float dist = 0f;
+                try { dist = mp.GetPosition2D.Distance(target.GetPosition2D); } catch { }
+
+                SetPartyAiAction.GetActionForBesiegingSettlement(mp, target, MobileParty.NavigationType.Default, false);
+
+                Scribe.Line("Pochod Nocnego Krola: " + mp.LeaderHero.Name + " (" + healthy + " zdrowych z " + men
+                            + ", limit " + limit + ") RUSZA NA " + target.Name + " - garnizon z milicja " + guard
+                            + ", przewaga " + ((float)men / guard).ToString("0.0") + "x, dystans " + dist.ToString("0")
+                            + "; rozkaz po nadaniu: " + mp.DefaultBehavior + " -> "
+                            + (mp.TargetSettlement != null ? mp.TargetSettlement.Name.ToString() : "brak") + ".");
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "NightKingCall.March", null); } catch { } }
         }
 
         private void Daily()
@@ -212,6 +427,8 @@ namespace CrashScribe
                                 + ", band w polu " + bands.Count + ")" + limitNote + ".");
                 else
                     Scribe.Line("Zew Nocnego Krola: wszystkie " + bands.Count + " bandy w walce albo oblezeniu - dzis bez przemarszu.");
+
+                March(beh, ww, lead);   // Pochod: gotowa horda dostaje cel za Murem
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "NightKingCall.Daily", null); } catch { } }
         }
