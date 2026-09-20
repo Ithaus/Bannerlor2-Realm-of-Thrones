@@ -196,6 +196,10 @@ namespace Armoury
         public bool WreckSalvageEnabled = true;            // the piece smashed by the killing blow is not lost - it lands in the loot as a wreck to mend at the forge
         public int LootMinConditionPercent = 3;            // gear battered down to this percent of its worth or less is DESTROYED - it never reaches the loot screen (0 = off)
         public int LegendaryLootValueFloor = 100000;       // weapons worth this much clean (the named blades of the realm) never lie in the common loot sacks (0 = off)
+        // --- Plague shield ---
+        public bool PlagueSparesYourMen = true;            // sickness may weaken your men - it will not kill them: any troop death caused by a disease system is refused for YOUR party (the rest of the world still buries its dead)
+        public int PlagueShieldLogEvery = 20;              // after the first three saves, log every Nth - a long epidemic must not drown the log
+
         // --- Desertion ---
         public bool DesertionLawEnabled = true;            // men desert only when party morale falls below THEIR tier's threshold (vanilla: below 10 for everyone); a fed and paid party at decent morale loses no one; pay and party-size desertion stay as in vanilla
         public int DesertionMoraleTier1 = 25;              // morale threshold for tier 1 troops - pressed men run first; every tier above lowers the threshold by Desertion Morale Step Per Tier; nobody deserts above this morale

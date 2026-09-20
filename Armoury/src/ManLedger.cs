@@ -38,34 +38,64 @@ namespace Armoury
                 var m = AccessTools.Method(typeof(TroopRoster), "AddToCountsAtIndex");
                 if (m == null) { Log.Info("ManLedger: TroopRoster.AddToCountsAtIndex nieznalezione - ubytki ludzi NIE beda nazywane."); return; }
                 harmony.Patch(m, prefix: new HarmonyMethod(typeof(ManLedger), "LossPrefix"));
-                Log.Info("ManLedger: ksiega ludzi czynna - kazdy ubytek z partii gracza trafi do logu z nazwa winowajcy.");
+                var s = Settings.Current;
+                Log.Info("ManLedger: ksiega ludzi czynna - kazdy ubytek z partii gracza trafi do logu z nazwa winowajcy."
+                         + (s != null && s.PlagueSparesYourMen ? " Tarcza przed zaraza WLACZONA - choroba nie zabije juz twoich ludzi." : ""));
             }
             catch (Exception e) { Log.Error("ManLedger.ApplyAll", e); }
         }
 
-        public static void LossPrefix(object __instance, int __0, int __1)
+        private static int _shielded;
+
+        public static bool LossPrefix(object __instance, int __0, int __1, ref int __result)
         {
             try
             {
-                if (__1 >= 0) return;                                  // to nie strata
+                if (__1 >= 0) return true;                             // to nie strata
                 var roster = __instance as TroopRoster;
-                if (roster == null) return;
+                if (roster == null) return true;
                 var main = MobileParty.MainParty;
-                if (main == null || main.MemberRoster != roster) return;   // tylko partia gracza
+                if (main == null || main.MemberRoster != roster) return true;   // tylko partia gracza
 
-                string who = "?";
-                try
-                {
-                    var ch = __0 >= 0 && __0 < roster.Count ? roster.GetCharacterAtIndex(__0) : null;
-                    if (ch != null) who = ch.Name != null ? ch.Name.ToString() : ch.StringId;
-                }
-                catch { }
+                string who = WhoAt(roster, __0);
 
                 string blame = Blame();
+
+                // ===== TARCZA PRZED ZARAZA (Jeff 20.09) =====
+                // Ksiega ludzi wskazala winowajce: DiseaseEffectSystem.KillTroopsFromDisease
+                // z moda AIInfluence (zaciemniony Confuserem, nie do zdekompilowania). Jego dane
+                // pokazaly 35 czynnych ognisk "The Dock Fever" naraz na partii gracza, przy jego
+                // wlasnym ustawieniu "maksymalnie 3 choroby naraz". Dwie proby zalatwienia tego
+                // po dobroci ZAWIODLY i to jest udokumentowane:
+                //   1. wyleczenie 35 ognisk w jego pliku danych (disease_instances.json) - mod
+                //      nadpisal plik przy nastepnym zapisie i wszystkie 36 wrocily jako czynne,
+                //      bo prawdziwy stan trzyma w save, a JSON jest tylko wypisem;
+                //   2. MCM "DiseaseMaxDeathChance" 0.3 -> 0.0 - ustawienie PRZETRWALO start gry
+                //      (sprawdzone w jego json), a ludzie i tak gina; ten suwak nie bramkuje
+                //      smierci ZOLNIERZY.
+                // Zostaje tarcza w jedynym miejscu, ktore na pewno dziala: tu, gdzie sztuka
+                // schodzi z rostera. Gdy ubytek z partii GRACZA pochodzi z systemu chorob -
+                // odmawiamy go. Reszta swiata chowa swoich umarlych normalnie (partie AI
+                // w ogole tu nie wchodza). Chorobie zostaja wszystkie kary - morale, predkosc,
+                // skille - tylko nie zabija. Dokladnie to, o co Jeff prosil.
+                var cfg = Settings.Current;
+                if (cfg != null && cfg.PlagueSparesYourMen
+                    && blame.IndexOf("Disease", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    _shielded += -__1;
+                    int every = cfg.PlagueShieldLogEvery > 0 ? cfg.PlagueShieldLogEvery : 20;
+                    if (_shielded <= 3 || _shielded % every == 0)
+                        Log.Info("TARCZA PRZED ZARAZA: odmowiono smierci " + (-__1) + " x " + WhoAt(roster, __0)
+                                 + " | probowal: " + blame + " | uratowanych w sesji: " + _shielded
+                                 + " | partia ma dalej " + main.MemberRoster.TotalManCount + ".");
+                    __result = __0;
+                    return false;                                      // oryginal NIE biegnie - nikt nie ginie
+                }
+
                 Tally tal;
                 if (!_byBlame.TryGetValue(blame, out tal)) { tal = new Tally(); _byBlame[blame] = tal; }
                 tal.Men += -__1; tal.Hits++; _menTotal += -__1;
-                if (tal.Hits > 3 && tal.Hits % 20 != 0) return;        // ta sama przyczyna - nie zasypuj pliku
+                if (tal.Hits > 3 && tal.Hits % 20 != 0) return true;   // ta sama przyczyna - nie zasypuj pliku
 
                 string gdzie = "";
                 try
@@ -83,6 +113,19 @@ namespace Armoury
                          + " | partia ma teraz " + main.MemberRoster.TotalManCount + ".");
             }
             catch { }
+            return true;
+        }
+
+        /// <summary>Nazwa oddzialu spod wskazanego wpisu rostera (po zmianie wpis moze zniknac).</summary>
+        private static string WhoAt(TroopRoster roster, int index)
+        {
+            try
+            {
+                var ch = index >= 0 && index < roster.Count ? roster.GetCharacterAtIndex(index) : null;
+                if (ch != null) return ch.Name != null ? ch.Name.ToString() : ch.StringId;
+            }
+            catch { }
+            return "?";
         }
 
         /// <summary>Kto wolal: pierwsze klatki stosu spoza rostera, Harmony i nas samych.

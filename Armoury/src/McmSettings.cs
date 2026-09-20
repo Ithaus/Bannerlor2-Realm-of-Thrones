@@ -632,6 +632,14 @@ namespace Armoury
         [SettingPropertyGroup("The law of the battlefield")]
         public int LegendaryLootValueFloor { get; set; } = 100000;
 
+        [SettingPropertyBool("Plague Spares Your Men", HintText = "sickness may weaken your men - it will not kill them: any troop death caused by a disease system is refused for YOUR party (the rest of the world still buries its dead)")]
+        [SettingPropertyGroup("Plague shield")]
+        public bool PlagueSparesYourMen { get; set; } = true;
+
+        [SettingPropertyInteger("Plague Shield Log Every", 0, 80, "0", HintText = "after the first three saves, log every Nth - a long epidemic must not drown the log")]
+        [SettingPropertyGroup("Plague shield")]
+        public int PlagueShieldLogEvery { get; set; } = 20;
+
         [SettingPropertyBool("Desertion Law Enabled", HintText = "men desert only when party morale falls below THEIR tier's threshold (vanilla: below 10 for everyone); a fed and paid party at decent morale loses no one; pay and party-size desertion stay as in vanilla")]
         [SettingPropertyGroup("Desertion")]
         public bool DesertionLawEnabled { get; set; } = true;
@@ -1553,6 +1561,8 @@ namespace Armoury
             s.WreckSalvageEnabled = WreckSalvageEnabled;
             s.LootMinConditionPercent = LootMinConditionPercent;
             s.LegendaryLootValueFloor = LegendaryLootValueFloor;
+            s.PlagueSparesYourMen = PlagueSparesYourMen;
+            s.PlagueShieldLogEvery = PlagueShieldLogEvery;
             s.DesertionLawEnabled = DesertionLawEnabled;
             s.DesertionMoraleTier1 = DesertionMoraleTier1;
             s.DesertionMoraleStepPerTier = DesertionMoraleStepPerTier;
