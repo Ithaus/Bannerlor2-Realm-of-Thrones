@@ -31,10 +31,21 @@ namespace CrashScribe
         {
             try
             {
+                // PRZEZ WIERSZ NPC, NIE WPROST (Jeff 20.09: "kompan z wlasna partia
+                // od razu chce sie pojedynkowac"). Po wierszu gracza silnik wola
+                // ConversationManager.DoOptionContinue -> ProcessPartnerSentence ->
+                // GetSentenceOptions(onlyPlayer: false), ktore bierze PIERWSZY pasujacy
+                // wiersz w stanie wyjsciowym - takze wiersz GRACZA - i WYKONUJE go
+                // jak klikniety. Skok "Let us talk" -> hero_main_options sam wybieral
+                // wiec pierwsza opcje z listy (u kompana: pojedynek ROT). Vanilla
+                // zawsze wchodzi do hero_main_options przez wiersz NPC ("So, then.
+                // What is it?") - robimy dokladnie tak samo.
+                starter.AddDialogLine("cs_escape_npc", "cs_escape_pretalk", "hero_main_options",
+                    "{=!}So, then. What is it?", null, null, 100);
                 foreach (var state in new[] { "lord_start", "lord_introduction", "lord_pretalk", "bk_preacher_asked_preaching", "bk_preacher_asked_faith", "bk_preacher_asked_induction" })
                 {
-                    starter.AddPlayerLine("cs_escape_talk_" + state, state, "hero_main_options",
-                        "{=!}Let us talk.", () => Stuck(), () => { _used++; Scribe.Line("DialogEscape: rozmowa uratowana (" + _used + ") - opcje z hero_main_options."); }, 1);
+                    starter.AddPlayerLine("cs_escape_talk_" + state, state, "cs_escape_pretalk",
+                        "{=!}Let us talk.", () => Stuck(), () => { _used++; Scribe.Line("DialogEscape: rozmowa uratowana (" + _used + ") - przez wiersz NPC do hero_main_options."); }, 1);
                     starter.AddPlayerLine("cs_escape_bye_" + state, state, "close_window",
                         "{=!}Farewell.", () => Stuck(), () => { _used++; Scribe.Line("DialogEscape: rozmowa zamknieta awaryjnie (" + _used + ")."); }, 0);
                 }
