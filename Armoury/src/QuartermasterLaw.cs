@@ -66,6 +66,13 @@ namespace Armoury
         internal sealed class Needs
         {
             public int Troops, Mounted, Bows, Xbows, TwoH, Pole, Shields, OneH, Thrown;
+            // STOSY AMUNICJI wedle wzorca (Jeff 03.10: "mam strzaly kazdego tieru, a kilka
+            // nie chce przyjac"). Dotad WornFor liczyl sztywne x2 na strzelca, a FitFor
+            // sloty wzorca (zmiana z 19.09 zostawila raport na starym x2). Raport braku
+            // szedl wiec z innej liczby niz dopasowanie: log 03.10 "papier Arrows:
+            // potrzeba 258 (dopasowanie liczy 249) ... bez sztuki 0" i na czerwono
+            // "Arrows 249/258", choc KAZDY lucznik mial kolczan. Teraz ta sama regula.
+            public int ArrowStacks, BoltStacks, ThrownStacks;
         }
 
         internal static Needs CountNeeds()
@@ -110,6 +117,11 @@ namespace Armoury
                     if (pole) n.Pole += k;
                     if (sh) n.Shields += k;
                     if (oneh) n.OneH += k;
+                    // dokladnie jak FitFor: kto wedle NeedsType nosi amunicje, ten ma
+                    // tyle stosow, ile slotow wzorca (nigdy mniej niz 1)
+                    if (NeedsType(c, ItemObject.ItemTypeEnum.Arrows)) n.ArrowStacks += k * SlotsOfType(c, ItemObject.ItemTypeEnum.Arrows);
+                    if (NeedsType(c, ItemObject.ItemTypeEnum.Bolts)) n.BoltStacks += k * SlotsOfType(c, ItemObject.ItemTypeEnum.Bolts);
+                    if (NeedsType(c, ItemObject.ItemTypeEnum.Thrown)) n.ThrownStacks += k * SlotsOfType(c, ItemObject.ItemTypeEnum.Thrown);
                 }
             }
             catch { }
@@ -142,11 +154,11 @@ namespace Armoury
                 case ItemObject.ItemTypeEnum.Crossbow:
                     return n.Xbows;
                 case ItemObject.ItemTypeEnum.Arrows:
-                    return n.Bows * 2;                               // kolczan i zapasowy na lucznika
+                    return n.ArrowStacks;                            // tyle kolczanow, ile slotow wzorca (jak FitFor)
                 case ItemObject.ItemTypeEnum.Bolts:
-                    return n.Xbows * 2;
+                    return n.BoltStacks;
                 case ItemObject.ItemTypeEnum.Thrown:
-                    return n.Thrown * 2;
+                    return n.ThrownStacks;
                 default:
                     return 0;
             }
