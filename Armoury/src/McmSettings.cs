@@ -1436,6 +1436,38 @@ namespace Armoury
         [SettingPropertyGroup("Iron bank")]
         public float HistBowLaborMultiplier { get; set; } = 1.0f;
 
+        [SettingPropertyBool("Town Household Use", HintText = "townsfolk buy only their household share of raw goods - flax, wool, hides and ore went to weavers, tanners and smiths, not into homes (England c.1300)")]
+        [SettingPropertyGroup("Iron bank")]
+        public bool TownHouseholdUse { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Town Use Flax", 0.00f, 1.00f, "0.00", HintText = "share of the townsfolk's old appetite for raw flax they keep (home spinning)")]
+        [SettingPropertyGroup("Iron bank")]
+        public float TownUseFlax { get; set; } = 0.02f;
+
+        [SettingPropertyFloatingInteger("Town Use Wool", 0.00f, 1.00f, "0.00", HintText = "share kept for raw wool")]
+        [SettingPropertyGroup("Iron bank")]
+        public float TownUseWool { get; set; } = 0.02f;
+
+        [SettingPropertyFloatingInteger("Town Use Hides", 0.00f, 1.00f, "0.00", HintText = "share kept for raw hides")]
+        [SettingPropertyGroup("Iron bank")]
+        public float TownUseHides { get; set; } = 0.02f;
+
+        [SettingPropertyFloatingInteger("Town Use Iron", 0.00f, 1.00f, "0.00", HintText = "share kept for iron ore - households bought nails and tools, never ore")]
+        [SettingPropertyGroup("Iron bank")]
+        public float TownUseIron { get; set; } = 0f;
+
+        [SettingPropertyFloatingInteger("Town Use Leather", 0.00f, 2.00f, "0.00", HintText = "share kept for leather (shoes, belts, straps)")]
+        [SettingPropertyGroup("Iron bank")]
+        public float TownUseLeather { get; set; } = 0.5f;
+
+        [SettingPropertyFloatingInteger("Town Use Linen", 0.00f, 1.60f, "0.00", HintText = "share kept for linen cloth (shirts, bedding)")]
+        [SettingPropertyGroup("Iron bank")]
+        public float TownUseLinen { get; set; } = 0.4f;
+
+        [SettingPropertyFloatingInteger("Town Use Hardwood", 0.00f, 4.00f, "0.00", HintText = "share kept for timber and firewood (hearths, bakers, brewers, building)")]
+        [SettingPropertyGroup("Iron bank")]
+        public float TownUseHardwood { get; set; } = 1f;
+
         [SettingPropertyBool("Hist Demand Scaling", HintText = "town demand for each repriced kind of goods is counted in the new coin too - otherwise townsfolk with the old purse buy up tens of times more cheap swords, ore and cloth and the stalls run dry")]
         [SettingPropertyGroup("Iron bank")]
         public bool HistDemandScaling { get; set; } = true;
@@ -2462,6 +2494,14 @@ namespace Armoury
             s.HistHidesPerKg = HistHidesPerKg;
             s.HistFlaxPerKg = HistFlaxPerKg;
             s.HistBowLaborMultiplier = HistBowLaborMultiplier;
+            s.TownHouseholdUse = TownHouseholdUse;
+            s.TownUseFlax = TownUseFlax;
+            s.TownUseWool = TownUseWool;
+            s.TownUseHides = TownUseHides;
+            s.TownUseIron = TownUseIron;
+            s.TownUseLeather = TownUseLeather;
+            s.TownUseLinen = TownUseLinen;
+            s.TownUseHardwood = TownUseHardwood;
             s.HistDemandScaling = HistDemandScaling;
             s.PopulationRentEnabled = PopulationRentEnabled;
             s.PopulationRentPerHead = PopulationRentPerHead;

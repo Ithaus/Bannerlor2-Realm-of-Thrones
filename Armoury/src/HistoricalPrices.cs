@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 
@@ -258,6 +259,43 @@ namespace Armoury
             catch { }
         }
 
+        // ------------------------------------------------------------ zakupy mieszczan (wpis 53, docs/BILANS-ZUZYCIA.md)
+        // BK EconomyPatches.CalculateBudget: budzet wiersza polki = popyt x indeks^a + DOBROBYT/1000/indeks - drugi skladnik
+        // jest w ZLOCIE i nie przechodzi przez DemandPostfix: przy rudzie i drewnie po kilka pensow zjadal ~465 ladunkow dziennie.
+        // (1) ten skladnik dzielimy przez przelicznik kategorii (jak popyt, wpis 44); (2) caly budzet surowcow mnozymy przez
+        // domowa czesc (TownUse*) - len, welna, skory surowe i ruda szly do tkaczy, garbarzy i kowali, nie do domow.
+        public static void BudgetPostfix(Town town, ItemCategory category, ref float __result)
+        {
+            try
+            {
+                if (!_applied || town == null || category == null) return;
+                var s = Settings.Current;
+                float idx = Math.Max(0.01f, town.GetItemCategoryPriceIndex(category));
+                float extra = town.Prosperity / 1000f / idx;
+                float r;
+                if (s.HistDemandScaling && _catRatio.TryGetValue(category, out r) && r > 1f)
+                    __result = __result - extra + extra / r;
+                if (s.TownHouseholdUse) __result *= TownUse(category.StringId);
+            }
+            catch { }
+        }
+
+        private static float TownUse(string id)
+        {
+            var s = Settings.Current;
+            switch (id)
+            {
+                case "flax": return Math.Max(0f, s.TownUseFlax);
+                case "wool": return Math.Max(0f, s.TownUseWool);
+                case "hides": return Math.Max(0f, s.TownUseHides);
+                case "iron": return Math.Max(0f, s.TownUseIron);
+                case "leather": return Math.Max(0f, s.TownUseLeather);
+                case "linen": return Math.Max(0f, s.TownUseLinen);
+                case "hardwood": return Math.Max(0f, s.TownUseHardwood);
+                default: return 1f;
+            }
+        }
+
         // ------------------------------------------------------------ XP kowalstwa od wartosci sprzed zmiany
         public static void XpPostfix(ItemObject item, ref int __result)
         {
@@ -378,6 +416,9 @@ namespace Armoury
                     }
                 }
                 Log.Info("HistoricalPrices: popyt miast w nowej monecie wpiety w " + d + " modelach ekonomii osad.");
+                var bud = AccessTools.Method("BannerKings.Patches.EconomyPatches:CalculateBudget");
+                if (bud != null) h.Patch(bud, postfix: new HarmonyMethod(typeof(HistoricalPrices), nameof(BudgetPostfix)));
+                Log.Info("HistoricalPrices: zakupy mieszczan (BK CalculateBudget) - " + (bud != null ? "domowa czesc surowcow i dodatek BK w nowej monecie wpiete" : "BRAK BK CalculateBudget") + ".");
             }
             catch (Exception e) { Log.Error("HistoricalPrices.ApplyAll", e); }
         }

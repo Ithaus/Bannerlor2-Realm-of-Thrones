@@ -422,6 +422,14 @@ namespace Armoury
         public float HistHidesPerKg = 1f;                  // raw hides, pence per kg (an ox hide of 25-30 kg sold for 1-3 shillings)
         public float HistFlaxPerKg = 2f;                   // raw flax and hemp, pence per kg (estimate)
         public float HistBowLaborMultiplier = 1.0f;        // a bowyer's days on a bow, against the smith's model (a war longbow cost 12-18 d)
+        public bool TownHouseholdUse = true;               // townsfolk buy only their household share of raw goods - flax, wool, hides and ore went to weavers, tanners and smiths, not into homes (England c.1300)
+        public float TownUseFlax = 0.02f;                  // share of the townsfolk's old appetite for raw flax they keep (home spinning)
+        public float TownUseWool = 0.02f;                  // share kept for raw wool
+        public float TownUseHides = 0.02f;                 // share kept for raw hides
+        public float TownUseIron = 0f;                     // share kept for iron ore - households bought nails and tools, never ore
+        public float TownUseLeather = 0.5f;                // share kept for leather (shoes, belts, straps)
+        public float TownUseLinen = 0.4f;                  // share kept for linen cloth (shirts, bedding)
+        public float TownUseHardwood = 1f;                 // share kept for timber and firewood (hearths, bakers, brewers, building)
         public bool HistDemandScaling = true;              // town demand for each repriced kind of goods is counted in the new coin too - otherwise townsfolk with the old purse buy up tens of times more cheap swords, ore and cloth and the stalls run dry
         public bool PopulationRentEnabled = true;          // a fief pays by the people it stands for: each village and town on the map is a symbol of a whole land, and its lord's rents follow that land's population (the Reach richest, the Iron Islands poor)
         public float PopulationRentPerHead = 40f;          // rents and dues a lord draws from each subject a year, in coins (about 40 pence a head in the medieval estimate)
