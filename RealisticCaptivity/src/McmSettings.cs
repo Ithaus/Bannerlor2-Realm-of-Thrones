@@ -326,19 +326,19 @@ namespace RealisticCaptivity
 
         [SettingPropertyFloatingInteger("Work Pay Village Base", 0.00f, 60.00f, "0.00", HintText = "village day wage before the hearth bonus")]
         [SettingPropertyGroup("Honest work")]
-        public float WorkPayVillageBase { get; set; } = 15f;
+        public float WorkPayVillageBase { get; set; } = 1f;
 
-        [SettingPropertyFloatingInteger("Work Pay Village Hearth Div", 0.00f, 160.00f, "0.00", HintText = "village hearths divided by this are added to the wage")]
+        [SettingPropertyFloatingInteger("Work Pay Village Hearth Div", 0.00f, 4000.00f, "0.00", HintText = "village hearths divided by this are added to the wage")]
         [SettingPropertyGroup("Honest work")]
-        public float WorkPayVillageHearthDiv { get; set; } = 40f;
+        public float WorkPayVillageHearthDiv { get; set; } = 1000f;
 
         [SettingPropertyFloatingInteger("Work Pay Town Base", 0.00f, 80.00f, "0.00", HintText = "town day wage before the prosperity bonus")]
         [SettingPropertyGroup("Honest work")]
-        public float WorkPayTownBase { get; set; } = 20f;
+        public float WorkPayTownBase { get; set; } = 1.5f;
 
-        [SettingPropertyFloatingInteger("Work Pay Town Prosperity Div", 0.00f, 1200.00f, "0.00", HintText = "town prosperity divided by this is added to the wage")]
+        [SettingPropertyFloatingInteger("Work Pay Town Prosperity Div", 0.00f, 20000.00f, "0.00", HintText = "town prosperity divided by this is added to the wage")]
         [SettingPropertyGroup("Honest work")]
-        public float WorkPayTownProsperityDiv { get; set; } = 300f;
+        public float WorkPayTownProsperityDiv { get; set; } = 5000f;
 
         [SettingPropertyInteger("Work Athletics Xp Per Day", 0, 100, "0", HintText = "athletics practice from a day of hard graft")]
         [SettingPropertyGroup("Honest work")]
@@ -366,11 +366,11 @@ namespace RealisticCaptivity
 
         [SettingPropertyFloatingInteger("Guard Pay Base", 0.00f, 180.00f, "0.00", HintText = "night-watch wage before the prosperity bonus")]
         [SettingPropertyGroup("Honest work")]
-        public float GuardPayBase { get; set; } = 45f;
+        public float GuardPayBase { get; set; } = 2f;
 
-        [SettingPropertyFloatingInteger("Guard Pay Prosperity Div", 0.00f, 600.00f, "0.00", HintText = "town prosperity divided by this is added to the wage")]
+        [SettingPropertyFloatingInteger("Guard Pay Prosperity Div", 0.00f, 16000.00f, "0.00", HintText = "town prosperity divided by this is added to the wage")]
         [SettingPropertyGroup("Honest work")]
-        public float GuardPayProsperityDiv { get; set; } = 150f;
+        public float GuardPayProsperityDiv { get; set; } = 4000f;
 
         [SettingPropertyInteger("Guard Weapon Xp Per Day", 0, 160, "0", HintText = "weapon practice from a night on the walls")]
         [SettingPropertyGroup("Honest work")]

@@ -95,6 +95,10 @@ namespace Armoury
             try
             {
                 if (!On || __2 == null) return;
+                // Jeff 04.10: "zaciag tez daje wyzszy tier" - ta sama szansa gry steruje zapelnieniem PUSTEGO miejsca i
+                // awansem ochotnika, ktory juz stoi. Chec do sluzby (nadwyzka rak + nedza) dotyczy tylko pustego miejsca;
+                // awans zostaje przy szansie BK i mocy notabla, a sprzet do niego notabl musi kupic (VolunteerKit).
+                try { var vt = __0 != null ? __0.VolunteerTypes : null; if (vt != null && __1 >= 0 && __1 < vt.Length && vt[__1] != null) return; } catch { }
                 float w = Willingness(__2);
                 __result *= w;
                 _calls++; _sumW += w;

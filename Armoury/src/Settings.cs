@@ -141,7 +141,7 @@ namespace Armoury
         public float CrossingRadius = 3f;                  // how far the bridge watch reaches around the crossing castle
 
         // --- The slow muster ---
-        public int VolunteerRegenPercent = 25;             // notables refill their volunteer slots at this percent of the normal daily chance - losses should STING, for lords and player alike (100 = vanilla, 0 = off; Jeff 30.08: halved again, the towns still teemed with recruits)
+        public int VolunteerRegenPercent = 100;            // notables refill their volunteer slots at this percent of the normal daily chance - losses should STING, for lords and player alike (100 = vanilla, 0 = off; Jeff 30.08: halved again, the towns still teemed with recruits)
 
         // --- The slow mending ---
         public int HealingRegenPercent = 50;               // wounded men and heroes heal on the map at this percent of the normal daily rate - medicine perks still count on top (100 = vanilla)
@@ -413,6 +413,11 @@ namespace Armoury
         public float PopulationScale = 1f;                 // scale on every land's population (Westeros ~30 million, Essos with its hinterlands ~30 million)
         public float PopulationRentMaxShare = 0.5f;        // a lord takes his due rents each day from the village or town purse, but never more than this share of what it holds - a burnt village pays nothing
         public bool WorkshopNoFreeRaw = true;              // nothing from thin air: the hidden town artisans no longer make timber, ore, hides, meat, leather and linen without any input, and a workshop roll never yields charcoal or ingots (those only come from smelting) - raw goods come from the villages
+        public bool HistoricalRecruitCost = true;          // a recruit costs his prest money - some days of his pay (mercenaries twice that) - instead of the game's flat table by level
+        public float RecruitCostDays = 10f;                // days of a troop's daily pay paid to take him on (historical prest/advance: a few to a dozen days of wages)
+        public bool AmmoRecoveryEnabled = true;            // arrows and bolts are spent: of those shot, the side holding the field gathers some back, some are mended, the rest are lost; the beaten side loses all it shot
+        public float AmmoRecoverPercent = 45f;             // share of shot arrows the winner picks up whole (estimate from Poitiers, Towton and the 1343 Breton shipment)
+        public float AmmoRepairPercent = 20f;              // share of shot arrows mended by the army's fletchers (new fletching, heads) - the rest are broken or lost
         public bool KeepWearThroughBattle = true;          // gear your men take into battle comes back in the state it went out (and worse after the fight) - worn mail no longer returns as new; damage piles up and must be repaired
         public bool StartKitEnabled = true;                // starting gear you cannot wear (heavy armour your Athletics cannot carry) is swapped once, after character creation, for the best piece of the same kind you can wear - never dearer than the original
         public bool OutlawLawEnabled = true;               // outlaws are real men: deserters, unpaid soldiers, men routed from battle, villagers driven off by raids, hunger and war; bands form only where such men exist and wear only what they brought, looted or bought
@@ -458,6 +463,7 @@ namespace Armoury
         public bool CrownDuesEnabled = true;               // vassals owe the crown a share of their daily income (fief income and rents), paid into the kingdom treasury - small in peace, heavy in war as with medieval war taxes
         public float CrownDuesPeacePercent = 2f;           // share of a vassal house's daily income owed to the crown in peace (aids and dues)
         public float CrownDuesWarPercent = 10f;            // share owed while the realm is at war (war taxes, scutage in place of service)
+        public bool NoRotClanBailout = true;               // Realm of Thrones no longer hands every poor AI house Tier x 5000 gold a day from thin air - a house short of money borrows from the Iron Bank or goes bankrupt
         public bool NoFreeKingdomGold = true;              // the kingdom treasury no longer refills from thin air (vanilla +1000 a day and random windfalls of 100-400 thousand); it lives on what the houses pay in - change needs a game restart
         public int IronBankMinDaysToLend = 30;             // the Bank lends no more to a house whose running debt falls due within this many days - pay first
         public float IronBankLoanFeePercent = 2f;          // fee the Iron Bank adds to every loan, owed with the debt - no free same-day borrowing

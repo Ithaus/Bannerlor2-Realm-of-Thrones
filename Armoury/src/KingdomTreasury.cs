@@ -75,12 +75,20 @@ namespace Armoury
             catch (Exception e) { Log.Error("KingdomTreasury.Daily", e); }
         }
 
+        // ROT ROTCoreBehavior.DailyTickClan: kazdy rod AI z kiesa <= 10 000 dostaje CODZIENNIE Tier x 5000 z niczego
+        // (audyt 04.10, spis stalych modow) - dlatego nikt nie bankrutowal ani nie pozyczal w Banku Zelaznym.
+        public static bool RotBailoutPrefix() { var s = Settings.Current; return s == null || !s.NoRotClanBailout; }
+
         internal static void ApplyAll(Harmony h)
         {
             try
             {
                 var m = AccessTools.Method(typeof(ClanVariablesCampaignBehavior), "DailyTickClan");
                 if (m != null) h.Patch(m, transpiler: new HarmonyMethod(typeof(KingdomTreasury), nameof(Transpiler)));
+                var rot = AccessTools.TypeByName("ROT.CampaignBehaviors.ROTCoreBehavior");
+                var rm = rot != null ? AccessTools.Method(rot, "DailyTickClan") : null;
+                if (rm != null) h.Patch(rm, prefix: new HarmonyMethod(typeof(KingdomTreasury), nameof(RotBailoutPrefix)));
+                Log.Info("KingdomTreasury: zapomoga ROT dla biednych rodow " + (rm != null ? "przechwycona (MCM No Rot Clan Bailout)" : "BRAK ROTCoreBehavior.DailyTickClan") + ".");
                 Log.Info("KingdomTreasury: zloto z niczego do skarbca krolestw " + (m != null ? "wylaczone (podmienionych stalych " + _swapped + ", oczekiwane 4)" : "BRAK DailyTickClan") + ".");
             }
             catch (Exception e) { Log.Error("KingdomTreasury.ApplyAll", e); }

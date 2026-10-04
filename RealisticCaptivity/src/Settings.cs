@@ -122,18 +122,18 @@ namespace RealisticCaptivity
         public bool WorkEnabled = true;                    // day labour and guard work for hire in settlements
         public int WorkMaxPartySize = 5;                   // with more mouths than this behind you, no one hires you as a hand
         public int WorkOnlyBelowGold = 2500;               // day labour offered only while your purse is under this (0 = always)
-        public float WorkPayVillageBase = 15f;             // village day wage before the hearth bonus
-        public float WorkPayVillageHearthDiv = 40f;        // village hearths divided by this are added to the wage
-        public float WorkPayTownBase = 20f;                // town day wage before the prosperity bonus
-        public float WorkPayTownProsperityDiv = 300f;      // town prosperity divided by this is added to the wage
+        public float WorkPayVillageBase = 1f;              // village day wage before the hearth bonus
+        public float WorkPayVillageHearthDiv = 1000f;       // village hearths divided by this are added to the wage
+        public float WorkPayTownBase = 1.5f;               // town day wage before the prosperity bonus
+        public float WorkPayTownProsperityDiv = 5000f;     // town prosperity divided by this is added to the wage
         public int WorkAthleticsXpPerDay = 25;             // athletics practice from a day of hard graft
         public int WorkSaturationDays = 10;                // after this many days in one place the wage halves
         public int WorkSaturationRestDays = 5;             // days away before the place forgets you and pays full again
         public bool GuardWorkEnabled = true;               // night-watch work for hire in towns
         public int GuardOnlyBelowGold = 10000;             // guard work offered only while your purse is under this (0 = always)
         public int GuardSkillRequired = 40;                // best weapon skill the merchants demand of a hired guard
-        public float GuardPayBase = 45f;                   // night-watch wage before the prosperity bonus
-        public float GuardPayProsperityDiv = 150f;         // town prosperity divided by this is added to the wage
+        public float GuardPayBase = 2f;                    // night-watch wage before the prosperity bonus
+        public float GuardPayProsperityDiv = 4000f;        // town prosperity divided by this is added to the wage
         public int GuardWeaponXpPerDay = 40;               // weapon practice from a night on the walls
         public int GuardBrawlChancePercent = 15;           // nightly chance of trouble at the gates
         public int GuardBrawlBonus = 50;                   // extra pay for cracking heads when trouble comes

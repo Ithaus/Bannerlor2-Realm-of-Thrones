@@ -482,7 +482,7 @@ namespace Armoury
             CampaignEvents.MapEventStarted.AddNonSerializedListener(this, OnMapEventStarted);
             // polegli oddaja rynsztunek na wozy zaraz po bitwie
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this,
-                delegate (MapEvent me) { try { if (me != null && me.IsPlayerMapEvent) GatherFallen(); } catch { } try { if (me != null && me.IsPlayerMapEvent) WearKeep.AfterBattle(); } catch { } });
+                delegate (MapEvent me) { try { if (me != null && me.IsPlayerMapEvent) GatherFallen(); } catch { } try { if (me != null && me.IsPlayerMapEvent) WearKeep.AfterBattle(); } catch { } try { if (me != null && me.IsPlayerMapEvent) AmmoRecovery.AfterBattle(); } catch { } });
             CampaignEvents.OnNewItemCraftedEvent.AddNonSerializedListener(this, OnNewItemCrafted);
             // DEPOZYT KWATERMISTRZA NIE MA PRAWA WEJSC DO SAVE'A: schowane
             // na czas ekranu zbrojowni sztuki zyja poza rosterem - zapis gry

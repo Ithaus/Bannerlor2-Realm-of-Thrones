@@ -474,7 +474,7 @@ namespace Armoury
 
         [SettingPropertyInteger("Volunteer Regen Percent", 0, 100, "0", HintText = "notables refill their volunteer slots at this percent of the normal daily chance - losses should STING, for lords and player alike (100 = vanilla, 0 = off; Jeff 30.08: halved again, the towns still teemed with recruits)")]
         [SettingPropertyGroup("The slow muster")]
-        public int VolunteerRegenPercent { get; set; } = 25;
+        public int VolunteerRegenPercent { get; set; } = 100;
 
         [SettingPropertyInteger("Healing Regen Percent", 0, 200, "0", HintText = "wounded men and heroes heal on the map at this percent of the normal daily rate - medicine perks still count on top (100 = vanilla)")]
         [SettingPropertyGroup("The slow mending")]
@@ -1400,6 +1400,26 @@ namespace Armoury
         [SettingPropertyGroup("Starting gear")]
         public bool StartKitEnabled { get; set; } = true;
 
+        [SettingPropertyBool("Historical Recruit Cost", HintText = "a recruit costs his prest money - some days of his pay (mercenaries twice that) - instead of the game's flat table by level")]
+        [SettingPropertyGroup("Levy")]
+        public bool HistoricalRecruitCost { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Recruit Cost Days", 1f, 40f, "0", HintText = "days of a troop's daily pay paid to take him on (historical prest/advance: a few to a dozen days of wages)")]
+        [SettingPropertyGroup("Levy")]
+        public float RecruitCostDays { get; set; } = 10f;
+
+        [SettingPropertyBool("Ammo Recovery Enabled", HintText = "arrows and bolts are spent: of those shot, the side holding the field gathers some back, some are mended, the rest are lost; the beaten side loses all it shot")]
+        [SettingPropertyGroup("Starting gear")]
+        public bool AmmoRecoveryEnabled { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Ammo Recover Percent", 0f, 100f, "0", HintText = "share of shot arrows the winner picks up whole (estimate from Poitiers, Towton and the 1343 Breton shipment)")]
+        [SettingPropertyGroup("Starting gear")]
+        public float AmmoRecoverPercent { get; set; } = 45f;
+
+        [SettingPropertyFloatingInteger("Ammo Repair Percent", 0f, 100f, "0", HintText = "share of shot arrows mended by the army's fletchers (new fletching, heads) - the rest are broken or lost")]
+        [SettingPropertyGroup("Starting gear")]
+        public float AmmoRepairPercent { get; set; } = 20f;
+
         [SettingPropertyBool("Keep Wear Through Battle", HintText = "gear your men take into battle comes back in the state it went out (and worse after the fight) - worn mail no longer returns as new; damage piles up and must be repaired")]
         [SettingPropertyGroup("Starting gear")]
         public bool KeepWearThroughBattle { get; set; } = true;
@@ -1579,6 +1599,10 @@ namespace Armoury
         [SettingPropertyBool("No Free Kingdom Gold", HintText = "the kingdom treasury no longer refills from thin air (vanilla +1000 a day and random windfalls of 100-400 thousand); it lives on what the houses pay in - change needs a game restart")]
         [SettingPropertyGroup("Iron bank")]
         public bool NoFreeKingdomGold { get; set; } = true;
+
+        [SettingPropertyBool("No Rot Clan Bailout", HintText = "Realm of Thrones no longer hands every poor AI house Tier x 5000 gold a day from thin air - a house short of money borrows from the Iron Bank or goes bankrupt")]
+        [SettingPropertyGroup("Iron bank")]
+        public bool NoRotClanBailout { get; set; } = true;
 
         [SettingPropertyBool("Crown Dues Enabled", HintText = "vassals owe the crown a share of their daily income (fief income and rents), paid into the kingdom treasury - small in peace, heavy in war as with medieval war taxes")]
         [SettingPropertyGroup("Iron bank")]
@@ -2350,7 +2374,12 @@ namespace Armoury
             s.PopulationRentPerHead = PopulationRentPerHead;
             s.PopulationScale = PopulationScale;
             s.PopulationRentMaxShare = PopulationRentMaxShare;
+            s.HistoricalRecruitCost = HistoricalRecruitCost;
+            s.RecruitCostDays = RecruitCostDays;
             s.StartKitEnabled = StartKitEnabled;
+            s.AmmoRecoveryEnabled = AmmoRecoveryEnabled;
+            s.AmmoRecoverPercent = AmmoRecoverPercent;
+            s.AmmoRepairPercent = AmmoRepairPercent;
             s.KeepWearThroughBattle = KeepWearThroughBattle;
             s.OutlawLawEnabled = OutlawLawEnabled;
             s.OutlawSeedPerHearth = OutlawSeedPerHearth;
@@ -2396,6 +2425,7 @@ namespace Armoury
             s.IronBankLoanFeePercent = IronBankLoanFeePercent;
             s.IronBankMinDaysToLend = IronBankMinDaysToLend;
             s.NoFreeKingdomGold = NoFreeKingdomGold;
+            s.NoRotClanBailout = NoRotClanBailout;
             s.CrownDuesEnabled = CrownDuesEnabled;
             s.CrownDuesPeacePercent = CrownDuesPeacePercent;
             s.CrownDuesWarPercent = CrownDuesWarPercent;

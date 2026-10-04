@@ -188,6 +188,22 @@ namespace Armoury
             catch { }
         }
 
+        // BK BKEducationBehavior.OnBuyBookConsequence: cena ksiazki = Value x 1000 (0.75-1.5 mln) - blad BK; wartosc ksiazki
+        // (750-1500 d = 3-6 L) jest historyczna dla rekopisu. Stala 1000 stojaca zaraz po get_Value -> 1.
+        private static int _bookSwaps;
+        public static System.Collections.Generic.IEnumerable<CodeInstruction> BookTranspiler(System.Collections.Generic.IEnumerable<CodeInstruction> instructions)
+        {
+            var getValue = AccessTools.PropertyGetter(typeof(ItemObject), "Value");
+            CodeInstruction prev = null;
+            foreach (var ci in instructions)
+            {
+                if (prev != null && Equals(prev.operand, getValue) && ci.opcode == System.Reflection.Emit.OpCodes.Ldc_I4 && ci.operand is int && (int)ci.operand == 1000)
+                { ci.operand = 1; _bookSwaps++; }
+                prev = ci;
+                yield return ci;
+            }
+        }
+
         internal static void ApplyAll(Harmony h)
         {
             try
@@ -207,6 +223,33 @@ namespace Armoury
                     if (m != null) { h.Patch(m, prefix: new HarmonyMethod(typeof(HistoricalPrices), nameof(PrizeRangePrefix)), postfix: new HarmonyMethod(typeof(HistoricalPrices), nameof(PrizeListPostfix))); p++; }
                 }
                 Log.Info("HistoricalPrices: nagrody turniejowe przeliczone w " + p + "/2 metodach.");
+                try
+                {
+                    var bt = AccessTools.TypeByName("BannerKings.Behaviours.BKEducationBehavior");
+                    int bm = 0;
+                    if (bt != null)
+                    {
+                        var types = new System.Collections.Generic.List<Type> { bt };
+                        types.AddRange(bt.GetNestedTypes(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic));
+                        var getValue = AccessTools.PropertyGetter(typeof(ItemObject), "Value");
+                        foreach (var ty in types)
+                            foreach (var mm in ty.GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.DeclaredOnly))
+                            {
+                                try
+                                {
+                                    if (mm.IsAbstract || mm.ContainsGenericParameters || mm.GetMethodBody() == null) continue;
+                                    object last = null; bool hit = false;
+                                    foreach (var kv in PatchProcessor.ReadMethodBody(mm)) { if (kv.Value is int && (int)kv.Value == 1000 && Equals(last, getValue)) { hit = true; break; } last = kv.Value; }
+                                    if (!hit) continue;
+                                    h.Patch(mm, transpiler: new HarmonyMethod(typeof(HistoricalPrices), nameof(BookTranspiler)));
+                                    bm++;
+                                }
+                                catch { }
+                            }
+                    }
+                    Log.Info("HistoricalPrices: cena ksiazek BK (Value x 1000 -> Value) w " + bm + " metodach (stalych " + _bookSwaps + ").");
+                }
+                catch (Exception e) { Log.Error("HistoricalPrices.Books", e); }
                 Log.Info("HistoricalPrices: XP kowalstwa od dawnych wartosci w " + n + "/3 metodach.");
             }
             catch (Exception e) { Log.Error("HistoricalPrices.ApplyAll", e); }
