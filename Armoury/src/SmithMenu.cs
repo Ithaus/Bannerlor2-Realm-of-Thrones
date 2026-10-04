@@ -515,7 +515,7 @@ namespace Armoury
                     }
                 }
                 if (done == 0) { Log.Player("You cannot pay for even the cheapest mend.", true); return; }
-                GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, null, paid);
+                Pay.ToSettlement(paid);
                 Log.Player(skipped > 0
                     ? "The smith mended the " + done + " cheapest pieces for " + paid + " gold. " + skipped + " await a fuller purse."
                     : "The smith hammered " + done + " battle-worn pieces back to true for " + paid + " gold.");
@@ -850,7 +850,7 @@ namespace Armoury
                     if (bySmith)
                     {
                         if (Hero.MainHero.Gold < gold) { Log.Player("Your purse came up short.", true); return; }
-                        GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, null, gold);
+                        Pay.ToSettlement(gold);
                     }
                     else
                     {
@@ -879,7 +879,7 @@ namespace Armoury
                 if (bySmith)
                 {
                     if (Hero.MainHero.Gold < gold) { Log.Player("Your purse came up short.", true); return; }
-                    GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, null, gold);
+                    Pay.ToSettlement(gold);
                 }
                 else
                 {
@@ -1047,7 +1047,7 @@ namespace Armoury
                     }
                 }
                 if (done == 0) { Log.Player("You cannot pay for even the cheapest mend.", true); return; }
-                GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, null, paid);
+                Pay.ToSettlement(paid);
                 Log.Player(skipped > 0
                     ? "The men's " + done + " cheapest pieces are whole again for " + paid + " gold. " + skipped + " await a fuller purse."
                     : "The men's racks are mended: " + done + " pieces made whole for " + paid + " gold.");
@@ -1294,11 +1294,19 @@ namespace Armoury
             {
                 var armory = QuartermasterLaw.DteArmory();
                 if (armory == null) { Log.Player("The armoury wagons are nowhere to be found.", true); return; }
-                if (Hero.MainHero.Gold < total) { Log.Player("Your purse came up short.", true); return; }
-                GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, null, total);
-                armory.AddToCounts(item, n);
-                Log.Player(n + " x " + item.Name + " delivered to the men's racks for " + total + " gold.");
-                Log.Info("Zamowienie dla wojska: " + n + "x " + item.StringId + " za " + total);
+                // AUDYT 04.10 (C2): sztuki z TARGU tego miasta, zloto do jego kasy - wczesniej z niczego, zloto w nicosc
+                var st = Settlement.CurrentSettlement;
+                int per = n > 0 ? total / n : total;
+                int have = st != null && st.ItemRoster != null ? st.ItemRoster.GetItemNumber(item) : 0;
+                int k = Math.Min(n, have);
+                if (k <= 0) { Log.Player("The smith's boys could not find a single " + item.Name + " on the market.", true); return; }
+                int pay = per * k;
+                if (Hero.MainHero.Gold < pay) { Log.Player("Your purse came up short.", true); return; }
+                st.ItemRoster.AddToCounts(item, -k);
+                Pay.ToSettlement(pay);
+                armory.AddToCounts(item, k);
+                Log.Player(k + " x " + item.Name + " delivered to the men's racks for " + pay + " gold" + (k < n ? " - the market had no more." : "."));
+                Log.Info("Zamowienie dla wojska: " + k + "/" + n + "x " + item.StringId + " za " + pay + " (z targu " + (st != null ? st.Name.ToString() : "?") + ")");
             }
             catch (Exception e) { Log.Error("DoOrderKit", e); }
         }

@@ -271,7 +271,7 @@ namespace Armoury
                 int fee = ForgeFee(r);
                 if (Hero.MainHero.Gold < fee)
                 { Log.Player("The smith wants " + fee + " gold for the use of his forge.", true); return false; }
-                if (fee > 0) GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, null, fee);
+                if (fee > 0) Pay.ToSettlement(fee);
 
                 var helper = Helper.Find();
                 float relief = Helper.Relief(helper);

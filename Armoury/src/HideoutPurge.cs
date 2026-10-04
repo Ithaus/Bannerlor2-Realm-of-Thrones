@@ -81,11 +81,20 @@ namespace Armoury
                 if (sett != null) _pendingPos = sett.GatePosition;
                 _pendingName = sett != null && sett.Name != null ? sett.Name.ToString() : "the hideout";
                 _pendingBands = bands;
-                float spread = 0.75f + MBRandom.RandomFloat * 0.5f;   // +-25%
-                _pendingGold = (int)MathF.Max(0f,
-                    (Math.Max(0, c.HideoutGoldBase) + Math.Max(0, c.HideoutGoldPerBand) * bands) * spread);
+                // AUDYT 04.10 (C6): lup to PRAWDZIWA kasa i magazyn kryjowki (vanilla odklada tam 25% wartosci
+                // lupow band - BanditSpawnCampaignBehavior.OnSettlementEntered), nie zloto i zelastwo z niczego.
+                _pendingGold = 0;
+                try
+                {
+                    if (sett != null && sett.SettlementComponent != null && sett.SettlementComponent.Gold > 0)
+                    {
+                        _pendingGold = sett.SettlementComponent.Gold;
+                        sett.SettlementComponent.ChangeGold(-_pendingGold);
+                    }
+                }
+                catch { }
                 _pending = true;
-                BuildLoot(bands);
+                BuildLoot(sett);
                 Log.Info("HideoutPurge: zwyciestwo w " + _pendingName + ", band " + bands + ", lup " + _pendingGold + " zlota czeka na przeszukanie.");
                 // odwet rusza JUZ TERAZ - przy duzej partii przeszukanie trwa
                 // ledwie pare godzin gry i bandy musza wyjsc w droge od razu
@@ -99,31 +108,21 @@ namespace Armoury
         /// tier 1-3, rzeczy z kramow, po kilka sztuk na bande. Do tego czasem
         /// beczka czegos mocniejszego. Pokazywany ekranem lupow jak po bitwie.
         /// </summary>
-        private static void BuildLoot(int bands)
+        private static void BuildLoot(Settlement sett)
         {
             try
             {
-                var pool = new System.Collections.Generic.List<ItemObject>();
-                foreach (var it in TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
-                {
-                    if (it == null || it.NotMerchandise) continue;
-                    if (!it.HasWeaponComponent && !it.HasArmorComponent) continue;
-                    int g = Recipes.Grade(it);
-                    if (g < 1 || g > 3) continue;
-                    if (it.Value < 20 || it.Value > 800) continue;
-                    var id = (it.StringId ?? "").ToLowerInvariant();
-                    if (id.Contains("practice") || id.Contains("tournament") || id.Contains("siege")
-                        || id.Contains("ballista") || id.Contains("dummy") || id.Contains("test")) continue;
-                    pool.Add(it);
-                }
                 _lootRoster = new ItemRoster();
-                if (pool.Count == 0) return;
-                int pieces = 3 + bands + MBRandom.RandomInt(bands + 1);
-                for (int i = 0; i < pieces; i++)
-                    _lootRoster.AddToCounts(pool[MBRandom.RandomInt(pool.Count)], 1);
-                var beer = TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObject<ItemObject>("beer");
-                if (beer != null) _lootRoster.AddToCounts(beer, 1 + MBRandom.RandomInt(2));
-                Log.Info("HideoutPurge: lup przedmiotowy przygotowany (" + _lootRoster.Count + " pozycji).");
+                var src = sett != null ? sett.ItemRoster : null;
+                if (src == null || src.Count == 0) { Log.Info("HideoutPurge: magazyn kryjowki pusty - lup tylko z band (vanilla)."); return; }
+                for (int i = src.Count - 1; i >= 0; i--)
+                {
+                    var el = src.GetElementCopyAtIndex(i);
+                    if (el.Amount <= 0 || el.EquipmentElement.Item == null) continue;
+                    _lootRoster.AddToCounts(el.EquipmentElement, el.Amount);
+                    src.AddToCounts(el.EquipmentElement, -el.Amount);
+                }
+                Log.Info("HideoutPurge: lup przedmiotowy z magazynu kryjowki (" + _lootRoster.Count + " pozycji).");
             }
             catch (Exception e) { Log.Error("HideoutPurge.BuildLoot", e); _lootRoster = null; }
         }
@@ -240,6 +239,7 @@ namespace Armoury
                             var el = ir.GetElementCopyAtIndex(i);
                             if (el.Amount > 0) boss.ItemRoster.AddToCounts(el.EquipmentElement, el.Amount);
                         }
+                        try { boss.PartyTradeGold += mp.PartyTradeGold; mp.PartyTradeGold = 0; } catch { }   // zloto scalanej bandy do bossa (audyt C6)
                         mp.MemberRoster.Clear();
                         DestroyPartyAction.Apply(null, mp);
                         merged++;
@@ -393,6 +393,7 @@ namespace Armoury
                                 var el = ir.GetElementCopyAtIndex(i);
                                 if (el.Amount > 0) boss.ItemRoster.AddToCounts(el.EquipmentElement, el.Amount);
                             }
+                            try { boss.PartyTradeGold += mp.PartyTradeGold; mp.PartyTradeGold = 0; } catch { }   // zloto scalanej bandy do bossa (audyt C6)
                             mp.MemberRoster.Clear();
                             mp.PrisonRoster.Clear();   // jency juz u bossa - inaczej OutlawLaw policzy ich drugi raz
                             DestroyPartyAction.Apply(null, mp);

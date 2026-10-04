@@ -1,5 +1,12 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-04 (34) - DROBNE WYCIEKI: kowal, kuznia, stajnie, kryjowki - zloto i towar od kogos do kogos
+**Mod:** Armoury | **Pliki:** NOWY `Pay.cs`; `SmithMenu.cs` (oplaty, naprawy, `DoOrderKit`), `Forge.cs` (oplata kuzni), `Stables.cs` (hodowca), `HideoutPurge.cs` (lup, scalanie)
+**Problem (audyt dziur C1, C2, C6):** oplaty kowala, naprawy i kuzni gracza szly `GiveGoldAction(gracz, null)` - w nicosc; zamowienie kompletu u kowala tworzylo przedmioty z niczego; hodowca w stajni AI dawal konia z niczego, gdy targ pusty; kryjowka dawala 150 + 120 zl za bande i 3+ losowe przedmioty z niczego; scalane bandy tracily zloto.
+**Zmiana:** (1) `Pay.ToSettlement`: platnosci gracza za uslugi w osadzie do kasy tej osady (poza osada jak dotad). (2) Zamowienie kompletu: sztuki z targu tego miasta (tyle, ile jest), zaplata tylko za dostarczone, do kasy miasta. (3) Hodowca: konie z zapasu wsi tej osady, zloto (z narzutem) do wsi; brak koni we wsiach = brak zakupu. (4) Kryjowka: lup = kasa kryjowki (vanilla odklada tam 25% wartosci lupow band) i jej magazyn; pusta kryjowka = brak dodatkowego lupu (ustawienia HideoutGoldBase/PerBand juz nie dzialaja). (5) Scalanie band: zloto scalanej bandy przechodzi do bossa.
+**Ryzyko:** mniejszy lup z kryjowek (realny, nie wymyslony); AI wolniej obsadza jazde, gdy wsie bez koni.
+**Status:** WGRANE 2026-10-04 (Armoury.dll md5 0222ce5797044571c0bb26fb39e83fd2, build rc=0, gra zamknieta; poprzednie DLL obok jako `Armoury.dll.bak-2026-10-04-przed-wyciekami`). Na obecnym save.
+
 ## 2026-10-04 (33) - BANK ZELAZNY: koniec rolowania dlugu, oplata 2% za pozyczke, zajecie przy bankructwie
 **Mod:** Armoury | **Pliki:** `IronBank.cs` (`Lend`, bankructwo w `Daily`), `Settings.cs` + `McmSettings.cs` (`IronBankLoanFeePercent` 2, `IronBankDefaultSeizeShare` 0.5)
 **Problem (audyt dziur B5):** kazda nowa pozyczka przesuwala termin CALEGO dlugu (IronBank.cs:159) - dobieranie 25% wolnego limitu rolowalo dlug w nieskonczonosc (AI tez); pozyczka i splata tego samego dnia bez kosztu; bankructwo: 100 renomy i 25% zlota dziennie - do wydania przed sciagnieciem.

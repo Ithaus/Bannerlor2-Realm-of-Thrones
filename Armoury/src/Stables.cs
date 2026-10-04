@@ -445,28 +445,43 @@ namespace Armoury
                 }
 
                 // 2. targ pusty, a lord potrzebuje - zamawia u hodowcy (narzut za fatyge)
-                if (need > 0 && c.AiMountBreederFallback)
+                // AUDYT 04.10 (C1): wczesniej kon "od hodowcy" powstawal z niczego. Teraz hodowca to wsie
+                // tej osady: kon schodzi z ich zapasu, zloto (z narzutem za fatyge) idzie do wsi.
+                int toVillages = 0;
+                if (need > 0 && c.AiMountBreederFallback && settlement.BoundVillages != null)
                 {
-                    var nag = CheapestMount(settlement);
-                    if (nag != null)
+                    float markup = Math.Max(1f, c.AiMountBreederMarkup);
+                    foreach (var v in settlement.BoundVillages)
                     {
-                        int price = (int)(nag.Value * Math.Max(1f, c.AiMountBreederMarkup));
-                        while (need > 0 && paid + price <= budget)
+                        if (need <= 0) break;
+                        var vs = v != null ? v.Settlement : null;
+                        if (vs == null || vs.ItemRoster == null) continue;
+                        var vr = vs.ItemRoster;
+                        for (int i = vr.Count - 1; i >= 0 && need > 0; i--)
                         {
-                            party.ItemRoster.AddToCounts(nag, 1);
-                            paid += price; bought++; need--;
+                            var el = vr.GetElementCopyAtIndex(i);
+                            var it = el.EquipmentElement.Item;
+                            if (it == null || el.Amount <= 0 || !IsPlainMount(it)) continue;
+                            int price = (int)(it.Value * markup);
+                            int take = 0;
+                            while (take < el.Amount && need > 0 && paid + toVillages + price <= budget) { take++; need--; toVillages += price; }
+                            if (take <= 0) continue;
+                            vr.AddToCounts(el.EquipmentElement, -take);
+                            party.ItemRoster.AddToCounts(el.EquipmentElement, take);
+                            TaleWorlds.CampaignSystem.Actions.GiveGoldAction.ApplyForCharacterToSettlement(lord, vs, price * take);
+                            bought += take;
+                            var nid = it.StringId ?? "?";
+                            if (what == null) what = nid; else if (!what.Contains(nid)) what += "," + nid;
                         }
-                        var nid = nag.StringId ?? "?";
-                        if (what == null) what = nid; else if (!what.Contains(nid)) what += "," + nid;
                     }
                 }
 
                 if (bought <= 0) return;
                 _lastBuy[pid] = today;
-                TaleWorlds.CampaignSystem.Actions.GiveGoldAction.ApplyForCharacterToSettlement(lord, settlement, paid);
+                if (paid > 0) TaleWorlds.CampaignSystem.Actions.GiveGoldAction.ApplyForCharacterToSettlement(lord, settlement, paid);
                 Log.Info("Stajnia AI: " + lord.Name + " kupil " + bought + " koni ["
                          + (what ?? "?") + "] w " + settlement.Name
-                         + " za " + paid + " (czekalo na awans " + (want - Math.Max(0, c.AiMountSpareBuffer))
+                         + " za " + paid + (toVillages > 0 ? " (+ " + toVillages + " wsiom-hodowcom)" : "") + " (czekalo na awans " + (want - Math.Max(0, c.AiMountSpareBuffer))
                          + ", mial " + have + "; z targu " + fromMarket + " przy polce " + shelfMounts + ").");
             }
             catch (Exception e) { Log.Error("Stables.AiBuy", e); }
