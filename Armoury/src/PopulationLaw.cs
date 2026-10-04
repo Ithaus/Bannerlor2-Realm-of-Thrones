@@ -138,18 +138,70 @@ namespace Armoury
         [ThreadStatic] private static int _taxDepth;
         public static void TownTaxPrefix() { _taxDepth++; }
         public static Exception TownTaxFinalizer(Exception __exception) { if (_taxDepth > 0) _taxDepth--; return __exception; }
-        public static void TownTaxPostfix(bool __1, ref TaleWorlds.CampaignSystem.ExplainedNumber __result)
+        public static void TownTaxPostfix(Town __0, bool __1, ref TaleWorlds.CampaignSystem.ExplainedNumber __result)
         {
             if (_taxDepth > 1) return;
             try
             {
                 var s = Settings.Current;
                 if (s == null || !On || !s.RentReplacesTownTax) return;
-                __result = new TaleWorlds.CampaignSystem.ExplainedNumber(0f, __1, _txtRent);
+                // wpis 51 (ZRODLA-DOCHODU.md C1): zerujemy TYLKO podatki klas ludnosci i cla od konsumpcji (z niczego);
+                // zostaje to, co ktos naprawde placi: podatek od cudzych warsztatow (BK pobiera go od wlascicieli), dochod
+                // kopalni i koszt materialow budow - inaczej te pieniadze znikaly w nicosc, a pan nie placil za budowy
+                float kept = KeptTownLines(__0);
+                __result = new TaleWorlds.CampaignSystem.ExplainedNumber(kept, __1, _txtRent);
             }
             catch { }
         }
         private static readonly TaleWorlds.Localization.TextObject _txtRent = new TaleWorlds.Localization.TextObject("{=!}Town rents are paid from the town purse (see daily rents)");
+
+        private static object _bkCfg; private static System.Reflection.MethodInfo _wsTax, _mining, _materials, _popData; private static Type _bldT; private static bool _bkResolved;
+
+        /// <summary>Linie podatku miasta BK placone przez kogos (warsztaty cudzych wlascicieli, kopalnie, materialy budow) x autonomia.</summary>
+        private static float KeptTownLines(Town town)
+        {
+            try
+            {
+                if (town == null) return 0f;
+                if (!_bkResolved)
+                {
+                    _bkResolved = true;
+                    var cfgT = AccessTools.TypeByName("BannerKings.BannerKingsConfig");
+                    _bkCfg = cfgT != null ? AccessTools.Property(cfgT, "Instance").GetValue(null, null) : null;
+                    var cfm = _bkCfg != null ? AccessTools.Property(cfgT, "ClanFinanceModel").GetValue(_bkCfg, null) : null;
+                    if (cfm != null) { _wsTax = AccessTools.Method(cfm.GetType(), "GetWorkshopTaxes", new[] { typeof(TaleWorlds.CampaignSystem.Settlements.Workshops.Workshop) }); _wsModel = cfm; }
+                    _bldT = AccessTools.TypeByName("BannerKings.Behaviours.BKBuildingsBehavior");
+                    if (_bldT != null) { _mining = AccessTools.Method(_bldT, "GetMiningRevenue", new[] { typeof(Town) }); _materials = AccessTools.Method(_bldT, "GetMaterialExpenses", new[] { typeof(Town) }); }
+                    var pm = _bkCfg != null ? AccessTools.Property(cfgT, "PopulationManager").GetValue(_bkCfg, null) : null;
+                    if (pm != null) { _popMgr = pm; _popData = AccessTools.Method(pm.GetType(), "GetPopData", new[] { typeof(Settlement) }); }
+                }
+                float sum = 0f;
+                var leader = town.OwnerClan != null ? town.OwnerClan.Leader : null;
+                if (_wsTax != null)
+                    foreach (var w in town.Workshops)
+                        if (w != null && w.Owner != null && w.Owner != leader)
+                            sum += Convert.ToSingle(_wsTax.Invoke(_wsModel, new object[] { w }));
+                if (_bldT != null && Campaign.Current != null)
+                {
+                    if (_getBeh == null) _getBeh = typeof(Campaign).GetMethod("GetCampaignBehavior").MakeGenericMethod(_bldT);
+                    var get = _getBeh;
+                    var beh = get.Invoke(Campaign.Current, null);
+                    if (beh != null)
+                    {
+                        if (_mining != null) sum += Convert.ToSingle(_mining.Invoke(beh, new object[] { town }));
+                        if (_materials != null) sum -= Convert.ToSingle(_materials.Invoke(beh, new object[] { town }));
+                    }
+                }
+                if (_popData != null)
+                {
+                    var pd = _popData.Invoke(_popMgr, new object[] { town.Settlement });
+                    if (pd != null) { float aut = Traverse.Create(pd).Property("Autonomy").GetValue<float>(); if (aut > 0f) sum *= Math.Max(0f, 1f - 0.6f * aut); }
+                }
+                return sum;
+            }
+            catch { return 0f; }
+        }
+        private static object _wsModel, _popMgr; private static System.Reflection.MethodInfo _getBeh;
 
         internal static void ApplyTownTax(HarmonyLib.Harmony h)
         {
