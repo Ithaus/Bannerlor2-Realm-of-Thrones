@@ -464,6 +464,9 @@ namespace Armoury
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this,
                 delegate { try { McmSettings.Apply(); } catch { } try { AmmoTracer.HourlyCheck(); } catch { } });
             CampaignEvents.OnSettlementOwnerChangedEvent.AddNonSerializedListener(this, WarLedger.OnOwnerChanged);
+            // sprzet startowy dopasowany do umiejetnosci (Jeff 04.10)
+            CampaignEvents.OnCharacterCreationIsOverEvent.AddNonSerializedListener(this, delegate { try { var ss = Settings.Current; if (ss != null && ss.StartKitEnabled) StartKit.OnCharacterCreationOver(); } catch { } });
+            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, delegate { try { StartKit.Hourly(); } catch { } });
             // prawo wyrzutkow (Jeff 04.10): pula ludzi wyjetych spod prawa
             CampaignEvents.OnTroopsDesertedEvent.AddNonSerializedListener(this, OutlawLaw.OnTroopsDeserted);
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, OutlawLaw.OnMapEventEnded);

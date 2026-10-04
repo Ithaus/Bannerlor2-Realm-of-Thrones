@@ -1,5 +1,13 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-04 (17) - SPRZET STARTOWY: rzeczy, ktorych postac nie moze nosic, zamieniane na najlepsze, jakie moze
+**Mod:** Armoury | **Pliki:** NOWY `StartKit.cs`; `ArmouryBehavior.cs` (OnCharacterCreationIsOver + HourlyTick), `Settings.cs` + `McmSettings.cs` (`StartKitEnabled`, grupa "Starting gear")
+**Problem (Jeff 04.10, zrzut ekranu):** "dostalem mase sprzetu, jak zaczalem gre, ale nie moge go nosic" - w taborze na czerwono Common Plated Boots x2, Common Armor x3, Common Pauldrons, Common Barbute x2, Common Kettle, Common Spangen, Common Bracers (ok. 7 tys.), tabor 84/30.
+**Przyczyna:** komplet z kreatora postaci (pochodzenie ROT/BK; nasz kod nic nie daje - brak wpisu w Armoury.log). Prawo Wagi CrashScribe (Mends: Atletyka 0.25 kg/pkt, prawo tieru 35 Atletyki na tier) stawia plycie t5 ~175 Atletyki; nowa postac jej nie ma, wiec gra trzyma to w taborze na czerwono. Przy okazji: BK `BKCampaignStartBehavior.OnCharacterCreationOver` -> `EducationManager.CorrectPlayerEducation` rzuca ArgumentNullException (CrashScribe session 09:00:57) - edukacja BK gracza mogla sie nie ustawic (nie ruszane).
+**Zmiana:** raz, w pierwszej godzinie gry po kreatorze: kazda sztuka na postaci (bojowy i cywilny komplet) i w taborze, ktorej bohater nie moze uzyc (Difficulty > umiejetnosc; zbroja = Atletyka jak w Prawie Wagi), idzie na najlepsza (Effectiveness) sztuke tego samego typu, ktora moze nosic: ta sama kultura albo neutralna, nie unikat, nie NotMerchandise, NIE drozsza od oryginalu. Bez zamiennika - zostaje. Log: `StartKit: ... zamienione N [stara -> nowa], bez zamiennika M`.
+**Ryzyko / co sprawdzic:** tylko NOWA gra (obecny save bez zmian - sprzet mozna sprzedac). Zamiennik moze byc duzo tanszy od oryginalu (gracz traci wartosc - zgodnie z "nie dostawac rzeczy, ktorych nie moge nosic").
+**Status:** WGRANE 2026-10-04 (Armoury.dll md5 012adbde7998f9cc26852f79d3804e37, build rc=0, gra zamknieta; poprzednie DLL obok jako `Armoury.dll.bak-2026-10-04-przed-startkit`). DO SPRAWDZENIA w nowej grze.
+
 ## 2026-10-04 (16) - CENY: widelki surowca wedle Jeffa - od 10% do x3 (surowiec i czynnik na sztuce)
 **Mod:** Armoury | **Pliki:** `Settings.cs` + `McmSettings.cs` (`MaterialRatioMin` 0.5 -> 0.1, `MaterialRatioMax` 2 -> 3, `MaterialIndexMin` 0.6 -> 0.1, `MaterialIndexMax` 1.8 -> 3)
 **Zgloszenie (Jeff 04.10):** "zamiast polowy 10% minimum i max x3 i pokaz mi pod to wyliczenie".
