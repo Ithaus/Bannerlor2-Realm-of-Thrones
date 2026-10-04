@@ -120,7 +120,13 @@ namespace Armoury
             try
             {
                 if (!On || mp == null || st == null || !Look()) return;
-                if (mp.IsMainParty || !mp.IsLordParty || mp.LeaderHero == null || !mp.IsActive || mp.MapEvent != null) return;
+                // wpis 57 (Jeff 04.10: "a co z garnizonem, skad oni maja miec bron?"): garnizon kupuje brakujacy sprzet na targu
+                // SWOJEJ osady, placi pan osady ze swojej kiesy, zloto idzie do kasy miasta (jak u partii lorda)
+                var s0 = Settings.Current;
+                bool garrison = mp.IsGarrison && mp.CurrentSettlement == st && s0.GarrisonBuysGear;
+                Hero payer = garrison ? (st.OwnerClan != null ? st.OwnerClan.Leader : null) : mp.LeaderHero;
+                if (garrison && payer == Hero.MainHero && !s0.GarrisonBuysGearPlayer) return;
+                if (mp.IsMainParty || (!mp.IsLordParty && !garrison) || payer == null || !payer.IsAlive || !mp.IsActive || mp.MapEvent != null) return;
                 if ((!st.IsTown && !st.IsCastle) || st.ItemRoster == null || st.Town == null) return;
                 if (FactionManager.IsAtWarAgainstFaction(mp.MapFaction, st.MapFaction)) return;
                 int day = (int)CampaignTime.Now.ToDays;
@@ -130,7 +136,7 @@ namespace Armoury
                 if (_dayStamp != day) { FlushDay(); _dayStamp = day; }
 
                 var s = Settings.Current;
-                var lord = mp.LeaderHero;
+                var lord = payer;
                 int reserve = Math.Max(0, s.AiGearGoldReserve);
                 int budget = (int)((lord.Gold - reserve) * Math.Max(0f, Math.Min(100f, s.AiGearBudgetPercent)) / 100f);
                 if (budget <= 0) return;
@@ -211,11 +217,11 @@ namespace Armoury
                     }
                 }
                 if (pieces <= 0) return;
-                _dayPieces += pieces; _dayGold += spent; _dayVisits++;
+                _dayPieces += pieces; _dayGold += spent; _dayVisits++; if (garrison) { _dayGarrison++; _dayGarrisonGold += spent; }
                 if (_dayLogged < Math.Max(0, s.AiGearLogPerDay))
                 {
                     _dayLogged++;
-                    Log.Info("ZakupyAI: " + lord.Name + " (" + mp.MemberRoster.TotalManCount + " ludzi) w " + st.Name + ": " + pieces
+                    Log.Info("ZakupyAI: " + (garrison ? "garnizon " + st.Name + " (placi " + lord.Name + ")" : lord.Name.ToString()) + " (" + mp.MemberRoster.TotalManCount + " ludzi) w " + st.Name + ": " + pieces
                              + " szt. za " + spent + " (budzet " + budget + ", zloto " + (lord.Gold + spent) + " -> " + lord.Gold + "); np. "
                              + string.Join(", ", bought.ToArray()) + ".");
                 }
@@ -223,11 +229,13 @@ namespace Armoury
             catch (Exception e) { Log.Error("AiGear.TryBuy", e); }
         }
 
+        private static int _dayGarrison, _dayGarrisonGold;
+
         private static void FlushDay()
         {
             if (_dayStamp >= 0 && (_dayVisits > 0))
-                Log.Info("ZakupyAI: dzien " + _dayStamp + " - " + _dayVisits + " wizyt, " + _dayPieces + " szt. kupionych za " + _dayGold + " zlota.");
-            _dayPieces = 0; _dayGold = 0; _dayVisits = 0; _dayLogged = 0;
+                Log.Info("ZakupyAI: dzien " + _dayStamp + " - " + _dayVisits + " wizyt, " + _dayPieces + " szt. kupionych za " + _dayGold + " zlota; w tym garnizony " + _dayGarrison + " zakupow za " + _dayGarrisonGold + ".");
+            _dayPieces = 0; _dayGold = 0; _dayVisits = 0; _dayLogged = 0; _dayGarrison = 0; _dayGarrisonGold = 0;
         }
     }
 }

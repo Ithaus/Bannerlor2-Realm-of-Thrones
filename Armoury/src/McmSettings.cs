@@ -1220,6 +1220,14 @@ namespace Armoury
         [SettingPropertyGroup("Army purchases")]
         public bool AiBuysGear { get; set; } = true;
 
+        [SettingPropertyBool("Garrison Buys Gear", HintText = "a garrison buys the gear its men lack at the market of its own town, paid by the lord of the place - the coin goes to the town")]
+        [SettingPropertyGroup("Army purchases")]
+        public bool GarrisonBuysGear { get; set; } = true;
+
+        [SettingPropertyBool("Garrison Buys Gear Player", HintText = "your own garrisons buy gear the same way, from your purse")]
+        [SettingPropertyGroup("Army purchases")]
+        public bool GarrisonBuysGearPlayer { get; set; } = false;
+
         [SettingPropertyBool("Ai Recruits Bring Kit", HintText = "a fresh recruit still arrives with his own kit (levies came armed); turn off and lords must buy for every new man")]
         [SettingPropertyGroup("Army purchases")]
         public bool AiRecruitsBringKit { get; set; } = true;
@@ -2488,6 +2496,8 @@ namespace Armoury
             s.SubstitutionShare = SubstitutionShare;
             s.TradeTransportPercentPer100 = TradeTransportPercentPer100;
             s.AiBuysGear = AiBuysGear;
+            s.GarrisonBuysGear = GarrisonBuysGear;
+            s.GarrisonBuysGearPlayer = GarrisonBuysGearPlayer;
             s.AiRecruitsBringKit = AiRecruitsBringKit;
             s.AiGearBudgetPercent = AiGearBudgetPercent;
             s.AiGearGoldReserve = AiGearGoldReserve;

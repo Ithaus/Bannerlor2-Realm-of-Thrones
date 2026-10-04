@@ -1,5 +1,40 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-04 (57) - GARNIZONY KUPUJA SPRZET NA TARGU SWOJEJ OSADY (placi pan, zloto do kasy miasta)
+**Mod:** Armoury | **Pliki:** `AiGear.cs` (`TryBuy` dla `mp.IsGarrison` w swojej osadzie, platnik = pan osady), `Settings.cs` + `McmSettings.cs` (NOWE `GarrisonBuysGear` true, `GarrisonBuysGearPlayer` false)
+**Problem (Jeff 04.10: "a co z garnizonem, skad oni maja miec bron? ... miasto kupuje sprzet, placi komu, gdzie idzie kasa?"):** garnizony nie kupowaly niczego - sprzet tylko z szablonu (darmowy).
+**Zmiana:** codziennie garnizon liczy braki wedlug wzorcow swoich ludzi minus zbrojownia DTE i kupuje na targu swojej osady (te same zasady co ZakupyAI lordow: budzet % kiesy ponad rezerwe, najlepsza skutecznosc do ceny, bez unikatow). Placi pan osady ze swojej kiesy, zloto idzie do kasy miasta. Garnizony gracza tylko po wlaczeniu `GarrisonBuysGearPlayer`. Zamek bez targu nic nie kupi (do decyzji: najblizsze miasto).
+**Ryzyko / co sprawdzic:** `ZakupyAI: dzien ... w tym garnizony N zakupow za X`; panowie z wieloma lennami wydaja wiecej (kazdy garnizon osobno bierze % kiesy) - obserwowac zloto rodow.
+**Status:** WGRANE 2026-10-04 razem z 52-56 (Armoury.dll md5 20531d523681c7f14080a8f021da2b02, build rc=0, gra zamknieta; poprzednie DLL obok jako `Armoury.dll.bak-2026-10-04-przed-52-57`). DO SPRAWDZENIA - nowa gra.
+
+## 2026-10-04 (56) - POLITYKI BEZ ZLOTA Z NICZEGO: mennica i monopole z kas, umowy handlowe 0, Tax Office BK wylaczony
+**Mod:** Armoury | **Pliki:** `KingdomTreasury.cs` (`RulingIncomePostfix` na `DefaultClanFinanceModel.AddRulingClanIncome`, `CaravanVisitPostfix` na kazdym `TradeAgreementModel.GetProfitPerCaravanVisit`, `TaxOfficePrefix` na BK `BKTaxModel.AddVillagePopulationTaxes`, pobor w `Levies`), `Settings.cs` (NOWE `PolicyIncomeConserved`, `DebasementShare` 0.005)
+**Problem (docs/ZRODLA-DOCHODU.md C5-C9):** Debasement of the Currency = 100 d na lenno dziennie z niczego; State Monopolies = 5% zysku warsztatow do krola bez odjecia warsztatom; umowy handlowe vanilla = 500 d z niczego za kazda wizyte obcej karawany; BK "Tax Office" we wsi = podatek klas ludnosci wsi z niczego.
+**Zmiana:** z rozliczenia rodu krola odejmujemy obie kwoty polityk, a w `Levies` pobieramy je realnie: mennica - 0.5% dziennie kasy kazdego miasta krolestwa ponad 20 000 do krola; monopole - 5% `ProfitMade` z KAPITALU cudzych warsztatow w miastach rodu krola. Umowy handlowe: 0. Tax Office: wylaczony (renta z ludnosci juz jest). Kary lojalnosci/dobrobytu polityk zostaja.
+
+## 2026-10-04 (55) - KORONA: danina wojenna z kas osad i clo od handlu do skarbca krolestwa; powinnosci panow w wojnie 10% -> 3%
+**Mod:** Armoury | **Pliki:** `KingdomTreasury.cs` (NOWE `Levies`), `ArmouryBehavior.cs` (dzienny tick), `Settings.cs` (`CrownDuesWarPercent` 10 -> 3, NOWE `LaySubsidy*`, `CrownCustoms*`)
+**Problem (docs/ZRODLA-DOCHODU.md C3-C4, AUDYT-EKONOMIA-KROLESTW.md):** krol slabszy od wasali; War Tax vanilla po wpisie 49 = 0; historycznie podatek wojenny (pietnastka/dziesiecina 1290, 1334) placili poddani z ruchomosci, a clo od handlu (1275) - 13 z 30 tys. L zwyklego dochodu korony 1337.
+**Zmiana:** codziennie: (1) w wojnie kazde miasto krolestwa oddaje 1% kasy ponad 20 000, wies 1.5% kiesy do `KingdomBudgetWallet` (z polityka War Tax x2); (2) zawsze 10% dziennego licznika cel kazdego miasta (`TradeTaxAccumulated`, odjete) do skarbca (z Crown Duty x2); (3) powinnosci panow w wojnie 3% dochodu (pokoj 2% bez zmian). Oblezone osady i spladrowane wsie nie placa. Log `Korona: dzien ... danina wojenna ..., clo ..., mennica ..., monopole ...`.
+**Ryzyko:** mniej zlota w kasach osad w wojnie (miasta nie schodza ponizej 20 000 przez nas); licznik cel krocej dla krola-pana (vanilla Crown Duty bierze z niego 5%).
+
+## 2026-10-04 (54) - RENTA WEDLUG DEKRETU PODATKOWEGO BK (Low 0.7, Standard 1, High 1.3, Exemption 0)
+**Mod:** Armoury | **Pliki:** `PopulationLaw.cs` (`TaxDecree` - refleksja na BK `PolicyManager.GetPolicy(settlement, "tax")`), `Settings.cs` (NOWE `RentTaxLow/High/Exemption`)
+**Problem (docs/ZRODLA-DOCHODU.md C2):** dekret podatkowy BK osady sterowal tylko prowizja i lojalnoscia, nie nasza renta (jedynym zrodlem dochodu z ziemi po wpisie 49).
+**Zmiana:** renta osady (nalezna i udzial kiesy) x mnoznik dekretu; lojalnosc za wysokie podatki dalej liczy BK.
+
+## 2026-10-04 (53) - ZAKUPY MIESZCZAN: tylko domowa czesc surowcow, dodatek BK w nowej monecie
+**Mod:** Armoury | **Pliki:** `HistoricalPrices.cs` (`BudgetPostfix` na BK `EconomyPatches.CalculateBudget`, `TownUse`), `Settings.cs` (NOWE `TownHouseholdUse`, `TownUseFlax/Wool/Hides` 0.02, `TownUseIron` 0, `TownUseLeather` 0.5, `TownUseLinen` 0.4, `TownUseHardwood` 1)
+**Problem (docs/BILANS-ZUZYCIA.md):** mieszczanie zjadali surowce rzemieslnicze (len ~537, welna ~274, skory ~240, ruda ~609 dziennie na swiat) - historycznie 90-100% szlo do tkaczy, garbarzy i kowali; budzet BK zawiera skladnik `dobrobyt/1000/indeks` w ZLOCIE (poza DemandPostfix) - sam zjadal ~465 ladunkow rudy i drewna dziennie.
+**Zmiana:** budzet zakupow wiersza polki: skladnik BK / przelicznik kategorii (jak popyt, wpis 44), potem x domowa czesc surowca. Gotowe wyroby bez zmian.
+**Ryzyko:** mniej zlota miast z konsumpcji (male, ~25 tys./dzien swiata); surowce zostaja na targach dla warsztatow - `Rynek surowcow` powinien rosnac przy lnie, welnie, skorach, rudzie.
+
+## 2026-10-04 (52) - WARSZTATY HISTORYCZNIE: rece x3, cechy wedlug Paryza 1292, poprawki cen (plyta t4-6, amunicja, luk, paliwo kuzni, surowka)
+**Mod:** Armoury | **Pliki:** `WorkshopLaw.cs` (`GuildWeight`, `LineShare` wagami, paliwo kuzni z ustawienia), `ArmsPricing.cs` (dni plyty t4-6, `DaysAmmo`), `HistoricalPrices.cs` (`FuelPerMetalKg`), `Settings.cs` + `McmSettings.cs` (`WorkshopProsperityPerHand` 500 -> 170, `WorkshopArtisansMin` 2 -> 6, `Max` 20 -> 60, NOWE `GuildShare*`, `WorkshopForgeWoodPerMetalKg` 12.5, `HistCrudeIronPerKg` 2 -> 1.4, `HistBowLaborMultiplier` 0.5 -> 1.0)
+**Problem (docs/HISTORIA-WARSZTATY.md, HISTORIA-ZBROJE-STRATY.md):** rzemieslnikow 10-20x za malo (Paryz 1292: 22 platnerzy, 51 siodlarzy, 197 krawcow; Mediolan: setki), cechy po rowno; pelna zbroja t6 ~78 s wobec 16 L (1374); snop strzal t6 3x za drogi; luk t1 ~6 d wobec 12-18 d; drewno kuzni 2.5 kg/kg metalu (powinno ~12.5); surowka 2 d/kg (Tudeley 1.4).
+**Zmiana:** rece miasta = dobrobyt/170 (6-60; mediana ~28) - pierwszy krok x3, nie x10, bo rudy juz brakuje; udzial cechow: krawiec 0.30, platnerz 0.20, miecznik 0.20, siodlarz 0.15, lucznik 0.10, tarczownik 0.05 (wsrod czynnych cechow warsztatu); plyta t>3: dni = waga x (1.5 + (t-3)) + t; `DaysAmmo` {0.3, 0.33, 0.36, 0.4, 0.45, 0.5}; luk x1.0; kuznia 12.5 kg drewna na kg metalu (w wycenie i w warsztacie); surowka 1.4 d/kg.
+**Ryzyko / co sprawdzic:** wiecej sztuk = wiecej rudy i drewna (spodziewany "brak surowca"), wiecej wywolan rankingu (tempo dnia); drozsze metalowe sztuki przez paliwo.
+
 ## 2026-10-04 (51) - POPRAWKA 49: z podatku miasta BK zerujemy tylko podatki klas i cla od konsumpcji; warsztaty, kopalnie i materialy budow zostaja
 **Mod:** Armoury | **Pliki:** `PopulationLaw.cs` (`TownTaxPostfix` -> `KeptTownLines`, refleksja na BK `ClanFinanceModel.GetWorkshopTaxes`, `BKBuildingsBehavior.GetMiningRevenue/GetMaterialExpenses`, `PopData.Autonomy`); raporty: NOWE `docs/HISTORIA-WARSZTATY.md`, `docs/BILANS-ZUZYCIA.md`, `docs/ZRODLA-DOCHODU.md`
 **Problem (docs/ZRODLA-DOCHODU.md, dekompilacja BKTaxModel.CalculateTownTax):** wpis 49 zerowal CALY podatek miasta. Oprocz podatkow klas ludnosci (z niczego) i cel od konsumpcji (z niczego) sa w nim linie, ktore ktos placi: podatek od warsztatow cudzych wlascicieli (BK pobiera go od nich - po wpisie 49 znikal w nicosc), dochod kopalni (polowa przepadala) i koszt materialow projektow budowlanych (pan przestal za nie placic).
