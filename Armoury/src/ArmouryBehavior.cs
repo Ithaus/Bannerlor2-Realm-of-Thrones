@@ -1263,7 +1263,9 @@ namespace Armoury
                 // okno na obszukanie jencow: ekran "wez jencow" przychodzi tuz
                 // po bitwie - tylko wtedy zdzieramy z nich rynsztunek (nie przy
                 // zwyklym przekladaniu jencow z lochu czy garnizonu)
-                _spoilsWindow = CampaignTime.HoursFromNow(2f);
+                // audyt pelny W3 (04.10): okna obszukania po bitwie NIE otwieramy - sprzet jencow z walki (nieprzytomnych)
+                // DTE juz wlozyl do lupu z pola; obszukanie bylo druga zaplata za ten sam rynsztunek.
+                // Obszukanie zostaje tylko dla kapitulantow bez walki (OnPrisonerTaken poza bitwa).
 
                 // wdzieczne wioski: wygrana z bandytami cieszy okolice
                 BanditCheer.AfterVictory(mapEvent);
@@ -1274,7 +1276,7 @@ namespace Armoury
                 if (mapEvent.IsHideoutBattle)
                 {
                     BattlefieldLaw.FlushShareToBaggage("kryjowka zdobyta");
-                    TryStripNewCaptives("kryjowka");
+                    try { _prisonerBaseline = SnapshotPrisoners(); } catch { }   // jency z walki - bez drugiego obszukania (W3)
                     _lootFlushDue = CampaignTime.Zero;
                 }
                 else if (BattlefieldLaw.SharePending())
@@ -1517,7 +1519,7 @@ namespace Armoury
                     || TaleWorlds.CampaignSystem.Encounters.PlayerEncounter.Battle != null;
             }
             catch { }
-            if (fromBattle && !BattlefieldLaw.CasualtyLootCut)
+            if (fromBattle)   // audyt pelny W3: jeniec z walki oddal sprzet w lupie z pola (DTE liczy nieprzytomnych jak poleglych)
             {
                 // stary lad (bez prawa zachowania lupu): vanilla loteria juz
                 // zaplacila za rannych - obszukanie byloby DRUGA nagroda

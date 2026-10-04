@@ -1,5 +1,11 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-04 (40) - PO PELNYM AUDYCIE (logistyka): dzialka lupu bez dubla, zachowanie zuzycia na bilansie, jeniec z walki placi raz
+**Mod:** Armoury | **Pliki:** `BattlefieldLaw.cs` (`AfterDtePartyItems`), `WearKeep.cs` (przebudowa), `ArmouryBehavior.cs` (obszukiwanie jencow)
+**Problem (docs/AUDYT-PELNY-LOGISTYKA.md W1-W3, W5):** W1 - dzialka 30% zdejmowala z magazynu sztuke "bez stanu" (`AddToCounts(item,-take)`), a kolejka dostawala `take` nawet, gdy w magazynie byly tylko sztuki zuzyte - towar z niczego (uaktywnione przez WearKeep). W2 - WearKeep (wpis 39) przechwytywal KAZDE `AddItemToArmory`: DTE oddaje ta sama metoda zwrot wlasnych, LUP, zbrojownie pokonanych i rekrutow - stany zniszczonych sztuk przechodzily na lup. W5 - mala metoda mogla byc wklejona przez JIT (bez dowodu w logu). W3 - DTE liczy nieprzytomnego jak poleglego (jego sprzet idzie do lupu), a my otwieralismy 2-godzinne okno obszukania jencow po bitwie i obszukiwalismy jencow z kryjowki - drugi komplet z szablonu.
+**Zmiana:** W1 - dzialka zdejmuje po wszystkich elementach tej sztuki RAZEM z ich stanem. W2/W5 - WearKeep nie przechwytuje juz zwrotow: zapamietuje zuzyte sztuki wydane na bitwe, liczy (postfix) czyste sztuki oddane do magazynu, a po `DynamicTroopMissionLogic.FinalizeMission` tyle czystych sztuk, ile zuzytych wyszlo (i nie wiecej, niz wrocilo), dostaje z powrotem swoj stan; log zawsze: `WearKeep: bitwa zakonczona - zwrotow do magazynu N, zuzytych sztuk z powrotem w swoim stanie M`. W3 - po wygranej nie ma okna obszukania; jency z walki i z kryjowki tylko do ksiegi; obszukanie zostaje dla kapitulantow bez walki.
+**Status:** WGRANE 2026-10-04 (Armoury.dll md5 8726dd8e01c50cb012ca399f1ff5c79d, build rc=0, gra zamknieta; poprzednie DLL obok jako `Armoury.dll.bak-2026-10-04-przed-audytem-pelnym1`). Na obecnym save.
+
 ## 2026-10-04 (39) - LUPY HISTORYCZNIE: zuzycie nie znika w bitwie, rozbita czesc wlasnego poleglego zostaje jako wrak
 **Mod:** Armoury | **Pliki:** NOWY `WearKeep.cs`; `BattlefieldLaw.cs` (`QueueWreck`), `ArmouryBehavior.cs` (Reset, MapEventEnded), `SubModuleMain.cs`, `Settings.cs` + `McmSettings.cs` (`KeepWearThroughBattle`)
 **Zgloszenie (Jeff 04.10):** "tak napraw system - ma byc historycznie" (historycznie wiekszosc zbroi po bitwie naprawiano: kolczuge latano, helmy wyklepywano; uszkodzenia nie znikaly same).

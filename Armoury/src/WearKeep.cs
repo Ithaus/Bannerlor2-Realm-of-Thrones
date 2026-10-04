@@ -23,7 +23,7 @@ namespace Armoury
         private static System.Reflection.PropertyInfo _armoryP;
         private static int _kept;
 
-        internal static void Reset() { _out.Clear(); _kept = 0; }
+        internal static void Reset() { _out.Clear(); _kept = 0; _cleanIn.Clear(); _calls = 0; }
 
         private static ItemRoster Armory()
         {
@@ -63,50 +63,69 @@ namespace Armoury
                 var now = Snapshot(Armory());
                 foreach (var kv in __state)
                 {
+                    if (kv.Key.ItemModifier == null) continue;                  // sprawna sztuka - nic do pamietania
                     int after; now.TryGetValue(kv.Key, out after);
                     int gone = kv.Value - after;
                     if (gone <= 0) continue;
                     string id = kv.Key.Item.StringId;
                     List<ItemModifier> l;
                     if (!_out.TryGetValue(id, out l)) { l = new List<ItemModifier>(); _out[id] = l; }
-                    for (int k = 0; k < gone; k++) l.Add(kv.Key.ItemModifier);      // null = sztuka w pelni sprawna
+                    for (int k = 0; k < gone; k++) l.Add(kv.Key.ItemModifier);
                 }
             }
             catch { }
         }
 
-        public static bool AddPrefix(ItemObject __0, int __1)
+        // audyt pelny W2/W5: NIE przechwytujemy zwrotow (DTE oddaje przez te sama metode lup, zbrojownie
+        // pokonanych, rekrutow) - tylko liczymy, ile sztuk "czystych" wrocilo w tej bitwie.
+        private static readonly Dictionary<string, int> _cleanIn = new Dictionary<string, int>();
+        private static int _calls;
+        public static void AddPostfix(ItemObject __0, int __1)
         {
             try
             {
-                var s = Settings.Current;
-                if (s == null || !s.KeepWearThroughBattle || __0 == null || __1 <= 0) return true;
-                List<ItemModifier> l;
-                if (!_out.TryGetValue(__0.StringId, out l) || l.Count == 0) return true;
-                var armory = Armory();
-                if (armory == null) return true;
-                int n = __1;
-                while (n > 0 && l.Count > 0)
-                {
-                    var m = l[l.Count - 1];
-                    l.RemoveAt(l.Count - 1);
-                    armory.AddToCounts(new EquipmentElement(__0, m), 1);
-                    if (m != null) _kept++;
-                    n--;
-                }
-                if (n > 0) armory.AddToCounts(__0, n);          // reszta (np. lup tej samej sztuki) - jak dotad
-                return false;
+                if (__0 == null || __1 <= 0 || _out.Count == 0) return;
+                _calls++;
+                int v; _cleanIn.TryGetValue(__0.StringId, out v); _cleanIn[__0.StringId] = v + __1;
             }
-            catch { return true; }
+            catch { }
         }
 
-        /// <summary>Po bitwie: sztuki, ktore nie wrocily (zniszczone, stracone), nie czekaja na kolejna bitwe.</summary>
-        internal static void AfterBattle()
+        /// <summary>Po zwrotach DTE (FinalizeMission): tyle czystych sztuk, ile zuzytych wyszlo na bitwe (i nie wiecej
+        /// niz wrocilo), dostaje z powrotem swoj stan. Bilans zamiast zgadywania, ktora sztuka byla ktora.</summary>
+        public static void FinalizePostfix()
         {
-            if (_out.Count == 0 && _kept == 0) return;
-            if (_kept > 0) Log.Info("WearKeep: " + _kept + " zuzytych sztuk wrocilo z bitwy ze swoim stanem (nie jako nowe).");
-            _out.Clear(); _kept = 0;
+            try
+            {
+                var armory = Armory();
+                if (armory != null)
+                    foreach (var kv in _out)
+                    {
+                        int back; _cleanIn.TryGetValue(kv.Key, out back);
+                        int n = Math.Min(kv.Value.Count, back);
+                        if (n <= 0) continue;
+                        ItemObject item = null; int clean = 0;
+                        for (int i = 0; i < armory.Count; i++)
+                        {
+                            var el = armory.GetElementCopyAtIndex(i);
+                            if (el.EquipmentElement.Item != null && el.EquipmentElement.Item.StringId == kv.Key && el.EquipmentElement.ItemModifier == null) { item = el.EquipmentElement.Item; clean += el.Amount; }
+                        }
+                        n = Math.Min(n, clean);
+                        for (int k = 0; k < n; k++)
+                        {
+                            armory.AddToCounts(new EquipmentElement(item), -1);
+                            armory.AddToCounts(new EquipmentElement(item, kv.Value[k]), 1);
+                            _kept++;
+                        }
+                    }
+                Log.Info("WearKeep: bitwa zakonczona - zwrotow do magazynu " + _calls + ", zuzytych sztuk z powrotem w swoim stanie " + _kept + ".");
+            }
+            catch (Exception e) { Log.Error("WearKeep.Finalize", e); }
+            _out.Clear(); _cleanIn.Clear(); _kept = 0; _calls = 0;
         }
+
+        /// <summary>Zapas: po bitwie gracza czyscimy pamiec, gdyby FinalizeMission nie zadzialal.</summary>
+        internal static void AfterBattle() { _out.Clear(); _cleanIn.Clear(); _kept = 0; _calls = 0; }
 
         internal static void ApplyAll(Harmony h)
         {
@@ -119,7 +138,10 @@ namespace Armoury
                 var assign = AccessTools.Method(t, "AssignEquipment", new[] { typeof(Equipment) });
                 var add = AccessTools.Method(t, "AddItemToArmory", new[] { typeof(ItemObject), typeof(int) });
                 if (assign != null) h.Patch(assign, prefix: new HarmonyMethod(typeof(WearKeep), nameof(AssignPrefix)), postfix: new HarmonyMethod(typeof(WearKeep), nameof(AssignPostfix)));
-                if (add != null) h.Patch(add, prefix: new HarmonyMethod(typeof(WearKeep), nameof(AddPrefix)));
+                if (add != null) h.Patch(add, postfix: new HarmonyMethod(typeof(WearKeep), nameof(AddPostfix)));
+                var mlT = AccessTools.TypeByName("DynamicTroopEquipmentReupload.DynamicTroopMissionLogic");
+                var fin = mlT != null ? AccessTools.Method(mlT, "FinalizeMission") : null;
+                if (fin != null) h.Patch(fin, postfix: new HarmonyMethod(typeof(WearKeep), nameof(FinalizePostfix)));
                 Log.Info("WearKeep: stan sprzetu przez bitwe - wydanie " + (assign != null ? "wpiete" : "BRAK") + ", zwrot " + (add != null ? "wpiety" : "BRAK")
                          + ", magazyn " + (_armoryF != null || _armoryP != null ? "znaleziony" : "BRAK") + ".");
             }

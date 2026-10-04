@@ -410,13 +410,19 @@ namespace Armoury
                         if (item == null || count <= 0) continue;
                         int share = Math.Min(count, (int)Math.Round(count * pct / 100.0, MidpointRounding.AwayFromZero));
                         if (share <= 0) continue;
-                        int idx = armory.FindIndexOfItem(item);
-                        int avail = idx >= 0 ? armory.GetElementNumber(idx) : 0;
-                        int take = Math.Min(share, avail);
-                        if (take <= 0) continue;
-                        armory.AddToCounts(item, -take);
-                        ShareQueue.AddToCounts(item, take);
-                        moved += take;
+                        // audyt pelny W1: zdejmujemy po wszystkich elementach tej sztuki RAZEM z ich stanem -
+                        // wczesniej AddToCounts(item, -take) celowal w element bez modyfikatora, a kolejka i tak
+                        // dostawala "take" (towar z niczego, gdy w magazynie byly tylko sztuki zuzyte)
+                        int left = share;
+                        for (int i = armory.Count - 1; i >= 0 && left > 0; i--)
+                        {
+                            var el = armory.GetElementCopyAtIndex(i);
+                            if (el.EquipmentElement.Item != item || el.Amount <= 0) continue;
+                            int t = Math.Min(left, el.Amount);
+                            armory.AddToCounts(el.EquipmentElement, -t);
+                            ShareQueue.AddToCounts(el.EquipmentElement, t);
+                            left -= t; moved += t;
+                        }
                     }
                     break;   // rekord partii gracza znaleziony i przetworzony
                 }
