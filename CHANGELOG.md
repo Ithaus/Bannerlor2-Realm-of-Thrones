@@ -1,5 +1,13 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-04 (15) - CENY: widelki wskaznika surowcow (skora x5 dawala garb bandyty za 20 tys.)
+**Mod:** Armoury | **Pliki:** `ArmsPricing.cs` (LocalRatio, MaterialIndex, spis), `Settings.cs` + `McmSettings.cs` (grupa "Arms pricing": `MaterialRatioMin` 0.5, `MaterialRatioMax` 2, `MaterialIndexMin` 0.6, `MaterialIndexMax` 1.8)
+**Problem (Jeff 04.10, pierwszy test nowej gry):** log `ZakupyAI` - lordowie AI placa za zwykle rzeczy kilkanascie razy za duzo: `bandit_garb` 7864 w Ten Towers i 20380 w Menetragos (skorzany garb 10 kg, pancerz 25), `bandit_hybrid_armor_helmet_b` 9855, `khuzait_civil_coat` 4681, `nordic_lamellar_vest` 33400. Indeks rudy w `Rynek broni` min/med/max 0.25/1.16/3.99 (dzien wczesniej max 5.42).
+**Przyczyna:** `LocalRatio` (cena surowca na targu / Value) mial widelki 0.1-10, a `MaterialIndex` 0.3-5. Zbroja skorzana to prawie sam surowiec, wiec skora x5 w miescie bez bydla dawala zbroje x5; do tego polka (do x2, SupplyDemand) i czynnik ceny gry (do x1.3) - razem ~13x podstawy. Indeks skory i lnu nie byl nawet wypisywany w logu.
+**Zmiana:** surowiec liczy sie w miescie najwyzej x2 i najmniej x0.5 swojej ceny (drozej - kowal kupuje w sasiednim miescie, taniej - surowiec wyjezdza), wskaznik surowcow na gotowej sztuce 0.6-1.8. Wszystko z MCM. Linia `Rynek broni` wypisuje teraz tez indeks skory i lnu. Dziala od razu na obecnym save (koncowy clamp; zapisane indeksy dojda do nowych widelek w kilka dni przez bezwladnosc).
+**Ryzyko / co sprawdzic:** najwyzsza cena wzgledem podstawy spada z ~13x do ~4.7x (1.8 x 2 x 1.3). W `ZakupyAI` nie powinno byc juz skorzanych garbow za kilka-kilkanascie tysiecy; w `Rynek broni` indeksy max <= 2.
+**Status:** WGRANE 2026-10-04 (Armoury.dll md5 9f0d499c9f3e88f9204209ef7a2fe44d, build rc=0, gra zamknieta; poprzednie DLL obok jako `Armoury.dll.bak-2026-10-04-przed-widelkami-surowcow`). DO SPRAWDZENIA - mozna na obecnym save.
+
 ## 2026-10-04 (14) - PRAWO WYRZUTKOW: bandy z prawdziwych ludzi (dezerterzy, rozbitkowie, wygnani przez rabunek, glod i wojne), sprzet tylko zdobyty albo kupiony
 **Mod:** Armoury | **Pliki:** NOWY `OutlawLaw.cs`; `ArmouryBehavior.cs` (zdarzenia, SyncData "arm_outlaws", Daily, Reset), `SubModuleMain.cs`, `HideoutPurge.cs` (czyszczenie jencow po scaleniu), `Settings.cs` + `McmSettings.cs` (grupa "Outlaws", 23 ustawienia)
 **Zgloszenie (Jeff 04.10):** "pula wyrzutkow i paser - zrobmy to od razu porzadnie: liczba band zalezna od ekonomii, im wiekszy dobrobyt i brak wojen, tym mniej band; spalone wioski i chaos - wiecej; bandy powstaja z dezerterow, nieoplaconych najemnikow, przestepcow; rekrutuja sie z ludzi, nie z kosmosu; maja sprzet, jaki maja, nic za darmo; moga werbowac jencow i chlopow".

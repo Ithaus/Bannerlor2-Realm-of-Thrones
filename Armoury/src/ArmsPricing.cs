@@ -249,7 +249,8 @@ namespace Armoury
             {
                 if (town == null || town.Town == null || it == null || it.Value <= 0) return 1f;
                 int p = town.Town.MarketData.GetPrice(it, null, false, null);
-                return MBMath.ClampFloat(p / (float)it.Value, 0.1f, 10f);
+                var s = Settings.Current;   // surowiec drozszy niz x2 jedzie z sasiedniego miasta - transport ogranicza roznice (Jeff 04.10: skora x5 = garb bandyty za 20 tys.)
+                return MBMath.ClampFloat(p / (float)it.Value, Math.Max(0.05f, s.MaterialRatioMin), Math.Max(s.MaterialRatioMin, s.MaterialRatioMax));
             }
             catch { return 1f; }
         }
@@ -320,7 +321,7 @@ namespace Armoury
                 if (raw <= 0f) return 1f;
                 float metalIdx = 0.3f * ix[0] + 0.7f * ix[1];
                 float now = c.Metal * metalIdx + c.Charcoal * ix[1] + c.Leather * ix[2] + c.Linen * ix[3] + c.Wood * ix[1] + c.Special + c.Labor;
-                return MBMath.ClampFloat(now / raw, 0.3f, 5f);
+                return MBMath.ClampFloat(now / raw, Math.Max(0.05f, s.MaterialIndexMin), Math.Max(s.MaterialIndexMin, s.MaterialIndexMax));
             }
             catch { return 1f; }
         }
@@ -389,9 +390,9 @@ namespace Armoury
                         total += el.Amount;
                     }
                 }
-                var oreL = new List<float>(); var woodL = new List<float>();
-                foreach (var kv in _idx) { oreL.Add(kv.Value[0]); woodL.Add(kv.Value[1]); }
-                oreL.Sort(); woodL.Sort();
+                var oreL = new List<float>(); var woodL = new List<float>(); var leaL = new List<float>(); var linL = new List<float>();
+                foreach (var kv in _idx) { oreL.Add(kv.Value[0]); woodL.Add(kv.Value[1]); leaL.Add(kv.Value[2]); linL.Add(kv.Value[3]); }
+                oreL.Sort(); woodL.Sort(); leaL.Sort(); linL.Sort();
                 var parts = new List<string>();
                 foreach (var kv in perType) parts.Add(kv.Key + " " + kv.Value);
                 var wars = new List<string>();
@@ -425,6 +426,7 @@ namespace Armoury
                 Log.Info("Rynek surowcow: zapasy na targach miast [" + string.Join(", ", rawParts.ToArray()) + "]; warsztaty [" + string.Join(", ", shopParts.ToArray()) + "].");
                 Log.Info("Rynek broni: na polkach " + total + " szt. [" + string.Join(", ", parts.ToArray()) + "]; indeks rudy min/med/max "
                          + Q(oreL, 0f) + "/" + Q(oreL, 0.5f) + "/" + Q(oreL, 1f) + ", drewna " + Q(woodL, 0f) + "/" + Q(woodL, 0.5f) + "/" + Q(woodL, 1f)
+                         + ", skory " + Q(leaL, 0f) + "/" + Q(leaL, 0.5f) + "/" + Q(leaL, 1f) + ", lnu " + Q(linL, 0f) + "/" + Q(linL, 0.5f) + "/" + Q(linL, 1f)
                          + "; premie wojenne: " + (wars.Count > 0 ? string.Join(", ", wars.ToArray()) : "brak") + ".");
             }
             catch { }
