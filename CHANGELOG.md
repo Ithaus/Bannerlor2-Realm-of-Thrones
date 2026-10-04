@@ -1,5 +1,12 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-04 (62) - UNIKATY KRAZA PO SWIECIE: nic nie znika, AI pojmujace bierze, lord kupuje z polki, kronika
+**Mod:** Armoury | **Pliki:** `UniqueSpoils.cs` (przebudowa), `ArmouryBehavior.cs` (`Reset`, klucz save `arm_uniq_init`, `DailyTickPartyEvent`), `Settings.cs` + `McmSettings.cs` (NOWE `UniqueSpoilsFromPlayer` true)
+**Problem (Jeff 04.10 do wpisu 61: AI pojmujace - "tak"; "jesli sprzedam, to bedzie gdzies w swiecie - maja byc unikaty monitorowane, kto potem kupil, gdzie jest, aby nie znikaly; ... ktos sprzeda albo jakis lord kupi"):** wpis 61 zdejmowal unikaty z targow CODZIENNIE - unikat sprzedany przez gracza znikal; AI pojmujace niczego nie bralo.
+**Zmiana:** (1) kopie z zaopatrzenia startowego zdejmowane RAZ na kampanie (flaga w save), potem nic nie znika - unikat sprzedany lezy na polce; NotMerchandise dalej (sklepy ich nie zaopatruja). (2) Zdobycz: pojmanie albo smierc w walce - unikaty z ekwipunku bojowego przechodza na pojmujacego/zabijajacego: gracz do taboru, lord AI zaklada (jego stara sztuka do taboru partii); pojmany dostaje zamiennik kultury; dotyczy tez gracza pojmanego przez AI (`UniqueSpoilsFromPlayer`, zwyczaj wojenny). (3) Lord AI w miescie kupuje unikat z polki, jesli jest lepszy od tego, co nosi w tym miejscu, umie go uzyc i ma 2x cene - placi miastu, zaklada. (4) Kronika: codziennie spis, gdzie jest kazdy unikat (nosi / tabor / targ) - pierwszego dnia stan swiata, potem tylko zmiany; komunikaty "Word spreads: ...".
+**Ryzyko:** stara sztuka lorda bez partii przepada (rzadkie); duzo komunikatow, jesli lordowie czesto sie pojmuja. Log: `UniqueSpoils: ...`, `Kronika unikatow: ...`.
+**Status:** ZBUDOWANE 2026-10-04 (build rc=0) - NIE WGRANE: gra byla uruchomiona; wgrac po zamknieciu (zastepuje wpis 61).
+
 ## 2026-10-04 (61) - UNIKATY U POSTACI, NIE NA TARGU; zbroja i bron pojmanego/zabitego przez gracza przechodza na gracza
 **Mod:** Armoury | **Pliki:** NOWY `UniqueSpoils.cs`, `ArmouryBehavior.cs` (start sesji, dzienny tick, zdarzenia `HeroPrisonerTaken` i `HeroKilledEvent`)
 **Problem (Jeff 04.10: "unikatow ma nie byc na targu - te unikaty maja postacie i potem mozna je zdobyc od nich, musi gdzies to byc, aby mozna bylo to zdobyc"; "jak maja kupic na targu zbroje Brienne, skoro Brienne ja nosi"):** wpis 60 tylko zabranial je robic i kupowac AI; kopie z zaopatrzenia startowego lezaly na targach, a od postaci nie dalo sie ich zdobyc (gra nie lupi ekwipunku bohaterow).

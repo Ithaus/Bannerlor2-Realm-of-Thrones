@@ -386,7 +386,7 @@ namespace Armoury
         }
         private Dictionary<string,int> _prisonerBaseline;
 
-        public ArmouryBehavior() { Instance = this; WesterosClimate.Reset(); OutlawLaw.Reset(); PopulationLaw.Reset(); WorkshopLaw.Reset(); IronBank.Reset(); MarketGlut.Reset(); ArmsPricing.Reset(); StartKit.Reset(); AiGear.Reset(); Levy.Reset(); VolunteerKit.Reset(); LevyGold.Reset(); WearKeep.Reset(); }   // stan jednej kampanii nie przecieka do drugiej (audyt 04.10)
+        public ArmouryBehavior() { Instance = this; WesterosClimate.Reset(); OutlawLaw.Reset(); PopulationLaw.Reset(); WorkshopLaw.Reset(); IronBank.Reset(); MarketGlut.Reset(); ArmsPricing.Reset(); StartKit.Reset(); AiGear.Reset(); Levy.Reset(); VolunteerKit.Reset(); LevyGold.Reset(); WearKeep.Reset(); UniqueSpoils.Reset(); }   // stan jednej kampanii nie przecieka do drugiej (audyt 04.10)
 
         public override void SyncData(IDataStore dataStore)
         {
@@ -422,6 +422,10 @@ namespace Armoury
                 dataStore.SyncData("arm_outlaws", ref outlaws);
                 if (dataStore.IsLoading) OutlawLaw.Import(outlaws);
                 // klimat Westeros: historia por roku (Jeff 04.10)
+                // unikaty ROT: kopie startowe zdjete raz na kampanie (wpis 62)
+                string uniq = UniqueSpoils.Export();
+                dataStore.SyncData("arm_uniq_init", ref uniq);
+                if (dataStore.IsLoading) UniqueSpoils.Import(uniq);
                 string climate = WesterosClimate.Export();
                 dataStore.SyncData("arm_climate", ref climate);
                 if (dataStore.IsLoading) WesterosClimate.Import(climate);
@@ -459,6 +463,7 @@ namespace Armoury
             CampaignEvents.WarDeclared.AddNonSerializedListener(this, ArmsPricing.OnWarDeclared);
             CampaignEvents.SettlementEntered.AddNonSerializedListener(this, AiGear.OnSettlementEntered);
             CampaignEvents.DailyTickPartyEvent.AddNonSerializedListener(this, AiGear.OnDailyTickParty);
+            CampaignEvents.DailyTickPartyEvent.AddNonSerializedListener(this, UniqueSpoils.OnDailyTickParty);
             // SUWAKI MCM NA ZYWO (Jeff 03.09: "nadal 1 predkosc, o co chodzi" -
             // World Pace Percent przestawiony w grze nie dzialal). McmSettings.Apply()
             // szlo TYLKO w OnGameStart, wiec kazda zmiana w Mod Options czekala

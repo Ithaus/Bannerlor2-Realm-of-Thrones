@@ -1228,6 +1228,10 @@ namespace Armoury
         [SettingPropertyGroup("Army purchases")]
         public bool GarrisonBuysGearPlayer { get; set; } = false;
 
+        [SettingPropertyBool("Unique Spoils From Player", HintText = "the custom of war binds you too: whoever takes you captive takes the renowned arms you wear")]
+        [SettingPropertyGroup("Army purchases")]
+        public bool UniqueSpoilsFromPlayer { get; set; } = true;
+
         [SettingPropertyBool("Ai Recruits Bring Kit", HintText = "a fresh recruit still arrives with his own kit (levies came armed); turn off and lords must buy for every new man")]
         [SettingPropertyGroup("Army purchases")]
         public bool AiRecruitsBringKit { get; set; } = true;
@@ -2502,6 +2506,7 @@ namespace Armoury
             s.AiBuysGear = AiBuysGear;
             s.GarrisonBuysGear = GarrisonBuysGear;
             s.GarrisonBuysGearPlayer = GarrisonBuysGearPlayer;
+            s.UniqueSpoilsFromPlayer = UniqueSpoilsFromPlayer;
             s.AiRecruitsBringKit = AiRecruitsBringKit;
             s.AiGearBudgetPercent = AiGearBudgetPercent;
             s.AiGearGoldReserve = AiGearGoldReserve;

@@ -366,6 +366,7 @@ namespace Armoury
         public bool AiBuysGear = true;                     // AI lords buy their soldiers' arms and armour on the market with their own gold - no more free gear from the quartermaster's hat, no more gold for sweeping the baggage into the armoury
         public bool GarrisonBuysGear = true;               // a garrison buys the gear its men lack at the market of its own town, paid by the lord of the place - the coin goes to the town
         public bool GarrisonBuysGearPlayer = false;        // your own garrisons buy gear the same way, from your purse
+        public bool UniqueSpoilsFromPlayer = true;         // the custom of war binds you too: whoever takes you captive takes the renowned arms you wear
         public bool AiRecruitsBringKit = true;             // a fresh recruit still arrives with his own kit (levies came armed); turn off and lords must buy for every new man
         public float AiGearBudgetPercent = 25f;            // share of a lord's gold (above the reserve) he is willing to spend on gear in one visit to a town
         public int AiGearGoldReserve = 2000;               // gold a lord always keeps back - wages come first
