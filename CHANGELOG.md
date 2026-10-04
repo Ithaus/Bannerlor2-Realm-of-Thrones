@@ -1,5 +1,11 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-04 (65) - KRONIKA BITEW (Logs/<sesja>/bitwy.log + podsumowanie dnia)
+**Mod:** Armoury | **Pliki:** NOWY `BattleChronicle.cs`, `ArmouryBehavior.cs` (MapEventEnded, dzienny tick), `Log.cs` (temat "bitwy"), `Settings.cs` + `McmSettings.cs` (NOWE `BattleChronicleMinMen` 30)
+**Problem (Jeff 04.10: "a byly wojny, jakies straty, czy podzial lupow dziala dobrze?" -> "tak" na kronike):** bitew AI nie zapisywalismy wcale - z logu 15:54 dalo sie tylko wywnioskowac z liczebnosci wojsk (CSV CrashScribe: 15 -> 60 tys. ludzi w 13 dni, zold 73 -> 256 tys./dzien), ze bitew bylo malo.
+**Zmiana:** po kazdej bitwie z walka: rodzaj, miejsce, przywodcy i frakcje, sily na starcie, zabici (i %), ranni, rozbici, zloto zdobyte/stracone kazdej strony, zwyciezca - do `bitwy.log`; potyczki ponizej 30 ludzi razem tylko liczone (bitwy gracza zawsze). Raz dziennie w glownym logu: `Bitwy: dzien ... N bitew, zabitych, rannych; zwyciezcy tracili zabitych srednio X%, przegrani Y% (historia: 1-5% / 15-40%)`. Jencow nie liczymy (gra rozlicza ich po bitwie).
+**Status:** WGRANE 2026-10-04 (gra zamknieta; poprzednie DLL obok jako `Armoury.dll.bak-2026-10-04-przed-65`). DO SPRAWDZENIA.
+
 ## 2026-10-04 (64) - RZEMIESLNICY MIASTA GARBUJA I TKAJA z targu (skory surowe -> skora, len -> plotno)
 **Mod:** Armoury | **Pliki:** `WorkshopLaw.cs` (`TanOrWeave` w bloku `FreeRawLine`, licznik w logu dnia), `Settings.cs` + `McmSettings.cs` (NOWE `ArtisanTanWeavePerCycle` 5)
 **Problem (test 15:54, Armoury-2026-10-04_15-54-06.log, dni 108836-108849):** warsztaty ruszyly (270-330 szt./dzien: luki, bron, helmy, tarcze, drzewce), ale "brak surowca" 1400-1650 cykli dziennie, zbroi korpusu 1 szt./dzien, polki zbroi 10; skora ~50 i plotno ~20 sztuk na swiat po 150-213 i 598-1012 d (wartosc 40 i 100), a skor surowych 2580 -> 2980 i lnu ~700 na polkach - za malo garbarni (10) i tkalni (12). Linie "leather" i "linen" ukrytych rzemieslnikow BK byly zablokowane (robily z niczego).

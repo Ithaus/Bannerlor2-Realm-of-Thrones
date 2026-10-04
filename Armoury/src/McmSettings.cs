@@ -1232,6 +1232,10 @@ namespace Armoury
         [SettingPropertyGroup("Army purchases")]
         public bool UniqueSpoilsFromPlayer { get; set; } = true;
 
+        [SettingPropertyInteger("Battle Chronicle Min Men", 0, 120, "0", HintText = "battles where both sides together had fewer men than this are only counted, not written out in the battle chronicle (yours always are)")]
+        [SettingPropertyGroup("Army purchases")]
+        public int BattleChronicleMinMen { get; set; } = 30;
+
         [SettingPropertyBool("Ai Recruits Bring Kit", HintText = "a fresh recruit still arrives with his own kit (levies came armed); turn off and lords must buy for every new man")]
         [SettingPropertyGroup("Army purchases")]
         public bool AiRecruitsBringKit { get; set; } = true;
@@ -2511,6 +2515,7 @@ namespace Armoury
             s.GarrisonBuysGear = GarrisonBuysGear;
             s.GarrisonBuysGearPlayer = GarrisonBuysGearPlayer;
             s.UniqueSpoilsFromPlayer = UniqueSpoilsFromPlayer;
+            s.BattleChronicleMinMen = BattleChronicleMinMen;
             s.AiRecruitsBringKit = AiRecruitsBringKit;
             s.AiGearBudgetPercent = AiGearBudgetPercent;
             s.AiGearGoldReserve = AiGearGoldReserve;
