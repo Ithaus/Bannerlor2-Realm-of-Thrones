@@ -67,6 +67,7 @@ namespace Armoury
                 ManLedger.ApplyAll(_harmony);   // ksiega ludzi - kazdy ubytek z partii gracza z nazwa winowajcy
                 WinterBite.ApplyAll(_harmony);
                 WesterosClimate.ApplyAll(_harmony);
+                OutlawLaw.ApplyAll(_harmony);
                 Rations.ApplyAll(_harmony);      // dlugi marsz, dlugie racje - zuzycie jedzenia w dol (gracz i AI)
                 ScorchedEarth.ApplyAll(_harmony);
                 Wayfinder.ApplyAll(_harmony);

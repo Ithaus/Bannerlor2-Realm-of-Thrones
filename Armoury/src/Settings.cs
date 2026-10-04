@@ -376,6 +376,29 @@ namespace Armoury
         public int WorkshopCandidates = 40;                // how many different pieces a workshop weighs each morning when deciding what pays best to make
 
         // --- Iron Bank ---
+        public bool OutlawLawEnabled = true;               // outlaws are real men: deserters, unpaid soldiers, men routed from battle, villagers driven off by raids, hunger and war; bands form only where such men exist and wear only what they brought, looted or bought
+        public float OutlawSeedPerHearth = 0.03f;          // outlaws already in the woods when the campaign begins, per hearth of each region's villages (taken from those villages)
+        public float OutlawDailyPerThousandHearth = 0.1f;  // men a region loses to the woods each day per 1000 hearths, times its misery (poverty, war, burnt villages, hunger, lawlessness)
+        public float OutlawWarMisery = 0.5f;               // misery added while the region's realm is at war - no order, easy plunder
+        public float OutlawLootedMisery = 2f;              // misery added when all of a region's villages lie burnt (scaled by the share burnt)
+        public float OutlawStarvingMisery = 1.5f;          // misery added while the region's town or castle is starving
+        public int OutlawProsperityGood = 5000;            // prosperity at which a town counts as fully well-off (no misery from poverty)
+        public float OutlawReturnBasePercent = 0.5f;       // percent of a region's outlaws who go home each day in any times
+        public float OutlawReturnPeacePercent = 2f;        // extra percent going home each day in peace, scaled by prosperity
+        public float OutlawRoutedShare = 0.5f;             // share of men routed from a battle who take to the woods instead of going home
+        public float OutlawRaidFleePercent = 3f;           // percent of a village's hearths that flee to the woods when it is burnt
+        public float OutlawHearthPerMan = 0.5f;            // hearths a village loses for each man who becomes an outlaw (and regains when he returns)
+        public int OutlawMinBand = 6;                      // fewest men needed nearby before a new band can form
+        public int OutlawNeighbourRegions = 4;             // a new band gathers men from its own region and this many nearest ones
+        public float OutlawBandSizeScale = 1f;             // size of a new band against the game's usual size (still only as many as there are men)
+        public int OutlawDailyRecruit = 2;                 // men a band can take in each day from the outlaws of the region it roams
+        public float OutlawPrisonerJoinPercent = 10f;      // percent of a band's healthy prisoners who join it each day (green men sooner than veterans)
+        public float OutlawCommonerMaxArmorKg = 8f;        // a commoner joins a band as its clan's lowest bandit only if that troop wears body armour this light; otherwise as a looter
+        public bool OutlawGearUpgrades = true;             // a bandit rises in rank only with gear for it: armour and horse from the band's loot, or bought from a fence in a nearby town
+        public float OutlawFenceRadius = 20f;              // how near a town must be for a band to buy from its fence
+        public float OutlawFenceMarkup = 1.5f;             // what the fence asks over the item's value
+        public bool OutlawNoFreeGold = true;               // bands get no gold from nowhere: only what they plunder (no daily top-up, no purse at birth beyond a few coins a man)
+        public int OutlawCoinsPerMan = 2;                  // coins each man brings to a new band
         public bool ClimateEnabled = true;                 // the seasons of Westeros: one season at a time lasting for years, its end proclaimed by a white raven from the Citadel; dates read "Day N of Summer, 299 AC"
         public bool ClimateDrivesEconomy = true;           // food, harvests, sickness, travel and the AI's winter caution (RealisticBannerlord, BetterEconomy, StrategicCampaignAI) follow the long seasons too - a winter of years is a hungry one
         public int ClimateSummerDaysSoFar = 3640;          // how long the summer has already lasted when the campaign begins (the summer that lasted ten years)

@@ -394,6 +394,7 @@ namespace Armoury
                                 if (el.Amount > 0) boss.ItemRoster.AddToCounts(el.EquipmentElement, el.Amount);
                             }
                             mp.MemberRoster.Clear();
+                            mp.PrisonRoster.Clear();   // jency juz u bossa - inaczej OutlawLaw policzy ich drugi raz
                             DestroyPartyAction.Apply(null, mp);
                             merged++;
                         }

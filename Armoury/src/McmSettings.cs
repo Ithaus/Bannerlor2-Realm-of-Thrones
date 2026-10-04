@@ -1249,6 +1249,98 @@ namespace Armoury
         public float WorkshopWoodPerOre { get; set; } = 5f;
 [SettingPropertyInteger("Workshop Candidates", 0, 160, "0", HintText = "how many different pieces a workshop weighs each morning when deciding what pays best to make")]        [SettingPropertyGroup("Workshops")]        public int WorkshopCandidates { get; set; } = 40;
 
+        [SettingPropertyBool("Outlaw Law Enabled", HintText = "outlaws are real men: deserters, unpaid soldiers, men routed from battle, villagers driven off by raids, hunger and war; bands form only where such men exist and wear only what they brought, looted or bought")]
+        [SettingPropertyGroup("Outlaws")]
+        public bool OutlawLawEnabled { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Outlaw Seed Per Hearth", 0f, 1f, "0.00", HintText = "outlaws already in the woods when the campaign begins, per hearth of each region's villages (taken from those villages)")]
+        [SettingPropertyGroup("Outlaws")]
+        public float OutlawSeedPerHearth { get; set; } = 0.03f;
+
+        [SettingPropertyFloatingInteger("Outlaw Daily Per Thousand Hearth", 0f, 1f, "0.00", HintText = "men a region loses to the woods each day per 1000 hearths, times its misery (poverty, war, burnt villages, hunger, lawlessness)")]
+        [SettingPropertyGroup("Outlaws")]
+        public float OutlawDailyPerThousandHearth { get; set; } = 0.1f;
+
+        [SettingPropertyFloatingInteger("Outlaw War Misery", 0f, 2f, "0.00", HintText = "misery added while the region's realm is at war - no order, easy plunder")]
+        [SettingPropertyGroup("Outlaws")]
+        public float OutlawWarMisery { get; set; } = 0.5f;
+
+        [SettingPropertyFloatingInteger("Outlaw Looted Misery", 0f, 8f, "0.00", HintText = "misery added when all of a region's villages lie burnt (scaled by the share burnt)")]
+        [SettingPropertyGroup("Outlaws")]
+        public float OutlawLootedMisery { get; set; } = 2f;
+
+        [SettingPropertyFloatingInteger("Outlaw Starving Misery", 0f, 6f, "0.00", HintText = "misery added while the region's town or castle is starving")]
+        [SettingPropertyGroup("Outlaws")]
+        public float OutlawStarvingMisery { get; set; } = 1.5f;
+
+        [SettingPropertyInteger("Outlaw Prosperity Good", 0, 20000, "0", HintText = "prosperity at which a town counts as fully well-off (no misery from poverty)")]
+        [SettingPropertyGroup("Outlaws")]
+        public int OutlawProsperityGood { get; set; } = 5000;
+
+        [SettingPropertyFloatingInteger("Outlaw Return Base Percent", 0f, 2f, "0.00", HintText = "percent of a region's outlaws who go home each day in any times")]
+        [SettingPropertyGroup("Outlaws")]
+        public float OutlawReturnBasePercent { get; set; } = 0.5f;
+
+        [SettingPropertyFloatingInteger("Outlaw Return Peace Percent", 0f, 8f, "0.00", HintText = "extra percent going home each day in peace, scaled by prosperity")]
+        [SettingPropertyGroup("Outlaws")]
+        public float OutlawReturnPeacePercent { get; set; } = 2f;
+
+        [SettingPropertyFloatingInteger("Outlaw Routed Share", 0f, 2f, "0.00", HintText = "share of men routed from a battle who take to the woods instead of going home")]
+        [SettingPropertyGroup("Outlaws")]
+        public float OutlawRoutedShare { get; set; } = 0.5f;
+
+        [SettingPropertyFloatingInteger("Outlaw Raid Flee Percent", 0f, 12f, "0.00", HintText = "percent of a village's hearths that flee to the woods when it is burnt")]
+        [SettingPropertyGroup("Outlaws")]
+        public float OutlawRaidFleePercent { get; set; } = 3f;
+
+        [SettingPropertyFloatingInteger("Outlaw Hearth Per Man", 0f, 2f, "0.00", HintText = "hearths a village loses for each man who becomes an outlaw (and regains when he returns)")]
+        [SettingPropertyGroup("Outlaws")]
+        public float OutlawHearthPerMan { get; set; } = 0.5f;
+
+        [SettingPropertyInteger("Outlaw Min Band", 0, 24, "0", HintText = "fewest men needed nearby before a new band can form")]
+        [SettingPropertyGroup("Outlaws")]
+        public int OutlawMinBand { get; set; } = 6;
+
+        [SettingPropertyInteger("Outlaw Neighbour Regions", 0, 16, "0", HintText = "a new band gathers men from its own region and this many nearest ones")]
+        [SettingPropertyGroup("Outlaws")]
+        public int OutlawNeighbourRegions { get; set; } = 4;
+
+        [SettingPropertyFloatingInteger("Outlaw Band Size Scale", 0f, 4f, "0.00", HintText = "size of a new band against the game's usual size (still only as many as there are men)")]
+        [SettingPropertyGroup("Outlaws")]
+        public float OutlawBandSizeScale { get; set; } = 1f;
+
+        [SettingPropertyInteger("Outlaw Daily Recruit", 0, 10, "0", HintText = "men a band can take in each day from the outlaws of the region it roams")]
+        [SettingPropertyGroup("Outlaws")]
+        public int OutlawDailyRecruit { get; set; } = 2;
+
+        [SettingPropertyFloatingInteger("Outlaw Prisoner Join Percent", 0f, 40f, "0.00", HintText = "percent of a band's healthy prisoners who join it each day (green men sooner than veterans)")]
+        [SettingPropertyGroup("Outlaws")]
+        public float OutlawPrisonerJoinPercent { get; set; } = 10f;
+
+        [SettingPropertyFloatingInteger("Outlaw Commoner Max Armor Kg", 0f, 32f, "0.00", HintText = "a commoner joins a band as its clan's lowest bandit only if that troop wears body armour this light; otherwise as a looter")]
+        [SettingPropertyGroup("Outlaws")]
+        public float OutlawCommonerMaxArmorKg { get; set; } = 8f;
+
+        [SettingPropertyBool("Outlaw Gear Upgrades", HintText = "a bandit rises in rank only with gear for it: armour and horse from the band's loot, or bought from a fence in a nearby town")]
+        [SettingPropertyGroup("Outlaws")]
+        public bool OutlawGearUpgrades { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Outlaw Fence Radius", 0f, 80f, "0.00", HintText = "how near a town must be for a band to buy from its fence")]
+        [SettingPropertyGroup("Outlaws")]
+        public float OutlawFenceRadius { get; set; } = 20f;
+
+        [SettingPropertyFloatingInteger("Outlaw Fence Markup", 0f, 6f, "0.00", HintText = "what the fence asks over the item's value")]
+        [SettingPropertyGroup("Outlaws")]
+        public float OutlawFenceMarkup { get; set; } = 1.5f;
+
+        [SettingPropertyBool("Outlaw No Free Gold", HintText = "bands get no gold from nowhere: only what they plunder (no daily top-up, no purse at birth beyond a few coins a man)")]
+        [SettingPropertyGroup("Outlaws")]
+        public bool OutlawNoFreeGold { get; set; } = true;
+
+        [SettingPropertyInteger("Outlaw Coins Per Man", 0, 10, "0", HintText = "coins each man brings to a new band")]
+        [SettingPropertyGroup("Outlaws")]
+        public int OutlawCoinsPerMan { get; set; } = 2;
+
         [SettingPropertyBool("Climate Enabled", HintText = "the seasons of Westeros: one season at a time lasting for years, its end proclaimed by a white raven from the Citadel; dates read \"Day N of Summer, 299 AC\"")]
         [SettingPropertyGroup("Westeros climate")]
         public bool ClimateEnabled { get; set; } = true;
@@ -2026,6 +2118,29 @@ namespace Armoury
             s.WorkshopCrudeKgPerOre = WorkshopCrudeKgPerOre;
             s.WorkshopWoodPerOre = WorkshopWoodPerOre;
             s.WorkshopCandidates = WorkshopCandidates;
+            s.OutlawLawEnabled = OutlawLawEnabled;
+            s.OutlawSeedPerHearth = OutlawSeedPerHearth;
+            s.OutlawDailyPerThousandHearth = OutlawDailyPerThousandHearth;
+            s.OutlawWarMisery = OutlawWarMisery;
+            s.OutlawLootedMisery = OutlawLootedMisery;
+            s.OutlawStarvingMisery = OutlawStarvingMisery;
+            s.OutlawProsperityGood = OutlawProsperityGood;
+            s.OutlawReturnBasePercent = OutlawReturnBasePercent;
+            s.OutlawReturnPeacePercent = OutlawReturnPeacePercent;
+            s.OutlawRoutedShare = OutlawRoutedShare;
+            s.OutlawRaidFleePercent = OutlawRaidFleePercent;
+            s.OutlawHearthPerMan = OutlawHearthPerMan;
+            s.OutlawMinBand = OutlawMinBand;
+            s.OutlawNeighbourRegions = OutlawNeighbourRegions;
+            s.OutlawBandSizeScale = OutlawBandSizeScale;
+            s.OutlawDailyRecruit = OutlawDailyRecruit;
+            s.OutlawPrisonerJoinPercent = OutlawPrisonerJoinPercent;
+            s.OutlawCommonerMaxArmorKg = OutlawCommonerMaxArmorKg;
+            s.OutlawGearUpgrades = OutlawGearUpgrades;
+            s.OutlawFenceRadius = OutlawFenceRadius;
+            s.OutlawFenceMarkup = OutlawFenceMarkup;
+            s.OutlawNoFreeGold = OutlawNoFreeGold;
+            s.OutlawCoinsPerMan = OutlawCoinsPerMan;
             s.ClimateEnabled = ClimateEnabled;
             s.ClimateDrivesEconomy = ClimateDrivesEconomy;
             s.ClimateSummerDaysSoFar = ClimateSummerDaysSoFar;

@@ -386,7 +386,7 @@ namespace Armoury
         }
         private Dictionary<string,int> _prisonerBaseline;
 
-        public ArmouryBehavior() { Instance = this; WesterosClimate.Reset(); }
+        public ArmouryBehavior() { Instance = this; WesterosClimate.Reset(); OutlawLaw.Reset(); }
 
         public override void SyncData(IDataStore dataStore)
         {
@@ -413,6 +413,10 @@ namespace Armoury
                 string nightrest = NightRest.Export();
                 dataStore.SyncData("arm_nightrest", ref nightrest);
                 if (dataStore.IsLoading) NightRest.Import(nightrest);
+                // prawo wyrzutkow: pula ludzi w regionach (Jeff 04.10)
+                string outlaws = OutlawLaw.Export();
+                dataStore.SyncData("arm_outlaws", ref outlaws);
+                if (dataStore.IsLoading) OutlawLaw.Import(outlaws);
                 // klimat Westeros: historia por roku (Jeff 04.10)
                 string climate = WesterosClimate.Export();
                 dataStore.SyncData("arm_climate", ref climate);
@@ -460,6 +464,12 @@ namespace Armoury
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this,
                 delegate { try { McmSettings.Apply(); } catch { } try { AmmoTracer.HourlyCheck(); } catch { } });
             CampaignEvents.OnSettlementOwnerChangedEvent.AddNonSerializedListener(this, WarLedger.OnOwnerChanged);
+            // prawo wyrzutkow (Jeff 04.10): pula ludzi wyjetych spod prawa
+            CampaignEvents.OnTroopsDesertedEvent.AddNonSerializedListener(this, OutlawLaw.OnTroopsDeserted);
+            CampaignEvents.MapEventEnded.AddNonSerializedListener(this, OutlawLaw.OnMapEventEnded);
+            CampaignEvents.VillageLooted.AddNonSerializedListener(this, OutlawLaw.OnVillageLooted);
+            CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, OutlawLaw.OnPartyDestroyed);
+            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, delegate { try { OutlawLaw.Hourly(); } catch { } });
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, OnMapEventEnded);
             CampaignEvents.MapEventStarted.AddNonSerializedListener(this, OnMapEventStarted);
             // polegli oddaja rynsztunek na wozy zaraz po bitwie
@@ -1102,6 +1112,7 @@ namespace Armoury
             try { Orders.DailyTick(); }
             catch (Exception e) { Log.Error("OnDailyTick", e); }
             try { ArmsPricing.Daily(); } catch (Exception e) { Log.Error("ArmsPricing.Daily", e); }   // indeksy surowcow i premie wojenne PRZED handlem
+            try { OutlawLaw.Daily(); } catch (Exception e) { Log.Error("OutlawLaw.Daily", e); }   // wyrzutki: bieda, powroty, werbunek band
             try { IronBank.Daily(); } catch (Exception e) { Log.Error("IronBank.Daily", e); }   // Bank Zelazny: pozyczki AI, raty, bankructwa
             try { SupplyDemand.DailyTrade(); } catch (Exception e) { Log.Error("SupplyDemand.DailyTrade", e); }
             try { MarketGlut.DailyDigest(); }
