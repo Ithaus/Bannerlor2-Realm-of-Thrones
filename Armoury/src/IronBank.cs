@@ -160,12 +160,13 @@ namespace Armoury
                 bool running = d.Principal > 1;
                 int today0 = (int)CampaignTime.Now.ToDays;
                 // audyt ponowny W6: tuz przed terminem Bank nie dobiera - inaczej rata skacze (np. 1/3 dlugu dziennie)
-                if (running && d.DueDay > today0 && d.DueDay - today0 < Math.Max(0, Settings.Current.IronBankMinDaysToLend)) return 0;
+                // audyt pelny K3: takze W dniu terminu i PO nim - wczesniej wtedy termin calego dlugu przesuwal sie o pol roku
+                if (running && d.DueDay - today0 < Math.Max(1, Settings.Current.IronBankMinDaysToLend)) return 0;
                 d.Rate = running ? (d.Rate * d.Principal + rate * amount) / (d.Principal + amount) : rate;
                 d.Principal += amount + fee;
                 d.Loans++;
                 int today = (int)CampaignTime.Now.ToDays;
-                if (!running || d.DueDay <= today) d.DueDay = today + Math.Max(7, DaysPerYear() / 2);
+                if (!running) d.DueDay = today + Math.Max(7, DaysPerYear() / 2);
                 c.Leader.ChangeHeroGold(amount);
                 _capital -= amount;
                 Note("IronBank: " + c.Name + " pozycza " + amount + " (" + why + ") na " + (d.Rate * 100).ToString("0") + "% rocznie, dlug " + (int)d.Principal

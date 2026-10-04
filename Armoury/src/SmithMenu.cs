@@ -1297,7 +1297,14 @@ namespace Armoury
                 // AUDYT 04.10 (C2): sztuki z TARGU tego miasta, zloto do jego kasy - wczesniej z niczego, zloto w nicosc
                 var st = Settlement.CurrentSettlement;
                 int per = n > 0 ? total / n : total;
-                int have = st != null && st.ItemRoster != null ? st.ItemRoster.GetItemNumber(item) : 0;
+                // audyt pelny W8: tylko sztuki w pelni sprawne (GetItemNumber liczyl tez zuzyte, a zdejmujemy nowe - reszta byla z niczego)
+                int have = 0;
+                if (st != null && st.ItemRoster != null)
+                    for (int i = 0; i < st.ItemRoster.Count; i++)
+                    {
+                        var el = st.ItemRoster.GetElementCopyAtIndex(i);
+                        if (el.EquipmentElement.Item == item && el.EquipmentElement.ItemModifier == null) have += el.Amount;
+                    }
                 int k = Math.Min(n, have);
                 if (k <= 0) { Log.Player("The smith's boys could not find a single " + item.Name + " on the market.", true); return; }
                 int pay = per * k;

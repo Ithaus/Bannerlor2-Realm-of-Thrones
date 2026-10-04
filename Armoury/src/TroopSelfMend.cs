@@ -39,6 +39,7 @@ namespace Armoury
                     var el = armory.GetElementCopyAtIndex(i);
                     var mod = el.EquipmentElement.ItemModifier;
                     if (el.Amount <= 0 || mod == null || mod.PriceMultiplier >= 1f) continue;
+                    if (mod.PriceMultiplier < 0.1f) continue;   // audyt pelny K2: wrak - tylko kowal z materialem albo przetop
                     if (el.EquipmentElement.Item == null) continue;
                     worn.Add(el);
                 }
@@ -50,20 +51,26 @@ namespace Armoury
                 foreach (var el in worn) wornTotal += el.Amount;
                 int budget = Math.Max(3, (int)Math.Round(wornTotal * s.TroopSelfMendPercentPerDay / 100.0));
                 if (budget > wornTotal) budget = wornTotal;
-                int mended = 0;
+                int mended = 0, paidAll = 0;
                 foreach (var el in worn)
                 {
                     if (budget <= 0) break;
-                    int take = Math.Min(budget, el.Amount);
+                    // audyt pelny K2: naprawa PLATNA miastu (robocizna jak u kowala: 25% utraconej wartosci) - wczesniej za darmo
+                    int unit = Math.Max(1, (int)(el.EquipmentElement.Item.Value * (1f - el.EquipmentElement.ItemModifier.PriceMultiplier) * 0.25f));
+                    int afford = Math.Max(0, TaleWorlds.CampaignSystem.Hero.MainHero.Gold - paidAll) / unit;
+                    int take = Math.Min(Math.Min(budget, el.Amount), afford);
+                    if (take <= 0) break;
+                    paidAll += unit * take;
                     armory.AddToCounts(el.EquipmentElement, -take);
                     armory.AddToCounts(new EquipmentElement(el.EquipmentElement.Item), take);   // czysty stan
                     mended += take; budget -= take;
                 }
+                if (paidAll > 0) Pay.ToSettlement(paidAll);
                 if (mended > 0)
                 {
-                    Log.Info("TroopSelfMend: wojsko naprawilo " + mended + " sztuk w " + st.Name + " (z wlasnego zoldu).");
+                    Log.Info("TroopSelfMend: wojsko naprawilo " + mended + " sztuk w " + st.Name + " za " + paidAll + " zl do kasy miasta.");
                     Log.Player("The men see to their own kit at " + st.Name + " - " + mended
-                               + " pieces mended out of their pay.", true);
+                               + " pieces mended by the town smiths for " + paidAll + " gold.", true);
                 }
             }
             catch (Exception e) { Log.Error("TroopSelfMend.Run", e); }

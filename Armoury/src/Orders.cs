@@ -237,15 +237,26 @@ namespace Armoury
 
             // dostawa
             if (!HasItem(item)) { Log.Player("You do not carry the piece.", true); return; }
+            // audyt pelny K4: lord placi ZE SWOJEJ KIESY (wczesniej zloto z niczego), sztuka trafia do JEGO taboru
+            // (wczesniej znikala); najpierw sztuka sprawna - zuzyta obniza zaplate wedlug swojego stanu
             var roster = MobileParty.MainParty.ItemRoster;
+            int pick = -1;
             for (int i = 0; i < roster.Count; i++)
             {
                 var el = roster[i];
-                if (el.EquipmentElement.Item == item && el.Amount > 0)
-                { roster.AddToCounts(el.EquipmentElement, -1); break; }
+                if (el.EquipmentElement.Item != item || el.Amount <= 0) continue;
+                if (pick < 0 || el.EquipmentElement.ItemModifier == null) pick = i;
+                if (el.EquipmentElement.ItemModifier == null) break;
             }
-            int pay = (int)(item.Value * s.OrderPayMultiplier);
-            GiveGoldAction.ApplyBetweenCharacters(null, Hero.MainHero, pay);
+            if (pick < 0) { Log.Player("You do not carry the piece.", true); return; }
+            var delivered = roster[pick].EquipmentElement;
+            float cond = delivered.ItemModifier != null ? delivered.ItemModifier.PriceMultiplier : 1f;
+            int pay = (int)(item.Value * s.OrderPayMultiplier * Math.Min(1f, cond));
+            pay = Math.Min(pay, Math.Max(0, lord.Gold));
+            if (pay <= 0) { Log.Player(lord.Name + " cannot pay for the piece right now.", true); return; }
+            roster.AddToCounts(delivered, -1);
+            try { var lp = lord.PartyBelongedTo; if (lp != null && lp.ItemRoster != null) lp.ItemRoster.AddToCounts(delivered, 1); } catch { }
+            GiveGoldAction.ApplyBetweenCharacters(lord, Hero.MainHero, pay);
             ChangeRelationAction.ApplyPlayerRelation(lord, s.OrderRelationReward);
             Board.Remove(line);
             Log.Player(lord.Name + " pays " + pay + " gold for the " + item.Name +

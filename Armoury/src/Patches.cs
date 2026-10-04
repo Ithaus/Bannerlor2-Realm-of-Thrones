@@ -152,7 +152,11 @@ namespace Armoury
                 // pancerzach): kwit bierzemy z naszych receptur luczarskich
                 // i przekladamy na tablice BK (0-5 zelaza, 6 drewno, 7 wegiel,
                 // 9 skora, 10 len)
-                if (item.ItemType == ItemObject.ItemTypeEnum.Bow || item.ItemType == ItemObject.ItemTypeEnum.Crossbow
+                // audyt pelny K1 (04.10): zbroja METALOWA w CRAFT dostaje ten sam kwit co nasza kuznia (Recipes, z WAGI) -
+                // wczesniej z punktow ochrony x0.5 (plyta t6 ~8 sztabek wobec ~50 w kuzni i ~63 w cenie rynku: kucie 5-10x na plus)
+                bool metalArmour = item.HasArmorComponent && (item.ArmorComponent.MaterialType == ArmorComponent.ArmorMaterialTypes.Plate
+                                                             || item.ArmorComponent.MaterialType == ArmorComponent.ArmorMaterialTypes.Chainmail);
+                if (metalArmour || item.ItemType == ItemObject.ItemTypeEnum.Bow || item.ItemType == ItemObject.ItemTypeEnum.Crossbow
                     || item.ItemType == ItemObject.ItemTypeEnum.Arrows || item.ItemType == ItemObject.ItemTypeEnum.Bolts)
                 {
                     var rr = Recipes.For(item);
