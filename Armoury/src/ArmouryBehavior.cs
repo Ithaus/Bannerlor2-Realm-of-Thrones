@@ -493,6 +493,8 @@ namespace Armoury
                 delegate { try { QuartermasterEscrow.SafetyRelease(); } catch { } });
             // jeniec wziety po bitwie zostaje obszukany - jego rynsztunek idzie do sakw
             CampaignEvents.OnPrisonerTakenEvent.AddNonSerializedListener(this, OnPrisonerTaken);
+            CampaignEvents.HeroPrisonerTaken.AddNonSerializedListener(this, UniqueSpoils.OnPrisonerTaken);
+            CampaignEvents.HeroKilledEvent.AddNonSerializedListener(this, UniqueSpoils.OnHeroKilled);
             // DIAGNOSTYKA (Jeff 29.08: "awans wycina sprzet z magazynu?") -
             // ani DTE, ani my nie sluchamy awansow, wiec logujemy sume
             // magazynu przy kazdym awansie: jak suma spada miedzy wpisami,
@@ -906,7 +908,7 @@ namespace Armoury
 
         private void OnSessionLaunched(CampaignGameStarter starter)
         {
-            try { McmSettings.Apply(); MaterialLaw.Apply(); ArmsPricing.Build(); HistoricalPrices.Apply(); MapClock.ApplySpeed(); } catch (Exception e) { Log.Error("MaterialLaw/ArmsPricing", e); }   // surowce PRZED wycena uzbrojenia
+            try { McmSettings.Apply(); MaterialLaw.Apply(); ArmsPricing.Build(); HistoricalPrices.Apply(); MapClock.ApplySpeed(); UniqueSpoils.OnSessionLaunched(); } catch (Exception e) { Log.Error("MaterialLaw/ArmsPricing", e); }   // surowce PRZED wycena uzbrojenia
             try { Stables.BuildRiderMap(); } catch (Exception e) { Log.Error("Stables.BuildRiderMap", e); }
             try { FixCharcoalWeight(); } catch (Exception e) { Log.Error("FixCharcoalWeight", e); }
             try { WearGroups.Fix(); } catch (Exception e) { Log.Error("WearGroups.Fix", e); }
@@ -1119,7 +1121,7 @@ namespace Armoury
             try { WarLedger.OnDaily(); } catch (Exception e) { Log.Error("WarLedger", e); }
             try { Orders.DailyTick(); }
             catch (Exception e) { Log.Error("OnDailyTick", e); }
-            try { HistoricalPrices.Recheck(); ArmsPricing.Daily(); } catch (Exception e) { Log.Error("ArmsPricing.Daily", e); }   // indeksy surowcow i premie wojenne PRZED handlem
+            try { HistoricalPrices.Recheck(); UniqueSpoils.Daily(); ArmsPricing.Daily(); } catch (Exception e) { Log.Error("ArmsPricing.Daily", e); }   // indeksy surowcow i premie wojenne PRZED handlem
             try { PopulationLaw.Daily(); } catch (Exception e) { Log.Error("PopulationLaw.Daily", e); }   // ludnosc i renty krain
             try { KingdomTreasury.Daily(); KingdomTreasury.Levies(); } catch (Exception e) { Log.Error("KingdomTreasury.Daily", e); }   // powinnosci wasali wobec korony (po rentach)
             try { OutlawLaw.Daily(); } catch (Exception e) { Log.Error("OutlawLaw.Daily", e); }   // wyrzutki: bieda, powroty, werbunek band

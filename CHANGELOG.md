@@ -1,5 +1,12 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-04 (61) - UNIKATY U POSTACI, NIE NA TARGU; zbroja i bron pojmanego/zabitego przez gracza przechodza na gracza
+**Mod:** Armoury | **Pliki:** NOWY `UniqueSpoils.cs`, `ArmouryBehavior.cs` (start sesji, dzienny tick, zdarzenia `HeroPrisonerTaken` i `HeroKilledEvent`)
+**Problem (Jeff 04.10: "unikatow ma nie byc na targu - te unikaty maja postacie i potem mozna je zdobyc od nich, musi gdzies to byc, aby mozna bylo to zdobyc"; "jak maja kupic na targu zbroje Brienne, skoro Brienne ja nosi"):** wpis 60 tylko zabranial je robic i kupowac AI; kopie z zaopatrzenia startowego lezaly na targach, a od postaci nie dalo sie ich zdobyc (gra nie lupi ekwipunku bohaterow).
+**Zmiana:** (1) 177 unikatow ROT (`RotUniques`) dostaje `NotMerchandise`; przy wczytaniu i codziennie schodza z polek wszystkich osad, przy wczytaniu z bagazy partii AI (kopie - oryginal nosi postac). (2) Zwyczaj wojenny XIV w. (zbroja i kon jenca dla pojmujacego): gdy gracz bierze w niewole albo zabija postac, ktora NOSI unikat w ekwipunku bojowym, unikat trafia do taboru gracza, a postac dostaje zwykly zamiennik swojej kultury (`UniqueLaw.StandInFor`); komunikat "By the custom of war, the arms of X are yours: ...". Log `UniqueSpoils: ...`.
+**Ryzyko / do decyzji:** AI, ktore pojmie postac, na razie niczego nie zabiera (do zrobienia: unikat do pojmujacego lorda); unikat sprzedany przez gracza na targu zejdzie z polki nastepnego dnia (miasto zaplacilo - strata miasta) - do decyzji, czy kupcy maja w ogole nie przyjmowac unikatow.
+**Status:** WGRANE 2026-10-04 (Armoury.dll md5 071184de2f9ed51682612a0c4db5c5d4, build rc=0, gra zamknieta; poprzednie DLL obok jako `Armoury.dll.bak-2026-10-04-przed-61`). DO SPRAWDZENIA - razem z 58-60.
+
 ## 2026-10-04 (60) - SPIS UNIKATOW ROT (177 sztuk) - warsztaty ich nie robia, AI nie kupuje, wycena x prestiz
 **Mod:** Armoury | **Pliki:** NOWY `RotUniques.cs` (generowany), `ArmsPricing.cs` (`IsUnique` + spis), NOWE `docs/ROT-UNIKATY.md` (tabela), `tools/rot_uniques.py` (generator - wymaga `rot_arms.json` z ekstrakcji ModuleData ROT; przy aktualizacji ROT uruchomic ponownie)
 **Problem (Jeff 04.10: "a moze zrob audyt - tabele przedmiotow, ktore dodaje Gra o Tron, i wyklucz przedmioty unikatowe"):** zakaz z wpisu 58 szedl po fragmentach nazw; unikaty ROT, ktore nie sa `NotMerchandise` (weirwood, luki olbrzymow, Kruczy Zab, stal valyrianska, rynsztunek Brienne/Ogara/Gory/Lorasa...), byly traktowane jak zwykly sprzet.
