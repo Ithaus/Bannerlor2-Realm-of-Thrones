@@ -61,8 +61,8 @@ namespace Armoury
         public int OrderMaxTier = 5;                       // nor ask a town smith for the impossible
         public int OrderMaxItemValue = 12000;              // cap on the piece's worth
         // --- Forge fee ---
-        public int ForgeFeeBase = 75;                      // what the smith charges you to use his forge
-        public int ForgeFeePerTier = 60;                   // and this much more for every tier of the work
+        public int ForgeFeeBase = 3;                       // what the smith charges you to use his forge (historical prices: about a day of a craftsman, 3 d)
+        public int ForgeFeePerTier = 2;                    // and this much more for every tier of the work
         public float BkForgeHourlyMultiplier = 0.5f;       // Banner Kings charges by the hour at the anvil - this scales that hourly rate
         public bool ForgeDayPassEnabled = true;            // the smith hires his forge BY THE DAY, paid up front - one hour or twenty-three, same coin
         public float ForgeDayHours = 8f;                   // the day's hire costs this many hours at the smith's rate (~200 gold in an average town)
@@ -374,7 +374,7 @@ namespace Armoury
         public bool WorkshopLawEnabled = true;             // town workshops that make arms and armour run as real businesses: they buy ore, wood, leather and linen on the market by the true weight of each piece, pay their workers, sell to the market - and make only what turns a profit
         public float WorkshopWorkersArtisans = 6f;         // man-days of work the town's artisans put in each day
         public float WorkshopWorkers = 4f;                 // man-days of work a notable's smithy or wood workshop puts in each day
-        public float WorkshopWagePerDay = 10f;             // wages for one man-day at the forge, paid into the town
+        public float WorkshopWagePerDay = 3f;              // wages for one man-day at the forge, paid into the town (3 d - a craftsman's day in historical prices)
         public float WorkshopMinProfitPercent = 10f;       // a workshop makes a piece only if the market pays at least this much over materials and wages
         public float WorkshopCrudeKgPerOre = 1.5f;         // kilograms of crude iron a bloomery wins from one load of ore (10 kg); each finer grade costs a fifth more
         public float WorkshopWoodPerOre = 5f;              // loads of wood burnt to charcoal for each load of ore smelted
@@ -389,6 +389,25 @@ namespace Armoury
         public bool RecruitGoldToSeller = true;            // the gold an AI lord pays for a recruit goes to the notable who raised him (tavern hirelings: to the town), as it already does for you - not into thin air
         public bool NoFreeKitForNewParties = true;         // a new AI warband no longer gets a full free kit for all its men (Dynamic Troop Equipment) after the campaign has begun - its lord buys gear at market
         public bool VolunteerKitEnabled = true;            // a volunteer rises to a better troop only when his notable buys the missing gear for it on the town market (paid to the town, taken off the stall) - no gear from thin air
+        public bool HistoricalPricesEnabled = true;        // the whole world in historical prices (1 coin = 1 medieval penny): arms and armour priced from their real making cost, smithing materials at medieval prices - wages and incomes already sit at this scale
+        public float HistIronOrePerKg = 0.075f;            // iron ore, pence per kg (England c.1300, estimate)
+        public float HistWoodPerKg = 0.035f;               // timber and firewood, pence per kg (Clark/Rogers)
+        public float HistCharcoalPerKg = 0.07f;            // charcoal, pence per kg (Clark/Rogers)
+        public float HistCrudeIronPerKg = 2f;              // crude bloom iron, pence per kg
+        public float HistWroughtIronPerKg = 2.5f;          // wrought bar iron, pence per kg (Clark/Rogers 1300-49: 1.15 d a pound)
+        public float HistIronPerKg = 3.5f;                 // refined iron, pence per kg
+        public float HistSteelPerKg = 6f;                  // steel, pence per kg (estimate)
+        public float HistFineSteelPerKg = 8f;              // fine steel, pence per kg (estimate)
+        public float HistValyrianPerKg = 200f;             // Valyrian steel, pence per kg - a lost art, priced as a rare treasure
+        public float HistLeatherPerKg = 4f;                // tanned leather, pence per kg
+        public float HistLinenPerKg = 10f;                 // linen and canvas for padding, pence per kg
+        public float HistSpecialFactor = 0.1f;             // horn, sinew and glue of bows, against the old game-scale bill
+        public float HistMasterWageT1 = 3f;                // a smith's day of work on plain gear, pence (a craftsman earned about 3 d a day)
+        public float HistMasterWagePerTier = 1.5f;         // each tier above the first adds this to the master's day (a master armourer of fine harness about 10 d)
+        public float HistProfitPercent = 25f;              // the maker's profit on top of material and labour
+        public float HistAmmoLaborMultiplier = 8f;         // fletcher and arrowsmith work on a stack of arrows or bolts (a sheaf of 24 cost about 15 d)
+        public float HistTournamentScale = 4f;             // the game seeks tournament prizes worth 1600-5000; with historical prices the range is divided by this (400-1250 pence: a fine sword, a good harness piece)
+        public float HistUniquePrestige = 4f;              // named pieces of the great houses cost this many times their making
         public bool PopulationRentEnabled = true;          // a fief pays by the people it stands for: each village and town on the map is a symbol of a whole land, and its lord's rents follow that land's population (the Reach richest, the Iron Islands poor)
         public float PopulationRentPerHead = 40f;          // rents and dues a lord draws from each subject a year, in coins (about 40 pence a head in the medieval estimate)
         public float PopulationScale = 1f;                 // scale on every land's population (Westeros ~30 million, Essos with its hinterlands ~30 million)

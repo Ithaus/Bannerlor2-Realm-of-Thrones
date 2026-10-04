@@ -235,6 +235,7 @@ namespace Armoury
         {
             if (it == null) return 0f;
             float v = it.Value;
+            if (HistoricalPrices.On) return v;   // wartosc historyczna (HistoricalPrices) juz jest kosztem - bez widelek w skali gry
             if (!PricingOn || IsUnique(it) || it.ItemType == ItemObject.ItemTypeEnum.Horse) return v;
             var c = CostOf(it);
             if (c == null || c.Total <= 0f) return v;

@@ -95,6 +95,20 @@ namespace Armoury
             bool steel2 = Perk(weaponsmith, DefaultPerks.Crafting.SteelMaker2);
             bool steel3 = Perk(weaponsmith, DefaultPerks.Crafting.SteelMaker3);
             int bloomCoal = Math.Max(1, s.BloomeryCharcoalPerOre);
+            if (HistoricalPrices.On)
+            {
+                // ceny historyczne: wegiel liczony ze swoja PRAWDZIWA waga z gry (5 kg) - z drewna wychodzi ok. 20% wagi
+                // w weglu (5 drewna = 50 kg -> 2 wegle = 10 kg); dymarka: 1 ruda (10 kg) + 2 wegle -> 4 surowki (2 kg zelaza);
+                // dalsze stopnie: 5 sztabek + 1 wegiel -> 4 (strata 20%, Jeff)
+                yield return new Crafting.RefiningFormula(CraftingMaterials.Wood, 5, CraftingMaterials.Iron1, 0, CraftingMaterials.Charcoal, charcoal ? 3 : 2);
+                yield return new Crafting.RefiningFormula(CraftingMaterials.IronOre, 1, CraftingMaterials.Charcoal, 2, CraftingMaterials.Iron1, ironMaker ? 5 : 4);
+                yield return new Crafting.RefiningFormula(CraftingMaterials.Iron1, 5, CraftingMaterials.Charcoal, 1, CraftingMaterials.Iron2, 4);
+                yield return new Crafting.RefiningFormula(CraftingMaterials.Iron2, 5, CraftingMaterials.Charcoal, 1, CraftingMaterials.Iron3, 4);
+                if (steel1) yield return new Crafting.RefiningFormula(CraftingMaterials.Iron3, 5, CraftingMaterials.Charcoal, 1, CraftingMaterials.Iron4, 4);
+                if (steel2) yield return new Crafting.RefiningFormula(CraftingMaterials.Iron4, 5, CraftingMaterials.Charcoal, 1, CraftingMaterials.Iron5, 4);
+                if (steel3) yield return new Crafting.RefiningFormula(CraftingMaterials.Iron5, 5, CraftingMaterials.Charcoal, 2, CraftingMaterials.Iron6, 4);
+                yield break;
+            }
             yield return new Crafting.RefiningFormula(CraftingMaterials.Wood, 1, CraftingMaterials.Iron1, 0, CraftingMaterials.Charcoal, charcoal ? 5 : 4);
             yield return new Crafting.RefiningFormula(CraftingMaterials.IronOre, 1, CraftingMaterials.Charcoal, bloomCoal, CraftingMaterials.Iron1, ironMaker ? 4 : 3);
             yield return new Crafting.RefiningFormula(CraftingMaterials.Iron1, 5, CraftingMaterials.Charcoal, 2, CraftingMaterials.Iron2, 4);

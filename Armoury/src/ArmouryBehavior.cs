@@ -906,7 +906,7 @@ namespace Armoury
 
         private void OnSessionLaunched(CampaignGameStarter starter)
         {
-            try { McmSettings.Apply(); MaterialLaw.Apply(); ArmsPricing.Build(); MapClock.ApplySpeed(); } catch (Exception e) { Log.Error("MaterialLaw/ArmsPricing", e); }   // surowce PRZED wycena uzbrojenia
+            try { McmSettings.Apply(); MaterialLaw.Apply(); ArmsPricing.Build(); HistoricalPrices.Apply(); MapClock.ApplySpeed(); } catch (Exception e) { Log.Error("MaterialLaw/ArmsPricing", e); }   // surowce PRZED wycena uzbrojenia
             try { Stables.BuildRiderMap(); } catch (Exception e) { Log.Error("Stables.BuildRiderMap", e); }
             try { FixCharcoalWeight(); } catch (Exception e) { Log.Error("FixCharcoalWeight", e); }
             try { WearGroups.Fix(); } catch (Exception e) { Log.Error("WearGroups.Fix", e); }

@@ -198,11 +198,11 @@ namespace Armoury
 
         [SettingPropertyInteger("Forge Fee Base", 0, 300, "0", HintText = "what the smith charges you to use his forge")]
         [SettingPropertyGroup("Forge fee")]
-        public int ForgeFeeBase { get; set; } = 75;
+        public int ForgeFeeBase { get; set; } = 3;
 
         [SettingPropertyInteger("Forge Fee Per Tier", 0, 240, "0", HintText = "and this much more for every tier of the work")]
         [SettingPropertyGroup("Forge fee")]
-        public int ForgeFeePerTier { get; set; } = 60;
+        public int ForgeFeePerTier { get; set; } = 2;
 
         [SettingPropertyFloatingInteger("Bk Forge Hourly Multiplier", 0.00f, 2.00f, "0.00", HintText = "Banner Kings charges by the hour at the anvil - this scales that hourly rate")]
         [SettingPropertyGroup("Forge fee")]
@@ -1258,7 +1258,7 @@ namespace Armoury
 
         [SettingPropertyFloatingInteger("Workshop Wage Per Day", 0.00f, 40.00f, "0.00", HintText = "wages for one man-day at the forge, paid into the town")]
         [SettingPropertyGroup("Workshops")]
-        public float WorkshopWagePerDay { get; set; } = 10f;
+        public float WorkshopWagePerDay { get; set; } = 3f;
 
         [SettingPropertyFloatingInteger("Workshop Min Profit Percent", 0.00f, 40.00f, "0.00", HintText = "a workshop makes a piece only if the market pays at least this much over materials and wages")]
         [SettingPropertyGroup("Workshops")]
@@ -1304,6 +1304,82 @@ namespace Armoury
         [SettingPropertyBool("No Free Kit For New Parties", HintText = "a new AI warband no longer gets a full free kit for all its men (Dynamic Troop Equipment) after the campaign has begun - its lord buys gear at market")]
         [SettingPropertyGroup("Levy")]
         public bool NoFreeKitForNewParties { get; set; } = true;
+
+        [SettingPropertyBool("Historical Prices Enabled", HintText = "the whole world in historical prices (1 coin = 1 medieval penny): arms and armour priced from their real making cost, smithing materials at medieval prices - wages and incomes already sit at this scale")]
+        [SettingPropertyGroup("Historical prices")]
+        public bool HistoricalPricesEnabled { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Hist Iron Ore Per Kg", 0f, 1f, "0.000", HintText = "iron ore, pence per kg (England c.1300, estimate)")]
+        [SettingPropertyGroup("Historical prices")]
+        public float HistIronOrePerKg { get; set; } = 0.075f;
+
+        [SettingPropertyFloatingInteger("Hist Wood Per Kg", 0f, 1f, "0.000", HintText = "timber and firewood, pence per kg (Clark/Rogers)")]
+        [SettingPropertyGroup("Historical prices")]
+        public float HistWoodPerKg { get; set; } = 0.035f;
+
+        [SettingPropertyFloatingInteger("Hist Charcoal Per Kg", 0f, 1f, "0.000", HintText = "charcoal, pence per kg (Clark/Rogers)")]
+        [SettingPropertyGroup("Historical prices")]
+        public float HistCharcoalPerKg { get; set; } = 0.07f;
+
+        [SettingPropertyFloatingInteger("Hist Crude Iron Per Kg", 0f, 8f, "0.000", HintText = "crude bloom iron, pence per kg")]
+        [SettingPropertyGroup("Historical prices")]
+        public float HistCrudeIronPerKg { get; set; } = 2f;
+
+        [SettingPropertyFloatingInteger("Hist Wrought Iron Per Kg", 0f, 10f, "0.000", HintText = "wrought bar iron, pence per kg (Clark/Rogers 1300-49: 1.15 d a pound)")]
+        [SettingPropertyGroup("Historical prices")]
+        public float HistWroughtIronPerKg { get; set; } = 2.5f;
+
+        [SettingPropertyFloatingInteger("Hist Iron Per Kg", 0f, 14f, "0.000", HintText = "refined iron, pence per kg")]
+        [SettingPropertyGroup("Historical prices")]
+        public float HistIronPerKg { get; set; } = 3.5f;
+
+        [SettingPropertyFloatingInteger("Hist Steel Per Kg", 0f, 24f, "0.000", HintText = "steel, pence per kg (estimate)")]
+        [SettingPropertyGroup("Historical prices")]
+        public float HistSteelPerKg { get; set; } = 6f;
+
+        [SettingPropertyFloatingInteger("Hist Fine Steel Per Kg", 0f, 32f, "0.000", HintText = "fine steel, pence per kg (estimate)")]
+        [SettingPropertyGroup("Historical prices")]
+        public float HistFineSteelPerKg { get; set; } = 8f;
+
+        [SettingPropertyFloatingInteger("Hist Valyrian Per Kg", 0f, 800f, "0.000", HintText = "Valyrian steel, pence per kg - a lost art, priced as a rare treasure")]
+        [SettingPropertyGroup("Historical prices")]
+        public float HistValyrianPerKg { get; set; } = 200f;
+
+        [SettingPropertyFloatingInteger("Hist Leather Per Kg", 0f, 16f, "0.000", HintText = "tanned leather, pence per kg")]
+        [SettingPropertyGroup("Historical prices")]
+        public float HistLeatherPerKg { get; set; } = 4f;
+
+        [SettingPropertyFloatingInteger("Hist Linen Per Kg", 0f, 40f, "0.000", HintText = "linen and canvas for padding, pence per kg")]
+        [SettingPropertyGroup("Historical prices")]
+        public float HistLinenPerKg { get; set; } = 10f;
+
+        [SettingPropertyFloatingInteger("Hist Special Factor", 0f, 1f, "0.000", HintText = "horn, sinew and glue of bows, against the old game-scale bill")]
+        [SettingPropertyGroup("Historical prices")]
+        public float HistSpecialFactor { get; set; } = 0.1f;
+
+        [SettingPropertyFloatingInteger("Hist Master Wage T1", 0f, 12f, "0.000", HintText = "a smith's day of work on plain gear, pence (a craftsman earned about 3 d a day)")]
+        [SettingPropertyGroup("Historical prices")]
+        public float HistMasterWageT1 { get; set; } = 3f;
+
+        [SettingPropertyFloatingInteger("Hist Master Wage Per Tier", 0f, 6f, "0.000", HintText = "each tier above the first adds this to the master's day (a master armourer of fine harness about 10 d)")]
+        [SettingPropertyGroup("Historical prices")]
+        public float HistMasterWagePerTier { get; set; } = 1.5f;
+
+        [SettingPropertyFloatingInteger("Hist Profit Percent", 0f, 100f, "0.000", HintText = "the maker's profit on top of material and labour")]
+        [SettingPropertyGroup("Historical prices")]
+        public float HistProfitPercent { get; set; } = 25f;
+
+        [SettingPropertyFloatingInteger("Hist Ammo Labor Multiplier", 0f, 32f, "0.000", HintText = "fletcher and arrowsmith work on a stack of arrows or bolts (a sheaf of 24 cost about 15 d)")]
+        [SettingPropertyGroup("Historical prices")]
+        public float HistAmmoLaborMultiplier { get; set; } = 8f;
+
+        [SettingPropertyFloatingInteger("Hist Unique Prestige", 0f, 16f, "0.000", HintText = "named pieces of the great houses cost this many times their making")]
+        [SettingPropertyGroup("Historical prices")]
+        public float HistUniquePrestige { get; set; } = 4f;
+
+        [SettingPropertyFloatingInteger("Hist Tournament Scale", 1f, 20f, "0.0", HintText = "the game seeks tournament prizes worth 1600-5000; with historical prices the range is divided by this (400-1250 pence: a fine sword, a good harness piece)")]
+        [SettingPropertyGroup("Historical prices")]
+        public float HistTournamentScale { get; set; } = 4f;
 
         [SettingPropertyBool("Population Rent Enabled", HintText = "a fief pays by the people it stands for: each village and town on the map is a symbol of a whole land, and its lord's rents follow that land's population (the Reach richest, the Iron Islands poor)")]
         [SettingPropertyGroup("Population")]
@@ -2251,6 +2327,25 @@ namespace Armoury
             s.VolunteerKitEnabled = VolunteerKitEnabled;
             s.RecruitGoldToSeller = RecruitGoldToSeller;
             s.NoFreeKitForNewParties = NoFreeKitForNewParties;
+            s.HistoricalPricesEnabled = HistoricalPricesEnabled;
+            s.HistIronOrePerKg = HistIronOrePerKg;
+            s.HistWoodPerKg = HistWoodPerKg;
+            s.HistCharcoalPerKg = HistCharcoalPerKg;
+            s.HistCrudeIronPerKg = HistCrudeIronPerKg;
+            s.HistWroughtIronPerKg = HistWroughtIronPerKg;
+            s.HistIronPerKg = HistIronPerKg;
+            s.HistSteelPerKg = HistSteelPerKg;
+            s.HistFineSteelPerKg = HistFineSteelPerKg;
+            s.HistValyrianPerKg = HistValyrianPerKg;
+            s.HistLeatherPerKg = HistLeatherPerKg;
+            s.HistLinenPerKg = HistLinenPerKg;
+            s.HistSpecialFactor = HistSpecialFactor;
+            s.HistMasterWageT1 = HistMasterWageT1;
+            s.HistMasterWagePerTier = HistMasterWagePerTier;
+            s.HistProfitPercent = HistProfitPercent;
+            s.HistAmmoLaborMultiplier = HistAmmoLaborMultiplier;
+            s.HistUniquePrestige = HistUniquePrestige;
+            s.HistTournamentScale = HistTournamentScale;
             s.PopulationRentEnabled = PopulationRentEnabled;
             s.PopulationRentPerHead = PopulationRentPerHead;
             s.PopulationScale = PopulationScale;

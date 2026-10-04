@@ -127,7 +127,7 @@ namespace Armoury
             try
             {
                 var s = Settings.Current;
-                return it != null && it.NotMerchandise && it.Value >= MathF.Max(1000f, s.LegendaryValueFloor);
+                return it != null && it.NotMerchandise && HistoricalPrices.Orig(it) >= MathF.Max(1000f, s.LegendaryValueFloor);   // od wartosci sprzed cen historycznych
             }
             catch { return false; }
         }
