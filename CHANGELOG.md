@@ -1,5 +1,13 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-04 (11) - KALENDARZ: rok 364 dni ("1 dzien = 1 dzien") i start kampanii 299 AC wedle ROT
+**Mod:** Armoury | **Pliki:** `Calendar.cs` (LongYearTimeModel bierze poprzedni model czasu), `Settings.cs` + `McmSettings.cs` (`WeeksPerSeason` 6 -> 13, suwak 1-13); zapisany `Configs/ModSettings/Global/Armoury/Armoury.json` 6 -> 13 (kopia `Armoury.json.bak-2026-10-04-weeks6`)
+**Zgloszenie (Jeff 04.10):** "1 dzien = 1 dzien" (docs/AUDYT-KALENDARZ.md) oraz "W nowej grze mozna przywrocic 299 AC - tak".
+**Przyczyna (rok 1084):** `LongYearTimeModel : DefaultCampaignTimeModel` jest dodawany po ROT (ROT-Core LoadBeforeThis) i ZASTEPUJE `ROTCampaignTimeModel`; dziedziczony `CampaignStartTime` vanilla = Years(1084) + 1 sezon + 9 h, zamiast ROT Years(299) + 6 h.
+**Zmiana:** model dostaje poprzedni `CampaignTimeModel` ze startera (ostatni na liscie, czyli ROT; vanilla pomijany) i oddaje jego `CampaignStartTime`, `SunRise`, `SunSet`; sam zmienia tylko `WeeksInSeason`. Sufit tygodni 12 -> 13, domyslnie 13 = rok 7 x 13 x 4 = 364 dni, sezon 91 dni. `CampaignTime.Years()` liczy wedle zegara po `CampaignTime.Initialize()`, wiec start to rok 299 przy kazdej dlugosci roku. Log: `Kalendarz: rok ma 364 dni ... Data startu wedle ROT.Models.ROTCampaignTimeModel`.
+**Ryzyko / co sprawdzic (NIE testowane w grze):** tylko NOWA kampania (stary save przeczyta czas inaczej - inna data i wiek). Sprawdzic date na mapie (299 AC, nie 1084) i wiek bohaterow (urodziny liczone od startu - powinny pasowac). Pory roku: start ROT = pierwszy dzien wiosny, sezon 91 dni - klimat Westeros (wieloletnie pory) to osobna, nastepna zmiana. Fabula ROT liczona w dniach od startu - rozciagniecie x4.33 to osobna zmiana (CrashScribe).
+**Status:** WGRANE 2026-10-04 (Armoury.dll md5 a3c518cf3c98cc4ab33e13f10eaeeda4, build rc=0, gra zamknieta; poprzednie DLL obok jako `Armoury.dll.bak-2026-10-04-przed-kalendarz364`). DO SPRAWDZENIA w nowej grze.
+
 ## 2026-10-04 (10) - BANK ZELAZNY Z BRAAVOS: pozyczki dla lordow AI i gracza, raty, odsetki, bankructwa, kapital Banku
 **Mod:** Armoury | **Pliki:** NOWY `IronBank.cs`; `ArmouryBehavior.cs` (SyncData "arm_ironbank", Daily, AddMenus), `Settings.cs` + `McmSettings.cs` (grupa "Iron bank", 14 ustawien)
 **Zgloszenie (Jeff 04.10):** "dodaj Bank of Braavos - zobacz, czy jest taki mod - lordowie moga pozyczac pieniadze, jesli potrzeba, tak jak bylo w sredniowieczu, potem splacaja albo z wygranej wojny, lupy wojenne"; liczby zatwierdzone ("tak zgoda").

@@ -275,7 +275,7 @@ namespace Armoury
 
         // --- The turning year ---
         public bool LongYearEnabled = true;                // stretch the year so the world stops racing: children grow, lords age and seasons turn at a pace a long campaign can live with
-        public int WeeksPerSeason = 6;                     // weeks in a season (vanilla 3 = an 84-day year; 6 = a 168-day year with 42-day seasons). SET IT BEFORE STARTING A CAMPAIGN and leave it alone afterwards
+        public int WeeksPerSeason = 13;                    // weeks in a season (vanilla 3 = an 84-day year; 13 = a 364-day year, one day is one day). SET IT BEFORE STARTING A CAMPAIGN and leave it alone afterwards
 
         // --- The marching column ---
         public bool MarchPaceEnabled = true;               // a column moves at the pace of its slowest man: any soldier or prisoner on foot holds the whole party to walking speed

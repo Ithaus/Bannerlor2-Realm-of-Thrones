@@ -896,9 +896,9 @@ namespace Armoury
         [SettingPropertyGroup("The turning year")]
         public bool LongYearEnabled { get; set; } = true;
 
-        [SettingPropertyInteger("Weeks Per Season", 0, 24, "0", HintText = "weeks in a season (vanilla 3 = an 84-day year; 6 = a 168-day year with 42-day seasons). SET IT BEFORE STARTING A CAMPAIGN and leave it alone afterwards")]
+        [SettingPropertyInteger("Weeks Per Season", 1, 13, "0", HintText = "weeks in a season (vanilla 3 = an 84-day year; 13 = a 364-day year, one day is one day). SET IT BEFORE STARTING A CAMPAIGN and leave it alone afterwards")]
         [SettingPropertyGroup("The turning year")]
-        public int WeeksPerSeason { get; set; } = 6;
+        public int WeeksPerSeason { get; set; } = 13;
 
         [SettingPropertyBool("March Pace Enabled", HintText = "a column moves at the pace of its slowest man: any soldier or prisoner on foot holds the whole party to walking speed")]
         [SettingPropertyGroup("The marching column")]
