@@ -240,6 +240,123 @@ namespace CrashScribe
             catch { }
         }
 
+
+        // ---------------------------------------------------------- wojny fabularne i progi Innych (Jeff 04.10)
+        // ROTStorylineWar.Enforced porownuje dni od startu ze StartDay/EndDay (np. Zelazni Ludzie
+        // na Polnoc 100-235) - na czas wywolania podstawiamy daty x skala osi, potem przywracamy.
+        private static System.Reflection.PropertyInfo _pWarStart, _pWarEnd;
+
+        public static void WarPrefix(object __instance, out int[] __state)
+        {
+            __state = null;
+            try
+            {
+                float k = ScaleK();
+                if (Math.Abs(k - 1f) < 0.001f || _pWarStart == null || _pWarEnd == null) return;
+                int s = (int)_pWarStart.GetValue(__instance, null);
+                int e = (int)_pWarEnd.GetValue(__instance, null);
+                if (s <= 0 && e <= 0) return;
+                __state = new[] { s, e };
+                if (s > 0) _pWarStart.SetValue(__instance, (int)Math.Round(s * k), null);
+                if (e > 0) _pWarEnd.SetValue(__instance, (int)Math.Round(e * k), null);
+            }
+            catch { __state = null; }
+        }
+
+        public static Exception WarFinalizer(object __instance, int[] __state, Exception __exception)
+        {
+            try
+            {
+                if (__state != null)
+                {
+                    _pWarStart.SetValue(__instance, __state[0], null);
+                    _pWarEnd.SetValue(__instance, __state[1], null);
+                }
+            }
+            catch { }
+            return __exception;
+        }
+
+        private static float ScaleK()
+        {
+            float k = Config.FabulaTimeScale;
+            if (k < 0.25f) k = 0.25f;
+            if (k > 6f) k = 6f;
+            return k;
+        }
+
+        // Inni: ROT wypuszcza ich na Mrozny Brzeg/Rogowa Stope po 300 dniach, Thenn/Kly Mrozu po 400,
+        // Hardhome po 500 (OnAiHourlyTick). Mnozymy stala, ktora stoi zaraz po ElapsedDaysUntilNow.
+        public static System.Collections.Generic.IEnumerable<CodeInstruction> OthersTranspiler(System.Collections.Generic.IEnumerable<CodeInstruction> instructions)
+        {
+            float k = ScaleK();
+            var elapsed = AccessTools.PropertyGetter(typeof(CampaignTime), "ElapsedDaysUntilNow");
+            CodeInstruction prev = null;
+            foreach (var ci in instructions)
+            {
+                if (prev != null && ci.opcode == System.Reflection.Emit.OpCodes.Ldc_R4 && ci.operand is float
+                    && (prev.opcode == System.Reflection.Emit.OpCodes.Call || prev.opcode == System.Reflection.Emit.OpCodes.Callvirt)
+                    && Equals(prev.operand, elapsed))
+                {
+                    float v = (float)ci.operand;
+                    if (v == 300f || v == 400f || v == 500f) { ci.operand = v * k; _othersSwapped++; }
+                }
+                prev = ci;
+                yield return ci;
+            }
+        }
+        private static int _othersSwapped;
+
+        private static void InstallWars(Harmony h)
+        {
+            try
+            {
+                var tWar = Type.GetType("ROT.CampaignBehaviors.ROTStorylineWar, ROT");
+                var mEnf = tWar != null ? AccessTools.Method(tWar, "Enforced") : null;
+                if (mEnf != null)
+                {
+                    _pWarStart = AccessTools.Property(tWar, "StartDay");
+                    _pWarEnd = AccessTools.Property(tWar, "EndDay");
+                    h.Patch(mEnf, prefix: new HarmonyMethod(typeof(Fabula), "WarPrefix"), finalizer: new HarmonyMethod(typeof(Fabula), "WarFinalizer"));
+                }
+                int others = 0;
+                var tOth = Type.GetType("ROT.CampaignBehaviors.ROTOthersCampaignBehavior, ROT");
+                if (tOth != null)
+                {
+                    var elapsed = AccessTools.PropertyGetter(typeof(CampaignTime), "ElapsedDaysUntilNow");
+                    var types = new System.Collections.Generic.List<Type> { tOth };
+                    try { types.AddRange(tOth.GetNestedTypes(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic)); } catch { }
+                    foreach (var t in types)
+                    {
+                        if (t.ContainsGenericParameters) continue;
+                        foreach (var m in t.GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.DeclaredOnly))
+                        {
+                            try
+                            {
+                                if (m.IsAbstract || m.ContainsGenericParameters || m.GetMethodBody() == null) continue;
+                                bool hit = false; object last = null;
+                                foreach (var kv in PatchProcessor.ReadMethodBody(m))
+                                {
+                                    if (kv.Value is float && Equals(last, elapsed))
+                                    {
+                                        float v = (float)kv.Value;
+                                        if (v == 300f || v == 400f || v == 500f) { hit = true; break; }
+                                    }
+                                    last = kv.Value;
+                                }
+                                if (!hit) continue;
+                                h.Patch(m, transpiler: new HarmonyMethod(typeof(Fabula), "OthersTranspiler"));
+                                others++;
+                            }
+                            catch { }
+                        }
+                    }
+                }
+                Scribe.Line("Fabula: wojny fabularne " + (mEnf != null ? "x" + ScaleK() + " (StartDay/EndDay)" : "BRAK ROTStorylineWar.Enforced")
+                            + ", progi Innych x" + ScaleK() + " w " + others + " metodach (podmienionych stalych " + _othersSwapped + ").");
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Fabula.InstallWars", null); } catch { } }
+        }
         internal static void Install(Harmony h)
         {
             try
@@ -247,6 +364,7 @@ namespace CrashScribe
                 if (!Config.FabulaPacerEnabled) { Scribe.Line("Fabula: rozrusznik wylaczony."); return; }
                 var tBase = Type.GetType("ROT.Events.EventBase, ROT");
                 if (tBase == null) { Scribe.Line("Fabula: ROT nieobecny - rozrusznik spi."); return; }
+                InstallWars(h);
 
                 int done = 0;
                 foreach (var name in Timeline.Keys)

@@ -26,7 +26,7 @@ namespace CrashScribe
         // --- rozrusznik fabuly ROT (os serialu + tempo nadrabiania) ---
         public static bool FabulaPacerEnabled = true;  // fabula ROT idzie po kolei, wedle osi serialu
         public static int FabulaPaceDays = 4;          // najwyzej jedno wydarzenie fabularne na tyle dni
-        public static float FabulaTimeScale = 2.0f;    // rozciagniecie calej osi fabuly: 1.0 = daty ROT bez zmian, 2.0 = wszystko dwa razy dalej (przy dluzszym roku, zeby lata zgadzaly sie z serialem)
+        public static float FabulaTimeScale = 4.33f;   // rozciagniecie calej osi fabuly: 1.0 = daty ROT bez zmian (rok 84 dni); 4.33 = rok 364 dni Armoury (Jeff 04.10: "rozciagniete") - lata zgadzaja sie z serialem
 
         // --- Zew Nocnego Krola (patrz NightKingCall.cs) ---
         public static bool NightKingCallEnabled = true;   // trupy z mniejszych band Innych ida do najsilniejszej, az ta dobije do progu oblezenia ROT

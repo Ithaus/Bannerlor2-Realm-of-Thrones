@@ -1,5 +1,13 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-04 (13) - FABULA ROT ROZCIAGNIETA x4.33 (rok 364 dni): wydarzenia, wojny fabularne, progi Innych
+**Mod:** CrashScribe | **Pliki:** `Config.cs` (`FabulaTimeScale` 2.0 -> 4.33), `Fabula.cs` (NOWE: `WarPrefix`/`WarFinalizer`, `OthersTranspiler`, `InstallWars`)
+**Zgloszenie (Jeff 04.10):** "3. rozciagniete" - fabula ma trwac tyle LAT, ile w serialu, przy roku 364 dni.
+**Przyczyna:** ROT liczy fabule w DNIACH od startu przy roku 84 dni (Ned 2, Renly 120, Krwawe Gody 220, Dany 450). Przy roku 364 cala Wojna Pieciu Kroli zmiescilaby sie w ~8 miesiacach. Dotad skalowalismy tylko daty wydarzen (x2), nie wojny fabularne ani progi Innych.
+**Zmiana:** (1) os wydarzen x4.33 (Ned ~dzien 9, Krwawe Gody ~953 = 2.6 roku, Dany ~1950 = 5.4 roku). (2) `ROTStorylineWar.Enforced`: na czas wywolania StartDay/EndDay x4.33, potem przywrocone (np. Zelazni Ludzie na Polnoc 100-235 -> 433-1018, Lannister -> Dorzecze 30 -> 130, Stannis/Renly 135 -> 585, Polnoc pomsta 350 -> 1516). (3) Inni: stale 300/400/500 dni (Mrozny Brzeg/Rogowa Stopa, Thenn/Kly Mrozu, Hardhome) stojace zaraz po `ElapsedDaysUntilNow` w ROTOthersCampaignBehavior x4.33 (1299/1732/2165). Skala odczytana raz przy starcie gry.
+**Ryzyko / co sprawdzic (NIE testowane w grze):** log CrashScribe `Fabula: wojny fabularne x4.33 ... progi Innych x4.33 w N metodach (podmienionych stalych 3)` - jesli 0 stalych, Inni ruszaja po starych progach. Wojny fabularne ze StartDay=0 (wyzwalane wydarzeniami) bez zmian. Stara kampania: daty liczone od startu - po zmianie skali wojny "jeszcze nie wybuchly", choc juz trwaja (Enforced tylko blokuje wymuszanie, nie konczy wojen).
+**Status:** WGRANE 2026-10-04 (CrashScribe.dll md5 11fa021464f285207063147e9eb6f7f3, build rc=0, gra zamknieta; poprzednie DLL obok jako `CrashScribe.dll.bak-2026-10-04-przed-fabula433`). DO SPRAWDZENIA w nowej grze.
+
 ## 2026-10-04 (12) - KLIMAT WESTEROS: jedna pora roku na lata, biale kruki Cytadeli, data "Day N of Summer, 299 AC"
 **Mod:** Armoury | **Pliki:** NOWY `WesterosClimate.cs`; `ArmouryBehavior.cs` (Reset w konstruktorze, SyncData "arm_climate", Daily), `SubModuleMain.cs` (ApplyAll), `WinterBite.cs` (pora z klimatu), `Settings.cs` + `McmSettings.cs` (grupa "Westeros climate", 17 ustawien)
 **Zgloszenie (Jeff 04.10):** pory roku jak w Grze o Tron, wieloletnie: "1. tak 2. 3 - 5 lat losowo"; potem: "nie bylo miesiecy - jest jedna pora roku, teraz jest summer i dzien summer, potem jesien i winter".
