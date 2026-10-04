@@ -77,3 +77,10 @@ ROT odpala wydarzenia serialowe po dacie kampanii. Problemy, ktore rozwiazuje `F
   marszu; po sledztwie glodu takze `BkSupplyDaysCap` 1→3-4 (nasz temper
   tnie zywnosc z sakw BK i przyspiesza glod AI o 2-4 dni).
 - **PLAN-kuznia-1do1 krok 5** (popup wyboru klas pancerza) — bez decyzji.
+- **Gospodarka od ludnosci (Jeff 04.10, kolejnosc do ustalenia)**: (1) dochod z lenn
+  liczony od ludnosci krainy (docs/POPULACJA-WESTEROS-ESSOS.md) - dzis 2-26 pensow na
+  mieszkanca rocznie wobec ~40 historycznie, Reach najbiedniejsza na glowe; (2) werbunek
+  od ludnosci; (3) ceny sprzetu wobec zoldu. ZASADA JEFFA dla (2): pobor zabiera ludzi
+  z pola - mniej rak = mniejsze wydobycie wsi na czas sluzby, polegli trwale zmniejszaja
+  ludnosc, przyrost naturalny ja odbudowuje, zdemobilizowani wracaja do pracy. Nie
+  dodawac poboru bez strony produkcji i ludnosci (ta sama zasada co pula wyrzutkow).
