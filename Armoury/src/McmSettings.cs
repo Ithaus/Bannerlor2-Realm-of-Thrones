@@ -1269,6 +1269,26 @@ namespace Armoury
         public float WorkshopWoodPerOre { get; set; } = 5f;
 [SettingPropertyInteger("Workshop Candidates", 0, 160, "0", HintText = "how many different pieces a workshop weighs each morning when deciding what pays best to make")]        [SettingPropertyGroup("Workshops")]        public int WorkshopCandidates { get; set; } = 40;
 
+        [SettingPropertyBool("Levy Enabled", HintText = "volunteers come forward only where there are men to spare: hands the fields do not need, and men who want to leave a poor, burnt or warring land")]
+        [SettingPropertyGroup("Levy")]
+        public bool LevyEnabled { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Recruit Base Willing", 0f, 1f, "0.00", HintText = "younger sons and restless lads: the small chance of a volunteer even in a land that needs every hand (against Banner Kings' daily chance)")]
+        [SettingPropertyGroup("Levy")]
+        public float RecruitBaseWilling { get; set; } = 0.05f;
+
+        [SettingPropertyFloatingInteger("Recruit Excess Weight", 0f, 4f, "0.00", HintText = "how strongly hands without work on the land (Banner Kings workforce surplus) bring volunteers forward")]
+        [SettingPropertyGroup("Levy")]
+        public float RecruitExcessWeight { get; set; } = 1f;
+
+        [SettingPropertyFloatingInteger("Recruit Misery Weight", 0f, 1f, "0.00", HintText = "how strongly poverty, war, burnt villages and hunger push men to leave and take service")]
+        [SettingPropertyGroup("Levy")]
+        public float RecruitMiseryWeight { get; set; } = 0.2f;
+
+        [SettingPropertyFloatingInteger("Recruit Willing Max", 0f, 6f, "0.00", HintText = "ceiling on the willingness multiplier")]
+        [SettingPropertyGroup("Levy")]
+        public float RecruitWillingMax { get; set; } = 1.5f;
+
         [SettingPropertyBool("Population Rent Enabled", HintText = "a fief pays by the people it stands for: each village and town on the map is a symbol of a whole land, and its lord's rents follow that land's population (the Reach richest, the Iron Islands poor)")]
         [SettingPropertyGroup("Population")]
         public bool PopulationRentEnabled { get; set; } = true;
@@ -2174,6 +2194,11 @@ namespace Armoury
             s.WorkshopCrudeKgPerOre = WorkshopCrudeKgPerOre;
             s.WorkshopWoodPerOre = WorkshopWoodPerOre;
             s.WorkshopCandidates = WorkshopCandidates;
+            s.LevyEnabled = LevyEnabled;
+            s.RecruitBaseWilling = RecruitBaseWilling;
+            s.RecruitExcessWeight = RecruitExcessWeight;
+            s.RecruitMiseryWeight = RecruitMiseryWeight;
+            s.RecruitWillingMax = RecruitWillingMax;
             s.PopulationRentEnabled = PopulationRentEnabled;
             s.PopulationRentPerHead = PopulationRentPerHead;
             s.PopulationScale = PopulationScale;

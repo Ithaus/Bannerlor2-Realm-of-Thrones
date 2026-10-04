@@ -70,6 +70,7 @@ namespace Armoury
                 OutlawLaw.ApplyAll(_harmony);
                 PopulationLaw.ApplyAll(_harmony);
                 MapClock.ApplyAll(_harmony);
+                Levy.ApplyAll(_harmony);
                 Rations.ApplyAll(_harmony);      // dlugi marsz, dlugie racje - zuzycie jedzenia w dol (gracz i AI)
                 ScorchedEarth.ApplyAll(_harmony);
                 Wayfinder.ApplyAll(_harmony);

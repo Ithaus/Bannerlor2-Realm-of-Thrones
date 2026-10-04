@@ -380,6 +380,11 @@ namespace Armoury
         public int WorkshopCandidates = 40;                // how many different pieces a workshop weighs each morning when deciding what pays best to make
 
         // --- Iron Bank ---
+        public bool LevyEnabled = true;                    // volunteers come forward only where there are men to spare: hands the fields do not need, and men who want to leave a poor, burnt or warring land
+        public float RecruitBaseWilling = 0.05f;           // younger sons and restless lads: the small chance of a volunteer even in a land that needs every hand (against Banner Kings' daily chance)
+        public float RecruitExcessWeight = 1f;             // how strongly hands without work on the land (Banner Kings workforce surplus) bring volunteers forward
+        public float RecruitMiseryWeight = 0.2f;           // how strongly poverty, war, burnt villages and hunger push men to leave and take service
+        public float RecruitWillingMax = 1.5f;             // ceiling on the willingness multiplier
         public bool PopulationRentEnabled = true;          // a fief pays by the people it stands for: each village and town on the map is a symbol of a whole land, and its lord's rents follow that land's population (the Reach richest, the Iron Islands poor)
         public float PopulationRentPerHead = 40f;          // rents and dues a lord draws from each subject a year, in coins (about 40 pence a head in the medieval estimate)
         public float PopulationScale = 1f;                 // scale on every land's population (Westeros ~30 million, Essos with its hinterlands ~30 million)

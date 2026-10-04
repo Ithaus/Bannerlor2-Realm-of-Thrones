@@ -1,5 +1,13 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-04 (26) - POBOR krok 1: ochotnik zglasza sie tam, gdzie sa rece bez pracy albo ludzie chcacy odejsc
+**Mod:** Armoury | **Pliki:** NOWY `Levy.cs`; `OutlawLaw.cs` (NOWE `MiseryOf` - wspolna miara nedzy), `SubModuleMain.cs`, `ArmouryBehavior.cs` (Reset), `Settings.cs` + `McmSettings.cs` (grupa "Levy", 5 ustawien); plan: `docs/PLAN-POBOR.md`
+**Zgloszenie (Jeff 04.10):** "zrob ten duzy system ... jak teraz beda pokazywac sie ludzie w werbunku, bo teraz nie ma losowosci - pewnie ci, co nie maja pracy, albo ci, co chca opuscic wioske - i jaka bedzie zasada werbunku?"
+**Przyczyna (rozpoznanie 04.10):** BK juz zabiera rekruta z ludnosci (`MilitaryData.DeduceManpower`) i BEE liczy produkcje wsi od chlopow BK - ale puste miejsce u notabla wypelnia sie z szansa `GetDraftEfficiency` ~0.5 dziennie (vanilla `UpdateVolunteersOfNotablesInSettlement`), wiec ochotnicy sa zawsze.
+**Zmiana:** postfix na `BKVolunteerModel.GetDailyVolunteerProductionProbability(Hero,int,Settlement)`: szansa x checi; checi = `RecruitBaseWilling` 0.05 + udzial rak bez pracy (BK `LandData.WorkforceExcess / AvailableWorkForce`) x `RecruitExcessWeight` 1 + nedza regionu (jak u wyrzutkow: bieda, bezprawie, wojna +0.5, spalone wsie do +2, glod +1.5) x `RecruitMiseryWeight` 0.2; sufit 1.5; raz dziennie na osade. Ta sama szansa steruje vanillowym awansem ochotnikow w puli - mniej checi = wolniejsze awanse. Log dzienny: `Pobor: dzien N - chec do sluzby srednio xW szansy BK`.
+**Ryzyko / co sprawdzic:** w spokojnej, zamoznej krainie bez nadwyzki rak ochotnikow bedzie ~20x mniej (to zamierzone); armie AI moga rosnac wolniej - obserwowac wielkosc partii lordow i `Pobor:` w logu. Jesli BK nie poda danych ziemi, przyjmowane 0.2.
+**Status:** WGRANE 2026-10-04 (Armoury.dll md5 a5d27ec567cb53ece0492080bca0f7ae, build rc=0, gra zamknieta; poprzednie DLL obok jako `Armoury.dll.bak-2026-10-04-przed-poborem1`). DO SPRAWDZENIA - dziala na obecnym save.
+
 ## 2026-10-04 (25) - RENTY OD LUDNOSCI jako PRZEPLYW z kasy osad (wpis 20 sie nie wpinal i bylby zlotem z niczego)
 **Mod:** Armoury | **Pliki:** `PopulationLaw.cs` (usuniete latki modeli podatku; Daily placi renty), `Settings.cs` + `McmSettings.cs` (`PopulationRentMaxShare` 0.5)
 **Problem (audyt ekonomii 04.10):** (a) `AccessTools.Method(BKTaxModel, "CalculateVillageTaxFromIncome")` - BK ma dwie wersje (`(Village,bool,bool)` i `(Village,int)`), AmbiguousMatchException w jednym try wywracal tez latki podatku miast - wpis 20 NIC nie robil. (b) Gdyby sie wpial: podmiana podatku = zloto z niczego ~7 mln/dzien (BK wyplaca dochod wsi `payTo.Gold += income`, a zdejmuje z wioski tylko `min(TradeTaxAccumulated, income)`), kasowal polityke podatkowa BK, sufit BK 10 000 dla wsi, placil spalonym wsiom.

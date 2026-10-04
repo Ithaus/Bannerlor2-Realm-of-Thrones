@@ -369,6 +369,36 @@ namespace Armoury
             return w;
         }
 
+        /// <summary>Nedza regionu (miasto/zamek z wsiami): bieda, bezprawie, wojna, spalone wsie, glod.
+        /// Ta sama miara dla wyrzutkow i dla ochotnikow (Levy) - jedna prawda o regionie.</summary>
+        internal static float MiseryOf(Settlement r)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (r == null || s == null) return 0f;
+                if (r.IsVillage && r.Village != null && r.Village.Bound != null) r = r.Village.Bound;
+                float looted = 0f; int nv = 0;
+                if (r.BoundVillages != null)
+                    foreach (var v in r.BoundVillages)
+                    {
+                        nv++;
+                        if (v.VillageState == Village.VillageStates.Looted || v.VillageState == Village.VillageStates.BeingRaided) looted++;
+                    }
+                float prosp = 0.5f, sec = 0.5f;
+                if (r.Town != null)
+                {
+                    prosp = MBMath.ClampFloat(r.Town.Prosperity / Math.Max(1f, s.OutlawProsperityGood), 0f, 1f);
+                    sec = MBMath.ClampFloat(r.Town.Security / 100f, 0f, 1f);
+                }
+                return (1f - prosp) + (1f - sec) * 0.5f
+                       + (AtWar(r.MapFaction) ? s.OutlawWarMisery : 0f)
+                       + (nv > 0 ? looted / nv * s.OutlawLootedMisery : 0f)
+                       + (r.IsStarving ? s.OutlawStarvingMisery : 0f);
+            }
+            catch { return 0f; }
+        }
+
         internal static void Daily()
         {
             if (!On) return;
