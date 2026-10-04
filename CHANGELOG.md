@@ -1,5 +1,11 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-04 (63) - LOG UPORZADKOWANY: szczegoly w plikach tematycznych Logs/<sesja>/, w grze tylko komunikaty o graczu
+**Mod:** Armoury | **Pliki:** `Log.cs` (`TopicOf`, folder `Modules/Armoury/Logs/<data sesji>/`, przycinanie do 12 sesji), `UniqueSpoils.cs` (bez "Word spreads" o cudzych sprawach)
+**Problem (Jeff 04.10: "ten log sie robi tak dlugi, ze za duzo tam jest smieci, trzeba to jakos uporzadkowac"):** jeden plik Armoury-<data>.log mial wszystko: setki linii zakupow AI, cen towar po towarze, obozow nocnych, zamiennikow przy starcie, kroniki unikatow; w grze komunikaty o cudzych zdobyczach.
+**Zmiana:** glowny log = start, bledy, podsumowania dnia (Warsztaty: dzien, Rynek, Ludnosc, Korona, Wyrzutki, IronBank, ZakupyAI: dzien, PodazPopyt: kupcy...). Szczegoly: `unikaty.log` (Kronika unikatow, UniqueSpoils), `zakupy.log` (ZakupyAI poszczegolne, Stajnia AI, Oferta), `handel.log` (PodazPopyt towar po towarze), `warsztaty.log` (diagnoza), `noc.log` (AiNightCamp), `start.log` (zamienniki UniqueLaw/LegendaryLaw, TroopFit, Uniques, latki modeli). W grze z kroniki tylko to, co dotyczy gracza.
+**Status (62+63):** ZBUDOWANE 2026-10-04 (build rc=0) - NIE WGRANE: gra uruchomiona; wgrac po zamknieciu. Uwaga dla czytajacego logi: szczegoly szukac w `Modules/Armoury/Logs/<sesja>/`.
+
 ## 2026-10-04 (62) - UNIKATY KRAZA PO SWIECIE: nic nie znika, AI pojmujace bierze, lord kupuje z polki, kronika
 **Mod:** Armoury | **Pliki:** `UniqueSpoils.cs` (przebudowa), `ArmouryBehavior.cs` (`Reset`, klucz save `arm_uniq_init`, `DailyTickPartyEvent`), `Settings.cs` + `McmSettings.cs` (NOWE `UniqueSpoilsFromPlayer` true)
 **Problem (Jeff 04.10 do wpisu 61: AI pojmujace - "tak"; "jesli sprzedam, to bedzie gdzies w swiecie - maja byc unikaty monitorowane, kto potem kupil, gdzie jest, aby nie znikaly; ... ktos sprzeda albo jakis lord kupi"):** wpis 61 zdejmowal unikaty z targow CODZIENNIE - unikat sprzedany przez gracza znikal; AI pojmujace niczego nie bralo.

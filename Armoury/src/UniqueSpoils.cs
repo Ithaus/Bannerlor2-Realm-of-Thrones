@@ -118,7 +118,7 @@ namespace Armoury
             Log.Info("Kronika unikatow: " + from.Name + " -> " + to.Name + " (" + how + "): " + list + ".");
             if (toPlayer) Log.Player("By the custom of war, the arms of " + from.Name + " are yours: " + list + ".");
             else if (from == Hero.MainHero) Log.Player(to.Name + " takes your arms by the custom of war: " + list + ".", true);
-            else Log.Player("Word spreads: " + to.Name + " took " + list + " from " + from.Name + ".", false);
+            // cudze zdobycze tylko w kronice (Jeff: za duzo smieci)
         }
 
         /// <summary>Lord AI zaklada sztuke w jej miejsce; to, co nosil, idzie do taboru jego partii (nic nie znika).</summary>
@@ -177,7 +177,7 @@ namespace Armoury
                     st.Town.ChangeGold(price);
                     Wear(lord, el.EquipmentElement);
                     Log.Info("Kronika unikatow: " + lord.Name + " kupil " + it.StringId + " w " + st.Name + " za " + price + ".");
-                    Log.Player("Word spreads: " + lord.Name + " bought " + it.Name + " in " + st.Name + ".", false);
+
                     return;
                 }
             }

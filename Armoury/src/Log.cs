@@ -7,7 +7,7 @@ namespace Armoury
 {
     internal static class Log
     {
-        private static string _path;
+        private static string _path, _topicDir;
         private static readonly object Gate = new object();
         private const int KeepLogs = 12;      // ile ostatnich sesji trzymamy
 
@@ -29,6 +29,19 @@ namespace Armoury
                 // zeby nikt (ani Jeff, ani Claude) nie czytal za rok zamrozonych bzdur
                 try { var legacy = Path.Combine(moduleDir, "Armoury.log"); if (File.Exists(legacy)) File.Delete(legacy); } catch { }
                 Prune(moduleDir);
+                // wpis 63 (Jeff 04.10: "ten log sie robi tak dlugi, ze za duzo tam jest smieci - trzeba to uporzadkowac"):
+                // szczegoly ida do osobnych plikow tematycznych w Logs/<sesja>/, glowny log = start, bledy, podsumowania dnia
+                try
+                {
+                    var root = Path.Combine(moduleDir, "Logs");
+                    _topicDir = Path.Combine(root, Path.GetFileNameWithoutExtension(_path).Replace("Armoury-", ""));
+                    Directory.CreateDirectory(_topicDir);
+                    var dirs = new List<DirectoryInfo>();
+                    foreach (var d in Directory.GetDirectories(root)) dirs.Add(new DirectoryInfo(d));
+                    dirs.Sort(delegate (DirectoryInfo a, DirectoryInfo b) { return b.CreationTimeUtc.CompareTo(a.CreationTimeUtc); });
+                    for (int i = KeepLogs; i < dirs.Count; i++) { try { dirs[i].Delete(true); } catch { } }
+                }
+                catch { _topicDir = null; }
             }
             catch { _path = null; }
         }
@@ -51,9 +64,26 @@ namespace Armoury
             if (_path == null || !Settings.Current.LogEnabled) return;
             try
             {
-                lock (Gate) File.AppendAllText(_path, "[" + DateTime.Now.ToString("HH:mm:ss") + "] " + msg + Environment.NewLine);
+                string topic = TopicOf(msg);
+                string file = topic != null && _topicDir != null ? Path.Combine(_topicDir, topic + ".log") : _path;
+                lock (Gate) File.AppendAllText(file, "[" + DateTime.Now.ToString("HH:mm:ss") + "] " + msg + Environment.NewLine);
             }
             catch { }
+        }
+
+        /// <summary>Plik tematyczny dla szczegolowej linii (null = glowny log). Podsumowania dnia zostaja w glownym.</summary>
+        private static string TopicOf(string m)
+        {
+            if (m == null) return null;
+            if (m.StartsWith("Kronika unikatow") || m.StartsWith("UniqueSpoils")) return "unikaty";
+            if (m.StartsWith("ZakupyAI: dzien") || m.StartsWith("PodazPopyt: kupcy")) return null;
+            if (m.StartsWith("ZakupyAI:") || m.StartsWith("Stajnia AI:") || m.StartsWith("Oferta:")) return "zakupy";
+            if (m.StartsWith("PodazPopyt:")) return "handel";
+            if (m.StartsWith("Warsztaty (diagnoza)")) return "warsztaty";
+            if (m.StartsWith("AiNightCamp")) return "noc";
+            if (m.StartsWith("UniqueLaw: zamiennik") || m.StartsWith("LegendaryLaw: zamiennik") || m.StartsWith("TroopFit:   ")
+                || m.StartsWith("Uniques: ") || m.StartsWith("Rozrzut miotanych:") || m.StartsWith("Podloga zlomu:")) return "start";
+            return null;
         }
 
         internal static void Error(string where, Exception e)
