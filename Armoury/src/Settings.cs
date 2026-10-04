@@ -380,6 +380,9 @@ namespace Armoury
         public int WorkshopCandidates = 40;                // how many different pieces a workshop weighs each morning when deciding what pays best to make
 
         // --- Iron Bank ---
+        public bool PopulationRentEnabled = true;          // a fief pays by the people it stands for: each village and town on the map is a symbol of a whole land, and its lord's rents follow that land's population (the Reach richest, the Iron Islands poor)
+        public float PopulationRentPerHead = 40f;          // rents and dues a lord draws from each subject a year, in coins (about 40 pence a head in the medieval estimate)
+        public float PopulationScale = 1f;                 // scale on every land's population (Westeros ~30 million, Essos with its hinterlands ~30 million)
         public bool WorkshopNoFreeRaw = true;              // nothing from thin air: the hidden town artisans no longer make timber, ore, hides, meat, leather and linen without any input, and a workshop roll never yields charcoal or ingots (those only come from smelting) - raw goods come from the villages
         public bool StartKitEnabled = true;                // starting gear you cannot wear (heavy armour your Athletics cannot carry) is swapped once, after character creation, for the best piece of the same kind you can wear - never dearer than the original
         public bool OutlawLawEnabled = true;               // outlaws are real men: deserters, unpaid soldiers, men routed from battle, villagers driven off by raids, hunger and war; bands form only where such men exist and wear only what they brought, looted or bought

@@ -386,7 +386,7 @@ namespace Armoury
         }
         private Dictionary<string,int> _prisonerBaseline;
 
-        public ArmouryBehavior() { Instance = this; WesterosClimate.Reset(); OutlawLaw.Reset(); }
+        public ArmouryBehavior() { Instance = this; WesterosClimate.Reset(); OutlawLaw.Reset(); PopulationLaw.Reset(); }
 
         public override void SyncData(IDataStore dataStore)
         {
@@ -413,6 +413,10 @@ namespace Armoury
                 string nightrest = NightRest.Export();
                 dataStore.SyncData("arm_nightrest", ref nightrest);
                 if (dataStore.IsLoading) NightRest.Import(nightrest);
+                // ludnosc krain: ludzi na punkt hearth/dobrobytu (Jeff 04.10)
+                string popk = PopulationLaw.Export();
+                dataStore.SyncData("arm_population", ref popk);
+                if (dataStore.IsLoading) PopulationLaw.Import(popk);
                 // prawo wyrzutkow: pula ludzi w regionach (Jeff 04.10)
                 string outlaws = OutlawLaw.Export();
                 dataStore.SyncData("arm_outlaws", ref outlaws);
@@ -1115,6 +1119,7 @@ namespace Armoury
             try { Orders.DailyTick(); }
             catch (Exception e) { Log.Error("OnDailyTick", e); }
             try { ArmsPricing.Daily(); } catch (Exception e) { Log.Error("ArmsPricing.Daily", e); }   // indeksy surowcow i premie wojenne PRZED handlem
+            try { PopulationLaw.Daily(); } catch (Exception e) { Log.Error("PopulationLaw.Daily", e); }   // ludnosc i renty krain
             try { OutlawLaw.Daily(); } catch (Exception e) { Log.Error("OutlawLaw.Daily", e); }   // wyrzutki: bieda, powroty, werbunek band
             try { IronBank.Daily(); } catch (Exception e) { Log.Error("IronBank.Daily", e); }   // Bank Zelazny: pozyczki AI, raty, bankructwa
             try { SupplyDemand.DailyTrade(); } catch (Exception e) { Log.Error("SupplyDemand.DailyTrade", e); }

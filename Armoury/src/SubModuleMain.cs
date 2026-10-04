@@ -68,6 +68,7 @@ namespace Armoury
                 WinterBite.ApplyAll(_harmony);
                 WesterosClimate.ApplyAll(_harmony);
                 OutlawLaw.ApplyAll(_harmony);
+                PopulationLaw.ApplyAll(_harmony);
                 Rations.ApplyAll(_harmony);      // dlugi marsz, dlugie racje - zuzycie jedzenia w dol (gracz i AI)
                 ScorchedEarth.ApplyAll(_harmony);
                 Wayfinder.ApplyAll(_harmony);

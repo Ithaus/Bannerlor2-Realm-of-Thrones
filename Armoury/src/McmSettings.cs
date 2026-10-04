@@ -1269,6 +1269,18 @@ namespace Armoury
         public float WorkshopWoodPerOre { get; set; } = 5f;
 [SettingPropertyInteger("Workshop Candidates", 0, 160, "0", HintText = "how many different pieces a workshop weighs each morning when deciding what pays best to make")]        [SettingPropertyGroup("Workshops")]        public int WorkshopCandidates { get; set; } = 40;
 
+        [SettingPropertyBool("Population Rent Enabled", HintText = "a fief pays by the people it stands for: each village and town on the map is a symbol of a whole land, and its lord's rents follow that land's population (the Reach richest, the Iron Islands poor)")]
+        [SettingPropertyGroup("Population")]
+        public bool PopulationRentEnabled { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Population Rent Per Head", 0f, 160f, "0.00", HintText = "rents and dues a lord draws from each subject a year, in coins (about 40 pence a head in the medieval estimate)")]
+        [SettingPropertyGroup("Population")]
+        public float PopulationRentPerHead { get; set; } = 40f;
+
+        [SettingPropertyFloatingInteger("Population Scale", 0f, 4f, "0.00", HintText = "scale on every land's population (Westeros ~30 million, Essos with its hinterlands ~30 million)")]
+        [SettingPropertyGroup("Population")]
+        public float PopulationScale { get; set; } = 1f;
+
         [SettingPropertyBool("Start Kit Enabled", HintText = "starting gear you cannot wear (heavy armour your Athletics cannot carry) is swapped once, after character creation, for the best piece of the same kind you can wear - never dearer than the original")]
         [SettingPropertyGroup("Starting gear")]
         public bool StartKitEnabled { get; set; } = true;
@@ -2147,6 +2159,9 @@ namespace Armoury
             s.WorkshopCrudeKgPerOre = WorkshopCrudeKgPerOre;
             s.WorkshopWoodPerOre = WorkshopWoodPerOre;
             s.WorkshopCandidates = WorkshopCandidates;
+            s.PopulationRentEnabled = PopulationRentEnabled;
+            s.PopulationRentPerHead = PopulationRentPerHead;
+            s.PopulationScale = PopulationScale;
             s.StartKitEnabled = StartKitEnabled;
             s.OutlawLawEnabled = OutlawLawEnabled;
             s.OutlawSeedPerHearth = OutlawSeedPerHearth;
