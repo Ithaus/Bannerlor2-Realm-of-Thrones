@@ -203,6 +203,34 @@ namespace Armoury
         }
         private static object _wsModel, _popMgr; private static System.Reflection.MethodInfo _getBeh;
 
+        private static System.Reflection.MethodInfo _getPolicy; private static object _policyMgr; private static bool _polResolved;
+        /// <summary>Mnoznik renty z dekretu podatkowego BK osady (1 gdy brak BK albo dekretu).</summary>
+        internal static float TaxDecree(Settlement st)
+        {
+            try
+            {
+                if (!_polResolved)
+                {
+                    _polResolved = true;
+                    var cfgT = AccessTools.TypeByName("BannerKings.BannerKingsConfig");
+                    var cfg = cfgT != null ? AccessTools.Property(cfgT, "Instance").GetValue(null, null) : null;
+                    _policyMgr = cfg != null ? AccessTools.Property(cfgT, "PolicyManager").GetValue(cfg, null) : null;
+                    if (_policyMgr != null) _getPolicy = AccessTools.Method(_policyMgr.GetType(), "GetPolicy", new[] { typeof(Settlement), typeof(string) });
+                }
+                if (_getPolicy == null || st == null) return 1f;
+                var pol = _getPolicy.Invoke(_policyMgr, new object[] { st, "tax" });
+                if (pol == null) return 1f;
+                var type = Traverse.Create(pol).Property("Policy").GetValue();
+                string name = type != null ? type.ToString() : "Standard";
+                var s = Settings.Current;
+                if (name == "Low") return Math.Max(0f, s.RentTaxLow);
+                if (name == "High") return Math.Max(0f, s.RentTaxHigh);
+                if (name == "Exemption") return Math.Max(0f, s.RentTaxExemption);
+                return 1f;
+            }
+            catch { return 1f; }
+        }
+
         internal static void ApplyTownTax(HarmonyLib.Harmony h)
         {
             int n = 0;
@@ -270,7 +298,9 @@ namespace Armoury
                             gold = Math.Max(0, gold - (int)Math.Max(0f, s.TownRentFloorGold));
                             takeShare = Math.Max(0f, Math.Min(1f, s.TownRentShare));
                         }
-                        int pay = (int)Math.Min(rent, gold * takeShare);
+                        // wpis 54: dekret podatkowy lenna BK (Low/Standard/High/Exemption) steruje renta
+                        float decree = TaxDecree(st);
+                        int pay = (int)Math.Min(rent * decree, gold * takeShare * decree);
                         if (pay <= 0) continue;
                         GiveGoldAction.ApplyForSettlementToCharacter(st, lord, pay, true);
                         { int r0; RentToday.TryGetValue(st.OwnerClan, out r0); RentToday[st.OwnerClan] = r0 + pay; }

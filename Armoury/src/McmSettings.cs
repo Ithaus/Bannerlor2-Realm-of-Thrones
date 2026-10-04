@@ -1488,6 +1488,18 @@ namespace Armoury
         [SettingPropertyGroup("Iron bank")]
         public float PopulationRentMaxShare { get; set; } = 0.2f;
 
+        [SettingPropertyFloatingInteger("Rent Tax Low", 0.00f, 2.80f, "0.00", HintText = "the fief's tax decree (Banner Kings) sets the rent: Low takes this share of the usual rent")]
+        [SettingPropertyGroup("Iron bank")]
+        public float RentTaxLow { get; set; } = 0.7f;
+
+        [SettingPropertyFloatingInteger("Rent Tax High", 0.00f, 5.20f, "0.00", HintText = "High tax takes this much of the usual rent (and Banner Kings costs loyalty for it)")]
+        [SettingPropertyGroup("Iron bank")]
+        public float RentTaxHigh { get; set; } = 1.3f;
+
+        [SettingPropertyFloatingInteger("Rent Tax Exemption", 0.00f, 1.00f, "0.00", HintText = "Exemption: no rent at all")]
+        [SettingPropertyGroup("Iron bank")]
+        public float RentTaxExemption { get; set; } = 0f;
+
         [SettingPropertyBool("Rent Replaces Town Tax", HintText = "one source of land income: Banner Kings' town population tax (paid from nothing) is replaced by rent from the town purse")]
         [SettingPropertyGroup("Iron bank")]
         public bool RentReplacesTownTax { get; set; } = true;
@@ -2507,6 +2519,9 @@ namespace Armoury
             s.PopulationRentPerHead = PopulationRentPerHead;
             s.PopulationScale = PopulationScale;
             s.PopulationRentMaxShare = PopulationRentMaxShare;
+            s.RentTaxLow = RentTaxLow;
+            s.RentTaxHigh = RentTaxHigh;
+            s.RentTaxExemption = RentTaxExemption;
             s.RentReplacesTownTax = RentReplacesTownTax;
             s.TownRentShare = TownRentShare;
             s.TownRentFloorGold = TownRentFloorGold;

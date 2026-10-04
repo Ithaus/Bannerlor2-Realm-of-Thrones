@@ -435,6 +435,9 @@ namespace Armoury
         public float PopulationRentPerHead = 40f;          // rents and dues a lord draws from each subject a year, in coins (about 40 pence a head in the medieval estimate)
         public float PopulationScale = 1f;                 // scale on every land's population (Westeros ~30 million, Essos with its hinterlands ~30 million)
         public float PopulationRentMaxShare = 0.2f;        // a village pays its lord at most this share of its purse each day (0.5 emptied the villages in a few days)
+        public float RentTaxLow = 0.7f;                    // the fief's tax decree (Banner Kings) sets the rent: Low takes this share of the usual rent
+        public float RentTaxHigh = 1.3f;                   // High tax takes this much of the usual rent (and Banner Kings costs loyalty for it)
+        public float RentTaxExemption = 0f;                // Exemption: no rent at all
         public bool RentReplacesTownTax = true;            // one source of land income: Banner Kings' town population tax (paid from nothing) is replaced by rent from the town purse
         public float TownRentShare = 0.07f;                // share of the town purse above the merchants' floor its lord draws each day as rents, tolls and farms
         public float TownRentFloorGold = 20000f;           // a town keeps this much for its merchants - below 20 000 Banner Kings takes prosperity away
