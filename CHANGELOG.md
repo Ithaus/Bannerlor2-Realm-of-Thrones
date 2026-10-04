@@ -1,5 +1,12 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-04 (33) - BANK ZELAZNY: koniec rolowania dlugu, oplata 2% za pozyczke, zajecie przy bankructwie
+**Mod:** Armoury | **Pliki:** `IronBank.cs` (`Lend`, bankructwo w `Daily`), `Settings.cs` + `McmSettings.cs` (`IronBankLoanFeePercent` 2, `IronBankDefaultSeizeShare` 0.5)
+**Problem (audyt dziur B5):** kazda nowa pozyczka przesuwala termin CALEGO dlugu (IronBank.cs:159) - dobieranie 25% wolnego limitu rolowalo dlug w nieskonczonosc (AI tez); pozyczka i splata tego samego dnia bez kosztu; bankructwo: 100 renomy i 25% zlota dziennie - do wydania przed sciagnieciem.
+**Zmiana:** (1) termin ustawiany tylko przy pierwszej pozyczce (albo gdy minal) - dobieranie nie odsuwa terminu; (2) oplata `IronBankLoanFeePercent` 2% doliczana do dlugu przy kazdej pozyczce (do kapitalu Banku przy splacie); (3) przy bankructwie Bank od razu zajmuje `IronBankDefaultSeizeShare` 50% skarbca na poczet dlugu, dalej 25% dziennie jak dotad.
+**Ryzyko:** AI z biezacym dlugiem ma krotszy termin na nowe pozyczki - wiecej spoznien i bankructw (obserwowac linie `IronBank: dzien N`).
+**Status:** WGRANE 2026-10-04 (Armoury.dll md5 f2c77536eba93be8a361a0e39a8d4c8f, build rc=0, gra zamknieta; poprzednie DLL obok jako `Armoury.dll.bak-2026-10-04-przed-bankiem2`). Na obecnym save.
+
 ## 2026-10-04 (32) - OKUP U POSREDNIKA: nadwyzka ponad cene gry placi rod jenca (nie zloto z niczego)
 **Mod:** RealisticCaptivity | **Pliki:** `FairRansom.cs` (`LordPrice`, flaga `_inSale` - prefix/finalizer na `SellPrisonersAction.ApplyInternal`)
 **Problem (audyt dziur B4):** posrednik w karczmie ("sprzedaj wszystkich") placi przez `GiveGoldAction(null, gracz)` - z niczego - a nasza wycena lorda (krol do ~250 tys.) podnosila te kwote; mozna bylo lapac, sprzedawac, lapac znowu.

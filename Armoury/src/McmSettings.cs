@@ -1488,6 +1488,14 @@ namespace Armoury
         [SettingPropertyGroup("Iron bank")]
         public bool IronBankEnabled { get; set; } = true;
 
+        [SettingPropertyFloatingInteger("Iron Bank Loan Fee Percent", 0f, 10f, "0.00", HintText = "fee the Iron Bank adds to every loan, owed with the debt - no free same-day borrowing")]
+        [SettingPropertyGroup("Iron bank")]
+        public float IronBankLoanFeePercent { get; set; } = 2f;
+
+        [SettingPropertyFloatingInteger("Iron Bank Default Seize Share", 0f, 1f, "0.00", HintText = "share of a defaulter's purse the Bank seizes at once when he defaults (then 25% a day as before)")]
+        [SettingPropertyGroup("Iron bank")]
+        public float IronBankDefaultSeizeShare { get; set; } = 0.5f;
+
         [SettingPropertyInteger("Iron Bank Capital", 0, 20000000, "0", HintText = "gold the Bank starts with; loans draw it down, repayments with interest fill it up - an empty Bank lends nothing")]
         [SettingPropertyGroup("Iron bank")]
         public int IronBankCapital { get; set; } = 5000000;
@@ -2265,6 +2273,8 @@ namespace Armoury
             s.ClimateWinterYearsMin = ClimateWinterYearsMin;
             s.ClimateWinterYearsMax = ClimateWinterYearsMax;
             s.IronBankEnabled = IronBankEnabled;
+            s.IronBankLoanFeePercent = IronBankLoanFeePercent;
+            s.IronBankDefaultSeizeShare = IronBankDefaultSeizeShare;
             s.IronBankCapital = IronBankCapital;
             s.IronBankIncomeDays = IronBankIncomeDays;
             s.IronBankPerTown = IronBankPerTown;

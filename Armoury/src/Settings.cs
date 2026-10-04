@@ -435,6 +435,8 @@ namespace Armoury
         public float ClimateAutumnYearsMax = 2f;           // later autumns last at most this many years
         public float ClimateWinterYearsMin = 2f;           // later winters last at least this many years
         public float ClimateWinterYearsMax = 6f;           // later winters last at most this many years
+        public float IronBankLoanFeePercent = 2f;          // fee the Iron Bank adds to every loan, owed with the debt - no free same-day borrowing
+        public float IronBankDefaultSeizeShare = 0.5f;     // share of a defaulter's purse the Bank seizes at once when he defaults (then 25% a day as before)
         public bool IronBankEnabled = true;                // the Iron Bank of Braavos lends to lords (AI and you): wages and war chests on credit, repaid daily with interest and from the spoils of war - and woe to those who do not pay
         public int IronBankCapital = 5000000;              // gold the Bank starts with; loans draw it down, repayments with interest fill it up - an empty Bank lends nothing
         public float IronBankIncomeDays = 60f;             // a house may borrow this many days of its income, plus its fiefs as surety

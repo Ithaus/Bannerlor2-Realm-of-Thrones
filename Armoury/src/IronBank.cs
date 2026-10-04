@@ -153,11 +153,16 @@ namespace Armoury
                 amount = Math.Min(amount, Math.Min(room, (int)_capital));
                 if (amount <= 0) return 0;
                 double rate = RateFor(c, d);
-                d.Rate = d.Principal > 1 ? (d.Rate * d.Principal + rate * amount) / (d.Principal + amount) : rate;
-                d.Principal += amount;
+                // AUDYT 04.10 (B5): oplata za udzielenie (pozyczka i splata tego samego dnia nie jest juz darmowa)
+                // i termin NIE przesuwa sie przy dobieraniu - wczesniej kazda nowa pozyczka odsuwala termin calego
+                // dlugu (rolowanie w nieskonczonosc, AI tez).
+                double fee = amount * Math.Max(0f, Settings.Current.IronBankLoanFeePercent) / 100.0;
+                bool running = d.Principal > 1;
+                d.Rate = running ? (d.Rate * d.Principal + rate * amount) / (d.Principal + amount) : rate;
+                d.Principal += amount + fee;
                 d.Loans++;
                 int today = (int)CampaignTime.Now.ToDays;
-                d.DueDay = today + Math.Max(7, DaysPerYear() / 2);
+                if (!running || d.DueDay <= today) d.DueDay = today + Math.Max(7, DaysPerYear() / 2);
                 c.Leader.ChangeHeroGold(amount);
                 _capital -= amount;
                 Note("IronBank: " + c.Name + " pozycza " + amount + " (" + why + ") na " + (d.Rate * 100).ToString("0") + "% rocznie, dlug " + (int)d.Principal
@@ -229,6 +234,9 @@ namespace Armoury
                             if (d.Missed >= 3)
                             {
                                 d.Defaulted = true; d.EverDefaulted = true; d.Trust = 0f; defaults++;
+                                // zajecie od razu: polowa skarbca na poczet dlugu (wczesniej tylko 25% dziennie - do wydania przed sciagnieciem)
+                                int seize = (int)Math.Min(d.Principal, hero.Gold * Math.Max(0f, Math.Min(1f, s.IronBankDefaultSeizeShare)));
+                                if (seize > 0) { hero.ChangeHeroGold(-seize); d.Principal -= seize; _capital += seize; paidSum += seize; }
                                 Log.Info("IronBank: BANKRUCTWO " + c.Name + " - dlug " + (int)d.Principal + ", Bank odcina kredyt, sciaga zloto i pozycza wrogom.");
                                 if (c == Clan.PlayerClan)
                                 {
