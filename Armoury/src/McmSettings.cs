@@ -1716,9 +1716,45 @@ namespace Armoury
         [SettingPropertyGroup("Iron bank")]
         public float CrownDuesPeacePercent { get; set; } = 2f;
 
-        [SettingPropertyFloatingInteger("Crown Dues War Percent", 0.00f, 40.00f, "0.00", HintText = "share owed while the realm is at war (war taxes, scutage in place of service)")]
+        [SettingPropertyFloatingInteger("Crown Dues War Percent", 0.00f, 12.00f, "0.00", HintText = "share owed while the realm is at war (aids, scutage in place of service) - the war tax itself is paid by the subjects (lay subsidy below)")]
         [SettingPropertyGroup("Iron bank")]
-        public float CrownDuesWarPercent { get; set; } = 10f;
+        public float CrownDuesWarPercent { get; set; } = 3f;
+
+        [SettingPropertyBool("Lay Subsidy Enabled", HintText = "in war the realm's towns and villages pay a war subsidy (the fifteenth and tenth) from their purses into the kingdom treasury")]
+        [SettingPropertyGroup("Iron bank")]
+        public bool LaySubsidyEnabled { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Lay Subsidy Town Share", 0.00f, 1.00f, "0.00", HintText = "share of a town's purse above the merchants' floor paid each day of war")]
+        [SettingPropertyGroup("Iron bank")]
+        public float LaySubsidyTownShare { get; set; } = 0.01f;
+
+        [SettingPropertyFloatingInteger("Lay Subsidy Village Share", 0.00f, 1.00f, "0.00", HintText = "share of a village purse paid each day of war")]
+        [SettingPropertyGroup("Iron bank")]
+        public float LaySubsidyVillageShare { get; set; } = 0.015f;
+
+        [SettingPropertyFloatingInteger("Lay Subsidy War Tax Multiplier", 0.00f, 8.00f, "0.00", HintText = "with the War Tax policy the subsidy is this many times heavier")]
+        [SettingPropertyGroup("Iron bank")]
+        public float LaySubsidyWarTaxMultiplier { get; set; } = 2f;
+
+        [SettingPropertyBool("Crown Customs Enabled", HintText = "every crown takes customs on trade: a share of each town's toll counter goes to the kingdom treasury (the wool custom of 1275)")]
+        [SettingPropertyGroup("Iron bank")]
+        public bool CrownCustomsEnabled { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Crown Customs Share", 0.00f, 1.00f, "0.00", HintText = "share of a town's daily toll counter taken as customs")]
+        [SettingPropertyGroup("Iron bank")]
+        public float CrownCustomsShare { get; set; } = 0.1f;
+
+        [SettingPropertyFloatingInteger("Crown Customs Duty Multiplier", 0.00f, 8.00f, "0.00", HintText = "with the Crown Duty policy the customs are this many times heavier")]
+        [SettingPropertyGroup("Iron bank")]
+        public float CrownCustomsDutyMultiplier { get; set; } = 2f;
+
+        [SettingPropertyBool("Policy Income Conserved", HintText = "Debasement and State Monopolies no longer make gold from nothing: the mint's profit comes out of the realm's town purses, monopoly dues out of workshop capital; foreign caravans no longer bring 500 from nothing under trade agreements; Banner Kings' village tax office is replaced by the rent")]
+        [SettingPropertyGroup("Iron bank")]
+        public bool PolicyIncomeConserved { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Debasement Share", 0.00f, 1.00f, "0.00", HintText = "share of each town purse above the merchants' floor the crown takes each day while it debases the coin")]
+        [SettingPropertyGroup("Iron bank")]
+        public float DebasementShare { get; set; } = 0.005f;
 
         [SettingPropertyBool("No Rot Clan Bailout", HintText = "Realm of Thrones no longer hands every poor AI house Tier x 5000 gold a day from thin air - a house short of money borrows from the Iron Bank or goes bankrupt")]
         [SettingPropertyGroup("Iron bank")]
@@ -2577,6 +2613,15 @@ namespace Armoury
             s.CrownDuesEnabled = CrownDuesEnabled;
             s.CrownDuesPeacePercent = CrownDuesPeacePercent;
             s.CrownDuesWarPercent = CrownDuesWarPercent;
+            s.LaySubsidyEnabled = LaySubsidyEnabled;
+            s.LaySubsidyTownShare = LaySubsidyTownShare;
+            s.LaySubsidyVillageShare = LaySubsidyVillageShare;
+            s.LaySubsidyWarTaxMultiplier = LaySubsidyWarTaxMultiplier;
+            s.CrownCustomsEnabled = CrownCustomsEnabled;
+            s.CrownCustomsShare = CrownCustomsShare;
+            s.CrownCustomsDutyMultiplier = CrownCustomsDutyMultiplier;
+            s.PolicyIncomeConserved = PolicyIncomeConserved;
+            s.DebasementShare = DebasementShare;
             s.NoRotClanBailout = NoRotClanBailout;
             s.NoFreeKingdomGold = NoFreeKingdomGold;
             s.IronBankMinDaysToLend = IronBankMinDaysToLend;

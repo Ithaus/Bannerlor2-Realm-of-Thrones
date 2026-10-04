@@ -492,7 +492,16 @@ namespace Armoury
         public float ClimateWinterYearsMax = 6f;           // later winters last at most this many years
         public bool CrownDuesEnabled = true;               // vassals owe the crown a share of their daily income (fief income and rents), paid into the kingdom treasury - small in peace, heavy in war as with medieval war taxes
         public float CrownDuesPeacePercent = 2f;           // share of a vassal house's daily income owed to the crown in peace (aids and dues)
-        public float CrownDuesWarPercent = 10f;            // share owed while the realm is at war (war taxes, scutage in place of service)
+        public float CrownDuesWarPercent = 3f;             // share owed while the realm is at war (aids, scutage in place of service) - the war tax itself is paid by the subjects (lay subsidy below)
+        public bool LaySubsidyEnabled = true;              // in war the realm's towns and villages pay a war subsidy (the fifteenth and tenth) from their purses into the kingdom treasury
+        public float LaySubsidyTownShare = 0.01f;          // share of a town's purse above the merchants' floor paid each day of war
+        public float LaySubsidyVillageShare = 0.015f;      // share of a village purse paid each day of war
+        public float LaySubsidyWarTaxMultiplier = 2f;      // with the War Tax policy the subsidy is this many times heavier
+        public bool CrownCustomsEnabled = true;            // every crown takes customs on trade: a share of each town's toll counter goes to the kingdom treasury (the wool custom of 1275)
+        public float CrownCustomsShare = 0.1f;             // share of a town's daily toll counter taken as customs
+        public float CrownCustomsDutyMultiplier = 2f;      // with the Crown Duty policy the customs are this many times heavier
+        public bool PolicyIncomeConserved = true;          // Debasement and State Monopolies no longer make gold from nothing: the mint's profit comes out of the realm's town purses, monopoly dues out of workshop capital; foreign caravans no longer bring 500 from nothing under trade agreements; Banner Kings' village tax office is replaced by the rent
+        public float DebasementShare = 0.005f;             // share of each town purse above the merchants' floor the crown takes each day while it debases the coin
         public bool NoRotClanBailout = true;               // Realm of Thrones no longer hands every poor AI house Tier x 5000 gold a day from thin air - a house short of money borrows from the Iron Bank or goes bankrupt
         public bool NoFreeKingdomGold = true;              // the kingdom treasury no longer refills from thin air (vanilla +1000 a day and random windfalls of 100-400 thousand); it lives on what the houses pay in - change needs a game restart
         public int IronBankMinDaysToLend = 30;             // the Bank lends no more to a house whose running debt falls due within this many days - pay first

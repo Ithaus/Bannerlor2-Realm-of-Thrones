@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Reflection.Emit;
 using HarmonyLib;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace Armoury
 {
@@ -75,6 +77,101 @@ namespace Armoury
             catch (Exception e) { Log.Error("KingdomTreasury.Daily", e); }
         }
 
+        // ------------------------------------------------------------ danina wojenna, clo, mennica, monopole (wpisy 55-56)
+        // Jeff 04.10 "tak" na E i G (docs/ZRODLA-DOCHODU.md C3-C9). Historycznie: pietnastka i dziesiecina (1290, 1334) placili
+        // poddani, nie panowie; clo od handlu (1275) mial kazdy krol; oplata menniczna szla z monety w obiegu; monopole z
+        // dzierzaw. Wszystko z kiesy kogos - zadnego zlota z powietrza.
+        internal static void Levies()
+        {
+            var s = Settings.Current;
+            if (s == null || Campaign.Current == null) return;
+            try
+            {
+                long sub = 0, cus = 0, deb = 0, mon = 0;
+                float floor = Math.Max(0f, s.TownRentFloorGold);
+                foreach (var k in Kingdom.All)
+                {
+                    if (k == null || k.IsEliminated) continue;
+                    bool war = false;
+                    try { foreach (var o in Kingdom.All) if (o != k && !o.IsEliminated && k.IsAtWarWith(o)) { war = true; break; } } catch { }
+                    bool warTax = k.ActivePolicies.Contains(DefaultPolicies.WarTax);
+                    bool duty = k.ActivePolicies.Contains(DefaultPolicies.CrownDuty);
+                    bool debase = k.ActivePolicies.Contains(DefaultPolicies.DebasementOfTheCurrency);
+                    bool mono = k.ActivePolicies.Contains(DefaultPolicies.StateMonopolies);
+                    var ruler = k.RulingClan != null ? k.RulingClan.Leader : null;
+                    foreach (var st in k.Settlements)
+                    {
+                        if (st == null || st.SettlementComponent == null) continue;
+                        bool town = st.IsTown && st.Town != null;
+                        if (!town && !st.IsVillage) continue;
+                        if (st.IsUnderSiege || (st.IsVillage && st.Village.VillageState != Village.VillageStates.Normal)) continue;
+                        int gold = st.SettlementComponent.Gold;
+                        int spare = town ? Math.Max(0, gold - (int)floor) : Math.Max(0, gold);
+                        // danina wojenna (lay subsidy)
+                        if (s.LaySubsidyEnabled && war && spare > 0)
+                        {
+                            float share = (town ? s.LaySubsidyTownShare : s.LaySubsidyVillageShare) * (warTax ? Math.Max(1f, s.LaySubsidyWarTaxMultiplier) : 1f);
+                            int x = (int)Math.Min(spare, spare * Math.Max(0f, share));
+                            if (x > 0) { st.SettlementComponent.ChangeGold(-x); k.KingdomBudgetWallet += x; sub += x; spare -= x; }
+                        }
+                        if (!town) continue;
+                        // clo od handlu - z licznika cel miasta
+                        if (s.CrownCustomsEnabled && st.Town.TradeTaxAccumulated > 0)
+                        {
+                            float share = Math.Max(0f, s.CrownCustomsShare) * (duty ? Math.Max(1f, s.CrownCustomsDutyMultiplier) : 1f);
+                            int x = (int)(st.Town.TradeTaxAccumulated * Math.Min(1f, share));
+                            if (x > 0) { st.Town.TradeTaxAccumulated -= x; k.KingdomBudgetWallet += x; cus += x; }
+                        }
+                        if (!s.PolicyIncomeConserved || ruler == null) continue;
+                        // mennica: oplata z kasy miasta do krola (zamiast 100 d na lenno z niczego)
+                        if (debase && spare > 0)
+                        {
+                            int x = (int)(spare * Math.Max(0f, s.DebasementShare));
+                            if (x > 0) { st.SettlementComponent.ChangeGold(-x); ruler.ChangeHeroGold(x); deb += x; spare -= x; }
+                        }
+                        // monopole: 5% zysku warsztatow w miastach rodu krola, z KAPITALU warsztatu
+                        if (mono && st.OwnerClan == k.RulingClan)
+                            foreach (var w in st.Town.Workshops)
+                            {
+                                if (w == null || w.Owner == null || w.Owner == ruler) continue;
+                                int x = Math.Min((int)(w.ProfitMade * 0.05f), Math.Max(0, w.Capital));
+                                if (x > 0) { w.ChangeGold(-x); ruler.ChangeHeroGold(x); mon += x; }
+                            }
+                    }
+                }
+                Log.Info("Korona: dzien " + (int)CampaignTime.Now.ToDays + " - danina wojenna z kas osad " + sub + ", clo od handlu miast " + cus
+                         + " (do skarbcow krolestw); mennica " + deb + ", monopole " + mon + " (do krolow, z kas miast i kapitalu warsztatow).");
+            }
+            catch (Exception e) { Log.Error("KingdomTreasury.Levies", e); }
+        }
+
+        // Debasement (100 d na lenno) i State Monopolies (5% zysku, nie odejmowane) w AddRulingClanIncome sa z niczego - odejmujemy je
+        // w tym samym rozliczeniu (pobieramy je realnie w Levies)
+        public static void RulingIncomePostfix(Clan clan, ref ExplainedNumber goldChange)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || !s.PolicyIncomeConserved || clan == null || clan.Kingdom == null) return;
+                var k = clan.Kingdom;
+                float minus = 0f;
+                if (k.ActivePolicies.Contains(DefaultPolicies.DebasementOfTheCurrency)) minus += k.Fiefs.Count * 100;
+                if (k.ActivePolicies.Contains(DefaultPolicies.StateMonopolies))
+                    foreach (var st in clan.Settlements)
+                    {
+                        if (st == null || !st.IsTown || st.Town == null) continue;
+                        int sum = 0; foreach (var w in st.Town.Workshops) if (w != null) sum += w.ProfitMade;
+                        minus += (int)(sum * 0.05f);
+                    }
+                if (minus > 0f) goldChange.Add(-minus, _txtPolicy);
+            }
+            catch { }
+        }
+        private static readonly TaleWorlds.Localization.TextObject _txtPolicy = new TaleWorlds.Localization.TextObject("{=!}Mint and monopoly dues are collected from towns and workshops");
+
+        public static void CaravanVisitPostfix(ref int __result) { var s = Settings.Current; if (s != null && s.PolicyIncomeConserved) __result = 0; }
+        public static bool TaxOfficePrefix() { var s = Settings.Current; return s == null || !s.PolicyIncomeConserved; }
+
         // ROT ROTCoreBehavior.DailyTickClan: kazdy rod AI z kiesa <= 10 000 dostaje CODZIENNIE Tier x 5000 z niczego
         // (audyt 04.10, spis stalych modow) - dlatego nikt nie bankrutowal ani nie pozyczal w Banku Zelaznym.
         public static bool RotBailoutPrefix() { var s = Settings.Current; return s == null || !s.NoRotClanBailout; }
@@ -88,6 +185,27 @@ namespace Armoury
                 var rot = AccessTools.TypeByName("ROT.CampaignBehaviors.ROTCoreBehavior");
                 var rm = rot != null ? AccessTools.Method(rot, "DailyTickClan") : null;
                 if (rm != null) h.Patch(rm, prefix: new HarmonyMethod(typeof(KingdomTreasury), nameof(RotBailoutPrefix)));
+                var ri = AccessTools.Method(typeof(TaleWorlds.CampaignSystem.GameComponents.DefaultClanFinanceModel), "AddRulingClanIncome");
+                if (ri != null) h.Patch(ri, postfix: new HarmonyMethod(typeof(KingdomTreasury), nameof(RulingIncomePostfix)));
+                int tv = 0;
+                foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+                {
+                    Type[] types;
+                    try { types = asm.GetTypes(); } catch (System.Reflection.ReflectionTypeLoadException e) { types = e.Types; } catch { continue; }
+                    foreach (var t in types)
+                    {
+                        try
+                        {
+                            if (t == null || t.IsAbstract || !typeof(TaleWorlds.CampaignSystem.ComponentInterfaces.TradeAgreementModel).IsAssignableFrom(t)) continue;
+                            var pm = t.GetMethod("GetProfitPerCaravanVisit", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.DeclaredOnly);
+                            if (pm != null) { h.Patch(pm, postfix: new HarmonyMethod(typeof(KingdomTreasury), nameof(CaravanVisitPostfix))); tv++; }
+                        }
+                        catch { }
+                    }
+                }
+                var to = AccessTools.Method("BannerKings.Models.Vanilla.BKTaxModel:AddVillagePopulationTaxes");
+                if (to != null) h.Patch(to, prefix: new HarmonyMethod(typeof(KingdomTreasury), nameof(TaxOfficePrefix)));
+                Log.Info("KingdomTreasury: polityki bez zlota z niczego - mennica/monopole " + (ri != null ? "wpiete" : "BRAK") + ", umowy handlowe w " + tv + " modelach, Tax Office BK " + (to != null ? "wpiety" : "BRAK") + ".");
                 Log.Info("KingdomTreasury: zapomoga ROT dla biednych rodow " + (rm != null ? "przechwycona (MCM No Rot Clan Bailout)" : "BRAK ROTCoreBehavior.DailyTickClan") + ".");
                 Log.Info("KingdomTreasury: zloto z niczego do skarbca krolestw " + (m != null ? "wylaczone (podmienionych stalych " + _swapped + ", oczekiwane 4)" : "BRAK DailyTickClan") + ".");
             }
