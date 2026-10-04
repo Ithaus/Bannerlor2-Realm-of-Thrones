@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Localization;
 
@@ -119,97 +120,59 @@ namespace Armoury
             return people * Math.Max(0f, Settings.Current.PopulationRentPerHead) / days;
         }
 
-        // ------------------------------------------------------------ latki
-        private static readonly TextObject _txt = new TextObject("{=!}Rents and dues of the people");
-
-        public static void VillagePostfix(Village __0, ref ExplainedNumber __result)
-        {
-                var village = __0;
-            try
-            {
-                if (!On || village == null || village.Settlement == null) return;
-                float people = PeopleOf(village.Settlement);
-                if (people <= 0f) return;
-                float target = DailyRent(people);
-                __result.Add(target - __result.ResultNumber, _txt);
-            }
-            catch { }
-        }
-
-        [ThreadStatic] private static int _depth;
-        public static void TownPrefix() { _depth++; }
-        public static Exception TownFinalizer(Exception __exception) { if (_depth > 0) _depth--; return __exception; }
-        public static void TownPostfix(Town __0, ref ExplainedNumber __result)
-        {
-            if (_depth > 1) return;
-                var town = __0;
-            try
-            {
-                if (!On || town == null || town.Settlement == null || !town.Settlement.IsTown) return;   // zamki bez zmian
-                float people = PeopleOf(town.Settlement);
-                if (people <= 0f) return;
-                float target = DailyRent(people);
-                __result.Add(target - __result.ResultNumber, _txt);
-            }
-            catch { }
-        }
-
+        // ------------------------------------------------------------ renty jako przeplyw
+        // Audyt 04.10: podmiana podatku w modelach (a) nie wpinala sie (BK ma dwie wersje
+        // CalculateVillageTaxFromIncome - AmbiguousMatch wywracal cale ApplyAll), (b) bylaby zlotem
+        // z niczego (~7 mln/dzien). Teraz renta to PRZEPLYW: raz dziennie pan bierze z kasy wsi/miasta
+        // to, co mu sie nalezy wedle ludnosci, najwyzej `PopulationRentMaxShare` tego, co osada ma.
+        // Podatki gry (BK/vanilla) zostaja, jak byly. Spalona albo lupiona wies nie placi.
         internal static void ApplyAll(Harmony h)
         {
-            var done = new List<string>();
-            try
-            {
-                var bk = AccessTools.TypeByName("BannerKings.Models.Vanilla.BKTaxModel");
-                var vm = bk != null ? AccessTools.Method(bk, "CalculateVillageTaxFromIncome") : null;
-                if (vm != null) { h.Patch(vm, postfix: new HarmonyMethod(typeof(PopulationLaw), nameof(VillagePostfix)) { priority = Priority.Last }); done.Add("wsie (BK)"); }
-                int towns = 0;
-                var seen = new HashSet<Type>();
-                foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
-                {
-                    Type[] types;
-                    try { types = asm.GetTypes(); } catch { continue; }
-                    foreach (var t in types)
-                    {
-                        try
-                        {
-                            if (t == null || t.IsAbstract || !typeof(TaleWorlds.CampaignSystem.ComponentInterfaces.SettlementTaxModel).IsAssignableFrom(t)) continue;
-                            var m = t.GetMethod("CalculateTownTax", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                            if (m == null || m.DeclaringType != t || seen.Contains(t)) continue;
-                            seen.Add(t);
-                            h.Patch(m, prefix: new HarmonyMethod(typeof(PopulationLaw), nameof(TownPrefix)) { priority = Priority.First },
-                                       postfix: new HarmonyMethod(typeof(PopulationLaw), nameof(TownPostfix)) { priority = Priority.Last },
-                                       finalizer: new HarmonyMethod(typeof(PopulationLaw), nameof(TownFinalizer)));
-                            towns++;
-                        }
-                        catch { }
-                    }
-                }
-                done.Add("podatek miast w " + towns + " modelach");
-            }
-            catch (Exception e) { Log.Error("PopulationLaw.ApplyAll", e); }
-            Log.Info("PopulationLaw: dochod z lenn od ludnosci - wpiete: " + string.Join(", ", done.ToArray()) + ".");
+            Log.Info("PopulationLaw: renty od ludnosci jako przeplyw z kasy osad do panow " + (On ? "CZYNNE" : "wylaczone w MCM") + " (bez latek modeli podatku).");
         }
 
-        /// <summary>Raz dziennie: ludnosc i renta na krainy.</summary>
         internal static void Daily()
         {
             if (!On) return;
             try
             {
+                var s = Settings.Current;
+                float share = Math.Max(0f, Math.Min(1f, s.PopulationRentMaxShare));
                 var pop = new Dictionary<string, float>();
-                var rent = new Dictionary<string, float>();
-                foreach (var s in Settlement.All)
+                var due = new Dictionary<string, float>();
+                var paid = new Dictionary<string, float>();
+                long totalPaid = 0, totalDue = 0;
+                foreach (var st in Settlement.All)
                 {
-                    if (s == null || s.Culture == null || !(s.IsVillage || s.IsTown)) continue;
-                    float p = PeopleOf(s);
+                    if (st == null || st.Culture == null || !(st.IsVillage || st.IsTown)) continue;
+                    float p = PeopleOf(st);
                     if (p <= 0f) continue;
-                    string c = s.Culture.StringId;
+                    string c = st.Culture.StringId;
                     float v; pop.TryGetValue(c, out v); pop[c] = v + p;
-                    rent.TryGetValue(c, out v); rent[c] = v + DailyRent(p);
+                    float rent = DailyRent(p);
+                    due.TryGetValue(c, out v); due[c] = v + rent;
+                    totalDue += (long)rent;
+                    try
+                    {
+                        if (st.IsVillage && (st.Village.VillageState == Village.VillageStates.Looted || st.Village.VillageState == Village.VillageStates.BeingRaided)) continue;
+                        var lord = st.OwnerClan != null ? st.OwnerClan.Leader : null;
+                        if (lord == null || !lord.IsAlive) continue;
+                        int gold = st.SettlementComponent != null ? st.SettlementComponent.Gold : 0;
+                        int pay = (int)Math.Min(rent, gold * share);
+                        if (pay <= 0) continue;
+                        GiveGoldAction.ApplyForSettlementToCharacter(st, lord, pay, true);
+                        paid.TryGetValue(c, out v); paid[c] = v + pay;
+                        totalPaid += pay;
+                    }
+                    catch { }
                 }
-                var parts = pop.OrderByDescending(kv => kv.Value).Select(kv => kv.Key + " " + (kv.Value / 1e6f).ToString("0.00", CultureInfo.InvariantCulture) + "M/" + (int)rent[kv.Key] + " zl");
-                Log.Info("Ludnosc: dzien " + (int)CampaignTime.Now.ToDays + " | " + (pop.Values.Sum() / 1e6f).ToString("0.0", CultureInfo.InvariantCulture) + " mln, renty "
-                         + (int)rent.Values.Sum() + " zl/dzien | " + string.Join(", ", parts.ToArray()) + ".");
+                var parts = pop.OrderByDescending(kv => kv.Value).Select(kv =>
+                {
+                    float pd; paid.TryGetValue(kv.Key, out pd);
+                    return kv.Key + " " + (kv.Value / 1e6f).ToString("0.00", CultureInfo.InvariantCulture) + "M " + (int)pd + "/" + (int)due[kv.Key];
+                });
+                Log.Info("Ludnosc: dzien " + (int)CampaignTime.Now.ToDays + " | " + (pop.Values.Sum() / 1e6f).ToString("0.0", CultureInfo.InvariantCulture)
+                         + " mln | renty zaplacone " + totalPaid + " z naleznych " + totalDue + " zl (z kasy osad) | kraina ludnosc zaplacone/nalezne: " + string.Join(", ", parts.ToArray()) + ".");
             }
             catch (Exception e) { Log.Error("PopulationLaw.Daily", e); }
         }

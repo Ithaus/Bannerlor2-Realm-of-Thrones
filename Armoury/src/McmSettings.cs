@@ -1280,6 +1280,9 @@ namespace Armoury
         [SettingPropertyFloatingInteger("Population Scale", 0f, 4f, "0.00", HintText = "scale on every land's population (Westeros ~30 million, Essos with its hinterlands ~30 million)")]
         [SettingPropertyGroup("Population")]
         public float PopulationScale { get; set; } = 1f;
+        [SettingPropertyFloatingInteger("Population Rent Max Share", 0f, 1f, "0.00", HintText = "a lord takes his due rents each day from the village or town purse, but never more than this share of what it holds - a burnt village pays nothing")]
+        [SettingPropertyGroup("Population")]
+        public float PopulationRentMaxShare { get; set; } = 0.5f;
 
         [SettingPropertyBool("Start Kit Enabled", HintText = "starting gear you cannot wear (heavy armour your Athletics cannot carry) is swapped once, after character creation, for the best piece of the same kind you can wear - never dearer than the original")]
         [SettingPropertyGroup("Starting gear")]
@@ -2174,6 +2177,7 @@ namespace Armoury
             s.PopulationRentEnabled = PopulationRentEnabled;
             s.PopulationRentPerHead = PopulationRentPerHead;
             s.PopulationScale = PopulationScale;
+            s.PopulationRentMaxShare = PopulationRentMaxShare;
             s.StartKitEnabled = StartKitEnabled;
             s.OutlawLawEnabled = OutlawLawEnabled;
             s.OutlawSeedPerHearth = OutlawSeedPerHearth;
