@@ -21,7 +21,8 @@ namespace Armoury
     ///    historyczna + dni x dniowka mistrza wedle tieru, zysk; unikaty x prestiz.
     /// Wartosc idzie wszedzie: targ (dalej przez prawo podazy i popytu), lup, naprawa, zamowienia, nagrody.
     /// XP kowalstwa (DefaultSmithingModel liczy z Value) przeliczane od wartosci sprzed zmiany.
-    /// Konie, zwierzeta i towary handlowe - bez zmian w tym etapie (konie i bydlo juz sa historyczne).
+    /// Konie i zwierzeta bez zmian (juz historyczne); z towarow handlowych - surowce warsztatow (skora, len, skory, lnianka).
+    /// Popyt miast na przeliczone kategorie liczony w nowej monecie (DemandPostfix).
     /// </summary>
     internal static class HistoricalPrices
     {
@@ -67,15 +68,21 @@ namespace Armoury
             var s = Settings.Current;
             int t = Math.Max(1, Math.Min(6, (int)it.Tier + 1));
             float days = c.Days;
+            float wage = WageFor(t);
             if (it.ItemType == ItemObject.ItemTypeEnum.Arrows || it.ItemType == ItemObject.ItemTypeEnum.Bolts || it.ItemType == ItemObject.ItemTypeEnum.Thrown)
+            {
                 days *= Math.Max(0f, s.HistAmmoLaborMultiplier);    // fletcher i grotnik: snop to dzien-dwa pracy
+                wage = WageFor(1);                                    // test 04.10: dniowka mistrza t6 dawala snop strzal za 130 d - fletcher to zwykly rzemieslnik
+            }
+            else if (it.ItemType == ItemObject.ItemTypeEnum.Bow)
+                days *= Math.Max(0f, s.HistBowLaborMultiplier);     // test 04.10: luk t6 = 12 dni mistrza; historycznie luk wojenny 12-18 d
             float mat = c.MetalKg * MetalPerKg(c.Grade)
                         + c.MetalKg * s.HistCharcoalPerKg            // ~1 kg wegla na kg kutego metalu
                         + c.LeatherKg * s.HistLeatherPerKg
                         + c.LinenKg * s.HistLinenPerKg
                         + c.WoodKg * s.HistWoodPerKg
                         + c.Special * s.HistSpecialFactor;           // rog, sciegno, klej lukow (w modelu w skali gry)
-            float labor = days * WageFor(t);
+            float labor = days * wage;
             return (mat + labor) * (1f + Math.Max(0f, s.HistProfitPercent) / 100f);
         }
 
@@ -115,6 +122,12 @@ namespace Armoury
                     new KeyValuePair<string, float>("iron", s.HistIronOrePerKg),
                     new KeyValuePair<string, float>("hardwood", s.HistWoodPerKg),
                     new KeyValuePair<string, float>("charcoal", s.HistCharcoalPerKg),
+                    // test 04.10: skora i len zostaly w skali gry (23-24.5 d/kg) przy zbrojach juz w pensach - warsztaty
+                    // nie mialy z czego zarobic na przeszywanicy i robily tylko luki; surowce warsztatow tez historycznie
+                    new KeyValuePair<string, float>("leather", s.HistLeatherPerKg),
+                    new KeyValuePair<string, float>("linen", s.HistLinenPerKg),
+                    new KeyValuePair<string, float>("hides", s.HistHidesPerKg),
+                    new KeyValuePair<string, float>("flax", s.HistFlaxPerKg),
                 })
                 {
                     var it = MBObjectManager.Instance.GetObject<ItemObject>(kv.Key);
@@ -145,11 +158,52 @@ namespace Armoury
                     n++; before += was; after += it.Value;
                     if (watch.Contains(it.StringId)) samples.Add(it.StringId + " (" + it.ItemType + " t" + ((int)it.Tier + 1) + ", " + it.Weight.ToString("0.0", CultureInfo.InvariantCulture) + " kg) " + was + " -> " + it.Value + " d");
                 }
+                // 3. popyt miast w nowej monecie: srednia geometryczna (stara/nowa wartosc) przedmiotow kazdej kategorii
+                _catRatio.Clear();
+                var sumLog = new Dictionary<ItemCategory, double>(); var cnt = new Dictionary<ItemCategory, int>();
+                foreach (var kv in _orig)
+                {
+                    var cat = kv.Key.ItemCategory;
+                    if (cat == null || kv.Value <= 0 || kv.Key.Value <= 0) continue;
+                    double l; sumLog.TryGetValue(cat, out l); sumLog[cat] = l + Math.Log((double)kv.Value / kv.Key.Value);
+                    int k; cnt.TryGetValue(cat, out k); cnt[cat] = k + 1;
+                }
+                var cats = new List<string>();
+                foreach (var kv in sumLog)
+                {
+                    float r = (float)Math.Exp(kv.Value / cnt[kv.Key]);
+                    if (Math.Abs(r - 1f) < 0.02f) continue;
+                    _catRatio[kv.Key] = r;
+                    cats.Add(kv.Key.StringId + " /" + r.ToString("0.#", CultureInfo.InvariantCulture));
+                }
                 _applied = true;
-                Log.Info("HistoricalPrices: surowce kuzni [" + string.Join(", ", raw.ToArray()) + "]; uzbrojenie " + n + " szt. przeliczone z kosztu historycznego (suma wartosci "
+                Log.Info("HistoricalPrices: popyt miast przeliczony na nowa monete (" + (s.HistDemandScaling ? "CZYNNE" : "wylaczone") + ") w " + cats.Count + " kategoriach: " + string.Join(", ", cats.ToArray()) + ".");
+                Log.Info("HistoricalPrices: surowce kuzni ["+ string.Join(", ", raw.ToArray()) + "]; uzbrojenie " + n + " szt. przeliczone z kosztu historycznego (suma wartosci "
                          + before + " -> " + after + "). Przyklady: " + string.Join("; ", samples.ToArray()) + ".");
             }
             catch (Exception e) { Log.Error("HistoricalPrices.Apply", e); }
+        }
+
+        // ------------------------------------------------------------ popyt miast w nowej monecie
+        // Test 04.10: polki broni i zbroi opustoszaly w 4 dni (zbroje 88 -> 11, bron jednoreczna 341 -> 16). Miasto liczy
+        // popyt w ZLOCIE (DefaultSettlementEconomyModel.GetDailyDemandForCategory = BaseDemand x dobrobyt) i zjada
+        // budzet / cena sztuk (ItemConsumptionBehavior.MakeConsumption) - przy cenach 40x nizszych mieszczanie kupowali
+        // 40x wiecej mieczy; a wspolczynnik ceny (popyt / podaz w zlocie) szedl pod sufit, wiec ruda i drewno staly na
+        // indeksie 1.5. Dzielimy popyt kategorii przez to, ile razy potanialy jej przedmioty - rynek liczy te same sztuki.
+        private static readonly Dictionary<ItemCategory, float> _catRatio = new Dictionary<ItemCategory, float>();
+        [ThreadStatic] private static int _demandDepth;
+
+        public static void DemandPrefix() { _demandDepth++; }
+        public static Exception DemandFinalizer(Exception __exception) { if (_demandDepth > 0) _demandDepth--; return __exception; }
+        public static void DemandPostfix(ItemCategory __1, ref float __result)
+        {
+            if (_demandDepth > 1 || !_applied || __1 == null) return;
+            try
+            {
+                float r;
+                if (Settings.Current.HistDemandScaling && _catRatio.TryGetValue(__1, out r) && r > 0f) __result /= r;
+            }
+            catch { }
         }
 
         // ------------------------------------------------------------ XP kowalstwa od wartosci sprzed zmiany
@@ -251,6 +305,27 @@ namespace Armoury
                 }
                 catch (Exception e) { Log.Error("HistoricalPrices.Books", e); }
                 Log.Info("HistoricalPrices: XP kowalstwa od dawnych wartosci w " + n + "/3 metodach.");
+                int d = 0;
+                foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+                {
+                    Type[] types;
+                    try { types = asm.GetTypes(); } catch (System.Reflection.ReflectionTypeLoadException e) { types = e.Types; } catch { continue; }
+                    foreach (var ty in types)
+                    {
+                        try
+                        {
+                            if (ty == null || ty.IsAbstract || !typeof(TaleWorlds.CampaignSystem.ComponentInterfaces.SettlementEconomyModel).IsAssignableFrom(ty)) continue;
+                            var m = ty.GetMethod("GetDailyDemandForCategory", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.DeclaredOnly);
+                            if (m == null) continue;
+                            h.Patch(m, prefix: new HarmonyMethod(typeof(HistoricalPrices), nameof(DemandPrefix)) { priority = Priority.First },
+                                       postfix: new HarmonyMethod(typeof(HistoricalPrices), nameof(DemandPostfix)) { priority = Priority.Last },
+                                       finalizer: new HarmonyMethod(typeof(HistoricalPrices), nameof(DemandFinalizer)));
+                            d++;
+                        }
+                        catch { }
+                    }
+                }
+                Log.Info("HistoricalPrices: popyt miast w nowej monecie wpiety w " + d + " modelach ekonomii osad.");
             }
             catch (Exception e) { Log.Error("HistoricalPrices.ApplyAll", e); }
         }

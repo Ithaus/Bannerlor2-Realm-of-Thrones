@@ -126,5 +126,33 @@ namespace Armoury
             if (swaps.Count > 0)
                 Log.Player("Your starting gear has been matched to what you can actually wear.");
         }
+
+        // ------------------------------------------------------------ zloto startowe BK
+        // Jeff 04.10: "nie moge miec na starcie 1000 denarow". BK (DefaultStartOptions.Adventurer) daje awanturnikowi
+        // 1000 d = ok. 4 funty, ponad rok pracy robotnika. Prefix na StartOption.Initialize podmienia kwote dla
+        // "start_adventurer" na StartGoldAdventurer (BKCampaignStartBehavior.RunStartOption ustawia zloto = option.Gold).
+        public static void StartOptionPrefix(object __instance, ref int gold)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || s.StartGoldAdventurer < 0) return;
+                var id = HarmonyLib.Traverse.Create(__instance).Property("StringId").GetValue() as string;
+                if (id == "start_adventurer") gold = s.StartGoldAdventurer;
+            }
+            catch { }
+        }
+
+        internal static void ApplyAll(HarmonyLib.Harmony h)
+        {
+            try
+            {
+                var t = HarmonyLib.AccessTools.TypeByName("BannerKings.Managers.CampaignStart.StartOption");
+                var m = t != null ? HarmonyLib.AccessTools.Method(t, "Initialize") : null;
+                if (m != null) h.Patch(m, prefix: new HarmonyLib.HarmonyMethod(typeof(StartKit), nameof(StartOptionPrefix)));
+                Log.Info("StartKit: zloto startowe awanturnika BK = " + Settings.Current.StartGoldAdventurer + " d " + (m != null ? "wpiete" : "(brak BK StartOption)") + ".");
+            }
+            catch (Exception e) { Log.Error("StartKit.ApplyAll", e); }
+        }
     }
 }

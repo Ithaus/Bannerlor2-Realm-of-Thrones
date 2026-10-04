@@ -408,6 +408,10 @@ namespace Armoury
         public float HistAmmoLaborMultiplier = 8f;         // fletcher and arrowsmith work on a stack of arrows or bolts (a sheaf of 24 cost about 15 d)
         public float HistTournamentScale = 4f;             // the game seeks tournament prizes worth 1600-5000; with historical prices the range is divided by this (400-1250 pence: a fine sword, a good harness piece)
         public float HistUniquePrestige = 4f;              // named pieces of the great houses cost this many times their making
+        public float HistHidesPerKg = 1f;                  // raw hides, pence per kg (an ox hide of 25-30 kg sold for 1-3 shillings)
+        public float HistFlaxPerKg = 2f;                   // raw flax and hemp, pence per kg (estimate)
+        public float HistBowLaborMultiplier = 0.5f;        // a bowyer's days on a bow, against the smith's model (a war longbow cost 12-18 d, a day or two of work)
+        public bool HistDemandScaling = true;              // town demand for each repriced kind of goods is counted in the new coin too - otherwise townsfolk with the old purse buy up tens of times more cheap swords, ore and cloth and the stalls run dry
         public bool PopulationRentEnabled = true;          // a fief pays by the people it stands for: each village and town on the map is a symbol of a whole land, and its lord's rents follow that land's population (the Reach richest, the Iron Islands poor)
         public float PopulationRentPerHead = 40f;          // rents and dues a lord draws from each subject a year, in coins (about 40 pence a head in the medieval estimate)
         public float PopulationScale = 1f;                 // scale on every land's population (Westeros ~30 million, Essos with its hinterlands ~30 million)
@@ -420,6 +424,7 @@ namespace Armoury
         public float AmmoRepairPercent = 20f;              // share of shot arrows mended by the army's fletchers (new fletching, heads) - the rest are broken or lost
         public bool KeepWearThroughBattle = true;          // gear your men take into battle comes back in the state it went out (and worse after the fight) - worn mail no longer returns as new; damage piles up and must be repaired
         public bool StartKitEnabled = true;                // starting gear you cannot wear (heavy armour your Athletics cannot carry) is swapped once, after character creation, for the best piece of the same kind you can wear - never dearer than the original
+        public int StartGoldAdventurer = 100;              // coins an Adventurer starts with in the Banner Kings start (Banner Kings gives 1000 - over a year of a labourer's pay); -1 leaves Banner Kings as it is
         public bool OutlawLawEnabled = true;               // outlaws are real men: deserters, unpaid soldiers, men routed from battle, villagers driven off by raids, hunger and war; bands form only where such men exist and wear only what they brought, looted or bought
         public float OutlawSeedPerHearth = 0.03f;          // outlaws already in the woods when the campaign begins, per hearth of each region's villages (taken from those villages)
         public float OutlawDailyPerThousandHearth = 0.1f;  // men a region loses to the woods each day per 1000 hearths, times its misery (poverty, war, burnt villages, hunger, lawlessness)

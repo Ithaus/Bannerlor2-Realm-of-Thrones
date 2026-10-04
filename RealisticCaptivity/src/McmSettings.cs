@@ -324,7 +324,7 @@ namespace RealisticCaptivity
         [SettingPropertyGroup("Honest work")]
         public int WorkOnlyBelowGold { get; set; } = 2500;
 
-        [SettingPropertyFloatingInteger("Work Pay Village Base", 0.00f, 60.00f, "0.00", HintText = "village day wage before the hearth bonus")]
+        [SettingPropertyFloatingInteger("Work Pay Village Base", 0.00f, 4.00f, "0.00", HintText = "village day wage before the hearth bonus")]
         [SettingPropertyGroup("Honest work")]
         public float WorkPayVillageBase { get; set; } = 1f;
 
@@ -332,7 +332,7 @@ namespace RealisticCaptivity
         [SettingPropertyGroup("Honest work")]
         public float WorkPayVillageHearthDiv { get; set; } = 1000f;
 
-        [SettingPropertyFloatingInteger("Work Pay Town Base", 0.00f, 80.00f, "0.00", HintText = "town day wage before the prosperity bonus")]
+        [SettingPropertyFloatingInteger("Work Pay Town Base", 0.00f, 6.00f, "0.00", HintText = "town day wage before the prosperity bonus")]
         [SettingPropertyGroup("Honest work")]
         public float WorkPayTownBase { get; set; } = 1.5f;
 
@@ -364,7 +364,7 @@ namespace RealisticCaptivity
         [SettingPropertyGroup("Honest work")]
         public int GuardSkillRequired { get; set; } = 40;
 
-        [SettingPropertyFloatingInteger("Guard Pay Base", 0.00f, 180.00f, "0.00", HintText = "night-watch wage before the prosperity bonus")]
+        [SettingPropertyFloatingInteger("Guard Pay Base", 0.00f, 8.00f, "0.00", HintText = "night-watch wage before the prosperity bonus")]
         [SettingPropertyGroup("Honest work")]
         public float GuardPayBase { get; set; } = 2f;
 
