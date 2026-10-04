@@ -125,6 +125,7 @@ namespace CrashScribe
                 if (cgs != null) cgs.AddBehavior(new MendsBehavior());
                 if (cgs != null) cgs.AddBehavior(new DialogEscape());
                 if (cgs != null) cgs.AddBehavior(new NightKingCall());   // Zew Nocnego Krola (Jeff 16.09)
+                if (cgs != null) cgs.AddBehavior(new EconomyAudit());    // audyt ekonomii rodow (Jeff 04.10), tylko odczyt
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "OnGameStart.WarReport", null); } catch { } }
         }
