@@ -1561,6 +1561,14 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public int CampBackground { get; set; } = 1;
 
+        [SettingPropertyBool("Map Clock Enabled", HintText = "the hour of the day next to the date on the map bar (\"Day 12 of Summer, 299 AC - 14:30\")")]
+        [SettingPropertyGroup("A night's rest")]
+        public bool MapClockEnabled { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Fast Forward Multiplier", 1f, 32f, "0.0", HintText = "how fast the fast-forward button runs (vanilla 4) - a 364-day year and slow marches need a quicker clock")]
+        [SettingPropertyGroup("A night's rest")]
+        public float FastForwardMultiplier { get; set; } = 8f;
+
 
         [SettingPropertyFloatingInteger("Sleep Hours Needed", 0.00f, 24.00f, "0.00", HintText = "base hours of sleep per day; sleep debt adds interest on top (1 night owed: +3h, 2: +9h, 3: +15h) and only the full sum clears it")]
         [SettingPropertyGroup("A night's rest")]
@@ -2236,6 +2244,8 @@ namespace Armoury
             s.MarketGlutRecoverPerDay = MarketGlutRecoverPerDay;
             s.NightRestEnabled = NightRestEnabled;
             s.CampBackground = CampBackground;
+            s.MapClockEnabled = MapClockEnabled;
+            s.FastForwardMultiplier = FastForwardMultiplier;
             s.SleepHoursNeeded = SleepHoursNeeded;
             s.DayRestFactor = DayRestFactor;
             s.QuickCampKey = QuickCampKey;

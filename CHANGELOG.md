@@ -1,5 +1,13 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-04 (22) - ZEGAR NA PASKU MAPY i SZYBSZE PRZEWIJANIE (x8 zamiast x4)
+**Mod:** Armoury | **Pliki:** NOWY `MapClock.cs`; `ArmouryBehavior.cs` (HourlyTick + OnSessionLaunched: ApplySpeed), `SubModuleMain.cs`, `Settings.cs` + `McmSettings.cs` (`MapClockEnabled`, `FastForwardMultiplier` 8, grupa "A night's rest")
+**Zgloszenie (Jeff 04.10):** "czy mozna dodac szybszy uplyw czasu plus ktora jest dokladnie godzina".
+**Przyczyna:** `MapTimeControlVM.Tick` odswieza date tylko przy zmianie dnia i bez godziny; przewijanie = `Campaign.SpeedUpMultiplier` 4, przywracane do 4 przy kazdym wczytaniu (`Campaign.OnLoad`).
+**Zmiana:** (1) postfix na `MapTimeControlVM.Tick` i `RefreshValues`: data + " - HH:MM", przepisywana tylko przy zmianie minuty. (2) `SpeedUpMultiplier` = MCM "Fast Forward Multiplier" (domyslnie 8, zakres 1-32), ustawiany przy starcie sesji i co godzine gry.
+**Ryzyko / co sprawdzic:** przy x8 dzienne obliczenia (bandy, rynek, warsztaty, bank) wypadaja dwa razy czesciej w czasie rzeczywistym - jesli gra przycina o polnocy, zejsc nizej. Data z godzina moze nie zmiescic sie w okienku paska (wtedy zawija w dwie linie, jak dzis).
+**Status:** WGRANE 2026-10-04 (Armoury.dll md5 dea8850a878ebf142ea5d7eab5f16999, build rc=0, gra zamknieta; poprzednie DLL obok jako `Armoury.dll.bak-2026-10-04-przed-zegarem`). DO SPRAWDZENIA - na obecnym save.
+
 ## 2026-10-04 (21) - TLO MENU OBOZU do wyboru (domyslnie oboz pod murami zamiast jezdzcow kultury)
 **Mod:** Armoury | **Pliki:** `NightRest.cs` (`SetCampBackground`), `Settings.cs` + `McmSettings.cs` (`CampBackground` 1, grupa "A night's rest")
 **Zgloszenie (Jeff 04.10, zrzut):** "czy te obrazki, jak rozbijam oboz, musza byc z jezdzcami - nie ma obrazka przypominajacego oboz?"

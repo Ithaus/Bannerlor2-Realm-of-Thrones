@@ -471,6 +471,7 @@ namespace Armoury
             // sprzet startowy dopasowany do umiejetnosci (Jeff 04.10)
             CampaignEvents.OnCharacterCreationIsOverEvent.AddNonSerializedListener(this, delegate { try { var ss = Settings.Current; if (ss != null && ss.StartKitEnabled) StartKit.OnCharacterCreationOver(); } catch { } });
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, delegate { try { StartKit.Hourly(); } catch { } });
+            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, delegate { MapClock.ApplySpeed(); });   // gra wraca do x4 przy wczytaniu
             // prawo wyrzutkow (Jeff 04.10): pula ludzi wyjetych spod prawa
             CampaignEvents.OnTroopsDesertedEvent.AddNonSerializedListener(this, OutlawLaw.OnTroopsDeserted);
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, OutlawLaw.OnMapEventEnded);
@@ -905,7 +906,7 @@ namespace Armoury
 
         private void OnSessionLaunched(CampaignGameStarter starter)
         {
-            try { McmSettings.Apply(); MaterialLaw.Apply(); ArmsPricing.Build(); } catch (Exception e) { Log.Error("MaterialLaw/ArmsPricing", e); }   // surowce PRZED wycena uzbrojenia
+            try { McmSettings.Apply(); MaterialLaw.Apply(); ArmsPricing.Build(); MapClock.ApplySpeed(); } catch (Exception e) { Log.Error("MaterialLaw/ArmsPricing", e); }   // surowce PRZED wycena uzbrojenia
             try { Stables.BuildRiderMap(); } catch (Exception e) { Log.Error("Stables.BuildRiderMap", e); }
             try { FixCharcoalWeight(); } catch (Exception e) { Log.Error("FixCharcoalWeight", e); }
             try { WearGroups.Fix(); } catch (Exception e) { Log.Error("WearGroups.Fix", e); }
