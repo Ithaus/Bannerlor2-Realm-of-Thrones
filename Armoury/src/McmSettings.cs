@@ -1249,6 +1249,74 @@ namespace Armoury
         public float WorkshopWoodPerOre { get; set; } = 5f;
 [SettingPropertyInteger("Workshop Candidates", 0, 160, "0", HintText = "how many different pieces a workshop weighs each morning when deciding what pays best to make")]        [SettingPropertyGroup("Workshops")]        public int WorkshopCandidates { get; set; } = 40;
 
+        [SettingPropertyBool("Climate Enabled", HintText = "the seasons of Westeros: one season at a time lasting for years, its end proclaimed by a white raven from the Citadel; dates read \"Day N of Summer, 299 AC\"")]
+        [SettingPropertyGroup("Westeros climate")]
+        public bool ClimateEnabled { get; set; } = true;
+
+        [SettingPropertyBool("Climate Drives Economy", HintText = "food, harvests, sickness, travel and the AI's winter caution (RealisticBannerlord, BetterEconomy, StrategicCampaignAI) follow the long seasons too - a winter of years is a hungry one")]
+        [SettingPropertyGroup("Westeros climate")]
+        public bool ClimateDrivesEconomy { get; set; } = true;
+
+        [SettingPropertyInteger("Climate Summer Days So Far", 0, 14560, "0", HintText = "how long the summer has already lasted when the campaign begins (the summer that lasted ten years)")]
+        [SettingPropertyGroup("Westeros climate")]
+        public int ClimateSummerDaysSoFar { get; set; } = 3640;
+
+        [SettingPropertyInteger("Climate Summer Days Left Min", 0, 480, "0", HintText = "fewest days the long summer still lasts after the campaign begins")]
+        [SettingPropertyGroup("Westeros climate")]
+        public int ClimateSummerDaysLeftMin { get; set; } = 120;
+
+        [SettingPropertyInteger("Climate Summer Days Left Max", 0, 1080, "0", HintText = "most days the long summer still lasts after the campaign begins")]
+        [SettingPropertyGroup("Westeros climate")]
+        public int ClimateSummerDaysLeftMax { get; set; } = 270;
+
+        [SettingPropertyInteger("Climate First Autumn Days Min", 0, 1200, "0", HintText = "the first autumn lasts at least this many days")]
+        [SettingPropertyGroup("Westeros climate")]
+        public int ClimateFirstAutumnDaysMin { get; set; } = 300;
+
+        [SettingPropertyInteger("Climate First Autumn Days Max", 0, 1800, "0", HintText = "the first autumn lasts at most this many days")]
+        [SettingPropertyGroup("Westeros climate")]
+        public int ClimateFirstAutumnDaysMax { get; set; } = 450;
+
+        [SettingPropertyFloatingInteger("Climate First Winter Years Min", 0f, 12f, "0.00", HintText = "the first winter lasts at least this many years")]
+        [SettingPropertyGroup("Westeros climate")]
+        public float ClimateFirstWinterYearsMin { get; set; } = 3f;
+
+        [SettingPropertyFloatingInteger("Climate First Winter Years Max", 0f, 20f, "0.00", HintText = "the first winter lasts at most this many years")]
+        [SettingPropertyGroup("Westeros climate")]
+        public float ClimateFirstWinterYearsMax { get; set; } = 5f;
+
+        [SettingPropertyFloatingInteger("Climate Spring Years Min", 0f, 4f, "0.00", HintText = "later springs last at least this many years")]
+        [SettingPropertyGroup("Westeros climate")]
+        public float ClimateSpringYearsMin { get; set; } = 1f;
+
+        [SettingPropertyFloatingInteger("Climate Spring Years Max", 0f, 12f, "0.00", HintText = "later springs last at most this many years")]
+        [SettingPropertyGroup("Westeros climate")]
+        public float ClimateSpringYearsMax { get; set; } = 3f;
+
+        [SettingPropertyFloatingInteger("Climate Summer Years Min", 0f, 8f, "0.00", HintText = "later summers last at least this many years")]
+        [SettingPropertyGroup("Westeros climate")]
+        public float ClimateSummerYearsMin { get; set; } = 2f;
+
+        [SettingPropertyFloatingInteger("Climate Summer Years Max", 0f, 32f, "0.00", HintText = "later summers last at most this many years")]
+        [SettingPropertyGroup("Westeros climate")]
+        public float ClimateSummerYearsMax { get; set; } = 8f;
+
+        [SettingPropertyFloatingInteger("Climate Autumn Years Min", 0f, 4f, "0.00", HintText = "later autumns last at least this many years")]
+        [SettingPropertyGroup("Westeros climate")]
+        public float ClimateAutumnYearsMin { get; set; } = 1f;
+
+        [SettingPropertyFloatingInteger("Climate Autumn Years Max", 0f, 8f, "0.00", HintText = "later autumns last at most this many years")]
+        [SettingPropertyGroup("Westeros climate")]
+        public float ClimateAutumnYearsMax { get; set; } = 2f;
+
+        [SettingPropertyFloatingInteger("Climate Winter Years Min", 0f, 8f, "0.00", HintText = "later winters last at least this many years")]
+        [SettingPropertyGroup("Westeros climate")]
+        public float ClimateWinterYearsMin { get; set; } = 2f;
+
+        [SettingPropertyFloatingInteger("Climate Winter Years Max", 0f, 24f, "0.00", HintText = "later winters last at most this many years")]
+        [SettingPropertyGroup("Westeros climate")]
+        public float ClimateWinterYearsMax { get; set; } = 6f;
+
         [SettingPropertyBool("Iron Bank Enabled", HintText = "the Iron Bank of Braavos lends to lords (AI and you): wages and war chests on credit, repaid daily with interest and from the spoils of war - and woe to those who do not pay")]
         [SettingPropertyGroup("Iron bank")]
         public bool IronBankEnabled { get; set; } = true;
@@ -1958,6 +2026,23 @@ namespace Armoury
             s.WorkshopCrudeKgPerOre = WorkshopCrudeKgPerOre;
             s.WorkshopWoodPerOre = WorkshopWoodPerOre;
             s.WorkshopCandidates = WorkshopCandidates;
+            s.ClimateEnabled = ClimateEnabled;
+            s.ClimateDrivesEconomy = ClimateDrivesEconomy;
+            s.ClimateSummerDaysSoFar = ClimateSummerDaysSoFar;
+            s.ClimateSummerDaysLeftMin = ClimateSummerDaysLeftMin;
+            s.ClimateSummerDaysLeftMax = ClimateSummerDaysLeftMax;
+            s.ClimateFirstAutumnDaysMin = ClimateFirstAutumnDaysMin;
+            s.ClimateFirstAutumnDaysMax = ClimateFirstAutumnDaysMax;
+            s.ClimateFirstWinterYearsMin = ClimateFirstWinterYearsMin;
+            s.ClimateFirstWinterYearsMax = ClimateFirstWinterYearsMax;
+            s.ClimateSpringYearsMin = ClimateSpringYearsMin;
+            s.ClimateSpringYearsMax = ClimateSpringYearsMax;
+            s.ClimateSummerYearsMin = ClimateSummerYearsMin;
+            s.ClimateSummerYearsMax = ClimateSummerYearsMax;
+            s.ClimateAutumnYearsMin = ClimateAutumnYearsMin;
+            s.ClimateAutumnYearsMax = ClimateAutumnYearsMax;
+            s.ClimateWinterYearsMin = ClimateWinterYearsMin;
+            s.ClimateWinterYearsMax = ClimateWinterYearsMax;
             s.IronBankEnabled = IronBankEnabled;
             s.IronBankCapital = IronBankCapital;
             s.IronBankIncomeDays = IronBankIncomeDays;

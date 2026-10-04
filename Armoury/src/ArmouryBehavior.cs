@@ -386,7 +386,7 @@ namespace Armoury
         }
         private Dictionary<string,int> _prisonerBaseline;
 
-        public ArmouryBehavior() { Instance = this; }
+        public ArmouryBehavior() { Instance = this; WesterosClimate.Reset(); }
 
         public override void SyncData(IDataStore dataStore)
         {
@@ -413,6 +413,10 @@ namespace Armoury
                 string nightrest = NightRest.Export();
                 dataStore.SyncData("arm_nightrest", ref nightrest);
                 if (dataStore.IsLoading) NightRest.Import(nightrest);
+                // klimat Westeros: historia por roku (Jeff 04.10)
+                string climate = WesterosClimate.Export();
+                dataStore.SyncData("arm_climate", ref climate);
+                if (dataStore.IsLoading) WesterosClimate.Import(climate);
                 // Bank Zelazny: dlugi rodow i kapital Banku (Jeff 04.10)
                 string bank = IronBank.Export();
                 dataStore.SyncData("arm_ironbank", ref bank);
@@ -1091,6 +1095,7 @@ namespace Armoury
             try { TerrainEase.DailyAudit(); } catch (Exception e) { Log.Error("SpeedAudit", e); }
             try { PlagueWatch.DailyReport(); } catch (Exception e) { Log.Error("PlagueWatch", e); }
             try { InfluenceWatch.DailyReport(); } catch (Exception e) { Log.Error("InfluenceWatch", e); }
+            try { WesterosClimate.Daily(); } catch (Exception e) { Log.Error("WesterosClimate.Daily", e); }   // biale kruki: koniec pory roku
             try { WinterBite.OnDaily(); } catch (Exception e) { Log.Error("WinterBite", e); }
             try { ScorchedEarth.OnDaily(); } catch (Exception e) { Log.Error("ScorchedEarth", e); }
             try { WarLedger.OnDaily(); } catch (Exception e) { Log.Error("WarLedger", e); }

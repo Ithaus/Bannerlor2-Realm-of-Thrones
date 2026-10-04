@@ -376,6 +376,23 @@ namespace Armoury
         public int WorkshopCandidates = 40;                // how many different pieces a workshop weighs each morning when deciding what pays best to make
 
         // --- Iron Bank ---
+        public bool ClimateEnabled = true;                 // the seasons of Westeros: one season at a time lasting for years, its end proclaimed by a white raven from the Citadel; dates read "Day N of Summer, 299 AC"
+        public bool ClimateDrivesEconomy = true;           // food, harvests, sickness, travel and the AI's winter caution (RealisticBannerlord, BetterEconomy, StrategicCampaignAI) follow the long seasons too - a winter of years is a hungry one
+        public int ClimateSummerDaysSoFar = 3640;          // how long the summer has already lasted when the campaign begins (the summer that lasted ten years)
+        public int ClimateSummerDaysLeftMin = 120;         // fewest days the long summer still lasts after the campaign begins
+        public int ClimateSummerDaysLeftMax = 270;         // most days the long summer still lasts after the campaign begins
+        public int ClimateFirstAutumnDaysMin = 300;        // the first autumn lasts at least this many days
+        public int ClimateFirstAutumnDaysMax = 450;        // the first autumn lasts at most this many days
+        public float ClimateFirstWinterYearsMin = 3f;      // the first winter lasts at least this many years
+        public float ClimateFirstWinterYearsMax = 5f;      // the first winter lasts at most this many years
+        public float ClimateSpringYearsMin = 1f;           // later springs last at least this many years
+        public float ClimateSpringYearsMax = 3f;           // later springs last at most this many years
+        public float ClimateSummerYearsMin = 2f;           // later summers last at least this many years
+        public float ClimateSummerYearsMax = 8f;           // later summers last at most this many years
+        public float ClimateAutumnYearsMin = 1f;           // later autumns last at least this many years
+        public float ClimateAutumnYearsMax = 2f;           // later autumns last at most this many years
+        public float ClimateWinterYearsMin = 2f;           // later winters last at least this many years
+        public float ClimateWinterYearsMax = 6f;           // later winters last at most this many years
         public bool IronBankEnabled = true;                // the Iron Bank of Braavos lends to lords (AI and you): wages and war chests on credit, repaid daily with interest and from the spoils of war - and woe to those who do not pay
         public int IronBankCapital = 5000000;              // gold the Bank starts with; loans draw it down, repayments with interest fill it up - an empty Bank lends nothing
         public float IronBankIncomeDays = 60f;             // a house may borrow this many days of its income, plus its fiefs as surety

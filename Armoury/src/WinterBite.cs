@@ -41,7 +41,7 @@ namespace Armoury
                 var s = Settings.Current;
                 if (s == null || !s.WinterBiteEnabled) return false;
                 if (_longNight && s.LongNightWithNK) return true;
-                return CampaignTime.Now.GetSeasonOfYear == CampaignTime.Seasons.Winter;
+                return WesterosClimate.Now() == CampaignTime.Seasons.Winter;
             }
             catch { return false; }
         }
@@ -78,13 +78,13 @@ namespace Armoury
                                   : "Dawn breaks over the realm - the Long Night is over.", true);
                 }
 
-                int season = (int)CampaignTime.Now.GetSeasonOfYear;
+                int season = (int)WesterosClimate.Now();
                 if (season != _lastSeason)
                 {
                     _lastSeason = season;
-                    if (CampaignTime.Now.GetSeasonOfYear == CampaignTime.Seasons.Winter)
+                    if (WesterosClimate.Now() == CampaignTime.Seasons.Winter)
                         Log.Player("Winter has come - the granaries will be tested.", true);
-                    else if (CampaignTime.Now.GetSeasonOfYear == CampaignTime.Seasons.Spring)
+                    else if (WesterosClimate.Now() == CampaignTime.Seasons.Spring)
                         Log.Player("The thaw - spring loosens winter's grip.", false);
                 }
             }
@@ -99,7 +99,7 @@ namespace Armoury
             try
             {
                 if (s != null && s.WinterBiteEnabled
-                    && CampaignTime.Now.GetSeasonOfYear == CampaignTime.Seasons.Autumn)
+                    && WesterosClimate.Now() == CampaignTime.Seasons.Autumn)
                     cap = (int)(cap * Math.Max(1f, s.AutumnStockMultiplier));
             }
             catch { }
