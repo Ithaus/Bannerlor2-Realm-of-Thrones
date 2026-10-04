@@ -90,7 +90,8 @@ namespace Armoury
                 if (item.Value <= 0) return;
                 var key = PlaceKey(__2);
                 if (key == null) return;
-                float sold = SoldCount(key, (int)item.ItemType);
+                // gdy dziala prawo podazy i popytu (SupplyDemand), nadmiar karze ono - tu tylko podloga 5%
+                float sold = SupplyDemand.Active ? 0f : SoldCount(key, (int)item.ItemType);
 
                 float baseRate = __result * 100f / item.Value;                  // co daje rynek (handel, perki, stan)
                 float start = MathF.Max(baseRate, c.MarketGlutStartPercent);    // 5% to podloga, lepsza stawka stoi

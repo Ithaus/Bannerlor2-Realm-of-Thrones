@@ -302,7 +302,7 @@ namespace Armoury
                 {
                     if (it == null || !it.HasWeaponComponent || it.StringId == null) continue;
                     if (LegendIds.Contains(it.StringId) || HasLegendPrefix(it.StringId)) { set.Add(it); continue; }
-                    if (floor > 0 && PriceLaw.Orig(it) >= floor && it.NotMerchandise) set.Add(it);
+                    if (floor > 0 && it.Value >= floor && it.NotMerchandise) set.Add(it);
                 }
                 Log.Info("LegendaryLaw: zbior legend zbudowany - " + set.Count
                          + " broni (fabryczne NotMerchandise 100k+, lista person, seryjne klingi valyrianskie).");
@@ -317,7 +317,7 @@ namespace Armoury
             if (_legendSet != null) return _legendSet.Contains(it);
             if (LegendIds.Contains(it.StringId) || HasLegendPrefix(it.StringId)) return true;
             var floor = Settings.Current.LegendaryLootValueFloor;
-            return floor > 0 && PriceLaw.Orig(it) >= floor && it.NotMerchandise;
+            return floor > 0 && it.Value >= floor && it.NotMerchandise;
         }
 
         /// <summary>Najlepszy ZWYKLY odpowiednik legendy: ta sama klasa broni,

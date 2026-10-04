@@ -876,7 +876,6 @@ namespace Armoury
 
         private void OnSessionLaunched(CampaignGameStarter starter)
         {
-            try { McmSettings.Apply(); PriceLaw.Apply(); } catch (Exception e) { Log.Error("PriceLaw.Apply", e); }   // ceny sredniowieczne - PRZED wszystkim, co czyta Value
             try { Stables.BuildRiderMap(); } catch (Exception e) { Log.Error("Stables.BuildRiderMap", e); }
             try { FixCharcoalWeight(); } catch (Exception e) { Log.Error("FixCharcoalWeight", e); }
             try { WearGroups.Fix(); } catch (Exception e) { Log.Error("WearGroups.Fix", e); }
@@ -1087,6 +1086,7 @@ namespace Armoury
             try { WarLedger.OnDaily(); } catch (Exception e) { Log.Error("WarLedger", e); }
             try { Orders.DailyTick(); }
             catch (Exception e) { Log.Error("OnDailyTick", e); }
+            try { SupplyDemand.DailyDrain(); } catch (Exception e) { Log.Error("SupplyDemand.DailyDrain", e); }
             try { MarketGlut.DailyDigest(); }
             catch (Exception e) { Log.Error("GlutDigest", e); }
             try

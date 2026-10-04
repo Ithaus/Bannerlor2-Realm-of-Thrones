@@ -328,9 +328,14 @@ namespace Armoury
         public float MarchRiderPace = 6.5f;                // map speed cap for a clean column of riders - every man horsed, no train
         public float MarchPackAllowance = 0.25f;           // this many pack animals PER MAN count as field supply, not a train (0.25 = a mule per four men rides free)
 
-        // --- Medieval prices ---
-        public bool MedievalArmsPrices = true;             // arms and armour cost what they cost in the Middle Ages, measured against the soldier's pay (1 denar ~ 1 penny): a levy's kit ~150, a knight's harness a few thousand - horses, goods and wages untouched (takes effect on loading a save)
-        public float MedievalArmsPriceScale = 1.0f;        // times the medieval target prices (2 = twice as dear) - never above the game's own price
+        // --- Supply and demand ---
+        public bool SupplyDemandEnabled = true;            // arms, armour and horses obey supply and demand in towns and castles: a full stall sells cheap, an empty one dear - for buying AND selling, you and the AI alike (the item's own worth is untouched)
+        public float SupplyDemandBase = 4f;                // pieces of one kind (type and tier) a town of reference prosperity wants on its stalls; fewer for higher tiers
+        public float SupplyDemandRefProsperity = 3000f;    // prosperity at which a town wants exactly the base amount (0.3x to 3x around it; castles half)
+        public float SupplyDemandElasticity = 0.5f;        // how hard the price reacts: (wanted + 1) / (on the stall + 1) raised to this power
+        public float SupplyDemandMinFactor = 0.25f;        // a glutted stall never pays less than this share of the normal price
+        public float SupplyDemandMaxFactor = 2f;           // a starved stall never charges more than this many times the normal price
+        public float SupplyDemandDrainPercent = 15f;       // each day locals and traders take this % of the surplus above demand off the stalls
 
         // --- The glutted market ---
         public bool MarketGlutEnabled = true;              // a merchant needs only so many of one thing: each extra piece of a type you sell him fetches less

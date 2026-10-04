@@ -90,7 +90,7 @@ namespace Armoury
                     if (it == null || !it.HasArmorComponent || it.NotMerchandise) continue;
                     int tier = (int)it.Tier + 1;
                     if (tier < s.OrderMinTier || tier > s.OrderMaxTier) continue;
-                    if (it.Value <= 0 || PriceLaw.Orig(it) > s.OrderMaxItemValue) continue;
+                    if (it.Value <= 0 || it.Value > s.OrderMaxItemValue) continue;
                     if (it.Culture != null && settlement.Culture != null && it.Culture != settlement.Culture) continue;
                     pool.Add(it);
                 }

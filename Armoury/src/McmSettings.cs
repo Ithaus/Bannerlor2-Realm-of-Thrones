@@ -1096,13 +1096,33 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public float MarchPackAllowance { get; set; } = 0.25f;
 
-        [SettingPropertyBool("Medieval Arms Prices", HintText = "arms and armour cost what they cost in the Middle Ages, measured against the soldier's pay (1 denar ~ 1 penny): a levy's kit ~150, a knight's harness a few thousand - horses, goods and wages untouched (takes effect on loading a save)")]
-        [SettingPropertyGroup("Medieval prices")]
-        public bool MedievalArmsPrices { get; set; } = true;
+        [SettingPropertyBool("Supply Demand Enabled", HintText = "arms, armour and horses obey supply and demand in towns and castles: a full stall sells cheap, an empty one dear - for buying AND selling, you and the AI alike (the item's own worth is untouched)")]
+        [SettingPropertyGroup("Supply and demand")]
+        public bool SupplyDemandEnabled { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Medieval Arms Price Scale", 0.00f, 4.00f, "0.00", HintText = "times the medieval target prices (2 = twice as dear) - never above the game's own price")]
-        [SettingPropertyGroup("Medieval prices")]
-        public float MedievalArmsPriceScale { get; set; } = 1.0f;
+        [SettingPropertyFloatingInteger("Supply Demand Base", 0.00f, 16.00f, "0.00", HintText = "pieces of one kind (type and tier) a town of reference prosperity wants on its stalls; fewer for higher tiers")]
+        [SettingPropertyGroup("Supply and demand")]
+        public float SupplyDemandBase { get; set; } = 4f;
+
+        [SettingPropertyFloatingInteger("Supply Demand Ref Prosperity", 0.00f, 12000.00f, "0.00", HintText = "prosperity at which a town wants exactly the base amount (0.3x to 3x around it; castles half)")]
+        [SettingPropertyGroup("Supply and demand")]
+        public float SupplyDemandRefProsperity { get; set; } = 3000f;
+
+        [SettingPropertyFloatingInteger("Supply Demand Elasticity", 0.00f, 2.00f, "0.00", HintText = "how hard the price reacts: (wanted + 1) / (on the stall + 1) raised to this power")]
+        [SettingPropertyGroup("Supply and demand")]
+        public float SupplyDemandElasticity { get; set; } = 0.5f;
+
+        [SettingPropertyFloatingInteger("Supply Demand Min Factor", 0.00f, 1.00f, "0.00", HintText = "a glutted stall never pays less than this share of the normal price")]
+        [SettingPropertyGroup("Supply and demand")]
+        public float SupplyDemandMinFactor { get; set; } = 0.25f;
+
+        [SettingPropertyFloatingInteger("Supply Demand Max Factor", 0.00f, 8.00f, "0.00", HintText = "a starved stall never charges more than this many times the normal price")]
+        [SettingPropertyGroup("Supply and demand")]
+        public float SupplyDemandMaxFactor { get; set; } = 2f;
+
+        [SettingPropertyFloatingInteger("Supply Demand Drain Percent", 0.00f, 60.00f, "0.00", HintText = "each day locals and traders take this % of the surplus above demand off the stalls")]
+        [SettingPropertyGroup("Supply and demand")]
+        public float SupplyDemandDrainPercent { get; set; } = 15f;
 
         [SettingPropertyBool("Market Glut Enabled", HintText = "a merchant needs only so many of one thing: each extra piece of a type you sell him fetches less")]
         [SettingPropertyGroup("The glutted market")]
@@ -1685,8 +1705,13 @@ namespace Armoury
             s.MarchFootRiderPace = MarchFootRiderPace;
             s.MarchRiderPace = MarchRiderPace;
             s.MarchPackAllowance = MarchPackAllowance;
-            s.MedievalArmsPrices = MedievalArmsPrices;
-            s.MedievalArmsPriceScale = MedievalArmsPriceScale;
+            s.SupplyDemandEnabled = SupplyDemandEnabled;
+            s.SupplyDemandBase = SupplyDemandBase;
+            s.SupplyDemandRefProsperity = SupplyDemandRefProsperity;
+            s.SupplyDemandElasticity = SupplyDemandElasticity;
+            s.SupplyDemandMinFactor = SupplyDemandMinFactor;
+            s.SupplyDemandMaxFactor = SupplyDemandMaxFactor;
+            s.SupplyDemandDrainPercent = SupplyDemandDrainPercent;
             s.MarketGlutEnabled = MarketGlutEnabled;
             s.MarketGlutStartPercent = MarketGlutStartPercent;
             s.MarketGlutDropPP = MarketGlutDropPP;
