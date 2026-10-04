@@ -44,6 +44,15 @@ namespace RealisticCaptivity
         public int WesterosFencePercent = 20;              // what a Westerosi fence pays for a captive, as percent of the full Essosi price
         public float PrisonerSaleFloorFactor = 1f;         // times the vanilla broker rate (a quarter of the man's recruitment cost)
 
+        // --- Lord ransom ---
+        public bool LordRansomByRank = true;               // a lord YOU hold is worth his station: kings, heads of houses and landed lords fetch ransoms fit for their rank (couriers, brokers, barter)
+        public int LordRansomKing = 100000;                // base ransom for a king or queen held by you
+        public int LordRansomClanLeader = 25000;           // base ransom for the head of a noble house held by you
+        public int LordRansomLord = 8000;                  // base ransom for any other lord or lady of a noble house held by you
+        public float LordRansomPerClanTier = 0.25f;        // each tier of the prisoner's house adds this share of the base
+        public int LordRansomPerTown = 10000;              // a king or head of house is worth this much more for every town his house holds
+        public int LordRansomPerCastle = 5000;             // a king or head of house is worth this much more for every castle his house holds
+
         // --- Bandit plunder ---
         public bool FenceGearWhenNoLord = true;            // bandits sell your gear at the nearest market
 

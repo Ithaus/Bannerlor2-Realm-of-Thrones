@@ -112,6 +112,34 @@ namespace RealisticCaptivity
         [SettingPropertyGroup("Selling prisoners")]
         public float PrisonerSaleFloorFactor { get; set; } = 1f;
 
+        [SettingPropertyBool("Lord Ransom By Rank", HintText = "a lord YOU hold is worth his station: kings, heads of houses and landed lords fetch ransoms fit for their rank (couriers, brokers, barter)")]
+        [SettingPropertyGroup("Lord ransom")]
+        public bool LordRansomByRank { get; set; } = true;
+
+        [SettingPropertyInteger("Lord Ransom King", 0, 400000, "0", HintText = "base ransom for a king or queen held by you")]
+        [SettingPropertyGroup("Lord ransom")]
+        public int LordRansomKing { get; set; } = 100000;
+
+        [SettingPropertyInteger("Lord Ransom Clan Leader", 0, 100000, "0", HintText = "base ransom for the head of a noble house held by you")]
+        [SettingPropertyGroup("Lord ransom")]
+        public int LordRansomClanLeader { get; set; } = 25000;
+
+        [SettingPropertyInteger("Lord Ransom Lord", 0, 32000, "0", HintText = "base ransom for any other lord or lady of a noble house held by you")]
+        [SettingPropertyGroup("Lord ransom")]
+        public int LordRansomLord { get; set; } = 8000;
+
+        [SettingPropertyFloatingInteger("Lord Ransom Per Clan Tier", 0.00f, 1.00f, "0.00", HintText = "each tier of the prisoner's house adds this share of the base")]
+        [SettingPropertyGroup("Lord ransom")]
+        public float LordRansomPerClanTier { get; set; } = 0.25f;
+
+        [SettingPropertyInteger("Lord Ransom Per Town", 0, 40000, "0", HintText = "a king or head of house is worth this much more for every town his house holds")]
+        [SettingPropertyGroup("Lord ransom")]
+        public int LordRansomPerTown { get; set; } = 10000;
+
+        [SettingPropertyInteger("Lord Ransom Per Castle", 0, 20000, "0", HintText = "a king or head of house is worth this much more for every castle his house holds")]
+        [SettingPropertyGroup("Lord ransom")]
+        public int LordRansomPerCastle { get; set; } = 5000;
+
         [SettingPropertyBool("Fence Gear When No Lord", HintText = "bandits sell your gear at the nearest market")]
         [SettingPropertyGroup("Bandit plunder")]
         public bool FenceGearWhenNoLord { get; set; } = true;
@@ -403,6 +431,13 @@ namespace RealisticCaptivity
             s.PrisonerGeoSale = PrisonerGeoSale;
             s.WesterosFencePercent = WesterosFencePercent;
             s.PrisonerSaleFloorFactor = PrisonerSaleFloorFactor;
+            s.LordRansomByRank = LordRansomByRank;
+            s.LordRansomKing = LordRansomKing;
+            s.LordRansomClanLeader = LordRansomClanLeader;
+            s.LordRansomLord = LordRansomLord;
+            s.LordRansomPerClanTier = LordRansomPerClanTier;
+            s.LordRansomPerTown = LordRansomPerTown;
+            s.LordRansomPerCastle = LordRansomPerCastle;
             s.FenceGearWhenNoLord = FenceGearWhenNoLord;
             s.StarvationEnabled = StarvationEnabled;
             s.StarvationHealthPerDay = StarvationHealthPerDay;
