@@ -1,5 +1,12 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-04 (32) - OKUP U POSREDNIKA: nadwyzka ponad cene gry placi rod jenca (nie zloto z niczego)
+**Mod:** RealisticCaptivity | **Pliki:** `FairRansom.cs` (`LordPrice`, flaga `_inSale` - prefix/finalizer na `SellPrisonersAction.ApplyInternal`)
+**Problem (audyt dziur B4):** posrednik w karczmie ("sprzedaj wszystkich") placi przez `GiveGoldAction(null, gracz)` - z niczego - a nasza wycena lorda (krol do ~250 tys.) podnosila te kwote; mozna bylo lapac, sprzedawac, lapac znowu.
+**Zmiana:** gdy sprzedaje gracz, nasza nadwyzka ponad cene gry = najwyzej tyle, ile ma glowa rodu jenca (gdy sam jest w niewoli - ze swojej kiesy); przy faktycznej sprzedazy (wewnatrz `SellPrisonersAction`) ta nadwyzka jest zdejmowana z kiesy glowy rodu - rodzina placi przez posrednika. Cena gry (vanilla) bez zmian. Kurier rodu (barter z glowa rodu) jak dotad. Log: `Okup lorda (posrednik): rod X placi Y ponad cene gry Z za W`.
+**Ryzyko:** biedny rod = niski okup u posrednika; okup przez kuriera dalej wedle rangi (rod placi przy barterze).
+**Status:** WGRANE 2026-10-04 (RealisticCaptivity.dll md5 dd29562c7bc0bc2c796b0de470a9ea05, build rc=0, gra zamknieta; poprzednie DLL obok jako `RealisticCaptivity.dll.bak-2026-10-04-przed-okupem-posrednika`). Na obecnym save.
+
 ## 2026-10-04 (31) - EKRAN HANDLU: zapas na polce z chwili otwarcia (koniec "wykup na kredyt i odkup")
 **Mod:** Armoury | **Pliki:** `SupplyDemand.cs` (`ShelfView`, `TradeScreenOpen`, `Stock`, `Substitution`)
 **Problem (audyt dziur B1):** nasza cena czytala zywa polke. Vanilla `InventoryLogic` przenosi towar sztuka po sztuce, a zloto sprawdza dopiero przy Done; cofniecie zwraca dokladna cene. Wiec w jednym ekranie: wykupic caly koszyk (bez pieniedzy) -> sprzedac swoje po cenie pustej polki (do x2) -> odkupic koszyk po tej samej cenie; odwrotnie dla taniego zakupu (do x0.25). Rozrzut 8x - wiekszy niz kara sprzedazy vanilli.

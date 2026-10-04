@@ -102,7 +102,19 @@ namespace RealisticCaptivity
                              + (long)castles * Math.Max(0, s.LordRansomPerCastle);
                 if (price > int.MaxValue) price = int.MaxValue;
                 int vanilla = result;
-                if (price > result) result = (int)price;
+                // AUDYT 04.10 (B4): posrednik w karczmie placi z niczego (SellPrisonersAction -> GiveGoldAction(null, ...)).
+                // Nasza nadwyzka ponad cene gry to pieniadze RODU jenca: najwyzej tyle, ile ma glowa rodu,
+                // a przy faktycznej sprzedazy (w srodku SellPrisonersAction) zdejmowane z jej kiesy.
+                var payerHero = clan.Leader;
+                long extra = Math.Max(0L, price - vanilla);
+                if (sellerIsPlayer && payerHero != null) extra = Math.Min(extra, Math.Max(0, payerHero.Gold));   // glowa rodu w niewoli placi ze swojej kiesy
+                else if (sellerIsPlayer) extra = 0;
+                if (extra > 0) result = (int)Math.Min(int.MaxValue, vanilla + extra);
+                if (sellerIsPlayer && _inSale && extra > 0 && payerHero != null)
+                {
+                    payerHero.ChangeHeroGold(-(int)extra);
+                    Log.Info("Okup lorda (posrednik): rod " + clan.Name + " placi " + extra + " ponad cene gry " + vanilla + " za " + h.Name + ".");
+                }
 
                 // log raz na dobe na jenca - wycene wola ekran druzyny przy kazdym ruchu
                 int day = (int)CampaignTime.Now.ToDays;
@@ -136,6 +148,11 @@ namespace RealisticCaptivity
             return false;
         }
 
+        // flaga: jestesmy w srodku faktycznej sprzedazy jencow (nie w podgladzie ekranu)
+        [ThreadStatic] internal static bool _inSale;
+        public static void SalePrefix() { _inSale = true; }
+        public static Exception SaleFinalizer(Exception __exception) { _inSale = false; return __exception; }
+
         internal static void ApplyAll(Harmony harmony)
         {
             try
@@ -166,6 +183,12 @@ namespace RealisticCaptivity
                         catch (Exception e) { Log.Error("FairRansom.Patch(" + t.Name + ")", e); }
                     }
                 }
+                try
+                {
+                    var sell = AccessTools.Method(typeof(TaleWorlds.CampaignSystem.Actions.SellPrisonersAction), "ApplyInternal");
+                    if (sell != null) harmony.Patch(sell, prefix: new HarmonyMethod(typeof(FairRansomPatch), nameof(SalePrefix)), finalizer: new HarmonyMethod(typeof(FairRansomPatch), nameof(SaleFinalizer)));
+                }
+                catch (Exception e) { Log.Error("FairRansom.SellHook", e); }
                 Log.Info("FairRansom: cena szeregowego jenca ma podloge (broker rate) w " + done + " modelach.");
             }
             catch (Exception e) { Log.Error("FairRansom.ApplyAll", e); }
