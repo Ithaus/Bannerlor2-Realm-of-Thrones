@@ -1140,6 +1140,13 @@ namespace Armoury
             try
             {
                 string mesh = null;
+                // Jeff 04.10: "czy te obrazki przy obozie musza byc z jezdzcami - nie ma obrazka obozu?"
+                // 0 = grafika kultury (stare), 1 = oboz pod murami (vanilla), 2-10 = obrazki ROT z zycia w armii
+                int pick = Settings.Current != null ? Settings.Current.CampBackground : 1;
+                if (pick == 1) mesh = "wait_besieging";
+                else if (pick == 2) mesh = "bg_enlistment";
+                else if (pick >= 3 && pick <= 10) mesh = "bg_enlistment" + (pick - 1);
+                if (mesh == null)
                 try
                 {
                     var f = Hero.MainHero != null ? Hero.MainHero.MapFaction : null;

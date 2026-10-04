@@ -1557,6 +1557,10 @@ namespace Armoury
         [SettingPropertyBool("Night Rest Enabled", HintText = "the men must sleep: quiet night hours in camp or under a roof, or the column grows weary")]
         [SettingPropertyGroup("A night's rest")]
         public bool NightRestEnabled { get; set; } = true;
+        [SettingPropertyInteger("Camp Background", 0, 10, "0", HintText = "picture behind the camp menu: 0 = your culture's riders (old), 1 = an army camp before the walls, 2-10 = Realm of Thrones pictures of army life - try them and keep the one you like")]
+        [SettingPropertyGroup("A night's rest")]
+        public int CampBackground { get; set; } = 1;
+
 
         [SettingPropertyFloatingInteger("Sleep Hours Needed", 0.00f, 24.00f, "0.00", HintText = "base hours of sleep per day; sleep debt adds interest on top (1 night owed: +3h, 2: +9h, 3: +15h) and only the full sum clears it")]
         [SettingPropertyGroup("A night's rest")]
@@ -2231,6 +2235,7 @@ namespace Armoury
             s.MarketGlutMinPercent = MarketGlutMinPercent;
             s.MarketGlutRecoverPerDay = MarketGlutRecoverPerDay;
             s.NightRestEnabled = NightRestEnabled;
+            s.CampBackground = CampBackground;
             s.SleepHoursNeeded = SleepHoursNeeded;
             s.DayRestFactor = DayRestFactor;
             s.QuickCampKey = QuickCampKey;

@@ -1,5 +1,12 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-04 (21) - TLO MENU OBOZU do wyboru (domyslnie oboz pod murami zamiast jezdzcow kultury)
+**Mod:** Armoury | **Pliki:** `NightRest.cs` (`SetCampBackground`), `Settings.cs` + `McmSettings.cs` (`CampBackground` 1, grupa "A night's rest")
+**Zgloszenie (Jeff 04.10, zrzut):** "czy te obrazki, jak rozbijam oboz, musza byc z jezdzcami - nie ma obrazka przypominajacego oboz?"
+**Przyczyna:** menu obozu bralo `Culture.EncounterBackgroundMesh` frakcji gracza (obrazek spotkania - jezdzcy).
+**Zmiana:** MCM "Camp Background": 0 = stare (kultura), 1 = `wait_besieging` (vanilla, oboz pod murami - domyslnie), 2-10 = `bg_enlistment`..`bg_enlistment9` (obrazki ROT z zaciagu do armii). Obrazkow nie da sie podejrzec poza gra (sa w tpac) - Jeff wybiera w grze; zla nazwa pokazalaby czerwone "temp".
+**Status:** WGRANE 2026-10-04 (Armoury.dll md5 0bcdf9229b94465eb98f7db09da8c052, build rc=0, gra zamknieta; poprzednie DLL obok jako `Armoury.dll.bak-2026-10-04-przed-tlem-obozu`). DO SPRAWDZENIA - na obecnym save.
+
 ## 2026-10-04 (20) - DOCHOD Z LENN OD LUDNOSCI KRAINY (wioska i miasto to symbol calej krainy)
 **Mod:** Armoury | **Pliki:** NOWY `PopulationLaw.cs`; `ArmouryBehavior.cs` (SyncData "arm_population", Daily, Reset), `SubModuleMain.cs`, `Settings.cs` + `McmSettings.cs` (grupa "Population": `PopulationRentEnabled`, `PopulationRentPerHead` 40, `PopulationScale` 1)
 **Zgloszenie (Jeff 04.10):** "to nie jest jedna wioska, pamietaj - to symbol, trzeba liczyc po ludnosci, ktora podalem dla kazdego krolestwa/regionu"; "tak" na dochod od ludnosci.

@@ -459,6 +459,7 @@ namespace Armoury
 
         // --- A night's rest ---
         public bool NightRestEnabled = true;               // the men must sleep: quiet night hours in camp or under a roof, or the column grows weary
+        public int CampBackground = 1;                     // picture behind the camp menu: 0 = your culture's riders (old), 1 = an army camp before the walls, 2-10 = Realm of Thrones pictures of army life - try them and keep the one you like
         public float SleepHoursNeeded = 6f;                // base hours of sleep per day; sleep debt adds interest on top (1 night owed: +3h, 2: +9h, 3: +15h) and only the full sum clears it
         public float DayRestFactor = 0.6f;                 // sleep by daylight counts at this rate (camp noise, heat, light) - night hours count in full
         public bool QuickCampKey = true;                   // press O on the campaign map to pitch the BannerKings camp on the spot
