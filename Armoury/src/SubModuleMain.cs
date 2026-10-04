@@ -75,6 +75,7 @@ namespace Armoury
                 LevyGold.ApplyAll(_harmony);
                 WinterSource.ApplyAll(_harmony);
                 KingdomTreasury.ApplyAll(_harmony);
+                WearKeep.ApplyAll(_harmony);
                 Rations.ApplyAll(_harmony);      // dlugi marsz, dlugie racje - zuzycie jedzenia w dol (gracz i AI)
                 ScorchedEarth.ApplyAll(_harmony);
                 Wayfinder.ApplyAll(_harmony);

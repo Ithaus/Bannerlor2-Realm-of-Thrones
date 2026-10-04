@@ -386,7 +386,7 @@ namespace Armoury
         }
         private Dictionary<string,int> _prisonerBaseline;
 
-        public ArmouryBehavior() { Instance = this; WesterosClimate.Reset(); OutlawLaw.Reset(); PopulationLaw.Reset(); WorkshopLaw.Reset(); IronBank.Reset(); MarketGlut.Reset(); ArmsPricing.Reset(); StartKit.Reset(); AiGear.Reset(); Levy.Reset(); VolunteerKit.Reset(); LevyGold.Reset(); }   // stan jednej kampanii nie przecieka do drugiej (audyt 04.10)
+        public ArmouryBehavior() { Instance = this; WesterosClimate.Reset(); OutlawLaw.Reset(); PopulationLaw.Reset(); WorkshopLaw.Reset(); IronBank.Reset(); MarketGlut.Reset(); ArmsPricing.Reset(); StartKit.Reset(); AiGear.Reset(); Levy.Reset(); VolunteerKit.Reset(); LevyGold.Reset(); WearKeep.Reset(); }   // stan jednej kampanii nie przecieka do drugiej (audyt 04.10)
 
         public override void SyncData(IDataStore dataStore)
         {
@@ -482,7 +482,7 @@ namespace Armoury
             CampaignEvents.MapEventStarted.AddNonSerializedListener(this, OnMapEventStarted);
             // polegli oddaja rynsztunek na wozy zaraz po bitwie
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this,
-                delegate (MapEvent me) { try { if (me != null && me.IsPlayerMapEvent) GatherFallen(); } catch { } });
+                delegate (MapEvent me) { try { if (me != null && me.IsPlayerMapEvent) GatherFallen(); } catch { } try { if (me != null && me.IsPlayerMapEvent) WearKeep.AfterBattle(); } catch { } });
             CampaignEvents.OnNewItemCraftedEvent.AddNonSerializedListener(this, OnNewItemCrafted);
             // DEPOZYT KWATERMISTRZA NIE MA PRAWA WEJSC DO SAVE'A: schowane
             // na czas ekranu zbrojowni sztuki zyja poza rosterem - zapis gry

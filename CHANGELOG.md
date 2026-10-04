@@ -1,5 +1,13 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-04 (39) - LUPY HISTORYCZNIE: zuzycie nie znika w bitwie, rozbita czesc wlasnego poleglego zostaje jako wrak
+**Mod:** Armoury | **Pliki:** NOWY `WearKeep.cs`; `BattlefieldLaw.cs` (`QueueWreck`), `ArmouryBehavior.cs` (Reset, MapEventEnded), `SubModuleMain.cs`, `Settings.cs` + `McmSettings.cs` (`KeepWearThroughBattle`)
+**Zgloszenie (Jeff 04.10):** "tak napraw system - ma byc historycznie" (historycznie wiekszosc zbroi po bitwie naprawiano: kolczuge latano, helmy wyklepywano; uszkodzenia nie znikaly same).
+**Przyczyna (audyt logistyki):** (a) DTE `ArmyArmory.AssignEquipment` zdejmuje z magazynu pierwszy egzemplarz o danym StringId bez wzgledu na stan, a po bitwie zwraca `AddItemToArmory(ItemObject)` BEZ modyfikatora - zuzyty sprzet wracal nowy, nasze zuzycie znikalo. (b) Wrak (rozbita ciosem czesc) zbieralismy tylko, gdy zabojca byl z partii gracza - rozbite czesci wlasnych poleglych znikaly.
+**Zmiana:** (1) WearKeep: przy wydaniu na bitwe zapamietuje stan kazdej zdjetej sztuki; przy zwrocie te sztuki wracaja ze swoim stanem (reszta, np. lup, jak dotad); potem `WearTheTroops` po wygranej doklada zuzycie walki - uszkodzenia sie kumuluja, trzeba naprawiac. Pamiec czyszczona po kazdej bitwie gracza. (2) Wrak tez z wlasnego poleglego (kto utrzyma pole, ten zbiera; przegrana czysci worek jak dotad); stan 8% (wpis 37), do naprawy albo przetopu.
+**Ryzyko / co sprawdzic:** log `WearKeep: stan sprzetu przez bitwe - wydanie wpiete, zwrot wpiety` i po bitwie `WearKeep: N zuzytych sztuk wrocilo ...`. Magazyn bedzie mial wiecej sztuk z (N%) - naprawy u kowala i samonaprawa w miescie nabiora znaczenia.
+**Status:** WGRANE 2026-10-04 (Armoury.dll md5 0c7f652106338c0f0421bb890c0e826c, build rc=0, gra zamknieta; poprzednie DLL obok jako `Armoury.dll.bak-2026-10-04-przed-wearkeep`). Na obecnym save.
+
 ## 2026-10-04 (38) - SKARBIEC KROLESTWA: koniec zlota z niczego, powinnosci wasali wobec korony (pokoj 2%, wojna 10%)
 **Mod:** Armoury | **Pliki:** NOWY `KingdomTreasury.cs` (transpiler + `Daily`); `PopulationLaw.cs` (`RentToday`), `ArmouryBehavior.cs` (Daily po rentach), `SubModuleMain.cs`, `Settings.cs` + `McmSettings.cs` (`NoFreeKingdomGold`, `CrownDuesEnabled`, `CrownDuesPeacePercent` 2, `CrownDuesWarPercent` 10; grupa "Iron bank")
 **Zgloszenie (Jeff 04.10):** "jak z niczego dosypuje? ... tak, wylacz"; "prawdziwe zasilanie skarbca - kazdy rod oddaje koronie czesc dochodu - zrob tak, jak bylo historycznie".

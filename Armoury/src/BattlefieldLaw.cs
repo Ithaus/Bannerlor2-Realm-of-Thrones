@@ -559,13 +559,15 @@ namespace Armoury
         /// ale TYLKO gdy zabojca byl z PARTII GRACZA (Jeff 30.08: przy
         /// sojusznikach zbieralismy wraki z CALEGO pola, takze z cudzych
         /// zabojstw - kazdemu jego lup).</summary>
-        public static void QueueWreck(Agent affectorAgent)
+        public static void QueueWreck(Agent affectedAgent, Agent affectorAgent)
         {
             try
             {
+                // Jeff 04.10 ("ma byc historycznie"): rozbita czesc WLASNEGO poleglego tez zostaje na polu jako wrak -
+                // kto utrzyma pole, ten ja zbiera (przegrana: DropShare czysci worek). Wczesniej znikala.
                 if (_lastPick != null && Settings.Current.WreckSalvageEnabled &&
                     Settings.Current.BattlefieldLawEnabled && Wrecks.Count < 400 &&
-                    IsMainPartyAgent(affectorAgent))
+                    (IsMainPartyAgent(affectorAgent) || IsMainPartyAgent(affectedAgent)))
                     Wrecks.Add(_lastPick);
             }
             catch { }

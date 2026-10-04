@@ -1324,6 +1324,10 @@ namespace Armoury
         [SettingPropertyGroup("Starting gear")]
         public bool StartKitEnabled { get; set; } = true;
 
+        [SettingPropertyBool("Keep Wear Through Battle", HintText = "gear your men take into battle comes back in the state it went out (and worse after the fight) - worn mail no longer returns as new; damage piles up and must be repaired")]
+        [SettingPropertyGroup("Starting gear")]
+        public bool KeepWearThroughBattle { get; set; } = true;
+
         [SettingPropertyBool("Outlaw Law Enabled", HintText = "outlaws are real men: deserters, unpaid soldiers, men routed from battle, villagers driven off by raids, hunger and war; bands form only where such men exist and wear only what they brought, looted or bought")]
         [SettingPropertyGroup("Outlaws")]
         public bool OutlawLawEnabled { get; set; } = true;
@@ -2252,6 +2256,7 @@ namespace Armoury
             s.PopulationScale = PopulationScale;
             s.PopulationRentMaxShare = PopulationRentMaxShare;
             s.StartKitEnabled = StartKitEnabled;
+            s.KeepWearThroughBattle = KeepWearThroughBattle;
             s.OutlawLawEnabled = OutlawLawEnabled;
             s.OutlawSeedPerHearth = OutlawSeedPerHearth;
             s.OutlawDailyPerThousandHearth = OutlawDailyPerThousandHearth;
