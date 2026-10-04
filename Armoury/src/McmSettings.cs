@@ -1272,6 +1272,10 @@ namespace Armoury
         [SettingPropertyGroup("Workshops")]
         public float WorkshopArtisansMax { get; set; } = 60f;
 
+        [SettingPropertyFloatingInteger("Workshop Sell Share", 0.00f, 3.20f, "0.00", HintText = "a craftsman sells his wares at the market price buyers pay, less this merchant's cut (0.8 = he keeps 80%)")]
+        [SettingPropertyGroup("Workshops")]
+        public float WorkshopSellShare { get; set; } = 0.8f;
+
         [SettingPropertyFloatingInteger("Guild Share Tailor", 0.00f, 1.20f, "0.00", HintText = "share of a town's craftsmen who are tailors and doublet-makers (Paris tax roll 1292)")]
         [SettingPropertyGroup("Workshops")]
         public float GuildShareTailor { get; set; } = 0.30f;
@@ -2509,6 +2513,7 @@ namespace Armoury
             s.WorkshopProsperityPerHand = WorkshopProsperityPerHand;
             s.WorkshopArtisansMin = WorkshopArtisansMin;
             s.WorkshopArtisansMax = WorkshopArtisansMax;
+            s.WorkshopSellShare = WorkshopSellShare;
             s.GuildShareTailor = GuildShareTailor;
             s.GuildShareArmourer = GuildShareArmourer;
             s.GuildShareWeaponsmith = GuildShareWeaponsmith;

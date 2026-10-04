@@ -200,7 +200,7 @@ namespace Armoury
                             if (!ok) { reason = Math.Max(reason, 2); continue; }
                             // koszt surowcow od zuzycia (ulamki tez), po cenie historycznej / targowej
                             for (int m = 0; m < 4; m++) matCost += need[m] * MatPrice(town, mats[m], m);
-                            int revenue = town.GetItemPrice(new EquipmentElement(it, null, null, false), null, true);
+                            int revenue = Revenue(town, it);
                             if (revenue < (matCost + days * wage) * minProfit) { reason = Math.Max(reason, 1); continue; }
                             int mc = MBRandom.RoundRandomized(matCost);
                             if (workshop.Capital < mc) { reason = Math.Max(reason, 4); continue; }
@@ -224,7 +224,7 @@ namespace Armoury
                     }
                     if (w.Labor < w.Days) { _skipLabor++; break; }      // sztuka w robocie
                     int wagesI = MBRandom.RoundRandomized(w.Days * wage);
-                    int rev = town.GetItemPrice(new EquipmentElement(w.Item, null, null, false), null, true);
+                    int rev = Revenue(town, w.Item);
                     if (town.Gold < rev || workshop.Capital < wagesI) { _skipGold++; break; }   // gotowa czeka na kupca / na place
                     ItemModifier mod = null;
                     try { var g = w.Item.ItemComponent != null ? w.Item.ItemComponent.ItemModifierGroup : null; if (g != null) mod = g.GetRandomItemModifierProductionScoreBased(); } catch { }
@@ -278,7 +278,7 @@ namespace Armoury
                             if (o.Item1 == null || !dict.TryGetValue(o.Item1, out items)) continue;
                             foreach (var it in items)
                             {
-                                if (it == null || !seen.Add(it) || ArmsPricing.IsUnique(it) || LegendaryLaw.IsLegend(it)) continue;   // Jeff 04.10: zadnych unikatow rodow, klingi valyrianskiej ani legend z warsztatu
+                                if (it == null || !seen.Add(it) || ArmsPricing.IsUnique(it) || LegendaryLaw.IsLegend(it) || Forbidden(it)) continue;   // Jeff 04.10: zadnych unikatow rodow, klingi valyrianskiej ani legend z warsztatu
                                 bool local = it.Culture == null || it.Culture.StringId == "neutral_culture" || it.Culture == town.Culture;
                                 (local ? pool : foreign).Add(it);
                             }
@@ -298,7 +298,7 @@ namespace Armoury
                     var need = Needs(it, out days);
                     if (need == null) continue;
                     float cost = need[0] * pOre + need[1] * pWood + need[2] * pLea + need[3] * pLin + days * s.WorkshopWagePerDay;
-                    int revenue = town.GetItemPrice(new EquipmentElement(it, null, null, false), null, true);
+                    int revenue = Revenue(town, it);
                     float perDay = (revenue - cost) / Math.Max(0.1f, days);
                     if (perDay > 0f) scored.Add(new KeyValuePair<float, ItemObject>(perDay, it));
                 }
@@ -343,6 +343,35 @@ namespace Armoury
             }
             catch { }
             return "?";
+        }
+
+        // wpis 58: test 15:31 - warsztaty robily 80-106 lukow ravens_teeth_longbow, weirwood_bow i giant_bow dziennie
+        // (Value 90-200 tys., nie sa NotMerchandise) - przedmioty magiczne i lore nie wychodza z warsztatu miasta
+        private static string[] _forbid; private static string _forbidSrc;
+        private static bool Forbidden(ItemObject it)
+        {
+            var src = Settings.Current.WorkshopForbiddenIds ?? "";
+            if (_forbid == null || _forbidSrc != src)
+            {
+                _forbidSrc = src;
+                var l = new List<string>();
+                foreach (var p in src.Split(',')) { var t = p.Trim().ToLowerInvariant(); if (t.Length > 0) l.Add(t); }
+                _forbid = l.ToArray();
+            }
+            string id = (it.StringId ?? "").ToLowerInvariant();
+            foreach (var f in _forbid) if (id.Contains(f)) return true;
+            return false;
+        }
+
+        // wpis 59: test 15:31 - cena, jaka miasto placilo warsztatowi (sprzedaz, klient bez partii), wychodzila 4-8% wartosci
+        // (miecz 34 -> 2, plyta konska 7861 -> 441; trzymala ja tylko podloga zlomu 5%) - zaden warsztat poza lukami nic nie robil.
+        // Vanilla daje sprzedajacemu 60-80%; cos w lancuchu modeli cen (AIInfluence - kod zaciemniony) tnie dalej. Rzemieslnik
+        // sprzedawal na targu sam: dostaje cene, jaka placi kupujacy (cena kupna z targu), minus marze kupca (WorkshopSellShare).
+        private static int Revenue(Town town, ItemObject it)
+        {
+            if (town == null || it == null) return 0;
+            int buy = town.GetItemPrice(new EquipmentElement(it, null, null, false), null, false);
+            return Math.Max(1, (int)(buy * MBMath.ClampFloat(Settings.Current.WorkshopSellShare, 0.05f, 1f)));
         }
 
         private static float GuildWeight(string g)
@@ -457,7 +486,7 @@ namespace Armoury
                     float days; var need = Needs(it, out days);
                     if (need == null) continue;
                     float cost = need[0] * pOre + need[1] * pWood + need[2] * pLea + need[3] * pLin + days * s.WorkshopWagePerDay;
-                    int revenue = town.GetItemPrice(new EquipmentElement(it, null, null, false), null, true);
+                    int revenue = Revenue(town, it);
                     float pd = (revenue - cost) / Math.Max(0.1f, days);
                     if (pd > bestPd)
                     {

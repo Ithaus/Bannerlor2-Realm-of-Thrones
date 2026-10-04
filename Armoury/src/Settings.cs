@@ -379,6 +379,8 @@ namespace Armoury
         public float WorkshopProsperityPerHand = 170f;     // the town's own craftsmen: one man-day of arms work each day for this much prosperity (a town of 4800 keeps about 28 hands busy) - history had 10-20x more (Paris 1292, Milan), raised step by step as ore allows
         public float WorkshopArtisansMin = 6f;             // fewest man-days a day the craftsmen of even a poor town put in
         public float WorkshopArtisansMax = 60f;            // most man-days a day the craftsmen of the richest town put in
+        public string WorkshopForbiddenIds = "weirwood,giant_,ravens_teeth,dragonglass,obsidian,val_steel,valyrian,dragonbone";   // pieces whose id contains any of these are never made by town workshops (magic and lore gear: weirwood bows, giants' gear, Valyrian steel, dragonglass)
+        public float WorkshopSellShare = 0.8f;             // a craftsman sells his wares at the market price buyers pay, less this merchant's cut (0.8 = he keeps 80%)
         public float GuildShareTailor = 0.30f;             // share of a town's craftsmen who are tailors and doublet-makers (Paris tax roll 1292)
         public float GuildShareArmourer = 0.20f;           // share who are armourers and mail-makers
         public float GuildShareWeaponsmith = 0.20f;        // share who are weaponsmiths, cutlers and spear-makers

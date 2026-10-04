@@ -32,6 +32,28 @@ namespace Armoury
 
         private static readonly Dictionary<ItemObject, int> _orig = new Dictionary<ItemObject, int>();
         private static readonly Dictionary<ItemObject, float> _origWeight = new Dictionary<ItemObject, float>();
+        private static readonly Dictionary<ItemObject, int> _target = new Dictionary<ItemObject, int>();
+
+        /// <summary>Wpis 58: codzienna kontrola - czy ktos (inny mod) nie nadpisal przeliczonych wartosci; jesli tak, przywracamy i logujemy.</summary>
+        internal static void Recheck()
+        {
+            if (!_applied || _target.Count == 0) return;
+            try
+            {
+                var setter = AccessTools.PropertySetter(typeof(ItemObject), "Value");
+                if (setter == null) return;
+                var bad = new List<string>(); int n = 0;
+                foreach (var kv in _target)
+                {
+                    if (kv.Key == null || kv.Key.Value == kv.Value) continue;
+                    n++;
+                    if (bad.Count < 12) bad.Add(kv.Key.StringId + " " + kv.Key.Value + "->" + kv.Value);
+                    setter.Invoke(kv.Key, new object[] { kv.Value });
+                }
+                if (n > 0) Log.Info("HistoricalPrices: kontrola - " + n + " przedmiotow mialo zmieniona wartosc (inny mod?), przywrocone: " + string.Join(", ", bad.ToArray()) + ".");
+            }
+            catch (Exception e) { Log.Error("HistoricalPrices.Recheck", e); }
+        }
 
         // ------------------------------------------------------------ ladunek zamiast 10 kg (wpis 50)
         // Jeff 04.10: "jak ceny sa ponizej 1, to trzeba pomnozyc x10, aby latwiej oddac ceny". Gra zna tylko pensy calkowite:
@@ -198,7 +220,7 @@ namespace Armoury
                 // 2. bron i zbroje z kosztu historycznego
                 int n = 0; long before = 0, after = 0;
                 var samples = new List<string>();
-                var watch = new HashSet<string> { "stark_boots_1", "battania_sword_5_t5", "casterly_heavy_helm", "sturgian_fortified_armor", "ramsay_armor" };
+                var watch = new HashSet<string> { "stark_boots_1", "battania_sword_5_t5", "casterly_heavy_helm", "sturgian_fortified_armor", "ramsay_armor", "weirwood_bow", "giant_bow", "giant_arrows", "ravens_teeth_longbow" };
                 foreach (var it in MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
                 {
                     if (it == null || !IsArms(it) || it.Value <= 0) continue;
@@ -207,6 +229,7 @@ namespace Armoury
                     if (ArmsPricing.IsUnique(it)) hc *= Math.Max(1f, s.HistUniquePrestige);
                     int was = it.Value;
                     set(it, hc);
+                    _target[it] = it.Value;
                     n++; before += was; after += it.Value;
                     if (watch.Contains(it.StringId)) samples.Add(it.StringId + " (" + it.ItemType + " t" + ((int)it.Tier + 1) + ", " + it.Weight.ToString("0.0", CultureInfo.InvariantCulture) + " kg) " + was + " -> " + it.Value + " d");
                 }

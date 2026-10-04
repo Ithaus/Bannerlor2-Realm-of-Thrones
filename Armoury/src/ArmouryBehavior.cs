@@ -1119,7 +1119,7 @@ namespace Armoury
             try { WarLedger.OnDaily(); } catch (Exception e) { Log.Error("WarLedger", e); }
             try { Orders.DailyTick(); }
             catch (Exception e) { Log.Error("OnDailyTick", e); }
-            try { ArmsPricing.Daily(); } catch (Exception e) { Log.Error("ArmsPricing.Daily", e); }   // indeksy surowcow i premie wojenne PRZED handlem
+            try { HistoricalPrices.Recheck(); ArmsPricing.Daily(); } catch (Exception e) { Log.Error("ArmsPricing.Daily", e); }   // indeksy surowcow i premie wojenne PRZED handlem
             try { PopulationLaw.Daily(); } catch (Exception e) { Log.Error("PopulationLaw.Daily", e); }   // ludnosc i renty krain
             try { KingdomTreasury.Daily(); KingdomTreasury.Levies(); } catch (Exception e) { Log.Error("KingdomTreasury.Daily", e); }   // powinnosci wasali wobec korony (po rentach)
             try { OutlawLaw.Daily(); } catch (Exception e) { Log.Error("OutlawLaw.Daily", e); }   // wyrzutki: bieda, powroty, werbunek band

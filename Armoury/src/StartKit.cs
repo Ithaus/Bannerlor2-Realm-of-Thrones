@@ -32,6 +32,7 @@ namespace Armoury
             if (!_pending) return;
             _pending = false;
             try { Run(); } catch (Exception e) { Log.Error("StartKit", e); }
+            try { EnforceStartGold(); } catch (Exception e) { Log.Error("StartKit.Gold", e); }
         }
 
         private static SkillObject ReqSkill(ItemObject it)
@@ -147,6 +148,32 @@ namespace Armoury
                 Log.Info("StartKit: awanturnik BK - zloto startowe " + was + " -> " + Hero.MainHero.Gold + " d.");
             }
             catch (Exception e) { Log.Error("StartKit.RunStartPostfix", e); }
+        }
+
+        // wpis 58: test 15:31 - mimo latki dalej 1000 d: okno startu BK nie wywolalo RunStartOption (w logu brak linii "awanturnik"
+        // ani "start BK"; CrashScribe: wyjatek BK w OnCharacterCreationOver -> CorrectPlayerEducation). W pierwszej godzinie gry:
+        // jesli w BK nie wybrano innego startu niz awanturnik - zloto = StartGoldAdventurer (nadwyzka znika, nikt jej nie mial).
+        private static void EnforceStartGold()
+        {
+            var s = Settings.Current;
+            var h = Hero.MainHero;
+            if (s == null || s.StartGoldAdventurer < 0 || h == null || h.Gold <= s.StartGoldAdventurer) return;
+            string id = null;
+            try
+            {
+                var t = HarmonyLib.AccessTools.TypeByName("BannerKings.Behaviours.BKCampaignStartBehavior");
+                if (t != null && Campaign.Current != null)
+                {
+                    var beh = typeof(Campaign).GetMethod("GetCampaignBehavior").MakeGenericMethod(t).Invoke(Campaign.Current, null);
+                    var opt = beh != null ? HarmonyLib.Traverse.Create(beh).Field("option").GetValue() : null;
+                    id = opt != null ? HarmonyLib.Traverse.Create(opt).Property("StringId").GetValue() as string : null;
+                }
+            }
+            catch { }
+            if (id != null && id != "start_adventurer") { Log.Info("StartKit: start BK '" + id + "' - zloto bez zmian (" + h.Gold + " d)."); return; }
+            int was = h.Gold;
+            h.ChangeHeroGold(s.StartGoldAdventurer - was);
+            Log.Info("StartKit: zloto startowe " + was + " -> " + h.Gold + " d (start " + (id ?? "bez wyboru BK") + ").");
         }
 
         internal static void ApplyAll(HarmonyLib.Harmony h)
