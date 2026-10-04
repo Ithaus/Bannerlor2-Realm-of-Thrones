@@ -396,6 +396,33 @@ namespace Armoury
                 foreach (var kv in perType) parts.Add(kv.Key + " " + kv.Value);
                 var wars = new List<string>();
                 foreach (var kv in _war) wars.Add(kv.Key.Name + " +" + (kv.Value * 100f).ToString("0") + "%");
+                // BILANS SUROWCOW (Jeff 04.10: "sprawdz, ile tego sie produkuje na swiecie i czy mamy dopasowane"):
+                // zapasy surowcow kuzni na targach miast i liczba warsztatow kazdego typu
+                var raw = new Dictionary<string, int>();
+                var shops = new Dictionary<string, int>();
+                foreach (var st in Settlement.All)
+                {
+                    if (st == null || !st.IsTown || st.Town == null || st.ItemRoster == null) continue;
+                    foreach (var id in new[] { "iron", "hardwood", "charcoal", "leather", "hides", "linen", "flax", "wool" })
+                    {
+                        var it = MBObjectManager.Instance.GetObject<ItemObject>(id);
+                        if (it == null) continue;
+                        int n; raw.TryGetValue(id, out n); raw[id] = n + st.ItemRoster.GetItemNumber(it);
+                    }
+                    try
+                    {
+                        foreach (var w in st.Town.Workshops)
+                        {
+                            if (w == null || w.WorkshopType == null) continue;
+                            string k = w.WorkshopType.StringId ?? "?";
+                            int n; shops.TryGetValue(k, out n); shops[k] = n + 1;
+                        }
+                    }
+                    catch { }
+                }
+                var rawParts = new List<string>(); foreach (var kv in raw) rawParts.Add(kv.Key + " " + kv.Value);
+                var shopParts = new List<string>(); foreach (var kv in shops) shopParts.Add(kv.Key + " " + kv.Value);
+                Log.Info("Rynek surowcow: zapasy na targach miast [" + string.Join(", ", rawParts.ToArray()) + "]; warsztaty [" + string.Join(", ", shopParts.ToArray()) + "].");
                 Log.Info("Rynek broni: na polkach " + total + " szt. [" + string.Join(", ", parts.ToArray()) + "]; indeks rudy min/med/max "
                          + Q(oreL, 0f) + "/" + Q(oreL, 0.5f) + "/" + Q(oreL, 1f) + ", drewna " + Q(woodL, 0f) + "/" + Q(woodL, 0.5f) + "/" + Q(woodL, 1f)
                          + "; premie wojenne: " + (wars.Count > 0 ? string.Join(", ", wars.ToArray()) : "brak") + ".");

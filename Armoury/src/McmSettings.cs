@@ -1140,9 +1140,9 @@ namespace Armoury
         [SettingPropertyGroup("Smithing materials")]
         public float MineOutputMultiplier { get; set; } = 3f;
 
-        [SettingPropertyFloatingInteger("Lumber Output Multiplier", 0.00f, 6.00f, "0.00", HintText = "woodcutters fell this many times the old output - charcoal burners need wood by the cartload")]
+        [SettingPropertyFloatingInteger("Lumber Output Multiplier", 0.00f, 12.00f, "0.00", HintText = "woodcutters fell this many times the old output - charcoal burners need wood by the cartload (a forge burns ~5 loads of wood per load of ore)")]
         [SettingPropertyGroup("Smithing materials")]
-        public float LumberOutputMultiplier { get; set; } = 1.5f;
+        public float LumberOutputMultiplier { get; set; } = 3f;
 
         [SettingPropertyBool("Smelt Cap To Craft Cost", HintText = "melting a piece down never gives back more metal than a share of what forging it costs - no metal out of thin air")]
         [SettingPropertyGroup("Smithing materials")]
@@ -1247,6 +1247,7 @@ namespace Armoury
         [SettingPropertyFloatingInteger("Workshop Wood Per Ore", 0.00f, 20.00f, "0.00", HintText = "loads of wood burnt to charcoal for each load of ore smelted")]
         [SettingPropertyGroup("Workshops")]
         public float WorkshopWoodPerOre { get; set; } = 5f;
+[SettingPropertyInteger("Workshop Candidates", 0, 160, "0", HintText = "how many different pieces a workshop weighs each morning when deciding what pays best to make")]        [SettingPropertyGroup("Workshops")]        public int WorkshopCandidates { get; set; } = 40;
 
         [SettingPropertyBool("Supply Demand Enabled", HintText = "arms, armour and horses obey supply and demand in towns and castles: a full stall sells cheap, an empty one dear - for buying AND selling, you and the AI alike (the item's own worth is untouched)")]
         [SettingPropertyGroup("Supply and demand")]
@@ -1904,6 +1905,7 @@ namespace Armoury
             s.WorkshopMinProfitPercent = WorkshopMinProfitPercent;
             s.WorkshopCrudeKgPerOre = WorkshopCrudeKgPerOre;
             s.WorkshopWoodPerOre = WorkshopWoodPerOre;
+            s.WorkshopCandidates = WorkshopCandidates;
             s.SupplyDemandEnabled = SupplyDemandEnabled;
             s.SupplyDemandBase = SupplyDemandBase;
             s.SupplyDemandRefProsperity = SupplyDemandRefProsperity;

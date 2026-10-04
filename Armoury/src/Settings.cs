@@ -340,7 +340,7 @@ namespace Armoury
         public int FineSteelValue = 281;                   // worth of one bar of fine steel (0.5 kg)
         public int ValyrianSteelValue = 1000;              // worth of one bar of Valyrian steel (0.5 kg)
         public float MineOutputMultiplier = 3f;            // iron mines dig this many times the old output - the workshops of the realm were starving for ore
-        public float LumberOutputMultiplier = 1.5f;        // woodcutters fell this many times the old output - charcoal burners need wood by the cartload
+        public float LumberOutputMultiplier = 3f;          // woodcutters fell this many times the old output - charcoal burners need wood by the cartload (a forge burns ~5 loads of wood per load of ore)
         public bool SmeltCapToCraftCost = true;            // melting a piece down never gives back more metal than a share of what forging it costs - no metal out of thin air
 
         // --- Arms pricing ---
@@ -373,6 +373,7 @@ namespace Armoury
         public float WorkshopMinProfitPercent = 10f;       // a workshop makes a piece only if the market pays at least this much over materials and wages
         public float WorkshopCrudeKgPerOre = 1.5f;         // kilograms of crude iron a bloomery wins from one load of ore (10 kg); each finer grade costs a fifth more
         public float WorkshopWoodPerOre = 5f;              // loads of wood burnt to charcoal for each load of ore smelted
+        public int WorkshopCandidates = 40;                // how many different pieces a workshop weighs each morning when deciding what pays best to make
 
         // --- Supply and demand ---
         public bool SupplyDemandEnabled = true;            // arms, armour and horses obey supply and demand in towns and castles: a full stall sells cheap, an empty one dear - for buying AND selling, you and the AI alike (the item's own worth is untouched)
