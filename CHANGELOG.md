@@ -1,5 +1,11 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-04 (29) - CENY: widelki surowca i czynnika na sztuce 0.5-1.5 (Jeff, po audycie arbitrazu)
+**Mod:** Armoury | **Pliki:** `Settings.cs` + `McmSettings.cs` (`MaterialRatioMin/Max` 0.1/3 -> 0.5/1.5, `MaterialIndexMin/Max` 0.1/3 -> 0.5/1.5)
+**Problem (audyt dziur B2, docs/AUDYT-DZIURY.md):** przy 0.1-3 praca to 2-3% kosztu plyty, wiec dolny prog dzialal w pelni: plyta t6 od ~730 do ~146 tys. miedzy miastami; indeks drewna (waga 0.7 w metalu - wegiel) da sie popchnac wykupem drewna w miescie.
+**Zmiana:** Jeff 04.10: "zawezic 0.5 do 1.5". Najwiekszy rozrzut ceny tej samej sztuki: 3x z surowcow (wczesniej 30x), razy polka i gra.
+**Status:** WGRANE 2026-10-04 (Armoury.dll md5 cd95e44492015b83b85350ff4cec81be, build rc=0, gra zamknieta; poprzednie DLL obok jako `Armoury.dll.bak-2026-10-04-przed-widelkami-05-15`). Na obecnym save.
+
 ## 2026-10-04 (28) - POBOR krok 3: zloto za werbunek AI do notabla/miasta, koniec darmowego kompletu nowej partii AI
 **Mod:** Armoury | **Pliki:** NOWY `LevyGold.cs`; `SubModuleMain.cs`, `ArmouryBehavior.cs` (Reset), `Settings.cs` + `McmSettings.cs` (`RecruitGoldToSeller`, `NoFreeKitForNewParties`, grupa "Levy")
 **Problem (audyt ekonomii + rozpoznanie werbunku 04.10):** (a) vanilla `RecruitmentCampaignBehavior.ApplyInternal` placi za ochotnika i najemnika z karczmy `GiveGoldAction(lord, null)` - zloto AI znika (u gracza BK placi notablowi, RecruitmentOnDonePatch.cs:38). (b) DTE `EveryoneCampaignBehavior.OnMobilePartyCreated` (:468-507) daje kazdej nowej partii AI komplet dla calego skladu z niczego - AiGear blokowal tylko przydzial dzienny, przenoszenie taboru i komplet przy werbunku.

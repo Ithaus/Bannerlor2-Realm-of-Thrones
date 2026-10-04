@@ -350,10 +350,10 @@ namespace Armoury
         public float SmithProfitPercent = 25f;             // the workshop's profit on top of materials and labour
         public bool MaterialIndexEnabled = true;           // the market prices by the cost of making it AGAIN: dear ore and wood make armour dear, even the pieces already on the stall
         public float MaterialIndexInertia = 0.25f;         // share of the gap to today's material prices the market closes each day - prices drift, they do not jump
-        public float MaterialRatioMin = 0.1f;              // cheapest a raw material (ore, wood, leather, linen) counts in one town against its usual price - below that it is shipped out (Jeff: 10%)
-        public float MaterialRatioMax = 3f;                // dearest a raw material counts in one town against its usual price - above that a smith buys it in the next town (Jeff: x3)
-        public float MaterialIndexMin = 0.1f;              // floor of the material-cost factor on a finished piece
-        public float MaterialIndexMax = 3f;                // ceiling of the material-cost factor on a finished piece (before it was 5 - a leather garb sold for 20 000)
+        public float MaterialRatioMin = 0.5f;              // cheapest a raw material (ore, wood, leather, linen) counts in one town against its usual price - below that it is shipped out (Jeff: 0.5)
+        public float MaterialRatioMax = 1.5f;              // dearest a raw material counts in one town against its usual price - above that a smith buys it in the next town (Jeff: 1.5)
+        public float MaterialIndexMin = 0.5f;              // floor of the material-cost factor on a finished piece
+        public float MaterialIndexMax = 1.5f;              // ceiling of the material-cost factor on a finished piece (before it was 5 - a leather garb sold for 20 000)
         public bool WarExpectationEnabled = true;          // when war is declared, traders on both sides expect armies to buy and raise their asking prices before the first lord arrives
         public float WarExpectationBase = 0.5f;            // extra demand expected at the declaration of war, scaled by the enemy's strength against ours (0.5x to 2x)
         public float WarExpectationDays = 15f;             // days over which the traders' expectation fades unless real purchases bear it out
