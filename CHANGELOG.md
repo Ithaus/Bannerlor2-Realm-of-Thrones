@@ -1,5 +1,14 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-04 (18) - BetterEconomy: wylaczone dwa kurki "z niczego / w nicosc" (ustawienia, bez kodu)
+**Mod:** BetterEconomy (plik cudzego moda!) | **Pliki:** `Modules/BetterEconomy/ModuleData/better_economy_settings.xml` (kopia: `better_economy_settings.xml.bak-2026-10-04-przed-kurkami`)
+**Zgloszenie (Jeff 04.10):** "tak" na propozycje 1 z docs/AUDYT-TOWARY.md (sekcja 6).
+**Przyczyna (AUDYT-TOWARY.md 2):** (a) `WorkshopDailyInputDrawPerShop` 1.0 - BEE codziennie w kazdym miescie zdejmuje wsad warsztatow z targu bez zadnego wyrobu (`TownEconomyCampaignBehavior.cs:1653 -> ConsumeInputs :3034-3083`, liczba `ceil(1.0 x pokrycie)` :2878); len, welna, skory topnieja w nicosc. (b) `VillageSecondaryBoundTownShare` 0.45 - produkcja drugorzedna wsi trafia do wsi I DODATKOWO 45% tej ilosci od razu na polke miasta (`VillageDevelopmentCampaignBehavior.cs:438-446`) - kopia z niczego.
+**Zmiana:** oba na 0. Przy 0 pobor = `ceil(0 x n) = 0`; cel punktacji receptur ma podloge 1 (:2814), wiec bez dzielenia przez zero; reszta BEE (status warsztatu, deficyty, produkcja drugorzedna do wsi) dziala dalej.
+**Swiadomie NIE zrobione:** "przekierowanie handlu" wsi z zalem (`VillageDevelopmentCampaignBehavior.cs:520-560`) - drugi strumien z niczego, wymaga kodu.
+**Ryzyko / co sprawdzic:** przy aktualizacji BEE plik wroci do 1.0/0.45 - sprawdzic po kazdej aktualizacji. Linia `Rynek surowcow`: len, welna i skory przestaja topniec; mniej towarow drugorzednych na polkach miast (narzedzia, plotno ze wsi) - wioski je dalej robia, ale miasto dostaje je tylko przez wiesniakow.
+**Status:** WGRANE 2026-10-04 (gra zamknieta). Dziala od nastepnego uruchomienia gry, tez na obecnym save.
+
 ## 2026-10-04 (17) - SPRZET STARTOWY: rzeczy, ktorych postac nie moze nosic, zamieniane na najlepsze, jakie moze
 **Mod:** Armoury | **Pliki:** NOWY `StartKit.cs`; `ArmouryBehavior.cs` (OnCharacterCreationIsOver + HourlyTick), `Settings.cs` + `McmSettings.cs` (`StartKitEnabled`, grupa "Starting gear")
 **Problem (Jeff 04.10, zrzut ekranu):** "dostalem mase sprzetu, jak zaczalem gre, ale nie moge go nosic" - w taborze na czerwono Common Plated Boots x2, Common Armor x3, Common Pauldrons, Common Barbute x2, Common Kettle, Common Spangen, Common Bracers (ok. 7 tys.), tabor 84/30.
