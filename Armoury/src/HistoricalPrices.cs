@@ -123,7 +123,7 @@ namespace Armoury
         internal static float FuelPerMetalKg()
         {
             var s = Settings.Current;
-            float woodKg = Math.Max(0f, s.WorkshopWoodPerOre) * 10f / Math.Max(0.1f, s.WorkshopCrudeKgPerOre) + 2.5f;
+            float woodKg = Math.Max(0f, s.WorkshopWoodPerOre) * 10f / Math.Max(0.1f, s.WorkshopCrudeKgPerOre) + Math.Max(0f, s.WorkshopForgeWoodPerMetalKg);
             return woodKg * s.HistWoodPerKg;
         }
 

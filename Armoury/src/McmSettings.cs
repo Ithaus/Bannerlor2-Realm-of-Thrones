@@ -1252,17 +1252,45 @@ namespace Armoury
         [SettingPropertyGroup("Workshops")]
         public float WorkshopWorkers { get; set; } = 6f;
 
-        [SettingPropertyFloatingInteger("Workshop Prosperity Per Hand", 0.00f, 2000.00f, "0.00", HintText = "the town's own craftsmen: one man-day of arms work each day for this much prosperity (a town of 4800 keeps about 10 hands busy), shared evenly between the guilds - tailors, armourers, weaponsmiths, bowyers, shieldwrights, saddlers")]
+        [SettingPropertyFloatingInteger("Workshop Prosperity Per Hand", 0.00f, 680.00f, "0.00", HintText = "the town's own craftsmen: one man-day of arms work each day for this much prosperity (a town of 4800 keeps about 28 hands busy) - history had 10-20x more (Paris 1292, Milan), raised step by step as ore allows")]
         [SettingPropertyGroup("Workshops")]
-        public float WorkshopProsperityPerHand { get; set; } = 500f;
+        public float WorkshopProsperityPerHand { get; set; } = 170f;
 
-        [SettingPropertyFloatingInteger("Workshop Artisans Min", 0.00f, 8.00f, "0.00", HintText = "fewest man-days a day the craftsmen of even a poor town put in")]
+        [SettingPropertyFloatingInteger("Workshop Artisans Min", 0.00f, 24.00f, "0.00", HintText = "fewest man-days a day the craftsmen of even a poor town put in")]
         [SettingPropertyGroup("Workshops")]
-        public float WorkshopArtisansMin { get; set; } = 2f;
+        public float WorkshopArtisansMin { get; set; } = 6f;
 
-        [SettingPropertyFloatingInteger("Workshop Artisans Max", 0.00f, 80.00f, "0.00", HintText = "most man-days a day the craftsmen of the richest town put in")]
+        [SettingPropertyFloatingInteger("Workshop Artisans Max", 0.00f, 240.00f, "0.00", HintText = "most man-days a day the craftsmen of the richest town put in")]
         [SettingPropertyGroup("Workshops")]
-        public float WorkshopArtisansMax { get; set; } = 20f;
+        public float WorkshopArtisansMax { get; set; } = 60f;
+
+        [SettingPropertyFloatingInteger("Guild Share Tailor", 0.00f, 1.20f, "0.00", HintText = "share of a town's craftsmen who are tailors and doublet-makers (Paris tax roll 1292)")]
+        [SettingPropertyGroup("Workshops")]
+        public float GuildShareTailor { get; set; } = 0.30f;
+
+        [SettingPropertyFloatingInteger("Guild Share Armourer", 0.00f, 1.00f, "0.00", HintText = "share who are armourers and mail-makers")]
+        [SettingPropertyGroup("Workshops")]
+        public float GuildShareArmourer { get; set; } = 0.20f;
+
+        [SettingPropertyFloatingInteger("Guild Share Weaponsmith", 0.00f, 1.00f, "0.00", HintText = "share who are weaponsmiths, cutlers and spear-makers")]
+        [SettingPropertyGroup("Workshops")]
+        public float GuildShareWeaponsmith { get; set; } = 0.20f;
+
+        [SettingPropertyFloatingInteger("Guild Share Saddler", 0.00f, 1.00f, "0.00", HintText = "share who are saddlers and harness-makers")]
+        [SettingPropertyGroup("Workshops")]
+        public float GuildShareSaddler { get; set; } = 0.15f;
+
+        [SettingPropertyFloatingInteger("Guild Share Bowyer", 0.00f, 1.00f, "0.00", HintText = "share who are bowyers and fletchers")]
+        [SettingPropertyGroup("Workshops")]
+        public float GuildShareBowyer { get; set; } = 0.10f;
+
+        [SettingPropertyFloatingInteger("Guild Share Shieldwright", 0.00f, 1.00f, "0.00", HintText = "share who are shield-makers")]
+        [SettingPropertyGroup("Workshops")]
+        public float GuildShareShieldwright { get; set; } = 0.05f;
+
+        [SettingPropertyFloatingInteger("Workshop Forge Wood Per Metal Kg", 0.00f, 50.00f, "0.00", HintText = "kilograms of wood (as charcoal) the forge burns for each kilogram of metal worked, on top of the bloomery")]
+        [SettingPropertyGroup("Workshops")]
+        public float WorkshopForgeWoodPerMetalKg { get; set; } = 12.5f;
 
         [SettingPropertyFloatingInteger("Workshop Wage Per Day", 0.00f, 12.00f, "0.00", HintText = "wages for one man-day at the forge, paid into the town (3 d - a craftsman's day in historical prices)")]
         [SettingPropertyGroup("Workshops")]
@@ -1332,9 +1360,9 @@ namespace Armoury
         [SettingPropertyGroup("Iron bank")]
         public float HistCharcoalPerKg { get; set; } = 0.07f;
 
-        [SettingPropertyFloatingInteger("Hist Crude Iron Per Kg", 0.00f, 8.00f, "0.00", HintText = "crude bloom iron, pence per kg")]
+        [SettingPropertyFloatingInteger("Hist Crude Iron Per Kg", 0.00f, 5.60f, "0.00", HintText = "crude bloom iron, pence per kg (Tudeley bloom 3s 4d)")]
         [SettingPropertyGroup("Iron bank")]
-        public float HistCrudeIronPerKg { get; set; } = 2f;
+        public float HistCrudeIronPerKg { get; set; } = 1.4f;
 
         [SettingPropertyFloatingInteger("Hist Wrought Iron Per Kg", 0.00f, 10.00f, "0.00", HintText = "wrought bar iron, pence per kg (Clark/Rogers 1300-49: 1.15 d a pound)")]
         [SettingPropertyGroup("Iron bank")]
@@ -1404,9 +1432,9 @@ namespace Armoury
         [SettingPropertyGroup("Iron bank")]
         public float HistFlaxPerKg { get; set; } = 2f;
 
-        [SettingPropertyFloatingInteger("Hist Bow Labor Multiplier", 0.00f, 2.00f, "0.00", HintText = "a bowyer's days on a bow, against the smith's model (a war longbow cost 12-18 d, a day or two of work)")]
+        [SettingPropertyFloatingInteger("Hist Bow Labor Multiplier", 0.00f, 4.00f, "0.00", HintText = "a bowyer's days on a bow, against the smith's model (a war longbow cost 12-18 d)")]
         [SettingPropertyGroup("Iron bank")]
-        public float HistBowLaborMultiplier { get; set; } = 0.5f;
+        public float HistBowLaborMultiplier { get; set; } = 1.0f;
 
         [SettingPropertyBool("Hist Demand Scaling", HintText = "town demand for each repriced kind of goods is counted in the new coin too - otherwise townsfolk with the old purse buy up tens of times more cheap swords, ore and cloth and the stalls run dry")]
         [SettingPropertyGroup("Iron bank")]
@@ -2391,6 +2419,13 @@ namespace Armoury
             s.WorkshopProsperityPerHand = WorkshopProsperityPerHand;
             s.WorkshopArtisansMin = WorkshopArtisansMin;
             s.WorkshopArtisansMax = WorkshopArtisansMax;
+            s.GuildShareTailor = GuildShareTailor;
+            s.GuildShareArmourer = GuildShareArmourer;
+            s.GuildShareWeaponsmith = GuildShareWeaponsmith;
+            s.GuildShareSaddler = GuildShareSaddler;
+            s.GuildShareBowyer = GuildShareBowyer;
+            s.GuildShareShieldwright = GuildShareShieldwright;
+            s.WorkshopForgeWoodPerMetalKg = WorkshopForgeWoodPerMetalKg;
             s.WorkshopWagePerDay = WorkshopWagePerDay;
             s.WorkshopMinProfitPercent = WorkshopMinProfitPercent;
             s.WorkshopCrudeKgPerOre = WorkshopCrudeKgPerOre;

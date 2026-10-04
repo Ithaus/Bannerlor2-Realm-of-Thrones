@@ -374,9 +374,16 @@ namespace Armoury
         public bool WorkshopLawEnabled = true;             // town workshops that make arms and armour run as real businesses: they buy ore, wood, leather and linen on the market by the true weight of each piece, pay their workers, sell to the market - and make only what turns a profit
         public float WorkshopWorkersArtisans = 6f;         // man-days of work the town's artisans put in each day
         public float WorkshopWorkers = 6f;                 // man-days of work a notable's smithy or wood workshop puts in each day (a master with journeymen and apprentices)
-        public float WorkshopProsperityPerHand = 500f;     // the town's own craftsmen: one man-day of arms work each day for this much prosperity (a town of 4800 keeps about 10 hands busy), shared evenly between the guilds - tailors, armourers, weaponsmiths, bowyers, shieldwrights, saddlers
-        public float WorkshopArtisansMin = 2f;             // fewest man-days a day the craftsmen of even a poor town put in
-        public float WorkshopArtisansMax = 20f;            // most man-days a day the craftsmen of the richest town put in
+        public float WorkshopProsperityPerHand = 170f;     // the town's own craftsmen: one man-day of arms work each day for this much prosperity (a town of 4800 keeps about 28 hands busy) - history had 10-20x more (Paris 1292, Milan), raised step by step as ore allows
+        public float WorkshopArtisansMin = 6f;             // fewest man-days a day the craftsmen of even a poor town put in
+        public float WorkshopArtisansMax = 60f;            // most man-days a day the craftsmen of the richest town put in
+        public float GuildShareTailor = 0.30f;             // share of a town's craftsmen who are tailors and doublet-makers (Paris tax roll 1292)
+        public float GuildShareArmourer = 0.20f;           // share who are armourers and mail-makers
+        public float GuildShareWeaponsmith = 0.20f;        // share who are weaponsmiths, cutlers and spear-makers
+        public float GuildShareSaddler = 0.15f;            // share who are saddlers and harness-makers
+        public float GuildShareBowyer = 0.10f;             // share who are bowyers and fletchers
+        public float GuildShareShieldwright = 0.05f;       // share who are shield-makers
+        public float WorkshopForgeWoodPerMetalKg = 12.5f;  // kilograms of wood (as charcoal) the forge burns for each kilogram of metal worked, on top of the bloomery
         public float WorkshopWagePerDay = 3f;              // wages for one man-day at the forge, paid into the town (3 d - a craftsman's day in historical prices)
         public float WorkshopMinProfitPercent = 10f;       // a workshop makes a piece only if the market pays at least this much over materials and wages
         public float WorkshopCrudeKgPerOre = 1.5f;         // kilograms of crude iron a bloomery wins from one load of ore (10 kg); each finer grade costs a fifth more
@@ -396,7 +403,7 @@ namespace Armoury
         public float HistIronOrePerKg = 0.075f;            // iron ore, pence per kg (England c.1300, estimate)
         public float HistWoodPerKg = 0.035f;               // timber and firewood, pence per kg (Clark/Rogers)
         public float HistCharcoalPerKg = 0.07f;            // charcoal, pence per kg (Clark/Rogers)
-        public float HistCrudeIronPerKg = 2f;              // crude bloom iron, pence per kg
+        public float HistCrudeIronPerKg = 1.4f;            // crude bloom iron, pence per kg (Tudeley bloom 3s 4d)
         public float HistWroughtIronPerKg = 2.5f;          // wrought bar iron, pence per kg (Clark/Rogers 1300-49: 1.15 d a pound)
         public float HistIronPerKg = 3.5f;                 // refined iron, pence per kg
         public float HistSteelPerKg = 6f;                  // steel, pence per kg (estimate)
@@ -414,7 +421,7 @@ namespace Armoury
         public float HistBulkUnitFactor = 10f;             // ore and timber are sold by the load: one unit weighs this many times the game's 10 kg, so a unit costs whole pence (ore 100 kg = about 8 d, timber 100 kg = about 4 d) instead of a fraction of a penny rounded up to 1-2; village output, town use and every recipe are counted by weight, so nothing else changes
         public float HistHidesPerKg = 1f;                  // raw hides, pence per kg (an ox hide of 25-30 kg sold for 1-3 shillings)
         public float HistFlaxPerKg = 2f;                   // raw flax and hemp, pence per kg (estimate)
-        public float HistBowLaborMultiplier = 0.5f;        // a bowyer's days on a bow, against the smith's model (a war longbow cost 12-18 d, a day or two of work)
+        public float HistBowLaborMultiplier = 1.0f;        // a bowyer's days on a bow, against the smith's model (a war longbow cost 12-18 d)
         public bool HistDemandScaling = true;              // town demand for each repriced kind of goods is counted in the new coin too - otherwise townsfolk with the old purse buy up tens of times more cheap swords, ore and cloth and the stalls run dry
         public bool PopulationRentEnabled = true;          // a fief pays by the people it stands for: each village and town on the map is a symbol of a whole land, and its lord's rents follow that land's population (the Reach richest, the Iron Islands poor)
         public float PopulationRentPerHead = 40f;          // rents and dues a lord draws from each subject a year, in coins (about 40 pence a head in the medieval estimate)

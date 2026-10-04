@@ -63,7 +63,7 @@ namespace Armoury
         private static readonly float[] DaysShield = { 1f, 1.5f, 2f, 3f, 4f, 5f };
         private static readonly float[] DaysBow = { 2f, 3f, 4f, 6f, 8f, 12f };
         private static readonly float[] DaysXbow = { 3f, 4f, 6f, 8f, 10f, 14f };
-        private static readonly float[] DaysAmmo = { 0.3f, 0.4f, 0.5f, 0.7f, 1f, 1.5f };
+        private static readonly float[] DaysAmmo = { 0.3f, 0.33f, 0.36f, 0.4f, 0.45f, 0.5f };   // wpis 52: snop t6 nie 3x drozszy od t1 (12-16 d)
         private static readonly float[] DaysCape = { 0.5f, 1f, 1.5f, 2f, 4f, 6f };
 
         internal static bool PricingOn { get { var s = Settings.Current; return s != null && s.ArmsCostPricingEnabled; } }
@@ -179,7 +179,7 @@ namespace Armoury
                     case ItemObject.ItemTypeEnum.LegArmor:
                     case ItemObject.ItemTypeEnum.HandArmor:
                     case ItemObject.ItemTypeEnum.HorseHarness:
-                        if (mat == ArmorComponent.ArmorMaterialTypes.Plate) { metalKg = w * 0.9f * 1.4f; linenKg = w * 0.1f; days = w * 1.5f + t; }
+                        if (mat == ArmorComponent.ArmorMaterialTypes.Plate) { metalKg = w * 0.9f * 1.4f; linenKg = w * 0.1f; days = t > 3 ? w * (1.5f + 1.0f * (t - 3)) + t : w * 1.5f + t; }   // wpis 52: pelna zbroja t6 16 L (1374) - wyzsze tiery to praca hartowania i dopasowania
                         else if (mat == ArmorComponent.ArmorMaterialTypes.Chainmail) { metalKg = w * 0.9f * 1.4f; linenKg = w * 0.1f; days = w * 5f; }
                         else if (mat == ArmorComponent.ArmorMaterialTypes.Leather) { leatherKg = w * 0.85f * 1.2f; metalKg = w * 0.15f * 1.4f; days = w * 1f + t; }
                         else { linenKg = w * 1.1f; days = w * 0.7f + t * 0.5f; }

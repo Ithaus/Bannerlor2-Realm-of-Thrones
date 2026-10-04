@@ -114,7 +114,7 @@ namespace Armoury
             // wpis 50: liczone w KG, potem na jednostki rynku wedle ich wagi (ladunek rudy/drewna 100 kg)
             Resolve();
             float oreKg = c.MetalKg > 0f ? c.MetalKg / crudePerOre * 10f * (float)Math.Pow(1.25, StepsOf(c.Grade)) : 0f;
-            float woodKg = c.WoodKg + oreKg * Math.Max(0f, s.WorkshopWoodPerOre) + c.MetalKg * 2.5f;
+            float woodKg = c.WoodKg + oreKg * Math.Max(0f, s.WorkshopWoodPerOre) + c.MetalKg * Math.Max(0f, s.WorkshopForgeWoodPerMetalKg);
             float ore = oreKg / UnitKg(_ore);
             float wood = woodKg / UnitKg(_wood);
             days = Math.Max(0.05f, HistoricalPrices.On ? HistoricalPrices.HistDays(it, c) : c.Days);
@@ -345,6 +345,21 @@ namespace Armoury
             return "?";
         }
 
+        private static float GuildWeight(string g)
+        {
+            var s = Settings.Current;
+            switch (g)
+            {
+                case "krawiec": return Math.Max(0f, s.GuildShareTailor);
+                case "platnerz": return Math.Max(0f, s.GuildShareArmourer);
+                case "miecznik": return Math.Max(0f, s.GuildShareWeaponsmith);
+                case "siodlarz": return Math.Max(0f, s.GuildShareSaddler);
+                case "lucznik": return Math.Max(0f, s.GuildShareBowyer);
+                case "tarczownik": return Math.Max(0f, s.GuildShareShieldwright);
+                default: return 0.05f;
+            }
+        }
+
         /// <summary>Roboczodni dziennie warsztatu: rzemieslnicy miasta wedle dobrobytu, warsztat notabla stale.</summary>
         internal static float Hands(Workshop workshop, Town town)
         {
@@ -372,7 +387,11 @@ namespace Armoury
             }
             int lines; string gu = GuildOf(production);
             if (c.Value.Count == 0 || !c.Value.TryGetValue(gu, out lines) || lines <= 0) return 0f;
-            return Hands(workshop, town) / c.Value.Count / lines;
+            // wpis 52: cechy wedle Paryza 1292 (krawcy 30%, platnerze 20%, miecznicy 20%, siodlarze 15%, lucznicy 10%,
+            // tarczownicy 5%) - udzial cechu wsrod CZYNNYCH cechow warsztatu (nieczynny oddaje rece pozostalym)
+            float sum = 0f; foreach (var g in c.Value.Keys) sum += GuildWeight(g);
+            if (sum <= 0f) return 0f;
+            return Hands(workshop, town) * GuildWeight(gu) / sum / lines;
         }
 
         /// <summary>Cena jednostki surowca dla warsztatu (m: 0 ruda, 1 drewno, 2 skora, 3 len/welna). Gra zna tylko pensy calkowite:
