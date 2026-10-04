@@ -385,6 +385,7 @@ namespace Armoury
         public float RecruitExcessWeight = 1f;             // how strongly hands without work on the land (Banner Kings workforce surplus) bring volunteers forward
         public float RecruitMiseryWeight = 0.2f;           // how strongly poverty, war, burnt villages and hunger push men to leave and take service
         public float RecruitWillingMax = 1.5f;             // ceiling on the willingness multiplier
+        public bool VolunteerKitEnabled = true;            // a volunteer rises to a better troop only when his notable buys the missing gear for it on the town market (paid to the town, taken off the stall) - no gear from thin air
         public bool PopulationRentEnabled = true;          // a fief pays by the people it stands for: each village and town on the map is a symbol of a whole land, and its lord's rents follow that land's population (the Reach richest, the Iron Islands poor)
         public float PopulationRentPerHead = 40f;          // rents and dues a lord draws from each subject a year, in coins (about 40 pence a head in the medieval estimate)
         public float PopulationScale = 1f;                 // scale on every land's population (Westeros ~30 million, Essos with its hinterlands ~30 million)

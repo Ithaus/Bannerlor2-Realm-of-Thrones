@@ -1289,6 +1289,10 @@ namespace Armoury
         [SettingPropertyGroup("Levy")]
         public float RecruitWillingMax { get; set; } = 1.5f;
 
+        [SettingPropertyBool("Volunteer Kit Enabled", HintText = "a volunteer rises to a better troop only when his notable buys the missing gear for it on the town market (paid to the town, taken off the stall) - no gear from thin air")]
+        [SettingPropertyGroup("Levy")]
+        public bool VolunteerKitEnabled { get; set; } = true;
+
         [SettingPropertyBool("Population Rent Enabled", HintText = "a fief pays by the people it stands for: each village and town on the map is a symbol of a whole land, and its lord's rents follow that land's population (the Reach richest, the Iron Islands poor)")]
         [SettingPropertyGroup("Population")]
         public bool PopulationRentEnabled { get; set; } = true;
@@ -2199,6 +2203,7 @@ namespace Armoury
             s.RecruitExcessWeight = RecruitExcessWeight;
             s.RecruitMiseryWeight = RecruitMiseryWeight;
             s.RecruitWillingMax = RecruitWillingMax;
+            s.VolunteerKitEnabled = VolunteerKitEnabled;
             s.PopulationRentEnabled = PopulationRentEnabled;
             s.PopulationRentPerHead = PopulationRentPerHead;
             s.PopulationScale = PopulationScale;

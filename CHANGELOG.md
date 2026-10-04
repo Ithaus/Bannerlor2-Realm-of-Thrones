@@ -1,5 +1,13 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-04 (27) - POBOR krok 2: ochotnik awansuje w puli notabla tylko z kupionym sprzetem
+**Mod:** Armoury | **Pliki:** NOWY `VolunteerKit.cs`; `SubModuleMain.cs`, `ArmouryBehavior.cs` (Reset), `Settings.cs` + `McmSettings.cs` (`VolunteerKitEnabled`, grupa "Levy")
+**Zgloszenie (Jeff 04.10):** "a co, jak sa ludzie wyzszego tieru, skad maja sprzet - przeciez jest zycie swiata, sa inni zbrojni nie w sluzbie, co moga kupic sprzet i miec swoj".
+**Przyczyna:** vanilla `RecruitmentCampaignBehavior.UpdateVolunteersOfNotablesInSettlement` awansuje ochotnika (log2(moc/tier) x 1%, do tieru 4) za darmo; DTE przy werbunku wklada do zbrojowni caly komplet szablonu - sprzet wyzszych tierow z niczego.
+**Zmiana:** prefix zapamietuje pule (6 miejsc) kazdego notabla, postfix znajduje awanse X -> Y (roznica multizbiorow, bo vanilla sortuje miejsca). Dla awansu: czesci kompletu Y (FirstBattleEquipment), ktorych X nie mial, bez amunicji; dla kazdej najtansza sztuka na targu miasta regionu (wies -> jej miasto; zamek -> najblizsze miasto) tego samego typu i tieru nie nizszego (bez koni jucznych), cena z `MarketData.GetPrice` (z naszym prawem cen). Notabl placi miastu ze swojej kiesy (`GiveGoldAction.ApplyForCharacterToSettlement`), towar schodzi z polki. Brak towaru albo zlota = awans cofniety. Tier 1 (nowy ochotnik) bez zakupu - wlasny dobytek. Log dzienny: `Ochotnicy: dzien N - awanse z kupionym sprzetem A (szt. za X zl), cofniete B`.
+**Ryzyko / co sprawdzic:** popyt na uzbrojenie poza armiami (kupuja notable) - polki moga sie przerzedzic; mniej ochotnikow tieru 3-4 tam, gdzie miasto biedne w towar. Komplet DTE przy werbunku zostaje (to "ten zakupiony" - przyblizenie, DTE losuje rownowazne sztuki).
+**Status:** WGRANE 2026-10-04 (Armoury.dll md5 421221e6a2c83d998a302088002ff4bc, build rc=0, gra zamknieta; poprzednie DLL obok jako `Armoury.dll.bak-2026-10-04-przed-poborem2`). DO SPRAWDZENIA - dziala na obecnym save.
+
 ## 2026-10-04 (26) - POBOR krok 1: ochotnik zglasza sie tam, gdzie sa rece bez pracy albo ludzie chcacy odejsc
 **Mod:** Armoury | **Pliki:** NOWY `Levy.cs`; `OutlawLaw.cs` (NOWE `MiseryOf` - wspolna miara nedzy), `SubModuleMain.cs`, `ArmouryBehavior.cs` (Reset), `Settings.cs` + `McmSettings.cs` (grupa "Levy", 5 ustawien); plan: `docs/PLAN-POBOR.md`
 **Zgloszenie (Jeff 04.10):** "zrob ten duzy system ... jak teraz beda pokazywac sie ludzie w werbunku, bo teraz nie ma losowosci - pewnie ci, co nie maja pracy, albo ci, co chca opuscic wioske - i jaka bedzie zasada werbunku?"
