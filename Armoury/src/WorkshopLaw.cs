@@ -67,6 +67,32 @@ namespace Armoury
             _wool = MBObjectManager.Instance.GetObject<ItemObject>("wool");
         }
 
+        private static int _tanned, _woven;
+        private static bool TanOrWeave(WorkshopType.Production p, Workshop w)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (s.ArtisanTanWeavePerCycle <= 0 || w == null || w.Settlement == null || w.Settlement.Town == null) return false;
+                string outId = null;
+                foreach (var o in p.Outputs) if (o.Item1 != null) { outId = o.Item1.StringId; break; }
+                string inId = outId == "leather" ? "hides" : outId == "linen" ? "flax" : null;
+                if (inId == null) return false;
+                var inIt = MBObjectManager.Instance.GetObject<ItemObject>(inId);
+                var outIt = MBObjectManager.Instance.GetObject<ItemObject>(outId);
+                var shelf = w.Settlement.Town.Owner.ItemRoster;
+                if (inIt == null || outIt == null || shelf == null) return false;
+                int n = Math.Min(s.ArtisanTanWeavePerCycle, shelf.GetItemNumber(inIt));
+                if (n <= 0) return false;
+                shelf.AddToCounts(inIt, -n);
+                shelf.AddToCounts(outIt, n);
+                CampaignEventDispatcher.Instance.OnItemProduced(outIt, w.Settlement, n);
+                if (outId == "leather") _tanned += n; else _woven += n;
+                return true;
+            }
+            catch { return false; }
+        }
+
         private static float UnitKg(ItemObject it) { return it != null && it.Weight > 0.05f ? it.Weight : 10f; }
 
         // wpis 50: kopalnia BK robi rude bez wsadu (praca gornikow - to nie "z niczego"), ale w starych sztukach po 10 kg;
@@ -137,6 +163,10 @@ namespace Armoury
                 {
                     int d0 = (int)CampaignTime.Now.ToDays;
                     if (_dayStamp != d0) { Flush(); _dayStamp = d0; }
+                    // wpis 64 (test 15:54: skora ~50 i plotno ~20 sztuk na swiat po 150-1000 d, a skor surowych 3000 i lnu 700
+                    // na polkach - za malo garbarni i tkalni): linie skory i plotna rzemieslnikow miasta nie robia ich z niczego,
+                    // tylko garbuja skory surowe i tkaja len z wlasnego targu (1 -> 1)
+                    if (TanOrWeave(production, workshop)) { __result = true; return false; }
                     _freeRawBlocked++;
                     __result = false;
                     return false;
@@ -450,10 +480,10 @@ namespace Armoury
                 Log.Info("Warsztaty: dzien " + _dayStamp + " - wykonano " + _made + " szt. [" + string.Join(", ", parts.ToArray())
                          + "], koszt " + _dayCost + ", sprzedaz " + _dayRevenue + "; odpuszczone: bez zysku " + _skipLoss
                          + ", brak surowca " + _skipMat + ", w robocie (cykle) " + _skipLabor + ", brak zlota/kupca " + _skipGold + "; rozpoczete sztuki " + _started + ", w toku teraz " + InProgress()
-                         + " | z niczego zablokowane: cykle rzemieslnikow " + _freeRawBlocked + ", sztabki/wegiel z losowania -> ruda/drewno " + _swappedSmith + ".");
+                         + " | rzemieslnicy miasta wygarbowali skor " + _tanned + ", utkali plotna " + _woven + " | z niczego zablokowane: cykle rzemieslnikow " + _freeRawBlocked + ", sztabki/wegiel z losowania -> ruda/drewno " + _swappedSmith + ".");
             }
             FlushDiag();
-            _made = _skipLoss = _skipMat = _skipLabor = _skipGold = _freeRawBlocked = _swappedSmith = _started = 0; _dayRevenue = _dayCost = 0; _madeByType.Clear();
+            _made = _skipLoss = _skipMat = _skipLabor = _skipGold = _freeRawBlocked = _swappedSmith = _started = _tanned = _woven = 0; _dayRevenue = _dayCost = 0; _madeByType.Clear();
         }
 
         // ------------------------------------------------------------ diagnoza (wpis 46, tylko log)

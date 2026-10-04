@@ -1,10 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-04 (64) - RZEMIESLNICY MIASTA GARBUJA I TKAJA z targu (skory surowe -> skora, len -> plotno)
+**Mod:** Armoury | **Pliki:** `WorkshopLaw.cs` (`TanOrWeave` w bloku `FreeRawLine`, licznik w logu dnia), `Settings.cs` + `McmSettings.cs` (NOWE `ArtisanTanWeavePerCycle` 5)
+**Problem (test 15:54, Armoury-2026-10-04_15-54-06.log, dni 108836-108849):** warsztaty ruszyly (270-330 szt./dzien: luki, bron, helmy, tarcze, drzewce), ale "brak surowca" 1400-1650 cykli dziennie, zbroi korpusu 1 szt./dzien, polki zbroi 10; skora ~50 i plotno ~20 sztuk na swiat po 150-213 i 598-1012 d (wartosc 40 i 100), a skor surowych 2580 -> 2980 i lnu ~700 na polkach - za malo garbarni (10) i tkalni (12). Linie "leather" i "linen" ukrytych rzemieslnikow BK byly zablokowane (robily z niczego).
+**Zmiana:** te linie nie robia z niczego, tylko przerabiaja z targu swojego miasta: do 5 ladunkow skor surowych -> 5 skory, albo lnu -> plotna na cykl (szybkosc linii BK: skora 0.2, plotno 0.5 cyklu dziennie -> ~1 i ~2.5 dziennie na miasto); bez zlota (rzemieslnicy tego samego miasta). Log dnia: `rzemieslnicy miasta wygarbowali skor N, utkali plotna M`.
+**Inne z testu (bez zmian):** zloto startowe dziala (1000 -> 100 d), kontrola cen przywrocila 7 lukow/strzal nadpisanych przez inny mod pierwszego dnia; renty stabilne ~340 tys./dzien; korona: powinnosci ~9 tys., danina ~14 tys., clo ~14 tys. dziennie; rody traca ~300-560 d/dzien (wojna kosztuje); 1-4 unikaty dziennie pojawialy sie na targach - zrodlo nieznane (od wpisu 62 kronika pokaze, skad). Wpisy 62-63 wgrane po tym tescie.
+**Status (62-64):** WGRANE 2026-10-04 (gra zamknieta; poprzednie DLL obok jako `Armoury.dll.bak-2026-10-04-przed-62-63` i `-przed-64`). DO SPRAWDZENIA.
+
 ## 2026-10-04 (63) - LOG UPORZADKOWANY: szczegoly w plikach tematycznych Logs/<sesja>/, w grze tylko komunikaty o graczu
 **Mod:** Armoury | **Pliki:** `Log.cs` (`TopicOf`, folder `Modules/Armoury/Logs/<data sesji>/`, przycinanie do 12 sesji), `UniqueSpoils.cs` (bez "Word spreads" o cudzych sprawach)
 **Problem (Jeff 04.10: "ten log sie robi tak dlugi, ze za duzo tam jest smieci, trzeba to jakos uporzadkowac"):** jeden plik Armoury-<data>.log mial wszystko: setki linii zakupow AI, cen towar po towarze, obozow nocnych, zamiennikow przy starcie, kroniki unikatow; w grze komunikaty o cudzych zdobyczach.
 **Zmiana:** glowny log = start, bledy, podsumowania dnia (Warsztaty: dzien, Rynek, Ludnosc, Korona, Wyrzutki, IronBank, ZakupyAI: dzien, PodazPopyt: kupcy...). Szczegoly: `unikaty.log` (Kronika unikatow, UniqueSpoils), `zakupy.log` (ZakupyAI poszczegolne, Stajnia AI, Oferta), `handel.log` (PodazPopyt towar po towarze), `warsztaty.log` (diagnoza), `noc.log` (AiNightCamp), `start.log` (zamienniki UniqueLaw/LegendaryLaw, TroopFit, Uniques, latki modeli). W grze z kroniki tylko to, co dotyczy gracza.
-**Status (62+63):** ZBUDOWANE 2026-10-04 (build rc=0) - NIE WGRANE: gra uruchomiona; wgrac po zamknieciu. Uwaga dla czytajacego logi: szczegoly szukac w `Modules/Armoury/Logs/<sesja>/`.
+**Status (62+63):** WGRANE 2026-10-04 po tescie 15:54 (Armoury.dll md5 6238bb959a21a1e7285ac82449f7d899). Uwaga dla czytajacego logi: szczegoly szukac w `Modules/Armoury/Logs/<sesja>/`.
 
 ## 2026-10-04 (62) - UNIKATY KRAZA PO SWIECIE: nic nie znika, AI pojmujace bierze, lord kupuje z polki, kronika
 **Mod:** Armoury | **Pliki:** `UniqueSpoils.cs` (przebudowa), `ArmouryBehavior.cs` (`Reset`, klucz save `arm_uniq_init`, `DailyTickPartyEvent`), `Settings.cs` + `McmSettings.cs` (NOWE `UniqueSpoilsFromPlayer` true)

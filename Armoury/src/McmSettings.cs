@@ -1276,6 +1276,10 @@ namespace Armoury
         [SettingPropertyGroup("Workshops")]
         public float WorkshopArtisansMax { get; set; } = 60f;
 
+        [SettingPropertyInteger("Artisan Tan Weave Per Cycle", 0, 20, "0", HintText = "the town's own tanners and weavers turn this many loads of raw hides into leather, or flax into linen, each working cycle - from the town market, nothing from thin air")]
+        [SettingPropertyGroup("Workshops")]
+        public int ArtisanTanWeavePerCycle { get; set; } = 5;
+
         [SettingPropertyFloatingInteger("Workshop Sell Share", 0.00f, 3.20f, "0.00", HintText = "a craftsman sells his wares at the market price buyers pay, less this merchant's cut (0.8 = he keeps 80%)")]
         [SettingPropertyGroup("Workshops")]
         public float WorkshopSellShare { get; set; } = 0.8f;
@@ -2518,6 +2522,7 @@ namespace Armoury
             s.WorkshopProsperityPerHand = WorkshopProsperityPerHand;
             s.WorkshopArtisansMin = WorkshopArtisansMin;
             s.WorkshopArtisansMax = WorkshopArtisansMax;
+            s.ArtisanTanWeavePerCycle = ArtisanTanWeavePerCycle;
             s.WorkshopSellShare = WorkshopSellShare;
             s.GuildShareTailor = GuildShareTailor;
             s.GuildShareArmourer = GuildShareArmourer;

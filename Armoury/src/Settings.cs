@@ -381,6 +381,7 @@ namespace Armoury
         public float WorkshopArtisansMin = 6f;             // fewest man-days a day the craftsmen of even a poor town put in
         public float WorkshopArtisansMax = 60f;            // most man-days a day the craftsmen of the richest town put in
         public string WorkshopForbiddenIds = "weirwood,giant_,ravens_teeth,dragonglass,obsidian,val_steel,valyrian,dragonbone";   // pieces whose id contains any of these are never made by town workshops (magic and lore gear: weirwood bows, giants' gear, Valyrian steel, dragonglass)
+        public int ArtisanTanWeavePerCycle = 5;            // the town's own tanners and weavers turn this many loads of raw hides into leather, or flax into linen, each working cycle - from the town market, nothing from thin air
         public float WorkshopSellShare = 0.8f;             // a craftsman sells his wares at the market price buyers pay, less this merchant's cut (0.8 = he keeps 80%)
         public float GuildShareTailor = 0.30f;             // share of a town's craftsmen who are tailors and doublet-makers (Paris tax roll 1292)
         public float GuildShareArmourer = 0.20f;           // share who are armourers and mail-makers
