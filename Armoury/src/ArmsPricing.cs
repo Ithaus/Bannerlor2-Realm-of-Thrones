@@ -79,7 +79,7 @@ namespace Armoury
             if (it == null) return false;
             bool u;
             if (_unique.TryGetValue(it, out u)) return u;     // straz CrashScribe przez refleksje - raz na przedmiot
-            try { u = it.NotMerchandise || QuartermasterLaw.BarredInBattle(it); } catch { u = false; }
+            try { u = it.NotMerchandise || QuartermasterLaw.BarredInBattle(it) || (it.StringId != null && RotUniques.Ids.Contains(it.StringId)); } catch { u = false; }   // wpis 60: spis unikatow ROT (docs/ROT-UNIKATY.md)
             _unique[it] = u;
             return u;
         }
