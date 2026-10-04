@@ -102,6 +102,17 @@ namespace Armoury
         {
             try
             {
+                // KONIEC SUROWCOW Z NICZEGO (Jeff 04.10, docs/AUDYT-TOWARY.md 6.2): ukryty warsztat BK
+                // "artisans" w kazdym miescie mial linie BEZ wsadu, ktore robily drewno, rude, skory surowe,
+                // mieso, skore i plotno z powietrza. Surowce maja przychodzic ze wsi (wiesniacy, karawany).
+                if (FreeRawLine(production, workshop))
+                {
+                    int d0 = (int)CampaignTime.Now.ToDays;
+                    if (_dayStamp != d0) { Flush(); _dayStamp = d0; }
+                    _freeRawBlocked++;
+                    __result = false;
+                    return false;
+                }
                 if (!On || !AllOutputsArms(production) || workshop == null || workshop.Settlement == null) return true;
                 if (workshop.Owner == Hero.MainHero) return true;          // warsztaty gracza - vanilla
                 if (!Campaign.Current.GameStarted) return true;           // start gry - vanilla zapelnia rynki
@@ -260,15 +271,56 @@ namespace Armoury
         private static void Flush()
         {
             if (_dayStamp < 0) return;
-            if (_made > 0 || _skipLoss + _skipMat + _skipLabor + _skipGold > 0)
+            if (_made > 0 || _skipLoss + _skipMat + _skipLabor + _skipGold + _freeRawBlocked + _swappedSmith > 0)
             {
                 var parts = new List<string>();
                 foreach (var kv in _madeByType) parts.Add(kv.Key + " " + kv.Value);
                 Log.Info("Warsztaty: dzien " + _dayStamp + " - wykonano " + _made + " szt. [" + string.Join(", ", parts.ToArray())
                          + "], koszt " + _dayCost + ", sprzedaz " + _dayRevenue + "; odpuszczone: bez zysku " + _skipLoss
-                         + ", brak surowca " + _skipMat + ", brak rak " + _skipLabor + ", brak zlota " + _skipGold + ".");
+                         + ", brak surowca " + _skipMat + ", brak rak " + _skipLabor + ", brak zlota " + _skipGold
+                         + " | z niczego zablokowane: cykle rzemieslnikow " + _freeRawBlocked + ", sztabki/wegiel z losowania -> ruda/drewno " + _swappedSmith + ".");
             }
-            _made = _skipLoss = _skipMat = _skipLabor = _skipGold = 0; _dayRevenue = _dayCost = 0; _madeByType.Clear();
+            _made = _skipLoss = _skipMat = _skipLabor = _skipGold = _freeRawBlocked = _swappedSmith = 0; _dayRevenue = _dayCost = 0; _madeByType.Clear();
+        }
+
+        private static int _freeRawBlocked, _swappedSmith;
+        private static readonly HashSet<string> FreeRawCats = new HashSet<string> { "hardwood", "iron", "hides", "meat", "leather", "linen" };
+
+        /// <summary>Linia ukrytego "artisans" bez wsadu, ktora robi surowiec z powietrza.</summary>
+        private static bool FreeRawLine(WorkshopType.Production p, Workshop w)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || !s.WorkshopNoFreeRaw || w == null || w.WorkshopType == null) return false;
+                if (w.WorkshopType.StringId != "artisans") return false;
+                if (p.Inputs != null && p.Inputs.Count > 0) return false;
+                if (p.Outputs == null || p.Outputs.Count == 0) return false;
+                foreach (var o in p.Outputs) if (o.Item1 == null || !FreeRawCats.Contains(o.Item1.StringId)) return false;
+                return true;
+            }
+            catch { return false; }
+        }
+
+        /// <summary>Losowanie wyrobu z kategorii: wegiel (kategoria drewna) i sztabki (kategoria zelaza)
+        /// tylko z wytopu - warsztat i kopalnia daja surowiec, nie gotowa stal (w tym valyrianska).</summary>
+        public static void RandomItemPostfix(ref EquipmentElement __result)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || !s.WorkshopNoFreeRaw) return;
+                var it = __result.Item;
+                if (it == null) return;
+                string id = it.StringId ?? "";
+                if (id != "charcoal" && !id.StartsWith("ironIngot")) return;
+                Resolve();
+                var raw = id == "charcoal" ? _wood : _ore;
+                if (raw == null) return;
+                __result = new EquipmentElement(raw);
+                _swappedSmith++;
+            }
+            catch { }
         }
 
         internal static void ApplyAll(Harmony h)
@@ -278,6 +330,10 @@ namespace Armoury
                 var m = AccessTools.Method(typeof(WorkshopsCampaignBehavior), "TickOneProductionCycleForNotableWorkshop");
                 if (m == null) { Log.Info("WorkshopLaw: brak TickOneProductionCycleForNotableWorkshop - warsztaty vanilla."); return; }
                 h.Patch(m, prefix: new HarmonyMethod(typeof(WorkshopLaw), nameof(CyclePrefix)));
+                var ri = AccessTools.Method(typeof(WorkshopsCampaignBehavior), "GetRandomItemAux");
+                if (ri != null) h.Patch(ri, postfix: new HarmonyMethod(typeof(WorkshopLaw), nameof(RandomItemPostfix)));
+                Log.Info("WorkshopLaw: koniec surowcow z niczego - rzemieslnicy bez wsadu " + (Settings.Current != null && Settings.Current.WorkshopNoFreeRaw ? "ZABLOKOWANI" : "wolni (MCM)")
+                         + ", losowanie sztabek/wegla " + (ri != null ? "wpiete" : "BRAK GetRandomItemAux") + ".");
                 Log.Info("WorkshopLaw: warsztaty uzbrojenia jako firmy " + (On ? "CZYNNE" : "wylaczone w MCM") + ".");
             }
             catch (Exception e) { Log.Error("WorkshopLaw.ApplyAll", e); }

@@ -1240,6 +1240,10 @@ namespace Armoury
         [SettingPropertyGroup("Workshops")]
         public bool WorkshopLawEnabled { get; set; } = true;
 
+        [SettingPropertyBool("Workshop No Free Raw", HintText = "nothing from thin air: the hidden town artisans no longer make timber, ore, hides, meat, leather and linen without any input, and a workshop roll never yields charcoal or ingots (those only come from smelting) - raw goods come from the villages")]
+        [SettingPropertyGroup("Workshops")]
+        public bool WorkshopNoFreeRaw { get; set; } = true;
+
         [SettingPropertyFloatingInteger("Workshop Workers Artisans", 0.00f, 24.00f, "0.00", HintText = "man-days of work the town's artisans put in each day")]
         [SettingPropertyGroup("Workshops")]
         public float WorkshopWorkersArtisans { get; set; } = 6f;
@@ -2135,6 +2139,7 @@ namespace Armoury
             s.AiGearMaxPiecesPerVisit = AiGearMaxPiecesPerVisit;
             s.AiGearLogPerDay = AiGearLogPerDay;
             s.WorkshopLawEnabled = WorkshopLawEnabled;
+            s.WorkshopNoFreeRaw = WorkshopNoFreeRaw;
             s.WorkshopWorkersArtisans = WorkshopWorkersArtisans;
             s.WorkshopWorkers = WorkshopWorkers;
             s.WorkshopWagePerDay = WorkshopWagePerDay;

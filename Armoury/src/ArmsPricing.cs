@@ -404,7 +404,7 @@ namespace Armoury
                 foreach (var st in Settlement.All)
                 {
                     if (st == null || !st.IsTown || st.Town == null || st.ItemRoster == null) continue;
-                    foreach (var id in new[] { "iron", "hardwood", "charcoal", "leather", "hides", "linen", "flax", "wool" })
+                    foreach (var id in new[] { "iron", "hardwood", "charcoal", "ironIngot1", "ironIngot2", "ironIngot3", "ironIngot4", "ironIngot5", "ironIngot6", "leather", "hides", "linen", "flax", "wool", "meat" })
                     {
                         var it = MBObjectManager.Instance.GetObject<ItemObject>(id);
                         if (it == null) continue;

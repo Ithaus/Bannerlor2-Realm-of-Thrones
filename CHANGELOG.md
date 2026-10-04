@@ -1,5 +1,13 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-04 (19) - KONIEC SUROWCOW Z NICZEGO: rzemieslnicy bez wsadu zablokowani, sztabki i wegiel tylko z wytopu
+**Mod:** Armoury | **Pliki:** `WorkshopLaw.cs` (`FreeRawLine` w CyclePrefix, NOWY postfix `RandomItemPostfix` na `GetRandomItemAux`, licznik w linii "Warsztaty:"), `ArmsPricing.cs` (spis "Rynek surowcow" + ironIngot1-6 i mieso), `Settings.cs` + `McmSettings.cs` (`WorkshopNoFreeRaw`, grupa "Workshops")
+**Zgloszenie (Jeff 04.10):** "tak" na propozycje 2 z docs/AUDYT-TOWARY.md.
+**Przyczyna (AUDYT-TOWARY.md 2.4, 3):** ukryty warsztat BK `artisans` (`BannerKings.Redux/ModuleData/workshops.xml:5-70`) w kazdym z 97 miast ma linie BEZ wsadu: drewno 1/cykl, skory surowe 0.6, mieso 0.5, kategoria zelaza 1.25, skora 0.2, plotno 0.5 - z powietrza. `GetRandomItemAux` losuje z kategorii: w drewnie wegiel (50%), w zelazie sztabki (w tym valyrianska) - wegiel na targach 17 -> 37 w 4 dni, choc nikt go nie wytapia.
+**Zmiana:** (1) cykl `artisans` bez wsadu, ktorego wszystkie wyjscia to hardwood/iron/hides/meat/leather/linen -> pominiety (`__result=false`); linie z wsadem (zboze -> piwo, glina -> ceramika itd.) bez zmian. (2) wynik losowania `charcoal` -> `hardwood`, `ironIngot*` -> `iron` (ruda) - wszedzie, gdzie gra losuje wyrob z kategorii. (3) Spis "Rynek surowcow" liczy teraz tez sztabki 1-6 i mieso. Linia "Warsztaty:" konczy sie: `z niczego zablokowane: cykle rzemieslnikow N, sztabki/wegiel z losowania -> ruda/drewno M`.
+**Ryzyko / co sprawdzic (zasada 8.4 - ile pracy znika):** znika ok. 120 rudy, 97 drewna, 58 skor, 48 miesa, 19 skory i 48 plotna dziennie (97 miast x conversion_speed, przed mnoznikiem BK). Ruda: kopalnie x3 daja ~780/dzien wobec ~400 popytu warsztatow - powinno starczyc; jesli "Warsztaty: brak surowca" urosnie, podniesc `MineOutputMultiplier`. Mieso z niczego znika z targow - jedzenie partii (sprawdzic glod AI). Linia "Rynek surowcow": wegiel i sztabki powinny przestac rosnac.
+**Status:** WGRANE 2026-10-04 (Armoury.dll md5 2e22197af6f685b7ef974e0070b20817, build rc=0, gra zamknieta; poprzednie DLL obok jako `Armoury.dll.bak-2026-10-04-przed-bez-surowcow-z-niczego`). DO SPRAWDZENIA - dziala tez na obecnym save.
+
 ## 2026-10-04 (18) - BetterEconomy: wylaczone dwa kurki "z niczego / w nicosc" (ustawienia, bez kodu)
 **Mod:** BetterEconomy (plik cudzego moda!) | **Pliki:** `Modules/BetterEconomy/ModuleData/better_economy_settings.xml` (kopia: `better_economy_settings.xml.bak-2026-10-04-przed-kurkami`)
 **Zgloszenie (Jeff 04.10):** "tak" na propozycje 1 z docs/AUDYT-TOWARY.md (sekcja 6).
