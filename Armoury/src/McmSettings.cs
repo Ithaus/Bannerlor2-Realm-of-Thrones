@@ -1120,9 +1120,18 @@ namespace Armoury
         [SettingPropertyGroup("Supply and demand")]
         public float SupplyDemandMaxFactor { get; set; } = 2f;
 
-        [SettingPropertyFloatingInteger("Supply Demand Drain Percent", 0.00f, 60.00f, "0.00", HintText = "each day locals and traders take this % of the surplus above demand off the stalls")]
+        [SettingPropertyFloatingInteger("Supply Demand Trade Percent", 0.00f, 60.00f, "0.00", HintText = "each day traders carry this % of a stall's surplus to the nearest town or castle that lacks it - nothing vanishes, the buyer pays")]
         [SettingPropertyGroup("Supply and demand")]
-        public float SupplyDemandDrainPercent { get; set; } = 15f;
+        public float SupplyDemandTradePercent { get; set; } = 15f;
+
+        [SettingPropertyFloatingInteger("Supply Demand Trade Range", 0.00f, 1000.00f, "0.00", HintText = "how far (map distance) traders will haul arms to a market that lacks them")]
+        [SettingPropertyGroup("Supply and demand")]
+        public float SupplyDemandTradeRange { get; set; } = 250f;
+
+        [SettingPropertyFloatingInteger("Supply Demand Trade Price Percent", 0.00f, 200.00f, "0.00", HintText = "wholesale price between towns, as % of worth times the glutted source's price factor")]
+        [SettingPropertyGroup("Supply and demand")]
+        public float SupplyDemandTradePricePercent { get; set; } = 50f;
+
 
         [SettingPropertyBool("Market Glut Enabled", HintText = "a merchant needs only so many of one thing: each extra piece of a type you sell him fetches less")]
         [SettingPropertyGroup("The glutted market")]
@@ -1711,7 +1720,9 @@ namespace Armoury
             s.SupplyDemandElasticity = SupplyDemandElasticity;
             s.SupplyDemandMinFactor = SupplyDemandMinFactor;
             s.SupplyDemandMaxFactor = SupplyDemandMaxFactor;
-            s.SupplyDemandDrainPercent = SupplyDemandDrainPercent;
+            s.SupplyDemandTradePercent = SupplyDemandTradePercent;
+            s.SupplyDemandTradeRange = SupplyDemandTradeRange;
+            s.SupplyDemandTradePricePercent = SupplyDemandTradePricePercent;
             s.MarketGlutEnabled = MarketGlutEnabled;
             s.MarketGlutStartPercent = MarketGlutStartPercent;
             s.MarketGlutDropPP = MarketGlutDropPP;

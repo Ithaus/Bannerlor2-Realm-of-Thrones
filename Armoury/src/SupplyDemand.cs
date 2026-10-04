@@ -23,16 +23,16 @@ namespace Armoury
     ///
     /// Nasza regula, w miescie i zamku, dla kazdego "koszyka" = typ przedmiotu x tier:
     ///   popyt D = PopytBazowy x (zamoznosc / zamoznosc wzorcowa, 0.3-3) x waga tieru
-    ///             (t1 1.0 ... t6 0.15 - na rycerski miecz jest mniej chetnych);
+    ///             (t1 1.0 ... t6 0.15 - na rycerski miecz jest mniej chetnych)
     ///   podaz S = sztuk tego koszyka na polce (przy sprzedazy + ta jedna sprzedawana);
     ///   mnoznik = ((D + 1) / (S + 1)) ^ elastycznosc, w granicach Min..Max.
     /// Pusta polka przy duzym popycie = drozej, zawalona polka = taniej - dla KUPNA
     /// i SPRZEDAZY, dla gracza i dla AI. Ekran handlu dziala na zywej polce miasta,
     /// wiec dziesiaty sprzedany miecz juz widzi dziewiec poprzednich.
     ///
-    /// Rynek trawi: co dzien w kazdym miescie/zamku miejscowi i kupcy wykupuja
-    /// DrainPercent nadwyzki ponad popyt (sztuki znikaja z polki - wywiezione,
-    /// rozkupione) - inaczej raz zawalony rynek bylby zawalony na zawsze.
+    /// Towar jak kazdy: co dzien kupcy wywoza TradePercent nadwyzki z zawalonych polek
+    /// do najblizszej osady, ktorej brakuje (patrz DailyTrade) - nic nie znika w prozni,
+    /// a popyt wojenny bierze sie z PRAWDZIWYCH zakupow armii (osobna zmiana), nie z mnoznika.
     ///
     /// Nasycony rynek (MarketGlut) zostaje tylko jako podloga 5% za zuzyty lup -
     /// jego licznik "kazda kolejna sztuka -0.25 pp" jest wylaczony, gdy to prawo dziala
@@ -170,55 +170,109 @@ namespace Armoury
             catch { }
         }
 
-        /// <summary>Rynek trawi nadwyzke: co dzien DrainPercent nadwyzki ponad popyt znika z polek.</summary>
-        internal static void DailyDrain()
+        /// <summary>
+        /// WYWOZ NADWYZKI (Jeff 04.10: "jak kupuja, to gdzie potem sprzedaja - nie znika
+        /// 15% w prozni"). Nic nie znika: co dzien kupcy zabieraja TradePercent nadwyzki
+        /// koszyka ponad popyt z zawalonej polki i wioza ja do NAJBLIZSZEJ osady (w zasiegu
+        /// TradeRange), ktorej w tym koszyku brakuje. Osada docelowa PLACI osadzie zrodlowej
+        /// (TradePricePercent wartosci x mnoznik zawalonego rynku zrodla - hurt z nadmiaru
+        /// jest tani); bez zlota nie kupuje. Gdy nikt w zasiegu nie potrzebuje - towar zostaje
+        /// na polce i cena zostaje niska, az ktos kupi.
+        /// </summary>
+        internal static void DailyTrade()
         {
             try
             {
                 if (!Active) return;
                 var c = Settings.Current;
-                float share = MBMath.ClampFloat(c.SupplyDemandDrainPercent, 0f, 100f) / 100f;
+                float share = MBMath.ClampFloat(c.SupplyDemandTradePercent, 0f, 100f) / 100f;
                 if (share <= 0f) return;
-                int removed = 0, places = 0;
+                float range = Math.Max(1f, c.SupplyDemandTradeRange);
+                float pricePct = MBMath.ClampFloat(c.SupplyDemandTradePricePercent, 0f, 200f) / 100f;
+
+                // stan: osada -> koszyk -> sztuk; probka przedmiotu koszyka do liczenia popytu
+                var places = new List<Settlement>();
+                var stock = new Dictionary<Settlement, Dictionary<int, int>>();
+                var sample = new Dictionary<int, ItemObject>();
                 foreach (var st in Settlement.All)
                 {
-                    if (st == null || (!st.IsTown && !st.IsCastle) || st.ItemRoster == null) continue;
+                    if (st == null || (!st.IsTown && !st.IsCastle) || st.ItemRoster == null || st.Town == null) continue;
+                    places.Add(st);
+                    var b = new Dictionary<int, int>();
                     var shelf = st.ItemRoster;
-                    // zlicz koszyki
-                    var bucket = new Dictionary<int, int>();
-                    var sample = new Dictionary<int, ItemObject>();
                     for (int i = 0; i < shelf.Count; i++)
                     {
                         var el = shelf.GetElementCopyAtIndex(i);
                         var it = el.EquipmentElement.Item;
                         if (el.Amount <= 0 || !Equipmentish(it)) continue;
                         int k = (int)it.ItemType * 10 + TierOf(it);
-                        int n; bucket.TryGetValue(k, out n); bucket[k] = n + el.Amount;
+                        int n; b.TryGetValue(k, out n); b[k] = n + el.Amount;
                         if (!sample.ContainsKey(k)) sample[k] = it;
                     }
-                    bool any = false;
-                    foreach (var kv in bucket)
+                    stock[st] = b;
+                }
+
+                int moved = 0, deals = 0, stuck = 0; long paid = 0;
+                foreach (var kv in sample)
+                {
+                    int key = kv.Key; var probe = kv.Value;
+                    foreach (var src in places)
                     {
-                        float d = Demand(st, sample[kv.Key]);
-                        float surplus = kv.Value - d;
+                        int have; stock[src].TryGetValue(key, out have);
+                        if (have <= 0) continue;
+                        float surplus = have - Demand(src, probe);
                         if (surplus <= 0f) continue;
-                        int take = (int)Math.Ceiling(surplus * share);
-                        // zdejmujemy od konca polki (najswiezsze wpisy), sztuka po sztuce
-                        for (int i = shelf.Count - 1; i >= 0 && take > 0; i--)
+                        int toShip = (int)Math.Ceiling(surplus * share);
+                        float srcFactor = (float)Math.Pow((Demand(src, probe) + 1f) / (have + 1f), MBMath.ClampFloat(c.SupplyDemandElasticity, 0.05f, 2f));
+                        srcFactor = MBMath.ClampFloat(srcFactor, MBMath.ClampFloat(c.SupplyDemandMinFactor, 0.01f, 1f), 1f);
+                        var srcPos = src.GetPosition2D;
+                        while (toShip > 0)
                         {
-                            var el = shelf.GetElementCopyAtIndex(i);
-                            var it = el.EquipmentElement.Item;
-                            if (el.Amount <= 0 || it == null || (int)it.ItemType * 10 + TierOf(it) != kv.Key) continue;
-                            int t = Math.Min(take, el.Amount);
-                            shelf.AddToCounts(el.EquipmentElement, -t);
-                            take -= t; removed += t; any = true;
+                            // najblizsza osada z brakiem w tym koszyku
+                            Settlement best = null; float bestD = float.MaxValue; int bestCap = 0;
+                            foreach (var dst in places)
+                            {
+                                if (dst == src) continue;
+                                int dh; stock[dst].TryGetValue(key, out dh);
+                                int cap = (int)Math.Ceiling(Demand(dst, probe)) - dh;
+                                if (cap <= 0) continue;
+                                float dist = srcPos.Distance(dst.GetPosition2D);
+                                if (dist > range || dist >= bestD) continue;
+                                best = dst; bestD = dist; bestCap = cap;
+                            }
+                            if (best == null) { stuck += toShip; break; }
+                            // przenosimy sztuki koszyka ze zrodla (od konca polki), placi odbiorca
+                            int want = Math.Min(toShip, bestCap);
+                            int got = 0;
+                            var shelf = src.ItemRoster;
+                            for (int i = shelf.Count - 1; i >= 0 && got < want; i--)
+                            {
+                                var el = shelf.GetElementCopyAtIndex(i);
+                                var it = el.EquipmentElement.Item;
+                                if (el.Amount <= 0 || it == null || (int)it.ItemType * 10 + TierOf(it) != key) continue;
+                                int unit = Math.Max(1, (int)(it.Value * pricePct * srcFactor));
+                                int n = Math.Min(want - got, el.Amount);
+                                int afford = best.Town.Gold / unit;
+                                if (afford <= 0) break;
+                                if (n > afford) n = afford;
+                                shelf.AddToCounts(el.EquipmentElement, -n);
+                                best.ItemRoster.AddToCounts(el.EquipmentElement, n);
+                                best.Town.ChangeGold(-unit * n);
+                                src.Town.ChangeGold(unit * n);
+                                got += n; paid += (long)unit * n;
+                            }
+                            if (got <= 0) { stock[best][key] = (stock[best].ContainsKey(key) ? stock[best][key] : 0) + bestCap; continue; }   // biedny odbiorca - pomijamy go dzis
+                            int sh; stock[src].TryGetValue(key, out sh); stock[src][key] = sh - got;
+                            int dh2; stock[best].TryGetValue(key, out dh2); stock[best][key] = dh2 + got;
+                            toShip -= got; moved += got; deals++;
                         }
                     }
-                    if (any) places++;
                 }
-                if (removed > 0) Log.Info("PodazPopyt: rynek strawil " + removed + " szt. nadwyzki uzbrojenia w " + places + " osadach.");
+                if (moved > 0 || stuck > 0)
+                    Log.Info("PodazPopyt: kupcy wywiezli " + moved + " szt. nadwyzki uzbrojenia w " + deals + " transakcjach miedzy osadami (zaplacone "
+                             + paid + " zlota); " + stuck + " szt. bez odbiorcy w zasiegu " + (int)range + " - zostaja na polkach.");
             }
-            catch (Exception e) { Log.Error("SupplyDemand.DailyDrain", e); }
+            catch (Exception e) { Log.Error("SupplyDemand.DailyTrade", e); }
         }
 
         internal static void ApplyAll(Harmony h)
