@@ -411,6 +411,7 @@ namespace Armoury
         public float HistAmmoLaborMultiplier = 8f;         // fletcher and arrowsmith work on a stack of arrows or bolts (a sheaf of 24 cost about 15 d)
         public float HistTournamentScale = 4f;             // the game seeks tournament prizes worth 1600-5000; with historical prices the range is divided by this (400-1250 pence: a fine sword, a good harness piece)
         public float HistUniquePrestige = 4f;              // named pieces of the great houses cost this many times their making
+        public float HistBulkUnitFactor = 10f;             // ore and timber are sold by the load: one unit weighs this many times the game's 10 kg, so a unit costs whole pence (ore 100 kg = about 8 d, timber 100 kg = about 4 d) instead of a fraction of a penny rounded up to 1-2; village output, town use and every recipe are counted by weight, so nothing else changes
         public float HistHidesPerKg = 1f;                  // raw hides, pence per kg (an ox hide of 25-30 kg sold for 1-3 shillings)
         public float HistFlaxPerKg = 2f;                   // raw flax and hemp, pence per kg (estimate)
         public float HistBowLaborMultiplier = 0.5f;        // a bowyer's days on a bow, against the smith's model (a war longbow cost 12-18 d, a day or two of work)

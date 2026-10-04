@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
@@ -29,6 +30,28 @@ namespace Armoury
         internal static bool On { get { var s = Settings.Current; return s != null && s.HistoricalPricesEnabled; } }
 
         private static readonly Dictionary<ItemObject, int> _orig = new Dictionary<ItemObject, int>();
+        private static readonly Dictionary<ItemObject, float> _origWeight = new Dictionary<ItemObject, float>();
+
+        // ------------------------------------------------------------ ladunek zamiast 10 kg (wpis 50)
+        // Jeff 04.10: "jak ceny sa ponizej 1, to trzeba pomnozyc x10, aby latwiej oddac ceny". Gra zna tylko pensy calkowite:
+        // ruda 10 kg = 0.75 d i drewno 10 kg = 0.35 d stoja na 1 d (2-3x historii). Jednostka rudy i drewna = HistBulkUnitFactor x
+        // waga z gry (100 kg, "ladunek"): ruda ~8 d, drewno ~4 d. Wszystko, co liczy sztuki, przeliczamy wagą: wydobycie wsi
+        // (MaterialLaw.ProdPostfix / BulkScale), popyt miast (stosunek cen za KG), warsztaty (WorkshopLaw.Needs w kg),
+        // przetopy (MaterialLaw.RefinePostfix), kopalnie BK (WorkshopLaw), kuznia gracza (Recipes - juz wedle wagi).
+        internal static float BulkScale(ItemObject it)
+        {
+            float w0;
+            if (it == null || !_origWeight.TryGetValue(it, out w0) || w0 <= 0f) return 1f;
+            return Math.Max(0.01f, it.Weight) / w0;
+        }
+
+        private static void SetWeight(ItemObject it, float w)
+        {
+            var f = typeof(ItemObject).GetProperty("Weight");
+            if (f != null && f.CanWrite) { f.SetValue(it, w, null); return; }
+            var bf = typeof(ItemObject).GetField("<Weight>k__BackingField", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            if (bf != null) bf.SetValue(it, w);
+        }
         private static bool _applied;
 
         internal static void Reset() { }   // Value zyje w obiektach przedmiotow - Apply przy kazdym starcie sesji
@@ -133,7 +156,17 @@ namespace Armoury
                     setter.Invoke(it, new object[] { Math.Max(1, (int)Math.Round(v)) });
                 };
 
-                // 1. surowce kuzni - cena za kg x WAGA z gry (ruda i drewno 10 kg, wegiel 5 kg, sztabki 0.5 kg)
+                // 0. ruda i drewno w ladunkach (wpis 50)
+                if (s.HistBulkUnitFactor > 1.01f)
+                    foreach (var id in new[] { "iron", "hardwood" })
+                    {
+                        var it = MBObjectManager.Instance.GetObject<ItemObject>(id);
+                        if (it == null) continue;
+                        if (!_origWeight.ContainsKey(it)) _origWeight[it] = it.Weight;
+                        SetWeight(it, _origWeight[it] * s.HistBulkUnitFactor);
+                    }
+
+                // 1. surowce kuzni - cena za kg x WAGA (ruda i drewno 100 kg w ladunku, wegiel, sztabki 0.5 kg)
                 var raw = new List<string>();
                 foreach (var kv in new[]
                 {
@@ -183,7 +216,7 @@ namespace Armoury
                 {
                     var cat = kv.Key.ItemCategory;
                     if (cat == null || kv.Value <= 0 || kv.Key.Value <= 0) continue;
-                    double l; sumLog.TryGetValue(cat, out l); sumLog[cat] = l + Math.Log((double)kv.Value / kv.Key.Value);
+                    double l; sumLog.TryGetValue(cat, out l); sumLog[cat] = l + Math.Log((double)kv.Value / kv.Key.Value * BulkScale(kv.Key));   // za kg - ladunek to tyle samo towaru co 10 starych sztuk
                     int k; cnt.TryGetValue(cat, out k); cnt[cat] = k + 1;
                 }
                 var cats = new List<string>();
@@ -196,6 +229,7 @@ namespace Armoury
                 }
                 _applied = true;
                 Log.Info("HistoricalPrices: popyt miast przeliczony na nowa monete (" + (s.HistDemandScaling ? "CZYNNE" : "wylaczone") + ") w " + cats.Count + " kategoriach: " + string.Join(", ", cats.ToArray()) + ".");
+                if (_origWeight.Count > 0) Log.Info("HistoricalPrices: ruda i drewno w ladunkach - " + string.Join(", ", _origWeight.Select(kv => kv.Key.StringId + " " + kv.Value + " -> " + kv.Key.Weight + " kg = " + kv.Key.Value + " d").ToArray()) + ".");
                 Log.Info("HistoricalPrices: surowce kuzni ["+ string.Join(", ", raw.ToArray()) + "]; uzbrojenie " + n + " szt. przeliczone z kosztu historycznego (suma wartosci "
                          + before + " -> " + after + "). Przyklady: " + string.Join("; ", samples.ToArray()) + ".");
             }

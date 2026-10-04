@@ -1392,6 +1392,10 @@ namespace Armoury
         [SettingPropertyGroup("Iron bank")]
         public float HistUniquePrestige { get; set; } = 4f;
 
+        [SettingPropertyFloatingInteger("Hist Bulk Unit Factor", 0.00f, 40.00f, "0.00", HintText = "ore and timber are sold by the load: one unit weighs this many times the game's 10 kg, so a unit costs whole pence (ore 100 kg = about 8 d, timber 100 kg = about 4 d) instead of a fraction of a penny rounded up to 1-2; village output, town use and every recipe are counted by weight, so nothing else changes")]
+        [SettingPropertyGroup("Iron bank")]
+        public float HistBulkUnitFactor { get; set; } = 10f;
+
         [SettingPropertyFloatingInteger("Hist Hides Per Kg", 0.00f, 4.00f, "0.00", HintText = "raw hides, pence per kg (an ox hide of 25-30 kg sold for 1-3 shillings)")]
         [SettingPropertyGroup("Iron bank")]
         public float HistHidesPerKg { get; set; } = 1f;
@@ -2419,6 +2423,7 @@ namespace Armoury
             s.HistAmmoLaborMultiplier = HistAmmoLaborMultiplier;
             s.HistTournamentScale = HistTournamentScale;
             s.HistUniquePrestige = HistUniquePrestige;
+            s.HistBulkUnitFactor = HistBulkUnitFactor;
             s.HistHidesPerKg = HistHidesPerKg;
             s.HistFlaxPerKg = HistFlaxPerKg;
             s.HistBowLaborMultiplier = HistBowLaborMultiplier;

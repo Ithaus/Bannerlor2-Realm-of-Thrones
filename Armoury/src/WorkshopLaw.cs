@@ -67,6 +67,28 @@ namespace Armoury
             _wool = MBObjectManager.Instance.GetObject<ItemObject>("wool");
         }
 
+        private static float UnitKg(ItemObject it) { return it != null && it.Weight > 0.05f ? it.Weight : 10f; }
+
+        // wpis 50: kopalnia BK robi rude bez wsadu (praca gornikow - to nie "z niczego"), ale w starych sztukach po 10 kg;
+        // przy ladunku 100 kg puszczamy co HistBulkUnitFactor-ty cykl, zeby kg rudy sie nie zmienily
+        private static bool BulkLineSkip(WorkshopType.Production p)
+        {
+            try
+            {
+                if (p.Inputs != null && p.Inputs.Count > 0) return false;
+                foreach (var o in p.Outputs)
+                {
+                    if (o.Item1 == null) continue;
+                    string id = o.Item1.StringId;
+                    if (id != "iron" && id != "hardwood") return false;
+                }
+                Resolve();
+                float scale = HistoricalPrices.BulkScale(_ore);
+                return scale > 1.01f && MBRandom.RandomFloat > 1f / scale;
+            }
+            catch { return false; }
+        }
+
         private static int StepsOf(CraftingMaterials g)
         {
             switch (g)
@@ -89,10 +111,14 @@ namespace Armoury
             if (c == null) return null;
             var s = Settings.Current;
             float crudePerOre = Math.Max(0.1f, s.WorkshopCrudeKgPerOre);
-            float ore = c.MetalKg > 0f ? c.MetalKg / crudePerOre * (float)Math.Pow(1.25, StepsOf(c.Grade)) : 0f;
-            float wood = c.WoodKg / 10f + ore * Math.Max(0f, s.WorkshopWoodPerOre) + c.MetalKg * 0.25f;
+            // wpis 50: liczone w KG, potem na jednostki rynku wedle ich wagi (ladunek rudy/drewna 100 kg)
+            Resolve();
+            float oreKg = c.MetalKg > 0f ? c.MetalKg / crudePerOre * 10f * (float)Math.Pow(1.25, StepsOf(c.Grade)) : 0f;
+            float woodKg = c.WoodKg + oreKg * Math.Max(0f, s.WorkshopWoodPerOre) + c.MetalKg * 2.5f;
+            float ore = oreKg / UnitKg(_ore);
+            float wood = woodKg / UnitKg(_wood);
             days = Math.Max(0.05f, HistoricalPrices.On ? HistoricalPrices.HistDays(it, c) : c.Days);
-            return new[] { ore, wood, c.LeatherKg / 10f, c.LinenKg / 10f };
+            return new[] { ore, wood, c.LeatherKg / UnitKg(_leather), c.LinenKg / UnitKg(_linen) };
         }
 
         private static int Available(ItemRoster r, ItemObject it)
@@ -115,6 +141,7 @@ namespace Armoury
                     __result = false;
                     return false;
                 }
+                if (BulkLineSkip(production)) { __result = false; return false; }
                 if (!On || !AllOutputsArms(production) || workshop == null || workshop.Settlement == null) return true;
                 if (workshop.Owner == Hero.MainHero) return true;          // warsztaty gracza - vanilla
                 if (!Campaign.Current.GameStarted) return true;           // start gry - vanilla zapelnia rynki
@@ -251,7 +278,7 @@ namespace Armoury
                             if (o.Item1 == null || !dict.TryGetValue(o.Item1, out items)) continue;
                             foreach (var it in items)
                             {
-                                if (it == null || !seen.Add(it) || ArmsPricing.IsUnique(it)) continue;
+                                if (it == null || !seen.Add(it) || ArmsPricing.IsUnique(it) || LegendaryLaw.IsLegend(it)) continue;   // Jeff 04.10: zadnych unikatow rodow, klingi valyrianskiej ani legend z warsztatu
                                 bool local = it.Culture == null || it.Culture.StringId == "neutral_culture" || it.Culture == town.Culture;
                                 (local ? pool : foreign).Add(it);
                             }

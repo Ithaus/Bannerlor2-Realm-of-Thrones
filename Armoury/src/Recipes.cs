@@ -344,7 +344,7 @@ namespace Armoury
                     item.ItemType == ItemObject.ItemTypeEnum.Crossbow ||
                     item.ItemType == ItemObject.ItemTypeEnum.Arrows ||
                     item.ItemType == ItemObject.ItemTypeEnum.Bolts)
-                    Add(r, _wood, MathF.Max(1, MathF.Ceiling(weight)));
+                    Add(r, _wood, MathF.Max(1, MathF.Ceiling(weight / WoodKg())));   // wpis 50: sztuka drewna to ladunek, nie kilogram
 
                 float fiddly = IsFiddly(item.ItemType) ? (1f + s.FiddlyStaminaBonus) : 1f;
                 r.Stamina = MathF.Max(5, (int)(tier * s.StaminaPerTier * fiddly));

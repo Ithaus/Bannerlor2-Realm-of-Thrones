@@ -100,8 +100,18 @@ namespace Armoury
                 // ceny historyczne: wegiel liczony ze swoja PRAWDZIWA waga z gry (5 kg) - z drewna wychodzi ok. 20% wagi
                 // w weglu (5 drewna = 50 kg -> 2 wegle = 10 kg); dymarka: 1 ruda (10 kg) + 2 wegle -> 4 surowki (2 kg zelaza);
                 // dalsze stopnie: 5 sztabek + 1 wegiel -> 4 (strata 20%, Jeff)
-                yield return new Crafting.RefiningFormula(CraftingMaterials.Wood, 5, CraftingMaterials.Iron1, 0, CraftingMaterials.Charcoal, charcoal ? 3 : 2);
-                yield return new Crafting.RefiningFormula(CraftingMaterials.IronOre, 1, CraftingMaterials.Charcoal, 2, CraftingMaterials.Iron1, ironMaker ? 5 : 4);
+                // wpis 50: ilosci z WAG (ladunek drewna/rudy 100 kg, wegiel i sztabki z gry): drewno -> 20% masy w weglu,
+                // dymarka: ruda + tyle samo kg wegla -> WorkshopCrudeKgPerOre/10 masy rudy w surowce (jak warsztaty)
+                var wi = Recipes.MaterialItem(CraftingMaterials.Wood); var oi = Recipes.MaterialItem(CraftingMaterials.IronOre);
+                var ci = Recipes.MaterialItem(CraftingMaterials.Charcoal); var i1 = Recipes.MaterialItem(CraftingMaterials.Iron1);
+                float wW = wi != null ? Math.Max(0.1f, wi.Weight) : 10f, oW = oi != null ? Math.Max(0.1f, oi.Weight) : 10f;
+                float cW = ci != null ? Math.Max(0.05f, ci.Weight) : 5f, iW = i1 != null ? Math.Max(0.05f, i1.Weight) : 0.5f;
+                float crude = Math.Max(0.01f, s.WorkshopCrudeKgPerOre) / 10f;
+                int coalFromWood = Math.Max(1, (int)Math.Round(wW * 0.2f / cW * (charcoal ? 1.5f : 1f)));
+                int coalPerOre = Math.Max(1, (int)Math.Round(oW / cW));
+                int crudeFromOre = Math.Max(1, (int)Math.Round(oW * crude / iW * (ironMaker ? 1.25f : 1f)));
+                yield return new Crafting.RefiningFormula(CraftingMaterials.Wood, 1, CraftingMaterials.Iron1, 0, CraftingMaterials.Charcoal, coalFromWood);
+                yield return new Crafting.RefiningFormula(CraftingMaterials.IronOre, 1, CraftingMaterials.Charcoal, coalPerOre, CraftingMaterials.Iron1, crudeFromOre);
                 yield return new Crafting.RefiningFormula(CraftingMaterials.Iron1, 5, CraftingMaterials.Charcoal, 1, CraftingMaterials.Iron2, 4);
                 yield return new Crafting.RefiningFormula(CraftingMaterials.Iron2, 5, CraftingMaterials.Charcoal, 1, CraftingMaterials.Iron3, 4);
                 if (steel1) yield return new Crafting.RefiningFormula(CraftingMaterials.Iron3, 5, CraftingMaterials.Charcoal, 1, CraftingMaterials.Iron4, 4);
@@ -153,6 +163,7 @@ namespace Armoury
                 float m = 1f;
                 if (id == "iron") m = s.MineOutputMultiplier;
                 else if (id == "hardwood") m = s.LumberOutputMultiplier;
+                m /= HistoricalPrices.BulkScale(item);      // wpis 50: ladunek 100 kg - tyle samo kg co dotad
                 if (Math.Abs(m - 1f) < 0.001f || m <= 0f) return;
                 __result.AddFactor(m - 1f, new TextObject("{=!}Armoury: mines and woods"));
             }
