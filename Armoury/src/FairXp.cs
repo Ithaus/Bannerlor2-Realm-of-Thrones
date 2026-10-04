@@ -26,11 +26,17 @@ namespace Armoury
     /// </summary>
     internal static class FairXpPatch
     {
+        // audyt 04.10 (AUDYT-KONFLIKTY W3): modele z innych modow (Naval, ROT, BKROT) wolaja model wewnetrzny - bez licznika efekt szedl raz na kazdy model lancucha; liczymy raz, na zewnatrz
+        [ThreadStatic] private static int _depth;
+        public static void DepthPrefix() { _depth++; }
+        public static Exception DepthFinalizer(Exception __exception) { if (_depth > 0) _depth--; return __exception; }
+
         internal static void Postfix(CharacterObject attackedTroop, int damage, bool isFatal,
             CombatXpModel.MissionTypeEnum missionType, ref ExplainedNumber __result)
         {
             try
             {
+                if (_depth > 1) return;
                 var s = Settings.Current;
                 if (s == null || !s.CombatXpFixEnabled) return;
                 if (__result.ResultNumber <= 0f) return;
@@ -84,7 +90,7 @@ namespace Armoury
                             var m = t.GetMethod("GetXpFromHit", BindingFlags.Public | BindingFlags.NonPublic |
                                                                 BindingFlags.Instance | BindingFlags.DeclaredOnly);
                             if (m == null || m.IsAbstract) continue;
-                            harmony.Patch(m, postfix: post);
+                            harmony.Patch(m, prefix: new HarmonyMethod(typeof(FairXpPatch), nameof(DepthPrefix)) { priority = Priority.First }, postfix: post, finalizer: new HarmonyMethod(typeof(FairXpPatch), nameof(DepthFinalizer)));
                             done++;
                         }
                         catch (Exception e) { Log.Error("FairXp.Patch(" + t.Name + ")", e); }

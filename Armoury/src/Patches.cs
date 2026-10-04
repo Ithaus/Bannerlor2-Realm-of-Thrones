@@ -511,10 +511,16 @@ namespace Armoury
     /// </summary>
     internal static class ThrownWobblePatch
     {
+        // audyt 04.10 (AUDYT-KONFLIKTY W1): modele z innych modow (Naval, ROT, BKROT) wolaja model wewnetrzny - bez licznika efekt szedl raz na kazdy model lancucha; liczymy raz, na zewnatrz
+        [ThreadStatic] private static int _depth;
+        public static void DepthPrefix() { _depth++; }
+        public static Exception DepthFinalizer(Exception __exception) { if (_depth > 0) _depth--; return __exception; }
+
         internal static void Postfix(TaleWorlds.MountAndBlade.Agent agent, WeaponComponentData weapon, ref float __result)
         {
             try
             {
+                if (_depth > 1) return;
                 var s = Settings.Current;
                 if (s == null || !s.ThrownWobbleEnabled || weapon == null) return;
                 if (weapon.RelevantSkill != TaleWorlds.Core.DefaultSkills.Throwing) return;
@@ -548,7 +554,7 @@ namespace Armoury
                         var m = t.GetMethod("GetWeaponInaccuracy", BindingFlags.Public | BindingFlags.NonPublic |
                                                                    BindingFlags.Instance | BindingFlags.DeclaredOnly);
                         if (m == null || m.IsAbstract) continue;
-                        harmony.Patch(m, postfix: post);
+                        harmony.Patch(m, prefix: new HarmonyMethod(typeof(ThrownWobblePatch), nameof(DepthPrefix)) { priority = Priority.First }, postfix: post, finalizer: new HarmonyMethod(typeof(ThrownWobblePatch), nameof(DepthFinalizer)));
                         done++;
                         Log.Info("Rozrzut miotanych: " + t.FullName + ".GetWeaponInaccuracy");
                     }

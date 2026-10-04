@@ -16,6 +16,11 @@ namespace Armoury
     /// </summary>
     internal static class SightRange
     {
+        // audyt 04.10 (AUDYT-KONFLIKTY W2): modele z innych modow (Naval, ROT, BKROT) wolaja model wewnetrzny - bez licznika efekt szedl raz na kazdy model lancucha; liczymy raz, na zewnatrz
+        [ThreadStatic] private static int _depth;
+        public static void DepthPrefix() { _depth++; }
+        public static Exception DepthFinalizer(Exception __exception) { if (_depth > 0) _depth--; return __exception; }
+
         private static readonly TextObject _txtDay = new TextObject("{=!}Daylight");
         private static readonly TextObject _txtNight = new TextObject("{=!}Darkness (sound carries)");
 
@@ -23,6 +28,7 @@ namespace Armoury
         {
             try
             {
+                if (_depth > 1) return;
                 var s = Settings.Current;
                 if (s == null || !s.SightCycleEnabled) return;
                 int h = CampaignTime.Now.GetHourOfDay;
@@ -54,7 +60,7 @@ namespace Armoury
                             var m = t.GetMethod("GetPartySpottingRange", BindingFlags.Public | BindingFlags.NonPublic |
                                                                           BindingFlags.Instance | BindingFlags.DeclaredOnly);
                             if (m == null || m.IsAbstract) continue;
-                            harmony.Patch(m, postfix: post);
+                            harmony.Patch(m, prefix: new HarmonyMethod(typeof(SightRange), nameof(DepthPrefix)) { priority = Priority.First }, postfix: post, finalizer: new HarmonyMethod(typeof(SightRange), nameof(DepthFinalizer)));
                             done++;
                         }
                         catch { }
