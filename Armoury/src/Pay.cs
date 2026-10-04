@@ -5,7 +5,7 @@ using TaleWorlds.CampaignSystem.Settlements;
 namespace Armoury
 {
     /// <summary>
-    /// Platnosci gracza za uslugi w osadzie (kowal, kuznia, naprawy, zamowienia) idą do KASY OSADY,
+    /// Platnosci gracza za uslugi w osadzie (kowal, kuznia, naprawy, zamowienia) ida do KASY OSADY,
     /// a nie w nicosc (audyt dziur C2, 04.10). Poza osada - jak dotad (w nicosc nie ma komu).
     /// </summary>
     internal static class Pay
