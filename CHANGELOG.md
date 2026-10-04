@@ -1,5 +1,12 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-04 (24) - ZEROWANIE STANOW przy nowej grze i wczytaniu (przeciek miedzy kampaniami w jednej sesji)
+**Mod:** Armoury | **Pliki:** `WorkshopLaw.cs`, `IronBank.cs`, `MarketGlut.cs`, `ArmsPricing.cs`, `StartKit.cs`, `AiGear.cs` (NOWE `Reset()`), `ArmouryBehavior.cs` (konstruktor wola wszystkie)
+**Problem (audyt ekonomii 04.10):** stany statyczne zyly przez cala sesje gry: `WorkshopLaw` trzymal ItemObject rudy/drewna z poprzedniej kampanii (po wczytaniu innej gry: wszystkie warsztaty "brak surowca", a `RandomItemPostfix` mogl wlozyc stary przedmiot do rosteru nowej gry - ryzyko zepsucia save); `IronBank` dlugi i kapital przechodzily do NOWEJ gry; `MarketGlut` sprzedaze; `ArmsPricing` indeksy surowcow, premie wojenne, cache kosztow; `StartKit` flaga; `AiGear` dni wizyt.
+**Zmiana:** kazdy modul ma `Reset()`, konstruktor `ArmouryBehavior` (nowa gra i wczytanie, przed SyncData) wola je wszystkie, jak juz robil dla klimatu i wyrzutkow. Wczytanie dalej odtwarza z save to, co jest zapisywane (bank, glut).
+**Ryzyko:** premie wojenne `ArmsPricing` nie sa w save - po wczytaniu zaczynaja od zera (jak dotad); indeksy surowcow odbuduja sie w 1 dzien.
+**Status:** WGRANE 2026-10-04 (Armoury.dll md5 67db4b533f7b7841107757bab7f7ee17, build rc=0, gra zamknieta; poprzednie DLL obok jako `Armoury.dll.bak-2026-10-04-przed-resetem-stanow`).
+
 ## 2026-10-04 (23) - RACJE: ciecie jedzenia -40% naliczalo sie 3-4 razy (partie jadly ~13-22% normy)
 **Mod:** Armoury | **Pliki:** `Rations.cs` (licznik zagniezdzenia prefix/finalizer)
 **Problem (audyt ekonomii 04.10):** `Rations` latal kazdy "lisc" hierarchii modeli jedzenia (log: BKPartyConsumptionModel, BEE_MobilePartyFoodConsumptionModel, NavalDLCMobilePartyFoodConsumptionModel, ROTMobilePartyFoodConsumptionModel, RealisticFoodConsumptionModel), zakladajac, ze nie woluja sie nawzajem. Woluja: ROT `_previousModel.CalculateDailyFoodConsumptionf` (ROTMobilePartyFoodConsumptionModel.cs:57), NavalDLC `BaseModel` (:32), BEE `_baseModel` (:59). Kazda warstwa dokladala x0.6 - zuzycie 0.6^3-0.6^4 normy.

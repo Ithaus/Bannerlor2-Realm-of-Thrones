@@ -21,6 +21,7 @@ namespace Armoury
     /// </summary>
     internal static class MarketGlut
     {
+        internal static void Reset() { Sold.Clear(); }
         // miejsce (osada / karawana) -> typ przedmiotu -> ile sztuk juz wzial
         private static readonly Dictionary<string, Dictionary<int, float>> Sold =
             new Dictionary<string, Dictionary<int, float>>();

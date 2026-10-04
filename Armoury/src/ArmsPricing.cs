@@ -38,6 +38,7 @@ namespace Armoury
     /// </summary>
     internal static class ArmsPricing
     {
+        internal static void Reset() { _cost.Clear(); _effMedian.Clear(); _idx.Clear(); _nearestTown.Clear(); _war.Clear(); _unique.Clear(); _built = false; _ore = _wood = _leather = _linen = null; }
         internal sealed class Cost
         {
             public float Metal, Charcoal, Leather, Linen, Wood, Special, Labor, Total;

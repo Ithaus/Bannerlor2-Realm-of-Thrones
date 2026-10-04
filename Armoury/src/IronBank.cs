@@ -37,6 +37,7 @@ namespace Armoury
     /// </summary>
     internal static class IronBank
     {
+        internal static void Reset() { _debts.Clear(); _capital = -1; _lastDay = -1; _logged = 0; }
         internal sealed class Debt
         {
             public double Principal;      // dlug glowny + doliczone odsetki niesplacone

@@ -22,6 +22,7 @@ namespace Armoury
     /// </summary>
     internal static class StartKit
     {
+        internal static void Reset() { _pending = false; }
         private static bool _pending;
 
         internal static void OnCharacterCreationOver() { _pending = true; }

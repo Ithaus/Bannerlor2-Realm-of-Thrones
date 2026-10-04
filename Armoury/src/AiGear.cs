@@ -32,6 +32,7 @@ namespace Armoury
     /// </summary>
     internal static class AiGear
     {
+        internal static void Reset() { _lastDay.Clear(); }
         private static Type _dte;
         private static FieldInfo _armories;
         private static MethodInfo _add;
