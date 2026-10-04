@@ -42,8 +42,15 @@ namespace Armoury
         }
 
         /// <summary>Priority.Last - po BK i po wszystkich, co dokladaja swoje.</summary>
+        // Licznik zagniezdzenia (audyt 04.10): ROT -> NavalDLC -> BEE -> BK woluja model wewnetrzny, a latka
+        // siedzi na kazdym z nich - ciecie -40% szlo 3-4 razy (partie jadly ~13-22% normy). Tniemy RAZ, na zewnatrz.
+        [ThreadStatic] private static int _depth;
+        public static void Prefix() { _depth++; }
+        public static Exception Finalizer(Exception __exception) { if (_depth > 0) _depth--; return __exception; }
+
         public static void Postfix(ref ExplainedNumber __result)
         {
+            if (_depth > 1) return;
             try
             {
                 var s = Settings.Current;
@@ -96,7 +103,7 @@ namespace Armoury
                     foreach (var o in declaring) if (o != t && t.IsAssignableFrom(o)) { leaf = false; break; }
                     if (!leaf) continue;                       // po nim dziedziczy inny model - ten jest w uzyciu
                     // kazda latka osobno - egzotyczny model nie moze polozyc reszty
-                    try { h.Patch(Declared(t), postfix: post); done++; names += (names.Length > 0 ? ", " : "") + t.Name; }
+                    try { h.Patch(Declared(t), prefix: new HarmonyMethod(typeof(Rations), "Prefix") { priority = Priority.First }, postfix: post, finalizer: new HarmonyMethod(typeof(Rations), "Finalizer")); done++; names += (names.Length > 0 ? ", " : "") + t.Name; }
                     catch (Exception pe) { Log.Error("Rations.Patch(" + t.Name + ")", pe); }
                 }
                 Log.Info("Rations: zuzycie jedzenia -" + s.FoodConsumptionCutPercent

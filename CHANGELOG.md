@@ -1,5 +1,12 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-04 (23) - RACJE: ciecie jedzenia -40% naliczalo sie 3-4 razy (partie jadly ~13-22% normy)
+**Mod:** Armoury | **Pliki:** `Rations.cs` (licznik zagniezdzenia prefix/finalizer)
+**Problem (audyt ekonomii 04.10):** `Rations` latal kazdy "lisc" hierarchii modeli jedzenia (log: BKPartyConsumptionModel, BEE_MobilePartyFoodConsumptionModel, NavalDLCMobilePartyFoodConsumptionModel, ROTMobilePartyFoodConsumptionModel, RealisticFoodConsumptionModel), zakladajac, ze nie woluja sie nawzajem. Woluja: ROT `_previousModel.CalculateDailyFoodConsumptionf` (ROTMobilePartyFoodConsumptionModel.cs:57), NavalDLC `BaseModel` (:32), BEE `_baseModel` (:59). Kazda warstwa dokladala x0.6 - zuzycie 0.6^3-0.6^4 normy.
+**Zmiana:** prefix (_depth++), finalizer (_depth--), postfix tnie tylko na zewnetrznym poziomie (_depth == 1) - jeden raz -40%, jak zamierzone.
+**Ryzyko / co sprawdzic:** partie (gracz i AI) beda jesc ~3-4x wiecej niz przez ostatnie tygodnie (tyle, ile mialy jesc). Mozliwy wiekszy glod AI na dlugich marszach, wieksze zakupy jedzenia; DesertionLaw "glod" w logu. Jesli za duzo - suwak `FoodConsumptionCutPercent`.
+**Status:** WGRANE 2026-10-04 (Armoury.dll md5 765d44ee83b6790728ad518cab90d556, build rc=0, gra zamknieta; poprzednie DLL obok jako `Armoury.dll.bak-2026-10-04-przed-racjami-raz`). DO SPRAWDZENIA.
+
 ## 2026-10-04 (22) - ZEGAR NA PASKU MAPY i SZYBSZE PRZEWIJANIE (x8 zamiast x4)
 **Mod:** Armoury | **Pliki:** NOWY `MapClock.cs`; `ArmouryBehavior.cs` (HourlyTick + OnSessionLaunched: ApplySpeed), `SubModuleMain.cs`, `Settings.cs` + `McmSettings.cs` (`MapClockEnabled`, `FastForwardMultiplier` 8, grupa "A night's rest")
 **Zgloszenie (Jeff 04.10):** "czy mozna dodac szybszy uplyw czasu plus ktora jest dokladnie godzina".
