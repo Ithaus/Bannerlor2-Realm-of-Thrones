@@ -86,3 +86,35 @@ Koszt metalu na wyrob przy dzisiejszych cenach sztabek wobec ceny wyrobu z gry:
 Gdy wegiel i sztabki dostana koszt zgodny z historia (wegla duzo, zelazo z dymarki drozsze), kolczuga
 t3 kosztowalaby wiecej metalu niz jest warta, a helm t2 dalej bylby zlota zyla. Ceny wyrobow w grze
 (ROT) sa ustawione "pod gre", nie pod wage metalu.
+
+## 7. Model ceny wyrobu (uzgadniany z Jeffem 04.10)
+
+Opcje cen wyrobow (tabela w rozmowie): 1 = ceny z gry, surowce realne; 2 = cena z kosztu wykucia
+(metal x1.4 wagi + wegiel + praca 10/dzien + 25% zysku); 3 = cena z gry, ale nie dalej niz 2x od kosztu.
+Jeff waha sie miedzy 2 i 3 -> jeden suwak "bezpiecznik" (1x = opcja 2, 2x = opcja 3, wiecej = blizej gry).
+
+Cena wyrobu w miescie = Podstawa x Wskaznik surowcow x Wskaznik oczekiwan x Wskaznik polki
+
+1. Podstawa - wedle suwaka (koszt wykucia przy NORMALNYCH cenach surowcow albo cena z gry w granicach).
+2. Wskaznik surowcow - KOSZT ODTWORZENIA (Jeff: "im surowce drozsze, tym drozszy pancerz - nie tylko
+   wykuty, ale tez ten, co juz jest; rynek dziala z wyprzedzeniem: 50 plyt na stanie, ale brak surowca,
+   to cena idzie w gore"). Koszt wykucia przy DZISIEJSZYCH cenach rudy/drewna/wegla/sztab w okolicy
+   (vanilla daje im zywy rynek 0.1-10) / koszt przy cenach normalnych. Przeliczany raz dziennie per miasto
+   i gatunek metalu, dochodzi plynnie (bezwladnosc kilku dni).
+3. Wskaznik oczekiwan - WOJNA (Jeff: "jak wybucha wojna, ceny moga isc w gore, bo wiedza, ze zaraz
+   beda kupowac bron"). W chwili wypowiedzenia wojny kupcy w osadach stron doliczaja OCZEKIWANY popyt
+   (szacunek z liczebnosci armii stron), premia wygasa w ciagu kilkunastu dni, a PRAWDZIWE zakupy armii
+   (krok 5) ja zastepuja albo obalaja - nie jest to staly mnoznik (ten Jeff odrzucil: "nie sztucznie").
+4. Wskaznik polki - prawo podazy i popytu (SupplyDemand, wgrane 04.10).
+
+Prawa do ujecia dodatkowo: arbitraz (kupcy wioza tam, gdzie drozej, minus koszt drogi - zamiast samych
+brakow), substytucja (droga plyta -> czesc popytu na kolczuge), bezwladnosc cen.
+
+Kolejnosc budowy (jedna zmiana naraz):
+1. Ceny i przetopy surowcow (wegiel z drewna 1:4, ruda + 20 wegla -> 3 surowki, kolejne stopnie 3 -> 2)
+   + podniesione wydobycie kopaln i drwali.
+2. Podstawa ceny wyrobu z suwakiem (start 2x).
+3. Wskaznik surowcow (koszt odtworzenia).
+4. Wskaznik oczekiwan wojennych.
+5. Handel kupcow wedle roznicy cen + substytucja.
+6. Zakupy armii AI na targach zamiast darmowego sprzetu DTE.
