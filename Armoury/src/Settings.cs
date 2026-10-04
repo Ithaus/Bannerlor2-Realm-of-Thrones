@@ -328,6 +328,10 @@ namespace Armoury
         public float MarchRiderPace = 6.5f;                // map speed cap for a clean column of riders - every man horsed, no train
         public float MarchPackAllowance = 0.25f;           // this many pack animals PER MAN count as field supply, not a train (0.25 = a mule per four men rides free)
 
+        // --- Medieval prices ---
+        public bool MedievalArmsPrices = true;             // arms and armour cost what they cost in the Middle Ages, measured against the soldier's pay (1 denar ~ 1 penny): a levy's kit ~150, a knight's harness a few thousand - horses, goods and wages untouched (takes effect on loading a save)
+        public float MedievalArmsPriceScale = 1.0f;        // times the medieval target prices (2 = twice as dear) - never above the game's own price
+
         // --- The glutted market ---
         public bool MarketGlutEnabled = true;              // a merchant needs only so many of one thing: each extra piece of a type you sell him fetches less
         public float MarketGlutStartPercent = 5f;          // the FLOOR for the first piece: pays at least this % of value - a better trade rate (say 8%) stands as is

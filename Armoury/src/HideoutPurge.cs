@@ -110,7 +110,7 @@ namespace Armoury
                     if (!it.HasWeaponComponent && !it.HasArmorComponent) continue;
                     int g = Recipes.Grade(it);
                     if (g < 1 || g > 3) continue;
-                    if (it.Value < 20 || it.Value > 800) continue;
+                    if (PriceLaw.Orig(it) < 20 || PriceLaw.Orig(it) > 800) continue;
                     var id = (it.StringId ?? "").ToLowerInvariant();
                     if (id.Contains("practice") || id.Contains("tournament") || id.Contains("siege")
                         || id.Contains("ballista") || id.Contains("dummy") || id.Contains("test")) continue;

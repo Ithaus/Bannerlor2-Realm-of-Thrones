@@ -16,13 +16,19 @@ namespace Armoury
     /// </summary>
     internal static class WeaponXpPatch
     {
-        internal static void Postfix(ItemObject item, ref int __result)
+        internal static void Postfix(ItemObject item, ref int __result, MethodBase __originalMethod)
         {
             try
             {
+                if (item == null) return;
+                // CENY SREDNIOWIECZNE (04.10): gra liczy XP jako ulamek ceny wyrobu, a PriceLaw
+                // tnie ceny uzbrojenia 20-50x - XP liczymy od ceny SPRZED skalowania, zeby
+                // kowalstwo nie stanelo w miejscu. Dotyczy tez przetapiania.
+                int now = item.Value, orig = PriceLaw.Orig(item);
+                if (now > 0 && orig > now) __result = (int)Math.Round(__result * (double)orig / now);
+                if (__originalMethod != null && __originalMethod.Name == "GetSkillXpForSmelting") return;   // sufit tylko dla kucia
                 var s = Settings.Current;
                 if (s == null || !s.WeaponXpFromValueCapped) return;
-                if (item == null) return;
                 int tier = Recipes.Grade(item);
                 int cap = MathF.Max(50, s.WeaponXpCapPerTier * tier);
                 if (__result > cap) __result = cap;
@@ -34,6 +40,7 @@ namespace Armoury
         {
             "GetSkillXpForSmithingInFreeBuildMode",
             "GetSkillXpForSmithingInCraftingOrderMode",
+            "GetSkillXpForSmelting",                       // tylko przywrocenie skali cen (PriceLaw), bez sufitu
         };
 
         /// <summary>Lapiemy kazda konkretna implementacje modelu kowalstwa, takze z innych modow.</summary>

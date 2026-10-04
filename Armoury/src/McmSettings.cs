@@ -1096,6 +1096,14 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public float MarchPackAllowance { get; set; } = 0.25f;
 
+        [SettingPropertyBool("Medieval Arms Prices", HintText = "arms and armour cost what they cost in the Middle Ages, measured against the soldier's pay (1 denar ~ 1 penny): a levy's kit ~150, a knight's harness a few thousand - horses, goods and wages untouched (takes effect on loading a save)")]
+        [SettingPropertyGroup("Medieval prices")]
+        public bool MedievalArmsPrices { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Medieval Arms Price Scale", 0.00f, 4.00f, "0.00", HintText = "times the medieval target prices (2 = twice as dear) - never above the game's own price")]
+        [SettingPropertyGroup("Medieval prices")]
+        public float MedievalArmsPriceScale { get; set; } = 1.0f;
+
         [SettingPropertyBool("Market Glut Enabled", HintText = "a merchant needs only so many of one thing: each extra piece of a type you sell him fetches less")]
         [SettingPropertyGroup("The glutted market")]
         public bool MarketGlutEnabled { get; set; } = true;
@@ -1677,6 +1685,8 @@ namespace Armoury
             s.MarchFootRiderPace = MarchFootRiderPace;
             s.MarchRiderPace = MarchRiderPace;
             s.MarchPackAllowance = MarchPackAllowance;
+            s.MedievalArmsPrices = MedievalArmsPrices;
+            s.MedievalArmsPriceScale = MedievalArmsPriceScale;
             s.MarketGlutEnabled = MarketGlutEnabled;
             s.MarketGlutStartPercent = MarketGlutStartPercent;
             s.MarketGlutDropPP = MarketGlutDropPP;

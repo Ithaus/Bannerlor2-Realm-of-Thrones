@@ -204,6 +204,31 @@ namespace GrandTourney
         /// Skromna nagroda LOKALNYCH szranek: losowy porzadny przedmiot do
         /// LocalPrizeMaxValue. Wielka sakiewka czeka na Grand Tournament w pokoju.
         /// </summary>
+        // CENY SREDNIOWIECZNE (Armoury PriceLaw, 04.10) tna ceny uzbrojenia 20-50x. Prog
+        // nagrody (400..LocalPrizeMaxValue) to klasa przedmiotu, nie cena - pytamy Armoury
+        // o cene sprzed skalowania (refleksja; bez Armoury zwykla Value).
+        private static System.Reflection.MethodInfo _orig;
+        private static bool _origLooked;
+        private static int OrigValue(ItemObject it)
+        {
+            try
+            {
+                if (!_origLooked)
+                {
+                    _origLooked = true;
+                    foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+                    {
+                        if (asm.GetName().Name != "Armoury") continue;
+                        var t = asm.GetType("Armoury.PriceLaw");
+                        if (t != null) _orig = t.GetMethod("Orig", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public);
+                    }
+                }
+                if (_orig != null) return (int)_orig.Invoke(null, new object[] { it });
+            }
+            catch { }
+            return it.Value;
+        }
+
         private static void SetLocalPrize(TournamentGame game)
         {
             try
@@ -215,7 +240,8 @@ namespace GrandTourney
                 {
                     if (it == null || it.NotMerchandise) continue;
                     if (!it.HasWeaponComponent && !it.HasArmorComponent) continue;
-                    if (it.Value < 400 || it.Value > s.LocalPrizeMaxValue) continue;
+                    int worth = OrigValue(it);   // cena sprzed cen sredniowiecznych Armoury (04.10)
+                    if (worth < 400 || worth > s.LocalPrizeMaxValue) continue;
                     pool.Add(it);
                 }
                 if (pool.Count == 0) return;

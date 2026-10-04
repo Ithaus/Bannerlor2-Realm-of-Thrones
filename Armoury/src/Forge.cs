@@ -282,7 +282,7 @@ namespace Armoury
                 days *= (1f - relief * s.HelperTimeRelief);
                 if (helper != null)
                 {
-                    Helper.GiveXp(helper, item.Value * 0.08f);
+                    Helper.GiveXp(helper, PriceLaw.Orig(item) * 0.08f);   // XP od ceny SPRZED cen sredniowiecznych
                     Log.Player(helper.Name + " works the bellows for you - the labour goes faster.");
                     Log.Info("Pomocnik: " + helper.Name + " ulga=" + relief.ToString("0.00"));
                 }

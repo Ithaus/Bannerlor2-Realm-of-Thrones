@@ -56,6 +56,7 @@ namespace Armoury
                 SmithAudit.ApplyAll(_harmony);
                 QuartermasterLaw.ApplyAll(_harmony);
                 MarketGlut.ApplyAll(_harmony);
+                PriceLaw.ApplyAll(_harmony);     // ceny sredniowieczne: bron kuta w trakcie gry (Jeff 04.10)
                 Stables.ApplyAll(_harmony);
                 ShieldGuard.ApplyAll(_harmony);  // strzaly przestaja lupic tarcze (RBM liczy je x1.5)
                 SpeedDepth.ApplyAll(_harmony);   // licznik zagniezdzenia - PRZED wszystkimi latkami predkosci/morale
