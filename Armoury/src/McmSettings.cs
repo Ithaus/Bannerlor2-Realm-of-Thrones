@@ -1172,21 +1172,21 @@ namespace Armoury
         [SettingPropertyGroup("Arms pricing")]
         public float MaterialIndexInertia { get; set; } = 0.25f;
 
-        [SettingPropertyFloatingInteger("Material Ratio Min", 0f, 2f, "0.00", HintText = "cheapest a raw material (ore, wood, leather, linen) counts in one town against its usual price - below that it is shipped out")]
+        [SettingPropertyFloatingInteger("Material Ratio Min", 0f, 2f, "0.00", HintText = "cheapest a raw material (ore, wood, leather, linen) counts in one town against its usual price - below that it is shipped out (Jeff: 10%)")]
         [SettingPropertyGroup("Arms pricing")]
-        public float MaterialRatioMin { get; set; } = 0.5f;
+        public float MaterialRatioMin { get; set; } = 0.1f;
 
-        [SettingPropertyFloatingInteger("Material Ratio Max", 0f, 8f, "0.00", HintText = "dearest a raw material counts in one town against its usual price - above that a smith buys it in the next town")]
+        [SettingPropertyFloatingInteger("Material Ratio Max", 0f, 12f, "0.00", HintText = "dearest a raw material counts in one town against its usual price - above that a smith buys it in the next town (Jeff: x3)")]
         [SettingPropertyGroup("Arms pricing")]
-        public float MaterialRatioMax { get; set; } = 2f;
+        public float MaterialRatioMax { get; set; } = 3f;
 
         [SettingPropertyFloatingInteger("Material Index Min", 0f, 2.4f, "0.00", HintText = "floor of the material-cost factor on a finished piece")]
         [SettingPropertyGroup("Arms pricing")]
-        public float MaterialIndexMin { get; set; } = 0.6f;
+        public float MaterialIndexMin { get; set; } = 0.1f;
 
-        [SettingPropertyFloatingInteger("Material Index Max", 0f, 7.2f, "0.00", HintText = "ceiling of the material-cost factor on a finished piece (before it was 5 - a leather garb sold for 20 000)")]
+        [SettingPropertyFloatingInteger("Material Index Max", 0f, 12f, "0.00", HintText = "ceiling of the material-cost factor on a finished piece (before it was 5 - a leather garb sold for 20 000)")]
         [SettingPropertyGroup("Arms pricing")]
-        public float MaterialIndexMax { get; set; } = 1.8f;
+        public float MaterialIndexMax { get; set; } = 3f;
 
         [SettingPropertyBool("War Expectation Enabled", HintText = "when war is declared, traders on both sides expect armies to buy and raise their asking prices before the first lord arrives")]
         [SettingPropertyGroup("Arms pricing")]

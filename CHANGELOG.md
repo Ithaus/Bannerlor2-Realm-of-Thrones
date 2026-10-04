@@ -1,5 +1,12 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-04 (16) - CENY: widelki surowca wedle Jeffa - od 10% do x3 (surowiec i czynnik na sztuce)
+**Mod:** Armoury | **Pliki:** `Settings.cs` + `McmSettings.cs` (`MaterialRatioMin` 0.5 -> 0.1, `MaterialRatioMax` 2 -> 3, `MaterialIndexMin` 0.6 -> 0.1, `MaterialIndexMax` 1.8 -> 3)
+**Zgloszenie (Jeff 04.10):** "zamiast polowy 10% minimum i max x3 i pokaz mi pod to wyliczenie".
+**Zmiana:** tylko domyslne wartosci (zapisany Armoury.json MCM nie mial jeszcze tych pol - wejda nowe). Czynnik na sztuce ma te same widelki co surowiec, wiec nie przycina dodatkowo - sztuka drozeje dokladnie o udzial drogiego surowca w jej koszcie.
+**Wyliczenie (bandit_garb, skora 10 kg, t3):** skora 10.2 kg x 23 = 235, metal 2.1 kg x 314 = 659, wegiel 19, praca 13 dni x 10 = 130; surowo 1043, koszt wykucia x1.25 = 1304; podstawa = wartosc gry w granicach 652-2607. Skora x3 w miescie: (1043 + 235 x 2) / 1043 = x1.45. Wszystkie surowce x3: (913 x 3 + 130) / 1043 = x2.75 (praca nie drozeje). Najdrozej: 2607 x 2.75 x polka 2 x gra 1.3 = ~18 600; przy samej drogiej skorze: 2607 x 1.45 x 2 x 1.3 = ~9 800.
+**Status:** WGRANE 2026-10-04 (Armoury.dll md5 96e765fdb413c9e0035f249b462c9a01, build rc=0, gra zamknieta; poprzednie DLL obok jako `Armoury.dll.bak-2026-10-04-przed-widelkami-x3`). DO SPRAWDZENIA - na obecnym save.
+
 ## 2026-10-04 (15) - CENY: widelki wskaznika surowcow (skora x5 dawala garb bandyty za 20 tys.)
 **Mod:** Armoury | **Pliki:** `ArmsPricing.cs` (LocalRatio, MaterialIndex, spis), `Settings.cs` + `McmSettings.cs` (grupa "Arms pricing": `MaterialRatioMin` 0.5, `MaterialRatioMax` 2, `MaterialIndexMin` 0.6, `MaterialIndexMax` 1.8)
 **Problem (Jeff 04.10, pierwszy test nowej gry):** log `ZakupyAI` - lordowie AI placa za zwykle rzeczy kilkanascie razy za duzo: `bandit_garb` 7864 w Ten Towers i 20380 w Menetragos (skorzany garb 10 kg, pancerz 25), `bandit_hybrid_armor_helmet_b` 9855, `khuzait_civil_coat` 4681, `nordic_lamellar_vest` 33400. Indeks rudy w `Rynek broni` min/med/max 0.25/1.16/3.99 (dzien wczesniej max 5.42).
