@@ -1293,6 +1293,14 @@ namespace Armoury
         [SettingPropertyGroup("Levy")]
         public bool VolunteerKitEnabled { get; set; } = true;
 
+        [SettingPropertyBool("Recruit Gold To Seller", HintText = "the gold an AI lord pays for a recruit goes to the notable who raised him (tavern hirelings: to the town), as it already does for you - not into thin air")]
+        [SettingPropertyGroup("Levy")]
+        public bool RecruitGoldToSeller { get; set; } = true;
+
+        [SettingPropertyBool("No Free Kit For New Parties", HintText = "a new AI warband no longer gets a full free kit for all its men (Dynamic Troop Equipment) after the campaign has begun - its lord buys gear at market")]
+        [SettingPropertyGroup("Levy")]
+        public bool NoFreeKitForNewParties { get; set; } = true;
+
         [SettingPropertyBool("Population Rent Enabled", HintText = "a fief pays by the people it stands for: each village and town on the map is a symbol of a whole land, and its lord's rents follow that land's population (the Reach richest, the Iron Islands poor)")]
         [SettingPropertyGroup("Population")]
         public bool PopulationRentEnabled { get; set; } = true;
@@ -2204,6 +2212,8 @@ namespace Armoury
             s.RecruitMiseryWeight = RecruitMiseryWeight;
             s.RecruitWillingMax = RecruitWillingMax;
             s.VolunteerKitEnabled = VolunteerKitEnabled;
+            s.RecruitGoldToSeller = RecruitGoldToSeller;
+            s.NoFreeKitForNewParties = NoFreeKitForNewParties;
             s.PopulationRentEnabled = PopulationRentEnabled;
             s.PopulationRentPerHead = PopulationRentPerHead;
             s.PopulationScale = PopulationScale;

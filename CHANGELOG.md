@@ -1,5 +1,12 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-04 (28) - POBOR krok 3: zloto za werbunek AI do notabla/miasta, koniec darmowego kompletu nowej partii AI
+**Mod:** Armoury | **Pliki:** NOWY `LevyGold.cs`; `SubModuleMain.cs`, `ArmouryBehavior.cs` (Reset), `Settings.cs` + `McmSettings.cs` (`RecruitGoldToSeller`, `NoFreeKitForNewParties`, grupa "Levy")
+**Problem (audyt ekonomii + rozpoznanie werbunku 04.10):** (a) vanilla `RecruitmentCampaignBehavior.ApplyInternal` placi za ochotnika i najemnika z karczmy `GiveGoldAction(lord, null)` - zloto AI znika (u gracza BK placi notablowi, RecruitmentOnDonePatch.cs:38). (b) DTE `EveryoneCampaignBehavior.OnMobilePartyCreated` (:468-507) daje kazdej nowej partii AI komplet dla calego skladu z niczego - AiGear blokowal tylko przydzial dzienny, przenoszenie taboru i komplet przy werbunku.
+**Zmiana:** postfix na `ApplyInternal`: ochotnik (AI, nie gracz) - koszt werbunku (`PartyWageModel.GetTroopRecruitmentCost`) do kiesy notabla, ktory go wystawil; najemnik z karczmy (lord albo karawana) - koszt x liczba do kasy miasta. Prefix na DTE `OnMobilePartyCreated`: po starcie gry pomija partie AI (gracz i start gry bez zmian). Log dzienny: `Werbunek: dzien N - zloto AI za ochotnikow do notabli X, za najemnikow do miast Y; nowe partie AI bez darmowego kompletu: Z`.
+**Ryzyko / co sprawdzic:** nowe partie AI zaczynaja z pusta zbrojownia DTE - w bitwach z graczem DTE i tak dopelnia AI sprzetem szablonu (FillEmptySlots), wiec wyglad bez zmian; za to AiGear kupi im braki na targu (wiecej popytu na uzbrojenie). Notable bogatsi - wiecej awansow ochotnikow z kupionym sprzetem (krok 2).
+**Status:** WGRANE 2026-10-04 (Armoury.dll md5 fddf2aa287c3568351bbdf850548b5b3, build rc=0, gra zamknieta; poprzednie DLL obok jako `Armoury.dll.bak-2026-10-04-przed-poborem3`). DO SPRAWDZENIA - na obecnym save.
+
 ## 2026-10-04 (27) - POBOR krok 2: ochotnik awansuje w puli notabla tylko z kupionym sprzetem
 **Mod:** Armoury | **Pliki:** NOWY `VolunteerKit.cs`; `SubModuleMain.cs`, `ArmouryBehavior.cs` (Reset), `Settings.cs` + `McmSettings.cs` (`VolunteerKitEnabled`, grupa "Levy")
 **Zgloszenie (Jeff 04.10):** "a co, jak sa ludzie wyzszego tieru, skad maja sprzet - przeciez jest zycie swiata, sa inni zbrojni nie w sluzbie, co moga kupic sprzet i miec swoj".
