@@ -373,7 +373,10 @@ namespace Armoury
         // --- Workshops ---
         public bool WorkshopLawEnabled = true;             // town workshops that make arms and armour run as real businesses: they buy ore, wood, leather and linen on the market by the true weight of each piece, pay their workers, sell to the market - and make only what turns a profit
         public float WorkshopWorkersArtisans = 6f;         // man-days of work the town's artisans put in each day
-        public float WorkshopWorkers = 4f;                 // man-days of work a notable's smithy or wood workshop puts in each day
+        public float WorkshopWorkers = 6f;                 // man-days of work a notable's smithy or wood workshop puts in each day (a master with journeymen and apprentices)
+        public float WorkshopProsperityPerHand = 500f;     // the town's own craftsmen: one man-day of arms work each day for this much prosperity (a town of 4800 keeps about 10 hands busy), shared evenly between the guilds - tailors, armourers, weaponsmiths, bowyers, shieldwrights, saddlers
+        public float WorkshopArtisansMin = 2f;             // fewest man-days a day the craftsmen of even a poor town put in
+        public float WorkshopArtisansMax = 20f;            // most man-days a day the craftsmen of the richest town put in
         public float WorkshopWagePerDay = 3f;              // wages for one man-day at the forge, paid into the town (3 d - a craftsman's day in historical prices)
         public float WorkshopMinProfitPercent = 10f;       // a workshop makes a piece only if the market pays at least this much over materials and wages
         public float WorkshopCrudeKgPerOre = 1.5f;         // kilograms of crude iron a bloomery wins from one load of ore (10 kg); each finer grade costs a fifth more
@@ -415,7 +418,10 @@ namespace Armoury
         public bool PopulationRentEnabled = true;          // a fief pays by the people it stands for: each village and town on the map is a symbol of a whole land, and its lord's rents follow that land's population (the Reach richest, the Iron Islands poor)
         public float PopulationRentPerHead = 40f;          // rents and dues a lord draws from each subject a year, in coins (about 40 pence a head in the medieval estimate)
         public float PopulationScale = 1f;                 // scale on every land's population (Westeros ~30 million, Essos with its hinterlands ~30 million)
-        public float PopulationRentMaxShare = 0.5f;        // a lord takes his due rents each day from the village or town purse, but never more than this share of what it holds - a burnt village pays nothing
+        public float PopulationRentMaxShare = 0.2f;        // a village pays its lord at most this share of its purse each day (0.5 emptied the villages in a few days)
+        public bool RentReplacesTownTax = true;            // one source of land income: Banner Kings' town population tax (paid from nothing) is replaced by rent from the town purse
+        public float TownRentShare = 0.07f;                // share of the town purse above the merchants' floor its lord draws each day as rents, tolls and farms
+        public float TownRentFloorGold = 20000f;           // a town keeps this much for its merchants - below 20 000 Banner Kings takes prosperity away
         public bool WorkshopNoFreeRaw = true;              // nothing from thin air: the hidden town artisans no longer make timber, ore, hides, meat, leather and linen without any input, and a workshop roll never yields charcoal or ingots (those only come from smelting) - raw goods come from the villages
         public bool HistoricalRecruitCost = true;          // a recruit costs his prest money - some days of his pay (mercenaries twice that) - instead of the game's flat table by level
         public float RecruitCostDays = 10f;                // days of a troop's daily pay paid to take him on (historical prest/advance: a few to a dozen days of wages)

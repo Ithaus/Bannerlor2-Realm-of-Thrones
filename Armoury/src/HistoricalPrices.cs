@@ -67,23 +67,41 @@ namespace Armoury
             if (c == null) return 0f;
             var s = Settings.Current;
             int t = Math.Max(1, Math.Min(6, (int)it.Tier + 1));
-            float days = c.Days;
-            float wage = WageFor(t);
-            if (it.ItemType == ItemObject.ItemTypeEnum.Arrows || it.ItemType == ItemObject.ItemTypeEnum.Bolts || it.ItemType == ItemObject.ItemTypeEnum.Thrown)
-            {
-                days *= Math.Max(0f, s.HistAmmoLaborMultiplier);    // fletcher i grotnik: snop to dzien-dwa pracy
-                wage = WageFor(1);                                    // test 04.10: dniowka mistrza t6 dawala snop strzal za 130 d - fletcher to zwykly rzemieslnik
-            }
-            else if (it.ItemType == ItemObject.ItemTypeEnum.Bow)
-                days *= Math.Max(0f, s.HistBowLaborMultiplier);     // test 04.10: luk t6 = 12 dni mistrza; historycznie luk wojenny 12-18 d
+            float days = HistDays(it, c);
+            float wage = IsAmmo(it) ? WageFor(1) : WageFor(t);      // test 04.10: dniowka mistrza t6 dawala snop strzal za 130 d - fletcher to zwykly rzemieslnik
             float mat = c.MetalKg * MetalPerKg(c.Grade)
-                        + c.MetalKg * s.HistCharcoalPerKg            // ~1 kg wegla na kg kutego metalu
+                        + c.MetalKg * FuelPerMetalKg()               // wpis 48: drewno na wegiel tyle, ile spala warsztat (WorkshopLaw.Needs)
                         + c.LeatherKg * s.HistLeatherPerKg
                         + c.LinenKg * s.HistLinenPerKg
                         + c.WoodKg * s.HistWoodPerKg
                         + c.Special * s.HistSpecialFactor;           // rog, sciegno, klej lukow (w modelu w skali gry)
             float labor = days * wage;
             return (mat + labor) * (1f + Math.Max(0f, s.HistProfitPercent) / 100f);
+        }
+
+        private static bool IsAmmo(ItemObject it)
+        {
+            return it.ItemType == ItemObject.ItemTypeEnum.Arrows || it.ItemType == ItemObject.ItemTypeEnum.Bolts || it.ItemType == ItemObject.ItemTypeEnum.Thrown;
+        }
+
+        /// <summary>Dni pracy wedle cen historycznych - te same w wartosci sztuki i w warsztacie (WorkshopLaw), zeby
+        /// warsztat liczyl prace tak, jak ja wyceniono: snop strzal x HistAmmoLaborMultiplier, luk x HistBowLaborMultiplier.</summary>
+        internal static float HistDays(ItemObject it, ArmsPricing.Cost c)
+        {
+            var s = Settings.Current;
+            float days = c.Days;
+            if (IsAmmo(it)) days *= Math.Max(0f, s.HistAmmoLaborMultiplier);          // fletcher i grotnik: snop to dzien-dwa pracy
+            else if (it.ItemType == ItemObject.ItemTypeEnum.Bow) days *= Math.Max(0f, s.HistBowLaborMultiplier);   // luk wojenny 12-18 d
+            return days;
+        }
+
+        /// <summary>Paliwo na kg metalu (pensy): drewno na wegiel do dymarki (WorkshopWoodPerOre na rude, ktora daje
+        /// WorkshopCrudeKgPerOre kg surowki) + 2.5 kg na kuznie - po cenie drewna.</summary>
+        internal static float FuelPerMetalKg()
+        {
+            var s = Settings.Current;
+            float woodKg = Math.Max(0f, s.WorkshopWoodPerOre) * 10f / Math.Max(0.1f, s.WorkshopCrudeKgPerOre) + 2.5f;
+            return woodKg * s.HistWoodPerKg;
         }
 
         private static bool IsArms(ItemObject it)

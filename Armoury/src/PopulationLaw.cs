@@ -134,6 +134,52 @@ namespace Armoury
         /// <summary>Renty zaplacone dzis kazdemu rodowi (do powinnosci wobec korony).</summary>
         internal static readonly Dictionary<Clan, int> RentToday = new Dictionary<Clan, int>();
 
+        // ------------------------------------------------------------ podatek ludnosci miasta BK -> renta (wpis 49)
+        [ThreadStatic] private static int _taxDepth;
+        public static void TownTaxPrefix() { _taxDepth++; }
+        public static Exception TownTaxFinalizer(Exception __exception) { if (_taxDepth > 0) _taxDepth--; return __exception; }
+        public static void TownTaxPostfix(bool __1, ref TaleWorlds.CampaignSystem.ExplainedNumber __result)
+        {
+            if (_taxDepth > 1) return;
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || !On || !s.RentReplacesTownTax) return;
+                __result = new TaleWorlds.CampaignSystem.ExplainedNumber(0f, __1, _txtRent);
+            }
+            catch { }
+        }
+        private static readonly TaleWorlds.Localization.TextObject _txtRent = new TaleWorlds.Localization.TextObject("{=!}Town rents are paid from the town purse (see daily rents)");
+
+        internal static void ApplyTownTax(HarmonyLib.Harmony h)
+        {
+            int n = 0;
+            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                Type[] types;
+                try { types = asm.GetTypes(); } catch (System.Reflection.ReflectionTypeLoadException e) { types = e.Types; } catch { continue; }
+                foreach (var t in types)
+                {
+                    try
+                    {
+                        if (t == null || t.IsAbstract || !typeof(TaleWorlds.CampaignSystem.ComponentInterfaces.SettlementTaxModel).IsAssignableFrom(t)) continue;
+                        foreach (var m in t.GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.DeclaredOnly))
+                        {
+                            if (m.Name != "CalculateTownTax" || m.IsAbstract) continue;
+                            var ps = m.GetParameters();
+                            if (ps.Length != 2 || ps[0].ParameterType != typeof(Town) || ps[1].ParameterType != typeof(bool)) continue;
+                            h.Patch(m, prefix: new HarmonyLib.HarmonyMethod(typeof(PopulationLaw), nameof(TownTaxPrefix)) { priority = HarmonyLib.Priority.First },
+                                       postfix: new HarmonyLib.HarmonyMethod(typeof(PopulationLaw), nameof(TownTaxPostfix)) { priority = HarmonyLib.Priority.Last },
+                                       finalizer: new HarmonyLib.HarmonyMethod(typeof(PopulationLaw), nameof(TownTaxFinalizer)));
+                            n++;
+                        }
+                    }
+                    catch { }
+                }
+            }
+            Log.Info("PopulationLaw: podatek ludnosci miasta (Walled Demesnes) zastapiony renta z kasy miasta w " + n + " modelach podatku.");
+        }
+
         internal static void Daily()
         {
             if (!On) return;
@@ -162,11 +208,17 @@ namespace Armoury
                         var lord = st.OwnerClan != null ? st.OwnerClan.Leader : null;
                         if (lord == null || !lord.IsAlive) continue;
                         int gold = st.SettlementComponent != null ? st.SettlementComponent.Gold : 0;
-                        // Audyt ponowny K2: gra trzyma kase miasta przy celu 10000 + 12 x dobrobyt (DefaultSettlementEconomyModel
-                        // .GetTownGoldChange: 25% roznicy dziennie - dosypuje z niczego albo kasuje w nicosc). Renta z miasta tylko
-                        // z NADWYZKI ponad cel - ta i tak by przepadla; dosypka z niczego sie przez nas nie uruchamia.
-                        if (st.IsTown && st.Town != null) gold = Math.Max(0, gold - (int)(10000f + st.Town.Prosperity * 12f));
-                        int pay = (int)Math.Min(rent, gold * (st.IsTown ? 1f : share));
+                        // Wpis 49 (Jeff 04.10: "tak" - jedno zrodlo dochodu z ziemi): podatek ludnosci miasta BK ("Walled Demesnes",
+                        // z niczego) wylaczony (TownTaxPostfix); pan bierze z MIASTA czesc kasy ponad prog bogactwa kupcow
+                        // (BK BKProsperityModel: kasa < 20 000 = do -2 dobrobytu dziennie) - miasto nie bankrutuje i nie traci dobrobytu.
+                        // Wies placi czesc swojej kiesy (PopulationRentMaxShare, 0.2 - wczesniej 0.5 oproznialo wsie w kilka dni).
+                        float takeShare = share;
+                        if (st.IsTown && st.Town != null)
+                        {
+                            gold = Math.Max(0, gold - (int)Math.Max(0f, s.TownRentFloorGold));
+                            takeShare = Math.Max(0f, Math.Min(1f, s.TownRentShare));
+                        }
+                        int pay = (int)Math.Min(rent, gold * takeShare);
                         if (pay <= 0) continue;
                         GiveGoldAction.ApplyForSettlementToCharacter(st, lord, pay, true);
                         { int r0; RentToday.TryGetValue(st.OwnerClan, out r0); RentToday[st.OwnerClan] = r0 + pay; }

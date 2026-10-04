@@ -1248,9 +1248,21 @@ namespace Armoury
         [SettingPropertyGroup("Workshops")]
         public float WorkshopWorkersArtisans { get; set; } = 6f;
 
-        [SettingPropertyFloatingInteger("Workshop Workers", 0.00f, 16.00f, "0.00", HintText = "man-days of work a notable's smithy or wood workshop puts in each day")]
+        [SettingPropertyFloatingInteger("Workshop Workers", 0.00f, 24.00f, "0.00", HintText = "man-days of work a notable's smithy or wood workshop puts in each day (a master with journeymen and apprentices)")]
         [SettingPropertyGroup("Workshops")]
-        public float WorkshopWorkers { get; set; } = 4f;
+        public float WorkshopWorkers { get; set; } = 6f;
+
+        [SettingPropertyFloatingInteger("Workshop Prosperity Per Hand", 0.00f, 2000.00f, "0.00", HintText = "the town's own craftsmen: one man-day of arms work each day for this much prosperity (a town of 4800 keeps about 10 hands busy), shared evenly between the guilds - tailors, armourers, weaponsmiths, bowyers, shieldwrights, saddlers")]
+        [SettingPropertyGroup("Workshops")]
+        public float WorkshopProsperityPerHand { get; set; } = 500f;
+
+        [SettingPropertyFloatingInteger("Workshop Artisans Min", 0.00f, 8.00f, "0.00", HintText = "fewest man-days a day the craftsmen of even a poor town put in")]
+        [SettingPropertyGroup("Workshops")]
+        public float WorkshopArtisansMin { get; set; } = 2f;
+
+        [SettingPropertyFloatingInteger("Workshop Artisans Max", 0.00f, 80.00f, "0.00", HintText = "most man-days a day the craftsmen of the richest town put in")]
+        [SettingPropertyGroup("Workshops")]
+        public float WorkshopArtisansMax { get; set; } = 20f;
 
         [SettingPropertyFloatingInteger("Workshop Wage Per Day", 0.00f, 12.00f, "0.00", HintText = "wages for one man-day at the forge, paid into the town (3 d - a craftsman's day in historical prices)")]
         [SettingPropertyGroup("Workshops")]
@@ -1408,9 +1420,21 @@ namespace Armoury
         [SettingPropertyGroup("Iron bank")]
         public float PopulationScale { get; set; } = 1f;
 
-        [SettingPropertyFloatingInteger("Population Rent Max Share", 0.00f, 2.00f, "0.00", HintText = "a lord takes his due rents each day from the village or town purse, but never more than this share of what it holds - a burnt village pays nothing")]
+        [SettingPropertyFloatingInteger("Population Rent Max Share", 0.00f, 1.00f, "0.00", HintText = "a village pays its lord at most this share of its purse each day (0.5 emptied the villages in a few days)")]
         [SettingPropertyGroup("Iron bank")]
-        public float PopulationRentMaxShare { get; set; } = 0.5f;
+        public float PopulationRentMaxShare { get; set; } = 0.2f;
+
+        [SettingPropertyBool("Rent Replaces Town Tax", HintText = "one source of land income: Banner Kings' town population tax (paid from nothing) is replaced by rent from the town purse")]
+        [SettingPropertyGroup("Iron bank")]
+        public bool RentReplacesTownTax { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Town Rent Share", 0.00f, 1.00f, "0.00", HintText = "share of the town purse above the merchants' floor its lord draws each day as rents, tolls and farms")]
+        [SettingPropertyGroup("Iron bank")]
+        public float TownRentShare { get; set; } = 0.07f;
+
+        [SettingPropertyFloatingInteger("Town Rent Floor Gold", 0.00f, 80000.00f, "0.00", HintText = "a town keeps this much for its merchants - below 20 000 Banner Kings takes prosperity away")]
+        [SettingPropertyGroup("Iron bank")]
+        public float TownRentFloorGold { get; set; } = 20000f;
 
         [SettingPropertyBool("Workshop No Free Raw", HintText = "nothing from thin air: the hidden town artisans no longer make timber, ore, hides, meat, leather and linen without any input, and a workshop roll never yields charcoal or ingots (those only come from smelting) - raw goods come from the villages")]
         [SettingPropertyGroup("Iron bank")]
@@ -2360,6 +2384,9 @@ namespace Armoury
             s.WorkshopLawEnabled = WorkshopLawEnabled;
             s.WorkshopWorkersArtisans = WorkshopWorkersArtisans;
             s.WorkshopWorkers = WorkshopWorkers;
+            s.WorkshopProsperityPerHand = WorkshopProsperityPerHand;
+            s.WorkshopArtisansMin = WorkshopArtisansMin;
+            s.WorkshopArtisansMax = WorkshopArtisansMax;
             s.WorkshopWagePerDay = WorkshopWagePerDay;
             s.WorkshopMinProfitPercent = WorkshopMinProfitPercent;
             s.WorkshopCrudeKgPerOre = WorkshopCrudeKgPerOre;
@@ -2400,6 +2427,9 @@ namespace Armoury
             s.PopulationRentPerHead = PopulationRentPerHead;
             s.PopulationScale = PopulationScale;
             s.PopulationRentMaxShare = PopulationRentMaxShare;
+            s.RentReplacesTownTax = RentReplacesTownTax;
+            s.TownRentShare = TownRentShare;
+            s.TownRentFloorGold = TownRentFloorGold;
             s.WorkshopNoFreeRaw = WorkshopNoFreeRaw;
             s.HistoricalRecruitCost = HistoricalRecruitCost;
             s.RecruitCostDays = RecruitCostDays;
