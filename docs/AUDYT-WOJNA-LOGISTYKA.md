@@ -244,3 +244,280 @@ osobna praca (siatki), najpierw sama mechanika.
 8. Wozy jako mechanika - projekt w "Propozycje (uzupelnienie)" ponizej.
 9. Zmierzyc 30+ dni CSV nowej gry: spadek "Village Demesnes" 1.44 -> 0.25 mln/dzien i czy po wylaczeniu
    doplaty DTE najemnicy dalej puchna.
+
+---
+
+# UZUPELNIENIE (2026-10-04, druga tura - odczyt kodu i XML, nic nie zmieniane w grze)
+
+## 7. Udzwig, zwierzeta juczne, predkosc, wozy w danych gry
+
+### 7.1 Zwierzeta juczne w XML (wszystkie moduly)
+
+`is_pack_animal="true"` maja tylko 3 pliki: `SandBoxCore/ModuleData/items/horses_and_others.xml`,
+`RBM/ModuleData/RBMCombat_horses.xml` (nadpisuje te same id) i `BannerKings.Redux/ModuleData/items.xml` (wol).
+ROT, NavalDLC, Spoils, DTE - zadnych wlasnych jucznych. Kategoria wszystkich koni jucznych: `sumpter_horse`;
+wol BK: `Oxen`.
+
+| id | nazwa | wierzchowy | cena w grze (items-dump.csv) | uwagi |
+|---|---|---|---|---|
+| sumpter_horse | Sumpter Horse | tak | 99 | RBM: weight 450, speed 34 |
+| old_horse | Work Horse | tak | 99 | RBM speed 37 |
+| saddle_horse | Saddle Horse | tak | 140 | TEZ juczny (is_pack_animal=true) - liczy sie jako 100 kg, nie 20 |
+| mule / mule_unmountable | Mule | tak / nie | 99 | |
+| pack_camel(_unmountable) | Pack Camel | tak / nie | 99 | |
+| ox (BK) | Ox | nie (brak is_mountable) | 300 (XML) | juczny, NIE bydlo rzezne |
+
+Klasyfikacja (dekompilacja `HorseComponent` z TaleWorlds.Core.dll, scratchpad `cap/HorseComponent.cs:47-67,154-155`):
+`IsMount = rideable && !pack`, `IsLiveStock = !rideable && !pack`, `IsPackAnimal` = flaga XML.
+`ItemRoster.OnRosterUpdated` (tw ItemRoster.cs:439-452) liczy jucznego i luzaka TYLKO bez modyfikatora -
+kon "kulawy"/"stary" z lupu Spoils nie daje ani udzwigu, ani nie wchodzi do stada (a pelny przelicznik
+:566-576 modyfikatory ignoruje - niespojnosc vanilli, drobna).
+
+Waga zwierzat: `GetItemEffectiveWeight` zwraca 0 dla kazdego przedmiotu z HorseComponent
+(tw DefaultInventoryCapacityModel.cs:39-48) - waga 150-520 kg z XML nic nie znaczy.
+
+### 7.2 Pojemnosc (udzwig) - wzor i liczby
+
+tw DefaultInventoryCapacityModel.cs:50-99 (stale :12-18):
+- baza 10 kg;
+- **zdrowy czlowiek: 20 kg** (TroopsFactor 2 x srednia waga 10); ranni nic; perk ForcedLabor dolicza jencow;
+- **luzak (kon wierzchowy w taborze, bez modyfikatora): 20 kg**;
+- **zwierze juczne: 100 kg** (10 x 10); perki BeastWhisperer, DeeperSacks, ArenicosMules jako procent;
+  BK perk CaravaneerStrider +20 kg/jucznego (bk VanillaModelTweakPatches.cs:625-641);
+- konie pod jezdzcami (sprzet oddzialu) NIE daja nic - nie sa w taborze;
+- na morzu: tylko ludzie + ladownosc statkow (nv NavalDLCInventoryCapacityModel.cs:37-53).
+- Zaden inny mod nie rusza pojemnosci (skan DLL w Modules: tylko BK i NavalDLC).
+
+Przyklad: 100 ludzi bez zwierzat = 2 010 kg; +25 mulow (tyle, ile MarchPace puszcza "za darmo",
+Settings.cs:330 `MarchPackAllowance 0.25`) = 4 510 kg. 300 ludzi + 75 mulow = 13 510 kg.
+
+**Wazne: zbrojownia DTE nic nie wazy.** Magazyn sprzetu wojska (`ArmyArmory.Armory`, dte ArmyArmory.cs:24)
+to osobny statyczny ItemRoster; `CalculateTotalWeightCarried` sumuje tylko `mobileParty.ItemRoster`
+(tw DefaultInventoryCapacityModel.cs:102-113). Setki zbroi, lukow i kolczanow zapasu jada bez wagi.
+
+Historia (szacunki): zolnierz poza bronia niesie 15-25 kg (20 kg w grze - trafne); kon juczny 100-150 kg
+(100 kg - trafne); kon w wozie ciagnie 250-350 kg (w grze brak wozow).
+
+### 7.3 Predkosc: stado i przeciazenie
+
+Lancuch modeli: ROTPartySpeedModel (rot ROT.Models/ROTPartySpeedModel.cs:21-43, tylko +20% dla partii,
+do ktorej gracz jest zaciagniety) -> BEE_PartySpeedModel (tylko karawany) -> BKROTPartySpeedModel
+(blogoslawienstwa bogow +15%) -> RealisticPartySpeedModel (pory roku i pogoda, rbl
+RealisticPartySpeedModel.cs:58-101, podloga 0.2) -> NavalDLC -> vanilla. **Zaden mod nie zmienia wzoru
+stada ani przeciazenia** - liczy vanilla:
+
+tw DefaultPartySpeedCalculatingModel.cs:
+- baza `4 x (200/(200+ludzie))^0.4` (:240-243): 100 ludzi 3.40, 300 ludzi 2.77; potem nasz WorldPace
+  x0.5 (WorldPace.cs:54-56, Settings.cs:282);
+- ladunek w granicach udzwigu: najwyzej -2% (:361-364);
+- **przeciazenie: -0.4 x (nadwyzka / udzwig)** (:154-158, :245-252), bez sufitu poza perkami
+  Energetic/Unburdened: 10% ponad = -4%, 50% = -20%, 100% = -40%, 200% = -80%;
+- **stado**: stado = juczne + bydlo + luzaki ponad liczbe piechurow (:175, :230-238); kara
+  `-0.3 x (stado - ludzie)/ludzie`, max -80% (:378-390). Stado do liczby ludzi jest DARMOWE; kazde
+  zwierze ponad to -0.3/ludzie (100 ludzi: -0.3% za sztuke; 150 zwierzat = -15%, 300 = -60%);
+  wiesniacy zwolnieni; perk Shepherd lagodzi;
+- jazda +30% x udzial jazdy, piechota na luzakach +15% x udzial (:411-426);
+- ranni -5% x udzial ponad 1/4 (:392-409).
+
+Nasze nakladki (Armoury): MarchPace.cs:35-52, 75-125 - sufit kolumny w jednostkach mapy, x WorldPace 50%:
+ktos idzie pieszo 4.0 -> 2.0; sama jazda z taborem (juczne+bydlo > 0.25/czlowieka) 4.2 -> 2.1; piechota
+na luzakach 5.0 -> 2.5; czysta jazda 6.5 -> 3.25 (Settings.cs:326-330). TerrainEase: las -0.10 i noc
+-0.5 PLASKO zamiast procentow vanilli (Settings.cs:284, 289). W praktyce kara stada vanilli prawie nigdy
+nie dziala (armie maja mniej zwierzat niz ludzi), a kara taboru zyje tylko w MarchPace i tylko dla jazdy.
+AIInfluence.dll tez odwoluje sie do PartySpeedModel - nie dekompilowane [NIESPRAWDZONE, raczej poboczne].
+
+### 7.4 Wozy - czy cos istnieje
+
+- **Przedmiot "woz"**: brak w KAZDYM module (grep `cart|wagon|wain|carriage` po ModuleData poza Languages:
+  tylko teksty w Native module_strings.xml i SandBox wanderer_strings.xml). CrashScribe items-dump.csv:
+  0 trafien.
+- **Siatki 3D (sceny)**: Native/SandBox maja `bd_cart_a/b/c`, `bd_hay_cart_a/b`, `bd_cartbroken_a-d`,
+  `bd_cart_wheel_a/b`, `cart_village*` (meta-mesh `bd_cart_a` uzyty 23x w prefabach).
+- **Siatki w skali mapy**: `Native/Prefabs/map_icon_parts.xml:1247-1260` - prefaby `map_icons_props_cart_a`,
+  `map_icons_props_cart_b`, `map_icons_props_cart_b_full` (meta-mesh `mi_cart_a`, `mi_cart_b`,
+  `mi_cart_b_full`) - rekwizyty mapy (ikony produkcji), statyczne, bez koni.
+- ROT-Map: `cart_village_animated_a` (ROT-Map/Prefabs/Mystaf_Outside.xml:19115) - animowana krowa przy wozie,
+  dekoracja mapy; `horse_wagon` (ROT-Map/Prefabs/Others.xml:821) - kon + narzedzia tortur, rekwizyt sceny.
+- **Wizual partii na mapie**: lider + JEDNO dodatkowe zwierze z uprzeza (sbv MobilePartyVisual.cs:1021-1029,
+  1632-1644). Karawany dostaja `mule` + `mule_load_a/b/c` albo wielblada (tw CaravanPartyComponent.cs:265-292);
+  partie lordow - nic (bazowe PartyComponent.cs:102-106 zwraca puste). Wozu w ikonie partii nie ma nigdzie.
+
+## 8. Praca dla gracza - wyplaty
+
+Skala odniesienia - zold dzienny zolnierza w tej grze: vanilla 1/2/3/5/8/12/17/23 (tier 0-7,
+tw DefaultPartyWageModel.cs:23-41) x BK `BaseWage` 1.2546 z zapisanego MCM (BannerKings.json; bk
+BKPartyWageModel.cs:85) = **t1 2, t2 3, t3 6, t4 10, t5 15, t6 21 zl/dzien**. Rok 364 dni: t1 = 730 zl/rok.
+
+| Zrodlo | Wyplata | Plik | W dniach zoldu t1 / t6 |
+|---|---|---|---|
+| Zaciag ROT (gracz jako zolnierz) | 2 + 2 x poziom bohatera / dzien (poziom 20 = 42) | tw CharacterObject.cs:349-357; rot ROTClanFinanceModel.cs:45-59 | 21 / 2 dziennie |
+| ^ blad ROT | ta sama stawka dodawana RAZ NA KAZDEGO bohatera rodu w partii gracza (petla :55-59) - 3 kompanow = x4 | j.w. | - |
+| ^ Free Folk, Biali Wedrowcy | 0 | j.w. :47-54 | - |
+| Arena (trening) | 0 / 5 / 10 / 25 / 60 zl wg liczby pokonanych (<3, <6, <10, <20, 20+), 250 za wszystkich 30 | sb ArenaMasterCampaignBehavior.cs:400-443 | 30 / 3 (60 zl) |
+| Turniej vanilla | przedmiot o Value 1 600-5 000; zaklad max 150 na runde | tw FightTournamentGame.cs:343,359; sb TournamentBehavior.cs:33,71 | 800-2 500 / 76-238 |
+| GrandTourney | lokalny (wojna) przedmiot do 2 000; sakiewki 3 000 / 8 000 / 15 000; organizator placi 2 000 + prosperity x0.5, dostaje 200/lorda | GrandTourney/src/Settings.cs:26,33-37,47 | do 7 500 / 714 |
+| Questy vanilla (m = PlayerProgress 0.1-1, tw DefaultIssueModel.cs:23-26) | MerchantNeedsHelpWithOutlaws 400+1500m; CaravanAmbush 1000+3000m; ExtortionByDeserters 800+4200m; LandlordTrainingForRetainers 2000+4000m; Smugglers 750+3000m; NearbyBanditBase 3 000; CapturedByBountyHunters 3 000; LordWantsRivalCaptured 5 000; TheConquestOfSettlement 20 000; EscortMerchantCaravan min(8 000, (250+1000m) x k); LandLordNeedsManualLaborers 50/jenca; GangLeaderNeedsRecruits 2000+100/rekruta | tw TaleWorlds.CampaignSystem.Issues/*.cs (RewardGold), sb SandBox.Issues/*.cs | 3 000 zl = 1 500 / 143 |
+| Karawana | koszt 15 000 / 22 500 (duza); dochod gracza w starym save 485/dzien | tw DefaultCaravanModel.cs:43-51; economy-...05-47-36.csv | 242 / 23 dziennie |
+| Warsztat | koszt = EquipmentCost + 4 x prosperity + InitialCapital/5; dochod mediana 475/dzien (34 rody), gracz 371 | tw DefaultWorkshopModel.cs:60-63; CSV | 185-237 / 18-23 dziennie |
+| Rada BK (Councillor role) | mediana 150-166/dzien, p90 209-512, max 1 000 | bk BKClanFinanceModel.cs:218-225; CSV oba save | 75-83 / 7-8 dziennie |
+| Kontrakt najemny | 1 080/dzien (jedyny przypadek w CSV) | CSV | 540 / 51 dziennie |
+| Sprzedaz jenca (zwykly) | 25% kosztu rekrutacji: koszt 10/20/50/100/200/400/600/1000 wg poziomu (+150 kon) -> looter 2, t3 ~12-15 (BK podloga 10 x zold) | tw DefaultRansomValueCalculationModel.cs:9-30; tw DefaultPartyWageModel.cs:215-231; bk BKPartyWageModel.cs:383 | 1-8 / 0.1-0.7 |
+| Okup lorda (RealisticCaptivity) | 8 000 / 25 000 / 100 000 | sekcja 2 | 4 000 / 381 (lord) |
+| Glowy bandytow | BRAK systemu nagrod w zainstalowanych modulach (grep "Bounty": tylko BK DefaultContractAspects) | - | - |
+| Kucie BK CRAFT | plyta t6 ~23 tys. rynek przy ~2.7 tys. surowca | AUDYT-DZIURY B3 | 10 000 / 1 000 |
+
+Mody "z praca" (BannerlordExpanded.SettlementInteractions, BasicOverhaul, Arena Overhaul, WealthyWorkshops,
+MinimalWorkshopIncome...) - maja tylko stare pliki w `Configs/ModSettings/Global`, **nie sa w Modules** -
+nie dzialaja. Zainstalowane dodatki z zarobkiem: GrandTourney, TournamentsXPanded (nie dekompilowany
+[NIESPRAWDZONE]), RealisticCaptivity (okupy, praca jenca), ROT (zaciag, pojedynki z zakladem
+rot ROTDuelsBehavior.cs:655-690).
+
+Ocena: gracz-wojownik zarabia w skali RYCERZA/BARONA od pierwszego tygodnia. Najtansza droga (arena 60 zl za
+godzine walki) = miesiac zoldu t1; pojedynczy quest 3 000 = 4 lata zoldu t1; karawana 485/dzien = dochod
+barona (200-500 L/rok ~ 130-330 d/dzien, sekcja 1.4). Historycznie najemnik 2-6 d/dzien, rycerz 24 d/dzien.
+Najblizej realiow jest zaciag ROT (rycerz-poziom 11 = 24 zl/dzien) - poza bledem mnozenia przez kompanow.
+
+## 9. DTE: zniszczenie sprzetu i amunicja (dekompilacja)
+
+Ustawienia gracza: obecny plik DTE to `Configs/ModSettings/Global/DynamicTroop/DynamicTroopSettings.json`
+(dte ModSettings.cs:12,16 - Id "DynamicTroopSettings", folder "DynamicTroop"): **DropRate 1.0**,
+ScrapCapPerCategory 600, Underequipped true. Plik `bannerlord.dynamictroop.json` (DropRate 0.5, 21.08)
+to stara wersja - nieuzywany.
+
+### 9.1 Bitwa osobista (dte DynamicTroopMissionLogic.cs)
+
+Dla KAZDEGO zwyklego zolnierza (nie bohatera), ktory padl ZABITY albo NIEPRZYTOMNY (`agentState 3/4`, :241;
+AgentState: Unconscious=3, Killed=4 - zweryfikowane w TaleWorlds.Core.dll), po obu stronach:
+1. **czesc trafiona ciosem** - losowana sposrod noszonych zbroi pokrywajacych trafiona czesc ciala,
+   z waga = wartosc pancerza tej czesci (:330, dte ArmorSelector.cs) - **zawsze niszczona**;
+2. **dodatkowa czesc** (losowa inna zbroja, bez uprzezy konskiej) - tylko gdy ofiara jest po stronie
+   PRZECIWNEJ graczowi; szansa wg tieru ofiary: t3 25%, t4 35%, t5 45%, t6+ 60%, t1-2 0% (:336-368);
+3. reszta (bron, tarcze cale, pozostale zbroje, kon) idzie do `ItemsToRecover` wlasnej partii, a z
+   szansa DropRate (u nas 1.0 = zawsze) TAKZE do lupu partii zabojcy (:376-394).
+Rozliczenie (:703-733): zwyciezca odzyskuje swoje + bierze lup; przegrany - nic (ani swoich, ani lupu);
+bitwa nierozstrzygnieta - kazdy odzyskuje swoje. Tarcza rozbita (HP 0) przepada (Global.cs:268).
+Uwaga: **ranni (nieprzytomni) tez traca czesc trafiona** - takze ludzie gracza.
+Skala: zolnierz nosi zwykle 3-5 zbroi + 2-4 bronie/tarcze/kolczany; strata 1 (swoi) albo 1-1.6 (wrog t3-t6)
+sztuki = ok. 12-25% sztuk z kazdej ofiary.
+
+Bitwa automatyczna z graczem (dte EveryoneCampaignBehavior.cs:571-725): dla zabitego/rannego przegranego
+tylko "dodatkowa czesc" wg tieru (:676-701, te same 25/35/45/60%), reszta z szansa DropRate do losowo
+wybranego zwyciezcy wg szans lupu (:712-724). Bitwy AI-AI: cala zbrojownia przegranych rozdana
+zwyciezcom (`DistributeLootRandomly`, :561) - AUDYT-DZIURY C5.
+Magazyn gracza: zlomowanie ponad 600 sztuk na kategorie (dte ArmyArmoryBehavior.cs:283).
+
+### 9.2 Nasze "wraki" - martwa funkcja
+
+BattlefieldLaw.cs:187-199 podpina sie pod `GetRandomArmorByBodyPart` i `OnAgentRemoved`, zapamietuje
+czesc z pkt 1 (tylko pkt 1 - "dodatkowa czesc" z pkt 2 ginie bez sladu) i dla zabojstw ludzi gracza
+wklada ja do worka (limit 400, :562-573). Przy oddaniu lupu `AppendWrecks` (:659-674) nadaje modyfikator
+Spoils `rl_looted_heavy_max` (WreckModifier, :576-586) - a ten ma `price_factor="0.03"`
+(Spoils of War/ModuleData/item_modifiers.xml:4-12). Prog zniszczenia `LootMinConditionPercent = 3`
+(Settings.cs:197), warunek `<=` (:668-669) -> **kazdy wrak jest zawsze kasowany**. Logi: 8 na 8 przypadkow
+"N wrakow ponizej progu zniszczenia - zostaly na polu" (41, 43, 74, 208, 400 x4) - ani jeden wrak nie
+dotarl do gracza. Funkcja WreckSalvage (Settings.cs:196) nic nie robi.
+
+### 9.3 Amunicja (strzaly, belty, oszczepy)
+
+- Vanilla: agent dostaje pelny kolczan co bitwe, kampania nie odejmuje nic.
+- DTE: przy pojawieniu sie zolnierza sprzet (z kolczanami) jest ZDEJMOWANY z magazynu - gracz
+  ArmyArmory.cs:236-261 (`AddToCounts -1`), AI przez distributor (dte Patches/SpawnAgentPatch.cs:127-134);
+  po bitwie wraca tylko to, co przeszlo filtr `Global.ProcessAgentEquipment` (Global.cs:257-273):
+  kolczan/belty/rzucane wracaja tylko, jesli NIE sa puste (`IsAmmoAndEmpty`, :276). Kolczan z 1 strzala
+  wraca pelny (magazyn nie pamieta liczby strzal).
+- CrashScribe Mends.QuiversComeBack (CrashScribe/src/Mends.cs:2510-2517, 4259-4269) - aktywne w sesji
+  09:00:57 (session log :162) - zmusza `IsAmmoAndEmpty` do false dla strzal i beltow. **Skutek: strzaly
+  i belty nie zuzywaja sie WCALE - ani u gracza, ani u AI w bitwach z graczem.** Przepadaja tylko
+  wyrzucone do zera oszczepy/toporki (galaz IsThrowing celowo nietknieta) i kolczany zabitych po
+  przegranej. Komunikat Mends "jedyna trwala strata to AmmoAttrition" jest nieaktualny - AmmoAttrition
+  usuniety 17.09 (ArmouryBehavior.cs:1243).
+- Uzupelnianie: gracz - recznie, wkladajac do zbrojowni; QuartermasterLaw.cs:14-22 broni zejscia ponizej
+  progow DTE (liczy kolczany per strzelec, :63-75, 350-360). AI - zakupy AiGear w miastach (AiGear.cs:100-107).
+  DTE doklada "extra arrows" lucznikom z nadwyzki magazynu (dte PartyEquipmentDistributor.cs:1041-1069).
+- AmmoTracer (log 03-04.10): wahania -96/-44/+44/+32 itp. - pobranie przy wejsciu w bitwe i zwrot po niej,
+  plus ruchy gracza; trwalego ubytku nie widac.
+
+## 10. Jedzenie
+
+- Zuzycie vanilla: `(ludzie + jency/2) / 20` jednostek dziennie (tw DefaultMobilePartyFoodConsumptionModel.cs,
+  `NumberOfMenOnMapToEatOneFood => 20`); BK: 20 + SlowerParties x 20, u Jeffa SlowerParties 0.0
+  (BannerKings.json) -> 20. ROT/BEE/NavalDLC/RBL przekazuja dalej; RBL dodaje lato (premia) i zime/zamiec/upal
+  (kara) - rbl RealisticFoodConsumptionModel.cs.
+- **Nasze Rations -40% raz** (Rations.cs:51-71, licznik zagniezdzenia :47-49; log 09:01:12: zalatane 5 modeli):
+  **0.03 jednostki na czlowieka dziennie**. Jednostka = 1 sztuka jedzenia = 10 kg (grain/fish/cheese/butter/
+  beer: weight 10, items-dump.csv) -> **0.3 kg/czlowieka/dzien** (vanilla 0.5 kg).
+- Konie: BK `CalculateAnimalFoodNeed` (kon 0.25, rumak 0.5, mul 0.15, krowa 0.175, swinia 0.1, owca 0.05
+  jednostki/dzien) liczone TYLKO na pustyni i (polowa) w sniegu (bk BKPartyConsumptionModel.cs) - poza tym
+  konie nie jedza.
+- Furaz: vanilla brak (tylko perk Foragers w lesie/stepie). Nasze ScorchedEarth: armia >= 100 ludzi przy
+  wrogiej wiosce (promien 3) zdejmuje paleniska i bierze `1 + ludzie/250` ziarna dziennie
+  (ScorchedEarth.cs:76, Settings.cs:311-314) - dla 500 ludzi 3 z 15 zjadanych jednostek.
+- W praktyce: 100 ludzi zjada 3 jednostki = 30 kg dziennie; sam ich udzwig (2 010 kg) miesci 200 jednostek
+  = **~66 dni jedzenia bez jednego zwierzecia**. 300 ludzi: 9 jednostek/dzien, udzwig 6 010 kg = 66 dni.
+- Historia (szacunki): racja 1.5-2 kg/dzien (chleb ~1 kg, piwo 3-4 l, mieso/ryba, groch) + obrok konia
+  5-10 kg (wypas latem). 100 ludzi = 150-200 kg/dzien = 5-7x wiecej niz w grze; zolnierz niosl 3-5 dni
+  zapasu, reszta jechala wozami albo z furazu. **W grze jedzenie jest 5-7x za lekkie, wiec udzwig nigdy nie
+  ogranicza - dlatego dzis wozy nie mialyby po co istniec.**
+
+---
+
+## Propozycje (uzupelnienie) - ranking wplyw / ryzyko
+
+1. **Wraki naprawde wracaja** (wplyw sredni, ryzyko b. male, jedna linia): wrak dostaje `rl_looted_heavy`
+   (8%) zamiast `rl_looted_heavy_max` (3%) w BattlefieldLaw.WreckModifier, albo prog porownuje `<` zamiast `<=`.
+   Dzis WreckSalvage jest martwe (9.2). Sprawdzic w logu: "BattlefieldLaw: N szt. ... (w tym M wrakow...)".
+2. **Blad zoldu zaciagu ROT x liczba bohaterow** (wplyw maly-sredni, ryzyko male): Postfix na
+   ROTClanFinanceModel.CalculateClanGoldChange zostawiajacy jeden wpis "Wages from". Najpierw zobaczyc
+   w grze dymek dochodu przy 2+ kompanach (dowod), dopiero potem latka.
+3. **Waga zbrojowni DTE** (wplyw duzy na logistyke, ryzyko srednie): doliczac do ciezaru partii gracza
+   np. 50% wagi magazynu DTE (Postfix CalculateTotalWeightCarried, osobny wpis "Army stores"). Bez tego ani
+   juczne, ani wozy nie maja sensu. Najpierw zmierzyc: ile kg ma dzis magazyn (log).
+4. **Amunicja zbierana przez zwyciezce** (wplyw sredni, ryzyko male): w QuiversComeBack przepuszczac pusty
+   kolczan tylko stronie wygranej; przegrany traci puste. To jest "ubywa tylko w polu" z 17.09.
+5. **Wozy** (wplyw duzy na realizm, ryzyko srednie; dopiero po pkt 3) - projekt ponizej.
+6. **Racje realniejsze** (wplyw sredni, ryzyko srednie - glod AI): jednostka jedzenia na 3-4 dni czlowieka
+   zamiast 33 - dopiero gdy wozy i waga magazynu beda; dzis podniesienie zuzycia = glodujace armie AI.
+7. Nagrody questow/areny do skali zoldu - dopiero po cenach uzbrojenia (sekcja 2, AUDYT-CEN).
+
+### Projekt wozow (szkic, liczby do strojenia)
+
+**Przedmioty** (nowe XML w Armoury/ModuleData, typ Goods, nowa kategoria `arm_cart`, sprzedawane w miastach;
+NIE jako HorseComponent - bez flag bylyby "bydlem", liczylyby sie do stada i do jedzenia z miesa):
+
+| id | nazwa (EN) | udzwig | zaprzeg | waga wlasna | cena gry | historia (SZACUNEK) |
+|---|---|---|---|---|---|---|
+| arm_cart | Two-wheeled Cart | +600 kg | 2 zwierzeta pociagowe | 150 kg | 80 | carecta 5-8 s = 60-96 d (zakres 3-10 s) |
+| arm_wain | Four-wheeled Wain | +1 400 kg | 4 zwierzeta (woly lub konie) | 400 kg | 300 | wain/plaustrum 15-40 s = 180-480 d |
+
+- **Zwierzeta pociagowe** = istniejace juczne: sumpter_horse, old_horse (Work Horse), mule, ox (BK).
+  Ceny gry: kon roboczy 99 (historycznie affer 3-10 s = 36-120 d - OK); wol BK 300 (historycznie 10-13 s =
+  120-156 d - za drogi x2, propozycja 150). Wozak historycznie 2 d/dzien; wynajem wozu z 3-4 konmi
+  i wozakiem 12-24 d/dzien (szacunek) - w grze bez zoldu wozaka (woz prowadzi dowolny zolnierz).
+- Zwierze w zaprzegu NIE daje swoich 100 kg i NIE liczy sie do stada (ciagnie, nie niesie): netto woz
+  +400 kg za 2 konie (vs 200 kg jako juczne), wain +1 000 kg za 4 zwierzeta. To oddaje historie (kon w wozie
+  ciagnie 2-3x tyle, ile uniesie na grzbiecie).
+- Woz bez zaprzegu = martwy ladunek (wazy 150/400 kg). Waga wozu z zaprzegiem = 0 (Postfix
+  GetItemEffectiveWeight dla kategorii arm_cart, jak vanilla robi z konmi).
+- Realizacja: Postfix na NAJBARDZIEJ ZEWNETRZNYM CalculateInventoryCapacity (z licznikiem zagniezdzenia jak
+  Rations/SpeedDepth - NavalDLC owija vanille, BK patchuje vanille) dodajacy wpis "Carts". Bez nowego modelu.
+- **Predkosc**: woz zawsze = tabor dla MarchPace (sufit MarchTrainPace 4.2 -> 2.1, niezaleznie od
+  MarchPackAllowance); wain z wolami: sufit 0.85 x tempo piechura (woly 15-20 km/dzien vs ludzie 25-30).
+  Teren (plasko, styl TerrainEase, tylko gdy wozy > 0): las -0.15, gory/wzgorza -0.3, snieg -0.2, brod -0.3;
+  drogi/rownina 0. Bloto jesienne juz daje RBL wszystkim.
+- Utrata: zwykly przedmiot w ItemRoster -> po przegranej trafia do zwyciezcy jak lup vanilla.
+- AI: na start TYLKO gracz. AI dopiero gdy pkt 3 (waga magazynu) obejmie AI; wtedy AiGear kupuje 1 woz na
+  60 ludzi w miescie.
+
+**Wizual na mapie**:
+- A (najlepsze, do sprawdzenia w grze): raz przy zmianie stanu (wozy 0 <-> >0, NIGDY co klatke - pulapka
+  z CLAUDE.md) doczepic prefab `map_icons_props_cart_b_full` (Native/Prefabs/map_icon_parts.xml:1257-1260,
+  meta-mesh `mi_cart_b_full`) jako dziecko encji partii. Siatka jest w skali mapy, ale statyczna (bez kol
+  i koni); skala i obrot wzgledem ikony partii NIESPRAWDZONE.
+- B (bezpieczny zapas): drugie zwierze ikony jak u karawan - Postfix na
+  `PartyComponent.GetMountAndHarnessVisualIdsForPartyIcon` (tw PartyComponent.cs:102-106; lordowie nie
+  nadpisuja) zwracajacy `mule` + `mule_load_c` (wzor: CaravanPartyComponent.cs:281-292). Wolane tylko przy
+  przebudowie ikony - bez ryzyka "co klatke". Nie woz, ale widac tabor.
+- C: ROT `cart_village_animated_a` (animowany woz z krowa, ROT-Map/Prefabs/Mystaf_Outside.xml:19115) -
+  dekoracja mapy, doczepienie do partii niesprawdzone.
+- Ikona w ekwipunku: meta-mesh `bd_cart_a` (sceny Native) - czy renderuje sie jako ikona przedmiotu,
+  NIESPRAWDZONE.

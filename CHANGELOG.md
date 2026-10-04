@@ -1,5 +1,11 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-04 (37) - WRAKI z pobojowiska znowu dochodza (stan 8% zamiast 3%)
+**Mod:** Armoury | **Pliki:** `BattlefieldLaw.cs` (`WreckModifier`)
+**Problem (docs/AUDYT-WOJNA-LOGISTYKA.md):** wrak dostawal modyfikator Spoils `rl_looted_heavy_max` (price_factor 0.03), a prog zniszczenia (`LootMinConditionPercent` 3, Jeff 28.08: "<=3% = zniszczone") kasowal kazdy taki wrak - odzysk wrakow byl martwa funkcja (w logach 8 na 8 razy "zostaly na polu").
+**Zmiana:** wrak dostaje najpierw `rl_looted_heavy` (8% - ciezko uszkodzony, do przetopu), `heavy_max` tylko gdy tamtego brak. Prog zniszczenia Jeffa bez zmian.
+**Status:** WGRANE 2026-10-04 (Armoury.dll md5 effaee42da06888d4f68d7b5e49d20c0, build rc=0, gra zamknieta; poprzednie DLL obok jako `Armoury.dll.bak-2026-10-04-przed-wrakami`). Na obecnym save.
+
 ## 2026-10-04 (36) - POPRAWKI PO PONOWNYM AUDYCIE: odwrotny arbitraz w handlu, renty miast z nadwyzki, zloto kryjowki przy przeszukaniu, bank nie dobiera przed terminem
 **Mod:** Armoury | **Pliki:** `SupplyDemand.cs` (`Stock` z kierunkiem), `PopulationLaw.cs` (renta miasta), `HideoutPurge.cs` (`_pendingHideout`, `DoSearch`), `IronBank.cs` (`Lend`), `Settings.cs` + `McmSettings.cs` (`IronBankMinDaysToLend` 30)
 **Problem (docs/AUDYT-PONOWNY.md K1, K2, W5, W6):** K1 - zamrozona polka (wpis 31) otworzyla odwrotny arbitraz: wlasny wykup nie podnosil ceny, wiec mozna bylo tanio wykupic polke, zamknac i otworzyc ekran, i sprzedac drozej. K2 - gra trzyma kase miasta przy celu 10000 + 12 x dobrobyt (`DefaultSettlementEconomyModel.GetTownGoldChange`, 25% roznicy dziennie w obie strony), wiec renta zabrana z kasy wracala nastepnego dnia z niczego. W5 - zloto kryjowki zdejmowane przy zwyciestwie przepadalo przy odejsciu bez przeszukania. W6 - pozyczka dobrana tuz przed terminem dawala skok raty (np. 1/3 dlugu dziennie) - lawina bankructw AI.
