@@ -1,5 +1,12 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-04 (36) - POPRAWKI PO PONOWNYM AUDYCIE: odwrotny arbitraz w handlu, renty miast z nadwyzki, zloto kryjowki przy przeszukaniu, bank nie dobiera przed terminem
+**Mod:** Armoury | **Pliki:** `SupplyDemand.cs` (`Stock` z kierunkiem), `PopulationLaw.cs` (renta miasta), `HideoutPurge.cs` (`_pendingHideout`, `DoSearch`), `IronBank.cs` (`Lend`), `Settings.cs` + `McmSettings.cs` (`IronBankMinDaysToLend` 30)
+**Problem (docs/AUDYT-PONOWNY.md K1, K2, W5, W6):** K1 - zamrozona polka (wpis 31) otworzyla odwrotny arbitraz: wlasny wykup nie podnosil ceny, wiec mozna bylo tanio wykupic polke, zamknac i otworzyc ekran, i sprzedac drozej. K2 - gra trzyma kase miasta przy celu 10000 + 12 x dobrobyt (`DefaultSettlementEconomyModel.GetTownGoldChange`, 25% roznicy dziennie w obie strony), wiec renta zabrana z kasy wracala nastepnego dnia z niczego. W5 - zloto kryjowki zdejmowane przy zwyciestwie przepadalo przy odejsciu bez przeszukania. W6 - pozyczka dobrana tuz przed terminem dawala skok raty (np. 1/3 dlugu dziennie) - lawina bankructw AI.
+**Zmiana:** K1 - w ekranie handlu kupno liczy zapas jako min(stan z otwarcia, zywy), sprzedaz jako max: wlasne transakcje gracza tylko pogarszaja jego cene. K2 - renta z miasta tylko z nadwyzki ponad cel gry (i tak by przepadla), cala; wies jak dotad (polowa kasy). W5 - zloto kryjowki zdejmowane dopiero przy przeszukaniu. W6 - Bank nie pozycza rodowi, ktoremu do terminu zostalo mniej niz `IronBankMinDaysToLend` (30) dni.
+**Ryzyko:** renty z miast beda male, gdy miasta nie maja nadwyzki - linia `Ludnosc:` pokaze zaplacone/nalezne.
+**Status:** WGRANE 2026-10-04 (Armoury.dll md5 5fa5712fa02e54bac766d386d8e68142, build rc=0, gra zamknieta; poprzednie DLL obok jako `Armoury.dll.bak-2026-10-04-przed-audytem2`). Na obecnym save.
+
 ## 2026-10-04 (35) - OKUP przez EKRAN DRUZYNY: nadwyzke ponad cene gry tez placi rod jenca
 **Mod:** RealisticCaptivity | **Pliki:** `FairRansom.cs` (NOWE `SalePostfix`, flaga `_vanillaOnly`)
 **Problem (ponowny audyt W1, docs/AUDYT-PONOWNY.md):** wpis 32 potracal nadwyzke tylko na sciezce posrednika (`applyConsequences=true`). Glowna sciezka - ekran wyboru jencow do okupu (`PartyScreenLogic` -> `SellPrisonersAction.ApplyByPartyScreen`, `applyConsequences=false`) - placi zloto wedle naszej wyceny w logice ekranu, a w akcji cena nie jest liczona, wiec rod nie byl obciazany: nadwyzka dalej z niczego.

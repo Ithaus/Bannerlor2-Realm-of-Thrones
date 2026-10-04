@@ -37,6 +37,7 @@ namespace Armoury
         private static string _pendingName = "";
         private static CampaignVec2 _pendingPos;
         private static bool _pendingHasPos;   // bez osady nie ma okregu wdziecznosci
+        private static Settlement _pendingHideout;   // kryjowka do przeszukania - jej kasa schodzi dopiero przy przeszukaniu
         // odwet: bandom odnawiamy rozkaz pogoni, bo AI co chwile przemysliwa
         private static readonly System.Collections.Generic.List<MobileParty> _reprisalPack =
             new System.Collections.Generic.List<MobileParty>();
@@ -83,16 +84,11 @@ namespace Armoury
                 _pendingBands = bands;
                 // AUDYT 04.10 (C6): lup to PRAWDZIWA kasa i magazyn kryjowki (vanilla odklada tam 25% wartosci
                 // lupow band - BanditSpawnCampaignBehavior.OnSettlementEntered), nie zloto i zelastwo z niczego.
+                // audyt ponowny W5: zloto zdejmowane dopiero przy PRZESZUKANIU (DoSearch) - odejscie bez przeszukania
+                // zostawia je w kryjowce, zamiast kasowac
+                _pendingHideout = sett;
                 _pendingGold = 0;
-                try
-                {
-                    if (sett != null && sett.SettlementComponent != null && sett.SettlementComponent.Gold > 0)
-                    {
-                        _pendingGold = sett.SettlementComponent.Gold;
-                        sett.SettlementComponent.ChangeGold(-_pendingGold);
-                    }
-                }
-                catch { }
+                try { if (sett != null && sett.SettlementComponent != null) _pendingGold = Math.Max(0, sett.SettlementComponent.Gold); } catch { }
                 _pending = true;
                 BuildLoot(sett);
                 Log.Info("HideoutPurge: zwyciestwo w " + _pendingName + ", band " + bands + ", lup " + _pendingGold + " zlota czeka na przeszukanie.");
@@ -482,6 +478,14 @@ namespace Armoury
             {
                 var c = Settings.Current;
                 _pending = false;   // lup zebrany - koniec sprawy
+                try
+                {
+                    var hs = _pendingHideout;
+                    _pendingGold = hs != null && hs.SettlementComponent != null ? Math.Max(0, hs.SettlementComponent.Gold) : 0;
+                    if (_pendingGold > 0) hs.SettlementComponent.ChangeGold(-_pendingGold);
+                }
+                catch { _pendingGold = 0; }
+                _pendingHideout = null;
                 if (_pendingGold > 0)
                 {
                     Hero.MainHero.ChangeHeroGold(_pendingGold);

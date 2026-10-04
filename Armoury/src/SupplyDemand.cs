@@ -170,7 +170,7 @@ namespace Armoury
         }
 
         /// <summary>Ile sztuk tego koszyka lezy na polce.</summary>
-        internal static int Stock(ItemRoster shelf, ItemObject it)
+        internal static int Stock(ItemRoster shelf, ItemObject it, int dir = 0)
         {
             int n = 0;
             if (shelf == null) return 0;
@@ -182,15 +182,18 @@ namespace Armoury
                 var el = shelf.GetElementCopyAtIndex(i);
                 if (el.Amount > 0 && SameBucket(el.EquipmentElement.Item, it)) n += el.Amount;
             }
-            // sprzedaz gracza podnosi zapas (cena spada z kazda sztuka), zakup w tym samym ekranie go NIE obniza
-            return frozen >= 0 ? Math.Max(frozen, n) : n;
+            // Audyt ponowny K1: wlasne transakcje gracza w ekranie handlu tylko mu szkodza:
+            // sprzedaz (dir +1) - wiekszy zapas (cena spada z kazda sprzedana sztuka, wlasny wykup jej nie podnosi);
+            // kupno (dir -1) - mniejszy zapas (cena rosnie z kazda kupiona sztuka, wlasna sprzedaz jej nie obniza).
+            if (frozen < 0 || dir == 0) return n;
+            return dir > 0 ? Math.Max(frozen, n) : Math.Min(frozen, n);
         }
 
         internal static float Factor(Settlement st, ItemObject it, bool isSelling, out float d, out int s)
         {
             var c = Settings.Current;
             d = Demand(st, it) + Substitution(st, it);
-            s = Stock(st.ItemRoster, it) + (isSelling ? 1 : 0);
+            s = Stock(st.ItemRoster, it, isSelling ? 1 : -1) + (isSelling ? 1 : 0);
             float f = (float)Math.Pow((d + 1f) / (s + 1f), MBMath.ClampFloat(c.SupplyDemandElasticity, 0.05f, 2f));
             float lo = MBMath.ClampFloat(c.SupplyDemandMinFactor, 0.01f, 1f);
             float hi = Math.Max(1f, c.SupplyDemandMaxFactor);

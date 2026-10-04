@@ -158,7 +158,11 @@ namespace Armoury
                         var lord = st.OwnerClan != null ? st.OwnerClan.Leader : null;
                         if (lord == null || !lord.IsAlive) continue;
                         int gold = st.SettlementComponent != null ? st.SettlementComponent.Gold : 0;
-                        int pay = (int)Math.Min(rent, gold * share);
+                        // Audyt ponowny K2: gra trzyma kase miasta przy celu 10000 + 12 x dobrobyt (DefaultSettlementEconomyModel
+                        // .GetTownGoldChange: 25% roznicy dziennie - dosypuje z niczego albo kasuje w nicosc). Renta z miasta tylko
+                        // z NADWYZKI ponad cel - ta i tak by przepadla; dosypka z niczego sie przez nas nie uruchamia.
+                        if (st.IsTown && st.Town != null) gold = Math.Max(0, gold - (int)(10000f + st.Town.Prosperity * 12f));
+                        int pay = (int)Math.Min(rent, gold * (st.IsTown ? 1f : share));
                         if (pay <= 0) continue;
                         GiveGoldAction.ApplyForSettlementToCharacter(st, lord, pay, true);
                         paid.TryGetValue(c, out v); paid[c] = v + pay;

@@ -158,6 +158,9 @@ namespace Armoury
                 // dlugu (rolowanie w nieskonczonosc, AI tez).
                 double fee = amount * Math.Max(0f, Settings.Current.IronBankLoanFeePercent) / 100.0;
                 bool running = d.Principal > 1;
+                int today0 = (int)CampaignTime.Now.ToDays;
+                // audyt ponowny W6: tuz przed terminem Bank nie dobiera - inaczej rata skacze (np. 1/3 dlugu dziennie)
+                if (running && d.DueDay > today0 && d.DueDay - today0 < Math.Max(0, Settings.Current.IronBankMinDaysToLend)) return 0;
                 d.Rate = running ? (d.Rate * d.Principal + rate * amount) / (d.Principal + amount) : rate;
                 d.Principal += amount + fee;
                 d.Loans++;
