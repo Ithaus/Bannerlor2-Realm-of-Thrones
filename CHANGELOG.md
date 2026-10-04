@@ -1,5 +1,11 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-04 (35) - OKUP przez EKRAN DRUZYNY: nadwyzke ponad cene gry tez placi rod jenca
+**Mod:** RealisticCaptivity | **Pliki:** `FairRansom.cs` (NOWE `SalePostfix`, flaga `_vanillaOnly`)
+**Problem (ponowny audyt W1, docs/AUDYT-PONOWNY.md):** wpis 32 potracal nadwyzke tylko na sciezce posrednika (`applyConsequences=true`). Glowna sciezka - ekran wyboru jencow do okupu (`PartyScreenLogic` -> `SellPrisonersAction.ApplyByPartyScreen`, `applyConsequences=false`) - placi zloto wedle naszej wyceny w logice ekranu, a w akcji cena nie jest liczona, wiec rod nie byl obciazany: nadwyzka dalej z niczego.
+**Zmiana:** postfix na `SellPrisonersAction.ApplyInternal` dla sprzedazy gracza z `applyConsequences=false`: dla kazdego lorda liczy cene gry (flaga `_vanillaOnly` wylacza nasza wycene) i nasza; roznice (najwyzej zloto glowy rodu) zdejmuje z kiesy glowy rodu. Sciezka posrednika bez zmian (tam potraca `LordPrice`) - bez podwojnego pobrania. Log: `Okup lorda (ekran druzyny): rod X placi Y ponad cene gry Z`.
+**Status:** WGRANE 2026-10-04 (RealisticCaptivity.dll md5 c6fd105527b3e5701aae3882ba9e38af, build rc=0, gra zamknieta; poprzednie DLL obok jako `RealisticCaptivity.dll.bak-2026-10-04-przed-okupem-ekran`). Na obecnym save.
+
 ## 2026-10-04 (34) - DROBNE WYCIEKI: kowal, kuznia, stajnie, kryjowki - zloto i towar od kogos do kogos
 **Mod:** Armoury | **Pliki:** NOWY `Pay.cs`; `SmithMenu.cs` (oplaty, naprawy, `DoOrderKit`), `Forge.cs` (oplata kuzni), `Stables.cs` (hodowca), `HideoutPurge.cs` (lup, scalanie)
 **Problem (audyt dziur C1, C2, C6):** oplaty kowala, naprawy i kuzni gracza szly `GiveGoldAction(gracz, null)` - w nicosc; zamowienie kompletu u kowala tworzylo przedmioty z niczego; hodowca w stajni AI dawal konia z niczego, gdy targ pusty; kryjowka dawala 150 + 120 zl za bande i 3+ losowe przedmioty z niczego; scalane bandy tracily zloto.

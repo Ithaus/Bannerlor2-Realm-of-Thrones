@@ -73,6 +73,7 @@ namespace RealisticCaptivity
             try
             {
                 var s = Settings.Current;
+                if (_vanillaOnly) return;                                     // liczymy cene gry (do potracenia nadwyzki)
                 if (s == null || !s.LordRansomByRank || h == null || h == Hero.MainHero) return;
                 var clan = h.Clan;
                 if (clan == null || clan == Clan.PlayerClan || clan.IsBanditFaction) return;
@@ -152,6 +153,37 @@ namespace RealisticCaptivity
         [ThreadStatic] internal static bool _inSale;
         public static void SalePrefix() { _inSale = true; }
         public static Exception SaleFinalizer(Exception __exception) { _inSale = false; return __exception; }
+        [ThreadStatic] internal static bool _vanillaOnly;
+
+        /// <summary>Ekran druzyny (ApplyByPartyScreen, applyConsequences=false): zloto placi PartyScreenLogic wedle
+        /// naszej wyceny, a tu cena nie jest liczona - wiec nadwyzke ponad cene gry zdejmujemy z kiesy rodu tutaj.
+        /// Sciezka posrednika (applyConsequences=true) potraca juz w LordPrice - tu jej nie ruszamy (bez podwojnego pobrania).</summary>
+        public static void SalePostfix(TaleWorlds.CampaignSystem.Party.PartyBase __0, TaleWorlds.CampaignSystem.Roster.TroopRoster __2, bool __3)
+        {
+            _inSale = false;
+            try
+            {
+                if (__3 || __0 != TaleWorlds.CampaignSystem.Party.PartyBase.MainParty || __2 == null) return;
+                var model = Campaign.Current.Models.RansomValueCalculationModel;
+                foreach (var el in __2.GetTroopRoster())
+                {
+                    var ch = el.Character;
+                    if (ch == null || !ch.IsHero || ch.HeroObject == null || ch.HeroObject == Hero.MainHero) continue;
+                    var h = ch.HeroObject;
+                    var payer = h.Clan != null ? h.Clan.Leader : null;
+                    if (payer == null) continue;
+                    int vanilla, ours;
+                    _vanillaOnly = true;
+                    try { vanilla = model.PrisonerRansomValue(ch, Hero.MainHero); } finally { _vanillaOnly = false; }
+                    ours = model.PrisonerRansomValue(ch, Hero.MainHero);
+                    int extra = Math.Min(ours - vanilla, Math.Max(0, payer.Gold));
+                    if (extra <= 0) continue;
+                    payer.ChangeHeroGold(-extra);
+                    Log.Info("Okup lorda (ekran druzyny): rod " + h.Clan.Name + " placi " + extra + " ponad cene gry " + vanilla + " za " + h.Name + ".");
+                }
+            }
+            catch (Exception e) { Log.Error("FairRansom.SalePostfix", e); }
+        }
 
         internal static void ApplyAll(Harmony harmony)
         {
@@ -186,7 +218,7 @@ namespace RealisticCaptivity
                 try
                 {
                     var sell = AccessTools.Method(typeof(TaleWorlds.CampaignSystem.Actions.SellPrisonersAction), "ApplyInternal");
-                    if (sell != null) harmony.Patch(sell, prefix: new HarmonyMethod(typeof(FairRansomPatch), nameof(SalePrefix)), finalizer: new HarmonyMethod(typeof(FairRansomPatch), nameof(SaleFinalizer)));
+                    if (sell != null) harmony.Patch(sell, prefix: new HarmonyMethod(typeof(FairRansomPatch), nameof(SalePrefix)), postfix: new HarmonyMethod(typeof(FairRansomPatch), nameof(SalePostfix)), finalizer: new HarmonyMethod(typeof(FairRansomPatch), nameof(SaleFinalizer)));
                 }
                 catch (Exception e) { Log.Error("FairRansom.SellHook", e); }
                 Log.Info("FairRansom: cena szeregowego jenca ma podloge (broker rate) w " + done + " modelach.");
