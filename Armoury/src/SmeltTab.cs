@@ -47,6 +47,8 @@ namespace Armoury
             catch { return false; }
         }
 
+        private static readonly HashSet<string> _capLogged = new HashSet<string>();
+
         /// <summary>Odzysk wedle naszej receptury - ten sam co w starym tyglu.</summary>
         internal static List<Recipes.Part> YieldFor(ItemObject it)
         {
@@ -54,7 +56,40 @@ namespace Armoury
             var r = Recipes.For(it);
             int skill = Hero.MainHero.GetSkillValue(DefaultSkills.Crafting);
             float share = MathF.Min(0.9f, s.SmeltingReturnShare + skill * s.SmeltingSkillBonus);
-            return Recipes.SmeltYield(r, share);
+            var y = Recipes.SmeltYield(r, share);
+            // PETLA "METAL Z NICZEGO" (audyt 04.10, docs/AUDYT-PRODUKCJI-MODY.md): kucie w CRAFT BK
+            // liczy metal z punktow ochrony (Recipes.ArmourUnits), a przetop z WAGI (Recipes.For) -
+            // korpus t5 18 kg: wykucie 10 Fine + 1 Steel, przetop 14 Fine + 4 Steel, kazdy cykl na plus.
+            // Przetop nie odda wiecej metalu niz ulamek KOSZTU WYKUCIA tej samej sztuki.
+            try
+            {
+                if (s.SmeltCapToCraftCost)
+                {
+                    int u = Recipes.ArmourUnits(it);
+                    if (u > 0)
+                    {
+                        int total = 0; foreach (var p in y) total += p.Count;
+                        int cap = Math.Max(1, (int)(u * MathF.Min(share, 0.5f)));
+                        if (total > cap)
+                        {
+                            var capped = new List<Recipes.Part>();
+                            int left = cap;
+                            foreach (var p in y)
+                            {
+                                if (left <= 0) break;
+                                int n = Math.Max(1, (int)Math.Floor(p.Count * (double)cap / total));
+                                if (n > left) n = left;
+                                capped.Add(new Recipes.Part(p.Item, n));
+                                left -= n;
+                            }
+                            if (_capLogged.Add(it.StringId ?? "")) Log.Info("SmeltTab: przetop " + it.StringId + " przyciety do kosztu wykucia: " + total + " -> " + (cap - left) + " szt. metalu (wykucie " + u + ").");
+                            y = capped;
+                        }
+                    }
+                }
+            }
+            catch (Exception e) { Log.Error("SmeltTab.Cap", e); }
+            return y;
         }
 
         private static int MaterialIndex(ItemObject mat)

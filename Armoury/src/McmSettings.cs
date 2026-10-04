@@ -1096,6 +1096,130 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public float MarchPackAllowance { get; set; } = 0.25f;
 
+        [SettingPropertyBool("Material Law Enabled", HintText = "charcoal and iron bars get honest prices and honest smelting: a load of wood gives a few sacks of charcoal, a bloomery eats charcoal by the sackful, each finer grade of steel loses metal")]
+        [SettingPropertyGroup("Smithing materials")]
+        public bool MaterialLawEnabled { get; set; } = true;
+
+        [SettingPropertyBool("Real Refining Enabled", HintText = "refining recipes follow the bloomery: 1 wood -> 4 charcoal, 1 ore + charcoal -> 3 crude iron, 3 bars + charcoal -> 2 bars of the next grade (perks still gate the steels)")]
+        [SettingPropertyGroup("Smithing materials")]
+        public bool RealRefiningEnabled { get; set; } = true;
+
+        [SettingPropertyInteger("Bloomery Charcoal Per Ore", 0, 80, "0", HintText = "charcoal (0.5 kg each) a bloomery burns for one load of ore (10 kg) - about a kilo of charcoal per kilo of ore")]
+        [SettingPropertyGroup("Smithing materials")]
+        public int BloomeryCharcoalPerOre { get; set; } = 20;
+
+        [SettingPropertyInteger("Charcoal Value", 0, 36, "0", HintText = "worth of one charcoal (0.5 kg): a quarter of a load of wood plus the burner's work")]
+        [SettingPropertyGroup("Smithing materials")]
+        public int CharcoalValue { get; set; } = 9;
+
+        [SettingPropertyInteger("Crude Iron Value", 0, 348, "0", HintText = "worth of one bar of crude iron (0.5 kg), costed from ore and charcoal")]
+        [SettingPropertyGroup("Smithing materials")]
+        public int CrudeIronValue { get; set; } = 87;
+
+        [SettingPropertyInteger("Wrought Iron Value", 0, 600, "0", HintText = "worth of one bar of wrought iron (0.5 kg)")]
+        [SettingPropertyGroup("Smithing materials")]
+        public int WroughtIronValue { get; set; } = 150;
+
+        [SettingPropertyInteger("Iron Value", 0, 980, "0", HintText = "worth of one bar of iron (0.5 kg)")]
+        [SettingPropertyGroup("Smithing materials")]
+        public int IronValue { get; set; } = 245;
+
+        [SettingPropertyInteger("Steel Value", 0, 1580, "0", HintText = "worth of one bar of steel (0.5 kg)")]
+        [SettingPropertyGroup("Smithing materials")]
+        public int SteelValue { get; set; } = 395;
+
+        [SettingPropertyInteger("Fine Steel Value", 0, 2520, "0", HintText = "worth of one bar of fine steel (0.5 kg)")]
+        [SettingPropertyGroup("Smithing materials")]
+        public int FineSteelValue { get; set; } = 630;
+
+        [SettingPropertyInteger("Valyrian Steel Value", 0, 4000, "0", HintText = "worth of one bar of Valyrian steel (0.5 kg)")]
+        [SettingPropertyGroup("Smithing materials")]
+        public int ValyrianSteelValue { get; set; } = 1000;
+
+        [SettingPropertyFloatingInteger("Mine Output Multiplier", 0.00f, 12.00f, "0.00", HintText = "iron mines dig this many times the old output - the workshops of the realm were starving for ore")]
+        [SettingPropertyGroup("Smithing materials")]
+        public float MineOutputMultiplier { get; set; } = 3f;
+
+        [SettingPropertyFloatingInteger("Lumber Output Multiplier", 0.00f, 6.00f, "0.00", HintText = "woodcutters fell this many times the old output - charcoal burners need wood by the cartload")]
+        [SettingPropertyGroup("Smithing materials")]
+        public float LumberOutputMultiplier { get; set; } = 1.5f;
+
+        [SettingPropertyBool("Smelt Cap To Craft Cost", HintText = "melting a piece down never gives back more metal than a share of what forging it costs - no metal out of thin air")]
+        [SettingPropertyGroup("Smithing materials")]
+        public bool SmeltCapToCraftCost { get; set; } = true;
+
+        [SettingPropertyBool("Arms Cost Pricing Enabled", HintText = "every piece of arms and armour is priced from what it costs to make - its weight, its metal, its leather and cloth, the days at the anvil and how well it protects; unique pieces keep the price of their fame")]
+        [SettingPropertyGroup("Arms pricing")]
+        public bool ArmsCostPricingEnabled { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Arms Price Band", 0.00f, 8.00f, "0.00", HintText = "how far the market price may stray from the cost of making it (1 = price is the cost, 2 = between half and double, higher = closer to the old prices)")]
+        [SettingPropertyGroup("Arms pricing")]
+        public float ArmsPriceBand { get; set; } = 2f;
+
+        [SettingPropertyFloatingInteger("Smith Day Wage", 0.00f, 40.00f, "0.00", HintText = "what a day of a master smith and his helper costs, in the price of a piece")]
+        [SettingPropertyGroup("Arms pricing")]
+        public float SmithDayWage { get; set; } = 10f;
+
+        [SettingPropertyFloatingInteger("Smith Profit Percent", 0.00f, 100.00f, "0.00", HintText = "the workshop's profit on top of materials and labour")]
+        [SettingPropertyGroup("Arms pricing")]
+        public float SmithProfitPercent { get; set; } = 25f;
+
+        [SettingPropertyBool("Material Index Enabled", HintText = "the market prices by the cost of making it AGAIN: dear ore and wood make armour dear, even the pieces already on the stall")]
+        [SettingPropertyGroup("Arms pricing")]
+        public bool MaterialIndexEnabled { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Material Index Inertia", 0.00f, 1.00f, "0.00", HintText = "share of the gap to today's material prices the market closes each day - prices drift, they do not jump")]
+        [SettingPropertyGroup("Arms pricing")]
+        public float MaterialIndexInertia { get; set; } = 0.25f;
+
+        [SettingPropertyBool("War Expectation Enabled", HintText = "when war is declared, traders on both sides expect armies to buy and raise their asking prices before the first lord arrives")]
+        [SettingPropertyGroup("Arms pricing")]
+        public bool WarExpectationEnabled { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("War Expectation Base", 0.00f, 2.00f, "0.00", HintText = "extra demand expected at the declaration of war, scaled by the enemy's strength against ours (0.5x to 2x)")]
+        [SettingPropertyGroup("Arms pricing")]
+        public float WarExpectationBase { get; set; } = 0.5f;
+
+        [SettingPropertyFloatingInteger("War Expectation Days", 0.00f, 60.00f, "0.00", HintText = "days over which the traders' expectation fades unless real purchases bear it out")]
+        [SettingPropertyGroup("Arms pricing")]
+        public float WarExpectationDays { get; set; } = 15f;
+
+        [SettingPropertyBool("Substitution Enabled", HintText = "when no piece of the better tier is on the stall, buyers settle for the tier below")]
+        [SettingPropertyGroup("Arms pricing")]
+        public bool SubstitutionEnabled { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Substitution Share", 0.00f, 1.20f, "0.00", HintText = "share of the missing tier's demand that falls to the tier below")]
+        [SettingPropertyGroup("Arms pricing")]
+        public float SubstitutionShare { get; set; } = 0.3f;
+
+        [SettingPropertyFloatingInteger("Trade Transport Percent Per100", 0.00f, 20.00f, "0.00", HintText = "hauling costs this % of a piece's worth per 100 leagues - traders carry goods only where the price difference pays for the road")]
+        [SettingPropertyGroup("Arms pricing")]
+        public float TradeTransportPercentPer100 { get; set; } = 5f;
+
+        [SettingPropertyBool("Ai Buys Gear", HintText = "AI lords buy their soldiers' arms and armour on the market with their own gold - no more free gear from the quartermaster's hat, no more gold for sweeping the baggage into the armoury")]
+        [SettingPropertyGroup("Army purchases")]
+        public bool AiBuysGear { get; set; } = true;
+
+        [SettingPropertyBool("Ai Recruits Bring Kit", HintText = "a fresh recruit still arrives with his own kit (levies came armed); turn off and lords must buy for every new man")]
+        [SettingPropertyGroup("Army purchases")]
+        public bool AiRecruitsBringKit { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Ai Gear Budget Percent", 0.00f, 100.00f, "0.00", HintText = "share of a lord's gold (above the reserve) he is willing to spend on gear in one visit to a town")]
+        [SettingPropertyGroup("Army purchases")]
+        public float AiGearBudgetPercent { get; set; } = 25f;
+
+        [SettingPropertyInteger("Ai Gear Gold Reserve", 0, 8000, "0", HintText = "gold a lord always keeps back - wages come first")]
+        [SettingPropertyGroup("Army purchases")]
+        public int AiGearGoldReserve { get; set; } = 2000;
+
+        [SettingPropertyInteger("Ai Gear Max Pieces Per Visit", 0, 240, "0", HintText = "most pieces a lord buys in one visit")]
+        [SettingPropertyGroup("Army purchases")]
+        public int AiGearMaxPiecesPerVisit { get; set; } = 60;
+
+        [SettingPropertyInteger("Ai Gear Log Per Day", 0, 60, "0", HintText = "how many lords' purchases are written to the log each day (the daily total is always written)")]
+        [SettingPropertyGroup("Army purchases")]
+        public int AiGearLogPerDay { get; set; } = 15;
+
         [SettingPropertyBool("Supply Demand Enabled", HintText = "arms, armour and horses obey supply and demand in towns and castles: a full stall sells cheap, an empty one dear - for buying AND selling, you and the AI alike (the item's own worth is untouched)")]
         [SettingPropertyGroup("Supply and demand")]
         public bool SupplyDemandEnabled { get; set; } = true;
@@ -1714,6 +1838,37 @@ namespace Armoury
             s.MarchFootRiderPace = MarchFootRiderPace;
             s.MarchRiderPace = MarchRiderPace;
             s.MarchPackAllowance = MarchPackAllowance;
+            s.MaterialLawEnabled = MaterialLawEnabled;
+            s.RealRefiningEnabled = RealRefiningEnabled;
+            s.BloomeryCharcoalPerOre = BloomeryCharcoalPerOre;
+            s.CharcoalValue = CharcoalValue;
+            s.CrudeIronValue = CrudeIronValue;
+            s.WroughtIronValue = WroughtIronValue;
+            s.IronValue = IronValue;
+            s.SteelValue = SteelValue;
+            s.FineSteelValue = FineSteelValue;
+            s.ValyrianSteelValue = ValyrianSteelValue;
+            s.MineOutputMultiplier = MineOutputMultiplier;
+            s.LumberOutputMultiplier = LumberOutputMultiplier;
+            s.SmeltCapToCraftCost = SmeltCapToCraftCost;
+            s.ArmsCostPricingEnabled = ArmsCostPricingEnabled;
+            s.ArmsPriceBand = ArmsPriceBand;
+            s.SmithDayWage = SmithDayWage;
+            s.SmithProfitPercent = SmithProfitPercent;
+            s.MaterialIndexEnabled = MaterialIndexEnabled;
+            s.MaterialIndexInertia = MaterialIndexInertia;
+            s.WarExpectationEnabled = WarExpectationEnabled;
+            s.WarExpectationBase = WarExpectationBase;
+            s.WarExpectationDays = WarExpectationDays;
+            s.SubstitutionEnabled = SubstitutionEnabled;
+            s.SubstitutionShare = SubstitutionShare;
+            s.TradeTransportPercentPer100 = TradeTransportPercentPer100;
+            s.AiBuysGear = AiBuysGear;
+            s.AiRecruitsBringKit = AiRecruitsBringKit;
+            s.AiGearBudgetPercent = AiGearBudgetPercent;
+            s.AiGearGoldReserve = AiGearGoldReserve;
+            s.AiGearMaxPiecesPerVisit = AiGearMaxPiecesPerVisit;
+            s.AiGearLogPerDay = AiGearLogPerDay;
             s.SupplyDemandEnabled = SupplyDemandEnabled;
             s.SupplyDemandBase = SupplyDemandBase;
             s.SupplyDemandRefProsperity = SupplyDemandRefProsperity;

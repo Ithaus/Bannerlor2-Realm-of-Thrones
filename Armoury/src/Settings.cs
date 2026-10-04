@@ -328,6 +328,43 @@ namespace Armoury
         public float MarchRiderPace = 6.5f;                // map speed cap for a clean column of riders - every man horsed, no train
         public float MarchPackAllowance = 0.25f;           // this many pack animals PER MAN count as field supply, not a train (0.25 = a mule per four men rides free)
 
+        // --- Smithing materials ---
+        public bool MaterialLawEnabled = true;             // charcoal and iron bars get honest prices and honest smelting: a load of wood gives a few sacks of charcoal, a bloomery eats charcoal by the sackful, each finer grade of steel loses metal
+        public bool RealRefiningEnabled = true;            // refining recipes follow the bloomery: 1 wood -> 4 charcoal, 1 ore + charcoal -> 3 crude iron, 3 bars + charcoal -> 2 bars of the next grade (perks still gate the steels)
+        public int BloomeryCharcoalPerOre = 20;            // charcoal (0.5 kg each) a bloomery burns for one load of ore (10 kg) - about a kilo of charcoal per kilo of ore
+        public int CharcoalValue = 9;                      // worth of one charcoal (0.5 kg): a quarter of a load of wood plus the burner's work
+        public int CrudeIronValue = 87;                    // worth of one bar of crude iron (0.5 kg), costed from ore and charcoal
+        public int WroughtIronValue = 150;                 // worth of one bar of wrought iron (0.5 kg)
+        public int IronValue = 245;                        // worth of one bar of iron (0.5 kg)
+        public int SteelValue = 395;                       // worth of one bar of steel (0.5 kg)
+        public int FineSteelValue = 630;                   // worth of one bar of fine steel (0.5 kg)
+        public int ValyrianSteelValue = 1000;              // worth of one bar of Valyrian steel (0.5 kg)
+        public float MineOutputMultiplier = 3f;            // iron mines dig this many times the old output - the workshops of the realm were starving for ore
+        public float LumberOutputMultiplier = 1.5f;        // woodcutters fell this many times the old output - charcoal burners need wood by the cartload
+        public bool SmeltCapToCraftCost = true;            // melting a piece down never gives back more metal than a share of what forging it costs - no metal out of thin air
+
+        // --- Arms pricing ---
+        public bool ArmsCostPricingEnabled = true;         // every piece of arms and armour is priced from what it costs to make - its weight, its metal, its leather and cloth, the days at the anvil and how well it protects; unique pieces keep the price of their fame
+        public float ArmsPriceBand = 2f;                   // how far the market price may stray from the cost of making it (1 = price is the cost, 2 = between half and double, higher = closer to the old prices)
+        public float SmithDayWage = 10f;                   // what a day of a master smith and his helper costs, in the price of a piece
+        public float SmithProfitPercent = 25f;             // the workshop's profit on top of materials and labour
+        public bool MaterialIndexEnabled = true;           // the market prices by the cost of making it AGAIN: dear ore and wood make armour dear, even the pieces already on the stall
+        public float MaterialIndexInertia = 0.25f;         // share of the gap to today's material prices the market closes each day - prices drift, they do not jump
+        public bool WarExpectationEnabled = true;          // when war is declared, traders on both sides expect armies to buy and raise their asking prices before the first lord arrives
+        public float WarExpectationBase = 0.5f;            // extra demand expected at the declaration of war, scaled by the enemy's strength against ours (0.5x to 2x)
+        public float WarExpectationDays = 15f;             // days over which the traders' expectation fades unless real purchases bear it out
+        public bool SubstitutionEnabled = true;            // when no piece of the better tier is on the stall, buyers settle for the tier below
+        public float SubstitutionShare = 0.3f;             // share of the missing tier's demand that falls to the tier below
+        public float TradeTransportPercentPer100 = 5f;     // hauling costs this % of a piece's worth per 100 leagues - traders carry goods only where the price difference pays for the road
+
+        // --- Army purchases ---
+        public bool AiBuysGear = true;                     // AI lords buy their soldiers' arms and armour on the market with their own gold - no more free gear from the quartermaster's hat, no more gold for sweeping the baggage into the armoury
+        public bool AiRecruitsBringKit = true;             // a fresh recruit still arrives with his own kit (levies came armed); turn off and lords must buy for every new man
+        public float AiGearBudgetPercent = 25f;            // share of a lord's gold (above the reserve) he is willing to spend on gear in one visit to a town
+        public int AiGearGoldReserve = 2000;               // gold a lord always keeps back - wages come first
+        public int AiGearMaxPiecesPerVisit = 60;           // most pieces a lord buys in one visit
+        public int AiGearLogPerDay = 15;                   // how many lords' purchases are written to the log each day (the daily total is always written)
+
         // --- Supply and demand ---
         public bool SupplyDemandEnabled = true;            // arms, armour and horses obey supply and demand in towns and castles: a full stall sells cheap, an empty one dear - for buying AND selling, you and the AI alike (the item's own worth is untouched)
         public float SupplyDemandBase = 4f;                // pieces of one kind (type and tier) a town of reference prosperity wants on its stalls; fewer for higher tiers

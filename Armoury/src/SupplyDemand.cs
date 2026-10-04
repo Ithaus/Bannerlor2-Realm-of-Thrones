@@ -88,6 +88,12 @@ namespace Armoury
         /// <summary>Popyt miasta na jeden koszyk (typ x tier).</summary>
         internal static float Demand(Settlement st, ItemObject it)
         {
+            return Demand(st, it.ItemType, TierOf(it));
+        }
+
+        /// <summary>Popyt na koszyk: zamoznosc x waga tieru x (1 + premia oczekiwan wojennych frakcji).</summary>
+        internal static float Demand(Settlement st, ItemObject.ItemTypeEnum type, int tier)
+        {
             var c = Settings.Current;
             float prosp = 1f;
             try
@@ -95,9 +101,37 @@ namespace Armoury
                 float p = st.Town != null ? st.Town.Prosperity : 0f;
                 prosp = MBMath.ClampFloat(p / Math.Max(1f, c.SupplyDemandRefProsperity), 0.3f, 3f);
                 if (st.IsCastle) prosp *= 0.5f;   // zamek to garnizon, nie targ
+                // OCZEKIWANIA WOJENNE (ArmsPricing): kupcy doliczaja zakupy, ktorych sie spodziewaja
+                if (type != ItemObject.ItemTypeEnum.Horse) prosp *= 1f + ArmsPricing.WarPremium(st.MapFaction);
             }
             catch { }
-            return Math.Max(0.1f, Math.Max(0f, c.SupplyDemandBase) * prosp * TierWeight[TierOf(it) - 1]);
+            tier = Math.Max(1, Math.Min(6, tier));
+            return Math.Max(0.1f, Math.Max(0f, c.SupplyDemandBase) * prosp * TierWeight[tier - 1]);
+        }
+
+        /// <summary>SUBSTYTUCJA (Jeff 04.10: "wojsko patrzy, jaki jest najlepszy pancerz do ceny"):
+        /// gdy na polce nie ma ani jednej sztuki tieru wyzej, czesc tamtego popytu przechodzi
+        /// na ten tier - kupujacy biora gorsze, ale dostepne.</summary>
+        private static float Substitution(Settlement st, ItemObject it)
+        {
+            try
+            {
+                var c = Settings.Current;
+                if (!c.SubstitutionEnabled) return 0f;
+                int t = TierOf(it);
+                if (t >= 6) return 0f;
+                int higher = 0;
+                var shelf = st.ItemRoster;
+                for (int i = 0; i < shelf.Count; i++)
+                {
+                    var el = shelf.GetElementCopyAtIndex(i);
+                    var x = el.EquipmentElement.Item;
+                    if (el.Amount > 0 && x != null && x.ItemType == it.ItemType && TierOf(x) == t + 1) { higher += el.Amount; break; }
+                }
+                if (higher > 0) return 0f;
+                return MBMath.ClampFloat(c.SubstitutionShare, 0f, 1f) * Demand(st, it.ItemType, t + 1);
+            }
+            catch { return 0f; }
         }
 
         /// <summary>Ile sztuk tego koszyka lezy na polce.</summary>
@@ -116,7 +150,7 @@ namespace Armoury
         internal static float Factor(Settlement st, ItemObject it, bool isSelling, out float d, out int s)
         {
             var c = Settings.Current;
-            d = Demand(st, it);
+            d = Demand(st, it) + Substitution(st, it);
             s = Stock(st.ItemRoster, it) + (isSelling ? 1 : 0);
             float f = (float)Math.Pow((d + 1f) / (s + 1f), MBMath.ClampFloat(c.SupplyDemandElasticity, 0.05f, 2f));
             float lo = MBMath.ClampFloat(c.SupplyDemandMinFactor, 0.01f, 1f);
@@ -146,7 +180,11 @@ namespace Armoury
                 var item = __0.Item;
                 if (!Equipmentish(item)) return;
                 float d; int s;
-                float f = Factor(st, item, __3, out d, out s);
+                float shelfF = Factor(st, item, __3, out d, out s);
+                // PODSTAWA x SUROWCE (ArmsPricing): cena konkretnej sztuki z kosztu wykucia w granicach
+                // bezpiecznika i koszt odtworzenia przy dzisiejszych cenach surowcow w okolicy
+                float arms = ArmsPricing.Multiplier(st, item);
+                float f = shelfF * arms;
                 int before = __result;
                 int np = (int)Math.Round(__result * f);
                 __result = np < 1 ? 1 : np;
@@ -163,7 +201,10 @@ namespace Armoury
                         Log.Info("PodazPopyt: " + st.Name + " " + item.ItemType + " t" + TierOf(item)
                                  + " (" + item.StringId + ") " + (__3 ? "SPRZEDAZ" : "KUPNO")
                                  + ": na polce " + s + ", popyt " + d.ToString("0.0")
-                                 + " -> x" + f.ToString("0.00") + " (" + before + " -> " + __result + ", wartosc " + item.Value + ").");
+                                 + " -> polka x" + shelfF.ToString("0.00") + ", podstawa+surowce x" + arms.ToString("0.00")
+                                 + " (podstawa " + (int)ArmsPricing.BaseOf(item) + ", surowce x" + ArmsPricing.MaterialIndex(st, item).ToString("0.00")
+                                 + (ArmsPricing.IsUnique(item) ? ", UNIKAT" : "") + ") = x" + f.ToString("0.00")
+                                 + " (" + before + " -> " + __result + ", wartosc " + item.Value + ").");
                     }
                 }
             }
@@ -226,19 +267,29 @@ namespace Armoury
                         float srcFactor = (float)Math.Pow((Demand(src, probe) + 1f) / (have + 1f), MBMath.ClampFloat(c.SupplyDemandElasticity, 0.05f, 2f));
                         srcFactor = MBMath.ClampFloat(srcFactor, MBMath.ClampFloat(c.SupplyDemandMinFactor, 0.01f, 1f), 1f);
                         var srcPos = src.GetPosition2D;
+                        var poor = new HashSet<Settlement>();   // odbiorcy bez zlota - do konca tego przebiegu
                         while (toShip > 0)
                         {
-                            // najblizsza osada z brakiem w tym koszyku
-                            Settlement best = null; float bestD = float.MaxValue; int bestCap = 0;
+                            // ARBITRAZ (docs/MODEL-MATERIALOW.md): kupiec wiezie tam, gdzie zarobi najwiecej -
+                            // cena w celu (polka po dostawie x podstawa x surowce) minus cena u zrodla minus
+                            // koszt drogi (TradeTransportPercentPer100 wartosci na 100 jednostek mapy);
+                            // brak w celu to nie warunek, tylko powod, dla ktorego tam drozej
+                            Settlement best = null; float bestProfit = 0f; int bestCap = 0;
+                            float elast = MBMath.ClampFloat(c.SupplyDemandElasticity, 0.05f, 2f);
+                            float srcIdx = srcFactor * ArmsPricing.Multiplier(src, probe);
+                            float perDist = Math.Max(0f, c.TradeTransportPercentPer100) / 100f / 100f;
                             foreach (var dst in places)
                             {
-                                if (dst == src) continue;
-                                int dh; stock[dst].TryGetValue(key, out dh);
-                                int cap = (int)Math.Ceiling(Demand(dst, probe)) - dh;
-                                if (cap <= 0) continue;
+                                if (dst == src || poor.Contains(dst)) continue;
                                 float dist = srcPos.Distance(dst.GetPosition2D);
-                                if (dist > range || dist >= bestD) continue;
-                                best = dst; bestD = dist; bestCap = cap;
+                                if (dist > range) continue;
+                                int dh; stock[dst].TryGetValue(key, out dh);
+                                float dd = Demand(dst, probe);
+                                float dstShelf = MBMath.ClampFloat((float)Math.Pow((dd + 1f) / (dh + 2f), elast),
+                                                                   MBMath.ClampFloat(c.SupplyDemandMinFactor, 0.01f, 1f), Math.Max(1f, c.SupplyDemandMaxFactor));
+                                float profit = dstShelf * ArmsPricing.Multiplier(dst, probe) - srcIdx - perDist * dist;
+                                if (profit <= bestProfit) continue;
+                                best = dst; bestProfit = profit; bestCap = Math.Max(1, (int)Math.Ceiling(dd) - dh);
                             }
                             if (best == null) { stuck += toShip; break; }
                             // przenosimy sztuki koszyka ze zrodla (od konca polki), placi odbiorca
@@ -250,7 +301,7 @@ namespace Armoury
                                 var el = shelf.GetElementCopyAtIndex(i);
                                 var it = el.EquipmentElement.Item;
                                 if (el.Amount <= 0 || it == null || (int)it.ItemType * 10 + TierOf(it) != key) continue;
-                                int unit = Math.Max(1, (int)(it.Value * pricePct * srcFactor));
+                                int unit = Math.Max(1, (int)(it.Value * pricePct * srcFactor * ArmsPricing.Multiplier(src, it)));
                                 int n = Math.Min(want - got, el.Amount);
                                 int afford = best.Town.Gold / unit;
                                 if (afford <= 0) break;
@@ -261,7 +312,7 @@ namespace Armoury
                                 src.Town.ChangeGold(unit * n);
                                 got += n; paid += (long)unit * n;
                             }
-                            if (got <= 0) { stock[best][key] = (stock[best].ContainsKey(key) ? stock[best][key] : 0) + bestCap; continue; }   // biedny odbiorca - pomijamy go dzis
+                            if (got <= 0) { poor.Add(best); continue; }   // biedny odbiorca - pomijamy go dzis
                             int sh; stock[src].TryGetValue(key, out sh); stock[src][key] = sh - got;
                             int dh2; stock[best].TryGetValue(key, out dh2); stock[best][key] = dh2 + got;
                             toShip -= got; moved += got; deals++;
