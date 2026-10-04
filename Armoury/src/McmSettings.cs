@@ -988,6 +988,10 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public bool WinterBiteEnabled { get; set; } = true;
 
+        [SettingPropertyBool("Single Winter Source", HintText = "one source of winter: our Winter Bite alone cuts harvests and feeds armies more; Better Economy seasons no longer cut harvests, raise food prices or slow caravans on top of it")]
+        [SettingPropertyGroup("The marching column")]
+        public bool SingleWinterSource { get; set; } = true;
+
         [SettingPropertyInteger("Winter Party Food Bonus Percent", 0, 200, "0", HintText = "extra food a party consumes in winter (scaled by how far north it stands)")]
         [SettingPropertyGroup("The marching column")]
         public int WinterPartyFoodBonusPercent { get; set; } = 50;
@@ -2135,6 +2139,7 @@ namespace Armoury
             s.SiegeSicknessDeathShare = SiegeSicknessDeathShare;
             s.SiegeSicknessMedicineMax = SiegeSicknessMedicineMax;
             s.WinterBiteEnabled = WinterBiteEnabled;
+            s.SingleWinterSource = SingleWinterSource;
             s.WinterPartyFoodBonusPercent = WinterPartyFoodBonusPercent;
             s.WinterVillageOutputCutPercent = WinterVillageOutputCutPercent;
             s.WinterTownAppetitePer1000 = WinterTownAppetitePer1000;

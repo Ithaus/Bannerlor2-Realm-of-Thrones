@@ -265,7 +265,7 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ transpilery
-        private static MethodInfo _gSeason, _gDay, _gSeasons, _gDis, _beeCur, _beeDay;
+        private static MethodInfo _gSeason, _gDay, _gSeasons, _gDis, _beeCur, _beeDay, _beeProd, _beeBias, _beeCar;
 
         public static IEnumerable<CodeInstruction> SkyTranspiler(IEnumerable<CodeInstruction> instructions) { return Swap(instructions, false); }
         public static IEnumerable<CodeInstruction> EconTranspiler(IEnumerable<CodeInstruction> instructions) { return Swap(instructions, true); }
@@ -285,6 +285,9 @@ namespace Armoury
                     else if (m == _gDis) rep = econ ? nameof(EconDaysInSeason) : nameof(SkyDaysInSeason);
                     else if (_beeCur != null && m == _beeCur) rep = nameof(BeeSeason);
                     else if (_beeDay != null && m == _beeDay) rep = nameof(BeeDay);
+                    else if (_beeProd != null && m == _beeProd) { ci.opcode = OpCodes.Call; ci.operand = AccessTools.Method(typeof(WinterSource), nameof(WinterSource.ProdMult)); }
+                    else if (_beeBias != null && m == _beeBias) { ci.opcode = OpCodes.Call; ci.operand = AccessTools.Method(typeof(WinterSource), nameof(WinterSource.FoodBias)); }
+                    else if (_beeCar != null && m == _beeCar) { ci.opcode = OpCodes.Call; ci.operand = AccessTools.Method(typeof(WinterSource), nameof(WinterSource.CaravanMult)); }
                     if (rep != null)
                     {
                         ci.opcode = OpCodes.Call;
@@ -338,6 +341,8 @@ namespace Armoury
                     _beeCur = AccessTools.PropertyGetter(bee, "Current");
                     _beeDay = AccessTools.PropertyGetter(bee, "DayInSeason");
                 }
+                var sp = AccessTools.TypeByName("BetterEconomy.Config.SeasonalityProfile");
+                if (sp != null) { _beeProd = AccessTools.Method(sp, "VillageProductionMult"); _beeBias = AccessTools.Method(sp, "FoodPriceBias"); _beeCar = AccessTools.Method(sp, "CaravanSpeedMult"); }
 
                 var ts = AccessTools.Method(ct, "ToString");
                 if (ts != null) h.Patch(ts, prefix: new HarmonyMethod(typeof(WesterosClimate), nameof(ToStringPrefix)));
@@ -402,7 +407,8 @@ namespace Armoury
                 var op = kv.Value as MethodInfo;
                 if (op == null) continue;
                 if (op == _gSeason || op == _gDay || op == _gSeasons || op == _gDis
-                    || (_beeCur != null && op == _beeCur) || (_beeDay != null && op == _beeDay)) return true;
+                    || (_beeCur != null && op == _beeCur) || (_beeDay != null && op == _beeDay)
+                    || (_beeProd != null && op == _beeProd) || (_beeBias != null && op == _beeBias) || (_beeCar != null && op == _beeCar)) return true;
             }
             return false;
         }

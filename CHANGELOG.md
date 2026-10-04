@@ -1,5 +1,12 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-04 (30) - JEDNO ZRODLO ZIMY (WinterBite); BEE i RBL nie dokladaja tej samej kary
+**Mod:** Armoury + pliki ustawien cudzych modow | **Pliki:** NOWY `WinterSource.cs`; `WesterosClimate.cs` (transpiler podmienia tez wywolania `BetterEconomy.Config.SeasonalityProfile`), `SubModuleMain.cs`, `Settings.cs` + `McmSettings.cs` (`SingleWinterSource`); `Configs/ModSettings/Global/RealisticBannerlord/RealisticBannerlord_v2.json` (`WinterFoodPenalty` 0.25 -> 0, kopia `.bak-2026-10-04-jedna-zima`); `Modules/BetterEconomy/ModuleData/better_economy_settings.xml` (`WinterFoodConsumptionMult` 1.15 -> 1.0, kopia `.bak-2026-10-04-jedna-zima`)
+**Problem (audyt D1, Jeff 04.10: "jedno zrodlo zimy"):** przy wieloletniej zimie kary sie mnozyly: plony wsi WinterBite -50% (polnoc mocniej) x BEE `VillageProductionMult` zima 0.7 = 0.35; jedzenie partii WinterBite +50% x RBL `WinterFoodPenalty` +25%; ceny jedzenia - nasza podaz + BEE `FoodPriceBias` +20%; jedzenie ludnosci miast - WinterBite `WinterTownAppetitePer1000` + BEE `WinterFoodConsumptionMult` 1.15; karawany RBL -20% (wszystkie partie) x BEE `CaravanSpeedMult` 0.8.
+**Zmiana:** zostaje WinterBite (gradient polnocy) oraz RBL dla rzeczy bez dubla (szybkosc partii, morale, leczenie, dobrobyt). BEE: plony, ceny jedzenia i szybkosc karawan neutralne w kazdej porze (transpiler w klasach BEE + prefix na samych funkcjach); przyrost chlopow BEE zostaje. RBL kara jedzenia zimowego 0, BEE zimowe jedzenie ludnosci 1.0. Wylacznik MCM `Single Winter Source` przywraca wartosci BEE (pliki ustawien trzeba by przywrocic z kopii).
+**Ryzyko / co sprawdzic:** BEE nie daje juz premii jesiennych/letnich do plonow (+10-25%) - plony wsi poza zima nieco nizsze niz dotad. Log: `WinterSource: ... neutralne w 3/3 funkcjach`.
+**Status:** WGRANE 2026-10-04 (Armoury.dll md5 66a8c90a7b6c97e8f994faed79b182fa, build rc=0, gra zamknieta; poprzednie DLL obok jako `Armoury.dll.bak-2026-10-04-przed-jedna-zima`). Na obecnym save.
+
 ## 2026-10-04 (29) - CENY: widelki surowca i czynnika na sztuce 0.5-1.5 (Jeff, po audycie arbitrazu)
 **Mod:** Armoury | **Pliki:** `Settings.cs` + `McmSettings.cs` (`MaterialRatioMin/Max` 0.1/3 -> 0.5/1.5, `MaterialIndexMin/Max` 0.1/3 -> 0.5/1.5)
 **Problem (audyt dziur B2, docs/AUDYT-DZIURY.md):** przy 0.1-3 praca to 2-3% kosztu plyty, wiec dolny prog dzialal w pelni: plyta t6 od ~730 do ~146 tys. miedzy miastami; indeks drewna (waga 0.7 w metalu - wegiel) da sie popchnac wykupem drewna w miescie.

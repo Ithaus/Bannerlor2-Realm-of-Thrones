@@ -299,6 +299,7 @@ namespace Armoury
         public int SiegeSicknessDefenderFactor = 40;       // defenders behind walls catch this share of the besiegers' rate; famine doubles it
         public int SiegeSicknessDeathShare = 10;           // share of the sick who die instead of joining the wounded (Siege Medic halves this)
         public int SiegeSicknessMedicineMax = 50;          // ceiling of the surgeon's risk reduction (0.25% per Medicine point up to this cap)
+        public bool SingleWinterSource = true;             // one source of winter: our Winter Bite alone cuts harvests and feeds armies more; Better Economy seasons no longer cut harvests, raise food prices or slow caravans on top of it
         public bool WinterBiteEnabled = true;              // winter with teeth: armies eat more, villages yield less, town granaries drain faster - the north bites hardest
         public int WinterPartyFoodBonusPercent = 50;       // extra food a party consumes in winter (scaled by how far north it stands)
         public int WinterVillageOutputCutPercent = 50;     // village production lost in winter - food prices rise on their own as supply dries up
