@@ -143,7 +143,7 @@ namespace Armoury
                 // linie uzbrojenia), wedle zysku na roboczodzien przy dzisiejszych cenach targu - brak na
                 // polce = wyzsza cena = wyzej w rankingu; cykl bierze pierwsza pozycje, na ktora sa surowce,
                 // rece i zloto, z cena przeliczona na nowo (po kazdej sztuce jej cena spada)
-                var cands = Candidates(__instance, workshop, town, day);
+                var cands = Candidates(__instance, workshop, production, town, day);
                 int toMake = 0;
                 foreach (var output in production.Outputs) toMake += Math.Max(1, output.Item2);
                 for (int n = 0; n < toMake; n++)
@@ -210,14 +210,19 @@ namespace Armoury
         }
 
         private static FieldInfo _itemsInCategory;
-        private static readonly Dictionary<Workshop, KeyValuePair<int, List<ItemObject>>> _rank = new Dictionary<Workshop, KeyValuePair<int, List<ItemObject>>>();
+        private static readonly Dictionary<KeyValuePair<Workshop, string>, KeyValuePair<int, List<ItemObject>>> _rank = new Dictionary<KeyValuePair<Workshop, string>, KeyValuePair<int, List<ItemObject>>>();
 
         /// <summary>Ranking dnia: wszystko z linii uzbrojenia warsztatu (kultura miasta albo neutralne,
         /// a gdy takich brak - wszystko), wedle szacunku zysku na roboczodzien przy dzisiejszych cenach.</summary>
-        private static List<ItemObject> Candidates(WorkshopsCampaignBehavior beh, Workshop workshop, Town town, int day)
+        private static List<ItemObject> Candidates(WorkshopsCampaignBehavior beh, Workshop workshop, WorkshopType.Production production, Town town, int day)
         {
             KeyValuePair<int, List<ItemObject>> cached;
-            if (_rank.TryGetValue(workshop, out cached) && cached.Key == day) return cached.Value;
+            // CECHY (Jeff 04.10: "zbrojmistrz, platnerz i lucznik to zupelnie inne role - lucznik nie zrobi miecza"):
+            // ranking tylko z LINII, ktorej cykl wlasnie biegnie - wczesniej ukryty "artisans" (97 miast, linie na wszystko)
+            // wybieral najoplacalniejsza sztuke ze wszystkich linii i robil same luki
+            string line = LineKey(production);
+            var key = new KeyValuePair<Workshop, string>(workshop, line);
+            if (_rank.TryGetValue(key, out cached) && cached.Key == day) return cached.Value;
             var list = new List<ItemObject>();
             try
             {
@@ -226,7 +231,7 @@ namespace Armoury
                 var pool = new List<ItemObject>(); var foreign = new List<ItemObject>();
                 var seen = new HashSet<ItemObject>();
                 if (dict != null)
-                    foreach (var p in workshop.WorkshopType.Productions)
+                    foreach (var p in new[] { production })
                     {
                         if (!AllOutputsArms(p)) continue;
                         foreach (var o in p.Outputs)
@@ -262,13 +267,20 @@ namespace Armoury
                     float perDay = (revenue - cost) / Math.Max(0.1f, days);
                     if (perDay > 0f) scored.Add(new KeyValuePair<float, ItemObject>(perDay, it));
                 }
-                if (scored.Count == 0) NoteEmpty(workshop, town, pool, pOre, pWood, pLea, pLin);
+                if (scored.Count == 0) NoteEmpty(workshop, line, town, pool, pOre, pWood, pLea, pLin);
                 scored.Sort((a, b) => b.Key.CompareTo(a.Key));
                 foreach (var kv in scored) list.Add(kv.Value);
             }
             catch (Exception e) { Log.Error("WorkshopLaw.Candidates", e); }
-            _rank[workshop] = new KeyValuePair<int, List<ItemObject>>(day, list);
+            _rank[key] = new KeyValuePair<int, List<ItemObject>>(day, list);
             return list;
+        }
+
+        private static string LineKey(WorkshopType.Production p)
+        {
+            var parts = new List<string>();
+            try { foreach (var o in p.Outputs) if (o.Item1 != null) parts.Add(o.Item1.StringId); } catch { }
+            return string.Join("+", parts.ToArray());
         }
 
         private static void Flush()
@@ -302,11 +314,11 @@ namespace Armoury
             a[0]++; a[1] += revenue; a[2] += cost;
         }
 
-        private static void NoteEmpty(Workshop workshop, Town town, List<ItemObject> pool, int pOre, int pWood, int pLea, int pLin)
+        private static void NoteEmpty(Workshop workshop, string line, Town town, List<ItemObject> pool, int pOre, int pWood, int pLea, int pLin)
         {
             try
             {
-                string wt = workshop.WorkshopType.StringId;
+                string wt = workshop.WorkshopType.StringId + "/" + line;
                 int n; _diagEmpty.TryGetValue(wt, out n); _diagEmpty[wt] = n + 1;
                 if (_diagEmptySample.ContainsKey(wt)) return;
                 if (pool.Count == 0) { _diagEmptySample[wt] = town.Name + ": brak kandydatow (pula pusta)"; return; }
