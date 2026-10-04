@@ -1,5 +1,13 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-04 (38) - SKARBIEC KROLESTWA: koniec zlota z niczego, powinnosci wasali wobec korony (pokoj 2%, wojna 10%)
+**Mod:** Armoury | **Pliki:** NOWY `KingdomTreasury.cs` (transpiler + `Daily`); `PopulationLaw.cs` (`RentToday`), `ArmouryBehavior.cs` (Daily po rentach), `SubModuleMain.cs`, `Settings.cs` + `McmSettings.cs` (`NoFreeKingdomGold`, `CrownDuesEnabled`, `CrownDuesPeacePercent` 2, `CrownDuesWarPercent` 10; grupa "Iron bank")
+**Zgloszenie (Jeff 04.10):** "jak z niczego dosypuje? ... tak, wylacz"; "prawdziwe zasilanie skarbca - kazdy rod oddaje koronie czesc dochodu - zrob tak, jak bylo historycznie".
+**Przyczyna (dekompilacja):** `ClanVariablesCampaignBehavior`: start 2 mln (:199), w `DailyTickClan` przy rodzie krola: skarbiec < 2 mln -> +1000 dziennie (:417), < 1 mln -> losowo 0.5%/1% dziennie +100/200/400 tys. (:418-421) - z niczego. Zapomogi dla rodow < 30 tys. (`DefaultClanFinanceModel.AddIncomeFromKingdomBudget` :517) placi skarbiec, wiec nikt nie bankrutowal.
+**Zmiana:** (1) transpiler na `DailyTickClan` zeruje stale 1000/100000/200000/400000 - skarbiec nie rosnie z niczego (start 2 mln zostaje; zmiana ustawienia wymaga restartu gry). (2) POWINNOSCI WASALI: raz dziennie kazdy rod wasalny krolestwa (takze gracza; bez rodu krola i najemnikow) oddaje koronie czesc dziennego dochodu (`ClanFinanceModel.CalculateClanIncome` + nasze renty od ludnosci zaplacone dzis): pokoj 2% (pomoce, powinnosci), wojna krolestwa 10% (podatki wojenne, tarczowe zamiast sluzby - historycznie wielkie podatki korona dostawala na wojne). Zloto od glowy rodu do skarbca. Zostaje vanillowa wplata 1% od majatku ponad 100 tys. Log: `Korona: dzien N - powinnosci wasali X zl od Y rodow (rod gracza Z)`.
+**Ryzyko / co sprawdzic:** skarbce beda chudnac w dlugich wojnach (zapomogi wyplacane z realnych wplat) - biedne rody zaczna pozyczac w Banku Zelaznym i bankrutowac (to zamierzone). Obserwowac `Korona:` i `IronBank:`.
+**Status:** WGRANE 2026-10-04 (Armoury.dll md5 48f157f522291ae485bcfdc4f79ebf0b, build rc=0, gra zamknieta; poprzednie DLL obok jako `Armoury.dll.bak-2026-10-04-przed-skarbcem`). Na obecnym save.
+
 ## 2026-10-04 (37) - WRAKI z pobojowiska znowu dochodza (stan 8% zamiast 3%)
 **Mod:** Armoury | **Pliki:** `BattlefieldLaw.cs` (`WreckModifier`)
 **Problem (docs/AUDYT-WOJNA-LOGISTYKA.md):** wrak dostawal modyfikator Spoils `rl_looted_heavy_max` (price_factor 0.03), a prog zniszczenia (`LootMinConditionPercent` 3, Jeff 28.08: "<=3% = zniszczone") kasowal kazdy taki wrak - odzysk wrakow byl martwa funkcja (w logach 8 na 8 razy "zostaly na polu").

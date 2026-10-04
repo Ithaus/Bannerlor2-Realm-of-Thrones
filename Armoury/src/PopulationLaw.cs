@@ -71,7 +71,7 @@ namespace Armoury
         // kultura -> [ludzi na punkt hearth wsi, ludzi na punkt dobrobytu miasta]
         private static readonly Dictionary<string, float[]> _k = new Dictionary<string, float[]>();
 
-        internal static void Reset() { _k.Clear(); }
+        internal static void Reset() { _k.Clear(); RentToday.Clear(); }
 
         private static void Calibrate()
         {
@@ -131,6 +131,9 @@ namespace Armoury
             Log.Info("PopulationLaw: renty od ludnosci jako przeplyw z kasy osad do panow " + (On ? "CZYNNE" : "wylaczone w MCM") + " (bez latek modeli podatku).");
         }
 
+        /// <summary>Renty zaplacone dzis kazdemu rodowi (do powinnosci wobec korony).</summary>
+        internal static readonly Dictionary<Clan, int> RentToday = new Dictionary<Clan, int>();
+
         internal static void Daily()
         {
             if (!On) return;
@@ -141,6 +144,7 @@ namespace Armoury
                 var pop = new Dictionary<string, float>();
                 var due = new Dictionary<string, float>();
                 var paid = new Dictionary<string, float>();
+                RentToday.Clear();
                 long totalPaid = 0, totalDue = 0;
                 foreach (var st in Settlement.All)
                 {
@@ -165,6 +169,7 @@ namespace Armoury
                         int pay = (int)Math.Min(rent, gold * (st.IsTown ? 1f : share));
                         if (pay <= 0) continue;
                         GiveGoldAction.ApplyForSettlementToCharacter(st, lord, pay, true);
+                        { int r0; RentToday.TryGetValue(st.OwnerClan, out r0); RentToday[st.OwnerClan] = r0 + pay; }
                         paid.TryGetValue(c, out v); paid[c] = v + pay;
                         totalPaid += pay;
                     }

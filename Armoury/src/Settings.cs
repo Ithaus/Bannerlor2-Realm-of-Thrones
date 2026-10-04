@@ -435,6 +435,10 @@ namespace Armoury
         public float ClimateAutumnYearsMax = 2f;           // later autumns last at most this many years
         public float ClimateWinterYearsMin = 2f;           // later winters last at least this many years
         public float ClimateWinterYearsMax = 6f;           // later winters last at most this many years
+        public bool CrownDuesEnabled = true;               // vassals owe the crown a share of their daily income (fief income and rents), paid into the kingdom treasury - small in peace, heavy in war as with medieval war taxes
+        public float CrownDuesPeacePercent = 2f;           // share of a vassal house's daily income owed to the crown in peace (aids and dues)
+        public float CrownDuesWarPercent = 10f;            // share owed while the realm is at war (war taxes, scutage in place of service)
+        public bool NoFreeKingdomGold = true;              // the kingdom treasury no longer refills from thin air (vanilla +1000 a day and random windfalls of 100-400 thousand); it lives on what the houses pay in - change needs a game restart
         public int IronBankMinDaysToLend = 30;             // the Bank lends no more to a house whose running debt falls due within this many days - pay first
         public float IronBankLoanFeePercent = 2f;          // fee the Iron Bank adds to every loan, owed with the debt - no free same-day borrowing
         public float IronBankDefaultSeizeShare = 0.5f;     // share of a defaulter's purse the Bank seizes at once when he defaults (then 25% a day as before)

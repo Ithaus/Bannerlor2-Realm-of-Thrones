@@ -1496,6 +1496,22 @@ namespace Armoury
         [SettingPropertyGroup("Iron bank")]
         public int IronBankMinDaysToLend { get; set; } = 30;
 
+        [SettingPropertyBool("No Free Kingdom Gold", HintText = "the kingdom treasury no longer refills from thin air (vanilla +1000 a day and random windfalls of 100-400 thousand); it lives on what the houses pay in - change needs a game restart")]
+        [SettingPropertyGroup("Iron bank")]
+        public bool NoFreeKingdomGold { get; set; } = true;
+
+        [SettingPropertyBool("Crown Dues Enabled", HintText = "vassals owe the crown a share of their daily income (fief income and rents), paid into the kingdom treasury - small in peace, heavy in war as with medieval war taxes")]
+        [SettingPropertyGroup("Iron bank")]
+        public bool CrownDuesEnabled { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Crown Dues Peace Percent", 0f, 20f, "0.0", HintText = "share of a vassal house's daily income owed to the crown in peace (aids and dues)")]
+        [SettingPropertyGroup("Iron bank")]
+        public float CrownDuesPeacePercent { get; set; } = 2f;
+
+        [SettingPropertyFloatingInteger("Crown Dues War Percent", 0f, 40f, "0.0", HintText = "share owed while the realm is at war (war taxes, scutage in place of service)")]
+        [SettingPropertyGroup("Iron bank")]
+        public float CrownDuesWarPercent { get; set; } = 10f;
+
         [SettingPropertyFloatingInteger("Iron Bank Default Seize Share", 0f, 1f, "0.00", HintText = "share of a defaulter's purse the Bank seizes at once when he defaults (then 25% a day as before)")]
         [SettingPropertyGroup("Iron bank")]
         public float IronBankDefaultSeizeShare { get; set; } = 0.5f;
@@ -2279,6 +2295,10 @@ namespace Armoury
             s.IronBankEnabled = IronBankEnabled;
             s.IronBankLoanFeePercent = IronBankLoanFeePercent;
             s.IronBankMinDaysToLend = IronBankMinDaysToLend;
+            s.NoFreeKingdomGold = NoFreeKingdomGold;
+            s.CrownDuesEnabled = CrownDuesEnabled;
+            s.CrownDuesPeacePercent = CrownDuesPeacePercent;
+            s.CrownDuesWarPercent = CrownDuesWarPercent;
             s.IronBankDefaultSeizeShare = IronBankDefaultSeizeShare;
             s.IronBankCapital = IronBankCapital;
             s.IronBankIncomeDays = IronBankIncomeDays;
