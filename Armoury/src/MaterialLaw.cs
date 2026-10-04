@@ -18,12 +18,12 @@ namespace Armoury
     /// WEGIEL: 1-2 kg wegla na kg rudy, z 4-7 kg drewna na kg wegla.
     ///
     /// 1. Ceny (Value) wegla i sztabek z MCM, liczone lancuchem od drewna i rudy
-    ///    (wegiel 9, surowka 87, zelazo kute 150, zelazo 245, stal 395, stal szl. 630,
+    ///    (wegiel 9, surowka 87, zelazo kute 118, zelazo 157, stal 210, stal szl. 281,
     ///    valyrianska 1000). Oryginaly zapamietane - XP za przetop liczymy od nich.
     /// 2. Przetopy (postfix na GetRefiningFormulas, PRZED ValyrianSteel.DearRefine):
     ///    1 drewno -> 4 wegla (perk CharcoalMaker 5); 1 ruda + 20 wegla -> 3 surowki
-    ///    (perk IronMaker 4); dalej 3 sztabki nizsze + wegiel -> 2 wyzsze (strata metalu
-    ///    jak przy zgrzewaniu), progi perkow SteelMaker 1/2/3 jak w vanilla.
+    ///    (perk IronMaker 4); dalej 5 sztabek nizszych + wegiel -> 4 wyzsze (strata metalu
+    ///    jak przy zgrzewaniu - Jeff 04.10: 20% na stopien, 5 sztabek -> 4), progi perkow SteelMaker 1/2/3 jak w vanilla.
     /// 3. Wydobycie: postfix na CalculateDailyProductionAmount (vanilla/BK/BEE, licznik
     ///    zagniezdzenia) - ruda x MineOutputMultiplier, drewno x LumberOutputMultiplier.
     ///    Warsztaty AI zjadaja ~860 rudy dziennie przy 260 wydobycia (docs/AUDYT-PRODUKCJI-*).
@@ -73,7 +73,7 @@ namespace Armoury
                 }
                 _applied = true;
                 Log.Info("MaterialLaw: ceny surowcow kuzni: " + string.Join(", ", parts.ToArray())
-                         + ". Wytop " + (s.RealRefiningEnabled ? "realny (drewno 1:4 wegla, ruda+20 wegla -> 3 surowki, 3 -> 2 na stopien)" : "vanilla")
+                         + ". Wytop " + (s.RealRefiningEnabled ? "realny (drewno 1:4 wegla, ruda+20 wegla -> 3 surowki, 5 -> 4 na stopien)" : "vanilla")
                          + ", wydobycie rudy x" + s.MineOutputMultiplier.ToString("0.0") + ", drewna x" + s.LumberOutputMultiplier.ToString("0.0") + ".");
             }
             catch (Exception e) { Log.Error("MaterialLaw.Apply", e); }
@@ -97,11 +97,11 @@ namespace Armoury
             int bloomCoal = Math.Max(1, s.BloomeryCharcoalPerOre);
             yield return new Crafting.RefiningFormula(CraftingMaterials.Wood, 1, CraftingMaterials.Iron1, 0, CraftingMaterials.Charcoal, charcoal ? 5 : 4);
             yield return new Crafting.RefiningFormula(CraftingMaterials.IronOre, 1, CraftingMaterials.Charcoal, bloomCoal, CraftingMaterials.Iron1, ironMaker ? 4 : 3);
-            yield return new Crafting.RefiningFormula(CraftingMaterials.Iron1, 3, CraftingMaterials.Charcoal, 2, CraftingMaterials.Iron2, 2);
-            yield return new Crafting.RefiningFormula(CraftingMaterials.Iron2, 3, CraftingMaterials.Charcoal, 2, CraftingMaterials.Iron3, 2);
-            if (steel1) yield return new Crafting.RefiningFormula(CraftingMaterials.Iron3, 3, CraftingMaterials.Charcoal, 3, CraftingMaterials.Iron4, 2);
-            if (steel2) yield return new Crafting.RefiningFormula(CraftingMaterials.Iron4, 3, CraftingMaterials.Charcoal, 4, CraftingMaterials.Iron5, 2);
-            if (steel3) yield return new Crafting.RefiningFormula(CraftingMaterials.Iron5, 3, CraftingMaterials.Charcoal, 5, CraftingMaterials.Iron6, 2);
+            yield return new Crafting.RefiningFormula(CraftingMaterials.Iron1, 5, CraftingMaterials.Charcoal, 2, CraftingMaterials.Iron2, 4);
+            yield return new Crafting.RefiningFormula(CraftingMaterials.Iron2, 5, CraftingMaterials.Charcoal, 2, CraftingMaterials.Iron3, 4);
+            if (steel1) yield return new Crafting.RefiningFormula(CraftingMaterials.Iron3, 5, CraftingMaterials.Charcoal, 3, CraftingMaterials.Iron4, 4);
+            if (steel2) yield return new Crafting.RefiningFormula(CraftingMaterials.Iron4, 5, CraftingMaterials.Charcoal, 4, CraftingMaterials.Iron5, 4);
+            if (steel3) yield return new Crafting.RefiningFormula(CraftingMaterials.Iron5, 5, CraftingMaterials.Charcoal, 5, CraftingMaterials.Iron6, 4);
         }
 
         private static bool Perk(Hero h, PerkObject p)

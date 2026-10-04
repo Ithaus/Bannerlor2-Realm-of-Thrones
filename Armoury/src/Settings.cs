@@ -330,14 +330,14 @@ namespace Armoury
 
         // --- Smithing materials ---
         public bool MaterialLawEnabled = true;             // charcoal and iron bars get honest prices and honest smelting: a load of wood gives a few sacks of charcoal, a bloomery eats charcoal by the sackful, each finer grade of steel loses metal
-        public bool RealRefiningEnabled = true;            // refining recipes follow the bloomery: 1 wood -> 4 charcoal, 1 ore + charcoal -> 3 crude iron, 3 bars + charcoal -> 2 bars of the next grade (perks still gate the steels)
+        public bool RealRefiningEnabled = true;            // refining recipes follow the bloomery: 1 wood -> 4 charcoal, 1 ore + charcoal -> 3 crude iron, 5 bars + charcoal -> 4 bars of the next grade (a fifth of the metal lost) (perks still gate the steels)
         public int BloomeryCharcoalPerOre = 20;            // charcoal (0.5 kg each) a bloomery burns for one load of ore (10 kg) - about a kilo of charcoal per kilo of ore
         public int CharcoalValue = 9;                      // worth of one charcoal (0.5 kg): a quarter of a load of wood plus the burner's work
         public int CrudeIronValue = 87;                    // worth of one bar of crude iron (0.5 kg), costed from ore and charcoal
-        public int WroughtIronValue = 150;                 // worth of one bar of wrought iron (0.5 kg)
-        public int IronValue = 245;                        // worth of one bar of iron (0.5 kg)
-        public int SteelValue = 395;                       // worth of one bar of steel (0.5 kg)
-        public int FineSteelValue = 630;                   // worth of one bar of fine steel (0.5 kg)
+        public int WroughtIronValue = 118;                 // worth of one bar of wrought iron (0.5 kg)
+        public int IronValue = 157;                        // worth of one bar of iron (0.5 kg)
+        public int SteelValue = 210;                       // worth of one bar of steel (0.5 kg)
+        public int FineSteelValue = 281;                   // worth of one bar of fine steel (0.5 kg)
         public int ValyrianSteelValue = 1000;              // worth of one bar of Valyrian steel (0.5 kg)
         public float MineOutputMultiplier = 3f;            // iron mines dig this many times the old output - the workshops of the realm were starving for ore
         public float LumberOutputMultiplier = 1.5f;        // woodcutters fell this many times the old output - charcoal burners need wood by the cartload
@@ -364,6 +364,15 @@ namespace Armoury
         public int AiGearGoldReserve = 2000;               // gold a lord always keeps back - wages come first
         public int AiGearMaxPiecesPerVisit = 60;           // most pieces a lord buys in one visit
         public int AiGearLogPerDay = 15;                   // how many lords' purchases are written to the log each day (the daily total is always written)
+
+        // --- Workshops ---
+        public bool WorkshopLawEnabled = true;             // town workshops that make arms and armour run as real businesses: they buy ore, wood, leather and linen on the market by the true weight of each piece, pay their workers, sell to the market - and make only what turns a profit
+        public float WorkshopWorkersArtisans = 6f;         // man-days of work the town's artisans put in each day
+        public float WorkshopWorkers = 4f;                 // man-days of work a notable's smithy or wood workshop puts in each day
+        public float WorkshopWagePerDay = 10f;             // wages for one man-day at the forge, paid into the town
+        public float WorkshopMinProfitPercent = 10f;       // a workshop makes a piece only if the market pays at least this much over materials and wages
+        public float WorkshopCrudeKgPerOre = 1.5f;         // kilograms of crude iron a bloomery wins from one load of ore (10 kg); each finer grade costs a fifth more
+        public float WorkshopWoodPerOre = 5f;              // loads of wood burnt to charcoal for each load of ore smelted
 
         // --- Supply and demand ---
         public bool SupplyDemandEnabled = true;            // arms, armour and horses obey supply and demand in towns and castles: a full stall sells cheap, an empty one dear - for buying AND selling, you and the AI alike (the item's own worth is untouched)

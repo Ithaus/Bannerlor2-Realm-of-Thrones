@@ -41,6 +41,8 @@ namespace Armoury
         internal sealed class Cost
         {
             public float Metal, Charcoal, Leather, Linen, Wood, Special, Labor, Total;
+            // ilosci fizyczne - dla warsztatow (WorkshopLaw): kg metalu danego gatunku, skory, lnu, drewna, dni pracy (z jakoscia)
+            public float MetalKg, LeatherKg, LinenKg, WoodKg, Days; public CraftingMaterials Grade;
         }
 
         private static readonly Dictionary<ItemObject, Cost> _cost = new Dictionary<ItemObject, Cost>();
@@ -218,6 +220,7 @@ namespace Armoury
                 c.Linen = linenKg * KgPrice(_linen);
                 c.Wood = woodKg * KgPrice(_wood);
                 c.Special = special;
+                c.MetalKg = metalKg; c.LeatherKg = leatherKg; c.LinenKg = linenKg; c.WoodKg = woodKg; c.Days = days * q; c.Grade = GradeFor(t);
                 c.Labor = days * q * Math.Max(0f, s.SmithDayWage);
                 float raw = c.Metal + c.Charcoal + c.Leather + c.Linen + c.Wood + c.Special + c.Labor;
                 c.Total = raw * (1f + Math.Max(0f, s.SmithProfitPercent) / 100f);

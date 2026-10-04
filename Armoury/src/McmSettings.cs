@@ -1100,7 +1100,7 @@ namespace Armoury
         [SettingPropertyGroup("Smithing materials")]
         public bool MaterialLawEnabled { get; set; } = true;
 
-        [SettingPropertyBool("Real Refining Enabled", HintText = "refining recipes follow the bloomery: 1 wood -> 4 charcoal, 1 ore + charcoal -> 3 crude iron, 3 bars + charcoal -> 2 bars of the next grade (perks still gate the steels)")]
+        [SettingPropertyBool("Real Refining Enabled", HintText = "refining recipes follow the bloomery: 1 wood -> 4 charcoal, 1 ore + charcoal -> 3 crude iron, 5 bars + charcoal -> 4 bars of the next grade (a fifth of the metal lost) (perks still gate the steels)")]
         [SettingPropertyGroup("Smithing materials")]
         public bool RealRefiningEnabled { get; set; } = true;
 
@@ -1116,21 +1116,21 @@ namespace Armoury
         [SettingPropertyGroup("Smithing materials")]
         public int CrudeIronValue { get; set; } = 87;
 
-        [SettingPropertyInteger("Wrought Iron Value", 0, 600, "0", HintText = "worth of one bar of wrought iron (0.5 kg)")]
+        [SettingPropertyInteger("Wrought Iron Value", 0, 472, "0", HintText = "worth of one bar of wrought iron (0.5 kg)")]
         [SettingPropertyGroup("Smithing materials")]
-        public int WroughtIronValue { get; set; } = 150;
+        public int WroughtIronValue { get; set; } = 118;
 
-        [SettingPropertyInteger("Iron Value", 0, 980, "0", HintText = "worth of one bar of iron (0.5 kg)")]
+        [SettingPropertyInteger("Iron Value", 0, 628, "0", HintText = "worth of one bar of iron (0.5 kg)")]
         [SettingPropertyGroup("Smithing materials")]
-        public int IronValue { get; set; } = 245;
+        public int IronValue { get; set; } = 157;
 
-        [SettingPropertyInteger("Steel Value", 0, 1580, "0", HintText = "worth of one bar of steel (0.5 kg)")]
+        [SettingPropertyInteger("Steel Value", 0, 840, "0", HintText = "worth of one bar of steel (0.5 kg)")]
         [SettingPropertyGroup("Smithing materials")]
-        public int SteelValue { get; set; } = 395;
+        public int SteelValue { get; set; } = 210;
 
-        [SettingPropertyInteger("Fine Steel Value", 0, 2520, "0", HintText = "worth of one bar of fine steel (0.5 kg)")]
+        [SettingPropertyInteger("Fine Steel Value", 0, 1124, "0", HintText = "worth of one bar of fine steel (0.5 kg)")]
         [SettingPropertyGroup("Smithing materials")]
-        public int FineSteelValue { get; set; } = 630;
+        public int FineSteelValue { get; set; } = 281;
 
         [SettingPropertyInteger("Valyrian Steel Value", 0, 4000, "0", HintText = "worth of one bar of Valyrian steel (0.5 kg)")]
         [SettingPropertyGroup("Smithing materials")]
@@ -1219,6 +1219,34 @@ namespace Armoury
         [SettingPropertyInteger("Ai Gear Log Per Day", 0, 60, "0", HintText = "how many lords' purchases are written to the log each day (the daily total is always written)")]
         [SettingPropertyGroup("Army purchases")]
         public int AiGearLogPerDay { get; set; } = 15;
+
+        [SettingPropertyBool("Workshop Law Enabled", HintText = "town workshops that make arms and armour run as real businesses: they buy ore, wood, leather and linen on the market by the true weight of each piece, pay their workers, sell to the market - and make only what turns a profit")]
+        [SettingPropertyGroup("Workshops")]
+        public bool WorkshopLawEnabled { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Workshop Workers Artisans", 0.00f, 24.00f, "0.00", HintText = "man-days of work the town's artisans put in each day")]
+        [SettingPropertyGroup("Workshops")]
+        public float WorkshopWorkersArtisans { get; set; } = 6f;
+
+        [SettingPropertyFloatingInteger("Workshop Workers", 0.00f, 16.00f, "0.00", HintText = "man-days of work a notable's smithy or wood workshop puts in each day")]
+        [SettingPropertyGroup("Workshops")]
+        public float WorkshopWorkers { get; set; } = 4f;
+
+        [SettingPropertyFloatingInteger("Workshop Wage Per Day", 0.00f, 40.00f, "0.00", HintText = "wages for one man-day at the forge, paid into the town")]
+        [SettingPropertyGroup("Workshops")]
+        public float WorkshopWagePerDay { get; set; } = 10f;
+
+        [SettingPropertyFloatingInteger("Workshop Min Profit Percent", 0.00f, 40.00f, "0.00", HintText = "a workshop makes a piece only if the market pays at least this much over materials and wages")]
+        [SettingPropertyGroup("Workshops")]
+        public float WorkshopMinProfitPercent { get; set; } = 10f;
+
+        [SettingPropertyFloatingInteger("Workshop Crude Kg Per Ore", 0.00f, 6.00f, "0.00", HintText = "kilograms of crude iron a bloomery wins from one load of ore (10 kg); each finer grade costs a fifth more")]
+        [SettingPropertyGroup("Workshops")]
+        public float WorkshopCrudeKgPerOre { get; set; } = 1.5f;
+
+        [SettingPropertyFloatingInteger("Workshop Wood Per Ore", 0.00f, 20.00f, "0.00", HintText = "loads of wood burnt to charcoal for each load of ore smelted")]
+        [SettingPropertyGroup("Workshops")]
+        public float WorkshopWoodPerOre { get; set; } = 5f;
 
         [SettingPropertyBool("Supply Demand Enabled", HintText = "arms, armour and horses obey supply and demand in towns and castles: a full stall sells cheap, an empty one dear - for buying AND selling, you and the AI alike (the item's own worth is untouched)")]
         [SettingPropertyGroup("Supply and demand")]
@@ -1869,6 +1897,13 @@ namespace Armoury
             s.AiGearGoldReserve = AiGearGoldReserve;
             s.AiGearMaxPiecesPerVisit = AiGearMaxPiecesPerVisit;
             s.AiGearLogPerDay = AiGearLogPerDay;
+            s.WorkshopLawEnabled = WorkshopLawEnabled;
+            s.WorkshopWorkersArtisans = WorkshopWorkersArtisans;
+            s.WorkshopWorkers = WorkshopWorkers;
+            s.WorkshopWagePerDay = WorkshopWagePerDay;
+            s.WorkshopMinProfitPercent = WorkshopMinProfitPercent;
+            s.WorkshopCrudeKgPerOre = WorkshopCrudeKgPerOre;
+            s.WorkshopWoodPerOre = WorkshopWoodPerOre;
             s.SupplyDemandEnabled = SupplyDemandEnabled;
             s.SupplyDemandBase = SupplyDemandBase;
             s.SupplyDemandRefProsperity = SupplyDemandRefProsperity;
