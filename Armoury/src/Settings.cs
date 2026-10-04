@@ -375,6 +375,21 @@ namespace Armoury
         public float WorkshopWoodPerOre = 5f;              // loads of wood burnt to charcoal for each load of ore smelted
         public int WorkshopCandidates = 40;                // how many different pieces a workshop weighs each morning when deciding what pays best to make
 
+        // --- Iron Bank ---
+        public bool IronBankEnabled = true;                // the Iron Bank of Braavos lends to lords (AI and you): wages and war chests on credit, repaid daily with interest and from the spoils of war - and woe to those who do not pay
+        public int IronBankCapital = 5000000;              // gold the Bank starts with; loans draw it down, repayments with interest fill it up - an empty Bank lends nothing
+        public float IronBankIncomeDays = 60f;             // a house may borrow this many days of its income, plus its fiefs as surety
+        public int IronBankPerTown = 10000;                // surety the Bank counts for every town a house holds
+        public int IronBankPerCastle = 5000;               // surety the Bank counts for every castle a house holds
+        public int IronBankWageDays = 10;                  // an AI lord borrows when his gold will not cover this many days of his armies' wages (twice that at war)
+        public float IronBankRateKing = 20f;               // yearly interest for a king (percent)
+        public float IronBankRateLanded = 30f;             // yearly interest for a house with fiefs (percent)
+        public float IronBankRateLandless = 45f;           // yearly interest for a house without fiefs (percent)
+        public float IronBankRatePerLoan = 10f;            // extra yearly interest when a debt is already running (percentage points)
+        public float IronBankRateAfterDefault = 15f;       // extra yearly interest for a house that has defaulted before (percentage points)
+        public float IronBankPlayerDefaultRenown = 100f;   // renown you lose when the Bank writes your name among those who did not pay
+        public int IronBankLogPerDay = 15;                 // how many loans and repayments are written to the log each day (the daily total always is)
+
         // --- Supply and demand ---
         public bool SupplyDemandEnabled = true;            // arms, armour and horses obey supply and demand in towns and castles: a full stall sells cheap, an empty one dear - for buying AND selling, you and the AI alike (the item's own worth is untouched)
         public float SupplyDemandBase = 4f;                // pieces of one kind (type and tier) a town of reference prosperity wants on its stalls; fewer for higher tiers

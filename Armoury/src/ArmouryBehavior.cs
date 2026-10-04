@@ -413,6 +413,10 @@ namespace Armoury
                 string nightrest = NightRest.Export();
                 dataStore.SyncData("arm_nightrest", ref nightrest);
                 if (dataStore.IsLoading) NightRest.Import(nightrest);
+                // Bank Zelazny: dlugi rodow i kapital Banku (Jeff 04.10)
+                string bank = IronBank.Export();
+                dataStore.SyncData("arm_ironbank", ref bank);
+                if (dataStore.IsLoading) IronBank.Import(bank);
                 string glut = MarketGlut.Export();
                 dataStore.SyncData("arm_glut", ref glut);
                 if (dataStore.IsLoading) MarketGlut.Import(glut);
@@ -892,6 +896,7 @@ namespace Armoury
             try { QualityRich.Enrich(); } catch (Exception e) { Log.Error("QualityRich.Enrich", e); }
             try { ValyrianSteel.Rename(); } catch (Exception e) { Log.Error("ValyrianSteel.Rename", e); }
             try { Restitution0831(); } catch (Exception e) { Log.Error("Restitution0831", e); }
+            try { IronBank.AddMenus(starter); } catch (Exception e) { Log.Error("IronBank.AddMenus", e); }
             try { SmithMenu.Add(starter); Log.Info("Menu kowala dodane."); }
             catch (Exception e) { Log.Error("OnSessionLaunched", e); }
             try { CleanseAmmo(); } catch (Exception e) { Log.Error("CleanseAmmo", e); }
@@ -1092,6 +1097,7 @@ namespace Armoury
             try { Orders.DailyTick(); }
             catch (Exception e) { Log.Error("OnDailyTick", e); }
             try { ArmsPricing.Daily(); } catch (Exception e) { Log.Error("ArmsPricing.Daily", e); }   // indeksy surowcow i premie wojenne PRZED handlem
+            try { IronBank.Daily(); } catch (Exception e) { Log.Error("IronBank.Daily", e); }   // Bank Zelazny: pozyczki AI, raty, bankructwa
             try { SupplyDemand.DailyTrade(); } catch (Exception e) { Log.Error("SupplyDemand.DailyTrade", e); }
             try { MarketGlut.DailyDigest(); }
             catch (Exception e) { Log.Error("GlutDigest", e); }

@@ -1249,6 +1249,58 @@ namespace Armoury
         public float WorkshopWoodPerOre { get; set; } = 5f;
 [SettingPropertyInteger("Workshop Candidates", 0, 160, "0", HintText = "how many different pieces a workshop weighs each morning when deciding what pays best to make")]        [SettingPropertyGroup("Workshops")]        public int WorkshopCandidates { get; set; } = 40;
 
+        [SettingPropertyBool("Iron Bank Enabled", HintText = "the Iron Bank of Braavos lends to lords (AI and you): wages and war chests on credit, repaid daily with interest and from the spoils of war - and woe to those who do not pay")]
+        [SettingPropertyGroup("Iron bank")]
+        public bool IronBankEnabled { get; set; } = true;
+
+        [SettingPropertyInteger("Iron Bank Capital", 0, 20000000, "0", HintText = "gold the Bank starts with; loans draw it down, repayments with interest fill it up - an empty Bank lends nothing")]
+        [SettingPropertyGroup("Iron bank")]
+        public int IronBankCapital { get; set; } = 5000000;
+
+        [SettingPropertyFloatingInteger("Iron Bank Income Days", 0.00f, 240.00f, "0.00", HintText = "a house may borrow this many days of its income, plus its fiefs as surety")]
+        [SettingPropertyGroup("Iron bank")]
+        public float IronBankIncomeDays { get; set; } = 60f;
+
+        [SettingPropertyInteger("Iron Bank Per Town", 0, 40000, "0", HintText = "surety the Bank counts for every town a house holds")]
+        [SettingPropertyGroup("Iron bank")]
+        public int IronBankPerTown { get; set; } = 10000;
+
+        [SettingPropertyInteger("Iron Bank Per Castle", 0, 20000, "0", HintText = "surety the Bank counts for every castle a house holds")]
+        [SettingPropertyGroup("Iron bank")]
+        public int IronBankPerCastle { get; set; } = 5000;
+
+        [SettingPropertyInteger("Iron Bank Wage Days", 0, 40, "0", HintText = "an AI lord borrows when his gold will not cover this many days of his armies' wages (twice that at war)")]
+        [SettingPropertyGroup("Iron bank")]
+        public int IronBankWageDays { get; set; } = 10;
+
+        [SettingPropertyFloatingInteger("Iron Bank Rate King", 0.00f, 80.00f, "0.00", HintText = "yearly interest for a king (percent)")]
+        [SettingPropertyGroup("Iron bank")]
+        public float IronBankRateKing { get; set; } = 20f;
+
+        [SettingPropertyFloatingInteger("Iron Bank Rate Landed", 0.00f, 120.00f, "0.00", HintText = "yearly interest for a house with fiefs (percent)")]
+        [SettingPropertyGroup("Iron bank")]
+        public float IronBankRateLanded { get; set; } = 30f;
+
+        [SettingPropertyFloatingInteger("Iron Bank Rate Landless", 0.00f, 180.00f, "0.00", HintText = "yearly interest for a house without fiefs (percent)")]
+        [SettingPropertyGroup("Iron bank")]
+        public float IronBankRateLandless { get; set; } = 45f;
+
+        [SettingPropertyFloatingInteger("Iron Bank Rate Per Loan", 0.00f, 40.00f, "0.00", HintText = "extra yearly interest when a debt is already running (percentage points)")]
+        [SettingPropertyGroup("Iron bank")]
+        public float IronBankRatePerLoan { get; set; } = 10f;
+
+        [SettingPropertyFloatingInteger("Iron Bank Rate After Default", 0.00f, 60.00f, "0.00", HintText = "extra yearly interest for a house that has defaulted before (percentage points)")]
+        [SettingPropertyGroup("Iron bank")]
+        public float IronBankRateAfterDefault { get; set; } = 15f;
+
+        [SettingPropertyFloatingInteger("Iron Bank Player Default Renown", 0.00f, 400.00f, "0.00", HintText = "renown you lose when the Bank writes your name among those who did not pay")]
+        [SettingPropertyGroup("Iron bank")]
+        public float IronBankPlayerDefaultRenown { get; set; } = 100f;
+
+        [SettingPropertyInteger("Iron Bank Log Per Day", 0, 60, "0", HintText = "how many loans and repayments are written to the log each day (the daily total always is)")]
+        [SettingPropertyGroup("Iron bank")]
+        public int IronBankLogPerDay { get; set; } = 15;
+
         [SettingPropertyBool("Supply Demand Enabled", HintText = "arms, armour and horses obey supply and demand in towns and castles: a full stall sells cheap, an empty one dear - for buying AND selling, you and the AI alike (the item's own worth is untouched)")]
         [SettingPropertyGroup("Supply and demand")]
         public bool SupplyDemandEnabled { get; set; } = true;
@@ -1906,6 +1958,19 @@ namespace Armoury
             s.WorkshopCrudeKgPerOre = WorkshopCrudeKgPerOre;
             s.WorkshopWoodPerOre = WorkshopWoodPerOre;
             s.WorkshopCandidates = WorkshopCandidates;
+            s.IronBankEnabled = IronBankEnabled;
+            s.IronBankCapital = IronBankCapital;
+            s.IronBankIncomeDays = IronBankIncomeDays;
+            s.IronBankPerTown = IronBankPerTown;
+            s.IronBankPerCastle = IronBankPerCastle;
+            s.IronBankWageDays = IronBankWageDays;
+            s.IronBankRateKing = IronBankRateKing;
+            s.IronBankRateLanded = IronBankRateLanded;
+            s.IronBankRateLandless = IronBankRateLandless;
+            s.IronBankRatePerLoan = IronBankRatePerLoan;
+            s.IronBankRateAfterDefault = IronBankRateAfterDefault;
+            s.IronBankPlayerDefaultRenown = IronBankPlayerDefaultRenown;
+            s.IronBankLogPerDay = IronBankLogPerDay;
             s.SupplyDemandEnabled = SupplyDemandEnabled;
             s.SupplyDemandBase = SupplyDemandBase;
             s.SupplyDemandRefProsperity = SupplyDemandRefProsperity;
