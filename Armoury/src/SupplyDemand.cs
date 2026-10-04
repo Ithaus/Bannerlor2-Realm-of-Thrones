@@ -122,6 +122,9 @@ namespace Armoury
                 if (t >= 6) return 0f;
                 int higher = 0;
                 var shelf = st.ItemRoster;
+                var view = ShelfView(shelf);
+                if (view != null) { foreach (var kv in view) if (kv.Key.ItemType == it.ItemType && TierOf(kv.Key) == t + 1) { higher += kv.Value; break; } }
+                else
                 for (int i = 0; i < shelf.Count; i++)
                 {
                     var el = shelf.GetElementCopyAtIndex(i);
@@ -134,17 +137,53 @@ namespace Armoury
             catch { return 0f; }
         }
 
+        // ZAMROZONA POLKA (audyt dziur B1, Jeff 04.10 "napraw"): w jednym ekranie handlu gracz mogl
+        // wykupic polke "na kredyt" (zloto liczone dopiero przy Done), sprzedac swoje po cenie pustej
+        // polki i odkupic towar za te sama cene - rozrzut x0.25..x2. Gdy ekran handlu jest otwarty,
+        // stan polki bierzemy z chwili jego otwarcia; po zamknieciu wraca zywy stan.
+        private static readonly Dictionary<ItemRoster, List<KeyValuePair<ItemObject, int>>> _frozen = new Dictionary<ItemRoster, List<KeyValuePair<ItemObject, int>>>();
+
+        private static bool TradeScreenOpen()
+        {
+            try
+            {
+                var top = TaleWorlds.ScreenSystem.ScreenManager.TopScreen;
+                return top != null && top.GetType().Name.IndexOf("Inventory", StringComparison.OrdinalIgnoreCase) >= 0;
+            }
+            catch { return false; }
+        }
+
+        private static List<KeyValuePair<ItemObject, int>> ShelfView(ItemRoster shelf)
+        {
+            if (shelf == null) return null;
+            if (!TradeScreenOpen()) { if (_frozen.Count > 0) _frozen.Clear(); return null; }
+            List<KeyValuePair<ItemObject, int>> snap;
+            if (_frozen.TryGetValue(shelf, out snap)) return snap;
+            snap = new List<KeyValuePair<ItemObject, int>>();
+            for (int i = 0; i < shelf.Count; i++)
+            {
+                var el = shelf.GetElementCopyAtIndex(i);
+                if (el.Amount > 0 && el.EquipmentElement.Item != null) snap.Add(new KeyValuePair<ItemObject, int>(el.EquipmentElement.Item, el.Amount));
+            }
+            _frozen[shelf] = snap;
+            return snap;
+        }
+
         /// <summary>Ile sztuk tego koszyka lezy na polce.</summary>
         internal static int Stock(ItemRoster shelf, ItemObject it)
         {
             int n = 0;
             if (shelf == null) return 0;
+            var view = ShelfView(shelf);
+            int frozen = -1;
+            if (view != null) { frozen = 0; foreach (var kv in view) if (SameBucket(kv.Key, it)) frozen += kv.Value; }
             for (int i = 0; i < shelf.Count; i++)
             {
                 var el = shelf.GetElementCopyAtIndex(i);
                 if (el.Amount > 0 && SameBucket(el.EquipmentElement.Item, it)) n += el.Amount;
             }
-            return n;
+            // sprzedaz gracza podnosi zapas (cena spada z kazda sztuka), zakup w tym samym ekranie go NIE obniza
+            return frozen >= 0 ? Math.Max(frozen, n) : n;
         }
 
         internal static float Factor(Settlement st, ItemObject it, bool isSelling, out float d, out int s)

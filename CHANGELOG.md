@@ -1,5 +1,12 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-04 (31) - EKRAN HANDLU: zapas na polce z chwili otwarcia (koniec "wykup na kredyt i odkup")
+**Mod:** Armoury | **Pliki:** `SupplyDemand.cs` (`ShelfView`, `TradeScreenOpen`, `Stock`, `Substitution`)
+**Problem (audyt dziur B1):** nasza cena czytala zywa polke. Vanilla `InventoryLogic` przenosi towar sztuka po sztuce, a zloto sprawdza dopiero przy Done; cofniecie zwraca dokladna cene. Wiec w jednym ekranie: wykupic caly koszyk (bez pieniedzy) -> sprzedac swoje po cenie pustej polki (do x2) -> odkupic koszyk po tej samej cenie; odwrotnie dla taniego zakupu (do x0.25). Rozrzut 8x - wiekszy niz kara sprzedazy vanilli.
+**Zmiana:** gdy na wierzchu jest ekran ekwipunku/handlu, zapas koszyka = max(stan z chwili otwarcia ekranu, stan zywy): sprzedaz gracza dalej podnosi zapas (cena spada z kazda sprzedana sztuka), zakup w tym samym ekranie NIE obniza zapasu (cena nie rosnie od wlasnego wykupu). Substytucja tez z zamrozonego stanu. Po zamknieciu ekranu wraca zywy stan (zakupy gracza po Done juz licza sie normalnie).
+**Ryzyko:** w jednym ekranie mozna kupic duzo sztuk po stalej cenie (cena nie rosnie od wlasnego wykupu) - jak w vanilli; po ponownym otwarciu cena juz uwzglednia wykup.
+**Status:** WGRANE 2026-10-04 (Armoury.dll md5 c9145dede60419ddfeb79dba9f5a4f06, build rc=0, gra zamknieta; poprzednie DLL obok jako `Armoury.dll.bak-2026-10-04-przed-zamrozona-polka`). Na obecnym save.
+
 ## 2026-10-04 (30) - JEDNO ZRODLO ZIMY (WinterBite); BEE i RBL nie dokladaja tej samej kary
 **Mod:** Armoury + pliki ustawien cudzych modow | **Pliki:** NOWY `WinterSource.cs`; `WesterosClimate.cs` (transpiler podmienia tez wywolania `BetterEconomy.Config.SeasonalityProfile`), `SubModuleMain.cs`, `Settings.cs` + `McmSettings.cs` (`SingleWinterSource`); `Configs/ModSettings/Global/RealisticBannerlord/RealisticBannerlord_v2.json` (`WinterFoodPenalty` 0.25 -> 0, kopia `.bak-2026-10-04-jedna-zima`); `Modules/BetterEconomy/ModuleData/better_economy_settings.xml` (`WinterFoodConsumptionMult` 1.15 -> 1.0, kopia `.bak-2026-10-04-jedna-zima`)
 **Problem (audyt D1, Jeff 04.10: "jedno zrodlo zimy"):** przy wieloletniej zimie kary sie mnozyly: plony wsi WinterBite -50% (polnoc mocniej) x BEE `VillageProductionMult` zima 0.7 = 0.35; jedzenie partii WinterBite +50% x RBL `WinterFoodPenalty` +25%; ceny jedzenia - nasza podaz + BEE `FoodPriceBias` +20%; jedzenie ludnosci miast - WinterBite `WinterTownAppetitePer1000` + BEE `WinterFoodConsumptionMult` 1.15; karawany RBL -20% (wszystkie partie) x BEE `CaravanSpeedMult` 0.8.
