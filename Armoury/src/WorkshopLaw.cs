@@ -192,7 +192,7 @@ namespace Armoury
                         CampaignEventDispatcher.Instance.OnItemProduced(it, workshop.Settlement, 1);
                         pool -= days;
                         any = true; done = true;
-                        _made++; _dayRevenue += revenue; _dayCost += cost;
+                        _made++; _dayRevenue += revenue; _dayCost += cost; Note(it, revenue, cost);
                         int k; _madeByType.TryGetValue(it.ItemType, out k); _madeByType[it.ItemType] = k + 1;
                         break;
                     }
@@ -262,6 +262,7 @@ namespace Armoury
                     float perDay = (revenue - cost) / Math.Max(0.1f, days);
                     if (perDay > 0f) scored.Add(new KeyValuePair<float, ItemObject>(perDay, it));
                 }
+                if (scored.Count == 0) NoteEmpty(workshop, town, pool, pOre, pWood, pLea, pLin);
                 scored.Sort((a, b) => b.Key.CompareTo(a.Key));
                 foreach (var kv in scored) list.Add(kv.Value);
             }
@@ -282,7 +283,82 @@ namespace Armoury
                          + ", brak surowca " + _skipMat + ", brak rak " + _skipLabor + ", brak zlota " + _skipGold
                          + " | z niczego zablokowane: cykle rzemieslnikow " + _freeRawBlocked + ", sztabki/wegiel z losowania -> ruda/drewno " + _swappedSmith + ".");
             }
+            FlushDiag();
             _made = _skipLoss = _skipMat = _skipLabor = _skipGold = _freeRawBlocked = _swappedSmith = 0; _dayRevenue = _dayCost = 0; _madeByType.Clear();
+        }
+
+        // ------------------------------------------------------------ diagnoza (wpis 46, tylko log)
+        // Test 14:05 po wpisie 44: dalej same luki po ~6800 zl sztuka, zbrojarze nic. Zanim cokolwiek zmienimy -
+        // log: CO warsztaty robia (id, Value, cena sprzedazy, koszt) i DLACZEGO warsztat ma pusty ranking
+        // (najlepsza sztuka: cena wobec kosztu surowcow i pracy).
+        private static readonly Dictionary<ItemObject, int[]> _diagMade = new Dictionary<ItemObject, int[]>();
+        private static readonly Dictionary<string, int> _diagEmpty = new Dictionary<string, int>();
+        private static readonly Dictionary<string, string> _diagEmptySample = new Dictionary<string, string>();
+
+        private static void Note(ItemObject it, int revenue, int cost)
+        {
+            int[] a;
+            if (!_diagMade.TryGetValue(it, out a)) { a = new int[3]; _diagMade[it] = a; }
+            a[0]++; a[1] += revenue; a[2] += cost;
+        }
+
+        private static void NoteEmpty(Workshop workshop, Town town, List<ItemObject> pool, int pOre, int pWood, int pLea, int pLin)
+        {
+            try
+            {
+                string wt = workshop.WorkshopType.StringId;
+                int n; _diagEmpty.TryGetValue(wt, out n); _diagEmpty[wt] = n + 1;
+                if (_diagEmptySample.ContainsKey(wt)) return;
+                if (pool.Count == 0) { _diagEmptySample[wt] = town.Name + ": brak kandydatow (pula pusta)"; return; }
+                var s = Settings.Current;
+                ItemObject best = null; float bestPd = float.MinValue; string bestTxt = "";
+                foreach (var it in pool)
+                {
+                    float days; var need = Needs(it, out days);
+                    if (need == null) continue;
+                    float cost = need[0] * pOre + need[1] * pWood + need[2] * pLea + need[3] * pLin + days * s.WorkshopWagePerDay;
+                    int revenue = town.GetItemPrice(new EquipmentElement(it, null, null, false), null, true);
+                    float pd = (revenue - cost) / Math.Max(0.1f, days);
+                    if (pd > bestPd)
+                    {
+                        bestPd = pd; best = it;
+                        bestTxt = it.StringId + " (Value " + it.Value + ", cena " + revenue + ") koszt " + (int)cost
+                                  + " = ruda " + need[0].ToString("0.0") + "x" + pOre + " drewno " + need[1].ToString("0.0") + "x" + pWood
+                                  + " skora " + need[2].ToString("0.0") + "x" + pLea + " len " + need[3].ToString("0.0") + "x" + pLin
+                                  + " dni " + days.ToString("0.0") + "x" + s.WorkshopWagePerDay;
+                    }
+                }
+                _diagEmptySample[wt] = town.Name + ": najlepsza " + (best != null ? bestTxt : "brak receptury") + " (pula " + pool.Count + ")";
+            }
+            catch { }
+        }
+
+        private static void FlushDiag()
+        {
+            try
+            {
+                if (_diagMade.Count > 0)
+                {
+                    var l = new List<KeyValuePair<ItemObject, int[]>>(_diagMade);
+                    l.Sort((a, b) => b.Value[1].CompareTo(a.Value[1]));
+                    var parts = new List<string>();
+                    for (int i = 0; i < l.Count && i < 6; i++)
+                        parts.Add(l[i].Key.StringId + " x" + l[i].Value[0] + " (Value " + l[i].Key.Value + ", sprzedaz srednio " + (l[i].Value[1] / l[i].Value[0]) + ", koszt " + (l[i].Value[2] / l[i].Value[0]) + ")");
+                    Log.Info("Warsztaty (diagnoza): najwiecej utargu - " + string.Join("; ", parts.ToArray()) + ".");
+                }
+                if (_diagEmpty.Count > 0)
+                {
+                    var parts = new List<string>();
+                    foreach (var kv in _diagEmpty)
+                    {
+                        string sm; _diagEmptySample.TryGetValue(kv.Key, out sm);
+                        parts.Add(kv.Key + " x" + kv.Value + " [" + sm + "]");
+                    }
+                    Log.Info("Warsztaty (diagnoza): pusty ranking (zadna sztuka nie daje zysku) - " + string.Join(" | ", parts.ToArray()) + ".");
+                }
+            }
+            catch { }
+            _diagMade.Clear(); _diagEmpty.Clear(); _diagEmptySample.Clear();
         }
 
         private static int _freeRawBlocked, _swappedSmith;

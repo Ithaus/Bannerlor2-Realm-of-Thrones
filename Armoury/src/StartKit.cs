@@ -129,28 +129,34 @@ namespace Armoury
 
         // ------------------------------------------------------------ zloto startowe BK
         // Jeff 04.10: "nie moge miec na starcie 1000 denarow". BK (DefaultStartOptions.Adventurer) daje awanturnikowi
-        // 1000 d = ok. 4 funty, ponad rok pracy robotnika. Prefix na StartOption.Initialize podmienia kwote dla
-        // "start_adventurer" na StartGoldAdventurer (BKCampaignStartBehavior.RunStartOption ustawia zloto = option.Gold).
-        public static void StartOptionPrefix(object __instance, ref int gold)
+        // 1000 d = ok. 4 funty, ponad rok pracy robotnika. Wpis 46: prefix na StartOption.Initialize (wpis 44) nie
+        // zadzialal w grze (test 14:05 - 1000 d), wiec ustawiamy zloto PO BKCampaignStartBehavior.RunStartOption, ktore
+        // robi ChangeHeroGold(option.Gold - gold): postfix czyta wybrana opcje i dla "start_adventurer" daje
+        // StartGoldAdventurer (nadwyzka znika - to nie jest zloto, ktore ktos mial).
+        public static void RunStartPostfix(object __instance)
         {
             try
             {
                 var s = Settings.Current;
-                if (s == null || s.StartGoldAdventurer < 0) return;
-                var id = HarmonyLib.Traverse.Create(__instance).Property("StringId").GetValue() as string;
-                if (id == "start_adventurer") gold = s.StartGoldAdventurer;
+                if (s == null || s.StartGoldAdventurer < 0 || Hero.MainHero == null) return;
+                var opt = HarmonyLib.Traverse.Create(__instance).Field("option").GetValue();
+                var id = opt != null ? HarmonyLib.Traverse.Create(opt).Property("StringId").GetValue() as string : null;
+                if (id != "start_adventurer") { Log.Info("StartKit: start BK '" + (id ?? "brak") + "' - zloto bez zmian (" + Hero.MainHero.Gold + " d)."); return; }
+                int was = Hero.MainHero.Gold;
+                Hero.MainHero.ChangeHeroGold(s.StartGoldAdventurer - was);
+                Log.Info("StartKit: awanturnik BK - zloto startowe " + was + " -> " + Hero.MainHero.Gold + " d.");
             }
-            catch { }
+            catch (Exception e) { Log.Error("StartKit.RunStartPostfix", e); }
         }
 
         internal static void ApplyAll(HarmonyLib.Harmony h)
         {
             try
             {
-                var t = HarmonyLib.AccessTools.TypeByName("BannerKings.Managers.CampaignStart.StartOption");
-                var m = t != null ? HarmonyLib.AccessTools.Method(t, "Initialize") : null;
-                if (m != null) h.Patch(m, prefix: new HarmonyLib.HarmonyMethod(typeof(StartKit), nameof(StartOptionPrefix)));
-                Log.Info("StartKit: zloto startowe awanturnika BK = " + Settings.Current.StartGoldAdventurer + " d " + (m != null ? "wpiete" : "(brak BK StartOption)") + ".");
+                var t = HarmonyLib.AccessTools.TypeByName("BannerKings.Behaviours.BKCampaignStartBehavior");
+                var m = t != null ? HarmonyLib.AccessTools.Method(t, "RunStartOption") : null;
+                if (m != null) h.Patch(m, postfix: new HarmonyLib.HarmonyMethod(typeof(StartKit), nameof(RunStartPostfix)));
+                Log.Info("StartKit: zloto startowe awanturnika BK = " + Settings.Current.StartGoldAdventurer + " d " + (m != null ? "wpiete (po RunStartOption)" : "(brak BK RunStartOption)") + ".");
             }
             catch (Exception e) { Log.Error("StartKit.ApplyAll", e); }
         }
