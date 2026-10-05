@@ -427,6 +427,7 @@ namespace Armoury
         // --- The road to market ---
         public bool CastleVillagesSellInTown = true;       // villagers of a village held from a castle cart their goods to the nearest town market of their realm instead of the lord's castle - the castle was the lord's storehouse and garrison, never a market (off = they keep hauling to the castle)
         public float MarketMaxDistance = 150f;             // the farthest town market, by road, a castle village will cart to - beyond it the villagers keep selling at their lord's castle, or the long haul would choke the village storehouse (0 = no limit of ours, only the game's own trade range)
+        public float MarketCartFactor = 2f;                // carts instead of pack loads: villagers of a castle village hauling to a town market carry this many times their usual load - the longer road would otherwise choke the village storehouse (1 = off; above 2 changes little, they take at most three fifths of the store)
 
         // --- Iron Bank ---
         public bool LevyEnabled = true;                    // volunteers come forward only where there are men to spare: hands the fields do not need, and men who want to leave a poor, burnt or warring land

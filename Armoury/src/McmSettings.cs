@@ -1452,6 +1452,10 @@ namespace Armoury
         [SettingPropertyGroup("The road to market")]
         public float MarketMaxDistance { get; set; } = 150f;
 
+        [SettingPropertyFloatingInteger("Market Cart Factor", 0.00f, 8.00f, "0.00", HintText = "carts instead of pack loads: villagers of a castle village hauling to a town market carry this many times their usual load - the longer road would otherwise choke the village storehouse (1 = off; above 2 changes little, they take at most three fifths of the store)")]
+        [SettingPropertyGroup("The road to market")]
+        public float MarketCartFactor { get; set; } = 2f;
+
         [SettingPropertyBool("Levy Enabled", HintText = "volunteers come forward only where there are men to spare: hands the fields do not need, and men who want to leave a poor, burnt or warring land")]
         [SettingPropertyGroup("Iron bank")]
         public bool LevyEnabled { get; set; } = true;
@@ -2726,6 +2730,7 @@ namespace Armoury
             s.WorkshopCandidates = WorkshopCandidates;
             s.CastleVillagesSellInTown = CastleVillagesSellInTown;
             s.MarketMaxDistance = MarketMaxDistance;
+            s.MarketCartFactor = MarketCartFactor;
             s.LevyEnabled = LevyEnabled;
             s.RecruitBaseWilling = RecruitBaseWilling;
             s.RecruitExcessWeight = RecruitExcessWeight;

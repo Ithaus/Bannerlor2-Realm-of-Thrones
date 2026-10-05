@@ -3,8 +3,10 @@ using System.Reflection;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Localization;
 
 namespace Armoury
 {
@@ -28,6 +30,7 @@ namespace Armoury
     {
         private static MethodInfo _move;
         private static bool _errLogged;
+        private static readonly TextObject _txtCart = new TextObject("{=!}Armoury: market carts");
         private static int _toTown, _noMarket, _tooFar, _barred, _lost, _lostToBandits;
 
         internal static void Reset() { _toTown = 0; _noMarket = 0; _tooFar = 0; _barred = 0; _lost = 0; _lostToBandits = 0; }
@@ -63,6 +66,28 @@ namespace Armoury
                 if (!_errLogged) { _errLogged = true; Log.Error("MarketRoad.RoutePrefix", e); }   // raz na sesje; BK (zamek) dziala dalej
                 return true;
             }
+        }
+
+        /// <summary>
+        /// WOZ (wpis 101). Tabor wsi zamkowej jadacy na targ miasta ma kurs ok. 2.7x dluzszy niz do zamku, a bierze tylko
+        /// ok. 14 ladunkow po 100 kg (10 + 20 kg na czlowieka + 100 kg na zwierze juczne): w tescie wpisu 100 magazyny wsi
+        /// zamkowych zatykaly sie dwa razy czesciej niz miejskich (17% wobec 8%), a zatkana wies wstrzymuje cala produkcje.
+        /// Udzwig taboru wsi zamkowej z targiem w miescie x MarketCartFactor (woz zamiast jukow). Postfiks na modelu
+        /// bazowym - model NavalDLC deleguje do niego, BK wlasnego nie rejestruje.
+        /// </summary>
+        public static void CartPostfix(MobileParty mobileParty, ref ExplainedNumber __result)
+        {
+            try
+            {
+                if (mobileParty == null || !mobileParty.IsVillager) return;      // tanie wyjscie - model wolany dla kazdej partii
+                var s = Settings.Current;
+                if (s == null || !s.CastleVillagesSellInTown || s.MarketCartFactor <= 1f) return;
+                var hs = mobileParty.HomeSettlement;
+                var v = hs != null ? hs.Village : null;
+                if (v == null || v.Bound == null || !v.Bound.IsCastle || v.TradeBound == null || !v.TradeBound.IsTown) return;
+                __result.AddFactor(s.MarketCartFactor - 1f, _txtCart);
+            }
+            catch { }
         }
 
         /// <summary>Rozbity tabor wiesniakow - ladunek przepada albo trafia do jukow zwyciezcy (bandy go nie sprzedaja).</summary>
@@ -163,6 +188,14 @@ namespace Armoury
                 if (target == null) { Log.Info("MarketRoad: BRAK VillagerCampaignBehavior.SendVillagerPartyToTradeBoundTown - wsie zamkowe woza do zamku jak dotad."); return; }
                 h.Patch(target, prefix: new HarmonyMethod(typeof(MarketRoad), nameof(RoutePrefix)) { priority = Priority.First });
                 Log.Info("MarketRoad: wsie zamkowe woza plon na targ miasta (TradeBound) - latka wpieta" + (_move != null ? ", trasa vanilli." : ", trasa prosta (brak metody vanilli)."));
+                var cap = AccessTools.Method(typeof(DefaultInventoryCapacityModel), "CalculateInventoryCapacity");
+                if (cap != null)
+                {
+                    h.Patch(cap, postfix: new HarmonyMethod(typeof(MarketRoad), nameof(CartPostfix)));
+                    var s = Settings.Current;
+                    Log.Info("MarketRoad: woz - udzwig taborow wsi zamkowych jadacych na targ x" + (s != null ? s.MarketCartFactor.ToString("0.0") : "?") + ".");
+                }
+                else Log.Info("MarketRoad: BRAK DefaultInventoryCapacityModel.CalculateInventoryCapacity - woz wylaczony.");
             }
             catch (Exception e) { Log.Error("MarketRoad.ApplyAll", e); }
         }
