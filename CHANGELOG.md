@@ -1,5 +1,13 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-05 (76) - OCHOTNICY: AWANS PO KUPNIE CZESCI KLUCZOWYCH (zbroja korpusu, glowna bron, kon u jezdnego); dodatki dokupowane, gdy sa
+**Mod:** Armoury | **Pliki:** `VolunteerKit.cs` (`IsKey`, dodatki w `Buy`, diagnoza dodatkow), `Settings.cs` + `McmSettings.cs` (NOWE `VolunteerKitKeyOnly` = true)
+**Problem:** ~800 cofnietych awansow ochotnikow dziennie (sesja 02:55); diagnoza: brak broni jednorecznej t1-t3, lukow t0-t1, tarcz t2-t3, helmow, zbroi t3. Awans wymagal kupna CALEGO brakujacego kompletu - jeden brakujacy helm albo tarcza cofal awans.
+**Przyczyna:** `VolunteerKit.Buy` traktowal kazda brakujaca czesc kompletu jako warunek awansu.
+**Zmiana (Jeff 05.10, opcja 1: "awans przy najwazniejszej rzeczy ... helm i tarcze dokupuje pozniej pan ... zeby nie biegali boso"):** warunek awansu = czesci kluczowe: zbroja korpusu, glowna bron (luk/kusza u strzelca, inaczej pierwsza bron biala) i kon. Reszta (helm, tarcza, buty, rekawice, plaszcz, rzad, bron zapasowa) - notabl kupuje najtansza z targu, jesli jest i starczy zlota; brak nie cofa awansu, idzie jako zamowienie dla warsztatow. Wyglad zolnierza = komplet szablonu (DTE przy werbunku), wiec nikt nie biega boso. Awanse zolnierzy w druzynie gracza nie byly i nie sa tym ruszane (to tylko pula notabli).
+**Ryzyko / co sprawdzic:** "Ochotnicy: ... cofniete X; dodatkow nie dokupiono Y" - cofniec powinno byc znacznie mniej; nowa linia "Ochotnicy (diagnoza): dodatki bez zakupu (awans zostaje)". Wiecej awansow = wiecej wyzszych tierow w puli = drozsze wojsko i wiekszy popyt na zbroje/bron. Wylacznik: VolunteerKitKeyOnly w MCM.
+**Status:** WGRANE 2026-10-05 (md5 f5d31c240b9280348220d19967dbd644; poprzednie DLL jako `Armoury.dll.bak-2026-10-05-przed-76`).
+
 ## 2026-10-05 (75) - SPRAWCA 7 LUKOW ROT ZNALEZIONY: ROT.dll `ROTRBMCompatibility`; latka u zrodla, kontrola co godzine (74) COFNIETA
 **Mod:** Armoury | **Pliki:** `HistoricalPrices.cs` (postfiks `RotRbmPostfix` na `ROT.CampaignBehaviors.ROTRBMCompatibility.ModifyBowsAndArrows`), `ArmouryBehavior.cs` (usuniety HourlyTickEvent z wpisu 74)
 **Problem:** Jeff 05.10 o wpisie 74: "nie, to trzeba sprawdzic" - kontrola co godzine to obejscie, nie przyczyna. 7 lukow/strzal ROT mialo w grze 90000/100000/200000/130000/150000/12000/11000 zamiast naszych cen; blokada settera (72) nic nie lapala.

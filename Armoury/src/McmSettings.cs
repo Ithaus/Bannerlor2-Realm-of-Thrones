@@ -1404,6 +1404,10 @@ namespace Armoury
         [SettingPropertyGroup("Iron bank")]
         public bool VolunteerKitEnabled { get; set; } = true;
 
+        [SettingPropertyBool("Volunteer Kit Key Only", HintText = "the volunteer rises once his notable buys the key pieces (body armour, main weapon - bow or crossbow for archers - and the horse for riders); helmet, shield, boots and the rest are bought if on the stall, otherwise they become orders for the workshops")]
+        [SettingPropertyGroup("Iron bank")]
+        public bool VolunteerKitKeyOnly { get; set; } = true;
+
         [SettingPropertyBool("Historical Prices Enabled", HintText = "the whole world in historical prices (1 coin = 1 medieval penny): arms and armour priced from their real making cost, smithing materials at medieval prices - wages and incomes already sit at this scale")]
         [SettingPropertyGroup("Iron bank")]
         public bool HistoricalPricesEnabled { get; set; } = true;
@@ -2618,6 +2622,7 @@ namespace Armoury
             s.RecruitGoldToSeller = RecruitGoldToSeller;
             s.NoFreeKitForNewParties = NoFreeKitForNewParties;
             s.VolunteerKitEnabled = VolunteerKitEnabled;
+            s.VolunteerKitKeyOnly = VolunteerKitKeyOnly;
             s.HistoricalPricesEnabled = HistoricalPricesEnabled;
             s.HistIronOrePerKg = HistIronOrePerKg;
             s.HistWoodPerKg = HistWoodPerKg;

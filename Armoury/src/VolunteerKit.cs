@@ -31,10 +31,10 @@ namespace Armoury
     {
         internal static bool On { get { var s = Settings.Current; return s != null && s.VolunteerKitEnabled; } }
 
-        private static int _bought, _reverted, _gold, _pieces, _dayStamp = -1;
+        private static int _bought, _reverted, _gold, _pieces, _extraMissing, _dayStamp = -1;
         private static readonly Dictionary<Settlement, Settlement> _market = new Dictionary<Settlement, Settlement>();
 
-        internal static void Reset() { SupplyDemand.ResetOrders(); _market.Clear(); _bought = _reverted = _gold = _pieces = 0; _dayStamp = -1; }
+        internal static void Reset() { SupplyDemand.ResetOrders(); _market.Clear(); _bought = _reverted = _gold = _pieces = _extraMissing = 0; _dayStamp = -1; }
 
         public static void Prefix(Settlement settlement, out Dictionary<Hero, CharacterObject[]> __state)
         {
@@ -127,11 +127,42 @@ namespace Armoury
             return need;
         }
 
+        // wpis 76 (Jeff 05.10: "awans przy najwazniejszej rzeczy: notabl kupuje glowna bron i zbroje (albo luk u strzelca),
+        // helm i tarcze dokupuje pozniej pan z zakupow AI ... zeby nie biegali boso"): o awansie decyduja czesci KLUCZOWE -
+        // zbroja korpusu, glowna bron (luk/kusza u strzelca, inaczej pierwsza bron biala kompletu) i kon u jezdnego.
+        // Reszta (helm, tarcza, buty, rekawice, plaszcz, rzad konski, bron zapasowa) - notabl dokupuje, jesli jest na targu
+        // i starczy zlota; brak nie cofa awansu, idzie jako zamowienie dla warsztatow (wyglad zolnierza daje komplet szablonu).
+        private static bool IsKey(CharacterObject y, ItemObject it, ref bool mainTaken)
+        {
+            switch (it.ItemType)
+            {
+                case ItemObject.ItemTypeEnum.BodyArmor:
+                case ItemObject.ItemTypeEnum.Horse: return true;
+                case ItemObject.ItemTypeEnum.Bow:
+                case ItemObject.ItemTypeEnum.Crossbow:
+                    if (y.IsRanged && !mainTaken) { mainTaken = true; return true; }
+                    return false;
+                case ItemObject.ItemTypeEnum.OneHandedWeapon:
+                case ItemObject.ItemTypeEnum.TwoHandedWeapon:
+                case ItemObject.ItemTypeEnum.Polearm:
+                    if (!y.IsRanged && !mainTaken) { mainTaken = true; return true; }
+                    return false;
+                default: return false;
+            }
+        }
+
         private static bool Buy(Hero notable, Settlement market, CharacterObject x, CharacterObject y)
         {
-            var need = Missing(x, y);
-            if (need.Count == 0) return true;
-            if (market == null || market.Town == null || market.ItemRoster == null) return false;
+            var all = Missing(x, y);
+            if (all.Count == 0) return true;
+            var need = all; var extra = new List<ItemObject>();
+            if (Settings.Current.VolunteerKitKeyOnly)
+            {
+                need = new List<ItemObject>(); bool main = false;
+                foreach (var it in all) if (IsKey(y, it, ref main)) need.Add(it); else extra.Add(it);
+            }
+            if (need.Count == 0 && extra.Count == 0) return true;
+            if (market == null || market.Town == null || market.ItemRoster == null) return need.Count == 0;   // bez targu: tylko gdy nic kluczowego nie trzeba
             var roster = market.ItemRoster;
             var picks = new List<EquipmentElement>();
             var taken = new Dictionary<int, int>();
@@ -158,20 +189,55 @@ namespace Armoury
             }
             if (notable.Gold < total) { Why("zloto notabla (" + notable.Gold + " < " + total + ")"); return false; }   // nie stac go
             foreach (var e in picks) roster.AddToCounts(e, -1);
-            GiveGoldAction.ApplyForCharacterToSettlement(notable, market, total, true);
+            if (total > 0) GiveGoldAction.ApplyForCharacterToSettlement(notable, market, total, true);
             _gold += total; _pieces += picks.Count;
+            // dodatki: najtansze z targu, jesli sa i starczy zlota; brak nie cofa awansu
+            foreach (var it in extra)
+            {
+                int best = -1, bestPrice = int.MaxValue;
+                for (int i = 0; i < roster.Count; i++)
+                {
+                    var el = roster.GetElementCopyAtIndex(i);
+                    var cand = el.EquipmentElement.Item;
+                    if (cand == null || el.Amount <= 0 || cand.ItemType != it.ItemType || cand.Tier < it.Tier) continue;
+                    if (cand.ItemType == ItemObject.ItemTypeEnum.Horse && cand.HorseComponent != null && cand.HorseComponent.IsPackAnimal) continue;
+                    int price;
+                    try { price = market.Town.MarketData.GetPrice(el.EquipmentElement, null, false, market.Party); } catch { price = cand.Value; }
+                    if (price < bestPrice) { bestPrice = price; best = i; }
+                }
+                if (best < 0 || notable.Gold < bestPrice)
+                {
+                    _extraMissing++;
+                    if (best < 0) SupplyDemand.NoteUnmet(market, it.ItemType, (int)it.Tier + 1, 1f);
+                    WhyExtra(it.ItemType + " t" + ((int)it.Tier + 1));
+                    continue;
+                }
+                var pe = roster.GetElementCopyAtIndex(best).EquipmentElement;
+                roster.AddToCounts(pe, -1);
+                GiveGoldAction.ApplyForCharacterToSettlement(notable, market, bestPrice, true);
+                _gold += bestPrice; _pieces++;
+            }
             return true;
         }
 
         // wpis 70: diagnoza cofnietych awansow - czego brakowalo
         private static readonly Dictionary<string, int> _why = new Dictionary<string, int>();
+        private static readonly Dictionary<string, int> _whyExtra = new Dictionary<string, int>();
+        private static void WhyExtra(string k) { int n; _whyExtra.TryGetValue(k, out n); _whyExtra[k] = n + 1; }
         private static void Why(string k) { if (k.StartsWith("zloto")) k = "zloto notabla"; int n; _why.TryGetValue(k, out n); _why[k] = n + 1; }
 
         private static void Flush()
         {
             if (_dayStamp < 0 || _bought + _reverted == 0) return;
             Log.Info("Ochotnicy: dzien " + _dayStamp + " - awanse z kupionym sprzetem " + _bought + " (" + _pieces + " szt. za " + _gold
-                     + " zl z kiesy notabli do miast), cofniete (brak towaru albo zlota) " + _reverted + ".");
+                     + " zl z kiesy notabli do miast), cofniete (brak towaru albo zlota) " + _reverted + "; dodatkow nie dokupiono " + _extraMissing + ".");
+            if (_whyExtra.Count > 0)
+            {
+                var l2 = new List<KeyValuePair<string, int>>(_whyExtra); l2.Sort((a, b) => b.Value.CompareTo(a.Value));
+                var p2 = new List<string>(); for (int i = 0; i < l2.Count && i < 10; i++) p2.Add(l2[i].Key + " x" + l2[i].Value);
+                Log.Info("Ochotnicy (diagnoza): dodatki bez zakupu (awans zostaje) - " + string.Join(", ", p2.ToArray()) + ".");
+                _whyExtra.Clear();
+            }
             if (_why.Count > 0)
             {
                 var l = new List<KeyValuePair<string, int>>(_why); l.Sort((x, y) => y.Value.CompareTo(x.Value));
@@ -179,7 +245,7 @@ namespace Armoury
                 Log.Info("Ochotnicy (diagnoza): powody cofniec - " + string.Join(", ", parts.ToArray()) + ".");
                 _why.Clear();
             }
-            _bought = _reverted = _gold = _pieces = 0;
+            _bought = _reverted = _gold = _pieces = _extraMissing = 0;
         }
 
         internal static void ApplyAll(Harmony h)
