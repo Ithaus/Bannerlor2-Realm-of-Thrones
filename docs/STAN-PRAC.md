@@ -1,4 +1,4 @@
-# Stan prac - przekazanie dla drugiego konta (2026-10-05, po wpisie 99)
+# Stan prac - przekazanie dla drugiego konta (2026-10-05, po wpisie 100)
 
 Czytaj najpierw: `CLAUDE.md` (zwlaszcza sekcja 8, **zasada 0**: kazda zmiana = kontrola regresji, kolizji
 i spojnosci calej logiki; oraz pulapka MCM w sekcji 7), potem ten plik, potem gorne wpisy `CHANGELOG.md`.
@@ -20,12 +20,21 @@ i spojnosci calej logiki; oraz pulapka MCM w sekcji 7), potem ten plik, potem go
   "miast bez towaru"; "zima: nie"). Potem pozycje 2 i 10 audytu: mnoznik do wartosci historycznej
   (uzbrojenie + narzedzia ok. 90-650 ladunkow rudy na dobe, srodek ok. 260; drewna ok. 6.3 ladunku na ladunek rudy),
   ale dopiero z dowozem (wsie zamkowe woza do zamkow) i rekami warsztatow.
-- **Do powtorzenia:** niezalezny przeglad wpisow 98-99 kilkoma recenzentami (przerwany przez limit sesji;
-  kontrola wg zasady 0 zrobiona recznie - wynik w CHANGELOG).
+- Niezalezny przeglad wpisow 98-99 zrobiony (bez regresji) - wynik w `docs/EKONOMIA-FUNDAMENT-2026-10-05.md`, rozdz. 5.
+- **Fundament ekonomii** (jak zarabiaja wsie, zamki, miasta; sredniowiecze; BetterEconomy; liczby dla 52.6 mln; model docelowy K1-K15):
+  `docs/EKONOMIA-FUNDAMENT-2026-10-05.md`. Zagadka drewna: mod RealisticBannerlord dosypuje je kazdej osadzie co dobe z niczego.
+- **Decyzje Jeffa 05.10:** (1) skala - wojsko zostaje ok. 108 tys., gospodarke dociagamy do niego; (2) plon wsi zamkowych wiezie
+  chlop sam na targ miasta; (3) podwojny mineral BK - USUNAC; (4) BetterEconomy - zamknac ujscia 13 kluczami (fundament, rozdz. 4.5);
+  (5) zaczynamy od dowozu. Zlecil tez: przyrost naturalny i pobor zdejmujacy ludzi z regionu jako czesc ekonomii - badanie i projekt
+  w `docs/DEMOGRAFIA-SILA-ROBOCZA-2026-10-05.md` (jesli pliku nie ma - badanie nie zostalo dokonczone).
+- **Wpis 100** (wsie zamkowe woza plon na targ miasta) WGRANY, NIEPRZETESTOWANY - co czytac w logu: wpis 100 w CHANGELOG
+  (linie "Dowoz:" i "Dowoz (skutki):").
+- **Kolejka (kazde osobno, z testem Jeffa):** 13 kluczy BetterEconomy; usuniecie podwojnego mineralu BK; zapas startowy x10 (K3);
+  paser skupujacy lup band; potem ksiega przeplywow (K1) i dalsze kroki fundamentu.
 
 ## Gdzie jestesmy
 
-- Ostatni wpis: **99** (98-99: aktualizacja wyzej). Wszystkie wpisy 75-97 sa **WGRANE** do gry (DLL Armoury), **ale NIE PRZETESTOWANE**
+- Ostatni wpis: **100** (98-100: aktualizacja wyzej). Wszystkie wpisy 75-97 sa **WGRANE** do gry (DLL Armoury), **ale NIE PRZETESTOWANE**
   w grze - Jeff jeszcze nie gral po nich. Nastepny krok: **test w NOWEJ grze** (dorobek stuleci - wpis 79 -
   dziala tylko w nowej kampanii).
 - Plik MCM Jeffa: `Documents\Mount and Blade II Bannerlord\Configs\ModSettings\Global\Armoury\Armoury.json`

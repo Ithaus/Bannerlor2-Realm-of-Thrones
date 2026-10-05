@@ -1444,6 +1444,14 @@ namespace Armoury
         [SettingPropertyGroup("Workshops")]
         public int WorkshopCandidates { get; set; } = 40;
 
+        [SettingPropertyBool("Castle Villages Sell In Town", HintText = "villagers of a village held from a castle cart their goods to the nearest town market of their realm instead of the lord's castle - the castle was the lord's storehouse and garrison, never a market (off = they keep hauling to the castle)")]
+        [SettingPropertyGroup("The road to market")]
+        public bool CastleVillagesSellInTown { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Market Max Distance", 0.00f, 600.00f, "0.00", HintText = "the farthest town market, by road, a castle village will cart to - beyond it the villagers keep selling at their lord's castle, or the long haul would choke the village storehouse (0 = no limit of ours, only the game's own trade range)")]
+        [SettingPropertyGroup("The road to market")]
+        public float MarketMaxDistance { get; set; } = 150f;
+
         [SettingPropertyBool("Levy Enabled", HintText = "volunteers come forward only where there are men to spare: hands the fields do not need, and men who want to leave a poor, burnt or warring land")]
         [SettingPropertyGroup("Iron bank")]
         public bool LevyEnabled { get; set; } = true;
@@ -2716,6 +2724,8 @@ namespace Armoury
             s.WorkshopCrudeKgPerOre = WorkshopCrudeKgPerOre;
             s.WorkshopWoodPerOre = WorkshopWoodPerOre;
             s.WorkshopCandidates = WorkshopCandidates;
+            s.CastleVillagesSellInTown = CastleVillagesSellInTown;
+            s.MarketMaxDistance = MarketMaxDistance;
             s.LevyEnabled = LevyEnabled;
             s.RecruitBaseWilling = RecruitBaseWilling;
             s.RecruitExcessWeight = RecruitExcessWeight;
