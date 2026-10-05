@@ -1244,6 +1244,10 @@ namespace Armoury
         [SettingPropertyGroup("Army purchases")]
         public int BattleChronicleMinMen { get; set; } = 30;
 
+        [SettingPropertyBool("Build Diary Enabled", HintText = "write a daily diary of building works in every town and castle (progress, daily construction power, days left, stalled works) - log only")]
+        [SettingPropertyGroup("Army purchases")]
+        public bool BuildDiaryEnabled { get; set; } = true;
+
         [SettingPropertyBool("Ai Recruits Bring Kit", HintText = "a fresh recruit still arrives with his own kit (levies came armed); turn off and lords must buy for every new man")]
         [SettingPropertyGroup("Army purchases")]
         public bool AiRecruitsBringKit { get; set; } = true;
@@ -2538,6 +2542,7 @@ namespace Armoury
             s.BattleRealMinSide = BattleRealMinSide;
             s.UniqueMaxWearers = UniqueMaxWearers;
             s.BattleChronicleMinMen = BattleChronicleMinMen;
+            s.BuildDiaryEnabled = BuildDiaryEnabled;
             s.AiRecruitsBringKit = AiRecruitsBringKit;
             s.AiGearBudgetPercent = AiGearBudgetPercent;
             s.AiGearGoldReserve = AiGearGoldReserve;

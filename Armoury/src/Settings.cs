@@ -370,6 +370,7 @@ namespace Armoury
         public int BattleRealMinSide = 50;                 // a clash counts as a real battle for the chronicle's averages only if both sides had at least this many men and neither outnumbered the other more than 4 to 1
         public int UniqueMaxWearers = 3;                   // an item worn by more than this many characters is ordinary attire, not a unique (kept out of the chronicle and the spoils of capture)
         public int BattleChronicleMinMen = 30;              // battles where both sides together had fewer men than this are only counted, not written out in the battle chronicle (yours always are)
+        public bool BuildDiaryEnabled = true;               // write a daily diary of building works in every town and castle (progress, daily construction power, days left, stalled works) - log only
         public bool AiRecruitsBringKit = true;             // a fresh recruit still arrives with his own kit (levies came armed); turn off and lords must buy for every new man
         public float AiGearBudgetPercent = 25f;            // share of a lord's gold (above the reserve) he is willing to spend on gear in one visit to a town
         public int AiGearGoldReserve = 2000;               // gold a lord always keeps back - wages come first
