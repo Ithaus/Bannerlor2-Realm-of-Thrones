@@ -127,7 +127,7 @@ namespace Armoury
                 sb.Append(" (").Append(Signed(delta)).Append(", bez wyjasnienia ").Append(Signed(delta - known)).Append(")");
             }
             sb.Append("; miast bez towaru ").Append(empty).Append(" z ").Append(townCount)
-              .Append("; zima: ").Append(WinterBite.WinterNow() ? (WinterBite.LongNight ? "TAK (Dluga Noc)" : "TAK") : "nie")
+              .Append("; zima: ").Append(WinterBite.WinterNow() ? "TAK" : "nie")
               .Append(". Ladunek = ").Append(kg.ToString("0")).Append(" kg.");
             Log.Info(sb.ToString());
             b.LastAll = all; b.LastTowns = towns; b.NewDay();

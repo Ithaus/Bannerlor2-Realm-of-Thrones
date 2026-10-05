@@ -321,7 +321,6 @@ namespace Armoury
         public float WinterTownAppetitePer1000 = 0.5f;     // extra daily food-stock drain per 1000 town prosperity in winter
         public float AutumnStockMultiplier = 2f;           // in autumn the AI supply cap (BkSupplyDaysCap) is multiplied by this - stock up or starve
         public int NorthGradientPercent = 25;              // how much harder winter bites in the far north (and softer in Dorne)
-        public bool LongNightWithNK = true;                // while the Night King marches, EVERY day counts as winter - the Others bring the cold with them
         public bool ScorchedEarthEnabled = true;           // war leaves scars: enemy armies forage villages on the march, and plundered villages heal slowly
         public int ForageMinMen = 100;                     // armies at least this large live off enemy land
         public float ForageRadius = 3f;                    // map range within which a passing army drains a hostile village

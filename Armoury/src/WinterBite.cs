@@ -11,8 +11,8 @@ namespace Armoury
 {
     /// <summary>
     /// ZIMA Z ZEBAMI (Jeff 31.08, "rob"). ROT ma mechanicznie zwykle 4 pory
-    /// roku - "pokoleniowa zima" to czysta fabula. Nasz kalendarz (rok 168
-    /// dni) daje zime 42-dniowa co roku i te zime uzbrajamy:
+    /// roku - "pokoleniowa zima" to czysta fabula. Nasz kalendarz (rok 364
+    /// dni) daje zime 91-dniowa co roku i te zime uzbrajamy:
     ///  - wojsko je wiecej (konsumpcja partii +50%),
     ///  - wioski nie rodza (produkcja -50%) - ceny zywnosci rosna SAME,
     ///    emergentnie, bo podaz wysycha,
@@ -20,10 +20,11 @@ namespace Armoury
     ///    i nasza zaraza lamie twierdze jak w kronikach,
     ///  - jesienia AI gromadzi (cap zapasow BK x2) - kto nie zdazyl, gloduje,
     ///  - GRADIENT POLNOCY: im dalej na polnoc (posY mapy), tym zima gryzie
-    ///    mocniej (+-25%): pod Winterfell przednowek, w Dorne lagodnie,
-    ///  - DLUGA NOC: gdy Nocny Krol jest w polu, KAZDY dzien liczy sie jak
-    ///    zimowy - Inni niosa zime ze soba (a sami nie jedza, wiec ich to
-    ///    nie boli; ROT pomija umarlych w konsumpcji przed delegacja).
+    ///    mocniej (+-25%): pod Winterfell przednowek, w Dorne lagodnie.
+    /// DLUGA NOC USUNIETA (wpis 99, Jeff 05.10: "wywal dluga noc"): warunek "zywy
+    /// bohater kultury whitewalker w partii" byl prawda od pierwszej doby kazdej
+    /// kampanii ROT (Inni maja partie od startu), wiec caly swiat mial wieczna zime:
+    /// wsie -38..-62% produkcji, wojsko +50% jedzenia. Zima jest teraz tylko z kalendarza.
     /// Marszu zima nie tniemy - vanilla juz ma -10% na sniegu.
     /// Patche TYLKO na modelach bazowych (ROT/BK deleguja/postfixuja) -
     /// zero podwojnego mnozenia.
@@ -32,8 +33,6 @@ namespace Armoury
     {
         private static readonly TextObject _txtWinter = new TextObject("{=!}Winter");
         private static int _lastSeason = -1;
-        private static bool _longNight;
-        internal static bool LongNight { get { return _longNight; } }   // wpis 98: do ksiegi rudy i drewna (tylko odczyt)
 
         internal static bool WinterNow()
         {
@@ -41,7 +40,6 @@ namespace Armoury
             {
                 var s = Settings.Current;
                 if (s == null || !s.WinterBiteEnabled) return false;
-                if (_longNight && s.LongNightWithNK) return true;
                 return WesterosClimate.Now() == CampaignTime.Seasons.Winter;
             }
             catch { return false; }
@@ -62,22 +60,6 @@ namespace Armoury
             {
                 var s = Settings.Current;
                 if (s == null || !s.WinterBiteEnabled) return;
-                // Dluga Noc: Nocny Krol w polu = zima maszeruje z umarlymi
-                bool nk = false;
-                if (s.LongNightWithNK)
-                {
-                    foreach (var h in Hero.AllAliveHeroes)
-                    {
-                        if (h == null || h.Culture == null || h.Culture.StringId != "whitewalker") continue;
-                        if (h.PartyBelongedTo != null) { nk = true; break; }
-                    }
-                }
-                if (nk != _longNight)
-                {
-                    _longNight = nk;
-                    Log.Player(nk ? "The Long Night falls - winter marches with the dead."
-                                  : "Dawn breaks over the realm - the Long Night is over.", true);
-                }
 
                 int season = (int)WesterosClimate.Now();
                 if (season != _lastSeason)
@@ -179,7 +161,7 @@ namespace Armoury
                 if (mTown != null) h.Patch(mTown, postfix: new HarmonyMethod(typeof(WinterBite), "TownFoodPostfix"));
                 Log.Info("WinterBite: zima uzbrojona (jedzenie +" + s.WinterPartyFoodBonusPercent
                          + "%, wioski -" + s.WinterVillageOutputCutPercent + "%, gradient polnocy "
-                         + s.NorthGradientPercent + "%, Dluga Noc " + (s.LongNightWithNK ? "TAK" : "nie") + ").");
+                         + s.NorthGradientPercent + "%; tylko zima z kalendarza - Dluga Noc usunieta wpisem 99).");
             }
             catch (Exception e) { Log.Error("WinterBite.ApplyAll", e); }
         }

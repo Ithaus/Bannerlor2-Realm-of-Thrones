@@ -1072,10 +1072,6 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public int NorthGradientPercent { get; set; } = 25;
 
-        [SettingPropertyBool("Long Night With N K", HintText = "while the Night King marches, EVERY day counts as winter - the Others bring the cold with them")]
-        [SettingPropertyGroup("The marching column")]
-        public bool LongNightWithNK { get; set; } = true;
-
         [SettingPropertyBool("Scorched Earth Enabled", HintText = "war leaves scars: enemy armies forage villages on the march, and plundered villages heal slowly")]
         [SettingPropertyGroup("The marching column")]
         public bool ScorchedEarthEnabled { get; set; } = true;
@@ -2627,7 +2623,6 @@ namespace Armoury
             s.WinterTownAppetitePer1000 = WinterTownAppetitePer1000;
             s.AutumnStockMultiplier = AutumnStockMultiplier;
             s.NorthGradientPercent = NorthGradientPercent;
-            s.LongNightWithNK = LongNightWithNK;
             s.ScorchedEarthEnabled = ScorchedEarthEnabled;
             s.ForageMinMen = ForageMinMen;
             s.ForageRadius = ForageRadius;
