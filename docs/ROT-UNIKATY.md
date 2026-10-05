@@ -1,214 +1,182 @@
-# Unikaty Realm of Thrones - spis (2026-10-04)
+# Unikaty Realm of Thrones - spis (2026-10-05, wedlug NAZW widocznych w grze)
 
-Jeff 04.10: "zrob audyt - tabele przedmiotow, ktore dodaje Gra o Tron, i wyklucz przedmioty unikatowe".
-Zrodlo: wszystkie `<Item>`/`<CraftedItem>` uzbrojenia w `Modules/ROT*/ModuleData` (1460 sztuk). Kryteria unikatu:
-(1) ROT oznacza je `is_merchandise="false"`; (2) autor wpisal recznie cene (>= 10 000 - zwykle przedmioty ROT nie maja ceny, liczy ja gra);
-(3) id zaczyna sie od imienia postaci (Brienne, Ogar, Gora, Ramsay, Loras, Renly, Rhaegar...); (4) legenda albo material z legend
-(stal valyrianska, weirwood, smocze szklo, smocza kosc, olbrzymy, Kruczy Zab); (5) korony.
-NIE sa unikatami: stroje oddzialow rodow (stark_, mormont_, dayne_, royce_, lannister_...), zbroje kultury valyrian (valyrian_plate - stroj kultury),
-zwykla bron z nazwa krainy (crownlands_halberd, spiked_mace).
+Jeff 05.10: "Northern Leather Boots to nie jest unikat, to buty z Polnocy - gdyby byly Jon Snow Boots, to bylby unikat".
+Zasada: unikat = nazwa w grze zawiera imie postaci, legende/material z legend (stal valyrianska, weirwood, smocze szklo,
+smocza kosc, olbrzymy, Kruczy Zab) albo korone, albo autor ROT dal mu legendarna cene (>= 100 000).
+NIE sa unikatami: rzeczy o nazwach ogolnych, nawet gdy id w plikach ROT ma imie (jon_snow_boots = Northern Leather Boots,
+jonsnow_armor = Northern Elite Leathers, jaime_clothes = Noble Clothes, dayne_armor = Targaryen Kingsguard Armor),
+stroje rodow (Mormont Armor, Dayne Plate), zbroje kultury Valyrian (Valyrian Plate Armor), Noble Default, Andal Shoes.
+Skutek w grze (Armoury RotUniques -> IsUnique): warsztaty ich nie robia, AI ich nie kupuje, wycena x prestiz, kronika i zdobycz.
+Razem: 157.
 
-Skutek w grze (Armoury `RotUniques.cs` -> `ArmsPricing.IsUnique`): warsztaty ich nie robia, AI ich nie kupuje na targu, wycena historyczna x prestiz (`HistUniquePrestige`).
-Razem unikatow: 177.
+## 1. Legendy i materialy z legend (63)
 
-## 1. Legendy i materialy z legend (48)
-
-| id | nazwa | typ | kultura | powod |
+| id | nazwa w grze | typ | kultura | powod |
 |---|---|---|---|---|
-| `assist_sword` | Despair | TwoHandedSword | - | poza handlem (ROT); cena wpisana przez autora: 300000; legenda/material: assist_sword |
-| `blackfyre` | Blackfyre | TwoHandedSword | - | poza handlem (ROT); cena wpisana przez autora: 300000; legenda/material: blackfyre |
-| `blackfyre_boots` | Blackfyre Sabatons | LegArmor | valyrian | legenda/material: blackfyre |
-| `blackfyre_gauntlets` | Blackfyre Gauntlets | HandArmor | valyrian | legenda/material: blackfyre |
-| `blackfyre_helmet` | Blackfyre Helmet | HeadArmor | valyrian | legenda/material: blackfyre |
-| `blackfyre_pauldrons` | Blackfyre Pauldrons | Cape | valyrian | legenda/material: blackfyre |
-| `blackfyre_plate` | Blackfyre Plate | BodyArmor | valyrian | legenda/material: blackfyre |
-| `brightroar` | Brightroar | TwoHandedSword | - | poza handlem (ROT); cena wpisana przez autora: 300000; legenda/material: brightroar |
-| `brightroar2` | Brightroar Silver | TwoHandedSword | - | poza handlem (ROT); cena wpisana przez autora: 300000; legenda/material: brightroar |
-| `darksister` | Dark Sister | OneHandedSword | - | poza handlem (ROT); cena wpisana przez autora: 300000; legenda/material: darksister |
-| `dragonbone_bow` | Dragonbone Bow | Bow | valyrian | cena wpisana przez autora: 150000; legenda/material: dragonbone |
-| `dragonglass_axe` | Dragonglass Axe | TwoHandedAxe | freefolk | legenda/material: dragonglass |
-| `giant_arrows` | Giant Arrows | Arrows | freefolk | legenda/material: giant |
-| `giant_boots` | Giant Boots | LegArmor | freefolk | legenda/material: giant |
-| `giant_bow` | Giant Bow | Bow | freefolk | cena wpisana przez autora: 500000; legenda/material: giant |
-| `giant_club` | Giant Club | TwoHandedAxe | freefolk | legenda/material: giant |
-| `giant_garb` | Giant King Armor | BodyArmor | freefolk | legenda/material: giant |
-| `giant_handwraps` | Giant Handwraps | HandArmor | freefolk | legenda/material: giant |
-| `goldenheart_longbow` | Goldenheart Longbow | Bow | summer | cena wpisana przez autora: 200000; legenda/material: goldenheart |
-| `heartsbane` | Heartsbane | TwoHandedSword | - | poza handlem (ROT); cena wpisana przez autora: 300000; legenda/material: heartsbane |
-| `ice_sword` | Ice | TwoHandedSword | battania | poza handlem (ROT); cena wpisana przez autora: 350000; legenda/material: ice_sword |
-| `ice_sword2` | Ice Sword | OneHandedSword | whitewalker | legenda/material: ice_sword |
-| `koa_sword_tier_5` | Valyrian Steel Sword type 1 | OneHandedSword | - | cena wpisana przez autora: 200000; legenda/material: koa_sword |
-| `lady_forlorn` | Tempest | OneHandedSword | - | poza handlem (ROT); cena wpisana przez autora: 300000; legenda/material: lady_forlorn |
-| `lady_forlorn2` | Lady Forlorn | OneHandedSword | - | poza handlem (ROT); cena wpisana przez autora: 300000; legenda/material: lady_forlorn |
-| `lamentation` | Lamentation | OneHandedSword | - | poza handlem (ROT); cena wpisana przez autora: 300000; legenda/material: lamentation |
-| `lightbringer` | Lightbringer | OneHandedSword | - | poza handlem (ROT); cena wpisana przez autora: 250000; legenda/material: lightbringer |
-| `longclaw_sword` | Longclaw | TwoHandedSword | - | poza handlem (ROT); cena wpisana przez autora: 300000; legenda/material: longclaw |
-| `nightfall` | Nightfall | TwoHandedSword | - | poza handlem (ROT); cena wpisana przez autora: 300000; legenda/material: nightfall |
-| `oathkeeper_sword` | Oathkeeper | OneHandedSword | - | poza handlem (ROT); cena wpisana przez autora: 300000; legenda/material: oathkeeper |
-| `ravens_teeth_arrows` | Ravens' Teeth Arrows | Arrows | river | legenda/material: ravens_teeth |
-| `ravens_teeth_longbow` | Ravens' Teeth Longbow | Bow | river | legenda/material: ravens_teeth |
-| `red_rain` | Red Rain | OneHandedSword | - | poza handlem (ROT); cena wpisana przez autora: 300000; legenda/material: red_rain |
-| `truth` | Truth | OneHandedSword | - | poza handlem (ROT); cena wpisana przez autora: 280000; legenda/material: truth |
-| `val_steel_sword_2` | Valyrian Steel Sword type 2 | OneHandedSword | - | cena wpisana przez autora: 200000; legenda/material: val_steel |
-| `val_steel_sword_3` | Valyrian Steel Sword type 3 | OneHandedSword | - | cena wpisana przez autora: 200000; legenda/material: val_steel |
-| `val_steel_sword_4` | Valyrian Steel Sword type 4 | OneHandedSword | - | cena wpisana przez autora: 200000; legenda/material: val_steel |
-| `val_steel_sword_5` | Valyrian Steel Sword type 5 | OneHandedSword | - | cena wpisana przez autora: 200000; legenda/material: val_steel |
-| `val_steel_sword_6` | Valyrian Steel Sword type 6 | OneHandedSword | - | cena wpisana przez autora: 200000; legenda/material: val_steel |
-| `val_steel_sword_7` | Valyrian Steel Sword type 7 | OneHandedSword | - | cena wpisana przez autora: 200000; legenda/material: val_steel |
-| `val_steel_sword_8` | Valyrian Steel Sword type 8 | TwoHandedSword | - | cena wpisana przez autora: 200000; legenda/material: val_steel |
-| `val_steel_sword_blue` | Valyrian Steel Sword Blue | OneHandedSword | - | cena wpisana przez autora: 200000; legenda/material: val_steel |
-| `val_steel_sword_red` | Valyrian Steel Sword Red | OneHandedSword | - | cena wpisana przez autora: 200000; legenda/material: val_steel |
-| `vigilance_sword` | Vigilance | OneHandedSword | - | poza handlem (ROT); cena wpisana przez autora: 300000; legenda/material: vigilance_sword |
-| `weirwood_bow` | Weirwood Bow | Bow | battania | cena wpisana przez autora: 150000; legenda/material: weirwood |
-| `whyt_sword` | Orphanmaker | TwoHandedSword | - | cena wpisana przez autora: 250000; legenda/material: whyt |
-| `widows_wail` | Liontooth | OneHandedSword | - | poza handlem (ROT); cena wpisana przez autora: 300000; legenda/material: widows_wail |
-| `ww2_sword` | Widow's Wail | OneHandedSword | - | poza handlem (ROT); cena wpisana przez autora: 300000; legenda/material: ww2 |
+| `assist_sword` | Despair | TwoHandedSword | - | legenda/material: Despair; legendarna cena autora 300000 |
+| `blackfyre` | Blackfyre | TwoHandedSword | - | legenda/material: Blackfyre; legendarna cena autora 300000 |
+| `blackfyre_boots` | Blackfyre Sabatons | LegArmor | valyrian | legenda/material: Blackfyre |
+| `blackfyre_gauntlets` | Blackfyre Gauntlets | HandArmor | valyrian | legenda/material: Blackfyre |
+| `blackfyre_helmet` | Blackfyre Helmet | HeadArmor | valyrian | legenda/material: Blackfyre |
+| `blackfyre_pauldrons` | Blackfyre Pauldrons | Cape | valyrian | legenda/material: Blackfyre |
+| `blackfyre_plate` | Blackfyre Plate | BodyArmor | valyrian | legenda/material: Blackfyre |
+| `bolton_sword` | Bolton Sword | OneHandedSword | - | legendarna cena autora 200000 |
+| `brightroar` | Brightroar | TwoHandedSword | - | legenda/material: Brightroar; legendarna cena autora 300000 |
+| `brightroar2` | Brightroar Silver | TwoHandedSword | - | legenda/material: Brightroar; legendarna cena autora 300000 |
+| `celtigar_axe` | Crab's Pincer | OneHandedAxe | dragonstone | legenda/material: Crab's Pincer |
+| `darksister` | Dark Sister | OneHandedSword | - | legenda/material: Dark Sister; legendarna cena autora 300000 |
+| `dawn` | Dawn | TwoHandedSword | - | legenda/material: Dawn; legendarna cena autora 300000 |
+| `dragonbone_bow` | Dragonbone Bow | Bow | valyrian | legenda/material: Dragonbone; legendarna cena autora 150000 |
+| `dragonglass_axe` | Dragonglass Axe | TwoHandedAxe | freefolk | legenda/material: Dragonglass |
+| `euron_axe` | Euron's Axe | OneHandedAxe | sturgia | postac w nazwie: Euron; legendarna cena autora 300000 |
+| `giant_arrows` | Giant Arrows | Arrows | freefolk | legenda/material: Giant |
+| `giant_boots` | Giant Boots | LegArmor | freefolk | legenda/material: Giant |
+| `giant_bow` | Giant Bow | Bow | freefolk | legenda/material: Giant; legendarna cena autora 500000 |
+| `giant_club` | Giant Club | TwoHandedAxe | freefolk | legenda/material: Giant |
+| `giant_garb` | Giant King Armor | BodyArmor | freefolk | legenda/material: Giant |
+| `giant_handwraps` | Giant Handwraps | HandArmor | freefolk | legenda/material: Giant |
+| `goldenheart_longbow` | Goldenheart Longbow | Bow | summer | legenda/material: Goldenheart; legendarna cena autora 200000 |
+| `heartsbane` | Heartsbane | TwoHandedSword | - | legenda/material: Heartsbane; legendarna cena autora 300000 |
+| `ice_spear` | Ice Spear | TwoHandedPolearm | whitewalker | legenda/material: Ice |
+| `ice_sword` | Ice | TwoHandedSword | battania | legenda/material: Ice; legendarna cena autora 350000 |
+| `ice_sword2` | Ice Sword | OneHandedSword | whitewalker | legenda/material: Ice |
+| `koa_sword_tier_5` | Valyrian Steel Sword type 1 | OneHandedSword | - | legenda/material: Valyrian Steel; legendarna cena autora 200000 |
+| `lady_forlorn` | Tempest | OneHandedSword | - | legenda/material: Tempest; legendarna cena autora 300000 |
+| `lady_forlorn2` | Lady Forlorn | OneHandedSword | - | legenda/material: Lady Forlorn; legendarna cena autora 300000 |
+| `lamentation` | Lamentation | OneHandedSword | - | legenda/material: Lamentation; legendarna cena autora 300000 |
+| `lightbringer` | Lightbringer | OneHandedSword | - | legenda/material: Lightbringer; legendarna cena autora 250000 |
+| `longclaw_sword` | Longclaw | TwoHandedSword | - | legenda/material: Longclaw; legendarna cena autora 300000 |
+| `mountain_sword` | Gregor Clegane's Sword | TwoHandedSword | - | postac w nazwie: Gregor; legendarna cena autora 175000 |
+| `needle` | Needle | OneHandedSword | battania | legenda/material: Needle |
+| `nightfall` | Nightfall | TwoHandedSword | - | legenda/material: Nightfall; legendarna cena autora 300000 |
+| `nightking_blade` | White Walker Blade | TwoHandedPolearm | looters | legenda/material: White Walker |
+| `nightking_boots` | White Walker Boots | LegArmor | looters | legenda/material: White Walker |
+| `nightking_bracers` | White Walker Bracers | HandArmor | looters | legenda/material: White Walker |
+| `oathkeeper_sword` | Oathkeeper | OneHandedSword | - | legenda/material: Oathkeeper; legendarna cena autora 300000 |
+| `red_rain` | Red Rain | OneHandedSword | - | legenda/material: Red Rain; legendarna cena autora 300000 |
+| `renly_sword` | Renly Baratheon's Sword | OneHandedSword | - | postac w nazwie: Renly; legendarna cena autora 180000 |
+| `skull_sword` | Skull Sword | OneHandedSword | - | legenda/material: Skull Sword; legendarna cena autora 150000 |
+| `truth` | Truth | OneHandedSword | - | legenda/material: Truth; legendarna cena autora 280000 |
+| `tyrell_sword` | Tyrell Sword | OneHandedSword | - | legendarna cena autora 200000 |
+| `val_steel_sword_2` | Valyrian Steel Sword type 2 | OneHandedSword | - | legenda/material: Valyrian Steel; legendarna cena autora 200000 |
+| `val_steel_sword_3` | Valyrian Steel Sword type 3 | OneHandedSword | - | legenda/material: Valyrian Steel; legendarna cena autora 200000 |
+| `val_steel_sword_4` | Valyrian Steel Sword type 4 | OneHandedSword | - | legenda/material: Valyrian Steel; legendarna cena autora 200000 |
+| `val_steel_sword_5` | Valyrian Steel Sword type 5 | OneHandedSword | - | legenda/material: Valyrian Steel; legendarna cena autora 200000 |
+| `val_steel_sword_6` | Valyrian Steel Sword type 6 | OneHandedSword | - | legenda/material: Valyrian Steel; legendarna cena autora 200000 |
+| `val_steel_sword_7` | Valyrian Steel Sword type 7 | OneHandedSword | - | legenda/material: Valyrian Steel; legendarna cena autora 200000 |
+| `val_steel_sword_8` | Valyrian Steel Sword type 8 | TwoHandedSword | - | legenda/material: Valyrian Steel; legendarna cena autora 200000 |
+| `val_steel_sword_blue` | Valyrian Steel Sword Blue | OneHandedSword | - | legenda/material: Valyrian Steel; legendarna cena autora 200000 |
+| `val_steel_sword_red` | Valyrian Steel Sword Red | OneHandedSword | - | legenda/material: Valyrian Steel; legendarna cena autora 200000 |
+| `vigilance_sword` | Vigilance | OneHandedSword | - | legenda/material: Vigilance; legendarna cena autora 300000 |
+| `weirwood_bow` | Weirwood Bow | Bow | battania | legenda/material: Weirwood; legendarna cena autora 150000 |
+| `white_walker_saddle` | White Walker Saddle | HorseHarness | wights | legenda/material: White Walker |
+| `whitewalker_armor2` | White Walker Pteruges | BodyArmor | whitewalker | legenda/material: White Walker |
+| `whitewalker_bracers2` | White Walker Leather Bracers | HandArmor | whitewalker | legenda/material: White Walker |
+| `whitewalker_greaves` | White Walker Leather Greaves | LegArmor | whitewalker | legenda/material: White Walker |
+| `whyt_sword` | Orphanmaker | TwoHandedSword | - | legenda/material: Orphanmaker; legendarna cena autora 250000 |
+| `widows_wail` | Liontooth | OneHandedSword | - | legenda/material: Liontooth; legendarna cena autora 300000 |
+| `ww2_sword` | Widow's Wail | OneHandedSword | - | legenda/material: Widow's Wail; legendarna cena autora 300000 |
 
 ## 2. Korony (8)
 
-| id | nazwa | typ | kultura | powod |
+| id | nazwa w grze | typ | kultura | powod |
 |---|---|---|---|---|
-| `baratheon_crown` | Robert's Crown | HeadArmor | stormlands | korona |
-| `cersei_crown` | Cersei's Crown | HeadArmor | crownlands | poza handlem (ROT); postac/imienny: cersei; korona |
-| `euron_crown` | Driftwood Crown | HeadArmor | sturgia | postac/imienny: euron; korona |
-| `joffrey_crown` | Joffrey's Crown | HeadArmor | crownlands | postac/imienny: joffrey; korona |
-| `margaery_crown` | Margaery's Crown | HeadArmor | reach | postac/imienny: margaery; korona |
-| `renly_crown` | Renly Crown | HeadArmor | stormlands | postac/imienny: renly; korona |
-| `robb_crown` | King in the North Crown | HeadArmor | battania | postac/imienny: robb; korona |
-| `sansa_crown` | Sansa's Crown | HeadArmor | battania | postac/imienny: sansa; korona |
+| `baratheon_crown` | Robert's Crown | HeadArmor | stormlands | postac w nazwie: Robert; korona |
+| `cersei_crown` | Cersei's Crown | HeadArmor | crownlands | postac w nazwie: Cersei; korona |
+| `euron_crown` | Driftwood Crown | HeadArmor | sturgia | korona |
+| `joffrey_crown` | Joffrey's Crown | HeadArmor | crownlands | postac w nazwie: Joffrey; korona |
+| `margaery_crown` | Margaery's Crown | HeadArmor | reach | postac w nazwie: Margaery; korona |
+| `renly_crown` | Renly Crown | HeadArmor | stormlands | postac w nazwie: Renly; korona |
+| `robb_crown` | King in the North Crown | HeadArmor | battania | korona |
+| `sansa_crown` | Sansa's Crown | HeadArmor | battania | postac w nazwie: Sansa; korona |
 
-## 3. Rynsztunek imiennych postaci (102)
+## 3. Rynsztunek postaci (imie w nazwie) (86)
 
-| id | nazwa | typ | kultura | powod |
+| id | nazwa w grze | typ | kultura | powod |
 |---|---|---|---|---|
-| `baelish_boots` | Baelish Boots | LegArmor | baelish | poza handlem (ROT); postac/imienny: baelish |
-| `baelish_clothes` | Baelish Clothes | BodyArmor | crownlands | poza handlem (ROT); postac/imienny: baelish |
-| `baratheon_hammer` | Robert Baratheon's Hammer | TwoHandedAxe | stormlands | poza handlem (ROT); postac/imienny: baratheon_hammer |
-| `barristan_sword` | Barristan Selmy Sword | OneHandedSword | - | poza handlem (ROT); postac/imienny: barristan |
-| `blackfish_armor` | Blackfish Armor | BodyArmor | river | postac/imienny: blackfish |
-| `blackfish_shoulders` | Blackfish Shoulders | Cape | river | postac/imienny: blackfish |
-| `bolton_sword` | Bolton Sword | OneHandedSword | - | poza handlem (ROT); cena wpisana przez autora: 200000; postac/imienny: bolton_sword |
-| `brienne_armor` | Brienne Armor | BodyArmor | crownlands | postac/imienny: brienne |
-| `brienne_boots` | Brienne Plated Boots | LegArmor | stormlands | postac/imienny: brienne |
-| `brienne_gloves` | Brienne Plated Gloves | HandArmor | stormlands | postac/imienny: brienne |
-| `brienne_helmet` | Brienne Helmet | HeadArmor | stormlands | postac/imienny: brienne |
-| `brienne_pauldrons` | Brienne Pauldrons | Cape | stormlands | postac/imienny: brienne |
-| `brienne_plate` | Brienne Plate | BodyArmor | stormlands | postac/imienny: brienne |
-| `bronn_armor1` | Bronn Leather Armor with Mail | BodyArmor | river | postac/imienny: bronn |
-| `bronn_armor2` | Bronn Leather Armor | BodyArmor | crownlands | postac/imienny: bronn |
-| `bull_helmet` | Gendry's Bull Helmet | HeadArmor | stormlands | poza handlem (ROT); postac/imienny: bull_helmet |
-| `celtigar_axe` | Crab's Pincer | OneHandedAxe | dragonstone | poza handlem (ROT); postac/imienny: celtigar_axe |
-| `cersei_armor` | Cersei's Armored Dress | BodyArmor | crownlands | poza handlem (ROT); postac/imienny: cersei |
-| `cersei_dress` | Cersei's Dress | BodyArmor | crownlands | poza handlem (ROT); postac/imienny: cersei |
-| `cersei_red_dress` | Cersei's Red Dress | BodyArmor | crownlands | poza handlem (ROT); postac/imienny: cersei |
-| `dany_boots` | Danaerys Boots | LegArmor | ghiscari | poza handlem (ROT); postac/imienny: dany |
-| `dany_dress` | Danaerys Dress | BodyArmor | ghiscari | poza handlem (ROT); postac/imienny: dany |
-| `dany_hair` | Danaerys Hair | HeadArmor | ghiscari | poza handlem (ROT); postac/imienny: dany |
-| `dany_sash` | Targaryen Sash | Cape | valyrian | postac/imienny: dany |
-| `euron_axe` | Euron's Axe | OneHandedAxe | sturgia | poza handlem (ROT); cena wpisana przez autora: 300000; postac/imienny: euron |
-| `gendry_hammer` | Gendry's Hammer | TwoHandedAxe | stormlands | poza handlem (ROT); postac/imienny: gendry |
-| `hound_armor` | Hound Armor | BodyArmor | vlandia | postac/imienny: hound |
-| `hound_boots` | Hound Boots | LegArmor | vlandia | postac/imienny: hound |
-| `hound_gloves` | Hound Gauntlets | HandArmor | vlandia | postac/imienny: hound |
-| `hound_helmet` | Hound Helmet | HeadArmor | vlandia | postac/imienny: hound |
-| `hound_shoulders` | Hound Shoulders | Cape | vlandia | postac/imienny: hound |
-| `jaime_clothes` | Noble Clothes | BodyArmor | crownlands | postac/imienny: jaime |
-| `jaime_leather` | Jaime Northern Armor | BodyArmor | battania | postac/imienny: jaime |
-| `jaime_leather2` | Jaime Northern Armor 2 | BodyArmor | battania | postac/imienny: jaime |
-| `jon_snow_boots` | Northern Leather Boots | LegArmor | battania | postac/imienny: jon_snow |
-| `jon_snow_gorget` | Stark Gorget | Cape | battania | postac/imienny: jon_snow |
-| `jonsnow_armor` | Northern Elite Leathers | BodyArmor | battania | postac/imienny: jonsnow |
-| `jonsnow_vambraces` | Northern Vambraces | HandArmor | battania | postac/imienny: jonsnow |
-| `loras_armor` | Loras Tyrell Armor | BodyArmor | reach | postac/imienny: loras |
-| `loras_boots` | Loras Tyrell Plated Boots | LegArmor | reach | postac/imienny: loras |
-| `loras_gloves` | Loras Tyrell Plated Gloves | HandArmor | reach | postac/imienny: loras |
-| `loras_helmet` | Loras Tyrell Helmet | HeadArmor | reach | postac/imienny: loras |
-| `loras_helmet2` | Loras Tyrell Tournament Helmet | HeadArmor | reach | postac/imienny: loras |
-| `loras_pauldrons` | Loras Tyrell Pauldrons | Cape | reach | postac/imienny: loras |
-| `lyanna_armor` | Lyanna Mormont Armor | BodyArmor | battania | postac/imienny: lyanna |
-| `lyanna_shoulders` | Lyanna Mormont Shoulders | Cape | battania | postac/imienny: lyanna |
-| `mace_armor` | Mace Tyrell Armor | BodyArmor | reach | postac/imienny: mace |
-| `mace_bracers` | Mace Tyrell Bracers | HandArmor | reach | postac/imienny: mace |
-| `mace_helmet` | Mace Tyrell Helmet | HeadArmor | reach | postac/imienny: mace |
-| `margaery_dress` | Margaery's Dress | BodyArmor | reach | poza handlem (ROT); postac/imienny: margaery |
-| `melisandre_dress` | Melisandre Dress | BodyArmor | dragonstone | poza handlem (ROT); postac/imienny: melisandre |
-| `mountain_armor` | Mountain Armor | BodyArmor | vlandia | postac/imienny: mountain |
-| `mountain_boots` | Mountain Boots | LegArmor | vlandia | postac/imienny: mountain |
-| `mountain_gauntlets` | Mountain Gauntlets | HandArmor | vlandia | postac/imienny: mountain |
-| `mountain_gloves` | Mountain Gloves | HandArmor | vlandia | postac/imienny: mountain |
-| `mountain_helmet` | Mountain Helmet | HeadArmor | vlandia | postac/imienny: mountain |
-| `mountain_pauldrons` | Mountain Pauldrons | Cape | vlandia | postac/imienny: mountain |
-| `mountain_sword` | Gregor Clegane's Sword | TwoHandedSword | - | poza handlem (ROT); cena wpisana przez autora: 175000; postac/imienny: mountain |
-| `ned_clothes` | Ned Stark Clothes | BodyArmor | battania | postac/imienny: ned |
-| `needle` | Needle | OneHandedSword | battania | poza handlem (ROT); postac/imienny: needle |
-| `nightking_armor` | Night King Armor | BodyArmor | looters | poza handlem (ROT); postac/imienny: nightking |
-| `nightking_armor2` | Night King Armor with Spikes | BodyArmor | looters | poza handlem (ROT); postac/imienny: nightking |
-| `nightking_blade` | White Walker Blade | TwoHandedPolearm | looters | poza handlem (ROT); postac/imienny: nightking |
-| `nightking_boots` | White Walker Boots | LegArmor | looters | poza handlem (ROT); postac/imienny: nightking |
-| `nightking_bracers` | White Walker Bracers | HandArmor | looters | poza handlem (ROT); postac/imienny: nightking |
-| `nightking_spikes` | Night King Spikes | HeadArmor | looters | poza handlem (ROT); postac/imienny: nightking |
-| `podrick_armor` | Podrick Leather Armor | BodyArmor | westerlands | postac/imienny: podrick_armor |
-| `podrick_armor2` | Dragonstone Leather Armor | BodyArmor | dragonstone | postac/imienny: podrick_armor |
-| `ramsay_armor` | Ramsay Armor | BodyArmor | battania | postac/imienny: ramsay |
-| `ramsay_boots` | Ramsay Sabatons | LegArmor | battania | postac/imienny: ramsay |
-| `ramsay_gloves` | Ramsay Plated Gloves | HandArmor | battania | postac/imienny: ramsay |
-| `ramsay_helmet` | Ramsay Helmet | HeadArmor | battania | postac/imienny: ramsay |
-| `ramsay_shoulders` | Ramsay Pauldrons | Cape | battania | postac/imienny: ramsay |
-| `ramsay_shoulders2` | Ramsay Pauldrons with Skin | Cape | battania | postac/imienny: ramsay |
-| `renly_armor` | Renly Armor | BodyArmor | stormlands | postac/imienny: renly |
-| `renly_boots` | Renly Boots | LegArmor | stormlands | postac/imienny: renly |
-| `renly_clothes` | Renly Clothes | BodyArmor | stormlands | postac/imienny: renly |
-| `renly_gloves` | Renly Gloves | HandArmor | stormlands | postac/imienny: renly |
-| `renly_shoulders_cloak` | Renly Shoulders and Cloak | Cape | stormlands | postac/imienny: renly |
-| `renly_sword` | Renly Baratheon's Sword | OneHandedSword | - | poza handlem (ROT); cena wpisana przez autora: 180000; postac/imienny: renly |
-| `rhaegar_boots` | Rhaegar Sabatons | LegArmor | valyrian | postac/imienny: rhaegar |
-| `rhaegar_gauntlets` | Rhaegar Gauntlets | HandArmor | valyrian | postac/imienny: rhaegar |
-| `rhaegar_helmet` | Rhaegar Helmet | HeadArmor | valyrian | postac/imienny: rhaegar |
-| `rhaegar_pauldrons` | Rhaegar Pauldrons | Cape | valyrian | postac/imienny: rhaegar |
-| `rhaegar_plate` | Rhaegar Plate | BodyArmor | valyrian | postac/imienny: rhaegar |
-| `rhaegar_plate2` | Rhaegar Plate 2 | BodyArmor | valyrian | postac/imienny: rhaegar |
-| `skull_sword` | Skull Sword | OneHandedSword | - | cena wpisana przez autora: 150000; postac/imienny: skull_sword |
-| `stannis_armor` | Stannis Armor | BodyArmor | dragonstone | postac/imienny: stannis |
-| `stannis_cape` | Stannis Cape | Cape | dragonstone | postac/imienny: stannis |
-| `tyrell_sword` | Tyrell Sword | OneHandedSword | - | poza handlem (ROT); cena wpisana przez autora: 200000; postac/imienny: tyrell_sword |
-| `tyrion_boots` | Tyrion's Boots | LegArmor | ghiscari | poza handlem (ROT); postac/imienny: tyrion |
-| `tyrion_clothes` | Tyrion's Clothes | BodyArmor | ghiscari | poza handlem (ROT); postac/imienny: tyrion |
-| `varys_clothes` | Varys Clothes | BodyArmor | crownlands | poza handlem (ROT); postac/imienny: varys |
-| `varys_shoes` | Varys Shoes | LegArmor | crownlands | poza handlem (ROT); postac/imienny: varys |
-| `viper_spear` | Red Viper Spear | TwoHandedPolearm | aserai | poza handlem (ROT); postac/imienny: viper_spear |
-| `westerling_axe` | Westerling Axe | OneHandedAxe | vlandia | poza handlem (ROT); postac/imienny: westerling_axe |
-| `white_walker_saddle` | White Walker Saddle | HorseHarness | wights | postac/imienny: white_walker |
-| `whitewalker_armor` | Whitewalker Armor | BodyArmor | whitewalker | postac/imienny: whitewalker |
-| `whitewalker_armor2` | White Walker Pteruges | BodyArmor | whitewalker | postac/imienny: whitewalker |
-| `whitewalker_bracers2` | White Walker Leather Bracers | HandArmor | whitewalker | postac/imienny: whitewalker |
-| `whitewalker_greaves` | White Walker Leather Greaves | LegArmor | whitewalker | postac/imienny: whitewalker |
-| `ygritte_armor` | Ygritte's Fur Armor | BodyArmor | freefolk | postac/imienny: ygritte |
-
-## 4. Rzadkie (cena wpisana przez autora ROT) (4)
-
-| id | nazwa | typ | kultura | powod |
-|---|---|---|---|---|
-| `andal_noble_bracelet` | Andal Noble Bracelet | HandArmor | crownlands | cena wpisana przez autora: 10000 |
-| `casterly_helmet2` | Casterly Rock Helmet 2 | HeadArmor | vlandia | cena wpisana przez autora: 10000 |
-| `dawn` | Dawn | TwoHandedSword | - | poza handlem (ROT); cena wpisana przez autora: 300000 |
-| `hightower_lord_armor` | Hightower Lord Armor | BodyArmor | reach | cena wpisana przez autora: 14000 |
-
-## 5. Poza handlem w ROT (stroje, fryzury, umarli) (15)
-
-| id | nazwa | typ | kultura | powod |
-|---|---|---|---|---|
-| `andal_civ_boots` | Andal Shoes | LegArmor | crownlands | poza handlem (ROT) |
-| `andal_civ_boots2` | Andal Shoes 2 | LegArmor | river | poza handlem (ROT) |
-| `chain_armor_reinforcements` | Chain Armor Reinforcements | Cape | bolton | poza handlem (ROT) |
-| `dothraki_hair` | Dothraki Default | HeadArmor | khuzait | poza handlem (ROT) |
-| `dual_blades` | Dual Blades | OneHandedWeapon | - | poza handlem (ROT) |
-| `dual_blades2` | Dual Wield Blade Left | OneHandedWeapon | - | poza handlem (ROT) |
-| `noble_default` | Noble Default | HeadArmor | battania | poza handlem (ROT) |
-| `plate_armor_reinforcements` | Plate Armor Reinforcements | Cape | dragonstone | poza handlem (ROT) |
-| `valyrian_pauldrons_master` | Valyrian Master Pauldrons | Cape | valyrian | poza handlem (ROT) |
-| `valyrian_surcoat_master` | Valyrian Master Surcoat | BodyArmor | valyrian | poza handlem (ROT) |
-| `wight_armor2` | Wight Armor 2 | BodyArmor | looters | poza handlem (ROT) |
-| `wight_armor3` | Wight Armor 3 | BodyArmor | looters | poza handlem (ROT) |
-| `wight_head4` | Rusted Northern Helmet | HeadArmor | looters | poza handlem (ROT) |
-| `wildling_axe` | Wildling Axe | OneHandedAxe | freefolk | poza handlem (ROT) |
-| `wildling_pickaxe` | Wildling Pickaxe | OneHandedAxe | freefolk | poza handlem (ROT) |
+| `baelish_boots` | Baelish Boots | LegArmor | baelish | postac w nazwie: Baelish |
+| `baelish_clothes` | Baelish Clothes | BodyArmor | crownlands | postac w nazwie: Baelish |
+| `baratheon_hammer` | Robert Baratheon's Hammer | TwoHandedAxe | stormlands | postac w nazwie: Robert |
+| `barristan_sword` | Barristan Selmy Sword | OneHandedSword | - | postac w nazwie: Barristan |
+| `blackfish_armor` | Blackfish Armor | BodyArmor | river | postac w nazwie: Blackfish |
+| `blackfish_shoulders` | Blackfish Shoulders | Cape | river | postac w nazwie: Blackfish |
+| `brienne_armor` | Brienne Armor | BodyArmor | crownlands | postac w nazwie: Brienne |
+| `brienne_boots` | Brienne Plated Boots | LegArmor | stormlands | postac w nazwie: Brienne |
+| `brienne_gloves` | Brienne Plated Gloves | HandArmor | stormlands | postac w nazwie: Brienne |
+| `brienne_helmet` | Brienne Helmet | HeadArmor | stormlands | postac w nazwie: Brienne |
+| `brienne_pauldrons` | Brienne Pauldrons | Cape | stormlands | postac w nazwie: Brienne |
+| `brienne_plate` | Brienne Plate | BodyArmor | stormlands | postac w nazwie: Brienne |
+| `bronn_armor1` | Bronn Leather Armor with Mail | BodyArmor | river | postac w nazwie: Bronn |
+| `bronn_armor2` | Bronn Leather Armor | BodyArmor | crownlands | postac w nazwie: Bronn |
+| `bull_helmet` | Gendry's Bull Helmet | HeadArmor | stormlands | postac w nazwie: Gendry |
+| `cersei_armor` | Cersei's Armored Dress | BodyArmor | crownlands | postac w nazwie: Cersei |
+| `cersei_dress` | Cersei's Dress | BodyArmor | crownlands | postac w nazwie: Cersei |
+| `cersei_red_dress` | Cersei's Red Dress | BodyArmor | crownlands | postac w nazwie: Cersei |
+| `dany_boots` | Danaerys Boots | LegArmor | ghiscari | postac w nazwie: Danaerys |
+| `dany_dress` | Danaerys Dress | BodyArmor | ghiscari | postac w nazwie: Danaerys |
+| `dany_hair` | Danaerys Hair | HeadArmor | ghiscari | postac w nazwie: Danaerys |
+| `fm_noble_dress1` | Sansa Stark Dress | BodyArmor | battania | postac w nazwie: Sansa |
+| `gendry_hammer` | Gendry's Hammer | TwoHandedAxe | stormlands | postac w nazwie: Gendry |
+| `gold_cloak_armor` | House Clegane Armor | BodyArmor | vlandia | postac w nazwie: Clegane |
+| `gold_cloak_boots` | House Clegane Boots | LegArmor | vlandia | postac w nazwie: Clegane |
+| `gold_cloak_bracers` | House Clegane Bracers | HandArmor | vlandia | postac w nazwie: Clegane |
+| `gold_cloak_helmet` | House Clegane Helmet | HeadArmor | vlandia | postac w nazwie: Clegane |
+| `gold_cloak_pauldrons` | House Clegane Pauldrons | Cape | vlandia | postac w nazwie: Clegane |
+| `hound_armor` | Hound Armor | BodyArmor | vlandia | postac w nazwie: Hound |
+| `hound_boots` | Hound Boots | LegArmor | vlandia | postac w nazwie: Hound |
+| `hound_gloves` | Hound Gauntlets | HandArmor | vlandia | postac w nazwie: Hound |
+| `hound_helmet` | Hound Helmet | HeadArmor | vlandia | postac w nazwie: Hound |
+| `hound_shoulders` | Hound Shoulders | Cape | vlandia | postac w nazwie: Hound |
+| `jaime_leather` | Jaime Northern Armor | BodyArmor | battania | postac w nazwie: Jaime |
+| `jaime_leather2` | Jaime Northern Armor 2 | BodyArmor | battania | postac w nazwie: Jaime |
+| `loras_armor` | Loras Tyrell Armor | BodyArmor | reach | postac w nazwie: Loras |
+| `loras_boots` | Loras Tyrell Plated Boots | LegArmor | reach | postac w nazwie: Loras |
+| `loras_gloves` | Loras Tyrell Plated Gloves | HandArmor | reach | postac w nazwie: Loras |
+| `loras_helmet` | Loras Tyrell Helmet | HeadArmor | reach | postac w nazwie: Loras |
+| `loras_helmet2` | Loras Tyrell Tournament Helmet | HeadArmor | reach | postac w nazwie: Loras |
+| `loras_pauldrons` | Loras Tyrell Pauldrons | Cape | reach | postac w nazwie: Loras |
+| `lyanna_armor` | Lyanna Mormont Armor | BodyArmor | battania | postac w nazwie: Lyanna |
+| `lyanna_shoulders` | Lyanna Mormont Shoulders | Cape | battania | postac w nazwie: Lyanna |
+| `mace_armor` | Mace Tyrell Armor | BodyArmor | reach | postac w nazwie: Mace Tyrell |
+| `mace_bracers` | Mace Tyrell Bracers | HandArmor | reach | postac w nazwie: Mace Tyrell |
+| `mace_helmet` | Mace Tyrell Helmet | HeadArmor | reach | postac w nazwie: Mace Tyrell |
+| `margaery_dress` | Margaery's Dress | BodyArmor | reach | postac w nazwie: Margaery |
+| `melisandre_dress` | Melisandre Dress | BodyArmor | dragonstone | postac w nazwie: Melisandre |
+| `mountain_armor` | Mountain Armor | BodyArmor | vlandia | postac w nazwie: Mountain |
+| `mountain_boots` | Mountain Boots | LegArmor | vlandia | postac w nazwie: Mountain |
+| `mountain_gauntlets` | Mountain Gauntlets | HandArmor | vlandia | postac w nazwie: Mountain |
+| `mountain_gloves` | Mountain Gloves | HandArmor | vlandia | postac w nazwie: Mountain |
+| `mountain_helmet` | Mountain Helmet | HeadArmor | vlandia | postac w nazwie: Mountain |
+| `mountain_pauldrons` | Mountain Pauldrons | Cape | vlandia | postac w nazwie: Mountain |
+| `ned_clothes` | Ned Stark Clothes | BodyArmor | battania | postac w nazwie: Ned |
+| `nightking_armor` | Night King Armor | BodyArmor | looters | postac w nazwie: Night King |
+| `nightking_armor2` | Night King Armor with Spikes | BodyArmor | looters | postac w nazwie: Night King |
+| `nightking_spikes` | Night King Spikes | HeadArmor | looters | postac w nazwie: Night King |
+| `podrick_armor` | Podrick Leather Armor | BodyArmor | westerlands | postac w nazwie: Podrick |
+| `ramsay_armor` | Ramsay Armor | BodyArmor | battania | postac w nazwie: Ramsay |
+| `ramsay_boots` | Ramsay Sabatons | LegArmor | battania | postac w nazwie: Ramsay |
+| `ramsay_gloves` | Ramsay Plated Gloves | HandArmor | battania | postac w nazwie: Ramsay |
+| `ramsay_helmet` | Ramsay Helmet | HeadArmor | battania | postac w nazwie: Ramsay |
+| `ramsay_shoulders` | Ramsay Pauldrons | Cape | battania | postac w nazwie: Ramsay |
+| `ramsay_shoulders2` | Ramsay Pauldrons with Skin | Cape | battania | postac w nazwie: Ramsay |
+| `renly_armor` | Renly Armor | BodyArmor | stormlands | postac w nazwie: Renly |
+| `renly_boots` | Renly Boots | LegArmor | stormlands | postac w nazwie: Renly |
+| `renly_clothes` | Renly Clothes | BodyArmor | stormlands | postac w nazwie: Renly |
+| `renly_gloves` | Renly Gloves | HandArmor | stormlands | postac w nazwie: Renly |
+| `renly_shoulders_cloak` | Renly Shoulders and Cloak | Cape | stormlands | postac w nazwie: Renly |
+| `rhaegar_boots` | Rhaegar Sabatons | LegArmor | valyrian | postac w nazwie: Rhaegar |
+| `rhaegar_gauntlets` | Rhaegar Gauntlets | HandArmor | valyrian | postac w nazwie: Rhaegar |
+| `rhaegar_helmet` | Rhaegar Helmet | HeadArmor | valyrian | postac w nazwie: Rhaegar |
+| `rhaegar_pauldrons` | Rhaegar Pauldrons | Cape | valyrian | postac w nazwie: Rhaegar |
+| `rhaegar_plate` | Rhaegar Plate | BodyArmor | valyrian | postac w nazwie: Rhaegar |
+| `rhaegar_plate2` | Rhaegar Plate 2 | BodyArmor | valyrian | postac w nazwie: Rhaegar |
+| `rot_horse_armor19` | Clegane Horse Armor | HorseHarness | vlandia | postac w nazwie: Clegane |
+| `stannis_armor` | Stannis Armor | BodyArmor | dragonstone | postac w nazwie: Stannis |
+| `stannis_cape` | Stannis Cape | Cape | dragonstone | postac w nazwie: Stannis |
+| `tyrion_boots` | Tyrion's Boots | LegArmor | ghiscari | postac w nazwie: Tyrion |
+| `tyrion_clothes` | Tyrion's Clothes | BodyArmor | ghiscari | postac w nazwie: Tyrion |
+| `varys_clothes` | Varys Clothes | BodyArmor | crownlands | postac w nazwie: Varys |
+| `varys_shoes` | Varys Shoes | LegArmor | crownlands | postac w nazwie: Varys |
+| `viper_spear` | Red Viper Spear | TwoHandedPolearm | aserai | postac w nazwie: Red Viper |
+| `wildling_medium_armor` | Tormund's Fur Armor | BodyArmor | freefolk | postac w nazwie: Tormund |
+| `ygritte_armor` | Ygritte's Fur Armor | BodyArmor | freefolk | postac w nazwie: Ygritte |

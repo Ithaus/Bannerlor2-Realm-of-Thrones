@@ -34,6 +34,24 @@ namespace Armoury
         private static readonly Dictionary<ItemObject, float> _origWeight = new Dictionary<ItemObject, float>();
         private static readonly Dictionary<ItemObject, int> _target = new Dictionary<ItemObject, int>();
 
+        /// <summary>Towary handlowe: pensy za kg (ujemne = za sztuke). Zrodla: docs/CENY-HISTORYCZNE.md.</summary>
+        private static readonly Dictionary<string, float> TradeGoodsPerKg = new Dictionary<string, float>
+        {
+            // zywnosc
+            { "grain", 0.31f }, { "bread", 0.55f }, { "beer", 0.3f }, { "wine", 1.4f }, { "mead", 1.0f },
+            { "meat", 0.9f }, { "fish", 1.0f }, { "WhaleMeat", 0.7f }, { "cheese", 1.3f }, { "butter", 2.4f },
+            { "Egg", 0.8f }, { "honey", 1.4f }, { "salt", 0.18f }, { "oil", 4.0f }, { "whale_oil", 2.4f },
+            { "olives", 0.5f }, { "grape", 0.3f }, { "date_fruit", 6.0f }, { "apple", 0.2f }, { "orange", 1.0f },
+            { "carrot", 0.15f }, { "garum", 2.0f }, { "pie", 1.0f }, { "spice", 27f },
+            // wlokna, tkaniny, futra (len, plotno, skory - wyzej, wlasne ustawienia)
+            { "wool", 8.3f }, { "felt", 20f }, { "cotton", 100f }, { "velvet", 400f }, { "fur", 20f },
+            // rzemioslo, budulec
+            { "tools", 4f }, { "pottery", 0.8f }, { "clay", 0.05f }, { "planks", 0.15f }, { "limestone", 0.02f }, { "marble", 0.2f },
+            // kruszce, luksus
+            { "silver", 2f }, { "gold_ore", 5f }, { "goldingot", 9500f }, { "Ink", 10f }, { "Papyrus", 10f }, { "PurpleDye", 30f },
+            { "walrus_tusk", 30f }, { "jewelry", -2400f }, { "pouchofgems", -1200f },
+        };
+
         /// <summary>Wpis 58: codzienna kontrola - czy ktos (inny mod) nie nadpisal przeliczonych wartosci; jesli tak, przywracamy i logujemy.</summary>
         internal static void Recheck()
         {
@@ -209,6 +227,19 @@ namespace Armoury
                     set(it, it.Weight * kv.Value);
                     raw.Add(kv.Key + " " + _orig[it] + "->" + it.Value);
                 }
+                // 1b. towary handlowe (wpis 71, Jeff 05.10: "narzedzia 173, jedwab, ruda srebra ... no to przelicz") - cena za kg
+                // z docs/CENY-HISTORYCZNE.md (Clark/Rogers 1300-49; [S] = szacunek) x waga sztuki z gry (zwykle 10 kg);
+                // ponizej 1 d za sztuke gra i tak pokaze 1 (rachunki warsztatow licza w ulamkach - wpis 68)
+                if (s.HistTradeGoods)
+                    foreach (var kv in TradeGoodsPerKg)
+                    {
+                        var it = MBObjectManager.Instance.GetObject<ItemObject>(kv.Key);
+                        if (it == null) continue;
+                        set(it, kv.Value < 0 ? -kv.Value : Math.Max(0.1f, it.Weight) * kv.Value);   // ujemna = cena za SZTUKE
+                        _target[it] = it.Value;
+                        raw.Add(it.StringId + " " + _orig[it] + "->" + it.Value);
+                    }
+
                 foreach (var g in new[] { CraftingMaterials.Iron1, CraftingMaterials.Iron2, CraftingMaterials.Iron3, CraftingMaterials.Iron4, CraftingMaterials.Iron5, CraftingMaterials.Iron6 })
                 {
                     var it = Recipes.MaterialItem(g);

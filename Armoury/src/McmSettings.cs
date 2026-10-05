@@ -1460,6 +1460,10 @@ namespace Armoury
         [SettingPropertyGroup("Iron bank")]
         public float HistBulkUnitFactor { get; set; } = 10f;
 
+        [SettingPropertyBool("Hist Trade Goods", HintText = "trade goods at historical prices too (grain, wine, tools, wool, silk, velvet, spices, ore of silver and gold...) - England c.1300 by the kilogram")]
+        [SettingPropertyGroup("Iron bank")]
+        public bool HistTradeGoods { get; set; } = true;
+
         [SettingPropertyFloatingInteger("Hist Hides Per Kg", 0.00f, 4.00f, "0.00", HintText = "raw hides, pence per kg (an ox hide of 25-30 kg sold for 1-3 shillings)")]
         [SettingPropertyGroup("Iron bank")]
         public float HistHidesPerKg { get; set; } = 1f;
@@ -2604,6 +2608,7 @@ namespace Armoury
             s.HistTournamentScale = HistTournamentScale;
             s.HistUniquePrestige = HistUniquePrestige;
             s.HistBulkUnitFactor = HistBulkUnitFactor;
+            s.HistTradeGoods = HistTradeGoods;
             s.HistHidesPerKg = HistHidesPerKg;
             s.HistFlaxPerKg = HistFlaxPerKg;
             s.HistBowLaborMultiplier = HistBowLaborMultiplier;
