@@ -115,7 +115,23 @@ namespace Armoury
             _noted = 0;
         }
 
-        internal static void ResetOrders() { _unmet.Clear(); _noted = 0; }
+        internal static void ResetOrders() { _unmet.Clear(); _noted = 0; _onceSeen.Clear(); }
+
+        // wpis 81 (audyt 05.10, pkt 1 - petla drozenia): ten sam niezaspokojony kupiec (garnizon co dzien, notabl z cofnietym
+        // awansem co dzien) wpisywal to samo zamowienie od nowa - przy wygaszaniu 15% stan rosl do ~6.7x dziennego wpisu,
+        // do sufitu 60, a cena polki szla na x4. Teraz jeden kupiec zamawia dany rodzaj (miasto x typ x tier) raz na
+        // SupplyDemandOrderRepeatDays dni - zamowienie to potrzeba, nie licznik prob.
+        private static readonly Dictionary<string, int> _onceSeen = new Dictionary<string, int>();
+        internal static void NoteUnmetOnce(object who, Settlement market, ItemObject.ItemTypeEnum type, int tier, float n)
+        {
+            if (who == null || market == null || n <= 0f) return;
+            int day = (int)CampaignTime.Now.ToDays, last;
+            string k = who.GetHashCode() + "|" + Key(market, type, Math.Max(1, Math.Min(6, tier)));
+            if (_onceSeen.TryGetValue(k, out last) && day - last < Math.Max(1, Settings.Current.SupplyDemandOrderRepeatDays)) return;
+            _onceSeen[k] = day;
+            if (_onceSeen.Count > 20000) _onceSeen.Clear();
+            NoteUnmet(market, type, tier, n);
+        }
 
         internal static float Demand(Settlement st, ItemObject it)
         {

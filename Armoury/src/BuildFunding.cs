@@ -35,19 +35,46 @@ namespace Armoury
         [ThreadStatic] private static int _depth;
         public static void PowerPrefix() { _depth++; }
         public static Exception PowerFinalizer(Exception __exception) { if (_depth > 0) _depth--; return __exception; }
+        // wpis 80 (audyt 05.10, pkt 2): nadpisujemy moc TYLKO osad objetych rozliczeniem. Lenna gracza przy wylaczonym
+        // PaidConstructionPlayer ida po staremu (model gry/BK) - dotad dostawaly 0 i staly na zawsze.
+        private static bool Covered(Town town)
+        {
+            var st = town.Settlement;
+            if (st == null || st.OwnerClan == null) return false;
+            return st.OwnerClan != Clan.PlayerClan || Settings.Current.PaidConstructionPlayer;
+        }
+
+        // wpis 80: przyspieszenie zlotem (vanilla BoostBuildingProcessWithGold zabiera zloto gracza) - dotad nasz postfiks je
+        // gubil i zloto znikalo bez skutku. Dodajemy dzienna premie jak w grze/BK: GetBoostAmount x min(1, wplata / 500|250).
+        private static float Boost(Town town)
+        {
+            try
+            {
+                if (town.BoostBuildingProcess <= 0) return 0f;
+                int amount = Campaign.Current.Models.BuildingConstructionModel.GetBoostAmount(town);
+                return amount * Math.Min(1f, town.BoostBuildingProcess / (town.IsCastle ? 250f : 500f));
+            }
+            catch { return 0f; }
+        }
+
+        private static readonly TextObject _boostTxt = new TextObject("Craftsmen services");
+
         public static void PowerPostfix(Town town, bool includeDescriptions, ref ExplainedNumber __result)
         {
-            if (_depth > 1 || !On || town == null) return;
+            if (_depth > 1 || !On || town == null || !Covered(town)) return;
             try
             {
                 float f; _funded.TryGetValue(town, out f);
-                __result = new ExplainedNumber(f, includeDescriptions, _txt);
+                var r = new ExplainedNumber(f, includeDescriptions, _txt);
+                float b = Boost(town);
+                if (b > 0f) r.Add(b, _boostTxt);
+                __result = r;
             }
             catch { }
         }
         public static void PowerIntPostfix(Town town, ref int __result)
         {
-            if (_depth > 1 || !On || town == null) return;
+            if (_depth > 1 || !On || town == null || !Covered(town)) return;
             float f; _funded.TryGetValue(town, out f); __result = (int)f;
         }
 

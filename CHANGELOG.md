@@ -1,5 +1,19 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-05 (81) - PETLA DROZENIA: zamowienie tylko, gdy towaru NIE MA na polce, i jeden kupiec raz na 7 dni
+**Mod:** Armoury | **Pliki:** `SupplyDemand.cs` (`NoteUnmetOnce`), `AiGear.cs` (zamowienia po zakupach), `VolunteerKit.cs` (zamowienia notabli), `Settings.cs` + `McmSettings.cs` (NOWE `SupplyDemandOrderRepeatDays` 7)
+**Problem (audyt kodu 05.10, pkt 1):** AiGear zapisywal jako "brak na polce" takze to, co lezalo, ale bylo za drogie (`price > budget - spent` -> `bestI < 0` -> `need[k] = deficit` -> `NoteUnmet`). Garnizon liczy braki CODZIENNIE, cofniety awans ochotnika probuje sie codziennie - to samo zamowienie wpisywalo sie co dzien od nowa; przy wygaszaniu 15% stan rosl do ~6.7x dziennego wpisu (sufit 60), mnoznik polki szedl do x4, lord mogl kupic jeszcze mniej -> wiecej zamowien. Gracz tez placil x4.
+**Zmiana:** (a) AiGear zamawia dany rodzaj (typ x tier) tylko, gdy na polce nie ma ZADNEJ sztuki tego typu i tieru t/t-1 (bez unikatow); "za drogie" to brak zlota, nie towaru. (b) Jeden kupiec (partia, garnizon, notabl) zamawia ten sam rodzaj w tym samym miescie najwyzej raz na SupplyDemandOrderRepeatDays (7) dni.
+**Ryzyko / co sprawdzic:** mniej zamowien -> warsztaty moga mniej celowac w braki; ceny polek powinny zejsc z sufitu x4. Diagnoza ochotnikow ("powody cofniec") liczy dalej kazda probe - to tylko log.
+**Status:** WGRANE 2026-10-05 razem z wpisem 80 w jednym DLL (md5 0fb2409e06b1d9beb16e630f876d4030; poprzednie DLL jako `Armoury.dll.bak-2026-10-05-przed-80`).
+
+## 2026-10-05 (80) - BUDOWY: moc nadpisywana tylko w oplacanych osadach; przyspieszenie zlotem znow dziala
+**Mod:** Armoury | **Pliki:** `BuildFunding.cs` (`Covered`, `Boost`, `PowerPostfix`, `PowerIntPostfix`)
+**Problem (audyt kodu 05.10, pkt 2):** postfiks wpisu 73 ustawial moc budowy KAZDEJ osadzie na `_funded` (brak wpisu = 0). (a) Lenna gracza przy `PaidConstructionPlayer = false` (Daily je pomija) dostawaly 0 - budowy staly na zawsze. (b) Vanilla `BoostBuildingProcessWithGold` zabiera zloto gracza, a nasz postfiks gubil premie "Craftsmen services" - zloto znikalo bez skutku (wpis 73 mylnie mowil "boost dalej vanilla").
+**Zmiana:** postfiksy dzialaja tylko dla osad objetych rozliczeniem (nie-gracza, albo gracza przy PaidConstructionPlayer); reszta idzie po staremu (model gry/BK). Do mocy oplacanej dodana premia przyspieszenia jak w grze/BK: `GetBoostAmount x min(1, wplata / 500 miasto | 250 zamek)`.
+**Ryzyko / co sprawdzic:** Twoje lenna przy wylaczonym PaidConstructionPlayer - moc z modelu BK (bez polityki "Construction" moze byc nadal mala; to juz BK, nie my). Przyspieszenie zlotem w miescie -> moc w podpowiedzi rosnie o "Craftsmen services".
+**Status:** WGRANE 2026-10-05 razem z wpisem 81 (md5 0fb2409e06b1d9beb16e630f876d4030).
+
 ## 2026-10-05 (79) - DOROBEK STULECI: zbrojownie lordow i garnizonow z kompletem ich ludzi + 14 dni zapasu rzemieslnikow na targach (raz, nowa gra)
 **Mod:** Armoury | **Pliki:** NOWY `ColdStart.cs`, `AiGear.cs` (`Armories`, `Bucket`, `AddToArmory`), `WorkshopLaw.cs` (`TownHands`; `Forbidden`, `GuildWeight` internal), `ArmouryBehavior.cs` (OnSessionLaunched, zapis "arm_coldstart", Reset), `Settings.cs` + `McmSettings.cs` (NOWE `ColdStartEnabled`, `ColdStartMarketDays` 14)
 **Problem (sesja 02:55; Jeff 05.10: "nie zaczynamy gry w prozni - minely setki lat produkcji ... wyglada, jakby wszystko bylo puste"):** pierwszego dnia AI i garnizony kupily 5 296 szt. (potem 2 505, dalej ~1 300-1 600/dzien przy produkcji ~850); na polkach na starcie 7 532 szt. (zbroi korpusu 295, helmow 84), po 11 dniach zbroi 123, lukow 124 - notable nie mieli czym ubrac ochotnikow.

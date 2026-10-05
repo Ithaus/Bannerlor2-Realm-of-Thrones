@@ -188,7 +188,7 @@ namespace Armoury
                     try { price = market.Town.MarketData.GetPrice(el.EquipmentElement, null, false, market.Party); } catch { price = cand.Value; }
                     if (price < bestPrice) { bestPrice = price; best = i; }
                 }
-                if (best < 0) { SupplyDemand.NoteUnmet(market, it.ItemType, (int)it.Tier + 1, 1f); Why(it.ItemType + " t" + ((int)it.Tier + 1)); return false; }   // nie ma czego kupic - zamowienie (wpis 67)
+                if (best < 0) { SupplyDemand.NoteUnmetOnce(notable, market, it.ItemType, (int)it.Tier + 1, 1f); Why(it.ItemType + " t" + ((int)it.Tier + 1)); return false; }   // nie ma czego kupic - zamowienie (wpis 67)
                 int u; taken.TryGetValue(best, out u); taken[best] = u + 1;
                 picks.Add(roster.GetElementCopyAtIndex(best).EquipmentElement);
                 total += bestPrice;
@@ -214,7 +214,7 @@ namespace Armoury
                 if (best < 0 || notable.Gold < bestPrice)
                 {
                     _extraMissing++;
-                    if (best < 0) SupplyDemand.NoteUnmet(market, it.ItemType, (int)it.Tier + 1, 1f);
+                    if (best < 0) SupplyDemand.NoteUnmetOnce(notable, market, it.ItemType, (int)it.Tier + 1, 1f);
                     WhyExtra(it.ItemType + " t" + ((int)it.Tier + 1));
                     continue;
                 }

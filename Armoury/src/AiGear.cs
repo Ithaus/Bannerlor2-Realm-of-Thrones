@@ -226,7 +226,19 @@ namespace Armoury
                     }
                 }
                 // wpis 67: czego nie bylo na polce - zamowienie w tym miescie (najwyzej po 10 na rodzaj z jednej wizyty)
-                foreach (var kv in need) if (kv.Value > 0) SupplyDemand.NoteUnmet(st, (ItemObject.ItemTypeEnum)(kv.Key / 10), kv.Key % 10, Math.Min(10, kv.Value));
+                // wpis 81: tylko gdy na polce NIE MA zadnej sztuki tego typu i tieru (t albo t-1) - "za drogie" to nie brak
+                // towaru, tylko brak zlota kupca; i jeden kupiec raz na SupplyDemandOrderRepeatDays (garnizon liczy co dzien)
+                foreach (var kv in need)
+                {
+                    if (kv.Value <= 0) continue;
+                    var ty = (ItemObject.ItemTypeEnum)(kv.Key / 10); int tr = kv.Key % 10; bool onShelf = false;
+                    for (int i = 0; i < shelf.Count && !onShelf; i++)
+                    {
+                        var el = shelf.GetElementCopyAtIndex(i); var it = el.EquipmentElement.Item;
+                        if (el.Amount > 0 && it != null && it.ItemType == ty && !ArmsPricing.IsUnique(it)) { int ti = TierOf(it); onShelf = ti == tr || ti == tr - 1; }
+                    }
+                    if (!onShelf) SupplyDemand.NoteUnmetOnce(mp, st, ty, tr, Math.Min(10, kv.Value));
+                }
                 if (pieces <= 0) return;
                 _dayPieces += pieces; _dayGold += spent; _dayVisits++; if (garrison) { _dayGarrison++; _dayGarrisonGold += spent; }
                 if (_dayLogged < Math.Max(0, s.AiGearLogPerDay))

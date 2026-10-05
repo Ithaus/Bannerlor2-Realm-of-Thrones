@@ -1960,6 +1960,10 @@ namespace Armoury
         [SettingPropertyGroup("Supply and demand")]
         public float SupplyDemandOrderCap { get; set; } = 60f;
 
+        [SettingPropertyInteger("Supply Demand Order Repeat Days", 0, 28, "0", HintText = "one buyer (a garrison, a lord, a notable) places an order for the same kind of gear in a town at most once in this many days - an order is a need, not a count of attempts")]
+        [SettingPropertyGroup("Supply and demand")]
+        public int SupplyDemandOrderRepeatDays { get; set; } = 7;
+
         [SettingPropertyFloatingInteger("Supply Demand Trade Percent", 0.00f, 60.00f, "0.00", HintText = "each day traders carry this % of a stall's surplus to the nearest town or castle that lacks it - nothing vanishes, the buyer pays")]
         [SettingPropertyGroup("Supply and demand")]
         public float SupplyDemandTradePercent { get; set; } = 15f;
@@ -2781,6 +2785,7 @@ namespace Armoury
             s.SupplyDemandOrderWeight = SupplyDemandOrderWeight;
             s.SupplyDemandOrderDecay = SupplyDemandOrderDecay;
             s.SupplyDemandOrderCap = SupplyDemandOrderCap;
+            s.SupplyDemandOrderRepeatDays = SupplyDemandOrderRepeatDays;
             s.SupplyDemandTradePercent = SupplyDemandTradePercent;
             s.SupplyDemandTradeRange = SupplyDemandTradeRange;
             s.SupplyDemandTradePricePercent = SupplyDemandTradePricePercent;
