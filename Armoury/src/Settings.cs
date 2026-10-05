@@ -104,6 +104,11 @@ namespace Armoury
         // --- Wear and tear ---
         public bool TroopWearEnabled = true;               // the men's kit wears with every battle: a share of pieces in use drops one condition step - mend it at the smith
         public float TroopWearPercent = 4f;               // this share of pieces IN USE takes one step of wear per battle
+        public float TroopWearPerHit = 0.05f;              // fought battle: chance that one hit on a soldier wears the piece it struck (helmet, body armour, gloves, greaves, cape) one step
+        public float TroopWearPerBlock = 0.03f;            // fought battle: chance that a blocked blow wears a soldier's shield one step
+        public float TroopWearPerStrike = 0.01f;           // fought battle: chance that a landed blow wears a soldier's weapon one step
+        public float TroopWearPerShot = 0.002f;            // fought battle: chance that one shot wears a soldier's bow or crossbow one step
+        public float TroopWearBaseCasualtyShare = 0.10f;   // auto-resolved battle: at this share of wounded men the stores wear by TroopWearPercent; lighter fights wear less, heavier more
         public bool WearEnabled = true;                    // gear loses condition with use
         public bool ShowConditionPercent = true;           // damaged gear carries its state in the name - (100%) is mint, (1%) is a wreck
         public bool ConditionScalesStats = true;           // Jeff's rule: protection and edge follow condition - light wear costs little, heavy wear costs dearly

@@ -267,6 +267,12 @@ namespace Armoury
             try
             {
                 var c = Settings.Current;
+                // wpis 96: strzal zolnierza partii gracza - luk/kusza
+                if (c.TroopWearEnabled && shooterAgent != null && shooterAgent.IsHuman && !shooterAgent.IsHero && BattlefieldLaw.IsMainPartyAgent(shooterAgent))
+                {
+                    var ti = shooterAgent.SpawnEquipment[weaponIndex].Item;
+                    if (ti != null && (ti.ItemType == ItemObject.ItemTypeEnum.Bow || ti.ItemType == ItemObject.ItemTypeEnum.Crossbow)) TroopWearLedger.Add(ti.ItemType, 1f);
+                }
                 if (!c.WearEnabled || shooterAgent == null || !shooterAgent.IsMainAgent) return;
                 var item = shooterAgent.SpawnEquipment[weaponIndex].Item;
                 if (item == null) return;
@@ -295,6 +301,25 @@ namespace Armoury
             try
             {
                 var c = Settings.Current;
+
+                // wpis 96: zuzycie WOJSKA z przebiegu walki - trafienia zolnierzy partii gracza (nie bohaterow)
+                if (c.TroopWearEnabled)
+                {
+                    try
+                    {
+                        int raw0 = blow.InflictedDamage + Math.Max(0, attackCollisionData.AbsorbedByArmor);
+                        if (raw0 > 0 && affectedAgent != null && affectedAgent.IsHuman && !affectedAgent.IsHero && BattlefieldLaw.IsMainPartyAgent(affectedAgent))
+                        {
+                            if (attackCollisionData.AttackBlockedWithShield) TroopWearLedger.Add(ItemObject.ItemTypeEnum.Shield, 1f);
+                            else TroopWearLedger.Add(TroopWearLedger.TypeOfSlot(ArmorSlotFor(blow.VictimBodyPart, affectedAgent)),
+                                blow.IsMissile ? Math.Max(0f, Math.Min(100f, c.MissileArmorWearPercent)) / 100f : 1f);
+                        }
+                        if (raw0 > 0 && affectorAgent != null && affectorAgent.IsHuman && !affectorAgent.IsHero && affectorWeapon.Item != null
+                            && !blow.IsMissile && BattlefieldLaw.IsMainPartyAgent(affectorAgent))
+                            TroopWearLedger.Add(affectorWeapon.Item.ItemType, 1f);
+                    }
+                    catch { }
+                }
 
                 // --- zuzycie sprzetu gracza: tylko od faktycznych zdarzen ---
                 if (c.WearEnabled)

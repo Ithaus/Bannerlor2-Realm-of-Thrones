@@ -570,7 +570,7 @@ namespace Armoury
 
         /// <summary>Czy agent nalezy do partii gracza (po Origin, przez refleksje -
         /// typy originow roznia sie miedzy trybami misji).</summary>
-        private static bool IsMainPartyAgent(Agent agent)
+        internal static bool IsMainPartyAgent(Agent agent)
         {
             try
             {

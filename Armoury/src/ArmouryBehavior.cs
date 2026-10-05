@@ -1410,14 +1410,41 @@ namespace Armoury
                 if (armory == null) return;
                 var needs = QuartermasterLaw.CountNeeds();
                 float share = MBMath.ClampFloat(s.TroopWearPercent, 0f, 100f) / 100f;
-                if (share <= 0f) return;
                 int worn = 0;
+                // wpis 96 (Jeff: "nie na sztywno - z walki"): bitwa rozgrywana - z trafien; symulacja - wedlug strat (ranni / ludzie)
+                var ledger = TroopWearLedger.TakeLast();
+                float intensity = 1f;
+                if (ledger == null)
+                {
+                    try
+                    {
+                        var r = MobileParty.MainParty.MemberRoster;
+                        float men = Math.Max(1, r.TotalManCount - r.TotalHeroes);
+                        intensity = MBMath.ClampFloat((r.TotalWounded / men) / Math.Max(0.01f, s.TroopWearBaseCasualtyShare), 0.1f, 3f);
+                    }
+                    catch { }
+                }
+                var report = new List<string>();
 
                 foreach (var type in QuartermasterLaw.KitTypes)
                 {
                     int inUse = QuartermasterLaw.WornFor(type, needs);
                     if (inUse <= 0) continue;
-                    int hits = (int)MathF.Ceiling(inUse * share);
+                    int hits;
+                    if (ledger != null)
+                    {
+                        float h; ledger.TryGetValue(type, out h);
+                        float chance = type == ItemObject.ItemTypeEnum.Shield ? s.TroopWearPerBlock
+                                     : (type == ItemObject.ItemTypeEnum.Bow || type == ItemObject.ItemTypeEnum.Crossbow) ? s.TroopWearPerShot
+                                     : (type == ItemObject.ItemTypeEnum.OneHandedWeapon || type == ItemObject.ItemTypeEnum.TwoHandedWeapon || type == ItemObject.ItemTypeEnum.Polearm) ? s.TroopWearPerStrike
+                                     : s.TroopWearPerHit;
+                        float exp = h * Math.Max(0f, chance);
+                        hits = (int)Math.Floor(exp + MBRandom.RandomFloat);   // ulamek - losowo
+                        hits = Math.Min(hits, inUse);
+                        if (h > 0f) report.Add(type + " " + (int)h + "->" + hits);
+                    }
+                    else hits = (int)Math.Floor(inUse * share * intensity + MBRandom.RandomFloat);
+                    if (hits <= 0) continue;
 
                     // kandydaci: sztuki tego typu podlegajace zuzyciu
                     var idx = new List<int>();
@@ -1433,7 +1460,11 @@ namespace Armoury
 
                     for (int n = 0; n < hits; n++)
                     {
-                        var el = armory.GetElementCopyAtIndex(idx[MBRandom.RandomInt(idx.Count)]).EquipmentElement;
+                        // wpis 96 (audyt pkt 5): kazda SZTUKA ma rowna szanse (dotad kazdy rodzaj - pojedyncze sztuki psuly sie w kolko)
+                        int totalAmt = 0; foreach (var ii in idx) totalAmt += armory.GetElementCopyAtIndex(ii).Amount;
+                        int pickN = MBRandom.RandomInt(Math.Max(1, totalAmt)), pickI = idx[0];
+                        foreach (var ii in idx) { int a0 = armory.GetElementCopyAtIndex(ii).Amount; if (pickN < a0) { pickI = ii; break; } pickN -= a0; }
+                        var el = armory.GetElementCopyAtIndex(pickI).EquipmentElement;
                         var group = el.Item.ItemComponent.ItemModifierGroup;
                         var bad = new List<ItemModifier>();
                         foreach (var m in group.ItemModifiers)
@@ -1470,7 +1501,7 @@ namespace Armoury
 
                 if (worn > 0)
                 {
-                    Log.Info("Zuzycie wojska: " + worn + " sztuk zeszlo o stopien.");
+                    Log.Info("Zuzycie wojska: " + worn + " sztuk zeszlo o stopien" + (ledger != null ? " (z trafien: " + string.Join(", ", report.ToArray()) + ")" : " (symulacja, natezenie " + intensity.ToString("0.00") + ")") + ".");
                     Log.Player("The battle wore the men's kit - " + worn + " pieces the worse for it.", true);
                 }
             }

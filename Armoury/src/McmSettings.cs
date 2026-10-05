@@ -356,6 +356,26 @@ namespace Armoury
         [SettingPropertyGroup("Wear and tear")]
         public float TroopWearPercent { get; set; } = 4f;
 
+        [SettingPropertyFloatingInteger("Troop Wear Per Hit", 0.00f, 1.00f, "0.00", HintText = "fought battle: chance that one hit on a soldier wears the piece it struck (helmet, body armour, gloves, greaves, cape) one step")]
+        [SettingPropertyGroup("Wear and tear")]
+        public float TroopWearPerHit { get; set; } = 0.05f;
+
+        [SettingPropertyFloatingInteger("Troop Wear Per Block", 0.00f, 1.00f, "0.00", HintText = "fought battle: chance that a blocked blow wears a soldier's shield one step")]
+        [SettingPropertyGroup("Wear and tear")]
+        public float TroopWearPerBlock { get; set; } = 0.03f;
+
+        [SettingPropertyFloatingInteger("Troop Wear Per Strike", 0.00f, 1.00f, "0.00", HintText = "fought battle: chance that a landed blow wears a soldier's weapon one step")]
+        [SettingPropertyGroup("Wear and tear")]
+        public float TroopWearPerStrike { get; set; } = 0.01f;
+
+        [SettingPropertyFloatingInteger("Troop Wear Per Shot", 0.00f, 1.00f, "0.00", HintText = "fought battle: chance that one shot wears a soldier's bow or crossbow one step")]
+        [SettingPropertyGroup("Wear and tear")]
+        public float TroopWearPerShot { get; set; } = 0.002f;
+
+        [SettingPropertyFloatingInteger("Troop Wear Base Casualty Share", 0.00f, 1.00f, "0.00", HintText = "auto-resolved battle: at this share of wounded men the stores wear by TroopWearPercent; lighter fights wear less, heavier more")]
+        [SettingPropertyGroup("Wear and tear")]
+        public float TroopWearBaseCasualtyShare { get; set; } = 0.10f;
+
         [SettingPropertyBool("Wear Enabled", HintText = "gear loses condition with use")]
         [SettingPropertyGroup("Wear and tear")]
         public bool WearEnabled { get; set; } = true;
@@ -2424,6 +2444,11 @@ namespace Armoury
             s.SmeltingSkillBonus = SmeltingSkillBonus;
             s.TroopWearEnabled = TroopWearEnabled;
             s.TroopWearPercent = TroopWearPercent;
+            s.TroopWearPerHit = TroopWearPerHit;
+            s.TroopWearPerBlock = TroopWearPerBlock;
+            s.TroopWearPerStrike = TroopWearPerStrike;
+            s.TroopWearPerShot = TroopWearPerShot;
+            s.TroopWearBaseCasualtyShare = TroopWearBaseCasualtyShare;
             s.WearEnabled = WearEnabled;
             s.ShowConditionPercent = ShowConditionPercent;
             s.ConditionScalesStats = ConditionScalesStats;
