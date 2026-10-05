@@ -78,7 +78,7 @@ namespace Armoury
                 worn.Sort((a, b) => a.EquipmentElement.ItemModifier.PriceMultiplier.CompareTo(b.EquipmentElement.ItemModifier.PriceMultiplier));
                 // godziny kowali na godzine: rece miasta x (platnerze + miecznicy) / wszystkie cechy
                 // wpis 91: godziny z WSPOLNEJ puli kowali miasta (dzienny zapas rozlozony na 18 godzin pracy)
-                float hourShare = Math.Min(SmithHours.Available(st.Town), SmithHours.Capacity(st.Town) / 18f);
+                float hourShare = Math.Min(SmithHours.Available(st.Town), SmithHours.Capacity(st.Town) / Math.Max(1f, s.WorkHoursPerManDay));   // wpis 93: dzien pracy kowala rozlozony na jego godziny
                 _bench += hourShare;
                 float per = Math.Max(0.05f, s.MendLootHoursPerPiece);
                 int mended = 0, paid = 0;

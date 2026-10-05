@@ -1,5 +1,12 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-05 (93) - DZIEN KOWALA 16 GODZIN (zamiast 10)
+**Mod:** Armoury | **Pliki:** `Settings.cs` + `McmSettings.cs` (`WorkHoursPerManDay` 10 -> 16), `TroopSelfMend.cs` (godzinowy udzial = dzienna pula / godziny pracy)
+**Problem:** Jeff 05.10: "10 godzin - platnerze robili do 16 godzin, jak sa zlecenia, plus czeladnicy". Pula kowali z wpisu 91 liczyla 10 h na czlowieka.
+**Zmiana:** dzien pracy kowala 16 h (od switu do zmroku przy zleceniach). Czeladnicy i uczniowie sa juz w "rekach" miasta (`WorkshopProsperityPerHand`: wszyscy pracujacy przy broni, celowo 10-20x mniej niz w historii z powodu rudy) - nie dodaje ich drugi raz. Naprawy gracza: dzienna pula rozlozona na 16 godzin pracy (w nocy 23-5 warsztat stoi).
+**Ryzyko / co sprawdzic (kontrola wg zasady glownej):** pula kowali x1.6 - naprawy szybsze, a naprawy zjadaja mniej roboczodni warsztatow (godziny / 16). Inne uzycia `WorkHoursPerManDay`: tylko SmithHours (pula i przeliczenie na roboczodni) - sprawdzone.
+**Status:** WGRANE 2026-10-05 (md5 37c9a716c84389a6d4ee9ceb35daf44d; poprzednie DLL jako `Armoury.dll.bak-2026-10-05-przed-93`).
+
 ## 2026-10-05 (92) - KOMPLET REKRUTA AI: do zbrojowni tylko to, co notabl kupil (tier 1 - wlasny dobytek), bez pelnego kompletu z niczego
 **Mod:** Armoury | **Pliki:** NOWY `RecruitKit.cs`, `VolunteerKit.cs` (lista kupionych, awans, znikniety ochotnik), `AiGear.cs` (`RecruitKitPrefix`), `ColdStart.cs` (komplety ochotnikow na starcie), `ArmouryBehavior.cs` (zapis "arm_recruitkit", Reset), `Settings.cs` + `McmSettings.cs` (NOWE `KitFromNotable`)
 **Problem (audyt 05.10, kod DTE OnTroopRecruited; Jeff: "tak"):** przy werbunku DTE wkladal do zbrojowni CALY komplet wzorca x liczba rekrutow z niczego, a sztuki kupione przez notabla przy awansie ochotnika (VolunteerKit) schodzily z targu i przepadaly.
