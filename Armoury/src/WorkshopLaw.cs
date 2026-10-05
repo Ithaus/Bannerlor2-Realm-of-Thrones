@@ -236,7 +236,7 @@ namespace Armoury
                             if (workshop.Capital < mc) { reason = Math.Max(reason, 4); continue; }
                             for (int m = 0; m < 4; m++)
                             {
-                                if (take[m] > 0 && mats[m] != null) shelf.AddToCounts(mats[m], -take[m]);
+                                if (take[m] > 0 && mats[m] != null) { shelf.AddToCounts(mats[m], -take[m]); if (mats[m] == _ore) OreLedger.NoteWorkshop(take[m]); }
                                 owed[m] = owed[m] + need[m] - take[m];
                             }
                             workshop.ChangeGold(-mc);

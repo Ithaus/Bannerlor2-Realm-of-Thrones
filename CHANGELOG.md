@@ -1,5 +1,12 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-05 (94) - KSIEGA RUDY: dzienny log wydobycia i zuzycia rudy (tylko log)
+**Mod:** Armoury | **Pliki:** NOWY `OreLedger.cs`, `MaterialLaw.cs` (ProdPostfix -> NoteVillage), `WorkshopLaw.cs` (zuzycie rudy -> NoteWorkshop), `ArmouryBehavior.cs` (dzienny tick, Reset)
+**Problem:** Jeff 05.10: "czemu rudy jest za malo? da sie zwiekszyc?" -> wybral "B" (rachunek historyczny przed zmiana). Gra nigdzie nie podaje, ile rudy wykopaly wsie (AUDYT-SUROWCE "P1 diagnostyka" nie byla zrobiona) - nie ma z czym porownac historii.
+**Zmiana:** codziennie w glownym logu: "Ruda: dzien N - wsie wykopaly X ladunkow (Y t, kopalo Z wsi); warsztaty zbrojne zuzyly A; zapas na targach miast S (+/-); reszta (konsumpcja miast/BK, kuznie narzedzi, kucie, tabor) R". Wydobycie liczone raz na wies na dobe z koncowego wyniku modelu produkcji (po naszym x3 i ladunku).
+**Ryzyko / co sprawdzic (kontrola wg zasady glownej):** tylko odczyt; ProdPostfix wolany tez przez podpowiedzi UI - liczony pierwszy wynik wsi w dobie. Pierwszy dzien sesji bez linii (brak poprzedniego zapasu).
+**Status:** WGRANE 2026-10-05 (md5 72d146e68a17e483f22c4e9104a53474; poprzednie DLL jako `Armoury.dll.bak-2026-10-05-przed-94`).
+
 ## 2026-10-05 (93) - DZIEN KOWALA 16 GODZIN (zamiast 10)
 **Mod:** Armoury | **Pliki:** `Settings.cs` + `McmSettings.cs` (`WorkHoursPerManDay` 10 -> 16), `TroopSelfMend.cs` (godzinowy udzial = dzienna pula / godziny pracy)
 **Problem:** Jeff 05.10: "10 godzin - platnerze robili do 16 godzin, jak sa zlecenia, plus czeladnicy". Pula kowali z wpisu 91 liczyla 10 h na czlowieka.

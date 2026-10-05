@@ -167,6 +167,7 @@ namespace Armoury
                 else if (On && id == "hardwood") m = s.LumberOutputMultiplier;
                 // wpis 87 (audyt pkt 13): dzielenie przez ladunek zawsze, gdy waga jest x10 - inaczej wylaczenie MaterialLaw = 10x kg rudy
                 m /= HistoricalPrices.BulkScale(item);      // wpis 50: ladunek 100 kg - tyle samo kg co dotad
+                if (id == "iron") OreLedger.NoteVillage(village, item, __result.ResultNumber * Math.Max(0f, m));   // wpis 94: ksiega rudy (tylko log)
                 if (Math.Abs(m - 1f) < 0.001f || m <= 0f) return;
                 __result.AddFactor(m - 1f, new TextObject("{=!}Armoury: mines and woods"));
             }
