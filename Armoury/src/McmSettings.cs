@@ -1248,6 +1248,18 @@ namespace Armoury
         [SettingPropertyGroup("Army purchases")]
         public bool BuildDiaryEnabled { get; set; } = true;
 
+        [SettingPropertyBool("Finance Ledger Enabled", HintText = "write a daily ledger of every kingdom: treasury and its change, the king's purse and daily balance, clan purses, poor clans and clans losing money, troops - log only")]
+        [SettingPropertyGroup("Army purchases")]
+        public bool FinanceLedgerEnabled { get; set; } = true;
+
+        [SettingPropertyInteger("Finance Ledger Poor", 0, 4000, "0", HintText = "a clan with less gold than this counts as poor in the ledger")]
+        [SettingPropertyGroup("Army purchases")]
+        public int FinanceLedgerPoor { get; set; } = 1000;
+
+        [SettingPropertyInteger("Finance Ledger Poorest", 0, 20, "0", HintText = "how many of the poorest clans of each kingdom the ledger lists")]
+        [SettingPropertyGroup("Army purchases")]
+        public int FinanceLedgerPoorest { get; set; } = 5;
+
         [SettingPropertyBool("Paid Construction", HintText = "buildings rise only as fast as their owner pays: wages and carting go to the town or castle purse, materials are bought off the market")]
         [SettingPropertyGroup("Army purchases")]
         public bool PaidConstruction { get; set; } = true;
@@ -2583,6 +2595,9 @@ namespace Armoury
             s.UniqueMaxWearers = UniqueMaxWearers;
             s.BattleChronicleMinMen = BattleChronicleMinMen;
             s.BuildDiaryEnabled = BuildDiaryEnabled;
+            s.FinanceLedgerEnabled = FinanceLedgerEnabled;
+            s.FinanceLedgerPoor = FinanceLedgerPoor;
+            s.FinanceLedgerPoorest = FinanceLedgerPoorest;
             s.PaidConstruction = PaidConstruction;
             s.PaidConstructionPlayer = PaidConstructionPlayer;
             s.BuildIncomeShare = BuildIncomeShare;

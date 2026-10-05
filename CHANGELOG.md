@@ -1,5 +1,12 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-05 (77) - KSIEGA KROLESTW: dzienny log finansow krolestw i rodow (tylko log)
+**Mod:** Armoury | **Pliki:** NOWY `KingdomLedger.cs`, `ArmouryBehavior.cs` (dzienny tick po KingdomTreasury, Reset), `Log.cs` (temat "finanse"), `Settings.cs` + `McmSettings.cs` (NOWE `FinanceLedgerEnabled`, `FinanceLedgerPoor` 1000, `FinanceLedgerPoorest` 5)
+**Problem:** Jeff 05.10: "jak sie maja finanse lordow i krolow po zmianach budowy - utrzymaja sie czy zbankrutuja?". W logu nie bylo stanu kies ani skarbcow - nie dalo sie odpowiedziec. Wiadomo tylko: budowy biora 10% DODATNIEGO dochodu i nie wiecej niz kiesa (same nie zbankrutuja nikogo); do skarbcow wplywa ~30-37 tys. d/dzien i nic z nich nie wychodzi (etap 3).
+**Zmiana:** codziennie w glownym logu "Skarbce: dzien N - <krolestwo> (WOJNA): skarbiec X (+/-), krol <rod> kiesa Y bilans +/-Z/dzien; rodow, kiesy razem, biednych, na minusie; wojsko rodow". W Logs/<sesja>/finanse.log "Finanse: ... najbiedniejsze rody" (kiesa, zmiana od wczoraj, bilans dzienny z modelu finansow).
+**Ryzyko / co sprawdzic:** tylko odczyt; `CalculateClanGoldChange` wolany raz na rod dziennie (~200) - jesli widac przyciecie przy zmianie dnia, wylaczyc FinanceLedgerEnabled. Wpis 76 (ochotnicy) jeszcze nieprzetestowany - ta zmiana go nie dotyka.
+**Status:** WGRANE 2026-10-05 (md5 c01808fad7621fc6424212bee87b3323; poprzednie DLL jako `Armoury.dll.bak-2026-10-05-przed-77`).
+
 ## 2026-10-05 (76) - OCHOTNICY: AWANS PO KUPNIE CZESCI KLUCZOWYCH (zbroja korpusu, glowna bron, kon u jezdnego); dodatki dokupowane, gdy sa
 **Mod:** Armoury | **Pliki:** `VolunteerKit.cs` (`IsKey`, dodatki w `Buy`, diagnoza dodatkow), `Settings.cs` + `McmSettings.cs` (NOWE `VolunteerKitKeyOnly` = true)
 **Problem:** ~800 cofnietych awansow ochotnikow dziennie (sesja 02:55); diagnoza: brak broni jednorecznej t1-t3, lukow t0-t1, tarcz t2-t3, helmow, zbroi t3. Awans wymagal kupna CALEGO brakujacego kompletu - jeden brakujacy helm albo tarcza cofal awans.

@@ -371,6 +371,9 @@ namespace Armoury
         public int UniqueMaxWearers = 3;                   // an item worn by more than this many characters is ordinary attire, not a unique (kept out of the chronicle and the spoils of capture)
         public int BattleChronicleMinMen = 30;              // battles where both sides together had fewer men than this are only counted, not written out in the battle chronicle (yours always are)
         public bool BuildDiaryEnabled = true;               // write a daily diary of building works in every town and castle (progress, daily construction power, days left, stalled works) - log only
+        public bool FinanceLedgerEnabled = true;           // write a daily ledger of every kingdom: treasury and its change, the king's purse and daily balance, clan purses, poor clans and clans losing money, troops - log only
+        public int FinanceLedgerPoor = 1000;               // a clan with less gold than this counts as poor in the ledger
+        public int FinanceLedgerPoorest = 5;               // how many of the poorest clans of each kingdom the ledger lists
         public bool PaidConstruction = true;               // buildings rise only as fast as their owner pays: wages and carting go to the town or castle purse, materials are bought off the market
         public bool PaidConstructionPlayer = true;         // your own fiefs too: their works take the same share of your daily income
         public float BuildIncomeShare = 0.10f;             // share of a lord's daily income (fiefs and rents) spent each day on building works, split over his fiefs with works; in war only military works (walls, towers, barracks)

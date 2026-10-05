@@ -78,6 +78,7 @@ namespace Armoury
             if (m.StartsWith("Kronika unikatow") || m.StartsWith("UniqueSpoils")) return "unikaty";
             if (m.StartsWith("Bitwa:")) return "bitwy";
             if (m.StartsWith("Budowa:")) return "budowy";
+            if (m.StartsWith("Finanse:")) return "finanse";
             if (m.StartsWith("ZakupyAI: dzien") || m.StartsWith("PodazPopyt: kupcy")) return null;
             if (m.StartsWith("ZakupyAI:") || m.StartsWith("Stajnia AI:") || m.StartsWith("Oferta:")) return "zakupy";
             if (m.StartsWith("PodazPopyt:")) return "handel";
