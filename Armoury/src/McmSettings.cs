@@ -1292,9 +1292,9 @@ namespace Armoury
         [SettingPropertyGroup("Workshops")]
         public int ArtisanTanWeavePerCycle { get; set; } = 5;
 
-        [SettingPropertyFloatingInteger("Workshop Sell Share", 0.00f, 3.20f, "0.00", HintText = "a craftsman sells his wares at the market price buyers pay, less this merchant's cut (0.8 = he keeps 80%)")]
+        [SettingPropertyFloatingInteger("Workshop Sell Share", 0.00f, 3.60f, "0.00", HintText = "a craftsman sells his wares at the market price buyers pay, less this merchant's cut (0.9 = he keeps 90%); with the maker's profit of 25% built into worth, at a normal price he earns 1.125x his cost")]
         [SettingPropertyGroup("Workshops")]
-        public float WorkshopSellShare { get; set; } = 0.8f;
+        public float WorkshopSellShare { get; set; } = 0.9f;
 
         [SettingPropertyFloatingInteger("Guild Share Tailor", 0.00f, 1.20f, "0.00", HintText = "share of a town's craftsmen who are tailors and doublet-makers (Paris tax roll 1292)")]
         [SettingPropertyGroup("Workshops")]
@@ -1328,9 +1328,9 @@ namespace Armoury
         [SettingPropertyGroup("Workshops")]
         public float WorkshopWagePerDay { get; set; } = 3f;
 
-        [SettingPropertyFloatingInteger("Workshop Min Profit Percent", 0.00f, 40.00f, "0.00", HintText = "a workshop makes a piece only if the market pays at least this much over materials and wages")]
+        [SettingPropertyFloatingInteger("Workshop Min Profit Percent", 0.00f, 20.00f, "0.00", HintText = "a workshop makes a piece only if the market pays at least this much over materials and wages (a glutted stall - price below about 0.93 of worth - stops it)")]
         [SettingPropertyGroup("Workshops")]
-        public float WorkshopMinProfitPercent { get; set; } = 10f;
+        public float WorkshopMinProfitPercent { get; set; } = 5f;
 
         [SettingPropertyFloatingInteger("Workshop Crude Kg Per Ore", 0.00f, 6.00f, "0.00", HintText = "kilograms of crude iron a bloomery wins from one load of ore (10 kg); each finer grade costs a fifth more")]
         [SettingPropertyGroup("Workshops")]

@@ -385,7 +385,7 @@ namespace Armoury
         public float WorkshopArtisansMax = 60f;            // most man-days a day the craftsmen of the richest town put in
         public string WorkshopForbiddenIds = "weirwood,giant_,ravens_teeth,dragonglass,obsidian,val_steel,valyrian,dragonbone";   // pieces whose id contains any of these are never made by town workshops (magic and lore gear: weirwood bows, giants' gear, Valyrian steel, dragonglass)
         public int ArtisanTanWeavePerCycle = 5;            // the town's own tanners and weavers turn this many loads of raw hides into leather, or flax into linen, each working cycle - from the town market, nothing from thin air
-        public float WorkshopSellShare = 0.8f;             // a craftsman sells his wares at the market price buyers pay, less this merchant's cut (0.8 = he keeps 80%)
+        public float WorkshopSellShare = 0.9f;             // a craftsman sells his wares at the market price buyers pay, less this merchant's cut (0.9 = he keeps 90%); with the maker's profit of 25% built into worth, at a normal price he earns 1.125x his cost
         public float GuildShareTailor = 0.30f;             // share of a town's craftsmen who are tailors and doublet-makers (Paris tax roll 1292)
         public float GuildShareArmourer = 0.20f;           // share who are armourers and mail-makers
         public float GuildShareWeaponsmith = 0.20f;        // share who are weaponsmiths, cutlers and spear-makers
@@ -394,7 +394,7 @@ namespace Armoury
         public float GuildShareShieldwright = 0.05f;       // share who are shield-makers
         public float WorkshopForgeWoodPerMetalKg = 12.5f;  // kilograms of wood (as charcoal) the forge burns for each kilogram of metal worked, on top of the bloomery
         public float WorkshopWagePerDay = 3f;              // wages for one man-day at the forge, paid into the town (3 d - a craftsman's day in historical prices)
-        public float WorkshopMinProfitPercent = 10f;       // a workshop makes a piece only if the market pays at least this much over materials and wages
+        public float WorkshopMinProfitPercent = 5f;        // a workshop makes a piece only if the market pays at least this much over materials and wages (a glutted stall - price below about 0.93 of worth - stops it)
         public float WorkshopCrudeKgPerOre = 1.5f;         // kilograms of crude iron a bloomery wins from one load of ore (10 kg); each finer grade costs a fifth more
         public float WorkshopWoodPerOre = 5f;              // loads of wood burnt to charcoal for each load of ore smelted
         public int WorkshopCandidates = 40;                // how many different pieces a workshop weighs each morning when deciding what pays best to make

@@ -230,7 +230,7 @@ namespace Armoury
                             if (!ok) { reason = Math.Max(reason, 2); continue; }
                             // koszt surowcow od zuzycia (ulamki tez), po cenie historycznej / targowej
                             for (int m = 0; m < 4; m++) matCost += need[m] * MatPrice(town, mats[m], m);
-                            int revenue = Revenue(town, it);
+                            float revenue = Revenue(town, it);
                             if (revenue < (matCost + days * wage) * minProfit) { reason = Math.Max(reason, 1); continue; }
                             int mc = MBRandom.RoundRandomized(matCost);
                             if (workshop.Capital < mc) { reason = Math.Max(reason, 4); continue; }
@@ -254,7 +254,7 @@ namespace Armoury
                     }
                     if (w.Labor < w.Days) { _skipLabor++; break; }      // sztuka w robocie
                     int wagesI = MBRandom.RoundRandomized(w.Days * wage);
-                    int rev = Revenue(town, w.Item);
+                    int rev = MBRandom.RoundRandomized(Revenue(town, w.Item));
                     if (town.Gold < rev || workshop.Capital < wagesI) { _skipGold++; break; }   // gotowa czeka na kupca / na place
                     ItemModifier mod = null;
                     try { var g = w.Item.ItemComponent != null ? w.Item.ItemComponent.ItemModifierGroup : null; if (g != null) mod = g.GetRandomItemModifierProductionScoreBased(); } catch { }
@@ -328,7 +328,7 @@ namespace Armoury
                     var need = Needs(it, out days);
                     if (need == null) continue;
                     float cost = need[0] * pOre + need[1] * pWood + need[2] * pLea + need[3] * pLin + days * s.WorkshopWagePerDay;
-                    int revenue = Revenue(town, it);
+                    float revenue = Revenue(town, it);
                     float perDay = (revenue - cost) / Math.Max(0.1f, days);
                     if (perDay > 0f) scored.Add(new KeyValuePair<float, ItemObject>(perDay, it));
                 }
@@ -397,11 +397,16 @@ namespace Armoury
         // (miecz 34 -> 2, plyta konska 7861 -> 441; trzymala ja tylko podloga zlomu 5%) - zaden warsztat poza lukami nic nie robil.
         // Vanilla daje sprzedajacemu 60-80%; cos w lancuchu modeli cen (AIInfluence - kod zaciemniony) tnie dalej. Rzemieslnik
         // sprzedawal na targu sam: dostaje cene, jaka placi kupujacy (cena kupna z targu), minus marze kupca (WorkshopSellShare).
-        private static int Revenue(Town town, ItemObject it)
+        // wpis 68 (Jeff 04.10: "droga 2" - ulamki pensa w rachunkach): gra zna tylko pensy calkowite - drobiazg za 3 d nie
+        // tanial ponizej 1 d, a cene lancucha modeli psuly cudze mody. Decyzja warsztatu liczona W ULAMKACH: wartosc x mnoznik
+        // NASZEGO prawa podazy i popytu (polka, popyt, zamowienia, oczekiwania wojenne) x udzial rzemieslnika; zaplata
+        // miedzy warsztatem a miastem zaokraglana losowo (srednio co do grosza).
+        private static float Revenue(Town town, ItemObject it)
         {
-            if (town == null || it == null) return 0;
-            int buy = town.GetItemPrice(new EquipmentElement(it, null, null, false), null, false);
-            return Math.Max(1, (int)(buy * MBMath.ClampFloat(Settings.Current.WorkshopSellShare, 0.05f, 1f)));
+            if (town == null || it == null) return 0f;
+            float f = 1f;
+            try { float d; int sh; if (SupplyDemand.Active) f = SupplyDemand.Factor(town.Settlement, it, false, out d, out sh); } catch { }
+            return Math.Max(0.01f, it.Value * f * MBMath.ClampFloat(Settings.Current.WorkshopSellShare, 0.05f, 1f));
         }
 
         private static float GuildWeight(string g)
@@ -516,7 +521,7 @@ namespace Armoury
                     float days; var need = Needs(it, out days);
                     if (need == null) continue;
                     float cost = need[0] * pOre + need[1] * pWood + need[2] * pLea + need[3] * pLin + days * s.WorkshopWagePerDay;
-                    int revenue = Revenue(town, it);
+                    float revenue = Revenue(town, it);
                     float pd = (revenue - cost) / Math.Max(0.1f, days);
                     if (pd > bestPd)
                     {
