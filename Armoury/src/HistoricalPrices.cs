@@ -91,6 +91,13 @@ namespace Armoury
             catch { return true; }
         }
 
+        public static void RotRbmPostfix()
+        {
+            if (!_applied) { Log.Info("HistoricalPrices: ROT-RBM nadpisal ceny lukow przed przeliczeniem - przeliczenie je zastapi."); return; }
+            Log.Info("HistoricalPrices: ROT-RBM (ROTRBMCompatibility) nadpisal ceny lukow ROT - przywracam.");
+            Recheck();
+        }
+
         internal static void Recheck()
         {
             if (!_applied || _target.Count == 0) return;
@@ -510,6 +517,13 @@ namespace Armoury
                 Log.Info("HistoricalPrices: popyt miast w nowej monecie wpiety w " + d + " modelach ekonomii osad.");
                 var vs = AccessTools.PropertySetter(typeof(ItemObject), "Value");
                 if (vs != null) h.Patch(vs, prefix: new HarmonyMethod(typeof(HistoricalPrices), nameof(ValueSetPrefix)) { priority = Priority.First });
+                // wpis 75: winowajca 7 lukow i strzal - ROT.CampaignBehaviors.ROTRBMCompatibility.ModifyBowsAndArrows (przy RBM, na
+                // OnSessionLaunched) wpisuje refleksja wprost do pola <Value>k__BackingField (90000, 100000, 200000, 130000, 150000,
+                // 12000, 11000) - z pominieciem settera, wiec blokada go nie widzi. Postfix: zaraz po nim przywracamy nasze ceny
+                // (nazwy i statystyki RBM zostaja nietkniete).
+                var rot = AccessTools.Method(AccessTools.TypeByName("ROT.CampaignBehaviors.ROTRBMCompatibility"), "ModifyBowsAndArrows");
+                if (rot != null) h.Patch(rot, postfix: new HarmonyMethod(typeof(HistoricalPrices), nameof(RotRbmPostfix)));
+                Log.Info("HistoricalPrices: ROT-RBM luki (ROTRBMCompatibility.ModifyBowsAndArrows) " + (rot != null ? "przechwycone" : "nie znalezione") + ".");
                 Log.Info("HistoricalPrices: blokada cen przeliczonych przedmiotow " + (vs != null ? "wpieta (setter Value)" : "BRAK settera") + "; zapis wprost do pola omija ja - wtedy dzienna kontrola.");
                 var bud = AccessTools.Method("BannerKings.Patches.EconomyPatches:CalculateBudget");
                 if (bud != null) h.Patch(bud, postfix: new HarmonyMethod(typeof(HistoricalPrices), nameof(BudgetPostfix)));

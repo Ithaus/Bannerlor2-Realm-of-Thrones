@@ -476,7 +476,6 @@ namespace Armoury
             // sprzet startowy dopasowany do umiejetnosci (Jeff 04.10)
             CampaignEvents.OnCharacterCreationIsOverEvent.AddNonSerializedListener(this, delegate { try { var ss = Settings.Current; if (ss != null && ss.StartKitEnabled) StartKit.OnCharacterCreationOver(); } catch { } });
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, delegate { try { StartKit.Hourly(); } catch { } });
-            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, delegate { try { HistoricalPrices.Recheck(); } catch { } });   // wpis 74: 7 lukow ROT nadpisywanych z pominieciem settera - kontrola co godzine
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, delegate { MapClock.ApplySpeed(); });   // gra wraca do x4 przy wczytaniu
             // prawo wyrzutkow (Jeff 04.10): pula ludzi wyjetych spod prawa
             CampaignEvents.OnTroopsDesertedEvent.AddNonSerializedListener(this, OutlawLaw.OnTroopsDeserted);
