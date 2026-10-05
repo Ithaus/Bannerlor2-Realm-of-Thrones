@@ -80,6 +80,7 @@ namespace Armoury
                 AmmoRecovery.ApplyAll(_harmony);
                 RecruitCost.ApplyAll(_harmony);
                 StartKit.ApplyAll(_harmony);
+                BuildFunding.ApplyAll(_harmony);
                 PopulationLaw.ApplyTownTax(_harmony);
                 Rations.ApplyAll(_harmony);      // dlugi marsz, dlugie racje - zuzycie jedzenia w dol (gracz i AI)
                 ScorchedEarth.ApplyAll(_harmony);

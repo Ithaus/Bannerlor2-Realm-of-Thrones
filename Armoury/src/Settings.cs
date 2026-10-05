@@ -371,6 +371,12 @@ namespace Armoury
         public int UniqueMaxWearers = 3;                   // an item worn by more than this many characters is ordinary attire, not a unique (kept out of the chronicle and the spoils of capture)
         public int BattleChronicleMinMen = 30;              // battles where both sides together had fewer men than this are only counted, not written out in the battle chronicle (yours always are)
         public bool BuildDiaryEnabled = true;               // write a daily diary of building works in every town and castle (progress, daily construction power, days left, stalled works) - log only
+        public bool PaidConstruction = true;               // buildings rise only as fast as their owner pays: wages and carting go to the town or castle purse, materials are bought off the market
+        public bool PaidConstructionPlayer = true;         // your own fiefs too: their works take the same share of your daily income
+        public float BuildIncomeShare = 0.10f;             // share of a lord's daily income (fiefs and rents) spent each day on building works, split over his fiefs with works; in war only military works (walls, towers, barracks)
+        public float BuildMaterialShare = 0.25f;           // of that money, this share buys materials (limestone, timber, clay, tools, marble) at the market; the rest pays masons, labourers and carters
+        public float BuildPencePerPointMilitary = 48f;     // pence per construction point of walls, towers and other military works
+        public float BuildPencePerPointCivil = 24f;        // pence per construction point of civil buildings
         public bool AiRecruitsBringKit = true;             // a fresh recruit still arrives with his own kit (levies came armed); turn off and lords must buy for every new man
         public float AiGearBudgetPercent = 25f;            // share of a lord's gold (above the reserve) he is willing to spend on gear in one visit to a town
         public int AiGearGoldReserve = 2000;               // gold a lord always keeps back - wages come first

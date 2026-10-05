@@ -1248,6 +1248,30 @@ namespace Armoury
         [SettingPropertyGroup("Army purchases")]
         public bool BuildDiaryEnabled { get; set; } = true;
 
+        [SettingPropertyBool("Paid Construction", HintText = "buildings rise only as fast as their owner pays: wages and carting go to the town or castle purse, materials are bought off the market")]
+        [SettingPropertyGroup("Army purchases")]
+        public bool PaidConstruction { get; set; } = true;
+
+        [SettingPropertyBool("Paid Construction Player", HintText = "your own fiefs too: their works take the same share of your daily income")]
+        [SettingPropertyGroup("Army purchases")]
+        public bool PaidConstructionPlayer { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Build Income Share", 0.00f, 1.00f, "0.00", HintText = "share of a lord's daily income (fiefs and rents) spent each day on building works, split over his fiefs with works; in war only military works (walls, towers, barracks)")]
+        [SettingPropertyGroup("Army purchases")]
+        public float BuildIncomeShare { get; set; } = 0.10f;
+
+        [SettingPropertyFloatingInteger("Build Material Share", 0.00f, 1.00f, "0.00", HintText = "of that money, this share buys materials (limestone, timber, clay, tools, marble) at the market; the rest pays masons, labourers and carters")]
+        [SettingPropertyGroup("Army purchases")]
+        public float BuildMaterialShare { get; set; } = 0.25f;
+
+        [SettingPropertyFloatingInteger("Build Pence Per Point Military", 0.00f, 192.00f, "0.00", HintText = "pence per construction point of walls, towers and other military works")]
+        [SettingPropertyGroup("Army purchases")]
+        public float BuildPencePerPointMilitary { get; set; } = 48f;
+
+        [SettingPropertyFloatingInteger("Build Pence Per Point Civil", 0.00f, 96.00f, "0.00", HintText = "pence per construction point of civil buildings")]
+        [SettingPropertyGroup("Army purchases")]
+        public float BuildPencePerPointCivil { get; set; } = 24f;
+
         [SettingPropertyBool("Ai Recruits Bring Kit", HintText = "a fresh recruit still arrives with his own kit (levies came armed); turn off and lords must buy for every new man")]
         [SettingPropertyGroup("Army purchases")]
         public bool AiRecruitsBringKit { get; set; } = true;
@@ -2555,6 +2579,12 @@ namespace Armoury
             s.UniqueMaxWearers = UniqueMaxWearers;
             s.BattleChronicleMinMen = BattleChronicleMinMen;
             s.BuildDiaryEnabled = BuildDiaryEnabled;
+            s.PaidConstruction = PaidConstruction;
+            s.PaidConstructionPlayer = PaidConstructionPlayer;
+            s.BuildIncomeShare = BuildIncomeShare;
+            s.BuildMaterialShare = BuildMaterialShare;
+            s.BuildPencePerPointMilitary = BuildPencePerPointMilitary;
+            s.BuildPencePerPointCivil = BuildPencePerPointCivil;
             s.AiRecruitsBringKit = AiRecruitsBringKit;
             s.AiGearBudgetPercent = AiGearBudgetPercent;
             s.AiGearGoldReserve = AiGearGoldReserve;
