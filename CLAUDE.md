@@ -116,6 +116,21 @@ wystawia obce wojsko — patrz `docs/ERRORS.md`.
 
 ## 8. Zasady pracy (wyciagniete z bolesnych doswiadczen)
 
+0. **ZASADA GLOWNA (Jeff, 05.10): kazda zmiana = kontrola calosci.** Zanim zmiana pojdzie
+   do gry, sprawdz w KODZIE (nie na oko):
+   - **regresje** - czy nie psuje tego, co juz dzialalo (wyszukaj wszystkie miejsca, ktore
+     czytaja/pisza ten sam stan, wolaja ta sama metode albo patchuja ten sam cel);
+   - **kolizje z innymi zmianami** - czy nie liczy drugi raz tego samego, nie nadpisuje
+     wyniku innej latki, nie robi z martwego kodu zywego (i odwrotnie);
+   - **spojnosc calej logiki** - zamknieta ekonomia ("nic z niczego": kazde zloto i kazda
+     sztuka ma platnika i odbiorce), jedna zasada na jedno zjawisko, ta sama kolejnosc
+     zdarzen w dniu/godzinie, stan czyszczony miedzy kampaniami;
+   - **cudzy kod** (DTE, BK, ROT, gra) - jesli zmiana opiera sie na jego zachowaniu,
+     sprawdz je w dekompilacji (pelny audyt 05.10 znalazl, ze DTE kasowal zbrojownie
+     garnizonow co dobe - wszystkie zakupy garnizonow szly w nicosc przez 2 wpisy).
+   Wynik tej kontroli wpisz w "Ryzyko / co sprawdzic" w CHANGELOG. Po wiekszej serii zmian
+   - pelny audyt (najlepiej kilka niezaleznych przegladow) przed testem.
+
 1. **Najpierw log, potem hipoteza, dopiero potem kod.** Jesli nie masz dowodu, powiedz
    ze nie masz, zamiast twierdzic.
 2. **Jedna zmiana naraz.** Jeff testuje po kazdej. Trzy zmiany w jednym DLL = nie wiadomo,
