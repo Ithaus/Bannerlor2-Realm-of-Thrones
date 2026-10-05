@@ -427,6 +427,14 @@ namespace Armoury
         }
 
         /// <summary>Roboczodni dziennie warsztatu: rzemieslnicy miasta wedle dobrobytu, warsztat notabla stale.</summary>
+        // ile ukrytych warsztatow rzemieslnikow ma miasto (zwykle 1) - zeby odjac naprawy raz, nie w kazdym
+        private static int ActiveSmithWorkshops(Town town)
+        {
+            int n = 0;
+            try { foreach (var w in town.Workshops) if (w != null && w.WorkshopType != null && w.WorkshopType.IsHidden) n++; } catch { }
+            return Math.Max(1, n);
+        }
+
         internal static float TownHands(Town town)
         {
             var s = Settings.Current;
@@ -464,7 +472,14 @@ namespace Armoury
             // tarczownicy 5%) - udzial cechu wsrod CZYNNYCH cechow warsztatu (nieczynny oddaje rece pozostalym)
             float sum = 0f; foreach (var g in c.Value.Keys) sum += GuildWeight(g);
             if (sum <= 0f) return 0f;
-            return Hands(workshop, town) * GuildWeight(gu) / sum / lines;
+            float h = Hands(workshop, town) * GuildWeight(gu) / sum;
+            // wpis 91: kowale, ktorzy wczoraj naprawiali, nie kuli - mniej rak cechow platnerzy i miecznikow
+            if (workshop.WorkshopType.IsHidden && (gu == "platnerz" || gu == "miecznik"))
+            {
+                float smithW = GuildWeight("platnerz") + GuildWeight("miecznik");
+                if (smithW > 0f) h = Math.Max(0f, h - SmithHours.ManDaysYesterday(town) * GuildWeight(gu) / smithW / Math.Max(1, ActiveSmithWorkshops(town)));
+            }
+            return h / lines;
         }
 
         /// <summary>Cena jednostki surowca dla warsztatu (m: 0 ruda, 1 drewno, 2 skora, 3 len/welna). Gra zna tylko pensy calkowite:

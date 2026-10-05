@@ -242,9 +242,9 @@ namespace Armoury
                 Dictionary<string, Dictionary<string, int>> byItem;
                 if (!_worn.TryGetValue(mp.StringId, out byItem)) return;
                 var s = Settings.Current;
-                float wsum = 0f; foreach (var g in new[] { "krawiec", "platnerz", "miecznik", "siodlarz", "lucznik", "tarczownik" }) wsum += WorkshopLaw.GuildWeight(g);
-                float smiths = WorkshopLaw.TownHands(st.Town) * (WorkshopLaw.GuildWeight("platnerz") + WorkshopLaw.GuildWeight("miecznik")) / Math.Max(0.01f, wsum);
-                int cap = (int)(smiths * 18f / Math.Max(0.05f, s.MendLootHoursPerPiece));
+                // wpis 91: z WSPOLNEJ puli kowali miasta - lordowie i gracz dziela te same rece
+                float perPiece = Math.Max(0.05f, s.MendLootHoursPerPiece);
+                int cap = (int)(SmithHours.Available(st.Town) / perPiece);
                 var jobs = new List<KeyValuePair<string, string>>();   // przedmiot, modyfikator - najgorsze najpierw
                 foreach (var it in byItem) foreach (var m in it.Value) if (Mendable(Mod(m.Key))) for (int k = 0; k < m.Value; k++) jobs.Add(new KeyValuePair<string, string>(it.Key, m.Key));
                 jobs.Sort((a, b) => { var ma = Mod(a.Value); var mb = Mod(b.Value); return (ma != null ? ma.PriceMultiplier : 1f).CompareTo(mb != null ? mb.PriceMultiplier : 1f); });
@@ -259,6 +259,7 @@ namespace Armoury
                     AddWorn(mp.StringId, j.Key, j.Value, -1);
                     done++; paid += unit;
                 }
+                SmithHours.Use(st.Town, done * perPiece);
                 _dayMended += done; _dayPaid += paid;
             }
             catch (Exception e) { Log.Error("AiWear.MendInTown", e); }

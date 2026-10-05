@@ -536,6 +536,10 @@ namespace Armoury
         [SettingPropertyGroup("The finished piece")]
         public bool MineWagesStayInTown { get; set; } = true;
 
+        [SettingPropertyFloatingInteger("Work Hours Per Man Day", 0.00f, 40.00f, "0.00", HintText = "hours a town smith works in a day - the town's smiths share them between mending (your men and AI lords alike) and new work in the workshops")]
+        [SettingPropertyGroup("The finished piece")]
+        public float WorkHoursPerManDay { get; set; } = 10f;
+
         [SettingPropertyInteger("Troop Self Mend Percent Per Day", 0, 40, "0", HintText = "the men mend this PERCENT of all battle-worn pieces in the stores each day in town (at least 3 pieces) - a full refit takes about 100/percent days of rest; pay the smith yourself to skip the wait")]
         [SettingPropertyGroup("The finished piece")]
         public int TroopSelfMendPercentPerDay { get; set; } = 10;
@@ -2457,6 +2461,7 @@ namespace Armoury
             s.LordLootThirdPercent = LordLootThirdPercent;
             s.AiWearEnabled = AiWearEnabled;
             s.MineWagesStayInTown = MineWagesStayInTown;
+            s.WorkHoursPerManDay = WorkHoursPerManDay;
             s.TroopSelfMendPercentPerDay = TroopSelfMendPercentPerDay;
             s.TroopSkillAutoFit = TroopSkillAutoFit;
             s.SkillsDecideEnabled = SkillsDecideEnabled;

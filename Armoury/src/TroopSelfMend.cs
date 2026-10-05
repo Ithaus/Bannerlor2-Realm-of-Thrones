@@ -77,9 +77,9 @@ namespace Armoury
                 if (worn.Count == 0) { _bench = 0f; return; }
                 worn.Sort((a, b) => a.EquipmentElement.ItemModifier.PriceMultiplier.CompareTo(b.EquipmentElement.ItemModifier.PriceMultiplier));
                 // godziny kowali na godzine: rece miasta x (platnerze + miecznicy) / wszystkie cechy
-                float wsum = 0f; foreach (var g in new[] { "krawiec", "platnerz", "miecznik", "siodlarz", "lucznik", "tarczownik" }) wsum += WorkshopLaw.GuildWeight(g);
-                float smiths = WorkshopLaw.TownHands(st.Town) * (WorkshopLaw.GuildWeight("platnerz") + WorkshopLaw.GuildWeight("miecznik")) / Math.Max(0.01f, wsum);
-                _bench += smiths;
+                // wpis 91: godziny z WSPOLNEJ puli kowali miasta (dzienny zapas rozlozony na 18 godzin pracy)
+                float hourShare = Math.Min(SmithHours.Available(st.Town), SmithHours.Capacity(st.Town) / 18f);
+                _bench += hourShare;
                 float per = Math.Max(0.05f, s.MendLootHoursPerPiece);
                 int mended = 0, paid = 0;
                 bool broke = false;
@@ -102,6 +102,7 @@ namespace Armoury
                     if (broke || _bench < per) break;
                 }
                 if (broke) _bench = Math.Min(_bench, per);   // nie ma czym zaplacic - kowale nie trzymaja godzin na zapas
+                SmithHours.Use(st.Town, broke ? mended * per : hourShare);   // godziny kowali tej godziny (bez zaplaty - tylko gotowe)
                 _hourMended += mended; _hourPaid += paid;
                 if (_hourMended > 0 && (TaleWorlds.CampaignSystem.CampaignTime.Now.GetHourOfDay == 22 || broke))
                 {
