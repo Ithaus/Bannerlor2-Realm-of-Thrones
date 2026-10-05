@@ -498,6 +498,7 @@ namespace Armoury
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, AiWear.OnMapEventEnded);   // wpis 85
             CampaignEvents.VillageLooted.AddNonSerializedListener(this, OutlawLaw.OnVillageLooted);
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, OutlawLaw.OnPartyDestroyed);
+            CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, MenPurse.OnPartyDestroyed);   // wpis 89
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, delegate { try { OutlawLaw.Hourly(); } catch { } });
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, OnMapEventEnded);
             CampaignEvents.MapEventStarted.AddNonSerializedListener(this, OnMapEventStarted);
@@ -1096,14 +1097,16 @@ namespace Armoury
                         Hero.MainHero.HeroDeveloper.AddSkillXp(DefaultSkills.Crafting,
                             Forge.ProjectXp(rr) * Settings.Current.XpShareWhileWorking / totalDays / 24f);
 
-                    _projects.Remove(line);
-                    if (p.DaysLeft > 0f) _projects.Add(p.Serialize());
-                    else if (atForge) HandOver(p);
+                    // wpis 89 (audyt): zapis W MIEJSCU - dotad Remove + Add przesuwal tykajaca sztuke na koniec listy,
+                    // wiec "najstarsza" zmieniala sie co godzine i cala kolejka szla na zmiane, konczac sie razem
+                    int at = _projects.IndexOf(line);
+                    if (p.DaysLeft > 0f) { if (at >= 0) _projects[at] = p.Serialize(); else _projects.Add(p.Serialize()); }
+                    else if (atForge) { _projects.Remove(line); HandOver(p); }
                     else
                     {
                         // skonczone pod twoja nieobecnosc: wyrob czeka na polce
                         p.DaysLeft = 0f;
-                        _projects.Add(p.Serialize());
+                        if (at >= 0) _projects[at] = p.Serialize(); else _projects.Add(p.Serialize());
                         var s = Settlement.Find(p.SettlementId);
                         Log.Player("The smith has finished your " + p.Item.Name + " - collect it at "
                                    + (s != null ? s.Name.ToString() : p.SettlementId) + ".");

@@ -39,7 +39,7 @@ namespace Armoury
         internal string Serialize()
         {
             return (Item != null ? Item.StringId : "") + "|" +
-                   DaysLeft.ToString("0.##", CultureInfo.InvariantCulture) + "|" +
+                   DaysLeft.ToString("0.#####", CultureInfo.InvariantCulture) + "|" +
                    Tempo + "|" + SettlementId + "|" + (Kind ?? "") + "|" + (ModifierId ?? "") + "|" + Math.Max(1, Count);
         }
 

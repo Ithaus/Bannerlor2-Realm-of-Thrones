@@ -98,7 +98,7 @@ namespace Armoury
             var seen = new HashSet<string>();
             foreach (var kv in arm)
             {
-                if (kv.Key == null || !SupplyDemand.Equipmentish(kv.Key) || ArmouryBehavior.NoWear(kv.Key)) continue;
+                if (kv.Key == null || !SupplyDemand.Equipmentish(kv.Key) || ArmouryBehavior.NoWear(kv.Key) || MenPurse.HorseKind(kv.Key)) continue;
                 string id = kv.Key.StringId; seen.Add(id);
                 int was; known.TryGetValue(id, out was);
                 int now = Math.Max(0, kv.Value);
@@ -121,6 +121,21 @@ namespace Armoury
             Dictionary<string, Dictionary<string, int>> byItem; Dictionary<string, int> byMod;
             if (!_worn.TryGetValue(p, out byItem) || !byItem.TryGetValue(item, out byMod)) return;
             foreach (var m in byMod.Keys.ToList()) { if (n <= 0) break; int c = Math.Min(n, byMod[m]); AddWorn(p, item, m, -c); n -= c; }
+        }
+
+        /// <summary>wpis 89: kupiona sztuka ze stanem z polki - obita zostaje obita (dotad AI kupowalo tanio zuzyte i mialo je jako nowe).</summary>
+        internal static void NoteBought(MobileParty mp, EquipmentElement el, int n)
+        {
+            if (!On || mp == null || el.Item == null) return;
+            NoteSound(mp, el.Item, n);
+            var m = el.ItemModifier;
+            if (m != null && m.PriceMultiplier < 1f && !MenPurse.HorseKind(el.Item) && !ArmouryBehavior.NoWear(el.Item)) AddWorn(mp.StringId, el.Item.StringId, m.StringId, n);
+        }
+
+        internal static void Forget(MobileParty mp)
+        {
+            if (mp == null) return;
+            string p = mp.StringId; _worn.Remove(p); _known.Remove(p); _battleSince.Remove(p); _lastMend.Remove(p);
         }
 
         /// <summary>AiGear dolozyl kupione sztuki - sprawne, spis od razu.</summary>
@@ -156,7 +171,7 @@ namespace Armoury
                         foreach (var kv in arm.ToList())
                         {
                             var it = kv.Key;
-                            if (it == null || kv.Value <= 0 || !SupplyDemand.Equipmentish(it) || ArmouryBehavior.NoWear(it)) continue;
+                            if (it == null || kv.Value <= 0 || !SupplyDemand.Equipmentish(it) || ArmouryBehavior.NoWear(it) || MenPurse.HorseKind(it)) continue;
                             int nd; need.TryGetValue(AiGear.Bucket(it), out nd);
                             int inUse = Math.Min(nd, kv.Value);
                             int sound = kv.Value - WornOf(mp.StringId, it.StringId);

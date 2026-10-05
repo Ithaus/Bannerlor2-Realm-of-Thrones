@@ -53,6 +53,28 @@ namespace Armoury
         }
 
         private static string Key(MobileParty mp) { return mp != null ? mp.StringId : null; }
+        internal static bool HorseKind(ItemObject it) { return it != null && (it.ItemType == ItemObject.ItemTypeEnum.Horse || it.ItemType == ItemObject.ItemTypeEnum.HorseHarness); }
+
+        /// <summary>wpis 89 (audyt): rozbita partia - sakiewka ludzi idzie do zwyciezcy (lup), inaczej do najblizszego miasta; nic nie znika.</summary>
+        internal static void OnPartyDestroyed(MobileParty mp, TaleWorlds.CampaignSystem.Party.PartyBase destroyer)
+        {
+            try
+            {
+                if (mp == null) return;
+                AiWear.Forget(mp); AiGear.Forget(mp);
+                int purse = Get(mp);
+                if (purse <= 0) return;
+                Take(mp, purse);
+                var win = destroyer != null ? destroyer.MobileParty : null;
+                if (win != null && win.LeaderHero != null && win.LeaderHero.IsAlive)
+                {
+                    if (win.IsMainParty) Add(win, purse);   // ludzie gracza - do ich sakiewki
+                    else { int third = purse / 3; win.LeaderHero.ChangeHeroGold(third); Add(win, purse - third); }
+                }
+                else { var t = NearestTown(mp); if (t != null && t.Town != null) t.Town.ChangeGold(purse); }
+            }
+            catch (Exception e) { Log.Error("MenPurse.OnPartyDestroyed", e); }
+        }
         internal static int Get(MobileParty mp) { int v; var k = Key(mp); return k != null && _purse.TryGetValue(k, out v) ? v : 0; }
         internal static void Add(MobileParty mp, int n) { var k = Key(mp); if (k == null || n == 0) return; int v; _purse.TryGetValue(k, out v); v = Math.Max(0, v + n); if (v > 0) _purse[k] = v; else _purse.Remove(k); }
         internal static int Take(MobileParty mp, int n) { int have = Get(mp); int t = Math.Min(have, Math.Max(0, n)); Add(mp, -t); return t; }
@@ -251,16 +273,20 @@ namespace Armoury
             var s = Settings.Current;
             var need = AiGear.NeedBuckets(mp);
             var have = new Dictionary<int, int>();
-            foreach (var kv in arm) { if (kv.Key == null || kv.Value <= 0 || !SupplyDemand.Equipmentish(kv.Key)) continue; int k = AiGear.Bucket(kv.Key); int n; have.TryGetValue(k, out n); have[k] = n + kv.Value; }
+            // wpis 89 (audyt): po TYPIE - sztuka innego tieru pokrywa potrzebe (AiGear tez tak liczy); konie i rzedy - Stajnia,
+            // NeedBuckets ich nie widzi, wiec dotad kazdy kon szedl do kupca jako "nadwyzka"
+            foreach (var kv in arm) { if (kv.Key == null || kv.Value <= 0 || !SupplyDemand.Equipmentish(kv.Key) || HorseKind(kv.Key)) continue; int k = (int)kv.Key.ItemType; int n; have.TryGetValue(k, out n); have[k] = n + kv.Value; }
+            var needT = new Dictionary<int, int>();
+            foreach (var nk in need) { int ty = nk.Key / 10; int v; needT.TryGetValue(ty, out v); needT[ty] = v + nk.Value; }
             int sold = 0, gold = 0;
             foreach (var hk in have.ToList())
             {
-                int nd; need.TryGetValue(hk.Key, out nd);
+                int nd; needT.TryGetValue(hk.Key, out nd);
                 int keep = (int)Math.Ceiling(nd * (1f + Math.Max(0f, s.SurplusKeepPercent) / 100f));
                 int extra = hk.Value - keep;
                 if (extra <= 0) continue;
-                var items = arm.Where(kv => kv.Key != null && kv.Value > 0 && SupplyDemand.Equipmentish(kv.Key) && AiGear.Bucket(kv.Key) == hk.Key && !ArmsPricing.IsUnique(kv.Key))
-                               .OrderBy(kv => kv.Key.Value).Select(kv => kv.Key).ToList();
+                var items = arm.Where(kv => kv.Key != null && kv.Value > 0 && SupplyDemand.Equipmentish(kv.Key) && !HorseKind(kv.Key) && (int)kv.Key.ItemType == hk.Key && !ArmsPricing.IsUnique(kv.Key))
+                               .OrderBy(kv => kv.Key.Tier).ThenBy(kv => kv.Key.Value).Select(kv => kv.Key).ToList();
                 foreach (var it in items)
                 {
                     int cnt; if (!arm.TryGetValue(it, out cnt)) continue;

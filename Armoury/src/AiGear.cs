@@ -66,6 +66,16 @@ namespace Armoury
         // ------------------------------------------------------------ latki DTE
         public static bool SkipWhenBuying() { return !On; }
 
+        public static bool KeepGarrisonArmory(MobileParty mobileParty, ref bool __result)
+        {
+            if (On && mobileParty != null && mobileParty.IsGarrison && mobileParty.IsActive) { __result = false; return false; }
+            return true;
+        }
+
+        public static bool SkipWeeklyTrim() { return !(On && MenPurse.On); }
+
+        internal static void Forget(MobileParty mp) { try { if (mp != null) _lastDay.Remove(mp); } catch { } }
+
         public static bool RecruitKitPrefix(Hero recruiterHero)
         {
             var s = Settings.Current;
@@ -86,6 +96,13 @@ namespace Armoury
                 if (a != null) h.Patch(a, prefix: skip);
                 if (m != null) h.Patch(m, prefix: skip);
                 if (r != null) h.Patch(r, prefix: new HarmonyMethod(typeof(AiGear), nameof(RecruitKitPrefix)));
+                // wpis 89 (audyt, kod DTE): GarbageCollectParties kasuje zbrojownie partii bez dowodcy - garnizon tracil co dobe wszystko,
+                // co kupil (log: 87-115 zakupow garnizonow dziennie bez spadku); GarbageCollectEquipments co tydzien kasowal nadwyzke
+                // ponad liczbe ludzi (zapas, druga bron) - nadwyzki sprzedaje teraz MenPurse
+                var gcp = AccessTools.Method(_dte, "GarbageCollectParties");
+                if (gcp != null) h.Patch(gcp, prefix: new HarmonyMethod(typeof(AiGear), nameof(KeepGarrisonArmory)));
+                var gce = AccessTools.Method(_dte, "GarbageCollectEquipments");
+                if (gce != null) h.Patch(gce, prefix: new HarmonyMethod(typeof(AiGear), nameof(SkipWeeklyTrim)));
                 Log.Info("AiGear: latki DTE - darmowy przydzial " + (a != null ? "wpiety" : "BRAK") + ", doplata z taboru "
                          + (m != null ? "wpieta" : "BRAK") + ", komplet przy werbunku " + (r != null ? "wpiety" : "BRAK")
                          + "; zakupy AI " + (On ? "CZYNNE" : "wylaczone w MCM") + ".");
@@ -171,7 +188,7 @@ namespace Armoury
                 int reserve = Math.Max(0, s.AiGearGoldReserve);
                 int budget = (int)((lord.Gold - reserve) * Math.Max(0f, Math.Min(100f, s.AiGearBudgetPercent)) / 100f);
                 // wpis 84: ludzie dokupuja braki ze swojej sakiewki (lup), dopiero potem kiesa lorda
-                int purse = garrison ? 0 : MenPurse.Get(mp);
+                int purse = garrison ? 0 : Math.Max(0, MenPurse.Get(mp) - AiWear.OutstandingCost(mp));   // wpis 89: naprawy maja pierwszenstwo
                 budget = Math.Max(0, budget) + purse;
                 if (budget <= 0) return;
 
@@ -198,13 +215,30 @@ namespace Armoury
                         int n; need.TryGetValue(k, out n); need[k] = n + el.Number;
                     }
                 }
+                // wpis 89 (audyt): zapas w innym tierze tego samego typu pokrywa brak - najpierw wyzsze, potem t-1 (AiGear sam
+                // kupuje t-1 na brak t); dotad brak t zostawal caly, lord co dzien dokupowal t-1, a MenPurse sprzedawal je jako nadwyzke
+                var spare = new Dictionary<int, int>();
                 if (armory != null)
                     foreach (var kv in armory)
                     {
                         if (kv.Key == null || kv.Value <= 0) continue;
                         int k = (int)kv.Key.ItemType * 10 + TierOf(kv.Key);
-                        int n; if (need.TryGetValue(k, out n)) need[k] = n - kv.Value;
+                        int n;
+                        if (need.TryGetValue(k, out n)) { need[k] = n - kv.Value; if (need[k] < 0) { int sp0; spare.TryGetValue(k, out sp0); spare[k] = sp0 - need[k]; need[k] = 0; } }
+                        else { int sp0; spare.TryGetValue(k, out sp0); spare[k] = sp0 + kv.Value; }
                     }
+                foreach (var k in new List<int>(need.Keys))
+                {
+                    int d = need[k]; if (d <= 0) continue;
+                    int type = k / 10, t = k % 10;
+                    var order = new List<int>(); for (int tt = t + 1; tt <= 6; tt++) order.Add(tt); if (t > 1) order.Add(t - 1);
+                    foreach (var tt in order)
+                    {
+                        int sk = type * 10 + tt, sp; if (!spare.TryGetValue(sk, out sp) || sp <= 0) continue;
+                        int c = Math.Min(d, sp); d -= c; spare[sk] = sp - c; if (d <= 0) break;
+                    }
+                    need[k] = d;
+                }
 
                 int spent = 0, pieces = 0;
                 int maxPieces = Math.Max(1, s.AiGearMaxPiecesPerVisit);
@@ -243,7 +277,7 @@ namespace Armoury
                             if (n <= 0) break;
                             shelf.AddToCounts(pick.EquipmentElement, -n);
                             _add.Invoke(null, new object[] { mp.Id, pick.EquipmentElement.Item, n });
-                            if (!garrison) AiWear.NoteSound(mp, pick.EquipmentElement.Item, n);
+                            if (!garrison) AiWear.NoteBought(mp, pick.EquipmentElement, n);   // wpis 89: zuzyta z polki zostaje zuzyta
                             int cost = bestPrice * n, fromPurse = garrison ? 0 : MenPurse.Take(mp, cost);
                             lord.ChangeHeroGold(-(cost - fromPurse));
                             st.Town.ChangeGold(bestPrice * n);
