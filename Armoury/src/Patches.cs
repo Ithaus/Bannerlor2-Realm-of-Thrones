@@ -580,6 +580,21 @@ namespace Armoury
         /// bije mocno, ale nigdy do zera. kara = Max x (zuzycie)^wykladnik:
         /// stan 99% ~ -0.5%, 90% ~ -6%, 50% ~ -41%, 10% ~ -80%, 1% ~ -89%.
         /// </summary>
+        /// <summary>wpis 95 (audyt zuzycia pkt 1): STAN sztuki 0..1. Spoils of War ma dla lupu stany nominalne 55/40/25/10%,
+        /// ale ceny 0.20/0.14/0.08/0.03 - czytane z ceny dawaly "Plundered" jako 20% i kare -70%. Reszta modyfikatorow: z ceny.</summary>
+        internal static float ConditionOf(ItemModifier m)
+        {
+            if (m == null) return 1f;
+            switch (m.StringId)
+            {
+                case "rl_looted": return 0.55f;
+                case "rl_looted_medium": return 0.40f;
+                case "rl_looted_heavy": return 0.25f;
+                case "rl_looted_heavy_max": return 0.10f;
+                default: return m.PriceMultiplier;
+            }
+        }
+
         internal static float StatFactor(float pm)
         {
             var s = Settings.Current;
@@ -600,7 +615,7 @@ namespace Armoury
                 {
                     var s = Settings.Current;
                     if (s == null || !s.ConditionScalesStats) return;
-                    float pm = __instance != null ? __instance.PriceMultiplier : 1f;
+                    float pm = ConditionOf(__instance);
                     if (pm >= 0.999f || pm <= 0f) return;
                     __result = Math.Max(1, (int)Math.Floor(armorValue * StatFactor(pm)));
                 }
@@ -617,7 +632,7 @@ namespace Armoury
                 {
                     var s = Settings.Current;
                     if (s == null || !s.ConditionScalesStats) return;
-                    float pm = __instance != null ? __instance.PriceMultiplier : 1f;
+                    float pm = ConditionOf(__instance);
                     if (pm >= 0.999f || pm <= 0f) return;
                     __result = Math.Max(1, (int)Math.Floor(baseDamage * StatFactor(pm)));
                 }

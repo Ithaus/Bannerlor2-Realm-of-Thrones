@@ -26,7 +26,7 @@ namespace Armoury
                 var item = el.Item;
                 var m = el.ItemModifier;
                 if (item == null || m == null || ArmouryBehavior.NoWear(item)) return;
-                float pm = m.PriceMultiplier;
+                float pm = ConditionScaling.ConditionOf(m);   // wpis 95: stan lupu Spoils wedlug ich skali
                 if (pm >= 0.999f || pm <= 0f) return;
                 int pct = Math.Max(1, (int)Math.Round(pm * 100f));
 

@@ -352,9 +352,9 @@ namespace Armoury
         [SettingPropertyGroup("Wear and tear")]
         public bool TroopWearEnabled { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Troop Wear Percent", 0.00f, 48.00f, "0.00", HintText = "this share of pieces IN USE takes one step of wear per battle")]
+        [SettingPropertyFloatingInteger("Troop Wear Percent", 0.00f, 16.00f, "0.00", HintText = "this share of pieces IN USE takes one step of wear per battle")]
         [SettingPropertyGroup("Wear and tear")]
-        public float TroopWearPercent { get; set; } = 12f;
+        public float TroopWearPercent { get; set; } = 4f;
 
         [SettingPropertyBool("Wear Enabled", HintText = "gear loses condition with use")]
         [SettingPropertyGroup("Wear and tear")]
@@ -372,9 +372,13 @@ namespace Armoury
         [SettingPropertyGroup("Wear and tear")]
         public float ConditionPenaltyMax { get; set; } = 90f;
 
-        [SettingPropertyFloatingInteger("Condition Penalty Exponent", 0.00f, 4.60f, "0.00", HintText = "the curve: above 1 = small wear is cheap, deep wear bites (99% state ~ -0.5%, 50% ~ -41%, 1% ~ -89%)")]
+        [SettingPropertyFloatingInteger("Condition Penalty Exponent", 0.00f, 8.00f, "0.00", HintText = "the curve: above 1 = small wear is cheap, deep wear bites (99% state ~ -0.5%, 50% ~ -41%, 1% ~ -89%)")]
         [SettingPropertyGroup("Wear and tear")]
-        public float ConditionPenaltyExponent { get; set; } = 1.15f;
+        public float ConditionPenaltyExponent { get; set; } = 2.0f;
+
+        [SettingPropertyInteger("Armor Pool Min Points", 0, 160, "0", HintText = "gloves, greaves and capes wear like the rest of the harness: their wear pool counts at least this many armour points")]
+        [SettingPropertyGroup("Wear and tear")]
+        public int ArmorPoolMinPoints { get; set; } = 40;
 
         [SettingPropertyFloatingInteger("Wear Per Battle", 0.00f, 1.00f, "0.00", HintText = "flat wear per battle ON TOP of real damage - 0 = gear suffers only when something actually hits it")]
         [SettingPropertyGroup("Wear and tear")]
@@ -396,9 +400,9 @@ namespace Armoury
         [SettingPropertyGroup("Wear and tear")]
         public float DurabilityPerArmorPoint { get; set; } = 20f;
 
-        [SettingPropertyFloatingInteger("Wear Weapon Per Hit", 0.00f, 2.40f, "0.00", HintText = "wear on your weapon for every blow you land (bows wear per arrow that strikes home)")]
+        [SettingPropertyFloatingInteger("Wear Weapon Per Hit", 0.00f, 1.00f, "0.00", HintText = "wear on your weapon for every blow you land (bows wear per arrow that strikes home)")]
         [SettingPropertyGroup("Wear and tear")]
-        public float WearWeaponPerHit { get; set; } = 0.6f;
+        public float WearWeaponPerHit { get; set; } = 0.25f;
 
         [SettingPropertyFloatingInteger("Wear Shield Factor", 0.00f, 1.20f, "0.00", HintText = "shields are built to take it - blocked damage wears them at this share")]
         [SettingPropertyGroup("Wear and tear")]
@@ -2425,6 +2429,7 @@ namespace Armoury
             s.ConditionScalesStats = ConditionScalesStats;
             s.ConditionPenaltyMax = ConditionPenaltyMax;
             s.ConditionPenaltyExponent = ConditionPenaltyExponent;
+            s.ArmorPoolMinPoints = ArmorPoolMinPoints;
             s.WearPerBattle = WearPerBattle;
             s.WearDamageFactor = WearDamageFactor;
             s.MissileArmorWearPercent = MissileArmorWearPercent;

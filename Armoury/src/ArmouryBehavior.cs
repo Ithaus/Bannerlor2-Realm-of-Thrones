@@ -1664,6 +1664,20 @@ namespace Armoury
         }
 
         /// <summary>Stan sprzetu zdartego z jenca - ta sama loteria co lupy z pola.</summary>
+        /// <summary>wpis 95: pierwszy (najlagodniejszy) stopien zuzycia - zuzycie walki, nie stan lupu.</summary>
+        internal static ItemModifier MildWornModifier(ItemObject item)
+        {
+            try
+            {
+                if (item == null || NoWear(item) || item.ItemComponent == null || item.ItemComponent.ItemModifierGroup == null) return null;
+                ItemModifier best = null;
+                foreach (var m in item.ItemComponent.ItemModifierGroup.ItemModifiers)
+                    if (m != null && m.PriceMultiplier < 1f && (best == null || m.PriceMultiplier > best.PriceMultiplier)) best = m;
+                return best;
+            }
+            catch { return null; }
+        }
+
         internal static ItemModifier PickWornModifier(ItemObject item)
         {
             try
@@ -1785,6 +1799,8 @@ namespace Armoury
                     ? a.BodyArmor
                     : a.HeadArmor + a.BodyArmor + a.LegArmor + a.ArmArmor;
                 int tier = Recipes.Grade(it);
+                // wpis 95 (audyt zuzycia pkt 7): rekawice (10 pkt) i nogawice zuzywaly sie 5-8x szybciej niz napiersnik - podloga puli
+                pts = Math.Max(pts, Math.Max(1, Settings.Current.ArmorPoolMinPoints));
                 int pool = (int)(pts * Math.Max(1f, Settings.Current.DurabilityPerArmorPoint) * tier);
                 return Math.Max(1, pool);
             }

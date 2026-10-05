@@ -168,17 +168,21 @@ namespace Armoury
                         // zuzycie walki: czesc sztuk W UZYCIU (do liczby ludzi) - sprawne staja sie obite
                         var arm = Armory(mp); if (arm == null) continue;
                         var need = AiGear.NeedBuckets(mp);
+                        // wpis 95 (audyt zuzycia pkt 4): potrzeba koszyka ROZDZIELANA miedzy przedmioty (dotad liczona od nowa dla
+                        // kazdego przedmiotu w koszyku - 10 roznych zbroi t3 dawalo ~5x za duzo sztuk "w uzyciu")
                         foreach (var kv in arm.ToList())
                         {
                             var it = kv.Key;
                             if (it == null || kv.Value <= 0 || !SupplyDemand.Equipmentish(it) || ArmouryBehavior.NoWear(it) || MenPurse.HorseKind(it)) continue;
-                            int nd; need.TryGetValue(AiGear.Bucket(it), out nd);
+                            int bk = AiGear.Bucket(it);
+                            int nd; need.TryGetValue(bk, out nd);
                             int inUse = Math.Min(nd, kv.Value);
+                            need[bk] = Math.Max(0, nd - inUse);
                             int sound = kv.Value - WornOf(mp.StringId, it.StringId);
                             int hits = Math.Min(sound, (int)Math.Floor(inUse * share + MBRandom.RandomFloat));
                             for (int k = 0; k < hits; k++)
                             {
-                                var m = ArmouryBehavior.PickWornModifier(it);
+                                var m = ArmouryBehavior.MildWornModifier(it);   // wpis 95 (pkt 5): bitwa = jeden stopien, nie loteria lupu
                                 if (m != null) { AddWorn(mp.StringId, it.StringId, m.StringId, 1); _dayWorn++; }
                             }
                         }

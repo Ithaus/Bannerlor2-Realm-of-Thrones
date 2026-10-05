@@ -103,18 +103,19 @@ namespace Armoury
 
         // --- Wear and tear ---
         public bool TroopWearEnabled = true;               // the men's kit wears with every battle: a share of pieces in use drops one condition step - mend it at the smith
-        public float TroopWearPercent = 12f;               // this share of pieces IN USE takes one step of wear per battle
+        public float TroopWearPercent = 4f;               // this share of pieces IN USE takes one step of wear per battle
         public bool WearEnabled = true;                    // gear loses condition with use
         public bool ShowConditionPercent = true;           // damaged gear carries its state in the name - (100%) is mint, (1%) is a wreck
         public bool ConditionScalesStats = true;           // Jeff's rule: protection and edge follow condition - light wear costs little, heavy wear costs dearly
         public float ConditionPenaltyMax = 90f;            // an all-but-broken piece (1%) still keeps this much less - never the full hundred
-        public float ConditionPenaltyExponent = 1.15f;     // the curve: above 1 = small wear is cheap, deep wear bites (99% state ~ -0.5%, 50% ~ -41%, 1% ~ -89%)
+        public float ConditionPenaltyExponent = 2.0f;     // the curve: above 1 = small wear is cheap, deep wear bites (99% state ~ -0.5%, 50% ~ -41%, 1% ~ -89%)
+        public int ArmorPoolMinPoints = 40;                // gloves, greaves and capes wear like the rest of the harness: their wear pool counts at least this many armour points
         public float WearPerBattle = 0f;                   // flat wear per battle ON TOP of real damage - 0 = gear suffers only when something actually hits it
         public float WearDamageFactor = 0.15f;             // wear per point of damage the STRUCK piece takes (armour wears where the blow lands)
         public float MissileArmorWearPercent = 10f;        // arrows punch tidy little holes, not rents - armour counts only this % of missile damage as wear (hp damage unchanged)
         public float HarnessWearFactor = 0.15f;            // saddle and barding count only this share of the horse's raw hits as wear - at the old half-share saddles kept dying under you
         public float DurabilityPerArmorPoint = 20f;        // Jeff's pool: every point of protection gives this much durability, times the tier - 61 armor at tier 3 = 61 x 20 x 3 = 3660 points, and damage taken subtracts one for one
-        public float WearWeaponPerHit = 0.6f;              // wear on your weapon for every blow you land (bows wear per arrow that strikes home)
+        public float WearWeaponPerHit = 0.25f;              // wear on your weapon for every blow you land (bows wear per arrow that strikes home)
         public float WearShieldFactor = 0.3f;              // shields are built to take it - blocked damage wears them at this share
         public bool ShieldMissileGuardEnabled = true;      // a shield is not there to be shot to pieces - arrows and bolts barely mark it
         public float MissileShieldDamagePercent = 1f;      // percent of the arrow or bolt damage a shield actually takes, both in the fight and as wear (RBM counts 150%, the bare game 15%)

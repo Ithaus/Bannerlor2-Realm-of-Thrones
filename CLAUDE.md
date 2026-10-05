@@ -114,6 +114,12 @@ wystawia obce wojsko — patrz `docs/ERRORS.md`.
 
 **Zawsze rob `cd` do katalogu projektu przed `dotnet build`** — inaczej MSB1003.
 
+**Zmiana wartosci DOMYSLNEJ w `Settings.cs` nie dziala, jesli MCM ma ja juz zapisana.**
+MCM trzyma wartosci w `Documents\Mount and Blade II Bannerlord\Configs\ModSettings\Global\
+Armoury\Armoury.json` i nadpisuje nimi domyslne z kodu. Po zmianie domyslnej sprawdz ten plik
+(`grep '"Klucz"'`); jesli klucz tam jest - popraw go w pliku (gra zamknieta, kopia `.bak`).
+Tak wpis 82 (dzialka 30 -> 33%) przez caly dzien nie dzialal u Jeffa.
+
 ## 8. Zasady pracy (wyciagniete z bolesnych doswiadczen)
 
 0. **ZASADA GLOWNA (Jeff, 05.10): kazda zmiana = kontrola calosci.** Zanim zmiana pojdzie
