@@ -216,7 +216,7 @@ namespace Armoury
 
         // ------------------------------------------------------------ naprawy w miescie
         private static int UnitCost(ItemObject it, ItemModifier m) { return Math.Max(1, (int)(it.Value * (1f - (m != null ? m.PriceMultiplier : 1f)) * 0.25f)); }
-        private static bool Mendable(ItemModifier m) { return m != null && m.PriceMultiplier < 1f && m.PriceMultiplier >= 0.1f; }
+        private static bool Mendable(ItemModifier m) { return m != null && m.PriceMultiplier < 1f && !LootPrices.IsWreck(m); }   // wpis 97
 
         internal static int OutstandingCost(MobileParty mp)
         {

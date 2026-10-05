@@ -634,8 +634,9 @@ namespace Armoury
                 if (_rlEnsureCache != null) _rlEnsureCache.Invoke(null, null);
                 // audyt 04.10: wrak dostawal heavy_max (3%) i prog zniszczenia (Jeff 28.08: "<=3% = zniszczone") kasowal
                 // KAZDY wrak - funkcja byla martwa (w logach 8/8 "zostaly na polu"). Wrak = ciezko uszkodzony (8%), do przetopu.
-                var m = _rlHeavy != null ? _rlHeavy.GetValue(null) as ItemModifier : null;
-                if (m == null && _rlHeavyMax != null) m = _rlHeavyMax.GetValue(null) as ItemModifier;
+                // wpis 97: cena lupu = stan - wrakiem jest "Mangled" (10%); "Battered" (25%) to juz zwykle zuzycie
+                var m = _rlHeavyMax != null ? _rlHeavyMax.GetValue(null) as ItemModifier : null;
+                if (m == null && _rlHeavy != null) m = _rlHeavy.GetValue(null) as ItemModifier;
                 return m;
             }
             catch { return null; }

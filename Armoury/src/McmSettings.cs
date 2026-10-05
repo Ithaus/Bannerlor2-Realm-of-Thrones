@@ -376,6 +376,10 @@ namespace Armoury
         [SettingPropertyGroup("Wear and tear")]
         public float TroopWearBaseCasualtyShare { get; set; } = 0.10f;
 
+        [SettingPropertyBool("Loot Price Follows Condition", HintText = "Spoils of War loot is priced by its condition (Plundered 55%, Damaged 40%, Battered 25%, Mangled 10% - a wreck)")]
+        [SettingPropertyGroup("Wear and tear")]
+        public bool LootPriceFollowsCondition { get; set; } = true;
+
         [SettingPropertyBool("Wear Enabled", HintText = "gear loses condition with use")]
         [SettingPropertyGroup("Wear and tear")]
         public bool WearEnabled { get; set; } = true;
@@ -2449,6 +2453,7 @@ namespace Armoury
             s.TroopWearPerStrike = TroopWearPerStrike;
             s.TroopWearPerShot = TroopWearPerShot;
             s.TroopWearBaseCasualtyShare = TroopWearBaseCasualtyShare;
+            s.LootPriceFollowsCondition = LootPriceFollowsCondition;
             s.WearEnabled = WearEnabled;
             s.ShowConditionPercent = ShowConditionPercent;
             s.ConditionScalesStats = ConditionScalesStats;

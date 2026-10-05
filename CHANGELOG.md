@@ -1,5 +1,12 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-05 (97) - CENA LUPU = STAN: Plundered 55%, Damaged 40%, Battered 25%, Mangled 10% (wrak)
+**Mod:** Armoury | **Pliki:** NOWY `LootPrices.cs` (`Apply`, `IsWreck`), `ArmouryBehavior.cs` (start sesji), `BattlefieldLaw.cs` (`WreckModifier` -> Mangled), `TroopSelfMend.cs`, `AiWear.cs` (wrak przez `IsWreck`), `Settings.cs` + `McmSettings.cs` (NOWE `LootPriceFollowsCondition`)
+**Problem:** Jeff 05.10: "im bardziej zniszczony, tym nizsza cena" -> "zrob tak". Spoils of War ma dla lupu stany 55/40/25/10%, ale ceny 0.20/0.14/0.08/0.03 - miecz "Plundered" sprawny w 55% kosztowal jak zlom (wpis 95 poprawil tylko kare w walce i podpowiedz).
+**Zmiana:** na starcie sesji PriceMultiplier modyfikatorow rl_* = ich stan (0.55/0.40/0.25/0.10). Wrak = tylko "Mangled" (10%) albo cena < 10% (`LootPrices.IsWreck`): ludzie i AI go nie lataja, tylko kowal z materialem albo przetop; wraki z bitwy dostaja Mangled (dotad Battered 8%). "Battered" (25%) to zwykle zuzycie - ludzie naprawiaja.
+**Ryzyko / co sprawdzic (kontrola wg zasady glownej):** lup sprzedaje sie ok. 2.75x drozej (Plundered 20% -> 55%) - Twoj dochod z lupu, sakiewki ludzi i trzecia lordow AI rosna; skup miast placi wiecej (kasy). Prog zniszczenia lupu (LootMinConditionPercent 3%) nie kasuje juz Mangled (10%) - wraki zostaja do przetopu. Naprawy liczone od ceny - Plundered tanszy w naprawie (25% utraconej wartosci od 45% zamiast 80%). ConditionOf (wpis 95) daje te same liczby - spojne.
+**Status:** WGRANE 2026-10-05 (md5 90828e9d5a569a99182746b3b8a5a8f9; poprzednie DLL jako `Armoury.dll.bak-2026-10-05-przed-97`).
+
 ## 2026-10-05 (96) - ZUZYCIE WOJSKA Z PRZEBIEGU WALKI: trafienia w bitwie rozgrywanej, straty w symulacji; losowanie po sztukach
 **Mod:** Armoury | **Pliki:** NOWY `TroopWearLedger.cs`, `FieldCraft.cs` (OnAgentHit, OnAgentShootMissile - zolnierze partii gracza), `ArmouryBehavior.cs` (`WearTheTroops`), `BattlefieldLaw.cs` (`IsMainPartyAgent` internal), `Settings.cs` + `McmSettings.cs` (NOWE `TroopWearPerHit` 0.05, `TroopWearPerBlock` 0.03, `TroopWearPerStrike` 0.01, `TroopWearPerShot` 0.002, `TroopWearBaseCasualtyShare` 0.10)
 **Problem:** Jeff 05.10: "4%, ale czy to na sztywno musi byc? nie wynika z walki?" -> "tak". Dotad wojsko po kazdej wygranej tracilo stale 12% (od wpisu 95: 4%) sztuk w uzyciu - tyle samo po 10 rabusiach, co po armii (log 03.10: 226-239 szt. przy obrazeniach 2-162). Losowanie po RODZAJACH w magazynie: pojedyncze sztuki psuly sie w kolko (audyt pkt 5).

@@ -38,7 +38,7 @@ namespace Armoury
         private static bool Mendable(ItemRosterElement el)
         {
             var mod = el.EquipmentElement.ItemModifier;
-            return el.Amount > 0 && el.EquipmentElement.Item != null && mod != null && mod.PriceMultiplier < 1f && mod.PriceMultiplier >= 0.1f;
+            return el.Amount > 0 && el.EquipmentElement.Item != null && mod != null && mod.PriceMultiplier < 1f && !LootPrices.IsWreck(mod);   // wpis 97
         }
 
         /// <summary>Ile kosztowalyby wszystkie zalegle naprawy (bez wrakow) - tyle ludzie trzymaja w sakiewce.</summary>
@@ -137,7 +137,7 @@ namespace Armoury
                     var el = armory.GetElementCopyAtIndex(i);
                     var mod = el.EquipmentElement.ItemModifier;
                     if (el.Amount <= 0 || mod == null || mod.PriceMultiplier >= 1f) continue;
-                    if (mod.PriceMultiplier < 0.1f) continue;   // audyt pelny K2: wrak - tylko kowal z materialem albo przetop
+                    if (LootPrices.IsWreck(mod)) continue;   // audyt pelny K2: wrak - tylko kowal z materialem albo przetop
                     if (el.EquipmentElement.Item == null) continue;
                     worn.Add(el);
                 }

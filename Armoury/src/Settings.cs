@@ -109,6 +109,7 @@ namespace Armoury
         public float TroopWearPerStrike = 0.01f;           // fought battle: chance that a landed blow wears a soldier's weapon one step
         public float TroopWearPerShot = 0.002f;            // fought battle: chance that one shot wears a soldier's bow or crossbow one step
         public float TroopWearBaseCasualtyShare = 0.10f;   // auto-resolved battle: at this share of wounded men the stores wear by TroopWearPercent; lighter fights wear less, heavier more
+        public bool LootPriceFollowsCondition = true;      // Spoils of War loot is priced by its condition (Plundered 55%, Damaged 40%, Battered 25%, Mangled 10% - a wreck)
         public bool WearEnabled = true;                    // gear loses condition with use
         public bool ShowConditionPercent = true;           // damaged gear carries its state in the name - (100%) is mint, (1%) is a wreck
         public bool ConditionScalesStats = true;           // Jeff's rule: protection and edge follow condition - light wear costs little, heavy wear costs dearly
