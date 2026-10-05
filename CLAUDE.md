@@ -169,5 +169,6 @@ w `CHANGELOG.md` i `docs/ERRORS.md`. To wystarczy, zeby wiedziec, gdzie jestesmy
 
 ## 10. Otwarte sprawy
 
-Patrz `docs/ERRORS.md` (bledy cudzych modow) i `docs/HISTORY.md` (co i dlaczego zrobilismy,
+**Najpierw `docs/STAN-PRAC.md`** - aktualny stan, co jest wgrane a nieprzetestowane, co sprawdzic
+w logach, decyzje czekajace na Jeffa. Potem `docs/ERRORS.md` (bledy cudzych modow) i `docs/HISTORY.md` (co i dlaczego zrobilismy,
 oraz lista rzeczy niedokonczonych).
