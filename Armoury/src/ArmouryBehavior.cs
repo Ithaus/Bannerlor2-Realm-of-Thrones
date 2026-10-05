@@ -946,6 +946,9 @@ namespace Armoury
         { StartProject(item, tempo, days, where, "", ""); }
 
         internal void StartProject(ItemObject item, int tempo, float days, Settlement where, string kind, string modifierId)
+        { StartProject(item, tempo, days, where, kind, modifierId, 1); }
+
+        internal void StartProject(ItemObject item, int tempo, float days, Settlement where, string kind, string modifierId, int count)
         {
             try
             {
@@ -953,7 +956,7 @@ namespace Armoury
                 {
                     Item = item, DaysLeft = days, Tempo = tempo,
                     SettlementId = where != null ? where.StringId : "",
-                    Kind = kind ?? "", ModifierId = modifierId ?? ""
+                    Kind = kind ?? "", ModifierId = modifierId ?? "", Count = Math.Max(1, count)
                 };
                 _projects.Add(p.Serialize());
                 Log.Info("Projekt dodany: " + p.Serialize());
@@ -988,7 +991,7 @@ namespace Armoury
 
         private static void HandOver(Project p)
         {
-            if (p.Kind == "van") Forge.Deliver(p.Item, p.ModifierId);   // sukces zapadl przy kowadle
+            if (p.Kind == "van" || p.Kind == "bk") Forge.Deliver(p.Item, p.ModifierId, Math.Max(1, p.Count));   // sukces zapadl przy kowadle
             else Forge.Finish(p.Item, p.Tempo);
         }
 
@@ -1006,7 +1009,7 @@ namespace Armoury
                 for (int i = 0; i < _projects.Count; i++)
                 {
                     var q = Project.Parse(_projects[i]);
-                    if (q.Item == null || q.Kind != "van") continue;
+                    if (q.Item == null || q.Kind != "van" || ForgeClock.On) continue;   // wpis 83: godziny z ekranu BK, bez przycinania
                     float cap = MathF.Max(0.1f, Recipes.Grade(q.Item) * Settings.Current.WeaponDaysPerTier);
                     if (q.DaysLeft > cap) { q.DaysLeft = cap; _projects[i] = q.Serialize(); capped++; }
                 }
@@ -1018,7 +1021,8 @@ namespace Armoury
                 // Teraz robota idzie zawsze; XP za prace w trakcie dostajesz
                 // tylko na miejscu (to twoje rece), a GOTOWY wyrob lezy
                 // w warsztacie i czeka na odbior przy wejsciu do osady.
-                bool remote = Settings.Current.ForgeWorksWithoutYou;
+                // wpis 83 (Jeff 05.10: "nie kuje sie, jak mnie nie ma w miescie") - to Twoje rece przy kowadle
+                bool remote = Settings.Current.ForgeWorksWithoutYou && !Settings.Current.ForgeOnlyWhileThere;
                 var copy = new List<string>(_projects);
                 bool idleWarned = false;
                 // JEDNA LINIA CZASU U KOWALA (Jeff 28.08: "wytapiam miecze,
@@ -1067,6 +1071,7 @@ namespace Armoury
                     // KROK GODZINOWY: zegar konczy sie DOKLADNIE z robota, bez
                     // doczekiwania do polnocy (blad, ktory wkurzyl Jeffa przy mieczu)
                     p.DaysLeft -= 1f / 24f;
+                    if (atForge && ForgeClock.On && (p.Kind == "bk" || p.Kind == "van")) { try { DayPass.EnsureBought(); } catch { } }   // kuznia wynajeta na dobe
                     var rr = Recipes.For(p.Item);
                     // XP liczy sie od WLASCIWEGO czasu projektu: bron "van" ma swoj
                     // przelicznik (WeaponDaysPerTier), pancerze swoj (Jeff 29.08:
@@ -1076,7 +1081,7 @@ namespace Armoury
                     float totalDays = p.Kind == "van"
                         ? MathF.Max(0.1f, Recipes.Grade(p.Item) * Settings.Current.WeaponDaysPerTier)
                         : MathF.Max(1f, rr.Tier * Settings.Current.DaysPerTier * Project.TimeFactor(p.Tempo));
-                    if (atForge)   // XP tylko za wlasna prace przy kowadle
+                    if (atForge && p.Kind != "bk")   // XP tylko za wlasna prace przy kowadle (bk: XP dal BK przy kliknieciu)
                         Hero.MainHero.HeroDeveloper.AddSkillXp(DefaultSkills.Crafting,
                             Forge.ProjectXp(rr) * Settings.Current.XpShareWhileWorking / totalDays / 24f);
 
@@ -1192,6 +1197,9 @@ namespace Armoury
 
                 int tier = Recipes.Grade(item);
                 float days = MathF.Max(0.1f, tier * s.WeaponDaysPerTier);   // minimum 0.1 dnia (Jeff 16.09: -80%)
+                // wpis 83: godziny z ekranu BK - koszt staminy tej sztuki / 6
+                if (ForgeClock.On)
+                    try { days = ForgeClock.HoursOf(Campaign.Current.Models.SmithingModel.GetEnergyCostForSmithing(item, Hero.MainHero)) / 24f; } catch { }
 
                 var roster = MobileParty.MainParty.ItemRoster;
                 var el = new EquipmentElement(item, modifier);   // takim lezy w sakwach
@@ -1217,8 +1225,8 @@ namespace Armoury
                 // po czasie ma NIE rzucac drugi raz (Jeff: "wykulem, a potem fail
                 // i miecza nie ma"). Modyfikator jedzie z projektem i wraca.
                 StartProject(item, 1, days, here, "van", modifier != null ? modifier.StringId : "");
-                Log.Player("The blade is roughed out. " + Project.TimeLabel(days) + " of the SMITH'S finishing work remain at "
-                           + here.Name + " - he works it himself, wherever you ride.");
+                Log.Player("The blade is roughed out. " + Project.TimeLabel(days) + " of finishing work remain at "
+                           + here.Name + (ForgeClock.On ? " - the work goes on only while you stay here." : " - he works it himself, wherever you ride."));
                 // gra przed chwila POKAZALA "dodano do ekwipunku" - bez glosnego
                 // baneru wyglada to na zniknieciecie miecza
                 try

@@ -80,6 +80,14 @@ namespace Armoury
         [SettingPropertyGroup("Time at the anvil")]
         public bool ForgeWorksWithoutYou { get; set; } = true;
 
+        [SettingPropertyBool("Forge One Clock", HintText = "one forge clock: Craft puts the piece on the smith's bench for the hours the Banner Kings screen shows (stamina spent / 6); pieces come off one by one when done - no lump wait afterwards")]
+        [SettingPropertyGroup("Time at the anvil")]
+        public bool ForgeOneClock { get; set; } = true;
+
+        [SettingPropertyBool("Forge Only While There", HintText = "your own work at the anvil goes on only while you stay in that settlement - ride away and the bench waits for you")]
+        [SettingPropertyGroup("Time at the anvil")]
+        public bool ForgeOnlyWhileThere { get; set; } = true;
+
         [SettingPropertyBool("Forge Takes Time", HintText = "armour is not finished the moment you order it")]
         [SettingPropertyGroup("Time at the anvil")]
         public bool ForgeTakesTime { get; set; } = true;
@@ -2315,6 +2323,8 @@ namespace Armoury
             s.CharcoalPerIron = CharcoalPerIron;
             s.StaminaPerTier = StaminaPerTier;
             s.ForgeWorksWithoutYou = ForgeWorksWithoutYou;
+            s.ForgeOneClock = ForgeOneClock;
+            s.ForgeOnlyWhileThere = ForgeOnlyWhileThere;
             s.ForgeTakesTime = ForgeTakesTime;
             s.DaysPerTier = DaysPerTier;
             s.TempoHastyTime = TempoHastyTime;

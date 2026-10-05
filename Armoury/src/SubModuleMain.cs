@@ -91,6 +91,7 @@ namespace Armoury
                 // kolumny (po suficie marszu), nie teoretyczna baze
                 NightRest.ApplyAll(_harmony);
                 FletchForge.ApplyAll(_harmony);
+                ForgeClock.ApplyAll(_harmony);   // wpis 83: jeden zegar kuzni
                 SmeltTab.ApplyAll(_harmony);
                 DressCode.ApplyAll(_harmony);
                 UniqueLaw.ApplyAll(_harmony);        // unikaty imienne: nabor do magazynow DTE zamienia kopie na zamienniki

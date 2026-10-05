@@ -16,6 +16,7 @@ namespace Armoury
         internal string SettlementId;
         internal string Kind;        // "" nasza kuznia (rzut przy koncu); "van" bron z vanilla kucia - DOSTAWA bez drugiego rzutu
         internal string ModifierId;  // jakosc z rzutu przy kowadle - wraca na wyrobie przy dostawie
+        internal int Count;          // wpis 83: ile sztuk wydac (seria amunicji); 0/brak = 1
 
         internal static Project Parse(string line)
         {
@@ -29,6 +30,7 @@ namespace Armoury
                 p.SettlementId = a.Length > 3 ? a[3] : "";
                 p.Kind = a.Length > 4 ? a[4] : "";
                 p.ModifierId = a.Length > 5 ? a[5] : "";
+                p.Count = a.Length > 6 ? int.Parse(a[6]) : 1;
             }
             catch (Exception e) { Log.Error("Project.Parse", e); }
             return p;
@@ -38,7 +40,7 @@ namespace Armoury
         {
             return (Item != null ? Item.StringId : "") + "|" +
                    DaysLeft.ToString("0.##", CultureInfo.InvariantCulture) + "|" +
-                   Tempo + "|" + SettlementId + "|" + (Kind ?? "") + "|" + (ModifierId ?? "");
+                   Tempo + "|" + SettlementId + "|" + (Kind ?? "") + "|" + (ModifierId ?? "") + "|" + Math.Max(1, Count);
         }
 
         internal string TempoName

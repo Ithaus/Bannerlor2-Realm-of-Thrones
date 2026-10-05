@@ -170,7 +170,7 @@ namespace Armoury
                         freshMod = el.EquipmentElement.ItemModifier;
                         break;
                     }
-                    CraftPopup.Show(item, freshMod, 1);
+                    if (!ForgeClock.On) CraftPopup.Show(item, freshMod, 1);   // wpis 83: okno przy wydaniu z kolejki
                 }
                 catch { }
             }

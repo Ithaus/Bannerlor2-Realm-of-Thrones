@@ -336,7 +336,9 @@ namespace Armoury
         /// KOWADLE - projekt "van" tylko oddaje wyrob po czasie. Bez drugiego
         /// rzutu (Jeff: "klikam, jest wykute, a potem czas mija i miecza nie ma").
         /// </summary>
-        internal static void Deliver(ItemObject item, string modifierId)
+        internal static void Deliver(ItemObject item, string modifierId) { Deliver(item, modifierId, 1); }
+
+        internal static void Deliver(ItemObject item, string modifierId, int count)
         {
             try
             {
@@ -344,10 +346,11 @@ namespace Armoury
                 ItemModifier mod = null;
                 if (!string.IsNullOrEmpty(modifierId))
                     try { mod = TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObject<ItemModifier>(modifierId); } catch { }
-                MobileParty.MainParty.ItemRoster.AddToCounts(new EquipmentElement(item, mod), 1);
-                Log.Player("The finishing work is done: " + (mod != null ? mod.Name + " " : "") + item.Name + " joins your baggage.");
+                count = Math.Max(1, count);
+                MobileParty.MainParty.ItemRoster.AddToCounts(new EquipmentElement(item, mod), count);
+                Log.Player("Off the anvil: " + (count > 1 ? count + " x " : "") + (mod != null ? mod.Name + " " : "") + item.Name + " joins your baggage.");
                 Banner("Finished and delivered: " + item.Name);
-                CraftPopup.Show(item, mod, 1);
+                if (item.ItemType != ItemObject.ItemTypeEnum.Arrows && item.ItemType != ItemObject.ItemTypeEnum.Bolts) CraftPopup.Show(item, mod, count);
                 Log.Info("Dostawa broni: " + item.StringId + " mod=" + (mod != null ? mod.StringId : "brak"));
             }
             catch (Exception e) { Log.Error("Deliver", e); }
@@ -514,6 +517,16 @@ namespace Armoury
                 // amunicje robi sie SERIAMI: jedna robota = kilka wiazek strzal/beltow
                 int made = (item.ItemType == ItemObject.ItemTypeEnum.Arrows || item.ItemType == ItemObject.ItemTypeEnum.Bolts)
                     ? MathF.Max(1, Settings.Current.AmmoBatchStacks) : 1;
+                if (ForgeClock.On && TaleWorlds.CampaignSystem.Settlements.Settlement.CurrentSettlement != null)
+                {
+                    // wpis 83: na lawe kowala, wydanie po godzinach z ekranu BK (stamina / 6)
+                    ForgeClock.Queue(item, quality, made, ForgeClock.HoursOf(r.Stamina));
+                    if (Recipes.IsLegendary(item) && !ArmouryBehavior.Legends.Contains(item.StringId)) ArmouryBehavior.Legends.Add(item.StringId);
+                    RangedLore.OnCrafted(item);
+                    hero.HeroDeveloper.AddSkillXp(DefaultSkills.Crafting, ProjectXp(r) * (1f - Settings.Current.XpShareWhileWorking) * xpMul);
+                    Log.Info("Wykuto (na lawe): " + item.StringId + " x" + made + " jakosc=" + (quality != null ? quality.StringId : "zwykla"));
+                    return;
+                }
                 MobileParty.MainParty.ItemRoster.AddToCounts(new EquipmentElement(item, quality), made);
                 // okno wyniku jak przy mieczach (Jeff 29.08: "wykulem luk i nie
                 // pojawilo sie okienko!") - amunicja bez popupu, bo seryjna

@@ -305,7 +305,8 @@ namespace Armoury
                 MBTextManager.SetTextVariable("ARM_PROJ_TEXT",
                     "The smith works the jobs one by one - about " +
                     ((int)Math.Ceiling(_projInitialHours)) + " hours until ALL your work here is done. " +
-                    "He needs no watching: leave, and the clock still runs.");
+                    (ForgeClock.On ? "Each piece comes off the anvil when it is done. Leave, and the work waits for you."
+                                   : "He needs no watching: leave, and the clock still runs."));
                 args.MenuContext.GameMenu.StartWait();
             }
             catch (Exception e) { Log.Error("ProjWaitInit", e); }
