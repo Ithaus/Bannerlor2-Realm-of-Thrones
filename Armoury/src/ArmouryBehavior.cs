@@ -488,7 +488,7 @@ namespace Armoury
                 delegate { try { McmSettings.Apply(); } catch { } try { AmmoTracer.HourlyCheck(); } catch { } });
             CampaignEvents.OnSettlementOwnerChangedEvent.AddNonSerializedListener(this, WarLedger.OnOwnerChanged);
             // sprzet startowy dopasowany do umiejetnosci (Jeff 04.10)
-            CampaignEvents.OnCharacterCreationIsOverEvent.AddNonSerializedListener(this, delegate { try { var ss = Settings.Current; if (ss != null && ss.StartKitEnabled) StartKit.OnCharacterCreationOver(); } catch { } });
+            CampaignEvents.OnCharacterCreationIsOverEvent.AddNonSerializedListener(this, delegate { try { StartKit.OnCharacterCreationOver(); } catch { } });   // wpis 86 (audyt pkt 17): limit zlota startowego niezalezny od StartKitEnabled
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, delegate { try { StartKit.Hourly(); } catch { } });
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, delegate { MapClock.ApplySpeed(); });   // gra wraca do x4 przy wczytaniu
             // prawo wyrzutkow (Jeff 04.10): pula ludzi wyjetych spod prawa
@@ -1147,8 +1147,16 @@ namespace Armoury
             try { WarLedger.OnDaily(); } catch (Exception e) { Log.Error("WarLedger", e); }
             try { Orders.DailyTick(); }
             catch (Exception e) { Log.Error("OnDailyTick", e); }
-            try { HistoricalPrices.Recheck(); UniqueSpoils.Daily(); BattleChronicle.Daily(); BuildFunding.Daily(); BuildDiary.Daily(); SupplyDemand.DecayOrders(); ArmsPricing.Daily(); } catch (Exception e) { Log.Error("ArmsPricing.Daily", e); }   // indeksy surowcow i premie wojenne PRZED handlem
+            // wpis 86 (audyt pkt 18): kazdy system we wlasnym try - wyjatek jednego nie zatrzymuje reszty dnia
+            try { HistoricalPrices.Recheck(); } catch (Exception e) { Log.Error("HistoricalPrices.Recheck", e); }
+            try { UniqueSpoils.Daily(); } catch (Exception e) { Log.Error("UniqueSpoils.Daily", e); }
+            try { BattleChronicle.Daily(); } catch (Exception e) { Log.Error("BattleChronicle.Daily", e); }
+            try { SupplyDemand.DecayOrders(); } catch (Exception e) { Log.Error("SupplyDemand.DecayOrders", e); }
+            try { ArmsPricing.Daily(); } catch (Exception e) { Log.Error("ArmsPricing.Daily", e); }   // indeksy surowcow i premie wojenne PRZED handlem
             try { PopulationLaw.Daily(); } catch (Exception e) { Log.Error("PopulationLaw.Daily", e); }   // ludnosc i renty krain
+            // wpis 86 (audyt pkt 7): budowy PO rentach - 10% od dzisiejszego dochodu
+            try { BuildFunding.Daily(); } catch (Exception e) { Log.Error("BuildFunding.Daily", e); }
+            try { BuildDiary.Daily(); } catch (Exception e) { Log.Error("BuildDiary.Daily", e); }
             try { KingdomTreasury.Daily(); KingdomTreasury.Levies(); KingdomLedger.Daily(); } catch (Exception e) { Log.Error("KingdomTreasury.Daily", e); }   // powinnosci wasali wobec korony (po rentach)
             try { OutlawLaw.Daily(); } catch (Exception e) { Log.Error("OutlawLaw.Daily", e); }   // wyrzutki: bieda, powroty, werbunek band
             try { IronBank.Daily(); } catch (Exception e) { Log.Error("IronBank.Daily", e); }   // Bank Zelazny: pozyczki AI, raty, bankructwa

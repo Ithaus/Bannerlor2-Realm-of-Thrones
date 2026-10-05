@@ -262,6 +262,7 @@ namespace Armoury
 
         internal static void Daily()
         {
+            RentToday.Clear();   // wpis 86 (audyt pkt 7): przy wylaczonych rentach nie zostaja stare kwoty w dochodzie
             if (!On) return;
             try
             {

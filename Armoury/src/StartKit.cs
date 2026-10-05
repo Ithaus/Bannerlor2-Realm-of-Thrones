@@ -31,7 +31,7 @@ namespace Armoury
         {
             if (!_pending) return;
             _pending = false;
-            try { Run(); } catch (Exception e) { Log.Error("StartKit", e); }
+            try { var ss = Settings.Current; if (ss != null && ss.StartKitEnabled) Run(); } catch (Exception e) { Log.Error("StartKit", e); }
             try { EnforceStartGold(); } catch (Exception e) { Log.Error("StartKit.Gold", e); }
         }
 

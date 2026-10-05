@@ -1,5 +1,12 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-05 (86) - AUDYT pkt 3, 7, 8, 15, 17, 18: budowy, renty, kolejnosc dnia, zloto startowe
+**Mod:** Armoury | **Pliki:** `BuildFunding.cs`, `PopulationLaw.cs`, `ArmouryBehavior.cs`, `StartKit.cs`
+**Problem (audyt kodu 05.10):** pkt 3 - pominiety BK `RunMaterials` nie zerowal `materialExpenses` (zapisane w save), `KeptTownLines` odejmowal stary koszt materialow od podatku miasta co dzien (zloto znikalo, podstawa War Tax ujemna). pkt 7 - `RentToday` nie czyszczone przy wylaczonych rentach; budowy liczyly sie od WCZORAJSZYCH rent (BuildFunding przed PopulationLaw). pkt 8 - w wojnie budowle cywilne liczyly sie do podzialu 10%, mur dostawal np. 2.5% zamiast 10%. pkt 15 - "brak materialow", gdy material byl, tylko drozszy niz dzienny budzet. pkt 17 - limit zlota startowego (100 d) dzialal tylko przy wlaczonym StartKit. pkt 18 - jeden `try` na siedem systemow dziennych.
+**Zmiana:** 3 - prefiks na `RunMaterials` czysci `materialExpenses` BK i pomija metode. 7 - `RentToday.Clear()` zawsze; BuildFunding i BuildDiary po PopulationLaw. 8 - cywilne w wojnie odpadaja juz przy liczeniu lenn z budowa. 15 - gdy zakup w budzecie nic nie dal, jedna najtansza sztuka materialu, jesli pana stac. 17 - znacznik startu zawsze; wymiana sprzetu startowego dalej wedle StartKitEnabled. 18 - kazdy system dzienny we wlasnym `try`.
+**Ryzyko / co sprawdzic:** "Budowy oplacone: ..." - mniej "brak materialow", w wojnie wiecej punktow na mury; podatek miasta w BK bez linii "Project material expenses".
+**Status:** WGRANE 2026-10-05 (md5 e084c8155eec8a77c3a082809706e87e; poprzednie DLL jako `Armoury.dll.bak-2026-10-05-przed-86`).
+
 ## 2026-10-05 (85) - ZUZYCIE I NAPRAWY SPRZETU AI: zapis stanu obok zbrojowni DTE, zuzycie walki, lup obity, naprawy w miastach z sakiewki ludzi
 **Mod:** Armoury | **Pliki:** `AiWear.cs` (pelna wersja), `MenPurse.cs` (naprawy AI po sprzedazy nadwyzek), `AiGear.cs` (kupione = sprawne; dzienny postoj = naprawy), `ArmouryBehavior.cs` (zapis "arm_aiwear", MapEventEnded), `Settings.cs` + `McmSettings.cs` (NOWE `AiWearEnabled`)
 **Problem:** Jeff 05.10: "jak AI naprawia sprzet zepsuty i ile to trwa?". Sprawdzone w kodzie: zuzycie, stan lupu i naprawy dzialaly TYLKO na zbrojowni gracza (`QuartermasterLaw.DteArmory`). Zbrojownie AI w DTE to lista "przedmiot: ile" bez stanu - sprzet AI byl wieczny i jak nowy.

@@ -80,6 +80,20 @@ namespace Armoury
 
         // ------------------------------------------------------------ materialy BK wylaczone
         public static bool SkipIfOn() { return !On; }
+
+        // wpis 86 (audyt pkt 3): BK zeruje materialExpenses na POCZATKU RunMaterials, a my pomijamy cala metode - na save sprzed
+        // wpisu 73 stary koszt materialow zostawal na zawsze i KeptTownLines odejmowal go co dzien od podatku miasta (zloto znikalo)
+        public static bool SkipMaterials(object __instance)
+        {
+            if (!On) return true;
+            try
+            {
+                var d = HarmonyLib.Traverse.Create(__instance).Field("materialExpenses").GetValue() as System.Collections.IDictionary;
+                if (d != null && d.Count > 0) d.Clear();
+            }
+            catch { }
+            return false;
+        }
         public static void EmptyMaterials(ref List<(ItemObject, int)> __result) { if (On) __result = new List<(ItemObject, int)>(); }
 
         // ------------------------------------------------------------ codzienne rozliczenie
@@ -103,6 +117,10 @@ namespace Armoury
                     var b = q != null && q.Count > 0 ? q.Peek() : null;
                     if (b == null || b.BuildingType == null || b.BuildingType.IsDailyProject) continue;
                     if (st.OwnerClan == Clan.PlayerClan && !s.PaidConstructionPlayer) continue;
+                    // wpis 86 (audyt pkt 8): wojna wstrzymuje cywilne JUZ TU - nie zabieraja dzialki murom
+                    bool warNow = false;
+                    try { if (st.OwnerClan.Kingdom != null) foreach (var k in Kingdom.All) if (k != st.OwnerClan.Kingdom && !k.IsEliminated && st.OwnerClan.Kingdom.IsAtWarWith(k)) { warNow = true; break; } } catch { }
+                    if (warNow && !b.BuildingType.IsMilitaryProject) { _warSkipped++; continue; }
                     jobs.Add(new KeyValuePair<Settlement, TaleWorlds.CampaignSystem.Settlements.Buildings.Building>(st, b));
                     int n; count.TryGetValue(st.OwnerClan, out n); count[st.OwnerClan] = n + 1;
                 }
@@ -113,9 +131,6 @@ namespace Armoury
                     var st = kv.Key; var b = kv.Value; var clan = st.OwnerClan; var lord = clan.Leader;
                     if (lord == null || !lord.IsAlive) continue;
                     bool military = b.BuildingType.IsMilitaryProject;
-                    bool war = false;
-                    try { if (clan.Kingdom != null) foreach (var k in Kingdom.All) if (k != clan.Kingdom && !k.IsEliminated && clan.Kingdom.IsAtWarWith(k)) { war = true; break; } } catch { }
-                    if (war && !military) { _warSkipped++; continue; }
                     float inc;
                     if (!income.TryGetValue(clan, out inc))
                     {
@@ -131,6 +146,8 @@ namespace Armoury
                     var market = st.IsTown ? st : NearestTown(st);
                     float matBudget = budget * MBMath.ClampFloat(s.BuildMaterialShare, 0f, 1f);
                     int matSpent = BuyMaterials(market, matBudget);
+                    // wpis 86 (audyt pkt 15): towar jest, tylko drozszy niz dzienny budzet - jedna najtansza sztuka, jesli pana stac
+                    if (matBudget > 0f && matSpent <= 0) matSpent = BuyOneCheapest(market, Math.Max(0, lord.Gold));
                     if (matBudget > 0f && matSpent <= 0) { _stalledNoMat++; continue; }   // nie ma z czego budowac
                     float labour = Math.Min(budget - matBudget, matSpent * Math.Max(0f, (1f - s.BuildMaterialShare) / Math.Max(0.01f, s.BuildMaterialShare)));
                     int labourI = MBRandom.RoundRandomized(labour);
@@ -145,6 +162,22 @@ namespace Armoury
             catch (Exception e) { Log.Error("BuildFunding", e); }
             Log.Info("Budowy oplacone: dzien " + (int)CampaignTime.Now.ToDays + " - osad " + _paidTowns + ", wydano " + _spent + " (place i wozy do kas osad " + _toPurses
                      + ", materialy z targow " + _toMarkets + "), punktow budowy " + (int)_points + "; wstrzymane: brak materialow " + _stalledNoMat + ", wojna (budowle cywilne) " + _warSkipped + ".");
+        }
+
+        private static int BuyOneCheapest(Settlement market, int purse)
+        {
+            if (market == null || market.Town == null || market.ItemRoster == null) return 0;
+            ItemObject best = null; int bp = int.MaxValue;
+            foreach (var id in MatIds)
+            {
+                var it = MBObjectManager.Instance.GetObject<ItemObject>(id);
+                if (it == null || market.ItemRoster.GetItemNumber(it) <= 0) continue;
+                int price = Math.Max(1, market.Town.GetItemPrice(it, null, false));
+                if (price < bp) { bp = price; best = it; }
+            }
+            if (best == null || bp > purse) return 0;
+            market.ItemRoster.AddToCounts(best, -1);
+            return bp;
         }
 
         private static int BuyMaterials(Settlement market, float budget)
@@ -224,7 +257,7 @@ namespace Armoury
                     foreach (var name in new[] { "RunMaterials", "OnBuildingChanged" })
                     {
                         var m = AccessTools.Method(bkb, name);
-                        if (m != null) { h.Patch(m, prefix: new HarmonyMethod(typeof(BuildFunding), nameof(SkipIfOn))); off++; }
+                        if (m != null) { h.Patch(m, prefix: new HarmonyMethod(typeof(BuildFunding), name == "RunMaterials" ? nameof(SkipMaterials) : nameof(SkipIfOn))); off++; }
                     }
                 var bkm = AccessTools.TypeByName("BannerKings.Models.Vanilla.BKConstructionModel");
                 var gm = bkm != null ? AccessTools.Method(bkm, "GetMaterialRequirements") : null;
