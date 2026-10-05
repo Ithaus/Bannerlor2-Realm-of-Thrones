@@ -184,6 +184,17 @@ namespace Armoury
                              + (_applyDamage == null ? " (Spoils nieobecny - bez zuzycia)" : ""));
                 }
 
+                // wpis 82: lup wedlug tego, kto powalil - liczymy powalonych wrogow (gracz/towarzysz vs zolnierz)
+                {
+                    var missionK = FindType("DynamicTroopEquipmentReupload.DynamicTroopMissionLogic");
+                    var removedK = missionK != null ? AccessTools.Method(missionK, "OnAgentRemoved") : null;
+                    if (removedK != null)
+                    {
+                        h.Patch(removedK, postfix: new HarmonyMethod(typeof(BattlefieldLaw), nameof(CountKill)));
+                        Log.Info("BattlefieldLaw: dzialka gracza wedlug tego, kto powalil wroga (Ty i towarzysze 100%, zolnierze 1/3 dla kapitana).");
+                    }
+                }
+
                 // wraki: podgladamy, ktora czesc DTE uznal za rozbita ciosem, i zamiast
                 // pozwolic jej zniknac, kladziemy ja na ekranie lupow jako zlom do naprawy
                 if (Settings.Current.WreckSalvageEnabled)
@@ -431,10 +442,45 @@ namespace Armoury
             catch (Exception e) { Log.Error("AfterDtePartyItems", e); }
         }
 
+        // wpis 82 (Jeff 05.10: "a jak jestem sam z 1 zolnierzem, a zabilem wszystkich ja?"): historycznie lup nalezal do
+        // tego, kto go zdobyl; kapitan bral trzecia tylko z tego, co zdobyli jego ludzie (umowy Edwarda III). Liczymy wrogow
+        // powalonych (zabici i ogluszeni) przez partie gracza: gracz i towarzysze (bohaterowie partii) -> 100% gracza,
+        // zolnierze -> 1/3 gracza (PlayerLootSharePercent), 2/3 ludzi. Bitwa bez misji (symulacja) - stala trzecia.
+        private static object _killMission;
+        private static int _killsHero, _killsTroop;
+
+        public static void CountKill(Agent affectedAgent, Agent affectorAgent, AgentState agentState)
+        {
+            try
+            {
+                var m = Mission.Current;
+                if (m == null) return;
+                if (!ReferenceEquals(m, _killMission)) { _killMission = m; _killsHero = 0; _killsTroop = 0; }
+                if (agentState != AgentState.Killed && agentState != AgentState.Unconscious) return;
+                if (affectedAgent == null || !affectedAgent.IsHuman || affectorAgent == null) return;
+                if (m.PlayerTeam == null || affectedAgent.Team == null || !affectedAgent.Team.IsEnemyOf(m.PlayerTeam)) return;
+                var a = affectorAgent;
+                if (a.IsMount && a.RiderAgent != null) a = a.RiderAgent;   // stratowany przez konia - liczy sie jezdziec
+                if (a == Agent.Main) { _killsHero++; return; }
+                if (!IsMainPartyAgent(a)) return;                             // sojusznicy - ich lup
+                if (a.IsHero) _killsHero++; else _killsTroop++;
+            }
+            catch { }
+        }
+
         private static int PlayerSharePercent()
         {
             try
             {
+                int third = Math.Max(0, Math.Min(100, Settings.Current.PlayerLootSharePercent));
+                if (ReferenceEquals(Mission.Current, _killMission) && _killsHero + _killsTroop > 0)
+                {
+                    float pct = (_killsHero * 100f + _killsTroop * third) / (_killsHero + _killsTroop);
+                    int r = Math.Max(0, Math.Min(100, (int)Math.Round(pct)));
+                    Log.Info("BattlefieldLaw: powaleni przez partie gracza - Ty i towarzysze " + _killsHero + ", zolnierze " + _killsTroop
+                             + " -> dzialka gracza " + r + "% (zolnierskie " + third + "%).");
+                    return r;
+                }
                 int troops = 0;
                 var roster = MobileParty.MainParty.MemberRoster;
                 if (roster != null)

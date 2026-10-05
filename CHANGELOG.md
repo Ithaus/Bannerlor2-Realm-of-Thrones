@@ -1,5 +1,13 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-05 (82) - LUP WEDLUG TEGO, KTO POWALIL: Ty i towarzysze 100%, zolnierze 1/3 dla kapitana
+**Mod:** Armoury | **Pliki:** `BattlefieldLaw.cs` (`CountKill` - postfiks na DTE `DynamicTroopMissionLogic.OnAgentRemoved`; `PlayerSharePercent`), `Settings.cs` + `McmSettings.cs` (`PlayerLootSharePercent` 30 -> 33, nowy opis)
+**Problem:** Jeff 05.10: "a jak jestem sam, mam 1 zolnierza, a zabilem wszystkich ja?". `PlayerSharePercent` patrzyl tylko, czy w druzynie jest choc jeden zolnierz: 0 zolnierzy = 100%, 1+ = 30% - nawet gdy wszystkich wrogow powalil gracz.
+**Przyczyna:** stala dzialka bez wzgledu na to, kto zdobyl lup. Historycznie (umowy Edwarda III, "trzecie") lup nalezal do zdobywcy; kapitan bral 1/3 tylko z lupu swoich ludzi.
+**Zmiana:** w bitwie liczymy wrogow powalonych (zabici + ogluszeni, tylko ludzie) przez partie gracza: gracz i towarzysze (bohaterowie partii) -> 100% gracza; zolnierze -> PlayerLootSharePercent (33%) gracza, reszta ludzi; stratowany przez konia liczy sie jezdzcowi; zabici przez sojusznikow - ich lup (bez zmian). Dzialka = (powaleni_przez_Ciebie x 100 + powaleni_przez_zolnierzy x 33) / wszyscy. Bitwa bez misji (symulacja) - 33%. Sam bez zolnierzy - 100% jak dotad.
+**Ryzyko / co sprawdzic:** po bitwie w logu "BattlefieldLaw: powaleni przez partie gracza - Ty i towarzysze X, zolnierze Y -> dzialka gracza Z%". Brak tej linii przy bitwie w misji = licznik nie zlapal (np. DTE wola rozliczenie po zamknieciu misji) -> zostaje 33%.
+**Status:** WGRANE 2026-10-05 (md5 864f5e7d62ede1345a8f107011d03967; poprzednie DLL jako `Armoury.dll.bak-2026-10-05-przed-82`).
+
 ## 2026-10-05 (81) - PETLA DROZENIA: zamowienie tylko, gdy towaru NIE MA na polce, i jeden kupiec raz na 7 dni
 **Mod:** Armoury | **Pliki:** `SupplyDemand.cs` (`NoteUnmetOnce`), `AiGear.cs` (zamowienia po zakupach), `VolunteerKit.cs` (zamowienia notabli), `Settings.cs` + `McmSettings.cs` (NOWE `SupplyDemandOrderRepeatDays` 7)
 **Problem (audyt kodu 05.10, pkt 1):** AiGear zapisywal jako "brak na polce" takze to, co lezalo, ale bylo za drogie (`price > budget - spent` -> `bestI < 0` -> `need[k] = deficit` -> `NoteUnmet`). Garnizon liczy braki CODZIENNIE, cofniety awans ochotnika probuje sie codziennie - to samo zamowienie wpisywalo sie co dzien od nowa; przy wygaszaniu 15% stan rosl do ~6.7x dziennego wpisu (sufit 60), mnoznik polki szedl do x4, lord mogl kupic jeszcze mniej -> wiecej zamowien. Gracz tez placil x4.
