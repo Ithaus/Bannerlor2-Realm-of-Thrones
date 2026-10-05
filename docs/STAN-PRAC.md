@@ -27,7 +27,7 @@ i spojnosci calej logiki; oraz pulapka MCM w sekcji 7), potem ten plik, potem go
   chlop sam na targ miasta; (3) podwojny mineral BK - USUNAC; (4) BetterEconomy - zamknac ujscia 13 kluczami (fundament, rozdz. 4.5);
   (5) zaczynamy od dowozu. Zlecil tez: przyrost naturalny i pobor zdejmujacy ludzi z regionu jako czesc ekonomii - badanie i projekt
   w `docs/DEMOGRAFIA-SILA-ROBOCZA-2026-10-05.md` (jesli pliku nie ma - badanie nie zostalo dokonczone).
-- **Wpis 100** (wsie zamkowe woza plon na targ miasta) WGRANY, NIEPRZETESTOWANY - co czytac w logu: wpis 100 w CHANGELOG
+- **Wpis 100** (wsie zamkowe woza plon na targ miasta) WGRANY, test 15:22 (28 dob): dziala, zamki przestaly gromadzic; zostaje rozprowadzenie miedzy miastami i zatykanie magazynow wsi zamkowych (17% wobec 8%) - wynik w statusie wpisu 100 w CHANGELOG
   (linie "Dowoz:" i "Dowoz (skutki):").
 - **Kolejka (kazde osobno, z testem Jeffa):** 13 kluczy BetterEconomy; usuniecie podwojnego mineralu BK; zapas startowy x10 (K3);
   paser skupujacy lup band; potem ksiega przeplywow (K1) i dalsze kroki fundamentu.
