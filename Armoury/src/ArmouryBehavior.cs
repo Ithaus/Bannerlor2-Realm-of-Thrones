@@ -473,6 +473,8 @@ namespace Armoury
         {
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this, OnSessionLaunched);
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, OnDailyTick);
+            CampaignEvents.OnItemProducedEvent.AddNonSerializedListener(this, OreLedger.OnProduced);   // wpis 98: ksiega rudy i drewna - sztuki faktycznie dopisane osadom
+            CampaignEvents.OnItemConsumedEvent.AddNonSerializedListener(this, OreLedger.OnConsumed);   // wpis 98: wsad linii towarowych (narzedzia, deski)
             // pelny system rynku uzbrojenia (Jeff 04.10, docs/MODEL-MATERIALOW.md)
             CampaignEvents.WarDeclared.AddNonSerializedListener(this, ArmsPricing.OnWarDeclared);
             CampaignEvents.SettlementEntered.AddNonSerializedListener(this, MenPurse.OnEntered);   // wpis 84: nadwyzki ludzi PRZED zakupami

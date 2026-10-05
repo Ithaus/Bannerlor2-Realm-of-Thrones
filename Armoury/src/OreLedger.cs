@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
@@ -8,56 +10,127 @@ using TaleWorlds.ObjectSystem;
 namespace Armoury
 {
     /// <summary>
-    /// KSIEGA RUDY (wpis 94; Jeff 05.10: "czemu rudy jest za malo? da sie zwiekszyc?" -> "B": najpierw rachunek historyczny).
-    /// Tylko log. Gra nigdzie nie podaje, ile rudy wykopaly wsie (docs/AUDYT-SUROWCE.md - "P1 diagnostyka"). Codziennie:
-    /// wydobycie wsi (ladunki i tony, ile wsi kopalo), zuzycie warsztatow zbrojnych, zmiana zapasu na targach miast i reszta
-    /// (konsumpcja miast/BK, kuznie narzedzi, kucie gracza) = wydobycie - warsztaty - przyrost zapasu.
+    /// KSIEGA RUDY I DREWNA (wpis 94, przebudowana wpisem 98). Tylko log - niczego nie zmienia w grze.
+    /// Wpis 94 zapisywal wynik MODELU x mnoznik przy pierwszym wywolaniu modelu na wies - a to nie bylo wydobycie:
+    /// mnoznik sie dodawal zamiast mnozyc (gra dostawala ok. 1/3), model woluja tez podpowiedzi i pojemnosc magazynu
+    /// (takze w doby, gdy tick produkcji stoi), a BK ma mineral wsi gorniczej na liscie produkcji dwa razy.
+    /// Teraz liczymy to, co FAKTYCZNIE dopisano osadom (zdarzenie gry OnItemProduced - BK wola je z liczba sztuk),
+    /// obok wynik modelu do porownania, zuzycie warsztatow zbrojnych (WorkshopLaw), zuzycie linii towarowych gry
+    /// (OnItemConsumed: narzedzia z rudy, deski z drewna) i zapas rozbity na miasta / zamki / wsie / tabory.
+    /// "Bez wyjasnienia" = zmiana calego zapasu - (dopisane - zuzyte): kucie i przetop gracza, budowy, spalone wsie.
     /// </summary>
     internal static class OreLedger
     {
-        private static float _mined; private static int _villages; private static float _workshops;
-        private static readonly HashSet<Village> _seen = new HashSet<Village>();
-        private static int _day = -1, _lastStock = -1;
+        private sealed class Book
+        {
+            public readonly string Id, Name, TownSource, LineName;
+            public int Villages, Towns, Lines, Shops;      // dopisane wsiom / miastom i zamkom, zuzyte przez linie towarowe / warsztaty zbrojne
+            public float Model;
+            public readonly HashSet<Settlement> Makers = new HashSet<Settlement>();
+            public readonly HashSet<Village> Modelled = new HashSet<Village>();
+            public int LastAll = -1, LastTowns = -1;
 
-        internal static void Reset() { _mined = 0f; _villages = 0; _workshops = 0f; _seen.Clear(); _day = -1; _lastStock = -1; }
+            public Book(string id, string name, string townSource, string lineName) { Id = id; Name = name; TownSource = townSource; LineName = lineName; }
+            public void NewDay() { Villages = 0; Towns = 0; Lines = 0; Shops = 0; Model = 0f; Makers.Clear(); Modelled.Clear(); }
+            public void Reset() { NewDay(); LastAll = -1; LastTowns = -1; }
+        }
 
-        private static void Roll() { int d = (int)CampaignTime.Now.ToDays; if (d != _day) { _seen.Clear(); _day = d; } }
+        private static readonly Book _iron = new Book("iron", "Ruda", "kopalnie miast i zamkow", "narzedzia");
+        private static readonly Book _wood = new Book("hardwood", "Drewno", "miasta i zamki", "deski");
 
-        /// <summary>Wolane z MaterialLaw.ProdPostfix (wynik koncowy modelu): raz na wies na dobe.</summary>
-        internal static void NoteVillage(Village v, ItemObject item, float amount)
+        private static Book Of(ItemObject it)
+        {
+            if (it == null) return null;
+            string id = it.StringId;
+            return id == "iron" ? _iron : (id == "hardwood" ? _wood : null);
+        }
+
+        internal static void Reset() { _iron.Reset(); _wood.Reset(); }
+
+        /// <summary>Wynik modelu produkcji wsi PO naszym mnozniku (MaterialLaw.ProdPostfix): pierwszy na wies w dobie ksiegi.</summary>
+        internal static void NoteModel(Village v, ItemObject item, float amount)
         {
             try
             {
-                if (v == null || item == null || item.StringId != "iron") return;
-                Roll();
-                if (!_seen.Add(v)) return;
-                _mined += Math.Max(0f, amount); if (amount > 0f) _villages++;
+                var b = Of(item);
+                if (b == null || v == null || !b.Modelled.Add(v)) return;
+                b.Model += Math.Max(0f, amount);
             }
             catch { }
         }
 
-        internal static void NoteWorkshop(int loads) { if (loads > 0) _workshops += loads; }
-
-        internal static void Daily()
+        /// <summary>Zdarzenie gry: sztuki faktycznie dopisane osadzie (wies = wydobycie, miasto albo zamek = kopalnia lub warsztat).</summary>
+        internal static void OnProduced(ItemObject item, Settlement st, int count)
         {
             try
             {
-                var ore = MBObjectManager.Instance.GetObject<ItemObject>("iron");
-                if (ore == null) return;
-                int stock = 0;
-                foreach (var st in Settlement.All) if (st != null && st.IsTown && st.ItemRoster != null) stock += st.ItemRoster.GetItemNumber(ore);
-                float kg = Math.Max(0.1f, ore.Weight);
-                if (_lastStock >= 0)
-                {
-                    int delta = stock - _lastStock;
-                    float rest = _mined - _workshops - delta;
-                    Log.Info("Ruda: dzien " + ((int)CampaignTime.Now.ToDays - 1) + " - wsie wykopaly " + _mined.ToString("0.#") + " ladunkow (" + (_mined * kg / 1000f).ToString("0.0")
-                             + " t, kopalo " + _villages + " wsi); warsztaty zbrojne zuzyly " + _workshops.ToString("0") + "; zapas na targach miast " + stock + " (" + (delta >= 0 ? "+" : "") + delta
-                             + "); reszta (konsumpcja miast/BK, kuznie narzedzi, kucie, tabor) " + rest.ToString("0") + ". Ladunek = " + kg.ToString("0") + " kg.");
-                }
-                _lastStock = stock; _mined = 0f; _villages = 0; _workshops = 0f;
+                var b = Of(item);
+                if (b == null || st == null || count <= 0) return;
+                if (st.IsVillage) { b.Villages += count; b.Makers.Add(st); }
+                else b.Towns += count;
             }
+            catch { }
+        }
+
+        /// <summary>Zdarzenie gry: wsad linii towarowej warsztatu (kuznia narzedzi, tartak). Warsztaty zbrojne ida przez NoteWorkshop.</summary>
+        internal static void OnConsumed(ItemObject item, Settlement st, int count)
+        {
+            try { var b = Of(item); if (b != null && count > 0) b.Lines += count; }
+            catch { }
+        }
+
+        internal static void NoteWorkshop(ItemObject item, int loads)
+        {
+            var b = Of(item);
+            if (b != null && loads > 0) b.Shops += loads;
+        }
+
+        internal static void Daily()
+        {
+            try { Line(_iron); Line(_wood); }
             catch (Exception e) { Log.Error("OreLedger", e); }
+        }
+
+        private static string Signed(int n) { return (n >= 0 ? "+" : "") + n; }
+
+        private static void Line(Book b)
+        {
+            var it = MBObjectManager.Instance.GetObject<ItemObject>(b.Id);
+            if (it == null) { b.NewDay(); return; }
+            int towns = 0, castles = 0, villages = 0, road = 0, empty = 0, townCount = 0;
+            foreach (var st in Settlement.All)
+            {
+                if (st == null || st.ItemRoster == null) continue;
+                int n = st.ItemRoster.GetItemNumber(it);
+                if (st.IsTown) { towns += n; townCount++; if (n <= 0) empty++; }
+                else if (st.IsCastle) castles += n;
+                else if (st.IsVillage) villages += n;
+            }
+            foreach (var mp in MobileParty.All)
+                if (mp != null && mp.ItemRoster != null) road += mp.ItemRoster.GetItemNumber(it);
+
+            float kg = Math.Max(0.1f, it.Weight);
+            int all = towns + castles + villages + road;
+            var sb = new StringBuilder();
+            sb.Append(b.Name).Append(": dzien ").Append((int)CampaignTime.Now.ToDays - 1)
+              .Append(" - wsie dopisaly ").Append(b.Villages).Append(" ladunkow (").Append((b.Villages * kg / 1000f).ToString("0.0"))
+              .Append(" t, ").Append(b.Makers.Count).Append(" wsi; model ").Append(b.Model.ToString("0.#")).Append(" w ").Append(b.Modelled.Count)
+              .Append(" wsiach), ").Append(b.TownSource).Append(" +").Append(b.Towns)
+              .Append("; zuzycie: warsztaty zbrojne ").Append(b.Shops).Append(", linie towarowe (").Append(b.LineName).Append(") ").Append(b.Lines)
+              .Append("; zapas: miasta ").Append(towns);
+            if (b.LastTowns >= 0) sb.Append(" (").Append(Signed(towns - b.LastTowns)).Append(")");
+            sb.Append(", zamki ").Append(castles).Append(", wsie ").Append(villages).Append(", tabory ").Append(road).Append(", razem ").Append(all);
+            if (b.LastAll >= 0)
+            {
+                int delta = all - b.LastAll;
+                int known = b.Villages + b.Towns - b.Shops - b.Lines;
+                sb.Append(" (").Append(Signed(delta)).Append(", bez wyjasnienia ").Append(Signed(delta - known)).Append(")");
+            }
+            sb.Append("; miast bez towaru ").Append(empty).Append(" z ").Append(townCount)
+              .Append("; zima: ").Append(WinterBite.WinterNow() ? (WinterBite.LongNight ? "TAK (Dluga Noc)" : "TAK") : "nie")
+              .Append(". Ladunek = ").Append(kg.ToString("0")).Append(" kg.");
+            Log.Info(sb.ToString());
+            b.LastAll = all; b.LastTowns = towns; b.NewDay();
         }
     }
 }

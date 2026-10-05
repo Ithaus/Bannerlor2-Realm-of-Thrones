@@ -26,7 +26,8 @@ namespace Armoury
     ///    jak przy zgrzewaniu - Jeff 04.10: 20% na stopien, 5 sztabek -> 4), progi perkow SteelMaker 1/2/3 jak w vanilla.
     /// 3. Wydobycie: postfix na CalculateDailyProductionAmount (vanilla/BK/BEE, licznik
     ///    zagniezdzenia) - ruda x MineOutputMultiplier, drewno x LumberOutputMultiplier.
-    ///    Warsztaty AI zjadaja ~860 rudy dziennie przy 260 wydobycia (docs/AUDYT-PRODUKCJI-*).
+    ///    Od wpisu 98 mnoznik MNOZY wynik modelu (zima, drogi, prawa BK skaluja sie razem z nim) -
+    ///    wczesniej dodawal sie do tych czynnikow. Faktyczne wydobycie pokazuje ksiega (OreLedger).
     /// </summary>
     internal static class MaterialLaw
     {
@@ -167,9 +168,15 @@ namespace Armoury
                 else if (On && id == "hardwood") m = s.LumberOutputMultiplier;
                 // wpis 87 (audyt pkt 13): dzielenie przez ladunek zawsze, gdy waga jest x10 - inaczej wylaczenie MaterialLaw = 10x kg rudy
                 m /= HistoricalPrices.BulkScale(item);      // wpis 50: ladunek 100 kg - tyle samo kg co dotad
-                if (id == "iron") OreLedger.NoteVillage(village, item, __result.ResultNumber * Math.Max(0f, m));   // wpis 94: ksiega rudy (tylko log)
-                if (Math.Abs(m - 1f) < 0.001f || m <= 0f) return;
-                __result.AddFactor(m - 1f, new TextObject("{=!}Armoury: mines and woods"));
+                if (m > 0f && Math.Abs(m - 1f) >= 0.001f)
+                {
+                    // wpis 98: mnoznik ma MNOZYC. ExplainedNumber SUMUJE czynniki (wynik = baza x (1 + suma)), wiec AddFactor(m - 1)
+                    // dodawal sie do zimy, drog i praw BK: przy m = 0.3 (x3 w ladunkach) i Dlugiej Nocy (-38..-62%) wies dawala
+                    // baza x (0.3 + f - zima) - okolo 1/3 zamiaru, a 5 z 26 wsi z ruda zero. Czynnik (m - 1) x (1 + suma) = wynik x m.
+                    float sum = 1f + __result.SumOfFactors;
+                    if (sum > 0f) __result.AddFactor((m - 1f) * sum, new TextObject("{=!}Armoury: mines and woods"));
+                }
+                OreLedger.NoteModel(village, item, __result.ResultNumber);   // wpis 98: wynik modelu PO mnozniku (ksiega - tylko log)
             }
             catch { }
         }

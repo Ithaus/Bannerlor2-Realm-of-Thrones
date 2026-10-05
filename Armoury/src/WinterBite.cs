@@ -33,6 +33,7 @@ namespace Armoury
         private static readonly TextObject _txtWinter = new TextObject("{=!}Winter");
         private static int _lastSeason = -1;
         private static bool _longNight;
+        internal static bool LongNight { get { return _longNight; } }   // wpis 98: do ksiegi rudy i drewna (tylko odczyt)
 
         internal static bool WinterNow()
         {
