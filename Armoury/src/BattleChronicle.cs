@@ -16,7 +16,7 @@ namespace Armoury
     /// </summary>
     internal static class BattleChronicle
     {
-        private static int _battles, _dead, _wounded, _small;
+        private static int _battles, _dead, _wounded, _small, _routs;
         private static double _winLossPct, _loseLossPct; private static int _winN, _loseN;
 
         private struct Side { public string Who; public int Start, Dead, Wounded, Routed, Gold, Lost; }
@@ -68,7 +68,12 @@ namespace Armoury
                          + " | atakujacy: zabici " + a.Dead + " (" + Pct(a.Dead, a.Start) + "), ranni " + a.Wounded + ", rozbici " + a.Routed + (a.Gold > 0 ? ", zdobyl " + a.Gold + " zl" : "") + (a.Lost > 0 ? ", stracil " + a.Lost + " zl" : "")
                          + " | obronca: zabici " + d.Dead + " (" + Pct(d.Dead, d.Start) + "), ranni " + d.Wounded + ", rozbici " + d.Routed + (d.Gold > 0 ? ", zdobyl " + d.Gold + " zl" : "") + (d.Lost > 0 ? ", stracil " + d.Lost + " zl" : "") + ".");
                 _battles++; _dead += a.Dead + d.Dead; _wounded += a.Wounded + d.Wounded;
-                if (win == BattleSideEnum.Attacker || win == BattleSideEnum.Defender)
+                // wpis 66 (test 16:53): wiekszosc bitew to lord 300-670 ludzi na bande 6-15 - przegrany ginie caly, srednia 70-80%
+                // nic nie mowila; do porownania z historia tylko prawdziwe bitwy: obie strony >= BattleRealMinSide, sily nie gorsze niz 1:4
+                int minSide = Math.Max(1, Settings.Current.BattleRealMinSide);
+                bool real = a.Start >= minSide && d.Start >= minSide && Math.Min(a.Start, d.Start) * 4 >= Math.Max(a.Start, d.Start);
+                if (!real) _routs++;
+                if (real && (win == BattleSideEnum.Attacker || win == BattleSideEnum.Defender))
                 {
                     var w = win == BattleSideEnum.Attacker ? a : d; var l = win == BattleSideEnum.Attacker ? d : a;
                     if (w.Start > 0) { _winLossPct += 100.0 * w.Dead / w.Start; _winN++; }
@@ -81,10 +86,10 @@ namespace Armoury
         internal static void Daily()
         {
             if (_battles + _small > 0)
-                Log.Info("Bitwy: dzien " + (int)CampaignTime.Now.ToDays + " - " + _battles + " bitew (malych potyczek pominietych " + _small + "), zabitych " + _dead + ", rannych " + _wounded
-                         + "; zwyciezcy tracili zabitych srednio " + (_winN > 0 ? (_winLossPct / _winN).ToString("0.#") + "%" : "-")
+                Log.Info("Bitwy: dzien " + (int)CampaignTime.Now.ToDays + " - " + _battles + " starc (w tym pogromow/nierownych " + _routs + ", malych potyczek pominietych " + _small + "), zabitych " + _dead + ", rannych " + _wounded
+                         + "; w " + _winN + " prawdziwych bitwach zwyciezcy tracili zabitych srednio " + (_winN > 0 ? (_winLossPct / _winN).ToString("0.#") + "%" : "-")
                          + ", przegrani " + (_loseN > 0 ? (_loseLossPct / _loseN).ToString("0.#") + "%" : "-") + " (historia: 1-5% / 15-40%).");
-            _battles = _dead = _wounded = _small = 0; _winLossPct = _loseLossPct = 0; _winN = _loseN = 0;
+            _battles = _dead = _wounded = _small = _routs = 0; _winLossPct = _loseLossPct = 0; _winN = _loseN = 0;
         }
     }
 }

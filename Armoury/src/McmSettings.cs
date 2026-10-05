@@ -1232,6 +1232,14 @@ namespace Armoury
         [SettingPropertyGroup("Army purchases")]
         public bool UniqueSpoilsFromPlayer { get; set; } = true;
 
+        [SettingPropertyInteger("Battle Real Min Side", 0, 200, "0", HintText = "a clash counts as a real battle for the chronicle's averages only if both sides had at least this many men and neither outnumbered the other more than 4 to 1")]
+        [SettingPropertyGroup("Army purchases")]
+        public int BattleRealMinSide { get; set; } = 50;
+
+        [SettingPropertyInteger("Unique Max Wearers", 0, 12, "0", HintText = "an item worn by more than this many characters is ordinary attire, not a unique (kept out of the chronicle and the spoils of capture)")]
+        [SettingPropertyGroup("Army purchases")]
+        public int UniqueMaxWearers { get; set; } = 3;
+
         [SettingPropertyInteger("Battle Chronicle Min Men", 0, 120, "0", HintText = "battles where both sides together had fewer men than this are only counted, not written out in the battle chronicle (yours always are)")]
         [SettingPropertyGroup("Army purchases")]
         public int BattleChronicleMinMen { get; set; } = 30;
@@ -2515,6 +2523,8 @@ namespace Armoury
             s.GarrisonBuysGear = GarrisonBuysGear;
             s.GarrisonBuysGearPlayer = GarrisonBuysGearPlayer;
             s.UniqueSpoilsFromPlayer = UniqueSpoilsFromPlayer;
+            s.BattleRealMinSide = BattleRealMinSide;
+            s.UniqueMaxWearers = UniqueMaxWearers;
             s.BattleChronicleMinMen = BattleChronicleMinMen;
             s.AiRecruitsBringKit = AiRecruitsBringKit;
             s.AiGearBudgetPercent = AiGearBudgetPercent;

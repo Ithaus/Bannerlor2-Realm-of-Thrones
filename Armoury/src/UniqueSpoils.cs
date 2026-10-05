@@ -31,11 +31,45 @@ namespace Armoury
         private static bool _initDone;
         private static Dictionary<string, string> _last = new Dictionary<string, string>();
 
-        internal static void Reset() { _initDone = false; _last = new Dictionary<string, string>(); }
+        internal static void Reset() { _initDone = false; _last = new Dictionary<string, string>(); _common = null; }
         internal static string Export() { return _initDone ? "init" : ""; }
         internal static void Import(string s) { _initDone = s == "init"; }
 
-        internal static bool Is(ItemObject it) { return it != null && it.StringId != null && RotUniques.Ids.Contains(it.StringId); }
+        // wpis 66 (test 16:53): "noble_default" (domyslne nakrycie glowy szlachty, poza handlem w ROT) nosza setki postaci -
+        // zasmiecal kronike (218 KB) i byl "zdobywany" przy kazdym pojmaniu. Co nosi wiecej niz UniqueMaxWearers postaci,
+        // to stroj, nie unikat - poza kronika i zdobycza (liczone raz na sesje, przy pierwszym spisie).
+        private static HashSet<string> _common;
+        internal static bool Is(ItemObject it)
+        {
+            if (it == null || it.StringId == null || !RotUniques.Ids.Contains(it.StringId)) return false;
+            if (_common == null) BuildCommon();
+            return !_common.Contains(it.StringId);
+        }
+
+        private static void BuildCommon()
+        {
+            _common = new HashSet<string>();
+            try
+            {
+                var n = new Dictionary<string, int>();
+                foreach (var h in Hero.AllAliveHeroes)
+                {
+                    var eq = h != null ? h.BattleEquipment : null;
+                    if (eq == null) continue;
+                    var seen = new HashSet<string>();
+                    for (int i = 0; i < (int)EquipmentIndex.NumEquipmentSetSlots; i++)
+                    {
+                        var el = eq[(EquipmentIndex)i];
+                        if (el.IsEmpty || el.Item.StringId == null || !RotUniques.Ids.Contains(el.Item.StringId) || !seen.Add(el.Item.StringId)) continue;
+                        int c; n.TryGetValue(el.Item.StringId, out c); n[el.Item.StringId] = c + 1;
+                    }
+                }
+                int max = Math.Max(1, Settings.Current.UniqueMaxWearers);
+                foreach (var kv in n) if (kv.Value > max) _common.Add(kv.Key);
+                if (_common.Count > 0) Log.Info("UniqueSpoils: nie unikaty (nosi je wiecej niz " + max + " postaci) - " + string.Join(", ", n.Where(kv => kv.Value > max).Select(kv => kv.Key + " x" + kv.Value).ToArray()) + ".");
+            }
+            catch (Exception e) { Log.Error("UniqueSpoils.BuildCommon", e); }
+        }
 
         internal static void OnSessionLaunched()
         {

@@ -1,5 +1,12 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-04 (66) - KRONIKI CZYTELNE: stroj noszony przez wielu to nie unikat; srednie strat tylko z prawdziwych bitew
+**Mod:** Armoury | **Pliki:** `UniqueSpoils.cs` (`BuildCommon`, `Is`), `BattleChronicle.cs` (prawdziwa bitwa: obie strony >= 50, sily nie gorsze niz 1:4), `Settings.cs` + `McmSettings.cs` (NOWE `UniqueMaxWearers` 3, `BattleRealMinSide` 50)
+**Problem (test 16:53, wczytany save, dni 108844-108848):** (1) `unikaty.log` 218 KB: `noble_default` (domyslne nakrycie glowy szlachty, poza handlem w ROT) nosza setki postaci - kazdy dzien "zmiany" z setka nazwisk, a przy pojmaniu "zdobyte unikaty: Noble Default". (2) Kronika bitew: srednio zwyciezcy 2.6-16%, przegrani 69-79% zabitych - ale ~90% starc to lord 300-670 ludzi na bande 6-15 (pogrom), co nie nadaje sie do porownania z historia.
+**Zmiana:** (1) przedmiot ze spisu unikatow noszony przez wiecej niz 3 postacie (liczone raz na sesje) wypada z kroniki i ze zdobyczy (log `UniqueSpoils: nie unikaty ...`). (2) srednie odsetkow zabitych liczone tylko z bitew, gdzie obie strony mialy >= 50 ludzi i nie bylo przewagi wiekszej niz 4:1; reszta liczona jako "pogromy/nierowne".
+**Inne z testu:** garbarze i tkacze dzialaja (skora 50 -> 398, plotno 20 -> 183 na targach; 54-153 skor i 20-37 bel dziennie); warsztaty 590-880 szt./dzien (helmy ~300, plaszcze ~200, zbroje korpusu 8-39); ochotnicy dalej ~800 cofnietych dziennie; brak bledow naszego kodu; gracz nie walczyl - lupy/strzaly dalej niesprawdzone. Crash 16:01:45 (Windows: access violation w TaleWorlds.Native.dll) - przy zamykaniu gry po sesji 15:54 (log skonczyl sie 16:00:43 podsumowaniem CrashScribe), natywny, bez sladu w naszych logach.
+**Status:** WGRANE 2026-10-04 (Armoury.dll md5 d751e6f17591222d63f7f3a25a618e34, gra zamknieta; poprzednie DLL obok jako `Armoury.dll.bak-2026-10-04-przed-66`). DO SPRAWDZENIA.
+
 ## 2026-10-04 (65) - KRONIKA BITEW (Logs/<sesja>/bitwy.log + podsumowanie dnia)
 **Mod:** Armoury | **Pliki:** NOWY `BattleChronicle.cs`, `ArmouryBehavior.cs` (MapEventEnded, dzienny tick), `Log.cs` (temat "bitwy"), `Settings.cs` + `McmSettings.cs` (NOWE `BattleChronicleMinMen` 30)
 **Problem (Jeff 04.10: "a byly wojny, jakies straty, czy podzial lupow dziala dobrze?" -> "tak" na kronike):** bitew AI nie zapisywalismy wcale - z logu 15:54 dalo sie tylko wywnioskowac z liczebnosci wojsk (CSV CrashScribe: 15 -> 60 tys. ludzi w 13 dni, zold 73 -> 256 tys./dzien), ze bitew bylo malo.
