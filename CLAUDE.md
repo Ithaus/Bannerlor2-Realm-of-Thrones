@@ -45,7 +45,7 @@ inaczej nie pojawi sie w MCM.
 ```bash
 ./build.sh                                  # wszystkie piec
 dotnet build Armoury/Armoury.csproj -c Release -v q --nologo   # jeden
-python3 tools/gen_mcm.py                    # po zmianie Settings.cs
+python tools/gen_mcm.py                     # po zmianie Settings.cs (na tym komputerze "python3" to atrapa Sklepu)
 ```
 
 Biblioteki gry — patrz `libs/README.md`. Wynik: `<Mod>/bin/Release/<Mod>.dll`.
@@ -90,8 +90,9 @@ Uzywaj `Recipes.Grade(item)`, nie rzutowania. Ten blad przez tydzien powodowal,
 ze luki tieru 6 kuly sie z materialow tieru 5.
 
 **Rok w Bannerlordzie ma 84 dni** (7 × 3 × 4 w `DefaultCampaignTimeModel`), a w trybie
-`GameAccelerationMode.Fast` — **24 dni**. Armoury wydluza rok do 168 dni
-(`Calendar.cs`, `WeeksPerSeason = 6`). Kazde przeliczenie "dni na lata" musi
+`GameAccelerationMode.Fast` — **24 dni**. Armoury wydluza rok do **364 dni**
+(`Calendar.cs`, `WeeksPerSeason = 13` w `Settings.cs` i w `Armoury.json` Jeffa; 168 dni to stara wartosc -
+dokumenty sprzed 05.10 licza nia i zawyzaja wszystko "na dobe" 2.17x). Kazde przeliczenie "dni na lata" musi
 mowic, o ktorym kalendarzu jest mowa.
 
 **NIE WOLNO wolac `GameMenu.SwitchToMenu()` z wnetrza opcji menu oczekiwania.**
