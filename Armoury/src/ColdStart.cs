@@ -41,6 +41,7 @@ namespace Armoury
             catch { }
             try { Armories(); } catch (Exception e) { Log.Error("ColdStart.Armories", e); }
             try { Markets(); } catch (Exception e) { Log.Error("ColdStart.Markets", e); }
+            try { int k = RecruitKit.SeedCampaignStart(); Log.Info("ColdStart: ochotnicy tieru 2+ w pulach notabli maja komplety (dorobek stuleci): " + k + "."); } catch (Exception e) { Log.Error("ColdStart.RecruitKit", e); }
         }
 
         // ------------------------------------------------------------ A. zbrojownie

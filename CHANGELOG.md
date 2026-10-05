@@ -1,5 +1,12 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-05 (92) - KOMPLET REKRUTA AI: do zbrojowni tylko to, co notabl kupil (tier 1 - wlasny dobytek), bez pelnego kompletu z niczego
+**Mod:** Armoury | **Pliki:** NOWY `RecruitKit.cs`, `VolunteerKit.cs` (lista kupionych, awans, znikniety ochotnik), `AiGear.cs` (`RecruitKitPrefix`), `ColdStart.cs` (komplety ochotnikow na starcie), `ArmouryBehavior.cs` (zapis "arm_recruitkit", Reset), `Settings.cs` + `McmSettings.cs` (NOWE `KitFromNotable`)
+**Problem (audyt 05.10, kod DTE OnTroopRecruited; Jeff: "tak"):** przy werbunku DTE wkladal do zbrojowni CALY komplet wzorca x liczba rekrutow z niczego, a sztuki kupione przez notabla przy awansie ochotnika (VolunteerKit) schodzily z targu i przepadaly.
+**Zmiana:** zapis kompletu kazdego ochotnika w puli notabla: awans X->Y = komplet X (albo dobytek X, ktory Y tez nosi) + kupione na targu. Werbunek AI tieru 2+: do zbrojowni ida zapisane komplety (stan sztuk zachowany w zapisie zuzycia AI); tier 1 - komplet DTE (wlasny dobytek). Ochotnik znikniety z puli bez werbunku: notabl sprzedaje jego kupione rzeczy na targu (cena skupu, nie wiecej niz kasa miasta). Nowa gra: ochotnicy tieru 2+ w pulach maja komplet wzorca (dorobek stuleci). Brak zapisu (stary save) - wzorzec, liczony w logu. Werbunek GRACZA bez zmian (DTE), tylko zapis kompletu jest zdejmowany.
+**Ryzyko / co sprawdzic (kontrola wg zasady glownej):** log "Komplet rekruta: dzien N - z kompletem od notabla X, bez zapisu Y, tier 1 Z; sprzedane ...". Rekruci AI tieru 2+ moga przyjsc bez helmu/tarczy (dodatki nie zawsze kupione) - AiGear dokupi. Nazwy parametrow prefiksu zgodne z DTE (recruiterHero, recruitmentSource, troop, amount). Konie rekrutow - jak dotad w komplecie, poza zuzyciem AI.
+**Status:** WGRANE 2026-10-05 (md5 f02658ef79780d952a47cf0e1dd3e425; poprzednie DLL jako `Armoury.dll.bak-2026-10-05-przed-92`).
+
 ## 2026-10-05 (91) - WSPOLNE RECE KOWALI: naprawy gracza, naprawy AI i warsztaty dziela czas tych samych kowali miasta
 **Mod:** Armoury | **Pliki:** NOWY `SmithHours.cs`, `TroopSelfMend.cs`, `AiWear.cs`, `WorkshopLaw.cs` (`LineShare`), `ArmouryBehavior.cs` (Reset), `Settings.cs` + `McmSettings.cs` (NOWE `WorkHoursPerManDay` 10)
 **Problem (audyt 05.10; Jeff: "tak" - dzielic):** naprawy ludzi gracza (TroopSelfMend), naprawy AI (kazdy lord osobno, pelna moc) i warsztaty liczyly te same rece rzemieslnikow miasta, kazdy od nowa - robocizna z niczego.

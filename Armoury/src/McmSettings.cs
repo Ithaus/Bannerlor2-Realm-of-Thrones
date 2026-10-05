@@ -1320,6 +1320,10 @@ namespace Armoury
         [SettingPropertyGroup("Army purchases")]
         public bool AiRecruitsBringKit { get; set; } = true;
 
+        [SettingPropertyBool("Kit From Notable", HintText = "an AI lord's new recruits bring only the kit their notable actually bought for them (tier 1 men bring their own belongings) - no full kit from thin air")]
+        [SettingPropertyGroup("Army purchases")]
+        public bool KitFromNotable { get; set; } = true;
+
         [SettingPropertyFloatingInteger("Ai Gear Budget Percent", 0.00f, 100.00f, "0.00", HintText = "share of a lord's gold (above the reserve) he is willing to spend on gear in one visit to a town")]
         [SettingPropertyGroup("Army purchases")]
         public float AiGearBudgetPercent { get; set; } = 25f;
@@ -2657,6 +2661,7 @@ namespace Armoury
             s.BuildPencePerPointMilitary = BuildPencePerPointMilitary;
             s.BuildPencePerPointCivil = BuildPencePerPointCivil;
             s.AiRecruitsBringKit = AiRecruitsBringKit;
+            s.KitFromNotable = KitFromNotable;
             s.AiGearBudgetPercent = AiGearBudgetPercent;
             s.AiGearGoldReserve = AiGearGoldReserve;
             s.AiGearMaxPiecesPerVisit = AiGearMaxPiecesPerVisit;

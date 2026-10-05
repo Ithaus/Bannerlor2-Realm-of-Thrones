@@ -76,12 +76,16 @@ namespace Armoury
 
         internal static void Forget(MobileParty mp) { try { if (mp != null) _lastDay.Remove(mp); } catch { } }
 
-        public static bool RecruitKitPrefix(Hero recruiterHero)
+        public static bool RecruitKitPrefix(Hero recruiterHero, Hero recruitmentSource, CharacterObject troop, int amount)
         {
             var s = Settings.Current;
-            if (s == null || s.AiRecruitsBringKit) return true;
-            if (recruiterHero == null || recruiterHero == Hero.MainHero) return true;
-            return false;
+            if (s == null) return true;
+            if (recruiterHero == null) return true;
+            if (recruiterHero == Hero.MainHero) { try { if (RecruitKit.On) RecruitKit.OnRecruited(recruiterHero, recruitmentSource, troop, amount); } catch { } return true; }
+            if (!s.AiRecruitsBringKit) return false;
+            // wpis 92: AI - tylko to, co notabl naprawde kupil (tier 1: wlasny dobytek)
+            try { if (RecruitKit.On) return RecruitKit.OnRecruited(recruiterHero, recruitmentSource, troop, amount); } catch (Exception e) { Log.Error("RecruitKit", e); }
+            return true;
         }
 
         internal static void ApplyAll(Harmony h)

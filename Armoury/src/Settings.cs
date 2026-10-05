@@ -389,6 +389,7 @@ namespace Armoury
         public float BuildPencePerPointMilitary = 48f;     // pence per construction point of walls, towers and other military works
         public float BuildPencePerPointCivil = 24f;        // pence per construction point of civil buildings
         public bool AiRecruitsBringKit = true;             // a fresh recruit still arrives with his own kit (levies came armed); turn off and lords must buy for every new man
+        public bool KitFromNotable = true;                 // an AI lord's new recruits bring only the kit their notable actually bought for them (tier 1 men bring their own belongings) - no full kit from thin air
         public float AiGearBudgetPercent = 25f;            // share of a lord's gold (above the reserve) he is willing to spend on gear in one visit to a town
         public int AiGearGoldReserve = 2000;               // gold a lord always keeps back - wages come first
         public int AiGearMaxPiecesPerVisit = 60;           // most pieces a lord buys in one visit

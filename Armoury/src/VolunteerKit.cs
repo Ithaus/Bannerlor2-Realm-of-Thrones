@@ -79,8 +79,10 @@ namespace Armoury
                         if (x == null) continue;                          // nowy ochotnik (tier 1) - wlasny dobytek
                         gone.Remove(x);
                         if (!Buy(n, market, x, y)) { after[i] = x; _reverted++; }
-                        else _bought++;
+                        else { _bought++; RecruitKit.OnUpgrade(n, x, y, new List<EquipmentElement>(_lastBought)); }
                     }
+                    // wpis 92: ochotnik zniknal z puli bez awansu (gra go podmienila) - jego kupione rzeczy wracaja na targ
+                    foreach (var g in gone) if (g != null && g.Tier >= 2) RecruitKit.OnVanished(n, g, market);
                 }
             }
             catch (Exception e) { Log.Error("VolunteerKit", e); }
@@ -157,8 +159,11 @@ namespace Armoury
             }
         }
 
+        private static readonly List<EquipmentElement> _lastBought = new List<EquipmentElement>();   // wpis 92: dla kompletu rekruta
+
         private static bool Buy(Hero notable, Settlement market, CharacterObject x, CharacterObject y)
         {
+            _lastBought.Clear();
             var all = Missing(x, y);
             if (all.Count == 0) return true;
             var need = all; var extra = new List<ItemObject>();
@@ -196,6 +201,7 @@ namespace Armoury
             }
             if (notable.Gold < total) { Why("zloto notabla (" + notable.Gold + " < " + total + ")"); return false; }   // nie stac go
             foreach (var e in picks) roster.AddToCounts(e, -1);
+            _lastBought.AddRange(picks);
             if (total > 0) GiveGoldAction.ApplyForCharacterToSettlement(notable, market, total, true);
             _gold += total; _pieces += picks.Count;
             // dodatki: najtansze z targu, jesli sa i starczy zlota; brak nie cofa awansu
@@ -222,6 +228,7 @@ namespace Armoury
                 }
                 var pe = roster.GetElementCopyAtIndex(best).EquipmentElement;
                 roster.AddToCounts(pe, -1);
+                _lastBought.Add(pe);
                 GiveGoldAction.ApplyForCharacterToSettlement(notable, market, bestPrice, true);
                 _gold += bestPrice; _pieces++;
             }
