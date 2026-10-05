@@ -162,6 +162,7 @@ namespace Armoury
         public float SurplusKeepPercent = 10f;             // spare kit the stores keep above what the men wear before the rest goes to the merchants
         public float LordLootThirdPercent = 33f;           // an AI lord's cut (the captain's third) when his men sell their spare kit in a town
         public bool AiWearEnabled = true;                  // AI lords' kit wears too: battle wear on pieces in use, loot comes in battered, town smiths mend it day by day from the men's purse
+        public bool MineWagesStayInTown = true;            // when a town buys a Banner Kings mine's ore, half the price is the lord's due and half the miners' wages - spent in that same town (before, that half vanished)
         public int TroopSelfMendPercentPerDay = 10;        // the men mend this PERCENT of all battle-worn pieces in the stores each day in town (at least 3 pieces) - a full refit takes about 100/percent days of rest; pay the smith yourself to skip the wait
 
         // --- Skills rule the gear ---

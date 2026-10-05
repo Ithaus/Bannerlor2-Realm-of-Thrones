@@ -147,27 +147,76 @@ namespace Armoury
 
         // Debasement (100 d na lenno) i State Monopolies (5% zysku, nie odejmowane) w AddRulingClanIncome sa z niczego - odejmujemy je
         // w tym samym rozliczeniu (pobieramy je realnie w Levies)
-        public static void RulingIncomePostfix(Clan clan, ref ExplainedNumber goldChange)
+        // wpis 88 (audyt pkt 5, sprawdzone w vanilla AddRulingClanIncome): Road Tolls i State Monopolies dodaja sie NARASTAJACO
+        // w petli po miastach (krol z miastami A, B, C dostaje 3a+2b+c), Land Tax (5% handlu wsi) i War Tax (5% podatku miast)
+        // nie zdejmuja nic z nikogo. Odejmujemy DOKLADNIE to, co dodala gra (z narastaniem), i doliczamy kwote prawdziwa,
+        // pobrana z kas osad (gdy gra naprawde rozlicza dzien - applyWithdrawals): mytem z kas miast krola, podatkiem gruntowym
+        // z kas wsi krolestwa, podatkiem wojennym z kas miast. Mennica i monopole - pobierane w Levies (z kas i kapitalu).
+        public static void RulingIncomePostfix(Clan clan, ref ExplainedNumber goldChange, bool applyWithdrawals)
         {
             try
             {
                 var s = Settings.Current;
                 if (s == null || !s.PolicyIncomeConserved || clan == null || clan.Kingdom == null) return;
                 var k = clan.Kingdom;
-                float minus = 0f;
-                if (k.ActivePolicies.Contains(DefaultPolicies.DebasementOfTheCurrency)) minus += k.Fiefs.Count * 100;
-                if (k.ActivePolicies.Contains(DefaultPolicies.StateMonopolies))
-                    foreach (var st in clan.Settlements)
+                var pol = k.ActivePolicies;
+                float smooth = 5f;
+                try { smooth = Math.Max(0.01f, Campaign.Current.Models.ClanFinanceModel.RevenueSmoothenFraction()); } catch { }
+                float vanilla = 0f, real = 0f;
+                // mennica: 100 d na lenno z niczego (pobierana w Levies)
+                if (pol.Contains(DefaultPolicies.DebasementOfTheCurrency)) vanilla += k.Fiefs.Count * 100;
+                // Land Tax: 5% licznika handlu wsi cudzych rodow - z kas tych wsi
+                if (pol.Contains(DefaultPolicies.LandTax))
+                    foreach (var v in k.Villages)
                     {
-                        if (st == null || !st.IsTown || st.Town == null) continue;
-                        int sum = 0; foreach (var w in st.Town.Workshops) if (w != null) sum += w.ProfitMade;
-                        minus += (int)(sum * 0.05f);
+                        if (v == null || v.IsOwnerUnassigned || v.Settlement.OwnerClan == clan || v.VillageState == Village.VillageStates.Looted || v.VillageState == Village.VillageStates.BeingRaided) continue;
+                        int due = (int)((int)(v.TradeTaxAccumulated / smooth) * 0.05f);
+                        vanilla += due;
+                        int x = Math.Min(due, Math.Max(0, v.Settlement.SettlementComponent.Gold));
+                        if (applyWithdrawals && x > 0) v.Settlement.SettlementComponent.ChangeGold(-x);
+                        real += x;
                     }
-                if (minus > 0f) goldChange.Add(-minus, _txtPolicy);
+                // War Tax: 5% podatku miast krolestwa - z kas tych miast
+                if (pol.Contains(DefaultPolicies.WarTax))
+                {
+                    float sum = 0f;
+                    foreach (var f in k.Fiefs) { try { sum += Campaign.Current.Models.SettlementTaxModel.CalculateTownTax(f).ResultNumber; } catch { } }
+                    vanilla += (int)(sum * 0.05f);
+                    foreach (var f in k.Fiefs)
+                    {
+                        if (f == null) continue;
+                        float t = 0f; try { t = Campaign.Current.Models.SettlementTaxModel.CalculateTownTax(f).ResultNumber; } catch { }
+                        int x = Math.Min((int)(t * 0.05f), Math.Max(0, f.Gold));
+                        if (x <= 0) continue;
+                        if (applyWithdrawals) f.ChangeGold(-x);
+                        real += x;
+                    }
+                }
+                // Road Tolls i Monopole: narastajaco jak w grze; myto prawdziwe - z kas miast krola
+                bool tolls = pol.Contains(DefaultPolicies.RoadTolls), mono = pol.Contains(DefaultPolicies.StateMonopolies);
+                int n6 = 0, n7 = 0;
+                foreach (var st in clan.Settlements)
+                {
+                    if (st == null || !st.IsTown || st.Town == null) continue;
+                    if (tolls)
+                    {
+                        // po zdjeciu przez gre licznik ma 29/30 dawnej wartosci: dawna/30 = obecna/29
+                        int r = applyWithdrawals ? st.Town.TradeTaxAccumulated / 29 : st.Town.TradeTaxAccumulated / 30;
+                        n6 += r;
+                        int x = Math.Min(r, Math.Max(0, st.Town.Gold));
+                        if (applyWithdrawals && x > 0) st.Town.ChangeGold(-x);
+                        real += x;
+                    }
+                    if (mono) { int sum = 0; foreach (var w in st.Town.Workshops) if (w != null) sum += w.ProfitMade; n7 += (int)(sum * 0.05f); }
+                    if (n6 > 0) vanilla += n6;
+                    if (n7 > 0) vanilla += n7;
+                }
+                float delta = real - vanilla;
+                if (Math.Abs(delta) > 0.5f) goldChange.Add(delta, _txtPolicy);
             }
             catch { }
         }
-        private static readonly TaleWorlds.Localization.TextObject _txtPolicy = new TaleWorlds.Localization.TextObject("{=!}Mint and monopoly dues are collected from towns and workshops");
+        private static readonly TaleWorlds.Localization.TextObject _txtPolicy = new TaleWorlds.Localization.TextObject("{=!}Crown dues are collected from the towns, villages and workshops themselves");
 
         public static void CaravanVisitPostfix(ref int __result) { var s = Settings.Current; if (s != null && s.PolicyIncomeConserved) __result = 0; }
         public static bool TaxOfficePrefix() { var s = Settings.Current; return s == null || !s.PolicyIncomeConserved; }

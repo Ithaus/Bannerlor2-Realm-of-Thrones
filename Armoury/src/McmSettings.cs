@@ -532,6 +532,10 @@ namespace Armoury
         [SettingPropertyGroup("The finished piece")]
         public bool AiWearEnabled { get; set; } = true;
 
+        [SettingPropertyBool("Mine Wages Stay In Town", HintText = "when a town buys a Banner Kings mine's ore, half the price is the lord's due and half the miners' wages - spent in that same town (before, that half vanished)")]
+        [SettingPropertyGroup("The finished piece")]
+        public bool MineWagesStayInTown { get; set; } = true;
+
         [SettingPropertyInteger("Troop Self Mend Percent Per Day", 0, 40, "0", HintText = "the men mend this PERCENT of all battle-worn pieces in the stores each day in town (at least 3 pieces) - a full refit takes about 100/percent days of rest; pay the smith yourself to skip the wait")]
         [SettingPropertyGroup("The finished piece")]
         public int TroopSelfMendPercentPerDay { get; set; } = 10;
@@ -2452,6 +2456,7 @@ namespace Armoury
             s.SurplusKeepPercent = SurplusKeepPercent;
             s.LordLootThirdPercent = LordLootThirdPercent;
             s.AiWearEnabled = AiWearEnabled;
+            s.MineWagesStayInTown = MineWagesStayInTown;
             s.TroopSelfMendPercentPerDay = TroopSelfMendPercentPerDay;
             s.TroopSkillAutoFit = TroopSkillAutoFit;
             s.SkillsDecideEnabled = SkillsDecideEnabled;

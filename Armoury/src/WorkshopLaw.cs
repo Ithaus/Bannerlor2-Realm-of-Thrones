@@ -406,7 +406,9 @@ namespace Armoury
             if (town == null || it == null) return 0f;
             float f = 1f;
             try { float d; int sh; if (SupplyDemand.Active) f = SupplyDemand.Factor(town.Settlement, it, false, out d, out sh); } catch { }
-            return Math.Max(0.01f, it.Value * f * MBMath.ClampFloat(Settings.Current.WorkshopSellShare, 0.05f, 1f));
+            float arms = 1f;   // wpis 88 (audyt pkt 9): drozejaca skora/ruda podnosi cene w sklepie - i zarobek warsztatu
+            try { arms = ArmsPricing.Multiplier(town.Settlement, it); } catch { }
+            return Math.Max(0.01f, it.Value * f * arms * MBMath.ClampFloat(Settings.Current.WorkshopSellShare, 0.05f, 1f));
         }
 
         internal static float GuildWeight(string g)

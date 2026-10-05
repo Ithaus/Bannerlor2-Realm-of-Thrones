@@ -81,6 +81,23 @@ namespace Armoury
         // ------------------------------------------------------------ materialy BK wylaczone
         public static bool SkipIfOn() { return !On; }
 
+        // wpis 88 (audyt pkt 14, kod BK RunMines): miasto placi za urobek kopalni num zlota DO NIKOGO, a panu idzie 0.5 x num
+        // przez podatek - polowa znikala. Druga polowa to place gornikow, wydane w tym samym miescie: wraca do kasy miasta.
+        // Do tego miningRevenues zerowalo sie tylko przy dzialajacej kopalni - stara kwota zostawala w podatku na zawsze.
+        public static void MinesPrefix(object __instance, Town town)
+        {
+            try
+            {
+                var d = HarmonyLib.Traverse.Create(__instance).Field("miningRevenues").GetValue() as System.Collections.IDictionary;
+                if (d != null && town != null && d.Contains(town)) d[town] = 0;
+            }
+            catch { }
+        }
+        public static void MineRevenuePostfix(Town town, int revenue)
+        {
+            try { if (town != null && revenue > 0 && Settings.Current.MineWagesStayInTown) town.ChangeGold(revenue); } catch { }
+        }
+
         // wpis 86 (audyt pkt 3): BK zeruje materialExpenses na POCZATKU RunMaterials, a my pomijamy cala metode - na save sprzed
         // wpisu 73 stary koszt materialow zostawal na zawsze i KeptTownLines odejmowal go co dzien od podatku miasta (zloto znikalo)
         public static bool SkipMaterials(object __instance)
@@ -259,6 +276,14 @@ namespace Armoury
                         var m = AccessTools.Method(bkb, name);
                         if (m != null) { h.Patch(m, prefix: new HarmonyMethod(typeof(BuildFunding), name == "RunMaterials" ? nameof(SkipMaterials) : nameof(SkipIfOn))); off++; }
                     }
+                if (bkb != null)
+                {
+                    var rm = AccessTools.Method(bkb, "RunMines");
+                    var ar = AccessTools.Method(bkb, "AddRevenue");
+                    if (rm != null) h.Patch(rm, prefix: new HarmonyMethod(typeof(BuildFunding), nameof(MinesPrefix)));
+                    if (ar != null) h.Patch(ar, postfix: new HarmonyMethod(typeof(BuildFunding), nameof(MineRevenuePostfix)));
+                    Log.Info("BuildFunding: kopalnie BK - place gornikow wracaja do kasy miasta (" + (ar != null) + "), stary dochod kopalni zerowany (" + (rm != null) + ").");
+                }
                 var bkm = AccessTools.TypeByName("BannerKings.Models.Vanilla.BKConstructionModel");
                 var gm = bkm != null ? AccessTools.Method(bkm, "GetMaterialRequirements") : null;
                 if (gm != null) { h.Patch(gm, postfix: new HarmonyMethod(typeof(BuildFunding), nameof(EmptyMaterials))); off++; }

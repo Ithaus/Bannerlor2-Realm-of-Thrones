@@ -285,6 +285,12 @@ namespace Armoury
                     baseP = Math.Max(1, __0.ItemValue) * (1f + Math.Max(0f, Settings.Current.RetailMarkupPercent) / 100f);
                 int np = (int)Math.Round(baseP * f);
                 __result = np < 1 ? 1 : np;
+                // wpis 88 (audyt pkt 10): podloga zlomu (MinSellPercentOfValue) liczyla sie PRZED nami - mnoznik polki 0.25 sciagal ja do 1.25%
+                if (__3 && Settings.Current.MinSellPercentOfValue > 0 && item.Value > 0)
+                {
+                    int floor = Math.Max(1, (int)(item.Value * Settings.Current.MinSellPercentOfValue / 100f));
+                    if (__result < floor) __result = floor;
+                }
 
                 // log: handel gracza, raz na godzine gry na koszyk i miejsce
                 if (__1 == MobileParty.MainParty)
