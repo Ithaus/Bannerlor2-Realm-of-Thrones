@@ -181,6 +181,7 @@ namespace Armoury
                     var el = roster.GetElementCopyAtIndex(i);
                     var cand = el.EquipmentElement.Item;
                     if (cand == null || cand.ItemType != it.ItemType || cand.Tier < it.Tier) continue;
+                    if (ArmsPricing.IsUnique(cand)) continue;   // wpis 87 (audyt pkt 6): unikat nie znika w puli ochotnikow
                     if (cand.ItemType == ItemObject.ItemTypeEnum.Horse && cand.HorseComponent != null && cand.HorseComponent.IsPackAnimal) continue;
                     int used; taken.TryGetValue(i, out used);
                     if (el.Amount - used <= 0) continue;
@@ -206,6 +207,7 @@ namespace Armoury
                     var el = roster.GetElementCopyAtIndex(i);
                     var cand = el.EquipmentElement.Item;
                     if (cand == null || el.Amount <= 0 || cand.ItemType != it.ItemType || cand.Tier < it.Tier) continue;
+                    if (ArmsPricing.IsUnique(cand)) continue;
                     if (cand.ItemType == ItemObject.ItemTypeEnum.Horse && cand.HorseComponent != null && cand.HorseComponent.IsPackAnimal) continue;
                     int price;
                     try { price = market.Town.MarketData.GetPrice(el.EquipmentElement, null, false, market.Party); } catch { price = cand.Value; }

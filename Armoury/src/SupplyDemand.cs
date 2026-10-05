@@ -115,7 +115,7 @@ namespace Armoury
             _noted = 0;
         }
 
-        internal static void ResetOrders() { _unmet.Clear(); _noted = 0; _onceSeen.Clear(); }
+        internal static void ResetOrders() { _unmet.Clear(); _noted = 0; _onceSeen.Clear(); _loggedHour.Clear(); }
 
         // wpis 81 (audyt 05.10, pkt 1 - petla drozenia): ten sam niezaspokojony kupiec (garnizon co dzien, notabl z cofnietym
         // awansem co dzien) wpisywal to samo zamowienie od nowa - przy wygaszaniu 15% stan rosl do ~6.7x dziennego wpisu,

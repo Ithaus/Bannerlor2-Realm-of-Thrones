@@ -29,7 +29,7 @@ namespace Armoury
         private static readonly string[] MatIds = { "limestone", "hardwood", "clay", "tools", "marble", "planks" };
         internal static bool On { get { var s = Settings.Current; return s != null && s.PaidConstruction; } }
 
-        internal static void Reset() { _funded.Clear(); }
+        internal static void Reset() { _funded.Clear(); _near.Clear(); }
 
         // ------------------------------------------------------------ moc budowy = oplacona praca
         [ThreadStatic] private static int _depth;

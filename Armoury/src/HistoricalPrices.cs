@@ -140,7 +140,9 @@ namespace Armoury
         }
         private static bool _applied;
 
-        internal static void Reset() { }   // Value zyje w obiektach przedmiotow - Apply przy kazdym starcie sesji
+        // wpis 87 (audyt pkt 12): nowa kampania = nowe obiekty przedmiotow - stare slowniki rosly, _applied zostawalo true,
+        // a diagnostyka blokady (40 wpisow) wyczerpywala sie na cale uruchomienie gry
+        internal static void Reset() { _target.Clear(); _orig.Clear(); _origWeight.Clear(); _blockedLogged.Clear(); _applied = false; }
 
         internal static int Orig(ItemObject it)
         {
@@ -238,7 +240,7 @@ namespace Armoury
                 Action<ItemObject, float> set = (it, v) =>
                 {
                     if (it == null) return;
-                    if (!_orig.ContainsKey(it)) _orig[it] = it.Value;
+                    if (!_orig.ContainsKey(it)) _orig[it] = MaterialLaw.Orig(it);   // wpis 87 (audyt pkt 11b): cena sprzed MaterialLaw, nie po
                     _ourSet = true; try { setter.Invoke(it, new object[] { Math.Max(1, (int)Math.Round(v)) }); } finally { _ourSet = false; }
                 };
 
@@ -270,6 +272,7 @@ namespace Armoury
                     var it = MBObjectManager.Instance.GetObject<ItemObject>(kv.Key);
                     if (it == null) continue;
                     set(it, it.Weight * kv.Value);
+                    _target[it] = it.Value;   // wpis 87 (audyt pkt 11a): surowce tez pod blokada cen
                     raw.Add(kv.Key + " " + _orig[it] + "->" + it.Value);
                 }
                 // 1b. towary handlowe (wpis 71, Jeff 05.10: "narzedzia 173, jedwab, ruda srebra ... no to przelicz") - cena za kg
@@ -290,6 +293,7 @@ namespace Armoury
                     var it = Recipes.MaterialItem(g);
                     if (it == null) continue;
                     set(it, Math.Max(0.5f, it.Weight) * MetalPerKg(g));
+                    _target[it] = it.Value;
                     raw.Add(it.StringId + " " + _orig[it] + "->" + it.Value);
                 }
 

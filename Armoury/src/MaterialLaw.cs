@@ -35,6 +35,8 @@ namespace Armoury
 
         internal static bool On { get { var s = Settings.Current; return s != null && s.MaterialLawEnabled; } }
 
+        internal static void Reset() { _orig.Clear(); }   // wpis 87 (audyt pkt 12)
+
         /// <summary>Cena sprzed prawa surowcow (XP za przetop).</summary>
         internal static int Orig(ItemObject it)
         {
@@ -157,12 +159,13 @@ namespace Armoury
             if (_depth > 1) return;                    // BK/BEE woluja model bazowy - mnozymy raz
             try
             {
-                if (!On || item == null) return;
+                if (item == null) return;
                 var s = Settings.Current;
                 string id = item.StringId ?? "";
                 float m = 1f;
-                if (id == "iron") m = s.MineOutputMultiplier;
-                else if (id == "hardwood") m = s.LumberOutputMultiplier;
+                if (On && id == "iron") m = s.MineOutputMultiplier;
+                else if (On && id == "hardwood") m = s.LumberOutputMultiplier;
+                // wpis 87 (audyt pkt 13): dzielenie przez ladunek zawsze, gdy waga jest x10 - inaczej wylaczenie MaterialLaw = 10x kg rudy
                 m /= HistoricalPrices.BulkScale(item);      // wpis 50: ladunek 100 kg - tyle samo kg co dotad
                 if (Math.Abs(m - 1f) < 0.001f || m <= 0f) return;
                 __result.AddFactor(m - 1f, new TextObject("{=!}Armoury: mines and woods"));

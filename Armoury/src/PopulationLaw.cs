@@ -71,7 +71,13 @@ namespace Armoury
         // kultura -> [ludzi na punkt hearth wsi, ludzi na punkt dobrobytu miasta]
         private static readonly Dictionary<string, float[]> _k = new Dictionary<string, float[]>();
 
-        internal static void Reset() { _k.Clear(); RentToday.Clear(); }
+        internal static void Reset()
+        {
+            _k.Clear(); RentToday.Clear();
+            // wpis 87 (audyt pkt 4): BK tworzy nowe PopulationManager/PolicyManager przy kazdej grze - stare referencje dawaly
+            // dekret podatkowy zawsze Standard i pomijaly autonomie po wczytaniu drugiego save'a bez restartu
+            _bkResolved = false; _popMgr = null; _popData = null; _polResolved = false; _policyMgr = null; _getPolicy = null;
+        }
 
         private static void Calibrate()
         {

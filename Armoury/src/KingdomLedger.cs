@@ -47,10 +47,11 @@ namespace Armoury
                         int g = c.Gold;
                         sumGold += g;
                         if (g < s.FinanceLedgerPoor) poor++;
-                        int b = 0;
-                        try { b = (int)model.CalculateClanGoldChange(c, false, false, false).ResultNumber; } catch { }
+                        // wpis 87 (audyt pkt 16): bilans = zmiana kiesy od wczoraj - model finansow nie zna naszych przeplywow
+                        int last0; bool had0 = _lastGold.TryGetValue(c, out last0);
+                        int b = had0 ? g - last0 : 0;
                         bal[c] = b;
-                        if (b < 0) minus++;
+                        if (had0 && b < 0) minus++;
                         try { foreach (var wp in c.WarPartyComponents) if (wp != null && wp.MobileParty != null && wp.MobileParty.MemberRoster != null) men += wp.MobileParty.MemberRoster.TotalManCount; } catch { }
                         rows.Add(new KeyValuePair<Clan, int>(c, g));
                     }

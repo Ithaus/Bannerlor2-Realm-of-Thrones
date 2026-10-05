@@ -38,6 +38,8 @@ namespace Armoury
     /// </summary>
     internal static class ArmsPricing
     {
+        internal static void ClearCostCache() { _cost.Clear(); }   // wpis 87 (audyt pkt 11c): przyklady z Build liczone przed cenami historycznymi
+
         internal static void Reset() { _cost.Clear(); _effMedian.Clear(); _idx.Clear(); _nearestTown.Clear(); _war.Clear(); _unique.Clear(); _built = false; _ore = _wood = _leather = _linen = null; }
         internal sealed class Cost
         {
