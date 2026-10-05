@@ -121,7 +121,8 @@ namespace Armoury
             {
                 var it = eqy[i].Item;
                 if (it == null || have.Contains(it)) continue;
-                if (it.ItemType == ItemObject.ItemTypeEnum.Arrows || it.ItemType == ItemObject.ItemTypeEnum.Bolts) continue;   // amunicja - zuzywalna, dokupuje pan
+                bool ammo = it.ItemType == ItemObject.ItemTypeEnum.Arrows || it.ItemType == ItemObject.ItemTypeEnum.Bolts;
+                if (ammo && !(Settings.Current.VolunteerKitKeyOnly && y.IsRanged)) continue;   // amunicja - zuzywalna, dokupuje pan (strzelec: 1 kolczan kluczowy, wpis 78)
                 need.Add(it);
             }
             return need;
@@ -132,12 +133,17 @@ namespace Armoury
         // zbroja korpusu, glowna bron (luk/kusza u strzelca, inaczej pierwsza bron biala kompletu) i kon u jezdnego.
         // Reszta (helm, tarcza, buty, rekawice, plaszcz, rzad konski, bron zapasowa) - notabl dokupuje, jesli jest na targu
         // i starczy zlota; brak nie cofa awansu, idzie jako zamowienie dla warsztatow (wyglad zolnierza daje komplet szablonu).
-        private static bool IsKey(CharacterObject y, ItemObject it, ref bool mainTaken)
+        private static bool IsKey(CharacterObject y, ItemObject it, ref bool mainTaken, ref bool ammoTaken)
         {
             switch (it.ItemType)
             {
                 case ItemObject.ItemTypeEnum.BodyArmor:
-                case ItemObject.ItemTypeEnum.Horse: return true;
+                case ItemObject.ItemTypeEnum.Horse:
+                case ItemObject.ItemTypeEnum.HorseHarness: return true;   // wpis 78: jezdny - kon i rzad
+                case ItemObject.ItemTypeEnum.Arrows:
+                case ItemObject.ItemTypeEnum.Bolts:
+                    if (y.IsRanged && !ammoTaken) { ammoTaken = true; return true; }   // wpis 78: strzelec - jeden kolczan
+                    return false;
                 case ItemObject.ItemTypeEnum.Bow:
                 case ItemObject.ItemTypeEnum.Crossbow:
                     if (y.IsRanged && !mainTaken) { mainTaken = true; return true; }
@@ -158,8 +164,8 @@ namespace Armoury
             var need = all; var extra = new List<ItemObject>();
             if (Settings.Current.VolunteerKitKeyOnly)
             {
-                need = new List<ItemObject>(); bool main = false;
-                foreach (var it in all) if (IsKey(y, it, ref main)) need.Add(it); else extra.Add(it);
+                need = new List<ItemObject>(); bool main = false, ammoT = false;
+                foreach (var it in all) if (IsKey(y, it, ref main, ref ammoT)) need.Add(it); else extra.Add(it);
             }
             if (need.Count == 0 && extra.Count == 0) return true;
             if (market == null || market.Town == null || market.ItemRoster == null) return need.Count == 0;   // bez targu: tylko gdy nic kluczowego nie trzeba

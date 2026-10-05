@@ -1416,7 +1416,7 @@ namespace Armoury
         [SettingPropertyGroup("Iron bank")]
         public bool VolunteerKitEnabled { get; set; } = true;
 
-        [SettingPropertyBool("Volunteer Kit Key Only", HintText = "the volunteer rises once his notable buys the key pieces (body armour, main weapon - bow or crossbow for archers - and the horse for riders); helmet, shield, boots and the rest are bought if on the stall, otherwise they become orders for the workshops")]
+        [SettingPropertyBool("Volunteer Kit Key Only", HintText = "the volunteer rises once his notable buys the key pieces (body armour, main weapon - bow or crossbow plus one quiver for archers - and horse with harness for riders); helmet, shield, boots and the rest are bought if on the stall, otherwise they become orders for the workshops")]
         [SettingPropertyGroup("Iron bank")]
         public bool VolunteerKitKeyOnly { get; set; } = true;
 

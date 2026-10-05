@@ -1,5 +1,12 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-05 (78) - OCHOTNICY: do czesci kluczowych dochodzi rzad konski (jezdny) i jeden kolczan (strzelec)
+**Mod:** Armoury | **Pliki:** `VolunteerKit.cs` (`IsKey`, `Missing`), `Settings.cs` + `McmSettings.cs` (opis `VolunteerKitKeyOnly`)
+**Problem:** Jeff 05.10 o wpisie 76: "konia i uprzaz, luk i strzaly - 1 komplet". Wpis 76 bral do warunku awansu tylko konia, a amunicje pomijal calkiem (dokupowal ja pan).
+**Zmiana:** kluczowe = zbroja korpusu + glowna bron + kon + rzad konski (HorseHarness) + u strzelca (IsRanged) jeden kolczan strzal/beltow. Pozostale bez zmian (dodatki z wpisu 76). Przy wylaczonym VolunteerKitKeyOnly amunicja dalej pomijana jak dawniej.
+**Ryzyko / co sprawdzic:** w "Ochotnicy (diagnoza): powody cofniec" moga pojawic sie Arrows / HorseHarness, jesli targi ich nie maja (warsztaty: rzedy 9-14 szt./dzien w sesji 02:55 - malo). Wpisy 76-78 nieprzetestowane w grze.
+**Status:** WGRANE 2026-10-05 (md5 d2926afa8019b4c1a674c72ce349cba6; poprzednie DLL jako `Armoury.dll.bak-2026-10-05-przed-78`).
+
 ## 2026-10-05 (77) - KSIEGA KROLESTW: dzienny log finansow krolestw i rodow (tylko log)
 **Mod:** Armoury | **Pliki:** NOWY `KingdomLedger.cs`, `ArmouryBehavior.cs` (dzienny tick po KingdomTreasury, Reset), `Log.cs` (temat "finanse"), `Settings.cs` + `McmSettings.cs` (NOWE `FinanceLedgerEnabled`, `FinanceLedgerPoor` 1000, `FinanceLedgerPoorest` 5)
 **Problem:** Jeff 05.10: "jak sie maja finanse lordow i krolow po zmianach budowy - utrzymaja sie czy zbankrutuja?". W logu nie bylo stanu kies ani skarbcow - nie dalo sie odpowiedziec. Wiadomo tylko: budowy biora 10% DODATNIEGO dochodu i nie wiecej niz kiesa (same nie zbankrutuja nikogo); do skarbcow wplywa ~30-37 tys. d/dzien i nic z nich nie wychodzi (etap 3).
