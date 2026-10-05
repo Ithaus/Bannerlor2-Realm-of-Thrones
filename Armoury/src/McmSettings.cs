@@ -1420,6 +1420,14 @@ namespace Armoury
         [SettingPropertyGroup("Iron bank")]
         public bool VolunteerKitKeyOnly { get; set; } = true;
 
+        [SettingPropertyBool("Cold Start Enabled", HintText = "new campaign only: the world does not start empty - lords and garrisons have the kit their men already wear in their armouries, and town stalls hold the craftsmen's stock")]
+        [SettingPropertyGroup("Iron bank")]
+        public bool ColdStartEnabled { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Cold Start Market Days", 0.00f, 56.00f, "0.00", HintText = "new campaign only: how many days of the town craftsmen's work lie on the stalls at the start (mostly common gear of the town's culture)")]
+        [SettingPropertyGroup("Iron bank")]
+        public float ColdStartMarketDays { get; set; } = 14f;
+
         [SettingPropertyBool("Historical Prices Enabled", HintText = "the whole world in historical prices (1 coin = 1 medieval penny): arms and armour priced from their real making cost, smithing materials at medieval prices - wages and incomes already sit at this scale")]
         [SettingPropertyGroup("Iron bank")]
         public bool HistoricalPricesEnabled { get; set; } = true;
@@ -2638,6 +2646,8 @@ namespace Armoury
             s.NoFreeKitForNewParties = NoFreeKitForNewParties;
             s.VolunteerKitEnabled = VolunteerKitEnabled;
             s.VolunteerKitKeyOnly = VolunteerKitKeyOnly;
+            s.ColdStartEnabled = ColdStartEnabled;
+            s.ColdStartMarketDays = ColdStartMarketDays;
             s.HistoricalPricesEnabled = HistoricalPricesEnabled;
             s.HistIronOrePerKg = HistIronOrePerKg;
             s.HistWoodPerKg = HistWoodPerKg;

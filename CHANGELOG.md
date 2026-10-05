@@ -1,5 +1,13 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-05 (79) - DOROBEK STULECI: zbrojownie lordow i garnizonow z kompletem ich ludzi + 14 dni zapasu rzemieslnikow na targach (raz, nowa gra)
+**Mod:** Armoury | **Pliki:** NOWY `ColdStart.cs`, `AiGear.cs` (`Armories`, `Bucket`, `AddToArmory`), `WorkshopLaw.cs` (`TownHands`; `Forbidden`, `GuildWeight` internal), `ArmouryBehavior.cs` (OnSessionLaunched, zapis "arm_coldstart", Reset), `Settings.cs` + `McmSettings.cs` (NOWE `ColdStartEnabled`, `ColdStartMarketDays` 14)
+**Problem (sesja 02:55; Jeff 05.10: "nie zaczynamy gry w prozni - minely setki lat produkcji ... wyglada, jakby wszystko bylo puste"):** pierwszego dnia AI i garnizony kupily 5 296 szt. (potem 2 505, dalej ~1 300-1 600/dzien przy produkcji ~850); na polkach na starcie 7 532 szt. (zbroi korpusu 295, helmow 84), po 11 dniach zbroi 123, lukow 124 - notable nie mieli czym ubrac ochotnikow.
+**Przyczyna (dekompilacja DTE EveryoneCampaignBehavior):** DTE daje partii sprzet startowy w `OnMobilePartyCreated`, ale `OnNewGameCreated` czysci `PartyArmories` PO utworzeniu partii startowych -> w nowej grze wszystkie zbrojownie puste; AiGear (braki = komplet ludzi minus zbrojownia) uznawal cale wojsko za gole i wykupowal targ.
+**Zmiana (Jeff: "A + B (14 dni)"):** raz na kampanie, tylko gdy kampania ma <= 3 dni: A) kazda partia lorda AI i garnizon (bez gracza) dostaje do zbrojowni brakujace sztuki kompletu swoich ludzi (koszyki typ x tier jak AiGear, przez DTE AddItemToPartyArmory); B) kazde miasto: 14 dni x rece rzemieslnikow (dobrobyt/170, 6-60) x udzialy cechow, sztuki kultury miasta (inaczej neutralne), tiery 1-6 wagi 35/30/20/10/4/1%, roboczodni z `WorkshopLaw.Needs`; bez unikatow, legend, zakazanych, NotMerchandise.
+**Ryzyko / co sprawdzic:** log startu: "ColdStart: zbrojownie - N partii ... X szt." i "ColdStart: zapas kupiecki - M miast ... Y szt. [typy]". Pierwszy dzien "ZakupyAI" powinien spasc z ~5 300 do kilkuset. Jesli pojawi sie "kampania ma juz N dni - pominiety" w nowej grze -> zly odczyt daty startu (Calendar.cs nadpisuje CampaignStartTime). Na starym zapisie nic nie robi (tylko ustawia znacznik). Wpisy 76-79 nieprzetestowane.
+**Status:** WGRANE 2026-10-05 (md5 1353376a2d0a477a25a1024a3ff61e55; poprzednie DLL jako `Armoury.dll.bak-2026-10-05-przed-79`).
+
 ## 2026-10-05 (78) - OCHOTNICY: do czesci kluczowych dochodzi rzad konski (jezdny) i jeden kolczan (strzelec)
 **Mod:** Armoury | **Pliki:** `VolunteerKit.cs` (`IsKey`, `Missing`), `Settings.cs` + `McmSettings.cs` (opis `VolunteerKitKeyOnly`)
 **Problem:** Jeff 05.10 o wpisie 76: "konia i uprzaz, luk i strzaly - 1 komplet". Wpis 76 bral do warunku awansu tylko konia, a amunicje pomijal calkiem (dokupowal ja pan).

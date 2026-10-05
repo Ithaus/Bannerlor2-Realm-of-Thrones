@@ -378,7 +378,7 @@ namespace Armoury
         // wpis 58: test 15:31 - warsztaty robily 80-106 lukow ravens_teeth_longbow, weirwood_bow i giant_bow dziennie
         // (Value 90-200 tys., nie sa NotMerchandise) - przedmioty magiczne i lore nie wychodza z warsztatu miasta
         private static string[] _forbid; private static string _forbidSrc;
-        private static bool Forbidden(ItemObject it)
+        internal static bool Forbidden(ItemObject it)
         {
             var src = Settings.Current.WorkshopForbiddenIds ?? "";
             if (_forbid == null || _forbidSrc != src)
@@ -409,7 +409,7 @@ namespace Armoury
             return Math.Max(0.01f, it.Value * f * MBMath.ClampFloat(Settings.Current.WorkshopSellShare, 0.05f, 1f));
         }
 
-        private static float GuildWeight(string g)
+        internal static float GuildWeight(string g)
         {
             var s = Settings.Current;
             switch (g)
@@ -425,6 +425,13 @@ namespace Armoury
         }
 
         /// <summary>Roboczodni dziennie warsztatu: rzemieslnicy miasta wedle dobrobytu, warsztat notabla stale.</summary>
+        internal static float TownHands(Town town)
+        {
+            var s = Settings.Current;
+            float per = Math.Max(50f, s.WorkshopProsperityPerHand);
+            return MBMath.ClampFloat(town.Prosperity / per, Math.Max(0.1f, s.WorkshopArtisansMin), Math.Max(s.WorkshopArtisansMin, s.WorkshopArtisansMax));
+        }
+
         internal static float Hands(Workshop workshop, Town town)
         {
             var s = Settings.Current;

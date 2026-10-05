@@ -110,6 +110,14 @@ namespace Armoury
             ItemObject.ItemTypeEnum.HandArmor, ItemObject.ItemTypeEnum.Cape
         };
 
+        // wpis 79: dla ColdStart (dorobek stuleci w zbrojowniach)
+        internal static Dictionary<MBGUID, Dictionary<ItemObject, int>> Armories() { return Look() ? _armories.GetValue(null) as Dictionary<MBGUID, Dictionary<ItemObject, int>> : null; }
+        internal static int Bucket(ItemObject it) { return (int)it.ItemType * 10 + TierOf(it); }
+        internal static bool AddToArmory(MobileParty mp, ItemObject it, int n)
+        {
+            try { if (!Look() || n <= 0) return false; _add.Invoke(null, new object[] { mp.Id, it, n }); return true; } catch { return false; }
+        }
+
         private static int TierOf(ItemObject it)
         {
             try { return Math.Max(1, Math.Min(6, (int)it.Tier + 1)); } catch { return 1; }
