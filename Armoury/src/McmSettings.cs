@@ -1884,6 +1884,14 @@ namespace Armoury
         [SettingPropertyGroup("Supply and demand")]
         public float SupplyDemandMinFactor { get; set; } = 0.25f;
 
+        [SettingPropertyBool("Retail From Worth", HintText = "the buying price of arms, armour and horses at a market is their worth (with condition) times supply and demand times the merchant's markup - no other mod's surcharges")]
+        [SettingPropertyGroup("Supply and demand")]
+        public bool RetailFromWorth { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Retail Markup Percent", 0.00f, 40.00f, "0.00", HintText = "the merchant's markup on what a piece is worth")]
+        [SettingPropertyGroup("Supply and demand")]
+        public float RetailMarkupPercent { get; set; } = 10f;
+
         [SettingPropertyFloatingInteger("Supply Demand Max Factor", 0.00f, 16.00f, "0.00", HintText = "a starved stall never charges more than this many times the normal price (armour doubled and trebled in wartime shortages)")]
         [SettingPropertyGroup("Supply and demand")]
         public float SupplyDemandMaxFactor { get; set; } = 4f;
@@ -2702,6 +2710,8 @@ namespace Armoury
             s.SupplyDemandRefProsperity = SupplyDemandRefProsperity;
             s.SupplyDemandElasticity = SupplyDemandElasticity;
             s.SupplyDemandMinFactor = SupplyDemandMinFactor;
+            s.RetailFromWorth = RetailFromWorth;
+            s.RetailMarkupPercent = RetailMarkupPercent;
             s.SupplyDemandMaxFactor = SupplyDemandMaxFactor;
             s.SupplyDemandOrderWeight = SupplyDemandOrderWeight;
             s.SupplyDemandOrderDecay = SupplyDemandOrderDecay;

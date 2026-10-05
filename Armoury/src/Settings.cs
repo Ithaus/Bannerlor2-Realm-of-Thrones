@@ -537,6 +537,8 @@ namespace Armoury
         public float SupplyDemandRefProsperity = 3000f;    // prosperity at which a town wants exactly the base amount (0.3x to 3x around it; castles half)
         public float SupplyDemandElasticity = 0.5f;        // how hard the price reacts: (wanted + 1) / (on the stall + 1) raised to this power
         public float SupplyDemandMinFactor = 0.25f;        // a glutted stall never pays less than this share of the normal price
+        public bool RetailFromWorth = true;                // the buying price of arms, armour and horses at a market is their worth (with condition) times supply and demand times the merchant's markup - no other mod's surcharges
+        public float RetailMarkupPercent = 10f;            // the merchant's markup on what a piece is worth
         public float SupplyDemandMaxFactor = 4f;           // a starved stall never charges more than this many times the normal price (armour doubled and trebled in wartime shortages)
         public float SupplyDemandOrderWeight = 1f;         // each unmet request (a volunteer who found no armour, a lord who found nothing for his men) adds this much to the town's demand for that kind of piece
         public float SupplyDemandOrderDecay = 0.15f;       // share of open requests forgotten each day

@@ -151,23 +151,34 @@ namespace Armoury
                     try { price = market.Town.MarketData.GetPrice(el.EquipmentElement, null, false, market.Party); } catch { price = cand.Value; }
                     if (price < bestPrice) { bestPrice = price; best = i; }
                 }
-                if (best < 0) { SupplyDemand.NoteUnmet(market, it.ItemType, (int)it.Tier + 1, 1f); return false; }   // nie ma czego kupic - zamowienie (wpis 67)
+                if (best < 0) { SupplyDemand.NoteUnmet(market, it.ItemType, (int)it.Tier + 1, 1f); Why(it.ItemType + " t" + ((int)it.Tier + 1)); return false; }   // nie ma czego kupic - zamowienie (wpis 67)
                 int u; taken.TryGetValue(best, out u); taken[best] = u + 1;
                 picks.Add(roster.GetElementCopyAtIndex(best).EquipmentElement);
                 total += bestPrice;
             }
-            if (notable.Gold < total) return false;                       // nie stac go
+            if (notable.Gold < total) { Why("zloto notabla (" + notable.Gold + " < " + total + ")"); return false; }   // nie stac go
             foreach (var e in picks) roster.AddToCounts(e, -1);
             GiveGoldAction.ApplyForCharacterToSettlement(notable, market, total, true);
             _gold += total; _pieces += picks.Count;
             return true;
         }
 
+        // wpis 70: diagnoza cofnietych awansow - czego brakowalo
+        private static readonly Dictionary<string, int> _why = new Dictionary<string, int>();
+        private static void Why(string k) { if (k.StartsWith("zloto")) k = "zloto notabla"; int n; _why.TryGetValue(k, out n); _why[k] = n + 1; }
+
         private static void Flush()
         {
             if (_dayStamp < 0 || _bought + _reverted == 0) return;
             Log.Info("Ochotnicy: dzien " + _dayStamp + " - awanse z kupionym sprzetem " + _bought + " (" + _pieces + " szt. za " + _gold
                      + " zl z kiesy notabli do miast), cofniete (brak towaru albo zlota) " + _reverted + ".");
+            if (_why.Count > 0)
+            {
+                var l = new List<KeyValuePair<string, int>>(_why); l.Sort((x, y) => y.Value.CompareTo(x.Value));
+                var parts = new List<string>(); for (int i = 0; i < l.Count && i < 10; i++) parts.Add(l[i].Key + " x" + l[i].Value);
+                Log.Info("Ochotnicy (diagnoza): powody cofniec - " + string.Join(", ", parts.ToArray()) + ".");
+                _why.Clear();
+            }
             _bought = _reverted = _gold = _pieces = 0;
         }
 

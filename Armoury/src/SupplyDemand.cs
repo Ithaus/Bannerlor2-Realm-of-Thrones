@@ -261,7 +261,13 @@ namespace Armoury
                 float arms = ArmsPricing.Multiplier(st, item);
                 float f = shelfF * arms;
                 int before = __result;
-                int np = (int)Math.Round(__result * f);
+                // wpis 70 (Jeff 05.10: "czy ceny w sklepie sa odpowiednie?"): przy kupnie lancuch modeli cen (gra + cudze mody,
+                // najpewniej AIInfluence) dawal juz ~2x wartosci PRZED nasza warstwa (log: karstark_boots 145 -> 211 przy wartosci 73).
+                // Cena kupna sprzetu = wartosc sztuki (ze stanem) x nasz mnoznik x marza kupca - bez cudzych narzutow.
+                float baseP = __result;
+                if (!__3 && HistoricalPrices.On && Settings.Current.RetailFromWorth)
+                    baseP = Math.Max(1, __0.ItemValue) * (1f + Math.Max(0f, Settings.Current.RetailMarkupPercent) / 100f);
+                int np = (int)Math.Round(baseP * f);
                 __result = np < 1 ? 1 : np;
 
                 // log: handel gracza, raz na godzine gry na koszyk i miejsce
