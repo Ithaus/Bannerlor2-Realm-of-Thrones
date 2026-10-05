@@ -215,6 +215,27 @@ namespace Armoury
             return woodKg * s.HistWoodPerKg;
         }
 
+        /// <summary>wpis 90 (audyt 1-43 F1): bron wykuta W TRAKCIE sesji to nowy ItemObject z cena w skali gry (DetermineValue) -
+        /// Apply przy starcie go nie widzial; sprzedaz takiego miecza dawala tysiace pensow z kilku pensow sztabek.</summary>
+        internal static void PriceOne(ItemObject it)
+        {
+            try
+            {
+                if (!On || !_applied || it == null || !IsArms(it) || it.Value <= 0 || _target.ContainsKey(it)) return;
+                var setter = AccessTools.PropertySetter(typeof(ItemObject), "Value");
+                if (setter == null) return;
+                float hc = HistCost(it);
+                if (hc <= 0f) return;
+                if (ArmsPricing.IsUnique(it)) hc *= Math.Max(1f, Settings.Current.HistUniquePrestige);
+                int was = it.Value;
+                if (!_orig.ContainsKey(it)) _orig[it] = was;
+                _ourSet = true; try { setter.Invoke(it, new object[] { Math.Max(1, (int)Math.Round(hc)) }); } finally { _ourSet = false; }
+                _target[it] = it.Value;
+                Log.Info("HistoricalPrices: wykuty " + it.StringId + " " + was + " -> " + it.Value + " d.");
+            }
+            catch (Exception e) { Log.Error("HistoricalPrices.PriceOne", e); }
+        }
+
         private static bool IsArms(ItemObject it)
         {
             switch (it.ItemType)

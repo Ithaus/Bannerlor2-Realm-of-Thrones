@@ -1209,6 +1209,7 @@ namespace Armoury
         /// <summary>Natywne kucie broni tez nie moze byc natychmiastowe - zabieramy wyrob i oddajemy po czasie.</summary>
         private void OnNewItemCrafted(ItemObject item, ItemModifier modifier, bool isCraftingOrderItem)
         {
+            try { HistoricalPrices.PriceOne(item); } catch { }   // wpis 90: wykuty miecz w pensach, jak reszta swiata
             try
             {
                 var s = Settings.Current;
@@ -2072,7 +2073,7 @@ namespace Armoury
                 int cost = RepairCost();
                 if (cost <= 0) { Log.Player("Your gear is sound. Nothing to mend."); return; }
                 if (Hero.MainHero.Gold < cost) { Log.Player("You cannot pay the smith's price.", true); return; }
-                GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, null, cost);
+                Pay.ToSettlement(cost);   // wpis 90 (audyt): zaplata kowalowi do kasy miasta, nie w nicosc
 
                 var eq = Hero.MainHero.BattleEquipment;
                 for (int slot = 0; slot < 12; slot++)

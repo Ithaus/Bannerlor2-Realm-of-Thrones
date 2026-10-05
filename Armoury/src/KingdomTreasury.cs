@@ -120,7 +120,11 @@ namespace Armoury
                         {
                             float share = Math.Max(0f, s.CrownCustomsShare) * (duty ? Math.Max(1f, s.CrownCustomsDutyMultiplier) : 1f);
                             int x = (int)(st.Town.TradeTaxAccumulated * Math.Min(1f, share));
-                            if (x > 0) { st.Town.TradeTaxAccumulated -= x; k.KingdomBudgetWallet += x; cus += x; }
+                            // wpis 90 (audyt, kod gry): licznik cel to MIARA handlu (prowizja dopisywana, nikt jej nie placi) -
+                            // do skarbca idzie tyle, ile realnie odda kasa miasta ponad prog
+                            int paid = Math.Min(x, spare);
+                            if (x > 0) st.Town.TradeTaxAccumulated -= x;
+                            if (paid > 0) { st.SettlementComponent.ChangeGold(-paid); k.KingdomBudgetWallet += paid; cus += paid; spare -= paid; }
                         }
                         if (!s.PolicyIncomeConserved || ruler == null) continue;
                         // mennica: oplata z kasy miasta do krola (zamiast 100 d na lenno z niczego)
@@ -163,6 +167,20 @@ namespace Armoury
                 float smooth = 5f;
                 try { smooth = Math.Max(0.01f, Campaign.Current.Models.ClanFinanceModel.RevenueSmoothenFraction()); } catch { }
                 float vanilla = 0f, real = 0f;
+                float floorG = Math.Max(0f, s.TownRentFloorGold);
+                // wpis 90 (audyt, kod gry): Crown Duty - gra daje krolowi 5% LICZNIKA cel (miara handlu, nikt jej nie placi);
+                // licznik zdejmuje sama, my odejmujemy kwote z niczego i bierzemy ja z kasy miasta ponad prog
+                if (pol.Contains(DefaultPolicies.CrownDuty))
+                    foreach (var f in k.Fiefs)
+                    {
+                        if (f == null) continue;
+                        // po zdjeciu przez gre licznik ma 95% dawnej wartosci: dawna x 5% = obecna x 5/95
+                        int due = applyWithdrawals ? (int)(f.TradeTaxAccumulated * 5f / 95f) : (int)(f.TradeTaxAccumulated * 0.05f);
+                        vanilla += due;
+                        int x = Math.Min(due, Math.Max(0, f.Gold - (int)floorG));
+                        if (applyWithdrawals && x > 0) f.ChangeGold(-x);
+                        real += x;
+                    }
                 // mennica: 100 d na lenno z niczego (pobierana w Levies)
                 if (pol.Contains(DefaultPolicies.DebasementOfTheCurrency)) vanilla += k.Fiefs.Count * 100;
                 // Land Tax: 5% licznika handlu wsi cudzych rodow - z kas tych wsi
@@ -186,7 +204,7 @@ namespace Armoury
                     {
                         if (f == null) continue;
                         float t = 0f; try { t = Campaign.Current.Models.SettlementTaxModel.CalculateTownTax(f).ResultNumber; } catch { }
-                        int x = Math.Min((int)(t * 0.05f), Math.Max(0, f.Gold));
+                        int x = Math.Min((int)(t * 0.05f), Math.Max(0, f.Gold - (int)floorG));   // wpis 90: prog kasy miasta
                         if (x <= 0) continue;
                         if (applyWithdrawals) f.ChangeGold(-x);
                         real += x;
@@ -203,7 +221,7 @@ namespace Armoury
                         // po zdjeciu przez gre licznik ma 29/30 dawnej wartosci: dawna/30 = obecna/29
                         int r = applyWithdrawals ? st.Town.TradeTaxAccumulated / 29 : st.Town.TradeTaxAccumulated / 30;
                         n6 += r;
-                        int x = Math.Min(r, Math.Max(0, st.Town.Gold));
+                        int x = Math.Min(r, Math.Max(0, st.Town.Gold - (int)floorG));   // wpis 90: prog kasy miasta
                         if (applyWithdrawals && x > 0) st.Town.ChangeGold(-x);
                         real += x;
                     }

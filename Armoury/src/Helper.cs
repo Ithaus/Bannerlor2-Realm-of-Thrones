@@ -10,6 +10,18 @@ namespace Armoury
     /// <summary>Czeladnik przy miechu: najlepszy kowal z twojej druzyny pomaga przy kowadle.</summary>
     internal static class Helper
     {
+        /// <summary>wpis 90 (audyt): zdejmij JEDNA sztuke danego przedmiotu w dowolnym stanie. AddToCounts(ItemObject, -1) celuje
+        /// tylko w sztuke bez modyfikatora - przy zuzytej nic nie zdejmowal (gra robi assert i return), a sztuka zostawala.</summary>
+        internal static bool RemoveOne(TaleWorlds.CampaignSystem.Roster.ItemRoster r, TaleWorlds.Core.ItemObject it)
+        {
+            if (r == null || it == null) return false;
+            for (int i = 0; i < r.Count; i++)
+            {
+                var el = r.GetElementCopyAtIndex(i);
+                if (el.EquipmentElement.Item == it && el.Amount > 0) { r.AddToCounts(el.EquipmentElement, -1); return true; }
+            }
+            return false;
+        }
         internal static Hero Find()
         {
             try

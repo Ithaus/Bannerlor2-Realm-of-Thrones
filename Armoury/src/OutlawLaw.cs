@@ -707,8 +707,9 @@ namespace Armoury
             if (hFence) price += (int)(h.Value * markup);
             if (price > 0 && p.PartyTradeGold < price) return false;
             var town = Fence(p) != null ? FenceTown(p) : null;
-            if (a != null) { if (aFence) town.ItemRoster.AddToCounts(a, -1); else p.ItemRoster.AddToCounts(a, -1); }
-            if (h != null) { if (hFence) town.ItemRoster.AddToCounts(h, -1); else p.ItemRoster.AddToCounts(h, -1); }
+            // wpis 90 (audyt 1-43 F8): zdejmujemy sztuke w jej stanie - dotad zuzyta zostawala na polce, banda awansowala z niczego
+            if (a != null) { if (!Helper.RemoveOne(aFence ? town.ItemRoster : p.ItemRoster, a)) return false; }
+            if (h != null) { if (!Helper.RemoveOne(hFence ? town.ItemRoster : p.ItemRoster, h)) return false; }
             if (price > 0)
             {
                 p.PartyTradeGold -= price;
