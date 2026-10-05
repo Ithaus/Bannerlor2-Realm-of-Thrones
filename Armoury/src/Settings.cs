@@ -158,6 +158,9 @@ namespace Armoury
         public bool CraftResultPopup = true;               // forging armour, bows or ammo ends with a result window: every stat, with the quality bonus or the botch penalty spelled out - same rule as weapons
         public bool RichQualityModifiers = true;           // fine/masterwork/legendary touch MORE than one stat (RBM strips them to bare damage): melee gains speed, ranged gains missile speed, botched work loses both
         public bool TroopSelfMendEnabled = true;           // each day in a town the men pay the smith from their own wages to mend the worst pieces in the company stores
+        public bool MenPurseEnabled = true;                // the men's share of the spoils is theirs: in a town they sell the spare kit to the merchants, mend their gear at the smiths, buy what they lack and spend the rest there; you buy from them what you take from the stores
+        public float SurplusKeepPercent = 10f;             // spare kit the stores keep above what the men wear before the rest goes to the merchants
+        public float LordLootThirdPercent = 33f;           // an AI lord's cut (the captain's third) when his men sell their spare kit in a town
         public int TroopSelfMendPercentPerDay = 10;        // the men mend this PERCENT of all battle-worn pieces in the stores each day in town (at least 3 pieces) - a full refit takes about 100/percent days of rest; pay the smith yourself to skip the wait
 
         // --- Skills rule the gear ---

@@ -516,6 +516,18 @@ namespace Armoury
         [SettingPropertyGroup("The finished piece")]
         public bool TroopSelfMendEnabled { get; set; } = true;
 
+        [SettingPropertyBool("Men Purse Enabled", HintText = "the men's share of the spoils is theirs: in a town they sell the spare kit to the merchants, mend their gear at the smiths, buy what they lack and spend the rest there; you buy from them what you take from the stores")]
+        [SettingPropertyGroup("The finished piece")]
+        public bool MenPurseEnabled { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Surplus Keep Percent", 0.00f, 40.00f, "0.00", HintText = "spare kit the stores keep above what the men wear before the rest goes to the merchants")]
+        [SettingPropertyGroup("The finished piece")]
+        public float SurplusKeepPercent { get; set; } = 10f;
+
+        [SettingPropertyFloatingInteger("Lord Loot Third Percent", 0.00f, 132.00f, "0.00", HintText = "an AI lord's cut (the captain's third) when his men sell their spare kit in a town")]
+        [SettingPropertyGroup("The finished piece")]
+        public float LordLootThirdPercent { get; set; } = 33f;
+
         [SettingPropertyInteger("Troop Self Mend Percent Per Day", 0, 40, "0", HintText = "the men mend this PERCENT of all battle-worn pieces in the stores each day in town (at least 3 pieces) - a full refit takes about 100/percent days of rest; pay the smith yourself to skip the wait")]
         [SettingPropertyGroup("The finished piece")]
         public int TroopSelfMendPercentPerDay { get; set; } = 10;
@@ -2432,6 +2444,9 @@ namespace Armoury
             s.CraftResultPopup = CraftResultPopup;
             s.RichQualityModifiers = RichQualityModifiers;
             s.TroopSelfMendEnabled = TroopSelfMendEnabled;
+            s.MenPurseEnabled = MenPurseEnabled;
+            s.SurplusKeepPercent = SurplusKeepPercent;
+            s.LordLootThirdPercent = LordLootThirdPercent;
             s.TroopSelfMendPercentPerDay = TroopSelfMendPercentPerDay;
             s.TroopSkillAutoFit = TroopSkillAutoFit;
             s.SkillsDecideEnabled = SkillsDecideEnabled;

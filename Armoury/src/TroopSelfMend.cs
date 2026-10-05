@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 
@@ -19,8 +20,104 @@ namespace Armoury
     /// </summary>
     internal static class TroopSelfMend
     {
+        // ------------------------------------------------------------ wpis 84: godzinowo, z sakiewki ludzi
+        // Jeff 05.10: "maja kase, to niech naprawiaja, na ile ich stac; a co jak wyjde z miasta?". Ludzie oddaja kowalom miasta
+        // najgorsze sztuki; kowale maja tyle godzin, ile rak (rece rzemieslnikow x udzial platnerzy i miecznikow), w nocy spia.
+        // Gotowa sztuka - zaplacona z sakiewki ludzi do kasy miasta. Wyjazd: to, co na warsztacie, ludzie zabieraja nienaprawione
+        // i nikt za to nie placi (postep sztuki przepada, nic wiecej). Wraki (<10%) - tylko kowal z materialem albo przetop.
+        private static float _bench;
+        private static string _benchTown;
+
+        internal static void LeftTown() { _bench = 0f; _benchTown = null; }
+
+        private static int UnitCost(EquipmentElement ee)
+        {
+            return Math.Max(1, (int)(ee.Item.Value * (1f - ee.ItemModifier.PriceMultiplier) * 0.25f));
+        }
+
+        private static bool Mendable(ItemRosterElement el)
+        {
+            var mod = el.EquipmentElement.ItemModifier;
+            return el.Amount > 0 && el.EquipmentElement.Item != null && mod != null && mod.PriceMultiplier < 1f && mod.PriceMultiplier >= 0.1f;
+        }
+
+        /// <summary>Ile kosztowalyby wszystkie zalegle naprawy (bez wrakow) - tyle ludzie trzymaja w sakiewce.</summary>
+        internal static int OutstandingCost()
+        {
+            int sum = 0;
+            try
+            {
+                var armory = QuartermasterLaw.DteArmory();
+                if (armory == null) return 0;
+                for (int i = 0; i < armory.Count; i++)
+                {
+                    var el = armory.GetElementCopyAtIndex(i);
+                    if (Mendable(el)) sum += UnitCost(el.EquipmentElement) * el.Amount;
+                }
+            }
+            catch { }
+            return sum;
+        }
+
+        internal static void Hourly()
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || !s.TroopSelfMendEnabled || !MenPurse.On) return;
+                var main = MobileParty.MainParty;
+                var st = main != null ? main.CurrentSettlement : null;
+                if (st == null || !st.IsTown || st.Town == null) { _bench = 0f; _benchTown = null; return; }
+                if (_benchTown != st.StringId) { _bench = 0f; _benchTown = st.StringId; }
+                if (s.WorkshopNightRest) { int hh = TaleWorlds.CampaignSystem.CampaignTime.Now.GetHourOfDay; if (hh >= 23 || hh < 5) return; }
+                var armory = QuartermasterLaw.DteArmory();
+                if (armory == null) return;
+                var worn = new List<ItemRosterElement>();
+                for (int i = 0; i < armory.Count; i++) { var el = armory.GetElementCopyAtIndex(i); if (Mendable(el)) worn.Add(el); }
+                if (worn.Count == 0) { _bench = 0f; return; }
+                worn.Sort((a, b) => a.EquipmentElement.ItemModifier.PriceMultiplier.CompareTo(b.EquipmentElement.ItemModifier.PriceMultiplier));
+                // godziny kowali na godzine: rece miasta x (platnerze + miecznicy) / wszystkie cechy
+                float wsum = 0f; foreach (var g in new[] { "krawiec", "platnerz", "miecznik", "siodlarz", "lucznik", "tarczownik" }) wsum += WorkshopLaw.GuildWeight(g);
+                float smiths = WorkshopLaw.TownHands(st.Town) * (WorkshopLaw.GuildWeight("platnerz") + WorkshopLaw.GuildWeight("miecznik")) / Math.Max(0.01f, wsum);
+                _bench += smiths;
+                float per = Math.Max(0.05f, s.MendLootHoursPerPiece);
+                int mended = 0, paid = 0;
+                bool broke = false;
+                foreach (var el in worn)
+                {
+                    int left = el.Amount, fixedN = 0;
+                    while (left > 0 && _bench >= per)
+                    {
+                        int unit = UnitCost(el.EquipmentElement);
+                        if (MenPurse.Get(main) < unit) { broke = true; break; }
+                        MenPurse.Take(main, unit); st.Town.ChangeGold(unit);
+                        _bench -= per; left--; fixedN++; paid += unit;
+                    }
+                    if (fixedN > 0)
+                    {
+                        armory.AddToCounts(el.EquipmentElement, -fixedN);
+                        armory.AddToCounts(new EquipmentElement(el.EquipmentElement.Item), fixedN);
+                        mended += fixedN;
+                    }
+                    if (broke || _bench < per) break;
+                }
+                if (broke) _bench = Math.Min(_bench, per);   // nie ma czym zaplacic - kowale nie trzymaja godzin na zapas
+                _hourMended += mended; _hourPaid += paid;
+                if (_hourMended > 0 && (TaleWorlds.CampaignSystem.CampaignTime.Now.GetHourOfDay == 22 || broke))
+                {
+                    Log.Player("The smiths of " + st.Name + " mended " + _hourMended + " pieces of your men's kit today for " + _hourPaid
+                               + " denars from the men's purse." + (broke ? " The men's purse is empty - the rest waits (or pay the smith yourself)." : ""), true);
+                    Log.Info("TroopSelfMend: " + st.Name + " - naprawiono " + _hourMended + " szt. za " + _hourPaid + " z sakiewki ludzi" + (broke ? " (sakiewka pusta)" : "") + ".");
+                    _hourMended = 0; _hourPaid = 0;
+                }
+            }
+            catch (Exception e) { Log.Error("TroopSelfMend.Hourly", e); }
+        }
+        private static int _hourMended, _hourPaid;
+
         internal static void Run(Settlement st)
         {
+            if (MenPurse.On) return;   // wpis 84: naprawy godzinowe z sakiewki ludzi (Hourly)
             try
             {
                 var s = Settings.Current;

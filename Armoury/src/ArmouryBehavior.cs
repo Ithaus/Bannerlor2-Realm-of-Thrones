@@ -386,7 +386,7 @@ namespace Armoury
         }
         private Dictionary<string,int> _prisonerBaseline;
 
-        public ArmouryBehavior() { Instance = this; WesterosClimate.Reset(); OutlawLaw.Reset(); PopulationLaw.Reset(); WorkshopLaw.Reset(); IronBank.Reset(); MarketGlut.Reset(); ArmsPricing.Reset(); StartKit.Reset(); AiGear.Reset(); Levy.Reset(); VolunteerKit.Reset(); LevyGold.Reset(); WearKeep.Reset(); UniqueSpoils.Reset(); BuildDiary.Reset(); BuildFunding.Reset(); KingdomLedger.Reset(); ColdStart.Reset(); }   // stan jednej kampanii nie przecieka do drugiej (audyt 04.10)
+        public ArmouryBehavior() { Instance = this; WesterosClimate.Reset(); OutlawLaw.Reset(); PopulationLaw.Reset(); WorkshopLaw.Reset(); IronBank.Reset(); MarketGlut.Reset(); ArmsPricing.Reset(); StartKit.Reset(); AiGear.Reset(); Levy.Reset(); VolunteerKit.Reset(); LevyGold.Reset(); WearKeep.Reset(); UniqueSpoils.Reset(); BuildDiary.Reset(); BuildFunding.Reset(); KingdomLedger.Reset(); ColdStart.Reset(); MenPurse.Reset(); AiWear.Reset(); }   // stan jednej kampanii nie przecieka do drugiej (audyt 04.10)
 
         public override void SyncData(IDataStore dataStore)
         {
@@ -424,6 +424,10 @@ namespace Armoury
                 // klimat Westeros: historia por roku (Jeff 04.10)
                 // unikaty ROT: kopie startowe zdjete raz na kampanie (wpis 62)
                 // dorobek stuleci: zbrojownie i zapas kupiecki raz na kampanie (wpis 79)
+                // sakiewki ludzi (wpis 84)
+                string purse = MenPurse.Export();
+                dataStore.SyncData("arm_menpurse", ref purse);
+                if (dataStore.IsLoading) MenPurse.Import(purse);
                 string cold = ColdStart.Export();
                 dataStore.SyncData("arm_coldstart", ref cold);
                 if (dataStore.IsLoading) ColdStart.Import(cold);
@@ -465,7 +469,10 @@ namespace Armoury
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, OnDailyTick);
             // pelny system rynku uzbrojenia (Jeff 04.10, docs/MODEL-MATERIALOW.md)
             CampaignEvents.WarDeclared.AddNonSerializedListener(this, ArmsPricing.OnWarDeclared);
+            CampaignEvents.SettlementEntered.AddNonSerializedListener(this, MenPurse.OnEntered);   // wpis 84: nadwyzki ludzi PRZED zakupami
             CampaignEvents.SettlementEntered.AddNonSerializedListener(this, AiGear.OnSettlementEntered);
+            CampaignEvents.OnSettlementLeftEvent.AddNonSerializedListener(this, MenPurse.OnLeft);
+            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, delegate { try { TroopSelfMend.Hourly(); } catch { } });
             CampaignEvents.DailyTickPartyEvent.AddNonSerializedListener(this, AiGear.OnDailyTickParty);
             CampaignEvents.DailyTickPartyEvent.AddNonSerializedListener(this, UniqueSpoils.OnDailyTickParty);
             // SUWAKI MCM NA ZYWO (Jeff 03.09: "nadal 1 predkosc, o co chodzi" -

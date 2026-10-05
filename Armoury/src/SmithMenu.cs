@@ -133,7 +133,7 @@ namespace Armoury
                 GameMenu.MenuAndOptionType.WaitMenuHideProgressAndHoursOption,
                 GameMenu.MenuOverlayType.SettlementWithBoth);
             starter.AddGameMenuOption("arm_work_wait", "arm_work_stop",
-                "{=!}Put the work aside (nothing finished, nothing paid)",
+                "{=!}Put the work aside (pay only for what is finished)",
                 delegate (MenuCallbackArgs a) { a.optionLeaveType = GameMenuOption.LeaveType.Leave; return true; },
                 // ZAKAZ SwitchToMenu z opcji menu OCZEKIWANIA (CTD, CLAUDE.md),
                 // a ExitToLast NISZCZY MenuContext (stosu menu nie ma - w miescie
@@ -1007,13 +1007,15 @@ namespace Armoury
                 float hours = Math.Min(MathF.Max(1f, s.TroopMendMaxHours), can * s.MendLootHoursPerPiece);
                 StartTimedWork(hours,
                     "The smith clears his benches and sets every apprentice on the men's gear.",
-                    delegate { DoMendTroops(); });
+                    delegate { DoMendTroops(int.MaxValue); },
+                    delegate (float frac) { DoMendTroops((int)Math.Floor(can * frac)); });
             }
             catch (Exception e) { Log.Error("MendTroopsConsequence", e); }
         }
 
-        private static void DoMendTroops()
+        private static void DoMendTroops(int limit)
         {
+            if (limit <= 0) { Log.Player("You call the smith off before a single piece is done - nothing to pay.", true); return; }
             try
             {
                 var armory = QuartermasterLaw.DteArmory();
@@ -1037,6 +1039,7 @@ namespace Armoury
                     int fix2 = 0;
                     for (int k = 0; k < el.Amount; k++)
                     {
+                        if (done + fix2 >= limit) break;   // wpis 84: przerwana robota - tylko gotowe sztuki
                         if (Hero.MainHero.Gold - paid - per < 0) { skipped += el.Amount - k; break; }
                         paid += per; fix2++;
                     }
@@ -1630,8 +1633,17 @@ namespace Armoury
         private static Action _workApply;
         private static bool _workLeave;   // opcja "Put the work aside" podnosi, WorkTick przelacza
 
+        private static Action<float> _workPartial;
+
+        private static void StartTimedWork(float hours, string label, Action apply, Action<float> partial)
+        {
+            StartTimedWork(hours, label, apply);
+            _workPartial = partial;
+        }
+
         private static void StartTimedWork(float hours, string label, Action apply)
         {
+            _workPartial = null;
             _workTarget = Math.Max(0.25f, hours);
             _workDone = 0f;
             _workLeave = false;
@@ -1657,12 +1669,20 @@ namespace Armoury
         {
             try
             {
-                if (_workLeave) { _workLeave = false; GameMenu.SwitchToMenu(Menu); return; }
+                if (_workLeave)
+                {
+                    _workLeave = false;
+                    var part = _workPartial; float frac = _workTarget > 0f ? _workDone / _workTarget : 0f;
+                    _workPartial = null;
+                    GameMenu.SwitchToMenu(Menu);
+                    if (part != null && frac > 0f) part(frac);   // wpis 84: gotowe sztuki zaplacone, reszta wraca nienaprawiona
+                    return;
+                }
                 if (_workApply == null) return;
                 _workDone += (float)dt.ToHours;
                 if (_workDone < _workTarget) return;
                 var apply = _workApply;
-                _workApply = null;
+                _workApply = null; _workPartial = null;
                 GameMenu.SwitchToMenu(Menu);
                 apply();
             }

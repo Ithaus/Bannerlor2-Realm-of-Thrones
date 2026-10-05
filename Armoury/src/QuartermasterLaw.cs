@@ -886,6 +886,9 @@ namespace Armoury
                 int n = Math.Max(1, transferCommand.Amount);
                 if (transferCommand.FromSide == InventoryLogic.InventorySide.OtherInventory)
                 {
+                    // wpis 84: czesc ponad Twoj wlasny wklad to lup ludzi - kupujesz go (rozliczenie przy zamknieciu)
+                    int own = ArmouryBehavior.StockOf(it.StringId);
+                    MenPurse.NoteBuy(transferCommand.ElementToTransfer.EquipmentElement, n - Math.Min(n, Math.Max(0, own)));
                     ArmouryBehavior.StockWithdraw(it.StringId, n);
                     // wycofanie wkladu w TEJ samej sesji ekranu kasuje tez
                     // jego wpis w rejestrze wymian - inaczej przy zamknieciu
@@ -894,6 +897,10 @@ namespace Armoury
                 }
                 else if (transferCommand.ToSide == InventoryLogic.InventorySide.OtherInventory)
                 {
+                    // wpis 84: odlozone z powrotem to, co w tej sesji wziales od ludzi - zakup skasowany, to nie Twoj wklad
+                    int undo = MenPurse.CancelBuy(it, n);
+                    n -= undo;
+                    if (n <= 0) return;
                     ArmouryBehavior.StockDeposit(it.StringId, n);
                     // wklad zapisany do WYMIANY BARTEROWEJ (rozliczy sie
                     // przy zamknieciu ekranu - Jeff: "wrzucam t6 luki,
@@ -1207,7 +1214,7 @@ namespace Armoury
                     foreach (var kv in _held) armory.AddToCounts(kv.Key, kv.Value);
                 _held.Clear();
                 Active = false;
-                if (!_screenOpen) ProcessSwaps(armory);
+                if (!_screenOpen) { ProcessSwaps(armory); MenPurse.SettleBuys(); }
             }
             catch (Exception e) { Log.Error("Escrow.Release", e); }
         }
@@ -1222,6 +1229,7 @@ namespace Armoury
                 if (!_screenOpen) return;
                 ArmouryBehavior.StockRestore(_stockAtOpen);
                 _pendingSwaps.Clear();
+                MenPurse.ClearBuys();
                 Log.Info("Kwatermistrz: Reset ekranu - ksiega wkladow i rejestr wymian cofniete do stanu z otwarcia.");
             }
             catch (Exception e) { Log.Error("Escrow.OnScreenReset", e); }

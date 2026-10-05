@@ -118,6 +118,29 @@ namespace Armoury
             try { if (!Look() || n <= 0) return false; _add.Invoke(null, new object[] { mp.Id, it, n }); return true; } catch { return false; }
         }
 
+        /// <summary>wpis 84: potrzeby partii w koszykach typ x tier (komplety ludzi, bez koni).</summary>
+        internal static Dictionary<int, int> NeedBuckets(MobileParty mp)
+        {
+            var need = new Dictionary<int, int>();
+            var roster = mp.MemberRoster;
+            for (int i = 0; i < roster.Count; i++)
+            {
+                var el = roster.GetElementCopyAtIndex(i);
+                var ch = el.Character;
+                if (ch == null || ch.IsHero || el.Number <= 0) continue;
+                Equipment eq = null;
+                try { eq = ch.Equipment; } catch { }
+                if (eq == null) continue;
+                for (int sl = 0; sl < 10; sl++)
+                {
+                    var it = eq[(EquipmentIndex)sl].Item;
+                    if (it == null || !SupplyDemand.Equipmentish(it)) continue;
+                    int k = Bucket(it); int n; need.TryGetValue(k, out n); need[k] = n + el.Number;
+                }
+            }
+            return need;
+        }
+
         private static int TierOf(ItemObject it)
         {
             try { return Math.Max(1, Math.Min(6, (int)it.Tier + 1)); } catch { return 1; }
@@ -147,6 +170,9 @@ namespace Armoury
                 var lord = payer;
                 int reserve = Math.Max(0, s.AiGearGoldReserve);
                 int budget = (int)((lord.Gold - reserve) * Math.Max(0f, Math.Min(100f, s.AiGearBudgetPercent)) / 100f);
+                // wpis 84: ludzie dokupuja braki ze swojej sakiewki (lup), dopiero potem kiesa lorda
+                int purse = garrison ? 0 : MenPurse.Get(mp);
+                budget = Math.Max(0, budget) + purse;
                 if (budget <= 0) return;
 
                 var all = _armories.GetValue(null) as Dictionary<MBGUID, Dictionary<ItemObject, int>>;
@@ -217,7 +243,8 @@ namespace Armoury
                             if (n <= 0) break;
                             shelf.AddToCounts(pick.EquipmentElement, -n);
                             _add.Invoke(null, new object[] { mp.Id, pick.EquipmentElement.Item, n });
-                            lord.ChangeHeroGold(-bestPrice * n);
+                            int cost = bestPrice * n, fromPurse = garrison ? 0 : MenPurse.Take(mp, cost);
+                            lord.ChangeHeroGold(-(cost - fromPurse));
                             st.Town.ChangeGold(bestPrice * n);
                             spent += bestPrice * n; pieces += n; deficit -= n;
                             if (bought.Count < 6) bought.Add(pick.EquipmentElement.Item.StringId + " " + bestPrice);
