@@ -104,7 +104,7 @@ namespace Armoury
                 if (!On || mp == null || st == null || !st.IsTown || st.Town == null) return;
                 Day();
                 if (mp.IsMainParty) { SellPlayerSurplus(st); BuyPlayerGaps(st); }
-                else if (mp.IsLordParty && mp.LeaderHero != null && mp.LeaderHero.IsAlive && mp.MapEvent == null) SellAiSurplus(mp, st);
+                else if (mp.IsLordParty && mp.LeaderHero != null && mp.LeaderHero.IsAlive && mp.MapEvent == null) { SellAiSurplus(mp, st); AiWear.MendInTown(mp, st); }
             }
             catch (Exception e) { Log.Error("MenPurse.OnEntered", e); }
         }

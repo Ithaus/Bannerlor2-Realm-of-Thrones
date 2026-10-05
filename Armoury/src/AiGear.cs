@@ -98,7 +98,7 @@ namespace Armoury
 
         internal static void OnDailyTickParty(MobileParty mp)
         {
-            try { if (mp != null && mp.CurrentSettlement != null) TryBuy(mp, mp.CurrentSettlement); } catch { }
+            try { if (mp != null && mp.CurrentSettlement != null) { AiWear.MendInTown(mp, mp.CurrentSettlement); TryBuy(mp, mp.CurrentSettlement); } } catch { }
         }
 
         private static readonly ItemObject.ItemTypeEnum[] Order =
@@ -243,6 +243,7 @@ namespace Armoury
                             if (n <= 0) break;
                             shelf.AddToCounts(pick.EquipmentElement, -n);
                             _add.Invoke(null, new object[] { mp.Id, pick.EquipmentElement.Item, n });
+                            if (!garrison) AiWear.NoteSound(mp, pick.EquipmentElement.Item, n);
                             int cost = bestPrice * n, fromPurse = garrison ? 0 : MenPurse.Take(mp, cost);
                             lord.ChangeHeroGold(-(cost - fromPurse));
                             st.Town.ChangeGold(bestPrice * n);

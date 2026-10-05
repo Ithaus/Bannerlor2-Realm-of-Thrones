@@ -428,6 +428,9 @@ namespace Armoury
                 string purse = MenPurse.Export();
                 dataStore.SyncData("arm_menpurse", ref purse);
                 if (dataStore.IsLoading) MenPurse.Import(purse);
+                string aiw = AiWear.Export();
+                dataStore.SyncData("arm_aiwear", ref aiw);
+                if (dataStore.IsLoading) AiWear.Import(aiw);
                 string cold = ColdStart.Export();
                 dataStore.SyncData("arm_coldstart", ref cold);
                 if (dataStore.IsLoading) ColdStart.Import(cold);
@@ -492,6 +495,7 @@ namespace Armoury
             CampaignEvents.OnTroopsDesertedEvent.AddNonSerializedListener(this, OutlawLaw.OnTroopsDeserted);
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, OutlawLaw.OnMapEventEnded);
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, BattleChronicle.OnMapEventEnded);
+            CampaignEvents.MapEventEnded.AddNonSerializedListener(this, AiWear.OnMapEventEnded);   // wpis 85
             CampaignEvents.VillageLooted.AddNonSerializedListener(this, OutlawLaw.OnVillageLooted);
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, OutlawLaw.OnPartyDestroyed);
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, delegate { try { OutlawLaw.Hourly(); } catch { } });

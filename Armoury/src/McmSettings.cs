@@ -528,6 +528,10 @@ namespace Armoury
         [SettingPropertyGroup("The finished piece")]
         public float LordLootThirdPercent { get; set; } = 33f;
 
+        [SettingPropertyBool("Ai Wear Enabled", HintText = "AI lords' kit wears too: battle wear on pieces in use, loot comes in battered, town smiths mend it day by day from the men's purse")]
+        [SettingPropertyGroup("The finished piece")]
+        public bool AiWearEnabled { get; set; } = true;
+
         [SettingPropertyInteger("Troop Self Mend Percent Per Day", 0, 40, "0", HintText = "the men mend this PERCENT of all battle-worn pieces in the stores each day in town (at least 3 pieces) - a full refit takes about 100/percent days of rest; pay the smith yourself to skip the wait")]
         [SettingPropertyGroup("The finished piece")]
         public int TroopSelfMendPercentPerDay { get; set; } = 10;
@@ -2447,6 +2451,7 @@ namespace Armoury
             s.MenPurseEnabled = MenPurseEnabled;
             s.SurplusKeepPercent = SurplusKeepPercent;
             s.LordLootThirdPercent = LordLootThirdPercent;
+            s.AiWearEnabled = AiWearEnabled;
             s.TroopSelfMendPercentPerDay = TroopSelfMendPercentPerDay;
             s.TroopSkillAutoFit = TroopSkillAutoFit;
             s.SkillsDecideEnabled = SkillsDecideEnabled;
