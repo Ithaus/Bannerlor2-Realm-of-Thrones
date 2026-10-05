@@ -1880,9 +1880,21 @@ namespace Armoury
         [SettingPropertyGroup("Supply and demand")]
         public float SupplyDemandMinFactor { get; set; } = 0.25f;
 
-        [SettingPropertyFloatingInteger("Supply Demand Max Factor", 0.00f, 8.00f, "0.00", HintText = "a starved stall never charges more than this many times the normal price")]
+        [SettingPropertyFloatingInteger("Supply Demand Max Factor", 0.00f, 16.00f, "0.00", HintText = "a starved stall never charges more than this many times the normal price (armour doubled and trebled in wartime shortages)")]
         [SettingPropertyGroup("Supply and demand")]
-        public float SupplyDemandMaxFactor { get; set; } = 2f;
+        public float SupplyDemandMaxFactor { get; set; } = 4f;
+
+        [SettingPropertyFloatingInteger("Supply Demand Order Weight", 0.00f, 4.00f, "0.00", HintText = "each unmet request (a volunteer who found no armour, a lord who found nothing for his men) adds this much to the town's demand for that kind of piece")]
+        [SettingPropertyGroup("Supply and demand")]
+        public float SupplyDemandOrderWeight { get; set; } = 1f;
+
+        [SettingPropertyFloatingInteger("Supply Demand Order Decay", 0.00f, 1.00f, "0.00", HintText = "share of open requests forgotten each day")]
+        [SettingPropertyGroup("Supply and demand")]
+        public float SupplyDemandOrderDecay { get; set; } = 0.15f;
+
+        [SettingPropertyFloatingInteger("Supply Demand Order Cap", 0.00f, 240.00f, "0.00", HintText = "at most this many open requests per kind of piece in one town")]
+        [SettingPropertyGroup("Supply and demand")]
+        public float SupplyDemandOrderCap { get; set; } = 60f;
 
         [SettingPropertyFloatingInteger("Supply Demand Trade Percent", 0.00f, 60.00f, "0.00", HintText = "each day traders carry this % of a stall's surplus to the nearest town or castle that lacks it - nothing vanishes, the buyer pays")]
         [SettingPropertyGroup("Supply and demand")]
@@ -2686,6 +2698,9 @@ namespace Armoury
             s.SupplyDemandElasticity = SupplyDemandElasticity;
             s.SupplyDemandMinFactor = SupplyDemandMinFactor;
             s.SupplyDemandMaxFactor = SupplyDemandMaxFactor;
+            s.SupplyDemandOrderWeight = SupplyDemandOrderWeight;
+            s.SupplyDemandOrderDecay = SupplyDemandOrderDecay;
+            s.SupplyDemandOrderCap = SupplyDemandOrderCap;
             s.SupplyDemandTradePercent = SupplyDemandTradePercent;
             s.SupplyDemandTradeRange = SupplyDemandTradeRange;
             s.SupplyDemandTradePricePercent = SupplyDemandTradePricePercent;

@@ -86,6 +86,37 @@ namespace Armoury
         }
 
         /// <summary>Popyt miasta na jeden koszyk (typ x tier).</summary>
+        // ------------------------------------------------------------ zamowienia (wpis 67)
+        // Jeff 04.10: "skoro czegos brakuje, to powinno sie najbardziej oplacac - nie dziala logika podazy i popytu". Popyt byl
+        // STALY (dobrobyt x 4 sztuki na rodzaj); ochotnik bez zbroi i lord z brakami odchodzili z niczym, a rynek tego nie
+        // widzial. Teraz kazda nieudana proba zakupu zapisuje sie w miescie jako zamowienie na rodzaj i tier, podnosi popyt
+        // (a wiec cene i oplacalnosc dla warsztatow) i codziennie wygasa (SupplyDemandOrderDecay).
+        private static readonly Dictionary<string, float> _unmet = new Dictionary<string, float>();
+        private static int _noted;
+        private static string Key(Settlement st, ItemObject.ItemTypeEnum type, int tier) { return (st != null ? st.StringId : "-") + "|" + (int)type + "|" + tier; }
+
+        internal static void NoteUnmet(Settlement market, ItemObject.ItemTypeEnum type, int tier, float n)
+        {
+            if (market == null || n <= 0f) return;
+            tier = Math.Max(1, Math.Min(6, tier));
+            string k = Key(market, type, tier);
+            float v; _unmet.TryGetValue(k, out v);
+            _unmet[k] = Math.Min(v + n, Math.Max(1f, Settings.Current.SupplyDemandOrderCap));
+            _noted++;
+        }
+
+        internal static void DecayOrders()
+        {
+            float keep = MBMath.ClampFloat(1f - Settings.Current.SupplyDemandOrderDecay, 0f, 1f);
+            var keys = new List<string>(_unmet.Keys);
+            float total = 0f;
+            foreach (var k in keys) { float v = _unmet[k] * keep; if (v < 0.2f) _unmet.Remove(k); else { _unmet[k] = v; total += v; } }
+            if (_noted > 0 || total > 0f) Log.Info("PodazPopyt: zamowienia - nowych dzis " + _noted + ", otwartych " + _unmet.Count + " (razem " + (int)total + " szt. czeka na towar).");
+            _noted = 0;
+        }
+
+        internal static void ResetOrders() { _unmet.Clear(); _noted = 0; }
+
         internal static float Demand(Settlement st, ItemObject it)
         {
             return Demand(st, it.ItemType, TierOf(it));
@@ -106,7 +137,9 @@ namespace Armoury
             }
             catch { }
             tier = Math.Max(1, Math.Min(6, tier));
-            return Math.Max(0.1f, Math.Max(0f, c.SupplyDemandBase) * prosp * TierWeight[tier - 1]);
+            float orders = 0f;
+            try { var m = st != null && st.IsVillage && st.Village != null && st.Village.Bound != null ? st.Village.Bound : st; _unmet.TryGetValue(Key(m, type, tier), out orders); } catch { }
+            return Math.Max(0.1f, Math.Max(0f, c.SupplyDemandBase) * prosp * TierWeight[tier - 1] + orders * Math.Max(0f, c.SupplyDemandOrderWeight));
         }
 
         /// <summary>SUBSTYTUCJA (Jeff 04.10: "wojsko patrzy, jaki jest najlepszy pancerz do ceny"):

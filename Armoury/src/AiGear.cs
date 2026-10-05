@@ -214,8 +214,11 @@ namespace Armoury
                             spent += bestPrice * n; pieces += n; deficit -= n;
                             if (bought.Count < 6) bought.Add(pick.EquipmentElement.Item.StringId + " " + bestPrice);
                         }
+                        need[k] = deficit;   // wpis 67: co zostalo niezaspokojone
                     }
                 }
+                // wpis 67: czego nie bylo na polce - zamowienie w tym miescie (najwyzej po 10 na rodzaj z jednej wizyty)
+                foreach (var kv in need) if (kv.Value > 0) SupplyDemand.NoteUnmet(st, (ItemObject.ItemTypeEnum)(kv.Key / 10), kv.Key % 10, Math.Min(10, kv.Value));
                 if (pieces <= 0) return;
                 _dayPieces += pieces; _dayGold += spent; _dayVisits++; if (garrison) { _dayGarrison++; _dayGarrisonGold += spent; }
                 if (_dayLogged < Math.Max(0, s.AiGearLogPerDay))

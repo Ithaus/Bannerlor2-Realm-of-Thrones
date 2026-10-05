@@ -34,7 +34,7 @@ namespace Armoury
         private static int _bought, _reverted, _gold, _pieces, _dayStamp = -1;
         private static readonly Dictionary<Settlement, Settlement> _market = new Dictionary<Settlement, Settlement>();
 
-        internal static void Reset() { _market.Clear(); _bought = _reverted = _gold = _pieces = 0; _dayStamp = -1; }
+        internal static void Reset() { SupplyDemand.ResetOrders(); _market.Clear(); _bought = _reverted = _gold = _pieces = 0; _dayStamp = -1; }
 
         public static void Prefix(Settlement settlement, out Dictionary<Hero, CharacterObject[]> __state)
         {
@@ -151,7 +151,7 @@ namespace Armoury
                     try { price = market.Town.MarketData.GetPrice(el.EquipmentElement, null, false, market.Party); } catch { price = cand.Value; }
                     if (price < bestPrice) { bestPrice = price; best = i; }
                 }
-                if (best < 0) return false;                               // nie ma czego kupic
+                if (best < 0) { SupplyDemand.NoteUnmet(market, it.ItemType, (int)it.Tier + 1, 1f); return false; }   // nie ma czego kupic - zamowienie (wpis 67)
                 int u; taken.TryGetValue(best, out u); taken[best] = u + 1;
                 picks.Add(roster.GetElementCopyAtIndex(best).EquipmentElement);
                 total += bestPrice;

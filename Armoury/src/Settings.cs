@@ -536,7 +536,10 @@ namespace Armoury
         public float SupplyDemandRefProsperity = 3000f;    // prosperity at which a town wants exactly the base amount (0.3x to 3x around it; castles half)
         public float SupplyDemandElasticity = 0.5f;        // how hard the price reacts: (wanted + 1) / (on the stall + 1) raised to this power
         public float SupplyDemandMinFactor = 0.25f;        // a glutted stall never pays less than this share of the normal price
-        public float SupplyDemandMaxFactor = 2f;           // a starved stall never charges more than this many times the normal price
+        public float SupplyDemandMaxFactor = 4f;           // a starved stall never charges more than this many times the normal price (armour doubled and trebled in wartime shortages)
+        public float SupplyDemandOrderWeight = 1f;         // each unmet request (a volunteer who found no armour, a lord who found nothing for his men) adds this much to the town's demand for that kind of piece
+        public float SupplyDemandOrderDecay = 0.15f;       // share of open requests forgotten each day
+        public float SupplyDemandOrderCap = 60f;           // at most this many open requests per kind of piece in one town
         public float SupplyDemandTradePercent = 15f;       // each day traders carry this % of a stall's surplus to the nearest town or castle that lacks it - nothing vanishes, the buyer pays
         public float SupplyDemandTradeRange = 250f;        // how far (map distance) traders will haul arms to a market that lacks them
         public float SupplyDemandTradePricePercent = 50f;  // wholesale price between towns, as % of worth times the glutted source's price factor
