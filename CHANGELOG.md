@@ -1,5 +1,11 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-05 (72) - BLOKADA CEN: po przeliczeniu inny mod nie zmieni wartosci przedmiotu
+**Mod:** Armoury | **Pliki:** `HistoricalPrices.cs` (`ValueSetPrefix` na setterze `ItemObject.Value`, flaga `_ourSet` dla wlasnych zapisow w Apply i Recheck)
+**Problem (Jeff 05.10: "no to tak trudno wpisac regule, ze nie moze nadpisac - ceny czytane sa z tego, bo to sa ceny?"):** codzienna kontrola (wpis 58) dopiero dzien pozniej przywracala ceny nadpisane przez inne mody (7 lukow/strzal kazdej sesji, BK `AdjustPrices` -> futra 125).
+**Zmiana:** prefix (Priority.First) na setterze `Value`: po przeliczeniu kazda zmiana wartosci przedmiotu z listy przeliczonych (`_target`), ktora nie pochodzi od nas, jest odrzucana; pierwsza proba dla przedmiotu (do 40) idzie do logu: `HistoricalPrices: ZABLOKOWANO zmiane ceny <id> X -> Y (wola: <typ.metoda> <- ...)` - zobaczymy, kto nadpisywal. Zapis wprost do pola (refleksja na backing field) omija setter - dla tego zostaje dzienna kontrola.
+**Status:** WGRANE 2026-10-05 (gra zamknieta; poprzednie DLL obok jako `Armoury.dll.bak-2026-10-05-przed-72`). DO SPRAWDZENIA - log `blokada cen ... wpieta` i ewentualne `ZABLOKOWANO`.
+
 ## 2026-10-05 (71) - TOWARY HANDLOWE HISTORYCZNIE; spis unikatow wedlug NAZW widocznych w grze
 **Mod:** Armoury | **Pliki:** `HistoricalPrices.cs` (`TradeGoodsPerKg`, petla 1b w `Apply`, towary w kontroli `_target`), `RotUniques.cs` (przegenerowany), `tools/rot_uniques.py` (zasada: nazwa w grze), `docs/ROT-UNIKATY.md`, `Settings.cs` + `McmSettings.cs` (NOWE `HistTradeGoods`)
 **Problem (Jeff 05.10):** (1) "narzedzia 173, jedwab, ruda srebra - towary handlowe, ktorych jeszcze nie przeliczalismy ... no to przelicz". (2) "Northern Leather Boots to nie jest unikat, to buty z Polnocy - gdyby byly Jon Snow Boots, to bylby unikat" - spis wpisu 60 szedl po id z plikow ROT (jon_snow_boots).

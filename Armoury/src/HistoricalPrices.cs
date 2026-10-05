@@ -53,6 +53,44 @@ namespace Armoury
         };
 
         /// <summary>Wpis 58: codzienna kontrola - czy ktos (inny mod) nie nadpisal przeliczonych wartosci; jesli tak, przywracamy i logujemy.</summary>
+        // ------------------------------------------------------------ blokada cen (wpis 72)
+        // Jeff 05.10: "trzeba wpisac regule, ze nie moze nadpisac - ceny czytane sa z tego, bo to sa ceny". Prefix na setterze
+        // ItemObject.Value: po przeliczeniu zadna zmiana wartosci przeliczonego przedmiotu (inny mod: BK AdjustPrices, kto
+        // nadpisywal 7 lukow) nie przechodzi; pierwsza proba dla kazdego przedmiotu idzie do logu ze stosem wywolan (kto).
+        [ThreadStatic] private static bool _ourSet;
+        private static readonly HashSet<ItemObject> _blockedLogged = new HashSet<ItemObject>();
+        private static int _blocked;
+        public static bool ValueSetPrefix(ItemObject __instance, int value)
+        {
+            try
+            {
+                if (_ourSet || !_applied || __instance == null) return true;
+                int t;
+                if (!_target.TryGetValue(__instance, out t) || t == value) return true;
+                _blocked++;
+                if (_blockedLogged.Add(__instance) && _blockedLogged.Count <= 40)
+                {
+                    string who = "";
+                    try
+                    {
+                        var st = new System.Diagnostics.StackTrace(2, false);
+                        var parts = new List<string>();
+                        for (int i = 0; i < st.FrameCount && parts.Count < 4; i++)
+                        {
+                            var m = st.GetFrame(i).GetMethod();
+                            if (m == null || m.DeclaringType == null) continue;
+                            parts.Add(m.DeclaringType.FullName + "." + m.Name);
+                        }
+                        who = string.Join(" <- ", parts.ToArray());
+                    }
+                    catch { }
+                    Log.Info("HistoricalPrices: ZABLOKOWANO zmiane ceny " + __instance.StringId + " " + t + " -> " + value + " (wola: " + who + ").");
+                }
+                return false;
+            }
+            catch { return true; }
+        }
+
         internal static void Recheck()
         {
             if (!_applied || _target.Count == 0) return;
@@ -66,7 +104,7 @@ namespace Armoury
                     if (kv.Key == null || kv.Key.Value == kv.Value) continue;
                     n++;
                     if (bad.Count < 12) bad.Add(kv.Key.StringId + " " + kv.Key.Value + "->" + kv.Value);
-                    setter.Invoke(kv.Key, new object[] { kv.Value });
+                    _ourSet = true; try { setter.Invoke(kv.Key, new object[] { kv.Value }); } finally { _ourSet = false; }
                 }
                 if (n > 0) Log.Info("HistoricalPrices: kontrola - " + n + " przedmiotow mialo zmieniona wartosc (inny mod?), przywrocone: " + string.Join(", ", bad.ToArray()) + ".");
             }
@@ -194,7 +232,7 @@ namespace Armoury
                 {
                     if (it == null) return;
                     if (!_orig.ContainsKey(it)) _orig[it] = it.Value;
-                    setter.Invoke(it, new object[] { Math.Max(1, (int)Math.Round(v)) });
+                    _ourSet = true; try { setter.Invoke(it, new object[] { Math.Max(1, (int)Math.Round(v)) }); } finally { _ourSet = false; }
                 };
 
                 // 0. ruda i drewno w ladunkach (wpis 50)
@@ -470,6 +508,9 @@ namespace Armoury
                     }
                 }
                 Log.Info("HistoricalPrices: popyt miast w nowej monecie wpiety w " + d + " modelach ekonomii osad.");
+                var vs = AccessTools.PropertySetter(typeof(ItemObject), "Value");
+                if (vs != null) h.Patch(vs, prefix: new HarmonyMethod(typeof(HistoricalPrices), nameof(ValueSetPrefix)) { priority = Priority.First });
+                Log.Info("HistoricalPrices: blokada cen przeliczonych przedmiotow " + (vs != null ? "wpieta (setter Value)" : "BRAK settera") + "; zapis wprost do pola omija ja - wtedy dzienna kontrola.");
                 var bud = AccessTools.Method("BannerKings.Patches.EconomyPatches:CalculateBudget");
                 if (bud != null) h.Patch(bud, postfix: new HarmonyMethod(typeof(HistoricalPrices), nameof(BudgetPostfix)));
                 Log.Info("HistoricalPrices: zakupy mieszczan (BK CalculateBudget) - " + (bud != null ? "domowa czesc surowcow i dodatek BK w nowej monecie wpiete" : "BRAK BK CalculateBudget") + ".");
