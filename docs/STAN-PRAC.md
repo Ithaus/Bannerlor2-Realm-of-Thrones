@@ -89,6 +89,37 @@ POZA LANCUCHEM:
 - **Narzedzie logow:** `tools/sprawdz_logi.py` czyta uklad wpisu 102 i starego lancucha; dopasowanie do 102b-109 w toku.
 - **Drobne, do zrobienia:** pozycje ksiegi dla napraw i sakiewek rozbitych partii, pomiar wyplat notablom (dzis w "reszcie").
 
+## PRZEKAZANIE NA INNE KONTO - stan 06.10 15:05 (limit tygodniowy tego konta 92%)
+
+CZYTAJ NAJPIERW TO. W grze: wpisy 101-107 (DLL md5 `0eeb0a105dc5ae4221809e222e327afe`), test zrobiony (wynik w nastepnej sekcji).
+Wszystko, co gotowe, jest w repo i na origin (galezie `paczki/102b..114`, opisy `docs/paczki/`). Katalog roboczy poprzedniej sesji
+(na tym samym komputerze, dysk C, katalog tymczasowy - moze zniknac): `
+C:\Users\GAME\AppData\Local\Temp\claude\C--Program-Files--x86--Steam-steamapps-common-Mount---Blade-II-Bannerlord\3cf3e0ac-5529-4b68-a794-0edec69cfda7\scratchpad
+`
+- klon lancucha: `scratchpad\lancuch` (galezie `n102b..n114` = to samo co `paczki/*`); skrypt skladania ogniwa: `scratchpad\dzien-1\nowy\ogniwo.ps1`
+  (cherry-pick -n, generator MCM, build, commit; numery commitow podawac W CUDZYSLOWIE - PowerShell czyta `6155e9d` jako liczbe).
+
+TRZY PACZKI W TOKU (06.10 15:05 pisza je autorzy, potem niezalezni recenzenci; baza kazdej = `n107-zold-i-skarbiec` = kod w grze):
+1. `scratchpad\dzien-4\cena` -> galaz `l117-cena-od-niedoboru`: CENA SUROWCOW OD NIEDOBORU (uwaga Jeffa: "ruda jest zle wyceniona,
+   w miescie bez rudy powinna kosztowac krocie"). Ustalone: wspolczynnik ceny gry = (popyt / (0.1 x podaz + 0.04 x wartosc zapasu
+   + 2))^0.6; popyt to tylko konsumpcja mieszczan (podzielona przez nasz przelicznik: ruda /23.5), zuzycie kuzni nie wchodzi; stala 2
+   zostala w starej monecie - ruda przy pustej polce ma indeks ok. 1.5 (cena zbytu 10.4 d za ladunek), plotno 10. NAJWAZNIEJSZA z trzech.
+2. `scratchpad\dzien-4\warsztaty` -> `l116-warsztaty-w-nowej-monecie`: cena kupna i koszty dzienne warsztatow towarowych w nowej
+   monecie (zgloszenie Jeffa: piekarnia w Lannisporcie 31 000 d).
+3. `scratchpad\dzien-4\karawany3` -> `l115-karawany-ruda-dociera`: zakup surowcow przed zakupami BK, kierunek jazdy wedle zysku
+   (w tescie 72 z 92 wyjazdow karawan dziennie bez wolnego miejsca; 736 karawan niesie razem 290 ladunkow rudy). Moze okazac sie
+   w czesci zbedna po paczce 1 - ocenic po recenzjach.
+Kazda paczka zostawia: worktree `<paczka>\repo` (zmiany wobec n107), `CHANGELOG-wpis.md`, proby poza gra; recenzent zapisuje commit na
+galezi w klonie. Jesli sesja padla przed koncem: stan jest w worktree (git diff wobec n107), dokonczyc recenzje i commit recznie.
+
+CO ZROBIC PO ICH ZAKONCZENIU: (a) zlozyc na n107 w kolejnosci cena -> karawany3 -> warsztaty (ogniwa 108a-c albo nowe numery),
+build kazdego; (b) powiedziec Jeffowi prostym jezykiem, co zmieniaja, i wgrac NA JEGO SLOWO (gra zamknieta, kopia .bak, md5, wpisy
+CHANGELOG); (c) test: nowa kampania 20 dob, `python tools/sprawdz_logi.py --grupa 1` - glowna liczba: "ruda: miast bez towaru"
+(bylo 74 -> 69, cel ponizej 20); (d) przeniesc ogniwa n108..n114 na nowy szczyt (cherry-pick po kolei, konflikty zwykle tylko w
+konstruktorze `ArmouryBehavior`, liscie `ApplyAll`, `Settings.cs`, `MoneyLedger.cs`) i zaktualizowac `paczki/*`.
+UWAGA O KOSZCIE: na tym koncie jedna runda narzedzi glownego watku kosztowala pod koniec ok. 0.3 punktu limitu tygodniowego (kontekst
+740 tys. tokenow) - nowa sesja jest tania; nie ciagnac dlugich sesji.
+
 ## WYNIK PIERWSZEGO TESTU W GRZE - 06.10 14:08 (grupy 1 + 2 = wpisy 101-107; nowa kampania, 20 dob; log `Armoury-2026-10-06_14-08-11.log`)
 
 Odczyt: `python tools/sprawdz_logi.py --grupa 1` / `--grupa 2`. ERROR 0, wyjatki 0, potkniecia 0; wszystkie latki wpiete; parser
