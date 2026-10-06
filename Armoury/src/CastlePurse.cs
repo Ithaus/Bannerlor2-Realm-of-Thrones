@@ -27,10 +27,14 @@ namespace Armoury
     ///     kiesa kupcow podzamcza i ich klientow, wiec zakup wewnatrz niej ma saldo 0. Prefiksow nie zakladamy - latka BK na
     ///     MakeConsumption zwraca false, a Harmony pomija po niej cudze prefiksy z parametrem-obiektem; postfiksy biegna zawsze.
     ///  3. Zapas i zawor: kasa trzyma zapas kupcow (CastlePurseFloorGold + CastlePurseFloorPerProsperity x dobrobyt = dzisiejszy
-    ///     cel regulatora, ok. 22 000 w typowym zamku); z nadwyzki ponad zapas pan zamku pobiera co dobe CastleDuesShare (7%, jak
-    ///     zawor renty miasta) - zaloga wydaje zold u jego ludzi: karczma, mlyn, kramy pod murami. Przelew kasa -> glowa rodu
-    ///     (GiveGoldAction), liczony do dziennych rent rodu (powinnosci wobec korony, budzet budow). Oblezony zamek nie placi.
-    ///     Dzieki temu kasa nie puchnie bez konca (stan ustalony: zapas + doplyw / 7%) ani nie wysycha (zapas jest poza zaworem).
+    ///     cel regulatora, ok. 22 000 w typowym zamku); z nadwyzki ponad zapas schodzi co dobe CastleDuesShare (7%, jak
+    ///     zawor renty miasta) - zaloga wydaje zold u ludzi pana: karczma, mlyn, kramy pod murami. Czesc pana to przelew kasa ->
+    ///     glowa rodu (GiveGoldAction), liczony do dziennych rent rodu (powinnosci wobec korony, budzet budow). Oblezony zamek nie
+    ///     placi. Dzieki temu kasa nie puchnie bez konca (stan ustalony: zapas + doplyw / 7%) ani nie wysycha (zapas jest poza zaworem).
+    ///     Wpis 114 - danina dzielona z korona tak jak zawor miasta (CastleDuesSplitWithCrown): pan dostaje CastleDuesLordShare
+    ///     (2/3), reszte bierze skarbiec jego krolestwa (bez zdarzenia gry, jak udzial korony z zaworu miasta) i oddaje ja rodom
+    ///     zwrotem zoldu w wojnie; zamek rodu bez krolestwa - calosc dla pana. Bez podzialu pan odzyskiwal caly zold zalogi
+    ///     wlasnego zamku (zaloga za darmo); z podzialem zaloga "u siebie" kosztuje go trzecia czesc zoldu - w zamku jak w miescie.
     ///  4. Tabory: wies, ktorej targ lezy za MarketMaxDistance, dalej wozi do zamku pana - ale tylko wtedy, gdy zamek ma ponad
     ///     zapasem dosc na caly ladunek; inaczej tabor jedzie na daleki targ (MarketRoad pyta CanPayCart). Pusty zamek nie kupuje.
     ///  5. Start nowej kampanii: dar startowy w kasach zamkow (gra 20 000 + BK 40 x dobrobyt = 8.0 mln w 130 zamkach) jest raz,
@@ -124,6 +128,18 @@ namespace Armoury
             if (spare <= 0 || float.IsNaN(share) || share <= 0f) return 0;
             if (share >= 1f) return (int)Math.Min(spare, int.MaxValue);
             return (int)Math.Min(spare, (long)(spare * (double)share));
+        }
+
+        /// <summary>
+        /// Udzial pana w daninie podzamcza zamku nalezacego do rodu w krolestwie: CastleDuesLordShare (obciete do 0..1, NaN = 0 - jak
+        /// udzial pana w zaworze miasta), a przy wylaczonym podziale z korona 1 (pan bierze calosc - stan sprzed wpisu 114).
+        /// Czyta go tez TownPurse.PayComesHome: przy udziale 0 nic do pana nie wraca, wiec zwrot zoldu z korony liczy zaloge jak dotad.
+        /// </summary>
+        internal static float LordShare(Settings s)
+        {
+            if (s == null || !s.CastleDuesSplitWithCrown) return 1f;
+            float v = s.CastleDuesLordShare;
+            return float.IsNaN(v) || v <= 0f ? 0f : (v >= 1f ? 1f : v);
         }
 
         /// <summary>
@@ -243,7 +259,9 @@ namespace Armoury
                      + " - wpiete: " + (done.Count > 0 ? string.Join(", ", done.ToArray()) : "nic")
                      + (miss.Count > 0 ? "; BRAK: " + string.Join(", ", miss.ToArray()) : "")
                      + "; zapas kupcow " + (s != null ? s.CastlePurseFloorGold.ToString(CultureInfo.InvariantCulture) + " + " + s.CastlePurseFloorPerProsperity.ToString("0.##", CultureInfo.InvariantCulture) + " x dobrobyt" : "?")
-                     + ", danina podzamcza " + (s != null ? (s.CastleDuesShare * 100f).ToString("0.#", CultureInfo.InvariantCulture) : "?") + "% nadwyzki dziennie dla pana zamku"
+                     + ", danina podzamcza " + (s != null ? (s.CastleDuesShare * 100f).ToString("0.#", CultureInfo.InvariantCulture) : "?") + "% nadwyzki dziennie"
+                     + (s != null && s.CastleDuesSplitWithCrown ? ", z tego panu zamku " + (LordShare(s) * 100f).ToString("0.#", CultureInfo.InvariantCulture) + "% i reszta do skarbca krolestwa (zamek rodu bez krolestwa: calosc dla pana)"
+                                                                : " dla pana zamku")
                      + ", dar startowy przycinany w pierwszej dobie nowej kampanii: " + (s != null && s.CastlePurseTrimAtStart ? "tak" : "nie")
                      + ", tabor do zamku tylko gdy zamek ma czym zaplacic: " + (s != null && s.CastleCartsNeedCoin ? "tak" : "nie") + ".");
         }
@@ -317,7 +335,8 @@ namespace Armoury
             if (age < -0.01)
             {
                 Log.Info("CastlePurse: kampania ma wiek ujemny (" + age.ToString("0.0", CultureInfo.InvariantCulture)
-                         + " dni - data startu z innego kalendarza) - dar startowy w kasach zamkow BEZ przyciecia (flaga zapisana). Nadwyzke ponad zapas pobiora panowie zaworem.");
+                         + " dni - data startu z innego kalendarza) - dar startowy w kasach zamkow BEZ przyciecia (flaga zapisana). Nadwyzke ponad zapas pobiora zaworem panowie"
+                         + (s.CastleDuesSplitWithCrown ? " i skarbce ich krolestw (podzial daniny z korona)." : "."));
                 return;
             }
             // mloda kampania: regulator gry daru jeszcze nie ruszyl (albo byl zablokowany od startu) - przycinamy caly; starszy zapis
@@ -364,8 +383,11 @@ namespace Armoury
             bool on = s.CastlePurseEnabled;
             if (on) { try { TrimStartGift(s); } catch (Exception e) { Stumble("CastlePurse.TrimStartGift", e); } }
             float share = float.IsNaN(s.CastleDuesShare) ? 0f : Math.Max(0f, Math.Min(1f, s.CastleDuesShare));
-            long gold = 0, reserveSum = 0, spareSum = 0, shortSum = 0, paid = 0, playerPaid = 0;
-            int castles = 0, payers = 0, below = 0, siege = 0, noLord = 0, overBk = 0, maxSpare = 0; string maxName = null;
+            bool split = s.CastleDuesSplitWithCrown;                  // wpis 114: danina dzielona z korona jak zawor miasta
+            float lordShare = LordShare(s);
+            long gold = 0, reserveSum = 0, spareSum = 0, shortSum = 0, paid = 0, playerPaid = 0, crownPaid = 0;
+            int castles = 0, payers = 0, below = 0, siege = 0, noLord = 0, overBk = 0, maxSpare = 0, crownPayers = 0, noCrown = 0; string maxName = null;
+            var crownKingdoms = new HashSet<Kingdom>();
             foreach (var st in Settlement.All)
             {
                 if (st == null || !st.IsCastle || st.Town == null) continue;
@@ -387,11 +409,30 @@ namespace Armoury
                             else if (st.IsUnderSiege) siege++;
                             else if (pay > 0)
                             {
-                                // przelew kasa zamku -> pan (ta sama akcja gry co renty PopulationLaw; kwota nigdy nie przekracza kasy)
-                                GiveGoldAction.ApplyForSettlementToCharacter(st, lord, pay, true);
-                                int r0; PopulationLaw.RentToday.TryGetValue(clan, out r0); PopulationLaw.RentToday[clan] = r0 + pay;
-                                paid += pay; payers++;
-                                if (lord == Hero.MainHero) playerPaid += pay;
+                                // wpis 114: podzial jak w zaworze miasta (TownPurse.CollectRent) - korona dostaje (1 - udzial pana) w dol, pan
+                                // reszte, suma zawsze rowna `pay`; zamek rodu bez krolestwa i wylaczony podzial: calosc dla pana (jak dotad)
+                                var k = clan.Kingdom;
+                                bool crownTakes = split && k != null && !k.IsEliminated;
+                                int lordPay, crown;
+                                TownPurse.Split(pay, crownTakes ? lordShare : 1f, out lordPay, out crown);
+                                if (split && !crownTakes) noCrown++;
+                                if (lordPay > 0)
+                                {
+                                    // przelew kasa zamku -> pan (ta sama akcja gry co renty PopulationLaw; kwota nigdy nie przekracza kasy)
+                                    GiveGoldAction.ApplyForSettlementToCharacter(st, lord, lordPay, true);
+                                    int r0; PopulationLaw.RentToday.TryGetValue(clan, out r0); PopulationLaw.RentToday[clan] = r0 + lordPay;
+                                    paid += lordPay; payers++;
+                                    if (lord == Hero.MainHero) playerPaid += lordPay;
+                                }
+                                if (crown > 0)
+                                {
+                                    // najpierw kasa, potem skarbiec: skarbiec dostaje dokladnie tyle, ile zeszlo z kasy (bez zdarzenia gry,
+                                    // jak udzial korony z zaworu miasta); po wyjatku przy przelewie pana tu nie dochodzimy - zamek nietkniety
+                                    int had = town.Gold;
+                                    town.ChangeGold(-crown);
+                                    int taken = had - town.Gold;
+                                    if (taken > 0) { k.KingdomBudgetWallet += taken; crownPaid += taken; crownPayers++; crownKingdoms.Add(k); }
+                                }
                             }
                         }
                         catch (Exception e) { Stumble("CastlePurse.Dues(" + st.StringId + ")", e); }   // ten jeden zamek; stan kasy i tak wchodzi do linii
@@ -404,6 +445,9 @@ namespace Armoury
                 }
                 catch (Exception e) { Stumble("CastlePurse.Daily(" + st.StringId + ")", e); }
             }
+            // ksiega pieniadza: udzial korony zszedl z kas zamkow razem z danina panow (jedna migawka MCastle zaraz po tej metodzie) -
+            // przenosimy go do wlasnej pozycji (tylko licznik; wlasny try w srodku)
+            if (crownPaid > 0) MoneyLedger.SplitCastleMark(MoneyLedger.MCastle, MoneyLedger.MCastleCrown, crownPaid);
             try
             {
                 if (!on)
@@ -416,13 +460,18 @@ namespace Armoury
                     }
                 }
                 else
+                    // wpis 114: udzial korony dopisany WEWNATRZ nawiasu daniny - dotychczasowe kotwice linii (narzedzie logow) zostaja co do znaku
                     Log.Info("Kasy zamkow: dzien " + day + " | stan " + gold + " w " + castles + " zamkach: zapas kupcow " + reserveSum + ", ponad zapasem " + spareSum
                              + ", do zapasu brakuje " + shortSum + "; najwieksza nadwyzka " + maxSpare + (maxName != null ? " (" + maxName + ")" : "")
                              + "; zamki ponad limitem kasy BK (" + BkLimitBase + " + " + BkLimitPerProsperity.ToString("0", CultureInfo.InvariantCulture) + " x dobrobyt - BK kasuje tam 1% dziennie): " + overBk
                              + " | regulator gry zablokowany: z dzisiejszych kas chcial dosypac z niczego " + _dRegUp + " (" + _dRegUpN + " tickow zamkow) i skasowac " + _dRegDown + " (" + _dRegDownN + " tickow)"
                              + " | \"zakupy\" ludnosci zamkow: zloto z niczego cofniete " + _dConsBack + " (w " + _dConsHit + " z " + _dConsN + " tickow; towar zjedzony jak dotad)"
                              + " | danina podzamcza: " + paid + " do panow z " + payers + " zamkow (" + (share * 100f).ToString("0.#", CultureInfo.InvariantCulture) + "% nadwyzki ponad zapas"
-                             + (playerPaid > 0 ? "; w tym rod gracza " + playerPaid : "") + "); bez poboru: kasa nie ponad zapasem " + below + ", oblezone " + siege + ", bez pana " + noLord
+                             + (playerPaid > 0 ? "; w tym rod gracza " + playerPaid : "")
+                             + (split ? "; skarbcom krolestw " + crownPaid + " z " + crownPayers + " zamkow w " + crownKingdoms.Count + " krolestwach - podzial z korona: panu "
+                                        + (lordShare * 100f).ToString("0.#", CultureInfo.InvariantCulture) + "%, reszta koronie, zamkow rodow bez krolestwa z caloscia dla pana " + noCrown
+                                      : "; skarbcom krolestw 0 - podzial z korona WYLACZONY w MCM, Castle Dues Split With Crown: pan bierze calosc")
+                             + "); bez poboru: kasa nie ponad zapasem " + below + ", oblezone " + siege + ", bez pana " + noLord
                              + " | tabory wsi z targiem za daleko: do zamku (ma czym zaplacic) " + _dCartPaid + ", na daleki targ (zamek nie mial na caly ladunek) " + _dCartSent
                              + (_dCartSent > 0 ? " - ladunki warte " + _dCartValue : "")
                              + (_stumbles > 0 ? " | potkniecia (wyjatki, pierwszy w logu): " + _stumbles : "") + ".");

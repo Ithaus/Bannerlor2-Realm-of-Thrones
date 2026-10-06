@@ -74,7 +74,15 @@ namespace Armoury
                     if (win.IsMainParty) Add(win, purse);   // ludzie gracza - do ich sakiewki
                     else { int third = purse / 3; win.LeaderHero.ChangeHeroGold(third); Add(win, purse - third); }
                 }
-                else { var t = NearestTown(mp); if (t != null && t.Town != null) t.Town.ChangeGold(purse); }
+                else
+                {
+                    var t = NearestTown(mp);
+                    if (t != null && t.Town != null)
+                    {
+                        t.Town.ChangeGold(purse);
+                        MoneyLedger.Note(MoneyLedger.NOrphan, t, purse);   // ksiega przeplywow osad (tylko licznik): sakiewka partii bez zwyciezcy z wodzem
+                    }
+                }
             }
             catch (Exception e) { Log.Error("MenPurse.OnPartyDestroyed", e); }
         }
