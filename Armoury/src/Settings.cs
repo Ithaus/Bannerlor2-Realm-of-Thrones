@@ -357,6 +357,7 @@ namespace Armoury
         public float MineOutputMultiplier = 3f;            // iron mines dig this many times the old output - the workshops of the realm were starving for ore
         public float LumberOutputMultiplier = 3f;          // woodcutters fell this many times the old output - charcoal burners need wood by the cartload (a forge burns ~5 loads of wood per load of ore)
         public bool SmeltCapToCraftCost = true;            // melting a piece down never gives back more metal than a share of what forging it costs - no metal out of thin air
+        public bool StartStockInLoads = true;              // new campaign only: the ore and timber the world starts with are counted by the load too - the game hands out the starting stock before the 100 kg load comes into force, so every storehouse, stall and pack train held ten times the intended weight and choked village storehouses stopped all work; done once, at the first launch of a new campaign (saves older than a day are left as they are)
 
         // --- Arms pricing ---
         public bool ArmsCostPricingEnabled = true;         // every piece of arms and armour is priced from what it costs to make - its weight, its metal, its leather and cloth, the days at the anvil and how well it protects; unique pieces keep the price of their fame
