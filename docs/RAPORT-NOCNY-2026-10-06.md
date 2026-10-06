@@ -153,9 +153,10 @@ maja jeszcze przegladu kolizji z ogniwami 103-105 - zrobie go jednym watkiem tuz
 - **23:12** - sesja zgasla w trakcie etapu 2 (trzy recenzje w toku, zold niedokonczony). Praca stala do 01:58, kiedy napisales;
   wznowiona o 01:59, skonczona o 03:20. Trzech autorow musialo czesc pracy powtorzyc. Od 02:00 komputer ma blokade usypiania
   na czas pracy.
-- **Limit tygodniowy:** 36% wieczorem, po calej nocy wyraznie wiecej (aktualna liczba w wiadomosci w rozmowie). Dlatego etap 3
-  nie poszedl w pelnym ksztalcie: scalenie paczek zrobilem sam, zlecilem jeden przeglad kolizji zamiast drugiego przegladu
-  wszystkiego, a paczka "przyrost naturalny" jest odlozona.
+- **Limit tygodniowy:** 36% wieczorem, 50% po nocy - noc kosztowala 14 punktow, z czego wiekszosc etap 2 (8 watkow, czesc
+  pracy powtarzana po przerwaniach). Odnowienie za 6 dni. Dlatego etap 3 nie poszedl w pelnym ksztalcie: scalenie paczek
+  zrobilem sam, zlecilem jeden przeglad kolizji zamiast drugiego przegladu wszystkiego, a paczka "przyrost naturalny" jest
+  odlozona.
 
 ## 6. Pytania do Ciebie
 
@@ -171,8 +172,8 @@ maja jeszcze przegladu kolizji z ogniwami 103-105 - zrobie go jednym watkiem tuz
    pokaze. Rekomendacja: wlaczyc na test; docelowo naprawic sam regulator (krok K6 fundamentu).
 5. **Zold (107): zold zalogi zamku do kasy zamku czy najblizszego miasta?** Twoja decyzja mowila "do kasy osady". Rekomendacja:
    zostawic zamek, ocenic po pierwszym logu.
-6. **Ile limitu tygodniowego moge wydawac na prace w tle?** Rekomendacja: do konca tygodnia bez nocnych zadan wieloosobowych,
-   tylko pojedyncze recenzje przy wgrywaniu.
+6. **Ile limitu tygodniowego moge wydawac na prace w tle?** Zostalo 50% na 6 dni. Rekomendacja: do konca tygodnia bez nocnych
+   zadan wieloosobowych, tylko pojedyncze recenzje przy wgrywaniu (ok. 1 punkt kazda).
 
 **B. Do regul krain (przed kodowaniem, nie pilne)** - 8 pytan z rekomendacjami w rozdziale 9 dokumentu regul. Najwazniejsze:
 czy jency Innych wstaja jako trupy (rekomendacja: tak); bracia Nocnej Strazy bez zoldu (tak - Straz ma 698 zl rent przy 14.4 tys.
