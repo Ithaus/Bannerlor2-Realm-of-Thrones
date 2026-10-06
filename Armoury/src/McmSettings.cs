@@ -1456,6 +1456,26 @@ namespace Armoury
         [SettingPropertyGroup("The road to market")]
         public float MarketCartFactor { get; set; } = 2f;
 
+        [SettingPropertyBool("Caravan Bulk Enabled", HintText = "caravans haul bulk raw goods (iron ore, timber, raw hides, leather, flax, linen, wool) by need: a town short of its own stock buys what it lacks from any passing caravan, and a caravan leaving a town buys only what that town holds to spare (off = Banner Kings' price-driven caravan trade alone)")]
+        [SettingPropertyGroup("The road to market")]
+        public bool CaravanBulkEnabled { get; set; } = true;
+
+        [SettingPropertyInteger("Caravan Bulk Stock Days", 0, 40, "0", HintText = "a town wants this many days of its own craftsmen's and workshops' use of each bulk good on its stalls - and never less than one large piece of work takes (8 loads of ore, 40 of timber)")]
+        [SettingPropertyGroup("The road to market")]
+        public int CaravanBulkStockDays { get; set; } = 10;
+
+        [SettingPropertyFloatingInteger("Caravan Bulk Surplus Factor", 0.00f, 8.00f, "0.00", HintText = "a town sells to caravans only what it holds above this many times the stock it wants for itself (2 = it keeps twenty days of use and sells the rest; never counted below 1)")]
+        [SettingPropertyGroup("The road to market")]
+        public float CaravanBulkSurplusFactor { get; set; } = 2f;
+
+        [SettingPropertyFloatingInteger("Caravan Bulk Capacity Share", 0.00f, 2.00f, "0.00", HintText = "at most this share of a caravan's carrying capacity goes to bulk raw goods, and no single one of them takes more than half of that - the rest stays free for its usual trade (never above 0.8)")]
+        [SettingPropertyGroup("The road to market")]
+        public float CaravanBulkCapacityShare { get; set; } = 0.5f;
+
+        [SettingPropertyFloatingInteger("Caravan Bulk Transit Cover", 0.00f, 24.00f, "0.00", HintText = "caravans keep buying a bulk good only while all of them together carry less than this many times what the towns of the world lack - above that they stop buying and unload it into any town up to its surplus mark (higher = fewer empty stalls, more cargo idling on the road; 0 = they never buy)")]
+        [SettingPropertyGroup("The road to market")]
+        public float CaravanBulkTransitCover { get; set; } = 6f;
+
         [SettingPropertyBool("Levy Enabled", HintText = "volunteers come forward only where there are men to spare: hands the fields do not need, and men who want to leave a poor, burnt or warring land")]
         [SettingPropertyGroup("Iron bank")]
         public bool LevyEnabled { get; set; } = true;
@@ -2731,6 +2751,11 @@ namespace Armoury
             s.CastleVillagesSellInTown = CastleVillagesSellInTown;
             s.MarketMaxDistance = MarketMaxDistance;
             s.MarketCartFactor = MarketCartFactor;
+            s.CaravanBulkEnabled = CaravanBulkEnabled;
+            s.CaravanBulkStockDays = CaravanBulkStockDays;
+            s.CaravanBulkSurplusFactor = CaravanBulkSurplusFactor;
+            s.CaravanBulkCapacityShare = CaravanBulkCapacityShare;
+            s.CaravanBulkTransitCover = CaravanBulkTransitCover;
             s.LevyEnabled = LevyEnabled;
             s.RecruitBaseWilling = RecruitBaseWilling;
             s.RecruitExcessWeight = RecruitExcessWeight;
