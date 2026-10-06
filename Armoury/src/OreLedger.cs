@@ -51,6 +51,29 @@ namespace Armoury
 
         internal static void Reset() { _iron.Reset(); _wood.Reset(); }
 
+        /// <summary>StartStock przeliczyl zapas startowy na ladunki: liczniki zebrane do tej chwili pochodza z tickow startowych nowej
+        /// kampanii i sa w sztukach z gry (10 kg), a ksiega liczy w ladunkach. Oddajemy je do logu przeliczenia i zerujemy -
+        /// pierwsza linia ksiegi opisuje wtedy sama pierwsza dobe. Wczytana kampania: liczniki sa puste, zwraca "".</summary>
+        internal static string TakeStartTicks(ItemObject item)
+        {
+            try
+            {
+                var b = Of(item);
+                if (b == null) return "";
+                // Shops (warsztaty zbrojne) i Builds (budowy, wpis 102) przy starcie gry stoja na zerze (WorkshopLaw puszcza wtedy
+                // vanille, BuildFunding jeszcze nie kupuje), ale NewDay zeruje i te liczniki - gdyby cos w nich bylo, ma trafic
+                // do logu, a nie zniknac po cichu
+                string s = b.Villages == 0 && b.Towns == 0 && b.Lines == 0 && b.Shops == 0 && b.Builds == 0 && b.Model <= 0f ? ""
+                    : "wsiom dopisano " + b.Villages + " (" + b.Makers.Count + " wsi; model " + b.Model.ToString("0.#") + " w " + b.Modelled.Count + " wsiach), "
+                      + b.TownSource + " +" + b.Towns + ", wsad linii towarowych (" + b.LineName + ") " + b.Lines
+                      + (b.Shops != 0 ? ", warsztaty zbrojne " + b.Shops : "")
+                      + (b.Builds != 0 ? ", budowy " + b.Builds : "");
+                b.NewDay();
+                return s;
+            }
+            catch { return ""; }
+        }
+
         /// <summary>Wynik modelu produkcji wsi PO naszym mnozniku (MaterialLaw.ProdPostfix): pierwszy DODATNI na wies w dobie ksiegi
         /// (model jest pytany takze o wsie, ktore tego towaru nie daja - wynik 0 nie robi z nich "wsi w modelu").</summary>
         internal static void NoteModel(Village v, ItemObject item, float amount)

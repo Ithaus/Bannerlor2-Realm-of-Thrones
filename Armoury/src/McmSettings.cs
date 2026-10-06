@@ -1208,6 +1208,10 @@ namespace Armoury
         [SettingPropertyGroup("Smithing materials")]
         public bool SmeltCapToCraftCost { get; set; } = true;
 
+        [SettingPropertyBool("Start Stock In Loads", HintText = "new campaign only: the ore and timber the world starts with are counted by the load too - the game hands out the starting stock before the 100 kg load comes into force, so every storehouse, stall and pack train held ten times the intended weight and choked village storehouses stopped all work; done once, at the first launch of a new campaign (saves older than a day are left as they are)")]
+        [SettingPropertyGroup("Smithing materials")]
+        public bool StartStockInLoads { get; set; } = true;
+
         [SettingPropertyBool("Arms Cost Pricing Enabled", HintText = "every piece of arms and armour is priced from what it costs to make - its weight, its metal, its leather and cloth, the days at the anvil and how well it protects; unique pieces keep the price of their fame")]
         [SettingPropertyGroup("Arms pricing")]
         public bool ArmsCostPricingEnabled { get; set; } = true;
@@ -2689,6 +2693,7 @@ namespace Armoury
             s.MineOutputMultiplier = MineOutputMultiplier;
             s.LumberOutputMultiplier = LumberOutputMultiplier;
             s.SmeltCapToCraftCost = SmeltCapToCraftCost;
+            s.StartStockInLoads = StartStockInLoads;
             s.ArmsCostPricingEnabled = ArmsCostPricingEnabled;
             s.ArmsPriceBand = ArmsPriceBand;
             s.SmithDayWage = SmithDayWage;
