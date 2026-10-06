@@ -28,6 +28,8 @@ namespace Armoury
     ///    zagniezdzenia) - ruda x MineOutputMultiplier, drewno x LumberOutputMultiplier.
     ///    Od wpisu 98 mnoznik MNOZY wynik modelu (zima, drogi, prawa BK skaluja sie razem z nim) -
     ///    wczesniej dodawal sie do tych czynnikow. Faktyczne wydobycie pokazuje ksiega (OreLedger).
+    ///    Od wpisu 105 ten sam postfix mnozy wynik przez MineralOnce.Times: mineral, ktory BK mial na liscie produkcji wsi
+    ///    kilka razy, jest na niej raz, a model oddaje go tyle razy, ile bylo wpisow (kazdy przedmiot, nie tylko ruda).
     /// </summary>
     internal static class MaterialLaw
     {
@@ -152,6 +154,9 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ 3. wydobycie
+        /// <summary>W ilu modelach produkcji wsi siedzi ProdPostfix (0 = w zadnym). MineralOnce zdejmuje powtorzenia z listy BK tylko
+        /// wtedy, gdy ten postfix jest wpiety - to on oddaje zdjety wpis mnoznikiem (bez niego mineral spadlby o polowe).</summary>
+        internal static int ProdModels;
         [ThreadStatic] private static int _depth;
         public static void ProdPrefix() { _depth++; }
         public static Exception ProdFinalizer(Exception __exception) { if (_depth > 0) _depth--; return __exception; }
@@ -168,7 +173,13 @@ namespace Armoury
                 else if (On && id == "hardwood") m = s.LumberOutputMultiplier;
                 // wpis 87 (audyt pkt 13): dzielenie przez ladunek zawsze, gdy waga jest x10 - inaczej wylaczenie MaterialLaw = 10x kg rudy
                 m /= HistoricalPrices.BulkScale(item);      // wpis 50: ladunek 100 kg - tyle samo kg co dotad
-                if (m > 0f && Math.Abs(m - 1f) >= 0.001f)
+                // suwak 0 (albo ujemny): mnoznika nie stosujemy i wynik modelu zostaje, jaki byl (znana usterka: to nie jest zero wydobycia).
+                // Powtorzenia BK liczymy takze wtedy - inaczej przy suwaku 0 wies dostawalaby polowe tego, co dotad
+                if (!(m > 0f)) m = 1f;
+                // MineralOnce: BK mial ten mineral na liscie produkcji wsi kilka razy - zdjelismy powtorzenia, a jeden wpis liczymy
+                // tyle razy, ile ich bylo (wydobycie bez zmian; niezalezne od wlacznika MaterialLaw i od suwakow)
+                m *= MineralOnce.Times(village, item);
+                if (Math.Abs(m - 1f) >= 0.001f)
                 {
                     // wpis 98: mnoznik ma MNOZYC. ExplainedNumber SUMUJE czynniki (wynik = baza x (1 + suma)), wiec AddFactor(m - 1)
                     // dodawal sie do zimy, drog i praw BK: przy m = 0.3 (x3 w ladunkach) i Dlugiej Nocy (-38..-62%) wies dawala
@@ -211,6 +222,7 @@ namespace Armoury
                         catch { }
                     }
                 }
+                ProdModels = prod;
                 Log.Info("MaterialLaw: wytop " + (rf != null ? "wpiety" : "BRAK GetRefiningFormulas")
                          + ", XP przetopu " + (rx != null ? "wpiete" : "BRAK") + ", wydobycie w " + prod + " modelach.");
             }

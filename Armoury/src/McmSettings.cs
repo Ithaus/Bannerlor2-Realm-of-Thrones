@@ -1196,6 +1196,10 @@ namespace Armoury
         [SettingPropertyGroup("Smithing materials")]
         public int ValyrianSteelValue { get; set; } = 1000;
 
+        [SettingPropertyBool("Minerals Counted Once", HintText = "Banner Kings lists the mineral of a mining village twice and so credited it twice a day (iron ore, salt, clay, silver); this strikes the second entry and counts the first one twice instead - the village digs exactly as much as before, but mines, village storehouses and village carts now all reckon with the same true output")]
+        [SettingPropertyGroup("Smithing materials")]
+        public bool MineralsCountedOnce { get; set; } = true;
+
         [SettingPropertyFloatingInteger("Mine Output Multiplier", 0.00f, 12.00f, "0.00", HintText = "iron mines dig this many times the old output - the workshops of the realm were starving for ore")]
         [SettingPropertyGroup("Smithing materials")]
         public float MineOutputMultiplier { get; set; } = 3f;
@@ -2690,6 +2694,7 @@ namespace Armoury
             s.SteelValue = SteelValue;
             s.FineSteelValue = FineSteelValue;
             s.ValyrianSteelValue = ValyrianSteelValue;
+            s.MineralsCountedOnce = MineralsCountedOnce;
             s.MineOutputMultiplier = MineOutputMultiplier;
             s.LumberOutputMultiplier = LumberOutputMultiplier;
             s.SmeltCapToCraftCost = SmeltCapToCraftCost;
