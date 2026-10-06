@@ -524,7 +524,10 @@ namespace Armoury
         {
             if (it == null) return 0f;
             var s = Settings.Current;
-            if (HistoricalPrices.On && it.Value < 10)
+            // cena surowcow od niedoboru (RawPrice): przy popycie z prawdziwego zuzycia warsztat placi za rude i drewno cene targu,
+            // jak za skore i len - ladunek po 8 d i 4 d miesci sie w calych pensach, a stala cena historyczna dawala w jednym
+            // miescie dwie ceny rudy (rzemieslnik 7.5 d, kuznia narzedzi cene targu) i kazala kasie miasta doplacac do drogiej rudy
+            if (HistoricalPrices.On && it.Value < 10 && !RawPrice.UseOn)
             {
                 float perKg = m == 0 ? s.HistIronOrePerKg : m == 1 ? s.HistWoodPerKg : m == 2 ? s.HistLeatherPerKg : s.HistLinenPerKg;
                 return perKg * Math.Max(0.1f, it.Weight);

@@ -163,8 +163,48 @@ namespace Armoury
         private static int Target(Town town, Good g, Settings s)
         {
             if (!town.IsTown) return 0;
-            float use = WorkshopLaw.TownHands(town) * g.PerHand + g.Fixed + g.PerCycle * Math.Max(0, s.ArtisanTanWeavePerCycle) + ShopUse(town, g);
+            float use = Use(town, g, s);
             return Math.Max(g.Floor, (int)Math.Ceiling(Math.Max(0, s.CaravanBulkStockDays) * use));
+        }
+
+        /// <summary>Zuzycie dobowe miasta w sztukach rynku: rzemieslnicy (na roboczodzien), czesc domowa i narzedzia (stale),
+        /// garbowanie i tkanie rzemieslnikow, linie towarowe warsztatow notabli. Jedno zrodlo dla zapasu docelowego i dla ceny.</summary>
+        private static float Use(Town town, Good g, Settings s)
+        {
+            return WorkshopLaw.TownHands(town) * g.PerHand + g.Fixed + g.PerCycle * Math.Max(0, s.ArtisanTanWeavePerCycle) + ShopUse(town, g);
+        }
+
+        /// <summary>Dla ceny surowcow (RawPrice): to samo zuzycie dobowe, z ktorego karawany licza zapas docelowy miasta - przedmiot
+        /// surowca, zuzycie razem i jego stala czesc domowa (sztuki rynku na dobe) oraz prog nadwyzki. Falsz = kategoria spoza tabeli,
+        /// zamek albo przedmioty jeszcze nie wczytane. Sam odczyt; nie zalezy od tego, czy regula karawan jest wlaczona i wpieta.</summary>
+        internal static bool Usage(Town town, ItemCategory cat, out ItemObject item, out float use, out float home, out int keep)
+        {
+            item = null; use = 0f; home = 0f; keep = 0;
+            var s = Settings.Current;
+            if (s == null || town == null || cat == null || !town.IsTown || !Ready() || !_cats.Contains(cat)) return false;
+            foreach (var g in _goods)
+            {
+                if (g.Item.ItemCategory != cat) continue;
+                item = g.Item; use = Use(town, g, s); home = g.Fixed; keep = Keep(town, g, s);
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>Kategorie surowcow masowych z tabeli (dla ceny surowcow i jej logu), w kolejnosci tabeli. Pusta = przedmioty nie wczytane.</summary>
+        internal static List<ItemObject> Items()
+        {
+            var list = new List<ItemObject>();
+            if (!Ready()) return list;
+            foreach (var g in _all) if (g.Item != null) list.Add(g.Item);
+            return list;
+        }
+
+        /// <summary>Nazwa surowca do logu (ta sama co w liniach "Karawany").</summary>
+        internal static string NameOf(ItemObject item)
+        {
+            foreach (var g in _all) if (g.Item == item) return g.Name;
+            return item != null ? item.StringId : "?";
         }
 
         /// <summary>Zuzycie dobowe linii TOWAROWYCH warsztatow notabli i gracza w miescie: predkosc linii x wsad (spworkshops.xml:
