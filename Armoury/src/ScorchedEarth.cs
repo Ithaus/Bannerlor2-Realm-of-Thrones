@@ -27,12 +27,18 @@ namespace Armoury
     ///    i podatki w vanilla/BK - zadnych dodatkowych kar, zero spirali;
     ///  - UMARLI NIE ZERUJA (nie jedza) - horda NK nie drenuje marszem,
     ///    ich sprawka to konwersje ROT.
+    /// Demografia krok 4 (Devastation): przy czynnym spustoszeniu marsz nie zdejmuje hearth w skali gry, tylko
+    /// pustoszy ULAMEK okregu w ludziach (DevastationPerForagerDay na zbrojnego na dobe) - ludzie ida na konto uchodzcow
+    /// i wracaja; podloge hearth zastepuje pulap spustoszenia okregu, a "+0.5 ponizej 40" nie dziala (wraca sie z konta).
     /// </summary>
     internal static class ScorchedEarth
     {
         private static readonly TextObject _txtScar = new TextObject("{=!}War scars");
         private static List<Village> _villages;
         private static int _playerForageShown = -1;
+
+        /// <summary>Stan jednej kampanii (lista wsi to obiekty tej kampanii - po wczytaniu innej gry bez restartu bylyby martwe).</summary>
+        internal static void Reset() { _villages = null; _playerForageShown = -1; }
 
         internal static void OnDaily()
         {
@@ -51,6 +57,11 @@ namespace Armoury
                 float radius = Math.Max(1f, s.ForageRadius);
                 int floor = Math.Max(0, s.ForageFloor);
                 int day = (int)CampaignTime.Now.ToDays;
+                // demografia krok 4: marsz pustoszy ulamek okregu (ludzie -> uchodzcy), a nie hearth w skali gry
+                bool dev = Devastation.On;
+                // pierwsza doba nowej kampanii: zerowanie biegnie przed rentami i siewem puli wyrzutkow, czyli przed kalibracja
+                // ludnosci - bez niej wies nie mialaby przelicznika i dostalaby stara regule (-0.8 hearth w nicosc)
+                if (dev) PopulationLaw.EnsureCalibrated();
 
                 foreach (var mp in MobileParty.All)
                 {
@@ -65,13 +76,25 @@ namespace Armoury
                     foreach (var v in _villages)
                     {
                         if (v == null || v.Settlement == null) continue;
-                        if (v.Hearth <= floor) continue;
+                        if (!dev && v.Hearth <= floor) continue;
                         var vf = v.Settlement.MapFaction;
                         if (vf == null || vf == f || !FactionManager.IsAtWarAgainstFaction(vf, f)) continue;
                         if (pos.Distance(v.Settlement.GetPosition2D) > radius) continue;
 
-                        float drain = Math.Max(0.2f, s.ForageHearthPerDay * mp.MemberRoster.TotalManCount / 500f);
-                        v.Hearth = Math.Max(floor, v.Hearth - drain);
+                        // wies bez przelicznika ludzi (w ROT nie ma takiej) zostaje przy starej regule z podloga hearth
+                        bool people = dev && Devastation.Covers(v);
+                        if (dev && !people && v.Hearth <= floor) continue;
+                        if (people)
+                        {
+                            // okreg spustoszony do pulapu nie ma juz czego oddac - jak dawna podloga: szukamy nastepnej wsi
+                            if (!Devastation.Open(v)) continue;
+                            Devastation.Forage(v, mp.MemberRoster.TotalManCount);
+                        }
+                        else
+                        {
+                            float drain = Math.Max(0.2f, s.ForageHearthPerDay * mp.MemberRoster.TotalManCount / 500f);
+                            v.Hearth = Math.Max(floor, v.Hearth - drain);
+                        }
                         if (grain != null && mp.ItemRoster != null)
                             mp.ItemRoster.AddToCounts(grain, 1 + mp.MemberRoster.TotalManCount / 250);
 
@@ -92,12 +115,14 @@ namespace Armoury
         /// regule stosuje blizna nizej; przy czynnym przyroscie naturalnym (PopulationLaw.GrowthPostfix, demografia krok 3)
         /// blizna nie biegnie, a przyrost pyta o powrot tutaj - jedna regula, jedno miejsce. Wies poza stanem Normal
         /// (spalona, lupiona, pod przymusem): 0 - wynik gry jest tam niedodatni i blizna tez nic nie dopisuje.
-        /// Zostaje do kroku 4 (uchodzcy z ksiegi).
+        /// Demografia krok 4: przy czynnym spustoszeniu (Devastation) regula nie dziala - do wsi wracaja uchodzcy z jej konta
+        /// w ksiedze ludzi, a nie pol punktu hearth z niczego (wies Reach: +222 ludzi dziennie).
         /// </summary>
         internal static float RefugeeReturn(Village village)
         {
             var s = Settings.Current;
             if (s == null || !s.ScorchedEarthEnabled || village == null) return 0f;
+            if (Devastation.Covers(village)) return 0f;
             if (village.VillageState != Village.VillageStates.Normal) return 0f;
             return village.Hearth < Math.Max(1, s.RefugeeFloorHearth) ? 0.5f : 0f;
         }
@@ -137,7 +162,7 @@ namespace Armoury
                 if (m != null)
                     h.Patch(m, postfix: new HarmonyMethod(typeof(ScorchedEarth).GetMethod("HearthScarPostfix")) { priority = Priority.Last });
                 Log.Info("ScorchedEarth: foraging (podloga " + s.ForageFloor + " palenisk) i blizny wojenne (regen "
-                         + s.ScarRegenPercent + "% ponizej " + s.ScarThresholdHearth + ") uzbrojone.");
+                         + s.ScarRegenPercent + "% ponizej " + s.ScarThresholdHearth + ") uzbrojone; przy czynnym spustoszeniu (Devastation) marsz pustoszy ulamek okregu w ludziach, podloga i blizny nie dzialaja.");
             }
             catch (Exception e) { Log.Error("ScorchedEarth.ApplyAll", e); }
         }

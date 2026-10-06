@@ -58,6 +58,8 @@ namespace Armoury
         private static int _iTimes;
         private static double _iHearth;
         private static double _outMen, _outHearth, _backMen, _backHearth;
+        // spustoszenie (demografia krok 4, Devastation): zabici i uchodzcy zdjeci z wsi, uchodzcy z powrotem
+        private static double _ruinMen, _ruinHearth, _homeMen, _homeHearth;
         private static int _stumbles;
         private static readonly HashSet<string> _errSites = new HashSet<string>();      // miejsca, ktorych pierwszy wyjatek juz jest w logu
         // siew puli wyrzutkow liczony osobno - nie jest ruchem doby
@@ -77,6 +79,7 @@ namespace Armoury
             _qTimes = 0; _qGame = _qOurs = 0.0;
             _iTimes = 0; _iHearth = 0.0;
             _outMen = _outHearth = _backMen = _backHearth = 0.0;
+            _ruinMen = _ruinHearth = _homeMen = _homeHearth = 0.0;
             _stumbles = 0;
         }
 
@@ -142,6 +145,12 @@ namespace Armoury
             else { _outMen += men; _outHearth += hearth; }
         }
         internal static void NoteBack(float men, float hearth) { _backMen += men; _backHearth += hearth; }
+
+        // ------------------------------------------------------------ spustoszenie (wola Devastation - tylko gdy jest czynne)
+        /// <summary>Zabici i uchodzcy zdjeci z hearth wsi (ci, ktorzy poszli w las, ida przez NoteOut jak kazdy wyrzutek).</summary>
+        internal static void NoteRuin(double men, double hearth) { _ruinMen += men; _ruinHearth += hearth; }
+        /// <summary>Uchodzcy, ktorzy wrocili do swojej wsi.</summary>
+        internal static void NoteHome(double men, double hearth) { _homeMen += men; _homeHearth += hearth; }
 
         internal static void SeedBegin() { _seeding = true; _seedHearth = 0.0; }
         /// <summary>Dopisek do linii "Wyrzutki: pula poczatkowa": ile hearth zdjeto z wsi i wedle jakiej stawki.</summary>
@@ -413,10 +422,11 @@ namespace Armoury
         /// Bilans hearth doby z ruchu ludzi, ktory ta klasa liczy (ujemny = wsie oddaly): tabory i lodzie, wyrzutki w las i
         /// z powrotem, pobor wymuszony, zadania i incydenty gracza. Linia przyrostu naturalnego (PopulationLaw.GrowthDaily)
         /// odejmuje go od zmiany hearth wsi, zeby reszta pokazala to, czego nie liczy nikt (inwestycje BetterEconomy, rabunki).
+        /// Od kroku 4 takze spustoszenie (zabici i uchodzcy) i powroty uchodzcow - przy czynnym Devastation rabunki sa tutaj.
         /// </summary>
         internal static double DayNetHearth()
         {
-            return -_vOurs - _outHearth + _backHearth - _pOurs + _qOurs + _iHearth;
+            return -_vOurs - _outHearth + _backHearth - _pOurs + _qOurs + _iHearth - _ruinHearth + _homeHearth;
         }
 
         /// <summary>Dopisek do linii "Ludzie:" (PeopleLedger): ruch hearth doby tam, gdzie wies oddaje albo odzyskuje ludzi.</summary>
@@ -433,6 +443,9 @@ namespace Armoury
               .Append(" (gra ").Append(F(_pGame, "0.#")).Append(')');
             sb.Append(", zadania gracza ").Append(Sg(_qOurs, "0.###")).Append(" w ").Append(_qTimes).Append(" (gra ").Append(Sg(_qGame, "0.#")).Append(')');
             sb.Append(", incydenty gracza ").Append(Sg(_iHearth, "0.#")).Append(" w ").Append(_iTimes).Append(" (bez przeliczenia)");
+            if (_ruinHearth != 0.0 || _homeHearth != 0.0)
+                sb.Append(", spustoszenie -").Append(F(_ruinHearth, "0.###")).Append(" za ").Append(F(_ruinMen, "0.#")).Append(" zabitych i uchodzcow")
+                  .Append(", powrot uchodzcow +").Append(F(_homeHearth, "0.###")).Append(" za ").Append(F(_homeMen, "0.#")).Append(" ludzi");
             int odd = _vOdd + _pOdd;
             if (odd > 0) sb.Append("; niezgodne z formula gry i zostawione: ").Append(odd);
             if (_vNoK > 0) sb.Append("; bez przelicznika kultury: ").Append(_vNoK).Append(" ludzi taborow");

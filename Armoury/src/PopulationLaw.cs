@@ -266,13 +266,18 @@ namespace Armoury
             catch (Exception e) { if (!_errTowns) { _errTowns = true; Log.Error("PopulationLaw.TownsDaily", e); } }
         }
 
-        /// <summary>Stan ksiegi ludzi do zapisu (klucz arm_people): sekcja "t:" = ludzie miasta. Kolejne kroki dopisza wlasne sekcje.</summary>
+        /// <summary>
+        /// Stan ksiegi ludzi do zapisu (klucz arm_people): sekcja "t:" = ludzie miasta (krok 9a), sekcja "u:" = uchodzcy i zabici
+        /// wsi przy spustoszeniu (krok 4, Devastation). Kolejne kroki dopisza wlasne sekcje.
+        /// </summary>
         internal static string ExportPeople()
         {
-            if (_townPeople.Count == 0) return "";
+            string scars = Devastation.ExportSections();
+            if (_townPeople.Count == 0 && scars.Length == 0) return "";
             var sb = new StringBuilder("v1");
             foreach (var kv in _townPeople)
                 sb.Append("|t:").Append(kv.Key).Append('=').Append(kv.Value.ToString("R", CultureInfo.InvariantCulture));
+            sb.Append(scars);
             return sb.ToString();
         }
 
@@ -281,6 +286,7 @@ namespace Armoury
             try
             {
                 _townPeople.Clear(); _townSeeded = 0;
+                Devastation.Import(data);                   // sekcje "u:" (uchodzcy wsi); pusty albo stary zapis = brak uchodzcow
                 if (string.IsNullOrEmpty(data)) return;     // zapis sprzed tej wersji - stan zalozy sie pierwszego dnia
                 foreach (var part in data.Split('|').Skip(1))
                 {
@@ -312,7 +318,8 @@ namespace Armoury
         // Premie hearth gry, BK i BKROT (perki, budynki, polityki, laski bogow, podatki, prawa) nie dopisuja hearth, tylko mnoza
         // DODATNIE g [KRYT 3]: (1 + dodatki / 1.2) x (1 + czynniki), obciete do [0.5; 2]; pulap +0.8 dopiero PO mnozeniu.
         // Wies spalona, lupiona albo pod przymusem (kazdy stan poza Normal): 0. Powrot uchodzcow +0.5 hearth ponizej 40
-        // (ScorchedEarth.RefugeeReturn) zostaje do kroku 4.
+        // (ScorchedEarth.RefugeeReturn) dziala juz tylko przy wylaczonym spustoszeniu (krok 4, Devastation): przy czynnym do wsi
+        // wracaja uchodzcy z jej konta w ksiedze ludzi (Devastation.Daily), poza tym modelem.
         // k kultury sie skraca, wiec rachunek idzie wprost na hearth; ludzi (hearth x k) pokazuja tylko dymek i log.
         private const float BonusUnit = 1.2f;          // hearth dziennie premii gry, ktore podwajaja przyrost (baza srodkowego pasma gry)
         private const float BonusMin = 0.5f, BonusMax = 2f;
@@ -422,6 +429,32 @@ namespace Armoury
         }
 
         /// <summary>
+        /// Niebezpieczenstwo wsi, 0..1: 0.4 x (1 - bezpieczenstwo warowni / 100) + 0.3 x [kraina w wojnie z krolestwem]
+        /// + 0.3 x udzial spalonych i lupionych wsi regionu. Jedna miara dla przyrostu naturalnego (czlon U) i dla tempa powrotu
+        /// uchodzcow (Devastation, demografia krok 4). Wies bez warowni: bezpieczenstwo 100, bez spalonych, pokoj.
+        /// </summary>
+        internal static float Danger(Village v, out float security, out bool war, out float burnt)
+        {
+            security = 100f; burnt = 0f;
+            Settlement node = v != null ? v.Bound : null;      // region wsi: jej miasto albo zamek
+            if (node != null)
+            {
+                if (node.Town != null) { float sec = node.Town.Security; security = sec >= 0f ? Math.Min(100f, sec) : 0f; }
+                var vs = node.BoundVillages; int nv = 0, nb = 0;
+                if (vs != null)
+                    foreach (var o in vs)
+                    {
+                        if (o == null) continue;
+                        nv++;
+                        if (o.VillageState == Village.VillageStates.Looted || o.VillageState == Village.VillageStates.BeingRaided) nb++;
+                    }
+                burnt = nv > 0 ? (float)nb / nv : 0f;
+            }
+            war = AtWarToday(node != null ? node.MapFaction : null);       // frakcja wsi to frakcja jej warowni (Village.MapFaction)
+            return MBMath.ClampFloat(USecurity * (1f - security / 100f) + (war ? UWar : 0f) + UBurnt * burnt, 0f, 1f);
+        }
+
+        /// <summary>
         /// Rachunek jednej wsi. `gameBase` i `gameFactors` to wynik gry z chwili wejscia postfiksu (po latkach BK i BKROT):
         /// suma dodatkow razem z baza pasma i suma czynnikow.
         /// </summary>
@@ -437,21 +470,7 @@ namespace Armoury
 
             Settlement node = v.Bound;      // region wsi: jej miasto albo zamek
             g.W = ProsperityIndex(node);
-            if (node != null)
-            {
-                if (node.Town != null) { float sec = node.Town.Security; g.Security = sec >= 0f ? Math.Min(100f, sec) : 0f; }
-                var vs = node.BoundVillages; int nv = 0, nb = 0;
-                if (vs != null)
-                    foreach (var o in vs)
-                    {
-                        if (o == null) continue;
-                        nv++;
-                        if (o.VillageState == Village.VillageStates.Looted || o.VillageState == Village.VillageStates.BeingRaided) nb++;
-                    }
-                g.Burnt = nv > 0 ? (float)nb / nv : 0f;
-            }
-            g.War = AtWarToday(node != null ? node.MapFaction : null);       // frakcja wsi to frakcja jej warowni (Village.MapFaction)
-            g.U = MBMath.ClampFloat(USecurity * (1f - g.Security / 100f) + (g.War ? UWar : 0f) + UBurnt * g.Burnt, 0f, 1f);
+            g.U = Danger(v, out g.Security, out g.War, out g.Burnt);
             g.H = MBMath.ClampFloat(WinterBite.VillageCut(v), 0f, 1f);
 
             g.Base = s.GrowthBasePercent;
@@ -521,6 +540,18 @@ namespace Armoury
             float[] k;
             if (!_k.TryGetValue(v.Settlement.Culture.StringId, out k) || k == null || k.Length == 0) return 0f;
             return k[0] > 0f && !float.IsInfinity(k[0]) ? k[0] : 0f;
+        }
+
+        /// <summary>
+        /// Ludzi na punkt hearth tej wsi: k jej krainy, a dla kultury spoza tabeli - srednia swiata (klucz "*", o ile juz
+        /// policzona). 0 = brak obu. Sam niczego nie liczy i nie kalibruje (wolany z latek modeli produkcji).
+        /// </summary>
+        internal static float PeoplePerHearthOrWorld(Village v)
+        {
+            float k = PeoplePerHearth(v);
+            if (k > 0f) return k;
+            float[] w;
+            return _k.TryGetValue(WorldKey, out w) && w != null && w.Length > 0 && w[0] > 0f && !float.IsInfinity(w[0]) ? w[0] : 0f;
         }
 
         /// <summary>
@@ -722,8 +753,9 @@ namespace Armoury
                     double change = hearthAll - _hearthLast, moved = PeopleUnit.DayNetHearth();
                     ledger = F(hearthAll) + ", od wczoraj " + Sg(change, "0.###") + " = " + (on ? "przyrost naturalny " : "wynik gry ") + Sg(takenHearth - backHearth, "0.###")
                              + (backHearth > 0.0 ? ", powrot uchodzcow " + Sg(backHearth, "0.###") : "")
-                             + ", ruch ludzi (tabory, wyrzutki, pobor, zadania, incydenty) " + Sg(moved, "0.###")
-                             + ", RESZTA " + Sg(change - takenHearth - moved, "0.###") + " (inwestycje BetterEconomy +10/25/50 za zloto, rabunki, zerowanie armii, dno 10 hearth)";
+                             + ", ruch ludzi (tabory, wyrzutki, pobor, zadania, incydenty" + (Devastation.On ? ", spustoszenie i powroty uchodzcow" : "") + ") " + Sg(moved, "0.###")
+                             + ", RESZTA " + Sg(change - takenHearth - moved, "0.###")
+                             + (Devastation.On ? " (inwestycje BetterEconomy +10/25/50 za zloto, dno 10 hearth)" : " (inwestycje BetterEconomy +10/25/50 za zloto, rabunki, zerowanie armii, dno 10 hearth)");
                 }
                 else ledger = F(hearthAll) + ", rozliczenie zmiany od jutra (pierwsza doba po wczytaniu)";
                 _hearthLast = hearthAll; _hearthLastDay = day;

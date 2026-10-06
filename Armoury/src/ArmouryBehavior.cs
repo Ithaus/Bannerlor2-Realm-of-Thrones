@@ -386,7 +386,7 @@ namespace Armoury
         }
         private Dictionary<string,int> _prisonerBaseline;
 
-        public ArmouryBehavior() { Instance = this; HistoricalPrices.Reset(); MaterialLaw.Reset(); WesterosClimate.Reset(); OutlawLaw.Reset(); PopulationLaw.Reset(); WorkshopLaw.Reset(); IronBank.Reset(); MarketGlut.Reset(); ArmsPricing.Reset(); StartKit.Reset(); AiGear.Reset(); Levy.Reset(); VolunteerKit.Reset(); LevyGold.Reset(); WearKeep.Reset(); UniqueSpoils.Reset(); BuildDiary.Reset(); BuildFunding.Reset(); KingdomLedger.Reset(); ColdStart.Reset(); MenPurse.Reset(); AiWear.Reset(); SmithHours.Reset(); RecruitKit.Reset(); OreLedger.Reset(); MarketRoad.Reset(); MoneyLedger.Reset(); PeopleLedger.Reset(); PeopleUnit.Reset(); CaravanBulk.Reset(); StartStock.Reset(); MineralOnce.Reset(); SoldierPay.Reset(); KingdomTreasury.Reset(); CastlePurse.Reset(); TownPurse.Reset(); VillageTakings.Reset(); }   // stan jednej kampanii nie przecieka do drugiej (audyt 04.10)
+        public ArmouryBehavior() { Instance = this; HistoricalPrices.Reset(); MaterialLaw.Reset(); WesterosClimate.Reset(); OutlawLaw.Reset(); PopulationLaw.Reset(); WorkshopLaw.Reset(); IronBank.Reset(); MarketGlut.Reset(); ArmsPricing.Reset(); StartKit.Reset(); AiGear.Reset(); Levy.Reset(); VolunteerKit.Reset(); LevyGold.Reset(); WearKeep.Reset(); UniqueSpoils.Reset(); BuildDiary.Reset(); BuildFunding.Reset(); KingdomLedger.Reset(); ColdStart.Reset(); MenPurse.Reset(); AiWear.Reset(); SmithHours.Reset(); RecruitKit.Reset(); OreLedger.Reset(); MarketRoad.Reset(); MoneyLedger.Reset(); PeopleLedger.Reset(); PeopleUnit.Reset(); CaravanBulk.Reset(); StartStock.Reset(); MineralOnce.Reset(); SoldierPay.Reset(); KingdomTreasury.Reset(); CastlePurse.Reset(); TownPurse.Reset(); VillageTakings.Reset(); Devastation.Reset(); ScorchedEarth.Reset(); }   // stan jednej kampanii nie przecieka do drugiej (audyt 04.10)
 
         public override void SyncData(IDataStore dataStore)
         {
@@ -447,7 +447,8 @@ namespace Armoury
                 string popk = PopulationLaw.Export();
                 dataStore.SyncData("arm_population", ref popk);
                 if (dataStore.IsLoading) PopulationLaw.Import(popk);
-                // ksiega ludzi: stan ludnosci miast (demografia krok 9a); brak klucza = stary zapis, stan zalozy sie pierwszego dnia
+                // ksiega ludzi: stan ludnosci miast (demografia krok 9a) i konta uchodzcow wsi (krok 4, Devastation - sekcje "u:");
+                // brak klucza = stary zapis: stan miast zalozy sie pierwszego dnia, uchodzcow nie ma
                 string people = PopulationLaw.ExportPeople();
                 dataStore.SyncData("arm_people", ref people);
                 if (dataStore.IsLoading) PopulationLaw.ImportPeople(people);
@@ -1203,6 +1204,7 @@ namespace Armoury
             try { WesterosClimate.Daily(); } catch (Exception e) { Log.Error("WesterosClimate.Daily", e); }   // biale kruki: koniec pory roku
             try { WinterBite.OnDaily(); } catch (Exception e) { Log.Error("WinterBite", e); }
             try { ScorchedEarth.OnDaily(); } catch (Exception e) { Log.Error("ScorchedEarth", e); }
+            try { Devastation.Daily(); } catch (Exception e) { Log.Error("Devastation.Daily", e); }   // demografia krok 4: uchodzcy wracaja do wsi (po zerowaniu armii, przed ksiega "Ludzie:")
             try { WarLedger.OnDaily(); } catch (Exception e) { Log.Error("WarLedger", e); }
             try { Orders.DailyTick(); }
             catch (Exception e) { Log.Error("OnDailyTick", e); }

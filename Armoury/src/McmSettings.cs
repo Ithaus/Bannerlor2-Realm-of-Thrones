@@ -1072,7 +1072,7 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public int NorthGradientPercent { get; set; } = 25;
 
-        [SettingPropertyBool("Scorched Earth Enabled", HintText = "war leaves scars: enemy armies forage villages on the march, and plundered villages heal slowly")]
+        [SettingPropertyBool("Scorched Earth Enabled", HintText = "war leaves scars: enemy armies forage villages on the march, and plundered villages heal slowly (with Devastation Enabled the march drives out a share of the countryside's people instead of taking hearths, and they come home in time)")]
         [SettingPropertyGroup("The marching column")]
         public bool ScorchedEarthEnabled { get; set; } = true;
 
@@ -1084,11 +1084,11 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public float ForageRadius { get; set; } = 3f;
 
-        [SettingPropertyFloatingInteger("Forage Hearth Per Day", 0.00f, 3.20f, "0.00", HintText = "hearths a 500-man army drains per day (scales with army size)")]
+        [SettingPropertyFloatingInteger("Forage Hearth Per Day", 0.00f, 3.20f, "0.00", HintText = "hearths a 500-man army drains per day (scales with army size) - used only with Devastation Enabled off, with it on see Devastation Per Forager Day")]
         [SettingPropertyGroup("The marching column")]
         public float ForageHearthPerDay { get; set; } = 0.8f;
 
-        [SettingPropertyInteger("Forage Floor", 0, 100, "0", HintText = "marching armies can never drain a village below this - true ruin takes a real raid")]
+        [SettingPropertyInteger("Forage Floor", 0, 100, "0", HintText = "marching armies can never drain a village below this - true ruin takes a real raid - used only with Devastation Enabled off, with it on the limit is Devastation Max Percent")]
         [SettingPropertyGroup("The marching column")]
         public int ForageFloor { get; set; } = 25;
 
@@ -1100,7 +1100,7 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public int ScarRegenPercent { get; set; } = 25;
 
-        [SettingPropertyInteger("Refugee Floor Hearth", 0, 160, "0", HintText = "below this the refugees trickle home (+0.5/day flat) - regions never die for good")]
+        [SettingPropertyInteger("Refugee Floor Hearth", 0, 160, "0", HintText = "below this the refugees trickle home (+0.5/day flat) - regions never die for good - works only with Devastation Enabled off, with it on the refugees come home from the people ledger (Refugee Return Percent)")]
         [SettingPropertyGroup("The marching column")]
         public int RefugeeFloorHearth { get; set; } = 40;
 
@@ -1788,7 +1788,7 @@ namespace Armoury
         [SettingPropertyGroup("Iron bank")]
         public float OutlawRoutedShare { get; set; } = 0.5f;
 
-        [SettingPropertyFloatingInteger("Outlaw Raid Flee Percent", 0.00f, 12.00f, "0.00", HintText = "percent of a village's hearths that flee to the woods when it is burnt")]
+        [SettingPropertyFloatingInteger("Outlaw Raid Flee Percent", 0.00f, 12.00f, "0.00", HintText = "percent of a village's hearths that flee to the woods when it is burnt - used only with Devastation Enabled off, with it on see Devastation Outlaw Percent")]
         [SettingPropertyGroup("Iron bank")]
         public float OutlawRaidFleePercent { get; set; } = 3f;
 
@@ -1839,6 +1839,38 @@ namespace Armoury
         [SettingPropertyBool("Town People Frozen", HintText = "a town's people are counted once and kept: until towns get their own births, deaths and migrants, the number of townsfolk (used for rents and the people ledger) no longer follows the town's prosperity up and down every day. Off = townsfolk are prosperity times the land's people per prosperity point, as before")]
         [SettingPropertyGroup("Iron bank")]
         public bool TownPeopleFrozen { get; set; } = true;
+
+        [SettingPropertyBool("Devastation Enabled", HintText = "a burnt village on the map stands for a whole countryside, so a raid no longer wipes out two fifths of it: raiders and foraging armies ruin only as many of its people as their numbers and days allow. A few of those die, a few turn outlaw, the rest are refugees who shelter in the region's town or castle and come home over the years - a village regrows only by their return and by natural growth. Raiders still get the game's plunder. The harvest falls with the hands that are missing. Needs People Unit Enabled and Natural Growth Enabled. Off = as before: the game's loss of hearths for every raid, hearths drained by foraging, and half a hearth a day returning to villages below Refugee Floor Hearth")]
+        [SettingPropertyGroup("Iron bank")]
+        public bool DevastationEnabled { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Devastation Per Raider Day", 0.00f, 2.00f, "0.00", HintText = "people of a village's countryside driven from their homes by each raider for each day of looting (the great mounted raids of the 1350s ruined 0.4-0.9 a man a day, lesser raids 0.1-0.2)")]
+        [SettingPropertyGroup("Iron bank")]
+        public float DevastationPerRaiderDay { get; set; } = 0.5f;
+
+        [SettingPropertyFloatingInteger("Devastation Per Forager Day", 0.00f, 1.00f, "0.00", HintText = "people driven from their homes by each soldier of a hostile army for each day it camps or marches beside the village (see Forage Min Men and Forage Radius)")]
+        [SettingPropertyGroup("Iron bank")]
+        public float DevastationPerForagerDay { get; set; } = 0.2f;
+
+        [SettingPropertyInteger("Devastation Max Percent", 0, 360, "0", HintText = "the most of a countryside that can lie devastated at once, in percent of its people (at most 95) - the nearer to it, the less each new raid finds to burn")]
+        [SettingPropertyGroup("Iron bank")]
+        public int DevastationMaxPercent { get; set; } = 90;
+
+        [SettingPropertyInteger("Devastation Killed Percent", 0, 20, "0", HintText = "percent of the people struck by a raid or by foraging who are killed, never more than one for each soldier for each day - the rest flee")]
+        [SettingPropertyGroup("Iron bank")]
+        public int DevastationKilledPercent { get; set; } = 5;
+
+        [SettingPropertyInteger("Devastation Outlaw Percent", 0, 20, "0", HintText = "percent of the people struck who take to the woods and join the region's outlaws (in place of Outlaw Raid Flee Percent)")]
+        [SettingPropertyGroup("Iron bank")]
+        public int DevastationOutlawPercent { get; set; } = 5;
+
+        [SettingPropertyFloatingInteger("Refugee Return Percent", 0.00f, 1.00f, "0.00", HintText = "percent of a village's refugees who come home each day in a safe land at peace - fewer in danger (a lawless town or castle, war, burnt villages nearby), a quarter while the town or castle starves, none while the village is burnt or raided or its town or castle besieged. At 0.08 a day half are back in about two and a half years")]
+        [SettingPropertyGroup("Iron bank")]
+        public float RefugeeReturnPercent { get; set; } = 0.1f;
+
+        [SettingPropertyFloatingInteger("Devastation Yield Elasticity", 0.00f, 2.00f, "0.00", HintText = "how hard missing hands cut a village's production: output is multiplied by (people at home / people before the devastation) to this power. 0.5 = a tenth of the hands gone costs a twentieth of the harvest, as in England after 1348 - 1 = output falls as fast as the people")]
+        [SettingPropertyGroup("Iron bank")]
+        public float DevastationYieldElasticity { get; set; } = 0.5f;
 
         [SettingPropertyInteger("Outlaw Min Band", 0, 24, "0", HintText = "fewest men needed nearby before a new band can form")]
         [SettingPropertyGroup("Iron bank")]
@@ -3031,6 +3063,14 @@ namespace Armoury
             s.GrowthMaxPercent = GrowthMaxPercent;
             s.GrowthMaxDeclinePercent = GrowthMaxDeclinePercent;
             s.TownPeopleFrozen = TownPeopleFrozen;
+            s.DevastationEnabled = DevastationEnabled;
+            s.DevastationPerRaiderDay = DevastationPerRaiderDay;
+            s.DevastationPerForagerDay = DevastationPerForagerDay;
+            s.DevastationMaxPercent = DevastationMaxPercent;
+            s.DevastationKilledPercent = DevastationKilledPercent;
+            s.DevastationOutlawPercent = DevastationOutlawPercent;
+            s.RefugeeReturnPercent = RefugeeReturnPercent;
+            s.DevastationYieldElasticity = DevastationYieldElasticity;
             s.OutlawMinBand = OutlawMinBand;
             s.OutlawNeighbourRegions = OutlawNeighbourRegions;
             s.OutlawBandSizeScale = OutlawBandSizeScale;

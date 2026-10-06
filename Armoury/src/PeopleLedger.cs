@@ -24,6 +24,8 @@ namespace Armoury
     ///    "hearth za ludzi dzis" - ile hearth wsie oddaly za tabory, wyrzutkow i wymuszonych rekrutow (liczniki PeopleUnit);
     ///  "Ludzie: przyrost naturalny" (krok 3, PopulationLaw.GrowthDaily) - ile ludzi przybywa wsiom dzis i wedle jakich skladowych,
     ///    krainy, rozliczenie zmiany hearth wsi od wczoraj (reszta = hearth z niczego), stan ludnosci miast wobec dobrobytu;
+    ///  "Ludzie (spustoszenie):" (krok 4, Devastation.RegionsNote) - rabunki i zerowanie doby w osobodniach i ludziach, powroty
+    ///    uchodzcow, 8 regionow najbardziej spustoszonych; w samej linii "Ludzie:" pozycje: zdjeci, zabici, w las, uchodzcy, powroty;
     ///  "Ludzie (regiony):" - 8 regionow najbardziej obciazonych: (zaloga + wyrzutki + bandy) wobec mezczyzn regionu;
     ///  plik Logs/[sesja]/ludzie-regiony.csv - wszystkie regiony, wiersz na region na dobe.
     /// Czego ksiega NIE widzi (do kroku 5): z jakiego regionu pochodzi zolnierz partii rodu; przyrost garnizonow (gra dopisuje
@@ -37,7 +39,7 @@ namespace Armoury
         private const string CsvName = "ludzie-regiony.csv";
         private const string CsvHeader = "dzien;region_id;region;rodzaj;kultura;krolestwo;rod;wsie;wsie_spalone;ludzie;ludzie_zmiana;ludzie_osada;ludzie_wsie;hearth;dobrobyt;"
                                          + "zaloga;milicja;wyrzutki;bandy_partie;bandy_ludzie;zabici_dzis;zwerbowani_dzis;obciazenie_proc_mezczyzn;bezpieczenstwo;zywnosc;"
-                                         + "bilans_zywnosci;glod;wojna";
+                                         + "bilans_zywnosci;glod;wojna;uchodzcy;spustoszenie_proc;zabici_spustoszenie";
 
         // rodzaje partii
         private const int KLord = 0, KGarrison = 1, KMilitia = 2, KBandit = 3, KCaravan = 4, KVillager = 5, KOther = 6, Kinds = 7;
@@ -56,6 +58,7 @@ namespace Armoury
         private static readonly Dictionary<string, float> _lastPeople = new Dictionary<string, float>();
         private static readonly int[] _lastMen = new int[Kinds];
         private static bool _haveLast;
+        private static double _lastAway;           // uchodzcy swiata poza domem wczoraj (krok 4)
         private static string _csvPath;
 
         // liczniki doby
@@ -67,7 +70,7 @@ namespace Armoury
 
         internal static void Reset()
         {
-            _lastPeople.Clear(); Array.Clear(_lastMen, 0, Kinds); _haveLast = false; _csvPath = null;
+            _lastPeople.Clear(); Array.Clear(_lastMen, 0, Kinds); _haveLast = false; _lastAway = 0.0; _csvPath = null;
             ClearDay();
         }
 
@@ -78,6 +81,7 @@ namespace Armoury
             _rNotableParty = _rNotableOther = _rTavern = _rNoPlace = _rPlayer = _rLed = _desLord = _desOther = 0;
             _stumbles = 0;
             PeopleUnit.NewDay();       // liczniki hearth za ludzi (krok 2) zyja w PeopleUnit, doba konczy sie razem z ksiega
+            Devastation.NewDay();      // liczniki spustoszenia (krok 4) tak samo
         }
 
         private static int KindOf(MobileParty mp)
@@ -271,6 +275,8 @@ namespace Armoury
                 }
                 ranked.Sort((a, b) => b.Burden.CompareTo(a.Burden));
                 double menWorld = people * MenShare;
+                double away = 0.0;
+                try { away = Devastation.AwayWorld(); } catch { _stumbles++; }
                 int killed = 0; foreach (var k in _killed) killed += k;
                 int recruited = _rNotableParty + _rNotableOther + _rTavern + _rNoPlace + _rPlayer;
                 var sb = new StringBuilder();
@@ -282,6 +288,13 @@ namespace Armoury
                     sb.Append(" [PopulationLaw: wsie ").Append(((people - peopleNodes) / 1e6).ToString("0.000", CultureInfo.InvariantCulture))
                       .Append(", miasta ").Append((peopleNodes / 1e6).ToString("0.000", CultureInfo.InvariantCulture)).Append("], mezczyzn 16-60 ok. ")
                       .Append((menWorld / 1e6).ToString("0.000", CultureInfo.InvariantCulture)).Append(" mln (27%)");
+                    // krok 4: uchodzcy zeszli z hearth wsi, ale zyja - ksiega pokazuje ich osobno i razem z ludnoscia w domu
+                    if (away > 0.0 || _lastAway > 0.0)
+                    {
+                        sb.Append("; uchodzcy poza domem ").Append(((long)Math.Round(away)).ToString(CultureInfo.InvariantCulture)).Append(", razem z nimi ")
+                          .Append(((people + away) / 1e6).ToString("0.000", CultureInfo.InvariantCulture)).Append(" mln");
+                        if (_haveLast && lastPeople > 0) sb.Append(" (").Append(Sg((long)Math.Round(people + away - lastPeople - _lastAway))).Append(" ludzi)");
+                    }
                 }
                 else sb.Append("ludnosc nieskalibrowana (PopulationLaw wylaczone albo przed pierwszym rozliczeniem rent)");
                 sb.Append(" | zolnierze: ");
@@ -315,12 +328,16 @@ namespace Armoury
                       .Append(" (bez ludnosci w ksiedze ").Append(noPeople).Append(')');
                 // demografia krok 2: ile hearth wsie oddaly i odzyskaly dzis za ludzi (tabory, wyrzutki, pobor wymuszony, zadania, incydenty)
                 try { sb.Append(PeopleUnit.DayNote()); } catch { _stumbles++; }
+                // demografia krok 4: spustoszenie doby (zdjeci, zabici, w las, uchodzcy, powroty) i stan konta uchodzcow
+                try { sb.Append(Devastation.DayNote()); } catch { _stumbles++; }
                 sb.Append(" | warownie glodne ").Append(starving).Append(", z ujemnym bilansem zywnosci ").Append(foodMinus).Append(" z ").Append(fiefs).Append('.');
                 if (_stumbles > 0) sb.Append(" Potkniecia ksiegi: ").Append(_stumbles).Append('.');
                 int reported = _stumbles;
                 Log.Info(sb.ToString());
                 // demografia krok 3: linia "Ludzie: przyrost naturalny" - tu, bo rozlicza zmiane hearth wsi z licznikami doby PeopleUnit (zeruje je ClearDay nizej)
                 PopulationLaw.GrowthDaily(day);
+                // demografia krok 4: pomiar doby i regiony najbardziej spustoszone (liczniki zeruje ClearDay nizej)
+                Devastation.RegionsNote(day);
 
                 // 4. osiem najbardziej obciazonych regionow
                 if (ranked.Count > 0)
@@ -371,7 +388,12 @@ namespace Armoury
                            .Append(r.Bands).Append(';').Append(r.BandMen).Append(';').Append(kin).Append(';').Append(rin).Append(';')
                            .Append(r.Burden >= 0f ? F(r.Burden * 100f, "0.##") : "").Append(';')
                            .Append(st.Town != null ? F(st.Town.Security, "0.#") : "").Append(';').Append(st.Town != null ? F(st.Town.FoodStocks, "0.#") : "").Append(';')
-                           .Append(r.HasFood ? F(r.FoodChange, "0.#") : "").Append(';').Append(st.IsStarving ? 1 : 0).Append(';').Append(atWar ? 1 : 0)
+                           .Append(r.HasFood ? F(r.FoodChange, "0.#") : "").Append(';').Append(st.IsStarving ? 1 : 0).Append(';').Append(atWar ? 1 : 0);
+                        // krok 4: uchodzcy wsi regionu poza domem, ich udzial w ludziach wsi sprzed spustoszenia, zabici przy spustoszeniu od poczatku
+                        double rAway, rDead; Devastation.RegionOf(st, out rAway, out rDead);
+                        csv.Append(';').Append(((long)Math.Round(rAway)).ToString(CultureInfo.InvariantCulture)).Append(';')
+                           .Append(calibrated && r.PeopleVillages + rAway > 0.0 ? F((float)(100.0 * rAway / (r.PeopleVillages + rAway)), "0.###") : "").Append(';')
+                           .Append(((long)Math.Round(rDead)).ToString(CultureInfo.InvariantCulture))
                            .Append(Environment.NewLine);
                     }
                     catch { csv.Length = rowStart; _stumbles++; }      // niepelny wiersz nie trafia do pliku
@@ -384,6 +406,7 @@ namespace Armoury
                 _lastPeople.Clear();
                 if (calibrated) foreach (var r in order) _lastPeople[r.St.StringId] = r.People;
                 Array.Copy(men, _lastMen, Kinds);
+                _lastAway = away;
                 _haveLast = true;
             }
             catch (Exception e) { Log.Error("PeopleLedger.Daily", e); }
