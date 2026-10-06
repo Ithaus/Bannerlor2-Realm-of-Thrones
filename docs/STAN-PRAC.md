@@ -132,6 +132,40 @@ tygodniowy na prace w tle.
   bandy z puli poleglych (pusta = sam wodz); zablokowac Innym ochotnikow z mapy i odbitych jencow; nekromancje ksiegowac i
   ograniczyc do Muru (decyzja Jeffa: czy jency Innych licza sie jako polegli); wightow nie wpuszczac do puli wyrzutkow, wylaczyc im
   dezercje i niewole; naprawic limit w Zewie.
+## Decyzje Jeffa 06.10 (wiazace; dopisane po raporcie nocnym)
+
+1. **Handel wedle zysku w danej chwili.** "To ma byc to, co sie oplaca w danej chwili, a nie sztucznie" - zadnych stalych list
+   ani sztucznych priorytetow. Karawany kupuja i sprzedaja w kolejnosci najwiekszego zysku na kilogram liczonego z biezacych cen
+   (poprawka `l103b-karawany-zysk` do ogniwa 103).
+2. **O parametrach ekonomii decyduje projekt, nie Jeff.** "Ty tworzysz ekonomie i jej sens, to co mnie pytasz" - NIE pytac
+   Jeffa o poziomy produkcji, ceny, mnozniki, promienie. Wybierac to, co ma sens ekonomiczny i historyczny, krotko uzasadnic i
+   robic. Pytac tylko o rzeczy, ktore zmieniaja to, w co Jeff gra (fabula, kanon, wygoda gracza).
+3. **Poprawka bledu nie zmienia po cichu poziomu produkcji.** Ogniwo 105 po przerobce (`l105b-mineral-bez-zmian`): powtorzony
+   mineral BK znika z listy, ale wynik modelu jest liczony tyle razy, ile bylo powtorzen - ruda, sol, glina i srebro bez zmian;
+   `MineOutputMultiplier` zostaje 3 (uwaga o pliku `Armoury.json` przed wgraniem 105 jest NIEAKTUALNA, w logu ma byc "x3.0").
+   Wlasciwe poziomy produkcji wszystkich towarow: jeden krok skali (K13) liczony od zuzycia i danych historycznych.
+4. **Paser dla 100% band.** "Nie moze byc tak, ze sa bandyci, ktorzy nie moga opchnac towaru"; "po co czesc band siedzi na
+   skarbach jak smok w jaskini". Pomiar z mapy: promien 20 = 4% kryjowek, 50 = 39%, 100 = 92%, 150 = 99%, 200 = 100% (najdalsza
+   kryjowka 170 od miasta). Przerobka ogniwa 106 (`l106b-paser-wszyscy`, w toku): promien 200 z cena malejaca z odlegloscia,
+   skup zrabowanej zywnosci (po zamknieciu dosypki z niczego), kasy kryjowek z odplywem (nie moga tylko rosnac).
+5. **Tarcza zoldu wlaczona** (`TownWageShield` = true, `l107b-zold-tarcza`). Skutek uboczny do naprawy razem z regulatorem kas
+   (K6): zaloga we wlasnym miescie prawie nic pana nie kosztuje (zold wraca w rentach); kas ZAMKOW tarcza nie obejmuje - zold
+   zalog zamkow dalej w wiekszosci kasuje regulator. Nastepny krok: K6 / tarcza takze dla zamkow.
+6. **Tempo: pelna para.** Limit tygodniowy tego konta ma starczyc do konca dnia 06.10 - sa inne konta. Zostaje zasada pauzy
+   przy 90% limitu 5-godzinnego. Dlatego ten dokument musi byc aktualny po kazdym etapie (przekazanie na inne konto).
+7. **Mowic prostym jezykiem.** Jeff nie zna nazw klas ani naszych skrotow ("tarcza zoldu", "regulator") - kazde pytanie i
+   podsumowanie tlumaczyc slowami gracza: co sie dzieje w grze i co on zobaczy.
+
+### Prace w toku 06.10 (katalog `scratchpad\dzien-1`, klon `scratchpad\lancuch`)
+
+- Workflow `dzien-1` (run `wf_088bc6c8-b18`): przeglad kolizji ogniw 106-107; poprawka ksiegi pieniadza (galaz
+  `l102b-ksiega-zoldu`, tylko log); demografia krok 2 (`l108-ludzie-jednostka`) i krok 3 + 9a (`l109-ludzie-przyrost`);
+  narzedzie `dzien-1\logi\sprawdz_logi.py` (docelowo `tools/sprawdz_logi.py`).
+- Workflow `dzien-1b` (run `wf_5aa7ad5f-54a`): przerobka pasera (`l106b-paser-wszyscy`); recenzje poprawek
+  `l103b-karawany-zysk` i `l105b-mineral-bez-zmian`.
+- Po zakonczeniu: zlozyc lancuch od nowa (102b -> 103+103b -> 104 -> 105+105b -> 106+106b -> 107+107b -> 108 -> 109), zbudowac
+  kazde ogniwo, zaktualizowac galezie `paczki/*` na origin i `docs/paczki/*.md`.
+
 ## Gdzie jestesmy
 
 - Ostatni wpis: **100** (98-100: aktualizacja wyzej). Wszystkie wpisy 75-97 sa **WGRANE** do gry (DLL Armoury), **ale NIE PRZETESTOWANE**
