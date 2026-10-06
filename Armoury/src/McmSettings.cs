@@ -1660,7 +1660,7 @@ namespace Armoury
         [SettingPropertyGroup("Iron bank")]
         public bool HistDemandScaling { get; set; } = true;
 
-        [SettingPropertyBool("Price Formula In New Coin", HintText = "the game's price formula keeps a fixed 2 coins beside the worth of the goods on the stall; in the new coin that weighs like a quarter load of ore or a whole measure of salt, so a bare stall of a cheap good never grew dear (ore 1.5 times its worth at most, timber 0.8). On: every trade good the new coin made cheaper is priced as the unmodded game prices it - a bare stall up to 10 times worth, a glutted one down to a tenth; goods the new coin made dearer (fur, wool, velvet, mead) keep the fixed 2 coins, which weigh little beside them (needs Hist Demand Scaling; off = prices as before)")]
+        [SettingPropertyBool("Price Formula In New Coin", HintText = "the game's price formula keeps a fixed 2 coins beside the worth of the goods on the stall; in the new coin that weighs like a quarter load of ore or a whole measure of salt, so a bare stall of a cheap good never grew dear (ore 1.5 times its worth at most, timber 0.8). On: every trade good the new coin made cheaper is priced as the unmodded game prices it - a bare stall up to 10 times worth, a glutted one down to a tenth; goods the new coin made dearer (fur, wool, velvet, mead) keep the fixed 2 coins, which weigh little beside them; and a new campaign opens with the towns' memory of supply and demand for every repriced trade good already in the new coin instead of drifting out of the old one for weeks (needs Hist Demand Scaling; off = prices as before)")]
         [SettingPropertyGroup("Iron bank")]
         public bool PriceFormulaInNewCoin { get; set; } = true;
 

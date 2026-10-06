@@ -47,7 +47,8 @@ namespace Armoury
     /// Warsztaty zbrojne placa za rude i drewno cene targu (WorkshopLaw.MatPrice), nie stala cene historyczna - inaczej drogi
     /// surowiec oplacalaby kasa miasta, a w jednym miescie byly dwie ceny rudy.
     /// Nowa kampania: popyt i podaz wygladzone przez ticki startowe sa jeszcze w starej monecie (przeliczenie wchodzi dopiero
-    /// w OnSessionLaunched) - przeliczamy je raz, zaraz po StartStock; wczytany zapis dochodzi sam (15% dziennie).
+    /// w OnSessionLaunched) - przeliczamy je raz, zaraz po StartStock, w miastach (zamkow gra nie wygladza - ich popyt jest 0
+    /// i tak zostaje); wczytany zapis dochodzi sam (15% dziennie).
     /// Sama cena niczego nie tworzy: zmienia sie tylko to, ile zlota przechodzi miedzy kasa miasta, kiesa karawany, taborem
     /// wsi i warsztatem.
     /// </summary>
@@ -142,7 +143,15 @@ namespace Armoury
         /// starej monecie i starych sztukach; bez przeliczenia pierwsze dwa-trzy tygodnie kampanii mialyby ceny z mieszanki monet
         /// (log 14:08: cena zbytu rudy 29.9 d w pierwszej dobie, 10.4 d w dwudziestej - bez zadnej zmiany na polkach).
         /// Podaz = wartosc polki w tej chwili (z rostera, w nowych cenach), popyt = szacunek czynnego modelu (juz w nowej monecie).
-        /// Dotyczy kategorii, ktorych cene ta paczka liczy inaczej: przeliczonych towarow handlowych (A) i surowcow masowych (B).
+        /// Kategorie: przy (A) WSZYSTKIE przeliczone towary handlowe - takze te, ktore w nowej monecie podrozaly (futro, miod
+        /// pitny, aksamit, klejnoty): stala wzoru ich nie dotyczy, ale ich pamiec z tickow startowych tez jest w starej monecie
+        /// (proba recenzenta 2: aksamit przy 5 sztukach na polce 0.38 zamiast 0.54 w 1. dobie, dochodzi przez 3 tygodnie;
+        /// sol 2.25 zamiast 1.83); przy (B) siedem surowcow masowych (welna przy 20 sztukach 0.63 zamiast 0.10).
+        /// TYLKO MIASTA (recenzja 2): gra prowadzi dane rynku samych miast (TradeCampaignBehavior.InitializeMarkets, ticki startowe
+        /// i dobowe ItemConsumptionBehavior ida po Town.AllTowns). Zamek ma popyt 0 przez cala kampanie (indeks towaru = podloga
+        /// 0.1) - nie ma tam czego przeliczac, a wpisany raz popyt zostalby na zawsze (nikt go potem nie wygladza): ceny w zamku
+        /// skoczylyby z 0.1 do 10, a targowiska wsi BK (BKBuildingsBehavior: kupuje z polki Bound, gdy podaz > popyt) zaczelyby
+        /// wykupywac polki zamkow.
         /// </summary>
         internal static void SeedNewCampaign()
         {
@@ -155,20 +164,19 @@ namespace Armoury
                 bool formula = FormulaOn, use = UseOn;
                 if (!formula && !use) return;
                 var cats = new HashSet<ItemCategory>();
-                if (formula) foreach (var c in HistoricalPrices.RepricedCategories()) if (c != null && c.IsTradeGood && HistoricalPrices.CoinRatio(c) > 1f) cats.Add(c);   // te same kategorie, co w FactorPrefix
+                if (formula) foreach (var c in HistoricalPrices.RepricedCategories()) if (c != null && c.IsTradeGood) cats.Add(c);   // kazdy przeliczony towar handlowy (uzbrojenie ma wlasne prawo podazy i popytu)
                 if (use) foreach (var it in CaravanBulk.Items()) if (it.ItemCategory != null) cats.Add(it.ItemCategory);
                 var model = Campaign.Current.Models != null ? Campaign.Current.Models.SettlementEconomyModel : null;
                 if (cats.Count == 0 || model == null) return;
                 int places = 0, cells = 0, stumbles = 0;
                 var worth = new Dictionary<ItemCategory, float>();
-                foreach (var st in Settlement.All)
+                foreach (var town in Town.AllTowns)      // same miasta - zamkow gra nie wygladza (opis wyzej)
                 {
                     try
                     {
-                        var town = st != null ? st.Town : null;      // miasta i zamki - jedne i drugie maja dane rynku
-                        if (town == null || town.MarketData == null || st.ItemRoster == null) continue;
+                        var shelf = town != null && town.Owner != null ? town.Owner.ItemRoster : null;
+                        if (shelf == null || town.MarketData == null) continue;
                         worth.Clear();
-                        var shelf = st.ItemRoster;
                         for (int i = 0; i < shelf.Count; i++)
                         {
                             var el = shelf.GetElementCopyAtIndex(i);
@@ -186,11 +194,11 @@ namespace Armoury
                         }
                         places++;
                     }
-                    catch (Exception e) { if (stumbles++ < 1) Log.Error("RawPrice.SeedNewCampaign (osada)", e); }
+                    catch (Exception e) { if (stumbles++ < 1) Log.Error("RawPrice.SeedNewCampaign (miasto)", e); }
                 }
                 Log.Info("RawPrice: nowa kampania - popyt i podaz wygladzone przez ticki startowe przeliczone na nowa monete w " + places
-                         + " miastach i zamkach, " + cats.Count + " kategorii (" + cells + " pozycji): podaz = wartosc polki teraz, popyt = szacunek modelu"
-                         + (use ? ", dla surowcow masowych w miastach z prawdziwego zuzycia" : "") + "; potkniecia " + stumbles + ".");
+                         + " miastach (zamki bez zmian - gra nie prowadzi ich danych rynku), " + cats.Count + " kategorii (" + cells + " pozycji): podaz = wartosc polki teraz, popyt = szacunek modelu"
+                         + (use ? ", dla surowcow masowych z prawdziwego zuzycia" : "") + "; potkniecia " + stumbles + ".");
             }
             catch (Exception e) { Log.Error("RawPrice.SeedNewCampaign", e); }
         }
