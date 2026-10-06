@@ -20,7 +20,8 @@ namespace Armoury
     ///  "Ludzie:" - swiat: ludnosc z PopulationLaw.PeopleOf i jej zmiana dobowa, zolnierze wedlug rodzaju partii (partie rodow,
     ///    garnizony, milicje, bandy, karawany, tabory wsi), jency, pula wyrzutkow; zabici dzis (wszystkie starcia, wedlug rodzaju
     ///    partii), zwerbowani dzis (zdarzenia gry: od notabli, z karczmy, bez osady, gracz), dezercja; bilans partii rodow
-    ///    z jawna reszta (nowe partie z szablonu, wymiana z garnizonem); odsetek mezczyzn pod bronia;
+    ///    z jawna reszta (nowe partie z szablonu, wymiana z garnizonem); odsetek mezczyzn pod bronia; od kroku 2 takze
+    ///    "hearth za ludzi dzis" - ile hearth wsie oddaly za tabory, wyrzutkow i wymuszonych rekrutow (liczniki PeopleUnit);
     ///  "Ludzie (regiony):" - 8 regionow najbardziej obciazonych: (zaloga + wyrzutki + bandy) wobec mezczyzn regionu;
     ///  plik Logs/[sesja]/ludzie-regiony.csv - wszystkie regiony, wiersz na region na dobe.
     /// Czego ksiega NIE widzi (do kroku 5): z jakiego regionu pochodzi zolnierz partii rodu; przyrost garnizonow (gra dopisuje
@@ -74,6 +75,7 @@ namespace Armoury
             _fights = _wounded = _routed = 0;
             _rNotableParty = _rNotableOther = _rTavern = _rNoPlace = _rPlayer = _rLed = _desLord = _desOther = 0;
             _stumbles = 0;
+            PeopleUnit.NewDay();       // liczniki hearth za ludzi (krok 2) zyja w PeopleUnit, doba konczy sie razem z ksiega
         }
 
         private static int KindOf(MobileParty mp)
@@ -309,6 +311,8 @@ namespace Armoury
                     sb.Append(" | pod bronia (partie rodow + garnizony): ").Append((100.0 * (men[KLord] + men[KGarrison]) / menWorld).ToString("0.00", CultureInfo.InvariantCulture))
                       .Append("% mezczyzn swiata; regionow ponad prog 20% mezczyzn: ").Append(over).Append(" z ").Append(order.Count)
                       .Append(" (bez ludnosci w ksiedze ").Append(noPeople).Append(')');
+                // demografia krok 2: ile hearth wsie oddaly i odzyskaly dzis za ludzi (tabory, wyrzutki, pobor wymuszony, zadania, incydenty)
+                try { sb.Append(PeopleUnit.DayNote()); } catch { _stumbles++; }
                 sb.Append(" | warownie glodne ").Append(starving).Append(", z ujemnym bilansem zywnosci ").Append(foodMinus).Append(" z ").Append(fiefs).Append('.');
                 if (_stumbles > 0) sb.Append(" Potkniecia ksiegi: ").Append(_stumbles).Append('.');
                 int reported = _stumbles;

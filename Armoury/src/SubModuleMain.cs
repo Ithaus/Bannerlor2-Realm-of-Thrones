@@ -74,6 +74,8 @@ namespace Armoury
                 WesterosClimate.ApplyAll(_harmony);
                 OutlawLaw.ApplyAll(_harmony);
                 PopulationLaw.ApplyAll(_harmony);
+                // demografia krok 2: 1 czlowiek = 1/k hearth (tabory wsi, lodzie rybackie, pobor wymuszony, zadania gracza); we wlasnym try - jej wywrotka nie moze zatrzymac latek ponizej
+                try { PeopleUnit.ApplyAll(_harmony); } catch (Exception e) { Log.Error("PeopleUnit.ApplyAll", e); }
                 MapClock.ApplyAll(_harmony);
                 Levy.ApplyAll(_harmony);
                 VolunteerKit.ApplyAll(_harmony);

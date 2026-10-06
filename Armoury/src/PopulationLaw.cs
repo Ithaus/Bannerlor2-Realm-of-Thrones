@@ -73,7 +73,7 @@ namespace Armoury
 
         internal static void Reset()
         {
-            _k.Clear(); RentToday.Clear();
+            _k.Clear(); RentToday.Clear(); _errCalibrate = false;
             // wpis 87 (audyt pkt 4): BK tworzy nowe PopulationManager/PolicyManager przy kazdej grze - stare referencje dawaly
             // dekret podatkowy zawsze Standard i pomijaly autonomie po wczytaniu drugiego save'a bez restartu
             _bkResolved = false; _popMgr = null; _popData = null; _polResolved = false; _policyMgr = null; _getPolicy = null;
@@ -111,6 +111,73 @@ namespace Armoury
 
         /// <summary>Czy ludnosc jest juz skalibrowana (ksiega "Ludzie:" czyta PeopleOf tylko wtedy - sama kalibracji nie wywoluje).</summary>
         internal static bool Calibrated { get { return _k.Count > 0; } }
+
+        // ------------------------------------------------------------ jednostka ludzi (demografia krok 2, PeopleUnit)
+        // klucz w `_k`, ktory nie jest id kultury: srednio ludzi wsi na punkt hearth na calym swiecie
+        private const string WorldKey = "*";
+        private static bool _errCalibrate;
+
+        /// <summary>
+        /// Kalibracja na zadanie. Jednostka ludzi wola ja PRZED pierwszym zdjeciem hearth (siew puli wyrzutkow, pierwszy tabor):
+        /// dotad kalibracja szla dopiero przy pierwszych rentach, po siewie, i rozkladala ludnosc krain na hearth juz pomniejszony.
+        /// </summary>
+        internal static void EnsureCalibrated()
+        {
+            try { Calibrate(); }
+            catch (Exception e) { if (!_errCalibrate) { _errCalibrate = true; Log.Error("PopulationLaw.EnsureCalibrated", e); } }
+        }
+
+        /// <summary>
+        /// Ile punktow hearth wsi to jeden jej czlowiek: 1/k kultury osady (k = ludzi na punkt hearth - ta sama liczba, przez
+        /// ktora PeopleOf mnozy hearth). 0 = brak przelicznika (kultura spoza tabeli, kraina bez wsi w dniu kalibracji,
+        /// PopulationScale 0) - wolajacy zostaje wtedy przy stawce dotychczasowej; dzielenia przez zero nie ma.
+        /// </summary>
+        internal static float HearthPerMan(Village v)
+        {
+            if (v == null || v.Settlement == null || v.Settlement.Culture == null) return 0f;
+            EnsureCalibrated();
+            float[] k;
+            if (!_k.TryGetValue(v.Settlement.Culture.StringId, out k) || k == null || k.Length == 0) return 0f;
+            float kv = k[0];
+            if (!(kv > 0f) || float.IsInfinity(kv)) return 0f;       // takze NaN
+            float per = 1f / kv;
+            return per > 0f ? per : 0f;
+        }
+
+        /// <summary>
+        /// Srednio ludzi wsi na punkt hearth na swiecie (ok. 191). Liczone raz - z ludnosci i hearth wsi w chwili pierwszego
+        /// pytania (w nowej kampanii: przy siewie puli wyrzutkow, zaraz po kalibracji) - i trzymane w `_k` pod kluczem "*",
+        /// wiec idzie do zapisu razem z reszta kalibracji; zapis sprzed tej wersji dostaje je przy pierwszym pytaniu.
+        /// 0 = brak danych (zadna wies nie ma przelicznika).
+        /// </summary>
+        internal static float WorldPeoplePerHearth()
+        {
+            EnsureCalibrated();
+            float[] w;
+            if (_k.TryGetValue(WorldKey, out w) && w != null && w.Length > 0 && w[0] > 0f) return w[0];
+            double people = 0.0, hearth = 0.0;
+            try
+            {
+                foreach (var s in Settlement.All)
+                {
+                    if (s == null || !s.IsVillage || s.Village == null || s.Culture == null) continue;
+                    float[] k;
+                    if (!_k.TryGetValue(s.Culture.StringId, out k) || k == null || k.Length == 0 || !(k[0] > 0f)) continue;
+                    double h = Math.Max(0f, s.Village.Hearth);
+                    people += h * k[0]; hearth += h;
+                }
+            }
+            catch (Exception e)
+            {
+                if (!_errCalibrate) { _errCalibrate = true; Log.Error("PopulationLaw.WorldPeoplePerHearth", e); }
+                return 0f;      // wolajacy liczy wtedy od hearth, jak dotad
+            }
+            float kw = hearth > 0.0 ? (float)(people / hearth) : 0f;
+            if (!(kw > 0f) || float.IsInfinity(kw)) return 0f;
+            _k[WorldKey] = new[] { kw, 0f };
+            Log.Info("PopulationLaw: srednia swiata " + kw.ToString("0.0", CultureInfo.InvariantCulture) + " ludzi wsi na punkt hearth (podstawa liczenia wyrzutkow od ludnosci).");
+            return kw;
+        }
 
         internal static float PeopleOf(Settlement s)
         {
