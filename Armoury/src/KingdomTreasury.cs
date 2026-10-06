@@ -77,6 +77,143 @@ namespace Armoury
             catch (Exception e) { Log.Error("KingdomTreasury.Daily", e); }
         }
 
+        // ------------------------------------------------------------ zwrot zoldu w wojnie
+        // Jeff 05.10: "skarbiec krolestwa w czasie wojny zwraca lordom polowe dziennego zoldu, dopoki ma z czego" (audyt 05.10
+        // pieniadz/P3, fundament K11: skarbce tylko rosly - BK wylacza jedyna wyplate gry). Raz na dobe, po powinnosciach i
+        // daninach: krolestwo w wojnie z innym krolestwem zwraca kazdemu platnikowi `CrownWageRefundPercent` (50%) zoldu, ktory
+        // jego partie (i garnizony - `CrownWageRefundGarrisons`) NAPRAWDE zaplacily od poprzedniego rozliczenia (SoldierPay liczy
+        // to, co zeszlo z kies). Gdy skarbiec nie ma dosc - wszystkim proporcjonalnie mniej; skarbiec nie schodzi ponizej zera.
+        // Rod krola i rod gracza na tych samych zasadach; najemnicy, rody bez krolestwa i krolestwa w pokoju - nic.
+        // Zloto: skarbiec krolestwa -> kiesa platnika (glowa rodu albo rycerz, ktory sam oplacil swoja partie).
+        internal struct RefundRow { public long Paid, Due, Given; public int Clans; }
+        private static readonly Dictionary<Kingdom, RefundRow> _refund = new Dictionary<Kingdom, RefundRow>();
+
+        internal static void Reset() { _refund.Clear(); _refundErr = false; }
+
+        private static bool AtWar(Kingdom k)
+        {
+            try { foreach (var o in Kingdom.All) if (o != k && !o.IsEliminated && k.IsAtWarWith(o)) return true; } catch { }
+            return false;
+        }
+
+        /// <summary>Jaka czesc kasy miasta ponad prog bierze dzis danina wojenna tego krolestwa (0 w pokoju albo gdy wylaczona) - jak w Levies.</summary>
+        internal static float LaySubsidyTownRate(Kingdom k)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || k == null || !s.LaySubsidyEnabled || !AtWar(k)) return 0f;
+                return Math.Max(0f, s.LaySubsidyTownShare) * (k.ActivePolicies.Contains(DefaultPolicies.WarTax) ? Math.Max(1f, s.LaySubsidyWarTaxMultiplier) : 1f);
+            }
+            catch { return 0f; }
+        }
+
+        /// <summary>Podzial zwrotu: kazdemu `due[i]`, a gdy skarbiec (`have`) nie starcza - proporcjonalnie mniej, w dol; suma nigdy ponad `have`.</summary>
+        internal static int[] Split(int[] due, long have)
+        {
+            var give = new int[due.Length];
+            long want = 0;
+            for (int i = 0; i < due.Length; i++) if (due[i] > 0) want += due[i];
+            if (want <= 0 || have <= 0) return give;
+            for (int i = 0; i < due.Length; i++)
+            {
+                if (due[i] <= 0) continue;
+                give[i] = have >= want ? due[i] : (int)((long)due[i] * have / want);
+            }
+            return give;
+        }
+
+        /// <summary>Dopisek do linii "Skarbce:" - zwrot zoldu tego krolestwa w dzisiejszym rozliczeniu.</summary>
+        internal static string RefundNote(Kingdom k)
+        {
+            RefundRow r;
+            if (k == null || !_refund.TryGetValue(k, out r)) return "";
+            return ", zwrot zoldu " + r.Given + " dla " + r.Clans + " rodow" + (r.Given < r.Due ? " (nalezne " + r.Due + " - skarbiec nie mial dosc)" : "");
+        }
+
+        internal static void WageRefund()
+        {
+            _refund.Clear();
+            var s = Settings.Current;
+            if (s == null || Campaign.Current == null) return;
+            try
+            {
+                var paid = SoldierPay.TakePaid();           // zawsze oproznia licznik doby
+                if (!s.CrownWageRefundEnabled) return;
+                float pct = Math.Max(0f, Math.Min(100f, s.CrownWageRefundPercent)) / 100f;
+                var byKingdom = new Dictionary<Kingdom, List<KeyValuePair<Hero, int>>>();
+                long peace = 0, noKingdom = 0, merc = 0;
+                foreach (var kv in paid)
+                {
+                    var h = kv.Key;
+                    if (h == null || kv.Value <= 0) continue;
+                    var c = h.Clan;
+                    if (c == null || c.IsEliminated) continue;
+                    if (!h.IsAlive) { h = c.Leader; if (h == null || !h.IsAlive) continue; }   // platnik nie dozyl rozliczenia - zwrot bierze glowa jego rodu
+                    var k = c.Kingdom;
+                    if (k == null || k.IsEliminated) { noKingdom += kv.Value; continue; }
+                    if (c.IsUnderMercenaryService) { merc += kv.Value; continue; }
+                    List<KeyValuePair<Hero, int>> list;
+                    if (!byKingdom.TryGetValue(k, out list)) { list = new List<KeyValuePair<Hero, int>>(); byKingdom[k] = list; }
+                    list.Add(new KeyValuePair<Hero, int>(h, kv.Value));
+                }
+                long totalGiven = 0, totalDue = 0, totalPaid = 0, left = 0, toDebtors = 0; int kingdoms = 0, shortK = 0, emptyK = 0, playerGot = 0, stumbles = 0;
+                var allClans = new HashSet<Clan>(); var debtors = new HashSet<Clan>();
+                foreach (var kk in byKingdom)
+                {
+                    var k = kk.Key; var list = kk.Value;
+                    long paidSum = 0, want = 0, given = 0, have = 0; var clans = new HashSet<Clan>();
+                    bool counted = false;
+                    // wyjatek przy jednym krolestwie nie zatrzymuje zwrotu w pozostalych (pierwszy do pliku, kolejne liczone)
+                    try
+                    {
+                        foreach (var kv in list) paidSum += kv.Value;
+                        if (!AtWar(k)) { peace += paidSum; continue; }
+                        var due = new int[list.Count];
+                        for (int i = 0; i < list.Count; i++) { due[i] = (int)(list[i].Value * pct); want += due[i]; }
+                        if (want <= 0) continue;
+                        counted = true;
+                        have = Math.Max(0, k.KingdomBudgetWallet);      // Diplomacy potrafi zostawic skarbiec na minusie - wtedy nic nie placimy
+                        var give = Split(due, have);
+                        for (int i = 0; i < list.Count; i++)
+                        {
+                            if (give[i] <= 0) continue;
+                            var h = list[i].Key;
+                            k.KingdomBudgetWallet -= give[i];   // najpierw skarbiec, potem platnik: skarbiec oddaje dokladnie tyle, ile dostal platnik
+                            h.ChangeHeroGold(give[i]);
+                            given += give[i];
+                            clans.Add(h.Clan); allClans.Add(h.Clan);
+                            if (h.Clan == Clan.PlayerClan) playerGot += give[i];
+                            // tylko pomiar: rod dluzny koronie (Clan.DebtToKingdom) - gra przy najblizszym rozliczeniu zabierze mu kiese na splate
+                            // dlugu (vanilla AddPaymentForDebts), a ta splata nie trafia do skarbca
+                            if (h.Clan != null && h.Clan.DebtToKingdom > 0) { toDebtors += give[i]; debtors.Add(h.Clan); }
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        stumbles++;
+                        if (!_refundErr) { _refundErr = true; Log.Error("KingdomTreasury.WageRefund(" + (k != null && k.Name != null ? k.Name.ToString() : "?") + ")", e); }
+                    }
+                    if (!counted) continue;
+                    _refund[k] = new RefundRow { Paid = paidSum, Due = want, Given = given, Clans = clans.Count };
+                    kingdoms++; totalGiven += given; totalDue += want; totalPaid += paidSum; left += k.KingdomBudgetWallet;
+                    if (given < want) { shortK++; if (have <= 0) emptyK++; }
+                }
+                Log.Info("Korona: dzien " + (int)CampaignTime.Now.ToDays + " - zwrot zoldu ze skarbcow krolestw w wojnie: " + totalGiven + " zl dla " + allClans.Count + " rodow w "
+                         + kingdoms + " krolestwach (" + (pct * 100f).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + "% z " + totalPaid
+                         + " zaplaconego zoldu = nalezne " + totalDue + "); skarbiec nie mial dosc w " + shortK + " krolestwach (w tym pusty: " + emptyK + "), niedoplata "
+                         + (totalDue - totalGiven) + "; w skarbcach tych krolestw zostalo " + left
+                         + (playerGot > 0 ? "; rod gracza dostal " + playerGot : "")
+                         + (toDebtors > 0 ? "; z tego " + toDebtors + " dla " + debtors.Count + " rodow dluznych koronie (gra zabierze im to na splate dlugu, ktora nie wraca do skarbca)" : "")
+                         + ". Bez zwrotu: zold krolestw w pokoju " + peace + ", rodow bez krolestwa " + noKingdom + ", najemnikow " + merc + "."
+                         + (stumbles > 0 ? " Potkniecia: wyjatek przy " + stumbles + " krolestwach." : ""));
+                if (playerGot > 0)
+                    Log.Player("The crown repaid your house " + playerGot + " denars of the wages it paid today - the realm is at war.");
+            }
+            catch (Exception e) { Log.Error("KingdomTreasury.WageRefund", e); }
+        }
+        private static bool _refundErr;
+
         // ------------------------------------------------------------ danina wojenna, clo, mennica, monopole (wpisy 55-56)
         // Jeff 04.10 "tak" na E i G (docs/ZRODLA-DOCHODU.md C3-C9). Historycznie: pietnastka i dziesiecina (1290, 1334) placili
         // poddani, nie panowie; clo od handlu (1275) mial kazdy krol; oplata menniczna szla z monety w obiegu; monopole z

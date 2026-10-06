@@ -80,6 +80,7 @@ namespace Armoury
                 LevyGold.ApplyAll(_harmony);
                 WinterSource.ApplyAll(_harmony);
                 KingdomTreasury.ApplyAll(_harmony);
+                try { SoldierPay.ApplyAll(_harmony); } catch (Exception e) { Log.Error("SoldierPay.ApplyAll", e); }   // zold do obiegu: sakiewki ludzi, kasy osad, zwrot ze skarbca
                 WearKeep.ApplyAll(_harmony);
                 HistoricalPrices.ApplyAll(_harmony);
                 AmmoRecovery.ApplyAll(_harmony);

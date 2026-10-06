@@ -1,0 +1,563 @@
+using System;
+using System.Collections.Generic;
+using System.Reflection;
+using HarmonyLib;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.GameComponents;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
+
+namespace Armoury
+{
+    /// <summary>
+    /// ZOLD DO OBIEGU (Jeff 05.10: "zold partii do sakiewek ludzi (wydaja w miastach), zold garnizonu do kasy jego osady - takze
+    /// u gracza"; audyt 05.10 pieniadz/P2, fundament K9). Dotad zold schodzil z kies i znikal: gra i BK zdejmuja go z kiesy
+    /// (Hero.Gold / PartyTradeGold) albo wliczaja do salda rodu i nikt go nie dostaje - najwieksze ujscie zlota swiata.
+    ///
+    /// Jak gra i BK pobieraja zold (dekompilacja: DefaultClanFinanceModel.AddExpensesFromPartiesAndGarrisons, AddPartyExpense,
+    /// AddExpenseFromLeaderParty; BK EconomyPatches.ClanFinancesPatches.PartyExpensesPrefix - w tym zestawie modow czynny jest BK):
+    ///  - kazda partia rodu przechodzi przez DefaultClanFinanceModel.CalculatePartyWage(partia, budzet, applyWithdrawals) - wynik to
+    ///    min(zold, budzet rodu); BK wola ja refleksja, vanilla wprost. To jedyny wspolny punkt (ten sam, ktory liczy MoneyLedger);
+    ///  - partia GLOWY rodu: kwota wchodzi do salda rodu, a saldo gra dopisuje glowie jednym GiveGoldAction (kiesa nie schodzi
+    ///    ponizej zera - gdy saldo sie nie miesci, czesc wydatkow nie zostala zaplacona);
+    ///  - pozostale partie rodu z wodzem: kwota schodzi od razu z kiesy wodza (BK: rycerz z lennem placi sam; innemu wodzowi rod
+    ///    wyrownuje kiese z salda); partia bez wodza: z kiesy glowy rodu;
+    ///  - garnizon i karawana: z kiesy partii (PartyTradeGold), rod wyrownuje ja z salda.
+    ///  W kazdym przypadku z kiesy schodzi najwyzej tyle, ile w niej jest (Hero.Gold i PartyTradeGold obcinaja do zera).
+    ///
+    /// Co robimy: prefiks i postfiks na ClanVariablesCampaignBehavior.DailyTickClan otwieraja i zamykaja rozliczenie jednego rodu;
+    /// postfiks na CalculatePartyWage zapisuje dla kazdej partii, ile za chwile zejdzie z kiesy platnika; postfiks na
+    /// CalculateClanGoldChange czynnego modelu finansow zapamietuje kiese glowy i saldo tuz przed jego dopisaniem. Po rozliczeniu
+    /// rodu: jesli saldo nie zmiescilo sie w kiesie glowy, wszystkie kwoty tego rodu sa proporcjonalnie przycinane o brak
+    /// (pusta kiesa = brak wyplaty = brak wplaty); potem partia rodu -> sakiewka jej ludzi (MenPurse - wydaja w miastach),
+    /// garnizon -> kasa jego miasta albo zamku. Nic ponad to, co naprawde zeszlo z kies. Karawany bez zmian.
+    /// Zaplacone kwoty sa tez podstawa zwrotu ze skarbca krolestwa w wojnie (KingdomTreasury.WageRefund).
+    ///
+    /// Brak ukryty w dlugu wobec korony (przeglad paczki, proba na prawdziwym kodzie gry): gdy wydatki rodu przekraczaja kiese
+    /// z dochodem dnia, a krolestwo ma do oplacenia najemnikow albo danine (MercenaryWallet / TributeWallet / CallToWarWallet
+    /// ponizej zera - wystarczy -1) albo rod juz jest dluzny, vanilla DefaultClanFinanceModel.ApplyShareForExpenses i
+    /// AddPaymentForDebts dopisuja brak do Clan.DebtToKingdom i WYROWNUJA saldo dokladnie do kiesy glowy. Saldo wyglada wtedy na
+    /// zaplacone, choc zlota nie bylo - samo porownanie salda z kiesa nie widzi braku. Dlatego kazdy przyrost DebtToKingdom
+    /// w trakcie rozliczenia rodu liczymy jako brak (takze niezaplacony udzial w najemnikach - bezpieczna strona: mniej wplat).
+    ///
+    /// Kiedy latamy (docs/ERRORS.md, pulapka z 14.09): Harmony kompiluje zalatana metode juz przy zakladaniu latki, a kompilacja
+    /// metody, ktora czyta pole statyczne klasy, uruchamia konstruktor statyczny tej klasy. Konstruktor DefaultClanFinanceModel
+    /// czyta Game.Current - przy starcie gry jeszcze pusty; nieudana proba zabija klase na caly proces. Dlatego przy starcie gry
+    /// zakladamy tylko pare na DailyTickClan (ta metoda ma juz od dawna nasz transpiler), a latki na modelach - zold partii,
+    /// saldo rodu i regulator kasy - dopiero w kampanii: przy pierwszym rozliczeniu rodu (EnsureHooks) i przy pierwszej wplacie
+    /// pod tarcza (EnsureShieldHook). Latamy jedna implementacje salda i jedna regulatora: te, ktorej uzywa czynny model.
+    /// </summary>
+    internal static class SoldierPay
+    {
+        private struct Rec
+        {
+            public MobileParty Party;
+            public int Wage;          // naliczone przez gre (min(zold, budzet))
+            public int Paid;          // tyle zejdzie z kiesy platnika (albo wejdzie do salda rodu)
+            public bool Balance;      // partia glowy rodu - kwota w saldzie rodu
+            public Hero Payer;        // wodz placacy wprost z wlasnej kiesy (null: kiesa partii)
+            public int PayerGold;     // jego kiesa przed zdjeciem zoldu
+        }
+
+        // ------------------------------------------------------------ rozliczenie jednego rodu (miedzy prefiksem a postfiksem DailyTickClan)
+        private static Clan _clan;
+        private static readonly List<Rec> _recs = new List<Rec>();
+        private static bool _haveNet;
+        private static int _goldMid, _net;                 // kiesa glowy tuz przed dopisaniem salda i samo saldo
+        private static int _debtBefore;                    // dlug rodu wobec korony przed rozliczeniem (jego przyrost = brak zapisany przez gre jako dlug)
+        private static object _netModel;
+        private static Type _netDecl;
+
+        // ------------------------------------------------------------ zaplacone dzis wedlug platnika (podstawa zwrotu ze skarbca)
+        private static readonly Dictionary<Hero, int> _paidToday = new Dictionary<Hero, int>();
+
+        // ------------------------------------------------------------ liczniki doby (linia "Zold:")
+        private static long _dLordAcc, _dLordTaken, _dGarAcc, _dGarTaken, _dToPurse, _dPlayer, _dToTowns, _dToCastles;
+        private static long _dUndead, _dNoTown, _dOff, _dOther, _dCut, _dBlindGold, _dDebtCut;
+        private static int _dLordN, _dGarN, _dToPurseN, _dToTownsN, _dToCastlesN, _dCutClans, _dBlind, _dDupes, _stumbles, _dDebtClans;
+        private static bool _errLogged;
+
+        private static readonly Type[] NetArgs = { typeof(Clan), typeof(bool), typeof(bool), typeof(bool) };
+
+        // ------------------------------------------------------------ latki na modelach: zakladane w kampanii, raz na proces (Reset ich nie rusza)
+        private static Harmony _harmony;
+        private static bool _wageTried, _wageHooked;
+        private static readonly HashSet<Type> _netHooked = new HashSet<Type>(), _regHooked = new HashSet<Type>();   // klasy z zalatana implementacja
+        private static object _netTriedFor, _regTriedFor;  // model tej kampanii, dla ktorego juz sprawdzalismy
+        private static bool _regReady;
+
+        internal static void Reset()
+        {
+            _clan = null; _recs.Clear(); _haveNet = false; _netModel = null; _netDecl = null; _debtBefore = 0;
+            _paidToday.Clear(); _errLogged = false;
+            _held.Clear(); _regModel = null; _regDecl = null;
+            _netTriedFor = null; _regTriedFor = null; _regReady = false;   // nowa kampania = nowe obiekty modeli (latki zostaja w procesie)
+            ClearDay();
+        }
+
+        private static void ClearDay()
+        {
+            _dLordAcc = _dLordTaken = _dGarAcc = _dGarTaken = _dToPurse = _dPlayer = _dToTowns = _dToCastles = 0;
+            _dUndead = _dNoTown = _dOff = _dOther = _dCut = _dBlindGold = _dDebtCut = 0;
+            _dLordN = _dGarN = _dToPurseN = _dToTownsN = _dToCastlesN = _dCutClans = _dBlind = _dDupes = _stumbles = _dDebtClans = 0;
+            _dShielded = 0; _dShieldTicks = 0;
+        }
+
+        /// <summary>Czy ktorakolwiek czesc mechanizmu jest wlaczona (bez tego latki tylko wracaja).</summary>
+        private static bool Watching
+        {
+            get { var s = Settings.Current; return s != null && (s.SoldierPayToPurse || s.GarrisonPayToCoffers || s.CrownWageRefundEnabled); }
+        }
+
+        private static bool Live { get { var c = Campaign.Current; return c != null && c.GameStarted; } }
+
+        /// <summary>Wyjatek przy jednym rodzie albo partii: pierwszy do pliku, kolejne liczone (nigdy nie gasimy mechanizmu).</summary>
+        private static void Stumble(string where, Exception e)
+        {
+            _stumbles++;
+            if (_errLogged) return;
+            _errLogged = true;
+            Log.Error(where, e);
+        }
+
+        // ------------------------------------------------------------ rachunek (czyste funkcje)
+        /// <summary>O ile saldo rodu nie zmiescilo sie w kiesie glowy (tyle wydatkow nie zostalo naprawde zaplacone).</summary>
+        internal static long Shortfall(int goldBefore, int net)
+        {
+            long after = (long)goldBefore + net;
+            return after < 0 ? -after : 0L;
+        }
+
+        /// <summary>Czesc kwoty jednej partii, ktora naprawde zeszla z kies, gdy rodowi zabraklo `shortfall` na wszystkie `owed`.</summary>
+        internal static int Share(int paid, long owed, long shortfall)
+        {
+            if (paid <= 0 || owed <= 0 || shortfall >= owed) return 0;
+            if (shortfall <= 0) return paid;
+            return (int)((long)paid * (owed - shortfall) / owed);   // w dol - suma nigdy nie przekroczy tego, co zeszlo
+        }
+
+        // ------------------------------------------------------------ latki
+        /// <summary>ClanVariablesCampaignBehavior.DailyTickClan - poczatek dziennego rozliczenia rodu.</summary>
+        public static void ClanTickPrefix(Clan __0)
+        {
+            try
+            {
+                _clan = null; _recs.Clear(); _haveNet = false;
+                if (__0 == null || __0.IsBanditFaction || __0.Leader == null || !Watching || !Live) return;
+                EnsureHooks();
+                _debtBefore = __0.DebtToKingdom;
+                _clan = __0;
+            }
+            catch (Exception e) { _clan = null; Stumble("SoldierPay.ClanTickPrefix", e); }
+        }
+
+        /// <summary>
+        /// Latki na model finansow, zakladane w kampanii (Game.Current i Campaign.Current istnieja): postfiks na CalculatePartyWage
+        /// (raz na proces) i postfiks na implementacji CalculateClanGoldChange, ktorej uzywa czynny model (raz na klase).
+        /// Wolane z prefiksu DailyTickClan - przed cialem gry, wiec juz pierwsze rozliczenie rodu jest liczone.
+        /// </summary>
+        private static void EnsureHooks()
+        {
+            var h = _harmony;
+            if (h == null) return;
+            var active = Campaign.Current.Models.ClanFinanceModel;
+            if (_wageTried && (active == null || ReferenceEquals(active, _netTriedFor))) return;
+            if (!_wageTried)
+            {
+                _wageTried = true;
+                try
+                {
+                    var m = AccessTools.Method(typeof(DefaultClanFinanceModel), "CalculatePartyWage");
+                    if (m != null) { h.Patch(m, postfix: new HarmonyMethod(typeof(SoldierPay), nameof(WagePostfix))); _wageHooked = true; }
+                }
+                catch (Exception e) { Log.Error("SoldierPay.EnsureHooks(CalculatePartyWage)", e); }
+            }
+            if (active == null || ReferenceEquals(active, _netTriedFor)) return;
+            _netTriedFor = active;
+            string where = "BRAK (rod z pusta kiesa nie dostanie przekazania)";
+            try
+            {
+                var decl = DeclOf(active.GetType());
+                if (decl != null && _netHooked.Contains(decl)) where = decl.FullName + " (wpiete wczesniej)";
+                else if (decl != null)
+                {
+                    var m = decl.GetMethod("CalculateClanGoldChange", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly, null, NetArgs, null);
+                    if (m != null && !m.IsAbstract)
+                    {
+                        h.Patch(m, postfix: new HarmonyMethod(typeof(SoldierPay), nameof(NetPostfix)) { priority = Priority.Last });
+                        _netHooked.Add(decl);
+                        where = decl.FullName + " (wpiete teraz)";
+                    }
+                }
+            }
+            catch (Exception e) { Log.Error("SoldierPay.EnsureHooks(saldo rodu)", e); }
+            Log.Info("SoldierPay: latki modelu finansow (zakladane w kampanii) - zold partii " + (_wageHooked ? "wpiete" : "BRAK - nic nie bedzie przekazywane")
+                     + "; saldo rodu z " + where + ", model czynny " + active.GetType().FullName + ".");
+        }
+
+        /// <summary>DefaultClanFinanceModel.CalculatePartyWage(partia, budzet, applyWithdrawals) - zaraz po niej gra i BK zdejmuja wynik z kiesy.</summary>
+        public static void WagePostfix(MobileParty __0, bool __2, int __result)
+        {
+            try
+            {
+                var clan = _clan;
+                if (clan == null || !__2 || __0 == null || __result <= 0) return;
+                for (int i = 0; i < _recs.Count; i++)
+                    if (ReferenceEquals(_recs[i].Party, __0)) { _dDupes++; return; }   // druga wyplata tej samej partii w jednym rozliczeniu - nie liczymy
+                var r = new Rec { Party = __0, Wage = __result };
+                var head = clan.Leader;
+                if (head != null && ReferenceEquals(head.PartyBelongedTo, __0))
+                {
+                    r.Balance = true; r.Paid = __result;                // partia glowy rodu: kwota wchodzi do salda rodu
+                }
+                else if (__0.IsLordParty)
+                {
+                    var payer = __0.LeaderHero ?? (__0.ActualClan != null ? __0.ActualClan.Leader : null);
+                    int gold = payer != null ? payer.Gold : 0;
+                    r.Payer = payer; r.PayerGold = gold;
+                    r.Paid = Math.Min(__result, Math.Max(0, gold));     // kiesa nie schodzi ponizej zera
+                }
+                else
+                {
+                    r.PayerGold = __0.PartyTradeGold;                   // garnizon, karawana: kiesa partii
+                    r.Paid = Math.Min(__result, Math.Max(0, r.PayerGold));
+                }
+                _recs.Add(r);
+            }
+            catch (Exception e) { Stumble("SoldierPay.WagePostfix", e); }
+        }
+
+        /// <summary>CalculateClanGoldChange czynnego modelu finansow (najbardziej zewnetrzna implementacja) - gra zaraz dopisze wynik glowie rodu.</summary>
+        public static void NetPostfix(object __instance, MethodBase __originalMethod, Clan __0, bool __2, ExplainedNumber __result)
+        {
+            try
+            {
+                var clan = _clan;
+                if (clan == null || !__2 || !ReferenceEquals(__0, clan)) return;
+                var active = Campaign.Current.Models.ClanFinanceModel;
+                if (!ReferenceEquals(__instance, active)) return;                  // model opakowany przez inny - liczy zewnetrzny
+                if (!ReferenceEquals(active, _netModel)) { _netModel = active; _netDecl = DeclOf(active.GetType()); }
+                if (__originalMethod == null || __originalMethod.DeclaringType != _netDecl) return;   // metoda bazowa wolana przez nadpisanie
+                var head = clan.Leader;
+                if (head == null) return;
+                _goldMid = head.Gold;
+                _net = TaleWorlds.Library.MathF.Round(__result.ResultNumber);      // tak samo zaokragla DailyTickClan
+                _haveNet = true;
+            }
+            catch (Exception e) { Stumble("SoldierPay.NetPostfix", e); }
+        }
+
+        private static Type DeclOf(Type t)
+        {
+            try
+            {
+                var m = t.GetMethod("CalculateClanGoldChange", BindingFlags.Public | BindingFlags.Instance, null, NetArgs, null);
+                return m != null ? m.DeclaringType : null;
+            }
+            catch { return null; }
+        }
+
+        /// <summary>ClanVariablesCampaignBehavior.DailyTickClan - koniec rozliczenia rodu: saldo dopisane, kiesy po wyplatach.</summary>
+        public static void ClanTickPostfix()
+        {
+            var clan = _clan;
+            _clan = null;
+            if (clan == null) return;
+            try { Settle(clan); }
+            catch (Exception e) { Stumble("SoldierPay.Settle", e); }
+            finally { _recs.Clear(); _haveNet = false; }
+        }
+
+        // ------------------------------------------------------------ rozdzial zaplaconego zoldu
+        private static void Settle(Clan clan)
+        {
+            if (_recs.Count == 0) return;
+            var s = Settings.Current;
+            if (s == null) return;
+            long owed = 0;
+            for (int i = 0; i < _recs.Count; i++) owed += _recs[i].Paid;
+            var head = clan.Leader;
+            long shortfall = 0;
+            if (owed > 0)
+            {
+                bool blind = false;
+                if (_haveNet) shortfall = Shortfall(_goldMid, _net);
+                else if (head == null || head.Gold <= 0)
+                {
+                    // saldo nieznane (model finansow spoza naszych latek), a kiesa glowy pusta: nie wiemy, ile naprawde zaplacono - nic nie przekazujemy
+                    _dBlind++; _dBlindGold += owed;
+                    shortfall = owed; blind = true;
+                }
+                if (!blind)
+                {
+                    // brak ukryty w dlugu wobec korony: gra dopisala go do Clan.DebtToKingdom i wyrownala saldo do kiesy (opis w naglowku klasy)
+                    long hidden = Math.Max(0L, (long)clan.DebtToKingdom - _debtBefore);
+                    if (hidden > 0)
+                    {
+                        if (shortfall < owed) { _dDebtClans++; _dDebtCut += Math.Min(hidden, owed - shortfall); }
+                        shortfall += hidden;
+                    }
+                    if (shortfall > 0) { _dCutClans++; _dCut += Math.Min(shortfall, owed); }
+                }
+            }
+            // takze gdy nic nie zeszlo z kies: Route dolicza zold naliczony (linia "Zold:" ma sie zgadzac z licznikiem ksiegi pieniadza)
+            for (int i = 0; i < _recs.Count; i++)
+            {
+                var r = _recs[i];
+                try { Route(clan, r, Share(r.Paid, owed, shortfall), s); }
+                catch (Exception e) { Stumble("SoldierPay.Route", e); }
+            }
+        }
+
+        private static void Route(Clan clan, Rec r, int amt, Settings s)
+        {
+            var mp = r.Party;
+            if (mp.IsGarrison)
+            {
+                _dGarAcc += r.Wage; _dGarTaken += amt; _dGarN++;
+                if (amt <= 0) return;
+                if (s.CrownWageRefundGarrisons) AddPaid(clan.Leader, amt, s);   // kiese zalogi wyrownuje rod z salda - placi glowa
+                if (!s.GarrisonPayToCoffers) { _dOff += amt; return; }
+                var st = mp.CurrentSettlement ?? mp.HomeSettlement;
+                var town = st != null ? st.Town : null;
+                if (town == null) { _dNoTown += amt; return; }
+                town.ChangeGold(amt);                                   // zaloga wydaje zold na miejscu - kasa jej miasta albo zamku
+                if (st.IsTown) { _dToTowns += amt; _dToTownsN++; Hold(st, amt); } else { _dToCastles += amt; _dToCastlesN++; }
+                MoneyLedger.Note(MoneyLedger.NWage, st, amt);           // ksiega przeplywow osad (tylko licznik)
+                MoneyLedger.NoteWageRouted(false, amt);
+            }
+            else if (mp.IsLordParty)
+            {
+                _dLordAcc += r.Wage; _dLordTaken += amt; _dLordN++;
+                if (amt <= 0) return;
+                // kto poniosl koszt: wodz, ktoremu rod nie wyrownal kiesy (rycerz z lennem u BK), inaczej glowa rodu
+                var payer = clan.Leader;
+                if (!r.Balance && r.Payer != null && r.Payer != payer && r.Payer.Gold < r.PayerGold) payer = r.Payer;
+                AddPaid(payer, amt, s);
+                if (!s.SoldierPayToPurse || !MenPurse.On) { _dOff += amt; return; }
+                if (Undead.Party(mp)) { _dUndead += amt; return; }      // trup zoldu nie wyda - bez sakiewki (jak dotad)
+                MenPurse.NoteWage(amt);                                 // licznik linii "Sakiewka ludzi:" (najpierw - zamyka poprzednia dobe przed wplata)
+                MenPurse.Add(mp, amt);                                  // ludzie wydadza w miescie: naprawy, braki, zycie
+                _dToPurse += amt; _dToPurseN++;
+                if (mp.IsMainParty) _dPlayer += amt;
+                MoneyLedger.NoteWageRouted(true, amt);
+            }
+            else _dOther += amt;                                        // karawany i inne partie: bez zmian
+        }
+
+        private static void AddPaid(Hero payer, int amt, Settings s)
+        {
+            if (payer == null || amt <= 0 || !s.CrownWageRefundEnabled) return;
+            int v; _paidToday.TryGetValue(payer, out v);
+            _paidToday[payer] = v + amt;
+        }
+
+        /// <summary>Zold partii i garnizonow naprawde zaplacony od poprzedniego rozliczenia korony, wedlug platnika; czysci licznik.</summary>
+        internal static List<KeyValuePair<Hero, int>> TakePaid()
+        {
+            var list = new List<KeyValuePair<Hero, int>>(_paidToday);
+            _paidToday.Clear();
+            return list;
+        }
+
+        // ------------------------------------------------------------ zabezpieczenie: tarcza zoldu w kasie miasta (TownWageShield, domyslnie WLACZONA - decyzja Jeffa 06.10; bez niej regulator kas kasuje ok. 81% zoldu wplaconego miastom)
+        // Regulator kasy gry (vanilla DefaultSettlementEconomyModel.GetTownGoldChange: co dobe 0.25 x (cel - kasa), cel = 10 000 +
+        // 12 x dobrobyt) kasuje cwierc kazdej nadwyzki dziennie, a zawor renty pana (PopulationLaw: 7% kasy ponad prog, z pulapem
+        // renty naleznej) jest wolniejszy - z zoldu wplaconego do kasy miasta do pana wraca ok. 17%, reszte zjada regulator.
+        // Tarcza: zold wplacony do kasy MIASTA (zaloga, wydatki ludzi "na zycie") dostaje znacznik. Regulator nie kasuje czesci
+        // nadwyzki objetej znacznikiem (nigdy niczego nie dosypuje z jego powodu). Znacznik wygasa co dobe w tempie, w jakim zawor
+        // i danina wojenna wyciagaja zloto z kasy (7% + 1% w wojnie): w miescie bez pulapu renty zold wraca wtedy do pana i korony,
+        // a gdzie pulap wiaze - po ok. dwoch tygodniach znacznik wygasa i nadwyzke bierze regulator jak dotad (nic nie zostaje
+        // uwiezione). Znacznik nie jest zlotem - to tylko liczba; kasy zamkow (bez renty) tarcza nie obejmuje.
+        private const float RegulatorRate = 0.25f;
+        private static readonly Dictionary<string, float> _held = new Dictionary<string, float>();   // id miasta -> zold w kasie "w drodze do pana"
+        private static object _regModel;
+        private static Type _regDecl;
+        private static long _dShielded;
+        private static int _dShieldTicks;
+
+        private static bool ShieldOn { get { var s = Settings.Current; return s != null && s.TownWageShield; } }
+
+        /// <summary>Zold wplacony do kasy miasta (zaloga albo wydatki ludzi z sakiewki) - dopisz znacznik tarczy. Samo zloto wplaca wolajacy.</summary>
+        internal static void Hold(Settlement st, int amount)
+        {
+            try
+            {
+                if (amount <= 0 || st == null || !ShieldOn || !st.IsTown || st.StringId == null) return;
+                if (!EnsureShieldHook()) return;                       // bez latki na regulatorze znacznik nic by nie chronil
+                float v; _held.TryGetValue(st.StringId, out v);
+                _held[st.StringId] = v + amount;
+            }
+            catch (Exception e) { Stumble("SoldierPay.Hold", e); }
+        }
+
+        /// <summary>
+        /// Latka na regulator kasy - tylko przy wlaczonej tarczy i dopiero w kampanii: postfiks (First - przed licznikiem ksiegi
+        /// pieniadza, zeby ksiega widziala wynik po tarczy) na implementacji GetTownGoldChange, ktorej uzywa czynny model.
+        /// </summary>
+        private static bool EnsureShieldHook()
+        {
+            var h = _harmony;
+            if (h == null || Campaign.Current == null) return false;
+            var active = Campaign.Current.Models.SettlementEconomyModel;
+            if (active == null) return false;
+            if (ReferenceEquals(active, _regTriedFor)) return _regReady;
+            _regTriedFor = active; _regReady = false;
+            string where = "BRAK - tarcza nie dziala";
+            try
+            {
+                var decl = RegDeclOf(active.GetType());
+                if (decl != null && _regHooked.Contains(decl)) { _regReady = true; where = decl.FullName + " (wpiete wczesniej)"; }
+                else if (decl != null)
+                {
+                    var m = decl.GetMethod("GetTownGoldChange", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly, null, new[] { typeof(Town) }, null);
+                    if (m != null && !m.IsAbstract)
+                    {
+                        h.Patch(m, postfix: new HarmonyMethod(typeof(SoldierPay), nameof(RegulatorPostfix)) { priority = Priority.First });
+                        _regHooked.Add(decl); _regReady = true;
+                        where = decl.FullName + " (wpiete teraz)";
+                    }
+                }
+            }
+            catch (Exception e) { Log.Error("SoldierPay.EnsureShieldHook", e); }
+            Log.Info("SoldierPay: tarcza zoldu w kasach miast (MCM Town Wage Shield) - regulator kasy z " + where + ", model czynny " + active.GetType().FullName + ".");
+            return _regReady;
+        }
+
+        /// <summary>GetTownGoldChange czynnego modelu kasy osad: kasowanie nadwyzki pomniejszone o czesc objeta znacznikiem zoldu.</summary>
+        public static void RegulatorPostfix(object __instance, MethodBase __originalMethod, Town __0, ref int __result)
+        {
+            if (_held.Count == 0) return;                               // tarcza wylaczona albo nic nie wplacono - bez zmian
+            try
+            {
+                if (__0 == null || !ShieldOn || !Live) return;
+                var active = Campaign.Current.Models.SettlementEconomyModel;
+                if (!ReferenceEquals(__instance, active)) return;                  // model opakowany przez inny - liczy zewnetrzny
+                if (!ReferenceEquals(active, _regModel)) { _regModel = active; _regDecl = RegDeclOf(active.GetType()); }
+                if (__originalMethod == null || __originalMethod.DeclaringType != _regDecl) return;
+                var st = __0.Settlement;
+                if (st == null || !st.IsTown || st.StringId == null) return;
+                float held;
+                if (!_held.TryGetValue(st.StringId, out held) || held <= 0f) return;
+                if (__result >= 0) { _held.Remove(st.StringId); return; }          // kasa nie ponad celem: zold zastapil dosypke albo juz wyszedl - nie ma czego chronic
+                float surplus = -__result / RegulatorRate;                         // nadwyzka ponad cel, ktora regulator zdejmuje po cwierci dziennie
+                if (held > surplus) { held = surplus; _held[st.StringId] = held; } // znacznik nigdy ponad faktyczna nadwyzke
+                int keep = Math.Min(-__result, (int)(held * RegulatorRate));
+                if (keep <= 0) return;
+                __result += keep;                                                  // zostaje <= 0: tarcza niczego nie dosypuje
+                if (MoneyLedger.RegulatorDue(__0)) { _dShielded += keep; _dShieldTicks++; }   // liczymy tylko dzienny tick osady, nie pytania z ekranow
+            }
+            catch (Exception e) { Stumble("SoldierPay.RegulatorPostfix", e); }
+        }
+
+        private static Type RegDeclOf(Type t)
+        {
+            try
+            {
+                var m = t.GetMethod("GetTownGoldChange", BindingFlags.Public | BindingFlags.Instance, null, new[] { typeof(Town) }, null);
+                return m != null ? m.DeclaringType : null;
+            }
+            catch { return null; }
+        }
+
+        /// <summary>Raz na dobe: znacznik wygasa w tempie zaworu renty (i daniny wojennej); przy wylaczonej tarczy znika caly.</summary>
+        private static void DecayHeld()
+        {
+            if (_held.Count == 0) return;
+            var s = Settings.Current;
+            if (s == null || !s.TownWageShield) { _held.Clear(); return; }
+            EnsureShieldHook();                                         // znaczniki z zapisu gry: latka takze bez nowej wplaty
+            float rent = Math.Max(0f, Math.Min(1f, s.TownRentShare));
+            foreach (var id in new List<string>(_held.Keys))
+            {
+                float rate = rent;
+                try
+                {
+                    var st = Settlement.Find(id);
+                    var k = st != null && st.OwnerClan != null ? st.OwnerClan.Kingdom : null;
+                    if (k != null) rate += KingdomTreasury.LaySubsidyTownRate(k);
+                }
+                catch { }
+                float v = _held[id] * (1f - Math.Min(1f, rate));
+                if (v < 1f) _held.Remove(id); else _held[id] = v;
+            }
+        }
+
+        internal static string ExportHeld()
+        {
+            var parts = new List<string>();
+            foreach (var kv in _held)
+                if (kv.Value >= 1f) parts.Add(kv.Key + "=" + ((int)kv.Value).ToString(System.Globalization.CultureInfo.InvariantCulture));
+            return string.Join(";", parts.ToArray());
+        }
+
+        internal static void ImportHeld(string data)
+        {
+            _held.Clear();
+            if (string.IsNullOrEmpty(data)) return;
+            foreach (var p in data.Split(';'))
+            {
+                var a = p.Split('='); int v;
+                if (a.Length == 2 && a[0].Length > 0 && int.TryParse(a[1], System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out v) && v > 0) _held[a[0]] = v;
+            }
+        }
+
+        // ------------------------------------------------------------ raz na dobe: linia "Zold:"
+        internal static void Daily()
+        {
+            try
+            {
+                _paidToday.Clear();                                     // gdyby zwrot ze skarbca dzis nie biegl
+                if (Campaign.Current == null) return;
+                float heldSum = 0f; foreach (var v in _held.Values) heldSum += v;
+                int heldTowns = _held.Count;
+                if (Watching || _dLordAcc + _dGarAcc > 0)
+                {
+                    long total; int count, max, orphans; long orphanGold; string maxKey;
+                    MenPurse.Stats(out total, out count, out max, out maxKey, out orphans, out orphanGold);
+                    Log.Info("Zold: dzien " + (int)CampaignTime.Now.ToDays
+                             + " | partie rodow: naliczony " + _dLordAcc + ", z kies zeszlo " + _dLordTaken + " (" + _dLordN + " partii) -> do sakiewek ludzi " + _dToPurse
+                             + " (" + _dToPurseN + " partii, w tym ludzie gracza " + _dPlayer + ")"
+                             + " | garnizony: naliczony " + _dGarAcc + ", z kies zeszlo " + _dGarTaken + " (" + _dGarN + " zalog) -> do kas miast " + _dToTowns + " (" + _dToTownsN
+                             + "), do kas zamkow " + _dToCastles + " (" + _dToCastlesN + ")"
+                             + " | nie przekazano: nieumarli " + _dUndead + ", zaloga bez osady " + _dNoTown + ", wylaczone w ustawieniach " + _dOff
+                             + "; karawany i inne partie (bez zmian) " + _dOther
+                             + " | przyciete, bo saldo rodu nie zmiescilo sie w kiesie glowy: " + _dCut + " w " + _dCutClans + " rodach (w tym brak zapisany przez gre jako dlug wobec korony: "
+                             + _dDebtCut + " w " + _dDebtClans + " rodach); rody z pusta kiesa i nieznanym saldem (nic nie przekazano): "
+                             + _dBlind + " (" + _dBlindGold + ")"
+                             + " | sakiewki ludzi: razem " + total + " w " + count + " partiach, najwieksza " + max + (maxKey != null ? " (" + maxKey + ")" : "")
+                             + ", po partiach, ktorych juz nie ma: " + orphanGold + " (" + orphans + ")"
+                             + " | tarcza zoldu w kasach miast: " + (ShieldOn ? "wlaczona, znacznik " + (long)heldSum + " w " + heldTowns + " miastach, regulator nie skasowal dzis "
+                                                                              + _dShielded + " (" + _dShieldTicks + " tickow miast)" : "wylaczona")
+                             + (_dDupes + _stumbles > 0 ? " | potkniecia: powtorzone wyplaty " + _dDupes + ", wyjatki " + _stumbles : "") + ".");
+                }
+            }
+            catch (Exception e) { Stumble("SoldierPay.Daily", e); }
+            finally { ClearDay(); }
+            try { DecayHeld(); } catch (Exception e) { Stumble("SoldierPay.DecayHeld", e); }
+        }
+
+        // ------------------------------------------------------------ wpiecie
+        /// <summary>Przy starcie gry: tylko para na DailyTickClan. Latki na modelach zaklada EnsureHooks / EnsureShieldHook w kampanii.</summary>
+        internal static void ApplyAll(Harmony h)
+        {
+            string tick = "BRAK";
+            _harmony = h;
+            try
+            {
+                var m = AccessTools.Method(typeof(ClanVariablesCampaignBehavior), "DailyTickClan");
+                if (m != null)
+                {
+                    h.Patch(m, prefix: new HarmonyMethod(typeof(SoldierPay), nameof(ClanTickPrefix)) { priority = Priority.First },
+                               postfix: new HarmonyMethod(typeof(SoldierPay), nameof(ClanTickPostfix)) { priority = Priority.Last });
+                    tick = "wpiete";
+                }
+            }
+            catch (Exception e) { Log.Error("SoldierPay.ApplyAll(DailyTickClan)", e); }
+            Log.Info("SoldierPay: zold do obiegu (partia -> sakiewka ludzi, garnizon -> kasa osady, zwrot ze skarbca w wojnie) - rozliczenie rodu " + tick
+                     + "; latki na model finansow (zold partii, saldo rodu) dojda przy pierwszym rozliczeniu rodu w kampanii, a latka na regulator kasy"
+                     + " tylko przy wlaczonej tarczy zoldu (MCM Town Wage Shield, domyslnie wylaczona).");
+        }
+    }
+}
