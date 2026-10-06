@@ -427,6 +427,10 @@ namespace Armoury
                 string popk = PopulationLaw.Export();
                 dataStore.SyncData("arm_population", ref popk);
                 if (dataStore.IsLoading) PopulationLaw.Import(popk);
+                // ksiega ludzi: stan ludnosci miast (demografia krok 9a); brak klucza = stary zapis, stan zalozy sie pierwszego dnia
+                string people = PopulationLaw.ExportPeople();
+                dataStore.SyncData("arm_people", ref people);
+                if (dataStore.IsLoading) PopulationLaw.ImportPeople(people);
                 // prawo wyrzutkow: pula ludzi w regionach (Jeff 04.10)
                 string outlaws = OutlawLaw.Export();
                 dataStore.SyncData("arm_outlaws", ref outlaws);

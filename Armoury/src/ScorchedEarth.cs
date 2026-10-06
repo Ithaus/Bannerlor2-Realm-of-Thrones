@@ -87,6 +87,21 @@ namespace Armoury
             catch (Exception e) { Log.Error("ScorchedEarth.OnDaily", e); }
         }
 
+        /// <summary>
+        /// Ile hearth dziennie wraca do wsi przy samym dnie ("uchodzcy wracaja", +0.5 ponizej RefugeeFloorHearth). Te sama
+        /// regule stosuje blizna nizej; przy czynnym przyroscie naturalnym (PopulationLaw.GrowthPostfix, demografia krok 3)
+        /// blizna nie biegnie, a przyrost pyta o powrot tutaj - jedna regula, jedno miejsce. Wies poza stanem Normal
+        /// (spalona, lupiona, pod przymusem): 0 - wynik gry jest tam niedodatni i blizna tez nic nie dopisuje.
+        /// Zostaje do kroku 4 (uchodzcy z ksiegi).
+        /// </summary>
+        internal static float RefugeeReturn(Village village)
+        {
+            var s = Settings.Current;
+            if (s == null || !s.ScorchedEarthEnabled || village == null) return 0f;
+            if (village.VillageState != Village.VillageStates.Normal) return 0f;
+            return village.Hearth < Math.Max(1, s.RefugeeFloorHearth) ? 0.5f : 0f;
+        }
+
         /// <summary>Blizna: z ruin wstaje sie wolno; przy samym dnie wracaja uchodzcy.</summary>
         public static void HearthScarPostfix(Village village, ref ExplainedNumber __result)
         {
@@ -94,6 +109,9 @@ namespace Armoury
             {
                 var s = Settings.Current;
                 if (s == null || !s.ScorchedEarthEnabled || village == null) return;
+                // demografia krok 3: przy czynnym przyroscie naturalnym wynik gry sluzy tylko za miare premii, a odrost +4 / +1.2
+                // dziennie, ktory blizna spowalniala, juz nie istnieje - blizna nie ma czego ciac, powrot +0.5 dopisuje przyrost
+                if (PopulationLaw.GrowthOn) return;
                 if (__result.ResultNumber <= 0f) return;
                 if (village.Hearth < Math.Max(1, s.RefugeeFloorHearth))
                 {
