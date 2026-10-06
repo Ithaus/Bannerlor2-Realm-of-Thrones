@@ -1,4 +1,4 @@
-# Stan prac - przekazanie dla drugiego konta (2026-10-06 13:00: w grze grupa 1 = wpisy 101-105, bez testu; lancuch 106-114 gotowy; prac w tle brak)
+# Stan prac - przekazanie dla drugiego konta (2026-10-06 13:15: w grze grupy 1 + 2 = wpisy 101-107, bez testu; lancuch 108-114 gotowy; prac w tle brak)
 
 Czytaj najpierw: `CLAUDE.md` (zwlaszcza sekcja 8, **zasada 0**: kazda zmiana = kontrola regresji, kolizji
 i spojnosci calej logiki; oraz pulapka MCM w sekcji 7), potem ten plik, potem gorne wpisy `CHANGELOG.md`.
@@ -34,7 +34,7 @@ i spojnosci calej logiki; oraz pulapka MCM w sekcji 7), potem ten plik, potem go
 
 ## Gotowe paczki czekajace na wgranie (stan 06.10 ok. 08:40 - po przebudowie lancucha)
 
-W GRZE (od 06.10 11:37): wpisy 101, 102, 102b + GRUPA 1 TOWARY = 103 (karawany) + 104 (zapas startowy) + 105 (mineral BK). DLL md5 `d59b06886a3686de71cf1b5fdd3ec2f5` (poprzedni: `Armoury.dll.bak-2026-10-06-przed-103` = 102b). WSZYSTKO NIEPRZETESTOWANE - czeka na pierwszy test Jeffa: swiezy start gry, NOWA kampania, 15-20 dob, zapis na koncu, "sprawdz logi". Nastepne do wgrania: grupa 2 (106 + 107) na tym samym zapisie.
+W GRZE (od 06.10 13:12): wpisy 101, 102, 102b + GRUPA 1 TOWARY (103 karawany, 104 zapas startowy, 105 mineral BK) + GRUPA 2 PIENIADZ (106 paser, 107 zold i skarbiec). DLL md5 `0eeb0a105dc5ae4221809e222e327afe` (poprzedni: `Armoury.dll.bak-2026-10-06-przed-106` = grupa 1). WSZYSTKO NIEPRZETESTOWANE - Jeff wybral jeden test dla grup 1 + 2: swiezy start gry, NOWA kampania, 20-30 dob, zapis na koncu, "sprawdz logi" (`python tools/sprawdz_logi.py --grupa 1` i `--grupa 2`). Nastepne do wgrania: grupa 3 (BetterEconomy + 108 + 109, nowa kampania).
 zrobil jeszcze zadnego testu po 05.10 15:22. Pierwszy test: nowa kampania 15-20 dob, potem "sprawdz logi"
 (`python tools/sprawdz_logi.py` daje skrot sesji: ktore ogniwo w grze, bledy, alarmy, tabela dzien po dniu).
 
@@ -165,7 +165,7 @@ POZA LANCUCHEM:
 
 ### Prace w toku 06.10 (katalogi `scratchpad\dzien-1..3`; klon `scratchpad\lancuch`, galezie `n102b..n114`)
 
-- STAN 06.10 13:00: zadnych prac w tle. W grze grupa 1 (wpisy 101-105), Jeff JESZCZE NIE TESTOWAL. Lancuch do wgrania: 106-114.
+- STAN 06.10 13:15: zadnych prac w tle. W grze grupy 1 + 2 (wpisy 101-107), Jeff JESZCZE NIE TESTOWAL. Lancuch do wgrania: 108-114.
   Limit tygodniowy tego konta 81% - nie puszczac kolejnych partii wieloosobowych na tym koncie; zostawic zapas na "sprawdz logi".
 - "SPRAWDZ LOGI" po tescie grupy N: `python tools/sprawdz_logi.py --grupa N` (zna ogniwa 100-113 i grupy 1-5; nowych linii
   ogniwa 114 jeszcze nie - pokaze je surowo). Nie istnieje zaden prawdziwy log ogniw 101+, wiec pierwszy log obejrzec takze z
