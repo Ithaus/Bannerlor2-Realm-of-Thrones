@@ -1,4 +1,4 @@
-# Stan prac - przekazanie dla drugiego konta (2026-10-06 ok. 08:40, lancuch paczek 102b-109 gotowy, dzien-2 w toku)
+# Stan prac - przekazanie dla drugiego konta (2026-10-06 ok. 11:20: w grze 102b; lancuch paczek 103-113 gotowy; prac w tle brak)
 
 Czytaj najpierw: `CLAUDE.md` (zwlaszcza sekcja 8, **zasada 0**: kazda zmiana = kontrola regresji, kolizji
 i spojnosci calej logiki; oraz pulapka MCM w sekcji 7), potem ten plik, potem gorne wpisy `CHANGELOG.md`.
@@ -52,6 +52,10 @@ Gotowe teksty wpisow CHANGELOG: `docs/paczki/`. Klon roboczy sesji: `scratchpad\
 | 107 | `paczki/107-zold-i-skarbiec` | 6ace39a | zold do sakiewek ludzi i kas osad, skarbiec w wojnie zwraca 50% zoldu, tarcza zoldu WLACZONA | nie |
 | 108 | `paczki/108-ludzie-jednostka` | fff2a3b | demografia krok 2: 1 czlowiek = 1/k hearth (wyrzutki, tabory, pobor gracza, zadania); pula band liczona od ludnosci | nie |
 | 109 | `paczki/109-ludzie-przyrost` | 1d3459f | demografia krok 3 + 9a: przyrost naturalny wsi (-1.3..+0.8% rocznie) zamiast stalej gry; ludnosc miast zamrozona (klucz `arm_people`) | nie |
+| 110 | `paczki/110-k5-kasa-zamku` | 2a405c9 | K5: kasa zamku jako prawdziwy pieniadz - bez dosypki i kasowania przez gre; nadwyzke ponad zapas kupcow pan zamku odbiera po 7% dziennie; na starcie nowej kampanii jednorazowo znika ok. 5 mln "daru" (klucz `arm_castlepurse`) | zalecana |
+| 111 | `paczki/111-k6-kasy-miast` | 61a3453 | K6: kasy miast bez kasowania nadwyzek i bez zlota za "zakupy" mieszczan; z nadwyzki 7% dziennie: 2/3 pan, 1/3 skarbiec krolestwa; zwrot zoldu z korony nie obejmuje zalogi, ktorej zold i tak wraca panu; tarcza zoldu z 107 staje sie zbedna; start kampanii: kasy miast przyciete o ok. 14 mln (klucz `arm_townpurse`) | zalecana |
+| 112 | `paczki/112-k7-utarg-wsi` | 306eafd | K7: utarg wsi nie znika - reszta po podatku pana zostaje we wsi; zaplata wojsk za zywnosc kupiona we wsi i sakwa rozbitego taboru tez (zwyciezca bierze cala sakwe) | nie |
+| 113 | `paczki/113-ludzie-spustoszenie` | 7b5b894 | demografia krok 4 + 6a: rabunek i marsz armii wyganiaja ulamek ludzi okregu (uchodzcy wracaja latami), koniec odrostu z niczego, plon spada z brakujacymi rekami; zawiera `ScorchedEarth.Reset` | zalecana |
 
 JAK WGRAC OGNIWO (po "wgraj NNN" od Jeffa, gra zamknieta): na galezi roboczej `git cherry-pick <commit ogniwa>` (ogniwa PO KOLEI;
 galaz robocza ma po 87c8e96 same commity dokumentow, wiec wchodzi czysto), `python tools/gen_mcm.py`, build z kodem 0, kopia
@@ -160,17 +164,30 @@ POZA LANCUCHEM:
 
 ### Prace w toku 06.10 (katalogi `scratchpad\dzien-1`, `scratchpad\dzien-2`; klon `scratchpad\lancuch`)
 
-- ZAKONCZONE 06.10 rano: workflow `dzien-1` i `dzien-1b` (ksiega 102b, karawany wedle zysku, mineral bez zmiany wydobycia,
-  paser dla wszystkich band, demografia krok 2 i 3, narzedzie logow, kolizje 106-107) - wszystko w lancuchu `paczki/102b..109`.
-- W TOKU: workflow `dzien-2` (run `wf_2556af79-033`, kazda paczka autor + recenzent, baza `n109-ludzie-przyrost`):
-  K5 kasa zamku (`l110-k5-kasa-zamku`) -> K6 kasy miast bez kasowania nadwyzek + pulap zaworu (`l111-k6-kasy-miast`);
-  K7 utarg wsi bez znikania (`l112-k7-utarg-wsi`); demografia krok 4 + 6a spustoszenie (`l113-ludzie-spustoszenie`);
-  dopasowanie `sprawdz_logi.py` (`dzien-2\logi`); przeglad kolizji nowego lancucha z propozycja grup testowych.
-- PO ZAKONCZENIU: dolozyc nowe paczki do lancucha jako 110-113 (skrypt `dzien-1\nowy\ogniwo.ps1`: cherry-pick, MCM, build,
-  commit), wypchnac `paczki/*`, zapisac opisy w `docs/paczki/`, zaktualizowac ten dokument.
+- ZAKONCZONE 06.10: workflow `dzien-1`, `dzien-1b`, `dzien-2` - wszystko w lancuchu `paczki/102b..113` (galezie `n102b..n113` w klonie).
+  Narzedzie `tools/sprawdz_logi.py` dopasowane do ogniw 102b-109 (ogniw 110-113 jeszcze nie zna: linie "Kasy zamkow:",
+  "Kasy miast:", "Utarg wsi:", "Ludzie (spustoszenie):" pokaze w trybie surowym).
+- NIE MA zadnych prac w tle. Limit tygodniowy tego konta: 76% (06.10 11:05) - kolejne duze partie dopiero na innym koncie albo
+  po decyzji Jeffa.
+- NASTEPNE KROKI (kolejnosc): (1) na slowo Jeffa "wgraj grupe 1": cherry-pick 103, 104, 105 na galaz robocza, build, wgranie,
+  3 wpisy CHANGELOG; (2) po tescie: "sprawdz logi" narzedziem + linie z `docs/paczki/PRZEGLAD-KOLIZJI-LANCUCHA-2026-10-06.txt`;
+  (3) przed grupa 2: przepisac `docs/paczki/107-*.md` (lista zmian w tym samym pliku przegladu, sceptyk K1) i sprawdzic
+  `OutlawFenceRadius` w `Armoury.json`; (4) paczka "porzadki" na szczyt lancucha (napis startowy SoldierPay, pusty catch w
+  `OutlawLaw.FencePaid`, pozycje ksiegi dla napraw i sakiewek rozbitych partii, pomiar wyplat notablom) + dopasowanie narzedzia
+  logow do 110-113; (5) przeglad kolizji ogniw 110-113 z reszta (kazde ma wlasna recenzje, wspolnego przegladu jeszcze nie bylo;
+  zlozenie: konflikty tylko w konstruktorze `ArmouryBehavior`, liscie `ApplyAll` i `MoneyLedger` - komentarz naglowka i linia
+  `long sinks` w `BalanceLine`, rozwiazane recznie); (6) dalej wg fundamentu: K10 druga polowa (bezpiecznik kas z prawdziwym
+  platnikiem), K8, K12, K13 skala produkcji; demografia kroki 5 (pobor), 6b, 7 (okno zniw); reguly krain R1-R13 po odpowiedziach
+  Jeffa na pytania o kanon.
+- SKUTKI NOWYCH PACZEK, O KTORYCH JEFF WIE (06.10): zaloga we wlasnym zamku po ok. 2 tygodniach prawie nic nie kosztuje (do
+  poprawy: podzial daniny podzamcza z korona); w zamku sprzeda sie mniej lupu (kupcy maja tylko prawdziwe pieniadze); spokojne
+  miasto daje panu malo, miasto z wojskiem sporo; na starcie kampanii kupcy miast maja ok. 67 tys. zamiast 210 tys.; za rozbity
+  tabor chlopski zwyciezca bierze cala sakwe; po rabunku liczba palenisk prawie stoi, szkode widac w plonie.
+
 - DECYZJA JEFFA 06.10 ("3 razy"): testy GRUPAMI, nie po jednym ogniwie. Grupa 1 TOWARY = 103 + 104 + 105 (nowa kampania
   wymagana przez 104); grupa 2 PIENIADZ = 106 + 107; grupa 3 LUDZIE = skrypt BetterEconomy + 108 + 109. Kazda paczka ma
-  wlacznik w MCM - gdy cos nie dziala, wylaczac po kolei. Wgranie grupy: cherry-pick wszystkich jej ogniw po kolei, jeden
+  wlacznik w MCM - gdy cos nie dziala, wylaczac po kolei. Dalsze grupy (propozycja): grupa 4 KASY = 110 + 111 + 112 (nowa
+  kampania zalecana - jednorazowe przyciecie kas na starcie), grupa 5 = 113 (nowa kampania zalecana). Wgranie grupy: cherry-pick wszystkich jej ogniw po kolei, jeden
   build, jedna kopia .bak, osobny wpis CHANGELOG na kazde ogniwo. Grupe wgrywac dopiero na slowo Jeffa ("wgraj grupe N") i po
   czystym przegladzie kolizji nowego lancucha (dzien-2). Paczki 110-113 (K5, K6, K7, krok 4) utworza grupy 4-5.
 - Do rozstrzygniecia z Jeffem jednym slowem: pierwszy test to samo "101 + 102 + 102b" (wtedy 4 testy) czy od razu z grupa 1
