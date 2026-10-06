@@ -2124,6 +2124,30 @@ namespace Armoury
         [SettingPropertyGroup("The soldier's pay")]
         public bool TownWageShield { get; set; } = true;
 
+        [SettingPropertyBool("Castle Purse Enabled", HintText = "a castle's purse holds real coin: the game no longer tops it up each day from thin air nor deletes what lies above its target, and the goods the castle folk use up no longer pay gold into it from nowhere (the goods are still used up). What the garrison's pay, the builders and the buyers bring in stays there until it is spent or drawn by the lord. Off = the game's daily regulator and purchases from nowhere, as before")]
+        [SettingPropertyGroup("The castle's purse")]
+        public bool CastlePurseEnabled { get; set; } = true;
+
+        [SettingPropertyInteger("Castle Purse Floor Gold", 0, 40000, "0", HintText = "working coin the sutlers under the castle walls keep before their lord draws anything - the fixed part (the game's own target for a castle purse is 10 000 plus 12 a point of prosperity, about 22 000 for a common castle)")]
+        [SettingPropertyGroup("The castle's purse")]
+        public int CastlePurseFloorGold { get; set; } = 10000;
+
+        [SettingPropertyFloatingInteger("Castle Purse Floor Per Prosperity", 0.00f, 48.00f, "0.00", HintText = "... and the part of the working coin that grows with the castle's prosperity, in coins a point")]
+        [SettingPropertyGroup("The castle's purse")]
+        public float CastlePurseFloorPerProsperity { get; set; } = 12f;
+
+        [SettingPropertyFloatingInteger("Castle Dues Share", 0.00f, 1.00f, "0.00", HintText = "share of the castle purse above the working coin its lord draws each day: the garrison spends its pay with his own people - alehouse, mill and stalls under the walls - as a town's lord draws his rents; nothing is drawn from a besieged castle (0 = the lord draws nothing and the purse only grows). Mind the side effect, the same as with the town wage shield: in the long run a garrison in one's own castle costs its lord little, for most of its pay comes back to him")]
+        [SettingPropertyGroup("The castle's purse")]
+        public float CastleDuesShare { get; set; } = 0.07f;
+
+        [SettingPropertyBool("Castle Purse Trim At Start", HintText = "once per campaign, on its first day: the starting gift in every castle purse (20 000 plus Banner Kings' 40 a point of prosperity) is cut down to the working coin. The game's regulator deleted that gold within two weeks anyway; left in, the castle lords would draw about five million from nowhere. A save a few days old loses only what the regulator had not yet deleted; an old save loses nothing")]
+        [SettingPropertyGroup("The castle's purse")]
+        public bool CastlePurseTrimAtStart { get; set; } = true;
+
+        [SettingPropertyBool("Castle Carts Need Coin", HintText = "villagers whose market town lies beyond Market Max Distance sell at their lord's castle only when its purse holds enough above the working coin to pay for the whole cartload; otherwise they take the long road to the market town (off = they haul to the castle whether it can pay or not)")]
+        [SettingPropertyGroup("The castle's purse")]
+        public bool CastleCartsNeedCoin { get; set; } = true;
+
         [SettingPropertyBool("Supply Demand Enabled", HintText = "arms, armour and horses obey supply and demand in towns and castles: a full stall sells cheap, an empty one dear - for buying AND selling, you and the AI alike (the item's own worth is untouched)")]
         [SettingPropertyGroup("Supply and demand")]
         public bool SupplyDemandEnabled { get; set; } = true;
@@ -3034,6 +3058,12 @@ namespace Armoury
             s.CrownWageRefundPercent = CrownWageRefundPercent;
             s.CrownWageRefundGarrisons = CrownWageRefundGarrisons;
             s.TownWageShield = TownWageShield;
+            s.CastlePurseEnabled = CastlePurseEnabled;
+            s.CastlePurseFloorGold = CastlePurseFloorGold;
+            s.CastlePurseFloorPerProsperity = CastlePurseFloorPerProsperity;
+            s.CastleDuesShare = CastleDuesShare;
+            s.CastlePurseTrimAtStart = CastlePurseTrimAtStart;
+            s.CastleCartsNeedCoin = CastleCartsNeedCoin;
             s.SupplyDemandEnabled = SupplyDemandEnabled;
             s.SupplyDemandBase = SupplyDemandBase;
             s.SupplyDemandRefProsperity = SupplyDemandRefProsperity;
