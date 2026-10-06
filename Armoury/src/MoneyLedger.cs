@@ -45,8 +45,10 @@ namespace Armoury
     ///  - regulator kasy: postfiks na GetTownGoldChange czynnego modelu (czyta wynik, zaraz potem gra robi ChangeGold);
     ///  - przelewy gry: zdarzenie HeroOrPartyTradedGold (kazdy GiveGoldAction: zakupy lordow, karawany, notable);
     ///  - zold: postfiks na DefaultClanFinanceModel.CalculatePartyWage (BK wola ja refleksja dla kazdej partii i garnizonu);
-    ///  - nasze moduly poza tickiem dobowym: wywolania-liczniki Note (zakupy AI, najemnicy z karczmy, warsztaty zbrojne);
-    ///  - nasz tick dobowy: migawki stanu kas miedzy modulami (BlockOpen / Mark) - renty, budowy, korona, reszta ticku.
+    ///  - nasze moduly poza tickiem dobowym: wywolania-liczniki Note (zakupy AI, najemnicy z karczmy, warsztaty zbrojne,
+    ///    sprzet kupiony przez bandy u pasera);
+    ///  - nasz tick dobowy: migawki stanu kas miedzy modulami (BlockOpen / Mark) - renty, budowy, korona, wydatki band
+    ///    i kryjowek na zycie w miastach, skup lupu band u pasera (OutlawLaw robi swoje trzy migawki sam), reszta ticku.
     /// </summary>
     internal static class MoneyLedger
     {
@@ -59,14 +61,14 @@ namespace Armoury
         private static readonly string[] PName = { "lordowie", "notable", "gracz", "inni bohaterowie", "karawany", "inne partie", "inne osady" };
 
         // nasze moduly liczone wprost, poza tickiem dobowym (Note)
-        internal const int NGear = 0, NMerc = 1, NShop = 2;
-        private const int Notes = 3;
-        private static readonly string[] NName = { "zakupy sprzetu AI", "najemnicy z karczmy", "warsztaty zbrojne" };
+        internal const int NGear = 0, NMerc = 1, NShop = 2, NFence = 3;
+        private const int Notes = 4;
+        private static readonly string[] NName = { "zakupy sprzetu AI", "najemnicy z karczmy", "warsztaty zbrojne", "paser band (sprzet dla band)" };
 
         // nasz tick dobowy (Mark)
-        internal const int MRent = 0, MBuild = 1, MCrown = 2, MRest = 3;
-        private const int Marks = 4;
-        private static readonly string[] MName = { "renty", "budowy", "korona (danina, clo, mennica)", "pozostale moduly ticku" };
+        internal const int MRent = 0, MBuild = 1, MCrown = 2, MRest = 3, MFence = 4, MLife = 5;
+        private const int Marks = 6;
+        private static readonly string[] MName = { "renty", "budowy", "korona (danina, clo, mennica)", "pozostale moduly ticku", "paser band (skup lupu)", "bandy i kryjowki (zycie w miastach)" };
 
         // posiadacze zlota
         private const int HTowns = 0, HCastles = 1, HVillages = 2, HLeaders = 3, HLords = 4, HPlayer = 5, HNotables = 6, HWanderers = 7, HOtherHeroes = 8,
@@ -526,7 +528,9 @@ namespace Armoury
         {
             var h = new long[Holders];
             h[HTowns] = snap[CTown]; h[HCastles] = snap[CCastle]; h[HVillages] = snap[CVill];
-            // kryjowki i inne osady spoza trzech klas: gra odklada w kryjowce 25% wartosci lupow band (BanditSpawnCampaignBehavior)
+            // kryjowki i inne osady spoza trzech klas: w kasie kryjowki lezy to, co bandy odlozyly z wlasnych kies (OutlawLaw),
+            // a wychodzi z niej kiesa startowa nowych band, doplata do sprzetu i wydatki na zycie w miastach - same przelewy;
+            // dosypka gry - 25% wartosci jukow przy kazdym wejsciu bandy (BanditSpawnCampaignBehavior) - jest zamknieta
             foreach (var st in Settlement.All)
                 if (st != null && st.SettlementComponent != null && ClassOf(st) < 0) h[HOtherSettlements] += st.SettlementComponent.Gold;
             foreach (var hero in Hero.AllAliveHeroes)

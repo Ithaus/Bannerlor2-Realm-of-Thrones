@@ -592,11 +592,11 @@ namespace Armoury
         [SettingPropertyGroup("The hideout purge")]
         public bool HideoutPurgeEnabled { get; set; } = true;
 
-        [SettingPropertyInteger("Hideout Gold Base", 0, 600, "0", HintText = "gold hidden in any den before counting its bands")]
+        [SettingPropertyInteger("Hideout Gold Base", 0, 600, "0", HintText = "gold a lived-in den keeps hidden before counting its bands - the hoard its bandits do not touch, found by whoever clears and searches it")]
         [SettingPropertyGroup("The hideout purge")]
         public int HideoutGoldBase { get; set; } = 150;
 
-        [SettingPropertyInteger("Hideout Gold Per Band", 0, 480, "0", HintText = "each raiding band that lived there stashed about this much loot from the district")]
+        [SettingPropertyInteger("Hideout Gold Per Band", 0, 480, "0", HintText = "each band that calls the den home adds this much to the hoard it keeps; whatever lies above the kept hoard is spent - on gear for its bands and on their living in town")]
         [SettingPropertyGroup("The hideout purge")]
         public int HideoutGoldPerBand { get; set; } = 120;
 
@@ -1808,25 +1808,65 @@ namespace Armoury
         [SettingPropertyGroup("Iron bank")]
         public float OutlawCommonerMaxArmorKg { get; set; } = 8f;
 
-        [SettingPropertyBool("Outlaw Gear Upgrades", HintText = "a bandit rises in rank only with gear for it: armour and horse from the band's loot, or bought from a fence in a nearby town")]
+        [SettingPropertyBool("Outlaw Gear Upgrades", HintText = "a bandit rises in rank only with gear for it: armour and horse from the band's loot, or bought from a fence in a town within reach")]
         [SettingPropertyGroup("Iron bank")]
         public bool OutlawGearUpgrades { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Outlaw Fence Radius", 0.00f, 80.00f, "0.00", HintText = "how near a town must be for a band to buy from its fence")]
+        [SettingPropertyFloatingInteger("Outlaw Fence Radius", 0.00f, 800.00f, "0.00", HintText = "reach of the fences: a band deals with every unbesieged town this near and takes the best bargain; a band with no town this near still reaches the nearest one, on the far-edge terms")]
         [SettingPropertyGroup("Iron bank")]
-        public float OutlawFenceRadius { get; set; } = 20f;
+        public float OutlawFenceRadius { get; set; } = 200f;
 
-        [SettingPropertyFloatingInteger("Outlaw Fence Markup", 0.00f, 6.00f, "0.00", HintText = "what the fence asks over the item's value")]
+        [SettingPropertyFloatingInteger("Outlaw Fence Markup", 0.00f, 6.00f, "0.00", HintText = "what the fence asks over an item's value when the band stands at the town's gates")]
         [SettingPropertyGroup("Iron bank")]
         public float OutlawFenceMarkup { get; set; } = 1.5f;
+
+        [SettingPropertyFloatingInteger("Outlaw Fence Markup Far", 0.00f, 8.00f, "0.00", HintText = "what the fence asks over an item's value at the edge of his reach - the price rises evenly with the road he must ride (armour and horses are light for their worth, so less steeply than plunder loses value)")]
+        [SettingPropertyGroup("Iron bank")]
+        public float OutlawFenceMarkupFar { get; set; } = 2f;
 
         [SettingPropertyBool("Outlaw No Free Gold", HintText = "bands get no gold from nowhere: only what they plunder (no daily top-up, no purse at birth beyond a few coins a man)")]
         [SettingPropertyGroup("Iron bank")]
         public bool OutlawNoFreeGold { get; set; } = true;
 
-        [SettingPropertyInteger("Outlaw Coins Per Man", 0, 10, "0", HintText = "coins each man brings to a new band")]
+        [SettingPropertyInteger("Outlaw Coins Per Man", 0, 10, "0", HintText = "coins each man of a new band is handed from what its home hideout holds above the kept hoard, as far as that goes (no surplus or no hideout - the band starts with none)")]
         [SettingPropertyGroup("Iron bank")]
         public int OutlawCoinsPerMan { get; set; } = 2;
+
+        [SettingPropertyBool("Outlaw Fence Buys Loot", HintText = "bands sell their plunder to the fences of the towns within reach, each piece where it pays the band best: trade goods, livestock and food go back on the town's shelves, and the town pays from its purse above the merchants' floor")]
+        [SettingPropertyGroup("Iron bank")]
+        public bool OutlawFenceBuysLoot { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Outlaw Fence Loot Share", 0.00f, 2.00f, "0.00", HintText = "share of the town's buying price the fence hands a band standing at the town's gates - the rest is the fence's cut and stays in the town's purse")]
+        [SettingPropertyGroup("Iron bank")]
+        public float OutlawFenceLootShare { get; set; } = 0.5f;
+
+        [SettingPropertyFloatingInteger("Outlaw Fence Loot Share Far", 0.00f, 1.00f, "0.00", HintText = "share of the town's buying price the fence hands a band at the edge of his reach - it falls evenly with the road and the risk of carting stolen goods")]
+        [SettingPropertyGroup("Iron bank")]
+        public float OutlawFenceLootShareFar { get; set; } = 0.25f;
+
+        [SettingPropertyBool("Outlaw Fence Buys Spare Animals", HintText = "bands also sell the animals they have no use for: pack beasts beyond what their remaining packs weigh, and riding horses beyond one for every man on foot")]
+        [SettingPropertyGroup("Iron bank")]
+        public bool OutlawFenceBuysSpareAnimals { get; set; } = true;
+
+        [SettingPropertyBool("Outlaw No Free Food", HintText = "bands get no food from nowhere (they do not eat in this game - what they carry is plunder), and so the fence takes their food too; off = the game hands every new band food again and the fence leaves food alone")]
+        [SettingPropertyGroup("Iron bank")]
+        public bool OutlawNoFreeFood { get; set; } = true;
+
+        [SettingPropertyBool("Outlaw No Hideout Gold", HintText = "a band coming home no longer gets a quarter of the worth of its packs as gold from nowhere, and neither does its hideout")]
+        [SettingPropertyGroup("Iron bank")]
+        public bool OutlawNoHideoutGold { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Outlaw Hideout Stash Share", 0.00f, 1.00f, "0.00", HintText = "share of its own purse a band leaves in the hideout's hoard each time it comes home - real coin, found by whoever clears and searches the hideout (0 = nothing is put by)")]
+        [SettingPropertyGroup("Iron bank")]
+        public float OutlawHideoutStashShare { get; set; } = 0.25f;
+
+        [SettingPropertyBool("Outlaw Hoard Circulates", HintText = "a hideout's hoard is spent, not only heaped: whatever lies above the kept hoard hands new bands their first coins, tops up its bands when they are short at the fence, and goes on their living in town")]
+        [SettingPropertyGroup("Iron bank")]
+        public bool OutlawHoardCirculates { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Outlaw Life Spend Share", 0.00f, 1.00f, "0.00", HintText = "share of its purse a band spends each day on food, drink and company in the nearest open town - and the share of a hoard's surplus its hideout spends the same way (0 = nothing is spent)")]
+        [SettingPropertyGroup("Iron bank")]
+        public float OutlawLifeSpendShare { get; set; } = 0.1f;
 
         [SettingPropertyBool("Climate Enabled", HintText = "the seasons of Westeros: one season at a time lasting for years, its end proclaimed by a white raven from the Citadel; dates read 'Day N of Summer, 299 AC'")]
         [SettingPropertyGroup("Iron bank")]
@@ -2850,8 +2890,18 @@ namespace Armoury
             s.OutlawGearUpgrades = OutlawGearUpgrades;
             s.OutlawFenceRadius = OutlawFenceRadius;
             s.OutlawFenceMarkup = OutlawFenceMarkup;
+            s.OutlawFenceMarkupFar = OutlawFenceMarkupFar;
             s.OutlawNoFreeGold = OutlawNoFreeGold;
             s.OutlawCoinsPerMan = OutlawCoinsPerMan;
+            s.OutlawFenceBuysLoot = OutlawFenceBuysLoot;
+            s.OutlawFenceLootShare = OutlawFenceLootShare;
+            s.OutlawFenceLootShareFar = OutlawFenceLootShareFar;
+            s.OutlawFenceBuysSpareAnimals = OutlawFenceBuysSpareAnimals;
+            s.OutlawNoFreeFood = OutlawNoFreeFood;
+            s.OutlawNoHideoutGold = OutlawNoHideoutGold;
+            s.OutlawHideoutStashShare = OutlawHideoutStashShare;
+            s.OutlawHoardCirculates = OutlawHoardCirculates;
+            s.OutlawLifeSpendShare = OutlawLifeSpendShare;
             s.ClimateEnabled = ClimateEnabled;
             s.ClimateDrivesEconomy = ClimateDrivesEconomy;
             s.ClimateSummerDaysSoFar = ClimateSummerDaysSoFar;

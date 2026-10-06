@@ -42,6 +42,25 @@ namespace Armoury
     /// kupione u pasera w miescie za zloto bandy (zloto idzie do miasta, towar schodzi z targu).
     /// Zloto band: koniec darmowego dosypywania (vanilla 0.95g + 2.5/czlowiek dziennie) i startowych
     /// 10/czlowieka - bandy maja to, co zrabuja.
+    ///
+    /// PASER W OBIE STRONY (Jeff 05.10: "bandy maja sprzedawac zrabowany ladunek u pasera w miescie"; Jeff 06.10: "nie moze
+    /// byc tak, ze sa bandyci, ktorzy nie moga opchnac towaru", "po co czesc band siedzi na skarbach jak smok w jaskini",
+    /// "to ma byc to, co sie oplaca w danej chwili"): KAZDA banda ma pasera - nieoblezone miasta w promieniu
+    /// OutlawFenceRadius, a gdy w promieniu nie ma zadnego, najblizsze otwarte miasto na warunkach z granicy promienia.
+    /// Raz na dobe banda sprzedaje z jukow towary handlowe, zwierzeta hodowlane i zywnosc, sztuka po sztuce temu miastu,
+    /// ktore za NASTEPNA sztuke da jej najwiecej na reke: cena skupu miasta x udzial bandy, a udzial maleje z odlegloscia
+    /// (droga i ryzyko posrednika; marza zostaje w kasie miasta jako nizsza zaplata). Miasto placi z kasy ponad rezerwe na
+    /// renty; gdy jednego nie stac, kupuje nastepne. Zwierzeta ponad potrzebe (juczne ponad to, co trzeba uniesc, konie
+    /// ponad jednego na pieszego) tez ida na sprzedaz. Kupno sprzetu: najtansza sztuka z dostawa posrod miast w zasiegu
+    /// (wartosc x marza rosnaca z odlegloscia). Zbroje, bron, helmy i tarcze zostaja w jukach - z pomiarem.
+    /// ZYWNOSC: bandy w tej grze nie jedza (DoesPartyConsumeFood = false dla IsBandit), a gra dawala kazdej nowej bandzie
+    /// zywnosc z niczego (GiveFoodToBanditParty) - zamkniete, wiec zywnosc w jukach to juz tylko lup i paser ja skupuje.
+    /// KRYJOWKI: vanilla przy kazdym wejsciu bandy do kryjowki dopisywala bandzie i kryjowce po 25% wartosci jukow
+    /// jako zloto z niczego (towar zostawal w jukach) - zamkniete. Kasa kryjowki rosnie tylko z tego, co banda odlozy
+    /// z WLASNEJ kiesy, i nie tylko rosnie: to, co lezy ponad skarbiec, jest w obiegu - nowa banda dostaje z tego kiese
+    /// startowa (zamiast z niczego), bandy kryjowki siegaja po to, gdy brakuje im na sprzet, a reszta idzie co dobe na
+    /// zycie w miescie. Skarbiec (HideoutGoldBase + HideoutGoldPerBand x bandy kryjowki) zostaje - HideoutPurge wyplaca
+    /// kase temu, kto kryjowke przetrzebi i przeszuka. Bandy tez zyja: co dobe wydaja czesc kiesy w najblizszym otwartym miescie.
     /// </summary>
     internal static class OutlawLaw
     {
@@ -63,9 +82,47 @@ namespace Armoury
         private static float _inDesert, _inRouted, _inRaid, _inMisery, _inDisband, _outReturn;
         private static int _bornBands, _bornMen, _refused, _emptyRemoved, _bandRecruit, _prisonerJoin, _upLoot, _upFence, _upBlocked, _fenceGold;
 
+        // paser - skup lupu band (licznik dnia)
+        private static int _sellBands, _sellFenced, _sellBeyond, _sellSellers, _sellSpareBands, _sellUnits, _sellIron, _sellWood, _sellFood, _sellAnimals, _sellStumbles;
+        private static int _leftBands, _leftUnits, _leftPoor, _leftNoTown, _leftBattle, _leftNoPurse, _leftQuest, _leftUndead;
+        private static long _sellPaid, _sellWorth;
+        // sprzedaz wedlug odleglosci bandy od miasta, ktore kupilo: do 50, 50-100, dalej (Jeff 06.10: "promien 50 ... to moze i 100, sprawdz")
+        private const float ZoneNear = 50f, ZoneMid = 100f;
+        private static readonly int[] _zoneUnits = new int[3];
+        private static readonly long[] _zonePaid = new long[3];
+        private static readonly HashSet<Settlement> _sellTowns = new HashSet<Settlement>();
+        // kurek kryjowek (licznik dnia)
+        private static int _hideEntries, _hideStumbles;
+        private static long _hideBand, _hideHoard, _hideStash;
+        // kryjowka -> suma NASZYCH zmian jej kasy (wplaty band +, wyplaty -) od poczatku sesji. Wejscie bywa zagniezdzone
+        // (gra tworzy herszta w srodku wejscia bandy): po roznicy tej sumy wejscie zewnetrzne odroznia nasze przelewy od dosypki gry.
+        private static readonly Dictionary<Settlement, long> _hoardSeen = new Dictionary<Settlement, long>();
+        // obieg kas kryjowek i zycie band (licznik dnia)
+        private static long _hoardStart, _hoardStartWant, _startNothing, _hoardGear, _lifeBands, _lifeHoards, _goneFought, _goneDisbanded;
+        private static int _lifeStumbles, _upStumbles;
+        // kryjowka -> skarbiec, ktory w niej zostaje (HideoutGoldBase + HideoutGoldPerBand x bandy tej kryjowki); liczony raz na dobe
+        private static readonly Dictionary<Settlement, int> _hoardKeep = new Dictionary<Settlement, int>();
+        // zywnosc z niczego (licznik dnia): ilu nowym bandom gra chciala ja dac; ile sztuk dosypanych bandom w bitwie zdjelismy
+        private static int _foodBands, _foodTaken;
+        private static bool _errSell, _errHide, _errFenceLog, _errLife, _errStart, _errFood, _errUpgrade;
+
         internal static void Reset()
         {
             _pool.Clear(); _seeded = false; _nodes = null; _near.Clear(); _regionOf.Clear(); _commonerOf.Clear(); _empty.Clear(); _refusedHour.Clear();
+            FenceNewDay(); _hoardSeen.Clear(); _hoardKeep.Clear(); _errSell = false; _errHide = false; _errFenceLog = false; _errLife = false; _errStart = false; _errFood = false; _errUpgrade = false;
+            _gold.Clear(); _goldTick = false; _foodSnap.Clear();      // migawki dziennego ticku gry nie przechodza do nastepnej kampanii
+            _upLoot = _upFence = _upBlocked = _fenceGold = 0;         // liczniki zakupow u pasera ida do linii "Paser:" - nie moga przejsc z poprzedniej kampanii
+        }
+
+        private static void FenceNewDay()
+        {
+            _sellBands = _sellFenced = _sellBeyond = _sellSellers = _sellSpareBands = _sellUnits = _sellIron = _sellWood = _sellFood = _sellAnimals = _sellStumbles = 0;
+            _leftBands = _leftUnits = _leftPoor = _leftNoTown = _leftBattle = _leftNoPurse = _leftQuest = _leftUndead = 0;
+            _sellPaid = _sellWorth = 0; _sellTowns.Clear();
+            Array.Clear(_zoneUnits, 0, _zoneUnits.Length); Array.Clear(_zonePaid, 0, _zonePaid.Length);
+            _hideEntries = _hideStumbles = 0; _hideBand = _hideHoard = _hideStash = 0;
+            _hoardStart = _hoardStartWant = _startNothing = _hoardGear = _lifeBands = _lifeHoards = _goneFought = _goneDisbanded = 0; _lifeStumbles = _upStumbles = 0;
+            _foodBands = _foodTaken = 0;
         }
 
         // ------------------------------------------------------------ geografia
@@ -323,8 +380,16 @@ namespace Armoury
             try
             {
                 _empty.Remove(party);
-                if (!On || party == null || destroyer != null) return;
+                if (!On || party == null) return;
                 if (!IsOutlawParty(party)) return;
+                // pomiar zastanej dziury (tylko licznik do linii "Paser:"): kiesa bandy znika razem z partia. Rozbitej w bitwie gra
+                // zdjela juz polowe dla zwyciezcy (CalculatePlunderedGoldAmountFromDefeatedParty -> MapEventParty.CommitGoldChanges
+                // biegnie PRZED zniszczeniem partii), wiec tu widzimy sama reszte, ktora przepada; rozwiazanej nikt nie dostaje nic
+                if (party.IsPartyTradeActive && party.PartyTradeGold > 0)
+                {
+                    if (destroyer != null) _goneFought += party.PartyTradeGold; else _goneDisbanded += party.PartyTradeGold;
+                }
+                if (destroyer != null) return;
                 var region = NearestNode(party.Position.ToVec2());
                 AddRoster(region, party.MemberRoster, 1f, ref _inDisband);
                 AddRoster(region, party.PrisonRoster, 1f, ref _inDisband);      // jency rozwiazanej bandy tez zostaja w lesie
@@ -501,6 +566,45 @@ namespace Armoury
                     catch { }
                 }
 
+                // 3. zycie band i kryjowek w miastach (z kiesy, ktora banda miala przez cala dobe - na sprzet byl czas), potem
+                // 4. paser: kazda banda sprzedaje zrabowany ladunek (wyjatek jednej bandy nie zatrzymuje pozostalych).
+                // Bez kiesy banda nie ma dokad wziac zaplaty; partii zajetej przez zadanie nie ruszamy; trup nie handluje.
+                MoneyLedger.Mark(MoneyLedger.MRest);          // ksiega przeplywow osad (tylko log): to, co zmienilo kasy dotad, to nie bandy
+                LifeDay(s);
+                MoneyLedger.Mark(MoneyLedger.MLife);          // ... zmiana kas od poprzedniej migawki to wydatki band i kryjowek na zycie
+                float fenceShare = MBMath.ClampFloat(s.OutlawFenceLootShare, 0f, 1f);
+                if (s.OutlawFenceBuysLoot && fenceShare > 0f)
+                {
+                    int reserve = (int)Math.Max(0f, s.TownRentFloorGold);
+                    bool food = s.OutlawNoFreeFood;
+                    foreach (var p in MobileParty.AllBanditParties.ToList())
+                    {
+                        try
+                        {
+                            if (p == null || !p.IsActive) continue;
+                            int why = p.MapEvent != null ? 1 : (!p.IsPartyTradeActive ? 2 : (p.IsCurrentlyUsedByAQuest ? 3 : (Undead.Party(p) ? 4 : 0)));
+                            if (why != 0)
+                            {
+                                // banda poza handlem: liczymy, ile ladunku przez to lezy (pomiar do linii "Paser:")
+                                int left = CargoUnits(p.ItemRoster, food);
+                                if (left > 0)
+                                {
+                                    _leftUnits += left;
+                                    if (why == 1) _leftBattle++; else if (why == 2) _leftNoPurse++; else if (why == 3) _leftQuest++; else _leftUndead++;
+                                }
+                                continue;
+                            }
+                            FenceSell(p, fenceShare, reserve);
+                        }
+                        catch (Exception e)
+                        {
+                            _sellStumbles++;
+                            if (!_errSell) { _errSell = true; Log.Error("OutlawLaw.FenceSell", e); }
+                        }
+                    }
+                }
+                MoneyLedger.Mark(MoneyLedger.MFence);         // ... a zmiana kas od poprzedniej migawki to zaplata miast za lup
+
                 int bands = 0, men = 0;
                 foreach (var p in MobileParty.AllBanditParties) { bands++; men += p.MemberRoster.TotalManCount; }
                 float tot = Total(); float sold = _pool.Values.Sum(d => d.Where(kv => kv.Key != Commoner).Sum(kv => kv.Value));
@@ -512,6 +616,7 @@ namespace Armoury
                          + " | werbunek: z puli " + _bandRecruit + ", jency " + _prisonerJoin
                          + " | awanse: z lupu " + _upLoot + ", od pasera " + _upFence + " (" + _fenceGold + " zl), bez sprzetu " + _upBlocked
                          + " | band " + bands + ", ludzi " + men + ".");
+                FenceLog(s, _upFence, _fenceGold);
                 _inDesert = _inRouted = _inRaid = _inMisery = _inDisband = _outReturn = 0f;
                 _bornBands = _bornMen = _refused = _emptyRemoved = _bandRecruit = _prisonerJoin = _upLoot = _upFence = _upBlocked = _fenceGold = 0;
             }
@@ -630,25 +735,136 @@ namespace Armoury
 
         // ------------------------------------------------------------ zloto band
         private static readonly Dictionary<MobileParty, int> _gold = new Dictionary<MobileParty, int>();
+        private static bool _goldTick;      // trwa dzienny tick gry (miedzy GoldPrefix a GoldPostfix) i migawka kies jest czynna
         public static void GoldPrefix()
         {
-            _gold.Clear();
-            if (!On || !Settings.Current.OutlawNoFreeGold) return;
+            _gold.Clear(); _goldTick = false; _foodSnap.Clear();
+            if (!On) return;
+            FoodSnapshot();
+            if (!Settings.Current.OutlawNoFreeGold) return;
             foreach (var p in MobileParty.AllBanditParties) if (p.IsPartyTradeActive) _gold[p] = p.PartyTradeGold;
+            _goldTick = true;
         }
         public static void GoldPostfix()
         {
+            _goldTick = false;
             foreach (var kv in _gold) { try { kv.Key.PartyTradeGold = kv.Value; } catch { } }
             _gold.Clear();
+            FoodRestore();
         }
-        public static void StartGoldPostfix(MobileParty banditParty)
+
+        /// <summary>
+        /// Kiesa startowa nowej bandy (postfiks na CreatePartyTrade gry i NavalDLC; pierwszy parametr po pozycji).
+        /// Gra losowala 5-15 zl na czlowieka z niczego. Przy obiegu kas kryjowek (OutlawHoardCirculates) banda dostaje
+        /// OutlawCoinsPerMan na czlowieka Z KASY swojej kryjowki - z tego, co lezy w niej ponad skarbiec, i tylko tyle, ile
+        /// tam jest (przelew, nie dosypka); banda bez kryjowki (lupiezcy, piraci) i banda z kryjowki bez nadwyzki zaczyna
+        /// bez monety. Przy wylaczonym obiegu - jak dotad, z niczego (z licznikiem).
+        /// </summary>
+        public static void StartGoldPostfix(MobileParty __0)
+        {
+            var banditParty = __0;
+            try
+            {
+                var s = Settings.Current;
+                if (!On || !s.OutlawNoFreeGold || banditParty == null) return;
+                int want = banditParty.MemberRoster.TotalManCount * Math.Max(0, s.OutlawCoinsPerMan);
+                int got = want;
+                if (s.OutlawHoardCirculates)
+                {
+                    got = 0;
+                    var home = HomeHideout(banditParty);
+                    // trup monety nie bierze (nie kupuje i nie wydaje)
+                    if (home != null && want > 0 && !Undead.Party(banditParty)) got = Math.Min(want, HoardSurplus(home));
+                    if (got > 0) HoardChange(home, -got);
+                    _hoardStart += got; _hoardStartWant += want;
+                }
+                else _startNothing += got;
+                banditParty.PartyTradeGold = got;
+                // Banda urodzona W SRODKU dziennego ticku gry (nowa kryjowka: gra wola AddNewHideouts PRZED petla dziennej dosypki)
+                // nie byla w migawce GoldPrefix - gra dopisalaby jej 2.5 zl na czlowieka z niczego, a GoldPostfix by tego nie cofnal.
+                // Wchodzi do migawki z kiesa startowa; to, co zaraz odlozy w kryjowce, odejmuje od migawki HideoutGoldPostfix.
+                if (_goldTick && banditParty.IsPartyTradeActive) _gold[banditParty] = banditParty.PartyTradeGold;
+            }
+            catch (Exception e) { if (!_errStart) { _errStart = true; Log.Error("OutlawLaw.StartGold", e); } }
+        }
+
+        // ------------------------------------------------------------ zywnosc z niczego
+        // Bandy nie jedza: DefaultMobilePartyFoodConsumptionModel.DoesPartyConsumeFood zwraca false dla IsBandit, a modele BK
+        // (BKPartyConsumptionModel), BEE, ROT i NavalDLC tylko je opakowuja; glodu, kary morale za glod ani dezercji band w kodzie
+        // gry nie ma (IsStarving ustawia tylko PartyConsumeFood, ktorego bandy nie wolaja). Mimo to gra daje zywnosc z niczego
+        // kazdej nowej bandzie (GiveFoodToBanditParty; NavalDLC ma wlasna kopie dla piratow) i z szansa 3% na dobe bandzie
+        // w bitwie (w srodku BanditSpawnCampaignBehavior.DailyTick). Odkad paser skupuje zywnosc, ta dosypka zamienialaby sie
+        // w zloto miast - zamykamy ja jednym wlacznikiem (OutlawNoFreeFood), tym samym, ktory pozwala paserowi brac zywnosc.
+
+        /// <summary>Prefiks na GiveFoodToBanditParty (gra i NavalDLC): przy zamknietym kurku oryginal nie biegnie.</summary>
+        public static bool FoodPrefix()
         {
             try
             {
-                if (!On || !Settings.Current.OutlawNoFreeGold || banditParty == null) return;
-                banditParty.PartyTradeGold = banditParty.MemberRoster.TotalManCount * Math.Max(0, Settings.Current.OutlawCoinsPerMan);
+                var s = Settings.Current;
+                if (!On || s == null || !s.OutlawNoFreeFood) return true;
+                _foodBands++;
+                return false;
             }
-            catch { }
+            catch { return true; }
+        }
+
+        // banda w bitwie w chwili dziennego ticku gry -> zywnosc w jukach przed tickiem (przedmiot -> sztuki)
+        private static readonly Dictionary<MobileParty, Dictionary<ItemObject, int>> _foodSnap = new Dictionary<MobileParty, Dictionary<ItemObject, int>>();
+
+        private static Dictionary<ItemObject, int> FoodOf(ItemRoster r)
+        {
+            var d = new Dictionary<ItemObject, int>();
+            if (r == null) return d;
+            for (int i = 0; i < r.Count; i++)
+            {
+                var el = r.GetElementCopyAtIndex(i);
+                var it = el.EquipmentElement.Item;
+                if (it == null || el.Amount <= 0 || !it.IsFood) continue;
+                int n; d.TryGetValue(it, out n); d[it] = n + el.Amount;
+            }
+            return d;
+        }
+
+        /// <summary>Przed dziennym tickiem gry: stan zywnosci band, ktorym gra moze cos dosypac (tylko bandy w bitwie, z kiesa).</summary>
+        private static void FoodSnapshot()
+        {
+            try
+            {
+                if (!Settings.Current.OutlawNoFreeFood) return;
+                foreach (var p in MobileParty.AllBanditParties)
+                    if (p != null && p.MapEvent != null && p.IsPartyTradeActive) _foodSnap[p] = FoodOf(p.ItemRoster);
+            }
+            catch (Exception e) { _foodSnap.Clear(); if (!_errFood) { _errFood = true; Log.Error("OutlawLaw.FoodSnapshot", e); } }
+        }
+
+        /// <summary>Po dziennym ticku gry: zdejmujemy to, co gra dosypala (w srodku ticku banda niczego nie rabuje ani nie kupuje).</summary>
+        private static void FoodRestore()
+        {
+            if (_foodSnap.Count == 0) return;
+            foreach (var kv in _foodSnap)
+            {
+                try
+                {
+                    var r = kv.Key != null ? kv.Key.ItemRoster : null;
+                    if (r == null) continue;
+                    foreach (var now in FoodOf(r))
+                    {
+                        int had; kv.Value.TryGetValue(now.Key, out had);
+                        int extra = now.Value - had;
+                        if (extra <= 0) continue;
+                        // gra dosypuje sztuki bez znacznika stanu - te same zdejmujemy, nigdy wiecej niz lezy w tym stosie
+                        var plain = new EquipmentElement(now.Key);
+                        int idx = r.FindIndexOfElement(plain);
+                        int take = idx >= 0 ? Math.Min(extra, r.GetElementNumber(idx)) : 0;
+                        if (take <= 0) continue;
+                        r.AddToCounts(plain, -take);
+                        _foodTaken += take;
+                    }
+                }
+                catch (Exception e) { if (!_errFood) { _errFood = true; Log.Error("OutlawLaw.FoodRestore", e); } }
+            }
+            _foodSnap.Clear();
         }
 
         // ------------------------------------------------------------ awanse tylko ze sprzetem
@@ -685,7 +901,13 @@ namespace Armoury
                 }
                 return false;
             }
-            catch (Exception e) { Log.Error("OutlawLaw.Upgrade", e); return false; }
+            catch (Exception e)
+            {
+                // odkad kazda banda ma pasera, zakupy biegna u wszystkich band - blad raz do logu, potem tylko licznik (linia "Paser:")
+                _upStumbles++;
+                if (!_errUpgrade) { _errUpgrade = true; Log.Error("OutlawLaw.Upgrade", e); }
+                return false;
+            }
         }
 
         private static float BodyOf(CharacterObject c)
@@ -694,7 +916,11 @@ namespace Armoury
             catch { return 0f; }
         }
 
-        /// <summary>Jedna sztuka sprzetu na awans: zbroja (gdy cel nosi ciezsza) i kon (gdy cel konny).</summary>
+        /// <summary>
+        /// Jedna sztuka sprzetu na awans: zbroja (gdy cel nosi ciezsza) i kon (gdy cel konny). Najpierw z jukow bandy; czego
+        /// w jukach nie ma, banda kupuje u pasera - w tym miescie w zasiegu, w ktorym wychodzi najtaniej Z DOSTAWA (wartosc
+        /// sztuki x marza rosnaca z odlegloscia). Gdy w kiesie brakuje, reszte doklada nadwyzka kasy kryjowki bandy.
+        /// </summary>
         private static bool Equip(MobileParty p, CharacterObject from, CharacterObject to)
         {
             float need = BodyOf(to);
@@ -704,26 +930,100 @@ namespace Armoury
             Func<ItemObject, bool> armourOk = it => it.ItemType == ItemObject.ItemTypeEnum.BodyArmor && it.ArmorComponent != null && it.ArmorComponent.BodyArmor >= need * 0.8f;
             Func<ItemObject, bool> horseOk = it => it.ItemType == ItemObject.ItemTypeEnum.Horse && it.HorseComponent != null && !it.HorseComponent.IsPackAnimal;
             ItemObject a = null, h = null;
-            bool aFence = false, hFence = false;
-            if (armour) { a = Find(p.ItemRoster, armourOk); if (a == null) { a = Find(Fence(p), armourOk); aFence = a != null; } if (a == null) return false; }
-            if (horse) { h = Find(p.ItemRoster, horseOk); if (h == null) { h = Find(Fence(p), horseOk); hFence = h != null; } if (h == null) return false; }
-            int price = 0;
-            float markup = Settings.Current.OutlawFenceMarkup;
-            if (aFence) price += (int)(a.Value * markup);
-            if (hFence) price += (int)(h.Value * markup);
-            if (price > 0 && p.PartyTradeGold < price) return false;
-            var town = Fence(p) != null ? FenceTown(p) : null;
+            Settlement aTown = null, hTown = null;
+            int aPrice = 0, hPrice = 0;
+            List<Bid> reach = null;
+            if (armour) { a = Find(p.ItemRoster, armourOk); if (a == null) a = FindAtFence(p, ref reach, armourOk, out aTown, out aPrice); if (a == null) return false; }
+            if (horse) { h = Find(p.ItemRoster, horseOk); if (h == null) h = FindAtFence(p, ref reach, horseOk, out hTown, out hPrice); if (h == null) return false; }
+            int price = aPrice + hPrice, lent = 0;
+            Settlement home = null;
+            if (price > 0 && p.PartyTradeGold < price)
+            {
+                lent = price - p.PartyTradeGold;
+                home = HoardSpare(p, lent);
+                if (home == null) return false;       // nie stac ani bandy, ani nadwyzki kasy jej kryjowki
+            }
             // wpis 90 (audyt 1-43 F8): zdejmujemy sztuke w jej stanie - dotad zuzyta zostawala na polce, banda awansowala z niczego
-            if (a != null) { if (!Helper.RemoveOne(aFence ? town.ItemRoster : p.ItemRoster, a)) return false; }
-            if (h != null) { if (!Helper.RemoveOne(hFence ? town.ItemRoster : p.ItemRoster, h)) return false; }
+            if (a != null) { if (!Helper.RemoveOne(aTown != null ? aTown.ItemRoster : p.ItemRoster, a)) return false; }
+            if (h != null) { if (!Helper.RemoveOne(hTown != null ? hTown.ItemRoster : p.ItemRoster, h)) return false; }
             if (price > 0)
             {
+                if (lent > 0) { HoardChange(home, -lent); p.PartyTradeGold += lent; _hoardGear += lent; }   // przelew kryjowka -> banda
                 p.PartyTradeGold -= price;
-                try { town.SettlementComponent.ChangeGold(price); } catch { }
+                FencePaid(aTown, aPrice); FencePaid(hTown, hPrice);
                 _fenceGold += price; _upFence++;
             }
             else _upLoot++;
             return true;
+        }
+
+        /// <summary>Zaplata bandy za sprzet trafia do kasy miasta pasera; Note = ksiega przeplywow osad (tylko licznik).</summary>
+        private static void FencePaid(Settlement town, int price)
+        {
+            if (town == null || price <= 0) return;
+            try { town.SettlementComponent.ChangeGold(price); MoneyLedger.Note(MoneyLedger.NFence, town, price); } catch { }
+        }
+
+        /// <summary>
+        /// Najtansza z dostawa sztuka, ktora wystarczy, na polkach miast w zasiegu pasera: wartosc sztuki x marza, a marza rosnie
+        /// rowno z odlegloscia od OutlawFenceMarkup przy miescie do OutlawFenceMarkupFar na granicy promienia (zbroja i kon sa
+        /// lekkie wobec swojej wartosci, wiec droga podnosi cene slabiej, niz obniza cene skupu lupu). Trup nie handluje.
+        /// </summary>
+        private static ItemObject FindAtFence(MobileParty p, ref List<Bid> reach, Func<ItemObject, bool> ok, out Settlement town, out int price)
+        {
+            town = null; price = 0;
+            if (Undead.Party(p)) return null;
+            var s = Settings.Current;
+            float radius = Math.Max(1f, s.OutlawFenceRadius);
+            if (reach == null) { bool beyond; reach = Reach(p, radius, out beyond); }
+            float near = Math.Max(0f, s.OutlawFenceMarkup), far = Math.Max(near, s.OutlawFenceMarkupFar);
+            ItemObject best = null;
+            foreach (var b in reach)
+            {
+                var it = Find(b.St.ItemRoster, ok);
+                if (it == null) continue;
+                int cost = (int)(it.Value * (double)Slide(near, far, b.Dist, radius));
+                if (best == null || cost < price) { best = it; price = cost; town = b.St; }
+            }
+            return best;
+        }
+
+        /// <summary>
+        /// Nadwyzka kasy kryjowki: to, co lezy w niej ponad skarbiec (liczony raz na dobe w LifeDay). Skarbca bandy nie
+        /// ruszaja - to lup dla tego, kto kryjowke oczysci; kasy czekajacej na przeszukanie przez gracza nie rusza nikt.
+        /// Dopoki skarbiec nie jest policzony (pierwsza doba po wczytaniu), nadwyzki nie ma.
+        /// </summary>
+        private static int HoardSurplus(Settlement hideout)
+        {
+            var comp = hideout != null ? hideout.SettlementComponent : null;
+            int keep;
+            if (comp == null || !_hoardKeep.TryGetValue(hideout, out keep) || HideoutPurge.Holds(hideout)) return 0;
+            return Math.Max(0, comp.Gold - keep);
+        }
+
+        /// <summary>Czy nadwyzka kasy kryjowki bandy pokryje brakujaca kwote. Zwraca kryjowke albo null.</summary>
+        private static Settlement HoardSpare(MobileParty p, int lack)
+        {
+            if (!Settings.Current.OutlawHoardCirculates || lack <= 0) return null;
+            var home = HomeHideout(p);
+            return home != null && HoardSurplus(home) >= lack ? home : null;
+        }
+
+        /// <summary>Kryjowka, z ktorej jest banda (lupiezcy i piraci jej nie maja).</summary>
+        private static Settlement HomeHideout(MobileParty p)
+        {
+            var c = p != null ? p.BanditPartyComponent : null;
+            var h = c != null ? c.Hideout : null;
+            return h != null ? h.Settlement : null;
+        }
+
+        /// <summary>Kazda NASZA zmiana kasy kryjowki idzie tedy - suma _hoardSeen pozwala wejsciu bandy (HideoutGoldPostfix)
+        /// odroznic nasze przelewy od dosypki gry, takze gdy kiesa startowa herszta wychodzi z kasy w srodku tego wejscia.</summary>
+        private static void HoardChange(Settlement hideout, int delta)
+        {
+            hideout.SettlementComponent.ChangeGold(delta);
+            long seen; _hoardSeen.TryGetValue(hideout, out seen);
+            _hoardSeen[hideout] = seen + delta;
         }
 
         private static ItemObject Find(ItemRoster r, Func<ItemObject, bool> ok)
@@ -740,26 +1040,515 @@ namespace Armoury
             return best;
         }
 
-        private static Settlement FenceTown(MobileParty p)
+        // ------------------------------------------------------------ paser: zasieg i warunki
+        /// <summary>Miasto w zasiegu pasera bandy i jego oferta na biezacy stos (pola robocze SellStack).</summary>
+        private sealed class Bid
+        {
+            public Settlement St; public Town Town;
+            public float Dist;          // odleglosc do warunkow handlu (banda poza promieniem: sam promien, czyli warunki z jego granicy)
+            public float Real;          // prawdziwa odleglosc bandy od miasta (do podzialu na strefy w logu)
+            public float Share;         // udzial bandy w cenie skupu tego miasta
+            public bool Skip;           // na ten stos to miasto odpada (nie stac go, zerowy udzial, zwierze nie z tej krainy)
+            public int Price; public double Net, Due; public long Worth; public int Moved;
+        }
+
+        /// <summary>Warunki pasera zmieniaja sie rowno z odlegloscia: `near` przy miescie, `far` na granicy promienia (i dalej).</summary>
+        private static float Slide(float near, float far, float dist, float radius)
+        {
+            return near + (far - near) * MBMath.ClampFloat(dist / Math.Max(1f, radius), 0f, 1f);
+        }
+
+        /// <summary>
+        /// Paserzy bandy: wszystkie nieoblezone miasta w promieniu (do oblezonego paser nie wjedzie). Gdy w promieniu nie ma
+        /// zadnego, banda i tak ma pasera - najblizsze otwarte miasto swiata, na warunkach z granicy promienia (`beyond`).
+        /// Pusta lista tylko wtedy, gdy na mapie nie ma ani jednego nieoblezonego miasta.
+        /// </summary>
+        private static List<Bid> Reach(MobileParty p, float radius, out bool beyond)
+        {
+            beyond = false;
+            var list = new List<Bid>();
+            var pos = p.Position.ToVec2();
+            var cur = p.CurrentSettlement;
+            float r2 = radius * radius, nd = float.MaxValue;
+            Settlement nearest = null;
+            foreach (var s in Nodes())
+            {
+                if (!s.IsTown || s.Town == null || s.ItemRoster == null || s.IsUnderSiege) continue;
+                float d2 = ReferenceEquals(s, cur) ? 0f : pos.DistanceSquared(s.GetPosition2D);
+                if (d2 <= r2) { float d = (float)Math.Sqrt(d2); list.Add(new Bid { St = s, Town = s.Town, Dist = d, Real = d }); }
+                else if (d2 < nd) { nd = d2; nearest = s; }
+            }
+            if (list.Count == 0 && nearest != null)
+            {
+                beyond = true;
+                list.Add(new Bid { St = nearest, Town = nearest.Town, Dist = radius, Real = (float)Math.Sqrt(nd) });
+            }
+            return list;
+        }
+
+        /// <summary>Najblizsze nieoblezone miasto - tam banda i kryjowka wydaja na zycie (bez promienia: do karczmy trafi kazdy).</summary>
+        private static Settlement NearestOpenTown(Vec2 pos)
+        {
+            Settlement best = null; float bd = float.MaxValue;
+            foreach (var s in Nodes())
+            {
+                if (!s.IsTown || s.Town == null || s.IsUnderSiege) continue;
+                float d = pos.DistanceSquared(s.GetPosition2D);
+                if (d < bd) { bd = d; best = s; }
+            }
+            return best;
+        }
+
+        // ------------------------------------------------------------ zycie band i obieg kas kryjowek
+        /// <summary>
+        /// Raz na dobe, przed skupem. (1) Skarbiec kazdej kryjowki = HideoutGoldBase + HideoutGoldPerBand x bandy, ktore maja
+        /// w niej dom; kryjowka bez band skarbca nie trzyma. (2) Banda wydaje na zycie (jedzenie, picie, towarzystwo) czesc
+        /// kiesy - OutlawLifeSpendShare - w najblizszym otwartym miescie: przelew kiesa -> kasa miasta, jak "zycie w miastach"
+        /// sakiewek ludzi (MenPurse). (3) Kryjowka wydaje tak samo czesc tego, co lezy w jej kasie PONAD skarbiec (tylko przy
+        /// OutlawHoardCirculates) - kasa kryjowki nie moze tylko rosnac. Lupu, ktory czeka na przeszukanie przez gracza, nie rusza.
+        /// </summary>
+        private static void LifeDay(Settings s)
         {
             try
             {
-                if (p.CurrentSettlement != null && p.CurrentSettlement.IsTown) return p.CurrentSettlement;
-                var pos = p.Position.ToVec2();
-                float r = Settings.Current.OutlawFenceRadius;
-                Settlement best = null; float bd = r * r;
-                foreach (var s in Nodes())
+                _hoardKeep.Clear();
+                var bandsOf = new Dictionary<Settlement, int>();
+                foreach (var p in MobileParty.AllBanditParties)
                 {
-                    if (!s.IsTown) continue;
-                    float d = pos.DistanceSquared(s.GetPosition2D);
-                    if (d <= bd) { bd = d; best = s; }
+                    if (p == null || !p.IsActive) continue;
+                    var home = HomeHideout(p);
+                    if (home == null) continue;
+                    int n; bandsOf.TryGetValue(home, out n); bandsOf[home] = n + 1;
                 }
-                return best;
+                int kb = Math.Max(0, s.HideoutGoldBase), kp = Math.Max(0, s.HideoutGoldPerBand);
+                foreach (var h in Hideout.All)
+                {
+                    if (h == null || h.Settlement == null) continue;
+                    int n; bandsOf.TryGetValue(h.Settlement, out n);
+                    _hoardKeep[h.Settlement] = n > 0 ? kb + kp * n : 0;
+                }
             }
-            catch { return null; }
+            catch (Exception e) { _lifeStumbles++; if (!_errLife) { _errLife = true; Log.Error("OutlawLaw.LifeDay(skarbce)", e); } }
+
+            double share = MBMath.ClampFloat(s.OutlawLifeSpendShare, 0f, 1f);
+            if (share <= 0.0) return;
+            foreach (var p in MobileParty.AllBanditParties.ToList())
+            {
+                try
+                {
+                    if (p == null || !p.IsActive || p.MapEvent != null || !p.IsPartyTradeActive) continue;
+                    if (p.IsCurrentlyUsedByAQuest || Undead.Party(p)) continue;
+                    int purse = p.PartyTradeGold;
+                    if (purse <= 0) continue;
+                    int spend = Math.Min(purse, Math.Max(1, (int)(purse * share)));      // co najmniej moneta - drobna kiesa tez sie rozchodzi
+                    var town = ReferenceEquals(p.CurrentSettlement, null) || !p.CurrentSettlement.IsTown ? NearestOpenTown(p.Position.ToVec2()) : p.CurrentSettlement;
+                    if (town == null || town.Town == null || spend <= 0) continue;
+                    p.PartyTradeGold = purse - spend;
+                    town.Town.ChangeGold(spend);
+                    _lifeBands += spend;
+                }
+                catch (Exception e) { _lifeStumbles++; if (!_errLife) { _errLife = true; Log.Error("OutlawLaw.LifeDay(banda)", e); } }
+            }
+            if (!s.OutlawHoardCirculates) return;
+            foreach (var h in Hideout.All)
+            {
+                try
+                {
+                    var hs = h != null ? h.Settlement : null;
+                    if (hs == null || h.Gold <= 0) continue;
+                    int keep;
+                    if (!_hoardKeep.TryGetValue(hs, out keep)) continue;      // skarbiec niepoliczony (potkniecie wyzej): jak w HoardSurplus - nadwyzki nie ma, calej kasy nie ruszamy
+                    int over = h.Gold - keep;
+                    if (over <= 0 || HideoutPurge.Holds(hs)) continue;
+                    int spend = Math.Min(over, Math.Max(1, (int)(over * share)));
+                    var town = NearestOpenTown(hs.GetPosition2D);
+                    if (town == null || town.Town == null || spend <= 0) continue;
+                    HoardChange(hs, -spend);
+                    town.Town.ChangeGold(spend);
+                    _lifeHoards += spend;
+                }
+                catch (Exception e) { _lifeStumbles++; if (!_errLife) { _errLife = true; Log.Error("OutlawLaw.LifeDay(kryjowka)", e); } }
+            }
         }
 
-        private static ItemRoster Fence(MobileParty p) { var t = FenceTown(p); return t != null ? t.ItemRoster : null; }
+        // ------------------------------------------------------------ paser: skup lupu band
+        private const int LootCargo = 0, LootFood = 1, LootArmour = 2, LootMount = 3, LootPack = 4, LootArms = 5, LootOther = 6, LootKinds = 7;
+
+        /// <summary>
+        /// Co lezy w jukach bandy.
+        ///  LootCargo  - ladunek na sprzedaz: towary handlowe (typ Goods), zwierzeta hodowlane (typ Animal) i zywnosc, gdy `foodSells`;
+        ///  LootFood   - zywnosc, ktorej paser nie bierze (tylko przy otwartym kurku zywnosci z niczego - skup zamienialby ja w zloto miast);
+        ///  LootArmour - zbroja na korpus bez znacznika stanu: tego szuka Equip na awanse;
+        ///  LootMount  - kon pod siodlo (awanse na konnych; piesi jada na zapasowych), LootPack - zwierze juczne (niesie lup);
+        ///  LootArms   - bron, helmy, tarcze, reszta sprzetu i zbroje ze znacznikiem stanu: zostaja w jukach (z pomiarem);
+        ///  LootOther  - przedmioty zadan i rzeczy niehandlowe.
+        /// </summary>
+        private static int LootKind(ItemRosterElement el, bool foodSells)
+        {
+            var it = el.EquipmentElement.Item;
+            if (it == null || el.Amount <= 0) return -1;
+            if (el.EquipmentElement.IsQuestItem || it.NotMerchandise) return LootOther;
+            if (it.ItemType == ItemObject.ItemTypeEnum.Horse) return it.HorseComponent != null && it.HorseComponent.IsPackAnimal ? LootPack : LootMount;
+            if (it.ItemType == ItemObject.ItemTypeEnum.BodyArmor) return el.EquipmentElement.ItemModifier == null ? LootArmour : LootArms;
+            if (it.IsFood) return foodSells ? LootCargo : LootFood;
+            if (it.ItemType == ItemObject.ItemTypeEnum.Goods || it.ItemType == ItemObject.ItemTypeEnum.Animal) return LootCargo;   // ladunek taborow i karawan, stada
+            return LootArms;
+        }
+
+        private static int CargoUnits(ItemRoster pack, bool foodSells)
+        {
+            int n = 0;
+            if (pack == null) return 0;
+            for (int i = 0; i < pack.Count; i++) { var el = pack.GetElementCopyAtIndex(i); if (LootKind(el, foodSells) == LootCargo) n += el.Amount; }
+            return n;
+        }
+
+        /// <summary>
+        /// Cena skupu sztuki w miescie. Towary, zywnosc i stada: Town.GetItemPrice ze sprzedaza, bez partii - jak przy taborze wsi
+        /// (na targ wnosi paser, czlowiek z miasta). Konie i zwierzeta juczne naleza do prawa podazy i popytu uzbrojenia
+        /// (SupplyDemand), a ono liczy cene tylko wtedy, gdy zna kupca - dlatego tu wycena z polka miasta jako kupcem, jak przy
+        /// nadwyzkach sprzedawanych przez ludzi lordow (MenPurse.SellPrice): zawalona polka placi mniej, podloga zlomu obowiazuje.
+        /// </summary>
+        private static int FencePrice(Settlement st, EquipmentElement what)
+        {
+            if (SupplyDemand.Equipmentish(what.Item)) return Math.Max(1, st.Town.MarketData.GetPrice(what, null, true, st.Party));
+            return Math.Max(1, st.Town.GetItemPrice(what, null, true));
+        }
+
+        /// <summary>
+        /// Banda sprzedaje paserom ladunek z jukow - kazda sztuke temu miastu w zasiegu, ktore za NASTEPNA sztuke da jej najwiecej
+        /// na reke (cena skupu miasta x udzial bandy malejacy z odlegloscia). Cena liczona od nowa po kazdej sztuce, ktora trafila
+        /// na polke (towar tanieje - jedna cena na stos przeplacalaby); reszta ceny to dzialka pasera, ktora zostaje w kasie
+        /// miasta. Miasto placi tylko z tego, co ma ponad rezerwe na renty (TownRentFloorGold); gdy go nie stac, kupuje nastepne.
+        /// Potem zwierzeta ponad potrzebe (SellSpare). Nic nie znika i nic nie powstaje: sztuka schodzi z jukow i trafia na polke
+        /// (nieudane dolozenie cofa zdjecie), zaplata za to, co przeszlo, idzie w finally - takze po wyjatku przy kolejnej sztuce.
+        /// </summary>
+        private static void FenceSell(MobileParty p, float share, int reserve)
+        {
+            var s = Settings.Current;
+            var pack = p.ItemRoster;
+            if (pack == null || pack.Count == 0) return;
+            bool food = s.OutlawNoFreeFood, spare = s.OutlawFenceBuysSpareAnimals;
+            bool cargo = false, beasts = false;
+            for (int i = 0; i < pack.Count; i++)
+            {
+                int k = LootKind(pack.GetElementCopyAtIndex(i), food);
+                if (k == LootCargo) cargo = true; else if (k == LootMount || k == LootPack) beasts = true;
+            }
+            if (!cargo && !(spare && beasts)) return;
+            if (cargo) _sellBands++;
+            float radius = Math.Max(1f, s.OutlawFenceRadius);
+            bool beyond;
+            var bids = Reach(p, radius, out beyond);
+            if (bids.Count == 0)
+            {
+                if (cargo) { _leftBands++; _leftNoTown++; _leftUnits += CargoUnits(pack, food); }
+                return;
+            }
+            float far = MBMath.ClampFloat(s.OutlawFenceLootShareFar, 0f, share);      // daleko nigdy lepiej niz przy miescie
+            foreach (var b in bids) b.Share = Slide(share, far, b.Dist, radius);
+            if (cargo) { _sellFenced++; if (beyond) _sellBeyond++; }
+            int units = 0;
+            bool poor = false;
+            try
+            {
+                // od konca: sprzedany do zera stos znika, a na jego miejsce wskakuje ostatni (juz obejrzany) - zaden nie zostaje pominiety
+                for (int i = pack.Count - 1; i >= 0; i--)
+                {
+                    if (i >= pack.Count) continue;
+                    var el = pack.GetElementCopyAtIndex(i);
+                    if (LootKind(el, food) != LootCargo) continue;
+                    units += SellStack(p, pack, el, bids, reserve, false, 0f, ref poor);
+                }
+                if (spare && beasts) units += SellSpare(p, pack, bids, reserve, ref poor);
+            }
+            finally
+            {
+                // "sprzedalo" w linii "Paser:" to bandy z ladunkiem (nie moze przekroczyc "band z ladunkiem"); banda, ktora miala do
+                // sprzedania same zwierzeta ponad potrzebe, idzie do osobnego licznika
+                if (units > 0) { if (cargo) _sellSellers++; else _sellSpareBands++; }
+                if (cargo)
+                {
+                    int left = CargoUnits(pack, food);
+                    if (left > 0) { _leftBands++; _leftUnits += left; if (poor) _leftPoor++; }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Sprzedaje do `el.Amount` sztuk jednego stosu. Dla zwierzat (`beast`) kazda sztuka przechodzi probe: po zdjeciu jej
+        /// z jukow banda musi dalej uniesc to, co niesie (`weight`) - inaczej zwierze wraca do jukow i stos jest skonczony.
+        /// Zaplata za sztuki, ktore przeszly, jest w finally: po miescie, z ulamkiem monety na korzysc pasera.
+        /// </summary>
+        private static int SellStack(MobileParty p, ItemRoster pack, ItemRosterElement el, List<Bid> bids, int reserve, bool beast, float weight, ref bool poor)
+        {
+            var what = el.EquipmentElement;
+            var item = what.Item;
+            bool exotic = beast && MountLaw.IsExotic(item);      // wielblad, slon, rydwan: tylko tam, gdzie targ ma prawo je trzymac (LegendaryLaw zdjalby je z polki)
+            foreach (var b in bids)
+            {
+                b.Skip = b.Share <= 0f || (exotic && !MountLaw.AllowedForSettlement(b.St, item));
+                b.Price = 0; b.Net = 0.0; b.Due = 0.0; b.Worth = 0; b.Moved = 0;
+            }
+            int sold = 0;
+            try
+            {
+                for (int k = 0; k < el.Amount; k++)
+                {
+                    if (pack.FindIndexOfElement(what) < 0) break;           // stosu juz nie ma - nic nie moze trafic na polke bez zdjecia z jukow
+                    pack.AddToCounts(what, -1);
+                    bool placed = false;
+                    try
+                    {
+                        if (beast && !Carries(p, weight)) break;            // bez tego zwierzecia banda nie uniesie jukow - zostaje
+                        Bid best = null;
+                        foreach (var b in bids)
+                        {
+                            if (b.Skip) continue;
+                            if (b.Price <= 0) { b.Price = FencePrice(b.St, what); b.Net = b.Price * (double)b.Share; }
+                            if (b.Town.Gold - reserve < (int)Math.Ceiling(b.Due + b.Net)) { b.Skip = true; poor = true; continue; }   // tego miasta na te sztuke nie stac
+                            if (best == null || b.Net > best.Net) best = b;
+                        }
+                        if (best == null) break;                            // nikt w zasiegu nie kupi - reszta stosu zostaje na pozniej
+                        best.St.ItemRoster.AddToCounts(what, 1);
+                        placed = true;
+                        best.Moved++; best.Due += best.Net; best.Worth += best.Price;
+                        best.Price = 0;                                     // polka tego miasta sie zmienila - nastepna sztuke wyceni od nowa
+                        sold++;
+                    }
+                    finally { if (!placed) pack.AddToCounts(what, 1); }     // sztuka, ktora nie trafila na polke, wraca do jukow
+                }
+            }
+            finally
+            {
+                string id = item.StringId;                                  // ruda i drewno osobno - do zestawienia z liniami "Ruda:" i "Drewno:"
+                foreach (var b in bids)
+                {
+                    if (b.Moved <= 0) continue;
+                    int pay = (int)b.Due;                                   // ulamek monety zostaje u pasera
+                    if (pay > 0) { b.Town.ChangeGold(-pay); p.PartyTradeGold += pay; }
+                    _sellUnits += b.Moved; _sellPaid += pay; _sellWorth += b.Worth;
+                    int zone = b.Real <= ZoneNear ? 0 : (b.Real <= ZoneMid ? 1 : 2);
+                    _zoneUnits[zone] += b.Moved; _zonePaid[zone] += pay;
+                    if (id == "iron") _sellIron += b.Moved; else if (id == "hardwood") _sellWood += b.Moved;
+                    if (beast) _sellAnimals += b.Moved; else if (item.IsFood) _sellFood += b.Moved;
+                    _sellTowns.Add(b.St);
+                    b.Moved = 0; b.Due = 0.0; b.Worth = 0;
+                }
+            }
+            return sold;
+        }
+
+        /// <summary>Czy banda uniesie to, co niesie (`weight`), z tym, co ma teraz w jukach (model nosnosci gry z cudzymi latkami).</summary>
+        private static bool Carries(MobileParty p, float weight)
+        {
+            return Campaign.Current.Models.InventoryCapacityModel.CalculateInventoryCapacity(p, p.IsCurrentlyAtSea).ResultNumber >= weight;
+        }
+
+        /// <summary>Piesi bandy - kazdy moze jechac na zapasowym koniu, wiec tyle koni banda trzyma.</summary>
+        private static int Footmen(MobileParty p)
+        {
+            var r = p.MemberRoster;
+            int mounted = 0;
+            for (int i = 0; i < r.Count; i++)
+            {
+                var e = r.GetElementCopyAtIndex(i);
+                if (e.Character != null && e.Character.IsMounted) mounted += e.Number;
+            }
+            return Math.Max(0, r.TotalManCount - mounted);
+        }
+
+        /// <summary>
+        /// Zwierzeta ponad potrzebe (po sprzedazy ladunku). Kon pod siodlo jest potrzebny, dopoki banda ma pieszego, ktory moze
+        /// na nim jechac (i awansowac na konnego) - nadwyzka to konie ponad liczbe pieszych, najdrozsze ida pierwsze. Zwierze
+        /// juczne jest potrzebne, dopoki bez niego banda nie uniesie reszty jukow - kazda sztuka przechodzi probe nosnosci.
+        /// </summary>
+        private static int SellSpare(MobileParty p, ItemRoster pack, List<Bid> bids, int reserve, ref bool poor)
+        {
+            float weight = Campaign.Current.Models.InventoryCapacityModel.CalculateTotalWeightCarried(p, p.IsCurrentlyAtSea).ResultNumber;
+            var beasts = new List<ItemRosterElement>();
+            int mounts = 0;
+            for (int i = 0; i < pack.Count; i++)
+            {
+                var el = pack.GetElementCopyAtIndex(i);
+                int kind = LootKind(el, false);
+                if (kind == LootMount) { mounts += el.Amount; beasts.Add(el); }
+                else if (kind == LootPack) beasts.Add(el);
+            }
+            int spareMounts = Math.Max(0, mounts - Footmen(p));
+            beasts.Sort((x, y) => y.EquipmentElement.ItemValue.CompareTo(x.EquipmentElement.ItemValue));
+            int sold = 0;
+            foreach (var el in beasts)
+            {
+                bool mount = LootKind(el, false) == LootMount;
+                int n = mount ? Math.Min(el.Amount, spareMounts) : el.Amount;
+                if (n <= 0) continue;
+                int got = SellStack(p, pack, new ItemRosterElement(el.EquipmentElement, n), bids, reserve, true, weight, ref poor);
+                if (mount) spareMounts -= got;
+                sold += got;
+            }
+            return sold;
+        }
+
+        /// <summary>Linia "Paser:" - raz na dobe, zaraz po linii "Wyrzutki:". Zeruje liczniki pasera, kryjowek i zywnosci.</summary>
+        private static void FenceLog(Settings s, int boughtUnits, int boughtGold)
+        {
+            try
+            {
+                bool food = s.OutlawNoFreeFood;
+                long purses = 0, hoards = 0, hoardMax = 0, keepSum = 0;
+                int hoardN = 0;
+                var units = new int[LootKinds]; var worth = new long[LootKinds];
+                foreach (var p in MobileParty.AllBanditParties)
+                {
+                    if (p == null || !p.IsActive) continue;
+                    purses += p.PartyTradeGold;
+                    var r = p.ItemRoster;
+                    if (r == null) continue;
+                    for (int i = 0; i < r.Count; i++)
+                    {
+                        var el = r.GetElementCopyAtIndex(i);
+                        int k = LootKind(el, food);
+                        if (k < 0) continue;
+                        units[k] += el.Amount; worth[k] += (long)el.Amount * el.EquipmentElement.ItemValue;
+                    }
+                }
+                foreach (var h in Hideout.All)
+                {
+                    if (h == null) continue;
+                    hoards += h.Gold;
+                    if (h.Gold > 0) hoardN++;
+                    if (h.Gold > hoardMax) hoardMax = h.Gold;
+                }
+                foreach (var kv in _hoardKeep) keepSum += kv.Value;
+                float share = MBMath.ClampFloat(s.OutlawFenceLootShare, 0f, 1f);
+                float far = MBMath.ClampFloat(s.OutlawFenceLootShareFar, 0f, share);
+                bool sells = s.OutlawFenceBuysLoot && share > 0f;
+                var inv = CultureInfo.InvariantCulture;
+                var sb = new StringBuilder("Paser: dzien " + (int)CampaignTime.Now.ToDays);
+                if (sells)
+                {
+                    sb.Append(" | skup lupu (udzial bandy ").Append(share.ToString("0.00", inv)).Append(" przy miescie -> ").Append(far.ToString("0.00", inv))
+                      .Append(" na granicy promienia ").Append(((int)Math.Max(1f, s.OutlawFenceRadius)).ToString(inv))
+                      .Append("): band z ladunkiem ").Append(_sellBands).Append(", z paserem ").Append(_sellFenced).Append(" (ma byc 100%; w tym poza promieniem ").Append(_sellBeyond)
+                      .Append("), sprzedalo ").Append(_sellSellers).Append(" w ").Append(_sellTowns.Count).Append(" miastach - ")
+                      .Append(_sellUnits).Append(" szt. (w tym ruda ").Append(_sellIron).Append(", drewno ").Append(_sellWood)
+                      .Append(" ladunkow, zywnosc ").Append(_sellFood).Append(", zwierzeta ponad potrzebe ").Append(_sellAnimals)
+                      .Append(") za ").Append(_sellPaid).Append(" zl; po cenach skupu miast ").Append(_sellWorth)
+                      .Append(" zl, dzialka pasera ").Append(_sellWorth - _sellPaid).Append(" zl zostala w kasach miast")
+                      .Append("; same zwierzeta ponad potrzebe (bez innego ladunku) sprzedalo ").Append(_sellSpareBands).Append(" band")
+                      .Append(" | wg odleglosci od miasta, ktore kupilo: do 50 - ").Append(_zoneUnits[0]).Append(" szt. za ").Append(_zonePaid[0])
+                      .Append(" zl, 50-100 - ").Append(_zoneUnits[1]).Append(" szt. za ").Append(_zonePaid[1])
+                      .Append(" zl, dalej - ").Append(_zoneUnits[2]).Append(" szt. za ").Append(_zonePaid[2]).Append(" zl")
+                      .Append(" | z ladunkiem zostalo ").Append(_leftBands).Append(" band (").Append(_leftUnits).Append(" szt. razem z bandami poza handlem): kasy miast w zasiegu przy rezerwie ")
+                      .Append(_leftPoor).Append(", brak otwartego miasta ").Append(_leftNoTown)
+                      .Append("; poza handlem z ladunkiem: w bitwie ").Append(_leftBattle).Append(", bez kiesy ").Append(_leftNoPurse)
+                      .Append(", zajete przez zadanie ").Append(_leftQuest).Append(", nieumarli ").Append(_leftUndead);
+                    if (!food) sb.Append("; zywnosci paser nie bierze (kurek zywnosci z niczego otwarty)");
+                    if (!s.OutlawFenceBuysSpareAnimals) sb.Append("; zwierzat ponad potrzebe nie bierze (wylaczone)");
+                }
+                else
+                    sb.Append(" | skup lupu WYLACZONY w ustawieniach (bandy niczego nie sprzedaja)");
+                sb.Append(" | kupno sprzetu u pasera: ").Append(boughtUnits).Append(" awansow za ").Append(boughtGold).Append(" zl (w tym z kas kryjowek ").Append(_hoardGear).Append(" zl)")
+                  .Append(" | zycie w miastach: bandy wydaly ").Append(_lifeBands).Append(" zl, kryjowki z nadwyzki ").Append(_lifeHoards).Append(" zl")
+                  .Append(" | kryjowki: wejsc band ").Append(_hideEntries);
+                if (s.OutlawNoHideoutGold)
+                    sb.Append(", zloto z niczego zablokowane - bandom ").Append(_hideBand).Append(" zl, kryjowkom ").Append(_hideHoard).Append(" zl");
+                else
+                    sb.Append(", KUREK OTWARTY w ustawieniach - gra dopisala z niczego bandom ").Append(_hideBand).Append(" zl, kryjowkom ").Append(_hideHoard).Append(" zl");
+                sb.Append("; kasy kryjowek: doplyw ").Append(_hideStash).Append(" zl (bandy odlozyly z wlasnych kies), odplyw ").Append(_hoardStart + _hoardGear + _lifeHoards)
+                  .Append(" zl (kiesy startowe nowych band ").Append(_hoardStart).Append(" z ").Append(_hoardStartWant).Append(" zl, na ktore liczyly; sprzet ").Append(_hoardGear)
+                  .Append("; zycie w miastach ").Append(_lifeHoards).Append("); stan ").Append(hoards).Append(" zl w ").Append(hoardN).Append(" kryjowkach, najwieksza ").Append(hoardMax)
+                  .Append(" zl, skarbce (to, co zostaje dla zdobywcy) razem do ").Append(keepSum).Append(" zl");
+                if (!s.OutlawHoardCirculates) sb.Append("; OBIEG KAS WYLACZONY - kiesy startowe z niczego: ").Append(_startNothing).Append(" zl");
+                sb.Append(" | zywnosc z niczego: ");
+                if (food) sb.Append("zablokowana ").Append(_foodBands).Append(" nowym bandom, w bitwie zdjete ").Append(_foodTaken).Append(" szt.");
+                else sb.Append("KUREK OTWARTY w ustawieniach (gra daje zywnosc kazdej nowej bandzie)");
+                sb.Append(" | kiesy band, ktore dzis zniknely z mapy: rozbitych ").Append(_goneFought).Append(" zl (reszta po dzialce zwyciezcy - przepada), rozwiazanych ")
+                  .Append(_goneDisbanded).Append(" zl (przepada)")
+                  .Append(" | stan: kiesy band ").Append(purses).Append(" zl; w jukach band: ladunek na sprzedaz ").Append(units[LootCargo]).Append(" szt. (").Append(worth[LootCargo])
+                  .Append(" zl), zywnosc poza skupem ").Append(units[LootFood]).Append(" (").Append(worth[LootFood])
+                  .Append(" zl), zbroje na awanse ").Append(units[LootArmour]).Append(" (").Append(worth[LootArmour])
+                  .Append(" zl), konie pod siodlo ").Append(units[LootMount]).Append(" (").Append(worth[LootMount])
+                  .Append(" zl), juczne ").Append(units[LootPack]).Append(" (").Append(worth[LootPack])
+                  .Append(" zl), bron i inny sprzet - nie na sprzedaz ").Append(units[LootArms]).Append(" (").Append(worth[LootArms])
+                  .Append(" zl), niehandlowe ").Append(units[LootOther]).Append(" (wartosci wg cen bazowych)");
+                if (_sellStumbles + _hideStumbles + _lifeStumbles + _upStumbles > 0)
+                    sb.Append(" | potkniecia: skup ").Append(_sellStumbles).Append(", kryjowki ").Append(_hideStumbles).Append(", zycie ").Append(_lifeStumbles)
+                      .Append(", awanse ").Append(_upStumbles);
+                sb.Append('.');
+                Log.Info(sb.ToString());
+            }
+            catch (Exception e) { if (!_errFenceLog) { _errFenceLog = true; Log.Error("OutlawLaw.FenceLog", e); } }
+            finally { FenceNewDay(); }
+        }
+
+        // ------------------------------------------------------------ kurek kryjowek
+        // BanditSpawnCampaignBehavior.OnSettlementEntered: gdy banda wchodzi do kryjowki, gra liczy wartosc jej jukow (bez zapasu
+        // zywnosci) i dopisuje bandzie oraz kryjowce po 25% tej wartosci jako zloto - towaru nie zdejmuje, wiec przy kazdym wejsciu
+        // od nowa. Prefiks zapamietuje kiese bandy i kase kryjowki, postfiks zdejmuje to, co doszlo: oryginal biegnie caly (herszt,
+        // wykrycie kryjowki, losowania gry w tej samej kolejnosci). W zamian banda odklada w kryjowce czesc WLASNEJ kiesy -
+        // przelew, nie dosypka. Metoda bywa zagniezdzona (gra tworzy partie herszta i wprowadza ja do tej samej kryjowki w srodku
+        // wywolania, przed swoja dosypka), stad stan w __state i suma _hoardSeen: wplata herszta nie jest dosypka gry.
+
+        /// <summary>Stan przed: [kiesa bandy, kasa kryjowki, _hoardSeen kryjowki]. Null = to nie banda w kryjowce albo modul wylaczony.</summary>
+        public static void HideoutGoldPrefix(MobileParty __0, Settlement __1, out long[] __state)
+        {
+            __state = null;
+            try
+            {
+                if (!On || __0 == null || __1 == null || !__0.IsBandit || !__1.IsHideout) return;
+                var c = Campaign.Current;
+                if (c == null || !c.GameStarted) return;              // przed startem kampanii gra niczego tu nie dopisuje
+                var comp = __1.SettlementComponent;
+                if (comp == null) return;
+                long seen; _hoardSeen.TryGetValue(__1, out seen);
+                __state = new long[] { __0.PartyTradeGold, comp.Gold, seen };
+            }
+            catch { __state = null; }
+        }
+
+        public static void HideoutGoldPostfix(MobileParty __0, Settlement __1, long[] __state)
+        {
+            if (__state == null) return;
+            try
+            {
+                var s = Settings.Current;
+                var comp = __1.SettlementComponent;
+                long seen; _hoardSeen.TryGetValue(__1, out seen);
+                long gotBand = __0.PartyTradeGold - __state[0];
+                long gotHoard = comp.Gold - __state[1] - (seen - __state[2]);      // bez tego, co zostawily wejscia zagniezdzone
+                _hideEntries++;
+                if (gotBand > 0) _hideBand += gotBand;
+                if (gotHoard > 0) _hideHoard += gotHoard;
+                int snap;
+                if (!s.OutlawNoHideoutGold)
+                {
+                    if (gotHoard > 0) _hoardSeen[__1] = seen + gotHoard;           // kurek otwarty - tylko pomiar; dosypka zostaje w kasie
+                    // ... i w kiesie: banda z migawki dziennego ticku gry (urodzona w jego srodku) nie moze jej stracic przy przywracaniu kies
+                    if (gotBand > 0 && _gold.TryGetValue(__0, out snap)) _gold[__0] = snap + (int)gotBand;
+                    return;
+                }
+                if (gotBand > 0) __0.PartyTradeGold -= (int)gotBand;
+                if (gotHoard > 0) comp.ChangeGold(-(int)gotHoard);
+                float share = MBMath.ClampFloat(s.OutlawHideoutStashShare, 0f, 1f);
+                if (share <= 0f || !__0.IsPartyTradeActive) return;
+                int put = (int)(__0.PartyTradeGold * share);
+                if (put <= 0) return;
+                __0.PartyTradeGold -= put;
+                comp.ChangeGold(put);
+                _hoardSeen[__1] = seen + put;
+                _hideStash += put;
+                // wejscie w srodku dziennego ticku gry (w praktyce: banda urodzona w tym ticku, dopisana do migawki przez StartGoldPostfix):
+                // GoldPostfix przywraca kiesy z migawki - wplata nie moze wrocic do bandy
+                if (_gold.TryGetValue(__0, out snap)) _gold[__0] = Math.Max(0, snap - put);
+            }
+            catch (Exception e)
+            {
+                _hideStumbles++;
+                if (!_errHide) { _errHide = true; Log.Error("OutlawLaw.HideoutGold", e); }
+            }
+        }
 
         // ------------------------------------------------------------ zapis
         internal static string Export()
@@ -811,6 +1600,13 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ latki
+        /// <summary>Postfiks kiesy startowej bierze pierwszy parametr po pozycji (__0) - sprawdzamy jego typ, nie nazwe.</summary>
+        private static bool StartGoldFits(System.Reflection.MethodInfo m)
+        {
+            var ps = m.GetParameters();
+            return ps.Length >= 1 && ps[0].ParameterType == typeof(MobileParty);
+        }
+
         internal static void ApplyAll(Harmony h)
         {
             var done = new List<string>();
@@ -837,6 +1633,9 @@ namespace Armoury
             pre("BannerKings.Behaviours.BKBanditBehavior", "UpgradeParty", nameof(SkipBkUpgrade), "BK dosypka");
             pre("TaleWorlds.CampaignSystem.CampaignBehaviors.DesertersCampaignBehavior", "TrySpawnDeserters", nameof(SkipVanillaDeserters), "vanilla dezerterzy");
             pre("TaleWorlds.CampaignSystem.CampaignBehaviors.PartyUpgraderCampaignBehavior", "UpgradeReadyTroops", nameof(UpgradePrefix), "awanse band");
+            // zywnosc z niczego dla nowych band: gra i jej kopia w NavalDLC (piraci) - ten sam prefiks, wlacznik OutlawNoFreeFood
+            pre(bsc, "GiveFoodToBanditParty", nameof(FoodPrefix), "zywnosc band");
+            pre("NavalDLC.CampaignBehaviors.PiratesCampaignBehavior", "GiveFoodToBanditParty", nameof(FoodPrefix), "NavalDLC zywnosc piratow");
             try
             {
                 var t = AccessTools.TypeByName(bsc);
@@ -844,10 +1643,33 @@ namespace Armoury
                 if (dt != null) { h.Patch(dt, prefix: new HarmonyMethod(typeof(OutlawLaw), nameof(GoldPrefix)), postfix: new HarmonyMethod(typeof(OutlawLaw), nameof(GoldPostfix))); done.Add("zloto dzienne"); }
                 else miss.Add("zloto dzienne");
                 var cpt = t != null ? AccessTools.Method(t, "CreatePartyTrade") : null;
-                if (cpt != null) { h.Patch(cpt, postfix: new HarmonyMethod(typeof(OutlawLaw), nameof(StartGoldPostfix))); done.Add("zloto startowe"); }
+                if (cpt != null && StartGoldFits(cpt)) { h.Patch(cpt, postfix: new HarmonyMethod(typeof(OutlawLaw), nameof(StartGoldPostfix))); done.Add("zloto startowe"); }
                 else miss.Add("zloto startowe");
             }
             catch (Exception e) { miss.Add("zloto(" + e.Message + ")"); }
+            try
+            {
+                // piraci NavalDLC maja wlasna kopie CreatePartyTrade (5-15 zl na czlowieka z niczego) - ta sama zasada co dla band z ladu
+                var nt = AccessTools.TypeByName("NavalDLC.CampaignBehaviors.PiratesCampaignBehavior");
+                var ncpt = nt != null ? AccessTools.Method(nt, "CreatePartyTrade") : null;
+                if (ncpt != null && StartGoldFits(ncpt)) { h.Patch(ncpt, postfix: new HarmonyMethod(typeof(OutlawLaw), nameof(StartGoldPostfix))); done.Add("NavalDLC zloto startowe"); }
+                else miss.Add("NavalDLC zloto startowe");
+            }
+            catch (Exception e) { miss.Add("NavalDLC zloto startowe(" + e.Message + ")"); }
+            try
+            {
+                // kurek kryjowek: parametry bierzemy po pozycji (__0, __1), wiec sprawdzamy typy, nie nazwy
+                var t = AccessTools.TypeByName(bsc);
+                var ose = t != null ? AccessTools.Method(t, "OnSettlementEntered") : null;
+                var ps = ose != null ? ose.GetParameters() : null;
+                if (ose != null && !ose.IsStatic && ose.ReturnType == typeof(void) && ps.Length == 3 && ps[0].ParameterType == typeof(MobileParty) && ps[1].ParameterType == typeof(Settlement))
+                {
+                    h.Patch(ose, prefix: new HarmonyMethod(typeof(OutlawLaw), nameof(HideoutGoldPrefix)), postfix: new HarmonyMethod(typeof(OutlawLaw), nameof(HideoutGoldPostfix)));
+                    done.Add("zloto kryjowek");
+                }
+                else miss.Add("zloto kryjowek");
+            }
+            catch (Exception e) { miss.Add("zloto kryjowek(" + e.Message + ")"); }
 
             int rosters = 0;
             var seen = new HashSet<Type>();
