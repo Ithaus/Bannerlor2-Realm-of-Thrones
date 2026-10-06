@@ -45,6 +45,8 @@ namespace Armoury
     ///  - regulator kasy: postfiks na GetTownGoldChange czynnego modelu (czyta wynik, zaraz potem gra robi ChangeGold);
     ///  - przelewy gry: zdarzenie HeroOrPartyTradedGold (kazdy GiveGoldAction: zakupy lordow, karawany, notable);
     ///  - zold: postfiks na DefaultClanFinanceModel.CalculatePartyWage (BK wola ja refleksja dla kazdej partii i garnizonu);
+    ///    czesc przekazana dalej przez SoldierPay (sakiewki ludzi, kasy osad) zglasza NoteWageRouted - w bilansie osobne zrodlo
+    ///    ("zold oddany do obiegu"), bo SoldierPay wplaca ja juz po pomiarze rozliczenia rodu;
     ///  - nasze moduly poza tickiem dobowym: wywolania-liczniki Note (zakupy AI, najemnicy z karczmy, warsztaty zbrojne,
     ///    sprzet kupiony przez bandy u pasera);
     ///  - nasz tick dobowy: migawki stanu kas miedzy modulami (BlockOpen / Mark) - renty, budowy, korona, wydatki band
@@ -61,9 +63,9 @@ namespace Armoury
         private static readonly string[] PName = { "lordowie", "notable", "gracz", "inni bohaterowie", "karawany", "inne partie", "inne osady" };
 
         // nasze moduly liczone wprost, poza tickiem dobowym (Note)
-        internal const int NGear = 0, NMerc = 1, NShop = 2, NFence = 3;
-        private const int Notes = 4;
-        private static readonly string[] NName = { "zakupy sprzetu AI", "najemnicy z karczmy", "warsztaty zbrojne", "paser band (sprzet dla band)" };
+        internal const int NGear = 0, NMerc = 1, NShop = 2, NFence = 3, NWage = 4, NLife = 5;
+        private const int Notes = 6;
+        private static readonly string[] NName = { "zakupy sprzetu AI", "najemnicy z karczmy", "warsztaty zbrojne", "paser band (sprzet dla band)", "zold garnizonow", "sakiewki ludzi - zycie w miastach" };
 
         // nasz tick dobowy (Mark)
         internal const int MRent = 0, MBuild = 1, MCrown = 2, MRest = 3, MFence = 4, MLife = 5;
@@ -101,6 +103,7 @@ namespace Armoury
         private static readonly long[,] _mark = new long[Classes, Marks];
         private static readonly long[] _wage = new long[Wages];
         private static readonly int[] _wageN = new int[Wages], _wageShort = new int[Wages];
+        private static long _wageToPurses, _wageToCoffers; // zold, ktory nie zniknal: SoldierPay przekazal go do sakiewek ludzi i kas osad
         private static int _stumbles;                      // potkniecia licznikow (wyjatek zlapany przy jednym zdarzeniu) - liczymy, nie gasimy
 
         // okno "tabor wsi wchodzi do osady"
@@ -151,6 +154,7 @@ namespace Armoury
             Array.Clear(_noteIn, 0, _noteIn.Length); Array.Clear(_noteOut, 0, _noteOut.Length);
             Array.Clear(_mark, 0, _mark.Length);
             Array.Clear(_wage, 0, Wages); Array.Clear(_wageN, 0, Wages); Array.Clear(_wageShort, 0, Wages);
+            _wageToPurses = _wageToCoffers = 0;
             _stumbles = 0; _winStale = 0;
         }
 
@@ -352,6 +356,13 @@ namespace Armoury
         /// </summary>
         internal static void NoteLevyBack(int amount) { if (amount > 0) _levyBack += amount; }
 
+        /// <summary>SoldierPay przekazal zaplacony zold dalej (sakiewka ludzi albo kasa osady) - w bilansie osobne zrodlo "zold oddany do obiegu". Tylko licznik.</summary>
+        internal static void NoteWageRouted(bool toPurse, int amount)
+        {
+            if (amount <= 0) return;
+            if (toPurse) _wageToPurses += amount; else _wageToCoffers += amount;
+        }
+
         // ------------------------------------------------------------ nasz tick dobowy: migawki kas
         private static long[] Snap()
         {
@@ -430,6 +441,9 @@ namespace Armoury
             }
             catch { _stumbles++; }
         }
+
+        /// <summary>Czy gra zaraz zapyta o regulator tej osady w jej dziennym ticku (zaraz po konsumpcji) - odczyt dla tarczy zoldu (SoldierPay).</summary>
+        internal static bool RegulatorDue(Town town) { return town != null && ReferenceEquals(town, _regExpect); }
 
         private static Type DeclOf(Type t)
         {
@@ -614,11 +628,16 @@ namespace Armoury
             // Pozycja "GiveGoldAction z niczego" zawiera tez dzienny dochod notabli (ClanVariablesCampaignBehavior.DailyTickHero ->
             // CalculateNotableDailyGoldChange): gra zdejmuje go z kapitalu warsztatow i kies karawan (Workshop.ChangeGold, PartyTradeGold),
             // a wyplaca zdarzeniem nic -> notabl. Ubytek kapitalu nie ma wlasnej pozycji - siedzi w reszcie ze znakiem minus (mowi to opis reszty).
-            long sources = cons + regIn + _clanUp + from;
+            // SoldierPay (ogniwo 107) oddaje zaplacony zold do obiegu PO pomiarze rozliczenia (jego postfiks na DailyTickClan ma priorytet
+            // Last, nasz Low): sakiewki ludzi i kasy osad rosna poza roznica stanu rozliczenia - to osobne zrodlo, nie "minus" w ujsciach
+            // (rozliczenia na minus to tylko czesc rodow; odjecie calego przekazanego zoldu dawaloby ujemne ujscia)
+            long routed = _wageToPurses + _wageToCoffers;
+            long sources = cons + regIn + _clanUp + routed + from;
             long sinks = _clanDown + regOut + vanished + to - _levyBack;
             return "Pieniadz swiata (bilans): dzien " + day + " | zmiana sumy " + S(delta) + " [P] = zmierzone zrodla z niczego +" + sources
                    + " [P] (\"zakupy\" mieszkancow miast i zamkow " + cons + ", regulator kas dosypal " + regIn + ", rozliczenia rodow na plus " + _clanUp + " w " + _clanUpN
-                   + " rodach, GiveGoldAction z niczego poza rozliczeniami rodow " + from + ")"
+                   + " rodach, zold oddany do obiegu przez SoldierPay " + routed + " (sakiewki ludzi " + _wageToPurses + ", kasy osad " + _wageToCoffers
+                   + "), GiveGoldAction z niczego poza rozliczeniami rodow " + from + ")"
                    + " - zmierzone ujscia w nicosc " + sinks + " [P] (rozliczenia rodow na minus " + _clanDown + " w " + _clanDownN + " rodach, regulator kas skasowal " + regOut
                    + ", z utargu wsi zniklo " + vanished
                    + ", GiveGoldAction w nicosc poza rozliczeniami rodow " + to + " minus " + _levyBack + " oddane przez LevyGold notablom i miastom)"
@@ -649,6 +668,9 @@ namespace Armoury
               .Append(" salda rodow bez zywej glowy)")
               .Append(" | zold naliczony ").Append(wages).Append(" [P] jest czescia tych rozliczen; bez niego zmienilyby zloto swiata o ").Append(S(change + wages))
               .Append(" (wyliczone: zmiana + zold naliczony; z pustej kiesy schodzi mniej, niz naliczono).");
+            if (_wageToPurses + _wageToCoffers != 0)
+                sb.Append(" Z zoldu SoldierPay oddal do obiegu ").Append(_wageToPurses + _wageToCoffers).Append(" (sakiewki ludzi ").Append(_wageToPurses).Append(", kasy osad ")
+                  .Append(_wageToCoffers).Append(") - juz po pomiarze rozliczenia, w bilansie osobne zrodlo.");
             if (_clanClsFrom + _clanClsTo + _clanOthFrom + _clanOthTo != 0)
                 sb.Append(" Inne GiveGoldAction w trakcie rozliczen (sa w zmianie zlota swiata): z niczego +").Append(_clanClsFrom + _clanOthFrom)
                   .Append(", w nicosc ").Append(Neg(_clanClsTo + _clanOthTo)).Append('.');
@@ -678,6 +700,7 @@ namespace Armoury
                 sb.Append(WName[k]).Append(' ').Append(_wage[k]).Append(" (").Append(_wageN[k]).Append(" partii, z niedoplata ").Append(_wageShort[k]).Append(')');
             }
             sb.Append(", razem ").Append(wages);
+            sb.Append("; z tego przekazano do sakiewek ludzi ").Append(_wageToPurses).Append(", do kas osad ").Append(_wageToCoffers);
             if (wages == 0) sb.Append(" - licznik nie widzial wyplat (rozliczenie rodow idzie inna sciezka?)");
             sb.Append(". [P] = pomiar (zdarzenie, licznik albo roznica stanu), [R] = reszta z bilansu.");
             if (_winStale + _consMissed + _regStray + _stumbles > 0)

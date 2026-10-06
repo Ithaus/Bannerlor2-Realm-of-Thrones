@@ -2056,6 +2056,30 @@ namespace Armoury
         [SettingPropertyGroup("Iron bank")]
         public int IronBankLogPerDay { get; set; } = 15;
 
+        [SettingPropertyBool("Soldier Pay To Purse", HintText = "the wages a party is actually paid no longer vanish: they go to the purse of its men, who spend them in the towns (mending, missing kit, food and drink) - your own men too; needs Men Purse Enabled")]
+        [SettingPropertyGroup("The soldier's pay")]
+        public bool SoldierPayToPurse { get; set; } = true;
+
+        [SettingPropertyBool("Garrison Pay To Coffers", HintText = "the wages a garrison is actually paid go to the purse of the town or castle it guards - the soldiers spend them on the spot; your own garrisons too")]
+        [SettingPropertyGroup("The soldier's pay")]
+        public bool GarrisonPayToCoffers { get; set; } = true;
+
+        [SettingPropertyBool("Crown Wage Refund Enabled", HintText = "a kingdom at war repays its houses a share of the wages they actually paid that day, out of the kingdom treasury and only while there is gold in it (shared out pro rata when it runs short); no refund in peace, to mercenaries or to houses without a kingdom")]
+        [SettingPropertyGroup("The soldier's pay")]
+        public bool CrownWageRefundEnabled { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Crown Wage Refund Percent", 0.00f, 200.00f, "0.00", HintText = "share of the day's wages the treasury of a kingdom at war repays to each of its houses (0-100)")]
+        [SettingPropertyGroup("The soldier's pay")]
+        public float CrownWageRefundPercent { get; set; } = 50f;
+
+        [SettingPropertyBool("Crown Wage Refund Garrisons", HintText = "the refund counts garrison wages too; off = wages of the parties in the field only")]
+        [SettingPropertyGroup("The soldier's pay")]
+        public bool CrownWageRefundGarrisons { get; set; } = true;
+
+        [SettingPropertyBool("Town Wage Shield", HintText = "wages spent in a town (garrison pay, the men's spending on leaving) are kept out of reach of the game's daily town-purse regulator, which otherwise deletes a quarter of everything above its target each day: they stay until the lord's rents and the war subsidy draw them out, and what is still there after about two weeks the regulator may take; castles unchanged. Mind the side effect: with it a garrison in one's own town costs its lord next to nothing, for the pay comes back to him in rents")]
+        [SettingPropertyGroup("The soldier's pay")]
+        public bool TownWageShield { get; set; } = true;
+
         [SettingPropertyBool("Supply Demand Enabled", HintText = "arms, armour and horses obey supply and demand in towns and castles: a full stall sells cheap, an empty one dear - for buying AND selling, you and the AI alike (the item's own worth is untouched)")]
         [SettingPropertyGroup("Supply and demand")]
         public bool SupplyDemandEnabled { get; set; } = true;
@@ -2949,6 +2973,12 @@ namespace Armoury
             s.IronBankRateAfterDefault = IronBankRateAfterDefault;
             s.IronBankPlayerDefaultRenown = IronBankPlayerDefaultRenown;
             s.IronBankLogPerDay = IronBankLogPerDay;
+            s.SoldierPayToPurse = SoldierPayToPurse;
+            s.GarrisonPayToCoffers = GarrisonPayToCoffers;
+            s.CrownWageRefundEnabled = CrownWageRefundEnabled;
+            s.CrownWageRefundPercent = CrownWageRefundPercent;
+            s.CrownWageRefundGarrisons = CrownWageRefundGarrisons;
+            s.TownWageShield = TownWageShield;
             s.SupplyDemandEnabled = SupplyDemandEnabled;
             s.SupplyDemandBase = SupplyDemandBase;
             s.SupplyDemandRefProsperity = SupplyDemandRefProsperity;

@@ -581,6 +581,14 @@ namespace Armoury
         public float IronBankPlayerDefaultRenown = 100f;   // renown you lose when the Bank writes your name among those who did not pay
         public int IronBankLogPerDay = 15;                 // how many loans and repayments are written to the log each day (the daily total always is)
 
+        // --- The soldier's pay ---
+        public bool SoldierPayToPurse = true;              // the wages a party is actually paid no longer vanish: they go to the purse of its men, who spend them in the towns (mending, missing kit, food and drink) - your own men too; needs Men Purse Enabled
+        public bool GarrisonPayToCoffers = true;           // the wages a garrison is actually paid go to the purse of the town or castle it guards - the soldiers spend them on the spot; your own garrisons too
+        public bool CrownWageRefundEnabled = true;         // a kingdom at war repays its houses a share of the wages they actually paid that day, out of the kingdom treasury and only while there is gold in it (shared out pro rata when it runs short); no refund in peace, to mercenaries or to houses without a kingdom
+        public float CrownWageRefundPercent = 50f;         // share of the day's wages the treasury of a kingdom at war repays to each of its houses (0-100)
+        public bool CrownWageRefundGarrisons = true;       // the refund counts garrison wages too; off = wages of the parties in the field only
+        public bool TownWageShield = true;                 // wages spent in a town (garrison pay, the men's spending on leaving) are kept out of reach of the game's daily town-purse regulator, which otherwise deletes a quarter of everything above its target each day: they stay until the lord's rents and the war subsidy draw them out, and what is still there after about two weeks the regulator may take; castles unchanged. Mind the side effect: with it a garrison in one's own town costs its lord next to nothing, for the pay comes back to him in rents
+
         // --- Supply and demand ---
         public bool SupplyDemandEnabled = true;            // arms, armour and horses obey supply and demand in towns and castles: a full stall sells cheap, an empty one dear - for buying AND selling, you and the AI alike (the item's own worth is untouched)
         public float SupplyDemandBase = 4f;                // pieces of one kind (type and tier) a town of reference prosperity wants on its stalls; fewer for higher tiers
