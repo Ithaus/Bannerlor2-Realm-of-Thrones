@@ -74,7 +74,8 @@ namespace Armoury
 
         // ------------------------------------------------------------ liczniki doby (linia "Zold:")
         private static long _dLordAcc, _dLordTaken, _dGarAcc, _dGarTaken, _dToPurse, _dPlayer, _dToTowns, _dToCastles;
-        private static long _dUndead, _dNoTown, _dOff, _dOther, _dCut, _dBlindGold, _dDebtCut;
+        private static long _dUndead, _dNoTown, _dOff, _dOther, _dCut, _dBlindGold, _dDebtCut, _dGarHome;
+        private static bool _shieldIdleLogged;             // linia "tarcza zbedna" raz na kampanie
         private static int _dLordN, _dGarN, _dToPurseN, _dToTownsN, _dToCastlesN, _dCutClans, _dBlind, _dDupes, _stumbles, _dDebtClans;
         private static bool _errLogged;
 
@@ -90,7 +91,7 @@ namespace Armoury
         internal static void Reset()
         {
             _clan = null; _recs.Clear(); _haveNet = false; _netModel = null; _netDecl = null; _debtBefore = 0;
-            _paidToday.Clear(); _errLogged = false;
+            _paidToday.Clear(); _errLogged = false; _shieldIdleLogged = false;
             _held.Clear(); _regModel = null; _regDecl = null;
             _netTriedFor = null; _regTriedFor = null; _regReady = false;   // nowa kampania = nowe obiekty modeli (latki zostaja w procesie)
             ClearDay();
@@ -99,7 +100,7 @@ namespace Armoury
         private static void ClearDay()
         {
             _dLordAcc = _dLordTaken = _dGarAcc = _dGarTaken = _dToPurse = _dPlayer = _dToTowns = _dToCastles = 0;
-            _dUndead = _dNoTown = _dOff = _dOther = _dCut = _dBlindGold = _dDebtCut = 0;
+            _dUndead = _dNoTown = _dOff = _dOther = _dCut = _dBlindGold = _dDebtCut = _dGarHome = 0;
             _dLordN = _dGarN = _dToPurseN = _dToTownsN = _dToCastlesN = _dCutClans = _dBlind = _dDupes = _stumbles = _dDebtClans = 0;
             _dShielded = 0; _dShieldTicks = 0;
         }
@@ -317,10 +318,19 @@ namespace Armoury
             {
                 _dGarAcc += r.Wage; _dGarTaken += amt; _dGarN++;
                 if (amt <= 0) return;
-                if (s.CrownWageRefundGarrisons) AddPaid(clan.Leader, amt, s);   // kiese zalogi wyrownuje rod z salda - placi glowa
-                if (!s.GarrisonPayToCoffers) { _dOff += amt; return; }
                 var st = mp.CurrentSettlement ?? mp.HomeSettlement;
                 var town = st != null ? st.Town : null;
+                // krok K6: zold, ktory z kasy osady wraca panu zaworem (miasto) albo danina podzamcza (zamek), nie jest podstawa
+                // zwrotu ze skarbca - inaczej zaloga oddawalaby panu w wojnie wiecej, niz kosztuje (zwrot 50% + zawor). Wraca tylko
+                // to, co wyladuje PONAD zapasem kupcow (HomePart, liczone przed wplata); czesc dopelniajaca kase do zapasu nie
+                // wraca nigdy, wiec zwrot korony za nia zostaje jak w ogniwie 107
+                int home = s.GarrisonPayToCoffers && town != null ? TownPurse.HomePart(st, amt) : 0;
+                if (s.CrownWageRefundGarrisons)
+                {
+                    if (amt > home) AddPaid(clan.Leader, amt - home, s);   // kiese zalogi wyrownuje rod z salda - placi glowa
+                    if (home > 0 && s.CrownWageRefundEnabled) _dGarHome += home;
+                }
+                if (!s.GarrisonPayToCoffers) { _dOff += amt; return; }
                 if (town == null) { _dNoTown += amt; return; }
                 town.ChangeGold(amt);                                   // zaloga wydaje zold na miejscu - kasa jej miasta albo zamku
                 if (st.IsTown) { _dToTowns += amt; _dToTownsN++; Hold(st, amt); } else { _dToCastles += amt; _dToCastlesN++; }
@@ -385,6 +395,7 @@ namespace Armoury
             try
             {
                 if (amount <= 0 || st == null || !ShieldOn || !st.IsTown || st.StringId == null) return;
+                if (TownPurse.On) return;                              // krok K6: regulator kas miast niczego nie kasuje - nie ma czego chronic (znacznikow nie dopisujemy)
                 if (!EnsureShieldHook()) return;                       // bez latki na regulatorze znacznik nic by nie chronil
                 float v; _held.TryGetValue(st.StringId, out v);
                 _held[st.StringId] = v + amount;
@@ -432,6 +443,7 @@ namespace Armoury
             try
             {
                 if (__0 == null || !ShieldOn || !Live) return;
+                if (TownPurse.On) return;                                          // krok K6: kasowania nie ma - znaczniki z zapisu porzuci DecayHeld, wyniku nie ruszamy
                 var active = Campaign.Current.Models.SettlementEconomyModel;
                 if (!ReferenceEquals(__instance, active)) return;                  // model opakowany przez inny - liczy zewnetrzny
                 if (!ReferenceEquals(active, _regModel)) { _regModel = active; _regDecl = RegDeclOf(active.GetType()); }
@@ -464,9 +476,15 @@ namespace Armoury
         /// <summary>Raz na dobe: znacznik wygasa w tempie zaworu renty (i daniny wojennej); przy wylaczonej tarczy znika caly.</summary>
         private static void DecayHeld()
         {
-            if (_held.Count == 0) return;
             var s = Settings.Current;
-            if (s == null || !s.TownWageShield) { _held.Clear(); return; }
+            if (s != null && s.TownWageShield && TownPurse.On && !_shieldIdleLogged)
+            {
+                _shieldIdleLogged = true;
+                Log.Info("SoldierPay: tarcza zoldu w kasach miast (MCM Town Wage Shield) - regulator kasy z TownPurse (krok K6): kas miast nic juz nie kasuje, tarcza jest zbedna i nieczynna"
+                         + " (znacznikow nie dopisuje; porzucone znaczniki z zapisu: " + _held.Count + ").");
+            }
+            if (_held.Count == 0) return;
+            if (s == null || !s.TownWageShield || TownPurse.On) { _held.Clear(); return; }
             EnsureShieldHook();                                         // znaczniki z zapisu gry: latka takze bez nowej wplaty
             float rent = Math.Max(0f, Math.Min(1f, s.TownRentShare));
             foreach (var id in new List<string>(_held.Keys))
@@ -530,6 +548,8 @@ namespace Armoury
                              + ", po partiach, ktorych juz nie ma: " + orphanGold + " (" + orphans + ")"
                              + " | tarcza zoldu w kasach miast: " + (ShieldOn ? "wlaczona, znacznik " + (long)heldSum + " w " + heldTowns + " miastach, regulator nie skasowal dzis "
                                                                               + _dShielded + " (" + _dShieldTicks + " tickow miast)" : "wylaczona")
+                             + (TownPurse.On ? (ShieldOn ? " - ZBEDNA i nieczynna: kas miast nic nie kasuje (Town Purse Regulator)" : "")
+                                               + " | zalogi bez zwrotu korony (czesc zoldu, ktora wplynela ponad zapas kupcow i wraca panu z kasy osady: zawor miasta, danina podzamcza): " + _dGarHome : "")
                              + (_dDupes + _stumbles > 0 ? " | potkniecia: powtorzone wyplaty " + _dDupes + ", wyjatki " + _stumbles : "") + ".");
                 }
             }

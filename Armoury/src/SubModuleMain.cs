@@ -65,6 +65,8 @@ namespace Armoury
                 try { MoneyLedger.ApplyAll(_harmony); } catch (Exception e) { Log.Error("MoneyLedger.ApplyAll", e); }
                 // K5: kasa zamku jako prawdziwy pieniadz - regulator gry dla zamku = 0, "zakupy" ludnosci zamku bez zlota z niczego (te same cele co ksiega, postfiksy First); we wlasnym try
                 try { CastlePurse.ApplyAll(_harmony); } catch (Exception e) { Log.Error("CastlePurse.ApplyAll", e); }
+                // K6: kasa miasta jako prawdziwy pieniadz - regulator i "zakupy" mieszczan ida latkami K5 (wyzej); tu tylko prefiks na gorna galaz BK HandleMarketGold; we wlasnym try
+                try { TownPurse.ApplyAll(_harmony); } catch (Exception e) { Log.Error("TownPurse.ApplyAll", e); }
                 AiGear.ApplyAll(_harmony);       // zakupy armii AI zamiast darmowego sprzetu DTE (Jeff 04.10)
                 WorkshopLaw.ApplyAll(_harmony);  // warsztaty uzbrojenia jako firmy (Jeff 04.10)
                 Stables.ApplyAll(_harmony);
