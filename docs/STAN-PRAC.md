@@ -34,7 +34,7 @@ i spojnosci calej logiki; oraz pulapka MCM w sekcji 7), potem ten plik, potem go
 
 ## Gotowe paczki czekajace na wgranie (stan 06.10 ok. 08:40 - po przebudowie lancucha)
 
-W GRZE (od 06.10 09:54): wpis 101 (woz x2) + wpis 102 (same logi) + wpis 102b (poprawka ksiegi pieniadza, sam log). DLL md5 `af2351f66adf8ac82b2cb71259145ff6` (poprzedni: `Armoury.dll.bak-2026-10-06-przed-102b`). Nastepne do wgrania: 103. Oba NIEPRZETESTOWANE - Jeff nie
+W GRZE (od 06.10 11:37): wpisy 101, 102, 102b + GRUPA 1 TOWARY = 103 (karawany) + 104 (zapas startowy) + 105 (mineral BK). DLL md5 `d59b06886a3686de71cf1b5fdd3ec2f5` (poprzedni: `Armoury.dll.bak-2026-10-06-przed-103` = 102b). WSZYSTKO NIEPRZETESTOWANE - czeka na pierwszy test Jeffa: swiezy start gry, NOWA kampania, 15-20 dob, zapis na koncu, "sprawdz logi". Nastepne do wgrania: grupa 2 (106 + 107) na tym samym zapisie.
 zrobil jeszcze zadnego testu po 05.10 15:22. Pierwszy test: nowa kampania 15-20 dob, potem "sprawdz logi"
 (`python tools/sprawdz_logi.py` daje skrot sesji: ktore ogniwo w grze, bledy, alarmy, tabela dzien po dniu).
 
