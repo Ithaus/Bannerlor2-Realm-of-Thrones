@@ -39,6 +39,7 @@ namespace Armoury
                     if (__0 == MobileParty.MainParty || __2 == null || !__2.IsAlive) return;   // gracz: BK juz placi notablowi
                     __2.ChangeHeroGold(cost);
                     _toNotables += cost;
+                    if (__0.LeaderHero != null) MoneyLedger.NoteLevyBack(cost);   // ksiega pieniadza (tylko licznik): gra skasowala te zaplate przez GiveGoldAction
                 }
                 else if (detail == "MercenaryFromTavern")
                 {
@@ -46,6 +47,9 @@ namespace Armoury
                     int n = Math.Max(1, __4);
                     __1.SettlementComponent.ChangeGold(cost * n);
                     _toTowns += cost * n;
+                    MoneyLedger.Note(MoneyLedger.NMerc, __1, cost * n);   // ksiega przeplywow osad (tylko licznik)
+                    // karawana placi z kiesy partii bez GiveGoldAction (nic nie znika) - "zwrot skasowanego" liczymy tylko dla wodza
+                    if (!__0.IsCaravan && __0.LeaderHero != null) MoneyLedger.NoteLevyBack(cost * n);
                 }
             }
             catch { }

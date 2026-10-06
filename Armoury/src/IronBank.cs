@@ -58,6 +58,9 @@ namespace Armoury
 
         internal static bool On { get { var s = Settings.Current; return s != null && s.IronBankEnabled; } }
 
+        /// <summary>Kapital Banku teraz (0, gdy Bank jeszcze nie ruszyl) - odczyt dla ksiegi "Pieniadz swiata" (MoneyLedger).</summary>
+        internal static long CapitalNow { get { return _capital > 0 ? (long)_capital : 0L; } }
+
         // dlugosc roku z ZYWEGO modelu czasu gry - dopasuje sie do kazdej zmiany kalendarza
         private static int DaysPerYear()
         {

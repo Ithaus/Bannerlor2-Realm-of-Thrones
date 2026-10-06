@@ -17,21 +17,25 @@ namespace Armoury
     /// Teraz liczymy to, co FAKTYCZNIE dopisano osadom (zdarzenie gry OnItemProduced - BK wola je z liczba sztuk),
     /// obok wynik modelu do porownania, zuzycie warsztatow zbrojnych (WorkshopLaw), zuzycie linii towarowych gry
     /// (OnItemConsumed: narzedzia z rudy, deski z drewna) i zapas rozbity na miasta / zamki / wsie / tabory.
-    /// "Bez wyjasnienia" = zmiana calego zapasu - (dopisane - zuzyte): kucie i przetop gracza, budowy, spalone wsie.
+    /// "Bez wyjasnienia" = zmiana calego zapasu - (dopisane - zuzyte): kucie i przetop gracza, spalone wsie, cudze mody.
+    /// Poprawki po fundamencie (docs/EKONOMIA-FUNDAMENT-2026-10-05.md, B2 i C3): osobna pozycja "budowy" - material, ktory
+    /// nasz BuildFunding zdejmuje z targow (dotad ok. 1646 ladunkow drewna dziennie siedzialo w "bez wyjasnienia");
+    /// "tabory" rozbite na wiesniakow / karawany / lordow / inne (kto trzyma towar w drodze); "model" liczony tylko
+    /// we wsiach z wynikiem powyzej zera (dotad "w 92 wsiach" przy 26 kopalniach - model pytany takze o wsie bez rudy).
     /// </summary>
     internal static class OreLedger
     {
         private sealed class Book
         {
             public readonly string Id, Name, TownSource, LineName;
-            public int Villages, Towns, Lines, Shops;      // dopisane wsiom / miastom i zamkom, zuzyte przez linie towarowe / warsztaty zbrojne
+            public int Villages, Towns, Lines, Shops, Builds;      // dopisane wsiom / miastom i zamkom, zuzyte przez linie towarowe / warsztaty zbrojne / budowy
             public float Model;
             public readonly HashSet<Settlement> Makers = new HashSet<Settlement>();
             public readonly HashSet<Village> Modelled = new HashSet<Village>();
             public int LastAll = -1, LastTowns = -1;
 
             public Book(string id, string name, string townSource, string lineName) { Id = id; Name = name; TownSource = townSource; LineName = lineName; }
-            public void NewDay() { Villages = 0; Towns = 0; Lines = 0; Shops = 0; Model = 0f; Makers.Clear(); Modelled.Clear(); }
+            public void NewDay() { Villages = 0; Towns = 0; Lines = 0; Shops = 0; Builds = 0; Model = 0f; Makers.Clear(); Modelled.Clear(); }
             public void Reset() { NewDay(); LastAll = -1; LastTowns = -1; }
         }
 
@@ -47,14 +51,15 @@ namespace Armoury
 
         internal static void Reset() { _iron.Reset(); _wood.Reset(); }
 
-        /// <summary>Wynik modelu produkcji wsi PO naszym mnozniku (MaterialLaw.ProdPostfix): pierwszy na wies w dobie ksiegi.</summary>
+        /// <summary>Wynik modelu produkcji wsi PO naszym mnozniku (MaterialLaw.ProdPostfix): pierwszy DODATNI na wies w dobie ksiegi
+        /// (model jest pytany takze o wsie, ktore tego towaru nie daja - wynik 0 nie robi z nich "wsi w modelu").</summary>
         internal static void NoteModel(Village v, ItemObject item, float amount)
         {
             try
             {
                 var b = Of(item);
-                if (b == null || v == null || !b.Modelled.Add(v)) return;
-                b.Model += Math.Max(0f, amount);
+                if (b == null || v == null || amount <= 0f || !b.Modelled.Add(v)) return;
+                b.Model += amount;
             }
             catch { }
         }
@@ -85,6 +90,13 @@ namespace Armoury
             if (b != null && loads > 0) b.Shops += loads;
         }
 
+        /// <summary>Material zdjety z targu przez nasze budowy (BuildFunding.BuyMaterials / BuyOneCheapest). Tylko licznik.</summary>
+        internal static void NoteBuild(ItemObject item, int loads)
+        {
+            try { var b = Of(item); if (b != null && loads > 0) b.Builds += loads; }
+            catch { }
+        }
+
         internal static void Daily()
         {
             try { Line(_iron); Line(_wood); }
@@ -98,6 +110,7 @@ namespace Armoury
             var it = MBObjectManager.Instance.GetObject<ItemObject>(b.Id);
             if (it == null) { b.NewDay(); return; }
             int towns = 0, castles = 0, villages = 0, road = 0, empty = 0, townCount = 0;
+            int roadVillagers = 0, roadCaravans = 0, roadLords = 0, roadOther = 0, roadBandits = 0;
             foreach (var st in Settlement.All)
             {
                 if (st == null || st.ItemRoster == null) continue;
@@ -107,7 +120,16 @@ namespace Armoury
                 else if (st.IsVillage) villages += n;
             }
             foreach (var mp in MobileParty.All)
-                if (mp != null && mp.ItemRoster != null) road += mp.ItemRoster.GetItemNumber(it);
+            {
+                if (mp == null || mp.ItemRoster == null) continue;
+                int n = mp.ItemRoster.GetItemNumber(it);
+                if (n == 0) continue;
+                road += n;
+                if (mp.IsVillager) roadVillagers += n;
+                else if (mp.IsCaravan) roadCaravans += n;
+                else if (mp.IsLordParty) roadLords += n;
+                else { roadOther += n; if (mp.IsBandit) roadBandits += n; }
+            }
 
             float kg = Math.Max(0.1f, it.Weight);
             int all = towns + castles + villages + road;
@@ -115,15 +137,18 @@ namespace Armoury
             sb.Append(b.Name).Append(": dzien ").Append((int)CampaignTime.Now.ToDays - 1)
               .Append(" - wsie dopisaly ").Append(b.Villages).Append(" ladunkow (").Append((b.Villages * kg / 1000f).ToString("0.0"))
               .Append(" t, ").Append(b.Makers.Count).Append(" wsi; model ").Append(b.Model.ToString("0.#")).Append(" w ").Append(b.Modelled.Count)
-              .Append(" wsiach), ").Append(b.TownSource).Append(" +").Append(b.Towns)
+              .Append(" wsiach z wynikiem > 0), ").Append(b.TownSource).Append(" +").Append(b.Towns)
               .Append("; zuzycie: warsztaty zbrojne ").Append(b.Shops).Append(", linie towarowe (").Append(b.LineName).Append(") ").Append(b.Lines)
+              .Append(", budowy ").Append(b.Builds)
               .Append("; zapas: miasta ").Append(towns);
             if (b.LastTowns >= 0) sb.Append(" (").Append(Signed(towns - b.LastTowns)).Append(")");
-            sb.Append(", zamki ").Append(castles).Append(", wsie ").Append(villages).Append(", tabory ").Append(road).Append(", razem ").Append(all);
+            sb.Append(", zamki ").Append(castles).Append(", wsie ").Append(villages).Append(", tabory ").Append(road)
+              .Append(" (wiesniacy ").Append(roadVillagers).Append(", karawany ").Append(roadCaravans).Append(", lordowie ").Append(roadLords)
+              .Append(", inne ").Append(roadOther).Append(" - w tym bandy ").Append(roadBandits).Append("), razem ").Append(all);
             if (b.LastAll >= 0)
             {
                 int delta = all - b.LastAll;
-                int known = b.Villages + b.Towns - b.Shops - b.Lines;
+                int known = b.Villages + b.Towns - b.Shops - b.Lines - b.Builds;
                 sb.Append(" (").Append(Signed(delta)).Append(", bez wyjasnienia ").Append(Signed(delta - known)).Append(")");
             }
             sb.Append("; miast bez towaru ").Append(empty).Append(" z ").Append(townCount)

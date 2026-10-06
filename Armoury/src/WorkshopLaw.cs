@@ -40,8 +40,9 @@ namespace Armoury
     internal static class WorkshopLaw
     {
         /// <summary>Nowa gra/wczytanie: stare przedmioty i pule z poprzedniej kampanii (audyt 04.10 - ryzyko zepsucia save).</summary>
-        internal static void Reset() { _ore = _wood = _leather = _linen = _wool = null; _owed.Clear(); _labor.Clear(); _rank.Clear(); _wip.Clear(); _guildCache.Clear(); _madeByType.Clear(); _dayStamp = -1; _made = _skipLoss = _skipMat = _skipLabor = _skipGold = 0; _dayRevenue = _dayCost = 0; }
+        internal static void Reset() { _ore = _wood = _leather = _linen = _wool = null; _owed.Clear(); _labor.Clear(); _rank.Clear(); _wip.Clear(); _guildCache.Clear(); _madeByType.Clear(); _dayStamp = -1; _made = _skipLoss = _skipMat = _skipLabor = _skipGold = 0; _dayRevenue = _dayCost = 0; Array.Clear(_skipMatBy, 0, _skipMatBy.Length); }
         private static ItemObject _ore, _wood, _leather, _linen, _wool;
+        private static readonly int[] _skipMatBy = new int[4];      // "brak surowca" wedlug surowca: ruda, drewno, skora, len albo welna (tylko licznik)
         private static readonly Dictionary<Workshop, float[]> _owed = new Dictionary<Workshop, float[]>();     // ruda, drewno, skora, len
         private static readonly Dictionary<Workshop, KeyValuePair<float, int>> _labor = new Dictionary<Workshop, KeyValuePair<float, int>>();
         private static int _dayStamp = -1, _made, _skipLoss, _skipMat, _skipLabor, _skipGold;
@@ -152,6 +153,29 @@ namespace Armoury
             return it != null && r != null ? r.GetItemNumber(it) : 0;
         }
 
+        /// <summary>Stan polki dla licznika "brak surowca": ruda, drewno, skora, len, welna - liczony raz na przebieg rankingu.</summary>
+        private static int[] ShelfHave(ItemRoster shelf)
+        {
+            return new[] { Available(shelf, _ore), Available(shelf, _wood), Available(shelf, _leather), Available(shelf, _linen), Available(shelf, _wool) };
+        }
+
+        /// <summary>Ktorych surowcow brakuje na te sztuke (bit 0 ruda, 1 drewno, 2 skora, 3 len albo welna) - ten sam warunek co
+        /// przy rozpoczeciu sztuki, ale sprawdzony dla WSZYSTKICH czterech (petla startu staje na pierwszym braku). Sam odczyt.</summary>
+        private static int MissMask(int[] have, float[] owed, float[] need)
+        {
+            int mask = 0;
+            for (int m = 0; m < 4; m++)
+            {
+                int take = (int)Math.Floor(owed[m] + need[m]);
+                if (take <= 0) continue;
+                var mi = m == 0 ? _ore : (m == 1 ? _wood : (m == 2 ? _leather : _linen));
+                int h = have[m];
+                if (m == 3 && h < take && _wool != null) { mi = _wool; h = have[4]; }   // welna za len
+                if (mi == null || h < take) mask |= 1 << m;
+            }
+            return mask;
+        }
+
         public static bool CyclePrefix(WorkshopsCampaignBehavior __instance, WorkshopType.Production production, Workshop workshop, ref bool __result)
         {
             try
@@ -209,6 +233,7 @@ namespace Armoury
                     {
                         // nowa sztuka: pierwsza z rankingu linii (zysk na roboczodzien), na ktora sa surowce i pieniadze
                         int reason = 0; bool started = false;
+                        int miss = 0; int[] shelfHave = null;      // licznik "brak surowca" wedlug surowca (tylko log)
                         foreach (var it in Candidates(__instance, workshop, production, town, day))
                         {
                             float days;
@@ -227,7 +252,12 @@ namespace Armoury
                                 if (m == 3 && have < take[m] && _wool != null) { mi = _wool; have = Available(shelf, mi); mats[m] = mi; }   // welna za len
                                 if (mi == null || have < take[m]) { ok = false; break; }
                             }
-                            if (!ok) { reason = Math.Max(reason, 2); continue; }
+                            if (!ok)
+                            {
+                                reason = Math.Max(reason, 2);
+                                try { if (shelfHave == null) shelfHave = ShelfHave(shelf); miss |= MissMask(shelfHave, owed, need); } catch { }
+                                continue;
+                            }
                             // koszt surowcow od zuzycia (ulamki tez), po cenie historycznej / targowej
                             for (int m = 0; m < 4; m++) matCost += need[m] * MatPrice(town, mats[m], m);
                             float revenue = Revenue(town, it);
@@ -241,6 +271,7 @@ namespace Armoury
                             }
                             workshop.ChangeGold(-mc);
                             town.ChangeGold(mc);                   // surowce kupione od miasta
+                            MoneyLedger.Note(MoneyLedger.NShop, workshop.Settlement, mc);       // ksiega przeplywow osad (tylko licznik)
                             w.Item = it; w.Days = days; w.MatCost = mc;
                             _started++;
                             started = true;
@@ -248,7 +279,9 @@ namespace Armoury
                         }
                         if (!started)
                         {
-                            if (reason == 1) _skipLoss++; else if (reason == 2) _skipMat++; else if (reason == 4) _skipGold++;
+                            if (reason == 1) _skipLoss++;
+                            else if (reason == 2) { _skipMat++; for (int m = 0; m < 4; m++) if ((miss & (1 << m)) != 0) _skipMatBy[m]++; }
+                            else if (reason == 4) _skipGold++;
                             break;
                         }
                     }
@@ -262,6 +295,8 @@ namespace Armoury
                     town.ChangeGold(wagesI);                    // place wydane w miescie
                     town.ChangeGold(-rev);
                     workshop.ChangeGold(rev);
+                    MoneyLedger.Note(MoneyLedger.NShop, workshop.Settlement, wagesI);   // ksiega przeplywow osad (tylko liczniki)
+                    MoneyLedger.Note(MoneyLedger.NShop, workshop.Settlement, -rev);
                     shelf.AddToCounts(new EquipmentElement(w.Item, mod, null, false), 1);
                     CampaignEventDispatcher.Instance.OnItemProduced(w.Item, workshop.Settlement, 1);
                     any = true;
@@ -508,11 +543,13 @@ namespace Armoury
                 foreach (var kv in _madeByType) parts.Add(kv.Key + " " + kv.Value);
                 Log.Info("Warsztaty: dzien " + _dayStamp + " - wykonano " + _made + " szt. [" + string.Join(", ", parts.ToArray())
                          + "], koszt " + _dayCost + ", sprzedaz " + _dayRevenue + "; odpuszczone: bez zysku " + _skipLoss
-                         + ", brak surowca " + _skipMat + ", w robocie (cykle) " + _skipLabor + ", brak zlota/kupca " + _skipGold + "; rozpoczete sztuki " + _started + ", w toku teraz " + InProgress()
+                         + ", brak surowca " + _skipMat + " [ruda " + _skipMatBy[0] + ", drewno " + _skipMatBy[1] + ", skora " + _skipMatBy[2] + ", len/welna " + _skipMatBy[3]
+                         + " - cykl liczony przy kazdym surowcu, ktorego zabraklo na ktoras sztuke z rankingu], w robocie (cykle) " + _skipLabor + ", brak zlota/kupca " + _skipGold + "; rozpoczete sztuki " + _started + ", w toku teraz " + InProgress()
                          + " | rzemieslnicy miasta wygarbowali skor " + _tanned + ", utkali plotna " + _woven + " | z niczego zablokowane: cykle rzemieslnikow " + _freeRawBlocked + ", sztabki/wegiel z losowania -> ruda/drewno " + _swappedSmith + ".");
             }
             FlushDiag();
             _made = _skipLoss = _skipMat = _skipLabor = _skipGold = _freeRawBlocked = _swappedSmith = _started = _tanned = _woven = 0; _dayRevenue = _dayCost = 0; _madeByType.Clear();
+            Array.Clear(_skipMatBy, 0, _skipMatBy.Length);
         }
 
         // ------------------------------------------------------------ diagnoza (wpis 46, tylko log)

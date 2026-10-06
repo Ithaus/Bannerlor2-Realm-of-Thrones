@@ -71,6 +71,27 @@ namespace Armoury
             catch { }
         }
 
+        /// <summary>
+        /// Plik CSV w katalogu sesji (Logs/&lt;sesja&gt;/nazwa): naglowek przy pierwszym zapisie, potem dopisywanie wierszy.
+        /// Zwraca sciezke pliku albo null (log wylaczony, brak katalogu sesji, blad zapisu). Wiersze koncza sie znakiem nowej linii.
+        /// </summary>
+        internal static string Csv(string name, string header, string rows)
+        {
+            if (_topicDir == null || string.IsNullOrEmpty(name) || string.IsNullOrEmpty(rows)) return null;
+            try
+            {
+                if (!Settings.Current.LogEnabled) return null;
+                string file = Path.Combine(_topicDir, name);
+                lock (Gate)
+                {
+                    if (!File.Exists(file)) File.WriteAllText(file, header + Environment.NewLine);
+                    File.AppendAllText(file, rows);
+                }
+                return file;
+            }
+            catch { return null; }
+        }
+
         /// <summary>Plik tematyczny dla szczegolowej linii (null = glowny log). Podsumowania dnia zostaja w glownym.</summary>
         private static string TopicOf(string m)
         {

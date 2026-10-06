@@ -285,6 +285,7 @@ namespace Armoury
                             int cost = bestPrice * n, fromPurse = garrison ? 0 : MenPurse.Take(mp, cost);
                             lord.ChangeHeroGold(-(cost - fromPurse));
                             st.Town.ChangeGold(bestPrice * n);
+                            MoneyLedger.Note(MoneyLedger.NGear, st, bestPrice * n);   // ksiega przeplywow osad (tylko licznik)
                             spent += bestPrice * n; pieces += n; deficit -= n;
                             if (bought.Count < 6) bought.Add(pick.EquipmentElement.Item.StringId + " " + bestPrice);
                         }

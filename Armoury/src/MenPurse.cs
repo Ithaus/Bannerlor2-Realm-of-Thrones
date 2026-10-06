@@ -75,6 +75,8 @@ namespace Armoury
             }
             catch (Exception e) { Log.Error("MenPurse.OnPartyDestroyed", e); }
         }
+        /// <summary>Suma wszystkich sakiewek ludzi - odczyt dla ksiegi "Pieniadz swiata" (MoneyLedger).</summary>
+        internal static long TotalNow() { long t = 0; foreach (var v in _purse.Values) t += v; return t; }
         internal static int Get(MobileParty mp) { int v; var k = Key(mp); return k != null && _purse.TryGetValue(k, out v) ? v : 0; }
         internal static void Add(MobileParty mp, int n) { var k = Key(mp); if (k == null || n == 0) return; int v; _purse.TryGetValue(k, out v); v = Math.Max(0, v + n); if (v > 0) _purse[k] = v; else _purse.Remove(k); }
         internal static int Take(MobileParty mp, int n) { int have = Get(mp); int t = Math.Min(have, Math.Max(0, n)); Add(mp, -t); return t; }

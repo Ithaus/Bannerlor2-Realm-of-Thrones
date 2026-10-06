@@ -386,7 +386,7 @@ namespace Armoury
         }
         private Dictionary<string,int> _prisonerBaseline;
 
-        public ArmouryBehavior() { Instance = this; HistoricalPrices.Reset(); MaterialLaw.Reset(); WesterosClimate.Reset(); OutlawLaw.Reset(); PopulationLaw.Reset(); WorkshopLaw.Reset(); IronBank.Reset(); MarketGlut.Reset(); ArmsPricing.Reset(); StartKit.Reset(); AiGear.Reset(); Levy.Reset(); VolunteerKit.Reset(); LevyGold.Reset(); WearKeep.Reset(); UniqueSpoils.Reset(); BuildDiary.Reset(); BuildFunding.Reset(); KingdomLedger.Reset(); ColdStart.Reset(); MenPurse.Reset(); AiWear.Reset(); SmithHours.Reset(); RecruitKit.Reset(); OreLedger.Reset(); MarketRoad.Reset(); }   // stan jednej kampanii nie przecieka do drugiej (audyt 04.10)
+        public ArmouryBehavior() { Instance = this; HistoricalPrices.Reset(); MaterialLaw.Reset(); WesterosClimate.Reset(); OutlawLaw.Reset(); PopulationLaw.Reset(); WorkshopLaw.Reset(); IronBank.Reset(); MarketGlut.Reset(); ArmsPricing.Reset(); StartKit.Reset(); AiGear.Reset(); Levy.Reset(); VolunteerKit.Reset(); LevyGold.Reset(); WearKeep.Reset(); UniqueSpoils.Reset(); BuildDiary.Reset(); BuildFunding.Reset(); KingdomLedger.Reset(); ColdStart.Reset(); MenPurse.Reset(); AiWear.Reset(); SmithHours.Reset(); RecruitKit.Reset(); OreLedger.Reset(); MarketRoad.Reset(); MoneyLedger.Reset(); PeopleLedger.Reset(); }   // stan jednej kampanii nie przecieka do drugiej (audyt 04.10)
 
         public override void SyncData(IDataStore dataStore)
         {
@@ -505,6 +505,14 @@ namespace Armoury
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, OutlawLaw.OnPartyDestroyed);
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, MenPurse.OnPartyDestroyed);   // wpis 89
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, MarketRoad.OnPartyDestroyed);   // wpis 100: rozbite tabory wiesniakow (log)
+            // ksiega pieniadza i przeplywow osad (K1) oraz ksiega ludzi (demografia, krok 1) - same nasluchy, tylko log
+            CampaignEvents.BeforeSettlementEnteredEvent.AddNonSerializedListener(this, MoneyLedger.OnBeforeEntered);   // tabor wsi: stan PRZED sprzedaza / podzialem utargu
+            CampaignEvents.AfterSettlementEntered.AddNonSerializedListener(this, MoneyLedger.OnAfterEntered);          // ... i PO
+            CampaignEvents.HeroOrPartyTradedGold.AddNonSerializedListener(this, MoneyLedger.OnGoldTraded);             // kazdy GiveGoldAction gry
+            CampaignEvents.MapEventEnded.AddNonSerializedListener(this, PeopleLedger.OnMapEventEnded);
+            CampaignEvents.OnTroopRecruitedEvent.AddNonSerializedListener(this, PeopleLedger.OnTroopRecruited);
+            CampaignEvents.OnUnitRecruitedEvent.AddNonSerializedListener(this, PeopleLedger.OnUnitRecruited);
+            CampaignEvents.OnTroopsDesertedEvent.AddNonSerializedListener(this, PeopleLedger.OnTroopsDeserted);
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, delegate { try { OutlawLaw.Hourly(); } catch { } });
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, OnMapEventEnded);
             CampaignEvents.MapEventStarted.AddNonSerializedListener(this, OnMapEventStarted);
@@ -1163,16 +1171,22 @@ namespace Armoury
             try { BattleChronicle.Daily(); } catch (Exception e) { Log.Error("BattleChronicle.Daily", e); }
             try { SupplyDemand.DecayOrders(); } catch (Exception e) { Log.Error("SupplyDemand.DecayOrders", e); }
             try { ArmsPricing.Daily(); } catch (Exception e) { Log.Error("ArmsPricing.Daily", e); }   // indeksy surowcow i premie wojenne PRZED handlem
+            try { MoneyLedger.BlockOpen(); } catch { }   // ksiega przeplywow osad (tylko log): stan kas przed naszym rozliczeniem doby
             try { PopulationLaw.Daily(); } catch (Exception e) { Log.Error("PopulationLaw.Daily", e); }   // ludnosc i renty krain
+            try { MoneyLedger.Mark(MoneyLedger.MRent); } catch { }
             // wpis 86 (audyt pkt 7): budowy PO rentach - 10% od dzisiejszego dochodu
             try { BuildFunding.Daily(); } catch (Exception e) { Log.Error("BuildFunding.Daily", e); }
+            try { MoneyLedger.Mark(MoneyLedger.MBuild); } catch { }
             try { BuildDiary.Daily(); } catch (Exception e) { Log.Error("BuildDiary.Daily", e); }
             try { OreLedger.Daily(); } catch (Exception e) { Log.Error("OreLedger.Daily", e); }   // wpis 94: ksiega rudy (tylko log)
             try { MarketRoad.Daily(); } catch (Exception e) { Log.Error("MarketRoad.Daily", e); }   // wpis 100: dowoz wsi zamkowych na targi (log)
             try { KingdomTreasury.Daily(); KingdomTreasury.Levies(); KingdomLedger.Daily(); } catch (Exception e) { Log.Error("KingdomTreasury.Daily", e); }   // powinnosci wasali wobec korony (po rentach)
+            try { MoneyLedger.Mark(MoneyLedger.MCrown); } catch { }
             try { OutlawLaw.Daily(); } catch (Exception e) { Log.Error("OutlawLaw.Daily", e); }   // wyrzutki: bieda, powroty, werbunek band
             try { IronBank.Daily(); } catch (Exception e) { Log.Error("IronBank.Daily", e); }   // Bank Zelazny: pozyczki AI, raty, bankructwa
             try { SupplyDemand.DailyTrade(); } catch (Exception e) { Log.Error("SupplyDemand.DailyTrade", e); }
+            try { MoneyLedger.Daily(); } catch (Exception e) { Log.Error("MoneyLedger.Daily", e); }     // K1: "Pieniadz swiata" i "Przeplywy osad" (tylko log) - po calym naszym rozliczeniu doby
+            try { PeopleLedger.Daily(); } catch (Exception e) { Log.Error("PeopleLedger.Daily", e); }   // demografia krok 1: "Ludzie:" i plik regionow (tylko log)
             try { MarketGlut.DailyDigest(); }
             catch (Exception e) { Log.Error("GlutDigest", e); }
             try

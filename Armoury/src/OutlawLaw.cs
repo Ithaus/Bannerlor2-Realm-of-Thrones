@@ -135,6 +135,12 @@ namespace Armoury
 
         private static float Total() { return _pool.Values.Sum(d => d.Values.Sum()); }
 
+        // odczyt dla ksiegi "Ludzie:" (PeopleLedger, tylko log) - ta sama geografia regionow i ta sama pula, niczego nie zmienia
+        internal static List<Settlement> RegionNodes() { return Nodes(); }
+        internal static Settlement RegionFor(Settlement s) { return RegionOf(s); }
+        internal static Settlement RegionAt(Vec2 p) { return NearestNode(p); }
+        internal static float PoolIn(Settlement region) { return region != null ? Count(region) : 0f; }
+
         private static void Add(Settlement region, string key, float n)
         {
             if (region == null || n <= 0f || string.IsNullOrEmpty(key)) return;

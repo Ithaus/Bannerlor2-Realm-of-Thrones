@@ -194,6 +194,7 @@ namespace Armoury
             }
             if (best == null || bp > purse) return 0;
             market.ItemRoster.AddToCounts(best, -1);
+            OreLedger.NoteBuild(best, 1);   // ksiega rudy i drewna: pozycja "budowy" (tylko licznik)
             return bp;
         }
 
@@ -214,6 +215,7 @@ namespace Armoury
                     n = Math.Min(n, (int)((budget - spent) / price));
                     if (n <= 0) continue;
                     roster.AddToCounts(it, -n);
+                    OreLedger.NoteBuild(it, n);   // ksiega rudy i drewna: pozycja "budowy" (tylko licznik)
                     spent += n * price;
                     if (spent >= budget) break;
                 }

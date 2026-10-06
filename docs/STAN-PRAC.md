@@ -1,4 +1,4 @@
-# Stan prac - przekazanie dla drugiego konta (2026-10-05, po wpisie 101)
+# Stan prac - przekazanie dla drugiego konta (2026-10-05, po wpisie 102)
 
 Czytaj najpierw: `CLAUDE.md` (zwlaszcza sekcja 8, **zasada 0**: kazda zmiana = kontrola regresji, kolizji
 i spojnosci calej logiki; oraz pulapka MCM w sekcji 7), potem ten plik, potem gorne wpisy `CHANGELOG.md`.
@@ -47,7 +47,19 @@ i spojnosci calej logiki; oraz pulapka MCM w sekcji 7), potem ten plik, potem go
   Jeffa); nasz zakup idzie po zakupach BK (patrzec na "brak miejsca w jukach"). Log: "Karawany:" i "Karawany (stan):". UWAGA przy
   wprowadzaniu: repo ma nowsze commity niz kopia - przeniesc zmiany paczki do aktualnych plikow (SubModuleMain / ArmouryBehavior /
   Settings mogly sie zmienic), wygenerowac MCM od nowa i zbudowac.
-- Dalsze paczki nocy (logi, zapas startowy, mineral BK, paser, BetterEconomy, zold i skarbiec, przyrost naturalny): patrz
+- **WPIS 102 - LOGI: WGRANE w nocy 05/06.10** (ksiega pieniadza i przeplywow osad "Pieniadz swiata:" / "Przeplywy osad:", ksiega
+  ludzi "Ludzie:" + plik CSV regionow, pozycja "budowy" i podzial "tabory" w "Ruda:" / "Drewno:", "brak surowca" wedlug surowca w
+  "Warsztaty:"). Tylko pomiar, zero zmian zasad gry. Nieprzetestowane w grze.
+- **ZAPAS STARTOWY** (gotowa, NIE wgrana): kopia `scratchpad\noc-1\zapas\repo` - 5 plikow (NOWY `StartStock.cs`, `ArmouryBehavior.cs`,
+  `OreLedger.cs`, `Settings.cs`, `McmSettings.cs`); recenzent: "poprawione i gotowe". Przy pierwszym uruchomieniu NOWEJ kampanii
+  dzieli liczbe sztuk rudy i drewna we wszystkich rosterach przez 10 (flaga w sejwie; stare kampanie bez zmian; wylacznik MCM
+  `StartStockInLoads`). Skutek zamierzony: miasta zaczna z ok. 200 ladunkami rudy zamiast ok. 2000 - odsloni prawdziwy niedobor.
+  UWAGA: kopia powstala PRZED wpisem 102 - `OreLedger.cs` i `ArmouryBehavior.cs` trzeba scalic recznie z aktualnymi.
+- **MINERAL BK** (gotowa, NIE wgrana): kopia `scratchpad\noc-1\mineral\repo` - NOWY `MineralOnce.cs`, `Settings.cs`, `McmSettings.cs`,
+  `SubModuleMain.cs`, `ArmouryBehavior.cs`; recenzent: "poprawione i gotowe". Postfiks na BK `PopulationManager.GetProductions`
+  zdejmuje powtorzony mineral; `MineOutputMultiplier` 3 -> 6 (ruda zostaje ok. 7.4 ladunku na kopiaca wies, do ok. 192 dziennie);
+  sol (12 wsi), glina (16), srebro (30) spadna o polowe - do decyzji Jeffa, czy wyrownac. Pelne wyniki obu paczek i teksty wpisow
+  CHANGELOG: plik `tasks\w2ujb3ury.output` sesji oraz `scratchpad\noc-1\<paczka>\CHANGELOG-wpis.md`.- Dalsze paczki nocy (logi, zapas startowy, mineral BK, paser, BetterEconomy, zold i skarbiec, przyrost naturalny): patrz
   `docs/PLAN-NOCNY-2026-10-05.md` i raport `docs/RAPORT-NOCNY-2026-10-06.md`.
 - Kolejka po karawanach (kazde osobno, z testem Jeffa): zapas startowy; mineral BK; 13 kluczy BetterEconomy; paser; zold i skarbiec;
   potem demografia.

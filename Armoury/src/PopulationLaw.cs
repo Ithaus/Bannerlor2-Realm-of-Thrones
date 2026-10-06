@@ -109,6 +109,9 @@ namespace Armoury
             Log.Info("PopulationLaw: kalibracja ludnosci - " + string.Join("; ", parts.ToArray()) + ".");
         }
 
+        /// <summary>Czy ludnosc jest juz skalibrowana (ksiega "Ludzie:" czyta PeopleOf tylko wtedy - sama kalibracji nie wywoluje).</summary>
+        internal static bool Calibrated { get { return _k.Count > 0; } }
+
         internal static float PeopleOf(Settlement s)
         {
             if (s == null || s.Culture == null) return 0f;
