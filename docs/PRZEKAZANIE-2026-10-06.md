@@ -120,8 +120,8 @@ Plan nocy (kazdy krok = jeden workflow z jednym agentem, skrypty w `~\.claude\pr
    przeliczenie pamieci rynku nowej kampanii tylko w miastach (zamki zamarzlyby na zawsze). Wpis: `docs/paczki/w-toku/cena-CHANGELOG-wpis.md`.
    Otwarte (osobne kroki): welna tanieje poza 23 miastami z tkalnia (wsie owczarskie -10..-30 tys. d dziennie); tabor wsi dostaje za caly ladunek
    cene pierwszej sztuki (przy cenach niedoboru przeplaca: 60 ladunkow drewna 2340 d przy wartosci 240); dosypka drewna RealisticBannerlord warta 3-5x wiecej.
-2. `noc-2-warsztaty` - niezalezny recenzent paczki "warsztaty" NA BAZIE l117 (worktree `dzien-4\warsztatyepo-na-cenie`) -> `l116-warsztaty-w-nowej-monecie`. W TOKU od 16:53.
+2. `noc-2-warsztaty` - niezalezny recenzent paczki "warsztaty" NA BAZIE l117 (worktree `dzien-4\warsztaty\repo-na-cenie`) -> `l116-warsztaty-w-nowej-monecie`. W TOKU od 16:53.
 3. `noc-3-karawany3` - recenzent "karawany3" na tle ceny: czy jeszcze potrzebna -> `l115-karawany-ruda-dociera` albo odrzucona.
-4. `noc-4-zlozenie` - zlozenie na n107 (cena -> karawany3 -> warsztaty), build kazdego ogniwa, przeniesienie n108..n114 na nowy szczyt.
+4. `noc-4-zlozenie` - zlozenie na n107 (cena -> warsztaty -> karawany3; warsztaty recenzowane juz na cenie), build kazdego ogniwa, przeniesienie n108..n114 na nowy szczyt.
 5. Repo: wpisy `docs/paczki/115-117-*.md`, galezie `paczki/*` na origin, STAN-PRAC, raport dla Jeffa prostym jezykiem.
 Stan kazdego kroku dopisuje ponizej.
