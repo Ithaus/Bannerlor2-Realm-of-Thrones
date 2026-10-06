@@ -1,4 +1,4 @@
-# Stan prac - przekazanie dla drugiego konta (2026-10-06 13:15: w grze grupy 1 + 2 = wpisy 101-107, bez testu; lancuch 108-114 gotowy; prac w tle brak)
+# Stan prac - przekazanie dla drugiego konta (2026-10-06 14:30: w grze wpisy 101-107, PIERWSZY TEST ZROBIONY - wynik nizej; w toku poprawka karawan i warsztaty towarowe)
 
 Czytaj najpierw: `CLAUDE.md` (zwlaszcza sekcja 8, **zasada 0**: kazda zmiana = kontrola regresji, kolizji
 i spojnosci calej logiki; oraz pulapka MCM w sekcji 7), potem ten plik, potem gorne wpisy `CHANGELOG.md`.
@@ -88,6 +88,32 @@ POZA LANCUCHEM:
   wiec dla Jeffa: czy jency Innych wstaja jako trupy, bracia Strazy bez zoldu, kto bierze jencow z rabunku).
 - **Narzedzie logow:** `tools/sprawdz_logi.py` czyta uklad wpisu 102 i starego lancucha; dopasowanie do 102b-109 w toku.
 - **Drobne, do zrobienia:** pozycje ksiegi dla napraw i sakiewek rozbitych partii, pomiar wyplat notablom (dzis w "reszcie").
+
+## WYNIK PIERWSZEGO TESTU W GRZE - 06.10 14:08 (grupy 1 + 2 = wpisy 101-107; nowa kampania, 20 dob; log `Armoury-2026-10-06_14-08-11.log`)
+
+Odczyt: `python tools/sprawdz_logi.py --grupa 1` / `--grupa 2`. ERROR 0, wyjatki 0, potkniecia 0; wszystkie latki wpiete; parser
+narzedzia rozpoznal wszystkie linie. Grupa 1: OK 61, UWAGA 5; grupa 2: OK 31, UWAGA 2.
+
+- DZIALA: zapas startowy (ruda 7541 szt. -> 754 ladunki, drewno 20795 -> 2080); mineral BK ("wsie dopisaly" 182 = "model" 194,
+  kopie 24 z 26 wsi - dotad srednio 15); woz (zatkane magazyny wsi zamkowych 4.6% wobec 7.4% miejskich; bylo 17% wobec 8%);
+  ksiegi 102 / 102b (komplet linii, rozliczen rodow 321 na dobe, zold naliczony 397 tys. mediana); zold 107 (naliczone 445 tys.,
+  do sakiewek 272 tys., do kas miast 97 tys., zamkow 42 tys.; tarcza: regulator nie skasowal 163 tys.); paser 106 (skup w strefach,
+  kasy kryjowek 0); kolejnosc kupna karawan wedle zysku (ruda pierwsza w 29 z 420 wyjazdow).
+- NIE DZIALA DOSTATECZNIE - KARAWANY A RUDA: miast bez rudy 74 -> 69 (cel <= 20), choc rudy przybywa (zapas swiata 887 -> 3685,
+  targi miast 247 -> 1740 - lezy w miastach przy kopalniach). Karawany kupuja 2-69 ladunkow rudy dziennie; "brak miejsca w
+  jukach" 32-72 dziennie (nasz zakup idzie po zakupach BK). Warsztaty zbrojne: 1482 cykle "brak surowca [ruda]". Poprawka w toku:
+  workflow `dzien-4`, paczka `karawany3` (galaz `l115-karawany-ruda-dociera`, baza n107).
+- ZGLOSZENIE JEFFA: piekarnia w Lannisporcie kosztuje 31 000 d przy 100 d gracza na starcie i chlebie po 6 d. Cena to wzor gry + BK
+  w starej monecie (sprzet 6000 + dobrobyt x 4 + "place" = wydatki dzienne BK x 15 x dni roku), Armoury jej nie przelicza;
+  wydatki dzienne warsztatow BK (12-50 d + 0.5% dobrobytu) tez sa w starej monecie - "kapital warsztatow" spada 34.7 tys.
+  dziennie. Poprawka w toku: `dzien-4`, paczka `warsztaty` (galaz `l116-warsztaty-w-nowej-monecie`, baza n107).
+- PIENIADZ (pomiar bazowy): zloto swiata 191.1 -> 178.8 mln w 20 dob (gra kasuje dar startowy kas: miasta 17.1 -> 6.9 mln, zamki
+  7.1 -> 3.2 mln - zamkna to K5 / K6), od ok. 15. doby +40..+140 tys. dziennie. Zrodla z niczego w dobie 20: "zakupy" mieszczan
+  526 tys., regulator +134 tys., GiveGoldAction z niczego 642 tys.; ujscia: rozliczenia rodow 443 tys., regulator 122 tys., utarg
+  wsi 62 tys. (15%), GiveGoldAction w nicosc 689 tys. RESZTA NIEWYJASNIONA ok. -320 tys. dziennie (10% ruchu) - do zbadania.
+- DREWNO: miast bez drewna 41 -> 17 -> 40; "bez wyjasnienia" +1.8..+2.5 tys. dziennie (dosypka RealisticBannerlord), budowy
+  biora 1.6-2.4 tys.; karawany prawie go nie woza (zgodnie z przewidywaniem - brak zysku).
+- PO PACZKACH Z `dzien-4`: wgrac je na n107 (w grze), potem przeniesc ogniwa n108..n114 na nowy szczyt (cherry-pick, MCM, build).
 
 ## Decyzje Jeffa 05.10 - komplet (wiazace przy dalszych krokach)
 
