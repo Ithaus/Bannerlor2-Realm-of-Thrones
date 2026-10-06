@@ -112,10 +112,10 @@ index 2d5375c..f5619d6 100644
          public static void DemandPostfix(ItemCategory __1, ref float __result)
 diff --git a/Armoury/src/RawPrice.cs b/Armoury/src/RawPrice.cs
 new file mode 100644
-index 0000000..f7b2201
+index 0000000..6719ba7
 --- /dev/null
 +++ b/Armoury/src/RawPrice.cs
-@@ -0,0 +1,332 @@
+@@ -0,0 +1,340 @@
 +using System;
 +using System.Collections.Generic;
 +using System.Globalization;
@@ -141,7 +141,12 @@ index 0000000..f7b2201
 +    ///      (popyt / 2) ^ 0.6: ruda 1.5, drewno 0.8, sol 2.6, piwo 3.8 - w grze bez przeliczenia kazdy z nich mial 10.
 +    ///      Naprawa: wzor dostaje swoje trzy wielkosci w monecie, w ktorej napisano jego stala (x przelicznik kategorii z
 +    ///      HistoricalPrices), czyli stala wazy 2 / przelicznik nowych denarow. Dla towaru o jednym przedmiocie to dokladnie
-+    ///      cena gry sprzed przeliczenia. Kazda przeliczona kategoria towarow handlowych - bez listy.
++    ///      cena gry sprzed przeliczenia. Kazda kategoria towarow handlowych, ktora w nowej monecie POTANIALA (przelicznik
++    ///      ponad 1) - bez listy. Kategorii, ktore podrozaly (futro 1 -> 200 d, miod pitny 1 -> 10, marmur 1 -> 2, atrament
++    ///      2 -> 100, bawelna, aksamit, klejnoty, welna 22 -> 83, len 15 -> 20), nie ruszamy: tam 2 nowe denary waza mniej niz
++    ///      w grze, a przeliczenie zrobiloby ze stalej 2 futra, 2 miary miodu albo cala sztuke atramentu - ten sam blad w druga
++    ///      strone (proba recenzenta: pusta polka miodu, marmuru i atramentu 10 -> 7.5, welna w miescie bez welny ponizej
++    ///      wartosci bazowej). Regula: stala nigdy nie wazy wiecej niz 2 nowe denary i nigdy wiecej niz w grze.
 +    ///  (B) POPYT TO SAMI MIESZCZANIE. Gra liczy popyt z dobrobytu (BaseDemand), a mieszczanie rudy nie kupuja wcale
 +    ///      (TownUseIron = 0), lnu, welny i skor surowych 2%. Zuzycie rzemieslnikow i warsztatow do popytu nie wchodzilo:
 +    ///      cena nie wiedziala, ze miastu z kuznia rudy brakuje, za to welna byla droga wszedzie, takze tam, gdzie nikt jej nie
@@ -182,7 +187,10 @@ index 0000000..f7b2201
 +        internal static void Reset() { _errFactor = false; _errUse = false; _errLog = false; }
 +
 +        // ------------------------------------------------------------ (A) stala wzoru w nowej monecie
-+        // BetterEconomy (BEE_ItemPriceFactorModel) wola w srodku model gry - przelicza tylko najbardziej zewnetrzne wywolanie
++        // BetterEconomy (BEE_ItemPriceFactorModel) wola w srodku model gry - przelicza tylko najbardziej zewnetrzne wywolanie.
++        // Metoda jest wolana przy kazdej wycenie (karawany licza nia kazde miasto i kazdy towar): prefiks ma byc tani - zadnych
++        // alokacji, jeden odczyt slownika. Pomiar poza gra na prawdziwym modelu: wycena 17 ns, z latka 34 ns (przez model w
++        // modelu 43 ns), z wylaczonym wlacznikiem 25 ns - przy 2 mln wycen na dobe to ok. 50 ms.
 +        [ThreadStatic] private static int _depth;
 +
 +        /// <summary>Prefiks GetBasePriceFactor(kategoria, wartosc polki, podaz, popyt, sprzedaz, wartosc sprzedawanej sztuki).</summary>
@@ -196,7 +204,7 @@ index 0000000..f7b2201
 +                var s = Settings.Current;
 +                if (s == null || !s.PriceFormulaInNewCoin || !s.HistDemandScaling) return;
 +                float r = HistoricalPrices.CoinRatio(__0);        // 0 = kategoria nieprzeliczona albo przeliczenie sesji jeszcze nie weszlo
-+                if (r <= 0f) return;
++                if (r <= 1f) return;                              // towar, ktory podrozal: 2 nowe denary waza przy nim mniej niz w grze - stala zostaje
 +                if (__4) { __1 += __5; __5 = 0; }                 // gra robi to samo: przy sprzedazy polka rosnie o sprzedawana sztuke
 +                __1 *= r; __2 *= r; __3 *= r;
 +            }
@@ -265,7 +273,7 @@ index 0000000..f7b2201
 +                bool formula = FormulaOn, use = UseOn;
 +                if (!formula && !use) return;
 +                var cats = new HashSet<ItemCategory>();
-+                if (formula) foreach (var c in HistoricalPrices.RepricedCategories()) if (c != null && c.IsTradeGood) cats.Add(c);
++                if (formula) foreach (var c in HistoricalPrices.RepricedCategories()) if (c != null && c.IsTradeGood && HistoricalPrices.CoinRatio(c) > 1f) cats.Add(c);   // te same kategorie, co w FactorPrefix
 +                if (use) foreach (var it in CaravanBulk.Items()) if (it.ItemCategory != null) cats.Add(it.ItemCategory);
 +                var model = Campaign.Current.Models != null ? Campaign.Current.Models.SettlementEconomyModel : null;
 +                if (cats.Count == 0 || model == null) return;
@@ -449,14 +457,14 @@ index 0000000..f7b2201
 +    }
 +}
 diff --git a/Armoury/src/Settings.cs b/Armoury/src/Settings.cs
-index 980af17..7c87c79 100644
+index 980af17..63c9dae 100644
 --- a/Armoury/src/Settings.cs
 +++ b/Armoury/src/Settings.cs
 @@ -481,6 +481,8 @@ namespace Armoury
          public float TownUseLinen = 0.4f;                  // share kept for linen cloth (shirts, bedding)
          public float TownUseHardwood = 1f;                 // share kept for timber and firewood (hearths, bakers, brewers, building)
          public bool HistDemandScaling = true;              // town demand for each repriced kind of goods is counted in the new coin too - otherwise townsfolk with the old purse buy up tens of times more cheap swords, ore and cloth and the stalls run dry
-+        public bool PriceFormulaInNewCoin = true;          // the game's price formula keeps a fixed 2 coins beside the worth of the goods on the stall; in the new coin that weighs like a quarter load of ore or a whole measure of salt, so a bare stall of a cheap good never grew dear (ore 1.5 times its worth at most, timber 0.8). On: every repriced trade good is priced as the unmodded game prices it - a bare stall up to 10 times worth, a glutted one down to a tenth (needs Hist Demand Scaling; off = prices as before)
++        public bool PriceFormulaInNewCoin = true;          // the game's price formula keeps a fixed 2 coins beside the worth of the goods on the stall; in the new coin that weighs like a quarter load of ore or a whole measure of salt, so a bare stall of a cheap good never grew dear (ore 1.5 times its worth at most, timber 0.8). On: every trade good the new coin made cheaper is priced as the unmodded game prices it - a bare stall up to 10 times worth, a glutted one down to a tenth; goods the new coin made dearer (fur, wool, velvet, mead) keep the fixed 2 coins, which weigh little beside them (needs Hist Demand Scaling; off = prices as before)
 +        public bool RawPriceByUse = true;                  // a town prices the seven bulk raw goods (iron ore, timber, raw hides, leather, flax, linen, wool) by what it really uses each day: the share of the townsfolk's old appetite that households truly buy, plus what its craftsmen and workshops work up - the same daily use the caravans stock it by. A town with a smithy and no ore pays many times its worth, a town sitting on a hundred days of use pays a fraction, and wool is dear only where someone weaves it. Arms workshops then pay the market price for ore and timber too (needs Hist Demand Scaling; off = demand and workshop prices as before)
          public bool PopulationRentEnabled = true;          // a fief pays by the people it stands for: each village and town on the map is a symbol of a whole land, and its lord's rents follow that land's population (the Reach richest, the Iron Islands poor)
          public float PopulationRentPerHead = 40f;          // rents and dues a lord draws from each subject a year, in coins (about 40 pence a head in the medieval estimate)

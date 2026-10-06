@@ -88,3 +88,18 @@ Przed grupa 4 (110-112): poprawic opisy 112 / 113 i powtorzyc proby K7 / ludzie4
 - `Armoury.json` Jeffa (Documents\Mount and Blade II Bannerlord\Configs\ModSettings\Global\Armoury) nadpisuje domyslne z kodu:
   przed wgraniem sprawdzic klucze zmienianych ustawien (dzis: brak `OutlawFenceRadius`, sa `HideoutGoldBase` 150 i `HideoutGoldPerBand` 120).
 - Kazda sesja testu = swiezy start gry, jedna kampania (ScorchedEarth nie czysci listy wsi przed ogniwem 113).
+
+## 8. STAN KONCOWY - 06.10 15:46 (praca zatrzymana na polecenie Jeffa: koniec limitu)
+
+Oba workflow w tle (dzien-4, dzien-4b) ZATRZYMANE recznie o 15:46. Na tym koncie nic juz nie pracuje. Do gry nic wiecej nie weszlo
+(w grze dalej wpisy 101-107, DLL md5 0eeb0a10...). Galezie l115 / l116 / l117 w klonie: ZADNEJ - zadna z trzech paczek nie przeszla recenzji.
+
+Stan trzech paczek w chwili zatrzymania (zmiany wobec kodu w grze; migawki odswiezone w docs/paczki/w-toku/):
+- **cena**: 7 files changed, 407 insertions(+), 3 deletions(-); opis CHANGELOG autora: jest; ostatni build autora: 0 bledow; katalog recenzji: jest (recenzja zaczeta).
+- **warsztaty**: 5 files changed, 987 insertions(+), 1 deletion(-); opis CHANGELOG autora: jest; brak logu builda; katalog recenzji: brak (recenzji nie bylo).
+- **karawany3**: 2 files changed, 420 insertions(+), 24 deletions(-); opis CHANGELOG autora: jest; ostatni build autora: 0 bledow; katalog recenzji: jest (recenzja zaczeta).
+
+Wniosek dla nastepnego konta: wszystkie trzy to PRACA AUTORA BEZ NIEZALEZNEJ RECENZJI - nie wgrywac. Najpierw: przeczytac zmiane
+(worktree w SCRATCH\dzien-4\<paczka>\repo albo migawka .patch), zbudowac, dac niezaleznemu recenzentowi (proba obalenia wg zasady 0),
+dopiero potem zlozyc na n107 i zaproponowac Jeffowi wgranie. Kolejnosc: cena -> warsztaty -> karawany3 (te ostatnia ocenic po cenie).
+
