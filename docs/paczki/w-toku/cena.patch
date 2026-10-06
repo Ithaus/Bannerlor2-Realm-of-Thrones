@@ -110,12 +110,40 @@ index 2d5375c..f5619d6 100644
          public static void DemandPrefix() { _demandDepth++; }
          public static Exception DemandFinalizer(Exception __exception) { if (_demandDepth > 0) _demandDepth--; return __exception; }
          public static void DemandPostfix(ItemCategory __1, ref float __result)
+diff --git a/Armoury/src/McmSettings.cs b/Armoury/src/McmSettings.cs
+index 22ef20e..fa5c2f7 100644
+--- a/Armoury/src/McmSettings.cs
++++ b/Armoury/src/McmSettings.cs
+@@ -1660,6 +1660,14 @@ namespace Armoury
+         [SettingPropertyGroup("Iron bank")]
+         public bool HistDemandScaling { get; set; } = true;
+ 
++        [SettingPropertyBool("Price Formula In New Coin", HintText = "the game's price formula keeps a fixed 2 coins beside the worth of the goods on the stall; in the new coin that weighs like a quarter load of ore or a whole measure of salt, so a bare stall of a cheap good never grew dear (ore 1.5 times its worth at most, timber 0.8). On: every trade good the new coin made cheaper is priced as the unmodded game prices it - a bare stall up to 10 times worth, a glutted one down to a tenth; goods the new coin made dearer (fur, wool, velvet, mead) keep the fixed 2 coins, which weigh little beside them; and a new campaign opens with the towns' memory of supply and demand for every repriced trade good already in the new coin instead of drifting out of the old one for weeks (needs Hist Demand Scaling; off = prices as before)")]
++        [SettingPropertyGroup("Iron bank")]
++        public bool PriceFormulaInNewCoin { get; set; } = true;
++
++        [SettingPropertyBool("Raw Price By Use", HintText = "a town prices the seven bulk raw goods (iron ore, timber, raw hides, leather, flax, linen, wool) by what it really uses each day: the share of the townsfolk's old appetite that households truly buy, plus what its craftsmen and workshops work up - the same daily use the caravans stock it by. A town with a smithy and no ore pays many times its worth, a town sitting on a hundred days of use pays a fraction, and wool is dear only where someone weaves it. Arms workshops then pay the market price for ore and timber too (needs Hist Demand Scaling; off = demand and workshop prices as before)")]
++        [SettingPropertyGroup("Iron bank")]
++        public bool RawPriceByUse { get; set; } = true;
++
+         [SettingPropertyBool("Population Rent Enabled", HintText = "a fief pays by the people it stands for: each village and town on the map is a symbol of a whole land, and its lord's rents follow that land's population (the Reach richest, the Iron Islands poor)")]
+         [SettingPropertyGroup("Iron bank")]
+         public bool PopulationRentEnabled { get; set; } = true;
+@@ -2874,6 +2882,8 @@ namespace Armoury
+             s.TownUseLinen = TownUseLinen;
+             s.TownUseHardwood = TownUseHardwood;
+             s.HistDemandScaling = HistDemandScaling;
++            s.PriceFormulaInNewCoin = PriceFormulaInNewCoin;
++            s.RawPriceByUse = RawPriceByUse;
+             s.PopulationRentEnabled = PopulationRentEnabled;
+             s.PopulationRentPerHead = PopulationRentPerHead;
+             s.PopulationScale = PopulationScale;
 diff --git a/Armoury/src/RawPrice.cs b/Armoury/src/RawPrice.cs
 new file mode 100644
-index 0000000..6719ba7
+index 0000000..0887ae2
 --- /dev/null
 +++ b/Armoury/src/RawPrice.cs
-@@ -0,0 +1,340 @@
+@@ -0,0 +1,348 @@
 +using System;
 +using System.Collections.Generic;
 +using System.Globalization;
@@ -165,7 +193,8 @@ index 0000000..6719ba7
 +    /// Warsztaty zbrojne placa za rude i drewno cene targu (WorkshopLaw.MatPrice), nie stala cene historyczna - inaczej drogi
 +    /// surowiec oplacalaby kasa miasta, a w jednym miescie byly dwie ceny rudy.
 +    /// Nowa kampania: popyt i podaz wygladzone przez ticki startowe sa jeszcze w starej monecie (przeliczenie wchodzi dopiero
-+    /// w OnSessionLaunched) - przeliczamy je raz, zaraz po StartStock; wczytany zapis dochodzi sam (15% dziennie).
++    /// w OnSessionLaunched) - przeliczamy je raz, zaraz po StartStock, w miastach (zamkow gra nie wygladza - ich popyt jest 0
++    /// i tak zostaje); wczytany zapis dochodzi sam (15% dziennie).
 +    /// Sama cena niczego nie tworzy: zmienia sie tylko to, ile zlota przechodzi miedzy kasa miasta, kiesa karawany, taborem
 +    /// wsi i warsztatem.
 +    /// </summary>
@@ -260,7 +289,15 @@ index 0000000..6719ba7
 +        /// starej monecie i starych sztukach; bez przeliczenia pierwsze dwa-trzy tygodnie kampanii mialyby ceny z mieszanki monet
 +        /// (log 14:08: cena zbytu rudy 29.9 d w pierwszej dobie, 10.4 d w dwudziestej - bez zadnej zmiany na polkach).
 +        /// Podaz = wartosc polki w tej chwili (z rostera, w nowych cenach), popyt = szacunek czynnego modelu (juz w nowej monecie).
-+        /// Dotyczy kategorii, ktorych cene ta paczka liczy inaczej: przeliczonych towarow handlowych (A) i surowcow masowych (B).
++        /// Kategorie: przy (A) WSZYSTKIE przeliczone towary handlowe - takze te, ktore w nowej monecie podrozaly (futro, miod
++        /// pitny, aksamit, klejnoty): stala wzoru ich nie dotyczy, ale ich pamiec z tickow startowych tez jest w starej monecie
++        /// (proba recenzenta 2: aksamit przy 5 sztukach na polce 0.38 zamiast 0.54 w 1. dobie, dochodzi przez 3 tygodnie;
++        /// sol 2.25 zamiast 1.83); przy (B) siedem surowcow masowych (welna przy 20 sztukach 0.63 zamiast 0.10).
++        /// TYLKO MIASTA (recenzja 2): gra prowadzi dane rynku samych miast (TradeCampaignBehavior.InitializeMarkets, ticki startowe
++        /// i dobowe ItemConsumptionBehavior ida po Town.AllTowns). Zamek ma popyt 0 przez cala kampanie (indeks towaru = podloga
++        /// 0.1) - nie ma tam czego przeliczac, a wpisany raz popyt zostalby na zawsze (nikt go potem nie wygladza): ceny w zamku
++        /// skoczylyby z 0.1 do 10, a targowiska wsi BK (BKBuildingsBehavior: kupuje z polki Bound, gdy podaz > popyt) zaczelyby
++        /// wykupywac polki zamkow.
 +        /// </summary>
 +        internal static void SeedNewCampaign()
 +        {
@@ -273,20 +310,19 @@ index 0000000..6719ba7
 +                bool formula = FormulaOn, use = UseOn;
 +                if (!formula && !use) return;
 +                var cats = new HashSet<ItemCategory>();
-+                if (formula) foreach (var c in HistoricalPrices.RepricedCategories()) if (c != null && c.IsTradeGood && HistoricalPrices.CoinRatio(c) > 1f) cats.Add(c);   // te same kategorie, co w FactorPrefix
++                if (formula) foreach (var c in HistoricalPrices.RepricedCategories()) if (c != null && c.IsTradeGood) cats.Add(c);   // kazdy przeliczony towar handlowy (uzbrojenie ma wlasne prawo podazy i popytu)
 +                if (use) foreach (var it in CaravanBulk.Items()) if (it.ItemCategory != null) cats.Add(it.ItemCategory);
 +                var model = Campaign.Current.Models != null ? Campaign.Current.Models.SettlementEconomyModel : null;
 +                if (cats.Count == 0 || model == null) return;
 +                int places = 0, cells = 0, stumbles = 0;
 +                var worth = new Dictionary<ItemCategory, float>();
-+                foreach (var st in Settlement.All)
++                foreach (var town in Town.AllTowns)      // same miasta - zamkow gra nie wygladza (opis wyzej)
 +                {
 +                    try
 +                    {
-+                        var town = st != null ? st.Town : null;      // miasta i zamki - jedne i drugie maja dane rynku
-+                        if (town == null || town.MarketData == null || st.ItemRoster == null) continue;
++                        var shelf = town != null && town.Owner != null ? town.Owner.ItemRoster : null;
++                        if (shelf == null || town.MarketData == null) continue;
 +                        worth.Clear();
-+                        var shelf = st.ItemRoster;
 +                        for (int i = 0; i < shelf.Count; i++)
 +                        {
 +                            var el = shelf.GetElementCopyAtIndex(i);
@@ -304,11 +340,11 @@ index 0000000..6719ba7
 +                        }
 +                        places++;
 +                    }
-+                    catch (Exception e) { if (stumbles++ < 1) Log.Error("RawPrice.SeedNewCampaign (osada)", e); }
++                    catch (Exception e) { if (stumbles++ < 1) Log.Error("RawPrice.SeedNewCampaign (miasto)", e); }
 +                }
 +                Log.Info("RawPrice: nowa kampania - popyt i podaz wygladzone przez ticki startowe przeliczone na nowa monete w " + places
-+                         + " miastach i zamkach, " + cats.Count + " kategorii (" + cells + " pozycji): podaz = wartosc polki teraz, popyt = szacunek modelu"
-+                         + (use ? ", dla surowcow masowych w miastach z prawdziwego zuzycia" : "") + "; potkniecia " + stumbles + ".");
++                         + " miastach (zamki bez zmian - gra nie prowadzi ich danych rynku), " + cats.Count + " kategorii (" + cells + " pozycji): podaz = wartosc polki teraz, popyt = szacunek modelu"
++                         + (use ? ", dla surowcow masowych z prawdziwego zuzycia" : "") + "; potkniecia " + stumbles + ".");
 +            }
 +            catch (Exception e) { Log.Error("RawPrice.SeedNewCampaign", e); }
 +        }
@@ -457,14 +493,14 @@ index 0000000..6719ba7
 +    }
 +}
 diff --git a/Armoury/src/Settings.cs b/Armoury/src/Settings.cs
-index 980af17..63c9dae 100644
+index 980af17..d50a1b6 100644
 --- a/Armoury/src/Settings.cs
 +++ b/Armoury/src/Settings.cs
 @@ -481,6 +481,8 @@ namespace Armoury
          public float TownUseLinen = 0.4f;                  // share kept for linen cloth (shirts, bedding)
          public float TownUseHardwood = 1f;                 // share kept for timber and firewood (hearths, bakers, brewers, building)
          public bool HistDemandScaling = true;              // town demand for each repriced kind of goods is counted in the new coin too - otherwise townsfolk with the old purse buy up tens of times more cheap swords, ore and cloth and the stalls run dry
-+        public bool PriceFormulaInNewCoin = true;          // the game's price formula keeps a fixed 2 coins beside the worth of the goods on the stall; in the new coin that weighs like a quarter load of ore or a whole measure of salt, so a bare stall of a cheap good never grew dear (ore 1.5 times its worth at most, timber 0.8). On: every trade good the new coin made cheaper is priced as the unmodded game prices it - a bare stall up to 10 times worth, a glutted one down to a tenth; goods the new coin made dearer (fur, wool, velvet, mead) keep the fixed 2 coins, which weigh little beside them (needs Hist Demand Scaling; off = prices as before)
++        public bool PriceFormulaInNewCoin = true;          // the game's price formula keeps a fixed 2 coins beside the worth of the goods on the stall; in the new coin that weighs like a quarter load of ore or a whole measure of salt, so a bare stall of a cheap good never grew dear (ore 1.5 times its worth at most, timber 0.8). On: every trade good the new coin made cheaper is priced as the unmodded game prices it - a bare stall up to 10 times worth, a glutted one down to a tenth; goods the new coin made dearer (fur, wool, velvet, mead) keep the fixed 2 coins, which weigh little beside them; and a new campaign opens with the towns' memory of supply and demand for every repriced trade good already in the new coin instead of drifting out of the old one for weeks (needs Hist Demand Scaling; off = prices as before)
 +        public bool RawPriceByUse = true;                  // a town prices the seven bulk raw goods (iron ore, timber, raw hides, leather, flax, linen, wool) by what it really uses each day: the share of the townsfolk's old appetite that households truly buy, plus what its craftsmen and workshops work up - the same daily use the caravans stock it by. A town with a smithy and no ore pays many times its worth, a town sitting on a hundred days of use pays a fraction, and wool is dear only where someone weaves it. Arms workshops then pay the market price for ore and timber too (needs Hist Demand Scaling; off = demand and workshop prices as before)
          public bool PopulationRentEnabled = true;          // a fief pays by the people it stands for: each village and town on the map is a symbol of a whole land, and its lord's rents follow that land's population (the Reach richest, the Iron Islands poor)
          public float PopulationRentPerHead = 40f;          // rents and dues a lord draws from each subject a year, in coins (about 40 pence a head in the medieval estimate)

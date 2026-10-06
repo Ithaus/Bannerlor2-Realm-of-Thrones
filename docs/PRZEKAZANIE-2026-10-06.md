@@ -115,8 +115,12 @@ Ustalenie na starcie (16:00): sekcja 8 byla nieaktualna co do "cena" - recenzent
 paczek: `SCRATCH\dzien-4\<paczka>\raport-autora.json`. Recenzje "warsztaty" i "karawany3" byly dopiero zaczete (bez zmian w kodzie).
 
 Plan nocy (kazdy krok = jeden workflow z jednym agentem, skrypty w `~\.claude\projects\...\fa2fd7a6-...\workflows\scripts\noc-*.js`):
-1. `noc-1-cena` - drugi niezalezny recenzent paczki "cena" (weryfikacja poprawek recenzenta 1, proba obalenia, testy, wpis). W TOKU od 16:08.
-2. `noc-2-warsztaty` - niezalezny recenzent paczki "warsztaty" -> galaz `l116-warsztaty-w-nowej-monecie`.
+1. `noc-1-cena` - drugi niezalezny recenzent paczki "cena" (weryfikacja poprawek recenzenta 1, proba obalenia, testy, wpis). ZROBIONE 16:51 - werdykt "poprawione-i-gotowe", galaz `l117-cena-od-niedoboru` = 8d8f72d (repo: `w-toku/l117-cena-od-niedoboru`),
+   DLL md5 3856d262..., htest 27/27, h2 OK, h3 13/13, zlozenie z karawany3+warsztaty i nalozenie n108..n114 bez konfliktu. Poprawka recenzenta 2:
+   przeliczenie pamieci rynku nowej kampanii tylko w miastach (zamki zamarzlyby na zawsze). Wpis: `docs/paczki/w-toku/cena-CHANGELOG-wpis.md`.
+   Otwarte (osobne kroki): welna tanieje poza 23 miastami z tkalnia (wsie owczarskie -10..-30 tys. d dziennie); tabor wsi dostaje za caly ladunek
+   cene pierwszej sztuki (przy cenach niedoboru przeplaca: 60 ladunkow drewna 2340 d przy wartosci 240); dosypka drewna RealisticBannerlord warta 3-5x wiecej.
+2. `noc-2-warsztaty` - niezalezny recenzent paczki "warsztaty" NA BAZIE l117 (worktree `dzien-4\warsztatyepo-na-cenie`) -> `l116-warsztaty-w-nowej-monecie`. W TOKU od 16:53.
 3. `noc-3-karawany3` - recenzent "karawany3" na tle ceny: czy jeszcze potrzebna -> `l115-karawany-ruda-dociera` albo odrzucona.
 4. `noc-4-zlozenie` - zlozenie na n107 (cena -> karawany3 -> warsztaty), build kazdego ogniwa, przeniesienie n108..n114 na nowy szczyt.
 5. Repo: wpisy `docs/paczki/115-117-*.md`, galezie `paczki/*` na origin, STAN-PRAC, raport dla Jeffa prostym jezykiem.
