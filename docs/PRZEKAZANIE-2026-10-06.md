@@ -1,0 +1,90 @@
+# PRZEKAZANIE NA DRUGIE KONTO - 2026-10-06, ok. 15:15 (zegar komputera, czas pacyficzny)
+
+Poprzednie konto wyczerpalo limit tygodniowy (92%+). Ten plik wystarcza, zeby podjac prace. Szczegoly: `docs/STAN-PRAC.md`
+(na gorze sekcje "PRZEKAZANIE NA INNE KONTO", "WYNIK PIERWSZEGO TESTU W GRZE", "Gotowe paczki", "Decyzje Jeffa 05.10 / 06.10").
+
+## 1. Co wkleic nowemu kontu (Jeff)
+
+> Pracujemy dalej nad modami do Bannerlorda (Realm of Thrones). Ten sam komputer i folder co poprzednie konto - kod, DLL w grze
+> i ustawienia sa na miejscu, nic nie pobieraj ani nie wgrywaj na nowo. Przeczytaj po kolei w repo
+> C:\Users\GAME\Bannerlor2-Realm-of-Thrones: CLAUDE.md, docs/PRZEKAZANIE-2026-10-06.md, docs/STAN-PRAC.md (sekcje od gory do
+> "Decyzje Jeffa 06.10") i 5 pierwszych wpisow CHANGELOG.md. Potem powiedz mi w 5-10 zdaniach prostym jezykiem, jak rozumiesz stan
+> prac i co jest nastepnym krokiem. Nic nie wgrywaj do gry, dopoki nie potwierdze.
+
+## 2. Stan w skrocie
+
+- **W grze** (DLL md5 `0eeb0a105dc5ae4221809e222e327afe`, kopie `.bak-2026-10-06-przed-102b / -103 / -106` obok): wpisy 101 woz,
+  102 + 102b ksiegi pieniadza i ludzi (log), 103 karawany wedle zysku, 104 zapas startowy, 105 mineral BK, 106 paser, 107 zold.
+  Galaz robocza `claude/bannerlord-rot-setup-o75kvo` = kod w grze + dokumenty; wszystko wypchniete na origin.
+- **Pierwszy test w grze zrobiony** (06.10 14:08, nowa kampania, 20 dob, log `Modules\Armoury\Armoury-2026-10-06_14-08-11.log`):
+  0 bledow, wszystko wpiete i dziala POZA dostawa rudy - miast bez rudy 74 -> 69 (cel ponizej 20), choc rudy przybywa (zapas
+  swiata 887 -> 3685 ladunkow). Karawany (736 na swiecie) niosa razem 290 ladunkow rudy; 72 z 92 wyjazdow dziennie nie ma
+  wolnego miejsca; zysk na rudzie 0.08 d na kilogram (len 5.2, plotno 12.2).
+- **Diagnoza Jeffa (sluszna): ruda jest zle wyceniona.** W miescie bez rudy kosztuje 10.4 d za ladunek przy bazie 8 d. Wzor gry:
+  wspolczynnik ceny = (popyt / (0.1 x podaz + 0.04 x wartosc zapasu + 2))^0.6, obciety do 0.1-10. Popyt to tylko konsumpcja
+  mieszczan (podzielona przez nasz przelicznik nowej monety: ruda /23.5), zuzycie kuzni i warsztatow nie wchodzi, a stala 2 zostala
+  w starej monecie - przy pustej polce ruda ma indeks ok. 1.5, plotno 10.
+- **Zgloszenie Jeffa:** piekarnia w Lannisporcie kosztuje 31 000 d (gracz zaczyna ze 100 d, chleb 6 d). To wzor gry + BK w starej
+  monecie (sprzet 6000 + dobrobyt x 4 + "place" = wydatki dzienne BK x 15 x dni roku); wydatki dzienne warsztatow BK (12-50 d +
+  0.5% dobrobytu) tez w starej monecie - "kapital warsztatow" swiata spada o 34.7 tys. dziennie.
+
+## 3. Trzy paczki W TOKU (uruchomione 06.10 14:19-14:33; autor, potem niezalezny recenzent; baza = kod w grze)
+
+Katalog roboczy poprzedniej sesji (dysk C, katalog tymczasowy - MOZE ZNIKNAC):
+`C:\Users\GAME\AppData\Local\Temp\claude\C--Program-Files--x86--Steam-steamapps-common-Mount---Blade-II-Bannerlord\3cf3e0ac-5529-4b68-a794-0edec69cfda7\scratchpad`
+(dalej: `SCRATCH`). Klon lancucha: `SCRATCH\lancuch` (galezie `n102b..n114` = `paczki/*` na origin; `n107-zold-i-skarbiec` = w grze).
+
+| Paczka | Katalog | Galaz po recenzji | Co robi |
+|---|---|---|---|
+| cena (NAJWAZNIEJSZA) | `SCRATCH\dzien-4\cena` | `l117-cena-od-niedoboru` | cena surowca w miescie rosnie z niedoborem wobec prawdziwego zuzycia rzemieslnikow; stale wzoru w nowej monecie; jedna regula dla rudy, drewna, skor, lnu, plotna, welny |
+| warsztaty | `SCRATCH\dzien-4\warsztaty` | `l116-warsztaty-w-nowej-monecie` | cena kupna warsztatu towarowego z jego zarobku, koszty dzienne w nowej monecie, wydatki do kas miast |
+| karawany3 | `SCRATCH\dzien-4\karawany3` | `l115-karawany-ruda-dociera` | zakup surowcow przed zakupami BK, kierunek jazdy wedle zysku; moze byc w czesci zbedna po paczce "cena" |
+
+Stan w chwili pisania: wszystkie trzy u AUTORA (recenzji jeszcze nie bylo). Jesli limit konta skonczyl sie w trakcie, watki padly w
+polowie. Jak sprawdzic, co jest:
+1. `git -C SCRATCH\lancuch branch --list "l11*" -v` - jesli galaz `l115 / l116 / l117` istnieje, paczka przeszla recenzje (commit gotowy).
+2. Jesli galezi nie ma, a istnieje `SCRATCH\dzien-4\<paczka>\repo`: tam lezy niedokonczona praca - `git -C <repo> status --short` i
+   `git -C <repo> diff n107-zold-i-skarbiec`; obok `CHANGELOG-wpis.md` (jesli autor skonczyl) i proby poza gra.
+3. Jesli katalog tymczasowy zniknal: migawki zmian z chwili przekazania sa w repo, `docs/paczki/w-toku/<paczka>.patch`
+   (roznica wobec `paczki/107-zold-i-skarbiec`; moga byc niepelne) - nakladac `git apply --3way` na galezi z `paczki/107-zold-i-skarbiec`.
+Niedokonczona paczke trzeba dokonczyc i dac NIEZALEZNEMU recenzentowi (zasada 0), zbudowac (kod 0) - dopiero potem proponowac wgranie.
+
+## 4. Gotowe, czeka w kolejce (po niezaleznych recenzjach, zbudowane, NIE wgrane)
+
+Galezie `paczki/108..114` na origin (opisy `docs/paczki/`, przeglady kolizji `docs/paczki/PRZEGLAD-KOLIZJI-*.txt`):
+108 jednostka ludzi, 109 przyrost naturalny (wymaga skryptu `tools/bee/zamknij-ujscia-bee.ps1` - 13 kluczy BetterEconomy, dzis 0 z 13
+zamknietych), 110 kasa zamku, 111 kasy miast, 112 utarg wsi, 113 spustoszenie, 114 porzadki + danina podzamcza z korona.
+Stoja na n107; po wgraniu trzech paczek z punktu 3 trzeba je PRZENIESC na nowy szczyt (cherry-pick po kolei, generator MCM, build).
+Przed grupa 4 (110-112): poprawic opisy 112 / 113 i powtorzyc proby K7 / ludzie4 na zlozonych DLL (lista w STAN-PRAC).
+
+## 5. Co zrobic najpierw
+
+1. Ustalic stan trzech paczek (punkt 3). Dokonczyc "cena" (najwazniejsza), potem "warsztaty", "karawany3" ocenic po "cenie".
+2. Zlozyc je na n107 (skrypt `SCRATCH\dzien-1\nowy\ogniwo.ps1`: cherry-pick -n, `python tools/gen_mcm.py`, build, commit; gdy skryptu
+   nie ma - recznie w tej kolejnosci). Kazde ogniwo: build z kodem 0.
+3. Powiedziec Jeffowi PROSTYM JEZYKIEM, co zmieniaja (ile kosztuje ruda w miescie bez rudy przed / po, ile piekarnia), i wgrac
+   NA JEGO SLOWO: gra zamknieta, kopia `Armoury.dll.bak-<data>-przed-NNN`, md5, wpis CHANGELOG ze statusem, commit + push.
+4. Test Jeffa: swiezy start gry, NOWA kampania, 20 dob, zapis, "sprawdz logi" = `python tools/sprawdz_logi.py --grupa 1` (i
+   `--grupa 2`). Glowna liczba: "ruda: miast bez towaru" (bylo 74 -> 69). Narzedzie zna ogniwa do 113; nowych linii nie zna - czytac surowo.
+5. Potem kolejka z punktu 4 grupami: LUDZIE (BetterEconomy + 108 + 109, nowa kampania), KASY (110 + 111 + 112 + 114, nowa kampania),
+   SPUSTOSZENIE (113, ten sam zapis co kasy).
+6. Otwarte: "reszta" bilansu pieniadza ok. -320 tys. d dziennie (niewyjasniona); pytanie do Jeffa o Spoils of War (automatyczna
+   sprzedaz magazynu wojennego w jego zamku); 8 pytan o kanon w `docs/REGULY-KRAIN-I-DLUGU-2026-10-06.md` rozdz. 9.
+
+## 6. Jak pracowac z Jeffem (wiazace, z 06.10)
+
+- Nie pytac o parametry ekonomii (ceny, mnozniki, progi) - "ty tworzysz ekonomie i jej sens": decydowac, uzasadnic jednym zdaniem.
+- Zachowania z biezacego zysku, bez sztucznych list. Mechanika ma objac 100% przypadkow, nie ulamek.
+- Mowic slowami gracza, bez nazw klas i ustawien. Odpowiedzi krotkie; Jeff pisze jednym slowem ("tak", "wgraj", "3 razy").
+- Do gry NIC bez jego slowa. Testy grupami. Po kazdym etapie aktualizowac `docs/STAN-PRAC.md`, commit + push.
+- Limit: pauza przy 90% limitu 5-godzinnego. NIE ciagnac jednej dlugiej rozmowy - pod koniec poprzedniej jedna runda narzedzi
+  kosztowala ok. 0.3 punktu limitu tygodniowego (kontekst 740 tys. tokenow). Prace wieloosobowe w tle: kilka watkow naraz, nie kilkanascie.
+
+## 7. Pulapki techniczne (sprawdzone 06.10)
+
+- PowerShell 5.1: lancuchy commitow w cudzyslowie (`'6155e9d'` bez cudzyslowu to liczba); `&&` nie dziala; do git dodawac `2>$null`.
+- `python`, nie `python3`. Build: `dotnet build Armoury/Armoury.csproj -c Release -v q --nologo`, wynik `Armoury\bin\Release\Armoury.dll`;
+  wgranie w OSOBNYM kroku po sprawdzeniu kodu wyjscia i md5.
+- `Armoury.json` Jeffa (Documents\Mount and Blade II Bannerlord\Configs\ModSettings\Global\Armoury) nadpisuje domyslne z kodu:
+  przed wgraniem sprawdzic klucze zmienianych ustawien (dzis: brak `OutlawFenceRadius`, sa `HideoutGoldBase` 150 i `HideoutGoldPerBand` 120).
+- Kazda sesja testu = swiezy start gry, jedna kampania (ScorchedEarth nie czysci listy wsi przed ogniwem 113).
