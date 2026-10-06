@@ -15,7 +15,7 @@ namespace Armoury
 {
     /// <summary>
     /// KSIEGA PIENIADZA I PRZEPLYWOW OSAD (krok K1 fundamentu, docs/EKONOMIA-FUNDAMENT-2026-10-05.md rozdz. 1.3 P9 i 6.3 K1).
-    /// Tylko log - niczego nie zmienia w grze: odczyt stanu, nasluch zdarzen gry i postfiksy-liczniki (zaden nie rusza wyniku).
+    /// Tylko log - niczego nie zmienia w grze: odczyt stanu, nasluch zdarzen gry, postfiksy-liczniki i jeden prefiks-odczyt (zaden nie rusza wyniku).
     /// Fundament: szesc kluczowych kwot mapy przeplywow to szacunki, bo utarg wiesniakow, kasy osad, "zakupy" mieszczan
     /// i regulator kas nie byly logowane. Krytyk K1: ksiege oprzec na STANIE (jedyny mutator kasy osady to ChangeGold),
     /// a nie na liscie hakow - dzienna zmiana stanu minus pozycje zmierzone = jawna reszta.
@@ -24,7 +24,9 @@ namespace Armoury
     ///  "Pieniadz swiata:" - zloto wedlug posiadaczy (kasy miast i zamkow, kiesy wsi, kryjowki, bohaterowie, skarbce krolestw, kapital
     ///    warsztatow, sakiewki ludzi, Bank Zelazny, partie bez wodza, liczniki podatku) z suma i zmiana dobowa - wszystko pomiar stanu;
     ///  "Pieniadz swiata (bilans):" - zmiana sumy = zmierzone zrodla z niczego - zmierzone ujscia w nicosc + reszta;
-    ///  "Przeplywy osad:" - utarg taborow wsi w miastach i zamkach, podzial utargu po powrocie do wsi, zold wyplacony;
+    ///  "Pieniadz swiata (rody):" - o ile dzienne rozliczenia rodow zmienily zloto swiata (stan przed i po kazdym), saldo
+    ///    dopisane glowom, zmiany poza saldem i zold naliczony ("w tym zold" - nie odejmowany w bilansie drugi raz);
+    ///  "Przeplywy osad:" - utarg taborow wsi w miastach i zamkach, podzial utargu po powrocie do wsi, zold naliczony;
     ///  "Przeplywy osad (kasy miast | kasy zamkow | kiesy wsi):" - zmiana stanu rozbita na pozycje zmierzone i reszte.
     /// Kazda liczba ma znacznik: [P] pomiar (stan, zdarzenie gry albo licznik), [R] reszta z bilansu.
     ///
@@ -34,6 +36,12 @@ namespace Armoury
     ///    i licznika podatku wsi; wyplaty majatkow BK (GiveGoldAction z niczego w tym oknie) osobno;
     ///  - "zakupy" mieszczan: dwa postfiksy na ItemConsumptionBehavior - DeleteOverproducedItems (przed konsumpcja) i
     ///    MakeConsumption (po niej): roznica kasy = zloto dopisane za zjedzony towar (BK wola te sama sciezke dla zamkow);
+    ///  - rozliczenie rodu: para prefiks / postfiks na ClanVariablesCampaignBehavior.DailyTickClan czyta sume WSZYSTKICH
+    ///    posiadaczy tuz przed i tuz po rozliczeniu jednego rodu - roznica to dokladnie tyle zlota, ile rozliczenie stworzylo
+    ///    albo skasowalo. Samego zdarzenia salda (GiveGoldAction nic -> glowa rodu) do bilansu NIE bierzemy: zold partii glowy
+    ///    siedzi w saldzie, BK zdejmuje zold pozostalych partii z kies i wyrownuje je z salda (z doplata 200), rycerz z lennem
+    ///    placi sam, dochod z cel i podatku wsi schodzi z licznikow, a pusta kiesa obcina ujemne saldo do zera - licznik zoldu
+    ///    plus saldo liczyly zold dwa razy. Licznik zoldu (nizej) zostaje jako informacja "w tym zold";
     ///  - regulator kasy: postfiks na GetTownGoldChange czynnego modelu (czyta wynik, zaraz potem gra robi ChangeGold);
     ///  - przelewy gry: zdarzenie HeroOrPartyTradedGold (kazdy GiveGoldAction: zakupy lordow, karawany, notable);
     ///  - zold: postfiks na DefaultClanFinanceModel.CalculatePartyWage (BK wola ja refleksja dla kazdej partii i garnizonu);
@@ -99,6 +107,19 @@ namespace Armoury
         private static CampaignTime _winTime;              // chwila otwarcia okna (porownanie tikow, nie ulamkow godzin)
         private static int _winGold, _winHomeGold, _winHomeTax, _winEstates, _winStale;
 
+        // rozliczenie rodu (ClanVariablesCampaignBehavior.DailyTickClan): zloto swiata przed i po - pomiar stanu
+        private static bool _clanHooked;                   // para na DailyTickClan zalozona (bez niej salda rodow ida do pozycji GiveGoldAction)
+        private static Clan _clanNow;                      // rod, ktorego rozliczenie wlasnie biegnie
+        private static CampaignTime _clanTime;             // chwila otwarcia (rozliczenie nie domkniete przez wyjatek nie lapie pozniejszych zdarzen)
+        private static long _clanBefore;                   // suma wszystkich posiadaczy tuz przed rozliczeniem
+        private static long _clanUp, _clanDown;            // rozliczenia, ktore dodaly zlota swiatu / ktore je skasowaly (suma zmian)
+        private static int _clanUpN, _clanDownN, _clanFlatN, _clanStale;
+        private static long _netUp, _netDown;              // saldo modelu finansow dopisane glowom rodow (kwota ze zdarzenia gry)
+        private static int _netUpN, _netDownN;
+        private static long _clanClsFrom, _clanClsTo;      // GiveGoldAction nic <-> osada w trakcie rozliczenia (sa tez w licznikach kas osad)
+        private static long _clanOthFrom, _clanOthTo;      // GiveGoldAction nic <-> ktos inny niz glowa rodu w trakcie rozliczenia
+        private static bool _clanErrLogged;                // pierwszy wyjatek pomiaru rozliczenia idzie do pliku, kolejne tylko liczymy
+
         // nawias konsumpcji i regulatora
         private static Town _shelfTown, _regExpect;
         private static int _shelfGold;
@@ -109,6 +130,7 @@ namespace Armoury
         {
             _first = true; _modelsLogged = false; _lastSnap = null; _lastHold = null; _blockSnap = null; _inBlock = false;
             _winParty = null; _winVillage = false; _shelfTown = null; _regExpect = null; _regModel = null; _regDecl = null;
+            _clanNow = null; _clanErrLogged = false;
             ClearDay();
         }
 
@@ -116,6 +138,8 @@ namespace Armoury
         {
             Array.Clear(_vPaid, 0, Classes); Array.Clear(_vVisits, 0, Classes); Array.Clear(_vUnsold, 0, Classes); Array.Clear(_vUnsoldVisits, 0, Classes);
             _vHanded = _vKept = _vTax = _vEstates = 0; _vReturns = 0;
+            _clanUp = _clanDown = _netUp = _netDown = _clanClsFrom = _clanClsTo = _clanOthFrom = _clanOthTo = 0;
+            _clanUpN = _clanDownN = _clanFlatN = _clanStale = _netUpN = _netDownN = 0;
             Array.Clear(_cons, 0, Classes); Array.Clear(_regIn, 0, Classes); Array.Clear(_regOut, 0, Classes);
             Array.Clear(_consTicks, 0, Classes); Array.Clear(_regTicks, 0, Classes);
             _consMissed = 0; _regStray = 0;
@@ -137,6 +161,9 @@ namespace Armoury
         }
 
         private static string S(long n) { return (n >= 0 ? "+" : "") + n; }
+
+        /// <summary>Kwota ubytku do linii logu: "-123", a przy zerze "0" (nie "-0").</summary>
+        private static string Neg(long n) { return n > 0 ? "-" + n : "0"; }
 
         private static string Pct(long part, long whole) { return whole != 0 ? (100.0 * part / whole).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + "%" : "-"; }
 
@@ -231,16 +258,23 @@ namespace Armoury
                 if (gNone && rh != null && _winVillage && WinOpen) { _winEstates += a; return; }
                 int gc = gh == null && gp != null && gp.IsSettlement ? ClassOf(gp.Settlement) : -1;
                 int rc = rh == null && rp != null && rp.IsSettlement ? ClassOf(rp.Settlement) : -1;
+                // w trakcie rozliczenia rodu zloto "z niczego" i "w nicosc" jest juz w roznicy stanu zlota swiata (ClanTickPrefix /
+                // ClanTickPostfix) - do bilansu swiata nie wchodzi drugi raz; saldo dopisane glowie rodu notujemy osobno (informacja)
+                var clan = ClanOpen ? _clanNow : null;
                 if (gNone)
                 {
-                    if (rc >= 0) { if (!_inBlock) _fromNothing[rc] += a; }
-                    else _worldFromNothing += a;
+                    if (rc >= 0) { if (!_inBlock) { _fromNothing[rc] += a; if (clan != null) _clanClsFrom += a; } }
+                    else if (clan == null) _worldFromNothing += a;
+                    else if (rh != null && ReferenceEquals(rh, clan.Leader)) { _netUp += a; _netUpN++; }
+                    else _clanOthFrom += a;
                     return;
                 }
                 if (rNone)
                 {
-                    if (gc >= 0) { if (!_inBlock) _toNothing[gc] += a; }
-                    else _worldToNothing += a;
+                    if (gc >= 0) { if (!_inBlock) { _toNothing[gc] += a; if (clan != null) _clanClsTo += a; } }
+                    else if (clan == null) _worldToNothing += a;
+                    else if (gh != null && ReferenceEquals(gh, clan.Leader)) { _netDown += a; _netDownN++; }
+                    else _clanOthTo += a;
                     return;
                 }
                 if (_inBlock) return;                       // nasz tick dobowy: zmiane kas lapia migawki (Mark)
@@ -248,6 +282,51 @@ namespace Armoury
                 if (rc >= 0) _goldIn[rc, SideOf(gh, gp)] += a;
             }
             catch { _stumbles++; }
+        }
+
+        // ------------------------------------------------------------ rozliczenie rodu (stan zlota swiata przed i po)
+        private static bool ClanOpen { get { return _clanNow != null && _clanTime == CampaignTime.Now; } }
+
+        /// <summary>
+        /// ClanVariablesCampaignBehavior.DailyTickClan - tuz przed dziennym rozliczeniem rodu: suma wszystkich posiadaczy zlota.
+        /// Tylko odczyt (prefiks void - oryginalu nie pomija). Rody band gra pomija, wiec ich nie mierzymy.
+        /// </summary>
+        public static void ClanTickPrefix(Clan __0)
+        {
+            try
+            {
+                if (_clanNow != null) { _clanStale++; _clanNow = null; }   // poprzednie rozliczenie nie doszlo do postfiksu (wyjatek w cudzym kodzie) - liczymy
+                if (__0 == null || __0.IsBanditFaction || !Live) return;
+                _clanBefore = WorldTotal();
+                _clanTime = CampaignTime.Now; _clanNow = __0;
+            }
+            catch (Exception e) { _clanNow = null; ClanStumble("MoneyLedger.ClanTickPrefix", e); }
+        }
+
+        /// <summary>Po rozliczeniu rodu: o ile zmienilo sie zloto swiata (saldo, zold, kiesy partii, liczniki podatkow, skarbce - wszystko naraz).</summary>
+        public static void ClanTickPostfix(Clan __0)
+        {
+            try
+            {
+                var c = _clanNow;
+                _clanNow = null;
+                if (c == null) return;
+                if (!ReferenceEquals(c, __0)) { _clanStale++; return; }
+                long d = WorldTotal() - _clanBefore;
+                if (d > 0) { _clanUp += d; _clanUpN++; }
+                else if (d < 0) { _clanDown -= d; _clanDownN++; }
+                else _clanFlatN++;
+            }
+            catch (Exception e) { ClanStumble("MoneyLedger.ClanTickPostfix", e); }
+        }
+
+        /// <summary>Wyjatek przy pomiarze jednego rozliczenia: pierwszy do pliku, kazdy liczony w "Potkniecia licznikow" (pomiaru nie gasimy).</summary>
+        private static void ClanStumble(string where, Exception e)
+        {
+            _stumbles++;
+            if (_clanErrLogged) return;
+            _clanErrLogged = true;
+            Log.Error(where, e);
         }
 
         // ------------------------------------------------------------ nasze moduly: wywolania-liczniki
@@ -360,7 +439,11 @@ namespace Armoury
             catch { return null; }
         }
 
-        /// <summary>DefaultClanFinanceModel.CalculatePartyWage(partia, budzet, applyWithdrawals) - wynik przy rozliczeniu = zold wyplacony.</summary>
+        /// <summary>
+        /// DefaultClanFinanceModel.CalculatePartyWage(partia, budzet, applyWithdrawals) - wynik przy rozliczeniu = zold NALICZONY
+        /// (min(zold partii, budzet rodu)). To informacja "w tym zold", nie pozycja bilansu: kwota siedzi w rozliczeniu rodu
+        /// (saldo albo kiesa partii), a z pustej kiesy schodzi mniej, niz naliczono.
+        /// </summary>
         public static void WagePostfix(MobileParty __0, bool __2, int __result)
         {
             try
@@ -419,6 +502,21 @@ namespace Armoury
                 else miss.Add("zold");
             }
             catch (Exception e) { miss.Add("zold (" + e.Message + ")"); }
+            try
+            {
+                // rozliczenie rodu: prefiks jak najwczesniej, postfiks po latkach innych modow, ale PRZED latkami o priorytecie Last
+                // (pomiar obejmuje rozliczenie gry i BK, a nie to, co ktos dopisuje po nim)
+                var tick = AccessTools.Method(typeof(ClanVariablesCampaignBehavior), "DailyTickClan");
+                if (tick != null)
+                {
+                    h.Patch(tick, prefix: new HarmonyMethod(typeof(MoneyLedger), nameof(ClanTickPrefix)) { priority = Priority.First },
+                                  postfix: new HarmonyMethod(typeof(MoneyLedger), nameof(ClanTickPostfix)) { priority = Priority.Low });
+                    _clanHooked = true;
+                    done.Add("rozliczenie rodow");
+                }
+                else miss.Add("rozliczenie rodow");
+            }
+            catch (Exception e) { miss.Add("rozliczenie rodow (" + e.Message + ")"); }
             Log.Info("MoneyLedger: ksiega pieniadza i przeplywow osad (tylko log) - liczniki wpiete: " + (done.Count > 0 ? string.Join(", ", done.ToArray()) : "zadne")
                      + (miss.Count > 0 ? "; BRAK: " + string.Join(", ", miss.ToArray()) : "") + "; utarg taborow i przelewy gry - z nasluchu zdarzen.");
         }
@@ -467,6 +565,15 @@ namespace Armoury
             return h;
         }
 
+        /// <summary>Zloto swiata teraz: suma tych samych posiadaczy, ktorych pokazuje linia "Pieniadz swiata:" (jedna definicja - bez rozjazdu).</summary>
+        private static long WorldTotal()
+        {
+            var h = ReadHolders(Snap());
+            long t = 0;
+            for (int i = 0; i < Holders; i++) t += h[i];
+            return t;
+        }
+
         private static string D(long[] now, long[] last, int i) { return now[i] + (last != null ? " (" + S(now[i] - last[i]) + ")" : ""); }
 
         private static string StateLine(int day, long[] now, long[] last)
@@ -492,17 +599,57 @@ namespace Armoury
             for (int i = 0; i < Holders; i++) { total += now[i]; lastTotal += last[i]; }
             long delta = total - lastTotal;
             long cons = _cons[CTown] + _cons[CCastle], regIn = _regIn[CTown] + _regIn[CCastle], regOut = _regOut[CTown] + _regOut[CCastle];
-            long from = _worldFromNothing, to = _worldToNothing;
+            // GiveGoldAction z niczego / w nicosc POZA rozliczeniami rodow: te z rozliczen siedza w roznicy stanu (_clanUp / _clanDown);
+            // z licznikow kas osad (wspolnych z liniami "Przeplywy osad") odejmujemy czesc zlapana w trakcie rozliczen
+            long from = _worldFromNothing - _clanClsFrom, to = _worldToNothing - _clanClsTo;
             for (int c = 0; c < Classes; c++) { from += _fromNothing[c]; to += _toNothing[c]; }
             long wages = 0; for (int k = 0; k < Wages; k++) wages += _wage[k];
             long vanished = _vHanded - _vKept - _vTax - _vEstates;
-            long sources = cons + regIn + from;
-            long sinks = wages + regOut + vanished + to - _levyBack;
+            // zold NIE jest osobnym ujsciem: partii glowy rodu siedzi w saldzie, pozostalych - w kiesach wyrownywanych z salda;
+            // cale rozliczenie rodu (saldo, kiesy, liczniki podatkow, skarbce) mierzy roznica stanu zlota swiata
+            // Pozycja "GiveGoldAction z niczego" zawiera tez dzienny dochod notabli (ClanVariablesCampaignBehavior.DailyTickHero ->
+            // CalculateNotableDailyGoldChange): gra zdejmuje go z kapitalu warsztatow i kies karawan (Workshop.ChangeGold, PartyTradeGold),
+            // a wyplaca zdarzeniem nic -> notabl. Ubytek kapitalu nie ma wlasnej pozycji - siedzi w reszcie ze znakiem minus (mowi to opis reszty).
+            long sources = cons + regIn + _clanUp + from;
+            long sinks = _clanDown + regOut + vanished + to - _levyBack;
             return "Pieniadz swiata (bilans): dzien " + day + " | zmiana sumy " + S(delta) + " [P] = zmierzone zrodla z niczego +" + sources
-                   + " [P] (\"zakupy\" mieszkancow miast i zamkow " + cons + ", regulator kas dosypal " + regIn + ", GiveGoldAction z niczego " + from + ")"
-                   + " - zmierzone ujscia w nicosc " + sinks + " [P] (zold " + wages + ", regulator kas skasowal " + regOut + ", z utargu wsi zniklo " + vanished
-                   + ", GiveGoldAction w nicosc " + to + " minus " + _levyBack + " oddane przez LevyGold notablom i miastom)"
-                   + " + reszta " + S(delta - sources + sinks) + " [R] (niezmierzone: dochody i wydatki rodow z modelu finansow, BEE, BK, handel partii, smierc bohaterow).";
+                   + " [P] (\"zakupy\" mieszkancow miast i zamkow " + cons + ", regulator kas dosypal " + regIn + ", rozliczenia rodow na plus " + _clanUp + " w " + _clanUpN
+                   + " rodach, GiveGoldAction z niczego poza rozliczeniami rodow " + from + ")"
+                   + " - zmierzone ujscia w nicosc " + sinks + " [P] (rozliczenia rodow na minus " + _clanDown + " w " + _clanDownN + " rodach, regulator kas skasowal " + regOut
+                   + ", z utargu wsi zniklo " + vanished
+                   + ", GiveGoldAction w nicosc poza rozliczeniami rodow " + to + " minus " + _levyBack + " oddane przez LevyGold notablom i miastom)"
+                   + " + reszta " + S(delta - sources + sinks) + " [R] (niezmierzone: BEE, BK poza rozliczeniami rodow, handel partii, liczniki cel rosnace przy handlu, kapital nowych karawan,"
+                   + " smierc bohaterow, lupy w kryjowkach; ze znakiem minus: zysk warsztatow i karawan wyplacany notablom - gra zdejmuje go z kapitalu, a wyplate zglasza jak zloto z niczego"
+                   + " (jest w zrodlach); rozliczenia rodow sa zmierzone w calosci)."
+                   + " W tym zold naliczony " + wages + " [P] - siedzi w rozliczeniach rodow (rozbicie w nastepnej linii), w bilansie nie jest odejmowany drugi raz."
+                   + (_clanHooked ? "" : " UWAGA: licznik rozliczen rodow nie jest wpiety - salda rodow sa w pozycjach GiveGoldAction, a zmiany kies partii i licznikow podatkow w reszcie.");
+        }
+
+        /// <summary>Dzienne rozliczenia rodow: zmiana zlota swiata (pomiar stanu), saldo dopisane glowom (zdarzenia gry), zold jako "w tym".</summary>
+        private static string ClanLine(int day)
+        {
+            long wages = 0; for (int k = 0; k < Wages; k++) wages += _wage[k];
+            var sb = new StringBuilder();
+            sb.Append("Pieniadz swiata (rody): dzien ").Append(day);
+            if (!_clanHooked)
+                return sb.Append(" | licznik rozliczen rodow nie jest wpiety (brak ClanVariablesCampaignBehavior.DailyTickClan) - salda rodow sa w pozycjach GiveGoldAction bilansu;")
+                         .Append(" zold naliczony ").Append(wages).Append(" [P] siedzi w tych saldach i w kiesach partii.").ToString();
+            long change = _clanUp - _clanDown, net = _netUp - _netDown;
+            sb.Append(" | dzienne rozliczenia rodow (model finansow gry i modow + dopisanie salda glowie rodu) zmienily zloto swiata o ").Append(S(change))
+              .Append(" [P] w ").Append(_clanUpN + _clanDownN + _clanFlatN).Append(" rozliczeniach: ").Append(_clanUpN).Append(" na plus +").Append(_clanUp).Append(", ")
+              .Append(_clanDownN).Append(" na minus ").Append(Neg(_clanDown)).Append(", ").Append(_clanFlatN)
+              .Append(" bez zmiany (pomiar: suma wszystkich posiadaczy tuz przed i tuz po kazdym rozliczeniu)")
+              .Append(" | z tego saldo dopisane glowom rodow +").Append(_netUp).Append(" (").Append(_netUpN).Append(" rodow) / ").Append(Neg(_netDown)).Append(" (").Append(_netDownN)
+              .Append(" rodow) [P] (kwota ze zdarzenia gry - z pustej kiesy schodzi mniej), zmiany poza saldem ").Append(S(change - net))
+              .Append(" [P] (kiesy partii i wodzow, liczniki cel i podatku wsi, kapital warsztatow, skarbce krolestw, kasy miast przy podatkach polityk, niedobor pustych kies,")
+              .Append(" salda rodow bez zywej glowy)")
+              .Append(" | zold naliczony ").Append(wages).Append(" [P] jest czescia tych rozliczen; bez niego zmienilyby zloto swiata o ").Append(S(change + wages))
+              .Append(" (wyliczone: zmiana + zold naliczony; z pustej kiesy schodzi mniej, niz naliczono).");
+            if (_clanClsFrom + _clanClsTo + _clanOthFrom + _clanOthTo != 0)
+                sb.Append(" Inne GiveGoldAction w trakcie rozliczen (sa w zmianie zlota swiata): z niczego +").Append(_clanClsFrom + _clanOthFrom)
+                  .Append(", w nicosc ").Append(Neg(_clanClsTo + _clanOthTo)).Append('.');
+            if (_clanStale > 0) sb.Append(" Rozliczenia niedomkniete (wyjatek w kodzie gry albo moda): ").Append(_clanStale).Append('.');
+            return sb.ToString();
         }
 
         private static string VillagerLine(int day)
@@ -518,7 +665,7 @@ namespace Armoury
               .Append(_vTax).Append(" [P] (").Append(Pct(_vTax, _vHanded)).Append(") + wlasciciele majatkow BK ").Append(_vEstates).Append(" [P] (").Append(Pct(_vEstates, _vHanded))
               .Append(") + kiesa wsi ").Append(_vKept).Append(" [P] (").Append(Pct(_vKept, _vHanded)).Append(") + zniklo ").Append(vanished).Append(" [R] (")
               .Append(Pct(vanished, _vHanded)).Append(")")
-              .Append(" | zold wyplacony [P]: ");
+              .Append(" | zold naliczony przy rozliczeniach rodow [P]: ");
             long wages = 0;
             for (int k = 0; k < Wages; k++)
             {
@@ -631,6 +778,7 @@ namespace Armoury
                 {
                     Log.Info(StateLine(day, hold, _lastHold));
                     Log.Info(BalanceLine(day, hold, _lastHold));
+                    Log.Info(ClanLine(day));
                     Log.Info(VillagerLine(day));
                     var golds = new List<int>[Classes];
                     for (int c = 0; c < Classes; c++) golds[c] = new List<int>();
