@@ -354,6 +354,7 @@ namespace Armoury
         public int SteelValue = 210;                       // worth of one bar of steel (0.5 kg)
         public int FineSteelValue = 281;                   // worth of one bar of fine steel (0.5 kg)
         public int ValyrianSteelValue = 1000;              // worth of one bar of Valyrian steel (0.5 kg)
+        public bool MineralsCountedOnce = true;            // Banner Kings lists the mineral of a mining village twice and so credited it twice a day (iron ore, salt, clay, silver); this strikes the second entry and counts the first one twice instead - the village digs exactly as much as before, but mines, village storehouses and village carts now all reckon with the same true output
         public float MineOutputMultiplier = 3f;            // iron mines dig this many times the old output - the workshops of the realm were starving for ore
         public float LumberOutputMultiplier = 3f;          // woodcutters fell this many times the old output - charcoal burners need wood by the cartload (a forge burns ~5 loads of wood per load of ore)
         public bool SmeltCapToCraftCost = true;            // melting a piece down never gives back more metal than a share of what forging it costs - no metal out of thin air

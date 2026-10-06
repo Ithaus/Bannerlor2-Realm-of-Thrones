@@ -22,6 +22,11 @@ namespace Armoury
     /// nasz BuildFunding zdejmuje z targow (dotad ok. 1646 ladunkow drewna dziennie siedzialo w "bez wyjasnienia");
     /// "tabory" rozbite na wiesniakow / karawany / lordow / inne (kto trzyma towar w drodze); "model" liczony tylko
     /// we wsiach z wynikiem powyzej zera (dotad "w 92 wsiach" przy 26 kopalniach - model pytany takze o wsie bez rudy).
+    /// Od wpisu 105 (MineralOnce): BK ma mineral na liscie produkcji wsi RAZ, a wynik modelu jest mnozony przez liczbe
+    /// zdjetych powtorzen (MineralOnce.Times) - wies kopiaca dopisuje wiec dokladnie tyle, ile pokazuje "model"
+    /// ("wsie dopisaly" / liczba kopiacych wsi = "model" / liczba wsi w modelu; dotad dopisywala dwa razy tyle).
+    /// Wyjatek: po wczytaniu gry mnoznik wsi pojawia sie dopiero przy pierwszym zlozeniu jej listy przez BK (tick produkcji),
+    /// a magazyn wsi pyta model wczesniej - w pierwszej dobie "model" pokazuje wiec jeszcze wynik liczony raz (polowe).
     /// </summary>
     internal static class OreLedger
     {
