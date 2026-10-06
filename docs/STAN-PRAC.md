@@ -60,7 +60,7 @@ Mozna wgrac kilka ogniw naraz (grupa testowa) - cherry-pick wszystkich po kolei,
 
 UWAGI DO WGRYWANIA I TESTOW:
 - 102b to sam log - najlepiej wgrac PRZED pierwszym testem Jeffa (bez niej bilans "Pieniadz swiata" odejmuje zold dwa razy).
-- Tuz przed wgraniem 106 i 107 przeczytac `Armoury.json` Jeffa (Documents\...\ModSettings\Global\Armoury): dzis nie ma w nim
+- Przed KAZDYM wgraniem DLL z ogniwem 106 lub pozniejszym sprawdzic w `Armoury.json` Jeffa klucz `OutlawFenceRadius`: ma go nie byc
   zadnego klucza tych paczek; gdyby Jeff zapisal ustawienia w MCM, plik dostanie komplet kluczy i domyslne z kodu przestana dzialac.
 - 109 wymaga zamknietych ujsc BetterEconomy (skrypt `tools/bee/zamknij-ujscia-bee.ps1`, NIE uruchomiony) - bez tego inwestycje
   BEE dopisuja wsiom 65-135 hearth dziennie z niczego, 20-40 razy wiecej niz caly przyrost naturalny.
@@ -70,7 +70,7 @@ UWAGI DO WGRYWANIA I TESTOW:
   nie odkladac.
 - Etykiety dnia w logu: "Wyrzutki / Paser / Zold / Korona / Skarbce dzien D" to ten sam tick co "Ruda / Karawany / Dowoz /
   Przeplywy osad / Pieniadz swiata / Ludzie dzien D-1".
-- Przeglad kolizji: stary lancuch 103-107 - dwa razy "czysty"; NOWY lancuch 102b-109 - przeglad w toku (workflow dzien-2).
+- Przeglad kolizji NOWEGO lancucha 102b-109 (06.10, z proba obalenia): w kodzie bez kolizji; zlozenie zgodne ze zrodlami (37 plikow,
 
 SKUTKI, O KTORYCH JEFF WIE (powiedziane 06.10): ruda nie idzie w karawanach pierwsza (tania - 8 d za 100 kg; wedle zysku wygrywaja
 welna i plotno), ale jest wozona; drewna karawany czesto nie woza (zysk bliski zera); w kryjowkach nowej kampanii prawie nie ma
