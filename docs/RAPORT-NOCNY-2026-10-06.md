@@ -1,17 +1,19 @@
 # Raport nocny 2026-10-05 / 06
 
-Godziny wedlug zegara komputera (ustawiony na czas pacyficzny). Stan na 02:30; rozdzial 3 bedzie uzupelniony, gdy skoncza sie
-recenzje w tle.
+Godziny wedlug zegara komputera (ustawiony na czas pacyficzny). Wersja 2 - komplet, stan na 03:45.
 
 ## 0. W skrocie
 
 - **Do gry weszla w nocy tylko paczka logow (wpis 102).** W grze jest wpis 101 (woz x2) + wpis 102 (ksiegi pieniadza i ludzi).
   DLL md5 `bf0945fcb4987f4bc54e49a6467895ab`. Zadna zmiana zasad gry nie zostala wgrana bez Ciebie.
-- **Trzy paczki sa gotowe i zlozone w lancuch na aktualnym kodzie:** 103 karawany -> 104 zapas startowy -> 105 mineral BK.
-  Kazde ogniwo buduje sie z kodem 0; niezalezny przeglad kolizji miedzy nimi: "czysty". Wgrywam po jednej, po Twoim tescie.
-- **Cztery rzeczy sa jeszcze w recenzji** (paser, skrypt BetterEconomy, zold i skarbiec, reguly krain i dlugu) - noc przerwala sie
-  dwa razy, szczegoly w rozdziale 5.
-- **Nie zrobione:** paczka "przyrost naturalny" (odpuszczona, zeby nie palic limitu tygodniowego - jest na 42%).
+- **Piec paczek kodu czeka w lancuchu na aktualnym kodzie:** 103 karawany -> 104 zapas startowy -> 105 mineral BK -> 106 paser ->
+  107 zold i skarbiec. Kazda ma niezalezna recenzje ("poprawione i gotowe"), kazde ogniwo buduje sie z kodem 0. Wgrywam po
+  jednej, po Twoim tescie.
+- **Poza lancuchem gotowe:** skrypt zamykajacy 13 ujsc zlota BetterEconomy (nie uruchomiony) i projekt regul krain i dlugu
+  (dokument, 5 regul gotowych do zakodowania).
+- **Nie zrobione:** paczka "przyrost naturalny" i przeglad kolizji ogniw 106-107 z reszta lancucha (odlozone, zeby nie palic
+  limitu tygodniowego - patrz rozdzial 5).
+- **Pierwszy krok dla Ciebie:** nowa kampania, 15-20 dob, "sprawdz logi" (rozdzial 1).
 
 ## 1. Co jest w grze i co testowac jako pierwsze
 
@@ -28,18 +30,22 @@ Nowa kampania, 15-20 dob, potem "sprawdz logi". Sprawdzam wtedy:
 
 Te liczby zastapia szacunki z fundamentu ekonomii (`docs/EKONOMIA-FUNDAMENT-2026-10-05.md`) - od nich zalezy kazdy dalszy krok.
 
-## 2. Lancuch gotowych paczek
+**Uwaga do odczytu:** dwoch recenzentow niezaleznie zauwazylo, ze linia "Pieniadz swiata (bilans):" najpewniej liczy zold dwa
+razy (raz licznikiem zoldu, raz jako ubytek z kiesy glowy rodu). "Ujscia" beda wtedy zawyzone, a "reszta" dodatnia o mniej wiecej
+cala pozycje zoldu. Potwierdze to na Twoim pierwszym logu i poprawie osobnym, malym wpisem. Stan kas i sumy sa od tego niezalezne.
 
-Galezie w repo i na GitHubie (galaz robocza i gra sa bez zmian):
+## 2. Lancuch paczek kodu
 
-| Nr | Galaz | Co zmienia | Recenzja paczki | Nowa kampania |
-|---|---|---|---|---|
-| 103 | `paczki/103-karawany` | karawany sprzedaja miastom rude, drewno, skory, len, plotno, welne do zapasu docelowego i kupuja tylko z nadwyzek | poprawione i gotowe | zalecana |
-| 104 | `paczki/104-zapas-startowy` | ruda i drewno na starcie kampanii przeliczone na ladunki (koniec masy x10) | poprawione i gotowe | WYMAGANA |
-| 105 | `paczki/105-mineral-bk` | BK nie dopisuje mineralu wsi gorniczej dwa razy; mnoznik rudy 3 -> 6 (wydobycie rudy bez zmian) | poprawione i gotowe | WYMAGANA |
+Galezie w repo i na GitHubie (galaz robocza i gra sa bez zmian). Gotowe teksty wpisow CHANGELOG z pelna lista ryzyk i linii logu
+sa w `docs/paczki/`.
 
-Gotowe teksty wpisow CHANGELOG (ze wszystkimi ryzykami i liniami logu): `docs/paczki/103-karawany.md`, `104-zapas-startowy.md`,
-`105-mineral-bk.md`.
+| Nr | Galaz | Co zmienia | Nowa kampania |
+|---|---|---|---|
+| 103 | `paczki/103-karawany` | karawany sprzedaja miastom rude, drewno, skory, len, plotno, welne do zapasu docelowego i kupuja tylko z nadwyzek | zalecana |
+| 104 | `paczki/104-zapas-startowy` | ruda i drewno na starcie kampanii przeliczone na ladunki (koniec masy x10) | WYMAGANA |
+| 105 | `paczki/105-mineral-bk` | BK nie dopisuje mineralu wsi gorniczej dwa razy; mnoznik rudy 3 -> 6 (wydobycie rudy bez zmian) | WYMAGANA |
+| 106 | `paczki/106-paser` | bandy sprzedaja zrabowany ladunek paserowi w miescie; koniec zlota z niczego przy wejsciu bandy do kryjowki | nie |
+| 107 | `paczki/107-zold-i-skarbiec` | zold trafia do sakiewek ludzi i kas osad zamiast znikac; skarbiec krolestwa w wojnie zwraca rodom polowe zoldu | nie |
 
 ### 103 - karawany
 - **Regula:** karawana wjezdzajac do miasta sprzedaje mu surowiec, ktorego miastu brakuje do 10 dob zuzycia (placi kasa miasta
@@ -66,7 +72,30 @@ Gotowe teksty wpisow CHANGELOG (ze wszystkimi ryzykami i liniami logu): `docs/pa
 - **Skutek uboczny:** sol (12 wsi), glina (16) i srebro (30) spadna o polowe (pytanie 2). Jednorazowo ok. +170 tys. d podatku
   poczatkowego dla panow 26 wsi z ruda (SZACUNEK autora paczki).
 
-### Przeglad kolizji miedzy paczkami (niezalezny, 06.10)
+### 106 - paser
+- **Regula:** raz na dobe banda w promieniu 20 od miasta sprzedaje paserowi towary handlowe i zwierzeta hodowlane za polowe ceny
+  skupu, z kasy miasta ponad 20 000; towar wraca na polke miasta. Zywnosci, zbroi i koni paser nie bierze. Gra nie dopisuje juz
+  bandzie i kryjowce po 25% wartosci jukow z niczego przy wejsciu do kryjowki; w zamian banda odklada w kryjowce 25% wlasnej
+  kiesy - prawdziwa monete, ktora znajdzie ten, kto kryjowke oczysci.
+- **Poprawka recenzenta:** banda urodzona w srodku dziennego ticku gry dostawala 2,5 zl na czlowieka z niczego.
+- **Po czym poznac:** start "OutlawLaw: ... wpiete: ..., zloto kryjowek"; co dobe "Paser:" (bandy z ladunkiem, ile w zasiegu
+  miasta, sztuki, zaplata, stan kies i jukow).
+- **Slabosc:** przy promieniu 20 w zasiegu miasta lezy 4% kryjowek i 11% wsi, wiec sprzeda pewnie 5-15% band z ladunkiem
+  (SZACUNEK z mapy, nie pomiar) - wiekszosc lupu nie wroci na rynek (pytanie 3). Zrabowana zywnosc zostaje w jukach na zawsze.
+
+### 107 - zold i skarbiec
+- **Regula:** zold, ktory partia faktycznie dostaje, idzie do sakiewek jej ludzi (wydaja go w miastach); zold zalogi idzie do
+  kasy jej miasta albo zamku. Dotyczy tez Twoich ludzi. Skarbiec krolestwa w wojnie zwraca rodom 50% faktycznie zaplaconego
+  zoldu, dopoki ma z czego.
+- **Poprawka recenzenta:** gdy rod nie mial na zold, a gra zapisywala brak jako dlug wobec korony, paczka autora przekazywala
+  dalej zloto z niczego (w probie 786 z 4000 rodow; po poprawce 0 z 12 000).
+- **Po czym poznac:** start "SoldierPay: zold do obiegu ... rozliczenie rodu wpiete"; pierwsza doba "latki modelu finansow ...
+  saldo rodu z ROT.Models.ROTClanFinanceModel (wpiete teraz)" (slowo BRAK = zglosic); co dobe "Zold:" i "Korona: ... zwrot zoldu".
+- **Ryzyka:** gra co dobe kasuje czesc zlota z kas osad (regulator). Bez wlaczonej tarczy zoldu zjada on ok. 81% zoldu wplaconego
+  do kas miast i ok. 99% w zamkach (pytania 4 i 5). Skarbce krolestw (ok. 2 mln kazdy) starcza na 106-740 dob zwrotow (mediana
+  354). Bogatsze rody to wieksze partie lordow.
+
+### Przeglad kolizji miedzy paczkami 103-105 (niezalezny, 06.10)
 
 Werdykt: **czysty** - kolejnosc 103 -> 104 -> 105 zostaje, kazde osobno, bez poprawek w kodzie. Sprawdzone: scalenie rownowazne
 paczkom, zadnych wspolnych celow latek Harmony, klucz zapisu unikalny, handel karawan nie jest w ksiedze pieniadza liczony
@@ -82,47 +111,77 @@ podwojnie ani jako zloto z niczego. Trzy uwagi wazne dla testow:
    Propozycja: test 103 krotki (5-7 dob - czy latki wpiete, czy sprzedaja i kupuja, czy pieniadz sie zgadza), test 104 pelny
    (15-20 dob). Po cofnieciu z 104 do starszego DLL trzeba zalozyc nowa kampanie.
 
-## 3. Paczki w recenzji (uzupelnie po zakonczeniu)
+**Ogniwa 106 i 107** sa zlozone na ogniwie 105 i zbudowane (kod 0). Paser wszedl bez konfliktow; zold wymagal pogodzenia z
+paserem w ksiedze pieniadza (obie paczki dopisaly wlasne pozycje - przenumerowane wedlug wskazowki recenzenta). Te dwa ogniwa NIE
+maja jeszcze przegladu kolizji z ogniwami 103-105 - zrobie go jednym watkiem tuz przed wgraniem 106.
 
-| Paczka | Stan na 02:30 |
-|---|---|
-| PASER - bandy sprzedaja zrabowany ladunek w miescie | kod i wpis gotowe, recenzja trwa |
-| BETTERECONOMY - skrypt zamykajacy 13 ujsc zlota (z kopia pliku i skryptem cofajacym; nie uruchamiany) | skrypt i opis gotowe, recenzja trwa |
-| ZOLD I SKARBIEC - zold do sakiewek ludzi i kas osad, skarbiec krolestwa zwraca polowe zoldu w wojnie | autor konczy, potem recenzja |
-| REGULY KRAIN I DLUGU - Nocna Straz, Zelazne Wyspy, Wolni Ludzie, nieumarli, dlug bez utraty lenna (dokument, bez kodu) | dokument ok. 100 KB, autor konczy, potem recenzja |
+## 3. Gotowe poza lancuchem
+
+### BetterEconomy - zamkniecie 13 ujsc zlota (`tools/bee/`)
+- `zamknij-ujscia-bee.ps1` zmienia dokladnie 13 wartosci w `better_economy_settings.xml` (robi kopie pliku, sprawdza, czy gra
+  jest zamknieta, zachowuje kodowanie); `cofnij-ujscia-bee.ps1` je cofa. Proby na kopiach: 227 sprawdzen, 0 niezaliczonych.
+  Na prawdziwym pliku nic nie bylo uruchamiane. Opis: `tools/bee/OPIS.md`.
+- **Zbrojownia:** domyslnie zamknieta tylko dla AI - zgodnie z Twoja decyzja "funkcje gracza bez zmian".
+- **Test:** nowa kampania niepotrzebna, 10-12 dob. Potrzebna sesja "przed" i sesja "po" z TEGO SAMEGO zapisu przez te same doby -
+  inaczej liczb nie da sie porownac. Miernik: `skoki-bee.py` (skoki zlota w zamkach ze 100-108 do ok. 6-7 na 12 dob).
+- **Ryzyko:** aktualizacja BetterEconomy albo "sprawdz spojnosc plikow" w Steam przywraca plik i ujscia otwieraja sie bez
+  ostrzezenia - po kazdej aktualizacji trzeba puscic skrypt ponownie.
+
+### Reguly krain i dlugu (`docs/REGULY-KRAIN-I-DLUGU-2026-10-06.md`)
+- Sam projekt, bez kodu: 5 regul gotowych do zakodowania w kolejnosci R1-R13 - Nocna Straz (rekrut z krolestw Westeros, najpierw
+  z pul wyrzutkow), niewolni Zelaznych Wysp, Wolni Ludzie 300 tys. (walcza wszyscy dorosli), nieumarli tylko z poleglych, dlug
+  bez utraty lenna (wierzyciel pobiera dochod wsi, lord wyprzedaje majatek).
+- **Najwazniejsze poprawki recenzenta:** BannerKings ogranicza zold partii wedlug kiesy glowy rodu w sposob ciagly, wiec
+  "podloga kiesy" dluznika nie chroni wojska calkiem, tylko wyznacza jego wielkosc (38 000 zl = ok. 135 ludzi na partie); sama
+  pierwsza regula nieumarlych w nowej kampanii zostawialaby Innym 216 trupow zamiast 616; sprzedaz warsztatu dluznika tworzyla
+  zloto z niczego.
+- 8 pytan do Ciebie z rekomendacjami: rozdzial 9 tego dokumentu.
 
 ## 4. Wyniki badan z wieczora
 
 - **Nieumarli:** dzis rosna glownie z niczego (ROT daje +100 przy narodzinach bandy, +2 dziennie i ochotnikow z mapy); z
-  pokonanych pochodzi najwyzej 25%. Twoja zasada "tylko z poleglych" wymaga zmiany - lista poprawek w `docs/STAN-PRAC.md`.
+  pokonanych pochodzi najwyzej 25%. Twoja zasada "tylko z poleglych" wymaga zmiany - reguly R2-R4 w dokumencie regul.
 - **Aneks demografii** (`docs/DEMOGRAFIA-ANEKS-2026-10-05.md`, PDF w `Dokumenty\Bannerlord-dokumenty`): spalona wies jako
   spustoszenie ulamka okregu, male krainy, widok ksiegi ludzi w menu osady, bandyci i kryjowki. Na koncu 26 pytan do Ciebie.
 
 ## 5. Co poszlo nie tak
 
-- **17:00** - limit sesji doszedl do 100% (zadania w tle przekroczyly Twoja granice 90%). Przeglad karawan i redakcja aneksu
+- **ok. 17:00** - limit sesji doszedl do 100% (zadania w tle przekroczyly Twoja granice 90%). Przeglad karawan i redakcja aneksu
   padly; wznowione po odnowieniu limitu, oba skonczone.
 - **18:39-18:55** - etap 2: po kwadransie pracy wszyscy czterej autorzy padli na bledzie dostepu do modelu (403), druga proba
   tez. Wznowione o 22:27.
 - **23:12** - sesja zgasla w trakcie etapu 2 (trzy recenzje w toku, zold niedokonczony). Praca stala do 01:58, kiedy napisales;
-  wznowiona o 01:59. Autorzy trzech paczek musieli czesc pracy powtorzyc. Od 02:00 komputer ma blokade usypiania na czas pracy.
-- **Limit tygodniowy:** 36% wieczorem, 42% teraz. Dlatego nie uruchomilem etapu 3 w pelnym ksztalcie: zamiast drugiego przegladu
-  wszystkich paczek zrobilem scalenie sam i zlecilem jeden przeglad kolizji; paczka "przyrost naturalny" odlozona.
+  wznowiona o 01:59, skonczona o 03:20. Trzech autorow musialo czesc pracy powtorzyc. Od 02:00 komputer ma blokade usypiania
+  na czas pracy.
+- **Limit tygodniowy:** 36% wieczorem, po calej nocy wyraznie wiecej (aktualna liczba w wiadomosci w rozmowie). Dlatego etap 3
+  nie poszedl w pelnym ksztalcie: scalenie paczek zrobilem sam, zlecilem jeden przeglad kolizji zamiast drugiego przegladu
+  wszystkiego, a paczka "przyrost naturalny" jest odlozona.
 
 ## 6. Pytania do Ciebie
 
-1. **Karawany: czy ruda ma byc kupowana pierwsza**, przed plotnem i welna? Rekomendacja: zostawic na test 103; zmienic, jesli w
-   logu ruda przegrywa miejsce w jukach.
-2. **Sol, glina i srebro spadna o polowe po 105 - wyrownac mnoznikiem?** Rekomendacja: nie wyrownywac w tescie 105, popatrzec na
-   ceny i utarg wsi; wyrownac dopiero, gdy sol wyraznie zdrozeje.
-3. **Ile limitu tygodniowego moge wydawac na prace w tle?** Jedna noc kosztowala ok. 10 punktow. Rekomendacja: do konca tygodnia
-   bez nocnych zadan wieloosobowych, tylko pojedyncze recenzje przy wgrywaniu.
-4. **Czy jency Innych wstaja jako upiory?** (otwarte z regul nieumarlych)
-5. **Danina zywnosci dla zamku** - czy zamek ma dostawac czesc plonu wsi w naturze, skoro chlop wozi juz na targ miasta?
-6. Pozostale: 26 pytan w aneksie demografii - mozna odpowiadac partiami.
+**A. Przed kolejnymi ogniwami (krotkie decyzje)**
+
+1. **Karawany (103): czy ruda ma byc kupowana pierwsza**, przed plotnem i welna? Rekomendacja: zostawic na test; zmienic, jesli
+   w logu ruda przegrywa miejsce w jukach.
+2. **Mineral (105): sol, glina i srebro spadna o polowe - wyrownac mnoznikiem?** Rekomendacja: nie w tescie 105; wyrownac
+   dopiero, gdy sol wyraznie zdrozeje albo utarg tych wsi siadzie.
+3. **Paser (106): promien 20 czy 40?** Przy 20 dziala dla ok. 5-15% band, przy 40 w zasiegu jest 26% kryjowek i 50% wsi.
+   Ten sam promien pozwala bandom kupowac sprzet. Rekomendacja: 40 - przy 20 paczka prawie nic nie zmienia.
+4. **Zold (107): wlaczyc tarcze zoldu?** Bez niej regulator kas skasuje wiekszosc zoldu wplaconego do kas osad i test niczego nie
+   pokaze. Rekomendacja: wlaczyc na test; docelowo naprawic sam regulator (krok K6 fundamentu).
+5. **Zold (107): zold zalogi zamku do kasy zamku czy najblizszego miasta?** Twoja decyzja mowila "do kasy osady". Rekomendacja:
+   zostawic zamek, ocenic po pierwszym logu.
+6. **Ile limitu tygodniowego moge wydawac na prace w tle?** Rekomendacja: do konca tygodnia bez nocnych zadan wieloosobowych,
+   tylko pojedyncze recenzje przy wgrywaniu.
+
+**B. Do regul krain (przed kodowaniem, nie pilne)** - 8 pytan z rekomendacjami w rozdziale 9 dokumentu regul. Najwazniejsze:
+czy jency Innych wstaja jako trupy (rekomendacja: tak); bracia Nocnej Strazy bez zoldu (tak - Straz ma 698 zl rent przy 14.4 tys.
+zoldu dziennie); ile wierzyciel zostawia dluznikowi w kiesie (38 000 zl); odsetki zamrozone w dniu zajecia (tak).
+
+**C. Pozostale** - 26 pytan w aneksie demografii; danina zywnosci dla zamku, skoro chlop wozi juz plon na targ miasta.
 
 ## 7. Jak wgrywam ogniwo
 
 Piszesz "wgraj 103" (gra zamknieta). Ja: przenosze galaz paczki na galaz robocza, generuje MCM, buduje (kod 0), robie kopie
 `Armoury.dll.bak-<data>-przed-103`, wgrywam, sprawdzam md5, dopisuje wpis CHANGELOG, commit i push. Potem Twoj test i
-"sprawdz logi". Kolejne ogniwo dopiero po wyniku poprzedniego.
+"sprawdz logi". Kolejne ogniwo dopiero po wyniku poprzedniego. Skrypt BetterEconomy uruchamiam tak samo - na Twoje slowo.

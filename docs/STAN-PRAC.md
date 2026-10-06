@@ -1,4 +1,4 @@
-# Stan prac - przekazanie dla drugiego konta (2026-10-05, po wpisie 102)
+# Stan prac - przekazanie dla drugiego konta (2026-10-06 rano, po wpisie 102 i nocy z paczkami 103-107)
 
 Czytaj najpierw: `CLAUDE.md` (zwlaszcza sekcja 8, **zasada 0**: kazda zmiana = kontrola regresji, kolizji
 i spojnosci calej logiki; oraz pulapka MCM w sekcji 7), potem ten plik, potem gorne wpisy `CHANGELOG.md`.
@@ -32,37 +32,56 @@ i spojnosci calej logiki; oraz pulapka MCM w sekcji 7), potem ten plik, potem go
 - **Wpis 101** (woz: udzwig taboru wsi zamkowej x2) WGRANY, NIEPRZETESTOWANY. Nastepny uzgodniony krok: KARAWANY - surowce masowe (ruda, drewno, skory, len, welna) sprzedawane tam, gdzie brakuje, w ilosci wedle braku i kasy miasta, kupowane tyle, ile da sie sprzedac (BK prowadzi wlasna kopie kodu karawan: BKCaravansBehavior; vanilla jest wylaczona; dzis kupno ogranicza stala 1500 w starej monecie, a sprzedaz dzienny budzet miasta + 2 x wartosc sztuki - stad 3155 ladunkow rudy w taborach i 60 miast bez rudy). usuniecie podwojnego mineralu BK; zapas startowy x10 (K3);
   paser skupujacy lup band; potem ksiega przeplywow (K1) i dalsze kroki fundamentu.
 
-## Gotowe paczki czekajace na wgranie (kopie robocze w scratchpadzie sesji)
+## Gotowe paczki czekajace na wgranie (stan 06.10 rano - CZYTAJ `docs/RAPORT-NOCNY-2026-10-06.md`)
 
-- **KARAWANY** (po tescie wozu): kopia `scratchpad\wpis-102\repo` - 5 plikow: NOWY `CaravanBulk.cs`, `Settings.cs`, `McmSettings.cs`,
-  `SubModuleMain.cs`, `ArmouryBehavior.cs`; build kod 0; niezalezny recenzent: "poprawione i gotowe" (pelny wynik i tekst wpisu
-  CHANGELOG: plik `tasks\womlo4hxt.output` sesji). Regula: karawana przy wjezdzie do MIASTA sprzedaje rude, drewno, skory, skore,
-  len, plotno i welne do zapasu docelowego miasta (10 dob zuzycia rzemieslnikow i warsztatow notabli; placi kasa miasta ponad
-  20 000); przy wyjezdzie z miasta kupuje tylko z jego nadwyzki (ponad 2 x zapas docelowy), krokami po 10 sztuk, najwyzej do polowy
-  udzwigu i tylko gdy swiat nie wiezie juz dosc; stara wycena zakupu BK dla tych kategorii wyzerowana, zakupy "gabki" BK oddawane na
-  polke. Poprawki recenzenta: zakup krokami (stary sposob przekraczal budzet), zamki wyciete z zakupu (karawany BK do zamkow nie
-  wjezdzaja), brak odkupu w tej samej wizycie, zapas docelowy liczy warsztaty notabli, wyjatek dla rozkazu gracza "tylko zywnosc",
-  cofanie przerwanej transakcji. OTWARTE: zapas zamkow (2641 rudy, 7905 drewna) zostaje na miejscu; kierunek jazdy karawan bez zmian
-  (regiony bez kopaln moga zostac puste); kolejnosc zakupu "najcenniejszy kilogram pierwszy" - ruda po lzejszych surowcach (decyzja
-  Jeffa); nasz zakup idzie po zakupach BK (patrzec na "brak miejsca w jukach"). Log: "Karawany:" i "Karawany (stan):". UWAGA przy
-  wprowadzaniu: repo ma nowsze commity niz kopia - przeniesc zmiany paczki do aktualnych plikow (SubModuleMain / ArmouryBehavior /
-  Settings mogly sie zmienic), wygenerowac MCM od nowa i zbudowac.
-- **WPIS 102 - LOGI: WGRANE w nocy 05/06.10** (ksiega pieniadza i przeplywow osad "Pieniadz swiata:" / "Przeplywy osad:", ksiega
-  ludzi "Ludzie:" + plik CSV regionow, pozycja "budowy" i podzial "tabory" w "Ruda:" / "Drewno:", "brak surowca" wedlug surowca w
-  "Warsztaty:"). Tylko pomiar, zero zmian zasad gry. Nieprzetestowane w grze.
-- **ZAPAS STARTOWY** (gotowa, NIE wgrana): kopia `scratchpad\noc-1\zapas\repo` - 5 plikow (NOWY `StartStock.cs`, `ArmouryBehavior.cs`,
-  `OreLedger.cs`, `Settings.cs`, `McmSettings.cs`); recenzent: "poprawione i gotowe". Przy pierwszym uruchomieniu NOWEJ kampanii
-  dzieli liczbe sztuk rudy i drewna we wszystkich rosterach przez 10 (flaga w sejwie; stare kampanie bez zmian; wylacznik MCM
-  `StartStockInLoads`). Skutek zamierzony: miasta zaczna z ok. 200 ladunkami rudy zamiast ok. 2000 - odsloni prawdziwy niedobor.
-  UWAGA: kopia powstala PRZED wpisem 102 - `OreLedger.cs` i `ArmouryBehavior.cs` trzeba scalic recznie z aktualnymi.
-- **MINERAL BK** (gotowa, NIE wgrana): kopia `scratchpad\noc-1\mineral\repo` - NOWY `MineralOnce.cs`, `Settings.cs`, `McmSettings.cs`,
-  `SubModuleMain.cs`, `ArmouryBehavior.cs`; recenzent: "poprawione i gotowe". Postfiks na BK `PopulationManager.GetProductions`
-  zdejmuje powtorzony mineral; `MineOutputMultiplier` 3 -> 6 (ruda zostaje ok. 7.4 ladunku na kopiaca wies, do ok. 192 dziennie);
-  sol (12 wsi), glina (16), srebro (30) spadna o polowe - do decyzji Jeffa, czy wyrownac. Pelne wyniki obu paczek i teksty wpisow
-  CHANGELOG: plik `tasks\w2ujb3ury.output` sesji oraz `scratchpad\noc-1\<paczka>\CHANGELOG-wpis.md`.- Dalsze paczki nocy (logi, zapas startowy, mineral BK, paser, BetterEconomy, zold i skarbiec, przyrost naturalny): patrz
-  `docs/PLAN-NOCNY-2026-10-05.md` i raport `docs/RAPORT-NOCNY-2026-10-06.md`.
-- Kolejka po karawanach (kazde osobno, z testem Jeffa): zapas startowy; mineral BK; 13 kluczy BetterEconomy; paser; zold i skarbiec;
-  potem demografia.
+W GRZE: wpis 101 (woz x2) + wpis 102 (same logi: "Pieniadz swiata:", "Przeplywy osad:", "Ludzie:" + CSV, "budowy" i podzial
+"tabory" w "Ruda:" / "Drewno:", "brak surowca" wedlug surowca). DLL md5 `bf0945fcb4987f4bc54e49a6467895ab`. Oba nieprzetestowane -
+pierwszy test Jeffa: nowa kampania 15-20 dob, "sprawdz logi".
+
+LANCUCH PACZEK KODU - galezie w repo i na origin, kazda na poprzedniej, baza = galaz robocza po wpisie 102 (87c8e96). Scalone
+recznie na aktualny kod, MCM wygenerowany, kazde ogniwo buduje sie z kodem 0. Kazda paczka ma wlasna niezalezna recenzje
+("poprawione i gotowe"). Gotowe teksty wpisow CHANGELOG: `docs/paczki/`.
+
+| Nr | Galaz | Commit | Tresc | Nowa kampania |
+|---|---|---|---|---|
+| 103 | `paczki/103-karawany` | 55eb166 | `CaravanBulk.cs`: karawany sprzedaja miastom surowce masowe do zapasu docelowego, kupuja tylko z nadwyzek | zalecana |
+| 104 | `paczki/104-zapas-startowy` | 10dd385 | `StartStock.cs`: ruda i drewno startu kampanii przeliczone na ladunki (flaga zapisu `arm_startstock`) | wymagana |
+| 105 | `paczki/105-mineral-bk` | 6155e9d | `MineralOnce.cs`: BK bez powtorzonego mineralu; `MineOutputMultiplier` 3 -> 6 | wymagana |
+| 106 | `paczki/106-paser` | a3ab91b | `OutlawLaw.cs`: bandy sprzedaja lup paserowi w miescie; koniec zlota z niczego w kryjowce | nie |
+| 107 | `paczki/107-zold-i-skarbiec` | cf37864 | `SoldierPay.cs`: zold do sakiewek ludzi i kas osad; skarbiec w wojnie zwraca 50% zoldu | nie |
+
+JAK WGRAC OGNIWO (po "wgraj NNN" od Jeffa, gra zamknieta): galaz robocza dostala po 87c8e96 same commity dokumentow, wiec
+`git cherry-pick <commit ogniwa>` wchodzi czysto (`McmSettings.cs` i tak wygenerowac od nowa: `python tools/gen_mcm.py`);
+build z kodem 0; kopia `Armoury.dll.bak-<data>-przed-NNN`; wgranie; md5; wpis z `docs/paczki/NNN-*.md` na gore CHANGELOG ze
+statusem; commit + push. Ogniwa wgrywac PO KOLEI (kazde zawiera poprzednie).
+
+UWAGI Z PRZEGLADU KOLIZJI 103-105 (werdykt "czysty"):
+- PRZED WGRANIEM 105 sprawdzic, czy w `Documents\Mount and Blade II Bannerlord\Configs\ModSettings\Global\Armoury\Armoury.json`
+  nie pojawil sie klucz `MineOutputMultiplier` (06.10 go nie ma, plik ma 335 kluczy). Zapis ustawien w MCM wpisze tam 3 i po
+  105 wydobycie rudy spadnie o polowe. W logu ma byc "wydobycie rudy x6.0".
+- Po 104 karawany przez pierwsze doby nie maja nadwyzek do wiezienia (miasta z 1/10 zapasu); do tego `CaravanBulk` zeruje wycene
+  BK juz w przebiegach startowych kampanii (`CaravanBulk.cs:467-476` bez warunku `GameStarted`). Jesli rozruch potrwa ponad
+  7-10 dob: dodac `GameStarted` do postfiksu wyceny - tylko razem z 104.
+- Test 103 biegnie jeszcze na zapasie x10 - pokazuje mechanike, nie skutecznosc; test 105 nie jest porownywalny ze 104 na
+  starcie (ticki startowe licza model x6 przed przelicznikiem; podatek poczatkowy 26 wsi z ruda ok. +170 tys. d).
+- Cofniecie z 104 do starszego DLL na kampanii mlodszej niz doba gubi flage - zakladac nowa kampanie.
+- OGNIWA 106-107 NIE MAJA przegladu kolizji z 103-105 - zrobic jednym watkiem przed wgraniem 106. Przy scalaniu 107 pozycje
+  ksiegi pieniadza przenumerowane: `NFence` 3, `NWage` 4, `NLife` 5, `Notes` 6; `MFence` 4, `Marks` 5.
+
+POZA LANCUCHEM:
+- **BetterEconomy, 13 kluczy:** `tools/bee/zamknij-ujscia-bee.ps1` (+ `cofnij-ujscia-bee.ps1`, `skoki-bee.py`, `OPIS.md`); NIE
+  uruchomione. Wywolanie: `powershell -NoProfile -ExecutionPolicy Bypass -File <skrypt>` (najpierw `-NaSucho`). Zbrojownia zamknieta
+  tylko dla AI. Test: sesja "przed" i "po" z tego samego zapisu, 10-12 dob. Aktualizacja BEE / weryfikacja plikow Steam cofa zmiane.
+- **Reguly krain i dlugu:** `docs/REGULY-KRAIN-I-DLUGU-2026-10-06.md` (projekt bez kodu, kolejnosc R1-R13, 8 pytan w rozdz. 9).
+- **Poprawka do wpisu 102 (do zrobienia po pierwszym logu):** "Pieniadz swiata (bilans):" najpewniej liczy zold dwa razy
+  (`WagePostfix` `MoneyLedger.cs:364-370` + bilans rodu przez GiveGoldAction) - potwierdzic na logu, poprawic osobnym wpisem.
+- NIE ZROBIONE: paczka "przyrost naturalny" (kroki 2-3 demografii).
+
+DECYZJE CZEKAJACE NA JEFFA (pelna lista z rekomendacjami: raport nocny, rozdz. 6): ruda pierwsza w zakupach karawan; wyrownanie
+soli / gliny / srebra po 105; promien pasera 20 czy 40 (`OutlawFenceRadius`); tarcza zoldu `TownWageShield` (domyslnie wylaczona -
+bez niej regulator kas kasuje ok. 81% zoldu w miastach i 99% w zamkach); zold zalogi zamku do kasy zamku czy miasta; limit
+tygodniowy na prace w tle.
+
 ## Decyzje Jeffa 05.10 - komplet (wiazace przy dalszych krokach)
 
 **Skala i towar**
