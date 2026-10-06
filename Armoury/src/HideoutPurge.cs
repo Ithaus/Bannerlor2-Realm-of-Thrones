@@ -56,6 +56,9 @@ namespace Armoury
 
         public override void SyncData(IDataStore dataStore) { }
 
+        /// <summary>Czy lup tej kryjowki czeka na przeszukanie przez gracza (odczyt dla OutlawLaw: takiej kasy nikt inny nie rusza).</summary>
+        internal static bool Holds(Settlement hideout) { return _pending && hideout != null && ReferenceEquals(hideout, _pendingHideout); }
+
         private void OnHideoutBattle(BattleSideEnum winnerSide, HideoutEventComponent component,
                                      HideoutEventComponent.HideoutBattleEndState endState)
         {

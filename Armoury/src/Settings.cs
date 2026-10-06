@@ -183,8 +183,8 @@ namespace Armoury
 
         // --- The hideout purge ---
         public bool HideoutPurgeEnabled = true;            // a cleared hideout must be SEARCHED: the plundered gold, renown and the gratitude of the district wait behind one more step
-        public int HideoutGoldBase = 150;                  // gold hidden in any den before counting its bands
-        public int HideoutGoldPerBand = 120;               // each raiding band that lived there stashed about this much loot from the district
+        public int HideoutGoldBase = 150;                  // gold a lived-in den keeps hidden before counting its bands - the hoard its bandits do not touch, found by whoever clears and searches it
+        public int HideoutGoldPerBand = 120;               // each band that calls the den home adds this much to the hoard it keeps; whatever lies above the kept hoard is spent - on gear for its bands and on their living in town
         public float HideoutRenown = 5f;                   // renown for purging a hideout - the realm hears of it
         public int HideoutRepMax = 5;                      // relation gained with notables right next to the den, fading to zero at the edge of the district
         public float HideoutRepRadius = 50f;               // the district: map-distance within which settlements care about the purge
@@ -518,11 +518,21 @@ namespace Armoury
         public int OutlawDailyRecruit = 2;                 // men a band can take in each day from the outlaws of the region it roams
         public float OutlawPrisonerJoinPercent = 10f;      // percent of a band's healthy prisoners who join it each day (green men sooner than veterans)
         public float OutlawCommonerMaxArmorKg = 8f;        // a commoner joins a band as its clan's lowest bandit only if that troop wears body armour this light; otherwise as a looter
-        public bool OutlawGearUpgrades = true;             // a bandit rises in rank only with gear for it: armour and horse from the band's loot, or bought from a fence in a nearby town
-        public float OutlawFenceRadius = 20f;              // how near a town must be for a band to buy from its fence
-        public float OutlawFenceMarkup = 1.5f;             // what the fence asks over the item's value
+        public bool OutlawGearUpgrades = true;             // a bandit rises in rank only with gear for it: armour and horse from the band's loot, or bought from a fence in a town within reach
+        public float OutlawFenceRadius = 200f;             // reach of the fences: a band deals with every unbesieged town this near and takes the best bargain; a band with no town this near still reaches the nearest one, on the far-edge terms
+        public float OutlawFenceMarkup = 1.5f;             // what the fence asks over an item's value when the band stands at the town's gates
+        public float OutlawFenceMarkupFar = 2f;            // what the fence asks over an item's value at the edge of his reach - the price rises evenly with the road he must ride (armour and horses are light for their worth, so less steeply than plunder loses value)
         public bool OutlawNoFreeGold = true;               // bands get no gold from nowhere: only what they plunder (no daily top-up, no purse at birth beyond a few coins a man)
-        public int OutlawCoinsPerMan = 2;                  // coins each man brings to a new band
+        public int OutlawCoinsPerMan = 2;                  // coins each man of a new band is handed from what its home hideout holds above the kept hoard, as far as that goes (no surplus or no hideout - the band starts with none)
+        public bool OutlawFenceBuysLoot = true;            // bands sell their plunder to the fences of the towns within reach, each piece where it pays the band best: trade goods, livestock and food go back on the town's shelves, and the town pays from its purse above the merchants' floor
+        public float OutlawFenceLootShare = 0.5f;          // share of the town's buying price the fence hands a band standing at the town's gates - the rest is the fence's cut and stays in the town's purse
+        public float OutlawFenceLootShareFar = 0.25f;      // share of the town's buying price the fence hands a band at the edge of his reach - it falls evenly with the road and the risk of carting stolen goods
+        public bool OutlawFenceBuysSpareAnimals = true;    // bands also sell the animals they have no use for: pack beasts beyond what their remaining packs weigh, and riding horses beyond one for every man on foot
+        public bool OutlawNoFreeFood = true;               // bands get no food from nowhere (they do not eat in this game - what they carry is plunder), and so the fence takes their food too; off = the game hands every new band food again and the fence leaves food alone
+        public bool OutlawNoHideoutGold = true;            // a band coming home no longer gets a quarter of the worth of its packs as gold from nowhere, and neither does its hideout
+        public float OutlawHideoutStashShare = 0.25f;      // share of its own purse a band leaves in the hideout's hoard each time it comes home - real coin, found by whoever clears and searches the hideout (0 = nothing is put by)
+        public bool OutlawHoardCirculates = true;          // a hideout's hoard is spent, not only heaped: whatever lies above the kept hoard hands new bands their first coins, tops up its bands when they are short at the fence, and goes on their living in town
+        public float OutlawLifeSpendShare = 0.1f;          // share of its purse a band spends each day on food, drink and company in the nearest open town - and the share of a hoard's surplus its hideout spends the same way (0 = nothing is spent)
         public bool ClimateEnabled = true;                 // the seasons of Westeros: one season at a time lasting for years, its end proclaimed by a white raven from the Citadel; dates read "Day N of Summer, 299 AC"
         public bool ClimateDrivesEconomy = true;           // food, harvests, sickness, travel and the AI's winter caution (RealisticBannerlord, BetterEconomy, StrategicCampaignAI) follow the long seasons too - a winter of years is a hungry one
         public int ClimateSummerDaysSoFar = 3640;          // how long the summer has already lasted when the campaign begins (the summer that lasted ten years)
