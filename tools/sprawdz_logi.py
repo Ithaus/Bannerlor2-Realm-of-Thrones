@@ -12,60 +12,85 @@ UZYCIE
   --surowe           linie bez parsowania (z --temat: wszystkie linie tematu w calosci; bez: pierwsza i ostatnia kazdego tematu)
   --porownaj LOG2    ten sam skrot dla dwoch sesji obok siebie: pierwsza i ostatnia doba kazdego tematu
   --csv              skrot pliku ludzie-regiony.csv z katalogu sesji (Logs\\<sesja>\\): 8 regionow o najwiekszym obciazeniu
+                     i - od ogniwa 113, gdy plik ma kolumny uchodzcy / spustoszenie_proc / zabici_spustoszenie - 8 regionow
+                     najbardziej spustoszonych
   --wczytanie N      gdy w jednym logu jest kilka kampanii / wczytan: ktora analizowac (domyslnie ta z najwieksza liczba dob)
   --test NAZWA       kontrole "po czym poznac w logu" z docs\\paczki\\<ogniwo>.md, kazda z wynikiem OK / UWAGA / BRAK DANYCH
                      i liczba z logu. NAZWA: numer ogniwa (102b, 106), kilka (103,104), zakres (102b-105), grupa testowa
-                     (surowce = 102b-105, pieniadz = 106-107, ludzie = 108-109, dowoz = 100-101, ksiegi = 102-102b), slowo z
-                     opisu ogniwa (paser, zold, karawany, mineral, przyrost...), "wykryte" (wszystkie ogniwa widoczne w logu)
-                     albo "wszystkie". Bez tej opcji skrot pokazuje do 10 kontroli najwyzszego ogniwa wykrytego w logu.
-  --pelny            bez limitu ok. 150 linii (wszystkie alarmy i wszystkie tematy dodatkowe)
+                     (surowce = 102b-105, pieniadz = 106-107, ludzie = 108-109, kasy = 110-112, dowoz = 100-101, ksiegi =
+                     102-102b), slowo z opisu ogniwa (paser, zold, karawany, mineral, przyrost, spustoszenie...), "wykryte"
+                     (wszystkie ogniwa widoczne w logu) albo "wszystkie". Bez tej opcji skrot pokazuje do 10 kontroli
+                     najwyzszego ogniwa wykrytego w logu.
+  --grupa N          komplet kontroli GRUPY TESTOWEJ naraz (decyzja Jeffa 06.10: testy grupami): 1 = TOWAR (101 + 102 + 102b
+                     + 103 + 104 + 105), 2 = PIENIADZ (106 + 107), 3 = LUDZIE (BetterEconomy + 108 + 109), 4 = KASY (110 +
+                     111 + 112), 5 = SPUSTOSZENIE (113); takze nazwa (towar, pieniadz, ludzie, kasy, spustoszenie) albo
+                     "w-grze" (grupa najwyzszego ogniwa wykrytego w logu). Wypisuje: warunki testu grupy (DLL, nowa kampania
+                     albo zapis, liczba dob, bledy, formaty nierozpoznane), kontrole wspolne grupy (lista test_groups z
+                     docs\\paczki\\PRZEGLAD-KOLIZJI-LANCUCHA-2026-10-06.txt i powiazania miedzy ogniwami), wszystkie
+                     kontrole kazdego ogniwa grupy i alarmy calego logu - kazda pozycja z OK / UWAGA / BRAK DANYCH i liczba
+                     z logu. Grupa 3 czyta tez (tylko odczyt) plik ustawien BetterEconomy (13 kluczy; stan pliku TERAZ,
+                     nie z chwili sesji) i plik ludzie-regiony.csv sesji (bandy za Murem); grupa 5 - ten sam plik CSV (trzy
+                     nowe kolumny). Gdy pliku nie ma, kontrola mowi BRAK DANYCH i podaje sciezke.
+  --pelny            bez limitu ok. 155 linii (wszystkie alarmy i wszystkie tematy dodatkowe)
   --szer N           szerokosc wyjscia (domyslnie 160)
 
-UKLAD SKROTU (domyslnie ok. 150 linii, do 160 znakow)
+UKLAD SKROTU (domyslnie ok. 155 linii, przy pelnym lancuchu 113 do ok. 170; do 160 znakow)
   1. naglowek: plik, rozmiar, doby i dni gry, linie startowe modulow (wpiete / CZYNNE / BRAK / NIE wpieta / WYLACZONE),
-     uklad ksiegi pieniadza (wpis 102 albo 102b), tabela ogniw lancucha paczek 100, 101, 102, 102b, 103 ... 109 (po czym
+     uklad ksiegi pieniadza (wpis 102 albo 102b), tabela ogniw lancucha paczek 100, 101, 102, 102b, 103 ... 113 (po czym
      poznac kazde w logu, ktore jest w grze, ktorych linii startowych nie ma) i linia "OGNIWO W GRZE"
   2. bledy: ERROR / Exception / potkniecia, pogrupowane, z numerem linii pierwszego wystapienia
   3. alarmy: reguly z docs\\paczki\\*.md i z raportu nocnego, kazdy z numerem linii logu (progi = stale na gorze pliku)
   4. co sprawdzic dla ogniwa w grze: do 10 kontroli najwyzszego wykrytego ogniwa, kazda w postaci
      "[OK | UWAGA | BRAK DANYCH] linia N: co sprawdzono -> liczba z logu" (kontrola OK = jedna linia, UWAGA i BRAK DANYCH
-     do dwoch linii; "pomiar:" = paczka kaze liczbe zmierzyc, progu nie ma) oraz jedna linia o pozostalych ogniwach
-     widocznych w logu; pelna lista i inne ogniwa: --test
+     do dwoch linii; "pomiar:" = paczka kaze liczbe zmierzyc, progu nie ma), jedna linia o pozostalych ogniwach
+     widocznych w logu i jedna o grupie testowej (--grupa N); pelna lista i inne ogniwa: --test
   5. szeregi dzienne: wiersz = miara, kolumny = pierwsza doba, kilka rownomiernie rozlozonych, ostatnia
   6. formaty nierozpoznane: tematy, ktore spadly do trybu surowego (zmieniony albo nieznany format linii)
 
-LANCUCH PACZEK (galezie 87c8e96 = wpis 102 w grze -> n102b-ksiega -> n103-karawany -> n104-zapas-startowy ->
-  n105-mineral-bk -> n106-paser -> n107-zold-i-skarbiec -> n108-ludzie-jednostka -> n109-ludzie-przyrost). Ksiega pieniadza
+LANCUCH PACZEK (galezie 87c8e96 = wpis 102 -> n102b-ksiega -> n103-karawany -> n104-zapas-startowy -> n105-mineral-bk ->
+  n106-paser -> n107-zold-i-skarbiec -> n108-ludzie-jednostka -> n109-ludzie-przyrost -> n110-k5-kasa-zamku ->
+  n111-k6-kasy-miast -> n112-k7-utarg-wsi -> n113-ludzie-spustoszenie = szczyt). Ksiega pieniadza
   ma dwa uklady linii i skrypt czyta oba: wpis 102 (bilans z pozycja "(zold N", sekcja "zold wyplacony [P]") i 102b (bilans
   z "rozliczenia rodow na plus / na minus" i zdaniem "W tym zold naliczony N", nowa linia "Pieniadz swiata (rody):", sekcja
-  "zold naliczony przy rozliczeniach rodow [P]"). Etykiety dnia: "Wyrzutki / Paser / Zold / Korona / Skarbce dzien D" to ten
-  sam tick co "Ruda / Karawany / Dowoz / Przeplywy osad / Pieniadz swiata / Ludzie dzien D-1" (tabela PRZESUNIECIE_DNIA).
+  "zold naliczony przy rozliczeniach rodow [P]"). Etykiety dnia: "Wyrzutki / Paser / Zold / Korona / Skarbce / Kasy zamkow /
+  Kasy miast dzien D" to ten sam tick co "Ruda / Karawany / Dowoz / Przeplywy osad / Pieniadz swiata / Utarg wsi / Ludzie /
+  Ludzie (spustoszenie) dzien D-1" (tabela PRZESUNIECIE_DNIA).
+  Ogniwa 110-112 zmieniaja linie ksiegi pieniadza: w bilansie nowe ujscia ("z ceny zywnosci kupionej we wsiach zniklo",
+  "z sakw zniszczonych taborow wsi zniklo") i dopiski o darze startowym kas ("w tym dar startowy kas zamkow / miast
+  przyciety"); w "Przeplywy osad (kasy ...)" pozycje ticku "danina podzamcza", "udzial korony z zaworu kas miast", "dar
+  startowy kas ... przyciety", w kiesach wsi "zywnosc kupiona we wsiach" i "sakwy rozwiazanych taborow"; w "Przeplywy osad:"
+  dopisek "w tym dopisane wsiom przez K7". Po ogniwie 111 linia "Zold:" konczy sie dopiskami "- ZBEDNA i nieczynna" i
+  "zalogi bez zwrotu korony": tarcza zoldu jest wtedy nieczynna i kontrola ogniwa 107 mowi to wprost (nie "wlaczona").
+  Ogniwo 113 dopisuje do "Ludzie:" uchodzcow ("uchodzcy poza domem N, razem z nimi X mln") i odcinek "spustoszenie dzis".
 
 TEMATY Z PARSEREM KOLUMN (prefiks linii logu)
   surowce:   Ruda, Drewno, Dowoz, Dowoz (skutki), Karawany, Karawany (stan), Warsztaty, Rynek surowcow, Rynek broni,
              Mineraly (dubel BK)
   pieniadz:  Pieniadz swiata, Pieniadz swiata (bilans), Pieniadz swiata (rody), Przeplywy osad, Przeplywy osad (kasy miast |
-             kasy zamkow | kiesy wsi), Korona (powinnosci | danina i clo | zwrot zoldu), Skarbce (suma krolestw), Zold,
-             Sakiewka ludzi, Paser, IronBank
-  ludzie:    Ludzie (z odcinkiem "hearth za ludzi dzis"), Ludzie (przyrost) = linia "Ludzie: przyrost naturalny",
-             Ludzie (regiony), Ludnosc, Wyrzutki, Bitwy
+             kasy zamkow | kiesy wsi), Kasy zamkow, Kasy miast, Utarg wsi, Korona (powinnosci | danina i clo | zwrot
+             zoldu), Skarbce (suma krolestw), Zold, Sakiewka ludzi, Paser, IronBank
+  ludzie:    Ludzie (z odcinkami "hearth za ludzi dzis" i "spustoszenie dzis"), Ludzie (przyrost) = linia "Ludzie: przyrost
+             naturalny", Ludzie (spustoszenie), Ludzie (regiony), Ludnosc, Wyrzutki, Bitwy
   dodatkowe: ZakupyAI, Zuzycie AI, HouseLevies, Werbunek, Pobor, Ochotnicy, Komplet rekruta, Budowy oplacone, Budowy,
              PodazPopyt, WPLYW, UniqueLaw (dzien), LegendaryLaw (targi), Audyt predkosci, ArmsPricing (wojny)
   jednorazowe (naglowek, alarmy, kontrole): StartStock, MineralOnce, MaterialLaw (mnoznik wydobycia), CaravanBulk,
-             MoneyLedger, OutlawLaw, SoldierPay, KingdomTreasury, PeopleUnit, PopulationLaw, Kalendarz, ColdStart
+             MoneyLedger, OutlawLaw, SoldierPay, KingdomTreasury, PeopleUnit, PopulationLaw, CastlePurse (start i
+             jednorazowe przyciecie daru), TownPurse (to samo), VillageTakings, Utarg wsi (latki), Devastation,
+             Spustoszenie, Kalendarz, ColdStart
   Kazdy inny prefiks, ktory powtarza sie w dobach, jest pokazany w trybie surowym (linia obcieta).
 
 Skrypt niczego nie zapisuje (tylko stdout, UTF-8). Nieznany albo zmieniony format linii nie wywraca skryptu:
 temat spada do trybu surowego i jest wymieniony w sekcji "formaty nierozpoznane".
 
-STAN NA 06.10: prawdziwego logu z ogniw 102-109 jeszcze nie ma (ostatnia sesja to 05.10 15:22, sprzed wpisu 101). Uklady
-linii tych ogniw sa wyprowadzone z ciagow Log.Info w kodzie galezi i sprawdzone testem test_syntetyczny.py (kotwice wobec
-literalow, linie zlozone mechanicznie z wyrazen kodu dla kazdej galezi lancucha, linie wypisane przez prawdziwy kod w
-probach poza gra: ksiega 102 i 102b, "Paser:", "Ludzie:" z odcinkiem hearth, "Ludzie: przyrost naturalny"); linii
-"Karawany:", "Karawany (stan):", "Mineraly (dubel BK):" i "Zold:" nowego lancucha nikt jeszcze nie wypisal prawdziwym
-kodem - sa tylko z literalow. Progi alarmow pochodza z opisow paczek.
+STAN NA 06.10: w grze jest grupa 1 (ogniwa 101-105), prawdziwego logu z ogniw 101-113 jeszcze nie ma (ostatnia sesja to
+05.10 15:22, sprzed wpisu 101). Uklady linii tych ogniw sa wyprowadzone z ciagow Log.Info w kodzie galezi i sprawdzone
+testem test_syntetyczny.py (kotwice wobec literalow, linie zlozone mechanicznie z wyrazen kodu dla kazdej galezi lancucha,
+linie wypisane przez prawdziwy kod w probach poza gra: ksiega 102 i 102b, "Paser:", "Ludzie:" z odcinkami hearth i
+spustoszenia, "Ludzie: przyrost naturalny", "Kasy zamkow:", "Kasy miast:", "Utarg wsi:", "Ludzie (spustoszenie):", ksiega
+po K5-K7); linii "Karawany:", "Karawany (stan):", "Mineraly (dubel BK):", "Zold:" i "Dowoz:" nowego lancucha nikt jeszcze
+nie wypisal prawdziwym kodem - sa tylko z literalow. Progi alarmow pochodza z opisow paczek (szacunki, nie pomiary).
 Pierwszy prawdziwy log po wgraniu ogniwa trzeba obejrzec takze z --surowe: gdyby kolumna byla pusta ("-") albo temat spadl
-do "formatow nierozpoznanych", parser trzeba poprawic, a nie ufac alarmom tego tematu.
+do "formatow nierozpoznanych", parser trzeba poprawic, a nie ufac alarmom tego tematu (--grupa N mowi to w warunkach testu).
 """
 
 import sys
@@ -76,14 +101,14 @@ import argparse
 from collections import Counter, OrderedDict, defaultdict
 
 # =====================================================================================================================
-# STALE I PROGI ALARMOW (zrodla: docs/paczki/102b..109, docs/RAPORT-NOCNY-2026-10-06.md rozdz. 1-2, CHANGELOG wpisy 100-102)
+# STALE I PROGI ALARMOW (zrodla: docs/paczki/102b..113, docs/RAPORT-NOCNY-2026-10-06.md rozdz. 1-2, CHANGELOG wpisy 100-102)
 # =====================================================================================================================
 KATALOG_LOGOW = r'C:\Program Files (x86)\Steam\steamapps\common\Mount & Blade II Bannerlord\Modules\Armoury'
 WZORZEC_LOGU = 'Armoury-*.log'
 PLIK_CSV = 'ludzie-regiony.csv'
 
 SZEROKOSC = 160                 # znakow na linie wyjscia
-LIMIT_LINII = 150               # domyslny limit dlugosci skrotu
+LIMIT_LINII = 155               # domyslny limit dlugosci skrotu (150 + 4 wiersze tabeli lancucha 110-113 + linia grupy)
 PROBKI = 6                      # ile dob w szeregu (pierwsza, rownomiernie rozlozone, ostatnia)
 MAKS_ALARMOW = 24               # ile alarmow w skrocie (reszta: --pelny)
 MAKS_GRUP_BLEDOW = 8
@@ -135,23 +160,54 @@ PRZYROST_G_MIN = 0.1                # "g srednio" poza tym przedzialem = uwaga (
 PRZYROST_G_MAKS = 0.8
 PRZYROST_RESZTA_HEARTH = 25.0       # |RESZTA| hearth wsi na dobe ponad tyle = uwaga (inwestycje BetterEconomy to +65..135)
 LUDNOSC_MAKS_ZMIANA_PROC = 0.05     # ludnosc swiata zmienia sie o ponad tyle % dziennie przy ogniwie 109 = alarm
+# kasy zamkow (110, K5) i kasy miast (111, K6) - liczby z opisow paczek (rachunek, nie pomiar)
+KASY_BRAKUJE_ROSNIE_DOB = 21        # "do zapasu brakuje" wyzsze niz przed tyloma dobami (3 tygodnie) = alarm (paczka 110, ryzyko 2)
+KASY_BRAKUJE_MIN_WZROST_PROC = 5.0  # ... o co najmniej tyle % i o co najmniej KASY_BRAKUJE_MIN_ABS
+KASY_BRAKUJE_MIN_ABS = 10000
+DAR_ZAMKOW_ZDJETO = (4000000, 6200000)      # nowa kampania: "zdjeto ok. 5.09 mln w 130 zamkach" (8 014 000 -> 2 924 200)
+DAR_MIAST_ZDJETO = (11500000, 16500000)     # nowa kampania: "zdjeto ok. 13.98 mln w 97 miastach" (20 528 000 -> 6 546 400)
+KASY_MIAST_DOSYPKA_MAKS = 160000    # "dosypal z niczego" na dobe: szacunek recenzenta 50-160 tys.; mediana ponad to = alarm
+RESZTA_KAS_K5_MIN_ABS = 20000       # reszta [R] kas zamkow / miast po K5 / K6 "mala": ponizej tylu zlota albo 25% ruchu
+SKARBIEC_WOJNA_MAKS_SPADEK = 100000  # skarbiec krolestwa w wojnie spada szybciej niz o tyle dziennie (mediana) = uwaga
+# utarg wsi (112, K7)
+UTARG_WIES_RAZEM_PROC = (10.0, 50.0)    # "wies razem" ok. 30% utargu (10-50% zaleznie od dekretow)
+KIESY_WSI_WZROST_DOB = 14           # kiesy wsi rosna ok. dwa tygodnie do ok. 2x (mniej przy doplatach notabli)
+# spustoszenie (113)
+SPUSTOSZENIE_NA_RABUNEK_ALARM = 10000   # zdjeci rabunkiem na jeden rabunek: oczekiwane setki ludzi (75-250 przy poczcie 110);
+                                        # dziesiatki tysiecy = tyle, ile zdejmowala gra - latka spustoszenia nie dziala
+SPUSTOSZENIE_UDZIAL_GRY_ALARM = 0.5     # ... albo zdjeci >= tej czesci "gra zdjelaby ... ludzi ksiegi"
+SPUSTOSZENIE_GRA_MIN_LUDZI = 2000       # ... liczone, gdy gra zdjelaby co najmniej tylu ludzi
+ZEROWANIE_OSOBODNI_UWAGA = 20000        # osobodni zerowania armii na dobe (mediana): "dziesiatki tysiecy" = uwaga (ryzyko 2)
+SPUSTOSZENIE_UDZIAL_TOL = 3.0           # zabici / w las maja byc po 5% trafionych: odchylenie ponad tyle pkt % = uwaga
 
 # przesuniecie numeru dnia w linii: 1 = linia drukuje (int)Now.ToDays (dzien biezacy), 0 = dzien wlasnie zakonczony
 # (Now.ToDays - 1). Ustalenie przegladu kolizji lancucha: "Wyrzutki / Paser / Zold / Korona / Skarbce dzien D" to ten sam
 # tick co "Ruda / Karawany / Dowoz / Przeplywy osad / Pieniadz swiata / Ludzie dzien D-1". Klucz = prefiks linii logu, wiec
 # "Ludzie: przyrost naturalny ... dzien N ..." (ogniwo 109) idzie z "Ludzie" (ten sam dzien co linia "Ludzie: dzien N").
+# Ogniwa 110-113 (z kodu galezi n113): "Kasy zamkow" i "Kasy miast" drukuja (int)Now.ToDays (jak "Ludnosc"), "Utarg wsi"
+# (int)Now.ToDays - 1, "Ludzie (spustoszenie)" dostaje dzien od ksiegi ludzi (ten sam co "Ludzie: dzien N").
 # Doba skrotu = dzien zakonczony; tematow spoza tabeli skrypt uczy sie z sasiednich linii tej samej sekundy.
 PRZESUNIECIE_DNIA = {
     'Bitwy': 1, 'Bitwa': 1, 'Budowy oplacone': 1, 'Budowy': 1, 'Budowa': 1, 'Korona': 1, 'Skarbce': 1, 'Finanse': 1,
     'Wyrzutki': 1, 'Paser': 1, 'Ludnosc': 1, 'Zold': 1, 'IronBank': 1, 'HouseLevies': 1, 'Audyt predkosci': 1,
-    'Kronika unikatow': 1, 'Klimat': 1,
+    'Kronika unikatow': 1, 'Klimat': 1, 'Kasy zamkow': 1, 'Kasy miast': 1,
     'Ruda': 0, 'Drewno': 0, 'Dowoz': 0, 'Dowoz (skutki)': 0, 'Karawany': 0, 'Karawany (stan)': 0,
     'Mineraly (dubel BK)': 0, 'Pieniadz swiata': 0, 'Pieniadz swiata (bilans)': 0, 'Pieniadz swiata (rody)': 0,
     'Przeplywy osad': 0, 'Przeplywy osad (kasy miast)': 0, 'Przeplywy osad (kasy zamkow)': 0,
-    'Przeplywy osad (kiesy wsi)': 0,
-    'Ludzie': 0, 'Ludzie (regiony)': 0, 'ZakupyAI': 0, 'Zuzycie AI': 0, 'Pobor': 0, 'Werbunek': 0,
-    'Sakiewka ludzi': 0, 'Komplet rekruta': 0, 'Ochotnicy': 0, 'Warsztaty': 0,
+    'Przeplywy osad (kiesy wsi)': 0, 'Utarg wsi': 0,
+    'Ludzie': 0, 'Ludzie (regiony)': 0, 'Ludzie (spustoszenie)': 0, 'ZakupyAI': 0, 'Zuzycie AI': 0, 'Pobor': 0,
+    'Werbunek': 0, 'Sakiewka ludzi': 0, 'Komplet rekruta': 0, 'Ochotnicy': 0, 'Warsztaty': 0,
 }
+# plik ustawien BetterEconomy (grupa 3: 13 kluczy zamykajacych ujscia - tools\bee\zamknij-ujscia-bee.ps1); tylko odczyt
+PLIK_BEE = os.path.join('BetterEconomy', 'ModuleData', 'better_economy_settings.xml')
+KLUCZE_BEE = [('CastleAiLeaderReserveGold', '1000000000'), ('LordInvestmentReserveFlat', '1000000000'),
+              ('VillageDiversionRelationThreshold', '-101'), ('VillageDiversionGrievanceThreshold', '101'),
+              ('VillageSecondaryRequiredStableDays', '1000000000'), ('CaravanDeliveryMinGold', '1000000000'),
+              ('CaravanEscortHireMinGold', '1000000000'), ('CaravanRecruitPromotionEnabled', '0'),
+              ('RouteDangerMaxLossRatio', '0'), ('TradeAgreementCustomsMin', '0'),
+              ('TradeAgreementCorridorProsperityPerDay', '0'), ('RaidPeasantFlightFraction', '0')]
+# trzynasty klucz: zbrojownia zamknieta tylko AI (domyslnie) albo doslownie z listy fundamentu (-ListaZFundamentu)
+KLUCZE_BEE_ZBROJOWNIA = [('ArmoryAiCheckCooldownDays', '1000000000'), ('ArmoryRequiredArtisans', '1000000000')]
 ZNACZNIK_KAMPANII = 'Behavior dodany do kampanii'
 
 # =====================================================================================================================
@@ -330,7 +386,7 @@ def obetnij(s, n):
 
 def wycinek(tresc, n):
     """Linia skrocona tak, zeby slowo BRAK / NIE wpiet / WYLACZON bylo widac (inaczej ginie za obcieciem)."""
-    m = re.search(r'\bBRAK\b|NIE wpiet|WYLACZON|regula wylaczona', tresc)
+    m = re.search(r'\bBRAK\b|NIE wpiet|NIECZYNN|WYLACZON|regula wylaczona|\) wylaczone w ustawieniach', tresc)
     if not m or m.end() + 30 <= n:
         return obetnij(tresc, n)
     pref = tresc.split(':', 1)[0][:30]
@@ -387,8 +443,8 @@ def najdluzsza_seria(flagi):
 
 
 # =====================================================================================================================
-# TEMATY - kolumny wyprowadzone z ciagow Log.Info (galaz n109-ludzie-przyrost = szczyt lancucha; uklad ksiegi pieniadza
-# wpisu 102 z commitu 87c8e96, ktory jest w grze) i z prawdziwych logow
+# TEMATY - kolumny wyprowadzone z ciagow Log.Info (galaz n113-ludzie-spustoszenie = szczyt lancucha; uklad ksiegi pieniadza
+# wpisu 102 z commitu 87c8e96) i z prawdziwych logow
 # =====================================================================================================================
 def _kol_ksiegi(zrodlo_miast):
     return [
@@ -475,6 +531,7 @@ def _extra_karawany(t, d):
         r['first_ruda'] = pary.get('ruda', 0)
         r['first_drewno'] = pary.get('drewno', 0)
         r['first_naj'] = max(pary, key=lambda k: pary[k]).replace(' ', '_') if pary else 'nic'
+        r['first_towary'] = ','.join(k.replace(' ', '_') for k in pary if pary[k] > 0)
     m = re.search(r'minus zaplacone\): (.*?) \(razem -?\d+ d\)', t)
     if m:
         pary = lista_par_f(m.group(1))
@@ -609,11 +666,106 @@ def _extra_przeplywy(t, d):
 def _extra_kasy(t, d):
     r = {}
     znane = 0
-    for k in ('taborom', 'z_utargu', 'zakupy', 'regulator', 'przelewy', 'poza_tickiem', 'tick'):
+    for k in ('taborom', 'z_utargu', 'zywnosc_wsi', 'sakwy', 'zakupy', 'regulator', 'przelewy', 'poza_tickiem', 'tick'):
         v = d.get(k)
         if isinstance(v, (int, float)):
             znane += abs(v)
     r['ruch'] = znane
+    return r
+
+
+def _extra_kasy_zamkow(t, d):
+    """Linia "Kasy zamkow:" (ogniwo 110, CastlePurse.Daily)."""
+    r = OrderedDict()
+    if d.get('brakuje') is not None and d.get('zapas'):
+        r['brakuje_proc'] = round(100.0 * d['brakuje'] / d['zapas'], 2)
+    a, b = d.get('chcial_dosypac'), d.get('chcial_skasowac')
+    r['regulator_chcial'] = (a or 0) + (b or 0) if (a is not None or b is not None) else None
+    a, b = d.get('dosypac_tickow'), d.get('skasowac_tickow')
+    r['regulator_tickow'] = (a or 0) + (b or 0) if (a is not None or b is not None) else None
+    return r
+
+
+def _extra_kasy_miast(t, d):
+    """Linia "Kasy miast:" (ogniwo 111, TownPurse.Daily)."""
+    r = OrderedDict()
+    r['zakupy_zostaja'] = 1 if 'zloto z niczego ZOSTAJE w kasach' in t else 0
+    r['zawor_nie_dziala'] = 1 if 'NIE DZIALA - renty od ludnosci wylaczone' in t else 0
+    if 'gorna galaz BK (1% kasy dziennie w nicosc): ' in t:
+        ogon = t.split('gorna galaz BK (1% kasy dziennie w nicosc): ', 1)[1]
+        r['bk'] = 'pominieta' if ogon.startswith('pominieta w ') else ('BRAK latki' if ogon.startswith('BRAK latki') else (
+            'zostaje' if ogon.startswith('zostaje (ustawienie)') else '?'))
+    if d.get('brakuje') is not None and d.get('zapas'):
+        r['brakuje_proc'] = round(100.0 * d['brakuje'] / d['zapas'], 2)
+    z, p, k = d.get('zeszlo'), d.get('panom'), d.get('koronie')
+    if z is not None and p is not None and k is not None:
+        r['zawor_rozjazd'] = z - p - k
+        r['panom_proc'] = round(100.0 * p / z, 1) if z else None
+    return r
+
+
+def _stan_strumienia(sekcja):
+    """Stan jednego strumienia linii "Utarg wsi:": czynne / WYLACZONE / nie wpieta."""
+    if sekcja is None:
+        return None
+    if 'latka nie jest wpieta' in sekcja:
+        return 'nie wpieta'
+    if 'WYLACZON' in sekcja:
+        return 'WYLACZONE'
+    return 'czynne'
+
+
+def _extra_utarg(t, d):
+    """Linia "Utarg wsi:" (ogniwo 112, VillageTakings.Daily): trzy strumienie - powroty taborow, zywnosc, sakwy taborow."""
+    r = OrderedDict()
+    sek = {}
+    for czesc in t.split(' | '):
+        for klucz, znak in (('powroty', 'powroty taborow z utargiem '), ('zywnosc', 'zywnosc kupiona we wsiach '),
+                            ('sakwy', 'tabory zniszczone z gotowka: ')):
+            if znak in czesc and klucz not in sek:
+                sek[klucz] = czesc
+    if 'sakwy' not in sek:
+        raise ValueError('brak sekcji taborow')
+    for klucz in ('powroty', 'zywnosc', 'sakwy'):
+        r[klucz + '_stan'] = _stan_strumienia(sek.get(klucz))
+    zn = [d.get(k) for k in ('nieprzypisane', 'zyw_zniklo', 'tab_zniklo')]
+    r['zniklo_razem'] = sum(v or 0 for v in zn) if any(v is not None for v in zn) else None
+    m = re.search(r' powrotow bez podatku BK: (.*?)\), nieprzypisane ', t)
+    r['bez_podatku_wsie'] = m.group(1) if m else ''
+    a, b = d.get('tab_bitwa'), d.get('tab_rozw')
+    r['tab_razem'] = (a or 0) + (b or 0) if (a is not None or b is not None) else None
+    return r
+
+
+RX_REGION_SPUST = re.compile(r'^(.*?)\s*\[(miasto|zamek|wies), ([^\]]*)\] uchodzcy (-?\d+) z (-?\d+) ludzi wsi '
+                             r'\((-?[\d.,]+)%\), plon najslabszej wsi x(-?[\d.,]+), zabici od poczatku (-?\d+)')
+
+
+def _extra_spustoszenie(t, d):
+    """Linia "Ludzie (spustoszenie):" (ogniwo 113, Devastation.RegionsNote)."""
+    r = OrderedDict()
+    rab, lud = d.get('rabunki'), d.get('ludzi_rab')
+    if rab and isinstance(lud, (int, float)):
+        r['na_rabunek'] = round(lud / float(rab), 1)
+    gl = d.get('gra_ludzi')
+    if isinstance(lud, (int, float)) and gl:
+        r['wobec_gry_proc'] = round(100.0 * lud / gl, 2)
+    m = re.search(r'regiony najbardziej spustoszone \((\d+)\): (.*?)(?: \| |\.?$)', t)
+    regiony = []
+    if m:
+        for czesc in m.group(2).split('; '):
+            mm = RX_REGION_SPUST.match(czesc.strip())
+            if mm:
+                regiony.append((mm.group(1), mm.group(3), int(mm.group(4)), int(mm.group(5)), _liczba(mm.group(6)),
+                                _liczba(mm.group(7))))
+        r['top_ile'] = int(m.group(1))
+    if regiony:
+        r['top1'] = regiony[0][0]
+        r['top1_kr'] = regiony[0][0][:10].strip()
+        r['top1_proc'] = regiony[0][4]
+        r['top1_uchodzcy'] = regiony[0][2]
+        r['top1_kultura'] = regiony[0][1]
+        r['lista'] = ', '.join('%s %s%%' % (x[0], x[4]) for x in regiony)
     return r
 
 
@@ -679,6 +831,14 @@ def _extra_ludzie(t, d):
         r['od_ludnosci'] = 1 if 'wyrzutki liczone od ludnosci' in t else 0
         if d.get('hz_tabory') and d.get('hz_gra') is not None:
             r['hz_gra_do_naszych'] = round(d['hz_gra'] / float(d['hz_tabory']), 1)
+    # ogniwo 113: odcinek "spustoszenie dzis: ..." (Devastation.DayNote) albo "spustoszenie WYLACZONE (...)"
+    if ' | spustoszenie dzis: zdjeci z wsi ' in t:
+        r['spustoszenie'] = 'czynne'
+        czesci = [d.get(k) for k in ('sp_zabici', 'sp_w_las', 'sp_uchodzcy')]
+        if d.get('sp_zdjeci') is not None and all(isinstance(v, (int, float)) for v in czesci):
+            r['sp_rozjazd'] = round(d['sp_zdjeci'] - sum(czesci), 1)
+    elif ' | spustoszenie WYLACZONE (' in t:
+        r['spustoszenie'] = 'WYLACZONE'
     return r
 
 
@@ -691,6 +851,9 @@ def _extra_przyrost(t, d):
     if d.get('ludzi') is None and not r['wylaczony']:
         raise ValueError('brak liczby ludzi przyrostu')
     r['pierwsza_doba'] = 1 if 'rozliczenie zmiany od jutra' in t else 0
+    # ogniwo 113: przy czynnym spustoszeniu rabunki i zerowanie armii sa w "ruch ludzi", nie w RESZCIE
+    if ', ruch ludzi (' in t:
+        r['spust_w_ruchu'] = 1 if ', spustoszenie i powroty uchodzcow) ' in t else 0
     if ' | miasta: ' in t:
         r['zamrozone'] = 1 if 'stan (zamrozony)' in t else 0
         r['miasta_nieskalibrowane'] = 1 if 'miasta: ludnosc nieskalibrowana' in t else 0
@@ -710,6 +873,11 @@ def _extra_przyrost(t, d):
 def _extra_zold(t, d):
     r = OrderedDict()
     r['tarcza_wl'] = 1 if 'tarcza zoldu w kasach miast: wlaczona' in t else 0
+    # ogniwo 111 (K6): przy czynnym TownPurse linia konczy sie dopiskiem o zalogach bez zwrotu korony, a wlaczona tarcza ma
+    # dopisek "- ZBEDNA i nieczynna" - regulator kas miast niczego nie kasuje, tarcza nic nie robi (nie wolno jej liczyc za OK)
+    r['k6'] = 1 if ' | zalogi bez zwrotu korony (' in t else 0
+    r['tarcza_zbedna'] = 1 if ' - ZBEDNA i nieczynna' in t else 0
+    r['tarcza_czynna'] = 1 if (r['tarcza_wl'] and not r['tarcza_zbedna'] and not r['k6']) else 0
     zeszlo = [d.get('rody_zeszlo'), d.get('gar_zeszlo')]
     dalej = [d.get(k) for k in ('do_sakiewek', 'do_miast', 'do_zamkow', 'nieumarli', 'bez_osady', 'wylaczone')]
     if all(v is not None for v in zeszlo) and all(v is not None for v in dalej):
@@ -807,6 +975,12 @@ def _kol_kasy():
         K('zmiana', ', zmiana ', 'sint', wym=True),
         K('taborom', 'zaplata taborom wsi ', 'sint'),
         K('z_utargu', 'z utargu taborow ', 'sint'),
+        # ogniwo 112 (K7), tylko kiesy wsi: cena zywnosci, ktora gra kasuje po zakupie we wsi, i to, co K7 oddal
+        K('zywnosc_wsi', 'zywnosc kupiona we wsiach ', 'sint'),
+        K('zyw_skasowala', ' [P] (gra skasowala ', 'sint'),
+        K('zyw_kiesom', ', K7 oddal kiesom +'),
+        K('zyw_panom', ', licznikom panow '),
+        K('sakwy', 'sakwy rozwiazanych taborow ', 'sint'),
         K('zakupy', '"zakupy" mieszkancow ', 'sint'),
         K('zakupy_tickow', rx=r'mieszkancow [+-]?\d+ \[P\] \((\d+) tickow osad', lit=[' tickow osad)']),
         K('regulator', 'regulator kasy ', 'sint'),
@@ -831,9 +1005,16 @@ def _kol_kasy():
         K('pozostale', 'pozostale moduly ticku ', 'sint'),
         K('paser_skup', 'paser band (skup lupu) ', 'sint'),
         K('zycie_band', 'bandy i kryjowki (zycie w miastach) ', 'sint'),
+        # ogniwa 110 i 111 (K5, K6): zawor kas zamkow i miast oraz jednorazowe przyciecie daru startowego
+        K('danina_podzamcza', 'danina podzamcza (kasy zamkow -> panowie) ', 'sint'),
+        K('dar_zamkow', 'dar startowy kas zamkow przyciety (raz na kampanie, w nicosc) ', 'sint'),
+        K('dar_miast', 'dar startowy kas miast przyciety (raz na kampanie, w nicosc) ', 'sint'),
+        K('udzial_korony', 'udzial korony z zaworu kas miast (kasy miast -> skarbce krolestw) ', 'sint'),
+        # opis reszty kies wsi zmienia ogniwo 112: do 111 "(m.in. podatek gry od zakupow we wsi)", od 112 "(m.in. doplaty
+        # notabli i odplyw BK ponad limit kiesy, zakupy wsi z targowiskiem)" - wyrazenie czyta oba
         K('reszta', rx=r'reszta - [^;|]*? ([+-]?\d+) \[R\]', wym=True,
           lit=['reszta - inne niezmierzone (i regulator, gdy jego licznik stoi na 0 tickow) ',
-               'reszta - niezmierzone (m.in. podatek gry od zakupow we wsi) ']),
+               'reszta - niezmierzone (m.in. doplaty notabli i odplyw BK ponad limit kiesy, zakupy wsi z targowiskiem) ']),
         K('osad', 'rozklad [P]: osad '),
         K('min', ', min '),
         K('mediana', ', mediana '),
@@ -847,6 +1028,7 @@ SEK_DZIS = 'dzis: zabici '
 # sekcja zoldu w "Przeplywy osad:": uklad wpisu 102 i uklad 102b (ten sam licznik, inny naglowek)
 SEK_ZOLD = ('zold wyplacony [P]', 'zold naliczony przy rozliczeniach rodow [P]')
 SEK_HZ = 'hearth za ludzi dzis ('
+SEK_SP = 'spustoszenie dzis: zdjeci z wsi '
 SEK_ROZL = 'hearth wsi swiata '
 
 TEMATY = [
@@ -860,6 +1042,8 @@ TEMATY = [
         K('brak_targu', 'do zamku: brak targu '),
         K('za_daleko', ', targ za daleko '),
         K('wojna', ', oblezenie albo wojna '),
+        # ogniwo 110 (K5): tabor wsi z targiem za daleko jedzie na daleki targ, gdy zamek nie ma na caly ladunek
+        K('daleki_targ', '; na daleki targ, bo zamek nie mial czym zaplacic: '),
         K('w_drodze', '); w drodze teraz ', wym=True),
         K('do_miasta', ': do miasta '),
         K('do_zamku', ', do zamku '),
@@ -993,10 +1177,20 @@ TEMATY = [
         K('zold', rx=r'(?:\(zold (?:naliczony )?|W tym zold naliczony )(-?\d+)', lit=[' W tym zold naliczony ']),
         K('skasowal', 'regulator kas skasowal '),
         K('zniklo', ', z utargu wsi zniklo '),
+        # ogniwo 112 (K7): dwa ujscia, ktore dotad siedzialy w reszcie - cena zywnosci kupionej we wsi i sakwy taborow
+        K('zyw_zniklo', ', z ceny zywnosci kupionej we wsiach zniklo ', 'sint'),
+        K('zyw_skasowala', rx=r'kupionej we wsiach zniklo -?\d+ \(gra skasowala (-?\d+)', lit=[' (gra skasowala ']),
+        K('zyw_oddane', ', oddane wsiom i panom '),
+        K('sakwy_zniklo', ', z sakw zniszczonych taborow wsi zniklo ', 'sint'),
+        K('sakwy_bylo', ' (bylo w nich '),
+        K('sakwy_oddane', ', oddane zwyciezcom i wsiom '),
         K('w_nicosc', rx=r', GiveGoldAction w nicosc (?:poza rozliczeniami rodow )?(-?\d+)',
           lit=[', GiveGoldAction w nicosc poza rozliczeniami rodow ']),
         K('levy_oddal', rx=r'w nicosc (?:poza rozliczeniami rodow )?-?\d+ minus (-?\d+) oddane',
           lit=[' minus ', ' oddane przez LevyGold notablom i miastom)']),
+        # ogniwa 110 i 111 (K5, K6): dar startowy kas zdjety raz na kampanie stoi w ujsciach (dopisek po nawiasie ujsc)
+        K('dar_zamkow', ' w tym dar startowy kas zamkow przyciety przez CastlePurse '),
+        K('dar_miast', ' w tym dar startowy kas miast przyciety przez TownPurse '),
         K('reszta', ' + reszta ', 'sint', wym=True),
     ], _extra_bilans, [
         ('zmiana sumy | reszta [R]', '{zmiana:+}|{reszta:+}'),
@@ -1049,6 +1243,9 @@ TEMATY = [
         K('kiesa_wsi', '+ kiesa wsi '),
         K('zniklo', '+ zniklo ', 'sint'),
         K('zniklo_proc', rx=r'\+ zniklo -?\d+ \[R\] \((-?[\d.,]+)%', lit=[') + zniklo ']),
+        # ogniwo 112 (K7): to, co VillageTakings dopisal wsiom, siedzi juz w "kiesa wsi" i "pan" - tu sam dopisek
+        K('k7_do_kies', '; w tym dopisane wsiom przez K7: do kies '),
+        K('k7_na_liczniki', rx=r'przez K7: do kies -?\d+, na liczniki panow (-?\d+)', lit=[', na liczniki panow ']),
         K('zold_rody', sek=SEK_ZOLD, rx=r'partie rodow (-?\d+) \(', lit=['partie rodow', ' partii, z niedoplata ']),
         K('zold_garnizony', sek=SEK_ZOLD, rx=r', garnizony (-?\d+) \(', lit=['garnizony']),
         K('zold_karawany', sek=SEK_ZOLD, rx=r', karawany (-?\d+) \(', lit=['karawany']),
@@ -1080,6 +1277,138 @@ TEMATY = [
         ('stan (zmiana)', '{stan} ({zmiana:+})'),
         ('z utargu taborow | reszta [R]', '{z_utargu:+}|{reszta:+}'),
     ], 'pieniadz', 'MoneyLedger.cs'),
+    # ogniwo 110 (K5, CastlePurse.Daily): kasa zamku jako prawdziwy pieniadz - zapas kupcow, zawor (danina podzamcza), tabory
+    Temat('Kasy zamkow', 'Kasy zamkow', r'^dzien \d+ \| stan ', [
+        K('stan', ' | stan ', wym=True),
+        K('zamkow', rx=r'\| stan -?\d+ w (\d+) zamkach', lit=[' w ', ' zamkach: zapas kupcow ']),
+        K('zapas', ' zamkach: zapas kupcow ', wym=True),
+        K('ponad', ', ponad zapasem '),
+        K('brakuje', ', do zapasu brakuje ', wym=True),
+        K('naj_nadwyzka', '; najwieksza nadwyzka '),
+        K('ponad_bk', rx=r'BK kasuje tam 1% dziennie\): (\d+)', lit=[' x dobrobyt - BK kasuje tam 1% dziennie): ']),
+        K('chcial_dosypac', ' | regulator gry zablokowany: z dzisiejszych kas chcial dosypac z niczego '),
+        K('dosypac_tickow', rx=r'chcial dosypac z niczego -?\d+ \((\d+) tickow zamkow', lit=[' tickow zamkow) i skasowac ']),
+        K('chcial_skasowac', ' tickow zamkow) i skasowac '),
+        K('skasowac_tickow', rx=r'i skasowac -?\d+ \((\d+) tickow\)', lit=[' tickow)']),
+        K('cofniete', ' | "zakupy" ludnosci zamkow: zloto z niczego cofniete '),
+        K('cofniete_tickow', rx=r'cofniete -?\d+ \(w (\d+) z \d+ tickow', lit=[' (w ', ' tickow; towar zjedzony jak dotad)']),
+        K('zakupy_tickow', rx=r'cofniete -?\d+ \(w \d+ z (\d+) tickow', lit=[' z ', ' tickow; towar zjedzony jak dotad)']),
+        K('danina', ' | danina podzamcza: ', wym=True),
+        K('danina_zamkow', ' do panow z '),
+        K('danina_proc', rx=r' do panow z \d+ zamkow \(' + RX_F + '% nadwyzki ponad zapas',
+          lit=[' zamkow (', '% nadwyzki ponad zapas']),
+        K('danina_gracz', '; w tym rod gracza '),
+        K('bez_nadwyzki', '); bez poboru: kasa nie ponad zapasem '),
+        K('oblezone', ', oblezone '),
+        K('bez_pana', ', bez pana '),
+        K('tabory_do_zamku', ' | tabory wsi z targiem za daleko: do zamku (ma czym zaplacic) '),
+        K('tabory_daleki', ', na daleki targ (zamek nie mial na caly ladunek) '),
+        K('tabory_wartosc', ' - ladunki warte '),
+        K('potkniecia', ' | potkniecia (wyjatki, pierwszy w logu): '),
+    ], _extra_kasy_zamkow, [
+        ('stan/zapas kupcow | do zapasu brakuje', '{stan}/{zapas}|{brakuje}'),
+        ('danina podzamcza (zamkow)|ponad lim.BK', '{danina} ({danina_zamkow})|{ponad_bk}'),
+        ('regulator chcial | "zakupy" cofniete', '{regulator_chcial}|{cofniete}'),
+    ], 'pieniadz', 'CastlePurse.cs'),
+    Temat('Kasy zamkow (wylaczone)', 'Kasy zamkow', r'^dzien \d+ \| WYLACZONE', [], None, [], 'pieniadz', 'CastlePurse.cs',
+          dzienny=False),
+    # ogniwo 111 (K6, TownPurse.Daily): kasa miasta - regulator bez kasowania, "zakupy" cofane, zawor dzielony pan / korona
+    Temat('Kasy miast', 'Kasy miast', r'^dzien \d+ \| tryb regulatora ', [
+        K('tryb', ' | tryb regulatora ', wym=True),
+        K('stan', ' | stan ', wym=True),
+        K('miast', rx=r'\| stan -?\d+ w (\d+) miastach', lit=[' w ', ' miastach: zapas kupcow ']),
+        K('zapas', ' miastach: zapas kupcow ', wym=True),
+        K('ponad', ', ponad zapasem '),
+        K('brakuje', ', do zapasu brakuje ', wym=True),
+        K('naj_nadwyzka', '; najwieksza nadwyzka '),
+        K('ponizej_1000', '; miast z kasa ponizej 1000: '),
+        K('ponad_bk', rx=r'miast ponad limitem kasy BK \([^)]*\): (\d+)',
+          lit=['; miast ponad limitem kasy BK (', ' x dobrobyt): ']),
+        K('dosypal', ' | regulator gry: dosypal z niczego ', wym=True),
+        K('dosypal_tickow', rx=r'dosypal z niczego -?\d+ \((\d+) tickow miast',
+          lit=[' tickow miast - bezpiecznik ponizej zapasu), kasowanie zablokowane ']),
+        K('kasowanie_zabl', ' tickow miast - bezpiecznik ponizej zapasu), kasowanie zablokowane '),
+        K('kasowanie_tickow', rx=r'kasowanie zablokowane -?\d+ \((\d+) tickow',
+          lit=[' tickow - tyle chcial dzis skasowac), dosypka zablokowana ']),
+        K('dosypka_zabl', ' tickow - tyle chcial dzis skasowac), dosypka zablokowana '),
+        K('cofniete', rx=r'mieszczan: zloto z niczego cofniete (-?\d+)',
+          lit=[' | "zakupy" mieszczan: ', 'zloto z niczego cofniete ']),
+        K('cofniete_tickow', rx=r'mieszczan: zloto z niczego cofniete -?\d+ \(w (\d+) z \d+ tickow',
+          lit=[' (w ', ' tickow; towar zjedzony jak dotad)']),
+        K('zakupy_tickow', rx=r'mieszczan: zloto z niczego (?:cofniete -?\d+ \(w \d+ z |ZOSTAJE w kasach \([^;]*; )(\d+) tickow',
+          lit=[' z ', ' tickow)']),
+        K('zawor_proc', rx=r'\| zawor \(' + RX_F + '% nadwyzki ponad zapas', lit=[' | zawor (']),
+        K('zeszlo', rx=r'bez pulapu naleznej\): zeszlo (-?\d+)',
+          lit=['% nadwyzki ponad zapas, bez pulapu naleznej): ', 'zeszlo ']),
+        K('panom', ' = panom '),
+        K('panom_miast', rx=r' = panom -?\d+ z (\d+) miast', lit=[' z ', ' miast']),
+        K('gracz', ' (w tym rod gracza '),
+        K('koronie', ' + skarbcom krolestw '),
+        K('krolestw', rx=r'skarbcom krolestw -?\d+ \((\d+) krolestw\)',
+          lit=[' krolestw); renta nalezna od ludnosci tych miast (dawny pulap, juz tylko dla porownania) ']),
+        K('nalezna', ' krolestw); renta nalezna od ludnosci tych miast (dawny pulap, juz tylko dla porownania) '),
+        K('bez_nadwyzki', '; bez poboru: kasa nie ponad zapasem '),
+        K('malutka', ', nadwyzka ponizej 1 d dziennie '),
+        K('dekret', ', pan zwolnil miasto dekretem (zostaje sam udzial korony) '),
+        K('bez_krolestwa', ', miast bez krolestwa (calosc dla pana) '),
+        K('z_panem', '; miast z zywym panem '),
+        K('bk_miast', rx=r'nicosc\): pominieta w (\d+) miastach', lit=['pominieta w ', ' miastach i ']),
+        K('bk_zamkow', ' miastach i '),
+        K('bk_zloto', ' zamkach (BK skasowalby ok. '),
+        K('potkniecia', ' | potkniecia (wyjatki, pierwszy w logu): '),
+    ], _extra_kasy_miast, [
+        ('stan/zapas kupcow | do zapasu brakuje', '{stan}/{zapas}|{brakuje}'),
+        ('dosypal|kasowanie zabl.|"zakupy" cofn.', '{dosypal}|{kasowanie_zabl}|{cofniete}'),
+        ('zawor: zeszlo = panom + koronie', '{zeszlo}={panom}+{koronie}'),
+    ], 'pieniadz', 'TownPurse.cs'),
+    Temat('Kasy miast (wylaczone)', 'Kasy miast', r'^dzien \d+ \| (?:WYLACZONE|Town Purse Regulator )', [], None, [],
+          'pieniadz', 'TownPurse.cs', dzienny=False),
+    # ogniwo 112 (K7, VillageTakings.Daily): utarg wsi bez znikania - powroty taborow, zywnosc kupiona we wsi, sakwy taborow
+    Temat('Utarg wsi', 'Utarg wsi', r'^dzien \d+ \| powroty taborow', [
+        K('powrotow', rx=r'powroty taborow z utargiem (\d+): oddane', lit=[' | powroty taborow z utargiem ', ': oddane ']),
+        K('oddane', ': oddane '),
+        K('pan', ' = pan (licznik podatku) '),
+        K('pan_proc', rx=r'pan \(licznik podatku\) -?\d+ \(' + RX_F + r'% po dopisaniu\)',
+          lit=[' po dopisaniu) + wlasciciele majatkow BK ']),
+        K('majatki', ' po dopisaniu) + wlasciciele majatkow BK '),
+        K('kiesa_bk', ' + kiesa wsi od BK '),
+        K('bez_odbiorcy', ' + bez odbiorcy '),
+        K('dopisane_kiesom', '; z tego dopisane kiesom wsi '),
+        K('wies_proc', rx=r' \(wies razem ' + RX_F + r'% utargu\)', lit=[' (wies razem ', ' utargu)']),
+        K('dopisane_panom', ', licznikom panow ', sek='powroty taborow z utargiem '),
+        K('bez_podatku_bk', rx=r', licznikom panow -?\d+ \((\d+) powrotow bez podatku BK', lit=[' powrotow bez podatku BK']),
+        K('nieprzypisane', '), nieprzypisane '),
+        K('nic_nie_zniklo', '; powroty, w ktorych nic nie zniklo '),
+        K('nadwyzka_bk', ', z nadwyzka rozliczona przez BK '),
+        K('okna', ', okna niedomkniete '),
+        K('zyw_zakupow', rx=r'zywnosc kupiona we wsiach (\d+) zakupow',
+          lit=[' | zywnosc kupiona we wsiach ', ' zakupow: kupcy zaplacili ']),
+        K('zyw_zaplacili', ' zakupow: kupcy zaplacili '),
+        K('zyw_skasowala', ', gra skasowala '),
+        K('zyw_za_duzo', rx=r'; w tym (\d+) zakupow, w ktorych zdjela wiecej',
+          lit=['; w tym ', ' zakupow, w ktorych zdjela wiecej, niz zaplacono)']),
+        K('zyw_panom', '; oddane: licznikom panow '),
+        K('zyw_kiesom', ', kiesom wsi ', sek='zywnosc kupiona we wsiach '),
+        K('zyw_zniklo', rx=r'(?:, zniklo |zwrot WYLACZONY w ustawieniach - zniklo )(-?\d+)', sek='zywnosc kupiona we wsiach ',
+          lit=[', zniklo ', '; zwrot WYLACZONY w ustawieniach - zniklo ']),
+        K('tab_bitwa', ' | tabory zniszczone z gotowka: w bitwie ', wym=True),
+        K('tab_bitwa_zl', rx=r'w bitwie \d+ \((-?\d+) po dzialce zwyciezcow\)', lit=[' po dzialce zwyciezcow), rozwiazane ']),
+        K('tab_rozw', ' po dzialce zwyciezcow), rozwiazane '),
+        K('tab_rozw_zl', rx=r'zwyciezcow\), rozwiazane \d+ \((-?\d+)\)', lit=[' po dzialce zwyciezcow), rozwiazane ']),
+        K('tab_wodzom', '; oddane: wodzom zwyciezcow '),
+        K('tab_bandom', ', kiesom band '),
+        K('tab_wsiom_kiesy', ', wsiom macierzystym '),
+        K('tab_wsiom_panom', ' do kies i '),
+        K('tab_zniklo', rx=r'(?: na liczniki panow, zniklo |zwrot WYLACZONY w ustawieniach - zniklo )(-?\d+)',
+          sek='tabory zniszczone z gotowka: ',
+          lit=[' na liczniki panow, zniklo ', '; zwrot WYLACZONY w ustawieniach - zniklo ']),
+        K('wyjatki', ' | wyjatki zlapane '),
+    ], _extra_utarg, [
+        ('powroty: oddane | wies razem % utargu', '{oddane}|{wies_proc}'),
+        ('dopisane kiesom/panom | zywn. skasow.', '{dopisane_kiesom}/{dopisane_panom}|{zyw_skasowala}'),
+        ('zniklo: nieprzyp./zywnosc/sakwy tab.', '{nieprzypisane}/{zyw_zniklo}/{tab_zniklo}'),
+    ], 'pieniadz', 'VillageTakings.cs', bezwar=True),
+    Temat('Utarg wsi (latki)', 'Utarg wsi (latki)', None, [], None, [], 'pieniadz', 'VillageTakings.cs', dzienny=False),
     Temat('Korona (powinnosci)', 'Korona', r'^dzien \d+ - powinnosci wasali', [
         K('powinnosci', ' - powinnosci wasali ', wym=True),
         K('rodow', ' zl od '),
@@ -1152,6 +1481,9 @@ TEMATY = [
         K('sak_sieroty_n', rx=r'ktorych juz nie ma: -?\d+ \((\d+)\)', lit=[', po partiach, ktorych juz nie ma: ']),
         K('znacznik', 'wlaczona, znacznik '),
         K('nie_skasowal', ' miastach, regulator nie skasowal dzis '),
+        # ogniwo 111 (K6): zold zalog, ktory wplynal ponad zapas kupcow i wraca panu z kasy osady - bez zwrotu korony
+        K('bez_zwrotu_korony', ' | zalogi bez zwrotu korony (czesc zoldu, ktora wplynela ponad zapas kupcow i wraca panu z kasy '
+                               'osady: zawor miasta, danina podzamcza): '),
         K('potk_powtorzone', '| potkniecia: powtorzone wyplaty '),
         K('potk_wyjatki', ', wyjatki ', sek='potkniecia: powtorzone wyplaty'),
     ], _extra_zold, [
@@ -1277,10 +1609,14 @@ TEMATY = [
     # ------------------------------------------------------------------------------------------------ ludzie
     Temat('Ludzie', 'Ludzie', r'^dzien \d+ \| swiat', [
         K('ludnosc_mln', rx=r'swiat: ludnosc (-?\d+(?:[.,]\d+)?) mln', lit=[' | swiat: ', 'ludnosc ', ' mln']),
-        K('ludnosc_zm', rx=r' mln \(([+-]\d+) ludzi\)', lit=[' ludzi)']),
+        K('ludnosc_zm', rx=r'swiat: ludnosc -?[\d.,]+ mln \(([+-]\d+) ludzi\)', lit=[' ludzi)']),
         K('wsie_mln', ' [PopulationLaw: wsie ', 'float'),
         K('miasta_mln', rx=r'\[PopulationLaw: wsie [\d.,]+, miasta ' + RX_F + r'\]', lit=[', miasta ']),
         K('mezczyzn_mln', '], mezczyzn 16-60 ok. ', 'float'),
+        # ogniwo 113: uchodzcy zeszli z hearth wsi, ale zyja - ksiega pokazuje ich osobno i razem z ludnoscia w domu
+        K('uchodzcy', '; uchodzcy poza domem '),
+        K('razem_mln', ', razem z nimi ', 'float'),
+        K('razem_zm', rx=r', razem z nimi -?[\d.,]+ mln \(([+-]\d+) ludzi\)', lit=[', razem z nimi ', ' ludzi)']),
         K('rody', sek=SEK_ZOLN, rx=r'partie rodow (-?\d+) \(', wym=True, lit=[' | zolnierze: ', 'partie rodow', ' partii']),
         K('rody_partii', sek=SEK_ZOLN, rx=r'partie rodow -?\d+ \((\d+) partii', lit=[' partii']),
         K('rody_zm', sek=SEK_ZOLN, rx=r'partie rodow -?\d+ \(\d+ partii; ([+-]\d+)\)', lit=[' partii']),
@@ -1330,9 +1666,35 @@ TEMATY = [
         K('hz_pobor', ', pobor wymuszony gracza -', 'float', zr='PeopleUnit.cs'),
         K('hz_zadania', ', zadania gracza ', 'float', zr='PeopleUnit.cs'),
         K('hz_incydenty', ', incydenty gracza ', 'float', zr='PeopleUnit.cs'),
+        # ogniwo 113: hearth zdjety za zabitych i uchodzcow oraz oddany za powroty (dopisek tylko w dobach z ruchem)
+        K('hz_spust', ', spustoszenie -', 'float', sek=SEK_HZ, zr='PeopleUnit.cs'),
+        K('hz_spust_ludzi', rx=r', spustoszenie -[\d.,]+ za ' + RX_F + ' zabitych i uchodzcow', sek=SEK_HZ,
+          lit=[', spustoszenie -', ' za ', ' zabitych i uchodzcow'], zr='PeopleUnit.cs'),
+        K('hz_dom', ', powrot uchodzcow +', 'float', sek=SEK_HZ, zr='PeopleUnit.cs'),
+        K('hz_dom_ludzi', rx=r', powrot uchodzcow \+[\d.,]+ za ' + RX_F + ' ludzi', sek=SEK_HZ,
+          lit=[', powrot uchodzcow +', ' za ', ' ludzi'], zr='PeopleUnit.cs'),
         K('hz_niezgodne', '; niezgodne z formula gry i zostawione: ', zr='PeopleUnit.cs'),
         K('hz_bez_k', '; bez przelicznika kultury: ', zr='PeopleUnit.cs'),
         K('hz_potk', '; potkniecia: ', sek=SEK_HZ, zr='PeopleUnit.cs'),
+        # ogniwo 113 (Devastation.DayNote): spustoszenie doby w ludziach i stan konta uchodzcow
+        K('sp_zdjeci', ' | spustoszenie dzis: zdjeci z wsi ', 'float', zr='Devastation.cs'),
+        K('sp_rabunki', ' ludzi (rabunki ', 'float', sek=SEK_SP, zr='Devastation.cs'),
+        K('sp_rab_wsi', rx=r' ludzi \(rabunki -?[\d.,]+ w (\d+) wsiach', sek=SEK_SP, lit=[' wsiach, zerowanie armii '],
+          zr='Devastation.cs'),
+        K('sp_zerowanie', ' wsiach, zerowanie armii ', 'float', sek=SEK_SP, zr='Devastation.cs'),
+        K('sp_zer_wsi', rx=r'zerowanie armii -?[\d.,]+ w (\d+) wsiach\)', sek=SEK_SP, lit=[' wsiach) = zabici '],
+          zr='Devastation.cs'),
+        K('sp_zabici', ' wsiach) = zabici ', 'float', sek=SEK_SP, zr='Devastation.cs'),
+        K('sp_w_las', ' + w las do puli wyrzutkow ', 'float', sek=SEK_SP, zr='Devastation.cs'),
+        K('sp_uchodzcy', ' + uchodzcy ', 'float', sek=SEK_SP, zr='Devastation.cs'),
+        K('sp_wrocilo', '; wrocilo do domu ', 'float', sek=SEK_SP, zr='Devastation.cs'),
+        K('sp_wrocilo_wsi', rx=r'; wrocilo do domu -?[\d.,]+ z (\d+) wsi', sek=SEK_SP, lit=[' z ', ' wsi'],
+          zr='Devastation.cs'),
+        K('sp_w_drodze', '; uchodzcy w drodze (poza domem) ', sek=SEK_SP, zr='Devastation.cs'),
+        K('sp_w_drodze_wsi', rx=r'\(poza domem\) -?\d+ z (\d+) wsi', sek=SEK_SP, lit=[' z ', ' wsi'], zr='Devastation.cs'),
+        K('sp_zabici_razem', ' wsi, zabici przy spustoszeniu od poczatku ', sek=SEK_SP, zr='Devastation.cs'),
+        K('sp_potk', '; potkniecia: ', sek=SEK_SP, zr='Devastation.cs'),
+        K('sp_na_koncie', '; na koncie jeszcze ', zr='Devastation.cs'),
         K('glodne', ' | warownie glodne '),
         K('ujemny_bilans', ', z ujemnym bilansem zywnosci '),
         K('potkniecia', ' Potkniecia ksiegi: '),
@@ -1344,6 +1706,7 @@ TEMATY = [
         ('pod bronia % | regionow ponad 20%', '{pod_bronia_proc} | {regionow_ponad}'),
         ('hearth za ludzi: tabory/w las/z lasu', '{hz_tabory}/{hz_wyrzutki}/{hz_powrot}'),
         ('tabory: ludzi | gra zdjelaby hearth', '{hz_tabory_ludzi}|{hz_gra}'),
+        ('spustoszenie: zdjeci dzis | uchodzcy', '{sp_zdjeci}|{sp_w_drodze}'),
     ], 'ludzie', 'PeopleLedger.cs', bezwar=True),
     # ogniwo 109 (PopulationLaw.GrowthDaily): linia "Ludzie: przyrost naturalny ..." zaraz po linii "Ludzie: dzien N"
     Temat('Ludzie (przyrost)', 'Ludzie', r'^przyrost naturalny', [
@@ -1381,7 +1744,9 @@ TEMATY = [
         K('rozl_przyrost', rx=r' = (?:przyrost naturalny|wynik gry) ' + RX_F, sek=SEK_ROZL,
           lit=[' = ', 'przyrost naturalny ', 'wynik gry ']),
         K('rozl_uchodzcy', ', powrot uchodzcow ', 'float', sek=SEK_ROZL),
-        K('rozl_ruch', ', ruch ludzi (tabory, wyrzutki, pobor, zadania, incydenty) ', 'float'),
+        # od ogniwa 113 przy czynnym spustoszeniu: "(tabory, ..., incydenty, spustoszenie i powroty uchodzcow)"
+        K('rozl_ruch', rx=r', ruch ludzi \(tabory, wyrzutki, pobor, zadania, incydenty(?:, spustoszenie i powroty uchodzcow)?\) '
+          + RX_F, lit=[', ruch ludzi (tabory, wyrzutki, pobor, zadania, incydenty', ') ']),
         K('reszta', ', RESZTA ', 'float'),
         K('prog_0', rx=r'od 600 hearth\): (\d+) / ',
           lit=[' | wsie wedle progow produkcji (ponizej 200 / 200-599 / od 600 hearth): ', ' / ']),
@@ -1410,6 +1775,42 @@ TEMATY = [
     Temat('Ludzie (pominiete)', 'Ludzie', r'^dzien \d+ - pominiete wiersze', [
         K('pominiete', '(wyjatek przy regionie): ', wym=True),
     ], None, [], 'ludzie', 'PeopleLedger.cs', dzienny=False),
+    # ogniwo 113 (Devastation.RegionsNote): pomiar doby - rabunki i zerowanie w osobodniach i ludziach, powroty, regiony.
+    # Linia jest pisana tylko w dobach, w ktorych cos sie dzialo albo ktos jest poza domem.
+    Temat('Ludzie (spustoszenie)', 'Ludzie (spustoszenie)', r'^dzien \d+', [
+        K('rabunki', ' | rabunki zakonczone ', wym=True),
+        K('spalone', ' (wies spalona '),
+        K('przerwane', ', przerwane '),
+        K('napastnikow', ', napastnikow srednio ', 'float'),
+        K('osobodni_rab', '; osobodni lupienia ', 'float', wym=True),
+        K('r_rab', rx=r'; osobodni lupienia -?[\d.,]+ x ' + RX_F + ' -> ', lit=[' x ', ' -> ']),
+        K('ludzi_rab', rx=r'; osobodni lupienia -?[\d.,]+ x -?[\d.,]+ -> ' + RX_F + ' ludzi; gra zdjelaby',
+          lit=[' -> ', ' ludzi; gra zdjelaby ']),
+        K('gra_hearth', ' ludzi; gra zdjelaby ', 'float'),
+        K('gra_ludzi', rx=r'gra zdjelaby -?[\d.,]+ hearth = (-?\d+) ludzi ksiegi', lit=[' hearth = ', ' ludzi ksiegi']),
+        K('podjete', ' (rabunki podjete po wczytaniu gry: '),
+        K('zer_partii', ' | zerowanie: partii '),
+        K('osobodni_zer', rx=r'\| zerowanie: partii -?\d+, osobodni ' + RX_F, lit=[', osobodni ']),
+        K('r_zer', rx=r'\| zerowanie: partii -?\d+, osobodni -?[\d.,]+ x ' + RX_F + ' -> ', lit=[' x ', ' -> ']),
+        K('ludzi_zer', rx=r'\| zerowanie: partii -?\d+, osobodni -?[\d.,]+ x -?[\d.,]+ -> ' + RX_F + ' ludzi',
+          lit=[' -> ', ' ludzi']),
+        K('nasycony', rx=r'albo dno hearth\): (\d+) razy', lit=['% albo dno hearth): ', ' razy']),
+        K('powrot_ludzi', ' | powrot: ', 'float'),
+        K('powrot_wsi', rx=r'\| powrot: -?[\d.,]+ ludzi do (\d+) wsi', lit=[' ludzi do ', ' wsi']),
+        K('tempo', ', tempo srednio ', 'float'),
+        K('wstrz_stan', '; wstrzymany: wies spalona, lupiona albo pod przymusem '),
+        K('wstrz_oblezenie', ', warownia oblezona '),
+        K('wstrz_inne', ', niebezpieczenstwo pelne albo tempo 0: '),
+        K('uchodzcy', ' | uchodzcy poza domem ', wym=True),
+        K('regionow', rx=r'\| uchodzcy poza domem -?\d+ w (\d+) regionach', lit=[' w ', ' regionach']),
+        K('min_plon', '; najnizszy mnoznik plonu x', 'float'),
+        K('bez_k', ' | bez przelicznika ludzi: '),
+        K('obcy_hearth', ' | hearth dopisany przez kogos w srodku kroku rabunku (zachowany): '),
+    ], _extra_spustoszenie, [
+        ('rabunki (przerw.) | osobodni -> ludzi', '{rabunki}({przerwane})|{osobodni_rab}->{ludzi_rab}'),
+        ('gra zdjelaby ludzi | zerowanie os.dni', '{gra_ludzi}|{osobodni_zer}->{ludzi_zer}'),
+        ('uchodzcy poza domem|wrocilo|min plon', '{uchodzcy}|{powrot_ludzi}|{min_plon}'),
+    ], 'ludzie', 'Devastation.cs'),
     Temat('Ludzie (regiony)', 'Ludzie (regiony)', r'^dzien \d+', [
         K('pokazanych', rx=r': dzien \d+ - (\d+) najbardziej', lit=[' najbardziej obciazonych z ']),
         K('regionow', ' najbardziej obciazonych z ', wym=True),
@@ -1568,6 +1969,12 @@ TEMATY = [
     Temat('OutlawLaw', 'OutlawLaw', None, [], None, [], 'ludzie', 'OutlawLaw.cs', dzienny=False),
     Temat('PopulationLaw', 'PopulationLaw', None, [], None, [], 'ludzie', 'PopulationLaw.cs', dzienny=False),
     Temat('PeopleUnit', 'PeopleUnit', None, [], None, [], 'ludzie', 'PeopleUnit.cs', dzienny=False),
+    # ogniwa 110-113: linie startowe i jednorazowe (przyciecie daru startowego kas, wylaczenie spustoszenia)
+    Temat('CastlePurse', 'CastlePurse', None, [], None, [], 'pieniadz', 'CastlePurse.cs', dzienny=False),
+    Temat('TownPurse', 'TownPurse', None, [], None, [], 'pieniadz', 'TownPurse.cs', dzienny=False),
+    Temat('VillageTakings', 'VillageTakings', None, [], None, [], 'pieniadz', 'VillageTakings.cs', dzienny=False),
+    Temat('Devastation', 'Devastation', None, [], None, [], 'ludzie', 'Devastation.cs', dzienny=False),
+    Temat('Spustoszenie', 'Spustoszenie', None, [], None, [], 'ludzie', 'Devastation.cs', dzienny=False),
     Temat('WarLedger', 'WarLedger', None, [], None, [], 'ludzie', 'WarLedger.cs', dzienny=False),
     Temat('Klimat', 'Klimat', None, [], None, [], 'dodatkowe', 'WesterosClimate.cs', dzienny=False),
 ]
@@ -1581,6 +1988,7 @@ NAZWY_KROTKIE = {
     'Przeplywy osad (kasy miast)': 'Przepl.: kasy miast',
     'Przeplywy osad (kasy zamkow)': 'Przepl.: kasy zamkow',
     'Przeplywy osad (kiesy wsi)': 'Przepl.: kiesy wsi',
+    'Ludzie (spustoszenie)': 'Ludzie (spustosz.)',
     'Korona (powinnosci)': 'Korona: powinnosci',
     'Korona (danina i clo)': 'Korona: danina, clo',
     'Korona (zwrot zoldu)': 'Korona: zwrot zoldu',
@@ -1626,13 +2034,72 @@ OGNIWA = [
     ('109', 'ludzie: przyrost', r'^PopulationLaw: przyrost naturalny', ['Ludzie (przyrost)'], True, None,
      'start "PopulationLaw: przyrost naturalny wsi ... CZYNNY"; co dobe "Ludzie: przyrost naturalny +N ludzi"',
      '109-ludzie-przyrost.md'),
+    ('110', 'K5: kasa zamku', r'^CastlePurse: kasa zamku', ['Kasy zamkow'], True, None,
+     'start "CastlePurse: kasa zamku jako prawdziwy pieniadz CZYNNA"; co dobe "Kasy zamkow:" z "danina podzamcza"',
+     '110-k5-kasa-zamku.md'),
+    ('111', 'K6: kasy miast', r'^TownPurse: kasa miasta', ['Kasy miast'], True, None,
+     'start "TownPurse: kasa miasta jako prawdziwy pieniadz CZYNNA, tryb regulatora 1"; co dobe "Kasy miast:" z "zawor"',
+     '111-k6-kasy-miast.md'),
+    ('112', 'K7: utarg wsi', r'^VillageTakings: ', ['Utarg wsi'], True, None,
+     'start "VillageTakings: utarg wsi bez znikania (K7) - latki wpiete"; co dobe "Utarg wsi:" z "nieprzypisane 0"',
+     '112-k7-utarg-wsi.md'),
+    ('113', 'ludzie: spustosz.', r'^Devastation: ', [], True, ('Ludzie', 'spustoszenie'),
+     'start "Devastation: spustoszenie jako ulamek okregu ... CZYNNE"; co dobe "spustoszenie dzis" w linii "Ludzie:"',
+     '113-ludzie-spustoszenie.md'),
 ]
 NR_OGNIW = [o[0] for o in OGNIWA]
-# grupy testowe (propozycja z docs/STAN-PRAC.md: testowac grupami zamiast dziewieciu osobnych kampanii) i nazwy dla --test
+# grupy ogniw dla --test (nazwy robocze; grupy testowe Jeffa z numerami 1-5 sa nizej w GRUPY_GRY i maja opcje --grupa)
 GRUPY_TESTOWE = OrderedDict([
     ('dowoz', ['100', '101']), ('ksiegi', ['102', '102b']), ('surowce', ['102b', '103', '104', '105']),
-    ('pieniadz', ['106', '107']), ('ludzie', ['108', '109']), ('wszystkie', list(NR_OGNIW)),
+    ('pieniadz', ['106', '107']), ('ludzie', ['108', '109']), ('kasy', ['110', '111', '112']),
+    ('wszystkie', list(NR_OGNIW)),
 ])
+# GRUPY TESTOWE W GRZE (decyzja Jeffa 06.10 "3 razy": testy grupami; docs\STAN-PRAC.md i sekcja test_groups przegladu
+# kolizji lancucha). Pola: nazwa, ogniwa, galaz DLL, kampania ('nowa' = wymagana, 'zalecana' = nowa zalecana, 'zapis' = ten
+# sam zapis co poprzednia grupa), zalecana liczba dob (od, do), opis testu, przypisanie linii do ogniw.
+# Liczba dob grup 4 i 5 to parametr projektu: grupa 4 potrzebuje ponad trzech tygodni, bo alarm "do zapasu brakuje" i
+# dojscie kies wsi do stanu ustalonego licza sie w tygodniach (paczki 110 ryzyko 2 i 112); grupa 5 jak pozostale.
+GRUPY_GRY = OrderedDict([
+    ('1', {'nazwa': 'TOWAR', 'ogniwa': ['101', '102', '102b', '103', '104', '105'], 'dll': 'n105-mineral-bk',
+           'kampania': 'nowa', 'dob': (15, 20), 'bee': False,
+           'test': 'NOWA kampania po swiezym starcie gry (wymaga jej 104), 15-20 dob, zapis na koncu = stan "przed" grupy 2',
+           'przypisanie': '"StartStock" = 104 (raz, na starcie); "Karawany" = 103; "Mineraly" i dopisaly = model = 105; '
+                          '"Pieniadz swiata" / "Przeplywy osad" = 102 i 102b; "Dowoz" = 100 i 101'}),
+    ('2', {'nazwa': 'PIENIADZ', 'ogniwa': ['106', '107'], 'dll': 'n107-zold-i-skarbiec', 'kampania': 'zapis',
+           'dob': (12, 15), 'bee': False,
+           'test': 'ten sam zapis co koniec grupy 1 (porownanie ksiegi przed / po na tym samym swiecie), 12-15 dob; pierwsze '
+                   '2-3 doby to jednorazowa wyprzedaz zaleglego lupu band - nie brac ich do sredniej',
+           'przypisanie': '"Paser" i pozycje paser / bandy w kasach miast = 106; "Zold", "Korona: zwrot zoldu", "zold '
+                          'garnizonow", "sakiewki ludzi - zycie w miastach" = 107'}),
+    ('3', {'nazwa': 'LUDZIE', 'ogniwa': ['108', '109'], 'dll': 'n109-ludzie-przyrost', 'kampania': 'nowa',
+           'dob': (15, 20), 'bee': True,
+           'test': 'przed startem 13 kluczy BetterEconomy (tools\\bee\\zamknij-ujscia-bee.ps1 -NaSucho, potem naprawde); NOWA '
+                   'kampania po swiezym starcie gry (siew puli wyrzutkow i kalibracja raz, przy zalozeniu), 15-20 dob',
+           'przypisanie': '"hearth za ludzi dzis" i pula poczatkowa = 108; "przyrost naturalny" i stan miast = 109; RESZTA '
+                          '+65..135 hearth = klucze BEE otwarte, -27..-33 = latki 108 nie dzialaja'}),
+    ('4', {'nazwa': 'KASY', 'ogniwa': ['110', '111', '112'], 'dll': 'n112-k7-utarg-wsi', 'kampania': 'zalecana',
+           'dob': (21, 30), 'bee': False,
+           'test': 'NOWA kampania zalecana (jednorazowe przyciecie daru startowego kas: zamki ok. 5.09 mln, miasta ok. 13.98 '
+                   'mln), 21-30 dob (alarm "do zapasu brakuje" i kiesy wsi licza sie w tygodniach)',
+           'przypisanie': '"Kasy zamkow" i "danina podzamcza" = 110; "Kasy miast", "udzial korony", tarcza ZBEDNA = 111; '
+                          '"Utarg wsi", "zywnosc kupiona we wsiach", "sakwy" = 112'}),
+    ('5', {'nazwa': 'SPUSTOSZENIE', 'ogniwa': ['113'], 'dll': 'n113-ludzie-spustoszenie', 'kampania': 'zalecana',
+           'dob': (15, 20), 'bee': False,
+           'test': 'NOWA kampania zalecana (konta uchodzcow od zera), 15-20 dob i co najmniej jeden zakonczony rabunek wsi',
+           'przypisanie': '"spustoszenie dzis" w "Ludzie:", "Ludzie (spustoszenie)", 3 kolumny CSV, "ruch ludzi (..., '
+                          'spustoszenie i powroty uchodzcow)" = 113'}),
+])
+NAZWY_GRUP_GRY = {'towar': '1', 'towary': '1', 'pieniadz': '2', 'ludzie': '3', 'kasy': '4', 'spustoszenie': '5'}
+
+
+def grupa_ogniwa(nr):
+    """Numer grupy testowej, do ktorej nalezy ogniwo (100 liczy sie do grupy 1 - jej log je obejmuje); None dla nieznanego."""
+    if nr == '100':
+        return '1'
+    for g, opis in GRUPY_GRY.items():
+        if nr in opis['ogniwa']:
+            return g
+    return None
 
 
 def ix_ogniwa(nr):
@@ -1882,11 +2349,14 @@ class Sesja(object):
 def status_linii(tresc):
     if re.search(r'\bBRAK\b', tresc):
         return 'BRAK'
-    if 'NIE wpiet' in tresc:
+    # Devastation (113): "NIECZYNNE - wymaga jednostki ludzi, przyrostu naturalnego i obu latek rabunku" - mechanizm stoi,
+    # choc ustawienie jest wlaczone (sprawdzane przed "CZYNN", ktore jest czescia tego slowa)
+    if 'NIE wpiet' in tresc or 'NIECZYNN' in tresc:
         return 'NIE wpieta'
     if (re.search(r'WYLACZON', tresc) or 'regula wylaczona w ustawieniach' in tresc
             or 'wylaczona - same liczniki' in tresc                    # PeopleUnit (108)
-            or 'hearth dziennie) wylaczony w ustawieniach' in tresc):   # PopulationLaw: przyrost naturalny (109)
+            or 'hearth dziennie) wylaczony w ustawieniach' in tresc    # PopulationLaw: przyrost naturalny (109)
+            or 'ponizej progu) wylaczone w ustawieniach' in tresc):    # Devastation (113)
         return 'WYLACZONE'
     if 'CZYNN' in tresc:
         return 'CZYNNE'
@@ -2038,6 +2508,16 @@ def _zbierz_bledy(ses):
     ses.bledy = sorted(([k] + v for k, v in grupy.items()), key=lambda g: (0 if g[0].startswith('ERROR') else 1, g[2]))
 
 
+# "CastlePurse: / TownPurse: poczatek kampanii (doba 1.00) - dar startowy w kasach zamkow (...) przyciety do zapasu kupcow:
+# zamkow 130, kasy A -> B (zdjeto C w N zamkach, najwiecej M - nazwa; zapas razem R)" albo "zapis z X. doby kampanii
+# wczytany pierwszy raz z ta zmiana (regulator gry zostawil ok. P% daru) - dar startowy ..."
+RX_PRZYCIECIE = re.compile(
+    r'(?:poczatek kampanii \(doba (-?[\d.,]+)\)|zapis z (-?[\d.,]+)\. doby kampanii wczytany pierwszy raz z ta zmiana '
+    r'\(regulator gry zostawil ok\. (-?[\d.,]+)% daru\)) - dar startowy w kasach (?:zamkow|miast) \([^)]*\) przyciety do '
+    r'zapasu kupcow: (?:zamkow|miast) (\d+), kasy (-?\d+) -> (-?\d+) \(zdjeto (-?\d+) w (\d+) (?:zamkach|miastach), '
+    r'najwiecej (-?\d+)(?: - [^;]*)?; zapas razem (-?\d+)\)')
+
+
 def _zbierz_fakty(ses, ws):
     f = ses.fakty
     wszystkie = ses.start + [w for w in ws if w.blok is not None]
@@ -2053,6 +2533,38 @@ def _zbierz_fakty(ses, ws):
                 f['mnoznik_rudy'] = float(m.group(1).replace(',', '.'))
                 f['mnoznik_drewna'] = float(m.group(2).replace(',', '.'))
                 f['mnoznik_nr'] = w.nr
+            m = re.search(r', wydobycie w (\d+) modelach', t)
+            if m:
+                f['modele_wydobycia'] = (int(m.group(1)), w.nr)
+        elif w.pref in ('CastlePurse', 'TownPurse'):
+            # ogniwa 110 i 111: linia startowa i jednorazowe przyciecie daru startowego kas
+            klucz = 'castle' if w.pref == 'CastlePurse' else 'town'
+            if 'jako prawdziwy pieniadz' in t:
+                f.setdefault(klucz + 'purse', w)
+            else:
+                m = RX_PRZYCIECIE.search(t)
+                if m:
+                    f[klucz + '_trim'] = {
+                        'nr': w.nr, 'nowa': m.group(1) is not None, 'doba': _liczba(m.group(1) or m.group(2)),
+                        'zostalo_proc': _liczba(m.group(3)), 'osad': int(m.group(4)), 'przed': int(m.group(5)),
+                        'po': int(m.group(6)), 'zdjeto': int(m.group(7)), 'zdjeto_osad': int(m.group(8)),
+                        'najwiecej': int(m.group(9)), 'zapas': int(m.group(10))}
+                elif 'wieku kampanii nie da sie odczytac' in t or 'kampania ma wiek ujemny' in t:
+                    f[klucz + '_trim_bez'] = w
+        elif w.pref == 'VillageTakings':
+            f.setdefault('villagetakings', w)
+        elif w.pref == 'Utarg wsi (latki)':
+            f.setdefault('utarg_latki', w)
+        elif w.pref == 'Devastation':
+            f.setdefault('devastation', w)
+        elif w.pref == 'Spustoszenie' and 'WYLACZONE' in t:
+            f.setdefault('spustoszenie_wyl', w)
+        elif w.pref == 'ScorchedEarth':
+            f.setdefault('scorched', w)
+        elif w.pref == 'Kasy zamkow' and (w.reszta or '').find('| WYLACZONE') >= 0:
+            f.setdefault('kasy_zamkow_wyl', w)
+        elif w.pref == 'Kasy miast' and ((w.reszta or '').find('| WYLACZONE') >= 0 or 'latki regulatora nie sa wpiete' in t):
+            f.setdefault('kasy_miast_wyl', w)
         elif w.pref == 'ColdStart' or (w.pref == 'StartKit' and 'zloto startowe' in t):
             f['nowa_kampania'] = True
         elif w.pref == 'Wyrzutki' and 'pula poczatkowa' in t:
@@ -2094,6 +2606,8 @@ def _zbierz_fakty(ses, ws):
                 f['soldierpay_latki'] = w
             elif 'tarcza zoldu w kasach miast' in t:
                 f['soldierpay_tarcza'] = w
+                if 'zbedna i nieczynna' in t:       # ogniwo 111 (K6): regulator kas miast niczego nie kasuje
+                    f['tarcza_zbedna'] = w
         elif w.pref == 'PeopleUnit':
             f.setdefault('peopleunit', w)
         elif w.pref == 'PopulationLaw':
@@ -2194,7 +2708,8 @@ def _alarmy(ses, ws):
                 al('uwaga', 'linia startowa WYLACZONE: %s' % wycinek(w.tresc, 105), w.nr)
         for w in ws:
             if w.blok is not None and w.pref in ('SoldierPay', 'MoneyLedger', 'CaravanBulk', 'MineralOnce', 'OutlawLaw',
-                                                 'PeopleUnit', 'PopulationLaw'):
+                                                 'PeopleUnit', 'PopulationLaw', 'CastlePurse', 'TownPurse',
+                                                 'VillageTakings', 'Devastation'):
                 if status_linii(w.tresc) in ('BRAK', 'NIE wpieta'):
                     al('ALARM', 'linia %s w kampanii: %s' % (status_linii(w.tresc), wycinek(w.tresc, 105)), w.nr)
         st = ses.fakty.get('stale_skarbca')
@@ -2609,10 +3124,13 @@ def _alarmy(ses, ws):
         if rz:
             naj = max(rz, key=lambda x: abs(x[1]['reszta']))
             plus = naj[1]['reszta'] > 0
+            # od ogniwa 113 (czynne spustoszenie) rabunki i zerowanie armii sa w "ruch ludzi" - ujemna RESZTA to cos innego
             al('uwaga', 'Ludzie: przyrost naturalny - RESZTA hearth wsi ponad %.0f na dobe w %d dobach, najwiecej %s (doba %d) - %s'
                % (PRZYROST_RESZTA_HEARTH, len(rz), skr(naj[1]['reszta'], True), naj[0] + 1,
-                  'hearth z niczego: inwestycje BetterEconomy (13 kluczy nie zamknietych)?' if plus else
-                  'hearth w nicosc: rabunki, marsz armii (spalona wies nie odrasta do kroku 4)'), naj[1].get('_nr'))
+                  'hearth z niczego: inwestycje BetterEconomy (13 kluczy nie zamknietych)?' if plus else (
+                      'hearth w nicosc mimo czynnego spustoszenia: rabunek poza latka (wies bez przelicznika, dno 10 hearth)?'
+                      if naj[1].get('spust_w_ruchu') else
+                      'hearth w nicosc: rabunki, marsz armii (spalona wies nie odrasta do kroku 4)')), naj[1].get('_nr'))
         uch = [(bi, d) for bi, d in pr if d.get('uch_ludzi') is not None and d.get('ludzi') is not None
                and d['uch_ludzi'] > max(0, d['ludzi'])]
         if uch:
@@ -2756,12 +3274,22 @@ def _alarmy(ses, ws):
                 al('ALARM', 'SoldierPay wpiete, a nie ma linii "Zold:" w %d dobach' % len(ses.pelne()))
         if not zo:
             return
-        # decyzja 06.10: tarcza zoldu w kasach miast WLACZONA (ogniwo 107) - bez niej regulator kas kasuje ok. 81% zoldu miast
-        bez_tarczy = [(bi, d) for bi, d in zo if not d.get('tarcza_wl')]
+        # decyzja 06.10: tarcza zoldu w kasach miast WLACZONA (ogniwo 107) - bez niej regulator kas kasuje ok. 81% zoldu miast.
+        # Od ogniwa 111 (K6, doby z dopiskiem "zalogi bez zwrotu korony") regulator kas miast niczego nie kasuje: tarcza jest
+        # zbedna i nieczynna, jej stan nie jest ani wada, ani zaleta - te doby nie wchodza do obu regul nizej.
+        bez_tarczy = [(bi, d) for bi, d in zo if not d.get('tarcza_wl') and not d.get('k6')]
         if bez_tarczy:
             al('uwaga', 'Zold: tarcza zoldu w kasach miast wylaczona w %d z %d dob (od ogniwa 107 domyslnie wlaczona - ustawienie '
                'Town Wage Shield zapisane w MCM?)' % (len(bez_tarczy), len(zo)), bez_tarczy[0][1].get('_nr'))
-        z_tarcza = [(bi, d) for bi, d in zo if d.get('tarcza_wl') and (d.get('do_miast') or 0) > 0]
+        # K6 czynne, a tarcza dalej trzyma znaczniki albo cos "chroni" - dwa mechanizmy na tej samej kasie
+        k6_znacznik = [(bi, d) for i, (bi, d) in enumerate(zo) if d.get('k6') and i > 0
+                       and ((d.get('znacznik') or 0) > 0 or (d.get('nie_skasowal') or 0) > 0)]
+        if k6_znacznik:
+            d = k6_znacznik[0][1]
+            al('uwaga', 'Zold: kasa miasta jest prawdziwym pieniadzem (K6), a tarcza zoldu dalej ma znacznik %s i "regulator nie '
+               'skasowal dzis" %s (%d dob) - przy K6 ma byc 0 / 0' % (skr(d.get('znacznik')), skr(d.get('nie_skasowal')),
+                                                                    len(k6_znacznik)), d.get('_nr'))
+        z_tarcza = [(bi, d) for bi, d in zo if d.get('tarcza_czynna') and (d.get('do_miast') or 0) > 0]
         if len(z_tarcza) >= 2 and 'soldierpay_tarcza' not in ses.fakty:
             al('uwaga', 'Zold: tarcza wlaczona i zold plynie do kas miast (%d dob), a nie ma linii "SoldierPay: tarcza zoldu w '
                'kasach miast ... regulator kasy z ..." - latka na regulator nie zalozona?' % len(z_tarcza),
@@ -2855,6 +3383,275 @@ def _alarmy(ses, ws):
             naj = max(zle)
             al('uwaga', 'Sakiewka ludzi: stan zmienil sie inaczej niz wplynelo - wyszlo o %s (doba %d; %d dob z rozjazdem)'
                % (skr(naj[1], True), naj[2] + 1, len(zle)), naj[3])
+
+    def alarm_brakuje(ser, nazwa):
+        """ "do zapasu brakuje" wyzsze niz przed trzema tygodniami i rosnace po drodze (paczka 110, ryzyko 2: kasy stoja
+        ponizej zapasu kupcow dluzej niz 3-4 tygodnie -> ograniczyc zakupy sprzetu do nadwyzki ponad zapas)."""
+        z = [(bi, d.get('brakuje'), d.get('_nr')) for bi, d in ser if isinstance(d.get('brakuje'), (int, float))]
+        if len(z) < 3:
+            return
+        ost = z[-1]
+        dawne = [x for x in z if x[0] <= ost[0] - KASY_BRAKUJE_ROSNIE_DOB]
+        if not dawne:
+            return
+        pocz = dawne[-1]
+        srodek = min(z, key=lambda x: abs(x[0] - (pocz[0] + ost[0]) // 2))
+        wzrost = ost[1] - pocz[1]
+        if wzrost >= max(KASY_BRAKUJE_MIN_ABS, KASY_BRAKUJE_MIN_WZROST_PROC / 100.0 * pocz[1]) and pocz[1] <= srodek[1] <= ost[1]:
+            al('ALARM', '%s: "do zapasu brakuje" rosnie od ponad %d dob: %s -> %s -> %s (doby %d, %d, %d) - kasy stoja coraz '
+               'nizej pod zapasem kupcow (paczka 110, ryzyko 2: zakupy sprzetu z zapasu)'
+               % (nazwa, KASY_BRAKUJE_ROSNIE_DOB, skr(pocz[1]), skr(srodek[1]), skr(ost[1]), pocz[0] + 1, srodek[0] + 1,
+                  ost[0] + 1), ost[2])
+
+    @regula
+    def r_kasy_zamkow():
+        # ogniwo 110 (K5): linia "Kasy zamkow:", jednorazowe przyciecie daru startowego i ksiega kas zamkow
+        f = ses.fakty
+        w = f.get('kasy_zamkow_wyl')
+        if w is not None:
+            al('uwaga', 'Kasy zamkow: WYLACZONE w ustawieniach (Castle Purse Enabled) - regulator gry i "zakupy" z niczego jak '
+               'przed ogniwem 110, bez daniny podzamcza', w.nr)
+        for klucz, co in (('castle_trim_bez', 'zamkow'), ('town_trim_bez', 'miast')):
+            w = f.get(klucz)
+            if w is not None:
+                al('uwaga', 'dar startowy kas %s BEZ przyciecia: %s' % (co, obetnij(w.tresc.split(': ', 1)[-1], 95)), w.nr)
+        kz = ses.ser('Kasy zamkow')
+        if not kz:
+            return
+        potk = [(bi, d) for bi, d in kz if (d.get('potkniecia') or 0) > 0]
+        if potk:
+            al('ALARM', 'Kasy zamkow: potkniecia (wyjatki) w %d dobach, np. %d' % (len(potk), potk[0][1].get('potkniecia')),
+               potk[0][1].get('_nr'))
+        alarm_brakuje(kz, 'Kasy zamkow')
+        bk = [(bi, d) for bi, d in kz if (d.get('ponad_bk') or 0) > 0]
+        if bk:
+            al('uwaga', 'Kasy zamkow: zamki ponad limitem kasy BK w %d dobach (najwiecej %d zamkow) - BK kasuje tam 1%% kasy '
+               'dziennie w nicosc (zamyka to ogniwo 111)' % (len(bk), max(d.get('ponad_bk') for _, d in bk)), bk[0][1].get('_nr'))
+        # ksiega kas zamkow przy czynnej kasie zamku: "zakupy" +0, regulator +0, danina = pozycja ticku dobowego
+        ks = dict(ses.ser('Przeplywy osad (kasy zamkow)'))
+        nz = [(bi, ks[bi]) for bi, d in kz if bi in ks and ((ks[bi].get('zakupy') or 0) != 0 or (ks[bi].get('regulator') or 0) != 0)]
+        if nz:
+            bi, k = nz[0]
+            al('ALARM', 'Przeplywy osad (kasy zamkow): przy czynnej kasie zamku "zakupy" %s i regulator %s (doba %d; %d dob) - '
+               'maja byc +0, gra dalej tworzy albo kasuje zloto zamkow' % (skr(k.get('zakupy'), True), skr(k.get('regulator'), True),
+                                                                          bi + 1, len(nz)), k.get('_nr'))
+        roz = []
+        for bi, d in kz:
+            k = ks.get(bi)
+            if k is None or d.get('danina') is None:
+                continue
+            ksiega = -(k.get('danina_podzamcza') or 0)
+            if abs(ksiega - d['danina']) > max(10, 0.01 * d['danina']):
+                roz.append((bi, d, ksiega))
+        if roz:
+            bi, d, ksiega = roz[0]
+            al('uwaga', 'Kasy zamkow: danina podzamcza %s, a ksiega kas zamkow liczy "danina podzamcza" %s (doba %d; %d dob z '
+               'rozjazdem)' % (skr(d['danina']), skr(-ksiega, True), bi + 1, len(roz)), d.get('_nr'))
+
+    @regula
+    def r_kasy_miast():
+        # ogniwo 111 (K6): linia "Kasy miast:" i ksiega kas miast
+        f = ses.fakty
+        w = f.get('kasy_miast_wyl')
+        if w is not None:
+            if 'latki regulatora nie sa wpiete' in w.tresc:
+                al('ALARM', 'Kasy miast: latki regulatora nie sa wpiete (CastlePurse: BRAK) - kasy miast jak przed ogniwem 111',
+                   w.nr)
+            else:
+                al('uwaga', 'Kasy miast: WYLACZONE w ustawieniach (Town Purse Regulator 0) - regulator gry kasuje nadwyzki, '
+                   '"zakupy" mieszczan z niczego, tarcza zoldu jak przed ogniwem 111', w.nr)
+        km = ses.ser('Kasy miast')
+        if not km:
+            return
+        potk = [(bi, d) for bi, d in km if (d.get('potkniecia') or 0) > 0]
+        if potk:
+            al('ALARM', 'Kasy miast: potkniecia (wyjatki) w %d dobach, np. %d' % (len(potk), potk[0][1].get('potkniecia')),
+               potk[0][1].get('_nr'))
+        # "dosypal z niczego": jedyne zloto z niczego po stronie miast (tryb 1: bezpiecznik ponizej zapasu kupcow)
+        dos = [(bi, d) for bi, d in km if (d.get('dosypal') or 0) > 0]
+        if dos:
+            wart = [d['dosypal'] for _, d in km if isinstance(d.get('dosypal'), (int, float))]
+            med, naj = mediana(wart), max(dos, key=lambda x: x[1]['dosypal'])
+            tryb2 = [1 for _, d in dos if (d.get('tryb') or 0) >= 2]
+            ponad = med is not None and med > KASY_MIAST_DOSYPKA_MAKS
+            al('ALARM' if (ponad or tryb2) else 'uwaga',
+               'Kasy miast: regulator gry "dosypal z niczego" w %d z %d dob - mediana %s, najwiecej %s (doba %d), razem %s zlota z '
+               'niczego%s' % (len(dos), len(km), skr(med), skr(naj[1]['dosypal']), naj[0] + 1, skr(sum(wart)),
+                              ' - w trybie regulatora 2 ma byc 0' if tryb2 else (
+                                  ' - ponad szacunek paczki (50-%dk na dobe)' % (KASY_MIAST_DOSYPKA_MAKS // 1000) if ponad else
+                                  ' (kurek trybu 1: miasta ponizej zapasu kupcow; szacunek paczki 50-%dk na dobe)'
+                                  % (KASY_MIAST_DOSYPKA_MAKS // 1000))), naj[1].get('_nr'))
+        zost = [(bi, d) for bi, d in km if d.get('zakupy_zostaja')]
+        if zost:
+            al('ALARM', 'Kasy miast: "zakupy" mieszczan - zloto z niczego ZOSTAJE w kasach (Town Folk Buy Without Minting '
+               'wylaczone; %d dob) i zaworem plynie do panow i korony' % len(zost), zost[0][1].get('_nr'))
+        nd = [(bi, d) for bi, d in km if d.get('zawor_nie_dziala')]
+        if nd:
+            al('ALARM', 'Kasy miast: zawor NIE DZIALA - renty od ludnosci wylaczone (Population Rent Enabled; %d dob), kasy '
+               'miast tylko rosna' % len(nd), nd[0][1].get('_nr'))
+        bkz = [(bi, d) for bi, d in km if d.get('bk') in ('BRAK latki', 'zostaje')]
+        if bkz:
+            brak = bkz[0][1].get('bk') == 'BRAK latki'
+            al('ALARM' if brak else 'uwaga', 'Kasy miast: gorna galaz BK (1%% kasy dziennie w nicosc) - %s (%d dob)'
+               % ('BRAK latki na BK HandleMarketGold' if brak else 'zostaje (ustawienie Town Purse No Bk Skim)', len(bkz)),
+               bkz[0][1].get('_nr'))
+        biedne = [(bi, d) for bi, d in km if (d.get('ponizej_1000') or 0) > 0]
+        if biedne:
+            al('uwaga', 'Kasy miast: miast z kasa ponizej 1000 - %d dob, najwiecej %d miast (miasto bez kasy nie kupuje od wsi '
+               'i karawan)' % (len(biedne), max(d.get('ponizej_1000') for _, d in biedne)), biedne[0][1].get('_nr'))
+        alarm_brakuje(km, 'Kasy miast')
+        rz = [(bi, d) for bi, d in km if abs(d.get('zawor_rozjazd') or 0) > 2]
+        if rz:
+            bi, d = rz[0]
+            al('uwaga', 'Kasy miast: zawor - zeszlo %s, a panom %s + skarbcom %s (roznica %s; %d dob)'
+               % (skr(d.get('zeszlo')), skr(d.get('panom')), skr(d.get('koronie')), skr(d.get('zawor_rozjazd'), True), len(rz)),
+               d.get('_nr'))
+        # ksiega kas miast przy czynnym K6: "zakupy" +0 (gdy cofanie wlaczone), "skasowal 0"
+        ks = dict(ses.ser('Przeplywy osad (kasy miast)'))
+        kas = [(bi, ks[bi]) for bi, d in km if bi in ks and (ks[bi].get('skasowal') or 0) != 0]
+        if kas:
+            bi, k = kas[0]
+            al('ALARM', 'Przeplywy osad (kasy miast): przy czynnej kasie miasta regulator "skasowal" %s (doba %d; %d dob) - ma '
+               'byc 0, gra dalej kasuje nadwyzki kas miast' % (skr(k.get('skasowal')), bi + 1, len(kas)), k.get('_nr'))
+        zak = [(bi, ks[bi]) for bi, d in km if bi in ks and not d.get('zakupy_zostaja') and (ks[bi].get('zakupy') or 0) != 0]
+        if zak:
+            bi, k = zak[0]
+            al('ALARM', 'Przeplywy osad (kasy miast): przy czynnej kasie miasta "zakupy" mieszkancow %s (doba %d; %d dob) - maja '
+               'byc +0, gra dalej tworzy zloto za zjedzony towar' % (skr(k.get('zakupy'), True), bi + 1, len(zak)), k.get('_nr'))
+
+    @regula
+    def r_utarg_wsi():
+        # ogniwo 112 (K7): linia "Utarg wsi:" - nic nie moze znikac ani zostac nieprzypisane
+        f = ses.fakty
+        w = f.get('utarg_latki')
+        if w is not None:
+            if 'na tej metodzie: BRAK' in w.tresc:
+                al('ALARM', 'Utarg wsi (latki): na Village.DailyTick nie ma latki innego moda - gra obcina kiese wsi do 1000 co '
+                   'dobe, dopisany utarg zniknie nastepnej doby', w.nr)
+            if 'blad odczytu' in w.tresc:
+                al('uwaga', 'Utarg wsi (latki): %s' % obetnij(w.tresc, 100), w.nr)
+        ut = ses.ser('Utarg wsi')
+        if not ut:
+            return
+        for klucz, co, pole in (('powroty_stan', 'powroty taborow (reszta utargu do kiesy wsi)', None),
+                                ('zywnosc_stan', 'zywnosc kupiona we wsiach', 'zyw_zniklo'),
+                                ('sakwy_stan', 'sakwy zniszczonych taborow', 'tab_zniklo')):
+            nw = [(bi, d) for bi, d in ut if d.get(klucz) == 'nie wpieta']
+            if nw:
+                al('ALARM', 'Utarg wsi: %s - latka nie jest wpieta (%d dob)' % (co, len(nw)), nw[0][1].get('_nr'))
+            wyl = [(bi, d) for bi, d in ut if d.get(klucz) == 'WYLACZONE']
+            if wyl:
+                zn = sum((d.get(pole) or 0) for _, d in wyl) if pole else None
+                al('uwaga', 'Utarg wsi: %s - WYLACZONE w ustawieniach (%d dob)%s' % (
+                    co, len(wyl), (', zniklo razem %s' % skr(zn)) if zn is not None else
+                    '; ile znika, mierzy linia "Przeplywy osad:"'), wyl[0][1].get('_nr'))
+        for pole, co, stan in (('nieprzypisane', '"nieprzypisane" (powroty taborow)', 'powroty_stan'),
+                               ('zyw_zniklo', '"zniklo" przy zywnosci kupionej we wsiach', 'zywnosc_stan'),
+                               ('tab_zniklo', '"zniklo" przy sakwach zniszczonych taborow', 'sakwy_stan')):
+            zle = [(bi, d) for bi, d in ut if d.get(stan) == 'czynne' and (d.get(pole) or 0) != 0]
+            if zle:
+                naj = max(zle, key=lambda x: abs(x[1][pole]))
+                al('ALARM', 'Utarg wsi: %s niezerowe w %d z %d dob, najwiecej %s (doba %d), razem %s - K7 ma oddawac wszystko'
+                   % (co, len(zle), len(ut), skr(naj[1][pole]), naj[0] + 1, skr(sum(d[pole] for _, d in zle))), naj[1].get('_nr'))
+        wyj = [(bi, d) for bi, d in ut if (d.get('wyjatki') or 0) > 0]
+        if wyj:
+            al('ALARM', 'Utarg wsi: wyjatki zlapane w %d dobach (np. %d)' % (len(wyj), wyj[0][1].get('wyjatki')),
+               wyj[0][1].get('_nr'))
+        okna = [(bi, d) for bi, d in ut if (d.get('okna') or 0) > 0]
+        if okna:
+            al('uwaga', 'Utarg wsi: okna niedomkniete w %d dobach (razem %d) - powrot taboru bez rozliczenia'
+               % (len(okna), sum(d.get('okna') for _, d in okna)), okna[0][1].get('_nr'))
+        bezbk = [(bi, d) for bi, d in ut if (d.get('bez_podatku_bk') or 0) > 0]
+        if bezbk:
+            d = bezbk[-1][1]
+            al('uwaga', 'Utarg wsi: powroty bez podatku BK w %d dobach (razem %d, licznikom panow dopisano %s) - BK nie zna tych '
+               'wsi: %s' % (len(bezbk), sum(x.get('bez_podatku_bk') for _, x in bezbk),
+                            skr(sum((x.get('dopisane_panom') or 0) for _, x in bezbk)), obetnij(d.get('bez_podatku_wsie') or '?', 40)),
+               d.get('_nr'))
+        # "Przeplywy osad: ... + zniklo N [R]" ma przy czynnym K7 spasc do zera
+        prz = dict(ses.ser('Przeplywy osad'))
+        zn = [(bi, prz[bi]) for bi, d in ut if d.get('powroty_stan') == 'czynne' and bi in prz and (prz[bi].get('zniklo') or 0) != 0]
+        if zn:
+            bi, p = max(zn, key=lambda x: abs(x[1]['zniklo']))
+            al('ALARM', 'Przeplywy osad: przy czynnym K7 z utargu taborow wsi nadal "zniklo" %s [R] (doba %d; %d dob)'
+               % (skr(p['zniklo'], True), bi + 1, len(zn)), p.get('_nr'))
+
+    @regula
+    def r_spustoszenie():
+        # ogniwo 113: odcinek "spustoszenie dzis" w "Ludzie:" i linia "Ludzie (spustoszenie):"
+        f = ses.fakty
+        w = f.get('spustoszenie_wyl')
+        if w is not None:
+            al('uwaga', obetnij(w.tresc, 120), w.nr)
+        lu = ses.ser('Ludzie')
+        wyl = [(bi, d) for bi, d in lu if d.get('spustoszenie') == 'WYLACZONE']
+        if wyl:
+            al('uwaga', 'Ludzie: spustoszenie WYLACZONE w %d dobach - rabunek i zerowanie zdejmuja hearth jak po kroku 3 '
+               '(-39.7%% hearth za rabunek, +0.5 hearth ponizej progu)' % len(wyl), wyl[0][1].get('_nr'))
+        cz = [(bi, d) for bi, d in lu if d.get('spustoszenie') == 'czynne']
+        potk = [(bi, d) for bi, d in cz if (d.get('sp_potk') or 0) > 0]
+        if potk:
+            al('ALARM', 'Ludzie: potkniecia w odcinku "spustoszenie dzis" w %d dobach (np. %d)'
+               % (len(potk), potk[0][1].get('sp_potk')), potk[0][1].get('_nr'))
+        roz = [(bi, d) for bi, d in cz if abs(d.get('sp_rozjazd') or 0) > max(1.0, 0.01 * (d.get('sp_zdjeci') or 0))]
+        if roz:
+            bi, d = roz[0]
+            al('uwaga', 'Ludzie: spustoszenie - zdjeci z wsi %s, a zabici + w las + uchodzcy = %s (doba %d; %d dob z rozjazdem)'
+               % (skr(d.get('sp_zdjeci')), skr(round((d.get('sp_zdjeci') or 0) - (d.get('sp_rozjazd') or 0), 1)), bi + 1,
+                  len(roz)), d.get('_nr'))
+        # zdjeci rabunkiem rzedu dziesiatek tysiecy ludzi = tyle, ile zdejmowala gra (-39.7% hearth): latka nie ogranicza
+        sp = ses.ser('Ludzie (spustoszenie)')
+        zle = []
+        for bi, d in sp:
+            na, lud, gra = d.get('na_rabunek'), d.get('ludzi_rab'), d.get('gra_ludzi')
+            if not isinstance(lud, (int, float)) or lud <= 0:
+                continue
+            if (na is not None and na >= SPUSTOSZENIE_NA_RABUNEK_ALARM) or (
+                    gra and gra >= SPUSTOSZENIE_GRA_MIN_LUDZI and lud >= SPUSTOSZENIE_UDZIAL_GRY_ALARM * gra):
+                zle.append((lud, bi, d))
+        widziane = set(bi for _, bi, _ in zle)
+        for bi, d in cz:
+            lud, wsi = d.get('sp_rabunki'), d.get('sp_rab_wsi')
+            if bi not in widziane and isinstance(lud, (int, float)) and lud / float(max(1, wsi or 1)) >= SPUSTOSZENIE_NA_RABUNEK_ALARM:
+                zle.append((lud, bi, d))
+        if zle:
+            lud, bi, d = max(zle, key=lambda x: x[0])
+            al('ALARM', 'spustoszenie: rabunek wygnal z wsi %s ludzi (doba %d%s; %d dob) - rzad dziesiatek tysiecy to tyle, ile '
+               'zdejmowala gra; oczekiwane setki ludzi na rabunek - latka spustoszenia nie dziala'
+               % (skr(lud), bi + 1, ('; gra zdjelaby %s' % skr(d.get('gra_ludzi'))) if d.get('gra_ludzi') else '', len(zle)),
+               d.get('_nr'))
+        # hearth zdjety przez gre w kroku rabunku ma wrocic do wsi co do bitu - inaczej siedzi w RESZCIE linii przyrostu
+        pr = dict(ses.ser('Ludzie (przyrost)'))
+        nw = []
+        for bi, d in sp:
+            p = pr.get(bi)
+            gh = d.get('gra_hearth')
+            if p is None or not isinstance(gh, (int, float)) or gh < 20 or p.get('reszta') is None:
+                continue
+            if p['reszta'] <= -0.5 * gh:
+                nw.append((bi, d, p))
+        if nw:
+            bi, d, p = nw[0]
+            al('ALARM', 'spustoszenie: w dobie rabunku RESZTA hearth wsi %s przy "gra zdjelaby %s hearth" (doba %d; %d dob) - '
+               'hearth zdjety przez gre nie wrocil do wsi' % (skr(p['reszta'], True), skr(d.get('gra_hearth')), bi + 1,
+                                                             len(nw)), p.get('_nr'))
+        for klucz, co in (('bez_k', 'bez przelicznika ludzi'), ('obcy_hearth', 'hearth dopisany przez kogos w srodku kroku '
+                                                                               'rabunku'),
+                          ('podjete', 'rabunki podjete po wczytaniu gry')):
+            z = [(bi, d) for bi, d in sp if (d.get(klucz) or 0) > 0]
+            if z:
+                al('uwaga', 'Ludzie (spustoszenie): dopisek "%s" w %d dobach (najwiecej %s) - mial sie nie pojawiac'
+                   % (co, len(z), skr(max(d.get(klucz) for _, d in z))), z[0][1].get('_nr'))
+        zer = [d.get('osobodni_zer') for _, d in sp if isinstance(d.get('osobodni_zer'), (int, float))]
+        if zer and mediana(zer) >= ZEROWANIE_OSOBODNI_UWAGA:
+            al('uwaga', 'Ludzie (spustoszenie): osobodni zerowania armii - mediana %s na dobe (prog %s): uchodzcow przybedzie '
+               'ponad 1%% ludzi wsi rocznie; Devastation Per Forager Day w dol albo Forage Radius'
+               % (skr(mediana(zer)), skr(ZEROWANIE_OSOBODNI_UWAGA)), sp[-1][1].get('_nr'))
+        stara = [(bi, p) for bi, p in pr.items() if p.get('spust_w_ruchu') and (p.get('uch_regula_wsi') or 0) > 0]
+        if stara:
+            bi, p = stara[0]
+            al('uwaga', 'Ludzie: przy czynnym spustoszeniu regula "powrot uchodzcow +0.5 hearth" objela %d wsi (doba %d; %d dob) '
+               '- ma byc 0' % (p.get('uch_regula_wsi'), bi + 1, len(stara)), p.get('_nr'))
 
     for f in reguly:
         try:
@@ -3028,9 +3825,16 @@ def _k102(K, ses):
         K.dodaj(OK, 'pomiar: licznik zoldu (porownac z CSV CrashScribe)',
                 'zold razem na dobe: mediana %s' % _zakres(zr), prz[-1][1].get('_nr'))
         zp = _wart(prz, 'zniklo_proc')
-        K.gdy(bool(zp) and 10.0 <= mediana(zp) <= 20.0, 'z utargu taborow wsi znika ok. 15% (znana dziura gry, krok K7)',
-              'zniklo: mediana %s%% utargu oddanego we wsi, %s zlota na dobe' % (_zakres(zp), _zakres(_wart(prz, 'zniklo'))),
-              prz[-1][1].get('_nr'))
+        # ogniwo 112 (K7) zamyka te dziure: przy czynnym "Utarg wsi: powroty taborow" ma znikac 0, nie 15%
+        k7 = [1 for _, d in ses.ser('Utarg wsi') if d.get('powroty_stan') == 'czynne']
+        if k7:
+            K.gdy(bool(zp) and max(abs(x) for x in zp) < 0.5, 'z utargu taborow wsi nic nie znika (dziure gry zamyka K7, ogniwo 112)',
+                  'zniklo: mediana %s%% utargu oddanego we wsi, %s zlota na dobe' % (_zakres(zp), _zakres(_wart(prz, 'zniklo'))),
+                  prz[-1][1].get('_nr'))
+        else:
+            K.gdy(bool(zp) and 10.0 <= mediana(zp) <= 20.0, 'z utargu taborow wsi znika ok. 15% (znana dziura gry, krok K7)',
+                  'zniklo: mediana %s%% utargu oddanego we wsi, %s zlota na dobe' % (_zakres(zp), _zakres(_wart(prz, 'zniklo'))),
+                  prz[-1][1].get('_nr'))
         potk = sum(_wart(prz, 'potkniecia'))
         K.gdy(potk == 0, 'potkniecia licznikow ksiegi pieniadza: brak', 'suma %d w %d dobach' % (potk, len(prz)),
               prz[-1][1].get('_nr'))
@@ -3392,11 +4196,27 @@ def _k107(K, ses):
         return
     wl = [1 for _, d in zo if d.get('tarcza_wl')]
     t = f.get('soldierpay_tarcza')
-    K.gdy(len(wl) == len(zo) and (t is None or 'BRAK' not in t.tresc), 'tarcza zoldu w kasach miast wlaczona (decyzja 06.10)',
-          'wlaczona w %d z %d dob; znacznik zoldu w kasach %s, regulator nie skasowal dzis: mediana %s; latka regulatora: %s'
-          % (len(wl), len(zo), skr(zo[-1][1].get('znacznik')), _zakres(_wart(zo, 'nie_skasowal')),
-             ('BRAK - tarcza nie dziala' if 'BRAK' in t.tresc else 'wpieta') if t is not None else 'linii jeszcze nie ma'),
-          (t.nr if t is not None else zo[-1][1].get('_nr')))
+    k6 = [(i, bi, d) for i, (bi, d) in enumerate(zo) if d.get('k6')]
+    if k6:
+        # Ogniwo 111 (K6) w grze: regulator kas miast niczego nie kasuje, tarcza zoldu nie dopisuje znacznikow i nie rusza
+        # wyniku. "wlaczona" w linii "Zold:" znaczy wtedy tylko, ze ustawienie Town Wage Shield stoi - nie wolno tego liczyc
+        # za dzialajaca tarcze. Kontrola sprawdza to, co po K6 ma byc prawda: znacznik 0 i "nie skasowal dzis" 0.
+        brudne = [(bi, d) for i, bi, d in k6 if i > 0 and ((d.get('znacznik') or 0) > 0 or (d.get('nie_skasowal') or 0) > 0)]
+        zb = [1 for _, _, d in k6 if d.get('tarcza_zbedna')]
+        tz = f.get('tarcza_zbedna')
+        K.gdy(len(k6) == len(zo) and not brudne,
+              'tarcza zoldu NIECZYNNA przy K6 (ogniwo 111): kas miast nic nie kasuje, znacznik 0',
+              'K6 w %d z %d dob; ustawienie tarczy wlaczone w %d dobach (dopisek "ZBEDNA i nieczynna" w %d); znacznik ostatnio %s, '
+              '"regulator nie skasowal dzis": najwiecej %s; linia "SoldierPay: tarcza ... zbedna i nieczynna": %s'
+              % (len(k6), len(zo), len(wl), len(zb), skr(zo[-1][1].get('znacznik')), skr(max(_wart(zo, 'nie_skasowal') or [0])),
+                 ('jest (linia %d)' % tz.nr) if tz is not None else 'nie ma'),
+              (brudne[0][1] if brudne else zo[-1][1]).get('_nr'))
+    else:
+        K.gdy(len(wl) == len(zo) and (t is None or 'BRAK' not in t.tresc), 'tarcza zoldu w kasach miast wlaczona (decyzja 06.10)',
+              'wlaczona w %d z %d dob; znacznik zoldu w kasach %s, regulator nie skasowal dzis: mediana %s; latka regulatora: %s'
+              % (len(wl), len(zo), skr(zo[-1][1].get('znacznik')), _zakres(_wart(zo, 'nie_skasowal')),
+                 ('BRAK - tarcza nie dziala' if 'BRAK' in t.tresc else 'wpieta') if t is not None else 'linii jeszcze nie ma'),
+              (t.nr if t is not None else zo[-1][1].get('_nr')))
     roz = [abs(d['rozjazd']) for _, d in zo if d.get('rozjazd') is not None]
     zeszlo = _wart(zo, 'zeszlo_razem')
     if roz and zeszlo:
@@ -3635,9 +4455,431 @@ def _k109(K, ses):
           pr[-1][1].get('_nr'))
 
 
+def _przyciecie(K, ses, klucz, co, przedzial, osady, flaga):
+    """Kontrola jednorazowego przyciecia daru startowego kas (ogniwa 110 i 111): linia "CastlePurse: / TownPurse: poczatek
+    kampanii ... zdjeto N" w pierwszej dobie nowej kampanii albo "zapis z X. doby ... wczytany pierwszy raz"."""
+    f = ses.fakty
+    tr, bez = f.get(klucz + '_trim'), f.get(klucz + '_trim_bez')
+    if tr:
+        opis = ('kasy %s -> %s, zdjeto %s w %d z %d %s, najwiecej %s; zapas kupcow razem %s'
+                % (skr(tr['przed']), skr(tr['po']), skr(tr['zdjeto']), tr['zdjeto_osad'], tr['osad'], osady, skr(tr['najwiecej']),
+                   skr(tr['zapas'])))
+        if tr['nowa']:
+            K.gdy(przedzial[0] <= tr['zdjeto'] <= przedzial[1], co, 'poczatek kampanii (doba %s): %s' % (skr(tr['doba']), opis),
+                  tr['nr'])
+        else:
+            K.dodaj(OK, 'pomiar: ' + co, 'zapis z %s. doby wczytany pierwszy raz (regulator gry zostawil ok. %s%% daru): %s'
+                    % (skr(tr['doba']), skr(tr['zostalo_proc']), opis), tr['nr'])
+    elif bez is not None:
+        K.dodaj(UW, co, 'BEZ przyciecia: ' + obetnij(bez.tresc.split(': ', 1)[-1], 110), bez.nr)
+    elif f.get('nowa_kampania') and ses.bloki:
+        K.dodaj(UW, co, 'nowa kampania, a linii o przycieciu daru nie ma (ustawienie przyciecia albo cala kasa wylaczone; bez '
+                        'przyciecia dar splynie zaworem do panow)')
+    else:
+        K.brak(co, 'wczytany zapis albo log bez pierwszej doby: przyciecie zrobione wczesniej (flaga %s w sejwie)' % flaga)
+
+
+def _reszta_mala(wiersze):
+    """Czy reszta [R] linii kas jest mala: ponizej RESZTA_KAS_K5_MIN_ABS albo ponizej RESZTA_KAS_PROC_RUCHU % ruchu."""
+    for k in wiersze:
+        re_, ruch = k.get('reszta'), k.get('ruch')
+        if re_ is None or abs(re_) < RESZTA_KAS_K5_MIN_ABS:
+            continue
+        if not ruch or 100.0 * abs(re_) / (ruch + abs(re_)) > RESZTA_KAS_PROC_RUCHU:
+            return False
+    return True
+
+
+def _k110(K, ses):
+    f = ses.fakty
+    _start(K, ses, '110', 'start: "CastlePurse: kasa zamku ... CZYNNA", regulator = 0 w 3 modelach, bez "BRAK"',
+           ['CZYNNA', '"zakupy" ludnosci zamkow bez zlota z niczego', 'regulator kasy zamku = 0 w 3 modelach',
+            'dar startowy przycinany w pierwszej dobie nowej kampanii: tak', 'tabor do zamku tylko gdy zamek ma czym zaplacic: tak'],
+           ('BRAK', 'NIE wpiet', 'WYLACZON'))
+    _przyciecie(K, ses, 'castle', 'pierwsza doba: dar startowy kas zamkow przyciety raz (ok. 5.09 mln w 130 zamkach)',
+                DAR_ZAMKOW_ZDJETO, 'zamkow', 'arm_castlepurse')
+    kz = ses.ser('Kasy zamkow')
+    if not kz:
+        K.brak('co dobe linia "Kasy zamkow:"', 'nie ma jej w logu' + (' - kasa zamku WYLACZONA w ustawieniach'
+                                                                     if f.get('kasy_zamkow_wyl') is not None else ''))
+        return
+    ost = kz[-1][1]
+    chc, cof, tick = sum(_wart(kz, 'regulator_chcial')), sum(_wart(kz, 'cofniete')), _wart(kz, 'regulator_tickow')
+    K.gdy(chc > 0 and cof > 0, 'regulator gry zablokowany i "zakupy" ludnosci zamkow cofniete (obie liczby niezerowe)',
+          'regulator chcial dosypac %s i skasowac %s (tickow zamkow na dobe: mediana %s przy %s zamkach); "zakupy" cofniete %s '
+          'w %d dobach' % (skr(sum(_wart(kz, 'chcial_dosypac'))), skr(sum(_wart(kz, 'chcial_skasowac'))), skr(mediana(tick)),
+                           skr(ost.get('zamkow')), skr(cof), len(kz)), ost.get('_nr'))
+    po, dn = _pierw_ost(kz, 'danina'), _wart(kz, 'danina')
+    if po:
+        K.gdy(max(dn) > 0 and po[1] >= po[0], 'danina podzamcza plynie do panow i rosnie w pierwszych tygodniach',
+              'danina %s -> %s na dobe (doby %d-%d; mediana %s), placi %s -> %s zamkow; ostatnio bez poboru: kasa nie ponad '
+              'zapasem %s, oblezone %s, bez pana %s' % (skr(po[0]), skr(po[1]), po[2], po[3], skr(mediana(dn)),
+                                                        skr(kz[0][1].get('danina_zamkow')), skr(ost.get('danina_zamkow')),
+                                                        skr(ost.get('bez_nadwyzki')), skr(ost.get('oblezone')),
+                                                        skr(ost.get('bez_pana'))), ost.get('_nr'))
+    potk = sum(_wart(kz, 'potkniecia'))
+    K.gdy(max(_wart(kz, 'ponad_bk') or [0]) == 0 and potk == 0, '"zamki ponad limitem kasy BK" = 0, bez potkniec',
+          'najwiecej %s zamkow ponad limitem (BK kasuje tam 1%% dziennie); najwieksza nadwyzka ostatnio %s; potkniecia razem %d w '
+          '%d dobach' % (skr(max(_wart(kz, 'ponad_bk') or [0])), skr(ost.get('naj_nadwyzka')), potk, len(kz)), ost.get('_nr'))
+    po = _pierw_ost(kz, 'brakuje')
+    if po:
+        K.gdy(po[1] <= po[0], '"do zapasu brakuje" maleje (kasy zamkow dochodza do zapasu kupcow)',
+              'brakuje %s -> %s (doby %d-%d); stan %s -> %s przy zapasie %s; ponad zapasem %s -> %s'
+              % (skr(po[0]), skr(po[1]), po[2], po[3], skr(kz[0][1].get('stan')), skr(ost.get('stan')), skr(ost.get('zapas')),
+                 skr(kz[0][1].get('ponad')), skr(ost.get('ponad'))), ost.get('_nr'))
+    ks = dict(ses.ser('Przeplywy osad (kasy zamkow)'))
+    wsp = [(bi, d, ks[bi]) for bi, d in kz if bi in ks]
+    if wsp:
+        zle = [1 for _, _, k in wsp if (k.get('zakupy') or 0) != 0 or (k.get('regulator') or 0) != 0]
+        bez_tickow = [1 for _, _, k in wsp if not (k.get('reg_tickow') or 0) > 0]
+        K.gdy(not zle and not bez_tickow, 'ksiega kas zamkow: "zakupy" +0 i regulator +0 przy tickach > 0',
+              'zgodne w %d z %d dob; ticki regulatora: mediana %s, konsumpcji: mediana %s'
+              % (len(wsp) - len(zle), len(wsp), skr(mediana([k.get('reg_tickow') for _, _, k in wsp])),
+                 skr(mediana([k.get('zakupy_tickow') for _, _, k in wsp]))), wsp[-1][2].get('_nr'))
+        roz = [1 for _, d, k in wsp if d.get('danina') is not None
+               and abs(-(k.get('danina_podzamcza') or 0) - d['danina']) > max(10, 0.01 * d['danina'])]
+        rs = [k.get('reszta') for _, _, k in wsp if k.get('reszta') is not None]
+        K.gdy(not roz and _reszta_mala([k for _, _, k in wsp]),
+              'ksiega kas zamkow: "danina podzamcza" ujemna i rowna daninie z "Kasy zamkow:", reszta [R] bliska 0',
+              'danina zgodna w %d z %d dob (ostatnio %s w ksiedze wobec %s); reszta: mediana %s; pozostale moduly ticku: mediana %s'
+              % (len(wsp) - len(roz), len(wsp), skr(wsp[-1][2].get('danina_podzamcza'), True), skr(wsp[-1][1].get('danina')),
+                 _zakres(rs), skr(mediana([k.get('pozostale') for _, _, k in wsp]), True)), wsp[-1][2].get('_nr'))
+    else:
+        K.brak('ksiega kas zamkow: "zakupy" +0, regulator +0, danina podzamcza, reszta [R]',
+               'nie ma linii "Przeplywy osad (kasy zamkow):" w dobach z linia "Kasy zamkow:" (ksiega pisze od drugiej doby)')
+    dw = [(bi, d) for bi, d in ses.ser('Dowoz') if d.get('daleki_targ') is not None]
+    pz = _pierw_ost(ses.ser('Dowoz (skutki)'), 'zatk_zamkowe_proc')
+    co = '"Dowoz:" targ za daleko + na daleki targ razem ok. 6 dziennie; zatkane magazyny wsi zamkowych nie rosna'
+    if dw:
+        razem = [(d.get('za_daleko') or 0) + d['daleki_targ'] for _, d in dw]
+        K.gdy(pz is None or pz[1] <= pz[0] + ZATKANE_ROZNICA_PP, co,
+              'za daleko + daleki targ: mediana %s na dobe, z tego na daleki targ (zamek nie mial czym zaplacic): mediana %s, razem '
+              '%s w %d dobach; zatkane magazyny wsi zamkowych %s%% -> %s%%'
+              % (_zakres(razem), skr(mediana(_wart(dw, 'daleki_targ'))), skr(sum(_wart(dw, 'daleki_targ'))), len(dw),
+                 skr(pz[0]) if pz else '-', skr(pz[1]) if pz else '-'), dw[-1][1].get('_nr'))
+    else:
+        K.brak(co, 'linia "Dowoz:" bez dopisku "na daleki targ, bo zamek nie mial czym zaplacic" (albo nie ma linii "Dowoz:")')
+    zo, zw = ses.ser('Zold'), ses.ser('Korona (zwrot zoldu)')
+    K.dodaj(OK, 'pomiar: danina podzamcza wobec zoldu zalog zamkow i zwrotu korony (ryzyko 12)',
+            'danina: mediana %s na dobe; "Zold: do kas zamkow": mediana %s; "Korona: zwrot zoldu": mediana %s; zalogi bez zwrotu '
+            'korony: mediana %s' % (skr(mediana(dn)), skr(mediana(_wart(zo, 'do_zamkow'))), skr(mediana(_wart(zw, 'zwrot'))),
+                                    skr(mediana(_wart(zo, 'bez_zwrotu_korony')))), ost.get('_nr'))
+
+
+def _k111(K, ses):
+    f = ses.fakty
+    _start(K, ses, '111', 'start: "TownPurse: kasa miasta ... CZYNNA, tryb regulatora 1", 3 modele, zawor 7% (panu 67%), bez "BRAK"',
+           ['CZYNNA, tryb regulatora 1', 'przez latki CastlePurse w 3 modelach', '"zakupy" mieszczan bez zlota z niczego: tak',
+            'wpiete (prefiks na BK HandleMarketGold)', 'zawor 7% nadwyzki dziennie, z tego panu 67%',
+            'dar startowy przycinany w pierwszej dobie nowej kampanii: tak',
+            'zwrot zoldu z korony bez zalog, ktorych zold wraca panu z kasy osady: tak'], ('BRAK', 'NIE wpiet', 'WYLACZON'))
+    _przyciecie(K, ses, 'town', 'pierwsza doba: dar startowy kas miast przyciety raz (ok. 13.98 mln w 97 miastach)',
+                DAR_MIAST_ZDJETO, 'miast', 'arm_townpurse')
+    km = ses.ser('Kasy miast')
+    if not km:
+        K.brak('co dobe linia "Kasy miast:"', 'nie ma jej w logu' + (' - ' + obetnij(f['kasy_miast_wyl'].tresc.split(' | ', 1)[-1],
+                                                                                  80) if f.get('kasy_miast_wyl') is not None
+                                                                    else ''))
+        return
+    ost = km[-1][1]
+    kas, cof = _wart(km, 'kasowanie_zabl'), _wart(km, 'cofniete')
+    zost = [1 for _, d in km if d.get('zakupy_zostaja')]
+    K.gdy(sum(kas) > 0 and sum(cof) > 0 and not zost, '"kasowanie zablokowane" i "zakupy" mieszczan cofniete niezerowe',
+          'kasowanie zablokowane: mediana %s na dobe (cwierc nadwyzki, nie strata); "zakupy" cofniete: mediana %s (pierwszy pomiar '
+          '"zakupow" mieszczan)%s' % (_zakres(kas), _zakres(cof), ('; ZLOTO Z "ZAKUPOW" ZOSTAJE w %d dobach' % len(zost))
+                                      if zost else ''), ost.get('_nr'))
+    zes = _wart(km, 'zeszlo')
+    roz = [1 for _, d in km if abs(d.get('zawor_rozjazd') or 0) > 2]
+    nd = [1 for _, d in km if d.get('zawor_nie_dziala')]
+    K.gdy(bool(zes) and sum(zes) > 0 and not roz and not nd, 'zawor: "zeszlo = panom + skarbcom krolestw" (pan 2/3, korona 1/3)',
+          ('zeszlo: mediana %s na dobe = panom %s (%s%%) + skarbcom %s; placi %s z %s miast z panem; renta nalezna (dawny pulap) %s'
+           % (_zakres(zes), skr(mediana(_wart(km, 'panom'))), skr(mediana(_wart(km, 'panom_proc'))),
+              skr(mediana(_wart(km, 'koronie'))), skr(ost.get('panom_miast')), skr(ost.get('z_panem')), skr(ost.get('nalezna'))))
+          if zes else ('zawor NIE DZIALA - renty od ludnosci wylaczone' if nd else 'linia bez pozycji "zeszlo"'), ost.get('_nr'))
+    potk = sum(_wart(km, 'potkniecia'))
+    K.gdy(max(_wart(km, 'ponizej_1000') or [0]) == 0 and potk == 0, '"miast z kasa ponizej 1000: 0", bez potkniec',
+          'najwiecej %s miast ponizej 1000; ponad limitem kasy BK najwiecej %s (gorna galaz BK: %s, ostatnio w %s miastach i %s '
+          'zamkach, BK skasowalby ok. %s); potkniecia razem %d'
+          % (skr(max(_wart(km, 'ponizej_1000') or [0])), skr(max(_wart(km, 'ponad_bk') or [0])), ost.get('bk') or '?',
+             skr(ost.get('bk_miast')), skr(ost.get('bk_zamkow')), skr(ost.get('bk_zloto')), potk), ost.get('_nr'))
+    po = _pierw_ost(km, 'brakuje')
+    dos = _wart(km, 'dosypal')
+    tryb2 = [1 for _, d in km if (d.get('tryb') or 0) >= 2 and (d.get('dosypal') or 0) > 0]
+    stabilne = po is None or po[1] <= po[0] * 1.25 + KASY_BRAKUJE_MIN_ABS
+    K.gdy(stabilne and not tryb2 and (not dos or mediana(dos) <= KASY_MIAST_DOSYPKA_MAKS),
+          '"do zapasu brakuje" stabilne; pomiar "dosypal z niczego" (kurek trybu 1, szacunek 50-160 tys. na dobe)',
+          'brakuje %s -> %s (stan %s -> %s przy zapasie %s); dosypal: mediana %s na dobe, razem %s w %d dobach (tickow miast: '
+          'mediana %s), dosypka zablokowana razem %s; tryb regulatora %s'
+          % (skr(po[0]) if po else '-', skr(po[1]) if po else '-', skr(km[0][1].get('stan')), skr(ost.get('stan')),
+             skr(ost.get('zapas')), _zakres(dos), skr(sum(dos)), len(km), skr(mediana(_wart(km, 'dosypal_tickow'))),
+             skr(sum(_wart(km, 'dosypka_zabl'))), skr(ost.get('tryb'))), ost.get('_nr'))
+    ks, bil = dict(ses.ser('Przeplywy osad (kasy miast)')), dict(ses.ser('Pieniadz swiata (bilans)'))
+    wsp = [(bi, d, ks[bi]) for bi, d in km if bi in ks]
+    if wsp:
+        zle = [1 for _, d, k in wsp if (k.get('skasowal') or 0) != 0 or (not d.get('zakupy_zostaja') and (k.get('zakupy') or 0) != 0)]
+        bw = [bil[bi] for bi, _, _ in wsp if bi in bil]
+        bsk = max([b.get('skasowal') or 0 for b in bw] or [0])
+        K.gdy(not zle and bsk == 0, 'ksiega kas miast: "zakupy" +0 i "skasowal 0"; bilans swiata: "regulator kas skasowal 0"',
+              'ksiega zgodna w %d z %d dob, regulator kasy (sama dosypka): mediana %s; bilans: skasowal najwiecej %s, "zakupy" '
+              'mieszkancow miast i zamkow najwiecej %s' % (len(wsp) - len(zle), len(wsp),
+                                                         skr(mediana([k.get('regulator') for _, _, k in wsp]), True), skr(bsk),
+                                                         skr(max([b.get('zakupy') or 0 for b in bw] or [0]))),
+              wsp[-1][2].get('_nr'))
+        rz = 0
+        for _, d, k in wsp:
+            for pole_k, pole_d in (('renty', 'panom'), ('udzial_korony', 'koronie')):
+                if d.get(pole_d) is not None and abs(-(k.get(pole_k) or 0) - d[pole_d]) > max(10, 0.01 * d[pole_d]):
+                    rz += 1
+                    break
+        rs = [k.get('reszta') for _, _, k in wsp if k.get('reszta') is not None]
+        K.gdy(rz == 0 and _reszta_mala([k for _, _, k in wsp]),
+              'ksiega kas miast: "renty" = czesc panow, "udzial korony" = czesc skarbcow (obie ujemne), reszta [R] mala',
+              'zgodne w %d z %d dob (ostatnio renty %s wobec panom %s; udzial korony %s wobec skarbcom %s); reszta: mediana %s'
+              % (len(wsp) - rz, len(wsp), skr(wsp[-1][2].get('renty'), True), skr(wsp[-1][1].get('panom')),
+                 skr(wsp[-1][2].get('udzial_korony'), True), skr(wsp[-1][1].get('koronie')), _zakres(rs)), wsp[-1][2].get('_nr'))
+    else:
+        K.brak('ksiega kas miast: "zakupy" +0, "skasowal 0", renty i udzial korony, reszta [R]',
+               'nie ma linii "Przeplywy osad (kasy miast):" w dobach z linia "Kasy miast:" (ksiega pisze od drugiej doby)')
+    wg = ses.wiersze.get('Skarbce') or {}
+    spadki = defaultdict(list)
+    for bi in ses.wyb:
+        for wiersz in wg.get(bi, []):
+            if wiersz.get('wojna') and wiersz.get('skarbiec_zm') is not None:
+                spadki[wiersz.get('krolestwo')].append(wiersz['skarbiec_zm'])
+    co = '"Skarbce:" krolestw w wojnie nie spadaja szybciej niz o kilkadziesiat tys. dziennie'
+    if spadki:
+        naj = min(((mediana(v), k) for k, v in spadki.items()), key=lambda x: x[0])
+        K.gdy(naj[0] >= -SKARBIEC_WOJNA_MAKS_SPADEK, co,
+              'krolestw w wojnie %d; najszybciej spada %s: mediana %s na dobe' % (len(spadki), obetnij(str(naj[1]), 40),
+                                                                               skr(naj[0], True)),
+              ses.ser('Skarbce')[-1][1].get('_nr') if ses.ser('Skarbce') else None)
+    else:
+        K.brak(co, 'nie ma linii "Skarbce:" krolestwa w wojnie ze zmiana dobowa')
+    zo = ses.ser('Zold')
+    co = '"Zold:" z dopiskami K6: tarcza ZBEDNA i nieczynna, "zalogi bez zwrotu korony"'
+    if zo:
+        k6 = [1 for _, d in zo if d.get('k6')]
+        czynna = [1 for _, d in zo if d.get('tarcza_czynna')]
+        K.gdy(len(k6) == len(zo) and not czynna, co,
+              'dopisek K6 w %d z %d dob; zalogi bez zwrotu korony: mediana %s na dobe; linia "SoldierPay: tarcza ... zbedna i '
+              'nieczynna": %s' % (len(k6), len(zo), _zakres(_wart(zo, 'bez_zwrotu_korony')),
+                                 'jest' if f.get('tarcza_zbedna') is not None else 'nie ma (pisana raz na kampanie przy wlaczonej '
+                                                                                   'tarczy)'), zo[-1][1].get('_nr'))
+    else:
+        K.brak(co, 'nie ma linii "Zold:"')
+
+
+def _k112(K, ses):
+    f = ses.fakty
+    _start(K, ses, '112', 'start: "VillageTakings: ... latki wpiete: powrot taboru do wsi, sprzedaz z magazynu wsi", 3 x WLACZONE',
+           ['latki wpiete: powrot taboru do wsi, sprzedaz z magazynu wsi', 'reszta utargu do kiesy wsi WLACZONE',
+            'zywnosc kupiona we wsi WLACZONE', 'sakwa zniszczonego taboru WLACZONE'])
+    lt = f.get('utarg_latki')
+    co = 'pierwsza doba "Utarg wsi (latki)": nasz prefiks (800) przed latka BK (400), model podatku BKTaxModel, sufit kiesy zdjety'
+    if lt is not None:
+        t = lt.tresc
+        m = re.search(r'powrot taboru - prefiksy \[([^\]]*)\]', t)
+        pref = [x.strip() for x in m.group(1).split(', ')] if m and m.group(1).strip() else []
+        nasz = [i for i, x in enumerate(pref) if ':VillageTakings (' in x]
+        bk = [i for i, x in enumerate(pref) if 'VillagerSettlementEnterPatch' in x]
+        mm = re.search(r'; model podatku ([^;]+);', t)
+        model = mm.group(1).strip() if mm else '?'
+        sufit = 'na tej metodzie: jest (' in t
+        K.gdy(bool(nasz) and nasz[0] == 0 and (not bk or bk[0] > nasz[0]) and model == 'BannerKings.Models.Vanilla.BKTaxModel'
+              and sufit, co, 'prefiksy powrotu taboru: %s%s; model podatku %s; sufit kiesy wsi: %s'
+              % (obetnij(', '.join(pref) or 'brak', 95), '' if bk else ' (LATKI BK NIE MA)', model,
+                 'latka innego moda na Village.DailyTick jest' if sufit else 'BRAK latki - gra obetnie kiesy wsi do 1000'), lt.nr)
+    elif ses.bloki:
+        K.brak(co, 'nie ma tej linii w logu (pisana raz na sesje, w pierwszej dobie)')
+    ut = ses.ser('Utarg wsi')
+    if not ut:
+        K.brak('co dobe linia "Utarg wsi:"', 'nie ma jej w logu')
+        return
+    ost = ut[-1][1]
+    czynne = [(bi, d) for bi, d in ut if d.get('powroty_stan') == 'czynne']
+    wp = _wart(czynne, 'wies_proc')
+    co = '"wies razem" ok. 30% utargu (10-50% wedle dekretow)'
+    if wp:
+        K.gdy(UTARG_WIES_RAZEM_PROC[0] <= mediana(wp) <= UTARG_WIES_RAZEM_PROC[1], co,
+              'wies razem: mediana %s%% utargu; oddane na dobe: mediana %s; dopisane kiesom wsi: mediana %s; pan po dopisaniu: '
+              'mediana %s%%' % (_zakres(wp), skr(mediana(_wart(czynne, 'oddane'))), skr(mediana(_wart(czynne, 'dopisane_kiesom'))),
+                                skr(mediana(_wart(czynne, 'pan_proc')))), czynne[-1][1].get('_nr'))
+    else:
+        stany = Counter(d.get('powroty_stan') for _, d in ut)
+        K.dodaj(UW if (stany.get('WYLACZONE') or stany.get('nie wpieta')) else BD, co,
+                'powroty taborow: %s' % (', '.join('%s %d dob' % (k, v) for k, v in stany.most_common()) +
+                                         ('' if czynne else '; zadnej doby z podzialem utargu')), ost.get('_nr'))
+    bp, dp = sum(_wart(ut, 'bez_podatku_bk')), sum(_wart(ut, 'dopisane_panom'))
+    npz, okn, wyj = sum(_wart(ut, 'nieprzypisane')), sum(_wart(ut, 'okna')), sum(_wart(ut, 'wyjatki'))
+    wsie = [d.get('bez_podatku_wsie') for _, d in ut if d.get('bez_podatku_wsie')]
+    K.gdy(bp == 0 and dp == 0 and npz == 0 and okn == 0 and wyj == 0,
+          '"licznikom panow 0 (0 powrotow bez podatku BK)", "nieprzypisane 0", "okna niedomkniete 0", bez "wyjatki zlapane"',
+          'powrotow bez podatku BK razem %s (licznikom panow dopisano %s%s), nieprzypisane %s, okna niedomkniete %s, wyjatki %s w '
+          '%d dobach; powrotow na dobe: mediana %s' % (skr(bp), skr(dp), (' - BK nie zna wsi: ' + obetnij(wsie[-1], 40)) if wsie
+                                                       else '', skr(npz), skr(okn), skr(wyj), len(ut),
+                                                       skr(mediana(_wart(ut, 'powrotow')))), ost.get('_nr'))
+    zz, tz = sum(_wart(ut, 'zyw_zniklo')), sum(_wart(ut, 'tab_zniklo'))
+    wyl = [k for k in ('zywnosc_stan', 'sakwy_stan') if any(d.get(k) != 'czynne' for _, d in ut)]
+    K.gdy(zz == 0 and tz == 0 and not wyl, 'przy zywnosci i sakwach taborow "zniklo 0"',
+          'zywnosc: %s zakupow, kupcy zaplacili %s, gra skasowala %s (pierwszy pomiar), zniklo %s; tabory z gotowka: w bitwie %s '
+          '(%s zl), rozwiazane %s (%s zl), zniklo %s%s'
+          % (skr(sum(_wart(ut, 'zyw_zakupow'))), skr(sum(_wart(ut, 'zyw_zaplacili'))), skr(sum(_wart(ut, 'zyw_skasowala'))), skr(zz),
+             skr(sum(_wart(ut, 'tab_bitwa'))), skr(sum(_wart(ut, 'tab_bitwa_zl'))), skr(sum(_wart(ut, 'tab_rozw'))),
+             skr(sum(_wart(ut, 'tab_rozw_zl'))), skr(tz), '; ZWROT WYLACZONY albo latka nie wpieta' if wyl else ''), ost.get('_nr'))
+    prz = dict(ses.ser('Przeplywy osad'))
+    pw = [(d, prz[bi]) for bi, d in czynne if bi in prz]
+    co = '"Przeplywy osad": "zniklo 0 [R]", a dopisane przez K7 bliskie polowie "kiesa wsi"'
+    if pw:
+        pp = [(0, p) for _, p in pw]
+        zn = [p.get('zniklo') or 0 for _, p in pw]
+        dk, kw = _wart(pp, 'k7_do_kies'), _wart(pp, 'kiesa_wsi')
+        udzial = (100.0 * mediana(dk) / mediana(kw)) if dk and kw and mediana(kw) else None
+        K.gdy(max(abs(x) for x in zn) == 0 and (udzial is None or 30.0 <= udzial <= 70.0), co,
+              'zniklo: najwiecej %s w %d dobach; dopisane do kies: mediana %s wobec "kiesa wsi" %s (%s%%); na liczniki panow %s'
+              % (skr(max(zn, key=abs)), len(pw), skr(mediana(dk)), skr(mediana(kw)), skr(round(udzial, 1)) if udzial is not None
+                 else '-', skr(sum(_wart(pp, 'k7_na_liczniki')))), pw[-1][1].get('_nr'))
+    else:
+        K.brak(co, 'nie ma linii "Przeplywy osad:" w dobach z czynnym K7 (ksiega pisze od drugiej doby)')
+    bil = dict(ses.ser('Pieniadz swiata (bilans)'))
+    bw = [(0, bil[bi]) for bi, _ in ut if bi in bil]
+    co = '"Pieniadz swiata (bilans)": z utargu wsi, z ceny zywnosci i z sakw taborow "zniklo 0"'
+    if bw:
+        a, b, c = [x.get('zniklo') or 0 for _, x in bw], _wart(bw, 'zyw_zniklo'), _wart(bw, 'sakwy_zniklo')
+        K.gdy(max(a) == 0 and bool(b) and max(abs(x) for x in b) == 0 and bool(c) and max(abs(x) for x in c) == 0, co,
+              ('z utargu wsi najwiecej %s; z zywnosci najwiecej %s (gra skasowala: mediana %s); z sakw najwiecej %s (bylo w nich: '
+               'mediana %s)' % (skr(max(a)), skr(max(b, key=abs)), skr(mediana(_wart(bw, 'zyw_skasowala'))), skr(max(c, key=abs)),
+                                skr(mediana(_wart(bw, 'sakwy_bylo')))))
+              if (b and c) else 'bilans bez pozycji "z ceny zywnosci kupionej we wsiach zniklo" (uklad sprzed ogniwa 112)',
+              bw[-1][1].get('_nr'))
+    else:
+        K.brak(co, 'nie ma linii "Pieniadz swiata (bilans):" w dobach z linia "Utarg wsi:" (ksiega pisze od drugiej doby)')
+    kw = ses.ser('Przeplywy osad (kiesy wsi)')
+    po, pb = _pierw_ost(kw, 'stan'), _pierw_ost(kw, 'ponizej_1000')
+    co = '"Przeplywy osad (kiesy wsi)": stan rosnie (ok. 2x w dwa tygodnie), "ponizej 1000 zlota" spada'
+    if po:
+        K.gdy(po[1] >= po[0], co,
+              'stan %s -> %s (x%.2f, doby %d-%d); wsi ponizej 1000 zlota %s -> %s; zywnosc kupiona we wsiach: mediana %s'
+              % (skr(po[0]), skr(po[1]), (po[1] / float(po[0])) if po[0] else 0.0, po[2], po[3], skr(pb[0]) if pb else '-',
+                 skr(pb[1]) if pb else '-', skr(mediana(_wart(kw, 'zywnosc_wsi')), True)), kw[-1][1].get('_nr'))
+    else:
+        K.brak(co, 'nie ma linii "Przeplywy osad (kiesy wsi):"')
+    pr = _pierw_ost(ses.ser('Ludnosc'), 'zaplacone')
+    if pr:
+        K.dodaj(OK, 'pomiar: "Ludnosc: renty zaplacone" (w gore o ok. tyle, ile K7 dopisuje kiesom wsi)',
+                'renty zaplacone %s -> %s (doby %d-%d)' % (skr(pr[0]), skr(pr[1]), pr[2], pr[3]),
+                ses.ser('Ludnosc')[-1][1].get('_nr'))
+    dw = dict(ses.ser('Dowoz'))
+    rozbite = sum((dw[bi].get('rozbite') or 0) for bi, _ in ut if bi in dw)
+    z_got = sum(_wart(ut, 'tab_bitwa')) + sum(_wart(ut, 'tab_rozw'))
+    if [1 for bi, _ in ut if bi in dw]:
+        K.gdy(z_got <= rozbite + 2, '"Dowoz: rozbite tabory wsi" nie mniej niz "tabory zniszczone z gotowka"',
+              'rozbite tabory razem %s, z gotowka %s (w bitwie %s, rozwiazane %s)'
+              % (skr(rozbite), skr(z_got), skr(sum(_wart(ut, 'tab_bitwa'))), skr(sum(_wart(ut, 'tab_rozw')))), ost.get('_nr'))
+
+
+def _k113(K, ses):
+    _start(K, ses, '113', 'start: "Devastation: ... CZYNNE", parametry domyslne, 4 latki wpiete, bez "BRAK" i "NIECZYNNE"',
+           ['CZYNNE', 'rabunek 0.5 i zerowanie 0.2 czlowieka na zbrojnego na dobe, pulap 90% okregu, ginie 5%, w las 5%, powrot '
+                      '0.1% dziennie x (1 - niebezpieczenstwo), plon ^0.5', 'krok rabunku', 'koniec rabunku',
+            'progi produkcji od ludzi sprzed spustoszenia', 'zywnosc wsi'],
+           ('BRAK', 'NIE wpiet', 'NIECZYNN', 'wylaczone w ustawieniach'))
+    lu = [(bi, d) for bi, d in ses.ser('Ludzie') if d.get('spustoszenie')]
+    if not lu:
+        K.brak('co dobe odcinek "spustoszenie dzis" w linii "Ludzie:"', 'linie "Ludzie:" go nie maja (albo nie ma linii)')
+        return
+    cz = [(bi, d) for bi, d in lu if d.get('spustoszenie') == 'czynne']
+    ost = lu[-1][1]
+    zdj, zab, las, uch = (sum(_wart(cz, k)) for k in ('sp_zdjeci', 'sp_zabici', 'sp_w_las', 'sp_uchodzcy'))
+    K.gdy(len(cz) == len(lu), 'co dobe odcinek "spustoszenie dzis: zdjeci z wsi ..." (spustoszenie czynne)',
+          'jest w %d dobach, czynne w %d; zdjeci razem %s ludzi (rabunki %s, zerowanie armii %s); uchodzcy poza domem ostatnio %s z '
+          '%s wsi' % (len(lu), len(cz), skr(round(zdj, 1)), skr(round(sum(_wart(cz, 'sp_rabunki')), 1)),
+                      skr(round(sum(_wart(cz, 'sp_zerowanie')), 1)), skr(ost.get('sp_w_drodze')), skr(ost.get('sp_w_drodze_wsi'))),
+          lu[0][1].get('_nr'))
+    co = 'trafieni: 5% ginie, 5% w las, 90% uchodzcy (suma sie zgadza)'
+    if zdj >= 100:
+        pz, pl = 100.0 * zab / zdj, 100.0 * las / zdj
+        roz = max([abs(d.get('sp_rozjazd') or 0) for _, d in cz] or [0])
+        K.gdy(abs(pz - 5.0) <= SPUSTOSZENIE_UDZIAL_TOL and abs(pl - 5.0) <= SPUSTOSZENIE_UDZIAL_TOL and roz <= 1.0,
+              co, 'zdjeci %s = zabici %s (%.1f%%) + w las %s (%.1f%%) + uchodzcy %s (%.1f%%); najwiekszy rozjazd doby %s'
+              % (skr(round(zdj, 1)), skr(round(zab, 1)), pz, skr(round(las, 1)), pl, skr(round(uch, 1)), 100.0 * uch / zdj,
+                 skr(roz)), cz[-1][1].get('_nr'))
+    else:
+        K.brak(co, 'za malo trafionych do rachunku: zdjeci razem %s ludzi w %d dobach' % (skr(round(zdj, 1)), len(cz)))
+    sp = ses.ser('Ludzie (spustoszenie)')
+    rab = [(bi, d) for bi, d in sp if (d.get('rabunki') or 0) > 0]
+    co = 'po rabunku: zdjeci rzedu setek ludzi, "gra zdjelaby" rzedu dziesiatek tysiecy'
+    if rab:
+        na = _wart(rab, 'na_rabunek')
+        zle = [1 for _, d in rab if (d.get('na_rabunek') or 0) >= SPUSTOSZENIE_NA_RABUNEK_ALARM or (
+            (d.get('gra_ludzi') or 0) >= SPUSTOSZENIE_GRA_MIN_LUDZI and isinstance(d.get('ludzi_rab'), (int, float))
+            and d['ludzi_rab'] >= SPUSTOSZENIE_UDZIAL_GRY_ALARM * d['gra_ludzi'])]
+        K.gdy(not zle, co, 'rabunkow %s (wies spalona %s, przerwane %s) w %d dobach, napastnikow srednio %s; zdjeci na rabunek: '
+              'mediana %s ludzi przy osobodniach %s; gra zdjelaby: mediana %s ludzi (%s hearth)'
+              % (skr(sum(_wart(rab, 'rabunki'))), skr(sum(_wart(rab, 'spalone'))), skr(sum(_wart(rab, 'przerwane'))), len(rab),
+                 skr(mediana(_wart(rab, 'napastnikow'))), _zakres(na), skr(mediana(_wart(rab, 'osobodni_rab'))),
+                 skr(mediana(_wart(rab, 'gra_ludzi'))), skr(mediana(_wart(rab, 'gra_hearth')))), rab[-1][1].get('_nr'))
+    else:
+        K.brak(co, 'zadnego zakonczonego rabunku w logu (linii "Ludzie (spustoszenie):" %d - pisana tylko w dobach z ruchem)'
+               % len(sp))
+    co = 'pomiar: osobodni zerowania armii (dziesiatki tysiecy dziennie = za duzo)'
+    if sp:
+        zer = _wart(sp, 'osobodni_zer')
+        K.gdy(not zer or mediana(zer) < ZEROWANIE_OSOBODNI_UWAGA, co,
+              'partii na dobe: mediana %s; osobodni: mediana %s -> ludzi %s; okreg nasycony razem %s razy'
+              % (skr(mediana(_wart(sp, 'zer_partii'))), _zakres(zer), skr(mediana(_wart(sp, 'ludzi_zer'))),
+                 skr(sum(_wart(sp, 'nasycony')))), sp[-1][1].get('_nr'))
+        so = sp[-1][1]
+        K.dodaj(OK, 'pomiar: powroty uchodzcow (0.1% dziennie x (1 - niebezpieczenstwo)) i plon od rak',
+                'wrocilo razem %s ludzi; tempo: mediana %s%% dziennie; uchodzcy poza domem %s -> %s w %s regionach; najnizszy '
+                'mnoznik plonu x%s; najbardziej spustoszony: %s'
+                % (skr(round(sum(_wart(sp, 'powrot_ludzi')), 1)), skr(mediana(_wart(sp, 'tempo'))), skr(sp[0][1].get('uchodzcy')),
+                   skr(so.get('uchodzcy')), skr(so.get('regionow')), skr(so.get('min_plon')),
+                   ('%s %s%%' % (obetnij(str(so.get('top1')), 30), skr(so.get('top1_proc')))) if so.get('top1') else '-'),
+                so.get('_nr'))
+    else:
+        K.brak(co, 'nie ma linii "Ludzie (spustoszenie):" (pisana tylko w dobach z rabunkiem, zerowaniem albo uchodzcami)')
+    pr = ses.ser('Ludzie (przyrost)')
+    rozl = [(bi, d) for bi, d in pr if d.get('spust_w_ruchu') is not None]
+    co = '"Ludzie: przyrost naturalny": ruch ludzi ze spustoszeniem, "powrot uchodzcow +0.5 hearth: 0 wsi"'
+    if rozl:
+        bez = [1 for _, d in rozl if not d.get('spust_w_ruchu')]
+        reg = max(_wart(pr, 'uch_regula_wsi') or [0])
+        K.gdy(not bez and reg == 0, co,
+              'dopisek "spustoszenie i powroty uchodzcow" w %d z %d dob; regula +0.5 hearth: najwiecej %s wsi; RESZTA: mediana %s '
+              '(bez rabunkow; zostaja inwestycje BetterEconomy)' % (len(rozl) - len(bez), len(rozl), skr(reg),
+                                                                   _zakres(_wart(rozl, 'reszta'))), rozl[-1][1].get('_nr'))
+    else:
+        K.brak(co, 'nie ma linii przyrostu z rozliczeniem zmiany hearth (zaczyna sie od drugiej doby)')
+    wy = dict(ses.ser('Wyrzutki'))
+    pary = [(wy[bi].get('rabunki'), d.get('sp_w_las')) for bi, d in cz if bi in wy and wy[bi].get('rabunki') is not None
+            and isinstance(d.get('sp_w_las'), (int, float))]
+    if pary:
+        zle = [1 for a, b in pary if abs(a - b) > 1.5]
+        K.gdy(not zle, '"Wyrzutki: ... rabunki N" = 5% trafionych, ktorzy poszli w las',
+              'zgodne w %d z %d dob; rabunki razem %s wobec "w las do puli wyrzutkow" %s'
+              % (len(pary) - len(zle), len(pary), skr(sum(a for a, _ in pary)), skr(round(sum(b for _, b in pary), 1))),
+              cz[-1][1].get('_nr'))
+    dop = [(k, sum(_wart(sp, k))) for k in ('bez_k', 'obcy_hearth', 'podjete')] + [('sp_potk', sum(_wart(cz, 'sp_potk')))]
+    K.gdy(all(v == 0 for _, v in dop), 'bez dopiskow: "bez przelicznika ludzi", "potkniecia", "hearth dopisany przez kogos", '
+          '"rabunki podjete po wczytaniu"', 'bez przelicznika %s, hearth dopisany przez kogos %s, rabunki podjete po wczytaniu %s, '
+          'potkniecia %s' % tuple(skr(v) for _, v in dop), ost.get('_nr'))
+    pc = []
+    for _, d in lu:
+        zm = d.get('razem_zm') if d.get('razem_zm') is not None else d.get('ludnosc_zm')
+        mln = d.get('razem_mln') or d.get('ludnosc_mln')
+        if zm is not None and mln:
+            pc.append(100.0 * abs(zm) / (mln * 1e6))
+    if pc:
+        K.gdy(max(pc) <= LUDNOSC_MAKS_ZMIANA_PROC, 'ludnosc razem z uchodzcami stoi (zmiana najwyzej %.2f%% dziennie)'
+              % LUDNOSC_MAKS_ZMIANA_PROC, 'najwieksza zmiana dobowa %.3f%%; ludnosc w domu %s mln, uchodzcy poza domem %s, razem '
+              '%s mln' % (max(pc), skr(ost.get('ludnosc_mln')), skr(ost.get('uchodzcy') if ost.get('uchodzcy') is not None
+                                                                 else ost.get('sp_w_drodze')),
+                          skr(ost.get('razem_mln') or ost.get('ludnosc_mln'))), ost.get('_nr'))
+
+
 FUNKCJE_KONTROLI = OrderedDict([('100', _k100), ('101', _k101), ('102', _k102), ('102b', _k102b), ('103', _k103),
                                 ('104', _k104), ('105', _k105), ('106', _k106), ('107', _k107), ('108', _k108),
-                                ('109', _k109)])
+                                ('109', _k109), ('110', _k110), ('111', _k111), ('112', _k112), ('113', _k113)])
 
 
 def kontrole_ogniwa(ses, nr):
@@ -3763,9 +5005,12 @@ def drukuj_test(ses, nazwa, szer=SZEROKOSC):
                      % nazwa)
         else:
             L.append('--test "%s": nie ma takiego ogniwa ani grupy.' % obetnij(nazwa, 60))
-        L.append(obetnij('  ogniwa: %s | grupy: %s, wszystkie | takze: wykryte, w-grze'
-                         % (', '.join(NR_OGNIW), ', '.join('%s = %s' % (k, '+'.join(v)) for k, v in GRUPY_TESTOWE.items()
-                                                           if k != 'wszystkie')), szer))
+        L.append(obetnij('  ogniwa: %s | takze: wykryte, w-grze, wszystkie' % ', '.join(NR_OGNIW), szer))
+        L.append(obetnij('  grupy: %s' % ', '.join('%s = %s' % (k, '+'.join(v)) for k, v in GRUPY_TESTOWE.items()
+                                                    if k != 'wszystkie'), szer))
+        L.append(obetnij('  grupy testowe w grze: --grupa 1..5 (%s)'
+                         % ', '.join('%s = %s%s' % (k, 'BetterEconomy + ' if o['bee'] else '', '+'.join(o['ogniwa']))
+                                     for k, o in GRUPY_GRY.items()), szer))
         return L
     w_grze = ses.ogniwo_w_grze
     L.append(obetnij('=== TEST: ogniwa %s | OGNIWO W GRZE (wg linii logu): %s | doby: %d ==='
@@ -3780,6 +5025,620 @@ def drukuj_test(ses, nazwa, szer=SZEROKOSC):
                      '(pelny skrot: bez --test) ===' % (razem[OK], razem[UW], razem[BD], ses.n_error, ses.n_exception, len(al),
                                                        len(ses.alarmy) - len(al)), szer))
     return L
+
+
+# =====================================================================================================================
+# GRUPY TESTOWE (--grupa N): warunki testu, kontrole wspolne grupy i wszystkie kontrole jej ogniw naraz.
+# Lista kontroli wspolnych grup 1-3: sekcja test_groups w docs\paczki\PRZEGLAD-KOLIZJI-LANCUCHA-2026-10-06.txt (tylko to,
+# czego nie ma juz w kontrolach ogniw); grupy 4-5: powiazania miedzy liniami ogniw 110-113 z docs\paczki\110..113.
+# =====================================================================================================================
+SCIEZKA_BEE = None      # None = plik ustawien BetterEconomy obok katalogu logu, potem w katalogu gry (test podmienia sciezke)
+SCIEZKA_CSV = None      # None = plik ludzie-regiony.csv sesji wedle sciezki logu (test podmienia sciezke)
+KULTURY_ZA_MUREM = ('nightswatch', 'wildlings', 'freefolk')     # id kultur ROT: Nocna Straz i Wolni Ludzie
+
+
+def sciezka_bee(sciezka_logu):
+    """Plik ustawien BetterEconomy: <gra>\\Modules\\BetterEconomy\\ModuleData\\better_economy_settings.xml (tylko odczyt)."""
+    if SCIEZKA_BEE is not None:
+        return SCIEZKA_BEE
+    kandydaci = []
+    try:
+        kat = os.path.dirname(os.path.abspath(sciezka_logu))
+        kandydaci.append(os.path.join(os.path.dirname(kat), PLIK_BEE))
+    except Exception:
+        pass
+    kandydaci.append(os.path.join(os.path.dirname(KATALOG_LOGOW), PLIK_BEE))
+    for k in kandydaci:
+        if os.path.isfile(k):
+            return k
+    return kandydaci[0]
+
+
+def stan_kluczy_bee(tekst):
+    """[(klucz, wartosc z pliku albo None, wartosc docelowa, zgodny)] dla 13 kluczy zamykajacych ujscia BetterEconomy;
+    trzynasty to ktorykolwiek z dwoch kluczy zbrojowni (domyslny albo z listy fundamentu)."""
+    tekst = re.sub(r'<!--.*?-->', '', tekst, flags=re.S)
+
+    def wartosc(k):
+        m = re.findall(r'<%s>\s*([^<]*?)\s*</%s>' % (re.escape(k), re.escape(k)), tekst)
+        return m[-1] if m else None
+
+    def rowne(a, b):
+        try:
+            return abs(float(str(a).replace(',', '.')) - float(b)) < 1e-9
+        except Exception:
+            return False
+    wyn = []
+    for k, cel in KLUCZE_BEE:
+        v = wartosc(k)
+        wyn.append((k, v, cel, v is not None and rowne(v, cel)))
+    zb = [(k, wartosc(k), cel) for k, cel in KLUCZE_BEE_ZBROJOWNIA]
+    traf = [x for x in zb if x[1] is not None and rowne(x[1], x[2])]
+    k, v, cel = traf[0] if traf else zb[0]
+    wyn.append((k, v, cel, bool(traf)))
+    return wyn
+
+
+def _csv_wiersze(tekst):
+    """(naglowek, wiersze jako slowniki, liczba wierszy uszkodzonych) pliku ludzie-regiony.csv."""
+    linie = [x for x in tekst.splitlines() if x.strip()]
+    if not linie:
+        return [], [], 0
+    nagl = [x.strip() for x in linie[0].split(';')]
+    wiersze, zle = [], 0
+    for x in linie[1:]:
+        p = x.split(';')
+        if len(p) < len(nagl):
+            zle += 1
+            continue
+        wiersze.append(dict((nagl[i], p[i].strip()) for i in range(len(nagl))))
+    return nagl, wiersze, zle
+
+
+def _csv_sesji(ses):
+    """Plik ludzie-regiony.csv sesji: (sciezka, naglowek, wiersze); naglowek None = pliku nie ma albo nie da sie go czytac."""
+    try:
+        sc = SCIEZKA_CSV if SCIEZKA_CSV is not None else sciezka_csv(ses.sciezka)
+        if not sc or not os.path.isfile(sc):
+            return sc, None, None
+        with open(sc, 'rb') as f:
+            tekst, _ = dekoduj(f.read())
+        nagl, wiersze, _ = _csv_wiersze(tekst)
+        return sc, nagl, wiersze
+    except Exception:
+        return None, None, None
+
+
+def _ogon(sciezka, n):
+    """Sciezka skrocona od lewej (koniec sciezki mowi wiecej niz poczatek)."""
+    s = str(sciezka)
+    return s if len(s) <= n else '...' + s[-(n - 3):]
+
+
+def _lf(s):
+    """Tekst komorki CSV -> float albo None."""
+    try:
+        v = float(str(s).replace(',', '.'))
+    except (TypeError, ValueError):
+        return None
+    return v if (v == v and abs(v) != float('inf')) else None       # "nan" i "inf" w komorce to brak liczby
+
+
+def _warunki_grupy(K, ses, g):
+    """Warunki testu grupy: czy log w ogole jest tym testem (DLL, komplet ogniw, kampania, dlugosc, bledy, parser)."""
+    opis = GRUPY_GRY[g]
+    f = ses.fakty
+    ogn = opis['ogniwa']
+    szczyt, w_grze = ogn[-1], ses.ogniwo_w_grze
+    nowa, wczytana = bool(f.get('nowa_kampania')), bool(f.get('wczytana'))
+    co = 'DLL grupy: najwyzsze ogniwo w logu = %s (galaz %s)' % (szczyt, opis['dll'])
+    if w_grze is None:
+        K.dodaj(UW, co, 'w logu nie widac zadnego ogniwa lancucha (sesja sprzed wpisu 100 albo log bez linii startowych)')
+    elif w_grze == szczyt:
+        o = ogniwo(ses, szczyt)
+        K.dodaj(OK, co, 'ogniwo w grze wg linii logu: %s %s' % (w_grze, o['opis'] if o else ''),
+                o['wpis'].nr if o and o['wpis'] else None)
+    elif ix_ogniwa(w_grze) > ix_ogniwa(szczyt):
+        K.dodaj(UW, co, 'w grze jest wyzsze ogniwo %s (grupa %s) - log obejmuje tez nastepne grupy, ich skutki nakladaja sie na '
+                        'liczby tej grupy' % (w_grze, grupa_ogniwa(w_grze) or '?'))
+    else:
+        K.dodaj(UW, co, 'najwyzsze ogniwo w logu to %s - grupa %s nie jest wgrana w calosci' % (w_grze, g))
+    # ogniwo 104 nie ma linii przy starcie gry: na wczytanym zapisie poznac je po wyzszym ogniwie
+    wyzsze = dict((n, any(ma_ogniwo(ses, x) for x in NR_OGNIW[ix_ogniwa(n) + 1:])) for n in ogn)
+    brak = [n for n in ogn if not ma_ogniwo(ses, n) and not (n == '104' and not nowa and wyzsze[n])]
+    zle = [(o['nr'], o['status']) for o in ses.ogniwa if o['nr'] in ogn and o['status'] in ('BRAK', 'NIE wpieta', 'WYLACZONE')]
+    K.gdy(not brak and not zle, 'wszystkie ogniwa grupy widac w logu, linie startowe bez BRAK / NIE wpieta / WYLACZONE',
+          ('ogniwa %s: komplet' % ' + '.join(ogn)) if not brak and not zle else
+          ('nie widac: %s' % ', '.join(brak) if brak else '') + ('; ' if brak and zle else '') +
+          ', '.join('%s [%s]' % x for x in zle))
+    tryb = opis['kampania']
+    stan = 'nowa kampania (ColdStart / pula poczatkowa wyrzutkow w logu)' if nowa else (
+        'wczytany zapis ("Wyrzutki: wczytano pule")' if wczytana else 'nie wiadomo (brak linii startu kampanii)')
+    if tryb == 'nowa':
+        K.dodaj(OK if nowa else (UW if wczytana else BD), 'NOWA kampania (wymagana przez grupe)', stan + ('' if nowa else (
+            ' - 104 przelicza zapas tylko przy starcie nowej kampanii' if g == '1' else
+            ' - siew puli wyrzutkow i kalibracja ludnosci dzieja sie raz, przy zalozeniu kampanii')), f.get('pula_nr'))
+    elif tryb == 'zalecana':
+        K.dodaj(OK if nowa else (UW if wczytana else BD), 'NOWA kampania (zalecana)', stan + ('' if nowa else (
+            ' - jednorazowe przyciecie daru startowego kas moze juz byc za nami (flaga w sejwie)' if g == '4' else
+            ' - konta uchodzcow nie zaczynaja od zera, wsie zbite wczesniej nie maja kto wracac')), f.get('pula_nr'))
+    else:
+        K.dodaj(OK if (wczytana and not nowa) else (UW if nowa else BD), 'ten sam zapis co poprzednia grupa (wczytana kampania)',
+                stan + (' - bez porownania ksiegi przed / po na tym samym swiecie' if nowa else ''), f.get('pula_nr'))
+    n = len(ses.pelne()) if ses.bloki else 0
+    od, do = opis['dob']
+    K.gdy(n >= od, 'dlugosc testu: %d-%d dob' % (od, do),
+          ('%d pelnych dob (dni gry %d-%d)' % (n, ses.bloki[0].D, ses.bloki[-1].D)) if ses.bloki else 'zadnej doby w logu')
+    K.gdy(len(ses.segmenty) == 1, 'jedna kampania w logu, po swiezym starcie gry',
+          'kampanii / wczytan w sesji: %d%s' % (len(ses.segmenty), '' if len(ses.segmenty) == 1 else
+                                              ' (analizowana nr %d) - druga gra bez restartu niesie stan statyczny modulow'
+                                              % (ses.wybrany + 1)))
+    K.gdy(ses.n_error == 0 and ses.n_exception == 0 and ses.n_potkniec == 0, 'bez ERROR, Exception i potkniec w calym logu',
+          'ERROR %d, Exception %d, potkniecia niezerowe %d%s' % (ses.n_error, ses.n_exception, ses.n_potkniec, (
+              '; pierwsze: ' + obetnij(ses.bledy[0][0], 60)) if ses.bledy else ''), ses.bledy[0][2] if ses.bledy else None)
+    sur = sorted(tematy_surowe(ses))
+    poza = [(nazwa, len(v)) for nazwa, v in ses.zle.items() if v]
+    inne = [p for p in ses.obce if p.endswith('(inny rodzaj linii)')]
+    K.gdy(not sur and not poza and not inne, 'parser: zaden temat w trybie surowym, zadna linia poza wzorcem',
+          'wszystkie linie dzienne rozpoznane' if not (sur or poza or inne) else
+          ('tryb surowy: %s; ' % ', '.join(sur) if sur else '') +
+          ('linie poza wzorcem: %s; ' % ', '.join('%s x%d' % x for x in poza[:6]) if poza else '') +
+          ('nieznany rodzaj linii: %s; ' % ', '.join(inne[:4]) if inne else '') + 'kontrolom tych tematow nie ufac - poprawic parser')
+    al = [a for a in ses.alarmy if a[0] == 'ALARM']
+    K.gdy(not al, 'alarmy calego logu: 0', '%d alarmow, %d uwag%s' % (len(al), len(ses.alarmy) - len(al), (
+        '; pierwszy: ' + obetnij(al[0][2], 90)) if al else ''), al[0][1] if al else None)
+
+
+def _g1(K, ses):
+    """Grupa 1 TOWAR - kontrole wspolne spoza list ogniw 101-105."""
+    f = ses.fakty
+    mw = f.get('modele_wydobycia')
+    if mw:
+        K.gdy(mw[0] > 0, 'start gry: "MaterialLaw: ... wydobycie w N modelach" (N > 0)', 'wydobycie w %d modelach' % mw[0], mw[1])
+    else:
+        K.brak('start gry: "MaterialLaw: ... wydobycie w N modelach" (N > 0)', 'nie ma tej linii')
+    co = 'start kampanii: StartStock ruda ok. 7000 szt. -> ok. 700 ladunkow, drewno ok. 24000 -> ok. 2400, 97 miast'
+    linie = f.get('startstock') or []
+    dane, miasta, nr = {}, None, None
+    for w in linie:
+        m = re.search(r'StartStock: (\w+) - (\d+) szt\. po .*? -> (\d+) ladunkow', w.tresc)
+        if m:
+            dane[m.group(1)] = (int(m.group(2)), int(m.group(3)))
+            nr = nr or w.nr
+        m = re.search(r'gotowe - .*? w (\d+) miastach; potkniecia (\d+)', w.tresc)
+        if m:
+            miasta = (int(m.group(1)), int(m.group(2)))
+    if dane:
+        r, d = dane.get('ruda'), dane.get('drewno')
+        ok = bool(r) and 6000 <= r[0] <= 8000 and 600 <= r[1] <= 800 and bool(d) and 20000 <= d[0] <= 30000 \
+            and 2000 <= d[1] <= 3000 and miasta is not None and miasta[0] == 97 and miasta[1] == 0
+        K.gdy(ok, co, 'ruda %s; drewno %s; %s' % (('%d szt. -> %d ladunkow' % r) if r else 'brak linii',
+                                                  ('%d szt. -> %d ladunkow' % d) if d else 'brak linii',
+                                                  ('dane rynku w %d miastach, potkniecia %d' % miasta) if miasta
+                                                  else 'brak linii "gotowe"'), nr)
+    else:
+        K.brak(co, 'nie ma linii "StartStock: ruda / drewno - N szt. ... -> M ladunkow"' + (
+            '' if f.get('nowa_kampania') else ' (wczytany zapis)'))
+    kar, stan = ses.ser('Karawany'), ses.ser('Karawany (stan)')
+    od = Counter(d.get('first_naj') for _, d in kar if d.get('first_naj') and d.get('first_naj') != 'nic')
+    towary = Counter()
+    for _, d in kar:
+        towary.update(x for x in (d.get('first_towary') or '').split(',') if x)
+    co = '103: "wyjazdow, ktore zaczely zakupy od" - nie zawsze ten sam towar (kolejnosc wedle zysku w danej chwili)'
+    if towary:
+        K.gdy(len(towary) >= 2, co, 'towary, od ktorych zaczynano zakupy (w ilu dobach): %s; najczesciej pierwszy w dobie: %s'
+              % (', '.join('%s %d' % x for x in towary.most_common(6)), ', '.join('%s %d dob' % x for x in od.most_common(3))),
+              kar[-1][1].get('_nr'))
+    else:
+        K.brak(co, 'nie ma linii "Karawany:" z ta pozycja (albo zadnych zakupow)')
+    po = _pierw_ost(stan, 'ruda_ponizej')
+    if po:
+        K.gdy(po[1] <= po[0], '103: "Karawany (stan): ruda: ponizej zapasu docelowego A -> B" maleje',
+              '%s -> %s miast ponizej zapasu docelowego rudy (doby %d-%d); drewno %s -> %s'
+              % (po[0], po[1], po[2], po[3], skr(stan[0][1].get('drewno_ponizej')), skr(stan[-1][1].get('drewno_ponizej'))),
+              stan[-1][1].get('_nr'))
+    else:
+        K.brak('103: "Karawany (stan): ruda: ponizej zapasu docelowego A -> B" maleje', 'nie ma linii "Karawany (stan):"')
+    ru, sk = ses.ser('Ruda'), ses.ser('Dowoz (skutki)')
+    pr, pz = _pierw_ost(ru, 'bez_towaru'), _pierw_ost(sk, 'zatk_zamkowe_proc')
+    if pr or pz:
+        K.dodaj(OK, 'pomiar: wspolne skutki grupy - "Ruda: miast bez towaru" i "Dowoz (skutki): zatkane magazyny"',
+                'miast bez rudy %s -> %s; zatkane magazyny wsi zamkowych %s%% -> %s%%, miejskich %s%% -> %s%%'
+                % (skr(pr[0]) if pr else '-', skr(pr[1]) if pr else '-', skr(pz[0]) if pz else '-', skr(pz[1]) if pz else '-',
+                   skr(sk[0][1].get('zatk_miejskie_proc')) if sk else '-', skr(sk[-1][1].get('zatk_miejskie_proc')) if sk else '-'),
+                (ru or sk)[-1][1].get('_nr'))
+    ps, bil = ses.ser('Pieniadz swiata'), ses.ser('Pieniadz swiata (bilans)')
+    if ps:
+        K.dodaj(OK, 'pomiar: stan "przed" dla grupy 2 - zloto swiata, reszta bilansu, rezerwa kas miast w "Karawany:"',
+                'zloto swiata %s -> %s; reszta bilansu: mediana %s (%s%% ruchu); "sprzedaz wstrzymana rezerwa kasy miasta": mediana %s'
+                % (skr(ps[0][1].get('razem')), skr(ps[-1][1].get('razem')), skr(mediana(_wart(bil, 'reszta')), True),
+                   skr(mediana(_wart(bil, 'reszta_proc'))), skr(mediana(_wart(kar, 'wstrzymana_rezerwa')))), ps[-1][1].get('_nr'))
+    else:
+        K.brak('pomiar: stan "przed" dla grupy 2 (zloto swiata, reszta bilansu)', 'nie ma linii "Pieniadz swiata:"')
+
+
+def _g2(K, ses):
+    """Grupa 2 PIENIADZ - kontrole wspolne spoza list ogniw 106-107."""
+    f = ses.fakty
+    st = f.get('stale_skarbca')
+    if st:
+        K.gdy(st[0] == st[1] == 4, 'start gry: "podmienionych stalych 4, oczekiwane 4" (skarbiec bez zlota z niczego)',
+              'podmienionych stalych %d, oczekiwane %d' % (st[0], st[1]), st[2])
+    else:
+        K.brak('start gry: "podmienionych stalych 4, oczekiwane 4"', 'nie ma linii "KingdomTreasury: ... podmienionych stalych"')
+    pa = ses.ser('Paser')
+    co = 'K2: paser z promieniem 200 i "poza promieniem" bliskie 0 (w Armoury.json nie ma OutlawFenceRadius = 20)'
+    prom = _wart(pa, 'promien')
+    if prom:
+        poza, lad = sum(_wart(pa, 'poza_promieniem')), sum(_wart(pa, 'z_ladunkiem'))
+        K.gdy(min(prom) == max(prom) == 200 and poza <= 0.05 * max(1, lad), co,
+              'promien %s; poza promieniem %s z %s band z ladunkiem (%s%%) w %d dobach'
+              % (skr(prom[-1]), skr(poza), skr(lad), skr(round(100.0 * poza / max(1, lad), 1)), len(pa)), pa[-1][1].get('_nr'))
+    else:
+        K.brak(co, 'nie ma linii "Paser:" z pozycja "na granicy promienia"')
+    km = ses.ser('Przeplywy osad (kasy miast)')
+    co = 'ksiega kas miast: osobne pozycje ogniwa 106 (paser, bandy) i 107 (zold garnizonow, zycie zolnierzy w miastach)'
+    if km:
+        s106 = [sum(_wart(km, k)) for k in ('paser_skup', 'zycie_band', 'paser_sprzet')]
+        s107 = [sum(_wart(km, k)) for k in ('zold_garnizonow', 'zycie')]
+        jest106 = any(_wart(km, k) for k in ('paser_skup', 'zycie_band', 'paser_sprzet'))
+        jest107 = any(_wart(km, k) for k in ('zold_garnizonow', 'zycie'))
+        K.gdy(jest106 and jest107, co,
+              'razem w %d dobach: paser skup lupu %s, bandy i kryjowki zycie %s, paser sprzet %s | zold garnizonow %s, sakiewki '
+              'ludzi - zycie %s | regulator: dosypal %s, skasowal %s'
+              % (len(km), skr(s106[0], True), skr(s106[1], True), skr(s106[2], True), skr(s107[0], True), skr(s107[1], True),
+                 skr(sum(_wart(km, 'dosypal'))), skr(sum(_wart(km, 'skasowal')))), km[-1][1].get('_nr'))
+    else:
+        K.brak(co, 'nie ma linii "Przeplywy osad (kasy miast):"')
+    kar = ses.ser('Karawany')
+    ws = _wart(kar, 'wstrzymana_rezerwa')
+    if ws:
+        K.dodaj(OK, 'pomiar: "Karawany: sprzedaz wstrzymana rezerwa kasy miasta" (skok wobec grupy 1 = paser 106, nie karawany 103)',
+                'mediana %s na dobe; pierwsze 3 doby: %s' % (_zakres(ws), ', '.join(skr(x) for x in ws[:3])), kar[-1][1].get('_nr'))
+    za = [(bi, d.get('za_zl')) for bi, d in pa if d.get('za_zl') is not None]
+    if len(za) >= 4:
+        K.dodaj(OK, 'pomiar: jednorazowa wyprzedaz zaleglego lupu w pierwszych 2-3 dobach (nie brac ich do sredniej)',
+                'skup lupu w dobach 1-3: %s zl; od doby 4: mediana %s zl; kasy kryjowek %s -> %s'
+                % (', '.join(skr(v) for _, v in za[:3]), skr(mediana([v for _, v in za[3:]])),
+                   skr(pa[0][1].get('kasy_kryjowek')), skr(pa[-1][1].get('kasy_kryjowek'))), pa[-1][1].get('_nr'))
+    elif pa:
+        K.brak('pomiar: jednorazowa wyprzedaz zaleglego lupu w pierwszych 2-3 dobach', 'za malo dob z linia "Paser:" (%d)' % len(za))
+    sa = ses.ser('Sakiewka ludzi')
+    zw = _wart(sa, 'zold')
+    if zw:
+        K.gdy(mediana(zw) > 0, '107: "Sakiewka ludzi: ... zold wplacony do sakiewek" co dobe',
+              'zold wplacony: mediana %s na dobe; w sakiewkach razem %s -> %s'
+              % (_zakres(zw), skr(sa[0][1].get('razem')), skr(sa[-1][1].get('razem'))), sa[-1][1].get('_nr'))
+    else:
+        K.brak('107: "Sakiewka ludzi: ... zold wplacony do sakiewek" co dobe', 'linia "Sakiewka ludzi:" bez czesci o zoldzie')
+
+
+def _g3(K, ses):
+    """Grupa 3 LUDZIE - BetterEconomy (13 kluczy) i kontrole wspolne spoza list ogniw 108-109."""
+    f = ses.fakty
+    # --- BetterEconomy: plik ustawien (stan pliku TERAZ - nie z chwili sesji) i slady w logu
+    co = 'BetterEconomy: 13 kluczy zamykajacych ujscia w pliku ustawien (stan pliku TERAZ, nie z chwili sesji)'
+    sc = None
+    try:
+        sc = sciezka_bee(ses.sciezka)
+        if sc and os.path.isfile(sc):
+            with open(sc, 'rb') as fh:
+                tekst, _ = dekoduj(fh.read())
+            stan = stan_kluczy_bee(tekst)
+            zle = [(k, v, cel) for k, v, cel, ok in stan if not ok]
+            # sciezka pliku przed lista kluczy: wydruk kontroli ma trzy linie i ucina koniec, a nie poczatek
+            K.gdy(not zle, co, ('%d z %d kluczy ma wartosc docelowa (plik %s)' % (len(stan) - len(zle), len(stan), _ogon(sc, 64))) + (
+                ('; otwarte: ' + ', '.join('%s = %s (ma byc %s)' % (k, v if v is not None else 'brak', cel) for k, v, cel in zle[:2])
+                 + (' ... i %d dalszych' % (len(zle) - 2) if len(zle) > 2 else '')
+                 + ' - uruchomic tools\\bee\\zamknij-ujscia-bee.ps1 (-NaSucho pokaze wszystkie)') if zle else ''))
+        else:
+            K.brak(co, 'nie ma pliku %s' % _ogon(sc, 110))
+    except Exception as e:
+        K.brak(co, 'pliku nie da sie odczytac (%s: %s)' % (type(e).__name__, obetnij(str(e), 80)))
+    pr = ses.ser('Ludzie (przyrost)')
+    rz = _wart(pr, 'reszta')
+    co = 'RESZTA hearth wsi: nie +65..135 (klucze BEE otwarte) i nie -27..-33 (latki 108 nie dzialaja)'
+    if rz:
+        med = mediana(rz)
+        K.gdy(abs(med) <= PRZYROST_RESZTA_HEARTH, co, 'RESZTA: mediana %s hearth na dobe w %d dobach%s'
+              % (_zakres(rz), len(rz), ' - inwestycje BetterEconomy dopisuja hearth z niczego (13 kluczy nie zamknietych)'
+                 if med > PRZYROST_RESZTA_HEARTH else (' - rzad ubytku taborow z gry: latki ogniwa 108 nie dzialaja?'
+                                                       if -40.0 <= med < -PRZYROST_RESZTA_HEARTH else (
+                                                           ' - rabunki i zerowanie armii (do ogniwa 113 hearth w nicosc)'
+                                                           if med < -40.0 else ''))), pr[-1][1].get('_nr'))
+    else:
+        K.brak(co, 'nie ma linii "Ludzie: przyrost naturalny" z rozliczeniem (od drugiej doby)')
+    bil, ps = ses.ser('Pieniadz swiata (bilans)'), ses.ser('Pieniadz swiata')
+    if bil:
+        K.dodaj(OK, 'pomiar BEE: "GiveGoldAction w nicosc poza rozliczeniami rodow" (bez inwestycji panow we wsie i wplat do '
+                    'skarbcow zamkow ma byc nizsze niz w grupie 2)',
+                'w nicosc: mediana %s na dobe; reszta bilansu: mediana %s' % (_zakres(_wart(bil, 'w_nicosc')),
+                                                                             skr(mediana(_wart(bil, 'reszta')), True)),
+                bil[-1][1].get('_nr'))
+    kz = [(d.get('karawany_zm'), d.get('karawany')) for _, d in ps if d.get('karawany_zm') is not None and d.get('karawany')]
+    if kz:
+        pc = [100.0 * a / b for a, b in kz]
+        K.gdy(mediana(pc) > -2.0, 'pomiar BEE: kiesy karawan bez straty na szlaku (bylo do 7.6% dziennie)',
+              'kiesy karawan %s -> %s; zmiana dobowa: mediana %s%% (od %s%% do %s%%)'
+              % (skr(ps[0][1].get('karawany')), skr(ps[-1][1].get('karawany')), skr(round(mediana(pc), 2), True),
+                 skr(round(min(pc), 2), True), skr(round(max(pc), 2), True)), ps[-1][1].get('_nr'))
+    ru, dr = [(bi, d) for bi, d in ses.ser('Ruda') if bi > 0], [(bi, d) for bi, d in ses.ser('Drewno') if bi > 0]
+    if ru or dr:
+        K.dodaj(OK, 'pomiar BEE: "bez wyjasnienia" rudy i drewna (koniec darmowych dostaw BEE na targi)',
+                'ruda: mediana %s ladunkow na dobe; drewno: mediana %s (ok. +2100 to znana dosypka RealisticBannerlord)'
+                % (_zakres(_wart(ru, 'bez_wyjasnienia')), _zakres(_wart(dr, 'bez_wyjasnienia'))), (ru or dr)[-1][1].get('_nr'))
+    # --- start kampanii: stan ludnosci miast
+    ms = f.get('miasta_stan')
+    co = 'start kampanii: "ludnosc miast zapisana jako stan (przy kalibracji) - 97 miast, 10.536 mln"'
+    if ms is not None:
+        m = re.search(r'razem (\d+) miast i ' + RX_F + ' mln ludzi', ms.tresc)
+        K.gdy(bool(m) and int(m.group(1)) == 97 and 10.0 <= float(m.group(2).replace(',', '.')) <= 11.0
+              and 'przy kalibracji' in ms.tresc, co,
+              ('%s miast, %s mln ludzi%s' % (m.group(1), m.group(2), '' if 'przy kalibracji' in ms.tresc else
+                                             ' - stan zalozony POZA kalibracja')) if m else wycinek(ms.tresc, 110), ms.nr)
+    elif f.get('nowa_kampania'):
+        K.dodaj(UW, co, 'nowa kampania, a tej linii nie ma (Town People Frozen wylaczone albo ogniwo 109 nie wgrane)')
+    else:
+        K.brak(co, 'wczytany zapis - stan miast zalozony wczesniej (klucz arm_people)')
+    # --- bandy za Murem: jedyna rzecz z tej grupy do pokazania Jeffowi (kanon) - z pliku regionow, jesli jest
+    co = 'bandy za Murem i na Murze (Nocna Straz, Wolni Ludzie) - gdyby ich nie bylo: pokazac Jeffowi (kanon)'
+    sc, nagl, wiersze = _csv_sesji(ses)
+    if nagl and 'kultura' in nagl and 'bandy_ludzie' in nagl and 'dzien' in nagl:
+        mur = [w for w in wiersze if w.get('kultura') in KULTURY_ZA_MUREM and _lf(w.get('dzien')) is not None]
+        dni = sorted(set(_lf(w['dzien']) for w in mur))
+        if dni:
+            def suma(dzien, pole):
+                return sum((_lf(w.get(pole)) or 0.0) for w in mur if _lf(w['dzien']) == dzien)
+            a, b = dni[0], dni[-1]
+            K.gdy(suma(b, 'bandy_ludzie') > 0 or suma(b, 'wyrzutki') >= 20, co,
+                  'regionow %d (kultury %s): bandy %s -> %s ludzi w %s -> %s partiach, pula wyrzutkow %s -> %s (dni %d-%d, plik CSV)'
+                  % (len(set(w.get('region_id') for w in mur)), ' / '.join(sorted(set(w['kultura'] for w in mur))),
+                     skr(int(suma(a, 'bandy_ludzie'))), skr(int(suma(b, 'bandy_ludzie'))), skr(int(suma(a, 'bandy_partie'))),
+                     skr(int(suma(b, 'bandy_partie'))), skr(round(suma(a, 'wyrzutki'), 1)), skr(round(suma(b, 'wyrzutki'), 1)),
+                     int(a), int(b)))
+        else:
+            K.brak(co, 'w pliku regionow nie ma regionow kultur %s' % ' / '.join(KULTURY_ZA_MUREM))
+    else:
+        K.brak(co, 'nie ma pliku regionow sesji (%s) - sprawdzic w grze albo w CSV z opcja --csv' % _ogon(sc, 70))
+
+
+def _g4(K, ses):
+    """Grupa 4 KASY - powiazania miedzy liniami ogniw 110, 111 i 112 (ta sama kwota w dwoch liniach ma byc ta sama)."""
+    f = ses.fakty
+    kz, km, ut = dict(ses.ser('Kasy zamkow')), dict(ses.ser('Kasy miast')), dict(ses.ser('Utarg wsi'))
+    bil, prz = ses.ser('Pieniadz swiata (bilans)'), dict(ses.ser('Przeplywy osad'))
+    oba = [(bi, b) for bi, b in bil if bi in kz and bi in km]
+    co = 'bilans swiata przy K5 + K6: "zakupy" mieszkancow miast i zamkow 0, "regulator kas skasowal 0"'
+    if oba:
+        zak, ska = [b.get('zakupy') or 0 for _, b in oba], [b.get('skasowal') or 0 for _, b in oba]
+        zost = [1 for bi, _ in oba if km[bi].get('zakupy_zostaja')]
+        K.gdy(max(ska) == 0 and (max(zak) == 0 or zost), co,
+              '"zakupy": najwiecej %s, skasowal: najwiecej %s w %d dobach%s' % (skr(max(zak)), skr(max(ska)), len(oba), (
+                  '; zloto z "zakupow" mieszczan zostaje w kasach (ustawienie) w %d dobach' % len(zost)) if zost else ''),
+              oba[-1][1].get('_nr'))
+        roz = [(bi, b) for bi, b in oba if b.get('dosypal') is not None and km[bi].get('dosypal') is not None
+               and abs(b['dosypal'] - km[bi]['dosypal']) > max(10, 0.01 * b['dosypal'])]
+        K.gdy(not roz, 'bilans "regulator kas dosypal" = "Kasy miast: dosypal z niczego" (zamki dosypki nie maja)',
+              'zgodne w %d z %d dob (ostatnio bilans %s wobec %s)' % (len(oba) - len(roz), len(oba), skr(oba[-1][1].get('dosypal')),
+                                                                     skr(km[oba[-1][0]].get('dosypal'))), oba[-1][1].get('_nr'))
+    else:
+        K.brak(co, 'nie ma doby z liniami "Kasy zamkow:", "Kasy miast:" i "Pieniadz swiata (bilans):" naraz')
+    co = 'dar startowy kas w ujsciach bilansu = "zdjeto" z linii CastlePurse / TownPurse'
+    tz, tm = f.get('castle_trim'), f.get('town_trim')
+    dz = [b.get('dar_zamkow') for _, b in bil if b.get('dar_zamkow') is not None]
+    dm = [b.get('dar_miast') for _, b in bil if b.get('dar_miast') is not None]
+    if dz or dm:
+        ok = (not dz or (tz is not None and sum(dz) == tz['zdjeto'])) and (not dm or (tm is not None and sum(dm) == tm['zdjeto']))
+        K.gdy(ok, co, 'bilans: zamki %s, miasta %s; linie przyciecia: zamki %s, miasta %s'
+              % (skr(sum(dz)) if dz else '-', skr(sum(dm)) if dm else '-', skr(tz['zdjeto']) if tz else '-',
+                 skr(tm['zdjeto']) if tm else '-'))
+    elif tz or tm:
+        K.dodaj(OK, 'pomiar: ' + co, 'przyciecie wypadlo w pierwszej dobie ksiegi (bilansu jeszcze nie ma): zamki %s, miasta %s; '
+                'razem z kas zniklo jednorazowo %s' % (skr(tz['zdjeto']) if tz else '-', skr(tm['zdjeto']) if tm else '-',
+                                                      skr((tz['zdjeto'] if tz else 0) + (tm['zdjeto'] if tm else 0))),
+                (tz or tm)['nr'])
+    else:
+        K.brak(co, 'nie ma linii o przycieciu daru (wczytany zapis po przycieciu albo ustawienia wylaczone)')
+    co = '"Przeplywy osad: dopisane wsiom przez K7" = "Utarg wsi: dopisane kiesom wsi / licznikom panow"'
+    wsp = [(ut[bi], prz[bi]) for bi in sorted(ut) if bi in prz and ut[bi].get('powroty_stan') == 'czynne']
+    if wsp:
+        roz = [1 for u, p in wsp if (u.get('dopisane_kiesom') or 0) != (p.get('k7_do_kies') or 0)
+               or (u.get('dopisane_panom') or 0) != (p.get('k7_na_liczniki') or 0)]
+        K.gdy(not roz, co, 'zgodne w %d z %d dob (ostatnio do kies %s wobec %s, na liczniki panow %s wobec %s)'
+              % (len(wsp) - len(roz), len(wsp), skr(wsp[-1][1].get('k7_do_kies')), skr(wsp[-1][0].get('dopisane_kiesom')),
+                 skr(wsp[-1][1].get('k7_na_liczniki')), skr(wsp[-1][0].get('dopisane_panom'))), wsp[-1][1].get('_nr'))
+    else:
+        K.brak(co, 'nie ma doby z liniami "Utarg wsi:" (czynne powroty) i "Przeplywy osad:" naraz')
+    bild = dict(bil)
+    co = 'bilans "z ceny zywnosci ... gra skasowala" = "Utarg wsi: zywnosc ... gra skasowala"'
+    wsp = [(ut[bi], bild[bi]) for bi in sorted(ut) if bi in bild and bild[bi].get('zyw_skasowala') is not None]
+    if wsp:
+        roz = [1 for u, b in wsp if (u.get('zyw_skasowala') or 0) != b['zyw_skasowala']]
+        K.gdy(not roz, co, 'zgodne w %d z %d dob (ostatnio %s wobec %s); sakwy taborow: w bilansie bylo w nich razem %s'
+              % (len(wsp) - len(roz), len(wsp), skr(wsp[-1][1].get('zyw_skasowala')), skr(wsp[-1][0].get('zyw_skasowala')),
+                 skr(sum(b.get('sakwy_bylo') or 0 for _, b in wsp))), wsp[-1][1].get('_nr'))
+    else:
+        K.brak(co, 'nie ma doby z liniami "Utarg wsi:" i bilansem w ukladzie ogniwa 112 naraz')
+    ps = ses.ser('Pieniadz swiata')
+    if ps and bil:
+        K.dodaj(OK, 'pomiar: zloto swiata po K5-K7 (z niczego zostaje dosypka miast ponizej zapasu kupcow)',
+                'zloto swiata %s -> %s (zmiana dobowa: mediana %s); zrodla z niczego: mediana %s, ujscia: mediana %s, reszta: '
+                'mediana %s (%s%% ruchu)' % (skr(ps[0][1].get('razem')), skr(ps[-1][1].get('razem')),
+                                            skr(mediana(_wart(ps, 'razem_zm')), True), skr(mediana(_wart(bil, 'zrodla'))),
+                                            skr(mediana(_wart(bil, 'ujscia'))), skr(mediana(_wart(bil, 'reszta')), True),
+                                            skr(mediana(_wart(bil, 'reszta_proc')))), bil[-1][1].get('_nr'))
+    kw = ses.ser('Przeplywy osad (kiesy wsi)')
+    pm, pzk, pw = _pierw_ost(ses.ser('Kasy miast'), 'stan'), _pierw_ost(ses.ser('Kasy zamkow'), 'stan'), _pierw_ost(kw, 'stan')
+    if pm or pzk or pw:
+        K.dodaj(OK, 'pomiar: masa pieniadza w kasach (miasta ok. 10.6 mln, zamki ok. 2.9 mln + nadwyzka, kiesy wsi do ok. 2x)',
+                'kasy miast %s -> %s; kasy zamkow %s -> %s; kiesy wsi %s -> %s'
+                % (skr(pm[0]) if pm else '-', skr(pm[1]) if pm else '-', skr(pzk[0]) if pzk else '-', skr(pzk[1]) if pzk else '-',
+                   skr(pw[0]) if pw else '-', skr(pw[1]) if pw else '-'))
+
+
+def _g5(K, ses):
+    """Grupa 5 SPUSTOSZENIE - powiazania linii ogniwa 113 z ksiega ludzi, plikiem regionow i reszta lancucha."""
+    f = ses.fakty
+    w = f.get('scorched')
+    co = 'start gry: "ScorchedEarth: ... przy czynnym spustoszeniu (Devastation) marsz pustoszy ulamek okregu w ludziach"'
+    if w is not None:
+        K.gdy('przy czynnym spustoszeniu (Devastation)' in w.tresc, co, wycinek(w.tresc, 115), w.nr)
+    else:
+        K.brak(co, 'nie ma linii "ScorchedEarth: foraging ..."')
+    lu = [(bi, d) for bi, d in ses.ser('Ludzie') if d.get('spustoszenie') == 'czynne']
+    co = 'ksiega hearth: "hearth za ludzi dzis ... spustoszenie -X za N zabitych i uchodzcow" = zabici + uchodzcy doby'
+    pary = [(d.get('hz_spust_ludzi'), (d.get('sp_zabici') or 0) + (d.get('sp_uchodzcy') or 0)) for _, d in lu
+            if d.get('hz_spust_ludzi') is not None]
+    if pary:
+        roz = [1 for a, b in pary if abs(a - b) > max(1.0, 0.01 * b)]
+        K.gdy(not roz, co, 'zgodne w %d z %d dob z ruchem (razem %s wobec %s ludzi)'
+              % (len(pary) - len(roz), len(pary), skr(round(sum(a for a, _ in pary), 1)), skr(round(sum(b for _, b in pary), 1))),
+              lu[-1][1].get('_nr'))
+    else:
+        K.brak(co, 'dopisek jest tylko w dobach, w ktorych kogos zdjeto z wsi albo ktos wrocil - takiej doby nie ma')
+    co = 'ksiega hearth: "powrot uchodzcow +X za N ludzi" = "wrocilo do domu N"'
+    pary = [(d.get('hz_dom_ludzi'), d.get('sp_wrocilo') or 0) for _, d in lu if d.get('hz_dom_ludzi') is not None]
+    if pary:
+        roz = [1 for a, b in pary if abs(a - b) > max(1.0, 0.01 * b)]
+        K.gdy(not roz, co, 'zgodne w %d z %d dob (razem %s wobec %s ludzi)'
+              % (len(pary) - len(roz), len(pary), skr(round(sum(a for a, _ in pary), 1)), skr(round(sum(b for _, b in pary), 1))),
+              lu[-1][1].get('_nr'))
+    else:
+        K.brak(co, 'nie ma doby z dopiskiem o powrotach w odcinku "hearth za ludzi dzis"')
+    sp = dict(ses.ser('Ludzie (spustoszenie)'))
+    co = '"Ludzie (spustoszenie): uchodzcy poza domem" = "Ludzie: uchodzcy w drodze (poza domem)"'
+    pary = [(sp[bi].get('uchodzcy'), d.get('sp_w_drodze')) for bi, d in lu if bi in sp and d.get('sp_w_drodze') is not None]
+    if pary:
+        roz = [1 for a, b in pary if a is None or abs(a - b) > max(2, 0.01 * b)]
+        K.gdy(not roz, co, 'zgodne w %d z %d dob (ostatnio %s wobec %s)' % (len(pary) - len(roz), len(pary), skr(pary[-1][0]),
+                                                                          skr(pary[-1][1])), lu[-1][1].get('_nr'))
+    else:
+        K.brak(co, 'nie ma doby z obiema liniami (linia "Ludzie (spustoszenie):" jest tylko w dobach z ruchem)')
+    co = 'plik regionow: 3 nowe kolumny (uchodzcy, spustoszenie_proc, zabici_spustoszenie)'
+    sc, nagl, wiersze = _csv_sesji(ses)
+    if nagl:
+        nowe = [k for k in ('uchodzcy', 'spustoszenie_proc', 'zabici_spustoszenie') if k in nagl]
+        if len(nowe) == 3:
+            dni = sorted(set(_lf(x.get('dzien')) for x in wiersze if _lf(x.get('dzien')) is not None))
+            ost = [x for x in wiersze if dni and _lf(x.get('dzien')) == dni[-1]]
+            naj = max(ost, key=lambda x: _lf(x.get('spustoszenie_proc')) or 0.0) if ost else None
+            K.dodaj(OK, co, 'sa; ostatnia doba %s: uchodzcy razem %s w %d regionach, zabici przy spustoszeniu %s; najbardziej '
+                    'spustoszony: %s %s%%' % (skr(int(dni[-1])) if dni else '-',
+                                              skr(int(sum((_lf(x.get('uchodzcy')) or 0) for x in ost))),
+                                              len([1 for x in ost if (_lf(x.get('uchodzcy')) or 0) > 0]),
+                                              skr(int(sum((_lf(x.get('zabici_spustoszenie')) or 0) for x in ost))),
+                                              obetnij(naj.get('region', '?'), 30) if naj else '-',
+                                              (naj.get('spustoszenie_proc') or '0') if naj else '-'))
+        else:
+            K.dodaj(UW, co, 'plik ma %d kolumn, nowych %d z 3 (%s) - plik sprzed ogniwa 113?' % (len(nagl), len(nowe),
+                                                                                              ', '.join(nowe) or 'zadnej'))
+    else:
+        K.brak(co, 'nie ma pliku regionow sesji (%s)' % _ogon(sc, 90))
+    ru = [(bi, d) for bi, d in ses.ser('Ruda') if bi > 0]
+    spl = ses.ser('Ludzie (spustoszenie)')
+    if spl:
+        K.dodaj(OK, 'pomiar: plon od rak (6a) - najnizszy mnoznik plonu wsi i wydobycie rudy',
+                'najnizszy mnoznik plonu: x%s -> x%s; "Ruda: wsie dopisaly": mediana %s ladunkow na dobe przy modelu %s'
+                % (skr(spl[0][1].get('min_plon')), skr(spl[-1][1].get('min_plon')), skr(mediana(_wart(ru, 'dopisaly'))),
+                   skr(mediana(_wart(ru, 'model')))), spl[-1][1].get('_nr'))
+
+
+FUNKCJE_GRUP = OrderedDict([('1', _g1), ('2', _g2), ('3', _g3), ('4', _g4), ('5', _g5)])
+
+
+def grupa_z_nazwy(ses, nazwa):
+    """Numer grupy testowej dla opcji --grupa: 1..5, nazwa (towar, pieniadz, ludzie, kasy, spustoszenie), "w-grze"."""
+    q = (nazwa or '').strip().lower()
+    if q in GRUPY_GRY:
+        return q
+    if q in NAZWY_GRUP_GRY:
+        return NAZWY_GRUP_GRY[q]
+    if q in ('', 'w-grze', 'wgrze', 'gra', 'auto'):
+        return grupa_ogniwa(ses.ogniwo_w_grze) if ses.ogniwo_w_grze else None
+    m = re.match(r'^(?:grupa[ -]?)?([1-5])$', q)
+    return m.group(1) if m else None
+
+
+def kontrole_grupy(ses, g):
+    """(warunki testu, kontrole wspolne) grupy g - dwie listy [(status, co, wynik, numer linii)]. Nigdy wyjatek."""
+    wyn = []
+    for funkcja, co in ((_warunki_grupy, 'warunki testu'), (FUNKCJE_GRUP.get(g), 'kontrole wspolne')):
+        K = Kontrole()
+        try:
+            if funkcja is _warunki_grupy:
+                funkcja(K, ses, g)
+            elif funkcja is not None:
+                funkcja(K, ses)
+        except Exception as e:
+            K.dodaj(BD, '%s grupy %s przerwane' % (co, g), 'blad wewnetrzny (%s: %s) - reszta wyjscia bez zmian'
+                    % (type(e).__name__, e))
+        wyn.append(K.lista)
+    return wyn[0], wyn[1]
+
+
+def _linie_listy(lista, szer):
+    L = []
+    for status, co, wynik, nr_linii in lista:
+        gdzie = ('linia %d' % nr_linii) if nr_linii else 'caly log'
+        L.extend(zawin('  [%s] %s: %s -> %s' % (status, gdzie, co, wynik), szer, 3))
+    return L
+
+
+def drukuj_grupe(ses, nazwa, szer=SZEROKOSC):
+    """Wyjscie opcji --grupa: warunki testu, kontrole wspolne, wszystkie kontrole ogniw grupy, alarmy calego logu."""
+    g = grupa_z_nazwy(ses, nazwa)
+    L = []
+    if g is None:
+        if (nazwa or '').strip().lower() in ('', 'w-grze', 'wgrze', 'gra', 'auto'):
+            L.append('--grupa "%s": w tym logu nie widac zadnego ogniwa lancucha - nie ma z czego poznac grupy.' % (nazwa or ''))
+        else:
+            L.append('--grupa "%s": nie ma takiej grupy.' % obetnij(str(nazwa), 60))
+        for k, opis in GRUPY_GRY.items():
+            L.append(obetnij('  %s = %s: %s%s' % (k, opis['nazwa'].lower(), ('BetterEconomy (13 kluczy) + ' if opis['bee'] else '')
+                                                  + ' + '.join(opis['ogniwa']), ' | DLL ' + opis['dll']), szer))
+        L.append('  takze: --grupa w-grze (grupa najwyzszego ogniwa wykrytego w logu)')
+        return L
+    opis = GRUPY_GRY[g]
+    sklad = ('BetterEconomy (13 kluczy) + ' if opis['bee'] else '') + ' + '.join(opis['ogniwa'])
+    L.append(obetnij('=== GRUPA %s %s: %s | DLL galezi %s | OGNIWO W GRZE (wg linii logu): %s | doby: %d ==='
+                     % (g, opis['nazwa'], sklad, opis['dll'], ses.ogniwo_w_grze or 'sprzed wpisu 100',
+                        len(ses.pelne()) if ses.bloki else 0), szer))
+    L.extend(zawin('  test: ' + opis['test'], szer, 2, wciecie='        '))
+    L.extend(zawin('  przypisanie linii do ogniw: ' + opis['przypisanie'], szer, 2, wciecie='        '))
+    warunki, wspolne = kontrole_grupy(ses, g)
+    razem = Counter()
+    for tytul, lista in (('WARUNKI TESTU', warunki), ('KONTROLE WSPOLNE GRUPY (przeglad kolizji lancucha, powiazania ogniw)',
+                                                      wspolne)):
+        licz = Counter(k[0] for k in lista)
+        razem.update(licz)
+        L.append(obetnij('--- GRUPA %s: %s: OK %d, UWAGA %d, BRAK DANYCH %d ---' % (g, tytul, licz[OK], licz[UW], licz[BD]), szer))
+        L.extend(_linie_listy(lista, szer))
+    for nr in opis['ogniwa']:
+        L.extend(linie_kontroli(ses, nr, szer, pelne=True))
+        razem.update(k[0] for k in kontrole_ogniwa(ses, nr))
+    al = [a for a in ses.alarmy if a[0] == 'ALARM']
+    L.append('--- ALARMY CALEGO LOGU: %d, uwagi: %d ---' % (len(al), len(ses.alarmy) - len(al)))
+    for poziom, nr, tekst in ses.alarmy[:MAKS_ALARMOW]:
+        L.extend(zawin('  [%s] %s: %s' % (poziom, ('linia %d' % nr) if nr else 'caly log', tekst), szer, 2))
+    if len(ses.alarmy) > MAKS_ALARMOW:
+        L.append('  ... i %d dalszych (pelny skrot z --pelny)' % (len(ses.alarmy) - MAKS_ALARMOW))
+    if not ses.alarmy:
+        L.append('  brak')
+    L.append(obetnij('=== RAZEM GRUPA %s: OK %d, UWAGA %d, BRAK DANYCH %d | w calym logu: ERROR %d, Exception %d, potkniecia %d, '
+                     'alarmy %d, uwagi %d (pelny skrot: bez --grupa) ===' % (g, razem[OK], razem[UW], razem[BD], ses.n_error,
+                                                                            ses.n_exception, ses.n_potkniec, len(al),
+                                                                            len(ses.alarmy) - len(al)), szer))
+    return L
+
+
+def linia_grupy(ses, szer):
+    """Jedna linia skrotu: do ktorej grupy testowej nalezy ogniwo w grze i jak wywolac komplet jej kontroli."""
+    g = grupa_ogniwa(ses.ogniwo_w_grze) if ses.ogniwo_w_grze else None
+    if g is None:
+        return []
+    opis = GRUPY_GRY[g]
+    return [obetnij('  grupa testowa w grze: %s %s (%s%s) | komplet kontroli grupy, warunki testu i powiazania ogniw: --grupa %s'
+                    % (g, opis['nazwa'], 'BetterEconomy + ' if opis['bee'] else '', ' + '.join(opis['ogniwa']), g), szer)]
 
 
 # =====================================================================================================================
@@ -3887,7 +5746,7 @@ def linie_naglowka(ses, szer):
     L.append('OGNIWO W GRZE (wg linii logu): %s%s' % (
         ('%s %s' % (w_grze, [o['opis'] for o in ses.ogniwa if o['nr'] == w_grze][0])) if w_grze else 'sprzed wpisu 100',
         (' | NIE MA linii startowych ogniw: ' + ', '.join(o['nr'] for o in brakujace)) if brakujace else
-        ' | komplet linii startowych lancucha 102-109'))
+        ' | komplet linii startowych lancucha 102-113'))
     for o in ses.ogniwa:
         if o['jest']:
             op = 'JEST  linia %d%s %s' % (o['wpis'].nr, (' [%s]' % o['status']) if o['status'] != 'inne' else '',
@@ -4069,6 +5928,7 @@ def drukuj_skrot(ses, szer=SZEROKOSC, pelny=False, surowe=False, limit=LIMIT_LIN
         try:
             L.extend(linie_kontroli(ses, ses.ogniwo_w_grze, szer, None if pelny else MAKS_KONTROLI, pelne=pelny))
             L.extend(linia_pozostalych_ogniw(ses, szer))
+            L.extend(linia_grupy(ses, szer))
         except Exception as e:
             ses.uwagi.append('kontrole ogniwa %s: blad wewnetrzny (%s: %s)' % (ses.ogniwo_w_grze, type(e).__name__, e))
     nier = linie_nierozpoznanych(ses, szer)
@@ -4200,8 +6060,13 @@ def drukuj_temat(ses, nazwa, szer=SZEROKOSC, surowe=False):
                 L.append('doba %s linia %d: %s' % ((w.blok + 1) if w.blok is not None else '-', w.nr, w.tresc))
             continue
         lin = [w for w in ses.linie_tematu.get(n, []) if w.blok is None or w.blok in ses.wyb]
-        if not lin:                 # linie startu gry stoja przed znacznikiem kampanii - nie ma ich wsrod linii tematu
-            lin = [w for w in ses.start if w.pref == t.prefiks and t.pasuje(w.reszta or '')]
+        # linie startu gry stoja przed znacznikiem kampanii - nie ma ich wsrod linii tematu; temat jednorazowy pokazuje je
+        # zawsze (np. "CastlePurse:" = linia startowa + jednorazowe przyciecie daru w pierwszej dobie kampanii)
+        if not lin or not t.dzienny:
+            znane = set(w.nr for w in lin)
+            ze_startu = [w for w in ses.start if w.pref == t.prefiks and t.pasuje(w.reszta or '') and w.nr not in znane]
+            if ze_startu:
+                lin = sorted(ze_startu + lin, key=lambda w: w.nr)
         s = ses.szer.get(n) or {}
         L.append('=== TEMAT: %s (prefiks "%s:", %d linii, %d dob z danymi%s) ==='
                  % (n, t.prefiks, len(lin), len([bi for bi in ses.wyb if bi in s]),
@@ -4368,6 +6233,31 @@ def skrot_csv_z_tekstu(tekst, szer=SZEROKOSC, ile=8):
     for i, (o, p) in enumerate(ranking[:ile], 1):
         wr.append([i] + [obetnij(pole(p, k[1]), 26) for k in kol])
     L.extend(tabela_pelna(nag, wr, szer, stale=2))
+    # ogniwo 113: trzy kolumny na koncu pliku - uchodzcy wsi regionu poza domem, ich udzial w ludziach wsi sprzed
+    # spustoszenia, zabici przy spustoszeniu od poczatku kampanii
+    nowe = [k for k in ('uchodzcy', 'spustoszenie_proc', 'zabici_spustoszenie') if k in idx]
+    if len(nowe) < 3:
+        L.append('spustoszenie (ogniwo 113): plik ma %d z 3 kolumn uchodzcy / spustoszenie_proc / zabici_spustoszenie%s'
+                 % (len(nowe), ' - sesja sprzed ogniwa 113' if not nowe else ''))
+        return L
+    sp = sorted([(lf(pole(p, 'spustoszenie_proc')) or 0.0, lf(pole(p, 'uchodzcy')) or 0.0, p) for p in dzis],
+                key=lambda x: (-x[0], -x[1]))
+    z_uch = [x for x in sp if x[1] > 0]
+    L.append('spustoszenie (ogniwo 113), ostatnia doba %d: uchodzcy poza domem razem %d w %d z %d regionow, zabici przy '
+             'spustoszeniu od poczatku kampanii %d%s'
+             % (ostatni, int(sum(x[1] for x in sp)), len(z_uch), len(dzis),
+                int(sum((lf(pole(x[2], 'zabici_spustoszenie')) or 0.0) for x in sp)),
+                '' if z_uch else ' - zaden region nie ma uchodzcow'))
+    if z_uch:
+        kol2 = [('region', 'region'), ('rodzaj', 'rodzaj'), ('kultura', 'kultura'), ('wsie', 'wsie'),
+                ('spalone', 'wsie_spalone'), ('ludzie wsi', 'ludzie_wsie'), ('uchodzcy', 'uchodzcy'),
+                ('spust.%', 'spustoszenie_proc'), ('zab.spust.', 'zabici_spustoszenie'), ('hearth', 'hearth'),
+                ('bezp.', 'bezpieczenstwo'), ('wojna', 'wojna')]
+        kol2 = [k for k in kol2 if k[1] in idx]
+        wr = []
+        for i, (o, u, p) in enumerate(z_uch[:ile], 1):
+            wr.append([i] + [obetnij(pole(p, k[1]), 26) for k in kol2])
+        L.extend(tabela_pelna(['nr'] + [k[0] for k in kol2], wr, szer, stale=2))
     return L
 
 
@@ -4439,7 +6329,9 @@ def main(argv=None):
     ap.add_argument('--csv', action='store_true', help='skrot pliku ludzie-regiony.csv z katalogu sesji')
     ap.add_argument('--wczytanie', type=int, help='numer kampanii / wczytania w logu (od 1)')
     ap.add_argument('--test', metavar='NAZWA', help='kontrole "po czym poznac w logu" ogniwa albo grupy: 102b, 106, 103,104, '
-                                                    '102b-105, surowce, pieniadz, ludzie, wykryte, wszystkie')
+                                                    '102b-105, surowce, pieniadz, ludzie, kasy, wykryte, wszystkie')
+    ap.add_argument('--grupa', metavar='N', help='komplet kontroli grupy testowej naraz: 1 (101-105), 2 (106-107), 3 '
+                                                 '(BetterEconomy + 108-109), 4 (110-112), 5 (113) albo w-grze')
     ap.add_argument('--pelny', action='store_true', help='bez limitu dlugosci skrotu')
     ap.add_argument('--szer', type=int, default=SZEROKOSC, help='szerokosc wyjscia (domyslnie %d)' % SZEROKOSC)
     try:
@@ -4468,6 +6360,8 @@ def main(argv=None):
                 wypisz(['nie ma pliku: %s' % a.porownaj])
                 return 1
             wypisz(drukuj_porownanie(ses, wczytaj_sesje(a.porownaj, None, dni), szer))
+        elif a.grupa:
+            wypisz(linie_naglowka(ses, szer)[:4] + drukuj_grupe(ses, a.grupa, szer))
         elif a.test:
             wypisz(linie_naglowka(ses, szer)[:4] + drukuj_test(ses, a.test, szer))
         elif a.temat:

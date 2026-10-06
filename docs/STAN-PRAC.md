@@ -1,4 +1,4 @@
-# Stan prac - przekazanie dla drugiego konta (2026-10-06 ok. 11:20: w grze 102b; lancuch paczek 103-113 gotowy; prac w tle brak)
+# Stan prac - przekazanie dla drugiego konta (2026-10-06 13:00: w grze grupa 1 = wpisy 101-105, bez testu; lancuch 106-114 gotowy; prac w tle brak)
 
 Czytaj najpierw: `CLAUDE.md` (zwlaszcza sekcja 8, **zasada 0**: kazda zmiana = kontrola regresji, kolizji
 i spojnosci calej logiki; oraz pulapka MCM w sekcji 7), potem ten plik, potem gorne wpisy `CHANGELOG.md`.
@@ -56,6 +56,7 @@ Gotowe teksty wpisow CHANGELOG: `docs/paczki/`. Klon roboczy sesji: `scratchpad\
 | 111 | `paczki/111-k6-kasy-miast` | 61a3453 | K6: kasy miast bez kasowania nadwyzek i bez zlota za "zakupy" mieszczan; z nadwyzki 7% dziennie: 2/3 pan, 1/3 skarbiec krolestwa; zwrot zoldu z korony nie obejmuje zalogi, ktorej zold i tak wraca panu; tarcza zoldu z 107 staje sie zbedna; start kampanii: kasy miast przyciete o ok. 14 mln (klucz `arm_townpurse`) | zalecana |
 | 112 | `paczki/112-k7-utarg-wsi` | 306eafd | K7: utarg wsi nie znika - reszta po podatku pana zostaje we wsi; zaplata wojsk za zywnosc kupiona we wsi i sakwa rozbitego taboru tez (zwyciezca bierze cala sakwe) | nie |
 | 113 | `paczki/113-ludzie-spustoszenie` | 7b5b894 | demografia krok 4 + 6a: rabunek i marsz armii wyganiaja ulamek ludzi okregu (uchodzcy wracaja latami), koniec odrostu z niczego, plon spada z brakujacymi rekami; zawiera `ScorchedEarth.Reset` | zalecana |
+| 114 | `paczki/114-porzadki` | de5ced5 | porzadki: napis startowy SoldierPay, licznik zamiast pustego catch w paserze, pozycje ksiegi (naprawy, sakiewki rozbitych partii, wyplaty notabli); ZMIANA ZASAD: danina podzamcza dzielona z korona jak w miescie (pan 2/3, skarbiec 1/3; wlacznik Castle Dues Split With Crown) | nie |
 
 JAK WGRAC OGNIWO (po "wgraj NNN" od Jeffa, gra zamknieta): na galezi roboczej `git cherry-pick <commit ogniwa>` (ogniwa PO KOLEI;
 galaz robocza ma po 87c8e96 same commity dokumentow, wiec wchodzi czysto), `python tools/gen_mcm.py`, build z kodem 0, kopia
@@ -162,27 +163,35 @@ POZA LANCUCHEM:
 7. **Mowic prostym jezykiem.** Jeff nie zna nazw klas ani naszych skrotow ("tarcza zoldu", "regulator") - kazde pytanie i
    podsumowanie tlumaczyc slowami gracza: co sie dzieje w grze i co on zobaczy.
 
-### Prace w toku 06.10 (katalogi `scratchpad\dzien-1`, `scratchpad\dzien-2`; klon `scratchpad\lancuch`)
+### Prace w toku 06.10 (katalogi `scratchpad\dzien-1..3`; klon `scratchpad\lancuch`, galezie `n102b..n114`)
 
-- ZAKONCZONE 06.10: workflow `dzien-1`, `dzien-1b`, `dzien-2` - wszystko w lancuchu `paczki/102b..113` (galezie `n102b..n113` w klonie).
-  Narzedzie `tools/sprawdz_logi.py` dopasowane do ogniw 102b-109 (ogniw 110-113 jeszcze nie zna: linie "Kasy zamkow:",
-  "Kasy miast:", "Utarg wsi:", "Ludzie (spustoszenie):" pokaze w trybie surowym).
-- NIE MA zadnych prac w tle. Limit tygodniowy tego konta: 76% (06.10 11:05) - kolejne duze partie dopiero na innym koncie albo
-  po decyzji Jeffa.
-- NASTEPNE KROKI (kolejnosc): (1) na slowo Jeffa "wgraj grupe 1": cherry-pick 103, 104, 105 na galaz robocza, build, wgranie,
-  3 wpisy CHANGELOG; (2) po tescie: "sprawdz logi" narzedziem + linie z `docs/paczki/PRZEGLAD-KOLIZJI-LANCUCHA-2026-10-06.txt`;
-  (3) przed grupa 2: przepisac `docs/paczki/107-*.md` (lista zmian w tym samym pliku przegladu, sceptyk K1) i sprawdzic
-  `OutlawFenceRadius` w `Armoury.json`; (4) paczka "porzadki" na szczyt lancucha (napis startowy SoldierPay, pusty catch w
-  `OutlawLaw.FencePaid`, pozycje ksiegi dla napraw i sakiewek rozbitych partii, pomiar wyplat notablom) + dopasowanie narzedzia
-  logow do 110-113; (5) przeglad kolizji ogniw 110-113 z reszta (kazde ma wlasna recenzje, wspolnego przegladu jeszcze nie bylo;
-  zlozenie: konflikty tylko w konstruktorze `ArmouryBehavior`, liscie `ApplyAll` i `MoneyLedger` - komentarz naglowka i linia
-  `long sinks` w `BalanceLine`, rozwiazane recznie); (6) dalej wg fundamentu: K10 druga polowa (bezpiecznik kas z prawdziwym
-  platnikiem), K8, K12, K13 skala produkcji; demografia kroki 5 (pobor), 6b, 7 (okno zniw); reguly krain R1-R13 po odpowiedziach
-  Jeffa na pytania o kanon.
-- SKUTKI NOWYCH PACZEK, O KTORYCH JEFF WIE (06.10): zaloga we wlasnym zamku po ok. 2 tygodniach prawie nic nie kosztuje (do
-  poprawy: podzial daniny podzamcza z korona); w zamku sprzeda sie mniej lupu (kupcy maja tylko prawdziwe pieniadze); spokojne
-  miasto daje panu malo, miasto z wojskiem sporo; na starcie kampanii kupcy miast maja ok. 67 tys. zamiast 210 tys.; za rozbity
-  tabor chlopski zwyciezca bierze cala sakwe; po rabunku liczba palenisk prawie stoi, szkode widac w plonie.
+- STAN 06.10 13:00: zadnych prac w tle. W grze grupa 1 (wpisy 101-105), Jeff JESZCZE NIE TESTOWAL. Lancuch do wgrania: 106-114.
+  Limit tygodniowy tego konta 81% - nie puszczac kolejnych partii wieloosobowych na tym koncie; zostawic zapas na "sprawdz logi".
+- "SPRAWDZ LOGI" po tescie grupy N: `python tools/sprawdz_logi.py --grupa N` (zna ogniwa 100-113 i grupy 1-5; nowych linii
+  ogniwa 114 jeszcze nie - pokaze je surowo). Nie istnieje zaden prawdziwy log ogniw 101+, wiec pierwszy log obejrzec takze z
+  `--surowe` / `--temat NAZWA`; pusta kolumna albo "formaty nierozpoznane" = poprawic parser, nie ufac alarmom tego tematu.
+- PRZED GRUPA 2 (106 + 107): sprawdzic `OutlawFenceRadius` w `Armoury.json` (ma go nie byc albo 200). Opis 107 juz przepisany.
+- PRZED GRUPA 3 (BetterEconomy + 108 + 109): skrypt `tools/bee/zamknij-ujscia-bee.ps1` (-NaSucho, potem naprawde; gra zamknieta);
+  `sprawdz_logi.py --grupa 3` sam liczy, ile z 13 kluczy jest zamknietych (06.10: 0 z 13).
+- PRZED GRUPA 4 (110 + 111 + 112, NOWA kampania; razem z nia mozna wgrac 114): (a) poprawic opisy `docs/paczki/112-*.md` i
+  `113-*.md` wedle listy w `docs/paczki/PRZEGLAD-KOLIZJI-110-113-2026-10-06.txt` (K9, K10: renty wsi czytac jako "Ludnosc: renty
+  zaplacone" minus "Kasy miast: ... panom"; 640 / 648 ustawien; skok kies band po 112 pochodzi z sakw taborow); (b) powtorzyc
+  proby poza gra K7 i ludzie4 na ZLOZONYCH DLL (`dzien-1\nowy\dll\Armoury-n112-*.dll`, `-n113-*.dll`; harnessy w
+  `dzien-2\k7\harness`, `dzien-2\ludzie4\harness` + `recenzja\harness`) - oczekiwane 0 nieudanych (K11); proba K5 + K6 na n113
+  juz powtorzona: 261 z 261. Najwazniejsza liczba testu grupy 4: "Pieniadz swiata: razem" - po zamknieciu ujsc zostaje jedno
+  zrodlo z niczego (dosypka regulatora miast ponizej zapasu kupcow), wiec suma zlota swiata bedzie rosla o te dosypke.
+- GRUPA 5 (113): na TYM SAMYM zapisie co grupa 4.
+- DROBIAZGI NA POZNIEJ (z przegladow, decyzje projektu): oblezone miasto nie powinno oddawac nadwyzki (K12); prog podatkow zamku =
+  zapas kupcow (K13); etykiety logu po zlozeniu (K14); dwa miasta z zapasem kupcow ponizej rezerwy karawan 20 000 - Ifequeveron,
+  Lotus Bay (K15); reszta kiesy rozbitej bandy przepada (ujednolicic z K7 i MenPurse); bezpiecznik kas miast z prawdziwym
+  platnikiem (druga polowa K10); skarbce krolestw w pokoju tylko rosna.
+- DALEJ WG PLANU (na inne konto): K8, K12 fundamentu, K13 skala produkcji; demografia kroki 5 (pobor), 6b, 7 (okno zniw);
+  reguly krain R1-R13 po odpowiedziach Jeffa na pytania o kanon (`docs/REGULY-KRAIN-I-DLUGU-2026-10-06.md`, rozdz. 9).
+- SKUTKI NOWYCH PACZEK, O KTORYCH JEFF WIE (06.10): zaloga we wlasnym zamku przestaje byc prawie darmowa dopiero po 114; w zamku
+  sprzeda sie mniej lupu; spokojne miasto daje panu malo, miasto z wojskiem sporo; na starcie kampanii kupcy miast maja ok. 67 tys.
+  zamiast 210 tys.; za rozbity tabor chlopski zwyciezca bierze cala sakwe (bandy szybciej sie dozbrajaja); po rabunku liczba
+  palenisk prawie stoi, szkode widac w plonie. PYTANIE OTWARTE do Jeffa: czy uzywa w Spoils of War automatycznej sprzedazy
+  magazynu wojennego we wlasnym zamku (utarg wracalby do niego - zloto z niczego).
 
 - DECYZJA JEFFA 06.10 ("3 razy"): testy GRUPAMI, nie po jednym ogniwie. Grupa 1 TOWARY = 103 + 104 + 105 (nowa kampania
   wymagana przez 104); grupa 2 PIENIADZ = 106 + 107; grupa 3 LUDZIE = skrypt BetterEconomy + 108 + 109. Kazda paczka ma
