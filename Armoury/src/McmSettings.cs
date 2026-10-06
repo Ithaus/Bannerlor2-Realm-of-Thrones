@@ -1464,6 +1464,18 @@ namespace Armoury
         [SettingPropertyGroup("The road to market")]
         public float MarketCartFactor { get; set; } = 2f;
 
+        [SettingPropertyBool("Village Takings Whole", HintText = "what a village's carts bring home from market no longer vanishes: after the lord's tax (Banner Kings: 70 percent, or 50 / 90 by the fief's tax decree) and the estate owners' cut, the village purse keeps the whole remainder - until now half of that remainder was simply deleted. The lord's tax, the estates and his tax counter stay exactly as Banner Kings sets them. Off = half the remainder vanishes as before")]
+        [SettingPropertyGroup("The road to market")]
+        public bool VillageTakingsWhole { get; set; } = true;
+
+        [SettingPropertyBool("Village Food Sales Kept", HintText = "coin a lord's party pays a village for food no longer vanishes (the game took the whole price back out of the village purse as a tax nobody received): it is shared like the carts' takings - the lord's share by his tax decree goes to the village tax counter he draws from, the rest stays in the village purse. Off = the price vanishes as before")]
+        [SettingPropertyGroup("The road to market")]
+        public bool VillageFoodSalesKept { get; set; } = true;
+
+        [SettingPropertyBool("Villager Purse Survives", HintText = "the purse of a village cart party that is wiped off the map no longer vanishes with it: beaten in battle, what the game left after the victors' tenth goes to the victor as well - to the winning party's leader (to you, if you beat them) or into a bandit band's purse - just as villagers who surrender hand you the whole purse; disbanded, or with no victor able to take it, the purse goes home and is shared like takings. Off = the purse vanishes as before")]
+        [SettingPropertyGroup("The road to market")]
+        public bool VillagerPurseSurvives { get; set; } = true;
+
         [SettingPropertyBool("Caravan Bulk Enabled", HintText = "caravans haul bulk raw goods (iron ore, timber, raw hides, leather, flax, linen, wool) by need: a town short of its own stock buys what it lacks from any passing caravan, and a caravan leaving a town buys only what that town holds to spare (off = Banner Kings' price-driven caravan trade alone)")]
         [SettingPropertyGroup("The road to market")]
         public bool CaravanBulkEnabled { get; set; } = true;
@@ -2925,6 +2937,9 @@ namespace Armoury
             s.CastleVillagesSellInTown = CastleVillagesSellInTown;
             s.MarketMaxDistance = MarketMaxDistance;
             s.MarketCartFactor = MarketCartFactor;
+            s.VillageTakingsWhole = VillageTakingsWhole;
+            s.VillageFoodSalesKept = VillageFoodSalesKept;
+            s.VillagerPurseSurvives = VillagerPurseSurvives;
             s.CaravanBulkEnabled = CaravanBulkEnabled;
             s.CaravanBulkStockDays = CaravanBulkStockDays;
             s.CaravanBulkSurplusFactor = CaravanBulkSurplusFactor;

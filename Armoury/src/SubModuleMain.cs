@@ -67,6 +67,8 @@ namespace Armoury
                 try { CastlePurse.ApplyAll(_harmony); } catch (Exception e) { Log.Error("CastlePurse.ApplyAll", e); }
                 // K6: kasa miasta jako prawdziwy pieniadz - regulator i "zakupy" mieszczan ida latkami K5 (wyzej); tu tylko prefiks na gorna galaz BK HandleMarketGold; we wlasnym try
                 try { TownPurse.ApplyAll(_harmony); } catch (Exception e) { Log.Error("TownPurse.ApplyAll", e); }
+                // K7: utarg wsi bez znikania (powrot taboru, zywnosc kupiona we wsi) - we wlasnym try; prefiks First / postfiks Last wokol latki BK
+                try { VillageTakings.ApplyAll(_harmony); } catch (Exception e) { Log.Error("VillageTakings.ApplyAll", e); }
                 AiGear.ApplyAll(_harmony);       // zakupy armii AI zamiast darmowego sprzetu DTE (Jeff 04.10)
                 WorkshopLaw.ApplyAll(_harmony);  // warsztaty uzbrojenia jako firmy (Jeff 04.10)
                 Stables.ApplyAll(_harmony);
