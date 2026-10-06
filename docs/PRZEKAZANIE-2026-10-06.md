@@ -103,3 +103,21 @@ Wniosek dla nastepnego konta: wszystkie trzy to PRACA AUTORA BEZ NIEZALEZNEJ REC
 (worktree w SCRATCH\dzien-4\<paczka>\repo albo migawka .patch), zbudowac, dac niezaleznemu recenzentowi (proba obalenia wg zasady 0),
 dopiero potem zlozyc na n107 i zaproponowac Jeffowi wgranie. Kolejnosc: cena -> warsztaty -> karawany3 (te ostatnia ocenic po cenie).
 
+
+## 9. NOC 06/07.10 - nowe konto (sesja fa2fd7a6), praca nocna do 11:00 czasu Jeffa (02:00 zegara komputera)
+
+Jeff: "rob jedna rzecz na raz ... praca nocna ... nie przekroczyc limitu sesji 5-godzinnych", "pracuj do 11.00". Zasada nocy: JEDEN
+watek w tle naraz, kroki po kolei, odczyt limitu miedzy krokami, pauza przy 85-90%. Do gry NIC (dalej md5 0eeb0a10..., wpisy 101-107).
+
+Ustalenie na starcie (16:00): sekcja 8 byla nieaktualna co do "cena" - recenzent 1 zdazyl ZACOMMITOWAC wynik o 15:46:32
+(galaz `l117-cena-od-niedoboru` = af9be0c w `SCRATCH\lancuch`, 8 plikow, +417), ale nie oddal raportu i nie dopisal poprawek do
+`CHANGELOG-wpis.md`. Jego zapis: `SCRATCH\dzien-4\cena\recenzja\zapis-recenzenta-1-przerwany.txt`. Raporty autorow wszystkich trzech
+paczek: `SCRATCH\dzien-4\<paczka>\raport-autora.json`. Recenzje "warsztaty" i "karawany3" byly dopiero zaczete (bez zmian w kodzie).
+
+Plan nocy (kazdy krok = jeden workflow z jednym agentem, skrypty w `~\.claude\projects\...\fa2fd7a6-...\workflows\scripts\noc-*.js`):
+1. `noc-1-cena` - drugi niezalezny recenzent paczki "cena" (weryfikacja poprawek recenzenta 1, proba obalenia, testy, wpis). W TOKU od 16:08.
+2. `noc-2-warsztaty` - niezalezny recenzent paczki "warsztaty" -> galaz `l116-warsztaty-w-nowej-monecie`.
+3. `noc-3-karawany3` - recenzent "karawany3" na tle ceny: czy jeszcze potrzebna -> `l115-karawany-ruda-dociera` albo odrzucona.
+4. `noc-4-zlozenie` - zlozenie na n107 (cena -> karawany3 -> warsztaty), build kazdego ogniwa, przeniesienie n108..n114 na nowy szczyt.
+5. Repo: wpisy `docs/paczki/115-117-*.md`, galezie `paczki/*` na origin, STAN-PRAC, raport dla Jeffa prostym jezykiem.
+Stan kazdego kroku dopisuje ponizej.
