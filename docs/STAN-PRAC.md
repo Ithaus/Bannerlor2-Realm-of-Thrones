@@ -32,6 +32,25 @@ i spojnosci calej logiki; oraz pulapka MCM w sekcji 7), potem ten plik, potem go
 - **Wpis 101** (woz: udzwig taboru wsi zamkowej x2) WGRANY, NIEPRZETESTOWANY. Nastepny uzgodniony krok: KARAWANY - surowce masowe (ruda, drewno, skory, len, welna) sprzedawane tam, gdzie brakuje, w ilosci wedle braku i kasy miasta, kupowane tyle, ile da sie sprzedac (BK prowadzi wlasna kopie kodu karawan: BKCaravansBehavior; vanilla jest wylaczona; dzis kupno ogranicza stala 1500 w starej monecie, a sprzedaz dzienny budzet miasta + 2 x wartosc sztuki - stad 3155 ladunkow rudy w taborach i 60 miast bez rudy). usuniecie podwojnego mineralu BK; zapas startowy x10 (K3);
   paser skupujacy lup band; potem ksiega przeplywow (K1) i dalsze kroki fundamentu.
 
+## Gotowe paczki czekajace na wgranie (kopie robocze w scratchpadzie sesji)
+
+- **KARAWANY** (po tescie wozu): kopia `scratchpad\wpis-102\repo` - 5 plikow: NOWY `CaravanBulk.cs`, `Settings.cs`, `McmSettings.cs`,
+  `SubModuleMain.cs`, `ArmouryBehavior.cs`; build kod 0; niezalezny recenzent: "poprawione i gotowe" (pelny wynik i tekst wpisu
+  CHANGELOG: plik `tasks\womlo4hxt.output` sesji). Regula: karawana przy wjezdzie do MIASTA sprzedaje rude, drewno, skory, skore,
+  len, plotno i welne do zapasu docelowego miasta (10 dob zuzycia rzemieslnikow i warsztatow notabli; placi kasa miasta ponad
+  20 000); przy wyjezdzie z miasta kupuje tylko z jego nadwyzki (ponad 2 x zapas docelowy), krokami po 10 sztuk, najwyzej do polowy
+  udzwigu i tylko gdy swiat nie wiezie juz dosc; stara wycena zakupu BK dla tych kategorii wyzerowana, zakupy "gabki" BK oddawane na
+  polke. Poprawki recenzenta: zakup krokami (stary sposob przekraczal budzet), zamki wyciete z zakupu (karawany BK do zamkow nie
+  wjezdzaja), brak odkupu w tej samej wizycie, zapas docelowy liczy warsztaty notabli, wyjatek dla rozkazu gracza "tylko zywnosc",
+  cofanie przerwanej transakcji. OTWARTE: zapas zamkow (2641 rudy, 7905 drewna) zostaje na miejscu; kierunek jazdy karawan bez zmian
+  (regiony bez kopaln moga zostac puste); kolejnosc zakupu "najcenniejszy kilogram pierwszy" - ruda po lzejszych surowcach (decyzja
+  Jeffa); nasz zakup idzie po zakupach BK (patrzec na "brak miejsca w jukach"). Log: "Karawany:" i "Karawany (stan):". UWAGA przy
+  wprowadzaniu: repo ma nowsze commity niz kopia - przeniesc zmiany paczki do aktualnych plikow (SubModuleMain / ArmouryBehavior /
+  Settings mogly sie zmienic), wygenerowac MCM od nowa i zbudowac.
+- Dalsze paczki nocy (logi, zapas startowy, mineral BK, paser, BetterEconomy, zold i skarbiec, przyrost naturalny): patrz
+  `docs/PLAN-NOCNY-2026-10-05.md` i raport `docs/RAPORT-NOCNY-2026-10-06.md`.
+- Kolejka po karawanach (kazde osobno, z testem Jeffa): zapas startowy; mineral BK; 13 kluczy BetterEconomy; paser; zold i skarbiec;
+  potem demografia.
 ## Decyzje Jeffa 05.10 - komplet (wiazace przy dalszych krokach)
 
 **Skala i towar**
