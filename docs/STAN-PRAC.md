@@ -1,4 +1,4 @@
-# Stan prac - przekazanie dla drugiego konta (2026-10-06 rano, po wpisie 102 i nocy z paczkami 103-107)
+# Stan prac - przekazanie dla drugiego konta (2026-10-06 ok. 08:40, lancuch paczek 102b-109 gotowy, dzien-2 w toku)
 
 Czytaj najpierw: `CLAUDE.md` (zwlaszcza sekcja 8, **zasada 0**: kazda zmiana = kontrola regresji, kolizji
 i spojnosci calej logiki; oraz pulapka MCM w sekcji 7), potem ten plik, potem gorne wpisy `CHANGELOG.md`.
@@ -32,55 +32,57 @@ i spojnosci calej logiki; oraz pulapka MCM w sekcji 7), potem ten plik, potem go
 - **Wpis 101** (woz: udzwig taboru wsi zamkowej x2) WGRANY, NIEPRZETESTOWANY. Nastepny uzgodniony krok: KARAWANY - surowce masowe (ruda, drewno, skory, len, welna) sprzedawane tam, gdzie brakuje, w ilosci wedle braku i kasy miasta, kupowane tyle, ile da sie sprzedac (BK prowadzi wlasna kopie kodu karawan: BKCaravansBehavior; vanilla jest wylaczona; dzis kupno ogranicza stala 1500 w starej monecie, a sprzedaz dzienny budzet miasta + 2 x wartosc sztuki - stad 3155 ladunkow rudy w taborach i 60 miast bez rudy). usuniecie podwojnego mineralu BK; zapas startowy x10 (K3);
   paser skupujacy lup band; potem ksiega przeplywow (K1) i dalsze kroki fundamentu.
 
-## Gotowe paczki czekajace na wgranie (stan 06.10 rano - CZYTAJ `docs/RAPORT-NOCNY-2026-10-06.md`)
+## Gotowe paczki czekajace na wgranie (stan 06.10 ok. 08:40 - po przebudowie lancucha)
 
-W GRZE: wpis 101 (woz x2) + wpis 102 (same logi: "Pieniadz swiata:", "Przeplywy osad:", "Ludzie:" + CSV, "budowy" i podzial
-"tabory" w "Ruda:" / "Drewno:", "brak surowca" wedlug surowca). DLL md5 `bf0945fcb4987f4bc54e49a6467895ab`. Oba nieprzetestowane -
-pierwszy test Jeffa: nowa kampania 15-20 dob, "sprawdz logi".
+W GRZE: wpis 101 (woz x2) + wpis 102 (same logi). DLL md5 `bf0945fcb4987f4bc54e49a6467895ab`. Oba NIEPRZETESTOWANE - Jeff nie
+zrobil jeszcze zadnego testu po 05.10 15:22. Pierwszy test: nowa kampania 15-20 dob, potem "sprawdz logi"
+(`python tools/sprawdz_logi.py` daje skrot sesji: ktore ogniwo w grze, bledy, alarmy, tabela dzien po dniu).
 
-LANCUCH PACZEK KODU - galezie w repo i na origin, kazda na poprzedniej, baza = galaz robocza po wpisie 102 (87c8e96). Scalone
-recznie na aktualny kod, MCM wygenerowany, kazde ogniwo buduje sie z kodem 0. Kazda paczka ma wlasna niezalezna recenzje
-("poprawione i gotowe"). Gotowe teksty wpisow CHANGELOG: `docs/paczki/`.
+LANCUCH PACZEK KODU (zlozony od nowa 06.10 z poprawkami po decyzjach Jeffa). Galezie `paczki/*` w repo i na origin; kazde
+ogniwo to JEDEN commit na poprzednim, baza 87c8e96 (kod w grze). Kazde buduje sie z kodem 0 i ma niezalezna recenzje.
+Gotowe teksty wpisow CHANGELOG: `docs/paczki/`. Klon roboczy sesji: `scratchpad\lancuch` (galezie `n102b..n109`).
 
 | Nr | Galaz | Commit | Tresc | Nowa kampania |
 |---|---|---|---|---|
-| 103 | `paczki/103-karawany` | 55eb166 | `CaravanBulk.cs`: karawany sprzedaja miastom surowce masowe do zapasu docelowego, kupuja tylko z nadwyzek | zalecana |
-| 104 | `paczki/104-zapas-startowy` | 10dd385 | `StartStock.cs`: ruda i drewno startu kampanii przeliczone na ladunki (flaga zapisu `arm_startstock`) | wymagana |
-| 105 | `paczki/105-mineral-bk` | 6155e9d | `MineralOnce.cs`: BK bez powtorzonego mineralu; `MineOutputMultiplier` 3 -> 6 | wymagana |
-| 106 | `paczki/106-paser` | a3ab91b | `OutlawLaw.cs`: bandy sprzedaja lup paserowi w miescie; koniec zlota z niczego w kryjowce | nie |
-| 107 | `paczki/107-zold-i-skarbiec` | cf37864 | `SoldierPay.cs`: zold do sakiewek ludzi i kas osad; skarbiec w wojnie zwraca 50% zoldu | nie |
+| 102b | `paczki/102b-ksiega-pieniadza` | 0ca94bf | TYLKO LOG: ksiega pieniadza mierzy rozliczenia rodow - zold liczony raz; nowa linia "Pieniadz swiata (rody):" | nie |
+| 103 | `paczki/103-karawany` | c387528 | karawany woza surowce masowe wedle brakow miast; kolejnosc kupna i sprzedazy wedle prawdziwego zysku w denarach | zalecana |
+| 104 | `paczki/104-zapas-startowy` | 46248e6 | ruda i drewno startu kampanii w ladunkach (flaga `arm_startstock`) | WYMAGANA |
+| 105 | `paczki/105-mineral-bk` | 52d5827 | BK bez powtorzonego mineralu; wydobycie rudy, soli, gliny, srebra BEZ ZMIAN (jeden wpis liczony tyle razy, ile bylo powtorzen); `MineOutputMultiplier` zostaje 3 | nie |
+| 106 | `paczki/106-paser` | 8213b26 | paser dla wszystkich band: promien 200, sprzedaz temu miastu, ktore zaplaci najwiecej (0.50 -> 0.25 ceny z odlegloscia), skup zywnosci, koniec zlota i zywnosci band z niczego, kasy kryjowek w obiegu, bandy wydaja 10% kiesy dziennie w miescie | nie |
+| 107 | `paczki/107-zold-i-skarbiec` | 6ace39a | zold do sakiewek ludzi i kas osad, skarbiec w wojnie zwraca 50% zoldu, tarcza zoldu WLACZONA | nie |
+| 108 | `paczki/108-ludzie-jednostka` | fff2a3b | demografia krok 2: 1 czlowiek = 1/k hearth (wyrzutki, tabory, pobor gracza, zadania); pula band liczona od ludnosci | nie |
+| 109 | `paczki/109-ludzie-przyrost` | 1d3459f | demografia krok 3 + 9a: przyrost naturalny wsi (-1.3..+0.8% rocznie) zamiast stalej gry; ludnosc miast zamrozona (klucz `arm_people`) | nie |
 
-JAK WGRAC OGNIWO (po "wgraj NNN" od Jeffa, gra zamknieta): galaz robocza dostala po 87c8e96 same commity dokumentow, wiec
-`git cherry-pick <commit ogniwa>` wchodzi czysto (`McmSettings.cs` i tak wygenerowac od nowa: `python tools/gen_mcm.py`);
-build z kodem 0; kopia `Armoury.dll.bak-<data>-przed-NNN`; wgranie; md5; wpis z `docs/paczki/NNN-*.md` na gore CHANGELOG ze
-statusem; commit + push. Ogniwa wgrywac PO KOLEI (kazde zawiera poprzednie).
+JAK WGRAC OGNIWO (po "wgraj NNN" od Jeffa, gra zamknieta): na galezi roboczej `git cherry-pick <commit ogniwa>` (ogniwa PO KOLEI;
+galaz robocza ma po 87c8e96 same commity dokumentow, wiec wchodzi czysto), `python tools/gen_mcm.py`, build z kodem 0, kopia
+`Armoury.dll.bak-<data>-przed-NNN`, wgranie, md5, wpis z `docs/paczki/NNN-*.md` na gore CHANGELOG ze statusem, commit + push.
+Mozna wgrac kilka ogniw naraz (grupa testowa) - cherry-pick wszystkich po kolei, jeden build.
 
-UWAGI Z PRZEGLADU KOLIZJI 103-105 (werdykt "czysty"):
-- PRZED WGRANIEM 105 sprawdzic, czy w `Documents\Mount and Blade II Bannerlord\Configs\ModSettings\Global\Armoury\Armoury.json`
-  nie pojawil sie klucz `MineOutputMultiplier` (06.10 go nie ma, plik ma 335 kluczy). Zapis ustawien w MCM wpisze tam 3 i po
-  105 wydobycie rudy spadnie o polowe. W logu ma byc "wydobycie rudy x6.0".
-- Po 104 karawany przez pierwsze doby nie maja nadwyzek do wiezienia (miasta z 1/10 zapasu); do tego `CaravanBulk` zeruje wycene
-  BK juz w przebiegach startowych kampanii (`CaravanBulk.cs:467-476` bez warunku `GameStarted`). Jesli rozruch potrwa ponad
-  7-10 dob: dodac `GameStarted` do postfiksu wyceny - tylko razem z 104.
-- Test 103 biegnie jeszcze na zapasie x10 - pokazuje mechanike, nie skutecznosc; test 105 nie jest porownywalny ze 104 na
-  starcie (ticki startowe licza model x6 przed przelicznikiem; podatek poczatkowy 26 wsi z ruda ok. +170 tys. d).
-- Cofniecie z 104 do starszego DLL na kampanii mlodszej niz doba gubi flage - zakladac nowa kampanie.
-- OGNIWA 106-107 NIE MAJA przegladu kolizji z 103-105 - zrobic jednym watkiem przed wgraniem 106. Przy scalaniu 107 pozycje
-  ksiegi pieniadza przenumerowane: `NFence` 3, `NWage` 4, `NLife` 5, `Notes` 6; `MFence` 4, `Marks` 5.
+UWAGI DO WGRYWANIA I TESTOW:
+- 102b to sam log - najlepiej wgrac PRZED pierwszym testem Jeffa (bez niej bilans "Pieniadz swiata" odejmuje zold dwa razy).
+- Tuz przed wgraniem 106 i 107 przeczytac `Armoury.json` Jeffa (Documents\...\ModSettings\Global\Armoury): dzis nie ma w nim
+  zadnego klucza tych paczek; gdyby Jeff zapisal ustawienia w MCM, plik dostanie komplet kluczy i domyslne z kodu przestana dzialac.
+- 109 wymaga zamknietych ujsc BetterEconomy (skrypt `tools/bee/zamknij-ujscia-bee.ps1`, NIE uruchomiony) - bez tego inwestycje
+  BEE dopisuja wsiom 65-135 hearth dziennie z niczego, 20-40 razy wiecej niz caly przyrost naturalny.
+- Po 104 karawany przez pierwsze doby nie maja nadwyzek do wiezienia (rozruch, nie blad). Test 103 bez 104 pokazuje mechanike,
+  nie skutecznosc.
+- Po 109 spalona wies nie odrasta az do kroku 4 (w toku); zostaje regula "+0.5 hearth ponizej 40" (ludzie z niczego) - kroku 4
+  nie odkladac.
+- Etykiety dnia w logu: "Wyrzutki / Paser / Zold / Korona / Skarbce dzien D" to ten sam tick co "Ruda / Karawany / Dowoz /
+  Przeplywy osad / Pieniadz swiata / Ludzie dzien D-1".
+- Przeglad kolizji: stary lancuch 103-107 - dwa razy "czysty"; NOWY lancuch 102b-109 - przeglad w toku (workflow dzien-2).
+
+SKUTKI, O KTORYCH JEFF WIE (powiedziane 06.10): ruda nie idzie w karawanach pierwsza (tania - 8 d za 100 kg; wedle zysku wygrywaja
+welna i plotno), ale jest wozona; drewna karawany czesto nie woza (zysk bliski zera); w kryjowkach nowej kampanii prawie nie ma
+zlota do znalezienia; pula band idzie za ludnoscia (Reach 486 -> 1130, Nocna Straz 163 -> 3).
 
 POZA LANCUCHEM:
-- **BetterEconomy, 13 kluczy:** `tools/bee/zamknij-ujscia-bee.ps1` (+ `cofnij-ujscia-bee.ps1`, `skoki-bee.py`, `OPIS.md`); NIE
-  uruchomione. Wywolanie: `powershell -NoProfile -ExecutionPolicy Bypass -File <skrypt>` (najpierw `-NaSucho`). Zbrojownia zamknieta
-  tylko dla AI. Test: sesja "przed" i "po" z tego samego zapisu, 10-12 dob. Aktualizacja BEE / weryfikacja plikow Steam cofa zmiane.
-- **Reguly krain i dlugu:** `docs/REGULY-KRAIN-I-DLUGU-2026-10-06.md` (projekt bez kodu, kolejnosc R1-R13, 8 pytan w rozdz. 9).
-- **Poprawka do wpisu 102 (do zrobienia po pierwszym logu):** "Pieniadz swiata (bilans):" najpewniej liczy zold dwa razy
-  (`WagePostfix` `MoneyLedger.cs:364-370` + bilans rodu przez GiveGoldAction) - potwierdzic na logu, poprawic osobnym wpisem.
-- NIE ZROBIONE: paczka "przyrost naturalny" (kroki 2-3 demografii).
-
-DECYZJE CZEKAJACE NA JEFFA (pelna lista z rekomendacjami: raport nocny, rozdz. 6): ruda pierwsza w zakupach karawan; wyrownanie
-soli / gliny / srebra po 105; promien pasera 20 czy 40 (`OutlawFenceRadius`); tarcza zoldu `TownWageShield` (domyslnie wylaczona -
-bez niej regulator kas kasuje ok. 81% zoldu w miastach i 99% w zamkach); zold zalogi zamku do kasy zamku czy miasta; limit
-tygodniowy na prace w tle.
+- **BetterEconomy, 13 kluczy:** `tools/bee/` (zamknij / cofnij / skoki-bee.py / OPIS.md); wywolanie
+  `powershell -NoProfile -ExecutionPolicy Bypass -File <skrypt>` (najpierw `-NaSucho`); zbrojownia zamknieta tylko dla AI.
+- **Reguly krain i dlugu:** `docs/REGULY-KRAIN-I-DLUGU-2026-10-06.md` (projekt bez kodu; 8 pytan w rozdz. 9 - to sprawy kanonu,
+  wiec dla Jeffa: czy jency Innych wstaja jako trupy, bracia Strazy bez zoldu, kto bierze jencow z rabunku).
+- **Narzedzie logow:** `tools/sprawdz_logi.py` czyta uklad wpisu 102 i starego lancucha; dopasowanie do 102b-109 w toku.
+- **Drobne, do zrobienia:** pozycje ksiegi dla napraw i sakiewek rozbitych partii, pomiar wyplat notablom (dzis w "reszcie").
 
 ## Decyzje Jeffa 05.10 - komplet (wiazace przy dalszych krokach)
 
@@ -156,15 +158,18 @@ tygodniowy na prace w tle.
 7. **Mowic prostym jezykiem.** Jeff nie zna nazw klas ani naszych skrotow ("tarcza zoldu", "regulator") - kazde pytanie i
    podsumowanie tlumaczyc slowami gracza: co sie dzieje w grze i co on zobaczy.
 
-### Prace w toku 06.10 (katalog `scratchpad\dzien-1`, klon `scratchpad\lancuch`)
+### Prace w toku 06.10 (katalogi `scratchpad\dzien-1`, `scratchpad\dzien-2`; klon `scratchpad\lancuch`)
 
-- Workflow `dzien-1` (run `wf_088bc6c8-b18`): przeglad kolizji ogniw 106-107; poprawka ksiegi pieniadza (galaz
-  `l102b-ksiega-zoldu`, tylko log); demografia krok 2 (`l108-ludzie-jednostka`) i krok 3 + 9a (`l109-ludzie-przyrost`);
-  narzedzie `dzien-1\logi\sprawdz_logi.py` (docelowo `tools/sprawdz_logi.py`).
-- Workflow `dzien-1b` (run `wf_5aa7ad5f-54a`): przerobka pasera (`l106b-paser-wszyscy`); recenzje poprawek
-  `l103b-karawany-zysk` i `l105b-mineral-bez-zmian`.
-- Po zakonczeniu: zlozyc lancuch od nowa (102b -> 103+103b -> 104 -> 105+105b -> 106+106b -> 107+107b -> 108 -> 109), zbudowac
-  kazde ogniwo, zaktualizowac galezie `paczki/*` na origin i `docs/paczki/*.md`.
+- ZAKONCZONE 06.10 rano: workflow `dzien-1` i `dzien-1b` (ksiega 102b, karawany wedle zysku, mineral bez zmiany wydobycia,
+  paser dla wszystkich band, demografia krok 2 i 3, narzedzie logow, kolizje 106-107) - wszystko w lancuchu `paczki/102b..109`.
+- W TOKU: workflow `dzien-2` (run `wf_2556af79-033`, kazda paczka autor + recenzent, baza `n109-ludzie-przyrost`):
+  K5 kasa zamku (`l110-k5-kasa-zamku`) -> K6 kasy miast bez kasowania nadwyzek + pulap zaworu (`l111-k6-kasy-miast`);
+  K7 utarg wsi bez znikania (`l112-k7-utarg-wsi`); demografia krok 4 + 6a spustoszenie (`l113-ludzie-spustoszenie`);
+  dopasowanie `sprawdz_logi.py` (`dzien-2\logi`); przeglad kolizji nowego lancucha z propozycja grup testowych.
+- PO ZAKONCZENIU: dolozyc nowe paczki do lancucha jako 110-113 (skrypt `dzien-1\nowy\ogniwo.ps1`: cherry-pick, MCM, build,
+  commit), wypchnac `paczki/*`, zapisac opisy w `docs/paczki/`, zaktualizowac ten dokument.
+- PROPOZYCJA DLA JEFFA (czeka): testowac grupami zamiast 9 osobnych kampanii - np. [102b + 103 + 104 + 105], [106 + 107],
+  [BetterEconomy + 108 + 109]; kazda paczka ma wlacznik w MCM, wiec winnego da sie wskazac.
 
 ## Gdzie jestesmy
 
