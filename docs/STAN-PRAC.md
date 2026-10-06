@@ -168,8 +168,13 @@ POZA LANCUCHEM:
   dopasowanie `sprawdz_logi.py` (`dzien-2\logi`); przeglad kolizji nowego lancucha z propozycja grup testowych.
 - PO ZAKONCZENIU: dolozyc nowe paczki do lancucha jako 110-113 (skrypt `dzien-1\nowy\ogniwo.ps1`: cherry-pick, MCM, build,
   commit), wypchnac `paczki/*`, zapisac opisy w `docs/paczki/`, zaktualizowac ten dokument.
-- PROPOZYCJA DLA JEFFA (czeka): testowac grupami zamiast 9 osobnych kampanii - np. [102b + 103 + 104 + 105], [106 + 107],
-  [BetterEconomy + 108 + 109]; kazda paczka ma wlacznik w MCM, wiec winnego da sie wskazac.
+- DECYZJA JEFFA 06.10 ("3 razy"): testy GRUPAMI, nie po jednym ogniwie. Grupa 1 TOWARY = 103 + 104 + 105 (nowa kampania
+  wymagana przez 104); grupa 2 PIENIADZ = 106 + 107; grupa 3 LUDZIE = skrypt BetterEconomy + 108 + 109. Kazda paczka ma
+  wlacznik w MCM - gdy cos nie dziala, wylaczac po kolei. Wgranie grupy: cherry-pick wszystkich jej ogniw po kolei, jeden
+  build, jedna kopia .bak, osobny wpis CHANGELOG na kazde ogniwo. Grupe wgrywac dopiero na slowo Jeffa ("wgraj grupe N") i po
+  czystym przegladzie kolizji nowego lancucha (dzien-2). Paczki 110-113 (K5, K6, K7, krok 4) utworza grupy 4-5.
+- Do rozstrzygniecia z Jeffem jednym slowem: pierwszy test to samo "101 + 102 + 102b" (wtedy 4 testy) czy od razu z grupa 1
+  (3 testy; ksiegi z tego testu sa wtedy stanem "przed" dla grup 2 i 3 - rekomendacja).
 
 ## Gdzie jestesmy
 
