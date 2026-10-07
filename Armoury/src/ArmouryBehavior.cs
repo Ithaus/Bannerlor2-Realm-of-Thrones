@@ -2286,18 +2286,81 @@ namespace Armoury
             catch (Exception e) { Log.Error("RepairAllSelf", e); }
         }
 
+        /// <summary>
+        /// Plan naprawy uprzezy u kowali miasta (lawa naprawcza, SmithMendFromMarket): kazda czesc ze stanem ponizej 100 - robocizna
+        /// jak dotad (wartosc x brak x RepairCostFactor), material wedle braku (MendMaterial.NeedsFor - ta sama regula co lup), brak
+        /// materialu = ta czesc czeka. Wrakow tu nie ma: naprawa przywraca oryginalny modyfikator (stan lupu zostaje). slots - przegrodki,
+        /// ktore kowale zrobia. Na probie - polke i zapas zmienia dopiero RepairAll (Commit).
+        /// </summary>
+        internal MendMaterial.Order PlanRepair(List<int> slots)
+        {
+            var o = new MendMaterial.Order(Settlement.CurrentSettlement);
+            try
+            {
+                var eq = Hero.MainHero.BattleEquipment;
+                for (int slot = 0; slot < 12; slot++)
+                {
+                    var el = eq[slot];
+                    if (el.Item == null) continue;
+                    float cond = GetConditionQuiet(slot);
+                    if (cond >= 100f) continue;
+                    float missing = (100f - cond) / 100f;
+                    int labor = (int)(el.Item.Value * missing * Settings.Current.RepairCostFactor);   // ta sama robocizna co RepairCost
+                    if (o.AddLot(new EquipmentElement(el.Item), MendMaterial.NeedsFor(el.Item, missing), labor, 1, long.MaxValue, int.MaxValue) > 0 && slots != null)
+                        slots.Add(slot);
+                }
+            }
+            catch (Exception e) { Log.Error("PlanRepair", e); }
+            return o;
+        }
+
+        /// <summary>Uprzaz u kowali miasta z materialem z targu (SmithMendFromMarket): czy zlecenie sie odbedzie - inaczej komunikat, nic nie
+        /// zaplacone i nic nie zdjete z polki. Kowale robia tylko czesci, na ktore jest material (PlanRepair); reszta czeka.</summary>
+        private static bool MarketRepairGo(MendMaterial.Order o, string town)
+        {
+            if (o.Pieces == 0 && o.Wait == 0 && o.NoSmith == 0) { Log.Player("Your gear is sound. Nothing to mend."); return false; }
+            if (!o.Ok) { Log.Player("There are no town smiths here - nothing was mended.", true); return false; }
+            if (o.Pieces == 0)
+            {
+                Log.Player("The smiths of " + town + " could mend nothing of your harness." + o.LeftEn(town), true);
+                Log.Info("Lawa naprawcza (uprzaz) - kowale " + town + ": " + o.LogPl());
+                return false;
+            }
+            if (Hero.MainHero.Gold < o.Total) { Log.Player("You cannot pay the smiths' price.", true); return false; }
+            return true;
+        }
+
         internal void RepairAll()
         {
             try
             {
-                int cost = RepairCost();
-                if (cost <= 0) { Log.Player("Your gear is sound. Nothing to mend."); return; }
-                if (Hero.MainHero.Gold < cost) { Log.Player("You cannot pay the smith's price.", true); return; }
+                // SmithMendFromMarket: kowale miasta robia tylko czesci, na ktore jest material na targu (PlanRepair) - robota jak dotad
+                // + material; reszta czeka. Przywracanie stanu - ta sama petla co dotad (jedna regula dla obu sciezek).
+                List<int> only = null;
+                MendMaterial.Order order = null;
+                var here = Settlement.CurrentSettlement;
+                string town = here != null && here.Name != null ? here.Name.ToString() : "this town";
+                int cost;
+                if (SmithMenu.MarketRule)
+                {
+                    only = new List<int>();
+                    order = PlanRepair(only);
+                    if (!MarketRepairGo(order, town)) return;
+                    cost = order.Total;
+                    order.Bench.Commit();
+                }
+                else
+                {
+                    cost = RepairCost();
+                    if (cost <= 0) { Log.Player("Your gear is sound. Nothing to mend."); return; }
+                    if (Hero.MainHero.Gold < cost) { Log.Player("You cannot pay the smith's price.", true); return; }
+                }
                 Pay.ToSettlement(cost);   // wpis 90 (audyt): zaplata kowalowi do kasy miasta, nie w nicosc
 
                 var eq = Hero.MainHero.BattleEquipment;
                 for (int slot = 0; slot < 12; slot++)
                 {
+                    if (only != null && !only.Contains(slot)) continue;   // SmithMendFromMarket: ta czesc czeka na material albo jest cala
                     var el = eq[slot];
                     if (el.Item == null) continue;
                     // ZBROJA Z KUZNI JAK BRON: kowal naprawia tylko sztuki zuzyte wedle ksiegi - te same, za ktore policzyl w RepairCost.
@@ -2310,6 +2373,13 @@ namespace Armoury
                     eq[slot] = new EquipmentElement(el.Item, orig);
                     SetCondition(slot, 100f);
                     if (ArmourQuality.On) SetLast(slot, origId);
+                }
+                if (order != null)
+                {
+                    Log.Player("The smiths of " + town + " made " + order.Pieces + (order.Pieces == 1 ? " piece" : " pieces") + " of your harness whole again for " + cost
+                               + " gold, paid into the town's coffers: " + order.Labor + " for their work and " + order.MatGold + " for materials from its market." + order.LeftEn(town));
+                    Log.Info("Lawa naprawcza (uprzaz) - kowale " + town + ": sloty " + string.Join(",", only) + "; " + order.LogPl());
+                    return;
                 }
                 Log.Player("The smith has made your harness whole again for " + cost + " gold.");
                 Log.Info("Naprawa za " + cost);

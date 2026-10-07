@@ -437,12 +437,111 @@ namespace Armoury
             catch (Exception e) { Log.Error("AffordableBattleWorn", e); }
         }
 
+        // ------------------------------------------------- kowale miasta za monete: robota + material z targu, bez wrakow
+        // Jeff 07.10 (naprawa u kwatermistrza Spoils): "placi kasie miasta (kowale), zuzywa material z targu wedle stanu, wrakow
+        // (Mangled) nie odnawia" - ta sama regula dla calej lawy naprawczej za monete: "Restore ALL", "Pick a piece - the smith",
+        // "Send the men's worn gear", "Mend everything you wear - the smith's price". Robocizna jak dotad (PieceCost / TroopPieceCost /
+        // uprzaz: RepairCostFactor), material MendMaterial.Order (wedle stanu, z polki miasta albo zapasu kowali, po cenie targu);
+        // brak materialu - sztuka czeka; wrak - tylko wlasne rece z materialem ("Mend it yourself") albo przetop. Wylacznik SmithMendFromMarket.
+        internal static bool MarketRule { get { var s = Settings.Current; return s != null && s.SmithMendFromMarket; } }
+
+        internal static string TownName()
+        {
+            var st = Settlement.CurrentSettlement;
+            return st != null && st.Name != null ? st.Name.ToString() : "this town";
+        }
+
+        private struct Lot { public EquipmentElement El; public int Amount, Labor; public float[] Need; public float Est; }
+
+        /// <summary>Plan zlecenia u kowali miasta dla zuzytych sztuk z rostera (sakwy albo zbrojownia wojska): wraki i sztuki bez receptury
+        /// pominiete, reszta najtansze najpierw (robocizna + szacunek materialu - jak dotad najtansze najpierw), razem najwyzej limit zlota
+        /// i maxPieces sztuk. Na probie (polka i zapas bez zmian) - wykonanie robi ApplyRoster.</summary>
+        private static MendMaterial.Order PlanRoster(TaleWorlds.CampaignSystem.Roster.ItemRoster roster, Func<EquipmentElement, int> labor, long limit, int maxPieces)
+        {
+            var o = new MendMaterial.Order(Settlement.CurrentSettlement);
+            if (roster == null) return o;
+            var lots = new List<Lot>();
+            for (int i = 0; i < roster.Count; i++)
+            {
+                var el = roster.GetElementCopyAtIndex(i);
+                var ee = el.EquipmentElement;
+                if (el.Amount <= 0 || ee.Item == null || !IsBattleWorn(ee.Item, ee.ItemModifier)) continue;
+                if (LootPrices.IsWreck(ee.ItemModifier)) { o.Wrecks += el.Amount; continue; }   // wpis 97: wrak nie za monete
+                var need = MendMaterial.Needs(ee);
+                if (need == null) { o.NoSmith += el.Amount; continue; }
+                lots.Add(new Lot { El = ee, Amount = el.Amount, Labor = labor(ee), Need = need });
+            }
+            for (int i = 0; i < lots.Count; i++) { var l = lots[i]; l.Est = l.Labor + o.Bench.Estimate(l.Need); lots[i] = l; }
+            lots.Sort((a, b) => a.Est.CompareTo(b.Est));
+            foreach (var l in lots) o.AddLot(l.El, l.Need, l.Labor, l.Amount, limit, maxPieces);
+            return o;
+        }
+
+        /// <summary>Wykonanie planu na rosterze: material z polki (Commit), sztuki z zuzytych na czyste, zaplata w finally - za to, co naprawde
+        /// zrobione (robocizna + material w calych pensach), z kiesy gracza do kasy miasta (Pay.ToSettlement - jak dotad).</summary>
+        private static void ApplyRoster(MendMaterial.Order o, TaleWorlds.CampaignSystem.Roster.ItemRoster roster, out int done, out int paid)
+        {
+            done = 0; paid = 0;
+            int labor = 0; float mat = 0f;
+            try
+            {
+                o.Bench.Commit();
+                foreach (var j in o.Jobs)
+                {
+                    bool off = false;
+                    try
+                    {
+                        roster.AddToCounts(j.El, -j.N); off = true;
+                        roster.AddToCounts(new EquipmentElement(j.El.Item), j.N); off = false;
+                    }
+                    finally { if (off) roster.AddToCounts(j.El, j.N); }
+                    done += j.N; labor += j.Labor; mat += j.Mat;
+                }
+            }
+            finally
+            {
+                if (done == o.Pieces) mat = o.Mat;   // cala robota: ta sama suma co w planie (podpowiedz opcji) - co do pensa
+                paid = labor + MendMaterial.Gold(mat);
+                Pay.ToSettlement(paid);
+            }
+        }
+
+        /// <summary>Linia "Smith: ..." w podpowiedzi listy: cena kowali miasta (robota + material) albo dlaczego nie za monete.</summary>
+        private static string SmithLine(MendMaterial.Order q, EquipmentElement ee)
+        {
+            string hrs = Settings.Current.MendLootHoursPerPiece.ToString("0.#") + "h";
+            int labor = PieceCost(ee);
+            if (q == null) return "Smith: " + labor + " gold, " + hrs;
+            int total, miss; float mat;
+            int r = q.Quote(ee, MendMaterial.Needs(ee), labor, out total, out mat, out miss);
+            if (r == MendMaterial.Wreck) return "Smith: not for coin - a wreck is mended only with your own materials (or melted down)";
+            if (r == MendMaterial.NoRecipe) return "Smith: no smith's work";
+            if (!q.Ok) return "Smith: no town smiths here";
+            if (r == MendMaterial.Waits) return "Smith: waits - the market has not enough " + MendMaterial.KindsEn(miss);
+            return "Smith: " + total + " gold (work " + labor + ", materials " + MendMaterial.Gold(mat) + "), " + hrs;
+        }
+
         private static bool MendLootCondition(MenuCallbackArgs args)
         {
             try
             {
                 args.optionLeaveType = GameMenuOption.LeaveType.Craft;
                 if (!Settings.Current.WreckSalvageEnabled && !Settings.Current.BattlefieldLawEnabled) return false;
+                if (MarketRule)
+                {
+                    int bags, bagsCost; ScanBattleWorn(out bags, out bagsCost);
+                    if (bags == 0)
+                    { args.IsEnabled = false; args.Tooltip = new TextObject("{=!}No battle-worn loot in your bags."); return true; }
+                    var o = PlanRoster(MobileParty.MainParty.ItemRoster, PieceCost, Hero.MainHero.Gold, int.MaxValue);
+                    string town = TownName();
+                    if (!o.Ok)
+                    { args.IsEnabled = false; args.Tooltip = new TextObject("There are no town smiths here."); return true; }
+                    if (o.Pieces == 0)
+                    { args.IsEnabled = false; args.Tooltip = new TextObject("The smiths of " + town + " can restore none of it for coin now." + o.LeftEn(town)); return true; }
+                    args.Tooltip = new TextObject("The smiths of " + town + " will make " + o.Pieces + " battle-worn pieces whole for " + o.Total + " gold - "
+                        + o.Labor + " for their work and " + o.MatGold + " for materials from the market." + o.LeftEn(town));
+                    return true;
+                }
                 int can, canCost, all, allCost;
                 AffordableBattleWorn(out can, out canCost, out all, out allCost);
                 if (all == 0)
@@ -464,6 +563,15 @@ namespace Armoury
         {
             try
             {
+                if (MarketRule)
+                {
+                    var o = PlanRoster(MobileParty.MainParty.ItemRoster, PieceCost, Hero.MainHero.Gold, int.MaxValue);
+                    if (o.Pieces == 0) { Log.Player("The smiths of " + TownName() + " can restore none of it for coin now." + o.LeftEn(TownName()), true); return; }
+                    StartTimedWork(o.Pieces * Settings.Current.MendLootHoursPerPiece,
+                        "The smiths sort the battle spoils and take hammer to the worst of it.",
+                        delegate { DoMendLoot(); });
+                    return;
+                }
                 var roster = MobileParty.MainParty.ItemRoster;
                 var worn = new List<ItemRosterElement>();
                 for (int i = 0; i < roster.Count; i++)
@@ -487,6 +595,25 @@ namespace Armoury
         {
             try
             {
+                if (MarketRule)
+                {
+                    // plan od nowa przy koncu roboty (jak dotad: zloto, polka i ceny moga sie zmienic przez te godziny)
+                    var bag = MobileParty.MainParty.ItemRoster;
+                    var o = PlanRoster(bag, PieceCost, Hero.MainHero.Gold, int.MaxValue);
+                    string town = TownName();
+                    if (o.Pieces == 0)
+                    {
+                        Log.Player("The smiths of " + town + " could restore nothing." + o.LeftEn(town), true);
+                        Log.Info("Lawa naprawcza (lup z sakw) - kowale " + town + ": " + o.LogPl());
+                        return;
+                    }
+                    int doneM, paidM;
+                    ApplyRoster(o, bag, out doneM, out paidM);
+                    Log.Player("The smiths of " + town + " restored " + doneM + " battle-worn pieces for " + paidM + " gold, paid into the town's coffers: "
+                               + o.Labor + " for their work and " + o.MatGold + " for materials from its market." + o.LeftEn(town));
+                    Log.Info("Lawa naprawcza (lup z sakw) - kowale " + town + ": " + o.LogPl());
+                    return;
+                }
                 var roster = MobileParty.MainParty.ItemRoster;
                 var worn = new List<ItemRosterElement>();
                 for (int i = 0; i < roster.Count; i++)
@@ -615,6 +742,7 @@ namespace Armoury
                 var found = new List<EquipmentElement>();
                 var slots = new List<int>();                      // -1 = z torby, >=0 = zalozone (slot)
                 var elements = new List<InquiryElement>();
+                var quote = MarketRule ? new MendMaterial.Order(Settlement.CurrentSettlement) : null;   // wycena kowali miasta (robota + material)
 
                 // najpierw to, co na grzbiecie - z wyraznym znacznikiem
                 var beq = Hero.MainHero.BattleEquipment;
@@ -623,7 +751,6 @@ namespace Armoury
                     var ee0 = beq[slot];
                     if (ee0.Item == null || !IsBattleWorn(ee0.Item, ee0.ItemModifier)) continue;
                     int pct0 = Math.Max(1, (int)Math.Round(ee0.ItemModifier.PriceMultiplier * 100f));
-                    int smith0 = PieceCost(ee0);
                     var mats0 = SelfMendParts(ee0);
                     var sb0 = new System.Text.StringBuilder();
                     foreach (var p in mats0)
@@ -633,7 +760,7 @@ namespace Armoury
                         sb0.Append(p.Count + "x " + p.Item.Name + " (" + Recipes.CountInInventory(p.Item) + ")");
                     }
                     string hint0 = "EQUIPPED - you wear this now.\nCondition " + pct0 + "%" +
-                                   "\nSmith: " + smith0 + " gold, " + Settings.Current.MendLootHoursPerPiece.ToString("0.#") + "h" +
+                                   "\n" + SmithLine(quote, ee0) +
                                    "\nYourself: " + (sb0.Length > 0 ? sb0.ToString() : "no materials") +
                                    "\n  + stamina " + SelfMendStamina(ee0) + " (you have " + Forge.Stamina() + ")" +
                                    ", Smithing " + SelfMendSkill(ee0) +
@@ -656,7 +783,6 @@ namespace Armoury
                         if (el.EquipmentElement.Item == null || !IsBattleWorn(el.EquipmentElement.Item, el.EquipmentElement.ItemModifier)) continue;
                         var ee = el.EquipmentElement;
                         int pct = Math.Max(1, (int)Math.Round(ee.ItemModifier.PriceMultiplier * 100f));
-                        int smith = PieceCost(ee);
                         var mats = SelfMendParts(ee);
                         var sb = new System.Text.StringBuilder();
                         foreach (var p in mats)
@@ -666,7 +792,7 @@ namespace Armoury
                             sb.Append(p.Count + "x " + p.Item.Name + " (" + Recipes.CountInInventory(p.Item) + ")");
                         }
                         string hint = "Condition " + pct + "%" +
-                                      "\nSmith: " + smith + " gold, " + Settings.Current.MendLootHoursPerPiece.ToString("0.#") + "h" +
+                                      "\n" + SmithLine(quote, ee) +
                                       "\nYourself: " + (sb.Length > 0 ? sb.ToString() : "no materials") +
                                       "\n  + stamina " + SelfMendStamina(ee) + " (you have " + Forge.Stamina() + ")" +
                                       ", Smithing " + SelfMendSkill(ee) +
@@ -689,9 +815,8 @@ namespace Armoury
                             var ee = el.EquipmentElement;
                             if (ee.Item == null || el.Amount <= 0 || !IsBattleWorn(ee.Item, ee.ItemModifier)) continue;
                             int pct2 = Math.Max(1, (int)Math.Round(ee.ItemModifier.PriceMultiplier * 100f));
-                            int smith2 = PieceCost(ee);
                             string hint2 = "COMPANY STORES - the men's kit.\nCondition " + pct2 + "%" +
-                                           "\nSmith: " + smith2 + " gold, " + Settings.Current.MendLootHoursPerPiece.ToString("0.#") + "h";
+                                           "\n" + SmithLine(quote, ee);
                             found.Add(ee); slots.Add(-2);
                             elements.Add(new InquiryElement(found.Count - 1,
                                 "[STORES] " + ee.GetModifiedItemName() + "  x" + el.Amount, ItemPic(ee.Item), true, hint2));
@@ -796,11 +921,37 @@ namespace Armoury
                 bool haveStam = Forge.Stamina() >= stam;
                 bool haveSkill = mySkill >= skillNeed;
 
+                string smithTitle = "The smith mends it - " + smith + " gold";
+                string smithHint = Settings.Current.MendLootHoursPerPiece.ToString("0.#") + " hours. Coin does the sweating.";
+                bool smithOk = Hero.MainHero.Gold >= smith;
+                if (MarketRule)
+                {
+                    // kowale miasta: robota + material z targu wedle stanu; wrak tylko wlasnymi rekami albo przetop
+                    var q = new MendMaterial.Order(Settlement.CurrentSettlement);
+                    int total, miss; float mat;
+                    int r = q.Quote(ee, MendMaterial.Needs(ee), smith, out total, out mat, out miss);
+                    string town = TownName();
+                    smithOk = false;
+                    if (r == MendMaterial.Wreck)
+                    { smithTitle = "The smith will not restore a wreck for coin"; smithHint = "A wreck (Mangled) is mended only with your own materials - or melt it down."; }
+                    else if (r == MendMaterial.NoRecipe)
+                    { smithTitle = "No smith's work"; smithHint = "The smiths of " + town + " do not mend this."; }
+                    else if (!q.Ok)
+                    { smithTitle = "No town smiths here"; smithHint = "Only a town's smiths take work for coin."; }
+                    else if (r == MendMaterial.Waits)
+                    { smithTitle = "The smith mends it - waits for materials"; smithHint = "The market of " + town + " has not enough " + MendMaterial.KindsEn(miss) + " - the piece waits."; }
+                    else
+                    {
+                        smith = total; smithOk = Hero.MainHero.Gold >= total;
+                        smithTitle = "The smith mends it - " + total + " gold";
+                        smithHint = Settings.Current.MendLootHoursPerPiece.ToString("0.#") + " hours. " + (total - MendMaterial.Gold(mat)) + " for the smiths' work and "
+                                    + MendMaterial.Gold(mat) + " for materials from the market of " + town + ", paid into the town's coffers.";
+                    }
+                }
+
                 var opts = new List<InquiryElement>
                 {
-                    new InquiryElement(0, "The smith mends it - " + smith + " gold", null,
-                        Hero.MainHero.Gold >= smith,
-                        Settings.Current.MendLootHoursPerPiece.ToString("0.#") + " hours. Coin does the sweating."),
+                    new InquiryElement(0, smithTitle, null, smithOk, smithHint),
                     new InquiryElement(1, "Mend it yourself - materials and sweat", null,
                         haveMats && haveStam && haveSkill,
                         "Needs: " + (sb.Length > 0 ? sb.ToString() : "nothing") +
@@ -837,10 +988,36 @@ namespace Armoury
             catch (Exception e) { Log.Error("AskHowToMend", e); }
         }
 
+        /// <summary>Kowale miasta robia JEDNA sztuke (SmithMendFromMarket): plan od nowa przy koncu roboty (robocizna PieceCost + material
+        /// z polki / zapasu kowali), material z polki, zaplata do kasy miasta. false = nic nie zrobiono i nic nie zaplacono (wrak, nie robota
+        /// kowala, brak materialu, za malo zlota) - komunikat juz pokazany.</summary>
+        private static bool SmithTakesOne(EquipmentElement ee, out int paid, out MendMaterial.Order o)
+        {
+            paid = 0;
+            o = new MendMaterial.Order(Settlement.CurrentSettlement);
+            string town = TownName();
+            if (o.AddLot(ee, MendMaterial.Needs(ee), PieceCost(ee), 1, Hero.MainHero.Gold, 1) <= 0)
+            {
+                string why = !o.Ok ? "There are no town smiths here - nothing was mended."
+                           : o.Wrecks > 0 ? "The smiths will not restore a wreck (Mangled) for coin - mend it yourself with your own materials, or melt it down."
+                           : o.NoSmith > 0 ? "That is no smith's work - nothing was mended."
+                           : o.Wait > 0 ? "The smiths of " + town + " ran short of " + MendMaterial.KindsEn(o.WaitMask) + " - the piece waits, nothing paid."
+                           : "Your purse came up short.";
+                Log.Player(why, true);
+                Log.Info("Lawa naprawcza (sztuka) - kowale " + town + ": " + ee.Item.StringId + " - " + o.LogPl());
+                return false;
+            }
+            o.Bench.Commit();
+            paid = o.Total;
+            Pay.ToSettlement(paid);
+            return true;
+        }
+
         private static void DoMendOne(EquipmentElement ee, int slot, bool bySmith, int gold, List<Recipes.Part> mats, int stamina)
         {
             try
             {
+                MendMaterial.Order order = null;   // SmithMendFromMarket: zlecenie kowali (robota + material)
                 // slot -2 = magazyn wojska: naprawa zdejmuje zbita sztuke ze stanu
                 // i odklada czysta na stan (zolnierze dostana ja przy przydziale)
                 if (slot == -2)
@@ -850,8 +1027,12 @@ namespace Armoury
                     { Log.Player("The piece is no longer in the stores.", true); return; }
                     if (bySmith)
                     {
-                        if (Hero.MainHero.Gold < gold) { Log.Player("Your purse came up short.", true); return; }
-                        Pay.ToSettlement(gold);
+                        if (MarketRule) { if (!SmithTakesOne(ee, out gold, out order)) return; }
+                        else
+                        {
+                            if (Hero.MainHero.Gold < gold) { Log.Player("Your purse came up short.", true); return; }
+                            Pay.ToSettlement(gold);
+                        }
                     }
                     else
                     {
@@ -865,8 +1046,10 @@ namespace Armoury
                     }
                     store.AddToCounts(ee, -1);
                     store.AddToCounts(new EquipmentElement(ee.Item), 1);
-                    Log.Player(ee.Item.Name + " is whole again and back in the company stores.");
-                    Log.Info("Naprawa sztuki (magazyn): " + ee.Item.StringId + (bySmith ? " kowal " + gold : " wlasna"));
+                    Log.Player(ee.Item.Name + " is whole again and back in the company stores." + (order != null
+                        ? " " + gold + " gold into the coffers of " + TownName() + " (" + order.Labor + " for the work, " + order.MatGold + " for materials)." : ""));
+                    Log.Info("Naprawa sztuki (magazyn): " + ee.Item.StringId + (bySmith ? " kowal " + gold : " wlasna")
+                             + (order != null ? " | lawa naprawcza - kowale " + TownName() + ": " + order.LogPl() : ""));
                     return;
                 }
 
@@ -879,8 +1062,12 @@ namespace Armoury
                 }
                 if (bySmith)
                 {
-                    if (Hero.MainHero.Gold < gold) { Log.Player("Your purse came up short.", true); return; }
-                    Pay.ToSettlement(gold);
+                    if (MarketRule) { if (!SmithTakesOne(ee, out gold, out order)) return; }
+                    else
+                    {
+                        if (Hero.MainHero.Gold < gold) { Log.Player("Your purse came up short.", true); return; }
+                        Pay.ToSettlement(gold);
+                    }
                 }
                 else
                 {
@@ -904,8 +1091,11 @@ namespace Armoury
                     roster.AddToCounts(ee, -1);
                     roster.AddToCounts(new EquipmentElement(ee.Item), 1);
                 }
-                Log.Player(ee.Item.Name + " is whole again" + (bySmith ? " - " + gold + " gold well spent." : " - your own work."));
-                Log.Info("Naprawa sztuki: " + ee.Item.StringId + (bySmith ? " kowal " + gold : " wlasna"));
+                Log.Player(ee.Item.Name + " is whole again" + (order != null
+                    ? " - " + gold + " gold into the coffers of " + TownName() + " (" + order.Labor + " for the work, " + order.MatGold + " for materials)."
+                    : bySmith ? " - " + gold + " gold well spent." : " - your own work."));
+                Log.Info("Naprawa sztuki: " + ee.Item.StringId + (bySmith ? " kowal " + gold : " wlasna")
+                         + (order != null ? " | lawa naprawcza - kowale " + TownName() + ": " + order.LogPl() : ""));
             }
             catch (Exception e) { Log.Error("DoMendOne", e); }
         }
@@ -973,6 +1163,28 @@ namespace Armoury
             catch (Exception e) { Log.Error("ScanTroopWorn", e); }
         }
 
+        /// <summary>Plan "Send the men's worn gear" (SmithMendFromMarket): zbrojownia wojska, robocizna TroopPieceCost z rabatem hurtowym
+        /// liczonym od sztuk, ktore kowale moga wziac za monete (bez wrakow i sztuk bez receptury), material z targu. racks - wszystkie
+        /// zuzyte sztuki na polkach (z wrakami), jak dotad w podpowiedziach.</summary>
+        private static MendMaterial.Order PlanTroops(long limit, int maxPieces, out int discountPct, out int racks)
+        {
+            discountPct = 0; racks = 0;
+            var armory = QuartermasterLaw.DteArmory();
+            int cand = 0;
+            if (armory != null)
+                for (int i = 0; i < armory.Count; i++)
+                {
+                    var el = armory.GetElementCopyAtIndex(i);
+                    var ee = el.EquipmentElement;
+                    if (el.Amount <= 0 || ee.Item == null || !IsBattleWorn(ee.Item, ee.ItemModifier)) continue;
+                    racks += el.Amount;
+                    if (!LootPrices.IsWreck(ee.ItemModifier) && MendMaterial.Needs(ee) != null) cand += el.Amount;
+                }
+            float discount = TroopBulkDiscount(cand);
+            discountPct = (int)(discount * 100f);
+            return PlanRoster(armory, ee => TroopPieceCost(ee, discount), limit, maxPieces);
+        }
+
         private static bool MendTroopsCondition(MenuCallbackArgs args)
         {
             try
@@ -981,6 +1193,21 @@ namespace Armoury
                 var s = Settings.Current;
                 if (s == null || !s.TroopMendEnabled) return false;
                 if (QuartermasterLaw.DteArmory() == null) return false;      // bez DTE nie ma zbrojowni
+                if (MarketRule)
+                {
+                    int dp = 0, racks = 0;
+                    var o = QuartermasterEscrow.Active ? null : PlanTroops(Hero.MainHero.Gold, int.MaxValue, out dp, out racks);
+                    if (o == null || racks == 0)
+                    { args.IsEnabled = false; args.Tooltip = new TextObject("{=!}The men's racks hold nothing worn - every piece is sound."); return true; }
+                    string town = TownName();
+                    if (!o.Ok)
+                    { args.IsEnabled = false; args.Tooltip = new TextObject("There are no town smiths here."); return true; }
+                    if (o.Pieces == 0)
+                    { args.IsEnabled = false; args.Tooltip = new TextObject(racks + " worn pieces on the men's racks - the smiths of " + town + " can mend none of them for coin now." + o.LeftEn(town)); return true; }
+                    args.Tooltip = new TextObject(racks + " worn pieces on the men's racks. The smiths of " + town + " and their apprentices will make " + o.Pieces + " of them whole for "
+                        + o.Total + " gold - " + o.Labor + " for the work (bulk discount " + dp + "%) and " + o.MatGold + " for materials from the market." + o.LeftEn(town));
+                    return true;
+                }
                 int all, allCost, can, canCost, disc;
                 ScanTroopWorn(out all, out allCost, out can, out canCost, out disc);
                 if (all == 0)
@@ -1004,6 +1231,18 @@ namespace Armoury
             {
                 var s = Settings.Current;
                 int all, allCost, can, canCost, disc;
+                if (MarketRule)
+                {
+                    int racks = 0;
+                    var o = QuartermasterEscrow.Active ? null : PlanTroops(Hero.MainHero.Gold, int.MaxValue, out disc, out racks);
+                    if (o == null || o.Pieces == 0) return;
+                    int canM = o.Pieces;
+                    StartTimedWork(Math.Min(MathF.Max(1f, s.TroopMendMaxHours), canM * s.MendLootHoursPerPiece),
+                        "The smiths clear their benches and set every apprentice on the men's gear.",
+                        delegate { DoMendTroops(int.MaxValue); },
+                        delegate (float frac) { DoMendTroops((int)Math.Floor(canM * frac)); });
+                    return;
+                }
                 ScanTroopWorn(out all, out allCost, out can, out canCost, out disc);
                 if (can == 0) return;
                 float hours = Math.Min(MathF.Max(1f, s.TroopMendMaxHours), can * s.MendLootHoursPerPiece);
@@ -1022,6 +1261,25 @@ namespace Armoury
             {
                 var armory = QuartermasterLaw.DteArmory();
                 if (armory == null) return;
+                if (MarketRule)
+                {
+                    // plan od nowa przy koncu roboty; przerwana robota (wpis 84) - najwyzej limit sztuk, tylko gotowe zaplacone
+                    int dp, racks;
+                    var o = PlanTroops(Hero.MainHero.Gold, limit, out dp, out racks);
+                    string town = TownName();
+                    if (o.Pieces == 0)
+                    {
+                        Log.Player("The smiths of " + town + " could mend none of the men's gear." + o.LeftEn(town), true);
+                        Log.Info("Lawa naprawcza (zbrojownia wojska) - kowale " + town + ": rabat " + dp + "%, " + o.LogPl());
+                        return;
+                    }
+                    int doneM, paidM;
+                    ApplyRoster(o, armory, out doneM, out paidM);
+                    Log.Player("The smiths of " + town + " made " + doneM + " pieces of the men's gear whole for " + paidM + " gold, paid into the town's coffers: "
+                               + o.Labor + " for the work (bulk discount " + dp + "%) and " + o.MatGold + " for materials from its market." + o.LeftEn(town));
+                    Log.Info("Lawa naprawcza (zbrojownia wojska) - kowale " + town + ": rabat " + dp + "%, " + o.LogPl());
+                    return;
+                }
                 var worn = new List<ItemRosterElement>();
                 int total = 0;
                 for (int i = 0; i < armory.Count; i++)
@@ -1716,6 +1974,20 @@ namespace Armoury
                 if (b == null) return false;
                 int cost = b.RepairCost();
                 if (cost <= 0) return false;
+                if (MarketRule)
+                {
+                    // kowale miasta: robota jak dotad + material z targu wedle zuzycia; brak materialu - ta czesc czeka
+                    var o = b.PlanRepair(null);
+                    string town = TownName();
+                    if (!o.Ok)
+                    { args.IsEnabled = false; args.Tooltip = new TextObject("There are no town smiths here."); return true; }
+                    if (o.Pieces == 0)
+                    { args.IsEnabled = false; args.Tooltip = new TextObject("The smiths of " + town + " cannot mend your harness now." + o.LeftEn(town)); return true; }
+                    args.Tooltip = new TextObject("The smiths of " + town + " will make " + o.Pieces + (o.Pieces == 1 ? " piece" : " pieces") + " of your harness sound again for "
+                        + o.Total + " gold - " + o.Labor + " for their work and " + o.MatGold + " for materials from the market." + o.LeftEn(town));
+                    args.IsEnabled = Hero.MainHero.Gold >= o.Total;
+                    return true;
+                }
                 args.Tooltip = new TextObject("The smith will make everything sound again for " + cost + " gold.");
                 args.IsEnabled = Hero.MainHero.Gold >= cost;
                 return true;
@@ -1729,6 +2001,7 @@ namespace Armoury
             {
                 int pieces = ArmouryBehavior.Instance != null ? ArmouryBehavior.Instance.WornPieces() : 0;
                 if (pieces == 0) return;
+                if (MarketRule) pieces = Math.Max(1, ArmouryBehavior.Instance.PlanRepair(null).Pieces);   // godziny za czesci, ktore kowale wezma
                 StartTimedWork(pieces * Settings.Current.SmithRepairHoursPerPiece,
                     "The smith lays your harness out and mends it piece by piece.",
                     delegate { ArmouryBehavior.Instance.RepairAll(); });

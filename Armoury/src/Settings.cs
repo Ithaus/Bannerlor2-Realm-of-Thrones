@@ -712,6 +712,7 @@ namespace Armoury
         public float SelfRepairHoursPerPiece = 2.5f;       // hours you need per piece working the anvil yourself
         public float MendLootHoursPerPiece = 0.6f;         // hours per battle-worn piece from the bags
         public float MendMaterialMaxShare = 0.20f;         // mending is NOT forging anew: even a wreck (1%) takes at most this share of the full recipe's materials
+        public bool SmithMendFromMarket = true;            // the town smiths at the mending bench work like the quartermaster's smiths: for coin you pay their work plus the materials they take from this market at its prices - iron (crude iron, scrap from wrecks or ore), wood, leather, linen or wool, more the worse the piece; with no such materials on the market the piece waits; wrecks (Mangled) are not restored for coin - mend them yourself with your own materials, or melt them down (off = as before: the smith's price only, no materials, wrecks restored)
         public bool TakeApartEnabled = true;                // rozlozenie gotowej rzeczy na czesci, zeby zdjac z niej wzor
         public float TakeApartBaseChance = 0.6f;           // szansa odczytania wzoru przy DOKLADNIE wymaganej Smithing
         public float TakeApartSkillSpan = 300f;            // ile punktow Smithing daje pelny przeskok szansy

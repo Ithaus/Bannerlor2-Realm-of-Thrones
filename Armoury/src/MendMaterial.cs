@@ -84,14 +84,148 @@ namespace Armoury
         /// null - to nie robota kowala (ArmsPricing nie zna receptury: kon, towar, sztandar).</summary>
         internal static float[] Needs(EquipmentElement el)
         {
-            var it = el.Item;
+            return NeedsShare(el.Item, Share(el));
+        }
+
+        /// <summary>To samo dla stanu z ksiegi zuzycia (uprzaz na grzbiecie: brak 0..1, modyfikator zostaje oryginalny).</summary>
+        internal static float[] NeedsFor(ItemObject it, float missing)
+        {
+            var s = Settings.Current;
+            return NeedsShare(it, Math.Max(0f, s != null ? s.MendMaterialMaxShare : 0.2f) * Math.Max(0f, Math.Min(1f, missing)));
+        }
+
+        private static float[] NeedsShare(ItemObject it, float share)
+        {
             var c = it != null ? ArmsPricing.CostOf(it) : null;
             if (c == null) return null;
             var s = Settings.Current;
-            float share = Share(el);
             float crude = c.MetalKg * (float)Math.Pow(1.25, WorkshopLaw.StepsOf(c.Grade));
             float wood = c.WoodKg + c.MetalKg * Math.Max(0f, s.WorkshopForgeWoodPerMetalKg);
             return new[] { crude * share, wood * share, c.LeatherKg * share, c.LinenKg * share };
+        }
+
+        /// <summary>Material placony w calych pensach, w gore (ulamek pensa za zuzyty material placi zlecajacy, nie miasto).</summary>
+        internal static int Gold(float m) { return m <= 0.001f ? 0 : (int)Math.Ceiling(m - 0.001f); }
+
+        /// <summary>Rodzaje z maski braku po angielsku ("iron (...) or leather").</summary>
+        internal static string KindsEn(int mask)
+        {
+            var l = new List<string>();
+            for (int k = 0; k < Kinds; k++) if ((mask & (1 << k)) != 0) l.Add(KindEn[k]);
+            if (l.Count == 0) return "materials";
+            if (l.Count == 1) return l[0];
+            return string.Join(", ", l.GetRange(0, l.Count - 1).ToArray()) + " or " + l[l.Count - 1];
+        }
+
+        /// <summary>Rodzaje z maski braku po polsku (log).</summary>
+        internal static string KindsPl(int mask)
+        {
+            var l = new List<string>();
+            for (int k = 0; k < Kinds; k++) if ((mask & (1 << k)) != 0) l.Add(KindName[k]);
+            return l.Count == 0 ? "-" : string.Join(", ", l.ToArray());
+        }
+
+        // ------------------------------------------------------------ zlecenie u kowali miasta (naprawa za monete - jedna regula)
+        // Lawa naprawcza Armoury u kowala (lup z sakw, sztuka na wybor, zbrojownia wojska, uprzaz na grzbiecie) - a w planie K13 pkt 139
+        // naprawy ludzi (TroopSelfMend) i AI (AiWear.MendInTown): Order na zlecenie, AddLot na kazda sztuke (robocizne liczy wolajacy -
+        // stawka jego miejsca), Commit, zaplata Total do kasy miasta od tego, kto placi. Regula w jednym miejscu: wrak (LootPrices.IsWreck,
+        // wpis 97) - nie za monete; bez receptury kowala - nie; material wedle stanu z polki / zapasu kowali (Bench); brak - sztuka czeka.
+
+        internal const int Done = 1, Waits = 0, Wreck = -2, NoRecipe = -3;   // wynik Quote (NoRecipe: nie robota kowala)
+
+        internal sealed class Job { public EquipmentElement El; public int N, Labor; public float Mat; }
+
+        internal sealed class Order
+        {
+            public readonly Bench Bench;
+            public readonly List<Job> Jobs = new List<Job>();
+            public readonly int[] WaitBy = new int[Kinds];
+            public int Pieces, Labor, Wrecks, NoSmith, Wait, WaitMask, Poor, CutOff;
+            public float Mat;
+            public bool Ok { get { return Bench.Ok; } }
+            public int MatGold { get { return Gold(Mat); } }
+            public int Total { get { return Labor + Gold(Mat); } }
+
+            internal Order(Settlement st) { Bench = new Bench(st); }
+
+            /// <summary>
+            /// amount sztuk tego samego rodzaju (ee: przedmiot i stan; need - z Needs(ee) albo NeedsFor dla uprzezy, null = nie robota kowala).
+            /// Kazda sztuka osobno: wrak - nie; material z lawy; razem (robocizna + material w calych pensach) najwyzej limit zlota;
+            /// najwyzej maxPieces sztuk na zlecenie. Ta sama sztuka i ten sam brak: reszta stosu tez czeka. Zwraca, ile sztuk zaplanowano.
+            /// </summary>
+            internal int AddLot(EquipmentElement ee, float[] need, int labor, int amount, long limit, int maxPieces)
+            {
+                if (amount <= 0 || ee.Item == null) return 0;
+                if (LootPrices.IsWreck(ee.ItemModifier)) { Wrecks += amount; return 0; }   // wpis 97: wrak - tylko wlasne rece z materialem albo przetop
+                if (need == null) { NoSmith += amount; return 0; }
+                Job job = null;
+                for (int k = 0; k < amount; k++)
+                {
+                    if (Pieces >= maxPieces) { CutOff += amount - k; break; }
+                    float cost; int miss;
+                    long sofar = Labor;
+                    float mat0 = Mat;
+                    int r = Bench.TryMend(need, c => sofar + labor + Gold(mat0 + c) <= limit, out cost, out miss);
+                    if (r == 0)
+                    {
+                        int rest = amount - k;
+                        Wait += rest; WaitMask |= miss;
+                        for (int m = 0; m < Kinds; m++) if ((miss & (1 << m)) != 0) WaitBy[m] += rest;
+                        break;
+                    }
+                    if (r < 0) { Poor += amount - k; break; }
+                    if (job == null) { job = new Job { El = ee }; Jobs.Add(job); }
+                    job.N++; job.Labor += labor; job.Mat += cost;
+                    Pieces++; Labor += labor; Mat += cost;
+                }
+                return job != null ? job.N : 0;
+            }
+
+            /// <summary>Wycena jednej sztuki bez zmian w lawie (lista i okno wyboru): Done + zloto razem albo Waits (miss) / Wreck / NoRecipe.</summary>
+            internal int Quote(EquipmentElement ee, float[] need, int labor, out int total, out float mat, out int miss)
+            {
+                total = 0; mat = 0f; miss = 0;
+                if (ee.Item == null) return NoRecipe;
+                if (LootPrices.IsWreck(ee.ItemModifier)) return Wreck;
+                if (need == null) return NoRecipe;
+                float cost;
+                int r = Bench.TryMend(need, c => false, out cost, out miss);   // accept = nie: lawa bez zmian, koszt policzony
+                if (r == 0) return Waits;
+                mat = cost; total = labor + Gold(cost);
+                return Done;
+            }
+
+            /// <summary>Co zostalo i dlaczego - po angielsku dla gracza (podpowiedz opcji, komunikat po robocie); pusty, gdy nic nie zostalo.</summary>
+            internal string LeftEn(string town)
+            {
+                var sb = new StringBuilder();
+                if (Wait > 0) sb.Append(' ').Append(Wait).Append(Wait == 1 ? " piece waits" : " pieces wait").Append(" for materials - the market of ").Append(town)
+                                .Append(" has not enough ").Append(KindsEn(WaitMask)).Append('.');
+                if (Wrecks > 0) sb.Append(' ').Append(Wrecks).Append(Wrecks == 1 ? " wreck (Mangled) is" : " wrecks (Mangled) are")
+                                  .Append(" not restored for coin - mend wrecks yourself with your own materials, or melt them down.");
+                if (NoSmith > 0) sb.Append(' ').Append(NoSmith).Append(NoSmith == 1 ? " piece is no smith's work." : " pieces are no smith's work.");
+                if (Poor > 0) sb.Append(' ').Append(Poor).Append(Poor == 1 ? " piece awaits" : " pieces await").Append(" a fuller purse.");
+                return sb.ToString();
+            }
+
+            /// <summary>Do logu: co zrobiono i co zostalo (po polsku).</summary>
+            internal string LogPl()
+            {
+                var sb = new StringBuilder();
+                sb.Append("naprawiono ").Append(Pieces).Append(" szt., zaplata ").Append(Total).Append(" zl do kasy miasta (robocizna ").Append(Labor)
+                  .Append(" + material ").Append(MatGold).Append(", wartosc zuzytego materialu ").Append(Bench.UsedValue.ToString("0.00", CultureInfo.InvariantCulture))
+                  .Append("); z polki: ");
+                if (Bench.TakenById.Count == 0) sb.Append("nic");
+                else { bool first = true; foreach (var kv in Bench.TakenById) { if (!first) sb.Append(", "); sb.Append(kv.Key).Append(' ').Append(kv.Value); first = false; } }
+                sb.Append("; zuzyto kg: metal ").Append(Bench.UsedKg[Metal].ToString("0.00", CultureInfo.InvariantCulture))
+                  .Append(", drewno ").Append(Bench.UsedKg[Wood].ToString("0.0", CultureInfo.InvariantCulture))
+                  .Append(", skora ").Append(Bench.UsedKg[Leather].ToString("0.00", CultureInfo.InvariantCulture))
+                  .Append(", plotno ").Append(Bench.UsedKg[Cloth].ToString("0.00", CultureInfo.InvariantCulture))
+                  .Append("; czeka na material ").Append(Wait).Append(" (brak: ").Append(KindsPl(WaitMask)).Append(")")
+                  .Append(", wrakow pominietych ").Append(Wrecks).Append(", nie robota kowala ").Append(NoSmith)
+                  .Append(", za malo zlota ").Append(Poor).Append(", poza czasem roboty ").Append(CutOff);
+                return sb.ToString();
+            }
         }
 
         // ------------------------------------------------------------ zapis (ArmouryBehavior.SyncData, klucz arm_mendstock)

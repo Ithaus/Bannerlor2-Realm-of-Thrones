@@ -2528,6 +2528,10 @@ namespace Armoury
         [SettingPropertyGroup("Time at the forge")]
         public float MendMaterialMaxShare { get; set; } = 0.20f;
 
+        [SettingPropertyBool("Smith Mend From Market", HintText = "the town smiths at the mending bench work like the quartermaster's smiths: for coin you pay their work plus the materials they take from this market at its prices - iron (crude iron, scrap from wrecks or ore), wood, leather, linen or wool, more the worse the piece; with no such materials on the market the piece waits; wrecks (Mangled) are not restored for coin - mend them yourself with your own materials, or melt them down (off = as before: the smith's price only, no materials, wrecks restored)")]
+        [SettingPropertyGroup("Time at the forge")]
+        public bool SmithMendFromMarket { get; set; } = true;
+
         [SettingPropertyBool("Take Apart Enabled", HintText = "rozlozenie gotowej rzeczy na czesci, zeby zdjac z niej wzor")]
         [SettingPropertyGroup("Time at the forge")]
         public bool TakeApartEnabled { get; set; } = true;
@@ -3231,6 +3235,7 @@ namespace Armoury
             s.SelfRepairHoursPerPiece = SelfRepairHoursPerPiece;
             s.MendLootHoursPerPiece = MendLootHoursPerPiece;
             s.MendMaterialMaxShare = MendMaterialMaxShare;
+            s.SmithMendFromMarket = SmithMendFromMarket;
             s.TakeApartEnabled = TakeApartEnabled;
             s.TakeApartBaseChance = TakeApartBaseChance;
             s.TakeApartSkillSpan = TakeApartSkillSpan;
