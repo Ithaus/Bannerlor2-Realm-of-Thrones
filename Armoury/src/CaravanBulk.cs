@@ -60,6 +60,21 @@ namespace Armoury
     /// Regula jest jedna dla wszystkich karawan, takze klanu gracza. Wyjatek: gdy karawana gracza ma czynny rozkaz BK
     /// "zaopatruj miasto w zywnosc" (CaravanOrdersBehavior.GetActiveBuyFilter), BK kupuje tylko zywnosc - my tez nie
     /// dokladamy jej surowcow (sprzedaz i cofanie gabki dzialaja dalej).
+    /// POPRAWKA 115 (test 06.10 14:08, 20 dob: rudy na targach miast 247 -> 1740 ladunkow, a bez rudy 74 -> 69 miast; karawany
+    /// kupily 371 ladunkow, sprzedaly 76, w jukach 290; len 3122 / 661, welna 1451 / 100, drewno 183 / 0). Dwie przyczyny w kodzie:
+    ///  (1) KOLEJNOSC. BK w jednym ticku decyzji robi: BuyGoods -> ThinkNextDestination -> wyjazd (HourlyTickPartyImpl), a nasz
+    ///      zakup szedl dopiero przy wyjezdzie (prefiks gabki) - cel byl juz wybrany bez nowego ladunku. BKROTPatch dopuszcza
+    ///      te decyzje raz na 24 h (BKCaravansHourlyThrottlePatch), wiec karawana robi 2-3 kursy na 20 dob i pierwszy kurs po
+    ///      zakupie szedl na slepo. Teraz zakup idzie zaraz po zakupach BK, przed wyborem celu (postfiks BuyGoods).
+    ///  (2) MIEJSCE. BK konczy wlasne zakupy po przekroczeniu 80% udzwigu i gora jukow jedzie pusta; nasz zakup liczyl miejsce
+    ///      do tej samej kreski, wiec po zakupach BK nie mial go w 7 wyjazdach na 10 ("brak miejsca w jukach" 72 z 92).
+    ///      Teraz surowiec z zyskiem wchodzi takze w te pusta czesc (CaravanBulkFillLimit, domyslnie caly udzwig) - niczego
+    ///      nie wypiera z zakupow BK w tym miescie. Karawany gracza zostaja przy 80% (jego zwykly handel bez zmian).
+    /// Wynik celu BK (GetTradeScoreForTown) liczy nasze surowce z indeksu ceny i tego NIE ruszamy: po wpisie "cena surowcow od
+    /// niedoboru" indeks rudy w miescie bez rudy to 10 (dotad 1.5), wiec BK sam widzi, gdzie jej brakuje. Wersja z wynikiem celu
+    /// liczonym z naszego utargu (recenzja: symulacja z nowymi cenami) nie zmieniala liczby miast bez rudy wcale (0-0.3 miasta),
+    /// a welne i len poprawiala albo psula zaleznie od obrazu ruchu karawan - wycieta.
+    /// Kazda z dwoch rzeczy ma wlacznik; obie wylaczone = zachowanie ogniwa 103.
     /// </summary>
     internal static class CaravanBulk
     {
@@ -76,13 +91,23 @@ namespace Armoury
             public float AvgIndex;
             public float SellPrice;                           // cena zbytu: srednio tyle placa miasta z brakiem i z kasa za srodkowa sztuke swojego braku (0 = nikt nie kupuje)
             public int LoggedShort = -1, LoggedEmpty = -1;
+            // poprawka 115 - liczniki doby: przyczyny przy wyjezdzie z miasta z nadwyzka tego surowca i kierunek ladunku
+            public int DepSurplus, DepBought, NoRoom, Gated, Dear, NoGain, Back, Ordered;
+            public int In, InShort, Out, OutShort;            // wjazdy / wyjazdy z tym surowcem w jukach; w tym do miasta, ktoremu go brakuje
+            public readonly HashSet<Town> Fed = new HashSet<Town>();   // miasta z brakiem, ktore dzis dostaly dostawe
+            public int Carriers, InTown;                      // stan z przeliczenia: ile karawan go wiezie; ile sztuk stoi w karawanach w miastach
 
             public Good(int ix, string id, string name, int floor, int free, float perHand, float fixedUse, float perCycle)
             { Ix = ix; Id = id; Name = name; Floor = floor; Free = free; PerHand = perHand; Fixed = fixedUse; PerCycle = perCycle; }
 
             public float Kg { get { return Item != null && Item.Weight > 0.05f ? Item.Weight : 10f; } }
-            public void NewDay() { Sold = 0; Bought = 0; Undone = 0; First = 0; Gain = 0f; }
-            public void Reset() { NewDay(); Item = null; Need = 0; Carried = 0; Short = 0; Empty = 0; Buyers = 0; AvgIndex = 0f; SellPrice = 0f; LoggedShort = -1; LoggedEmpty = -1; }
+            public void NewDay()
+            {
+                Sold = 0; Bought = 0; Undone = 0; First = 0; Gain = 0f;
+                DepSurplus = 0; DepBought = 0; NoRoom = 0; Gated = 0; Dear = 0; NoGain = 0; Back = 0; Ordered = 0;
+                In = 0; InShort = 0; Out = 0; OutShort = 0; Fed.Clear();
+            }
+            public void Reset() { NewDay(); Item = null; Need = 0; Carried = 0; Short = 0; Empty = 0; Buyers = 0; AvgIndex = 0f; SellPrice = 0f; LoggedShort = -1; LoggedEmpty = -1; Carriers = 0; InTown = 0; }
         }
 
         // Podloga = najwieksza sztuka, jaka warsztat zaczyna naraz (plyta bierze do 7.8 ladunku rudy; warsztat kupuje caly wsad
@@ -117,10 +142,21 @@ namespace Armoury
         private static int _entries, _sales, _departures, _buys, _gated, _dear, _noGain, _full, _poor, _back, _ordered, _bkZeroed;
         private static long _townsPaid, _caravansPaid, _refunded;
 
+        // ---- poprawka 115: zakup przed wyborem celu, juki ponad kreske BK
+
+        private static readonly HashSet<MobileParty> _boughtHere = new HashSet<MobileParty>();   // karawany, ktore w tej wizycie juz kupowaly (zdejmowane przy wyjezdzie)
+        private static readonly HashSet<Town> _entered = new HashSet<Town>();                    // miasta, do ktorych dzis wjechala jakas karawana
+        private static bool _wiredBuy;
+        private static bool _errEarly, _errRoute;
+        private static int _early, _late, _inTown;
+        private static float _kgBought, _kgOver;
+
         private static void NewDay()
         {
             _entries = 0; _sales = 0; _departures = 0; _buys = 0; _gated = 0; _dear = 0; _noGain = 0; _full = 0; _poor = 0; _back = 0; _ordered = 0; _bkZeroed = 0;
             _townsPaid = 0; _caravansPaid = 0; _refunded = 0;
+            _early = 0; _late = 0; _kgBought = 0f; _kgOver = 0f;
+            _entered.Clear();
             foreach (var g in _all) g.NewDay();
         }
 
@@ -128,6 +164,7 @@ namespace Armoury
         internal static void Reset()
         {
             _goods = null; _cats.Clear(); _cameWith.Clear(); _worldDay = -1; _towns = 0; _caravans = 0;
+            _boughtHere.Clear(); _inTown = 0;
             NewDay();
             foreach (var g in _all) g.Reset();
         }
@@ -150,6 +187,13 @@ namespace Armoury
             foreach (var g in list) if (g.Item.ItemCategory != null) _cats.Add(g.Item.ItemCategory);
             _goods = list.ToArray();
             return true;
+        }
+
+        /// <summary>Karawana rodu gracza: BKROTPatch nie dlawi jej decyzji, a jej juki ponad kreske 80% zostaja dla jego zwyklego handlu.</summary>
+        private static bool Players(MobileParty mp)
+        {
+            try { return mp.ActualClan != null && mp.ActualClan == Clan.PlayerClan; }
+            catch { return false; }
         }
 
         private static bool Trades(MobileParty mp)
@@ -245,7 +289,12 @@ namespace Armoury
         /// <summary>Prog nadwyzki: ponizej niego miasto nie sprzedaje karawanom nic (i nie wiecej niz tyle przyjmie przy rozladunku).</summary>
         private static int Keep(Town town, Good g, Settings s)
         {
-            return Math.Max((int)Math.Ceiling(Math.Max(1f, s.CaravanBulkSurplusFactor) * Target(town, g, s)), g.Free);
+            return KeepOf(g, s, Target(town, g, s));
+        }
+
+        private static int KeepOf(Good g, Settings s, int target)
+        {
+            return Math.Max((int)Math.Ceiling(Math.Max(1f, s.CaravanBulkSurplusFactor) * target), g.Free);
         }
 
         /// <summary>W drodze jest wiecej tego surowca, niz miasta zdolaja kupic - kupno stoi, rozladunek do progu nadwyzki.</summary>
@@ -266,9 +315,9 @@ namespace Armoury
             _worldDay = day;
             if (_goods.Length < _all.Length) Resolve();      // przedmiot z XML mogl dojsc po pierwszym wywolaniu
             Array.Sort(_goods, (a, b) => (b.Item.Value / b.Kg).CompareTo(a.Item.Value / a.Kg));
-            foreach (var g in _goods) { g.Need = 0; g.Carried = 0; g.Short = 0; g.Empty = 0; g.Buyers = 0; g.AvgIndex = 0f; g.SellPrice = 0f; }
+            foreach (var g in _goods) { g.Need = 0; g.Carried = 0; g.Short = 0; g.Empty = 0; g.Buyers = 0; g.AvgIndex = 0f; g.SellPrice = 0f; g.Carriers = 0; g.InTown = 0; }
             int reserve = (int)Math.Max(0f, s.TownRentFloorGold);
-            int towns = 0, caravans = 0;
+            int towns = 0, caravans = 0, inTown = 0;
             foreach (var t in Town.AllTowns)
             {
                 if (t == null || t.Owner == null || t.Owner.ItemRoster == null) continue;
@@ -286,7 +335,7 @@ namespace Armoury
                         if (pays)
                         {
                             g.Need += lack;
-                            int p = Fetch(t, g, lack);       // miasto z brakiem i z kasa: tu karawana ten surowiec sprzeda
+                            int p = Fetch(t, g, lack);           // miasto z brakiem i z kasa: tu karawana ten surowiec sprzeda
                             if (p > 0) { g.SellPrice += p; g.Buyers++; }
                         }
                     }
@@ -299,9 +348,17 @@ namespace Armoury
             {
                 if (c == null || !c.IsActive || c.ItemRoster == null || !c.IsPartyTradeActive || (c.Ai != null && c.Ai.DoNotMakeNewDecisions)) continue;   // tylko karawany, ktore handluja
                 caravans++;
-                foreach (var g in _goods) g.Carried += c.ItemRoster.GetItemNumber(g.Item);
+                bool stands = c.CurrentSettlement != null;
+                if (stands) inTown++;
+                foreach (var g in _goods)
+                {
+                    int a = c.ItemRoster.GetItemNumber(g.Item);
+                    if (a <= 0) continue;
+                    g.Carried += a; g.Carriers++;
+                    if (stands) g.InTown += a;
+                }
             }
-            _towns = towns; _caravans = caravans;
+            _towns = towns; _caravans = caravans; _inTown = inTown;
         }
 
         /// <summary>Akcja gry przerwana wyjatkiem po przeniesieniu sztuk, a przed zaplata: sztuki wracaja tam, skad wyszly (nic bez zaplaty).</summary>
@@ -317,6 +374,7 @@ namespace Armoury
             if (mp == null || st == null || !mp.IsCaravan || !st.IsTown) return;   // tanie wyjscie: zdarzenie pada dla kazdej partii i kazdego bohatera
             try
             {
+                if (_boughtHere.Count > 0) _boughtHere.Remove(mp);      // nowa wizyta: znacznik zakupu z poprzedniej nie moze zostac (np. przerzut statkiem BK bez zdarzenia wyjazdu)
                 var s = Settings.Current;
                 if (!_wired || s == null || !s.CaravanBulkEnabled || st.Town == null || !Trades(mp) || !Ready()) return;
                 EnsureWorld(s);
@@ -454,6 +512,13 @@ namespace Armoury
             int reserve = (int)Math.Max(0f, s.TownRentFloorGold);
             List<(EquipmentElement, int)> done = null;
             _entries++;
+            _entered.Add(town);
+            foreach (var g in _goods)      // dokad trafia ladunek: wjazd z surowcem w jukach, w tym do miasta, ktoremu go brakuje
+            {
+                if (pack.GetItemNumber(g.Item) <= 0) continue;
+                g.In++;
+                if (Target(town, g, s) - Math.Max(shelf.GetItemNumber(g.Item), g.Free) > 0) g.InShort++;
+            }
             foreach (var g in town.Gold > reserve ? SellOrder(mp, town, pack) : _goods)   // miasto bez kasy ponad rezerwe i tak nie kupi nic
             {
                 int at = pack.FindIndexOfItem(g.Item);
@@ -481,7 +546,11 @@ namespace Armoury
                     g.Sold += moved;
                     _townsPaid += got;
                     g.Carried = Math.Max(0, g.Carried - moved);
-                    if (lack > 0) g.Need = Math.Max(0, g.Need - Math.Min(moved, lack));
+                    if (lack > 0)
+                    {
+                        g.Need = Math.Max(0, g.Need - Math.Min(moved, lack));
+                        g.Fed.Add(town);
+                    }
                     if (done == null) done = new List<(EquipmentElement, int)>();
                     done.Add((el.EquipmentElement, moved));
                 }
@@ -502,13 +571,18 @@ namespace Armoury
             {
                 int[] came = null;
                 if (_cameWith.Count > 0 && _cameWith.TryGetValue(__0, out came)) _cameWith.Remove(__0);   // wizyta skonczona - takze gdy regula jest wylaczona
+                bool early = _boughtHere.Count > 0 && _boughtHere.Remove(__0);                            // w tej wizycie kupila juz przed wyborem celu
                 var s = Settings.Current;
                 if (!_wired || s == null || !s.CaravanBulkEnabled || !Trades(__0) || !Ready()) return;
                 EnsureWorld(s);
                 if (__1.IsTown)      // w zamku nie kupujemy (karawany tam nie jezdza; utarg zamku szedlby w calosci jako "clo") - tylko cofamy gabke
                 {
-                    try { Buy(__0, __1.Town, s, came); }
-                    catch (Exception e) { if (!_errBuy) { _errBuy = true; Log.Error("CaravanBulk.Buy", e); } }
+                    if (!early)      // zakup przy wyjezdzie: wlacznik zakupu przed celem wylaczony, brak latki BuyGoods albo wyjazd inna droga niz decyzja BK
+                    {
+                        try { Buy(__0, __1.Town, s, came, false); }
+                        catch (Exception e) { if (!_errBuy) { _errBuy = true; Log.Error("CaravanBulk.Buy", e); } }
+                    }
+                    Routed(__0, s);
                 }
                 var pack = __0.ItemRoster;
                 var state = new int[_goods.Length];
@@ -575,47 +649,107 @@ namespace Armoury
             }
         }
 
-        private static void Buy(MobileParty mp, Town town, Settings s, int[] came)
+        /// <summary>Dokad jedzie ladunek: przy wyjezdzie cel BK jest juz nadany - liczymy wyjazdy z surowcem w jukach i te do miasta,
+        /// ktoremu go teraz brakuje (ta sama miara co przy wjezdzie). Sam odczyt - do logu.</summary>
+        private static void Routed(MobileParty mp, Settings s)
+        {
+            try
+            {
+                var to = mp.TargetSettlement;
+                var town = to != null ? to.Town : null;
+                var shelf = town != null && town.IsTown && town.Owner != null ? town.Owner.ItemRoster : null;
+                var pack = mp.ItemRoster;
+                foreach (var g in _goods)
+                {
+                    if (pack.GetItemNumber(g.Item) <= 0) continue;
+                    g.Out++;
+                    if (shelf != null && Target(town, g, s) - Math.Max(shelf.GetItemNumber(g.Item), g.Free) > 0) g.OutShort++;
+                }
+            }
+            catch (Exception e) { if (!_errRoute) { _errRoute = true; Log.Error("CaravanBulk.Routed", e); } }
+        }
+
+        /// <summary>Postfiks BKCaravansBehavior.BuyGoods: nasz zakup zaraz po zakupach BK, a przed wyborem celu (HourlyTickPartyImpl wola
+        /// BuyGoods, potem ThinkNextDestination) - cel uwzglednia juz swiezy ladunek. Raz na wizyte: gdy BK nie znajdzie celu i karawana
+        /// zostaje, kolejne wywolania BuyGoods nic nie dokupuja. Przed startem kampanii (kursy wstepne BK) Trades() nie przepuszcza.</summary>
+        public static void BuyGoodsPostfix(MobileParty __0, Town __1)
+        {
+            if (__0 == null || __1 == null || !__0.IsCaravan || !__1.IsTown) return;
+            try
+            {
+                var s = Settings.Current;
+                if (!_wired || !_wiredBuy || s == null || !s.CaravanBulkEnabled || !s.CaravanBulkBuyBeforeRoute || !Trades(__0) || !Ready()) return;
+                if (__0.CurrentSettlement == null || __0.CurrentSettlement.Town != __1) return;   // tylko karawana stojaca w tym miescie
+                if (!_boughtHere.Add(__0)) return;                                                 // w tej wizycie juz kupowala
+                EnsureWorld(s);
+                int[] came = null;
+                if (_cameWith.Count > 0) _cameWith.TryGetValue(__0, out came);                     // migawke zdejmuje dopiero wyjazd
+                Buy(__0, __1, s, came, true);
+            }
+            catch (Exception e)
+            {
+                if (!_errEarly) { _errEarly = true; Log.Error("CaravanBulk.BuyGoodsPostfix", e); }   // raz na sesje; nastepna wizyta probuje znowu
+            }
+        }
+
+        private static void Buy(MobileParty mp, Town town, Settings s, int[] came, bool early)
         {
             _departures++;
+            if (early) _early++; else _late++;
             var pack = mp.ItemRoster;
             var shelf = town.Owner.ItemRoster;
             float cap = mp.InventoryCapacity;
             float allow = cap * MBMath.ClampFloat(s.CaravanBulkCapacityShare, 0f, FillLimit);   // kg na wszystkie surowce masowe razem
             float bulk = 0f;
             foreach (var g in _goods) bulk += pack.GetItemNumber(g.Item) * g.Kg;
-            float room = Math.Min(allow - bulk, cap * FillLimit - mp.TotalWeightCarried);
-            if (room <= 0f) { _full++; return; }
+            // surowiec z zyskiem wchodzi takze w te czesc jukow, ktorej BK nie uzywa (ponad 80% udzwigu) - nie wypiera nic z jego zakupow
+            // w tym miescie; karawany gracza zostaja przy kresce BK
+            float fill = Players(mp) ? FillLimit : MBMath.ClampFloat(s.CaravanBulkFillLimit, FillLimit, 1f);
+            float carried = mp.TotalWeightCarried;
+            float under = Math.Max(0f, cap * FillLimit - carried);      // wolne pod kreska BK - tyle mielismy dotad
+            float room = Math.Min(allow - bulk, cap * fill - carried);
+            if (room <= 0f)
+            {
+                _full++;
+                foreach (var g in _goods)      // przyczyna na surowiec: nadwyzka byla, miejsca w jukach nie
+                    if (shelf.GetItemNumber(g.Item) - Keep(town, g, s) > 0) { g.DepSurplus++; g.NoRoom++; }
+                return;
+            }
             float cover = Math.Max(0f, s.CaravanBulkTransitCover);
             int budget = mp.PartyTradeGold / 2;        // jak BK: na zakupy najwyzej pol kiesy
             if (budget <= 0) return;
             Func<ItemCategory, bool> orders = null;    // pytamy BK dopiero, gdy jest co kupic
             bool asked = false, broke = false;
             List<(EquipmentElement, int)> done = null;
-            foreach (var g in BuyOrder(mp, town, shelf, s))
+            float kg = 0f;
+            var order = BuyOrder(mp, town, shelf, s);
+            int at0 = 0;
+            for (; at0 < order.Length; at0++)
             {
+                var g = order[at0];
                 int at = shelf.FindIndexOfItem(g.Item);
                 if (at < 0) continue;
                 var el = shelf.GetElementCopyAtIndex(at);
                 int surplus = el.Amount - Keep(town, g, s);
                 if (surplus <= 0) continue;
+                g.DepSurplus++;
                 var cat = g.Item.ItemCategory;
                 if (!asked) { asked = true; orders = OrderFilter(mp); }
-                if (orders != null && !orders(cat)) { _ordered++; continue; }   // rozkaz gracza: teraz tylko zywnosc
+                if (orders != null && !orders(cat)) { _ordered++; g.Ordered++; continue; }   // rozkaz gracza: teraz tylko zywnosc
                 int mine = pack.GetItemNumber(g.Item);
-                if (came != null && mine < came[g.Ix]) { _back++; continue; }   // ten surowiec karawana sprzedala tu w czasie tej wizyty - nie odkupuje
+                if (came != null && mine < came[g.Ix]) { _back++; g.Back++; continue; }   // ten surowiec karawana sprzedala tu w czasie tej wizyty - nie odkupuje
                 int gate = (int)(cover * g.Need) - g.Carried;       // tyle jeszcze zdolaja sprzedac wszystkie karawany razem
-                if (gate <= 0) { _gated++; continue; }
+                if (gate <= 0) { _gated++; g.Gated++; continue; }
                 int fit = (int)(Math.Min(room, allow * OneGoodPart - mine * g.Kg) / g.Kg);
-                if (fit <= 0) { _full++; continue; }
+                if (fit <= 0) { _full++; g.NoRoom++; continue; }
                 int left = Math.Min(Math.Min(surplus, gate), fit), got = 0;
                 while (left > 0)
                 {
                     // cena i indeks od nowa przed kazdym krokiem: z kazda sztuka zdjeta z polki towar drozeje
-                    if (cat != null && g.AvgIndex > 0f && town.GetItemCategoryPriceIndex(cat) >= g.AvgIndex) { if (got == 0) _dear++; break; }
+                    if (cat != null && g.AvgIndex > 0f && town.GetItemCategoryPriceIndex(cat) >= g.AvgIndex) { if (got == 0) { _dear++; g.Dear++; } break; }
                     int price = Math.Max(1, town.GetItemPrice(el.EquipmentElement, mp, false));
                     // oplaca sie tylko, poki nastepna sztuka kosztuje mniej, niz dadza za nia miasta z brakiem (prawdziwe ceny gry)
-                    if (price >= g.SellPrice) { if (got == 0) _noGain++; break; }
+                    if (price >= g.SellPrice) { if (got == 0) { _noGain++; g.NoGain++; } break; }
                     int n = Step(left, budget / price);
                     if (n <= 0) break;
                     int purse = mp.PartyTradeGold, had = pack.GetItemNumber(g.Item);
@@ -629,13 +763,20 @@ namespace Armoury
                 }
                 if (got > 0)
                 {
-                    room -= got * g.Kg;
-                    g.Bought += got; g.Carried += got;
+                    room -= got * g.Kg; kg += got * g.Kg;
+                    g.Bought += got; g.Carried += got; g.DepBought++;
                     if (done == null) { g.First++; done = new List<(EquipmentElement, int)>(); }   // od tego surowca ten wyjazd zaczal zakupy
                     done.Add((el.EquipmentElement, -got));
                 }
                 if (broke || room <= 0f || budget <= 0) break;
             }
+            if (!broke && room <= 0f)      // juki pelne przed koncem listy: reszta surowcow z nadwyzka tez odpadla z braku miejsca
+                for (int i = at0 + 1; i < order.Length; i++)
+                {
+                    var g = order[i];
+                    if (shelf.GetItemNumber(g.Item) - Keep(town, g, s) > 0) { g.DepSurplus++; g.NoRoom++; }
+                }
+            if (kg > 0f) { _kgBought += kg; _kgOver += Math.Max(0f, kg - under); }
             if (done == null) return;
             _buys++;
             try { CampaignEventDispatcher.Instance.OnCaravanTransactionCompleted(mp, town, done); } catch { }   // jak BK po zakupie (ilosc ujemna)
@@ -672,6 +813,8 @@ namespace Armoury
                     if (kv.Key == null || !kv.Key.IsActive || kv.Key.CurrentSettlement == null) { if (gone == null) gone = new List<MobileParty>(); gone.Add(kv.Key); }
                 if (gone != null) foreach (var k in gone) _cameWith.Remove(k);
             }
+            if (_boughtHere.Count > 0)    // to samo dla znacznika "kupila w tej wizycie"
+                _boughtHere.RemoveWhere(k => k == null || !k.IsActive || k.CurrentSettlement == null);
             int day = now - 1;
             var sold = new StringBuilder(); var bought = new StringBuilder(); var undone = new StringBuilder(); var world = new StringBuilder();
             var first = new StringBuilder(); var gain = new StringBuilder();
@@ -710,6 +853,30 @@ namespace Armoury
                      + "; sprzedaz wstrzymana rezerwa kasy miasta " + _poor + "; wyceny zakupu BK wyzerowane " + _bkZeroed
                      + (s.CaravanBulkEnabled ? "." : ". REGULA WYLACZONA w ustawieniach."));
             Log.Info("Karawany (stan): dzien " + day + " - miast " + _towns + ", karawan " + _caravans + " (liczby: wczoraj -> dzis; sztuka rudy i drewna = ladunek) - " + world + ".");
+            // poprawka 115: dwie nowe linie (stare zostaja bez zmian - czyta je tools/sprawdz_logi.py)
+            var why = new StringBuilder(); var road = new StringBuilder(); var held = new StringBuilder();
+            foreach (var g in _all)
+            {
+                if (g.Item == null) continue;
+                if (g.DepSurplus > 0)
+                    why.Append(why.Length > 0 ? "; " : "").Append(g.Name).Append(' ').Append(g.DepSurplus).Append(": kupily ").Append(g.DepBought)
+                       .Append(", brak miejsca ").Append(g.NoRoom).Append(", w drodze dosc ").Append(g.Gated).Append(", cena nie nizsza od sredniej ").Append(g.Dear)
+                       .Append(", bez zysku ").Append(g.NoGain).Append(", sprzedane tu ").Append(g.Back).Append(", rozkaz gracza ").Append(g.Ordered);
+                if (g.In > 0 || g.Out > 0)
+                    road.Append(road.Length > 0 ? "; " : "").Append(g.Name).Append(": wjazdy ").Append(g.In).Append(", w tym do miasta z brakiem ").Append(g.InShort)
+                        .Append(" (dostawe dostalo ").Append(g.Fed.Count).Append(" miast), wyjazdy ").Append(g.Out).Append(", w tym z celem w miescie z brakiem ").Append(g.OutShort);
+                if (g.Carriers > 0)
+                    held.Append(held.Length > 0 ? ", " : "").Append(g.Name).Append(' ').Append(g.Carried).Append(" w ").Append(g.Carriers).Append(" karawanach (z tego ")
+                        .Append(g.InTown).Append(" stoi w miastach)");
+            }
+            Log.Info("Karawany (przyczyny): dzien " + day + " - zakup surowcow przed wyborem celu " + _early + " wizyt, przy wyjezdzie " + _late
+                     + "; surowce zajely " + _kgBought.ToString("0") + " kg jukow, z tego " + _kgOver.ToString("0") + " kg ponad 80% udzwigu (miejsce, ktorego BK nie uzywa; prog "
+                     + (MBMath.ClampFloat(s.CaravanBulkFillLimit, FillLimit, 1f) * 100f).ToString("0") + "%)"
+                     + "; wyjazdy z miasta z nadwyzka surowca - " + (why.Length > 0 ? why.ToString() : "brak")
+                     + (s.CaravanBulkBuyBeforeRoute && !_wiredBuy ? ". BRAK latki BuyGoods - zakup przy wyjezdzie." : "."));
+            Log.Info("Karawany (kierunek): dzien " + day + " - wjazdy do " + _entered.Count + " roznych miast; karawan w miastach " + _inTown + ", w drodze " + Math.Max(0, _caravans - _inTown)
+                     + "; ladunek surowcow - " + (road.Length > 0 ? road.ToString() : "brak")
+                     + "; w jukach teraz: " + (held.Length > 0 ? held.ToString() : "nic") + ".");
             NewDay();
         }
 
@@ -753,12 +920,26 @@ namespace Armoury
                     { _ordersInstance = inst; _ordersFilter = filt; }
                 }
                 catch (Exception e) { Log.Error("CaravanBulk.ApplyAll (rozkazy BK)", e); }
+                // poprawka 115: zakup przed wyborem celu; brak metody = zakup przy wyjezdzie jak dotad
+                try
+                {
+                    var goods = AccessTools.Method(bkc, "BuyGoods");
+                    if (Fits(goods, typeof(void), typeof(MobileParty), typeof(Town)))
+                    {
+                        h.Patch(goods, postfix: new HarmonyMethod(typeof(CaravanBulk), nameof(BuyGoodsPostfix)));
+                        _wiredBuy = true;
+                    }
+                }
+                catch (Exception e) { Log.Error("CaravanBulk.ApplyAll (BuyGoods)", e); }
                 var s = Settings.Current;
                 Log.Info("CaravanBulk: surowce masowe w karawanach wedle brakow miast - latki wpiete (BK CalculateBuyValue, BK OnSettlementLeft), regula "
                          + (s != null && s.CaravanBulkEnabled ? "CZYNNA" : "wylaczona w ustawieniach")
                          + (s != null ? ": zapas docelowy " + s.CaravanBulkStockDays + " dob zuzycia, nadwyzka powyzej x" + s.CaravanBulkSurplusFactor.ToString("0.0")
                                         + ", udzial udzwigu " + (s.CaravanBulkCapacityShare * 100f).ToString("0") + "%, pokrycie brakow x" + s.CaravanBulkTransitCover.ToString("0.0") : "")
                          + "; rozkazy gracza dla karawan (BK): " + (_ordersFilter != null ? "szanowane" : "BRAK w tej wersji BK - bez wyjatku") + ".");
+                Log.Info("CaravanBulk: poprawka 115 - zakup przed wyborem celu (BK BuyGoods): " + (_wiredBuy ? "latka wpieta" : "BRAK metody - zakup przy wyjezdzie jak dotad")
+                         + (s != null && !s.CaravanBulkBuyBeforeRoute ? " (wylaczone w ustawieniach)" : "")
+                         + (s != null ? "; juki na surowce do " + (MBMath.ClampFloat(s.CaravanBulkFillLimit, FillLimit, 1f) * 100f).ToString("0") + "% udzwigu (BK konczy zakupy na 80%; karawany gracza zostaja przy 80%)" : "") + ".");
             }
             catch (Exception e) { Log.Error("CaravanBulk.ApplyAll", e); }
         }
