@@ -95,6 +95,8 @@ namespace Armoury
                 PopulationLaw.ApplyTownTax(_harmony);
                 Rations.ApplyAll(_harmony);      // dlugi marsz, dlugie racje - zuzycie jedzenia w dol (gracz i AI)
                 ScorchedEarth.ApplyAll(_harmony);
+                // demografia krok 3: przyrost naturalny wsi - ten sam cel i ten sam priorytet co blizna ScorchedEarth, wpiety PO niej, wiec biegnie ostatni; we wlasnym try
+                try { PopulationLaw.ApplyGrowth(_harmony); } catch (Exception e) { Log.Error("PopulationLaw.ApplyGrowth", e); }
                 Wayfinder.ApplyAll(_harmony);
                 MarchPace.ApplyAll(_harmony);
                 TerrainEase.ApplyAll(_harmony);
