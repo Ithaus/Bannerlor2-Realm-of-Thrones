@@ -1660,6 +1660,14 @@ namespace Armoury
         [SettingPropertyGroup("Iron bank")]
         public bool HistDemandScaling { get; set; } = true;
 
+        [SettingPropertyBool("Price Formula In New Coin", HintText = "the game's price formula keeps a fixed 2 coins beside the worth of the goods on the stall; in the new coin that weighs like a quarter load of ore or a whole measure of salt, so a bare stall of a cheap good never grew dear (ore 1.5 times its worth at most, timber 0.8). On: every trade good the new coin made cheaper is priced as the unmodded game prices it - a bare stall up to 10 times worth, a glutted one down to a tenth; goods the new coin made dearer (fur, wool, velvet, mead) keep the fixed 2 coins, which weigh little beside them; and a new campaign opens with the towns' memory of supply and demand for every repriced trade good already in the new coin instead of drifting out of the old one for weeks (needs Hist Demand Scaling; off = prices as before)")]
+        [SettingPropertyGroup("Iron bank")]
+        public bool PriceFormulaInNewCoin { get; set; } = true;
+
+        [SettingPropertyBool("Raw Price By Use", HintText = "a town prices the seven bulk raw goods (iron ore, timber, raw hides, leather, flax, linen, wool) by what it really uses each day: the share of the townsfolk's old appetite that households truly buy, plus what its craftsmen and workshops work up - the same daily use the caravans stock it by. A town with a smithy and no ore pays many times its worth, a town sitting on a hundred days of use pays a fraction, and wool is dear only where someone weaves it. Arms workshops then pay the market price for ore and timber too (needs Hist Demand Scaling; off = demand and workshop prices as before)")]
+        [SettingPropertyGroup("Iron bank")]
+        public bool RawPriceByUse { get; set; } = true;
+
         [SettingPropertyBool("Population Rent Enabled", HintText = "a fief pays by the people it stands for: each village and town on the map is a symbol of a whole land, and its lord's rents follow that land's population (the Reach richest, the Iron Islands poor)")]
         [SettingPropertyGroup("Iron bank")]
         public bool PopulationRentEnabled { get; set; } = true;
@@ -2874,6 +2882,8 @@ namespace Armoury
             s.TownUseLinen = TownUseLinen;
             s.TownUseHardwood = TownUseHardwood;
             s.HistDemandScaling = HistDemandScaling;
+            s.PriceFormulaInNewCoin = PriceFormulaInNewCoin;
+            s.RawPriceByUse = RawPriceByUse;
             s.PopulationRentEnabled = PopulationRentEnabled;
             s.PopulationRentPerHead = PopulationRentPerHead;
             s.PopulationScale = PopulationScale;
