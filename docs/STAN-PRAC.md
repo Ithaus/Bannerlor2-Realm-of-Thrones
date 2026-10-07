@@ -1,11 +1,15 @@
-# Stan prac - przekazanie dla drugiego konta (2026-10-07 noc: w grze 101-107; GOTOWA grupa TOWARY 2 = 115-119 do wgrania na slowo Jeffa - sekcja ponizej)
+# Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
 Czytaj najpierw: `CLAUDE.md` (zwlaszcza sekcja 8, **zasada 0**: kazda zmiana = kontrola regresji, kolizji
 i spojnosci calej logiki; oraz pulapka MCM w sekcji 7), potem ten plik, potem gorne wpisy `CHANGELOG.md`.
 
 ## NOC 06/07.10 - GRUPA "TOWARY 2" (115-120) GOTOWA DO WGRANIA NA SLOWO JEFFA; kolejka 108-114 przeniesiona na 119 (na 120 naklada sie czysto)
 
-W GRZE BEZ ZMIAN: wpisy 101-107 (DLL md5 0eeb0a105dc5ae4221809e222e327afe). Noc: nowe konto (sesja fa2fd7a6), jeden watek naraz.
+WGRANE 2026-10-07 02:47 na slowo Jeffa ("wgraj"): W GRZE wpisy 101-107 + 115-120 (DLL md5 25b87631d468cb3e01a71a3578f9fc73; poprzedni
+`Armoury.dll.bak-2026-10-07-przed-115` = 0eeb0a10...). Galaz robocza = kod w grze (fast-forward na commity 115-120, 8383235); wpisy
+115-120 na gorze CHANGELOG. NASTEPNY KROK: test Jeffa (swiezy start gry, NOWA kampania, 20 dob, zapis) -> "sprawdz logi" =
+`python tools/sprawdz_logi.py --grupa 2b` (+ --surowe przy pierwszym logu). Kolejka dalej: `paczki-na-120/108..114`.
+Noc 06/07.10: nowe konto (sesja fa2fd7a6), jeden watek naraz.
 Galaz robocza = kod 107 (sprawdzone 07.10 ok. 21:40 czasu komputera: diff kodu z `paczki/107-zold-i-skarbiec` pusty).
 
 NOWY LANCUCH (kazde ogniwo: autor + niezalezny recenzent, cena: dwoch; jeden commit; build kod 0; opisy `docs/paczki/115..119-*.md`;

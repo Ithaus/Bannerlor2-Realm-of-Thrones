@@ -163,3 +163,9 @@ Wszystko w repo i na origin: `paczki/115..120`, `paczki-na-119/108..114`; robocz
 STAN-PRAC, sekcja "NOC 06/07.10". Stare `paczki/108..114` (na n107) nietkniete - nadpisanie zablokowane (force push), decyzja Jeffa.
 NASTEPNY KROK: Jeff czyta 6 punktow "CO JEFF ZOBACZY" i mowi "wgraj" -> wgranie 115-120 wg STAN-PRAC -> test: nowa kampania 20 dob ->
 `python tools/sprawdz_logi.py --grupa 2b`. Kolejka JUZ przeniesiona na 120: `paczki-na-120/108..114` (01:15). Potem: krok skali K13 (pilny po audycie), sztabka zlota (118).
+
+## 11. WGRANE 2026-10-07 02:47
+
+Jeff: "wgraj". W grze 101-107 + 115-120, DLL md5 25b87631... (kopia poprzedniego: `Armoury.dll.bak-2026-10-07-przed-115`). Galaz robocza
+przesunieta fast-forward na commity 115-120 (8383235), wpisy w CHANGELOG ze statusem WGRANE. Czeka na test Jeffa. W toku (po tescie do gry):
+paczka 121 "kategorie mieszane" (sztabka zlota) - workflow dzien-6-zloto, katalog SCRATCH\dzien-6\zloto, galaz docelowa n121-kategorie-mieszane.
