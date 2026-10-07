@@ -142,7 +142,60 @@ namespace Armoury
 
         // wpis 87 (audyt pkt 12): nowa kampania = nowe obiekty przedmiotow - stare slowniki rosly, _applied zostawalo true,
         // a diagnostyka blokady (40 wpisow) wyczerpywala sie na cale uruchomienie gry
-        internal static void Reset() { _target.Clear(); _orig.Clear(); _origWeight.Clear(); _blockedLogged.Clear(); _applied = false; RawPrice.Reset(); }   // RawPrice: cena surowcow liczy na tym przeliczeniu - czysci sie razem z nim
+        // Konstruktor ArmouryBehavior (OnGameStart) biegnie PRZED definicjami przedmiotow tej kampanii (Campaign: OnGameStart ->
+        // InitializeDefaultCampaignObjects -> DefaultItems -> BKItems.Initialize), wiec czyszczenie definicji niczego nie gubi.
+        internal static void Reset() { _target.Clear(); _orig.Clear(); _origWeight.Clear(); _blockedLogged.Clear(); _defValue.Clear(); _defLeft.Clear(); _defUsed.Clear(); _errDefine = false; _applied = false; RawPrice.Reset(); }   // RawPrice: cena surowcow liczy na tym przeliczeniu - czysci sie razem z nim
+
+        // ------------------------------------------------------------ wartosc z definicji przedmiotu (paczka "towary w nowej monecie")
+        // Test 06.10 14:08 (log, linia "surowce kuzni"): chleb 0 -> 6, jajka 0 -> 8, miod 0 -> 14, owoce 0 -> 2..10, garum 0 -> 20,
+        // ciasto 0 -> 10, wapien 0 -> 1, papirus 0 -> 100, miod pitny 1 -> 10, futro 1 -> 200, marmur 1 -> 2, atrament 2 -> 100,
+        // ruda zlota 4 -> 50. Przyczyna: BKROTPatch (BKItemsInitializePatch) w prefiksie BKItems.InitializeTradeGood robi
+        // "value /= 100" (liczby calkowite) dla KAZDEGO towaru BK - takze futra, ktore BK definiuje drugi raz w AdjustPrices
+        // (OnNewGameCreated / OnGameLoaded, przed nami). Popyt kategorii BK (BKItemCategories: chleb 100/5, miod 15/30...) i
+        // futra (gra) liczono do wartosci z definicji (chleb 20, miod 28, miod pitny 120, futro 125), nie do jednej setnej:
+        // przelicznik z zera nie istnieje (kategoria zostawala w starej monecie), a z jedynki wychodzil odwrotny (miod pitny /0.1,
+        // futro /0.005 - popyt x200). Regula: przelicznik kazdego przedmiotu liczony od wartosci, ktora podala mu jego definicja,
+        // jesli od tamtej chwili nikt jej nie zmienil inaczej (XML wczytany pozniej - np. przyprawy 300 - wygrywa, bo to on jest
+        // ostatnia definicja). Nasz prefiks ma pierwszenstwo First, wiec widzi wartosc przed dzieleniem BKROTPatch; postfiks
+        // zapisuje, co zostalo. Bez BK albo bez BKROTPatch definicja = wartosc w chwili Apply - nic sie nie zmienia.
+        private static readonly Dictionary<ItemObject, int> _defValue = new Dictionary<ItemObject, int>();   // wartosc podana w definicji
+        private static readonly Dictionary<ItemObject, int> _defLeft = new Dictionary<ItemObject, int>();    // wartosc, ktora po definicji zostala (po latkach innych modow)
+        private static readonly HashSet<ItemCategory> _defUsed = new HashSet<ItemCategory>();               // kategorie z przedmiotem, ktorego definicja rozni sie od wartosci w chwili Apply
+        private static bool _errDefine;
+        private static int _defineHooks;
+
+        /// <summary>Prefiks BKItems.InitializeTradeGood(item, name, mesh, category, value, ...) z pierwszenstwem First: wartosc z definicji BK.</summary>
+        public static void DefinePrefix(ItemObject __0, int __4, out int __state)
+        {
+            __state = __4;
+        }
+
+        /// <summary>Postfiks tej samej metody: co zostalo w przedmiocie po definicji (po prefiksach innych modow).</summary>
+        public static void DefinePostfix(ItemObject __0, int __state)
+        {
+            try
+            {
+                if (__0 == null || _applied) return;   // po przeliczeniu (AdjustPrices BK w OnSessionLaunched po nas) wartosci trzyma blokada cen - nic do zapisania
+                _defValue[__0] = __state;
+                _defLeft[__0] = __0.Value;
+            }
+            catch (Exception e)
+            {
+                if (!_errDefine) { _errDefine = true; Log.Error("HistoricalPrices.DefinePostfix", e); }   // raz na kampanie; przedmiot zostaje przy wartosci z chwili Apply
+            }
+        }
+
+        /// <summary>Wartosc, od ktorej liczymy przelicznik popytu: z definicji, gdy po niej nikt wartosci nie zmienil inaczej
+        /// (before = wartosc w chwili Apply, sprzed MaterialLaw); inaczej before - jak dotad.</summary>
+        private static int DemandBase(ItemObject it, int before)
+        {
+            int def, left;
+            if (it != null && _defValue.TryGetValue(it, out def) && _defLeft.TryGetValue(it, out left) && left == before && def > 0) return def;
+            return before;
+        }
+
+        /// <summary>Kategorie z przedmiotem, ktorego definicja rozni sie od wartosci w chwili Apply - przy wlaczonym HistDemandFromDefinition ich przelicznik jest z definicji (linia dnia "Ceny surowcow").</summary>
+        internal static List<ItemCategory> DefinedCategories() { return new List<ItemCategory>(_defUsed); }
 
         internal static int Orig(ItemObject it)
         {
@@ -334,14 +387,23 @@ namespace Armoury
                     n++; before += was; after += it.Value;
                     if (watch.Contains(it.StringId)) samples.Add(it.StringId + " (" + it.ItemType + " t" + ((int)it.Tier + 1) + ", " + it.Weight.ToString("0.0", CultureInfo.InvariantCulture) + " kg) " + was + " -> " + it.Value + " d");
                 }
-                // 3. popyt miast w nowej monecie: srednia geometryczna (stara/nowa wartosc) przedmiotow kazdej kategorii
-                _catRatio.Clear();
+                // 3. popyt miast w nowej monecie: srednia geometryczna (stara/nowa wartosc) przedmiotow kazdej kategorii;
+                // stara = wartosc z definicji przedmiotu (HistDemandFromDefinition; opis przy _defValue), wylaczone - wartosc z chwili Apply
+                // _defUsed: kategorie, w ktorych definicja rozni sie od wartosci z chwili Apply - zapisywane takze przy wylaczonym
+                // wlaczniku (linia dnia pokazuje je wtedy bez przelicznika - do porownania przed / po w tej samej grze)
+                _catRatio.Clear(); _defUsed.Clear();
+                bool fromDef = s.HistDemandFromDefinition;
                 var sumLog = new Dictionary<ItemCategory, double>(); var cnt = new Dictionary<ItemCategory, int>();
+                var defLog = new List<string>(); var zeroLog = new List<string>();
                 foreach (var kv in _orig)
                 {
                     var cat = kv.Key.ItemCategory;
-                    if (cat == null || kv.Value <= 0 || kv.Key.Value <= 0) continue;
-                    double l; sumLog.TryGetValue(cat, out l); sumLog[cat] = l + Math.Log((double)kv.Value / kv.Key.Value * BulkScale(kv.Key));   // za kg - ladunek to tyle samo towaru co 10 starych sztuk
+                    if (cat == null || kv.Key.Value <= 0) continue;
+                    int def = DemandBase(kv.Key, kv.Value);
+                    if (def != kv.Value) { _defUsed.Add(cat); defLog.Add(kv.Key.StringId + " " + kv.Value + " -> " + def); }
+                    int old = fromDef ? def : kv.Value;
+                    if (old <= 0) { zeroLog.Add(kv.Key.StringId + " (" + cat.StringId + ")"); continue; }
+                    double l; sumLog.TryGetValue(cat, out l); sumLog[cat] = l + Math.Log((double)old / kv.Key.Value * BulkScale(kv.Key));   // za kg - ladunek to tyle samo towaru co 10 starych sztuk
                     int k; cnt.TryGetValue(cat, out k); cnt[cat] = k + 1;
                 }
                 var cats = new List<string>();
@@ -354,6 +416,13 @@ namespace Armoury
                 }
                 _applied = true;
                 Log.Info("HistoricalPrices: popyt miast przeliczony na nowa monete (" + (s.HistDemandScaling ? "CZYNNE" : "wylaczone") + ") w " + cats.Count + " kategoriach: " + string.Join(", ", cats.ToArray()) + ".");
+                Log.Info("HistoricalPrices: przelicznik popytu od wartosci z definicji przedmiotu " + (fromDef ? "CZYNNY" : "WYLACZONY (MCM) - od wartosci z chwili przeliczenia, jak dotad")
+                         + " (definicje BK widziane przed latkami innych modow: " + _defValue.Count + ", wpiete w " + _defineHooks + " metodach); "
+                         + (defLog.Count > 0 ? (fromDef ? "wziete z definicji " : "definicja inna niz wartosc w chwili przeliczenia (NIEUZYTE) ") + defLog.Count + " [" + string.Join(", ", defLog.ToArray()) + "] w " + _defUsed.Count + " kategoriach"
+                                             : "zadna definicja nie rozni sie od wartosci w chwili przeliczenia") + ".");
+                if (zeroLog.Count > 0)
+                    Log.Info("HistoricalPrices: UWAGA - " + zeroLog.Count + " przeliczonych przedmiotow ma wartosc 0 i nie ma od czego liczyc przelicznika (" + (fromDef ? "brak wartosci z definicji" : "wartosc z definicji wylaczona w MCM")
+                             + "), ich kategorie licza popyt bez nich - bez przelicznika, gdy nie maja innych przedmiotow: " + string.Join(", ", zeroLog.ToArray()) + ".");
                 if (_origWeight.Count > 0) Log.Info("HistoricalPrices: ruda i drewno w ladunkach - " + string.Join(", ", _origWeight.Select(kv => kv.Key.StringId + " " + kv.Value + " -> " + kv.Key.Weight + " kg = " + kv.Key.Value + " d").ToArray()) + ".");
                 Log.Info("HistoricalPrices: surowce kuzni ["+ string.Join(", ", raw.ToArray()) + "]; uzbrojenie " + n + " szt. przeliczone z kosztu historycznego (suma wartosci "
                          + before + " -> " + after + "). Przyklady: " + string.Join("; ", samples.ToArray()) + ".");
@@ -569,6 +638,22 @@ namespace Armoury
                 var bud = AccessTools.Method("BannerKings.Patches.EconomyPatches:CalculateBudget");
                 if (bud != null) h.Patch(bud, postfix: new HarmonyMethod(typeof(HistoricalPrices), nameof(BudgetPostfix)));
                 Log.Info("HistoricalPrices: zakupy mieszczan (BK CalculateBudget) - " + (bud != null ? "domowa czesc surowcow i dodatek BK w nowej monecie wpiete" : "BRAK BK CalculateBudget") + ".");
+                // wartosc z definicji towarow BK (opis przy _defValue): BKItems.InitializeTradeGood(ItemObject, TextObject, string, ItemCategory, int, float, ItemTypeEnum, bool)
+                // - prywatna statyczna; definiuje nia BK swoje towary (Initialize) i futro (AdjustPrices). Parametry po pozycji, typy sprawdzane.
+                try
+                {
+                    var bkItems = AccessTools.TypeByName("BannerKings.Managers.Items.BKItems");
+                    var def = bkItems != null ? AccessTools.Method(bkItems, "InitializeTradeGood") : null;
+                    var dp = def != null ? def.GetParameters() : null;
+                    if (def != null && def.IsStatic && dp.Length >= 5 && dp[0].ParameterType == typeof(ItemObject) && dp[3].ParameterType == typeof(ItemCategory) && dp[4].ParameterType == typeof(int))
+                    {
+                        h.Patch(def, prefix: new HarmonyMethod(typeof(HistoricalPrices), nameof(DefinePrefix)) { priority = Priority.First },
+                                     postfix: new HarmonyMethod(typeof(HistoricalPrices), nameof(DefinePostfix)) { priority = Priority.Last });
+                        _defineHooks++;
+                    }
+                    Log.Info("HistoricalPrices: wartosc z definicji towarow BK (BKItems.InitializeTradeGood) - " + (_defineHooks > 0 ? "wpieta (przed latkami innych modow)" : bkItems == null ? "bez BK - nic do wpiecia" : "BRAK metody o oczekiwanych parametrach") + ".");
+                }
+                catch (Exception e) { Log.Error("HistoricalPrices.ApplyAll (BKItems.InitializeTradeGood)", e); }
             }
             catch (Exception e) { Log.Error("HistoricalPrices.ApplyAll", e); }
         }

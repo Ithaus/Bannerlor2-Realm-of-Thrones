@@ -1704,7 +1704,11 @@ namespace Armoury
         [SettingPropertyGroup("Iron bank")]
         public bool HistDemandScaling { get; set; } = true;
 
-        [SettingPropertyBool("Price Formula In New Coin", HintText = "the game's price formula keeps a fixed 2 coins beside the worth of the goods on the stall; in the new coin that weighs like a quarter load of ore or a whole measure of salt, so a bare stall of a cheap good never grew dear (ore 1.5 times its worth at most, timber 0.8). On: every trade good the new coin made cheaper is priced as the unmodded game prices it - a bare stall up to 10 times worth, a glutted one down to a tenth; goods the new coin made dearer (fur, wool, velvet, mead) keep the fixed 2 coins, which weigh little beside them; and a new campaign opens with the towns' memory of supply and demand for every repriced trade good already in the new coin instead of drifting out of the old one for weeks (needs Hist Demand Scaling; off = prices as before)")]
+        [SettingPropertyBool("Hist Demand From Definition", HintText = "the new-coin town demand of each kind of goods is reckoned from the worth its goods were defined with. A Realm of Thrones patch to Banner Kings divides the worth of every Banner Kings good by 100 (bread 20 becomes 0, honey 28 becomes 0, mead 120 becomes 1, fur 125 becomes 1), so bread, pies, fruit, honey, eggs, garum, papyrus and limestone kept their town demand in the old coin (bread up to 10 times its worth in big towns) and mead, fur, gold, ink and dyes got it many times too high. On: reckoned from the defined worth, like every other good; off = as before (a change takes effect when a game is next loaded)")]
+        [SettingPropertyGroup("Iron bank")]
+        public bool HistDemandFromDefinition { get; set; } = true;
+
+        [SettingPropertyBool("Price Formula In New Coin", HintText = "the game's price formula keeps a fixed 2 coins beside the worth of the goods on the stall; in the new coin that weighs like a quarter load of ore or a whole measure of salt, so a bare stall of a cheap good never grew dear (ore 1.5 times its worth at most, timber 0.8). On: every trade good the new coin made cheaper is priced as the unmodded game prices it - a bare stall up to 10 times worth, a glutted one down to a tenth; goods the new coin made dearer (fur, wool, raw silk, velvet) keep the fixed 2 coins, which weigh little beside them; and a new campaign opens with the towns' memory of supply and demand for every repriced trade good already in the new coin instead of drifting out of the old one for weeks (needs Hist Demand Scaling; off = prices as before)")]
         [SettingPropertyGroup("Iron bank")]
         public bool PriceFormulaInNewCoin { get; set; } = true;
 
@@ -2937,6 +2941,7 @@ namespace Armoury
             s.TownUseLinen = TownUseLinen;
             s.TownUseHardwood = TownUseHardwood;
             s.HistDemandScaling = HistDemandScaling;
+            s.HistDemandFromDefinition = HistDemandFromDefinition;
             s.PriceFormulaInNewCoin = PriceFormulaInNewCoin;
             s.RawPriceByUse = RawPriceByUse;
             s.PopulationRentEnabled = PopulationRentEnabled;

@@ -24,11 +24,13 @@ namespace Armoury
     ///      Naprawa: wzor dostaje swoje trzy wielkosci w monecie, w ktorej napisano jego stala (x przelicznik kategorii z
     ///      HistoricalPrices), czyli stala wazy 2 / przelicznik nowych denarow. Dla towaru o jednym przedmiocie to dokladnie
     ///      cena gry sprzed przeliczenia. Kazda kategoria towarow handlowych, ktora w nowej monecie POTANIALA (przelicznik
-    ///      ponad 1) - bez listy. Kategorii, ktore podrozaly (futro 1 -> 200 d, miod pitny 1 -> 10, marmur 1 -> 2, atrament
-    ///      2 -> 100, bawelna, aksamit, klejnoty, welna 22 -> 83, len 15 -> 20), nie ruszamy: tam 2 nowe denary waza mniej niz
-    ///      w grze, a przeliczenie zrobiloby ze stalej 2 futra, 2 miary miodu albo cala sztuke atramentu - ten sam blad w druga
-    ///      strone (proba recenzenta: pusta polka miodu, marmuru i atramentu 10 -> 7.5, welna w miescie bez welny ponizej
-    ///      wartosci bazowej). Regula: stala nigdy nie wazy wiecej niz 2 nowe denary i nigdy wiecej niz w grze.
+    ///      ponad 1) - bez listy. Kategorii, ktore podrozaly (welna 22 -> 83, len 15 -> 20, bawelna, aksamit, bizuteria; od
+    ///      paczki "towary w nowej monecie" przelicznik liczy sie od wartosci z definicji przedmiotu, wiec takze futro 125 -> 200,
+    ///      jajka 5 -> 8, papirus 60 -> 100 - a miod pitny, marmur, atrament, zloto i klejnoty, ktore BKROTPatch zbil do 1-10 d,
+    ///      sa wsrod tanszych), nie ruszamy: tam 2 nowe denary waza mniej niz w grze, a przeliczenie zrobiloby ze stalej 2 futra
+    ///      albo pol beli aksamitu - ten sam blad w druga strone (proba recenzenta: pusta polka miodu pitnego, marmuru i atramentu
+    ///      10 -> 7.5 przy przelicznikach odwrotnych sprzed tamtej paczki, welna w miescie bez welny ponizej wartosci bazowej).
+    ///      Regula: stala nigdy nie wazy wiecej niz 2 nowe denary i nigdy wiecej niz w grze.
     ///  (B) POPYT TO SAMI MIESZCZANIE. Gra liczy popyt z dobrobytu (BaseDemand), a mieszczanie rudy nie kupuja wcale
     ///      (TownUseIron = 0), lnu, welny i skor surowych 2%. Zuzycie rzemieslnikow i warsztatow do popytu nie wchodzilo:
     ///      cena nie wiedziala, ze miastu z kuznia rudy brakuje, za to welna byla droga wszedzie, takze tam, gdzie nikt jej nie
@@ -67,7 +69,7 @@ namespace Armoury
         private static int _factorModels, _demandModels;
 
         /// <summary>Nowa gra albo wczytanie (z HistoricalPrices.Reset, czyli z konstruktora ArmouryBehavior): bledy nowej kampanii znow ida do logu.</summary>
-        internal static void Reset() { _errFactor = false; _errUse = false; _errLog = false; }
+        internal static void Reset() { _errFactor = false; _errUse = false; _errLog = false; _errBudget = false; }
 
         // ------------------------------------------------------------ (A) stala wzoru w nowej monecie
         // BetterEconomy (BEE_ItemPriceFactorModel) wola w srodku model gry - przelicza tylko najbardziej zewnetrzne wywolanie.
@@ -143,8 +145,9 @@ namespace Armoury
         /// starej monecie i starych sztukach; bez przeliczenia pierwsze dwa-trzy tygodnie kampanii mialyby ceny z mieszanki monet
         /// (log 14:08: cena zbytu rudy 29.9 d w pierwszej dobie, 10.4 d w dwudziestej - bez zadnej zmiany na polkach).
         /// Podaz = wartosc polki w tej chwili (z rostera, w nowych cenach), popyt = szacunek czynnego modelu (juz w nowej monecie).
-        /// Kategorie: przy (A) WSZYSTKIE przeliczone towary handlowe - takze te, ktore w nowej monecie podrozaly (futro, miod
-        /// pitny, aksamit, klejnoty): stala wzoru ich nie dotyczy, ale ich pamiec z tickow startowych tez jest w starej monecie
+        /// Kategorie: przy (A) WSZYSTKIE przeliczone towary handlowe - takze te, ktore w nowej monecie podrozaly (futro, welna,
+        /// aksamit, jajka), i te, ktore przelicznik maja z wartosci z definicji (chleb, ciasta, owoce, miod - paczka "towary w
+        /// nowej monecie"): stala wzoru tych pierwszych nie dotyczy, ale pamiec kazdej z tickow startowych jest w starej monecie
         /// (proba recenzenta 2: aksamit przy 5 sztukach na polce 0.38 zamiast 0.54 w 1. dobie, dochodzi przez 3 tygodnie;
         /// sol 2.25 zamiast 1.83); przy (B) siedem surowcow masowych (welna przy 20 sztukach 0.63 zamiast 0.10).
         /// TYLKO MIASTA (recenzja 2): gra prowadzi dane rynku samych miast (TradeCampaignBehavior.InitializeMarkets, ticki startowe
@@ -205,6 +208,22 @@ namespace Armoury
 
         // ------------------------------------------------------------ log dnia
         private static string F(float v, string fmt) { return v.ToString(fmt, CultureInfo.InvariantCulture); }
+
+        // budzet dnia zakupow mieszczan w kategorii: ta sama metoda, ktora liczy go BK (EconomyPatches.CalculateBudget - z polityka
+        // podatkowa osady i z BudgetPostfix Armoury), a bez BK - model gry; popyt dnia bez dodatku dobrobytu (jak UpdateDemandShift)
+        private static MethodInfo _bkBudget; private static bool _bkBudgetLooked, _errBudget;
+        private static float HouseBudget(Town t, ItemCategory c, SettlementEconomyModel econ)
+        {
+            if (econ == null) return 0f;
+            float dem = econ.GetDailyDemandForCategory(t, c, 0);
+            if (!_bkBudgetLooked) { _bkBudgetLooked = true; _bkBudget = AccessTools.Method("BannerKings.Patches.EconomyPatches:CalculateBudget"); }
+            if (_bkBudget != null && !_errBudget)
+            {
+                try { return (float)_bkBudget.Invoke(null, new object[] { t, dem, c }); }
+                catch (Exception e) { _errBudget = true; Log.Error("RawPrice.Daily (budzet BK)", e); }   // raz na kampanie; dalej model gry
+            }
+            return econ.CalculateDailySettlementBudgetForItemCategory(t, dem, c);
+        }
 
         private static float Mid(List<float> l)
         {
@@ -271,9 +290,59 @@ namespace Armoury
                     idx.Sort();
                     other.Append(other.Length > 0 ? ", " : "").Append(id).Append(' ').Append(F(idx[0], "0.00")).Append('/').Append(F(Mid(idx), "0.00")).Append('/').Append(F(idx[idx.Count - 1], "0.00"));
                 }
+                // paczka "towary w nowej monecie": kategorie z przedmiotem, ktorego wartosc z definicji rozni sie od wartosci w grze
+                // (chleb, ciasta, owoce, miod, miod pitny, futro...) - bez listy, wedle HistoricalPrices; przy wylaczonym
+                // HistDemandFromDefinition te same kategorie "bez przelicznika" albo z dawnym (porownanie w jednej grze); indeks, sztuki
+                // na polkach miast, puste polki i budzet "zakupow" mieszczan (zloto z niczego do kas miast): caly i ile z niego dalo sie
+                // dzis wydac przy tej polce
+                var defined = new StringBuilder();
+                var dcats = HistoricalPrices.DefinedCategories();
+                if (dcats.Count > 0)
+                {
+                    var units = new Dictionary<ItemCategory, int>(); var seen = new Dictionary<ItemCategory, List<string>>();
+                    var bareTowns = new Dictionary<ItemCategory, int>(); var worth = new Dictionary<ItemCategory, float>();
+                    var budget = new Dictionary<ItemCategory, double>(); var spend = new Dictionary<ItemCategory, double>();
+                    foreach (var c in dcats) { units[c] = 0; seen[c] = new List<string>(); bareTowns[c] = 0; budget[c] = 0; spend[c] = 0; }
+                    foreach (var t in Town.AllTowns)
+                    {
+                        if (t == null || t.Owner == null || t.Owner.ItemRoster == null) continue;
+                        worth.Clear();
+                        var shelf = t.Owner.ItemRoster;
+                        for (int i = 0; i < shelf.Count; i++)
+                        {
+                            var e = shelf.GetElementCopyAtIndex(i);
+                            var it = e.EquipmentElement.Item;
+                            var c = it != null ? it.ItemCategory : null;
+                            if (c == null || e.Amount <= 0 || !units.ContainsKey(c)) continue;
+                            units[c] += e.Amount;
+                            float w; worth.TryGetValue(c, out w); worth[c] = w + (float)e.Amount * t.GetItemPrice(e.EquipmentElement, null, false);   // polka po cenie, jaka placa mieszczanie
+                            var names = seen[c]; string tag = it.StringId + " " + it.Value + " d";
+                            if (names.Count < 3 && !names.Contains(tag)) names.Add(tag);
+                        }
+                        foreach (var c in dcats)
+                        {
+                            float w; if (!worth.TryGetValue(c, out w)) { w = 0f; bareTowns[c]++; }
+                            float b = HouseBudget(t, c, econ);
+                            budget[c] += b; spend[c] += Math.Min(b, w);
+                        }
+                    }
+                    foreach (var c in dcats)
+                    {
+                        idx.Clear();
+                        foreach (var t in Town.AllTowns) if (t != null && t.MarketData != null) idx.Add(t.GetItemCategoryPriceIndex(c));
+                        if (idx.Count == 0) continue;
+                        idx.Sort();
+                        defined.Append(defined.Length > 0 ? "; " : "").Append(c.StringId).Append(seen[c].Count > 0 ? " (" + string.Join(", ", seen[c].ToArray()) + ")" : "")
+                               .Append(HistoricalPrices.CoinRatio(c) > 0f ? " /" + F(HistoricalPrices.CoinRatio(c), "0.##") : " bez przelicznika").Append(' ')
+                               .Append(F(idx[0], "0.00")).Append('/').Append(F(Mid(idx), "0.00")).Append('/').Append(F(idx[idx.Count - 1], "0.00"))
+                               .Append(", na polkach ").Append(units[c]).Append(" szt., pusto w ").Append(bareTowns[c]).Append(" miastach, budzet mieszczan ")
+                               .Append(F((float)budget[c], "0")).Append(" d (przy dzisiejszych polkach do ").Append(F((float)spend[c], "0")).Append(" d)");
+                    }
+                }
                 Log.Info("Ceny surowcow: dzien " + day + " - popyt z prawdziwego zuzycia " + (UseOn ? "CZYNNY" : "wylaczony") + ", stala wzoru w nowej monecie "
                          + (FormulaOn ? "CZYNNA" : "wylaczona") + " (model cen " + (price != null ? price.GetType().Name : "?") + ", mediany po miastach; sztuka rudy i drewna = ladunek) - "
-                         + sb + (other.Length > 0 ? ". Inne przeliczone towary, indeks min/mediana/max: " + other : "") + ".");
+                         + sb + (other.Length > 0 ? ". Inne przeliczone towary, indeks min/mediana/max: " + other : "")
+                         + (defined.Length > 0 ? ". Towary z wartoscia z definicji przedmiotu (przelicznik popytu, indeks min/mediana/max, sztuki na polkach miast): " + defined : "") + ".");
             }
             catch (Exception e)
             {
