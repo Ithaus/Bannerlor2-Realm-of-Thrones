@@ -41,6 +41,7 @@ namespace GrandTourney
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this, OnSessionLaunched);
             CampaignEvents.TournamentStarted.AddNonSerializedListener(this, OnTournamentStarted);
             CampaignEvents.TournamentFinished.AddNonSerializedListener(this, OnTournamentFinished);
+            CampaignEvents.TournamentCancelled.AddNonSerializedListener(this, OnTournamentCancelled);   // przeglad 07.10: oblezenie odwoluje turniej
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, OnDailyTick);
         }
 
@@ -417,7 +418,15 @@ namespace GrandTourney
                     if (settlement == null || settlement.Town == null) { _events.Remove(line); continue; }
                     var town = settlement.Town;
                     var game = Campaign.Current.TournamentManager.GetTournamentGame(town);
-                    if (game == null) { _events.Remove(line); continue; }
+                    if (game == null)
+                    {
+                        // turniej zniknal bez zakonczenia (nie bylo zwyciezcy) - pula gracza nie moze przepasc
+                        _events.Remove(line);
+                        int left = 0;
+                        if (p.Length > 3) int.TryParse(p[3], out left);
+                        RefundPurse(town, left, "is gone from the lists");
+                        continue;
+                    }
 
                     float proclaimed = float.Parse(p[1], System.Globalization.CultureInfo.InvariantCulture);
                     int state = int.Parse(p[2]);
@@ -504,6 +513,39 @@ namespace GrandTourney
                 }
             }
             catch (Exception e) { Log.Error("OnDailyTick", e); }
+        }
+
+        /// <summary>
+        /// Gra odwolala turniej (oblezenie miasta - vanilla ResolveTournament -> TournamentCancelled): pula gracza wraca, jak przy kazdym
+        /// innym odwolaniu. Nasze wlasne odwolania zdejmuja wpis PRZED ResolveTournament, wiec nie ma tu drugiego zwrotu.
+        /// </summary>
+        private void OnTournamentCancelled(Town town)
+        {
+            try
+            {
+                var line = Find(town);
+                if (line == null) return;
+                int purse = PurseOf(town);
+                Remove(town);
+                RefundPurse(town, purse, "is called off");
+                SilenceAdoption(town.Settlement);
+                Log.Info("Turniej w " + town.Name + " odwolany przez gre (oblezenie) - pula " + purse + " rozliczona.");
+            }
+            catch (Exception e) { Log.Error("OnTournamentCancelled", e); }
+        }
+
+        /// <summary>Zwrot puli gracza przy turnieju, ktory sie nie odbyl: przy stawkach historycznych cala (czekala na zwyciezce), inaczej
+        /// czesc wedle CancelledFeeRefund - jak w pozostalych odwolaniach.</summary>
+        private void RefundPurse(Town town, int purse, string what)
+        {
+            if (purse <= 0) return;
+            var s = Settings.Current;
+            int back = s.HistoricalTownRates ? purse : (int)(purse * s.CancelledFeeRefund);
+            if (back <= 0) return;
+            GiveGoldAction.ApplyBetweenCharacters(null, Hero.MainHero, back);
+            Log.Player("The tourney at " + (town != null ? town.Name.ToString() : "?") + " " + what + " before a champion was crowned. "
+                       + back + " gold of your purse comes back to you.", true);
+            Log.Info("Zwrot puli turnieju w " + (town != null ? town.Name.ToString() : "?") + ": " + back + " z " + purse + ".");
         }
 
         /// <summary>Pula gracza dla zwyciezcy: bohater dostaje ja do sakiewki; zwyciezca spoza bohaterow - kasa miasta (jego nagroda idzie
