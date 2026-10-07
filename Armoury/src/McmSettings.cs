@@ -1520,6 +1520,14 @@ namespace Armoury
         [SettingPropertyGroup("The road to market")]
         public float CaravanBulkTransitCover { get; set; } = 6f;
 
+        [SettingPropertyBool("Caravan Bulk Buy Before Route", HintText = "a caravan buys its bulk raw goods right after its usual purchases and before it picks the next town, so the fresh cargo already counts in that choice (off = it buys on its way out of the gate, when the destination is already set)")]
+        [SettingPropertyGroup("The road to market")]
+        public bool CaravanBulkBuyBeforeRoute { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Caravan Bulk Fill Limit", 0.00f, 4.00f, "0.00", HintText = "bulk raw goods bought at a profit may fill a caravan's packs up to this share of its carrying capacity - Banner Kings stops its own buying at 0.8 and leaves the rest empty (0.8 = no more room than before; never below 0.8 or above 1; the player's own caravans always stay at 0.8)")]
+        [SettingPropertyGroup("The road to market")]
+        public float CaravanBulkFillLimit { get; set; } = 1f;
+
         [SettingPropertyBool("Levy Enabled", HintText = "volunteers come forward only where there are men to spare: hands the fields do not need, and men who want to leave a poor, burnt or warring land")]
         [SettingPropertyGroup("Iron bank")]
         public bool LevyEnabled { get; set; } = true;
@@ -2883,6 +2891,8 @@ namespace Armoury
             s.CaravanBulkSurplusFactor = CaravanBulkSurplusFactor;
             s.CaravanBulkCapacityShare = CaravanBulkCapacityShare;
             s.CaravanBulkTransitCover = CaravanBulkTransitCover;
+            s.CaravanBulkBuyBeforeRoute = CaravanBulkBuyBeforeRoute;
+            s.CaravanBulkFillLimit = CaravanBulkFillLimit;
             s.LevyEnabled = LevyEnabled;
             s.RecruitBaseWilling = RecruitBaseWilling;
             s.RecruitExcessWeight = RecruitExcessWeight;
