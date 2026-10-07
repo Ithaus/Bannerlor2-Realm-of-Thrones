@@ -1,0 +1,133 @@
+=================== ZLOZENIE LANCUCHA 115..119 I PRZENIESIENIE KOLEJKI 108..114 (07.10, noc 06/07.10) ===================
+Skladajacy: Claude (sesja robocza). Klon lancucha: scratchpad\lancuch (sesja 3cf3e0ac; origin = repo C:\Users\GAME\Bannerlor2-Realm-of-Thrones).
+Do gry NIC nie wgrane, nic nie wypchniete, w repo Jeffa nic nie zacommitowane (dopisane tylko pliki w docs\paczki).
+Galaz glownego katalogu klonu (l107-zold) nieruszana; istniejace galezie n*, l*, paczki/*, pkg-* nieruszane.
+Sciezki ponizej wzgledem scratchpad sesji 3cf3e0ac (C:\Users\GAME\AppData\Local\Temp\claude\C--Program-Files--x86--Steam-steamapps-common-Mount---Blade-II-Bannerlord\3cf3e0ac-5529-4b68-a794-0edec69cfda7\scratchpad).
+
+--- WYNIK W JEDNYM AKAPICIE ---
+Piec nowych paczek zlozonych jako ogniwa 115..119 na n107 (kod w grze), kazde ogniwo = jeden commit, tresc kazdego = tresc
+zrecenzowanej galezi roboczej (git diff pusty). Wszystkie buduja sie z kodem 0, gen_mcm.py niczego nie zmienia. Stara kolejka
+108..114 przeniesiona na szczyt (m108..m114), konflikty tylko tekstowe, rozwiazane regulami recenzenta wozow; kazde ogniwo
+buduje sie z kodem 0; drzewo m114 jest identyczne co do bajtu z probnym scaleniem recenzenta wozow (klon dzien-5\wozy\sc).
+Proby recenzentow na DLL grupy 115..119 i na DLL m114: wszystkie jak u recenzentow. Armoury.json Jeffa: zadnego klucza nowych
+ani zmienionych ustawien.
+
+--- 1. NOWY LANCUCH (ogniwa 115..119) ---
+Sprawdzone przed zlozeniem: galezie robocze leza liniowo (git merge-base --is-ancestor): n107-zold-i-skarbiec -> l117-cena-od-niedoboru
+-> l116-warsztaty-w-nowej-monecie -> l115-karawany-ruda-dociera -> l118-towary-w-nowej-monecie -> l119-wozy-do-najlepszego-miasta (5 x OK).
+Sposob: dla kazdej paczki "git cherry-pick -n" jej commitow (cena: af9be0c + 8d8f72d, reszta po jednym) na poprzednie nowe ogniwo,
+jeden commit "<nr>: <tytul>" + Co-Authored-By; po kazdym "git diff <ogniwo> <galaz robocza> --stat" = PUSTY (5 x).
+Kazde ogniwo w osobnym worktree dzien-5\zlozenie\<nr>: libs z repo (20 dll), python tools/gen_mcm.py (McmSettings.cs Armoury,
+RealisticCaptivity, GrandTourney - hash bez zmian w kazdym ogniwie), dotnet build Armoury/Armoury.csproj -c Release (kod wyjscia).
+
+ nr  | galaz                            | commit  | robocza (commit)                      | build | ustawien MCM | DLL ogniwa md5
+-----+----------------------------------+---------+---------------------------------------+-------+--------------+----------------------------------
+ 107 | n107-zold-i-skarbiec (w grze)    | 6ace39a | -                                     |   -   |  612         | -
+ 115 | n115-cena-od-niedoboru           | c49cdda | l117-cena-od-niedoboru (8d8f72d)      |   0   |  614         | c32c359777c7754bc90e2c8fe2214ed1
+ 116 | n116-warsztaty-w-nowej-monecie   | 9b7a4e8 | l116-warsztaty-w-nowej-monecie (71fb952) | 0  |  623         | ca61a745227ba9bd8a7845fd4eea584d
+ 117 | n117-karawany-ruda-dociera       | 0ffc41c | l115-karawany-ruda-dociera (fea0c2f)  |   0   |  625         | de1b8f7e7a6b5738992124749190fe0f
+ 118 | n118-towary-w-nowej-monecie      | 38054d7 | l118-towary-w-nowej-monecie (ced39bd) |   0   |  626         | 7a6a093b54fc021f3558d24169d8da68
+ 119 | n119-wozy-do-najlepszego-miasta  | 0c7aa2d | l119-wozy-do-najlepszego-miasta (ffcbd5d) | 0 |  631         | faade7bf0dcc00de87d520a603234d15
+Pelne skroty: c49cdda61ead855affb669f7f097205ce229fe25, 9b7a4e8400f4cbf0bcc5d202c8471d7f6a95cd22, 0ffc41c302547982125fa8063153fb82c68d65cc,
+38054d7432107a06feac8d7493b97af9ba010eda, 0c7aa2ddb61556f761787e522048f4f93ec8393b.
+Build kazdego ogniwa: 0 bledow, 1 ostrzezenie (stare CS0169 BattlefieldLaw._vanillaHandledSetter). DLL ogniw: dzien-5\zlozenie\Armoury-<nr>.dll.
+Numeracja: robocze 117 (cena) i 115 (karawany) zamienione - w lancuchu 115 = cena, 117 = karawany; 116, 118, 119 bez zmian.
+
+--- 2. DLL GRUPY TESTOWEJ (115..119) ---
+dzien-5\zlozenie\Armoury-grupa-towary2.dll = build ogniwa 119, md5 faade7bf0dcc00de87d520a603234d15, build kod 0, 631 ustawien MCM.
+(Ten sam plik w dzien-5\zlozenie\grupa-dll\Armoury.dll - do prob, ktore biora katalog.) Wyniki prob w dzien-5\zlozenie\proby.
+
+Proby recenzentow uruchomione na tym DLL (te same programy, te same biblioteki; wlasne katalogi wynikow, katalogi recenzentow nietkniete):
+- 115 cena, proba autora dzien-4\cena\htest (run.sh, katalog logu wlasny): 27 z 27 OK, WYNIK: OK.
+- 115 cena, proba recenzenta 2 dzien-4\cena\recenzja2\h3: 13 z 13 (WYNIK RECENZENTA 2: OK).
+- 116 warsztaty, dzien-4\warsztaty\recenzja-na-cenie\proba-na-cenie.ps1 (te same trzy przebiegi programu h): baza l117 66 z 66,
+  paczka wylaczona 71 z 71, wlaczona 122 z 122; odcisk baza == wylaczona (242B26B2...), odcisk wlaczonej = recenzenta (0EF5E7A2...).
+- 117 karawany, dzien-4\karawany3\recenzja2\harness: 47 z 47 (WYNIK: OK); linie ODCISK identyczne z baza i z koncowym przebiegiem recenzenta.
+- 118 towary BK, dzien-5\towary-bk\recenzja\proba-r\uruchom.ps1: off 13 z 13, on 15 z 15, on2 15 z 15, nobk 4 z 4; zrzuty (dump-*.txt)
+  identyczne z wynikami recenzenta (proba3 i proba-scal), off = baza recenzenta bit w bit.
+- 119 wozy, proba recenzenta dzien-5\wozy\recenzja\proba2: 57 z 57; proba autora dzien-5\wozy\proba: 51 z 51; wyjscie obu = koncowe
+  przebiegi recenzenta poza godzinami (linie ODCISK identyczne).
+RAZEM: wszystkie przebiegi zaliczone (27/27, 13/13, 66/66, 71/71, 122/122, 47/47, 13/13 + 15/15 + 15/15 + 4/4, 57/57, 51/51).
+
+--- 3. ARMOURY.JSON JEFFA (tylko odczyt) ---
+Plik: Documents\Mount and Blade II Bannerlord\Configs\ModSettings\Global\Armoury\Armoury.json - 9874 B, 0 bajtow zerowych, 335 kluczy, poprawny JSON.
+Settings.cs n107 -> n119 (git diff n107-zold-i-skarbiec n119-wozy-do-najlepszego-miasta -- Armoury/src/Settings.cs): 19 NOWYCH ustawien,
+0 usunietych, 1 zmieniona wartosc domyslna:
+  nowe: WorkshopTradeEnabled, WorkshopTradeUpkeepPerDay, WorkshopTradeBatchWages, WorkshopTradeStartCapital, WorkshopTradeLowCapital,
+        WorkshopTradeEquipmentScale, WorkshopTradePriceYears, WorkshopTradeProfitDays, WorkshopTradeResaleShare, MarketCartAllVillages,
+        VillageCartsBestMarket, VillageCartFullLoadFar, VillageCartRoadNews, VillageCartFairPrice, CaravanBulkBuyBeforeRoute,
+        CaravanBulkFillLimit, HistDemandFromDefinition, PriceFormulaInNewCoin, RawPriceByUse;
+  zmieniona domyslna: MarketMaxDistance 150 -> 250 (paczka 119); MarketCartFactor - tylko nowy opis, wartosc 2 bez zmian.
+W Armoury.json: ZADNEGO z 19 nowych kluczy, brak MarketMaxDistance i MarketCartFactor - wszystkie wejda wartosciami z kodu.
+UWAGA na przyszlosc: zapis ustawien w MCM na DLL sprzed 119 wpisze MarketMaxDistance = 150 i po wgraniu 119 zasieg wozow zostanie 150
+(sprawdzic klucz przed wgraniem, jesli Jeff ruszal MCM). Ogniwa m108..m114 dokladaja 38 swoich nowych ustawien (650 - 612) - jak na n114.
+
+--- 4. PRZENIESIENIE KOLEJKI 108..114 NA 119 (galezie m108..m114) ---
+Sposob: kazde ogniwo w osobnym worktree dzien-5\zlozenie\m<nr> (galaz m... zakladana na poprzednim ogniwie), "git -c merge.conflictStyle=diff3
+cherry-pick -n <oryginal>", konflikty skryptem z regulami recenzenta wozow (asercje; nieznany blok = STOP - nie wystapil), gen_mcm.py,
+build (kod wyjscia), dopiero potem jeden commit "<komunikat oryginalu> (przeniesione na n119)" + Co-Authored-By. Kazde ogniwo: dokladnie
+1 commit, rodzic = poprzednie ogniwo, "git diff --stat" tej samej wielkosci co oryginal.
+
+ nr   | galaz                     | commit  | oryginal | konflikty i rozwiazanie                                              | build | ustawien | DLL md5
+------+---------------------------+---------+----------+----------------------------------------------------------------------+-------+----------+----------------------------------
+ m108 | m108-ludzie-jednostka     | 1ffe021 | fff2a3b  | ArmouryBehavior.cs: linia konstruktora (a)                           |   0   |  633     | 5f1a4ce8a7f14725c06e03ad7db6fc75
+ m109 | m109-ludzie-przyrost      | 86395b5 | 1d3459f  | brak                                                                 |   0   |  642     | 10bcf6271641dbf0aa23b15f666b2414
+ m110 | m110-k5-kasa-zamku        | 18033df | 2a405c9  | ArmouryBehavior.cs (a); MarketRoad.cs bez konfliktu (hunki rozlaczne) |   0   |  648     | 1bf061a37832dc8eda14cbb7ee53824d
+ m111 | m111-k6-kasy-miast        | 0924506 | 61a3453  | ArmouryBehavior.cs (a); MoneyLedger.cs bez konfliktu                 |   0   |  656     | 96e3a409e7f4aecc8cacd7c4c648ab30
+ m112 | m112-k7-utarg-wsi         | e7bd50e | 306eafd  | ArmouryBehavior.cs (a); Settings.cs (b); McmSettings.cs (c)          |   0   |  659     | fc97e06284d45bcd38428dfee7c64f4e
+ m113 | m113-ludzie-spustoszenie  | 86f3305 | 7b5b894  | ArmouryBehavior.cs (a)                                               |   0   |  667     | b141eebf6d7dcf3e45b540a2045d6566
+ m114 | m114-porzadki             | 817931e | de5ced5  | brak                                                                 |   0   |  669     | b1249a02f13fefe3864af106763bd555
+Pelne skroty: 1ffe02199ad036bdbf08d8046fa467060e7ad635, 86395b59c233341a0f9aa42b5011e3a48e170eba, 18033dfc5a92f1dcc55932fe82369ffa6b31fcec,
+09245064629ae1c4b4577f05e582a000ed1ed2d0, e7bd50e895028d5d3e644d0b66ec8adf92c45a0d, 86f33054866e6e75c2d5ac9999929b4e6475436b,
+817931e9b77159d8553876cbba097099ebe44a5c. DLL: dzien-5\zlozenie\Armoury-m<nr>.dll. Ustawien = n<nr> + 19 w kazdym ogniwie (n114: 650, m114: 669).
+Reguly (recenzent wozow, dzien-5\wozy\recenzja\scal_rozwiaz.py; moj skrypt z tymi samymi regulami i asercjami):
+ (a) konstruktor ArmouryBehavior (jedna linia, oba konce ja zmieniaja): linia OGNIWA + "MarketCarts.Reset();" zaraz po "MarketRoad.Reset();".
+     Asercje: zadne X.Reset() z lancucha ani z ogniwa nie ginie, poza Reset linia identyczna. Ogniwa dopisuja kolejno: PeopleUnit (108),
+     CastlePurse (110), TownPurse (111), VillageTakings (112), Devastation + ScorchedEarth (113). Na m114: 40 wywolan Reset = suma n114 (39)
+     i n119 (34) bez powtorzen, MarketCarts zaraz po MarketRoad; poza ta linia ArmouryBehavior.cs rozni sie od n114 tylko trzema liniami
+     paczek (RawPrice.SeedNewCampaign, RawPrice.Daily, MarketCarts.Daily).
+ (b) Settings.cs przy 112 (K7): linie paczki wozy (MarketMaxDistance 250, opis MarketCartFactor, 5 nowych wlacznikow) zostaja, pod nimi
+     DOKLADNIE trzy linie K7: VillageTakingsWhole, VillageFoodSalesKept, VillagerPurseSurvives (asercja: ogniwo tylko dopisuje).
+ (c) McmSettings.cs: nigdy recznie - z generatora (przy m112 generator przepisal plik po scaleniu tekstowym; w pozostalych ogniwach
+     wynik scalenia = wynik generatora). Koniec: 669 ustawien.
+KONTROLA CALOSCI m114:
+ - drzewo m114-porzadki (9ea12ad4...) = drzewo koncowego commitu probnego scalenia recenzenta wozow (dzien-5\wozy\sc, a17a1f7) CO DO BAJTU;
+   m108..m111 = jego ogniwa co do bajtu; m112, m113 roznia sie od jego ogniw tylko McmSettings.cs (on generowal raz na koncu, ja w kazdym).
+ - pliki zmienione tylko przez kolejke: w m114 = n114; pliki zmienione tylko przez paczki: w m114 = n119; plikow spoza obu stron: 0.
+ - pliki wspolne (ArmouryBehavior, MarketRoad, McmSettings, MoneyLedger, Settings, SubModuleMain): linie zmian n114 -> m114 = linie zmian
+   paczek n107 -> n119, a n119 -> m114 = linie zmian kolejki n107 -> n114 (poza linia konstruktora, patrz (a)).
+ - MarketRoad.cs: roznica wobec n114 = dokladnie zmiany paczki wozy (trzy fragmenty kodu: blok wyboru miasta na poczatku RoutePrefix,
+   CartPostfix, Forget w OnPartyDestroyed + dwa komentarze dokumentacji); fragmenty K5 (TooFar ... out noRoad, CastlePurse.CanPayCart,
+   _farMarket, dopisek linii "Dowoz:") nietkniete.
+ - MoneyLedger.cs: paczka 116 dodaje osobne tablice (_shopWage, _shopKeep) i pozycje opisowa bez numeru - nic do przenumerowania
+   wzgledem numeracji 110..114 (MCastle, MTrim, NMend, NOrphan...).
+PROBY PO OGNIWACH Z KONFLIKTEM (wzorzec = ta sama proba na DLL oryginalnego ogniwa, zbudowanym w dzien-5\zlozenie\r<nr>, detached):
+ - K5 (dzien-2\k5\harness) po m110: n110 145 z 145, m110 144 z 145; jedyna roznica: "zadnego bledu w logu" - atrapa proby nie ma typu wsi
+   ani modeli kampanii, wiec MarketCarts.Choose i MarketCarts.GameRange lapia NullReferenceException (po jednym Log.Error) i oddaja decyzje
+   regule K5. W grze wies zawsze ma typ (to samo stwierdzil recenzent wozow). Odciski wlaczone i wylaczone IDENTYCZNE z n110.
+ - K6 (dzien-2\k6\harness) po m111: n111 261 z 261, m111 260 z 261 - ta sama jedyna roznica; odciski identyczne z n111.
+ - K7 (dzien-2\k7\harness) po m112: n112 0 nieudanych, m112 0 nieudanych; wszystkie pliki wynikowe (k7.log, doby wlaczone/wylaczone,
+   rody, recenzja, regiony) identyczne poza czasem pomiaru odczytu zlota.
+ - Na szczycie (m114 wobec n114; stare oczekiwania prob): K5 8 nieudanych wobec 7 na n114 (+ ta sama "zadnego bledu w logu"),
+   K6 2 wobec 1 (+ ta sama), K7 7 wobec 7 (identyczne); wszystkie odciski identyczne z n114.
+ - Proby nowych paczek na DLL m114: cena htest 27 z 27 i h3 13 z 13; warsztaty 71 z 71 i 122 z 122 (odciski = recenzenta);
+   karawany 47 z 47 (odcisk = baza); towary off 13, on 15, on2 15, nobk 4 (zrzuty = recenzenta); wozy 61 z 61 (z sekcja K5)
+   i autor 51 z 51 - wyjscie proby recenzenta = jego przebieg na scalonym DLL poza godzinami.
+Komunikaty commitow m-ogniw: komunikat oryginalu + " (przeniesione na n119)" + pusta linia + Co-Authored-By (oryginaly nie mialy stopki).
+
+--- 5. DO WIADOMOSCI / OTWARTE ---
+- Kod paczki 117 (karawany) ma w komentarzach i w linii startowej logu roboczy numer "poprawka 115" ("CaravanBulk: poprawka 115 - zakup
+  przed wyborem celu ...") - w lancuchu to 117. Kodu nie ruszalem (tresc ogniwa = tresc recenzji); opis 117 mowi o tym wprost.
+- Proby K5 i K6 z dzien-2 maja na kodzie z wozami jedno dodatkowe "nieudane" z atrapy (wies bez typu) - do odswiezenia przy okazji
+  (dac atrapie typ wsi albo wylaczyc VillageCartsBestMarket w tej probie), plus stare oczekiwania znane z n114.
+- docs\paczki\108..114 opisuja ogniwa n108..n114 (na n107); ich tresc kodu przeniesiona bez zmian merytorycznych na m108..m114
+  (zmienila sie tylko linia konstruktora i scalone Settings/McmSettings jak wyzej). Tych plikow nie zmienialem (wolno bylo tylko dopisac).
+- Kolejnosc grup: grupa testowa 115..119 (ten DLL), potem m108..m114 - jesli kolejka ma isc do gry, to z galezi m*, nie n*.
+- Worktree skladajacego (do sprzatniecia po wypchnieciu): dzien-5\zlozenie\115..119, m108..m114 (na galeziach), r110, r111, r112, r114
+  (detached, tylko wzorcowe buildy do prob).
+
+--- 6. OPISY ---
+Dopisane: docs\paczki\115-cena-od-niedoboru.md, 116-warsztaty-w-nowej-monecie.md, 117-karawany-ruda-dociera.md,
+118-towary-w-nowej-monecie.md, 119-wozy-do-najlepszego-miasta.md (wpis CHANGELOG paczki: nowy naglowek-komentarz z lancuchem,
+tytul przenumerowany - data bez zmian, robocze skroty l117/l115 zamienione na 115/117, akapit "Lancuch:" na koncu, bez linii Status)
+i ten plik.

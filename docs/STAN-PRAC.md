@@ -1,7 +1,52 @@
-# Stan prac - przekazanie dla drugiego konta (2026-10-06 14:30: w grze wpisy 101-107, PIERWSZY TEST ZROBIONY - wynik nizej; w toku poprawka karawan i warsztaty towarowe)
+# Stan prac - przekazanie dla drugiego konta (2026-10-07 noc: w grze 101-107; GOTOWA grupa TOWARY 2 = 115-119 do wgrania na slowo Jeffa - sekcja ponizej)
 
 Czytaj najpierw: `CLAUDE.md` (zwlaszcza sekcja 8, **zasada 0**: kazda zmiana = kontrola regresji, kolizji
 i spojnosci calej logiki; oraz pulapka MCM w sekcji 7), potem ten plik, potem gorne wpisy `CHANGELOG.md`.
+
+## NOC 06/07.10 - GRUPA "TOWARY 2" (115-119) GOTOWA DO WGRANIA NA SLOWO JEFFA; kolejka 108-114 przeniesiona na 119
+
+W GRZE BEZ ZMIAN: wpisy 101-107 (DLL md5 0eeb0a105dc5ae4221809e222e327afe). Noc: nowe konto (sesja fa2fd7a6), jeden watek naraz.
+Galaz robocza = kod 107 (sprawdzone 07.10 ok. 21:40 czasu komputera: diff kodu z `paczki/107-zold-i-skarbiec` pusty).
+
+NOWY LANCUCH (kazde ogniwo: autor + niezalezny recenzent, cena: dwoch; jeden commit; build kod 0; opisy `docs/paczki/115..119-*.md`;
+przeglad zlozenia `docs/paczki/PRZEGLAD-ZLOZENIA-2026-10-07.txt`):
+
+| Nr | Galaz | Commit | Tresc (slowami gracza) | MCM |
+|---|---|---|---|---|
+| 115 | `paczki/115-cena-od-niedoboru` | c49cdda | surowiec drogi tam, gdzie go brakuje rzemieslnikom (ruda w miescie bez rudy: pierwszy ladunek 37 d zamiast 10, z kuznia 74 d; drewno 39 d zamiast 2); welna tanieje poza 23 miastami z tkalnia; sol, piwo, narzedzia przy pustej polce znow do x10 | 614 |
+| 116 | `paczki/116-warsztaty-w-nowej-monecie` | 9b7a4e8 | warsztat kosztuje 3 lata swojego zarobku (+ kasa warsztatu); 100 d dziennie przestaje znikac - czynsz i place ida do kasy miasta; zaczynaja pracowac piekarnie, winiarnie, olejarnie, garbarnie, garncarnie | 623 |
+| 117 | `paczki/117-karawany-ruda-dociera` | 0ffc41c | karawany kupuja surowce przed wyborem trasy i laduja je do pelnego udzwigu (karawany gracza 80%) | 625 |
+| 118 | `paczki/118-towary-w-nowej-monecie` | 38054d7 | towary BK (chleb, ciasta, miod, owoce, miod pitny, futro, zloto...) w nowej monecie - BKROTPatch dzieli ich wartosc przez 100, przez co popyt zostal w starej monecie; bochen (10/dobe) 61 -> 17-21 d | 626 |
+| 119 | `paczki/119-wozy-do-najlepszego-miasta` | 0c7aa2d | woz kazdej wsi jedzie do miasta w zasiegu 250 (ok. 4 doby), ktore najlepiej zaplaci; ladunek wyceniany sztuka po sztuce (koniec ceny pierwszej sztuki za caly woz); woz x2 dla wszystkich wsi | 631 |
+
+DLL GRUPY = build `paczki/119`: md5 faade7bf0dcc00de87d520a603234d15, 631 ustawien (kopia: `SCRATCH\dzien-5\zlozenie\Armoury-grupa-towary2.dll`,
+SCRATCH = katalog roboczy sesji 3cf3e0ac); proby wszystkich recenzentow przechodza na nim. `Armoury.json` Jeffa (07.10): zadnego z 19 nowych kluczy
+ani `MarketMaxDistance` (zmiana domyslnej 150 -> 250 zadziala). UWAGA: zapis ustawien w MCM PRZED wgraniem wpisalby MarketMaxDistance = 150.
+
+JAK WGRAC (dopiero po "wgraj" od Jeffa; gra zamknieta - proces `Bannerlord.BLSE.LauncherEx`): na galezi roboczej
+`git cherry-pick c49cdda 9b7a4e8 0ffc41c 38054d7 0c7aa2d`, `python tools/gen_mcm.py` (ma nic nie zmienic, 631), build z kodem 0, porownac md5 z
+faade7bf...; kopia `Armoury.dll.bak-2026-10-07-przed-115`; wgranie; md5 w grze; wpisy z `docs/paczki/115..119` na gore CHANGELOG ze statusem
+WGRANE (bez komentarza HTML na poczatku pliku); commit + push.
+
+TEST (decyzja Jeffa: testy grupami): swiezy start gry, NOWA kampania (115, 118 i 119 licza start kampanii), 20 dob, zapis; "sprawdz logi".
+Glowna liczba: "Ruda: miast bez towaru" - bylo 74 -> 69; oczekiwane ok. 25-30 po 20 dobach (ponizej 20 po ok. 40; 16 miast lezy dalej niz 250
+od kazdej kopalni - tam tylko karawany). Dalej: "Ceny surowcow:" (ruda w miescie bez rudy indeks ok. 10, pierwszy ladunek ok. 37 d; chleb),
+"Warsztaty towarowe:" (piekarnie pracuja od 1. doby; cena piekarni w Lannisporcie - zalezy od doplywu chleba i ciast, przy niedoborze moze
+przekroczyc 100 tys., bo tyle naprawde zarabia), "Dowoz (wozy):" ("niezgodne" 0, nadplata kilka-kilkanascie %, ms na dobe), "Karawany (przyczyny)" /
+"(kierunek)". Narzedzie `tools/sprawdz_logi.py`: nowa grupa dla 115-119 - w toku (noc-7); do tego czasu `--temat` / `--surowe`.
+
+KOLEJKA 108-114 PRZENIESIONA NA 119: galezie `paczki-na-119/108-...` .. `paczki-na-119/114-porzadki` (1ffe021 .. 817931e; build kod 0 kazdego,
+669 ustawien na 114; konflikty tylko tekstowe: lista Reset w konstruktorze ArmouryBehavior, Settings.cs przy K7; K5 i wozy w MarketRoad.cs
+rozlaczne - K5 dziala tylko dla wsi zamkowej bez zadnego miasta w zasiegu). STARE `paczki/108..114` (na n107) ZOSTALY - ich nadpisanie
+(force push) zablokowalo zabezpieczenie; do decyzji Jeffa (albo nadpisac, albo dalej uzywac `paczki-na-119/*`). Tresc ogniw ta sama, opisy
+`docs/paczki/108..114` dalej wazne (inna baza). Grupy dalej: LUDZIE (BetterEconomy + 108 + 109), KASY (110-112 + 114), SPUSTOSZENIE (113).
+
+OTWARTE PO NOCY (osobne kroki, nic z tego nie zrobione): (1) welna tanieje poza miastami z tkalnia (115) - wozy (119) w duzej czesci to
+rownowaza (utarg wsi owczarskich x2.5 w symulacji); sukno welniane jako rzemioslo miast - decyzja projektu przy K13; (2) dosypka drewna
+RealisticBannerlord (towar z niczego) jest teraz warta 3-5x wiecej - zamknac (fundament B1); (3) ksiazki BK kosztuja 7-10 d (BKROTPatch /100 +
+nasz BookTranspiler); (4) dlawik BKROTPatch: decyzja karawany raz na 24 h = 2-3 kursy na 20 dob (cudzy kod); (5) wozy nie widza karawan (mozliwy
+podwojny dowoz); (6) proby K5 / K6 z dzien-2: atrapa wsi bez typu - odswiezyc przed grupa KASY; (7) kosmetyka: linia startowa 117 mowi
+"poprawka 115"; (8) bez zmian: "reszta" bilansu pieniadza ok. -320 tys./dobe, pytanie o Spoils of War, 8 pytan kanonu.
 
 ## Aktualizacja 05.10 (wpisy 98-99 + pelny audyt) - czytaj przed reszta
 

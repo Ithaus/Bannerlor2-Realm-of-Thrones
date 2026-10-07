@@ -149,6 +149,7 @@ Plan nocy (kazdy krok = jeden workflow z jednym agentem, skrypty w `~\.claude\pr
    sztuce (nadplata wraca do kasy osady). Symulacja: miast bez rudy po 20 dobach ok. 25-30 (dzis 69), < 20 po ok. 40; utarg wsi owczarskich x2.5.
    Wpis: `docs/paczki/w-toku/wozy-CHANGELOG-wpis.md`.
    -> -> `l119-wozy-do-najlepszego-miasta`; potem zlozenie i przeniesienie n108..n114 (K5 do scalenia z wozami).
-4. `noc-4-zlozenie` - zlozenie na n107 (cena -> warsztaty -> karawany3; warsztaty recenzowane juz na cenie), build kazdego ogniwa, przeniesienie n108..n114 na nowy szczyt.
+4. ZLOZENIE (`noc-6-zlozenie`) - ZROBIONE 21:35: ogniwa 115-119 = `paczki/115..119` (c49cdda, 9b7a4e8, 0ffc41c, 38054d7, 0c7aa2d), DLL grupy
+   md5 faade7bf...; kolejka przeniesiona jako `paczki-na-119/108..114`. Szczegoly i instrukcja wgrania: STAN-PRAC, sekcja "NOC 06/07.10". 5. `noc-7` - narzedzie logow (w toku)., build kazdego ogniwa, przeniesienie n108..n114 na nowy szczyt.
 5. Repo: wpisy `docs/paczki/115-117-*.md`, galezie `paczki/*` na origin, STAN-PRAC, raport dla Jeffa prostym jezykiem.
 Stan kazdego kroku dopisuje ponizej.
