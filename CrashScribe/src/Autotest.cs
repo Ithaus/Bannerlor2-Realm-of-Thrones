@@ -76,6 +76,7 @@ namespace CrashScribe
         private static double _lastMoveAt, _lastStallDiag, _lastAction;
         private static int _errors, _errorsAtDay;
         private static int _windows;
+        private static int _stallTicks;            // Campaign.CurrentTickCount przy ostatnim ruchu zegara / ostatniej linii STOI
 
         // miasto
         private static Settlement _placedTown;
@@ -89,8 +90,9 @@ namespace CrashScribe
         // zapis i wyjscie
         private static string _saveName;
         private static double _saveAt;
-        private static bool _saveDone, _saveFinal;
+        private static bool _saveDone, _saveFinal, _saveWaitNoted;
         private static double _quitAt;
+        private static volatile bool _quitCalled;   // Utilities.QuitGame zawolane (czyta tez straznik zawieszen)
         private static bool _finishOk;
         private static string _finishWhy;
 
@@ -717,6 +719,7 @@ namespace CrashScribe
             _lastDay = (int)Math.Floor(DayNow());
             _firstPartial = true;
             _lastTicks = CampaignTime.Now.ToMilliseconds;
+            _stallTicks = Campaign.Current != null ? Campaign.Current.CurrentTickCount : 0;
             _lastMoveAt = t;
             _errorsAtDay = _errors;
             Go(Stage.Run, t, "bieg: przewijanie do doby " + Days + " (teraz " + DayLabel() + ", " + Where() + ")");
@@ -756,12 +759,17 @@ namespace CrashScribe
 
             // postoj czasu gry
             double ticks = CampaignTime.Now.ToMilliseconds;
-            if (ticks != _lastTicks || c.SaveHandler.IsSaving) { _lastTicks = ticks; _lastMoveAt = t; return; }
+            if (ticks != _lastTicks || c.SaveHandler.IsSaving) { _lastTicks = ticks; _lastMoveAt = t; _stallTicks = c.CurrentTickCount; return; }
             double still = t - _lastMoveAt;
             if (still > 20 && t - _lastStallDiag > 30)
             {
                 _lastStallDiag = t;
-                Note("STOI " + (int)still + " s: " + Where());
+                // [AT1b] tiki kampanii (Campaign.Tick z MapState.OnTick): 0 = MapState w ogole nie tyka
+                // (stan wstrzymany - np. menu Esc - albo inny stan na wierzchu); >0 przy stojacym zegarze = dt 0
+                int tc = c.CurrentTickCount, dtc = tc - _stallTicks;
+                _stallTicks = tc;
+                Note("STOI " + (int)still + " s: " + Where() + " | tiki kampanii +" + dtc
+                     + (dtc == 0 ? " (MapState nie tyka)" : " (MapState tyka, dt " + c.CampaignDt.ToString("0.#####", Inv) + ")"));
                 if (still > 60 && still < 95) Note("  stan gry (CrashScribe):" + Environment.NewLine + GameState.Describe());
                 TryUnstick(t, still, waiting);
             }
@@ -784,7 +792,7 @@ namespace CrashScribe
         private static void TryUnstick(double t, double still, bool waiting)
         {
             var c = Campaign.Current;
-            if (c == null || AutotestUi.AnyWindowOpen()) return;   // okna zamyka Handle
+            if (c == null || AutotestUi.AnyWindowOpen()) return;   // okna (takze menu Esc gry) zamyka Handle
             try
             {
                 if (c.ConversationManager != null && c.ConversationManager.IsConversationInProgress)
@@ -808,18 +816,29 @@ namespace CrashScribe
                     return;
                 }
                 if (AutotestUi.TryCloseBkWindow()) return;
+                // [AT1b] stan mapy wstrzymany przez cos, czego autotest nie zna (menu Esc gry jest oknem i zamyka
+                // je Handle): czas i zapis stoja; cudzego wstrzymania nie zdejmujemy - tylko slad w logu
+                string bl = Blockers();
+                if (bl.Length > 0)
+                {
+                    Note("ODBLOKOWANIE: brak - stan gry wstrzymany przez " + bl + " (czas i zapis stoja); autotest zdejmuje tylko menu Esc gry", true);
+                    return;
+                }
                 var ctx = c.CurrentMenuContext;
                 if (ctx != null && ctx.GameMenu != null)
                 {
                     var m = ctx.GameMenu;
                     if (m.IsWaitMenu)
                     {
-                        if (!m.IsWaitActive) { m.StartWait(); Note("ODBLOKOWANIE: menu oczekiwania " + m.StringId + " stalo - StartWait", true); }
+                        bool acted = false;
+                        if (!m.IsWaitActive) { m.StartWait(); acted = true; Note("ODBLOKOWANIE: menu oczekiwania " + m.StringId + " stalo - StartWait", true); }
                         ForceRun(c);
-                        if (still > 60 && m.StringId != "town_wait_menus") ClickLeave(ctx);
+                        if (still > 60 && m.StringId != "town_wait_menus") acted = ClickLeave(ctx) || acted;
+                        // [AT1b] bieg 07.10: ta galaz nic nie robila i nic nie pisala - 10 min postoju bez sladu prob
+                        if (!acted) Note("ODBLOKOWANIE: brak - menu oczekiwania " + m.StringId + " czeka, czas " + c.TimeControlMode + " - w menu nie ma czego klikac");
                         return;
                     }
-                    if (m.StringId == "town") return;   // EnsureWaiting kliknie town_wait
+                    if (m.StringId == "town") { Note("ODBLOKOWANIE: menu town - EnsureWaiting kliknie town_wait"); return; }
                     if (!ClickLeave(ctx)) Note("ODBLOKOWANIE: menu " + m.StringId + " bez wyjscia - opcje: " + ListOptions(ctx));
                     return;
                 }
@@ -837,6 +856,7 @@ namespace CrashScribe
             _saveName = name;
             _saveAt = t;
             _saveDone = false;
+            _saveWaitNoted = false;
             _saveFinal = final;
             if (final && !c.TimeControlModeLock) c.TimeControlMode = CampaignTimeControlMode.Stop;
             Note("ZAPIS start: \"" + name + "\" (" + DayLabel() + ")", true);
@@ -868,6 +888,13 @@ namespace CrashScribe
 
         private static void StepSaving(double t)
         {
+            // [AT1b] SaveAs tylko kolejkuje; zapis robi SaveTick z MapState.OnTick - przy wstrzymanym stanie
+            // (bieg 07.10: menu Esc) nie rusza wcale. Jedna linia ze stanem, zanim minie 5 min.
+            if (!_saveDone && !_saveWaitNoted && t - _saveAt > 60)
+            {
+                _saveWaitNoted = true;
+                Note("ZAPIS czeka od 60 s (zapis rusza tylko z tiku mapy): " + Where(), true);
+            }
             if (_saveDone || t - _saveAt > 300)
             {
                 if (!_saveDone) Note("ZAPIS: brak potwierdzenia po 5 min - koncze mimo to", true);
@@ -898,8 +925,22 @@ namespace CrashScribe
             {
                 Note("WYJSCIE: QuitGame (" + (atMenu ? "z menu glownego" : "po 120 s bez menu glownego, stan " + StateName()) + ")", true);
                 Now = Stage.Done;
+                _quitCalled = true;
                 TaleWorlds.Engine.Utilities.QuitGame();
             }
+        }
+
+        /// <summary>
+        /// [AT1b] Dopisek do linii ZAWIESZENIE po Utilities.QuitGame: proces nie wyszedl, a czesc zarzadzana juz
+        /// sie zamknela - to silnik przy sprzataniu (bieg 07.10: 0xC0000005 w TaleWorlds.Native po "Managed
+        /// Interface deleted", okno bledu silnika czeka na klikniecie; ten sam adres w grze Jeffa 05.10).
+        /// </summary>
+        internal static string QuitHint()
+        {
+            if (!_quitCalled) return "";
+            int pid = -1;
+            try { pid = Process.GetCurrentProcess().Id; } catch { }
+            return " (po QuitGame: proces gry nie wyszedl - silnik konczy sie albo wywrocil przy zamykaniu, zob. C:\\ProgramData\\Mount and Blade II Bannerlord\\logs\\rgl_log_errors_" + pid + ".txt)";
         }
 
         // ------------------------------------------------------------------ opisy
@@ -950,7 +991,40 @@ namespace CrashScribe
             catch { }
             try { if (Mission.Current != null) sb.Append(" | misja"); } catch { }
             try { var w = AutotestUi.OpenWindowName(); if (w != null) sb.Append(" | okno ").Append(w); } catch { }
+            // [AT1b] co trzyma czas poza menu i trybem czasu: wstrzymanie stanu gry i fokus okna gry
+            try { var bl = Blockers(); if (bl.Length > 0) sb.Append(" | STAN WSTRZYMANY przez: ").Append(bl); } catch { }
+            try { if (AutotestUi.WindowFocused() == false) sb.Append(" | okno gry bez fokusu"); } catch { }
             return sb.ToString();
+        }
+
+        private static FieldInfo _disableRequests;
+
+        /// <summary>
+        /// [AT1b] Kto wstrzymal stan gry na wierzchu (GameStateManager.ActiveStateDisabledByUser): nazwy typow
+        /// obiektow z listy zadan wstrzymania; "" gdy nikt. Wstrzymany stan dostaje OnIdleTick zamiast OnTick -
+        /// dla MapState znaczy to: czas kampanii i zapis (SaveTick) stoja. Bieg 07.10 05:09: MapScreen (menu Esc
+        /// otwarte przez gre po utracie fokusu okna).
+        /// </summary>
+        internal static string Blockers()
+        {
+            try
+            {
+                var gsm = GameStateManager.Current;
+                if (gsm == null || !gsm.ActiveStateDisabledByUser) return "";
+                if (_disableRequests == null)
+                    _disableRequests = typeof(GameStateManager).GetField("_activeStateDisableRequests", BindingFlags.Instance | BindingFlags.NonPublic);
+                var list = _disableRequests != null ? _disableRequests.GetValue(gsm) as System.Collections.IEnumerable : null;
+                var names = new List<string>();
+                if (list != null)
+                    foreach (var o in list)
+                    {
+                        var wr = o as WeakReference;
+                        object target = wr != null ? wr.Target : null;
+                        if (target != null) names.Add(target.GetType().Name);
+                    }
+                return names.Count > 0 ? string.Join(", ", names.ToArray()) : "(zadanie bez zywego obiektu)";
+            }
+            catch { return "?"; }
         }
     }
 

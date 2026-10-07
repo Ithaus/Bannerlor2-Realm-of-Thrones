@@ -229,6 +229,7 @@ namespace CrashScribe
             if ((o = ActiveScene()) != null) { HandleScene(o, t); return true; }
             if ((o = ActivePopup()) != null) { HandlePopup(o, t); return true; }
             if ((o = ActiveRotEvent()) != null) { HandleRotEvent(o, t); return true; }
+            if ((o = ActiveEscMenu()) != null) { HandleEscMenu(o, t); return true; }
             if ((o = ActiveIncident()) != null) { HandleIncident(o, t); return true; }
             _seen = null;
             return false;
@@ -236,7 +237,7 @@ namespace CrashScribe
 
         internal static bool AnyWindowOpen()
         {
-            try { return ActiveScene() != null || ActivePopup() != null || ActiveRotEvent() != null || ActiveIncident() != null; }
+            try { return ActiveScene() != null || ActivePopup() != null || ActiveRotEvent() != null || ActiveEscMenu() != null || ActiveIncident() != null; }
             catch { return false; }
         }
 
@@ -246,8 +247,53 @@ namespace CrashScribe
             if ((o = ActiveScene()) != null) return "scena \"" + SceneTitle(o) + "\"";
             if ((o = ActivePopup()) != null) return "zapytanie \"" + S(Get(o, "TitleText")) + "\"";
             if ((o = ActiveRotEvent()) != null) return "wydarzenie ROT \"" + S(Get(o, "EventTitle")) + "\"";
+            if ((o = ActiveEscMenu()) != null) return "menu Esc gry";
             if ((o = ActiveIncident()) != null) return "zdarzenie mapy \"" + S(Get(o, "Title")) + "\"";
             return null;
+        }
+
+        // ------------------------------------------------------------------ menu Esc mapy (gra otwiera je sama przy utracie fokusu)
+
+        /// <summary>
+        /// [AT1b] Bieg 07.10 05:09:39: okno gry stracilo fokus (rgl_log "OnGameWindowFocusChange: False"), a Jeff ma
+        /// w BannerlordConfig.txt StopGameOnFocusLost=True - MapScreen.OnFocusChangeOnGameWindow otworzyl menu Esc
+        /// (OnEscapeMenuToggled(true) -> GameStateManager.RegisterActiveStateDisableRequest). Wstrzymany MapState
+        /// dostaje tylko OnIdleTick: czas kampanii i SaveTick stoja, dopoki menu jest otwarte (powrot fokusu go
+        /// nie zamyka). Zamkniecie jak "Return to the Game": MapScreen.CloseEscapeMenu(). NavalMapScreen (NavalDLC)
+        /// dziedziczy to bez zmian.
+        /// </summary>
+        private static object ActiveEscMenu()
+        {
+            // tylko przy mapie na wierzchu: przy wyjsciu do menu glownego ekran mapy jest juz sprzatany
+            if (!(Autotest.ActiveState() is global::TaleWorlds.CampaignSystem.GameState.MapState)) return null;
+            var tm = T("mapScreen");
+            if (tm == null) return null;
+            var inst = GetStatic(tm, "Instance");
+            return inst != null && B(Get(inst, "IsEscapeMenuOpened")) ? inst : null;
+        }
+
+        private static void HandleEscMenu(object screen, double t)
+        {
+            if (Fresh(Get(screen, "_escapeMenuView") ?? screen, t) || !Due(t, 1.0)) return;
+            bool? f = WindowFocused();
+            Autotest.Note("OKNO menu Esc gry (gra otwiera je sama po utracie fokusu okna - opcja Stop Game On Focus Lost; dopoki jest otwarte, czas kampanii i zapis stoja; okno gry "
+                          + (f == false ? "BEZ fokusu" : f == true ? "z fokusem" : "?") + ") -> zamykam [Return to the Game]", true);
+            Autotest.CountWindow();
+            Call(screen, "CloseEscapeMenu");
+        }
+
+        private static FieldInfo _focusField;
+
+        /// <summary>Czy okno gry ma fokus (ScreenManager._isWindowFocused); null = nie wiadomo.</summary>
+        internal static bool? WindowFocused()
+        {
+            try
+            {
+                if (_focusField == null) _focusField = typeof(ScreenManager).GetField("_isWindowFocused", BindingFlags.NonPublic | BindingFlags.Static);
+                var v = _focusField != null ? _focusField.GetValue(null) : null;
+                return v is bool ? (bool?)(bool)v : null;
+            }
+            catch { return null; }
         }
 
         // ------------------------------------------------------------------ zapytania (InformationManager / MBInformationManager)
@@ -564,6 +610,7 @@ namespace CrashScribe
             new[] { "ccCulture", "ExecuteSelectCulture()" }, new[] { "ccCulture", "CultureID" },
             new[] { "ccOption", "ExecuteSelect()" }, new[] { "ccOption", "ActionText" },
             new[] { "mapScreen", "Instance" }, new[] { "mapScreen", "GetMapView<>" },
+            new[] { "mapScreen", "IsEscapeMenuOpened" }, new[] { "mapScreen", "_escapeMenuView" }, new[] { "mapScreen", "CloseEscapeMenu()" },
             new[] { "incVm", "Options" }, new[] { "incVm", "CanConfirm" }, new[] { "incVm", "ExecuteConfirm()" }, new[] { "incVm", "Title" },
             new[] { "rotPanel", "EventTitle" }, new[] { "rotPanel", "IsDoneEnabled" }, new[] { "rotPanel", "IsCancelEnabled" }, new[] { "rotPanel", "ExecuteDone()" }, new[] { "rotPanel", "ExecuteCancel()" },
             new[] { "bkUi", "instance" }, new[] { "bkUi", "mapView" }, new[] { "bkUi", "CloseUI()" },
@@ -603,6 +650,11 @@ namespace CrashScribe
             if (ta != null) ok++; else miss.Add("SaveHandler.TryAutoSave(bool)");
             if (fa != null) ok++; else miss.Add("SaveHandler.ForceAutoSave()");
             if (ow != null && ow.GetParameters().Any(p => p.Name == "saveName" && p.ParameterType == typeof(string))) ok++; else miss.Add("MBSaveLoad.OverwriteSaveAux(.., string saveName, ..)");
+            // [AT1b] pola czytane tylko do opisu postoju (brak = brak tej czesci opisu, nie blad)
+            var dr = typeof(GameStateManager).GetField("_activeStateDisableRequests", BindingFlags.Instance | BindingFlags.NonPublic);
+            var wf = typeof(ScreenManager).GetField("_isWindowFocused", BindingFlags.Static | BindingFlags.NonPublic);
+            if (dr != null) ok++; else miss.Add("GameStateManager._activeStateDisableRequests");
+            if (wf != null) ok++; else miss.Add("ScreenManager._isWindowFocused");
 
             if (!onlyMissing) res.Add("typow " + (Types.Length - miss.Count(x => x.StartsWith("typ "))) + "/" + Types.Length + ", skladowych zgodnych " + ok + (miss.Count == 0 ? " - komplet" : ""));
             foreach (var m in miss) res.Add("BRAK " + m);

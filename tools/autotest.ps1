@@ -12,7 +12,8 @@
 #       "_MODULES_*Id1*Id2*...*_MODULES_" - te same mody i ta sama kolejnosc co w LauncherData.xml
 #       (plik tylko CZYTANY); katalog roboczy MUSI byc bin\Win64_Shipping_Client (BLSE to sprawdza);
 #   (f) czekanie na koniec gry z limitem czasu, z kontrola postepu w autotest-*.log;
-#       po limicie / postoju / wywrotce - zamkniecie gry;
+#       po limicie / postoju / wywrotce - zamkniecie gry; po "WYJSCIE: QuitGame" proces ma ExitWaitSec
+#       (90 s) - dluzej wisi tylko silnik przy sprzataniu (okno bledu z rgl_log_errors_<PID>.txt);
 #   (g) ZAWSZE (finally): zamkniecie gry, przywrocenie zatwierdzonych DLL i kontrola md5,
 #       przywrocenie zmienionych plikow Configs, usuniecie niezuzytego przelacznika;
 #   (h) wynik: logi Armoury, CrashScribe, autotest-*.log, czas, doba, kody bledow.
@@ -39,6 +40,8 @@ param(
     [int]$StallMin = 12,           # bez nowej doby przez tyle minut = postoj (mod sam konczy po 10)
     [int]$SwitchWaitSec = 240,     # przelacznik niezuzyty po tylu s = w grze nie ma trybu autotestu
     [int]$QuitWaitSec = 600,       # po "KONIEC" w logu gra ma tyle s na zapis i wyjscie
+    [int]$ExitWaitSec = 90,        # po "WYJSCIE: QuitGame" w logu proces ma tyle s na zakonczenie (AT1b)
+    [string]$EngineLogDir = 'C:\ProgramData\Mount and Blade II Bannerlord\logs',   # rgl_log_errors_<PID>.txt (tylko odczyt)
     [int]$PollSec = 10,
     [switch]$NoSave,
     [switch]$NoQuit,
@@ -71,6 +74,7 @@ $script:logFile = $null
 $script:started = $null
 $script:proc = $null
 $script:exitCode = 0
+$script:exitNote = $null
 
 # ------------------------------------------------------------------ pomocnicze
 
@@ -243,6 +247,23 @@ function Read-Section([string]$path) {
     $j = $s.IndexOf('START run=', 10)
     if ($j -gt 0) { $s = $s.Substring(0, $j) }
     return $s
+}
+
+function Get-ExitCrash {
+    # AT1b: silnik potrafi wywrocic sie PO zamknieciu czesci zarzadzanej (rgl_log: "Managed Interface deleted",
+    # potem 0xC0000005 w TaleWorlds.Native) i czekac na klikniecie w swoim oknie bledu - tak samo w grze Jeffa
+    # (05.10 07:46 i 15:29: ten sam adres ...E20A; 06.10 14:14), wiec to nie wynik testu.
+    if (-not $script:proc) { return $null }
+    $f = Join-Path $EngineLogDir ('rgl_log_errors_' + $script:proc.Id + '.txt')
+    if (-not (Test-Path -LiteralPath $f)) { return $null }
+    $t = ''
+    try {
+        $fs = New-Object IO.FileStream($f, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]'ReadWrite, Delete')
+        try { $t = (New-Object IO.StreamReader($fs)).ReadToEnd() } finally { $fs.Dispose() }
+    } catch { return $null }
+    $m = [regex]::Match($t, 'Unhandled Exception Code (0x[0-9A-Fa-f]+) at adress (0x[0-9A-Fa-f]+)')
+    if (-not $m.Success) { return $null }
+    return ('silnik wywrocil sie przy zamykaniu: ' + $m.Groups[1].Value + ' pod ' + $m.Groups[2].Value + ' (' + $f + '); okno bledu silnika czeka na klikniecie - znany blad przy wyjsciu z gry, nie wynik testu')
 }
 
 function Get-LastDay([string]$sec) {
@@ -422,6 +443,7 @@ try {
     $lastDay = 0
     $lastProgress = Get-Date
     $koniecAt = $null
+    $quitAt = $null
     $autoLog = $null
     $lastReport = Get-Date
     $result = 'w-toku'
@@ -434,16 +456,27 @@ try {
         if ($d -gt $lastDay) { $lastDay = $d; $lastProgress = Get-Date }
         if (-not $consumed -and -not (Test-Path -LiteralPath $switchPath)) { $consumed = $true; Log "Przelacznik zuzyty przez gre (CrashScribe rusza autotest)." }
         if (-not $koniecAt -and $sec -match '\] KONIEC (OK|BLAD)') { $koniecAt = Get-Date; Log ("Gra zglosila koniec: " + (([regex]::Match($sec, '\] (KONIEC [^\r\n]*)')).Groups[1].Value)) }
+        if (-not $quitAt -and $sec -match '\] WYJSCIE: QuitGame') { $quitAt = Get-Date; Log "Gra zglosila QuitGame - czekam na koniec procesu." }
         if (((Get-Date) - $lastReport).TotalSeconds -ge 60) {
             $lastReport = Get-Date
             Log ("  postep: doba " + $lastDay + "/" + $Days + ", " + [int]((Get-Date) - $t0).TotalMinutes + " min, procesy gry: " + $alive.Count)
         }
         if ($alive.Count -eq 0) {
             if ($koniecAt) { $result = 'koniec-gry' } else { $result = 'wywrotka' }
+            if ($quitAt) { $script:exitNote = 'proces zakonczyl sie sam po QuitGame' }
             Log ("Gra zakonczona (" + $result + "), kod wyjscia " + $(try { $script:proc.ExitCode } catch { '?' }))
             break
         }
         $el = ((Get-Date) - $t0).TotalSeconds
+        # AT1b: po QuitGame czesc zarzadzana juz sie zamknela - proces, ktory nie konczy sie w ExitWaitSec, to silnik
+        # przy sprzataniu (bieg 07.10: 0xC0000005 po "Managed Interface deleted" i okno bledu; 10 min czekania na nic)
+        if ($quitAt -and ((Get-Date) - $quitAt).TotalSeconds -gt $ExitWaitSec) {
+            $result = 'wyjscie-wisi'
+            $crash = Get-ExitCrash
+            $script:exitNote = 'proces nie wyszedl w ' + $ExitWaitSec + ' s po QuitGame' + $(if ($crash) { ' - ' + $crash } else { ' (w rgl_log_errors brak wywrotki)' })
+            Stop-Game ("po QuitGame: " + $script:exitNote)
+            break
+        }
         if (-not $consumed -and $el -gt $SwitchWaitSec) { $result = 'przelacznik-niezuzyty'; Stop-Game ("przelacznik niezuzyty po " + $SwitchWaitSec + " s - CrashScribe w grze bez autotestu?"); break }
         if ($koniecAt -and ((Get-Date) - $koniecAt).TotalSeconds -gt $QuitWaitSec) { $result = 'koniec-bez-wyjscia'; Stop-Game ("po KONIEC gra nie wyszla w " + $QuitWaitSec + " s"); break }
         if ((Get-Date) -gt $deadline) { $result = 'limit-czasu'; Stop-Game ("limit " + $TimeoutMin + " min"); break }
@@ -503,6 +536,7 @@ $rep += ('autotest log : ' + $(if ($autoLog) { $autoLog } else { '(brak - gra ni
 $rep += ('CrashScribe  : ' + $(if ($sesLog) { $sesLog.FullName } else { '(brak nowego session-*.log)' }))
 $rep += ('Armoury      : ' + $(if ($armLog) { $armLog.FullName } else { '(brak nowego Armoury-*.log)' }))
 $rep += ('zawieszenia  : ' + $(if ($hangs.Count -gt 0) { ($hangs | ForEach-Object { $_.FullName }) -join ', ' } else { 'brak hang-*.log' }))
+$rep += ('wyjscie gry  : ' + $(if ($script:exitNote) { $script:exitNote } else { '(gra nie doszla do QuitGame)' }))
 $rep += ('zapisy testu : ' + $(if ($newSaves.Count -gt 0) { ($newSaves | ForEach-Object { $_.Name }) -join ', ' } else { 'brak' }))
 $rep += ('zapisy Jeffa : ' + $(if ($savesChanged.Count -eq 0) { 'nietkniete (' + $savesBefore.Count + ' plikow, saveauto1..3 md5 bez zmian)' } else { 'UWAGA ZMIENIONE: ' + ($savesChanged -join ', ') }))
 $rep += ('DLL w grze   : ' + $(if ($restoredOk) { 'zatwierdzone (md5 sprawdzone)' } else { 'PRZYWRACANIE NIEUDANE - patrz log skryptu, -RestoreOnly' }))
