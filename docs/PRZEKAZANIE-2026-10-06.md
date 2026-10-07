@@ -142,7 +142,13 @@ Plan nocy (kazdy krok = jeden workflow z jednym agentem, skrypty w `~\.claude\pr
    Skutek: bochen (10/dobe) 61 -> 17-21 d, miod pitny 102 -> 5-6 d; zloto i klejnoty z lupow duzo tansze; "zakupy" mieszczan z niczego ok. 320 -> 76 tys./dobe.
    Piekarnia Lannisport z paczka warsztaty: zalezy od doplywu chleba i ciast (13-522 tys.) - zmierzy test. Otwarte: ksiazki BK 7-10 d (BKROTPatch /100 + nasz BookTranspiler).
    Wpis: `docs/paczki/w-toku/towary-CHANGELOG-wpis.md`.
-3c. `noc-5-wozy` (autor + recenzent) na l118 - W TOKU od 19:50 -> `l119-wozy-do-najlepszego-miasta`; potem zlozenie i przeniesienie n108..n114 (K5 do scalenia z wozami).
+3c. `noc-5-wozy` (autor + recenzent) na l118 - ZROBIONE 21:15: "poprawione-i-gotowe", l119 = ffcbd5d (repo: `w-toku/l119-wozy-do-najlepszego-miasta`),
+   DLL md5 18d8156e..., proba 57/57 (recenzent), scalenie z n108..n114 bez konfliktu merytorycznego (K5 dziala tylko dla wsi zamkowej bez miasta
+   w zasiegu; konflikty tekstowe: konstruktor ArmouryBehavior - dopisac MarketCarts.Reset() po MarketRoad.Reset(); Settings.cs przy n112 - obie strony).
+   Trzy czesci: woz kazdej wsi do najlepiej placacego miasta w zasiegu 250 (ok. 4 doby), woz x2 dla wszystkich wsi, ladunek wyceniany sztuka po
+   sztuce (nadplata wraca do kasy osady). Symulacja: miast bez rudy po 20 dobach ok. 25-30 (dzis 69), < 20 po ok. 40; utarg wsi owczarskich x2.5.
+   Wpis: `docs/paczki/w-toku/wozy-CHANGELOG-wpis.md`.
+   -> -> `l119-wozy-do-najlepszego-miasta`; potem zlozenie i przeniesienie n108..n114 (K5 do scalenia z wozami).
 4. `noc-4-zlozenie` - zlozenie na n107 (cena -> warsztaty -> karawany3; warsztaty recenzowane juz na cenie), build kazdego ogniwa, przeniesienie n108..n114 na nowy szczyt.
 5. Repo: wpisy `docs/paczki/115-117-*.md`, galezie `paczki/*` na origin, STAN-PRAC, raport dla Jeffa prostym jezykiem.
 Stan kazdego kroku dopisuje ponizej.
