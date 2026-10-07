@@ -43,6 +43,14 @@ Acorn Hall nie maja wpisu -> odleglosc 1e8 -> straznik BK GuardSettlementMove (>
 a gra nie wystawia nowego. Od 119 te miasta wybiera do 99 wsi, stad liniowy przyrost. Poprawka CartTownExit (galaz w-toku/wozy-nie-utykaja-w-miastach,
 f8dced3, na diagnozie): rozkaz wyjazdu z takiej bramy przechodzi + bezpiecznik 2 doby; autotest 5 w toku. DO SPRAWDZENIA: czy lordowie / karawany
 tez utykaja w tych miastach (diagnoza liczy tylko wozy wsi).
+AUTOTEST 5 (07.10 10:40, DLL f8dced3 md5 ab6530b5, 40 dob, 9.6 min, 12.2 s/dobe, wynik OK, DLL Jeffa przywrocone 25b87631, zapisy nietkniete;
+log Armoury-2026-10-07_10-40-16.log): WOZY NAPRAWIONE - w 40. dobie zatkanych wsi 19 zamiast 53 (zamkowe 11 z 260 zamiast 25, miejskie 7 z 311
+zamiast 27); woz zatkanych W MIESCIE 1 (2.6 doby) zamiast 39 (27 dob); wozy wsi w miastach 16, najdluzej 0 dob; bezpiecznik 0 (latka wystarcza).
+Z 19 zatkanych 16 to wsie spladrowane / najezdzane (wojna - gra i tak nic tam nie produkuje), naprawde zatkane Normal 3; BRAK WOZU 10 (woz zniszczony,
+wies poza Normal nie wystawia nowego). NOWE: ten sam straznik BK odrzuca rozkazy KARAWAN (doba 2: 4, doba 40: 30 dziennie; Wickenden 20,
+Lord Hewett's Town 8) i LORDOW (2-6 dziennie, Acorn Hall 3) - karawany i lordowie tez utykaja w tych osadach; Pyke / Farton / Hull / Arbor /
+Downdelving / Pebbleton (wyspy?) - do sprawdzenia. Poprawka U ZRODLA w toku (workflow pamiec-drog-rot-uzupelniona, galaz w127-pamiec-drog):
+uzupelnienie 22 scian siatki bez wpisu w pamieci drog po wczytaniu - dla wszystkich partii; potem autotest 6.
 Gotowe obok (na 126): `paczki/127-pokretla-jeffa` (95baa63; json Jeffa: 45->35, 20.0->13.33, 5->2 przy wgraniu), `paczki/128-spoils-bez-darmowego-zlota` (83a8b1d).
 Pytania do Jeffa (07.10): zbroja z CRAFT jak bron (zepsuta/legendarna)? klan najemnikow Spoils dostaje ludzi z niczego - uszczelnic? naprawa u kwatermistrza
 Spoils bez materialu - ujednolicic z kuznia?
