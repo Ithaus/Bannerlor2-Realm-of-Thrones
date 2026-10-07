@@ -16,7 +16,7 @@ Odczyt `python tools/sprawdz_logi.py --grupa 2b`: OK 70, UWAGA 14; ERROR 0, Exce
   cena kupna warsztatow mediana 145 tys., max 12.27 mln. Przyczyna wstepnie: receptury luksusowe po przeliczeniu cen (ruda srebra 20 d ->
   bizuteria 2400 d) - sprawa K13 (receptury i ceny), nie wzoru ceny warsztatu.
 - WELNA zalega ("KUPNO STOI" 8 dob, na polkach 566 -> 2600). Nadplata wozow 27.6% (oddana kasom osad).
-- Analiza przyczyn i plan poprawek: workflow `test-2b-analiza` (w toku 07.10 03:35), raport `SCRATCH\dzien-6\analiza-testu-2b\RAPORT.md`.
+- ANALIZA (07.10 04:06, `docs/ANALIZA-TESTU-TOWARY2-2026-10-07.md`): (1) PILNE, regresja 119: wozy jada daleko, gra laduje 59% magazynu -> 89 z 571 wsi stoi z pelnym magazynem (+5 dziennie) -> paczka 122 "woz zabiera caly magazyn"; (2) PILNE: zysk warsztatow to renta z niedoboru + receptury (ruda srebra 20 d -> 2 klejnoty po 2400), placona "zakupami" mieszczan z niczego -> paczka 123 "cena sprawiedliwa warsztatu" (koszt cyklu + 25%, nadwyzka w kasie miasta); (3) drobne 116: kapital startowy liczony przed przeliczeniem cen -> paczka 124; ruda 51 = zuzycie kuzni x2.3 zjada dostawy (poprawi 122: +40% wywozu); welna i wsad warsztatow wedle wartosci, wytop przy kopalni -> krok K13 (projekt). 07.10 04:10: 122 i 123 w toku (autor + recenzent), potem 124 i zlozenie 121-124 (121 = sztabka zlota, gotowa: `paczki/121-kategorie-mieszane`). Rownolegle: tryb autotestu (zgoda Jeffa 07.10).
 
 ## NOC 06/07.10 - GRUPA "TOWARY 2" (115-120) GOTOWA DO WGRANIA NA SLOWO JEFFA; kolejka 108-114 przeniesiona na 119 (na 120 naklada sie czysto)
 
