@@ -37,7 +37,12 @@ nieznana -> najpierw diagnostyka w logu (sklad magazynu zatkanych wsi, stan wozu
 4. PRZEBIEG 09:11 (126 + diagnoza, galaz w-toku/diagnoza-zatkanych-wsi): PRZYCZYNA ZATKANYCH WSI ZNALEZIONA - z 53 zatkanych 39 ma WOZ W MIESCIE
 (nieoblezonym) srednio od 27 dob (max 40); gra nie wystawia nowego wozu, dopoki stary istnieje (galaz "woz poza domem > 7 dob" w grze martwa).
 Magazyny zatkanych: zboze 54%, ryby 15%, drewno 8%. Reszta: 5 spladrowanych, 2 najezdzane, 6 wozow w drodze do domu, 4 bez wozu.
-Poprawka w toku (workflow wozy-utkniete-w-miastach): przyczyna w kodzie + bezpiecznik odsylania wozu do domu.
+PRZYCZYNA (07.10): wszystkie wozy "w miescie" stoja w DWOCH miastach - Wickenden i Lord Hewett's Town. Pamiec drog mapy ROT
+(settlements_distance_cache_Default.bin, 28.07) jest starsza niz siatka mapy (navmesh 17.08): bramy Wickenden, Lord Hewett's Town i zamku
+Acorn Hall nie maja wpisu -> odleglosc 1e8 -> straznik BK GuardSettlementMove (>= 50000) odrzuca KAZDY rozkaz wyjazdu -> woz stoi na zawsze,
+a gra nie wystawia nowego. Od 119 te miasta wybiera do 99 wsi, stad liniowy przyrost. Poprawka CartTownExit (galaz w-toku/wozy-nie-utykaja-w-miastach,
+f8dced3, na diagnozie): rozkaz wyjazdu z takiej bramy przechodzi + bezpiecznik 2 doby; autotest 5 w toku. DO SPRAWDZENIA: czy lordowie / karawany
+tez utykaja w tych miastach (diagnoza liczy tylko wozy wsi).
 Gotowe obok (na 126): `paczki/127-pokretla-jeffa` (95baa63; json Jeffa: 45->35, 20.0->13.33, 5->2 przy wgraniu), `paczki/128-spoils-bez-darmowego-zlota` (83a8b1d).
 Pytania do Jeffa (07.10): zbroja z CRAFT jak bron (zepsuta/legendarna)? klan najemnikow Spoils dostaje ludzi z niczego - uszczelnic? naprawa u kwatermistrza
 Spoils bez materialu - ujednolicic z kuznia?
