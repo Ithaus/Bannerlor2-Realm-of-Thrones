@@ -965,10 +965,13 @@ namespace Armoury
                 {
                     if (st == null || st.Culture == null || !(st.IsVillage || st.IsTown)) continue;
                     float p = PeopleOf(st);
-                    if (p <= 0f) continue;
+                    // krok K6 (TownPurse): zawor kasy miasta nie zalezy od ludnosci - ma go kazde miasto, takze 8 miast krain bez
+                    // udzialu miejskiego (ludnosc 0), ktore dotad nie placily nic
+                    bool purseTown = st.IsTown && st.Town != null && TownPurse.On;
+                    if (p <= 0f && !purseTown) continue;
                     string c = st.Culture.StringId;
-                    float v; pop.TryGetValue(c, out v); pop[c] = v + p;
-                    float rent = DailyRent(p);
+                    float v; pop.TryGetValue(c, out v); pop[c] = v + (purseTown && !(p > 0f) ? 0f : p);
+                    float rent = purseTown && !(p > 0f) ? 0f : DailyRent(p);
                     due.TryGetValue(c, out v); due[c] = v + rent;
                     totalDue += (long)rent;
                     try
@@ -976,6 +979,19 @@ namespace Armoury
                         if (st.IsVillage && (st.Village.VillageState == Village.VillageStates.Looted || st.Village.VillageState == Village.VillageStates.BeingRaided)) continue;
                         var lord = st.OwnerClan != null ? st.OwnerClan.Leader : null;
                         if (lord == null || !lord.IsAlive) continue;
+                        if (purseTown)
+                        {
+                            // krok K6: z nadwyzki kasy ponad zapas kupcow schodzi TownRentShare dziennie - czesc pana (TownRentLordShare,
+                            // skalowana dekretem) tutaj, reszta do skarbca krolestwa; renta nalezna od ludnosci juz nie jest pulapem
+                            int got = TownPurse.CollectRent(st, lord, TaxDecree(st), rent);
+                            if (got > 0)
+                            {
+                                int r1; RentToday.TryGetValue(st.OwnerClan, out r1); RentToday[st.OwnerClan] = r1 + got;
+                                paid.TryGetValue(c, out v); paid[c] = v + got;
+                                totalPaid += got;
+                            }
+                            continue;
+                        }
                         int gold = st.SettlementComponent != null ? st.SettlementComponent.Gold : 0;
                         // Wpis 49 (Jeff 04.10: "tak" - jedno zrodlo dochodu z ziemi): podatek ludnosci miasta BK ("Walled Demesnes",
                         // z niczego) wylaczony (TownTaxPostfix); pan bierze z MIASTA czesc kasy ponad prog bogactwa kupcow
