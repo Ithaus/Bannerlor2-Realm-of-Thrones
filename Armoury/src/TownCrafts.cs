@@ -32,6 +32,10 @@ namespace Armoury
     ///    skory 2.4 na skore (24 kg -> 10 kg, 0.42 - mizdra, wlos, woda). Ulamki jako dlug miasta (jak w kuzni): sukno bierze na
     ///    przemian 1 i 2 welny.
     ///  - Praca = 20% wartosci wyrobu przy dniowce WorkshopWagePerDay (3 d): sukno 13.3, plotno 6.7, skora 2.7 roboczodnia na sztuke.
+    ///    Paczka 149 (Jeff 07.10: "wszelkie koszty w danym miescie zalezne od dobrobytu i stawek historycznych"): te roboczodni w bramce
+    ///    zysku placi sie dniowka TEGO miasta - WorkshopWagePerDay x poziom plac miasta (TownWage.Index: dobrobyt / TownWageRefProsperity,
+    ///    0.5-1.5), ta sama regula co place linii towarowych warsztatow (WorkshopTrade.CycleLabour) i utrzymanie (paczka 136); przy
+    ///    wylaczonym WorkshopWageByTier - wszedzie 3 d. Roboczodni na sztuke (rece) bez zmian - wskaznik dziala tylko na stawke.
     ///  - Rece = TownCraftHandsPerArmsHand (2) x rece rzemieslnikow miasta (WorkshopLaw.TownHands, rosna z dobrobytem): sukiennictwo
     ///    i skornictwo zatrudnialy ok. 2 razy wiecej ludzi niz cechy zbrojne (Paryz 1292, Gandawa 1356 - szacunek). Sztuka zaczeta,
     ///    gdy zostala choc czesc dnia pracy; brakujaca praca to dlug rak na nastepna dobe (male miasto robi sukno co kilka dni).
@@ -252,6 +256,14 @@ namespace Armoury
             return Campaign.Current.Models.TradeItemPriceFactorModel.GetBasePriceFactor(cat, d.InStoreValue, d.Supply, d.Demand, selling, it.Value);
         }
 
+        /// <summary>Paczka 149: poziom plac miasta dla dniowki rzemiosla - jak WorkshopTrade (place linii towarowych i utrzymanie): TownWage.Index
+        /// przy wlaczonym WorkshopWageByTier, inaczej 1 (wszedzie tyle samo).</summary>
+        internal static float WageIndex(Town town)
+        {
+            var s = Settings.Current;
+            return s != null && s.WorkshopWageByTier ? TownWage.Index(town) : 1f;
+        }
+
         /// <summary>Przerob jednego miasta na dzis. Wyjatek - licznik i koniec tego miasta (inne miasta dzialaja dalej).</summary>
         private static void Work(Town town)
         {
@@ -265,6 +277,7 @@ namespace Armoury
                 St st;
                 if (!_st.TryGetValue(sett.StringId, out st)) { st = new St(); _st[sett.StringId] = st; }
                 float wage = Math.Max(0.5f, s.WorkshopWagePerDay);
+                float pay = wage * WageIndex(town);      // paczka 149: dniowka tego miasta (poziom plac) - tylko w koszcie pracy, roboczodni bez zmian
                 float margin = 1f + Math.Max(0f, s.SmithProfitPercent) / 100f;
                 float today = Math.Max(0f, s.TownCraftHandsPerArmsHand) * WorkshopLaw.TownHands(town);
                 float hands = today - st.Labor;          // dlug rak z wczoraj schodzi z dzisiejszej pracy
@@ -286,7 +299,7 @@ namespace Armoury
                         if (shelf.GetItemNumber(p.In) < take) { reason[i] = 2; continue; }
                         float pin = Index(town, p.In, false) * p.In.Value;
                         float pout = Index(town, p.Out, true) * p.Out.Value;
-                        float cost = p.Ratio * pin + labor[i] * wage;
+                        float cost = p.Ratio * pin + labor[i] * pay;
                         if (pout < cost * margin) { reason[i] = 1; continue; }
                         float score = (pout - cost) / labor[i];
                         if (score > bestScore) { bestScore = score; best = p; bestTake = take; }
@@ -353,7 +366,7 @@ namespace Armoury
                               + p.Out.Value + " d = " + F2(p.ValueRatio) + " x " + p.In.Value + " d, masa " + F2(p.MassRatio) + " - wiaze " + (p.ValueRatio >= p.MassRatio ? "wartosc" : "masa")
                               + "), praca " + F1(p.Labor) + " roboczodnia");
                 Log.Info("Rzemioslo miasta (148): WLACZONE w " + towns + " miastach - rzemieslnicy przerabiaja surowiec z polki swojego miasta, gdy wyrob placi wsad + prace (dniowka "
-                         + F1(s.WorkshopWagePerDay) + " d) + " + F1(s.SmithProfitPercent) + "% (Smith Profit Percent), krokami po sztuce z cena od nowa, najpierw przerob z najwiekszym zyskiem na roboczodzien; pary z receptur gry ["
+                         + F1(s.WorkshopWagePerDay) + " d" + (s.WorkshopWageByTier && s.TownWageRefProsperity > 0f ? " x poziom plac miasta (dobrobyt / " + F1(s.TownWageRefProsperity) + ", " + F1(TownWage.Min) + "-" + F1(TownWage.Max) + ")" : " w kazdym miescie") + ") + " + F1(s.SmithProfitPercent) + "% (Smith Profit Percent), krokami po sztuce z cena od nowa, najpierw przerob z najwiekszym zyskiem na roboczodzien; pary z receptur gry ["
                          + string.Join("; ", parts.ToArray()) + "]; rece " + F1(s.TownCraftHandsPerArmsHand) + " x rece rzemieslnikow miasta = " + F1(world)
                          + " roboczodni dziennie na swiat; bez zlota (polka -> polka); garbowanie i tkanie 1:1 (TanOrWeave) WYLACZONE, "
                          // recenzja: przy wylaczonym Workshop No Free Raw linie BK skory i plotna bez wsadu ida torem gry (z niczego) - linia ma to mowic
