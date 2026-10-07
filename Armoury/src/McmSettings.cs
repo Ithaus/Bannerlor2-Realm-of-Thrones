@@ -2256,9 +2256,17 @@ namespace Armoury
         [SettingPropertyGroup("The castle's purse")]
         public float CastlePurseFloorPerProsperity { get; set; } = 12f;
 
-        [SettingPropertyFloatingInteger("Castle Dues Share", 0.00f, 1.00f, "0.00", HintText = "share of the castle purse above the working coin its lord draws each day: the garrison spends its pay with his own people - alehouse, mill and stalls under the walls - as a town's lord draws his rents; nothing is drawn from a besieged castle (0 = the lord draws nothing and the purse only grows). Mind the side effect, the same as with the town wage shield: in the long run a garrison in one's own castle costs its lord little, for most of its pay comes back to him")]
+        [SettingPropertyFloatingInteger("Castle Dues Share", 0.00f, 1.00f, "0.00", HintText = "share of the castle purse above the working coin that leaves it each day as the dues under the walls: the garrison spends its pay with the lord's own people - alehouse, mill and stalls - as a town pays its rents; nothing is drawn from a besieged castle (0 = nothing is drawn and the purse only grows). Who takes it is set by Castle Dues Split With Crown and Castle Dues Lord Share")]
         [SettingPropertyGroup("The castle's purse")]
         public float CastleDuesShare { get; set; } = 0.07f;
+
+        [SettingPropertyBool("Castle Dues Split With Crown", HintText = "the castle's daily dues are shared with the crown as a town's rents are: the lord keeps Castle Dues Lord Share of them and the rest goes to the treasury of his kingdom, which pays it back to the houses as wage refunds in war. A castle held outside any kingdom pays everything to its lord. Off = the lord takes all of it, as before, and in the long run a garrison in his own castle costs him almost nothing")]
+        [SettingPropertyGroup("The castle's purse")]
+        public bool CastleDuesSplitWithCrown { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Castle Dues Lord Share", 0.00f, 2.68f, "0.00", HintText = "of what the castle purse gives up each day its lord keeps this share and the kingdom treasury takes the rest (needs Castle Dues Split With Crown; 1 = all to the lord, 0 = all to the crown). Two thirds, as in a town: a garrison kept at home then costs its lord a third of its pay, in a castle as in a town. Kept apart from Town Rent Lord Share so that castles can be eased on their own - most of a castle purse is its lord's own coin coming back, and the houses that hold nothing but a castle are the poorest")]
+        [SettingPropertyGroup("The castle's purse")]
+        public float CastleDuesLordShare { get; set; } = 0.67f;
 
         [SettingPropertyBool("Castle Purse Trim At Start", HintText = "once per campaign, on its first day: the starting gift in every castle purse (20 000 plus Banner Kings' 40 a point of prosperity) is cut down to the working coin. The game's regulator deleted that gold within two weeks anyway; left in, the castle lords would draw about five million from nowhere. A save a few days old loses only what the regulator had not yet deleted; an old save loses nothing")]
         [SettingPropertyGroup("The castle's purse")]
@@ -3244,6 +3252,8 @@ namespace Armoury
             s.CastlePurseFloorGold = CastlePurseFloorGold;
             s.CastlePurseFloorPerProsperity = CastlePurseFloorPerProsperity;
             s.CastleDuesShare = CastleDuesShare;
+            s.CastleDuesSplitWithCrown = CastleDuesSplitWithCrown;
+            s.CastleDuesLordShare = CastleDuesLordShare;
             s.CastlePurseTrimAtStart = CastlePurseTrimAtStart;
             s.CastleCartsNeedCoin = CastleCartsNeedCoin;
             s.TownPurseRegulator = TownPurseRegulator;

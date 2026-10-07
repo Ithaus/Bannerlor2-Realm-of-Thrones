@@ -576,8 +576,32 @@ namespace Armoury
             }
             catch (Exception e) { Log.Error("SoldierPay.ApplyAll(DailyTickClan)", e); }
             Log.Info("SoldierPay: zold do obiegu (partia -> sakiewka ludzi, garnizon -> kasa osady, zwrot ze skarbca w wojnie) - rozliczenie rodu " + tick
-                     + "; latki na model finansow (zold partii, saldo rodu) dojda przy pierwszym rozliczeniu rodu w kampanii, a latka na regulator kasy"
-                     + " tylko przy wlaczonej tarczy zoldu (MCM Town Wage Shield, domyslnie wylaczona).");
+                     + "; latki na model finansow (zold partii, saldo rodu) dojda przy pierwszym rozliczeniu rodu w kampanii"
+                     + "; tarcza zoldu w kasach miast (MCM Town Wage Shield, domyslnie wlaczona; ma co robic tylko wtedy, gdy regulator gry kasuje nadwyzki kas miast,"
+                     + " czyli przy Town Purse Regulator 0 - domyslnie 1) wedle ustawien z chwili startu gry: " + ShieldState() + ".");
+        }
+
+        /// <summary>
+        /// Stan tarczy zoldu do linii startowej - trzy przypadki, kazdy prawdziwy: wylaczona; wlaczona, ale nieczynna (krok K6 -
+        /// TownPurse prowadzi kasy miast, nic ich nie kasuje, wiec Hold i DecayHeld nie zakladaja latki na regulator); wlaczona i
+        /// czynna (kasy miast prowadzi regulator gry). Ustawienia MCM moga sie zmienic po wczytaniu kampanii - stan biezacy podaje
+        /// co dobe linia "Zold:". Wolane po CastlePurse.ApplyAll i TownPurse.ApplyAll (kolejnosc w SubModuleMain).
+        /// </summary>
+        private static string ShieldState()
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (s == null) return "ustawien nie da sie odczytac";
+                if (!s.TownWageShield) return "WYLACZONA (latki na regulator kasy nie bedzie)";
+                int mode = TownPurse.Mode;
+                if (TownPurse.On)
+                    return "wlaczona, ale NIECZYNNA - Town Purse Regulator " + mode + " (krok K6): kas miast nic nie kasuje, znacznikow nie dopisuje i latki na regulator kasy nie zaklada";
+                return "wlaczona i CZYNNA - " + (mode == TownPurse.ModeGame ? "Town Purse Regulator 0: kasy miast prowadzi regulator gry"
+                                                                           : "Town Purse Regulator " + mode + ", ale latki kroku K5 na regulatorze nie sa wpiete, wiec kasy miast prowadzi regulator gry")
+                       + "; latka na regulator kasy dojdzie przy pierwszej wplacie zoldu do kasy miasta";
+            }
+            catch (Exception e) { Log.Error("SoldierPay.ShieldState", e); return "blad odczytu"; }
         }
     }
 }
