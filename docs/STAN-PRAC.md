@@ -22,6 +22,10 @@ Jeffa przywrocone (md5). Log `Armoury-2026-10-07_06-06-45.log`. WYNIK 121-124 wo
 max 192 tys. (12.27 mln), piekarnia Lannisport 12.7 tys. (373 tys.); ruda bez towaru doba 19: 45 (51), doba 40: 38; drewno 47 -> 1; ZATKANE MAGAZYNY
 nadal rosna: doba 16: 29, doba 40: 60 z 571 (10.5%; u Jeffa doba 19: 89) - 122 polowa, druga polowa = dosypka RBL -> paczka 125 (w toku); KUPNO STOI:
 skora, skory, welna, plotno (przesyt - K13). ERROR 0, potkniecia 0.
+3. PRZEBIEG 08:03 (Armoury 121-126, 40 dob): OK 40/40 (12.3 s/dobe), DLL i zapisy Jeffa przywrocone. Las wsi (126) +1190 ladunkow/dobe w 475 wsiach,
+dosypka RBL zablokowana (125), drewno w miastach rosnie (12.1 tys.), warsztaty mediana 13.3 tys. (max 452 tys.), piekarnia Lannisport 16.2 tys.
+ZATKANE MAGAZYNY BEZ POPRAWY: doba 40: 33 + 28 = 61 z 571 (10.7%; przebieg 2: 60) - modele 122 i 125/126 (1-3%) sie nie sprawdzily; przyczyna
+nieznana -> najpierw diagnostyka w logu (sklad magazynu zatkanych wsi, stan wozu), potem poprawka.
 
 ## PIERWSZY TEST GRUPY TOWARY 2 (115-120) - 07.10 03:18 (nowa kampania, 19 dob; log `Armoury-2026-10-07_03-18-52.log`)
 
