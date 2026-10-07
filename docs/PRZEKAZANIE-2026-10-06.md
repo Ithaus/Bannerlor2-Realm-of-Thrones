@@ -162,4 +162,4 @@ grupy (3 audytorow, nic blokujacego - `docs/audyt-2026-10-07/`), ogniwo 120 popr
 Wszystko w repo i na origin: `paczki/115..120`, `paczki-na-119/108..114`; robocze `w-toku/l115..l119` (mozna usunac). Stan i instrukcja wgrania:
 STAN-PRAC, sekcja "NOC 06/07.10". Stare `paczki/108..114` (na n107) nietkniete - nadpisanie zablokowane (force push), decyzja Jeffa.
 NASTEPNY KROK: Jeff czyta 6 punktow "CO JEFF ZOBACZY" i mowi "wgraj" -> wgranie 115-120 wg STAN-PRAC -> test: nowa kampania 20 dob ->
-`python tools/sprawdz_logi.py --grupa 2b`. Potem: przeniesienie kolejki na 120, krok skali K13 (pilny po audycie), sztabka zlota (118).
+`python tools/sprawdz_logi.py --grupa 2b`. Kolejka JUZ przeniesiona na 120: `paczki-na-120/108..114` (01:15). Potem: krok skali K13 (pilny po audycie), sztabka zlota (118).

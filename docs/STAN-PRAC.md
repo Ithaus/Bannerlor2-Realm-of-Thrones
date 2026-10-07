@@ -68,8 +68,9 @@ CO JEFF ZOBACZY W GRZE PO 115-119 (slowami gracza; do powiedzenia przed "wgraj")
    krolestwa; woz wiezie 2 x wiecej, wiec napad na tabor daje 2 x wiecej lupu. Pieniadze z Twoich wsi przyjda pozniej, ale zwykle wiecej.
 6. Karawany AI pakuja sie surowcami do pelna; Twoje karawany jak dotad (80%).
 
-KOLEJKA 108-114 (nakladanie na 120 sprawdzone `git merge-tree`: 7/7 bez konfliktu, 669 ustawien - do zrobienia przy nastepnym skladaniu)
-PRZENIESIONA NA 119: galezie `paczki-na-119/108-...` .. `paczki-na-119/114-porzadki` (1ffe021 .. 817931e; build kod 0 kazdego,
+KOLEJKA 108-114 PRZENIESIONA NA 120 (07.10 01:15): galezie `paczki-na-120/108-...` .. `paczki-na-120/114-porzadki` (e548266 .. a14efe8; bez konfliktu,
+build kod 0 kazdego, 633 -> 669 ustawien; drzewo 114 = kontrolne scalenie). Ponizej opis wersji na 119 (ta sama tresc) - AKTUALNE SA `paczki-na-120/*`.
+WCZESNIEJ PRZENIESIONA NA 119: galezie `paczki-na-119/108-...` .. `paczki-na-119/114-porzadki` (1ffe021 .. 817931e; build kod 0 kazdego,
 669 ustawien na 114; konflikty tylko tekstowe: lista Reset w konstruktorze ArmouryBehavior, Settings.cs przy K7; K5 i wozy w MarketRoad.cs
 rozlaczne - K5 dziala tylko dla wsi zamkowej bez zadnego miasta w zasiegu). STARE `paczki/108..114` (na n107) ZOSTALY - ich nadpisanie
 (force push) zablokowalo zabezpieczenie; do decyzji Jeffa (albo nadpisac, albo dalej uzywac `paczki-na-119/*`). Tresc ogniw ta sama, opisy
