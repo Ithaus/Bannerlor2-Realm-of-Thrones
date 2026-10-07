@@ -1437,6 +1437,17 @@ namespace Armoury
                 if (s == null || !s.TroopOrderEnabled) return false;
                 if (QuartermasterLaw.DteArmory() == null) return false;
                 var shortages = QuartermasterLaw.ShortageLines();
+                if (s.TroopOrderFromShelf)
+                {
+                    // paczka 145: z polki TEGO miasta po cenie polki + chodzenie kowala
+                    var st = Settlement.CurrentSettlement;
+                    args.Tooltip = (shortages.Count > 0
+                        ? new TextObject("{=!}The men go short: {LIST}. The smith buys plain pieces of any tier off the stalls of {TOWN} at the stall's own price and asks {FEE} gold a piece for his legwork.")
+                            .SetTextVariable("LIST", string.Join(", ", shortages.ToArray()))
+                        : new TextObject("{=!}No shortages today - but the smith will buy spare kit off the stalls of {TOWN} all the same, at the stall's own price and {FEE} gold a piece for his legwork."))
+                        .SetTextVariable("TOWN", st != null ? st.Name.ToString() : "this town").SetTextVariable("FEE", FeeText(st));
+                    return true;
+                }
                 args.Tooltip = shortages.Count > 0
                     ? new TextObject("{=!}The men go short: {LIST}. The smith will procure plain pieces of any tier for market worth plus his fee.")
                         .SetTextVariable("LIST", string.Join(", ", shortages.ToArray()))
@@ -1484,6 +1495,18 @@ namespace Armoury
             catch (Exception e) { Log.Error("OrderKitConsequence", e); }
         }
 
+        /// <summary>Sztuka, jaka kowal sprowadza dla ludzi: KUPNA, danego typu i tieru, prosty zolnierski wyrob (bez cwiczebnych,
+        /// turniejowych, testowych, oblezniczych). Jeden filtr dla wzoru ze swiata (CheapestOf) i dla polki miasta (ShelfOrderable).</summary>
+        private static bool Orderable(ItemObject item, ItemObject.ItemTypeEnum type, int tier)
+        {
+            if (item == null || item.ItemType != type || item.NotMerchandise) return false;
+            if (item.Value <= 0) return false;
+            if (Recipes.Grade(item) != tier) return false;
+            string sId = (item.StringId ?? "").ToLowerInvariant();
+            return !(sId.Contains("practice") || sId.Contains("tournament") || sId.Contains("dummy")
+                     || sId.Contains("test_") || sId.Contains("_test") || sId.Contains("siege"));
+        }
+
         /// <summary>Najtansza KUPNA sztuka danego typu i tieru - prosty, zolnierski wyrob.</summary>
         private static ItemObject CheapestOf(ItemObject.ItemTypeEnum type, int tier)
         {
@@ -1492,12 +1515,7 @@ namespace Armoury
             {
                 foreach (var item in MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
                 {
-                    if (item == null || item.ItemType != type || item.NotMerchandise) continue;
-                    if (item.Value <= 0) continue;
-                    if (Recipes.Grade(item) != tier) continue;
-                    string sId = (item.StringId ?? "").ToLowerInvariant();
-                    if (sId.Contains("practice") || sId.Contains("tournament") || sId.Contains("dummy")
-                        || sId.Contains("test_") || sId.Contains("_test") || sId.Contains("siege")) continue;
+                    if (!Orderable(item, type, tier)) continue;
                     if (best == null || item.Value < best.Value) best = item;
                 }
             }
@@ -1513,6 +1531,7 @@ namespace Armoury
 
         private static void OrderKitTiers(ItemObject.ItemTypeEnum type, int shortage)
         {
+            if (Settings.Current.TroopOrderFromShelf) { OrderShelfTiers(type, shortage); return; }   // paczka 145: z polki tego miasta
             try
             {
                 var elements = new List<InquiryElement>();
@@ -1609,6 +1628,298 @@ namespace Armoury
                 Log.Info("Zamowienie dla wojska: " + k + "/" + n + "x " + item.StringId + " za " + pay + " (z targu " + (st != null ? st.Name.ToString() : "?") + ")");
             }
             catch (Exception e) { Log.Error("DoOrderKit", e); }
+        }
+
+        // ------------------------------------------------- zamowienie z POLKI miasta (paczka 145, TroopOrderFromShelf)
+        // Jeff 07.10 ("cena tak, wybor tak, brak towarow tak"). Dotad kowal bral najtansza sztuke typu i tieru z CALEGO swiata
+        // (czesto nie ma jej na tej polce - "could not find"), liczyl wartosc x 1.15 bez wzgledu na cene polki i dawal tylko tyle,
+        // ile tej jednej sztuki lezalo na polce. Teraz:
+        //  - wybor: najtansza SPRAWNA sztuka typu i tieru, ktora NAPRAWDE lezy na polce tego miasta (te same filtry co dotad,
+        //    bez unikatow i koni, stan nie ponizej 100%); kupuje po jednej - przy kolejnej znow najtansza z tego, co zostalo;
+        //  - cena: cena kupna miasta za te sztuke w tej chwili (ta sama, ktora placi sakiewka ludzi, lordowie i ekran handlu -
+        //    kolejna sztuka widzi mniejsza polke) + chodzenie kowala po straganach: 0.2 dnia rzemieslnika (HistMasterWageT1, 3 d)
+        //    x poziom plac miasta (TownWage) za sztuke; wszystko do kasy miasta (Pay.ToSettlement);
+        //  - brak towaru: nic nie placisz, potrzeba idzie do warsztatow jako zamowienie w miescie (SupplyDemand, jak u lorda,
+        //    ktory nie znalazl towaru: najwyzej 10 na rodzaj z jednej wizyty, raz na SupplyDemandOrderRepeatDays).
+
+        private const float OrderLegworkDays = 0.2f;   // ulamek dnia rzemieslnika na jedna sprowadzona sztuke
+
+        /// <summary>Chodzenie kowala za jedna sztuke (ulamek pensa): 0.2 dniowki rzemieslnika x poziom plac miasta.</summary>
+        private static float OrderLegworkPerPiece(Settlement st)
+        {
+            var s = Settings.Current;
+            return OrderLegworkDays * Math.Max(0f, s.HistMasterWageT1) * TownWage.Index(st);
+        }
+
+        /// <summary>Chodzenie kowala za k sztuk w calych pensach (za cale zamowienie; co najmniej 1 d, gdy cokolwiek przyniosl).</summary>
+        private static int OrderLegwork(Settlement st, int k)
+        {
+            if (k <= 0) return 0;
+            return Math.Max(1, (int)Math.Round(k * OrderLegworkPerPiece(st)));
+        }
+
+        private static string FeeText(Settlement st)
+        {
+            return OrderLegworkPerPiece(st).ToString("0.0#", System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        private static string Pieces(int k) { return k == 1 ? "1 piece" : k + " pieces"; }
+
+        /// <summary>Sztuka z polki, ktora kowal kupi: Orderable (typ, tier, kupna), regula zbrojowni dla typu (CountsAsKit), nie unikat,
+        /// nie kon (stajnia), w pelni sprawna - stan nie ponizej 100%.</summary>
+        private static bool ShelfOrderable(EquipmentElement ee, ItemObject.ItemTypeEnum type, int tier)
+        {
+            var it = ee.Item;
+            if (type == ItemObject.ItemTypeEnum.Horse || !Orderable(it, type, tier)) return false;
+            if (!QuartermasterLaw.CountsAsKit(it, type) || ArmsPricing.IsUnique(it)) return false;
+            var m = ee.ItemModifier;
+            return m == null || m.PriceMultiplier >= 0.999f;
+        }
+
+        /// <summary>Cena kupna miasta za te sztuke teraz - jak ochotnicy, sakiewka ludzi i lordowie (MarketData, kupiec = osada,
+        /// wiec dziala podaz i popyt polki).</summary>
+        private static int ShelfPrice(Settlement st, EquipmentElement ee)
+        {
+            int price;
+            try { price = st.Town.MarketData.GetPrice(ee, null, false, st.Party); } catch { price = ee.ItemValue; }
+            return Math.Max(1, price);
+        }
+
+        private struct ShelfPick { public EquipmentElement El; public int Price; }
+
+        /// <summary>
+        /// Kowal kupuje z POLKI st po jednej sztuce: za kazdym razem najtansza sprawna sztuka typu i tieru po cenie kupna w tej chwili
+        /// (kolejna sztuka widzi mniejsza polke - jak sakiewka ludzi i ekran handlu). purse >= 0: towar + chodzenie najwyzej tyle
+        /// (shortPurse = przerwala kiesa, nie brak towaru). commit = false to WYCENA: zdjete sztuki wracaja na polke (finally) -
+        /// polka co do sztuki jak byla; commit = true - sztuki zostaja zdjete, placi i odbiera wolajacy.
+        /// </summary>
+        private static List<ShelfPick> ShelfPlan(Settlement st, ItemObject.ItemTypeEnum type, int tier, int n, int purse, bool commit, out bool shortPurse)
+        {
+            var picks = new List<ShelfPick>();
+            shortPurse = false;
+            if (st == null || st.Town == null || st.ItemRoster == null || n <= 0) return picks;
+            var shelf = st.ItemRoster;
+            try
+            {
+                int goods = 0;
+                while (picks.Count < n)
+                {
+                    int best = -1, bestPrice = int.MaxValue;
+                    for (int i = 0; i < shelf.Count; i++)
+                    {
+                        var el = shelf.GetElementCopyAtIndex(i);
+                        if (el.Amount <= 0 || !ShelfOrderable(el.EquipmentElement, type, tier)) continue;
+                        int price = ShelfPrice(st, el.EquipmentElement);
+                        if (price < bestPrice) { bestPrice = price; best = i; }
+                    }
+                    if (best < 0) break;
+                    if (purse >= 0 && goods + bestPrice + OrderLegwork(st, picks.Count + 1) > purse) { shortPurse = true; break; }
+                    var ee = shelf.GetElementCopyAtIndex(best).EquipmentElement;
+                    shelf.AddToCounts(ee, -1);
+                    picks.Add(new ShelfPick { El = ee, Price = bestPrice });
+                    goods += bestPrice;
+                }
+            }
+            catch (Exception e) { Log.Error("ShelfPlan", e); }
+            finally
+            {
+                if (!commit) foreach (var p in picks) shelf.AddToCounts(p.El, 1);
+            }
+            return picks;
+        }
+
+        private static int PickGoods(List<ShelfPick> picks, int k)
+        {
+            int g = 0;
+            for (int i = 0; i < k && i < picks.Count; i++) g += picks[i].Price;
+            return g;
+        }
+
+        /// <summary>"3 Leather Cap, 2 Padded Coif" - pierwsze k pozycji planu; ids: identyfikatory i ceny do logu ("3 leather_cap po 18-20").</summary>
+        private static string PickNames(List<ShelfPick> picks, int k, bool ids)
+        {
+            var names = new List<string>(); var counts = new List<int>(); var lo = new List<int>(); var hi = new List<int>();
+            for (int i = 0; i < k && i < picks.Count; i++)
+            {
+                var el = picks[i].El; int pr = picks[i].Price;
+                string nm = ids ? el.Item.StringId + (el.ItemModifier != null ? "[" + el.ItemModifier.StringId + "]" : "") : el.Item.Name.ToString();
+                int j = names.IndexOf(nm);
+                if (j < 0) { names.Add(nm); counts.Add(1); lo.Add(pr); hi.Add(pr); }
+                else { counts[j]++; lo[j] = Math.Min(lo[j], pr); hi[j] = Math.Max(hi[j], pr); }
+            }
+            var parts = new List<string>();
+            for (int j = 0; j < names.Count; j++)
+                parts.Add(counts[j] + " " + names[j] + (ids ? " po " + lo[j] + (hi[j] != lo[j] ? "-" + hi[j] : "") : ""));
+            return string.Join(", ", parts.ToArray());
+        }
+
+        /// <summary>Ile sprawnych sztuk typu i tieru lezy na polce i najtansza z nich - bez zmian w polce.</summary>
+        private static int ShelfStock(Settlement st, ItemObject.ItemTypeEnum type, int tier, out EquipmentElement cheapest, out int price)
+        {
+            cheapest = default(EquipmentElement); price = 0;
+            if (st == null || st.Town == null || st.ItemRoster == null) return 0;
+            int n = 0, best = int.MaxValue;
+            var shelf = st.ItemRoster;
+            for (int i = 0; i < shelf.Count; i++)
+            {
+                var el = shelf.GetElementCopyAtIndex(i);
+                if (el.Amount <= 0 || !ShelfOrderable(el.EquipmentElement, type, tier)) continue;
+                n += el.Amount;
+                int p = ShelfPrice(st, el.EquipmentElement);
+                if (p < best) { best = p; cheapest = el.EquipmentElement; }
+            }
+            if (n > 0) price = best;
+            return n;
+        }
+
+        private static void OrderShelfTiers(ItemObject.ItemTypeEnum type, int shortage)
+        {
+            try
+            {
+                var st = Settlement.CurrentSettlement;
+                if (st == null || st.Town == null || st.ItemRoster == null) { Log.Player("There is no market here for the smith to buy from.", true); return; }
+                string town = st.Name.ToString(), fee = FeeText(st);
+                var elements = new List<InquiryElement>();
+                for (int t = 1; t <= 6; t++)
+                {
+                    var rep = CheapestOf(type, t);
+                    if (rep == null) continue;                       // takiego tieru nie ma w handlu nigdzie
+                    EquipmentElement first; int price;
+                    int stock = ShelfStock(st, type, t, out first, out price);
+                    if (stock > 0)
+                        elements.Add(new InquiryElement(t, "Tier " + t + " - " + first.Item.Name + ", " + price + " gold off the stall (" + stock + " on the stalls)",
+                            ItemPic(first.Item), true, "The cheapest sound piece of its grade on the stalls of " + town + ", at the stall's own price - every further piece "
+                            + "at the price of the emptier stall. The smith asks " + fee + " gold a piece for his legwork."));
+                    else
+                        elements.Add(new InquiryElement(t, "Tier " + t + " - none on the stalls of " + town,
+                            ItemPic(rep), true, "Nothing of this grade lies on the stalls here. Ask anyway and the smith passes word of the want to the town's workshops - you pay nothing."));
+                }
+                if (elements.Count == 0) { Log.Player("No such kit is traded at any market the smith knows.", true); return; }
+
+                MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData(
+                    "The Order Ledger", "Which grade of " + type + "? The smith buys off the stalls of " + town + " at the stall's own price and asks " + fee
+                    + " gold a piece for his legwork." + (shortage > 0 ? " The men are short " + shortage + "." : ""),
+                    elements, true, 1, 1, "Choose", "Back",
+                    delegate (List<InquiryElement> sel)
+                    {
+                        try
+                        {
+                            if (sel == null || sel.Count == 0) return;
+                            OrderShelfCount(type, (int)sel[0].Identifier, shortage);
+                        }
+                        catch (Exception ex) { Log.Error("OrderShelfTiers.Selected", ex); }
+                    },
+                    delegate (List<InquiryElement> _) { }), true);
+            }
+            catch (Exception e) { Log.Error("OrderShelfTiers", e); }
+        }
+
+        private static void OrderShelfCount(ItemObject.ItemTypeEnum type, int tier, int shortage)
+        {
+            try
+            {
+                var st = Settlement.CurrentSettlement;
+                var counts = new List<int> { 1, 5, 10 };
+                if (shortage > 0 && !counts.Contains(shortage)) counts.Add(shortage);
+                counts.Sort();
+                bool sp;
+                var plan = ShelfPlan(st, type, tier, counts[counts.Count - 1], -1, false, out sp);   // wycena - polka bez zmian
+                if (plan.Count == 0) { OrderNoGoods(st, type, tier, Math.Max(1, shortage)); return; }
+                string what = type + " (tier " + tier + ")";
+                int gold = Hero.MainHero.Gold;
+                var elements = new List<InquiryElement>();
+                foreach (var n in counts)
+                {
+                    int k = Math.Min(n, plan.Count), goods = PickGoods(plan, k), fee = OrderLegwork(st, k), total = goods + fee;
+                    string label = n + " x " + what + " - " + total + " gold" + (k < n ? "  (only " + k + " on the stalls)" : "")
+                                 + (n == shortage ? "  (fills the shortage)" : "");
+                    string hint = Pieces(k) + " for " + total + " gold - " + goods + " for the goods off the stall and " + fee + " for the smith's legwork: "
+                                + PickNames(plan, k, false) + "." + (k < n ? " The stalls hold no more - word of the other " + (n - k) + " goes to the workshops." : "")
+                                + (gold >= total ? "" : " Your purse comes up short.");
+                    elements.Add(new InquiryElement(n, label, null, gold >= total, hint));
+                }
+
+                MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData(
+                    what + " off the stalls of " + st.Name, "Each piece at the stall's own price - the stall dearer by every piece it loses - and " + FeeText(st)
+                    + " gold a piece for the smith's legwork, all into the town's coffers. The pieces land on the armoury racks.",
+                    elements, true, 1, 1, "Order", "Back",
+                    delegate (List<InquiryElement> sel)
+                    {
+                        try
+                        {
+                            if (sel == null || sel.Count == 0) return;
+                            int n = (int)sel[0].Identifier;
+                            float hours = Math.Min(24f, 1f + n * 0.2f);
+                            StartTimedWork(hours,
+                                "The smith sends his boys round the stalls of " + st.Name + ".",
+                                delegate { DoOrderShelf(type, tier, n); });
+                        }
+                        catch (Exception ex) { Log.Error("OrderShelfCount.Selected", ex); }
+                    },
+                    delegate (List<InquiryElement> _) { }), true);
+            }
+            catch (Exception e) { Log.Error("OrderShelfCount", e); }
+        }
+
+        private static void DoOrderShelf(ItemObject.ItemTypeEnum type, int tier, int n)
+        {
+            try
+            {
+                var armory = QuartermasterLaw.DteArmory();
+                if (armory == null) { Log.Player("The armoury wagons are nowhere to be found.", true); return; }
+                var st = Settlement.CurrentSettlement;
+                bool shortPurse;
+                var picks = ShelfPlan(st, type, tier, n, Hero.MainHero.Gold, true, out shortPurse);
+                int k = picks.Count;
+                if (k == 0 && !shortPurse) { OrderNoGoods(st, type, tier, n); return; }
+                if (k == 0)
+                {
+                    Log.Player("Your purse came up short - the smith could not buy even one piece.", true);
+                    LogShelfOrder(st, type, tier, n, picks, 0, 0, 0, true);
+                    return;
+                }
+                int goods = PickGoods(picks, k), fee = OrderLegwork(st, k), total = goods + fee;
+                Pay.ToSettlement(total);
+                foreach (var p in picks) armory.AddToCounts(p.El, 1);
+                int unmet = shortPurse ? 0 : n - k;   // za drogo to nie brak towaru (jak u lordow, wpis 81)
+                NoteOrderUnmet(st, type, tier, unmet);
+                Log.Player(Pieces(k) + " of " + type + " (tier " + tier + ") delivered to the men's racks for " + total + " gold - " + goods
+                           + " for the goods off the stall and " + fee + " for the smith's legwork."
+                           + (unmet > 0 ? " The stalls of " + st.Name + " had no more: word of the other " + unmet + " goes to the workshops." : "")
+                           + (shortPurse ? " Your purse would stretch no further." : ""));
+                LogShelfOrder(st, type, tier, n, picks, goods, fee, unmet, shortPurse);
+            }
+            catch (Exception e) { Log.Error("DoOrderShelf", e); }
+        }
+
+        /// <summary>Na polce nie ma ani jednej sprawnej sztuki tego typu i tieru: nic nie placisz, potrzeba idzie do warsztatow.</summary>
+        private static void OrderNoGoods(Settlement st, ItemObject.ItemTypeEnum type, int tier, int n)
+        {
+            NoteOrderUnmet(st, type, tier, n);
+            Log.Player("Not a single sound " + type + " of tier " + tier + " lies on the stalls of " + (st != null ? st.Name.ToString() : "this town")
+                       + ". The smith passes word of the want of " + n + " to the town's workshops - you pay nothing.", true);
+            LogShelfOrder(st, type, tier, n, null, 0, 0, n, false);
+        }
+
+        /// <summary>Niezaspokojona potrzeba = zamowienie w miescie (SupplyDemand) - jak lord, ktory nie znalazl towaru (AiGear):
+        /// najwyzej 10 na rodzaj z jednej wizyty i raz na SupplyDemandOrderRepeatDays (zamowienie to potrzeba, nie licznik prob).</summary>
+        private static void NoteOrderUnmet(Settlement st, ItemObject.ItemTypeEnum type, int tier, int missing)
+        {
+            if (st == null || missing <= 0) return;
+            SupplyDemand.NoteUnmetOnce(MobileParty.MainParty, st, type, tier, Math.Min(10, missing));
+        }
+
+        /// <summary>Jedna linia logu na zamowienie: miasto, typ i tier, co przyniosl, towar + chodzenie, ile niezaspokojone.</summary>
+        private static void LogShelfOrder(Settlement st, ItemObject.ItemTypeEnum type, int tier, int n, List<ShelfPick> picks, int goods, int fee, int unmet, bool shortPurse)
+        {
+            int k = picks != null ? picks.Count : 0;
+            var rep = unmet > 0 ? CheapestOf(type, tier) : null;
+            Log.Info("Zamowienie dla wojska (z polki): " + (st != null ? st.Name.ToString() : "?") + ", " + type + " t" + tier
+                     + (k > 0 ? " [" + PickNames(picks, k, true) + "]" : " - brak na polce")
+                     + ": dostarczono " + k + "/" + n + " szt., towar " + goods + " + oplata kowala " + fee + " = " + (goods + fee)
+                     + " (poziom plac x" + TownWage.Index(st).ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) + ")"
+                     + ", niezaspokojone " + unmet + (unmet > 0 ? " -> potrzeba dla warsztatow " + Math.Min(10, unmet) + " szt. (wzor " + (rep != null ? rep.StringId : "-") + ")" : "")
+                     + (shortPurse ? ", kiesa nie starczyla" : ""));
         }
 
         private static bool OrdersCondition(MenuCallbackArgs args)

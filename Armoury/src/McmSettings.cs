@@ -2536,6 +2536,10 @@ namespace Armoury
         [SettingPropertyGroup("The men's gear")]
         public float TroopOrderMarkup { get; set; } = 1.15f;
 
+        [SettingPropertyBool("Troop Order From Shelf", HintText = "the smith procures the men's kit off THIS town's stalls: the cheapest sound piece of the type and tier you ask that is really on sale here, each at the stall's own buying price (the price your men's purse and the lords pay - every further piece dearer as the stall empties), plus his legwork: a fifth of a craftsman's day a piece (3 d a day, as dear as the town is prosperous), all paid into the town's coffers; what the stalls lack is passed to the town's workshops as an order and costs you nothing (off = as before: the cheapest such piece anywhere in the world at its worth times the markup, delivered only if this stall happens to hold it)")]
+        [SettingPropertyGroup("The men's gear")]
+        public bool TroopOrderFromShelf { get; set; } = true;
+
         [SettingPropertyFloatingInteger("Smith Repair Hours Per Piece", 0.00f, 6.00f, "0.00", HintText = "hours the smith needs per worn piece of your harness")]
         [SettingPropertyGroup("Time at the forge")]
         public float SmithRepairHoursPerPiece { get; set; } = 1.5f;
@@ -3261,6 +3265,7 @@ namespace Armoury
             s.TroopMendMaxHours = TroopMendMaxHours;
             s.TroopOrderEnabled = TroopOrderEnabled;
             s.TroopOrderMarkup = TroopOrderMarkup;
+            s.TroopOrderFromShelf = TroopOrderFromShelf;
             s.SmithRepairHoursPerPiece = SmithRepairHoursPerPiece;
             s.SelfRepairHoursPerPiece = SelfRepairHoursPerPiece;
             s.MendLootHoursPerPiece = MendLootHoursPerPiece;

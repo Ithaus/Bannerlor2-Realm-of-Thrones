@@ -712,6 +712,7 @@ namespace Armoury
         public float TroopMendMaxHours = 24f;              // the whole job never takes longer than this - the smith puts every hand he has on it
         public bool TroopOrderEnabled = true;              // order missing kit for the men from the town smith - plain pieces of the tier you ask, straight onto the racks
         public float TroopOrderMarkup = 1.15f;             // the smith's fee: each procured piece costs its market worth times this
+        public bool TroopOrderFromShelf = true;            // the smith procures the men's kit off THIS town's stalls: the cheapest sound piece of the type and tier you ask that is really on sale here, each at the stall's own buying price (the price your men's purse and the lords pay - every further piece dearer as the stall empties), plus his legwork: a fifth of a craftsman's day a piece (3 d a day, as dear as the town is prosperous), all paid into the town's coffers; what the stalls lack is passed to the town's workshops as an order and costs you nothing (off = as before: the cheapest such piece anywhere in the world at its worth times the markup, delivered only if this stall happens to hold it)
 
         // --- Time at the forge ---
         public float SmithRepairHoursPerPiece = 1.5f;      // hours the smith needs per worn piece of your harness
