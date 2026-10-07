@@ -49,8 +49,11 @@ namespace Armoury
     ///    ("zold oddany do obiegu"), bo SoldierPay wplaca ja juz po pomiarze rozliczenia rodu;
     ///  - nasze moduly poza tickiem dobowym: wywolania-liczniki Note (zakupy AI, najemnicy z karczmy, warsztaty zbrojne,
     ///    sprzet kupiony przez bandy u pasera);
-    ///  - nasz tick dobowy: migawki stanu kas miedzy modulami (BlockOpen / Mark) - renty, budowy, korona, wydatki band
-    ///    i kryjowek na zycie w miastach, skup lupu band u pasera (OutlawLaw robi swoje trzy migawki sam), reszta ticku.
+    ///  - nasz tick dobowy: migawki stanu kas miedzy modulami (BlockOpen / Mark) - renty, danina podzamcza (CastlePurse: zawor
+    ///    kas zamkow, krok K5), budowy, korona, wydatki band i kryjowek na zycie w miastach, skup lupu band u pasera (OutlawLaw
+    ///    robi swoje trzy migawki sam), reszta ticku.
+    ///  Krok K5 (CastlePurse) zeruje regulator i cofa "zakupy" w ZAMKACH wlasnymi postfiksami o priorytecie First - liczniki tej
+    ///  ksiegi (priorytet zwykly) biegna po nich i widza stan po zmianie: w linii kas zamkow obie pozycje maja wtedy 0.
     /// </summary>
     internal static class MoneyLedger
     {
@@ -68,9 +71,10 @@ namespace Armoury
         private static readonly string[] NName = { "zakupy sprzetu AI", "najemnicy z karczmy", "warsztaty zbrojne", "paser band (sprzet dla band)", "zold garnizonow", "sakiewki ludzi - zycie w miastach" };
 
         // nasz tick dobowy (Mark)
-        internal const int MRent = 0, MBuild = 1, MCrown = 2, MRest = 3, MFence = 4, MLife = 5;
-        private const int Marks = 6;
-        private static readonly string[] MName = { "renty", "budowy", "korona (danina, clo, mennica)", "pozostale moduly ticku", "paser band (skup lupu)", "bandy i kryjowki (zycie w miastach)" };
+        internal const int MRent = 0, MBuild = 1, MCrown = 2, MRest = 3, MFence = 4, MLife = 5, MCastle = 6, MTrim = 7;
+        private const int Marks = 8;
+        private static readonly string[] MName = { "renty", "budowy", "korona (danina, clo, mennica)", "pozostale moduly ticku", "paser band (skup lupu)", "bandy i kryjowki (zycie w miastach)",
+                                                   "danina podzamcza (kasy zamkow -> panowie)", "dar startowy kas zamkow przyciety (raz na kampanie, w nicosc)" };
 
         // posiadacze zlota
         private const int HTowns = 0, HCastles = 1, HVillages = 2, HLeaders = 3, HLords = 4, HPlayer = 5, HNotables = 6, HWanderers = 7, HOtherHeroes = 8,
@@ -653,8 +657,11 @@ namespace Armoury
             // Last, nasz Low): sakiewki ludzi i kasy osad rosna poza roznica stanu rozliczenia - to osobne zrodlo, nie "minus" w ujsciach
             // (rozliczenia na minus to tylko czesc rodow; odjecie calego przekazanego zoldu dawaloby ujemne ujscia)
             long routed = _wageToPurses + _wageToCoffers;
+            // krok K5 (CastlePurse): dar startowy zdjety z kas zamkow raz na kampanie to zloto w nicosc - jedyna migawka naszego ticku,
+            // ktora nie jest przelewem (zwykle wypada w pierwszej dobie ksiegi, ktora przeplywow nie drukuje)
+            long trim = 0; for (int c = 0; c < Classes; c++) trim -= _mark[c, MTrim];
             long sources = cons + regIn + _clanUp + routed + from;
-            long sinks = _clanDown + regOut + vanished + to - _levyBack;
+            long sinks = _clanDown + regOut + vanished + to - _levyBack + trim;
             return "Pieniadz swiata (bilans): dzien " + day + " | zmiana sumy " + S(delta) + " [P] = zmierzone zrodla z niczego +" + sources
                    + " [P] (\"zakupy\" mieszkancow miast i zamkow " + cons + ", regulator kas dosypal " + regIn + ", rozliczenia rodow na plus " + _clanUp + " w " + _clanUpN
                    + " rodach, zold oddany do obiegu przez SoldierPay " + routed + " (sakiewki ludzi " + _wageToPurses + ", kasy osad " + _wageToCoffers
@@ -662,6 +669,7 @@ namespace Armoury
                    + " - zmierzone ujscia w nicosc " + sinks + " [P] (rozliczenia rodow na minus " + _clanDown + " w " + _clanDownN + " rodach, regulator kas skasowal " + regOut
                    + ", z utargu wsi zniklo " + vanished
                    + ", GiveGoldAction w nicosc poza rozliczeniami rodow " + to + " minus " + _levyBack + " oddane przez LevyGold notablom i miastom)"
+                   + (trim != 0 ? " w tym dar startowy kas zamkow przyciety przez CastlePurse " + trim + " [P]" : "")
                    + " + reszta " + S(delta - sources + sinks) + " [R] (niezmierzone: BEE, BK poza rozliczeniami rodow, handel partii, liczniki cel rosnace przy handlu, kapital nowych karawan,"
                    + " smierc bohaterow, lupy w kryjowkach; ze znakiem minus: zysk warsztatow i karawan wyplacany notablom - gra zdejmuje go z kapitalu, a wyplate zglasza jak zloto z niczego"
                    + " (jest w zrodlach); rozliczenia rodow sa zmierzone w calosci)."

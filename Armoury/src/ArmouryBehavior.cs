@@ -386,7 +386,7 @@ namespace Armoury
         }
         private Dictionary<string,int> _prisonerBaseline;
 
-        public ArmouryBehavior() { Instance = this; HistoricalPrices.Reset(); MaterialLaw.Reset(); WesterosClimate.Reset(); OutlawLaw.Reset(); PopulationLaw.Reset(); WorkshopLaw.Reset(); IronBank.Reset(); MarketGlut.Reset(); ArmsPricing.Reset(); StartKit.Reset(); AiGear.Reset(); Levy.Reset(); VolunteerKit.Reset(); LevyGold.Reset(); WearKeep.Reset(); UniqueSpoils.Reset(); BuildDiary.Reset(); BuildFunding.Reset(); KingdomLedger.Reset(); ColdStart.Reset(); MenPurse.Reset(); AiWear.Reset(); SmithHours.Reset(); RecruitKit.Reset(); OreLedger.Reset(); MarketRoad.Reset(); MarketCarts.Reset(); MoneyLedger.Reset(); PeopleLedger.Reset(); PeopleUnit.Reset(); CaravanBulk.Reset(); StartStock.Reset(); MineralOnce.Reset(); SoldierPay.Reset(); KingdomTreasury.Reset(); }   // stan jednej kampanii nie przecieka do drugiej (audyt 04.10)
+        public ArmouryBehavior() { Instance = this; HistoricalPrices.Reset(); MaterialLaw.Reset(); WesterosClimate.Reset(); OutlawLaw.Reset(); PopulationLaw.Reset(); WorkshopLaw.Reset(); IronBank.Reset(); MarketGlut.Reset(); ArmsPricing.Reset(); StartKit.Reset(); AiGear.Reset(); Levy.Reset(); VolunteerKit.Reset(); LevyGold.Reset(); WearKeep.Reset(); UniqueSpoils.Reset(); BuildDiary.Reset(); BuildFunding.Reset(); KingdomLedger.Reset(); ColdStart.Reset(); MenPurse.Reset(); AiWear.Reset(); SmithHours.Reset(); RecruitKit.Reset(); OreLedger.Reset(); MarketRoad.Reset(); MarketCarts.Reset(); MoneyLedger.Reset(); PeopleLedger.Reset(); PeopleUnit.Reset(); CaravanBulk.Reset(); StartStock.Reset(); MineralOnce.Reset(); SoldierPay.Reset(); KingdomTreasury.Reset(); CastlePurse.Reset(); }   // stan jednej kampanii nie przecieka do drugiej (audyt 04.10)
 
         public override void SyncData(IDataStore dataStore)
         {
@@ -400,6 +400,17 @@ namespace Armoury
                 if (dataStore.IsLoading) StartStock.Import(startStock);
             }
             catch (Exception e) { Log.Error("SyncData.StartStock", e); }
+            // kasa zamku (krok K5): dar startowy w kasach zamkow rozliczony raz na kampanie; brak klucza = stary zapis (o przycieciu
+            // decyduje wiek kampanii). Osobny try PRZED reszta, jak przy zapasie startowym (poprawka recenzenta): wyjatek innego klucza
+            // nie moze zgubic tej flagi - zgubiona flaga to drugie przyciecie, ktore zdjeloby z kas zamkow prawdziwy doplyw
+            // (w pierwszych dobach kampanii cala nadwyzke ponad zapas kupcow, pozniej do nadwyzki daru x 0.75^wiek).
+            try
+            {
+                string castlePurse = CastlePurse.Export();
+                dataStore.SyncData("arm_castlepurse", ref castlePurse);
+                if (dataStore.IsLoading) CastlePurse.Import(castlePurse);
+            }
+            catch (Exception e) { Log.Error("SyncData.CastlePurse", e); }
             try
             {
                 dataStore.SyncData("arm_condition", ref _condition);
@@ -1194,6 +1205,10 @@ namespace Armoury
             try { MoneyLedger.BlockOpen(); } catch { }   // ksiega przeplywow osad (tylko log): stan kas przed naszym rozliczeniem doby
             try { PopulationLaw.Daily(); } catch (Exception e) { Log.Error("PopulationLaw.Daily", e); }   // ludnosc i renty krain
             try { MoneyLedger.Mark(MoneyLedger.MRent); } catch { }
+            // krok K5: kasa zamku - danina podzamcza (zawor: nadwyzka kasy ponad zapas kupcow -> pan zamku) i linia "Kasy zamkow:";
+            // zaraz PO rentach (dopisuje sie do dziennych rent rodu), PRZED budowami i powinnosciami, ktore licza od dzisiejszego dochodu
+            try { CastlePurse.Daily(); } catch (Exception e) { Log.Error("CastlePurse.Daily", e); }
+            try { MoneyLedger.Mark(MoneyLedger.MCastle); } catch { }
             // wpis 86 (audyt pkt 7): budowy PO rentach - 10% od dzisiejszego dochodu
             try { BuildFunding.Daily(); } catch (Exception e) { Log.Error("BuildFunding.Daily", e); }
             try { MoneyLedger.Mark(MoneyLedger.MBuild); } catch { }
