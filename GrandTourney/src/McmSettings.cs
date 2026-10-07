@@ -144,6 +144,18 @@ namespace GrandTourney
         [SettingPropertyGroup("What the host gains")]
         public float CancelledFeeRefund { get; set; } = 0.5f;
 
+        [SettingPropertyBool("Historical Town Rates", HintText = "a tourney's money goes where it should, as dear as the town is prosperous (the town wage level of Armoury): the hosting fee pays the town's carpenters, heralds and cooks (into its coffers), your purse waits for the champion and goes to him (all of it back to you if the tourney is called off), the takings come out of the town's coffers (off = the old way: fee and purse vanish, takings from nobody, half the purse back)")]
+        [SettingPropertyGroup("What the host gains")]
+        public bool HistoricalTownRates { get; set; } = true;
+
+        [SettingPropertyInteger("Host Fee Pence", 0, 17600, "0", HintText = "with historical town rates: what opening the lists costs in a middling town, pence (lists, stands, heralds, the feast - about 18 pounds), as dear as the town is prosperous")]
+        [SettingPropertyGroup("What the host gains")]
+        public int HostFeePence { get; set; } = 4400;
+
+        [SettingPropertyInteger("Host Takings Base Pence", 0, 1920, "0", HintText = "with historical town rates: the takings from the crowds in a middling town, pence, on top of the takings per lord - both as dear as the town is prosperous")]
+        [SettingPropertyGroup("What the host gains")]
+        public int HostTakingsBasePence { get; set; } = 480;
+
         [SettingPropertyBool("Nobles Fight In Tournaments", HintText = "lords present in town take their rightful places in the bracket - troops only fill what remains")]
         [SettingPropertyGroup("The lists themselves")]
         public bool NoblesFightInTournaments { get; set; } = true;
@@ -195,6 +207,9 @@ namespace GrandTourney
             s.HostTakingsPerLord = HostTakingsPerLord;
             s.HostTakingsProsperityFactor = HostTakingsProsperityFactor;
             s.CancelledFeeRefund = CancelledFeeRefund;
+            s.HistoricalTownRates = HistoricalTownRates;
+            s.HostFeePence = HostFeePence;
+            s.HostTakingsBasePence = HostTakingsBasePence;
             s.NoblesFightInTournaments = NoblesFightInTournaments;
             s.NoblesIgnoreSkillGate = NoblesIgnoreSkillGate;
             s.MaxNoblesInBracket = MaxNoblesInBracket;

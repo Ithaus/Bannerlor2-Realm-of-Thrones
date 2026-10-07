@@ -431,7 +431,7 @@ namespace GrandTourney
                         Campaign.Current.TournamentManager.ResolveTournament(game, town);
                         if (fee > 0)
                         {
-                            int back = (int)(fee * s.CancelledFeeRefund);
+                            int back = s.HistoricalTownRates ? fee : (int)(fee * s.CancelledFeeRefund);   // pula czekala na zwyciezce - wraca cala
                             if (back > 0) GiveGoldAction.ApplyBetweenCharacters(null, Hero.MainHero, back);
                         }
                         if (PlayerHearsOf(town, fee))
@@ -451,7 +451,7 @@ namespace GrandTourney
                         SetLocalPrize(game);
                         if (fee > 0)
                         {
-                            int back2 = (int)(fee * s.CancelledFeeRefund);
+                            int back2 = s.HistoricalTownRates ? fee : (int)(fee * s.CancelledFeeRefund);
                             if (back2 > 0) GiveGoldAction.ApplyBetweenCharacters(null, Hero.MainHero, back2);
                         }
                         if (PlayerHearsOf(town, fee))
@@ -488,7 +488,7 @@ namespace GrandTourney
                         SetLocalPrize(game);
                         if (fee > 0)
                         {
-                            int refund = (int)(fee * s.CancelledFeeRefund);
+                            int refund = s.HistoricalTownRates ? fee : (int)(fee * s.CancelledFeeRefund);
                             if (refund > 0) GiveGoldAction.ApplyBetweenCharacters(null, Hero.MainHero, refund);
                             Log.Player("Too few knights answered at " + town.Name + ". The tourney is held as a " +
                                        "local affair with a modest prize; " + refund + " gold was recovered.", true);
@@ -504,6 +504,21 @@ namespace GrandTourney
                 }
             }
             catch (Exception e) { Log.Error("OnDailyTick", e); }
+        }
+
+        /// <summary>Pula gracza dla zwyciezcy: bohater dostaje ja do sakiewki; zwyciezca spoza bohaterow - kasa miasta (jego nagroda idzie
+        /// na miasto). Pula zeszla z kiesy gracza przy obwieszczeniu i czekala - nic nie powstaje z niczego.</summary>
+        private void PayPurse(CharacterObject winner, Town town, int purse)
+        {
+            try
+            {
+                var h = winner != null ? winner.HeroObject : null;
+                if (h != null && h.IsAlive) GiveGoldAction.ApplyBetweenCharacters(null, h, purse, h != Hero.MainHero);
+                else if (town != null) town.ChangeGold(purse);
+                Log.Info("Pula turnieju w " + (town != null ? town.Name.ToString() : "?") + ": " + purse + " -> " + (h != null ? h.Name.ToString() : "kasa miasta"));
+                if (h == Hero.MainHero) Log.Player("The champion's purse is yours: " + purse + " gold.");
+            }
+            catch (Exception e) { Log.Error("PayPurse", e); }
         }
 
         private int CountLordsPresent(Town town)
@@ -528,7 +543,9 @@ namespace GrandTourney
         {
             try
             {
+                int purse = PurseOf(town);
                 Remove(town);
+                if (purse > 0 && Settings.Current.HistoricalTownRates) PayPurse(winner, town, purse);
                 if (town == null || town.OwnerClan != Clan.PlayerClan) return;
                 var s = Settings.Current;
 
@@ -549,8 +566,19 @@ namespace GrandTourney
                 town.Loyalty = MathF.Min(100f, town.Loyalty + s.HostLoyaltyGain);
                 town.Security = MathF.Max(0f, town.Security - s.HostSecurityLoss);
 
-                int takings = lords * s.HostTakingsPerLord + (int)(town.Prosperity * s.HostTakingsProsperityFactor);
-                if (takings > 0) GiveGoldAction.ApplyBetweenCharacters(null, Hero.MainHero, takings);
+                int takings;
+                if (s.HistoricalTownRates)
+                {
+                    // utarg od widzow placi kasa miasta (najwyzej tyle, ile ma) - stawki x poziom plac miasta
+                    takings = (int)Math.Round((lords * s.HostTakingsPerLord + s.HostTakingsBasePence) * TownWageLink.Index(town.Settlement));
+                    takings = Math.Min(takings, Math.Max(0, town.Gold));
+                    if (takings > 0) GiveGoldAction.ApplyForSettlementToCharacter(town.Settlement, Hero.MainHero, takings, true);
+                }
+                else
+                {
+                    takings = lords * s.HostTakingsPerLord + (int)(town.Prosperity * s.HostTakingsProsperityFactor);
+                    if (takings > 0) GiveGoldAction.ApplyBetweenCharacters(null, Hero.MainHero, takings);
+                }
 
                 Log.Info("Gospodarz rozliczony: lordow " + lords + ", reputacja +" + lords * s.HostRenownPerLord + ", utarg " + takings);
                 Log.Player("The tourney at " + town.Name + " is ended. " + lords + " lords rode in your lists: +" +
@@ -587,7 +615,22 @@ namespace GrandTourney
         internal int HostFee(Town town)
         {
             var s = Settings.Current;
+            // Jeff 07.10: koszty w miescie ze stawek historycznych i dobrobytu - kwota x poziom plac miasta (TownWageLink, jak w Armoury)
+            if (s.HistoricalTownRates) return Math.Max(1, (int)Math.Round(s.HostFeePence * TownWageLink.Index(town.Settlement)));
             return s.HostBaseFee + (int)(town.Prosperity * s.HostFeeProsperityFactor);
+        }
+
+        /// <summary>Pula nagrody turnieju gracza zapisana przy obwieszczeniu (czeka na zwyciezce); 0 - turniej AI albo bez puli.</summary>
+        private int PurseOf(Town town)
+        {
+            try
+            {
+                var line = town != null ? Find(town) : null;
+                if (line == null) return 0;
+                var p = line.Split('|');
+                int v; return p.Length > 3 && int.TryParse(p[3], out v) ? Math.Max(0, v) : 0;
+            }
+            catch { return 0; }
         }
 
         internal void HostTournament(Town town, int prizeGold)
@@ -595,7 +638,13 @@ namespace GrandTourney
             try
             {
                 int fee = HostFee(town) + prizeGold;
-                GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, null, fee);
+                if (Settings.Current.HistoricalTownRates)
+                {
+                    // oplata - do kasy miasta (ciesle, herold, kuchnia); pula czeka na zwyciezce (zapisana w obwieszczeniu)
+                    GiveGoldAction.ApplyForCharacterToSettlement(Hero.MainHero, town.Settlement, fee - prizeGold, true);
+                    if (prizeGold > 0) GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, null, prizeGold, true);
+                }
+                else GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, null, fee);
 
                 var game = Campaign.Current.Models.TournamentModel.CreateTournament(town);
                 Campaign.Current.TournamentManager.AddTournament(game);

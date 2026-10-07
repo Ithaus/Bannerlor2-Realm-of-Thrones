@@ -47,6 +47,9 @@ namespace GrandTourney
         public int HostTakingsPerLord = 200;               // your cut of the takings per lord
         public float HostTakingsProsperityFactor = 0.1f;   // a richer town pays out more
         public float CancelledFeeRefund = 0.5f;            // share of the fee returned if the tourney is called off
+        public bool HistoricalTownRates = true;            // a tourney's money goes where it should, as dear as the town is prosperous (the town wage level of Armoury): the hosting fee pays the town's carpenters, heralds and cooks (into its coffers), your purse waits for the champion and goes to him (all of it back to you if the tourney is called off), the takings come out of the town's coffers (off = the old way: fee and purse vanish, takings from nobody, half the purse back)
+        public int HostFeePence = 4400;                    // with historical town rates: what opening the lists costs in a middling town, pence (lists, stands, heralds, the feast - about 18 pounds), as dear as the town is prosperous
+        public int HostTakingsBasePence = 480;             // with historical town rates: the takings from the crowds in a middling town, pence, on top of the takings per lord - both as dear as the town is prosperous
 
         // --- The lists themselves ---
         public bool NoblesFightInTournaments = true;       // lords present in town take their rightful places in the bracket - troops only fill what remains
