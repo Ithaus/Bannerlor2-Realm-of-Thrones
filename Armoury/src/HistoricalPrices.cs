@@ -25,7 +25,8 @@ namespace Armoury
     ///    historyczna + dni x dniowka mistrza wedle tieru, zysk; unikaty x prestiz.
     /// Wartosc idzie wszedzie: targ (dalej przez prawo podazy i popytu), lup, naprawa, zamowienia, nagrody.
     /// XP kowalstwa (DefaultSmithingModel liczy z Value) przeliczane od wartosci sprzed zmiany.
-    /// Konie i zwierzeta bez zmian (juz historyczne); z towarow handlowych - surowce warsztatow (skora, len, skory, lnianka).
+    /// Konie bez zmian (juz historyczne); zywy inwentarz (wol, krowa, swinia, owca, ges, kura) wedle HistLivestockPrices (paczka 144);
+    /// z towarow handlowych - surowce warsztatow (skora, len, skory, lnianka).
     /// Popyt miast na przeliczone kategorie liczony w nowej monecie (DemandPostfix).
     /// </summary>
     internal static class HistoricalPrices
@@ -52,6 +53,18 @@ namespace Armoury
             // kruszce, luksus
             { "silver", 2f }, { "gold_ore", 5f }, { "goldingot", 9500f }, { "Ink", 10f }, { "Papyrus", 10f }, { "PurpleDye", 30f },
             { "walrus_tusk", 30f }, { "jewelry", -2400f }, { "pouchofgems", -1200f },
+        };
+
+        /// <summary>
+        /// ZYWY INWENTARZ W PENSACH (paczka 144, Jeff 07.10: "zwierzeta w cenach historycznych"). Pensy za sztuke, docs/CENY-HISTORYCZNE.md
+        /// pkt 5: wol 157 (13 s 1 d), krowa 113 (9 s 5 d), owca 17 (1 s 5 d) - Jusserand/Rogers, Farmer, pol. XIV w.; swinia 24-36
+        /// (2-3 s, Dyer 1338) - 30; ges 3-6 (Myers) - 4; kura 0.5-1 (Dyer, Norman) - 1, gra zna tylko pensy calkowite. Gra (SPIS-CEN-GRY
+        /// 1.2): wol 300, krowa 200, swinia 60, owca 80 (5x), ges i kura 50 (15-50x). Tylko zwierzeta hodowlane (ItemType Animal):
+        /// konie, muly, wielblady, slonie, mamuty i smoki (ItemType Horse) zostaja przy swojej wartosci; kot i pies (nie na handel) tez.
+        /// </summary>
+        private static readonly Dictionary<string, float> LivestockEach = new Dictionary<string, float>
+        {
+            { "ox", 157f }, { "cow", 113f }, { "hog", 30f }, { "sheep", 17f }, { "goose", 4f }, { "chicken", 1f },
         };
 
         /// <summary>Wpis 58: codzienna kontrola - czy ktos (inny mod) nie nadpisal przeliczonych wartosci; jesli tak, przywracamy i logujemy.</summary>
@@ -377,6 +390,18 @@ namespace Armoury
                         _target[it] = it.Value;
                         raw.Add(it.StringId + " " + _orig[it] + "->" + it.Value);
                     }
+                // 1c. zywy inwentarz za sztuke (paczka 144, HistLivestockPrices) - ta sama droga co towary handlowe: wartosc, blokada cen
+                // (_target) i przelicznik popytu kategorii (krok 3) - miasto kupuje dziennie tyle samo sztuk co dotad, placi w nowej monecie
+                var beasts = new List<string>();
+                if (s.HistLivestockPrices)
+                    foreach (var kv in LivestockEach)
+                    {
+                        var it = MBObjectManager.Instance.GetObject<ItemObject>(kv.Key);
+                        if (it == null || it.ItemType != ItemObject.ItemTypeEnum.Animal) continue;   // nigdy kon (ItemType Horse)
+                        set(it, kv.Value);
+                        _target[it] = it.Value;
+                        beasts.Add(it.StringId + " " + _orig[it] + "->" + it.Value);
+                    }
 
                 foreach (var g in new[] { CraftingMaterials.Iron1, CraftingMaterials.Iron2, CraftingMaterials.Iron3, CraftingMaterials.Iron4, CraftingMaterials.Iron5, CraftingMaterials.Iron6 })
                 {
@@ -443,6 +468,8 @@ namespace Armoury
                 if (_origWeight.Count > 0) Log.Info("HistoricalPrices: ruda i drewno w ladunkach - " + string.Join(", ", _origWeight.Select(kv => kv.Key.StringId + " " + kv.Value + " -> " + kv.Key.Weight + " kg = " + kv.Key.Value + " d").ToArray()) + ".");
                 Log.Info("HistoricalPrices: surowce kuzni ["+ string.Join(", ", raw.ToArray()) + "]; uzbrojenie " + n + " szt. przeliczone z kosztu historycznego (suma wartosci "
                          + before + " -> " + after + "). Przyklady: " + string.Join("; ", samples.ToArray()) + ".");
+                Log.Info("HistoricalPrices: zywy inwentarz " + (s.HistLivestockPrices ? "[" + string.Join(", ", beasts.ToArray()) + "] d za sztuke (konie bez zmian)"
+                                                                                      : "po wartosci gry (HistLivestockPrices wylaczone)") + ".");
                 MixedShelf(s, fromDef);   // paczka 121: wagi sztuk na polce w kategoriach mieszanych - po przeliczniku kategorii, ten sam skladnik przedmiotu
             }
             catch (Exception e) { Log.Error("HistoricalPrices.Apply", e); }

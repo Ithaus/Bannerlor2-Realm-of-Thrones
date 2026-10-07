@@ -1756,6 +1756,10 @@ namespace Armoury
         [SettingPropertyGroup("Iron bank")]
         public bool HistTradeGoods { get; set; } = true;
 
+        [SettingPropertyBool("Hist Livestock Prices", HintText = "farm animals at historical prices too (England mid-14th century, by the head): ox 157, cow 113, hog 30, sheep 17, goose 4, chicken 1 penny, where the game asked 300, 200, 60, 80, 50 and 50. Horses, mules and camels keep their worth, which is already about right. Town demand for these animals is counted in the new coin like every other repriced good, so towns buy as many head as before (needs Historical Prices Enabled; off = the game's worth; a change takes effect when a game is next loaded)")]
+        [SettingPropertyGroup("Iron bank")]
+        public bool HistLivestockPrices { get; set; } = true;
+
         [SettingPropertyFloatingInteger("Hist Hides Per Kg", 0.00f, 4.00f, "0.00", HintText = "raw hides, pence per kg (an ox hide of 25-30 kg sold for 1-3 shillings)")]
         [SettingPropertyGroup("Iron bank")]
         public float HistHidesPerKg { get; set; } = 1f;
@@ -3062,6 +3066,7 @@ namespace Armoury
             s.HistUniquePrestige = HistUniquePrestige;
             s.HistBulkUnitFactor = HistBulkUnitFactor;
             s.HistTradeGoods = HistTradeGoods;
+            s.HistLivestockPrices = HistLivestockPrices;
             s.HistHidesPerKg = HistHidesPerKg;
             s.HistFlaxPerKg = HistFlaxPerKg;
             s.HistBowLaborMultiplier = HistBowLaborMultiplier;
