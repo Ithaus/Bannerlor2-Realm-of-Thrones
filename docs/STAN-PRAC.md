@@ -364,6 +364,9 @@ narzedzia rozpoznal wszystkie linie. Grupa 1: OK 61, UWAGA 5; grupa 2: OK 31, UW
    (nie stodola) i spichlerz napelnia PRAWDZIWA produkcja zywnosci wsi regionu w grze (zboze, ryby, ser, maslo, mieso z hodowli - bydlo, owce, swinie,
    drob - oliwki, winogrona, daktyle), przeliczona na racje jedna stala (zwykly rok ok. 1.2 x potrzeby); zima, spustoszenie, brak rak, mniej bydla
    zmniejszaja spichlerz same. Razem z tym: spladrowana wies produkuje wedle tego, co zostalo (symbol), nie zero na 8-17 dob.
+   OKREG Z OSAD (Jeff 07.10): menu wsi pokazuje okreg (osady, ludzie, spalone, spichlerz); RABUNEK OSADA PO OSADZIE - po kazdej osadzie komunikat
+   "spalono to i to, rabowac kolejna? zajmie to tyle czasu"; jedna osada to DNI (dojazd, przeszukanie, spalenie), caly okreg tygodnie; AI tak samo.
+   10 x wiecej wsi na mapie - badanie wykonalnosci w toku. Projekt rabunku: workflow rabunek-osada-po-osadzie.
 4. "zgoda na autotest" (pamiec: jeff-zgoda-na-autotest); przewijac dluzej, gdy to ma sens (40 dob na test zmiany, rok na skutki dlugie).
 
 ## Decyzje Jeffa 06.10 (wiazace; dopisane po raporcie nocnym)
