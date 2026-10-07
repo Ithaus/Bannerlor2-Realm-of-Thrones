@@ -34,16 +34,19 @@ namespace Armoury
         private static MethodInfo _move;
         private static bool _errLogged;
         private static readonly TextObject _txtCart = new TextObject("{=!}Armoury: market carts");
-        private static int _toTown, _noMarket, _tooFar, _barred, _lost, _lostToBandits;
+        private static int _toTown, _noMarket, _tooFar, _barred, _lost, _lostToBandits, _farMarket;
 
-        internal static void Reset() { _toTown = 0; _noMarket = 0; _tooFar = 0; _barred = 0; _lost = 0; _lostToBandits = 0; }
+        internal static void Reset() { _toTown = 0; _noMarket = 0; _tooFar = 0; _barred = 0; _lost = 0; _lostToBandits = 0; _farMarket = 0; }
 
-        /// <summary>Targ dalej niz limit (droga ladowa) albo bez drogi - tabor krazylby tygodniami, a magazyn wsi stanal.</summary>
-        private static bool TooFar(Settlement home, Settlement tb, Settings s)
+        /// <summary>Targ dalej niz limit (droga ladowa) albo bez drogi - tabor krazylby tygodniami, a magazyn wsi stanal.
+        /// noRoad: drogi ladowej nie ma wcale (tam tabor nie pojedzie takze wtedy, gdy zamek nie ma czym zaplacic).</summary>
+        private static bool TooFar(Settlement home, Settlement tb, Settings s, out bool noRoad)
         {
+            noRoad = false;
             if (s.MarketMaxDistance <= 0f) return false;        // 0 = bez wlasnego limitu (obowiazuje limit gry dla TradeBound)
             float d = Campaign.Current.Models.MapDistanceModel.GetDistance(home, tb, false, false, MobileParty.NavigationType.Default);
-            return d <= 0f || d > s.MarketMaxDistance;
+            noRoad = d <= 0f;
+            return noRoad || d > s.MarketMaxDistance;
         }
 
         public static bool RoutePrefix(VillagerCampaignBehavior __instance, MobileParty villagerParty)
@@ -72,10 +75,17 @@ namespace Armoury
                 var tb = v.TradeBound;
                 if (tb == null || !tb.IsTown) { _noMarket++; return true; }
                 if (tb.IsUnderSiege || (tb.MapFaction != null && home.MapFaction != null && tb.MapFaction.IsAtWarWith(home.MapFaction))) { _barred++; return true; }
-                if (TooFar(home, tb, s)) { _tooFar++; return true; }
+                bool noRoad;
+                if (TooFar(home, tb, s, out noRoad))
+                {
+                    // K5 (CastlePurse): zamek placi prawdziwym pieniadzem - gdy ponad zapasem kupcow nie ma na caly ladunek,
+                    // tabor jedzie na daleki targ zamiast wracac z towarem (przy wylaczonej kasie zamku: jak dotad, do zamku)
+                    if (noRoad || CastlePurse.CanPayCart(v.Bound, villagerParty)) { _tooFar++; return true; }
+                    _farMarket++;
+                }
+                else _toTown++;
                 if (_move != null) _move.Invoke(__instance, new object[] { villagerParty, tb });
                 else villagerParty.SetMoveGoToSettlement(tb, MobileParty.NavigationType.Default, false);
-                _toTown++;
                 return false;       // pomija latke BK (do zamku) i oryginal - cel juz nadany
             }
             catch (Exception e)
@@ -188,6 +198,7 @@ namespace Armoury
             int day = (int)CampaignTime.Now.ToDays - 1;
             Log.Info("Dowoz: dzien " + day + " - tabory wsi zamkowych wyslane na targ miasta " + _toTown
                      + " (do zamku: brak targu " + _noMarket + ", targ za daleko " + _tooFar + ", oblezenie albo wojna " + _barred
+                     + "; na daleki targ, bo zamek nie mial czym zaplacic: " + _farMarket
                      + "); w drodze teraz " + onRoad + ": do miasta " + headTown + ", do zamku " + headCastle
                      + "; rozbite tabory wsi (wszystkich) " + _lost + ", w tym przez bandy " + _lostToBandits
                      + "; wsi zamkowych " + castleVillages + ": targ we wlasnym krolestwie " + own + ", w obcym " + foreign + ", bez targu " + none
