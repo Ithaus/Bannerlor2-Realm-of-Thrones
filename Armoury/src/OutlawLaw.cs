@@ -1209,7 +1209,7 @@ namespace Armoury
         /// (SupplyDemand), a ono liczy cene tylko wtedy, gdy zna kupca - dlatego tu wycena z polka miasta jako kupcem, jak przy
         /// nadwyzkach sprzedawanych przez ludzi lordow (MenPurse.SellPrice): zawalona polka placi mniej, podloga zlomu obowiazuje.
         /// </summary>
-        private static int FencePrice(Settlement st, EquipmentElement what)
+        internal static int FencePrice(Settlement st, EquipmentElement what)   // paczka 128: ta sama cena skupu dla sprzedazy gracza w Spoils of War (SpoilsSeal)
         {
             if (SupplyDemand.Equipmentish(what.Item)) return Math.Max(1, st.Town.MarketData.GetPrice(what, null, true, st.Party));
             return Math.Max(1, st.Town.GetItemPrice(what, null, true));

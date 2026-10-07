@@ -112,6 +112,7 @@ namespace Armoury
                 BkArmourList.ApplyAll(_harmony);
                 BowStats.ApplyAll(_harmony);
                 BattlefieldLaw.ApplyAll(_harmony);
+                SpoilsSeal.ApplyAll(_harmony);   // paczka 128: Spoils of War - koniec sprzedazy automatycznej magazynu wojennego i zlota z niczego (platnik: kasa miasta / skarbiec klanu)
                 BattleWind.ApplyAll(_harmony);
                 BkSupplyTemper.ApplyAll(_harmony);
                 DragonUnmount.ApplyAll(_harmony);

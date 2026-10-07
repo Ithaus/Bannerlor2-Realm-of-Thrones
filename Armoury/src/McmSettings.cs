@@ -692,6 +692,14 @@ namespace Armoury
         [SettingPropertyGroup("The law of the battlefield")]
         public int LegendaryLootValueFloor { get; set; } = 100000;
 
+        [SettingPropertyBool("Spoils No Auto Sale", HintText = "no automatic sale from the war stockpile: Spoils of War's quartermaster sold cheap stockpile gear every day - the goods vanished and the town treasury got coin that nobody paid; this stops it whatever the Spoils of War menu says (every Spoils preset turns auto-sell back on) - the gear stays in the stockpile until you take it (the day's log line shows how much was stopped)")]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool SpoilsNoAutoSale { get; set; } = true;
+
+        [SettingPropertyBool("Spoils No Free Gold", HintText = "no Spoils of War money out of thin air: no coins on the dead, no baggage-train chest, no lucky chest, ransom or extra gear while collecting (the beaten side's purse already pays the winner); the fence, the quartermaster's salvage and gear given to your mercenary company are paid from the town's coffers above its reserve, never above the market price, and the goods go onto the town's stalls - what the town cannot pay for stays with you; your company's share of its battle loot comes out of its own treasury; the war stockpile takes gear only clean or plundered (off = Spoils of War as before; the day's log line shows how much either way)")]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool SpoilsNoFreeGold { get; set; } = true;
+
         [SettingPropertyBool("Plague Spares Your Men", HintText = "sickness may weaken your men - it will not kill them: any troop death caused by a disease system is refused for YOUR party (the rest of the world still buries its dead)")]
         [SettingPropertyGroup("Plague shield")]
         public bool PlagueSparesYourMen { get; set; } = true;
@@ -2728,6 +2736,8 @@ namespace Armoury
             s.WreckSalvageEnabled = WreckSalvageEnabled;
             s.LootMinConditionPercent = LootMinConditionPercent;
             s.LegendaryLootValueFloor = LegendaryLootValueFloor;
+            s.SpoilsNoAutoSale = SpoilsNoAutoSale;
+            s.SpoilsNoFreeGold = SpoilsNoFreeGold;
             s.PlagueSparesYourMen = PlagueSparesYourMen;
             s.PlagueShieldLogEvery = PlagueShieldLogEvery;
             s.DesertionLawEnabled = DesertionLawEnabled;
