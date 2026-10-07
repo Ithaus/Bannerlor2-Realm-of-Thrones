@@ -34,6 +34,13 @@ skora, skory, welna, plotno (przesyt - K13). ERROR 0, potkniecia 0.
 dosypka RBL zablokowana (125), drewno w miastach rosnie (12.1 tys.), warsztaty mediana 13.3 tys. (max 452 tys.), piekarnia Lannisport 16.2 tys.
 ZATKANE MAGAZYNY BEZ POPRAWY: doba 40: 33 + 28 = 61 z 571 (10.7%; przebieg 2: 60) - modele 122 i 125/126 (1-3%) sie nie sprawdzily; przyczyna
 nieznana -> najpierw diagnostyka w logu (sklad magazynu zatkanych wsi, stan wozu), potem poprawka.
+4. PRZEBIEG 09:11 (126 + diagnoza, galaz w-toku/diagnoza-zatkanych-wsi): PRZYCZYNA ZATKANYCH WSI ZNALEZIONA - z 53 zatkanych 39 ma WOZ W MIESCIE
+(nieoblezonym) srednio od 27 dob (max 40); gra nie wystawia nowego wozu, dopoki stary istnieje (galaz "woz poza domem > 7 dob" w grze martwa).
+Magazyny zatkanych: zboze 54%, ryby 15%, drewno 8%. Reszta: 5 spladrowanych, 2 najezdzane, 6 wozow w drodze do domu, 4 bez wozu.
+Poprawka w toku (workflow wozy-utkniete-w-miastach): przyczyna w kodzie + bezpiecznik odsylania wozu do domu.
+Gotowe obok (na 126): `paczki/127-pokretla-jeffa` (95baa63; json Jeffa: 45->35, 20.0->13.33, 5->2 przy wgraniu), `paczki/128-spoils-bez-darmowego-zlota` (83a8b1d).
+Pytania do Jeffa (07.10): zbroja z CRAFT jak bron (zepsuta/legendarna)? klan najemnikow Spoils dostaje ludzi z niczego - uszczelnic? naprawa u kwatermistrza
+Spoils bez materialu - ujednolicic z kuznia?
 
 ## PIERWSZY TEST GRUPY TOWARY 2 (115-120) - 07.10 03:18 (nowa kampania, 19 dob; log `Armoury-2026-10-07_03-18-52.log`)
 
