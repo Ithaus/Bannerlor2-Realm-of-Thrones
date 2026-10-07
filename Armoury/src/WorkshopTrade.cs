@@ -1294,9 +1294,8 @@ namespace Armoury
         private void OnSessionLaunched(CampaignGameStarter starter)
         {
             WorkshopTrade.ApplyInCampaign();
-            // recenzja: kapital startowy w cenach nowej monety - po HistoricalPrices.Apply (ArmouryBehavior jest zarejestrowany wczesniej)
-            try { var seed = WorkshopTrade.SeedNewCampaign(); if (seed != null) Log.Info("WorkshopTrade: " + seed); }
-            catch (Exception e) { Log.Error("WorkshopTrade.SeedNewCampaign", e); }
+            // 124: kapitalu startowego NIE tu - ten sluchacz idzie przed ArmouryBehavior (gra wola od ostatnio dopisanego), czyli przed
+            // HistoricalPrices.Apply; SeedNewCampaign wola ArmouryBehavior.OnSessionLaunched zaraz po RawPrice.SeedNewCampaign
             try
             {
                 // ta sama para stanow co linia gry "workshop_notable_owner_answer_1_single" (priorytet 100) - nasza idzie pierwsza, gdy paczka jest czynna
