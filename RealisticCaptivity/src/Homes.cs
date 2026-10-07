@@ -32,6 +32,9 @@ namespace RealisticCaptivity
         internal static int BuyPrice(Settlement s)
         {
             var c = Settings.Current;
+            // Jeff 07.10: cena historyczna (dom miejski ok. 10 funtow, chata ok. 2) x poziom plac miasta (TownWageLink - jak w Armoury)
+            if (c.HistoricalTownRates)
+                return Math.Max(1, (int)Math.Round((s.IsVillage ? c.HomeVillagePence : c.HomeTownPence) * TownWageLink.Index(s)));
             if (s.IsVillage)
                 return (int)(c.HomePriceVillage + s.Village.Hearth * c.HomePriceHearthFactor);
             float prosperity = s.Town != null ? s.Town.Prosperity : 3000f;
@@ -181,7 +184,8 @@ namespace RealisticCaptivity
                     {
                         try
                         {
-                            GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, null, price);
+                            if (Settings.Current.HistoricalTownRates) GiveGoldAction.ApplyForCharacterToSettlement(Hero.MainHero, Here, price, true);   // do kasy osady (sprzedajacy - miasto), nie w nicosc
+                            else GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, null, price);
                             Vault[id] = 0;
                             Stash[id] = new ItemRoster();
                             Log.Player("The house in " + Here.Name + " is yours.", false);
@@ -237,7 +241,15 @@ namespace RealisticCaptivity
                                 stash.Clear();
                             }
                             int banked = Vault.ContainsKey(id) ? Vault[id] : 0;
-                            GiveGoldAction.ApplyBetweenCharacters(null, Hero.MainHero, pay + banked);
+                            if (Settings.Current.HistoricalTownRates)
+                            {
+                                // kupuje osada (jej kasa, najwyzej tyle, ile ma); skarbiec domu to Twoje wlasne pieniadze
+                                var sc = Here.SettlementComponent;
+                                pay = Math.Min(pay, sc != null ? Math.Max(0, sc.Gold) : 0);
+                                if (pay > 0) GiveGoldAction.ApplyForSettlementToCharacter(Here, Hero.MainHero, pay, true);
+                                if (banked > 0) GiveGoldAction.ApplyBetweenCharacters(null, Hero.MainHero, banked);
+                            }
+                            else GiveGoldAction.ApplyBetweenCharacters(null, Hero.MainHero, pay + banked);
                             Stash.Remove(id);
                             Vault.Remove(id);
                             // ostatni dom sprzedany - rodzinna chata nie odrasta za darmo

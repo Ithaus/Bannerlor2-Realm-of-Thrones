@@ -200,6 +200,14 @@ namespace RealisticCaptivity
         [SettingPropertyGroup("A roof of your own")]
         public float HomeSellFactor { get; set; } = 0.6f;
 
+        [SettingPropertyInteger("Home Town Pence", 0, 9600, "0", HintText = "with historical town rates: a modest town house in a middling town, pence (about 10 pounds c.1300), as dear as the town is prosperous")]
+        [SettingPropertyGroup("A roof of your own")]
+        public int HomeTownPence { get; set; } = 2400;
+
+        [SettingPropertyInteger("Home Village Pence", 0, 1920, "0", HintText = "with historical town rates: a village cottage, pence (about 2 pounds), by the wage level of its market town")]
+        [SettingPropertyGroup("A roof of your own")]
+        public int HomeVillagePence { get; set; } = 480;
+
         [SettingPropertyBool("Bandit Dump Enabled", HintText = "brigands do not feed a worthless mouth for weeks")]
         [SettingPropertyGroup("Cast out by brigands")]
         public bool BanditDumpEnabled { get; set; } = true;
@@ -388,6 +396,22 @@ namespace RealisticCaptivity
         [SettingPropertyGroup("Honest work")]
         public int GuardBrawlHealthLoss { get; set; } = 30;
 
+        [SettingPropertyBool("Historical Town Rates", HintText = "wages and house prices at historical rates, as dear as the town is prosperous (the town wage level of Armoury), and paid by the settlement's coffers - not out of thin air (off = the old formulas, gold from nobody and to nobody)")]
+        [SettingPropertyGroup("Honest work")]
+        public bool HistoricalTownRates { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Labourer Day Wage", 0.00f, 6.00f, "0.00", HintText = "an unskilled labourer's day in a middling town, pence (England c.1300: a labourer about 1.5 d, a craftsman 3 d); a night on the watch pays the same")]
+        [SettingPropertyGroup("Honest work")]
+        public float LabourerDayWage { get; set; } = 1.5f;
+
+        [SettingPropertyFloatingInteger("Village Wage Share", 0.00f, 3.00f, "0.00", HintText = "a day's hire in a village pays this share of the wage in its market town")]
+        [SettingPropertyGroup("Honest work")]
+        public float VillageWageShare { get; set; } = 0.75f;
+
+        [SettingPropertyFloatingInteger("Guard Brawl Bonus Days", 0.00f, 12.00f, "0.00", HintText = "cracking heads when trouble comes pays this many days' wages on top")]
+        [SettingPropertyGroup("Honest work")]
+        public float GuardBrawlBonusDays { get; set; } = 3f;
+
         [SettingPropertyBool("Enlisted Honest Wounds", HintText = "no miracle full-heal after enlisted battles - wounds mend with rest, as they should")]
         [SettingPropertyGroup("In the lord's service")]
         public bool EnlistedHonestWounds { get; set; } = true;
@@ -453,6 +477,8 @@ namespace RealisticCaptivity
             s.HomePriceVillage = HomePriceVillage;
             s.HomePriceHearthFactor = HomePriceHearthFactor;
             s.HomeSellFactor = HomeSellFactor;
+            s.HomeTownPence = HomeTownPence;
+            s.HomeVillagePence = HomeVillagePence;
             s.BanditDumpEnabled = BanditDumpEnabled;
             s.BanditDumpAfterDays = BanditDumpAfterDays;
             s.BanditDumpWorthlessGold = BanditDumpWorthlessGold;
@@ -500,6 +526,10 @@ namespace RealisticCaptivity
             s.GuardBrawlChancePercent = GuardBrawlChancePercent;
             s.GuardBrawlBonus = GuardBrawlBonus;
             s.GuardBrawlHealthLoss = GuardBrawlHealthLoss;
+            s.HistoricalTownRates = HistoricalTownRates;
+            s.LabourerDayWage = LabourerDayWage;
+            s.VillageWageShare = VillageWageShare;
+            s.GuardBrawlBonusDays = GuardBrawlBonusDays;
             s.EnlistedHonestWounds = EnlistedHonestWounds;
             s.EnlistedPostBattleHealHp = EnlistedPostBattleHealHp;
             s.EnlistedDailyCareHp = EnlistedDailyCareHp;

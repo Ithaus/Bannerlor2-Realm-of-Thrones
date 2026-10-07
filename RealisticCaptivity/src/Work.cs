@@ -71,9 +71,30 @@ namespace RealisticCaptivity
 
         // ------------------------------------------------------------------ pay
 
+        /// <summary>Dniowka robotnika w tej osadzie (pensy, z ulamkiem): stawka historyczna x poziom plac miasta (TownWageLink - ten sam co
+        /// w Armoury); wies - czesc stawki miasta targowego. Jeff 07.10: koszty w miescie z dobrobytu i stawek historycznych.</summary>
+        private static float DayWage(Settlement s)
+        {
+            var c = Settings.Current;
+            float w = Math.Max(0f, c.LabourerDayWage) * TownWageLink.Index(s);
+            return s.IsVillage ? w * Math.Max(0f, c.VillageWageShare) : w;
+        }
+
+        /// <summary>Wyplata od osady (kasa miasta albo wsi) - najwyzej tyle, ile osada ma; 0 = nie ma czym zaplacic.</summary>
+        private static int PayFromSettlement(Settlement s, int pay)
+        {
+            var sc = s != null ? s.SettlementComponent : null;
+            if (sc == null) return 0;
+            int give = Math.Min(pay, Math.Max(0, sc.Gold));
+            if (give > 0) GiveGoldAction.ApplyForSettlementToCharacter(s, Hero.MainHero, give, true);
+            return give;
+        }
+
         private static int LabourPay(Settlement s)
         {
             var c = Settings.Current;
+            if (c.HistoricalTownRates)
+                return Math.Max(1, MBRandom.RoundRandomized(DayWage(s) * (Saturated(s) ? 0.5f : 1f)));   // w calych pensach, srednio co do ulamka
             float pay;
             if (s.IsVillage)
                 pay = c.WorkPayVillageBase + s.Village.Hearth / Math.Max(1f, c.WorkPayVillageHearthDiv);
@@ -86,6 +107,7 @@ namespace RealisticCaptivity
         private static int GuardPay(Settlement s)
         {
             var c = Settings.Current;
+            if (c.HistoricalTownRates) return Math.Max(1, MBRandom.RoundRandomized(DayWage(s)));   // noc na murach - dniowka robotnika
             float pay = c.GuardPayBase + (s.Town != null ? s.Town.Prosperity : 3000f) / Math.Max(1f, c.GuardPayProsperityDiv);
             return Math.Max(1, (int)pay);
         }
@@ -286,7 +308,8 @@ namespace RealisticCaptivity
                 var c = Settings.Current;
                 bool halfPay = Saturated(Here);
                 int pay = LabourPay(Here);
-                GiveGoldAction.ApplyBetweenCharacters(null, Hero.MainHero, pay);
+                if (c.HistoricalTownRates) pay = PayFromSettlement(Here, pay);          // place daje kasa osady, nie nikt
+                else GiveGoldAction.ApplyBetweenCharacters(null, Hero.MainHero, pay);
                 _earned += pay;
                 MarkWorked();
                 Hero.MainHero.AddSkillXp(DefaultSkills.Athletics, c.WorkAthleticsXpPerDay);
@@ -321,8 +344,9 @@ namespace RealisticCaptivity
                     float winChance = Math.Min(0.9f, 0.30f + skill / 200f);
                     if (MBRandom.RandomFloat < winChance)
                     {
-                        int pay = GuardPay(Here) + c.GuardBrawlBonus;
-                        GiveGoldAction.ApplyBetweenCharacters(null, Hero.MainHero, pay);
+                        int pay = GuardPay(Here) + (c.HistoricalTownRates ? MBRandom.RoundRandomized(DayWage(Here) * Math.Max(0f, c.GuardBrawlBonusDays)) : c.GuardBrawlBonus);
+                        if (c.HistoricalTownRates) pay = PayFromSettlement(Here, pay);
+                        else GiveGoldAction.ApplyBetweenCharacters(null, Hero.MainHero, pay);
                         _earned += pay;
                         Hero.MainHero.AddSkillXp(skillObj, 150f);
                         if (MBRandom.RandomFloat < 0.25f) ThankfulNotable();
@@ -338,7 +362,8 @@ namespace RealisticCaptivity
                 else
                 {
                     int pay = GuardPay(Here);
-                    GiveGoldAction.ApplyBetweenCharacters(null, Hero.MainHero, pay);
+                    if (c.HistoricalTownRates) pay = PayFromSettlement(Here, pay);
+                    else GiveGoldAction.ApplyBetweenCharacters(null, Hero.MainHero, pay);
                     _earned += pay;
                     Log.Player("A quiet watch. " + pay + " stags for the night.");
                 }
