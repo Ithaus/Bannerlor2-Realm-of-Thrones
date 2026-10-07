@@ -101,6 +101,7 @@ namespace Armoury
         /// <summary>Nowa gra albo wczytanie (konstruktor ArmouryBehavior): liczniki od zera.</summary>
         internal static void Reset()
         {
+            SpoilsCompany.Reset();   // klan najemnikow Spoils (liczniki) - ten sam moment co reszta Spoils
             ClearDay();
             _stumbles = 0;
         }

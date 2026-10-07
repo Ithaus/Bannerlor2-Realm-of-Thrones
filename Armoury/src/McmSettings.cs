@@ -700,6 +700,10 @@ namespace Armoury
         [SettingPropertyGroup("The law of the battlefield")]
         public int LegendaryLootValueFloor { get; set; } = 100000;
 
+        [SettingPropertyBool("Spoils Clan Real Soldiers", HintText = "your Spoils of War mercenary company gets no soldiers out of thin air: a founded, reformed, newly hired or re-formed warband starts with its captain alone (no ready-made 50-odd men from the party template, no 20 initial troops, no volunteers from the map, and Banner Kings no longer swaps the captain out of his own warband for a soldier from nowhere) and grows only by real recruitment - notables' volunteers and tavern hirelings, paid from the company's own purse; what you pay Spoils of War to found, reform or hire a warband goes whole into the company's purse instead of partly vanishing (off = Spoils of War as before; the day's log line shows how many men either way)")]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool SpoilsClanRealSoldiers { get; set; } = true;
+
         [SettingPropertyBool("Spoils No Auto Sale", HintText = "no automatic sale from the war stockpile: Spoils of War's quartermaster sold cheap stockpile gear every day - the goods vanished and the town treasury got coin that nobody paid; this stops it whatever the Spoils of War menu says (every Spoils preset turns auto-sell back on) - the gear stays in the stockpile until you take it (the day's log line shows how much was stopped)")]
         [SettingPropertyGroup("The law of the battlefield")]
         public bool SpoilsNoAutoSale { get; set; } = true;
@@ -2766,6 +2770,7 @@ namespace Armoury
             s.WreckSalvageEnabled = WreckSalvageEnabled;
             s.LootMinConditionPercent = LootMinConditionPercent;
             s.LegendaryLootValueFloor = LegendaryLootValueFloor;
+            s.SpoilsClanRealSoldiers = SpoilsClanRealSoldiers;
             s.SpoilsNoAutoSale = SpoilsNoAutoSale;
             s.SpoilsNoFreeGold = SpoilsNoFreeGold;
             s.PlagueSparesYourMen = PlagueSparesYourMen;
