@@ -16,7 +16,7 @@ przeglad zlozenia `docs/paczki/PRZEGLAD-ZLOZENIA-2026-10-07.txt`):
 | 115 | `paczki/115-cena-od-niedoboru` | c49cdda | surowiec drogi tam, gdzie go brakuje rzemieslnikom (ruda w miescie bez rudy: pierwszy ladunek 37 d zamiast 10, z kuznia 74 d; drewno 39 d zamiast 2); welna tanieje poza 23 miastami z tkalnia; sol, piwo, narzedzia przy pustej polce znow do x10 | 614 |
 | 116 | `paczki/116-warsztaty-w-nowej-monecie` | 9b7a4e8 | warsztat kosztuje 3 lata swojego zarobku (+ kasa warsztatu); 100 d dziennie przestaje znikac - czynsz i place ida do kasy miasta; zaczynaja pracowac piekarnie, winiarnie, olejarnie, garbarnie, garncarnie | 623 |
 | 117 | `paczki/117-karawany-ruda-dociera` | 0ffc41c | karawany kupuja surowce przed wyborem trasy i laduja je do pelnego udzwigu (karawany gracza 80%) | 625 |
-| 118 | `paczki/118-towary-w-nowej-monecie` | 38054d7 | towary BK (chleb, ciasta, miod, owoce, miod pitny, futro, zloto...) w nowej monecie - BKROTPatch dzieli ich wartosc przez 100, przez co popyt zostal w starej monecie; bochen (10/dobe) 61 -> 17-21 d | 626 |
+| 118 | `paczki/118-towary-w-nowej-monecie` | 38054d7 | chleb, ciasta, miod i owoce tansze tam, gdzie je dowoza (bochen przy 10 dziennie 61 -> 17-21 d); miod pitny, futro, zloto, klejnoty, atrament, barwnik duzo tansze (lup ze zlota i klejnotow 10-15 x tanszy) | 626 |
 | 119 | `paczki/119-wozy-do-najlepszego-miasta` | 0c7aa2d | woz kazdej wsi jedzie do miasta w zasiegu 250 (ok. 4 doby), ktore najlepiej zaplaci; ladunek wyceniany sztuka po sztuce (koniec ceny pierwszej sztuki za caly woz); woz x2 dla wszystkich wsi | 631 |
 
 DLL GRUPY = build `paczki/119`: md5 faade7bf0dcc00de87d520a603234d15, 631 ustawien (kopia: `SCRATCH\dzien-5\zlozenie\Armoury-grupa-towary2.dll`,
@@ -24,11 +24,13 @@ SCRATCH = katalog roboczy sesji 3cf3e0ac); proby wszystkich recenzentow przechod
 ani `MarketMaxDistance` (zmiana domyslnej 150 -> 250 zadziala). UWAGA: zapis ustawien w MCM PRZED wgraniem wpisalby MarketMaxDistance = 150.
 
 JAK WGRAC (dopiero po "wgraj" od Jeffa; gra zamknieta - proces `Bannerlord.BLSE.LauncherEx`): na galezi roboczej
-`git cherry-pick c49cdda 9b7a4e8 0ffc41c 38054d7 0c7aa2d`, `python tools/gen_mcm.py` (ma nic nie zmienic, 631), build z kodem 0, porownac md5 z
-faade7bf...; kopia `Armoury.dll.bak-2026-10-07-przed-115`; wgranie; md5 w grze; wpisy z `docs/paczki/115..119` na gore CHANGELOG ze statusem
+`git cherry-pick c49cdda 9b7a4e8 0ffc41c 38054d7 0c7aa2d`, `python tools/gen_mcm.py` (ma nic nie zmienic, 631), build z kodem 0;
+KONTROLA = `git diff paczki/119-wozy-do-najlepszego-miasta HEAD -- Armoury` PUSTY (NIE md5 - numer commitu jest wpisany w DLL, wiec md5 builda
+z galezi roboczej zawsze wyjdzie inny niz faade7bf; audyt 07.10: 9a5040b8 przy tym samym kodzie); w CHANGELOG zapisac md5, ktory wyjdzie;
+NIE wgrywac kopii z dysku C (scratchpad); kopia `Armoury.dll.bak-2026-10-07-przed-115`; wgranie; md5 w grze; wpisy z `docs/paczki/115..119` na gore CHANGELOG ze statusem
 WGRANE (bez komentarza HTML na poczatku pliku); commit + push.
 
-TEST (decyzja Jeffa: testy grupami): swiezy start gry, NOWA kampania (115, 118 i 119 licza start kampanii), 20 dob, zapis; "sprawdz logi".
+TEST (decyzja Jeffa: testy grupami): swiezy start gry, NOWA kampania (115, 116 i 118 licza start kampanii), 20 dob, zapis; "sprawdz logi".
 Glowna liczba: "Ruda: miast bez towaru" - bylo 74 -> 69; oczekiwane ok. 25-30 po 20 dobach (ponizej 20 po ok. 40; 16 miast lezy dalej niz 250
 od kazdej kopalni - tam tylko karawany). Dalej: "Ceny surowcow:" (ruda w miescie bez rudy indeks ok. 10, pierwszy ladunek ok. 37 d; chleb),
 "Warsztaty towarowe:" (piekarnie pracuja od 1. doby; cena piekarni w Lannisporcie - zalezy od doplywu chleba i ciast, przy niedoborze moze
@@ -36,14 +38,41 @@ przekroczyc 100 tys., bo tyle naprawde zarabia), "Dowoz (wozy):" ("niezgodne" 0,
 "(kierunek)". Odczyt: `python tools/sprawdz_logi.py --grupa 2b` (nowa grupa TOWARY 2: glowna liczba, kontrole kazdego ogniwa, tabela dzien po dniu; progi to
 szacunki z opisow paczek - pierwszy log obejrzec tez z `--surowe`). Na starym logu --grupa 1 / 2 daja to samo co przed zmiana (bajt w bajt).
 
+AUDYT GRUPY PRZED TESTEM (07.10 noc, zasada 0: trzech niezaleznych audytorow 115-119 RAZEM - ekonomia i przeplywy, bezpieczenstwo
+w grze, gracz i decyzje Jeffa; raporty `docs/audyt-2026-10-07/1..3-*.md`): NIC BLOKUJACEGO. Zamknieta ekonomia pieciu paczek razem domknieta
+(uczciwa cena wozu = cena 115 = to, co placi kasa; ksiega nic nie liczy dwa razy; kasy miast trzyma regulator gry - nikt ich nie wyczerpie),
+latki bez kolizji z cudzymi modami, zapis / wczytanie bezpieczne, koszt grupy ok. 50-80 ms na dobe gry, napisy i linie logu = opisy co do
+slowa. WAZNE: (a) instrukcja wgrania kazala porownac md5 - poprawione wyzej; (b) zysk wsi z wozow przejsciowy - OTWARTE (1);
+(c) SZTABKA ZLOTA po 118 sprzeda sie najwyzej za ok. 42% wartosci (ok. 2 tys. przy wartosci 4750, druga 1.3 tys.), a ruda zlota za 4.6 x
+wartosci - w kategorii "zloto" ruda i sztabka przeliczone w przeciwne strony (x8 tansza, x4.75 drozsza), jeden wspolny przelicznik;
+poprawka po tescie osobna paczka (przelicznik na przedmiot albo wazony); opis 118 sprostowany; (d) opis dla Jeffa - nizej.
+Drobne (pamiec roku ceny warsztatu, place warsztatu gracza w menu kuzni, liczniki bledow, bramka cen, suwaki MCM, sprzedaz warsztatu
+notablowi bez kupca z pieniedzmi) -> ogniwo 120 "poprawki po audycie" (w toku 07.10 od 00:10; jesli nie przeszlo weryfikacji - test bez 120).
+
+CO JEFF ZOBACZY W GRZE PO 115-119 (slowami gracza; do powiedzenia przed "wgraj"):
+1. Targ: ruda w miescie bez rudy - pierwszy ladunek 37 d (z kuznia 74 d), drewno 39 d, sol i piwo przy pustym straganie do 10 x wartosci;
+   tam, gdzie tego pelno - grosze. Welna tania wszedzie poza 23 miastami z tkalnia.
+2. Chleb, ciasta, miod tansze tam, gdzie je dowoza (bochen ok. 20 d zamiast 61 przy 10 bochnach dziennie); miod pitny prawie nic nie wart,
+   miodosytnie stana.
+3. Lup: sztabka zlota ok. 2 tys. zamiast 31 tys. (druga 1.3 tys.), sakiewka klejnotow ok. 140 d zamiast 2.2 tys., futro, atrament, barwnik
+   kilka razy tansze.
+4. Warsztat kosztuje 3 lata swojego zarobku plus pieniadze w jego kasie - notabl mowi w rozmowie, skad ta cena; tam, gdzie brakuje chleba i
+   ciast, piekarnia moze kosztowac ponad 100 tys. (tyle naprawde zarabia). Wlasny warsztat placi miastu 4 d dziennie i czeladnikom za kazda
+   partie; sprzedajac go notablowi dostaniesz najwyzej tyle, ile on ma w sakiewce.
+5. Wozy: kazda wies (takze Twoja) wiezie towar do miasta do ok. 4 dob drogi, ktore zaplaci najwiecej - takze do miast innego (niewrogiego)
+   krolestwa; woz wiezie 2 x wiecej, wiec napad na tabor daje 2 x wiecej lupu. Pieniadze z Twoich wsi przyjda pozniej, ale zwykle wiecej.
+6. Karawany AI pakuja sie surowcami do pelna; Twoje karawany jak dotad (80%).
+
 KOLEJKA 108-114 PRZENIESIONA NA 119: galezie `paczki-na-119/108-...` .. `paczki-na-119/114-porzadki` (1ffe021 .. 817931e; build kod 0 kazdego,
 669 ustawien na 114; konflikty tylko tekstowe: lista Reset w konstruktorze ArmouryBehavior, Settings.cs przy K7; K5 i wozy w MarketRoad.cs
 rozlaczne - K5 dziala tylko dla wsi zamkowej bez zadnego miasta w zasiegu). STARE `paczki/108..114` (na n107) ZOSTALY - ich nadpisanie
 (force push) zablokowalo zabezpieczenie; do decyzji Jeffa (albo nadpisac, albo dalej uzywac `paczki-na-119/*`). Tresc ogniw ta sama, opisy
 `docs/paczki/108..114` dalej wazne (inna baza). Grupy dalej: LUDZIE (BetterEconomy + 108 + 109), KASY (110-112 + 114), SPUSTOSZENIE (113).
 
-OTWARTE PO NOCY (osobne kroki, nic z tego nie zrobione): (1) welna tanieje poza miastami z tkalnia (115) - wozy (119) w duzej czesci to
-rownowaza (utarg wsi owczarskich x2.5 w symulacji); sukno welniane jako rzemioslo miast - decyzja projektu przy K13; (2) dosypka drewna
+OTWARTE PO NOCY (osobne kroki, nic z tego nie zrobione): (1) welna tanieje poza miastami z tkalnia (115); wozy (119) rownowaza to
+TYLKO PRZEJSCIOWO (audyt 07.10, symulacja 200 dob: utarg wsi owczarskich wobec dzis x3.0 w dobach 1-20, x1.9 w 21-60, x1.15 w 61-200;
+polki rudy, welny i lnu puchna liniowo, bo wsie produkuja kilka razy wiecej, niz ktokolwiek zuzywa) - PILNY po tescie krok skali K13
+(produkcja wsi wobec prawdziwego zuzycia, w tym MineOutputMultiplier 3); sukno welniane jako rzemioslo miast - decyzja projektu przy K13; (2) dosypka drewna
 RealisticBannerlord (towar z niczego) jest teraz warta 3-5x wiecej - zamknac (fundament B1); (3) ksiazki BK kosztuja 7-10 d (BKROTPatch /100 +
 nasz BookTranspiler); (4) dlawik BKROTPatch: decyzja karawany raz na 24 h = 2-3 kursy na 20 dob (cudzy kod); (5) wozy nie widza karawan (mozliwy
 podwojny dowoz); (6) proby K5 / K6 z dzien-2: atrapa wsi bez typu - odswiezyc przed grupa KASY; (7) kosmetyka: linia startowa 117 mowi

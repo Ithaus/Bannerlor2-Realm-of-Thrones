@@ -91,3 +91,11 @@ UTARG WSI ZA RESZTE TOWAROW (zboze, ryby, mieso...): poza modelem. Przyblizenie 
 **Po czym poznac w logu - poprawki recenzenta:** linia "Dowoz (wozy)" ma nowe pole "wygasle przy porzadkach N" (kilka-kilkanascie na dobe to norma: tabory odeslane do domu, rozbite, z zamkow). "Ruda: miast bez towaru" - realnie ok. 25-30 po 20 dobach (SZACUNEK z mieszanym ladunkiem), ponizej 20 po ok. 40; pilnowac "Dowoz (skutki): zamki: bilans zywnosci ujemny" (wiecej wsi zamkowych wozi do miast zamiast do zamku: zasieg 150 -> 250).
 
 **Lancuch:** galaz `n119-wozy-do-najlepszego-miasta`, commit 0c7aa2ddb61556f761787e522048f4f93ec8393b (jeden commit na poprzednim ogniwie; tresc = recenzowana `l119-wozy-do-najlepszego-miasta`); poprzednie ogniwo `n118-towary-w-nowej-monecie` (38054d7); nastepne 108 przeniesione (`m108-ludzie-jednostka`). Build ogniwa kod 0 (jedno stare ostrzezenie CS0169 w `BattlefieldLaw.cs`), `python tools/gen_mcm.py` nie zmienia `McmSettings.cs`, ustawien MCM 631 (626 -> 631). DLL ogniwa md5 faade7bf0dcc00de87d520a603234d15 (`scratchpad\dzien-5\zlozenie\Armoury-119.dll`, worktree `dzien-5\zlozenie\119`). To jest DLL grupy testowej 115..119 (`Armoury-grupa-towary2.dll`, ten sam plik). Na tym ogniwie stoja przeniesione 108..114 (`m108-ludzie-jednostka` .. `m114-porzadki`, 669 ustawien) - opis przeniesienia w `docs/paczki/PRZEGLAD-ZLOZENIA-2026-10-07.txt`.
+
+**Korekta po audycie grupy (07.10, `docs/audyt-2026-10-07/1-ekonomia-i-przeplywy.md`):** liczby skutkow dla wsi (utarg x2.2-3.0, wies
+owczarska 153 -> 456 d, kasy miast 7.6 -> 21 tys.) to stan PIERWSZYCH 20 DOB. Symulacja 200 dob (model recenzenta, 3 losowania): utarg
+wsi za rude / drewno / len / welne 21.0 tys. d/dobe w dobach 1-20, 10.0 w 21-60, 5.8 w 61-200 (baza 7.4 / 3.7 / 2.6); welna wobec bazy
+x3.06 -> x1.88 -> x1.16. Polki miast puchna liniowo (welna 2.9 -> 10.4 -> 36.4 tys. sztuk w dobach 20 / 60 / 200), bo produkcja wsi jest kilka
+razy wieksza od zuzycia - przy przesycie wszedzie "najlepiej placace miasto" placi prawie tyle, co najblizsze. Wniosek: wozy nie sa trwala
+rownowaga dla wsi owczarskich; potrzebny krok skali produkcji K13. Do tego: po dotarciu rudy do ok. 70 miast wskaznik rudy w cenie broni
+("Rynek broni: indeks rudy") spadnie z 1.50 - bron i zbroje tam tansze o kilka procent (skutek wozow, nie blad).
