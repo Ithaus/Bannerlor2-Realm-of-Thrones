@@ -31,11 +31,12 @@ namespace Armoury
 
         private static readonly Dictionary<string, int> _purse = new Dictionary<string, int>();
         private static int _daySold, _dayGold, _dayLord, _dayLife, _dayGear, _dayStamp = -1;
+        private static long _dayCloth;         // 150: odziez wojska kupiona z sakiewek przy wyjezdzie z miasta (ArmyClothing.BuyForParty)
         private static long _dayWage;          // zold wplacony do sakiewek (SoldierPay)
         private static int _dayWageN;
         private static long _dayIn, _dayOut;   // ruch wszystkich sakiewek w dobie: kazda wplata i kazdy wydatek ida przez Add
 
-        internal static void Reset() { _purse.Clear(); _pending.Clear(); _daySold = _dayGold = _dayLord = _dayLife = _dayGear = 0; _dayWage = 0; _dayWageN = 0; _dayIn = _dayOut = 0; _dayStamp = -1; }
+        internal static void Reset() { _purse.Clear(); _pending.Clear(); _daySold = _dayGold = _dayLord = _dayLife = _dayGear = 0; _dayCloth = 0; _dayWage = 0; _dayWageN = 0; _dayIn = _dayOut = 0; _dayStamp = -1; }
 
         internal static string Export()
         {
@@ -119,12 +120,12 @@ namespace Armoury
         {
             int d = (int)CampaignTime.Now.ToDays;
             if (_dayStamp == d) return;
-            if (_dayStamp >= 0 && (_daySold + _dayLife + _dayGear + _dayWage + _dayIn + _dayOut) > 0)
+            if (_dayStamp >= 0 && (_daySold + _dayLife + _dayGear + _dayCloth + _dayWage + _dayIn + _dayOut) > 0)
                 Log.Info("Sakiewka ludzi: dzien " + _dayStamp + " - nadwyzki sprzedane " + _daySold + " szt. za " + _dayGold + " (trzecia lordow AI " + _dayLord
-                         + "), ludzie wydali na sprzet " + _dayGear + ", na zycie w miastach " + _dayLife
+                         + "), ludzie wydali na sprzet " + _dayGear + ", na zycie w miastach " + _dayLife + ", na odziez wojska (150) " + _dayCloth
                          + "; zold wplacony do sakiewek " + _dayWage + " (" + _dayWageN + " wyplat); ruch sakiewek: wplynelo " + _dayIn + " (zold, lup, przejete sakiewki), wyszlo " + _dayOut
-                         + " (sprzet, naprawy, zycie w miastach, utracone sakiewki), w sakiewkach razem " + TotalNow() + ".");
-            _daySold = _dayGold = _dayLord = _dayLife = _dayGear = 0; _dayWage = 0; _dayWageN = 0; _dayIn = _dayOut = 0; _dayStamp = d;
+                         + " (sprzet, naprawy, odziez, zycie w miastach, utracone sakiewki), w sakiewkach razem " + TotalNow() + ".");
+            _daySold = _dayGold = _dayLord = _dayLife = _dayGear = 0; _dayCloth = 0; _dayWage = 0; _dayWageN = 0; _dayIn = _dayOut = 0; _dayStamp = d;
         }
 
         /// <summary>Cena skupu sztuki (w tym stanie) w miescie; poza miastem - najblizsze miasto.</summary>
@@ -179,6 +180,10 @@ namespace Armoury
                 int purse = Get(mp);
                 if (purse <= 0) return;
                 int reserve = mp.IsMainParty ? TroopSelfMend.OutstandingCost() : AiWear.OutstandingCost(mp);
+                // 150: odziez, buty i plotno wojska - z polki miasta po cenie targu, z tej samej sakiewki PRZED wydatkiem "na zycie"
+                // (to samo zloto: mniej idzie "na zycie"); rezerwa na zalegle naprawy nietknieta, jak przy brakach w kompletach
+                int cloth = ArmyClothing.BuyForParty(mp, st, purse - reserve);
+                if (cloth > 0) { _dayCloth += cloth; purse = Get(mp); }
                 int life = Math.Max(0, purse - reserve);
                 if (life <= 0) return;
                 Take(mp, life);

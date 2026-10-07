@@ -386,7 +386,7 @@ namespace Armoury
         }
         private Dictionary<string,int> _prisonerBaseline;
 
-        public ArmouryBehavior() { Instance = this; HistoricalPrices.Reset(); MaterialLaw.Reset(); WesterosClimate.Reset(); OutlawLaw.Reset(); PopulationLaw.Reset(); WorkshopLaw.Reset(); IronBank.Reset(); MarketGlut.Reset(); ArmsPricing.Reset(); StartKit.Reset(); AiGear.Reset(); Levy.Reset(); VolunteerKit.Reset(); LevyGold.Reset(); WearKeep.Reset(); UniqueSpoils.Reset(); BuildDiary.Reset(); BuildFunding.Reset(); KingdomLedger.Reset(); ColdStart.Reset(); MenPurse.Reset(); AiWear.Reset(); SmithHours.Reset(); RecruitKit.Reset(); OreLedger.Reset(); GoodsLedger.Reset(); FreeSupplies.Reset(); VillageWoodlot.Reset(); SpoilsSeal.Reset(); MarketRoad.Reset(); MarketCarts.Reset(); VillageClogDiag.Reset(); CartTownExit.Reset(); MoneyLedger.Reset(); PeopleLedger.Reset(); CaravanBulk.Reset(); StartStock.Reset(); MineralOnce.Reset(); SoldierPay.Reset(); KingdomTreasury.Reset(); }   // stan jednej kampanii nie przecieka do drugiej (audyt 04.10)
+        public ArmouryBehavior() { Instance = this; HistoricalPrices.Reset(); MaterialLaw.Reset(); WesterosClimate.Reset(); OutlawLaw.Reset(); PopulationLaw.Reset(); WorkshopLaw.Reset(); IronBank.Reset(); MarketGlut.Reset(); ArmsPricing.Reset(); StartKit.Reset(); AiGear.Reset(); Levy.Reset(); VolunteerKit.Reset(); LevyGold.Reset(); WearKeep.Reset(); UniqueSpoils.Reset(); BuildDiary.Reset(); BuildFunding.Reset(); KingdomLedger.Reset(); ColdStart.Reset(); MenPurse.Reset(); ArmyClothing.Reset(); AiWear.Reset(); SmithHours.Reset(); RecruitKit.Reset(); OreLedger.Reset(); GoodsLedger.Reset(); FreeSupplies.Reset(); VillageWoodlot.Reset(); SpoilsSeal.Reset(); MarketRoad.Reset(); MarketCarts.Reset(); VillageClogDiag.Reset(); CartTownExit.Reset(); MoneyLedger.Reset(); PeopleLedger.Reset(); CaravanBulk.Reset(); StartStock.Reset(); MineralOnce.Reset(); SoldierPay.Reset(); KingdomTreasury.Reset(); }   // stan jednej kampanii nie przecieka do drugiej (audyt 04.10)
 
         public override void SyncData(IDataStore dataStore)
         {
@@ -438,6 +438,10 @@ namespace Armoury
                 string purse = MenPurse.Export();
                 dataStore.SyncData("arm_menpurse", ref purse);
                 if (dataStore.IsLoading) MenPurse.Import(purse);
+                // 150: odziez wojska - potrzeba czekajaca na zakup (partie i zalogi)
+                string cloth = ArmyClothing.Export();
+                dataStore.SyncData("arm_armyclothing", ref cloth);
+                if (dataStore.IsLoading) ArmyClothing.Import(cloth);
                 // tarcza zoldu: znaczniki zoldu w kasach miast (paczka zold; puste, gdy tarcza wylaczona)
                 string wagehold = SoldierPay.ExportHeld();
                 dataStore.SyncData("arm_wagehold", ref wagehold);
@@ -508,6 +512,7 @@ namespace Armoury
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, delegate { try { TroopSelfMend.Hourly(); } catch { } });
             CampaignEvents.DailyTickPartyEvent.AddNonSerializedListener(this, AiGear.OnDailyTickParty);
             CampaignEvents.DailyTickPartyEvent.AddNonSerializedListener(this, UniqueSpoils.OnDailyTickParty);
+            CampaignEvents.DailyTickPartyEvent.AddNonSerializedListener(this, ArmyClothing.OnDailyTickParty);   // 150: zuzycie odziezy w partiach rodow
             // SUWAKI MCM NA ZYWO (Jeff 03.09: "nadal 1 predkosc, o co chodzi" -
             // World Pace Percent przestawiony w grze nie dzialal). McmSettings.Apply()
             // szlo TYLKO w OnGameStart, wiec kazda zmiana w Mod Options czekala
@@ -530,6 +535,7 @@ namespace Armoury
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, GoodsLedger.OnPartyDestroyed);  // paczka 146: towar, ktory przepada z partia (tylko log)
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, OutlawLaw.OnPartyDestroyed);
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, MenPurse.OnPartyDestroyed);   // wpis 89
+            CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, ArmyClothing.OnPartyDestroyed);   // 150
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, MarketRoad.OnPartyDestroyed);   // wpis 100: rozbite tabory wiesniakow (log)
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, VillageClogDiag.OnPartyDestroyed);   // diagnoza zatkanych wsi: kiedy wies stracila woz (tylko log)
             // ksiega pieniadza i przeplywow osad (K1) oraz ksiega ludzi (demografia, krok 1) - same nasluchy, tylko log
@@ -995,6 +1001,7 @@ namespace Armoury
             try { CleanseAmmo(); } catch (Exception e) { Log.Error("CleanseAmmo", e); }
             try { NightRest.AddMenus(starter); } catch (Exception e) { Log.Error("NightRest.AddMenus", e); }
             try { RangedLore.ReportLedger(false); } catch (Exception e) { Log.Error("RangedLore.ReportLedger", e); }
+            try { ArmyClothing.StartLine(); } catch (Exception e) { Log.Error("ArmyClothing.StartLine", e); }   // 150: stawki odziezy wojska i zaleznosci
         }
 
         private static float Today { get { return (float)CampaignTime.Now.ToDays; } }
@@ -1241,6 +1248,7 @@ namespace Armoury
             try { KingdomTreasury.Daily(); KingdomTreasury.Levies(); KingdomTreasury.WageRefund(); KingdomLedger.Daily(); } catch (Exception e) { Log.Error("KingdomTreasury.Daily", e); }   // powinnosci wasali wobec korony (po rentach); potem zwrot zoldu w wojnie
             try { MoneyLedger.Mark(MoneyLedger.MCrown); } catch { }
             try { SoldierPay.Daily(); } catch (Exception e) { Log.Error("SoldierPay.Daily", e); }   // zold do obiegu: linia "Zold:" i liczniki doby (po zwrocie ze skarbca)
+            try { ArmyClothing.Daily(); } catch (Exception e) { Log.Error("ArmyClothing.Daily", e); }   // 150: linia "Odziez wojska (150):" (zlota nie rusza)
             try { OutlawLaw.Daily(); } catch (Exception e) { Log.Error("OutlawLaw.Daily", e); }   // wyrzutki: bieda, powroty, werbunek band
             try { IronBank.Daily(); } catch (Exception e) { Log.Error("IronBank.Daily", e); }   // Bank Zelazny: pozyczki AI, raty, bankructwa
             try { SupplyDemand.DailyTrade(); } catch (Exception e) { Log.Error("SupplyDemand.DailyTrade", e); }

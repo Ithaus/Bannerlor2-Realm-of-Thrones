@@ -2260,6 +2260,38 @@ namespace Armoury
         [SettingPropertyGroup("The soldier's pay")]
         public bool TownWageShield { get; set; } = true;
 
+        [SettingPropertyBool("Army Clothing Enabled", HintText = "every soldier on pay wears out his shoes, clothes and linen: men in a lord's party (yours too) buy leather, felt (woollen cloth) and linen in the towns they leave - piece by piece at the market price, out of their own purse, before they spend the rest on food and drink; a town garrison takes them from its own town's market without paying, for its pay already went into that town's purse; a castle garrison has the castle purse buy them in the town its villages trade with. What cannot be had waits (Army Clothing Max Wait Days), then is only noted in the log. Banner Kings party supplies no longer buy or use up wool, linen or flax for the troops, and their 'Textiles supplies' morale penalty is gone - one rule for clothing, rags carry no penalty (off = no wear, Banner Kings textiles and their morale penalty as before)")]
+        [SettingPropertyGroup("The soldier's clothes")]
+        public bool ArmyClothingEnabled { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Army Clothing Field Leather Kg", 0.00f, 8.00f, "0.00", HintText = "kg of leather a soldier in a party wears out in a year: four pairs of shoes of about 0.4 kg (a pair lasted a season of marching) and his belts, straps and pouch; a crate of leather on the market is 10 kg")]
+        [SettingPropertyGroup("The soldier's clothes")]
+        public float ArmyClothingFieldLeatherKg { get; set; } = 2f;
+
+        [SettingPropertyFloatingInteger("Army Clothing Field Cloth Kg", 0.00f, 12.00f, "0.00", HintText = "kg of woollen cloth (felt on the market) a soldier in a party wears out in a year: tunic, hood and hose - the yearly livery of a king's archer, two and a half to three yards of cloth - and his share of cloaks and blankets")]
+        [SettingPropertyGroup("The soldier's clothes")]
+        public float ArmyClothingFieldClothKg { get; set; } = 3f;
+
+        [SettingPropertyFloatingInteger("Army Clothing Field Linen Kg", 0.00f, 10.00f, "0.00", HintText = "kg of linen a soldier in a party wears out in a year: two shirts and two pairs of braies (about 1.2 kg) and his share of tents, sacks and bags - a tent for six to ten men lasted a year or two")]
+        [SettingPropertyGroup("The soldier's clothes")]
+        public float ArmyClothingFieldLinenKg { get; set; } = 2.5f;
+
+        [SettingPropertyFloatingInteger("Army Clothing Garrison Leather Kg", 0.00f, 4.80f, "0.00", HintText = "the same for a man of a garrison, who marches little: two pairs of shoes and his belts")]
+        [SettingPropertyGroup("The soldier's clothes")]
+        public float ArmyClothingGarrisonLeatherKg { get; set; } = 1.2f;
+
+        [SettingPropertyFloatingInteger("Army Clothing Garrison Cloth Kg", 0.00f, 8.00f, "0.00", HintText = "woollen cloth a garrison man wears out in a year - tunic and hood last longer behind walls")]
+        [SettingPropertyGroup("The soldier's clothes")]
+        public float ArmyClothingGarrisonClothKg { get; set; } = 2f;
+
+        [SettingPropertyFloatingInteger("Army Clothing Garrison Linen Kg", 0.00f, 4.00f, "0.00", HintText = "linen a garrison man wears out in a year - shirts only, he sleeps under a roof")]
+        [SettingPropertyGroup("The soldier's clothes")]
+        public float ArmyClothingGarrisonLinenKg { get; set; } = 1f;
+
+        [SettingPropertyInteger("Army Clothing Max Wait Days", 0, 480, "0", HintText = "how many days of wear the men can put off when the town has no leather, cloth or linen or their purse is empty; beyond that their clothes simply go to rags (noted in the log only, no penalty in the game)")]
+        [SettingPropertyGroup("The soldier's clothes")]
+        public int ArmyClothingMaxWaitDays { get; set; } = 120;
+
         [SettingPropertyBool("Supply Demand Enabled", HintText = "arms, armour and horses obey supply and demand in towns and castles: a full stall sells cheap, an empty one dear - for buying AND selling, you and the AI alike (the item's own worth is untouched)")]
         [SettingPropertyGroup("Supply and demand")]
         public bool SupplyDemandEnabled { get; set; } = true;
@@ -3212,6 +3244,14 @@ namespace Armoury
             s.CrownWageRefundPercent = CrownWageRefundPercent;
             s.CrownWageRefundGarrisons = CrownWageRefundGarrisons;
             s.TownWageShield = TownWageShield;
+            s.ArmyClothingEnabled = ArmyClothingEnabled;
+            s.ArmyClothingFieldLeatherKg = ArmyClothingFieldLeatherKg;
+            s.ArmyClothingFieldClothKg = ArmyClothingFieldClothKg;
+            s.ArmyClothingFieldLinenKg = ArmyClothingFieldLinenKg;
+            s.ArmyClothingGarrisonLeatherKg = ArmyClothingGarrisonLeatherKg;
+            s.ArmyClothingGarrisonClothKg = ArmyClothingGarrisonClothKg;
+            s.ArmyClothingGarrisonLinenKg = ArmyClothingGarrisonLinenKg;
+            s.ArmyClothingMaxWaitDays = ArmyClothingMaxWaitDays;
             s.SupplyDemandEnabled = SupplyDemandEnabled;
             s.SupplyDemandBase = SupplyDemandBase;
             s.SupplyDemandRefProsperity = SupplyDemandRefProsperity;

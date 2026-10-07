@@ -634,6 +634,21 @@ namespace Armoury
         public bool CrownWageRefundGarrisons = true;       // the refund counts garrison wages too; off = wages of the parties in the field only
         public bool TownWageShield = true;                 // wages spent in a town (garrison pay, the men's spending on leaving) are kept out of reach of the game's daily town-purse regulator, which otherwise deletes a quarter of everything above its target each day: they stay until the lord's rents and the war subsidy draw them out, and what is still there after about two weeks the regulator may take; castles unchanged. Mind the side effect: with it a garrison in one's own town costs its lord next to nothing, for the pay comes back to him in rents
 
+        // --- The soldier's clothes ---
+        // 150 (plan K13): kazdy zolnierz na zoldzie zdziera odziez; stawki w kg na czlowieka na rok (sztuka skory, filcu i plotna w grze = 10 kg),
+        // SZACUNEK z pamieci (raport projektanta B, widelki x0.7-1.5): but z podeszwa ok. 0.3-0.5 kg skory, para starczala na pore marszu;
+        // liberia lucznikow Edwarda III (tunika i kaptur raz w roku, ok. 2.5-3 jardow sukna; sukno szerokie wazylo ok. 1-1.3 kg na jard);
+        // 2 koszule i 2 pary gaci lnianych ok. 1.2 kg; namiot plocienny na 6-10 ludzi starczal rok-dwa. Koszt w polu ok. 93 d na glowe
+        // rocznie przy cenach wartosci (skora 4, sukno 20, plotno 10 d/kg) = ok. 5-6% zoldu (log 07.10: zold partii ok. 4.45 d na glowe dziennie)
+        public bool ArmyClothingEnabled = true;            // every soldier on pay wears out his shoes, clothes and linen: men in a lord's party (yours too) buy leather, felt (woollen cloth) and linen in the towns they leave - piece by piece at the market price, out of their own purse, before they spend the rest on food and drink; a town garrison takes them from its own town's market without paying, for its pay already went into that town's purse; a castle garrison has the castle purse buy them in the town its villages trade with. What cannot be had waits (Army Clothing Max Wait Days), then is only noted in the log. Banner Kings party supplies no longer buy or use up wool, linen or flax for the troops, and their "Textiles supplies" morale penalty is gone - one rule for clothing, rags carry no penalty (off = no wear, Banner Kings textiles and their morale penalty as before)
+        public float ArmyClothingFieldLeatherKg = 2f;      // kg of leather a soldier in a party wears out in a year: four pairs of shoes of about 0.4 kg (a pair lasted a season of marching) and his belts, straps and pouch; a crate of leather on the market is 10 kg
+        public float ArmyClothingFieldClothKg = 3f;        // kg of woollen cloth (felt on the market) a soldier in a party wears out in a year: tunic, hood and hose - the yearly livery of a king's archer, two and a half to three yards of cloth - and his share of cloaks and blankets
+        public float ArmyClothingFieldLinenKg = 2.5f;      // kg of linen a soldier in a party wears out in a year: two shirts and two pairs of braies (about 1.2 kg) and his share of tents, sacks and bags - a tent for six to ten men lasted a year or two
+        public float ArmyClothingGarrisonLeatherKg = 1.2f; // the same for a man of a garrison, who marches little: two pairs of shoes and his belts
+        public float ArmyClothingGarrisonClothKg = 2f;     // woollen cloth a garrison man wears out in a year - tunic and hood last longer behind walls
+        public float ArmyClothingGarrisonLinenKg = 1f;     // linen a garrison man wears out in a year - shirts only, he sleeps under a roof
+        public int ArmyClothingMaxWaitDays = 120;          // how many days of wear the men can put off when the town has no leather, cloth or linen or their purse is empty; beyond that their clothes simply go to rags (noted in the log only, no penalty in the game)
+
         // --- Supply and demand ---
         public bool SupplyDemandEnabled = true;            // arms, armour and horses obey supply and demand in towns and castles: a full stall sells cheap, an empty one dear - for buying AND selling, you and the AI alike (the item's own worth is untouched)
         public float SupplyDemandBase = 4f;                // pieces of one kind (type and tier) a town of reference prosperity wants on its stalls; fewer for higher tiers

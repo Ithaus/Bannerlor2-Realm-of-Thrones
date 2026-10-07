@@ -66,6 +66,31 @@ namespace Armoury
             catch { }
         }
 
+        // ------------------------------------------------------------ 150: tekstylia zaopatrzenia BK = 0 (jedna regula odziezy wojska)
+        // BK PartySupplies (dekompilacja BannerKings.dll): potrzeba tekstyliow (kategorie welna, plotno, len) rosnie co dobe o wynik
+        // BKPartyNeedsModel.CalculateClothNeed (0.01 sztuki na zolnierza x PartySuppliesFactor), zapisana w ClothNeed (w zapisie gry,
+        // do 0.3 x ludzi); BuyItems kupuje ja w osadzie z kiesy lorda (zloto w nicosc - osada nic nie dostaje), ConsumeItems zjada
+        // z jukow partii, takze gracza. Przy odziezy wojska (ArmyClothing) wynik = 0 dla KAZDEJ partii, a zapisana potrzeba (stary
+        // zapis) zerowana w tej samej chwili - inaczej BK kupilby i zjadl ja jeszcze raz obok naszej reguly.
+        internal static bool ClothHooked, ClothResetReady;
+        private static System.Reflection.MethodInfo _clothGet, _clothSet;
+
+        public static void ClothZeroPostfix(object __0, ref TaleWorlds.CampaignSystem.ExplainedNumber __result)
+        {
+            try
+            {
+                if (!ArmyClothing.On) return;
+                __result.LimitMin(0f);
+                __result.LimitMax(0f);
+                if (__0 == null || _clothGet == null || _clothSet == null) return;
+                float v = (float)_clothGet.Invoke(__0, null);
+                if (v == 0f) return;
+                _clothSet.Invoke(__0, new object[] { 0f });
+                ArmyClothing.BkClothZeroed++;
+            }
+            catch (Exception e) { ArmyClothing.Stumble("BkSupplyTemper.ClothZeroPostfix", e); }
+        }
+
         internal static void ApplyAll(HarmonyLib.Harmony h)
         {
             try
@@ -87,7 +112,24 @@ namespace Armoury
                         if (mm.ReturnType != typeof(TaleWorlds.CampaignSystem.ExplainedNumber)) continue;
                         try { h.Patch(mm, postfix: capPost); capped++; } catch { }
                     }
+                    // 150: tekstylia = 0 przy odziezy wojska - po czapce (Priority.Last), takze dla partii gracza
+                    try
+                    {
+                        var cloth = HarmonyLib.AccessTools.Method(tModel, "CalculateClothNeed");
+                        if (cloth != null && cloth.ReturnType == typeof(TaleWorlds.CampaignSystem.ExplainedNumber))
+                        {
+                            h.Patch(cloth, postfix: new HarmonyLib.HarmonyMethod(typeof(BkSupplyTemper), "ClothZeroPostfix") { priority = HarmonyLib.Priority.Last });
+                            ClothHooked = true;
+                        }
+                        _clothGet = HarmonyLib.AccessTools.PropertyGetter(t, "ClothNeed");
+                        _clothSet = HarmonyLib.AccessTools.PropertySetter(t, "ClothNeed");
+                        ClothResetReady = _clothGet != null && _clothSet != null && _clothGet.ReturnType == typeof(float);
+                        if (!ClothResetReady) { _clothGet = null; _clothSet = null; }
+                    }
+                    catch (Exception e) { Log.Error("BkSupplyTemper.ApplyAll(CalculateClothNeed)", e); }
                 }
+                Log.Info("BkSupplyTemper: tekstylia zaopatrzenia BK (CalculateClothNeed) = 0 przy odziezy wojska (150, MCM Army Clothing Enabled) - "
+                         + (ClothHooked ? "wpiete" : "BRAK latki (BK kupi tekstylia jak dotad)") + ", zerowanie zapisanej potrzeby ClothNeed " + (ClothResetReady ? "wpiete" : "BRAK") + ".");
                 Log.Info("BkSupplyTemper: sakwy AI ograniczone (dni=" + (Settings.Current != null ? Settings.Current.BkSupplyDaysCap : 4)
                          + ", sufit sztuk=" + (Settings.Current != null ? Settings.Current.BkSupplyMaxPieces : 15)
                          + ", czapka w " + capped + " modelach potrzeb).");

@@ -326,6 +326,7 @@ namespace Armoury
                 if (st.IsTown) { _dToTowns += amt; _dToTownsN++; Hold(st, amt); } else { _dToCastles += amt; _dToCastlesN++; }
                 MoneyLedger.Note(MoneyLedger.NWage, st, amt);           // ksiega przeplywow osad (tylko licznik)
                 MoneyLedger.NoteWageRouted(false, amt);
+                ArmyClothing.OnGarrisonPaid(mp, st, amt, r.Wage);       // 150: zaloga na zoldzie (juz w kasie osady) zdziera odziez - miasto z polki bez zlota, zamek placi miastu
             }
             else if (mp.IsLordParty)
             {

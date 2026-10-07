@@ -63,9 +63,10 @@ namespace Armoury
         private static readonly string[] PName = { "lordowie", "notable", "gracz", "inni bohaterowie", "karawany", "inne partie", "inne osady" };
 
         // nasze moduly liczone wprost, poza tickiem dobowym (Note)
-        internal const int NGear = 0, NMerc = 1, NShop = 2, NFence = 3, NWage = 4, NLife = 5;
-        private const int Notes = 6;
-        private static readonly string[] NName = { "zakupy sprzetu AI", "najemnicy z karczmy", "warsztaty zbrojne", "paser band (sprzet dla band)", "zold garnizonow", "sakiewki ludzi - zycie w miastach" };
+        internal const int NGear = 0, NMerc = 1, NShop = 2, NFence = 3, NWage = 4, NLife = 5, NCloth = 6;
+        private const int Notes = 7;
+        private static readonly string[] NName = { "zakupy sprzetu AI", "najemnicy z karczmy", "warsztaty zbrojne", "paser band (sprzet dla band)", "zold garnizonow", "sakiewki ludzi - zycie w miastach",
+                                                   "odziez wojska" };   // 150: sakiewki ludzi i kasy zamkow -> kasy miast
 
         // nasz tick dobowy (Mark)
         internal const int MRent = 0, MBuild = 1, MCrown = 2, MRest = 3, MFence = 4, MLife = 5;
