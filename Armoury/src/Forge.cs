@@ -344,7 +344,7 @@ namespace Armoury
         internal static int ForgeFee(Recipes.Recipe r)
         {
             var s = Settings.Current;
-            if (s.ForgeDayPassEnabled && DayPass.ActiveHere()) return 0;   // dniowka oplacona - kuznia i tak Twoja
+            if (DayPass.CoversHere()) return 0;   // dniowka oplacona - kuznia i tak Twoja
             // Jeff 07.10: "koszt kuzni to koszt kuzni, a co ja kuje to moja sprawa" - przy ForgeHireHistorical jedna cena dnia kuzni w
             // tym miescie (DayRentFee), bez wzgledu na to, co kujesz; wylaczone - dawna oplata wedle tieru
             if (s.ForgeHireHistorical) return DayRentFee(TaleWorlds.CampaignSystem.Settlements.Settlement.CurrentSettlement);
@@ -352,7 +352,8 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ kuznia za kazdy dzien roboty (Jeff 07.10: "za kazdy dzien kuznia")
-        private static readonly Dictionary<string, int> _rentDay = new Dictionary<string, int>();   // osada -> dzien oplacony (tylko w pamieci)
+        // przeglad 07.10: dzien kuzni zapisuje sie w JEDNYM rejestrze z karnetem BK (DayPass, doba od zaplaty, w save arm_daypass) -
+        // dotad osobny slownik dni kalendarza (tylko w pamieci) pozwalal zaplacic ten sam dzien drugi raz na ekranie BK
         private static int _rentShortDay = -1;
 
         /// <summary>Cena dnia kuzni w tym miescie (pensy, cale): ForgeFeeBase (dniowka rzemieslnika, 3 d) x poziom plac miasta (TownWage) -
@@ -363,26 +364,25 @@ namespace Armoury
         }
 
         /// <summary>
-        /// Oplata za dzien kuzni przy wlasnym projekcie (ForgeHireHistorical): DayRentFee, raz na dzien kalendarza w danej osadzie;
-        /// karnet dnia (DayPass) obejmuje dzien. true = dzien oplacony (juz, karnetem albo teraz); false = gracza nie stac - robota czeka
-        /// (komunikat raz na dzien).
+        /// Oplata za dzien kuzni przy kazdej robocie, ktora idzie naprzod (ForgeHireHistorical): DayRentFee za dobe od zaplaty w danej
+        /// osadzie - ten sam rejestr co karnet BK (DayPass), wiec dzien oplacony tu jest oplacony i na ekranie BK, i odwrotnie.
+        /// st = kuznia, w ktorej lezy robota (takze gdy kowal pracuje pod nieobecnosc gracza). true = doba oplacona (juz albo teraz);
+        /// false = gracza nie stac - robota czeka (komunikat raz na dzien).
         /// </summary>
         internal static bool PayDayRent(TaleWorlds.CampaignSystem.Settlements.Settlement st)
         {
             var s = Settings.Current;
             if (st == null || s == null || !s.ForgeHireHistorical) return true;
-            if (s.ForgeDayPassEnabled && DayPass.ActiveHere()) return true;
-            int day = (int)CampaignTime.Now.ToDays, paid;
-            if (_rentDay.TryGetValue(st.StringId, out paid) && paid == day) return true;
+            if (DayPass.ActiveAt(st)) return true;
+            int day = (int)CampaignTime.Now.ToDays;
             int fee = DayRentFee(st);
             if (Hero.MainHero.Gold < fee)
             {
                 if (_rentShortDay != day) { _rentShortDay = day; Log.Player("You cannot pay the forge hire in " + st.Name + " (" + fee + " gold a day) - the work waits.", true); }
                 return false;
             }
-            Pay.ToSettlement(fee);
-            _rentDay[st.StringId] = day;
-            Log.Info("Kuznia: dzien " + day + " w " + st.Name + " oplacony za " + fee + " (poziom plac " + TownWage.Index(st).ToString("0.00") + ").");
+            DayPass.Buy(st, fee);
+            Log.Info("Kuznia: doba w " + st.Name + " oplacona za " + fee + " (poziom plac " + TownWage.Index(st).ToString("0.00") + ").");
             return true;
         }
 

@@ -307,7 +307,7 @@ namespace Armoury
                 }
                 // dniowka oplacona - godziny NIE kosztuja NIC (twarde zero,
                 // zadnej arytmetyki mnoznikow, ktora moglaby to zepsuc)
-                if (s.ForgeDayPassEnabled && DayPass.ActiveHere())
+                if (DayPass.CoversHere())
                     __result = new ExplainedNumber(0f, false, new TextObject("{=arm_day_paid}Paid for the day"));
             }
             catch { }
@@ -712,15 +712,55 @@ namespace Armoury
 
         internal static bool ActiveHere()
         {
+            try { return ActiveAt(TaleWorlds.CampaignSystem.Settlements.Settlement.CurrentSettlement); }
+            catch { return false; }
+        }
+
+        /// <summary>Czy doba kuzni w tej osadzie jest oplacona (karnet BK albo dzien kuzni wlasnego projektu - jeden rejestr).</summary>
+        internal static bool ActiveAt(TaleWorlds.CampaignSystem.Settlements.Settlement s)
+        {
             try
             {
-                var s = TaleWorlds.CampaignSystem.Settlements.Settlement.CurrentSettlement;
                 if (s == null) return false;
                 double until;
                 return _paid.TryGetValue(s.StringId, out until)
                        && TaleWorlds.CampaignSystem.CampaignTime.Now.ToDays < until;
             }
             catch { return false; }
+        }
+
+        /// <summary>
+        /// Oplacona doba tutaj zwalnia z oplat godzinowych i oplaty za projekt - przy karnecie dnia albo przy dniu kuzni ze stawek
+        /// historycznych (ForgeHireHistorical: dzien kuzni wlasnego projektu to ta sama doba co karnet).
+        /// </summary>
+        internal static bool CoversHere()
+        {
+            var c = Settings.Current;
+            return c != null && (c.ForgeDayPassEnabled || c.ForgeHireHistorical) && ActiveHere();
+        }
+
+        /// <summary>Nowa kampania: zadnych dob z poprzedniej gry w tej samej sesji.</summary>
+        internal static void Clear() { _paid.Clear(); }
+
+        /// <summary>
+        /// Placi dobe kuzni w tej osadzie (24 h od teraz) z sakiewki gracza do kasy osady. Wolajacy sprawdza, czy gracza stac.
+        /// </summary>
+        internal static void Buy(TaleWorlds.CampaignSystem.Settlements.Settlement s, int rate)
+        {
+            if (s == null) return;
+            _paid[s.StringId] = TaleWorlds.CampaignSystem.CampaignTime.Now.ToDays + 1.0;   // pelna doba od TERAZ
+            if (rate <= 0) return;
+            bool was = Charging;
+            try
+            {
+                Charging = true;
+                if (s.SettlementComponent != null)
+                    TaleWorlds.CampaignSystem.Actions.GiveGoldAction.ApplyForCharacterToSettlement(Hero.MainHero, s, rate, true);
+                else
+                    TaleWorlds.CampaignSystem.Actions.GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, null, rate, true);
+            }
+            catch { }
+            finally { Charging = was; }
         }
 
         /// <summary>Stawka godzinowa kowala wg BK (po naszym mnozniku), bez skladnika dniowki.</summary>
@@ -751,6 +791,9 @@ namespace Armoury
             int rate = c.ForgeHireHistorical
                 ? Forge.DayRentFee(s)                                                       // dzien kuzni - ta sama cena co przy wlasnym projekcie
                 : (int)Math.Ceiling(HourlyRate(s) * Math.Max(1f, c.ForgeDayHours));
+            // przeglad 07.10: bez pieniedzy nie ma karnetu - dotad doba szla za darmo (gra oddaje tyle, ile jest w sakiewce);
+            // bez karnetu Banner Kings liczy godziny po swojemu
+            if (Hero.MainHero.Gold < rate) { Log.Info("DayPass: gracza nie stac na dobe kuzni w " + s.Name + " (" + rate + ")."); return; }
             _paid[s.StringId] = TaleWorlds.CampaignSystem.CampaignTime.Now.ToDays + 1.0;   // pelna doba od TERAZ
             try
             {

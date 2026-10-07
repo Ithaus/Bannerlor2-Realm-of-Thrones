@@ -495,6 +495,7 @@ namespace Armoury
         public override void RegisterEvents()
         {
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this, OnSessionLaunched);
+            CampaignEvents.OnNewGameCreatedEvent.AddNonSerializedListener(this, _ => DayPass.Clear());   // przeglad 07.10: doby kuzni z poprzedniej gry
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, OnDailyTick);
             CampaignEvents.OnItemProducedEvent.AddNonSerializedListener(this, OreLedger.OnProduced);   // wpis 98: ksiega rudy i drewna - sztuki faktycznie dopisane osadom
             CampaignEvents.OnItemConsumedEvent.AddNonSerializedListener(this, OreLedger.OnConsumed);   // wpis 98: wsad linii towarowych (narzedzia, deski)
@@ -1124,19 +1125,21 @@ namespace Armoury
                         if (hh >= 23 || hh < 5) continue;
                     }
 
-                    // kuznia za kazdy dzien roboty (Jeff 07.10): wlasny projekt przy kowadle placi dzien kuzni w pierwszej godzinie
-                    // roboty danego dnia (bk / van - karnet dnia jak dotad); bez pieniedzy robota czeka
-                    if (atForge && ForgeClock.On && p.Kind != "bk" && p.Kind != "van" && Settings.Current.ForgeHireHistorical)
+                    // kuznia za kazdy dzien roboty (Jeff 07.10): KAZDA robota, ktora idzie naprzod - wlasny projekt, sztuka z ekranu BK,
+                    // bron kuta po vanillowemu; przy kowadle i pod nieobecnosc gracza (kowal pracuje bez ciebie) - placi dobe kuzni tej
+                    // osady (jeden rejestr z karnetem BK); bez pieniedzy robota czeka. Przeglad 07.10: dotad tylko wlasny projekt, tylko
+                    // przy kowadle i tylko przy jednym zegarze kuzni - reszta szla za darmo.
+                    if (Settings.Current.ForgeHireHistorical)
                     {
                         bool rentOk = true;
-                        try { rentOk = Forge.PayDayRent(Settlement.CurrentSettlement); } catch (Exception er) { Log.Error("PayDayRent", er); }
+                        try { rentOk = Forge.PayDayRent(atForge ? Settlement.CurrentSettlement : Settlement.Find(p.SettlementId)); } catch (Exception er) { Log.Error("PayDayRent", er); }
                         if (!rentOk) continue;
                     }
 
                     // KROK GODZINOWY: zegar konczy sie DOKLADNIE z robota, bez
                     // doczekiwania do polnocy (blad, ktory wkurzyl Jeffa przy mieczu)
                     p.DaysLeft -= 1f / 24f;
-                    if (atForge && ForgeClock.On && (p.Kind == "bk" || p.Kind == "van")) { try { DayPass.EnsureBought(); } catch { } }   // kuznia wynajeta na dobe
+                    if (!Settings.Current.ForgeHireHistorical && atForge && ForgeClock.On && (p.Kind == "bk" || p.Kind == "van")) { try { DayPass.EnsureBought(); } catch { } }   // kuznia wynajeta na dobe
                     var rr = Recipes.For(p.Item);
                     // XP liczy sie od WLASCIWEGO czasu projektu: bron "van" ma swoj
                     // przelicznik (WeaponDaysPerTier), pancerze swoj (Jeff 29.08:
