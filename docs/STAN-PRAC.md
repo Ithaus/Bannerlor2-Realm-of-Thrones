@@ -54,6 +54,12 @@ uzupelnienie 22 scian siatki bez wpisu w pamieci drog po wczytaniu - dla wszystk
 K13 krok 3 (129 rzemioslo miasta: sukno/plotno/skora wedle oplacalnosci, galaz w-toku/k13-3-rzemioslo-miasta 9f7408f na k2) i krok 4
 (130 odziez, buty i plotno wojska z sakiewki zolnierzy, w-toku/k13-4-odziez-wojska 93ac4c1 na k2 - NIE na 129; test i wgranie TYLKO razem 128+129+130
 jako G1; zmiana widoczna: znika kara morale BK "Textiles supplies") - gotowe po recenzji, opisy docs/paczki/w-toku/k13-3-*, k13-4-*.
+Zbroja z CRAFT jak bron (w-toku/zbroja-craft-jak-bron 2344a61 na 127; tabela szans docs/TABELE-ZBROJA-SPOILS-2026-10-07.md), Spoils klan najemnikow
+"tylko prawdziwi" (w-toku/spoils-najemnicy-prawdziwi 383a724 na 128; znaleziona tez nocna podmiana wodza przez BK - naprawiona dla klanu Jeffa; 5 klanow
+najemnikow ROT ma te sama wade - osobny krok swiata) i naprawa u kwatermistrza z materialem (w-toku/spoils-kwatermistrz-z-materialem f0aef78 na 128)
+- gotowe po recenzji. OTWARTE: lawa naprawcza kowala (DoMendLoot) naprawia wraki bez materialu (zysk ok. 800 d na Brigandine z niczego) - Jeff
+uruchomil osobna sesje "Close Armoury mending-bench wreck repair hole" (07.10); naprawy ludzi (TroopSelfMend) i AI (AiWear) bez materialu - K13 krok 139;
+karczma rodzi najemnikow z niczego - krok "weterani".
 Gotowe obok (na 126): `paczki/127-pokretla-jeffa` (95baa63; json Jeffa: 45->35, 20.0->13.33, 5->2 przy wgraniu), `paczki/128-spoils-bez-darmowego-zlota` (83a8b1d).
 Pytania do Jeffa (07.10): zbroja z CRAFT jak bron (zepsuta/legendarna)? klan najemnikow Spoils dostaje ludzi z niczego - uszczelnic? naprawa u kwatermistrza
 Spoils bez materialu - ujednolicic z kuznia?
