@@ -451,6 +451,7 @@ namespace Armoury
                 if (need > 0 && c.AiMountBreederFallback && settlement.BoundVillages != null)
                 {
                     float markup = Math.Max(1f, c.AiMountBreederMarkup);
+                    bool byMarket = c.HorsesAtMarketPrice;
                     foreach (var v in settlement.BoundVillages)
                     {
                         if (need <= 0) break;
@@ -462,7 +463,7 @@ namespace Armoury
                             var el = vr.GetElementCopyAtIndex(i);
                             var it = el.EquipmentElement.Item;
                             if (it == null || el.Amount <= 0 || !IsPlainMount(it)) continue;
-                            int price = (int)(it.Value * markup);
+                            int price = BreederPrice(settlement, el.EquipmentElement, markup, byMarket);
                             int take = 0;
                             while (take < el.Amount && need > 0 && paid + toVillages + price <= budget) { take++; need--; toVillages += price; }
                             if (take <= 0) continue;
@@ -481,7 +482,7 @@ namespace Armoury
                 if (paid > 0) TaleWorlds.CampaignSystem.Actions.GiveGoldAction.ApplyForCharacterToSettlement(lord, settlement, paid);
                 Log.Info("Stajnia AI: " + lord.Name + " kupil " + bought + " koni ["
                          + (what ?? "?") + "] w " + settlement.Name
-                         + " za " + paid + (toVillages > 0 ? " (+ " + toVillages + " wsiom-hodowcom)" : "") + " (czekalo na awans " + (want - Math.Max(0, c.AiMountSpareBuffer))
+                         + " za " + paid + (toVillages > 0 ? " (+ " + toVillages + " wsiom-hodowcom" + (c.HorsesAtMarketPrice ? " po cenie targu" : "") + ")" : "") + " (czekalo na awans " + (want - Math.Max(0, c.AiMountSpareBuffer))
                          + ", mial " + have + "; z targu " + fromMarket + " przy polce " + shelfMounts + ").");
             }
             catch (Exception e) { Log.Error("Stables.AiBuy", e); }
@@ -572,6 +573,41 @@ namespace Armoury
             }
             catch { }
             return n;
+        }
+
+        /// <summary>
+        /// KON PO CENIE TARGU (paczka 143, Jeff 07.10: "konie: rekrut konny placi cene konia z targu, hodowca po cenie targu").
+        /// Cena konia na targu, na ktorym ta osada kupuje i sprzedaje konie - ten sam, na ktorym notabl kupuje konia ochotnikowi
+        /// (VolunteerKit.MarketOf: miasto - swoj targ; wies - jej miasto, inaczej najblizsze; zamek - najblizsze miasto). Cena kupna
+        /// bez kupca (Town.GetItemPrice) - ten sam wzor, ktorym lord placi za konia z polki (PriceOf): wartosc x wspolczynnik podazy
+        /// i popytu gry dla kategorii koni (0.8-1.3), wiec kon od hodowcy kosztuje tyle, co ten sam kon na polce. Prawo podazy
+        /// i popytu Armoury (SupplyDemand) liczy tylko przy znanym kupcu, wiec tu (jak dotad przy koniach z polki) nie dziala -
+        /// przy pustej polce dawaloby x2-4 wartosci za konia, ktorego wies ma w zapasie.
+        /// 0 = brak targu albo konia (wolajacy bierze wtedy stara cene). Jedna regula dla rekruta (RecruitCost) i hodowcy (BreederPrice).
+        /// </summary>
+        internal static int MarketPrice(TaleWorlds.CampaignSystem.Settlements.Settlement where, EquipmentElement horse)
+        {
+            try
+            {
+                if (horse.Item == null) return 0;
+                var m = VolunteerKit.MarketOf(where);
+                if (m == null || m.Town == null) return 0;
+                return Math.Max(1, m.Town.GetItemPrice(horse, null, false));
+            }
+            catch { return 0; }
+        }
+
+        /// <summary>
+        /// Cena konia od wsi-hodowcy (zamowienie lorda, gdy targ pusty). Dotad stala wartosc x AiMountBreederMarkup (1.3) bez
+        /// wzgledu na podaz i popyt - log 07.10 03:23: Tattered Prince w Braavos 5 koni z targu za 3620 (ok. 720 za sztuke)
+        /// i 2 od hodowcow za 9360 (4680 za sztuke). HorsesAtMarketPrice: hodowca bierze cene tego konia na targu miasta
+        /// (MarketPrice); zloto dalej idzie do wsi, kon dalej schodzi z jej zapasu. Bez targu - stara cena.
+        /// </summary>
+        internal static int BreederPrice(TaleWorlds.CampaignSystem.Settlements.Settlement settlement, EquipmentElement el, float markup, bool byMarket)
+        {
+            int price = byMarket ? MarketPrice(settlement, el) : 0;
+            if (price <= 0) price = (int)((el.Item != null ? el.Item.Value : 0) * markup);
+            return price;
         }
 
         private static int PriceOf(TaleWorlds.CampaignSystem.Settlements.Settlement st, EquipmentElement el)

@@ -293,6 +293,7 @@ namespace Armoury
         public float AiMountBuyCooldownDays = 4f;          // days before that same party restocks again: without a pause the AI resold the horses as ordinary goods and bought them back, pumping millions through the market
         public bool AiMountBreederFallback = true;         // market empty? he orders from the local breeder instead of riding away horseless
         public float AiMountBreederMarkup = 1.3f;          // the breeder charges this much over the plain worth for the trouble
+        public bool HorsesAtMarketPrice = true;            // a horse costs what the local town market asks for it: a mounted recruit is charged his own horse at that market price instead of the game's flat 150 or 500 (with Historical Recruit Cost on), and a lord ordering from the village breeders pays them the town's market price for that horse instead of a flat markup over its worth (off = as before)
         public int AiMountMarketSharePercent = 25;        // a lord may take at most this share of the horses on a town's shelf in one visit - the rest he orders from the breeder, so markets are not stripped bare (Jeff 15.09: no horses to buy anywhere)
         public int AiMountShelfFloor = 4;                  // and never buys the last few: this many head always stay on the shelf for other buyers
 

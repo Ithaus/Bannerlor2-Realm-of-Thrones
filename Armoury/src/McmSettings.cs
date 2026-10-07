@@ -976,6 +976,10 @@ namespace Armoury
         [SettingPropertyGroup("A knight needs a horse")]
         public float AiMountBreederMarkup { get; set; } = 1.3f;
 
+        [SettingPropertyBool("Horses At Market Price", HintText = "a horse costs what the local town market asks for it: a mounted recruit is charged his own horse at that market price instead of the game's flat 150 or 500 (with Historical Recruit Cost on), and a lord ordering from the village breeders pays them the town's market price for that horse instead of a flat markup over its worth (off = as before)")]
+        [SettingPropertyGroup("A knight needs a horse")]
+        public bool HorsesAtMarketPrice { get; set; } = true;
+
         [SettingPropertyInteger("Ai Mount Market Share Percent", 0, 100, "0", HintText = "a lord may take at most this share of the horses on a town's shelf in one visit - the rest he orders from the breeder, so markets are not stripped bare (Jeff 15.09: no horses to buy anywhere)")]
         [SettingPropertyGroup("A knight needs a horse")]
         public int AiMountMarketSharePercent { get; set; } = 25;
@@ -2863,6 +2867,7 @@ namespace Armoury
             s.AiMountBuyCooldownDays = AiMountBuyCooldownDays;
             s.AiMountBreederFallback = AiMountBreederFallback;
             s.AiMountBreederMarkup = AiMountBreederMarkup;
+            s.HorsesAtMarketPrice = HorsesAtMarketPrice;
             s.AiMountMarketSharePercent = AiMountMarketSharePercent;
             s.AiMountShelfFloor = AiMountShelfFloor;
             s.LongYearEnabled = LongYearEnabled;

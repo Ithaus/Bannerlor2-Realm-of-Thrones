@@ -88,7 +88,9 @@ namespace Armoury
             catch (Exception e) { Log.Error("VolunteerKit", e); }
         }
 
-        private static Settlement MarketOf(Settlement st)
+        /// <summary>Targ osady: miasto - swoj; wies - miasto, do ktorego nalezy, inaczej najblizsze miasto; zamek - najblizsze miasto.
+        /// Paczka 143: na tym samym targu wycenia sie konia rekruta i konia od hodowcy (Stables.MarketPrice) - notabl kupuje tu konia ochotnikowi.</summary>
+        internal static Settlement MarketOf(Settlement st)
         {
             if (st == null) return null;
             if (st.IsTown) return st;
