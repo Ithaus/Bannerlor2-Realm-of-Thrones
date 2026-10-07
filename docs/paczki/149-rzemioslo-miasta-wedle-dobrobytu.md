@@ -1,0 +1,18 @@
+<!-- SKLAD TOWARY 3 (07.10.2026), galaz t3-sklad w klonie lancuch, baza 126 (4563c75). NIEWGRANE - **Status** dopisze sie przy wgraniu.
+     Paczka 149 = commit 6609ad4 na t3-sklad - NOWA przy skladaniu (decyzja Jeffa 07.10 "wszystkie place w miescie x dobrobyt"; styk k13-3 / n131c z przekazania sesji lawy).
+     Proba: towary3\proba-148 (proba autora 148 + regula harnessu z dniowka x poziom plac + scenariusz W). -->
+
+## 2026-10-07 (149) - RZEMIOSLO MIASTA PLACI WEDLE DOBROBYTU (TownWage): praca folownikow, tkaczy i garbarzy w bramce zysku liczona dniowka tego miasta - 3 d x poziom plac miasta (0.5-1.5), jak place warsztatow (136)
+**Mod:** Armoury | **Pliki:** `TownCrafts.cs` (NOWE `WageIndex`; `Work` - koszt pracy x poziom plac; linia startowa "Rzemioslo miasta (148)"), `Settings.cs` + `McmSettings.cs` (opis `TownCraftsEnabled`; bez nowych ustawien).
+
+**Problem:** decyzja Jeffa 07.10 ("wszelkie koszty w danym miescie zalezne od dobrobytu i stawek historycznych"; "wszystko, co dotyczy pieniadza, placenia musi byc spojne") - rzemioslo miasta (148) liczylo prace w bramce zysku po stalej dniowce 3 d (`WorkshopWagePerDay`) w kazdym miescie, a od 136 place linii towarowych warsztatow i ich utrzymanie ida x poziom plac miasta (`TownWage.Index`). W bogatym miescie sukno tkalo sie tak samo jak w biednym, choc praca jest tam o polowe drozsza.
+
+**Przyczyna:** `TownCrafts.Work`: `cost = wsad x cena surowca + roboczodni x WorkshopWagePerDay` - bez poziomu plac.
+
+**Zmiana:** koszt pracy = roboczodni na sztuke x `WorkshopWagePerDay` x `TownWage.Index(miasto)` (dobrobyt / `TownWageRefProsperity` 4800, 0.5-1.5) - ta sama regula i ten sam wylacznik co `WorkshopTrade` (place linii towarowych, utrzymanie): przy wylaczonym `WorkshopWageByTier` - 3 d wszedzie (jak 148). Roboczodni na sztuke (rece) bez zmian - wskaznik dziala tylko na stawke (jak w `TownWage`); zlota dalej nie ma (polka -> polka tego samego miasta). Linia startowa: "... wyrob placi wsad + prace (dniowka 3.0 d x poziom plac miasta (dobrobyt / 4800.0, 0.5-1.5)) + 25.0% ...".
+
+**Rachunek:** wyrob wiazany wartoscia (wsad = 60% wartosci wyrobu, praca 20%, marza 25%) przerabia sie, gdy indeks ceny wyrobu >= 0.75 x indeks ceny surowca + 0.25 x poziom plac. W najbiedniejszym miescie (0.5) prog lezy o 0.125 wartosci wyrobu nizej niz w miescie srednim, w najbogatszym (1.5) o 0.125 wyzej: sukno (200 d) +-25 d, plotno (100 d) +-12.5 d, skora (40 d) +-5 d.
+
+**Proba poza gra (proba autora 148 - prawdziwe Harmony, DLL gry, BannerKings, prawdziwy Armoury - z dniowka x poziom plac w regule harnessu i NOWYM scenariuszem W):** on 83/83, on2 83/83 (odciski rowne), off 40/40. W: trzy miasta, dobrobyt 2400 / 4800 / 7200 (poziom plac 0.5 / 1.0 / 1.5), welna 0.3, filc 110 d (0.55): progi 70 / 95 / 120 d, zrobione 3 / 5 / 0 filcow = harness; przy jednej dniowce 3 d (148) bogate tkaloby tak samo (prog 95); przy wylaczonym `WorkshopWageByTier` bogate tka (7) jak w 148; linia startowa mowi o poziomie plac. DLL 148 na nowej regule: 76/83 (oblewa D i W) - proba lapie roznice.
+
+**Ryzyko / co sprawdzic:** REGRESJE - przy wylaczonym `WorkshopWageByTier` albo `TownWageRefProsperity` = 0 jak 148; rece i wsad bez zmian. EKONOMIA - w bogatych miastach (Kings Landing, Lannisport) mniej sukna przy tanim suknie, w biednych wiecej; welna i len tam, gdzie praca tansza, wiec zuzycie miasta dla karawan (`CaravanBulk.Use`) i cena surowcow pojda za tym. SPOJNOSC - jedna dniowka x poziom plac w warsztatach (136), naprawach (135), kuzni (142), budowach (138), niewoli (139), turniejach (140) i rzemiosle (149). **Co Jeff zobaczy:** nic wprost; w logu "Rzemioslo miasta (148): dzien N" bogate miasta czesciej "bez zysku".
