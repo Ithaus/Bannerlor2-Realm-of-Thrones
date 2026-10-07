@@ -118,7 +118,7 @@ namespace Armoury
             catch { return false; }
         }
 
-        private static int StepsOf(CraftingMaterials g)
+        internal static int StepsOf(CraftingMaterials g)   // internal: MendMaterial (naprawa u kwatermistrza) liczy metal tym samym przelicznikiem gatunku
         {
             switch (g)
             {
@@ -522,7 +522,7 @@ namespace Armoury
         /// <summary>Cena jednostki surowca dla warsztatu (m: 0 ruda, 1 drewno, 2 skora, 3 len/welna). Gra zna tylko pensy calkowite:
         /// ruda (0.75 d za 10 kg) i drewno (0.35 d) stoja na 1-2 d, czyli 2-5x historii - wtedy cena historyczna za kg x waga;
         /// skora, len, welna (dziesiatki pensow) - cena targu (brak = drozej).</summary>
-        private static float MatPrice(Town town, ItemObject it, int m)
+        internal static float MatPrice(Town town, ItemObject it, int m)   // internal: MendMaterial - material do naprawy po tej samej cenie, co warsztaty
         {
             if (it == null) return 0f;
             var s = Settings.Current;

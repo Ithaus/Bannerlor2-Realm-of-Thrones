@@ -30,7 +30,7 @@ namespace Armoury
 
         internal static void LeftTown() { _bench = 0f; _benchTown = null; }
 
-        private static int UnitCost(EquipmentElement ee)
+        internal static int UnitCost(EquipmentElement ee)   // internal: robocizna kowali miasta - ta sama stawka u kwatermistrza Spoils (SpoilsSeal)
         {
             return Math.Max(1, (int)(ee.Item.Value * (1f - ee.ItemModifier.PriceMultiplier) * 0.25f));
         }

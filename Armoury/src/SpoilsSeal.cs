@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Text;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
@@ -47,8 +48,15 @@ namespace Armoury
     ///     chipped... - zuzycie Armoury) wraca NOWA, "Mangled" (10%) wraca jako "Plundered" (55%) - wartosc z niczego ("masterwork"
     ///     wraca zwykla - strata). -> do magazynu wchodzi tylko to, co magazyn oddaje co do sztuki (czyste i "Plundered"), reszta
     ///     wraca do sakw.
+    /// 10. QuartermasterBehavior.ExecuteRepair / OnRepairBudgetConsequence - naprawa u kwatermistrza: zloto gracza w nicosc (30% wartosci
+    ///     x 1 / 1.5 / 2 / 4 wedle stanu), sztuka wraca czysta bez materialu - takze wrak "Mangled" (wbrew wpisowi 97). -> Jeff 07.10
+    ///     "TAK ujednolicic" (wlacznik SpoilsQuartermasterRepair): naprawiaja kowale miasta jak wszedzie w Armoury - robocizna 25%
+    ///     utraconej wartosci (TroopSelfMend.UnitCost, ta sama co AiWear i lawa naprawcza), material z polki miasta wedle stanu
+    ///     (MendMaterial: skora, plotno, drewno, metal z surowki, zlomu albo rudy) po cenie targu, wszystko do kasy miasta; brak
+    ///     materialu - sztuka czeka; wrakow kwatermistrz nie odnawia. Wycena w menu (CalculateRepairCosts, opis, podpowiedz) mowi to samo.
+    ///     Zaplata przez GiveGoldAction (jak lawa naprawcza - Pay.ToSettlement); wycena, wykonanie i budzet dzialaja tylko razem.
     /// Martwe w 1.8.4: zloto pozostalosci pola (BattlefieldRemnantsTemporarilyDisabled = true; i tak bralo z monet z cial).
-    /// Bez zmian (to nie zloto z niczego): naprawa i najem kwatermistrza, zalozenie / odnowienie / nowe druzyny klanu (zloto gracza
+    /// Bez zmian (to nie zloto z niczego): najem kwatermistrza, zalozenie / odnowienie / nowe druzyny klanu (zloto gracza
     /// czesciowo do nikad - ujscie), dary dla zalogi / milicji / zywnosc dla miasta (towar na wskazniki miasta), dzienny dochod
     /// klanu (przelew od przywodcy), wyslanie zlota (przelew), wyposazenie przywodcy (towar do jego partii), lup i modyfikatory.
     /// Wszystko przez refleksje - bez Spoils nic sie nie wpina. Stan: tylko liczniki do linii dnia (bez zapisu); wyjatek - licznik
@@ -72,7 +80,7 @@ namespace Armoury
         private static MethodInfo _mTypeCoef, _mFenceCat, _mBulk, _mCrime, _mCooldown, _mRecordFence, _mRecordSalvage;
         private static MethodInfo _mIsLooted, _mLootedMod, _mLogMessage, _mDonationGold;
         private static readonly List<string> _wired = new List<string>(), _missing = new List<string>();
-        private static bool _present, _saleWired;
+        private static bool _present, _saleWired, _repWired, _repCostWired, _repBudWired;
 
         internal static bool NoAutoSale { get { var s = Settings.Current; return s != null && s.SpoilsNoAutoSale; } }
         internal static bool NoFreeGold { get { var s = Settings.Current; return s != null && s.SpoilsNoFreeGold; } }
@@ -87,6 +95,27 @@ namespace Armoury
         private static readonly Tally _fence = new Tally(), _salv = new Tally(), _don = new Tally();
         private static int _fenceLet, _salvLet, _donLet, _scN, _scPaid, _scCut, _scLet, _stockBack, _stockUp, _stockDown;
         private static int _stumbles, _stumblesDay;
+
+        // 10. naprawa u kwatermistrza: pola wyceny Spoils, dziennik napraw, stan ostatniej wyceny (menu) i liczniki dnia
+        private static FieldInfo _fRepAllN, _fRepAllC, _fRepWN, _fRepWC, _fRepAN, _fRepAC, _fBudN, _fBudC;
+        private static MethodInfo _mRecordRepair;
+        private const int CatWeapons = 0, CatArmor = 1, CatAll = 2;   // QuartermasterBehavior.RepairCategory
+        private static int _lastWait, _lastWaitMask, _lastWrecks, _lastNoSmith;
+        private static string _lastTown = "";
+        private static int _rpDeals, _rpPieces, _rpLabor, _rpMat, _rpWait, _rpWrecks, _rpNoSmith, _rpPoor, _rpScrap, _rpNone;
+        private static float _rpMatValue;
+        private static readonly int[] _rpState = new int[3], _rpWaitBy = new int[MendMaterial.Kinds];
+        private static readonly float[] _rpKg = new float[MendMaterial.Kinds];
+        private static readonly Dictionary<string, int> _rpTaken = new Dictionary<string, int>();
+        private static readonly Dictionary<string, int[]> _rpWhere = new Dictionary<string, int[]>();   // miasto -> { sztuk, zl }
+        private static int _rpLetDeals, _rpLetN, _rpLetGold, _rpLetWrecks;
+
+        internal static bool QmRepair { get { var s = Settings.Current; return s != null && s.SpoilsQuartermasterRepair; } }
+
+        /// <summary>Naprawa po naszemu tylko w calosci: wycena (menu), wykonanie i budzet wpiete razem - inaczej menu pokazaloby nasze ceny,
+        /// a naprawial Spoils (albo odwrotnie). Brak ktorejkolwiek z trzech = Spoils jak dotad (linia dnia: "LATKA NIEWPIETA").</summary>
+        private static bool RepWiredAll { get { return _repWired && _repCostWired && _repBudWired; } }
+        private static bool QmOn { get { return QmRepair && RepWiredAll; } }
 
         /// <summary>Rozliczenie sprzedazy miastu: transakcje, sztuki sprzedane / zostawione, zaplata miasta, oferta Spoils (z niczego).</summary>
         private sealed class Tally
@@ -104,6 +133,8 @@ namespace Armoury
             SpoilsCompany.Reset();   // klan najemnikow Spoils (liczniki) - ten sam moment co reszta Spoils
             ClearDay();
             _stumbles = 0;
+            _lastWait = _lastWaitMask = _lastWrecks = _lastNoSmith = 0; _lastTown = "";
+            MendMaterial.Reset();   // zapas kowali miast (reszty calych sztuk) - wczytanie oddaje go w ArmouryBehavior.SyncData (arm_mendstock)
         }
 
         private static void ClearDay()
@@ -116,6 +147,10 @@ namespace Armoury
             _fence.Clear(); _salv.Clear(); _don.Clear();
             _fenceLet = _salvLet = _donLet = _scN = _scPaid = _scCut = _scLet = _stockBack = _stockUp = _stockDown = 0;
             _stumblesDay = 0;
+            _rpDeals = _rpPieces = _rpLabor = _rpMat = _rpWait = _rpWrecks = _rpNoSmith = _rpPoor = _rpScrap = _rpNone = 0; _rpMatValue = 0f;
+            Array.Clear(_rpState, 0, _rpState.Length); Array.Clear(_rpWaitBy, 0, _rpWaitBy.Length); Array.Clear(_rpKg, 0, _rpKg.Length);
+            _rpTaken.Clear(); _rpWhere.Clear();
+            _rpLetDeals = _rpLetN = _rpLetGold = _rpLetWrecks = 0;
         }
 
         private static void Stumble(string where, Exception e)
@@ -671,6 +706,316 @@ namespace Armoury
             catch (Exception e) { Stumble("SpoilsSeal.Income", e); }
         }
 
+        // ------------------------------------------------------------ 10. naprawa u kwatermistrza (kowale miasta, material z targu, bez wrakow)
+
+        /// <summary>Plan naprawy jednego zlecenia: sztuki, ktore kowale zrobia (robocizna i material), i to, co zostaje (czeka na
+        /// material, wraki, nie robota kowala, za drogo / poza budzetem). Lawa (MendMaterial.Bench) trzyma zaplanowany material.</summary>
+        private sealed class Plan
+        {
+            public MendMaterial.Bench Bench;
+            public readonly List<Job> Jobs = new List<Job>();
+            public readonly int[] WaitBy = new int[MendMaterial.Kinds];
+            public int Pieces, Labor, Wait, WaitMask, Wrecks, NoSmith, Poor;
+            public float Mat;
+            public int Total { get { return Labor + MatGold(Mat); } }
+        }
+
+        private sealed class Job { public EquipmentElement El; public int N, Labor; public float Mat; }
+
+        private struct Lot2 { public EquipmentElement El; public int Amount, Labor, Value; public float[] Need; public float Est; }
+
+        /// <summary>Material placony w calych pensach, w gore (ulamek pensa za zuzyty material placi zlecajacy, nie miasto).</summary>
+        private static int MatGold(float m) { return m <= 0.001f ? 0 : (int)Math.Ceiling(m - 0.001f); }
+
+        private static int StateOf(ItemModifier m)
+        {
+            if (m == null) return -1;
+            switch (m.StringId) { case "rl_looted": return 0; case "rl_looted_medium": return 1; case "rl_looted_heavy": return 2; default: return -1; }
+        }
+
+        private static bool InCategory(ItemObject it, int cat)
+        {
+            if (cat == CatAll) return true;
+            var m = cat == CatWeapons ? _mIsWeapon : _mIsArmor;
+            return (bool)m.Invoke(null, new object[] { it });
+        }
+
+        /// <summary>
+        /// Plan wedle zasad Spoils (te same sztuki: lup z sakw gracza, kategoria; budzet: kolejnosc, limit zlota i sztuk), ale ceny i
+        /// warunki Armoury: robocizna = TroopSelfMend.UnitCost (25% utraconej wartosci), material z polki miasta (MendMaterial),
+        /// wraki pominiete, sztuki bez receptury kowala pominiete. limit - najwyzej tyle zlota razem (robocizna + material w calych pensach).
+        /// </summary>
+        private static Plan MakePlan(Settlement st, ItemRoster bag, int cat, bool budget, int limit, int maxItems, int priority)
+        {
+            var p = new Plan { Bench = new MendMaterial.Bench(st) };
+            var lots = new List<Lot2>();
+            for (int i = 0; i < bag.Count; i++)
+            {
+                var el = bag.GetElementCopyAtIndex(i);
+                var ee = el.EquipmentElement;
+                var it = ee.Item;
+                if (el.Amount <= 0 || it == null || !IsLooted(ee.ItemModifier) || !InCategory(it, cat)) continue;
+                if (LootPrices.IsWreck(ee.ItemModifier)) { p.Wrecks += el.Amount; continue; }    // wpis 97: wrak - tylko kuznia z materialem albo przetop
+                var need = MendMaterial.Needs(ee);
+                if (need == null) { p.NoSmith += el.Amount; continue; }                       // nie robota kowala (brak receptury)
+                lots.Add(new Lot2 { El = ee, Amount = el.Amount, Labor = TroopSelfMend.UnitCost(ee), Value = it.Value, Need = need });
+            }
+            if (budget)
+            {
+                for (int i = 0; i < lots.Count; i++) { var l = lots[i]; l.Est = l.Labor + p.Bench.Estimate(l.Need); lots[i] = l; }
+                if (priority == 2) lots.Sort((a, b) => b.Value.CompareTo(a.Value));                                        // najlepsze najpierw
+                else if (priority == 1) lots.Sort((a, b) => (b.Value / Math.Max(0.01f, b.Est)).CompareTo(a.Value / Math.Max(0.01f, a.Est)));   // najwiecej wartosci za grosz
+                else lots.Sort((a, b) => a.Est.CompareTo(b.Est));                                                        // najtansze najpierw
+            }
+            foreach (var lot in lots)
+            {
+                Job job = null;
+                int labor = lot.Labor;
+                for (int k = 0; k < lot.Amount; k++)
+                {
+                    if (budget && p.Pieces >= maxItems) { p.Poor += lot.Amount - k; break; }
+                    float cost; int miss;
+                    var pp = p;
+                    int r = p.Bench.TryMend(lot.Need, c => (long)pp.Labor + labor + MatGold(pp.Mat + c) <= limit, out cost, out miss);
+                    if (r == 0)                                                                    // ta sama sztuka - ten sam brak: reszta stosu tez czeka
+                    {
+                        int rest = lot.Amount - k;
+                        p.Wait += rest; p.WaitMask |= miss;
+                        for (int m = 0; m < MendMaterial.Kinds; m++) if ((miss & (1 << m)) != 0) p.WaitBy[m] += rest;
+                        break;
+                    }
+                    if (r < 0) { p.Poor += lot.Amount - k; break; }
+                    if (job == null) { job = new Job { El = lot.El }; p.Jobs.Add(job); }
+                    job.N++; job.Labor += labor; job.Mat += cost;
+                    p.Pieces++; p.Labor += labor; p.Mat += cost;
+                }
+            }
+            return p;
+        }
+
+        /// <summary>Wykonanie planu: material z polki (Commit), sztuki w sakwach z lupu na czyste, zaplata w finally - za to, co naprawde
+        /// zrobione (robocizna + material w calych pensach) z kiesy gracza do kasy miasta. Nieudana zamiana wraca sztuke w jej stanie.
+        /// Zaplata przez GiveGoldAction (gracz -> osada) - ta sama droga co lawa naprawcza Armoury (Pay.ToSettlement): ksiega pieniadza
+        /// widzi przelew gracza do kasy miasta ("przelewy gry"), a nie niewyjasniona "reszte"; gra nie pobierze wiecej, niz gracz ma.</summary>
+        private static void Apply(Plan p, Settlement st, ItemRoster bag, out int done, out int labor, out int matGold)
+        {
+            done = 0; labor = 0; matGold = 0;
+            float mat = 0f;
+            try
+            {
+                p.Bench.Commit();
+                foreach (var j in p.Jobs)
+                {
+                    bool off = false;
+                    try
+                    {
+                        bag.AddToCounts(j.El, -j.N); off = true;
+                        bag.AddToCounts(new EquipmentElement(j.El.Item), j.N); off = false;
+                    }
+                    finally { if (off) bag.AddToCounts(j.El, j.N); }
+                    done += j.N; labor += j.Labor; mat += j.Mat;
+                    int s = StateOf(j.El.ItemModifier); if (s >= 0) _rpState[s] += j.N;
+                }
+            }
+            finally
+            {
+                if (done == p.Pieces) mat = p.Mat;   // cala robota zrobiona: ta sama suma co w planie (menu) - zaplata co do pensa jak w menu
+                matGold = MatGold(mat);
+                int due = labor + matGold;
+                if (due > 0) GiveGoldAction.ApplyForCharacterToSettlement(Hero.MainHero, st, due, true);
+            }
+        }
+
+        private static string Kinds(int mask, bool en)
+        {
+            var l = new List<string>();
+            for (int m = 0; m < MendMaterial.Kinds; m++) if ((mask & (1 << m)) != 0) l.Add(en ? MendMaterial.KindEn[m] : MendMaterial.KindName[m]);
+            if (l.Count == 0) return en ? "materials" : "?";
+            if (!en || l.Count == 1) return string.Join(", ", l.ToArray());
+            return string.Join(", ", l.GetRange(0, l.Count - 1).ToArray()) + " or " + l[l.Count - 1];   // "iron (...) or leather"
+        }
+
+        /// <summary>Co zostalo i dlaczego - po angielsku dla gracza (komunikat po naprawie, opis w menu, podpowiedz opcji).</summary>
+        private static string LeftEn(int wait, int waitMask, int wrecks, int noSmith, string town)
+        {
+            var sb = new StringBuilder();
+            if (wait > 0) sb.Append(' ').Append(wait).Append(wait == 1 ? " piece waits" : " pieces wait").Append(" for materials - the market of ").Append(town)
+                            .Append(" has not enough ").Append(Kinds(waitMask, true)).Append('.');
+            if (wrecks > 0) sb.Append(' ').Append(wrecks).Append(wrecks == 1 ? " wreck (Mangled) is" : " wrecks (Mangled) are")
+                              .Append(" not restored here - mend wrecks at a forge with your own materials, or salvage them.");
+            if (noSmith > 0) sb.Append(' ').Append(noSmith).Append(noSmith == 1 ? " piece is no smith's work and stays as it is." : " pieces are no smith's work and stay as they are.");
+            return sb.ToString();
+        }
+
+        private static void DoRepair(int cat, bool budget)
+        {
+            var bag = MobileParty.MainParty != null ? MobileParty.MainParty.ItemRoster : null;
+            if (bag == null || Hero.MainHero == null) return;                                        // jak Spoils: bez sakw nic sie nie dzieje
+            var st = Settlement.CurrentSettlement;
+            string town = Nm(st);
+            if (st == null || st.Town == null)
+            {
+                Say("There are no town smiths here - nothing was repaired.", "[QM] Armoury: repair refused - not in a town");
+                return;
+            }
+            var inst = Mcm();
+            int gold = Hero.MainHero.Gold;
+            int limit = budget ? Math.Max(0, Math.Min(McmInt(inst, "RepairBudget", 3000), gold)) : gold;
+            int maxItems = budget ? McmInt(inst, "RepairBudgetMaxItems", 6) : int.MaxValue;
+            var p = MakePlan(st, bag, cat, budget, limit, maxItems, McmInt(inst, "RepairBudgetPriority", 0));
+            _rpDeals++; _rpWait += p.Wait; _rpWrecks += p.Wrecks; _rpNoSmith += p.NoSmith; _rpPoor += p.Poor;
+            for (int m = 0; m < MendMaterial.Kinds; m++) _rpWaitBy[m] += p.WaitBy[m];
+            string what = budget ? "budzet" : cat == CatWeapons ? "bron" : cat == CatArmor ? "pancerz" : "wszystko";
+            if (p.Pieces == 0)
+            {
+                _rpNone++;
+                Say("The smiths of " + town + " could not restore anything." + LeftEn(p.Wait, p.WaitMask, p.Wrecks, p.NoSmith, town)
+                    + (p.Poor > 0 ? " Not enough coin for the rest." : ""),
+                    "[QM] Armoury: repair (" + what + ") in " + town + " - nothing restored: wait " + p.Wait + ", wrecks " + p.Wrecks + ", no smith's work " + p.NoSmith + ", over budget/gold " + p.Poor);
+                Log.Info("Kwatermistrz (Spoils) - naprawa (" + what + ") w " + town + ": nic nie naprawiono - czeka na material " + p.Wait + " szt. (brak: " + Kinds(p.WaitMask, false)
+                         + "), wrakow " + p.Wrecks + ", nie robota kowala " + p.NoSmith + ", za drogo / poza budzetem " + p.Poor + ".");
+                if (budget) { try { GameMenu.ActivateGameMenu("realistic_loot_qm_repair"); } catch { } }
+                return;
+            }
+            int done, labor, matGold;
+            Apply(p, st, bag, out done, out labor, out matGold);
+            int paid = labor + matGold;
+            _rpPieces += done; _rpLabor += labor; _rpMat += matGold; _rpMatValue += p.Bench.UsedValue; _rpScrap += p.Bench.ScrapTaken;
+            for (int m = 0; m < MendMaterial.Kinds; m++) _rpKg[m] += p.Bench.UsedKg[m];
+            var taken = new List<string>();
+            foreach (var kv in p.Bench.TakenById) { int t; _rpTaken.TryGetValue(kv.Key, out t); _rpTaken[kv.Key] = t + kv.Value; taken.Add(kv.Key + " " + kv.Value); }
+            int[] w; if (!_rpWhere.TryGetValue(town, out w)) { w = new int[2]; _rpWhere[town] = w; } w[0] += done; w[1] += paid;
+            try { var j = _pJournal != null ? _pJournal.GetValue(null, null) : null; if (j != null && _mRecordRepair != null) _mRecordRepair.Invoke(j, new object[] { done, paid }); }
+            catch (Exception e) { Stumble("SpoilsSeal.Repair.Journal", e); }
+            Say("The smiths of " + town + " restored " + done + (done == 1 ? " piece" : " pieces") + " for " + paid + " denars, paid into the town's coffers: "
+                + labor + " for their work and " + matGold + " for materials from its market." + LeftEn(p.Wait, p.WaitMask, p.Wrecks, p.NoSmith, town)
+                + (p.Poor > 0 ? " " + p.Poor + (budget ? " more do not fit the budget." : " more you cannot pay for.") : ""),
+                "[QM] Armoury: repair (" + what + ") in " + town + " - " + done + " items for " + paid + " den. to the town treasury (work " + labor + ", materials " + matGold
+                + "), wait " + p.Wait + ", wrecks " + p.Wrecks + ", no smith's work " + p.NoSmith + ", over budget/gold " + p.Poor);
+            Log.Info("Kwatermistrz (Spoils) - naprawa (" + what + ") w " + town + ": naprawiono " + done + " szt., zaplata " + paid + " zl z kiesy gracza do kasy miasta (robocizna "
+                     + labor + " + material " + matGold + ", wartosc zuzytego materialu " + p.Bench.UsedValue.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)
+                     + "); z polki: " + (taken.Count > 0 ? string.Join(", ", taken.ToArray()) : "nic (z zapasu kowali)") + "; zuzyto kg: metal "
+                     + p.Bench.UsedKg[0].ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) + ", drewno " + p.Bench.UsedKg[1].ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)
+                     + ", skora " + p.Bench.UsedKg[2].ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) + ", plotno " + p.Bench.UsedKg[3].ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)
+                     + "; czeka na material " + p.Wait + " szt. (brak: " + (p.Wait > 0 ? Kinds(p.WaitMask, false) : "-") + "), wrakow nieodnowionych " + p.Wrecks + ", nie robota kowala "
+                     + p.NoSmith + ", za drogo / poza budzetem " + p.Poor + ".");
+            try { GameMenu.ActivateGameMenu(budget ? "realistic_loot_qm_repair" : "realistic_loot_quartermaster"); } catch { }
+        }
+
+        /// <summary>Wylacznik wylaczony: stan sakw i zlota przed naprawa Spoils (pomiar: ile sztuk, ile wrakow, ile zlota w nicosc).</summary>
+        private static int[] RepairSnapshot()
+        {
+            int looted = 0, wrecks = 0;
+            try
+            {
+                var bag = MobileParty.MainParty != null ? MobileParty.MainParty.ItemRoster : null;
+                if (bag != null)
+                    for (int i = 0; i < bag.Count; i++)
+                    {
+                        var el = bag.GetElementCopyAtIndex(i);
+                        if (el.Amount <= 0 || !IsLooted(el.EquipmentElement.ItemModifier)) continue;
+                        looted += el.Amount;
+                        if (LootPrices.IsWreck(el.EquipmentElement.ItemModifier)) wrecks += el.Amount;
+                    }
+            }
+            catch { }
+            return new[] { MainGold(), looted, wrecks };
+        }
+
+        private static void RepairMeasure(int[] before)
+        {
+            try
+            {
+                var after = RepairSnapshot();
+                int gold = before[0] - after[0], n = before[1] - after[1], w = before[2] - after[2];
+                if (n <= 0 && gold <= 0) return;
+                _rpLetDeals++; _rpLetN += Math.Max(0, n); _rpLetGold += Math.Max(0, gold); _rpLetWrecks += Math.Max(0, w);
+            }
+            catch { }
+        }
+
+        /// <summary>Prefiks QuartermasterBehavior.ExecuteRepair(RepairCategory): naprawa przez kowali miasta (DoRepair) zamiast Spoils.</summary>
+        public static bool RepairPrefix(object[] __args, out int[] __state)
+        {
+            __state = null;
+            if (!QmOn) { __state = RepairSnapshot(); return true; }
+            try { DoRepair(__args != null && __args.Length > 0 ? Convert.ToInt32(__args[0]) : CatAll, false); }
+            catch (Exception e) { Stumble("SpoilsSeal.Repair", e); }
+            return false;
+        }
+
+        public static void RepairPostfix(int[] __state) { if (__state != null) RepairMeasure(__state); }
+
+        /// <summary>Prefiks QuartermasterBehavior.OnRepairBudgetConsequence: naprawa w budzecie (kolejnosc, budzet i limit sztuk z MCM Spoils).</summary>
+        public static bool BudgetPrefix(out int[] __state)
+        {
+            __state = null;
+            if (!QmOn) { __state = RepairSnapshot(); return true; }
+            try { DoRepair(CatAll, true); }
+            catch (Exception e) { Stumble("SpoilsSeal.Budget", e); try { GameMenu.ActivateGameMenu("realistic_loot_qm_repair"); } catch { } }
+            return false;
+        }
+
+        public static void BudgetPostfix(int[] __state) { if (__state != null) RepairMeasure(__state); }
+
+        /// <summary>Postfiks QuartermasterBehavior.CalculateRepairCosts: liczby w menu kwatermistrza wedle tych samych zasad co wykonanie
+        /// (proba na lawie - polka i zapas kowali bez zmian): ile sztuk kowale zrobia i za ile (robocizna + material), osobno bron,
+        /// pancerz i budzet; zapamietuje, ile czeka na material, ile wrakow i ile nie robota kowala (opis w menu).</summary>
+        public static void RepairCostsPostfix(object __instance)
+        {
+            if (!QmOn) return;
+            try
+            {
+                var bag = MobileParty.MainParty != null ? MobileParty.MainParty.ItemRoster : null;
+                if (bag == null) return;
+                var st = Settlement.CurrentSettlement;
+                var inst = Mcm();
+                int gold = Hero.MainHero != null ? Hero.MainHero.Gold : 0;
+                var all = MakePlan(st, bag, CatAll, false, int.MaxValue, int.MaxValue, 0);
+                var w = MakePlan(st, bag, CatWeapons, false, int.MaxValue, int.MaxValue, 0);
+                var a = MakePlan(st, bag, CatArmor, false, int.MaxValue, int.MaxValue, 0);
+                var b = MakePlan(st, bag, CatAll, true, Math.Max(0, Math.Min(McmInt(inst, "RepairBudget", 3000), gold)), McmInt(inst, "RepairBudgetMaxItems", 6), McmInt(inst, "RepairBudgetPriority", 0));
+                _fRepAllN.SetValue(__instance, all.Pieces); _fRepAllC.SetValue(__instance, all.Total);
+                _fRepWN.SetValue(__instance, w.Pieces); _fRepWC.SetValue(__instance, w.Total);
+                _fRepAN.SetValue(__instance, a.Pieces); _fRepAC.SetValue(__instance, a.Total);
+                _fBudN.SetValue(__instance, b.Pieces); _fBudC.SetValue(__instance, b.Total);
+                _lastWait = all.Wait; _lastWaitMask = all.WaitMask; _lastWrecks = all.Wrecks; _lastNoSmith = all.NoSmith; _lastTown = Nm(st);
+            }
+            catch (Exception e) { Stumble("SpoilsSeal.RepairCosts", e); }
+        }
+
+        /// <summary>Postfiks QuartermasterBehavior.OnRepairMenuInit: ten sam tekst Spoils (liczby juz nasze) plus wyjasnienie - kto naprawia,
+        /// za co placisz, co czeka na material, ze wrakow tu sie nie odnawia.</summary>
+        public static void RepairMenuPostfix(object __instance)
+        {
+            if (!QmOn) return;
+            try
+            {
+                int count = (int)_fRepAllN.GetValue(__instance), cost = (int)_fRepAllC.GetValue(__instance), gold = MainGold();
+                var afford = gold >= cost ? new TextObject("{=RL_QM_CanAfford}You have enough gold.") : new TextObject("{=RL_QM_NoGold}Not enough gold for all repairs.");
+                var t = new TextObject("{=RL_QM_RepairText}The quartermaster's smiths can remove the 'Plundered' mark from your equipment \u2014 for a price.\n\nTotal repairable: {COUNT} items\nTotal cost: {COST} denars\nYour gold: {GOLD} denars\n\n{AFFORD}");
+                t.SetTextVariable("COUNT", count); t.SetTextVariable("COST", cost); t.SetTextVariable("GOLD", gold); t.SetTextVariable("AFFORD", afford.ToString());
+                string note = "\n\nThe smiths of " + _lastTown + " do the work and the coin goes into the town's coffers: a quarter of the worth a piece has lost for their labour, plus the materials they take from this market at its prices - iron (crude iron, scrap from wrecks or ore), wood, leather, linen or wool; the worse the piece, the more material."
+                              + LeftEn(_lastWait, _lastWaitMask, _lastWrecks, _lastNoSmith, _lastTown);
+                MBTextManager.SetTextVariable("REALISTIC_LOOT_QM_REPAIR_TEXT", new TextObject("{=!}" + t.ToString() + note));
+            }
+            catch (Exception e) { Stumble("SpoilsSeal.RepairMenu", e); }
+        }
+
+        /// <summary>Postfiks QuartermasterBehavior.OnRepairCondition: gdy kowale nie maja dzis nic do zrobienia, podpowiedz mowi dlaczego
+        /// (material, wraki, nie robota kowala) zamiast "No plundered items to repair".</summary>
+        public static void RepairOptionPostfix(object __instance, MenuCallbackArgs args)
+        {
+            if (!QmOn || args == null) return;
+            try
+            {
+                if ((int)_fRepAllN.GetValue(__instance) > 0 || _lastWait + _lastWrecks + _lastNoSmith <= 0) return;
+                args.IsEnabled = false;
+                args.Tooltip = new TextObject("{=!}Nothing the smiths of " + _lastTown + " can restore now." + LeftEn(_lastWait, _lastWaitMask, _lastWrecks, _lastNoSmith, _lastTown));
+            }
+            catch (Exception e) { Stumble("SpoilsSeal.RepairOption", e); }
+        }
+
         // ------------------------------------------------------------ linia dnia
 
         private static string Deal(Tally t)
@@ -715,7 +1060,34 @@ namespace Armoury
                 Log.Info(sb.ToString());
             }
             catch (Exception e) { Log.Error("SpoilsSeal.Daily", e); }
+            try { Log.Info(RepairLine()); }
+            catch (Exception e) { Log.Error("SpoilsSeal.Daily.Repair", e); }
             finally { ClearDay(); }
+        }
+
+        /// <summary>Linia dnia naprawy u kwatermistrza: co zrobili kowale miast, za ile, z jakiego materialu, co czekalo i dlaczego;
+        /// przy wylaczonym wylaczniku - ile Spoils naprawil i ile zlota poszlo w nicosc.</summary>
+        private static string RepairLine()
+        {
+            var ci = System.Globalization.CultureInfo.InvariantCulture;
+            var sb = new StringBuilder();
+            sb.Append("Spoils - naprawa u kwatermistrza: dzien ").Append((int)CampaignTime.Now.ToDays - 1).Append(" | wylacznik Spoils Quartermaster Repair: ")
+              .Append(!RepWiredAll ? "LATKA NIEWPIETA (wycena, wykonanie i budzet musza byc wpiete razem) - Spoils naprawia jak dotad" : (QmRepair ? "WLACZONY (kowale miasta, material z targu, bez wrakow)" : "WYLACZONY - Spoils jak dotad, tu tylko pomiar"))
+              .Append(" | zlecen ").Append(_rpDeals).Append(" (bez efektu ").Append(_rpNone).Append("), naprawiono ").Append(_rpPieces).Append(" szt. (Plundered ").Append(_rpState[0])
+              .Append(", Damaged ").Append(_rpState[1]).Append(", Battered ").Append(_rpState[2]).Append("), do kas miast ").Append(_rpLabor).Append(" zl robocizny + ").Append(_rpMat)
+              .Append(" zl materialu (wartosc zuzytego ").Append(_rpMatValue.ToString("0.0", ci)).Append(" zl)");
+            if (_rpWhere.Count > 0) { var wl = new List<string>(); foreach (var kv in _rpWhere) wl.Add(kv.Key + " " + kv.Value[0] + " szt./" + kv.Value[1] + " zl"); sb.Append(" [").Append(string.Join(", ", wl.ToArray())).Append(']'); }
+            var taken = new List<string>();
+            foreach (var kv in _rpTaken) taken.Add(kv.Key + " " + kv.Value);
+            sb.Append("; z polek zdjeto: ").Append(taken.Count > 0 ? string.Join(", ", taken.ToArray()) : "nic").Append(" (w tym wrakow na zlom ").Append(_rpScrap).Append(")")
+              .Append("; zuzyto: metal ").Append(_rpKg[0].ToString("0.00", ci)).Append(" kg surowki, drewno ").Append(_rpKg[1].ToString("0.0", ci)).Append(" kg, skora ")
+              .Append(_rpKg[2].ToString("0.00", ci)).Append(" kg, plotno ").Append(_rpKg[3].ToString("0.00", ci)).Append(" kg")
+              .Append("; czekalo na material ").Append(_rpWait).Append(" szt. (brak: metal ").Append(_rpWaitBy[0]).Append(", drewno ").Append(_rpWaitBy[1]).Append(", skora ")
+              .Append(_rpWaitBy[2]).Append(", plotno ").Append(_rpWaitBy[3]).Append("), wrakow nieodnowionych ").Append(_rpWrecks).Append(" szt., nie robota kowala ").Append(_rpNoSmith)
+              .Append(" szt., za malo zlota / poza budzetem ").Append(_rpPoor).Append(" szt.; ").Append(MendMaterial.Describe())
+              .Append(" | Spoils przy wylaczonym wylaczniku: zlecen ").Append(_rpLetDeals).Append(", naprawil ").Append(_rpLetN).Append(" szt. (w tym wrakow ").Append(_rpLetWrecks)
+              .Append(") bez materialu za ").Append(_rpLetGold).Append(" zl w nicosc.");
+            return sb.ToString();
         }
 
         // ------------------------------------------------------------ wpiecie
@@ -731,6 +1103,9 @@ namespace Armoury
                        postfix: postfix != null ? new HarmonyMethod(typeof(SpoilsSeal), postfix) : null);
             _wired.Add(label);
             if (label == "sprzedaz automatyczna") _saleWired = true;
+            if (label == "naprawa: wykonanie") _repWired = true;
+            if (label == "naprawa: wycena") _repCostWired = true;
+            if (label == "naprawa w budzecie") _repBudWired = true;
         }
 
         internal static void ApplyAll(Harmony h)
@@ -819,12 +1194,30 @@ namespace Armoury
                      _fScLeader != null && _fScData != null && _fScClan != null && _fScDonate != null && _mDonationGold != null);
                 Wire(h, _tSub, "OnSubClanMapEventEnded", "IncomePrefix", "IncomePostfix", "udzial z bitew klanu", _fScLeader != null && _fScData != null);
 
+                // 10. naprawa u kwatermistrza: kowale miasta, material z targu, bez wrakow (wycena w menu, wykonanie, budzet, opis, podpowiedz)
+                if (_tQm != null)
+                {
+                    _fRepAllN = AccessTools.Field(_tQm, "_repairAllCount"); _fRepAllC = AccessTools.Field(_tQm, "_repairAllCost");
+                    _fRepWN = AccessTools.Field(_tQm, "_repairWeaponCount"); _fRepWC = AccessTools.Field(_tQm, "_repairWeaponCost");
+                    _fRepAN = AccessTools.Field(_tQm, "_repairArmorCount"); _fRepAC = AccessTools.Field(_tQm, "_repairArmorCost");
+                    _fBudN = AccessTools.Field(_tQm, "_budgetRepairCount"); _fBudC = AccessTools.Field(_tQm, "_budgetRepairCost");
+                }
+                _mRecordRepair = _tJournal != null ? AccessTools.Method(_tJournal, "RecordRepair") : null;
+                bool rep = _fRepAllN != null && _fRepAllC != null && _fRepWN != null && _fRepWC != null && _fRepAN != null && _fRepAC != null && _fBudN != null && _fBudC != null
+                           && _mIsWeapon != null && _mIsArmor != null && _mIsLooted != null && _pMcm != null;
+                Wire(h, _tQm, "CalculateRepairCosts", null, "RepairCostsPostfix", "naprawa: wycena", rep);
+                Wire(h, _tQm, "ExecuteRepair", "RepairPrefix", "RepairPostfix", "naprawa: wykonanie", rep);   // dziennik Spoils (TrophyJournal) opcjonalny - DoRepair sprawdza go sam
+                Wire(h, _tQm, "OnRepairBudgetConsequence", "BudgetPrefix", "BudgetPostfix", "naprawa w budzecie", rep);
+                Wire(h, _tQm, "OnRepairMenuInit", null, "RepairMenuPostfix", "naprawa: opis w menu", rep);
+                Wire(h, _tQm, "OnRepairCondition", null, "RepairOptionPostfix", "naprawa: podpowiedz opcji", rep);
+
                 string ver = "?";
                 try { var sm = Find("RealisticLoot.RealisticLootSubModule"); var f = sm != null ? sm.GetField("Version") : null; if (f != null) ver = f.GetRawConstantValue() as string; } catch { }
                 Log.Info("SpoilsSeal: Spoils of War (RealisticLoot " + ver + ") - wpiete: " + string.Join(", ", _wired.ToArray())
                          + (_missing.Count > 0 ? " | BRAK (te sciezki Spoils BEZ ZMIAN - sprawdzic dekompilacje): " + string.Join(", ", _missing.ToArray()) : " | BRAK: nic")
-                         + " - sprzedaz automatyczna magazynu wojennego blokowana wedle wlacznika Spoils No Auto Sale, reszta zlota z niczego wedle Spoils No Free Gold"
-                         + " (oba domyslnie wlaczone; reszta Spoils bez zmian); liczby - linia dnia \"Spoils of War (128)\".");
+                         + " - sprzedaz automatyczna magazynu wojennego blokowana wedle wlacznika Spoils No Auto Sale, reszta zlota z niczego wedle Spoils No Free Gold,"
+                         + " naprawa u kwatermistrza przez kowali miasta z materialem z targu wedle Spoils Quartermaster Repair"
+                         + " (wszystkie domyslnie wlaczone; reszta Spoils bez zmian); liczby - linie dnia \"Spoils of War (128)\" i \"Spoils - naprawa u kwatermistrza\".");
             }
             catch (Exception e) { Log.Error("SpoilsSeal.ApplyAll", e); }
         }

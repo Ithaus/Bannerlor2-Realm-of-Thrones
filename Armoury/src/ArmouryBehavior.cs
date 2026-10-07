@@ -481,6 +481,15 @@ namespace Armoury
                 if (_playerStock == null) _playerStock = new Dictionary<string,int>();
             }
             catch (Exception e) { Log.Error("SyncData", e); }
+            // zapas kowali miast z napraw u kwatermistrza Spoils (MendMaterial: reszty calych sztuk materialu zdjetych z polki, kg i wartosc);
+            // osobny try - wyjatek innego klucza go nie gubi; brak klucza (stary zapis) = pusty zapas
+            try
+            {
+                string mend = MendMaterial.Export();
+                dataStore.SyncData("arm_mendstock", ref mend);
+                if (dataStore.IsLoading) MendMaterial.Import(mend);
+            }
+            catch (Exception e) { Log.Error("SyncData.MendStock", e); }
         }
 
         public override void RegisterEvents()

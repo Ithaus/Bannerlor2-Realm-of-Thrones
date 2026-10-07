@@ -712,6 +712,10 @@ namespace Armoury
         [SettingPropertyGroup("The law of the battlefield")]
         public bool SpoilsNoFreeGold { get; set; } = true;
 
+        [SettingPropertyBool("Spoils Quartermaster Repair", HintText = "the Spoils of War quartermaster's repairs are done by this town's smiths, like every other repair in Armoury: you pay into the town's coffers a quarter of the worth a piece has lost for the work, plus the materials they take from this market at its prices - iron (crude iron, scrap from wrecks or ore), wood, leather, linen or wool, more the worse the piece; with no such materials on the market the piece waits; wrecks (Mangled) are not restored here - mend them at a forge with your own materials, or salvage them (off = Spoils of War as before: its price, the coin vanishes, no materials, wrecks restored; the day's log line shows how much either way)")]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool SpoilsQuartermasterRepair { get; set; } = true;
+
         [SettingPropertyBool("Plague Spares Your Men", HintText = "sickness may weaken your men - it will not kill them: any troop death caused by a disease system is refused for YOUR party (the rest of the world still buries its dead)")]
         [SettingPropertyGroup("Plague shield")]
         public bool PlagueSparesYourMen { get; set; } = true;
@@ -2773,6 +2777,7 @@ namespace Armoury
             s.SpoilsClanRealSoldiers = SpoilsClanRealSoldiers;
             s.SpoilsNoAutoSale = SpoilsNoAutoSale;
             s.SpoilsNoFreeGold = SpoilsNoFreeGold;
+            s.SpoilsQuartermasterRepair = SpoilsQuartermasterRepair;
             s.PlagueSparesYourMen = PlagueSparesYourMen;
             s.PlagueShieldLogEvery = PlagueShieldLogEvery;
             s.DesertionLawEnabled = DesertionLawEnabled;
