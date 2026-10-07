@@ -133,6 +133,20 @@ namespace Armoury
         }
 
         /// <summary>Potrzeby surowcow na sztuke: ruda, drewno, skora, len (jednostki rynku), roboczodni.</summary>
+        /// <summary>
+        /// Placa za jeden roboczodzien przy tej sztuce w tym miescie (pensy). Jeff 07.10 ("wszystko, co dotyczy placenia, musi byc
+        /// spojne"): te same dni (HistDays) i ta sama dniowka mistrza wedle tieru (HistoricalPrices.DayWageOf), z ktorych liczy sie
+        /// wartosc sztuki - dotad warsztat placil 3 d za dzien nad plyta t6 wycenionym po 10.5 d i roznice bral jako zysk - razy poziom
+        /// plac miasta (TownWage). Przy wylaczonym WorkshopWageByTier albo bez cen historycznych - WorkshopWagePerDay jak dotad.
+        /// </summary>
+        internal static float DayWage(ItemObject it, Town town)
+        {
+            var s = Settings.Current;
+            if (s == null || !s.WorkshopWageByTier) return Math.Max(0f, s != null ? s.WorkshopWagePerDay : 3f);
+            float w = HistoricalPrices.On && it != null ? HistoricalPrices.DayWageOf(it) : Math.Max(0f, s.WorkshopWagePerDay);
+            return w * TownWage.Index(town);
+        }
+
         internal static float[] Needs(ItemObject it, out float days)
         {
             days = 0f;
@@ -227,7 +241,6 @@ namespace Armoury
                 if (!_owed.TryGetValue(workshop, out owed)) { owed = new float[4]; _owed[workshop] = owed; }
                 var shelf = town.Owner.ItemRoster;
                 bool any = false;
-                float wage = Math.Max(0f, s.WorkshopWagePerDay);
                 float minProfit = 1f + Math.Max(0f, s.WorkshopMinProfitPercent) / 100f;
                 for (int guard = 0; guard < 8; guard++)
                 {
@@ -263,7 +276,7 @@ namespace Armoury
                             // koszt surowcow od zuzycia (ulamki tez), po cenie historycznej / targowej
                             for (int m = 0; m < 4; m++) matCost += need[m] * MatPrice(town, mats[m], m);
                             float revenue = Revenue(town, it);
-                            if (revenue < (matCost + days * wage) * minProfit) { reason = Math.Max(reason, 1); continue; }
+                            if (revenue < (matCost + days * DayWage(it, town)) * minProfit) { reason = Math.Max(reason, 1); continue; }
                             int mc = MBRandom.RoundRandomized(matCost);
                             if (workshop.Capital < mc) { reason = Math.Max(reason, 4); continue; }
                             for (int m = 0; m < 4; m++)
@@ -288,7 +301,7 @@ namespace Armoury
                         }
                     }
                     if (w.Labor < w.Days) { _skipLabor++; break; }      // sztuka w robocie
-                    int wagesI = MBRandom.RoundRandomized(w.Days * wage);
+                    int wagesI = MBRandom.RoundRandomized(w.Days * DayWage(w.Item, town));
                     int rev = MBRandom.RoundRandomized(Revenue(town, w.Item));
                     if (town.Gold < rev || workshop.Capital < wagesI) { _skipGold++; break; }   // gotowa czeka na kupca / na place
                     ItemModifier mod = null;
@@ -364,7 +377,7 @@ namespace Armoury
                     float days;
                     var need = Needs(it, out days);
                     if (need == null) continue;
-                    float cost = need[0] * pOre + need[1] * pWood + need[2] * pLea + need[3] * pLin + days * s.WorkshopWagePerDay;
+                    float cost = need[0] * pOre + need[1] * pWood + need[2] * pLea + need[3] * pLin + days * DayWage(it, town);
                     float revenue = Revenue(town, it);
                     float perDay = (revenue - cost) / Math.Max(0.1f, days);
                     if (perDay > 0f) scored.Add(new KeyValuePair<float, ItemObject>(perDay, it));
@@ -586,7 +599,7 @@ namespace Armoury
                 {
                     float days; var need = Needs(it, out days);
                     if (need == null) continue;
-                    float cost = need[0] * pOre + need[1] * pWood + need[2] * pLea + need[3] * pLin + days * s.WorkshopWagePerDay;
+                    float cost = need[0] * pOre + need[1] * pWood + need[2] * pLea + need[3] * pLin + days * DayWage(it, town);
                     float revenue = Revenue(town, it);
                     float pd = (revenue - cost) / Math.Max(0.1f, days);
                     if (pd > bestPd)
@@ -595,7 +608,7 @@ namespace Armoury
                         bestTxt = it.StringId + " (Value " + it.Value + ", cena " + revenue + ") koszt " + (int)cost
                                   + " = ruda " + need[0].ToString("0.0") + "x" + pOre.ToString("0.##") + " drewno " + need[1].ToString("0.0") + "x" + pWood.ToString("0.##")
                                   + " skora " + need[2].ToString("0.0") + "x" + pLea.ToString("0.##") + " len " + need[3].ToString("0.0") + "x" + pLin.ToString("0.##")
-                                  + " dni " + days.ToString("0.0") + "x" + s.WorkshopWagePerDay;
+                                  + " dni " + days.ToString("0.0") + "x" + DayWage(it, town).ToString("0.##");
                     }
                 }
                 _diagEmptySample[wt] = town.Name + ": najlepsza " + (best != null ? bestTxt : "brak receptury") + " (pula " + pool.Count + ")";

@@ -115,14 +115,7 @@ namespace Armoury
         internal static bool RuleOn { get { var s = Settings.Current; return s != null && s.SmithMendFromMarket; } }
 
         /// <summary>Wskaznik plac w miescie: dobrobyt / TownWageRefProsperity (mediana miast), 0.5 - 1.5; poza miastem albo przy 0 - 1.</summary>
-        internal static float LocalWage(Settlement st)
-        {
-            var s = Settings.Current;
-            float rf = s != null ? s.TownWageRefProsperity : 0f;
-            var town = st != null ? st.Town : null;
-            if (rf <= 0f || town == null) return 1f;
-            return Math.Max(0.5f, Math.Min(1.5f, town.Prosperity / rf));
-        }
+        internal static float LocalWage(Settlement st) { return TownWage.Index(st); }   // jeden wzor dla calej gry (TownWage)
 
         /// <summary>Robota naprawy w pensach (bez rabatow): share x robota wykonania (HistoricalPrices.MakingLabor; bez cen historycznych -
         /// ArmsPricing.Labor) x (1 + zysk mistrza) x LocalWage. -1 = brak receptury (wolajacy liczy po staremu).</summary>

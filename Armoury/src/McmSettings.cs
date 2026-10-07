@@ -1472,6 +1472,10 @@ namespace Armoury
         [SettingPropertyGroup("Workshops")]
         public float WorkshopWagePerDay { get; set; } = 3f;
 
+        [SettingPropertyBool("Workshop Wage By Tier", HintText = "an arms workshop pays every day of work at the master's day wage for the tier of the piece - the same wage that makes the piece's worth (3 d plain gear up to 10.5 d the finest harness) - and every workshop pays wages and keep as dear as its town is prosperous (off = 3 d a day for every piece, the same in every town)")]
+        [SettingPropertyGroup("Workshops")]
+        public bool WorkshopWageByTier { get; set; } = true;
+
         [SettingPropertyFloatingInteger("Workshop Min Profit Percent", 0.00f, 20.00f, "0.00", HintText = "a workshop makes a piece only if the market pays at least this much over materials and wages (a glutted stall - price below about 0.93 of worth - stops it)")]
         [SettingPropertyGroup("Workshops")]
         public float WorkshopMinProfitPercent { get; set; } = 5f;
@@ -2975,6 +2979,7 @@ namespace Armoury
             s.GuildShareShieldwright = GuildShareShieldwright;
             s.WorkshopForgeWoodPerMetalKg = WorkshopForgeWoodPerMetalKg;
             s.WorkshopWagePerDay = WorkshopWagePerDay;
+            s.WorkshopWageByTier = WorkshopWageByTier;
             s.WorkshopMinProfitPercent = WorkshopMinProfitPercent;
             s.WorkshopCrudeKgPerOre = WorkshopCrudeKgPerOre;
             s.WorkshopWoodPerOre = WorkshopWoodPerOre;

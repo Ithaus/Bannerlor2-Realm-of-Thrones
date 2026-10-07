@@ -124,6 +124,14 @@ namespace Armoury
         internal static bool On { get { var s = Settings.Current; return s != null && s.WorkshopTradeEnabled && HistoricalPrices.On && (HistoricalPrices.Applied || !Live); } }
         private static bool Batch { get { return On && Settings.Current.WorkshopTradeBatchWages; } }
         private static float Upkeep { get { return Math.Max(0f, Settings.Current.WorkshopTradeUpkeepPerDay); } }
+        /// <summary>Utrzymanie warsztatu na dobe w JEGO miescie: utrzymanie mistrza i czynsz x poziom plac miasta (TownWage; Jeff 07.10 -
+        /// koszty w miescie z dobrobytu i stawek historycznych). Przy wylaczonym WorkshopWageByTier - wszedzie tyle samo.</summary>
+        private static float UpkeepAt(Workshop w) { return Upkeep * WageIndex(w); }
+        private static float WageIndex(Workshop w)
+        {
+            var s = Settings.Current;
+            return s != null && s.WorkshopWageByTier && w != null ? TownWage.Index(w.Settlement) : 1f;
+        }
         private static int LowCapital { get { return Math.Max(0, Settings.Current.WorkshopTradeLowCapital); } }
         private static int Span { get { return Math.Max(2, Settings.Current.WorkshopTradeProfitDays); } }
         /// <summary>Pamiec roku (recenzja): rok kalendarza Armoury, nie krocej niz pamiec biezaca.</summary>
@@ -213,7 +221,7 @@ namespace Armoury
             float sum = TradeSpeed(w.WorkshopType);
             if (sum <= 0f) return 0f;
             var s = Settings.Current;
-            return Math.Max(0f, s.WorkshopWorkers) * Math.Max(0f, s.WorkshopWagePerDay) / sum * BulkFactor(p);
+            return Math.Max(0f, s.WorkshopWorkers) * Math.Max(0f, s.WorkshopWagePerDay) * WageIndex(w) / sum * BulkFactor(p);   // place czeladnikow x poziom plac miasta
         }
 
         private static ItemObject _oreItem;
@@ -504,7 +512,7 @@ namespace Armoury
                 var town = __0.Settlement != null ? __0.Settlement.Town : null;
                 if (town == null) return false;
                 var rec = Get(__0);
-                rec.KeepCarry += Upkeep;
+                rec.KeepCarry += UpkeepAt(__0);
                 int due = (int)Math.Floor(rec.KeepCarry);
                 rec.KeepCarry -= due;
                 int paid = PayToTown(__0, town, due, false, rec);
@@ -541,7 +549,7 @@ namespace Armoury
             var model = Campaign.Current.Models.WorkshopModel;
             Hero buyer = model.GetNotableOwnerForWorkshop(shop);
             int need = Math.Max(0, shop.InitialCapital - Math.Max(0, shop.Capital));
-            int least = Math.Min(need, (int)Math.Ceiling(Upkeep * 30f));      // co najmniej miesiac utrzymania
+            int least = Math.Min(need, (int)Math.Ceiling(UpkeepAt(shop) * 30f));      // co najmniej miesiac utrzymania
             if (buyer == null || Math.Max(0, buyer.Gold) / 2 < least) { _dNoTaker++; return; }
             WorkshopType type = null;
             try
@@ -989,7 +997,7 @@ namespace Armoury
                     float pay = Fair ? (float)Math.Min(credit, Math.Ceiling((inCost + CycleLabour(w, p)) * Margin)) : credit;
                     sum += (pay - inCost - labour) * p.ConversionSpeed / BulkFactor(p);   // kopalnia: przechodzi co N-ty cykl
                 }
-                return sum - Upkeep;
+                return sum - UpkeepAt(w);
             }
             catch (Exception e) { Stumble("WorkshopTrade.Expected", e); return 0f; }
         }
@@ -1058,7 +1066,7 @@ namespace Armoury
                     {
                         if (w == null || w.WorkshopType == null || w.WorkshopType.IsHidden || w.Owner == null) continue;
                         shops++; any = true;
-                        if (w.Capital < Math.Max(1, (int)Math.Ceiling(Upkeep))) broke++;
+                        if (w.Capital < Math.Max(1, (int)Math.Ceiling(UpkeepAt(w)))) broke++;
                         try { prices.Add(QuoteFor(w, Hero.MainHero).Price); } catch (Exception e) { Stumble("WorkshopTrade.Daily(cena)", e); }
                     }
                     if (!any) continue;
@@ -1093,7 +1101,7 @@ namespace Armoury
                   .Append(" | ").Append(FairText()).Append(" | ").Append(NotablesText())
                   .Append(" | cena kupna dla gracza: mediana ").Append(med).Append(", od ").Append(min).Append(" do ").Append(max).Append(" (").Append(prices.Count).Append(" warsztatow)");
                 if (sampleTown != null) sb.Append("; ").Append(SampleLine(sampleTown));
-                sb.Append(" | zasady: utrzymanie ").Append(N1(Upkeep)).Append(" d na dobe, place cyklu ").Append(s.WorkshopTradeBatchWages ? N1(Math.Max(0f, s.WorkshopWorkers) * Math.Max(0f, s.WorkshopWagePerDay)) + " d na dobe pelnej pracy" : "WYLACZONE (prog gry 200 / szybkosc)")
+                sb.Append(" | zasady: utrzymanie ").Append(N1(Upkeep)).Append(" d na dobe").Append(s.WorkshopWageByTier ? " x poziom plac miasta (dobrobyt / " + N1(s.TownWageRefProsperity) + ", 0.5-1.5)" : "").Append(", place cyklu ").Append(s.WorkshopTradeBatchWages ? N1(Math.Max(0f, s.WorkshopWorkers) * Math.Max(0f, s.WorkshopWagePerDay)) + " d na dobe pelnej pracy" : "WYLACZONE (prog gry 200 / szybkosc)")
                   .Append(", cena = ").Append(N1(Math.Max(0f, s.WorkshopTradePriceYears))).Append(" x roczny zysk po podatku kupujacego (nie mniej niz sprzet) + kapital; zysk ze sredniej ok. ").Append(Span)
                   .Append(" dob albo roku - gracz kupuje wedle lepszej, notabl odkupuje wedle gorszej; potkniecia ").Append(_dStumbles).Append('.');
                 Log.Info(sb.ToString());

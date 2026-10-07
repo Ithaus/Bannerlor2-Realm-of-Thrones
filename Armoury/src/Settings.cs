@@ -430,6 +430,7 @@ namespace Armoury
         public float GuildShareShieldwright = 0.05f;       // share who are shield-makers
         public float WorkshopForgeWoodPerMetalKg = 12.5f;  // kilograms of wood (as charcoal) the forge burns for each kilogram of metal worked, on top of the bloomery
         public float WorkshopWagePerDay = 3f;              // wages for one man-day at the forge, paid into the town (3 d - a craftsman's day in historical prices)
+        public bool WorkshopWageByTier = true;             // an arms workshop pays every day of work at the master's day wage for the tier of the piece - the same wage that makes the piece's worth (3 d plain gear up to 10.5 d the finest harness) - and every workshop pays wages and keep as dear as its town is prosperous (off = 3 d a day for every piece, the same in every town)
         public float WorkshopMinProfitPercent = 5f;        // a workshop makes a piece only if the market pays at least this much over materials and wages (a glutted stall - price below about 0.93 of worth - stops it)
         public float WorkshopCrudeKgPerOre = 1.5f;         // kilograms of crude iron a bloomery wins from one load of ore (10 kg); each finer grade costs a fifth more
         public float WorkshopWoodPerOre = 5f;              // loads of wood burnt to charcoal for each load of ore smelted

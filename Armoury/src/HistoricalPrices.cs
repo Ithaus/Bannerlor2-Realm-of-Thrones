@@ -248,10 +248,15 @@ namespace Armoury
         /// (HistCost) i w naprawie u kowali miasta (MendMaterial.Labor: ulamek tego).</summary>
         internal static float MakingLabor(ItemObject it, ArmsPricing.Cost c)
         {
+            return HistDays(it, c) * DayWageOf(it);
+        }
+
+        /// <summary>Dniowka mistrza przy tej sztuce (pensy): wedle tieru; strzaly i belty - dniowka t1. Ta sama w wartosci sztuki,
+        /// w naprawie i w placach warsztatu zbrojnego (WorkshopLaw.DayWage).</summary>
+        internal static float DayWageOf(ItemObject it)
+        {
             int t = Math.Max(1, Math.Min(6, (int)it.Tier + 1));
-            float days = HistDays(it, c);
-            float wage = IsAmmo(it) ? WageFor(1) : WageFor(t);      // test 04.10: dniowka mistrza t6 dawala snop strzal za 130 d - fletcher to zwykly rzemieslnik
-            return days * wage;
+            return IsAmmo(it) ? WageFor(1) : WageFor(t);      // test 04.10: dniowka mistrza t6 dawala snop strzal za 130 d - fletcher to zwykly rzemieslnik
         }
 
         private static bool IsAmmo(ItemObject it)
