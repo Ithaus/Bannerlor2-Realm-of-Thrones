@@ -60,6 +60,12 @@ Armoury-2026-10-07_12-37-02.log): w grze "kontrola generatora 137 z 137", 4 bram
 zatkanych wsi 14 (zamkowe 8, miejskie 6; z tego 11 spladrowane / najezdzane, Normal 3) - bieg 5: 19, bieg 4: 53; zamki z ujemnym bilansem zywnosci 0.
 WYSPY zostaja: karawany w Pyke 3-9 (najdluzej 13.9 doby), Pebbleton, Lonely Light, Blacktyde, Lys, Mormont Keep, Kyth, Qarkash, Lhazosh; lord w
 Pebbleton 15.6 doby -> poprawka w toku (workflow wyspy-karawany-lordowie, galaz w128-wyspy), potem autotest 7.
+WYSPY GOTOWE po recenzji (07.10): IslandRoads.cs (wylacznik IslandRoadsFix; regula w postfiksie straznika BK: partia ze statkami - ten sam cel droga
+All; karawana bez statkow - cel osiagalny ladem wedle zysku BK, dom, najblizsze; uczta i gentry BK - AI wraca, gdy rozkaz nie przeszedl; postfiks
+GetTradeScoreForTown -1 dla miast bez drogi ladowej), galaz w-toku/wyspy-karawany-lordowie 90234dc na c92f7e7, proba 111/111, DLL md5 3fead49a.
+NIE objete (osobny krok po autotescie): karawany lordow BK kupione w zamku / wsi na wyspie z jednym miastem (BKLordPropertyBehavior.cs:69-79) dalej
+czekaja; karawany Pyke czekaja na zysk z Lordsport jak w grze. Wyspy dolacza do TOWARY 3 na koncu skladania (jeden autotest calosci).
+Folder sesji lawy (f16095a4) usuniety przez Jeffa ok. 15:00 - pliki prob i raporty odtworzone pod ta sama sciezka z D:\Backup-Bannerlord\nprzekazanie-lawa-2026-10-07 (proby, przeglady, skrypty-latek, sklad) i z repo docs/przekazanie-lawa-2026-10-07.
 K13 krok 3 (129 rzemioslo miasta: sukno/plotno/skora wedle oplacalnosci, galaz w-toku/k13-3-rzemioslo-miasta 9f7408f na k2) i krok 4
 (130 odziez, buty i plotno wojska z sakiewki zolnierzy, w-toku/k13-4-odziez-wojska 93ac4c1 na k2 - NIE na 129; test i wgranie TYLKO razem 128+129+130
 jako G1; zmiana widoczna: znika kara morale BK "Textiles supplies") - gotowe po recenzji, opisy docs/paczki/w-toku/k13-3-*, k13-4-*.
