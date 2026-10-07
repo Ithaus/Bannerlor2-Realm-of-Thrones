@@ -334,7 +334,10 @@ narzedzia rozpoznal wszystkie linie. Grupa 1: OK 61, UWAGA 5; grupa 2: OK 31, UW
    Pytanie 8: (c) odsetki zamrozone w dniu zajecia, BEZ umorzenia - "dlugi trzeba splacac, Bank z Braavos na pewno nie daruje".
 5. Pentos i Lorath - BEZ niewolnictwa. Werbunek gracza "jak u AI" (rekrut od tieru 2 tylko ze sprzetem kupionym przez notabla, koniec darmowego
    kompletu DTE). Repo: galezie `paczki/108..114` NADPISANE wersjami na 120 (= `paczki-na-120/*`); stare (na n107) w `paczki-na-n107/*`.
-   Spoils of War i pokretla (SmithingSkillPerTier, DurabilityPerArmorPoint, MinSellPercentOfValue) - Jeff prosi o wyjasnienie.
+   Spoils of War: ZADNEJ automatycznej sprzedazy - "system ma byc szczelny i wszystko z czego wynika, zero darmowej kasy".
+   Pokretla: SmithingSkillPerTier 45 -> 35 (pamietac: kucie zbroi ma te sama zasade co bron - zepsuta / legendarna i premie; sprawdzic
+   rozklad jakosci po zmianie); DurabilityPerArmorPoint 20 -> 13 (zbroja zuzywa sie 1.5 x szybciej, NIE 3 x); MinSellPercentOfValue 5 -> 2
+   (nad podloga cene rupieci ustala podaz i popyt). Klucze SA w Armoury.json Jeffa - zmiana pliku przy wgraniu (gra zamknieta, .bak).
 4. "zgoda na autotest" (pamiec: jeff-zgoda-na-autotest); przewijac dluzej, gdy to ma sens (40 dob na test zmiany, rok na skutki dlugie).
 
 ## Decyzje Jeffa 06.10 (wiazace; dopisane po raporcie nocnym)
