@@ -1484,7 +1484,7 @@ namespace Armoury
         [SettingPropertyGroup("Workshops")]
         public int WorkshopTradeProfitDays { get; set; } = 30;
 
-        [SettingPropertyFloatingInteger("Workshop Trade Resale Share", 0.00f, 3.20f, "0.00", HintText = "a notable buying your workshop pays this share of its worth to him (after his own tax) plus the coin in its till - out of his own purse, and no more than he has")]
+        [SettingPropertyFloatingInteger("Workshop Trade Resale Share", 0.00f, 3.20f, "0.00", HintText = "a notable buying your workshop pays this share of its worth to him (after his own tax) plus the coin in its till - out of his own purse, and no more than he has (0 to 1 - anything above 1 counts as 1)")]
         [SettingPropertyGroup("Workshops")]
         public float WorkshopTradeResaleShare { get; set; } = 0.8f;
 

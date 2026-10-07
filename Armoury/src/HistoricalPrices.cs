@@ -144,7 +144,7 @@ namespace Armoury
         // a diagnostyka blokady (40 wpisow) wyczerpywala sie na cale uruchomienie gry
         // Konstruktor ArmouryBehavior (OnGameStart) biegnie PRZED definicjami przedmiotow tej kampanii (Campaign: OnGameStart ->
         // InitializeDefaultCampaignObjects -> DefaultItems -> BKItems.Initialize), wiec czyszczenie definicji niczego nie gubi.
-        internal static void Reset() { _target.Clear(); _orig.Clear(); _origWeight.Clear(); _blockedLogged.Clear(); _defValue.Clear(); _defLeft.Clear(); _defUsed.Clear(); _errDefine = false; _applied = false; RawPrice.Reset(); }   // RawPrice: cena surowcow liczy na tym przeliczeniu - czysci sie razem z nim
+        internal static void Reset() { _target.Clear(); _orig.Clear(); _origWeight.Clear(); _blockedLogged.Clear(); _defValue.Clear(); _defLeft.Clear(); _defUsed.Clear(); _errDefine = false; _stDefine = 0; _applied = false; RawPrice.Reset(); }   // RawPrice: cena surowcow liczy na tym przeliczeniu - czysci sie razem z nim
 
         // ------------------------------------------------------------ wartosc z definicji przedmiotu (paczka "towary w nowej monecie")
         // Test 06.10 14:08 (log, linia "surowce kuzni"): chleb 0 -> 6, jajka 0 -> 8, miod 0 -> 14, owoce 0 -> 2..10, garum 0 -> 20,
@@ -162,6 +162,7 @@ namespace Armoury
         private static readonly Dictionary<ItemObject, int> _defLeft = new Dictionary<ItemObject, int>();    // wartosc, ktora po definicji zostala (po latkach innych modow)
         private static readonly HashSet<ItemCategory> _defUsed = new HashSet<ItemCategory>();               // kategorie z przedmiotem, ktorego definicja rozni sie od wartosci w chwili Apply
         private static bool _errDefine;
+        private static int _stDefine;          // audyt 120: potkniecia przy zapisie definicji (kazde liczone, w logu pierwsze) - w linii startowej przelicznika
         private static int _defineHooks;
 
         /// <summary>Prefiks BKItems.InitializeTradeGood(item, name, mesh, category, value, ...) z pierwszenstwem First: wartosc z definicji BK.</summary>
@@ -181,6 +182,7 @@ namespace Armoury
             }
             catch (Exception e)
             {
+                _stDefine++;
                 if (!_errDefine) { _errDefine = true; Log.Error("HistoricalPrices.DefinePostfix", e); }   // raz na kampanie; przedmiot zostaje przy wartosci z chwili Apply
             }
         }
@@ -419,7 +421,8 @@ namespace Armoury
                 Log.Info("HistoricalPrices: przelicznik popytu od wartosci z definicji przedmiotu " + (fromDef ? "CZYNNY" : "WYLACZONY (MCM) - od wartosci z chwili przeliczenia, jak dotad")
                          + " (definicje BK widziane przed latkami innych modow: " + _defValue.Count + ", wpiete w " + _defineHooks + " metodach); "
                          + (defLog.Count > 0 ? (fromDef ? "wziete z definicji " : "definicja inna niz wartosc w chwili przeliczenia (NIEUZYTE) ") + defLog.Count + " [" + string.Join(", ", defLog.ToArray()) + "] w " + _defUsed.Count + " kategoriach"
-                                             : "zadna definicja nie rozni sie od wartosci w chwili przeliczenia") + ".");
+                                             : "zadna definicja nie rozni sie od wartosci w chwili przeliczenia")
+                         + "; potkniecia przy zapisie definicji (wyjatki, pierwszy w logu) " + _stDefine + ".");
                 if (zeroLog.Count > 0)
                     Log.Info("HistoricalPrices: UWAGA - " + zeroLog.Count + " przeliczonych przedmiotow ma wartosc 0 i nie ma od czego liczyc przelicznika (" + (fromDef ? "brak wartosci z definicji" : "wartosc z definicji wylaczona w MCM")
                              + "), ich kategorie licza popyt bez nich - bez przelicznika, gdy nie maja innych przedmiotow: " + string.Join(", ", zeroLog.ToArray()) + ".");
