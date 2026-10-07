@@ -25,6 +25,9 @@ namespace Armoury
     /// Sprzedaz w miescie i podzial utargu po powrocie do wsi robi dalej BK (bez zmian). Zywnosc zamku: wies przypisana
     /// dalej zasila spichlerz z samego przypisania; znika tylko zywnosc "z polki" - linie "Dowoz:" pilnuja glodnych
     /// zamkow, zatkanych magazynow wsi (z grupa kontrolna wsi miejskich), rozbitych taborow i kas miast.
+    /// Poprawka 119: ten sam prefiks najpierw pyta MarketCarts.Choose (VillageCartsBestMarket) - woz KAZDEJ wsi jedzie do miasta
+    /// w zasiegu, ktore zaplaci najwiecej; gdy zadne nie wchodzi w gre, dalej regula ponizej. Woz x2 takze dla wsi miejskich
+    /// (MarketCartAllVillages).
     /// </summary>
     internal static class MarketRoad
     {
@@ -48,9 +51,23 @@ namespace Armoury
             try
             {
                 var s = Settings.Current;
-                if (s == null || !s.CastleVillagesSellInTown || villagerParty == null) return true;
+                if (s == null || villagerParty == null) return true;
                 var home = villagerParty.HomeSettlement;
                 var v = home != null ? home.Village : null;
+                // poprawka 119 (MarketCarts): woz kazdej wsi do miasta w zasiegu, ktore zaplaci za ladunek najwiecej na dobe kursu;
+                // null = zadne miasto nie wchodzi w gre (albo tabor stoi w miescie) - dalej jak dotad
+                if (s.VillageCartsBestMarket && v != null && v.Bound != null)
+                {
+                    var go = MarketCarts.Choose(villagerParty, home, v, s);
+                    if (go != null)
+                    {
+                        if (v.Bound.IsCastle) _toTown++;
+                        if (_move != null) _move.Invoke(__instance, new object[] { villagerParty, go });
+                        else villagerParty.SetMoveGoToSettlement(go, MobileParty.NavigationType.Default, false);
+                        return false;       // pomija latke BK (Bound) i oryginal - cel juz nadany
+                    }
+                }
+                if (!s.CastleVillagesSellInTown) return true;
                 if (v == null || v.Bound == null || !v.Bound.IsCastle) return true;      // wsie miejskie - bez zmian (BK)
                 var tb = v.TradeBound;
                 if (tb == null || !tb.IsTown) { _noMarket++; return true; }
@@ -74,6 +91,8 @@ namespace Armoury
         /// zamkowych zatykaly sie dwa razy czesciej niz miejskich (17% wobec 8%), a zatkana wies wstrzymuje cala produkcje.
         /// Udzwig taboru wsi zamkowej z targiem w miescie x MarketCartFactor (woz zamiast jukow). Postfiks na modelu
         /// bazowym - model NavalDLC deleguje do niego, BK wlasnego nie rejestruje.
+        /// Poprawka 119 (MarketCartAllVillages): woz dla taborow WSZYSTKICH wsi. Pomiar testu 06.10 (doba 20): wsie miejskie bez wozu
+        /// zatykaly magazyn czesciej (23 z 311, 7.4%) niz zamkowe z wozem (12 z 260, 4.6%), a po poprawce 119 i one jezdza dalej.
         /// </summary>
         public static void CartPostfix(MobileParty mobileParty, ref ExplainedNumber __result)
         {
@@ -81,10 +100,11 @@ namespace Armoury
             {
                 if (mobileParty == null || !mobileParty.IsVillager) return;      // tanie wyjscie - model wolany dla kazdej partii
                 var s = Settings.Current;
-                if (s == null || !s.CastleVillagesSellInTown || s.MarketCartFactor <= 1f) return;
+                if (s == null || s.MarketCartFactor <= 1f) return;
                 var hs = mobileParty.HomeSettlement;
                 var v = hs != null ? hs.Village : null;
-                if (v == null || v.Bound == null || !v.Bound.IsCastle || v.TradeBound == null || !v.TradeBound.IsTown) return;
+                if (v == null) return;
+                if (!s.MarketCartAllVillages && (!s.CastleVillagesSellInTown || v.Bound == null || !v.Bound.IsCastle || v.TradeBound == null || !v.TradeBound.IsTown)) return;
                 __result.AddFactor(s.MarketCartFactor - 1f, _txtCart);
             }
             catch { }
@@ -96,6 +116,7 @@ namespace Armoury
             try
             {
                 if (party == null || !party.IsVillager) return;
+                MarketCarts.Forget(party);                                   // poprawka 119: wiesc z drogi o tym wozie wygasa
                 _lost++;
                 if (destroyer != null && destroyer.MobileParty != null && destroyer.MobileParty.IsBandit) _lostToBandits++;
             }
