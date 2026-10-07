@@ -151,6 +151,7 @@ namespace Armoury
             Array.Clear(_goldIn, 0, _goldIn.Length); Array.Clear(_goldOut, 0, _goldOut.Length);
             Array.Clear(_fromNothing, 0, Classes); Array.Clear(_toNothing, 0, Classes);
             _worldFromNothing = _worldToNothing = _levyBack = 0;
+            Array.Clear(_shopWage, 0, Classes); Array.Clear(_shopKeep, 0, Classes);
             Array.Clear(_noteIn, 0, _noteIn.Length); Array.Clear(_noteOut, 0, _noteOut.Length);
             Array.Clear(_mark, 0, _mark.Length);
             Array.Clear(_wage, 0, Wages); Array.Clear(_wageN, 0, Wages); Array.Clear(_wageShort, 0, Wages);
@@ -361,6 +362,26 @@ namespace Armoury
         {
             if (amount <= 0) return;
             if (toPurse) _wageToPurses += amount; else _wageToCoffers += amount;
+        }
+
+        // warsztaty towarowe (WorkshopTrade): place za cykle i dzienne utrzymanie przekazane z KAPITALU warsztatu do kasy miasta -
+        // osobna pozycja linii "Przeplywy osad (kasy miast)". To przelew miedzy posiadaczami (kapital warsztatow -> kasy miast),
+        // zlota swiata nie zmienia, wiec do bilansu "Pieniadz swiata" nie wchodzi. Wplaty z kiesy gracza ida przez GiveGoldAction
+        // i sa w pozycji "przelewy gry".
+        private static readonly long[] _shopWage = new long[Classes], _shopKeep = new long[Classes];
+
+        /// <summary>WorkshopTrade wplacil do kasy osady place za cykle i utrzymanie warsztatu z jego kapitalu. Tylko licznik.</summary>
+        internal static void NoteWorkshopPay(Settlement st, int wages, int upkeep)
+        {
+            try
+            {
+                if (_inBlock) return;                       // w naszym ticku dobowym zmiane kas lapia migawki (Mark)
+                int c = ClassOf(st);
+                if (c < 0) return;
+                if (wages > 0) _shopWage[c] += wages;
+                if (upkeep > 0) _shopKeep[c] += upkeep;
+            }
+            catch { _stumbles++; }
         }
 
         // ------------------------------------------------------------ nasz tick dobowy: migawki kas
@@ -748,6 +769,11 @@ namespace Armoury
             {
                 known += notes;
                 parts.Add("Armoury poza tickiem dobowym " + S(notes) + " [P]" + (det.Count > 0 ? " (" + string.Join(", ", det.ToArray()) + ")" : ""));
+            }
+            if (_shopWage[c] != 0 || _shopKeep[c] != 0)
+            {
+                known += _shopWage[c] + _shopKeep[c];
+                parts.Add("warsztaty towarowe - place i utrzymanie z kapitalu warsztatow " + S(_shopWage[c] + _shopKeep[c]) + " [P] (place za cykle +" + _shopWage[c] + ", utrzymanie +" + _shopKeep[c] + ")");
             }
             long marks = 0; det = new List<string>();
             for (int k = 0; k < Marks; k++)
