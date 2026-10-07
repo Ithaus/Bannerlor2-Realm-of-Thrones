@@ -566,4 +566,15 @@ przyczyn nadmiaru koni; konflikt linii konstruktora ArmouryBehavior z diag / k13
 pamiec-drog i wyspy - niesprawdzone ze stosem; TownWageLink (GT, RC) czyta Armoury.TownWage.Index i Settings.TownRentFloorGold przez refleksje.
 OTWARTE ze stosu: konie P0-P3 + srednia cena konia + udzwig; audyt produkcji i lore (nowa kampania); blad CrashScribe Mends.cs:2134/2140;
 16 niskich zgloszen przegladu (PRZEKAZANIE sekcja 5); kasy miast z dlugami - na pozniej.
+ANALIZA AUTOTESTU STOSU 14:18 (od sesji lawy, wf_283fe6bf-e3d): bledy z naszych modow 0 (8 starych sygnatur sprzed doby 1), 12.8 s/dobe;
+ekonomia zdrowa (warsztaty broni 31 299 szt., 17.73 d/szt., sprzedaz/koszt 2.52; budowy sredni poziom plac 1.031; kasy miast 7.86 mln, zadne < 20 000;
+naprawy AI 6.31 d/szt.). DO POPRAWY PRZED WGRANIEM: (1) BLAD 22336e0 (zywy inwentarz): w ROT ges, kura, kot, pies sa w kategorii "horse" ->
+HistoricalPrices.Apply (ok. :431-457) liczy dzielnik popytu kategorii z przecenionych sztuk -> "horse" /25: popyt mieszczan na zwykle konie spada 25x,
+konie na polkach 12 953 wobec 8 600-9 300, cena konia x0.40, zakupy mieszkancow do kas miast -17%, zamkow -42%, utarg wozow -5..-9%; poprawka: dzielnik
+ze WSZYSTKICH sztuk kategorii (nieprzecenione = 1) albo drob osobno. (2) EFEKT e10b449 (kon najemnika po cenie targu): zloto AI za najemnikow do miast
++55-64% (479 zamiast ok. 290 na najemnika), glowy rodow -4..-5%, Zelazny Bank 198 tys. dlugu / 14 dluznikow, 1 bankructwo; kon najemnika z karczmy bierze
+sie z niczego (wzorzec DTE), a miasto dostaje zaplate i konia nie oddaje -> kalibracja w zamknietej ekonomii (zaplata tylko za konia zdjetego z polki
+albo najemnik z wlasnym koniem bez doplaty). (3) drobne: dzienna linia cen koni rekrutow; naprawy AI bez materialu z targu (K13 krok 139);
+nieprzecwiczone w autotescie: oplata za kuznie, turnieje gracza, niewola, TroopSelfMend, rezerwa 20 000 przy domu i utargu.
+-> po zlozeniu TOWARY 3 (workflow towary3-skladanie) osobny krok poprawek (1) i (2) na t3-sklad.
 
