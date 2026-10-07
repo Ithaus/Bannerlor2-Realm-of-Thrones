@@ -963,6 +963,7 @@ namespace Armoury
             try { LootPrices.Apply(); } catch (Exception e) { Log.Error("LootPrices", e); }   // wpis 97: cena lupu = stan
             try { McmSettings.Apply(); MaterialLaw.Apply(); ArmsPricing.Build(); HistoricalPrices.Apply(); StartStock.Run(); ArmsPricing.ClearCostCache(); MapClock.ApplySpeed(); UniqueSpoils.OnSessionLaunched(); ColdStart.Run(); } catch (Exception e) { Log.Error("MaterialLaw/ArmsPricing", e); }   // surowce PRZED wycena uzbrojenia; StartStock zaraz PO Apply (przelicznik ladunku juz obowiazuje)
             try { Stables.BuildRiderMap(); } catch (Exception e) { Log.Error("Stables.BuildRiderMap", e); }
+            try { RawPrice.SeedNewCampaign(); } catch (Exception e) { Log.Error("RawPrice.SeedNewCampaign", e); }   // cena surowcow: w nowej kampanii pamiec rynku z tickow startowych na nowa monete - PO HistoricalPrices.Apply i StartStock.Run
             try { WearGroups.Fix(); } catch (Exception e) { Log.Error("WearGroups.Fix", e); }
             try { CleanseNegativeStacks(); } catch (Exception e) { Log.Error("CleanseNegativeStacks", e); }
             try { TryRestoreArmoryWear("sesja"); } catch (Exception e) { Log.Error("TryRestoreArmoryWear", e); }
@@ -1194,6 +1195,7 @@ namespace Armoury
             try { MoneyLedger.Mark(MoneyLedger.MBuild); } catch { }
             try { BuildDiary.Daily(); } catch (Exception e) { Log.Error("BuildDiary.Daily", e); }
             try { OreLedger.Daily(); } catch (Exception e) { Log.Error("OreLedger.Daily", e); }   // wpis 94: ksiega rudy (tylko log)
+            try { RawPrice.Daily(); } catch (Exception e) { Log.Error("RawPrice.Daily", e); }     // cena surowcow od niedoboru: linia "Ceny surowcow:" (tylko log)
             try { MineralOnce.Daily(); } catch (Exception e) { Log.Error("MineralOnce.Daily", e); }   // powtorzenia mineralu zdjete z list produkcji BK (tylko log)
             try { MarketRoad.Daily(); } catch (Exception e) { Log.Error("MarketRoad.Daily", e); }   // wpis 100: dowoz wsi zamkowych na targi (log)
             try { CaravanBulk.Daily(); } catch (Exception e) { Log.Error("CaravanBulk.Daily", e); }   // wpis 103: surowce masowe w karawanach (przeliczenie swiata + log)

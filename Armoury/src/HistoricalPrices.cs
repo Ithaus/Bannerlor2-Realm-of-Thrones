@@ -142,7 +142,7 @@ namespace Armoury
 
         // wpis 87 (audyt pkt 12): nowa kampania = nowe obiekty przedmiotow - stare slowniki rosly, _applied zostawalo true,
         // a diagnostyka blokady (40 wpisow) wyczerpywala sie na cale uruchomienie gry
-        internal static void Reset() { _target.Clear(); _orig.Clear(); _origWeight.Clear(); _blockedLogged.Clear(); _applied = false; }
+        internal static void Reset() { _target.Clear(); _orig.Clear(); _origWeight.Clear(); _blockedLogged.Clear(); _applied = false; RawPrice.Reset(); }   // RawPrice: cena surowcow liczy na tym przeliczeniu - czysci sie razem z nim
 
         internal static int Orig(ItemObject it)
         {
@@ -369,6 +369,22 @@ namespace Armoury
         // indeksie 1.5. Dzielimy popyt kategorii przez to, ile razy potanialy jej przedmioty - rynek liczy te same sztuki.
         private static readonly Dictionary<ItemCategory, float> _catRatio = new Dictionary<ItemCategory, float>();
         [ThreadStatic] private static int _demandDepth;
+
+        // dla ceny surowcow (RawPrice): czy przeliczenie tej sesji juz obowiazuje i ile starych denarow to jeden nowy w danej
+        // kategorii (0 = kategoria nieprzeliczona); slownik jest pisany tylko w Apply, potem sam odczyt
+        internal static bool Applied { get { return _applied; } }
+        internal static float CoinRatio(ItemCategory cat)
+        {
+            float r;
+            return _applied && cat != null && _catRatio.TryGetValue(cat, out r) && r > 0f ? r : 0f;
+        }
+        internal static List<ItemCategory> RepricedCategories() { return new List<ItemCategory>(_catRatio.Keys); }
+        /// <summary>Czesc popytu gry, ktora mieszczanie naprawde kupuja (ten sam mnoznik, ktorym BudgetPostfix tnie ich budzet).</summary>
+        internal static float HouseShare(ItemCategory cat)
+        {
+            var s = Settings.Current;
+            return s != null && s.TownHouseholdUse && cat != null ? TownUse(cat.StringId) : 1f;
+        }
 
         public static void DemandPrefix() { _demandDepth++; }
         public static Exception DemandFinalizer(Exception __exception) { if (_demandDepth > 0) _demandDepth--; return __exception; }
