@@ -1496,7 +1496,7 @@ namespace Armoury
         [SettingPropertyGroup("The road to market")]
         public float MarketMaxDistance { get; set; } = 250f;
 
-        [SettingPropertyFloatingInteger("Market Cart Factor", 0.00f, 8.00f, "0.00", HintText = "carts instead of pack loads: villagers hauling to a town market carry this many times their usual load - the longer road would otherwise choke the village storehouse (1 = off; above 2 changes little, they take at most three fifths of the store unless they set out on a long road)")]
+        [SettingPropertyFloatingInteger("Market Cart Factor", 0.00f, 8.00f, "0.00", HintText = "carts instead of pack loads: villagers hauling to a town market carry this many times their usual load - the longer road would otherwise choke the village storehouse (1 = off; above 2 changes little, they take at most three fifths of the store unless they set out on a long road; with Village Cart Whole Store on they take the whole store whatever it weighs)")]
         [SettingPropertyGroup("The road to market")]
         public float MarketCartFactor { get; set; } = 2f;
 
@@ -1511,6 +1511,10 @@ namespace Armoury
         [SettingPropertyBool("Village Cart Full Load Far", HintText = "villagers setting out on a road longer than their storehouse can bear take everything their cart can carry, so the village does not stand idle and its goods do not lie waiting (needs Village Carts Best Market)")]
         [SettingPropertyGroup("The road to market")]
         public bool VillageCartFullLoadFar { get; set; } = true;
+
+        [SettingPropertyBool("Village Cart Whole Store", HintText = "villagers setting out for a town market take the whole village storehouse every time - the district hires as many carts as the load needs, so a heavy load (ore, timber) neither stays behind nor slows the train; a journey counts as free only while they are back before the storehouse holds the next load (five days of the village's output, waits in town and at home included) - every day beyond that earns less, and a full storehouse stops all village work, food too. Takes the place of Village Cart Full Load Far (needs Village Carts Best Market; off = the game's three fifths of each stack, a full cart only for a long road)")]
+        [SettingPropertyGroup("The road to market")]
+        public bool VillageCartWholeStore { get; set; } = true;
 
         [SettingPropertyBool("Village Cart Road News", HintText = "villagers know what other carts are already hauling to a town and count it as if it were on the stalls, so they do not all drive their loads to the same empty market (needs Village Carts Best Market)")]
         [SettingPropertyGroup("The road to market")]
@@ -2917,6 +2921,7 @@ namespace Armoury
             s.MarketCartAllVillages = MarketCartAllVillages;
             s.VillageCartsBestMarket = VillageCartsBestMarket;
             s.VillageCartFullLoadFar = VillageCartFullLoadFar;
+            s.VillageCartWholeStore = VillageCartWholeStore;
             s.VillageCartRoadNews = VillageCartRoadNews;
             s.VillageCartFairPrice = VillageCartFairPrice;
             s.CaravanBulkEnabled = CaravanBulkEnabled;

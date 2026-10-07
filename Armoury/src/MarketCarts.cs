@@ -45,6 +45,10 @@ namespace Armoury
     /// tabor dostal (dowod, ze odtworzenie jest wierne), nadplata wraca z sakwy taboru do kasy osady. Zloto nie powstaje i nie
     /// znika - przechodzi z powrotem miedzy tymi samymi dwiema kasami. Niezgodnosc albo blad = sprzedaz zostaje jak w grze (licznik).
     /// CZESC 2 (MarketCartAllVillages) siedzi w MarketRoad.CartPostfix (woz x MarketCartFactor dla wszystkich wsi).
+    /// POPRAWKA 122 (VillageCartWholeStore; test 07.10: 89 z 571 wsi z zatkanym magazynem, 8 z 26 kopaln stoi) - WOZ ZABIERA CALY
+    /// MAGAZYN: przy kazdym wyjezdzie z domu na targ miasta woz bierze wszystko, co lezy w magazynie wsi (bez limitu udzwigu - udzwig
+    /// taboru rosnie do wagi ladunku, CapFloor), a miernik liczy kurs z czekaniem (CycleWait) wobec dob, po ktorych magazyn zbierze
+    /// nastepny ladunek (W = 5 dob produkcji), zamiast dob do przestoju (1.5 W). Wylaczone = zachowanie 121.
     /// </summary>
     internal static class MarketCarts
     {
@@ -75,6 +79,12 @@ namespace Armoury
         private static readonly HashSet<Town> _oreTowns = new HashSet<Town>();
         private static int _fairN, _mismatch, _rising, _fairMax;
         private static long _fairFirst, _fairPaid;
+        private static double _wholeKg, _wholeMaxKg;                // poprawka 122: waga ladunku wozow z calym magazynem (linia dobowa)
+
+        /// <summary>Poprawka 122: czekanie w kursie, ktorego nie ma w drodze - stale gry: woz wraca z miasta z szansa 20% na godzine
+        /// (srednio 5 h, ThinkAboutSendingInsideVillagersToTheirHomeVillage), a z domu rusza z szansa 15% na godzine (srednio 6.7 h,
+        /// ThinkAboutSendingItemToTown); razem ok. 0.49 doby.</summary>
+        internal const double CycleWait = (1.0 / 0.20 + 1.0 / 0.15) / 24.0;
 
         internal static void Reset()
         {
@@ -88,6 +98,7 @@ namespace Armoury
             _calls = _ticks = 0; _sumD = _sumVal = _sumOwn = _sumOwnChosen = 0.0;
             _oreTowns.Clear();
             _fairN = _mismatch = _rising = _fairMax = 0; _fairFirst = _fairPaid = 0;
+            _wholeKg = _wholeMaxKg = 0.0;
         }
 
         /// <summary>Wyjatek przy jednym taborze: liczony zawsze, do pliku raz na miejsce (mechanizmu nie gasimy).</summary>
@@ -251,10 +262,11 @@ namespace Armoury
         }
 
         /// <summary>Plan doladunku "pelny woz": reszta magazynu wsi do udzwigu taboru (zwierzeta ida bez wagi - jak w grze,
-        /// MoveItemsToVillagerParty), w kolejnosci magazynu. Nic nie przenosi; left = ile sztuk zostanie w magazynie.</summary>
-        private static List<Line> TopUpPlan(MobileParty cart, ItemRoster store, out int units, out int left)
+        /// MoveItemsToVillagerParty), w kolejnosci magazynu. Nic nie przenosi; left = ile sztuk zostanie w magazynie.
+        /// Poprawka 122 (capped = false): caly magazyn, bez limitu udzwigu - udzwig taboru rosnie do wagi ladunku (CapFloor).</summary>
+        private static List<Line> TopUpPlan(MobileParty cart, ItemRoster store, bool capped, out int units, out int left)
         {
-            float room = cart.InventoryCapacity - cart.TotalWeightCarried;
+            float room = capped ? cart.InventoryCapacity - cart.TotalWeightCarried : 0f;
             var plan = new List<Line>();
             units = 0; left = 0;
             for (int i = 0; i < store.Count; i++)
@@ -263,7 +275,7 @@ namespace Armoury
                 var it = el.EquipmentElement.Item;
                 if (it == null || el.Amount <= 0) continue;
                 int n = el.Amount;
-                if (!it.HasHorseComponent && it.Weight > 0f) n = Math.Min(n, (int)Math.Floor(room / it.Weight));
+                if (capped && !it.HasHorseComponent && it.Weight > 0f) n = Math.Min(n, (int)Math.Floor(room / it.Weight));
                 if (n < 0) n = 0;
                 left += el.Amount - n;
                 if (n == 0) continue;
@@ -389,13 +401,21 @@ namespace Armoury
                 double perDay = PerDay(s);
                 int W = Math.Max(1, v.GetWarehouseCapacity());
                 int stock = Count(home.ItemRoster);
-                double tfree = Math.Max(0.0, 5.0 * (1.5 - (double)stock / W));
+                // poprawka 122 (caly magazyn): woz zabiera wszystko przy kazdym wyjezdzie z domu, a kurs liczy sie bez straty, gdy woz wraca,
+                // zanim magazyn zbierze nastepny ladunek (W = 5 dob produkcji: magazyn pelny = wyjazd); kazda doba ponad to to doba, w ktorej
+                // towar wsi lezy, a od 1.5 W wies nie produkuje niczego. Kurs liczony z czekaniem w miescie i w domu (CycleWait).
+                // Zapas 2.5 doby miedzy W a bramka 1.5 W pokrywa to, czego miernik nie widzi: dosypke RealisticBannerlord po wyjezdzie
+                // (10 drewna + 4 narzedzia, przy W ok. 65 ok. 1.1 doby), losowe czekanie i jazde wolniejsza od szacunku gry.
+                // Wylaczone: jak 121 - doby do przestoju (1.5 W), kurs bez czekania, pelny woz tylko na daleka droge, do udzwigu.
+                bool whole = s.VillageCartWholeStore;
+                double fill = whole ? 1.0 : 1.5, wait = whole ? CycleWait : 0.0;
+                double tfree = Math.Max(0.0, 5.0 * (fill - (double)stock / W));
                 List<Line> full = null, plan = null; double tfreeFull = tfree; int extra = 0, uFull = 0;
-                if (at == home && s.VillageCartFullLoadFar)
+                if (at == home && (s.VillageCartFullLoadFar || whole))
                 {
                     int left;
-                    plan = TopUpPlan(cart, home.ItemRoster, out extra, out left);
-                    if (extra > 0) { full = Merged(load, plan); uFull = SellUnits(cart, full, bk); tfreeFull = Math.Max(0.0, 5.0 * (1.5 - (double)left / W)); }
+                    plan = TopUpPlan(cart, home.ItemRoster, !whole, out extra, out left);
+                    if (extra > 0) { full = Merged(load, plan); uFull = SellUnits(cart, full, bk); tfreeFull = Math.Max(0.0, 5.0 * (fill - (double)left / W)); }
                     if (uFull <= 0) full = null;
                 }
                 var cands = new List<Cand>();
@@ -408,8 +428,8 @@ namespace Armoury
                     float d = Dist(cart, at, st);
                     if (!isOwn && (d <= 0f || (max > 0f && d > max))) continue;
                     if (d < 0f) d = 0f;
-                    double T = 2.0 * d / perDay;
-                    bool useFull = full != null && T > tfree;
+                    double T = 2.0 * d / perDay + wait;
+                    bool useFull = full != null && (whole || T > tfree);
                     var news = s.VillageCartRoadNews ? NewsFor(t) : null;
                     var ld = useFull ? full : load;
                     // miernik: utarg na sztuke x czesc kursu, w ktorej wies dalej produkuje (min(1, doby magazynu / doby kursu)) -
@@ -434,7 +454,11 @@ namespace Armoury
                 if (best.Full && plan != null)
                 {
                     int moved = TopUp(cart, home.ItemRoster, plan);
-                    if (moved > 0) { _full++; _fullUnits += moved; }
+                    if (moved > 0)
+                    {
+                        _full++; _fullUnits += moved;
+                        if (whole) { double kg = cart.TotalWeightCarried; _wholeKg += kg; if (kg > _wholeMaxKg) _wholeMaxKg = kg; }
+                    }
                 }
                 Note(cart, best.T, best.Load, bk);
                 // liczniki linii dobowej
@@ -451,6 +475,25 @@ namespace Armoury
             }
             catch (Exception e) { Stumble("MarketCarts.Choose", e); return null; }
             finally { _ticks += Stopwatch.GetTimestamp() - t0; }
+        }
+
+        /// <summary>
+        /// Poprawka 122: udzwig taboru wsi = co najmniej waga tego, co wiezie (wolane z MarketRoad.CartPostfix, po wozie x MarketCartFactor).
+        /// Woz zabiera caly magazyn bez limitu udzwigu - okreg najmuje tylu wozakow, ilu trzeba; bez tego ciezki ladunek (ruda i drewno
+        /// po 100 kg) przeciazylby tabor i model predkosci gry (kara przeciazenia -0.4 x nadwyzka / udzwig) wydluzylby kurs. Z tym tabor
+        /// jedzie jak pelny woz dzis (ladunek w udzwigu: -2% predkosci). Tylko w gore, tylko gdy waga przekracza dotychczasowy udzwig.
+        /// </summary>
+        internal static void CapFloor(MobileParty mp, Settings s, ref ExplainedNumber cap)
+        {
+            try
+            {
+                if (!s.VillageCartWholeStore || !s.VillageCartsBestMarket) return;
+                // recenzja: w gore do pelnego kilograma - gra czyta udzwig jako liczbe calkowita (MobileParty.InventoryCapacity, (int) w
+                // CalculateLandBaseSpeed), wiec ulamek kg ponad udzwig (np. 3933.1 kg przy udzwigu 3933) liczylby sie jako przeciazenie
+                float need = (float)Math.Ceiling(mp.TotalWeightCarried);
+                if (need > cap.ResultNumber) cap.LimitMin(need);
+            }
+            catch (Exception e) { Stumble("MarketCarts.CapFloor", e); }
         }
 
         private static void OreNote(Town t, List<Line> load)
@@ -626,7 +669,9 @@ namespace Armoury
                      + ", do wlasnego miasta " + _toOwn + ", do innego " + _toOther + ", bez miasta w zasiegu " + _noTown + ", w miescie (jak dotad) " + _inTown
                      + "; srednio " + (_dec > 0 ? (_sumD / _dec).ToString("0", inv) : "-") + " jedn. drogi (zasieg " + s.MarketMaxDistance.ToString("0", inv) + ", gry dla targu wsi " + game + ")"
                      + "; oczekiwany utarg " + (long)_sumVal + " d" + (_ownN > 0 ? " (tam, gdzie wlasne miasto bylo w grze: " + (long)_sumOwnChosen + " d wobec " + (long)_sumOwn + " d we wlasnym)" : "")
-                     + "; pelny woz na daleka droge " + _full + " (doladowane " + _fullUnits + " szt.)" + (s.VillageCartFullLoadFar ? "" : " - WYLACZONY")
+                     + (s.VillageCartWholeStore
+                        ? "; caly magazyn przy wyjezdzie (122): wozow " + _full + " (doladowane " + _fullUnits + " szt.; srednio " + (_full > 0 ? (_wholeKg / _full).ToString("0", inv) : "-") + " kg na woz, najciezszy " + _wholeMaxKg.ToString("0", inv) + " kg)"
+                        : "; pelny woz na daleka droge " + _full + " (doladowane " + _fullUnits + " szt.)" + (s.VillageCartFullLoadFar ? "" : " - WYLACZONY"))
                      + "; wiesc z drogi: wozow w drodze " + _hauls.Count + ", miast " + _news.Count + ", wygasle przy porzadkach " + dropped + (s.VillageCartRoadNews ? "" : " - WYLACZONA")
                      + "; z ruda " + _oreCarts + ", w tym do miasta bez rudy " + _oreToEmpty + " (roznych miast " + _oreTowns.Count + ")"
                      + "; wycen " + _evals + " (cen " + _calls + ", " + ms.ToString("0.0", inv) + " ms)"
@@ -655,6 +700,7 @@ namespace Armoury
                 var s = Settings.Current;
                 Log.Info("MarketCarts: poprawka 119 - wozy wsi do najlepiej placacego miasta w zasiegu " + (s != null ? s.MarketMaxDistance.ToString("0", CultureInfo.InvariantCulture) : "?")
                          + " (" + (s != null && s.VillageCartsBestMarket ? "CZYNNE" : "wylaczone") + "; pelny woz na daleka droge " + (s != null && s.VillageCartFullLoadFar ? "tak" : "nie")
+                         + ", caly magazyn przy wyjezdzie (122) " + (s != null && s.VillageCartWholeStore ? "tak - udzwig na miare ladunku, kurs z czekaniem " + CycleWait.ToString("0.00", CultureInfo.InvariantCulture) + " doby wobec dob do nastepnego ladunku" : "nie")
                          + ", wiesc z drogi " + (s != null && s.VillageCartRoadNews ? "tak" : "nie") + "), cena ladunku sztuka po sztuce - latka wpieta ("
                          + (s != null && s.VillageCartFairPrice ? "CZYNNA" : "wylaczona") + "), woz x" + (s != null ? s.MarketCartFactor.ToString("0.0", CultureInfo.InvariantCulture) : "?")
                          + " dla wsi " + (s != null && s.MarketCartAllVillages ? "wszystkich" : "zamkowych") + ".");

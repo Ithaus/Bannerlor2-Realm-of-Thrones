@@ -93,6 +93,8 @@ namespace Armoury
         /// bazowym - model NavalDLC deleguje do niego, BK wlasnego nie rejestruje.
         /// Poprawka 119 (MarketCartAllVillages): woz dla taborow WSZYSTKICH wsi. Pomiar testu 06.10 (doba 20): wsie miejskie bez wozu
         /// zatykaly magazyn czesciej (23 z 311, 7.4%) niz zamkowe z wozem (12 z 260, 4.6%), a po poprawce 119 i one jezdza dalej.
+        /// Poprawka 122 (VillageCartWholeStore): woz zabiera caly magazyn - udzwig taboru wsi co najmniej rowny wadze ladunku
+        /// (MarketCarts.CapFloor, po wozie x MarketCartFactor); wylaczone = jak dotad.
         /// </summary>
         public static void CartPostfix(MobileParty mobileParty, ref ExplainedNumber __result)
         {
@@ -100,12 +102,13 @@ namespace Armoury
             {
                 if (mobileParty == null || !mobileParty.IsVillager) return;      // tanie wyjscie - model wolany dla kazdej partii
                 var s = Settings.Current;
-                if (s == null || s.MarketCartFactor <= 1f) return;
+                if (s == null) return;
                 var hs = mobileParty.HomeSettlement;
                 var v = hs != null ? hs.Village : null;
                 if (v == null) return;
-                if (!s.MarketCartAllVillages && (!s.CastleVillagesSellInTown || v.Bound == null || !v.Bound.IsCastle || v.TradeBound == null || !v.TradeBound.IsTown)) return;
-                __result.AddFactor(s.MarketCartFactor - 1f, _txtCart);
+                if (s.MarketCartFactor > 1f && (s.MarketCartAllVillages || (s.CastleVillagesSellInTown && v.Bound != null && v.Bound.IsCastle && v.TradeBound != null && v.TradeBound.IsTown)))
+                    __result.AddFactor(s.MarketCartFactor - 1f, _txtCart);
+                MarketCarts.CapFloor(mobileParty, s, ref __result);              // poprawka 122: udzwig na miare ladunku (wlasny licznik potkniec)
             }
             catch { }
         }
