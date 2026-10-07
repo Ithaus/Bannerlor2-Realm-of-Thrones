@@ -1212,6 +1212,10 @@ namespace Armoury
         [SettingPropertyGroup("Smithing materials")]
         public bool NoFreeTimberAndTools { get; set; } = true;
 
+        [SettingPropertyFloatingInteger("Village Woodlot Loads", 0.00f, 10.00f, "0.00", HintText = "every village that is not a woodcutters' village fells this many loads (100 kg) of timber a day in its own woods and sends them to market with its carts - firewood and building timber came to a town from the woods of all the villages around it, not from a few woodcutters alone; the village storehouse holds five days of it like any other produce; it stands in for Realistic Bannerlord's free timber, so it works only while No Free Timber And Tools is on (0 = off)")]
+        [SettingPropertyGroup("Smithing materials")]
+        public float VillageWoodlotLoads { get; set; } = 2.5f;
+
         [SettingPropertyBool("Smelt Cap To Craft Cost", HintText = "melting a piece down never gives back more metal than a share of what forging it costs - no metal out of thin air")]
         [SettingPropertyGroup("Smithing materials")]
         public bool SmeltCapToCraftCost { get; set; } = true;
@@ -2854,6 +2858,7 @@ namespace Armoury
             s.MineOutputMultiplier = MineOutputMultiplier;
             s.LumberOutputMultiplier = LumberOutputMultiplier;
             s.NoFreeTimberAndTools = NoFreeTimberAndTools;
+            s.VillageWoodlotLoads = VillageWoodlotLoads;
             s.SmeltCapToCraftCost = SmeltCapToCraftCost;
             s.StartStockInLoads = StartStockInLoads;
             s.ArmsCostPricingEnabled = ArmsCostPricingEnabled;

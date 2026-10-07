@@ -27,6 +27,8 @@ namespace Armoury
     /// ("wsie dopisaly" / liczba kopiacych wsi = "model" / liczba wsi w modelu; dotad dopisywala dwa razy tyle).
     /// Wyjatek: po wczytaniu gry mnoznik wsi pojawia sie dopiero przy pierwszym zlozeniu jej listy przez BK (tick produkcji),
     /// a magazyn wsi pyta model wczesniej - w pierwszej dobie "model" pokazuje wiec jeszcze wynik liczony raz (polowe).
+    /// Paczka 126: drewno z lasu wsi (VillageWoodlot - kazda wies bez drwali) to osobna pozycja "las wsi" (NoteWoodlot): "wsie dopisaly"
+    /// zostaje wydobyciem drwali porownywalnym z "model", a "bez wyjasnienia" liczy las wsi jak kazde dopisanie.
     /// </summary>
     internal static class OreLedger
     {
@@ -34,13 +36,15 @@ namespace Armoury
         {
             public readonly string Id, Name, TownSource, LineName;
             public int Villages, Towns, Lines, Shops, Builds;      // dopisane wsiom / miastom i zamkom, zuzyte przez linie towarowe / warsztaty zbrojne / budowy
+            public int Woodlot;                                    // paczka 126: drewno z lasu wsi (VillageWoodlot) - osobno od wydobycia drwali ("wsie dopisaly" i "model")
             public float Model;
             public readonly HashSet<Settlement> Makers = new HashSet<Settlement>();
+            public readonly HashSet<Settlement> WoodlotMakers = new HashSet<Settlement>();
             public readonly HashSet<Village> Modelled = new HashSet<Village>();
             public int LastAll = -1, LastTowns = -1;
 
             public Book(string id, string name, string townSource, string lineName) { Id = id; Name = name; TownSource = townSource; LineName = lineName; }
-            public void NewDay() { Villages = 0; Towns = 0; Lines = 0; Shops = 0; Builds = 0; Model = 0f; Makers.Clear(); Modelled.Clear(); }
+            public void NewDay() { Villages = 0; Towns = 0; Lines = 0; Shops = 0; Builds = 0; Woodlot = 0; Model = 0f; Makers.Clear(); WoodlotMakers.Clear(); Modelled.Clear(); }
             public void Reset() { NewDay(); LastAll = -1; LastTowns = -1; }
         }
 
@@ -68,8 +72,9 @@ namespace Armoury
                 // Shops (warsztaty zbrojne) i Builds (budowy, wpis 102) przy starcie gry stoja na zerze (WorkshopLaw puszcza wtedy
                 // vanille, BuildFunding jeszcze nie kupuje), ale NewDay zeruje i te liczniki - gdyby cos w nich bylo, ma trafic
                 // do logu, a nie zniknac po cichu
-                string s = b.Villages == 0 && b.Towns == 0 && b.Lines == 0 && b.Shops == 0 && b.Builds == 0 && b.Model <= 0f ? ""
+                string s = b.Villages == 0 && b.Towns == 0 && b.Lines == 0 && b.Shops == 0 && b.Builds == 0 && b.Woodlot == 0 && b.Model <= 0f ? ""
                     : "wsiom dopisano " + b.Villages + " (" + b.Makers.Count + " wsi; model " + b.Model.ToString("0.#") + " w " + b.Modelled.Count + " wsiach), "
+                      + (b.Woodlot != 0 ? "las wsi (126) " + b.Woodlot + " (" + b.WoodlotMakers.Count + " wsi), " : "")
                       + b.TownSource + " +" + b.Towns + ", wsad linii towarowych (" + b.LineName + ") " + b.Lines
                       + (b.Shops != 0 ? ", warsztaty zbrojne " + b.Shops : "")
                       + (b.Builds != 0 ? ", budowy " + b.Builds : "");
@@ -109,6 +114,20 @@ namespace Armoury
         internal static void OnConsumed(ItemObject item, Settlement st, int count)
         {
             try { var b = Of(item); if (b != null && count > 0) b.Lines += count; }
+            catch { }
+        }
+
+        /// <summary>Paczka 126: drewno, ktore las wsi (VillageWoodlot) dopisal wsi - sztuki w jednostce chwili, jak OnProduced. Osobna pozycja,
+        /// zeby "wsie dopisaly" zostalo wydobyciem drwali porownywalnym z "model"; w "bez wyjasnienia" liczy sie jak kazde dopisanie.</summary>
+        internal static void NoteWoodlot(ItemObject item, Settlement st, int count)
+        {
+            try
+            {
+                var b = Of(item);
+                if (b == null || count <= 0) return;
+                b.Woodlot += count;
+                if (st != null) b.WoodlotMakers.Add(st);
+            }
             catch { }
         }
 
@@ -165,8 +184,9 @@ namespace Armoury
             sb.Append(b.Name).Append(": dzien ").Append((int)CampaignTime.Now.ToDays - 1)
               .Append(" - wsie dopisaly ").Append(b.Villages).Append(" ladunkow (").Append((b.Villages * kg / 1000f).ToString("0.0"))
               .Append(" t, ").Append(b.Makers.Count).Append(" wsi; model ").Append(b.Model.ToString("0.#")).Append(" w ").Append(b.Modelled.Count)
-              .Append(" wsiach z wynikiem > 0), ").Append(b.TownSource).Append(" +").Append(b.Towns)
-              .Append("; zuzycie: warsztaty zbrojne ").Append(b.Shops).Append(", linie towarowe (").Append(b.LineName).Append(") ").Append(b.Lines)
+              .Append(" wsiach z wynikiem > 0), ").Append(b.TownSource).Append(" +").Append(b.Towns);
+            if (b == _wood) sb.Append(", las wsi (126) +").Append(b.Woodlot).Append(" (").Append(b.WoodlotMakers.Count).Append(" wsi)");
+            sb.Append("; zuzycie: warsztaty zbrojne ").Append(b.Shops).Append(", linie towarowe (").Append(b.LineName).Append(") ").Append(b.Lines)
               .Append(", budowy ").Append(b.Builds)
               .Append("; zapas: miasta ").Append(towns);
             if (b.LastTowns >= 0) sb.Append(" (").Append(Signed(towns - b.LastTowns)).Append(")");
@@ -176,7 +196,7 @@ namespace Armoury
             if (b.LastAll >= 0)
             {
                 int delta = all - b.LastAll;
-                int known = b.Villages + b.Towns - b.Shops - b.Lines - b.Builds;
+                int known = b.Villages + b.Woodlot + b.Towns - b.Shops - b.Lines - b.Builds;
                 sb.Append(" (").Append(Signed(delta)).Append(", bez wyjasnienia ").Append(Signed(delta - known)).Append(")");
             }
             sb.Append("; miast bez towaru ").Append(empty).Append(" z ").Append(townCount)

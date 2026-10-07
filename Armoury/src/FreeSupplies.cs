@@ -27,7 +27,7 @@ namespace Armoury
     internal static class FreeSupplies
     {
         private const string RblType = "RealisticBannerlord.Systems.Supplies.SettlementSupplyAvailabilityBehavior";
-        private static bool _wired;
+        private static bool _wired, _found;   // _found: klasa dosypki RBL jest w grze (paczka 126 - las wsi tylko wtedy, gdy RBL nie dosypuje)
         private static int _stumbles, _stumblesDay;
         // [tryb, osada]: tryb 0 = zablokowane, 1 = przepuszczone (RBL dosypal); osada 0 miasta, 1 zamki, 2 wsie, 3 kryjowki i inne
         private static readonly int[,] _wood = new int[2, 4], _tools = new int[2, 4], _places = new int[2, 4];
@@ -36,6 +36,10 @@ namespace Armoury
 
         /// <summary>Dosypka RBL naprawde zablokowana: latka wpieta i wlacznik wlaczony (CaravanBulk.FreeOf).</summary>
         internal static bool Blocking { get { return _wired && On; } }
+
+        /// <summary>Paczka 126: RBL naprawde dosypuje drewno z niczego - klasa dosypki jest w grze, a blokada nie dziala (wlacznik wylaczony
+        /// albo metoda nie znaleziona). Wtedy las wsi (VillageWoodlot) nie tnie - drewno nie przychodzi dwa razy.</summary>
+        internal static bool RblFeeds { get { return _found && !Blocking; } }
 
         /// <summary>Nowa gra albo wczytanie (konstruktor ArmouryBehavior): liczniki doby i potkniec od zera.</summary>
         internal static void Reset()
@@ -131,6 +135,7 @@ namespace Armoury
             {
                 var t = QuartermasterLaw.FindType(RblType);
                 if (t == null) { Log.Info("FreeSupplies: RealisticBannerlord nieobecny (brak " + RblType + ") - nie ma dosypki do blokowania."); return; }
+                _found = true;
                 var m = AccessTools.Method(t, "OnDailyTickSettlement", new[] { typeof(Settlement) });
                 if (m == null || m.IsStatic || m.ReturnType != typeof(void))
                 {
