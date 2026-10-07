@@ -51,6 +51,9 @@ wies poza Normal nie wystawia nowego). NOWE: ten sam straznik BK odrzuca rozkazy
 Lord Hewett's Town 8) i LORDOW (2-6 dziennie, Acorn Hall 3) - karawany i lordowie tez utykaja w tych osadach; Pyke / Farton / Hull / Arbor /
 Downdelving / Pebbleton (wyspy?) - do sprawdzenia. Poprawka U ZRODLA w toku (workflow pamiec-drog-rot-uzupelniona, galaz w127-pamiec-drog):
 uzupelnienie 22 scian siatki bez wpisu w pamieci drog po wczytaniu - dla wszystkich partii; potem autotest 6.
+K13 krok 3 (129 rzemioslo miasta: sukno/plotno/skora wedle oplacalnosci, galaz w-toku/k13-3-rzemioslo-miasta 9f7408f na k2) i krok 4
+(130 odziez, buty i plotno wojska z sakiewki zolnierzy, w-toku/k13-4-odziez-wojska 93ac4c1 na k2 - NIE na 129; test i wgranie TYLKO razem 128+129+130
+jako G1; zmiana widoczna: znika kara morale BK "Textiles supplies") - gotowe po recenzji, opisy docs/paczki/w-toku/k13-3-*, k13-4-*.
 Gotowe obok (na 126): `paczki/127-pokretla-jeffa` (95baa63; json Jeffa: 45->35, 20.0->13.33, 5->2 przy wgraniu), `paczki/128-spoils-bez-darmowego-zlota` (83a8b1d).
 Pytania do Jeffa (07.10): zbroja z CRAFT jak bron (zepsuta/legendarna)? klan najemnikow Spoils dostaje ludzi z niczego - uszczelnic? naprawa u kwatermistrza
 Spoils bez materialu - ujednolicic z kuznia?
@@ -350,6 +353,11 @@ narzedzia rozpoznal wszystkie linie. Grupa 1: OK 61, UWAGA 5; grupa 2: OK 31, UW
   ograniczyc do Muru (decyzja Jeffa: czy jency Innych licza sie jako polegli); wightow nie wpuszczac do puli wyrzutkow, wylaczyc im
   dezercje i niewole; naprawic limit w Zewie.
 ## Decyzje Jeffa 07.10 (wiazace)
+- WIOSKI NA MAPIE (07.10 ok. 11:10): przyjal projekt rabunku osada po osadzie (okreg = ok. 240 osad po 250 ludzi, na mapie ok. 10 obrazkow-gromad
+  na okreg wedlug ludnosci). NIE nazywac "przysiolek": kazdy obrazek to WIOSKA Z NAZWA ("Wioska XYZ spalona", "plonie na mapie" - widac ogien w
+  trakcie rabunku i spalona po). Rozstawienie NIE losowe: "wzdluz drog, czesc kilka po bokach", przy brodach, mostach, rzekach - ma wygladac
+  na mapie z sensem. Projekt w toku: workflow wioski-na-mapie-projekt (prototyp na prawdziwej mapie ROT z obrazkami, krytyk, poprawka).
+  Drogi ROT sa namalowane w terenie (terrain.bin), rzeki to sciezki w scene.xscene (trident, red fork, mander, rhoyne ...).
 
 1. Pytanie kanonu 1 (`docs/REGULY-KRAIN-I-DLUGU-2026-10-06.md` rozdz. 9): jency Innych wstaja jako trupy - TAK (Inni nie biora jencow; pojmany i odbity jeniec
    to polegly swojego regionu i cialo dla Innych, tylko za Murem i przy Murze).
