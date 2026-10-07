@@ -1448,9 +1448,17 @@ namespace Armoury
         [SettingPropertyGroup("Workshops")]
         public float WorkshopArtisansMax { get; set; } = 60f;
 
-        [SettingPropertyInteger("Artisan Tan Weave Per Cycle", 0, 20, "0", HintText = "the town's own tanners and weavers turn this many loads of raw hides into leather, or flax into linen, each working cycle - from the town market, nothing from thin air")]
+        [SettingPropertyInteger("Artisan Tan Weave Per Cycle", 0, 20, "0", HintText = "the town's own tanners and weavers turn this many loads of raw hides into leather, or flax into linen, each working cycle - from the town market, nothing from thin air (one for one; not used while Town Crafts Enabled is on)")]
         [SettingPropertyGroup("Workshops")]
         public int ArtisanTanWeavePerCycle { get; set; } = 5;
+
+        [SettingPropertyBool("Town Crafts Enabled", HintText = "the town's own fullers, weavers and tanners, in every town: wool into woollen cloth (felt), flax into linen, raw hides into leather, taken from their own town's stalls whenever the cloth or leather fetches enough to pay for its material, the work and a master's profit (Smith Profit Percent) at today's prices - one piece at a time, each priced anew, the best paying trade first. Material by the worth of the goods - 60% of the cloth's worth, never less than the cloth weighs: about 3 sacks of wool for 2 bolts of cloth, 3 of flax for 1 of linen, 12 hides for 5 leathers; the work is 20% of the worth at a craftsman's day wage (cloth 13 man-days, linen 7, leather 3). No coin changes hands - from stall to stall of the same town. What they work up counts in the town's daily use, so wool and flax are dear where they are worked and caravans bring them there. Replaces the one-for-one tanning and weaving (Artisan Tan Weave Per Cycle); needs Historical Prices (off = one for one as before)")]
+        [SettingPropertyGroup("Workshops")]
+        public bool TownCraftsEnabled { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Town Craft Hands Per Arms Hand", 0.00f, 8.00f, "0.00", HintText = "hands of a town's cloth and leather trades for each hand of its arms craftsmen (Workshop Prosperity Per Hand), so they grow with the town's prosperity - weaving, fulling and tanning kept about twice as many people as the arms guilds (Paris 1292, Ghent 1356, estimate); 0 = town crafts off, the one-for-one tanning and weaving as before")]
+        [SettingPropertyGroup("Workshops")]
+        public float TownCraftHandsPerArmsHand { get; set; } = 2f;
 
         [SettingPropertyFloatingInteger("Workshop Sell Share", 0.00f, 3.60f, "0.00", HintText = "a craftsman sells his wares at the market price buyers pay, less this merchant's cut (0.9 = he keeps 90%); with the maker's profit of 25% built into worth, at a normal price he earns 1.125x his cost")]
         [SettingPropertyGroup("Workshops")]
@@ -3002,6 +3010,8 @@ namespace Armoury
             s.WorkshopArtisansMin = WorkshopArtisansMin;
             s.WorkshopArtisansMax = WorkshopArtisansMax;
             s.ArtisanTanWeavePerCycle = ArtisanTanWeavePerCycle;
+            s.TownCraftsEnabled = TownCraftsEnabled;
+            s.TownCraftHandsPerArmsHand = TownCraftHandsPerArmsHand;
             s.WorkshopSellShare = WorkshopSellShare;
             s.GuildShareTailor = GuildShareTailor;
             s.GuildShareArmourer = GuildShareArmourer;

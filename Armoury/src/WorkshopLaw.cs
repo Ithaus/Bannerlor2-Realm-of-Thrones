@@ -42,6 +42,7 @@ namespace Armoury
         /// <summary>Nowa gra/wczytanie: stare przedmioty i pule z poprzedniej kampanii (audyt 04.10 - ryzyko zepsucia save).</summary>
         internal static void Reset() { _ore = _wood = _leather = _linen = _wool = null; _owed.Clear(); _labor.Clear(); _rank.Clear(); _wip.Clear(); _guildCache.Clear(); _madeByType.Clear(); _dayStamp = -1; _made = _skipLoss = _skipMat = _skipLabor = _skipGold = 0; _dayRevenue = _dayCost = 0; Array.Clear(_skipMatBy, 0, _skipMatBy.Length);
             WorkshopTrade.Reset();   // warsztaty towarowe w nowej monecie: stan czyszczony razem z warsztatami zbrojnymi (ta metoda idzie z konstruktora ArmouryBehavior)
+            TownCrafts.Reset();      // paczka 148: rzemioslo miasta - dlugi wsadu i rak, srednie zuzycia (przed SyncData wczytania)
         }
         private static ItemObject _ore, _wood, _leather, _linen, _wool;
         private static readonly int[] _skipMatBy = new int[4];      // "brak surowca" wedlug surowca: ruda, drewno, skora, len albo welna (tylko licznik)
@@ -76,6 +77,9 @@ namespace Armoury
             try
             {
                 var s = Settings.Current;
+                // paczka 148: rzemioslo miasta (TownCrafts) przerabia skory, len i welne wedle wartosci w dobie miasta - tu 1:1 juz nie;
+                // linia zostaje zablokowana jak reszta "z niczego" (_freeRawBlocked)
+                if (TownCrafts.Active) return false;
                 if (s.ArtisanTanWeavePerCycle <= 0 || w == null || w.Settlement == null || w.Settlement.Town == null) return false;
                 string outId = null;
                 foreach (var o in p.Outputs) if (o.Item1 != null) { outId = o.Item1.StringId; break; }
@@ -563,7 +567,7 @@ namespace Armoury
                          + "], koszt " + _dayCost + ", sprzedaz " + _dayRevenue + "; odpuszczone: bez zysku " + _skipLoss
                          + ", brak surowca " + _skipMat + " [ruda " + _skipMatBy[0] + ", drewno " + _skipMatBy[1] + ", skora " + _skipMatBy[2] + ", len/welna " + _skipMatBy[3]
                          + " - cykl liczony przy kazdym surowcu, ktorego zabraklo na ktoras sztuke z rankingu], w robocie (cykle) " + _skipLabor + ", brak zlota/kupca " + _skipGold + "; rozpoczete sztuki " + _started + ", w toku teraz " + InProgress()
-                         + " | rzemieslnicy miasta wygarbowali skor " + _tanned + ", utkali plotna " + _woven + " | z niczego zablokowane: cykle rzemieslnikow " + _freeRawBlocked + ", sztabki/wegiel z losowania -> ruda/drewno " + _swappedSmith + ".");
+                         + (TownCrafts.Active ? " | garbowanie i tkanie 1:1 wylaczone (rzemioslo miasta 148 - linia \"Rzemioslo miasta\")" : " | rzemieslnicy miasta wygarbowali skor " + _tanned + ", utkali plotna " + _woven) + " | z niczego zablokowane: cykle rzemieslnikow " + _freeRawBlocked + ", sztabki/wegiel z losowania -> ruda/drewno " + _swappedSmith + ".");
             }
             FlushDiag();
             _made = _skipLoss = _skipMat = _skipLabor = _skipGold = _freeRawBlocked = _swappedSmith = _started = _tanned = _woven = 0; _dayRevenue = _dayCost = 0; _madeByType.Clear();

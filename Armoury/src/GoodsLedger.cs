@@ -56,10 +56,10 @@ namespace Armoury
         // ------------------------------------------------------------ rodzaje ramek
         internal const int FVillage = 0, FVillageFood = 1, FCycle = 2, FCons = 3, FFood = 4, FSupplyUse = 5, FSupplyBuy = 6, FBkSettle = 7,
                            FBkParty = 8, FWagon = 9, FSell = 10, FCaravanLeave = 11, FBuild = 12, FForage = 13, FBee = 14,
-                           FTickParty = 15, FTickSettle = 16, FTickTown = 17, Kinds = 18;
+                           FTickParty = 15, FTickSettle = 16, FTickTown = 17, FTownCraft = 18, Kinds = 19;   // FTownCraft: paczka 148 (rzemioslo miasta)
         private static readonly string[] KindName = { "produkcja wsi", "zywnosc wsi", "cykle warsztatow", "konsumpcja osad", "jedzenie partii",
             "zaopatrzenie BK (zuzycie)", "zaopatrzenie BK (zakupy)", "tick osady BK", "tick partii BK", "sprzedaz wozow", "handel partii",
-            "wyjazd karawany (BK)", "budowy", "furaz", "BetterEconomy", "tick partii", "tick osady", "tick miasta" };
+            "wyjazd karawany (BK)", "budowy", "furaz", "BetterEconomy", "tick partii", "tick osady", "tick miasta", "rzemioslo miasta (148)" };
 
         // ------------------------------------------------------------ posiadacze zapasu
         private const int HTown = 0, HCastle = 1, HVillage = 2, HStash = 3, HOtherSettl = 4, HWagon = 5, HCaravan = 6, HLord = 7, HPlayer = 8, HOtherParty = 9, Holders = 10;
@@ -69,13 +69,13 @@ namespace Armoury
         private const int TWagon = 0, TCarBuy = 1, TCarSell = 2, TLordBuy = 3, TLordSell = 4, TOthBuy = 5, TOthSell = 6, TSupplyBuy = 7, Transfers = 8;
 
         // ------------------------------------------------------------ grupy zrodel i ujsc (kolejnosc w linii)
-        private const string GVil = "wsie", GWoodlot = "las wsi (126)", GShop = "warsztaty", GArt = "rzemieslnicy BK", GTanW = "garbowanie i tkanie 1:1 (TanOrWeave)",
+        private const string GVil = "wsie", GWoodlot = "las wsi (126)", GShop = "warsztaty", GArt = "rzemieslnicy BK", GTanW = "garbowanie i tkanie 1:1 (TanOrWeave)", GCraft = "rzemioslo miasta (148)",
                              GShopIn = "linie warsztatow", GArms = "warsztaty zbrojne", GBuild = "budowy", GTown = "mieszczanie", GCastle = "zamki",
                              GFood = "zywnosc partii", GSlaughter = "uboj w partiach", GSupply = "zaopatrzenie BK", GBkSettle = "BK osady", GBkParty = "BK partie",
                              GBee = "BetterEconomy", GForage = "furaz armii (Armoury)", GLost = "przepadlo z rozbitymi partiami", GNoBuyer = "sprzedane bez kupca",
                              GTick = "inne ticki dobowe", GRest = "handel (reszta)";
-        private static readonly string[] SrcOrder = { GVil, GWoodlot, GShop, GArt, GTanW, GSlaughter, GBkParty, GBkSettle, GBee, GForage, GTick };
-        private static readonly string[] SinkOrder = { GShopIn, GArt, GTanW, GArms, GBuild, GTown, GCastle, GFood, GSupply, GBkSettle, GBkParty, GBee, GLost, GNoBuyer, GTick };
+        private static readonly string[] SrcOrder = { GVil, GWoodlot, GShop, GArt, GTanW, GCraft, GSlaughter, GBkParty, GBkSettle, GBee, GForage, GTick };
+        private static readonly string[] SinkOrder = { GShopIn, GArt, GTanW, GCraft, GArms, GBuild, GTown, GCastle, GFood, GSupply, GBkSettle, GBkParty, GBee, GLost, GNoBuyer, GTick };
 
         // ------------------------------------------------------------ ramka
         internal sealed class Frame
@@ -475,6 +475,9 @@ namespace Armoury
                     return;
                 case FForage:
                     foreach (var i in f.Touched) Book(i, GForage, null, f.Net[i]);
+                    return;
+                case FTownCraft:   // paczka 148: przerob rzemiosla miasta (TownCrafts) - wsad welny, lnu i skor jako ujscie, filc, plotno i skora jako zrodlo
+                    foreach (var i in f.Touched) Book(i, GCraft, null, f.Net[i]);
                     return;
                 case FBee:
                     {

@@ -114,7 +114,7 @@ namespace Armoury
         // przy starcie sztuki, WorkshopLaw.cs:222-228). Zuzycie na roboczodzien z pomiaru logu 05.10 (warsztaty 26.6 ladunku rudy
         // i 172 drewna dziennie przy 37 miastach z ruda i medianie 28 rak) i z receptur; stale = mieszczanie (budzet BK x TownUse*)
         // i narzedzia. Garbowanie i tkanie rzemieslnikow: predkosc linii 0.2 i 0.5 cyklu na dobe (BannerKings workshops.xml:47,62)
-        // x ArtisanTanWeavePerCycle. Drewno BEZ budow (dziura bez dna) i z 30 ladunkami, ktore RealisticBannerlord dosypuje
+        // x ArtisanTanWeavePerCycle (paczka 148: przy czynnym rzemiosle miasta zamiast tego prawdziwy przerob - TownCrafts.UseOf). Drewno BEZ budow (dziura bez dna) i z 30 ladunkami, ktore RealisticBannerlord dosypuje
         // miastu co dobe - tego karawana nie wozi i nie wykupuje (paczka 125: gdy ta dosypka jest zablokowana, Free = 0 - FreeOf).
         // Linie towarowe warsztatow notabli (tkalnie, garbarnie, tartaki,
         // narzedzia kuzni) nie sa w tabeli - liczy je ShopUse z receptur gry, osobno dla kazdego miasta.
@@ -217,7 +217,10 @@ namespace Armoury
         /// garbowanie i tkanie rzemieslnikow, linie towarowe warsztatow notabli. Jedno zrodlo dla zapasu docelowego i dla ceny.</summary>
         private static float Use(Town town, Good g, Settings s)
         {
-            return WorkshopLaw.TownHands(town) * g.PerHand + g.Fixed + g.PerCycle * Math.Max(0, s.ArtisanTanWeavePerCycle) + ShopUse(town, g);
+            // paczka 148: przy czynnym rzemiosle miasta (TownCrafts) garbowania i tkania 1:1 nie ma - zamiast jego stalej (PerCycle x sztuk na
+            // cykl) prawdziwy przerob rzemiosla w tym miescie (srednia z ok. 14 dob, sztuki wsadu na dobe; takze welna)
+            float crafts = TownCrafts.Active ? TownCrafts.UseOf(town, g.Item) : g.PerCycle * Math.Max(0, s.ArtisanTanWeavePerCycle);
+            return WorkshopLaw.TownHands(town) * g.PerHand + g.Fixed + crafts + ShopUse(town, g);
         }
 
         /// <summary>Dla ceny surowcow (RawPrice): to samo zuzycie dobowe, z ktorego karawany licza zapas docelowy miasta - przedmiot
