@@ -374,6 +374,10 @@ narzedzia rozpoznal wszystkie linie. Grupa 1: OK 61, UWAGA 5; grupa 2: OK 31, UW
   ograniczyc do Muru (decyzja Jeffa: czy jency Innych licza sie jako polegli); wightow nie wpuszczac do puli wyrzutkow, wylaczyc im
   dezercje i niewole; naprawic limit w Zewie.
 ## Decyzje Jeffa 07.10 (wiazace)
+- CENA SPRZEDAZY SPRZETU (07.10 ok. 15:20; projekt docs/PROJEKT-CENA-SPRZEDAZY-SPRZETU-2026-10-07.md): (1) "tak, jesli to poprawia realizm ekonomii" -
+  wgrac razem z 127 (kara BK x5 RAZ zamiast x25, podloga 2% od wartosci ZE STANEM); (2) "tak" - sufit: kupiec nie da wiecej niz 1/10 ceny nowej sztuki
+  na tej polce; (3) "tak" - handel odnowionym sprzetem miedzy miastami zostaje. Paczka w toku (workflow cena-sprzedazy-paczka, galaz w127b-cena-sprzedazy),
+  dolaczy na koniec TOWARY 3. OTWARTE: wraki na polkach wojska - naprawa za 10% (decyzja 26.08) czy tylko zlom i kowadlo.
 - JEDEN CZAT (07.10 ok. 14:25, przekazane przez sesje lawy f16095a4): "nie puszczaj zadnych innych prac w drugim czacie, wszystko idzie w jednym" -
   wszystko prowadzi ten czat; zadnych rownoleglych sesji (takze propozycji osobnych zadan); przed kazda praca sprawdzic, czy temat nie jest juz robiony.
 - KOSZT NAPRAWY (07.10 ok. 14:25): "nasza robocizna jest lepsza" - zostaje robocizna stosu n131b (b36a6d6: 0.2 x ubytek stanu x robota wykonania
