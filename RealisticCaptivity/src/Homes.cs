@@ -43,7 +43,9 @@ namespace RealisticCaptivity
 
         internal static int SellPrice(Settlement s)
         {
-            return (int)(BuyPrice(s) * Settings.Current.HomeSellFactor);
+            int price = (int)(BuyPrice(s) * Settings.Current.HomeSellFactor);
+            // przy stawkach historycznych kupuje osada - najwyzej tyle, ile ma w kasie (cena w podpowiedzi = zaplata)
+            return Settings.Current.HistoricalTownRates ? Math.Min(price, Work.CofferOf(s)) : price;
         }
 
         // ------------------------------------------------------------ dom rodzinny
@@ -210,6 +212,8 @@ namespace RealisticCaptivity
         {
             args.optionLeaveType = GameMenuOption.LeaveType.Trade;
             if (!Owned(Here)) return false;
+            if (SellPrice(Here) <= 0)
+            { args.IsEnabled = false; args.Tooltip = new TextObject("{=!}No one in " + Here.Name + " has the coin to buy a house now."); return true; }
             args.Tooltip = new TextObject("{=!}A buyer would give " + SellPrice(Here) +
                 " gold. Whatever lies in the chest and strongbox comes with you.");
             return true;

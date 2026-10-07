@@ -80,6 +80,27 @@ namespace RealisticCaptivity
             return s.IsVillage ? w * Math.Max(0f, c.VillageWageShare) : w;
         }
 
+        /// <summary>Kasa osady (miasto albo wies; 0 - brak).</summary>
+        internal static int CofferOf(Settlement s)
+        {
+            var sc = s != null ? s.SettlementComponent : null;
+            return sc != null ? Math.Max(0, sc.Gold) : 0;
+        }
+
+        /// <summary>Czy osada ma z czego zaplacic pelna dniowke (przy stawkach historycznych placi kasa osady).</summary>
+        private static bool CanPay(Settlement s)
+        {
+            return !Settings.Current.HistoricalTownRates || CofferOf(s) >= Math.Max(1, (int)Math.Ceiling(DayWage(s)));
+        }
+
+        /// <summary>Komunikat dniowki: pelna, czesciowa albo zadna (pusta kasa osady).</summary>
+        private static string WageNote(int paid, int due, string what)
+        {
+            if (paid <= 0) return "No one here has the coin to pay you - " + what + " goes unpaid.";
+            if (paid < due) return "Only " + paid + " of " + due + " stags - the purse here is thin.";
+            return null;
+        }
+
         /// <summary>Wyplata od osady (kasa miasta albo wsi) - najwyzej tyle, ile osada ma; 0 = nie ma czym zaplacic.</summary>
         private static int PayFromSettlement(Settlement s, int pay)
         {
@@ -222,8 +243,10 @@ namespace RealisticCaptivity
                 { args.IsEnabled = false; args.Tooltip = new TextObject("{=!}You command too many men - no one hires a captain as a farmhand. (at most {MAX} in your party)").SetTextVariable("MAX", c.WorkMaxPartySize); return true; }
                 if (c.WorkOnlyBelowGold > 0 && Hero.MainHero.Gold >= c.WorkOnlyBelowGold)
                 { args.IsEnabled = false; args.Tooltip = new TextObject("{=!}You are far too wealthy to be seen digging ditches. (under {MAX} gold)").SetTextVariable("MAX", c.WorkOnlyBelowGold); return true; }
+                if (!CanPay(Here))
+                { args.IsEnabled = false; args.Tooltip = new TextObject("{=!}No one here has the coin to hire a hand - the purse of " + Here.Name + " is empty."); return true; }
                 args.Tooltip = new TextObject("{=!}About {PAY} stags a day, food included. Hard graft builds Athletics.")
-                    .SetTextVariable("PAY", LabourPay(Here));
+                    .SetTextVariable("PAY", c.HistoricalTownRates ? DayWage(Here).ToString("0.#") : LabourPay(Here).ToString());
                 return true;
             }
             catch (Exception e) { Log.Error("LabourCondition", e); return false; }
@@ -244,8 +267,10 @@ namespace RealisticCaptivity
                 { args.IsEnabled = false; args.Tooltip = new TextObject("{=!}No merchant believes a man of your wealth needs watch work. (under {MAX} gold)").SetTextVariable("MAX", c.GuardOnlyBelowGold); return true; }
                 if (BestWeaponSkill() < c.GuardSkillRequired)
                 { args.IsEnabled = false; args.Tooltip = new TextObject("{=!}They want someone who can handle a weapon. (best weapon skill {MIN} needed)").SetTextVariable("MIN", c.GuardSkillRequired); return true; }
+                if (!CanPay(Here))
+                { args.IsEnabled = false; args.Tooltip = new TextObject("{=!}The merchants of " + Here.Name + " have no coin left to hire a watchman."); return true; }
                 args.Tooltip = new TextObject("{=!}About {PAY} stags a night. Rowdy nights may earn a bonus - or a beating.")
-                    .SetTextVariable("PAY", GuardPay(Here));
+                    .SetTextVariable("PAY", c.HistoricalTownRates ? DayWage(Here).ToString("0.#") : GuardPay(Here).ToString());
                 return true;
             }
             catch (Exception e) { Log.Error("GuardCondition", e); return false; }
@@ -307,10 +332,12 @@ namespace RealisticCaptivity
 
                 var c = Settings.Current;
                 bool halfPay = Saturated(Here);
-                int pay = LabourPay(Here);
+                int pay = LabourPay(Here), due = pay;
                 if (c.HistoricalTownRates) pay = PayFromSettlement(Here, pay);          // place daje kasa osady, nie nikt
                 else GiveGoldAction.ApplyBetweenCharacters(null, Hero.MainHero, pay);
                 _earned += pay;
+                string thin = WageNote(pay, due, "the day's work");
+                if (thin != null) { Log.Player(thin, true); Log.Info("Praca dniowkowa w " + Here.Name + ": kasa osady zaplacila " + pay + " z " + due); }
                 MarkWorked();
                 Hero.MainHero.AddSkillXp(DefaultSkills.Athletics, c.WorkAthleticsXpPerDay);
                 FeedFromMastersPot();
@@ -345,8 +372,11 @@ namespace RealisticCaptivity
                     if (MBRandom.RandomFloat < winChance)
                     {
                         int pay = GuardPay(Here) + (c.HistoricalTownRates ? MBRandom.RoundRandomized(DayWage(Here) * Math.Max(0f, c.GuardBrawlBonusDays)) : c.GuardBrawlBonus);
+                        int dueB = pay;
                         if (c.HistoricalTownRates) pay = PayFromSettlement(Here, pay);
                         else GiveGoldAction.ApplyBetweenCharacters(null, Hero.MainHero, pay);
+                        string thinB = WageNote(pay, dueB, "the night's watch");
+                        if (thinB != null) Log.Player(thinB, true);
                         _earned += pay;
                         Hero.MainHero.AddSkillXp(skillObj, 150f);
                         if (MBRandom.RandomFloat < 0.25f) ThankfulNotable();
@@ -361,9 +391,11 @@ namespace RealisticCaptivity
                 }
                 else
                 {
-                    int pay = GuardPay(Here);
+                    int pay = GuardPay(Here), dueG = pay;
                     if (c.HistoricalTownRates) pay = PayFromSettlement(Here, pay);
                     else GiveGoldAction.ApplyBetweenCharacters(null, Hero.MainHero, pay);
+                    string thinG = WageNote(pay, dueG, "the night's watch");
+                    if (thinG != null) Log.Player(thinG, true);
                     _earned += pay;
                     Log.Player("A quiet watch. " + pay + " stags for the night.");
                 }

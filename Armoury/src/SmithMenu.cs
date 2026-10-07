@@ -1644,7 +1644,7 @@ namespace Armoury
 
                 MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData(
                     "How will you work?",
-                    item.Name + ". Forge fee " + Forge.ForgeFee(r) + " gold. Materials and stamina are spent now; " +
+                    item.Name + (Settings.Current.ForgeHireHistorical ? ". Forge hire " + Forge.ForgeFee(r) + " gold for every day of work. " : ". Forge fee " + Forge.ForgeFee(r) + " gold. ") + "Materials and stamina are spent now; " +
                     "the piece is finished only when the work is done - and only while you remain in this settlement.",
                     opts, true, 1, 1, "Set to work", "Step back",
                     delegate (List<InquiryElement> sel)

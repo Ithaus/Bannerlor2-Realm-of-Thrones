@@ -273,10 +273,20 @@ namespace Armoury
                 if (Stamina() < staminaNeed)
                 { Log.Player("You are too spent to start such work. Rest first.", true); return false; }
 
-                int fee = ForgeFee(r);
-                if (Hero.MainHero.Gold < fee)
-                { Log.Player("The smith wants " + fee + " gold for the use of his forge.", true); return false; }
-                if (fee > 0) Pay.ToSettlement(fee);
+                if (s.ForgeHireHistorical)
+                {
+                    // Jeff 07.10: kuznia za KAZDY dzien roboty - pierwszy dzien teraz, kolejne w ArmouryBehavior (PayDayRent)
+                    int dayFee = ForgeFee(r);
+                    if (!PayDayRent(TaleWorlds.CampaignSystem.Settlements.Settlement.CurrentSettlement, r.Tier))
+                    { Log.Player("The smith wants " + dayFee + " gold for a day of his forge.", true); return false; }
+                }
+                else
+                {
+                    int fee = ForgeFee(r);
+                    if (Hero.MainHero.Gold < fee)
+                    { Log.Player("The smith wants " + fee + " gold for the use of his forge.", true); return false; }
+                    if (fee > 0) Pay.ToSettlement(fee);
+                }
 
                 var helper = Helper.Find();
                 float relief = Helper.Relief(helper);
@@ -291,7 +301,7 @@ namespace Armoury
                     Log.Player(helper.Name + " works the bellows for you - the labour goes faster.");
                     Log.Info("Pomocnik: " + helper.Name + " ulga=" + relief.ToString("0.00"));
                 }
-                Log.Info("Rozpoczeto: " + item.StringId + " tempo=" + tempo + " dni=" + days + " oplata=" + fee);
+                Log.Info("Rozpoczeto: " + item.StringId + " tempo=" + tempo + " dni=" + days + " oplata=" + (s.ForgeHireHistorical ? ForgeFee(Recipes.For(item)) + " za dzien" : ForgeFee(Recipes.For(item)).ToString()));
                 return true;
             }
             catch (Exception e) { Log.Error("Begin", e); return false; }
@@ -346,6 +356,34 @@ namespace Armoury
         /// (dzien / ForgeDayHours) - z tego, przy ForgeHireHistorical. Dotad karnet kosztowal stawke godzinowa BK x 8 h (ok. 200,
         /// tyle co ok. 70 dniowek rzemieslnika).
         /// </summary>
+        // ------------------------------------------------------------ kuznia za kazdy dzien roboty (Jeff 07.10: "za kazdy dzien kuznia")
+        private static readonly Dictionary<string, int> _rentDay = new Dictionary<string, int>();   // osada -> dzien oplacony (tylko w pamieci)
+        private static int _rentShortDay = -1;
+
+        /// <summary>
+        /// Oplata za dzien kuzni przy wlasnym projekcie (ForgeHireHistorical): (ForgeFeeBase + ForgeFeePerTier x tier) x poziom plac miasta,
+        /// raz na dzien kalendarza w danej osadzie; karnet dnia (DayPass) obejmuje dzien. true = dzien oplacony (juz, karnetem albo teraz);
+        /// false = gracza nie stac - robota czeka (komunikat raz na dzien).
+        /// </summary>
+        internal static bool PayDayRent(TaleWorlds.CampaignSystem.Settlements.Settlement st, int tier)
+        {
+            var s = Settings.Current;
+            if (st == null || s == null || !s.ForgeHireHistorical) return true;
+            if (s.ForgeDayPassEnabled && DayPass.ActiveHere()) return true;
+            int day = (int)CampaignTime.Now.ToDays, paid;
+            if (_rentDay.TryGetValue(st.StringId, out paid) && paid == day) return true;
+            int fee = Math.Max(1, (int)Math.Round((s.ForgeFeeBase + s.ForgeFeePerTier * tier) * TownWage.Index(st)));
+            if (Hero.MainHero.Gold < fee)
+            {
+                if (_rentShortDay != day) { _rentShortDay = day; Log.Player("You cannot pay the forge hire in " + st.Name + " (" + fee + " gold a day) - the work waits.", true); }
+                return false;
+            }
+            Pay.ToSettlement(fee);
+            _rentDay[st.StringId] = day;
+            Log.Info("Kuznia: dzien " + day + " w " + st.Name + " oplacony za " + fee + " (tier " + tier + ", poziom plac " + TownWage.Index(st).ToString("0.00") + ").");
+            return true;
+        }
+
         internal static float ForgeDayRent(TaleWorlds.CampaignSystem.Settlements.Settlement st)
         {
             var s = Settings.Current;

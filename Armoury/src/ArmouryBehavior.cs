@@ -1124,6 +1124,15 @@ namespace Armoury
                         if (hh >= 23 || hh < 5) continue;
                     }
 
+                    // kuznia za kazdy dzien roboty (Jeff 07.10): wlasny projekt przy kowadle placi dzien kuzni w pierwszej godzinie
+                    // roboty danego dnia (bk / van - karnet dnia jak dotad); bez pieniedzy robota czeka
+                    if (atForge && ForgeClock.On && p.Kind != "bk" && p.Kind != "van" && Settings.Current.ForgeHireHistorical)
+                    {
+                        bool rentOk = true;
+                        try { rentOk = Forge.PayDayRent(Settlement.CurrentSettlement, Recipes.For(p.Item).Tier); } catch (Exception er) { Log.Error("PayDayRent", er); }
+                        if (!rentOk) continue;
+                    }
+
                     // KROK GODZINOWY: zegar konczy sie DOKLADNIE z robota, bez
                     // doczekiwania do polnocy (blad, ktory wkurzyl Jeffa przy mieczu)
                     p.DaysLeft -= 1f / 24f;
