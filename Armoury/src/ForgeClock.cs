@@ -64,9 +64,15 @@ namespace Armoury
             {
                 if (!On || _item == null || FletchForge.RangedType(_item)) return;   // strzeleckie kolejkuje Forge.Smith
                 var bag = MobileParty.MainParty.ItemRoster;
-                if (bag.GetItemNumber(_item) <= _count) return;                        // spartaczone - nic nie przybylo
+                // zbroja z kuzni jak bron: nasza regula wie, ze sie udalo i CO wyszlo spod mlota - na lawe idzie dokladnie ta sztuka
+                // (z jej stanem). GetItemNumber liczy tylko PIERWSZY stos tej zbroi w sakwach: sztuka w innym stanie niz pierwszy
+                // stos (np. druga kopia z kuzni) wygladalaby na "spartaczona" i zostawala w sakwach od razu, bez godzin kowala
+                EquipmentElement exact;
+                bool ours = ArmourQuality.Fresh(_item, out exact) && bag.FindIndexOfElement(exact) >= 0;
+                if (!ours && bag.GetItemNumber(_item) <= _count) return;               // spartaczone - nic nie przybylo
                 EquipmentElement fresh = default(EquipmentElement); bool found = false;
-                for (int i = bag.Count - 1; i >= 0; i--)
+                if (ours) { fresh = exact; found = true; }
+                for (int i = bag.Count - 1; i >= 0 && !found; i--)
                 {
                     var el = bag.GetElementCopyAtIndex(i);
                     if (el.EquipmentElement.Item == _item && el.Amount > 0) { fresh = el.EquipmentElement; found = true; break; }

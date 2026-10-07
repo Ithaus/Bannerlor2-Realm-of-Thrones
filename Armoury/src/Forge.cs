@@ -101,6 +101,8 @@ namespace Armoury
                     roll -= qp.P;
                 }
                 quality = CapQualityByTier(quality, Recipes.Grade(item));
+                // zbroja z kuzni jak bron: modyfikator z drabinki cen grupy zbroi (w grupie chain etykiety jakosci sa pomieszane)
+                if (item.HasArmorComponent && ArmourQuality.CraftOn) return ArmourQuality.Grade(group, quality);
                 var mods = group.GetModifiersBasedOnQuality(quality);
                 if (mods == null || mods.Count == 0) return null;
                 return mods.Count == 1 ? mods[0] : mods[MBRandom.RandomInt(0, mods.Count)];
@@ -353,7 +355,12 @@ namespace Armoury
                     try { mod = TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObject<ItemModifier>(modifierId); } catch { }
                 count = Math.Max(1, count);
                 MobileParty.MainParty.ItemRoster.AddToCounts(new EquipmentElement(item, mod), count);
-                Log.Player("Off the anvil: " + (count > 1 ? count + " x " : "") + (mod != null ? mod.Name + " " : "") + item.Name + " joins your baggage.");
+                // nazwa ze stanem jak w ekwipunku ("Rusty Brigandine"): sam tekst modyfikatora niesie {ITEMNAME} ostatniej ogladanej
+                // sztuki; bron kuta po vanillowemu (IsCraftedByPlayer) gra nazywa bez stanu - tam zostaje stary napis
+                string named = (mod != null ? mod.Name + " " : "") + item.Name;
+                if (mod != null && !item.IsCraftedByPlayer && ArmourQuality.On)
+                    try { named = new EquipmentElement(item, mod).GetModifiedItemName().ToString(); } catch { }
+                Log.Player("Off the anvil: " + (count > 1 ? count + " x " : "") + named + " joins your baggage.");
                 Banner("Finished and delivered: " + item.Name);
                 if (item.ItemType != ItemObject.ItemTypeEnum.Arrows && item.ItemType != ItemObject.ItemTypeEnum.Bolts) CraftPopup.Show(item, mod, count);
                 Log.Info("Dostawa broni: " + item.StringId + " mod=" + (mod != null ? mod.StringId : "brak"));

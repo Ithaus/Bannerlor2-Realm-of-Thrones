@@ -155,6 +155,8 @@ namespace Armoury
                 if (cur == null) return;
                 var item = Traverse.Create(cur).Property("Item").GetValue<ItemObject>();
                 if (item == null || RangedType(item)) return;      // strzeleckie licza sie w Forge.Smith
+                // zbroja z kuzni jak bron: brama progu odmowila - nic sie nie kulo, wiec ani nauki wzorow, ani okna wyniku
+                if (ArmourQuality.Refused) return;
                 RangedLore.OnCrafted(item);
                 // okno wyniku takze dla pancerza kutego w BK CRAFT: jakosc
                 // czytamy z OSTATNIEGO stacka tego itemu w sakwach (rostery
@@ -162,8 +164,11 @@ namespace Armoury
                 try
                 {
                     ItemModifier freshMod = null;
+                    EquipmentElement exact;
+                    bool known = ArmourQuality.Fresh(item, out exact);   // nasza regula wie dokladnie, co wyszlo spod mlota
+                    if (known) freshMod = exact.ItemModifier;
                     var bag = TaleWorlds.CampaignSystem.Party.MobileParty.MainParty.ItemRoster;
-                    for (int i = bag.Count - 1; i >= 0; i--)
+                    for (int i = bag.Count - 1; i >= 0 && !known; i--)
                     {
                         var el = bag.GetElementCopyAtIndex(i);
                         if (el.EquipmentElement.Item != item) continue;

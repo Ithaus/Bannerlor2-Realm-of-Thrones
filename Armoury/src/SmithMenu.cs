@@ -894,7 +894,9 @@ namespace Armoury
                 }
                 if (slot >= 0)
                 {
-                    Hero.MainHero.BattleEquipment[slot] = new EquipmentElement(ee.Item);
+                    // zbroja z kuzni jak bron: zuzyta w boju dobra/lordly/legendarna sztuka wraca do swojego stanu, reszta - zwykla
+                    ItemModifier back = ArmouryBehavior.Instance != null ? ArmouryBehavior.Instance.GoodOriginal(slot) : null;
+                    Hero.MainHero.BattleEquipment[slot] = new EquipmentElement(ee.Item, back);
                     if (ArmouryBehavior.Instance != null) ArmouryBehavior.Instance.ResetSlotCondition(slot);
                 }
                 else

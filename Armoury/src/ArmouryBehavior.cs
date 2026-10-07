@@ -1979,18 +1979,101 @@ namespace Armoury
                     _condition[i] = p[0] + "|" + p[1] + "|" + (p.Length > 2 ? p[2] : "") + "|" + id;
                     return float.Parse(p[1], System.Globalization.CultureInfo.InvariantCulture);
                 }
-                if (had == id) return float.Parse(p[1], System.Globalization.CultureInfo.InvariantCulture);
+                if (had == id)
+                {
+                    // ZBROJA Z KUZNI JAK BRON: ta sama nazwa, inny stan niz zostawilo zuzycie = INNA sztuka (dwie kopie tej samej
+                    // zbroi z kuzni - legendarna i zardzewiala); bez tego naprawa dawala zamienionej sztuce stan poprzedniczki
+                    if (ArmourQuality.On && !SamePiece(p, el)) { _condition[i] = BookLine(slot, el, id); return 100f; }
+                    if (ArmourQuality.On && p.Length == 4) _condition[i] = _condition[i] + "|" + ModId(el);   // stary wpis: od teraz zna stan sztuki
+                    return float.Parse(p[1], System.Globalization.CultureInfo.InvariantCulture);
+                }
                 // w slocie lezy INNA sztuka - stary rachunek jej nie dotyczy
-                _condition[i] = slot + "|100|" + (el.ItemModifier != null ? el.ItemModifier.StringId : "") + "|" + id;
+                _condition[i] = ArmourQuality.On ? BookLine(slot, el, id) : slot + "|100|" + (el.ItemModifier != null ? el.ItemModifier.StringId : "") + "|" + id;
                 return 100f;
             }
             // pierwszy raz - zapamietaj oryginalny modyfikator i sztuke
-            _condition.Add(slot + "|100|" + (el.ItemModifier != null ? el.ItemModifier.StringId : "") + "|" + id);
+            _condition.Add(ArmourQuality.On ? BookLine(slot, el, id) : slot + "|100|" + (el.ItemModifier != null ? el.ItemModifier.StringId : "") + "|" + id);
             return 100f;
         }
 
+        private static string ModId(EquipmentElement el) { return el.ItemModifier != null ? el.ItemModifier.StringId : ""; }
+
+        /// <summary>
+        /// ZBROJA Z KUZNI JAK BRON: czy w slocie lezy TA SAMA sztuka, ktora zna wpis ksiegi (ta sama nazwa nie wystarcza).
+        /// Wpis z piatym polem - po stanie, w jakim ja zostawilismy. Stary wpis (4 pola, zapis sprzed paczki) stanu nie zna:
+        /// ta sama sztuka ma swoj stan oryginalny albo dokladnie ten stan zuzycia, ktory ksiega daje przy tym stanie - kazdy
+        /// inny stan to inna kopia tej zbroi. Bez tego swiezo wykuta lordly albo legendarna zalozona w miejsce zuzytej zwyklej
+        /// przejmowala stary wpis (zuzycie i "oryginalny" stan zwyklej) i u kowala stawala sie zwykla, a zardzewiala kopia
+        /// zalozona w miejsce lekko zuzytej legendy dostawala u kowala legende (podwojenie, jak w 127).
+        /// </summary>
+        private static bool SamePiece(string[] p, EquipmentElement el)
+        {
+            string now = ModId(el);
+            if (p.Length > 4) return p[4] == now;
+            string orig = p.Length > 2 ? p[2] : "";
+            if (now == orig) return true;
+            float cond;
+            if (p.Length < 2 || !float.TryParse(p[1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out cond))
+                return true;   // nieczytelny wpis - jak dotad (po samej nazwie)
+            var group = el.Item != null && el.Item.ItemComponent != null ? el.Item.ItemComponent.ItemModifierGroup : null;
+            var worn = WornModifierFor(group, cond);
+            return worn != null && worn == el.ItemModifier;
+        }
+
+        /// <summary>Nowy wpis ksiegi: slot|stan|stan oryginalny|sztuka|stan, ktory sztuka ma teraz (piate pole - zbroja z kuzni jak bron).</summary>
+        private static string BookLine(int slot, EquipmentElement el, string id) { return slot + "|100|" + ModId(el) + "|" + id + "|" + ModId(el); }
+
+        /// <summary>Piate pole wpisu: stan, w jakim zostawilismy sztuke w slocie (po zuzyciu albo naprawie).</summary>
+        private void SetLast(int slot, string modId)
+        {
+            for (int i = 0; i < _condition.Count; i++)
+            {
+                var p = _condition[i].Split('|');
+                if (int.Parse(p[0]) != slot) continue;
+                _condition[i] = p[0] + "|" + (p.Length > 1 ? p[1] : "100") + "|" + (p.Length > 2 ? p[2] : "") + "|" + (p.Length > 3 ? p[3] : "") + "|" + (modId ?? "");
+                return;
+            }
+        }
+
         /// <summary>Po naprawie zalozonej czesci stan wraca do 100 - inaczej Wear odlozylby modyfikator z powrotem.</summary>
-        internal void ResetSlotCondition(int slot) { SetCondition(slot, 100f); }
+        internal void ResetSlotCondition(int slot)
+        {
+            SetCondition(slot, 100f);
+            // ZBROJA Z KUZNI JAK BRON: po lawce naprawczej sztuka zaczyna ksiege od nowa w stanie, jaki ma teraz - dotad ksiega
+            // pamietala dawny stan i nastepna naprawa u kowala go przywracala (zardzewiala zbroja, za ktorej naprawe zaplaciles,
+            // wracala do rdzy)
+            if (!ArmourQuality.On) return;
+            try
+            {
+                var el = Hero.MainHero.BattleEquipment[slot];
+                string id = el.Item != null ? el.Item.StringId : "";
+                for (int i = 0; i < _condition.Count; i++)
+                {
+                    var p = _condition[i].Split('|');
+                    if (int.Parse(p[0]) != slot) continue;
+                    _condition[i] = BookLine(slot, el, id);
+                    return;
+                }
+            }
+            catch (Exception e) { Log.Error("ResetSlotCondition", e); }
+        }
+
+        /// <summary>
+        /// ZBROJA Z KUZNI JAK BRON: w jakim stanie lawka naprawcza oddaje zalozona sztuke. Zuzyta w boju sztuka, ktora wyszla
+        /// z kuzni (albo z lupu) dobra, lordly albo legendarna, wraca do swojego stanu; reszta - zwykla (jak dotad). Dotad lawka
+        /// zawsze dawala zwykla: zuzyta legenda po naprawie na lawce przestawala byc legenda.
+        /// </summary>
+        internal ItemModifier GoodOriginal(int slot)
+        {
+            try
+            {
+                if (!ArmourQuality.On || GetConditionQuiet(slot) >= 100f) return null;   // ksiega nie zna tej sztuki albo nie byla bita
+                var origId = OriginalModifier(slot);
+                var orig = string.IsNullOrEmpty(origId) ? null : MBObjectManager.Instance.GetObject<ItemModifier>(origId);
+                return orig != null && orig.PriceMultiplier >= 1f ? orig : null;
+            }
+            catch (Exception e) { Log.Error("GoodOriginal", e); return null; }
+        }
 
         private void SetCondition(int slot, float cond)
         {
@@ -1999,7 +2082,10 @@ namespace Armoury
                 var p = _condition[i].Split('|');
                 if (int.Parse(p[0]) != slot) continue;
                 _condition[i] = slot + "|" + cond.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)
-                                + "|" + (p.Length > 2 ? p[2] : "") + "|" + (p.Length > 3 ? p[3] : "");
+                                + "|" + (p.Length > 2 ? p[2] : "") + "|" + (p.Length > 3 ? p[3] : "")
+                                // zbroja z kuzni jak bron: stan sztuki zostaje w ksiedze; przy wylaczonym znika (wpis jak w 127 -
+                                // po ponownym wlaczeniu stary wpis dostaje stan sztuki od nowa, zamiast uznac ja za obca)
+                                + (ArmourQuality.On && p.Length > 4 ? "|" + p[4] : "");
                 return;
             }
         }
@@ -2014,36 +2100,54 @@ namespace Armoury
             return "";
         }
 
+        /// <summary>
+        /// Stan zuzycia, ktory ksiega daje sztuce przy tym stanie: modyfikator z wlasnej grupy przedmiotu - im gorszy stan, tym
+        /// gorszy modyfikator; null = stan powyzej progu ThresholdWorn albo grupa bez stanow zuzycia. Jedna regula dla zuzycia
+        /// (ApplyModifierForCondition) i dla rozpoznania sztuki ze starego wpisu ksiegi (SamePiece).
+        /// </summary>
+        private static ItemModifier WornModifierFor(ItemModifierGroup group, float cond)
+        {
+            if (group == null) return null;
+            var s = Settings.Current;
+            int step;
+            if (cond > s.ThresholdWorn) step = 0;
+            else if (cond > s.ThresholdDamaged) step = 1;
+            else if (cond > s.ThresholdRuined) step = 2;
+            else step = 3;
+            if (step == 0) return null;
+
+            // posortuj modyfikatory od najgorszego (najnizszy mnoznik ceny)
+            var bad = new List<ItemModifier>();
+            foreach (var m in group.ItemModifiers)
+                if (m != null && m.PriceMultiplier < 1f) bad.Add(m);
+            if (bad.Count == 0) return null;
+            bad.Sort((a, b) => a.PriceMultiplier.CompareTo(b.PriceMultiplier));   // najgorszy pierwszy
+
+            return step >= 3 ? bad[0] : bad[MathF.Min(bad.Count - 1, bad.Count - step)];
+        }
+
         /// <summary>Dobiera modyfikator z wlasnej grupy przedmiotu - im gorszy stan, tym gorszy modyfikator.</summary>
         private void ApplyModifierForCondition(int slot, float cond)
         {
             try
             {
-                var s = Settings.Current;
                 var eq = Hero.MainHero.BattleEquipment;
                 var el = eq[slot];
                 if (el.Item == null) return;
                 var group = el.Item.ItemComponent != null ? el.Item.ItemComponent.ItemModifierGroup : null;
                 if (group == null) return;
 
-                int step;
-                if (cond > s.ThresholdWorn) step = 0;
-                else if (cond > s.ThresholdDamaged) step = 1;
-                else if (cond > s.ThresholdRuined) step = 2;
-                else step = 3;
-                if (step == 0) return;
-
-                // posortuj modyfikatory od najgorszego (najnizszy mnoznik ceny)
-                var bad = new List<ItemModifier>();
-                foreach (var m in group.ItemModifiers)
-                    if (m != null && m.PriceMultiplier < 1f) bad.Add(m);
-                if (bad.Count == 0) return;
-                bad.Sort((a, b) => a.PriceMultiplier.CompareTo(b.PriceMultiplier));   // najgorszy pierwszy
-
-                ItemModifier chosen = step >= 3 ? bad[0] : bad[MathF.Min(bad.Count - 1, bad.Count - step)];
+                ItemModifier chosen = WornModifierFor(group, cond);
+                if (chosen == null) return;
                 if (el.ItemModifier == chosen) return;
+                // ZBROJA Z KUZNI JAK BRON: zuzycie nigdy nie poprawia sztuki - zardzewiala zbroja z kuzni (stan 30%) przy 70%
+                // ksiegi nie staje sie "tylko pogieta" (60%, lepsza ochrona); zostaje gorszy z dwoch stanow
+                if (ArmourQuality.On && el.ItemModifier != null
+                    && ConditionScaling.ConditionOf(el.ItemModifier) < 0.999f
+                    && ConditionScaling.ConditionOf(el.ItemModifier) <= ConditionScaling.ConditionOf(chosen)) return;
 
                 eq[slot] = new EquipmentElement(el.Item, chosen);
+                if (ArmourQuality.On) SetLast(slot, chosen.StringId);
                 Log.Info("Zuzycie: slot " + slot + " " + el.Item.StringId + " -> " + chosen.StringId + " (stan " + (int)cond + ")");
                 Log.Player(el.Item.Name + " is showing hard use (" + chosen.Name + ", condition " + (int)cond + "%).", true);
             }
@@ -2111,9 +2215,11 @@ namespace Armoury
         private float GetConditionQuiet(int slot)
         {
             string id = "";
+            EquipmentElement cur = default(EquipmentElement);
             try
             {
-                var it = Hero.MainHero.BattleEquipment[slot].Item;
+                cur = Hero.MainHero.BattleEquipment[slot];
+                var it = cur.Item;
                 id = it != null ? it.StringId : "";
             }
             catch { }
@@ -2123,6 +2229,9 @@ namespace Armoury
                 if (int.Parse(p[0]) != slot) continue;
                 string had = p.Length > 3 ? p[3] : "";
                 if (had.Length > 0 && id.Length > 0 && had != id) return 100f;   // inna czesc w slocie
+                // zbroja z kuzni jak bron: ta sama nazwa w innym stanie, niz ja zostawilismy - inna sztuka (np. druga kopia z kuzni);
+                // stary wpis bez stanu sztuki (zapis sprzed paczki) - SamePiece rozpoznaje ja wedle stanu oryginalnego i zuzycia
+                if (ArmourQuality.On && id.Length > 0 && !SamePiece(p, cur)) return 100f;
                 return float.Parse(p[1], System.Globalization.CultureInfo.InvariantCulture);
             }
             return 100f;
@@ -2154,6 +2263,7 @@ namespace Armoury
                     ItemModifier orig = string.IsNullOrEmpty(origId) ? null : MBObjectManager.Instance.GetObject<ItemModifier>(origId);
                     eq[slot] = new EquipmentElement(el.Item, orig);
                     SetCondition(slot, 100f);
+                    if (ArmourQuality.On) SetLast(slot, origId);   // zbroja z kuzni jak bron: sztuka wrocila do swojego stanu
                     mended++;
                 }
                 if (mended > 0) Log.Player("You worked " + mended + " pieces back into shape yourself.");
@@ -2180,10 +2290,16 @@ namespace Armoury
                 {
                     var el = eq[slot];
                     if (el.Item == null) continue;
+                    // ZBROJA Z KUZNI JAK BRON: kowal naprawia tylko sztuki zuzyte wedle ksiegi - te same, za ktore policzyl w RepairCost.
+                    // Dotad kazda zalozona czesc dostawala "oryginalny" stan przegrodki: sztuka nigdy nie bita (zardzewiala zbroja
+                    // z kuzni wychodzila zwykla za darmo, przy okazji naprawy butow) i sztuka o innej nazwie (dostawala stan
+                    // poprzedniczki - takze legendarny, nawet z obcej grupy)
+                    if (ArmourQuality.On && GetConditionQuiet(slot) >= 100f) continue;
                     var origId = OriginalModifier(slot);
                     ItemModifier orig = string.IsNullOrEmpty(origId) ? null : MBObjectManager.Instance.GetObject<ItemModifier>(origId);
                     eq[slot] = new EquipmentElement(el.Item, orig);
                     SetCondition(slot, 100f);
+                    if (ArmourQuality.On) SetLast(slot, origId);
                 }
                 Log.Player("The smith has made your harness whole again for " + cost + " gold.");
                 Log.Info("Naprawa za " + cost);

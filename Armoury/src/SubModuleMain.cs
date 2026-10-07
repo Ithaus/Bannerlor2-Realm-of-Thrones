@@ -105,6 +105,7 @@ namespace Armoury
                 NightRest.ApplyAll(_harmony);
                 FletchForge.ApplyAll(_harmony);
                 ForgeClock.ApplyAll(_harmony);   // wpis 83: jeden zegar kuzni
+                ArmourQuality.ApplyAll(_harmony); // zbroja z zakladki CRAFT jak bron: prog, pekniecie i jakosc z kowalstwa (PO FletchForge i ForgeClock)
                 SmeltTab.ApplyAll(_harmony);
                 DressCode.ApplyAll(_harmony);
                 UniqueLaw.ApplyAll(_harmony);        // unikaty imienne: nabor do magazynow DTE zamienia kopie na zamienniki

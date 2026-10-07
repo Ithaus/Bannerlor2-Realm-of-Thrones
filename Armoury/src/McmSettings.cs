@@ -32,6 +32,10 @@ namespace Armoury
         [SettingPropertyGroup("Forging armour")]
         public int SmithingDifficultyPerTier { get; set; } = 45;
 
+        [SettingPropertyBool("Armour Craft Like Weapons", HintText = "armour forged in the Banner Kings CRAFT tab follows the rule of bows and reforged weapons: you may start a piece once your smith reaches its threshold (Smithing Skill Per Tier - the tab shows it as Difficulty), and his Smithing against the piece's difficulty (Smithing Difficulty Per Tier) sets the risk of cracking it (the tab shows the real Botching Chance) and the quality it comes out with from its own armour group - rusty or ripped, dented or worn, plain, fine, lordly, legendary, with their protection bonus or loss (tier 1-3 at best fine, tier 4 at best lordly). Your own armour keeps its make under wear: wear never turns a rusty piece into a better one, and the smith's repair restores only the piece that was actually worn. Off: armour from the tab comes out plain as before, with the Banner Kings crack chance")]
+        [SettingPropertyGroup("Forging armour")]
+        public bool ArmourCraftLikeWeapons { get; set; } = true;
+
         [SettingPropertyFloatingInteger("Iron Per Weight Unit", 0.00f, 5.60f, "0.00", HintText = "refined iron per pound of the finished piece")]
         [SettingPropertyGroup("Forging armour")]
         public float IronPerWeightUnit { get; set; } = 1.4f;
@@ -2595,6 +2599,7 @@ namespace Armoury
             s.CraftingEnabled = CraftingEnabled;
             s.SmithingSkillPerTier = SmithingSkillPerTier;
             s.SmithingDifficultyPerTier = SmithingDifficultyPerTier;
+            s.ArmourCraftLikeWeapons = ArmourCraftLikeWeapons;
             s.IronPerWeightUnit = IronPerWeightUnit;
             s.ClassCostBody = ClassCostBody;
             s.ClassCostLeg = ClassCostLeg;
