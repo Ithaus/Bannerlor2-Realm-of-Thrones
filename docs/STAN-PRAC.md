@@ -324,7 +324,10 @@ narzedzia rozpoznal wszystkie linie. Grupa 1: OK 61, UWAGA 5; grupa 2: OK 31, UW
 2. Pytanie kanonu 4: bracia Nocnej Strazy BEZ ZOLDU (zold oddzialow Strazy = 0; zostaje wyzywienie i sprzet).
 3. Pytanie 2: 0% cial niespalonych - "spalaja wszystkich, bo wiedza"; 616 dawnych umarlych na start - TAK.
    Pytanie 3: 3% puli wyrzutkow regionu dziennie do Strazy (reszta z ludnosci); Jeff chce tabeli strat i przyrostu Strazy i Wolnych Ludzi.
-   Pytanie 5: hamulce H1 + H2 (Straz nie pali wsi za Murem; Inni tylko z poleglych); H3 i H4 - Jeff prosi o wyjasnienie.
+   Pytanie 5: hamulce H1 + H2 + H3 (Straz nie pali wsi za Murem; Inni tylko z poleglych; przegrani uchodza zamiast ginac - CALY SWIAT:
+   w bitwach AI ginie dzis 51% przegranych, cel w widelkach historycznych 15-40%); H4 (wojna falami) NIE.
+   Rabunek (paczka 113: R 0.5 czlowieka na napastnika na dobe, 5% ginie / 5% w las / 90% uchodzcy) - Jeff pyta o dane historyczne: to szacunek
+   projektowy; badanie zrodel zlecone 07.10 (workflow historia-rabunku), potem kalibracja.
    Pytanie 6: (a) jency z rabunku biora tylko kultury z niewolnictwem w swiecie Martina, ludzie zdjeci z napadnietej wsi; Zelazne Wyspy 27 tys.
    niewolnych na start - TAK (Jeff pyta, skad 27 tys.); rabunek = ulamek okregu (paczka 113: zabici odejmowani, uchodzcy wracaja).
    Pytanie 7: A - wierzyciel bierze caly dochod wsi + z kiesy ponad 38 tys. (poczet ok. 135 na oddzial).
