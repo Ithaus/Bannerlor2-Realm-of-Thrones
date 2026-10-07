@@ -322,7 +322,13 @@ narzedzia rozpoznal wszystkie linie. Grupa 1: OK 61, UWAGA 5; grupa 2: OK 31, UW
 1. Pytanie kanonu 1 (`docs/REGULY-KRAIN-I-DLUGU-2026-10-06.md` rozdz. 9): jency Innych wstaja jako trupy - TAK (Inni nie biora jencow; pojmany i odbity jeniec
    to polegly swojego regionu i cialo dla Innych, tylko za Murem i przy Murze).
 2. Pytanie kanonu 4: bracia Nocnej Strazy BEZ ZOLDU (zold oddzialow Strazy = 0; zostaje wyzywienie i sprzet).
-3. Pytania 2, 3, 5, 6, 7, 8 - Jeff poprosil o wyjasnienie z liczbami i mozliwosci (07.10); czekaja na jego wybor.
+3. Pytanie 2: 0% cial niespalonych - "spalaja wszystkich, bo wiedza"; 616 dawnych umarlych na start - TAK.
+   Pytanie 3: 3% puli wyrzutkow regionu dziennie do Strazy (reszta z ludnosci); Jeff chce tabeli strat i przyrostu Strazy i Wolnych Ludzi.
+   Pytanie 5: hamulce H1 + H2 (Straz nie pali wsi za Murem; Inni tylko z poleglych); H3 i H4 - Jeff prosi o wyjasnienie.
+   Pytanie 6: (a) jency z rabunku biora tylko kultury z niewolnictwem w swiecie Martina, ludzie zdjeci z napadnietej wsi; Zelazne Wyspy 27 tys.
+   niewolnych na start - TAK (Jeff pyta, skad 27 tys.); rabunek = ulamek okregu (paczka 113: zabici odejmowani, uchodzcy wracaja).
+   Pytanie 7: A - wierzyciel bierze caly dochod wsi + z kiesy ponad 38 tys. (poczet ok. 135 na oddzial).
+   Pytanie 8: (c) odsetki zamrozone w dniu zajecia, BEZ umorzenia - "dlugi trzeba splacac, Bank z Braavos na pewno nie daruje".
 4. "zgoda na autotest" (pamiec: jeff-zgoda-na-autotest); przewijac dluzej, gdy to ma sens (40 dob na test zmiany, rok na skutki dlugie).
 
 ## Decyzje Jeffa 06.10 (wiazace; dopisane po raporcie nocnym)
