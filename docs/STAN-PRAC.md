@@ -12,7 +12,16 @@ za wyrob najwyzej koszt cyklu + 25%, nadwyzka w kasie miasta - piekarnia ok. 10-
 Kazde: autor + niezalezny recenzent; zlozenie: build 0 kazdego ogniwa, proby recenzentow na DLL grupy, kolejka p108..p114 naklada sie bez konfliktu.
 Opisy `docs/paczki/121..124-*.md`. Test: NOWA kampania (123 i 124 licza start). AUTOTEST (zgoda Jeffa 07.10): tryb w CrashScribe + `tools/autotest.ps1`
 (galaz at1-autotest w klonie, niewypchnieta); 1. przebieg 05:06 - menu, kreator ROT, kampania, czekanie w miescie OK (10.5 s/dobe), STANAL w 4. dobie,
-gra zawiesila sie przy wyjsciu; skrypt przywrocil DLL Jeffa (md5 OK), zapisy Jeffa nietkniete. Naprawa w toku (workflow autotest-naprawa-1).
+gra zawiesila sie przy wyjsciu; skrypt przywrocil DLL Jeffa (md5 OK), zapisy Jeffa nietkniete. PRZYCZYNA: okno gry stracilo fokus, a przy
+StopGameOnFocusLost=True (ustawienie Jeffa, nietkniete) gra otwiera menu Esc i wstrzymuje mape; wyjscie - wywrotka silnika przy zamykaniu (znana z gier Jeffa).
+AT1b (f1d3705): autotest zamyka menu Esc, diagnostyka postoju, skrypt czeka 90 s na wyjscie. Kod: galaz `narzedzia/autotest` (CrashScribe + tools/autotest.ps1;
+CrashScribe z autotestem NIE jest wgrany na stale - skrypt wgrywa go tylko na czas testu). Uruchomienie: `powershell -NoProfile -ExecutionPolicy Bypass -File
+<worktree>	oolsutotest.ps1 -CrashScribeDll <CrashScribe z autotestem> -ArmouryDll <Armoury probny> -Days 40`.
+2. PRZEBIEG 06:06 (Armoury 121-124, 40 dob): OK - 40/40 dob w 9.6 min (12 s/dobe), zapis autotest-2026-10-07-0616.sav, gra wyszla sama, DLL i zapisy
+Jeffa przywrocone (md5). Log `Armoury-2026-10-07_06-06-45.log`. WYNIK 121-124 wobec testu Jeffa (115-120): cena warsztatow mediana 13.3 tys. (bylo 145 tys.),
+max 192 tys. (12.27 mln), piekarnia Lannisport 12.7 tys. (373 tys.); ruda bez towaru doba 19: 45 (51), doba 40: 38; drewno 47 -> 1; ZATKANE MAGAZYNY
+nadal rosna: doba 16: 29, doba 40: 60 z 571 (10.5%; u Jeffa doba 19: 89) - 122 polowa, druga polowa = dosypka RBL -> paczka 125 (w toku); KUPNO STOI:
+skora, skory, welna, plotno (przesyt - K13). ERROR 0, potkniecia 0.
 
 ## PIERWSZY TEST GRUPY TOWARY 2 (115-120) - 07.10 03:18 (nowa kampania, 19 dob; log `Armoury-2026-10-07_03-18-52.log`)
 
