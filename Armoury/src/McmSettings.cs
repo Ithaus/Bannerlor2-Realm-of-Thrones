@@ -1552,6 +1552,10 @@ namespace Armoury
         [SettingPropertyGroup("The road to market")]
         public bool VillageCartFairPrice { get; set; } = true;
 
+        [SettingPropertyBool("Village Clog Diagnostics", HintText = "log only, changes nothing in the game: once a day the Armoury log says why village storehouses stand full (one and a half times their size stops all village work) - village types, what lies in them, where each village's villagers are (at home, on the road and for how long, in town, none at all) and how many villages filled up or emptied that day; ten examples every five days (off = no such lines)")]
+        [SettingPropertyGroup("The road to market")]
+        public bool VillageClogDiagnostics { get; set; } = true;
+
         [SettingPropertyBool("Caravan Bulk Enabled", HintText = "caravans haul bulk raw goods (iron ore, timber, raw hides, leather, flax, linen, wool) by need: a town short of its own stock buys what it lacks from any passing caravan, and a caravan leaving a town buys only what that town holds to spare (off = Banner Kings' price-driven caravan trade alone)")]
         [SettingPropertyGroup("The road to market")]
         public bool CaravanBulkEnabled { get; set; } = true;
@@ -2959,6 +2963,7 @@ namespace Armoury
             s.VillageCartWholeStore = VillageCartWholeStore;
             s.VillageCartRoadNews = VillageCartRoadNews;
             s.VillageCartFairPrice = VillageCartFairPrice;
+            s.VillageClogDiagnostics = VillageClogDiagnostics;
             s.CaravanBulkEnabled = CaravanBulkEnabled;
             s.CaravanBulkStockDays = CaravanBulkStockDays;
             s.CaravanBulkSurplusFactor = CaravanBulkSurplusFactor;
