@@ -135,8 +135,14 @@ Plan nocy (kazdy krok = jeden workflow z jednym agentem, skrypty w `~\.claude\pr
    cena + paczka 38-61. Cel < 20 daje dopiero NASTEPNA paczka: wozy wsi do najlepiej placacego miasta w zasiegu 250 (16 miast) + wycena
    ladunku taboru sztuka po sztuce (dzis BK placi za caly ladunek cene pierwszej sztuki). Dotyka MarketRoad.RoutePrefix = kolizja z n110 K5.
    Wpis: `docs/paczki/w-toku/karawany3-CHANGELOG-wpis.md`.
-3b. `noc-4-towary-bk` (autor + recenzent po kolei) na l115 -> `l118-towary-w-nowej-monecie`. W TOKU od 18:30.
-3c. PLAN: `noc-5-wozy` (autor + recenzent) na l118 -> `l119-wozy-do-najlepszego-miasta`; potem zlozenie i przeniesienie n108..n114 (K5 do scalenia z wozami).
+3b. `noc-4-towary-bk` (autor + recenzent po kolei) na l115 -> `l118-towary-w-nowej-monecie`. ZROBIONE 19:45 - "poprawione-i-gotowe" (kod autora bez zmian), l118 = ced39bd NA l115
+   (repo: `w-toku/l118-towary-w-nowej-monecie`), DLL md5 3d0d9fc8..., proby 11/13/15/15 + bez BKROTPatch 4/4, z n108..n114 bez konfliktu (664 ust.).
+   PRZYCZYNA: BKROTPatch (BKItemsInitializePatch) dzieli wartosc kazdego towaru BK przez 100 (int): chleb 20->0, miod pitny 120->1, futro 125->1.
+   Zmiana: przelicznik popytu z wartosci z DEFINICJI przedmiotu (wlacznik HistDemandFromDefinition) - rynek co do bitu jak bez tej latki ROT.
+   Skutek: bochen (10/dobe) 61 -> 17-21 d, miod pitny 102 -> 5-6 d; zloto i klejnoty z lupow duzo tansze; "zakupy" mieszczan z niczego ok. 320 -> 76 tys./dobe.
+   Piekarnia Lannisport z paczka warsztaty: zalezy od doplywu chleba i ciast (13-522 tys.) - zmierzy test. Otwarte: ksiazki BK 7-10 d (BKROTPatch /100 + nasz BookTranspiler).
+   Wpis: `docs/paczki/w-toku/towary-CHANGELOG-wpis.md`.
+3c. `noc-5-wozy` (autor + recenzent) na l118 - W TOKU od 19:50 -> `l119-wozy-do-najlepszego-miasta`; potem zlozenie i przeniesienie n108..n114 (K5 do scalenia z wozami).
 4. `noc-4-zlozenie` - zlozenie na n107 (cena -> warsztaty -> karawany3; warsztaty recenzowane juz na cenie), build kazdego ogniwa, przeniesienie n108..n114 na nowy szczyt.
 5. Repo: wpisy `docs/paczki/115-117-*.md`, galezie `paczki/*` na origin, STAN-PRAC, raport dla Jeffa prostym jezykiem.
 Stan kazdego kroku dopisuje ponizej.
