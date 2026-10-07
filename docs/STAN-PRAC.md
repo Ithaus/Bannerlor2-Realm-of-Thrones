@@ -3,6 +3,14 @@
 Czytaj najpierw: `CLAUDE.md` (zwlaszcza sekcja 8, **zasada 0**: kazda zmiana = kontrola regresji, kolizji
 i spojnosci calej logiki; oraz pulapka MCM w sekcji 7), potem ten plik, potem gorne wpisy `CHANGELOG.md`.
 
+## PLAN K13 (skala produkcji) - 07.10, `docs/PLAN-K13-2026-10-07.md`
+
+Trzy projekty (podaz / popyt / lancuch) + sedzia: szkielet POPYT (wojsko jako odbiorca odziezy, rzemioslo miast wedle wartosci), z lancucha: receptury
+wedle wartosci, wytop przy kopalni ("Iron Bloom" zamiast rudy - NOWA kampania), srebro przy kopalni; z podazy: rzemieslnicy BK robia z niczego (mnoznik
+count = 1 + rzemieslnicy/45/wartosc) i zawor dla towaru bez zbytu. Kolejnosc (numery w planie 127-139 sa ROBOCZE - 127/128 zajete przez pokretla i
+Spoils; numery nada skladanie): ksiega towarow (log) -> rzemieslnicy BK z wlasnego wsadu -> rzemioslo miasta wedle wartosci -> odziez wojska -> receptury
+warsztatow wedle wartosci -> K13 x1.3 -> wytop przy kopalni -> zawor -> (warunkowo) zlom do kuzni, reszta receptur, srebro, rzemioslo wsi BK, naprawy z materialem.
+
 ## GRUPA "TOWARY 3" (121-125) - W PRZYGOTOWANIU (07.10 rano; NIEWGRANA)
 
 Lancuch na 120 (w grze): `paczki/121-kategorie-mieszane` (ed9f07d; sztabka zlota ok. 5.7 tys. zamiast 2 tys.) -> `paczki/122-woz-caly-magazyn`
