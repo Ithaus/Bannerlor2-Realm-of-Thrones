@@ -16,28 +16,39 @@ UZYCIE
                      najbardziej spustoszonych
   --wczytanie N      gdy w jednym logu jest kilka kampanii / wczytan: ktora analizowac (domyslnie ta z najwieksza liczba dob)
   --test NAZWA       kontrole "po czym poznac w logu" z docs\\paczki\\<ogniwo>.md, kazda z wynikiem OK / UWAGA / BRAK DANYCH
-                     i liczba z logu. NAZWA: numer ogniwa (102b, 106), kilka (103,104), zakres (102b-105), grupa testowa
-                     (surowce = 102b-105, pieniadz = 106-107, ludzie = 108-109, kasy = 110-112, dowoz = 100-101, ksiegi =
-                     102-102b), slowo z opisu ogniwa (paser, zold, karawany, mineral, przyrost, spustoszenie...), "wykryte"
-                     (wszystkie ogniwa widoczne w logu) albo "wszystkie". Bez tej opcji skrot pokazuje do 10 kontroli
-                     najwyzszego ogniwa wykrytego w logu.
+                     i liczba z logu. NAZWA: numer ogniwa (102b, 106, 117), kilka (103,104), zakres (102b-105; zakres idzie
+                     wedle KOLEJNOSCI LANCUCHA, wiec 107-108 obejmuje tez 115-119), grupa testowa (surowce = 102b-105,
+                     pieniadz = 106-107, towary2 = 115-119, ludzie = 108-109, kasy = 110-112, dowoz = 100-101, ksiegi =
+                     102-102b), slowo z opisu ogniwa (paser, zold, karawany, mineral, warsztaty, wozy, przyrost,
+                     spustoszenie...), "wykryte" (wszystkie ogniwa widoczne w logu) albo "wszystkie". Bez tej opcji skrot
+                     pokazuje do 10 kontroli najwyzszego ogniwa wykrytego w logu.
   --grupa N          komplet kontroli GRUPY TESTOWEJ naraz (decyzja Jeffa 06.10: testy grupami): 1 = TOWAR (101 + 102 + 102b
-                     + 103 + 104 + 105), 2 = PIENIADZ (106 + 107), 3 = LUDZIE (BetterEconomy + 108 + 109), 4 = KASY (110 +
-                     111 + 112), 5 = SPUSTOSZENIE (113); takze nazwa (towar, pieniadz, ludzie, kasy, spustoszenie) albo
-                     "w-grze" (grupa najwyzszego ogniwa wykrytego w logu). Wypisuje: warunki testu grupy (DLL, nowa kampania
-                     albo zapis, liczba dob, bledy, formaty nierozpoznane), kontrole wspolne grupy (lista test_groups z
-                     docs\\paczki\\PRZEGLAD-KOLIZJI-LANCUCHA-2026-10-06.txt i powiazania miedzy ogniwami), wszystkie
-                     kontrole kazdego ogniwa grupy i alarmy calego logu - kazda pozycja z OK / UWAGA / BRAK DANYCH i liczba
-                     z logu. Grupa 3 czyta tez (tylko odczyt) plik ustawien BetterEconomy (13 kluczy; stan pliku TERAZ,
-                     nie z chwili sesji) i plik ludzie-regiony.csv sesji (bandy za Murem); grupa 5 - ten sam plik CSV (trzy
-                     nowe kolumny). Gdy pliku nie ma, kontrola mowi BRAK DANYCH i podaje sciezke.
-  --pelny            bez limitu ok. 155 linii (wszystkie alarmy i wszystkie tematy dodatkowe)
+                     + 103 + 104 + 105), 2 = PIENIADZ (106 + 107), 2b = TOWARY 2 (115 + 116 + 117 + 118 + 119), 3 = LUDZIE
+                     (BetterEconomy + 108 + 109), 4 = KASY (110 + 111 + 112), 5 = SPUSTOSZENIE (113); takze nazwa (towar,
+                     pieniadz, towary2, ludzie, kasy, spustoszenie) albo "w-grze" (grupa najwyzszego ogniwa wykrytego w
+                     logu). Wypisuje: warunki testu grupy (DLL, nowa kampania albo zapis, liczba dob, bledy, formaty
+                     nierozpoznane), kontrole wspolne grupy (lista test_groups z docs\\paczki\\PRZEGLAD-KOLIZJI-LANCUCHA-
+                     2026-10-06.txt i powiazania miedzy ogniwami), wszystkie kontrole kazdego ogniwa grupy i alarmy calego
+                     logu - kazda pozycja z OK / UWAGA / BRAK DANYCH i liczba z logu. Grupa 3 czyta tez (tylko odczyt) plik
+                     ustawien BetterEconomy (13 kluczy; stan pliku TERAZ, nie z chwili sesji) i plik ludzie-regiony.csv
+                     sesji (bandy za Murem); grupa 5 - ten sam plik CSV (trzy nowe kolumny). Gdy pliku nie ma, kontrola
+                     mowi BRAK DANYCH i podaje sciezke.
+                     GRUPA 2b = TOWARY 2 (ogniwa 115-119, DLL Armoury-grupa-towary2.dll = build n119, md5 faade7bf...): idzie
+                     do gry PRZED grupami 3-5 (lancuch 07.10: 107 -> 115..119 -> 108..114 przeniesione na 119), a numery 3-5
+                     zostaja, bo tak nazywaja je STAN-PRAC i opisy paczek; "2b" = druga czesc towaru po pieniadzu (nazwy:
+                     2b, towary2, ceny). Warunki testu: swiezy start gry, NOWA kampania (115, 116 i 118 przeliczaja start
+                     kampanii tylko w sesji, ktora ja zalozyla), 20 dob. GLOWNA LICZBA: "Ruda: miast bez towaru" w ostatniej
+                     dobie (test 14:08: 74 -> 69; oczekiwane ok. 25-30 po 20 dobach; ponad 50 = ALARM). Grupa 2b wypisuje tez
+                     TABELE DZIEN PO DNIU glownych liczb (ruda i drewno bez towaru, indeks i cena rudy w pustym miescie,
+                     karawany, wozy, nadplata, niezgodne, ms, piekarnia i chleb, potkniecia).
+  --pelny            bez limitu ok. 160 linii (wszystkie alarmy i wszystkie tematy dodatkowe)
   --szer N           szerokosc wyjscia (domyslnie 160)
 
-UKLAD SKROTU (domyslnie ok. 155 linii, przy pelnym lancuchu 113 do ok. 170; do 160 znakow)
+UKLAD SKROTU (domyslnie ok. 160 linii, przy pelnym lancuchu do ok. 190; do 160 znakow)
   1. naglowek: plik, rozmiar, doby i dni gry, linie startowe modulow (wpiete / CZYNNE / BRAK / NIE wpieta / WYLACZONE),
-     uklad ksiegi pieniadza (wpis 102 albo 102b), tabela ogniw lancucha paczek 100, 101, 102, 102b, 103 ... 113 (po czym
-     poznac kazde w logu, ktore jest w grze, ktorych linii startowych nie ma) i linia "OGNIWO W GRZE"
+     uklad ksiegi pieniadza (wpis 102 albo 102b), tabela ogniw lancucha paczek w kolejnosci lancucha 100, 101, 102, 102b,
+     103 ... 107, 115 ... 119, 108 ... 113 (po czym poznac kazde w logu, ktore jest w grze, ktorych linii startowych nie
+     ma) i linia "OGNIWO W GRZE"
   2. bledy: ERROR / Exception / potkniecia, pogrupowane, z numerem linii pierwszego wystapienia
   3. alarmy: reguly z docs\\paczki\\*.md i z raportu nocnego, kazdy z numerem linii logu (progi = stale na gorze pliku)
   4. co sprawdzic dla ogniwa w grze: do 10 kontroli najwyzszego wykrytego ogniwa, kazda w postaci
@@ -48,8 +59,12 @@ UKLAD SKROTU (domyslnie ok. 155 linii, przy pelnym lancuchu 113 do ok. 170; do 1
   6. formaty nierozpoznane: tematy, ktore spadly do trybu surowego (zmieniony albo nieznany format linii)
 
 LANCUCH PACZEK (galezie 87c8e96 = wpis 102 -> n102b-ksiega -> n103-karawany -> n104-zapas-startowy -> n105-mineral-bk ->
-  n106-paser -> n107-zold-i-skarbiec -> n108-ludzie-jednostka -> n109-ludzie-przyrost -> n110-k5-kasa-zamku ->
-  n111-k6-kasy-miast -> n112-k7-utarg-wsi -> n113-ludzie-spustoszenie = szczyt). Ksiega pieniadza
+  n106-paser -> n107-zold-i-skarbiec (w grze) -> n115-cena-od-niedoboru -> n116-warsztaty-w-nowej-monecie ->
+  n117-karawany-ruda-dociera -> n118-towary-w-nowej-monecie -> n119-wozy-do-najlepszego-miasta (= grupa 2b) ->
+  m108-ludzie-jednostka -> m109-ludzie-przyrost -> m110-k5-kasa-zamku -> m111-k6-kasy-miast -> m112-k7-utarg-wsi ->
+  m113-ludzie-spustoszenie -> m114-porzadki; kolejka 108..114 przeniesiona na 119 07.10 - docs\\paczki\\PRZEGLAD-ZLOZENIA-
+  2026-10-07.txt). Kolejnosc ogniw w tabeli i w kontroli "lancuch niespojny" jest kolejnoscia lancucha: log z 108-113 bez
+  115-119 (stare galezie n108..n113 na n107) daje alarm "lancuch niespojny" - te galezie sa nieaktualne. Ksiega pieniadza
   ma dwa uklady linii i skrypt czyta oba: wpis 102 (bilans z pozycja "(zold N", sekcja "zold wyplacony [P]") i 102b (bilans
   z "rozliczenia rodow na plus / na minus" i zdaniem "W tym zold naliczony N", nowa linia "Pieniadz swiata (rody):", sekcja
   "zold naliczony przy rozliczeniach rodow [P]"). Etykiety dnia: "Wyrzutki / Paser / Zold / Korona / Skarbce / Kasy zamkow /
@@ -62,9 +77,17 @@ LANCUCH PACZEK (galezie 87c8e96 = wpis 102 -> n102b-ksiega -> n103-karawany -> n
   dopisek "w tym dopisane wsiom przez K7". Po ogniwie 111 linia "Zold:" konczy sie dopiskami "- ZBEDNA i nieczynna" i
   "zalogi bez zwrotu korony": tarcza zoldu jest wtedy nieczynna i kontrola ogniwa 107 mowi to wprost (nie "wlaczona").
   Ogniwo 113 dopisuje do "Ludzie:" uchodzcow ("uchodzcy poza domem N, razem z nimi X mln") i odcinek "spustoszenie dzis".
+  Ogniwa 115-119 (grupa 2b) dodaja piec linii dnia: "Ceny surowcow:" (115; z czescia "Towary z wartoscia z definicji
+  przedmiotu" od 118), "Warsztaty towarowe:" (116), "Karawany (przyczyny):" i "Karawany (kierunek):" (117), "Dowoz (wozy):"
+  (119) - wszystkie z numerem dnia jak "Ruda:" (dzien zakonczony); 116 dopisuje do "Przeplywy osad (kasy miast)" pozycje
+  "warsztaty towarowe - place i utrzymanie z kapitalu warsztatow", 117 druga linie startowa "CaravanBulk: poprawka 115 ..."
+  (roboczy numer w kodzie; w lancuchu 117), 118 linie startowe "HistoricalPrices: wartosc z definicji towarow BK ..." i
+  "HistoricalPrices: przelicznik popytu od wartosci z definicji przedmiotu ...", 115 i 116 linie "nowa kampania - ..." (tylko w
+  sesji, ktora zalozyla kampanie), 119 linie startowa "MarketCarts: poprawka 119 ...".
 
 TEMATY Z PARSEREM KOLUMN (prefiks linii logu)
-  surowce:   Ruda, Drewno, Dowoz, Dowoz (skutki), Karawany, Karawany (stan), Warsztaty, Rynek surowcow, Rynek broni,
+  surowce:   Ruda, Drewno, Ceny surowcow (115/118), Dowoz, Dowoz (skutki), Dowoz (wozy) (119), Karawany, Karawany (stan),
+             Karawany (przyczyny), Karawany (kierunek) (117), Warsztaty, Warsztaty towarowe (116), Rynek surowcow, Rynek broni,
              Mineraly (dubel BK)
   pieniadz:  Pieniadz swiata, Pieniadz swiata (bilans), Pieniadz swiata (rody), Przeplywy osad, Przeplywy osad (kasy miast |
              kasy zamkow | kiesy wsi), Kasy zamkow, Kasy miast, Utarg wsi, Korona (powinnosci | danina i clo | zwrot
@@ -76,21 +99,26 @@ TEMATY Z PARSEREM KOLUMN (prefiks linii logu)
   jednorazowe (naglowek, alarmy, kontrole): StartStock, MineralOnce, MaterialLaw (mnoznik wydobycia), CaravanBulk,
              MoneyLedger, OutlawLaw, SoldierPay, KingdomTreasury, PeopleUnit, PopulationLaw, CastlePurse (start i
              jednorazowe przyciecie daru), TownPurse (to samo), VillageTakings, Utarg wsi (latki), Devastation,
-             Spustoszenie, Kalendarz, ColdStart
+             Spustoszenie, Kalendarz, ColdStart, RawPrice (115), WorkshopTrade (116), MarketCarts (119), HistoricalPrices
+             (118: wartosc z definicji, popyt w N kategoriach, przelicznik od definicji, "UWAGA - ... wartosc 0")
   Kazdy inny prefiks, ktory powtarza sie w dobach, jest pokazany w trybie surowym (linia obcieta).
 
 Skrypt niczego nie zapisuje (tylko stdout, UTF-8). Nieznany albo zmieniony format linii nie wywraca skryptu:
 temat spada do trybu surowego i jest wymieniony w sekcji "formaty nierozpoznane".
 
-STAN NA 06.10: w grze jest grupa 1 (ogniwa 101-105), prawdziwego logu z ogniw 101-113 jeszcze nie ma (ostatnia sesja to
-05.10 15:22, sprzed wpisu 101). Uklady linii tych ogniw sa wyprowadzone z ciagow Log.Info w kodzie galezi i sprawdzone
-testem test_syntetyczny.py (kotwice wobec literalow, linie zlozone mechanicznie z wyrazen kodu dla kazdej galezi lancucha,
-linie wypisane przez prawdziwy kod w probach poza gra: ksiega 102 i 102b, "Paser:", "Ludzie:" z odcinkami hearth i
-spustoszenia, "Ludzie: przyrost naturalny", "Kasy zamkow:", "Kasy miast:", "Utarg wsi:", "Ludzie (spustoszenie):", ksiega
-po K5-K7); linii "Karawany:", "Karawany (stan):", "Mineraly (dubel BK):", "Zold:" i "Dowoz:" nowego lancucha nikt jeszcze
-nie wypisal prawdziwym kodem - sa tylko z literalow. Progi alarmow pochodza z opisow paczek (szacunki, nie pomiary).
-Pierwszy prawdziwy log po wgraniu ogniwa trzeba obejrzec takze z --surowe: gdyby kolumna byla pusta ("-") albo temat spadl
-do "formatow nierozpoznanych", parser trzeba poprawic, a nie ufac alarmom tego tematu (--grupa N mowi to w warunkach testu).
+STAN NA 07.10 (noc 06/07.10): w grze grupy 1 i 2 (wpisy 101-107; prawdziwy log Armoury-2026-10-06_14-08-11.log, 20 dob nowej
+kampanii). Nastepny test: GRUPA 2b TOWARY 2 (115-119; niewgrana - czeka na slowo Jeffa), potem 3-5 z galezi m108..m114.
+Linie ogniw 115-119 wziete z kodu galezi n119-wozy-do-najlepszego-miasta (klon scratchpad\\lancuch) i z logow prob
+recenzentow (prawdziwy kod poza gra: "Ceny surowcow:" z czescia o towarach z definicji, "Warsztaty towarowe:", "Karawany
+(przyczyny)", "Karawany (kierunek)", "Dowoz (wozy):", linie startowe RawPrice / WorkshopTrade / CaravanBulk poprawka /
+HistoricalPrices z definicji / MarketCarts); sprawdzone na logu sztucznym = log 14:08 + te linie z prawdziwymi znacznikami
+czasu i numerami dni (zero formatow nierozpoznanych). Linii "WorkshopTrade: nowa kampania - kapital startowy ..." i pozycji
+"warsztaty towarowe - place i utrzymanie" w kasach miast nikt jeszcze nie wypisal prawdziwym kodem - sa z literalow.
+Uklady linii ogniw 108-113 - jak dotad z kodu galezi n108..n113 i testu test_syntetyczny.py (kotwice wobec literalow, linie
+wypisane przez prawdziwy kod w probach poza gra). Progi alarmow i kontroli pochodza z opisow paczek (SZACUNKI z prob i
+symulacji, nie pomiary) - stale na gorze pliku. Pierwszy prawdziwy log po wgraniu ogniwa trzeba obejrzec takze z --surowe:
+gdyby kolumna byla pusta ("-") albo temat spadl do "formatow nierozpoznanych", parser trzeba poprawic, a nie ufac alarmom
+tego tematu (--grupa N mowi to w warunkach testu).
 """
 
 import sys
@@ -108,7 +136,8 @@ WZORZEC_LOGU = 'Armoury-*.log'
 PLIK_CSV = 'ludzie-regiony.csv'
 
 SZEROKOSC = 160                 # znakow na linie wyjscia
-LIMIT_LINII = 155               # domyslny limit dlugosci skrotu (150 + 4 wiersze tabeli lancucha 110-113 + linia grupy)
+LIMIT_LINII = 160               # domyslny limit dlugosci skrotu (150 + 4 wiersze tabeli lancucha 110-113 + linia grupy
+                                # + 5 wierszy ogniw 115-119)
 PROBKI = 6                      # ile dob w szeregu (pierwsza, rownomiernie rozlozone, ostatnia)
 MAKS_ALARMOW = 24               # ile alarmow w skrocie (reszta: --pelny)
 MAKS_GRUP_BLEDOW = 8
@@ -179,6 +208,47 @@ SPUSTOSZENIE_UDZIAL_GRY_ALARM = 0.5     # ... albo zdjeci >= tej czesci "gra zdj
 SPUSTOSZENIE_GRA_MIN_LUDZI = 2000       # ... liczone, gdy gra zdjelaby co najmniej tylu ludzi
 ZEROWANIE_OSOBODNI_UWAGA = 20000        # osobodni zerowania armii na dobe (mediana): "dziesiatki tysiecy" = uwaga (ryzyko 2)
 SPUSTOSZENIE_UDZIAL_TOL = 3.0           # zabici / w las maja byc po 5% trafionych: odchylenie ponad tyle pkt % = uwaga
+# grupa 2b TOWARY 2 (ogniwa 115-119) - progi z "Po czym poznac w logu" docs\paczki\115..119 (SZACUNKI z prob i symulacji
+# recenzentow, nie pomiary; "dotad" = test 06.10 14:08, grupy 1 + 2, 20 dob nowej kampanii)
+RUDA_BEZ_TOWARU_CEL_2B = 30             # GLOWNA LICZBA: "Ruda: miast bez towaru" po 20 dobach - realnie ok. 25-30 (recenzent wozow;
+                                        # dotad 74 -> 69; ponizej 20 dopiero po ok. 40 dobach, 16 miast lezy dalej niz 250 od kopaln)
+RUDA_BEZ_TOWARU_ALARM_2B = 50           # ... ponad tyle po 20 dobach = ALARM (wozy i karawany nie dowoza rudy)
+TOWARY2_MIN_DOB = 15                    # od tylu pelnych dob oceniamy glowna liczbe (krocej: tylko kierunek)
+DREWNO_BEZ_TOWARU_CEL_2B = 20           # "Drewno: miast bez towaru": dotad 41 -> 40, oczekiwane ok. 10-15
+INDEKS_SUFIT = 9.95                     # indeks ceny na suficie gry x10 (log pisze 10.00)
+CENA_RUDY_PUSTA_MIN = 20.0              # "ruda ... za pierwsza sztuke placa" (pusta polka): dotad ok. 10 d, oczekiwane ok. 37-40 d
+INDEKS_DREWNA_MIN = 0.7                 # "Ceny surowcow": mediana indeksu drewna ok. 0.8-1.1 (dotad 0.2-0.6)
+INDEKS_WELNY_MAKS = 0.5                 # ... welny 0.10-0.3 (polki pelne welny; dotad 10 przy pustej polce)
+CENA_ZBYTU_RUDY_2B = (12.0, 40.0)       # "Karawany (stan): ruda ... cena zbytu" ok. 15-25 d (dotad 29.9 -> 10.4, spadala sama)
+CENA_ZBYTU_DREWNA_MIN_2B = 5.0          # ... drewno 8-12 d (dotad 10.4 -> 1.3)
+CENA_ZBYTU_WELNY_MAKS_2B = 300.0        # ... welna wyraznie ponizej 372 d
+ZYSK_RUDY_KG_MIN = 0.1                  # "Karawany: oczekiwany zysk ... na kilogram": ruda ok. 0.15 (dotad 0.08)
+ZYSK_DREWNA_KG_MIN = 0.03               # ... drewno ok. 0.08 (dotad 0.003)
+INDEKS_BRONI_DREWNA_MIN = 0.8           # "Rynek broni: indeks drewna" mediana ok. 1.0-1.25 (dotad 0.58 w ostatniej dobie)
+WARSZTATY_BEZ_ZYSKU_MAKS = 100          # "Warsztaty: bez zysku" na dobe (mediana): dotad 32; setki = drewno na suficie w wielu miastach
+WARSZTATY_TOW_MIN = 250                 # "Warsztaty towarowe: warsztatow" ok. 291 (97 miast x 3 warsztaty notabli bez ukrytych)
+KAPITAL_WARSZTATOW_START = (1800000, 3200000)   # "Pieniadz swiata: kapital warsztatow" 1. doby nowej kampanii ok. 2.4 mln (dotad 4.1 mln)
+KAPITAL_WARSZTATOW_ZM_MIN = -10000      # ... zmiana dobowa (mediana) - przestaje tracic ok. 29 tys. dziennie w nicosc (dotad -17.6 tys.)
+PIEKARNIA_CENA_MAKS = 150000            # cena piekarni w przykladzie miasta (Lannisport): 13-116 tys. przy ok. 20 chlebach dziennie;
+                                        # ponad to = chleba i ciast naprawde brakuje (przy ok. 10 bochnach 92-522 tys.)
+BUDZET_CHLEBA = (5000, 30000)           # "Ceny surowcow: bread ... budzet mieszczan" ok. 15-20 tys. (przy wylaczonym 118: 30-67 tys.)
+KARAWANY_BRAK_MIEJSCA_2B = 15           # "zakup odpuszczony: brak miejsca w jukach" na dobe (mediana): dotad 37 (pod koniec ok. 70)
+KARAWANY_KUP_RUDY_2B = 25               # "kupione z nadwyzek: ruda" na dobe (mediana): dotad 10, oczekiwane 35-55
+KARAWANY_SPRZ_RUDY_2B = 7               # "sprzedane miastom z brakiem: ruda" na dobe (mediana): dotad 1, oczekiwane 10-25
+KARAWANY_PRZY_WYJEZDZIE_PROC = 10.0     # "Karawany (przyczyny): przy wyjezdzie M" wobec N + M: M bliskie 0
+KARAWANY_WJAZDY_MIN_2B = 70             # "wjazdy karawan do miast" (mediana): dotad 85; wyraznie mniej przy rosnacym "karawan w miastach"
+                                        # = karawany przeciazone (CaravanBulkFillLimit z powrotem na 0.8)
+WOZY_N_2B = (100, 350)                  # "Dowoz (wozy): N wozow" na dobe (mediana): oczekiwane ok. 150-250
+WOZY_DO_INNEGO_MIN_PROC = 30.0          # "do innego" miasta jako % wozow: "wyraznie > 0" (symulacja: ok. 80% kursow surowcow)
+WOZY_DROGA_2B = (40.0, 180.0)           # "srednio X jedn. drogi": oczekiwane ok. 60-140
+WOZY_MS_MAKS = 300.0                    # "(cen N, X ms)" na dobe: kilkadziesiat; ponad ok. 300 zglosic
+WOZY_WYGASLE_MAKS = 50                  # "wygasle przy porzadkach" na dobe: kilka-kilkanascie to norma
+NADPLATA_PROC_MAKS = 30.0               # "tabory oddaly osadom nadplate ... (R%": SZACUNEK kilka-kilkanascie procent
+# wartosci "dotad" z testu 14:08 (do porownan w kontrolach grupy 2b; policzone tym narzedziem z Armoury-2026-10-06_14-08-11.log)
+BAZA_1408 = {'ruda_bez': (74, 69), 'drewno_bez': (41, 40), 'drewno_budowy_med': 1958, 'drewno_bez_wyj_med': 2055,
+             'zatk_zamkowe': 4.6, 'zatk_miejskie': 7.4, 'zakupy_med': 462411, 'miasta_zaplacily_med': 380037,
+             'wool': (660, 4094), 'kap_warsztatow': (4101882, 3915736), 'wjazdy_med': 85, 'kup_ruda_med': 10,
+             'sprz_ruda_med': 1, 'brak_miejsca_med': 37, 'zamki_glodne': (0, 1), 'ruda_cena_zbytu': (29.9, 10.4)}
 
 # przesuniecie numeru dnia w linii: 1 = linia drukuje (int)Now.ToDays (dzien biezacy), 0 = dzien wlasnie zakonczony
 # (Now.ToDays - 1). Ustalenie przegladu kolizji lancucha: "Wyrzutki / Paser / Zold / Korona / Skarbce dzien D" to ten sam
@@ -197,6 +267,8 @@ PRZESUNIECIE_DNIA = {
     'Przeplywy osad (kiesy wsi)': 0, 'Utarg wsi': 0,
     'Ludzie': 0, 'Ludzie (regiony)': 0, 'Ludzie (spustoszenie)': 0, 'ZakupyAI': 0, 'Zuzycie AI': 0, 'Pobor': 0,
     'Werbunek': 0, 'Sakiewka ludzi': 0, 'Komplet rekruta': 0, 'Ochotnicy': 0, 'Warsztaty': 0,
+    # ogniwa 115-119 (z kodu galezi n119): wszystkie drukuja (int)Now.ToDays - 1, czyli dzien zakonczony jak "Ruda:"
+    'Ceny surowcow': 0, 'Karawany (przyczyny)': 0, 'Karawany (kierunek)': 0, 'Warsztaty towarowe': 0, 'Dowoz (wozy)': 0,
 }
 # plik ustawien BetterEconomy (grupa 3: 13 kluczy zamykajacych ujscia - tools\bee\zamknij-ujscia-bee.ps1); tylko odczyt
 PLIK_BEE = os.path.join('BetterEconomy', 'ModuleData', 'better_economy_settings.xml')
@@ -501,6 +573,206 @@ def _extra_dowoz(t, d):
     return {'wylaczona': 1 if 'LATKA WYLACZONA' in t else 0}
 
 
+# ------------------------------------------------------------------------------------------------ ogniwa 115-119 (grupa 2b)
+# "Ceny surowcow:" (RawPrice.Daily, ogniwo 115): na surowiec "ruda (wartosc 8 d): indeks min/mediana/max 0.27/2.67/10.00, bez towaru
+# 2 miast - za pierwsza sztuke placa 25.5 d, z nadwyzka 1 miast - sprzedaja po 3 d, popyt dobowy miasta: mieszczan 0 d + rzemiosla
+# 5.6 d, w danych rynku 5.6 d, sam szacunek gry 4 d" (czesci "- za pierwsza ..." / "- sprzedaja po ..." tylko przy liczbie > 0)
+RX_CENY_SUROWCA = re.compile(
+    r'([a-z][a-z ]*?) \(wartosc (-?\d+) d\): indeks min/mediana/max ' + RX_F + '/' + RX_F + '/' + RX_F +
+    r', bez towaru (\d+) miast(?: - za pierwsza sztuke placa ' + RX_F + r' d)?, z nadwyzka (\d+) miast(?: - sprzedaja po ' + RX_F +
+    r' d)?, popyt dobowy miasta: mieszczan ' + RX_F + r' d \+ rzemiosla ' + RX_F + r' d, w danych rynku ' + RX_F +
+    r' d, sam szacunek gry ' + RX_F + r' d')
+RX_CENY_INNE = re.compile(r'(\w+) ' + RX_F + '/' + RX_F + '/' + RX_F)
+# czesc ogniwa 118: "bread (bread 6 d) /3.33 5.39/5.64/5.89, na polkach 24 szt., pusto w 0 miastach, budzet mieszczan 541 d (przy
+# dzisiejszych polkach do 541 d)" - nawias z przykladami tylko, gdy towar lezy na polce; "bez przelicznika" zamiast "/N"
+RX_CENY_DEF = re.compile(
+    r'^(\S+)(?: \(([^)]*)\))? (?:/' + RX_F + r'|bez przelicznika) ' + RX_F + '/' + RX_F + '/' + RX_F +
+    r', na polkach (-?\d+) szt\., pusto w (\d+) miastach, budzet mieszczan (-?\d+) d \(przy dzisiejszych polkach do (-?\d+) d\)$')
+ZN_CENY_SUR = '= ladunek) - '
+ZN_CENY_INNE = '. Inne przeliczone towary, indeks min/mediana/max: '
+ZN_CENY_DEF = '. Towary z wartoscia z definicji przedmiotu ('
+
+
+def _kat_klucz(s):
+    """Id kategorii (bread, Eggs, Ink) -> klucz kolumny (bread, eggs, ink)."""
+    return re.sub(r'[^a-z0-9_]', '_', s.lower())
+
+
+def _extra_ceny(t, d):
+    """Linia "Ceny surowcow:" (ogniwo 115, RawPrice.Daily; czesc o towarach z wartoscia z definicji = ogniwo 118)."""
+    r = OrderedDict()
+    if ' - popyt z prawdziwego zuzycia ' not in t:
+        raise ValueError('brak naglowka linii')
+    r['popyt_stan'] = 'CZYNNY' if 'popyt z prawdziwego zuzycia CZYNNY' in t else 'wylaczony'
+    r['stala_stan'] = 'CZYNNA' if 'stala wzoru w nowej monecie CZYNNA' in t else 'wylaczona'
+    m = re.search(r'\(model cen ([^,)]+)', t)
+    r['model_cen'] = m.group(1) if m else '?'
+    i_sur, i_inne, i_def = t.find(ZN_CENY_SUR), t.find(ZN_CENY_INNE), t.find(ZN_CENY_DEF)
+    konce = [x for x in (i_inne, i_def) if x >= 0]
+    sur = t[i_sur + len(ZN_CENY_SUR):(min(konce) if konce else len(t))] if i_sur >= 0 else ''
+    n = 0
+    for m in RX_CENY_SUROWCA.finditer(sur):
+        k = SUROWCE_KARAWAN.get(m.group(1).strip(), m.group(1).strip().replace(' ', '_'))
+        g = m.groups()
+        n += 1
+        r[k + '_wartosc'] = int(g[1])
+        r[k + '_idx_min'], r[k + '_idx_med'], r[k + '_idx_max'] = _liczba(g[2]), _liczba(g[3]), _liczba(g[4])
+        r[k + '_bez'] = int(g[5])
+        r[k + '_placa'] = _liczba(g[6]) if g[6] is not None else None
+        r[k + '_nadw'] = int(g[7])
+        r[k + '_sprzedaja'] = _liczba(g[8]) if g[8] is not None else None
+        r[k + '_popyt_m'], r[k + '_popyt_r'] = _liczba(g[9]), _liczba(g[10])
+        r[k + '_popyt_dane'], r[k + '_popyt_gra'] = _liczba(g[11]), _liczba(g[12])
+    if n == 0:
+        raise ValueError('brak surowcow')
+    r['surowcow'] = n
+    if i_inne >= 0:
+        kon = i_def if i_def > i_inne else len(t)
+        for m in RX_CENY_INNE.finditer(t[i_inne + len(ZN_CENY_INNE):kon]):
+            k = 'inne_' + _kat_klucz(m.group(1))
+            r[k + '_min'], r[k + '_med'], r[k + '_max'] = _liczba(m.group(2)), _liczba(m.group(3)), _liczba(m.group(4))
+    if i_def >= 0:
+        ogon = t[i_def + len(ZN_CENY_DEF):]
+        ogon = ogon.split('): ', 1)[1] if '): ' in ogon else ''
+        ogon = ogon[:-1] if ogon.endswith('.') else ogon
+        kat, zle, bez = 0, 0, 0
+        budzet = wydane = 0
+        for czesc in ogon.split('; '):
+            mm = RX_CENY_DEF.match(czesc.strip())
+            if not mm:
+                zle += 1
+                continue
+            g = mm.groups()
+            k = 'def_' + _kat_klucz(g[0])
+            kat += 1
+            r[k + '_przel'] = _liczba(g[2]) if g[2] is not None else None
+            if g[2] is None:
+                bez += 1
+            r[k + '_min'], r[k + '_med'], r[k + '_max'] = _liczba(g[3]), _liczba(g[4]), _liczba(g[5])
+            r[k + '_szt'], r[k + '_pusto'] = int(g[6]), int(g[7])
+            r[k + '_budzet'], r[k + '_wydane'] = int(g[8]), int(g[9])
+            budzet += int(g[8])
+            wydane += int(g[9])
+        if kat == 0:
+            raise ValueError('czesc o towarach z definicji bez zadnej kategorii')
+        r['def_kat'], r['def_zle'], r['def_bez_przel'] = kat, zle, bez
+        r['def_budzet'], r['def_wydane'] = budzet, wydane
+    return r
+
+
+# "Karawany (przyczyny):" (CaravanBulk.Daily, ogniwo 117): "ruda 4: kupily 3, brak miejsca 1, w drodze dosc 0, cena nie nizsza od
+# sredniej 0, bez zysku 0, sprzedane tu 0, rozkaz gracza 0"
+RX_PRZYCZYNY = re.compile(r'([a-z][a-z ]*?) (\d+): kupily (\d+), brak miejsca (\d+), w drodze dosc (\d+), cena nie nizsza od sredniej '
+                          r'(\d+), bez zysku (\d+), sprzedane tu (\d+), rozkaz gracza (\d+)')
+POLA_PRZYCZYN = ('wyj', 'kupily', 'brak_miejsca', 'w_drodze_dosc', 'cena', 'bez_zysku', 'sprzedane_tu', 'rozkaz')
+
+
+def _extra_przyczyny(t, d):
+    r = OrderedDict()
+    r['brak_latki'] = 1 if 'BRAK latki BuyGoods' in t else 0
+    m = re.search(r'; wyjazdy z miasta z nadwyzka surowca - (.*)$', t)
+    if not m:
+        raise ValueError('brak czesci o wyjazdach z nadwyzka')
+    razem = Counter()
+    for x in RX_PRZYCZYNY.finditer(m.group(1)):
+        k = SUROWCE_KARAWAN.get(x.group(1).strip(), x.group(1).strip().replace(' ', '_'))
+        for pole, v in zip(POLA_PRZYCZYN, x.groups()[1:]):
+            r[k + '_' + pole] = int(v)
+            razem[pole] += int(v)
+    r['nadw_wyj'], r['nadw_kupily'], r['nadw_brak_miejsca'] = razem['wyj'], razem['kupily'], razem['brak_miejsca']
+    a, b = d.get('przed_celem'), d.get('przy_wyjezdzie')
+    if a is not None and b is not None:
+        r['przy_wyjezdzie_proc'] = round(100.0 * b / (a + b), 1) if (a + b) else 0.0
+    return r
+
+
+# "Karawany (kierunek):" (ogniwo 117): "ruda: wjazdy 1, w tym do miasta z brakiem 1 (dostawe dostalo 1 miast), wyjazdy 2, w tym z celem
+# w miescie z brakiem 1"; "w jukach teraz: ruda 13 w 4 karawanach (z tego 13 stoi w miastach), ..."
+RX_KIERUNEK = re.compile(r'([a-z][a-z ]*?): wjazdy (\d+), w tym do miasta z brakiem (\d+) \(dostawe dostalo (\d+) miast\), wyjazdy (\d+), '
+                         r'w tym z celem w miescie z brakiem (\d+)')
+RX_JUKI_TERAZ = re.compile(r'([a-z][a-z ]*?) (\d+) w (\d+) karawanach \(z tego (\d+) stoi w miastach\)')
+
+
+def _extra_kierunek(t, d):
+    r = OrderedDict()
+    if '; ladunek surowcow - ' not in t or '; w jukach teraz: ' not in t:
+        raise ValueError('brak czesci o ladunku albo jukach')
+    lad = t.split('; ladunek surowcow - ', 1)[1].split('; w jukach teraz: ', 1)[0]
+    for x in RX_KIERUNEK.finditer(lad):
+        k = SUROWCE_KARAWAN.get(x.group(1).strip(), x.group(1).strip().replace(' ', '_'))
+        for pole, v in zip(('wj', 'wj_brak', 'dostalo', 'wyj', 'wyj_brak'), x.groups()[1:]):
+            r[k + '_' + pole] = int(v)
+    juki = t.split('; w jukach teraz: ', 1)[1]
+    for x in RX_JUKI_TERAZ.finditer(juki):
+        k = SUROWCE_KARAWAN.get(x.group(1).strip(), x.group(1).strip().replace(' ', '_'))
+        r[k + '_juki'], r[k + '_karawan'], r[k + '_stoi'] = int(x.group(2)), int(x.group(3)), int(x.group(4))
+    return r
+
+
+# "Warsztaty towarowe:" (WorkshopTrade.Daily, ogniwo 116): wedle typu "bakery 5 (pracowalo 5, cykli 15, wynik +81 = 16.2 d na warsztat,
+# place 49, utrzymanie 20)"; przyklad miasta "bakery 19768 (zysk sredni z 5 dob 16.2 d na dobe, podatek gracza 0%, 3 x roczny zysk =
+# 17687, kapital 2081; wyrob bread x1.00, wsad grain x1.00)" (albo "zysk sredni z 30 dob (pamiec 145) 12.2 d", "zysk oczekiwany z cen
+# -4 d", "sam sprzet 600")
+RX_TYP_WT = re.compile(r'(\S+) (\d+) \(pracowalo (\d+), cykli (\d+), wynik ([+-]?\d+) = ' + RX_F + r' d na warsztat, place (-?\d+), '
+                       r'utrzymanie (-?\d+)\)')
+RX_PRZYKLAD_WT = re.compile(
+    r'(\S+) (-?\d+) \(zysk (?:sredni z (\d+) dob(?: \(pamiec (\d+)\))? |oczekiwany z cen )' + RX_F + r' d na dobe, podatek gracza '
+    + RX_F + r'%, (?:sam sprzet (-?\d+)|' + RX_F + r' x roczny zysk = (-?\d+)), kapital (-?\d+)(?:; wyrob (\S+) x' + RX_F
+    + r'(?:, wsad (\S+) x' + RX_F + r')?)?\)')
+
+
+def _extra_warsztaty_tow(t, d):
+    r = OrderedDict()
+    m = re.search(r' \| wedle typu: (.*?) \| do kas miast: ', t)
+    if not m:
+        raise ValueError('brak czesci "wedle typu"')
+    typow = 0
+    for x in RX_TYP_WT.finditer(m.group(1)):
+        k = 'typ_' + _kat_klucz(x.group(1))
+        typow += 1
+        r[k + '_n'], r[k + '_prac'], r[k + '_cykli'] = int(x.group(2)), int(x.group(3)), int(x.group(4))
+        r[k + '_wynik'], r[k + '_dnw'] = int(x.group(5)), _liczba(x.group(6))
+    r['typow'] = typow
+    m = re.search(r'; przyklad (.+?) \(dobrobyt (-?\d+)\): (.*?)(?: \| zasady: |$)', t)
+    if m:
+        r['przyklad_miasto'], r['przyklad_dobrobyt'] = m.group(1), int(m.group(2))
+        podatki = []
+        for x in RX_PRZYKLAD_WT.finditer(m.group(3)):
+            g = x.groups()
+            podatki.append(_liczba(g[5]))
+            if g[0] == 'bakery' and 'piekarnia_cena' not in r:
+                r['piekarnia_cena'], r['piekarnia_zysk'] = int(g[1]), _liczba(g[4])
+                r['piekarnia_dob'] = int(g[2]) if g[2] is not None else 0
+                r['piekarnia_kapital'] = int(g[9])
+                r['piekarnia_wyrob'] = g[10] or ''
+                r['piekarnia_wyrob_x'] = _liczba(g[11]) if g[11] is not None else None
+                r['piekarnia_wsad_x'] = _liczba(g[13]) if g[13] is not None else None
+        r['przyklad_warsztatow'] = len(podatki)
+        r['podatek_max'] = max(podatki) if podatki else None
+    return r
+
+
+def _extra_wozy(t, d):
+    """Linia "Dowoz (wozy):" (MarketCarts.Daily, ogniwo 119)."""
+    r = OrderedDict()
+    m = re.search(r' - wybor miasta (\w+): ', t)
+    if not m:
+        raise ValueError('brak "wybor miasta"')
+    r['wybor'] = m.group(1)
+    m = re.search(r' \| cena ladunku sztuka po sztuce (BRAK LATKI|CZYNNA|WYLACZONA): ', t)
+    r['cena_stan'] = m.group(1) if m else '?'
+    m = re.search(r' \| woz x[\d.,]+ dla wsi (\w+)', t)
+    r['dla_wsi'] = m.group(1) if m else '?'
+    r['pelny_wyl'] = 1 if ' szt.) - WYLACZONY;' in t else 0
+    r['wiesc_wyl'] = 1 if ' - WYLACZONA; z ruda ' in t else 0
+    r['potkn'] = d.get('potkniecia') or 0
+    if d.get('wozow'):
+        r['do_innego_proc'] = round(100.0 * (d.get('do_innego') or 0) / d['wozow'], 1)
+    if d.get('z_ruda'):
+        r['ruda_do_pustych_proc'] = round(100.0 * (d.get('ruda_do_pustych') or 0) / d['z_ruda'], 1)
+    return r
+
+
 def _extra_skutki(t, d):
     r = {}
     if d.get('zatk_zamkowe') is not None and d.get('wsi_zamkowych'):
@@ -666,7 +938,8 @@ def _extra_przeplywy(t, d):
 def _extra_kasy(t, d):
     r = {}
     znane = 0
-    for k in ('taborom', 'z_utargu', 'zywnosc_wsi', 'sakwy', 'zakupy', 'regulator', 'przelewy', 'poza_tickiem', 'tick'):
+    for k in ('taborom', 'z_utargu', 'zywnosc_wsi', 'sakwy', 'zakupy', 'regulator', 'przelewy', 'poza_tickiem', 'tick',
+              'warsztaty_tow'):
         v = d.get(k)
         if isinstance(v, (int, float)):
             znane += abs(v)
@@ -998,6 +1271,10 @@ def _kol_kasy():
         K('paser_sprzet', rx=para('paser band (sprzet dla band)'), lit=['paser band (sprzet dla band)']),
         K('zold_garnizonow', rx=para('zold garnizonow'), lit=['zold garnizonow']),
         K('zycie', rx=para('sakiewki ludzi - zycie w miastach'), lit=['sakiewki ludzi - zycie w miastach']),
+        # ogniwo 116 (WorkshopTrade -> MoneyLedger.NoteWorkshopPay): place za cykle i utrzymanie z kapitalu warsztatow do kas miast
+        K('warsztaty_tow', 'warsztaty towarowe - place i utrzymanie z kapitalu warsztatow ', 'sint'),
+        K('warsztaty_tow_place', rx=r'warsztatow [+-]?\d+ \[P\] \(place za cykle \+(-?\d+)', lit=[' [P] (place za cykle +']),
+        K('warsztaty_tow_utrz', rx=r'\(place za cykle \+-?\d+, utrzymanie \+(-?\d+)\)', lit=[', utrzymanie +']),
         K('tick', 'Armoury tick dobowy ', 'sint'),
         K('renty', rx=r'[(,] ?renty ([+-]\d+)', lit=['renty']),
         K('budowy', rx=r'[(,] ?budowy ([+-]\d+)', lit=['budowy']),
@@ -1037,6 +1314,15 @@ TEMATY = [
           'OreLedger.cs', bezwar=True),
     Temat('Drewno', 'Drewno', r'^dzien \d+', _kol_ksiegi('miasta i zamki'), _extra_ksiegi, SKROT_KSIEGI, 'surowce',
           'OreLedger.cs', bezwar=True),
+    # ogniwo 115 (RawPrice.Daily, zaraz po "Ruda:" i "Drewno:"): indeks i ceny 7 surowcow masowych w miastach, popyt z prawdziwego
+    # zuzycia, przyklady innych przeliczonych towarow (grain, salt, beer) i - od ogniwa 118 - towary z wartoscia z definicji (BK)
+    Temat('Ceny surowcow', 'Ceny surowcow', r'^dzien \d+ - popyt z prawdziwego zuzycia ', [], _extra_ceny, [
+        ('ruda: indeks med/max | bez towaru miast', '{ruda_idx_med}/{ruda_idx_max}|{ruda_bez}'),
+        ('ruda: 1. sztuka w pustym d | popyt dane', '{ruda_placa}|{ruda_popyt_dane}'),
+        ('drewno: indeks med/max | 1. sztuka d', '{drewno_idx_med}/{drewno_idx_max}|{drewno_placa}'),
+        ('welna: indeks med/max | sol/piwo max', '{welna_idx_med}/{welna_idx_max}|{inne_salt_max}/{inne_beer_max}'),
+        ('chleb: indeks med | na polkach | budzet', '{def_bread_med}|{def_bread_szt}|{def_bread_budzet}'),
+    ], 'surowce', 'RawPrice.cs', bezwar=True),
     Temat('Dowoz', 'Dowoz', r'^dzien \d+', [
         K('wyslane', 'wyslane na targ miasta ', wym=True),
         K('brak_targu', 'do zamku: brak targu '),
@@ -1070,6 +1356,47 @@ TEMATY = [
     ], _extra_skutki, [('zatkane magazyny %: zamkowe/miejskie', '{zatk_zamkowe_proc}/{zatk_miejskie_proc}'),
                        ('kasy miast | ponizej progu rent', '{kasy_miast} | {ponizej_progu}')],
           'surowce', 'MarketRoad.cs', bezwar=True),
+    # ogniwo 119 (MarketCarts.Daily, zaraz po "Dowoz:"): wybor najlepiej placacego miasta, wiesc z drogi, cena ladunku sztuka po sztuce
+    Temat('Dowoz (wozy)', 'Dowoz (wozy)', r'^dzien \d+ - wybor miasta ', [
+        K('wozow', rx=r' - wybor miasta \w+: (\d+) wozow', wym=True, lit=[' wozow (wsi zamkowych ']),
+        K('wsi_zamkowych', ' wozow (wsi zamkowych '),
+        K('do_wlasnego', ', do wlasnego miasta '),
+        K('do_innego', ', do innego '),
+        K('bez_miasta', ', bez miasta w zasiegu '),
+        K('w_miescie', ', w miescie (jak dotad) '),
+        K('srednio', '; srednio ', 'float'),
+        K('zasieg', ' jedn. drogi (zasieg '),
+        K('zasieg_gry', ', gry dla targu wsi '),
+        K('utarg', '; oczekiwany utarg '),
+        K('utarg_wybrane', rx=r'wlasne miasto bylo w grze: (-?\d+) d wobec', lit=[' (tam, gdzie wlasne miasto bylo w grze: ', ' d wobec ']),
+        K('utarg_wlasne', rx=r' d wobec (-?\d+) d we wlasnym\)', lit=[' d we wlasnym)']),
+        K('pelny', '; pelny woz na daleka droge '),
+        K('doladowane', ' (doladowane '),
+        K('w_drodze', '; wiesc z drogi: wozow w drodze '),
+        K('miast_wiesc', rx=r'wozow w drodze -?\d+, miast (\d+)', lit=[', miast ']),
+        K('wygasle', ', wygasle przy porzadkach '),
+        K('z_ruda', '; z ruda '),
+        K('ruda_do_pustych', ', w tym do miasta bez rudy '),
+        K('ruda_miast', rx=r'do miasta bez rudy -?\d+ \(roznych miast (\d+)\)', lit=[' (roznych miast ']),
+        K('wycen', '; wycen '),
+        K('cen', rx=r'; wycen -?\d+ \(cen (\d+), ', lit=[' (cen ']),
+        K('ms', rx=r'\(cen \d+, ' + RX_F + r' ms\)', lit=[' ms)']),
+        K('sprzedazy', ': sprzedazy '),
+        K('pierwsza', ', po cenie pierwszej sztuki '),
+        K('sztuka', ' d, sztuka po sztuce '),
+        K('nadplata', ' d, tabory oddaly osadom nadplate '),
+        K('nadplata_proc', rx=r'osadom nadplate -?\d+ d \(' + RX_F + '%', lit=[' d (']),
+        K('nadplata_max', ', najwieksza '),
+        K('niezgodne', ', niezgodne ', wym=True),
+        K('cena_rosla', ', cena rosla '),
+        K('woz_x', ' | woz x', 'float'),
+        K('potkniecia', ' | POTKNIECIA '),
+    ], _extra_wozy, [
+        ('wozow | do wlasnego/innego/bez miasta', '{wozow}|{do_wlasnego}/{do_innego}/{bez_miasta}'),
+        ('srednio jedn. drogi | wygasle | ms', '{srednio}|{wygasle}|{ms}'),
+        ('z ruda / do miasta bez rudy (miast)', '{z_ruda}/{ruda_do_pustych} ({ruda_miast})'),
+        ('nadplata d (%) | niezgodne/cena rosla', '{nadplata}({nadplata_proc}%)|{niezgodne}/{cena_rosla}'),
+    ], 'surowce', 'MarketCarts.cs', bezwar=True),
     Temat('Karawany', 'Karawany', r'^dzien \d+', [
         K('wjazdy', 'wjazdy karawan do miast ', wym=True),
         K('ze_sprzedaza', ', w tym ze sprzedaza surowcow '),
@@ -1104,6 +1431,27 @@ TEMATY = [
         ('drewno: ponizej/bez | brakuje/w jukach', '{drewno_ponizej}/{drewno_bez}|{drewno_brak}/{drewno_juki}'),
         ('KUPNO STOI (surowce)', '{kupno_stoi}'),
     ], 'surowce', 'CaravanBulk.cs'),
+    # ogniwo 117 (CaravanBulk.Daily, "poprawka 115" w kodzie): zakup surowcow przed wyborem celu i juki do 100% udzwigu
+    Temat('Karawany (przyczyny)', 'Karawany (przyczyny)', r'^dzien \d+ - zakup surowcow przed wyborem celu ', [
+        K('przed_celem', ' - zakup surowcow przed wyborem celu ', wym=True),
+        K('przy_wyjezdzie', ' wizyt, przy wyjezdzie ', wym=True),
+        K('kg', '; surowce zajely '),
+        K('kg_ponad', ' kg jukow, z tego '),
+        K('prog', rx=r'BK nie uzywa; prog (\d+)%\)', lit=[' kg ponad 80% udzwigu (miejsce, ktorego BK nie uzywa; prog ', '%)']),
+    ], _extra_przyczyny, [
+        ('zakup przed celem / przy wyjezdzie', '{przed_celem}/{przy_wyjezdzie}'),
+        ('juki: kg surowcow / ponad 80%', '{kg}/{kg_ponad}'),
+        ('ruda z nadwyzka: wyj/kupily/brak miejsca', '{ruda_wyj}/{ruda_kupily}/{ruda_brak_miejsca}'),
+    ], 'surowce', 'CaravanBulk.cs', bezwar=True),
+    Temat('Karawany (kierunek)', 'Karawany (kierunek)', r'^dzien \d+ - wjazdy do ', [
+        K('miast_wjazdy', ' - wjazdy do ', wym=True, lit=[' - wjazdy do ', ' roznych miast; karawan w miastach ']),
+        K('w_miastach', '; karawan w miastach ', wym=True),
+        K('w_drodze', rx=r'karawan w miastach -?\d+, w drodze (-?\d+)', lit=[', w drodze ']),
+    ], _extra_kierunek, [
+        ('karawan w miastach / w drodze', '{w_miastach}/{w_drodze}'),
+        ('ruda: wjazdy (do braku) | wyjazdy (cel)', '{ruda_wj}({ruda_wj_brak})|{ruda_wyj}({ruda_wyj_brak})'),
+        ('ruda: dostawe dostalo miast | w jukach', '{ruda_dostalo}|{ruda_juki}'),
+    ], 'surowce', 'CaravanBulk.cs', bezwar=True),
     Temat('Warsztaty', 'Warsztaty', r'^dzien \d+', [
         K('wykonano', ' - wykonano ', wym=True),
         K('koszt', '], koszt '),
@@ -1127,6 +1475,44 @@ TEMATY = [
         ('odpuszczone: brak surowca | w robocie', '{brak_surowca} | {w_robocie}'),
         ('brak wg surowca: ruda/drewno/skora/len', '{bs_ruda}/{bs_drewno}/{bs_skora}/{bs_len}'),
     ], 'surowce', 'WorkshopLaw.cs'),
+    # ogniwo 116 (WorkshopTrade.Daily, zdarzenie DailyTickEvent): warsztaty towarowe w nowej monecie - utrzymanie i place do kas miast,
+    # wynik wedle typu, wyplaty, bankructwa, cena kupna (przyklad: Lannisport - zgloszenie Jeffa o piekarni)
+    Temat('Warsztaty towarowe', 'Warsztaty towarowe', r'^dzien \d+ \| warsztatow ', [
+        K('warsztatow', ' | warsztatow ', wym=True),
+        K('rozliczonych', ' (bez ukrytych rzemieslnikow), rozliczonych dzis '),
+        K('pracowalo', rx=r'rozliczonych dzis -?\d+, pracowalo (-?\d+)', lit=[', pracowalo ']),
+        K('cykli', ' (cykli towarowych '),
+        K('bez_kapitalu', '), bez kapitalu na utrzymanie '),
+        K('zysk', ' | wynik dnia po placach i utrzymaniu: zysk +'),
+        K('strata', ', strata -'),
+        K('wynik', rx=r', strata -?\d+, razem ([+-]?\d+)', lit=[', razem ']),
+        K('place', ' | do kas miast: place za cykle ', wym=True),
+        K('place_kapital', rx=r'place za cykle -?\d+ \(z kapitalu (-?\d+)', lit=[' (z kapitalu ']),
+        K('place_kiesa', rx=r'place za cykle -?\d+ \(z kapitalu -?\d+, z kiesy gracza (-?\d+)\)', lit=[', z kiesy gracza ']),
+        K('utrzymanie', rx=r'\), utrzymanie (-?\d+) \(z kapitalu', lit=['), utrzymanie ']),
+        K('utrzymanie_kiesa', rx=r'\), utrzymanie -?\d+ \(z kapitalu -?\d+, z kiesy gracza (-?\d+)\)', lit=[', z kiesy gracza ']),
+        K('sprzet', '), sprzet przy zmianie produkcji '),
+        K('niezaplacone', '; niezaplacone (pusty kapital) '),
+        K('wypl_notable', '(wyplata zysku wlascicielom, monopol korony): notable '),
+        K('wypl_lordowie', rx=r'monopol korony\): notable -?\d+, lordowie (-?\d+)', lit=[', lordowie ']),
+        K('wypl_gracz', rx=r'monopol korony\): notable -?\d+, lordowie -?\d+, gracz (-?\d+)', lit=[', gracz ']),
+        K('bankructwa', ' | bankructwa '),
+        K('bankr_wlozyli', ' (nowi wlasciciele wlozyli z wlasnych kies '),
+        K('bez_chetnego', '), bez chetnego z pieniedzmi '),
+        K('sprz_zaplacone', '; sprzedaz gracza notablom: zaplacone '),
+        K('sprz_zabraklo', ', zabraklo kupcowi '),
+        K('cena_med', ' | cena kupna dla gracza: mediana '),
+        K('cena_min', rx=r'dla gracza: mediana -?\d+, od (-?\d+) do', lit=[', od ', ' do ']),
+        K('cena_max', rx=r'dla gracza: mediana -?\d+, od -?\d+ do (-?\d+)', lit=[' do ']),
+        K('cena_n', rx=r' do -?\d+ \((\d+) warsztatow\)', lit=[' warsztatow)']),
+        K('utrzymanie_stawka', ' | zasady: utrzymanie ', 'float'),
+        K('potkniecia', rx=r'; potkniecia (-?\d+)\.?$', wym=True, lit=['; potkniecia ']),
+    ], _extra_warsztaty_tow, [
+        ('warsztatow / pracowalo (cykli)', '{warsztatow}/{pracowalo} ({cykli})'),
+        ('wynik dnia | do kas: place/utrzymanie', '{wynik:+}|{place}/{utrzymanie}'),
+        ('piekarnia: cena | zysk d | chleb x', '{piekarnia_cena}|{piekarnia_zysk}|{piekarnia_wyrob_x}'),
+        ('bankructwa/bez chetnego | potkniecia', '{bankructwa}/{bez_chetnego}|{potkniecia}'),
+    ], 'surowce', 'WorkshopTrade.cs', bezwar=True),
     Temat('Rynek surowcow', 'Rynek surowcow', r'^zapasy na targach miast', [], _extra_rynek_surowcow, [
         ('targi miast: ruda/drewno', '{iron}/{hardwood}'),
         ('targi miast: skora/skory surowe', '{leather}/{hides}'),
@@ -1976,6 +2362,10 @@ TEMATY = [
     Temat('Devastation', 'Devastation', None, [], None, [], 'ludzie', 'Devastation.cs', dzienny=False),
     Temat('Spustoszenie', 'Spustoszenie', None, [], None, [], 'ludzie', 'Devastation.cs', dzienny=False),
     Temat('WarLedger', 'WarLedger', None, [], None, [], 'ludzie', 'WarLedger.cs', dzienny=False),
+    # ogniwa 115, 116 i 119: linie startowe i jednorazowe (nowa kampania, latka modelu finansow rodu zakladana w kampanii)
+    Temat('RawPrice', 'RawPrice', None, [], None, [], 'surowce', 'RawPrice.cs', dzienny=False),
+    Temat('WorkshopTrade', 'WorkshopTrade', None, [], None, [], 'surowce', 'WorkshopTrade.cs', dzienny=False),
+    Temat('MarketCarts', 'MarketCarts', None, [], None, [], 'surowce', 'MarketCarts.cs', dzienny=False),
     Temat('Klimat', 'Klimat', None, [], None, [], 'dodatkowe', 'WesterosClimate.cs', dzienny=False),
 ]
 
@@ -2000,7 +2390,8 @@ for _t in TEMATY:
     TEMATY_WG_PREFIKSU[_t.prefiks].append(_t)
     TEMATY_WG_NAZWY[_t.nazwa] = _t
 
-# Ogniwa lancucha paczek (87c8e96 = wpis 102 w grze -> n102b-ksiega -> ... -> n109-ludzie-przyrost). Pola:
+# Ogniwa lancucha paczek W KOLEJNOSCI LANCUCHA (87c8e96 = wpis 102 -> n102b-ksiega -> ... -> n107 (w grze) -> n115 ... n119 ->
+# m108 ... m113; kolejnosc decyduje o "ogniwie w grze" i o alarmie "lancuch niespojny"). Pola:
 #   nr, opis, wzorzec linii startowej, tematy dzienne, czy linia startowa jest zawsze (104: tylko przy nowej kampanii),
 #   znak = (temat, kolumna): ogniwo widac takze po kolumnie cudzej linii dziennej (108: odcinek "hearth za ludzi dzis"),
 #   poznac = po czym poznac ogniwo w logu (do tabeli w naglowku), paczka = plik opisu w docs\paczki albo wpis CHANGELOG
@@ -2028,6 +2419,22 @@ OGNIWA = [
     ('107', 'zold i skarbiec', r'^SoldierPay: zold do obiegu', ['Zold'], True, None,
      'start "SoldierPay: zold do obiegu"; co dobe "Zold:" z "tarcza zoldu ... wlaczona" i "Korona: ... zwrot zoldu"',
      '107-zold-i-skarbiec.md'),
+    # grupa 2b TOWARY 2 (lancuch 07.10: 107 -> 115..119 -> 108..114 przeniesione na 119; docs\paczki\PRZEGLAD-ZLOZENIA-2026-10-07.txt)
+    ('115', 'cena od niedoboru', r'^RawPrice: cena surowcow od niedoboru', ['Ceny surowcow'], True, None,
+     'start "RawPrice: cena surowcow od niedoboru - stala wzoru ... (CZYNNA), popyt ... (CZYNNY)"; co dobe "Ceny surowcow:"',
+     '115-cena-od-niedoboru.md'),
+    ('116', 'warsztaty: moneta', r'^WorkshopTrade: warsztaty towarowe w nowej monecie', ['Warsztaty towarowe'], True, None,
+     'start "WorkshopTrade: warsztaty towarowe w nowej monecie CZYNNE - wpiete: ..."; co dobe "Warsztaty towarowe:"',
+     '116-warsztaty-w-nowej-monecie.md'),
+    ('117', 'karawany: ruda', r'^CaravanBulk: poprawka 115 - zakup przed wyborem celu', ['Karawany (przyczyny)', 'Karawany (kierunek)'],
+     True, None, 'start "CaravanBulk: poprawka 115 - zakup przed wyborem celu (BK BuyGoods): latka wpieta"; co dobe "Karawany '
+     '(przyczyny):" i "Karawany (kierunek):"', '117-karawany-ruda-dociera.md'),
+    ('118', 'towary BK: moneta', r'^HistoricalPrices: wartosc z definicji towarow BK', [], True, ('Ceny surowcow', 'def_kat'),
+     'start "HistoricalPrices: wartosc z definicji towarow BK (BKItems.InitializeTradeGood) - wpieta"; co dobe "Towary z wartoscia '
+     'z definicji przedmiotu" w "Ceny surowcow:"', '118-towary-w-nowej-monecie.md'),
+    ('119', 'wozy do miasta', r'^MarketCarts: ', ['Dowoz (wozy)'], True, None,
+     'start "MarketCarts: poprawka 119 - wozy wsi do najlepiej placacego miasta w zasiegu 250 (CZYNNE; ...)"; co dobe "Dowoz '
+     '(wozy):"', '119-wozy-do-najlepszego-miasta.md'),
     ('108', 'ludzie: jednostka', r'^PeopleUnit: ', [], True, ('Ludzie', 'hz_tabory'),
      'start "PeopleUnit: jednostka ludzi ... CZYNNA"; co dobe "hearth za ludzi dzis" w linii "Ludzie:"',
      '108-ludzie-jednostka.md'),
@@ -2051,8 +2458,8 @@ NR_OGNIW = [o[0] for o in OGNIWA]
 # grupy ogniw dla --test (nazwy robocze; grupy testowe Jeffa z numerami 1-5 sa nizej w GRUPY_GRY i maja opcje --grupa)
 GRUPY_TESTOWE = OrderedDict([
     ('dowoz', ['100', '101']), ('ksiegi', ['102', '102b']), ('surowce', ['102b', '103', '104', '105']),
-    ('pieniadz', ['106', '107']), ('ludzie', ['108', '109']), ('kasy', ['110', '111', '112']),
-    ('wszystkie', list(NR_OGNIW)),
+    ('pieniadz', ['106', '107']), ('towary2', ['115', '116', '117', '118', '119']), ('ludzie', ['108', '109']),
+    ('kasy', ['110', '111', '112']), ('wszystkie', list(NR_OGNIW)),
 ])
 # GRUPY TESTOWE W GRZE (decyzja Jeffa 06.10 "3 razy": testy grupami; docs\STAN-PRAC.md i sekcja test_groups przegladu
 # kolizji lancucha). Pola: nazwa, ogniwa, galaz DLL, kampania ('nowa' = wymagana, 'zalecana' = nowa zalecana, 'zapis' = ten
@@ -2071,25 +2478,38 @@ GRUPY_GRY = OrderedDict([
                    '2-3 doby to jednorazowa wyprzedaz zaleglego lupu band - nie brac ich do sredniej',
            'przypisanie': '"Paser" i pozycje paser / bandy w kasach miast = 106; "Zold", "Korona: zwrot zoldu", "zold '
                           'garnizonow", "sakiewki ludzi - zycie w miastach" = 107'}),
-    ('3', {'nazwa': 'LUDZIE', 'ogniwa': ['108', '109'], 'dll': 'n109-ludzie-przyrost', 'kampania': 'nowa',
+    # grupa 2b (noc 06/07.10): ogniwa 115-119 zlozone na n107, ida do gry PRZED grupami 3-5 (kolejka 108..114 przeniesiona na 119 -
+    # galezie m108..m114); numery 3-5 zostaja, bo tak nazywaja je STAN-PRAC i opisy paczek
+    ('2b', {'nazwa': 'TOWARY 2', 'ogniwa': ['115', '116', '117', '118', '119'], 'dll': 'n119-wozy-do-najlepszego-miasta',
+            'kampania': 'nowa', 'dob': (20, 20), 'bee': False,
+            'test': 'swiezy start gry, NOWA kampania (115, 116 i 118 przeliczaja pamiec rynku, kapital warsztatow i popyt tylko w sesji, '
+                    'ktora zalozyla kampanie), 20 dob; DLL Armoury-grupa-towary2.dll (md5 faade7bf...); GLOWNA LICZBA: "Ruda: miast bez '
+                    'towaru" w ostatniej dobie - dotad 74 -> 69, oczekiwane ok. 25-30, ponad 50 = ALARM',
+            'przypisanie': '"Ceny surowcow" (bez czesci o towarach z definicji), "RawPrice" = 115; "Warsztaty towarowe", "WorkshopTrade", '
+                           'pozycja "warsztaty towarowe" w kasach miast = 116; "Karawany (przyczyny)", "Karawany (kierunek)", "CaravanBulk: '
+                           'poprawka 115" = 117; "HistoricalPrices: wartosc z definicji / przelicznik popytu", "Towary z wartoscia z '
+                           'definicji" w "Ceny surowcow" = 118; "Dowoz (wozy)", "MarketCarts" = 119; "Ruda / Drewno: miast bez towaru" = '
+                           'wspolny skutek 115 + 117 + 119'}),
+    ('3', {'nazwa': 'LUDZIE', 'ogniwa': ['108', '109'], 'dll': 'm109-ludzie-przyrost', 'kampania': 'nowa',
            'dob': (15, 20), 'bee': True,
            'test': 'przed startem 13 kluczy BetterEconomy (tools\\bee\\zamknij-ujscia-bee.ps1 -NaSucho, potem naprawde); NOWA '
                    'kampania po swiezym starcie gry (siew puli wyrzutkow i kalibracja raz, przy zalozeniu), 15-20 dob',
            'przypisanie': '"hearth za ludzi dzis" i pula poczatkowa = 108; "przyrost naturalny" i stan miast = 109; RESZTA '
                           '+65..135 hearth = klucze BEE otwarte, -27..-33 = latki 108 nie dzialaja'}),
-    ('4', {'nazwa': 'KASY', 'ogniwa': ['110', '111', '112'], 'dll': 'n112-k7-utarg-wsi', 'kampania': 'zalecana',
+    ('4', {'nazwa': 'KASY', 'ogniwa': ['110', '111', '112'], 'dll': 'm112-k7-utarg-wsi', 'kampania': 'zalecana',
            'dob': (21, 30), 'bee': False,
            'test': 'NOWA kampania zalecana (jednorazowe przyciecie daru startowego kas: zamki ok. 5.09 mln, miasta ok. 13.98 '
                    'mln), 21-30 dob (alarm "do zapasu brakuje" i kiesy wsi licza sie w tygodniach)',
            'przypisanie': '"Kasy zamkow" i "danina podzamcza" = 110; "Kasy miast", "udzial korony", tarcza ZBEDNA = 111; '
                           '"Utarg wsi", "zywnosc kupiona we wsiach", "sakwy" = 112'}),
-    ('5', {'nazwa': 'SPUSTOSZENIE', 'ogniwa': ['113'], 'dll': 'n113-ludzie-spustoszenie', 'kampania': 'zalecana',
+    ('5', {'nazwa': 'SPUSTOSZENIE', 'ogniwa': ['113'], 'dll': 'm113-ludzie-spustoszenie', 'kampania': 'zalecana',
            'dob': (15, 20), 'bee': False,
            'test': 'NOWA kampania zalecana (konta uchodzcow od zera), 15-20 dob i co najmniej jeden zakonczony rabunek wsi',
            'przypisanie': '"spustoszenie dzis" w "Ludzie:", "Ludzie (spustoszenie)", 3 kolumny CSV, "ruch ludzi (..., '
                           'spustoszenie i powroty uchodzcow)" = 113'}),
 ])
-NAZWY_GRUP_GRY = {'towar': '1', 'towary': '1', 'pieniadz': '2', 'ludzie': '3', 'kasy': '4', 'spustoszenie': '5'}
+NAZWY_GRUP_GRY = {'towar': '1', 'towary': '1', 'pieniadz': '2', 'towary2': '2b', 'towary-2': '2b', 'towar2': '2b', 'ceny': '2b',
+                  'ludzie': '3', 'kasy': '4', 'spustoszenie': '5'}
 
 
 def grupa_ogniwa(nr):
@@ -2475,7 +2895,7 @@ def _rozdaj_tematy(ses, ws):
                 ses.uwagi.append('%s: agregacja doby %d nie powiodla sie (%s)' % (nazwa, bi + 1, type(e).__name__))
 
 
-RX_POTK = re.compile(r'[Pp]otkniecia[^.|]*')
+RX_POTK = re.compile(r'(?:[Pp]otkniecia|POTKNIECIA)[^.|]*')     # "| POTKNIECIA N" = "Dowoz (wozy):" (ogniwo 119)
 
 
 def _zbierz_bledy(ses):
@@ -2592,7 +3012,39 @@ def _zbierz_fakty(ses, ws):
         elif w.pref == 'MoneyLedger' and 'liczniki wpiete' in t:
             f['moneyledger'] = w
         elif w.pref == 'CaravanBulk':
-            f.setdefault('caravanbulk', w)
+            # ogniwo 117: druga linia startowa "CaravanBulk: poprawka 115 - ..." (roboczy numer w kodzie) - osobny fakt
+            if 'poprawka 115 - zakup przed wyborem celu' in t:
+                f.setdefault('caravanbulk_117', w)
+            else:
+                f.setdefault('caravanbulk', w)
+        elif w.pref == 'RawPrice':
+            # ogniwo 115: linia startowa (latki modeli) i przeliczenie pamieci rynku nowej kampanii
+            if 'cena surowcow od niedoboru' in t:
+                f.setdefault('rawprice', w)
+            elif t.startswith('RawPrice: nowa kampania - '):
+                f.setdefault('rawprice_seed', w)
+        elif w.pref == 'WorkshopTrade':
+            # ogniwo 116: linia startowa, latka modelu finansow rodu (w kampanii), kapital startowy nowej kampanii
+            if 'warsztaty towarowe w nowej monecie' in t:
+                f.setdefault('workshoptrade', w)
+            elif t.startswith('WorkshopTrade: latka modelu finansow rodu') or 'AddPlayerExpenseForWorkshops' in t:
+                f.setdefault('workshoptrade_latka', w)
+            elif t.startswith('WorkshopTrade: nowa kampania - '):
+                f.setdefault('workshoptrade_seed', w)
+            elif 'BRAK' in t:
+                f.setdefault('workshoptrade_brak', w)
+        elif w.pref == 'MarketCarts':
+            f.setdefault('marketcarts', w)
+        elif w.pref == 'HistoricalPrices':
+            # ogniwo 118 (linie przy starcie gry i po wejsciu do kampanii); "popyt miast przeliczony" bywa tez bez 118 (test 14:08)
+            if 'wartosc z definicji towarow BK' in t:
+                f.setdefault('hp_definicja', w)
+            elif 'popyt miast przeliczony na nowa monete' in t:
+                f.setdefault('hp_popyt', w)
+            elif 'przelicznik popytu od wartosci z definicji' in t:
+                f.setdefault('hp_przelicznik', w)
+            elif t.startswith('HistoricalPrices: UWAGA - ') and 'wartosc 0' in t:
+                f.setdefault('hp_uwaga0', w)
         elif w.pref == 'MineralOnce':
             f.setdefault('mineralonce', w)
         elif w.pref == 'OutlawLaw' and 'wpiete: ' in t:
@@ -2709,7 +3161,7 @@ def _alarmy(ses, ws):
         for w in ws:
             if w.blok is not None and w.pref in ('SoldierPay', 'MoneyLedger', 'CaravanBulk', 'MineralOnce', 'OutlawLaw',
                                                  'PeopleUnit', 'PopulationLaw', 'CastlePurse', 'TownPurse',
-                                                 'VillageTakings', 'Devastation'):
+                                                 'VillageTakings', 'Devastation', 'RawPrice', 'WorkshopTrade', 'MarketCarts'):
                 if status_linii(w.tresc) in ('BRAK', 'NIE wpieta'):
                     al('ALARM', 'linia %s w kampanii: %s' % (status_linii(w.tresc), wycinek(w.tresc, 105)), w.nr)
         st = ses.fakty.get('stale_skarbca')
@@ -3652,6 +4104,75 @@ def _alarmy(ses, ws):
             bi, p = stara[0]
             al('uwaga', 'Ludzie: przy czynnym spustoszeniu regula "powrot uchodzcow +0.5 hearth" objela %d wsi (doba %d; %d dob) '
                '- ma byc 0' % (p.get('uch_regula_wsi'), bi + 1, len(stara)), p.get('_nr'))
+
+    @regula
+    def r_towary2():
+        # ogniwa 115-119 (grupa 2b): reguly z "Po czym poznac w logu" docs\paczki\115..119 - tylko, gdy ich linie sa w logu
+        n = len(ses.pelne()) if ses.bloki else 0
+        ru = ses.ser('Ruda')
+        if (ma_ogniwo(ses, '119') or ma_ogniwo(ses, '117')) and ru and n >= TOWARY2_MIN_DOB:
+            d = ru[-1][1]
+            b = d.get('bez_towaru')
+            if b is not None and b > RUDA_BEZ_TOWARU_ALARM_2B:
+                al('ALARM', 'GLOWNA LICZBA grupy 2b: "Ruda: miast bez towaru" %d po %d dobach (prog %d; oczekiwane ok. 25-30, test 14:08: '
+                   '74 -> 69) - wozy i karawany nie dowoza rudy do miast bez rudy' % (b, n, RUDA_BEZ_TOWARU_ALARM_2B), d.get('_nr'))
+        wz = ses.ser('Dowoz (wozy)')
+        zle = [(bi, d) for bi, d in wz if (d.get('niezgodne') or 0) > 0]
+        if zle:
+            al('ALARM', 'Dowoz (wozy): "niezgodne" %d w %d dobach (ma byc 0) - korekta ceny ladunku nie dziala, ktos zmienia cene osady '
+               'w trakcie sprzedazy' % (sum(d.get('niezgodne') for _, d in zle), len(zle)), zle[0][1].get('_nr'))
+        ros = [(bi, d) for bi, d in wz if (d.get('cena_rosla') or 0) > 0]
+        if ros:
+            al('uwaga', 'Dowoz (wozy): "cena rosla" %d w %d dobach (ma byc 0)' % (sum(d.get('cena_rosla') for _, d in ros), len(ros)),
+               ros[0][1].get('_nr'))
+        pot = [(bi, d) for bi, d in wz if d.get('potkn')]
+        if pot:
+            al('ALARM', 'Dowoz (wozy): POTKNIECIA %d w %d dobach (wyjatek przy taborze; pierwszy z kazdego miejsca jest w ERROR)'
+               % (sum(d.get('potkn') for _, d in pot), len(pot)), pot[0][1].get('_nr'))
+        bl = [(bi, d) for bi, d in wz if d.get('cena_stan') == 'BRAK LATKI']
+        if bl:
+            al('ALARM', 'Dowoz (wozy): cena ladunku sztuka po sztuce - BRAK LATKI (%d dob): tabory dalej po cenie pierwszej sztuki za '
+               'caly ladunek' % len(bl), bl[0][1].get('_nr'))
+        wyl = [(bi, d) for bi, d in wz if d.get('wybor') != 'CZYNNY' or d.get('cena_stan') == 'WYLACZONA']
+        if wyl:
+            al('uwaga', 'Dowoz (wozy): wybor miasta albo cena ladunku WYLACZONE w ustawieniach (%d dob)' % len(wyl),
+               wyl[0][1].get('_nr'))
+        ms = _wart(wz, 'ms')
+        if ms and mediana(ms) > WOZY_MS_MAKS:
+            al('uwaga', 'Dowoz (wozy): wyceny wozow %s ms na dobe (mediana; prog %s, oczekiwane kilkadziesiat) - za drogo, zglosic'
+               % (skr(mediana(ms)), skr(WOZY_MS_MAKS)), wz[-1][1].get('_nr'))
+        ce = ses.ser('Ceny surowcow')
+        wyl = [(bi, d) for bi, d in ce if d.get('popyt_stan') != 'CZYNNY' or d.get('stala_stan') != 'CZYNNA']
+        if wyl:
+            al('uwaga', 'Ceny surowcow: popyt z prawdziwego zuzycia albo stala wzoru w nowej monecie wylaczone (%d dob) - ceny jak '
+               'przed ogniwem 115' % len(wyl), wyl[0][1].get('_nr'))
+        wt = ses.ser('Warsztaty towarowe')
+        pk = [(bi, d) for bi, d in wt if (d.get('potkniecia') or 0) > 0]
+        if pk:
+            al('ALARM', 'Warsztaty towarowe: potkniecia w %d dobach (np. %d)' % (len(pk), pk[0][1].get('potkniecia')),
+               pk[0][1].get('_nr'))
+        nz, nz_od = najdluzsza_seria([(d.get('niezaplacone') or 0) > 0 for _, d in wt])
+        if nz > 3:
+            al('uwaga', 'Warsztaty towarowe: "niezaplacone (pusty kapital)" > 0 przez %d dob z rzedu (od doby %d)'
+               % (nz, wt[nz_od][0] + 1), wt[nz_od][1].get('_nr'))
+        bc = [d.get('bez_chetnego') for _, d in wt]
+        rosnie, naj = 0, 0
+        for i in range(1, len(bc)):
+            if bc[i] is not None and bc[i - 1] is not None and bc[i] > bc[i - 1] > 0:
+                rosnie += 1
+                naj = max(naj, rosnie)
+            else:
+                rosnie = 0
+        if naj >= 3:
+            al('uwaga', 'Warsztaty towarowe: "bez chetnego z pieniedzmi" rosnie z doby na dobe (%d dob z rzedu, ostatnio %s) - notable nie '
+               'maja pieniedzy na przejecie warsztatow' % (naj + 1, skr(bc[-1])), wt[-1][1].get('_nr'))
+        bl = [(bi, d) for bi, d in ses.ser('Karawany (przyczyny)') if d.get('brak_latki')]
+        if bl:
+            al('ALARM', 'Karawany (przyczyny): BRAK latki BuyGoods (%d dob) - zakup surowcow przy wyjezdzie jak dotad (inna wersja BK)'
+               % len(bl), bl[0][1].get('_nr'))
+        w = ses.fakty.get('hp_uwaga0')
+        if w is not None and ma_ogniwo(ses, '118'):
+            al('uwaga', 'HistoricalPrices (118): %s' % wycinek(w.tresc[len('HistoricalPrices: '):], 100), w.nr)
 
     for f in reguly:
         try:
@@ -4877,8 +5398,533 @@ def _k113(K, ses):
                           skr(ost.get('razem_mln') or ost.get('ludnosc_mln'))), ost.get('_nr'))
 
 
+# ------------------------------------------------------------------------------------------------ ogniwa 115-119 (grupa 2b)
+def _bledy_z(ses, *fragmenty):
+    """Grupy bledow (ERROR / Exception / potkniecia), ktorych klucz albo przyklad zawiera ktorys fragment: [(klucz, ile, nr)]."""
+    return [(b[0], b[1], b[2]) for b in ses.bledy if any(x in b[0] or x in (b[3] or '') for x in fragmenty)]
+
+
+def _opis_bledow(bl):
+    return ('; '.join('%s x%d (linia %d)' % (obetnij(k, 60), ile, nr) for k, ile, nr in bl[:3])) if bl else 'brak'
+
+
+def _miast_swiata(ses):
+    """Liczba miast swiata z linii "Ruda: ... miast bez towaru N z M" (97 w ROT, gdy linii nie ma)."""
+    v = _wart(ses.ser('Ruda'), 'miast')
+    return mediana(v) if v else 97
+
+
+def _pierw_ost_txt(ser, klucz):
+    po = _pierw_ost(ser, klucz)
+    return ('%s -> %s' % (skr(po[0]), skr(po[1]))) if po else '-'
+
+
+def _k115(K, ses):
+    """Ogniwo 115 cena od niedoboru (docs\\paczki\\115-cena-od-niedoboru.md, "PO CZYM POZNAC W LOGU")."""
+    f = ses.fakty
+    w = _start(K, ses, '115', 'start: "RawPrice: cena surowcow od niedoboru - stala wzoru ... (CZYNNA), popyt ... (CZYNNY)"',
+               ['(CZYNNA)', '(CZYNNY)'], ('BRAK', 'NIE wpiet', 'NIECZYNN'))
+    if w is not None:
+        m = re.search(r'wpieta w (\d+) modelach cen .*?wpiety w (\d+) modelach ekonomii osad', w.tresc)
+        K.gdy(bool(m) and int(m.group(1)) > 0 and int(m.group(2)) > 0,
+              'latki weszly: modeli cen > 0 i modeli ekonomii osad > 0 (0 = latka nie weszla; u Jeffa po 2)',
+              ('modeli cen %s, modeli ekonomii osad %s' % m.groups()) if m else 'liczb modeli nie ma w linii', w.nr)
+    s = f.get('rawprice_seed')
+    co = 'nowa kampania: "RawPrice: nowa kampania - ... w 97 miastach (zamki bez zmian), ok. 46 kategorii (bez 118: 38); potkniecia 0"'
+    if s is not None:
+        m = re.search(r'na nowa monete w (\d+) miastach .*?, (\d+) kategorii \((\d+) pozycji\).*?; potkniecia (\d+)', s.tresc)
+        if m:
+            miast, kat, poz, potk = [int(x) for x in m.groups()]
+            K.gdy(miast >= 90 and potk == 0, co, '%d miast, %d kategorii (%d pozycji), potkniecia %d' % (miast, kat, poz, potk), s.nr)
+        else:
+            K.dodaj(UW, co, 'linia bez oczekiwanych liczb: ' + wycinek(s.tresc, 100), s.nr)
+    elif f.get('nowa_kampania'):
+        K.dodaj(UW, co, 'nowa kampania, a tej linii nie ma - pamiec rynku z tickow startowych zostala w starej monecie (ceny przez 2-3 '
+                        'tygodnie z mieszanki monet)')
+    else:
+        K.brak(co, 'wczytany zapis - linia jest tylko w sesji, ktora zalozyla kampanie')
+    ce = ses.ser('Ceny surowcow')
+    if not ce:
+        K.brak('co dobe linia "Ceny surowcow:"', 'nie ma jej w logu (pisze ja RawPrice.Daily po przeliczeniu cen historycznych)')
+        return
+    pelne = len(ses.pelne())
+    cz = [1 for _, d in ce if d.get('popyt_stan') == 'CZYNNY' and d.get('stala_stan') == 'CZYNNA']
+    K.gdy(len(ce) >= pelne - 1 and len(cz) == len(ce), 'co dobe "Ceny surowcow:" - popyt z prawdziwego zuzycia CZYNNY, stala wzoru CZYNNA',
+          '%d linii w %d dobach, obie czesci czynne w %d; model cen %s' % (len(ce), pelne, len(cz), ce[-1][1].get('model_cen')),
+          ce[-1][1].get('_nr'))
+    # ruda w miastach bez rudy: indeks na suficie gry (dopoki ponad polowa miast nie ma rudy - takze mediana)
+    miast = _miast_swiata(ses)
+    puste = [(bi, d) for bi, d in ce if (d.get('ruda_bez') or 0) > 0 and d.get('ruda_idx_max') is not None]
+    pol = [(bi, d) for bi, d in puste if d['ruda_bez'] > miast / 2.0]
+    co = 'ruda: indeks w miastach bez rudy ok. 10 (sufit) - max 10.00, mediana 10.00, dopoki wiekszosc miast nie ma rudy (dotad 1.50)'
+    if puste:
+        sufit = len([1 for _, d in puste if d['ruda_idx_max'] >= INDEKS_SUFIT])
+        med = len([1 for _, d in pol if (d.get('ruda_idx_med') or 0) >= INDEKS_SUFIT])
+        a, b = ce[0][1], ce[-1][1]
+        K.gdy(sufit >= 0.8 * len(puste) and (not pol or med >= 0.8 * len(pol)), co,
+              'max na suficie w %d z %d dob z pustymi miastami; mediana na suficie w %d z %d dob, gdy ponad polowa z %s miast bez rudy; '
+              'min/med/max 1. doba %s/%s/%s (bez rudy %s), ostatnia %s/%s/%s (bez rudy %s)'
+              % (sufit, len(puste), med, len(pol), skr(miast), skr(a.get('ruda_idx_min')), skr(a.get('ruda_idx_med')),
+                 skr(a.get('ruda_idx_max')), skr(a.get('ruda_bez')), skr(b.get('ruda_idx_min')), skr(b.get('ruda_idx_med')),
+                 skr(b.get('ruda_idx_max')), skr(b.get('ruda_bez'))), b.get('_nr'))
+    else:
+        K.brak(co, 'w zadnej dobie nie ma miasta bez rudy')
+    pl = _wart(ce, 'ruda_placa')
+    co = 'ruda: "bez towaru N miast - za pierwsza sztuke placa" ok. 37-40 d (dotad 10 d); "z nadwyzka ... sprzedaja po" 2-4 d'
+    if pl:
+        K.gdy(mediana(pl) >= CENA_RUDY_PUSTA_MIN, co, 'za pierwsza sztuke: mediana %s d; sprzedaja po: %s d'
+              % (_zakres(pl), _zakres(_wart(ce, 'ruda_sprzedaja'))), ce[-1][1].get('_nr'))
+    else:
+        K.brak(co, 'linie bez pozycji "za pierwsza sztuke placa" (w zadnej dobie nie ma miasta bez rudy)')
+    # popyt w danych rynku = mieszczanie + rzemioslo od pierwszej doby nowej kampanii (wczytany zapis: dochodzi wygladzaniem gry)
+    nowa = bool(f.get('nowa_kampania'))
+    bi, d = ce[0] if nowa else ce[-1]
+    dn, pm, pr, pg = d.get('ruda_popyt_dane'), d.get('ruda_popyt_m'), d.get('ruda_popyt_r'), d.get('ruda_popyt_gra')
+    co = ('ruda: "popyt dobowy miasta: mieszczan 0 d + rzemiosla 5.6 d, w danych rynku" ok. 5.6 d OD PIERWSZEJ DOBY nowej kampanii '
+          '("sam szacunek gry" 4 d)')
+    if dn is not None and pm is not None and pr is not None:
+        suma = pm + pr
+        K.gdy(abs(dn - suma) <= max(0.5, 0.2 * suma), co, '%s (doba %d): mieszczan %s + rzemiosla %s = %s d, w danych rynku %s d, sam '
+              'szacunek gry %s d' % ('pierwsza doba' if nowa else 'ostatnia doba - wczytany zapis, popyt dochodzi wygladzaniem gry', bi + 1,
+                                     skr(pm), skr(pr), skr(round(suma, 2)), skr(dn), skr(pg)), d.get('_nr'))
+    else:
+        K.brak(co, 'linia bez czesci "popyt dobowy miasta" dla rudy')
+    dm = _wart(ce, 'drewno_idx_med')
+    co = 'drewno: mediana indeksu ok. 0.8-1.1 (dotad 0.2-0.6), za pierwszy ladunek w pustym miescie ok. 39 d'
+    if dm:
+        K.gdy(mediana(dm) >= INDEKS_DREWNA_MIN, co, 'mediana indeksu po dobach %s; za pierwszy ladunek %s d; miast bez drewna %s'
+              % (_zakres(dm), _zakres(_wart(ce, 'drewno_placa')), _pierw_ost_txt(ce, 'drewno_bez')), ce[-1][1].get('_nr'))
+    else:
+        K.brak(co, 'linie bez drewna')
+    wm = _wart(ce, 'welna_idx_med')
+    co = ('welna: mediana indeksu 0.10-0.3 (polki pelne welny), max 0.8-10 tylko w miastach z tkalnia; pierwsza sztuka w pustym '
+          'miescie bez tkalni ok. 81 d')
+    if wm:
+        K.gdy(mediana(wm) <= INDEKS_WELNY_MAKS, co, 'mediana indeksu %s, max %s; za pierwsza sztuke %s d'
+              % (_zakres(wm), _zakres(_wart(ce, 'welna_idx_max')), _zakres(_wart(ce, 'welna_placa'))), ce[-1][1].get('_nr'))
+    else:
+        K.brak(co, 'linie bez welny')
+    smax, pmax = _wart(ce, 'inne_salt_max'), _wart(ce, 'inne_beer_max')
+    co = '"Inne przeliczone towary": sol i piwo max 10.00 (dotad 2.54 i 3.74 - stala wzoru w starej monecie)'
+    if smax and pmax:
+        K.gdy(max(smax) >= INDEKS_SUFIT and max(pmax) >= INDEKS_SUFIT, co, 'najwyzszy max po dobach: sol %s, piwo %s; mediana indeksu '
+              'zboza %s' % (skr(max(smax)), skr(max(pmax)), _zakres(_wart(ce, 'inne_grain_med'))), ce[-1][1].get('_nr'))
+    else:
+        K.brak(co, 'linie bez czesci "Inne przeliczone towary" (grain, salt, beer)')
+    st = ses.ser('Karawany (stan)')
+    rc = _wart(st, 'ruda_cena')
+    co = ('"Karawany (stan): ruda ... cena zbytu" ok. 15-25 d (dotad 29.9 -> 10.4) i nie spada sama z doby na dobe; drewno 8-12 d '
+          '(dotad 1.3); welna wyraznie ponizej 372 d')
+    if rc:
+        med = mediana(rc)
+        dc, wc = _wart(st, 'drewno_cena'), _wart(st, 'welna_cena')
+        K.gdy(CENA_ZBYTU_RUDY_2B[0] <= med <= CENA_ZBYTU_RUDY_2B[1] and rc[0] <= 1.5 * med
+              and (not dc or mediana(dc) >= CENA_ZBYTU_DREWNA_MIN_2B) and (not wc or mediana(wc) < CENA_ZBYTU_WELNY_MAKS_2B), co,
+              'ruda %s -> %s d (mediana %s); drewno: mediana %s d; welna: mediana %s d'
+              % (skr(rc[0]), skr(rc[-1]), skr(med), skr(mediana(dc)) if dc else '-', skr(mediana(wc)) if wc else '-'), st[-1][1].get('_nr'))
+    else:
+        K.brak(co, 'linie "Karawany (stan):" bez ceny zbytu rudy')
+    kar = ses.ser('Karawany')
+    zr, zd = _wart(kar, 'zysk_ruda_kg'), _wart(kar, 'zysk_drewno_kg')
+    co = '"Karawany: oczekiwany zysk ... na kilogram": ruda ok. 0.15 (dotad 0.08), drewno ok. 0.08 (dotad 0.003); drewno wsrod kupionych'
+    if zr or zd:
+        kd = sum(_wart(kar, 'kup_drewno'))
+        K.gdy(bool(zr) and mediana(zr) >= ZYSK_RUDY_KG_MIN and bool(zd) and mediana(zd) >= ZYSK_DREWNA_KG_MIN and kd > 0, co,
+              'ruda: mediana %s d/kg (%d dob z zakupem rudy); drewno: mediana %s d/kg (%d dob); kupione drewno razem %s ladunkow'
+              % (skr(mediana(zr)) if zr else '-', len(zr), skr(mediana(zd)) if zd else '-', len(zd), skr(kd)), kar[-1][1].get('_nr'))
+    else:
+        K.brak(co, 'linie "Karawany:" bez zakupow rudy i drewna')
+    rb = ses.ser('Rynek broni')
+    idr = _wart(rb, 'idx_drewno_med')
+    co = '"Rynek broni: indeks drewna" mediana ok. 1.0-1.25 (dotad 0.58 w ostatniej dobie)'
+    if idr:
+        K.gdy(idr[-1] >= INDEKS_BRONI_DREWNA_MIN, co, 'ostatnia doba %s, po dobach %s; indeks rudy %s'
+              % (skr(idr[-1]), _zakres(idr), _zakres(_wart(rb, 'idx_ruda_med'))), rb[-1][1].get('_nr'))
+    else:
+        K.brak(co, 'nie ma linii "Rynek broni:" z indeksem drewna')
+    dr = [(bi, d) for bi, d in ses.ser('Drewno') if bi > 0]
+    if dr:
+        K.dodaj(OK, 'pomiar: "Drewno: zuzycie ... budowy" wyraznie mniej ladunkow (dotad mediana 1958, pod koniec 2.3-2.4 tys.) przy '
+                    'podobnych "Budowy oplacone: materialy z targow" w denarach; zapas miast rosnie, "bez wyjasnienia" (dosypka RBL) maleje',
+                'budowy: mediana %s ladunkow; materialy z targow: mediana %s d; zapas drewna w miastach %s; bez wyjasnienia: mediana %s '
+                '(dotad 2055)' % (_zakres(_wart(dr, 'budowy')), _zakres(_wart(ses.ser('Budowy oplacone'), 'materialy')),
+                                  _pierw_ost_txt(dr, 'miasta'), _zakres(_wart(dr, 'bez_wyjasnienia'))), dr[-1][1].get('_nr'))
+    wr = ses.ser('Warsztaty')
+    bz = _wart(wr, 'bez_zysku')
+    co = '"Warsztaty: odpuszczone: bez zysku" moze wzrosnac o kilkadziesiat cykli (setki = drewno na suficie w wielu miastach)'
+    if bz:
+        K.gdy(mediana(bz) <= WARSZTATY_BEZ_ZYSKU_MAKS, co, 'bez zysku: mediana %s na dobe (dotad 32); koszt: mediana %s, wykonano: mediana %s '
+              'szt.' % (_zakres(bz), skr(mediana(_wart(wr, 'koszt'))), skr(mediana(_wart(wr, 'wykonano')))), wr[-1][1].get('_nr'))
+    bl = _bledy_z(ses, 'RawPrice.')
+    K.gdy(not bl, 'bez ERROR "RawPrice." (blad = wycena wraca do wzoru gry, jeden wpis na kampanie)', _opis_bledow(bl),
+          bl[0][2] if bl else None)
+    prz, rs, ps = ses.ser('Przeplywy osad'), ses.ser('Rynek surowcow'), ses.ser('Pieniadz swiata')
+    K.dodaj(OK, 'pomiar (do obserwacji): "Przeplywy osad: miasta zaplacily" (spadek o kilka % - welna), "Rynek surowcow: wool" na polkach, '
+                '"Kasy miast"', 'miasta zaplacily taborom: mediana %s (dotad 380.0k); welna na polkach miast %s (dotad 660 -> 4094); '
+                'kasy miast %s'
+            % (skr(mediana(_wart(prz, 'miasta_zaplacily'))), _pierw_ost_txt(rs, 'wool'), _pierw_ost_txt(ps, 'kasy_miast')),
+            ce[-1][1].get('_nr'))
+
+
+def _k116(K, ses):
+    """Ogniwo 116 warsztaty towarowe w nowej monecie (docs\\paczki\\116-warsztaty-w-nowej-monecie.md, "Po czym poznac w logu")."""
+    f = ses.fakty
+    w = _start(K, ses, '116', 'start: "WorkshopTrade: warsztaty towarowe w nowej monecie CZYNNE - wpiete: ...; stala 200 podmieniona w 2 z 2 '
+                              'metod" (bez "BRAK")', ['CZYNNE', 'podmieniona w 2 z 2 metod'], ('BRAK', 'NIE wpiet', 'NIECZYNN'))
+    if w is not None:
+        m = re.search(r' - wpiete: (.*?); stala 200', w.tresc)
+        wp = [x for x in m.group(1).split(', ') if x.strip() and x.strip() != 'nic'] if m else []
+        K.gdy(len(wp) == 15, 'start: wpiete wszystkie 15 latek (prog, place, wynik doby, wydatek, kapital, sprzedaz, ceny, koszt sprzetu)',
+              'wpietych %d z 15%s' % (len(wp), ('; ' + ', '.join(wp[:4]) + ' ...') if wp else ''), w.nr)
+    la = f.get('workshoptrade_latka')
+    co = 'po wejsciu do kampanii: "WorkshopTrade: latka modelu finansow rodu (zakladana w kampanii) - drugi pobor wydatku ... wylaczony"'
+    if la is not None:
+        K.gdy('BRAK' not in la.tresc and 'wylaczony' in la.tresc, co, wycinek(la.tresc, 110), la.nr)
+    elif ma_ogniwo(ses, '116') and ses.bloki:
+        K.dodaj(UW, co, 'tej linii nie ma - wydatek warsztatu gracza moze schodzic dwa razy')
+    else:
+        K.brak(co, 'w logu nie ma kampanii')
+    s = f.get('workshoptrade_seed')
+    co = ('nowa kampania: "WorkshopTrade: nowa kampania - kapital startowy wedle cen nowej monety: sprawdzono 291 warsztatow, poprawiono '
+          'ok. 14 (velvet_weavery 2000 -> 10000), kapital warsztatow +112000"')
+    if s is not None:
+        m = re.search(r'sprawdzono (\d+) warsztatow, poprawiono (\d+)(?: \((.*?)\))?, kapital warsztatow ([+-]?\d+)', s.tresc)
+        if m:
+            K.gdy(int(m.group(1)) >= WARSZTATY_TOW_MIN, co, 'sprawdzono %s, poprawiono %s (%s), kapital warsztatow %s'
+                  % (m.group(1), m.group(2), obetnij(m.group(3) or '-', 50), m.group(4)), s.nr)
+        else:
+            K.dodaj(UW, co, 'linia bez oczekiwanych liczb: ' + wycinek(s.tresc, 100), s.nr)
+    elif f.get('nowa_kampania'):
+        K.dodaj(UW, co, 'nowa kampania, a tej linii nie ma - kapital startowy tkalni aksamitu zostal w starej monecie')
+    else:
+        K.brak(co, 'wczytany zapis - linia jest tylko w sesji, ktora zalozyla kampanie')
+    wt = ses.ser('Warsztaty towarowe')
+    if not wt:
+        K.brak('co dobe linia "Warsztaty towarowe:"', 'nie ma jej w logu')
+        return
+    pelne = len(ses.pelne())
+    n, r = _wart(wt, 'warsztatow'), _wart(wt, 'rozliczonych')
+    K.gdy(len(wt) >= pelne - 1 and n and mediana(n) >= WARSZTATY_TOW_MIN and r and mediana(r) >= 0.9 * mediana(n),
+          'co dobe "Warsztaty towarowe:" - warsztatow ok. 291 (bez ukrytych rzemieslnikow), "rozliczonych dzis" ok. tyle samo',
+          '%d linii w %d dobach; warsztatow %s, rozliczonych %s; pracowalo %s (cykli %s)'
+          % (len(wt), pelne, _zakres(n), _zakres(r), _zakres(_wart(wt, 'pracowalo')), _zakres(_wart(wt, 'cykli'))), wt[-1][1].get('_nr'))
+    bp = [(bi, d.get('typ_bakery_prac'), d.get('typ_bakery_n')) for bi, d in wt if d.get('typ_bakery_prac') is not None]
+    co = 'piekarnie pracuja od pierwszej doby ("wedle typu: bakery 76 (pracowalo X" > 0)'
+    if bp:
+        K.gdy(bp[0][1] > 0 and mediana([x[1] for x in bp]) > 0, co, 'bakery: 1. doba pracowalo %s z %s, potem mediana %s; d na warsztat %s'
+              % (skr(bp[0][1]), skr(bp[0][2]), _zakres([x[1] for x in bp]), _zakres(_wart(wt, 'typ_bakery_dnw'))), wt[-1][1].get('_nr'))
+    else:
+        K.brak(co, 'w linii "wedle typu" nie ma piekarni (bakery)')
+    pk = [(bi, d) for bi, d in wt if d.get('piekarnia_cena') is not None]
+    co = ('piekarnia: "d na warsztat" 16-50 przy "wyrob bread x1-2" albo 150-400 przy x5-10; cena w przykladzie miasta (Lannisport) '
+          '13-116 tys. przy ok. 20 chlebach dziennie (ponad %s = chleba naprawde brakuje)' % skr(PIEKARNIA_CENA_MAKS))
+    if pk:
+        bi, d = pk[-1]
+        x, dnw = d.get('piekarnia_wyrob_x'), wt[-1][1].get('typ_bakery_dnw')
+        zgodnie = ''
+        if isinstance(x, (int, float)) and isinstance(dnw, (int, float)):
+            spod = (16, 50) if x <= 2.0 else ((150, 400) if x >= 5.0 else (16, 400))
+            zgodnie = '; zysk %s d na warsztat przy chlebie x%s - %s z rachunkiem paczki (%d-%d)' % (
+                skr(dnw), skr(x), 'zgodnie' if spod[0] <= dnw <= spod[1] else 'INACZEJ niz', spod[0], spod[1])
+        K.gdy(d['piekarnia_cena'] <= PIEKARNIA_CENA_MAKS and (x is None or x < INDEKS_SUFIT), co,
+              '%s (dobrobyt %s), ostatnia doba: piekarnia %s (zysk %s d na dobe ze sredniej %s dob, kapital %s; wyrob %s x%s, wsad x%s); '
+              'w szeregu cena %s%s' % (d.get('przyklad_miasto'), skr(d.get('przyklad_dobrobyt')), skr(d['piekarnia_cena']),
+                                       skr(d.get('piekarnia_zysk')), skr(d.get('piekarnia_dob')), skr(d.get('piekarnia_kapital')),
+                                       d.get('piekarnia_wyrob') or '?', skr(x), skr(d.get('piekarnia_wsad_x')),
+                                       _zakres(_wart(pk, 'piekarnia_cena')), zgodnie), d.get('_nr'))
+    else:
+        K.brak(co, 'przyklad miasta w "Warsztaty towarowe:" bez piekarni')
+    pod = _wart(wt, 'podatek_max')
+    co = '"podatek gracza 0%" w przykladzie miasta (u Jeffa czynny model warsztatow gry - rody nie placa podatku od warsztatow)'
+    if pod:
+        K.gdy(max(pod) == 0, co, 'najwyzszy podatek gracza w przykladach: %s%%' % skr(max(pod)), wt[-1][1].get('_nr'))
+    else:
+        K.brak(co, 'linie bez przykladu miasta')
+    ps = ses.ser('Pieniadz swiata')
+    kap, kzm = _wart(ps, 'warsztaty'), _wart(ps, 'warsztaty_zm')
+    co = ('"Pieniadz swiata: kapital warsztatow" przestaje tracic ok. 29 tys. dziennie w nicosc (nowa kampania: start ok. 2.4 mln; dotad '
+          '4.1 mln i zmiana dobowa -17.6 tys.)')
+    if kap:
+        ok = (not kzm or mediana(kzm) >= KAPITAL_WARSZTATOW_ZM_MIN) and (
+            not ses.fakty.get('nowa_kampania') or KAPITAL_WARSZTATOW_START[0] <= kap[0] <= KAPITAL_WARSZTATOW_START[1])
+        K.gdy(ok, co, 'kapital warsztatow %s -> %s; zmiana dobowa: mediana %s' % (skr(kap[0]), skr(kap[-1]), _zakres(kzm)),
+              ps[-1][1].get('_nr'))
+    else:
+        K.brak(co, 'nie ma linii "Pieniadz swiata:" z kapitalem warsztatow')
+    km = ses.ser('Przeplywy osad (kasy miast)')
+    wv = _wart(km, 'warsztaty_tow')
+    co = '"Przeplywy osad (kasy miast)": nowa pozycja "warsztaty towarowe - place i utrzymanie z kapitalu warsztatow +..."'
+    if km:
+        K.gdy(len(wv) >= len(km) - 1 and bool(wv) and mediana(wv) > 0, co, 'pozycja w %d z %d dob, mediana %s (place %s, utrzymanie %s)'
+              % (len(wv), len(km), _zakres(wv), skr(mediana(_wart(km, 'warsztaty_tow_place'))),
+                 skr(mediana(_wart(km, 'warsztaty_tow_utrz')))), km[-1][1].get('_nr'))
+    else:
+        K.brak(co, 'nie ma linii "Przeplywy osad (kasy miast):"')
+    ut = [(d.get('utrzymanie'), d.get('warsztatow'), d.get('utrzymanie_stawka')) for _, d in wt]
+    ut = [a / (b * c) for a, b, c in ut if isinstance(a, (int, float)) and b and c]
+    co = 'do kas miast: utrzymanie ok. 4 d x liczba warsztatow (291 x 4 = 1164 na dobe)'
+    if ut:
+        K.gdy(0.85 <= mediana(ut) <= 1.05, co, 'utrzymanie wobec stawka x warsztatow: mediana %s; utrzymanie %s, place za cykle %s na dobe'
+              % (_zakres([round(x, 2) for x in ut]), _zakres(_wart(wt, 'utrzymanie')), _zakres(_wart(wt, 'place'))), wt[-1][1].get('_nr'))
+    potk = sum(_wart(wt, 'potkniecia'))
+    bl = _bledy_z(ses, 'WorkshopTrade')
+    nz, _ = najdluzsza_seria([(d.get('niezaplacone') or 0) > 0 for _, d in wt])
+    bc = _wart(wt, 'bez_chetnego')
+    K.gdy(potk == 0 and not bl and nz <= 3 and not (len(bc) >= 4 and bc[-1] > bc[0] > 0),
+          'sygnaly bledu: potkniecia 0, ERROR "WorkshopTrade." brak, "niezaplacone" nie stale > 0, "bez chetnego z pieniedzmi" nie rosnie',
+          'potkniecia %d; bledy: %s; niezaplacone > 0 najdluzej %d dob z rzedu; bez chetnego %s; bankructwa razem %s'
+          % (potk, _opis_bledow(bl), nz, _pierw_ost_txt(wt, 'bez_chetnego'), skr(sum(_wart(wt, 'bankructwa')))), wt[-1][1].get('_nr'))
+    K.dodaj(OK, 'pomiar: wynik dnia warsztatow, cena kupna dla gracza (mediana, od-do), wyplaty wlascicielom',
+            'wynik dnia: mediana %s; cena kupna: mediana %s (ostatnio od %s do %s); wyplaty notablom %s, lordom %s na dobe'
+            % (_zakres(_wart(wt, 'wynik')), _zakres(_wart(wt, 'cena_med')), skr(wt[-1][1].get('cena_min')), skr(wt[-1][1].get('cena_max')),
+               _zakres(_wart(wt, 'wypl_notable')), _zakres(_wart(wt, 'wypl_lordowie'))), wt[-1][1].get('_nr'))
+
+
+def _k117(K, ses):
+    """Ogniwo 117 karawany: ruda dociera (docs\\paczki\\117-karawany-ruda-dociera.md, "Po czym poznac w logu")."""
+    _start(K, ses, '117', 'start: druga linia "CaravanBulk: poprawka 115 - zakup przed wyborem celu (BK BuyGoods): latka wpieta; juki na '
+                          'surowce do 100% udzwigu"', ['latka wpieta', 'do 100% udzwigu'], ('BRAK', 'NIE wpiet', 'wylaczone w ustawieniach'))
+    pr, kr, kar = ses.ser('Karawany (przyczyny)'), ses.ser('Karawany (kierunek)'), ses.ser('Karawany')
+    pelne = len(ses.pelne())
+    if not pr or not kr:
+        K.brak('co dobe linie "Karawany (przyczyny):" i "Karawany (kierunek):"', 'nie ma ich w logu')
+        return
+    bl = [1 for _, d in pr if d.get('brak_latki')]
+    K.gdy(len(pr) >= pelne - 1 and len(kr) >= pelne - 1 and not bl,
+          'co dobe "Karawany (przyczyny):" i "Karawany (kierunek):", bez "BRAK latki BuyGoods"',
+          '"(przyczyny)" %d, "(kierunek)" %d linii w %d dobach; BRAK latki w %d' % (len(pr), len(kr), pelne, len(bl)),
+          pr[-1][1].get('_nr'))
+    przed, przy = sum(_wart(pr, 'przed_celem')), sum(_wart(pr, 'przy_wyjezdzie'))
+    zak = sum(_wart(kar, 'z_zakupem'))
+    K.gdy((przed + przy) > 0 and 100.0 * przy / (przed + przy) <= KARAWANY_PRZY_WYJEZDZIE_PROC,
+          'zakup przed wyborem celu N prawie rowny liczbie wyjazdow z zakupem, "przy wyjezdzie M" bliskie 0',
+          'przed celem %s, przy wyjezdzie %s wizyt w %d dobach (%s%%); wyjazdow z zakupem ("Karawany:") %s'
+          % (skr(przed), skr(przy), len(pr), skr(round(100.0 * przy / (przed + przy), 1)) if (przed + przy) else '-', skr(zak)),
+          pr[-1][1].get('_nr'))
+    kp = [(bi, d.get('kg_ponad')) for bi, d in pr if d.get('kg_ponad') is not None]
+    K.gdy(bool(kp) and len([1 for _, v in kp if v > 0]) >= 0.5 * len(kp), '"surowce zajely X kg jukow, z tego Y kg ponad 80% udzwigu" - Y '
+          'wyraznie > 0', 'Y > 0 w %d z %d dob; Y: mediana %s kg, X: mediana %s kg; prog %s%%'
+          % (len([1 for _, v in kp if v > 0]), len(kp), _zakres(_wart(pr, 'kg_ponad')), _zakres(_wart(pr, 'kg')),
+             skr(pr[-1][1].get('prog'))), pr[-1][1].get('_nr'))
+    bm, kru, sru = _wart(kar, 'odp_brak_miejsca'), _wart(kar, 'kup_ruda'), _wart(kar, 'sprz_ruda')
+    if kar:
+        K.gdy(bool(bm) and mediana(bm) <= KARAWANY_BRAK_MIEJSCA_2B, '"zakup odpuszczony: brak miejsca w jukach" z ok. 70 do kilku dziennie',
+              'mediana %s na dobe (dotad 37, pod koniec 72)' % _zakres(bm), kar[-1][1].get('_nr'))
+        K.gdy(bool(kru) and mediana(kru) >= KARAWANY_KUP_RUDY_2B, '"kupione z nadwyzek: ruda" z ok. 19 do ok. 35-55 dziennie',
+              'mediana %s ladunkow na dobe (dotad 10), razem %s' % (_zakres(kru), skr(sum(kru))), kar[-1][1].get('_nr'))
+        K.gdy(bool(sru) and mediana(sru) >= KARAWANY_SPRZ_RUDY_2B, '"sprzedane miastom z brakiem: ruda" z ok. 4 do ok. 10-25 dziennie',
+              'mediana %s ladunkow na dobe (dotad 1), razem %s' % (_zakres(sru), skr(sum(sru))), kar[-1][1].get('_nr'))
+    e, fb = sum(_wart(kr, 'ruda_wyj')), sum(_wart(kr, 'ruda_wyj_brak'))
+    if e:
+        u = fb / float(e)
+        obraz = 'ROZPROSZONY (karawany wioza rude tam, gdzie brakuje)' if u >= 0.5 else (
+            'SZYNY (rude zostawiaja tam, dokad jada po inne towary - nastepny krok to wozy wsi gorniczych, nie karawany)' if u < 0.25
+            else 'posredni')
+        K.dodaj(OK, 'pomiar: obraz ruchu rudy - "wyjazdy E, w tym z celem w miescie z brakiem F": F >= polowy E = rozproszony, F < 1/4 E = '
+                    'szyny', 'F %s z E %s (%s%%) = %s; wjazdy z ruda do miasta z brakiem %s z %s, dostawe dostalo miast: mediana %s'
+                % (skr(fb), skr(e), skr(round(100.0 * u, 1)), obraz, skr(sum(_wart(kr, 'ruda_wj_brak'))), skr(sum(_wart(kr, 'ruda_wj'))),
+                   _zakres(_wart(kr, 'ruda_dostalo'))), kr[-1][1].get('_nr'))
+    else:
+        K.brak('pomiar: obraz ruchu rudy (szyny / rozproszony)', 'w liniach "Karawany (kierunek):" nie ma wyjazdow z ruda')
+    st = ses.ser('Karawany (stan)')
+    po = _pierw_ost(st, 'ruda_bez')
+    if po:
+        K.dodaj(OK, 'pomiar: "Karawany (stan): ruda: bez towaru" - same karawany: ok. 40-60 po 20 dobach (zamiast 69); ponizej 20 to zadanie '
+                    'wozow wsi (119)', '%s -> %s miast (doby %d-%d); w jukach karawan %s -> %s ladunkow rudy'
+                % (po[0], po[1], po[2], po[3], skr(st[0][1].get('ruda_juki')), skr(st[-1][1].get('ruda_juki'))), st[-1][1].get('_nr'))
+    wj, wm = _wart(kar, 'wjazdy'), _wart(kr, 'w_miastach')
+    if wj:
+        rosnie = len(wm) >= 2 and wm[-1] > 1.2 * max(1, wm[0])
+        K.gdy(mediana(wj) >= KARAWANY_WJAZDY_MIN_2B or not rosnie, '"wjazdy karawan do miast" (dotad ok. 85-90 na dobe) - wyraznie mniej przy '
+              'rosnacym "karawan w miastach" = karawany przeciazone (CaravanBulkFillLimit na 0.8)',
+              'wjazdy: mediana %s; karawan w miastach %s, w drodze %s' % (_zakres(wj), _pierw_ost_txt(kr, 'w_miastach'),
+                                                                        _pierw_ost_txt(kr, 'w_drodze')), kar[-1][1].get('_nr'))
+    bl = _bledy_z(ses, 'CaravanBulk')
+    K.gdy(not bl, 'bez ERROR "CaravanBulk." (BuyGoods, rozkazy BK)', _opis_bledow(bl), bl[0][2] if bl else None)
+
+
+def _k118(K, ses):
+    """Ogniwo 118 towary BK w nowej monecie (docs\\paczki\\118-towary-w-nowej-monecie.md, "Po czym poznac w logu")."""
+    f = ses.fakty
+    _start(K, ses, '118', 'start: "HistoricalPrices: wartosc z definicji towarow BK (BKItems.InitializeTradeGood) - wpieta (przed latkami '
+                          'innych modow)"', ['wpieta'], ('BRAK', 'NIE wpiet'))
+    w = f.get('hp_popyt')
+    co = ('"popyt miast przeliczony na nowa monete (CZYNNE) w 72 kategoriach" z "bread /3.3, mead /12, ..." (test 14:08: 64 kategorie, bez '
+          'chleba, mead /0.1)')
+    if w is not None:
+        m = re.search(r'\((\w+)\) w (\d+) kategoriach: (.*)$', w.tresc)
+        prz = dict((a, _liczba(b)) for a, b in re.findall(r'(\S+) /(\d+(?:\.\d+)?)', m.group(3))) if m else {}
+        n = int(m.group(2)) if m else 0
+        mead = prz.get('mead')
+        K.gdy(bool(m) and m.group(1) == 'CZYNNE' and 'bread' in prz and isinstance(mead, (int, float)) and mead >= 1.0, co,
+              '%s w %d kategoriach; bread /%s, mead /%s, Eggs /%s, fur /%s, gems /%s' % (m.group(1) if m else '?', n, skr(prz.get('bread')),
+                                                                                   skr(mead), skr(prz.get('Eggs')), skr(prz.get('fur')),
+                                                                                   skr(prz.get('gems'))), w.nr)
+    else:
+        K.brak(co, 'nie ma linii "HistoricalPrices: popyt miast przeliczony na nowa monete"')
+    w = f.get('hp_przelicznik')
+    co = '"przelicznik popytu od wartosci z definicji przedmiotu CZYNNY (...); wziete z definicji 18 [...] w 15 kategoriach"'
+    if w is not None:
+        m = re.search(r'wziete z definicji (\d+) \[.*\] w (\d+) kategoriach', w.tresc)
+        K.gdy('przedmiotu CZYNNY' in w.tresc and bool(m) and int(m.group(1)) > 0, co,
+              ('wziete z definicji %s w %s kategoriach' % m.groups()) if m else wycinek(w.tresc, 110), w.nr)
+    else:
+        K.brak(co, 'nie ma tej linii (pisze ja HistoricalPrices.Apply po wejsciu do kampanii)')
+    w = f.get('hp_uwaga0')
+    K.gdy(w is None, 'BRAK linii "HistoricalPrices: UWAGA - ... przeliczonych przedmiotow ma wartosc 0"',
+          wycinek(w.tresc, 110) if w is not None else 'takiej linii nie ma', w.nr if w is not None else None)
+    s = f.get('rawprice_seed')
+    if s is not None:
+        m = re.search(r', (\d+) kategorii \(', s.tresc)
+        K.gdy(bool(m) and int(m.group(1)) >= 44, 'nowa kampania: "RawPrice: nowa kampania - ... ok. 46 kategorii" (bylo 38)',
+              ('%s kategorii' % m.group(1)) if m else wycinek(s.tresc, 100), s.nr)
+    ce = ses.ser('Ceny surowcow')
+    dk = [(bi, d) for bi, d in ce if d.get('def_kat') is not None]
+    co = 'co dobe w "Ceny surowcow:" czesc "Towary z wartoscia z definicji przedmiotu" (chleb, ciasta, miod, futro, zloto...)'
+    if not dk:
+        K.brak(co, 'linie "Ceny surowcow:" bez tej czesci' if ce else 'nie ma linii "Ceny surowcow:"')
+        return
+    K.gdy(len(dk) >= len(ce) - 1 and all((d.get('def_zle') or 0) == 0 for _, d in dk), co,
+          'czesc jest w %d z %d dob; kategorii %s; bez przelicznika %s; nierozpoznanych pozycji %s'
+          % (len(dk), len(ce), _zakres(_wart(dk, 'def_kat')), _zakres(_wart(dk, 'def_bez_przel')), skr(sum(_wart(dk, 'def_zle')))),
+          dk[-1][1].get('_nr'))
+    bm, bb = _wart(dk, 'def_bread_med'), _wart(dk, 'def_bread_budzet')
+    co = ('chleb: mediana indeksu ponizej 10, "na polkach" N sztuk (pomiar doplywu), "budzet mieszczan" ok. 15-20 tys. (przy wylaczonym '
+          'wlaczniku 30-67 tys.)')
+    if bm:
+        K.gdy(bm[-1] < INDEKS_SUFIT and bool(bb) and BUDZET_CHLEBA[0] <= mediana(bb) <= BUDZET_CHLEBA[1], co,
+              'indeks chleba: mediana po dobach %s (ostatnio %s); na polkach %s szt.; budzet mieszczan %s d; pusto w %s miastach'
+              % (_zakres(bm), skr(bm[-1]), _pierw_ost_txt(dk, 'def_bread_szt'), _zakres(bb), _pierw_ost_txt(dk, 'def_bread_pusto')),
+              dk[-1][1].get('_nr'))
+    else:
+        K.brak(co, 'w czesci o towarach z definicji nie ma chleba (bread)')
+    drogie = [(k, _wart(dk, 'def_%s_med' % k)) for k in ('fur', 'mead', 'gold', 'ink', 'dyes')]
+    drogie = [(k, v) for k, v in drogie if v]
+    co = ('futro, miod pitny, zloto, atrament, barwnik: mediana indeksu wyraznie ponizej 10 (dotad 10), "przy dzisiejszych polkach do" '
+          'kilku-kilkunastu tys.')
+    if drogie:
+        zle = [k for k, v in drogie if mediana(v) >= INDEKS_SUFIT]
+        K.gdy(not zle, co, ', '.join('%s %s (wydane do %s d)' % (k, skr(mediana(v)), skr(dk[-1][1].get('def_%s_wydane' % k)))
+                                     for k, v in drogie) + (('; NA SUFICIE: ' + ', '.join(zle)) if zle else ''), dk[-1][1].get('_nr'))
+    else:
+        K.brak(co, 'w czesci o towarach z definicji nie ma tych kategorii')
+    tanie = [(k, _wart(dk, 'def_%s_med' % k), _wart(dk, 'def_%s_szt' % k)) for k in ('limestone', 'marble')]
+    tanie = [x for x in tanie if x[1]]
+    if tanie:
+        K.dodaj(OK, 'pomiar: wapien i marmur - setki sztuk na polkach i indeks na podlodze 0.1',
+                ', '.join('%s: indeks %s, na polkach %s szt.' % (k, _zakres(v), _zakres(n)) for k, v, n in tanie), dk[-1][1].get('_nr'))
+    bil, prz = ses.ser('Pieniadz swiata (bilans)'), ses.ser('Przeplywy osad')
+    if bil or prz:
+        K.dodaj(OK, 'pomiar: "zakupy mieszkancow miast i zamkow" nizsze (kilkadziesiat do ok. 250 tys. dziennie - zalezy od futra), "miasta '
+                    'zaplacily" taborom nizsze o podobna kwote', 'zakupy mieszkancow: mediana %s (dotad 462.4k); miasta zaplacily: mediana %s '
+                '(dotad 380.0k); budzet mieszczan na towary z definicji: mediana %s, wydane %s'
+                % (skr(mediana(_wart(bil, 'zakupy'))), skr(mediana(_wart(prz, 'miasta_zaplacily'))), skr(mediana(_wart(dk, 'def_budzet'))),
+                   skr(mediana(_wart(dk, 'def_wydane')))), (bil or prz)[-1][1].get('_nr'))
+    bl = _bledy_z(ses, 'HistoricalPrices.DefinePostfix', 'HistoricalPrices.ApplyAll (BKItems', 'RawPrice.Daily (budzet BK)')
+    K.gdy(not bl, 'bez ERROR "HistoricalPrices.DefinePostfix", "HistoricalPrices.ApplyAll (BKItems.InitializeTradeGood)", "RawPrice.Daily '
+                  '(budzet BK)"', _opis_bledow(bl), bl[0][2] if bl else None)
+
+
+def _k119(K, ses):
+    """Ogniwo 119 wozy wsi do najlepiej placacego miasta (docs\\paczki\\119-wozy-do-najlepszego-miasta.md, "Po czym poznac w logu")."""
+    _start(K, ses, '119', 'start: "MarketCarts: poprawka 119 - wozy wsi do najlepiej placacego miasta w zasiegu 250 (CZYNNE; ...), cena '
+                          'ladunku sztuka po sztuce - latka wpieta (CZYNNA), woz x2.0 dla wsi wszystkich"',
+           ['w zasiegu 250', '(CZYNNE;', 'latka wpieta (CZYNNA)', 'dla wsi wszystkich'], ('BRAK', 'NIE wpiet'))
+    o = ogniwo(ses, '100')
+    K.gdy(bool(o and o['jest']), 'start: "MarketRoad: wsie zamkowe woza plon na targ miasta" (jak dotad)',
+          wycinek(o['wpis'].tresc, 100) if o and o['wpis'] else 'nie ma tej linii', o['wpis'].nr if o and o['wpis'] else None)
+    wz = ses.ser('Dowoz (wozy)')
+    if not wz:
+        K.brak('co dobe linia "Dowoz (wozy):"', 'nie ma jej w logu')
+        return
+    pelne = len(ses.pelne())
+    cz = [1 for _, d in wz if d.get('wybor') == 'CZYNNY' and d.get('cena_stan') == 'CZYNNA']
+    K.gdy(len(wz) >= pelne - 1 and len(cz) == len(wz),
+          'co dobe "Dowoz (wozy):" - "wybor miasta CZYNNY", "cena ladunku sztuka po sztuce CZYNNA"',
+          '%d linii w %d dobach, oba czynne w %d; woz x%s dla wsi %s' % (len(wz), pelne, len(cz), skr(wz[-1][1].get('woz_x')),
+                                                                      wz[-1][1].get('dla_wsi')), wz[-1][1].get('_nr'))
+    n = _wart(wz, 'wozow')
+    K.gdy(bool(n) and WOZY_N_2B[0] <= mediana(n) <= WOZY_N_2B[1], '"N wozow" ok. 150-250 na dobe',
+          'wozow: mediana %s (wsi zamkowych %s); do wlasnego miasta %s, bez miasta w zasiegu %s, w miescie %s'
+          % (_zakres(n), _zakres(_wart(wz, 'wsi_zamkowych')), _zakres(_wart(wz, 'do_wlasnego')), _zakres(_wart(wz, 'bez_miasta')),
+             _zakres(_wart(wz, 'w_miescie'))), wz[-1][1].get('_nr'))
+    di = _wart(wz, 'do_innego_proc')
+    K.gdy(bool(di) and mediana(di) >= WOZY_DO_INNEGO_MIN_PROC, '"do innego" miasta wyraznie > 0 (symulacja: ok. 80% kursow surowcow)',
+          'do innego: mediana %s%% wozow (%s na dobe)' % (_zakres(di), _zakres(_wart(wz, 'do_innego'))), wz[-1][1].get('_nr'))
+    sr = _wart(wz, 'srednio')
+    K.gdy(bool(sr) and WOZY_DROGA_2B[0] <= mediana(sr) <= WOZY_DROGA_2B[1], '"srednio X jedn. drogi" ok. 60-140 (zasieg 250)',
+          'srednio %s jedn. drogi; zasieg %s (gry dla targu wsi %s)' % (_zakres(sr), skr(wz[-1][1].get('zasieg')),
+                                                                       skr(wz[-1][1].get('zasieg_gry'))), wz[-1][1].get('_nr'))
+    j = _wart(wz, 'z_ruda')
+    if j:
+        pierwsze = wz[:5]
+        jj, kk = sum(_wart(pierwsze, 'z_ruda')), sum(_wart(pierwsze, 'ruda_do_pustych'))
+        K.dodaj(OK, 'pomiar: "z ruda J" ok. 4-6 na dobe, "w tym do miasta bez rudy K" ok. polowy J w pierwszych dobach, "roznych '
+                    'miast L" rosnie', 'z ruda: mediana %s; do miasta bez rudy w pierwszych %d dobach %s z %s (%s%%); roznych miast %s'
+                % (_zakres(j), len(pierwsze), skr(kk), skr(jj), skr(round(100.0 * kk / jj, 1)) if jj else '-',
+                   _pierw_ost_txt(wz, 'ruda_miast')),
+                wz[-1][1].get('_nr'))
+    nz, cr = sum(_wart(wz, 'niezgodne')), sum(_wart(wz, 'cena_rosla'))
+    K.gdy(nz == 0 and cr == 0, '"niezgodne" 0 i "cena rosla" 0 (inaczej korekta ceny ladunku nie dziala - kto zmienia cene osady?)',
+          'niezgodne razem %s, cena rosla razem %s w %d dobach' % (skr(nz), skr(cr), len(wz)), wz[-1][1].get('_nr'))
+    ms = _wart(wz, 'ms')
+    K.gdy(bool(ms) and mediana(ms) <= WOZY_MS_MAKS, 'ms na dobe - kilkadziesiat (setki = za drogo, ponad ok. 300 zglosic)',
+          'ms: mediana %s, najwiecej %s; wycen %s, cen %s na dobe' % (_zakres(ms), skr(max(ms)) if ms else '-', _zakres(_wart(wz, 'wycen')),
+                                                                     _zakres(_wart(wz, 'cen'))), wz[-1][1].get('_nr'))
+    pt = sum(_wart(wz, 'potkn'))
+    bl = _bledy_z(ses, 'MarketCarts', 'MarketRoad')
+    K.gdy(pt == 0 and not bl, 'POTKNIECIA - brak; bez ERROR "MarketCarts." / "MarketRoad."', 'potkniecia razem %d; bledy: %s'
+          % (pt, _opis_bledow(bl)), bl[0][2] if bl else wz[-1][1].get('_nr'))
+    wg = _wart(wz, 'wygasle')
+    if wg:
+        K.gdy(mediana(wg) <= WOZY_WYGASLE_MAKS, '"wygasle przy porzadkach N" - kilka-kilkanascie na dobe to norma',
+              'wygasle: mediana %s; wiesc z drogi: wozow w drodze %s, miast %s' % (_zakres(wg), _pierw_ost_txt(wz, 'w_drodze'),
+                                                                                  _pierw_ost_txt(wz, 'miast_wiesc')), wz[-1][1].get('_nr'))
+    p, q = sum(_wart(wz, 'pierwsza')), sum(_wart(wz, 'sztuka'))
+    npr = _wart(wz, 'nadplata_proc')
+    co = ('nadplata wozow: "tabory oddaly osadom nadplate P-Q d (R%%)" - kilka-kilkanascie procent (ponad %s%% = uwaga)'
+          % skr(NADPLATA_PROC_MAKS))
+    if p:
+        K.gdy(100.0 * (p - q) / p <= NADPLATA_PROC_MAKS, co,
+              'razem po cenie pierwszej sztuki %s d, sztuka po sztuce %s d, nadplata %s d (%s%%); na dobe: mediana %s%%, najwieksza '
+              'jednorazowa %s; sprzedazy %s' % (skr(p), skr(q), skr(p - q), skr(round(100.0 * (p - q) / p, 1)), _zakres(npr),
+                                                 skr(max(_wart(wz, 'nadplata_max') or [0])), skr(sum(_wart(wz, 'sprzedazy')))),
+              wz[-1][1].get('_nr'))
+    else:
+        K.brak(co, 'zadnej sprzedazy taborow z korekta ceny ("sprzedazy 0")')
+    pe = _wart(wz, 'pelny')
+    K.dodaj(OK, 'pomiar: pelny woz na daleka droge, oczekiwany utarg (tam, gdzie wlasne miasto bylo w grze, wobec utargu we wlasnym)',
+            'pelny woz: mediana %s (doladowane %s szt.); oczekiwany utarg: mediana %s d; wybrane %s wobec wlasnego %s d'
+            % (_zakres(pe), skr(sum(_wart(wz, 'doladowane'))), skr(mediana(_wart(wz, 'utarg'))), skr(sum(_wart(wz, 'utarg_wybrane'))),
+               skr(sum(_wart(wz, 'utarg_wlasne')))), wz[-1][1].get('_nr'))
+    dr = ses.ser('Drewno')
+    po = _pierw_ost(dr, 'bez_towaru')
+    co = '"Drewno: miast bez towaru" (dotad 41 -> 40) ok. 10-15 po 20 dobach'
+    if po:
+        n_dob = len(ses.pelne())
+        K.gdy(po[1] <= DREWNO_BEZ_TOWARU_CEL_2B or (n_dob < TOWARY2_MIN_DOB and po[1] <= po[0]), co, '%s -> %s miast bez drewna (doby %d-%d)'
+              % (po[0], po[1], po[2], po[3]), dr[-1][1].get('_nr'))
+    else:
+        K.brak(co, 'nie ma linii "Drewno:"')
+    sk = ses.ser('Dowoz (skutki)')
+    if sk:
+        d = sk[-1][1]
+        za, zm = d.get('zatk_zamkowe_proc'), d.get('zatk_miejskie_proc')
+        K.gdy(za is not None and zm is not None and zm <= BAZA_1408['zatk_miejskie'] and za <= BAZA_1408['zatk_zamkowe'] + 3.0,
+              '"Dowoz (skutki): zatkane magazyny" - wsie miejskie spadna z ok. 7% (woz), zamkowe moga wzrosnac o 1-3 punkty',
+              'ostatnia doba: zamkowe %s%%, miejskie %s%% (dotad 4.6%% / 7.4%%); zamki z ujemnym bilansem zywnosci %s (dotad 0 -> 1)'
+              % (skr(za), skr(zm), _pierw_ost_txt(sk, 'zamki_glodne')), d.get('_nr'))
+    ru = ses.ser('Ruda')
+    po = _pierw_ost(ru, 'bez_towaru')
+    if po:
+        K.dodaj(OK, 'pomiar: "Ruda: miast bez towaru" - GLOWNA LICZBA grupy 2b (ocena: --grupa 2b; cel ok. 25-30 po 20 dobach)',
+                '%s -> %s miast bez rudy (doby %d-%d; dotad 74 -> 69); "Karawany (stan): ruda: bez towaru" %s'
+                % (po[0], po[1], po[2], po[3], _pierw_ost_txt(ses.ser('Karawany (stan)'), 'ruda_bez')), ru[-1][1].get('_nr'))
+
+
 FUNKCJE_KONTROLI = OrderedDict([('100', _k100), ('101', _k101), ('102', _k102), ('102b', _k102b), ('103', _k103),
-                                ('104', _k104), ('105', _k105), ('106', _k106), ('107', _k107), ('108', _k108),
+                                ('104', _k104), ('105', _k105), ('106', _k106), ('107', _k107), ('115', _k115),
+                                ('116', _k116), ('117', _k117), ('118', _k118), ('119', _k119), ('108', _k108),
                                 ('109', _k109), ('110', _k110), ('111', _k111), ('112', _k112), ('113', _k113)])
 
 
@@ -5008,7 +6054,7 @@ def drukuj_test(ses, nazwa, szer=SZEROKOSC):
         L.append(obetnij('  ogniwa: %s | takze: wykryte, w-grze, wszystkie' % ', '.join(NR_OGNIW), szer))
         L.append(obetnij('  grupy: %s' % ', '.join('%s = %s' % (k, '+'.join(v)) for k, v in GRUPY_TESTOWE.items()
                                                     if k != 'wszystkie'), szer))
-        L.append(obetnij('  grupy testowe w grze: --grupa 1..5 (%s)'
+        L.append(obetnij('  grupy testowe w grze: --grupa 1, 2, 2b, 3, 4, 5 (%s)'
                          % ', '.join('%s = %s%s' % (k, 'BetterEconomy + ' if o['bee'] else '', '+'.join(o['ogniwa']))
                                      for k, o in GRUPY_GRY.items()), szer))
         return L
@@ -5156,8 +6202,10 @@ def _warunki_grupy(K, ses, g):
         'wczytany zapis ("Wyrzutki: wczytano pule")' if wczytana else 'nie wiadomo (brak linii startu kampanii)')
     if tryb == 'nowa':
         K.dodaj(OK if nowa else (UW if wczytana else BD), 'NOWA kampania (wymagana przez grupe)', stan + ('' if nowa else (
-            ' - 104 przelicza zapas tylko przy starcie nowej kampanii' if g == '1' else
-            ' - siew puli wyrzutkow i kalibracja ludnosci dzieja sie raz, przy zalozeniu kampanii')), f.get('pula_nr'))
+            ' - 104 przelicza zapas tylko przy starcie nowej kampanii' if g == '1' else (
+                ' - 115 (pamiec rynku), 116 (kapital startowy warsztatow) i 118 (popyt w nowej monecie) licza start kampanii tylko w '
+                'sesji, ktora ja zalozyla' if g == '2b' else
+                ' - siew puli wyrzutkow i kalibracja ludnosci dzieja sie raz, przy zalozeniu kampanii'))), f.get('pula_nr'))
     elif tryb == 'zalecana':
         K.dodaj(OK if nowa else (UW if wczytana else BD), 'NOWA kampania (zalecana)', stan + ('' if nowa else (
             ' - jednorazowe przyciecie daru startowego kas moze juz byc za nami (flaga w sejwie)' if g == '4' else
@@ -5167,7 +6215,7 @@ def _warunki_grupy(K, ses, g):
                 stan + (' - bez porownania ksiegi przed / po na tym samym swiecie' if nowa else ''), f.get('pula_nr'))
     n = len(ses.pelne()) if ses.bloki else 0
     od, do = opis['dob']
-    K.gdy(n >= od, 'dlugosc testu: %d-%d dob' % (od, do),
+    K.gdy(n >= od, ('dlugosc testu: %d-%d dob' % (od, do)) if od != do else ('dlugosc testu: %d dob' % od),
           ('%d pelnych dob (dni gry %d-%d)' % (n, ses.bloki[0].D, ses.bloki[-1].D)) if ses.bloki else 'zadnej doby w logu')
     K.gdy(len(ses.segmenty) == 1, 'jedna kampania w logu, po swiezym starcie gry',
           'kampanii / wczytan w sesji: %d%s' % (len(ses.segmenty), '' if len(ses.segmenty) == 1 else
@@ -5543,11 +6591,152 @@ def _g5(K, ses):
                    skr(mediana(_wart(ru, 'model')))), spl[-1][1].get('_nr'))
 
 
-FUNKCJE_GRUP = OrderedDict([('1', _g1), ('2', _g2), ('3', _g3), ('4', _g4), ('5', _g5)])
+def _g2b(K, ses):
+    """Grupa 2b TOWARY 2 - glowne liczby testu i powiazania miedzy liniami ogniw 115-119 (szczegoly - kontrole kazdego ogniwa)."""
+    f = ses.fakty
+    n = len(ses.pelne()) if ses.bloki else 0
+    ru = ses.ser('Ruda')
+    po = _pierw_ost(ru, 'bez_towaru')
+    co = ('GLOWNA LICZBA: "Ruda: miast bez towaru" w ostatniej dobie - dotad 74 -> 69, oczekiwane ok. 25-30 po 20 dobach (<= %d OK, '
+          'ponad %d ALARM)' % (RUDA_BEZ_TOWARU_CEL_2B, RUDA_BEZ_TOWARU_ALARM_2B))
+    if po:
+        spadek = po[0] - po[1]
+        if n >= TOWARY2_MIN_DOB:
+            if po[1] <= RUDA_BEZ_TOWARU_CEL_2B:
+                ocena = 'OK'
+            elif po[1] > RUDA_BEZ_TOWARU_ALARM_2B:
+                ocena = 'ALARM - ponad %d' % RUDA_BEZ_TOWARU_ALARM_2B
+            else:
+                ocena = 'za malo (miedzy %d a %d)' % (RUDA_BEZ_TOWARU_CEL_2B, RUDA_BEZ_TOWARU_ALARM_2B)
+            ok = po[1] <= RUDA_BEZ_TOWARU_CEL_2B
+        else:
+            ocena = 'za malo dob do oceny (%d < %d) - tylko kierunek: %s' % (n, TOWARY2_MIN_DOB, 'spada' if spadek > 0 else 'NIE spada')
+            ok = spadek > 0
+        K.gdy(ok, co, '%s -> %s miast bez rudy z %s (doby %d-%d, %d pelnych dob; ubylo %s) - %s'
+              % (po[0], po[1], skr(_miast_swiata(ses)), po[2], po[3], n, skr(spadek), ocena), ru[-1][1].get('_nr'))
+    else:
+        K.brak(co, 'nie ma linii "Ruda:" z pozycja "miast bez towaru"')
+    dr = ses.ser('Drewno')
+    po = _pierw_ost(dr, 'bez_towaru')
+    co = '"Drewno: miast bez towaru" w ostatniej dobie - dotad 41 -> 40, oczekiwane ok. 10-15 (<= %d OK)' % DREWNO_BEZ_TOWARU_CEL_2B
+    if po:
+        K.gdy(po[1] <= DREWNO_BEZ_TOWARU_CEL_2B if n >= TOWARY2_MIN_DOB else po[1] <= po[0], co, '%s -> %s miast bez drewna (doby %d-%d)%s'
+              % (po[0], po[1], po[2], po[3], '' if n >= TOWARY2_MIN_DOB else ' - za malo dob do oceny, tylko kierunek'), dr[-1][1].get('_nr'))
+    else:
+        K.brak(co, 'nie ma linii "Drewno:"')
+    # dostawy rudy do miast bez rudy: wozy wsi (119) i karawany (117)
+    wz, kr = ses.ser('Dowoz (wozy)'), ses.ser('Karawany (kierunek)')
+    k_wozy, k_kar = sum(_wart(wz, 'ruda_do_pustych')), sum(_wart(kr, 'ruda_wj_brak'))
+    co = ('dostawy rudy do miast bez rudy: wozy wsi (119: "z ruda ..., w tym do miasta bez rudy K") + karawany (117: "wjazdy, w tym do '
+          'miasta z brakiem")')
+    if wz or kr:
+        K.gdy(k_wozy + k_kar > 0, co,
+              'wozy: %s kursow do miast bez rudy (z %s z ruda); karawany: %s wjazdow z ruda do miast z brakiem (z %s); '
+              'razem %s w %d dobach' % (skr(k_wozy), skr(sum(_wart(wz, 'z_ruda'))), skr(k_kar), skr(sum(_wart(kr, 'ruda_wj'))),
+                                        skr(k_wozy + k_kar), n), (wz or kr)[-1][1].get('_nr'))
+    else:
+        K.brak(co, 'nie ma linii "Dowoz (wozy):" ani "Karawany (kierunek):"')
+    # 116 x 118: wspolczynnik chleba w przykladzie warsztatow miesci sie w rozpietosci indeksu chleba z "Ceny surowcow" tej samej doby
+    wt, ce = dict(ses.ser('Warsztaty towarowe')), dict(ses.ser('Ceny surowcow'))
+    pary = [(bi, wt[bi].get('piekarnia_wyrob_x'), ce[bi].get('def_bread_min'), ce[bi].get('def_bread_max')) for bi in sorted(wt)
+            if bi in ce and wt[bi].get('piekarnia_wyrob') == 'bread']
+    pary = [p for p in pary if None not in p[1:]]
+    co = '116 + 118: "Warsztaty towarowe: ... wyrob bread xN" (przyklad miasta) miesci sie w "Ceny surowcow: bread min/max" tej samej doby'
+    if pary:
+        zle = [p for p in pary if not (p[2] - 0.01 <= p[1] <= p[3] + 0.01)]
+        bi, x, a, b = pary[-1]
+        K.gdy(not zle, co, 'zgodne w %d z %d dob (ostatnio chleb x%s w przykladzie, indeks chleba w miastach %s-%s)%s'
+              % (len(pary) - len(zle), len(pary), skr(x), skr(a), skr(b), ('; pierwsza niezgodna doba %d' % (zle[0][0] + 1)) if zle else ''),
+              wt[bi].get('_nr'))
+    else:
+        K.brak(co, 'nie ma doby z piekarnia (wyrob bread) w przykladzie i czescia o chlebie w "Ceny surowcow:" naraz')
+    # 116 x ksiega kas miast: pozycja "warsztaty towarowe" wobec "do kas miast" z linii warsztatow (pomiar - inne okna czasu i migawki)
+    km = ses.ser('Przeplywy osad (kasy miast)')
+    a = sum(_wart(km, 'warsztaty_tow'))
+    b = sum((d.get('place_kapital') or 0) + (d.get('utrzymanie') or 0) - (d.get('utrzymanie_kiesa') or 0) for d in wt.values())
+    if a or b:
+        K.dodaj(OK, 'pomiar 116: "Przeplywy osad (kasy miast): warsztaty towarowe - place i utrzymanie" wobec "Warsztaty towarowe: do '
+                    'kas miast" '
+                    '(z kapitalu; ksiega liczy miedzy tickami miast, w ticku dobowym Armoury lapia je migawki)',
+                'ksiega kas miast %s, linia warsztatow %s (%s%%)' % (skr(a), skr(b), skr(round(100.0 * a / b, 1)) if b else '-'),
+                km[-1][1].get('_nr') if km else None)
+    # linie startowe i jednorazowe ogniw 115-119 - bez BRAK / NIECZYNNE / wylaczone
+    klucze = [('rawprice', '115 start'), ('rawprice_seed', '115 nowa kampania'), ('workshoptrade', '116 start'),
+              ('workshoptrade_latka', '116 latka w kampanii'), ('workshoptrade_seed', '116 nowa kampania'),
+              ('workshoptrade_brak', '116 BRAK'), ('caravanbulk_117', '117 start'), ('hp_definicja', '118 start'),
+              ('hp_popyt', '118 popyt'), ('hp_przelicznik', '118 przelicznik'), ('hp_uwaga0', '118 UWAGA wartosc 0'),
+              ('marketcarts', '119 start')]
+    # linia "popyt miast przeliczony" jest tez bez ogniwa 118 (test 14:08) - liczy sie tylko przy 118
+    jest = [(op, f[k]) for k, op in klucze if f.get(k) is not None and (k != 'hp_popyt' or ma_ogniwo(ses, '118'))]
+    # "drugi pobor wydatku z kiesy gracza wylaczony" to dobry stan latki 116 (nie wylacznik)
+    zle = [(op, w) for op, w in jest if re.search(r'\bBRAK\b|NIECZYNN|WYLACZON|wylaczon|UWAGA - ',
+                                                  w.tresc.replace('drugi pobor wydatku z kiesy gracza wylaczony', ''))]
+    co = 'linie startowe i jednorazowe ogniw 115-119 bez "BRAK", "NIECZYNNA", "WYLACZONE / wylaczone", "UWAGA - ... wartosc 0"'
+    if jest:
+        K.gdy(not zle, co, ('%d linii, wszystkie czyste: %s' % (len(jest), ', '.join(op for op, _ in jest))) if not zle else
+              '; '.join('%s: %s' % (op, wycinek(w.tresc, 70)) for op, w in zle[:2]), zle[0][1].nr if zle else None)
+    else:
+        K.brak(co, 'w logu nie ma zadnej linii startowej ogniw 115-119')
+    # ERROR i potkniecia w modulach grupy (wszystkie miejsca, ktore paczki opisuja jako sygnal bledu)
+    bl = _bledy_z(ses, 'RawPrice', 'WorkshopTrade', 'CaravanBulk', 'HistoricalPrices.Define', 'HistoricalPrices.ApplyAll (BKItems',
+                  'MarketCarts', 'Dowoz (wozy)', 'Warsztaty towarowe')
+    s = f.get('rawprice_seed')
+    m = re.search(r'; potkniecia (\d+)', s.tresc) if s is not None else None
+    pot = sum(_wart(ses.ser('Warsztaty towarowe'), 'potkniecia')) + sum(_wart(wz, 'potkn')) + (int(m.group(1)) if m else 0)
+    K.gdy(not bl and pot == 0,
+          'potkniecia 0 i bez ERROR w modulach 115-119 (RawPrice, WorkshopTrade, CaravanBulk, HistoricalPrices z definicji, '
+          'MarketCarts)', 'potkniecia razem %d; bledy: %s' % (pot, _opis_bledow(bl)), bl[0][2] if bl else None)
+    ps, bil = ses.ser('Pieniadz swiata'), ses.ser('Pieniadz swiata (bilans)')
+    if ps:
+        K.dodaj(OK, 'pomiar: stan "przed" dla grupy 3 - zloto swiata, reszta bilansu, "zakupy" mieszkancow (dotad 462.4k), kapital warsztatow',
+                'zloto swiata %s -> %s; reszta bilansu: mediana %s (%s%% ruchu); zakupy mieszkancow: mediana %s; kapital warsztatow %s'
+                % (skr(ps[0][1].get('razem')), skr(ps[-1][1].get('razem')), skr(mediana(_wart(bil, 'reszta')), True),
+                   skr(mediana(_wart(bil, 'reszta_proc'))), skr(mediana(_wart(bil, 'zakupy'))), _pierw_ost_txt(ps, 'warsztaty')),
+                ps[-1][1].get('_nr'))
+
+
+def tabela_dzienna_2b(ses, szer):
+    """Grupa 2b: tabela dzien po dniu glownych liczb testu (wiersz = doba; kolumny lamane do szerokosci, pierwsze 3 powtarzane)."""
+    zr = dict((n, dict(ses.ser(n))) for n in ('Ruda', 'Drewno', 'Karawany (stan)', 'Ceny surowcow', 'Karawany', 'Dowoz (wozy)',
+                                               'Warsztaty towarowe'))
+
+    def v(nazwa, bi, klucz):
+        return (zr[nazwa].get(bi) or {}).get(klucz)
+
+    def para(a, b):
+        return '-' if a is None and b is None else '%s/%s' % (skr(a), skr(b))
+    kol = ['doba', 'dzien', 'ruda bez', 'drewno bez', 'kar.ruda bez', 'ruda idx med/max', 'ruda 1.szt d', 'ruda zbyt d', 'kar.ruda kup/sprz',
+           'wozy', 'do innego %', 'wozy ruda/puste', 'nadplata %', 'niezg.', 'ms', 'piekarnia', 'chleb x', 'chleb idx', 'potkn.']
+    wiersze = []
+    for bi in ses.wyb:
+        if not any(bi in zr[n] for n in zr):
+            continue
+        pt = [x for x in (v('Warsztaty towarowe', bi, 'potkniecia'), v('Dowoz (wozy)', bi, 'potkn')) if x is not None]
+        wiersze.append([bi + 1, ses.bloki[bi].D, skr(v('Ruda', bi, 'bez_towaru')), skr(v('Drewno', bi, 'bez_towaru')),
+                        skr(v('Karawany (stan)', bi, 'ruda_bez')),
+                        para(v('Ceny surowcow', bi, 'ruda_idx_med'), v('Ceny surowcow', bi, 'ruda_idx_max')),
+                        skr(v('Ceny surowcow', bi, 'ruda_placa')), skr(v('Karawany (stan)', bi, 'ruda_cena')),
+                        para(v('Karawany', bi, 'kup_ruda'), v('Karawany', bi, 'sprz_ruda')), skr(v('Dowoz (wozy)', bi, 'wozow')),
+                        skr(v('Dowoz (wozy)', bi, 'do_innego_proc')),
+                        para(v('Dowoz (wozy)', bi, 'z_ruda'), v('Dowoz (wozy)', bi, 'ruda_do_pustych')),
+                        skr(v('Dowoz (wozy)', bi, 'nadplata_proc')), skr(v('Dowoz (wozy)', bi, 'niezgodne')),
+                        skr(v('Dowoz (wozy)', bi, 'ms')), skr(v('Warsztaty towarowe', bi, 'piekarnia_cena')),
+                        skr(v('Warsztaty towarowe', bi, 'piekarnia_wyrob_x')), skr(v('Ceny surowcow', bi, 'def_bread_med')),
+                        skr(sum(pt)) if pt else '-'])
+    L = ['--- GRUPA 2b: TABELA DZIEN PO DNIU (glowne liczby; "-" = brak linii; ruda bez = "Ruda: miast bez towaru", kar. = "Karawany", '
+         'idx = indeks ceny, 1.szt = "za pierwsza sztuke placa", piekarnia = cena w przykladzie miasta) ---']
+    if not wiersze:
+        return [obetnij(L[0], szer), '  brak dob z liniami grupy']
+    return [obetnij(L[0], szer)] + tabela_pelna(kol, wiersze, szer)
+
+
+FUNKCJE_GRUP = OrderedDict([('1', _g1), ('2', _g2), ('2b', _g2b), ('3', _g3), ('4', _g4), ('5', _g5)])
+# grupy z tabela dzien po dniu glownych liczb (drukowana po kontrolach wspolnych)
+TABELE_GRUP = {'2b': tabela_dzienna_2b}
 
 
 def grupa_z_nazwy(ses, nazwa):
-    """Numer grupy testowej dla opcji --grupa: 1..5, nazwa (towar, pieniadz, ludzie, kasy, spustoszenie), "w-grze"."""
+    """Numer grupy testowej dla opcji --grupa: 1..5 i 2b, nazwa (towar, pieniadz, towary2, ludzie, kasy, spustoszenie), "w-grze"."""
     q = (nazwa or '').strip().lower()
     if q in GRUPY_GRY:
         return q
@@ -5555,7 +6744,7 @@ def grupa_z_nazwy(ses, nazwa):
         return NAZWY_GRUP_GRY[q]
     if q in ('', 'w-grze', 'wgrze', 'gra', 'auto'):
         return grupa_ogniwa(ses.ogniwo_w_grze) if ses.ogniwo_w_grze else None
-    m = re.match(r'^(?:grupa[ -]?)?([1-5])$', q)
+    m = re.match(r'^(?:grupa[ -]?)?(2b|[1-5])$', q)
     return m.group(1) if m else None
 
 
@@ -5613,6 +6802,11 @@ def drukuj_grupe(ses, nazwa, szer=SZEROKOSC):
         razem.update(licz)
         L.append(obetnij('--- GRUPA %s: %s: OK %d, UWAGA %d, BRAK DANYCH %d ---' % (g, tytul, licz[OK], licz[UW], licz[BD]), szer))
         L.extend(_linie_listy(lista, szer))
+    if g in TABELE_GRUP:
+        try:
+            L.extend(TABELE_GRUP[g](ses, szer))
+        except Exception as e:
+            L.append('--- GRUPA %s: tabela dzien po dniu przerwana (blad wewnetrzny %s: %s) ---' % (g, type(e).__name__, e))
     for nr in opis['ogniwa']:
         L.extend(linie_kontroli(ses, nr, szer, pelne=True))
         razem.update(k[0] for k in kontrole_ogniwa(ses, nr))
@@ -5746,7 +6940,7 @@ def linie_naglowka(ses, szer):
     L.append('OGNIWO W GRZE (wg linii logu): %s%s' % (
         ('%s %s' % (w_grze, [o['opis'] for o in ses.ogniwa if o['nr'] == w_grze][0])) if w_grze else 'sprzed wpisu 100',
         (' | NIE MA linii startowych ogniw: ' + ', '.join(o['nr'] for o in brakujace)) if brakujace else
-        ' | komplet linii startowych lancucha 102-113'))
+        ' | komplet linii startowych lancucha 102-107, 115-119, 108-113'))
     for o in ses.ogniwa:
         if o['jest']:
             op = 'JEST  linia %d%s %s' % (o['wpis'].nr, (' [%s]' % o['status']) if o['status'] != 'inne' else '',
@@ -6329,9 +7523,9 @@ def main(argv=None):
     ap.add_argument('--csv', action='store_true', help='skrot pliku ludzie-regiony.csv z katalogu sesji')
     ap.add_argument('--wczytanie', type=int, help='numer kampanii / wczytania w logu (od 1)')
     ap.add_argument('--test', metavar='NAZWA', help='kontrole "po czym poznac w logu" ogniwa albo grupy: 102b, 106, 103,104, '
-                                                    '102b-105, surowce, pieniadz, ludzie, kasy, wykryte, wszystkie')
-    ap.add_argument('--grupa', metavar='N', help='komplet kontroli grupy testowej naraz: 1 (101-105), 2 (106-107), 3 '
-                                                 '(BetterEconomy + 108-109), 4 (110-112), 5 (113) albo w-grze')
+                                                    '102b-105, surowce, pieniadz, towary2, ludzie, kasy, wykryte, wszystkie')
+    ap.add_argument('--grupa', metavar='N', help='komplet kontroli grupy testowej naraz: 1 (101-105), 2 (106-107), 2b (115-119, '
+                                                 'TOWARY 2), 3 (BetterEconomy + 108-109), 4 (110-112), 5 (113) albo w-grze')
     ap.add_argument('--pelny', action='store_true', help='bez limitu dlugosci skrotu')
     ap.add_argument('--szer', type=int, default=SZEROKOSC, help='szerokosc wyjscia (domyslnie %d)' % SZEROKOSC)
     try:

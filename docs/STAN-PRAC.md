@@ -33,7 +33,8 @@ Glowna liczba: "Ruda: miast bez towaru" - bylo 74 -> 69; oczekiwane ok. 25-30 po
 od kazdej kopalni - tam tylko karawany). Dalej: "Ceny surowcow:" (ruda w miescie bez rudy indeks ok. 10, pierwszy ladunek ok. 37 d; chleb),
 "Warsztaty towarowe:" (piekarnie pracuja od 1. doby; cena piekarni w Lannisporcie - zalezy od doplywu chleba i ciast, przy niedoborze moze
 przekroczyc 100 tys., bo tyle naprawde zarabia), "Dowoz (wozy):" ("niezgodne" 0, nadplata kilka-kilkanascie %, ms na dobe), "Karawany (przyczyny)" /
-"(kierunek)". Narzedzie `tools/sprawdz_logi.py`: nowa grupa dla 115-119 - w toku (noc-7); do tego czasu `--temat` / `--surowe`.
+"(kierunek)". Odczyt: `python tools/sprawdz_logi.py --grupa 2b` (nowa grupa TOWARY 2: glowna liczba, kontrole kazdego ogniwa, tabela dzien po dniu; progi to
+szacunki z opisow paczek - pierwszy log obejrzec tez z `--surowe`). Na starym logu --grupa 1 / 2 daja to samo co przed zmiana (bajt w bajt).
 
 KOLEJKA 108-114 PRZENIESIONA NA 119: galezie `paczki-na-119/108-...` .. `paczki-na-119/114-porzadki` (1ffe021 .. 817931e; build kod 0 kazdego,
 669 ustawien na 114; konflikty tylko tekstowe: lista Reset w konstruktorze ArmouryBehavior, Settings.cs przy K7; K5 i wozy w MarketRoad.cs
