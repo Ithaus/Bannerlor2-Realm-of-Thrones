@@ -444,6 +444,8 @@ namespace Armoury
         public float CaravanBulkSurplusFactor = 2f;        // a town sells to caravans only what it holds above this many times the stock it wants for itself (2 = it keeps twenty days of use and sells the rest; never counted below 1)
         public float CaravanBulkCapacityShare = 0.5f;      // at most this share of a caravan's carrying capacity goes to bulk raw goods, and no single one of them takes more than half of that - the rest stays free for its usual trade (never above 0.8)
         public float CaravanBulkTransitCover = 6f;         // caravans keep buying a bulk good only while all of them together carry less than this many times what the towns of the world lack - above that they stop buying and unload it into any town up to its surplus mark (higher = fewer empty stalls, more cargo idling on the road; 0 = they never buy)
+        public bool CaravanBulkBuyBeforeRoute = true;      // a caravan buys its bulk raw goods right after its usual purchases and before it picks the next town, so the fresh cargo already counts in that choice (off = it buys on its way out of the gate, when the destination is already set)
+        public float CaravanBulkFillLimit = 1f;            // bulk raw goods bought at a profit may fill a caravan's packs up to this share of its carrying capacity - Banner Kings stops its own buying at 0.8 and leaves the rest empty (0.8 = no more room than before; never below 0.8 or above 1; the player's own caravans always stay at 0.8)
 
         // --- Iron Bank ---
         public bool LevyEnabled = true;                    // volunteers come forward only where there are men to spare: hands the fields do not need, and men who want to leave a poor, burnt or warring land
