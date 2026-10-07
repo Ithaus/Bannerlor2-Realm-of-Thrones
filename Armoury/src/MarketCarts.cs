@@ -54,7 +54,7 @@ namespace Armoury
         /// <summary>Migawka przed sprzedaza: kiesa taboru, juki i dane rynku osady.</summary>
         internal sealed class Snap { public Town Town; public int Gold; public EquipmentElement[] El; public int[] N; public Dictionary<ItemCategory, ItemData> Market; }
 
-        /// <summary>Wiesc z drogi: dokad jedzie woz i ile wartosci towaru (Item.Value x sztuki - jednostka polki) wiezie w kazdej kategorii.</summary>
+        /// <summary>Wiesc z drogi: dokad jedzie woz i ile wartosci towaru (Item.Value x sztuki - jednostka polki; paczka 121: waga sztuki) wiezie w kazdej kategorii.</summary>
         private sealed class Haul { public Town To; public Dictionary<ItemCategory, int> Value; public double Day; }
 
         private sealed class Cand { public Town T; public float D; public double Rate; public double Ub; public List<Line> Load; public bool Full; public Dictionary<ItemCategory, int> News; }
@@ -200,9 +200,9 @@ namespace Armoury
                 int sold = (int)Math.Min((long)n, gold / p0);
                 if (sold <= 0) continue;
                 gold -= (long)sold * p0;
-                total += fair ? SumRun(model, load[i].El, cart, inStore, d.Supply, d.Demand, it.Value, sold, p0) : (long)sold * p0;
+                total += fair ? SumRun(model, load[i].El, cart, inStore, d.Supply, d.Demand, HistoricalPrices.ShelfWorth(it), sold, p0) : (long)sold * p0;   // paczka 121: jednostka polki = waga sztuki (kategorie mieszane)
                 if (added == null) added = new Dictionary<ItemCategory, int>();
-                added[cat] = off + sold * it.Value;
+                added[cat] = off + sold * HistoricalPrices.ShelfWorth(it);
             }
             return total;
         }
@@ -231,8 +231,9 @@ namespace Armoury
                 long p0 = Math.Max(0, Price(model, load[i].El, cart, inStore, d.Supply, d.Demand));
                 if (!fair || n < 8) { total += n * p0; continue; }
                 int m1 = n / 8, m2 = n / 2;
-                long p1 = Math.Max(0, Price(model, load[i].El, cart, inStore + m1 * it.Value, d.Supply, d.Demand));
-                long p2 = Math.Max(0, Price(model, load[i].El, cart, inStore + m2 * it.Value, d.Supply, d.Demand));
+                int wv = HistoricalPrices.ShelfWorth(it);   // paczka 121: jednostka polki = waga sztuki
+                long p1 = Math.Max(0, Price(model, load[i].El, cart, inStore + m1 * wv, d.Supply, d.Demand));
+                long p2 = Math.Max(0, Price(model, load[i].El, cart, inStore + m2 * wv, d.Supply, d.Demand));
                 total += m1 * p0 + (m2 - m1) * p1 + (n - m2) * p2;
             }
             return total;
@@ -487,7 +488,7 @@ namespace Armoury
                 var cat = it.GetItemCategory();
                 int v;
                 h.Value.TryGetValue(cat, out v);
-                h.Value[cat] = v + n * it.Value;
+                h.Value[cat] = v + n * HistoricalPrices.ShelfWorth(it);   // jednostka polki (paczka 121: waga sztuki w kategorii mieszanej)
             }
             if (h.Value.Count == 0) return;
             _hauls[cart] = h;
@@ -585,8 +586,9 @@ namespace Armoury
                     int p0 = model.GetPrice(el, __1, null, true, inStore, d.Supply, d.Demand);
                     first += (long)sold * p0;
                     fair += p0;
-                    for (int k = 1; k < sold; k++) fair += model.GetPrice(el, __1, null, true, inStore + k * it.Value, d.Supply, d.Demand);
-                    added[cat] = off + sold * it.Value;
+                    int wv = HistoricalPrices.ShelfWorth(it);   // paczka 121: jednostka polki = waga sztuki (tak samo dopisuje ja gra w danych rynku)
+                    for (int k = 1; k < sold; k++) fair += model.GetPrice(el, __1, null, true, inStore + k * wv, d.Supply, d.Demand);
+                    added[cat] = off + sold * wv;
                 }
                 if (first != paid) { _mismatch++; return; }                            // odtworzenie niewierne (inna sprzedaz niz gry / BK) - nie ruszamy
                 long refund = paid - fair;

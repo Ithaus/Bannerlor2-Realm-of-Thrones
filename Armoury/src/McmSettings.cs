@@ -1728,6 +1728,10 @@ namespace Armoury
         [SettingPropertyGroup("Iron bank")]
         public bool HistDemandFromDefinition { get; set; } = true;
 
+        [SettingPropertyBool("Hist Mixed Category Shelf", HintText = "goods that share one town market but were repriced in opposite directions weigh on the stall by the share their makers gave them, not by their new worth. Gold ore became 8 times cheaper and the gold ingot nearly 5 times dearer than Banner Kings set them, so one ingot on a stall (worth 4750) counted like a hundred days of the whole town demand for gold: the first sold for about 2 in 5 parts of its worth, the next for less, and ore fetched 4.6 times its worth on a bare stall. On: an ingot weighs on the stall like 2.5 sacks of ore, as Banner Kings designed, so a bare stall pays about 1.2 times worth for an ingot and about 2 times for ore; the same rule evens apples, carrots and oranges, meat and whale meat, iron ingots beside ore. Prices are still paid in the new worth; kinds of goods with a single good do not change (needs Hist Demand Scaling; off = as before; a change takes effect when a game is next loaded)")]
+        [SettingPropertyGroup("Iron bank")]
+        public bool HistMixedCategoryShelf { get; set; } = true;
+
         [SettingPropertyBool("Price Formula In New Coin", HintText = "the game's price formula keeps a fixed 2 coins beside the worth of the goods on the stall; in the new coin that weighs like a quarter load of ore or a whole measure of salt, so a bare stall of a cheap good never grew dear (ore 1.5 times its worth at most, timber 0.8). On: every trade good the new coin made cheaper is priced as the unmodded game prices it - a bare stall up to 10 times worth, a glutted one down to a tenth; goods the new coin made dearer (fur, wool, raw silk, velvet) keep the fixed 2 coins, which weigh little beside them; and a new campaign opens with the towns' memory of supply and demand for every repriced trade good already in the new coin instead of drifting out of the old one for weeks (needs Hist Demand Scaling; off = prices as before)")]
         [SettingPropertyGroup("Iron bank")]
         public bool PriceFormulaInNewCoin { get; set; } = true;
@@ -2967,6 +2971,7 @@ namespace Armoury
             s.TownUseHardwood = TownUseHardwood;
             s.HistDemandScaling = HistDemandScaling;
             s.HistDemandFromDefinition = HistDemandFromDefinition;
+            s.HistMixedCategoryShelf = HistMixedCategoryShelf;
             s.PriceFormulaInNewCoin = PriceFormulaInNewCoin;
             s.RawPriceByUse = RawPriceByUse;
             s.PopulationRentEnabled = PopulationRentEnabled;

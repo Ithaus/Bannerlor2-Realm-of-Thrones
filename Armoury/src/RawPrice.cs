@@ -89,6 +89,13 @@ namespace Armoury
             try
             {
                 if (__0 == null || !__0.IsTradeGood) return;      // uzbrojenie ma wlasne prawo podazy i popytu (SupplyDemand)
+                // paczka 121: sprzedawana sztuka kategorii mieszanej wazy tyle, ile na polce w danych rynku (HistoricalPrices.ShelfWorth;
+                // model zna tylko kategorie i wartosc sztuki) - takze przy wylaczonej stalej wzoru; bez wag = wartosc, jak dotad
+                if (__4)
+                {
+                    int w = HistoricalPrices.ShelfWorthOf(__0, __5);
+                    if (w != __5) { __1 += w; __5 = 0; }
+                }
                 var s = Settings.Current;
                 if (s == null || !s.PriceFormulaInNewCoin || !s.HistDemandScaling) return;
                 float r = HistoricalPrices.CoinRatio(__0);        // 0 = kategoria nieprzeliczona albo przeliczenie sesji jeszcze nie weszlo
@@ -191,7 +198,7 @@ namespace Armoury
                             var it = el.EquipmentElement.Item;
                             var cat = it != null ? it.ItemCategory : null;
                             if (cat == null || el.Amount <= 0 || !cats.Contains(cat)) continue;
-                            float w; worth.TryGetValue(cat, out w); worth[cat] = w + (float)el.Amount * it.Value;   // jak TownMarketData: sztuki x Value
+                            float w; worth.TryGetValue(cat, out w); worth[cat] = w + (float)el.Amount * HistoricalPrices.ShelfWorth(it);   // jak TownMarketData: sztuki x Value (paczka 121: x waga w kategorii mieszanej)
                         }
                         foreach (var cat in cats)
                         {
@@ -350,12 +357,38 @@ namespace Armoury
                                .Append(F((float)budget[c], "0")).Append(" d (przy dzisiejszych polkach do ").Append(F((float)spend[c], "0")).Append(" d)");
                     }
                 }
+                // paczka 121: kategorie mieszane (bez listy - wedle HistoricalPrices) - ile miasto placi za sprzedana sztuke przy dzisiejszej
+                // polce (mediana miast, x wartosci) i ile sztuk lezy na polkach; przy wylaczonym wlaczniku te same przedmioty bez wag
+                var mixed = new StringBuilder();
+                foreach (var m in HistoricalPrices.MixedCategories())
+                {
+                    var p = new List<string>();
+                    for (int i = 0; i < m.Items.Count; i++)
+                    {
+                        var it = m.Items[i]; var el = new EquipmentElement(it);
+                        idx.Clear(); int units = 0;
+                        foreach (var t in Town.AllTowns)
+                        {
+                            if (t == null || t.Owner == null || t.Owner.ItemRoster == null || t.MarketData == null) continue;
+                            idx.Add(t.GetItemPrice(el, null, true));
+                            units += t.Owner.ItemRoster.GetItemNumber(it);
+                        }
+                        if (idx.Count == 0) continue;
+                        float mid = Mid(idx);
+                        p.Add(it.StringId + " " + it.Value + " d (waga " + m.Worth[i] + ") - za sztuke " + F(mid, "0") + " d (x" + F(mid / Math.Max(1, it.Value), "0.00") + "), na polkach " + units + " szt.");
+                    }
+                    if (p.Count > 0) mixed.Append(mixed.Length > 0 ? "; " : "").Append(m.Cat.StringId).Append(" /").Append(F(m.Coin, "0.##")).Append(": ").Append(string.Join(", ", p.ToArray()));
+                }
                 // audyt 120: potkniecia od poprzedniej linii (zdanie konczy kropka - narzedzie logow czyta liczby potkniec do kropki)
                 int stF = System.Threading.Interlocked.Exchange(ref _stFactor, 0), stU = System.Threading.Interlocked.Exchange(ref _stUse, 0);
                 int stB = _stBudget; _stBudget = 0;
+                int stS = HistoricalPrices.TakeShelfStumbles();
                 Log.Info("Ceny surowcow: dzien " + day + " - popyt z prawdziwego zuzycia " + (UseOn ? "CZYNNY" : "wylaczony") + ", stala wzoru w nowej monecie "
                          + (FormulaOn ? "CZYNNA" : "wylaczona") + " (model cen " + (price != null ? price.GetType().Name : "?") + ", mediany po miastach; sztuka rudy i drewna = ladunek) - "
-                         + sb + ". Potkniecia dzis (wyjatki, pierwszy w logu): wycena " + stF + ", popyt " + stU + ", budzet BK " + stB
+                         + sb + ". Potkniecia dzis (wyjatki, pierwszy w logu): wycena " + stF + ", popyt " + stU + ", budzet BK " + stB + ", wagi polki " + stS
+                         // paczka 121: czesc o kategoriach mieszanych PRZED "Inne" i "Towary z wartoscia z definicji" - narzedzie logow czyta te
+                         // dwie czesci do konca linii, a odcinek surowcow (do "Inne") przeszukuje wzorcem, ktorego ta czesc nie ma
+                         + (mixed.Length > 0 ? ". Kategorie mieszane (waga sztuki na polce " + (HistoricalPrices.MixedActive ? "CZYNNA" : "NIEUZYTA") + "; moneta popytu, miasto placi za sprzedana sztuke przy dzisiejszej polce - mediana miast): " + mixed : "")
                          + (other.Length > 0 ? ". Inne przeliczone towary, indeks min/mediana/max: " + other : "")
                          + (defined.Length > 0 ? ". Towary z wartoscia z definicji przedmiotu (przelicznik popytu, indeks min/mediana/max, sztuki na polkach miast): " + defined : "") + ".");
             }

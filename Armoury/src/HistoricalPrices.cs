@@ -4,6 +4,8 @@ using System.Globalization;
 using System.Linq;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Extensions;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
@@ -144,7 +146,7 @@ namespace Armoury
         // a diagnostyka blokady (40 wpisow) wyczerpywala sie na cale uruchomienie gry
         // Konstruktor ArmouryBehavior (OnGameStart) biegnie PRZED definicjami przedmiotow tej kampanii (Campaign: OnGameStart ->
         // InitializeDefaultCampaignObjects -> DefaultItems -> BKItems.Initialize), wiec czyszczenie definicji niczego nie gubi.
-        internal static void Reset() { _target.Clear(); _orig.Clear(); _origWeight.Clear(); _blockedLogged.Clear(); _defValue.Clear(); _defLeft.Clear(); _defUsed.Clear(); _errDefine = false; _stDefine = 0; _applied = false; RawPrice.Reset(); }   // RawPrice: cena surowcow liczy na tym przeliczeniu - czysci sie razem z nim
+        internal static void Reset() { _target.Clear(); _orig.Clear(); _origWeight.Clear(); _blockedLogged.Clear(); _defValue.Clear(); _defLeft.Clear(); _defUsed.Clear(); _errDefine = false; _stDefine = 0; _shelfWorth.Clear(); _shelfByValue.Clear(); _mixed.Clear(); _errShelf = false; _stShelf = 0; _applied = false; RawPrice.Reset(); }   // RawPrice: cena surowcow liczy na tym przeliczeniu - czysci sie razem z nim; wagi polki (paczka 121) - nowe przedmioty kampanii
 
         // ------------------------------------------------------------ wartosc z definicji przedmiotu (paczka "towary w nowej monecie")
         // Test 06.10 14:08 (log, linia "surowce kuzni"): chleb 0 -> 6, jajka 0 -> 8, miod 0 -> 14, owoce 0 -> 2..10, garum 0 -> 20,
@@ -429,9 +431,257 @@ namespace Armoury
                 if (_origWeight.Count > 0) Log.Info("HistoricalPrices: ruda i drewno w ladunkach - " + string.Join(", ", _origWeight.Select(kv => kv.Key.StringId + " " + kv.Value + " -> " + kv.Key.Weight + " kg = " + kv.Key.Value + " d").ToArray()) + ".");
                 Log.Info("HistoricalPrices: surowce kuzni ["+ string.Join(", ", raw.ToArray()) + "]; uzbrojenie " + n + " szt. przeliczone z kosztu historycznego (suma wartosci "
                          + before + " -> " + after + "). Przyklady: " + string.Join("; ", samples.ToArray()) + ".");
+                MixedShelf(s, fromDef);   // paczka 121: wagi sztuk na polce w kategoriach mieszanych - po przeliczniku kategorii, ten sam skladnik przedmiotu
             }
             catch (Exception e) { Log.Error("HistoricalPrices.Apply", e); }
         }
+
+        // ------------------------------------------------------------ kategorie mieszane: waga sztuki na polce (paczka 121)
+        // Audyt 07.10 (W2): w kategorii "gold" ruda zlota (400 -> 50, 8 x tansza) i sztabka (1000 -> 4750, 4.75 x drozsza) maja jeden
+        // przelicznik popytu (srednia geometryczna 1.30). Wzor ceny gry liczy JEDEN indeks kategorii: (popyt / (0.1 x podaz + 0.04 x
+        // wartosc polki + 2))^0.6, a popyt i polka sa w monecie. Popyt zlota w miescie-medianie to ok. 45 nowych d dziennie, wiec jedna
+        // sztabka (4750) to ok. 100 dni popytu (w projekcie BK 1000 / 58 = 17): pierwsza sprzedana 0.42 x wartosci, druga 0.28, ruda
+        // przy pustej polce 4.6 x (projekt BK: sztabka 1.21 x, ruda 2.02 x). Zaden jeden popyt nie da obu naraz - ruda i sztabka
+        // zmienily wzajemny stosunek 38 razy, a popyt kategorii jest jeden.
+        // Regula: w danych rynku miasta (wartosc polki, podaz z niej wygladzana, sprzedawana sztuka) kazda sztuka wazy swoja wartosc
+        // x (przelicznik przedmiotu / przelicznik, w ktorym liczony jest popyt kategorii) - czyli swoja wartosc z definicji w monecie
+        // popytu. Kazda sztuka zapelnia rynek tyle dni popytu, ile w projekcie jej kategorii; cena dalej = nowa wartosc x indeks.
+        // Kategoria jednego przedmiotu albo przedmiotow przeliczonych jednakowo: waga = wartosc (nic sie nie zmienia). Moneta popytu =
+        // przelicznik kategorii (DemandPostfix); popyt surowca masowego z prawdziwego zuzycia (RawPrice B) liczony jest w wartosci
+        // samego surowca - tam moneta popytu = przelicznik tego surowca (ruda zostaje przy swojej wartosci, wagi dostaja sztabki).
+        // Uzbrojenie nie: jego cene prowadzi prawo podazy i popytu w sztukach (SupplyDemand), wzor gry zaciska je do 0.8-1.3.
+        // Tylko miasta: zamek ma popyt 0 (indeks na podlodze 0.1, polka nie gra roli), a jego danych rynku gra nigdy nie przebudowuje
+        // - waga wpisana raz zostalaby tam po wylaczeniu albo cofnieciu paczki.
+        // Wagi licza sie raz na sesje (Apply) i nie zmieniaja do nastepnego wczytania - dodawane przyrostowo i przy przebudowie
+        // polek musza byc te same.
+        internal sealed class MixedCat { public ItemCategory Cat; public float Coin; public bool ByUse; public readonly List<ItemObject> Items = new List<ItemObject>(); public readonly List<int> Worth = new List<int>(); }
+        private static readonly Dictionary<ItemObject, int> _shelfWorth = new Dictionary<ItemObject, int>();                       // waga rozna od wartosci (puste = wylaczone)
+        private static readonly Dictionary<ItemCategory, Dictionary<int, int>> _shelfByValue = new Dictionary<ItemCategory, Dictionary<int, int>>();   // sprzedawana sztuka: (kategoria, wartosc) -> waga; -1 = niejednoznaczne
+        private static readonly List<MixedCat> _mixed = new List<MixedCat>();                                                    // plan (liczony takze przy wylaczonym - do logu)
+        private static bool _errShelf;
+        private static int _stShelf;
+        private static int _shelfHooks;        // 2 = obie latki danych rynku wpiete (na cale uruchomienie gry, jak _defineHooks)
+        private static AccessTools.FieldRef<TownMarketData, Town> _marketTown;
+
+        /// <summary>Waga sztuki w danych rynku miasta (jednostka polki): przy wylaczonej paczce i w kategoriach jednorodnych = Value.</summary>
+        internal static int ShelfWorth(ItemObject it)
+        {
+            if (it == null) return 0;
+            int w;
+            return _shelfWorth.Count > 0 && _shelfWorth.TryGetValue(it, out w) ? w : it.Value;
+        }
+
+        /// <summary>Waga sprzedawanej sztuki dla modelu ceny (zna tylko kategorie i wartosc sztuki); bez wpisu albo niejednoznaczne - wartosc.</summary>
+        internal static int ShelfWorthOf(ItemCategory cat, int value)
+        {
+            Dictionary<int, int> m; int w;
+            if (_shelfByValue.Count == 0 || cat == null || !_shelfByValue.TryGetValue(cat, out m) || !m.TryGetValue(value, out w) || w < 0) return value;
+            return w;
+        }
+
+        /// <summary>Kategorie mieszane tej sesji (linia dnia "Ceny surowcow"); Active = wagi czynne.</summary>
+        internal static List<MixedCat> MixedCategories() { return new List<MixedCat>(_mixed); }
+        internal static bool MixedActive { get { return _shelfWorth.Count > 0; } }
+
+        private static void MixedShelf(Settings s, bool fromDef)
+        {
+            try
+            {
+                _shelfWorth.Clear(); _shelfByValue.Clear(); _mixed.Clear();
+                // 1. przelicznik kazdego przeliczonego towaru handlowego - ten sam skladnik, z ktorego Apply liczy przelicznik kategorii
+                var own = new Dictionary<ItemObject, double>(); var sum = new Dictionary<ItemCategory, double>(); var cnt = new Dictionary<ItemCategory, int>();
+                foreach (var kv in _orig)
+                {
+                    var it = kv.Key; var cat = it.ItemCategory;
+                    if (cat == null || !cat.IsTradeGood || it.Value <= 0) continue;
+                    int old = fromDef ? DemandBase(it, kv.Value) : kv.Value;
+                    if (old <= 0) continue;
+                    double l = Math.Log((double)old / it.Value * BulkScale(it));
+                    own[it] = l;
+                    double a; sum.TryGetValue(cat, out a); sum[cat] = a + l;
+                    int k; cnt.TryGetValue(cat, out k); cnt[cat] = k + 1;
+                }
+                // 2. moneta popytu kategorii (logarytm): ten przelicznik, ktorym DemandPostfix naprawde dzieli popyt (_catRatio); kategorii
+                // z przelicznikiem blizej 1 niz 2% Apply nie wpisuje - jej popyt zostaje nieprzeliczony, moneta 1 (recenzja 121: srednia
+                // dalaby tam wagi do 2% obok monety popytu); surowiec masowy z popytem z prawdziwego zuzycia - jego wlasny
+                var coin = new Dictionary<ItemCategory, double>(); var byUse = new HashSet<ItemCategory>();
+                foreach (var kv in sum) coin[kv.Key] = _catRatio.ContainsKey(kv.Key) ? kv.Value / cnt[kv.Key] : 0.0;
+                if (s.RawPriceByUse && s.HistDemandScaling)
+                    foreach (var b in CaravanBulk.Items())
+                    {
+                        double l;
+                        if (b == null || b.ItemCategory == null || !coin.ContainsKey(b.ItemCategory) || !own.TryGetValue(b, out l)) continue;
+                        coin[b.ItemCategory] = l; byUse.Add(b.ItemCategory);
+                    }
+                // 3. waga kazdego przedmiotu tych kategorii - takze nieprzeliczonego (jego przelicznik: z definicji albo 1)
+                var byCat = new Dictionary<ItemCategory, List<ItemObject>>();
+                foreach (var it in MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
+                {
+                    var cat = it != null ? it.ItemCategory : null;
+                    if (cat == null || !coin.ContainsKey(cat) || it.Value <= 0) continue;
+                    List<ItemObject> l; if (!byCat.TryGetValue(cat, out l)) byCat[cat] = l = new List<ItemObject>();
+                    l.Add(it);
+                }
+                foreach (var kv in byCat)
+                {
+                    double c = coin[kv.Key];
+                    MixedCat m = null;
+                    foreach (var it in kv.Value)
+                    {
+                        double l;
+                        if (!own.TryGetValue(it, out l))
+                        {
+                            int def = fromDef ? DemandBase(it, it.Value) : it.Value;
+                            l = def > 0 ? Math.Log((double)def / it.Value * BulkScale(it)) : c;
+                        }
+                        int w = Math.Max(1, (int)Math.Round(it.Value * Math.Exp(l - c), MidpointRounding.AwayFromZero));   // jak gra: sztuka z wartoscia wazy co najmniej 1
+                        if (w == it.Value) continue;
+                        if (m == null) m = new MixedCat { Cat = kv.Key, Coin = (float)Math.Exp(c), ByUse = byUse.Contains(kv.Key) };
+                        m.Items.Add(it); m.Worth.Add(w);
+                    }
+                    if (m != null) _mixed.Add(m);
+                }
+                // 4. sprzedawana sztuka: model ceny zna tylko kategorie i wartosc - tablica (kategoria, wartosc) -> waga po WSZYSTKICH
+                // przedmiotach kategorii; dwa przedmioty o tej samej wartosci i roznej wadze = niejednoznaczne (liczona wartosc, w logu)
+                int ambiguous = 0;
+                var byValue = new Dictionary<ItemCategory, Dictionary<int, int>>();
+                foreach (var m in _mixed)
+                {
+                    var map = new Dictionary<int, int>();
+                    foreach (var it in byCat[m.Cat])
+                    {
+                        int i = m.Items.IndexOf(it), w = i >= 0 ? m.Worth[i] : it.Value, had;
+                        if (!map.TryGetValue(it.Value, out had)) map[it.Value] = w;
+                        else if (had != w && had >= 0) { map[it.Value] = -1; ambiguous++; }
+                    }
+                    byValue[m.Cat] = map;
+                }
+                bool on = s.HistMixedCategoryShelf && s.HistDemandScaling && _shelfHooks == 2;
+                int towns = 0;
+                if (on && _mixed.Count > 0)
+                {
+                    foreach (var m in _mixed) for (int i = 0; i < m.Items.Count; i++) _shelfWorth[m.Items[i]] = m.Worth[i];
+                    foreach (var kv in byValue) _shelfByValue[kv.Key] = kv.Value;
+                    towns = FixStores();
+                }
+                var parts = new List<string>();
+                foreach (var m in _mixed)
+                {
+                    var p = new List<string>();
+                    for (int i = 0; i < m.Items.Count; i++) p.Add(m.Items[i].StringId + " " + m.Items[i].Value + " -> " + m.Worth[i]);
+                    parts.Add(m.Cat.StringId + " (moneta popytu /" + m.Coin.ToString("0.##", CultureInfo.InvariantCulture) + (m.ByUse ? " - popyt z prawdziwego zuzycia surowca" : "") + "): " + string.Join(", ", p.ToArray()));
+                }
+                Log.Info("HistoricalPrices: kategorie mieszane - waga sztuki na polce wedle przelicznika przedmiotu "
+                         + (on ? "CZYNNA" : !s.HistMixedCategoryShelf ? "WYLACZONA (MCM) - wagi NIEUZYTE, polka liczona wartoscia jak dotad"
+                                          : _shelfHooks != 2 ? "NIECZYNNA - latki danych rynku nie weszly" : "NIECZYNNA - wymaga Hist Demand Scaling")
+                         + " (" + _mixed.Count + " kategorii; pozostale kategorie - waga = wartosc): " + (parts.Count > 0 ? string.Join("; ", parts.ToArray()) : "brak")
+                         + "; niejednoznaczne (kategoria, wartosc) " + ambiguous + (on ? "; wartosc polek przeliczona w " + towns + " miastach" : "") + ".");
+            }
+            catch (Exception e)
+            {
+                _shelfWorth.Clear(); _shelfByValue.Clear();   // polowiczne wagi gorsze niz zadne: polka liczona wartoscia jak dotad
+                Log.Error("HistoricalPrices.MixedShelf", e);
+            }
+        }
+
+        /// <summary>Wartosc polki kategorii mieszanych w kazdym miescie od nowa z polki, z waga. Gra przebudowuje dane rynku
+        /// w OnSessionLaunched (TradeCampaignBehavior - przed nami, jeszcze bez wag) i co dobe (DailyTickTown -> UpdateStores, tam wagi
+        /// dodaje StoresPostfix); tu - zaraz po policzeniu wag, zeby pierwsza doba sesji tez je miala. Inne kategorie nietkniete.</summary>
+        private static int FixStores()
+        {
+            if (Campaign.Current == null) return 0;
+            int towns = 0, stumbles = 0;
+            var want = new Dictionary<ItemCategory, int>();
+            foreach (var t in Town.AllTowns)
+            {
+                try
+                {
+                    var shelf = t != null && t.Owner != null ? t.Owner.ItemRoster : null;
+                    if (shelf == null || t.MarketData == null) continue;
+                    want.Clear();
+                    foreach (var m in _mixed) want[m.Cat] = 0;
+                    for (int i = 0; i < shelf.Count; i++)
+                    {
+                        var e = shelf.GetElementCopyAtIndex(i);
+                        var it = e.EquipmentElement.Item;
+                        var c = it != null && it.ItemCategory != null ? it.GetItemCategory() : null;   // jak TownMarketData.UpdateStores
+                        int w;
+                        if (c == null || !want.TryGetValue(c, out w)) continue;
+                        want[c] = w + e.Amount * ShelfWorth(it);
+                    }
+                    foreach (var kv in want) AddWorth(t.MarketData, kv.Key, kv.Value - t.MarketData.GetCategoryData(kv.Key).InStoreValue);
+                    towns++;
+                }
+                catch (Exception e) { if (stumbles++ < 1) Log.Error("HistoricalPrices.FixStores (miasto)", e); }
+            }
+            return towns;
+        }
+
+        /// <summary>Dopisuje roznice do wartosci polki kategorii bez zmiany liczby sztuk (dwa publiczne wywolania gry: +1 sztuka
+        /// o wartosci delta, -1 sztuka o wartosci 0).</summary>
+        private static void AddWorth(TownMarketData md, ItemCategory cat, int delta)
+        {
+            if (delta == 0 || md == null || cat == null) return;
+            md.AddNumberInStore(cat, 1, delta);
+            md.AddNumberInStore(cat, -1, 0);
+        }
+
+        private static bool InTown(TownMarketData md)
+        {
+            if (_marketTown == null) _marketTown = AccessTools.FieldRefAccess<TownMarketData, Town>("_town");
+            var t = _marketTown(md);
+            return t != null && t.IsTown;
+        }
+
+        /// <summary>Postfiks TownMarketData.OnTownInventoryUpdated(sztuka, liczba): gra dopisala liczba x Value, my roznice do wagi.</summary>
+        public static void StorePostfix(TownMarketData __instance, ItemRosterElement __0, int __1)
+        {
+            if (_shelfWorth.Count == 0) return;
+            try
+            {
+                var it = __0.EquipmentElement.Item;
+                int w;
+                if (it == null || __1 == 0 || !_shelfWorth.TryGetValue(it, out w) || !InTown(__instance)) return;
+                AddWorth(__instance, it.GetItemCategory(), __1 * (w - it.Value));
+            }
+            catch (Exception e)
+            {
+                _stShelf++;
+                if (!_errShelf) { _errShelf = true; Log.Error("HistoricalPrices.StorePostfix", e); }   // raz na kampanie; nastepna przebudowa polki (doba) wyrowna
+            }
+        }
+
+        /// <summary>Postfiks TownMarketData.UpdateStores (gra: co dobe i na starcie sesji przebudowuje polke z Value): roznice do wag.</summary>
+        public static void StoresPostfix(TownMarketData __instance)
+        {
+            if (_shelfWorth.Count == 0) return;
+            try
+            {
+                if (!InTown(__instance)) return;
+                var shelf = _marketTown(__instance).Owner != null ? _marketTown(__instance).Owner.ItemRoster : null;
+                if (shelf == null) return;
+                Dictionary<ItemCategory, int> delta = null;
+                for (int i = 0; i < shelf.Count; i++)
+                {
+                    var e = shelf.GetElementCopyAtIndex(i);
+                    var it = e.EquipmentElement.Item;
+                    int w;
+                    if (it == null || it.ItemCategory == null || !_shelfWorth.TryGetValue(it, out w)) continue;
+                    var c = it.GetItemCategory();
+                    if (delta == null) delta = new Dictionary<ItemCategory, int>();
+                    int d; delta.TryGetValue(c, out d); delta[c] = d + e.Amount * (w - it.Value);
+                }
+                if (delta != null) foreach (var kv in delta) AddWorth(__instance, kv.Key, kv.Value);
+            }
+            catch (Exception e)
+            {
+                _stShelf++;
+                if (!_errShelf) { _errShelf = true; Log.Error("HistoricalPrices.StoresPostfix", e); }
+            }
+        }
+
+        /// <summary>Potkniecia wag polki od poprzedniej linii dnia (linia "Ceny surowcow").</summary>
+        internal static int TakeShelfStumbles() { int n = _stShelf; _stShelf = 0; return n; }
 
         // ------------------------------------------------------------ popyt miast w nowej monecie
         // Test 04.10: polki broni i zbroi opustoszaly w 4 dni (zbroje 88 -> 11, bron jednoreczna 341 -> 16). Miasto liczy
@@ -657,6 +907,22 @@ namespace Armoury
                     Log.Info("HistoricalPrices: wartosc z definicji towarow BK (BKItems.InitializeTradeGood) - " + (_defineHooks > 0 ? "wpieta (przed latkami innych modow)" : bkItems == null ? "bez BK - nic do wpiecia" : "BRAK metody o oczekiwanych parametrach") + ".");
                 }
                 catch (Exception e) { Log.Error("HistoricalPrices.ApplyAll (BKItems.InitializeTradeGood)", e); }
+                // paczka 121: wagi sztuk na polce w kategoriach mieszanych - dane rynku miasta przy zmianie polki i przy jej przebudowie;
+                // obie latki albo zadna (jedna bez drugiej rozjechalaby wartosc polki) - MixedShelf sprawdza _shelfHooks
+                try
+                {
+                    var tmd = typeof(TownMarketData);
+                    var upd = AccessTools.Method(tmd, "OnTownInventoryUpdated", new[] { typeof(ItemRosterElement), typeof(int) });
+                    var reb = AccessTools.Method(tmd, "UpdateStores", Type.EmptyTypes);
+                    if (upd != null && reb != null)
+                    {
+                        h.Patch(upd, postfix: new HarmonyMethod(typeof(HistoricalPrices), nameof(StorePostfix)));
+                        h.Patch(reb, postfix: new HarmonyMethod(typeof(HistoricalPrices), nameof(StoresPostfix)));
+                        _shelfHooks = 2;
+                    }
+                    Log.Info("HistoricalPrices: wagi sztuk na polce (kategorie mieszane) - dane rynku miasta " + (_shelfHooks == 2 ? "wpiete (zmiana polki i przebudowa polki)" : "BRAK " + (upd == null ? "OnTownInventoryUpdated " : "") + (reb == null ? "UpdateStores" : "") + " - wagi nieczynne") + ".");
+                }
+                catch (Exception e) { Log.Error("HistoricalPrices.ApplyAll (TownMarketData)", e); }
             }
             catch (Exception e) { Log.Error("HistoricalPrices.ApplyAll", e); }
         }

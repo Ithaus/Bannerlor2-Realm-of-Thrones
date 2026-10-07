@@ -409,7 +409,7 @@ namespace Armoury
                 if (cat == null || market == null || model == null) return 0;
                 var d = market.GetCategoryData(cat);
                 int before = Math.Max(0, lack - 1) / 2;      // tyle sztuk zejdzie przed srodkowa
-                return Math.Max(1, model.GetPrice(new EquipmentElement(g.Item), null, null, true, d.InStoreValue + before * g.Item.Value, d.Supply, d.Demand));
+                return Math.Max(1, model.GetPrice(new EquipmentElement(g.Item), null, null, true, d.InStoreValue + before * HistoricalPrices.ShelfWorth(g.Item), d.Supply, d.Demand));   // paczka 121: jednostka polki = waga sztuki
             }
             catch (Exception e)
             {
