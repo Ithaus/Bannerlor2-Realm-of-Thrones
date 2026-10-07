@@ -30,10 +30,13 @@ namespace Armoury
     ///    wczesniej dodawal sie do tych czynnikow. Faktyczne wydobycie pokazuje ksiega (OreLedger).
     ///    Od wpisu 105 ten sam postfix mnozy wynik przez MineralOnce.Times: mineral, ktory BK mial na liscie produkcji wsi
     ///    kilka razy, jest na niej raz, a model oddaje go tyle razy, ile bylo wpisow (kazdy przedmiot, nie tylko ruda).
+    ///    Demografia krok 6a: ten sam postfix mnozy wynik KAZDEGO towaru wsi przez Devastation.YieldFactor - ubytek rak przez
+    ///    spustoszenie (uchodzcy poza domem); osobna linia opisu, bez progu 0.001 (poprawka krytyka nr 12).
     /// </summary>
     internal static class MaterialLaw
     {
         private static readonly Dictionary<ItemObject, int> _orig = new Dictionary<ItemObject, int>();
+        private static readonly TextObject _txtRuin = new TextObject("{=!}Armoury: hands lost to devastation (refugees not yet home)");
         private static bool _applied;
 
         internal static bool On { get { var s = Settings.Current; return s != null && s.MaterialLawEnabled; } }
@@ -186,6 +189,15 @@ namespace Armoury
                     // baza x (0.3 + f - zima) - okolo 1/3 zamiaru, a 5 z 26 wsi z ruda zero. Czynnik (m - 1) x (1 + suma) = wynik x m.
                     float sum = 1f + __result.SumOfFactors;
                     if (sum > 0f) __result.AddFactor((m - 1f) * sum, new TextObject("{=!}Armoury: mines and woods"));
+                }
+                // demografia krok 6a: plon i wydobycie x (ludzie w domu / ludzie sprzed spustoszenia) ^ elastycznosc. Dokladnie 1,
+                // gdy wies nie ma uchodzcow albo spustoszenie jest wylaczone - wtedy nic nie dopisujemy. Mnozy tak samo jak wyzej
+                // (czynnik x suma dotychczasowych), po mnozniku wydobycia i powtorzen BK; bez progu 0.001 [KRYT 12]
+                float hands = Devastation.YieldFactor(village);
+                if (hands != 1f)
+                {
+                    float sum = 1f + __result.SumOfFactors;
+                    if (sum > 0f) __result.AddFactor((hands - 1f) * sum, _txtRuin);
                 }
                 OreLedger.NoteModel(village, item, __result.ResultNumber);   // wpis 98: wynik modelu PO mnozniku (ksiega - tylko log)
             }

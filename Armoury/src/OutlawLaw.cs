@@ -404,6 +404,9 @@ namespace Armoury
             try
             {
                 if (!On || v == null || v.Settlement == null) return;
+                // demografia krok 4: przy czynnym spustoszeniu w las idzie czesc ludzi trafionych rabunkiem (Devastation.Strike ->
+                // AddFled, takze z rabunku przerwanego i z zerowania armii) - ta regula liczylaby ich drugi raz
+                if (Devastation.Covers(v)) return;
                 var region = RegionOf(v.Settlement);
                 // ilu ucieka: procent podstawy wsi (hearth, a przy liczeniu od ludzi - jej ludnosc w hearth sredniej wsi swiata); stawka hearth za czlowieka w TakeFrom
                 float men = PeopleUnit.Base(v) * Settings.Current.OutlawRaidFleePercent / 100f;
@@ -413,6 +416,17 @@ namespace Armoury
                 _inRaid += men;
             }
             catch (Exception e) { Log.Error("OutlawLaw.VillageLooted", e); }
+        }
+
+        /// <summary>
+        /// Ludzie wsi wygnani spustoszeniem, ktorzy poszli w las (Devastation): do puli regionu wsi, 1:1. Hearth zdjal juz
+        /// wolajacy (razem z zabitymi i uchodzcami) - tu tylko pula i licznik "rabunki" linii "Wyrzutki:".
+        /// </summary>
+        internal static void AddFled(Settlement village, float men)
+        {
+            if (!On || village == null || !(men > 0f)) return;
+            Add(RegionOf(village), Commoner, men);
+            _inRaid += men;
         }
 
         internal static void OnPartyDestroyed(MobileParty party, PartyBase destroyer)
