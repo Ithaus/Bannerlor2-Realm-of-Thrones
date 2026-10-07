@@ -81,7 +81,7 @@ namespace Armoury
     /// </summary>
     internal static class ScrapFloorPatch
     {
-        internal static void Postfix(EquipmentElement itemRosterElement, bool isSelling, ref int __result)
+        internal static void Postfix(EquipmentElement itemRosterElement, TaleWorlds.CampaignSystem.Party.PartyBase __2, bool isSelling, ref int __result)
         {
             try
             {
@@ -90,6 +90,11 @@ namespace Armoury
                 if (!isSelling) return;                              // tylko gdy TY sprzedajesz
                 var item = itemRosterElement.Item;
                 if (item == null || item.Value <= 0) return;
+                // POKRETLA JEFFA 07.10: sprzet w miescie/zamku wycenia prawo podazy i ono stawia te sama podloge PO
+                // mnozniku polki. Podloga tutaj (przed polka) robila z rupiecia "towar za podloge x polka" - na pustej
+                // polce zlom za 0.5% wartosci szedl za 2 x podloge. Teraz: stan rupiecia x polka, nie mniej niz podloga.
+                // Wylacznik OneScrapFloor = false: jak w 126 (podloga takze tu, przed polka).
+                if (s.OneScrapFloor && SupplyDemand.Prices(__2, item)) return;
                 int floor = (int)((float)item.Value * s.MinSellPercentOfValue / 100f);
                 if (floor < 1) floor = 1;
                 if (__result < floor) __result = floor;

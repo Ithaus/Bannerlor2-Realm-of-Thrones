@@ -55,7 +55,9 @@ namespace Armoury
         {
             var s = Settings.Current;
             int skill = (who ?? Hero.MainHero).GetSkillValue(DefaultSkills.Crafting);
-            float margin = skill - r.SkillNeeded;
+            // pokretla Jeffa 07.10: ryzyko z TRUDNOSCI sztuki (stala skala), nie z progu - nizszy prog
+            // pozwala zaczac wczesniej, ale pierwsze proby pekaja tak, jak dawniej przy tej umiejetnosci
+            float margin = skill - r.Difficulty;
             float risk = Project.RiskFactor(tempo);
             if (margin >= s.MarginForNoFailure) return 0f;
             float chance = margin <= 0f
@@ -78,7 +80,8 @@ namespace Armoury
         /// przesuwaja szanse, na koncu losowy modyfikator wylosowanej jakosci
         /// z grupy PRZEDMIOTU - dla pancerza dziala identycznie jak dla broni,
         /// tylko nazwy sa pancerne (Battered/Rusty zamiast Dull). Trudnosc =
-        /// SkillNeeded receptury. Tempo (nasze, vanilla go nie ma) przesuwa
+        /// Difficulty receptury (stala skala SmithingDifficultyPerTier, NIE prog
+        /// SkillNeeded - pokretla Jeffa 07.10). Tempo (nasze, vanilla go nie ma) przesuwa
         /// wynik: z dbaloscia +20, w pospiechu ~-17.
         /// </summary>
         internal static ItemModifier RollQuality(ItemObject item, Recipes.Recipe r, int tempo, Hero who)
@@ -89,7 +92,7 @@ namespace Armoury
                 var group = item.ItemComponent != null ? item.ItemComponent.ItemModifierGroup : null;
                 if (group == null) return null;
 
-                var probs = QualityProbabilities(r.SkillNeeded, smith, tempo);
+                var probs = QualityProbabilities(r.Difficulty, smith, tempo);
                 var quality = probs[probs.Count - 1].Q;
                 float roll = MBRandom.RandomFloat;
                 foreach (var qp in probs)
@@ -313,7 +316,9 @@ namespace Armoury
             {
                 var s = Settings.Current;
                 int skill = Hero.MainHero.GetSkillValue(DefaultSkills.Crafting);
-                float margin = MathF.Max(0f, (float)(skill - r.SkillNeeded - s.XpFullCreditMargin));
+                // nauka z TRUDNOSCI sztuki (pokretla Jeffa 07.10): ta sama sztuka przy tej samej umiejetnosci uczy
+                // tyle co dawniej; droge skraca to, ze wyzszy tier (wiecej XP) otwiera sie wczesniej
+                float margin = MathF.Max(0f, (float)(skill - r.Difficulty - s.XpFullCreditMargin));
                 float learning = MathF.Max(s.XpFloorFactor, 1f - margin / MathF.Max(1f, s.XpDiminishingRange));
                 float days = timed ? BaseDays(r) : 1f;
                 int xp = (int)(days * r.Tier * s.XpPerDayPerTier * learning);
@@ -508,7 +513,7 @@ namespace Armoury
                     Recipes.TakePartial(r, s.MaterialLossOnFailure);
                     hero.HeroDeveloper.AddSkillXp(DefaultSkills.Crafting, ProjectXp(r, false) * 0.3f * xpMul);
                     Log.Player("The piece cracked on the anvil. Half your metal is slag.", true);
-                    Log.Info("Kucie nieudane: " + item.StringId + " (skill " + skill + "/" + r.SkillNeeded + ")");
+                    Log.Info("Kucie nieudane: " + item.StringId + " (skill " + skill + "/" + r.SkillNeeded + ", trudnosc " + r.Difficulty + ")");
                     return;
                 }
 
@@ -524,7 +529,8 @@ namespace Armoury
                     if (Recipes.IsLegendary(item) && !ArmouryBehavior.Legends.Contains(item.StringId)) ArmouryBehavior.Legends.Add(item.StringId);
                     RangedLore.OnCrafted(item);
                     hero.HeroDeveloper.AddSkillXp(DefaultSkills.Crafting, ProjectXp(r) * (1f - Settings.Current.XpShareWhileWorking) * xpMul);
-                    Log.Info("Wykuto (na lawe): " + item.StringId + " x" + made + " jakosc=" + (quality != null ? quality.StringId : "zwykla"));
+                    Log.Info("Wykuto (na lawe): " + item.StringId + " x" + made + " jakosc=" + (quality != null ? quality.StringId : "zwykla")
+                             + " skill=" + skill + "/" + r.SkillNeeded + " trudnosc=" + r.Difficulty);   // ForgeOneClock (domyslnie wlaczony): ta linia, nie "Wykuto:"
                     return;
                 }
                 MobileParty.MainParty.ItemRoster.AddToCounts(new EquipmentElement(item, quality), made);
@@ -542,7 +548,7 @@ namespace Armoury
                 string qname = quality != null ? quality.Name + " " : "";
                 Log.Player("You forged " + (made > 1 ? made + " x " : "") + qname + item.Name + ".");
                 Log.Info("Wykuto: " + item.StringId + " jakosc=" + (quality != null ? quality.StringId : "zwykla")
-                         + " skill=" + skill + "/" + r.SkillNeeded);
+                         + " skill=" + skill + "/" + r.SkillNeeded + " trudnosc=" + r.Difficulty);
             }
             catch (Exception e) { Log.Error("Smith", e); }
         }

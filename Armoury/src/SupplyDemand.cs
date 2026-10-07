@@ -34,9 +34,11 @@ namespace Armoury
     /// do najblizszej osady, ktorej brakuje (patrz DailyTrade) - nic nie znika w prozni,
     /// a popyt wojenny bierze sie z PRAWDZIWYCH zakupow armii (osobna zmiana), nie z mnoznika.
     ///
-    /// Nasycony rynek (MarketGlut) zostaje tylko jako podloga 5% za zuzyty lup -
-    /// jego licznik "kazda kolejna sztuka -0.25 pp" jest wylaczony, gdy to prawo dziala
-    /// (inaczej kara za nadmiar liczylaby sie dwa razy).
+    /// Nasycony rynek (MarketGlut) milczy, gdy to prawo dziala (kara za nadmiar liczylaby
+    /// sie dwa razy). Od 07.10 nie stawia tez swojej podlogi 5% PRZED nami (pokretla Jeffa:
+    /// "najnizsza cena tak, ale zalezna od podazy i popytu za rupiecie") - jedyna podloga
+    /// to MinSellPercentOfValue, liczona na koncu, po mnozniku polki, i nie wyzsza niz cena, jakiej ta polka
+    /// zada za te sama sztuke (recenzja: bez petli "kup rupiec tanio, sprzedaj za podloge"). Wylacznik OneScrapFloor.
     /// </summary>
     internal static class SupplyDemand
     {
@@ -258,18 +260,32 @@ namespace Armoury
         // finalizer biegnie ZAWSZE (takze po wyjatku) - licznik nie zostanie zawyzony na stale
         public static Exception PriceFinalizer(Exception __exception) { if (_depth > 0) _depth--; return __exception; }
 
+        /// <summary>
+        /// Czy te transakcje wycenia prawo podazy (miasto/zamek, sprzet, nie zbrojownia) - wtedy podloge zlomu
+        /// stawiamy MY, PO mnozniku polki, a ScrapFloor nie stawia drugiej przed nami (pokretla Jeffa 07.10).
+        /// </summary>
+        internal static bool Prices(PartyBase merchant, ItemObject item)
+        {
+            try
+            {
+                if (!Active || merchant == null) return false;
+                var st = merchant.Settlement;
+                if (st == null || (!st.IsTown && !st.IsCastle)) return false;
+                if (QuartermasterEscrow.Active) return false;           // zbrojownia, nie targ
+                return Equipmentish(item);
+            }
+            catch { return false; }
+        }
+
         /// <summary>Postfix na GetPrice kazdego modelu cen - po MarketGlut (rejestrowany pozniej).</summary>
         public static void PricePostfix(EquipmentElement __0, MobileParty __1, PartyBase __2, bool __3, ref int __result)
         {
             if (_depth > 1) return;                                     // wewnetrzny model - zewnetrzny policzy
             try
             {
-                if (!Active || __2 == null) return;
-                var st = __2.Settlement;
-                if (st == null || (!st.IsTown && !st.IsCastle)) return;
-                if (QuartermasterEscrow.Active) return;                 // zbrojownia, nie targ
                 var item = __0.Item;
-                if (!Equipmentish(item)) return;
+                if (!Prices(__2, item)) return;
+                var st = __2.Settlement;
                 float d; int s;
                 float shelfF = Factor(st, item, __3, out d, out s);
                 // PODSTAWA x SUROWCE (ArmsPricing): cena konkretnej sztuki z kosztu wykucia w granicach
@@ -289,6 +305,15 @@ namespace Armoury
                 if (__3 && Settings.Current.MinSellPercentOfValue > 0 && item.Value > 0)
                 {
                     int floor = Math.Max(1, (int)(item.Value * Settings.Current.MinSellPercentOfValue / 100f));
+                    // POKRETLA JEFFA 07.10 (recenzja; "zero darmowej kasy"): podloga nie placi wiecej, niz TA polka zada za TE
+                    // sama sztuke (wartosc ze stanem x marza x ten sam mnoznik polki i surowcow, polka juz z ta sztuka) - inaczej
+                    // "zmasakrowany" rupiec (cena x0.03) kupiony z zawalonej polki za ~0.8% wartosci szedl z powrotem za 2%
+                    // (a przy dawnej podlodze 5% takze rupiecie x0.08 / x0.1). Wylacznik OneScrapFloor = false: jak w 126.
+                    if (Settings.Current.OneScrapFloor && HistoricalPrices.On && Settings.Current.RetailFromWorth)
+                    {
+                        int ask = (int)Math.Round(Math.Max(1, __0.ItemValue) * (1f + Math.Max(0f, Settings.Current.RetailMarkupPercent) / 100f) * f);
+                        if (ask < floor) floor = Math.Max(1, ask);
+                    }
                     if (__result < floor) __result = floor;
                 }
 
@@ -447,7 +472,7 @@ namespace Armoury
                             var m = t.GetMethod("GetPrice", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
                             if (m == null || m.DeclaringType != t || seen.Contains(t)) continue;
                             seen.Add(t);
-                            // Priority.Last i rejestracja PO MarketGlut - biegniemy po nim (podloga 5% najpierw)
+                            // Priority.Last i rejestracja PO MarketGlut - biegniemy po nim (MarketGlut milczy, gdy dzialamy)
                             h.Patch(m, prefix: new HarmonyMethod(typeof(SupplyDemand), "PricePrefix") { priority = Priority.First },
                                        postfix: new HarmonyMethod(typeof(SupplyDemand), "PricePostfix") { priority = Priority.Last },
                                        finalizer: new HarmonyMethod(typeof(SupplyDemand), "PriceFinalizer"));

@@ -24,9 +24,13 @@ namespace Armoury
         [SettingPropertyGroup("Forging armour")]
         public bool CraftingEnabled { get; set; } = true;
 
-        [SettingPropertyInteger("Smithing Skill Per Tier", 0, 180, "0", HintText = "Smithing needed per tier - 40 means tier 5 plate wants 200")]
+        [SettingPropertyInteger("Smithing Skill Per Tier", 0, 140, "0", HintText = "Smithing you need before you may attempt a piece, per tier above the first - 35 means tier 5 plate opens at 140 and tier 6 at 175 (cloth 20 and leather, bows and crossbows 10 lower); also the gate for mending your own gear by hand. It only opens the door - the dice are set by Smithing Difficulty Per Tier")]
         [SettingPropertyGroup("Forging armour")]
-        public int SmithingSkillPerTier { get; set; } = 45;
+        public int SmithingSkillPerTier { get; set; } = 35;
+
+        [SettingPropertyInteger("Smithing Difficulty Per Tier", 0, 180, "0", HintText = "how hard a piece really is for the dice, per tier above the first, whatever the door says: the quality it comes out with (rusty to legendary - armour, bows and the reforged weapons alike), the risk of cracking it, the XP it teaches and the odds of copying a pattern. 45 keeps the odds as they were, so a lower Smithing Skill Per Tier lets you start finer work sooner - at first with more spoiled pieces - and never hands out more legends")]
+        [SettingPropertyGroup("Forging armour")]
+        public int SmithingDifficultyPerTier { get; set; } = 45;
 
         [SettingPropertyFloatingInteger("Iron Per Weight Unit", 0.00f, 5.60f, "0.00", HintText = "refined iron per pound of the finished piece")]
         [SettingPropertyGroup("Forging armour")]
@@ -420,9 +424,9 @@ namespace Armoury
         [SettingPropertyGroup("Wear and tear")]
         public float HarnessWearFactor { get; set; } = 0.15f;
 
-        [SettingPropertyFloatingInteger("Durability Per Armor Point", 0.00f, 80.00f, "0.00", HintText = "Jeff's pool: every point of protection gives this much durability, times the tier - 61 armor at tier 3 = 61 x 20 x 3 = 3660 points, and damage taken subtracts one for one")]
+        [SettingPropertyFloatingInteger("Durability Per Armor Point", 0.00f, 53.32f, "0.00", HintText = "Jeff's pool: every point of protection gives this much durability, times the tier - 61 armor at tier 3 = 61 x 13.33 x 3 = 2439 points, and damage taken subtracts one for one. 13.33 wears your armour 1.5 times faster than the old 20")]
         [SettingPropertyGroup("Wear and tear")]
-        public float DurabilityPerArmorPoint { get; set; } = 20f;
+        public float DurabilityPerArmorPoint { get; set; } = 13.33f;
 
         [SettingPropertyFloatingInteger("Wear Weapon Per Hit", 0.00f, 1.00f, "0.00", HintText = "wear on your weapon for every blow you land (bows wear per arrow that strikes home)")]
         [SettingPropertyGroup("Wear and tear")]
@@ -732,9 +736,13 @@ namespace Armoury
         [SettingPropertyGroup("The law of the battlefield")]
         public bool UniqueGearLawEnabled { get; set; } = true;
 
-        [SettingPropertyInteger("Min Sell Percent Of Value", 0, 20, "0", HintText = "merchants never pay less than this share of an item's clean value - scrap is still metal and leather (0 = off)")]
+        [SettingPropertyInteger("Min Sell Percent Of Value", 0, 10, "0", HintText = "merchants never pay less than this share of an item's clean value - scrap is still metal and leather. Only junk ever sinks this low: above the floor the price of worn gear follows its condition and the stall's supply and demand (0 = off)")]
         [SettingPropertyGroup("The law of the battlefield")]
-        public int MinSellPercentOfValue { get; set; } = 5;
+        public int MinSellPercentOfValue { get; set; } = 2;
+
+        [SettingPropertyBool("One Scrap Floor", HintText = "one floor for junk, after the stall's supply and demand: in towns and castles worn-out gear fetches its condition times the stall, never under Min Sell Percent Of Value - and never more than that stall itself asks for the very same piece, so a glutted stall pays little and nobody can buy junk cheap and sell it back at the floor. The glutted market's 5% start steps aside while supply and demand is on. Off = as before: a floor before the stall, the glutted market's 5% start, and the floor again after the stall")]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool OneScrapFloor { get; set; } = true;
 
         [SettingPropertyBool("Enlisted Soldier No Looting", HintText = "serving in a lord's army: the quartermasters strip the field - one soldier does not pocket the army's loot and gold")]
         [SettingPropertyGroup("The law of the battlefield")]
@@ -2236,7 +2244,7 @@ namespace Armoury
         [SettingPropertyGroup("Supply and demand")]
         public float SupplyDemandTradePricePercent { get; set; } = 50f;
 
-        [SettingPropertyBool("Market Glut Enabled", HintText = "a merchant needs only so many of one thing: each extra piece of a type you sell him fetches less")]
+        [SettingPropertyBool("Market Glut Enabled", HintText = "a merchant needs only so many of one thing: each extra piece of a type you sell him fetches less. With supply and demand on (and One Scrap Floor) it steps aside - the stall's own supply and demand prices the glut and Min Sell Percent Of Value is the only floor")]
         [SettingPropertyGroup("The glutted market")]
         public bool MarketGlutEnabled { get; set; } = true;
 
@@ -2562,6 +2570,7 @@ namespace Armoury
             s.ForgeArmourEnabled = ForgeArmourEnabled;
             s.CraftingEnabled = CraftingEnabled;
             s.SmithingSkillPerTier = SmithingSkillPerTier;
+            s.SmithingDifficultyPerTier = SmithingDifficultyPerTier;
             s.IronPerWeightUnit = IronPerWeightUnit;
             s.ClassCostBody = ClassCostBody;
             s.ClassCostLeg = ClassCostLeg;
@@ -2739,6 +2748,7 @@ namespace Armoury
             s.DesertionLawForAi = DesertionLawForAi;
             s.UniqueGearLawEnabled = UniqueGearLawEnabled;
             s.MinSellPercentOfValue = MinSellPercentOfValue;
+            s.OneScrapFloor = OneScrapFloor;
             s.EnlistedSoldierNoLooting = EnlistedSoldierNoLooting;
             s.FieldCraftEnabled = FieldCraftEnabled;
             s.SprintFatigueEnabled = SprintFatigueEnabled;
