@@ -1,3 +1,66 @@
+diff --git a/Armoury/src/McmSettings.cs b/Armoury/src/McmSettings.cs
+index fa5c2f7..4be3c1d 100644
+--- a/Armoury/src/McmSettings.cs
++++ b/Armoury/src/McmSettings.cs
+@@ -1452,6 +1452,42 @@ namespace Armoury
+         [SettingPropertyGroup("Workshops")]
+         public int WorkshopCandidates { get; set; } = 40;
+ 
++        [SettingPropertyBool("Workshop Trade Enabled", HintText = "workshops keep their books in the new coin (needs Historical Prices): the daily keep and the wages go into the town purse instead of vanishing, a failed shop is refitted with its new owner's own coin instead of 10000 from nowhere, the coin in the till stays with the shop when it changes hands, and a workshop is bought and sold for what it earns (off = the game's rules in the old coin: 100 a day into thin air, price by town prosperity)")]
++        [SettingPropertyGroup("Workshops")]
++        public bool WorkshopTradeEnabled { get; set; } = true;
++
++        [SettingPropertyFloatingInteger("Workshop Trade Upkeep Per Day", 0.00f, 16.00f, "0.00", HintText = "what every workshop pays the town each day whether it works or not - the master's own keep (a craftsman's 3 d) and the rent of the house (about 1 d a day, 30 shillings a year); the game took 100 a day")]
++        [SettingPropertyGroup("Workshops")]
++        public float WorkshopTradeUpkeepPerDay { get; set; } = 4f;
++
++        [SettingPropertyBool("Workshop Trade Batch Wages", HintText = "journeymen are paid by the batch: a workshop makes a batch of trade goods (bread, beer, wine, leather, linen, pottery, oil, tools, felt, velvet, jewelry) only when the market pays for the materials and for that batch's wages, and the wages go into the town - Workshop Workers man-days a day at Workshop Wage Per Day, shared by its trade lines (off = the game's rule: a batch must clear 200 of the old coin per day of work, which no baker, brewer, tanner or potter can at today's prices, so they stand idle)")]
++        [SettingPropertyGroup("Workshops")]
++        public bool WorkshopTradeBatchWages { get; set; } = true;
++
++        [SettingPropertyInteger("Workshop Trade Start Capital", 0, 8000, "0", HintText = "working coin of a workshop that makes only trade goods (bakery, brewery, tannery, weavery...): what it starts a new campaign with, what a new owner puts in from his own purse after a failure, and the level above which profit is paid out - a season of wages and a few batches of materials (the game: 10000 out of thin air). Never less than ten batches of its dearest material at the usual price, up to the game's 10000 (a velvet weavery buys raw silk at 1000 a bale, so it keeps 10000). Workshops that also make arms keep the game's 10000 - the materials of one mail barding cost thousands - and workshops in an old save keep their mark until they change trade")]
++        [SettingPropertyGroup("Workshops")]
++        public int WorkshopTradeStartCapital { get; set; } = 2000;
++
++        [SettingPropertyInteger("Workshop Trade Low Capital", 0, 2000, "0", HintText = "when your own workshop's till holds no more than this, its keep and wages are paid from your purse instead (the game: 5000)")]
++        [SettingPropertyGroup("Workshops")]
++        public int WorkshopTradeLowCapital { get; set; } = 500;
++
++        [SettingPropertyFloatingInteger("Workshop Trade Equipment Scale", 0.00f, 1.00f, "0.00", HintText = "worth of a workshop's tools and fittings in the new coin as a share of the old price list (bakery 6000 -> 1200, tannery 1000 -> 200): the floor under a workshop's price and the cost of changing what it makes - about what wages and tools fell by between the two coins")]
++        [SettingPropertyGroup("Workshops")]
++        public float WorkshopTradeEquipmentScale { get; set; } = 0.2f;
++
++        [SettingPropertyFloatingInteger("Workshop Trade Price Years", 0.00f, 12.00f, "0.00", HintText = "a workshop sells for this many years of its profit after the workshop tax its buyer will really pay (a notable pays Banner Kings' tax; you and the lords pay none unless Banner Kings' own workshop model is the game's), never less than its tools and fittings, plus the coin in its till; town rents sold at about ten years' purchase and merchant ventures paid 15-30% a year, but here a workshop is seized without payment whenever its owner's realm goes to war with the town's - so a buyer wants his coin back in three years")]
++        [SettingPropertyGroup("Workshops")]
++        public float WorkshopTradePriceYears { get; set; } = 3f;
++
++        [SettingPropertyInteger("Workshop Trade Profit Days", 0, 120, "0", HintText = "the profit a price is reckoned from is a running average over about this many days of the workshop's real takings (before that - what today's market prices promise); the shop also remembers its past year: a seller asks by the better of the two, a notable buying from you pays by the worse, so a shop that stood idle for a month is no bargain")]
++        [SettingPropertyGroup("Workshops")]
++        public int WorkshopTradeProfitDays { get; set; } = 30;
++
++        [SettingPropertyFloatingInteger("Workshop Trade Resale Share", 0.00f, 3.20f, "0.00", HintText = "a notable buying your workshop pays this share of its worth to him (after his own tax) plus the coin in its till - out of his own purse, and no more than he has")]
++        [SettingPropertyGroup("Workshops")]
++        public float WorkshopTradeResaleShare { get; set; } = 0.8f;
++
+         [SettingPropertyBool("Castle Villages Sell In Town", HintText = "villagers of a village held from a castle cart their goods to the nearest town market of their realm instead of the lord's castle - the castle was the lord's storehouse and garrison, never a market (off = they keep hauling to the castle)")]
+         [SettingPropertyGroup("The road to market")]
+         public bool CastleVillagesSellInTown { get; set; } = true;
+@@ -2830,6 +2866,15 @@ namespace Armoury
+             s.WorkshopCrudeKgPerOre = WorkshopCrudeKgPerOre;
+             s.WorkshopWoodPerOre = WorkshopWoodPerOre;
+             s.WorkshopCandidates = WorkshopCandidates;
++            s.WorkshopTradeEnabled = WorkshopTradeEnabled;
++            s.WorkshopTradeUpkeepPerDay = WorkshopTradeUpkeepPerDay;
++            s.WorkshopTradeBatchWages = WorkshopTradeBatchWages;
++            s.WorkshopTradeStartCapital = WorkshopTradeStartCapital;
++            s.WorkshopTradeLowCapital = WorkshopTradeLowCapital;
++            s.WorkshopTradeEquipmentScale = WorkshopTradeEquipmentScale;
++            s.WorkshopTradePriceYears = WorkshopTradePriceYears;
++            s.WorkshopTradeProfitDays = WorkshopTradeProfitDays;
++            s.WorkshopTradeResaleShare = WorkshopTradeResaleShare;
+             s.CastleVillagesSellInTown = CastleVillagesSellInTown;
+             s.MarketMaxDistance = MarketMaxDistance;
+             s.MarketCartFactor = MarketCartFactor;
 diff --git a/Armoury/src/MoneyLedger.cs b/Armoury/src/MoneyLedger.cs
 index 3e49cb3..2b9c55e 100644
 --- a/Armoury/src/MoneyLedger.cs
@@ -50,7 +113,7 @@ index 3e49cb3..2b9c55e 100644
              for (int k = 0; k < Marks; k++)
              {
 diff --git a/Armoury/src/Settings.cs b/Armoury/src/Settings.cs
-index 980af17..572f669 100644
+index d50a1b6..97f7944 100644
 --- a/Armoury/src/Settings.cs
 +++ b/Armoury/src/Settings.cs
 @@ -425,6 +425,15 @@ namespace Armoury
@@ -60,17 +123,17 @@ index 980af17..572f669 100644
 +        public bool WorkshopTradeEnabled = true;           // workshops keep their books in the new coin (needs Historical Prices): the daily keep and the wages go into the town purse instead of vanishing, a failed shop is refitted with its new owner's own coin instead of 10000 from nowhere, the coin in the till stays with the shop when it changes hands, and a workshop is bought and sold for what it earns (off = the game's rules in the old coin: 100 a day into thin air, price by town prosperity)
 +        public float WorkshopTradeUpkeepPerDay = 4f;       // what every workshop pays the town each day whether it works or not - the master's own keep (a craftsman's 3 d) and the rent of the house (about 1 d a day, 30 shillings a year); the game took 100 a day
 +        public bool WorkshopTradeBatchWages = true;        // journeymen are paid by the batch: a workshop makes a batch of trade goods (bread, beer, wine, leather, linen, pottery, oil, tools, felt, velvet, jewelry) only when the market pays for the materials and for that batch's wages, and the wages go into the town - Workshop Workers man-days a day at Workshop Wage Per Day, shared by its trade lines (off = the game's rule: a batch must clear 200 of the old coin per day of work, which no baker, brewer, tanner or potter can at today's prices, so they stand idle)
-+        public int WorkshopTradeStartCapital = 2000;       // working coin of a workshop that makes only trade goods (bakery, brewery, tannery, weavery...): what it starts a new campaign with, what a new owner puts in from his own purse after a failure, and the level above which profit is paid out - a season of wages and a few batches of materials (the game: 10000 out of thin air). Workshops that also make arms keep the game's 10000 - the materials of one mail barding cost thousands - and workshops in an old save keep their mark until they change trade
++        public int WorkshopTradeStartCapital = 2000;       // working coin of a workshop that makes only trade goods (bakery, brewery, tannery, weavery...): what it starts a new campaign with, what a new owner puts in from his own purse after a failure, and the level above which profit is paid out - a season of wages and a few batches of materials (the game: 10000 out of thin air). Never less than ten batches of its dearest material at the usual price, up to the game's 10000 (a velvet weavery buys raw silk at 1000 a bale, so it keeps 10000). Workshops that also make arms keep the game's 10000 - the materials of one mail barding cost thousands - and workshops in an old save keep their mark until they change trade
 +        public int WorkshopTradeLowCapital = 500;          // when your own workshop's till holds no more than this, its keep and wages are paid from your purse instead (the game: 5000)
 +        public float WorkshopTradeEquipmentScale = 0.2f;   // worth of a workshop's tools and fittings in the new coin as a share of the old price list (bakery 6000 -> 1200, tannery 1000 -> 200): the floor under a workshop's price and the cost of changing what it makes - about what wages and tools fell by between the two coins
-+        public float WorkshopTradePriceYears = 3f;         // a workshop sells for this many years of its profit after the town's tax (never less than its tools and fittings), plus the coin in its till; town rents sold at about ten years' purchase and merchant ventures paid 15-30% a year, but here a workshop is seized without payment whenever its owner's realm goes to war with the town's - so a buyer wants his coin back in three years
-+        public int WorkshopTradeProfitDays = 30;           // the profit a price is reckoned from is a running average over about this many days of the workshop's real takings (before that - what today's market prices promise)
-+        public float WorkshopTradeResaleShare = 0.8f;      // a notable buying your workshop pays this share of its worth (plus the coin in its till) - out of his own purse, and no more than he has
++        public float WorkshopTradePriceYears = 3f;         // a workshop sells for this many years of its profit after the workshop tax its buyer will really pay (a notable pays Banner Kings' tax; you and the lords pay none unless Banner Kings' own workshop model is the game's), never less than its tools and fittings, plus the coin in its till; town rents sold at about ten years' purchase and merchant ventures paid 15-30% a year, but here a workshop is seized without payment whenever its owner's realm goes to war with the town's - so a buyer wants his coin back in three years
++        public int WorkshopTradeProfitDays = 30;           // the profit a price is reckoned from is a running average over about this many days of the workshop's real takings (before that - what today's market prices promise); the shop also remembers its past year: a seller asks by the better of the two, a notable buying from you pays by the worse, so a shop that stood idle for a month is no bargain
++        public float WorkshopTradeResaleShare = 0.8f;      // a notable buying your workshop pays this share of its worth to him (after his own tax) plus the coin in its till - out of his own purse, and no more than he has
  
          // --- The road to market ---
          public bool CastleVillagesSellInTown = true;       // villagers of a village held from a castle cart their goods to the nearest town market of their realm instead of the lord's castle - the castle was the lord's storehouse and garrison, never a market (off = they keep hauling to the castle)
 diff --git a/Armoury/src/SubModuleMain.cs b/Armoury/src/SubModuleMain.cs
-index d0dce15..e5e27c6 100644
+index dd4971f..47a5cc9 100644
 --- a/Armoury/src/SubModuleMain.cs
 +++ b/Armoury/src/SubModuleMain.cs
 @@ -65,6 +65,7 @@ namespace Armoury
@@ -81,7 +144,7 @@ index d0dce15..e5e27c6 100644
                  Stables.ApplyAll(_harmony);
                  ShieldGuard.ApplyAll(_harmony);  // strzaly przestaja lupic tarcze (RBM liczy je x1.5)
                  SpeedDepth.ApplyAll(_harmony);   // licznik zagniezdzenia - PRZED wszystkimi latkami predkosci/morale
-@@ -171,6 +172,7 @@ namespace Armoury
+@@ -172,6 +173,7 @@ namespace Armoury
                  starter.AddBehavior(new MusterBook());
                  starter.AddBehavior(new HideoutSpotter());
                  starter.AddBehavior(new HouseLevies());
@@ -90,7 +153,7 @@ index d0dce15..e5e27c6 100644
              }
              catch (Exception e) { Log.Error("OnGameStart", e); }
 diff --git a/Armoury/src/WorkshopLaw.cs b/Armoury/src/WorkshopLaw.cs
-index 949da2c..16193e1 100644
+index 0be4a83..e119c66 100644
 --- a/Armoury/src/WorkshopLaw.cs
 +++ b/Armoury/src/WorkshopLaw.cs
 @@ -40,7 +40,9 @@ namespace Armoury
@@ -106,10 +169,10 @@ index 949da2c..16193e1 100644
          private static readonly Dictionary<Workshop, float[]> _owed = new Dictionary<Workshop, float[]>();     // ruda, drewno, skora, len
 diff --git a/Armoury/src/WorkshopTrade.cs b/Armoury/src/WorkshopTrade.cs
 new file mode 100644
-index 0000000..64c90c1
+index 0000000..4fb61b3
 --- /dev/null
 +++ b/Armoury/src/WorkshopTrade.cs
-@@ -0,0 +1,947 @@
+@@ -0,0 +1,1093 @@
 +using System;
 +using System.Collections.Generic;
 +using System.Globalization;
@@ -155,9 +218,11 @@ index 0000000..64c90c1
 +    ///     rzemieslnicy zostaja przy 10 000 gry - tyle kosztuje wykucie najdrozszych sztuk (kropierz kolczy wart 10-11 tys. d), mniej
 +    ///     zmieniloby po cichu produkcje uzbrojenia. Prog "z kiesy gracza" w nowej monecie. Przy kazdej zmianie wlasciciela kapital
 +    ///     ZOSTAJE (nic z niczego i nic w nicosc), a po bankructwie nowy wlasciciel wklada kapital z WLASNEJ kiesy;
-+    ///  4. CENA: wartosc warsztatu = WorkshopTradePriceYears lat jego zysku po podatku BK (srednia kroczaca prawdziwego wyniku
-+    ///     dnia; w pierwszej dobie - oczekiwany wynik z cen targu), nie mniej niz wartosc sprzetu; do tego kapital w kasie,
-+    ///     ktory zostaje w warsztacie. Notabl kupujacy od gracza placi czesc tej wartosci z WLASNEJ kiesy;
++    ///  4. CENA: wartosc warsztatu = WorkshopTradePriceYears lat jego zysku po podatku, ktory KUPUJACY naprawde zaplaci (notabl:
++    ///     2 x stawka BK; gracz i lordowie: 0, dopoki czynnym modelem warsztatow nie jest model BK), ze sredniej kroczacej
++    ///     prawdziwego wyniku dnia (pierwszej doby - oczekiwany wynik z cen targu), nie mniej niz wartosc sprzetu; do tego kapital
++    ///     w kasie, ktory zostaje w warsztacie. Gracz kupuje wedle lepszej z dwoch pamieci (ok. 30 dob, rok), notabl odkupuje
++    ///     od gracza czesc wartosci wedle gorszej - z WLASNEJ kiesy (recenzja: bez okazji na warsztacie, ktory chwilowo stoi);
 +    ///  5. log dzienny "Warsztaty towarowe:" i linia wyjasnienia ceny w rozmowie kupna (po angielsku).
 +    /// Linii uzbrojenia (WorkshopLaw), ukrytych rzemieslnikow, receptur i szybkosci NIE rusza. Przy wylaczonym - gra jak dotad.
 +    /// </summary>
@@ -168,6 +233,7 @@ index 0000000..64c90c1
 +        {
 +            public string Type;                 // typ warsztatu, dla ktorego liczona jest srednia (zmiana typu = od nowa)
 +            public float Avg;                   // srednia kroczaca wyniku dnia (po placach i utrzymaniu, przed wyplata wlascicielowi i podatkiem)
++            public float Slow;                  // to samo z pamiecia roku (recenzja: sprzedajacy pamieta dobre lata, kupujacy zle - miesiac przestoju nie robi z warsztatu okazji)
 +            public int Days;                    // ile dob weszlo do sredniej
 +            public int Op;                      // dzis: zmiana kapitalu w RunTownWorkshop (utarg - wsad - place z kapitalu)
 +            public int Purse;                   // dzis: place cykli zaplacone z kiesy gracza
@@ -213,6 +279,9 @@ index 0000000..64c90c1
 +        private static bool Batch { get { return On && Settings.Current.WorkshopTradeBatchWages; } }
 +        private static float Upkeep { get { return Math.Max(0f, Settings.Current.WorkshopTradeUpkeepPerDay); } }
 +        private static int LowCapital { get { return Math.Max(0, Settings.Current.WorkshopTradeLowCapital); } }
++        private static int Span { get { return Math.Max(2, Settings.Current.WorkshopTradeProfitDays); } }
++        /// <summary>Pamiec roku (recenzja): rok kalendarza Armoury, nie krocej niz pamiec biezaca.</summary>
++        private static int YearSpan { get { return Math.Max(Span, Math.Max(2, CampaignTime.DaysInYear)); } }
 +        private static bool Live { get { var c = Campaign.Current; return c != null && c.GameStarted; } }
 +
 +        /// <summary>Wyjatek przy jednym warsztacie: pierwszy z danego miejsca do pliku, kazdy liczony w linii dnia (funkcji nie gasimy).</summary>
@@ -240,7 +309,7 @@ index 0000000..64c90c1
 +                {
 +                    // zmiana produkcji albo bankructwo: srednia od nowa. Typ potrafi tez zmienic cudzy kod wprost
 +                    // (Workshop.ChangeWorkshopProduction - np. CrashScribe "strawa Polnocy") - wtedy znacznik kapitalu poprawiamy tutaj
-+                    r.Type = type; r.Avg = 0f; r.Days = 0; r.WageCarry = 0f;
++                    r.Type = type; r.Avg = 0f; r.Slow = 0f; r.Days = 0; r.WageCarry = 0f;
 +                    try { if (On) SyncInitialCapital(w); } catch (Exception e) { Stumble("WorkshopTrade.Get(kapital)", e); }
 +                }
 +                return r;
@@ -249,9 +318,13 @@ index 0000000..64c90c1
 +            string[] sv;
 +            if (_saved.TryGetValue(Key(w), out sv) && sv.Length >= 3 && sv[0] == type)
 +            {
-+                float a; int d;
++                float a, sl; int d;
 +                if (float.TryParse(sv[1], NumberStyles.Float, CultureInfo.InvariantCulture, out a) && int.TryParse(sv[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out d) && d > 0)
-+                { r.Avg = a; r.Days = d; }
++                {
++                    r.Avg = a; r.Days = d;
++                    // pamiec roku (pole dopisane w recenzji); brak pola = srednia miesieczna
++                    r.Slow = sv.Length >= 4 && float.TryParse(sv[3], NumberStyles.Float, CultureInfo.InvariantCulture, out sl) ? sl : a;
++                }
 +            }
 +            _rec[w] = r;
 +            return r;
@@ -469,9 +542,10 @@ index 0000000..64c90c1
 +        private static void CloseDay(Workshop shop, Rec rec, int keepPaid)
 +        {
 +            int x = rec.Op - rec.Purse - keepPaid;
-+            if (rec.Days <= 0) rec.Avg = Expected(shop);          // pierwsza doba: punkt wyjscia = oczekiwany wynik z cen targu
-+            int span = Math.Max(2, Settings.Current.WorkshopTradeProfitDays);
++            if (rec.Days <= 0) { rec.Avg = Expected(shop); rec.Slow = rec.Avg; }   // pierwsza doba: punkt wyjscia = oczekiwany wynik z cen targu
++            int span = Span;
 +            rec.Avg += (x - rec.Avg) / Math.Min(rec.Days + 2, span);
++            rec.Slow += (x - rec.Slow) / Math.Min(rec.Days + 2, YearSpan);
 +            rec.Days++;
 +            TypeStat t;
 +            if (!_dType.TryGetValue(rec.Type, out t)) { t = new TypeStat(); _dType[rec.Type] = t; }
@@ -510,13 +584,72 @@ index 0000000..64c90c1
 +        /// Typ czysto towarowy: WorkshopTradeStartCapital. Typ z choc jedna linia uzbrojenia i ukryci rzemieslnicy: wartosc gry
 +        /// (10 000) - material na najdrozsze sztuki w robocie (WorkshopLaw kupuje go z kapitalu) kosztuje tysiace d, wiec mniejszy
 +        /// kapital zmienilby produkcje uzbrojenia.
++        /// Recenzja: ta sama zasada dla wsadu towarowego - gra puszcza cykl tylko, gdy kapital >= cena wsadu partii; tkalnia
++        /// aksamitu kupuje bele jedwabiu za 1000 d (x wspolczynnik ceny), wiec z 2000 w kasie stalaby, gdy jedwab jest ponad 2 x
++        /// drozszy niz zwykle (w grze z 10 000 - dopiero ponad 10 x). Kapital czysto towarowy = co najmniej BatchesInTill partii
++        /// najdrozszego wsadu w cenach bazowych, najwyzej tyle co gra: aksamit 10 000 jak dotad, piekarnia, garbarnia, winiarnia 2000.
 +        /// </summary>
 +        internal static int StartCapitalFor(WorkshopType t)
 +        {
 +            int game = Campaign.Current.Models.WorkshopModel.InitialCapital;
 +            if (t == null || t.IsHidden) return game;
-+            foreach (var p in t.Productions) if (!IsTradeLine(p)) return game;
-+            return Math.Max(100, Settings.Current.WorkshopTradeStartCapital);
++            int batch = 0;
++            foreach (var p in t.Productions)
++            {
++                if (!IsTradeLine(p)) return game;
++                int c = 0;
++                if (p.Inputs != null)
++                    foreach (var i in p.Inputs)
++                    {
++                        var it = Sample(i.Item1);
++                        if (it != null) c += Math.Max(0, it.Value) * Math.Max(1, i.Item2);
++                    }
++                batch = Math.Max(batch, c);
++            }
++            return Math.Min(Math.Max(game, 100), Math.Max(Math.Max(100, Settings.Current.WorkshopTradeStartCapital), batch * BatchesInTill));
++        }
++
++        private const int BatchesInTill = 10;   // ile partii najdrozszego wsadu warsztat ma w kasie na start (jak 10 000 gry dla aksamitu)
++
++        /// <summary>
++        /// Nowa kampania (raz, w sesji, ktora ja zalozyla - po HistoricalPrices.Apply w OnSessionLaunched ArmouryBehavior): warsztaty
++        /// zaklada gra PRZED przeliczeniem cen (OnNewGameCreatedPartialFollowUp), wiec InitPostfix wycenil wsad w starej monecie
++        /// (jedwab 80 zamiast 1000). Tu ta sama zasada w nowej monecie - tylko warsztaty nietkniete od zalozenia swiata (kapital =
++        /// znacznik); to dar startowy swiata, jak 10 000 gry, nie zloto w trakcie gry. Zwraca opis do logu.
++        /// </summary>
++        internal static string SeedNewCampaign()
++        {
++            if (!On || Campaign.Current == null) return null;
++            bool fresh = false;
++            try { fresh = Campaign.Current.CampaignGameLoadingType == Campaign.GameLoadingType.NewCampaign; }
++            catch (Exception e) { Stumble("WorkshopTrade.SeedNewCampaign(rodzaj sesji)", e); return null; }
++            if (!fresh) return null;
++            int changed = 0, seen = 0; long delta = 0;
++            var byType = new Dictionary<string, string>();
++            foreach (var t in Town.AllTowns)
++            {
++                if (t == null || t.Workshops == null) continue;
++                foreach (var w in t.Workshops)
++                {
++                    try
++                    {
++                        if (w == null || w.WorkshopType == null || w.WorkshopType.IsHidden || w.Owner == null) continue;
++                        seen++;
++                        int want = StartCapitalFor(w.WorkshopType);
++                        if (want == w.InitialCapital || w.Capital != w.InitialCapital) continue;
++                        delta += want - w.Capital;
++                        byType[TypeId(w)] = w.InitialCapital + " -> " + want;
++                        SetCapitalMark(w, want, true);
++                        changed++;
++                    }
++                    catch (Exception e) { Stumble("WorkshopTrade.SeedNewCampaign", e); }
++                }
++            }
++            var parts = new List<string>();
++            foreach (var kv in byType) parts.Add(kv.Key + " " + kv.Value);
++            return "nowa kampania - kapital startowy wedle cen nowej monety: sprawdzono " + seen + " warsztatow, poprawiono " + changed
++                   + (parts.Count > 0 ? " (" + string.Join(", ", parts.ToArray()) + ")" : "") + ", kapital warsztatow " + (delta >= 0 ? "+" : "") + delta
++                   + " (dar startowy swiata - gra dawala 10000 kazdemu).";
 +        }
 +
 +        private static void SetCapitalMark(Workshop w, int initial, bool alsoCapital)
@@ -673,23 +806,41 @@ index 0000000..64c90c1
 +
 +        internal sealed class Quote
 +        {
-+            public int Price, Going, Equip, Capital, Days;
++            public int Price, Going, Equip, Capital, Days, Window;
 +            public float Profit, Tax, Years;
 +            public bool Floor;                  // zysk nie dzwiga wartosci sprzetu - cena to sam sprzet
 +        }
 +
 +        /// <summary>
-+        /// Cena warsztatu dla kupujacego: lata zysku po podatku miasta (srednia kroczaca prawdziwego wyniku; bez historii -
-+        /// oczekiwany wynik z dzisiejszych cen targu), nie mniej niz wartosc sprzetu, plus kapital w kasie (zostaje w warsztacie).
++        /// Cena warsztatu, ktory kupuje `buyer` od obecnego wlasciciela: lata zysku po podatku, ktory ten KUPUJACY naprawde zaplaci
++        /// (srednia kroczaca prawdziwego wyniku; bez historii - oczekiwany wynik z dzisiejszych cen targu), nie mniej niz wartosc
++        /// sprzetu, plus kapital w kasie (zostaje w warsztacie). Sprzedajacy liczy zysk z lepszej z dwoch pamieci (miesiac, rok).
 +        /// </summary>
-+        internal static Quote QuoteFor(Workshop w, Hero buyer)
++        internal static Quote QuoteFor(Workshop w, Hero buyer) { return Build(w, TaxShare(w.Settlement, buyer), true); }
++
++        /// <summary>Cena, ktora daje NOTABL kupujacy warsztat od gracza (przed udzialem WorkshopTradeResaleShare): jego podatek i gorsza z dwoch pamieci.</summary>
++        internal static Quote QuoteForNotable(Workshop w) { return Build(w, NotableTax(w.Settlement, w.Owner), false); }
++
++        /// <summary>
++        /// Recenzja: sprzedajacy pamieta dobre lata, kupujacy zle. Sama srednia z ok. 30 dob robila z warsztatu, ktory miesiac stal
++        /// bez wsadu (oblezenie, pusta polka), okazje za cene sprzetu - gracz kupowal go za ulamek, a po powrocie wsadu odsprzedawal
++        /// notablowi za wielokrotnosc. Teraz gracz placi wedle lepszej z pamieci (miesiac, rok), notabl daje wedle gorszej - kupno i
++        /// odsprzedaz w tej samej chwili nigdy nie daja zysku; tanio idzie tylko warsztat, ktory nie zarabia od roku.
++        /// </summary>
++        private static Quote Build(Workshop w, float tax, bool sellerAsks)
 +        {
 +            var s = Settings.Current;
 +            var q = new Quote();
 +            var rec = Get(w);
 +            q.Days = rec.Days;
-+            q.Profit = rec.Days > 0 ? rec.Avg : Expected(w);
-+            q.Tax = TaxShare(w.Settlement, buyer);
++            if (rec.Days > 0)
++            {
++                bool year = sellerAsks ? rec.Slow > rec.Avg : rec.Slow < rec.Avg;
++                q.Profit = year ? rec.Slow : rec.Avg;
++                q.Window = Math.Min(rec.Days, year ? YearSpan : Span);
++            }
++            else q.Profit = Expected(w);
++            q.Tax = tax;
 +            q.Years = Math.Max(0f, s.WorkshopTradePriceYears);
 +            float net = Math.Max(0f, q.Profit) * (1f - q.Tax);
 +            q.Going = (int)Math.Round(net * Math.Max(1, CampaignTime.DaysInYear) * q.Years);
@@ -711,30 +862,44 @@ index 0000000..64c90c1
 +            catch (Exception e) { Stumble("WorkshopTrade.CostPlayerPostfix", e); }
 +        }
 +
-+        /// <summary>DefaultWorkshopModel.GetCostForNotable - tyle notabl daje graczowi: czesc wartosci (jego ryzyko) plus kapital w kasie.</summary>
++        /// <summary>DefaultWorkshopModel.GetCostForNotable - tyle notabl daje graczowi: czesc wartosci DLA NIEGO (jego podatek, gorsza pamiec) plus kapital w kasie.</summary>
 +        public static void CostNotablePostfix(Workshop __0, ref int __result)
 +        {
 +            try
 +            {
 +                if (!On || !Live || __0 == null || __0.WorkshopType == null || __0.WorkshopType.IsHidden) return;
-+                var q = QuoteFor(__0, __0.Owner);
++                var q = QuoteForNotable(__0);
 +                float share = MBMath.ClampFloat(Settings.Current.WorkshopTradeResaleShare, 0f, 1f);
 +                __result = (int)Math.Round(Math.Max(q.Going, q.Equip) * share) + q.Capital;
 +            }
 +            catch (Exception e) { Stumble("WorkshopTrade.CostNotablePostfix", e); }
 +        }
 +
++        private static Type _bkWsType; private static bool _bkWsTried;
++
 +        /// <summary>
-+        /// Jaka czesc zysku warsztatu zabiera podatek miasta BK. BK liczy podatek od zysku NAGROMADZONEGO w kapitale (ProfitMade x
-+        /// stawka), a wlascicielowi wyplaca co dobe polowe tego zysku - w stanie ustalonym podatek to 2 x stawka zysku dnia.
-+        /// Wlasciciel miasta podatku od swoich warsztatow nie placi (BKClanFinanceModel.AddExpenses). Bez BK: 0.
++        /// Jaka czesc zysku warsztatu naprawde zabiera podatek BK temu, kto bedzie wlascicielem (recenzja - sprawdzone w dekompilacji):
++        ///  - NOTABL: BKClanFinanceModel.CalculateNotableDailyGoldChange zawsze odejmuje TaxExpenses (stawka x zysk NAGROMADZONY
++        ///    w kapitale), a wyplata to polowa tego zysku (CalculateOwnerIncomeFromWorkshop) - w stanie ustalonym 2 x stawka zysku dnia;
++        ///  - ROD (gracz, lord): BKClanFinanceModel.AddExpenses pobiera podatek warsztatow tylko glowie rodu, tylko poza wlasnym
++        ///    miastem i tylko gdy CZYNNYM modelem warsztatow gry jest BKWorkshopModel. U Jeffa czynny jest NavalDLCWorkshopModel
++        ///    (BK swojego nie rejestruje), wiec gracz i lordowie podatku od warsztatow nie placa wcale - autor liczyl graczowi 40%
++        ///    (cena o 40% za niska, a rozmowa obiecywala podatek, ktorego nie bedzie).
++        /// Bez BK: 0.
 +        /// </summary>
 +        internal static float TaxShare(Settlement st, Hero payer)
 +        {
 +            try
 +            {
 +                if (st == null || payer == null) return 0f;
-+                if (!payer.IsNotable && payer.Clan != null && st.OwnerClan == payer.Clan) return 0f;
++                if (!payer.IsNotable)
++                {
++                    var clan = payer.Clan;
++                    if (clan == null || clan.Leader != payer || st.OwnerClan == clan) return 0f;
++                    if (!_bkWsTried) { _bkWsTried = true; _bkWsType = AccessTools.TypeByName("BannerKings.Models.Vanilla.BKWorkshopModel"); }
++                    var active = Campaign.Current != null && Campaign.Current.Models != null ? Campaign.Current.Models.WorkshopModel : null;
++                    if (_bkWsType == null || active == null || !_bkWsType.IsInstanceOfType(active)) return 0f;
++                }
 +                if (!_bkTried)
 +                {
 +                    _bkTried = true;
@@ -750,12 +915,29 @@ index 0000000..64c90c1
 +            catch (Exception e) { Stumble("WorkshopTrade.TaxShare", e); return 0f; }
 +        }
 +
++        /// <summary>Podatek notabla, ktory odkupi warsztat od gracza (kupca losuje gra dopiero przy transakcji - bierzemy pierwszego
++        /// zywego notabla miasta poza obecnym wlascicielem; stawka BK rozni sie miedzy nimi tylko jednym atutem).</summary>
++        private static float NotableTax(Settlement st, Hero owner)
++        {
++            if (st == null) return 0f;
++            Hero who = null;
++            var list = st.Notables;
++            if (list != null)
++                foreach (var h in list)
++                    if (h != null && h.IsAlive && h != owner) { who = h; break; }
++            if (who == null) return 0f;
++            return TaxShare(st, who);
++        }
++
 +        private static ItemObject Sample(ItemCategory cat)
 +        {
 +            ItemObject it;
++            if (cat == null) return null;
 +            if (_sample.TryGetValue(cat, out it)) return it;
 +            it = null;
-+            foreach (var o in Game.Current.ObjectManager.GetObjectTypeList<ItemObject>())
++            var om = Game.Current != null ? Game.Current.ObjectManager : null;
++            if (om == null) return null;                    // przedmioty jeszcze nie wczytane - bez zapamietywania, nastepne wywolanie sprobuje znowu
++            foreach (var o in om.GetObjectTypeList<ItemObject>())
 +                if (o != null && o.ItemCategory == cat && !o.NotMerchandise && !o.MultiplayerItem && (it == null || o.Value < it.Value)) it = o;
 +            _sample[cat] = it;
 +            return it;
@@ -841,15 +1023,16 @@ index 0000000..64c90c1
 +            var sb = new StringBuilder();
 +            sb.Append("I'm willing to sell. It will cost you ").Append(price).Append(" denars. ");
 +            string earned = q.Days > 0
-+                ? "The shop has cleared about " + N1(q.Profit) + " a day over the last " + Math.Min(q.Days, Math.Max(2, Settings.Current.WorkshopTradeProfitDays)) + " days"
++                ? "The shop has cleared about " + N1(q.Profit) + " a day " + (q.Window >= YearSpan ? "over the past year" : "over the last " + Math.Max(1, q.Window) + " days")
 +                : "At today's market prices the shop should clear about " + N1(q.Profit) + " a day";
 +            if (q.Floor)
 +                sb.Append(earned).Append(" - too little to price it by, so I ask only what its tools and fittings are worth: ").Append(q.Equip).Append(". ");
 +            else
 +            {
 +                sb.Append(earned);
-+                if (q.Tax > 0.001f) sb.Append("; the town takes about ").Append(N1(q.Tax * 100f)).Append("% of that in tax");
-+                sb.Append(". I ask ").Append(N1(q.Years)).Append(" years of what is left: ").Append(q.Going).Append(". ");
++                bool taxed = q.Tax > 0.001f;
++                if (taxed) sb.Append("; the town takes about ").Append(N1(q.Tax * 100f)).Append("% of that in tax");
++                sb.Append(". I ask ").Append(N1(q.Years)).Append(taxed ? " years of what is left: " : " years of that: ").Append(q.Going).Append(". ");
 +            }
 +            sb.Append("The ").Append(q.Capital).Append(" in its till stays with the shop and becomes yours. Are you willing to pay?");
 +            return sb.ToString();
@@ -912,7 +1095,8 @@ index 0000000..64c90c1
 +                  .Append(" | cena kupna dla gracza: mediana ").Append(med).Append(", od ").Append(min).Append(" do ").Append(max).Append(" (").Append(prices.Count).Append(" warsztatow)");
 +                if (sampleTown != null) sb.Append("; ").Append(SampleLine(sampleTown));
 +                sb.Append(" | zasady: utrzymanie ").Append(N1(Upkeep)).Append(" d na dobe, place cyklu ").Append(s.WorkshopTradeBatchWages ? N1(Math.Max(0f, s.WorkshopWorkers) * Math.Max(0f, s.WorkshopWagePerDay)) + " d na dobe pelnej pracy" : "WYLACZONE (prog gry 200 / szybkosc)")
-+                  .Append(", cena = ").Append(N1(Math.Max(0f, s.WorkshopTradePriceYears))).Append(" x roczny zysk po podatku (nie mniej niz sprzet) + kapital, srednia zysku z ok. ").Append(Math.Max(2, s.WorkshopTradeProfitDays)).Append(" dob; potkniecia ").Append(_dStumbles).Append('.');
++                  .Append(", cena = ").Append(N1(Math.Max(0f, s.WorkshopTradePriceYears))).Append(" x roczny zysk po podatku kupujacego (nie mniej niz sprzet) + kapital; zysk ze sredniej ok. ").Append(Span)
++                  .Append(" dob albo roku - gracz kupuje wedle lepszej, notabl odkupuje wedle gorszej; potkniecia ").Append(_dStumbles).Append('.');
 +                Log.Info(sb.ToString());
 +            }
 +            catch (Exception e) { Log.Error("WorkshopTrade.Daily", e); }
@@ -930,12 +1114,32 @@ index 0000000..64c90c1
 +                try
 +                {
 +                    var q = QuoteFor(w, Hero.MainHero);
-+                    parts.Add(TypeId(w) + " " + q.Price + " (zysk " + (q.Days > 0 ? "sredni z " + q.Days + " dob " : "oczekiwany z cen ") + N1(q.Profit) + " d na dobe, podatek " + N1(q.Tax * 100f) + "%, "
-+                              + (q.Floor ? "sam sprzet " + q.Equip : N1(q.Years) + " x roczny zysk = " + q.Going) + ", kapital " + q.Capital + ")");
++                    parts.Add(TypeId(w) + " " + q.Price + " (zysk " + (q.Days > 0 ? "sredni z " + q.Window + " dob" + (q.Window < q.Days ? " (pamiec " + q.Days + ") " : " ") : "oczekiwany z cen ") + N1(q.Profit) + " d na dobe, podatek gracza " + N1(q.Tax * 100f) + "%, "
++                              + (q.Floor ? "sam sprzet " + q.Equip : N1(q.Years) + " x roczny zysk = " + q.Going) + ", kapital " + q.Capital + ProductIndex(t, w) + ")");
 +                }
 +                catch (Exception e) { Stumble("WorkshopTrade.SampleLine", e); }
 +            }
 +            return "przyklad " + (t.Name != null ? t.Name.ToString() : "?") + " (dobrobyt " + (int)t.Prosperity + "): " + (parts.Count > 0 ? string.Join(", ", parts.ToArray()) : "brak warsztatow");
++        }
++
++        /// <summary>Recenzja (tylko log): wspolczynnik ceny wyrobu i wsadu pierwszej linii towarowej w tym miescie - rachunek autora
++        /// zakladal 1.0 wszedzie, a zysk (i cena) piekarni zalezy glownie od tego, ile miasto placi za chleb.</summary>
++        private static string ProductIndex(Town t, Workshop w)
++        {
++            try
++            {
++                foreach (var p in w.WorkshopType.Productions)
++                {
++                    if (!IsTradeLine(p)) continue;
++                    var sb = new StringBuilder("; wyrob ");
++                    sb.Append(p.Outputs[0].Item1.StringId).Append(" x").Append(t.GetItemCategoryPriceIndex(p.Outputs[0].Item1).ToString("0.00", CultureInfo.InvariantCulture));
++                    if (p.Inputs != null && p.Inputs.Count > 0)
++                        sb.Append(", wsad ").Append(p.Inputs[0].Item1.StringId).Append(" x").Append(t.GetItemCategoryPriceIndex(p.Inputs[0].Item1).ToString("0.00", CultureInfo.InvariantCulture));
++                    return sb.ToString();
++                }
++            }
++            catch (Exception e) { Stumble("WorkshopTrade.ProductIndex", e); }
++            return "";
 +        }
 +
 +        // ------------------------------------------------------------ zapis
@@ -947,7 +1151,8 @@ index 0000000..64c90c1
 +                var w = kv.Key; var r = kv.Value;
 +                if (w == null || r == null || r.Days <= 0 || w.Settlement == null) continue;
 +                if (sb.Length > 0) sb.Append(';');
-+                sb.Append(Key(w)).Append('|').Append(r.Type).Append('|').Append(r.Avg.ToString("0.###", CultureInfo.InvariantCulture)).Append('|').Append(r.Days);
++                sb.Append(Key(w)).Append('|').Append(r.Type).Append('|').Append(r.Avg.ToString("0.###", CultureInfo.InvariantCulture)).Append('|').Append(r.Days)
++                  .Append('|').Append(r.Slow.ToString("0.###", CultureInfo.InvariantCulture));
 +            }
 +            // warsztaty, ktorych w tej sesji jeszcze nikt nie rozliczyl, zachowuja zapis z poprzedniej
 +            var live = new HashSet<string>();
@@ -957,6 +1162,7 @@ index 0000000..64c90c1
 +                if (live.Contains(kv.Key) || kv.Value == null || kv.Value.Length < 3) continue;
 +                if (sb.Length > 0) sb.Append(';');
 +                sb.Append(kv.Key).Append('|').Append(kv.Value[0]).Append('|').Append(kv.Value[1]).Append('|').Append(kv.Value[2]);
++                if (kv.Value.Length >= 4) sb.Append('|').Append(kv.Value[3]);
 +            }
 +            return sb.ToString();
 +        }
@@ -967,9 +1173,9 @@ index 0000000..64c90c1
 +            if (string.IsNullOrEmpty(data)) return;
 +            foreach (var row in data.Split(';'))
 +            {
-+                var f = row.Split('|');                     // osada | znacznik warsztatu | typ | srednia | doby
++                var f = row.Split('|');                     // osada | znacznik warsztatu | typ | srednia | doby [| srednia roku]
 +                if (f.Length < 5) continue;
-+                _saved[f[0] + "|" + f[1]] = new[] { f[2], f[3], f[4] };
++                _saved[f[0] + "|" + f[1]] = f.Length >= 6 ? new[] { f[2], f[3], f[4], f[5] } : new[] { f[2], f[3], f[4] };
 +            }
 +        }
 +
@@ -1036,6 +1242,9 @@ index 0000000..64c90c1
 +        private void OnSessionLaunched(CampaignGameStarter starter)
 +        {
 +            WorkshopTrade.ApplyInCampaign();
++            // recenzja: kapital startowy w cenach nowej monety - po HistoricalPrices.Apply (ArmouryBehavior jest zarejestrowany wczesniej)
++            try { var seed = WorkshopTrade.SeedNewCampaign(); if (seed != null) Log.Info("WorkshopTrade: " + seed); }
++            catch (Exception e) { Log.Error("WorkshopTrade.SeedNewCampaign", e); }
 +            try
 +            {
 +                // ta sama para stanow co linia gry "workshop_notable_owner_answer_1_single" (priorytet 100) - nasza idzie pierwsza, gdy paczka jest czynna

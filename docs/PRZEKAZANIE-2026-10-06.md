@@ -120,8 +120,15 @@ Plan nocy (kazdy krok = jeden workflow z jednym agentem, skrypty w `~\.claude\pr
    przeliczenie pamieci rynku nowej kampanii tylko w miastach (zamki zamarzlyby na zawsze). Wpis: `docs/paczki/w-toku/cena-CHANGELOG-wpis.md`.
    Otwarte (osobne kroki): welna tanieje poza 23 miastami z tkalnia (wsie owczarskie -10..-30 tys. d dziennie); tabor wsi dostaje za caly ladunek
    cene pierwszej sztuki (przy cenach niedoboru przeplaca: 60 ladunkow drewna 2340 d przy wartosci 240); dosypka drewna RealisticBannerlord warta 3-5x wiecej.
-2. `noc-2-warsztaty` - niezalezny recenzent paczki "warsztaty" NA BAZIE l117 (worktree `dzien-4\warsztaty\repo-na-cenie`) -> `l116-warsztaty-w-nowej-monecie`. W TOKU od 16:53.
-3. `noc-3-karawany3` - recenzent "karawany3" na tle ceny: czy jeszcze potrzebna -> `l115-karawany-ruda-dociera` albo odrzucona.
+2. `noc-2-warsztaty` - niezalezny recenzent paczki "warsztaty" NA BAZIE l117 (worktree `dzien-4\warsztaty\repo-na-cenie`) -> `l116-warsztaty-w-nowej-monecie`. ZROBIONE 17:45 - "poprawione-i-gotowe", l116 = 71fb952 NA l117 (repo: `w-toku/l116-warsztaty-w-nowej-monecie`),
+   DLL md5 9142c1df..., proba 66/71/122 z kompletem, z n108..n114 bez konfliktu (122/122). Poprawki: gracz NIE placi podatku BK od warsztatow
+   (czynny model warsztatow to NavalDLC/gra) - piekarnia Lannisport ok. 19 800 przy chlebie 6 d; odkup wedle podatku notabla; luka "kup stojacy warsztat
+   tanio i odsprzedaj" zamknieta druga srednia z pamiecia roku; kapital czysto towarowy >= 10 partii najdrozszego wsadu (aksamit 10 000).
+   ODKRYCIE (blad sprzed paczek): towary BK (chleb, ciasta, owoce, miod, jajka, garum, papirus, wapien) mialy przy HistoricalPrices.Apply wartosc 0
+   -> ich kategorie bez przelicznika popytu; miod pitny przelicznik odwrotny. Chleb w duzych miastach pewnie 30-60 d -> piekarnia 170-435 tys.
+   Wpis: `docs/paczki/w-toku/warsztaty-CHANGELOG-wpis.md`.
+2b. NOWY KROK `noc-4-towary-bk`: przelicznik nowej monety dla towarow BK (autor + recenzent) - bez niego paczka warsztaty nie spelni zgloszenia o piekarni.
+3. `noc-3-karawany3` - recenzent "karawany3" na bazie l116 (cena + warsztaty): czy jeszcze potrzebna, symulacja na nowych cenach -> `l115` albo odrzucona. W TOKU od 17:50.
 4. `noc-4-zlozenie` - zlozenie na n107 (cena -> warsztaty -> karawany3; warsztaty recenzowane juz na cenie), build kazdego ogniwa, przeniesienie n108..n114 na nowy szczyt.
 5. Repo: wpisy `docs/paczki/115-117-*.md`, galezie `paczki/*` na origin, STAN-PRAC, raport dla Jeffa prostym jezykiem.
 Stan kazdego kroku dopisuje ponizej.
