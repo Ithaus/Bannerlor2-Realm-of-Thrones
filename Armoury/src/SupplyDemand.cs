@@ -220,6 +220,20 @@ namespace Armoury
             return snap;
         }
 
+        // paczka 145 (wycena zamowienia kowala bez ruszania polki): na czas jednego wywolania modelu ceny Stock odejmuje sztuki,
+        // ktore zamowienie juz "zdjelo" z koszyka tej polki - cena kolejnej sztuki jak po prawdziwym zdjeciu, a polka nietknieta.
+        // Poza takim wywolaniem (Hold ... Release) - zero, nic sie nie zmienia.
+        [ThreadStatic] private static ItemRoster _heldShelf;
+        [ThreadStatic] private static ItemObject _heldBucket;
+        [ThreadStatic] private static int _held;
+
+        internal static void Hold(ItemRoster shelf, ItemObject bucketOf, int taken)
+        {
+            _heldShelf = taken > 0 ? shelf : null; _heldBucket = bucketOf; _held = Math.Max(0, taken);
+        }
+
+        internal static void Release() { _heldShelf = null; _heldBucket = null; _held = 0; }
+
         /// <summary>Ile sztuk tego koszyka lezy na polce.</summary>
         internal static int Stock(ItemRoster shelf, ItemObject it, int dir = 0)
         {
@@ -233,6 +247,7 @@ namespace Armoury
                 var el = shelf.GetElementCopyAtIndex(i);
                 if (el.Amount > 0 && SameBucket(el.EquipmentElement.Item, it)) n += el.Amount;
             }
+            if (_heldShelf != null && ReferenceEquals(shelf, _heldShelf) && SameBucket(_heldBucket, it)) n = Math.Max(0, n - _held);   // paczka 145: wycena
             // Audyt ponowny K1: wlasne transakcje gracza w ekranie handlu tylko mu szkodza:
             // sprzedaz (dir +1) - wiekszy zapas (cena spada z kazda sprzedana sztuka, wlasny wykup jej nie podnosi);
             // kupno (dir -1) - mniejszy zapas (cena rosnie z kazda kupiona sztuka, wlasna sprzedaz jej nie obniza).

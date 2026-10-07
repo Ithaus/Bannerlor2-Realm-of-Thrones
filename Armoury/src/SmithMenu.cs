@@ -6,6 +6,7 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
+using TaleWorlds.CampaignSystem.Extensions;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
@@ -1636,9 +1637,10 @@ namespace Armoury
         // ile tej jednej sztuki lezalo na polce. Teraz:
         //  - wybor: najtansza SPRAWNA sztuka typu i tieru, ktora NAPRAWDE lezy na polce tego miasta (te same filtry co dotad,
         //    bez unikatow i koni, stan nie ponizej 100%); kupuje po jednej - przy kolejnej znow najtansza z tego, co zostalo;
-        //  - cena: cena kupna miasta za te sztuke w tej chwili (ta sama, ktora placi sakiewka ludzi, lordowie i ekran handlu -
-        //    kolejna sztuka widzi mniejsza polke) + chodzenie kowala po straganach: 0.2 dnia rzemieslnika (HistMasterWageT1, 3 d)
-        //    x poziom plac miasta (TownWage) za sztuke; wszystko do kasy miasta (Pay.ToSettlement);
+        //  - cena: cena kupna miasta za te sztuke (ta sama, ktora placi sakiewka ludzi, lordowie i ekran handlu - kolejna sztuka
+        //    po cenie polki mniejszej o sztuki juz wziete, policzonej rachunkiem: polki NIE ruszamy przy wycenie, zdejmujemy dopiero
+        //    przy dostawie) + chodzenie kowala po straganach: 0.2 dnia rzemieslnika (HistMasterWageT1, 3 d) x poziom plac miasta
+        //    (TownWage) za sztuke; wszystko do kasy miasta (Pay.ToSettlement);
         //  - brak towaru: nic nie placisz, potrzeba idzie do warsztatow jako zamowienie w miescie (SupplyDemand, jak u lorda,
         //    ktory nie znalazl towaru: najwyzej 10 na rodzaj z jednej wizyty, raz na SupplyDemandOrderRepeatDays).
 
@@ -1676,55 +1678,69 @@ namespace Armoury
             return m == null || m.PriceMultiplier >= 0.999f;
         }
 
-        /// <summary>Cena kupna miasta za te sztuke teraz - jak ochotnicy, sakiewka ludzi i lordowie (MarketData, kupiec = osada,
-        /// wiec dziala podaz i popyt polki).</summary>
-        private static int ShelfPrice(Settlement st, EquipmentElement ee)
+        /// <summary>
+        /// Cena kupna miasta za te sztuke, gdy zamowienie wzielo juz "taken" sztuk tego koszyka (typ x tier), o wartosci polki
+        /// "takenWorth" w kategorii tej sztuki - BEZ ruszania polki. Liczy to samo co TownMarketData.GetPrice (jak ochotnicy, sakiewka
+        /// ludzi i lordowie: model ceny z danymi kategorii, kupiec = osada, z podaza i popytem), tylko z zapasem pomniejszonym
+        /// rachunkiem: wartosc polki kategorii minus takenWorth (tyle gra odejmuje przy zdjeciu - HistoricalPrices.ShelfWorth),
+        /// sztuki koszyka dla SupplyDemand minus taken (SupplyDemand.Hold). Przy taken = 0 - dokladnie dzisiejsza cena polki.
+        /// </summary>
+        private static int ShelfPrice(Settlement st, EquipmentElement ee, int taken, int takenWorth)
         {
             int price;
-            try { price = st.Town.MarketData.GetPrice(ee, null, false, st.Party); } catch { price = ee.ItemValue; }
+            try
+            {
+                var cd = st.Town.MarketData.GetCategoryData(ee.Item.GetItemCategory());
+                SupplyDemand.Hold(st.ItemRoster, ee.Item, taken);
+                try { price = Campaign.Current.Models.TradeItemPriceFactorModel.GetPrice(ee, null, st.Party, false, cd.InStoreValue - takenWorth, cd.Supply, cd.Demand); }
+                finally { SupplyDemand.Release(); }
+            }
+            catch { price = ee.ItemValue; }
             return Math.Max(1, price);
         }
 
         private struct ShelfPick { public EquipmentElement El; public int Price; }
 
         /// <summary>
-        /// Kowal kupuje z POLKI st po jednej sztuce: za kazdym razem najtansza sprawna sztuka typu i tieru po cenie kupna w tej chwili
-        /// (kolejna sztuka widzi mniejsza polke - jak sakiewka ludzi i ekran handlu). purse >= 0: towar + chodzenie najwyzej tyle
-        /// (shortPurse = przerwala kiesa, nie brak towaru). commit = false to WYCENA: zdjete sztuki wracaja na polke (finally) -
-        /// polka co do sztuki jak byla; commit = true - sztuki zostaja zdjete, placi i odbiera wolajacy.
+        /// Plan zakupu kowala z POLKI st, BEZ ruszania polki: po jednej sztuce najtansza sprawna sztuka typu i tieru, ktorej na polce
+        /// jeszcze zostalo (licznik wzietych na pozycje), po cenie polki pomniejszonej rachunkiem o sztuki juz wziete (ShelfPrice) -
+        /// jak sakiewka ludzi i ekran handlu, gdzie kazda kolejna sztuka widzi mniejsza polke. purse >= 0: towar + chodzenie najwyzej
+        /// tyle (shortPurse = przerwala kiesa, nie brak towaru). Ta sama funkcja dla wyceny i dostawy; zdejmuje dopiero DoOrderShelf.
         /// </summary>
-        private static List<ShelfPick> ShelfPlan(Settlement st, ItemObject.ItemTypeEnum type, int tier, int n, int purse, bool commit, out bool shortPurse)
+        private static List<ShelfPick> ShelfPlan(Settlement st, ItemObject.ItemTypeEnum type, int tier, int n, int purse, out bool shortPurse)
         {
             var picks = new List<ShelfPick>();
             shortPurse = false;
             if (st == null || st.Town == null || st.ItemRoster == null || n <= 0) return picks;
-            var shelf = st.ItemRoster;
             try
             {
+                var shelf = st.ItemRoster;
+                var used = new int[shelf.Count];                              // ile z pozycji i juz w planie
+                var worth = new Dictionary<ItemCategory, int>();              // wartosc polki kategorii juz w planie
                 int goods = 0;
                 while (picks.Count < n)
                 {
                     int best = -1, bestPrice = int.MaxValue;
-                    for (int i = 0; i < shelf.Count; i++)
+                    for (int i = 0; i < used.Length; i++)
                     {
                         var el = shelf.GetElementCopyAtIndex(i);
-                        if (el.Amount <= 0 || !ShelfOrderable(el.EquipmentElement, type, tier)) continue;
-                        int price = ShelfPrice(st, el.EquipmentElement);
+                        if (el.Amount - used[i] <= 0 || !ShelfOrderable(el.EquipmentElement, type, tier)) continue;
+                        int w = 0; var cat = el.EquipmentElement.Item.GetItemCategory();
+                        if (cat != null) worth.TryGetValue(cat, out w);
+                        int price = ShelfPrice(st, el.EquipmentElement, picks.Count, w);
                         if (price < bestPrice) { bestPrice = price; best = i; }
                     }
                     if (best < 0) break;
                     if (purse >= 0 && goods + bestPrice + OrderLegwork(st, picks.Count + 1) > purse) { shortPurse = true; break; }
                     var ee = shelf.GetElementCopyAtIndex(best).EquipmentElement;
-                    shelf.AddToCounts(ee, -1);
+                    used[best]++;
+                    var c = ee.Item.GetItemCategory();
+                    if (c != null) { int w0; worth.TryGetValue(c, out w0); worth[c] = w0 + HistoricalPrices.ShelfWorth(ee.Item); }
                     picks.Add(new ShelfPick { El = ee, Price = bestPrice });
                     goods += bestPrice;
                 }
             }
             catch (Exception e) { Log.Error("ShelfPlan", e); }
-            finally
-            {
-                if (!commit) foreach (var p in picks) shelf.AddToCounts(p.El, 1);
-            }
             return picks;
         }
 
@@ -1765,7 +1781,7 @@ namespace Armoury
                 var el = shelf.GetElementCopyAtIndex(i);
                 if (el.Amount <= 0 || !ShelfOrderable(el.EquipmentElement, type, tier)) continue;
                 n += el.Amount;
-                int p = ShelfPrice(st, el.EquipmentElement);
+                int p = ShelfPrice(st, el.EquipmentElement, 0, 0);
                 if (p < best) { best = p; cheapest = el.EquipmentElement; }
             }
             if (n > 0) price = best;
@@ -1823,7 +1839,7 @@ namespace Armoury
                 if (shortage > 0 && !counts.Contains(shortage)) counts.Add(shortage);
                 counts.Sort();
                 bool sp;
-                var plan = ShelfPlan(st, type, tier, counts[counts.Count - 1], -1, false, out sp);   // wycena - polka bez zmian
+                var plan = ShelfPlan(st, type, tier, counts[counts.Count - 1], -1, out sp);   // wycena - polki nie ruszamy
                 if (plan.Count == 0) { OrderNoGoods(st, type, tier, Math.Max(1, shortage)); return; }
                 string what = type + " (tier " + tier + ")";
                 int gold = Hero.MainHero.Gold;
@@ -1869,7 +1885,7 @@ namespace Armoury
                 if (armory == null) { Log.Player("The armoury wagons are nowhere to be found.", true); return; }
                 var st = Settlement.CurrentSettlement;
                 bool shortPurse;
-                var picks = ShelfPlan(st, type, tier, n, Hero.MainHero.Gold, true, out shortPurse);
+                var picks = ShelfPlan(st, type, tier, n, Hero.MainHero.Gold, out shortPurse);
                 int k = picks.Count;
                 if (k == 0 && !shortPurse) { OrderNoGoods(st, type, tier, n); return; }
                 if (k == 0)
@@ -1880,7 +1896,7 @@ namespace Armoury
                 }
                 int goods = PickGoods(picks, k), fee = OrderLegwork(st, k), total = goods + fee;
                 Pay.ToSettlement(total);
-                foreach (var p in picks) armory.AddToCounts(p.El, 1);
+                foreach (var p in picks) { st.ItemRoster.AddToCounts(p.El, -1); armory.AddToCounts(p.El, 1); }   // dostawa: dopiero teraz z polki na regaly
                 int unmet = shortPurse ? 0 : n - k;   // za drogo to nie brak towaru (jak u lordow, wpis 81)
                 NoteOrderUnmet(st, type, tier, unmet);
                 Log.Player(Pieces(k) + " of " + type + " (tier " + tier + ") delivered to the men's racks for " + total + " gold - " + goods
