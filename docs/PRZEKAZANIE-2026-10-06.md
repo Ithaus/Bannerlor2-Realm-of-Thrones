@@ -128,7 +128,15 @@ Plan nocy (kazdy krok = jeden workflow z jednym agentem, skrypty w `~\.claude\pr
    -> ich kategorie bez przelicznika popytu; miod pitny przelicznik odwrotny. Chleb w duzych miastach pewnie 30-60 d -> piekarnia 170-435 tys.
    Wpis: `docs/paczki/w-toku/warsztaty-CHANGELOG-wpis.md`.
 2b. NOWY KROK `noc-4-towary-bk`: przelicznik nowej monety dla towarow BK (autor + recenzent) - bez niego paczka warsztaty nie spelni zgloszenia o piekarni.
-3. `noc-3-karawany3` - recenzent "karawany3" na bazie l116 (cena + warsztaty): czy jeszcze potrzebna, symulacja na nowych cenach -> `l115` albo odrzucona. W TOKU od 17:50.
+3. `noc-3-karawany3` - recenzent "karawany3" na bazie l116 (cena + warsztaty): czy jeszcze potrzebna, symulacja na nowych cenach -> `l115` albo odrzucona. ZROBIONE 18:28 - "czesciowo-zbedna-przycieta", l115 = fea0c2f NA l116
+   (repo: `w-toku/l115-karawany-ruda-dociera`), DLL md5 7160335f..., proba 47/47, h3 13/13, warsztaty 122/122, z n108..n114 bez konfliktu.
+   Zostaja: zakup surowcow przed wyborem trasy (CaravanBulkBuyBeforeRoute) + juki surowcami do 100% (CaravanBulkFillLimit 1.0, karawany gracza 0.8).
+   WYCIETE: trasa z utargu (CaravanBulkHonestRoute) - po cenie nic nie dawala. Symulacja 20 dob, miast bez rudy: dzis 65-67, sama cena 65-67,
+   cena + paczka 38-61. Cel < 20 daje dopiero NASTEPNA paczka: wozy wsi do najlepiej placacego miasta w zasiegu 250 (16 miast) + wycena
+   ladunku taboru sztuka po sztuce (dzis BK placi za caly ladunek cene pierwszej sztuki). Dotyka MarketRoad.RoutePrefix = kolizja z n110 K5.
+   Wpis: `docs/paczki/w-toku/karawany3-CHANGELOG-wpis.md`.
+3b. `noc-4-towary-bk` (autor + recenzent po kolei) na l115 -> `l118-towary-w-nowej-monecie`. W TOKU od 18:30.
+3c. PLAN: `noc-5-wozy` (autor + recenzent) na l118 -> `l119-wozy-do-najlepszego-miasta`; potem zlozenie i przeniesienie n108..n114 (K5 do scalenia z wozami).
 4. `noc-4-zlozenie` - zlozenie na n107 (cena -> warsztaty -> karawany3; warsztaty recenzowane juz na cenie), build kazdego ogniwa, przeniesienie n108..n114 na nowy szczyt.
 5. Repo: wpisy `docs/paczki/115-117-*.md`, galezie `paczki/*` na origin, STAN-PRAC, raport dla Jeffa prostym jezykiem.
 Stan kazdego kroku dopisuje ponizej.
