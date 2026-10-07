@@ -332,6 +332,9 @@ narzedzia rozpoznal wszystkie linie. Grupa 1: OK 61, UWAGA 5; grupa 2: OK 31, UW
    niewolnych na start - TAK (Jeff pyta, skad 27 tys.); rabunek = ulamek okregu (paczka 113: zabici odejmowani, uchodzcy wracaja).
    Pytanie 7: A - wierzyciel bierze caly dochod wsi + z kiesy ponad 38 tys. (poczet ok. 135 na oddzial).
    Pytanie 8: (c) odsetki zamrozone w dniu zajecia, BEZ umorzenia - "dlugi trzeba splacac, Bank z Braavos na pewno nie daruje".
+5. Pentos i Lorath - BEZ niewolnictwa. Werbunek gracza "jak u AI" (rekrut od tieru 2 tylko ze sprzetem kupionym przez notabla, koniec darmowego
+   kompletu DTE). Repo: galezie `paczki/108..114` NADPISANE wersjami na 120 (= `paczki-na-120/*`); stare (na n107) w `paczki-na-n107/*`.
+   Spoils of War i pokretla (SmithingSkillPerTier, DurabilityPerArmorPoint, MinSellPercentOfValue) - Jeff prosi o wyjasnienie.
 4. "zgoda na autotest" (pamiec: jeff-zgoda-na-autotest); przewijac dluzej, gdy to ma sens (40 dob na test zmiany, rok na skutki dlugie).
 
 ## Decyzje Jeffa 06.10 (wiazace; dopisane po raporcie nocnym)
