@@ -3,6 +3,21 @@
 Czytaj najpierw: `CLAUDE.md` (zwlaszcza sekcja 8, **zasada 0**: kazda zmiana = kontrola regresji, kolizji
 i spojnosci calej logiki; oraz pulapka MCM w sekcji 7), potem ten plik, potem gorne wpisy `CHANGELOG.md`.
 
+## PIERWSZY TEST GRUPY TOWARY 2 (115-120) - 07.10 03:18 (nowa kampania, 19 dob; log `Armoury-2026-10-07_03-18-52.log`)
+
+Odczyt `python tools/sprawdz_logi.py --grupa 2b`: OK 70, UWAGA 14; ERROR 0, Exception 0, potkniecia 0; wszystkie ogniwa wpiete.
+- RUDA: miast bez rudy 76 -> 51 (poprzedni test 74 -> 69; oczekiwane 25-30) - lepiej, ale ALARM (> 50). Wozy 116/dobe (oczekiwane 150-250),
+  z ruda mediana 7/dobe, do miast bez rudy 63 z 112 kursow; karawany kupuja rudy mediana 4/dobe.
+- DREWNO: miast bez drewna 50 -> 11 (dobrze).
+- ZATKANE MAGAZYNY WSI: zamkowe 16.5%, miejskie 14.8% (poprzednio 4.6% / 7.4%; opis 119 przewidywal +1-3 punkty) - do wyjasnienia (pelny magazyn
+  wstrzymuje cala produkcje wsi).
+- WARSZTATY: piekarnie pracuja (75 z 76), ale chleb x3.3-4.5 wartosci przez 19 dob -> piekarnia 363 d/dobe, w Lannisporcie 373 tys.; ZLOTNIK
+  w Lannisporcie 3257 d/dobe -> cena 3 558 909 d (zrzut Jeffa z gry - ta sama liczba), tkalnia aksamitu 5107 d/dobe, tkalnia welny 1148 d;
+  cena kupna warsztatow mediana 145 tys., max 12.27 mln. Przyczyna wstepnie: receptury luksusowe po przeliczeniu cen (ruda srebra 20 d ->
+  bizuteria 2400 d) - sprawa K13 (receptury i ceny), nie wzoru ceny warsztatu.
+- WELNA zalega ("KUPNO STOI" 8 dob, na polkach 566 -> 2600). Nadplata wozow 27.6% (oddana kasom osad).
+- Analiza przyczyn i plan poprawek: workflow `test-2b-analiza` (w toku 07.10 03:35), raport `SCRATCH\dzien-6naliza-testu-2b\RAPORT.md`.
+
 ## NOC 06/07.10 - GRUPA "TOWARY 2" (115-120) GOTOWA DO WGRANIA NA SLOWO JEFFA; kolejka 108-114 przeniesiona na 119 (na 120 naklada sie czysto)
 
 WGRANE 2026-10-07 02:47 na slowo Jeffa ("wgraj"): W GRZE wpisy 101-107 + 115-120 (DLL md5 25b87631d468cb3e01a71a3578f9fc73; poprzedni
