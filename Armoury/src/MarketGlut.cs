@@ -79,6 +79,8 @@ namespace Armoury
         /// KOLEJNA sztuka tego typu w tym miejscu schodzi o 0.25 punktu
         /// procentowego OD TWOJEJ stawki, az do dna absolutnego 1% wartosci.
         /// Czyli: stawka_n = max(1%, max(stawka_rynku, 5%) - 0.25 x sprzedane).
+        /// Od 07.10 TYLKO przy wylaczonym SupplyDemand (wlaczony = podaz i popyt + podloga MinSellPercentOfValue),
+        /// chyba ze wylacznik OneScrapFloor = false (wtedy jak w 126).
         /// </summary>
         public static void PricePostfix(EquipmentElement __0, MobileParty __1, PartyBase __2, bool __3, ref int __result)
         {
@@ -88,10 +90,17 @@ namespace Armoury
                 var item = __0.Item;
                 var c = Settings.Current;
                 if (c == null || !c.MarketGlutEnabled || !Equipmentish(item)) return;
+                // POKRETLA JEFFA 07.10 ("najnizsza cena tak, ale to jest zalezne od podazy i popytu za rupiecie"):
+                // gdy dziala prawo podazy i popytu, ono karze nadmiar, a jedyna podloga jest MinSellPercentOfValue
+                // (w miescie/zamku stawia ja SupplyDemand PO mnozniku polki, gdzie indziej ScrapFloor). Dotad tu stala druga podloga 5%
+                // (audyt N2) i to PRZED SupplyDemand - rupiec gracza szedl za 5% x polka, a obnizona podloga 2%
+                // siegala go tylko na zawalonej polce. Teraz cena rupiecia = jego stan x polka, nie mniej niz 2%.
+                // Wylacznik OneScrapFloor = false: jak w 126 (tu podloga 5% takze przy prawie podazy).
+                if (SupplyDemand.Active && c.OneScrapFloor) return;
                 if (item.Value <= 0) return;
                 var key = PlaceKey(__2);
                 if (key == null) return;
-                // gdy dziala prawo podazy i popytu (SupplyDemand), nadmiar karze ono - tu tylko podloga 5%
+                // gdy dziala prawo podazy i popytu (SupplyDemand), nadmiar karze ono - tu tylko podloga 5% (tylko przy OneScrapFloor = false)
                 float sold = SupplyDemand.Active ? 0f : SoldCount(key, (int)item.ItemType);
 
                 float baseRate = __result * 100f / item.Value;                  // co daje rynek (handel, perki, stan)

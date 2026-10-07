@@ -23,7 +23,8 @@ namespace Armoury
         {
             public List<Part> Parts;
             public int Stamina;
-            public int SkillNeeded;
+            public int SkillNeeded;  // PROG: od ilu Smithing wolno sie zabrac (SmithingSkillPerTier) - kucie, naprawa wlasnoreczna
+            public int Difficulty;   // TRUDNOSC dla kosci (SmithingDifficultyPerTier): jakosc, pekniecie, XP, odczyt wzoru (pokretla Jeffa 07.10)
             public int Tier;
             public bool Ranged;      // luk/kusza/amunicja - lzejsze ryzyko i stamina niz platnerka
         }
@@ -144,6 +145,7 @@ namespace Armoury
                 Add(r, MaterialItem(CraftingMaterials.Iron6), MathF.Max(1, r.Tier));
                 r.Stamina = Math.Min(100, r.Stamina * 3);
                 r.SkillNeeded = Math.Max(r.SkillNeeded, s.LegendarySkillNeeded);
+                r.Difficulty = Math.Max(r.Difficulty, s.LegendarySkillNeeded);
             }
             catch (Exception e) { Log.Error("Legendize", e); }
             return r;
@@ -167,6 +169,22 @@ namespace Armoury
         {
             try { return _wood != null && _wood.Weight > 0.01f ? _wood.Weight : 10f; }
             catch { return 10f; }
+        }
+
+        /// <summary>
+        /// PROG I TRUDNOSC (Jeff 07.10: "kowalstwo - okay, moze byc zmiana, ale pamietaj, ze jak kujemy zbroje,
+        /// to jest ta sama zasada jak przy broni - pancerz mozna zepsuc lub zrobic legendary"). Do 07.10 jedna liczba
+        /// SkillNeeded byla i progiem (od ilu Smithing wolno kuc), i trudnoscia dla kosci (jakosc, pekniecie, XP) -
+        /// obnizenie SmithingSkillPerTier 45 -> 35 przy TEJ SAMEJ umiejetnosci dawalo wiecej legend i mniej
+        /// spartaczonych (tier 6 przy 250: legenda 3.3% -> 4.9%, pekniecie 20% -> 0%). Teraz prog idzie z
+        /// SmithingSkillPerTier, a trudnosc ze stalej skali SmithingDifficultyPerTier (45) - ta sama ulga
+        /// (cloth -20, skora/luki -10) w obu. Pokretlo skraca droge do wyzszych tierow, nie zmienia kosci.
+        /// </summary>
+        private static void Need(ref Recipe r, int tier, int less)
+        {
+            var s = Settings.Current;
+            r.SkillNeeded = MathF.Max(0, (tier - 1) * s.SmithingSkillPerTier - less);
+            r.Difficulty = MathF.Max(0, (tier - 1) * s.SmithingDifficultyPerTier - less);
         }
 
         private static Recipe BuildRecipe(ItemObject item)
@@ -197,7 +215,7 @@ namespace Armoury
                     if (u - soft > 0) Add(r, MaterialItem(IronForTier(tier)), u - soft);   // okucia, nity, sprzaczki
                     // velvet wypadl (Jeff 01.09: "pancerze nie potrzebuja velvet, to nie suknia")
                     r.Stamina = MathF.Max(3, (int)(tier * s.StaminaPerTier * 0.4f));
-                    r.SkillNeeded = MathF.Max(0, (tier - 1) * s.SmithingSkillPerTier - 20);
+                    Need(ref r, tier, 20);
                     return r;
                 }
                 if (armourStuff == ArmorComponent.ArmorMaterialTypes.Leather)
@@ -210,7 +228,7 @@ namespace Armoury
                     if (soft - hide > 0) Add(r, _linen, soft - hide);
                     if (u - soft > 0) Add(r, MaterialItem(IronForTier(tier)), u - soft);
                     r.Stamina = MathF.Max(4, (int)(tier * s.StaminaPerTier * 0.6f));
-                    r.SkillNeeded = MathF.Max(0, (tier - 1) * s.SmithingSkillPerTier - 10);
+                    Need(ref r, tier, 10);
                     return r;
                 }
 
@@ -240,7 +258,7 @@ namespace Armoury
                         Add(r, _leather, 1);
                     float fidA = IsFiddly(item.ItemType) ? (1f + s.FiddlyStaminaBonus) : 1f;
                     r.Stamina = MathF.Max(5, (int)(tier * s.StaminaPerTier * fidA));
-                    r.SkillNeeded = (tier - 1) * s.SmithingSkillPerTier;
+                    Need(ref r, tier, 0);
                     return r;
                 }
 
@@ -303,7 +321,7 @@ namespace Armoury
                     r.Stamina = ammo
                         ? MathF.Max(2, (int)(tier * s.StaminaPerTier * 0.05f))
                         : MathF.Max(4, (int)(tier * s.StaminaPerTier * MathF.Max(0.05f, s.RangedStaminaFactor)));
-                    r.SkillNeeded = MathF.Max(0, (tier - 1) * s.SmithingSkillPerTier - 10);
+                    Need(ref r, tier, 10);
                     return r;
                 }
 
@@ -348,7 +366,7 @@ namespace Armoury
 
                 float fiddly = IsFiddly(item.ItemType) ? (1f + s.FiddlyStaminaBonus) : 1f;
                 r.Stamina = MathF.Max(5, (int)(tier * s.StaminaPerTier * fiddly));
-                r.SkillNeeded = (tier - 1) * s.SmithingSkillPerTier;   // tier 1 od zera - zaczynasz od podkowek, nie od plach
+                Need(ref r, tier, 0);   // tier 1 od zera - zaczynasz od podkowek, nie od plach
             }
             catch (Exception e) { Log.Error("Recipes.For", e); }
             return r;

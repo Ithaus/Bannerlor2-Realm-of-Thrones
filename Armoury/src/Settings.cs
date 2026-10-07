@@ -13,7 +13,8 @@ namespace Armoury
         public bool TidyBannerKingsArmourList = true;       // real categories and tier labels in the Banner Kings armour tab
         public bool ForgeArmourEnabled = false;             // off when Banner Kings' own armour tab in the smithy screen handles forging
         public bool CraftingEnabled = true;                // armour forging on or off
-        public int SmithingSkillPerTier = 45;              // Smithing needed per tier - 40 means tier 5 plate wants 200
+        public int SmithingSkillPerTier = 35;              // Smithing you need before you may attempt a piece, per tier above the first - 35 means tier 5 plate opens at 140 and tier 6 at 175 (cloth 20 and leather, bows and crossbows 10 lower); also the gate for mending your own gear by hand. It only opens the door - the dice are set by Smithing Difficulty Per Tier
+        public int SmithingDifficultyPerTier = 45;         // how hard a piece really is for the dice, per tier above the first, whatever the door says: the quality it comes out with (rusty to legendary - armour, bows and the reforged weapons alike), the risk of cracking it, the XP it teaches and the odds of copying a pattern. 45 keeps the odds as they were, so a lower Smithing Skill Per Tier lets you start finer work sooner - at first with more spoiled pieces - and never hands out more legends
         public float IronPerWeightUnit = 1.4f;             // refined iron per pound of the finished piece
         // --- Cost by piece ---
         public float ClassCostBody = 1.15f;                // cuirass - the most waste when the plates are cut
@@ -120,7 +121,7 @@ namespace Armoury
         public float WearDamageFactor = 0.15f;             // wear per point of damage the STRUCK piece takes (armour wears where the blow lands)
         public float MissileArmorWearPercent = 10f;        // arrows punch tidy little holes, not rents - armour counts only this % of missile damage as wear (hp damage unchanged)
         public float HarnessWearFactor = 0.15f;            // saddle and barding count only this share of the horse's raw hits as wear - at the old half-share saddles kept dying under you
-        public float DurabilityPerArmorPoint = 20f;        // Jeff's pool: every point of protection gives this much durability, times the tier - 61 armor at tier 3 = 61 x 20 x 3 = 3660 points, and damage taken subtracts one for one
+        public float DurabilityPerArmorPoint = 13.33f;     // Jeff's pool: every point of protection gives this much durability, times the tier - 61 armor at tier 3 = 61 x 13.33 x 3 = 2439 points, and damage taken subtracts one for one. 13.33 wears your armour 1.5 times faster than the old 20
         public float WearWeaponPerHit = 0.25f;              // wear on your weapon for every blow you land (bows wear per arrow that strikes home)
         public float WearShieldFactor = 0.3f;              // shields are built to take it - blocked damage wears them at this share
         public bool ShieldMissileGuardEnabled = true;      // a shield is not there to be shot to pieces - arrows and bolts barely mark it
@@ -226,7 +227,8 @@ namespace Armoury
 
         // --- The law of the battlefield ---
         public bool UniqueGearLawEnabled = true;           // named heroes' gear (Ramsay, the Hound, the Mountain, Brienne, Renly...) belongs to its owner alone: copies in armouries, packs and on other heroes become same-tier gear of the wearer's own culture, and DTE swaps them on the way into any armoury
-        public int MinSellPercentOfValue = 5;              // merchants never pay less than this share of an item's clean value - scrap is still metal and leather (0 = off)
+        public int MinSellPercentOfValue = 2;              // merchants never pay less than this share of an item's clean value - scrap is still metal and leather. Only junk ever sinks this low: above the floor the price of worn gear follows its condition and the stall's supply and demand (0 = off)
+        public bool OneScrapFloor = true;                  // one floor for junk, after the stall's supply and demand: in towns and castles worn-out gear fetches its condition times the stall, never under Min Sell Percent Of Value - and never more than that stall itself asks for the very same piece, so a glutted stall pays little and nobody can buy junk cheap and sell it back at the floor. The glutted market's 5% start steps aside while supply and demand is on. Off = as before: a floor before the stall, the glutted market's 5% start, and the floor again after the stall
         public bool EnlistedSoldierNoLooting = true;       // serving in a lord's army: the quartermasters strip the field - one soldier does not pocket the army's loot and gold
 
         // --- Flesh and wind ---
@@ -631,7 +633,7 @@ namespace Armoury
         public float SupplyDemandTradePricePercent = 50f;  // wholesale price between towns, as % of worth times the glutted source's price factor
 
         // --- The glutted market ---
-        public bool MarketGlutEnabled = true;              // a merchant needs only so many of one thing: each extra piece of a type you sell him fetches less
+        public bool MarketGlutEnabled = true;              // a merchant needs only so many of one thing: each extra piece of a type you sell him fetches less. With supply and demand on (and One Scrap Floor) it steps aside - the stall's own supply and demand prices the glut and Min Sell Percent Of Value is the only floor
         public float MarketGlutStartPercent = 5f;          // the FLOOR for the first piece: pays at least this % of value - a better trade rate (say 8%) stands as is
         public float MarketGlutDropPP = 0.25f;             // each further piece of that type knocks this many percentage points off YOUR rate
         public float MarketGlutMinPercent = 1f;            // the rate never falls below this % of the item's value

@@ -1470,7 +1470,8 @@ namespace Armoury
         {
             var s = Settings.Current;
             int tier = Recipes.Grade(item);
-            need = Math.Max(0, (tier - 1) * (s != null ? s.SmithingSkillPerTier : 45));
+            // szansa odczytu wzoru to kosc, nie prog - stala skala trudnosci (pokretla Jeffa 07.10)
+            need = Math.Max(0, (tier - 1) * (s != null ? s.SmithingDifficultyPerTier : 45));
             have = Hero.MainHero.GetSkillValue(DefaultSkills.Crafting);
             float span = s != null ? MathF.Max(50f, s.TakeApartSkillSpan) : 300f;
             float bas = s != null ? s.TakeApartBaseChance : 0.6f;

@@ -7,7 +7,8 @@
   <ForgeArmourEnabled>false</ForgeArmourEnabled>
   <!-- real categories (Helmets / Gauntlets / Boots...) and [tier] labels in the Banner Kings armour tab -->
   <TidyBannerKingsArmourList>true</TidyBannerKingsArmourList>
-  <SmithingSkillPerTier>45</SmithingSkillPerTier>   <!-- (tier-1) x this: tier 1 = 0, tier 2 = 45, tier 5 = 180, tier 6 = 225 -->
+  <SmithingSkillPerTier>35</SmithingSkillPerTier>   <!-- the door: (tier-1) x this before you may attempt a piece - tier 1 = 0, tier 2 = 35, tier 5 = 140, tier 6 = 175 -->
+  <SmithingDifficultyPerTier>45</SmithingDifficultyPerTier>   <!-- the dice: (tier-1) x this sets quality, cracking, XP and pattern odds - tier 5 = 180, tier 6 = 225 -->
   <IronPerWeightUnit>1.4</IronPerWeightUnit>         <!-- refined iron per pound of armour -->
   <!-- PIECE CLASS: big plates waste stock, small pieces cost time instead -->
   <ClassCostBody>1.15</ClassCostBody>
@@ -36,7 +37,7 @@
        (Endurance and Smithing focus), so we do not punish high skill a second time. -->
   <XpPerDayPerTier>100</XpPerDayPerTier>       <!-- tier 5 plate, 10 days = 5000 raw XP -->
   <XpFullCreditMargin>100</XpFullCreditMargin>
-  <!-- tier 1 needs 0 Smithing, tier 2 needs 45, ... tier 6 needs 225 --> <!-- full credit until you are this far past the recipe -->
+  <!-- measured from the piece's difficulty: tier 1 = 0, tier 2 = 45, ... tier 6 = 225 --> <!-- full credit until you are this far past the recipe -->
   <XpDiminishingRange>250</XpDiminishingRange> <!-- and only then does it taper off -->
   <XpFloorFactor>0.25</XpFloorFactor>
   <XpCapPerTier>1300</XpCapPerTier>            <!-- ceiling per project = this times the tier -->
