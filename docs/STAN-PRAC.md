@@ -51,6 +51,10 @@ wies poza Normal nie wystawia nowego). NOWE: ten sam straznik BK odrzuca rozkazy
 Lord Hewett's Town 8) i LORDOW (2-6 dziennie, Acorn Hall 3) - karawany i lordowie tez utykaja w tych osadach; Pyke / Farton / Hull / Arbor /
 Downdelving / Pebbleton (wyspy?) - do sprawdzenia. Poprawka U ZRODLA w toku (workflow pamiec-drog-rot-uzupelniona, galaz w127-pamiec-drog):
 uzupelnienie 22 scian siatki bez wpisu w pamieci drog po wczytaniu - dla wszystkich partii; potem autotest 6.
+GOTOWE po recenzji (07.10): RoadMemoryFix.cs (postfiks Campaign.LoadMapScene, wylacznik MapRoadTableFix, generator gry dla scian 17842-17863:
+Default 22/22, All 22/22, Naval 0), galaz w-toku/pamiec-drog-rot-uzupelniona c92f7e7 na f8dced3; DLL autotestu 6 SCRATCH\dzien-6\pamiec-drog\nArmoury-pamiec-drog.dll md5 6d43c19c. Wyspy (Pyke, Hull, Arbor, Farton, Downdelving) - INNA przyczyna w BK: karawana BK bez statkow na wyspie
+moze stac na zawsze (BKCaravansBehavior :1091, :1296), lord z wyspy na uczcie BK na ladzie stoi do konca uczty (BKFeastBehavior :247) -
+autotest 6 zmierzy (nowe liczniki "najdluzej D dob"), ewentualnie osobna paczka.
 K13 krok 3 (129 rzemioslo miasta: sukno/plotno/skora wedle oplacalnosci, galaz w-toku/k13-3-rzemioslo-miasta 9f7408f na k2) i krok 4
 (130 odziez, buty i plotno wojska z sakiewki zolnierzy, w-toku/k13-4-odziez-wojska 93ac4c1 na k2 - NIE na 129; test i wgranie TYLKO razem 128+129+130
 jako G1; zmiana widoczna: znika kara morale BK "Textiles supplies") - gotowe po recenzji, opisy docs/paczki/w-toku/k13-3-*, k13-4-*.
