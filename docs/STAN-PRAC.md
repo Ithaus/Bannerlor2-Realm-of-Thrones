@@ -390,6 +390,10 @@ narzedzia rozpoznal wszystkie linie. Grupa 1: OK 61, UWAGA 5; grupa 2: OK 31, UW
   trakcie rabunku i spalona po). Rozstawienie NIE losowe: "wzdluz drog, czesc kilka po bokach", przy brodach, mostach, rzekach - ma wygladac
   na mapie z sensem. Projekt w toku: workflow wioski-na-mapie-projekt (prototyp na prawdziwej mapie ROT z obrazkami, krytyk, poprawka).
   Drogi ROT sa namalowane w terenie (terrain.bin), rzeki to sciezki w scene.xscene (trident, red fork, mander, rhoyne ...).
+- WIOSKI WEDLUG LUDNOSCI (07.10 ok. 15:10): "wiosek postawmy tyle, ile ludnosc danego obszaru ... x10 to byl przyklad" - liczba wiosek w okregu =
+  ludzie okregu / P (1 wioska = gromada osad po 250 ludzi, dzis P ok. 6 000 -> ok. 7 000 wiosek na swiat, Ramsport 50, typowy okreg 10, Nocna Straz 0);
+  prototyp v2 (1 483 wiosek tylko przy widocznych liniach) za maly. W toku: workflow wioski-wedlug-ludnosci (v3: P 4000 / 6000 / 8000, dawne trakty
+  wyliczone jako miejsca, obrazki, tabela przykladow) - wynik do wyboru P przez Jeffa.
 
 1. Pytanie kanonu 1 (`docs/REGULY-KRAIN-I-DLUGU-2026-10-06.md` rozdz. 9): jency Innych wstaja jako trupy - TAK (Inni nie biora jencow; pojmany i odbity jeniec
    to polegly swojego regionu i cialo dla Innych, tylko za Murem i przy Murze).
