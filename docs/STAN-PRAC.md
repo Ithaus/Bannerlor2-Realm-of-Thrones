@@ -3,6 +3,17 @@
 Czytaj najpierw: `CLAUDE.md` (zwlaszcza sekcja 8, **zasada 0**: kazda zmiana = kontrola regresji, kolizji
 i spojnosci calej logiki; oraz pulapka MCM w sekcji 7), potem ten plik, potem gorne wpisy `CHANGELOG.md`.
 
+## GRUPA "TOWARY 3" (121-125) - W PRZYGOTOWANIU (07.10 rano; NIEWGRANA)
+
+Lancuch na 120 (w grze): `paczki/121-kategorie-mieszane` (ed9f07d; sztabka zlota ok. 5.7 tys. zamiast 2 tys.) -> `paczki/122-woz-caly-magazyn`
+(0fe4901; woz zabiera caly magazyn, udzwig na miare ladunku - zatkane wsie 15.6% -> szac. 2-6%) -> `paczki/123-cena-sprawiedliwa-warsztatu` (d0408ab;
+za wyrob najwyzej koszt cyklu + 25%, nadwyzka w kasie miasta - piekarnia ok. 10-25 tys., zlotnik kilka tys. zamiast 3.56 mln) ->
+`paczki/124-kapital-startowy-warsztatow` (4608b8c; seed po przeliczeniu cen - wczesniej nigdy nie zadzialal) -> 125 koniec dosypki RBL (w toku).
+Kazde: autor + niezalezny recenzent; zlozenie: build 0 kazdego ogniwa, proby recenzentow na DLL grupy, kolejka p108..p114 naklada sie bez konfliktu.
+Opisy `docs/paczki/121..124-*.md`. Test: NOWA kampania (123 i 124 licza start). AUTOTEST (zgoda Jeffa 07.10): tryb w CrashScribe + `tools/autotest.ps1`
+(galaz at1-autotest w klonie, niewypchnieta); 1. przebieg 05:06 - menu, kreator ROT, kampania, czekanie w miescie OK (10.5 s/dobe), STANAL w 4. dobie,
+gra zawiesila sie przy wyjsciu; skrypt przywrocil DLL Jeffa (md5 OK), zapisy Jeffa nietkniete. Naprawa w toku (workflow autotest-naprawa-1).
+
 ## PIERWSZY TEST GRUPY TOWARY 2 (115-120) - 07.10 03:18 (nowa kampania, 19 dob; log `Armoury-2026-10-07_03-18-52.log`)
 
 Odczyt `python tools/sprawdz_logi.py --grupa 2b`: OK 70, UWAGA 14; ERROR 0, Exception 0, potkniecia 0; wszystkie ogniwa wpiete.
