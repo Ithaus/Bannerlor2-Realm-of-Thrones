@@ -35,6 +35,9 @@ namespace Armoury
     /// przez straznika BK przechodzi ta sama regula latki. VillageCartLeaveTown = false gasi CALA paczke (latke i bezpiecznik) - gra
     /// jak przed paczka, zostaje tylko linia w logu (recenzja: wylacznik = d126 bit w bit). Niesprzedany towar jedzie z wozem do domu i wraca na
     /// targ z nastepnym kursem (MarketCarts.Choose wycenia caly ladunek wozu); nic nie powstaje i nic nie znika.
+    /// PO RoadMemoryFix (pamiec drog uzupelniona u zrodla po wczytaniu mapy) BK nie odrzuca juz rozkazow z tych 3 osad - latka i bezpiecznik zostaja
+    /// jako siatka bezpieczenstwa (oczekiwane: przepuszczone 0); linia dnia liczy dodatkowo ROZNE partie (lordowie, karawany) odrzucane przez BK,
+    /// powod odrzucenia i najdluzsze stanie lorda / karawany w osadzie z odrzuceniem (tylko log).
     /// </summary>
     internal static class CartTownExit
     {
@@ -58,9 +61,18 @@ namespace Armoury
         private static readonly Dictionary<string, int> _passAt = new Dictionary<string, int>();
         private static readonly Dictionary<string, int> _otherAt = new Dictionary<string, int>();
 
+        // inne partie (lordowie, karawany, inne): ROZNE partie doby, powod odrzucenia i stanie w osadzie z odrzuceniem - tylko log (autotest 5 07.10:
+        // po latce wozow straznik BK odrzucal coraz wiecej rozkazow karawan i lordow w tych samych 3 osadach, osobno na wyspach - linia ma pokazac, ilu
+        // ich jest i czy stoja na zawsze; po RoadMemoryFix w 3 osadach ma byc 0)
+        private static readonly HashSet<MobileParty> _dLord = new HashSet<MobileParty>(), _dCaravan = new HashSet<MobileParty>(), _dOther = new HashSet<MobileParty>();
+        private static int _rFace, _rSea, _rNoRoad, _rElse;
+        private sealed class Stand { public Settlement At; public double First, Last; public bool Lord; }
+        private static readonly Dictionary<MobileParty, Stand> _stand = new Dictionary<MobileParty, Stand>();   // lord / karawana w osadzie -> od kiedy BK odrzuca jej rozkazy (w tej osadzie)
+        internal const double StandWindowDays = 2.0;                                                            // "stoi z odrzuceniem" = nadal w tej osadzie i odrzucona w ostatnich 2 dobach
+
         internal static void Reset()
         {
-            _seen.Clear(); _sent.Clear(); _errSites.Clear();
+            _seen.Clear(); _sent.Clear(); _errSites.Clear(); _stand.Clear();
             _scanned = false; _force = false; _stumblesAll = 0;
             ClearDay();
         }
@@ -69,6 +81,8 @@ namespace Armoury
         {
             _gV = _gVPass = _gVForce = _gVDead = _gVRoad = _gVOff = _gLord = _gCaravan = _gOther = 0;
             _passAt.Clear(); _otherAt.Clear();
+            _dLord.Clear(); _dCaravan.Clear(); _dOther.Clear();
+            _rFace = _rSea = _rNoRoad = _rElse = 0;
             _stumbles = 0;
         }
 
@@ -110,8 +124,33 @@ namespace Armoury
                     var at = party.CurrentSettlement;
                     if (!party.IsVillager)
                     {
-                        if (party.IsLordParty) _gLord++; else if (party.IsCaravan) _gCaravan++; else _gOther++;
+                        bool lord = party.IsLordParty, car = !lord && party.IsCaravan;
+                        if (lord) { _gLord++; _dLord.Add(party); } else if (car) { _gCaravan++; _dCaravan.Add(party); } else { _gOther++; _dOther.Add(party); }
                         Bump(_otherAt, at != null ? Name(at) : "w polu");
+                        try
+                        {
+                            // powod (tylko log): to samo, co liczy NavalDLCMapDistanceModel.GetDistance(partia, osada, Default) przed progiem BK
+                            if (party.IsCurrentlyAtSea) _rSea++;                             // partia na morzu (takze w wsi z portem po przyplynieciu) - droga ladowa = 1e8
+                            else
+                            {
+                                var m = Campaign.Current.Models.MapDistanceModel;
+                                var ent = m.GetClosestEntranceToFace(party.CurrentNavigationFace, MobileParty.NavigationType.Default).Item1;
+                                if (ent == null) _rFace++;                                   // sciana bez wpisu w pamieci drog (to, co naprawia RoadMemoryFix)
+                                else
+                                {
+                                    float dd = m.GetDistance(ent, to, false, false, MobileParty.NavigationType.Default);
+                                    if (!(dd >= 0f && dd < BkLimit)) _rNoRoad++; else _rElse++;   // brak drogi ladowej do celu (np. z wyspy na lad) / inne
+                                }
+                            }
+                        }
+                        catch (Exception e) { Stumble("CartTownExit.GuardPostfix (powod)", e); }
+                        if (at != null && (lord || car))
+                        {
+                            double now = CampaignTime.Now.ToDays;
+                            Stand st;
+                            if (!_stand.TryGetValue(party, out st) || st.At != at) { st = new Stand { At = at, First = now, Lord = lord }; _stand[party] = st; }
+                            st.Last = now;
+                        }
                         return;
                     }
                     _gV++;
@@ -254,6 +293,23 @@ namespace Armoury
 
             lock (_lock)
             {
+            // lordowie i karawany stojacy w osadzie, ktorym BK odrzuca rozkazy (w ostatnich StandWindowDays dobach) - ile ich i najdluzej
+            int standL = 0, standC = 0; double standMax = -1; string standAt = "", standKind = "";
+            var standTowns = new Dictionary<string, int>();
+            double nowD = CampaignTime.Now.ToDays;
+            List<MobileParty> left = null;
+            foreach (var kv in _stand)
+            {
+                var p = kv.Key; var st = kv.Value;
+                bool stays = false;
+                try { stays = p != null && p.IsActive && p.CurrentSettlement == st.At && nowD - st.Last <= StandWindowDays; } catch { }
+                if (!stays) { if (left == null) left = new List<MobileParty>(); left.Add(p); continue; }
+                if (st.Lord) standL++; else standC++;
+                Bump(standTowns, Name(st.At));
+                double dur = nowD - st.First;
+                if (dur > standMax) { standMax = dur; standAt = Name(st.At); standKind = st.Lord ? "lord" : "karawana"; }
+            }
+            if (left != null) foreach (var p in left) _stand.Remove(p);
             var sb = new StringBuilder();
             sb.Append("Wozy w miastach: dzien ").Append(day)
               .Append(" - straznik drog BK (GuardSettlementMove) odrzucil dzis rozkazow \"jedz do osady\": wozom wsi ").Append(_gV)
@@ -264,6 +320,12 @@ namespace Armoury
               .Append("; w drodze ").Append(_gVRoad).Append(" - bez zmian)")
               .Append(", lordom ").Append(_gLord).Append(", karawanom ").Append(_gCaravan).Append(", innym ").Append(_gOther)
               .Append(" (bez zmian").Append(Top(_otherAt, 4)).Append(")")
+              .Append("; rozne partie: lordow ").Append(_dLord.Count).Append(", karawan ").Append(_dCaravan.Count).Append(", innych ").Append(_dOther.Count)
+              .Append(" (powod: sciana bez wpisu w pamieci drog ").Append(_rFace).Append(", na morzu ").Append(_rSea)
+              .Append(", brak drogi ladowej do celu, np. z wyspy ").Append(_rNoRoad).Append(", inne ").Append(_rElse).Append(")")
+              .Append("; stoja w osadzie z odrzuceniem (ostatnie ").Append(StandWindowDays.ToString("0", inv)).Append(" doby): lordow ").Append(standL).Append(", karawan ").Append(standC)
+              .Append(Top(standTowns, 4))
+              .Append(", najdluzej ").Append(standMax >= 0 ? standMax.ToString("0.0", inv) + " dob - " + standKind + " w " + standAt : "-")
               .Append("; wozy wsi w miastach teraz ").Append(inTown)
               .Append(" (od wczoraj lub dluzej ").Append(townsNow.Values.Sum()).Append(Top(townsNow, 4))
               .Append("; najdluzej ").Append(longest >= 0 ? longest + " dob - " + longestAt : "-").Append(")")

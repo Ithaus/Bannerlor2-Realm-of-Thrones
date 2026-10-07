@@ -1552,6 +1552,10 @@ namespace Armoury
         [SettingPropertyGroup("The road to market")]
         public bool VillageCartFairPrice { get; set; } = true;
 
+        [SettingPropertyBool("Map Road Table Fix", HintText = "the map's road table is completed when a campaign loads: the Realm of Thrones map was reworked after its road table was made, and the new spots by Wickenden, Lord Hewett's Town, Acorn Hall, Griffin's Roost, Pinkmaiden and a hideout had no entry, so every party standing there - in those settlements or on the road beside them - looked cut off from the whole world: Banner Kings refused all its orders, caravans thought every town too far, and lords, caravans and villagers stood there for good. Each spot the road table never saw gets the nearest gate by road, worked out exactly as the game's own map tool does; spots the tool saw and left empty (no road to any settlement) stay as they are. Nothing goes into the save - the table is read anew at every load (off = the table as the map ships it)")]
+        [SettingPropertyGroup("The road to market")]
+        public bool MapRoadTableFix { get; set; } = true;
+
         [SettingPropertyBool("Village Cart Leave Town", HintText = "villagers who have sold their load in a town always set off again - Banner Kings refuses a 'go to' order whenever the map's road table has no entry for the spot a party stands on, and the gates of Wickenden, Lord Hewett's Town and Acorn Hall stand on such spots (the Realm of Thrones map was reworked after its road table was made), so carts that drove in there never left and their villages stopped all work; with this on, a village cart standing in a settlement may go wherever the game's own settlement road table knows a road (off = as Banner Kings decides, and Village Cart Town Max Days stands idle too)")]
         [SettingPropertyGroup("The road to market")]
         public bool VillageCartLeaveTown { get; set; } = true;
@@ -2971,6 +2975,7 @@ namespace Armoury
             s.VillageCartWholeStore = VillageCartWholeStore;
             s.VillageCartRoadNews = VillageCartRoadNews;
             s.VillageCartFairPrice = VillageCartFairPrice;
+            s.MapRoadTableFix = MapRoadTableFix;
             s.VillageCartLeaveTown = VillageCartLeaveTown;
             s.VillageCartTownMaxDays = VillageCartTownMaxDays;
             s.VillageClogDiagnostics = VillageClogDiagnostics;
