@@ -1,3 +1,9 @@
+> **POPRAWKA JEFFA 07.10 (wiazaca, ma pierwszenstwo przed tekstem ponizej):** nazwa SPICHLERZ (nie stodola). Plon spichlerza NIE jest abstrakcyjnym
+> 1.25 racji na czlowieka - spichlerz napelnia PRAWDZIWA produkcja zywnosci wsi regionu w grze (wszystkie przedmioty IsFood z produkcji wsi: zboze,
+> ryby, ser, maslo, mieso z hodowli, oliwki, winogrona, daktyle...), przeliczona na racje jedna stala skalibrowana tak, by zwykly rok dawal ok. 1.2 x
+> potrzeby regionu. Zima, spustoszenie (113), brak rak, mniej zwierzat i stan wsi obnizaja plon same. Stan "spladrowana" gry nie zeruje produkcji
+> calego okregu: wies produkuje wedle tego, co zostalo (decyzja Jeffa 05.10 - spalona wies to symbol).
+
 # Glod z prawdziwego bilansu zywnosci - analiza kodu i projekt (2026-10-07)
 
 Pytanie Jeffa: "glod jest, jak nie ma jedzenia - przeciez wioski maja albo nie maja jedzenia - i jak to jest przeliczane, ze jest food?".

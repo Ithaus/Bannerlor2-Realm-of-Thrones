@@ -360,7 +360,10 @@ narzedzia rozpoznal wszystkie linie. Grupa 1: OK 61, UWAGA 5; grupa 2: OK 31, UW
    Zbroja z CRAFT jak bron (zepsuta / legendarna, premie RBM: Legendary +15 / x5, Lordly +10 / x2.5, Fine +5 / x1.5, Loose -10 / x0.6, Rusty -20 / x0.3)
    - TAK (Jeff chce tabeli szans wedle kowalstwa). Klan najemnikow Spoils: TYLKO PRAWDZIWI zolnierze (koniec 20 z niczego). Naprawa u kwatermistrza
    Spoils - TAK ujednolicic: placi kasie miasta (kowale), zuzywa material z targu wedle stanu, wrakow (Mangled) nie odnawia.
-   Glod: z prawdziwego bilansu jedzenia (stodola regionu w racjach) - projekt `docs/PROJEKT-GLOD-2026-10-07.md`, po ksiedze ludzi (108-113).
+   Glod: z prawdziwego bilansu jedzenia - projekt `docs/PROJEKT-GLOD-2026-10-07.md`, po ksiedze ludzi (108-113). POPRAWKA JEFFA 07.10: nazwa "SPICHLERZ"
+   (nie stodola) i spichlerz napelnia PRAWDZIWA produkcja zywnosci wsi regionu w grze (zboze, ryby, ser, maslo, mieso z hodowli - bydlo, owce, swinie,
+   drob - oliwki, winogrona, daktyle), przeliczona na racje jedna stala (zwykly rok ok. 1.2 x potrzeby); zima, spustoszenie, brak rak, mniej bydla
+   zmniejszaja spichlerz same. Razem z tym: spladrowana wies produkuje wedle tego, co zostalo (symbol), nie zero na 8-17 dob.
 4. "zgoda na autotest" (pamiec: jeff-zgoda-na-autotest); przewijac dluzej, gdy to ma sens (40 dob na test zmiany, rok na skutki dlugie).
 
 ## Decyzje Jeffa 06.10 (wiazace; dopisane po raporcie nocnym)
