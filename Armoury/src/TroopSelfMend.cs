@@ -32,7 +32,15 @@ namespace Armoury
 
         internal static int UnitCost(EquipmentElement ee)   // internal: robocizna kowali miasta - ta sama stawka u kwatermistrza Spoils (SpoilsSeal)
         {
-            return Math.Max(1, (int)(ee.Item.Value * (1f - ee.ItemModifier.PriceMultiplier) * 0.25f));
+            return UnitCost(ee, Settlement.CurrentSettlement);
+        }
+
+        /// <summary>Robota kowali miasta st za jedna sztuke: przy regule kowali miasta (MendMaterial.RuleOn) ulamek wykonania po dniowce
+        /// mistrza w tym miescie (MendMaterial.Labor - ta sama co na lawie); inaczej jak dotad 25% utraconej wartosci.</summary>
+        internal static int UnitCost(EquipmentElement ee, Settlement st)
+        {
+            int old = Math.Max(1, (int)(ee.Item.Value * (1f - ee.ItemModifier.PriceMultiplier) * 0.25f));
+            return MendMaterial.RuleOn ? MendMaterial.Labor(ee.Item, MendMaterial.Share(ee), st, old) : old;
         }
 
         private static bool Mendable(ItemRosterElement el)
@@ -88,7 +96,7 @@ namespace Armoury
                     int left = el.Amount, fixedN = 0;
                     while (left > 0 && _bench >= per)
                     {
-                        int unit = UnitCost(el.EquipmentElement);
+                        int unit = UnitCost(el.EquipmentElement, st);
                         if (MenPurse.Get(main) < unit) { broke = true; break; }
                         MenPurse.Take(main, unit); st.Town.ChangeGold(unit);
                         _bench -= per; left--; fixedN++; paid += unit;
@@ -154,7 +162,7 @@ namespace Armoury
                 {
                     if (budget <= 0) break;
                     // audyt pelny K2: naprawa PLATNA miastu (robocizna jak u kowala: 25% utraconej wartosci) - wczesniej za darmo
-                    int unit = Math.Max(1, (int)(el.EquipmentElement.Item.Value * (1f - el.EquipmentElement.ItemModifier.PriceMultiplier) * 0.25f));
+                    int unit = UnitCost(el.EquipmentElement, st);   // ta sama robota co w Hourly i na lawie
                     int afford = Math.Max(0, TaleWorlds.CampaignSystem.Hero.MainHero.Gold - paidAll) / unit;
                     int take = Math.Min(Math.Min(budget, el.Amount), afford);
                     if (take <= 0) break;

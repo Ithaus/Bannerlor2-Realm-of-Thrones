@@ -215,7 +215,12 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ naprawy w miescie
-        private static int UnitCost(ItemObject it, ItemModifier m) { return Math.Max(1, (int)(it.Value * (1f - (m != null ? m.PriceMultiplier : 1f)) * 0.25f)); }
+        private static int UnitCost(ItemObject it, ItemModifier m, Settlement st)
+        {
+            int old = Math.Max(1, (int)(it.Value * (1f - (m != null ? m.PriceMultiplier : 1f)) * 0.25f));
+            // regula kowali miasta: ta sama robota co u gracza (MendMaterial.Labor); st null (zalegle naprawy w sakiewce) - zwykla dniowka
+            return MendMaterial.RuleOn ? MendMaterial.Labor(it, MendMaterial.Share(new EquipmentElement(it, m)), st, old) : old;
+        }
         private static bool Mendable(ItemModifier m) { return m != null && m.PriceMultiplier < 1f && !LootPrices.IsWreck(m); }   // wpis 97
 
         internal static int OutstandingCost(MobileParty mp)
@@ -227,7 +232,7 @@ namespace Armoury
             foreach (var it in byItem)
             {
                 var item = MBObjectManager.Instance.GetObject<ItemObject>(it.Key); if (item == null) continue;
-                foreach (var m in it.Value) { var mod = Mod(m.Key); if (Mendable(mod)) sum += UnitCost(item, mod) * m.Value; }
+                foreach (var m in it.Value) { var mod = Mod(m.Key); if (Mendable(mod)) sum += UnitCost(item, mod, null) * m.Value; }
             }
             return sum;
         }
@@ -257,7 +262,7 @@ namespace Armoury
                 {
                     if (done >= cap) break;
                     var item = MBObjectManager.Instance.GetObject<ItemObject>(j.Key); if (item == null) continue;
-                    int unit = UnitCost(item, Mod(j.Value));
+                    int unit = UnitCost(item, Mod(j.Value), st);
                     if (MenPurse.Get(mp) < unit) break;
                     MenPurse.Take(mp, unit); st.Town.ChangeGold(unit);
                     AddWorn(mp.StringId, j.Key, j.Value, -1);

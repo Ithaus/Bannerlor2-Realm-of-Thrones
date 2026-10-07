@@ -104,6 +104,54 @@ namespace Armoury
             return new[] { crude * share, wood * share, c.LeatherKg * share, c.LinenKg * share };
         }
 
+        // ------------------------------------------------------------ robota kowali miasta: dniowka historyczna x dobrobyt miasta
+        // Jeff 07.10: "stawka robocizny ma byc zalezna od dobrobytu miasta ... na stawkach w naszej grze - nasze stawki sa oparte
+        // o stawki historyczne - wszystko, co dotyczy placenia, musi byc spojne". Naprawa = ulamek wykonania sztuki, liczony tak samo
+        // jak jej wykonanie w wartosci (HistoricalPrices.HistCost): dni roboty x dniowka mistrza wedle tieru x zysk mistrza; ulamek - ten
+        // sam co materialu (Share: MendMaterialMaxShare x zniszczenie); dniowka w tym miescie = dniowka historyczna x LocalWage. Material
+        // po cenie targu bez narzutu (kowal kupuje go na targu dla zlecajacego). Jedna stawka dla lawy, kwatermistrza, ludzi i AI.
+
+        /// <summary>Wlaczona regula kowali miasta (SmithMendFromMarket): robota z dniowek, material z targu, bez wrakow.</summary>
+        internal static bool RuleOn { get { var s = Settings.Current; return s != null && s.SmithMendFromMarket; } }
+
+        /// <summary>Wskaznik plac w miescie: dobrobyt / TownWageRefProsperity (mediana miast), 0.5 - 1.5; poza miastem albo przy 0 - 1.</summary>
+        internal static float LocalWage(Settlement st)
+        {
+            var s = Settings.Current;
+            float rf = s != null ? s.TownWageRefProsperity : 0f;
+            var town = st != null ? st.Town : null;
+            if (rf <= 0f || town == null) return 1f;
+            return Math.Max(0.5f, Math.Min(1.5f, town.Prosperity / rf));
+        }
+
+        /// <summary>Robota naprawy w pensach (bez rabatow): share x robota wykonania (HistoricalPrices.MakingLabor; bez cen historycznych -
+        /// ArmsPricing.Labor) x (1 + zysk mistrza) x LocalWage. -1 = brak receptury (wolajacy liczy po staremu).</summary>
+        internal static float LaborF(ItemObject it, float share, Settlement st)
+        {
+            var c = it != null ? ArmsPricing.CostOf(it) : null;
+            if (c == null) return -1f;
+            var s = Settings.Current;
+            bool hist = HistoricalPrices.On;
+            float making = hist ? HistoricalPrices.MakingLabor(it, c) : c.Labor;
+            float profit = hist ? s.HistProfitPercent : s.SmithProfitPercent;
+            return Math.Max(0f, share) * making * (1f + Math.Max(0f, profit) / 100f) * LocalWage(st);
+        }
+
+        /// <summary>To samo w calych pensach (najmniej 1); brak receptury - fallback (stara stawka wolajacego).</summary>
+        internal static int Labor(ItemObject it, float share, Settlement st, int fallback)
+        {
+            float x = LaborF(it, share, st);
+            return x < 0f ? fallback : Math.Max(1, (int)Math.Round(x));
+        }
+
+        /// <summary>Dopisek do podpowiedzi: placa w tym miescie wzgledem zwyklej (pusty przy 95-105%).</summary>
+        internal static string WageNote(Settlement st)
+        {
+            float w = LocalWage(st);
+            if (Math.Abs(w - 1f) < 0.05f || st == null) return "";
+            return " Wages in " + st.Name + " run at " + (int)Math.Round(w * 100f) + "% of the usual" + (w > 1f ? " - a rich town." : " - a poor town.");
+        }
+
         /// <summary>Material placony w calych pensach, w gore (ulamek pensa za zuzyty material placi zlecajacy, nie miasto).</summary>
         internal static int Gold(float m) { return m <= 0.001f ? 0 : (int)Math.Ceiling(m - 0.001f); }
 

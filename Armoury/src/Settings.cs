@@ -495,6 +495,7 @@ namespace Armoury
         public float HistMasterWageT1 = 3f;                // a smith's day of work on plain gear, pence (a craftsman earned about 3 d a day)
         public float HistMasterWagePerTier = 1.5f;         // each tier above the first adds this to the master's day (a master armourer of fine harness about 10 d)
         public float HistProfitPercent = 25f;              // the maker's profit on top of material and labour
+        public float TownWageRefProsperity = 4800f;        // a town this prosperous pays its craftsmen exactly the historical day wage (the middle town of Westeros and Essos); a richer town pays more, up to half again (London paid about half again the provinces), a poorer less, down to half (0 = the same everywhere)
         public float HistAmmoLaborMultiplier = 8f;         // fletcher and arrowsmith work on a stack of arrows or bolts (a sheaf of 24 cost about 15 d)
         public float HistTournamentScale = 4f;             // the game seeks tournament prizes worth 1600-5000; with historical prices the range is divided by this (400-1250 pence: a fine sword, a good harness piece)
         public float HistUniquePrestige = 4f;              // named pieces of the great houses cost this many times their making
@@ -711,8 +712,8 @@ namespace Armoury
         public float SmithRepairHoursPerPiece = 1.5f;      // hours the smith needs per worn piece of your harness
         public float SelfRepairHoursPerPiece = 2.5f;       // hours you need per piece working the anvil yourself
         public float MendLootHoursPerPiece = 0.6f;         // hours per battle-worn piece from the bags
-        public float MendMaterialMaxShare = 0.20f;         // mending is NOT forging anew: even a wreck (1%) takes at most this share of the full recipe's materials
-        public bool SmithMendFromMarket = true;            // the town smiths at the mending bench work like the quartermaster's smiths: for coin you pay their work plus the materials they take from this market at its prices - iron (crude iron, scrap from wrecks or ore), wood, leather, linen or wool, more the worse the piece; with no such materials on the market the piece waits; wrecks (Mangled) are not restored for coin - mend them yourself with your own materials, or melt them down (off = as before: the smith's price only, no materials, wrecks restored)
+        public float MendMaterialMaxShare = 0.20f;         // mending is NOT forging anew: even a wreck (1%) takes at most this share of the full recipe's materials - and of the days of work that made the piece
+        public bool SmithMendFromMarket = true;            // the town smiths' rule for every repair in a town (the mending bench, the quartermaster, your men, the lords' men): the work is paid like the making of the piece - its share of the days a master spent forging it, at the master's historical day wage, as dear as the town is prosperous; the mending bench also charges the materials they take from this market at its prices - iron (crude iron, scrap from wrecks or ore), wood, leather, linen or wool, more the worse the piece; with no such materials on the market the piece waits; wrecks (Mangled) are not restored for coin - mend them yourself with your own materials, or melt them down (off = as before: the smith's price only, no materials, wrecks restored)
         public bool TakeApartEnabled = true;                // rozlozenie gotowej rzeczy na czesci, zeby zdjac z niej wzor
         public float TakeApartBaseChance = 0.6f;           // szansa odczytania wzoru przy DOKLADNIE wymaganej Smithing
         public float TakeApartSkillSpan = 300f;            // ile punktow Smithing daje pelny przeskok szansy

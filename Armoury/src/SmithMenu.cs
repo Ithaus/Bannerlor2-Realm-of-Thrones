@@ -408,7 +408,9 @@ namespace Armoury
             float pm = el.ItemModifier != null ? el.ItemModifier.PriceMultiplier : 1f;
             if (pm < 0f) pm = 0f; if (pm > 1f) pm = 1f;
             // liczone jak dawniej, na koncu POL CENY (zyczenie Jeffa), w dol
-            return Math.Max(2, (int)(el.Item.Value * (1f - pm) * Settings.Current.RepairCostFactor) / 2);
+            int old = Math.Max(2, (int)(el.Item.Value * (1f - pm) * Settings.Current.RepairCostFactor) / 2);
+            // regula kowali miasta: ulamek wykonania sztuki po dniowce mistrza w tym miescie (MendMaterial.Labor)
+            return MarketRule ? MendMaterial.Labor(el.Item, MendMaterial.Share(el), Settlement.CurrentSettlement, old) : old;
         }
 
         /// <summary>Ile sztuk (najtansze najpierw) i za ile zmiesci sie w sakwie.</summary>
@@ -443,7 +445,7 @@ namespace Armoury
         // "Send the men's worn gear", "Mend everything you wear - the smith's price". Robocizna jak dotad (PieceCost / TroopPieceCost /
         // uprzaz: RepairCostFactor), material MendMaterial.Order (wedle stanu, z polki miasta albo zapasu kowali, po cenie targu);
         // brak materialu - sztuka czeka; wrak - tylko wlasne rece z materialem ("Mend it yourself") albo przetop. Wylacznik SmithMendFromMarket.
-        internal static bool MarketRule { get { var s = Settings.Current; return s != null && s.SmithMendFromMarket; } }
+        internal static bool MarketRule { get { return MendMaterial.RuleOn; } }
 
         internal static string TownName()
         {
@@ -539,7 +541,7 @@ namespace Armoury
                     if (o.Pieces == 0)
                     { args.IsEnabled = false; args.Tooltip = new TextObject("The smiths of " + town + " can restore none of it for coin now." + o.LeftEn(town)); return true; }
                     args.Tooltip = new TextObject("The smiths of " + town + " will make " + o.Pieces + " battle-worn pieces whole for " + o.Total + " gold - "
-                        + o.Labor + " for their work and " + o.MatGold + " for materials from the market." + o.LeftEn(town));
+                        + o.Labor + " for their work and " + o.MatGold + " for materials from the market." + MendMaterial.WageNote(Settlement.CurrentSettlement) + o.LeftEn(town));
                     return true;
                 }
                 int can, canCost, all, allCost;
@@ -945,7 +947,7 @@ namespace Armoury
                         smith = total; smithOk = Hero.MainHero.Gold >= total;
                         smithTitle = "The smith mends it - " + total + " gold";
                         smithHint = Settings.Current.MendLootHoursPerPiece.ToString("0.#") + " hours. " + (total - MendMaterial.Gold(mat)) + " for the smiths' work and "
-                                    + MendMaterial.Gold(mat) + " for materials from the market of " + town + ", paid into the town's coffers.";
+                                    + MendMaterial.Gold(mat) + " for materials from the market of " + town + ", paid into the town's coffers." + MendMaterial.WageNote(Settlement.CurrentSettlement);
                     }
                 }
 
@@ -1117,6 +1119,12 @@ namespace Armoury
         {
             float pm = el.ItemModifier != null ? el.ItemModifier.PriceMultiplier : 1f;
             if (pm < 0f) pm = 0f; if (pm > 1f) pm = 1f;
+            if (MarketRule)
+            {
+                // regula kowali miasta: ta sama robota co na lawie (MendMaterial.LaborF), rabat hurtowy jak dotad
+                float lf = MendMaterial.LaborF(el.Item, MendMaterial.Share(el), Settlement.CurrentSettlement);
+                if (lf >= 0f) return Math.Max(1, (int)Math.Round(lf * (1f - discount)));
+            }
             float share = MathF.Max(0.01f, Settings.Current.TroopMendWreckShare);
             return Math.Max(1, (int)(el.Item.Value * (1f - pm) * share * (1f - discount)));
         }
@@ -1205,7 +1213,7 @@ namespace Armoury
                     if (o.Pieces == 0)
                     { args.IsEnabled = false; args.Tooltip = new TextObject(racks + " worn pieces on the men's racks - the smiths of " + town + " can mend none of them for coin now." + o.LeftEn(town)); return true; }
                     args.Tooltip = new TextObject(racks + " worn pieces on the men's racks. The smiths of " + town + " and their apprentices will make " + o.Pieces + " of them whole for "
-                        + o.Total + " gold - " + o.Labor + " for the work (bulk discount " + dp + "%) and " + o.MatGold + " for materials from the market." + o.LeftEn(town));
+                        + o.Total + " gold - " + o.Labor + " for the work (bulk discount " + dp + "%) and " + o.MatGold + " for materials from the market." + MendMaterial.WageNote(Settlement.CurrentSettlement) + o.LeftEn(town));
                     return true;
                 }
                 int all, allCost, can, canCost, disc;
@@ -1984,7 +1992,7 @@ namespace Armoury
                     if (o.Pieces == 0)
                     { args.IsEnabled = false; args.Tooltip = new TextObject("The smiths of " + town + " cannot mend your harness now." + o.LeftEn(town)); return true; }
                     args.Tooltip = new TextObject("The smiths of " + town + " will make " + o.Pieces + (o.Pieces == 1 ? " piece" : " pieces") + " of your harness sound again for "
-                        + o.Total + " gold - " + o.Labor + " for their work and " + o.MatGold + " for materials from the market." + o.LeftEn(town));
+                        + o.Total + " gold - " + o.Labor + " for their work and " + o.MatGold + " for materials from the market." + MendMaterial.WageNote(Settlement.CurrentSettlement) + o.LeftEn(town));
                     args.IsEnabled = Hero.MainHero.Gold >= o.Total;
                     return true;
                 }

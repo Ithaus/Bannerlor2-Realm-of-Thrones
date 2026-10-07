@@ -2165,6 +2165,17 @@ namespace Armoury
         }
 
         // ---------------------------------------------------------- naprawa
+        /// <summary>Robota kowala przy jednej czesci uprzezy: dawniej wartosc x brak x RepairCostFactor; przy regule kowali miasta
+        /// (MendMaterial.RuleOn) - ulamek wykonania (MendMaterialMaxShare x brak) po dniowce mistrza w tym miescie, jak lup i sztuka na lawie.</summary>
+        private static int HarnessLabor(ItemObject it, float cond)
+        {
+            float missing = Math.Max(0f, (100f - cond) / 100f);
+            int old = (int)(it.Value * missing * Settings.Current.RepairCostFactor);
+            if (!MendMaterial.RuleOn) return old;
+            var s = Settings.Current;
+            return MendMaterial.Labor(it, Math.Max(0f, s.MendMaterialMaxShare) * Math.Min(1f, missing), Settlement.CurrentSettlement, old);
+        }
+
         internal int RepairCost()
         {
             int cost = 0;
@@ -2177,7 +2188,7 @@ namespace Armoury
                     if (el.Item == null) continue;
                     float cond = GetConditionQuiet(slot);
                     if (cond >= 100f) continue;
-                    cost += (int)(el.Item.Value * (1f - cond / 100f) * Settings.Current.RepairCostFactor);
+                    cost += HarnessLabor(el.Item, cond);
                 }
             }
             catch (Exception e) { Log.Error("RepairCost", e); }
@@ -2305,7 +2316,7 @@ namespace Armoury
                     float cond = GetConditionQuiet(slot);
                     if (cond >= 100f) continue;
                     float missing = (100f - cond) / 100f;
-                    int labor = (int)(el.Item.Value * missing * Settings.Current.RepairCostFactor);   // ta sama robocizna co RepairCost
+                    int labor = HarnessLabor(el.Item, cond);   // ta sama robocizna co RepairCost
                     if (o.AddLot(new EquipmentElement(el.Item), MendMaterial.NeedsFor(el.Item, missing), labor, 1, long.MaxValue, int.MaxValue) > 0 && slots != null)
                         slots.Add(slot);
                 }

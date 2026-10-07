@@ -1716,6 +1716,10 @@ namespace Armoury
         [SettingPropertyGroup("Iron bank")]
         public float HistProfitPercent { get; set; } = 25f;
 
+        [SettingPropertyFloatingInteger("Town Wage Ref Prosperity", 0.00f, 19200.00f, "0.00", HintText = "a town this prosperous pays its craftsmen exactly the historical day wage (the middle town of Westeros and Essos); a richer town pays more, up to half again (London paid about half again the provinces), a poorer less, down to half (0 = the same everywhere)")]
+        [SettingPropertyGroup("Iron bank")]
+        public float TownWageRefProsperity { get; set; } = 4800f;
+
         [SettingPropertyFloatingInteger("Hist Ammo Labor Multiplier", 0.00f, 32.00f, "0.00", HintText = "fletcher and arrowsmith work on a stack of arrows or bolts (a sheaf of 24 cost about 15 d)")]
         [SettingPropertyGroup("Iron bank")]
         public float HistAmmoLaborMultiplier { get; set; } = 8f;
@@ -2524,11 +2528,11 @@ namespace Armoury
         [SettingPropertyGroup("Time at the forge")]
         public float MendLootHoursPerPiece { get; set; } = 0.6f;
 
-        [SettingPropertyFloatingInteger("Mend Material Max Share", 0.00f, 1.00f, "0.00", HintText = "mending is NOT forging anew: even a wreck (1%) takes at most this share of the full recipe's materials")]
+        [SettingPropertyFloatingInteger("Mend Material Max Share", 0.00f, 1.00f, "0.00", HintText = "mending is NOT forging anew: even a wreck (1%) takes at most this share of the full recipe's materials - and of the days of work that made the piece")]
         [SettingPropertyGroup("Time at the forge")]
         public float MendMaterialMaxShare { get; set; } = 0.20f;
 
-        [SettingPropertyBool("Smith Mend From Market", HintText = "the town smiths at the mending bench work like the quartermaster's smiths: for coin you pay their work plus the materials they take from this market at its prices - iron (crude iron, scrap from wrecks or ore), wood, leather, linen or wool, more the worse the piece; with no such materials on the market the piece waits; wrecks (Mangled) are not restored for coin - mend them yourself with your own materials, or melt them down (off = as before: the smith's price only, no materials, wrecks restored)")]
+        [SettingPropertyBool("Smith Mend From Market", HintText = "the town smiths' rule for every repair in a town (the mending bench, the quartermaster, your men, the lords' men): the work is paid like the making of the piece - its share of the days a master spent forging it, at the master's historical day wage, as dear as the town is prosperous; the mending bench also charges the materials they take from this market at its prices - iron (crude iron, scrap from wrecks or ore), wood, leather, linen or wool, more the worse the piece; with no such materials on the market the piece waits; wrecks (Mangled) are not restored for coin - mend them yourself with your own materials, or melt them down (off = as before: the smith's price only, no materials, wrecks restored)")]
         [SettingPropertyGroup("Time at the forge")]
         public bool SmithMendFromMarket { get; set; } = true;
 
@@ -3032,6 +3036,7 @@ namespace Armoury
             s.HistMasterWageT1 = HistMasterWageT1;
             s.HistMasterWagePerTier = HistMasterWagePerTier;
             s.HistProfitPercent = HistProfitPercent;
+            s.TownWageRefProsperity = TownWageRefProsperity;
             s.HistAmmoLaborMultiplier = HistAmmoLaborMultiplier;
             s.HistTournamentScale = HistTournamentScale;
             s.HistUniquePrestige = HistUniquePrestige;
