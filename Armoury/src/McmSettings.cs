@@ -1452,6 +1452,42 @@ namespace Armoury
         [SettingPropertyGroup("Workshops")]
         public int WorkshopCandidates { get; set; } = 40;
 
+        [SettingPropertyBool("Workshop Trade Enabled", HintText = "workshops keep their books in the new coin (needs Historical Prices): the daily keep and the wages go into the town purse instead of vanishing, a failed shop is refitted with its new owner's own coin instead of 10000 from nowhere, the coin in the till stays with the shop when it changes hands, and a workshop is bought and sold for what it earns (off = the game's rules in the old coin: 100 a day into thin air, price by town prosperity)")]
+        [SettingPropertyGroup("Workshops")]
+        public bool WorkshopTradeEnabled { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Workshop Trade Upkeep Per Day", 0.00f, 16.00f, "0.00", HintText = "what every workshop pays the town each day whether it works or not - the master's own keep (a craftsman's 3 d) and the rent of the house (about 1 d a day, 30 shillings a year); the game took 100 a day")]
+        [SettingPropertyGroup("Workshops")]
+        public float WorkshopTradeUpkeepPerDay { get; set; } = 4f;
+
+        [SettingPropertyBool("Workshop Trade Batch Wages", HintText = "journeymen are paid by the batch: a workshop makes a batch of trade goods (bread, beer, wine, leather, linen, pottery, oil, tools, felt, velvet, jewelry) only when the market pays for the materials and for that batch's wages, and the wages go into the town - Workshop Workers man-days a day at Workshop Wage Per Day, shared by its trade lines (off = the game's rule: a batch must clear 200 of the old coin per day of work, which no baker, brewer, tanner or potter can at today's prices, so they stand idle)")]
+        [SettingPropertyGroup("Workshops")]
+        public bool WorkshopTradeBatchWages { get; set; } = true;
+
+        [SettingPropertyInteger("Workshop Trade Start Capital", 0, 8000, "0", HintText = "working coin of a workshop that makes only trade goods (bakery, brewery, tannery, weavery...): what it starts a new campaign with, what a new owner puts in from his own purse after a failure, and the level above which profit is paid out - a season of wages and a few batches of materials (the game: 10000 out of thin air). Never less than ten batches of its dearest material at the usual price, up to the game's 10000 (a velvet weavery buys raw silk at 1000 a bale, so it keeps 10000). Workshops that also make arms keep the game's 10000 - the materials of one mail barding cost thousands - and workshops in an old save keep their mark until they change trade")]
+        [SettingPropertyGroup("Workshops")]
+        public int WorkshopTradeStartCapital { get; set; } = 2000;
+
+        [SettingPropertyInteger("Workshop Trade Low Capital", 0, 2000, "0", HintText = "when your own workshop's till holds no more than this, its keep and wages are paid from your purse instead (the game: 5000)")]
+        [SettingPropertyGroup("Workshops")]
+        public int WorkshopTradeLowCapital { get; set; } = 500;
+
+        [SettingPropertyFloatingInteger("Workshop Trade Equipment Scale", 0.00f, 1.00f, "0.00", HintText = "worth of a workshop's tools and fittings in the new coin as a share of the old price list (bakery 6000 -> 1200, tannery 1000 -> 200): the floor under a workshop's price and the cost of changing what it makes - about what wages and tools fell by between the two coins")]
+        [SettingPropertyGroup("Workshops")]
+        public float WorkshopTradeEquipmentScale { get; set; } = 0.2f;
+
+        [SettingPropertyFloatingInteger("Workshop Trade Price Years", 0.00f, 12.00f, "0.00", HintText = "a workshop sells for this many years of its profit after the workshop tax its buyer will really pay (a notable pays Banner Kings' tax; you and the lords pay none unless Banner Kings' own workshop model is the game's), never less than its tools and fittings, plus the coin in its till; town rents sold at about ten years' purchase and merchant ventures paid 15-30% a year, but here a workshop is seized without payment whenever its owner's realm goes to war with the town's - so a buyer wants his coin back in three years")]
+        [SettingPropertyGroup("Workshops")]
+        public float WorkshopTradePriceYears { get; set; } = 3f;
+
+        [SettingPropertyInteger("Workshop Trade Profit Days", 0, 120, "0", HintText = "the profit a price is reckoned from is a running average over about this many days of the workshop's real takings (before that - what today's market prices promise); the shop also remembers its past year: a seller asks by the better of the two, a notable buying from you pays by the worse, so a shop that stood idle for a month is no bargain")]
+        [SettingPropertyGroup("Workshops")]
+        public int WorkshopTradeProfitDays { get; set; } = 30;
+
+        [SettingPropertyFloatingInteger("Workshop Trade Resale Share", 0.00f, 3.20f, "0.00", HintText = "a notable buying your workshop pays this share of its worth to him (after his own tax) plus the coin in its till - out of his own purse, and no more than he has")]
+        [SettingPropertyGroup("Workshops")]
+        public float WorkshopTradeResaleShare { get; set; } = 0.8f;
+
         [SettingPropertyBool("Castle Villages Sell In Town", HintText = "villagers of a village held from a castle cart their goods to the nearest town market of their realm instead of the lord's castle - the castle was the lord's storehouse and garrison, never a market (off = they keep hauling to the castle)")]
         [SettingPropertyGroup("The road to market")]
         public bool CastleVillagesSellInTown { get; set; } = true;
@@ -2830,6 +2866,15 @@ namespace Armoury
             s.WorkshopCrudeKgPerOre = WorkshopCrudeKgPerOre;
             s.WorkshopWoodPerOre = WorkshopWoodPerOre;
             s.WorkshopCandidates = WorkshopCandidates;
+            s.WorkshopTradeEnabled = WorkshopTradeEnabled;
+            s.WorkshopTradeUpkeepPerDay = WorkshopTradeUpkeepPerDay;
+            s.WorkshopTradeBatchWages = WorkshopTradeBatchWages;
+            s.WorkshopTradeStartCapital = WorkshopTradeStartCapital;
+            s.WorkshopTradeLowCapital = WorkshopTradeLowCapital;
+            s.WorkshopTradeEquipmentScale = WorkshopTradeEquipmentScale;
+            s.WorkshopTradePriceYears = WorkshopTradePriceYears;
+            s.WorkshopTradeProfitDays = WorkshopTradeProfitDays;
+            s.WorkshopTradeResaleShare = WorkshopTradeResaleShare;
             s.CastleVillagesSellInTown = CastleVillagesSellInTown;
             s.MarketMaxDistance = MarketMaxDistance;
             s.MarketCartFactor = MarketCartFactor;
