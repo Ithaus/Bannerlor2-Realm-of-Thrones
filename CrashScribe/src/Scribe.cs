@@ -95,6 +95,7 @@ namespace CrashScribe
                     if (_written > Config.MaxReportsPerSession) return false;
                     _written++;
                 }
+                if (Autotest.Active) Autotest.NoteError(kind, where, ex);   // jedna linia w autotest-*.log
 
                 var sb = new StringBuilder();
                 sb.AppendLine();

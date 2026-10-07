@@ -199,8 +199,11 @@ namespace CrashScribe
                 _lastStarted = __instance; _lastStartedFor = d;
                 _lastStartDay = d;
                 if (__instance != null)
+                {
                     Scribe.Line("FABULA: wydarzenie " + __instance.GetType().Name + " WYSTARTOWALO (dzien "
                                 + ((int)d) + ").");
+                    if (Autotest.Active) Autotest.Note("FABULA: wydarzenie " + __instance.GetType().Name + " WYSTARTOWALO (dzien " + ((int)d) + ")");
+                }
             }
             catch { }
         }

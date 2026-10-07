@@ -147,6 +147,8 @@ namespace CrashScribe
 
                 // proba dopisania do glownego logu - z limitem, nigdy na wiszaco
                 Scribe.TryRaw(sb.ToString(), 2000);
+                if (Autotest.Active)
+                    Autotest.NoteOffThread("ZAWIESZENIE: watek glowny milczy " + (int)quietSeconds + " s - stos w " + (hangFile != null ? System.IO.Path.GetFileName(hangFile) : "hang-*.log"));
             }
             catch { }
         }

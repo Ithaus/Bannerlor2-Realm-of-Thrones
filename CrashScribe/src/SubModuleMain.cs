@@ -29,6 +29,7 @@ namespace CrashScribe
                 Config.Load(Path.Combine(moduleRoot, "ModuleData"));
                 Blame.Map();
                 Scribe.Init();
+                Autotest.Arm(Scribe.ReportDir);   // przelacznik autotest.json: bez pliku nic sie nie zmienia
                 Trail.Init(Scribe.ReportDir);
                 Scribe.Line("Scribe ready. Reports: " + Scribe.ReportDir);
                 Watchdog.Init(Thread.CurrentThread);
@@ -83,6 +84,8 @@ namespace CrashScribe
             try
             {
                 if (_harmony == null) _harmony = new Harmony(HarmonyId);
+                // autotest PIERWSZY: wywrotka ponizej nie moze zostawic gry bez ochrony zapisow Jeffa
+                if (Autotest.Active) Autotest.Install(_harmony);
                 Watch.Install(_harmony);
                 Net.WrapModules(_harmony);
                 Net.WrapHotspots(_harmony);
@@ -111,6 +114,7 @@ namespace CrashScribe
         {
             base.OnApplicationTick(dt);
             Watchdog.Beat();
+            if (Autotest.Active) Autotest.Tick(dt);
         }
 
         protected override void OnGameStart(Game game, IGameStarter gameStarterObject)
@@ -126,6 +130,7 @@ namespace CrashScribe
                 if (cgs != null) cgs.AddBehavior(new DialogEscape());
                 if (cgs != null) cgs.AddBehavior(new NightKingCall());   // Zew Nocnego Krola (Jeff 16.09)
                 if (cgs != null) cgs.AddBehavior(new EconomyAudit());    // audyt ekonomii rodow (Jeff 04.10), tylko odczyt
+                if (cgs != null && Autotest.Active) cgs.AddBehavior(new AutotestBehavior());   // tylko w autotescie
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "OnGameStart.WarReport", null); } catch { } }
         }
