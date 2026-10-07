@@ -1,0 +1,313 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
+using System.Reflection;
+using System.Text;
+using HarmonyLib;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
+
+namespace Armoury
+{
+    /// <summary>
+    /// WOZY NIE UTYKAJA W MIASTACH (paczka NN; autotest 07.10 09:11, 40 dob: 39 z 53 zatkanych wsi ma woz w miescie od 8 do 40 dob -
+    /// w 10 przykladach co 5 dob wylacznie Wickenden i Lord Hewett's Town; gra nie wystawia wsi nowego wozu, dopoki stary istnieje).
+    /// PRZYCZYNA (kod gry, BK i dane mapy ROT): woz wsi po sprzedazy czeka w miescie na rozkaz gry "do domu"
+    /// (VillagerCampaignBehavior.ThinkAboutSendingInsideVillagersToTheirHomeVillage, co godzine z szansa 20%) - rozkaz idzie przez
+    /// MobileParty.SetMoveGoToSettlement(dom, Default). BannerKings ma na tej metodzie prefiks (AiDecisionTracePatches
+    /// .SetMoveGoToSettlementPostfix -> GuardSettlementMove), ktory ODRZUCA rozkaz, gdy MapDistanceModel.GetDistance(partia, osada,
+    /// Default) >= 50000. Ten dystans gra liczy od "najblizszego wejscia" sciany siatki drog, na ktorej partia stoi (tablica sciana ->
+    /// osada w pamieci drog ROT-Map\ModuleData\DistanceCaches\settlements_distance_cache_Default.bin); gdy sciany nie ma w tablicy,
+    /// zwraca 1e8 (DefaultMapDistanceModel i NavalDLCMapDistanceModel tak samo). Pamiec drog ROT (28.07) jest starsza niz siatka mapy:
+    /// siatka ma 17864 scian, tablica konczy sie na scianie 17841 - 22 sciany dociete pozniej leza przy Griffin's Roost, Lord Hewett's
+    /// Town, Pinkmaiden, Acorn Hall, kryjowce i Wickenden, a BRAMY Wickenden (sciana 17862), Lord Hewett's Town (17848) i zamku Acorn
+    /// Hall (17858) stoja wlasnie na nich (jedyne 3 z 1065 osad). Partia w osadzie stoi na bramie, wiec KAZDY rozkaz "jedz do osady"
+    /// z tych trzech osad BK odrzuca: woz wjechal (rozkaz wydany we wsi przechodzi), sprzedal i stoi na zawsze z celem = to miasto.
+    /// LATKA (VillageCartLeaveTown, wylacznik): postfiks na BK GuardSettlementMove - gdy BK odrzucil rozkaz WOZU WSI stojacego w osadzie,
+    /// pytamy o te sama droge tablice osada -> osada (MapDistanceModel.GetDistance(osada, cel, Default) - ta sama pamiec drog, z ktorej
+    /// gra liczy droge z osady): jest droga ladowa (< 50000, prog BK) - rozkaz przechodzi; nie ma - zostaje odrzucony jak u BK. Lordow,
+    /// karawan i wozow w polu nie ruszamy (tylko liczniki w logu). Ten sam rozkaz, ktory i tak wydaje gra - zloto i towar bez zmian.
+    /// BEZPIECZNIK (VillageCartTownMaxDays, 0 = wylaczony): raz na dobe woz wsi, ktory stoi w (nieoblezonym, bez bitwy) miescie od
+    /// N dob, dostaje rozkaz gry "do domu" (MoveVillagersToSettlementWithBestNavigationType - ten sam, ktory gra wydaje co godzine);
+    /// przez straznika BK przechodzi ta sama regula latki. VillageCartLeaveTown = false gasi CALA paczke (latke i bezpiecznik) - gra
+    /// jak przed paczka, zostaje tylko linia w logu (recenzja: wylacznik = d126 bit w bit). Niesprzedany towar jedzie z wozem do domu i wraca na
+    /// targ z nastepnym kursem (MarketCarts.Choose wycenia caly ladunek wozu); nic nie powstaje i nic nie znika.
+    /// </summary>
+    internal static class CartTownExit
+    {
+        /// <summary>Prog BK (GuardSettlementMove): dystans od tej wartosci = "brak drogi ladowej".</summary>
+        internal const float BkLimit = 50000f;
+
+        private static MethodInfo _guard, _move;
+        private static bool _wired;
+        private static bool _force;                               // trwa rozkaz bezpiecznika (tylko licznik "w tym rozkazy bezpiecznika"; przepuszcza go ta sama regula latki)
+        private static bool _scanned;                             // raz po wczytaniu: lista osad z brama poza pamiecia drog
+        private static readonly HashSet<string> _errSites = new HashSet<string>();
+        private static readonly object _lock = new object();
+
+        // ------------------------------------------------------------ stan (tylko pamiec; czyszczony w konstruktorze ArmouryBehavior)
+        private static readonly Dictionary<MobileParty, int> _seen = new Dictionary<MobileParty, int>();   // woz wsi w miescie -> doba pierwszej obserwacji
+        private static readonly HashSet<MobileParty> _sent = new HashSet<MobileParty>();                    // woz odeslany juz przez bezpiecznik (i nadal w miescie)
+        private static int _stumbles, _stumblesAll;
+
+        // ------------------------------------------------------------ liczniki doby (straznik BK)
+        private static int _gV, _gVPass, _gVForce, _gVDead, _gVRoad, _gVOff, _gLord, _gCaravan, _gOther;
+        private static readonly Dictionary<string, int> _passAt = new Dictionary<string, int>();
+        private static readonly Dictionary<string, int> _otherAt = new Dictionary<string, int>();
+
+        internal static void Reset()
+        {
+            _seen.Clear(); _sent.Clear(); _errSites.Clear();
+            _scanned = false; _force = false; _stumblesAll = 0;
+            ClearDay();
+        }
+
+        private static void ClearDay()
+        {
+            _gV = _gVPass = _gVForce = _gVDead = _gVRoad = _gVOff = _gLord = _gCaravan = _gOther = 0;
+            _passAt.Clear(); _otherAt.Clear();
+            _stumbles = 0;
+        }
+
+        private static void Stumble(string where, Exception e)
+        {
+            _stumbles++; _stumblesAll++;
+            if (_errSites.Add(where)) Log.Error(where, e);
+        }
+
+        private static string Name(Settlement s)
+        {
+            try { return s != null && s.Name != null ? s.Name.ToString() : "?"; } catch { return "?"; }
+        }
+
+        private static void Bump(Dictionary<string, int> d, string k) { int n; d.TryGetValue(k, out n); d[k] = n + 1; }
+
+        private static string Top(Dictionary<string, int> d, int k)
+        {
+            if (d.Count == 0) return "";
+            return " [" + string.Join(", ", d.OrderByDescending(x => x.Value).Take(k).Select(x => x.Key + " " + x.Value)) + (d.Count > k ? ", ..." : "") + "]";
+        }
+
+        // ------------------------------------------------------------ latka: straznik BK
+        /// <summary>
+        /// Postfiks na BannerKings.Patches.AiDecisionTracePatches.GuardSettlementMove(MobileParty, Settlement, ref NavigationType).
+        /// Gdy BK odrzucil rozkaz (false) wozowi wsi stojacemu w osadzie, a pamiec drog osada -> cel ma droge ladowa - rozkaz przechodzi.
+        /// Inaczej (lordowie, karawany, woz w polu, cel naprawde bez drogi) wynik BK bez zmian - tylko liczniki.
+        /// </summary>
+        public static void GuardPostfix(MobileParty __0, Settlement __1, ref bool __result)
+        {
+            if (__result) return;                                                   // BK przepuscil - nic (ogromna wiekszosc wywolan)
+            lock (_lock)                                                            // rozkazy AI moga isc z kilku watkow - liczniki i slowniki pod zamkiem (tylko odrzucone przez BK)
+            {
+                try
+                {
+                    var party = __0;
+                    var to = __1;
+                    if (party == null || to == null) return;
+                    var at = party.CurrentSettlement;
+                    if (!party.IsVillager)
+                    {
+                        if (party.IsLordParty) _gLord++; else if (party.IsCaravan) _gCaravan++; else _gOther++;
+                        Bump(_otherAt, at != null ? Name(at) : "w polu");
+                        return;
+                    }
+                    _gV++;
+                    if (at == null || party.IsCurrentlyAtSea) { _gVRoad++; return; }      // woz w drodze - jak u BK (obecny rozkaz zostaje)
+                    var s = Settings.Current;
+                    if (s == null || !s.VillageCartLeaveTown) { _gVOff++; return; }       // wylacznik calej paczki: wynik BK bez zmian (bezpiecznik tez stoi)
+                    // ta sama droga, ktora gra liczy dla partii w osadzie (DistanceHelper.FindClosestDistanceFromSettlementToSettlementForMobileParty):
+                    // pamiec drog osada -> osada, nie sciana, na ktorej stoi brama
+                    float d = Campaign.Current.Models.MapDistanceModel.GetDistance(at, to, false, false, MobileParty.NavigationType.Default);
+                    if (!(d >= 0f && d < BkLimit)) { _gVDead++; return; }                // z tej osady naprawde nie ma drogi ladowej (albo NaN) - jak u BK
+                    __result = true;
+                    _gVPass++;
+                    if (_force) _gVForce++;
+                    Bump(_passAt, Name(at));
+                }
+                catch (Exception e) { Stumble("CartTownExit.GuardPostfix", e); }   // blad = wynik BK bez zmian
+            }
+        }
+
+        // ------------------------------------------------------------ bezpiecznik + linia dnia
+        /// <summary>Dlaczego woz stal w miescie (stan przed rozkazem bezpiecznika).</summary>
+        private enum Why { Stale, Hold, AiOff, TargetTown, WaitsHome, Other }
+
+        private static Why Reason(MobileParty cart, Settlement at, Settlement home)
+        {
+            if (cart.Ai != null && cart.Ai.IsDisabled) return Why.AiOff;
+            if (cart.DefaultBehavior == AiBehavior.Hold || cart.ShortTermBehavior == AiBehavior.Hold) return Why.Hold;
+            if (cart.TargetSettlement == home) return Why.WaitsHome;                  // rozkaz do domu jest, a woz czeka (zagrozenie pod brama - gra chowa woz w miescie)
+            if (cart.TargetSettlement == at)
+            {
+                try
+                {
+                    var entrance = Campaign.Current.Models.MapDistanceModel.GetClosestEntranceToFace(cart.CurrentNavigationFace, MobileParty.NavigationType.Default).Item1;
+                    if (entrance == null) return Why.Stale;                           // cel = to miasto, a brama poza pamiecia drog - BK zjadal kazdy rozkaz gry
+                }
+                catch { }
+                return Why.TargetTown;
+            }
+            return Why.Other;
+        }
+
+        /// <summary>Rozkaz gry "do domu" (ten sam, ktory gra wydaje co godzine wozom w miescie); przez straznika BK przechodzi regula latki (_force - tylko licznik).</summary>
+        private static void SendHome(MobileParty cart, Settlement home)
+        {
+            _force = true;
+            try
+            {
+                var vcb = Campaign.Current != null ? Campaign.Current.GetCampaignBehavior<VillagerCampaignBehavior>() : null;
+                if (_move != null && vcb != null) _move.Invoke(vcb, new object[] { cart, home });
+                else cart.SetMoveGoToSettlement(home, MobileParty.NavigationType.Default, false);
+            }
+            finally { _force = false; }
+        }
+
+        /// <summary>Raz po wczytaniu: osady, ktorych brama stoi na scianie spoza pamieci drog (Default) - BK nie wypusci z nich rozkazem "jedz".</summary>
+        private static string StaleGates()
+        {
+            var names = new List<string>();
+            int n = 0;
+            var m = Campaign.Current.Models.MapDistanceModel;
+            foreach (var st in Settlement.All)
+            {
+                if (st == null || st.IsHideout) continue;
+                n++;
+                try { if (m.GetClosestEntranceToFace(st.GatePosition.Face, MobileParty.NavigationType.Default).Item1 == null) names.Add(Name(st) + (st.IsTown ? "" : st.IsCastle ? " (zamek)" : st.IsVillage ? " (wies)" : "")); }
+                catch (Exception e) { Stumble("CartTownExit.StaleGates", e); }
+            }
+            return (names.Count > 0 ? string.Join(", ", names) : "zadna") + " (" + names.Count + " z " + n + " osad)";
+        }
+
+        /// <summary>Raz na dobe: bezpiecznik (woz wsi w miescie od N dob - do domu) i linia "Wozy w miastach:".</summary>
+        internal static void Daily()
+        {
+            var s = Settings.Current;
+            if (s == null) return;
+            var inv = CultureInfo.InvariantCulture;
+            int today = (int)CampaignTime.Now.ToDays;
+            int day = today - 1;
+            if (!_scanned)
+            {
+                _scanned = true;
+                string stale = "?";
+                try { stale = StaleGates(); } catch (Exception e) { Stumble("CartTownExit.StaleGates", e); }
+                Log.Info("Wozy w miastach: brama poza pamiecia drog ROT (sciana siatki bez wpisu w settlements_distance_cache_Default.bin - straznik BK odrzuca stamtad kazdy rozkaz \"jedz do osady\"): " + stale
+                         + "; latka straznika BK " + (!_wired ? "BRAK (nie znaleziono GuardSettlementMove)" : (s.VillageCartLeaveTown ? "CZYNNA" : "WYLACZONA")) + ".");
+            }
+            bool on = s.VillageCartLeaveTown;                                         // wylacznik calej paczki: wylaczony = latka i bezpiecznik stoja (jak d126), zostaje sam log
+            float maxDays = on ? s.VillageCartTownMaxDays : 0f;
+            int inTown = 0, over = 0, sent = 0, resent = 0, failed = 0, homeDead = 0, held = 0;
+            int rStale = 0, rHold = 0, rAiOff = 0, rTown = 0, rWait = 0, rOther = 0;
+            int longest = -1; string longestAt = "";
+            var townsNow = new Dictionary<string, int>();
+            var present = new HashSet<MobileParty>();
+            foreach (var v in Village.All)
+            {
+                try
+                {
+                    var comp = v != null ? v.VillagerPartyComponent : null;
+                    var cart = comp != null ? comp.MobileParty : null;
+                    if (cart == null || !cart.IsActive) continue;
+                    var at = cart.CurrentSettlement;
+                    if (at == null || !at.IsTown) continue;
+                    inTown++;
+                    present.Add(cart);
+                    int first;
+                    if (!_seen.TryGetValue(cart, out first)) { first = today; _seen[cart] = today; }   // po wczytaniu: od pierwszej obserwacji
+                    int days = today - first;
+                    if (days > longest) { longest = days; longestAt = Name(at); }
+                    if (days >= 1) Bump(townsNow, Name(at));
+                    if (maxDays <= 0f || days < maxDays) continue;
+                    over++;
+                    if (at.IsUnderSiege || (at.Party != null && at.Party.MapEvent != null) || cart.MapEvent != null) { held++; continue; }   // gra trzyma wozy w oblezonym miescie i w bitwie - jak dotad
+                    var home = cart.HomeSettlement;
+                    if (home == null) { failed++; continue; }
+                    switch (Reason(cart, at, home))
+                    {
+                        case Why.Stale: rStale++; break;
+                        case Why.Hold: rHold++; break;
+                        case Why.AiOff: rAiOff++; break;
+                        case Why.TargetTown: rTown++; break;
+                        case Why.WaitsHome: rWait++; break;
+                        default: rOther++; break;
+                    }
+                    float d = Campaign.Current.Models.MapDistanceModel.GetDistance(at, home, false, false, MobileParty.NavigationType.Default);
+                    if (!(d >= 0f && d < BkLimit)) { homeDead++; continue; }
+                    SendHome(cart, home);
+                    if (cart.DefaultBehavior == AiBehavior.GoToSettlement && cart.TargetSettlement == home)
+                    {
+                        sent++;
+                        if (!_sent.Add(cart)) resent++;
+                    }
+                    else failed++;
+                }
+                catch (Exception e) { Stumble("CartTownExit.Daily", e); }
+            }
+            // porzadki: wozy, ktore wyjechaly z miasta albo zniknely
+            List<MobileParty> gone = null;
+            foreach (var k in _seen.Keys) if (!present.Contains(k)) { if (gone == null) gone = new List<MobileParty>(); gone.Add(k); }
+            if (gone != null) foreach (var k in gone) { _seen.Remove(k); _sent.Remove(k); }
+
+            lock (_lock)
+            {
+            var sb = new StringBuilder();
+            sb.Append("Wozy w miastach: dzien ").Append(day)
+              .Append(" - straznik drog BK (GuardSettlementMove) odrzucil dzis rozkazow \"jedz do osady\": wozom wsi ").Append(_gV)
+              .Append(" (z osady: przepuszczone ").Append(_gVPass).Append(Top(_passAt, 4))
+              .Append(", w tym rozkazy bezpiecznika ").Append(_gVForce)
+              .Append(", bez drogi ladowej z osady ").Append(_gVDead)
+              .Append(", latka wylaczona ").Append(_gVOff)
+              .Append("; w drodze ").Append(_gVRoad).Append(" - bez zmian)")
+              .Append(", lordom ").Append(_gLord).Append(", karawanom ").Append(_gCaravan).Append(", innym ").Append(_gOther)
+              .Append(" (bez zmian").Append(Top(_otherAt, 4)).Append(")")
+              .Append("; wozy wsi w miastach teraz ").Append(inTown)
+              .Append(" (od wczoraj lub dluzej ").Append(townsNow.Values.Sum()).Append(Top(townsNow, 4))
+              .Append("; najdluzej ").Append(longest >= 0 ? longest + " dob - " + longestAt : "-").Append(")")
+              .Append("; bezpiecznik (").Append(maxDays > 0f ? "od " + maxDays.ToString("0.#", inv) + " dob w miescie" : (on ? "WYLACZONY" : "WYLACZONY - latka wylaczona")).Append("): wozow ").Append(over)
+              .Append(", odeslano do domu ").Append(sent).Append(" (w tym ponownie ").Append(resent).Append(")")
+              .Append(", oblezenie / bitwa - czeka ").Append(held)
+              .Append(", dom bez drogi ladowej ").Append(homeDead)
+              .Append(", rozkaz nie przeszedl ").Append(failed)
+              .Append("; staly, bo: brama poza pamiecia drog ROT ").Append(rStale)
+              .Append(", cel to miasto ").Append(rTown)
+              .Append(", Hold ").Append(rHold)
+              .Append(", AI wylaczone ").Append(rAiOff)
+              .Append(", cel dom - czeka (zagrozenie pod brama) ").Append(rWait)
+              .Append(", inne ").Append(rOther)
+              .Append("; latka straznika BK ").Append(!_wired ? "BRAK" : (s.VillageCartLeaveTown ? "CZYNNA" : "WYLACZONA"))
+              .Append("; potkniecia dzis ").Append(_stumbles).Append(" (od wczytania ").Append(_stumblesAll).Append(").");
+            Log.Info(sb.ToString());
+            ClearDay();
+            }
+        }
+
+        internal static void ApplyAll(Harmony h)
+        {
+            try
+            {
+                _move = AccessTools.Method(typeof(VillagerCampaignBehavior), "MoveVillagersToSettlementWithBestNavigationType");
+                var t = AccessTools.TypeByName("BannerKings.Patches.AiDecisionTracePatches");
+                _guard = t != null ? AccessTools.Method(t, "GuardSettlementMove") : null;
+                var ps = _guard != null ? _guard.GetParameters() : null;
+                if (_guard == null || !_guard.IsStatic || _guard.ReturnType != typeof(bool) || ps.Length < 2 || ps[0].ParameterType != typeof(MobileParty) || ps[1].ParameterType != typeof(Settlement))
+                {
+                    _guard = null;
+                    Log.Info("CartTownExit: BRAK BannerKings AiDecisionTracePatches.GuardSettlementMove(MobileParty, Settlement, ..) - straznika BK nie ma albo zmienil sie kod; latka niewpieta, bezpiecznik (VillageCartTownMaxDays, przy wlaczonym VillageCartLeaveTown) dziala"
+                             + (_move != null ? "." : ", rozkaz prosty (brak metody gry)."));
+                    return;
+                }
+                h.Patch(_guard, postfix: new HarmonyMethod(typeof(CartTownExit), nameof(GuardPostfix)));
+                _wired = true;
+                var s = Settings.Current;
+                Log.Info("CartTownExit: latka wpieta - woz wsi stojacy w osadzie wyjezdza, gdy pamiec drog osada -> cel zna droge ladowa (straznik BK odrzucal rozkazy z bram poza pamiecia drog ROT: Wickenden, Lord Hewett's Town, Acorn Hall) ("
+                         + (s != null && s.VillageCartLeaveTown ? "CZYNNA" : "wylaczona") + "); bezpiecznik: woz w miescie od "
+                         + (s != null ? s.VillageCartTownMaxDays.ToString("0.#", CultureInfo.InvariantCulture) : "?") + " dob - do domu" + (_move != null ? " (rozkaz gry)." : " (rozkaz prosty - brak metody gry)."));
+            }
+            catch (Exception e) { Log.Error("CartTownExit.ApplyAll", e); }
+        }
+    }
+}

@@ -1536,6 +1536,14 @@ namespace Armoury
         [SettingPropertyGroup("The road to market")]
         public bool VillageCartFairPrice { get; set; } = true;
 
+        [SettingPropertyBool("Village Cart Leave Town", HintText = "villagers who have sold their load in a town always set off again - Banner Kings refuses a 'go to' order whenever the map's road table has no entry for the spot a party stands on, and the gates of Wickenden, Lord Hewett's Town and Acorn Hall stand on such spots (the Realm of Thrones map was reworked after its road table was made), so carts that drove in there never left and their villages stopped all work; with this on, a village cart standing in a settlement may go wherever the game's own settlement road table knows a road (off = as Banner Kings decides, and Village Cart Town Max Days stands idle too)")]
+        [SettingPropertyGroup("The road to market")]
+        public bool VillageCartLeaveTown { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Village Cart Town Max Days", 0.00f, 8.00f, "0.00", HintText = "a village cart still standing in a town this many days after it drove in is sent home with whatever it carries - nothing is made or lost; carts in a besieged town or one under attack wait as before. A sound cart leaves within hours (the game sends it home with one chance in five every hour), so two days catch only a cart that is truly stuck (needs Village Cart Leave Town; 0 = never)")]
+        [SettingPropertyGroup("The road to market")]
+        public float VillageCartTownMaxDays { get; set; } = 2f;
+
         [SettingPropertyBool("Village Clog Diagnostics", HintText = "log only, changes nothing in the game: once a day the Armoury log says why village storehouses stand full (one and a half times their size stops all village work) - village types, what lies in them, where each village's villagers are (at home, on the road and for how long, in town, none at all) and how many villages filled up or emptied that day; ten examples every five days (off = no such lines)")]
         [SettingPropertyGroup("The road to market")]
         public bool VillageClogDiagnostics { get; set; } = true;
@@ -2943,6 +2951,8 @@ namespace Armoury
             s.VillageCartWholeStore = VillageCartWholeStore;
             s.VillageCartRoadNews = VillageCartRoadNews;
             s.VillageCartFairPrice = VillageCartFairPrice;
+            s.VillageCartLeaveTown = VillageCartLeaveTown;
+            s.VillageCartTownMaxDays = VillageCartTownMaxDays;
             s.VillageClogDiagnostics = VillageClogDiagnostics;
             s.CaravanBulkEnabled = CaravanBulkEnabled;
             s.CaravanBulkStockDays = CaravanBulkStockDays;
