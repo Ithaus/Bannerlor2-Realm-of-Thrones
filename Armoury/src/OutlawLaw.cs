@@ -218,7 +218,10 @@ namespace Armoury
             }
         }
 
-        /// <summary>Ludzie z wsi regionu: zabrani z hearth (nie z kosmosu).</summary>
+        /// <summary>
+        /// Ludzie z wsi regionu: zabrani z hearth (nie z kosmosu). Ile hearth za czlowieka - PeopleUnit.PerMan (demografia
+        /// krok 2): 1/k kultury wsi, a przy wylaczonej jednostce `OutlawHearthPerMan` jak dotad.
+        /// </summary>
         private static float TakeCommoners(Settlement region, float men)
         {
             if (region == null || men <= 0f) return 0f;
@@ -226,17 +229,43 @@ namespace Armoury
             var vs = region.BoundVillages;
             if (vs == null || vs.Count == 0) return 0f;
             float taken = 0f;
+            if (PeopleUnit.ByPeople)
+            {
+                // liczba od ludzi: kazda wies regionu oddaje wedle swojej ludnosci (ten sam ulamek mieszkancow), nie najwieksza pierwsza
+                double all = 0.0;
+                foreach (var v in vs) all += PeopleUnit.Base(v);
+                if (all > 0.0)
+                {
+                    foreach (var v in vs)
+                    {
+                        double share = PeopleUnit.Base(v) / all;
+                        if (share > 0.0) taken += TakeFrom(v, (float)(men * share), per);
+                    }
+                    Add(region, Commoner, taken);
+                    return taken;
+                }
+            }
             foreach (var v in vs.OrderByDescending(x => x.Hearth))
             {
                 if (taken >= men) break;
-                float can = Math.Max(0f, (v.Hearth - 50f) / per);      // wies nie znika do zera
-                float t = Math.Min(can, men - taken);
-                if (t <= 0f) continue;
-                v.Hearth -= t * per;
-                taken += t;
+                taken += TakeFrom(v, men - taken, per);
             }
             Add(region, Commoner, taken);
             return taken;
+        }
+
+        /// <summary>Zdejmuje z jednej wsi do `men` ludzi (wies nie schodzi ponizej 50 hearth); `legacy` = stawka z ustawien. Zwraca, ilu wyszlo.</summary>
+        private static float TakeFrom(Village v, float men, float legacy)
+        {
+            bool unit;
+            float per = PeopleUnit.PerMan(v, legacy, out unit);
+            float can = Math.Max(0f, (v.Hearth - 50f) / per);      // wies nie znika do zera
+            float t = Math.Min(can, men);
+            if (t <= 0f) return 0f;
+            if (unit) PeopleUnit.Shift(v, -(double)t * per);
+            else v.Hearth -= t * per;
+            PeopleUnit.NoteOut(t, t * per);
+            return t;
         }
 
         private static void ReturnHome(Settlement region, float men)
@@ -246,7 +275,11 @@ namespace Armoury
             if (vs == null || vs.Count == 0) return;
             float per = Settings.Current.OutlawHearthPerMan;
             var v = vs.OrderBy(x => x.Hearth).First();
-            v.Hearth += men * per;
+            bool unit;
+            float one = PeopleUnit.PerMan(v, Math.Max(0.01f, per), out unit);
+            if (unit) { per = one; PeopleUnit.Shift(v, (double)men * per); }
+            else v.Hearth += men * per;
+            PeopleUnit.NoteBack(men, men * per);
         }
 
         private static void Seed()
@@ -255,15 +288,23 @@ namespace Armoury
             _seeded = true;
             try
             {
+                // demografia krok 2: k krain liczone z hearth SPRZED siewu (dotad kalibracja szla po nim, na hearth pomniejszonym o pule)
+                if (PeopleUnit.On) PopulationLaw.EnsureCalibrated();
                 float per = Settings.Current.OutlawSeedPerHearth;
                 float sum = 0f;
-                foreach (var r in Nodes())
+                string note = "";
+                PeopleUnit.SeedBegin();
+                try
                 {
-                    float h = 0f;
-                    if (r.BoundVillages != null) foreach (var v in r.BoundVillages) h += v.Hearth;
-                    sum += TakeCommoners(r, h * per);
+                    foreach (var r in Nodes())
+                    {
+                        float h = 0f;
+                        if (r.BoundVillages != null) foreach (var v in r.BoundVillages) h += PeopleUnit.Base(v);
+                        sum += TakeCommoners(r, h * per);
+                    }
                 }
-                Log.Info("Wyrzutki: pula poczatkowa " + (int)sum + " ludzi w " + Nodes().Count + " regionach (" + per.ToString("0.000", CultureInfo.InvariantCulture) + " na hearth, zabrani z wsi).");
+                finally { note = PeopleUnit.SeedEnd(); }
+                Log.Info("Wyrzutki: pula poczatkowa " + (int)sum + " ludzi w " + Nodes().Count + " regionach (" + per.ToString("0.000", CultureInfo.InvariantCulture) + " na hearth, zabrani z wsi" + note + ").");
             }
             catch (Exception e) { Log.Error("OutlawLaw.Seed", e); }
         }
@@ -364,11 +405,10 @@ namespace Armoury
             {
                 if (!On || v == null || v.Settlement == null) return;
                 var region = RegionOf(v.Settlement);
-                float men = v.Hearth * Settings.Current.OutlawRaidFleePercent / 100f;
-                float per = Math.Max(0.01f, Settings.Current.OutlawHearthPerMan);
-                men = Math.Min(men, Math.Max(0f, (v.Hearth - 50f) / per));
+                // ilu ucieka: procent podstawy wsi (hearth, a przy liczeniu od ludzi - jej ludnosc w hearth sredniej wsi swiata); stawka hearth za czlowieka w TakeFrom
+                float men = PeopleUnit.Base(v) * Settings.Current.OutlawRaidFleePercent / 100f;
+                men = TakeFrom(v, men, Math.Max(0.01f, Settings.Current.OutlawHearthPerMan));
                 if (men <= 0f) return;
-                v.Hearth -= men * per;
                 Add(region, Commoner, men);
                 _inRaid += men;
             }
@@ -487,7 +527,7 @@ namespace Armoury
                         if (r.BoundVillages != null)
                             foreach (var v in r.BoundVillages)
                             {
-                                hearth += v.Hearth; nv++;
+                                hearth += PeopleUnit.Base(v); nv++;      // podstawa naplywu: hearth, a przy liczeniu od ludzi - ludnosc wsi w hearth sredniej wsi swiata
                                 if (v.VillageState == Village.VillageStates.Looted || v.VillageState == Village.VillageStates.BeingRaided) looted++;
                             }
                         float prosp = 0.5f, sec = 0.5f;
