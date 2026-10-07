@@ -57,6 +57,10 @@ namespace Armoury
     ///  Krok K6 (TownPurse) robi to samo dla MIAST tymi samymi latkami: "zakupy" 0, regulator "skasowal 0", a "dosypal" to juz
     ///  tylko bezpiecznik ponizej zapasu kupcow (tryb 1) albo 0 (tryb 2). Zawor miasta ma w ticku dobowym dwie pozycje: "renty"
     ///  (kasy -> panowie) i "udzial korony z zaworu kas miast" (kasy -> skarbce; TownPurse przenosi go z rent przez SplitTownMark).
+    ///  - utarg wsi bez znikania (K7, VillageTakings): to, co paczka dopisala wsiom przy powrocie taboru, siedzi juz w oknie
+    ///    powrotu (kiesa wsi i licznik podatku rosna przed zdarzeniem AfterSettlementEntered) - "zniklo" spada do zera samo;
+    ///    zywnosc kupiona we wsiach (cena kasowana przez SellItemsAction) i sakwy zniszczonych taborow wsi czytamy z licznikow
+    ///    doby VillageTakings: w bilansie ujsciem jest tylko to, czego paczka nie oddala.
     /// </summary>
     internal static class MoneyLedger
     {
@@ -680,13 +684,19 @@ namespace Armoury
             // krok K6 (TownPurse): to samo dla daru startowego kas miast (osobna migawka, osobny dopisek)
             long trim = 0, trimTowns = 0; for (int c = 0; c < Classes; c++) { trim -= _mark[c, MTrim]; trimTowns -= _mark[c, MTownTrim]; }
             long sources = cons + regIn + _clanUp + routed + from;
-            long sinks = _clanDown + regOut + vanished + to - _levyBack + trim + trimTowns;
+            // K7 (VillageTakings): cena zywnosci kupionej we wsi, ktora gra kasuje w SellItemsAction, i sakwy zniszczonych taborow wsi.
+            // Ujsciem jest tylko to, czego paczka nie oddala (kiesom wsi, licznikom panow, zwyciezcom); przy wylaczonych ustawieniach - calosc.
+            long foodGone = VillageTakings.FoodGone, foodBack = VillageTakings.FoodToPurse + VillageTakings.FoodToTax;
+            long cartGone = VillageTakings.CartGone, cartBack = VillageTakings.CartToOthers + VillageTakings.CartToPurse + VillageTakings.CartToTax;
+            long sinks = _clanDown + regOut + vanished + (foodGone - foodBack) + (cartGone - cartBack) + to - _levyBack + trim + trimTowns;
             return "Pieniadz swiata (bilans): dzien " + day + " | zmiana sumy " + S(delta) + " [P] = zmierzone zrodla z niczego +" + sources
                    + " [P] (\"zakupy\" mieszkancow miast i zamkow " + cons + ", regulator kas dosypal " + regIn + ", rozliczenia rodow na plus " + _clanUp + " w " + _clanUpN
                    + " rodach, zold oddany do obiegu przez SoldierPay " + routed + " (sakiewki ludzi " + _wageToPurses + ", kasy osad " + _wageToCoffers
                    + "), GiveGoldAction z niczego poza rozliczeniami rodow " + from + ")"
                    + " - zmierzone ujscia w nicosc " + sinks + " [P] (rozliczenia rodow na minus " + _clanDown + " w " + _clanDownN + " rodach, regulator kas skasowal " + regOut
                    + ", z utargu wsi zniklo " + vanished
+                   + ", z ceny zywnosci kupionej we wsiach zniklo " + (foodGone - foodBack) + " (gra skasowala " + foodGone + ", oddane wsiom i panom " + foodBack + ")"
+                   + ", z sakw zniszczonych taborow wsi zniklo " + (cartGone - cartBack) + " (bylo w nich " + cartGone + ", oddane zwyciezcom i wsiom " + cartBack + ")"
                    + ", GiveGoldAction w nicosc poza rozliczeniami rodow " + to + " minus " + _levyBack + " oddane przez LevyGold notablom i miastom)"
                    + (trim != 0 ? " w tym dar startowy kas zamkow przyciety przez CastlePurse " + trim + " [P]" : "")
                    + (trimTowns != 0 ? " w tym dar startowy kas miast przyciety przez TownPurse " + trimTowns + " [P]" : "")
@@ -739,8 +749,11 @@ namespace Armoury
               .Append(" | powrot do wsi: tabory oddaly ").Append(_vHanded).Append(" [P] w ").Append(_vReturns).Append(" powrotach = pan (licznik podatku wsi) ")
               .Append(_vTax).Append(" [P] (").Append(Pct(_vTax, _vHanded)).Append(") + wlasciciele majatkow BK ").Append(_vEstates).Append(" [P] (").Append(Pct(_vEstates, _vHanded))
               .Append(") + kiesa wsi ").Append(_vKept).Append(" [P] (").Append(Pct(_vKept, _vHanded)).Append(") + zniklo ").Append(vanished).Append(" [R] (")
-              .Append(Pct(vanished, _vHanded)).Append(")")
-              .Append(" | zold naliczony przy rozliczeniach rodow [P]: ");
+              .Append(Pct(vanished, _vHanded)).Append(")");
+            // K7: dopisane przez VillageTakings siedzi juz w "kiesa wsi" i "pan" (okno powrotu obejmuje nasz postfiks)
+            if (VillageTakings.TakingsToPurse + VillageTakings.TakingsToTax != 0)
+                sb.Append("; w tym dopisane wsiom przez K7: do kies ").Append(VillageTakings.TakingsToPurse).Append(", na liczniki panow ").Append(VillageTakings.TakingsToTax).Append(" [P]");
+            sb.Append(" | zold naliczony przy rozliczeniach rodow [P]: ");
             long wages = 0;
             for (int k = 0; k < Wages; k++)
             {
@@ -766,6 +779,16 @@ namespace Armoury
             {
                 known += _vKept;
                 parts.Add("z utargu taborow " + S(_vKept) + " [P]");
+                // K7: zaplate lordow za zywnosc licza "przelewy gry"; tu to, co gra zaraz potem zdejmuje wsi, i to, co wraca do kies
+                long food = VillageTakings.FoodToPurse - VillageTakings.FoodGone;
+                known += food;
+                parts.Add("zywnosc kupiona we wsiach " + S(food) + " [P] (gra skasowala " + Neg(VillageTakings.FoodGone) + ", K7 oddal kiesom +" + VillageTakings.FoodToPurse
+                          + ", licznikom panow " + VillageTakings.FoodToTax + ")");
+                if (VillageTakings.CartToPurse != 0)
+                {
+                    known += VillageTakings.CartToPurse;
+                    parts.Add("sakwy rozwiazanych taborow " + S(VillageTakings.CartToPurse) + " [P]");
+                }
             }
             else
             {
@@ -811,7 +834,7 @@ namespace Armoury
             }
             known += marks;
             parts.Add("Armoury tick dobowy " + S(marks) + " [P]" + (det.Count > 0 ? " (" + string.Join(", ", det.ToArray()) + ")" : ""));
-            parts.Add((c == CVill ? "reszta - niezmierzone (m.in. podatek gry od zakupow we wsi) " : "reszta - inne niezmierzone (i regulator, gdy jego licznik stoi na 0 tickow) ")
+            parts.Add((c == CVill ? "reszta - niezmierzone (m.in. doplaty notabli i odplyw BK ponad limit kiesy, zakupy wsi z targowiskiem) " : "reszta - inne niezmierzone (i regulator, gdy jego licznik stoi na 0 tickow) ")
                       + S(delta - known) + " [R]");
             string spread = "";
             if (golds != null && golds.Count > 0)
