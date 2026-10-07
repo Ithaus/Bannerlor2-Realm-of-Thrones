@@ -1388,12 +1388,33 @@ namespace Armoury
                     sb.Append("\n");
                 }
                 int all, allCost, can, canCost, disc;
-                ScanTroopWorn(out all, out allCost, out can, out canCost, out disc);
-                if (all > 0)
-                    sb.Append("\nThe smith will mend all ").Append(all).Append(" worn pieces for ")
-                      .Append(allCost).Append(" gold (bulk discount ").Append(disc).Append("%).");
+                if (MarketRule)
+                {
+                    // przeglad 07.10: ta sama wycena co "Send the men's worn gear" - bez wrakow, robota + material z targu, rabat od sztuk,
+                    // ktore kowale wezma za monete (dotad stary rachunek: wraki w cenie, bez materialu)
+                    int racks = 0; disc = 0;
+                    var o = QuartermasterEscrow.Active ? null : PlanTroops(Hero.MainHero.Gold, int.MaxValue, out disc, out racks);
+                    string town = TownName();
+                    if (o == null || racks == 0)
+                        sb.Append("\nEvery piece on the racks is sound.");
+                    else if (!o.Ok)
+                        sb.Append("\n").Append(racks).Append(" worn pieces on the racks - there are no town smiths here.");
+                    else if (o.Pieces == 0)
+                        sb.Append("\n").Append(racks).Append(" worn pieces on the racks - the smiths of ").Append(town).Append(" can mend none of them for coin now.").Append(o.LeftEn(town));
+                    else
+                        sb.Append("\n").Append(racks).Append(" worn pieces on the racks. The smiths of ").Append(town).Append(" will make ").Append(o.Pieces)
+                          .Append(" of them whole for ").Append(o.Total).Append(" gold - ").Append(o.Labor).Append(" for the work (bulk discount ").Append(disc)
+                          .Append("%) and ").Append(o.MatGold).Append(" for materials from the market.").Append(o.LeftEn(town));
+                }
                 else
-                    sb.Append("\nEvery piece on the racks is sound.");
+                {
+                    ScanTroopWorn(out all, out allCost, out can, out canCost, out disc);
+                    if (all > 0)
+                        sb.Append("\nThe smith will mend all ").Append(all).Append(" worn pieces for ")
+                          .Append(allCost).Append(" gold (bulk discount ").Append(disc).Append("%).");
+                    else
+                        sb.Append("\nEvery piece on the racks is sound.");
+                }
 
                 InformationManager.ShowInquiry(new InquiryData("The Quartermaster's Muster",
                     sb.ToString(), true, false, "Good", "", null, null), true);

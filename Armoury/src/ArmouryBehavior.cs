@@ -2057,25 +2057,28 @@ namespace Armoury
             }
         }
 
-        /// <summary>Po naprawie zalozonej czesci stan wraca do 100 - inaczej Wear odlozylby modyfikator z powrotem.</summary>
+        /// <summary>
+        /// Po naprawie zalozonej czesci stan wraca do 100 - inaczej Wear odlozylby modyfikator z powrotem - a ksiega zapamietuje
+        /// NOWY stan sztuki jako oryginal. Przeglad 07.10: dotad zostawal modyfikator sprzed naprawy (np. Plundered), wiec
+        /// pozniejsza naprawa calej uprzezy brala zaplate drugi raz i przywracala sztuce stan sprzed oplaconej naprawy.
+        /// ZBROJA Z KUZNI JAK BRON (132): przy wlaczonej jakosci zbroi wpis z piatym polem (BookLine) - sztuka zaczyna ksiege od
+        /// nowa w stanie, jaki ma teraz; przy wylaczonej - wpis 4 pola (ta sama regula, scalenie TOWARY 3).
+        /// </summary>
         internal void ResetSlotCondition(int slot)
         {
-            SetCondition(slot, 100f);
-            // ZBROJA Z KUZNI JAK BRON: po lawce naprawczej sztuka zaczyna ksiege od nowa w stanie, jaki ma teraz - dotad ksiega
-            // pamietala dawny stan i nastepna naprawa u kowala go przywracala (zardzewiala zbroja, za ktorej naprawe zaplaciles,
-            // wracala do rdzy)
-            if (!ArmourQuality.On) return;
             try
             {
                 var el = Hero.MainHero.BattleEquipment[slot];
                 string id = el.Item != null ? el.Item.StringId : "";
+                string line = ArmourQuality.On ? BookLine(slot, el, id) : slot + "|100|" + ModId(el) + "|" + id;
                 for (int i = 0; i < _condition.Count; i++)
                 {
                     var p = _condition[i].Split('|');
                     if (int.Parse(p[0]) != slot) continue;
-                    _condition[i] = BookLine(slot, el, id);
+                    _condition[i] = line;
                     return;
                 }
+                _condition.Add(line);
             }
             catch (Exception e) { Log.Error("ResetSlotCondition", e); }
         }
