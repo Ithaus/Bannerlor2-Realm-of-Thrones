@@ -120,7 +120,7 @@ namespace Armoury
         {
             if (!On || Campaign.Current == null) return;
             _funded.Clear();
-            _paidTowns = _stalledNoMat = _warSkipped = 0; _spent = _toPurses = _toMarkets = 0; _points = 0;
+            _paidTowns = _stalledNoMat = _warSkipped = 0; _spent = _toPurses = _toMarkets = 0; _points = 0; _wageIdxSum = 0f; _wageIdxN = 0;
             try
             {
                 var s = Settings.Current;
@@ -171,15 +171,36 @@ namespace Armoury
                     lord.ChangeHeroGold(-(matSpent + labourI));
                     if (market != null && market.Town != null) market.Town.ChangeGold(matSpent);
                     st.Town.ChangeGold(labourI);                 // place murarzy, robotnikow, woznic - do kasy osady
-                    float pts = (matSpent + labourI) / ppp;
+                    float pts = PointsFor(matSpent, labourI, ppp, market);
+                    _wageIdxSum += WageIdx(market); _wageIdxN++;
                     _funded[st.Town] = pts;
                     _paidTowns++; _spent += matSpent + labourI; _toMarkets += matSpent; _toPurses += labourI; _points += pts;
                 }
             }
             catch (Exception e) { Log.Error("BuildFunding", e); }
             Log.Info("Budowy oplacone: dzien " + (int)CampaignTime.Now.ToDays + " - osad " + _paidTowns + ", wydano " + _spent + " (place i wozy do kas osad " + _toPurses
-                     + ", materialy z targow " + _toMarkets + "), punktow budowy " + (int)_points + "; wstrzymane: brak materialow " + _stalledNoMat + ", wojna (budowle cywilne) " + _warSkipped + ".");
+                     + ", materialy z targow " + _toMarkets + "), punktow budowy " + (int)_points + " (place wedle miast targowych: sredni poziom plac "
+                     + (_wageIdxN > 0 ? (_wageIdxSum / _wageIdxN).ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) : "-") + ")"
+                     + "; wstrzymane: brak materialow " + _stalledNoMat + ", wojna (budowle cywilne) " + _warSkipped + ".");
         }
+
+        /// <summary>
+        /// Punkty budowy z zaplaty (Jeff 07.10: koszty w miescie z dobrobytu i stawek historycznych): cena punktu ppp liczona przy
+        /// zwyklej dniowce; pens plac kupuje tyle pracy, ile dniowka w miescie targowym, z ktorego sa robotnicy (TownWage - dla zamku
+        /// najblizsze miasto, jak przy materialach) - w bogatym miescie mniej, w biednym wiecej. Materialy - po cenie targu jak dotad.
+        /// </summary>
+        internal static float PointsFor(int matSpent, int labour, float ppp, Settlement market)
+        {
+            return (matSpent + labour / WageIdx(market)) / Math.Max(1f, ppp);
+        }
+
+        private static float WageIdx(Settlement market)
+        {
+            var s = Settings.Current;
+            return s != null && s.BuildWagesByTown ? Math.Max(0.1f, TownWage.Index(market)) : 1f;
+        }
+
+        private static float _wageIdxSum; private static int _wageIdxN;
 
         private static int BuyOneCheapest(Settlement market, int purse)
         {

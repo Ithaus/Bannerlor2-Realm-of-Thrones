@@ -1388,6 +1388,10 @@ namespace Armoury
         [SettingPropertyGroup("Army purchases")]
         public float BuildPencePerPointCivil { get; set; } = 24f;
 
+        [SettingPropertyBool("Build Wages By Town", HintText = "the masons and labourers are paid the day wage of the market town they come from: a penny of wages buys less work in a rich town and more in a poor one (materials at the market price either way; off = a penny of wages is a penny of work everywhere)")]
+        [SettingPropertyGroup("Army purchases")]
+        public bool BuildWagesByTown { get; set; } = true;
+
         [SettingPropertyBool("Ai Recruits Bring Kit", HintText = "a fresh recruit still arrives with his own kit (levies came armed); turn off and lords must buy for every new man")]
         [SettingPropertyGroup("Army purchases")]
         public bool AiRecruitsBringKit { get; set; } = true;
@@ -2962,6 +2966,7 @@ namespace Armoury
             s.BuildMaterialShare = BuildMaterialShare;
             s.BuildPencePerPointMilitary = BuildPencePerPointMilitary;
             s.BuildPencePerPointCivil = BuildPencePerPointCivil;
+            s.BuildWagesByTown = BuildWagesByTown;
             s.AiRecruitsBringKit = AiRecruitsBringKit;
             s.KitFromNotable = KitFromNotable;
             s.AiGearBudgetPercent = AiGearBudgetPercent;

@@ -406,6 +406,7 @@ namespace Armoury
         public float BuildMaterialShare = 0.25f;           // of that money, this share buys materials (limestone, timber, clay, tools, marble) at the market; the rest pays masons, labourers and carters
         public float BuildPencePerPointMilitary = 48f;     // pence per construction point of walls, towers and other military works
         public float BuildPencePerPointCivil = 24f;        // pence per construction point of civil buildings
+        public bool BuildWagesByTown = true;               // the masons and labourers are paid the day wage of the market town they come from: a penny of wages buys less work in a rich town and more in a poor one (materials at the market price either way; off = a penny of wages is a penny of work everywhere)
         public bool AiRecruitsBringKit = true;             // a fresh recruit still arrives with his own kit (levies came armed); turn off and lords must buy for every new man
         public bool KitFromNotable = true;                 // an AI lord's new recruits bring only the kit their notable actually bought for them (tier 1 men bring their own belongings) - no full kit from thin air
         public float AiGearBudgetPercent = 25f;            // share of a lord's gold (above the reserve) he is willing to spend on gear in one visit to a town
