@@ -165,6 +165,7 @@ namespace Armoury
         {
             _goods = null; _cats.Clear(); _cameWith.Clear(); _worldDay = -1; _towns = 0; _caravans = 0;
             _boughtHere.Clear(); _inTown = 0;
+            _errEarly = false; _errRoute = false;   // audyt 120: pierwszy blad nowej kampanii tej samej sesji znow idzie do logu
             NewDay();
             foreach (var g in _all) g.Reset();
         }

@@ -65,11 +65,14 @@ namespace Armoury
 
         // Stanu kampanii tu nie ma (popyt i podaz siedza w danych rynku gry i w sejwie). Zatrzaski bledow: wyjatek idzie do
         // logu raz na kampanie, a wycena wraca wtedy do wzoru gry; liczniki wpiecia sa na cale uruchomienie gry.
+        // Audyt 120: kazde potkniecie liczone (_st*, linia dnia "Ceny surowcow: ... Potkniecia dzis") - po pierwszym wpisie w logu
+        // widac, czy to jeden przypadek, czy kazda wycena. Prefiks ceny moze biec poza watkiem glownym - licznik przez Interlocked.
         private static bool _errFactor, _errUse, _errLog;
+        private static int _stFactor, _stUse, _stBudget;
         private static int _factorModels, _demandModels;
 
         /// <summary>Nowa gra albo wczytanie (z HistoricalPrices.Reset, czyli z konstruktora ArmouryBehavior): bledy nowej kampanii znow ida do logu.</summary>
-        internal static void Reset() { _errFactor = false; _errUse = false; _errLog = false; _errBudget = false; }
+        internal static void Reset() { _errFactor = false; _errUse = false; _errLog = false; _errBudget = false; _stFactor = 0; _stUse = 0; _stBudget = 0; }
 
         // ------------------------------------------------------------ (A) stala wzoru w nowej monecie
         // BetterEconomy (BEE_ItemPriceFactorModel) wola w srodku model gry - przelicza tylko najbardziej zewnetrzne wywolanie.
@@ -95,6 +98,7 @@ namespace Armoury
             }
             catch (Exception e)
             {
+                System.Threading.Interlocked.Increment(ref _stFactor);
                 if (!_errFactor) { _errFactor = true; Log.Error("RawPrice.FactorPrefix", e); }   // raz na kampanie; cena zostaje wedle gry
             }
         }
@@ -134,6 +138,7 @@ namespace Armoury
             }
             catch (Exception e)
             {
+                System.Threading.Interlocked.Increment(ref _stUse);
                 if (!_errUse) { _errUse = true; Log.Error("RawPrice.EstimatePostfix", e); }      // raz na kampanie; popyt zostaje wedle gry
             }
         }
@@ -217,10 +222,16 @@ namespace Armoury
             if (econ == null) return 0f;
             float dem = econ.GetDailyDemandForCategory(t, c, 0);
             if (!_bkBudgetLooked) { _bkBudgetLooked = true; _bkBudget = AccessTools.Method("BannerKings.Patches.EconomyPatches:CalculateBudget"); }
-            if (_bkBudget != null && !_errBudget)
+            if (_bkBudget != null)
             {
                 try { return (float)_bkBudget.Invoke(null, new object[] { t, dem, c }); }
-                catch (Exception e) { _errBudget = true; Log.Error("RawPrice.Daily (budzet BK)", e); }   // raz na kampanie; dalej model gry
+                catch (Exception e)
+                {
+                    // audyt 120: bez globalnego wylacznika - kazde wywolanie probuje BK znowu (blad jednego miasta nie gasi budzetu BK
+                    // wszystkim), potkniecia liczone w linii dnia, w logu pierwszy raz na kampanie; ta pozycja - model gry
+                    _stBudget++;
+                    if (!_errBudget) { _errBudget = true; Log.Error("RawPrice.Daily (budzet BK)", e); }
+                }
             }
             return econ.CalculateDailySettlementBudgetForItemCategory(t, dem, c);
         }
@@ -339,9 +350,13 @@ namespace Armoury
                                .Append(F((float)budget[c], "0")).Append(" d (przy dzisiejszych polkach do ").Append(F((float)spend[c], "0")).Append(" d)");
                     }
                 }
+                // audyt 120: potkniecia od poprzedniej linii (zdanie konczy kropka - narzedzie logow czyta liczby potkniec do kropki)
+                int stF = System.Threading.Interlocked.Exchange(ref _stFactor, 0), stU = System.Threading.Interlocked.Exchange(ref _stUse, 0);
+                int stB = _stBudget; _stBudget = 0;
                 Log.Info("Ceny surowcow: dzien " + day + " - popyt z prawdziwego zuzycia " + (UseOn ? "CZYNNY" : "wylaczony") + ", stala wzoru w nowej monecie "
                          + (FormulaOn ? "CZYNNA" : "wylaczona") + " (model cen " + (price != null ? price.GetType().Name : "?") + ", mediany po miastach; sztuka rudy i drewna = ladunek) - "
-                         + sb + (other.Length > 0 ? ". Inne przeliczone towary, indeks min/mediana/max: " + other : "")
+                         + sb + ". Potkniecia dzis (wyjatki, pierwszy w logu): wycena " + stF + ", popyt " + stU + ", budzet BK " + stB
+                         + (other.Length > 0 ? ". Inne przeliczone towary, indeks min/mediana/max: " + other : "")
                          + (defined.Length > 0 ? ". Towary z wartoscia z definicji przedmiotu (przelicznik popytu, indeks min/mediana/max, sztuki na polkach miast): " + defined : "") + ".");
             }
             catch (Exception e)

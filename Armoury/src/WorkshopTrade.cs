@@ -99,8 +99,12 @@ namespace Armoury
             _dFail = _dNoTaker = _dStumbles = 0;
         }
 
-        /// <summary>Nowa moneta warsztatow ma sens tylko przy cenach historycznych (HistoricalPrices) - bez nich zostaje gra.</summary>
-        internal static bool On { get { var s = Settings.Current; return s != null && s.WorkshopTradeEnabled && HistoricalPrices.On; } }
+        /// <summary>Nowa moneta warsztatow ma sens tylko przy cenach historycznych (HistoricalPrices) - bez nich zostaje gra.
+        /// Audyt 120: po starcie gry liczy sie, czy przeliczenie NAPRAWDE weszlo (HistoricalPrices.Applied, jak RawPrice), nie samo
+        /// ustawienie - wyjatek przed HistoricalPrices.Apply w OnSessionLaunched zostawia ceny starej monety i wtedy zostaje gra.
+        /// Przed startem gry (zakladanie swiata, przed OnSessionLaunched) przeliczenia jeszcze nie ma z natury rzeczy - tam jak dotad
+        /// (InitPostfix, poprawke robi SeedNewCampaign po Apply).</summary>
+        internal static bool On { get { var s = Settings.Current; return s != null && s.WorkshopTradeEnabled && HistoricalPrices.On && (HistoricalPrices.Applied || !Live); } }
         private static bool Batch { get { return On && Settings.Current.WorkshopTradeBatchWages; } }
         private static float Upkeep { get { return Math.Max(0f, Settings.Current.WorkshopTradeUpkeepPerDay); } }
         private static int LowCapital { get { return Math.Max(0, Settings.Current.WorkshopTradeLowCapital); } }
@@ -256,18 +260,33 @@ namespace Armoury
         /// <summary>
         /// Warsztat placi miastu (place albo utrzymanie). Gracz z kapitalem przy progu placi z wlasnej kiesy (jak w grze), reszta z
         /// kapitalu - najwyzej tyle, ile w nim jest. Zwraca kwote faktycznie przekazana; to, co zeszlo, w calosci trafia do kasy miasta.
+        /// Audyt 120: z kiesy liczy sie tylko to, co naprawde z niej zeszlo (pomiar przed / po, jak ConvertPostfix); brak - z kapitalu,
+        /// reszta niezaplacona. Zapora kuzni (TrueArmourCost.SwallowForgeFee) polyka KAZDY przelew gracza do osady, gdy gracz czeka
+        /// w menu kuzni (i przy wygaslej dobie kupuje za niego dobe kuzni) - wyplata warsztatu to nie oplata za kuznie, wiec idzie z
+        /// flaga, ktora zapora przepuszcza (DayPass.Charging; samej zapory nie zmieniamy). Bez tego warsztat gracza z pustym
+        /// kapitalem bankrutowalby w trakcie kucia, choc w kiesie bylo zloto.
         /// </summary>
         private static int PayToTown(Workshop shop, Town town, int amount, bool wages, Rec rec)
         {
             if (amount <= 0 || shop == null || town == null) return 0;
             var owner = shop.Owner;
+            int fromPurse = 0;
             if (owner != null && owner == Hero.MainHero && shop.Capital <= LowCapital && owner.Gold >= amount)
             {
-                GiveGoldAction.ApplyForCharacterToSettlement(owner, shop.Settlement, amount, true);   // zdarzenie gry: ksiega widzi przelew gracz -> miasto
-                if (wages) { _dWagePurse += amount; if (rec != null) rec.Purse += amount; } else _dKeepPurse += amount;
-                return amount;
+                int before = owner.Gold;
+                bool was = DayPass.Charging;
+                try
+                {
+                    DayPass.Charging = true;
+                    GiveGoldAction.ApplyForCharacterToSettlement(owner, shop.Settlement, amount, true);   // zdarzenie gry: ksiega widzi przelew gracz -> miasto
+                }
+                finally { DayPass.Charging = was; }
+                fromPurse = Math.Max(0, Math.Min(amount, before - owner.Gold));
+                if (fromPurse > 0) { if (wages) { _dWagePurse += fromPurse; if (rec != null) rec.Purse += fromPurse; } else _dKeepPurse += fromPurse; }
+                if (fromPurse >= amount) return amount;
             }
-            int paid = Math.Min(amount, Math.Max(0, shop.Capital));
+            int rest = amount - fromPurse;
+            int paid = Math.Min(rest, Math.Max(0, shop.Capital));
             if (paid > 0)
             {
                 shop.ChangeGold(-paid);
@@ -275,8 +294,8 @@ namespace Armoury
                 MoneyLedger.NoteWorkshopPay(shop.Settlement, wages ? paid : 0, wages ? 0 : paid);
                 if (wages) _dWageCap += paid; else _dKeepCap += paid;
             }
-            if (paid < amount) _dUnpaid += amount - paid;
-            return paid;
+            if (paid < rest) _dUnpaid += rest - paid;
+            return fromPurse + paid;
         }
 
         // ------------------------------------------------------------ latki: cykl produkcji
@@ -367,10 +386,12 @@ namespace Armoury
         private static void CloseDay(Workshop shop, Rec rec, int keepPaid)
         {
             int x = rec.Op - rec.Purse - keepPaid;
-            if (rec.Days <= 0) { rec.Avg = Expected(shop); rec.Slow = rec.Avg; }   // pierwsza doba: punkt wyjscia = oczekiwany wynik z cen targu
+            if (rec.Days <= 0) rec.Avg = Expected(shop);   // pierwsza doba: punkt wyjscia sredniej biezacej = oczekiwany wynik z cen targu
             int span = Span;
             rec.Avg += (x - rec.Avg) / Math.Min(rec.Days + 2, span);
-            rec.Slow += (x - rec.Slow) / Math.Min(rec.Days + 2, YearSpan);
+            // audyt 120: pamiec roku to srednia samych PRAWDZIWYCH wynikow doby (pierwsza doba: Slow = x) - oczekiwany wynik z cen
+            // pustej polki wyrobu (garbarnia +1456 d przy 86 d prawdziwych) nie trzyma ceny kupna przez caly pierwszy rok
+            rec.Slow += (x - rec.Slow) / Math.Min(rec.Days + 1, YearSpan);
             rec.Days++;
             TypeStat t;
             if (!_dType.TryGetValue(rec.Type, out t)) { t = new TypeStat(); _dType[rec.Type] = t; }
@@ -444,7 +465,7 @@ namespace Armoury
         /// </summary>
         internal static string SeedNewCampaign()
         {
-            if (!On || Campaign.Current == null) return null;
+            if (!On || Campaign.Current == null || !HistoricalPrices.Applied) return null;   // audyt 120: kapital w nowej monecie tylko po przeliczeniu
             bool fresh = false;
             try { fresh = Campaign.Current.CampaignGameLoadingType == Campaign.GameLoadingType.NewCampaign; }
             catch (Exception e) { Stumble("WorkshopTrade.SeedNewCampaign(rodzaj sesji)", e); return null; }
@@ -687,7 +708,9 @@ namespace Armoury
             catch (Exception e) { Stumble("WorkshopTrade.CostPlayerPostfix", e); }
         }
 
-        /// <summary>DefaultWorkshopModel.GetCostForNotable - tyle notabl daje graczowi: czesc wartosci DLA NIEGO (jego podatek, gorsza pamiec) plus kapital w kasie.</summary>
+        /// <summary>DefaultWorkshopModel.GetCostForNotable - tyle notabl daje graczowi: czesc wartosci DLA NIEGO (jego podatek, gorsza pamiec) plus kapital w kasie.
+        /// Audyt 120: nie wiecej niz ma w sakiewce najbogatszy notabl miasta, ktory moze kupic - te liczbe gracz widzi w rozmowie
+        /// ("you can get {PRICE}") PRZED sprzedaza; kupca losuje gra dopiero w konsekwencji, wiec biedniejszy kupiec dalej placi tyle, ile ma.</summary>
         public static void CostNotablePostfix(Workshop __0, ref int __result)
         {
             try
@@ -696,8 +719,22 @@ namespace Armoury
                 var q = QuoteForNotable(__0);
                 float share = MBMath.ClampFloat(Settings.Current.WorkshopTradeResaleShare, 0f, 1f);
                 __result = (int)Math.Round(Math.Max(q.Going, q.Equip) * share) + q.Capital;
+                int purse = RichestBuyerPurse(__0);
+                if (purse >= 0 && __result > purse) __result = purse;
             }
             catch (Exception e) { Stumble("WorkshopTrade.CostNotablePostfix", e); }
+        }
+
+        /// <summary>Sakiewka najbogatszego notabla, ktory moze odkupic warsztat: zywy notabl osady poza obecnym wlascicielem (z tych
+        /// samych gra losuje kupca w GetNotableOwnerForWorkshop). -1 = nikogo takiego (gra i tak nie pozwoli sprzedac).</summary>
+        private static int RichestBuyerPurse(Workshop w)
+        {
+            var list = w.Settlement != null ? w.Settlement.Notables : null;
+            if (list == null) return -1;
+            int best = -1;
+            foreach (var h in list)
+                if (h != null && h.IsAlive && h != w.Owner) best = Math.Max(best, Math.Max(0, h.Gold));
+            return best;
         }
 
         private static Type _bkWsType; private static bool _bkWsTried;
