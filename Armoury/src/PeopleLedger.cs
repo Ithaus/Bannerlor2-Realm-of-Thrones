@@ -22,6 +22,8 @@ namespace Armoury
     ///    partii), zwerbowani dzis (zdarzenia gry: od notabli, z karczmy, bez osady, gracz), dezercja; bilans partii rodow
     ///    z jawna reszta (nowe partie z szablonu, wymiana z garnizonem); odsetek mezczyzn pod bronia; od kroku 2 takze
     ///    "hearth za ludzi dzis" - ile hearth wsie oddaly za tabory, wyrzutkow i wymuszonych rekrutow (liczniki PeopleUnit);
+    ///  "Ludzie: przyrost naturalny" (krok 3, PopulationLaw.GrowthDaily) - ile ludzi przybywa wsiom dzis i wedle jakich skladowych,
+    ///    krainy, rozliczenie zmiany hearth wsi od wczoraj (reszta = hearth z niczego), stan ludnosci miast wobec dobrobytu;
     ///  "Ludzie (regiony):" - 8 regionow najbardziej obciazonych: (zaloga + wyrzutki + bandy) wobec mezczyzn regionu;
     ///  plik Logs/[sesja]/ludzie-regiony.csv - wszystkie regiony, wiersz na region na dobe.
     /// Czego ksiega NIE widzi (do kroku 5): z jakiego regionu pochodzi zolnierz partii rodu; przyrost garnizonow (gra dopisuje
@@ -317,6 +319,8 @@ namespace Armoury
                 if (_stumbles > 0) sb.Append(" Potkniecia ksiegi: ").Append(_stumbles).Append('.');
                 int reported = _stumbles;
                 Log.Info(sb.ToString());
+                // demografia krok 3: linia "Ludzie: przyrost naturalny" - tu, bo rozlicza zmiane hearth wsi z licznikami doby PeopleUnit (zeruje je ClearDay nizej)
+                PopulationLaw.GrowthDaily(day);
 
                 // 4. osiem najbardziej obciazonych regionow
                 if (ranked.Count > 0)

@@ -54,6 +54,24 @@ namespace Armoury
             return 1f + (n - 0.5f) * 2f * g;
         }
 
+        /// <summary>
+        /// Jaka czesc plonu zima zabiera tej wsi dzis: ten sam rachunek co VillageProdPostfix (ciecie x gradient polnocy),
+        /// 0 poza zima i przy wylaczonej zimie. Miara glodu WSI dla przyrostu naturalnego (demografia krok 3, poprawka
+        /// krytyka nr 5: glod wsi z jej wlasnego stanu, nie ze spichlerza warowni). Niczego nie zmienia.
+        /// </summary>
+        internal static float VillageCut(Village village)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || village == null || village.Settlement == null || !WinterNow()) return 0f;
+                float cut = Math.Max(0, Math.Min(90, s.WinterVillageOutputCutPercent)) / 100f
+                          * Northness(village.Settlement.GetPosition2D.Y);
+                return MBMath.ClampFloat(cut, 0f, 0.95f);
+            }
+            catch { return 0f; }
+        }
+
         internal static void OnDaily()
         {
             try

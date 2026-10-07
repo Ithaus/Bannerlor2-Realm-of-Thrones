@@ -409,6 +409,16 @@ namespace Armoury
         private static string F(double v, string fmt) { return v.ToString(fmt, CultureInfo.InvariantCulture); }
         private static string Sg(double v, string fmt) { return (v >= 0.0 ? "+" : "") + v.ToString(fmt, CultureInfo.InvariantCulture); }
 
+        /// <summary>
+        /// Bilans hearth doby z ruchu ludzi, ktory ta klasa liczy (ujemny = wsie oddaly): tabory i lodzie, wyrzutki w las i
+        /// z powrotem, pobor wymuszony, zadania i incydenty gracza. Linia przyrostu naturalnego (PopulationLaw.GrowthDaily)
+        /// odejmuje go od zmiany hearth wsi, zeby reszta pokazala to, czego nie liczy nikt (inwestycje BetterEconomy, rabunki).
+        /// </summary>
+        internal static double DayNetHearth()
+        {
+            return -_vOurs - _outHearth + _backHearth - _pOurs + _qOurs + _iHearth;
+        }
+
         /// <summary>Dopisek do linii "Ludzie:" (PeopleLedger): ruch hearth doby tam, gdzie wies oddaje albo odzyskuje ludzi.</summary>
         internal static string DayNote()
         {
