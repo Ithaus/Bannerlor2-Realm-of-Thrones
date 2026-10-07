@@ -1,7 +1,7 @@
 # PROJEKT: rabunek okregu osada po osadzie (07.10, projektant + krytyk; NIC NIE ZAKODOWANE)
 
 Pomysl Jeffa 07.10: okreg = wiele osad, rabunek osada po osadzie, po kazdej okienko i pytanie "rabowac kolejna? zajmie N dni" (raczej dni - trzeba dojechac).
-Projekt autora: SCRATCH 3cf3e0ac\dzien-6abunek-osady\PROJEKT.md (+ calc.py, calc2.py); krytyk: kryt.py, kryt2.py w scratchpadzie sesji fa2fd7a6.
+Projekt autora: SCRATCH 3cf3e0ac\dzien-6\rabunek-osady\PROJEKT.md (+ calc.py, calc2.py); krytyk: kryt.py, kryt2.py w scratchpadzie sesji fa2fd7a6.
 KOLEJNOSC: dopiero PO paczce spichlerza (bez spichlerza napastnik nie ma z czego jesc) i po ksiedze ludzi 108-113.
 OTWARTE: zgranie z przysiolkami-obrazkami (ok. 10 obrazkow na okreg, a osad po 250 ludzi srednio 243 -> obrazek = gromada ok. 24 osad).
 
