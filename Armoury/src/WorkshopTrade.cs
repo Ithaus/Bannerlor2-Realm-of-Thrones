@@ -106,6 +106,7 @@ namespace Armoury
             _bkTried = false; _bkModel = null; _bkTax = null;
             _cyc = null; _cycIn = _cycWare = _cycCredit = 0; _cycOut = 0;
             ClearDay();
+            ArtisanInputs.Reset();   // 147: rzemieslnicy BK - te same latki cyklu i wyrobu, stan czyszczony razem
         }
 
         private static void ClearDay()
@@ -367,6 +368,7 @@ namespace Armoury
         /// </summary>
         public static void CyclePostfix(WorkshopType.Production __0, Workshop __1, bool __2, bool __result)
         {
+            ArtisanInputs.CycleEnd();   // 147: koniec cyklu rzemieslnikow BK (zamyka ich rachunek takze po pominietym cyklu)
             // cena sprawiedliwa (123) przed placami: utarg ponad koszt + marze wraca do kasy miasta, z reszty warsztat placi place cyklu
             if (_cyc != null)
             {
@@ -397,9 +399,14 @@ namespace Armoury
         /// TickOneProductionCycleFor{Notable,Player}Workshop - poczatek cyklu: cykl linii towarowej (effectCapital) warsztatu, ktory
         /// nie jest ukrytym rzemieslnikiem, otwiera rachunek cyklu. Prefiks bez wyniku (void) - Harmony wola go takze wtedy, gdy prefiks
         /// WorkshopLaw pomija cykl (linia uzbrojenia, kopalnia co N-ty cykl); wtedy rachunek zamyka CyclePostfix bez przelewu.
+        /// Paczka 147: ten sam prefiks otwiera rachunek cyklu ukrytych rzemieslnikow BK (ArtisanInputs - linia z wsadem). Recenzja 147
+        /// (dekompilacja Harmony 2.4.2, MethodCreatorTools.AffectsOriginal): prefiks z parametrem typu referencyjnego (Workshop) Harmony
+        /// POMIJA, gdy wczesniejszy prefiks (WorkshopLaw, wpiety przed nami) zwrocil false - oba rachunki zamyka wtedy CyclePostfix
+        /// (postfiksy ida zawsze), a pominiety cykl i tak nie woli ProduceAnOutputToTown.
         /// </summary>
-        public static void CycleStartPrefix(Workshop __1, bool __2)
+        public static void CycleStartPrefix(WorkshopType.Production __0, Workshop __1, bool __2)
         {
+            ArtisanInputs.CycleStart(__0, __1, __2);
             _cyc = null; _cycIn = _cycWare = _cycCredit = 0; _cycOut = 0;
             try
             {
@@ -423,14 +430,20 @@ namespace Armoury
         }
 
         /// <summary>ProduceAnOutputToTown (prefiks BK: cena kupna miasta bez limitu gry 1000) - ile kasa miasta zaplacila za wyrob cyklu.
-        /// Pierwszenstwo First - jak InPrefix.</summary>
+        /// Pierwszenstwo First - jak InPrefix. Paczka 147: ten sam prefiks zapamietuje polke wyrobu i kapital rzemieslnikow BK przed
+        /// prefiksem BK (ArtisanInputs.OutPre), postfiks liczy, ile BK dopisal, i bierze wsad dodatkowych cykli albo zdejmuje sztuki bez wsadu.</summary>
         [HarmonyPriority(Priority.First)]
-        public static void OutPrefix(Workshop __1, out int __state) { __state = _cyc != null && __1 == _cyc ? __1.Capital : int.MinValue; }
+        public static void OutPrefix(EquipmentElement __0, Workshop __1, out int __state)
+        {
+            ArtisanInputs.OutPre(__0, __1);
+            __state = _cyc != null && __1 == _cyc ? __1.Capital : int.MinValue;
+        }
 
-        public static void OutPostfix(Workshop __1, int __state)
+        public static void OutPostfix(WorkshopsCampaignBehavior __instance, Workshop __1, int __state)
         {
             try { if (__state != int.MinValue && _cyc != null && __1 == _cyc) { _cycCredit += (long)__1.Capital - __state; _cycOut++; } }
             catch (Exception e) { Stumble("WorkshopTrade.OutPostfix", e); }
+            ArtisanInputs.OutPost(__instance, __1);
         }
 
         /// <summary>ConsumeInputFromWarehouse (warsztat gracza bierze wsad z jego magazynu - za darmo dla kapitalu): wsad i tak jest kosztem
@@ -933,7 +946,7 @@ namespace Armoury
             return TaxShare(st, who);
         }
 
-        private static ItemObject Sample(ItemCategory cat)
+        internal static ItemObject Sample(ItemCategory cat)
         {
             ItemObject it;
             if (cat == null) return null;
@@ -1263,6 +1276,8 @@ namespace Armoury
             patch("place cyklu gracza", AccessTools.Method(beh, "TickOneProductionCycleForPlayerWorkshop"), nameof(CycleStartPrefix), nameof(CyclePostfix), null);
             _fairWired = done.Contains("cena sprawiedliwa: wsad z targu") && done.Contains("cena sprawiedliwa: wsad z magazynu") && done.Contains("cena sprawiedliwa: wyrob do miasta")
                          && done.Contains("place cyklu notabla") && done.Contains("place cyklu gracza");
+            // 147: rzemieslnicy BK ida przez te same latki cyklu notabla i wyrobu do miasta
+            string artisans = ArtisanInputs.Wire(done.Contains("place cyklu notabla"), done.Contains("cena sprawiedliwa: wyrob do miasta"));
             patch("wynik doby", AccessTools.Method(beh, "RunTownWorkshop"), nameof(RunPrefix), nameof(RunPostfix), null);
             patch("wydatek dzienny", AccessTools.Method(beh, "HandleDailyExpense"), nameof(ExpensePrefix), null, null);
             patch("kapital startowy", AccessTools.Method(typeof(Workshop), "InitializeWorkshop"), null, nameof(InitPostfix), null);
@@ -1286,6 +1301,7 @@ namespace Armoury
                                     + ", kapital startowy warsztatu czysto towarowego " + s.WorkshopTradeStartCapital + " (gra: 10000; typy z uzbrojeniem zostaja przy 10000), prog kiesy gracza " + s.WorkshopTradeLowCapital + " (gra: 5000), sprzet x"
                                     + N1(EquipScale * 100f) + "%, cena = " + N1(s.WorkshopTradePriceYears) + " x roczny zysk po podatku + kapital"
                                     + "; cena sprawiedliwa " + (!_fairWired ? "NIECZYNNA - brak latki pomiaru (BRAK wyzej), warsztat bierze pelna cene miasta" : s.WorkshopTradeFairPrice ? "WLACZONA - za wyrob cyklu najwyzej (wsad + place) x" + Margin.ToString("0.##", CultureInfo.InvariantCulture) + ", nadwyzka zostaje w kasie miasta" : "wylaczona (pelna cena miasta)") + "." : ""));
+            Log.Info(artisans);
         }
     }
 
@@ -1297,6 +1313,7 @@ namespace Armoury
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, WorkshopTrade.Daily);
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this, OnSessionLaunched);
             CampaignEvents.HeroOrPartyTradedGold.AddNonSerializedListener(this, WorkshopTrade.OnGold);   // 123: pomiar kies notabli (tylko licznik)
+            CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, ArtisanInputs.Daily);           // 147: linia dnia rzemieslnikow BK
         }
 
         private void OnSessionLaunched(CampaignGameStarter starter)

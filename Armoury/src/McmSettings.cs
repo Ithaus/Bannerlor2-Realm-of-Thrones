@@ -1544,6 +1544,10 @@ namespace Armoury
         [SettingPropertyGroup("Workshops")]
         public float WorkshopTradeResaleShare { get; set; } = 0.8f;
 
+        [SettingPropertyBool("Artisan Own Inputs", HintText = "every loaf from its own grain: Banner Kings lets the hidden craftsmen of a town make several pieces from one piece of material - with today's prices about 5 loaves or 9 jugs of beer from one sack of grain, 4 pots from one load of clay, three times the meat and hides from one beast - and the town pays them for every piece. On: that number stays as the work the craftsmen can do that day, but every extra batch takes its own grain, clay or beast from the town market at the town's price, paid from the craftsmen's till, and only when the batch is worth more than its material (the game's own rule for their first batch); where the market has none or it does not pay, the extra pieces are not made and the town gets back what it paid for them. A slaughter yields one beast's meat, hides and wool per batch. Quality, the lines without any material and the arms lines stay as they are (off = Banner Kings as before)")]
+        [SettingPropertyGroup("Workshops")]
+        public bool ArtisanOwnInputs { get; set; } = true;
+
         [SettingPropertyBool("Workshop Trade Fair Price", HintText = "the just price of the towns (assize of bread, guild prices): for each batch of trade goods the town pays a workshop at most what the batch cost - its materials at the town's price and its wages - plus the master's profit (Smith Profit Percent, the same margin as in the price of arms); whatever an empty stall would pay above that stays in the town purse. Bakers, weavers and silversmiths earn a craftsman's living instead of a lord's rent, so a workshop costs what such a living is worth. Your own workshops too; arms lines keep their own price (off = a workshop gets the town's full price for every piece)")]
         [SettingPropertyGroup("Workshops")]
         public bool WorkshopTradeFairPrice { get; set; } = true;
@@ -3021,6 +3025,7 @@ namespace Armoury
             s.WorkshopTradePriceYears = WorkshopTradePriceYears;
             s.WorkshopTradeProfitDays = WorkshopTradeProfitDays;
             s.WorkshopTradeResaleShare = WorkshopTradeResaleShare;
+            s.ArtisanOwnInputs = ArtisanOwnInputs;
             s.WorkshopTradeFairPrice = WorkshopTradeFairPrice;
             s.CastleVillagesSellInTown = CastleVillagesSellInTown;
             s.MarketMaxDistance = MarketMaxDistance;
