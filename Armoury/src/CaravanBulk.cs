@@ -115,7 +115,8 @@ namespace Armoury
         // i 172 drewna dziennie przy 37 miastach z ruda i medianie 28 rak) i z receptur; stale = mieszczanie (budzet BK x TownUse*)
         // i narzedzia. Garbowanie i tkanie rzemieslnikow: predkosc linii 0.2 i 0.5 cyklu na dobe (BannerKings workshops.xml:47,62)
         // x ArtisanTanWeavePerCycle. Drewno BEZ budow (dziura bez dna) i z 30 ladunkami, ktore RealisticBannerlord dosypuje
-        // miastu co dobe - tego karawana nie wozi i nie wykupuje. Linie towarowe warsztatow notabli (tkalnie, garbarnie, tartaki,
+        // miastu co dobe - tego karawana nie wozi i nie wykupuje (paczka 125: gdy ta dosypka jest zablokowana, Free = 0 - FreeOf).
+        // Linie towarowe warsztatow notabli (tkalnie, garbarnie, tartaki,
         // narzedzia kuzni) nie sa w tabeli - liczy je ShopUse z receptur gry, osobno dla kazdego miasta.
         private static readonly Good[] _all =
         {
@@ -295,7 +296,14 @@ namespace Armoury
 
         private static int KeepOf(Good g, Settings s, int target)
         {
-            return Math.Max((int)Math.Ceiling(Math.Max(1f, s.CaravanBulkSurplusFactor) * target), g.Free);
+            return Math.Max((int)Math.Ceiling(Math.Max(1f, s.CaravanBulkSurplusFactor) * target), FreeOf(g));
+        }
+
+        /// <summary>Zapas, ktory miasto dostaje samo (Good.Free - drewno: 30 ladunkow dosypki RealisticBannerlord co dobe). Paczka 125
+        /// blokuje te dosypke (FreeSupplies.Blocking): wtedy miasto ma tylko to, co lezy na polce, i brak liczy sie od zera.</summary>
+        private static int FreeOf(Good g)
+        {
+            return g.Free > 0 && FreeSupplies.Blocking ? 0 : g.Free;
         }
 
         /// <summary>W drodze jest wiecej tego surowca, niz miasta zdolaja kupic - kupno stoi, rozladunek do progu nadwyzki.</summary>
@@ -328,7 +336,7 @@ namespace Armoury
                 foreach (var g in _goods)
                 {
                     int n = shelf.GetItemNumber(g.Item);
-                    int lack = Target(t, g, s) - Math.Max(n, g.Free);
+                    int lack = Target(t, g, s) - Math.Max(n, FreeOf(g));
                     if (n <= 0) g.Empty++;
                     if (lack > 0)
                     {
@@ -518,7 +526,7 @@ namespace Armoury
             {
                 if (pack.GetItemNumber(g.Item) <= 0) continue;
                 g.In++;
-                if (Target(town, g, s) - Math.Max(shelf.GetItemNumber(g.Item), g.Free) > 0) g.InShort++;
+                if (Target(town, g, s) - Math.Max(shelf.GetItemNumber(g.Item), FreeOf(g)) > 0) g.InShort++;
             }
             foreach (var g in town.Gold > reserve ? SellOrder(mp, town, pack) : _goods)   // miasto bez kasy ponad rezerwe i tak nie kupi nic
             {
@@ -526,7 +534,7 @@ namespace Armoury
                 if (at < 0) continue;
                 var el = pack.GetElementCopyAtIndex(at);
                 if (el.Amount <= 0) continue;
-                int held = Math.Max(shelf.GetItemNumber(g.Item), g.Free);
+                int held = Math.Max(shelf.GetItemNumber(g.Item), FreeOf(g));
                 int lack = Target(town, g, s) - held;
                 int want = Glut(g, s) ? Keep(town, g, s) - held : lack;
                 if (want <= 0) continue;
@@ -664,7 +672,7 @@ namespace Armoury
                 {
                     if (pack.GetItemNumber(g.Item) <= 0) continue;
                     g.Out++;
-                    if (shelf != null && Target(town, g, s) - Math.Max(shelf.GetItemNumber(g.Item), g.Free) > 0) g.OutShort++;
+                    if (shelf != null && Target(town, g, s) - Math.Max(shelf.GetItemNumber(g.Item), FreeOf(g)) > 0) g.OutShort++;
                 }
             }
             catch (Exception e) { if (!_errRoute) { _errRoute = true; Log.Error("CaravanBulk.Routed", e); } }

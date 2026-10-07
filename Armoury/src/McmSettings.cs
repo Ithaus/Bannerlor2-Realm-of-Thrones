@@ -1208,6 +1208,10 @@ namespace Armoury
         [SettingPropertyGroup("Smithing materials")]
         public float LumberOutputMultiplier { get; set; } = 3f;
 
+        [SettingPropertyBool("No Free Timber And Tools", HintText = "no timber or tools out of thin air: Realistic Bannerlord tops every settlement up each day from nothing - a town to 30 loads of timber and 15 tools, a castle to 15 and 8, a village or hideout to 10 and 4; this stops it, so timber and tools come only from woodcutters, smithies, village carts, caravans and the fence (off = Realistic Bannerlord's daily top-up as before; the day's log line shows either way how much it is or would be)")]
+        [SettingPropertyGroup("Smithing materials")]
+        public bool NoFreeTimberAndTools { get; set; } = true;
+
         [SettingPropertyBool("Smelt Cap To Craft Cost", HintText = "melting a piece down never gives back more metal than a share of what forging it costs - no metal out of thin air")]
         [SettingPropertyGroup("Smithing materials")]
         public bool SmeltCapToCraftCost { get; set; } = true;
@@ -2849,6 +2853,7 @@ namespace Armoury
             s.MineralsCountedOnce = MineralsCountedOnce;
             s.MineOutputMultiplier = MineOutputMultiplier;
             s.LumberOutputMultiplier = LumberOutputMultiplier;
+            s.NoFreeTimberAndTools = NoFreeTimberAndTools;
             s.SmeltCapToCraftCost = SmeltCapToCraftCost;
             s.StartStockInLoads = StartStockInLoads;
             s.ArmsCostPricingEnabled = ArmsCostPricingEnabled;

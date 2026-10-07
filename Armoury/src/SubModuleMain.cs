@@ -90,6 +90,7 @@ namespace Armoury
                 RecruitCost.ApplyAll(_harmony);
                 StartKit.ApplyAll(_harmony);
                 BuildFunding.ApplyAll(_harmony);
+                FreeSupplies.ApplyAll(_harmony); // paczka 125: koniec dosypki drewna i narzedzi z niczego (RealisticBannerlord)
                 PopulationLaw.ApplyTownTax(_harmony);
                 Rations.ApplyAll(_harmony);      // dlugi marsz, dlugie racje - zuzycie jedzenia w dol (gracz i AI)
                 ScorchedEarth.ApplyAll(_harmony);
