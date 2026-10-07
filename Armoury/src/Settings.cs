@@ -392,6 +392,7 @@ namespace Armoury
         public bool FinanceLedgerEnabled = true;           // write a daily ledger of every kingdom: treasury and its change, the king's purse and daily balance, clan purses, poor clans and clans losing money, troops - log only
         public int FinanceLedgerPoor = 1000;               // a clan with less gold than this counts as poor in the ledger
         public int FinanceLedgerPoorest = 5;               // how many of the poorest clans of each kingdom the ledger lists
+        public bool GoodsLedgerEnabled = true;             // write a daily ledger of every trade good and farm animal - how much villages, workshops and hidden craftsmen made, how much townsfolk, workshops, armies, builders and Banner Kings supplies used up, what carts and caravans carried, who holds the stock and what is left unexplained; each line balances yesterday's stock + made - used = today's stock - log only, changes nothing in the game
         public bool PaidConstruction = true;               // buildings rise only as fast as their owner pays: wages and carting go to the town or castle purse, materials are bought off the market
         public bool PaidConstructionPlayer = true;         // your own fiefs too: their works take the same share of your daily income
         public float BuildIncomeShare = 0.10f;             // share of a lord's daily income (fiefs and rents) spent each day on building works, split over his fiefs with works; in war only military works (walls, towers, barracks)

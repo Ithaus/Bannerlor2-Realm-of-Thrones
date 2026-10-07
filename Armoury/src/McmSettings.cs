@@ -1332,6 +1332,10 @@ namespace Armoury
         [SettingPropertyGroup("Army purchases")]
         public int FinanceLedgerPoorest { get; set; } = 5;
 
+        [SettingPropertyBool("Goods Ledger Enabled", HintText = "write a daily ledger of every trade good and farm animal - how much villages, workshops and hidden craftsmen made, how much townsfolk, workshops, armies, builders and Banner Kings supplies used up, what carts and caravans carried, who holds the stock and what is left unexplained; each line balances yesterday's stock + made - used = today's stock - log only, changes nothing in the game")]
+        [SettingPropertyGroup("Army purchases")]
+        public bool GoodsLedgerEnabled { get; set; } = true;
+
         [SettingPropertyBool("Paid Construction", HintText = "buildings rise only as fast as their owner pays: wages and carting go to the town or castle purse, materials are bought off the market")]
         [SettingPropertyGroup("Army purchases")]
         public bool PaidConstruction { get; set; } = true;
@@ -2888,6 +2892,7 @@ namespace Armoury
             s.FinanceLedgerEnabled = FinanceLedgerEnabled;
             s.FinanceLedgerPoor = FinanceLedgerPoor;
             s.FinanceLedgerPoorest = FinanceLedgerPoorest;
+            s.GoodsLedgerEnabled = GoodsLedgerEnabled;
             s.PaidConstruction = PaidConstruction;
             s.PaidConstructionPlayer = PaidConstructionPlayer;
             s.BuildIncomeShare = BuildIncomeShare;

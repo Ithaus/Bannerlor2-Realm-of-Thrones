@@ -386,7 +386,7 @@ namespace Armoury
         }
         private Dictionary<string,int> _prisonerBaseline;
 
-        public ArmouryBehavior() { Instance = this; HistoricalPrices.Reset(); MaterialLaw.Reset(); WesterosClimate.Reset(); OutlawLaw.Reset(); PopulationLaw.Reset(); WorkshopLaw.Reset(); IronBank.Reset(); MarketGlut.Reset(); ArmsPricing.Reset(); StartKit.Reset(); AiGear.Reset(); Levy.Reset(); VolunteerKit.Reset(); LevyGold.Reset(); WearKeep.Reset(); UniqueSpoils.Reset(); BuildDiary.Reset(); BuildFunding.Reset(); KingdomLedger.Reset(); ColdStart.Reset(); MenPurse.Reset(); AiWear.Reset(); SmithHours.Reset(); RecruitKit.Reset(); OreLedger.Reset(); FreeSupplies.Reset(); VillageWoodlot.Reset(); MarketRoad.Reset(); MarketCarts.Reset(); MoneyLedger.Reset(); PeopleLedger.Reset(); CaravanBulk.Reset(); StartStock.Reset(); MineralOnce.Reset(); SoldierPay.Reset(); KingdomTreasury.Reset(); }   // stan jednej kampanii nie przecieka do drugiej (audyt 04.10)
+        public ArmouryBehavior() { Instance = this; HistoricalPrices.Reset(); MaterialLaw.Reset(); WesterosClimate.Reset(); OutlawLaw.Reset(); PopulationLaw.Reset(); WorkshopLaw.Reset(); IronBank.Reset(); MarketGlut.Reset(); ArmsPricing.Reset(); StartKit.Reset(); AiGear.Reset(); Levy.Reset(); VolunteerKit.Reset(); LevyGold.Reset(); WearKeep.Reset(); UniqueSpoils.Reset(); BuildDiary.Reset(); BuildFunding.Reset(); KingdomLedger.Reset(); ColdStart.Reset(); MenPurse.Reset(); AiWear.Reset(); SmithHours.Reset(); RecruitKit.Reset(); OreLedger.Reset(); GoodsLedger.Reset(); FreeSupplies.Reset(); VillageWoodlot.Reset(); MarketRoad.Reset(); MarketCarts.Reset(); MoneyLedger.Reset(); PeopleLedger.Reset(); CaravanBulk.Reset(); StartStock.Reset(); MineralOnce.Reset(); SoldierPay.Reset(); KingdomTreasury.Reset(); }   // stan jednej kampanii nie przecieka do drugiej (audyt 04.10)
 
         public override void SyncData(IDataStore dataStore)
         {
@@ -517,6 +517,7 @@ namespace Armoury
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, BattleChronicle.OnMapEventEnded);
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, AiWear.OnMapEventEnded);   // wpis 85
             CampaignEvents.VillageLooted.AddNonSerializedListener(this, OutlawLaw.OnVillageLooted);
+            CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, GoodsLedger.OnPartyDestroyed);  // paczka 127: towar, ktory przepada z partia (tylko log)
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, OutlawLaw.OnPartyDestroyed);
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, MenPurse.OnPartyDestroyed);   // wpis 89
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, MarketRoad.OnPartyDestroyed);   // wpis 100: rozbite tabory wiesniakow (log)
@@ -1180,7 +1181,9 @@ namespace Armoury
             try { InfluenceWatch.DailyReport(); } catch (Exception e) { Log.Error("InfluenceWatch", e); }
             try { WesterosClimate.Daily(); } catch (Exception e) { Log.Error("WesterosClimate.Daily", e); }   // biale kruki: koniec pory roku
             try { WinterBite.OnDaily(); } catch (Exception e) { Log.Error("WinterBite", e); }
+            var gfForage = GoodsLedger.Begin(GoodsLedger.FForage);   // paczka 127: ksiega towarow - zboze z furazu armii (tylko licznik)
             try { ScorchedEarth.OnDaily(); } catch (Exception e) { Log.Error("ScorchedEarth", e); }
+            finally { GoodsLedger.End(gfForage); }
             try { WarLedger.OnDaily(); } catch (Exception e) { Log.Error("WarLedger", e); }
             try { Orders.DailyTick(); }
             catch (Exception e) { Log.Error("OnDailyTick", e); }
@@ -1194,10 +1197,13 @@ namespace Armoury
             try { PopulationLaw.Daily(); } catch (Exception e) { Log.Error("PopulationLaw.Daily", e); }   // ludnosc i renty krain
             try { MoneyLedger.Mark(MoneyLedger.MRent); } catch { }
             // wpis 86 (audyt pkt 7): budowy PO rentach - 10% od dzisiejszego dochodu
+            var gfBuild = GoodsLedger.Begin(GoodsLedger.FBuild);     // paczka 127: ksiega towarow - material zdjety przez budowy (tylko licznik)
             try { BuildFunding.Daily(); } catch (Exception e) { Log.Error("BuildFunding.Daily", e); }
+            finally { GoodsLedger.End(gfBuild); }
             try { MoneyLedger.Mark(MoneyLedger.MBuild); } catch { }
             try { BuildDiary.Daily(); } catch (Exception e) { Log.Error("BuildDiary.Daily", e); }
             try { OreLedger.Daily(); } catch (Exception e) { Log.Error("OreLedger.Daily", e); }   // wpis 94: ksiega rudy (tylko log)
+            try { GoodsLedger.Daily(); } catch (Exception e) { Log.Error("GoodsLedger.Daily", e); }   // paczka 127: ksiega towarow (tylko log) - zaraz po ksiedze rudy (kontrola tymi samymi liczbami)
             try { FreeSupplies.Daily(); } catch (Exception e) { Log.Error("FreeSupplies.Daily", e); }   // paczka 125: dosypka RBL zablokowana / przepuszczona (tylko log)
             try { VillageWoodlot.Daily(); } catch (Exception e) { Log.Error("VillageWoodlot.Daily", e); }   // paczka 126: las wsi - drewno kazdej wsi bez drwali (tylko log)
             try { RawPrice.Daily(); } catch (Exception e) { Log.Error("RawPrice.Daily", e); }     // cena surowcow od niedoboru: linia "Ceny surowcow:" (tylko log)

@@ -42,10 +42,20 @@ namespace Armoury
             public readonly HashSet<Settlement> WoodlotMakers = new HashSet<Settlement>();
             public readonly HashSet<Village> Modelled = new HashSet<Village>();
             public int LastAll = -1, LastTowns = -1;
+            public int[] Shown; public int ShownDay = -1;           // paczka 127: liczby ostatniej wydrukowanej linii - kontrola ksiegi towarow (GoodsLedger)
 
             public Book(string id, string name, string townSource, string lineName) { Id = id; Name = name; TownSource = townSource; LineName = lineName; }
             public void NewDay() { Villages = 0; Towns = 0; Lines = 0; Shops = 0; Builds = 0; Woodlot = 0; Model = 0f; Makers.Clear(); WoodlotMakers.Clear(); Modelled.Clear(); }
-            public void Reset() { NewDay(); LastAll = -1; LastTowns = -1; }
+            public void Reset() { NewDay(); LastAll = -1; LastTowns = -1; Shown = null; ShownDay = -1; }
+        }
+
+        /// <summary>Paczka 127: liczby dzisiejszej linii "Ruda:"/"Drewno:" (wsie, las wsi, miasta i zamki, warsztaty zbrojne, linie towarowe,
+        /// budowy, zapas razem) - odczyt dla kontroli ksiegi towarow; null, gdy linia nie byla dzis drukowana.</summary>
+        internal static int[] ShownToday(string id)
+        {
+            var b = id == "iron" ? _iron : (id == "hardwood" ? _wood : null);
+            if (b == null || b.Shown == null || b.ShownDay != (int)CampaignTime.Now.ToDays) return null;
+            return b.Shown;
         }
 
         private static readonly Book _iron = new Book("iron", "Ruda", "kopalnie miast i zamkow", "narzedzia");
@@ -121,6 +131,7 @@ namespace Armoury
         /// zeby "wsie dopisaly" zostalo wydobyciem drwali porownywalnym z "model"; w "bez wyjasnienia" liczy sie jak kazde dopisanie.</summary>
         internal static void NoteWoodlot(ItemObject item, Settlement st, int count)
         {
+            GoodsLedger.NoteWoodlot(item, count);   // paczka 127: ksiega towarow - ta czesc drewna w ramce produkcji wsi to las wsi (tylko licznik)
             try
             {
                 var b = Of(item);
@@ -133,6 +144,7 @@ namespace Armoury
 
         internal static void NoteWorkshop(ItemObject item, int loads)
         {
+            GoodsLedger.NoteArms(item, loads);   // paczka 127: ksiega towarow - wsad warsztatow zbrojnych (ruda, drewno, skora, len, welna) w ramce cyklu (tylko licznik, bez wyjatkow)
             var b = Of(item);
             if (b != null && loads > 0) b.Shops += loads;
         }
@@ -203,6 +215,7 @@ namespace Armoury
               .Append("; zima: ").Append(WinterBite.WinterNow() ? "TAK" : "nie")
               .Append(". Ladunek = ").Append(kg.ToString("0")).Append(" kg.");
             Log.Info(sb.ToString());
+            b.Shown = new[] { b.Villages, b.Woodlot, b.Towns, b.Shops, b.Lines, b.Builds, all }; b.ShownDay = (int)CampaignTime.Now.ToDays;
             b.LastAll = all; b.LastTowns = towns; b.NewDay();
         }
     }
