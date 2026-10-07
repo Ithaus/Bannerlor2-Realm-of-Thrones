@@ -55,6 +55,11 @@ GOTOWE po recenzji (07.10): RoadMemoryFix.cs (postfiks Campaign.LoadMapScene, wy
 Default 22/22, All 22/22, Naval 0), galaz w-toku/pamiec-drog-rot-uzupelniona c92f7e7 na f8dced3; DLL autotestu 6 SCRATCH\dzien-6\pamiec-drog\nArmoury-pamiec-drog.dll md5 6d43c19c. Wyspy (Pyke, Hull, Arbor, Farton, Downdelving) - INNA przyczyna w BK: karawana BK bez statkow na wyspie
 moze stac na zawsze (BKCaravansBehavior :1091, :1296), lord z wyspy na uczcie BK na ladzie stoi do konca uczty (BKFeastBehavior :247) -
 autotest 6 zmierzy (nowe liczniki "najdluzej D dob"), ewentualnie osobna paczka.
+AUTOTEST 6 (07.10 12:37, DLL c92f7e7 md5 6d43c19c, 40 dob, 12.6 s/dobe, wynik OK, DLL Jeffa przywrocone 25b87631, zapisy nietkniete; log
+Armoury-2026-10-07_12-37-02.log): w grze "kontrola generatora 137 z 137", 4 bramy naprawione, 28 ms; odrzucen z powodu sciany bez wpisu 0 przez 40 dob;
+zatkanych wsi 14 (zamkowe 8, miejskie 6; z tego 11 spladrowane / najezdzane, Normal 3) - bieg 5: 19, bieg 4: 53; zamki z ujemnym bilansem zywnosci 0.
+WYSPY zostaja: karawany w Pyke 3-9 (najdluzej 13.9 doby), Pebbleton, Lonely Light, Blacktyde, Lys, Mormont Keep, Kyth, Qarkash, Lhazosh; lord w
+Pebbleton 15.6 doby -> poprawka w toku (workflow wyspy-karawany-lordowie, galaz w128-wyspy), potem autotest 7.
 K13 krok 3 (129 rzemioslo miasta: sukno/plotno/skora wedle oplacalnosci, galaz w-toku/k13-3-rzemioslo-miasta 9f7408f na k2) i krok 4
 (130 odziez, buty i plotno wojska z sakiewki zolnierzy, w-toku/k13-4-odziez-wojska 93ac4c1 na k2 - NIE na 129; test i wgranie TYLKO razem 128+129+130
 jako G1; zmiana widoczna: znika kara morale BK "Textiles supplies") - gotowe po recenzji, opisy docs/paczki/w-toku/k13-3-*, k13-4-*.
