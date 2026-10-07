@@ -152,6 +152,7 @@ namespace Armoury
             Array.Clear(_fromNothing, 0, Classes); Array.Clear(_toNothing, 0, Classes);
             _worldFromNothing = _worldToNothing = _levyBack = 0;
             Array.Clear(_shopWage, 0, Classes); Array.Clear(_shopKeep, 0, Classes); Array.Clear(_shopFair, 0, Classes);
+            Array.Clear(_artIn, 0, Classes); Array.Clear(_artBack, 0, Classes);
             Array.Clear(_noteIn, 0, _noteIn.Length); Array.Clear(_noteOut, 0, _noteOut.Length);
             Array.Clear(_mark, 0, _mark.Length);
             Array.Clear(_wage, 0, Wages); Array.Clear(_wageN, 0, Wages); Array.Clear(_wageShort, 0, Wages);
@@ -394,6 +395,24 @@ namespace Armoury
                 if (_inBlock || amount <= 0) return;
                 int c = ClassOf(st);
                 if (c >= 0) _shopFair[c] += amount;
+            }
+            catch { _stumbles++; }
+        }
+
+        // 128: rzemieslnicy BK (ArtisanInputs) - wsad dodatkowych cykli zaplacony kasie miasta i zwrot zaplaty BK za sztuki bez wsadu,
+        // oba z kapitalu ukrytego warsztatu (te same dwie kasy co prefiks BK; zlota swiata nie zmienia)
+        private static readonly long[] _artIn = new long[Classes], _artBack = new long[Classes];
+
+        /// <summary>128: kapital rzemieslnikow BK -> kasa miasta (wsad dodatkowych cykli, zwrot za zdjete sztuki). Tylko licznik.</summary>
+        internal static void NoteArtisans(Settlement st, int inputs, int refund)
+        {
+            try
+            {
+                if (_inBlock) return;
+                int c = ClassOf(st);
+                if (c < 0) return;
+                if (inputs > 0) _artIn[c] += inputs;
+                if (refund > 0) _artBack[c] += refund;
             }
             catch { _stumbles++; }
         }
@@ -793,6 +812,11 @@ namespace Armoury
             {
                 known += _shopFair[c];
                 parts.Add("warsztaty towarowe - nadwyzka ceny wyrobow ponad koszt i marze (cena sprawiedliwa) " + S(_shopFair[c]) + " [P]");
+            }
+            if (_artIn[c] != 0 || _artBack[c] != 0)
+            {
+                known += _artIn[c] + _artBack[c];
+                parts.Add("rzemieslnicy BK (128) - z ich kapitalu " + S(_artIn[c] + _artBack[c]) + " [P] (wsad dodatkowych cykli +" + _artIn[c] + ", zwrot zaplaty BK za sztuki bez wsadu +" + _artBack[c] + ")");
             }
             long marks = 0; det = new List<string>();
             for (int k = 0; k < Marks; k++)
