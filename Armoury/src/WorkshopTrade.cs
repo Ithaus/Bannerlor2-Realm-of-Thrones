@@ -9,6 +9,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.GameComponents;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
 using TaleWorlds.Core;
@@ -48,7 +49,10 @@ namespace Armoury
     ///     prawdziwego wyniku dnia (pierwszej doby - oczekiwany wynik z cen targu), nie mniej niz wartosc sprzetu; do tego kapital
     ///     w kasie, ktory zostaje w warsztacie. Gracz kupuje wedle lepszej z dwoch pamieci (ok. 30 dob, rok), notabl odkupuje
     ///     od gracza czesc wartosci wedle gorszej - z WLASNEJ kiesy (recenzja: bez okazji na warsztacie, ktory chwilowo stoi);
-    ///  5. log dzienny "Warsztaty towarowe:" i linia wyjasnienia ceny w rozmowie kupna (po angielsku).
+    ///  5. log dzienny "Warsztaty towarowe:" i linia wyjasnienia ceny w rozmowie kupna (po angielsku);
+    ///  6. CENA SPRAWIEDLIWA (paczka 123, wlacznik WorkshopTradeFairPrice): za wyrob cyklu linii towarowej miasto placi warsztatowi
+    ///     najwyzej koszt cyklu (wsad wedle ceny miasta + place cyklu) x (1 + SmithProfitPercent) - ta sama marza mistrza co w cenie
+    ///     broni (ArmsPricing); nadwyzke ceny (renta z pustej polki, BK placi bez limitu gry 1000) zatrzymuje kasa miasta.
     /// Linii uzbrojenia (WorkshopLaw), ukrytych rzemieslnikow, receptur i szybkosci NIE rusza. Przy wylaczonym - gra jak dotad.
     /// </summary>
     internal static class WorkshopTrade
@@ -84,18 +88,31 @@ namespace Armoury
         private static MethodInfo _decide; private static FieldInfo _lastSelected;
         private static MethodInfo _setCapital, _setInitial; private static bool _settersTried;
 
+        // cena sprawiedliwa (123): biezacy cykl linii towarowej - gra wola cykle po kolei w jednym watku, wiec wystarczy jeden zestaw pol
+        private static Workshop _cyc;                       // warsztat, ktorego cykl wlasnie trwa i podlega regule (null = cykl poza regula)
+        private static long _cycIn, _cycWare, _cycCredit;   // wsad zaplacony miastu, wsad z magazynu gracza (wartosc wedle ceny miasta), utarg za wyroby oddane miastu
+        private static int _cycOut;                         // ile sztuk wyrobu cyklu poszlo do miasta (warsztat gracza czesc odklada do magazynu)
+        private sealed class FairStat { public int Cycles, Capped; public long Credit, Cost, Kept; }
+        private static readonly Dictionary<string, FairStat> _dFair = new Dictionary<string, FairStat>();
+        private static long _dNotFrom, _dNotTo;             // kiesy notabli: zdarzenia gry "z niczego" i "w nicosc" (pomiar do ryzyka 123)
+        // recenzja 123: regula tylko przy wpietym CALYM pomiarze (wsad z targu, wsad z magazynu, wyrob do miasta, poczatek obu cykli) -
+        // bez latki wsadu cykl liczylby koszt 0 i warsztat oddawalby miastu cene wsadu w kazdym cyklu. Raz na proces (Reset nie rusza)
+        private static bool _fairWired;
+
         /// <summary>Nowa gra / wczytanie: wolane z WorkshopLaw.Reset(), czyli z konstruktora ArmouryBehavior.</summary>
         internal static void Reset()
         {
             _rec.Clear(); _saved.Clear(); _tradeSpeed.Clear(); _sample.Clear(); _errOnce.Clear(); _oreItem = null;
             _bkTried = false; _bkModel = null; _bkTax = null;
+            _cyc = null; _cycIn = _cycWare = _cycCredit = 0; _cycOut = 0;
             ClearDay();
         }
 
         private static void ClearDay()
         {
-            _dType.Clear();
+            _dType.Clear(); _dFair.Clear();
             _dWageCap = _dWagePurse = _dKeepCap = _dKeepPurse = _dUnpaid = _dPayNotable = _dPayLord = _dPayPlayer = _dFunded = _dSalePaid = _dSaleShort = _dGear = 0;
+            _dNotFrom = _dNotTo = 0;
             _dFail = _dNoTaker = _dStumbles = 0;
         }
 
@@ -112,6 +129,11 @@ namespace Armoury
         /// <summary>Pamiec roku (recenzja): rok kalendarza Armoury, nie krocej niz pamiec biezaca.</summary>
         private static int YearSpan { get { return Math.Max(Span, Math.Max(2, CampaignTime.DaysInYear)); } }
         private static bool Live { get { var c = Campaign.Current; return c != null && c.GameStarted; } }
+        /// <summary>Cena sprawiedliwa (123): czynna razem z paczka warsztatow (nowa moneta) i wlasnym wlacznikiem - i tylko, gdy wpiete
+        /// sa wszystkie jej latki pomiaru (recenzja).</summary>
+        private static bool Fair { get { return On && _fairWired && Settings.Current.WorkshopTradeFairPrice; } }
+        /// <summary>Marza mistrza na koszcie cyklu - ta sama, z ktorej ArmsPricing liczy cene broni (SmithProfitPercent).</summary>
+        private static double Margin { get { return 1.0 + Math.Max(0f, Settings.Current.SmithProfitPercent) / 100.0; } }
 
         /// <summary>Wyjatek przy jednym warsztacie: pierwszy z danego miejsca do pliku, kazdy liczony w linii dnia (funkcji nie gasimy).</summary>
         private static void Stumble(string where, Exception e)
@@ -337,6 +359,13 @@ namespace Armoury
         /// </summary>
         public static void CyclePostfix(WorkshopType.Production __0, Workshop __1, bool __2, bool __result)
         {
+            // cena sprawiedliwa (123) przed placami: utarg ponad koszt + marze wraca do kasy miasta, z reszty warsztat placi place cyklu
+            if (_cyc != null)
+            {
+                var shop = _cyc; _cyc = null;
+                try { if (__result && __2 && shop == __1) FairCycle(__0, __1); }
+                catch (Exception e) { Stumble("WorkshopTrade.FairCycle", e); }
+            }
             try
             {
                 if (!__result || !__2 || !Batch || !Live || __1 == null || __1.WorkshopType == null || __1.WorkshopType.IsHidden) return;
@@ -353,6 +382,111 @@ namespace Armoury
                 rec.Wages += PayToTown(__1, town, due, true, rec);
             }
             catch (Exception e) { Stumble("WorkshopTrade.CyclePostfix", e); }
+        }
+
+        // ------------------------------------------------------------ latki: cena sprawiedliwa (123)
+        /// <summary>
+        /// TickOneProductionCycleFor{Notable,Player}Workshop - poczatek cyklu: cykl linii towarowej (effectCapital) warsztatu, ktory
+        /// nie jest ukrytym rzemieslnikiem, otwiera rachunek cyklu. Prefiks bez wyniku (void) - Harmony wola go takze wtedy, gdy prefiks
+        /// WorkshopLaw pomija cykl (linia uzbrojenia, kopalnia co N-ty cykl); wtedy rachunek zamyka CyclePostfix bez przelewu.
+        /// </summary>
+        public static void CycleStartPrefix(Workshop __1, bool __2)
+        {
+            _cyc = null; _cycIn = _cycWare = _cycCredit = 0; _cycOut = 0;
+            try
+            {
+                if (!__2 || __1 == null || __1.WorkshopType == null || __1.WorkshopType.IsHidden || !Fair || !Live) return;
+                if (__1.Settlement == null || __1.Settlement.Town == null) return;
+                _cyc = __1;
+            }
+            catch (Exception e) { Stumble("WorkshopTrade.CycleStartPrefix", e); }
+        }
+
+        /// <summary>ConsumeInputFromTownMarket (prefiks BK placi miastu za wsad z kapitalu) - ile naprawde zeszlo z kapitalu za wsad cyklu.
+        /// Pierwszenstwo First: prefiks BK pomija oryginal (false), a Harmony wola dalsze prefiksy bez wyniku PO nim - odczyt kapitalu
+        /// musi isc przed BK, inaczej widzialby kapital juz po zaplacie (sprawdzone na Harmony 2.4.2).</summary>
+        [HarmonyPriority(Priority.First)]
+        public static void InPrefix(Workshop __3, out int __state) { __state = _cyc != null && __3 == _cyc ? __3.Capital : int.MinValue; }
+
+        public static void InPostfix(Workshop __3, int __state)
+        {
+            try { if (__state != int.MinValue && _cyc != null && __3 == _cyc) _cycIn += (long)__state - __3.Capital; }
+            catch (Exception e) { Stumble("WorkshopTrade.InPostfix", e); }
+        }
+
+        /// <summary>ProduceAnOutputToTown (prefiks BK: cena kupna miasta bez limitu gry 1000) - ile kasa miasta zaplacila za wyrob cyklu.
+        /// Pierwszenstwo First - jak InPrefix.</summary>
+        [HarmonyPriority(Priority.First)]
+        public static void OutPrefix(Workshop __1, out int __state) { __state = _cyc != null && __1 == _cyc ? __1.Capital : int.MinValue; }
+
+        public static void OutPostfix(Workshop __1, int __state)
+        {
+            try { if (__state != int.MinValue && _cyc != null && __1 == _cyc) { _cycCredit += (long)__1.Capital - __state; _cycOut++; } }
+            catch (Exception e) { Stumble("WorkshopTrade.OutPostfix", e); }
+        }
+
+        /// <summary>ConsumeInputFromWarehouse (warsztat gracza bierze wsad z jego magazynu - za darmo dla kapitalu): wsad i tak jest kosztem
+        /// cyklu - liczony wedle ceny, za jaka miasto sprzedaje ten towar (inaczej miasto zatrzymaloby wartosc srebra gracza).</summary>
+        public static void WarePostfix(ItemCategory __0, int __1, Workshop __2)
+        {
+            try
+            {
+                if (_cyc == null || __2 != _cyc || __0 == null || __1 <= 0) return;
+                var town = __2.Settlement != null ? __2.Settlement.Town : null;
+                var it = Sample(__0);
+                if (town != null && it != null) _cycWare += (long)town.GetItemPrice(it, null, false) * __1;
+            }
+            catch (Exception e) { Stumble("WorkshopTrade.WarePostfix", e); }
+        }
+
+        /// <summary>
+        /// Udany cykl linii towarowej: miasto placi za wyrob najwyzej (wsad + place cyklu) x marza mistrza. Utarg ponad to warsztat oddaje
+        /// do kasy miasta, ktora mu go przed chwila zaplacila (te same dwie kasy co latka BK - zloto nie powstaje i nie znika). Rynek
+        /// placacy mniej niz koszt + marza - bez zmian (warsztat bierze cene rynku; prog cyklu gry pilnuje, by pokryla wsad i place).
+        /// Warsztat gracza, ktory czesc wyrobu odklada do magazynu: miasto placi za swoja czesc sztuk (koszt cyklu x sztuki do miasta /
+        /// wszystkie sztuki cyklu) - reszta wyrobu zostaje graczowi, a z nia reszta kosztu.
+        /// </summary>
+        private static void FairCycle(WorkshopType.Production p, Workshop w)
+        {
+            var town = w.Settlement != null ? w.Settlement.Town : null;
+            if (town == null) return;
+            string type = TypeId(w);
+            FairStat st;
+            if (!_dFair.TryGetValue(type, out st)) { st = new FairStat(); _dFair[type] = st; }
+            st.Cycles++;
+            long credit = _cycCredit, cost = Math.Max(0L, _cycIn) + _cycWare;
+            float labour = CycleLabour(w, p);
+            st.Credit += credit; st.Cost += cost + (long)Math.Round(labour);
+            if (credit <= 0) return;
+            int all = 0;
+            foreach (var o in p.Outputs) all += Math.Max(0, o.Item2);
+            double share = all > 0 ? Math.Min(1.0, (double)_cycOut / all) : 1.0;
+            long allowed = (long)Math.Ceiling((cost + labour) * Margin * share);
+            long over = credit - allowed;
+            if (over <= 0) return;
+            int n = (int)Math.Min(over, (long)Math.Max(0, w.Capital));
+            if (n <= 0) return;
+            w.ChangeGold(-n);
+            town.ChangeGold(n);
+            MoneyLedger.NoteWorkshopFair(w.Settlement, n);
+            st.Capped++; st.Kept += n;
+        }
+
+        /// <summary>Pomiar do ryzyka 123 (tylko licznik): zdarzenia gry "z niczego" do notabli i "w nicosc" z ich kies. Gra trzyma kiese
+        /// notabla w pasie 4 500 - 10 500 (NotablePowerManagementBehavior.BalanceGoldAndPowerOfNotable: nadwyzka -> wplyw, brak <- wplyw).</summary>
+        internal static void OnGold((Hero, PartyBase) giver, (Hero, PartyBase) recipient, (int, string) amount, bool showNotification)
+        {
+            try
+            {
+                int a = amount.Item1;
+                if (a == 0 || !On) return;
+                Hero gh = giver.Item1, rh = recipient.Item1;
+                PartyBase gp = giver.Item2, rp = recipient.Item2;
+                if (a < 0) { var th = gh; gh = rh; rh = th; var tp = gp; gp = rp; rp = tp; a = -a; }   // jak MoneyLedger: ujemna kwota = w druga strone
+                if (gh == null && gp == null && rh != null && rh.IsNotable) _dNotFrom += a;
+                else if (rh == null && rp == null && gh != null && gh.IsNotable) _dNotTo += a;
+            }
+            catch (Exception e) { Stumble("WorkshopTrade.OnGold", e); }
         }
 
         // ------------------------------------------------------------ latka: wydatek dzienny i bankructwo
@@ -851,7 +985,9 @@ namespace Armoury
                     float labour = Batch ? CycleLabour(w, p) : 0f;
                     float gate = Batch ? labour : 200f / p.ConversionSpeed;
                     if (sell <= inCost + gate) continue;
-                    sum += (credit - inCost - labour) * p.ConversionSpeed / BulkFactor(p);   // kopalnia: przechodzi co N-ty cykl
+                    // cena sprawiedliwa (123): miasto zaplaci najwyzej koszt cyklu + marza - ta sama regula co w FairCycle
+                    float pay = Fair ? (float)Math.Min(credit, Math.Ceiling((inCost + CycleLabour(w, p)) * Margin)) : credit;
+                    sum += (pay - inCost - labour) * p.ConversionSpeed / BulkFactor(p);   // kopalnia: przechodzi co N-ty cykl
                 }
                 return sum - Upkeep;
             }
@@ -954,6 +1090,7 @@ namespace Armoury
                   .Append(" | zeszlo z kapitalu miedzy tickami miast (wyplata zysku wlascicielom, monopol korony): notable ").Append(_dPayNotable).Append(", lordowie ").Append(_dPayLord).Append(", gracz ").Append(_dPayPlayer)
                   .Append(" | bankructwa ").Append(_dFail).Append(" (nowi wlasciciele wlozyli z wlasnych kies ").Append(_dFunded).Append("), bez chetnego z pieniedzmi ").Append(_dNoTaker)
                   .Append("; sprzedaz gracza notablom: zaplacone ").Append(_dSalePaid).Append(", zabraklo kupcowi ").Append(_dSaleShort)
+                  .Append(" | ").Append(FairText()).Append(" | ").Append(NotablesText())
                   .Append(" | cena kupna dla gracza: mediana ").Append(med).Append(", od ").Append(min).Append(" do ").Append(max).Append(" (").Append(prices.Count).Append(" warsztatow)");
                 if (sampleTown != null) sb.Append("; ").Append(SampleLine(sampleTown));
                 sb.Append(" | zasady: utrzymanie ").Append(N1(Upkeep)).Append(" d na dobe, place cyklu ").Append(s.WorkshopTradeBatchWages ? N1(Math.Max(0f, s.WorkshopWorkers) * Math.Max(0f, s.WorkshopWagePerDay)) + " d na dobe pelnej pracy" : "WYLACZONE (prog gry 200 / szybkosc)")
@@ -966,6 +1103,51 @@ namespace Armoury
         }
 
         private static int SumShops() { int n = 0; foreach (var t in _dType.Values) n += t.Shops; return n; }
+
+        /// <summary>Czesc linii dnia o cenie sprawiedliwej (123): cykle, koszt, utarg wedle cen miasta, nadwyzka w kasach miast, wedle typu.</summary>
+        private static string FairText()
+        {
+            if (!Settings.Current.WorkshopTradeFairPrice) return "cena sprawiedliwa WYLACZONA (MCM) - warsztat bierze pelna cene miasta za kazda sztuke";
+            if (!_fairWired) return "cena sprawiedliwa NIECZYNNA - brak latki pomiaru (BRAK w linii startowej WorkshopTrade), warsztat bierze pelna cene miasta za kazda sztuke";
+            int cyc = 0, capped = 0; long credit = 0, cost = 0, kept = 0;
+            foreach (var f in _dFair.Values) { cyc += f.Cycles; capped += f.Capped; credit += f.Credit; cost += f.Cost; kept += f.Kept; }
+            var keys = new List<string>(_dFair.Keys);
+            keys.Sort((a, b) => _dFair[b].Kept != _dFair[a].Kept ? _dFair[b].Kept.CompareTo(_dFair[a].Kept) : string.CompareOrdinal(a, b));
+            var parts = new List<string>();
+            foreach (var k in keys)
+            {
+                var f = _dFair[k];
+                if (f.Kept <= 0 || parts.Count >= 8) continue;
+                parts.Add(k + " " + f.Capped + "/" + f.Cycles + " cykli: koszt " + f.Cost + ", utarg " + f.Credit + ", nadwyzka " + f.Kept);
+            }
+            return "cena sprawiedliwa CZYNNA (za wyrob cyklu najwyzej wsad wedle ceny miasta + place, x" + Margin.ToString("0.##", CultureInfo.InvariantCulture)
+                   + " jak cena broni): cykli " + cyc + ", przycietych " + capped + "; koszt cykli (wsad + place) " + cost + ", utarg wedle cen miasta " + credit
+                   + ", zaplacono warsztatom " + (credit - kept) + ", nadwyzka zostala w kasach miast " + kept
+                   + (parts.Count > 0 ? " (wedle typu: " + string.Join("; ", parts.ToArray()) + ")" : "");
+        }
+
+        /// <summary>Pomiar do ryzyka 123 (tylko log): kiesy notabli i zdarzenia gry z niczego / w nicosc z ich udzialem.</summary>
+        private static string NotablesText()
+        {
+            int n = 0, low = 0, high = 0; long sum = 0;
+            try
+            {
+                foreach (var st in Settlement.All)
+                {
+                    if (st == null || st.Notables == null) continue;
+                    foreach (var h in st.Notables)
+                    {
+                        if (h == null || !h.IsAlive) continue;
+                        n++; sum += h.Gold;
+                        if (h.Gold < 4500) low++; else if (h.Gold > 10500) high++;
+                    }
+                }
+            }
+            catch (Exception e) { Stumble("WorkshopTrade.NotablesText", e); }
+            return "kiesy notabli (gra trzyma je w pasie 4500-10500 - nadwyzke zamienia na wplyw, brak dosypuje za wplyw): notabli " + n + ", w kiesach " + sum
+                   + ", ponizej 4500 " + low + ", ponad 10500 " + high + "; zdarzenia gry dzis: do notabli z niczego +" + _dNotFrom
+                   + " (wyplaty zysku warsztatow i karawan, dosypka, nowi notable), z kies notabli w nicosc -" + _dNotTo + " (nadwyzka na wplyw)";
+        }
 
         private static string SampleLine(Town t)
         {
@@ -1065,8 +1247,14 @@ namespace Armoury
             patch("prog cyklu notabla", AccessTools.Method(beh, "CanNotableWorkshopProduceThisCycle"), null, null, nameof(GateTranspiler));
             patch("prog cyklu gracza", AccessTools.Method(beh, "CanPlayerWorkshopProduceThisCycle"), null, null, nameof(GateTranspiler));
             int gates = _gatePatched - before;
-            patch("place cyklu notabla", AccessTools.Method(beh, "TickOneProductionCycleForNotableWorkshop"), null, nameof(CyclePostfix), null);
-            patch("place cyklu gracza", AccessTools.Method(beh, "TickOneProductionCycleForPlayerWorkshop"), null, nameof(CyclePostfix), null);
+            // cena sprawiedliwa (123): pomiar wsadu i utargu cyklu - metody wolane przez cykl, wiec PRZED latkami cyklu
+            patch("cena sprawiedliwa: wsad z targu", AccessTools.Method(beh, "ConsumeInputFromTownMarket"), nameof(InPrefix), nameof(InPostfix), null);
+            patch("cena sprawiedliwa: wsad z magazynu", AccessTools.Method(beh, "ConsumeInputFromWarehouse"), null, nameof(WarePostfix), null);
+            patch("cena sprawiedliwa: wyrob do miasta", AccessTools.Method(beh, "ProduceAnOutputToTown"), nameof(OutPrefix), nameof(OutPostfix), null);
+            patch("place cyklu notabla", AccessTools.Method(beh, "TickOneProductionCycleForNotableWorkshop"), nameof(CycleStartPrefix), nameof(CyclePostfix), null);
+            patch("place cyklu gracza", AccessTools.Method(beh, "TickOneProductionCycleForPlayerWorkshop"), nameof(CycleStartPrefix), nameof(CyclePostfix), null);
+            _fairWired = done.Contains("cena sprawiedliwa: wsad z targu") && done.Contains("cena sprawiedliwa: wsad z magazynu") && done.Contains("cena sprawiedliwa: wyrob do miasta")
+                         && done.Contains("place cyklu notabla") && done.Contains("place cyklu gracza");
             patch("wynik doby", AccessTools.Method(beh, "RunTownWorkshop"), nameof(RunPrefix), nameof(RunPostfix), null);
             patch("wydatek dzienny", AccessTools.Method(beh, "HandleDailyExpense"), nameof(ExpensePrefix), null, null);
             patch("kapital startowy", AccessTools.Method(typeof(Workshop), "InitializeWorkshop"), null, nameof(InitPostfix), null);
@@ -1088,7 +1276,8 @@ namespace Armoury
                      + (miss.Count > 0 ? "; BRAK: " + string.Join(", ", miss.ToArray()) : "") + "; latka modelu finansow rodu dojdzie w kampanii"
                      + (s != null ? ". Utrzymanie " + N1(Upkeep) + " d na dobe do kasy miasta (gra: 100 w nicosc), place cyklu " + (s.WorkshopTradeBatchWages ? "wlaczone" : "wylaczone")
                                     + ", kapital startowy warsztatu czysto towarowego " + s.WorkshopTradeStartCapital + " (gra: 10000; typy z uzbrojeniem zostaja przy 10000), prog kiesy gracza " + s.WorkshopTradeLowCapital + " (gra: 5000), sprzet x"
-                                    + N1(EquipScale * 100f) + "%, cena = " + N1(s.WorkshopTradePriceYears) + " x roczny zysk po podatku + kapital." : ""));
+                                    + N1(EquipScale * 100f) + "%, cena = " + N1(s.WorkshopTradePriceYears) + " x roczny zysk po podatku + kapital"
+                                    + "; cena sprawiedliwa " + (!_fairWired ? "NIECZYNNA - brak latki pomiaru (BRAK wyzej), warsztat bierze pelna cene miasta" : s.WorkshopTradeFairPrice ? "WLACZONA - za wyrob cyklu najwyzej (wsad + place) x" + Margin.ToString("0.##", CultureInfo.InvariantCulture) + ", nadwyzka zostaje w kasie miasta" : "wylaczona (pelna cena miasta)") + "." : ""));
         }
     }
 
@@ -1099,6 +1288,7 @@ namespace Armoury
         {
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, WorkshopTrade.Daily);
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this, OnSessionLaunched);
+            CampaignEvents.HeroOrPartyTradedGold.AddNonSerializedListener(this, WorkshopTrade.OnGold);   // 123: pomiar kies notabli (tylko licznik)
         }
 
         private void OnSessionLaunched(CampaignGameStarter starter)

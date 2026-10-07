@@ -151,7 +151,7 @@ namespace Armoury
             Array.Clear(_goldIn, 0, _goldIn.Length); Array.Clear(_goldOut, 0, _goldOut.Length);
             Array.Clear(_fromNothing, 0, Classes); Array.Clear(_toNothing, 0, Classes);
             _worldFromNothing = _worldToNothing = _levyBack = 0;
-            Array.Clear(_shopWage, 0, Classes); Array.Clear(_shopKeep, 0, Classes);
+            Array.Clear(_shopWage, 0, Classes); Array.Clear(_shopKeep, 0, Classes); Array.Clear(_shopFair, 0, Classes);
             Array.Clear(_noteIn, 0, _noteIn.Length); Array.Clear(_noteOut, 0, _noteOut.Length);
             Array.Clear(_mark, 0, _mark.Length);
             Array.Clear(_wage, 0, Wages); Array.Clear(_wageN, 0, Wages); Array.Clear(_wageShort, 0, Wages);
@@ -369,6 +369,8 @@ namespace Armoury
         // zlota swiata nie zmienia, wiec do bilansu "Pieniadz swiata" nie wchodzi. Wplaty z kiesy gracza ida przez GiveGoldAction
         // i sa w pozycji "przelewy gry".
         private static readonly long[] _shopWage = new long[Classes], _shopKeep = new long[Classes];
+        // 123: nadwyzka ceny wyrobu ponad koszt cyklu + marze (cena sprawiedliwa) oddana z kapitalu warsztatu do kasy miasta
+        private static readonly long[] _shopFair = new long[Classes];
 
         /// <summary>WorkshopTrade wplacil do kasy osady place za cykle i utrzymanie warsztatu z jego kapitalu. Tylko licznik.</summary>
         internal static void NoteWorkshopPay(Settlement st, int wages, int upkeep)
@@ -380,6 +382,18 @@ namespace Armoury
                 if (c < 0) return;
                 if (wages > 0) _shopWage[c] += wages;
                 if (upkeep > 0) _shopKeep[c] += upkeep;
+            }
+            catch { _stumbles++; }
+        }
+
+        /// <summary>123: WorkshopTrade oddal kasie miasta nadwyzke ceny wyrobu (cena sprawiedliwa) z kapitalu warsztatu. Tylko licznik.</summary>
+        internal static void NoteWorkshopFair(Settlement st, int amount)
+        {
+            try
+            {
+                if (_inBlock || amount <= 0) return;
+                int c = ClassOf(st);
+                if (c >= 0) _shopFair[c] += amount;
             }
             catch { _stumbles++; }
         }
@@ -774,6 +788,11 @@ namespace Armoury
             {
                 known += _shopWage[c] + _shopKeep[c];
                 parts.Add("warsztaty towarowe - place i utrzymanie z kapitalu warsztatow " + S(_shopWage[c] + _shopKeep[c]) + " [P] (place za cykle +" + _shopWage[c] + ", utrzymanie +" + _shopKeep[c] + ")");
+            }
+            if (_shopFair[c] != 0)
+            {
+                known += _shopFair[c];
+                parts.Add("warsztaty towarowe - nadwyzka ceny wyrobow ponad koszt i marze (cena sprawiedliwa) " + S(_shopFair[c]) + " [P]");
             }
             long marks = 0; det = new List<string>();
             for (int k = 0; k < Marks; k++)

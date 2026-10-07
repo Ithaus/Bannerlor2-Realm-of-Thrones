@@ -1488,6 +1488,10 @@ namespace Armoury
         [SettingPropertyGroup("Workshops")]
         public float WorkshopTradeResaleShare { get; set; } = 0.8f;
 
+        [SettingPropertyBool("Workshop Trade Fair Price", HintText = "the just price of the towns (assize of bread, guild prices): for each batch of trade goods the town pays a workshop at most what the batch cost - its materials at the town's price and its wages - plus the master's profit (Smith Profit Percent, the same margin as in the price of arms); whatever an empty stall would pay above that stays in the town purse. Bakers, weavers and silversmiths earn a craftsman's living instead of a lord's rent, so a workshop costs what such a living is worth. Your own workshops too; arms lines keep their own price (off = a workshop gets the town's full price for every piece)")]
+        [SettingPropertyGroup("Workshops")]
+        public bool WorkshopTradeFairPrice { get; set; } = true;
+
         [SettingPropertyBool("Castle Villages Sell In Town", HintText = "villagers of a village held from a castle cart their goods to the nearest town market of their realm instead of the lord's castle - the castle was the lord's storehouse and garrison, never a market (off = they keep hauling to the castle)")]
         [SettingPropertyGroup("The road to market")]
         public bool CastleVillagesSellInTown { get; set; } = true;
@@ -2915,6 +2919,7 @@ namespace Armoury
             s.WorkshopTradePriceYears = WorkshopTradePriceYears;
             s.WorkshopTradeProfitDays = WorkshopTradeProfitDays;
             s.WorkshopTradeResaleShare = WorkshopTradeResaleShare;
+            s.WorkshopTradeFairPrice = WorkshopTradeFairPrice;
             s.CastleVillagesSellInTown = CastleVillagesSellInTown;
             s.MarketMaxDistance = MarketMaxDistance;
             s.MarketCartFactor = MarketCartFactor;
