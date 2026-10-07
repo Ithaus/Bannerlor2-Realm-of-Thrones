@@ -293,9 +293,18 @@ namespace Armoury
             {
                 var s = Settings.Current;
                 if (s == null) return;
-                float m = s.BkForgeHourlyMultiplier;
-                if (m > 0.01f && Math.Abs(m - 1f) > 0.01f)
-                    __result.AddFactor(m - 1f, new TextObject("{=arm_fair_rent}Fair rent"));
+                if (s.ForgeHireHistorical)
+                {
+                    // stawka godzinowa = dzien kuzni w tym miescie / godziny dnia (Forge.ForgeDayRent - skala historyczna x poziom plac)
+                    float day = Forge.ForgeDayRent(TaleWorlds.CampaignSystem.Settlements.Settlement.CurrentSettlement);
+                    __result = new ExplainedNumber(day / Math.Max(1f, s.ForgeDayHours), false, new TextObject("{=arm_forge_hire}Forge hire (a day split by the hours)"));
+                }
+                else
+                {
+                    float m = s.BkForgeHourlyMultiplier;
+                    if (m > 0.01f && Math.Abs(m - 1f) > 0.01f)
+                        __result.AddFactor(m - 1f, new TextObject("{=arm_fair_rent}Fair rent"));
+                }
                 // dniowka oplacona - godziny NIE kosztuja NIC (twarde zero,
                 // zadnej arytmetyki mnoznikow, ktora moglaby to zepsuc)
                 if (s.ForgeDayPassEnabled && DayPass.ActiveHere())
@@ -739,7 +748,9 @@ namespace Armoury
             var s = TaleWorlds.CampaignSystem.Settlements.Settlement.CurrentSettlement;
             if (s == null || ActiveHere()) return;
 
-            int rate = (int)Math.Ceiling(HourlyRate(s) * Math.Max(1f, c.ForgeDayHours));
+            int rate = c.ForgeHireHistorical
+                ? (int)Math.Ceiling(Forge.ForgeDayRent(s))                                  // dzien kuzni w skali historycznej x poziom plac miasta
+                : (int)Math.Ceiling(HourlyRate(s) * Math.Max(1f, c.ForgeDayHours));
             _paid[s.StringId] = TaleWorlds.CampaignSystem.CampaignTime.Now.ToDays + 1.0;   // pelna doba od TERAZ
             try
             {

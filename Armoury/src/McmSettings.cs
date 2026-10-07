@@ -232,6 +232,10 @@ namespace Armoury
         [SettingPropertyGroup("Forge fee")]
         public float ForgeDayHours { get; set; } = 8f;
 
+        [SettingPropertyBool("Forge Hire Historical", HintText = "the smith's forge is hired at historical prices, as dear as the town is prosperous: a project pays the forge fee (3 d and 2 d a tier), a whole day of the forge as much as the finest work (15 d in a middling town), the Banner Kings hourly rate is that day split by the hours (off = the forge fee the same everywhere and the day at the Banner Kings hourly rate)")]
+        [SettingPropertyGroup("Forge fee")]
+        public bool ForgeHireHistorical { get; set; } = true;
+
         [SettingPropertyBool("Forge Work No Rest", HintText = "hammering is not napping - smithing stamina does NOT recover during hours spent working the forge")]
         [SettingPropertyGroup("Forge fee")]
         public bool ForgeWorkNoRest { get; set; } = true;
@@ -2669,6 +2673,7 @@ namespace Armoury
             s.BkForgeHourlyMultiplier = BkForgeHourlyMultiplier;
             s.ForgeDayPassEnabled = ForgeDayPassEnabled;
             s.ForgeDayHours = ForgeDayHours;
+            s.ForgeHireHistorical = ForgeHireHistorical;
             s.ForgeWorkNoRest = ForgeWorkNoRest;
             s.EnforceStaminaCosts = EnforceStaminaCosts;
             s.StaminaCostMessages = StaminaCostMessages;

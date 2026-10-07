@@ -335,7 +335,21 @@ namespace Armoury
         {
             var s = Settings.Current;
             if (s.ForgeDayPassEnabled && DayPass.ActiveHere()) return 0;   // dniowka oplacona - kuznia i tak Twoja
-            return s.ForgeFeeBase + s.ForgeFeePerTier * r.Tier;
+            int fee = s.ForgeFeeBase + s.ForgeFeePerTier * r.Tier;
+            // Jeff 07.10 (koszty w miescie z dobrobytu i stawek historycznych): oplata historyczna x poziom plac miasta (TownWage)
+            return s.ForgeHireHistorical ? Math.Max(1, (int)Math.Round(fee * TownWage.Index(TaleWorlds.CampaignSystem.Settlements.Settlement.CurrentSettlement))) : fee;
+        }
+
+        /// <summary>
+        /// Wynajem kuzni na CALY dzien w tym miescie (pensy): tyle, co oplata za robote najwyzszego tieru (ForgeFeeBase + 6 x
+        /// ForgeFeePerTier = 15 d) x poziom plac miasta - ta sama skala co oplata za projekt. Karnet dnia BK i stawka godzinowa BK
+        /// (dzien / ForgeDayHours) - z tego, przy ForgeHireHistorical. Dotad karnet kosztowal stawke godzinowa BK x 8 h (ok. 200,
+        /// tyle co ok. 70 dniowek rzemieslnika).
+        /// </summary>
+        internal static float ForgeDayRent(TaleWorlds.CampaignSystem.Settlements.Settlement st)
+        {
+            var s = Settings.Current;
+            return Math.Max(1f, (s.ForgeFeeBase + s.ForgeFeePerTier * 6) * TownWage.Index(st));
         }
 
         /// <summary>
