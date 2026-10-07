@@ -44,6 +44,9 @@ namespace Armoury
     /// Poza zakresem zostaja dwa przecieki BK: -1% dziennie od kasy ponad 50 000 + 12 x dobrobyt (zawor trzyma kase ponizej -
     /// linia dobowa liczy zamki ponad limitem) i cotygodniowy skup zywnosci przy pelnym spichlerzu (zloto w nicosc); oba widac
     /// jako "reszta" w linii "Przeplywy osad (kasy zamkow)".
+    ///
+    /// Krok K6 (TownPurse) uzywa tych samych trzech latek dla MIAST: kazdy postfiks oddaje miasto modulowi TownPurse i wraca
+    /// (nowych zalatanych metod nie przybywa). K6 zamyka tez pierwszy z przeciekow BK - takze dla zamkow.
     /// </summary>
     internal static class CastlePurse
     {
@@ -67,6 +70,10 @@ namespace Armoury
         private static long _dRegUp, _dRegDown, _dConsBack, _dCartValue;
         private static int _dRegUpN, _dRegDownN, _dConsN, _dConsHit, _dCartPaid, _dCartSent, _stumbles;
         private static bool _errLogged;
+
+        // ------------------------------------------------------------ wpiecie (raz na proces - to nie jest stan kampanii); czyta je TownPurse (krok K6)
+        internal static int HookedModels;                    // w ilu modelach kasy osad siedzi nasz postfiks regulatora
+        internal static bool HookedConsumption;              // para postfiksow na konsumpcji osady zalozona
 
         internal static void Reset()
         {
@@ -140,6 +147,7 @@ namespace Armoury
             try
             {
                 _consTown = null;
+                if (__0 != null && __0.IsTown) { TownPurse.OnShelf(__0); return; }   // krok K6: miasto ma wlasny nawias (wlasny try w srodku)
                 if (__0 == null || !__0.IsCastle || !On || Campaign.Current == null) return;
                 _consTown = __0; _consGold = __0.Gold;
             }
@@ -155,6 +163,7 @@ namespace Armoury
             try
             {
                 var t = _consTown; _consTown = null;
+                if (__0 != null && __0.IsTown) { TownPurse.OnConsumed(__0); return; }   // krok K6
                 if (t == null || !ReferenceEquals(t, __0)) return;
                 _regDue = __0;                                   // zaraz potem gra pyta model o regulator tej samej osady
                 _dConsN++;
@@ -173,6 +182,7 @@ namespace Armoury
         public static void RegulatorPostfix(Town __0, ref int __result)
         {
             if (__0 == null) return;
+            if (__0.IsTown) { TownPurse.OnRegulator(__0, ref __result); return; }   // krok K6: regulator kasy MIASTA (wlasny try w srodku)
             if (__result == 0) { if (ReferenceEquals(__0, _regDue)) _regDue = null; return; }   // gra niczego nie chciala - tick zamku rozliczony
             try
             {
@@ -198,6 +208,7 @@ namespace Armoury
                 {
                     h.Patch(shelf, postfix: new HarmonyMethod(typeof(CastlePurse), nameof(ShelfPostfix)));
                     h.Patch(cons, postfix: new HarmonyMethod(typeof(CastlePurse), nameof(ConsumePostfix)) { priority = Priority.First });
+                    HookedConsumption = true;
                     done.Add("\"zakupy\" ludnosci zamkow bez zlota z niczego");
                 }
                 else miss.Add("\"zakupy\" ludnosci zamkow");
@@ -225,6 +236,7 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Log.Error("CastlePurse.ApplyAll(regulator)", e); }
+            HookedModels = reg;
             if (reg > 0) done.Add("regulator kasy zamku = 0 w " + reg + " modelach"); else miss.Add("regulator kasy");
             var s = Settings.Current;
             Log.Info("CastlePurse: kasa zamku jako prawdziwy pieniadz " + (s != null && s.CastlePurseEnabled ? "CZYNNA" : "WYLACZONA w ustawieniach (latki tylko wracaja)")

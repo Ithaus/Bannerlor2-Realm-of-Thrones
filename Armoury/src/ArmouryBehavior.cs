@@ -386,7 +386,7 @@ namespace Armoury
         }
         private Dictionary<string,int> _prisonerBaseline;
 
-        public ArmouryBehavior() { Instance = this; HistoricalPrices.Reset(); MaterialLaw.Reset(); WesterosClimate.Reset(); OutlawLaw.Reset(); PopulationLaw.Reset(); WorkshopLaw.Reset(); IronBank.Reset(); MarketGlut.Reset(); ArmsPricing.Reset(); StartKit.Reset(); AiGear.Reset(); Levy.Reset(); VolunteerKit.Reset(); LevyGold.Reset(); WearKeep.Reset(); UniqueSpoils.Reset(); BuildDiary.Reset(); BuildFunding.Reset(); KingdomLedger.Reset(); ColdStart.Reset(); MenPurse.Reset(); AiWear.Reset(); SmithHours.Reset(); RecruitKit.Reset(); OreLedger.Reset(); MarketRoad.Reset(); MarketCarts.Reset(); MoneyLedger.Reset(); PeopleLedger.Reset(); PeopleUnit.Reset(); CaravanBulk.Reset(); StartStock.Reset(); MineralOnce.Reset(); SoldierPay.Reset(); KingdomTreasury.Reset(); CastlePurse.Reset(); }   // stan jednej kampanii nie przecieka do drugiej (audyt 04.10)
+        public ArmouryBehavior() { Instance = this; HistoricalPrices.Reset(); MaterialLaw.Reset(); WesterosClimate.Reset(); OutlawLaw.Reset(); PopulationLaw.Reset(); WorkshopLaw.Reset(); IronBank.Reset(); MarketGlut.Reset(); ArmsPricing.Reset(); StartKit.Reset(); AiGear.Reset(); Levy.Reset(); VolunteerKit.Reset(); LevyGold.Reset(); WearKeep.Reset(); UniqueSpoils.Reset(); BuildDiary.Reset(); BuildFunding.Reset(); KingdomLedger.Reset(); ColdStart.Reset(); MenPurse.Reset(); AiWear.Reset(); SmithHours.Reset(); RecruitKit.Reset(); OreLedger.Reset(); MarketRoad.Reset(); MarketCarts.Reset(); MoneyLedger.Reset(); PeopleLedger.Reset(); PeopleUnit.Reset(); CaravanBulk.Reset(); StartStock.Reset(); MineralOnce.Reset(); SoldierPay.Reset(); KingdomTreasury.Reset(); CastlePurse.Reset(); TownPurse.Reset(); }   // stan jednej kampanii nie przecieka do drugiej (audyt 04.10)
 
         public override void SyncData(IDataStore dataStore)
         {
@@ -411,6 +411,15 @@ namespace Armoury
                 if (dataStore.IsLoading) CastlePurse.Import(castlePurse);
             }
             catch (Exception e) { Log.Error("SyncData.CastlePurse", e); }
+            // kasa miasta (krok K6): dar startowy w kasach miast rozliczony raz na kampanie; brak klucza = stary zapis (o przycieciu
+            // decyduje wiek kampanii). Wlasny try z tego samego powodu co wyzej - zgubiona flaga to drugie przyciecie, z prawdziwego doplywu.
+            try
+            {
+                string townPurse = TownPurse.Export();
+                dataStore.SyncData("arm_townpurse", ref townPurse);
+                if (dataStore.IsLoading) TownPurse.Import(townPurse);
+            }
+            catch (Exception e) { Log.Error("SyncData.TownPurse", e); }
             try
             {
                 dataStore.SyncData("arm_condition", ref _condition);
@@ -1203,8 +1212,11 @@ namespace Armoury
             try { SupplyDemand.DecayOrders(); } catch (Exception e) { Log.Error("SupplyDemand.DecayOrders", e); }
             try { ArmsPricing.Daily(); } catch (Exception e) { Log.Error("ArmsPricing.Daily", e); }   // indeksy surowcow i premie wojenne PRZED handlem
             try { MoneyLedger.BlockOpen(); } catch { }   // ksiega przeplywow osad (tylko log): stan kas przed naszym rozliczeniem doby
-            try { PopulationLaw.Daily(); } catch (Exception e) { Log.Error("PopulationLaw.Daily", e); }   // ludnosc i renty krain
+            // krok K6: kasa miasta - dar startowy przycinany raz na kampanie PRZED rentami (zawor nie moze go rozdac); wlasna migawka ksiegi w srodku
+            try { TownPurse.BeforeRents(); } catch (Exception e) { Log.Error("TownPurse.BeforeRents", e); }
+            try { PopulationLaw.Daily(); } catch (Exception e) { Log.Error("PopulationLaw.Daily", e); }   // ludnosc i renty krain (zawor kas miast: pan i korona)
             try { MoneyLedger.Mark(MoneyLedger.MRent); } catch { }
+            try { TownPurse.Daily(); } catch (Exception e) { Log.Error("TownPurse.Daily", e); }   // krok K6: linia "Kasy miast:" i rozdzial pozycji ksiegi (kas nie zmienia)
             // krok K5: kasa zamku - danina podzamcza (zawor: nadwyzka kasy ponad zapas kupcow -> pan zamku) i linia "Kasy zamkow:";
             // zaraz PO rentach (dopisuje sie do dziennych rent rodu), PRZED budowami i powinnosciami, ktore licza od dzisiejszego dochodu
             try { CastlePurse.Daily(); } catch (Exception e) { Log.Error("CastlePurse.Daily", e); }

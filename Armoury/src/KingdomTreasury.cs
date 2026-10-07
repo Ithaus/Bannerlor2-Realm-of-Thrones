@@ -225,7 +225,6 @@ namespace Armoury
             try
             {
                 long sub = 0, cus = 0, deb = 0, mon = 0;
-                float floor = Math.Max(0f, s.TownRentFloorGold);
                 foreach (var k in Kingdom.All)
                 {
                     if (k == null || k.IsEliminated) continue;
@@ -243,7 +242,8 @@ namespace Armoury
                         if (!town && !st.IsVillage) continue;
                         if (st.IsUnderSiege || (st.IsVillage && st.Village.VillageState != Village.VillageStates.Normal)) continue;
                         int gold = st.SettlementComponent.Gold;
-                        int spare = town ? Math.Max(0, gold - (int)floor) : Math.Max(0, gold);
+                        // krok K6: granica to zapas kupcow miasta (TownPurse.TaxFloor; przy wylaczonym K6 dotychczasowe TownRentFloorGold)
+                        int spare = town ? Math.Max(0, gold - TownPurse.TaxFloor(st.Town)) : Math.Max(0, gold);
                         // danina wojenna (lay subsidy)
                         if (s.LaySubsidyEnabled && war && spare > 0)
                         {
@@ -304,7 +304,6 @@ namespace Armoury
                 float smooth = 5f;
                 try { smooth = Math.Max(0.01f, Campaign.Current.Models.ClanFinanceModel.RevenueSmoothenFraction()); } catch { }
                 float vanilla = 0f, real = 0f;
-                float floorG = Math.Max(0f, s.TownRentFloorGold);
                 // wpis 90 (audyt, kod gry): Crown Duty - gra daje krolowi 5% LICZNIKA cel (miara handlu, nikt jej nie placi);
                 // licznik zdejmuje sama, my odejmujemy kwote z niczego i bierzemy ja z kasy miasta ponad prog
                 if (pol.Contains(DefaultPolicies.CrownDuty))
@@ -314,7 +313,7 @@ namespace Armoury
                         // po zdjeciu przez gre licznik ma 95% dawnej wartosci: dawna x 5% = obecna x 5/95
                         int due = applyWithdrawals ? (int)(f.TradeTaxAccumulated * 5f / 95f) : (int)(f.TradeTaxAccumulated * 0.05f);
                         vanilla += due;
-                        int x = Math.Min(due, Math.Max(0, f.Gold - (int)floorG));
+                        int x = Math.Min(due, Math.Max(0, f.Gold - TownPurse.TaxFloor(f)));   // krok K6: zapas kupcow miasta (zamek: jak dotad)
                         if (applyWithdrawals && x > 0) f.ChangeGold(-x);
                         real += x;
                     }
@@ -341,7 +340,7 @@ namespace Armoury
                     {
                         if (f == null) continue;
                         float t = 0f; try { t = Campaign.Current.Models.SettlementTaxModel.CalculateTownTax(f).ResultNumber; } catch { }
-                        int x = Math.Min((int)(t * 0.05f), Math.Max(0, f.Gold - (int)floorG));   // wpis 90: prog kasy miasta
+                        int x = Math.Min((int)(t * 0.05f), Math.Max(0, f.Gold - TownPurse.TaxFloor(f)));   // wpis 90: prog kasy miasta (krok K6: zapas kupcow)
                         if (x <= 0) continue;
                         if (applyWithdrawals) f.ChangeGold(-x);
                         real += x;
@@ -358,7 +357,7 @@ namespace Armoury
                         // po zdjeciu przez gre licznik ma 29/30 dawnej wartosci: dawna/30 = obecna/29
                         int r = applyWithdrawals ? st.Town.TradeTaxAccumulated / 29 : st.Town.TradeTaxAccumulated / 30;
                         n6 += r;
-                        int x = Math.Min(r, Math.Max(0, st.Town.Gold - (int)floorG));   // wpis 90: prog kasy miasta
+                        int x = Math.Min(r, Math.Max(0, st.Town.Gold - TownPurse.TaxFloor(st.Town)));   // wpis 90: prog kasy miasta (krok K6: zapas kupcow)
                         if (applyWithdrawals && x > 0) st.Town.ChangeGold(-x);
                         real += x;
                     }
