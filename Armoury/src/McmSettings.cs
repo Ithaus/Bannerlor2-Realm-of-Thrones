@@ -1492,13 +1492,33 @@ namespace Armoury
         [SettingPropertyGroup("The road to market")]
         public bool CastleVillagesSellInTown { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Market Max Distance", 0.00f, 600.00f, "0.00", HintText = "the farthest town market, by road, a castle village will cart to - beyond it the villagers keep selling at their lord's castle, or the long haul would choke the village storehouse (0 = no limit of ours, only the game's own trade range)")]
+        [SettingPropertyFloatingInteger("Market Max Distance", 0.00f, 1000.00f, "0.00", HintText = "the farthest town market, by road, villagers will cart to - about four days on the road, the game's own trade range for a village (three spans between neighbouring towns). Beyond it a castle village keeps selling at its lord's castle (0 = no limit of ours, only the game's own trade range)")]
         [SettingPropertyGroup("The road to market")]
-        public float MarketMaxDistance { get; set; } = 150f;
+        public float MarketMaxDistance { get; set; } = 250f;
 
-        [SettingPropertyFloatingInteger("Market Cart Factor", 0.00f, 8.00f, "0.00", HintText = "carts instead of pack loads: villagers of a castle village hauling to a town market carry this many times their usual load - the longer road would otherwise choke the village storehouse (1 = off; above 2 changes little, they take at most three fifths of the store)")]
+        [SettingPropertyFloatingInteger("Market Cart Factor", 0.00f, 8.00f, "0.00", HintText = "carts instead of pack loads: villagers hauling to a town market carry this many times their usual load - the longer road would otherwise choke the village storehouse (1 = off; above 2 changes little, they take at most three fifths of the store unless they set out on a long road)")]
         [SettingPropertyGroup("The road to market")]
         public float MarketCartFactor { get; set; } = 2f;
+
+        [SettingPropertyBool("Market Cart All Villages", HintText = "every village's villagers haul by cart, not only those of villages held from a castle - town villages now take longer roads too, and they already choked their storehouses more often (off = carts for castle villages only)")]
+        [SettingPropertyGroup("The road to market")]
+        public bool MarketCartAllVillages { get; set; } = true;
+
+        [SettingPropertyBool("Village Carts Best Market", HintText = "villagers take their load to the town within Market Max Distance that pays most for it per day of their journey - valued as that town's stalls would pay for it; their own town always counts, besieged and enemy towns never; a journey longer than the village storehouse can bear (it stops all work once full) earns less per day (off = the village's own town, as before)")]
+        [SettingPropertyGroup("The road to market")]
+        public bool VillageCartsBestMarket { get; set; } = true;
+
+        [SettingPropertyBool("Village Cart Full Load Far", HintText = "villagers setting out on a road longer than their storehouse can bear take everything their cart can carry, so the village does not stand idle and its goods do not lie waiting (needs Village Carts Best Market)")]
+        [SettingPropertyGroup("The road to market")]
+        public bool VillageCartFullLoadFar { get; set; } = true;
+
+        [SettingPropertyBool("Village Cart Road News", HintText = "villagers know what other carts are already hauling to a town and count it as if it were on the stalls, so they do not all drive their loads to the same empty market (needs Village Carts Best Market)")]
+        [SettingPropertyGroup("The road to market")]
+        public bool VillageCartRoadNews { get; set; } = true;
+
+        [SettingPropertyBool("Village Cart Fair Price", HintText = "a town pays for a cartload piece by piece - each piece at the price its stall gives once the pieces before it lie there - not the whole load at the price of the first piece; what was overpaid goes back from the villagers' purse to the town's. Keep it on while Village Carts Best Market is on - carts sent to empty markets would otherwise take the first piece's price for the whole load out of those towns' purses (off = the whole load at the first piece's price, as the game does)")]
+        [SettingPropertyGroup("The road to market")]
+        public bool VillageCartFairPrice { get; set; } = true;
 
         [SettingPropertyBool("Caravan Bulk Enabled", HintText = "caravans haul bulk raw goods (iron ore, timber, raw hides, leather, flax, linen, wool) by need: a town short of its own stock buys what it lacks from any passing caravan, and a caravan leaving a town buys only what that town holds to spare (off = Banner Kings' price-driven caravan trade alone)")]
         [SettingPropertyGroup("The road to market")]
@@ -2890,6 +2910,11 @@ namespace Armoury
             s.CastleVillagesSellInTown = CastleVillagesSellInTown;
             s.MarketMaxDistance = MarketMaxDistance;
             s.MarketCartFactor = MarketCartFactor;
+            s.MarketCartAllVillages = MarketCartAllVillages;
+            s.VillageCartsBestMarket = VillageCartsBestMarket;
+            s.VillageCartFullLoadFar = VillageCartFullLoadFar;
+            s.VillageCartRoadNews = VillageCartRoadNews;
+            s.VillageCartFairPrice = VillageCartFairPrice;
             s.CaravanBulkEnabled = CaravanBulkEnabled;
             s.CaravanBulkStockDays = CaravanBulkStockDays;
             s.CaravanBulkSurplusFactor = CaravanBulkSurplusFactor;
