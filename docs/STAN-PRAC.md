@@ -16,7 +16,7 @@ gra zawiesila sie przy wyjsciu; skrypt przywrocil DLL Jeffa (md5 OK), zapisy Jef
 StopGameOnFocusLost=True (ustawienie Jeffa, nietkniete) gra otwiera menu Esc i wstrzymuje mape; wyjscie - wywrotka silnika przy zamykaniu (znana z gier Jeffa).
 AT1b (f1d3705): autotest zamyka menu Esc, diagnostyka postoju, skrypt czeka 90 s na wyjscie. Kod: galaz `narzedzia/autotest` (CrashScribe + tools/autotest.ps1;
 CrashScribe z autotestem NIE jest wgrany na stale - skrypt wgrywa go tylko na czas testu). Uruchomienie: `powershell -NoProfile -ExecutionPolicy Bypass -File
-<worktree>	oolsutotest.ps1 -CrashScribeDll <CrashScribe z autotestem> -ArmouryDll <Armoury probny> -Days 40`.
+<worktree>\tools\autotest.ps1 -CrashScribeDll <CrashScribe z autotestem> -ArmouryDll <Armoury probny> -Days 40`.
 2. PRZEBIEG 06:06 (Armoury 121-124, 40 dob): OK - 40/40 dob w 9.6 min (12 s/dobe), zapis autotest-2026-10-07-0616.sav, gra wyszla sama, DLL i zapisy
 Jeffa przywrocone (md5). Log `Armoury-2026-10-07_06-06-45.log`. WYNIK 121-124 wobec testu Jeffa (115-120): cena warsztatow mediana 13.3 tys. (bylo 145 tys.),
 max 192 tys. (12.27 mln), piekarnia Lannisport 12.7 tys. (373 tys.); ruda bez towaru doba 19: 45 (51), doba 40: 38; drewno 47 -> 1; ZATKANE MAGAZYNY
