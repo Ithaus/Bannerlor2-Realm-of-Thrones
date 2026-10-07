@@ -104,12 +104,12 @@ namespace Armoury
         private static readonly Dictionary<Settlement, int> _hoardKeep = new Dictionary<Settlement, int>();
         // zywnosc z niczego (licznik dnia): ilu nowym bandom gra chciala ja dac; ile sztuk dosypanych bandom w bitwie zdjelismy
         private static int _foodBands, _foodTaken;
-        private static bool _errSell, _errHide, _errFenceLog, _errLife, _errStart, _errFood, _errUpgrade;
+        private static bool _errSell, _errHide, _errFenceLog, _errLife, _errStart, _errFood, _errUpgrade, _errFencePay;
 
         internal static void Reset()
         {
             _pool.Clear(); _seeded = false; _nodes = null; _near.Clear(); _regionOf.Clear(); _commonerOf.Clear(); _empty.Clear(); _refusedHour.Clear();
-            FenceNewDay(); _hoardSeen.Clear(); _hoardKeep.Clear(); _errSell = false; _errHide = false; _errFenceLog = false; _errLife = false; _errStart = false; _errFood = false; _errUpgrade = false;
+            FenceNewDay(); _hoardSeen.Clear(); _hoardKeep.Clear(); _errSell = false; _errHide = false; _errFenceLog = false; _errLife = false; _errStart = false; _errFood = false; _errUpgrade = false; _errFencePay = false;
             _gold.Clear(); _goldTick = false; _foodSnap.Clear();      // migawki dziennego ticku gry nie przechodza do nastepnej kampanii
             _upLoot = _upFence = _upBlocked = _fenceGold = 0;         // liczniki zakupow u pasera ida do linii "Paser:" - nie moga przejsc z poprzedniej kampanii
         }
@@ -1011,11 +1011,21 @@ namespace Armoury
             return true;
         }
 
-        /// <summary>Zaplata bandy za sprzet trafia do kasy miasta pasera; Note = ksiega przeplywow osad (tylko licznik).</summary>
+        /// <summary>
+        /// Zaplata bandy za sprzet trafia do kasy miasta pasera; Note = ksiega przeplywow osad (tylko licznik). Cena zeszla juz
+        /// z kiesy bandy (Equip) - wyjatek przy wplacie to zloto, ktore nie doszlo do kasy: pierwszy do pliku z miastem i kwota (wlasna flaga,
+        /// zeby wczesniejszy blad awansu go nie zagluszyl), kazdy liczony w "potkniecia: ... awanse" linii "Paser:" - jak pozostale
+        /// sciezki pasera; awansu nie cofamy.
+        /// </summary>
         private static void FencePaid(Settlement town, int price)
         {
             if (town == null || price <= 0) return;
-            try { town.SettlementComponent.ChangeGold(price); MoneyLedger.Note(MoneyLedger.NFence, town, price); } catch { }
+            try { town.SettlementComponent.ChangeGold(price); MoneyLedger.Note(MoneyLedger.NFence, town, price); }
+            catch (Exception e)
+            {
+                _upStumbles++;
+                if (!_errFencePay) { _errFencePay = true; Log.Error("OutlawLaw.FencePaid(" + town.StringId + ": " + price + " zl z kiesy bandy nie doszlo do kasy miasta)", e); }
+            }
         }
 
         /// <summary>

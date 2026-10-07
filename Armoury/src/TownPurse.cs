@@ -334,6 +334,9 @@ namespace Armoury
         /// <summary>
         /// Czy zold tej zalogi, wplacony do kasy jej osady, wraca panu zaworem (miasto: ten modul; zamek: danina podzamcza K5) -
         /// wtedy korona go nie zwraca (zaloga to koszt pana, pokrywany z dochodow jego ziemi; korona placi za wojsko w polu).
+        /// Jedna regula dla miasta i zamku (wpis 114): osada musi oddawac nadwyzke (zawor / danina czynne, stawka > 0) i pan musi
+        /// miec w niej udzial > 0 - przy udziale 0 calosc bierze korona, do pana nic nie wraca, wiec zwrot korony liczy zaloge
+        /// jak w ogniwie 107. Przy wylaczonym podziale daniny podzamcza udzial pana w zamku to 1 (stan sprzed wpisu 114).
         /// </summary>
         internal static bool PayComesHome(Settlement st)
         {
@@ -342,7 +345,7 @@ namespace Armoury
                 var s = Settings.Current;
                 if (s == null || st == null || st.Town == null || !s.CrownRefundSkipsHomeGarrisons || !On) return false;
                 if (st.IsTown) return s.PopulationRentEnabled && Unit(s.TownRentShare) > 0f && Unit(s.TownRentLordShare) > 0f;
-                if (st.IsCastle) return s.CastlePurseEnabled && Unit(s.CastleDuesShare) > 0f;
+                if (st.IsCastle) return s.CastlePurseEnabled && Unit(s.CastleDuesShare) > 0f && CastlePurse.LordShare(s) > 0f;
             }
             catch (Exception e) { Stumble("TownPurse.PayComesHome", e); }
             return false;

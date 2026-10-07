@@ -264,6 +264,7 @@ namespace Armoury
                     done++; paid += unit;
                 }
                 SmithHours.Use(st.Town, done * perPiece);
+                if (paid > 0) MoneyLedger.Note(MoneyLedger.NMend, st, paid);   // ksiega przeplywow osad (tylko licznik): sakiewka ludzi -> kasa miasta
                 _dayMended += done; _dayPaid += paid;
             }
             catch (Exception e) { Log.Error("AiWear.MendInTown", e); }

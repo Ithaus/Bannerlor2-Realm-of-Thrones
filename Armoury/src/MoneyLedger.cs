@@ -15,7 +15,7 @@ namespace Armoury
 {
     /// <summary>
     /// KSIEGA PIENIADZA I PRZEPLYWOW OSAD (krok K1 fundamentu, docs/EKONOMIA-FUNDAMENT-2026-10-05.md rozdz. 1.3 P9 i 6.3 K1).
-    /// Tylko log - niczego nie zmienia w grze: odczyt stanu, nasluch zdarzen gry, postfiksy-liczniki i jeden prefiks-odczyt (zaden nie rusza wyniku).
+    /// Tylko log - niczego nie zmienia w grze: odczyt stanu, nasluch zdarzen gry, postfiksy-liczniki i dwa prefiksy-odczyty (zaden nie rusza wyniku).
     /// Fundament: szesc kluczowych kwot mapy przeplywow to szacunki, bo utarg wiesniakow, kasy osad, "zakupy" mieszczan
     /// i regulator kas nie byly logowane. Krytyk K1: ksiege oprzec na STANIE (jedyny mutator kasy osady to ChangeGold),
     /// a nie na liscie hakow - dzienna zmiana stanu minus pozycje zmierzone = jawna reszta.
@@ -48,7 +48,14 @@ namespace Armoury
     ///    czesc przekazana dalej przez SoldierPay (sakiewki ludzi, kasy osad) zglasza NoteWageRouted - w bilansie osobne zrodlo
     ///    ("zold oddany do obiegu"), bo SoldierPay wplaca ja juz po pomiarze rozliczenia rodu;
     ///  - nasze moduly poza tickiem dobowym: wywolania-liczniki Note (zakupy AI, najemnicy z karczmy, warsztaty zbrojne,
-    ///    sprzet kupiony przez bandy u pasera);
+    ///    sprzet kupiony przez bandy u pasera, zold zalog, wydatki ludzi na zycie, naprawy u kowali placone z sakiewek ludzi,
+    ///    sakiewki partii rozbitych bez zwyciezcy z wodzem albo rozwiazanych - oddawane kasie najblizszego miasta);
+    ///  - dzienny dochod notabla z warsztatow i karawan (ClanVariablesCampaignBehavior.DailyTickHero -> CalculateNotableDailyGoldChange):
+    ///    gra zdejmuje zysk z kapitalu warsztatu (Workshop.ChangeGold) i z kiesy karawany (PartyTradeGold), a wyplaca zdarzeniem
+    ///    "nic -> notabl" - to przelew, nie zloto z niczego. Para prefiks / postfiks na DailyTickHero czyta kapital warsztatow
+    ///    i kiesy karawan notabla przed i po: ile z wyplaty pokrywa ubytek kapitalu (odejmowane od zrodel), ile wyplacono ponad
+    ///    ubytek (zostaje zrodlem - np. 30 d dziennie za zaulek) i ile zeszlo z kapitalu bez wyplaty (ujscie - np. podatek
+    ///    warsztatu u BK, ktory pan dostaje w rozliczeniu rodu);
     ///  - nasz tick dobowy: migawki stanu kas miedzy modulami (BlockOpen / Mark) - renty, danina podzamcza (CastlePurse: zawor
     ///    kas zamkow, krok K5), budowy, korona, wydatki band i kryjowek na zycie w miastach, skup lupu band u pasera (OutlawLaw
     ///    robi swoje trzy migawki sam), reszta ticku.
@@ -57,6 +64,8 @@ namespace Armoury
     ///  Krok K6 (TownPurse) robi to samo dla MIAST tymi samymi latkami: "zakupy" 0, regulator "skasowal 0", a "dosypal" to juz
     ///  tylko bezpiecznik ponizej zapasu kupcow (tryb 1) albo 0 (tryb 2). Zawor miasta ma w ticku dobowym dwie pozycje: "renty"
     ///  (kasy -> panowie) i "udzial korony z zaworu kas miast" (kasy -> skarbce; TownPurse przenosi go z rent przez SplitTownMark).
+    ///  Danina podzamcza dzielona z korona (CastlePurse, wpis 114) ma tak samo dwie pozycje kas ZAMKOW: "danina podzamcza" (kasy ->
+    ///  panowie) i "udzial korony z daniny podzamcza" (kasy -> skarbce; CastlePurse przenosi go przez SplitCastleMark).
     ///  - utarg wsi bez znikania (K7, VillageTakings): to, co paczka dopisala wsiom przy powrocie taboru, siedzi juz w oknie
     ///    powrotu (kiesa wsi i licznik podatku rosna przed zdarzeniem AfterSettlementEntered) - "zniklo" spada do zera samo;
     ///    zywnosc kupiona we wsiach (cena kasowana przez SellItemsAction) i sakwy zniszczonych taborow wsi czytamy z licznikow
@@ -73,16 +82,18 @@ namespace Armoury
         private static readonly string[] PName = { "lordowie", "notable", "gracz", "inni bohaterowie", "karawany", "inne partie", "inne osady" };
 
         // nasze moduly liczone wprost, poza tickiem dobowym (Note)
-        internal const int NGear = 0, NMerc = 1, NShop = 2, NFence = 3, NWage = 4, NLife = 5;
-        private const int Notes = 6;
-        private static readonly string[] NName = { "zakupy sprzetu AI", "najemnicy z karczmy", "warsztaty zbrojne", "paser band (sprzet dla band)", "zold garnizonow", "sakiewki ludzi - zycie w miastach" };
+        internal const int NGear = 0, NMerc = 1, NShop = 2, NFence = 3, NWage = 4, NLife = 5, NMend = 6, NOrphan = 7;
+        private const int Notes = 8;
+        private static readonly string[] NName = { "zakupy sprzetu AI", "najemnicy z karczmy", "warsztaty zbrojne", "paser band (sprzet dla band)", "zold garnizonow", "sakiewki ludzi - zycie w miastach",
+                                                   "naprawy u kowali (z sakiewek ludzi)", "sakiewki partii rozbitych i rozwiazanych (do najblizszego miasta)" };
 
         // nasz tick dobowy (Mark)
-        internal const int MRent = 0, MBuild = 1, MCrown = 2, MRest = 3, MFence = 4, MLife = 5, MCastle = 6, MTrim = 7, MTownTrim = 8, MTownCrown = 9;
-        private const int Marks = 10;
+        internal const int MRent = 0, MBuild = 1, MCrown = 2, MRest = 3, MFence = 4, MLife = 5, MCastle = 6, MTrim = 7, MTownTrim = 8, MTownCrown = 9, MCastleCrown = 10;
+        private const int Marks = 11;
         private static readonly string[] MName = { "renty", "budowy", "korona (danina, clo, mennica)", "pozostale moduly ticku", "paser band (skup lupu)", "bandy i kryjowki (zycie w miastach)",
                                                    "danina podzamcza (kasy zamkow -> panowie)", "dar startowy kas zamkow przyciety (raz na kampanie, w nicosc)",
-                                                   "dar startowy kas miast przyciety (raz na kampanie, w nicosc)", "udzial korony z zaworu kas miast (kasy miast -> skarbce krolestw)" };
+                                                   "dar startowy kas miast przyciety (raz na kampanie, w nicosc)", "udzial korony z zaworu kas miast (kasy miast -> skarbce krolestw)",
+                                                   "udzial korony z daniny podzamcza (kasy zamkow -> skarbce krolestw)" };
 
         // posiadacze zlota
         private const int HTowns = 0, HCastles = 1, HVillages = 2, HLeaders = 3, HLords = 4, HPlayer = 5, HNotables = 6, HWanderers = 7, HOtherHeroes = 8,
@@ -137,6 +148,16 @@ namespace Armoury
         private static long _clanOthFrom, _clanOthTo;      // GiveGoldAction nic <-> ktos inny niz glowa rodu w trakcie rozliczenia
         private static bool _clanErrLogged;                // pierwszy wyjatek pomiaru rozliczenia idzie do pliku, kolejne tylko liczymy
 
+        // dzienna wyplata notabla (ClanVariablesCampaignBehavior.DailyTickHero): kapital jego warsztatow i kiesy jego karawan przed i po - pomiar stanu
+        private static bool _heroHooked;                   // para na DailyTickHero zalozona (bez niej wyplaty notablom zostaja w "GiveGoldAction z niczego", a ubytek kapitalu w reszcie)
+        private static Hero _nbHero;                       // notabl, ktorego wyplata wlasnie biegnie
+        private static CampaignTime _nbTime;               // chwila otwarcia (nawias niedomkniety przez wyjatek nie lapie pozniejszych zdarzen)
+        private static long _nbShops, _nbCaravans;         // kapital warsztatow i kiesy karawan notabla tuz przed wyplata
+        private static long _nbPaid;                       // GiveGoldAction nic -> ten notabl w trakcie nawiasu (ta sama kwota weszla do _worldFromNothing)
+        private static long _notPaid, _notShops, _notCaravans;   // doba: wyplacono notablom; zeszlo z kapitalu warsztatow; zeszlo z kies karawan
+        private static long _notMoved, _notLost;           // doba: czesc wyplat pokryta ubytkiem kapitalu (przelew); ubytek kapitalu bez wyplaty (ujscie)
+        private static int _notN, _notStale;               // doba: notable z wyplata albo ubytkiem kapitalu; nawiasy niedomkniete
+
         // nawias konsumpcji i regulatora
         private static Town _shelfTown, _regExpect;
         private static int _shelfGold;
@@ -148,6 +169,7 @@ namespace Armoury
             _first = true; _modelsLogged = false; _lastSnap = null; _lastHold = null; _blockSnap = null; _inBlock = false;
             _winParty = null; _winVillage = false; _shelfTown = null; _regExpect = null; _regModel = null; _regDecl = null;
             _clanNow = null; _clanErrLogged = false;
+            _nbHero = null; _nbPaid = 0;
             ClearDay();
         }
 
@@ -168,6 +190,7 @@ namespace Armoury
             Array.Clear(_mark, 0, _mark.Length);
             Array.Clear(_wage, 0, Wages); Array.Clear(_wageN, 0, Wages); Array.Clear(_wageShort, 0, Wages);
             _wageToPurses = _wageToCoffers = 0;
+            _notPaid = _notShops = _notCaravans = _notMoved = _notLost = 0; _notN = _notStale = 0;
             _stumbles = 0; _winStale = 0;
         }
 
@@ -272,6 +295,10 @@ namespace Armoury
                 if (a < 0) { var th = gh; gh = rh; rh = th; var tp = gp; gp = rp; rp = tp; a = -a; }   // gra zapisuje "osada -> bohater" ujemna kwota w druga strone
                 bool gNone = gh == null && gp == null, rNone = rh == null && rp == null;
                 if (gNone && rNone) return;
+                // dzienna wyplata notabla (nawias HeroTickPrefix / HeroTickPostfix - najciasniejszy z nawiasow, wiec pytamy o niego najpierw:
+                // niedomkniete okno taboru albo rozliczenie rodu z tej samej chwili gry nie moga jej przejac): kwota idzie jak dotad do
+                // "GiveGoldAction z niczego", a nawias zapamietuje dokladnie to, co weszlo do licznika zrodel - rozliczy to z ubytkiem kapitalu
+                if (gNone && rh != null && NotableOpen && ReferenceEquals(rh, _nbHero)) { _worldFromNothing += a; _nbPaid += a; return; }
                 // utarg wsi: wyplata dla wlasciciela majatku BK w oknie POWROTU taboru do wsi to czesc utargu, nie zloto z niczego
                 // (okno wizyty w miescie albo zamku tego nie lapie - tam nikt utargu nie dzieli)
                 if (gNone && rh != null && _winVillage && WinOpen) { _winEstates += a; return; }
@@ -346,6 +373,60 @@ namespace Armoury
             if (_clanErrLogged) return;
             _clanErrLogged = true;
             Log.Error(where, e);
+        }
+
+        // ------------------------------------------------------------ dzienna wyplata notabla (kapital warsztatow i kiesy karawan przed i po)
+        private static bool NotableOpen { get { return _nbHero != null && _nbTime == CampaignTime.Now; } }
+
+        /// <summary>Kapital warsztatow i kiesy karawan jednego notabla - to z nich gra zdejmuje jego dzienny dochod (tylko odczyt).</summary>
+        private static void NotableAssets(Hero h, out long shops, out long caravans)
+        {
+            shops = 0; caravans = 0;
+            var ws = h.OwnedWorkshops;
+            if (ws != null) for (int i = 0; i < ws.Count; i++) { var w = ws[i]; if (w != null) shops += w.Capital; }
+            var cs = h.OwnedCaravans;
+            if (cs != null) for (int i = 0; i < cs.Count; i++) { var c = cs[i]; var mp = c != null ? c.MobileParty : null; if (mp != null) caravans += mp.PartyTradeGold; }
+        }
+
+        /// <summary>
+        /// ClanVariablesCampaignBehavior.DailyTickHero - tuz przed dzienna wyplata bohatera. Gra placi tylko czynnemu notablowi
+        /// (hero.IsActive &amp;&amp; hero.IsNotable) - tylko dla niego otwieramy nawias. Sam odczyt (prefiks void - oryginalu nie pomija).
+        /// </summary>
+        public static void HeroTickPrefix(Hero __0)
+        {
+            try
+            {
+                if (_nbHero != null) { _notStale++; _nbHero = null; }      // poprzednia wyplata nie doszla do postfiksu (wyjatek w cudzym kodzie) - liczymy
+                if (__0 == null || !Live || !__0.IsNotable || !__0.IsActive) return;
+                NotableAssets(__0, out _nbShops, out _nbCaravans);
+                _nbPaid = 0; _nbTime = CampaignTime.Now; _nbHero = __0;
+            }
+            catch (Exception e) { _nbHero = null; ClanStumble("MoneyLedger.HeroTickPrefix", e); }
+        }
+
+        /// <summary>
+        /// Po wyplacie: ile zeszlo z kapitalu warsztatow i z kies karawan notabla wobec tego, co gra mu wyplacila "z niczego".
+        /// Czesc wspolna to przelew (odejmowana od zrodel bilansu); wyplata ponad ubytek zostaje zrodlem; ubytek bez wyplaty to ujscie.
+        /// </summary>
+        public static void HeroTickPostfix(Hero __0)
+        {
+            try
+            {
+                var h = _nbHero;
+                _nbHero = null;
+                if (h == null) return;
+                if (!ReferenceEquals(h, __0)) { _notStale++; return; }
+                long shops, caravans;
+                NotableAssets(h, out shops, out caravans);
+                long fromShops = _nbShops - shops, fromCaravans = _nbCaravans - caravans, paid = _nbPaid;
+                long drawn = fromShops + fromCaravans;
+                if (paid == 0 && drawn == 0) return;                       // notabl bez dochodu
+                if (drawn < 0) drawn = 0;                                  // kapital urosl w trakcie wyplaty (nie nasz przypadek) - nic nie przypisujemy
+                long moved = paid < drawn ? paid : drawn;
+                _notPaid += paid; _notShops += fromShops; _notCaravans += fromCaravans;
+                _notMoved += moved; _notLost += drawn - moved; _notN++;
+            }
+            catch (Exception e) { ClanStumble("MoneyLedger.HeroTickPostfix", e); }
         }
 
         // ------------------------------------------------------------ nasze moduly: wywolania-liczniki
@@ -433,12 +514,20 @@ namespace Armoury
         /// Czesc zmiany kas MIAST zlapanej juz migawka `from` nalezy do pozycji `to` (kwota `gone` > 0 = tyle zeszlo z kas):
         /// zawor miasta placi panu i koronie w jednej petli rent, a w ksiedze to dwie pozycje. Tylko liczniki, tylko w naszym ticku.
         /// </summary>
-        internal static void SplitTownMark(int from, int to, long gone)
+        internal static void SplitTownMark(int from, int to, long gone) { SplitMark(CTown, from, to, gone); }
+
+        /// <summary>
+        /// To samo dla kas ZAMKOW: danina podzamcza placi panu i koronie w jednej petli (CastlePurse.Daily), a w ksiedze to dwie
+        /// pozycje. Liczniki sie sumuja, wiec wolno wolac przed migawka `from` albo po niej. Tylko liczniki, tylko w naszym ticku.
+        /// </summary>
+        internal static void SplitCastleMark(int from, int to, long gone) { SplitMark(CCastle, from, to, gone); }
+
+        private static void SplitMark(int cls, int from, int to, long gone)
         {
             try
             {
                 if (!_inBlock || gone == 0 || from < 0 || from >= Marks || to < 0 || to >= Marks || from == to) return;
-                _mark[CTown, from] += gone; _mark[CTown, to] -= gone;
+                _mark[cls, from] += gone; _mark[cls, to] -= gone;
             }
             catch { _stumbles++; }
         }
@@ -580,6 +669,21 @@ namespace Armoury
                 else miss.Add("rozliczenie rodow");
             }
             catch (Exception e) { miss.Add("rozliczenie rodow (" + e.Message + ")"); }
+            try
+            {
+                // dzienna wyplata notabla: ta sama klasa gry co rozliczenie rodu (bez pol statycznych - pulapka konstruktora statycznego
+                // z 14.09 jej nie dotyczy); prefiks jak najwczesniej, postfiks jak najpozniej - nawias obejmuje wyplate i nic wiecej
+                var hero = AccessTools.Method(typeof(ClanVariablesCampaignBehavior), "DailyTickHero", new[] { typeof(Hero) });
+                if (hero != null)
+                {
+                    h.Patch(hero, prefix: new HarmonyMethod(typeof(MoneyLedger), nameof(HeroTickPrefix)) { priority = Priority.First },
+                                  postfix: new HarmonyMethod(typeof(MoneyLedger), nameof(HeroTickPostfix)) { priority = Priority.Last });
+                    _heroHooked = true;
+                    done.Add("wyplaty notabli");
+                }
+                else miss.Add("wyplaty notabli");
+            }
+            catch (Exception e) { miss.Add("wyplaty notabli (" + e.Message + ")"); }
             Log.Info("MoneyLedger: ksiega pieniadza i przeplywow osad (tylko log) - liczniki wpiete: " + (done.Count > 0 ? string.Join(", ", done.ToArray()) : "zadne")
                      + (miss.Count > 0 ? "; BRAK: " + string.Join(", ", miss.ToArray()) : "") + "; utarg taborow i przelewy gry - z nasluchu zdarzen.");
         }
@@ -674,7 +778,9 @@ namespace Armoury
             // cale rozliczenie rodu (saldo, kiesy, liczniki podatkow, skarbce) mierzy roznica stanu zlota swiata
             // Pozycja "GiveGoldAction z niczego" zawiera tez dzienny dochod notabli (ClanVariablesCampaignBehavior.DailyTickHero ->
             // CalculateNotableDailyGoldChange): gra zdejmuje go z kapitalu warsztatow i kies karawan (Workshop.ChangeGold, PartyTradeGold),
-            // a wyplaca zdarzeniem nic -> notabl. Ubytek kapitalu nie ma wlasnej pozycji - siedzi w reszcie ze znakiem minus (mowi to opis reszty).
+            // a wyplaca zdarzeniem nic -> notabl. Od wpisu 114 nawias na DailyTickHero mierzy ubytek kapitalu: czesc wyplat pokryta
+            // ubytkiem (_notMoved) to przelew - odejmujemy ja od zrodel ("minus ... wyplacone notablom"); ubytek bez wyplaty (_notLost)
+            // to ujscie. Bez nawiasu (_heroHooked == false) obie liczby sa zerami, a ubytek kapitalu siedzi w reszcie jak dotad.
             // SoldierPay (ogniwo 107) oddaje zaplacony zold do obiegu PO pomiarze rozliczenia (jego postfiks na DailyTickClan ma priorytet
             // Last, nasz Low): sakiewki ludzi i kasy osad rosna poza roznica stanu rozliczenia - to osobne zrodlo, nie "minus" w ujsciach
             // (rozliczenia na minus to tylko czesc rodow; odjecie calego przekazanego zoldu dawaloby ujemne ujscia)
@@ -683,28 +789,38 @@ namespace Armoury
             // ktora nie jest przelewem (zwykle wypada w pierwszej dobie ksiegi, ktora przeplywow nie drukuje)
             // krok K6 (TownPurse): to samo dla daru startowego kas miast (osobna migawka, osobny dopisek)
             long trim = 0, trimTowns = 0; for (int c = 0; c < Classes; c++) { trim -= _mark[c, MTrim]; trimTowns -= _mark[c, MTownTrim]; }
-            long sources = cons + regIn + _clanUp + routed + from;
+            long sources = cons + regIn + _clanUp + routed + from - _notMoved;
             // K7 (VillageTakings): cena zywnosci kupionej we wsi, ktora gra kasuje w SellItemsAction, i sakwy zniszczonych taborow wsi.
             // Ujsciem jest tylko to, czego paczka nie oddala (kiesom wsi, licznikom panow, zwyciezcom); przy wylaczonych ustawieniach - calosc.
             long foodGone = VillageTakings.FoodGone, foodBack = VillageTakings.FoodToPurse + VillageTakings.FoodToTax;
             long cartGone = VillageTakings.CartGone, cartBack = VillageTakings.CartToOthers + VillageTakings.CartToPurse + VillageTakings.CartToTax;
-            long sinks = _clanDown + regOut + vanished + (foodGone - foodBack) + (cartGone - cartBack) + to - _levyBack + trim + trimTowns;
+            long sinks = _clanDown + regOut + vanished + (foodGone - foodBack) + (cartGone - cartBack) + _notLost + to - _levyBack + trim + trimTowns;
             return "Pieniadz swiata (bilans): dzien " + day + " | zmiana sumy " + S(delta) + " [P] = zmierzone zrodla z niczego +" + sources
                    + " [P] (\"zakupy\" mieszkancow miast i zamkow " + cons + ", regulator kas dosypal " + regIn + ", rozliczenia rodow na plus " + _clanUp + " w " + _clanUpN
                    + " rodach, zold oddany do obiegu przez SoldierPay " + routed + " (sakiewki ludzi " + _wageToPurses + ", kasy osad " + _wageToCoffers
-                   + "), GiveGoldAction z niczego poza rozliczeniami rodow " + from + ")"
+                   + "), GiveGoldAction z niczego poza rozliczeniami rodow " + from + " minus " + _notMoved + " wyplacone notablom z kapitalu warsztatow i kies karawan - przelew)"
                    + " - zmierzone ujscia w nicosc " + sinks + " [P] (rozliczenia rodow na minus " + _clanDown + " w " + _clanDownN + " rodach, regulator kas skasowal " + regOut
                    + ", z utargu wsi zniklo " + vanished
                    + ", z ceny zywnosci kupionej we wsiach zniklo " + (foodGone - foodBack) + " (gra skasowala " + foodGone + ", oddane wsiom i panom " + foodBack + ")"
                    + ", z sakw zniszczonych taborow wsi zniklo " + (cartGone - cartBack) + " (bylo w nich " + cartGone + ", oddane zwyciezcom i wsiom " + cartBack + ")"
+                   + ", z kapitalu warsztatow i kies karawan zdjete przy wyplatach notabli, a nie wyplacone " + _notLost
                    + ", GiveGoldAction w nicosc poza rozliczeniami rodow " + to + " minus " + _levyBack + " oddane przez LevyGold notablom i miastom)"
                    + (trim != 0 ? " w tym dar startowy kas zamkow przyciety przez CastlePurse " + trim + " [P]" : "")
                    + (trimTowns != 0 ? " w tym dar startowy kas miast przyciety przez TownPurse " + trimTowns + " [P]" : "")
                    + " + reszta " + S(delta - sources + sinks) + " [R] (niezmierzone: BEE, BK poza rozliczeniami rodow, handel partii, liczniki cel rosnace przy handlu, kapital nowych karawan,"
-                   + " smierc bohaterow, lupy w kryjowkach; ze znakiem minus: zysk warsztatow i karawan wyplacany notablom - gra zdejmuje go z kapitalu, a wyplate zglasza jak zloto z niczego"
-                   + " (jest w zrodlach); rozliczenia rodow sa zmierzone w calosci)."
+                   + " smierc bohaterow, lupy w kryjowkach; "
+                   + (_heroHooked ? "wyplaty notablom z zysku warsztatow i karawan sa zmierzone - przelew odjety od zrodel, opis na koncu linii"
+                                  : "ze znakiem minus: zysk warsztatow i karawan wyplacany notablom - gra zdejmuje go z kapitalu, a wyplate zglasza jak zloto z niczego (jest w zrodlach)")
+                   + "; rozliczenia rodow sa zmierzone w calosci)."
                    + " W tym zold naliczony " + wages + " [P] - siedzi w rozliczeniach rodow (rozbicie w nastepnej linii), w bilansie nie jest odejmowany drugi raz."
-                   + (_clanHooked ? "" : " UWAGA: licznik rozliczen rodow nie jest wpiety - salda rodow sa w pozycjach GiveGoldAction, a zmiany kies partii i licznikow podatkow w reszcie.");
+                   + (_clanHooked ? "" : " UWAGA: licznik rozliczen rodow nie jest wpiety - salda rodow sa w pozycjach GiveGoldAction, a zmiany kies partii i licznikow podatkow w reszcie.")
+                   + (_heroHooked
+                        ? " Wyplaty dzienne notabli [P]: " + _notN + " notablom " + _notPaid + ", z kapitalu ich warsztatow zeszlo " + _notShops + ", z kies ich karawan " + _notCaravans
+                          + " (pomiar stanu przed i po kazdej wyplacie) - przelew " + _notMoved + " (odjety od zrodel), wyplacone ponad ubytek kapitalu " + (_notPaid - _notMoved)
+                          + " (zloto z niczego - np. 30 d dziennie za zaulek - zostaje w zrodlach), zdjete z kapitalu bez wyplaty " + _notLost
+                          + " (w ujsciach - u BK podatek warsztatu, ktory pan dostaje w rozliczeniu rodu)"
+                          + (_notStale > 0 ? "; wyplaty niedomkniete (wyjatek w kodzie gry albo moda): " + _notStale : "") + "."
+                        : " UWAGA: licznik wyplat notabli nie jest wpiety (brak ClanVariablesCampaignBehavior.DailyTickHero) - wyplaty sa w \"GiveGoldAction z niczego\", ubytek kapitalu w reszcie.");
         }
 
         /// <summary>Dzienne rozliczenia rodow: zmiana zlota swiata (pomiar stanu), saldo dopisane glowom (zdarzenia gry), zold jako "w tym".</summary>

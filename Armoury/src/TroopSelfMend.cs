@@ -103,6 +103,7 @@ namespace Armoury
                 }
                 if (broke) _bench = Math.Min(_bench, per);   // nie ma czym zaplacic - kowale nie trzymaja godzin na zapas
                 SmithHours.Use(st.Town, broke ? mended * per : hourShare);   // godziny kowali tej godziny (bez zaplaty - tylko gotowe)
+                if (paid > 0) MoneyLedger.Note(MoneyLedger.NMend, st, paid);   // ksiega przeplywow osad (tylko licznik): sakiewka ludzi gracza -> kasa miasta
                 _hourMended += mended; _hourPaid += paid;
                 if (_hourMended > 0 && (TaleWorlds.CampaignSystem.CampaignTime.Now.GetHourOfDay == 22 || broke))
                 {
