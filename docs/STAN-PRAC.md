@@ -368,6 +368,17 @@ narzedzia rozpoznal wszystkie linie. Grupa 1: OK 61, UWAGA 5; grupa 2: OK 31, UW
   ograniczyc do Muru (decyzja Jeffa: czy jency Innych licza sie jako polegli); wightow nie wpuszczac do puli wyrzutkow, wylaczyc im
   dezercje i niewole; naprawic limit w Zewie.
 ## Decyzje Jeffa 07.10 (wiazace)
+- JEDEN CZAT (07.10 ok. 14:25, przekazane przez sesje lawy f16095a4): "nie puszczaj zadnych innych prac w drugim czacie, wszystko idzie w jednym" -
+  wszystko prowadzi ten czat; zadnych rownoleglych sesji (takze propozycji osobnych zadan); przed kazda praca sprawdzic, czy temat nie jest juz robiony.
+- KOSZT NAPRAWY (07.10 ok. 14:25): "nasza robocizna jest lepsza" - zostaje robocizna stosu n131b (b36a6d6: 0.2 x ubytek stanu x robota wykonania
+  x dobrobyt miasta, MendMaterial.Labor/LaborF, jedno miejsce dla lawy, Pick a piece, uprzezy, polek wojska, ludzi, AI). Projekt
+  docs/PROJEKT-KOSZT-NAPRAWY-2026-10-07.md NIE do wdrozenia; jego inne elementy (godziny zajmujace rzemieslnikow, limit AI, rabat 30%) tylko na slowo Jeffa.
+- Z sesji lawy (szczegoly docs/przekazanie-lawa-2026-10-07/PRZEKAZANIE-DLA-DRUGIEGO-CZATU.md sekcja 6): wszelkie koszty w miescie zalezne od dobrobytu
+  i stawek historycznych, spojne; kuznia za kazdy dzien, dzien kuzni bez tieru; puste kasy pilnowac wszedzie; rezerwa miasta 20 000 zostaje; kasy miast
+  z dlugami - NA POZNIEJ; paczki 7a/7b/7c TAK, paczka 8 TAK; audyt produkcji wedle lore (smoki tylko Daenerys + misja gracza, mamuty Polnoc/Za Murem,
+  wielblady cieple krainy, Dorne - decyzja Jeffa); konie: P0 pomiar TAK, P1 hodowla wedle popytu TAK (+ czy stadnin nie za duzo), P2 "kon ginie jak
+  ginie" - tylko zabite, ocalaly kon = lup zwyciezcy, przegrani odkupuja; P3 juczne z targu TAK; lordowie MUSZA miec zapasowe konie; udzwig: propozycja
+  zapasowy kon 60 kg, jezdziec +10 kg (MarchPace czyta udzwig).
 - WIOSKI NA MAPIE (07.10 ok. 11:10): przyjal projekt rabunku osada po osadzie (okreg = ok. 240 osad po 250 ludzi, na mapie ok. 10 obrazkow-gromad
   na okreg wedlug ludnosci). NIE nazywac "przysiolek": kazdy obrazek to WIOSKA Z NAZWA ("Wioska XYZ spalona", "plonie na mapie" - widac ogien w
   trakcie rabunku i spalona po). Rozstawienie NIE losowe: "wzdluz drog, czesc kilka po bokach", przy brodach, mostach, rzekach - ma wygladac
@@ -536,3 +547,23 @@ narzedzia rozpoznal wszystkie linie. Grupa 1: OK 61, UWAGA 5; grupa 2: OK 31, UW
 - Jedna zmiana = wpis w CHANGELOG (Problem / Przyczyna / Zmiana / Ryzyko - wynik kontroli wg zasady 0 / Status) + commit + push.
 - DLL wgrywac tylko przy zamknietej grze (`tasklist | grep -i bannerlord`), z kopia `.bak-<data>-przed-NN`.
 - Galaz robocza: `claude/bannerlord-rot-setup-o75kvo`; `main` przesuniety do niej 05.10.
+
+## PRZEJECIE STOSU n131 Z SESJI LAWY (07.10 ok. 14:30)
+
+Sesja "Close Armoury mending-bench wreck repair hole" (f16095a4) skonczyla prace i przekazala wszystko tutaj (Jeff: "dokoncz i wszystko przekaz jemu").
+Dokumenty: docs/przekazanie-lawa-2026-10-07/ (PRZEKAZANIE, STAN-SESJI, PLAN-KOSZTY-MIASTA, wpisy CHANGELOG 1-9, DIAGNOZA-NADMIARU-KONI,
+AUDYT-PRODUKCJI-I-WARSZTATOW, autotesty). Galezie (klon lancuch; na GitHubie w-toku/n131b..n131k), kazda na poprzedniej, baza f0aef78 (131 kwatermistrz):
+n131b lawa naprawcza + robota kowali z dniowek x dobrobyt (81109ab, b36a6d6) -> n131c warsztaty, NOWY TownWage.cs (cb21de2) -> n131d wynajem kuzni
+(a9bb933) -> n131e budowy (3290b01) -> n131f niewola RealisticCaptivity (14504a5) -> n131g turnieje GrandTourney (e010a25) -> n131h kuznia za dzien,
+puste kasy, rezerwa 20 000 + poprawki przegladu (5b121ea, c471705, 1fe5c35, 100112a, ad6f6ce); od c471705: n131i konie i zwierzeta (e10b449, 22336e0,
+7d919ee) i n131j zamowienie sprzetu z polki (ce26642, a645723); n131k-sklad-proba (2f476d5) = h + merge i + merge j: bez konfliktow, build 3 x 0,
+proby 118/118, 136/136, 130/130; AUTOTEST CALEGO STOSU 14:18 OK 40/40 (DLL D:\Backup-Bannerlord\przekazanie-lawa-2026-10-07\sklad: Armoury 4111b77e,
+GrandTourney def7574d, RealisticCaptivity 03dca428). Zatwierdzone DLL Jeffa przywracane po testach: Armoury 25b87631, CrashScribe 11fa0214,
+GrandTourney 0aa5d0ef, RealisticCaptivity c393f4fb. Analiza logow autotestu 14:18 - dosle sesja lawy.
+STYKI PRZY SKLADANIU TOWARY 3: k13-3 TownCrafts placi 3 d bez dobrobytu -> WorkshopLaw.DayWage / TownWage.Index; warsztaty 116/123/124 vs n131c
+(WorkshopTrade/WorkshopLaw); k13-4 odziez wojska i paczka 8 kupuja z tej samej polki (czy nie liczy sie dwa razy); 122 (caly magazyn) - jedna z
+przyczyn nadmiaru koni; konflikt linii konstruktora ArmouryBehavior z diag / k13-1 / k13-4 / wozy / zbroja-craft; l115-l119 (06.10) - stare;
+pamiec-drog i wyspy - niesprawdzone ze stosem; TownWageLink (GT, RC) czyta Armoury.TownWage.Index i Settings.TownRentFloorGold przez refleksje.
+OTWARTE ze stosu: konie P0-P3 + srednia cena konia + udzwig; audyt produkcji i lore (nowa kampania); blad CrashScribe Mends.cs:2134/2140;
+16 niskich zgloszen przegladu (PRZEKAZANIE sekcja 5); kasy miast z dlugami - na pozniej.
+

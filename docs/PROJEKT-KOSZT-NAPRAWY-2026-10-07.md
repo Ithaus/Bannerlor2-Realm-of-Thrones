@@ -1,3 +1,7 @@
+> **DECYZJA JEFFA 07.10 ok. 14:25 (przekazana przez sesje lawy): "nasza robocizna jest lepsza" - NIE WDRAZAC tego projektu w miejsce robocizny
+> stosu n131b (b36a6d6: 0.2 x ubytek stanu x robota wykonania x dobrobyt miasta, MendMaterial.Labor/LaborF). Inne elementy (godziny zajmujace
+> rzemieslnikow, limit AI 50%, rabat do 30%) - tylko na wyrazne slowo Jeffa. Zostaje jako material porownawczy i zrodla historyczne.**
+
 # PROJEKT: koszt naprawy wedle godzin pracy (07.10; historia + mechanika gry -> projekt -> krytyk; NIC NIE ZAKODOWANE)
 
 Pytanie Jeffa 07.10: "25% to chyba za duzo na naprawe, ile by kosztowalo realnie?". Zrodla historyczne: docs/HISTORIA-KOSZT-NAPRAWY-2026-10-07.md.

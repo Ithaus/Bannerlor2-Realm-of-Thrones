@@ -1,0 +1,50 @@
+<!-- GOTOWY TEKST WPISU CHANGELOG - paczka 8 planu "koszty w miescie" (Jeff 07.10: "cena tak, wybor tak, brak towarow tak"). NIC nie wgrane do gry, nic nie wypchniete.
+     Commity: ce26642 "NN: ZAMOWIENIE SPRZETU DLA LUDZI Z POLKI MIASTA - CENA POLKI + CHODZENIE KOWALA, BRAK TOWARU DLA WARSZTATOW"
+     + a645723 "NN: ZAMOWIENIE Z POLKI - WYCENA BEZ RUSZANIA POLKI (ZAPAS POMNIEJSZONY RACHUNKIEM), ZDJECIE DOPIERO PRZY DOSTAWIE"
+     (galaz n131j-zamowienie-sprzetu-z-polki w LANCUCH, na c471705; worktree TU\repo-zamowienia; TU = scratchpad f16095a4\lawa).
+     Build kod 0 (stare CS0169 BattlefieldLaw); gen_mcm 644 -> 645 (RealisticCaptivity i GrandTourney bez zmian).
+     DLL do ewentualnego autotestu: TU\dll\n131j\Armoury.dll md5 994124cdd794515c35e8b7e1a909781f (a645723; poprzedni ce26642 w TU\dll\n131j-v1).
+     Proba poza gra: TU\proba-zamowienia (kopia TU\proba + sekcja 16; w sekcji 1 licznik ustawien 645) - nowa 130 z 130 (111 dotychczasowych + 19 nowych,
+     z PROBA_RC / PROBA_GT), baza 7 z 7 (DLL ce26642 na tej samej probie: 125 z 130 - kontrole "polka nietknieta" wykrywaja dawna wycene na probie); wyniki TU\wyniki-zamowienia. Oryginalna TU\proba na tym DLL zglosi tylko licznik ustawien (644 != 645). -->
+
+## 2026-10-07 (NN) - ZAMOWIENIE SPRZETU DLA LUDZI Z POLKI MIASTA - kowal ("Order kit for the men - the smith procures it") kupuje to, co naprawde lezy na polce tego miasta, po cenie polki plus chodzenie (0.2 dniowki rzemieslnika x poziom plac miasta); czego na polce brak, idzie jako zamowienie do warsztatow
+**Mod:** Armoury | **Pliki:** `SmithMenu.cs` (wspolny filtr `Orderable` dla `CheapestOf` i polki; NOWE `OrderShelfTiers`, `OrderShelfCount`, `DoOrderShelf`, `ShelfPlan`, `ShelfOrderable`, `ShelfPrice`, `ShelfStock`, `OrderLegwork`, `OrderNoGoods`, `NoteOrderUnmet`, `LogShelfOrder`; podpowiedz `OrderKitCondition`; przelacznik w `OrderKitTiers`), `SupplyDemand.cs` (NOWE `Hold` / `Release` - zapas koszyka pomniejszony rachunkiem na czas jednego wywolania modelu ceny), `Settings.cs` + `McmSettings.cs` (NOWE `TroopOrderFromShelf` = true; 644 -> 645).
+
+**Problem:**
+- Zamowienie brakow dla ludzi u kowala czesto konczylo sie po godzinach czekania komunikatem "The smith's boys could not find a single ... on the market" - kowal szukal na polce najtanszej sztuki danego typu i tieru z CALEGO swiata, ktorej w tym miescie zwykle nie ma.
+- Cena nie miala nic wspolnego z polka: wartosc sztuki x 1.15 (`TroopOrderMarkup`) - taniej albo drozej, niz ta sama sztuka kosztuje na tym straganie u kazdego innego kupca (sakiewka ludzi, lordowie, ekran handlu); narzut 15% nie byl zaplata za zadna policzona prace.
+- Gdy towaru brakowalo, nikt sie o tym nie dowiadywal - potrzeba ludzi nie trafiala do zamowien miasta (SupplyDemand), wiec warsztaty nie widzialy popytu (lordowie i ochotnicy zostawiaja zamowienie, gracz nie).
+
+**Przyczyna:** `SmithMenu.CheapestOf` - najtansza kupna sztuka typu i tieru wsrod wszystkich przedmiotow gry; `OrderPieceCost` = `item.Value x TroopOrderMarkup`; `DoOrderKit` dostarczal `min(n, sztuk TEJ pozycji na polce)` i nic nie zapisywal przy braku.
+
+**Zmiana (wylacznik `TroopOrderFromShelf`, domyslnie wlaczony; wylaczony = dokladnie jak dotad):**
+1. WYBOR: najtansza SPRAWNA sztuka wybranego typu i tieru, ktora lezy na polce tego miasta - te same filtry kupnej sztuki co dotad (`Orderable`: nie NotMerchandise, wartosc > 0, tier, bez cwiczebnych / turniejowych / testowych / oblezniczych), do tego regula zbrojowni dla typu (`CountsAsKit`), bez unikatow (`ArmsPricing.IsUnique`), bez koni (stajnia), stan nie ponizej 100%. Kowal kupuje po jednej sztuce - przy kazdej znow najtansza z tego, co zostalo (najpierw 3 skorzane czapki, potem pikowane kaptury).
+2. CENA: kazda sztuka po cenie kupna miasta w chwili zdjecia - `Town.MarketData.GetPrice(sztuka, null, kupno, osada)`, ta sama droga co ochotnicy (VolunteerKit), sakiewka ludzi (MenPurse) i lordowie (AiGear), z podaza i popytem polki (kolejna sztuka widzi mniejsza polke, jak w ekranie handlu). Do tego chodzenie kowala po straganach: 0.2 dnia rzemieslnika (`HistMasterWageT1` 3 d) x poziom plac miasta (`TownWage.Index`) za sztuke, za cale zamowienie w calych pensach (co najmniej 1 d). Wszystko jednym przelewem do kasy miasta (`Pay.ToSettlement`). Lista tierow: "Tier 2 - Leather Cap, 20 gold off the stall (7 on the stalls)"; okno ilosci i komunikat: "5 pieces for 115 gold - 112 for the goods off the stall and 3 for the smith's legwork". Wycena (lista, okno ilosci, plan dostawy) NIE rusza polki (a645723): cena kolejnej sztuki z tego samego modelu co `TownMarketData.GetPrice` (dane kategorii, kupiec = osada, latki podazy i popytu), z zapasem pomniejszonym rachunkiem - wartosc polki kategorii minus `HistoricalPrices.ShelfWorth` sztuk juz wzietych (tyle gra odejmuje przy zdjeciu), sztuki koszyka dla SupplyDemand minus juz wziete (`SupplyDemand.Hold`); dostepnosc pozycji z licznika wzietych. Ten sam plan dla wyceny i dostawy; z polki na regaly schodzi dopiero przy dostawie.
+3. BRAK TOWARU: tier bez ani jednej sprawnej sztuki na polce jest na liscie ("Tier 3 - none on the stalls of X"); wybor - od razu, bez roboty i bez zaplaty: "Not a single sound Polearm of tier 3 lies on the stalls of X. The smith passes word of the want of 4 to the town's workshops - you pay nothing." i zamowienie w miescie `SupplyDemand.NoteUnmetOnce` (kupiec = druzyna gracza, jak lord w AiGear: najwyzej 10 na rodzaj z jednej wizyty, raz na `SupplyDemandOrderRepeatDays`; liczba = brak ludzi, co najmniej 1). To samo dla reszty zamowienia, gdy polka skonczy sie w trakcie (zamowione 12, na polce 10 -> 2 dla warsztatow) albo gdy ja wykupiono w czasie roboty. Brak zlota to nie brak towaru (jak u lordow, wpis 81): kowal kupuje tyle, na ile starczy kiesy, bez zamowienia.
+4. Robota jak dotad (1 h + 0.2 h za sztuke, najwyzej 24 h). Jedna linia logu na zamowienie, np. `Zamowienie dla wojska (z polki): town_a, HeadArmor t2 [3 leather_cap_t2 po 20, 7 padded_coif_t2 po 26]: dostarczono 10/12 szt., towar 242 + oplata kowala 9 = 251 (poziom plac x1.45), niezaspokojone 2 -> potrzeba dla warsztatow 2 szt. (wzor wrapped_headcloth_t2)`.
+
+**Przyklady (proba, sekcja 16; polka town_a: 3 skorzane czapki t2 po 20, 4 pikowane kaptury t2 po 26, 2 zuzyte czapki, 2 cwiczebne; najtansza czapka t2 w swiecie - owijka za 9 - nie lezy na polce):**
+
+| Sytuacja | Dotad | Teraz |
+|---|---|---|
+| Lista tierow, helm t2 | "wrapped_headcloth_t2, 10 gold apiece" (9 x 1.15, sztuka spoza polki) | "leather_cap_t2, 20 gold off the stall (7 on the stalls)" |
+| 5 helmow t2, miasto srednie (4800) | po 2 h "could not find a single wrapped_headcloth_t2" - nic, ludzie dalej bez helmow | po 2 h 3 czapki + 2 kaptury za 115 zl = 112 towar + 3 chodzenie, do kasy miasta |
+| Ta owijka jednak na polce (2 szt.) | 2 szt. po 10 (wartosc x 1.15, nie cena polki), reszta przepada po cichu | najtansza sprawna z polki po cenie polki + chodzenie, reszta - zamowienie dla warsztatow |
+| 10 helmow t2 (polka 3 + 7): srednie / Kings Landing (6952) | jedna cena wszedzie | 242 + 6 = 248 / 242 + 9 = 251 zl (chodzenie 0.6 / 0.87 d za sztuke) |
+| 12 helmow t2, na polce 10, Kings Landing | - | 10 dostarczone za 251, 2 jako zamowienie czapek t2 w miescie |
+| Wlocznie t3 - brak na polce | wybor, czekanie, "could not find", zero sladu w miescie | od razu: "Not a single sound Polearm of tier 3...", 0 zl, zamowienie 4 wloczni t3 dla warsztatow |
+| Kiesa 50 zl, 5 helmow (115) | calosc albo nic | w wycenie opcja nieaktywna; gdy kiesa schudnie w czasie roboty - 2 szt. za 41 (40 + 1), bez zamowienia |
+| Prawdziwa podaz i popyt (PricePostfix na modelu ceny proby), 7 helmow | 7 x 23 / 7 x 29 bez wzgledu na polke | 18, 19, 20, 27, 29, 31, 33 - kazda kolejna drozsza, razem 177 + 4 = 181 = wycena rachunkiem = kolejne zdjecia z zywej polki |
+| Model ceny gry zalezny od wartosci polki kategorii (inStoreValue), 7 helmow | jw. | 33, 34, 35, 46, 49, 52, 56 = 305 + 4 = 309 = wycena rachunkiem = kolejne zdjecia z zywej polki |
+
+Chodzenie kowala za sztuke: miasto biedne (0.5) 0.3 d, srednie 0.6 d, Kings Landing 0.87 d, gorna granica (1.5) 0.9 d.
+
+**Ryzyko / co sprawdzic (kontrola wg zasady glownej):**
+- REGRESJE: przy wylaczonym `TroopOrderFromShelf` - stara sciezka bez zmian (proba: owijka 10 zl, "could not find", 2 szt. po 10 gdy lezy, bez zamowienia). `CheapestOf` ma te same warunki (wyciagniete do `Orderable`). Dotychczasowe 111 kontroli proby przechodzi.
+- WYCENA: od a645723 bez ruszania polki (pierwsza wersja ce26642 zdejmowala i oddawala sztuki - licznik wersji rostera, zdarzenie rynku miasta z latka `HistoricalPrices.StorePostfix`, kolejnosc pozycji; zastapione). Proba: po podpowiedzi, liscie i wycenie polka ta sama co do pozycji, kolejnosci i `VersionNo`. Cena liczona modelem wprost (jak cialo `TownMarketData.GetPrice` w grze) - gdyby obcy mod latal samo `TownMarketData.GetPrice`, wycena by tego nie widziala (w repo nikt nie lata). `SupplyDemand.Hold` dziala tylko na czas jednego wywolania modelu (try/finally `Release`). Ceny bez zmian wobec ce26642.
+- CENA: zamowienie kosztuje tyle, co ta sama polka w ekranie handlu + chodzenie - przy pustej polce i duzym popycie drozej niz dawne wartosc x 1.15 (do x4 podazy i popytu), przy zawalonej taniej. `TroopOrderMarkup` przy wlaczonej regule nieuzywany. Zaokraglenie chodzenia: najmniej 1 d za zamowienie (1 sztuka w srednim miescie = 1 d zamiast 0.6).
+- ZAMOWIENIA: ten sam rodzaj (miasto x typ x tier) od gracza zapisuje sie raz na 7 dni i najwyzej 10 na wizyte (jak lordowie) - nie da sie pompowac ceny klikaniem; linia logu mowi o potrzebie takze wtedy, gdy SupplyDemand odrzucil powtorke.
+- SKLADANIE: `McmSettings.cs` i licznik ustawien kolidowac beda z galeziami, ktore tez dodaja ustawienia (n131i konie) - po zlozeniu przegenerowac `tools/gen_mcm.py` i poprawic licznik w probie.
+- Nie bylo autotestu w grze (zadne DLL nie wgrane).
+
+**Status:** zrobione na galezi n131j (commity ce26642 + a645723), build kod 0, proba 130/130 + baza 7/7; czeka na zlozenie, autotest i "wgraj" Jeffa.

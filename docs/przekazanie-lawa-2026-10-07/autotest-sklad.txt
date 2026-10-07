@@ -1,0 +1,60 @@
+﻿[14:18:07] autotest.ps1 start | run at-20261007-141807 | dni 40 | gra C:\Program Files (x86)\Steam\steamapps\common\Mount & Blade II Bannerlord
+[14:18:07] Mody (37, kolejnosc LauncherData.xml): Bannerlord.Harmony, Bannerlord.UIExtenderEx, Bannerlord.ButterLib, Bannerlord.MBOptionScreen, Native, CrashScribe, SandBoxCore, Sandbox, StoryMode, CustomBattle, BannerKings.Redux, BetterEconomy, NavalDLC, BirthAndDeath, RBM, RBM_WS, ROT-Core, ROT-Content, ROT_Map, ROT-Dragon, TournamentsXPanded, RealisticBannerlord, RealisticLoot, Dynamic Troop Equipment Reupload, StrategicCampaignAI145, Bannerlord.Diplomacy, DynamicReinforcements, RealisticCaptivity, Armoury, ArtemsLivelyAnimations, Bannerlord.DiplomacyUI, DismembermentPlus, ForgeView, GrandTourney, BKROTPatch, ROT_Hideouts, VoiceActingPatch
+[14:18:07] Polecenie: [C:\Program Files (x86)\Steam\steamapps\common\Mount & Blade II Bannerlord\bin\Win64_Shipping_Client] C:\Program Files (x86)\Steam\steamapps\common\Mount & Blade II Bannerlord\bin\Win64_Shipping_Client\Bannerlord.BLSE.Standalone.exe /singleplayer "_MODULES_*Bannerlord.Harmony*Bannerlord.UIExtenderEx*Bannerlord.ButterLib*Bannerlord.MBOptionScreen*Native*CrashScribe*SandBoxCore*Sandbox*StoryMode*CustomBattle*BannerKings.Redux*BetterEconomy*NavalDLC*BirthAndDeath*RBM*RBM_WS*ROT-Core*ROT-Content*ROT_Map*ROT-Dragon*TournamentsXPanded*RealisticBannerlord*RealisticLoot*Dynamic Troop Equipment Reupload*StrategicCampaignAI145*Bannerlord.Diplomacy*DynamicReinforcements*RealisticCaptivity*Armoury*ArtemsLivelyAnimations*Bannerlord.DiplomacyUI*DismembermentPlus*ForgeView*GrandTourney*BKROTPatch*ROT_Hideouts*VoiceActingPatch*_MODULES_"
+[14:18:07] Limit czasu: 27 min (40 dob x 25 s + 10 min); start do pierwszej doby 20 min; postoj 12 min
+[14:18:08] Kopia zatwierdzonego CrashScribe: md5 11fa021464f285207063147e9eb6f7f3 -> C:\Users\GAME\autotest-kopie\2026-10-07_14-18-07\CrashScribe.dll + D:\Backup-Bannerlord\autotest-kopie\2026-10-07_14-18-07\CrashScribe.dll
+[14:18:08] Kopia zatwierdzonego Armoury: md5 25b87631d468cb3e01a71a3578f9fc73 -> C:\Users\GAME\autotest-kopie\2026-10-07_14-18-07\Armoury.dll + D:\Backup-Bannerlord\autotest-kopie\2026-10-07_14-18-07\Armoury.dll
+[14:18:09] Kopia zatwierdzonego GrandTourney: md5 0aa5d0eff29261bf9dca3b7be173c7cd -> C:\Users\GAME\autotest-kopie\2026-10-07_14-18-07\GrandTourney.dll + D:\Backup-Bannerlord\autotest-kopie\2026-10-07_14-18-07\GrandTourney.dll
+[14:18:09] Kopia zatwierdzonego RealisticCaptivity: md5 c393f4fb82585abe1f37bf3c1687a2f1 -> C:\Users\GAME\autotest-kopie\2026-10-07_14-18-07\RealisticCaptivity.dll + D:\Backup-Bannerlord\autotest-kopie\2026-10-07_14-18-07\RealisticCaptivity.dll
+[14:18:12] Kopia Configs: 169 plikow (md5) -> C:\Users\GAME\autotest-kopie\2026-10-07_14-18-07\Configs
+[14:18:12] Wgrany probny CrashScribe: md5 cafd9ae8cae24073361846696392d932 (z C:\Users\GAME\AppData\Local\Temp\claude\C--Program-Files--x86--Steam-steamapps-common-Mount---Blade-II-Bannerlord\3cf3e0ac-5529-4b68-a794-0edec69cfda7\scratchpad\dzien-6\autotest\do-gry\CrashScribe.dll)
+[14:18:13] Wgrany probny Armoury: md5 4111b77e8c6ae1c84ebbfa9a7e7c0cde (z C:\Users\GAME\AppData\Local\Temp\claude\C--Program-Files--x86--Steam-steamapps-common-Mount---Blade-II-Bannerlord\f16095a4-010b-4254-b1b4-9353fc402da7\scratchpad\lawa\dll\sklad\Armoury.dll)
+[14:18:13] Wgrany probny GrandTourney: md5 def7574dcecfe55a7178f10260a5daad (z C:\Users\GAME\AppData\Local\Temp\claude\C--Program-Files--x86--Steam-steamapps-common-Mount---Blade-II-Bannerlord\f16095a4-010b-4254-b1b4-9353fc402da7\scratchpad\lawa\dll\sklad\GrandTourney.dll)
+[14:18:13] Wgrany probny RealisticCaptivity: md5 03dca428a70ed083c798103e42d70803 (z C:\Users\GAME\AppData\Local\Temp\claude\C--Program-Files--x86--Steam-steamapps-common-Mount---Blade-II-Bannerlord\f16095a4-010b-4254-b1b4-9353fc402da7\scratchpad\lawa\dll\sklad\RealisticCaptivity.dll)
+[14:18:13] Przelacznik: C:\Users\GAME\Documents\Mount and Blade II Bannerlord\CrashScribe\autotest.json = {"run":"at-20261007-141807","days":40,"save":true,"quit":true,"speed":0,"limit_s":1440}
+[14:18:13] Gra uruchomiona: PID 25248
+[14:18:33] Przelacznik zuzyty przez gre (CrashScribe rusza autotest).
+[14:19:13]   postep: doba 0/40, 1 min, procesy gry: 1
+[14:20:13]   postep: doba 0/40, 2 min, procesy gry: 1
+[14:21:14]   postep: doba 6/40, 3 min, procesy gry: 1
+[14:22:14]   postep: doba 11/40, 4 min, procesy gry: 1
+[14:23:14]   postep: doba 16/40, 5 min, procesy gry: 1
+[14:24:14]   postep: doba 21/40, 6 min, procesy gry: 1
+[14:25:14]   postep: doba 25/40, 7 min, procesy gry: 1
+[14:26:14]   postep: doba 30/40, 8 min, procesy gry: 1
+[14:27:14]   postep: doba 34/40, 9 min, procesy gry: 1
+[14:28:14]   postep: doba 38/40, 10 min, procesy gry: 1
+[14:28:44] Gra zglosila koniec: KONIEC OK: dotarl do 40/40 dob | czas od startu gry 10.1 min, biegu 8.5 min | 39 pelnych dob, srednio 12.8 s/dobe | okna zamkniete: 3 | bledy: 8
+[14:28:44] Gra zglosila QuitGame - czekam na koniec procesu.
+[14:29:15]   postep: doba 40/40, 11 min, procesy gry: 1
+[14:30:15]   postep: doba 40/40, 12 min, procesy gry: 1
+[14:30:15] ZAMYKAM GRE: po QuitGame: proces nie wyszedl w 90 s po QuitGame - silnik wywrocil sie przy zamykaniu: 0xC0000094 pod 0x7FF8F4C3E259 (C:\ProgramData\Mount and Blade II Bannerlord\logs\rgl_log_errors_25248.txt); okno bledu silnika czeka na klikniecie - znany blad przy wyjsciu z gry, nie wynik testu (procesy: Bannerlord.BLSE.Standalone#25248)
+[14:30:45]   zabity: Bannerlord.BLSE.Standalone#25248
+[14:30:46] Przywracanie zatwierdzonych:
+[14:30:46]   CrashScribe: PRZYWROCONY zatwierdzony, md5 11fa021464f285207063147e9eb6f7f3 OK
+[14:30:47]   Armoury: PRZYWROCONY zatwierdzony, md5 25b87631d468cb3e01a71a3578f9fc73 OK
+[14:30:47]   GrandTourney: PRZYWROCONY zatwierdzony, md5 0aa5d0eff29261bf9dca3b7be173c7cd OK
+[14:30:47]   RealisticCaptivity: PRZYWROCONY zatwierdzony, md5 c393f4fb82585abe1f37bf3c1687a2f1 OK
+[14:30:47]   Configs: przywrocony BannerlordConfig.txt
+[14:30:47]   Configs: przywrocony DynamicReinforcements.reputation.cfg
+[14:30:47]   Configs: przywroconych 2, nowych przeniesionych 0, reszta bez zmian
+[14:30:47] Przywracanie OK - znacznik usuniety.
+[14:30:47] =============================== WYNIK AUTOTESTU ===============================
+[14:30:47] run          : at-20261007-141807   (2026-10-07_14-18-07)
+[14:30:47] wynik        : OK - dotarl do 40/40 dob
+[14:30:47] koniec w logu: KONIEC OK: dotarl do 40/40 dob | czas od startu gry 10.1 min, biegu 8.5 min | 39 pelnych dob, srednio 12.8 s/dobe | okna zamkniete: 3 | bledy: 8
+[14:30:47] czas         : 13 min 33 s od startu gry
+[14:30:47] okna zamkn.  : 3 | bledy CrashScribe: 8
+[14:30:47] autotest log : C:\Users\GAME\Documents\Mount and Blade II Bannerlord\CrashScribe\autotest-2026-10-07.log
+[14:30:47] CrashScribe  : C:\Users\GAME\Documents\Mount and Blade II Bannerlord\CrashScribe\session-2026-10-07_14-18-30.log
+[14:30:47] Armoury      : C:\Program Files (x86)\Steam\steamapps\common\Mount & Blade II Bannerlord\Modules\Armoury\Armoury-2026-10-07_14-18-31.log
+[14:30:47] zawieszenia  : C:\Users\GAME\Documents\Mount and Blade II Bannerlord\CrashScribe\hang-2026-10-07_14-29-45.log
+[14:30:47] wyjscie gry  : proces nie wyszedl w 90 s po QuitGame - silnik wywrocil sie przy zamykaniu: 0xC0000094 pod 0x7FF8F4C3E259 (C:\ProgramData\Mount and Blade II Bannerlord\logs\rgl_log_errors_25248.txt); okno bledu silnika czeka na klikniecie - znany blad przy wyjsciu z gry, nie wynik testu
+[14:30:47] zapisy testu : autotest-2026-10-07-1428.sav
+[14:30:47] zapisy Jeffa : nietkniete (100 plikow, saveauto1..3 md5 bez zmian)
+[14:30:47] DLL w grze   : zatwierdzone (md5 sprawdzone)
+[14:30:47] kopie        : C:\Users\GAME\autotest-kopie\2026-10-07_14-18-07 + D:\Backup-Bannerlord\autotest-kopie\2026-10-07_14-18-07
+[14:30:47] log skryptu  : C:\Users\GAME\autotest-kopie\autotest-skrypt-2026-10-07_14-18-07.log
+[14:30:47] kod wyjscia  : 0 (0 OK, 1 nie dotarl, 2 stop przed testem, 3 przywracanie nieudane)
+[14:30:47] ===============================================================================
+KOD: 0
