@@ -374,6 +374,14 @@ narzedzia rozpoznal wszystkie linie. Grupa 1: OK 61, UWAGA 5; grupa 2: OK 31, UW
   ograniczyc do Muru (decyzja Jeffa: czy jency Innych licza sie jako polegli); wightow nie wpuszczac do puli wyrzutkow, wylaczyc im
   dezercje i niewole; naprawic limit w Zewie.
 ## Decyzje Jeffa 07.10 (wiazace)
+- WRAKI (07.10 ok. 15:35): "wraki ida na zlom" - kowale miasta NIE odnawiaja wrakow (Mangled i stany <= 0.10) nigdzie: ani u kwatermistrza, ani na
+  polkach wojska (koniec decyzji 26.08 "wrak max 10% wartosci"), ani dla ludzi i lordow AI; wrak = zlom do przetopu (zrodlo materialu MendMaterial) albo
+  wlasne kowadlo gracza. Do wprowadzenia w TOWARY 3 (TroopMend / TroopPieceCost i wszystkie drogi, ktore jeszcze odnawiaja wraki).
+- WIOSKI 2200 W GRZE (07.10 ok. 15:30): "poczekaj z wioskami, wgraj mi wioski 2200, chce najpierw zobaczyc w grze" - TERAZ sam widok (W2) z wariantem
+  ok. 2 200 wiosek na wersji z gry (n120), wgrac po sprawdzeniu (workflow wioski-2200-w-grze, galaz w2-wioski-2200). Wersja wedlug ludnosci CZEKA
+  (workflow v3 zatrzymany); przy niej pamietac (Jeff): "nie wszyscy ludzie zyja w wioskach - sa ludzie w miastach, podrozni, w samotniach,
+  klasztorach itp." - liczba wiosek tylko z ludzi mieszkajacych we wsiach (udzial wedlug regionu: osadnictwo skupione vs rozproszone, zagrody,
+  klasztory / septy, pustelnie, mlyny, karczmy, podrozni, ludzie w lesie z ksiegi).
 - CENA SPRZEDAZY SPRZETU (07.10 ok. 15:20; projekt docs/PROJEKT-CENA-SPRZEDAZY-SPRZETU-2026-10-07.md): (1) "tak, jesli to poprawia realizm ekonomii" -
   wgrac razem z 127 (kara BK x5 RAZ zamiast x25, podloga 2% od wartosci ZE STANEM); (2) "tak" - sufit: kupiec nie da wiecej niz 1/10 ceny nowej sztuki
   na tej polce; (3) "tak" - handel odnowionym sprzetem miedzy miastami zostaje. Paczka w toku (workflow cena-sprzedazy-paczka, galaz w127b-cena-sprzedazy),
