@@ -3,7 +3,7 @@
 Czytaj najpierw: `CLAUDE.md` (zwlaszcza sekcja 8, **zasada 0**: kazda zmiana = kontrola regresji, kolizji
 i spojnosci calej logiki; oraz pulapka MCM w sekcji 7), potem ten plik, potem gorne wpisy `CHANGELOG.md`.
 
-## NOC 06/07.10 - GRUPA "TOWARY 2" (115-119) GOTOWA DO WGRANIA NA SLOWO JEFFA; kolejka 108-114 przeniesiona na 119
+## NOC 06/07.10 - GRUPA "TOWARY 2" (115-120) GOTOWA DO WGRANIA NA SLOWO JEFFA; kolejka 108-114 przeniesiona na 119 (na 120 naklada sie czysto)
 
 W GRZE BEZ ZMIAN: wpisy 101-107 (DLL md5 0eeb0a105dc5ae4221809e222e327afe). Noc: nowe konto (sesja fa2fd7a6), jeden watek naraz.
 Galaz robocza = kod 107 (sprawdzone 07.10 ok. 21:40 czasu komputera: diff kodu z `paczki/107-zold-i-skarbiec` pusty).
@@ -17,6 +17,7 @@ przeglad zlozenia `docs/paczki/PRZEGLAD-ZLOZENIA-2026-10-07.txt`):
 | 116 | `paczki/116-warsztaty-w-nowej-monecie` | 9b7a4e8 | warsztat kosztuje 3 lata swojego zarobku (+ kasa warsztatu); 100 d dziennie przestaje znikac - czynsz i place ida do kasy miasta; zaczynaja pracowac piekarnie, winiarnie, olejarnie, garbarnie, garncarnie | 623 |
 | 117 | `paczki/117-karawany-ruda-dociera` | 0ffc41c | karawany kupuja surowce przed wyborem trasy i laduja je do pelnego udzwigu (karawany gracza 80%) | 625 |
 | 118 | `paczki/118-towary-w-nowej-monecie` | 38054d7 | chleb, ciasta, miod i owoce tansze tam, gdzie je dowoza (bochen przy 10 dziennie 61 -> 17-21 d); miod pitny, futro, zloto, klejnoty, atrament, barwnik duzo tansze (lup ze zlota i klejnotow 10-15 x tanszy) | 626 |
+| 120 | `paczki/120-poprawki-po-audycie` | e0dd773 | drobne poprawki po audycie: wlasny warsztat placi naprawde z kiesy takze w czasie kucia; cena warsztatu w pierwszym roku liczona z prawdziwych dob; notabl w rozmowie nie obiecuje wiecej, niz ma w sakiewce; liczniki bledow w liniach dnia | 631 |
 | 119 | `paczki/119-wozy-do-najlepszego-miasta` | 0c7aa2d | woz kazdej wsi jedzie do miasta w zasiegu 250 (ok. 4 doby), ktore najlepiej zaplaci; ladunek wyceniany sztuka po sztuce (koniec ceny pierwszej sztuki za caly woz); woz x2 dla wszystkich wsi | 631 |
 
 DLL GRUPY = build `paczki/119`: md5 faade7bf0dcc00de87d520a603234d15, 631 ustawien (kopia: `SCRATCH\dzien-5\zlozenie\Armoury-grupa-towary2.dll`,
@@ -24,8 +25,8 @@ SCRATCH = katalog roboczy sesji 3cf3e0ac); proby wszystkich recenzentow przechod
 ani `MarketMaxDistance` (zmiana domyslnej 150 -> 250 zadziala). UWAGA: zapis ustawien w MCM PRZED wgraniem wpisalby MarketMaxDistance = 150.
 
 JAK WGRAC (dopiero po "wgraj" od Jeffa; gra zamknieta - proces `Bannerlord.BLSE.LauncherEx`): na galezi roboczej
-`git cherry-pick c49cdda 9b7a4e8 0ffc41c 38054d7 0c7aa2d`, `python tools/gen_mcm.py` (ma nic nie zmienic, 631), build z kodem 0;
-KONTROLA = `git diff paczki/119-wozy-do-najlepszego-miasta HEAD -- Armoury` PUSTY (NIE md5 - numer commitu jest wpisany w DLL, wiec md5 builda
+`git cherry-pick c49cdda 9b7a4e8 0ffc41c 38054d7 0c7aa2d e0dd773` (115-120), `python tools/gen_mcm.py` (ma nic nie zmienic, 631), build z kodem 0;
+KONTROLA = `git diff paczki/120-poprawki-po-audycie HEAD -- Armoury` PUSTY (NIE md5 - numer commitu jest wpisany w DLL, wiec md5 builda
 z galezi roboczej zawsze wyjdzie inny niz faade7bf; audyt 07.10: 9a5040b8 przy tym samym kodzie); w CHANGELOG zapisac md5, ktory wyjdzie;
 NIE wgrywac kopii z dysku C (scratchpad); kopia `Armoury.dll.bak-2026-10-07-przed-115`; wgranie; md5 w grze; wpisy z `docs/paczki/115..119` na gore CHANGELOG ze statusem
 WGRANE (bez komentarza HTML na poczatku pliku); commit + push.
@@ -47,7 +48,11 @@ slowa. WAZNE: (a) instrukcja wgrania kazala porownac md5 - poprawione wyzej; (b)
 wartosci - w kategorii "zloto" ruda i sztabka przeliczone w przeciwne strony (x8 tansza, x4.75 drozsza), jeden wspolny przelicznik;
 poprawka po tescie osobna paczka (przelicznik na przedmiot albo wazony); opis 118 sprostowany; (d) opis dla Jeffa - nizej.
 Drobne (pamiec roku ceny warsztatu, place warsztatu gracza w menu kuzni, liczniki bledow, bramka cen, suwaki MCM, sprzedaz warsztatu
-notablowi bez kupca z pieniedzmi) -> ogniwo 120 "poprawki po audycie" (w toku 07.10 od 00:10; jesli nie przeszlo weryfikacji - test bez 120).
+notablowi bez kupca z pieniedzmi) -> OGNIWO 120 "poprawki po audycie" ZROBIONE 07.10 01:00: autor + niezalezny weryfikator ("gotowe"), wszystkie
+proby recenzentow jak na 119 (roznice zamierzone i opisane), wlasne proby 20/20 (na 119: 3/20); DLL builda n120 md5 999ae178 (build z galezi
+roboczej da inny md5 - patrz KONTROLA). Opis `docs/paczki/120-poprawki-po-audycie.md`. Zostaje: pamiec roku obniza zawyzona cene warsztatu po
+wczesnym skoku zysku tylko czesciowo (-10% po 60 dobach) - dalej to decyzja projektu; zakresy suwakow tylko opisane (generator bierze zakres z
+wartosci domyslnej).
 
 CO JEFF ZOBACZY W GRZE PO 115-119 (slowami gracza; do powiedzenia przed "wgraj"):
 1. Targ: ruda w miescie bez rudy - pierwszy ladunek 37 d (z kuznia 74 d), drewno 39 d, sol i piwo przy pustym straganie do 10 x wartosci;
@@ -63,7 +68,8 @@ CO JEFF ZOBACZY W GRZE PO 115-119 (slowami gracza; do powiedzenia przed "wgraj")
    krolestwa; woz wiezie 2 x wiecej, wiec napad na tabor daje 2 x wiecej lupu. Pieniadze z Twoich wsi przyjda pozniej, ale zwykle wiecej.
 6. Karawany AI pakuja sie surowcami do pelna; Twoje karawany jak dotad (80%).
 
-KOLEJKA 108-114 PRZENIESIONA NA 119: galezie `paczki-na-119/108-...` .. `paczki-na-119/114-porzadki` (1ffe021 .. 817931e; build kod 0 kazdego,
+KOLEJKA 108-114 (nakladanie na 120 sprawdzone `git merge-tree`: 7/7 bez konfliktu, 669 ustawien - do zrobienia przy nastepnym skladaniu)
+PRZENIESIONA NA 119: galezie `paczki-na-119/108-...` .. `paczki-na-119/114-porzadki` (1ffe021 .. 817931e; build kod 0 kazdego,
 669 ustawien na 114; konflikty tylko tekstowe: lista Reset w konstruktorze ArmouryBehavior, Settings.cs przy K7; K5 i wozy w MarketRoad.cs
 rozlaczne - K5 dziala tylko dla wsi zamkowej bez zadnego miasta w zasiegu). STARE `paczki/108..114` (na n107) ZOSTALY - ich nadpisanie
 (force push) zablokowalo zabezpieczenie; do decyzji Jeffa (albo nadpisac, albo dalej uzywac `paczki-na-119/*`). Tresc ogniw ta sama, opisy

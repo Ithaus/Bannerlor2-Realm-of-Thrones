@@ -153,3 +153,13 @@ Plan nocy (kazdy krok = jeden workflow z jednym agentem, skrypty w `~\.claude\pr
    md5 faade7bf...; kolejka przeniesiona jako `paczki-na-119/108..114`. Szczegoly i instrukcja wgrania: STAN-PRAC, sekcja "NOC 06/07.10". 5. `noc-7` - narzedzie logow (w toku)., build kazdego ogniwa, przeniesienie n108..n114 na nowy szczyt.
 5. Repo: wpisy `docs/paczki/115-117-*.md`, galezie `paczki/*` na origin, STAN-PRAC, raport dla Jeffa prostym jezykiem.
 Stan kazdego kroku dopisuje ponizej.
+
+## 10. KONIEC NOCY 06/07.10 (01:05 zegara komputera)
+
+Zrobione po kolei (kazdy krok jeden watek w tle): recenzja ceny (2. recenzent), warsztaty, karawany (przycieta), NOWE: towary BK w nowej
+monecie (118) i wozy wsi (119), zlozenie 115-119 + przeniesienie 108-114 (`paczki-na-119/*`), narzedzie `sprawdz_logi --grupa 2b`, audyt
+grupy (3 audytorow, nic blokujacego - `docs/audyt-2026-10-07/`), ogniwo 120 poprawek po audycie (weryfikacja: gotowe). Do gry NIC.
+Wszystko w repo i na origin: `paczki/115..120`, `paczki-na-119/108..114`; robocze `w-toku/l115..l119` (mozna usunac). Stan i instrukcja wgrania:
+STAN-PRAC, sekcja "NOC 06/07.10". Stare `paczki/108..114` (na n107) nietkniete - nadpisanie zablokowane (force push), decyzja Jeffa.
+NASTEPNY KROK: Jeff czyta 6 punktow "CO JEFF ZOBACZY" i mowi "wgraj" -> wgranie 115-120 wg STAN-PRAC -> test: nowa kampania 20 dob ->
+`python tools/sprawdz_logi.py --grupa 2b`. Potem: przeniesienie kolejki na 120, krok skali K13 (pilny po audycie), sztabka zlota (118).
