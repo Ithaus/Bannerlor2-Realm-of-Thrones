@@ -357,6 +357,10 @@ narzedzia rozpoznal wszystkie linie. Grupa 1: OK 61, UWAGA 5; grupa 2: OK 31, UW
    Pokretla: SmithingSkillPerTier 45 -> 35 (pamietac: kucie zbroi ma te sama zasade co bron - zepsuta / legendarna i premie; sprawdzic
    rozklad jakosci po zmianie); DurabilityPerArmorPoint 20 -> 13 (zbroja zuzywa sie 1.5 x szybciej, NIE 3 x); MinSellPercentOfValue 5 -> 2
    (nad podloga cene rupieci ustala podaz i popyt). Klucze SA w Armoury.json Jeffa - zmiana pliku przy wgraniu (gra zamknieta, .bak).
+   Zbroja z CRAFT jak bron (zepsuta / legendarna, premie RBM: Legendary +15 / x5, Lordly +10 / x2.5, Fine +5 / x1.5, Loose -10 / x0.6, Rusty -20 / x0.3)
+   - TAK (Jeff chce tabeli szans wedle kowalstwa). Klan najemnikow Spoils: TYLKO PRAWDZIWI zolnierze (koniec 20 z niczego). Naprawa u kwatermistrza
+   Spoils - TAK ujednolicic: placi kasie miasta (kowale), zuzywa material z targu wedle stanu, wrakow (Mangled) nie odnawia.
+   Glod: z prawdziwego bilansu jedzenia (stodola regionu w racjach) - projekt `docs/PROJEKT-GLOD-2026-10-07.md`, po ksiedze ludzi (108-113).
 4. "zgoda na autotest" (pamiec: jeff-zgoda-na-autotest); przewijac dluzej, gdy to ma sens (40 dob na test zmiany, rok na skutki dlugie).
 
 ## Decyzje Jeffa 06.10 (wiazace; dopisane po raporcie nocnym)
