@@ -232,7 +232,7 @@ namespace Armoury
         [SettingPropertyGroup("Forge fee")]
         public float ForgeDayHours { get; set; } = 8f;
 
-        [SettingPropertyBool("Forge Hire Historical", HintText = "the smith's forge is hired at historical prices, as dear as the town is prosperous: every day of work on a project pays the forge fee for that day (3 d and 2 d a tier; the first day when you set to work, the rest as the work goes on - with an empty purse the work waits), a whole day of the forge as much as the finest work (15 d in a middling town), the Banner Kings hourly rate is that day split by the hours (off = the forge fee the same everywhere and the day at the Banner Kings hourly rate)")]
+        [SettingPropertyBool("Forge Hire Historical", HintText = "the smith's forge is hired by the day at historical prices, as dear as the town is prosperous - one price for a day of the forge whatever you forge on it: a craftsman's day (the forge fee base, 3 d in a middling town); a project pays it for every day of work (the first day when you set to work, the rest as the work goes on - with an empty purse the work waits), the Banner Kings day the same, its hourly rate that day split by the hours (off = the old fee by tier and the day at the Banner Kings hourly rate)")]
         [SettingPropertyGroup("Forge fee")]
         public bool ForgeHireHistorical { get; set; } = true;
 

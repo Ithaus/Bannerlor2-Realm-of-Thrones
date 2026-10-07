@@ -1129,7 +1129,7 @@ namespace Armoury
                     if (atForge && ForgeClock.On && p.Kind != "bk" && p.Kind != "van" && Settings.Current.ForgeHireHistorical)
                     {
                         bool rentOk = true;
-                        try { rentOk = Forge.PayDayRent(Settlement.CurrentSettlement, Recipes.For(p.Item).Tier); } catch (Exception er) { Log.Error("PayDayRent", er); }
+                        try { rentOk = Forge.PayDayRent(Settlement.CurrentSettlement); } catch (Exception er) { Log.Error("PayDayRent", er); }
                         if (!rentOk) continue;
                     }
 

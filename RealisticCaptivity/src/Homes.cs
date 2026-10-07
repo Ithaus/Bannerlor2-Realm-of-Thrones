@@ -44,8 +44,9 @@ namespace RealisticCaptivity
         internal static int SellPrice(Settlement s)
         {
             int price = (int)(BuyPrice(s) * Settings.Current.HomeSellFactor);
-            // przy stawkach historycznych kupuje osada - najwyzej tyle, ile ma w kasie (cena w podpowiedzi = zaplata)
-            return Settings.Current.HistoricalTownRates ? Math.Min(price, Work.CofferOf(s)) : price;
+            // przy stawkach historycznych kupuje osada - najwyzej tyle, ile moze wydac (miasto: ponad rezerwe 20 000 jak w Armoury;
+            // cena w podpowiedzi = zaplata)
+            return Settings.Current.HistoricalTownRates ? Math.Min(price, TownWageLink.Spare(s)) : price;
         }
 
         // ------------------------------------------------------------ dom rodzinny
@@ -248,8 +249,7 @@ namespace RealisticCaptivity
                             if (Settings.Current.HistoricalTownRates)
                             {
                                 // kupuje osada (jej kasa, najwyzej tyle, ile ma); skarbiec domu to Twoje wlasne pieniadze
-                                var sc = Here.SettlementComponent;
-                                pay = Math.Min(pay, sc != null ? Math.Max(0, sc.Gold) : 0);
+                                pay = Math.Min(pay, TownWageLink.Spare(Here));
                                 if (pay > 0) GiveGoldAction.ApplyForSettlementToCharacter(Here, Hero.MainHero, pay, true);
                                 if (banked > 0) GiveGoldAction.ApplyBetweenCharacters(null, Hero.MainHero, banked);
                             }

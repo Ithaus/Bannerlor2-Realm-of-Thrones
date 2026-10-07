@@ -26,6 +26,87 @@ namespace GrandTourney
             catch (Exception e) { if (!_fail) { _fail = true; Log.Error("TownWageLink", e); } return 1f; }
         }
 
+        // ------------------------------------------------------------ rezerwa miasta (ta sama co w Armoury)
+
+        private static System.Reflection.FieldInfo _floorField, _curField;
+
+        private static bool _floorTried;
+
+
+
+        /// <summary>
+
+        /// Ile osada moze wydac, gdy KUPUJE od gracza albo dzieli sie z nim utargiem: miasto - kasa ponad rezerwe na renty
+
+        /// (Armoury TownRentFloorGold, 20 000 - ponizej Banner Kings odbiera miastu dobrobyt; ta sama regula co paser, przetop i karawany
+
+        /// w Armoury); wies - cala kasa; bez Armoury - cala kasa.
+
+        /// </summary>
+
+        internal static int Spare(Settlement s)
+
+        {
+
+            var sc = s != null ? s.SettlementComponent : null;
+
+            if (sc == null) return 0;
+
+            int gold = Math.Max(0, sc.Gold);
+
+            if (!s.IsTown) return gold;
+
+            return Math.Max(0, gold - (int)Math.Ceiling(Floor()));
+
+        }
+
+
+
+        private static float Floor()
+
+        {
+
+            try
+
+            {
+
+                if (!_floorTried)
+
+                {
+
+                    _floorTried = true;
+
+                    foreach (var a in AppDomain.CurrentDomain.GetAssemblies())
+
+                    {
+
+                        if (a.GetName().Name != "Armoury") continue;
+
+                        var st = a.GetType("Armoury.Settings", false);
+
+                        if (st == null) break;
+
+                        _curField = st.GetField("Current", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+
+                        _floorField = st.GetField("TownRentFloorGold");
+
+                        break;
+
+                    }
+
+                }
+
+                var cur = _curField != null ? _curField.GetValue(null) : null;
+
+                return cur != null && _floorField != null ? Math.Max(0f, Convert.ToSingle(_floorField.GetValue(cur))) : 0f;
+
+            }
+
+            catch { return 0f; }
+
+        }
+
+
         private static void Resolve()
         {
             if (_tried) return;

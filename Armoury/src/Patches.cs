@@ -749,7 +749,7 @@ namespace Armoury
             if (s == null || ActiveHere()) return;
 
             int rate = c.ForgeHireHistorical
-                ? (int)Math.Ceiling(Forge.ForgeDayRent(s))                                  // dzien kuzni w skali historycznej x poziom plac miasta
+                ? Forge.DayRentFee(s)                                                       // dzien kuzni - ta sama cena co przy wlasnym projekcie
                 : (int)Math.Ceiling(HourlyRate(s) * Math.Max(1f, c.ForgeDayHours));
             _paid[s.StringId] = TaleWorlds.CampaignSystem.CampaignTime.Now.ToDays + 1.0;   // pelna doba od TERAZ
             try

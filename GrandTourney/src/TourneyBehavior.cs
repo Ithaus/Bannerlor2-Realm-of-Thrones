@@ -571,8 +571,14 @@ namespace GrandTourney
                 {
                     // utarg od widzow placi kasa miasta (najwyzej tyle, ile ma) - stawki x poziom plac miasta
                     takings = (int)Math.Round((lords * s.HostTakingsPerLord + s.HostTakingsBasePence) * TownWageLink.Index(town.Settlement));
-                    takings = Math.Min(takings, Math.Max(0, town.Gold));
+                    int owed = takings;
+                    takings = Math.Min(takings, TownWageLink.Spare(town.Settlement));   // tylko ponad rezerwe miasta (jak paser w Armoury)
                     if (takings > 0) GiveGoldAction.ApplyForSettlementToCharacter(town.Settlement, Hero.MainHero, takings, true);
+                    if (takings < owed)
+                    {
+                        Log.Player("The coffers of " + town.Name + " could spare only " + takings + " of the " + owed + " gold in takings.", true);
+                        Log.Info("Utarg turnieju w " + town.Name + ": kasa miasta dala " + takings + " z " + owed + " (rezerwa miasta).");
+                    }
                 }
                 else
                 {

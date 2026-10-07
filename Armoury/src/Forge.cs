@@ -277,7 +277,7 @@ namespace Armoury
                 {
                     // Jeff 07.10: kuznia za KAZDY dzien roboty - pierwszy dzien teraz, kolejne w ArmouryBehavior (PayDayRent)
                     int dayFee = ForgeFee(r);
-                    if (!PayDayRent(TaleWorlds.CampaignSystem.Settlements.Settlement.CurrentSettlement, r.Tier))
+                    if (!PayDayRent(TaleWorlds.CampaignSystem.Settlements.Settlement.CurrentSettlement))
                     { Log.Player("The smith wants " + dayFee + " gold for a day of his forge.", true); return false; }
                 }
                 else
@@ -345,34 +345,36 @@ namespace Armoury
         {
             var s = Settings.Current;
             if (s.ForgeDayPassEnabled && DayPass.ActiveHere()) return 0;   // dniowka oplacona - kuznia i tak Twoja
-            int fee = s.ForgeFeeBase + s.ForgeFeePerTier * r.Tier;
-            // Jeff 07.10 (koszty w miescie z dobrobytu i stawek historycznych): oplata historyczna x poziom plac miasta (TownWage)
-            return s.ForgeHireHistorical ? Math.Max(1, (int)Math.Round(fee * TownWage.Index(TaleWorlds.CampaignSystem.Settlements.Settlement.CurrentSettlement))) : fee;
+            // Jeff 07.10: "koszt kuzni to koszt kuzni, a co ja kuje to moja sprawa" - przy ForgeHireHistorical jedna cena dnia kuzni w
+            // tym miescie (DayRentFee), bez wzgledu na to, co kujesz; wylaczone - dawna oplata wedle tieru
+            if (s.ForgeHireHistorical) return DayRentFee(TaleWorlds.CampaignSystem.Settlements.Settlement.CurrentSettlement);
+            return s.ForgeFeeBase + s.ForgeFeePerTier * r.Tier;
         }
 
-        /// <summary>
-        /// Wynajem kuzni na CALY dzien w tym miescie (pensy): tyle, co oplata za robote najwyzszego tieru (ForgeFeeBase + 6 x
-        /// ForgeFeePerTier = 15 d) x poziom plac miasta - ta sama skala co oplata za projekt. Karnet dnia BK i stawka godzinowa BK
-        /// (dzien / ForgeDayHours) - z tego, przy ForgeHireHistorical. Dotad karnet kosztowal stawke godzinowa BK x 8 h (ok. 200,
-        /// tyle co ok. 70 dniowek rzemieslnika).
-        /// </summary>
         // ------------------------------------------------------------ kuznia za kazdy dzien roboty (Jeff 07.10: "za kazdy dzien kuznia")
         private static readonly Dictionary<string, int> _rentDay = new Dictionary<string, int>();   // osada -> dzien oplacony (tylko w pamieci)
         private static int _rentShortDay = -1;
 
+        /// <summary>Cena dnia kuzni w tym miescie (pensy, cale): ForgeFeeBase (dniowka rzemieslnika, 3 d) x poziom plac miasta (TownWage) -
+        /// jedna dla wlasnego projektu i karnetu BK, bez wzgledu na to, co sie kuje.</summary>
+        internal static int DayRentFee(TaleWorlds.CampaignSystem.Settlements.Settlement st)
+        {
+            return Math.Max(1, (int)Math.Round(ForgeDayRent(st)));
+        }
+
         /// <summary>
-        /// Oplata za dzien kuzni przy wlasnym projekcie (ForgeHireHistorical): (ForgeFeeBase + ForgeFeePerTier x tier) x poziom plac miasta,
-        /// raz na dzien kalendarza w danej osadzie; karnet dnia (DayPass) obejmuje dzien. true = dzien oplacony (juz, karnetem albo teraz);
-        /// false = gracza nie stac - robota czeka (komunikat raz na dzien).
+        /// Oplata za dzien kuzni przy wlasnym projekcie (ForgeHireHistorical): DayRentFee, raz na dzien kalendarza w danej osadzie;
+        /// karnet dnia (DayPass) obejmuje dzien. true = dzien oplacony (juz, karnetem albo teraz); false = gracza nie stac - robota czeka
+        /// (komunikat raz na dzien).
         /// </summary>
-        internal static bool PayDayRent(TaleWorlds.CampaignSystem.Settlements.Settlement st, int tier)
+        internal static bool PayDayRent(TaleWorlds.CampaignSystem.Settlements.Settlement st)
         {
             var s = Settings.Current;
             if (st == null || s == null || !s.ForgeHireHistorical) return true;
             if (s.ForgeDayPassEnabled && DayPass.ActiveHere()) return true;
             int day = (int)CampaignTime.Now.ToDays, paid;
             if (_rentDay.TryGetValue(st.StringId, out paid) && paid == day) return true;
-            int fee = Math.Max(1, (int)Math.Round((s.ForgeFeeBase + s.ForgeFeePerTier * tier) * TownWage.Index(st)));
+            int fee = DayRentFee(st);
             if (Hero.MainHero.Gold < fee)
             {
                 if (_rentShortDay != day) { _rentShortDay = day; Log.Player("You cannot pay the forge hire in " + st.Name + " (" + fee + " gold a day) - the work waits.", true); }
@@ -380,14 +382,19 @@ namespace Armoury
             }
             Pay.ToSettlement(fee);
             _rentDay[st.StringId] = day;
-            Log.Info("Kuznia: dzien " + day + " w " + st.Name + " oplacony za " + fee + " (tier " + tier + ", poziom plac " + TownWage.Index(st).ToString("0.00") + ").");
+            Log.Info("Kuznia: dzien " + day + " w " + st.Name + " oplacony za " + fee + " (poziom plac " + TownWage.Index(st).ToString("0.00") + ").");
             return true;
         }
 
+        /// <summary>
+        /// Dzien kuzni w tym miescie (pensy, z ulamkiem): ForgeFeeBase (dniowka rzemieslnika - tyle kowal traci, oddajac kuznie na dzien)
+        /// x poziom plac miasta. Jeden dla wszystkiego, co sie kuje (Jeff 07.10). Karnet dnia BK i stawka godzinowa BK (dzien /
+        /// ForgeDayHours) - z tego, przy ForgeHireHistorical. Dotad karnet kosztowal stawke godzinowa BK x 8 h (ok. 200).
+        /// </summary>
         internal static float ForgeDayRent(TaleWorlds.CampaignSystem.Settlements.Settlement st)
         {
             var s = Settings.Current;
-            return Math.Max(1f, (s.ForgeFeeBase + s.ForgeFeePerTier * 6) * TownWage.Index(st));
+            return Math.Max(1f, Math.Max(0, s.ForgeFeeBase) * TownWage.Index(st));
         }
 
         /// <summary>
