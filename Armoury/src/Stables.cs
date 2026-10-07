@@ -578,11 +578,8 @@ namespace Armoury
         /// <summary>
         /// KON PO CENIE TARGU (paczka 143, Jeff 07.10: "konie: rekrut konny placi cene konia z targu, hodowca po cenie targu").
         /// Cena konia na targu, na ktorym ta osada kupuje i sprzedaje konie - ten sam, na ktorym notabl kupuje konia ochotnikowi
-        /// (VolunteerKit.MarketOf: miasto - swoj targ; wies - jej miasto, inaczej najblizsze; zamek - najblizsze miasto). Cena kupna
-        /// bez kupca (Town.GetItemPrice) - ten sam wzor, ktorym lord placi za konia z polki (PriceOf): wartosc x wspolczynnik podazy
-        /// i popytu gry dla kategorii koni (0.8-1.3), wiec kon od hodowcy kosztuje tyle, co ten sam kon na polce. Prawo podazy
-        /// i popytu Armoury (SupplyDemand) liczy tylko przy znanym kupcu, wiec tu (jak dotad przy koniach z polki) nie dziala -
-        /// przy pustej polce dawaloby x2-4 wartosci za konia, ktorego wies ma w zapasie.
+        /// (VolunteerKit.MarketOf: miasto - swoj targ; wies - jej miasto, inaczej najblizsze; zamek - najblizsze miasto), liczona
+        /// ShelfPrice - tym samym wzorem, ktorym notabl kupuje konia ochotnikowi, gracz na straganie i lord z polki (PriceOf).
         /// 0 = brak targu albo konia (wolajacy bierze wtedy stara cene). Jedna regula dla rekruta (RecruitCost) i hodowcy (BreederPrice).
         /// </summary>
         internal static int MarketPrice(TaleWorlds.CampaignSystem.Settlements.Settlement where, EquipmentElement horse)
@@ -592,9 +589,21 @@ namespace Armoury
                 if (horse.Item == null) return 0;
                 var m = VolunteerKit.MarketOf(where);
                 if (m == null || m.Town == null) return 0;
-                return Math.Max(1, m.Town.GetItemPrice(horse, null, false));
+                return ShelfPrice(m, horse);
             }
             catch { return 0; }
+        }
+
+        /// <summary>
+        /// Cena kupna konia na targu tego miasta - JEDNA dla wszystkich (przeglad 07.10): wartosc sztuki x podaz i popyt Armoury
+        /// (SupplyDemand) x marza kupca, tak jak liczy targ, gdy znany jest kupiec-miasto (MarketData.GetPrice z partia miasta) -
+        /// ten sam wzor co notabl (VolunteerKit), gracz na straganie i lordowie przy sprzecie (AiGear). Dotad konie lorda z polki,
+        /// rekrut konny i hodowca szly przez Town.GetItemPrice bez kupca - wtedy podaz i popyt Armoury nie dzialaja, a liczy
+        /// lancuch cudzych modeli cen (ok. 2x wartosci), wiec ten sam kon mial na jednym targu trzy ceny.
+        /// </summary>
+        internal static int ShelfPrice(TaleWorlds.CampaignSystem.Settlements.Settlement market, EquipmentElement el)
+        {
+            return Math.Max(1, market.Town.MarketData.GetPrice(el, null, false, market.Party));
         }
 
         /// <summary>
@@ -614,7 +623,8 @@ namespace Armoury
         {
             try
             {
-                if (st.Town != null) return Math.Max(1, st.Town.GetItemPrice(el, null, false));
+                // przeglad 07.10: przy HorsesAtMarketPrice ta sama cena co gracz i notabl na tym targu (ShelfPrice)
+                if (st.Town != null) return Settings.Current.HorsesAtMarketPrice ? ShelfPrice(st, el) : Math.Max(1, st.Town.GetItemPrice(el, null, false));
             }
             catch { }
             return Math.Max(1, el.Item != null ? el.Item.Value : 1);
