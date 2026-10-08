@@ -40,15 +40,38 @@ namespace Armoury
                     __2.ChangeHeroGold(cost);
                     _toNotables += cost;
                     if (__0.LeaderHero != null) MoneyLedger.NoteLevyBack(cost);   // ksiega pieniadza (tylko licznik): gra skasowala te zaplate przez GiveGoldAction
+                    try { if (__3.IsMounted && Settings.Current.HistoricalRecruitCost && Settings.Current.HorsesAtMarketPrice) RecruitCost.NoteVolunteerHorse((int)RecruitCost.HorseCost(__3, __0.LeaderHero)); } catch { }   // linia "Konie rekrutow (157)" (tylko licznik)
                 }
                 else if (detail == "MercenaryFromTavern")
                 {
                     if (__1 == null || __1.SettlementComponent == null) return;
                     int n = Math.Max(1, __4);
-                    __1.SettlementComponent.ChangeGold(cost * n);
-                    _toTowns += cost * n;
-                    MoneyLedger.Note(MoneyLedger.NMerc, __1, cost * n);   // ksiega przeplywow osad (tylko licznik)
-                    // karawana placi z kiesy partii bez GiveGoldAction (nic nie znika) - "zwrot skasowanego" liczymy tylko dla wodza
+                    // POPRAWKA 157 (kon najemnika z karczmy): w koszcie siedzi cena konia tylko wtedy, gdy na polce tego miasta stoi kon tej rasy
+                    // (RecruitCost.HorseCost) - teraz ten kon naprawde schodzi z polki (po jednym na najemnika), a gdy koni na polce jest mniej niz
+                    // najemnikow, nadplata za brakujace wraca do kiesy, ktora placila (lord - gra skasowala jego zaplate; karawana - kiesa partii).
+                    // Polka bez takiego konia: w koszcie konia nie ma (najemnik z wlasnym koniem), nic nie schodzi, nic nie wraca.
+                    int horse = 0, took = 0, refund = 0;
+                    Settlement market = null;
+                    if (__3.IsMounted && RecruitCost.IsMerc(__3))
+                    {
+                        horse = RecruitCost.MercHorseQuote(__3, __0.LeaderHero, out market);
+                        if (horse > 0)
+                        {
+                            took = RecruitCost.TakeShelfHorses(__1, __3, n);
+                            refund = (n - took) * horse;
+                        }
+                        if (RecruitCost.MercShelfOn) RecruitCost.NoteMercHorses(__1, took, n - took, horse, refund, market == null || market.Town == null, false);
+                    }
+                    if (refund > 0)
+                    {
+                        if (__0.IsCaravan) __0.PartyTradeGold += refund;
+                        else if (__0.LeaderHero != null) __0.LeaderHero.ChangeHeroGold(refund);
+                    }
+                    int toTown = cost * n - refund;
+                    __1.SettlementComponent.ChangeGold(toTown);
+                    _toTowns += toTown;
+                    MoneyLedger.Note(MoneyLedger.NMerc, __1, toTown);   // ksiega przeplywow osad (tylko licznik)
+                    // karawana placi z kiesy partii bez GiveGoldAction (nic nie znika) - "zwrot skasowanego" liczymy tylko dla wodza (miastu + zwrot = cala zaplata)
                     if (!__0.IsCaravan && __0.LeaderHero != null) MoneyLedger.NoteLevyBack(cost * n);
                 }
             }

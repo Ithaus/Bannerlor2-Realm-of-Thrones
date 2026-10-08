@@ -992,6 +992,10 @@ namespace Armoury
         [SettingPropertyGroup("A knight needs a horse")]
         public bool HorsesAtMarketPrice { get; set; } = true;
 
+        [SettingPropertyBool("Merc Horse From Shelf", HintText = "a mounted hireling from a tavern costs a horse only if the town's market has one of the same breed on its shelf (the same horse, or one of the same kind and grade): that horse leaves the shelf with him and the town is paid its market price. With no such horse he rides in on his own and costs only his days of pay; if more men are hired than horses stand on the shelf, the overpayment goes back to the purse. Needs Historical Recruit Cost and Horses At Market Price (off = the market price of his horse is charged and paid to the town though no horse leaves the shelf)")]
+        [SettingPropertyGroup("A knight needs a horse")]
+        public bool MercHorseFromShelf { get; set; } = true;
+
         [SettingPropertyInteger("Ai Mount Market Share Percent", 0, 100, "0", HintText = "a lord may take at most this share of the horses on a town's shelf in one visit - the rest he orders from the breeder, so markets are not stripped bare (Jeff 15.09: no horses to buy anywhere)")]
         [SettingPropertyGroup("A knight needs a horse")]
         public int AiMountMarketSharePercent { get; set; } = 25;
@@ -2959,6 +2963,7 @@ namespace Armoury
             s.AiMountBreederFallback = AiMountBreederFallback;
             s.AiMountBreederMarkup = AiMountBreederMarkup;
             s.HorsesAtMarketPrice = HorsesAtMarketPrice;
+            s.MercHorseFromShelf = MercHorseFromShelf;
             s.AiMountMarketSharePercent = AiMountMarketSharePercent;
             s.AiMountShelfFloor = AiMountShelfFloor;
             s.LongYearEnabled = LongYearEnabled;
