@@ -1,5 +1,16 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-08 (158, poprawka po recenzji dokonczenia TOWARY 3) - WRAKI NA ZLOM TAKZE W "PICK A PIECE" NA GRZBIECIE: sztuka zalozona, zuzyta w ksiedze do 10% lub mniej, jest wrakiem na kazdej drodze kowali miasta (dotad "Pick a piece" ja odnawial, a "Mend everything you wear" odmawial)
+**Mod:** Armoury | **Pliki:** `SmithMenu.cs` (NOWE `SmithRefusesHere`: `AskHowToMend`, `DoMendOne`, podpowiedz `SmithLine` dla sztuk [EQUIPPED]), `ArmouryBehavior.cs` (NOWE `SlotWreck`). Bez nowych ustawien, bez zapisu w grze.
+
+**Problem (recenzja dokonczenia 08.10; dowod - proba lawy, NOWA sekcja 18j, na DLL po poprawce 157):** 158 uznaje na grzbiecie za wrak takze sztuke ze stanem w ksiedze zuzycia <= 10% (`LootPrices.HarnessWreck` w "Mend everything you wear"), ale "Pick a piece" sprawdzal dla sztuk [EQUIPPED] tylko modyfikator (`SmithRefuses(ee.ItemModifier)`). Bron i tarcze maja w grupach modyfikatorow najgorszy stan 0.3 (rusty, cracked, splintered - RBM / Native), wiec miecz zuzyty w ksiedze do 8% nosi modyfikator, ktory wrakiem nie jest: proba - miecz 8% w ksiedze, "Pick a piece - the smith" aktywny, kowal odnawia go do 100% za 6 zl (z regula kowali) albo 23 zl (bez reguly), a "Mend everything you wear" tej samej sztuki odmawia. Dwie reguly jednego zjawiska i droga obejscia decyzji Jeffa 07.10 "wraki ida na zlom".
+
+**Zmiana:** jedna regula dla sztuki zalozonej - `ArmouryBehavior.SlotWreck(slot)` = `LootPrices.HarnessWreck(modyfikator, stan w ksiedze)` (ta sama co `RepairCost`, `PlanRepair`, `HarnessWrecks`); "Pick a piece" (okno wyboru, wykonanie, podpowiedz na liscie) uzywa jej dla slotow >= 0, sakwy i magazyn wojska - modyfikatora jak dotad. Wlasne kowadlo - bez zmian (wrak mozna naprawic samemu). `WrecksToScrap` = false - jak dotad.
+
+**Proba (kopia proby lawy, sekcja 18j: miecz zalozony z modyfikatorem zuzycia 0.70 i stanem w ksiedze 8%, z regula kowali i bez):** PRZED 147 z 149 (kowal aktywny, ksiega 8% -> 100%, zaplata 6 / 23 zl); PO **149 z 149** - kowal nieaktywny ("The smiths will not restore a wreck for coin"), wykonanie odmawia z napisem, ksiega 8% i modyfikator zostaja, nic nie zaplacone. Pozostale sekcje (1-19) bez zmian.
+
+**Ryzyko / co sprawdzic:** dotyczy tylko sztuk [EQUIPPED] w "Pick a piece" ze stanem w ksiedze <= 10% - w praktyce bron i tarcze (zbroje grup RBM maja przy stanie <= 20% modyfikator 0.1, ktory od 158 i tak jest wrakiem); sztuki zalozone z ksiega > 10% - jak dotad. W grze: "Pick a piece" przy zalozonym wraku pokazuje "The smiths will not restore a wreck for coin" i zostawia "Mend it yourself".
+
 ## 2026-10-08 (157, poprawka po recenzji dokonczenia TOWARY 3) - KON NAJEMNIKA: ZAPLATA I ZWROT ZA KONIA W TEJ KWOCIE, KTORA KUPUJACY NAPRAWDE ZAPLACIL (mnoznik perkow, kultury i praw BK) - kasa miasta nie oddaje lordom za konie, ktorych nie bylo, gracz nie dostaje zlota z niczego
 **Mod:** Armoury | **Pliki:** `RecruitCost.cs` (NOWE `HorseShareOfCost`; `PlayerBuyPrefix` / `PlayerBuyPostfix` - kon w koszcie gracza; `NoteMercHorses` - zwrot przy stalej gry), `LevyGold.cs` (`ApplyInternalPostfix`, najemnik z karczmy), `Settings.cs` + `McmSettings.cs` (opis `MercHorseFromShelf`). Bez nowych ustawien (Armoury 677), bez zapisu w grze.
 

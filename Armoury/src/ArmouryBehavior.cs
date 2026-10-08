@@ -2254,6 +2254,20 @@ namespace Armoury
             return n;
         }
 
+        /// <summary>Poprawka po recenzji 158: czesc zalozona w tym slocie to wrak (modyfikator wraku albo stan w ksiedze <= 10%) - ta sama regula co
+        /// HarnessWrecks / RepairCost, dla "Pick a piece" (SmithMenu.SmithRefusesHere). Wylaczone WrecksToScrap - false.</summary>
+        internal bool SlotWreck(int slot)
+        {
+            try
+            {
+                if (!LootPrices.ScrapRule || slot < 0 || slot >= 12) return false;
+                var el = Hero.MainHero.BattleEquipment[slot];
+                if (el.Item == null) return false;
+                return LootPrices.HarnessWreck(el.ItemModifier, GetConditionQuiet(slot));
+            }
+            catch (Exception e) { Log.Error("SlotWreck", e); return false; }
+        }
+
         /// <summary>Ile czesci na grzbiecie wymaga naprawy.</summary>
         internal int WornPieces()
         {

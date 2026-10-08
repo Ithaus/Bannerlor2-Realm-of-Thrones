@@ -528,11 +528,21 @@ namespace Armoury
         }
 
         /// <summary>Linia "Smith: ..." w podpowiedzi listy: cena kowali miasta (robota + material) albo dlaczego nie za monete.</summary>
-        private static string SmithLine(MendMaterial.Order q, EquipmentElement ee)
+        /// <summary>Poprawka po recenzji 158: czy kowale miasta odmawiaja tej sztuki. Na grzbiecie (slot >= 0) - ta sama regula co "Mend everything
+        /// you wear" (modyfikator wraku ALBO stan w ksiedze zuzycia <= 10%, ArmouryBehavior.SlotWreck); w sakwach i w magazynie - modyfikator.
+        /// Dotad "Pick a piece" patrzyl na grzbiecie tylko na modyfikator: miecz zuzyty w ksiedze do 8% (modyfikator zuzycia z grupy broni,
+        /// nie wrak) kowal odnawial za kilka groszy, a "Mend everything you wear" tej samej sztuki odmawial.</summary>
+        private static bool SmithRefusesHere(EquipmentElement ee, int slot)
+        {
+            if (slot >= 0 && ArmouryBehavior.Instance != null) return ArmouryBehavior.Instance.SlotWreck(slot);
+            return LootPrices.SmithRefuses(ee.ItemModifier);
+        }
+
+        private static string SmithLine(MendMaterial.Order q, EquipmentElement ee, int slot = -1)
         {
             string hrs = Settings.Current.MendLootHoursPerPiece.ToString("0.#") + "h";
             const string scrap = "Smith: not for coin - a wreck (worn to a tenth of its worth or less) is scrap: melt it down, or mend it at your own anvil";   // paczka 158
-            if (LootPrices.SmithRefuses(ee.ItemModifier)) return scrap;
+            if (SmithRefusesHere(ee, slot)) return scrap;   // recenzja 158: na grzbiecie takze stan w ksiedze
             int labor = PieceCost(ee);
             if (q == null) return "Smith: " + labor + " gold, " + hrs;
             int total, miss; float mat;
@@ -789,7 +799,7 @@ namespace Armoury
                         sb0.Append(p.Count + "x " + p.Item.Name + " (" + Recipes.CountInInventory(p.Item) + ")");
                     }
                     string hint0 = "EQUIPPED - you wear this now.\nCondition " + pct0 + "%" +
-                                   "\n" + SmithLine(quote, ee0) +
+                                   "\n" + SmithLine(quote, ee0, slot) +
                                    "\nYourself: " + (sb0.Length > 0 ? sb0.ToString() : "no materials") +
                                    "\n  + stamina " + SelfMendStamina(ee0) + " (you have " + Forge.Stamina() + ")" +
                                    ", Smithing " + SelfMendSkill(ee0) +
@@ -953,7 +963,7 @@ namespace Armoury
                 string smithTitle = "The smith mends it - " + smith + " gold";
                 string smithHint = Settings.Current.MendLootHoursPerPiece.ToString("0.#") + " hours. Coin does the sweating.";
                 bool smithOk = Hero.MainHero.Gold >= smith;
-                if (LootPrices.SmithRefuses(ee.ItemModifier))
+                if (SmithRefusesHere(ee, slot))   // recenzja 158: na grzbiecie takze stan w ksiedze <= 10% (jak "Mend everything you wear")
                 {
                     // paczka 158 (decyzja Jeffa 07.10 "wraki ida na zlom"): na kazdej drodze, takze bez reguly kowali miasta
                     smithOk = false;
@@ -1054,7 +1064,7 @@ namespace Armoury
         {
             try
             {
-                if (bySmith && LootPrices.SmithRefuses(ee.ItemModifier))
+                if (bySmith && SmithRefusesHere(ee, slot))
                 { Log.Player("A" + LootPrices.WreckWhatEn(1), true); return; }   // paczka 158
                 MendMaterial.Order order = null;   // SmithMendFromMarket: zlecenie kowali (robota + material)
                 // slot -2 = magazyn wojska: naprawa zdejmuje zbita sztuke ze stanu
