@@ -50,8 +50,10 @@ namespace Armoury
                 if (s.HealingRegenPercent == 100 && s.AiHealingRegenPercent == 100)
                 { Log.Info("SlowHealing: 100%/100% - vanilla tempo gojenia, patch spi."); return; }
                 int patched = 0;
-                if (m1 != null) { harmony.Patch(m1, postfix: new HarmonyMethod(typeof(SlowHealing), "SlowPostfix")); patched++; }
-                if (m2 != null) { harmony.Patch(m2, postfix: new HarmonyMethod(typeof(SlowHealing), "SlowPostfix")); patched++; }
+                // poprawka po audycie TOWARY 3: Priority.Low (200) - PO postfiksie BK (400, wpinany w OnGameStart, czyli po nas) i przed StarvePostfix
+                // (Last): warunek "kara - nie lagodzic" widzi juz kare BK za glod w oblezonej osadzie (dotad AddFactor gracza mnozyl ja przez pol)
+                if (m1 != null) { harmony.Patch(m1, postfix: new HarmonyMethod(typeof(SlowHealing), "SlowPostfix") { priority = Priority.Low }); patched++; }
+                if (m2 != null) { harmony.Patch(m2, postfix: new HarmonyMethod(typeof(SlowHealing), "SlowPostfix") { priority = Priority.Low }); patched++; }
                 Log.Info("SlowHealing: gojenie na mapie - gracz " + s.HealingRegenPercent
                          + "%, AI " + s.AiHealingRegenPercent + "% (" + patched + "/2 metod).");
             }

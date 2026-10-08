@@ -1,5 +1,14 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-08 (153, poprawka po audycie TOWARY 3) - WOLNE GOJENIE NIE LAGODZI KARY BANNER KINGS ZA GLOD W OBLEZONEJ OSADZIE
+**Mod:** Armoury | **Pliki:** `SlowHealing.cs` (ApplyAll: `SlowPostfix` z `Priority.Low`)
+
+**Problem (audyt latek Harmony TOWARY 3, spis prawdziwego wpiecia w kolejnosci gry; blad sprzed lancucha):** na `DefaultPartyHealingModel.GetDailyHealingForRegulars` nasz `SlowPostfix` (p400, wpiety przy menu glownym) biegnie PRZED postfiksem BK (p400, wpinany w BK `Main.OnGameStart`, czyli po nas - wyzszy index). Warunek "kara - nie lagodzic" (`ResultNumber <= 0`) ocenia wynik, zanim BK doda kare -10% szeregowych dla partii w oblezonej, glodujacej osadzie, a `AddFactor(-0.5)` gracza (HealingRegenPercent 50 w Armoury.json Jeffa) mnozy potem takze te kare (ExplainedNumber: wynik = baza x (1 + suma czynnikow)). Gracz w takim miescie tracil polowe rannych z kary BK - wbrew opisowi latki ("tniemy leczenie, nie kary"). `StarvePostfix` (Last) tego nie naprawia - dziala tylko, gdy glodna jest sama partia.
+
+**Zmiana:** `SlowPostfix` na obu metodach (szeregowi i bohaterowie) z `Priority.Low` (200): po BK (400), przed `StarvePostfix` (0) - warunek widzi juz kare BK. Przy dodatnim wyniku nic sie nie zmienia (czynniki ExplainedNumber sa addytywne - ten sam wynik w kazdej kolejnosci).
+
+**Ryzyko / co sprawdzic:** dotyczy tylko partii gracza (AI 100%) w oblezonej, glodujacej osadzie: pelna kara BK zamiast polowy. Bez linii logu (latka nie pisze dziennie); linia startowa "SlowHealing: gojenie na mapie - gracz 50%, AI 100% (2/2 metod)" bez zmian.
+
 ## 2026-10-08 (134, 135, 137, 139, 140, 142, 145 - poprawka po audycie TOWARY 3) - OPISY MCM I NAPISY W GRZE ZGODNE Z NOWYMI REGULAMI
 **Mod:** Armoury, GrandTourney, RealisticCaptivity | **Pliki:** `Armoury/src/SpoilsSeal.cs` (napis menu naprawy kwatermistrza), `Armoury/src/Settings.cs`, `GrandTourney/src/Settings.cs`, `RealisticCaptivity/src/Settings.cs` (opisy MCM; `McmSettings.cs` z `tools/gen_mcm.py`), `RealisticCaptivity/src/Work.cs` (podpowiedz pracy dniowkowej)
 
