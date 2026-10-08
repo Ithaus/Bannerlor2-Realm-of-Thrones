@@ -1,5 +1,15 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-08 (TOWARY 3: 127-159 + W2 v5) - GRUPA TOWARY 3 WGRANA
+**Status:** WGRANE 2026-10-08 ok. 08:20 na slowo Jeffa ("wgraj najpierw towary"). Galaz paczki/towary3 = t3-sklad 5ccb0f5 (n126 + 127-159 + W2 8518996; opisy
+paczek docs/paczki/127..159-*.md i wpisy CHANGELOG w tej galezi; docs/towary3/SKLAD.md, WYNIK.md, ANALIZA-AUTOTESTU-2026-10-08.md). DLL: Armoury
+5a7074c07f79741d807e21c2631127d0, GrandTourney 1337433c1f87410b1319f50efeb63a71, RealisticCaptivity 3e04b89b8839b95843dc178e459b983f; dane wiosek bez zmian
+(b742f307). Poprzednie: Armoury b0e62e1f, GT 0aa5d0ef, RC c393f4fb - kopie *.bak-2026-10-08-przed-T3 obok plikow i D:\Backup-Bannerlord\towary3-2026-10-08\przed-wgraniem.
+Armoury.json (kopia Armoury.json.bak-2026-10-08-przed-T3): SmithingSkillPerTier 45 -> 35, DurabilityPerArmorPoint 20.0 -> 13.33, MinSellPercentOfValue 5 -> 2
+(cofniecie: DLL z kopii + te 3 wartosci z powrotem). Nowe klucze zapisu: arm_mendstock, arm_towncrafts, arm_armyclothing. Autotest 40 dob 08.10 06:51: OK, 0 ERROR,
+12.4 s/dobe. Znane: kon najemnika placony po cenie targu (157) - zmiana na "najemnik z wlasnym koniem, wyzszy zold konnych" w toku (160); obieg pieniadza
+nie spina sie (regulator kasy gry kasuje ok. 330 tys. dziennie, wojsko AI x7) - analiza w toku.
+
 ## 2026-10-08 (W2 v5) - WIOSKI NA MAPIE - WYGLAD 3: domy na dole siatki (koniec zapadania), mlyn przy brzegu z kolem, wiatrak ze skrzydlami (sturgia_windmill_a), rybacy tylko na ladzie, odstep od sasiednich wiosek
 **Status:** WGRANE 2026-10-08 ok. 06:30 (n120 + W2; galaz paczki/w2-wioski-na-mapie 8518996), Armoury.dll md5 b0e62e1fc3e88ac911f459bcbb8307e6 (poprzedni 70b29477:
 Armoury.dll.bak-2026-10-08-wioski-v4 + D:\Backup-Bannerlord\wioski-2026-10-08), dane bez zmian (b742f307). Autotest ze zdjeciami 08.10 06:19 (2 doby): 0 ERROR,

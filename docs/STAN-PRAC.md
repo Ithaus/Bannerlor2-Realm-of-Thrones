@@ -662,3 +662,7 @@ TABELA RODOW I KAS OSAD po autotescie T3 (strona dla Jeffa): https://claude.ai/a
 (GetTownGoldChange czynnego modelu gry / BK) kasuje srednio ok. 196 tys. zl na dobe z kas miast i ok. 132 tys. z kas zamkow (doby 2-39; doba 1
 jednorazowo -2.64 mln) - zloto znika z gry; kasy miast 17.0 mln -> 7.84 mln w 40 dob (tak samo w testach bez T3). Do zbadania i uszczelnienia
 (np. nadwyzka ponad cel idzie do pana / na rynek zamiast w nicosc).
+
+TOWARY 3 WGRANE 08.10 ok. 08:20 (Jeff: "wgraj najpierw towary"): Armoury 5a7074c0, GT 1337433c, RC 3e04b89b, Armoury.json 35 / 13.33 / 2. ZATWIERDZONE OD TERAZ:
+Armoury 5a7074c0, GrandTourney 1337433c, RealisticCaptivity 3e04b89b, CrashScribe 11fa0214 (bez zmian). Galaz paczki/towary3 (5ccb0f5). Test roczny
+(punkt odniesienia przed poprawkami ekonomii) puszczony ponownie po wgraniu.
