@@ -58,6 +58,10 @@ param(
     [string]$PhotosFile,           # AT2: plik JSON z "photos" (i opcjonalnie "photo_shots", "photo_hours")
     [string]$PhotoShots = '',      # AT2: wysokosci kamery nad celem, np. "8,17,40" (puste = z pliku albo 8,17,40)
     [string]$PhotoHours = '',      # AT2: jasna pora, np. "9-15" (puste = z pliku albo 9-15)
+    [string]$LoadSave = '',        # AT3: zamiast nowej kampanii wczytaj ten zapis (nazwa bez .sav, np. autotest-rok-364); -Days liczone od wczytania
+    [int]$Census = 0,              # AT3: spis swiata co tyle dob (0 = brak)
+    [switch]$Profile,              # AT3: pomiar klatki (sekcje silnika + sluchacze zdarzen kampanii)
+    [int]$Sample = 0,              # AT3: probkowanie stosu watku gry co tyle ms (0 = brak)
     [switch]$NoSave,
     [switch]$NoQuit,
     [switch]$RestoreOnly,
@@ -538,6 +542,10 @@ try {
     $limitS = [Math]::Max(0, $TimeoutMin * 60 - 180)
     $sw = '{"run":"' + $runId + '","days":' + $Days + ',"save":' + $(if ($NoSave) { 'false' } else { 'true' }) + ',"quit":' + $(if ($NoQuit) { 'false' } else { 'true' }) +
           ',"speed":' + $Speed.ToString([Globalization.CultureInfo]::InvariantCulture) + ',"limit_s":' + $limitS
+    if ($LoadSave) { $sw += ',"load":"' + $LoadSave + '"' }
+    if ($Census -gt 0) { $sw += ',"census":' + $Census }
+    if ($Profile) { $sw += ',"profile":true' }
+    if ($Sample -gt 0) { $sw += ',"sample":' + $Sample }
     if ($script:photoItems.Count -gt 0) {
         $sw += ',"photos":[' + ($script:photoItems -join ',') + ']'
         if ($photoShotsEff) { $sw += ',"photo_shots":"' + $photoShotsEff + '"' }

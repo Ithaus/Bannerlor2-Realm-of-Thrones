@@ -58,6 +58,9 @@ namespace CrashScribe
         internal static int StallQuitMin = 10;     // czas gry stoi tyle minut mimo prob odblokowania -> koniec
         internal static int LimitS;                // miekki limit calego biegu w s (0 = brak); skrypt daje swoj twardy
         internal static string RunId = "";
+        internal static string LoadName = "";     // [AT3] zamiast nowej kampanii wczytaj ten zapis (np. koniec testu rocznego)
+        private static bool _loaded, _rebased;
+        private static int _runStartDay;
 
         internal static string LogPath;
         internal static string Dir;                // katalog CrashScribe w Documents (log autotestu, zdjecia)
@@ -164,6 +167,10 @@ namespace CrashScribe
             StallQuitMin = Int(json, "stall_min", 10, 1, 240);
             LimitS = Int(json, "limit_s", 0, 0, 30 * 24 * 3600);
             RunId = Str(json, "run", "");
+            LoadName = Regex.Replace(Raw(json, "load") ?? "", "[^A-Za-z0-9_.:,-]", "");   // kilka nazw po przecinku = proby po kolei
+            Census.Every = Int(json, "census", 0, 0, 365);
+            FrameProfiler.Enabled = Bool(json, "profile", false);
+            StackSampler.IntervalMs = Int(json, "sample", 0, 0, 10000);
             AutotestPhotos.Parse(json);   // [AT2] klucze photos / photo_shots / photo_hours; bez nich lista celow pusta
         }
 
@@ -220,6 +227,8 @@ namespace CrashScribe
                  + (Days > 60 ? " | zapis kontrolny \"autotest-dlugi\" co " + CheckpointDays + " dob" : "")
                  + " | koniec przy postoju " + StallQuitMin + " min"
                  + (LimitS > 0 ? " | limit " + (LimitS / 60) + " min" : ""), true);
+            if (LoadName.Length > 0) Note("  wczytanie zapisu: \"" + LoadName + "\" (dni liczone od wczytania)", true);
+            if (Census.Every > 0 || FrameProfiler.Enabled) Note("  spis swiata: " + (Census.Every > 0 ? "co " + Census.Every + " dob" : "nie") + " | pomiar klatki: " + (FrameProfiler.Enabled ? "tak" : "nie"), true);
             string ph = AutotestPhotos.Describe();
             if (ph.Length > 0) Note("  zdjecia: " + ph, true);
         }
@@ -342,6 +351,7 @@ namespace CrashScribe
                 foreach (var line in AutotestUi.SelfCheck()) Note("  sygnatury: " + line);
             }
             catch (Exception e) { Fail("Install.SelfCheck", e); }
+            try { FrameProfiler.Install(h); } catch (Exception e) { Fail("Install.Profil", e); }
         }
 
         private static int _autoSaveSkips;
@@ -459,6 +469,8 @@ namespace CrashScribe
 
             if (_noSaveGuard) { Finish("brak ochrony zapisow - kampania nie zalozona", false, t); return; }
 
+            if (LoadName.Length > 0) { LoadSave(t); return; }
+
             var mod = TaleWorlds.MountAndBlade.Module.CurrentModule;
             var opts = mod.GetInitialStateOptions().ToList();
             string ids = string.Join(", ", opts.Select(o => o.Id).ToArray());
@@ -474,6 +486,37 @@ namespace CrashScribe
             Note("ETAP menu glowne: opcje [" + ids + "] -> wybieram \"" + pick.Name + "\" [" + pick.Id + "] (to samo co klikniecie gracza)", true);
             Go(Stage.Creation, t, null);
             pick.DoAction();
+        }
+
+        /// <summary>
+        /// [AT3] Wczytanie zapisu zamiast nowej kampanii - to samo, co robi ekran "Load" gry
+        /// (SavedGameVM.StartGame), bez okna niezgodnosci modulow (te same moduly co przy zapisie).
+        /// </summary>
+        private static void LoadSave(double t)
+        {
+            var gm = AccessTools.TypeByName("SandBox.SandBoxGameManager");
+            var ctor = gm != null ? gm.GetConstructor(new[] { typeof(TaleWorlds.SaveSystem.Load.LoadResult) }) : null;
+            if (ctor == null) { Finish("brak SandBoxGameManager(LoadResult) - nie wczytam zapisu", false, t); return; }
+            TaleWorlds.SaveSystem.Load.LoadResult lr = null;
+            var failed = new List<string>();
+            foreach (var name in LoadName.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                var info = MBSaveLoad.GetSaveFileWithName(name);
+                if (info == null) { Note("ETAP menu glowne: brak zapisu \"" + name + "\"", true); failed.Add(name + " (brak)"); continue; }
+                string meta = "";
+                try { meta = " | " + string.Join(", ", info.MetaData.Keys.Where(k => k.IndexOf("Version", StringComparison.OrdinalIgnoreCase) >= 0 || k.IndexOf("Day", StringComparison.OrdinalIgnoreCase) >= 0).Select(k => k + "=" + info.MetaData[k]).ToArray()); } catch { }
+                Note("ETAP menu glowne: wczytuje zapis \"" + info.Name + "\" (zamiast nowej kampanii)" + meta, true);
+                try { lr = MBSaveLoad.LoadSaveGameData(info.Name); }
+                catch (Exception e) { Note("  wczytanie \"" + info.Name + "\" rzucilo " + e.GetType().Name + ": " + OneLine(e.Message, 200), true); lr = null; }
+                if (lr != null) { Note("ETAP menu glowne: zapis \"" + info.Name + "\" wczytany (dlugie napisy ratuje Armoury 161, wynik w logu Armoury)", true); break; }
+                Note("ETAP menu glowne: zapis \"" + info.Name + "\" NIE wczytal sie (LoadSaveGameData = null)", true);
+                failed.Add(info.Name);
+            }
+            if (lr == null) { Finish("zaden zapis nie wczytal sie: " + string.Join(", ", failed.ToArray()), false, t); return; }
+            _loaded = true;
+            Go(Stage.Creation, t, null);
+            MBSaveLoad.OnStartGame(lr);
+            MBGameManager.StartNewGame((MBGameManager)ctor.Invoke(new object[] { lr }));
         }
 
         // ------------------------------------------------------------------ 2. kreator postaci
@@ -744,6 +787,16 @@ namespace CrashScribe
             _stallTicks = Campaign.Current != null ? Campaign.Current.CurrentTickCount : 0;
             _lastMoveAt = t;
             _errorsAtDay = _errors;
+            _runStartDay = _lastDay;
+            if (_loaded && !_rebased)
+            {
+                _rebased = true;
+                Days += _lastDay;
+                Note("ETAP bieg: zapis wczytany na dobie " + _lastDay + " - cel przesuniety na dobe " + Days, true);
+            }
+            Census.Run("start biegu, doba " + _lastDay);
+            FrameProfiler.WrapListeners();
+            StackSampler.Start(System.Threading.Thread.CurrentThread);
             Go(Stage.Run, t, "bieg: przewijanie do doby " + Days + " (teraz " + DayLabel() + ", " + Where() + ")");
             try { foreach (var line in AutotestUi.SelfCheck(onlyMissing: true)) Note("  sygnatury (ponownie): " + line); } catch { }
             if (_lastDay >= Days) Finish("dotarl do " + _lastDay + "/" + Days + " dob", true, t);
@@ -785,6 +838,13 @@ namespace CrashScribe
                 Note("DOBA " + d + "/" + Days + " | " + sec.ToString("0.0", Inv) + " s" + mark + " | " + ShortWhere(c)
                      + " | okna " + _windows + " | bledy +" + newErr + " (razem " + _errors + ")");
                 if (d % 10 == 0 && PerDay.Count > 0) Note(Averages(d));
+                FrameProfiler.Report("doba " + d, 25);
+                if ((d - _runStartDay) % 4 == 0) StackSampler.Report("doby do " + d, 30);
+                if (Census.Every > 0 && (d - _runStartDay) % Census.Every == 0 && d < Days)
+                {
+                    Census.Run("doba " + d);
+                    FrameProfiler.WrapListeners();
+                }
                 if (Days > 60 && CheckpointDays > 0 && d % CheckpointDays == 0 && d < Days) StartSave("autotest-dlugi", false, t);
                 if (d >= Days) { Finish("dotarl do " + d + "/" + Days + " dob", true, t); return; }
             }
@@ -927,6 +987,7 @@ namespace CrashScribe
             if (Now == Stage.Photos) AutotestPhotos.Abort("koniec biegu: " + why);   // [AT2] kamera wraca do druzyny przed zapisem
             _finishOk = ok;
             _finishWhy = why;
+            if (Now == Stage.Run) { Census.Run("koniec, doba " + Math.Max(0, _lastDay)); FrameProfiler.RunSummary(40); StackSampler.RunSummary(60); }
             string sum = "";
             if (PerDay.Count > 0) sum = " | " + PerDay.Count + " pelnych dob, srednio " + PerDay.Average().ToString("0.0", Inv) + " s/dobe";
             double runMin = _runStartAt > 0 ? (t - _runStartAt) / 60.0 : 0;

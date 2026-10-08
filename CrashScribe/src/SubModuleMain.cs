@@ -114,7 +114,7 @@ namespace CrashScribe
         {
             base.OnApplicationTick(dt);
             Watchdog.Beat();
-            if (Autotest.Active) Autotest.Tick(dt);
+            if (Autotest.Active) { FrameProfiler.Frame(); Autotest.Tick(dt); }
         }
 
         protected override void OnGameStart(Game game, IGameStarter gameStarterObject)
