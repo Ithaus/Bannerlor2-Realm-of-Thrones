@@ -50,17 +50,20 @@ namespace Armoury
                     // (RecruitCost.HorseCost) - teraz ten kon naprawde schodzi z polki (po jednym na najemnika), a gdy koni na polce jest mniej niz
                     // najemnikow, nadplata za brakujace wraca do kiesy, ktora placila (lord - gra skasowala jego zaplate; karawana - kiesa partii).
                     // Polka bez takiego konia: w koszcie konia nie ma (najemnik z wlasnym koniem), nic nie schodzi, nic nie wraca.
-                    int horse = 0, took = 0, refund = 0;
+                    // Poprawka po recenzji 157: kon w koszcie to cena polki RAZY mnoznik kupujacego (perki, kultura, prawa i ranga klanu BK) - do kasy
+                    // za konia z polki i z powrotem za konia, ktorego nie bylo, idzie ta sama kwota, ktora kupujacy za konia zaplacil (per = koszt ze
+                    // sprzetem - koszt bez sprzetu); dotad zwrot liczyl sama cene polki: przy mnozniku < 1 kasa miasta oddawala lordowi za konie,
+                    // ktorych nie bylo (przy 0.5 i 10 najemnikach - na minus), przy > 1 zatrzymywala doplate za nie. Kon "bez targu" (stala gry
+                    // w koszcie, polka nieznana) - jak kon spoza polki: wraca cala doplata, miasto nie bierze nic za konia, ktory z niej nie zszedl.
+                    int horse = 0, per = 0, took = 0, refund = 0;
                     Settlement market = null;
-                    if (__3.IsMounted && RecruitCost.IsMerc(__3))
+                    if (__3.IsMounted && RecruitCost.IsMerc(__3) && RecruitCost.MercShelfOn)
                     {
                         horse = RecruitCost.MercHorseQuote(__3, __0.LeaderHero, out market);
-                        if (horse > 0)
-                        {
-                            took = RecruitCost.TakeShelfHorses(__1, __3, n);
-                            refund = (n - took) * horse;
-                        }
-                        if (RecruitCost.MercShelfOn) RecruitCost.NoteMercHorses(__1, took, n - took, horse, refund, market == null || market.Town == null, false);
+                        per = RecruitCost.HorseShareOfCost(__3, __0.LeaderHero, cost, horse);
+                        if (horse > 0 && per > 0) took = RecruitCost.TakeShelfHorses(market ?? __1, __3, n);
+                        refund = (n - took) * per;
+                        RecruitCost.NoteMercHorses(__1, took, n - took, per, refund, market == null || market.Town == null, false);
                     }
                     if (refund > 0)
                     {

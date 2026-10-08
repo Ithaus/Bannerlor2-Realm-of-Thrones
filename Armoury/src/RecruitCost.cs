@@ -33,7 +33,8 @@ namespace Armoury
     /// a miasto dostawalo zaplate po cenie targu i konia nie oddawalo. Teraz doplata za konia najemnika (Mercenary, Gangster,
     /// CaravanGuard) jest tylko wtedy, gdy na polce targu tego miasta stoi kon tej samej rasy (ten sam przedmiot, a gdy go nie ma -
     /// ta sama kategoria, tier i rodzaj zwierzecia): przy werbunku ten kon schodzi z polki (to on jest koniem najemnika), a miasto
-    /// dostaje jego cene polki. Gdy polka takiego konia nie ma - najemnik przychodzi z wlasnym koniem i placi sie tylko dni zoldu.
+    /// dostaje to, co kupujacy za niego zaplacil (cena polki x mnoznik kupujacego z modelu gry - perki, kultura, prawa i ranga klanu BK;
+    /// poprawka po recenzji 157, HorseShareOfCost). Gdy polka takiego konia nie ma - najemnik przychodzi z wlasnym koniem i placi sie tylko dni zoldu.
     /// "Wlasny kon" dalej bierze sie z niczego (jak caly komplet najemnika) - do kroku "weterani" (skad najemnik ma sprzet i konia:
     /// z puli zolnierzy rozpuszczonych z armii, z lupu, z wlasnego kupna). Gdy najemnikow jest wiecej niz koni na polce, nadplata za
     /// brakujace konie wraca do kiesy (lord, karawana, gracz). Linia dnia "Konie rekrutow (157)" zamiast 8 probek wyceny.
@@ -171,6 +172,23 @@ namespace Armoury
             return k;
         }
 
+        /// <summary>Poprawka po recenzji 157: ile z kosztu werbunku (cost - koszt jednej sztuki z gry) kupujacy naprawde placi za konia - koszt ze
+        /// sprzetem minus koszt "bez sprzetu" (withoutItemCost) tego samego modelu i tego samego kupujacego. Gra mnozy (dni zoldu + kon) przez
+        /// 1 + SumOfFactors (perki gry: Slick Negotiator, Sword for Barter, Frugal, kultura; BK: ranga klanu, obca kultura w krolestwie +25%,
+        /// Drafting Hidage / Free Contracts +50 / +100%) - kon w koszcie to cena polki RAZY ten mnoznik (po zaokragleniu i dolnej granicy
+        /// modelu), nie sama cena polki. Ta kwota idzie do kasy miasta za konia zdjetego z polki i ta sama wraca za konia, ktorego nie bylo.
+        /// fallback - gdy model rzuci wyjatkiem (cena polki, najwyzej cost).</summary>
+        internal static int HorseShareOfCost(CharacterObject troop, Hero buyer, int cost, int fallback)
+        {
+            if (troop == null || cost <= 0) return 0;
+            try
+            {
+                int bare = Campaign.Current.Models.PartyWageModel.GetTroopRecruitmentCost(troop, buyer, true).RoundedResultNumber;
+                return Math.Max(0, Math.Min(cost, cost - bare));
+            }
+            catch { return Math.Max(0, Math.Min(cost, fallback)); }
+        }
+
         /// <summary>Poprawka 157: cena konia najemnika, ktora siedzi w jego koszcie werbunku (0 = wlasny kon albo poza regula), i targ.</summary>
         internal static int MercHorseQuote(CharacterObject troop, Hero buyer, out Settlement market)
         {
@@ -198,7 +216,7 @@ namespace Armoury
         internal static void NoteVolunteerHorse(int price) { if (price <= 0) return; _dVolN++; _dVolSum += price; if (price < _dVolMin) _dVolMin = price; if (price > _dVolMax) _dVolMax = price; }
         internal static void NoteMercHorses(Settlement town, int shelf, int own, int horsePrice, int refund, bool flat, bool player)
         {
-            if (flat) { _dMercFlat += shelf + own; return; }
+            if (flat) { _dMercFlat += shelf + own; if (!player) _dMercRefund += refund; return; }   // recenzja 157: doplata stalej gry za konia spoza polki wraca kupujacemu
             if (player) { _dPlShelf += shelf; _dPlOwn += own; _dPlShelfGold += (long)shelf * horsePrice; _dPlRefund += refund; }
             else { _dMercShelf += shelf; _dMercOwn += own; _dMercShelfGold += (long)shelf * horsePrice; _dMercRefund += refund; Bump(_dShelfTowns, town, shelf); Bump(_dOwnTowns, town, own); }   // miasta - tylko AI
         }
@@ -229,7 +247,7 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ poprawka 157: najemnicy gracza (menu zaulka i rozmowa w karczmie)
-        internal sealed class PlayerBuy { public Settlement Town; public CharacterObject Troop; public int Before, Horse; }
+        internal sealed class PlayerBuy { public Settlement Town; public CharacterObject Troop; public int Before, Horse, Per; }   // Per: poprawka po recenzji 157 - kon w koszcie gracza (z jego mnoznikiem)
 
         /// <summary>Prefiks RecruitmentCampaignBehavior.buy_mercenaries_on_consequence / BuyMercenaries: co i po ile kupuje gracz.</summary>
         public static void PlayerBuyPrefix(RecruitmentCampaignBehavior __instance, out PlayerBuy __state)
@@ -244,13 +262,18 @@ namespace Armoury
                 if (md == null || md.TroopType == null || !md.TroopType.IsMounted || !IsMerc(md.TroopType)) return;
                 Settlement market;
                 int horse = MercHorseQuote(md.TroopType, Hero.MainHero, out market);
-                __state = new PlayerBuy { Town = st, Troop = md.TroopType, Before = md.Number, Horse = horse };
+                // poprawka po recenzji 157: kon w koszcie gracza = koszt ze sprzetem - bez sprzetu (ten sam model, perki gracza, prawa i ranga
+                // jego klanu) - dotad miasto dostawalo pelna cene polki, a gracz zwrot pelnej ceny polki: przy mnozniku 0.75 zloto z niczego
+                int cost = Campaign.Current.Models.PartyWageModel.GetTroopRecruitmentCost(md.TroopType, Hero.MainHero).RoundedResultNumber;
+                int per = HorseShareOfCost(md.TroopType, Hero.MainHero, cost, horse);
+                __state = new PlayerBuy { Town = st, Troop = md.TroopType, Before = md.Number, Horse = horse, Per = per };
             }
             catch { __state = null; }
         }
 
         /// <summary>Postfiks tych metod: gra skasowala zaplate gracza (GiveGoldAction do nikogo); za kazdego konia, ktory zszedl z polki,
-        /// miasto dostaje jego cene polki, a nadplata za konie, ktorych na polce zabraklo, wraca graczowi.</summary>
+        /// miasto dostaje to, co gracz za niego zaplacil (cena polki x mnoznik gracza - poprawka po recenzji 157), a doplata za konie, ktorych
+        /// na polce zabraklo, wraca graczowi w tej samej kwocie.</summary>
         public static void PlayerBuyPostfix(RecruitmentCampaignBehavior __instance, PlayerBuy __state)
         {
             if (__state == null || __instance == null) return;
@@ -259,13 +282,14 @@ namespace Armoury
                 var md = __instance.GetMercenaryData(__state.Town.Town);
                 int n = __state.Before - (md != null && md.TroopType == __state.Troop ? md.Number : 0);
                 if (n <= 0) return;
-                if (__state.Horse <= 0) { NoteMercHorses(__state.Town, 0, n, 0, 0, false, true); return; }
-                int k = TakeShelfHorses(__state.Town, __state.Troop, n);
-                int toTown = k * __state.Horse, refund = (n - k) * __state.Horse;
+                int per = Math.Max(0, __state.Per);
+                if (__state.Horse <= 0 && per <= 0) { NoteMercHorses(__state.Town, 0, n, 0, 0, false, true); return; }
+                int k = __state.Horse > 0 && per > 0 ? TakeShelfHorses(__state.Town, __state.Troop, n) : 0;   // kon "bez targu" (stala gry) - zaden z polki, cala doplata wraca
+                int toTown = k * per, refund = (n - k) * per;
                 if (toTown > 0) { __state.Town.Town.ChangeGold(toTown); MoneyLedger.Note(MoneyLedger.NMerc, __state.Town, toTown); }
                 if (refund > 0) Hero.MainHero.ChangeHeroGold(refund);
                 MoneyLedger.NoteLevyBack(toTown + refund);   // ksiega pieniadza: gra skasowala te zaplate gracza przez GiveGoldAction
-                NoteMercHorses(__state.Town, k, n - k, __state.Horse, refund, false, true);
+                NoteMercHorses(__state.Town, k, n - k, per, refund, false, true);
             }
             catch (Exception e) { Log.Error("RecruitCost.PlayerBuyPostfix", e); }
         }
