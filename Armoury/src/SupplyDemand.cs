@@ -293,13 +293,13 @@ namespace Armoury
         }
 
         /// <summary>Postfix na GetPrice kazdego modelu cen - po MarketGlut (rejestrowany pozniej).</summary>
-        public static void PricePostfix(EquipmentElement __0, MobileParty __1, PartyBase __2, bool __3, ref int __result)
+        public static void PricePostfix(TradeItemPriceFactorModel __instance, EquipmentElement __0, MobileParty __1, PartyBase __2, bool __3, float __4, float __5, float __6, ref int __result)
         {
             if (_depth > 1) return;                                     // wewnetrzny model - zewnetrzny policzy
             try
             {
                 var item = __0.Item;
-                if (!Prices(__2, item)) return;
+                if (!Prices(__2, item)) { SellByCondition.Seen(__0, __3, __result, -1); return; }   // ksiega skupu (tylko log): sprzedaz poza prawem podazy
                 var st = __2.Settlement;
                 float d; int s;
                 float shelfF = Factor(st, item, __3, out d, out s);
@@ -314,12 +314,18 @@ namespace Armoury
                 float baseP = __result;
                 if (!__3 && HistoricalPrices.On && Settings.Current.RetailFromWorth)
                     baseP = Math.Max(1, __0.ItemValue) * (1f + Math.Max(0f, Settings.Current.RetailMarkupPercent) / 100f);
+                // CENA SPRZEDAZY OD STANU (B2, 07.10): gdy gra dala swoje minimum 1 zl, bierzemy prawdziwy ulamek (wartosc ze stanem x mnoznik
+                // ceny aktywnego modelu) i dopiero go mnozymy przez polke - "1 zl x polka" placilo za wrak tarczy wartej 2 zl 4-6 zl. Wylacznik SellPriceByCondition.
+                bool byCond = __3 && SellByCondition.On;
+                if (byCond && before <= 1) baseP = SellByCondition.Fraction(__instance, __0, __1, __2, __4, __5, __6);
                 int np = (int)Math.Round(baseP * f);
                 __result = np < 1 ? 1 : np;
+                int floorP = 0, capP = 0, bound = 0;
                 // wpis 88 (audyt pkt 10): podloga zlomu (MinSellPercentOfValue) liczyla sie PRZED nami - mnoznik polki 0.25 sciagal ja do 1.25%
                 if (__3 && Settings.Current.MinSellPercentOfValue > 0 && item.Value > 0)
                 {
-                    int floor = Math.Max(1, (int)(item.Value * Settings.Current.MinSellPercentOfValue / 100f));
+                    // B1 (07.10): podloga od WARTOSCI ZE STANEM - wrak (x0.1) ma podloge 0.2% wartosci nowej, legenda 10%; wylacznik: od czystej, jak w 127
+                    int floor = Math.Max(1, (int)((byCond ? __0.ItemValue : item.Value) * Settings.Current.MinSellPercentOfValue / 100f));
                     // POKRETLA JEFFA 07.10 (recenzja; "zero darmowej kasy"): podloga nie placi wiecej, niz TA polka zada za TE
                     // sama sztuke (wartosc ze stanem x marza x ten sam mnoznik polki i surowcow, polka juz z ta sztuka) - inaczej
                     // "zmasakrowany" rupiec (cena x0.03) kupiony z zawalonej polki za ~0.8% wartosci szedl z powrotem za 2%
@@ -329,8 +335,13 @@ namespace Armoury
                         int ask = (int)Math.Round(Math.Max(1, __0.ItemValue) * (1f + Math.Max(0f, Settings.Current.RetailMarkupPercent) / 100f) * f);
                         if (ask < floor) floor = Math.Max(1, ask);
                     }
-                    if (__result < floor) __result = floor;
+                    floorP = floor;
+                    if (__result < floor) { __result = floor; bound = 1; }
                 }
+                // B3 (decyzja Jeffa 07.10 "tak"): kupiec nie da za sztuke wiecej niz SellCapPercentOfNewAsk (10%) ceny, jaka TA polka zada za NOWA
+                // sztuke tej jakosci - czyli nie wiecej, niz sam bierze za jej wrak; sufit wygrywa z podloga
+                if (byCond) { capP = SellByCondition.Cap(__0, f); if (capP > 0 && __result > capP) { __result = capP; bound = 2; } }
+                SellByCondition.Seen(__0, __3, __result, bound);   // ksiega skupu (tylko log)
 
                 // log: handel gracza, raz na godzine gry na koszyk i miejsce
                 if (__1 == MobileParty.MainParty)
@@ -347,7 +358,8 @@ namespace Armoury
                                  + " -> polka x" + shelfF.ToString("0.00") + ", podstawa+surowce x" + arms.ToString("0.00")
                                  + " (podstawa " + (int)ArmsPricing.BaseOf(item) + ", surowce x" + ArmsPricing.MaterialIndex(st, item).ToString("0.00")
                                  + (ArmsPricing.IsUnique(item) ? ", UNIKAT" : "") + ") = x" + f.ToString("0.00")
-                                 + " (" + before + " -> " + __result + ", wartosc " + item.Value + ").");
+                                 + " (" + before + " -> " + __result + ", wartosc " + item.Value
+                                 + (__3 ? SellByCondition.Bounds(__0, floorP, capP, bound) : "") + ").");
                     }
                 }
             }
@@ -444,7 +456,9 @@ namespace Armoury
                                 var el = shelf.GetElementCopyAtIndex(i);
                                 var it = el.EquipmentElement.Item;
                                 if (el.Amount <= 0 || it == null || (int)it.ItemType * 10 + TierOf(it) != key) continue;
-                                int unit = Math.Max(1, (int)(it.Value * pricePct * srcFactor * ArmsPricing.Multiplier(src, it)));
+                                // B4 (07.10): hurt od wartosci ZE STANEM - odbiorca nie placi za wrak jak za czysta sztuke (wylacznik SellPriceByCondition: jak w 127)
+                                int worth = SellByCondition.On ? el.EquipmentElement.ItemValue : it.Value;
+                                int unit = Math.Max(1, (int)(worth * pricePct * srcFactor * ArmsPricing.Multiplier(src, it)));
                                 int n = Math.Min(want - got, el.Amount);
                                 int afford = best.Town.Gold / unit;
                                 if (afford <= 0) break;

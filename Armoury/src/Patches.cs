@@ -95,7 +95,9 @@ namespace Armoury
                 // polce zlom za 0.5% wartosci szedl za 2 x podloge. Teraz: stan rupiecia x polka, nie mniej niz podloga.
                 // Wylacznik OneScrapFloor = false: jak w 126 (podloga takze tu, przed polka).
                 if (s.OneScrapFloor && SupplyDemand.Prices(__2, item)) return;
-                int floor = (int)((float)item.Value * s.MinSellPercentOfValue / 100f);
+                // CENA SPRZEDAZY OD STANU (B1, 07.10): we wsi, u karawany i przy kupcu bez osady (lordowie przez Town.GetItemPrice) podloga
+                // od wartosci ZE STANEM, jak w miescie - wrak nie idzie za 2% ceny nowej; wylacznik SellPriceByCondition: od czystej, jak w 127
+                int floor = (int)((float)SellByCondition.FloorWorth(itemRosterElement) * s.MinSellPercentOfValue / 100f);
                 if (floor < 1) floor = 1;
                 if (__result < floor) __result = floor;
             }

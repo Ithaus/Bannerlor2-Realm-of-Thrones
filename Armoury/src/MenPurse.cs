@@ -254,6 +254,7 @@ namespace Armoury
                     st.Town.ChangeGold(-unit * n);
                     Add(main, unit * n);
                     sold += n; gold += unit * n; extra -= n;
+                    SellByCondition.NoteSale(SellByCondition.Men, el.EquipmentElement, n, unit);   // ksiega skupu sprzetu (tylko log)
                 }
             }
             if (sold > 0)
@@ -347,6 +348,7 @@ namespace Armoury
                         mp.LeaderHero.ChangeHeroGold(third);
                         Add(mp, unit - third);
                         sold++; gold += unit; _dayLord += third;
+                        SellByCondition.NoteSale(SellByCondition.Men, el, 1, unit);   // ksiega skupu sprzetu (tylko log)
                     }
                     if (cnt > 0) arm[it] = cnt; else arm.Remove(it);
                     if (extra <= 0) break;

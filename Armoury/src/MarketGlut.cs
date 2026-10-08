@@ -102,14 +102,18 @@ namespace Armoury
                 if (key == null) return;
                 // gdy dziala prawo podazy i popytu (SupplyDemand), nadmiar karze ono - tu tylko podloga 5% (tylko przy OneScrapFloor = false)
                 float sold = SupplyDemand.Active ? 0f : SoldCount(key, (int)item.ItemType);
+                // CENA SPRZEDAZY OD STANU (B1, 07.10; tu uspione przy prawie podazy): stawki od wartosci ZE STANEM, jedna zasada z podloga
+                // SupplyDemand i ScrapFloor; wylacznik SellPriceByCondition: od czystej, jak w 127
+                int worth = SellByCondition.FloorWorth(__0);
+                if (worth <= 0) return;
 
-                float baseRate = __result * 100f / item.Value;                  // co daje rynek (handel, perki, stan)
+                float baseRate = __result * 100f / worth;                       // co daje rynek (handel, perki, stan)
                 float start = MathF.Max(baseRate, c.MarketGlutStartPercent);    // 5% to podloga, lepsza stawka stoi
                 float min = MBMath.ClampFloat(c.MarketGlutMinPercent, 0.1f, 100f);
                 float rate = start - MathF.Max(0f, c.MarketGlutDropPP) * sold;  // kazda kolejna sztuka -0.25 pp
                 if (rate < min) rate = min;                                     // dno absolutne 1%
 
-                int np = (int)(item.Value * rate / 100f);
+                int np = (int)(worth * rate / 100f);
                 __result = np < 1 ? 1 : np;
             }
             catch { }

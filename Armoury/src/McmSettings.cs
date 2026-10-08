@@ -760,13 +760,25 @@ namespace Armoury
         [SettingPropertyGroup("The law of the battlefield")]
         public bool UniqueGearLawEnabled { get; set; } = true;
 
-        [SettingPropertyInteger("Min Sell Percent Of Value", 0, 10, "0", HintText = "merchants never pay less than this share of an item's clean value - scrap is still metal and leather. Only junk ever sinks this low: above the floor the price of worn gear follows its condition and the stall's supply and demand (0 = off)")]
+        [SettingPropertyInteger("Min Sell Percent Of Value", 0, 10, "0", HintText = "merchants never pay less than this share of what an item is worth in its present condition (with Sell Price By Condition off: of its clean worth) - scrap is still metal and leather. Only junk ever sinks this low: above the floor the price of worn gear follows its condition and the stall's supply and demand (0 = off)")]
         [SettingPropertyGroup("The law of the battlefield")]
         public int MinSellPercentOfValue { get; set; } = 2;
 
         [SettingPropertyBool("One Scrap Floor", HintText = "one floor for junk, after the stall's supply and demand: in towns and castles worn-out gear fetches its condition times the stall, never under Min Sell Percent Of Value - and never more than that stall itself asks for the very same piece, so a glutted stall pays little and nobody can buy junk cheap and sell it back at the floor. The glutted market's 5% start steps aside while supply and demand is on. Off = as before: a floor before the stall, the glutted market's 5% start, and the floor again after the stall")]
         [SettingPropertyGroup("The law of the battlefield")]
         public bool OneScrapFloor { get; set; } = true;
+
+        [SettingPropertyBool("Bk Trade Penalty Once", HintText = "Banner Kings' trade penalty on arms, armour and saddles counts ONCE (x5, as Banner Kings means it): the price model of the Banner Kings - Realm of Thrones patch calls the game's own penalty, which Banner Kings has already multiplied by 5, and Banner Kings then multiplied the result by 5 again - x25 on every weapon and piece of armour you or the AI sell (x225 in a castle). Only that doubled patch is lifted; Banner Kings' castle, Gladiator and perk effects still apply once. Applied when a session loads; the log line 'Kara handlowa BK' shows the multiplier at every start (off = as before, x25)")]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool BkTradePenaltyOnce { get; set; } = true;
+
+        [SettingPropertyBool("Sell Price By Condition", HintText = "what a merchant pays for arms, armour and horses follows the piece's condition and quality: Min Sell Percent Of Value and the wholesale price between towns count from what the piece is worth as it is, not from a clean one; when the game's price drops to its 1-denar minimum the true fraction is kept before supply and demand multiplies it; and no town or castle stall pays more for a weapon, a piece of armour, a saddle or a quiver than Sell Cap Percent Of New Ask of what it asks for a new one of the same quality. A wreck fetches pennies, a clean or finer piece more, a legendary one many times more (off = as before: floor and wholesale from the clean worth, no cap)")]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool SellPriceByCondition { get; set; } = true;
+
+        [SettingPropertyInteger("Sell Cap Percent Of New Ask", 0, 40, "0", HintText = "the most a town or castle merchant pays for a weapon, a piece of armour, a saddle or ammunition, as % of what his own stall asks for a NEW one of the same kind and quality - and never more than he charges for its wreck, so buying worn gear or spoilt arrows, putting them right and selling them back in the same town never pays; carrying mended gear to a town that lacks it still pays. Horses and pack animals are not capped (0 = no cap; needs Sell Price By Condition)")]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public int SellCapPercentOfNewAsk { get; set; } = 10;
 
         [SettingPropertyBool("Enlisted Soldier No Looting", HintText = "serving in a lord's army: the quartermasters strip the field - one soldier does not pocket the army's loot and gold")]
         [SettingPropertyGroup("The law of the battlefield")]
@@ -2891,6 +2903,9 @@ namespace Armoury
             s.UniqueGearLawEnabled = UniqueGearLawEnabled;
             s.MinSellPercentOfValue = MinSellPercentOfValue;
             s.OneScrapFloor = OneScrapFloor;
+            s.BkTradePenaltyOnce = BkTradePenaltyOnce;
+            s.SellPriceByCondition = SellPriceByCondition;
+            s.SellCapPercentOfNewAsk = SellCapPercentOfNewAsk;
             s.EnlistedSoldierNoLooting = EnlistedSoldierNoLooting;
             s.FieldCraftEnabled = FieldCraftEnabled;
             s.SprintFatigueEnabled = SprintFatigueEnabled;

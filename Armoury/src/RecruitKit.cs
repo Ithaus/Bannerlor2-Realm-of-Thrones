@@ -79,6 +79,7 @@ namespace Armoury
                 market.Town.ChangeGold(-price);
                 n.ChangeHeroGold(price);
                 _daySold++;
+                SellByCondition.NoteSale(SellByCondition.Notable, e, 1, price);   // ksiega skupu sprzetu (tylko log)
             }
         }
 
