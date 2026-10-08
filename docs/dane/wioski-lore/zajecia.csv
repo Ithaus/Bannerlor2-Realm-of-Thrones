@@ -1,0 +1,120 @@
+table,kind,vtype,group,place,text,source
+crops,,,N,,"barley, oats and turnips",Lore (regions) [STYL]
+crops,,,W,,"wheat, barley and oats",Lore (regions) [STYL]
+crops,,,R,,"wheat, barley and apples",Lore (regions) [STYL]
+crops,,,D,,wheat and barley on watered land,Lore (regions) [STYL]
+crops,,,I,,"barley and oats on thin, stony soil",Lore (regions) [STYL]
+crops,,,E1,,"barley, oats and cabbages",Lore (regions) [STYL]
+crops,,,E2,,"wheat, barley and beans",Lore (regions) [STYL]
+crops,,,E3,,"wheat, barley and figs",Lore (regions) [STYL]
+crops,,,G,,wheat and barley on irrigated land,Lore (regions) [STYL]
+crops,,,X,,barley and beans,Lore (regions) [STYL]
+farmers,,,N,,Farmers,Slavery / thralls
+farmers,,,W,,Farmers,Slavery / thralls
+farmers,,,R,,Farmers,Slavery / thralls
+farmers,,,D,,Farmers,Slavery / thralls
+farmers,,,I,,Thralls and farmers,Slavery / thralls
+farmers,,,E1,,Free farmers,Slavery / thralls
+farmers,,,E2,,Farmers and bond servants,Slavery / thralls
+farmers,,,E3,,Field slaves,Slavery / thralls
+farmers,,,G,,Field slaves,Slavery / thralls
+farmers,,,X,,Farmers,Slavery / thralls
+fish,,,N,coast,"cod, herring and seal",[STYL]
+fish,,,I,coast,"cod, herring and crabs",[STYL]
+fish,,,E1,coast,"cod, herring and eels",[STYL]
+fish,,,D,coast,"crabs, octopus and tuna",[STYL]
+fish,,,E3,coast,"crabs, octopus and tuna",[STYL]
+fish,,,G,coast,crabs and shellfish,[STYL]
+fish,,,*,coast,"crabs, eels and mackerel",[STYL]
+fish,,,*,river,"eels, pike and trout",[STYL]
+fish,,,*,lake,lake trout and eels,[STYL]
+fish,,,*,*,eels and river fish,[STYL]
+main,mill,*,*,,{FARMERS} and millers: {CROPS}. The mill wheel turns on {RIVER_OR}.,PROJEKT v4 (mill = water mill) [STYL]
+main,mill,*,E3,,Field slaves and a miller: {CROPS} for the masters of {SEAT}. The mill turns on {RIVER_OR}.,Volantis/Lys/Myr/Tyrosh slavery
+main,mill,*,G,,Field slaves and a miller: {CROPS} for the masters of {SEAT}. The mill turns on {RIVER_OR}.,Slaver's_Bay
+main,windmill,*,*,,{FARMERS}: {CROPS}. A windmill on the rise grinds for the whole district.,PROJEKT v4 (windmill) [STYL]
+main,granary,*,*,,{FARMERS} and carters: {CROPS}. The great barn here holds the grain of the district.,PROJEKT v4 (granary) [STYL]
+main,granary,*,E3,,Field slaves and overseers: {CROPS}. The masters' granary holds the grain of the district.,Slavery (Essos)
+main,granary,*,G,,Field slaves and overseers: {CROPS}. The masters' granary holds the grain of the district.,Slaver's_Bay
+main,fishing,*,*,,Fishers and net-makers: {FISH}.,Fisherman
+main,fishing,*,I,,"Fishers, seven families in ten, as everywhere on the isles: {FISH}.",Iron_Islands (Haereg: 7 of 10 fishers)
+main,farm,*,*,,"Crofters and herdsmen: {CROPS}, a few cows and pigs.",PROJEKT v4 (farm) [STYL]
+main,farm,*,E3,,"Slaves on a master's estate: {CROPS}, goats and pigs.",Slavery (Essos)
+main,farm,*,G,,"Slaves on a master's estate: {CROPS}, goats and sheep.",Slaver's_Bay
+main,*,wheat_farm,*,,{FARMERS}: {CROPS}.,settlements.xml wheat_farm
+main,*,wheat_farm,E3,,Field slaves: {CROPS} for the masters of {SEAT}.,Slavery (Essos)
+main,*,wheat_farm,G,,Field slaves: {CROPS} for the masters of {SEAT}.,Slaver's_Bay
+main,*,fisherman,*,,Fishers and net-makers: {FISH}.,fisherman
+main,*,lumberjack,*,,Woodcutters and charcoal burners.,lumberjack
+main,*,lumberjack,N,,"Woodsmen: pine, oak and sentinel trees felled for the lords' halls.",North (sentinel trees) [STYL]
+main,*,lumberjack,E1,,Woodcutters: pine from the hills for the shipwrights of the Arsenal.,"Braavos (Arsenal, pine hills)"
+main,*,lumberjack,E2,,Woodsmen: timber from the great forest for the city.,Qohor (forest of Qohor)
+main,*,lumberjack,D,,Woodcutters in the hills: timber is scarce in Dorne and dearly sold.,Dorne [STYL]
+main,*,silver_mine,*,,Silver miners and smelters.,silver_mine
+main,*,silver_mine,W,,Miners in the silver workings of the hills.,Westerlands (mines)
+main,*,iron_mine,*,,Iron miners and smiths.,iron_mine
+main,*,iron_mine,I,,"Thralls in the iron mines, and smiths who sell to the longships.",Iron_Islands (thralls in mines)
+main,*,iron_mine,E2,,"Iron miners: ore for the smiths of Qohor, the best in the world.",Qohor (smiths)
+main,*,clay_mine,*,,Potters and brickmakers: clay pits by the water.,clay_mine
+main,*,clay_mine,G,,Slave brickmakers: the red and yellow bricks of the slaver cities.,"Astapor (red brick), Yunkai (yellow)"
+main,*,salt_mine,*,,Salt-makers: salt pans along the shore.,Saltpans (riverlands) [STYL]
+main,*,vineyard,*,,Vintners: vines on the slopes and a wine press.,vineyard
+main,*,vineyard,R,,Vintners: the vines of the Reach and a wine press.,Reach (wine)
+main,*,vineyard,D,,Vintners: the vines that make Dornish red.,Dornish red
+main,*,vineyard,N,,Brewers and beekeepers: barley ale and heather mead.,North (no vines) [STYL]
+main,*,vineyard,E3,,Slaves in the vineyards and a master's press.,Slavery (Essos)
+main,*,cattle_farm,*,,Herdsmen and cheesemakers: cattle on the common grazing.,cattle_farm
+main,*,sheep_farm,*,,Shepherds and weavers: sheep and wool.,sheep_farm
+main,*,sheep_farm,G,,Shepherds: sheep and wool for the looms of the slaver cities.,Slaver's_Bay
+main,*,swine_farm,*,,Swineherds: pigs fattened in the oak woods.,swine_farm
+main,*,flax_plant,*,,Flax growers and linen weavers.,flax_plant
+main,*,flax_plant,E3,,Slaves in the flax fields: thread for the lacemakers of Myr.,Myr (lace)
+main,*,olive_trees,*,,Olive growers: groves and an oil press.,olive_trees
+main,*,date_farm,*,,Date growers and well-keepers.,date_farm
+main,*,date_farm,D,,"Date palms around a guarded well, worth more than gold.",Dorne (wells)
+main,*,silk_plant,*,,Dyers and weavers of fine cloth.,silk_plant (ROT) [STYL]
+main,*,silk_plant,E3,,"Dyers and weavers of fine cloth, slaves to a master in {SEAT}.",Slavery (Essos)
+main,*,silk_plant,X,,Silk growers and weavers.,Yi Ti [STYL]
+main,*,trapper,*,,Trappers and furriers.,trapper
+main,*,trapper,N,,"Trappers: fox, marten and beaver furs for the winter.",North [STYL]
+main,*,europe_horse_ranch,*,,Horse breeders: palfreys and plough horses.,europe_horse_ranch
+main,*,vlandian_horse_ranch,*,,Horse breeders: coursers and destriers for knights.,vlandian_horse_ranch
+main,*,vlandian_horse_ranch,W,,Horse breeders: destriers for the knights of the west.,Westerlands [STYL]
+main,*,battanian_horse_ranch,*,,Horse breeders: shaggy garrons and riding horses.,garron (North)
+main,*,sturgian_horse_ranch,*,,Horse breeders: hardy garrons for hill and moor.,garron
+main,*,desert_horse_ranch,*,,Horse breeders: swift horses of the south.,desert_horse_ranch
+main,*,desert_horse_ranch,D,,"Breeders of sand steeds, the swift and tireless horses of Dorne.",Sand_steed
+main,*,steppe_horse_ranch,*,,"Horse herders on the open grass, selling to khalasars and sellswords.",steppe_horse_ranch
+main,*,whaler,*,,Whalers and oil-boilers.,whaler
+main,*,whaler,E1,,Whalers: whale oil for the lamps of Ibben and the markets beyond.,Port_of_Ibben (whale-oil lamps)
+main,*,walrus_hunter,*,,Walrus and seal hunters.,walrus_hunter
+main,*,*,*,,{FARMERS}: {CROPS}.,fallback
+main,*,wheat_farm,*,,Ploughmen and reapers: {CROPS}.,wheat_farm [STYL]
+main,*,wheat_farm,*,,Farmers and beekeepers: {CROPS}.,wheat_farm [STYL]
+main,*,vineyard,*,,"Vintners and coopers: grapes, casks and a wine press.",vineyard [STYL]
+main,*,flax_plant,*,,Linen weavers: flax retted in the ponds and spun through the winter.,flax_plant [STYL]
+main,*,cattle_farm,*,,"Herdsmen: cattle, butter and hides for the tanners.",cattle_farm [STYL]
+main,*,desert_horse_ranch,*,,"Horse breeders: lean, swift horses for the caravans.",desert_horse_ranch [STYL]
+main,*,sheep_farm,*,,"Shepherds and shearers: wool, mutton and cheese.",sheep_farm [STYL]
+main,*,lumberjack,*,,"Woodcutters and sawyers: timber, charcoal and bark for the tanners.",lumberjack [STYL]
+main,*,clay_mine,*,,"Potters and tile-makers, with kilns that smoke day and night.",clay_mine [STYL]
+place,,,*,bridge,"Bridge tolls, and a smithy for passing riders.",Bridge (toll) [STYL]
+place,,,E1|E2|E3|G,bridge,"Bridge tolls for {SEAT}, paid in coin or in kind.",[STYL]
+place,,,*,ford,"Ox teams help carts across the ford, for a coin.",[STYL]
+place,,,*,crossroad,"An inn at the crossroads, and a market on feast days.",Crossroads_Inn
+place,,,N,crossroad,"An inn at the crossroads, busiest before winter.",Kingsroad (inns rarer in the north)
+place,,,E1|E2|E3|G|X,crossroad,Caravans rest at the crossroads market.,[STYL]
+place,,,*,road,An alehouse on the road serves carters and riders.,Kingsroad (inns and villages)
+place,,,D|E3|G|X,road,A well and a stable for the caravans on the road.,Dorne (wells) [STYL]
+place,,,*,river,Ferrymen and eel traps on {RIVER_OR}.,Riverlands (river trade)
+place,,,*,coast,"Boats drawn up on the shingle, and salt fish for the markets.",[STYL]
+place,,,*,lake,Reed-cutters and boats on the lake.,[STYL]
+place,,,*,field,,-
+place,,,*,road,A smithy on the road shoes the horses of passing riders.,[STYL]
+place,,,*,road,A waystation on the road sells bread and ale.,[STYL]
+place,,,D|E3|G|X,road,Caravan drivers water their beasts at the village well.,[STYL]
+place,,,*,river,A landing on {RIVER_OR} for barges and boats.,[STYL]
+place,,,*,coast,Salt fish and seaweed are dried along the shore.,[STYL]
+place,,,*,crossroad,Carters and drovers meet at the crossroads inn.,[STYL]
+place,,,*,bridge,A smithy and an alehouse by the bridge.,[STYL]
+group,,,,,north=N gift=N skagos=N beyond=N riverlands=W vale=W westerlands=W crownlands=W stormlands=W dragonstone=W reach=R dorne=D iron=I braavos=E1 lorath=E1 ibben=E1 pentos=E2 norvos=E2 qohor=E2 myr=E3 lys=E3 tyrosh=E3 volantis=E3 valyria=E3 ghis=G qarth=X dothraki=X sarnor=X yiti=X summer=X,region -> group

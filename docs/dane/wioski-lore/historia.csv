@@ -1,0 +1,473 @@
+id,region,place,needs,seats,era,text,source
+shared_01,riverlands|vale|westerlands|reach|stormlands|crownlands|dragonstone,bridge,,,Jaehaerys I,"The bridge was built in the Old King's day, when roads were laid across the realm; before it there was a ferry.",Kingsroad (Jaehaerys I roads)
+shared_02,riverlands|vale|westerlands|reach|stormlands|crownlands|dragonstone,bridge,RIVER,,-,The stone bridge over {RIVER} has paid for three lords' weddings with its tolls.,[WYM]
+shared_03,riverlands|vale|westerlands|reach|stormlands|crownlands|dragonstone,bridge,,,-,The first bridge here was timber and burned in some forgotten war; the stone one is younger than the sept.,[WYM]
+shared_04,riverlands|vale|westerlands|reach|stormlands|crownlands|dragonstone,ford,,,-,"Armies have crossed at this ford in every war, so the village keeps its grain in the cellars.",[WYM]
+shared_05,riverlands|vale|westerlands|reach|stormlands|crownlands|dragonstone,ford,RIVER,,First Men,Men have forded {RIVER} here since the First Men; a holdfast on the far bank still takes the toll.,Holdfast [STYL]
+shared_06,riverlands|vale|westerlands|reach|stormlands|crownlands|dragonstone,crossroad,,,-,An inn stood at this crossing before the Conquest; its sign has changed with every king.,Crossroads_Inn [STYL]
+shared_07,riverlands|vale|westerlands|reach|stormlands|crownlands|dragonstone,crossroad,,,-,"Wandering septons, singers and hedge knights meet at the crossroads inn on their way to everywhere.",Hedge_knight; Faith_of_the_Seven
+shared_08,riverlands|vale|westerlands|reach|stormlands|crownlands|dragonstone,road,,,-,The village grew along the road one alehouse at a time; carters still stop here for the night.,Kingsroad (inns and villages)
+shared_09,riverlands|vale|westerlands|reach|stormlands|crownlands|dragonstone,road,,,-,"Hedge knights ride this road looking for service, and the village feeds them for their news.",Hedge_knight
+shared_10,riverlands|vale|westerlands|reach|stormlands|crownlands|dragonstone,river,,,-,Spring floods once carried off half the houses; the new ones stand on the high bank.,[WYM]
+shared_11,riverlands|vale|westerlands|reach|stormlands|crownlands|dragonstone,river,RIVER,,-,Barges and fishing boats tie up at the landing on {RIVER}; the village has always lived off the water.,Riverlands (river trade)
+shared_12,riverlands|vale|westerlands|reach|stormlands|crownlands|dragonstone,coast,,,First Men,Its fishers have worked this shore since before the Andals; the boats are still built the old way.,[STYL]
+shared_13,riverlands|vale|westerlands|reach|stormlands|crownlands|dragonstone,field,,,-,"The village lies among its fields, away from the road, and most wars have passed it by.",[WYM]
+shared_14,riverlands|vale|westerlands|reach|stormlands|crownlands|dragonstone,field,,,-,Its fields were cleared from the woods by younger sons who could hope for no land at home.,[STYL]
+shared_15,riverlands|vale|westerlands|reach|stormlands|crownlands|dragonstone,lake,,,-,Its boats fish the lake; on still days the far shore seems close enough to touch.,[WYM]
+shared_16,riverlands|vale|westerlands|reach|stormlands|crownlands|dragonstone,any,,,-,"Broken men and outlaws come with every war, and the village has learned to hide its seed corn.",Broken men (AFFC 25)
+shared_17,riverlands|vale|westerlands|reach|stormlands|crownlands|dragonstone,any,,,Andals,"Its oldest families say they were here before the Andals, and the Andals married them anyway.",Coming_of_the_Andals [STYL]
+shared_18,riverlands|vale|westerlands|reach|stormlands|crownlands|dragonstone,any,,,-,The village has paid its rents in grain and eggs to {SEAT} for as long as anyone remembers.,[WYM]
+shared_19,riverlands|vale|westerlands|reach|stormlands|crownlands|dragonstone,any,,,-,"Floods, sickness and war have each half emptied the village, and each time it filled again.",[WYM]
+north_01,north,any,,,First Men,First Men cleared these fields; the stones of their old ringfort still lie under the turf.,First_Men (ringforts)
+north_02,north,any,,,Kings of Winter,Its people say their forebears fought for the Kings of Winter long before any dragon came.,House_Stark
+north_03,north,any,,,-,In hard winters its people shelter behind the walls of {SEAT} and come home with the thaw.,Winter town (AGOT 37)
+north_04,north,any,,,Conquest,The old men still say Torrhen Stark knelt to the dragon so that their forefathers would not burn.,Torrhen_Stark
+north_05,north,any,,,282-283 AC,Men from the village marched south in Robert's Rebellion; fewer came back from the Trident.,Robert's_Rebellion
+north_06,north,any,,,289 AC,Some of its men sailed with Lord Stark to the siege of Pyke in 289 AC.,Greyjoy's_Rebellion
+north_07,north,any,,,First Men,A holdfast of the First Men stood here once; only its well and a grassy barrow remain.,[STYL]
+north_08,north,any,,,-,"Its fields were first given to a younger son of {SEAT}, with a holdfast and the land around it.",Holdfast (AGOT 5)
+north_09,north,any,,,-,A hard winter once took half the village; the dead lie under the cairn on the hill.,Winter [WYM]
+north_10,north,any,,,Andals,"The Andals never came north of the Neck, and the old men here are proud of it.",Coming_of_the_Andals; Moat_Cailin
+north_11,north,road,,,Jaehaerys I,"When the Old King's roads were laid, the cattle track past the village became a road.",Kingsroad (to the Wall)
+north_12,north,road,,,-,Riders from {SEAT} change horses here; the stable is older than the stone well.,[WYM]
+north_13,north,crossroad,,,-,Two old tracks met here long before the Conquest; the inn at the crossing has had many names.,[STYL]
+north_14,north,bridge,,,-,A lord of {SEAT} built the bridge after the old ford drowned a wedding party.,[WYM]
+north_15,north,ford,,,-,The ford is passable from spring to the first snows; in winter the river is crossed on the ice.,[WYM]
+north_16,north,river,RIVER,,-,The village grew where {RIVER} could be crossed in summer and fished in every season.,[STYL]
+north_17,north,river,,,-,"Its first houses stood on the high bank, above the floods of the spring thaw.",[WYM]
+north_18,north,coast,,,First Men,Fishers here have worked the cold sea since the First Men; the boats are still built the old way.,[STYL]
+north_19,north,field,,,-,Its fields were won from the wood by axe and fire; the stumps still show at the edges.,[WYM]
+north_20,north,any,,Barrowton,Age of Heroes,The Barrow Kings once ruled here as Kings of the First Men; their mounds still dot the fields.,Barrow_Kings
+north_21,north,any,,Dreadfort,Age of Heroes,Under the Red Kings of the Dreadfort its people learned to fear the flayed man; some still do.,Red_Kings; House_Bolton
+north_22,north,any,,Dreadfort,Andals,Andal ships once came up the Weeping Water; King Theon Stark and the Boltons threw them back.,Red_Kings (Battle of the Weeping Water)
+north_23,north,any,,White Harbor|Ramsgate,c. 1000 BC,"Many families here came north with the Manderlys, when the Gardener kings drove them from the Reach.",House_Manderly
+north_24,north,any,,Moat Cailin,Andals,"No southern host has ever taken Moat Cailin, and the village has never seen an Andal king.",Moat_Cailin
+north_25,north,any,,Greywater Watch,-,"Crannogmen trade frogs and fish here; their castle moves, they say, and no stranger finds it.",Greywater_Watch
+north_26,north,any,,Winterfell,Age of Heroes,"The Starks have held this land since the Age of Heroes, and the village has never known another liege.",House_Stark
+north_27,north,any,,Last Hearth,226 AC,In 226 AC its men fought Raymun Redbeard's wildlings at Long Lake beside the Umbers and Lord Willam Stark.,Battle_at_Long_Lake
+north_28,north,any,,Last Hearth,-,"The Umbers have held back wildlings here for centuries, and every house keeps an axe by the door.",House_Umber [STYL]
+north_29,north,any,,Karhold,-,"The Karstarks are Starks by blood, the village says, and says it proudly.",House_Karstark (Karlon Stark)
+north_30,north,coast,,Flint's Finger|Deepwood Motte|Torrhen's Square|Ironrath,Old Way,"Ironborn reavers have harried this shore for centuries, and the boats are kept far up the beach.",Stony_Shore (centuries of reaving)
+gift_01,gift,any,,,Age of Heroes,Brandon's Gift has been farmed for thousands of years to feed the Watch; the village is one of the few left.,Brandon's_Gift
+gift_02,gift,any,,,58 AC,"Queen Alysanne asked for the New Gift in 58 AC; settlers came then, and wildling raids drove most away.",New_Gift
+gift_03,gift,any,,,-,Wildling raiders cross the Wall every few winters; the village pays its tithe to the Watch and hopes.,Wall [STYL]
+gift_04,gift,any,,,226 AC,In 226 AC Raymun Redbeard's wildlings passed through; the black brothers came too late to help.,Battle_at_Long_Lake (Sleepy Jack)
+gift_05,gift,any,,,Jaehaerys I,The Nightfort was abandoned in the Old King's day; the village keeps well clear of its ruins.,Nightfort
+gift_06,gift,any,,,-,"Like Mole's Town, the village lives half under the ground when winter comes.",Mole's_Town (AGOT 70)
+gift_07,gift,any,,,-,"Every boy here has watched black brothers ride by, and some have taken the black themselves.",Night's_Watch
+gift_08,gift,any,,,Conquest,The Watch had ten thousand men at the Conquest and has fewer than a thousand now; the village feels it.,Night's_Watch (TWOIAF)
+gift_09,gift,any,,,-,Its orchards went wild when the Watch could no longer keep them; the village picks what it can.,Brandon's_Gift (nature reclaimed orchards)
+gift_10,gift,any,,,c. 300 BC,Hardhome burned six hundred years ago; old women here say its glow lit the northern sky.,Hardhome
+gift_11,gift,road,,,-,"Lords send their criminals to the Wall along this road, and the village feeds them on the way.",Night's_Watch [STYL]
+gift_12,gift,field,,,58 AC,Its fields were cleared by settlers of the New Gift; half of them lie fallow now.,New_Gift
+gift_13,gift,coast,,,-,"When ships come to Eastwatch, they buy salt fish here; most years they do not come.",Eastwatch [STYL]
+gift_14,gift,any,,,-,In the long winters the village shuts its doors and lives on what it salted in autumn.,[WYM]
+gift_15,gift,any,,,-,"The black brothers' rangers come back fewer every year, and the village has stopped asking why.",Night's_Watch [STYL]
+beyond_01,beyond,any,,,Long Night,"Free folk have lived here since before there was a Wall, and they kneel to no one.",Free_folk
+beyond_02,beyond,any,,,226 AC,"Raymun Redbeard gathered the clans in 226 AC; the village sent men south, and few came back from Long Lake.",Raymun_Redbeard
+beyond_03,beyond,any,,,Legend,"Bael the Bard stole a Stark daughter, the songs say, and the village still sings it to annoy the crows.",Bael_the_Bard
+beyond_04,beyond,any,,,c. 300 BC,"Hardhome burned six hundred years ago, and no one from the village will camp near its ruins.",Hardhome
+beyond_05,beyond,any,,,Legend,"Joramun blew the Horn of Winter and woke giants from the earth, the old women say.",Horn_of_Winter
+beyond_06,beyond,any,,,-,"Thenns come down from their hidden valley to trade bronze for furs, and keep apart.",Thenns
+beyond_07,beyond,any,,,-,Weirwoods still grow thick in the woods here; the free folk say the old gods see everything.,Haunted_forest
+beyond_08,beyond,any,,,-,"Raiders from the village have crossed the Wall more than once, and come back with southron steel.",Free_folk
+beyond_09,beyond,any,,,Legend,"Gendel and Gorne led the free folk under the Wall in the old days, the singers say.",Gendel; Gorne
+beyond_10,beyond,any,,,-,Its people are hunters and spearwives; the strongest chief takes what he can hold.,Free_folk
+beyond_11,beyond,any,,,-,Winters here kill more than any war; every family has lost someone to the snow.,[WYM]
+beyond_12,beyond,any,,,-,The Frostfangs loom over the village; in summer the clans come down to trade.,Frostfangs
+beyond_13,beyond,any,,,-,Mammoth bones mark the path to the village; the giants passed this way once.,Giants (mammoths)
+beyond_14,beyond,river,RIVER,,-,"The village sits on {RIVER}, where the clans meet when the hunting is poor.",Milkwater [STYL]
+beyond_15,beyond,coast,,,-,"Slavers from across the sea once took people from this shore, the elders say.",Hardhome (slavers tale)
+skagos_01,skagos,any,,,c. 200 AC,The stoneborn rose against Winterfell in the reign of Daeron II; Lord Barthogan Stark died putting them down.,Barthogan_Stark
+skagos_02,skagos,any,,,-,Traders say the lords of Skagos ride shaggy unicorns; the village does not deny it.,Skagosi
+skagos_03,skagos,any,,,-,Mainlanders say the Skagosi eat men in winter; the village says mainlanders talk too much.,Skagosi (rumours)
+skagos_04,skagos,any,,,-,Skagos is Stark land in name; the village has seen a Stark ship once in living memory.,Skagos (AFFC 15)
+skagos_05,skagos,coast,,,-,Ships that pass too close to this coast are said to be lured onto the rocks by false lights.,Skagosi (rumours)
+skagos_06,skagos,any,,,c. 300 BC,Some tales blame Skagosi cannibals for the ruin of Hardhome; the village has its own tale.,Hardhome
+skagos_07,skagos,any,,,First Men,"The stoneborn clans have held these crags since the First Men, and no Andal ever came.",Skagosi
+skagos_08,skagos,any,,,-,"The village lives in stone houses half sunk into the hill, out of the sea wind.","Skagosi (caves, fastnesses) [STYL]"
+skagos_09,skagos,any,,,-,Its clan has feuded with the next valley for longer than anyone can count.,[WYM]
+skagos_10,skagos,any,,,-,"Wildling ships sometimes put in here; the stoneborn trade with them, and fight them.",[STYL]
+skagos_11,skagos,coast,,,-,"Seals and whales feed the village in winter, and their oil lights its halls.",[STYL]
+skagos_12,skagos,any,,,-,The village pays no tax to Winterfell and sends no levies; the Starks have stopped asking.,Skagos (in name only)
+skagos_13,skagos,any,,,-,A weirwood grove above the village is older than any house on the island.,Old_gods
+skagos_14,skagos,any,,,-,"The stoneborn bury their dead in the rock, and do not speak of them to strangers.",[WYM]
+skagos_15,skagos,any,,,-,"Sailors from White Harbor call this coast cursed, and steer wide of it.",Skagos [STYL]
+riverlands_01,riverlands,any,,,Andals,"First Men raised the first huts here; the Andals came later, with steel and the seven-pointed star.",Coming_of_the_Andals
+riverlands_02,riverlands,any,,,Storm Kings; Hoare,"Under the Storm Kings, and later the ironborn kings, the village paid tribute it never forgot.",Arlan_III; House_Hoare
+riverlands_03,riverlands,any,,,Hoare,"Men from the village died in Harren's quarries, chained to the sledges that built Harrenhal.","Harrenhal (forty years, captives)"
+riverlands_04,riverlands,any,,,2 BC,"When Aegon came, Lord Edmyn Tully rose against Harren, and the men of the village rose with him.",Edmyn_Tully
+riverlands_05,riverlands,any,,,196 AC,"In 196 AC its men marched to the Redgrass Field, some for the red dragon and some for the black.",Battle_of_the_Redgrass_Field
+riverlands_06,riverlands,any,,,283 AC,"Its men fought on the Trident in 283 AC, though no one here agrees on which side.",Battle_of_the_Trident
+riverlands_07,riverlands,river,RIVER=the Trident,,283 AC,After the Trident in 283 AC the village children dived for Rhaegar's rubies; none were ever found.,Battle_of_the_Trident (rubies)
+riverlands_08,riverlands,river,RIVER,,-,Barges have carried grain down {RIVER} from this landing since the days of the river kings.,Riverlands (river trade)
+riverlands_09,riverlands,road,,,-,"Mummers' carts and wandering septons pass in every season, and the village never lacks for news.",Mummers (ASOS 2); septons (AFFC 25)
+riverlands_10,riverlands,field,,,-,"Its fields lie away from the river, too poor to be fought over, and so the village has survived.",[WYM]
+riverlands_11,riverlands,lake,,,-,On a clear day the Isle of Faces can be seen from the shore; no one rows out there.,Isle_of_Faces
+riverlands_12,riverlands,any,,Stone Hedge|Raventree Hall,129 AC,In 129 AC Brackens and Blackwoods fought by a burning mill nearby; the feud is older than the mill.,Battle_of_the_Burning_Mill
+riverlands_13,riverlands,any,,Stone Hedge|Raventree Hall,-,"Brackens and Blackwoods have quarrelled over these fields for a thousand years, and both have burned it.",House_Blackwood; House_Bracken
+riverlands_14,riverlands,any,,Stoney Sept,283 AC,"When the bells of Stoney Sept rang in 283 AC, the village hid its people in the cellars.",Battle_of_the_Bells
+riverlands_15,riverlands,any,,Riverrun,1 AC,"Its lords swear to Riverrun, where Aegon raised the Tullys over all the riverlands.",Edmyn_Tully (Lord Paramount)
+riverlands_16,riverlands,any,,The Twins,-,"Every cart that crosses at the Twins pays the Freys, and the village sells them bread, not love.",The_Twins (toll)
+riverlands_17,riverlands,coast,,Seagard,289 AC,"In 289 AC ironborn longships came against Seagard, where Lord Jason Mallister slew Rodrik Greyjoy.",Storming_of_Seagard
+riverlands_18,riverlands,any,,Harrenhal,-,"The ruined towers of Harrenhal cast long shadows; folk here say the castle is cursed, and many lords agree.",Curse_of_Harrenhal
+riverlands_19,riverlands,any,,Harrenhal,Hoare,Harren cut weirwoods three thousand years old for his rafters; the village still curses his name.,Harrenhal (weirwood beams)
+riverlands_20,riverlands,any,,Fairmarket,Hoare,"Harwyn Hardhand won the riverlands at Fairmarket, and the village paid the ironborn for three generations.",Harwyn_Hoare
+riverlands_21,riverlands,any,,Acorn Hall,Andals,Smallfolk here will not climb High Heart at night; the ghosts of the children of the forest walk there.,High_Heart
+riverlands_22,riverlands,coast,,Saltpans,-,Salt has been dried in pans along this shore for as long as Saltpans has had its name.,Saltpans [STYL]
+vale_01,vale,any,,,Andals,"The first Andal ships landed on the Fingers, and the village says its founders came with them.",Coming_of_the_Andals (Fingers)
+vale_02,vale,any,,,Andals,"Since the Andals the Arryns have ruled the Vale, and the village has paid its dues to the Eyrie for thousands of years.",House_Arryn
+vale_03,vale,any,,,-,Clansmen from the Mountains of the Moon have raided here in living memory; the knights ride out every spring.,Vale_mountain_clans
+vale_04,vale,any,,,282 AC,"Its men rode under Jon Arryn's banners in 282 AC, when the Vale rose for Robert.",Robert's_Rebellion
+vale_05,vale,any,,,129-131 AC,"In the Dance of the Dragons the Vale stood for Rhaenyra, and the village sent men and grain.",Jeyne_Arryn
+vale_06,vale,any,,,209 AC,"The Vale shut its roads and ports in 209 AC, and the Great Spring Sickness passed the village by.",Great_Spring_Sickness
+vale_07,vale,any,,,Andals,The Arryn kings built septs and septries across the Vale; the village sept is one of them.,Vale (learning at septs)
+vale_08,vale,any,,,97 AC,In 97 AC the Stone Crows killed Lady Jeyne's father and brothers; the village has kept its spears since.,Stone_Crows
+vale_09,vale,river,,,-,"Snowmelt from the Mountains of the Moon floods the river each spring, so the village stands on the high bank.",Mountains_of_the_Moon [STYL]
+vale_10,vale,crossroad,,,-,"The valley roads meet here; septons, wool carts and knights pass in every season.",[STYL]
+vale_11,vale,field,,,-,"Its fields lie in a fold of the hills, out of sight of the road and of the clansmen.",Vale_mountain_clans [STYL]
+vale_12,vale,any,,Bloody Gate,-,"Every host that tried the Bloody Gate has broken there, and the village has fed the garrison for centuries.",Bloody_Gate
+vale_13,vale,any,,Gulltown,282 AC,"When Jon Arryn took Gulltown from the Graftons in 282 AC, the village quartered his knights.",Taking_of_Gulltown
+vale_14,vale,any,,Runestone,First Men,"The Royces of Runestone are older than the Arryns, and their bronze runes are older still.",House_Royce
+vale_15,vale,any,,Heart's Home,Andals,"The Corbrays won the Fingers in the Andal wars, and the village still sings of it.",Coming_of_the_Andals (Corbray)
+vale_16,vale,any,,The Eyrie,Andals,"Its old songs are of the Battle of the Seven Stars, fought at the foot of the Giant's Lance.",Battle_of_the_Seven_Stars
+vale_17,vale,coast,,Sisterton,-,Mainlanders call the Sistermen smugglers and wreckers; the village says only that it fishes.,Sisterton
+westerlands_01,westerlands,any,,,Age of Heroes,"Gold and silver have come out of these hills since the First Men, and the Lannisters have taken their share since Lann.",Westerlands (mines); Lann_the_Clever
+westerlands_02,westerlands,any,,,2 BC,The Kings of the Rock ruled here until Loren Lannister knelt after the Field of Fire.,Field_of_Fire
+westerlands_03,westerlands,any,,,Andals,"When the Andals came, the Lannisters took them in as wards and brides, and the first sept was raised here.",House_Lannister (Andals)
+westerlands_04,westerlands,any,,,261 AC,In 261 AC its men marched with young Tywin Lannister against the Reynes of Castamere.,Reyne-Tarbeck_revolt
+westerlands_05,westerlands,any,,,261 AC,"Its people still sing The Rains of Castamere, and know better than to sing it at the wrong table.",The_Rains_of_Castamere
+westerlands_06,westerlands,any,,,283 AC,"Its men marched with Lord Tywin to King's Landing in 283 AC, and some came home richer.",Sack_of_King's_Landing
+westerlands_07,westerlands,coast,,,130 AC,The Red Kraken's longships harried this shore in 130 AC and carried off wives and daughters.,Sack_of_Lannisport (Dalton Greyjoy)
+westerlands_08,westerlands,river,,,-,"The stream below the village once ran yellow with mine washings, the old women say.",[WYM]
+westerlands_09,westerlands,road,,,-,Ore carts and wool carts have worn ruts in this road since the Kings of the Rock.,[STYL]
+westerlands_10,westerlands,any,,Lannisport|Kayce|Casterly Rock,289 AC,In 289 AC the village watched the Lannister fleet burn in the harbour of Lannisport.,Burning_of_the_Lannister_fleet
+westerlands_11,westerlands,any,,Lannisport|Kayce|Casterly Rock,209 AC,The Great Spring Sickness of 209 AC came out of Lannisport and took many in the village.,Great_Spring_Sickness (Lannisport)
+westerlands_12,westerlands,any,,Goldentooth,-,"The Golden Tooth guards the pass to the riverlands, and armies have come through it in every war.",Golden_Tooth
+westerlands_13,westerlands,any,,Silverhill,First Men,The silver workings in the hills above the village are older than any lord's name.,Westerlands (mines) [STYL]
+westerlands_14,westerlands,coast,,Banefort,Old Way,"The Banefort watches the sea for ironborn sails, and the village keeps a beacon on the hill.",Banefort [STYL]
+westerlands_15,westerlands,any,,The Crag,-,"The Westerlings' gold mines gave out long ago, and the village lives from the sea and the fields now.",House_Westerling (mines exhausted)
+westerlands_16,westerlands,any,,Clegane's Keep,c. 260 AC,The Cleganes won their land when a kennelman saved a Lannister from a lioness; the village remembers the dogs.,House_Clegane
+reach_01,reach,any,,,Legend,"Garth Greenhand taught the First Men to sow here, the old songs say, and the soil has never failed since.",Garth_Greenhand
+reach_02,reach,any,,,Andals,"The Gardener kings welcomed the Andals with marriages, not swords, and the village took the Seven in peace.",King_of_the_Reach (Three Sage Kings)
+reach_03,reach,any,,,2 BC,"Its men went to the Field of Fire with King Mern in 2 BC, and the dragons burned them there.",Field_of_Fire
+reach_04,reach,any,,,1 AC,"When Aegon gave Highgarden to the Tyrells, the village paid its dues to new masters without a battle.",House_Tyrell
+reach_05,reach,any,,,282-283 AC,"Its men spent a year at the siege of Storm's End in Robert's war, and came home with nothing but stories.",Siege_of_Storm's_End
+reach_06,reach,any,,,Andals,A Gardener king built the first sept here; the Tyrells only gave it a new roof.,House_Gardener (Merle I septs)
+reach_07,reach,road,,,-,"Carts of grain and apples roll past {VILLAGE} all autumn, bound for {SEAT}.",Reach [STYL]
+reach_08,reach,crossroad,,,-,"Travelling knights, singers and septons meet at the inn here on the way to every tourney.",[STYL]
+reach_09,reach,field,,,-,"Its orchards and fields lie off the road, quiet enough that no war has found it in a century.",Reach [STYL]
+reach_10,reach,river,RIVER,,-,Barges have carried wine and grain down {RIVER} from this landing since the Gardener kings.,Mander (river trade) [STYL]
+reach_11,reach,coast,,,Old Way,"Ironborn longships raided this coast in the old days, until the Gardener kings armed the Shield Islands.",Shield_Islands (Garth VII)
+reach_12,reach,any,,Tumbleton,130 AC,"In 130 AC the Two Betrayers burned Tumbleton with dragonfire, and the village took in what was left.",First_Battle_of_Tumbleton
+reach_13,reach,any,,Honeyholt,130 AC,"Ormund Hightower's host was trapped on the Honeywine in 130 AC, a day's ride from here.",Battle_of_the_Honeywine
+reach_14,reach,any,,Goldengrove,2 BC,"Before the Field of Fire, Loren and Mern joined their hosts at Goldengrove, and the village fed both kings.",Field_of_Fire (Goldengrove)
+reach_15,reach,any,,Ashford,282 AC,At Ashford in 282 AC Lord Tarly broke Robert Baratheon's van before Mace Tyrell even arrived.,Battle_of_Ashford
+reach_16,reach,any,,Oldtown,209 AC,The Great Spring Sickness of 209 AC was worse in Oldtown than anywhere but King's Landing.,Great_Spring_Sickness
+reach_17,reach,any,,Oldtown,-,"Acolytes of the Citadel walk out here to study the soil and the stars, and pay for their ale.",Citadel [STYL]
+reach_18,reach,any,,Hornhill,-,"Horn Hill guards the Dornish marches, and Dornish raiders have burned the village more than once.",Dornish_Marches (Horn Hill)
+reach_19,reach,coast,,Lord Hewett's Town,Old Way,"The Shield Islands were armed against ironborn reavers, and the village keeps its boats ready.",Shield_Islands
+reach_20,reach,any,,Brightwater Keep,-,"The Florents say Highgarden should have been theirs, and the village hears it at every harvest feast.",House_Florent
+reach_21,reach,any,,Old Oak,-,"The Oakhearts of Old Oak are older than the Tyrells, and the village never lets anyone forget it.",House_Oakheart
+reach_22,reach,any,,Highgarden,-,"Its people send grain and roses to Highgarden, as they did when green-crowned kings sat there.",House_Gardener
+stormlands_01,stormlands,any,,,Age of Heroes,"The Storm Kings ruled here from Storm's End for thousands of years; its walls, they say, were raised by Bran the Builder.",House_Durrandon; Storm's_End
+stormlands_02,stormlands,any,,,2 BC,"Its men followed Argilac the Arrogant to the Last Storm, where Orys Baratheon slew him.",House_Durrandon (Last Storm)
+stormlands_03,stormlands,any,,,282 AC,"In 282 AC Robert won three battles in one day at Summerhall, and men from here fought in all three.",Battles_at_Summerhall
+stormlands_04,stormlands,any,,,-,"It rains here more than anywhere in the realm, the villagers boast, and their mossy roofs agree.",Stormlands (TWOIAF)
+stormlands_05,stormlands,any,,,129-131 AC,In the Dance of the Dragons the storm lords followed Lord Borros Baratheon for Aegon II.,Borros_Baratheon
+stormlands_06,stormlands,any,,,c. 239 AC,"When Lyonel Baratheon, the Laughing Storm, crowned himself Storm King, the village sent him its sons.",Lyonel_Baratheon
+stormlands_07,stormlands,any,,,Storm Kings,"Arlan III led the storm lords north and took the riverlands, and the village's forefathers went with him.",Arlan_III_Durrandon
+stormlands_08,stormlands,river,RIVER,,-,"{RIVER} floods with the autumn rains, and the village has learned to build on the high ground.",[WYM]
+stormlands_09,stormlands,coast,,,-,"Storms off the narrow sea wreck ships every autumn, and the village salvages what the sea gives.",Shipbreaker_Bay [STYL]
+stormlands_10,stormlands,road,,Bronzegate|Haystack Hall|Storm's End,281 AC,The Kingswood Brotherhood robbed travellers on this road until the Kingsguard broke them in 281 AC.,Kingswood_Brotherhood
+stormlands_11,stormlands,any,,Bronzegate,2 BC,"The Last Storm was fought near Bronzegate in 2 BC, and ploughs here still turn up rusted helms.",House_Durrandon (Last Storm near Bronzegate)
+stormlands_12,stormlands,any,,Storm's End,282-283 AC,During the year-long siege of Storm's End the Reach host ate the village bare.,Siege_of_Storm's_End
+stormlands_13,stormlands,any,,Nightsong|Blackhaven|Harvest Hall|Stonehelm,-,"Dornish raiders came over the mountains for a thousand years, and every house here has a hiding cellar.",Dornish_Marches
+stormlands_14,stormlands,any,,Nightsong|Blackhaven|Harvest Hall|Stonehelm,259 AC,Summerhall burned in 259 AC and the king died with it; the village saw the glow from its fields.,Tragedy_at_Summerhall
+stormlands_15,stormlands,any,,Nightsong,4-13 AC,In the First Dornish War Lord Fowler came over the mountains and burned Nightsong.,Dornish_Marches (Nightsong burned)
+stormlands_16,stormlands,any,,Harvest Hall,-,"The Selmys of Harvest Hall gave the realm Ser Barristan the Bold, and every boy here has fought him with a stick.",House_Selmy
+stormlands_17,stormlands,any,,Rain House,-,"The Rainwood begins behind the last field, and outlaws and ghosts are both said to live there.",Rainwood [STYL]
+crownlands_01,crownlands,any,,,2 BC,"Aegon landed at the mouth of the Blackwater in 2 BC, and the lords hereabouts were among the first to kneel.",Aegon's_Landing
+crownlands_02,crownlands,any,,,-,"Its people have seen Targaryen and Baratheon kings ride past, and paid the same taxes to both.",[WYM]
+crownlands_03,crownlands,any,,,129-131 AC,"In the Dance of the Dragons the city changed hands more than once, and the village fed whoever held it.",Dance_of_the_Dragons [STYL]
+crownlands_04,crownlands,road,,,62 AC,"The Old King's roads were begun in 62 AC, and the village grew up beside one of them.",Kingsroad (begun 62 AC)
+crownlands_05,crownlands,road,,,281 AC,The Kingswood Brotherhood robbed travellers on this road until the Kingsguard broke them in 281 AC.,Kingswood_Brotherhood
+crownlands_06,crownlands,river,RIVER=the Blackwater Rush,,-,"Barges come down the Blackwater Rush to the city, and the village sells them bread and eels.",Blackwater_Rush [STYL]
+crownlands_07,crownlands,coast,,,-,"Its fishers sell crabs and eels in the city's markets, and the walk there takes all night.",[STYL]
+crownlands_08,crownlands,field,,,-,"Its fields have fed the capital since Aegon's day, and the tax-men know every furrow.",[WYM]
+crownlands_09,crownlands,any,,Rosby,2 BC,"Queen Rhaenys flew to Rosby in the Conquest, and Rosby yielded without a fight.","Aegon's_Conquest (Rosby, Stokeworth)"
+crownlands_10,crownlands,any,,Duskendale,277 AC,"In 277 AC King Aerys was held captive in Duskendale for half a year, and the village paid for the Defiance.",Defiance_of_Duskendale
+crownlands_11,crownlands,any,,Duskendale,277 AC,The Darklyns once ruled from Duskendale as kings; after the Defiance not one of them was left.,House_Darklyn
+crownlands_12,crownlands,any,,King's Landing|Red Keep,209 AC,The Great Spring Sickness of 209 AC killed four in ten in King's Landing; the village buried its dead in the fields.,Great_Spring_Sickness
+crownlands_13,crownlands,any,,King's Landing|Red Keep,283 AC,"When the Lannisters sacked King's Landing in 283 AC, refugees filled the village for a month.",Sack_of_King's_Landing
+crownlands_14,crownlands,any,,King's Landing|Red Keep,130 AC,"In 130 AC a mob stormed the Dragonpit, and the village saw the fires from its fields.",Storming_of_the_Dragonpit
+crownlands_15,crownlands,any,,,-,"The lords hereabouts have sent their sons to court for three hundred years, and their debts home.",[WYM]
+dragonstone_01,dragonstone,any,,,c. 114 BC,"The Targaryens came to Dragonstone before the Doom, and these lands have served dragons ever since.",House_Targaryen (Dragonstone)
+dragonstone_02,dragonstone,any,,,129-131 AC,"Dragons flew over this coast in the Dance of the Dragons, and the village still tells of fire in the sky.",Dance_of_the_Dragons [STYL]
+dragonstone_03,dragonstone,any,,,284 AC,"After Robert's war the last Targaryen ships left Dragonstone, and Stannis Baratheon came to rule it.",Assault_on_Dragonstone
+dragonstone_04,dragonstone,coast,,,130 AC,"In 130 AC the Triarchy's fleet sacked Spicetown on Driftmark, and the village still fears sails from the east.",Spicetown; Battle_of_the_Gullet
+dragonstone_05,dragonstone,coast,,,-,Storms off the narrow sea take a boat from the village every year; the widows keep the count.,[WYM]
+dragonstone_06,dragonstone,road,,,-,"Riders bound for King's Landing water their horses here, and leave their news behind.",[STYL]
+dragonstone_07,dragonstone,any,,Dyre Den,Andals,"The Crackclaws are First Men blood; no Andal king ever conquered them, and they remind visitors of it.",Crackclaw_Point
+dragonstone_08,dragonstone,any,,Dyre Den,-,Blood feuds run deep here; two families of the village have not spoken since before the Conquest.,Crackclaw_Point (blood feuds)
+dragonstone_09,dragonstone,any,,Rook's Rest,129 AC,"In 129 AC Princess Rhaenys and her dragon Meleys fell in battle at Rook's Rest, close by.",Battle_of_Rook's_Rest
+dragonstone_10,dragonstone,any,,Fellwood,282 AC,Lord Fell rode to Summerhall in 282 AC and died there by Robert's hand; the village mourned him.,Battles_at_Summerhall (Lord Fell)
+dragonstone_11,dragonstone,any,,Celtigar Keep,c. 114 BC,"The Celtigars came from Valyria with the Targaryens, and the village serves them as it always has.",House_Celtigar
+dragonstone_12,dragonstone,any,,Cape Wrath,283 AC,Its lord was once a smuggler who carried onions to Storm's End during the siege.,Davos_Seaworth
+iron_01,iron,any,,,Age of Heroes,The drowned men say the Grey King himself once walked this shore.,Grey_King
+iron_02,iron,any,,,Old Way,In the Old Way its men paid the iron price on every coast of the Sunset Sea.,Iron_Islands (Old Way)
+iron_03,iron,any,,,Old Way,Thralls taken in raids tilled this thin soil while the ironborn went reaving.,Iron_Islands (thralls)
+iron_04,iron,any,,,Hoare,Its longships sailed with Harwyn Hardhand when the ironborn won the riverlands.,Harwyn_Hoare
+iron_05,iron,any,,,2 BC,"When Harrenhal burned in 2 BC, the village lost sons who had gone east with Harren.",Burning_of_Harrenhal
+iron_06,iron,any,,,1 AC,"After Harren burned, the ironborn chose Vickon Greyjoy to rule them, and the village gave him its oars.",House_Greyjoy
+iron_07,iron,any,,,130 AC,In 130 AC its longships followed the Red Kraken to sack Lannisport.,Sack_of_Lannisport
+iron_08,iron,any,,,AC,"The dragon kings forbade the Old Way; the village grumbled and went fishing, mostly.",Iron_Islands (Old Way suppressed)
+iron_09,iron,coast,,,-,"Seven families in ten fish here, as the maesters wrote; the other three reave.",Iron_Islands (Haereg)
+iron_10,iron,field,,,-,The fields are thin and stony; what grows here grows because thralls broke their backs over it.,Iron_Islands (thin soil)
+iron_11,iron,any,,,Age of Heroes,Each island once had a rock king and a salt king; the village remembers serving both.,Iron_Islands (rock and salt kings)
+iron_12,iron,any,,,Old Way,Its people despise the gold price; what a man has not taken with iron is not truly his.,Iron_Islands (iron price)
+iron_13,iron,any,,,289 AC,The Iron Fleet took men from the village every summer of Balon's rebellion in 289 AC.,Greyjoy's_Rebellion
+iron_14,iron,any,,,-,Driftwood shelters of the drowned men stand on the beach below the village.,Priest_of_the_Drowned_God (driftwood)
+iron_15,iron,any,,Ten Towers|Pebbleton,289 AC,In 289 AC King Robert's knights landed on these islands to end Balon's rebellion.,Greyjoy's_Rebellion
+iron_16,iron,any,,Lonely Light,-,"Lonely Light lies far out in the western sea; the Farwynds, men say, can take the shape of seals.",House_Farwynd
+iron_17,iron,coast,,,-,No ironborn of the village was ever buried on land; they are all given back to the sea.,Drowned_God
+iron_18,iron,any,,,Age of Heroes,"Its men still tell of the kingsmoot on Old Wyk, where the first High King was chosen.",Iron_Islands (Urras Greyiron)
+dorne_01,dorne,any,,,c. 700 BC,"Nymeria's Rhoynar came ashore about seven hundred years before the Conquest, and their blood runs in the village.",Ten_thousand_ships
+dorne_02,dorne,any,,,c. 700 BC,"When Nymeria burned her ships, the Rhoynar stayed; their customs still rule inheritance here.",Nymeria's_War; Dorne (equal inheritance)
+dorne_03,dorne,any,,,4-13 AC,Dorne never knelt to Aegon; in the First Dornish War the village hid in the hills while dragons burned the castles.,Conquest_of_Dorne (First Dornish War)
+dorne_04,dorne,any,,,157-161 AC,The Young Dragon conquered Dorne in 158 AC and lost it within three years; the village saw both.,Daeron_I_Targaryen
+dorne_05,dorne,any,,,187 AC,"Dorne joined the realm by marriage in 187 AC, not by the sword, and the village is proud of it.",Wedding_of_Maron_Martell_and_Daenerys_Targaryen
+dorne_06,dorne,any,,,283 AC,"Prince Lewyn Martell led Dornish spears to the Trident in 283 AC, and few came back to the village.",Battle_of_the_Trident
+dorne_07,dorne,any,,,-,"In Dorne water is worth more than gold, and the lords of the wells fought over this one for centuries.",Dorne (lords of the wells)
+dorne_08,dorne,any,,,-,"Caravans cross the deep sand to the village wells, and the well-keeper is the richest man here.",Dorne (caravans) [STYL]
+dorne_09,dorne,river,RIVER,,-,Everything green here lives off {RIVER}; the wells were dug and guarded before any castle.,Dorne (rivers)
+dorne_10,dorne,river,RIVER=the Greenblood,,-,"Orphans of the Greenblood pole their rafts past the village, still mourning Mother Rhoyne.",Orphans_of_the_Greenblood
+dorne_11,dorne,coast,,,-,The salt Dornishmen of this coast trade with Lys and Tyrosh as readily as with the realm.,"Dorne (salt, sand, stony)"
+dorne_12,dorne,bridge,,,-,The bridge spans a river half dry in summer; travellers mock it until the floods come.,[WYM]
+dorne_13,dorne,road,,,-,"The road follows the old caravan track from well to well, and the village is one of the wells.",Dorne (caravans) [STYL]
+dorne_14,dorne,field,,,-,Its fields are watered by little canals; whoever cuts a neighbour's channel answers for it with blood.,"Dorne (irrigation, AFFC 22) [STYL]"
+dorne_15,dorne,any,,,Andals,Andal adventurers carved out petty kingdoms here long before Nymeria; the village served three of them.,Dorne (Andal petty kingdoms)
+dorne_16,dorne,any,,,-,The sun is the village's oldest enemy; work stops at noon and begins again at dusk.,Dorne [STYL]
+dorne_17,dorne,any,,,-,"Dornishmen avoid pitched battle; when armies came, the village went into the hills and waited.",Conquest_of_Dorne (Dornish tactics)
+dorne_18,dorne,any,,Hellholt,10 AC,Queen Rhaenys and her dragon Meraxes fell at Hellholt in 10 AC; the village still tells it as a victory.,Conquest_of_Dorne (Hellholt)
+dorne_19,dorne,any,,Skyreach,4-13 AC,In the First Dornish War Lord Fowler rode out of Skyreach and burned Nightsong across the mountains.,Dornish_Marches (Nightsong burned)
+dorne_20,dorne,any,,Skyreach|Wyl|Kingsgrave|Yronwood|Blackmont,-,"Dornish raiders rode north through the passes from here for centuries, and stormlanders rode south to repay them.",Dornish_Marches; Prince's_Pass
+dorne_21,dorne,any,,Sunspear|Planky Town,c. 700 BC,"The Martells have ruled here since Mors Martell wed Nymeria, and the village has known no other princes.",Nymeria's_War
+dorne_22,dorne,coast,,Planky Town|Sunspear,c. 700 BC,"Nymeria's fleet made landfall at the mouth of the Greenblood, within sight of this shore.",Ten_thousand_ships (Greenblood mouth)
+dorne_23,dorne,any,,Starfall,Age of Heroes,"The Daynes of Starfall keep a sword forged from a fallen star, the village swears, and so do the singers.",House_Dayne (Dawn)
+dorne_24,dorne,any,,Yronwood,Rhoynar,"The Yronwoods were kings before the Martells, and the village has not quite forgotten it.",House_Yronwood
+dorne_25,dorne,any,,Lemonwood,-,The lemon trees of Lemonwood drink from canals older than the Conquest.,Lemonwood [STYL]
+shared_20,pentos|norvos|qohor|myr|lys|tyrosh|volantis|ghis|valyria,road,,,Freehold,"The road past the village is Valyrian, fused stone that has not cracked in a thousand years.",Valyrian roads
+shared_21,pentos|norvos|qohor|myr|lys|tyrosh|volantis|ghis|valyria,crossroad,,,Freehold,An old Valyrian milestone stands at the crossroads; the distances on it are to cities long gone.,[STYL]
+shared_22,pentos|norvos|qohor|myr|lys|tyrosh|volantis|ghis|valyria,bridge,,,Freehold,"The bridge is Valyrian work, older than the Doom, and no one here knows how it was made.",Valyrian stonework [STYL]
+shared_23,pentos|norvos|qohor|myr|lys|tyrosh|volantis|braavos|lorath,bridge,,,-,A toll-keeper of {SEAT} sits at the bridge; even beggars pay to cross.,[WYM]
+shared_24,pentos|norvos|qohor|myr|lys|tyrosh|volantis|braavos|lorath|ghis,ford,RIVER,,-,"Caravans cross {RIVER} at this ford in the dry season; in the floods they wait, and spend.",[STYL]
+shared_25,pentos|norvos|qohor|myr|lys|tyrosh|volantis|braavos|lorath|ghis,crossroad,,,-,"Caravans from three cities meet at this crossroads, and the village lives by their thirst.",[STYL]
+shared_26,pentos|norvos|qohor|myr|lys|tyrosh|volantis|braavos|lorath,road,,,-,"Sellswords on the march stop here for water and wine, and the village keeps its daughters indoors.",Free companies [STYL]
+shared_27,pentos|norvos|qohor|myr|lys|tyrosh|volantis|braavos|lorath|ghis,river,,,-,"River galleys and poleboats pass the village landing every day, bound for the sea.",[STYL]
+shared_28,pentos|norvos|qohor|myr|lys|tyrosh|volantis|lorath|ghis,river,,,-,"The river floods every spring; the fields are richer for it, and the houses stand on mounds.",[WYM]
+shared_29,pentos|myr|lys|tyrosh|volantis|braavos|lorath,coast,,,-,Its fishers and smugglers know every cove on this shore; the customs men of {SEAT} know a few.,[WYM]
+shared_30,pentos|norvos|qohor|myr|lys|tyrosh|volantis|braavos|lorath,field,,,-,The village lies off the road among its fields; tax-men are its only regular visitors.,[WYM]
+shared_31,myr|lys|tyrosh|volantis,any,,,Freehold,The village paid its dues to Valyria before the Doom and pays {SEAT} now; the sum is about the same.,Free_Cities (colonies)
+shared_32,volantis|lys|myr|tyrosh|qohor|norvos|pentos,any,,,c. 100-1 BC,"In the Century of Blood after the Doom, wars and khalasars swept these lands, and the village was burned and built again.",Century_of_Blood
+shared_33,myr|lys|tyrosh,any,,,96 AC,"In 96 AC Myr, Lys and Tyrosh joined as the Kingdom of the Three Daughters to clear the Stepstones of pirates.",Kingdom_of_the_Three_Daughters
+shared_34,myr|lys|tyrosh,any,,,212 AC,The Golden Company has fought over these fields in many wars since its founding in 212 AC.,Golden_Company; Disputed_Lands
+shared_35,myr|lys|tyrosh,any,,,-,Sellswords of the free companies winter here between wars; the village feeds them and counts the spoons.,Disputed_Lands (free companies)
+shared_36,myr|lys|tyrosh,any,,,-,"Slaves work these fields, three for every free man, as everywhere in the Quarrelsome Daughters.",Lys; Myr; Tyrosh (3:1)
+shared_37,braavos|pentos|norvos|lorath,any,,,Andals,"Andals once tilled these lands, before they took ship for Westeros; their old stones still stand.",Hills_of_Andalos
+braavos_01,braavos,any,,,Freehold,Braavos was founded by slaves who fled their Valyrian masters and hid in the fog of the lagoon.,Uncloaking_of_Uthero (founding)
+braavos_02,braavos,any,,,-,Its families still keep the masks and the ten days of the Uncloaking of Uthero every year.,Uncloaking_of_Uthero (festival)
+braavos_03,braavos,any,,,-,"No man may be a slave in the lands of Braavos, and the village is proud that free hands work its fields.",Braavos (slavery forbidden)
+braavos_04,braavos,any,,,c. 0-209 AC,"Braavos and Pentos fought six wars in two hundred years, and the village sent oarsmen to every one.",Pentos (six wars with Braavos)
+braavos_05,braavos,any,,,Freehold,"Moonsingers led the founders to the lagoon, and the village shrine still sings their hymns.",Temple_of_the_Moonsingers
+braavos_06,braavos,any,,,-,"Its young men go to the city to learn the water dance, and come back with scars and stories.","Braavos (bravos, water dancers)"
+braavos_07,braavos,any,,,-,Pine from the hills above the village went to build the war galleys of the Arsenal.,"Braavos (Arsenal, pine hills)"
+braavos_08,braavos,any,,,Freehold,The village has never seen a dragon; the fog that hid Braavos hid it too.,Braavos (Secret City)
+braavos_09,braavos,coast,,,-,Its fishers row their catch to the fishmongers of Braavos before dawn.,Braavos [STYL]
+braavos_10,braavos,any,,,-,"The Iron Bank will have its due, the villagers say, and so will the Sealord's tax-farmers.",Iron_Bank
+braavos_11,braavos,any,,,-,On a still night the shepherds swear they hear the Titan of Braavos roar from the sea.,Titan_of_Braavos [STYL]
+braavos_12,braavos,any,,,-,Silver from the hills behind the village paid for many Braavosi ships.,[STYL]
+pentos_01,pentos,any,,,c. 200 AC,"Braavos forbade Pentos its slaves, but the village's bond servants wear collars all the same.",Pentos (free bond servants)
+pentos_02,pentos,any,,,-,"When khalasars come west, the magisters pay them off, and the village pays the magisters.",Pentos (tribute to khals)
+pentos_03,pentos,any,,,209 AC,"In the war that ended in 209 AC, Pentos sacrificed four princes in one year, and the village lost its sons.",Prince_of_Pentos
+pentos_04,pentos,any,,,c. 0-209 AC,"Braavosi raiders burned the village in one of the six wars, and it was built again in Pentoshi stone.",Pentos (wars with Braavos) [STYL]
+pentos_05,pentos,any,,,-,The magisters' estates swallowed the village fields long ago; most here work another man's land.,Pentos (magisters' estates)
+pentos_06,pentos,any,,Pentos,298 AC,"Khal Drogo's khalasar camped outside the city in 298 AC, and the village hid its horses.",Khal Drogo (AGOT)
+pentos_07,pentos,any,,Ghoyan Drohe,c. 700 BC,"The ruins of Ghoyan Drohe on the Little Rhoyne, burned by Valyrian dragons, lie a day's walk away.",Rhoynish_Wars (Ghoyan Drohe)
+pentos_08,pentos,any,,,-,"Its cheeses and wine go to Pentos by cart, and the magisters' tax-men count every wheel.",[WYM]
+pentos_09,pentos,any,,,c. 200 AC,"Pentos may keep no army by Braavosi treaty, so the village keeps its own spears.",Pentos (military restrictions)
+norvos_01,norvos,any,,,Freehold,"Norvos was founded by bearded priests who left Valyria to keep their faith, and the village keeps it too.",Bearded_priests (Norvos founding)
+norvos_02,norvos,any,,,-,"The three bells of Norvos rule the day; the village rises and rests by them, as the priests command.",Norvos (three bells)
+norvos_03,norvos,any,,,-,"Its terraced fields climb the hills, as they have since the city was young.",Norvos (AGOT 3)
+norvos_04,norvos,any,,,-,"Dothraki riders have come into the hills of Norvos before, and the village walls remember them.",Norvos (walled villages) [STYL]
+norvos_05,norvos,river,RIVER=the Noyne,,-,The Noyne carries the village's wine down to the Rhoyne and on to Volantis.,Noyne
+norvos_06,norvos,any,,,-,"The bearded priests choose the magisters, and the magisters choose the tax-men; the village pays them all.",Bearded_priests (council)
+norvos_07,norvos,any,,,-,"Its sons go to the city to learn the long axe; one of them, they say, now guards a prince of Dorne.",Areo_Hotah
+norvos_08,norvos,any,,Ny Sar,c. 700 BC,"The ruins of Ny Sar, Nymeria's city, destroyed by the dragonlords, lie close by.",Rhoynish_Wars (Ny Sar)
+qohor_01,qohor,any,,,c. 100 BC,Four centuries ago three thousand Unsullied held off Khal Temmo's riders; without them there would be no village.,Three_Thousand_of_Qohor
+qohor_02,qohor,any,,,-,"Qohorik smiths can rework Valyrian steel, and the village sells them charcoal and iron.",Qohor (smiths)
+qohor_03,qohor,any,,,-,"The forest of Qohor begins at the village fields, and its woodsmen fell timber for the city.",Qohor (forest)
+qohor_04,qohor,any,,,-,Every day a beast is given to the Black Goat; in hard years the village gives its best bullock.,Black_Goat [STYL]
+qohor_05,qohor,any,,,-,Khalasars still ride to the edge of the forest; the village watches the eastern grass every summer.,Qohor (Dothraki) [STYL]
+qohor_06,qohor,river,RIVER,,-,Rafts of timber float down {RIVER} from the village to the Rhoyne.,[STYL]
+qohor_07,qohor,any,,Ar Noy,c. 700 BC,"The ruins of Ar Noy, a Rhoynish city burned by Valyria, lie upriver of the village.",Rhoynish_Wars (Ar Noy)
+qohor_08,qohor,any,,,-,"When Qohor is threatened, its nobles give their own children to the Black Goat; the village gives its prayers.",Black_Goat (crisis sacrifice)
+lorath_01,lorath,any,,,Dawn Age,"Mazemakers raised the stone mazes here long before men knew their name, and left no word of why.",Mazemakers
+lorath_02,lorath,any,,,Freehold,"Followers of the Blind God settled Lorath from Valyria; their cult is long dead, but their maze-towns remain.",Boash
+lorath_03,lorath,any,,,-,"Lorath is the poorest of the Free Cities; the village is poorer still, and does not complain.",Lorath (TWOIAF)
+lorath_04,lorath,any,,,-,"Freed and runaway slaves have settled here for centuries, and no one asks a newcomer whose he was.",Lorath (refuge)
+lorath_05,lorath,coast,,,-,"The Shivering Sea is cold and full of fish, and the village has never gone hungry in summer.",[STYL]
+lorath_06,lorath,coast,,,-,"Ibbenese whalers put in here for water and trouble, and the village sells them both.",Ibben (whalers) [WYM]
+lorath_07,lorath,any,,,c. 100 BC,"Refugees from fallen Sarnor passed through in the Century of Blood, the old songs say.",Century_of_Blood [STYL]
+lorath_08,lorath,any,,,Freehold,"The followers of Boash held all life equal, lord and beggar, man and beast; the village has not forgotten.",Boash
+lorath_09,lorath,any,,Axe Castle,Andals,"The Axe stretches north of the village, and once it was the land of the Andals.",Hills_of_Andalos (Axe)
+myr_01,myr,any,,,-,"Myr has fought Lys and Tyrosh over the Disputed Lands for centuries, and the village has changed hands often.",Disputed_Lands
+myr_02,myr,any,,,131-134 AC,"In the Daughters' War the Myrmen lost the most, and the village paid for it in sons and grain.",Daughters'_War
+myr_03,myr,any,,,-,Myrish lace and lenses are made in the city; the flax and the thread come from villages like this.,"Myr (lace, lenses)"
+myr_04,myr,any,,,-,The red temple of Myr takes boys from villages like this; Thoros of Myr was one of them.,Thoros_of_Myr
+myr_05,myr,any,,Chroyane,c. 700 BC,"The Sorrows and drowned Chroyane lie near; men who breathe the mist there, they say, turn to stone.",Chroyane; Sorrows
+myr_06,myr,any,,Chroyane,c. 700 BC,"Prince Garin called down his curse on the Valyrians at Chroyane, and the village still makes a sign against it.",Rhoynish_Wars (Garin)
+tyrosh_01,tyrosh,coast,,,Freehold,"Tyrosh grew rich on a sea snail whose dye the dragonlords loved, and the snails are gathered on these shores.",Tyrosh (sea snail dye)
+tyrosh_02,tyrosh,any,,,Freehold,"Tyrosh was a Valyrian military outpost before it was a city, and the village still musters spears for the Archon.",Tyrosh [STYL]
+tyrosh_03,tyrosh,any,,,-,Its pear orchards press the brandy Tyrosh sells across the world.,Tyroshi_pear_brandy
+tyrosh_04,tyrosh,any,,,-,"Tyroshi dye their beards in bright colours, and in the village even old men wear green or blue.",Tyroshi (dyed beards)
+tyrosh_05,tyrosh,any,,,-,"Tyrosh has fought Myr and Lys over the Disputed Lands, and the village sits where their borders shift.",Disputed_Lands
+tyrosh_06,tyrosh,any,,,-,"The Archon's tax-men come twice a year, and the village hides its brandy once.",[WYM]
+tyrosh_07,tyrosh,coast,,,c. 130 AC,Pirates of the Stepstones have raided this shore since the Three Daughters failed to keep them down.,Daughters'_War (Stepstones)
+lys_01,lys,any,,,Freehold,"Lys was a pleasure isle of the dragonlords before the Doom, and its masters still live as if it were.",Lys (Valyrian pleasure isle)
+lys_02,lys,any,,,Freehold,Here too many have the pale hair and violet eyes of old Valyria.,Lyseni (Valyrian looks)
+lys_03,lys,any,,,c. 100 BC,"In the Century of Blood the tigers of Volantis ruled Lys for two generations, and the village paid them.",Century_of_Blood (Volantis ruled Lys and Myr)
+lys_04,lys,any,,,-,"The tears of Lys are a poison; the village grows nothing but grapes and olives, everyone insists.",Tears of Lys
+lys_05,lys,coast,,,-,Lyseni galleys put in at the village for water on their way to the Summer Sea.,[STYL]
+lys_06,lys,any,,,-,"Lys fought Myr and Tyrosh over the Disputed Lands, and the village sent spears and grain.",Disputed_Lands
+lys_07,lys,coast,,,-,Pleasure barges from Lys drift past the village coast on summer nights.,Lys (pleasure houses) [STYL]
+volantis_01,volantis,any,,,Freehold,"Volantis was the First Daughter of Valyria, and the village has served the Old Blood since before the Doom.",Century_of_Blood (First Daughter)
+volantis_02,volantis,any,,,c. 100 BC,"After the Doom the tigers of Volantis went to war for Valyria's empire, and many of the village's men never came home.",Tigers_(Volantis)
+volantis_03,volantis,any,,,-,"For centuries now the elephants have ruled Volantis, and the village sells to merchants, not to armies.",Elephants_(Volantis)
+volantis_04,volantis,any,,,-,"Five slaves to every free man work these fields, and their faces bear the tattoos of their trade.","Volantis (5:1, tattoos)"
+volantis_05,volantis,any,,,c. 100 BC,Volantis lost a whole fleet in the Smoking Sea trying to reclaim Valyria; the widows' songs are still sung here.,Century_of_Blood (fleet lost)
+volantis_06,volantis,any,,,-,The Black Walls of Volantis keep the Old Blood in and everyone else out; no one from the village has been inside.,Black_Walls
+volantis_07,volantis,river,RIVER=the Rhoyne,,-,"The Rhoyne carries the village's grain to Volantis, and river galleys pass every day.",Rhoyne
+volantis_08,volantis,any,,Selhorys|Valysar|Volon Therys,c. 700 BC,"Prince Garin of Chroyane won his first battles near here, a thousand years ago, before the dragons crushed him.","Rhoynish_Wars (Selhorys, Valysar, Volon Therys)"
+volantis_09,volantis,any,,Sar Mell,c. 700 BC,Rhoynish Sar Mell stood here before the dragonlords burned it; its stones are in every village wall.,Rhoynish_Wars (Sar Mell)
+valyria_01,valyria,any,,,c. 100 BC,"The Doom fell on Valyria four hundred years ago, and ash still turns up under the plough.",Doom_of_Valyria
+valyria_02,valyria,any,,,Freehold,"The old Valyrian roads still run straight through the village, though no dragonlord has used them in centuries.",Valyrian roads
+valyria_03,valyria,any,,,-,"Sailors say the Smoking Sea is cursed, and no one here will sail toward the old Freehold.",Smoking Sea
+valyria_04,valyria,coast,,,c. 100 BC,"Dragonglass still washes up on the shore after storms, and the village sells it to the traders.",Doom_of_Valyria (dragonglass rain)
+valyria_05,valyria,any,,,-,"Dragonlords once ruled from here; now Volantenes, Ghiscari and outlaws fight over what is left.",Valyria [STYL]
+valyria_06,valyria,any,,,-,"The Fourteen Flames still smoke on clear days, and the village prays they stay asleep.",Fourteen_Flames
+valyria_07,valyria,any,,,c. 100 BC,"Its people say they descend from the dragonlords' slaves, the only ones who were far enough away.",[WYM]
+valyria_08,valyria,any,,,-,Treasure-seekers come through every year bound for the ruins; few come back.,Valyria (TWOIAF) [STYL]
+valyria_09,valyria,road,,,-,The demon road runs near here; travellers who take it rarely come back the same.,Demon_road
+valyria_10,valyria,coast,,,-,"Fishers here will not take their boats past the headland, where the water steams.",Smoking Sea [STYL]
+valyria_11,valyria,field,,,-,"The soil here is black and rich from the old ash, and strange things grow in it.",[WYM]
+valyria_12,valyria,any,,,-,"The village is built of Valyrian fused stone, cut from the ruins nearby.",[STYL]
+valyria_13,valyria,any,,,Freehold,Before the Doom the Freehold ruled half the world; the village now rules a field and a well.,[WYM]
+ghis_01,ghis,any,,,c. 4700 BC,"Old Ghis fell to the dragonlords five thousand years ago, and the Valyrians sowed its fields with salt.",Ghiscari_wars
+ghis_02,ghis,any,,,-,Slaves work the estates here for masters in {SEAT}; few free men own any land.,Slaver's_Bay
+ghis_03,ghis,any,,,-,"Its masters trace their blood to Old Ghis, and wear tokars to prove it.",Ghiscari (tokar)
+ghis_04,ghis,any,,,-,"The harpy of Ghis is carved over the village gate, as over every slaver city.",Ghiscari (harpy) [STYL]
+ghis_05,ghis,any,,,-,"Dothraki sell their captives in the markets of Slaver's Bay, and the road past the village carries them.",Slaver's_Bay (Dothraki captives)
+ghis_06,ghis,river,RIVER=the Skahazadhan,,-,The brown Skahazadhan feeds the village fields before it reaches Meereen.,Skahazadhan
+ghis_07,ghis,any,,,Freehold,"The slaver cities were Ghiscari colonies long before Valyria took them, and the village fields have known masters ever since.",Slaver's_Bay [STYL]
+ghis_08,ghis,any,,,-,Overseers with whips walk the village fields; the slaves sing to keep the rhythm.,Slaver's_Bay [STYL]
+ghis_09,ghis,any,,,-,"The Good Masters of the cities quarrel endlessly, and the village pays whoever wins.",[WYM]
+ghis_10,ghis,any,,Astapor,-,"Astapor trains its Unsullied from boyhood, and the village has sold boys to the Good Masters.",Unsullied
+ghis_11,ghis,any,,Yunkai,-,"Yunkai's Wise Masters trade in slaves of every kind, and the village grows their grain.",Yunkai
+ghis_12,ghis,any,,Meereen,-,"The pyramids of Meereen can be seen from the hills, and the fighting pits are the village's only holiday.",Meereen
+ghis_13,ghis,any,,Mantarys,-,Mantarys lies at the end of the demon road; travellers from the west arrive frightened or not at all.,Demon_road; Mantarys
+ghis_14,ghis,any,,Lhazosh|Hesh,-,"The Lamb Men of Lhazar herd sheep here, and every few years the Dothraki come to take slaves.",Lhazareen
+ghis_15,ghis,any,,Lhazosh|Hesh,-,The Lhazareen say all men are one flock; the Dothraki do not agree.,Great_Shepherd
+qarth_01,qarth,any,,,-,"Qarth is the greatest city that ever was or will be, the Qartheen say, and the village sells it fruit and flowers.",Qartheen
+qarth_02,qarth,any,,,-,"The village wells were dug by order of the ancient kings of Qarth, and are still guarded.",[WYM]
+qarth_03,qarth,any,,,-,"The red waste lies west of here, and whoever crosses it is lucky to see the village.",Qarth (red waste)
+qarth_04,qarth,any,,,-,The warlocks of the House of the Undying are feared here more than any lord.,House_of_the_Undying
+qarth_05,qarth,coast,,,-,"Qarth sits on the Jade Gates between two seas, and ships from Yi Ti pass the village coast.",Qarth (Jade Gates)
+qarth_06,qarth,any,,,-,"The Pureborn trace their blood to the ancient kings of Qarth, and the village pays their taxes.",Pureborn
+qarth_07,qarth,any,,,-,"The Thirteen buy the village's harvest before it is grown, and sell it twice over.",Thirteen [STYL]
+qarth_08,qarth,any,,,-,Spice caravans from the east rest here before the last day's march to the city.,Ancient Guild of Spicers [STYL]
+qarth_09,qarth,any,,,-,"The warlocks drink shade of the evening, and their lips are blue; the village children run from them.",Warlocks (shade of the evening)
+qarth_10,qarth,coast,,,-,Its fishers keep to the coast; the open sea beyond the Jade Gates belongs to the great ships.,[STYL]
+qarth_11,qarth,road,,,-,Every traveller on this road is going to Qarth or coming back poorer.,[WYM]
+qarth_12,qarth,any,,,-,"The Qartheen weep easily, the traders say, but the village tax-men never do.",Qartheen (weeping) [STYL]
+qarth_13,qarth,any,,,-,"Water is carried from the city cisterns to the village in dry years, at a price.",[WYM]
+qarth_14,qarth,any,,,-,"Dothraki never come so far; it is the desert the village fears, not the khals.",Qarth (red waste) [STYL]
+qarth_15,qarth,any,,,-,The Tourmaline Brotherhood and the Thirteen quarrel in the city; the village keeps its head down.,Thirteen; Tourmaline Brotherhood
+qarth_16,qarth,field,,,-,"Its gardens are watered by hand, a bucket at a time, as they have been for a thousand years.",[WYM]
+dothraki_01,dothraki,any,,,-,"Khalasars ride past each summer, and the village pays in horses and grain, or burns.",Dothraki [STYL]
+dothraki_02,dothraki,any,,,-,"Vaes Dothrak lies far to the east beneath the Mother of Mountains, and the riders go there to honour the horse god.",Mother_of_Mountains
+dothraki_03,dothraki,any,,,c. 100 BC,The village stands on the stones of a town the Dothraki burned in the Century of Blood.,Century_of_Blood (Sarnor)
+dothraki_04,dothraki,any,,,-,Its people are slaves and freedmen who keep horses for a khal; they belong to no khalasar.,[STYL]
+dothraki_05,dothraki,any,,,-,The Dothraki take what they want and call it a gift; the village has learned to give first.,Dothraki [STYL]
+dothraki_06,dothraki,any,,,-,"Stolen gods line the godsway of Vaes Dothrak; one of them, the old men say, came from this village.",Godsway
+dothraki_07,dothraki,any,,,-,"The dosh khaleen of Vaes Dothrak send word through the grass, and every khal listens.",Dosh_khaleen
+dothraki_08,dothraki,river,RIVER,,-,"The riders water their horses at {RIVER} below the village, and leave when the grass is gone.",[STYL]
+dothraki_09,dothraki,any,,,-,"No Dothraki will cross the poison water of the sea, and the village is glad of it.",Dothraki (poison water)
+dothraki_10,dothraki,any,,,-,Twice in living memory two khalasars met here and fought; the bones are still in the grass.,[WYM]
+dothraki_11,dothraki,any,,,-,"The stallion who mounts the world will come one day, the riders say; the village hopes he passes by.",Stallion_who_mounts_the_world
+dothraki_12,dothraki,any,,,-,"The grass sea runs to the edge of sight in every direction, and the village is a stone in it.",Dothraki_sea [STYL]
+dothraki_13,dothraki,any,,,-,"Lhazareen captives built the first houses here, and their children still herd sheep on the hill.",Lhazareen [STYL]
+dothraki_14,dothraki,any,,,-,"Traders from the Free Cities come with gifts for the khal, and buy what the village has.",Dothraki (gifts) [STYL]
+dothraki_15,dothraki,field,,,-,"Its fields are small and fenced with stone, so the horses of the khalasars do not graze them bare.",[WYM]
+sarnor_01,sarnor,any,,,c. 100 BC,The Tall Men ruled this land until the Dothraki burned their cities in the Century of Blood.,Kingdom_of_Sarnor
+sarnor_02,sarnor,any,,,c. 100 BC,"At the Field of Crows the Sarnori host died, and the village was founded by the few who fled.",Field_of_Crows
+sarnor_03,sarnor,any,,,-,Saath is all that is left of Sarnor; the village pays it taxes and honours its hundred gods.,Saath
+sarnor_04,sarnor,any,,,-,"Its people still call themselves Tagaez Fen, the Tall Men, though few are tall.",Tall_Men
+sarnor_05,sarnor,any,,,c. 100 BC,"Ruins of a Sarnori city stand on the plain, and the village takes its stone from them.",Kingdom_of_Sarnor (ruins)
+sarnor_06,sarnor,any,,,c. 100 BC,Sarnath was put to the torch by Khal Loso; the village keeps one of its carved stones over the door.,Field_of_Crows (Sarnath)
+sarnor_07,sarnor,any,,,-,Once Sarnor ruled all the lands of the Sarne; now the village rules a well and a few fields.,Kingdom_of_Sarnor
+sarnor_08,sarnor,river,RIVER=the Sarne,,-,The Sarne still runs past the village as it did when Sarnor had kings.,Sarne
+sarnor_09,sarnor,any,,,-,The Dothraki ride past and burn what is left every few years; the village rebuilds lower each time.,[STYL]
+sarnor_10,sarnor,any,,,-,"Old men here still remember the names of the Sarnori kings, a hundred names and more.",[WYM]
+sarnor_11,sarnor,any,,,-,"The lakes here were once the Silver Sea, the old songs say.",Kingdom_of_Sarnor (Silver Sea)
+sarnor_12,sarnor,any,,,c. 100 BC,Scythed chariots once rode from here against the khals; their wheels lie rusting in the barns.,Kingdom_of_Sarnor (chariots) [STYL]
+sarnor_13,sarnor,any,,,-,Traders from Lorath buy the village furs and sell it salt.,[WYM]
+sarnor_14,sarnor,field,,,-,Its fields are small and walled with ruins; the rest of the plain belongs to the grass.,[WYM]
+sarnor_15,sarnor,any,,,-,"No khal has ever kept a promise to the village, and the village has stopped asking for one.",[WYM]
+ibben_01,ibben,coast,,,-,"Ibbenese whalers sail from here into the Shivering Sea, and the village smells of whale oil all year.",Ibben (whalers)
+ibben_02,ibben,any,,,-,"Ibbenese traders say their islands were old when Valyria was young, and no one here argues.",Ibben [STYL]
+ibben_03,ibben,any,,,c. 100 BC,Ibben was ruled by a God-King until the Doom; now the Shadow Council and the Thousand rule.,God-King_of_Ib
+ibben_04,ibben,any,,,-,"Its people are short, broad and hairy, and proud of all three.",Ibbenese
+ibben_05,ibben,any,,,-,"Whale-oil lamps hang on iron chains in the village street, as in the Port of Ibben.",Port_of_Ibben
+ibben_06,ibben,any,,,-,"The Thousand chose the village's lord, and the village paid for the choosing.",Ibben (Thousand)
+ibben_07,ibben,coast,,,-,Fat-bellied whalers with tarred hulls are built on the beach below the village.,Ibben (whalers)
+ibben_08,ibben,any,,,-,"Ibbenese settlers came over the sea to these mainland hills, and the forest has fought them ever since.",Ibben (mainland colonies) [STYL]
+ibben_09,ibben,any,,,-,"Its men go to sea for a year at a time, and the women run the village.",[WYM]
+ibben_10,ibben,any,,,-,"Dothraki once rode up to the village palisade, looked at it, and rode away.",[WYM]
+ibben_11,ibben,any,,,-,The forests here are full of pigs and wolves; the village eats the first and fears the second.,[WYM]
+ibben_12,ibben,any,,,-,Lorathi and Braavosi traders buy the village's oil and amber.,[STYL]
+ibben_13,ibben,any,,,-,Winter comes early here; the village lays in salt meat before the first frost.,[WYM]
+ibben_14,ibben,field,,,-,"Its fields are cleared from the forest, and the stumps are older than the village.",[WYM]
+ibben_15,ibben,road,,,-,"The only road runs from the village to the harbour, and everything that matters travels on it.",[WYM]
+ibben_16,ibben,any,,,-,"The Port of Ibben is grey and gloomy, the villagers say, and they visit it as rarely as they can.",Port_of_Ibben
+yiti_01,yiti,any,,,Legend,"The God-on-Earth ruled the Great Empire of the Dawn for ten thousand years, the priests of Yin say.",God-on-Earth
+yiti_02,yiti,any,,,-,Yi Ti's emperors come and go; the village pays its taxes to whichever one is reigning.,Yi Ti [STYL]
+yiti_03,yiti,any,,,Legend,"The Bloodstone Emperor brought the Long Night, the Yi Tish tales say, and the village lights lamps at dusk.",Bloodstone Emperor
+yiti_04,yiti,any,,,-,"The priestly scribes of Yin keep the village in their tax rolls, and have for a thousand years.",Yi Ti (priestly scribes)
+yiti_05,yiti,any,,,-,Traders from the Jade Sea buy the village's timber and furs for silk.,[STYL]
+yiti_06,yiti,any,,,-,"The forest here is old and dark, and the village keeps to its edge.",[WYM]
+yiti_07,yiti,any,,,-,Its people burn incense to the Maiden-Made-of-Light every dawn.,Maiden-Made-of-Light [STYL]
+yiti_08,yiti,any,,,-,"Bandits from the hills raid the village roads, and the emperor's soldiers come too late.",Yi Ti (bandits) [STYL]
+yiti_09,yiti,any,,,-,"The village is far from any emperor, and likes it that way.",[WYM]
+yiti_10,yiti,any,,,-,Traders say the Church of Starry Wisdom began in Yi Ti; the village says nothing about it.,Church of Starry Wisdom
+yiti_11,yiti,any,,,-,"Its people have seen men from the west only twice, and both times they were lost.",[WYM]
+yiti_12,yiti,road,,,-,"The emperor's road passes the village, but the emperor never has.",[WYM]
+yiti_13,yiti,river,,,-,Timber rafts float down the river from the village to the sea.,[STYL]
+yiti_14,yiti,field,,,-,"Its fields are terraced up the hillside, a step for every generation.",[WYM]
+yiti_15,yiti,any,,,-,The Lion of Night is feared here as much as he is worshipped.,Lion_of_Night
+summer_01,summer,any,,,-,"Swan ships from the village have sailed as far as Oldtown, and come back with tales of snow.",Swan_ship [STYL]
+summer_02,summer,any,,,-,"Summer Islanders sail swan ships across the world, and the village sends its sons as archers.",Swan_ship
+summer_03,summer,any,,,-,"Their laws are written on the talking trees, and the village keeps its own beneath one.",Summer_Isles (talking trees)
+summer_04,summer,any,,,-,"Goldenheart bows are the best in the world, and the village cuts the wood for them.",Goldenheart
+summer_05,summer,any,,,-,"Every islander serves a time in the temples of love, and the village is proud of its priests.",Summer_Isles (temples of love)
+summer_06,summer,coast,,,-,Swan ships with white sails put in at the village bay on their way to Oldtown and Qarth.,Swan_ship [STYL]
+summer_07,summer,any,,,-,Silver from the hills here buys the feathers and fruit of the other islands.,[STYL]
+summer_08,summer,any,,,-,"Islanders seldom fight in war; when they must, they meet at a holy place and settle it there.",Summer_Isles (ritual war) [STYL]
+summer_09,summer,any,,,-,"The village wears feathered cloaks on feast days, as its grandmothers did.",Summer_Isles (feathered cloaks)
+summer_10,summer,any,,,-,"Slavers have come to these shores before, and the village keeps its archers ready.",[STYL]
+summer_11,summer,any,,,-,Its people trade spices and fruit for western cloth and steel.,[STYL]
+summer_12,summer,coast,,,-,"The village bay is blue and deep, and swan ships anchor there in the storm season.",[WYM]
+summer_13,summer,any,,,-,"Red archers of the swan ships learn to shoot here, before they ever see a sail.",Goldenheart (red archers)
+summer_14,summer,any,,,-,"Its elders say the islands were born of the sea, and will go back to it one day.",[WYM]
+summer_15,summer,field,,,-,Its gardens grow fruit that the west has no names for.,[WYM]
+summer_16,summer,any,,,-,The village honours the god and goddess of love before every voyage.,Summer_Isles (gods of love)
