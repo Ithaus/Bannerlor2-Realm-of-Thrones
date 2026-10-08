@@ -1870,6 +1870,9 @@ namespace Armoury
         /// Sprzatanie po starych zasadach: amunicja z "uszkodzonym" stanem
         /// (z lupow, ze starych bitew) wraca do stanu fabrycznego - w sakwach
         /// i w kolczanach na grzbiecie.
+        /// POPRAWKA 159 (recenzja ceny sprzedazy 07.10): konie i zwierzeta (IsBeast) NIE - kon nie ma komponentu broni ani zbroi, wiec
+        /// IsGoods bral go za towar i kulawy kon gracza (lame_horse) wracal zdrowy przy kazdym wczytaniu i po kazdej bitwie: kulawy kon
+        /// kupiony tanio i sprzedany zdrowy dawal zarobek z niczego (Handel 300). Kulawy kon to kulawy kon (opis IsBeast) - stan zostaje.
         /// </summary>
         internal void CleanseAmmo()
         {
@@ -1884,6 +1887,7 @@ namespace Armoury
                     // inne mody potrafia nalozyc "uszkodzenie" na rybe i maslo,
                     // scinajac przy okazji ich cene do grosza
                     if (!IsAmmo(el.Item) && !IsGoods(el.Item)) continue;
+                    if (IsBeast(el.Item)) continue;                            // poprawka 159: kon i zwierze zachowuja swoj stan (kulawy zostaje kulawy)
                     if (el.ItemModifier == null) continue;
                     if (el.ItemModifier.PriceMultiplier >= 1f) continue;      // dodatnie stany zostaja
                     int n = roster[i].Amount;
@@ -1900,7 +1904,7 @@ namespace Armoury
                     eq[(EquipmentIndex)slot] = new EquipmentElement(el.Item);
                     fixedUp++;
                 }
-                if (fixedUp > 0) Log.Info("Amunicja oczyszczona ze stanow: " + fixedUp + " szt.");
+                if (fixedUp > 0) Log.Info("Amunicja oczyszczona ze stanow: " + fixedUp + " szt. (konie i zwierzeta zachowuja stan - poprawka 159)");
             }
             catch (Exception e) { Log.Error("CleanseAmmo", e); }
         }
