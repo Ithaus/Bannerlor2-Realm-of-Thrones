@@ -1,5 +1,14 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-08 (128, 129, 132, 133, 148 - poprawka po audycie TOWARY 3) - LINIE STARTOWE BEZ FALSZYWEGO "BRAK" I "WYLACZONE"; przyklady zatkanych wsi pod jednym prefiksem
+**Mod:** Armoury | **Pliki:** `SpoilsSeal.cs` (linia startowa 128), `SpoilsCompany.cs` (133), `ArmourQuality.cs` (132), `TownCrafts.cs` (148), `VillageClogDiag.cs` (129) - tylko teksty logu
+
+**Problem (audyt kosztu i logow TOWARY 3; `tools/sprawdz_logi.py` z repo Jeffa na prawdziwym logu autotestu 14-18 i na logu syntetycznym z prawdziwymi liniami startowymi prob 128/132/133/148):** narzedzie logow daje w kazdym logu TOWARY 3 trzy falszywe "[ALARM] linia startowa BRAK" (SpoilsSeal, SpoilsCompany, "Zbroja z kuzni" - wszystkie pisza " | BRAK: nic", gdy nic nie brakuje; `status_linii` lapie samo slowo BRAK) i falszywa uwage "[WYLACZONE] Rzemioslo miasta (148)" (linia WLACZONEJ paczki mowi "garbowanie i tkanie 1:1 (TanOrWeave) WYLACZONE"). Falszywe alarmy zaslaniaja prawdziwy BRAK. Przyklady diagnozy 129 mialy liczniki w prefiksie ("Zatkane wsie (przyklad 1/10 z 12):") - narzedzie widzialo kazda kombinacje jako osobny temat (48 pozycji w autotescie 6).
+
+**Zmiana (tylko napisy logu; w grze nic):** " | BRAK: nic" -> " | wszystkie sciezki wpiete" (128), " | wszystkie drogi wpiete" (133), " | wszystko wpiete" (132) - slowo BRAK tylko przy prawdziwym braku (bez zmian: " | BRAK (...): <lista>"); 148: "(TanOrWeave) WYLACZONE" -> "(TanOrWeave) zastapione rzemioslem"; 129: "Zatkane wsie (przyklad): dzien D - i/k z n - <wies> ..." (staly prefiks, reszta linii bez zmian).
+
+**Ryzyko / co sprawdzic:** proby 128, 132, 133, 134 (i kopia kwatermistrza lawy) sprawdzaly napis "BRAK: nic" - w ich kopiach do powtorki napis zamieniony na nowy (roznica oczekiwana). W logu autotestu: linie startowe "SpoilsSeal: ... | wszystkie sciezki wpiete", "SpoilsCompany: ... | wszystkie drogi wpiete", "Zbroja z kuzni: ... | wszystko wpiete", "Rzemioslo miasta (148): WLACZONE ... zastapione rzemioslem".
+
 ## 2026-10-08 (151, poprawka po audycie TOWARY 3) - SUFIT XP RAFINACJI DZIALA: przeliczenie XP od dawnej wartosci sztabek idzie PRZED sufitem (stal uczyla 133-200 XP za partie zamiast najwyzej 60)
 **Mod:** Armoury | **Pliki:** `MaterialLaw.cs` (ApplyAll: postfiks `RefineXpPostfix` z `Priority.High`), `HistoricalPrices.cs` (ApplyAll: postfiks `XpPostfix` z `Priority.High`)
 

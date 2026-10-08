@@ -1214,7 +1214,7 @@ namespace Armoury
                 string ver = "?";
                 try { var sm = Find("RealisticLoot.RealisticLootSubModule"); var f = sm != null ? sm.GetField("Version") : null; if (f != null) ver = f.GetRawConstantValue() as string; } catch { }
                 Log.Info("SpoilsSeal: Spoils of War (RealisticLoot " + ver + ") - wpiete: " + string.Join(", ", _wired.ToArray())
-                         + (_missing.Count > 0 ? " | BRAK (te sciezki Spoils BEZ ZMIAN - sprawdzic dekompilacje): " + string.Join(", ", _missing.ToArray()) : " | BRAK: nic")
+                         + (_missing.Count > 0 ? " | BRAK (te sciezki Spoils BEZ ZMIAN - sprawdzic dekompilacje): " + string.Join(", ", _missing.ToArray()) : " | wszystkie sciezki wpiete")
                          + " - sprzedaz automatyczna magazynu wojennego blokowana wedle wlacznika Spoils No Auto Sale, reszta zlota z niczego wedle Spoils No Free Gold,"
                          + " naprawa u kwatermistrza przez kowali miasta z materialem z targu wedle Spoils Quartermaster Repair"
                          + " (wszystkie domyslnie wlaczone; reszta Spoils bez zmian); liczby - linie dnia \"Spoils of War (128)\" i \"Spoils - naprawa u kwatermistrza\".");

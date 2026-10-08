@@ -559,7 +559,7 @@ namespace Armoury
 
                 Log.Info("SpoilsCompany: Spoils of War - klan najemnikow tylko z prawdziwych zolnierzy (wlacznik Spoils Clan Real Soldiers "
                          + (On ? "TAK" : "NIE - tylko pomiar") + "); wpiete: " + string.Join(", ", _wired.ToArray())
-                         + (_missing.Count > 0 ? " | BRAK (te drogi BEZ ZMIAN - sprawdzic dekompilacje): " + string.Join(", ", _missing.ToArray()) : " | BRAK: nic")
+                         + (_missing.Count > 0 ? " | BRAK (te drogi BEZ ZMIAN - sprawdzic dekompilacje): " + string.Join(", ", _missing.ToArray()) : " | wszystkie drogi wpiete")
                          + "; liczby - linia dnia \"Spoils - klan najemnikow\".");
             }
             catch (Exception e) { Log.Error("SpoilsCompany.ApplyAll", e); }

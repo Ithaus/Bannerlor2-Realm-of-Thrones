@@ -550,7 +550,7 @@ namespace Armoury
                     for (int i = 0; i < k; i++)
                     {
                         var e = exs[k == exs.Count ? i : (int)((long)i * exs.Count / k)];   // rownomiernie wedle zapas/W, od najwiekszego
-                        Log.Info("Zatkane wsie (przyklad " + (i + 1) + "/" + k + " z " + exs.Count + "): dzien " + day + " - " + Name(e.V.Settlement) + " [" + e.V.Settlement.StringId + "], typ " + e.Type
+                        Log.Info("Zatkane wsie (przyklad): dzien " + day + " - " + (i + 1) + "/" + k + " z " + exs.Count + " - " + Name(e.V.Settlement) + " [" + e.V.Settlement.StringId + "], typ " + e.Type
                                  + ", wies " + (e.V.Bound.IsCastle ? "zamkowa" : "miejska") + ", zapas/W " + F2(e.Ratio) + " (" + e.Stock + "/" + e.W + "), top: " + e.Top + "; woz: " + e.CartText + ".");
                     }
                 }

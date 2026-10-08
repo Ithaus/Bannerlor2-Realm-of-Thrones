@@ -368,7 +368,7 @@ namespace Armoury
                 Log.Info("Rzemioslo miasta (148): WLACZONE w " + towns + " miastach - rzemieslnicy przerabiaja surowiec z polki swojego miasta, gdy wyrob placi wsad + prace (dniowka "
                          + F1(s.WorkshopWagePerDay) + " d" + (s.WorkshopWageByTier && s.TownWageRefProsperity > 0f ? " x poziom plac miasta (dobrobyt / " + F1(s.TownWageRefProsperity) + ", " + F1(TownWage.Min) + "-" + F1(TownWage.Max) + ")" : " w kazdym miescie") + ") + " + F1(s.SmithProfitPercent) + "% (Smith Profit Percent), krokami po sztuce z cena od nowa, najpierw przerob z najwiekszym zyskiem na roboczodzien; pary z receptur gry ["
                          + string.Join("; ", parts.ToArray()) + "]; rece " + F1(s.TownCraftHandsPerArmsHand) + " x rece rzemieslnikow miasta = " + F1(world)
-                         + " roboczodni dziennie na swiat; bez zlota (polka -> polka); garbowanie i tkanie 1:1 (TanOrWeave) WYLACZONE, "
+                         + " roboczodni dziennie na swiat; bez zlota (polka -> polka); garbowanie i tkanie 1:1 (TanOrWeave) zastapione rzemioslem, "
                          // recenzja: przy wylaczonym Workshop No Free Raw linie BK skory i plotna bez wsadu ida torem gry (z niczego) - linia ma to mowic
                          + (s.WorkshopNoFreeRaw ? "jego linie bez wsadu zablokowane" : "UWAGA: Workshop No Free Raw wylaczone - linie BK skory i plotna bez wsadu robia z niczego obok rzemiosla")
                          + "; zuzycie surowca rzemiosla (srednia z ok. "

@@ -379,7 +379,7 @@ namespace Armoury
                 else miss.Add("dymek");
                 Log.Info("Zbroja z kuzni: zbroja z zakladki CRAFT jak bron (prog, pekniecie i jakosc z kowalstwa) - "
                          + (CraftOn ? "CZYNNE" : On ? "uspione (kuznia Armoury wylaczona - CraftingEnabled)" : "wylaczone w MCM (ArmourCraftLikeWeapons)") + "; wpiete: " + string.Join(", ", ok)
-                         + " | BRAK: " + (miss.Count > 0 ? string.Join(", ", miss) : "nic") + ".");
+                         + (miss.Count > 0 ? " | BRAK: " + string.Join(", ", miss) : " | wszystko wpiete") + ".");   // slowo BRAK tylko przy prawdziwym braku (sprawdz_logi: slowo BRAK w linii = alarm)
             }
             catch (Exception e) { Log.Error("ArmourQuality.ApplyAll", e); }
         }
