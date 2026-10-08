@@ -771,6 +771,11 @@ namespace Armoury
 
         public bool LogEnabled = true;                     // write a log file in the module folder
 
+        // --- Map villages ---
+        public bool MapVillagesEnabled = true;             // named villages on the campaign map between the game's own villages, castles and towns - each one a cluster of its district's settlements, standing where a village had reason to stand (bridge, ford, crossroads, road, river, coast); off = none drawn. Nothing is written to the save
+        public float MapVillagesHideAboveCameraHeight = 160f; // map villages vanish when the camera rises above this height - from afar only the game's villages, castles and towns remain
+        public bool MapVillageNamesOnHover = true;         // Map Village Names - hover only: point at a map village to see its name, its district, its settlements and people. Labels over burning villages come in a later update
+
         public static void Load(string moduleDataDir)
         {
             var file = Path.Combine(moduleDataDir, "Armoury.settings.xml");

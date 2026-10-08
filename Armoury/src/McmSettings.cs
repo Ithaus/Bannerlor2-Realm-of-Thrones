@@ -2680,6 +2680,18 @@ namespace Armoury
         [SettingPropertyGroup("Grateful villages")]
         public bool LogEnabled { get; set; } = true;
 
+        [SettingPropertyBool("Map Villages Enabled", HintText = "named villages on the campaign map between the game's own villages, castles and towns - each one a cluster of its district's settlements, standing where a village had reason to stand (bridge, ford, crossroads, road, river, coast); off = none drawn. Nothing is written to the save")]
+        [SettingPropertyGroup("Map villages")]
+        public bool MapVillagesEnabled { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Map Villages Hide Above Camera Height", 0.00f, 640.00f, "0.00", HintText = "map villages vanish when the camera rises above this height - from afar only the game's villages, castles and towns remain")]
+        [SettingPropertyGroup("Map villages")]
+        public float MapVillagesHideAboveCameraHeight { get; set; } = 160f;
+
+        [SettingPropertyBool("Map Village Names On Hover", HintText = "Map Village Names - hover only: point at a map village to see its name, its district, its settlements and people. Labels over burning villages come in a later update")]
+        [SettingPropertyGroup("Map villages")]
+        public bool MapVillageNamesOnHover { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -3349,6 +3361,9 @@ namespace Armoury
             s.BanditCheerRadius = BanditCheerRadius;
             s.BanditCheerRelation = BanditCheerRelation;
             s.LogEnabled = LogEnabled;
+            s.MapVillagesEnabled = MapVillagesEnabled;
+            s.MapVillagesHideAboveCameraHeight = MapVillagesHideAboveCameraHeight;
+            s.MapVillageNamesOnHover = MapVillageNamesOnHover;
         }
 
         internal static void Apply()

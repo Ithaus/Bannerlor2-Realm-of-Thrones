@@ -105,6 +105,7 @@ namespace Armoury
             if (m.StartsWith("PodazPopyt:")) return "handel";
             if (m.StartsWith("Warsztaty (diagnoza)")) return "warsztaty";
             if (m.StartsWith("AiNightCamp")) return "noc";
+            if (m.StartsWith("Wioski: ogien") || m.StartsWith("Wioski: zgaszony")) return "wioski";   // W2: kazdy rabunek - do pliku tematycznego; start, wypelnienie i podsumowania w glownym
             if (m.StartsWith("UniqueLaw: zamiennik") || m.StartsWith("LegendaryLaw: zamiennik") || m.StartsWith("TroopFit:   ")
                 || m.StartsWith("Uniques: ") || m.StartsWith("Rozrzut miotanych:") || m.StartsWith("Podloga zlomu:")) return "start";
             return null;

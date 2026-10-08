@@ -26,6 +26,14 @@ Nie commituj ich — `.gitignore` je pomija (to wlasnosc TaleWorlds i autorow mo
     Bannerlord.UIExtenderEx.dll  <- Bannerlord.UIExtenderEx
     BannerKings.dll              <- BannerKings.Redux
 
+## Z `Modules\SandBox\bin\Win64_Shipping_Client\` (Armoury: wioski na mapie, W2)
+
+    SandBox.dll
+    SandBox.View.dll
+
+Gdy ich tu nie ma, `Armoury.csproj` bierze je wprost z katalogu modulu SandBox gry
+(wlasciwosc `SandBoxLibs`, domyslnie `C:/Program Files (x86)/Steam/steamapps/common/Mount & Blade II Bannerlord/Modules/SandBox/bin/Win64_Shipping_Client`).
+
 ## Szybciej
 
 Zamiast kopiowac, wskaz katalogi wprost przy budowaniu:

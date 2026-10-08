@@ -11,6 +11,12 @@
     <AssemblyVersion>1.0.0.0</AssemblyVersion>
     <FileVersion>1.0.0.0</FileVersion>
   </PropertyGroup>
+  <PropertyGroup>
+    <!-- Wioski na mapie (W2): SandBox.dll i SandBox.View.dll (komponent widoku mapy dziedziczy po typach SandBox.View - refleksja
+         nie wystarczy). Z libs/, a gdy ich tam nie ma - wprost z katalogu modulu SandBox gry (patrz libs/README.md). -->
+    <SandBoxLibs Condition="'$(SandBoxLibs)' == '' And Exists('$(GameLibs)/SandBox.View.dll')">$(GameLibs)</SandBoxLibs>
+    <SandBoxLibs Condition="'$(SandBoxLibs)' == ''">C:/Program Files (x86)/Steam/steamapps/common/Mount &amp; Blade II Bannerlord/Modules/SandBox/bin/Win64_Shipping_Client</SandBoxLibs>
+  </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
   </ItemGroup>
@@ -39,5 +45,7 @@
     <Reference Include="TaleWorlds.Engine.GauntletUI"><HintPath>$(GameLibs)/TaleWorlds.Engine.GauntletUI.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="TaleWorlds.Core.ViewModelCollection"><HintPath>$(GameLibs)/TaleWorlds.Core.ViewModelCollection.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="TaleWorlds.CampaignSystem.ViewModelCollection"><HintPath>$(GameLibs)/TaleWorlds.CampaignSystem.ViewModelCollection.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="SandBox"><HintPath>$(SandBoxLibs)/SandBox.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="SandBox.View"><HintPath>$(SandBoxLibs)/SandBox.View.dll</HintPath><Private>false</Private></Reference>
   </ItemGroup>
 </Project>

@@ -133,6 +133,33 @@ namespace Armoury
             catch (Exception e) { Log.Error("OnBeforeInitialModuleScreenSetAsRoot", e); }
         }
 
+        private static int _mapVillagesLoadFails;
+
+        /// <summary>Wioski na mapie (W2): rejestracja komponentu widoku, gdy mapa kampanii ma juz swoje menedzery (tani test co klatke).
+        /// Wylacznik sprawdzany TUTAJ: przy "Map Villages Enabled" = off typ MapVillagesView (dziedziczy po SandBox.View) w ogole
+        /// sie nie laduje. Wywolanie przez osobna metode NoInlining: blad ladowania typu (inna wersja SandBox.View po aktualizacji
+        /// gry) wylatuje wtedy w tym try, a nie z OnApplicationTick do petli modulow gry (CTD). Wszystko inne lapie EnsureRegistered.</summary>
+        protected override void OnApplicationTick(float dt)
+        {
+            base.OnApplicationTick(dt);
+            if (_mapVillagesLoadFails >= 3 || !Settings.Current.MapVillagesEnabled) return;
+            try { MapVillagesTick(); }
+            catch (Exception e)
+            {
+                // tu dochodzi tylko blad ladowania typu / zestawu (TypeLoad, MissingMethod, FileNotFound) - powtarzalby sie co klatke,
+                // wiec po 3 probach wioski nie startuja do konca sesji (gra bez zmian); to nie jest blad jednej wioski
+                _mapVillagesLoadFails++;
+                Log.Error("MapVillages: komponent widoku nie laduje sie (proba " + _mapVillagesLoadFails + "/3"
+                          + (_mapVillagesLoadFails >= 3 ? " - wioski na mapie wylaczone do konca sesji, gra bez zmian" : "") + ")", e);
+            }
+        }
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static void MapVillagesTick()
+        {
+            MapVillagesView.EnsureRegistered();
+        }
+
         public override void OnMissionBehaviorInitialize(Mission mission)
         {
             base.OnMissionBehaviorInitialize(mission);
