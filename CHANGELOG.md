@@ -1,5 +1,14 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-08 (140, poprawka po audycie TOWARY 3) - PULA TURNIEJU GRACZA WRACA, GDY OGLOSZENIE PADNIE W POLOWIE (WYJATEK)
+**Mod:** GrandTourney | **Pliki:** `TourneyBehavior.cs` (`HostTournament`)
+
+**Problem (audyt zamknietej ekonomii TOWARY 3, Z6):** przy `HistoricalTownRates` pula gracza schodzi w nicosc (czeka na zwyciezce) PRZED `CreateTournament` / `AddTournament`, a zapisuje sie w wpisie obwieszczenia dopiero w `Proclaim`. Gdy model turnieju albo menedzer rzuci wyjatek (catch tylko logowal), pula (3000-15000) przepadala: nie ma wpisu, wiec nie ma ani wyplaty zwyciezcy, ani zwrotu (`RefundPurse` / `PayPurse` czytaja pule tylko z wpisu).
+
+**Zmiana:** zapamietana kwota faktycznie zdjeta z kiesy (roznica zlota gracza); w catch, gdy wpis nie powstal (`Proclaim` nie doszedl do konca), pula wraca graczowi z nicosci (`GiveGoldAction` null -> gracz, bilans zerowy) i linia logu "HostTournament: pula N zwrocona graczowi (turniej nie ogloszony)". Oplata gospodarza zostaje w kasie miasta jak dotad. Przy wylaczonym `HistoricalTownRates` - bez zmian (cala oplata w nicosc jak dotad).
+
+**Ryzyko / co sprawdzic:** tylko sciezka wyjatku (w zwyklej grze nie wystepuje). W logu GrandTourney przy bledzie "ERROR in HostTournament" zaraz po nim linia zwrotu.
+
 ## 2026-10-08 (153, poprawka po audycie TOWARY 3) - WOLNE GOJENIE NIE LAGODZI KARY BANNER KINGS ZA GLOD W OBLEZONEJ OSADZIE
 **Mod:** Armoury | **Pliki:** `SlowHealing.cs` (ApplyAll: `SlowPostfix` z `Priority.Low`)
 

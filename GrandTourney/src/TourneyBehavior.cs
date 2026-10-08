@@ -683,6 +683,7 @@ namespace GrandTourney
 
         internal void HostTournament(Town town, int prizeGold)
         {
+            int purseTaken = 0; bool proclaimed = false;   // poprawka po audycie TOWARY 3: pula zdjeta, a wpisu nie ma (wyjatek) - wraca do gracza
             try
             {
                 int fee = HostFee(town) + prizeGold;
@@ -690,7 +691,7 @@ namespace GrandTourney
                 {
                     // oplata - do kasy miasta (ciesle, herold, kuchnia); pula czeka na zwyciezce (zapisana w obwieszczeniu)
                     GiveGoldAction.ApplyForCharacterToSettlement(Hero.MainHero, town.Settlement, fee - prizeGold, true);
-                    if (prizeGold > 0) GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, null, prizeGold, true);
+                    if (prizeGold > 0) { int had = Hero.MainHero.Gold; GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, null, prizeGold, true); purseTaken = had - Hero.MainHero.Gold; }
                 }
                 else GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, null, fee);
 
@@ -702,10 +703,21 @@ namespace GrandTourney
 
                 Remove(town);
                 Proclaim(town, prizeGold);
+                proclaimed = true;
                 Log.Info("Gracz oglosil turniej w " + town.Name + ", koszt " + fee);
                 Log.Player("You have proclaimed a tourney at " + town.Name + ". It cost you " + fee + " gold.");
             }
-            catch (Exception e) { Log.Error("HostTournament", e); }
+            catch (Exception e)
+            {
+                Log.Error("HostTournament", e);
+                // pula gracza zeszla w nicosc przed utworzeniem turnieju, a wpisu obwieszczenia (z ktorego placi sie zwyciezcy albo zwraca) nie ma -
+                // oddajemy ja z nicosci (bilans zerowy); oplata gospodarza zostaje w kasie miasta jak przy kazdym ogloszeniu
+                if (purseTaken > 0 && !proclaimed)
+                {
+                    try { GiveGoldAction.ApplyBetweenCharacters(null, Hero.MainHero, purseTaken, true); Log.Info("HostTournament: pula " + purseTaken + " zwrocona graczowi (turniej nie ogloszony)."); }
+                    catch (Exception e2) { Log.Error("HostTournament.Refund", e2); }
+                }
+            }
         }
     }
 }
