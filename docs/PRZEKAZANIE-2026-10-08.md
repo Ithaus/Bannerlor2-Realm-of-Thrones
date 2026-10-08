@@ -93,3 +93,10 @@ dana faze od nowa, korzystajac z zapisanych wynikow:
   Nowe konto: przy przerwaniu zaczyna od fazy PROJEKT, dajac projektantowi te 3 pliki jako wyniki rozpoznania (prompt projektanta w skrypcie workflow 169).
 - **170 i 171:** rozpoznanie w toku, brak gotowych wynikow; drzewa bez zmian. Nowe konto: zaczyna od ROZPOZNANIA (prompty w skryptach workflow).
 - Zapis automatyczny wynikow (co 2 min, commit + push + kopia D:) dziala do konca sesji.
+
+## 13. DECYZJA JEFFA: konczymy na rozpoznaniu, nowe konto zaczyna od PROJEKTU
+- "nie rozpoczynaj projektu, to nowe konto" / "konczymy faze rozpoznania i nowe konto zacznie dalej".
+- 169: workflow ZATRZYMANY przed projektem (drzewo obieg169 czyste, brak specyfikacji). Rozpoznanie 3/3 w docs/rozpoznanie-2026-10-08/paczka-169-wynik-*.md.
+- 170 i 171: czekaja na koniec rozpoznania, potem zostana zatrzymane; wyniki zapisuja sie do docs/rozpoznanie-2026-10-08/paczka-170-*.md / paczka-171-*.md.
+- NOWE KONTO: dla kazdej paczki uruchom faze PROJEKT (potem wykonanie, recenzje, poprawki) z promptami ze skryptow workflow (rozdz. 11), dajac
+  projektantowi pliki rozpoznania z docs/rozpoznanie-2026-10-08/ zamiast ponownego rozpoznania. Kolejnosc: 169 -> 170 -> 171.
