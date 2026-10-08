@@ -625,3 +625,17 @@ albo najemnik z wlasnym koniem bez doplaty). (3) drobne: dzienna linia cen koni 
 nieprzecwiczone w autotescie: oplata za kuznie, turnieje gracza, niewola, TroopSelfMend, rezerwa 20 000 przy domu i utargu.
 -> po zlozeniu TOWARY 3 (workflow towary3-skladanie) osobny krok poprawek (1) i (2) na t3-sklad.
 
+## TOWARY 3 - ZLOZONE (08.10 ok. 05:00)
+
+Galaz t3-sklad c1e8bea (GitHub w-toku/towary3-sklad; worktree SCRATCH\dzien-6\towary3\repo), opis docs/towary3/SKLAD.md i WYNIK.md: na n126 paczki
+127 pokretla, 128 Spoils bez zlota, 129 diagnoza zatkanych, 130 wozy, 131 pamiec drog, 132 zbroja z kuzni, 133 najemnicy, 134 kwatermistrz,
+135 lawa + robota kowali, 136 warsztaty x dobrobyt (TownWage), 137 wynajem kuzni, 138 budowy, 139 niewola (RC), 140 turnieje (GT), 141-142 kuznia
+za dzien / puste kasy / rezerwa, 143 konie po cenie targu, 144 zywy inwentarz, 145 zamowienia z polki, 146 ksiega towarow, 147 rzemieslnicy BK,
+148 rzemioslo miasta, 149 rzemioslo x dobrobyt (NOWE), 150 odziez wojska, + W2 wioski (wersja z gry, z AccessViolation w diagnostyce), 151
+sufit XP rafinacji, 152 BuildFunding, 153 SlowHealing po BK, naprawy ludzi i AI z materialem (MendMaterialMenAndLords). Audyt 5 wymiarow: 7 waznych
+- wszystkie poprawione; proby OK (oczekiwane roznice opisane). DLL dll-final: Armoury a08ac43a, GT 1337433c, RC 3e04b89b (kopia
+D:\Backup-Bannerlord\towary3-2026-10-08). Narzedzie sprawdz_logi.py z grupa 3t - obok galezi (naprawa\narzedzia), do wniesienia do repo.
+Armoury.json przy wgraniu: SmithingSkillPerTier 45->35, DurabilityPerArmorPoint 20.0->13.33, MinSellPercentOfValue 5->2 (cofniecie: odwrotnie).
+Nowe klucze zapisu: arm_mendstock, arm_towncrafts, arm_armyclothing. PRZED WGRANIEM DOLOZYC: wyspy (90234dc), cena sprzedazy (a87ad4a),
+poprawki 144 (dzielnik "horse" przez drob) i 143 (kon najemnika z niczego), wraki na zlom (polki wojska), CleanseAmmo leczy kulawe konie,
+nowa wersja W2 (wyglad 2 + uklad v4 - workflow wioski-wyglad-2), potem autotest 40 dob + zdjecia, potem "wgraj".
