@@ -114,3 +114,10 @@ dana faze od nowa, korzystajac z zapisanych wynikow:
   Skrypt: `C:\Users\GAME\.claude\projects\C--Program-Files--x86--Steam-steamapps-common-Mount---Blade-II-Bannerlord\7016f733-d379-418e-b700-f66fd52e4d2b\workflows\scripts\paczka-169-projekt-do-poprawek-wf_6f6961dc-464.js`.
   Gdy sesja padnie: `git -C <obieg169> log` + `docs/paczki/169-ksiega-obiegu.md` w drzewie (sekcja "Krytyka i odpowiedzi" = projekt po krytyce gotowy) - dokonczyc od brakujacej fazy.
 - Potem: autotest 40 dob z probnym DLL -> wynik dla Jeffa -> 170 + skrypt BEE `-ListaZFundamentu` -> 171.
+- 13:00 aplikacja zamknieta w trakcie projektu 169 (nic nie zapisane) -> 169 wznowiony tym samym `wf_6f6961dc-464` od projektu.
+- **170** rownolegle: workflow `wf_5166afca-96d` (projekt z paczka-170-wynik-1..2 -> krytyka -> projekt po krytyce -> wykonanie -> recenzja x2 -> poprawki),
+  drzewo bee170, skrypt `...\7016f733-...\workflows\scripts\paczka-170-projekt-do-poprawek-wf_5166afca-96d.js`.
+- **171** rownolegle: workflow `wf_170b9c8b-c05` (projekt z paczka-171-wynik-1..3 -> krytyka -> projekt po krytyce -> wykonanie -> recenzja x3 -> poprawki),
+  drzewo zaloga171, skrypt `...\7016f733-...\workflows\scripts\paczka-171-projekt-do-poprawek-wf_170b9c8b-c05.js`.
+- Scalanie i testy PO KOLEI: 169 (autotest 40 dob, wynik Jeffowi) -> 170 + skrypt BEE -ListaZFundamentu -> 171. Gdy sesja padnie: w drzewie `git log` +
+  docs/paczki/17x-*.md (sekcja "Krytyka i odpowiedzi" = projekt po krytyce gotowy), dokonczyc brakujace fazy.
