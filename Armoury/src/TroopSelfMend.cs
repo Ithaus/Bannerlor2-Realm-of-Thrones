@@ -50,17 +50,31 @@ namespace Armoury
         }
 
         /// <summary>Ile kosztowalyby wszystkie zalegle naprawy (bez wrakow) - tyle ludzie trzymaja w sakiewce.</summary>
-        internal static int OutstandingCost()
+        internal static int OutstandingCost() { return OutstandingCost(null); }
+
+        /// <summary>To samo; przy naprawach z materialem (MendMaterial.MenAndLordsOn) i podanym miescie - robocizna + szacunek materialu
+        /// z polki tego miasta (Bench.Estimate - ta sama cena co na lawie), sztuki bez receptury kowala pominiete (kowale ich nie naprawia).
+        /// Robocizna jak dotad (UnitCost(ee) - stawka biezacej osady).</summary>
+        internal static int OutstandingCost(Settlement st)
         {
             int sum = 0;
             try
             {
                 var armory = QuartermasterLaw.DteArmory();
                 if (armory == null) return 0;
+                MendMaterial.Bench bench = MendMaterial.MenAndLordsOn && st != null && st.IsTown ? new MendMaterial.Bench(st) : null;
                 for (int i = 0; i < armory.Count; i++)
                 {
                     var el = armory.GetElementCopyAtIndex(i);
-                    if (Mendable(el)) sum += UnitCost(el.EquipmentElement) * el.Amount;
+                    if (!Mendable(el)) continue;
+                    int unit = UnitCost(el.EquipmentElement);
+                    if (bench != null && bench.Ok)
+                    {
+                        var need = MendMaterial.Needs(el.EquipmentElement);
+                        if (need == null) continue;
+                        unit += MendMaterial.Gold(bench.Estimate(need));
+                    }
+                    sum += unit * el.Amount;
                 }
             }
             catch { }
@@ -89,6 +103,7 @@ namespace Armoury
                 float hourShare = Math.Min(SmithHours.Available(st.Town), SmithHours.Capacity(st.Town) / Math.Max(1f, s.WorkHoursPerManDay));   // wpis 93: dzien pracy kowala rozlozony na jego godziny
                 _bench += hourShare;
                 float per = Math.Max(0.05f, s.MendLootHoursPerPiece);
+                if (MendMaterial.MenAndLordsOn) { HourlyWithMaterial(main, st, armory, worn, hourShare, per); return; }   // poprawka po audycie TOWARY 3
                 int mended = 0, paid = 0;
                 bool broke = false;
                 foreach (var el in worn)
@@ -124,6 +139,71 @@ namespace Armoury
         }
         private static int _hourMended, _hourPaid;
 
+        // ------------------------------------------------------------ poprawka po audycie TOWARY 3 (krok 139 planu K13): naprawy ludzi z materialem
+        // Do 135 kazda naprawa u kowali miasta byla sama robocizna; 135 dal lawie (i kwatermistrzowi) material z polki, a ludzie dalej naprawiali
+        // ta sama sztuke w tej samej kuzni bez grama materialu - dwie ceny jednej naprawy i material z niczego. Teraz ta sama regula co na lawie:
+        // MendMaterial.Order (material wedle stanu z polki miasta / zapasu kowali, po cenie targu; brak - sztuka czeka; wraki i sztuki bez
+        // receptury kowala - nie). Godziny kowali jak dotad (gdy robota stanela - tylko za gotowe sztuki). Zaplata (robota + material w calych
+        // pensach) z sakiewki ludzi do kasy miasta - za to, co naprawde zrobione (najpierw plan na kopii, potem Commit i zaplata).
+        private static int _hourMat;
+        private static readonly float[] _hourKg = new float[MendMaterial.Kinds];
+
+        private static void HourlyWithMaterial(MobileParty main, Settlement st, ItemRoster armory, List<ItemRosterElement> worn, float hourShare, float per)
+        {
+            var o = new MendMaterial.Order(st);
+            int purse = MenPurse.Get(main);
+            bool broke = false;
+            foreach (var el in worn)
+            {
+                if (_bench < per) break;
+                var ee = el.EquipmentElement;
+                int n = Math.Min(el.Amount, (int)Math.Floor(_bench / per + 0.0001f));   // tyle sztuk tego stosu, na ile starczy godzin kowali
+                if (n <= 0) break;
+                int poor0 = o.Poor;
+                int planned = o.AddLot(ee, MendMaterial.Needs(ee), UnitCost(ee, st), n, purse, int.MaxValue);   // brak materialu: reszta stosu czeka, nastepny stos dalej
+                _bench -= planned * per;
+                if (o.Poor > poor0) { broke = true; break; }
+            }
+            int mended = 0, paid = 0;
+            if (o.Pieces > 0)
+            {
+                o.Bench.Commit();
+                foreach (var j in o.Jobs)
+                {
+                    armory.AddToCounts(j.El, -j.N);
+                    armory.AddToCounts(new EquipmentElement(j.El.Item), j.N);
+                    mended += j.N;
+                }
+                paid = MenPurse.Take(main, o.Total);
+                st.Town.ChangeGold(paid);
+                for (int k = 0; k < MendMaterial.Kinds; k++) _hourKg[k] += o.Bench.UsedKg[k];
+                _hourMat += o.MatGold;
+            }
+            // kowale stoja (pusta sakiewka, brak materialu, nic do roboty): godziny tylko za gotowe sztuki, bez trzymania na zapas
+            bool idle = broke || _bench >= per;
+            if (idle) _bench = Math.Min(_bench, per);
+            SmithHours.Use(st.Town, idle ? mended * per : hourShare);
+            _hourMended += mended; _hourPaid += paid;
+            int hour = TaleWorlds.CampaignSystem.CampaignTime.Now.GetHourOfDay;
+            if ((_hourMended > 0 || o.Wait > 0) && (hour == 22 || (broke && _hourMended > 0)))
+            {
+                string wait = o.Wait > 0 ? " " + o.Wait + (o.Wait == 1 ? " piece waits" : " pieces wait") + " for materials - the market of " + st.Name + " has not enough "
+                                           + MendMaterial.KindsEn(o.WaitMask) + "." : "";
+                if (_hourMended > 0)
+                    Log.Player("The smiths of " + st.Name + " mended " + _hourMended + " pieces of your men's kit today for " + _hourPaid
+                               + " denars from the men's purse (work and materials)." + (broke ? " The men's purse is empty - the rest waits (or pay the smith yourself)." : "") + wait, true);
+                else Log.Player("The smiths of " + st.Name + " could not mend your men's kit today." + wait, true);
+                Log.Info("TroopSelfMend: " + st.Name + " - naprawiono " + _hourMended + " szt. za " + _hourPaid + " z sakiewki ludzi (w tym material " + _hourMat
+                         + " zl; zuzyto kg: metal " + F(_hourKg[MendMaterial.Metal]) + ", drewno " + F(_hourKg[MendMaterial.Wood]) + ", skora " + F(_hourKg[MendMaterial.Leather])
+                         + ", plotno " + F(_hourKg[MendMaterial.Cloth]) + ")" + (broke ? " (sakiewka pusta)" : "") + "; czeka na material " + o.Wait
+                         + " (brak: " + MendMaterial.KindsPl(o.WaitMask) + "), nie robota kowala " + o.NoSmith + ".");
+                _hourMended = 0; _hourPaid = 0; _hourMat = 0;
+                for (int k = 0; k < MendMaterial.Kinds; k++) _hourKg[k] = 0f;
+            }
+        }
+
+        private static string F(float v) { return v.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture); }
+
         internal static void Run(Settlement st)
         {
             if (MenPurse.On) return;   // wpis 84: naprawy godzinowe z sakiewki ludzi (Hourly)
@@ -157,6 +237,7 @@ namespace Armoury
                 foreach (var el in worn) wornTotal += el.Amount;
                 int budget = Math.Max(3, (int)Math.Round(wornTotal * s.TroopSelfMendPercentPerDay / 100.0));
                 if (budget > wornTotal) budget = wornTotal;
+                if (MendMaterial.MenAndLordsOn) { RunWithMaterial(st, armory, worn, budget); return; }   // poprawka po audycie TOWARY 3: material jak na lawie
                 int mended = 0, paidAll = 0;
                 foreach (var el in worn)
                 {
@@ -180,6 +261,38 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Log.Error("TroopSelfMend.Run", e); }
+        }
+
+        /// <summary>Run przy naprawach z materialem: ten sam plan co Hourly (MendMaterial.Order), zaplata z kiesy gracza do kasy miasta.</summary>
+        private static void RunWithMaterial(Settlement st, ItemRoster armory, List<ItemRosterElement> worn, int budget)
+        {
+            var o = new MendMaterial.Order(st);
+            long gold = Math.Max(0, TaleWorlds.CampaignSystem.Hero.MainHero.Gold);
+            foreach (var el in worn)
+            {
+                if (o.Pieces >= budget) break;
+                var ee = el.EquipmentElement;
+                o.AddLot(ee, MendMaterial.Needs(ee), UnitCost(ee, st), el.Amount, gold, budget);
+                if (o.Poor > 0) break;
+            }
+            if (o.Pieces <= 0)
+            {
+                if (o.Wait > 0) Log.Info("TroopSelfMend: " + st.Name + " - nic nie naprawiono, czeka na material " + o.Wait + " (brak: " + MendMaterial.KindsPl(o.WaitMask) + ").");
+                return;
+            }
+            o.Bench.Commit();
+            int mended = 0;
+            foreach (var j in o.Jobs)
+            {
+                armory.AddToCounts(j.El, -j.N);
+                armory.AddToCounts(new EquipmentElement(j.El.Item), j.N);
+                mended += j.N;
+            }
+            int paid = o.Total;
+            Pay.ToSettlement(paid);
+            Log.Info("TroopSelfMend: wojsko naprawilo " + mended + " sztuk w " + st.Name + " - " + o.LogPl());
+            Log.Player("The men see to their own kit at " + st.Name + " - " + mended + " pieces mended by the town smiths for " + paid + " gold (work and materials)."
+                       + o.LeftEn(st.Name.ToString()), true);
         }
     }
 }

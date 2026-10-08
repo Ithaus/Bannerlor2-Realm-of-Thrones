@@ -179,7 +179,7 @@ namespace Armoury
                 if (mp.IsMainParty) TroopSelfMend.LeftTown();
                 int purse = Get(mp);
                 if (purse <= 0) return;
-                int reserve = mp.IsMainParty ? TroopSelfMend.OutstandingCost() : AiWear.OutstandingCost(mp);
+                int reserve = mp.IsMainParty ? TroopSelfMend.OutstandingCost(st) : AiWear.OutstandingCost(mp, st);   // przy naprawach z materialem: z szacunkiem materialu z polki tego miasta
                 // 150: odziez, buty i plotno wojska - z polki miasta po cenie targu, z tej samej sakiewki PRZED wydatkiem "na zycie"
                 // (to samo zloto: mniej idzie "na zycie"); rezerwa na zalegle naprawy nietknieta, jak przy brakach w kompletach
                 int cloth = ArmyClothing.BuyForParty(mp, st, purse - reserve);
@@ -271,7 +271,7 @@ namespace Armoury
             var armory = QuartermasterLaw.DteArmory();
             var main = MobileParty.MainParty;
             if (armory == null) return;
-            int budget = Get(main) - TroopSelfMend.OutstandingCost();   // naprawy maja pierwszenstwo
+            int budget = Get(main) - TroopSelfMend.OutstandingCost(st);   // naprawy maja pierwszenstwo (z materialem - szacunek z tej polki)
             if (budget <= 0) return;
             int spent = 0, pieces = 0, maxPieces = Math.Max(1, Settings.Current.AiGearMaxPiecesPerVisit);
             var shelf = st.ItemRoster;

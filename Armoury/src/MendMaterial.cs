@@ -11,7 +11,8 @@ namespace Armoury
 {
     /// <summary>
     /// MATERIAL DO NAPRAWY Z TARGU MIASTA (Jeff 07.10: naprawa u kwatermistrza Spoils "placi kasie miasta (kowale), zuzywa material
-    /// z targu wedle stanu, wrakow nie odnawia"; plan K13 pkt 139 - ta sama regula ma potem objac naprawy ludzi i AI).
+    /// z targu wedle stanu, wrakow nie odnawia"; plan K13 pkt 139 - od poprawki po audycie TOWARY 3 ta sama regula obejmuje naprawy ludzi gracza
+    /// i lordow AI: TroopSelfMend.HourlyWithMaterial / RunWithMaterial, AiWear.MendWithMaterial, wylacznik MendMaterialMenAndLords).
     /// Jedna regula dla naprawy u kowali miasta:
     ///  - ILE: udzial materialu pelnej sztuki = MendMaterialMaxShare x (1 - stan) - ta sama regula co naprawa wlasnymi rekami
     ///    (SmithMenu.SelfMendParts: "naprawiamy, nie kujemy od nowa"); Plundered 55% -> 9%, Damaged 40% -> 12%, Battered 25% -> 15%;
@@ -114,6 +115,10 @@ namespace Armoury
         /// <summary>Wlaczona regula kowali miasta (SmithMendFromMarket): robota z dniowek, material z targu, bez wrakow.</summary>
         internal static bool RuleOn { get { var s = Settings.Current; return s != null && s.SmithMendFromMarket; } }
 
+        /// <summary>Poprawka po audycie TOWARY 3 (krok 139 planu K13): naprawy ludzi gracza (TroopSelfMend) i lordow AI (AiWear.MendInTown)
+        /// tez biora material z targu (Order) - przy regule kowali miasta i wlaczniku MendMaterialMenAndLords.</summary>
+        internal static bool MenAndLordsOn { get { var s = Settings.Current; return s != null && s.SmithMendFromMarket && s.MendMaterialMenAndLords; } }
+
         /// <summary>Wskaznik plac w miescie: dobrobyt / TownWageRefProsperity (mediana miast), 0.5 - 1.5; poza miastem albo przy 0 - 1.</summary>
         internal static float LocalWage(Settlement st) { return TownWage.Index(st); }   // jeden wzor dla calej gry (TownWage)
 
@@ -167,7 +172,7 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ zlecenie u kowali miasta (naprawa za monete - jedna regula)
-        // Lawa naprawcza Armoury u kowala (lup z sakw, sztuka na wybor, zbrojownia wojska, uprzaz na grzbiecie) - a w planie K13 pkt 139
+        // Lawa naprawcza Armoury u kowala (lup z sakw, sztuka na wybor, zbrojownia wojska, uprzaz na grzbiecie) - a od poprawki po audycie TOWARY 3 (plan K13 pkt 139)
         // naprawy ludzi (TroopSelfMend) i AI (AiWear.MendInTown): Order na zlecenie, AddLot na kazda sztuke (robocizne liczy wolajacy -
         // stawka jego miejsca), Commit, zaplata Total do kasy miasta od tego, kto placi. Regula w jednym miejscu: wrak (LootPrices.IsWreck,
         // wpis 97) - nie za monete; bez receptury kowala - nie; material wedle stanu z polki / zapasu kowali (Bench); brak - sztuka czeka.
@@ -523,19 +528,24 @@ namespace Armoury
             internal void Commit()
             {
                 if (!Ok) return;
-                foreach (var kv in _taken)
+                var gf = GoodsLedger.Begin(GoodsLedger.FMend, _st);   // ksiega towarow (146): zdjete z polki jako ujscie "naprawy kowali miasta (135)" (tylko licznik)
+                try
                 {
-                    if (kv.Value <= 0) continue;
-                    int i = _shelf.FindIndexOfElement(kv.Key);
-                    int have = i >= 0 ? _shelf.GetElementCopyAtIndex(i).Amount : 0;
-                    int n = Math.Min(have, kv.Value);
-                    if (n <= 0) continue;
-                    _shelf.AddToCounts(kv.Key, -n);
-                    var it = kv.Key.Item;
-                    string id = it.StringId + (kv.Key.ItemModifier != null ? "[" + kv.Key.ItemModifier.StringId + "]" : "");
-                    int t; TakenById.TryGetValue(id, out t); TakenById[id] = t + n;
-                    if (kv.Key.ItemModifier != null) ScrapTaken += n;
+                    foreach (var kv in _taken)
+                    {
+                        if (kv.Value <= 0) continue;
+                        int i = _shelf.FindIndexOfElement(kv.Key);
+                        int have = i >= 0 ? _shelf.GetElementCopyAtIndex(i).Amount : 0;
+                        int n = Math.Min(have, kv.Value);
+                        if (n <= 0) continue;
+                        _shelf.AddToCounts(kv.Key, -n);
+                        var it = kv.Key.Item;
+                        string id = it.StringId + (kv.Key.ItemModifier != null ? "[" + kv.Key.ItemModifier.StringId + "]" : "");
+                        int t; TakenById.TryGetValue(id, out t); TakenById[id] = t + n;
+                        if (kv.Key.ItemModifier != null) ScrapTaken += n;
+                    }
                 }
+                finally { GoodsLedger.End(gf); }
                 _taken.Clear();
                 Stock s0;
                 if (!_stock.TryGetValue(_st.StringId, out s0)) { s0 = new Stock(); _stock[_st.StringId] = s0; }

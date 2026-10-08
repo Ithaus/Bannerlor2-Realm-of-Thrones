@@ -33,8 +33,22 @@ namespace Armoury
         private static readonly HashSet<string> _battleSince = new HashSet<string>();
         private static readonly Dictionary<string, int> _lastMend = new Dictionary<string, int>();
         private static int _dayLoot, _dayWorn, _dayMended, _dayPaid, _dayStamp = -1;
+        // poprawka po audycie TOWARY 3 (krok 139 planu K13): material napraw AI z polek miast - liczniki doby (tylko log)
+        private static int _dayMat, _dayWait, _dayWaitMask, _dayNoSmith, _dayTowns;
+        private static readonly float[] _dayKg = new float[MendMaterial.Kinds];
+        private static readonly int[] _dayWaitBy = new int[MendMaterial.Kinds];
 
-        internal static void Reset() { _worn.Clear(); _known.Clear(); _battleSince.Clear(); _lastMend.Clear(); _dayLoot = _dayWorn = _dayMended = _dayPaid = 0; _dayStamp = -1; }
+        internal static void Reset()
+        {
+            _worn.Clear(); _known.Clear(); _battleSince.Clear(); _lastMend.Clear(); _dayLoot = _dayWorn = _dayMended = _dayPaid = 0; _dayStamp = -1;
+            ClearMatDay();
+        }
+
+        private static void ClearMatDay()
+        {
+            _dayMat = _dayWait = _dayWaitMask = _dayNoSmith = _dayTowns = 0;
+            Array.Clear(_dayKg, 0, _dayKg.Length); Array.Clear(_dayWaitBy, 0, _dayWaitBy.Length);
+        }
 
         internal static string Export()
         {
@@ -223,16 +237,33 @@ namespace Armoury
         }
         private static bool Mendable(ItemModifier m) { return m != null && m.PriceMultiplier < 1f && !LootPrices.IsWreck(m); }   // wpis 97
 
-        internal static int OutstandingCost(MobileParty mp)
+        internal static int OutstandingCost(MobileParty mp) { return OutstandingCost(mp, null); }
+
+        /// <summary>Rezerwa sakiewki na zalegle naprawy. Przy naprawach z materialem (MendMaterial.MenAndLordsOn) i podanym MIESCIE -
+        /// robocizna + szacunek materialu z polki tego miasta (Bench.Estimate), sztuki bez receptury kowala pominiete; robocizna jak dotad.</summary>
+        internal static int OutstandingCost(MobileParty mp, Settlement st)
         {
             if (!On || mp == null) return 0;
             int sum = 0;
             Dictionary<string, Dictionary<string, int>> byItem;
             if (!_worn.TryGetValue(mp.StringId, out byItem)) return 0;
+            MendMaterial.Bench bench = MendMaterial.MenAndLordsOn && st != null && st.IsTown ? new MendMaterial.Bench(st) : null;
+            if (bench != null && !bench.Ok) bench = null;
             foreach (var it in byItem)
             {
                 var item = MBObjectManager.Instance.GetObject<ItemObject>(it.Key); if (item == null) continue;
-                foreach (var m in it.Value) { var mod = Mod(m.Key); if (Mendable(mod)) sum += UnitCost(item, mod, null) * m.Value; }
+                foreach (var m in it.Value)
+                {
+                    var mod = Mod(m.Key); if (!Mendable(mod)) continue;
+                    int unit = UnitCost(item, mod, null);
+                    if (bench != null)
+                    {
+                        var need = MendMaterial.Needs(new EquipmentElement(item, mod));
+                        if (need == null) continue;
+                        unit += MendMaterial.Gold(bench.Estimate(need));
+                    }
+                    sum += unit * m.Value;
+                }
             }
             return sum;
         }
@@ -257,6 +288,7 @@ namespace Armoury
                 var jobs = new List<KeyValuePair<string, string>>();   // przedmiot, modyfikator - najgorsze najpierw
                 foreach (var it in byItem) foreach (var m in it.Value) if (Mendable(Mod(m.Key))) for (int k = 0; k < m.Value; k++) jobs.Add(new KeyValuePair<string, string>(it.Key, m.Key));
                 jobs.Sort((a, b) => { var ma = Mod(a.Value); var mb = Mod(b.Value); return (ma != null ? ma.PriceMultiplier : 1f).CompareTo(mb != null ? mb.PriceMultiplier : 1f); });
+                if (MendMaterial.MenAndLordsOn) { MendWithMaterial(mp, st, jobs, cap, perPiece); return; }   // poprawka po audycie TOWARY 3: material jak na lawie
                 int done = 0, paid = 0;
                 foreach (var j in jobs)
                 {
@@ -274,17 +306,69 @@ namespace Armoury
             catch (Exception e) { Log.Error("AiWear.MendInTown", e); }
         }
 
+        /// <summary>
+        /// Poprawka po audycie TOWARY 3 (krok 139 planu K13): kowale miasta naprawiaja AI ta sama regula co lawe gracza - MendMaterial.Order:
+        /// material wedle stanu z polki miasta albo zapasu kowali, po cenie targu; brak materialu - ta sztuka czeka (kolejne sztuki tego samego
+        /// przedmiotu i stanu tez), inne ida dalej; sakiewka ludzi placi robote + material w calych pensach do kasy miasta. Najpierw plan na
+        /// kopii (polka i zapas bez zmian), potem Commit, zaplata i zapis stanu - tylko dla zaplanowanych sztuk. Godziny kowali - za gotowe.
+        /// </summary>
+        private static void MendWithMaterial(MobileParty mp, Settlement st, List<KeyValuePair<string, string>> jobs, int cap, float perPiece)
+        {
+            var o = new MendMaterial.Order(st);
+            int purse = MenPurse.Get(mp);
+            // ta sama sztuka i ten sam stan - jeden stos (kolejnosc: najgorsze najpierw, jak lista jobs); brak materialu - caly stos czeka
+            var order = new List<KeyValuePair<string, string>>();
+            var count = new Dictionary<string, int>();
+            foreach (var j in jobs) { string key = j.Key + "|" + j.Value; int c; if (!count.TryGetValue(key, out c)) order.Add(j); count[key] = c + 1; }
+            foreach (var j in order)
+            {
+                if (o.Pieces >= cap) break;
+                var item = MBObjectManager.Instance.GetObject<ItemObject>(j.Key); if (item == null) continue;
+                var mod = Mod(j.Value);
+                var ee = new EquipmentElement(item, mod);
+                o.AddLot(ee, MendMaterial.Needs(ee), UnitCost(item, mod, st), count[j.Key + "|" + j.Value], purse, cap);
+                if (o.Poor > 0) break;   // sakiewka nie starcza - jak dotad koniec na dzis
+            }
+            int done = 0, paid = 0;
+            if (o.Pieces > 0)
+            {
+                o.Bench.Commit();
+                foreach (var job in o.Jobs) { AddWorn(mp.StringId, job.El.Item.StringId, job.El.ItemModifier.StringId, -job.N); done += job.N; }
+                paid = MenPurse.Take(mp, o.Total);
+                st.Town.ChangeGold(paid);
+                _dayMat += o.MatGold; _dayTowns++;
+                for (int k = 0; k < MendMaterial.Kinds; k++) _dayKg[k] += o.Bench.UsedKg[k];
+            }
+            SmithHours.Use(st.Town, done * perPiece);
+            _dayMended += done; _dayPaid += paid;
+            _dayWait += o.Wait; _dayWaitMask |= o.WaitMask; _dayNoSmith += o.NoSmith;
+            for (int k = 0; k < MendMaterial.Kinds; k++) _dayWaitBy[k] += o.WaitBy[k];
+        }
+
         private static void Day()
         {
             int d = (int)CampaignTime.Now.ToDays;
             if (_dayStamp == d) return;
-            if (_dayStamp >= 0 && (_dayLoot + _dayWorn + _dayMended) > 0)
+            if (_dayStamp >= 0 && (_dayLoot + _dayWorn + _dayMended + _dayWait) > 0)   // _dayWait: tylko przy naprawach z materialem (dzien, w ktorym wszystko czekalo, tez ma linie)
             {
                 int parties = _worn.Count, pieces = 0; foreach (var p in _worn.Values) foreach (var it in p.Values) foreach (var v in it.Values) pieces += v;
                 Log.Info("Zuzycie AI: dzien " + _dayStamp + " - lup obity " + _dayLoot + " szt., zuzyte w bitwach " + _dayWorn + ", naprawione w miastach " + _dayMended
-                         + " za " + _dayPaid + " z sakiewek ludzi; obitych razem " + pieces + " szt. w " + parties + " partiach.");
+                         + " za " + _dayPaid + " z sakiewek ludzi; obitych razem " + pieces + " szt. w " + parties + " partiach."
+                         + (MendMaterial.MenAndLordsOn ? MatDay() : ""));
             }
             _dayLoot = _dayWorn = _dayMended = _dayPaid = 0; _dayStamp = d;
+            ClearMatDay();
+        }
+
+        /// <summary>Dopisek linii dnia: material napraw AI (poprawka po audycie TOWARY 3).</summary>
+        private static string MatDay()
+        {
+            var ci = System.Globalization.CultureInfo.InvariantCulture;
+            return " Material napraw z targu: " + _dayMat + " zl w " + _dayTowns + " zleceniach, zuzyto kg: metal " + _dayKg[MendMaterial.Metal].ToString("0.0", ci)
+                   + ", drewno " + _dayKg[MendMaterial.Wood].ToString("0.0", ci) + ", skora " + _dayKg[MendMaterial.Leather].ToString("0.0", ci)
+                   + ", plotno " + _dayKg[MendMaterial.Cloth].ToString("0.0", ci) + "; czeka na material " + _dayWait + " szt. (metal " + _dayWaitBy[MendMaterial.Metal]
+                   + ", drewno " + _dayWaitBy[MendMaterial.Wood] + ", skora " + _dayWaitBy[MendMaterial.Leather] + ", plotno " + _dayWaitBy[MendMaterial.Cloth]
+                   + "), nie robota kowala " + _dayNoSmith + "; " + MendMaterial.Describe() + ".";
         }
     }
 }

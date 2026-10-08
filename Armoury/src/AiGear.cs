@@ -192,7 +192,7 @@ namespace Armoury
                 int reserve = Math.Max(0, s.AiGearGoldReserve);
                 int budget = (int)((lord.Gold - reserve) * Math.Max(0f, Math.Min(100f, s.AiGearBudgetPercent)) / 100f);
                 // wpis 84: ludzie dokupuja braki ze swojej sakiewki (lup), dopiero potem kiesa lorda
-                int purse = garrison ? 0 : Math.Max(0, MenPurse.Get(mp) - AiWear.OutstandingCost(mp));   // wpis 89: naprawy maja pierwszenstwo
+                int purse = garrison ? 0 : Math.Max(0, MenPurse.Get(mp) - AiWear.OutstandingCost(mp, st));   // wpis 89: naprawy maja pierwszenstwo (z materialem - szacunek z polki miasta)
                 budget = Math.Max(0, budget) + purse;
                 if (budget <= 0) return;
 

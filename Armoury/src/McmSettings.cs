@@ -2604,9 +2604,13 @@ namespace Armoury
         [SettingPropertyGroup("Time at the forge")]
         public float MendMaterialMaxShare { get; set; } = 0.20f;
 
-        [SettingPropertyBool("Smith Mend From Market", HintText = "the town smiths' rule for every repair in a town (the mending bench, the quartermaster, your men, the lords' men): the work is paid like the making of the piece - its share of the days a master spent forging it, at the master's historical day wage, as dear as the town is prosperous; the mending bench also charges the materials they take from this market at its prices - iron (crude iron, scrap from wrecks or ore), wood, leather, linen or wool, more the worse the piece; with no such materials on the market the piece waits; wrecks (Mangled) are not restored for coin - mend them yourself with your own materials, or melt them down (off = as before: the smith's price only, no materials, wrecks restored)")]
+        [SettingPropertyBool("Smith Mend From Market", HintText = "the town smiths' rule for every repair in a town (the mending bench, the quartermaster, your men, the lords' men): the work is paid like the making of the piece - its share of the days a master spent forging it, at the master's historical day wage, as dear as the town is prosperous; the mending bench (and, with Mend Material Men And Lords, your men's and the lords' repairs) also charges the materials they take from this market at its prices - iron (crude iron, scrap from wrecks or ore), wood, leather, linen or wool, more the worse the piece; with no such materials on the market the piece waits; wrecks (Mangled) are not restored for coin - mend them yourself with your own materials, or melt them down (off = as before: the smith's price only, no materials, wrecks restored)")]
         [SettingPropertyGroup("Time at the forge")]
         public bool SmithMendFromMarket { get; set; } = true;
+
+        [SettingPropertyBool("Mend Material Men And Lords", HintText = "with Smith Mend From Market on: the repairs your men pay for from their own purse each hour in a town, and the repairs the lords' men pay for, also take the materials from this market at its prices - the same rule and the same price as the mending bench (iron, wood, leather, linen or wool, more the worse the piece); a piece the market has no material for waits, the next goes ahead; off = your men's and the lords' repairs are the work only, as before")]
+        [SettingPropertyGroup("Time at the forge")]
+        public bool MendMaterialMenAndLords { get; set; } = true;
 
         [SettingPropertyBool("Take Apart Enabled", HintText = "rozlozenie gotowej rzeczy na czesci, zeby zdjac z niej wzor")]
         [SettingPropertyGroup("Time at the forge")]
@@ -3343,6 +3347,7 @@ namespace Armoury
             s.MendLootHoursPerPiece = MendLootHoursPerPiece;
             s.MendMaterialMaxShare = MendMaterialMaxShare;
             s.SmithMendFromMarket = SmithMendFromMarket;
+            s.MendMaterialMenAndLords = MendMaterialMenAndLords;
             s.TakeApartEnabled = TakeApartEnabled;
             s.TakeApartBaseChance = TakeApartBaseChance;
             s.TakeApartSkillSpan = TakeApartSkillSpan;
