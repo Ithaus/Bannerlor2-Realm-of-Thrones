@@ -1,5 +1,14 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-08 (W2 v4) - WIOSKI NA MAPIE - WYGLAD 2: domy z prefabu wsi okregu na terenie, zwarte kepy, mlyny / wiatraki / farmy / spichlerze / rybacy, uklad v4 (bez prostej linii), bez AccessViolation
+**Mod:** Armoury | **Pliki:** `MapVillagesView.cs` (wyglad z prefabu domow wsi + wyglad 2: kepy, rodzaje osad, teren pod obrysem, odwrocenie przy wodzie za kepa; zero `GetPrefabName` / `GetOldPrefabName`), `ModuleData\arm_map_villages.tsv` (uklad v4: 2446 wiosek z kolumna model, md5 b742f307 - ten sam plik, ktory lezy w grze). Bez nowych ustawien (Armoury 677), bez zapisu w grze, bez latek Harmony.
+
+**Problem / Zmiana:** jak we wpisie W2 v4 repo Jeffa (CHANGELOG 08.10, docs/paczki/W2-wioski-na-mapie.md): poprzedni widok W2 (39b60a0, w t3 jako 1a2a6a3 + 80dbb34 + 3a9a41e) stawial "mala szara brylke / szope" i rzucal AccessViolationException w diagnostyce drzewa (`TreeLine` - `GetOldPrefabName`); v4 kopiuje domy z prefabu wsi okregu na teren, stawia mlyny przy rzekach, wiatraki, farmy, spichlerze i osady rybakow, a plik danych v4 rozklada wioski bez prostych linii.
+
+**Ryzyko / co sprawdzic:** to jest dokladnie wersja wiosek z gry (70b29477) - `MapVillagesView.cs` i plik danych co do bajtu jak 85215de (sprawdzone `git diff --cached 85215de`); w lancuchu nikt inny nie dotyka tych plikow. Znane do poprawy (repo Jeffa, nastepna runda wiosek): czesc domow andal w Reach zapada sie po dach, mlyn z dala od wody bez widocznego kola, wiatrak bez skrzydel, jedna osada rybacka na skalach w wodzie.
+
+**Skladanie TOWARY 3 (dokonczenie 08.10):** `git cherry-pick -n 10239d9 85215de` na 159 - `MapVillagesView.cs` bez konfliktu, konflikt tylko w pliku danych (t3: wariant 4000, 08ab1f16 z 3a9a41e) - wziety plik 85215de (v4, b742f307 = plik w grze). `python tools/gen_mcm.py` bez zmian, build Armoury kod 0. Proby lancucha na DLL z tym commitem: patrz WYNIK "Dokonczenie 08.10" (proby nie maja sekcji wiosek - W2 sprawdzaja tylko proby galezi wiosek, ProbaV4 26 OK).
+
 ## 2026-10-08 (159) - CLEANSEAMMO NIE LECZY KONI: kulawy kon gracza zostaje kulawy - amunicja i towar jak dotad bez ujemnych stanow, kon i zwierze zachowuja swoj stan
 **Mod:** Armoury | **Pliki:** `ArmouryBehavior.cs` (`CleanseAmmo`: pomija `IsBeast`; linia logu "Amunicja oczyszczona ze stanow: N szt. (konie i zwierzeta zachowuja stan - poprawka 159)"). Bez nowych ustawien (poprawka bledu - zamiar CleanseAmmo to amunicja i towar), bez zapisu w grze.
 

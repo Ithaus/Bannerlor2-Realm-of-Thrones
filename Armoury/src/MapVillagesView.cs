@@ -14,6 +14,23 @@
 // sceny zbiera siatki osad do wspolnych ikon (rgl_log "Town scene manager: Total mesh: 23858, Total Unique Mesh: 304"), wiec encje
 // wsi-matek nie maja juz komponentow MetaMesh. Wzor powstaje teraz kilkoma drogami po kolei (BuildTemplate): drzewo matki z siatka
 // po nazwie encji, kopia prefabu bez sceny, prefab wsi kultury; trzy pierwsze matki wypisane drzewem do wioski.log.
+// POPRAWKA WYGLADU 08.10 (zrzut Jeffa: wioska = mala szara brylka): Town Scene Manager laczy domy wsi w JEDNA grupe - zostaje jedna
+// encja-zastepca (np. szopa fm_wm_shed2_snow) przeniesiona pod matke z ikona calej grupy, a encja prefabu domow (fm_village4,
+// andal_village*) zostaje pusta (0 dzieci, 0 siatek). Droga 1 rozwija teraz taka zwinieta encje kopia jej prefabu bez sceny (wszystkie
+// domy z ramkami), zastepce po nazwie zdejmuje jako duplikat, a skale obrazka liczy z BB widocznych domow matki (MapVillageData.FitToMother).
+// Prefab encji = jej NAZWA (PrefabExists) - GetPrefabName / GetOldPrefabName nie sa wolane nigdzie (naruszenie pamieci w silniku na
+// bo_village / *_village_looted, CrashScribe 08.10 02:03); drzewa encji w wioski.log tylko w autotescie, lista siatek 3 wzorow zawsze
+// (w autotescie tez pierwszy wzor kazdego rodzaju). Recenzja 08.10: flaga NotAffectedBySeason matki na KAZDEJ encji obrazka (zima ROT).
+// Poziom: 0.70 / 0.75 / 0.80 wielkosci matki.
+// WYGLAD 2 (08.10, zdjecia autotestu 03:37 + plik v4 z kolumna "model"): (1) KAZDY budynek na wysokosci gruntu w swoim punkcie (korzen
+// bez pochylania wedlug jednej normalnej; domy na brzegu Poppymead / Sweet Bridge byly zapadniete po dach), wioska na stoku / brzegu
+// przesuwana w granicach obrysu z pliku albo sciskana, budynki z krawedzi stoku zdejmowane - wszystko liczone w logu; (2) kepa "village"
+// zwarta jak wies gry: domy wzoru w ukladzie prefabu + detale (sterta drewna, oborka, studnia / stog, woz) do 9 budynkow, poziom 1 / 2 / 3
+// = co najmniej 5 / 7 / wszystkie, przerzedzanie od BRZEGU kepy; (3) obrazek wedlug kolumny "model" (village / mill / windmill / farm /
+// granary / fishing; brak kolumny = village): wzor na (okreg, model), siatki mapowe gry / ROT i modele scenowe (mlyn wodny z kolem,
+// wiatrak, stodoly) jako SAME KOPIE SIATEK ze skala z BB - bez fizyki, skryptow, czastek i dzwiekow. Kazda uzyta siatka w wioski.log.
+// Recenzja wygladu 2 (08.10): poziom 1 / 2 kepy "village" ma najwyzej 2 / 3 detale (inaczej detale z luk przy srodku wypieraly domy);
+// mlyn / rybacy z woda ZA kepa (front z pliku na droge) - obrazek odwrocony o pi, zeby kolo / pomost staly od wody.
 // Teksty w grze po angielsku (VillageTexts.cs), komentarze bez polskich znakow.
 using System;
 using System.Collections.Generic;
@@ -56,6 +73,8 @@ namespace Armoury
         public float FrontDeg;            // obrot rot_z w stopniach: lokalna +Y = front, lokalna X = ulica wzdluz drogi
         public float HalfLen = 1.3f;      // pol dlugosci obrysu (wzdluz ulicy)
         public float HalfWid = 0.7f;      // pol szerokosci obrysu
+        public int Model;                 // v4: rodzaj obrazka (MapVillageData.ModelVillage / Mill / Windmill / Farm / Granary / Fishing)
+        public bool ModelUnknown;         // v4: w kolumnie "model" nieznana wartosc (obrazek village, liczone w logu)
         public int Line;                  // numer wiersza w pliku (do logu)
     }
 
@@ -71,6 +90,9 @@ namespace Armoury
         public int BadRows;
         public int LevelClamped;          // poziom spoza 1..3 przyciety (wiersz zostaje)
         public string MissingColumns = ""; // brak wymaganej kolumny w naglowku = caly plik odrzucony
+        public bool HasModelColumn;       // v4: naglowek ma kolumne "model" (bez niej kazda wioska = village)
+        public readonly int[] ModelCounts = new int[MapVillageData.ModelCount];   // wiersze wedlug rodzaju obrazka
+        public int ModelUnknown;          // nieznana wartosc w kolumnie "model" (obrazek village)
         public readonly SortedDictionary<string, int> BadReasons = new SortedDictionary<string, int>(StringComparer.Ordinal);
         public string FirstBad = "";
 
@@ -90,6 +112,18 @@ namespace Armoury
             foreach (var kv in BadReasons) { if (sb.Length > 0) sb.Append(", "); sb.Append(kv.Key).Append(' ').Append(kv.Value); }
             return sb.ToString();
         }
+
+        /// <summary>Rozklad rodzajow obrazka do logu, np. "village 1053, farm 446, ...".</summary>
+        internal string ModelsText()
+        {
+            var sb = new StringBuilder();
+            for (int i = 0; i < ModelCounts.Length; i++)
+            {
+                if (sb.Length > 0) sb.Append(", ");
+                sb.Append(MapVillageData.ModelName(i)).Append(' ').Append(ModelCounts[i]);
+            }
+            return sb.ToString();
+        }
     }
 
     /// <summary>Czyste funkcje danych wiosek (bez gry): wczytanie, CRC, lancuch ognia, obrys, przerzedzenie, os domow.</summary>
@@ -101,7 +135,7 @@ namespace Armoury
         private static readonly string[] Required = { "id", "village_id", "name", "x", "y", "settlements", "order", "level", "front_deg" };
         // kolumny pliku v2 / wedlug ludnosci (generator: naglowek "#id\tvillage_id\t...") - gdy naglowka brak, takie pozycje
         private static readonly string[] DefaultColumns = { "id", "village_id", "name", "x", "y", "road_deg", "settlements", "order", "kind", "uid",
-            "class", "side", "level", "road_dist", "toward_village", "neighbors", "front_deg", "half_len", "half_wid", "face" };
+            "class", "side", "level", "road_dist", "toward_village", "neighbors", "front_deg", "half_len", "half_wid", "face", "model" };
         private static readonly Regex CrcRx = new Regex(@"scene_xml_crc\s*[:=]\s*(0x[0-9A-Fa-f]+|[0-9]+)", RegexOptions.CultureInvariant);
 
         /// <summary>Wczytuje tresc pliku. Wiersz z bledem jest odrzucany (z powodem), reszta zostaje.</summary>
@@ -130,6 +164,7 @@ namespace Armoury
                         var miss = new List<string>();
                         foreach (var r in Required) if (!col.ContainsKey(r)) miss.Add(r);
                         if (miss.Count > 0) { f.MissingColumns = string.Join(",", miss.ToArray()); f.Records.Clear(); return f; }
+                        f.HasModelColumn = col.ContainsKey("model");
                         continue;
                     }
                     var m = CrcRx.Match(body);
@@ -154,6 +189,8 @@ namespace Armoury
                 if (why != null) { f.Bad(why, lineNo); continue; }
                 if (rec.Level < 1 || rec.Level > 3) { rec.Level = rec.Level < 1 ? 1 : 3; f.LevelClamped++; }
                 f.Records.Add(rec);
+                f.ModelCounts[rec.Model]++;
+                if (rec.ModelUnknown) f.ModelUnknown++;
             }
             return f;
         }
@@ -201,6 +238,7 @@ namespace Armoury
             if (Num(Get(c, col, "half_wid"), out v) && v > 0.05f && v < 20f) r.HalfWid = v;
             r.Kind = Get(c, col, "kind") ?? "";
             r.Class = Get(c, col, "class") ?? "";
+            r.Model = ParseModel(Get(c, col, "model"), out r.ModelUnknown);   // v4; brak kolumny = village
             string uid = Get(c, col, "uid");
             r.Uid = string.IsNullOrEmpty(uid) || uid == "-" ? r.VillageId + "#" + r.Id.ToString(CultureInfo.InvariantCulture) : uid;
             return null;
@@ -266,18 +304,26 @@ namespace Armoury
         /// <summary>Punkt w obroconym prostokacie obrysu (+ margines) - test najechania (krytyk K4).</summary>
         internal static bool InFootprint(MapVillageRecord r, float px, float py, float margin)
         {
+            return InFootprintAt(r, r.X, r.Y, px, py, margin);
+        }
+
+        /// <summary>Jak InFootprint, ale srodek obrazka (cx, cy) - po przesunieciu wioski ze stoku na plaskie miejsce (v4).</summary>
+        internal static bool InFootprintAt(MapVillageRecord r, float cx, float cy, float px, float py, float margin)
+        {
             double a = r.FrontDeg * Math.PI / 180.0;
             double ca = Math.Cos(a), sa = Math.Sin(a);
-            double dx = px - r.X, dy = py - r.Y;
+            double dx = px - cx, dy = py - cy;
             double along = dx * ca + dy * sa;          // lokalna X = ulica wzdluz drogi
             double across = -dx * sa + dy * ca;        // lokalna Y = front
             return Math.Abs(along) <= r.HalfLen + margin && Math.Abs(across) <= r.HalfWid + margin;
         }
 
-        /// <summary>Skala obrazka wedlug poziomu (zawsze mniejszy od wsi-matki, projekt 5.3).</summary>
+        /// <summary>Skala obrazka wedlug poziomu (zawsze mniejszy od wsi-matki, projekt 5.3). Poprawka wygladu 08.10: 0.70 / 0.75 / 0.80
+        /// (bylo 0.60 / 0.70 / 0.80) - 2136 z 2449 wiosek pliku 4000 ma poziom 1, a przy 0.6 i 1/3 domow zostawaly "grudki"; poziom mowi
+        /// teraz glownie, ILE domow stoi (ThinCluster), a obrazek ma zawsze ok. 0.7-0.8 wielkosci widocznych domow matki (x FitToMother).</summary>
         internal static float LevelScale(int level)
         {
-            return level >= 3 ? 0.80f : level == 2 ? 0.70f : 0.60f;
+            return level >= 3 ? 0.80f : level == 2 ? 0.75f : 0.70f;
         }
 
         internal static uint Fnv(string s)
@@ -287,20 +333,555 @@ namespace Armoury
             return h;
         }
 
-        /// <summary>Przerzedzenie wsi o jednym wygladzie na 1/2/3 (307 wsi ROT z domami andal / fm, projekt 5.3): poziom 3 - wszystkie
-        /// domy, 2 - ok. 2/3, 1 - ok. 1/3, zawsze co najmniej 2. Wybor staly z ziarna uid (ta sama wioska wyglada tak samo co wczytanie).</summary>
-        internal static bool[] ThinLeaves(string uid, int leafCount, int level)
+        // ---------- v4 (08.10, autotest 03:37): rodzaj obrazka (kolumna "model"), zwarta kepa wsi, kazdy budynek na swoim gruncie ----------
+        // Zdjecia autotestu 08.10 03:37: (1) domy na stoku / brzegu (Poppymead przy Sweet Bridge) zapadniete po dach - wysokosc terenu brana
+        // w srodku wioski i cala kepa pochylona wedlug jednej normalnej; (2) wioska poziomu 1 = 3 domy luzno, a wies gry (Tumbledown) to zwarta
+        // kepa ok. 9 budynkow; (3) Jeff: farmy, mlyny, spichlerze, przy rzekach mlyny - plik v4 ma kolumne "model". Ponizej czyste funkcje
+        // (bez typow gry, do proby poza gra): liczby budynkow, przerzedzenie od brzegu kepy, ukladanie elementow, przesuniecie ze stoku, przepisy.
+        internal const int ModelVillage = 0, ModelMill = 1, ModelWindmill = 2, ModelFarm = 3, ModelGranary = 4, ModelFishing = 5, ModelCount = 6;
+        internal static readonly string[] ModelNames = { "village", "mill", "windmill", "farm", "granary", "fishing" };
+
+        /// <summary>Rodzaj obrazka z kolumny "model": brak / pusty / "-" = village; nieznana wartosc = village (unknown = true, liczona w logu).</summary>
+        internal static int ParseModel(string s, out bool unknown)
         {
-            var keep = new bool[Math.Max(0, leafCount)];
-            if (leafCount <= 0) return keep;
-            int want = level >= 3 ? leafCount : (int)Math.Ceiling(leafCount * (level == 2 ? 2.0 / 3.0 : 1.0 / 3.0));
-            want = Math.Max(Math.Min(2, leafCount), Math.Min(leafCount, want));
-            var idx = new int[leafCount];
-            var key = new uint[leafCount];
-            for (int i = 0; i < leafCount; i++) { idx[i] = i; key[i] = Fnv(uid + ":" + i.ToString(CultureInfo.InvariantCulture)); }
-            Array.Sort(key, idx);
-            for (int i = 0; i < want; i++) keep[idx[i]] = true;
+            unknown = false;
+            if (string.IsNullOrEmpty(s) || s.Trim() == "-" || s.Trim().Length == 0) return ModelVillage;
+            string v = s.Trim().ToLowerInvariant();
+            for (int i = 0; i < ModelNames.Length; i++) if (ModelNames[i] == v) return i;
+            unknown = true;
+            return ModelVillage;
+        }
+
+        internal static string ModelName(int m)
+        {
+            return m >= 0 && m < ModelCount ? ModelNames[m] : "?";
+        }
+
+        internal const int VillageKitMin = 9;   // wies gry Tumbledown (fm_village2): 9 budynkow - kepa "village" ma co najmniej tyle (domy wzoru + detale)
+
+        /// <summary>Ile budynkow kepy "village" stoi przy poziomie (n = budynki wzoru): 3 - wszystkie, 2 - co najmniej 7 (ok. 2/3), 1 - co najmniej 5
+        /// (ok. 1/3); nigdy wiecej niz n. Zdjecia 08.10 03:37: poziom 1 = 3 domy to nie wies (bylo minimum 3).</summary>
+        internal static int VillageWant(int n, int level)
+        {
+            if (n <= 0) return 0;
+            if (level >= 3) return n;
+            int want = level == 2 ? Math.Max(7, (int)Math.Ceiling(n * 2.0 / 3.0)) : Math.Max(5, (int)Math.Ceiling(n / 3.0));
+            return Math.Min(n, want);
+        }
+
+        /// <summary>Domy przy innych obrazkach (poziom 1/2/3): zagroda 1/2/2, mlyn 1/2/3, wiatrak 1/2/2, spichlerz 2/3/4, rybacy 2/3/4.</summary>
+        internal static int HousesFor(int model, int level)
+        {
+            int lv = level < 1 ? 1 : level > 3 ? 3 : level;
+            switch (model)
+            {
+                case ModelFarm: return lv >= 2 ? 2 : 1;
+                case ModelMill: return lv;
+                case ModelWindmill: return lv >= 2 ? 2 : 1;
+                case ModelGranary: return lv + 1;
+                case ModelFishing: return lv + 1;
+            }
+            return 0;
+        }
+
+        /// <summary>Kolejnosc budynkow od SRODKA kepy: kotwica = srodek ciezkosci (lekko przesuniety ziarnem, najwyzej 0.3 sredniego promienia),
+        /// potem odleglosc od kotwicy (remis - nizszy numer). Przerzedzenie bierze poczatek listy, wiec ubywa budynkow z BRZEGU kepy.</summary>
+        internal static int[] RankCentral(string seed, IList<float> xs, IList<float> ys)
+        {
+            int n = xs == null || ys == null ? 0 : Math.Min(xs.Count, ys.Count);
+            var idx = new int[n];
+            if (n == 0) return idx;
+            double mx = 0, my = 0;
+            for (int i = 0; i < n; i++) { mx += xs[i]; my += ys[i]; }
+            mx /= n; my /= n;
+            double rms = 0;
+            for (int i = 0; i < n; i++) { double dx = xs[i] - mx, dy = ys[i] - my; rms += dx * dx + dy * dy; }
+            rms = Math.Sqrt(rms / n);
+            uint h = Fnv(seed ?? "");
+            double ang = (h % 3600u) / 3600.0 * 2.0 * Math.PI;
+            double mag = 0.3 * rms * ((h / 3600u) % 1000u) / 1000.0;
+            double ax = mx + Math.Cos(ang) * mag, ay = my + Math.Sin(ang) * mag;
+            var d2 = new double[n];
+            for (int i = 0; i < n; i++)
+            {
+                idx[i] = i;
+                double dx = xs[i] - ax, dy = ys[i] - ay;
+                d2[i] = dx * dx + dy * dy + i * 1e-9;
+            }
+            Array.Sort(d2, idx);
+            return idx;
+        }
+
+        /// <summary>Przerzedzenie kepy od brzegu (RankCentral): stoi `want` budynkow najblizszych srodka.</summary>
+        internal static bool[] ThinCentral(string seed, IList<float> xs, IList<float> ys, int want)
+        {
+            int[] order = RankCentral(seed, xs, ys);
+            var keep = new bool[order.Length];
+            for (int i = 0; i < order.Length && i < want; i++) keep[order[i]] = true;
             return keep;
+        }
+
+        /// <summary>Najwiecej detali (studnia, szopa, sterta drewna, stog, woz, worki) w kepie "village" na poziomie: 1 - 2, 2 - 3, 3 - wszystkie.
+        /// Recenzja 08.10: detale wypelniaja luki przy SRODKU kepy, wiec samo przerzedzanie od brzegu zostawialo na poziomie 1 glownie detale
+        /// (lustro fm_village4: 1 dom + hala + 2 szopy + studnia), a wies gry (Tumbledown) to w wiekszosci domy.</summary>
+        internal static int VillageDetailMax(int level)
+        {
+            return level >= 3 ? int.MaxValue : level == 2 ? 3 : 2;
+        }
+
+        /// <summary>Budynek wzoru wsi-matki, ktory jest detalem, a nie domem: studnia (andal_wm_well*), szopa / sterta drewna Polnocy (fm_wm_shed*).</summary>
+        internal static bool IsDetailMesh(string mesh)
+        {
+            return !string.IsNullOrEmpty(mesh) && (mesh.IndexOf("well", StringComparison.Ordinal) >= 0 || mesh.IndexOf("_shed", StringComparison.Ordinal) >= 0);
+        }
+
+        /// <summary>Przerzedzenie kepy "village" od brzegu (RankCentral) z limitem detali: od srodka stoi `want` budynkow, w tym najwyzej
+        /// maxDetail detali; gdy domow za malo - dopelnienie pominietymi detalami (dalej od srodka). detail == null = jak ThinCentral.</summary>
+        internal static bool[] ThinVillage(string seed, IList<float> xs, IList<float> ys, IList<bool> detail, int want, int maxDetail)
+        {
+            int[] order = RankCentral(seed, xs, ys);
+            var keep = new bool[order.Length];
+            int kept = 0, det = 0;
+            foreach (int i in order)
+            {
+                if (kept >= want) break;
+                bool d = detail != null && i < detail.Count && detail[i];
+                if (d && det >= maxDetail) continue;
+                keep[i] = true;
+                kept++;
+                if (d) det++;
+            }
+            foreach (int i in order)
+            {
+                if (kept >= want) break;
+                if (keep[i]) continue;
+                keep[i] = true;
+                kept++;
+            }
+            return keep;
+        }
+
+        // ---------- ukladanie elementow obrazka (jednostki wzoru = uklad wsi-matki; front +Y do drogi / wody, X wzdluz ulicy) ----------
+        internal const int SlotPreset = 0, SlotFill = 1, SlotFront = 2, SlotBack = 3, SlotRight = 4, SlotLeft = 5,
+                           SlotFrontRight = 6, SlotFrontLeft = 7, SlotBackRight = 8, SlotBackLeft = 9, SlotCenter = 10;
+        internal const float LayoutGap = 0.92f;   // kola obrysow moga zachodzic o 8% (obrys prostokata jest mniejszy niz kolo)
+
+        /// <summary>Element ukladu: kolo obrysu (R = pol wiekszego boku BB) i miejsce. SlotPreset = polozenie z wzoru (domy wsi-matki);
+        /// Core = czesc kepy domow (od jej obrysu licza sie miejsca Front / Back / Right / Left ...).</summary>
+        internal sealed class LayoutItem
+        {
+            public int Slot;
+            public float R;
+            public float X, Y;
+            public bool Core;
+        }
+
+        internal static bool FreeAt(IList<float> xs, IList<float> ys, IList<float> rs, float px, float py, float r)
+        {
+            for (int i = 0; i < xs.Count; i++)
+            {
+                float dx = xs[i] - px, dy = ys[i] - py, need = (rs[i] + r) * LayoutGap;
+                if (dx * dx + dy * dy < need * need) return false;
+            }
+            return true;
+        }
+
+        /// <summary>Najblizsze wolne miejsce przy (cx, cy): pierscienie co ringStep, na kazdym perRing katow (przesuniete ziarnem). false = brak.</summary>
+        internal static bool FreeSpot(IList<float> xs, IList<float> ys, IList<float> rs, float cx, float cy, float r, float ringStep, int rings, int perRing,
+            uint seed, out float ox, out float oy)
+        {
+            ox = cx; oy = cy;
+            if (FreeAt(xs, ys, rs, cx, cy, r)) return true;
+            double off = (seed % 1000u) / 1000.0;
+            for (int k = 1; k <= rings; k++)
+            {
+                double rad = k * ringStep;
+                for (int j = 0; j < perRing; j++)
+                {
+                    double a = 2.0 * Math.PI * (j + off) / perRing;
+                    float px = cx + (float)(Math.Cos(a) * rad), py = cy + (float)(Math.Sin(a) * rad);
+                    if (FreeAt(xs, ys, rs, px, py, r)) { ox = px; oy = py; return true; }
+                }
+            }
+            return false;
+        }
+
+        /// <summary>Uklada elementy po kolei: najpierw SlotPreset (domy z wzoru, bez przesuwania), potem reszta - punkt startu wedlug miejsca
+        /// wzgledem obrysu kepy (Core) i przesuwanie w kierunku miejsca az bez kolizji; SlotFill / SlotCenter = najblizsze wolne miejsce przy
+        /// srodku kepy (wypelnianie luk - kepa zwarta jak wies gry).</summary>
+        internal static void Layout(IList<LayoutItem> items, uint seed)
+        {
+            var xs = new List<float>();
+            var ys = new List<float>();
+            var rs = new List<float>();
+            float minX = 0f, maxX = 0f, minY = 0f, maxY = 0f;
+            bool any = false;
+            Action<LayoutItem> grow = it =>
+            {
+                if (!it.Core) return;
+                if (!any) { minX = it.X - it.R; maxX = it.X + it.R; minY = it.Y - it.R; maxY = it.Y + it.R; any = true; return; }
+                minX = Math.Min(minX, it.X - it.R); maxX = Math.Max(maxX, it.X + it.R);
+                minY = Math.Min(minY, it.Y - it.R); maxY = Math.Max(maxY, it.Y + it.R);
+            };
+            foreach (var it in items)
+            {
+                if (it.Slot != SlotPreset) continue;
+                xs.Add(it.X); ys.Add(it.Y); rs.Add(it.R);
+                grow(it);
+            }
+            uint k = 0;
+            foreach (var it in items)
+            {
+                if (it.Slot == SlotPreset) continue;
+                k++;
+                float r = Math.Max(0.02f, it.R);
+                float cx = any ? (minX + maxX) * 0.5f : 0f, cy = any ? (minY + maxY) * 0.5f : 0f;
+                float hx = any ? (maxX - minX) * 0.5f : 0f, hy = any ? (maxY - minY) * 0.5f : 0f;
+                float px, py, dx, dy;
+                switch (it.Slot)
+                {
+                    case SlotFront: px = cx; py = cy + hy + r * 0.9f; dx = 0f; dy = 1f; break;
+                    case SlotBack: px = cx; py = cy - hy - r * 0.9f; dx = 0f; dy = -1f; break;
+                    case SlotRight: px = cx + hx + r * 0.9f; py = cy; dx = 1f; dy = 0f; break;
+                    case SlotLeft: px = cx - hx - r * 0.9f; py = cy; dx = -1f; dy = 0f; break;
+                    case SlotFrontRight: px = cx + hx * 0.6f + r * 0.5f; py = cy + hy + r * 0.7f; dx = 0.8f; dy = 0.6f; break;
+                    case SlotFrontLeft: px = cx - hx * 0.6f - r * 0.5f; py = cy + hy + r * 0.7f; dx = -0.8f; dy = 0.6f; break;
+                    case SlotBackRight: px = cx + hx * 0.6f + r * 0.5f; py = cy - hy - r * 0.7f; dx = 0.8f; dy = -0.6f; break;
+                    case SlotBackLeft: px = cx - hx * 0.6f - r * 0.5f; py = cy - hy - r * 0.7f; dx = -0.8f; dy = -0.6f; break;
+                    default:
+                    {
+                        // SlotFill / SlotCenter: najblizsze wolne miejsce przy srodku ciezkosci tego, co juz stoi
+                        float gx = 0f, gy = 0f;
+                        if (xs.Count > 0) { for (int i = 0; i < xs.Count; i++) { gx += xs[i]; gy += ys[i]; } gx /= xs.Count; gy /= xs.Count; }
+                        float fx, fy;
+                        if (!FreeSpot(xs, ys, rs, gx, gy, r, Math.Max(0.02f, r * 0.3f), 60, 12, Fnv(seed.ToString(CultureInfo.InvariantCulture) + ":" + k), out fx, out fy))
+                        { fx = gx + (hx + r) * 1.5f; fy = gy; }
+                        it.X = fx; it.Y = fy;
+                        xs.Add(it.X); ys.Add(it.Y); rs.Add(r);
+                        grow(it);
+                        continue;
+                    }
+                }
+                float len = (float)Math.Sqrt(dx * dx + dy * dy);
+                dx /= len; dy /= len;
+                float step = Math.Max(0.02f, r * 0.15f);
+                for (int s = 0; s < 120 && !FreeAt(xs, ys, rs, px, py, r); s++) { px += dx * step; py += dy * step; }
+                it.X = px; it.Y = py;
+                xs.Add(it.X); ys.Add(it.Y); rs.Add(r);
+                grow(it);
+            }
+        }
+
+        // ---------- teren (poprawka 1): przesuniecie ze stoku / brzegu w granicach obrysu z pliku ----------
+        /// <summary>Najwiekszy dopuszczalny rozrzut wysokosci gruntu pod budynkami wioski (jedn. mapy): 0.9 wysokosci domu na mapie, 0.25..0.8.</summary>
+        internal static float SpreadMax(float houseHeightWorld)
+        {
+            float v = 0.9f * houseHeightWorld;
+            return v < 0.25f ? 0.25f : v > 0.8f ? 0.8f : v;
+        }
+
+        internal static float Spread(IList<float> h)
+        {
+            if (h == null || h.Count == 0) return 0f;
+            float lo = float.MaxValue, hi = float.MinValue;
+            foreach (float v in h) { if (v < lo) lo = v; if (v > hi) hi = v; }
+            return hi - lo;
+        }
+
+        /// <summary>Przesuniecia srodka wioski (jedn. mapy, uklad obrazka: X wzdluz ulicy, Y do frontu) w granicach obrysu z pliku (half_len /
+        /// half_wid), od najmniejszego. Obrazek przy wodzie (mlyn, rybacy) nie odchodzi od wody (+Y) ani nie wchodzi w nia - tylko wzdluz brzegu
+        /// i lekko w tyl.</summary>
+        internal static List<float[]> ShiftCandidates(float halfLen, float halfWid, bool waterSide)
+        {
+            var l = new List<float[]>();
+            float[] fx = { 0f, 0.35f, -0.35f, 0.7f, -0.7f, 1f, -1f };
+            float[] fy = waterSide ? new[] { 0f, -0.5f } : new[] { 0f, -0.5f, 0.5f, -1f, 1f };
+            foreach (float a in fx)
+                foreach (float b in fy)
+                {
+                    if (a == 0f && b == 0f) continue;
+                    l.Add(new[] { a * halfLen, b * halfWid });
+                }
+            l.Sort((p, q) => (p[0] * p[0] + p[1] * p[1]).CompareTo(q[0] * q[0] + q[1] * q[1]));
+            return l;
+        }
+
+        /// <summary>Budynki do zdjecia, gdy po przesunieciu i scisnieciu grunt pod kepa dalej jest zbyt nierowny: kolejno ten, ktorego grunt
+        /// najdalej od mediany, az rozrzut &lt;= max albo zostanie minKeep stojacych; budynki niezbedne (mlyn, stodola...) nigdy.</summary>
+        internal static bool[] DropOutliers(IList<float> h, IList<bool> essential, int minKeep, float max)
+        {
+            int n = h == null ? 0 : h.Count;
+            var keep = new bool[n];
+            for (int i = 0; i < n; i++) keep[i] = true;
+            int alive = n;
+            while (alive > minKeep)
+            {
+                var cur = new List<float>();
+                for (int i = 0; i < n; i++) if (keep[i]) cur.Add(h[i]);
+                if (Spread(cur) <= max) break;
+                cur.Sort();
+                float med = cur[cur.Count / 2];
+                int worst = -1;
+                float wd = -1f;
+                for (int i = 0; i < n; i++)
+                {
+                    if (!keep[i] || (essential != null && i < essential.Count && essential[i])) continue;
+                    float d = Math.Abs(h[i] - med);
+                    if (d > wd) { wd = d; worst = i; }
+                }
+                if (worst < 0) break;
+                keep[worst] = false;
+                alive--;
+            }
+            return keep;
+        }
+
+        /// <summary>Brzeg wody na profilu terenu od frontu kepy (+Y): pierwszy punkt nizej niz pierwszy o wiecej niz drop; -1 = brak.</summary>
+        internal static int FirstDrop(IList<float> h, float drop)
+        {
+            if (h == null || h.Count < 2) return -1;
+            for (int i = 1; i < h.Count; i++) if (h[i] < h[0] - drop) return i;
+            return -1;
+        }
+
+        /// <summary>Woda ZA kepa, nie przed nia: na profilu od frontu (+Y) brak brzegu, na profilu od tylu (-Y) jest (FirstDrop). Recenzja 08.10:
+        /// generator v4 kieruje front wioski "droga" (14 mlynow, 22 osady rybakow) na droge, a rzeka / morze bywa za nia - obrazek odwracany
+        /// o pi, zeby kolo mlyna / pomost staly od strony wody (prostokat obrysu z pliku po obrocie o pi ten sam).</summary>
+        internal static bool WaterBehind(IList<float> front, IList<float> back, float drop)
+        {
+            return FirstDrop(front, drop) < 0 && FirstDrop(back, drop) >= 0;
+        }
+
+        // ---------- przepisy obrazkow (poprawka 3): siatki MAPOWE gry / ROT, modele scenowe tylko jako kopia siatki ze skala z BB ----------
+        internal const int RoleHouse = 0, RoleDetail = 1, RoleSpecial = 2, RoleWater = 3, RoleAttached = 4;
+        internal const int SizeFitH = 0, SizeFitHeight = 1, SizeNatural = 2, SizeUnit = 3;
+        internal const int GroundMin = 0, GroundLand = 1, GroundEnd = 2, GroundBeach = 3, GroundTilt = 4, GroundAttached = 5;
+        internal const int TurnNone = 0, TurnLongX = 1, TurnLongY = 2, TurnPi = 3, TurnSeed = 4;
+        internal const string SrcMap = "mapa gry (Native Prefabs\\map_icon_parts.xml)";
+        internal const string SrcRot = "mapa ROT (ROT-Map, scena Main_map)";
+        internal const string SrcScene = "model scenowy gry (Native Prefabs\\archhitecture_*.xml) - sama siatka, skala z BB";
+        internal const string SrcHouse = "dom wsi okregu (kopia prefabu domow ROT)";
+        internal const float IconHouseH = 0.55f;   // wielkosc domu (jedn. wzoru) dla wsi z ikona Calradii / Essos (dom andal / fm: ok. 0.5)
+        // kolo mlyna w prefabie battania_watermill (Native archhitecture_battania.xml): (0.358, -5.333, 0), rotation_euler (0, -1.591, 0)
+        internal const float WheelX = 0.358f, WheelY = -5.333f, WheelZ = 0f, WheelFwd = -1.591f;
+        internal const string Watermill = "battania_watermill", WatermillWheel = "battania_watermill_mill", Windmill = "battania_windmill";
+
+        /// <summary>Jeden element przepisu. Size = wielkosc wzgledem domu wsi okregu (H): SizeFitH - wiekszy bok BB, SizeFitHeight - wysokosc BB;
+        /// SizeNatural - skala Natural z mapy gry (mediana sceny ROT), poprawiana do Size x H tylko gdy wychodzi poza 0.4..2.5 tego;
+        /// SizeUnit - skala domow wzoru x Natural (siatki rodziny domow fm / andal).</summary>
+        internal sealed class PieceSpec
+        {
+            public int Role;
+            public string[] Meshes = new string[0];   // warianty (wybor z ziarna okregu, pierwszy istniejacy)
+            public float Size = 1f;
+            public int SizeMode;
+            public float Natural = 1f;
+            public int Slot;
+            public int MinLevel = 1;
+            public int Ground;
+            public int Turn;
+            public string Source = "";
+            public bool Essential;                    // bez niego obrazek nie ma sensu (mlyn, pomost, stodola) - nigdy zdejmowany ze stoku
+            public bool WaterSide;                    // stoi przy wodzie (+Y) - przesuwany do brzegu
+            public bool BarnLike;                     // stodola: brak siatki -> najwieksza szopa / dom stylu x 1.3
+            public bool Pivot;                        // wysokosc wedlug punktu zaczepienia siatki (mlyn: os kola na wysokosci brzegu, jak w scenie)
+        }
+
+        private static PieceSpec P(int role, string[] meshes, float size, int mode, float natural, int slot, int minLevel, int ground, int turn, string src)
+        {
+            return new PieceSpec { Role = role, Meshes = meshes ?? new string[0], Size = size, SizeMode = mode, Natural = natural, Slot = slot,
+                                   MinLevel = minLevel, Ground = ground, Turn = turn, Source = src };
+        }
+
+        /// <summary>Styl krainy: domy i budynki gospodarcze wedlug rodziny domow wsi-matki (andal = Westeros poludniowy, fm = Polnoc) albo
+        /// kultury ikony wsi (Calradia / Essos).</summary>
+        internal sealed class StyleKit
+        {
+            public string Name = "";
+            public string[] Houses = new string[0];    // domy kultury (wsie z ikona): mapowe mi_*
+            public string Well;                        // studnia
+            public string[] Barn = new string[0];      // spichlerz / stodola dziesiecinna
+            public string[] FarmBarn = new string[0];  // stodola zagrody
+            public string[] Sheds = new string[0];     // fm: [0] oborka / szopa, [1] sterta drewna pod daszkiem (skala domow wzoru)
+            public string Hall;                        // fm: najwiekszy budynek gospodarczy (zapas stodoly)
+            public string[] Pier = new string[0];
+            public string[] Boats = new string[0];
+            public string[] Fill = new string[0];      // detale do kepy wsi (do VillageKitMin budynkow)
+            public bool FillUnit;                      // detale Fill w skali domow wzoru (fm), inaczej mapowe naturalne
+        }
+
+        internal static readonly string[] StyleNames = { "andal", "fm", "empire", "aserai", "khuzait", "sturgia", "vlandia", "battania" };
+        private static readonly string[] Pens = { "mi_cattle_farm_a", "mi_cattle_farm_b", "mi_cattle_farm_c", "mi_cattle_farm_d" };
+        private static readonly string[] Fishers = { "mi_fisherman_1", "mi_fisherman_2", "mi_fisherman_3" };
+
+        /// <summary>Skala naturalna siatek mapowych (mediana iloczynu skal od korzenia osady w scenie ROT 8.1.8 Main_map; dzien-6\wioski-2200\proba-0810).</summary>
+        internal static float NaturalScale(string mesh)
+        {
+            switch (mesh)
+            {
+                case "mi_straw_pile": return 1.44f;
+                case "mi_sack_a": return 1.0f;
+                case "mi_sack_b": return 1.11f;
+                case "mi_sack_c": return 1.40f;
+                case "mi_barrels_a": return 1.07f;
+                case "mi_cart_a": return 0.83f;
+                case "mi_cart_b_full": return 0.785f;
+                case "mi_pier_a": case "rot_dock1": case "mi_docks_b": case "mi_asera_docks_c": return 1.0f;
+                case "rot_boat1": case "rot_boat3": return 0.30f;
+                case "mi_fisherman_1": case "mi_fisherman_2": case "mi_fisherman_3": return 0.76f;
+                case "mi_emp_well": return 0.32f;
+                case "mi_bat_well": return 0.76f;
+            }
+            if (mesh != null && mesh.StartsWith("mi_cattle_farm_", StringComparison.Ordinal)) return 1.0f;
+            return 1.0f;
+        }
+
+        internal static StyleKit StyleFor(string style, bool snow)
+        {
+            var s = new StyleKit { Name = style ?? "empire" };
+            string[] westPier = { "rot_dock1", "mi_pier_a" };
+            string[] boats = { "rot_boat1", "rot_boat3" };
+            switch (s.Name)
+            {
+                case "andal":
+                    s.Houses = new[] { "mi_vla_house_b", "mi_vla_house_a", "mi_vla_house_c" };
+                    s.Well = "andal_wm_well";
+                    s.Barn = new[] { "european_village_barn_a" };
+                    s.FarmBarn = new[] { "european_village_barn_b", "european_village_barn_a" };
+                    s.Pier = westPier; s.Boats = boats;
+                    s.Fill = new[] { "mi_straw_pile", "mi_cart_a", "mi_sack_a" };
+                    break;
+                case "fm":
+                    s.Name = snow ? "fm_snow" : "fm";
+                    s.Houses = new[] { "mi_stu_house_a", "mi_stu_house_b" };
+                    s.Well = "andal_wm_well2";
+                    s.Barn = new[] { "sturgia_village_barn_a" };
+                    s.FarmBarn = new[] { "sturgia_village_barn_b", "sturgia_village_barn_a" };
+                    s.Sheds = snow ? new[] { "fm_wm_shed_snow", "fm_wm_shed2_snow" } : new[] { "fm_wm_shed", "fm_wm_shed2" };
+                    s.Hall = "fm_wm_hall_snow";
+                    s.Pier = westPier; s.Boats = boats;
+                    s.Fill = snow ? new[] { "fm_wm_shed2_snow", "fm_wm_shed_snow", "andal_wm_well2" } : new[] { "fm_wm_shed2", "fm_wm_shed", "andal_wm_well2" };
+                    s.FillUnit = true;
+                    break;
+                case "aserai":
+                    s.Houses = new[] { "mi_aserai_city_house_a", "mi_aserai_city_house_b", "mi_aserai_city_house_c" };
+                    s.Well = "mi_emp_well";
+                    s.Barn = new[] { "aserai_village_barn_a" };
+                    s.FarmBarn = new[] { "aserai_village_barn_a" };
+                    s.Pier = new[] { "mi_asera_docks_c", "mi_pier_a" }; s.Boats = boats;
+                    break;
+                case "khuzait":
+                    s.Houses = new[] { "mi_khuz_tent_1", "mi_khuz_tent_2" };
+                    s.Barn = new[] { "khuzait_barn_a" };
+                    s.FarmBarn = new[] { "khuzait_barn_a" };
+                    s.Pier = new[] { "mi_pier_a" }; s.Boats = boats;
+                    break;
+                case "sturgia":
+                    s.Houses = new[] { "mi_stu_house_a", "mi_stu_house_b", "mi_stu_house_c", "mi_stu_house_d" };
+                    s.Well = "mi_bat_well";
+                    s.Barn = new[] { "sturgia_village_barn_a" };
+                    s.FarmBarn = new[] { "sturgia_village_barn_b", "sturgia_village_barn_a" };
+                    s.Pier = westPier; s.Boats = boats;
+                    break;
+                case "vlandia":
+                    s.Houses = new[] { "mi_vla_house_a", "mi_vla_house_b", "mi_vla_house_c", "mi_vla_house_d", "mi_vla_house_e", "mi_vla_house_f" };
+                    s.Well = "mi_emp_well";
+                    s.Barn = new[] { "european_village_barn_a" };
+                    s.FarmBarn = new[] { "european_village_barn_b", "european_village_barn_a" };
+                    s.Pier = westPier; s.Boats = boats;
+                    break;
+                case "battania":
+                    s.Houses = new[] { "mi_bat_house_a", "mi_bat_house_b", "mi_bat_house_c" };
+                    s.Well = "mi_bat_well";
+                    s.Barn = new[] { "european_village_barn_a" };
+                    s.FarmBarn = new[] { "sturgia_village_barn_b", "european_village_barn_b" };
+                    s.Pier = westPier; s.Boats = boats;
+                    break;
+                default:   // empire i Essos bez wlasnej rodziny
+                    s.Name = "empire";
+                    s.Houses = new[] { "mi_emp_house_a", "mi_emp_house_b", "mi_emp_house_c", "mi_emp_house_d" };
+                    s.Well = "mi_emp_well";
+                    s.Barn = new[] { "empire_village_barn_a" };
+                    s.FarmBarn = new[] { "empire_village_barn_a2", "empire_village_barn_a" };
+                    s.Pier = new[] { "mi_pier_a", "mi_docks_b" }; s.Boats = boats;
+                    break;
+            }
+            return s;
+        }
+
+        /// <summary>Przepis obrazka bez domow (domy dobiera widok: z wzoru wsi-matki albo domy kultury; ile - HousesFor). village = brak
+        /// elementow (kepa domow + detale Fill). Bez fizyki, skryptow, czastek i dzwiekow: kazdy element to tylko KOPIA SIATKI (MetaMesh).</summary>
+        internal static List<PieceSpec> Recipe(int model, StyleKit st)
+        {
+            var l = new List<PieceSpec>();
+            bool fm = st.Sheds.Length > 0;
+            switch (model)
+            {
+                case ModelMill:
+                {
+                    var mill = P(RoleSpecial, new[] { Watermill }, 1.5f, SizeFitH, 1f, SlotFront, 1, GroundLand, TurnPi, SrcScene);
+                    mill.Essential = true; mill.WaterSide = true; mill.Pivot = true;
+                    l.Add(mill);
+                    l.Add(P(RoleDetail, new[] { "mi_sack_a" }, 0.3f, SizeNatural, NaturalScale("mi_sack_a"), SlotFrontRight, 1, GroundMin, TurnSeed, SrcMap));
+                    l.Add(P(RoleDetail, new[] { "mi_sack_b" }, 0.3f, SizeNatural, NaturalScale("mi_sack_b"), SlotFrontLeft, 2, GroundMin, TurnSeed, SrcMap));
+                    l.Add(P(RoleDetail, new[] { "mi_cart_b_full" }, 0.6f, SizeNatural, NaturalScale("mi_cart_b_full"), SlotRight, 3, GroundMin, TurnSeed, SrcMap));
+                    break;
+                }
+                case ModelWindmill:
+                {
+                    var wm = P(RoleSpecial, new[] { Windmill }, 2.2f, SizeFitHeight, 1f, SlotBackRight, 1, GroundMin, TurnSeed, SrcScene);
+                    wm.Essential = true;
+                    l.Add(wm);
+                    l.Add(P(RoleDetail, new[] { "mi_straw_pile" }, 0.55f, SizeNatural, NaturalScale("mi_straw_pile"), SlotBackLeft, 1, GroundMin, TurnSeed, SrcMap));
+                    l.Add(P(RoleDetail, new[] { "mi_sack_a" }, 0.3f, SizeNatural, NaturalScale("mi_sack_a"), SlotRight, 2, GroundMin, TurnSeed, SrcMap));
+                    l.Add(P(RoleDetail, new[] { "mi_cart_a" }, 0.6f, SizeNatural, NaturalScale("mi_cart_a"), SlotFrontRight, 3, GroundMin, TurnSeed, SrcMap));
+                    break;
+                }
+                case ModelFarm:
+                {
+                    var barn = P(RoleSpecial, st.FarmBarn, 1.5f, SizeFitH, 1f, SlotRight, 1, GroundMin, TurnLongX, SrcScene);
+                    barn.Essential = true; barn.BarnLike = true;
+                    l.Add(barn);
+                    if (fm)
+                    {
+                        l.Add(P(RoleDetail, new[] { st.Sheds[0] }, 1f, SizeUnit, 1f, SlotLeft, 1, GroundMin, TurnSeed, SrcRot));
+                        l.Add(P(RoleDetail, new[] { st.Sheds[1] }, 1f, SizeUnit, 1f, SlotBackLeft, 2, GroundMin, TurnSeed, SrcRot));
+                    }
+                    l.Add(P(RoleDetail, Pens, 1.8f, SizeNatural, 1.0f, SlotBack, 1, GroundMin, TurnLongX, SrcMap));
+                    l.Add(P(RoleDetail, new[] { "mi_straw_pile" }, 0.55f, SizeNatural, NaturalScale("mi_straw_pile"), SlotBackRight, 1, GroundMin, TurnSeed, SrcMap));
+                    l.Add(P(RoleDetail, new[] { "mi_sack_a" }, 0.3f, SizeNatural, NaturalScale("mi_sack_a"), SlotFrontRight, 2, GroundMin, TurnSeed, SrcMap));
+                    l.Add(P(RoleDetail, new[] { "mi_straw_pile" }, 0.55f, SizeNatural, NaturalScale("mi_straw_pile"), SlotBackRight, 3, GroundMin, TurnSeed, SrcMap));
+                    break;
+                }
+                case ModelGranary:
+                {
+                    var barn = P(RoleSpecial, st.Barn, 2.0f, SizeFitH, 1f, SlotRight, 1, GroundMin, TurnLongX, SrcScene);
+                    barn.Essential = true; barn.BarnLike = true;
+                    l.Add(barn);
+                    l.Add(P(RoleDetail, new[] { "mi_sack_c" }, 0.35f, SizeNatural, NaturalScale("mi_sack_c"), SlotFrontRight, 1, GroundMin, TurnSeed, SrcMap));
+                    l.Add(P(RoleDetail, new[] { "mi_barrels_a" }, 0.3f, SizeNatural, NaturalScale("mi_barrels_a"), SlotFrontRight, 2, GroundMin, TurnSeed, SrcMap));
+                    l.Add(P(RoleDetail, new[] { "mi_cart_b_full" }, 0.6f, SizeNatural, NaturalScale("mi_cart_b_full"), SlotFront, 2, GroundMin, TurnSeed, SrcMap));
+                    l.Add(P(RoleDetail, new[] { "mi_straw_pile" }, 0.55f, SizeNatural, NaturalScale("mi_straw_pile"), SlotBackRight, 3, GroundMin, TurnSeed, SrcMap));
+                    if (fm) l.Add(P(RoleDetail, new[] { st.Sheds[1] }, 1f, SizeUnit, 1f, SlotLeft, 3, GroundMin, TurnSeed, SrcRot));
+                    break;
+                }
+                case ModelFishing:
+                {
+                    var pier = P(RoleWater, st.Pier, 2.0f, SizeNatural, 1.0f, SlotFront, 1, GroundEnd, TurnLongY, SrcRot);
+                    pier.Essential = true; pier.WaterSide = true;
+                    l.Add(pier);
+                    var b1 = P(RoleWater, new[] { st.Boats.Length > 0 ? st.Boats[0] : "rot_boat1" }, 0.9f, SizeNatural, NaturalScale("rot_boat1"), SlotFrontRight, 1, GroundBeach, TurnLongY, SrcRot);
+                    b1.WaterSide = true;
+                    l.Add(b1);
+                    var b2 = P(RoleWater, new[] { st.Boats.Length > 1 ? st.Boats[1] : "rot_boat3" }, 0.9f, SizeNatural, NaturalScale("rot_boat3"), SlotFrontLeft, 2, GroundBeach, TurnLongY, SrcRot);
+                    b2.WaterSide = true;
+                    l.Add(b2);
+                    l.Add(P(RoleDetail, new[] { "mi_barrels_a" }, 0.3f, SizeNatural, NaturalScale("mi_barrels_a"), SlotFrontLeft, 2, GroundMin, TurnSeed, SrcMap));
+                    l.Add(P(RoleDetail, Fishers, 1.4f, SizeNatural, NaturalScale("mi_fisherman_1"), SlotRight, 3, GroundMin, TurnSeed, SrcMap));
+                    break;
+                }
+            }
+            return l;
         }
 
         /// <summary>Dluga os rozkladu domow matki (PCA srodkow) w jej ukladzie lokalnym, kat w (-pi/2, pi/2].
@@ -321,14 +902,6 @@ namespace Armoury
             if (l1 <= 1e-6 || l1 < 1.5 * Math.Max(l2, 0)) return false;
             angle = (float)(0.5 * Math.Atan2(2 * cxy, cxx - cyy));
             return true;
-        }
-
-        /// <summary>Obrot obrazka (radiany, rot_z): z pliku; gdy matka ma wyrazna dluga os - tak, zeby ta os szla wzdluz ulicy
-        /// (lokalna X pliku), po tej stronie, ktora jest najblizej frontu z pliku (projekt 2.9).</summary>
-        internal static float Yaw(float frontDeg, bool hasAxis, float axis)
-        {
-            float a = (float)(frontDeg * Math.PI / 180.0);
-            return hasAxis ? a - axis : a;
         }
 
         // ---------- siatki wsi-matek bez komponentow (poprawka po autotescie 07.10 17:41) ----------
@@ -363,13 +936,36 @@ namespace Armoury
         };
 
         // Zapas "kultura": prefab domow najczestszy w wsiach tej kultury w scenie ROT 8.1.8 (ten sam skrypt; prefab polaczony albo
-        // old_prefab_name). Kultury Essos / Calradii nie maja domow andal / fm - dla nich stary prefab samej matki (map_icon_full_*).
+        // old_prefab_name). Kultury Essos / Calradii nie maja domow andal / fm - dla nich stary prefab wsi-matek kultury (CultureMothers).
         private static readonly Dictionary<string, string> CultureHouses = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             { "battania", "fm_village1" }, { "sturgia", "fm_village1" }, { "nightswatch", "fm_village3" }, { "skagosi", "fm_village3" },
             { "crownlands", "andal_village3" }, { "reach", "andal_village3" }, { "vlandia", "andal_village3" },
             { "dragonstone", "andal_village5" }, { "vale", "andal_village5" }, { "river", "andal_village10" }, { "stormlands", "andal_village7" }
         };
+
+        // Zapas "kultura", krok 2 (poprawka wygladu 08.10): zamiast GetOldPrefabName(matka) - najczestszy stary prefab wsi-matek tej kultury
+        // w scenie ROT 8.1.8 (dzien-6\wioski-2200\proba-0810\gen_tablica_0810.py; kod gry nie wola juz GetPrefabName / GetOldPrefabName).
+        private static readonly Dictionary<string, string> CultureMothers = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            { "aserai", "map_icon_full_aserai_village" }, { "battania", "map_icon_full_battania_village" }, { "crownlands", "map_village_emp_all_40" },
+            { "dragonstone", "map_village_emp_all_40" }, { "empire", "map_village_emp_all_40" }, { "freefolk", "map_icon_full_sturgia_village" },
+            { "ghiscari", "map_icon_full_khuzait_village" }, { "ibbenese", "map_icon_full_battania_village" }, { "khuzait", "map_icon_full_khuzait_village" },
+            { "lyseni", "map_icon_full_aserai_village" }, { "myrish", "map_icon_full_khuzait_village" }, { "nightswatch", "map_icon_full_battania_village" },
+            { "nord", "map_village_emp_all_40" }, { "norvos", "map_village_emp_all_40" }, { "pentoshi", "map_village_emp_all_40" },
+            { "qartheen", "map_village_emp_all_40" }, { "qohorik", "map_village_emp_all_40" }, { "reach", "map_icon_full_vlandia_village" },
+            { "river", "map_village_emp_all_40" }, { "sarnor", "map_icon_full_khuzait_village" }, { "skagosi", "map_icon_full_battania_village" },
+            { "stormlands", "map_village_emp_all_40" }, { "sturgia", "map_icon_full_sturgia_village" }, { "summer", "map_icon_full_khuzait_village" },
+            { "tyroshi", "map_icon_full_aserai_village" }, { "vale", "map_village_emp_all_40" }, { "valyrian", "map_icon_full_khuzait_village" },
+            { "vlandia", "map_icon_full_vlandia_village" }, { "volantine", "map_village_emp_all_40" }, { "yiti", "map_icon_full_khuzait_village" }
+        };
+
+        /// <summary>Stary prefab wsi-matek kultury (StringId kultury) albo null.</summary>
+        internal static string CultureMotherPrefab(string cultureId)
+        {
+            string p;
+            return !string.IsNullOrEmpty(cultureId) && CultureMothers.TryGetValue(cultureId, out p) ? p : null;
+        }
 
         internal const string LastResortPrefab = "andal_village3";   // ostatni zapas, gdy nic innego nie ma (ROT-Map\Prefabs\ROT_north.xml)
 
@@ -393,6 +989,44 @@ namespace Armoury
             if (NameToMesh.TryGetValue(entityName, out m)) return m;
             bool rotHouse = entityName.StartsWith("andal_wm_", StringComparison.Ordinal) || entityName.StartsWith("fm_wm_", StringComparison.Ordinal);
             return leaf && rotHouse ? entityName : null;
+        }
+
+        // ---------- poprawka wygladu 08.10: zwiniete prefaby domow, zastepcy grup, skala z BB ----------
+        // Wioski.log 08.10 02:03 (Wolves Den / Silver Rock / White Ranch, Polnoc): pod matka zostaja fm_village4 / fm_village3 (prefab, 0 dzieci,
+        // BB 0) i JEDNA szopa fm_wm_shed2_snow przeniesiona pod matke (ramka = ramka prefabu x ramka szopy w prefabie, komponent TownIcon,
+        // BB 2.86x2.95 = cala grupa 6 domow, choc sama szopa w skali 0.6 ma ok. 0.5). Tak samo andal (wioski.log 07.10 19:02: andal_village3/4
+        // puste, zostaje andal_wm_house1 z BB 3.49x3.53).
+
+        internal const float SameHouseTol = 0.15f;   // ten sam dom: ta sama siatka, srodki w XY blizej niz 0.15 (rozjazd sceny i prefabu tylko w Z)
+        internal const float FitMin = 0.5f, FitMax = 1.5f;   // wzor wiernie z domow matki daje ok. 1; dalej od 1 = cos nie tak, bez skrajnosci
+
+        /// <summary>Czy encje matki rozwinac kopia jej prefabu bez sceny: ma nazwe prefabu, jest zwinieta (0 dzieci i 0 komponentow MetaMesh)
+        /// i nie jest sama domem / ikona po nazwie (zastepca grupy Town Scene Managera zostaje lisciem po nazwie). Pomocniki nigdy.</summary>
+        internal static bool ExpandCollapsed(string entityName, int childCount, int meshComponents, string prefabName)
+        {
+            if (string.IsNullOrEmpty(prefabName) || IsHelperName(entityName) || IsHelperName(prefabName)) return false;
+            if (childCount > 0 || meshComponents > 0) return false;
+            return MeshForName(entityName, true) == null;
+        }
+
+        /// <summary>Ten sam dom (zastepca grupy vs dom z rozwinietego prefabu): ta sama siatka albo ta sama nazwa encji i srodki w XY (uklad
+        /// korzenia matki) blizej niz SameHouseTol.</summary>
+        internal static bool SameHouse(string meshA, string nameA, float ax, float ay, string meshB, string nameB, float bx, float by)
+        {
+            bool same = (!string.IsNullOrEmpty(meshA) && meshA == meshB) || (!string.IsNullOrEmpty(nameA) && nameA == nameB);
+            if (!same) return false;
+            float dx = ax - bx, dy = ay - by;
+            return dx * dx + dy * dy <= SameHouseTol * SameHouseTol;
+        }
+
+        /// <summary>Dopasowanie wielkosci wzoru do wsi-matki: (pole BB widocznych domow matki / pole BB wzoru w skali matki) ^ 1/2, przyciete do
+        /// FitMin..FitMax; 1 gdy ktores BB puste. Obrazek = LevelScale(poziom) x to x skala matki, czyli 0.70 / 0.75 / 0.80 wielkosci matki.</summary>
+        internal static float FitToMother(float motherW, float motherD, float tplW, float tplD)
+        {
+            if (!(motherW > 0.05f) || !(motherD > 0.05f) || !(tplW > 0.05f) || !(tplD > 0.05f)) return 1f;
+            double f = Math.Sqrt((double)motherW * motherD / ((double)tplW * tplD));
+            if (double.IsNaN(f) || double.IsInfinity(f)) return 1f;
+            return (float)Math.Max(FitMin, Math.Min(FitMax, f));
         }
 
         /// <summary>Prefab domow kultury wsi (StringId kultury) albo null.</summary>
@@ -448,6 +1082,7 @@ namespace Armoury
             public int LeafIndex = -1;        // numer liscia z siatka (do przerzedzenia), -1 = nie lisc
             public float RootX, RootY;        // polozenie w ukladzie korzenia matki (dluga os)
             public int Src;                   // skad siatka: SrcComp komponent encji, SrcName po nazwie encji, SrcPrefab z kopii prefabu
+            public string Name = "";          // nazwa encji matki / prefabu (duplikaty zastepcow, diagnostyka)
         }
 
         private const int SrcComp = 0, SrcName = 1, SrcPrefab = 2;
@@ -469,14 +1104,24 @@ namespace Armoury
             public string WaySource = "";     // prefab drogi "kultura" (do logu)
             public bool Lenient;              // wzor z zapasu maski
             public int FromComp, FromName, FromPrefab;   // siatki poziomu 3 wedlug zrodla
+            // poprawka wygladu 08.10 (poziom 3): rozwiniete zwiniete prefaby, zdjete duplikaty zastepcow, siatki pominiete bez materialu
+            public int Expanded, DupDropped, MatSkipped;
+            public float Fit = 1f;            // dopasowanie wielkosci do matki (MapVillageData.FitToMother)
+            public float TplW, TplD, TplH;    // BB wzoru poziomu 3 w skali i obrocie matki
+            public float MotherW, MotherD;    // BB widocznych domow matki (bez pomocnikow, zgliszcz, oblezenia)
+            public float MotherAllW, MotherAllD;   // BB calej encji matki (z ukrytymi zgliszczami)
+            public bool MotherFromAll;        // widoczne domy bez BB - wzieta cala matka
         }
 
-        /// <summary>Warunki przejscia drzewa: maska wsi, zapas maski, droga "prefaby" (encja z nazwa prefabu -> kopia prefabu bez sceny).</summary>
+        /// <summary>Warunki przejscia drzewa: maska wsi, zapas maski, droga "prefaby" (kazda encja z nazwa prefabu -> kopia prefabu bez sceny),
+        /// droga 1 "rozwin zwiniete" (tylko encja zwinieta przez Town Scene Manager -> kopia prefabu); liczniki jednego przejscia.</summary>
         private sealed class WalkArgs
         {
             public uint Mask;
             public bool Lenient;
             public bool Prefabs;
+            public bool Expand;
+            public int Expanded, DupDropped, MatSkipped;
         }
 
         private sealed class District
@@ -488,6 +1133,7 @@ namespace Armoury
             public Slot FxSlot;               // wioska, na ktorej stoi ogien / dym
             public Template T;
             public bool TemplateTried;
+            public Kit[] Kits;                // v4: wzor obrazka na (okreg, model) - wspolny dla wszystkich wiosek okregu z tym modelem
         }
 
         private sealed class Slot
@@ -500,7 +1146,56 @@ namespace Armoury
             public int Strikes;
             public int FxWanted, FxShown;
             public float Z;
+            public float Cx, Cy;              // v4: srodek obrazka (po ewentualnym przesunieciu ze stoku; dymek, ogien)
+            public bool Placed;               // Cx / Cy ustawione
             public string Why = "";
+        }
+
+        // ---------- v4: wzor obrazka (okreg, model) - elementy z siatkami, bez fizyki / skryptow / czastek ----------
+        /// <summary>Element obrazka: kopie siatek w ramce wzoru (obrot + skala; X / Y srodka ustawia uklad, Z liczy teren przy tworzeniu).</summary>
+        private sealed class Piece
+        {
+            public MetaMesh[] Meshes = NoMeshes;
+            public MatrixFrame Local = MatrixFrame.Identity;   // obrot + skala, origin X / Y w jedn. wzoru
+            public float Bottom, Top;         // najnizszy / najwyzszy punkt BB pod obrotem i skala (jedn. wzoru, wzgledem origin)
+            public float Cx0, Cy0;            // srodek BB w XY wzgledem origin (jedn. wzoru)
+            public float Rx, Ry;              // pol boku BB w X / Y wzoru
+            public int Role;
+            public int Levels = 14;           // bity 1..3: na jakich poziomach stoi
+            public int ThinIndex = -1;        // kepa "village": numer do przerzedzenia od brzegu
+            public int Ground;
+            public bool NoSeason, Essential, WaterSide;
+            public int Parent = -1;           // element doczepiony (kolo mlyna) - numer rodzica, ramka wzgledem niego
+            public bool Pivot;                // wysokosc wedlug punktu zaczepienia siatki (ZOff nad gruntem, jak w prefabie / scenie), inaczej dol BB na gruncie
+            public float ZOff;                // Pivot: wysokosc origin nad gruntem (jedn. wzoru) - z ramki domu we wzorze wsi-matki (projekt autora prefabu)
+            public string Name = "";          // nazwa siatki (log)
+        }
+
+        private sealed class Kit
+        {
+            public int Model, Asked;          // zbudowany model / proszony (zapas: windmill -> farm, mill / fishing -> village)
+            public string Style = "";
+            public readonly List<Piece> Pieces = new List<Piece>();
+            public float[] ThinX, ThinY;      // kepa "village": srodki budynkow do przerzedzenia (wedlug ThinIndex)
+            public bool[] ThinDetail;         // kepa "village": budynek to detal (studnia, szopa, stog...) - limit na poziomie (VillageDetailMax)
+            public int ThinN;
+            public float H = MapVillageData.IconHouseH;   // wielkosc domu wsi okregu (jedn. wzoru)
+            public float FrontY;              // przod kepy domow (+Y, jedn. wzoru) - od niego szukany brzeg wody
+            public float BackY;               // tyl kepy domow (-Y, jedn. wzoru) - woda za kepa = obrazek odwrocony o pi (recenzja 08.10)
+            public bool HasWater;             // ma elementy przy wodzie (mlyn, pomost, lodzie)
+            public List<HouseUnit> Units;     // domy wzoru wsi-matki (rodzina andal / fm) - siatki rodziny w skali i wysokosci jak we wzorze
+            public string Why = "";
+        }
+
+        /// <summary>Dom wsi okregu z wzoru (lisc z siatka poziomu 3 w ramce zlozonej wzgledem korzenia matki, obrocony do osi domow).</summary>
+        private sealed class HouseUnit
+        {
+            public MetaMesh[] Meshes;
+            public MatrixFrame F;
+            public bool NoSeason;
+            public string Name = "";
+            public float Ext;                 // wiekszy bok BB w XY (jedn. wzoru)
+            public float Scale;               // skala (|s|) ramki
         }
 
         // ---------- stan komponentu (jeden na mape; nic statycznego poza rejestracja) ----------
@@ -515,14 +1210,32 @@ namespace Armoury
         private readonly SortedDictionary<string, int> _skip = new SortedDictionary<string, int>(StringComparer.Ordinal);
         private int _created, _createdTotal, _shownMax, _fires, _smokes, _templatesOk, _templatesBad, _thinned, _axisTurned, _lenient;
         // drogi wzoru (poprawka po autotescie 17:41): wzory wedlug drogi, siatki wzorow (poziom 3) wedlug zrodla, prefaby bez sceny, nazwy
-        private int _tplComp, _tplName, _tplPrefab, _tplCulture, _meshComp, _meshName, _meshPrefab, _prefabMade, _prefabNoMesh, _prefabMissing, _nameMiss;
+        private int _tplComp, _tplName, _tplExpand, _tplPrefab, _tplCulture, _meshComp, _meshName, _meshPrefab, _prefabMade, _prefabNoMesh, _prefabMissing, _nameMiss;
         private readonly Dictionary<string, MetaMesh> _meshByName = new Dictionary<string, MetaMesh>(StringComparer.Ordinal);   // nazwa siatki -> wzor (null = brak)
         private readonly Dictionary<string, GameEntity> _prefabs = new Dictionary<string, GameEntity>(StringComparer.Ordinal);   // prefab -> kopia bez sceny (null = brak)
         private int _diagMothers, _diagPrefabs, _stDiag;   // diagnostyka do wioski.log: drzewa 3 pierwszych wsi-matek (+ pierwszej bez wzoru) i 3 prefabow
         private bool _diagFailDone;
+        private bool _diagOn;   // drzewa encji matek / kopii prefabow w wioski.log tylko w autotescie (AutotestActive przy Load)
+        // poprawka wygladu 08.10: rozwiniete zwiniete prefaby (droga 1), duplikaty zastepcow, siatki bez materialu, dopasowanie skali, 3 wzory w logu
+        private int _expandedTotal, _dupDropped, _matSkipped, _matBad, _matDefault, _fitN, _diagTemplates;
+        private float _fitMin = float.MaxValue, _fitMax, _fitSum;
+        private const int DiagKindsMax = 40;   // autotest: najwyzej tyle rodzajow wzoru z lista siatek w wioski.log
+        private readonly HashSet<string> _diagKinds = new HashSet<string>(StringComparer.Ordinal);   // rodzaje wzoru juz wypisane (autotest)
+        private readonly Dictionary<string, int> _prefabMeshes = new Dictionary<string, int>(StringComparer.Ordinal);   // prefab -> komponentow MetaMesh w kopii
+        private readonly Dictionary<string, bool> _prefabExists = new Dictionary<string, bool>(StringComparer.Ordinal); // nazwa encji -> jest prefab o tej nazwie
+        private readonly Dictionary<string, bool> _matOk = new Dictionary<string, bool>(StringComparer.Ordinal);       // nazwa siatki -> ma material (podsiatka z waznym materialem)
         private long _createTicks;
         private int _stCreate, _stFx, _stHover, _stVis, _stTemplate, _stTick, _stRemove;
         private string _lastSummary = "";
+        // v4 (zdjecia 08.10 03:37): obrazki wedlug modelu, zapasy, teren pod kazdym budynkiem, stok / brzeg, brzeg wody
+        private readonly int[] _modelMade = new int[MapVillageData.ModelCount];      // wioski postawione wedlug zbudowanego modelu (od wczytania)
+        private readonly int[] _modelAsked = new int[MapVillageData.ModelCount];     // ... wedlug modelu z pliku
+        private readonly SortedDictionary<string, int> _kitFallback = new SortedDictionary<string, int>(StringComparer.Ordinal);   // "mill->village" -> okregi
+        private int _kitsBuilt, _kitMeshMiss, _snapPieces, _tiltPieces, _slopeVillages, _slopeShift, _slopeSqueeze, _slopeDropped, _slopeLeft,
+                    _steepDropped, _bankFound, _bankMiss, _diagSlope, _waterFlip, _diagFlip;
+        private readonly HashSet<string> _meshLogged = new HashSet<string>(StringComparer.Ordinal);   // siatki obrazkow juz opisane w wioski.log
+        private readonly HashSet<string> _kitLogged = new HashSet<string>(StringComparer.Ordinal);    // (model, styl) juz opisane
+        private readonly HashSet<string> _missLogged = new HashSet<string>(StringComparer.Ordinal);   // brakujace siatki juz zapisane
 
         // ---------- rejestracja (z SubModuleMain.OnApplicationTick; tani test co klatke) ----------
         private static WeakReference _regVm, _regScreen;
@@ -648,16 +1361,43 @@ namespace Armoury
                 _districts.Add(d);
             }
             _active = true;
+            _diagOn = AutotestActive();
             Log.Info(head + "; wiosek " + file.Records.Count + " w " + byDistrict.Count + " okregach; odrzucone wiersze " + file.BadRows
                      + " (" + file.ReasonsText() + (file.FirstBad.Length > 0 ? "; pierwszy: " + file.FirstBad : "") + ")"
                      + (file.LevelClamped > 0 ? "; poziom przyciety do 1-3: " + file.LevelClamped : "")
+                     + "; obrazki (kolumna model" + (file.HasModelColumn ? "" : " - BRAK, kazda wioska village") + "): " + file.ModelsText()
+                     + (file.ModelUnknown > 0 ? " (nieznana wartosc -> village: " + file.ModelUnknown + ")" : "")
                      + "; CRC sceny: " + (check == MapVillageData.CheckMatch ? "zgodne (" + sceneCrc + ")"
                                           : "brak w pliku - sprawdzenie pominiete (scena gry " + sceneCrc + "; do naglowka: '# scene_xml_crc: " + sceneCrc + "')")
                      + "; pominiete od razu: brak wsi gry " + noMother + " (okregow " + noMotherDistricts + "), nie wies " + notVillage
                      + ", poza granica mapy " + outside + "; maski sceny civilian " + _maskCivil + ", level_1/2/3 " + _maskL1 + "/" + _maskL2 + "/" + _maskL3
                      + ", looted/siege " + _maskLooted + "/" + _maskSiege
+                     + "; drzewa encji w wioski.log: " + (_diagOn ? "tak (autotest)" : "nie (tylko w autotescie)")
                      + "; czas " + sw.ElapsedMilliseconds + " ms. Obrazki powstaja przy kamerze (z <= "
                      + Settings.Current.MapVillagesHideAboveCameraHeight.ToString("0", CultureInfo.InvariantCulture) + "), nic nie idzie do zapisu gry.");
+        }
+
+        private static int _autotest = -1;   // -1 nie sprawdzone, 0 nie, 1 tak
+
+        /// <summary>Czy dziala autotest (pole CrashScribe.Autotest.Active - jest tylko w DLL autotestu CrashScribe-AT1; w grze Jeffa typu brak).
+        /// Sprawdzane raz na sesje gry (autotest uzbraja sie przy starcie, przed kampania); blad = nie.</summary>
+        private static bool AutotestActive()
+        {
+            if (_autotest >= 0) return _autotest == 1;
+            _autotest = 0;
+            try
+            {
+                foreach (Assembly asm in AppDomain.CurrentDomain.GetAssemblies())
+                {
+                    if (asm.GetName().Name != "CrashScribe") continue;
+                    Type t = asm.GetType("CrashScribe.Autotest", false);
+                    FieldInfo f = t != null ? t.GetField("Active", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public) : null;
+                    if (f != null && f.FieldType == typeof(bool) && (bool)f.GetValue(null)) _autotest = 1;
+                    break;
+                }
+            }
+            catch { _autotest = 0; }
+            return _autotest == 1;
         }
 
         protected override void OnFinalize()
@@ -742,13 +1482,34 @@ namespace Armoury
                 foreach (var kv in _skip) { if (!first) sb.Append(", "); first = false; sb.Append(kv.Key).Append(' ').Append(kv.Value); }
                 sb.Append(')');
             }
-            sb.Append("; wzory wsi-matek ").Append(_templatesOk).Append(" dobrych (drzewo: komponenty ").Append(_tplComp).Append(", nazwy ").Append(_tplName)
+            sb.Append("; wzory wsi-matek ").Append(_templatesOk).Append(" dobrych (drzewo: komponenty ").Append(_tplComp).Append(", nazwy ").Append(_tplName).Append(", rozwiniete prefaby domow ").Append(_tplExpand)
               .Append("; prefaby ").Append(_tplPrefab).Append("; kultura ").Append(_tplCulture).Append("), ").Append(_templatesBad).Append(" bez wzoru")
               .Append(_lenient > 0 ? " (dobrych z zapasu maski: " + _lenient + ")" : "")
               .Append("; siatki wzorow (poziom 3) z komponentow ").Append(_meshComp).Append(", z nazw ").Append(_meshName).Append(", z prefabow ").Append(_meshPrefab)
               .Append("; prefaby bez sceny ").Append(_prefabMade).Append(" (bez siatek ").Append(_prefabNoMesh).Append(", brak ").Append(_prefabMissing).Append(')')
               .Append("; nazwy bez siatki ").Append(_nameMiss)
-              .Append("; przerzedzone (domy ROT) ").Append(_thinned).Append(", obrot do osi domow ").Append(_axisTurned);
+              .Append("; rozwiniete zwiniete prefaby domow ").Append(_expandedTotal).Append(", zdjete duplikaty zastepcow ").Append(_dupDropped)
+              .Append(", siatki pominiete bez materialu ").Append(_matSkipped).Append(" (nazw ").Append(_matBad).Append("), nazw z samym domyslnym materialem ").Append(_matDefault)
+              .Append("; dopasowanie skali do matki ").Append(_fitN > 0
+                  ? F2(_fitMin) + ".." + F2(_fitMax) + " (srednio " + F2(_fitSum / _fitN) + ", wzorow " + _fitN + ")" : "-")
+              .Append("; przerzedzone od brzegu kepy ").Append(_thinned).Append(", obrot do osi domow ").Append(_axisTurned);
+            // v4: obrazki wedlug modelu (z pliku -> postawione), zapasy, teren
+            sb.Append("; obrazki (od wczytania, model z pliku -> postawiony): ");
+            for (int i = 0; i < MapVillageData.ModelCount; i++)
+            {
+                if (i > 0) sb.Append(", ");
+                sb.Append(MapVillageData.ModelName(i)).Append(' ').Append(_modelAsked[i]).Append("->").Append(_modelMade[i]);
+            }
+            sb.Append("; wzory obrazkow ").Append(_kitsBuilt).Append(" (zapas: ");
+            if (_kitFallback.Count == 0) sb.Append('-');
+            else { bool f1 = true; foreach (var kv in _kitFallback) { if (!f1) sb.Append(", "); f1 = false; sb.Append(kv.Key).Append(' ').Append(kv.Value); } }
+            sb.Append("; brak siatek ").Append(_kitMeshMiss).Append(')');
+            sb.Append("; teren: budynki na wlasnym gruncie ").Append(_snapPieces).Append(", ikony pochylone do stoku ").Append(_tiltPieces)
+              .Append("; stok / brzeg (rozrzut gruntu > prog) wiosek ").Append(_slopeVillages).Append(": przesuniete w obrysie ").Append(_slopeShift)
+              .Append(", scisniete ").Append(_slopeSqueeze).Append(", zdjete budynki ").Append(_slopeDropped).Append(", dalej nierowne ").Append(_slopeLeft)
+              .Append("; zdjete budynki na stromym gruncie ").Append(_steepDropped)
+              .Append("; brzeg wody przed mlynem / pomostem znaleziony ").Append(_bankFound).Append(", brak ").Append(_bankMiss)
+              .Append(", odwrocone o 180 st. (woda za kepa) ").Append(_waterFlip);
             double ms = _createdTotal > 0 ? _createTicks * 1000.0 / System.Diagnostics.Stopwatch.Frequency / _createdTotal : 0;
             sb.Append("; sredni czas obrazka ").Append(ms.ToString("0.000", CultureInfo.InvariantCulture)).Append(" ms");
             int fireNow = 0, smokeNow = 0;
@@ -979,43 +1740,168 @@ namespace Armoury
             }
         }
 
+        /// <summary>Obrazek wioski (v4, zdjecia autotestu 08.10 03:37): wzor obrazka (okreg, model) -> elementy widoczne przy poziomie
+        /// (kepa "village" przerzedzana od brzegu) -> stok / brzeg (przesuniecie w obrysie z pliku, scisniecie, zdjecie budynkow z krawedzi)
+        /// -> brzeg wody dla mlyna / pomostu / lodzi -> KAZDY budynek na wysokosci gruntu w swoim punkcie (korzen bez pochylenia; ikona wsi
+        /// Calradii / Essos - jedna siatka calej wsi - pochylona do stoku jak wies gry). Tylko kopie siatek: bez fizyki, skryptow, czastek.</summary>
         private void Create(Slot s, Template t)
         {
             int lv = Math.Max(1, Math.Min(3, s.R.Level));
-            PlanNode[] plan = t.Plans[lv];
-            bool[] keep = t.Flat && lv < 3 && t.LeafCount >= 3 ? MapVillageData.ThinLeaves(s.R.Uid, t.LeafCount, lv) : null;
+            Kit k = KitFor(s.D, t, s.R.Model);
+            if (k == null || k.Pieces.Count == 0)
+                throw new InvalidOperationException("brak wzoru obrazka" + (k != null && k.Why.Length > 0 ? " (" + k.Why + ")" : ""));
             Scene scene = MapScene;
             if (scene == null) throw new InvalidOperationException("brak sceny mapy");
+            // 1. elementy widoczne przy poziomie
+            bool[] keepThin = null;
+            if (k.ThinN > 0 && k.ThinX != null && k.ThinY != null)
+            {
+                int want = MapVillageData.VillageWant(k.ThinN, lv);
+                // od brzegu kepy, ale detali (studnia, szopy, stog) najwyzej 2 / 3 / wszystkie - poziom 1 to glownie domy (recenzja 08.10)
+                if (want < k.ThinN) keepThin = MapVillageData.ThinVillage(s.R.Uid, k.ThinX, k.ThinY, k.ThinDetail, want, MapVillageData.VillageDetailMax(lv));
+            }
+            var vis = new List<int>();
+            for (int i = 0; i < k.Pieces.Count; i++)
+            {
+                Piece p = k.Pieces[i];
+                if (p.Parent >= 0 || (p.Levels & (1 << lv)) == 0) continue;
+                if (keepThin != null && p.ThinIndex >= 0 && p.ThinIndex < keepThin.Length && !keepThin[p.ThinIndex]) continue;
+                vis.Add(i);
+            }
+            if (vis.Count == 0) throw new InvalidOperationException("brak elementow obrazka na poziomie " + lv);
+            // 2. uklad: korzen BEZ pochylenia (obrot z pliku), skala matki x poziom x dopasowanie do matki
+            Vec3 S = t.Scale * (MapVillageData.LevelScale(lv) * t.Fit);
+            float yaw = (float)(s.R.FrontDeg * Math.PI / 180.0);
+            var g = new Geo
+            {
+                Ca = (float)Math.Cos(yaw), Sa = (float)Math.Sin(yaw), Sx = S.x, Sy = S.y, Sz = Math.Max(0.05f, S.z),
+                Cx = s.R.X, Cy = s.R.Y, Ms = Campaign.Current.MapSceneWrapper
+            };
+            int n = vis.Count;
+            var px = new float[n];
+            var py = new float[n];
+            var alive = new bool[n];
+            for (int j = 0; j < n; j++) { Piece p = k.Pieces[vis[j]]; px[j] = p.Local.origin.x; py[j] = p.Local.origin.y; alive[j] = true; }
+            int minKeep = MinKeep(k, vis);
+            // 3a. woda ZA kepa (front z pliku patrzy na droge): obrazek odwrocony o pi, zeby kolo mlyna / pomost staly od wody (recenzja 08.10)
+            if (k.HasWater && WaterBehindKit(k, g))
+            {
+                yaw += (float)Math.PI;
+                g.Ca = -g.Ca;
+                g.Sa = -g.Sa;
+                _waterFlip++;
+                if (_diagFlip < 10)
+                {
+                    _diagFlip++;
+                    Log.Info("Wioski: drzewo terenu " + s.R.Uid + " '" + s.R.Name + "' (" + MapVillageData.ModelName(k.Model) + ", miejsce " + s.R.Kind
+                             + "): przed frontem brak brzegu, za tylem jest - obrazek odwrocony o 180 st. (mlyn / pomost od strony wody).");
+                }
+            }
+            // 3. stok / brzeg (poprawka 1)
+            Settle(s, k, g, vis, px, py, alive, minKeep);
+            // 4. brzeg wody: mlyn kolem nad brzegiem, pomost od brzegu, lodzie wyciagniete na brzeg
+            if (k.HasWater) ToBank(k, g, vis, px, py, alive);
+            // 5. wysokosc kazdego budynku z gruntu w JEGO punkcie
+            float zc = g.H(g.Cx, g.Cy);
+            float shoreZ = k.HasWater ? g.HK(0f, k.FrontY) : zc;
+            var frames = new MatrixFrame[n];
+            var tilt = new bool[n];
+            int kept = 0;
+            for (int j = 0; j < n; j++) if (alive[j]) kept++;
+            for (int j = 0; j < n; j++)
+            {
+                if (!alive[j]) continue;
+                Piece p = k.Pieces[vis[j]];
+                float ckx = px[j] + p.Cx0, cky = py[j] + p.Cy0;   // srodek BB (jedn. wzoru)
+                float hgtW = Math.Max(0.01f, (p.Top - p.Bottom) * g.Sz);
+                MatrixFrame f = p.Local;
+                float baseW;
+                bool byTop = false;
+                switch (p.Ground)
+                {
+                    case MapVillageData.GroundLand:
+                    {
+                        // mlyn: grunt od strony ladu (tyl -Y), przod z kolem moze wisiec nad brzegiem
+                        float h0 = g.HK(ckx, cky), h1 = g.HK(ckx - p.Rx, cky - p.Ry), h2 = g.HK(ckx + p.Rx, cky - p.Ry);
+                        baseW = Math.Min(h0, Math.Min(h1, h2)) - (p.Pivot ? 0f : 0.04f * hgtW);
+                        break;
+                    }
+                    case MapVillageData.GroundEnd:
+                    {
+                        // pomost: poklad na wysokosci gruntu przy ladowym koncu (-Y)
+                        baseW = g.HK(ckx, cky - p.Ry * 0.9f) + 0.01f;
+                        byTop = true;
+                        break;
+                    }
+                    case MapVillageData.GroundBeach:
+                    {
+                        // lodz: na brzegu; nad woda (grunt nizej niz brzeg) najwyzej troche ponizej brzegu
+                        float h0 = g.HK(ckx, cky);
+                        baseW = Math.Max(h0, shoreZ - 0.3f * hgtW) - 0.15f * hgtW;
+                        break;
+                    }
+                    case MapVillageData.GroundTilt:
+                    {
+                        // ikona calej wsi gry (jedna siatka): jak wies gry - pochylona do normalnej terenu w swoim srodku
+                        float wx = g.WX(ckx, cky), wy = g.WY(ckx, cky), hz;
+                        Vec3 nw;
+                        g.Ms.GetTerrainHeightAndNormal(new Vec2(wx, wy), out hz, out nw);
+                        g.Calls++;
+                        f.rotation = Tilted(p.Local.rotation, nw, g);
+                        baseW = hz - 0.02f;   // jak dawny korzen (z - 0.02), origin ikony na gruncie + ZOff z wzoru
+                        tilt[j] = true;
+                        break;
+                    }
+                    default:
+                    {
+                        // dom / detal: najnizszy z 5 punktow pod obrysem (nic nie wisi w powietrzu); na zbyt stromym gruncie budynek niekonieczny zdjety
+                        float h0 = g.HK(ckx, cky), h1 = g.HK(ckx - p.Rx, cky - p.Ry), h2 = g.HK(ckx + p.Rx, cky - p.Ry),
+                              h3 = g.HK(ckx - p.Rx, cky + p.Ry), h4 = g.HK(ckx + p.Rx, cky + p.Ry);
+                        float lo = Math.Min(h0, Math.Min(Math.Min(h1, h2), Math.Min(h3, h4)));
+                        float hi = Math.Max(h0, Math.Max(Math.Max(h1, h2), Math.Max(h3, h4)));
+                        if (hi - lo > 0.5f * hgtW && !p.Essential && kept > minKeep)
+                        {
+                            alive[j] = false;
+                            kept--;
+                            _steepDropped++;
+                            continue;
+                        }
+                        baseW = lo - (p.Pivot ? 0f : 0.04f * hgtW);   // dom wzoru: wysokosc nad najnizszym punktem jak w prefabie
+                        break;
+                    }
+                }
+                float lz = p.Pivot ? (baseW - zc) / g.Sz + p.ZOff : (baseW - zc) / g.Sz - (byTop ? p.Top : p.Bottom);
+                f.origin = new Vec3(px[j], py[j], lz, 1f);
+                frames[j] = f;
+            }
+            if (kept <= 0) throw new InvalidOperationException("brak elementow obrazka po terenie");
             GameEntity root = GameEntity.CreateEmpty(scene, false, false, false);   // bez fizyki, bez skryptow
             if (root == (GameEntity)null) throw new InvalidOperationException("CreateEmpty zwrocil null");
             try
             {
                 root.Name = "arm_mapvillage_" + SafeName(s.R.Uid);   // gra szuka osad po nazwie encji (SettlementVisual.cs:465) - nazwa nie moze byc id osady
-                float yaw = MapVillageData.Yaw(s.R.FrontDeg, t.HasAxis, t.Axis);
-                PlaceRoot(s, root, t, lv, yaw);
-                var made = new GameEntity[plan.Length];
-                int meshes = 0;
-                for (int i = 0; i < plan.Length; i++)
+                Mat3 rr = Mat3.Identity;
+                rr.RotateAboutUp(yaw);
+                rr.ApplyScaleLocal(in S);
+                MatrixFrame rf = new MatrixFrame(in rr, new Vec3(g.Cx, g.Cy, zc, 1f));
+                root.SetFrame(ref rf, true);
+                var made = new GameEntity[k.Pieces.Count];
+                int meshes = 0, snapped = 0, tilted = 0;
+                for (int j = 0; j < n; j++)
                 {
-                    PlanNode n = plan[i];
-                    if (keep != null && n.LeafIndex >= 0 && n.LeafIndex < keep.Length && !keep[n.LeafIndex]) continue;
-                    GameEntity parent = n.Parent < 0 ? root : made[n.Parent];
-                    if (parent == (GameEntity)null) continue;
-                    GameEntity e = GameEntity.CreateEmpty(scene, false, false, false);
+                    if (!alive[j]) continue;
+                    Piece p = k.Pieces[vis[j]];
+                    GameEntity e = MakeEntity(scene, root, p, frames[j], t.NoSeason, ref meshes);
                     if (e == (GameEntity)null) continue;
-                    for (int m = 0; m < n.Meshes.Length; m++)
-                    {
-                        MetaMesh copy = n.Meshes[m].CreateCopy();
-                        if (copy == null || !copy.IsValid) copy = MetaMesh.GetCopy(n.Meshes[m].GetName(), false, true);
-                        if (copy != null && copy.IsValid) { e.AddMultiMesh(copy, true); meshes++; }
-                    }
-                    MatrixFrame lf = n.Local;
-                    e.SetFrame(ref lf, true);                 // jak namiot partii: ramka, potem AddChild bez przeliczania = ramka lokalna
-                    parent.AddChild(e, false);
-                    if (n.NoSeason) e.EntityFlags = e.EntityFlags | EntityFlags.NotAffectedBySeason;
-                    e.EntityFlags = e.EntityFlags | EntityFlags.DoNotTick;
-                    e.SetReadyToRender(true);
-                    made[i] = e;
+                    made[vis[j]] = e;
+                    if (tilt[j]) tilted++; else snapped++;
+                }
+                // doczepione (kolo mlyna): pod rodzicem, ramka wzgledem niego (w jednostkach siatki mlyna)
+                for (int i = 0; i < k.Pieces.Count; i++)
+                {
+                    Piece p = k.Pieces[i];
+                    if (p.Parent < 0 || p.Parent >= made.Length || made[p.Parent] == (GameEntity)null) continue;
+                    MakeEntity(scene, made[p.Parent], p, p.Local, t.NoSeason, ref meshes);
                 }
                 if (meshes == 0) throw new InvalidOperationException("kopia bez siatek");
                 if (t.NoSeason) root.EntityFlags = root.EntityFlags | EntityFlags.NotAffectedBySeason;   // snieg jak na matce (projekt 5.1)
@@ -1023,9 +1909,17 @@ namespace Armoury
                 root.SetReadyToRender(true);                 // jak SettlementVisual.OnStartup (:590-591)
                 root.SetEntityEnvMapVisibility(false);
                 root.SetVisibilityExcludeParents(false);     // pokaze UpdateVisibility
-                if (keep != null) _thinned++;
+                if (keepThin != null) _thinned++;
                 if (t.HasAxis) _axisTurned++;
+                _snapPieces += snapped;
+                _tiltPieces += tilted;
+                _modelAsked[Math.Max(0, Math.Min(MapVillageData.ModelCount - 1, s.R.Model))]++;
+                _modelMade[k.Model]++;
                 s.Root = root;
+                s.Z = zc;
+                s.Cx = g.Cx;
+                s.Cy = g.Cy;
+                s.Placed = true;
                 s.FxShown = FxNone;
                 ApplyFx(s);                                  // gdy wies gry wlasnie plonie, ogien od razu
             }
@@ -1037,6 +1931,26 @@ namespace Armoury
             }
         }
 
+        /// <summary>Encja elementu: pusta encja + kopie siatek (jak namiot partii: CreateEmpty + AddMultiMesh + SetFrame + AddChild), flagi jak dotad.</summary>
+        private static GameEntity MakeEntity(Scene scene, GameEntity parent, Piece p, MatrixFrame f, bool noSeason, ref int meshes)
+        {
+            GameEntity e = GameEntity.CreateEmpty(scene, false, false, false);
+            if (e == (GameEntity)null) return null;
+            for (int m = 0; m < p.Meshes.Length; m++)
+            {
+                MetaMesh copy = p.Meshes[m].CreateCopy();
+                if (copy == null || !copy.IsValid) copy = MetaMesh.GetCopy(p.Meshes[m].GetName(), false, true);
+                if (copy != null && copy.IsValid) { e.AddMultiMesh(copy, true); meshes++; }
+            }
+            e.SetFrame(ref f, true);                 // jak namiot partii: ramka, potem AddChild bez przeliczania = ramka lokalna
+            parent.AddChild(e, false);
+            // recenzja 08.10: flaga "bez sniegu pory roku" na KAZDEJ encji obrazka, gdy ma ja matka (zima ROT: jednolita szara brylka)
+            if (p.NoSeason || noSeason) e.EntityFlags = e.EntityFlags | EntityFlags.NotAffectedBySeason;
+            e.EntityFlags = e.EntityFlags | EntityFlags.DoNotTick;
+            e.SetReadyToRender(true);
+            return e;
+        }
+
         private static string SafeName(string uid)
         {
             var sb = new StringBuilder(uid.Length);
@@ -1044,27 +1958,806 @@ namespace Armoury
             return sb.ToString();
         }
 
-        /// <summary>Korzen na terenie: wysokosc z MapSceneWrapper (sam teren), os "gora" wedlug normalnej, obrot, skala matki x poziom.</summary>
-        private static void PlaceRoot(Slot s, GameEntity root, Template t, int lv, float yaw)
+        /// <summary>Uklad obrazka na mapie: jedn. wzoru (X wzdluz ulicy, Y do frontu) -> swiat; grunt z MapSceneWrapper.GetTerrainHeightAndNormal
+        /// (sam teren, jak dotad - jedyne wywolanie terenu).</summary>
+        private sealed class Geo
         {
-            float z;
-            Vec3 n;
-            Campaign.Current.MapSceneWrapper.GetTerrainHeightAndNormal(new Vec2(s.R.X, s.R.Y), out z, out n);
-            Vec3 u = n;
-            if (u.Length < 0.5f || u.z < 0.5f) u = new Vec3(0f, 0f, 1f);
+            public float Ca, Sa, Sx, Sy, Sz, Cx, Cy;
+            public TaleWorlds.CampaignSystem.Map.IMapScene Ms;
+            public int Calls;
+            public float WX(float kx, float ky) { return Cx + Ca * kx * Sx - Sa * ky * Sy; }
+            public float WY(float kx, float ky) { return Cy + Sa * kx * Sx + Ca * ky * Sy; }
+            public float H(float wx, float wy)
+            {
+                float z;
+                Vec3 nn;
+                Ms.GetTerrainHeightAndNormal(new Vec2(wx, wy), out z, out nn);
+                Calls++;
+                return z;
+            }
+            public float HK(float kx, float ky) { return H(WX(kx, ky), WY(kx, ky)); }
+        }
+
+        /// <summary>Obrot elementu pochylony do normalnej terenu (normalna swiata -> uklad korzenia: obrot o -yaw), z zachowaniem skali elementu.</summary>
+        private static Mat3 Tilted(Mat3 rot, Vec3 nWorld, Geo g)
+        {
+            Vec3 u = new Vec3(g.Ca * nWorld.x + g.Sa * nWorld.y, -g.Sa * nWorld.x + g.Ca * nWorld.y, nWorld.z);
+            if (u.Length < 0.5f || u.z < 0.5f) return rot;
             u.Normalize();
-            Vec3 s0 = new Vec3(MathF.Cos(yaw), MathF.Sin(yaw), 0f);
+            Vec3 sc = rot.GetScaleVector();
+            Vec3 s0 = rot.s;
+            s0 = new Vec3(s0.x, s0.y, 0f);
+            if (s0.Length < 1e-4f) return rot;
+            s0.Normalize();
             Vec3 f = Vec3.CrossProduct(u, s0);
             f.Normalize();
             Vec3 side = Vec3.CrossProduct(f, u);
             side.Normalize();
-            Mat3 rot = new Mat3(in side, in f, in u);
-            Vec3 scale = t.Scale * MapVillageData.LevelScale(lv);
-            rot.ApplyScaleLocal(in scale);
-            Vec3 o = new Vec3(s.R.X, s.R.Y, z - 0.02f, 1f);
-            MatrixFrame fr = new MatrixFrame(in rot, in o);
-            root.SetFrame(ref fr, true);
-            s.Z = z;
+            Mat3 r = new Mat3(in side, in f, in u);
+            r.ApplyScaleLocal(in sc);
+            return r;
+        }
+
+        /// <summary>Ile budynkow zostaje najmniej przy zdejmowaniu ze stoku: kepa "village" - tyle co poziom 1 (VillageWant), inne obrazki -
+        /// elementy niezbedne (mlyn, stodola, pomost...) + 1 dom.</summary>
+        private static int MinKeep(Kit k, List<int> vis)
+        {
+            if (k.ThinN > 0) return Math.Min(vis.Count, MapVillageData.VillageWant(k.ThinN, 1));
+            int ess = 0;
+            foreach (int i in vis) if (k.Pieces[i].Essential) ess++;
+            return Math.Min(vis.Count, ess + 1);
+        }
+
+        /// <summary>Poprawka 1 (zdjecie crop-sb-dach: domy na brzegu zapadniete po dach): rozrzut gruntu pod budynkami (srodki elementow, bez
+        /// elementow przy wodzie i pochylonych ikon). Gdy wiekszy niz prog (MapVillageData.SpreadMax ok. 0.9 wysokosci domu): (a) przesuniecie
+        /// srodka w granicach obrysu z pliku (half_len / half_wid) na najrowniejsze miejsce, (b) scisniecie kepy do 0.75, (c) tylko urwisko /
+        /// brzeg (dalej &gt; 2 x prog): zdjecie budynkow z gruntem najdalej od mediany (MapVillageData.DropOutliers, nigdy niezbednych, zostaje
+        /// MinKeep). Wszystko liczone w logu.</summary>
+        private void Settle(Slot s, Kit k, Geo g, List<int> vis, float[] px, float[] py, bool[] alive, int minKeep)
+        {
+            int n = vis.Count;
+            var idx = new List<int>();
+            for (int j = 0; j < n; j++)
+            {
+                Piece p = k.Pieces[vis[j]];
+                if (p.WaterSide || p.Ground == MapVillageData.GroundTilt || p.Ground == MapVillageData.GroundEnd || p.Ground == MapVillageData.GroundBeach) continue;
+                idx.Add(j);
+            }
+            if (idx.Count < 2) return;
+            float max = MapVillageData.SpreadMax(k.H * g.Sz);
+            var h = new List<float>();
+            float sp0 = SpreadAt(k, g, vis, px, py, alive, idx, g.Cx, g.Cy, h);
+            if (sp0 <= max) return;
+            _slopeVillages++;
+            float bestSp = sp0, bx = g.Cx, by = g.Cy, bdx = 0f, bdy = 0f;
+            bool water = k.HasWater;
+            foreach (float[] c in MapVillageData.ShiftCandidates(s.R.HalfLen, s.R.HalfWid, water))
+            {
+                // przesuniecie w ukladzie obrazka (jedn. mapy) -> swiat
+                float wx = s.R.X + g.Ca * c[0] - g.Sa * c[1], wy = s.R.Y + g.Sa * c[0] + g.Ca * c[1];
+                float sp = SpreadAt(k, g, vis, px, py, alive, idx, wx, wy, null);
+                if (sp < bestSp - 0.02f) { bestSp = sp; bx = wx; by = wy; bdx = c[0]; bdy = c[1]; }
+                if (bestSp <= max) break;
+            }
+            bool shifted = bx != g.Cx || by != g.Cy;
+            if (shifted) { g.Cx = bx; g.Cy = by; _slopeShift++; }
+            bool squeezed = false;
+            int dropped = 0;
+            if (bestSp > max)
+            {
+                // scisniecie kepy (bez elementow przy wodzie) do 0.75 wokol jej srodka
+                float mx = 0f, my = 0f;
+                foreach (int j in idx) { mx += px[j]; my += py[j]; }
+                mx /= idx.Count; my /= idx.Count;
+                var ox = (float[])px.Clone();
+                var oy = (float[])py.Clone();
+                foreach (int j in idx) { px[j] = mx + (px[j] - mx) * 0.75f; py[j] = my + (py[j] - my) * 0.75f; }
+                float sp = SpreadAt(k, g, vis, px, py, alive, idx, g.Cx, g.Cy, null);
+                if (sp < bestSp - 0.02f) { bestSp = sp; squeezed = true; _slopeSqueeze++; }
+                else { Array.Copy(ox, px, ox.Length); Array.Copy(oy, py, oy.Length); }
+            }
+            if (bestSp > 2f * max)
+            {
+                // urwisko / brzeg (rozrzut > 2 x prog): zdjecie budynkow z gruntem najdalej od mediany (dom w korycie rzeki, na skarpie), nigdy
+                // niezbednych, az rozrzut <= 2 x prog. Rowny stok (rozrzut <= 2 x prog) nic nie zdejmuje - kazdy dom i tak stoi na swoim gruncie.
+                h.Clear();
+                SpreadAt(k, g, vis, px, py, alive, idx, g.Cx, g.Cy, h);
+                var ess = new List<bool>();
+                foreach (int j in idx) ess.Add(k.Pieces[vis[j]].Essential);
+                int aliveNow = 0;
+                for (int j = 0; j < n; j++) if (alive[j]) aliveNow++;
+                int keepAmong = Math.Max(1, idx.Count - Math.Max(0, aliveNow - minKeep));
+                bool[] keep = MapVillageData.DropOutliers(h, ess, keepAmong, 2f * max);
+                for (int q = 0; q < idx.Count; q++) if (!keep[q] && alive[idx[q]]) { alive[idx[q]] = false; dropped++; }
+                _slopeDropped += dropped;
+                bestSp = SpreadAt(k, g, vis, px, py, alive, idx, g.Cx, g.Cy, null);
+            }
+            if (bestSp > max) _slopeLeft++;
+            if (_diagSlope < 15)
+            {
+                _diagSlope++;
+                Log.Info("Wioski: drzewo terenu " + s.R.Uid + " '" + s.R.Name + "' (" + MapVillageData.ModelName(k.Model) + ", poziom " + s.R.Level
+                         + "): rozrzut gruntu pod budynkami " + F2(sp0) + " > prog " + F2(max) + " -> " + F2(bestSp)
+                         + (shifted ? "; przesuniete w obrysie o " + F2(bdx) + " wzdluz ulicy, " + F2(bdy) + " do frontu" : "; bez przesuniecia")
+                         + (squeezed ? "; kepa scisnieta do 0.75" : "") + (dropped > 0 ? "; zdjete budynki " + dropped : "")
+                         + (bestSp > max ? "; DALEJ NIEROWNO (kazdy budynek i tak na swoim gruncie)" : "") + ".");
+            }
+        }
+
+        /// <summary>Rozrzut gruntu w srodkach elementow idx przy srodku obrazka (cx, cy); h (gdy nie null) dostaje wysokosci wedlug idx.</summary>
+        private static float SpreadAt(Kit k, Geo g, List<int> vis, float[] px, float[] py, bool[] alive, List<int> idx, float cx, float cy, List<float> h)
+        {
+            float ox = g.Cx, oy = g.Cy;
+            g.Cx = cx; g.Cy = cy;
+            float lo = float.MaxValue, hi = float.MinValue;
+            try
+            {
+                foreach (int j in idx)
+                {
+                    Piece p = k.Pieces[vis[j]];
+                    float z = g.HK(px[j] + p.Cx0, py[j] + p.Cy0);
+                    if (h != null) h.Add(z);
+                    if (!alive[j]) continue;
+                    if (z < lo) lo = z;
+                    if (z > hi) hi = z;
+                }
+            }
+            finally { g.Cx = ox; g.Cy = oy; }
+            return hi >= lo ? hi - lo : 0f;
+        }
+
+        /// <summary>Brzeg wody przed kepa (mlyn, rybacy): profil terenu co 0.25 jedn. mapy od przodu kepy (+Y), do 2.5; pierwszy spadek o 0.12
+        /// = brzeg (MapVillageData.FirstDrop). Mlyn staje kolem nad brzegiem, pomost od brzegu w strone wody, lodzie na brzegu. Elementy
+        /// przy wodzie przesuwane tylko do przodu (najwyzej 1.6 jedn. mapy) - brak spadku = zostaja przy kepie (liczone w logu).</summary>
+        /// <summary>Woda za kepa: profil od frontu kepy (+Y) bez brzegu, profil od jej tylu (-Y) z brzegiem (MapVillageData.WaterBehind), oba co
+        /// 0.25 jedn. mapy do 2.5 - jak ToBank. Profil tylu liczony tylko, gdy przed frontem brzegu nie ma (11 wywolan terenu wiecej).</summary>
+        private static bool WaterBehindKit(Kit k, Geo g)
+        {
+            float step = 0.25f / Math.Max(0.05f, g.Sy);
+            var hf = new List<float>();
+            for (int i = 0; i <= 10; i++) hf.Add(g.HK(0f, k.FrontY + i * step));
+            if (MapVillageData.FirstDrop(hf, 0.12f) >= 0) return false;
+            var hb = new List<float>();
+            for (int i = 0; i <= 10; i++) hb.Add(g.HK(0f, k.BackY - i * step));
+            return MapVillageData.WaterBehind(hf, hb, 0.12f);
+        }
+
+        private void ToBank(Kit k, Geo g, List<int> vis, float[] px, float[] py, bool[] alive)
+        {
+            float step = 0.25f / Math.Max(0.05f, g.Sy);
+            var h = new List<float>();
+            for (int i = 0; i <= 10; i++) h.Add(g.HK(0f, k.FrontY + i * step));
+            int d = MapVillageData.FirstDrop(h, 0.12f);
+            if (d < 0) { _bankMiss++; return; }
+            _bankFound++;
+            float bankY = k.FrontY + (d - 0.5f) * step;
+            float maxShift = 1.6f / Math.Max(0.05f, g.Sy);
+            for (int j = 0; j < vis.Count; j++)
+            {
+                if (!alive[j]) continue;
+                Piece p = k.Pieces[vis[j]];
+                if (!p.WaterSide) continue;
+                float cy = py[j] + p.Cy0;
+                float want = p.Ground == MapVillageData.GroundEnd ? bankY + 0.6f * p.Ry          // pomost: ladowy koniec tuz przed brzegiem
+                           : p.Ground == MapVillageData.GroundBeach ? bankY - 0.6f * p.Ry      // lodz: na brzegu
+                           : bankY - 0.7f * p.Ry;                                              // mlyn: przod z kolem nad brzegiem
+                float sh = want - cy;
+                if (sh > maxShift) sh = maxShift;
+                if (sh > 0f) py[j] += sh;
+            }
+        }
+
+        // ---------- v4: wzor obrazka na (okreg, model) - wspolny dla wiosek okregu, budowany raz ----------
+        private Kit KitFor(District d, Template t, int model)
+        {
+            if (model < 0 || model >= MapVillageData.ModelCount) model = MapVillageData.ModelVillage;
+            if (d.Kits == null) d.Kits = new Kit[MapVillageData.ModelCount];
+            Kit k = d.Kits[model];
+            if (k != null) return k;
+            k = BuildKit(d, t, model);
+            d.Kits[model] = k;
+            return k;
+        }
+
+        /// <summary>Wzor obrazka: styl krainy z domow wzoru wsi-matki (andal / fm) albo z ikony wsi (kultura Calradii / Essos), potem przepis
+        /// modelu (MapVillageData.Recipe). Brak niezbednej siatki = zapas: windmill -> farm -> village, mill / fishing / farm / granary -> village
+        /// (stodola granary / farm ma najpierw swoj zapas: najwieksza szopa / dom stylu x 1.3).</summary>
+        private Kit BuildKit(District d, Template t, int asked)
+        {
+            float unitScale;
+            string family;
+            List<HouseUnit> units = HouseUnits(t, out unitScale, out family);
+            bool snow = false;
+            if (units != null) foreach (var u in units) if (u.Name.EndsWith("_snow", StringComparison.Ordinal)) snow = true;
+            string style = family ?? IconStyle(t, d);
+            MapVillageData.StyleKit st = MapVillageData.StyleFor(style, snow);
+            float H = MapVillageData.IconHouseH;
+            if (units != null)
+            {
+                var ex = new List<float>();
+                foreach (var u in units) if (u.Ext > 0.01f) ex.Add(u.Ext);
+                if (ex.Count > 0) { ex.Sort(); H = ex[ex.Count / 2]; }
+            }
+            int m = asked;
+            Kit k = null;
+            for (int guard = 0; guard < 4; guard++)
+            {
+                k = new Kit { Asked = asked, Model = m, Style = st.Name, H = H, Units = units };
+                string why = null;
+                bool ok;
+                try
+                {
+                    ok = m == MapVillageData.ModelVillage ? FillVillage(k, d, t, units, st, unitScale)
+                                                          : FillModel(k, d, t, units, st, unitScale, m, out why);
+                }
+                catch (Exception e)
+                {
+                    ok = false;
+                    why = "blad " + e.GetType().Name;
+                    _stTemplate++;
+                    if (_stTemplate <= 5 || _stTemplate % 100 == 0) Log.Error("MapVillagesView.BuildKit " + d.Id + " " + MapVillageData.ModelName(m) + " (potkniecie " + _stTemplate + ")", e);
+                }
+                if (ok && k.Pieces.Count > 0)
+                {
+                    _kitsBuilt++;
+                    LogKit(k, d);
+                    return k;
+                }
+                k.Why = why ?? "brak elementow";
+                if (m == MapVillageData.ModelVillage) return k;   // bez elementow - Create rzuci "brak wzoru obrazka"
+                int next = m == MapVillageData.ModelWindmill ? MapVillageData.ModelFarm : MapVillageData.ModelVillage;
+                string key = MapVillageData.ModelName(m) + "->" + MapVillageData.ModelName(next);
+                int c;
+                _kitFallback.TryGetValue(key, out c);
+                _kitFallback[key] = c + 1;
+                if (c < 3)
+                    Log.Info("Wioski: drzewo obrazkow - okreg " + d.Id + " (styl " + st.Name + "): obrazek " + MapVillageData.ModelName(m) + " -> "
+                             + MapVillageData.ModelName(next) + " (" + k.Why + ")" + (c == 2 ? "; dalsze takie zapasy tylko w liczniku podsumowania." : "."));
+                m = next;
+            }
+            return k;
+        }
+
+        /// <summary>Domy wsi-matki z wzoru (rodzina andal / fm; ten sam wyglad na 1/2/3): kazda encja z siatka poziomu 3 w ramce zlozonej
+        /// wzgledem korzenia matki, obrocona tak, zeby dluga os domow szla wzdluz ulicy (lokalna X; dawniej obrot calego korzenia). null =
+        /// wies z ikona (Calradia / Essos / Dothrakowie) albo mniej niz 3 domy ROT.</summary>
+        private static List<HouseUnit> HouseUnits(Template t, out float unitScale, out string family)
+        {
+            unitScale = 1f;
+            family = null;
+            if (t == null || !t.Flat) return null;
+            var plan = t.Plans[3];
+            if (plan == null || plan.Length == 0) return null;
+            var frames = PlanFrames(plan);
+            Mat3 tr = Mat3.Identity;
+            if (t.HasAxis) tr.RotateAboutUp(-t.Axis);
+            var turn = new MatrixFrame(in tr, new Vec3(0f, 0f, 0f, 1f));
+            int andal = 0, fm = 0;
+            var list = new List<HouseUnit>();
+            var scales = new List<float>();
+            for (int i = 0; i < plan.Length; i++)
+            {
+                var nd = plan[i];
+                if (nd.Meshes.Length == 0) continue;
+                string mn = nd.Meshes[0].GetName() ?? "";
+                if (mn.StartsWith("andal_wm_", StringComparison.Ordinal)) andal++;
+                else if (mn.StartsWith("fm_wm_", StringComparison.Ordinal)) fm++;
+                MatrixFrame f = turn.TransformToParent(in frames[i]);
+                Vec3 b0, b1;
+                float ext = RotBox(nd.Meshes, f.rotation, out b0, out b1) ? Math.Max(b1.x - b0.x, b1.y - b0.y) : 0f;
+                float sc = Math.Abs(f.rotation.GetScaleVector().x);
+                list.Add(new HouseUnit { Meshes = nd.Meshes, F = f, NoSeason = nd.NoSeason, Name = mn, Ext = ext, Scale = sc });
+                if (sc > 1e-3f && !mn.Contains("well")) scales.Add(sc);
+            }
+            if (list.Count < 3 || andal + fm < 3) return null;
+            family = fm > andal ? "fm" : "andal";
+            if (scales.Count > 0) { scales.Sort(); unitScale = scales[scales.Count / 2]; }
+            return list;
+        }
+
+        /// <summary>Styl wsi z ikona: kultura z nazwy siatki ikony (village_&lt;c&gt;_N, dothraki_village -> khuzait), inaczej ze starego
+        /// prefabu wsi-matek kultury (map_icon_full_&lt;c&gt;_village), inaczej empire.</summary>
+        private static string IconStyle(Template t, District d)
+        {
+            var p = t != null ? t.Plans[3] : null;
+            if (p != null)
+                foreach (var n in p)
+                    foreach (var m in n.Meshes)
+                    {
+                        string nm = m.GetName() ?? "";
+                        if (nm.StartsWith("dothraki_village", StringComparison.Ordinal)) return "khuzait";
+                        if (nm.StartsWith("village_", StringComparison.Ordinal))
+                        {
+                            string c = nm.Substring(8);
+                            int us = c.IndexOf('_');
+                            if (us > 0) c = c.Substring(0, us);
+                            if (Array.IndexOf(MapVillageData.StyleNames, c) >= 2) return c;
+                        }
+                    }
+            string cid = d != null && d.S != null && d.S.Culture != null ? d.S.Culture.StringId : "";
+            string mp = MapVillageData.CultureMotherPrefab(cid) ?? "";
+            if (mp.StartsWith("map_icon_full_", StringComparison.Ordinal))
+            {
+                string c = mp.Substring(14);
+                int us = c.IndexOf('_');
+                if (us > 0) c = c.Substring(0, us);
+                if (Array.IndexOf(MapVillageData.StyleNames, c) >= 2) return c;
+            }
+            return "empire";
+        }
+
+        /// <summary>BB siatek pod obrotem (ze skala) rot: min / max wzgledem origin (jedn. wzoru); false = brak BB.</summary>
+        private static bool RotBox(MetaMesh[] meshes, Mat3 rot, out Vec3 mn, out Vec3 mx)
+        {
+            mn = new Vec3(float.MaxValue, float.MaxValue, float.MaxValue);
+            mx = new Vec3(float.MinValue, float.MinValue, float.MinValue);
+            bool any = false;
+            if (meshes == null) return false;
+            foreach (MetaMesh mm in meshes)
+            {
+                Vec3 b0, b1;
+                if (!MeshBox(mm, out b0, out b1)) continue;
+                for (int c = 0; c < 8; c++)
+                {
+                    Vec3 v = new Vec3((c & 1) != 0 ? b1.x : b0.x, (c & 2) != 0 ? b1.y : b0.y, (c & 4) != 0 ? b1.z : b0.z);
+                    Vec3 w = rot.TransformToParent(in v);
+                    mn = new Vec3(Math.Min(mn.x, w.x), Math.Min(mn.y, w.y), Math.Min(mn.z, w.z));
+                    mx = new Vec3(Math.Max(mx.x, w.x), Math.Max(mx.y, w.y), Math.Max(mx.z, w.z));
+                    any = true;
+                }
+            }
+            return any;
+        }
+
+        /// <summary>Element z siatek pod obrotem rot (ze skala): dol / gora / srodek / polboki BB (jedn. wzoru). null = brak BB.</summary>
+        private static Piece MakePiece(MetaMesh[] meshes, Mat3 rot, string name)
+        {
+            Vec3 mn, mx;
+            if (!RotBox(meshes, rot, out mn, out mx)) return null;
+            var p = new Piece { Meshes = meshes, Name = name ?? "" };
+            p.Local = new MatrixFrame(in rot, new Vec3(0f, 0f, 0f, 1f));
+            p.Bottom = mn.z;
+            p.Top = mx.z;
+            p.Cx0 = (mn.x + mx.x) * 0.5f;
+            p.Cy0 = (mn.y + mx.y) * 0.5f;
+            p.Rx = Math.Max(0.01f, (mx.x - mn.x) * 0.5f);
+            p.Ry = Math.Max(0.01f, (mx.y - mn.y) * 0.5f);
+            return p;
+        }
+
+        private static int LevelsFrom(int minLevel)
+        {
+            int b = 0;
+            for (int lv = Math.Max(1, minLevel); lv <= 3; lv++) b |= 1 << lv;
+            return b;
+        }
+
+        /// <summary>Dom numer r (od srodka) stoi na poziomach, gdzie HousesFor(model, poziom) &gt; r.</summary>
+        private static int LevelsForHouse(int model, int r)
+        {
+            int b = 0;
+            for (int lv = 1; lv <= 3; lv++) if (MapVillageData.HousesFor(model, lv) > r) b |= 1 << lv;
+            return b;
+        }
+
+        /// <summary>Kepa "village": wies z domami ROT - wszystkie domy wzoru w ukladzie wsi-matki (odstepy jak w prefabie) + detale stylu
+        /// (sterta drewna, oborka, studnia / stog, woz, worki) w luki przy srodku do VillageKitMin budynkow; przerzedzanie od brzegu w Create.
+        /// Wies z ikona (cala wies gry w jednej siatce na poziom): ikony poziomow z wzoru, pochylone do stoku jak wies gry.</summary>
+        private bool FillVillage(Kit k, District d, Template t, List<HouseUnit> units, MapVillageData.StyleKit st, float unitScale)
+        {
+            if (units == null)
+            {
+                for (int lv = 1; lv <= 3; lv++)
+                {
+                    var plan = t.Plans[lv];
+                    if (plan == null) continue;
+                    var frames = PlanFrames(plan);
+                    for (int i = 0; i < plan.Length; i++)
+                    {
+                        if (plan[i].Meshes.Length == 0) continue;
+                        int same = -1;
+                        for (int q = 0; q < k.Pieces.Count; q++)
+                        {
+                            Piece o = k.Pieces[q];
+                            if (o.Meshes.Length == plan[i].Meshes.Length && o.Meshes[0].GetName() == plan[i].Meshes[0].GetName()
+                                && Math.Abs(o.Local.origin.x - frames[i].origin.x) < 0.01f && Math.Abs(o.Local.origin.y - frames[i].origin.y) < 0.01f) { same = q; break; }
+                        }
+                        if (same >= 0) { k.Pieces[same].Levels |= 1 << lv; continue; }
+                        Piece p = MakePiece(plan[i].Meshes, frames[i].rotation, plan[i].Meshes[0].GetName());
+                        if (p == null) continue;
+                        p.Local.origin = new Vec3(frames[i].origin.x, frames[i].origin.y, 0f, 1f);
+                        p.Levels = 1 << lv;
+                        p.Role = MapVillageData.RoleHouse;
+                        p.Ground = MapVillageData.GroundTilt;
+                        p.NoSeason = plan[i].NoSeason;
+                        p.Essential = true;
+                        p.Pivot = true;
+                        p.ZOff = frames[i].origin.z;
+                        k.Pieces.Add(p);
+                    }
+                }
+                foreach (var p in k.Pieces) k.FrontY = Math.Max(k.FrontY, p.Local.origin.y + p.Cy0 + p.Ry);
+                return k.Pieces.Count > 0;
+            }
+            var pieces = new List<Piece>();
+            var items = new List<MapVillageData.LayoutItem>();
+            foreach (var u in units)
+            {
+                Piece p = MakePiece(u.Meshes, u.F.rotation, u.Name);
+                if (p == null) continue;
+                p.Role = MapVillageData.RoleHouse;
+                p.NoSeason = u.NoSeason;
+                p.Pivot = true;
+                p.ZOff = u.F.origin.z;
+                pieces.Add(p);
+                LogUnit(u, k);
+                items.Add(new MapVillageData.LayoutItem { Slot = MapVillageData.SlotPreset, R = Math.Max(p.Rx, p.Ry), X = u.F.origin.x + p.Cx0, Y = u.F.origin.y + p.Cy0, Core = true });
+            }
+            if (pieces.Count == 0) return false;
+            Recenter(items);
+            uint seed = MapVillageData.Fnv(d.Id);
+            int fi = 0;
+            while (pieces.Count < MapVillageData.VillageKitMin && st.Fill.Length > 0 && fi < MapVillageData.VillageKitMin * 2)
+            {
+                string name = st.Fill[fi % st.Fill.Length];
+                fi++;
+                // studnia bez wzoru we wsi-matce: skala domow x 0.5 (= 0.3 jak andal_wm_well2 w fm_village1/2); gdy wzor ja ma, SpecPiece bierze
+                // jej wlasna skale z prefabu - bez drugiego x 0.5 (recenzja 08.10)
+                bool unitHas = false;
+                foreach (var u in units) if (u.Name == name) { unitHas = true; break; }
+                var sp = st.FillUnit
+                    ? new MapVillageData.PieceSpec { Role = MapVillageData.RoleDetail, Meshes = new[] { name }, Size = 1f, SizeMode = MapVillageData.SizeUnit,
+                                                     Natural = name.Contains("well") && !unitHas ? 0.5f : 1f, Turn = MapVillageData.TurnSeed, Source = MapVillageData.SrcRot }
+                    : new MapVillageData.PieceSpec { Role = MapVillageData.RoleDetail, Meshes = new[] { name }, Size = name == "mi_cart_a" ? 0.6f : name == "mi_sack_a" ? 0.3f : 0.55f,
+                                                     SizeMode = MapVillageData.SizeNatural, Natural = MapVillageData.NaturalScale(name), Turn = MapVillageData.TurnSeed, Source = MapVillageData.SrcMap };
+                sp.Slot = MapVillageData.SlotFill;
+                Piece p = SpecPiece(sp, k, t, unitScale, seed + (uint)fi);
+                if (p == null) continue;
+                pieces.Add(p);
+                items.Add(new MapVillageData.LayoutItem { Slot = MapVillageData.SlotFill, R = Math.Max(p.Rx, p.Ry), Core = true });
+            }
+            MapVillageData.Layout(items, seed);
+            k.ThinN = pieces.Count;
+            k.ThinX = new float[pieces.Count];
+            k.ThinY = new float[pieces.Count];
+            k.ThinDetail = new bool[pieces.Count];
+            for (int i = 0; i < pieces.Count; i++)
+            {
+                Piece p = pieces[i];
+                p.Local.origin = new Vec3(items[i].X - p.Cx0, items[i].Y - p.Cy0, 0f, 1f);
+                p.ThinIndex = i;
+                k.ThinX[i] = items[i].X;
+                k.ThinY[i] = items[i].Y;
+                k.ThinDetail[i] = p.Role == MapVillageData.RoleDetail || MapVillageData.IsDetailMesh(p.Name);
+                k.FrontY = Math.Max(k.FrontY, items[i].Y + p.Ry);
+                k.Pieces.Add(p);
+            }
+            return true;
+        }
+
+        /// <summary>Obrazki mill / windmill / farm / granary / fishing: domy (z wzoru - najblizsze srodka kepy wsi-matki, albo domy kultury)
+        /// + elementy przepisu ulozone wokol kepy (MapVillageData.Layout). false = brak niezbednej siatki (zapas w BuildKit).</summary>
+        private bool FillModel(Kit k, District d, Template t, List<HouseUnit> units, MapVillageData.StyleKit st, float unitScale, int model, out string why)
+        {
+            why = null;
+            uint seed = MapVillageData.Fnv(d.Id + ":" + model.ToString(CultureInfo.InvariantCulture));
+            var pieces = new List<Piece>();
+            var items = new List<MapVillageData.LayoutItem>();
+            int nh = MapVillageData.HousesFor(model, 3);
+            if (units != null)
+            {
+                var all = new List<Piece>();
+                var xs = new List<float>();
+                var ys = new List<float>();
+                foreach (var u in units)
+                {
+                    if (u.Name.Contains("well")) continue;   // studnia to nie dom
+                    Piece p = MakePiece(u.Meshes, u.F.rotation, u.Name);
+                    if (p == null) continue;
+                    p.Role = MapVillageData.RoleHouse;
+                    p.NoSeason = u.NoSeason;
+                    p.Pivot = true;
+                    p.ZOff = u.F.origin.z;
+                    p.Local.origin = new Vec3(u.F.origin.x, u.F.origin.y, 0f, 1f);
+                    all.Add(p);
+                    LogUnit(u, k);
+                    xs.Add(u.F.origin.x + p.Cx0);
+                    ys.Add(u.F.origin.y + p.Cy0);
+                }
+                int[] order = MapVillageData.RankCentral(d.Id + ":" + model.ToString(CultureInfo.InvariantCulture), xs, ys);
+                for (int r = 0; r < nh && r < order.Length; r++)
+                {
+                    Piece p = all[order[r]];
+                    p.Levels = LevelsForHouse(model, r);
+                    pieces.Add(p);
+                    items.Add(new MapVillageData.LayoutItem { Slot = MapVillageData.SlotPreset, R = Math.Max(p.Rx, p.Ry), X = xs[order[r]], Y = ys[order[r]], Core = true });
+                }
+                Recenter(items);
+            }
+            else
+            {
+                for (int i = 0; i < nh && st.Houses.Length > 0; i++)
+                {
+                    var hs = new string[st.Houses.Length];
+                    for (int q = 0; q < hs.Length; q++) hs[q] = st.Houses[(i + q) % st.Houses.Length];
+                    var sp = new MapVillageData.PieceSpec { Role = MapVillageData.RoleHouse, Meshes = hs, Size = 1f, SizeMode = MapVillageData.SizeFitH,
+                                                            Slot = i == 0 ? MapVillageData.SlotCenter : MapVillageData.SlotFill, Turn = MapVillageData.TurnSeed,
+                                                            Source = MapVillageData.SrcMap };
+                    Piece p = SpecPiece(sp, k, t, unitScale, seed + (uint)i);
+                    if (p == null) continue;
+                    p.Levels = LevelsForHouse(model, i);
+                    pieces.Add(p);
+                    items.Add(new MapVillageData.LayoutItem { Slot = sp.Slot, R = Math.Max(p.Rx, p.Ry), Core = true });
+                }
+            }
+            if (pieces.Count == 0) { why = "brak domow stylu " + st.Name; return false; }
+            int mill = -1;
+            foreach (var sp in MapVillageData.Recipe(model, st))
+            {
+                Piece p = SpecPiece(sp, k, t, unitScale, seed);
+                if (p == null && sp.BarnLike) p = BarnSubstitute(k, t, st, units, unitScale, sp, seed);
+                if (p == null)
+                {
+                    if (sp.Essential && (model == MapVillageData.ModelMill || model == MapVillageData.ModelWindmill))
+                    { why = "brak siatki " + (sp.Meshes.Length > 0 ? sp.Meshes[0] : "?"); return false; }
+                    continue;
+                }
+                p.Levels = LevelsFrom(sp.MinLevel);
+                if (model == MapVillageData.ModelMill && sp.Role == MapVillageData.RoleSpecial) mill = pieces.Count;
+                pieces.Add(p);
+                items.Add(new MapVillageData.LayoutItem { Slot = sp.Slot, R = Math.Max(p.Rx, p.Ry), Core = false });
+            }
+            if (model == MapVillageData.ModelFishing)
+            {
+                bool anyWater = false;
+                foreach (var p in pieces) if (p.Role == MapVillageData.RoleWater) anyWater = true;
+                if (!anyWater) { why = "brak pomostu i lodzi"; return false; }
+            }
+            MapVillageData.Layout(items, seed);
+            for (int i = 0; i < pieces.Count; i++)
+            {
+                Piece p = pieces[i];
+                p.Local.origin = new Vec3(items[i].X - p.Cx0, items[i].Y - p.Cy0, 0f, 1f);
+                if (items[i].Core) { k.FrontY = Math.Max(k.FrontY, items[i].Y + p.Ry); k.BackY = Math.Min(k.BackY, items[i].Y - p.Ry); }
+                if (p.WaterSide) k.HasWater = true;
+                k.Pieces.Add(p);
+            }
+            if (mill >= 0)
+            {
+                // kolo mlyna: osobna siatka doczepiona do mlyna w ramce z prefabu battania_watermill (bez skryptu WindMill i bez czastek)
+                MetaMesh wm = KitMesh(MapVillageData.WatermillWheel);
+                if (wm != null)
+                {
+                    Mat3 wr = Mat3.Identity;
+                    wr.RotateAboutForward(MapVillageData.WheelFwd);
+                    var wp = new Piece
+                    {
+                        Meshes = new[] { wm }, Local = new MatrixFrame(in wr, new Vec3(MapVillageData.WheelX, MapVillageData.WheelY, MapVillageData.WheelZ, 1f)),
+                        Parent = mill, Role = MapVillageData.RoleAttached, Ground = MapVillageData.GroundAttached, Levels = 14, Name = MapVillageData.WatermillWheel,
+                        NoSeason = t.NoSeason
+                    };
+                    k.Pieces.Add(wp);
+                    float msc = Math.Abs(k.Pieces[mill].Local.rotation.GetScaleVector().x);
+                    Vec3 b0, b1;
+                    if (MeshBox(wm, out b0, out b1))
+                        LogMesh(MapVillageData.WatermillWheel, "kolo mlyna (doczepione)", k, MapVillageData.SrcScene, b0, b1, msc,
+                                "jak mlyn (ramka z prefabu: 0.358, -5.333, 0; obrot -1.591 wokol osi Y)", Math.Max(b1.x - b0.x, b1.y - b0.y) * msc);
+                }
+            }
+            return true;
+        }
+
+        private static void Recenter(List<MapVillageData.LayoutItem> items)
+        {
+            float mx = 0f, my = 0f;
+            int c = 0;
+            foreach (var it in items) if (it.Slot == MapVillageData.SlotPreset) { mx += it.X; my += it.Y; c++; }
+            if (c == 0) return;
+            mx /= c; my /= c;
+            foreach (var it in items) if (it.Slot == MapVillageData.SlotPreset) { it.X -= mx; it.Y -= my; }
+        }
+
+        /// <summary>Element przepisu: wariant siatki z ziarna (pierwszy istniejacy), skala wedlug trybu (z BB / naturalna z mapy gry / skala domow
+        /// wzoru), obrot (dluga os wzdluz ulicy / do wody, pi dla mlyna, z ziarna). Kazda uzyta siatka raz w wioski.log (nazwa, skala, zrodlo).</summary>
+        private Piece SpecPiece(MapVillageData.PieceSpec sp, Kit k, Template t, float unitScale, uint seed)
+        {
+            int nm = sp.Meshes.Length;
+            if (nm == 0) return null;
+            string name = null;
+            MetaMesh mm = null;
+            for (int i = 0; i < nm && mm == null; i++)
+            {
+                string cand = sp.Meshes[(int)((seed + (uint)i) % (uint)nm)];
+                mm = KitMesh(cand);
+                if (mm != null) name = cand;
+            }
+            if (mm == null) return null;
+            Vec3 b0, b1;
+            if (!MeshBox(mm, out b0, out b1)) return null;
+            float w = b1.x - b0.x, dd = b1.y - b0.y, hh = b1.z - b0.z;
+            float ext = Math.Max(w, dd);
+            float target = sp.Size * k.H;
+            // siatka rodziny domow (fm_wm_* / andal_wm_*), ktora JEST we wzorze wsi-matki: ta sama siatka (kolory z prefabu), skala i wysokosc
+            // nad gruntem jak u autora prefabu (x Natural)
+            HouseUnit clone = null;
+            if (sp.SizeMode == MapVillageData.SizeUnit && k.Units != null)
+                foreach (var u in k.Units) if (u.Name == name && u.Meshes.Length == 1) { clone = u; break; }
+            MetaMesh[] meshes = clone != null ? clone.Meshes : new[] { mm };
+            Mat3 r0;
+            float sc;
+            string how;
+            bool pivot = sp.Pivot;
+            float zoff = 0f;
+            if (clone != null)
+            {
+                r0 = clone.F.rotation;
+                if (Math.Abs(sp.Natural - 1f) > 1e-3f) r0.ApplyScaleLocal(sp.Natural);
+                sc = Math.Abs(r0.GetScaleVector().x);
+                how = "jak ta siatka we wzorze wsi-matki" + (Math.Abs(sp.Natural - 1f) > 0.01f ? " x " + F2(sp.Natural) : "");
+                pivot = true;
+                zoff = clone.F.origin.z * sp.Natural;
+            }
+            else
+            {
+                switch (sp.SizeMode)
+                {
+                    case MapVillageData.SizeFitHeight:
+                        sc = hh > 1e-3f ? target / hh : 1f;
+                        how = "z BB: wysokosc " + F2(sp.Size) + " x dom";
+                        if (ext * sc > 1.3f * target) { sc = 1.3f * target / ext; how += " (przycieta szerokoscia)"; }
+                        break;
+                    case MapVillageData.SizeNatural:
+                        sc = sp.Natural;
+                        how = "naturalna z mapy gry " + F2(sp.Natural);
+                        if (ext * sc < 0.4f * target || ext * sc > 2.5f * target)
+                        {
+                            sc = ext > 1e-3f ? target / ext : 1f;
+                            how = "z BB (naturalna " + F2(sp.Natural) + " dalaby " + F2(ext * sp.Natural / Math.Max(0.01f, k.H)) + " x dom)";
+                        }
+                        break;
+                    case MapVillageData.SizeUnit:
+                        sc = unitScale * sp.Natural;
+                        how = "skala domow wzoru " + F2(unitScale) + (Math.Abs(sp.Natural - 1f) > 0.01f ? " x " + F2(sp.Natural) : "");
+                        break;
+                    default:
+                        sc = ext > 1e-3f ? target / ext : 1f;
+                        how = "z BB: wiekszy bok " + F2(sp.Size) + " x dom";
+                        break;
+                }
+                if (!(sc > 1e-4f) || sc > 50f || float.IsNaN(sc)) return null;
+                r0 = Mat3.Identity;
+                r0.ApplyScaleLocal(sc);
+            }
+            Vec3 e0, e1;
+            if (!RotBox(meshes, r0, out e0, out e1)) return null;
+            float ex = e1.x - e0.x, ey = e1.y - e0.y;
+            float yaw = 0f;
+            switch (sp.Turn)
+            {
+                case MapVillageData.TurnPi: yaw = (float)Math.PI; break;
+                case MapVillageData.TurnLongX: yaw = ey > ex ? (float)(Math.PI / 2) : 0f; break;
+                case MapVillageData.TurnLongY: yaw = ex > ey ? (float)(Math.PI / 2) : 0f; break;
+                case MapVillageData.TurnSeed: yaw = (MapVillageData.Fnv(name + ":" + seed.ToString(CultureInfo.InvariantCulture)) % 360u) * (float)Math.PI / 180f; break;
+            }
+            Mat3 ry = Mat3.Identity;
+            ry.RotateAboutUp(yaw);
+            Mat3 r = ry.TransformToParent(in r0);
+            Piece p = MakePiece(meshes, r, name);
+            if (p == null) return null;
+            p.Role = sp.Role;
+            p.Ground = sp.Ground;
+            p.Essential = sp.Essential;
+            p.WaterSide = sp.WaterSide;
+            p.Pivot = pivot;
+            p.ZOff = zoff;
+            p.NoSeason = (t != null && t.NoSeason) || (clone != null && clone.NoSeason);
+            string role = sp.Role == MapVillageData.RoleHouse ? "dom" : sp.Role == MapVillageData.RoleSpecial ? "budynek glowny" : sp.Role == MapVillageData.RoleWater ? "przy wodzie" : "detal";
+            LogMesh(name, role, k, clone != null ? MapVillageData.SrcHouse : sp.Source, b0, b1, sc, how, Math.Max(ex, ey));
+            return p;
+        }
+
+        /// <summary>Zapas stodoly (brak modelu scenowego): fm - najwiekszy budynek gospodarczy Polnocy (fm_wm_hall_snow) w skali domow x 1.3;
+        /// inaczej najwiekszy dom wzoru / stylu x 1.3 ("najwieksza szopa / stodola w stylu krainy").</summary>
+        private Piece BarnSubstitute(Kit k, Template t, MapVillageData.StyleKit st, List<HouseUnit> units, float unitScale, MapVillageData.PieceSpec barn, uint seed)
+        {
+            Piece p = null;
+            if (!string.IsNullOrEmpty(st.Hall))
+            {
+                var sp = new MapVillageData.PieceSpec { Role = MapVillageData.RoleSpecial, Meshes = new[] { st.Hall }, Size = barn.Size, SizeMode = MapVillageData.SizeUnit,
+                                                        Natural = 1.3f, Turn = MapVillageData.TurnLongX, Ground = barn.Ground, Source = MapVillageData.SrcRot, Essential = true };
+                p = SpecPiece(sp, k, t, unitScale, seed);
+            }
+            if (p == null && units != null)
+            {
+                HouseUnit big = null;
+                foreach (var u in units) if (!u.Name.Contains("well") && (big == null || u.Ext > big.Ext)) big = u;
+                if (big != null)
+                {
+                    Mat3 r = big.F.rotation;
+                    r.ApplyScaleLocal(1.3f);
+                    p = MakePiece(big.Meshes, r, big.Name);
+                    if (p != null) { p.Role = MapVillageData.RoleSpecial; p.Essential = true; p.NoSeason = big.NoSeason; p.Pivot = true; p.ZOff = big.F.origin.z * 1.3f; }
+                }
+            }
+            if (p == null && st.Houses.Length > 0)
+            {
+                var sp = new MapVillageData.PieceSpec { Role = MapVillageData.RoleSpecial, Meshes = st.Houses, Size = 1.6f, SizeMode = MapVillageData.SizeFitH,
+                                                        Turn = MapVillageData.TurnLongX, Ground = barn.Ground, Source = MapVillageData.SrcMap, Essential = true };
+                p = SpecPiece(sp, k, t, unitScale, seed);
+            }
+            string key = "stodola->" + (p != null ? "szopa/dom" : "nic");
+            int c;
+            _kitFallback.TryGetValue(key, out c);
+            _kitFallback[key] = c + 1;
+            return p;
+        }
+
+        /// <summary>Siatka elementu obrazka po NAZWIE SIATKI (MetaMesh.GetCopy bez bledow i z null - jak namiot partii i ikony wsi), raz na nazwe;
+        /// siatka bez materialu = brak. Brak = element pominiety albo zapas (log raz na nazwe).</summary>
+        private MetaMesh KitMesh(string mesh)
+        {
+            if (string.IsNullOrEmpty(mesh)) return null;
+            MetaMesh mm;
+            if (_meshByName.TryGetValue(mesh, out mm)) return mm;
+            _meshByName[mesh] = null;   // blad w srodku = ta nazwa juz nie probowana
+            mm = MetaMesh.GetCopy(mesh, false, true);
+            if (mm != null && !mm.IsValid) mm = null;
+            if (mm != null && !MaterialOk(mm)) mm = null;
+            _meshByName[mesh] = mm;
+            if (mm == null)
+            {
+                _kitMeshMiss++;
+                if (_missLogged.Add(mesh)) Log.Info("Wioski: drzewo obrazkow - brak siatki '" + mesh + "' w grze (albo bez materialu) - element pominiety albo zapas.");
+            }
+            return mm;
+        }
+
+        /// <summary>Raz na nazwe siatki do wioski.log: rola, model, styl, zrodlo, BB, skala i wielkosc wzgledem domu wsi okregu.</summary>
+        private void LogMesh(string name, string role, Kit k, string src, Vec3 b0, Vec3 b1, float sc, string how, float extScaled)
+        {
+            if (string.IsNullOrEmpty(name) || !_meshLogged.Add(name)) return;
+            Log.Info("Wioski: drzewo obrazkow - siatka " + name + ": " + role + " w '" + MapVillageData.ModelName(k.Model) + "' (styl " + k.Style + "); zrodlo "
+                     + src + "; BB siatki " + F2(b1.x - b0.x) + "x" + F2(b1.y - b0.y) + "x" + F2(b1.z - b0.z) + " (z od " + F2(b0.z) + " do " + F2(b1.z) + ")"
+                     + "; skala " + sc.ToString("0.000", CultureInfo.InvariantCulture)
+                     + " (" + how + "); na obrazku " + F2(extScaled) + " jedn. wzoru = " + F2(extScaled / Math.Max(0.01f, k.H)) + " x dom wsi okregu (H " + F2(k.H)
+                     + "); tylko kopia siatki - bez fizyki, skryptow, czastek, dzwiekow.");
+        }
+
+        /// <summary>Dom wsi okregu z wzoru wsi-matki (siatka rodziny andal / fm) - raz na nazwe do wioski.log, jak siatki przepisow.</summary>
+        private void LogUnit(HouseUnit u, Kit k)
+        {
+            if (u == null || u.Meshes.Length == 0 || _meshLogged.Contains(u.Name)) return;
+            Vec3 b0, b1;
+            if (!MeshBox(u.Meshes[0], out b0, out b1)) return;
+            LogMesh(u.Name, "dom wsi okregu", k, MapVillageData.SrcHouse, b0, b1, u.Scale, "jak w prefabie domow wsi-matki", u.Ext);
+        }
+
+        /// <summary>Raz na (model, styl) do wioski.log: sklad wzoru obrazka, ile budynkow na poziomach 1/2/3, obrys.</summary>
+        private void LogKit(Kit k, District d)
+        {
+            string key = k.Model + ":" + k.Style;
+            if (!_kitLogged.Add(key)) return;
+            int houses = 0, det = 0, spec = 0, water = 0, att = 0;
+            float x0 = float.MaxValue, x1 = float.MinValue, y0 = float.MaxValue, y1 = float.MinValue;
+            var names = new List<string>();
+            var lvCount = new int[4];
+            foreach (var p in k.Pieces)
+            {
+                if (p.Role == MapVillageData.RoleHouse) houses++; else if (p.Role == MapVillageData.RoleSpecial) spec++;
+                else if (p.Role == MapVillageData.RoleWater) water++; else if (p.Role == MapVillageData.RoleAttached) att++; else det++;
+                if (!names.Contains(p.Name)) names.Add(p.Name);
+                if (p.Parent >= 0) continue;
+                for (int lv = 1; lv <= 3; lv++) if ((p.Levels & (1 << lv)) != 0) lvCount[lv]++;
+                float cx = p.Local.origin.x + p.Cx0, cy = p.Local.origin.y + p.Cy0;
+                x0 = Math.Min(x0, cx - p.Rx); x1 = Math.Max(x1, cx + p.Rx); y0 = Math.Min(y0, cy - p.Ry); y1 = Math.Max(y1, cy + p.Ry);
+            }
+            if (k.ThinN > 0) for (int lv = 1; lv <= 3; lv++) lvCount[lv] = MapVillageData.VillageWant(k.ThinN, lv);
+            Log.Info("Wioski: drzewo obrazkow - wzor '" + MapVillageData.ModelName(k.Model) + "'" + (k.Asked != k.Model ? " (z pliku '" + MapVillageData.ModelName(k.Asked) + "')" : "")
+                     + " styl " + k.Style + " (pierwszy: okreg " + d.Id + " '" + (d.S != null ? d.S.Name.ToString() : "?") + "'): elementow " + k.Pieces.Count
+                     + " (domy " + houses + ", detale " + det + ", glowny " + spec + ", przy wodzie " + water + ", doczepione " + att + "); budynkow na poziomie 1/2/3 "
+                     + lvCount[1] + "/" + lvCount[2] + "/" + lvCount[3] + (k.ThinN > 0 ? " (przerzedzanie od brzegu kepy)" : "") + "; dom H " + F2(k.H)
+                     + "; obrys " + F2(x1 - x0) + "x" + F2(y1 - y0) + " jedn. wzoru (" + F2((x1 - x0) / Math.Max(0.01f, k.H)) + "x" + F2((y1 - y0) / Math.Max(0.01f, k.H))
+                     + " domu); siatki: " + string.Join(", ", names.ToArray()) + ".");
         }
 
         // ---------- wzor wsi-matki: uklad siatek widocznych przy danym poziomie (algorytm gry, bez kopiowania encji) ----------
@@ -1074,9 +2767,13 @@ namespace Armoury
         // zarzadzanej, GetComponentAtIndex dalby null). Encje, nazwy, ramki i maski zostaja. Drogi po kolei, kazda liczona w logu:
         //  1 drzewo matki: siatka encji = jej komponenty MetaMesh, a gdy ich brak - siatka po nazwie encji (MapVillageData.MeshForName,
         //    MetaMesh.GetCopy jak namiot partii); ramki i maski z encji w grze;
-        //  2 prefaby: encje matki z nazwa prefabu (GetPrefabName, potem GetOldPrefabName) -> kopia prefabu BEZ SCENY
+        //  2 prefaby: encje matki, ktorych NAZWA jest nazwa prefabu (PrefabExists; od 08.10 bez GetPrefabName / GetOldPrefabName) -> kopia BEZ SCENY
         //    (GameEntity.Instantiate(null, ...) jak DestructableComponent.cs:194 / MissionDeploymentBoundaryMarker.cs:184) i jej siatki;
         //  3 kultura: prefab domow kultury wsi (Westeros), potem stary prefab samej matki (map_icon_full_*), na koncu andal_village3.
+        // POPRAWKA WYGLADU 08.10: droga 1 dal na Polnocy JEDNA szope (zastepce grupy domow), bo encja prefabu domow byla zwinieta. Teraz
+        // droga 1 = drzewo matki + kazda zwinieta encja z nazwa prefabu rozwinieta kopia prefabu bez sceny (MapVillageData.ExpandCollapsed,
+        // wszystkie domy z ramkami lokalnymi) + liscie po nazwie; zastepca, ktory jest tym samym domem co dom z rozwinietego prefabu, zdjety
+        // (MapVillageData.SameHouse). Siatka bez materialu pominieta (z samym domyslnym zostaje, liczona). Skala z BB: widoczne domy matki / BB wzoru.
         private Template TemplateOf(District d)
         {
             if (d.TemplateTried) return d.T;
@@ -1092,20 +2789,45 @@ namespace Armoury
             {
                 _templatesOk++;
                 if (d.T.Lenient) _lenient++;
-                if (d.T.Way == WayTree) { if (d.T.FromName > 0) _tplName++; else _tplComp++; }
+                if (d.T.Way == WayTree) { if (d.T.Expanded > 0) _tplExpand++; else if (d.T.FromName > 0) _tplName++; else _tplComp++; }
                 else if (d.T.Way == WayPrefab) _tplPrefab++;
                 else if (d.T.Way == WayCulture) _tplCulture++;
                 _meshComp += d.T.FromComp;
                 _meshName += d.T.FromName;
                 _meshPrefab += d.T.FromPrefab;
+                _expandedTotal += d.T.Expanded;
+                _dupDropped += d.T.DupDropped;
+                _matSkipped += d.T.MatSkipped;
+                _fitN++;
+                _fitSum += d.T.Fit;
+                if (d.T.Fit < _fitMin) _fitMin = d.T.Fit;
+                if (d.T.Fit > _fitMax) _fitMax = d.T.Fit;
             }
             else _templatesBad++;
             // diagnostyka (nastepny autotest rozstrzyga, jesli poprawka nie trafi): 3 pierwsze matki po wczytaniu + pierwsza bez wzoru
-            if (_diagMothers < 3 || (!d.T.Ok && !_diagFailDone))
+            // 08.10: drzewo encji matki TYLKO w autotescie (CrashScribe.Autotest.Active) - naruszenia pamieci w silniku nie lapie zaden catch
+            if (_diagOn && (_diagMothers < 3 || (!d.T.Ok && !_diagFailDone)))
             {
                 if (_diagMothers >= 3) _diagFailDone = true;
                 _diagMothers++;
                 DiagMother(d);
+            }
+            // 3 pierwsze dobre wzory: lista siatek (nazwa, material, ramka, BB) i BB calego wzoru (poprawka wygladu 08.10); w autotescie
+            // dodatkowo pierwszy wzor kazdego RODZAJU (droga + zestaw nazw siatek, najwyzej DiagKindsMax) - recenzja 08.10: start autotestu
+            // jest daleko od Polnocy, wiec 3 pierwsze wzory nie pokazalyby materialow domow fm_wm_* ze zrzutu Jeffa (Tumbledown, fm_village2)
+            if (d.T.Ok)
+            {
+                bool newKind = false;
+                if (_diagOn && _diagKinds.Count < DiagKindsMax)
+                {
+                    try { newKind = _diagKinds.Add(TemplateKind(d.T)); }
+                    catch (Exception e) { _stDiag++; if (_stDiag <= 3) Log.Error("MapVillagesView.TemplateKind " + d.Id + " (potkniecie " + _stDiag + ")", e); }
+                }
+                if (_diagTemplates < 3 || newKind)
+                {
+                    _diagTemplates++;
+                    DiagTemplate(d);
+                }
             }
             return d.T;
         }
@@ -1129,19 +2851,20 @@ namespace Armoury
             Vec3 sc = mg.rotation.GetScaleVector();
             t.Scale = new Vec3(Clamp(sc.x, 0.2f, 5f), Clamp(sc.y, 0.2f, 5f), Clamp(sc.z, 0.2f, 5f));
             t.NoSeason = (mother.EntityFlags & EntityFlags.NotAffectedBySeason) != 0;
-            // droga 1: drzewo matki (komponenty, a gdy ich brak - po nazwie encji); droga 2: prefaby encji matki bez sceny
-            if (FillPlans(t, mother, false, false)) t.Way = WayTree;
-            else if (FillPlans(t, mother, true, false)) t.Way = WayPrefab;
+            // droga 1: drzewo matki (komponenty, a gdy ich brak - po nazwie encji) + zwiniete encje prefabow domow rozwiniete kopia prefabu
+            // bez sceny (poprawka wygladu 08.10); droga 2: kazda encja matki z prefabem -> kopia bez sceny
+            if (FillPlans(t, mother, false, true, false)) t.Way = WayTree;
+            else if (FillPlans(t, mother, true, false, false)) t.Way = WayPrefab;
             else
             {
                 // droga 3: prefab wsi kultury (Westeros: domy andal / fm), potem stary prefab samej matki, na koncu jeden staly
                 string cid = s.Culture != null ? s.Culture.StringId : "";
-                string[] cands = { MapVillageData.CultureHousePrefab(cid), PrefabNameOf(mother), MapVillageData.LastResortPrefab };
+                string[] cands = { MapVillageData.CultureHousePrefab(cid), MapVillageData.CultureMotherPrefab(cid), MapVillageData.LastResortPrefab };
                 foreach (string p in cands)
                 {
                     GameEntity tmp = PrefabTemplate(p);
                     if (tmp == (GameEntity)null) continue;
-                    if (FillPlans(t, tmp, false, true)) { t.Way = WayCulture; t.WaySource = p; break; }
+                    if (FillPlans(t, tmp, false, false, true)) { t.Way = WayCulture; t.WaySource = p; break; }
                 }
             }
             if (t.Way == 0) { t.Why = "brak siatek"; return t; }
@@ -1169,13 +2892,15 @@ namespace Armoury
             float axis;
             t.HasAxis = MapVillageData.LongAxis(xs, ys, out axis);
             t.Axis = axis;
+            FitTemplate(t, mother, mg);
             t.Ok = true;
             return t;
         }
 
         /// <summary>Plany 1/2/3 z drzewa src: najpierw scisly warunek maski (gra + encje bez poziomow), gdy nic - zapas maski.
-        /// includeRoot = siatki samego src tez (kopia prefabu wsi kultury: korzen prefabu bywa jedyna siatka).</summary>
-        private bool FillPlans(Template t, GameEntity src, bool prefabs, bool includeRoot)
+        /// expand = droga 1 rozwija zwiniete encje prefabow domow; includeRoot = siatki samego src tez (kopia prefabu wsi kultury: korzen
+        /// prefabu bywa jedyna siatka). Liczniki (rozwiniete, duplikaty, bez materialu) z przejscia poziomu 3.</summary>
+        private bool FillPlans(Template t, GameEntity src, bool prefabs, bool expand, bool includeRoot)
         {
             for (int pass = 0; pass < 2; pass++)
             {
@@ -1183,13 +2908,129 @@ namespace Armoury
                 bool any = false;
                 for (int lv = 1; lv <= 3; lv++)
                 {
-                    var a = new WalkArgs { Mask = _maskCivil | LevelMask(lv), Lenient = lenient, Prefabs = prefabs };
+                    var a = new WalkArgs { Mask = _maskCivil | LevelMask(lv), Lenient = lenient, Prefabs = prefabs, Expand = expand };
                     t.Plans[lv] = BuildPlan(src, a, includeRoot);
                     if (t.Plans[lv].Length > 0) any = true;
+                    if (lv == 3) { t.Expanded = a.Expanded; t.DupDropped = a.DupDropped; t.MatSkipped = a.MatSkipped; }
                 }
                 if (any) { t.Lenient = lenient; return true; }
             }
             return false;
+        }
+
+        // ---------- skala z BB (poprawka wygladu 08.10): obrazek ma 0.70 / 0.75 / 0.80 wielkosci widocznych domow matki ----------
+        /// <summary>BB wzoru poziomu 3 (siatki w ramkach wzoru, obrocone i przeskalowane jak matka) vs BB widocznych domow matki z gry
+        /// (zastepca grupy Town Scene Managera ma BB calej grupy); t.Fit = MapVillageData.FitToMother.</summary>
+        private void FitTemplate(Template t, GameEntity mother, MatrixFrame mg)
+        {
+            t.Fit = 1f;
+            try
+            {
+                Vec3 mn, mx;
+                var turn = new MatrixFrame(in mg.rotation, new Vec3(0f, 0f, 0f, 1f));
+                if (PlanBox(t.Plans[3], turn, out mn, out mx)) { t.TplW = mx.x - mn.x; t.TplD = mx.y - mn.y; t.TplH = mx.z - mn.z; }
+                Vec3 all0 = mother.GlobalBoxMin, all1 = mother.GlobalBoxMax;
+                t.MotherAllW = Math.Max(0f, all1.x - all0.x);
+                t.MotherAllD = Math.Max(0f, all1.y - all0.y);
+                bool any = false;
+                Vec3 h0 = new Vec3(float.MaxValue, float.MaxValue, float.MaxValue), h1 = new Vec3(float.MinValue, float.MinValue, float.MinValue);
+                HousesBox(mother, 0, ref any, ref h0, ref h1);
+                if (any)
+                {
+                    t.MotherW = h1.x - h0.x;
+                    t.MotherD = h1.y - h0.y;
+                    t.Fit = MapVillageData.FitToMother(t.MotherW, t.MotherD, t.TplW, t.TplD);
+                }
+                else
+                {
+                    // brak widocznych domow z BB (np. zastepca grupy to pole / stado - pomocnik): cala matka ma w BB pola i zgliszcza,
+                    // wiec jej nie ufamy - dopasowanie 1 (skala jak dotad: matka x poziom)
+                    t.MotherW = t.MotherAllW;
+                    t.MotherD = t.MotherAllD;
+                    t.MotherFromAll = true;
+                    t.Fit = 1f;
+                }
+            }
+            catch (Exception e)
+            {
+                t.Fit = 1f;
+                _stDiag++;
+                if (_stDiag <= 3) Log.Error("MapVillagesView.FitTemplate (potkniecie " + _stDiag + ")", e);
+            }
+        }
+
+        /// <summary>Ramki wezlow planu wzgledem korzenia wzoru (rodzic przed dzieckiem).</summary>
+        private static MatrixFrame[] PlanFrames(PlanNode[] plan)
+        {
+            var f = new MatrixFrame[plan.Length];
+            for (int i = 0; i < plan.Length; i++)
+            {
+                MatrixFrame l = plan[i].Local;
+                f[i] = plan[i].Parent >= 0 && plan[i].Parent < i ? f[plan[i].Parent].TransformToParent(in l) : l;
+            }
+            return f;
+        }
+
+        /// <summary>BB siatek planu (MetaMesh.GetBoundingBox w ramkach wezlow) po przeksztalceniu turn; false = brak siatek z BB.</summary>
+        private static bool PlanBox(PlanNode[] plan, MatrixFrame turn, out Vec3 mn, out Vec3 mx)
+        {
+            mn = new Vec3(float.MaxValue, float.MaxValue, float.MaxValue);
+            mx = new Vec3(float.MinValue, float.MinValue, float.MinValue);
+            if (plan == null || plan.Length == 0) return false;
+            var frames = PlanFrames(plan);
+            bool any = false;
+            for (int i = 0; i < plan.Length; i++)
+            {
+                if (plan[i].Meshes.Length == 0) continue;
+                MatrixFrame g = turn.TransformToParent(in frames[i]);
+                foreach (MetaMesh mm in plan[i].Meshes)
+                {
+                    Vec3 b0, b1;
+                    if (!MeshBox(mm, out b0, out b1)) continue;
+                    for (int k = 0; k < 8; k++)
+                    {
+                        Vec3 c = new Vec3((k & 1) != 0 ? b1.x : b0.x, (k & 2) != 0 ? b1.y : b0.y, (k & 4) != 0 ? b1.z : b0.z);
+                        Vec3 w = g.TransformToParent(in c);
+                        mn = new Vec3(Math.Min(mn.x, w.x), Math.Min(mn.y, w.y), Math.Min(mn.z, w.z));
+                        mx = new Vec3(Math.Max(mx.x, w.x), Math.Max(mx.y, w.y), Math.Max(mx.z, w.z));
+                        any = true;
+                    }
+                }
+            }
+            return any;
+        }
+
+        private static bool MeshBox(MetaMesh mm, out Vec3 b0, out Vec3 b1)
+        {
+            b0 = b1 = new Vec3(0f, 0f, 0f);
+            if (mm == null || !mm.IsValid) return false;
+            BoundingBox bb = mm.GetBoundingBox();
+            b0 = bb.min;
+            b1 = bb.max;
+            return b1.x > b0.x && b1.y > b0.y && !float.IsNaN(b0.x) && !float.IsInfinity(b1.x) && b1.x - b0.x < 1000f;
+        }
+
+        /// <summary>BB (swiat) encji domow matki widocznych przy pelnej wsi (civilian + level_3, jak wzor poziomu 3): bez pomocnikow, zgliszcz,
+        /// oblezenia i ich poddrzew; encje z pustym BB (zwiniete prefaby) pomijane.</summary>
+        private void HousesBox(GameEntity e, int depth, ref bool any, ref Vec3 mn, ref Vec3 mx)
+        {
+            if (depth > 8) return;
+            uint levels = _maskL1 | _maskL2 | _maskL3;
+            foreach (GameEntity c in e.GetChildren())
+            {
+                if (c == (GameEntity)null) continue;
+                if (MapVillageData.IsHelperName(c.Name ?? "")) continue;
+                uint m = (uint)c.GetUpgradeLevelMask();
+                if (!MapVillageData.LevelVisible(m, _maskCivil | _maskL3, false, _maskCivil, _maskLooted, _maskSiege, levels)) continue;
+                Vec3 b0 = c.GlobalBoxMin, b1 = c.GlobalBoxMax;
+                if (b1.x - b0.x > 0.01f && b1.y - b0.y > 0.01f && b1.x - b0.x < 1000f && b1.y - b0.y < 1000f)
+                {
+                    mn = new Vec3(Math.Min(mn.x, b0.x), Math.Min(mn.y, b0.y), Math.Min(mn.z, b0.z));
+                    mx = new Vec3(Math.Max(mx.x, b1.x), Math.Max(mx.y, b1.y), Math.Max(mx.z, b1.z));
+                    any = true;
+                }
+                HousesBox(c, depth + 1, ref any, ref mn, ref mx);
+            }
         }
 
         private uint LevelMask(int lv)
@@ -1224,11 +3065,12 @@ namespace Armoury
             if (includeRoot)
             {
                 int rs;
-                MetaMesh[] rm = MeshesOf(src, out rs);
-                raw.Add(new PlanNode { Parent = -1, Local = MatrixFrame.Identity, Meshes = rm, NoSeason = (src.EntityFlags & EntityFlags.NotAffectedBySeason) != 0, Src = SrcPrefab });
+                MetaMesh[] rm = MeshesOf(src, a, out rs);
+                raw.Add(new PlanNode { Parent = -1, Local = MatrixFrame.Identity, Meshes = rm, NoSeason = (src.EntityFlags & EntityFlags.NotAffectedBySeason) != 0, Src = SrcPrefab, Name = src.Name ?? "" });
                 top = 0;
             }
             Walk(src, top, a, raw, 0, includeRoot);
+            DropDuplicateStandIns(raw, a);
             var keep = new bool[raw.Count];
             for (int i = raw.Count - 1; i >= 0; i--)
             {
@@ -1263,6 +3105,43 @@ namespace Armoury
             return outList.ToArray();
         }
 
+        /// <summary>Zastepca grupy domow (lisc po nazwie), ktory jest tym samym domem co dom z rozwinietego prefabu (ta sama siatka / nazwa,
+        /// srodek w XY korzenia blizej niz MapVillageData.SameHouseTol) - zdjety (bez siatek; galaz wytnie BuildPlan). Inne liscie po nazwie
+        /// (ikony Calradii / Essos, domy spoza prefabow) zostaja.</summary>
+        private static void DropDuplicateStandIns(List<PlanNode> raw, WalkArgs a)
+        {
+            bool anyPrefab = false, anyName = false;
+            foreach (var n in raw) { if (n.Meshes.Length == 0) continue; if (n.Src == SrcPrefab) anyPrefab = true; else if (n.Src == SrcName) anyName = true; }
+            if (!anyPrefab || !anyName) return;
+            var px = new float[raw.Count];
+            var py = new float[raw.Count];
+            var mesh = new string[raw.Count];
+            for (int i = 0; i < raw.Count; i++)
+            {
+                Vec3 p = raw[i].Local.origin;
+                int up = raw[i].Parent;
+                int guard = 0;
+                while (up >= 0 && up < raw.Count && guard++ < 16) { p = raw[up].Local.TransformToParent(in p); up = raw[up].Parent; }
+                px[i] = p.x;
+                py[i] = p.y;
+                mesh[i] = raw[i].Meshes.Length > 0 ? raw[i].Meshes[0].GetName() ?? "" : "";
+            }
+            for (int i = 0; i < raw.Count; i++)
+            {
+                var n = raw[i];
+                if (n.Src != SrcName || n.Meshes.Length == 0) continue;
+                for (int j = 0; j < raw.Count; j++)
+                {
+                    var o = raw[j];
+                    if (j == i || o.Src != SrcPrefab || o.Meshes.Length == 0) continue;
+                    if (!MapVillageData.SameHouse(mesh[i], n.Name, px[i], py[i], mesh[j], o.Name, px[j], py[j])) continue;
+                    n.Meshes = NoMeshes;
+                    a.DupDropped++;
+                    break;
+                }
+            }
+        }
+
         private void Walk(GameEntity src, int parent, WalkArgs a, List<PlanNode> outList, int depth, bool inPrefab)
         {
             if (depth > 8) return;
@@ -1277,22 +3156,28 @@ namespace Armoury
                 if (!MapVillageData.LevelVisible(m, a.Mask, a.Lenient, _maskCivil, _maskLooted, _maskSiege, levels)) continue;
                 MatrixFrame lf = c.GetFrame();
                 bool noSeason = (c.EntityFlags & EntityFlags.NotAffectedBySeason) != 0;
-                if (a.Prefabs && !inPrefab)
+                if ((a.Prefabs || a.Expand) && !inPrefab)
                 {
-                    // droga 2: encja z nazwa prefabu - zamiast jej dzieci w grze kopia prefabu bez sceny w ramce tej encji
-                    GameEntity tmp = PrefabTemplate(PrefabNameOf(c));
-                    if (tmp != (GameEntity)null)
+                    // droga 2 (a.Prefabs): encja z nazwa prefabu; droga 1 (a.Expand): tylko encja zwinieta przez Town Scene Manager (0 dzieci,
+                    // 0 komponentow MetaMesh), ktora nie jest sama domem po nazwie. Zamiast jej dzieci w grze - kopia prefabu bez sceny
+                    // w ramce tej encji, z niej WSZYSTKIE siatki rekurencyjnie (ramki lokalne z prefabu).
+                    string pn = PrefabNameFor(name);
+                    bool take = a.Prefabs || MapVillageData.ExpandCollapsed(name, c.ChildCount, c.MultiMeshComponentCount, pn);
+                    GameEntity tmp = take ? PrefabTemplate(pn) : null;
+                    int pm;
+                    if (tmp != (GameEntity)null && (a.Prefabs || (_prefabMeshes.TryGetValue(pn, out pm) && pm > 0)))
                     {
                         int ts;
-                        MetaMesh[] tm = MeshesOf(tmp, out ts);
+                        MetaMesh[] tm = MeshesOf(tmp, a, out ts);
                         int pi = outList.Count;
-                        outList.Add(new PlanNode { Parent = parent, Local = lf, Meshes = tm, NoSeason = noSeason, Src = SrcPrefab });
+                        outList.Add(new PlanNode { Parent = parent, Local = lf, Meshes = tm, NoSeason = noSeason, Src = SrcPrefab, Name = name });
                         Walk(tmp, pi, a, outList, depth + 1, true);
+                        if (a.Expand) a.Expanded++;
                         continue;
                     }
                 }
                 int s;
-                MetaMesh[] meshes = MeshesOf(c, out s);
+                MetaMesh[] meshes = MeshesOf(c, a, out s);
                 if (meshes.Length > 0 && c.ChildCount == 0)
                 {
                     string sig = meshes[0].GetName() + "|" + Math.Round(lf.origin.x, 2).ToString(CultureInfo.InvariantCulture) + "|"
@@ -1300,13 +3185,14 @@ namespace Armoury
                     if (!seen.Add(sig)) continue;
                 }
                 int idx = outList.Count;
-                outList.Add(new PlanNode { Parent = parent, Local = lf, Meshes = meshes, NoSeason = noSeason, Src = inPrefab ? SrcPrefab : s });
+                outList.Add(new PlanNode { Parent = parent, Local = lf, Meshes = meshes, NoSeason = noSeason, Src = inPrefab ? SrcPrefab : s, Name = name });
                 Walk(c, idx, a, outList, depth + 1, inPrefab);
             }
         }
 
-        /// <summary>Siatki encji: komponenty MetaMesh, a gdy ich brak (Town Scene Manager) - jedna siatka po nazwie encji.</summary>
-        private MetaMesh[] MeshesOf(GameEntity e, out int src)
+        /// <summary>Siatki encji: komponenty MetaMesh, a gdy ich brak (Town Scene Manager) - jedna siatka po nazwie encji. Siatka bez
+        /// materialu pominieta - liczona w a.MatSkipped (z samym domyslnym materialem silnika zostaje, liczona w MaterialOk).</summary>
+        private MetaMesh[] MeshesOf(GameEntity e, WalkArgs a, out int src)
         {
             src = SrcComp;
             List<MetaMesh> list = null;
@@ -1315,14 +3201,67 @@ namespace Armoury
             {
                 MetaMesh mm = e.GetMetaMesh(i);
                 if (mm == null || !mm.IsValid) continue;
+                if (!MaterialOk(mm)) { a.MatSkipped++; continue; }
                 if (list == null) list = new List<MetaMesh>();
                 list.Add(mm);
             }
             if (list != null) return list.ToArray();
+            if (mc > 0) return NoMeshes;   // komponenty byly, ale bez materialu - nie zgadujemy siatki po nazwie
             MetaMesh byName = MeshByName(e.Name, e.ChildCount == 0);
             if (byName == null) return NoMeshes;
+            if (!MaterialOk(byName)) { a.MatSkipped++; return NoMeshes; }
             src = SrcName;
             return new[] { byName };
+        }
+
+        private static string _defaultMaterial;
+
+        private static string DefaultMaterialName()
+        {
+            if (_defaultMaterial != null) return _defaultMaterial;
+            try { Material dm = Material.GetDefaultMaterial(); _defaultMaterial = dm != null && dm.IsValid ? dm.Name ?? "" : ""; }
+            catch { _defaultMaterial = ""; }
+            return _defaultMaterial;
+        }
+
+        /// <summary>Czy siatka ma material: co najmniej jedna podsiatka z waznym materialem o niepustej nazwie. Raz na nazwe siatki. Siatka
+        /// z samym domyslnym materialem silnika (Material.GetDefaultMaterial) ZOSTAJE (nie ryzykujemy zgaszenia wszystkich wiosek przez
+        /// zly test), ale jest liczona (_matDefault) i widac ja w liscie siatek wzoru w wioski.log. Siatki domow ROT (fm_wm_*) maja w paczce
+        /// ROT-Content\pack2.tpac wlasny material first_men_modular_mat1 (tekstury first_men_modular_mat1_d / _s).</summary>
+        private bool MaterialOk(MetaMesh mm)
+        {
+            string key = mm.GetName() ?? "";
+            bool ok;
+            if (_matOk.TryGetValue(key, out ok)) return ok;
+            ok = true;   // blad odczytu = nie odrzucamy
+            try
+            {
+                string def = DefaultMaterialName();
+                int n = mm.MeshCount;
+                bool any = false, onlyDefault = true;
+                for (int k = 0; k < n; k++)
+                {
+                    Mesh sm = mm.GetMeshAtIndex(k);
+                    if (sm == null || !sm.IsValid) continue;
+                    Material mat = sm.GetMaterial();
+                    if (mat == null || !mat.IsValid) continue;
+                    string mn = mat.Name ?? "";
+                    if (mn.Length == 0) continue;
+                    any = true;
+                    if (mn != def) onlyDefault = false;
+                }
+                ok = any;
+                if (any && onlyDefault && def.Length > 0) _matDefault++;
+            }
+            catch (Exception e)
+            {
+                ok = true;
+                _stDiag++;
+                if (_stDiag <= 3) Log.Error("MapVillagesView.MaterialOk " + key + " (potkniecie " + _stDiag + ")", e);
+            }
+            _matOk[key] = ok;
+            if (!ok) _matBad++;
+            return ok;
         }
 
         /// <summary>Wzor siatki po nazwie encji (MetaMesh.GetCopy bez bledow i z null, jak MobilePartyVisual namiot) - raz na nazwe siatki.</summary>
@@ -1340,11 +3279,21 @@ namespace Armoury
             return mm;
         }
 
-        private static string PrefabNameOf(GameEntity e)
+        /// <summary>Prefab o NAZWIE ENCJI (albo null): GameEntity.GetPrefabName / GetOldPrefabName NIE sa wolane nigdzie (08.10: odczyt na
+        /// bo_village i *_village_looted konczyl sie naruszeniem pamieci w silniku - w wioski.log 08.10 linie tych encji urwane po nazwie).
+        /// W scenie ROT 8.1.8 kazda encja prefabu domow wsi ma nazwe = nazwa prefabu (265 linkow fm_village* / andal_village* + 42 ze
+        /// starym linkiem andal_village*: 307 / 307, proba-0810). Pomocniki nigdy; PrefabExists raz na nazwe.</summary>
+        private string PrefabNameFor(string entityName)
         {
-            string p = e.GetPrefabName();
-            if (string.IsNullOrEmpty(p)) p = e.GetOldPrefabName();
-            return string.IsNullOrEmpty(p) ? null : p;
+            if (string.IsNullOrEmpty(entityName) || MapVillageData.IsHelperName(entityName)) return null;
+            bool ex;
+            if (!_prefabExists.TryGetValue(entityName, out ex))
+            {
+                ex = false;
+                try { ex = GameEntity.PrefabExists(entityName); } catch { ex = false; }
+                _prefabExists[entityName] = ex;
+            }
+            return ex ? entityName : null;
         }
 
         /// <summary>Kopia prefabu BEZ SCENY, bez skryptow i fizyki (tylko do odczytu siatek; nigdy nie trafia do sceny mapy) - raz na prefab.
@@ -1366,11 +3315,14 @@ namespace Armoury
             if (meshes == 0) _prefabNoMesh++;   // zostaje: siatki po nazwach encji prefabu
             _prefabMade++;
             _prefabs[name] = g;
-            if (_diagPrefabs < 3)
+            _prefabMeshes[name] = meshes;       // droga 1 rozwija zwinieta encje tylko prefabem z siatkami
+            // 08.10: BEZ drzewa kopii w logu - TreeText na kopii bez sceny skonczyl sie u Jeffa naruszeniem pamieci (CrashScribe 02:07:38;
+            // gettery widocznosci / BB / pierwszej siatki na encji bez sceny). Na kopii tylko to, co przeszlo: GetChildren, Name, GetFrame,
+            // MultiMeshComponentCount, GetMetaMesh, ChildCount, GetUpgradeLevelMask, EntityFlags, GetChildrenRecursive.
+            if (_diagPrefabs < 3 && _diagOn)
             {
                 _diagPrefabs++;
-                try { Log.Info("Wioski: drzewo prefabu " + name + " (kopia bez sceny, komponentow MetaMesh w drzewie " + meshes + "):" + TreeText(g, 40)); }
-                catch (Exception ex) { _stDiag++; if (_stDiag <= 3) Log.Error("MapVillagesView.DiagPrefab " + name, ex); }
+                Log.Info("Wioski: drzewo prefabu " + name + " (kopia bez sceny): encji " + all.Count + ", komponentow MetaMesh " + meshes + ".");
             }
             return g;
         }
@@ -1424,6 +3376,118 @@ namespace Armoury
             }
         }
 
+        /// <summary>Wzor wsi-matki do wioski.log (poprawka wygladu 08.10): naglowek (droga, siatki poziomu 3 wedlug zrodla, rozwiniete prefaby,
+        /// duplikaty zastepcow, bez materialu, BB wzoru, BB matki, dopasowanie, skala obrazka na poziomach) i linia na kazda siatke poziomu 3
+        /// (encja, siatka, podsiatki, material / shader / tekstura pierwszej podsiatki, czynnik koloru, zrodlo, ramka w ukladzie wzoru, BB).
+        /// Kazda linia osobnym wpisem (zrzut 08.10 mial w srodku drzew linie z sama nazwa encji). Tylko odczyt.</summary>
+        private void DiagTemplate(District d)
+        {
+            var t = d.T;
+            string id = d.Id;
+            try
+            {
+                var p = t.Plans[3] ?? new PlanNode[0];
+                int nodes = 0, meshes = 0;
+                foreach (var n in p) if (n.Meshes.Length > 0) { nodes++; meshes += n.Meshes.Length; }
+                float l3 = MapVillageData.LevelScale(3) * t.Fit;
+                var sb = new StringBuilder();
+                sb.Append("Wioski: drzewo wzoru ").Append(id).Append(" '").Append(d.S != null ? d.S.Name.ToString() : "?").Append("' kultura ")
+                  .Append(d.S != null && d.S.Culture != null ? d.S.Culture.StringId : "?").Append(": droga ")
+                  .Append(t.Way == WayTree ? "drzewo" : t.Way == WayPrefab ? "prefaby" : "kultura " + t.WaySource).Append(t.Lenient ? " (zapas maski)" : "")
+                  .Append("; poziom 3: encji z siatka ").Append(nodes).Append(", siatek ").Append(meshes)
+                  .Append(" (z prefabow ").Append(t.FromPrefab).Append(", po nazwie ").Append(t.FromName).Append(", z komponentow ").Append(t.FromComp)
+                  .Append("); rozwiniete zwiniete prefaby ").Append(t.Expanded).Append(", zdjete duplikaty zastepcow ").Append(t.DupDropped)
+                  .Append(", pominiete bez materialu ").Append(t.MatSkipped)
+                  .Append("; liscie ").Append(t.LeafCount).Append(t.Flat ? " (jeden wyglad 1/2/3, przerzedzenie)" : "")
+                  .Append("; BB wzoru w skali matki ").Append(F2(t.TplW)).Append('x').Append(F2(t.TplD)).Append('x').Append(F2(t.TplH))
+                  .Append("; BB matki: widoczne domy ").Append(F2(t.MotherW)).Append('x').Append(F2(t.MotherD)).Append(t.MotherFromAll ? " (brak - cala matka, dopasowanie 1)" : "")
+                  .Append(", cala matka ").Append(F2(t.MotherAllW)).Append('x').Append(F2(t.MotherAllD))
+                  .Append("; dopasowanie ").Append(F2(t.Fit)).Append("; skala obrazka (x skala matki) poziom 1/2/3 ")
+                  .Append(F2(MapVillageData.LevelScale(1) * t.Fit)).Append('/').Append(F2(MapVillageData.LevelScale(2) * t.Fit)).Append('/').Append(F2(l3))
+                  .Append(" = obrazek poziomu 3 ok. ").Append(F2(t.TplW * l3)).Append('x').Append(F2(t.TplD * l3))
+                  .Append("; material domyslny silnika '").Append(DefaultMaterialName()).Append('\'');
+                Log.Info(sb.ToString());
+                var frames = PlanFrames(p);
+                int k = 0;
+                for (int i = 0; i < p.Length; i++)
+                {
+                    var n = p[i];
+                    if (n.Meshes.Length == 0) continue;
+                    k++;
+                    for (int m = 0; m < n.Meshes.Length; m++)
+                    {
+                        string line;
+                        try { line = MeshLine(n, n.Meshes[m], frames[i]); }
+                        catch (Exception ex) { line = (n.Name ?? "?") + " | blad odczytu " + ex.GetType().Name + ": " + ex.Message; }
+                        Log.Info("Wioski: drzewo wzoru " + id + " siatka " + k + "/" + nodes + (n.Meshes.Length > 1 ? "." + (m + 1) : "") + ": " + line);
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                _stDiag++;
+                if (_stDiag <= 3) Log.Error("MapVillagesView.DiagTemplate " + id + " (potkniecie " + _stDiag + ")", e);
+            }
+        }
+
+        /// <summary>Rodzaj wzoru do diagnostyki autotestu: droga + posortowane nazwy siatek poziomu 3 (np. fm_village1/2 = jeden rodzaj,
+        /// fm_village3/4 = drugi, ikony wsi kazdej kultury osobno). Tylko nazwy siatek (MetaMesh.GetName - jak Signature).</summary>
+        private static string TemplateKind(Template t)
+        {
+            var names = new List<string>();
+            var p = t.Plans[3] ?? new PlanNode[0];
+            foreach (var n in p)
+                foreach (var m in n.Meshes)
+                {
+                    string nm = m.GetName() ?? "";
+                    if (!names.Contains(nm)) names.Add(nm);
+                }
+            names.Sort(StringComparer.Ordinal);
+            return t.Way + ":" + string.Join(",", names.ToArray());
+        }
+
+        private static string MeshLine(PlanNode n, MetaMesh mm, MatrixFrame f)
+        {
+            var sb = new StringBuilder();
+            sb.Append(n.Name.Length > 0 ? n.Name : "(bez nazwy)").Append(" | siatka ").Append(mm.GetName());
+            int subs = mm.MeshCount;
+            sb.Append(" (podsiatek ").Append(subs).Append(')');
+            Mesh sm = subs > 0 ? mm.GetMeshAtIndex(0) : null;
+            Material mat = sm != null && sm.IsValid ? sm.GetMaterial() : null;
+            if (mat != null && mat.IsValid)
+            {
+                sb.Append(" | material ").Append(mat.Name);
+                // jak gra (MapScreen.CheckValidityOfItems :1490-1494): GetMeshAtIndex -> GetMaterial().Name i GetTexture(slot) != null; bez GetShader
+                Texture tx = mat.GetTexture(Material.MBTextureType.DiffuseMap);
+                sb.Append(" tekstura ").Append(tx != null && tx.IsValid ? "jest" : "BRAK");
+            }
+            else sb.Append(" | material BRAK");
+            if (subs > 1)
+            {
+                var names = new List<string>();
+                for (int k = 1; k < subs && k < 4; k++)
+                {
+                    Mesh s2 = mm.GetMeshAtIndex(k);
+                    Material m2 = s2 != null && s2.IsValid ? s2.GetMaterial() : null;
+                    names.Add(m2 != null && m2.IsValid ? m2.Name : "BRAK");
+                }
+                sb.Append(" (dalsze ").Append(string.Join(",", names.ToArray())).Append(')');
+            }
+            sb.Append(" | czynnik ").Append(mm.GetFactor1().ToString("X8"));
+            sb.Append(" | zrodlo ").Append(n.Src == SrcPrefab ? "prefab" : n.Src == SrcName ? "nazwa" : "komponent");
+            Vec3 scl = f.rotation.GetScaleVector();
+            Vec3 fwd = f.rotation.f;
+            double yaw = Math.Atan2(-fwd.x, fwd.y) * 180.0 / Math.PI;
+            sb.Append(" | ramka we wzorze ").Append(F2(f.origin.x)).Append(',').Append(F2(f.origin.y)).Append(',').Append(F2(f.origin.z))
+              .Append(" obrot ").Append(((float)yaw).ToString("0", CultureInfo.InvariantCulture)).Append(" skala ").Append(F2(scl.x));
+            Vec3 b0, b1;
+            if (MeshBox(mm, out b0, out b1))
+                sb.Append(" | BB siatki ").Append(F2(b1.x - b0.x)).Append('x').Append(F2(b1.y - b0.y)).Append('x').Append(F2(b1.z - b0.z))
+                  .Append(" (w skali ").Append(F2((b1.x - b0.x) * scl.x)).Append('x').Append(F2((b1.y - b0.y) * scl.y)).Append(')');
+            else sb.Append(" | BB siatki brak");
+            return sb.ToString();
+        }
+
         /// <summary>Drzewo encji, linia na encje: nazwa, prefab / stary prefab, maska (kumul., widocznosc poziomow z rodzicami), widoczna,
         /// komponenty wedlug typu (MM swiatlo zlozony plotno czastki ikona-osady inny naklejka), siatki komponentow, pierwsza siatka,
         /// rozmiar BB, ramka lokalna, dzieci, siatka po nazwie.</summary>
@@ -1442,9 +3506,24 @@ namespace Armoury
             lines++;
             string name = e.Name ?? "";
             sb.Append("\n    ").Append(' ', depth * 2).Append(name.Length > 0 ? name : "(bez nazwy)");
-            string pf = e.GetPrefabName(), op = e.GetOldPrefabName();
-            if (!string.IsNullOrEmpty(pf)) sb.Append(" | prefab ").Append(pf);
-            if (!string.IsNullOrEmpty(op)) sb.Append(" | stary prefab ").Append(op);
+            // pomocniki (bo_*, *_looted, siege_*, czastki, produkcja) bez zadnych odczytow z silnika - wzor ich nie uzywa, a na bo_village /
+            // *_village_looted odczyt nazwy prefabu konczyl sie naruszeniem pamieci (08.10)
+            if (MapVillageData.IsHelperName(name)) { sb.Append(" | pomocnik (bez odczytu, bez dzieci)"); return; }
+            try { TreeDetails(sb, e, name); }
+            catch (Exception ex) { sb.Append(" | blad odczytu ").Append(ex.GetType().Name).Append(": ").Append(ex.Message); }
+            foreach (GameEntity c in e.GetChildren())
+            {
+                if (c == (GameEntity)null) continue;
+                TreeLine(sb, c, depth + 1, ref lines, maxLines);
+            }
+        }
+
+        private static void TreeDetails(StringBuilder sb, GameEntity e, string name)
+        {
+            // bez GetPrefabName / GetOldPrefabName (naruszenie pamieci na bo_village / *_village_looted, 08.10) - tylko: jest prefab o nazwie encji
+            bool pfx = false;
+            try { pfx = !string.IsNullOrEmpty(name) && GameEntity.PrefabExists(name); } catch { }
+            if (pfx) sb.Append(" | prefab o tej nazwie");
             sb.Append(" | maska ").Append((uint)e.GetUpgradeLevelMask()).Append(" kumul ").Append((uint)e.GetUpgradeLevelMaskCumulative())
               .Append(" z rodzicami ").Append(e.GetVisibilityLevelMaskIncludingParents())
               .Append(" | widoczna ").Append(e.IsVisibleIncludeParents() ? 1 : 0)
@@ -1467,11 +3546,6 @@ namespace Armoury
             sb.Append(" | dzieci ").Append(cc);
             string byName = MapVillageData.MeshForName(name, cc == 0);
             if (byName != null) sb.Append(" | po nazwie ").Append(byName);
-            foreach (GameEntity c in e.GetChildren())
-            {
-                if (c == (GameEntity)null) continue;
-                TreeLine(sb, c, depth + 1, ref lines, maxLines);
-            }
         }
 
         private static string F2(float v)
@@ -1495,10 +3569,11 @@ namespace Armoury
                 s.Shown = false;
                 s.NeedRes = false;
                 s.FxShown = FxNone;
+                s.Placed = false;
             }
             _shown.Clear();
             _created = 0;
-            foreach (var d in _districts) { d.T = null; d.TemplateTried = false; }   // wzory od nowa (siatki matek moga byc przeladowane)
+            foreach (var d in _districts) { d.T = null; d.TemplateTried = false; d.Kits = null; }   // wzory (i wzory obrazkow v4) od nowa (siatki matek moga byc przeladowane)
             _templatesOk = _templatesBad = _lenient = _thinned = _axisTurned = 0;   // liczniki "teraz" razem z wzorami (bez podwojnego liczenia po wlaczeniu w MCM)
             ClearTemplateCaches();
             return n;
@@ -1506,8 +3581,8 @@ namespace Armoury
 
         private void DropAll()
         {
-            foreach (var s in _slots) { s.Root = null; s.V = null; s.Shown = false; }
-            foreach (var d in _districts) { d.T = null; d.TemplateTried = false; }
+            foreach (var s in _slots) { s.Root = null; s.V = null; s.Shown = false; s.Placed = false; }
+            foreach (var d in _districts) { d.T = null; d.TemplateTried = false; d.Kits = null; }
             _shown.Clear();
             _created = 0;
             ClearTemplateCaches();
@@ -1519,8 +3594,14 @@ namespace Armoury
         {
             _meshByName.Clear();
             _prefabs.Clear();
-            _tplComp = _tplName = _tplPrefab = _tplCulture = _meshComp = _meshName = _meshPrefab = 0;
+            _prefabMeshes.Clear();
+            _prefabExists.Clear();
+            _matOk.Clear();
+            _tplComp = _tplName = _tplExpand = _tplPrefab = _tplCulture = _meshComp = _meshName = _meshPrefab = 0;
             _prefabMade = _prefabNoMesh = _prefabMissing = _nameMiss = 0;
+            _expandedTotal = _dupDropped = _matSkipped = _matBad = _matDefault = _fitN = 0;
+            _fitSum = _fitMax = 0f;
+            _fitMin = float.MaxValue;
         }
 
         // ---------- dymek po najechaniu: bez fizyki, punkt terenu pod kursorem w obroconym obrysie (krytyk K4) ----------
@@ -1546,8 +3627,9 @@ namespace Armoury
                         {
                             var s = l[j];
                             if (!s.Shown || s.Root == null) continue;
-                            if (!MapVillageData.InFootprint(s.R, px, py, HoverMargin)) continue;
-                            float dx = s.R.X - px, dy = s.R.Y - py, dd = dx * dx + dy * dy;
+                            float cx = s.Placed ? s.Cx : s.R.X, cy = s.Placed ? s.Cy : s.R.Y;   // v4: srodek po przesunieciu ze stoku
+                            if (!MapVillageData.InFootprintAt(s.R, cx, cy, px, py, HoverMargin)) continue;
+                            float dx = cx - px, dy = cy - py, dd = dx * dx + dy * dy;
                             if (dd < bestD) { bestD = dd; best = s; }
                         }
                     }
@@ -1571,13 +3653,13 @@ namespace Armoury
             private readonly Slot _s;
             internal Visual(Slot s) { _s = s; }
 
-            public override CampaignVec2 InteractionPositionForPlayer => new CampaignVec2(new Vec2(_s.R.X, _s.R.Y), true);
+            public override CampaignVec2 InteractionPositionForPlayer => new CampaignVec2(_s.Placed ? new Vec2(_s.Cx, _s.Cy) : new Vec2(_s.R.X, _s.R.Y), true);
             public override MapEntityVisual AttachedTo => null;
             public override bool IsMobileEntity => true;            // MapScreen.cs:1608 - bez kursora "raczki", wioski nie da sie kliknac
             public override bool OnMapClick(bool followModifierUsed) { return false; }
             public override void OnOpenEncyclopedia() { }
             public override bool IsVisibleOrFadingOut() { return _s.Shown; }
-            public override Vec3 GetVisualPosition() { return new Vec3(_s.R.X, _s.R.Y, _s.Z); }
+            public override Vec3 GetVisualPosition() { return _s.Placed ? new Vec3(_s.Cx, _s.Cy, _s.Z) : new Vec3(_s.R.X, _s.R.Y, _s.Z); }
 
             public override void OnHover()
             {
