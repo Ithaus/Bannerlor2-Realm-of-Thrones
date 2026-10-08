@@ -385,7 +385,11 @@ narzedzia rozpoznal wszystkie linie. Grupa 1: OK 61, UWAGA 5; grupa 2: OK 31, UW
 - CENA SPRZEDAZY SPRZETU (07.10 ok. 15:20; projekt docs/PROJEKT-CENA-SPRZEDAZY-SPRZETU-2026-10-07.md): (1) "tak, jesli to poprawia realizm ekonomii" -
   wgrac razem z 127 (kara BK x5 RAZ zamiast x25, podloga 2% od wartosci ZE STANEM); (2) "tak" - sufit: kupiec nie da wiecej niz 1/10 ceny nowej sztuki
   na tej polce; (3) "tak" - handel odnowionym sprzetem miedzy miastami zostaje. Paczka w toku (workflow cena-sprzedazy-paczka, galaz w127b-cena-sprzedazy),
-  dolaczy na koniec TOWARY 3. OTWARTE: wraki na polkach wojska - naprawa za 10% (decyzja 26.08) czy tylko zlom i kowadlo.
+  GOTOWE po recenzji: galaz w-toku/cena-sprzedazy-sprzetu a87ad4a na 127 (SellByCondition.cs; wylaczniki BkTradePenaltyOnce, SellPriceByCondition,
+  SellCapPercentOfNewAsk 10; sufit = min(1/10 ceny nowej, cena wraku na tej polce), obejmuje amunicje, nie konie), DLL md5 66b74be2; naklada sie
+  czysto na t3; Armoury.json - nic nowego (tylko edycje 127). Dolaczy na koniec TOWARY 3. Wraki - rozstrzygniete ("na zlom").
+  OTWARTE (sprzed paczki): CleanseAmmo leczy tez kulawe konie gracza - kulawy kon kupiony i sprzedany zdrowy daje zarobek przy Handlu 300;
+  poprawic w tym czacie (propozycje osobnego zadania od pomocnika wycofane).
 - JEDEN CZAT (07.10 ok. 14:25, przekazane przez sesje lawy f16095a4): "nie puszczaj zadnych innych prac w drugim czacie, wszystko idzie w jednym" -
   wszystko prowadzi ten czat; zadnych rownoleglych sesji (takze propozycji osobnych zadan); przed kazda praca sprawdzic, czy temat nie jest juz robiony.
 - KOSZT NAPRAWY (07.10 ok. 14:25): "nasza robocizna jest lepsza" - zostaje robocizna stosu n131b (b36a6d6: 0.2 x ubytek stanu x robota wykonania
