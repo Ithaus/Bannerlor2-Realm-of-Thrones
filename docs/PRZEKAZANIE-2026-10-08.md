@@ -105,3 +105,12 @@ dana faze od nowa, korzystajac z zapisanych wynikow:
 - docs/rozpoznanie-2026-10-08/: paczka-169-wynik-1..3.md, paczka-170-wynik-1..2.md, paczka-171-wynik-1..3.md (kolejnosc plikow = kolejnosc ukonczenia;
   naglowek/summary w pliku mowi, ktory to raport). Drzewa robocze obieg169, bee170, zaloga171 czyste (na 2e235ea).
 - NOWE KONTO zaczyna od PROJEKTU kazdej paczki (169 -> 170 -> 171), prompty projektanta/wykonawcy/recenzentow w skryptach workflow (rozdz. 11).
+
+## 15. NOWE KONTO (sesja 7016f733, 08.10 wieczorem) - start od PROJEKTU 169
+- SCRATCH nowej sesji = `C:\Users\GAME\AppData\Local\Temp\claude\C--Program-Files--x86--Steam-steamapps-common-Mount---Blade-II-Bannerlord\7016f733-d379-418e-b700-f66fd52e4d2b\scratchpad`.
+  Drzewa robocze i dekompilacje zostaja w STARYM scratchu (3cf3e0ac...\scratchpad\dzien-6\obieg169|bee170|zaloga171|autotest, ore-supply) - to worktree klonu
+  `3cf3e0ac...\scratchpad\lancuch` (origin = repo Jeffa).
+- **169**: workflow `wf_6f6961dc-464` (projekt z 3 plikow rozpoznania -> krytyka projektu -> projekt po krytyce -> wykonanie -> recenzja x3 -> poprawki).
+  Skrypt: `C:\Users\GAME\.claude\projects\C--Program-Files--x86--Steam-steamapps-common-Mount---Blade-II-Bannerlord\7016f733-d379-418e-b700-f66fd52e4d2b\workflows\scripts\paczka-169-projekt-do-poprawek-wf_6f6961dc-464.js`.
+  Gdy sesja padnie: `git -C <obieg169> log` + `docs/paczki/169-ksiega-obiegu.md` w drzewie (sekcja "Krytyka i odpowiedzi" = projekt po krytyce gotowy) - dokonczyc od brakujacej fazy.
+- Potem: autotest 40 dob z probnym DLL -> wynik dla Jeffa -> 170 + skrypt BEE `-ListaZFundamentu` -> 171.
