@@ -100,3 +100,8 @@ dana faze od nowa, korzystajac z zapisanych wynikow:
 - 170 i 171: czekaja na koniec rozpoznania, potem zostana zatrzymane; wyniki zapisuja sie do docs/rozpoznanie-2026-10-08/paczka-170-*.md / paczka-171-*.md.
 - NOWE KONTO: dla kazdej paczki uruchom faze PROJEKT (potem wykonanie, recenzje, poprawki) z promptami ze skryptow workflow (rozdz. 11), dajac
   projektantowi pliki rozpoznania z docs/rozpoznanie-2026-10-08/ zamiast ponownego rozpoznania. Kolejnosc: 169 -> 170 -> 171.
+
+## 14. ROZPOZNANIE ZAKONCZONE DLA 169, 170, 171 - wszystkie workflowy ZATRZYMANE przed projektem
+- docs/rozpoznanie-2026-10-08/: paczka-169-wynik-1..3.md, paczka-170-wynik-1..2.md, paczka-171-wynik-1..3.md (kolejnosc plikow = kolejnosc ukonczenia;
+  naglowek/summary w pliku mowi, ktory to raport). Drzewa robocze obieg169, bee170, zaloga171 czyste (na 2e235ea).
+- NOWE KONTO zaczyna od PROJEKTU kazdej paczki (169 -> 170 -> 171), prompty projektanta/wykonawcy/recenzentow w skryptach workflow (rozdz. 11).
