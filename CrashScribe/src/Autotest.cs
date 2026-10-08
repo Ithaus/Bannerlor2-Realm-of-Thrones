@@ -170,7 +170,6 @@ namespace CrashScribe
             LoadName = Regex.Replace(Raw(json, "load") ?? "", "[^A-Za-z0-9_.:,-]", "");   // kilka nazw po przecinku = proby po kolei
             Census.Every = Int(json, "census", 0, 0, 365);
             FrameProfiler.Enabled = Bool(json, "profile", false);
-            StackSampler.IntervalMs = Int(json, "sample", 0, 0, 10000);
             AutotestPhotos.Parse(json);   // [AT2] klucze photos / photo_shots / photo_hours; bez nich lista celow pusta
         }
 
@@ -796,7 +795,6 @@ namespace CrashScribe
             }
             Census.Run("start biegu, doba " + _lastDay);
             FrameProfiler.WrapListeners();
-            StackSampler.Start(System.Threading.Thread.CurrentThread);
             Go(Stage.Run, t, "bieg: przewijanie do doby " + Days + " (teraz " + DayLabel() + ", " + Where() + ")");
             try { foreach (var line in AutotestUi.SelfCheck(onlyMissing: true)) Note("  sygnatury (ponownie): " + line); } catch { }
             if (_lastDay >= Days) Finish("dotarl do " + _lastDay + "/" + Days + " dob", true, t);
@@ -839,7 +837,6 @@ namespace CrashScribe
                      + " | okna " + _windows + " | bledy +" + newErr + " (razem " + _errors + ")");
                 if (d % 10 == 0 && PerDay.Count > 0) Note(Averages(d));
                 FrameProfiler.Report("doba " + d, 25);
-                if ((d - _runStartDay) % 4 == 0) StackSampler.Report("doby do " + d, 30);
                 if (Census.Every > 0 && (d - _runStartDay) % Census.Every == 0 && d < Days)
                 {
                     Census.Run("doba " + d);
@@ -987,7 +984,7 @@ namespace CrashScribe
             if (Now == Stage.Photos) AutotestPhotos.Abort("koniec biegu: " + why);   // [AT2] kamera wraca do druzyny przed zapisem
             _finishOk = ok;
             _finishWhy = why;
-            if (Now == Stage.Run) { Census.Run("koniec, doba " + Math.Max(0, _lastDay)); FrameProfiler.RunSummary(40); StackSampler.RunSummary(60); }
+            if (Now == Stage.Run) { Census.Run("koniec, doba " + Math.Max(0, _lastDay)); FrameProfiler.RunSummary(40); }
             string sum = "";
             if (PerDay.Count > 0) sum = " | " + PerDay.Count + " pelnych dob, srednio " + PerDay.Average().ToString("0.0", Inv) + " s/dobe";
             double runMin = _runStartAt > 0 ? (t - _runStartAt) / 60.0 : 0;
