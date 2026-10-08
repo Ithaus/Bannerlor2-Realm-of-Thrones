@@ -1,5 +1,14 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-08 (135, poprawka po audycie TOWARY 3) - NAPRAWA UPRZEZY PRZY WYLACZONEJ REGULE KOWALI CO DO GROSZA JAK DOTAD
+**Mod:** Armoury | **Pliki:** `ArmouryBehavior.cs` (`HarnessLabor`)
+
+**Problem (audyt zapisu i wylacznikow TOWARY 3):** opis 135 obiecuje "przy wylaczonym lawa dziala co do znaku jak dotad", a przy `SmithMendFromMarket` = off "Mend everything you wear - the smith's price" (RepairCost, RepairAll, podpowiedz) liczyl stara kwote innym wyrazeniem float (`Math.Max(0f, (100f - cond) / 100f)` zamiast n120 `(1f - cond / 100f)`, zmiana z 135 czesc 2). Emulacja float32: przy RepairCostFactor 0.5 i stanach z jednym miejscem po przecinku 3940 z 4.9 mln par (wartosc 50-5000 d, stan 1.0-99.9) daje inna kwote o 1 d (np. 2000 d przy 21.3%: 787 w n120, 786 w lancuchu).
+
+**Zmiana:** stara kwota (`old`, takze fallback reguly dla sztuk bez receptury) liczona wyrazeniem z n120: `(int)(it.Value * (1f - cond / 100f) * RepairCostFactor)`; `missing` zostaje tylko dla galezi reguly kowali miasta.
+
+**Ryzyko / co sprawdzic:** przy wlaczonej regule (domyslnie) nic sie nie zmienia poza fallbackiem dla sztuk bez receptury (roznica najwyzej 1 d). Proba lawy (sekcja 2, wzorzec przy wylaczonej regule) - bez zmian.
+
 ## 2026-10-08 (152, poprawka po audycie TOWARY 3) - BUDOWY NIE PLACA KASOM WIECEJ, NIZ LORD MA (zloto z niczego przy drogim materiale)
 **Mod:** Armoury | **Pliki:** `BuildFunding.cs` (robocizna najwyzej z reszty kiesy lorda)
 

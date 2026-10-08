@@ -2200,7 +2200,8 @@ namespace Armoury
         private static int HarnessLabor(ItemObject it, float cond)
         {
             float missing = Math.Max(0f, (100f - cond) / 100f);
-            int old = (int)(it.Value * missing * Settings.Current.RepairCostFactor);
+            // poprawka po audycie TOWARY 3: stara kwota starym wyrazeniem (n120) - inne wyrazenie float dawalo czasem 1 d roznicy przy wylaczonej regule
+            int old = (int)(it.Value * (1f - cond / 100f) * Settings.Current.RepairCostFactor);
             if (!MendMaterial.RuleOn) return old;
             var s = Settings.Current;
             return MendMaterial.Labor(it, Math.Max(0f, s.MendMaterialMaxShare) * Math.Min(1f, missing), Settlement.CurrentSettlement, old);
