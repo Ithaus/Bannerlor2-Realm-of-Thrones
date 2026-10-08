@@ -693,7 +693,7 @@ i naprawy AI przegladaja zbrojownie), ArmouryBehavior.OnDailyTick 1.5 s naraz (x
 tik godzinny 2.6 ms. Gra: AiMilitaryBehavior x44, werbunek x7; ROT malzenstwa x2.4. Druzyn 2071 -> 6213 (majatki BK 1390
 od doby 4, karawany 324 -> 1037, bandyci 647 -> 1137, lordowie -> 654). "Widly" pod The Eyrie = kafelki druzyn w osadzie
 (moneta karawana, widly ani lord ani karawana); w srodku bylo 7 - kafelki zostaja po druzynach usunietych w miescie (UI).
-Probkowanie stosu (Thread.Suspend) ZAWIESILO gre - usuniete. Autotest zamyka gre 4 s po zapisie koncowym (do poprawy).
+Probkowanie stosu (Thread.Suspend) ZAWIESILO gre - usuniete. (Sprostowanie: zapis koncowy autotestu NIE byl uciety przy wyjsciu - nie wczytywal sie przez napisy > 32767 B, jak wszystkie; z 161 wczytuje sie.)
 DO ZROBIENIA: 161 sprawdzic (zapis w kawalkach, ponowne wczytanie) -> "wgraj"; RecruitKit sprzatanie (komplety ochotnikow,
 ktorych nie ma w puli; zmarli notable); przyspieszenie MenPurse/AiWear/dziennego tiku Armoury (pomiar sekcjami wewnatrz).
 161 GOTOWA DO WGRANIA (08.10 11:45): galaz w-toku/161-zapis 2e235ea (na 160), Armoury c01a54ba (dll-final-5, kopia
