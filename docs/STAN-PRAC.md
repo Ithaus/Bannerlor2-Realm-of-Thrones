@@ -639,3 +639,8 @@ Armoury.json przy wgraniu: SmithingSkillPerTier 45->35, DurabilityPerArmorPoint 
 Nowe klucze zapisu: arm_mendstock, arm_towncrafts, arm_armyclothing. PRZED WGRANIEM DOLOZYC: wyspy (90234dc), cena sprzedazy (a87ad4a),
 poprawki 144 (dzielnik "horse" przez drob) i 143 (kon najemnika z niczego), wraki na zlom (polki wojska), CleanseAmmo leczy kulawe konie,
 nowa wersja W2 (wyglad 2 + uklad v4 - workflow wioski-wyglad-2), potem autotest 40 dob + zdjecia, potem "wgraj".
+
+WIOSKI v4 WGRANE 08.10 ok. 04:55: Armoury 70b29477 (n120 + W2 85215de), dane b742f307 (v4, 2446 wiosek, kolumna model). ZATWIERDZONY DLL OD TERAZ = 70b29477.
+Zdjecia z autotestu: CrashScribe\zdjecia\at-20261008-044251 (pomniejszone scratchpad\zdj2). Do poprawy: zapadajace sie domy andal w Reach (ustawiac dol BB
+kazdej siatki na terenie), mlyn przy samym brzegu z kolem w wodzie, skrzydla wiatraka, rybacy na skalach w wodzie (sprawdzac teren pod obrysem).
+TOWARY 3 musi przy skladaniu dostac W2 85215de (zamiast 3b59c75 + 39b60a0 + pliku 4000).

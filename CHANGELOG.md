@@ -1,5 +1,13 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-08 (W2 v4) - WIOSKI NA MAPIE - WYGLAD 2: domy z prefabu wsi okregu na terenie, zwarte kepy, mlyny / wiatraki / farmy / spichlerze / rybacy, uklad v4 (bez prostej linii), bez AccessViolation
+**Status:** WGRANE 2026-10-08 ok. 04:55 (na wersji z gry n120 + W2; galaz paczki/w2-wioski-na-mapie 85215de), Armoury.dll md5 70b294776b13a1f1a2127c31f779f75c
+(poprzedni 62e37795: Armoury.dll.bak-2026-10-08-wioski-v1 + D:\Backup-Bannerlord\wioski-2026-10-08), dane ModuleData\arm_map_villages.tsv md5
+b742f307bb26b37134c686a9693a3c11 (2446 wiosek v4 z kolumna model; poprzedni plik .bak-2026-10-08-4000). Autotest ze zdjeciami 08.10 04:42 (2 doby): 0 ERROR,
+postawione 1204 (najwiecej 378 naraz), modele village 537 / mill 191 / windmill 50 / farm 195 / granary 45 / fishing 186, zero GetPrefabName /
+GetOldPrefabName. Znane do poprawy (nastepna runda): czesc domow andal w Reach zapada sie po dach (takze na plaskim), mlyn stoi z dala od wody i
+nie widac kola, wiatrak bez skrzydel, jedna osada rybacka na skalach w wodzie. Opis: docs/paczki/W2-wioski-na-mapie.md.
+
 ## 2026-10-07 (W2) - WIOSKI NA MAPIE - WIDOK: 2449 nazwanych wiosek (wariant 4000 ludzi na wioske), dymek, ogien przy rabunku
 **Status:** WGRANE 2026-10-07 ok. 19:06 na slowo Jeffa ("wgraj mi wioski 2200, chce najpierw zobaczyc w grze") - na wersji z gry (n120 + W2,
 galaz paczki/w2-wioski-na-mapie 39b60a0), Armoury.dll md5 62e377956518a5f6f493e8839b9e700a (kopia poprzedniego 25b87631:
