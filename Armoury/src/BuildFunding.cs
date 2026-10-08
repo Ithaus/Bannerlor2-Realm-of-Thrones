@@ -168,6 +168,9 @@ namespace Armoury
                     if (matBudget > 0f && matSpent <= 0) { _stalledNoMat++; continue; }   // nie ma z czego budowac
                     float labour = Math.Min(budget - matBudget, matSpent * Math.Max(0f, (1f - s.BuildMaterialShare) / Math.Max(0.01f, s.BuildMaterialShare)));
                     int labourI = MBRandom.RoundRandomized(labour);
+                    // poprawka po audycie TOWARY 3: material drozszy niz budzet (BuyOneCheapest do calej kiesy) + robocizna z budzetu moglo dac
+                    // wiecej niz lord ma - ChangeHeroGold obcina kiese do 0, a kasy dostawaly pelne kwoty (zloto z niczego); robota najwyzej z reszty kiesy
+                    labourI = Math.Min(labourI, Math.Max(0, lord.Gold - matSpent));
                     lord.ChangeHeroGold(-(matSpent + labourI));
                     if (market != null && market.Town != null) market.Town.ChangeGold(matSpent);
                     st.Town.ChangeGold(labourI);                 // place murarzy, robotnikow, woznic - do kasy osady

@@ -1,5 +1,14 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-08 (152, poprawka po audycie TOWARY 3) - BUDOWY NIE PLACA KASOM WIECEJ, NIZ LORD MA (zloto z niczego przy drogim materiale)
+**Mod:** Armoury | **Pliki:** `BuildFunding.cs` (robocizna najwyzej z reszty kiesy lorda)
+
+**Problem (audyt zamknietej ekonomii TOWARY 3, Z7; blad sprzed lancucha - wpis 86 z 05.10, jest w grze):** gdy material jest drozszy niz dzienny budzet, `BuyOneCheapest` kupuje jedna sztuke do calej kiesy lorda, a robocizna liczy sie dalej z budzetu - `matSpent + labourI` moze przekroczyc `lord.Gold`. `Hero.ChangeHeroGold` obcina kiese do 0, a kasa targu i kasa osady dostaja pelne kwoty. Przyklad: lord 100, budzet 100, najtanszy material 40 -> kasy +115, lord -100, 15 zl z niczego (do 0.75 x budzetu).
+
+**Zmiana:** `labourI = Math.Min(labourI, Math.Max(0, lord.Gold - matSpent))` przed zaplata (matSpent zawsze <= kiesy: `BuyMaterials` z budzetu <= kiesy, `BuyOneCheapest` do kiesy). Punkty budowy liczone jak dotad od tego, co naprawde zaplacono (`PointsFor(matSpent, labourI, ...)`).
+
+**Ryzyko / co sprawdzic:** zmiana tylko w tym jednym przypadku (material drozszy niz budzet i kiesa mniejsza niz material + robota) - wtedy mniej punktow budowy tego dnia, zadnego zlota z niczego. Linia "Budowy oplacone:" bez zmian formatu.
+
 ## 2026-10-08 (135, poprawka po audycie TOWARY 3; krok 139 planu K13) - NAPRAWY LUDZI GRACZA I LORDOW AI BIORA MATERIAL Z TARGU jak lawa u kowala - jedna regula i jedna cena kazdej naprawy w miescie
 **Mod:** Armoury | **Pliki:** `TroopSelfMend.cs` (NOWE `HourlyWithMaterial`, `RunWithMaterial`; `OutstandingCost(Settlement)`), `AiWear.cs` (NOWE `MendWithMaterial`, liczniki doby i dopisek linii "Zuzycie AI:"; `OutstandingCost(mp, st)`), `MendMaterial.cs` (`MenAndLordsOn`; ramka ksiegi towarow w `Bench.Commit`), `GoodsLedger.cs` (ramka `FMend`, ujscie "naprawy kowali miasta (135)"), `MenPurse.cs` i `AiGear.cs` (rezerwa sakiewki z miastem), `Settings.cs` + `McmSettings.cs` (NOWY wlacznik `MendMaterialMenAndLords`, opis `SmithMendFromMarket`)
 
