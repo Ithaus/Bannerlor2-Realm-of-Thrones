@@ -1,5 +1,11 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-08 (W2 v5) - WIOSKI NA MAPIE - WYGLAD 3: domy na dole siatki (koniec zapadania), mlyn przy brzegu z kolem, wiatrak ze skrzydlami (sturgia_windmill_a), rybacy tylko na ladzie, odstep od sasiednich wiosek
+**Status:** WGRANE 2026-10-08 ok. 06:30 (n120 + W2; galaz paczki/w2-wioski-na-mapie 8518996), Armoury.dll md5 b0e62e1fc3e88ac911f459bcbb8307e6 (poprzedni 70b29477:
+Armoury.dll.bak-2026-10-08-wioski-v4 + D:\Backup-Bannerlord\wioski-2026-10-08), dane bez zmian (b742f307). Autotest ze zdjeciami 08.10 06:19 (2 doby): 0 ERROR,
+siatka nawigacyjna 40/40 bram na ladzie, postawione 1197, zdjecia: domy na ziemi, wiatrak ze skrzydlami, rybacy na ladzie z pomostem; mlyny nad rzeka (czesc
+za bardzo w wodzie - drobiazg na pozniej). Opis: docs/paczki/W2-wioski-na-mapie.md.
+
 ## 2026-10-08 (W2 v4) - WIOSKI NA MAPIE - WYGLAD 2: domy z prefabu wsi okregu na terenie, zwarte kepy, mlyny / wiatraki / farmy / spichlerze / rybacy, uklad v4 (bez prostej linii), bez AccessViolation
 **Status:** WGRANE 2026-10-08 ok. 04:55 (na wersji z gry n120 + W2; galaz paczki/w2-wioski-na-mapie 85215de), Armoury.dll md5 70b294776b13a1f1a2127c31f779f75c
 (poprzedni 62e37795: Armoury.dll.bak-2026-10-08-wioski-v1 + D:\Backup-Bannerlord\wioski-2026-10-08), dane ModuleData\arm_map_villages.tsv md5

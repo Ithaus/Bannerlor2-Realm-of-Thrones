@@ -644,3 +644,6 @@ WIOSKI v4 WGRANE 08.10 ok. 04:55: Armoury 70b29477 (n120 + W2 85215de), dane b74
 Zdjecia z autotestu: CrashScribe\zdjecia\at-20261008-044251 (pomniejszone scratchpad\zdj2). Do poprawy: zapadajace sie domy andal w Reach (ustawiac dol BB
 kazdej siatki na terenie), mlyn przy samym brzegu z kolem w wodzie, skrzydla wiatraka, rybacy na skalach w wodzie (sprawdzac teren pod obrysem).
 TOWARY 3 musi przy skladaniu dostac W2 85215de (zamiast 3b59c75 + 39b60a0 + pliku 4000).
+
+WIOSKI v5 WGRANE 08.10 ok. 06:30: Armoury b0e62e1f (n120 + W2 8518996), dane b742f307. ZATWIERDZONY DLL OD TERAZ = b0e62e1f. TOWARY 3 przy skladaniu musi dostac W2 do 8518996.
+Drobiazg na pozniej: mlyny czesciowo za bardzo w wodzie (przesunac ok. 0.5 jedn. ku ladowi).
