@@ -393,6 +393,7 @@ namespace Armoury
                 // 1c. zywy inwentarz za sztuke (paczka 144, HistLivestockPrices) - ta sama droga co towary handlowe: wartosc, blokada cen
                 // (_target) i przelicznik popytu kategorii (krok 3) - miasto kupuje dziennie tyle samo sztuk co dotad, placi w nowej monecie
                 var beasts = new List<string>();
+                var beastSet = new HashSet<ItemObject>();   // poprawka 156: przeliczone zwierzeta (krok 3 - przelicznik kategorii)
                 if (s.HistLivestockPrices)
                     foreach (var kv in LivestockEach)
                     {
@@ -400,6 +401,7 @@ namespace Armoury
                         if (it == null || it.ItemType != ItemObject.ItemTypeEnum.Animal) continue;   // nigdy kon (ItemType Horse)
                         set(it, kv.Value);
                         _target[it] = it.Value;
+                        beastSet.Add(it);
                         beasts.Add(it.StringId + " " + _orig[it] + "->" + it.Value);
                     }
 
@@ -436,10 +438,30 @@ namespace Armoury
                 bool fromDef = s.HistDemandFromDefinition;
                 var sumLog = new Dictionary<ItemCategory, double>(); var cnt = new Dictionary<ItemCategory, int>();
                 var defLog = new List<string>(); var zeroLog = new List<string>();
+                // POPRAWKA 156 (autotest stosu lawy 07.10 14:18): w ROT ges i kura (oraz kot i pies) leza w kategorii "horse" razem z
+                // konmi, ktorych ceny nie przeliczamy - przelicznik ze sredniej samych przeliczonych sztuk (ges 50 -> 4, kura 50 -> 1)
+                // wychodzil /25 i dzielil przez 25 caly popyt kategorii, czyli popyt mieszczan na zwykle konie (konie na polkach 12 953
+                // wobec ok. 9 000, cena konia x0.40). Regula: przeliczone zwierze (krok 1c) liczy sie do przelicznika swojej kategorii
+                // tylko wtedy, gdy w kategorii nie ma przedmiotu NA HANDEL (wartosc > 0, nie NotMerchandise) z cena nieprzeliczona -
+                // inaczej popyt kategorii zostaje w monecie tych przedmiotow (konie: jak przed 144), a ges i kura wchodza na polke z waga
+                // swojej dawnej wartosci (MixedShelf, krok 3 tam: moneta popytu 1). Wol, krowa, swinia, owca (wlasne kategorie) - bez zmian.
+                var beastOut = new HashSet<ItemCategory>(); var beastOutLog = new List<string>();
+                if (beastSet.Count > 0)
+                {
+                    var beastCats = new HashSet<ItemCategory>();
+                    foreach (var b in beastSet) if (b.ItemCategory != null) beastCats.Add(b.ItemCategory);
+                    foreach (var it in MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
+                    {
+                        var c = it != null ? it.ItemCategory : null;
+                        if (c == null || !beastCats.Contains(c) || beastOut.Contains(c) || it.Value <= 0 || it.NotMerchandise || _orig.ContainsKey(it)) continue;
+                        beastOut.Add(c);
+                    }
+                }
                 foreach (var kv in _orig)
                 {
                     var cat = kv.Key.ItemCategory;
                     if (cat == null || kv.Key.Value <= 0) continue;
+                    if (beastOut.Contains(cat) && beastSet.Contains(kv.Key)) { beastOutLog.Add(kv.Key.StringId + " [" + cat.StringId + "]"); continue; }   // poprawka 156
                     int def = DemandBase(kv.Key, kv.Value);
                     if (def != kv.Value) { _defUsed.Add(cat); defLog.Add(kv.Key.StringId + " " + kv.Value + " -> " + def); }
                     int old = fromDef ? def : kv.Value;
@@ -469,6 +491,8 @@ namespace Armoury
                 Log.Info("HistoricalPrices: surowce kuzni ["+ string.Join(", ", raw.ToArray()) + "]; uzbrojenie " + n + " szt. przeliczone z kosztu historycznego (suma wartosci "
                          + before + " -> " + after + "). Przyklady: " + string.Join("; ", samples.ToArray()) + ".");
                 Log.Info("HistoricalPrices: zywy inwentarz " + (s.HistLivestockPrices ? "[" + string.Join(", ", beasts.ToArray()) + "] d za sztuke (konie bez zmian)"
+                                                                                        + "; poza przelicznikiem popytu kategorii (w kategorii sa przedmioty na handel z cena nieprzeliczona - jej popyt jak przed 144): "
+                                                                                        + (beastOutLog.Count > 0 ? string.Join(", ", beastOutLog.ToArray()) : "zadne")
                                                                                       : "po wartosci gry (HistLivestockPrices wylaczone)") + ".");
                 MixedShelf(s, fromDef);   // paczka 121: wagi sztuk na polce w kategoriach mieszanych - po przeliczniku kategorii, ten sam skladnik przedmiotu
             }
