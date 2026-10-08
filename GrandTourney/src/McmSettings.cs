@@ -84,11 +84,11 @@ namespace GrandTourney
         [SettingPropertyGroup("Hosting your own")]
         public int HostCooldownDays { get; set; } = 365;
 
-        [SettingPropertyInteger("Host Base Fee", 0, 8000, "0", HintText = "what it costs you to open the lists")]
+        [SettingPropertyInteger("Host Base Fee", 0, 8000, "0", HintText = "what it costs you to open the lists (not used while Historical Town Rates is on)")]
         [SettingPropertyGroup("Hosting your own")]
         public int HostBaseFee { get; set; } = 2000;
 
-        [SettingPropertyFloatingInteger("Host Fee Prosperity Factor", 0.00f, 2.00f, "0.00", HintText = "a richer town costs more to hire")]
+        [SettingPropertyFloatingInteger("Host Fee Prosperity Factor", 0.00f, 2.00f, "0.00", HintText = "a richer town costs more to hire (not used while Historical Town Rates is on)")]
         [SettingPropertyGroup("Hosting your own")]
         public float HostFeeProsperityFactor { get; set; } = 0.5f;
 
@@ -136,11 +136,11 @@ namespace GrandTourney
         [SettingPropertyGroup("What the host gains")]
         public int HostTakingsPerLord { get; set; } = 200;
 
-        [SettingPropertyFloatingInteger("Host Takings Prosperity Factor", 0.00f, 1.00f, "0.00", HintText = "a richer town pays out more")]
+        [SettingPropertyFloatingInteger("Host Takings Prosperity Factor", 0.00f, 1.00f, "0.00", HintText = "a richer town pays out more (not used while Historical Town Rates is on)")]
         [SettingPropertyGroup("What the host gains")]
         public float HostTakingsProsperityFactor { get; set; } = 0.1f;
 
-        [SettingPropertyFloatingInteger("Cancelled Fee Refund", 0.00f, 2.00f, "0.00", HintText = "share of the fee returned if the tourney is called off")]
+        [SettingPropertyFloatingInteger("Cancelled Fee Refund", 0.00f, 2.00f, "0.00", HintText = "share of the fee returned if the tourney is called off (not used while Historical Town Rates is on)")]
         [SettingPropertyGroup("What the host gains")]
         public float CancelledFeeRefund { get; set; } = 0.5f;
 

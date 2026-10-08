@@ -995,7 +995,7 @@ namespace Armoury
                 var afford = gold >= cost ? new TextObject("{=RL_QM_CanAfford}You have enough gold.") : new TextObject("{=RL_QM_NoGold}Not enough gold for all repairs.");
                 var t = new TextObject("{=RL_QM_RepairText}The quartermaster's smiths can remove the 'Plundered' mark from your equipment \u2014 for a price.\n\nTotal repairable: {COUNT} items\nTotal cost: {COST} denars\nYour gold: {GOLD} denars\n\n{AFFORD}");
                 t.SetTextVariable("COUNT", count); t.SetTextVariable("COST", cost); t.SetTextVariable("GOLD", gold); t.SetTextVariable("AFFORD", afford.ToString());
-                string note = "\n\nThe smiths of " + _lastTown + " do the work and the coin goes into the town's coffers: a quarter of the worth a piece has lost for their labour, plus the materials they take from this market at its prices - iron (crude iron, scrap from wrecks or ore), wood, leather, linen or wool; the worse the piece, the more material."
+                string note = "\n\nThe smiths of " + _lastTown + " do the work and the coin goes into the town's coffers: " + (MendMaterial.RuleOn ? "their share of the days a master spent making each piece, at the day wage of " + _lastTown : "a quarter of the worth a piece has lost") + " for their labour, plus the materials they take from this market at its prices - iron (crude iron, scrap from wrecks or ore), wood, leather, linen or wool; the worse the piece, the more material."
                               + LeftEn(_lastWait, _lastWaitMask, _lastWrecks, _lastNoSmith, _lastTown);
                 MBTextManager.SetTextVariable("REALISTIC_LOOT_QM_REPAIR_TEXT", new TextObject("{=!}" + t.ToString() + note));
             }

@@ -246,7 +246,7 @@ namespace RealisticCaptivity
                 if (!CanPay(Here))
                 { args.IsEnabled = false; args.Tooltip = new TextObject("{=!}No one here has the coin to hire a hand - the purse of " + Here.Name + " is empty."); return true; }
                 args.Tooltip = new TextObject("{=!}About {PAY} stags a day, food included. Hard graft builds Athletics.")
-                    .SetTextVariable("PAY", c.HistoricalTownRates ? DayWage(Here).ToString("0.#") : LabourPay(Here).ToString());
+                    .SetTextVariable("PAY", c.HistoricalTownRates ? Math.Max(1f, DayWage(Here) * (Saturated(Here) ? 0.5f : 1f)).ToString("0.#") : LabourPay(Here).ToString());   // poprawka po audycie TOWARY 3: ta sama polowa co LabourPay w miejscu "nasyconym"
                 return true;
             }
             catch (Exception e) { Log.Error("LabourCondition", e); return false; }

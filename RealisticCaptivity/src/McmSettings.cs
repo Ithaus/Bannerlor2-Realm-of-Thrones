@@ -180,19 +180,19 @@ namespace RealisticCaptivity
         [SettingPropertyGroup("A roof of your own")]
         public bool FamilyHomeFree { get; set; } = true;
 
-        [SettingPropertyInteger("Home Price Town", 0, 16000, "0", HintText = "base price of a town house")]
+        [SettingPropertyInteger("Home Price Town", 0, 16000, "0", HintText = "base price of a town house (not used while Historical Town Rates is on)")]
         [SettingPropertyGroup("A roof of your own")]
         public int HomePriceTown { get; set; } = 4000;
 
-        [SettingPropertyFloatingInteger("Home Price Prosperity Factor", 0.00f, 2.00f, "0.00", HintText = "plus this per point of prosperity")]
+        [SettingPropertyFloatingInteger("Home Price Prosperity Factor", 0.00f, 2.00f, "0.00", HintText = "plus this per point of prosperity (not used while Historical Town Rates is on)")]
         [SettingPropertyGroup("A roof of your own")]
         public float HomePriceProsperityFactor { get; set; } = 0.5f;
 
-        [SettingPropertyInteger("Home Price Village", 0, 6000, "0", HintText = "base price of a village house")]
+        [SettingPropertyInteger("Home Price Village", 0, 6000, "0", HintText = "base price of a village house (not used while Historical Town Rates is on)")]
         [SettingPropertyGroup("A roof of your own")]
         public int HomePriceVillage { get; set; } = 1500;
 
-        [SettingPropertyFloatingInteger("Home Price Hearth Factor", 0.00f, 6.00f, "0.00", HintText = "plus this per hearth of the village")]
+        [SettingPropertyFloatingInteger("Home Price Hearth Factor", 0.00f, 6.00f, "0.00", HintText = "plus this per hearth of the village (not used while Historical Town Rates is on)")]
         [SettingPropertyGroup("A roof of your own")]
         public float HomePriceHearthFactor { get; set; } = 1.5f;
 
@@ -332,19 +332,19 @@ namespace RealisticCaptivity
         [SettingPropertyGroup("Honest work")]
         public int WorkOnlyBelowGold { get; set; } = 2500;
 
-        [SettingPropertyFloatingInteger("Work Pay Village Base", 0.00f, 4.00f, "0.00", HintText = "village day wage before the hearth bonus")]
+        [SettingPropertyFloatingInteger("Work Pay Village Base", 0.00f, 4.00f, "0.00", HintText = "village day wage before the hearth bonus (not used while Historical Town Rates is on)")]
         [SettingPropertyGroup("Honest work")]
         public float WorkPayVillageBase { get; set; } = 1f;
 
-        [SettingPropertyFloatingInteger("Work Pay Village Hearth Div", 0.00f, 4000.00f, "0.00", HintText = "village hearths divided by this are added to the wage")]
+        [SettingPropertyFloatingInteger("Work Pay Village Hearth Div", 0.00f, 4000.00f, "0.00", HintText = "village hearths divided by this are added to the wage (not used while Historical Town Rates is on)")]
         [SettingPropertyGroup("Honest work")]
         public float WorkPayVillageHearthDiv { get; set; } = 1000f;
 
-        [SettingPropertyFloatingInteger("Work Pay Town Base", 0.00f, 6.00f, "0.00", HintText = "town day wage before the prosperity bonus")]
+        [SettingPropertyFloatingInteger("Work Pay Town Base", 0.00f, 6.00f, "0.00", HintText = "town day wage before the prosperity bonus (not used while Historical Town Rates is on)")]
         [SettingPropertyGroup("Honest work")]
         public float WorkPayTownBase { get; set; } = 1.5f;
 
-        [SettingPropertyFloatingInteger("Work Pay Town Prosperity Div", 0.00f, 20000.00f, "0.00", HintText = "town prosperity divided by this is added to the wage")]
+        [SettingPropertyFloatingInteger("Work Pay Town Prosperity Div", 0.00f, 20000.00f, "0.00", HintText = "town prosperity divided by this is added to the wage (not used while Historical Town Rates is on)")]
         [SettingPropertyGroup("Honest work")]
         public float WorkPayTownProsperityDiv { get; set; } = 5000f;
 
@@ -372,11 +372,11 @@ namespace RealisticCaptivity
         [SettingPropertyGroup("Honest work")]
         public int GuardSkillRequired { get; set; } = 40;
 
-        [SettingPropertyFloatingInteger("Guard Pay Base", 0.00f, 8.00f, "0.00", HintText = "night-watch wage before the prosperity bonus")]
+        [SettingPropertyFloatingInteger("Guard Pay Base", 0.00f, 8.00f, "0.00", HintText = "night-watch wage before the prosperity bonus (not used while Historical Town Rates is on)")]
         [SettingPropertyGroup("Honest work")]
         public float GuardPayBase { get; set; } = 2f;
 
-        [SettingPropertyFloatingInteger("Guard Pay Prosperity Div", 0.00f, 16000.00f, "0.00", HintText = "town prosperity divided by this is added to the wage")]
+        [SettingPropertyFloatingInteger("Guard Pay Prosperity Div", 0.00f, 16000.00f, "0.00", HintText = "town prosperity divided by this is added to the wage (not used while Historical Town Rates is on)")]
         [SettingPropertyGroup("Honest work")]
         public float GuardPayProsperityDiv { get; set; } = 4000f;
 
@@ -388,7 +388,7 @@ namespace RealisticCaptivity
         [SettingPropertyGroup("Honest work")]
         public int GuardBrawlChancePercent { get; set; } = 15;
 
-        [SettingPropertyInteger("Guard Brawl Bonus", 0, 200, "0", HintText = "extra pay for cracking heads when trouble comes")]
+        [SettingPropertyInteger("Guard Brawl Bonus", 0, 200, "0", HintText = "extra pay for cracking heads when trouble comes (not used while Historical Town Rates is on)")]
         [SettingPropertyGroup("Honest work")]
         public int GuardBrawlBonus { get; set; } = 50;
 

@@ -30,8 +30,8 @@ namespace GrandTourney
         public bool PlayerHostingEnabled = true;           // you may proclaim a tourney of your own
         public int HostMinRenown = 300;                    // renown needed before anyone would answer your summons
         public int HostCooldownDays = 365;                 // days before you may hold another
-        public int HostBaseFee = 2000;                     // what it costs you to open the lists
-        public float HostFeeProsperityFactor = 0.5f;       // a richer town costs more to hire
+        public int HostBaseFee = 2000;                     // what it costs you to open the lists (not used while Historical Town Rates is on)
+        public float HostFeeProsperityFactor = 0.5f;       // a richer town costs more to hire (not used while Historical Town Rates is on)
         public int PrizeModest = 3000;                     // a modest purse
         public int PrizeWorthy = 8000;                     // a purse worth riding for
         public int PrizePrincely = 15000;                  // a princely purse
@@ -45,8 +45,8 @@ namespace GrandTourney
         public int HostLoyaltyGain = 5;                    // loyalty the town gains for the spectacle
         public int HostSecurityLoss = 3;                   // security the town loses to the crowds
         public int HostTakingsPerLord = 200;               // your cut of the takings per lord
-        public float HostTakingsProsperityFactor = 0.1f;   // a richer town pays out more
-        public float CancelledFeeRefund = 0.5f;            // share of the fee returned if the tourney is called off
+        public float HostTakingsProsperityFactor = 0.1f;   // a richer town pays out more (not used while Historical Town Rates is on)
+        public float CancelledFeeRefund = 0.5f;            // share of the fee returned if the tourney is called off (not used while Historical Town Rates is on)
         public bool HistoricalTownRates = true;            // a tourney's money goes where it should, as dear as the town is prosperous (the town wage level of Armoury): the hosting fee pays the town's carpenters, heralds and cooks (into its coffers), your purse waits for the champion and goes to him (all of it back to you if the tourney is called off), the takings come out of the town's coffers (off = the old way: fee and purse vanish, takings from nobody, half the purse back)
         public int HostFeePence = 4400;                    // with historical town rates: what opening the lists costs in a middling town, pence (lists, stands, heralds, the feast - about 18 pounds), as dear as the town is prosperous
         public int HostTakingsBasePence = 480;             // with historical town rates: the takings from the crowds in a middling town, pence, on top of the takings per lord - both as dear as the town is prosperous

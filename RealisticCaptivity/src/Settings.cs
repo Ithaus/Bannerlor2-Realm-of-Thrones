@@ -69,10 +69,10 @@ namespace RealisticCaptivity
         // --- A roof of your own ---
         public bool HomesEnabled = true;                   // houses to own in towns and villages
         public bool FamilyHomeFree = true;                 // the hearth you were born under is yours from the start
-        public int HomePriceTown = 4000;                   // base price of a town house
-        public float HomePriceProsperityFactor = 0.5f;     // plus this per point of prosperity
-        public int HomePriceVillage = 1500;                // base price of a village house
-        public float HomePriceHearthFactor = 1.5f;         // plus this per hearth of the village
+        public int HomePriceTown = 4000;                   // base price of a town house (not used while Historical Town Rates is on)
+        public float HomePriceProsperityFactor = 0.5f;     // plus this per point of prosperity (not used while Historical Town Rates is on)
+        public int HomePriceVillage = 1500;                // base price of a village house (not used while Historical Town Rates is on)
+        public float HomePriceHearthFactor = 1.5f;         // plus this per hearth of the village (not used while Historical Town Rates is on)
         public float HomeSellFactor = 0.6f;                // a buyer gives this share of the price
         public int HomeTownPence = 2400;                   // with historical town rates: a modest town house in a middling town, pence (about 10 pounds c.1300), as dear as the town is prosperous
         public int HomeVillagePence = 480;                 // with historical town rates: a village cottage, pence (about 2 pounds), by the wage level of its market town
@@ -124,21 +124,21 @@ namespace RealisticCaptivity
         public bool WorkEnabled = true;                    // day labour and guard work for hire in settlements
         public int WorkMaxPartySize = 5;                   // with more mouths than this behind you, no one hires you as a hand
         public int WorkOnlyBelowGold = 2500;               // day labour offered only while your purse is under this (0 = always)
-        public float WorkPayVillageBase = 1f;              // village day wage before the hearth bonus
-        public float WorkPayVillageHearthDiv = 1000f;       // village hearths divided by this are added to the wage
-        public float WorkPayTownBase = 1.5f;               // town day wage before the prosperity bonus
-        public float WorkPayTownProsperityDiv = 5000f;     // town prosperity divided by this is added to the wage
+        public float WorkPayVillageBase = 1f;              // village day wage before the hearth bonus (not used while Historical Town Rates is on)
+        public float WorkPayVillageHearthDiv = 1000f;       // village hearths divided by this are added to the wage (not used while Historical Town Rates is on)
+        public float WorkPayTownBase = 1.5f;               // town day wage before the prosperity bonus (not used while Historical Town Rates is on)
+        public float WorkPayTownProsperityDiv = 5000f;     // town prosperity divided by this is added to the wage (not used while Historical Town Rates is on)
         public int WorkAthleticsXpPerDay = 25;             // athletics practice from a day of hard graft
         public int WorkSaturationDays = 10;                // after this many days in one place the wage halves
         public int WorkSaturationRestDays = 5;             // days away before the place forgets you and pays full again
         public bool GuardWorkEnabled = true;               // night-watch work for hire in towns
         public int GuardOnlyBelowGold = 10000;             // guard work offered only while your purse is under this (0 = always)
         public int GuardSkillRequired = 40;                // best weapon skill the merchants demand of a hired guard
-        public float GuardPayBase = 2f;                    // night-watch wage before the prosperity bonus
-        public float GuardPayProsperityDiv = 4000f;        // town prosperity divided by this is added to the wage
+        public float GuardPayBase = 2f;                    // night-watch wage before the prosperity bonus (not used while Historical Town Rates is on)
+        public float GuardPayProsperityDiv = 4000f;        // town prosperity divided by this is added to the wage (not used while Historical Town Rates is on)
         public int GuardWeaponXpPerDay = 40;               // weapon practice from a night on the walls
         public int GuardBrawlChancePercent = 15;           // nightly chance of trouble at the gates
-        public int GuardBrawlBonus = 50;                   // extra pay for cracking heads when trouble comes
+        public int GuardBrawlBonus = 50;                   // extra pay for cracking heads when trouble comes (not used while Historical Town Rates is on)
         public int GuardBrawlHealthLoss = 30;              // health lost when the toughs get the better of you
         public bool HistoricalTownRates = true;            // wages and house prices at historical rates, as dear as the town is prosperous (the town wage level of Armoury), and paid by the settlement's coffers - not out of thin air (off = the old formulas, gold from nobody and to nobody)
         public float LabourerDayWage = 1.5f;               // an unskilled labourer's day in a middling town, pence (England c.1300: a labourer about 1.5 d, a craftsman 3 d); a night on the watch pays the same

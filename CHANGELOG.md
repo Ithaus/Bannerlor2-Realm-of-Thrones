@@ -1,5 +1,14 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-08 (134, 135, 137, 139, 140, 142, 145 - poprawka po audycie TOWARY 3) - OPISY MCM I NAPISY W GRZE ZGODNE Z NOWYMI REGULAMI
+**Mod:** Armoury, GrandTourney, RealisticCaptivity | **Pliki:** `Armoury/src/SpoilsSeal.cs` (napis menu naprawy kwatermistrza), `Armoury/src/Settings.cs`, `GrandTourney/src/Settings.cs`, `RealisticCaptivity/src/Settings.cs` (opisy MCM; `McmSettings.cs` z `tools/gen_mcm.py`), `RealisticCaptivity/src/Work.cs` (podpowiedz pracy dniowkowej)
+
+**Problem (audyt MCM / Armoury.json / tekstow TOWARY 3):** (1) menu naprawy u kwatermistrza Spoils pisalo "a quarter of the worth a piece has lost for their labour" i tak samo opis `SpoilsQuartermasterRepair`, a przy `SmithMendFromMarket` (domyslnie wl.) robota kosztuje ulamek dni wykonania x dniowka miasta (tekst z 134, niepoprawiony po 135); (2) opisy starych suwakow, ktore przy nowych wlacznikach nic nie robia, o tym nie mowily (Jeff przesunie suwak i nic sie nie zmieni): `ForgeFeePerTier`, `BkForgeHourlyMultiplier` (Forge Hire Historical), `RepairCostFactor` (Smith Mend From Market), `TroopOrderMarkup` (Troop Order From Shelf), GT `HostBaseFee`, `HostFeeProsperityFactor`, `HostTakingsProsperityFactor`, `CancelledFeeRefund`, RC `HomePrice*`, `WorkPay*`, `GuardPay*`, `GuardBrawlBonus` (Historical Town Rates); opis `ForgeDayHours` "(~200 gold in an average town)" byl bledny; (3) RC: przy `HistoricalTownRates` podpowiedz "About {PAY} stags a day" pokazywala pelna dniowke, a zaplata w miejscu "nasyconym" to polowa (n120 pokazywal polowe); (4) opis `BkSupplyDaysCap` mial polski cytat (sprzed lancucha; CLAUDE.md: opisy MCM po angielsku bez wyjatkow).
+
+**Zmiana (tylko teksty; liczby i reguly bez zmian - kazde "not used while X is on" sprawdzone w kodzie galezi):** (1) napis kwatermistrza zalezny od `MendMaterial.RuleOn` ("their share of the days a master spent making each piece, at the day wage of <miasto>" / jak dotad), opis `SpoilsQuartermasterRepair` mowi oba przypadki; (2) dopiski "(not used while ... is on ...)" i nowy opis `ForgeDayHours` (wl.: dzien kuzni dzielony na godziny stawki BK; wyl.: karnet = tyle godzin po stawce BK); `RepairCostFactor`: przy regule kowali zostaje tylko dla sztuk bez receptury; (3) RC: `Math.Max(1, DayWage x (Saturated ? 0.5 : 1))` - ta sama polowa co `LabourPay`; (4) `Jeff 31.08: set to 4`. `python tools/gen_mcm.py` - McmSettings trzech modulow przepisane (te same klucze, liczba ustawien bez zmian: 671 / 40 / 104).
+
+**Ryzyko / co sprawdzic:** tylko teksty (ASCII). W MCM: opisy wymienionych suwakow; w grze: menu kwatermistrza Spoils (naprawa), podpowiedz "day labour" w RC.
+
 ## 2026-10-08 (135, poprawka po audycie TOWARY 3) - NAPRAWA UPRZEZY PRZY WYLACZONEJ REGULE KOWALI CO DO GROSZA JAK DOTAD
 **Mod:** Armoury | **Pliki:** `ArmouryBehavior.cs` (`HarnessLabor`)
 

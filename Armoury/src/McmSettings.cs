@@ -216,11 +216,11 @@ namespace Armoury
         [SettingPropertyGroup("Forge fee")]
         public int ForgeFeeBase { get; set; } = 3;
 
-        [SettingPropertyInteger("Forge Fee Per Tier", 0, 10, "0", HintText = "and this much more for every tier of the work")]
+        [SettingPropertyInteger("Forge Fee Per Tier", 0, 10, "0", HintText = "and this much more for every tier of the work (not used while Forge Hire Historical is on - then a forge day costs the same whatever you make)")]
         [SettingPropertyGroup("Forge fee")]
         public int ForgeFeePerTier { get; set; } = 2;
 
-        [SettingPropertyFloatingInteger("Bk Forge Hourly Multiplier", 0.00f, 2.00f, "0.00", HintText = "Banner Kings charges by the hour at the anvil - this scales that hourly rate")]
+        [SettingPropertyFloatingInteger("Bk Forge Hourly Multiplier", 0.00f, 2.00f, "0.00", HintText = "Banner Kings charges by the hour at the anvil - this scales that hourly rate (not used while Forge Hire Historical is on - then the hour is the forge day split by Forge Day Hours)")]
         [SettingPropertyGroup("Forge fee")]
         public float BkForgeHourlyMultiplier { get; set; } = 0.5f;
 
@@ -228,7 +228,7 @@ namespace Armoury
         [SettingPropertyGroup("Forge fee")]
         public bool ForgeDayPassEnabled { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Forge Day Hours", 0.00f, 32.00f, "0.00", HintText = "the day's hire costs this many hours at the smith's rate (~200 gold in an average town)")]
+        [SettingPropertyFloatingInteger("Forge Day Hours", 0.00f, 32.00f, "0.00", HintText = "with Forge Hire Historical on: the forge day (Forge Fee Base x the town's wage level) is split into this many hours for the Banner Kings hourly rate; off: the day's hire costs this many hours at the Banner Kings rate")]
         [SettingPropertyGroup("Forge fee")]
         public float ForgeDayHours { get; set; } = 8f;
 
@@ -476,7 +476,7 @@ namespace Armoury
         [SettingPropertyGroup("Wear and tear")]
         public int ThresholdRuined { get; set; } = 20;
 
-        [SettingPropertyFloatingInteger("Repair Cost Factor", 0.00f, 2.00f, "0.00", HintText = "share of item value for a full repair")]
+        [SettingPropertyFloatingInteger("Repair Cost Factor", 0.00f, 2.00f, "0.00", HintText = "share of item value for a full repair (with Smith Mend From Market on, the town smiths charge by their day wages instead - this share is left only for pieces they have no recipe for)")]
         [SettingPropertyGroup("Wear and tear")]
         public float RepairCostFactor { get; set; } = 0.5f;
 
@@ -492,7 +492,7 @@ namespace Armoury
         [SettingPropertyGroup("Crown jewels")]
         public int UniqueCrownHeadArmor { get; set; } = 10;
 
-        [SettingPropertyInteger("Bk Supply Days Cap", 0, 16, "0", HintText = "AI parties stock this many days of Banner Kings supplies instead of 10 - healthier logistics than living hand to mouth (0 = off; Jeff 31.08: 'daj na 4')")]
+        [SettingPropertyInteger("Bk Supply Days Cap", 0, 16, "0", HintText = "AI parties stock this many days of Banner Kings supplies instead of 10 - healthier logistics than living hand to mouth (0 = off; Jeff 31.08: set to 4)")]
         [SettingPropertyGroup("The lean quartermasters")]
         public int BkSupplyDaysCap { get; set; } = 4;
 
@@ -716,7 +716,7 @@ namespace Armoury
         [SettingPropertyGroup("The law of the battlefield")]
         public bool SpoilsNoFreeGold { get; set; } = true;
 
-        [SettingPropertyBool("Spoils Quartermaster Repair", HintText = "the Spoils of War quartermaster's repairs are done by this town's smiths, like every other repair in Armoury: you pay into the town's coffers a quarter of the worth a piece has lost for the work, plus the materials they take from this market at its prices - iron (crude iron, scrap from wrecks or ore), wood, leather, linen or wool, more the worse the piece; with no such materials on the market the piece waits; wrecks (Mangled) are not restored here - mend them at a forge with your own materials, or salvage them (off = Spoils of War as before: its price, the coin vanishes, no materials, wrecks restored; the day's log line shows how much either way)")]
+        [SettingPropertyBool("Spoils Quartermaster Repair", HintText = "the Spoils of War quartermaster's repairs are done by this town's smiths, like every other repair in Armoury: you pay into the town's coffers the smiths' work (with Smith Mend From Market on: its share of the days a master spent making the piece, at the town's day wage; off: a quarter of the worth it has lost), plus the materials they take from this market at its prices - iron (crude iron, scrap from wrecks or ore), wood, leather, linen or wool, more the worse the piece; with no such materials on the market the piece waits; wrecks (Mangled) are not restored here - mend them at a forge with your own materials, or salvage them (off = Spoils of War as before: its price, the coin vanishes, no materials, wrecks restored; the day's log line shows how much either way)")]
         [SettingPropertyGroup("The law of the battlefield")]
         public bool SpoilsQuartermasterRepair { get; set; } = true;
 
@@ -2580,7 +2580,7 @@ namespace Armoury
         [SettingPropertyGroup("The men's gear")]
         public bool TroopOrderEnabled { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Troop Order Markup", 0.00f, 4.60f, "0.00", HintText = "the smith's fee: each procured piece costs its market worth times this")]
+        [SettingPropertyFloatingInteger("Troop Order Markup", 0.00f, 4.60f, "0.00", HintText = "the smith's fee: each procured piece costs its market worth times this (not used while Troop Order From Shelf is on - then the shelf price plus the smith's legwork)")]
         [SettingPropertyGroup("The men's gear")]
         public float TroopOrderMarkup { get; set; } = 1.15f;
 
