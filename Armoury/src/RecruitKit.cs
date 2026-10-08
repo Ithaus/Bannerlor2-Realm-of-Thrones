@@ -26,8 +26,11 @@ namespace Armoury
         private class Kit { internal CharacterObject Troop; internal bool Template; internal List<EquipmentElement> Items = new List<EquipmentElement>(); }
         private static readonly Dictionary<Hero, List<Kit>> _kits = new Dictionary<Hero, List<Kit>>();
         private static int _dayKits, _dayLegacy, _dayTier1, _daySold, _dayStamp = -1;
+        // 161: zapis z SyncData czeka na rozwiazanie do startu sesji - w SyncData bohaterowie gry nie sa jeszcze
+        // do znalezienia (MBObjectManager.GetObject<Hero> = null), wiec dotad KAZDE wczytanie gubilo wszystkie komplety
+        private static string _pending;
 
-        internal static void Reset() { _kits.Clear(); _dayKits = _dayLegacy = _dayTier1 = _daySold = 0; _dayStamp = -1; }
+        internal static void Reset() { _kits.Clear(); _pending = null; _dayKits = _dayLegacy = _dayTier1 = _daySold = 0; _dayStamp = -1; }
 
         private static List<EquipmentElement> TemplateItems(CharacterObject c)
         {
@@ -69,17 +72,90 @@ namespace Armoury
         internal static void OnVanished(Hero n, CharacterObject x, Settlement market)
         {
             if (!On) return;
-            var k = Pop(n, x);
-            if (k == null || k.Items.Count == 0 || market == null || market.Town == null) return;
+            SellOff(n, Pop(n, x), market);
+        }
+
+        /// <summary>Kupione rzeczy kompletu na targ: notabl dostaje cene skupu, nie wiecej niz kasa miasta.</summary>
+        private static int SellOff(Hero n, Kit k, Settlement market)
+        {
+            if (k == null || k.Items.Count == 0 || market == null || market.Town == null) return 0;
+            int sold = 0;
             foreach (var e in k.Items)
             {
+                if (e.Item == null) continue;
                 int price = MenPurse.SellPrice(e, market, null);
                 if (market.Town.Gold < price) break;
                 market.ItemRoster.AddToCounts(e, 1);
                 market.Town.ChangeGold(-price);
                 n.ChangeHeroGold(price);
                 _daySold++;
+                sold++;
                 SellByCondition.NoteSale(SellByCondition.Notable, e, 1, price);   // ksiega skupu sprzetu (tylko log)
+            }
+            return sold;
+        }
+
+        private static Settlement MarketOfNotable(Hero n)
+        {
+            Settlement st = null;
+            try { st = n.HomeSettlement ?? n.CurrentSettlement; } catch { }
+            return st != null ? VolunteerKit.MarketOf(st) : null;
+        }
+
+        /// <summary>
+        /// 161: uzgodnienie kompletow z pulami ochotnikow (raz na dobe i po wczytaniu). Komplet bez ochotnika w puli
+        /// to sierota (ochotnik odszedl poza zdarzeniami, ktore widzi VolunteerKit) - w tescie rocznym 12 927 kompletow
+        /// u 2760 notabli. Nadmiar wobec puli: kupione rzeczy notabl sprzedaje na targu (jak przy odejsciu ochotnika);
+        /// notabl nie zyje albo nie jest juz notablem: rzeczy wracaja na targ jego osady bez zaplaty (zloto zmarlego
+        /// nikomu by nie przypadlo). Zostaja najnowsze komplety danego oddzialu.
+        /// </summary>
+        internal static void Reconcile(string why)
+        {
+            if (!On || _kits.Count == 0) return;
+            int before = 0, extra = 0, dead = 0, deadNotables = 0, sold = 0, returned = 0;
+            foreach (var n in new List<Hero>(_kits.Keys))
+            {
+                var l = _kits[n];
+                before += l.Count;
+                bool gone = n == null || !n.IsAlive || !n.IsNotable || n.VolunteerTypes == null;
+                if (gone)
+                {
+                    var market = n != null ? MarketOfNotable(n) : null;
+                    foreach (var k in l)
+                    {
+                        if (market == null || market.ItemRoster == null) continue;
+                        foreach (var e in k.Items) if (e.Item != null) { market.ItemRoster.AddToCounts(e, 1); returned++; }
+                    }
+                    dead += l.Count; deadNotables++;
+                    _kits.Remove(n);
+                    continue;
+                }
+                var pool = new Dictionary<CharacterObject, int>();
+                foreach (var c in n.VolunteerTypes) if (c != null) { int v; pool.TryGetValue(c, out v); pool[c] = v + 1; }
+                var kept = new Dictionary<CharacterObject, int>();
+                var drop = new List<Kit>();
+                for (int i = l.Count - 1; i >= 0; i--)
+                {
+                    var k = l[i];
+                    int have = 0, room = 0;
+                    if (k.Troop != null) { kept.TryGetValue(k.Troop, out have); pool.TryGetValue(k.Troop, out room); }
+                    if (k.Troop != null && have < room) { kept[k.Troop] = have + 1; continue; }
+                    drop.Add(k);
+                    l.RemoveAt(i);
+                }
+                if (drop.Count > 0)
+                {
+                    var market = MarketOfNotable(n);
+                    foreach (var k in drop) sold += SellOff(n, k, market);
+                    extra += drop.Count;
+                }
+                if (l.Count == 0) _kits.Remove(n);
+            }
+            if (extra + dead > 0 || why != "doba")
+            {
+                int after = 0; foreach (var l in _kits.Values) after += l.Count;
+                Log.Info("Komplet rekruta: uzgodnienie z pulami (" + why + ") - kompletow " + before + " -> " + after + " u " + _kits.Count + " notabli; nadmiar wobec puli "
+                         + extra + " (kupione rzeczy sprzedane " + sold + " szt.), notable zmarli/bez puli " + deadNotables + " (" + dead + " kompletow, rzeczy na targ " + returned + " szt.).");
             }
         }
 
@@ -133,6 +209,7 @@ namespace Armoury
         // ------------------------------------------------------------ zapis: notabl>oddzial>T|przedmiot:stan,...~
         internal static string Export()
         {
+            if (_pending != null) ResolvePending("zapis przed startem sesji");
             var sb = new StringBuilder();
             foreach (var kv in _kits)
                 foreach (var k in kv.Value)
@@ -150,16 +227,33 @@ namespace Armoury
             return sb.ToString();
         }
 
+        /// <summary>Z SyncData: tylko zapamietanie - rozwiazanie w ResolvePending (start sesji).</summary>
         internal static void Import(string s)
         {
             _kits.Clear();
+            _pending = string.IsNullOrEmpty(s) ? null : s;
+        }
+
+        /// <summary>Z OnSessionLaunched (i awaryjnie z Export): komplety z zapisu na zywych bohaterow gry.</summary>
+        internal static void ResolvePending(string why)
+        {
+            var s = _pending;
+            _pending = null;
             if (string.IsNullOrEmpty(s)) return;
             var om = MBObjectManager.Instance;
+            var heroes = new Dictionary<string, Hero>();
+            try { foreach (var hh in Hero.AllAliveHeroes) if (hh != null && hh.StringId != null) heroes[hh.StringId] = hh; } catch { }
+            try { foreach (var hh in Hero.DeadOrDisabledHeroes) if (hh != null && hh.StringId != null && !heroes.ContainsKey(hh.StringId)) heroes[hh.StringId] = hh; } catch { }
+            int recs = 0, noHero = 0, noTroop = 0, ok = 0;
             foreach (var rec in s.Split('~'))
             {
                 var a = rec.Split('>'); if (a.Length != 4) continue;
-                var h = om.GetObject<Hero>(a[0]); var c = om.GetObject<CharacterObject>(a[1]);
-                if (h == null || c == null) continue;
+                recs++;
+                Hero h; if (!heroes.TryGetValue(a[0], out h)) { try { h = om.GetObject<Hero>(a[0]); } catch { h = null; } }
+                CharacterObject c = null; try { c = om.GetObject<CharacterObject>(a[1]); } catch { }
+                if (h == null) { noHero++; continue; }
+                if (c == null) { noTroop++; continue; }
+                ok++;
                 var k = new Kit { Troop = c, Template = a[2] == "T" };
                 foreach (var tok in a[3].Split(','))
                 {
@@ -171,6 +265,8 @@ namespace Armoury
                 }
                 Push(h, k);
             }
+            Log.Info("Komplet rekruta: z zapisu (" + why + ") " + ok + " kompletow z " + recs + " (brak notabla " + noHero + ", brak oddzialu " + noTroop + ").");
+            Reconcile("po wczytaniu");
         }
     }
 }

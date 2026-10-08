@@ -979,6 +979,7 @@ namespace Armoury
         private void OnSessionLaunched(CampaignGameStarter starter)
         {
             SaveText.ReportAfterLoad();   // 161: ile dlugich napisow uratowal ratunek przy wczytaniu
+            try { RecruitKit.ResolvePending("wczytanie"); } catch (Exception e) { Log.Error("RecruitKit.ResolvePending", e); }   // 161: komplety rekrutow dopiero teraz (w SyncData bohaterow nie ma)
             try { FixCharcoalWeight(); } catch (Exception e) { Log.Error("FixCharcoalWeight", e); }   // wpis 87 (audyt pkt 11d): waga wegla PRZED wycena
             try { LootPrices.Apply(); } catch (Exception e) { Log.Error("LootPrices", e); }   // wpis 97: cena lupu = stan
             try { McmSettings.Apply(); MaterialLaw.Apply(); ArmsPricing.Build(); HistoricalPrices.Apply(); StartStock.Run(); ArmsPricing.ClearCostCache(); MapClock.ApplySpeed(); UniqueSpoils.OnSessionLaunched(); ColdStart.Run(); } catch (Exception e) { Log.Error("MaterialLaw/ArmsPricing", e); }   // surowce PRZED wycena uzbrojenia; StartStock zaraz PO Apply (przelicznik ladunku juz obowiazuje)
@@ -1208,6 +1209,7 @@ namespace Armoury
         private void OnDailyTick()
         {
             try { CampFever.OnDaily(); } catch (Exception e) { Log.Error("CampFever", e); }
+            try { RecruitKit.Reconcile("doba"); } catch (Exception e) { Log.Error("RecruitKit.Reconcile", e); }   // 161: komplety bez ochotnika w puli (sieroty)
             // audyt predkosci STAD, nie z postfixa - w postfixie SpeedExplained
             // wchodzilo o poziom glebiej i rozpiska pokazywala gole liczby vanilli
             try { TerrainEase.DailyAudit(); } catch (Exception e) { Log.Error("SpeedAudit", e); }
