@@ -374,6 +374,13 @@ narzedzia rozpoznal wszystkie linie. Grupa 1: OK 61, UWAGA 5; grupa 2: OK 31, UW
   ograniczyc do Muru (decyzja Jeffa: czy jency Innych licza sie jako polegli); wightow nie wpuszczac do puli wyrzutkow, wylaczyc im
   dezercje i niewole; naprawic limit w Zewie.
 ## Decyzje Jeffa 07.10 (wiazace)
+- WIOSKI - IMMERSJA (08.10 ok. 02:20): "bierzemy wszystkie 8 do wiosek": (1) dymek z panem okregu i herbem, (2) proporczyk w barwach pana,
+  (3) rycerz / pomniejszy rod zaprzysiezony z lore (prawdziwe rody z siedziba w poblizu, potem wymyslone w stylu krainy), (4) czym zyje wioska,
+  (5) wiara i swiete miejsce, (6) zdanie historii, (7) pamiec wojny (po 108-113), (8) menu okregu z lista wiosek. Do tego (08.10 02:11): "za prosta
+  linia", modele farm / wiosek / mlynow / spichlerzy (mlyny przy rzekach), drogi nieutwardzone / lesne - zbadac. W toku: wioski-wyglad-i-zdjecia
+  (wyglad + roznorodnosc + bez AccessViolation + zdjecia w autotescie), wioski-uklad-i-drogi (generator v4 + badanie drog), wioski-lore-i-immersja
+  (dane lore + projekt techniczny pkt 1-8). Sesja Jeffa 08.10 02:01-02:14: zapis save039 caly; 7 x AccessViolation w diagnostyce wiosek;
+  wywrotka silnika przy wyjsciu (0xC0000005 po "Managed Interface deleted", ta sama co w autotestach); zalecone MCM Map Villages Enabled = off.
 - WRAKI (07.10 ok. 15:35): "wraki ida na zlom" - kowale miasta NIE odnawiaja wrakow (Mangled i stany <= 0.10) nigdzie: ani u kwatermistrza, ani na
   polkach wojska (koniec decyzji 26.08 "wrak max 10% wartosci"), ani dla ludzi i lordow AI; wrak = zlom do przetopu (zrodlo materialu MendMaterial) albo
   wlasne kowadlo gracza. Do wprowadzenia w TOWARY 3 (TroopMend / TroopPieceCost i wszystkie drogi, ktore jeszcze odnawiaja wraki).
