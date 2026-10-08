@@ -31,6 +31,16 @@
 // wiatrak, stodoly) jako SAME KOPIE SIATEK ze skala z BB - bez fizyki, skryptow, czastek i dzwiekow. Kazda uzyta siatka w wioski.log.
 // Recenzja wygladu 2 (08.10): poziom 1 / 2 kepy "village" ma najwyzej 2 / 3 detale (inaczej detale z luk przy srodku wypieraly domy);
 // mlyn / rybacy z woda ZA kepa (front z pliku na droge) - obrazek odwrocony o pi, zeby kolo / pomost staly od wody.
+// WYGLAD 3 (08.10, zdjecia autotestu 04:42): (1) wysokosc KAZDEGO budynku = dol BB (ze skala i obrotem) na najnizszym gruncie pod obrysem
+// minus 0.03 - domy Reach (Poppymead, Berrybush) byly zapadniete po dach takze na plaskim, bo "wysokosc z prefabu" liczyla sie od korzenia
+// wsi-matki (Berrybush: prefab 0.23 pod korzeniem); (2) mlyn / rybacy: brzeg wody z wachlarza 16 kierunkow (sciany siatki nawigacyjnej
+// bez ladu + teren pod poziomem wody), front obrazka do wody, obrazek przesuniety tak, ze kolo mlyna stoi NAD woda i jej dotyka (przy
+// wodzie na polnoc mlyn obrocony o 50 st. wokol kola - kolo od strony kamery), pomost od brzegu, lodzie na wodzie; brak wody w 5 jedn. -
+// mlyn = wiatrak, rybacy = wioska; (3) wiatrak = sturgia_windmill_a ze skrzydlami (smiglo) i schodami jako doczepione kopie siatek,
+// skrzydla od strony kamery (battania_windmill to wieza bez skrzydel - zapas); (4) srodek obrazka i kazdy budynek na ladzie (sciana siatki
+// ladowej i teren nad morzem 5.5) - inaczej przeniesiony / zdjety. Bez nowych prefabow scenowych, fizyki, skryptow, czastek i dzwiekow.
+// Recenzja wygladu 3 (08.10): srodek obrazka przeniesiony (na lad, ku wodzie, ze stoku) nie blizej innej wioski niz 3.5 jedn. (plik: >= 4.5) -
+// na lad do 6 jedn. i ku wodzie do 3.5 jedn. stawialo wioski przy sasiadach (Gallowsmill 2.1 od Blackholt, Talosa 2.6 od Stonecove).
 // Teksty w grze po angielsku (VillageTexts.cs), komentarze bez polskich znakow.
 using System;
 using System.Collections.Generic;
@@ -310,7 +320,13 @@ namespace Armoury
         /// <summary>Jak InFootprint, ale srodek obrazka (cx, cy) - po przesunieciu wioski ze stoku na plaskie miejsce (v4).</summary>
         internal static bool InFootprintAt(MapVillageRecord r, float cx, float cy, float px, float py, float margin)
         {
-            double a = r.FrontDeg * Math.PI / 180.0;
+            return InFootprintDeg(r, r.FrontDeg, cx, cy, px, py, margin);
+        }
+
+        /// <summary>Jak InFootprintAt, ale obrot obrazka deg (wyglad 3: mlyn / rybacy obroceni frontem do wody).</summary>
+        internal static bool InFootprintDeg(MapVillageRecord r, float deg, float cx, float cy, float px, float py, float margin)
+        {
+            double a = deg * Math.PI / 180.0;
             double ca = Math.Cos(a), sa = Math.Sin(a);
             double dx = px - cx, dy = py - cy;
             double along = dx * ca + dy * sa;          // lokalna X = ulica wzdluz drogi
@@ -636,35 +652,294 @@ namespace Armoury
             return keep;
         }
 
-        /// <summary>Brzeg wody na profilu terenu od frontu kepy (+Y): pierwszy punkt nizej niz pierwszy o wiecej niz drop; -1 = brak.</summary>
-        internal static int FirstDrop(IList<float> h, float drop)
+        // ---------- WYGLAD 3 (zdjecia autotestu 08.10 04:42): lad pod budynkami, brzeg wody dla mlyna / rybakow ----------
+        // Zdjecia: mlyn kilka domow od rzeki bez widocznego kola (Sweet Bridge), osada rybacka na skalach w wodzie (Widow's Horn). Proba poza
+        // gra na danych mapy ROT (proba-0810\proba_v5_dane.py): srodek Widow's Horn lezy na scianie siatki typu Plain, ale teren ma tam 5.21,
+        // pod poziomem morza 5.50 (9 wiosek pliku v4 ma tak srodek, 38 czesc obrysu); rzeki to pasy scian Mountain (472 z 520 punktow osi
+        // rzek), woda rzeki stoi ok. 0.22 nad dnem koryta; brzeg wody od srodka wioski-mlyna: mediana 2.85 jedn. (dawny profil szukal 2.5 jedn.
+        // tylko przed frontem i przesuwal mlyn najwyzej o 1.6). Lad = sciana siatki ladowej I teren nad poziomem morza.
+        internal const float SeaLevelRot = 5.5f;        // ROT 8.1.8 Main_map: water_properties water_level 5.500 (scene.xscene); tylko przy zgodnym CRC sceny
+        internal const float NoSea = -1e6f;             // poziom morza nieznany (plik bez CRC sceny) - lad tylko wedlug siatki
+        internal const float GroundSink = 0.03f;        // dol BB budynku tyle pod najnizszym gruntem pod obrysem (jedn. mapy)
+        internal const float RiverAboveBed = 0.22f;     // woda rzeki nad dnem koryta (mediana 520 punktow sciezek 56 rzek ROT; 10% 0.07, 90% 0.39)
+        internal const float ShoreMaxR = 5.0f;          // brzeg wody szukany do 5 jedn. od srodka (pierwsza sciana bez ladu; proba-0810\ProbaV5 na mapie ROT)
+        internal const float ShoreStep = 0.25f;
+        internal const float ShoreNorthPenalty = 0.6f;  // kamera mapy patrzy na polnoc: woda na N (kolo / pomost za budynkiem) liczy sie jak 0.6 jedn. dalej
+        internal const float ShoreMaxShift = 3.5f;      // obrazek przesuwany ku wodzie najwyzej o tyle (jedn. mapy)
+        internal const float ShoreMaxBack = 1.0f;       // ... i od wody najwyzej o tyle (woda blizej niz przod kepy)
+        internal const int ShoreDirs = 16;
+        internal const float LandSearchR = 6.0f;        // srodek obrazka poza ladem: najblizsze miejsce z obrysem na ladzie do 6 jedn. (Muqazmion: lad 4.6 jedn.)
+        internal const float NeighborMinDist = 3.5f;    // recenzja: srodek przeniesiony (na lad / ku wodzie / ze stoku) nie blizej innej wioski (plik: >= 4.5)
+
+        /// <summary>Typ sciany siatki nawigacyjnej (PathFaceRecord.FaceGroupIndex = TerrainType), na ktorym moze stac budynek: Plain 1, Desert 2,
+        /// Snow 3, Forest 4, Steppe 5, RuralArea 14, Swamp 15, Dune 16, Beach 20. Nie: Fording 6, Mountain 7 (w ROT pasy rzek, urwiska i plot
+        /// zeglugi), Lake 8, Water 10, River 11, Canyon 13, Bridge 17, CoastalSea 18, OpenSea 19, Cliff 21, NonNavigableRiver 22, 23-25; -1 = brak sciany.</summary>
+        internal static bool IsLandGroup(int g)
         {
-            if (h == null || h.Count < 2) return -1;
-            for (int i = 1; i < h.Count; i++) if (h[i] < h[0] - drop) return i;
-            return -1;
+            return g == 1 || g == 2 || g == 3 || g == 4 || g == 5 || g == 14 || g == 15 || g == 16 || g == 20;
         }
 
-        /// <summary>Woda ZA kepa, nie przed nia: na profilu od frontu (+Y) brak brzegu, na profilu od tylu (-Y) jest (FirstDrop). Recenzja 08.10:
-        /// generator v4 kieruje front wioski "droga" (14 mlynow, 22 osady rybakow) na droge, a rzeka / morze bywa za nia - obrazek odwracany
-        /// o pi, zeby kolo mlyna / pomost staly od strony wody (prostokat obrysu z pliku po obrocie o pi ten sam).</summary>
-        internal static bool WaterBehind(IList<float> front, IList<float> back, float drop)
+        /// <summary>Lad pod punktem: sciana ladowa i teren nad poziomem morza (seaLevel = NoSea: tylko sciana).</summary>
+        internal static bool LandAt(int group, float h, float seaLevel)
         {
-            return FirstDrop(front, drop) < 0 && FirstDrop(back, drop) >= 0;
+            return IsLandGroup(group) && !(seaLevel > NoSea * 0.5f && h <= seaLevel + 0.02f);
+        }
+
+        /// <summary>Zaglebienie dolu BB pod najnizszy grunt: GroundSink, ale najwyzej 10% wysokosci budynku (worek, stog nie znika w ziemi).</summary>
+        internal static float Sink(float heightWorld)
+        {
+            return Math.Max(0f, Math.Min(GroundSink, 0.1f * heightWorld));
+        }
+
+        /// <summary>Brzeg wody na promieniu: kierunek (Dx, Dy), odleglosc od startu do wody (Edge) i do ostatniego ladu (LastLand), poziom wody
+        /// (WaterZ), grunt na ostatnim ladzie (Top), morze / rzeka-jezioro, ocena (Edge + kara za wode na polnoc), numer promienia.</summary>
+        internal sealed class ShoreHit
+        {
+            public float Dx, Dy, Edge, LastLand, WaterZ, Top, Score;
+            public bool Sea;
+            public int Dir = -1;
+        }
+
+        /// <summary>Promien od (x, y) w kierunku (dx, dy) co step do maxR: pierwszy punkt bez ladu (LandAt), granica doprecyzowana polowieniem.
+        /// Teren pod poziomem morza = brzeg morza tutaj (woda na poziomie morza). Sciana bez ladu nad poziomem morza (pas rzeki Mountain, jezioro):
+        /// dno = najnizszy teren w nastepnych 3.5 jedn. (do ladu po drugiej stronie; pasy Mountain bywaja szersze niz koryto - Andarel: koryto
+        /// 2.2 jedn. za poczatkiem pasa); spadek od brzegu ponizej 0.15 = urwisko, nie woda (null);
+        /// poziom wody = dno + 0.22 (najwyzej 0.12 pod brzegiem, co najmniej 0.05 nad dnem), brzeg wody = pierwszy punkt pasa z terenem nie
+        /// wyzej niz woda. null = start nie na ladzie albo brak wody na promieniu.</summary>
+        internal static ShoreHit ShoreRay(Func<float, float, int> group, Func<float, float, float> height, float sea, float x, float y, float dx, float dy,
+            float maxR, float step)
+        {
+            if (group == null || height == null || !(step > 0.01f)) return null;
+            bool hasSea = sea > NoSea * 0.5f;
+            float top = 0f, lastLand = 0f;
+            int steps = (int)Math.Floor(maxR / step + 1e-4f);
+            for (int i = 0; i <= steps; i++)
+            {
+                float t = i * step;
+                float px = x + dx * t, py = y + dy * t, h = height(px, py);
+                if (LandAt(group(px, py), h, sea)) { lastLand = t; top = h; continue; }
+                if (i == 0) return null;   // start nie na ladzie (srodek obrazka przenosi wczesniej FindLandSpot)
+                float a = lastLand, b = t;
+                for (int it = 0; it < 4; it++)
+                {
+                    float m = (a + b) * 0.5f, mx = x + dx * m, my = y + dy * m;
+                    if (LandAt(group(mx, my), height(mx, my), sea)) a = m; else b = m;
+                }
+                float hb = height(x + dx * b, y + dy * b);
+                if (hasSea && hb <= sea + 0.02f)
+                    return new ShoreHit { Dx = dx, Dy = dy, Edge = b, LastLand = a, WaterZ = sea, Top = top, Sea = true };
+                // pas bez ladu nad poziomem morza (rzeka, jezioro): dno i brzeg wody
+                float bed = hb;
+                int bedAt = 0;
+                bool across = false;
+                var qs = new List<float>();
+                var hs = new List<float>();
+                for (int j = 0; j <= 35; j++)
+                {
+                    float q = b + j * 0.1f, qx = x + dx * q, qy = y + dy * q, hq = height(qx, qy);
+                    if (hasSea && hq <= sea + 0.02f)   // ujscie rzeki / zatoka: morze w pasie
+                        return new ShoreHit { Dx = dx, Dy = dy, Edge = q, LastLand = a, WaterZ = sea, Top = top, Sea = true };
+                    if (j >= 3 && LandAt(group(qx, qy), hq, sea)) { across = true; break; }   // druga strona pasa
+                    qs.Add(q);
+                    hs.Add(hq);
+                    if (hq < bed) { bed = hq; bedAt = qs.Count - 1; }
+                }
+                if (top - bed < 0.15f) return null;   // urwisko / gora - nie woda
+                if (!across && bedAt >= qs.Count - 2) return null;   // teren tylko opada (stok za krawedzia), bez koryta - nie woda
+                float wl = Math.Max(bed + 0.05f, Math.Min(bed + RiverAboveBed, top - 0.12f));
+                for (int j = 0; j < qs.Count; j++)
+                    if (hs[j] <= wl) return new ShoreHit { Dx = dx, Dy = dy, Edge = qs[j], LastLand = a, WaterZ = wl, Top = top, Sea = false };
+                return null;
+            }
+            return null;
+        }
+
+        /// <summary>Najblizszy brzeg wody wokol (cx, cy): `dirs` promieni (pierwszy na front z pliku - generator v4 kieruje tam wode - potem na
+        /// przemian w lewo / w prawo). Ocena = odleglosc do wody + northPenalty x skladowa polnocna kierunku (kamera mapy patrzy na polnoc: kolo
+        /// mlyna / pomost od strony kamery wygrywa przy podobnej odleglosci); promien konczy sie, gdy nie moze juz pobic najlepszego. null = brak.</summary>
+        internal static ShoreHit FindShore(Func<float, float, int> group, Func<float, float, float> height, float sea, float cx, float cy, float frontDeg,
+            int dirs, float maxR, float step, float northPenalty)
+        {
+            ShoreHit best = null;
+            if (dirs < 1) dirs = 1;
+            double a0 = (frontDeg + 90.0) * Math.PI / 180.0, da = 2.0 * Math.PI / dirs;   // front (+Y lokalne) = swiat (-sin f, cos f)
+            for (int k = 0; k < dirs; k++)
+            {
+                int s = (k + 1) / 2;
+                double a = a0 + (k % 2 == 1 ? s : -s) * da;
+                float dx = (float)Math.Cos(a), dy = (float)Math.Sin(a);
+                float pen = northPenalty * Math.Max(0f, dy);
+                float lim = best == null ? maxR : Math.Min(maxR, best.Score - pen);
+                if (lim <= 0f) continue;
+                ShoreHit h = ShoreRay(group, height, sea, cx, cy, dx, dy, lim, step);
+                if (h == null) continue;
+                h.Score = h.Edge + pen;
+                h.Dir = k;
+                if (best == null || h.Score < best.Score) best = h;
+            }
+            return best;
+        }
+
+        /// <summary>Woda wzdluz linii od (x, y) w kierunku (dx, dy): odleglosc do pierwszego punktu z terenem nie wyzej niz poziom wody wl (co step
+        /// do maxR); -1 = brak. Zapas dla elementu przy wodzie, gdy punkt 1.2 jedn. za nim nie stoi na ladzie (szeroki pas Mountain przy rzece:
+        /// srodek obrazka nie wchodzi w pas, wiec kolo stawalo nad sucha skarpa - Andarel).</summary>
+        internal static float WaterAlong(Func<float, float, float> height, float wl, float x, float y, float dx, float dy, float maxR, float step)
+        {
+            if (height == null || float.IsNaN(wl) || !(step > 0.01f)) return -1f;
+            int steps = (int)Math.Floor(maxR / step + 1e-4f);
+            for (int i = 0; i <= steps; i++)
+            {
+                float t = i * step;
+                if (height(x + dx * t, y + dy * t) <= wl) return t;
+            }
+            return -1f;
+        }
+
+        /// <summary>Obrot korzenia obrazka (rad), przy ktorym front (+Y lokalne = swiat (-sin, cos)) patrzy w kierunku (dx, dy).</summary>
+        internal static float ShoreYaw(float dx, float dy)
+        {
+            return (float)Math.Atan2(-dx, dy);
+        }
+
+        /// <summary>Obrys z pliku (srodek + 8 punktow prostokata half_len x half_wid x k, obrot frontDeg) caly na ladzie.</summary>
+        internal static bool FootprintLand(Func<float, float, bool> land, float cx, float cy, float frontDeg, float halfLen, float halfWid, float k)
+        {
+            if (land == null || !land(cx, cy)) return false;
+            double a = frontDeg * Math.PI / 180.0;
+            float ca = (float)Math.Cos(a), sa = (float)Math.Sin(a);
+            for (int i = -1; i <= 1; i++)
+                for (int j = -1; j <= 1; j++)
+                {
+                    if (i == 0 && j == 0) continue;
+                    float u = i * halfLen * k, v = j * halfWid * k;
+                    if (!land(cx + u * ca - v * sa, cy + u * sa + v * ca)) return false;
+                }
+            return true;
+        }
+
+        /// <summary>Najblizsze miejsce, gdzie obrys z pliku (x 0.8) jest caly na ladzie: pierscienie co 0.35 jedn. do maxR, 24 katy (od frontu,
+        /// potem na przemian). false = brak (obrazek zostaje, kazdy budynek sprawdza PushToLand).</summary>
+        internal static bool FindLandSpot(Func<float, float, bool> land, float cx, float cy, float frontDeg, float halfLen, float halfWid, float maxR,
+            out float nx, out float ny)
+        {
+            return FindLandSpotWhere(land, null, cx, cy, frontDeg, halfLen, halfWid, maxR, out nx, out ny);
+        }
+
+        /// <summary>Jak FindLandSpot, ale miejsce musi tez spelniac ok (null = bez warunku). Recenzja wygladu 3: ok = odstep od innych wiosek
+        /// (NeighborMinDist) - przeniesienie na lad do 6 jedn. stawialo wioske przy sasiedzie (Talosa 2.6 od Stonecove, Widow's Horn 3.2 od
+        /// Misthaven; plik trzyma odstep co najmniej 4.5). Najpierw ok (bez wywolan silnika), potem obrys na ladzie.</summary>
+        internal static bool FindLandSpotWhere(Func<float, float, bool> land, Func<float, float, bool> ok, float cx, float cy, float frontDeg, float halfLen,
+            float halfWid, float maxR, out float nx, out float ny)
+        {
+            nx = cx; ny = cy;
+            double a0 = (frontDeg + 90.0) * Math.PI / 180.0;
+            int rings = (int)Math.Floor(maxR / 0.35f + 1e-4f);
+            for (int ring = 1; ring <= rings; ring++)
+            {
+                float r = ring * 0.35f;
+                for (int k = 0; k < 24; k++)
+                {
+                    int s = (k + 1) / 2;
+                    double a = a0 + (k % 2 == 1 ? s : -s) * Math.PI / 12.0;
+                    float px = cx + (float)Math.Cos(a) * r, py = cy + (float)Math.Sin(a) * r;
+                    if (ok != null && !ok(px, py)) continue;
+                    if (FootprintLand(land, px, py, frontDeg, halfLen, halfWid, 0.8f)) { nx = px; ny = py; return true; }
+                }
+            }
+            return false;
+        }
+
+        /// <summary>Budynek (srodek BB cx, cy; polboki rx, ry) caly na ladzie: srodek i 4 rogi (x 0.85).</summary>
+        internal static bool BoxLand(Func<float, float, bool> land, float cx, float cy, float rx, float ry)
+        {
+            if (land == null || !land(cx, cy)) return false;
+            float ux = rx * 0.85f, uy = ry * 0.85f;
+            return land(cx - ux, cy - uy) && land(cx + ux, cy - uy) && land(cx - ux, cy + uy) && land(cx + ux, cy + uy);
+        }
+
+        /// <summary>Nowe miejsce budynku na ladzie (uklad wzoru): najpierw w strone (tx, ty) - srodek kepy / od wody - krokami pol promienia az za
+        /// cel, potem pierscienie 8 kierunkow (promien x 1, 2, 3); kazde miejsce: BoxLand i bez kolizji z kolami obrysow innych (FreeAt).
+        /// false = brak miejsca (budynek zdjety albo zostaje, gdy niezbedny).</summary>
+        internal static bool PushToLand(Func<float, float, bool> land, float cx, float cy, float rx, float ry, float tx, float ty,
+            IList<float> ox, IList<float> oy, IList<float> orr, out float nx, out float ny)
+        {
+            nx = cx; ny = cy;
+            float r = Math.Max(0.02f, Math.Max(rx, ry));
+            float vx = tx - cx, vy = ty - cy, len = (float)Math.Sqrt(vx * vx + vy * vy);
+            if (len > 1e-3f)
+            {
+                vx /= len; vy /= len;
+                float st = 0.5f * r;
+                int n = Math.Min(24, (int)Math.Ceiling((len + 2f * r) / st));
+                for (int i = 1; i <= n; i++)
+                {
+                    float px = cx + vx * st * i, py = cy + vy * st * i;
+                    if (BoxLand(land, px, py, rx, ry) && FreeAt(ox, oy, orr, px, py, r)) { nx = px; ny = py; return true; }
+                }
+            }
+            for (int ring = 1; ring <= 3; ring++)
+                for (int k = 0; k < 8; k++)
+                {
+                    double a = k * Math.PI / 4.0;
+                    float px = cx + (float)Math.Cos(a) * r * ring, py = cy + (float)Math.Sin(a) * r * ring;
+                    if (BoxLand(land, px, py, rx, ry) && FreeAt(ox, oy, orr, px, py, r)) { nx = px; ny = py; return true; }
+                }
+            return false;
+        }
+
+        /// <summary>Wysokosc origin mlyna wodnego (os kola = podloga, jak w prefabie battania_watermill: kolo w z = 0): kolo dotyka wody (os 0.8
+        /// promienia nad woda), ale podloga nie nizej niz grunt od strony ladu - 0.45 wysokosci mlyna nad podloga (nie zakopany w brzegu) i nie
+        /// wyzej niz ten grunt. Bez wody (waterZ NaN): podloga na gruncie od strony ladu. Mlyn ma pod podloga fundament 0.42 swojej wysokosci
+        /// (BB z od -4.62 do 6.44) - wysokosc z dolu BB postawilaby kolo nad brzegiem, nie w wodzie.</summary>
+        internal static float MillFloor(float landBack, float waterZ, float wheelR, float aboveFloor)
+        {
+            if (float.IsNaN(waterZ)) return landBack;
+            float f = Math.Min(landBack, waterZ + 0.8f * wheelR);
+            return Math.Max(f, landBack - 0.45f * Math.Max(0f, aboveFloor));
         }
 
         // ---------- przepisy obrazkow (poprawka 3): siatki MAPOWE gry / ROT, modele scenowe tylko jako kopia siatki ze skala z BB ----------
         internal const int RoleHouse = 0, RoleDetail = 1, RoleSpecial = 2, RoleWater = 3, RoleAttached = 4;
         internal const int SizeFitH = 0, SizeFitHeight = 1, SizeNatural = 2, SizeUnit = 3;
         internal const int GroundMin = 0, GroundLand = 1, GroundEnd = 2, GroundBeach = 3, GroundTilt = 4, GroundAttached = 5;
-        internal const int TurnNone = 0, TurnLongX = 1, TurnLongY = 2, TurnPi = 3, TurnSeed = 4;
+        internal const int TurnNone = 0, TurnLongX = 1, TurnLongY = 2, TurnPi = 3, TurnSeed = 4, TurnCamera = 5;
         internal const string SrcMap = "mapa gry (Native Prefabs\\map_icon_parts.xml)";
         internal const string SrcRot = "mapa ROT (ROT-Map, scena Main_map)";
         internal const string SrcScene = "model scenowy gry (Native Prefabs\\archhitecture_*.xml) - sama siatka, skala z BB";
         internal const string SrcHouse = "dom wsi okregu (kopia prefabu domow ROT)";
         internal const float IconHouseH = 0.55f;   // wielkosc domu (jedn. wzoru) dla wsi z ikona Calradii / Essos (dom andal / fm: ok. 0.5)
-        // kolo mlyna w prefabie battania_watermill (Native archhitecture_battania.xml): (0.358, -5.333, 0), rotation_euler (0, -1.591, 0)
-        internal const float WheelX = 0.358f, WheelY = -5.333f, WheelZ = 0f, WheelFwd = -1.591f;
-        internal const string Watermill = "battania_watermill", WatermillWheel = "battania_watermill_mill", Windmill = "battania_windmill";
+        internal const string Watermill = "battania_watermill", WatermillWheel = "battania_watermill_mill";
+        // Wyglad 3 (zdjecie windmill-applewick 04:42: sama kamienna wieza): battania_windmill to w grze JEDNA siatka bez dzieci (archhitecture_
+        // battania.xml, paczka archhitecture_battania.tpac: tylko battania_windmill.0-7 - wieza bez skrzydel, z ruin zamku). Skrzydla ma tylko
+        // wiatrak sturgia_windmill_a: osobny prefab smigla sturgia_windmill_fan_a_open, w 15 scenach gry stawiany wzgledem wiatraka w (0.01,
+        // -2.43, 10.64) (mediana; m.in. sturgia_village_a / e, sturgia_town_c, ROT_twins, arena_sturgia_a, mp_skirmish_map_009 / 014,
+        // ROT_kings_landing_field_battle; proba-0810\proba_v5_dane.py), obrot jak wiatrak + obrot wokol osi smigla; schody
+        // sturgia_windmill_a_stair w prefabie wiatraka.
+        internal const string Windmill = "sturgia_windmill_a", WindmillTower = "battania_windmill", WindmillFan = "sturgia_windmill_fan_a_open",
+                              WindmillStair = "sturgia_windmill_a_stair";
+
+        /// <summary>Siatka doczepiona do budynku (kolo mlyna, skrzydla i schody wiatraka) jako dziecko jego encji: ramka w jednostkach siatki
+        /// rodzica, jak dziecko w prefabie gry (obrot wokol pionu, potem wokol lokalnej osi Y = os kola / smigla). Tylko gdy budynek ma siatke
+        /// ForMesh. Sama kopia siatki - bez skryptu WindMill, fizyki, czastek i dzwieku (AmbientSoundEmitter smigla).</summary>
+        internal sealed class AttachSpec
+        {
+            public string ForMesh = "", Mesh = "", Why = "";
+            public float X, Y, Z, RotUp, RotFwd;
+        }
+
+        internal static readonly AttachSpec[] WatermillParts =
+        {
+            new AttachSpec { ForMesh = Watermill, Mesh = WatermillWheel, X = 0.358f, Y = -5.333f, Z = 0f, RotFwd = -1.591f,
+                             Why = "prefab battania_watermill: (0.358, -5.333, 0), rotation_euler (0, -1.591, 0)" }
+        };
+
+        internal static readonly AttachSpec[] WindmillParts =
+        {
+            new AttachSpec { ForMesh = Windmill, Mesh = WindmillFan, X = 0.01f, Y = -2.43f, Z = 10.64f, RotFwd = 0.6f,
+                             Why = "mediana 15 scen gry: smiglo wzgledem wiatraka (0.01, -2.43, 10.64), obrot wiatraka + 0.6 rad wokol osi smigla" },
+            new AttachSpec { ForMesh = Windmill, Mesh = WindmillStair, X = 0.065f, Y = 7.610f, Z = 0f, RotUp = -0.021f,
+                             Why = "prefab sturgia_windmill_a: (0.065, 7.610, 0), rotation_euler (0, 0, -0.021)" }
+        };
 
         /// <summary>Jeden element przepisu. Size = wielkosc wzgledem domu wsi okregu (H): SizeFitH - wiekszy bok BB, SizeFitHeight - wysokosc BB;
         /// SizeNatural - skala Natural z mapy gry (mediana sceny ROT), poprawiana do Size x H tylko gdy wychodzi poza 0.4..2.5 tego;
@@ -672,7 +947,8 @@ namespace Armoury
         internal sealed class PieceSpec
         {
             public int Role;
-            public string[] Meshes = new string[0];   // warianty (wybor z ziarna okregu, pierwszy istniejacy)
+            public string[] Meshes = new string[0];   // warianty (wybor z ziarna okregu, pierwszy istniejacy; Ordered - pierwszy istniejacy po kolei)
+            public bool Ordered;
             public float Size = 1f;
             public int SizeMode;
             public float Natural = 1f;
@@ -684,7 +960,8 @@ namespace Armoury
             public bool Essential;                    // bez niego obrazek nie ma sensu (mlyn, pomost, stodola) - nigdy zdejmowany ze stoku
             public bool WaterSide;                    // stoi przy wodzie (+Y) - przesuwany do brzegu
             public bool BarnLike;                     // stodola: brak siatki -> najwieksza szopa / dom stylu x 1.3
-            public bool Pivot;                        // wysokosc wedlug punktu zaczepienia siatki (mlyn: os kola na wysokosci brzegu, jak w scenie)
+            public bool Pivot;                        // wysokosc wedlug punktu zaczepienia siatki (mlyn: podloga = os kola, MillFloor)
+            public AttachSpec[] Attach;               // siatki doczepione (kolo mlyna, skrzydla wiatraka)
         }
 
         private static PieceSpec P(int role, string[] meshes, float size, int mode, float natural, int slot, int minLevel, int ground, int turn, string src)
@@ -820,7 +1097,7 @@ namespace Armoury
                 case ModelMill:
                 {
                     var mill = P(RoleSpecial, new[] { Watermill }, 1.5f, SizeFitH, 1f, SlotFront, 1, GroundLand, TurnPi, SrcScene);
-                    mill.Essential = true; mill.WaterSide = true; mill.Pivot = true;
+                    mill.Essential = true; mill.WaterSide = true; mill.Pivot = true; mill.Attach = WatermillParts;
                     l.Add(mill);
                     l.Add(P(RoleDetail, new[] { "mi_sack_a" }, 0.3f, SizeNatural, NaturalScale("mi_sack_a"), SlotFrontRight, 1, GroundMin, TurnSeed, SrcMap));
                     l.Add(P(RoleDetail, new[] { "mi_sack_b" }, 0.3f, SizeNatural, NaturalScale("mi_sack_b"), SlotFrontLeft, 2, GroundMin, TurnSeed, SrcMap));
@@ -829,8 +1106,9 @@ namespace Armoury
                 }
                 case ModelWindmill:
                 {
-                    var wm = P(RoleSpecial, new[] { Windmill }, 2.2f, SizeFitHeight, 1f, SlotBackRight, 1, GroundMin, TurnSeed, SrcScene);
-                    wm.Essential = true;
+                    // wyglad 3: wiatrak ze skrzydlami (sturgia_windmill_a + smiglo), skrzydla od strony kamery; brak - dawna wieza bez skrzydel
+                    var wm = P(RoleSpecial, new[] { Windmill, WindmillTower }, 2.2f, SizeFitHeight, 1f, SlotBackRight, 1, GroundMin, TurnCamera, SrcScene);
+                    wm.Essential = true; wm.Ordered = true; wm.Attach = WindmillParts;
                     l.Add(wm);
                     l.Add(P(RoleDetail, new[] { "mi_straw_pile" }, 0.55f, SizeNatural, NaturalScale("mi_straw_pile"), SlotBackLeft, 1, GroundMin, TurnSeed, SrcMap));
                     l.Add(P(RoleDetail, new[] { "mi_sack_a" }, 0.3f, SizeNatural, NaturalScale("mi_sack_a"), SlotRight, 2, GroundMin, TurnSeed, SrcMap));
@@ -870,10 +1148,11 @@ namespace Armoury
                     var pier = P(RoleWater, st.Pier, 2.0f, SizeNatural, 1.0f, SlotFront, 1, GroundEnd, TurnLongY, SrcRot);
                     pier.Essential = true; pier.WaterSide = true;
                     l.Add(pier);
-                    var b1 = P(RoleWater, new[] { st.Boats.Length > 0 ? st.Boats[0] : "rot_boat1" }, 0.9f, SizeNatural, NaturalScale("rot_boat1"), SlotFrontRight, 1, GroundBeach, TurnLongY, SrcRot);
+                    // wyglad 3: lodzie burta do brzegu (dluga os wzdluz brzegu) - na rzece szerokiej na ok. 1 jedn. lodz w poprzek siegala drugiego brzegu
+                    var b1 = P(RoleWater, new[] { st.Boats.Length > 0 ? st.Boats[0] : "rot_boat1" }, 0.9f, SizeNatural, NaturalScale("rot_boat1"), SlotFrontRight, 1, GroundBeach, TurnLongX, SrcRot);
                     b1.WaterSide = true;
                     l.Add(b1);
-                    var b2 = P(RoleWater, new[] { st.Boats.Length > 1 ? st.Boats[1] : "rot_boat3" }, 0.9f, SizeNatural, NaturalScale("rot_boat3"), SlotFrontLeft, 2, GroundBeach, TurnLongY, SrcRot);
+                    var b2 = P(RoleWater, new[] { st.Boats.Length > 1 ? st.Boats[1] : "rot_boat3" }, 0.9f, SizeNatural, NaturalScale("rot_boat3"), SlotFrontLeft, 2, GroundBeach, TurnLongX, SrcRot);
                     b2.WaterSide = true;
                     l.Add(b2);
                     l.Add(P(RoleDetail, new[] { "mi_barrels_a" }, 0.3f, SizeNatural, NaturalScale("mi_barrels_a"), SlotFrontLeft, 2, GroundMin, TurnSeed, SrcMap));
@@ -1067,6 +1346,7 @@ namespace Armoury
         private const float HoverMargin = 0.3f;       // margines obrysu przy najechaniu
         private const int CreatePerTick = 48;         // potem tworzenie po 48 na cwierc sekundy
         private const int FirstFillCap = 600;         // pierwsze wypelnienie po wczytaniu - bez limitu w praktyce (projekt 5.7), z bezpiecznikiem
+        private static readonly long CreateBudgetTicks = System.Diagnostics.Stopwatch.Frequency * 8 / 1000;   // wyglad 3: ok. 8 ms tworzenia na tick (po pierwszym wypelnieniu)
         private const int StrikesPerVillage = 3;      // potkniecia jednej wioski, po ktorych ta JEDNA wioska jest pomijana (nigdy cala warstwa)
         private const float SummaryEvery = 120f;      // linia podsumowania w logu najwyzej co 2 minuty, tylko gdy cos sie zmienilo
         private const int FxNone = 0, FxSmoke = 1, FxFire = 2;
@@ -1147,7 +1427,8 @@ namespace Armoury
             public int FxWanted, FxShown;
             public float Z;
             public float Cx, Cy;              // v4: srodek obrazka (po ewentualnym przesunieciu ze stoku; dymek, ogien)
-            public bool Placed;               // Cx / Cy ustawione
+            public float Deg;                 // wyglad 3: obrot obrazka w stopniach (front do wody u mlyna / rybakow; dymek wedlug niego)
+            public bool Placed;               // Cx / Cy / Deg ustawione
             public string Why = "";
         }
 
@@ -1165,9 +1446,11 @@ namespace Armoury
             public int ThinIndex = -1;        // kepa "village": numer do przerzedzenia od brzegu
             public int Ground;
             public bool NoSeason, Essential, WaterSide;
-            public int Parent = -1;           // element doczepiony (kolo mlyna) - numer rodzica, ramka wzgledem niego
-            public bool Pivot;                // wysokosc wedlug punktu zaczepienia siatki (ZOff nad gruntem, jak w prefabie / scenie), inaczej dol BB na gruncie
-            public float ZOff;                // Pivot: wysokosc origin nad gruntem (jedn. wzoru) - z ramki domu we wzorze wsi-matki (projekt autora prefabu)
+            public int Parent = -1;           // element doczepiony (kolo mlyna, skrzydla wiatraka) - numer rodzica, ramka wzgledem niego
+            public bool Pivot;                // wysokosc wedlug punktu zaczepienia: ikona wsi (origin na gruncie + ZOff, jak wies gry), mlyn (podloga = os kola)
+            public float ZOff;                // ikona: wysokosc origin nad korzeniem matki (jedn. wzoru); dom wzoru (PrefabZ): to samo - tylko do logu korekty
+            public bool PrefabZ;              // dom z wzoru wsi-matki: dawniej wysokosc z ramki prefabu (ZOff), od wygladu 3 dol BB na gruncie
+            public bool FaceCamera;           // wiatrak: skrzydla (lokalne -Y) od strony kamery mapy (swiat -Y), obrot elementu ustawiany przy tworzeniu
             public string Name = "";          // nazwa siatki (log)
         }
 
@@ -1180,9 +1463,14 @@ namespace Armoury
             public bool[] ThinDetail;         // kepa "village": budynek to detal (studnia, szopa, stog...) - limit na poziomie (VillageDetailMax)
             public int ThinN;
             public float H = MapVillageData.IconHouseH;   // wielkosc domu wsi okregu (jedn. wzoru)
-            public float FrontY;              // przod kepy domow (+Y, jedn. wzoru) - od niego szukany brzeg wody
-            public float BackY;               // tyl kepy domow (-Y, jedn. wzoru) - woda za kepa = obrazek odwrocony o pi (recenzja 08.10)
             public bool HasWater;             // ma elementy przy wodzie (mlyn, pomost, lodzie)
+            // wyglad 3: kotwica przy wodzie - punkt elementu Anchor (mlyn: srodek kola; pomost: ladowy koniec), ktory staje na brzegu wody
+            public int Anchor = -1;           // numer elementu (k.Pieces) albo -1
+            public float AnchorDX, AnchorDY;  // punkt kotwicy wzgledem origin elementu (jedn. wzoru)
+            public float AnchorOut;           // o ile za brzegiem w strone wody (jedn. wzoru; mlyn: 0.6 polgrubosci kola)
+            public float WheelR;              // promien kola mlyna (jedn. wzoru), 0 = brak kola
+            public int AttachMiss;            // doczepione siatki, ktorych brak w grze (kolo / skrzydla)
+            public bool HasFan;               // wiatrak ze skrzydlami (sturgia_windmill_fan_a_open doczepione)
             public List<HouseUnit> Units;     // domy wzoru wsi-matki (rodzina andal / fm) - siatki rodziny w skali i wysokosci jak we wzorze
             public string Why = "";
         }
@@ -1232,7 +1520,16 @@ namespace Armoury
         private readonly int[] _modelAsked = new int[MapVillageData.ModelCount];     // ... wedlug modelu z pliku
         private readonly SortedDictionary<string, int> _kitFallback = new SortedDictionary<string, int>(StringComparer.Ordinal);   // "mill->village" -> okregi
         private int _kitsBuilt, _kitMeshMiss, _snapPieces, _tiltPieces, _slopeVillages, _slopeShift, _slopeSqueeze, _slopeDropped, _slopeLeft,
-                    _steepDropped, _bankFound, _bankMiss, _diagSlope, _waterFlip, _diagFlip;
+                    _steepDropped, _diagSlope;
+        // wyglad 3 (zdjecia 08.10 04:42): wysokosc z dolu BB, lad pod budynkami, brzeg wody (mlyn / rybacy), skrzydla wiatraka
+        private float _seaLevel = MapVillageData.NoSea;   // poziom morza (ROT 5.5 przy zgodnym CRC sceny; inaczej lad tylko z siatki)
+        private int _faceTest = -1;                       // sprawdzian scian siatki na bramach wsi gry: -1 nie robiony, 1 dobry, 0 zly (lad z wysokosci)
+        private int _bbPieces, _corrN, _landMoved, _landMiss, _landPushed, _landDropped, _landStuck, _diagLand,
+                    _shoreRiver, _shoreSea, _noWaterMill, _noWaterFish, _wheelWater, _wheelDry, _wheelCam, _wheelTouch, _millNoWheel,
+                    _boatsWater, _boatsBeach, _pierShore, _diagWater, _fanOn, _fanOff, _attachMiss,
+                    _landNear, _shiftNear;   // recenzja: przeniesione na lad blizej sasiada (brak ladu z odstepem); przesuniecie ku wodzie / ze stoku skrocone przez sasiada
+        private float _corrMin = float.MaxValue, _corrMax = float.MinValue, _corrSum, _shiftSum, _shiftMax;
+        private readonly HashSet<string> _hLogged = new HashSet<string>(StringComparer.Ordinal);   // domy wzoru z korekta wysokosci juz w wioski.log
         private readonly HashSet<string> _meshLogged = new HashSet<string>(StringComparer.Ordinal);   // siatki obrazkow juz opisane w wioski.log
         private readonly HashSet<string> _kitLogged = new HashSet<string>(StringComparer.Ordinal);    // (model, styl) juz opisane
         private readonly HashSet<string> _missLogged = new HashSet<string>(StringComparer.Ordinal);   // brakujace siatki juz zapisane
@@ -1362,6 +1659,9 @@ namespace Armoury
             }
             _active = true;
             _diagOn = AutotestActive();
+            // wyglad 3: poziom morza ze sceny ROT 8.1.8 (water_properties water_level 5.500) - tylko gdy plik jest dla tej sceny (CRC zgodne);
+            // bez CRC lad tylko wedlug scian siatki (zadnego nowego odczytu silnika: GetWaterLevel na scenie mapy gra nie wola)
+            _seaLevel = check == MapVillageData.CheckMatch ? MapVillageData.SeaLevelRot : MapVillageData.NoSea;
             Log.Info(head + "; wiosek " + file.Records.Count + " w " + byDistrict.Count + " okregach; odrzucone wiersze " + file.BadRows
                      + " (" + file.ReasonsText() + (file.FirstBad.Length > 0 ? "; pierwszy: " + file.FirstBad : "") + ")"
                      + (file.LevelClamped > 0 ? "; poziom przyciety do 1-3: " + file.LevelClamped : "")
@@ -1372,6 +1672,8 @@ namespace Armoury
                      + "; pominiete od razu: brak wsi gry " + noMother + " (okregow " + noMotherDistricts + "), nie wies " + notVillage
                      + ", poza granica mapy " + outside + "; maski sceny civilian " + _maskCivil + ", level_1/2/3 " + _maskL1 + "/" + _maskL2 + "/" + _maskL3
                      + ", looted/siege " + _maskLooted + "/" + _maskSiege
+                     + "; lad pod budynkami: sciana siatki ladowej" + (_seaLevel > MapVillageData.NoSea * 0.5f
+                         ? " i teren nad poziomem morza " + F2(_seaLevel) + " (scena ROT)" : " (poziom morza nieznany - plik bez CRC sceny)")
                      + "; drzewa encji w wioski.log: " + (_diagOn ? "tak (autotest)" : "nie (tylko w autotescie)")
                      + "; czas " + sw.ElapsedMilliseconds + " ms. Obrazki powstaja przy kamerze (z <= "
                      + Settings.Current.MapVillagesHideAboveCameraHeight.ToString("0", CultureInfo.InvariantCulture) + "), nic nie idzie do zapisu gry.");
@@ -1507,9 +1809,23 @@ namespace Armoury
             sb.Append("; teren: budynki na wlasnym gruncie ").Append(_snapPieces).Append(", ikony pochylone do stoku ").Append(_tiltPieces)
               .Append("; stok / brzeg (rozrzut gruntu > prog) wiosek ").Append(_slopeVillages).Append(": przesuniete w obrysie ").Append(_slopeShift)
               .Append(", scisniete ").Append(_slopeSqueeze).Append(", zdjete budynki ").Append(_slopeDropped).Append(", dalej nierowne ").Append(_slopeLeft)
-              .Append("; zdjete budynki na stromym gruncie ").Append(_steepDropped)
-              .Append("; brzeg wody przed mlynem / pomostem znaleziony ").Append(_bankFound).Append(", brak ").Append(_bankMiss)
-              .Append(", odwrocone o 180 st. (woda za kepa) ").Append(_waterFlip);
+              .Append("; zdjete budynki na stromym gruncie ").Append(_steepDropped);
+            // wyglad 3 (zdjecia 08.10 04:42)
+            sb.Append("; wysokosc: dol BB na najnizszym gruncie pod obrysem (- do ").Append(F2(MapVillageData.GroundSink)).Append(") budynkow ").Append(_bbPieces)
+              .Append(", korekta domow wzoru wobec dawnej wysokosci z prefabu ").Append(_corrN > 0
+                  ? F2(_corrMin) + ".." + F2(_corrMax) + " (srednio " + F2(_corrSum / _corrN) + ", domow " + _corrN + ")" : "-")
+              .Append("; lad (siatka ").Append(_faceTest == 1 ? "dobra" : _faceTest == 0 ? "ZLA - tylko wysokosc nad morzem" : "-").Append("): srodki obrazkow przeniesione na lad ").Append(_landMoved).Append(" (brak ladu w ").Append(F2(MapVillageData.LandSearchR))
+              .Append(" jedn. ").Append(_landMiss).Append("), budynki przesuniete na lad ").Append(_landPushed).Append(", zdjete z wody ").Append(_landDropped)
+              .Append(", niezbedne dalej w wodzie ").Append(_landStuck)
+              .Append("; odstep od innych wiosek ").Append(F2(MapVillageData.NeighborMinDist)).Append(": na lad mimo sasiada ").Append(_landNear)
+              .Append(", przesuniecia skrocone przez sasiada ").Append(_shiftNear)
+              .Append("; woda (mlyn / rybacy): brzeg rzeki / jeziora ").Append(_shoreRiver).Append(", morza ").Append(_shoreSea)
+              .Append(", brak wody w ").Append(F2(MapVillageData.ShoreMaxR)).Append(" jedn.: mlyn->wiatrak ").Append(_noWaterMill).Append(", rybacy->wioska ").Append(_noWaterFish)
+              .Append("; przesuniecie obrazka ku wodzie srednio ").Append(F2(_shoreRiver + _shoreSea > 0 ? _shiftSum / (_shoreRiver + _shoreSea) : 0f)).Append(" (najwiecej ").Append(F2(_shiftMax)).Append(')')
+              .Append("; kolo mlyna nad woda ").Append(_wheelWater).Append(", nad ladem ").Append(_wheelDry).Append(" (dotyka wody ").Append(_wheelTouch)
+              .Append(", od strony kamery ").Append(_wheelCam).Append("), mlyn bez kola ").Append(_millNoWheel)
+              .Append("; pomost od brzegu ").Append(_pierShore).Append(", lodzie na wodzie ").Append(_boatsWater).Append(", na brzegu ").Append(_boatsBeach)
+              .Append("; wiatraki ze skrzydlami ").Append(_fanOn).Append(", bez skrzydel ").Append(_fanOff).Append("; brak siatek doczepionych ").Append(_attachMiss);
             double ms = _createdTotal > 0 ? _createTicks * 1000.0 / System.Diagnostics.Stopwatch.Frequency / _createdTotal : 0;
             sb.Append("; sredni czas obrazka ").Append(ms.ToString("0.000", CultureInfo.InvariantCulture)).Append(" ms");
             int fireNow = 0, smokeNow = 0;
@@ -1676,6 +1992,9 @@ namespace Armoury
                             if (s.Root == null)
                             {
                                 if (made >= budget) continue;
+                                // wyglad 3: obrazek przy wodzie kosztuje wiecej (lad pod budynkami, brzeg wody) - po pierwszym wypelnieniu
+                                // najwyzej ok. 8 ms tworzenia na cwierc sekundy, reszta w nastepnym ticku (bez przyciec przy szybkim przesuwaniu kamery)
+                                if (_firstFillDone && made > 0 && System.Diagnostics.Stopwatch.GetTimestamp() - t0 > CreateBudgetTicks) continue;
                                 if (!TryCreate(s)) continue;
                                 made++;
                             }
@@ -1740,19 +2059,50 @@ namespace Armoury
             }
         }
 
-        /// <summary>Obrazek wioski (v4, zdjecia autotestu 08.10 03:37): wzor obrazka (okreg, model) -> elementy widoczne przy poziomie
-        /// (kepa "village" przerzedzana od brzegu) -> stok / brzeg (przesuniecie w obrysie z pliku, scisniecie, zdjecie budynkow z krawedzi)
-        /// -> brzeg wody dla mlyna / pomostu / lodzi -> KAZDY budynek na wysokosci gruntu w swoim punkcie (korzen bez pochylenia; ikona wsi
-        /// Calradii / Essos - jedna siatka calej wsi - pochylona do stoku jak wies gry). Tylko kopie siatek: bez fizyki, skryptow, czastek.</summary>
+        /// <summary>Obrazek wioski. v4 (zdjecia 08.10 03:37): wzor obrazka (okreg, model) -> elementy widoczne przy poziomie (kepa "village"
+        /// przerzedzana od brzegu) -> stok / brzeg (przesuniecie w obrysie z pliku, scisniecie, zdjecie budynkow z krawedzi). WYGLAD 3 (zdjecia
+        /// 08.10 04:42): (4) srodek obrazka na ladzie - obrys z pliku pod woda albo na scianie bez ladu -> najblizsze miejsce na ladzie; (2) mlyn /
+        /// rybacy: najblizszy brzeg wody wokol (16 kierunkow, 5 jedn.), front obrazka do wody, obrazek przesuniety tak, ze kolo mlyna stoi nad
+        /// woda, a ladowy koniec pomostu na brzegu, domy za nimi od strony ladu (brak wody: mlyn = wiatrak, rybacy = wioska); (3) skrzydla
+        /// wiatraka od strony kamery; (4) kazdy budynek caly na ladzie (przesuniety albo zdjety); (1) wysokosc KAZDEGO budynku: dol BB na
+        /// najnizszym gruncie pod obrysem minus male zaglebienie - nie wysokosc z ramki prefabu wsi-matki, ktora liczyla sie od KORZENIA matki
+        /// (Berrybush: prefab andal_village3 0.23 pod korzeniem), nie od gruntu; ikona wsi Calradii / Essos - pochylona do stoku, origin na
+        /// gruncie jak wies gry; mlyn - podloga (os kola) nad woda (MapVillageData.MillFloor). Tylko kopie siatek: bez fizyki, skryptow, czastek.</summary>
         private void Create(Slot s, Template t)
         {
             int lv = Math.Max(1, Math.Min(3, s.R.Level));
-            Kit k = KitFor(s.D, t, s.R.Model);
-            if (k == null || k.Pieces.Count == 0)
-                throw new InvalidOperationException("brak wzoru obrazka" + (k != null && k.Why.Length > 0 ? " (" + k.Why + ")" : ""));
             Scene scene = MapScene;
             if (scene == null) throw new InvalidOperationException("brak sceny mapy");
-            // 1. elementy widoczne przy poziomie
+            // 0. uklad: korzen BEZ pochylenia (obrot z pliku), skala matki x poziom x dopasowanie do matki
+            Vec3 S = t.Scale * (MapVillageData.LevelScale(lv) * t.Fit);
+            float yaw = (float)(s.R.FrontDeg * Math.PI / 180.0);
+            var g = new Geo
+            {
+                Ca = (float)Math.Cos(yaw), Sa = (float)Math.Sin(yaw), Sx = S.x, Sy = S.y, Sz = Math.Max(0.05f, S.z),
+                Cx = s.R.X, Cy = s.R.Y, Ms = Campaign.Current.MapSceneWrapper, Sea = _seaLevel
+            };
+            g.Faces = FacesOk(g);
+            var notes = new StringBuilder();
+            // 1. (poprawka 4) srodek obrazka na ladzie
+            ToLand(s, g, notes);
+            // 2. (poprawka 2) mlyn / rybacy: brzeg wody wokol; brak wody w 5 jedn. -> mlyn = wiatrak, rybacy = wioska
+            int model = s.R.Model < 0 || s.R.Model >= MapVillageData.ModelCount ? MapVillageData.ModelVillage : s.R.Model;
+            MapVillageData.ShoreHit shore = null;
+            if (model == MapVillageData.ModelMill || model == MapVillageData.ModelFishing)
+            {
+                shore = MapVillageData.FindShore(g.Group, g.H, g.Sea, g.Cx, g.Cy, s.R.FrontDeg, MapVillageData.ShoreDirs, MapVillageData.ShoreMaxR,
+                                                 MapVillageData.ShoreStep, MapVillageData.ShoreNorthPenalty);
+                if (shore == null)
+                {
+                    if (model == MapVillageData.ModelMill) { _noWaterMill++; model = MapVillageData.ModelWindmill; }
+                    else { _noWaterFish++; model = MapVillageData.ModelVillage; }
+                    notes.Append("; brak wody w ").Append(F2(MapVillageData.ShoreMaxR)).Append(" jedn. -> ").Append(MapVillageData.ModelName(model));
+                }
+            }
+            Kit k = KitFor(s.D, t, model);
+            if (k == null || k.Pieces.Count == 0)
+                throw new InvalidOperationException("brak wzoru obrazka" + (k != null && k.Why.Length > 0 ? " (" + k.Why + ")" : ""));
+            // 3. elementy widoczne przy poziomie
             bool[] keepThin = null;
             if (k.ThinN > 0 && k.ThinX != null && k.ThinY != null)
             {
@@ -1769,94 +2119,161 @@ namespace Armoury
                 vis.Add(i);
             }
             if (vis.Count == 0) throw new InvalidOperationException("brak elementow obrazka na poziomie " + lv);
-            // 2. uklad: korzen BEZ pochylenia (obrot z pliku), skala matki x poziom x dopasowanie do matki
-            Vec3 S = t.Scale * (MapVillageData.LevelScale(lv) * t.Fit);
-            float yaw = (float)(s.R.FrontDeg * Math.PI / 180.0);
-            var g = new Geo
-            {
-                Ca = (float)Math.Cos(yaw), Sa = (float)Math.Sin(yaw), Sx = S.x, Sy = S.y, Sz = Math.Max(0.05f, S.z),
-                Cx = s.R.X, Cy = s.R.Y, Ms = Campaign.Current.MapSceneWrapper
-            };
             int n = vis.Count;
             var px = new float[n];
             var py = new float[n];
             var alive = new bool[n];
-            for (int j = 0; j < n; j++) { Piece p = k.Pieces[vis[j]]; px[j] = p.Local.origin.x; py[j] = p.Local.origin.y; alive[j] = true; }
-            int minKeep = MinKeep(k, vis);
-            // 3a. woda ZA kepa (front z pliku patrzy na droge): obrazek odwrocony o pi, zeby kolo mlyna / pomost staly od wody (recenzja 08.10)
-            if (k.HasWater && WaterBehindKit(k, g))
+            // osobne ramki elementow tej wioski: obrot ze skala, srodek / polboki / dol / gora BB (wiatrak obracany do kamery, pomost i lodzie
+            // na rzece mniejsze); jedn. wzoru
+            var rot = new Mat3[n];
+            var cx0 = new float[n];
+            var cy0 = new float[n];
+            var rxj = new float[n];
+            var ryj = new float[n];
+            var bot = new float[n];
+            var top = new float[n];
+            var adx = new float[n];   // mlyn: srodek kola wzgledem origin (jedn. wzoru; obracany z mlynem - 6b)
+            var ady = new float[n];
+            int ja = -1;
+            for (int j = 0; j < n; j++)
             {
-                yaw += (float)Math.PI;
-                g.Ca = -g.Ca;
-                g.Sa = -g.Sa;
-                _waterFlip++;
-                if (_diagFlip < 10)
-                {
-                    _diagFlip++;
-                    Log.Info("Wioski: drzewo terenu " + s.R.Uid + " '" + s.R.Name + "' (" + MapVillageData.ModelName(k.Model) + ", miejsce " + s.R.Kind
-                             + "): przed frontem brak brzegu, za tylem jest - obrazek odwrocony o 180 st. (mlyn / pomost od strony wody).");
-                }
+                Piece p = k.Pieces[vis[j]];
+                px[j] = p.Local.origin.x; py[j] = p.Local.origin.y; alive[j] = true;
+                rot[j] = p.Local.rotation; cx0[j] = p.Cx0; cy0[j] = p.Cy0; rxj[j] = p.Rx; ryj[j] = p.Ry; bot[j] = p.Bottom; top[j] = p.Top;
+                if (vis[j] == k.Anchor) { ja = j; adx[j] = k.AnchorDX; ady[j] = k.AnchorDY; }
             }
-            // 3. stok / brzeg (poprawka 1)
+            int minKeep = MinKeep(k, vis);
+            // 4. woda: front obrazka do wody, obrazek przesuniety tak, zeby kotwica (srodek kola / ladowy koniec pomostu) stanela na brzegu
+            bool water = k.HasWater && shore != null;
+            float shift = 0f;
+            if (water)
+            {
+                yaw = MapVillageData.ShoreYaw(shore.Dx, shore.Dy);
+                g.Ca = (float)Math.Cos(yaw);
+                g.Sa = (float)Math.Sin(yaw);
+                if (!shore.Sea) ShrinkForRiver(k, vis, px, py, rot, cx0, cy0, rxj, ryj, bot, top);
+                if (ja >= 0)
+                {
+                    float ay = AnchorY(k.Pieces[vis[ja]], ja, py, cy0, ryj, ady);
+                    float want = shore.Edge + AnchorOutW(k, k.Pieces[vis[ja]], ja, shore.Sea, ryj, g) - ay * g.Sy;
+                    shift = Clamp(want, -MapVillageData.ShoreMaxBack, MapVillageData.ShoreMaxShift);
+                    // srodek obrazka zostaje na ladzie (kotwica jest przed srodkiem; gdy nie - mniejsze przesuniecie); recenzja: i nie blizej
+                    // innej wioski niz NeighborMinDist (przesuniecie do 3.5 jedn. stawialo mlyn przy sasiedzie) - wtedy tez mniejsze przesuniecie,
+                    // kolo / pomost dosuwa do wody PlaceAtWater (do 1 jedn.)
+                    bool nearHit = false;
+                    Func<float, bool> okAt = sh =>
+                    {
+                        float x = g.Cx + shore.Dx * sh, y = g.Cy + shore.Dy * sh;
+                        if (!g.Land(x, y)) return false;
+                        if (Math.Abs(sh) > 0.01f && !FarFromOthers(s, x, y)) { nearHit = true; return false; }
+                        return true;
+                    };
+                    for (int it = 0; it < 6 && Math.Abs(shift) > 0.01f && !okAt(shift); it++) shift *= 0.6f;
+                    if (!okAt(shift)) shift = 0f;
+                    if (nearHit) _shiftNear++;
+                    g.Cx += shore.Dx * shift;
+                    g.Cy += shore.Dy * shift;
+                }
+                if (shore.Sea) _shoreSea++; else _shoreRiver++;
+                _shiftSum += Math.Abs(shift);
+                if (Math.Abs(shift) > _shiftMax) _shiftMax = Math.Abs(shift);
+            }
+            // 5. stok / brzeg (wyglad 2) - przesuniecia srodka tylko na lad
             Settle(s, k, g, vis, px, py, alive, minKeep);
-            // 4. brzeg wody: mlyn kolem nad brzegiem, pomost od brzegu, lodzie wyciagniete na brzeg
-            if (k.HasWater) ToBank(k, g, vis, px, py, alive);
-            // 5. wysokosc kazdego budynku z gruntu w JEGO punkcie
+            // 6. elementy przy wodzie na brzegu SWOJEJ linii: kolo mlyna nad woda, pomost od brzegu, lodzie na wodzie
+            var wz = new float[n];
+            for (int j = 0; j < n; j++) wz[j] = float.NaN;
+            if (water) PlaceAtWater(k, g, vis, px, py, alive, cx0, cy0, ryj, wz, shore, ja, adx, ady);
+            // 6b. mlyn z woda na polnoc (kamera mapy patrzy na polnoc - kolo za mlynem): mlyn obrocony o 50 st. wokol kola (kolo zostaje nad
+            // woda), budynek w strone ladu na wschod albo zachod - kolo widac obok mlyna, nie za nim
+            float millTurn = 0f;
+            if (water && ja >= 0 && alive[ja] && k.Pieces[vis[ja]].Ground == MapVillageData.GroundLand && k.WheelR > 0f && shore.Dy > 0.35f)
+                millTurn = TurnMill(s, g, ja, px, py, rot, cx0, cy0, rxj, ryj, adx, ady, wz[ja]);
+            // 7. wiatrak: skrzydla (lokalne -Y wiatraka) od strony kamery mapy (swiat -Y), +-25 st. z ziarna wioski; srodek BB zostaje
+            for (int j = 0; j < n; j++)
+            {
+                Piece p = k.Pieces[vis[j]];
+                if (!p.FaceCamera || !alive[j]) continue;
+                float jit = ((MapVillageData.Fnv(s.R.Uid + ":wiatrak") % 51u) - 25f) * (float)Math.PI / 180f;
+                float extra = jit - yaw;
+                Mat3 rz = Mat3.Identity;
+                rz.RotateAboutUp(extra);
+                float bx = px[j] + cx0[j], by = py[j] + cy0[j];
+                rot[j] = rz.TransformToParent(in rot[j]);
+                float ce = (float)Math.Cos(extra), se = (float)Math.Sin(extra);
+                float ncx = ce * cx0[j] - se * cy0[j], ncy = se * cx0[j] + ce * cy0[j];
+                cx0[j] = ncx; cy0[j] = ncy;
+                float rr0 = Math.Max(rxj[j], ryj[j]);
+                rxj[j] = rr0; ryj[j] = rr0;
+                px[j] = bx - ncx; py[j] = by - ncy;
+            }
+            // 8. (poprawka 4) kazdy budynek caly na ladzie: przesuniety (do srodka kepy / od wody) albo zdjety, gdy niekonieczny
+            OnLand(k, g, vis, px, py, alive, minKeep, cx0, cy0, rxj, ryj, water, notes);
+            // 9. (poprawka 1) wysokosc kazdego budynku z gruntu w JEGO punkcie: dol BB na najnizszym gruncie pod obrysem - zaglebienie
             float zc = g.H(g.Cx, g.Cy);
-            float shoreZ = k.HasWater ? g.HK(0f, k.FrontY) : zc;
             var frames = new MatrixFrame[n];
             var tilt = new bool[n];
+            var orgW = new float[n];
             int kept = 0;
             for (int j = 0; j < n; j++) if (alive[j]) kept++;
+            int boatsW = 0, boatsB = 0;
             for (int j = 0; j < n; j++)
             {
                 if (!alive[j]) continue;
                 Piece p = k.Pieces[vis[j]];
-                float ckx = px[j] + p.Cx0, cky = py[j] + p.Cy0;   // srodek BB (jedn. wzoru)
-                float hgtW = Math.Max(0.01f, (p.Top - p.Bottom) * g.Sz);
+                float ckx = px[j] + cx0[j], cky = py[j] + cy0[j], rx = rxj[j], ry = ryj[j];   // srodek i polboki BB (jedn. wzoru)
+                float hgtW = Math.Max(0.01f, (top[j] - bot[j]) * g.Sz);
                 MatrixFrame f = p.Local;
-                float baseW;
-                bool byTop = false;
+                f.rotation = rot[j];
+                float originW;   // wysokosc origin elementu w swiecie
                 switch (p.Ground)
                 {
                     case MapVillageData.GroundLand:
                     {
-                        // mlyn: grunt od strony ladu (tyl -Y), przod z kolem moze wisiec nad brzegiem
-                        float h0 = g.HK(ckx, cky), h1 = g.HK(ckx - p.Rx, cky - p.Ry), h2 = g.HK(ckx + p.Rx, cky - p.Ry);
-                        baseW = Math.Min(h0, Math.Min(h1, h2)) - (p.Pivot ? 0f : 0.04f * hgtW);
+                        // mlyn wodny: podloga (os kola) - kolo dotyka wody, mlyn nie zakopany w brzegu (grunt od strony ladu, -Y)
+                        float hb0 = g.HK(ckx, cky - ry * 0.8f), hb1 = g.HK(ckx - rx * 0.8f, cky - ry * 0.8f), hb2 = g.HK(ckx + rx * 0.8f, cky - ry * 0.8f);
+                        originW = MapVillageData.MillFloor(Math.Min(hb0, Math.Min(hb1, hb2)), wz[j], k.WheelR * g.Sz, top[j] * g.Sz);
                         break;
                     }
                     case MapVillageData.GroundEnd:
                     {
-                        // pomost: poklad na wysokosci gruntu przy ladowym koncu (-Y)
-                        baseW = g.HK(ckx, cky - p.Ry * 0.9f) + 0.01f;
-                        byTop = true;
+                        // pomost: poklad 0.175 skali nad woda (jak rot_dock1 w scenie ROT: origin 0.135 pod poziomem morza przy skali 1);
+                        // bez wody - poklad na gruncie przy ladowym koncu (jak dotad)
+                        float ps = Math.Abs(rot[j].GetScaleVector().x);
+                        originW = !float.IsNaN(wz[j]) ? wz[j] + 0.175f * g.Sz * ps - top[j] * g.Sz : g.HK(ckx, cky - ry * 0.9f) + 0.01f - top[j] * g.Sz;
                         break;
                     }
                     case MapVillageData.GroundBeach:
                     {
-                        // lodz: na brzegu; nad woda (grunt nizej niz brzeg) najwyzej troche ponizej brzegu
+                        // lodz: na wodzie (teren pod nia nie wyzej niz woda) - origin na wodzie, jak lodzie ROT w scenie (5.50); inaczej na brzegu
                         float h0 = g.HK(ckx, cky);
-                        baseW = Math.Max(h0, shoreZ - 0.3f * hgtW) - 0.15f * hgtW;
+                        if (!float.IsNaN(wz[j]) && h0 <= wz[j] + 0.02f) { originW = wz[j]; boatsW++; }
+                        else
+                        {
+                            float lo = Math.Min(h0, Math.Min(Math.Min(g.HK(ckx - rx, cky - ry), g.HK(ckx + rx, cky - ry)), Math.Min(g.HK(ckx - rx, cky + ry), g.HK(ckx + rx, cky + ry))));
+                            originW = lo - MapVillageData.Sink(hgtW) - bot[j] * g.Sz;
+                            boatsB++;
+                        }
                         break;
                     }
                     case MapVillageData.GroundTilt:
                     {
-                        // ikona calej wsi gry (jedna siatka): jak wies gry - pochylona do normalnej terenu w swoim srodku
+                        // ikona calej wsi gry (jedna siatka): jak wies gry - pochylona do normalnej terenu w swoim srodku, origin na gruncie
                         float wx = g.WX(ckx, cky), wy = g.WY(ckx, cky), hz;
                         Vec3 nw;
                         g.Ms.GetTerrainHeightAndNormal(new Vec2(wx, wy), out hz, out nw);
                         g.Calls++;
-                        f.rotation = Tilted(p.Local.rotation, nw, g);
-                        baseW = hz - 0.02f;   // jak dawny korzen (z - 0.02), origin ikony na gruncie + ZOff z wzoru
+                        f.rotation = Tilted(rot[j], nw, g);
+                        originW = hz - 0.02f + p.ZOff * g.Sz;   // jak dawny korzen (z - 0.02) + wysokosc ikony we wzorze
                         tilt[j] = true;
                         break;
                     }
                     default:
                     {
-                        // dom / detal: najnizszy z 5 punktow pod obrysem (nic nie wisi w powietrzu); na zbyt stromym gruncie budynek niekonieczny zdjety
-                        float h0 = g.HK(ckx, cky), h1 = g.HK(ckx - p.Rx, cky - p.Ry), h2 = g.HK(ckx + p.Rx, cky - p.Ry),
-                              h3 = g.HK(ckx - p.Rx, cky + p.Ry), h4 = g.HK(ckx + p.Rx, cky + p.Ry);
+                        // dom / detal / stodola / wiatrak: dol BB na najnizszym z 5 punktow pod obrysem - zaglebienie (nic nie wisi i nic nie
+                        // zapada sie po dach); na zbyt stromym gruncie budynek niekonieczny zdjety
+                        float h0 = g.HK(ckx, cky), h1 = g.HK(ckx - rx, cky - ry), h2 = g.HK(ckx + rx, cky - ry),
+                              h3 = g.HK(ckx - rx, cky + ry), h4 = g.HK(ckx + rx, cky + ry);
                         float lo = Math.Min(h0, Math.Min(Math.Min(h1, h2), Math.Min(h3, h4)));
                         float hi = Math.Max(h0, Math.Max(Math.Max(h1, h2), Math.Max(h3, h4)));
                         if (hi - lo > 0.5f * hgtW && !p.Essential && kept > minKeep)
@@ -1866,15 +2283,25 @@ namespace Armoury
                             _steepDropped++;
                             continue;
                         }
-                        baseW = lo - (p.Pivot ? 0f : 0.04f * hgtW);   // dom wzoru: wysokosc nad najnizszym punktem jak w prefabie
+                        originW = lo - MapVillageData.Sink(hgtW) - bot[j] * g.Sz;
+                        _bbPieces++;
+                        if (p.PrefabZ) NoteHeight(p, s, originW - (lo + p.ZOff * g.Sz), bot[j], g.Sz);
                         break;
                     }
                 }
-                float lz = p.Pivot ? (baseW - zc) / g.Sz + p.ZOff : (baseW - zc) / g.Sz - (byTop ? p.Top : p.Bottom);
-                f.origin = new Vec3(px[j], py[j], lz, 1f);
+                orgW[j] = originW;
+                f.origin = new Vec3(px[j], py[j], (originW - zc) / g.Sz, 1f);
                 frames[j] = f;
             }
             if (kept <= 0) throw new InvalidOperationException("brak elementow obrazka po terenie");
+            if (water) WaterNote(s, k, g, vis, px, py, alive, cx0, cy0, ryj, wz, orgW, shore, ja, shift, boatsW, boatsB, notes, adx, ady, millTurn);
+            else if (notes.Length > 0 && _diagLand < 15)
+            {
+                _diagLand++;
+                Log.Info("Wioski: drzewo ladu " + s.R.Uid + " '" + s.R.Name + "' (" + MapVillageData.ModelName(s.R.Model) + " -> " + MapVillageData.ModelName(k.Model) + ")" + notes + ".");
+            }
+            if (k.Model == MapVillageData.ModelWindmill) { if (k.HasFan) _fanOn++; else _fanOff++; }
+            if (k.Model == MapVillageData.ModelMill && !(k.WheelR > 0f)) _millNoWheel++;
             GameEntity root = GameEntity.CreateEmpty(scene, false, false, false);   // bez fizyki, bez skryptow
             if (root == (GameEntity)null) throw new InvalidOperationException("CreateEmpty zwrocil null");
             try
@@ -1896,7 +2323,7 @@ namespace Armoury
                     made[vis[j]] = e;
                     if (tilt[j]) tilted++; else snapped++;
                 }
-                // doczepione (kolo mlyna): pod rodzicem, ramka wzgledem niego (w jednostkach siatki mlyna)
+                // doczepione (kolo mlyna, skrzydla i schody wiatraka): pod rodzicem, ramka wzgledem niego (w jednostkach siatki rodzica)
                 for (int i = 0; i < k.Pieces.Count; i++)
                 {
                     Piece p = k.Pieces[i];
@@ -1913,12 +2340,15 @@ namespace Armoury
                 if (t.HasAxis) _axisTurned++;
                 _snapPieces += snapped;
                 _tiltPieces += tilted;
+                _boatsWater += boatsW;
+                _boatsBeach += boatsB;
                 _modelAsked[Math.Max(0, Math.Min(MapVillageData.ModelCount - 1, s.R.Model))]++;
                 _modelMade[k.Model]++;
                 s.Root = root;
                 s.Z = zc;
                 s.Cx = g.Cx;
                 s.Cy = g.Cy;
+                s.Deg = yaw * 180f / (float)Math.PI;
                 s.Placed = true;
                 s.FxShown = FxNone;
                 ApplyFx(s);                                  // gdy wies gry wlasnie plonie, ogien od razu
@@ -1929,6 +2359,318 @@ namespace Armoury
                 s.Root = null;
                 throw;
             }
+        }
+
+        /// <summary>Bezpiecznik ladu (raz na mape): bramy do 40 wsi gry (Settlement.GatePosition - zawsze na ladzie) musza w wiekszosci lezec na
+        /// scianie ladowej siatki (GetFaceIndex z IsOnLand = true). Nie - siatka nie odpowiada tak, jak zakladamy: lad tylko wedlug wysokosci nad
+        /// morzem (bez tego kazdy budynek bylby "w wodzie" i zdjety). Wynik w glownym logu.</summary>
+        private bool FacesOk(Geo g)
+        {
+            if (_faceTest >= 0) return _faceTest == 1;
+            int tried = 0, land = 0;
+            try
+            {
+                foreach (var d in _districts)
+                {
+                    if (d.S == null || !d.S.IsVillage) continue;
+                    Vec2 gp = d.S.GatePosition.ToVec2();
+                    tried++;
+                    if (MapVillageData.IsLandGroup(g.Group(gp.x, gp.y))) land++;
+                    if (tried >= 40) break;
+                }
+                _faceTest = tried == 0 || land * 2 >= tried ? 1 : 0;
+            }
+            catch (Exception e)
+            {
+                _faceTest = 0;
+                Log.Error("MapVillagesView.FacesOk - lad tylko wedlug wysokosci", e);
+            }
+            Log.Info("Wioski: sprawdzian siatki nawigacyjnej - bramy wsi gry " + tried + ", na scianie ladowej " + land
+                     + (_faceTest == 1 ? " - lad pod budynkami wedlug scian siatki" : " - SIATKA NIE PASUJE: lad tylko wedlug wysokosci nad morzem")
+                     + (_seaLevel > MapVillageData.NoSea * 0.5f ? " (morze " + F2(_seaLevel) + ")" : " (poziom morza nieznany)") + ".");
+            return _faceTest == 1;
+        }
+
+        /// <summary>Poprawka 4 (zdjecie fishing-widows-horn: osada na skalach w wodzie): obrys z pliku (x 0.8, 9 punktow) nie caly na ladzie -
+        /// srodek obrazka na najblizsze miejsce z obrysem na ladzie (MapVillageData.FindLandSpot, do 6 jedn.); brak - zostaje (budynki sprawdzi
+        /// OnLand). Proba: 9 wiosek pliku v4 ma srodek pod poziomem morza na scianie siatki Plain (Widow's Horn: teren 5.21).</summary>
+        private void ToLand(Slot s, Geo g, StringBuilder notes)
+        {
+            Func<float, float, bool> land = g.Land;
+            if (MapVillageData.FootprintLand(land, g.Cx, g.Cy, s.R.FrontDeg, s.R.HalfLen, s.R.HalfWid, 0.8f)) return;
+            float h0 = g.H(g.Cx, g.Cy);
+            int g0 = g.Group(g.Cx, g.Cy);
+            notes.Append("; obrys z pliku nie na ladzie (srodek: teren ").Append(F2(h0)).Append(", sciana typu ").Append(g0)
+                 .Append(MapVillageData.IsLandGroup(g0) ? "" : " - bez ladu")
+                 .Append(g.Sea > MapVillageData.NoSea * 0.5f ? ", morze " + F2(g.Sea) : "").Append(')');
+            float nx, ny;
+            // recenzja: najpierw miejsce z odstepem od innych wiosek (NeighborMinDist); brak - najblizszy lad mimo sasiada (lad wazniejszy niz odstep)
+            bool near = false;
+            if (!MapVillageData.FindLandSpotWhere(land, (x, y) => FarFromOthers(s, x, y), g.Cx, g.Cy, s.R.FrontDeg, s.R.HalfLen, s.R.HalfWid,
+                                                  MapVillageData.LandSearchR, out nx, out ny))
+            {
+                if (!MapVillageData.FindLandSpot(land, g.Cx, g.Cy, s.R.FrontDeg, s.R.HalfLen, s.R.HalfWid, MapVillageData.LandSearchR, out nx, out ny))
+                {
+                    _landMiss++;
+                    notes.Append(" - brak ladu w ").Append(F2(MapVillageData.LandSearchR)).Append(" jedn., srodek zostaje");
+                    return;
+                }
+                near = true;
+                _landNear++;
+            }
+            float d = (float)Math.Sqrt((nx - g.Cx) * (nx - g.Cx) + (ny - g.Cy) * (ny - g.Cy));
+            notes.Append(" -> srodek przeniesiony o ").Append(F2(d)).Append(" jedn. na lad (").Append(F2(nx)).Append(", ").Append(F2(ny)).Append(')')
+                 .Append(near ? " BLIZEJ niz " + F2(MapVillageData.NeighborMinDist) + " jedn. od innej wioski (dalej lad z odstepem brak)" : "");
+            g.Cx = nx;
+            g.Cy = ny;
+            _landMoved++;
+        }
+
+        /// <summary>Recenzja wygladu 3: (x, y) co najmniej MapVillageData.NeighborMinDist od kazdej innej wioski - od jej miejsca z pliku i, gdy
+        /// juz postawiona, od jej srodka po przesunieciu (Slot.Cx / Cy). Przeniesienie na lad (do 6 jedn.) i ku wodzie (do 3.5 jedn.) stawialo
+        /// wioski przy sasiadach (proba na mapie ROT: 17 par blizej niz 4, Gallowsmill 2.1 od Blackholt; plik trzyma co najmniej 4.5).
+        /// Sam odczyt pol slotow z siatki wyszukiwania (komorki 50 jedn.) - zadnych wywolan silnika.</summary>
+        private bool FarFromOthers(Slot s, float x, float y)
+        {
+            float m2 = MapVillageData.NeighborMinDist * MapVillageData.NeighborMinDist;
+            int bx = (int)Math.Floor(x / Cell), by = (int)Math.Floor(y / Cell);
+            for (int ix = -1; ix <= 1; ix++)
+                for (int iy = -1; iy <= 1; iy++)
+                {
+                    List<Slot> l;
+                    if (!_grid.TryGetValue(((long)(bx + ix) << 32) ^ (uint)(by + iy), out l)) continue;
+                    for (int j = 0; j < l.Count; j++)
+                    {
+                        var o = l[j];
+                        if (o == s || o.R == null) continue;
+                        float dx = o.R.X - x, dy = o.R.Y - y;
+                        if (dx * dx + dy * dy < m2) return false;
+                        if (!o.Placed) continue;
+                        dx = o.Cx - x; dy = o.Cy - y;
+                        if (dx * dx + dy * dy < m2) return false;
+                    }
+                }
+            return true;
+        }
+
+        /// <summary>Pomost i lodzie na rzece mniejsze (pomost x 0.6, lodz x 0.8; rzeka na mapie ma ok. 1 jedn. szerokosci, pomost rot_dock1
+        /// ok. 1.4 jedn. - siegalby drugiego brzegu); srodek BB zostaje.</summary>
+        private static void ShrinkForRiver(Kit k, List<int> vis, float[] px, float[] py, Mat3[] rot, float[] cx0, float[] cy0, float[] rxj, float[] ryj,
+            float[] bot, float[] top)
+        {
+            for (int j = 0; j < vis.Count; j++)
+            {
+                Piece p = k.Pieces[vis[j]];
+                if (p.Ground != MapVillageData.GroundEnd && p.Ground != MapVillageData.GroundBeach) continue;
+                float f = p.Ground == MapVillageData.GroundEnd ? 0.6f : 0.8f;
+                float bx = px[j] + cx0[j], by = py[j] + cy0[j];
+                rot[j].ApplyScaleLocal(f);
+                cx0[j] *= f; cy0[j] *= f; rxj[j] *= f; ryj[j] *= f; bot[j] *= f; top[j] *= f;
+                px[j] = bx - cx0[j];
+                py[j] = by - cy0[j];
+            }
+        }
+
+        /// <summary>Punkt kotwicy elementu przy wodzie (Y, jedn. wzoru): mlyn - srodek kola (albo przod mlyna bez kola); pomost / lodz - koniec od ladu.</summary>
+        private static float AnchorY(Piece p, int j, float[] py, float[] cy0, float[] ryj, float[] ady)
+        {
+            if (p.Ground == MapVillageData.GroundLand) return py[j] + ady[j];
+            return py[j] + cy0[j] - ryj[j];
+        }
+
+        private static float AnchorX(Piece p, int j, float[] px, float[] cx0, float[] adx)
+        {
+            if (p.Ground == MapVillageData.GroundLand) return px[j] + adx[j];
+            return px[j] + cx0[j];
+        }
+
+        /// <summary>Mlyn z woda na polnoc: obrot o +-50 st. wokol srodka kola (jedn. wzoru; kolo zostaje nad woda), gdy srodek budynku i jego tyl
+        /// stoja nad woda (teren wyzej niz woda + 0.05); kierunek z ziarna wioski, drugi gdy pierwszy w wodzie. Zwraca kat (0 = bez obrotu).</summary>
+        private static float TurnMill(Slot s, Geo g, int j, float[] px, float[] py, Mat3[] rot, float[] cx0, float[] cy0, float[] rxj, float[] ryj,
+            float[] adx, float[] ady, float wz)
+        {
+            float wx = px[j] + adx[j], wy = py[j] + ady[j];   // srodek kola - zostaje
+            float lim = float.IsNaN(wz) ? float.MinValue : wz + 0.05f;
+            bool first = (MapVillageData.Fnv(s.R.Uid + ":mlyn") & 1u) == 0;
+            foreach (float deg in first ? new[] { 50f, -50f } : new[] { -50f, 50f })
+            {
+                float a = deg * (float)Math.PI / 180f, c = (float)Math.Cos(a), sn = (float)Math.Sin(a);
+                float nadx = c * adx[j] - sn * ady[j], nady = sn * adx[j] + c * ady[j];
+                float ncx = c * cx0[j] - sn * cy0[j], ncy = sn * cx0[j] + c * cy0[j];
+                float ox = wx - nadx, oy = wy - nady, bx = ox + ncx, by = oy + ncy;
+                float tx = bx + (bx - wx) * 0.6f, ty = by + (by - wy) * 0.6f;   // tyl budynku (od kola za srodek)
+                if (g.HK(bx, by) < lim || g.HK(tx, ty) < lim) continue;
+                Mat3 rz = Mat3.Identity;
+                rz.RotateAboutUp(a);
+                rot[j] = rz.TransformToParent(in rot[j]);
+                adx[j] = nadx; ady[j] = nady; cx0[j] = ncx; cy0[j] = ncy;
+                float rr = Math.Max(rxj[j], ryj[j]);
+                rxj[j] = rr; ryj[j] = rr;
+                px[j] = ox; py[j] = oy;
+                return deg;
+            }
+            return 0f;
+        }
+
+        /// <summary>O ile kotwica staje za brzegiem wody (jedn. mapy, + w wode): mlyn - 0.6 polgrubosci kola (kolo nad woda; bez kola przod 0.05
+        /// przed brzegiem); pomost - ladowy koniec 0.05 na ladzie (morze) albo pol pomostu na ladzie (rzeka); lodz - cala na wodzie (+0.05).</summary>
+        private static float AnchorOutW(Kit k, Piece p, int j, bool sea, float[] ryj, Geo g)
+        {
+            float sy = Math.Max(0.05f, g.Sy);
+            if (p.Ground == MapVillageData.GroundLand) return k.WheelR > 0f ? k.AnchorOut * sy : -0.05f;
+            if (p.Ground == MapVillageData.GroundEnd) return sea ? -0.05f : -ryj[j] * sy;
+            return 0.05f;
+        }
+
+        /// <summary>Elementy przy wodzie na brzegu SWOJEJ linii (+Y = do wody): promien od punktu 1.2 jedn. za kotwica elementu
+        /// (MapVillageData.ShoreRay co 0.1 jedn.), kotwica staje AnchorOutW za brzegiem; przesuniecie najwyzej 1 jedn.; wz[j] = poziom wody
+        /// przy elemencie (brak brzegu na jego linii - poziom z brzegu obrazka).</summary>
+        private void PlaceAtWater(Kit k, Geo g, List<int> vis, float[] px, float[] py, bool[] alive, float[] cx0, float[] cy0, float[] ryj, float[] wz,
+            MapVillageData.ShoreHit shore, int ja, float[] adx, float[] ady)
+        {
+            float fx = -g.Sa, fy = g.Ca;   // front (+Y lokalne) w swiecie
+            float sy = Math.Max(0.05f, g.Sy);
+            const float back = 1.2f;
+            var order = new List<int>();
+            if (ja >= 0) order.Add(ja);
+            for (int j = 0; j < vis.Count; j++) if (j != ja) order.Add(j);
+            foreach (int j in order)
+            {
+                if (!alive[j]) continue;
+                Piece p = k.Pieces[vis[j]];
+                if (!p.WaterSide) continue;
+                wz[j] = shore.WaterZ;
+                float ax = AnchorX(p, j, px, cx0, adx), ay = AnchorY(p, j, py, cy0, ryj, ady);
+                float sx = g.WX(ax, ay - back / sy), syw = g.WY(ax, ay - back / sy);
+                MapVillageData.ShoreHit hit = MapVillageData.ShoreRay(g.Group, g.H, g.Sea, sx, syw, fx, fy, back + 2.0f, 0.2f);
+                float edge;
+                if (hit != null) { edge = hit.Edge; wz[j] = hit.WaterZ; }
+                else
+                {
+                    // start nie na ladzie (szeroki pas przy rzece) albo brzeg dalej: pierwszy punkt z terenem pod woda z brzegu obrazka, od kotwicy
+                    float wa = MapVillageData.WaterAlong(g.H, shore.WaterZ, g.WX(ax, ay), g.WY(ax, ay), fx, fy, 2.0f, 0.1f);
+                    if (wa < 0f) continue;   // woda dalej niz 2 jedn. przed kotwica: zostaje po przesunieciu obrazka
+                    edge = back + wa;
+                }
+                float d = (edge + AnchorOutW(k, p, j, shore.Sea, ryj, g) - back) / sy;
+                float lim = 1.0f / sy;
+                if (d > lim) d = lim;
+                if (d < -lim) d = -lim;
+                py[j] += d;
+                if (p.Ground == MapVillageData.GroundEnd) _pierShore++;
+            }
+        }
+
+        /// <summary>Poprawka 4: kazdy budynek (bez elementow przy wodzie i ikon wsi) caly na ladzie (MapVillageData.BoxLand: srodek i 4 rogi BB);
+        /// gdy nie - nowe miejsce (MapVillageData.PushToLand: do srodka kepy, przy wodzie od wody), bez kolizji z innymi; brak miejsca: budynek
+        /// niekonieczny zdjety (zostaje najmniej minKeep), niezbedny zostaje (licznik).</summary>
+        private void OnLand(Kit k, Geo g, List<int> vis, float[] px, float[] py, bool[] alive, int minKeep, float[] cx0, float[] cy0, float[] rxj, float[] ryj,
+            bool water, StringBuilder notes)
+        {
+            int n = vis.Count, kept = 0, pushed = 0, dropped = 0, stuck = 0;
+            for (int j = 0; j < n; j++) if (alive[j]) kept++;
+            Func<float, float, bool> landK = (kx, ky) => g.Land(g.WX(kx, ky), g.WY(kx, ky));
+            for (int j = 0; j < n; j++)
+            {
+                if (!alive[j]) continue;
+                Piece p = k.Pieces[vis[j]];
+                if (p.WaterSide || p.Ground == MapVillageData.GroundTilt) continue;   // mlyn / pomost / lodzie - wlasna regula; ikona wsi - ToLand
+                float cx = px[j] + cx0[j], cy = py[j] + cy0[j];
+                if (MapVillageData.BoxLand(landK, cx, cy, rxj[j], ryj[j])) continue;
+                var ox = new List<float>();
+                var oy = new List<float>();
+                var orr = new List<float>();
+                for (int q = 0; q < n; q++)
+                {
+                    if (q == j || !alive[q]) continue;
+                    ox.Add(px[q] + cx0[q]); oy.Add(py[q] + cy0[q]); orr.Add(Math.Max(rxj[q], ryj[q]));
+                }
+                float tx = 0f, ty = water ? -1.5f / Math.Max(0.05f, g.Sy) : 0f;
+                float nx, ny;
+                if (MapVillageData.PushToLand(landK, cx, cy, rxj[j], ryj[j], tx, ty, ox, oy, orr, out nx, out ny))
+                {
+                    px[j] += nx - cx;
+                    py[j] += ny - cy;
+                    pushed++;
+                    continue;
+                }
+                if (!p.Essential && kept > minKeep) { alive[j] = false; kept--; dropped++; continue; }
+                stuck++;
+            }
+            _landPushed += pushed;
+            _landDropped += dropped;
+            _landStuck += stuck;
+            if (pushed + dropped + stuck > 0)
+                notes.Append("; budynki nie na ladzie: przesuniete ").Append(pushed).Append(", zdjete ").Append(dropped).Append(", niezbedne zostaly ").Append(stuck);
+        }
+
+        /// <summary>Poprawka 1 - log: korekta wysokosci domu wzoru wobec dawnej (origin = najnizszy grunt + wysokosc z ramki prefabu wsi-matki,
+        /// liczona od KORZENIA matki); min / max / srednia w podsumowaniu, kazda siatka domu raz w wioski.log (najwyzej 40).</summary>
+        private void NoteHeight(Piece p, Slot s, float corr, float bottom, float sz)
+        {
+            _corrN++;
+            _corrSum += corr;
+            if (corr < _corrMin) _corrMin = corr;
+            if (corr > _corrMax) _corrMax = corr;
+            if (_hLogged.Count >= 40 || !_hLogged.Add(p.Name)) return;
+            float oldBottom = (p.ZOff + bottom) * sz;   // dawniej: dol BB wzgledem najnizszego gruntu (jedn. mapy)
+            Log.Info("Wioski: drzewo wysokosci - siatka " + p.Name + " (pierwsza: okreg " + s.D.Id + ", wioska '" + s.R.Name + "'): dol BB w ukladzie encji "
+                     + F2(bottom) + " jedn. wzoru (ze skala siatki), wysokosc z ramki prefabu wsi-matki " + F2(p.ZOff) + " -> dawniej dol "
+                     + (oldBottom < 0f ? F2(-oldBottom) + " jedn. mapy POD gruntem" : F2(oldBottom) + " jedn. mapy nad gruntem")
+                     + "; teraz dol BB " + F2(MapVillageData.Sink(Math.Max(0.01f, (p.Top - p.Bottom) * sz))) + " pod najnizszym gruntem pod obrysem (korekta "
+                     + (corr >= 0f ? "+" : "") + F2(corr) + ").");
+        }
+
+        /// <summary>Mlyn / rybacy - do wioski.log (15 pierwszych): brzeg wody, obrot i przesuniecie obrazka, kolo mlyna (siatka, gdzie stoi, nad
+        /// woda / ladem, czy dotyka wody, od strony kamery), pomost i lodzie; liczniki kola w podsumowaniu.</summary>
+        private void WaterNote(Slot s, Kit k, Geo g, List<int> vis, float[] px, float[] py, bool[] alive, float[] cx0, float[] cy0, float[] ryj, float[] wz,
+            float[] orgW, MapVillageData.ShoreHit shore, int ja, float shift, int boatsW, int boatsB, StringBuilder notes, float[] adx, float[] ady, float millTurn)
+        {
+            double az = Math.Atan2(shore.Dx, shore.Dy) * 180.0 / Math.PI;
+            if (az < 0) az += 360.0;
+            // kamera mapy patrzy na polnoc: woda na S / E / W - kolo / pomost przed budynkiem; mlyn obrocony wokol kola (6b) - kolo obok budynku
+            bool camSide = shore.Dy <= 0.35f || millTurn != 0f;
+            var sb = new StringBuilder();
+            sb.Append("Wioski: drzewo wody ").Append(s.R.Uid).Append(" '").Append(s.R.Name).Append("' (").Append(MapVillageData.ModelName(k.Model))
+              .Append(", styl ").Append(k.Style).Append(", miejsce ").Append(s.R.Kind).Append("): brzeg ").Append(shore.Sea ? "morza" : "rzeki / jeziora")
+              .Append(" w kierunku ").Append(az.ToString("0", CultureInfo.InvariantCulture)).Append(" st. (0 = N), woda ").Append(F2(shore.Edge))
+              .Append(" jedn. od srodka (ostatni lad ").Append(F2(shore.LastLand)).Append("), poziom wody ").Append(F2(shore.WaterZ))
+              .Append("; obrazek frontem do wody, przesuniety ku wodzie o ").Append(F2(shift)).Append(notes);
+            if (k.Model == MapVillageData.ModelMill)
+            {
+                if (ja < 0 || !alive[ja]) sb.Append("; mlyn NIE STOI na tym poziomie");
+                else if (!(k.WheelR > 0f)) sb.Append("; kolo: siatki ").Append(MapVillageData.WatermillWheel).Append(" BRAK w grze (mlyn bez kola)");
+                else
+                {
+                    Piece p = k.Pieces[vis[ja]];
+                    float kx = AnchorX(p, ja, px, cx0, adx), ky = AnchorY(p, ja, py, cy0, ryj, ady);
+                    float wx = g.WX(kx, ky), wy = g.WY(kx, ky), hw = g.H(wx, wy), wr = k.WheelR * g.Sz, zw = orgW[ja];
+                    bool overWater = !g.Land(wx, wy) && hw <= wz[ja] + 0.05f;
+                    bool touch = zw - wr <= wz[ja] + 0.02f;
+                    if (overWater) _wheelWater++; else _wheelDry++;
+                    if (touch) _wheelTouch++;
+                    if (camSide) _wheelCam++;
+                    sb.Append("; kolo: siatka ").Append(MapVillageData.WatermillWheel).Append(" jest, srodek kola (").Append(F2(wx)).Append(", ").Append(F2(wy))
+                      .Append(", ").Append(F2(zw)).Append("), promien ").Append(F2(wr)).Append(", teren pod kolem ").Append(F2(hw)).Append(", woda ").Append(F2(wz[ja]))
+                      .Append(overWater ? " - NAD WODA" : " - nad ladem / brzegiem").Append(touch ? ", dotyka wody" : ", nad woda o " + F2(zw - wr - wz[ja]))
+                      .Append(millTurn != 0f ? "; woda na polnoc - mlyn obrocony o " + millTurn.ToString("0", CultureInfo.InvariantCulture) + " st. wokol kola, kolo obok mlyna od strony kamery"
+                              : camSide ? "; od strony kamery" : "; woda na polnoc - kolo za mlynem (kamera patrzy na polnoc; obrot wokol kola: budynek nie mial gdzie stanac)");
+                }
+            }
+            else
+            {
+                int pier = 0, pierOk = 0;
+                for (int j = 0; j < vis.Count; j++)
+                {
+                    if (!alive[j] || k.Pieces[vis[j]].Ground != MapVillageData.GroundEnd) continue;
+                    pier++;
+                    float lx = px[j] + cx0[j], ly = py[j] + cy0[j] - ryj[j] * 0.8f;
+                    if (g.Land(g.WX(lx, ly), g.WY(lx, ly)) || g.HK(lx, ly) >= wz[j] - 0.01f) pierOk++;   // na ladzie albo na brzegu nad woda
+                }
+                sb.Append("; pomost ").Append(pier > 0 ? (pierOk > 0 ? "od brzegu (ladowy koniec na brzegu nad woda)" : "ladowy koniec POD WODA") : "brak na tym poziomie")
+                  .Append(", lodzie na wodzie ").Append(boatsW).Append(", na brzegu ").Append(boatsB).Append(camSide ? "; od strony kamery" : "; woda na polnoc");
+            }
+            if (_diagWater < 15) { _diagWater++; Log.Info(sb.Append('.').ToString()); }
         }
 
         /// <summary>Encja elementu: pusta encja + kopie siatek (jak namiot partii: CreateEmpty + AddMultiMesh + SetFrame + AddChild), flagi jak dotad.</summary>
@@ -1959,10 +2701,14 @@ namespace Armoury
         }
 
         /// <summary>Uklad obrazka na mapie: jedn. wzoru (X wzdluz ulicy, Y do frontu) -> swiat; grunt z MapSceneWrapper.GetTerrainHeightAndNormal
-        /// (sam teren, jak dotad - jedyne wywolanie terenu).</summary>
+        /// (sam teren, jak dotad). Wyglad 3: typ sciany siatki nawigacyjnej pod punktem - MapSceneWrapper.GetFaceIndex (to samo, co gra wola
+        /// dla kazdej partii przez CampaignVec2.Face; tu z IsOnLand = true, jak partia ladowa) i PathFaceRecord.FaceGroupIndex = TerrainType
+        /// (MapScene.GetFaceTerrainType robi tylko to rzutowanie); lad = sciana ladowa i teren nad poziomem morza (Sea).</summary>
         private sealed class Geo
         {
             public float Ca, Sa, Sx, Sy, Sz, Cx, Cy;
+            public float Sea = MapVillageData.NoSea;
+            public bool Faces = true;         // sciany siatki przeszly sprawdzian (FacesOk); nie - lad tylko wedlug wysokosci nad morzem
             public TaleWorlds.CampaignSystem.Map.IMapScene Ms;
             public int Calls;
             public float WX(float kx, float ky) { return Cx + Ca * kx * Sx - Sa * ky * Sy; }
@@ -1976,6 +2722,21 @@ namespace Armoury
                 return z;
             }
             public float HK(float kx, float ky) { return H(WX(kx, ky), WY(kx, ky)); }
+            /// <summary>Typ sciany siatki nawigacyjnej (TerrainType) pod punktem swiata; -1 = poza siatka.</summary>
+            public int Group(float wx, float wy)
+            {
+                if (!Faces) return 1;   // siatka nie przeszla sprawdzianu: kazdy punkt "Plain", lad wedlug wysokosci nad morzem
+                var cv = new CampaignVec2(new Vec2(wx, wy), true);
+                PathFaceRecord f = Ms.GetFaceIndex(in cv);
+                Calls++;
+                return f.IsValid() ? f.FaceGroupIndex : -1;
+            }
+            /// <summary>Lad pod punktem swiata (MapVillageData.LandAt); wysokosc liczona tylko na scianie ladowej, gdy znany poziom morza.</summary>
+            public bool Land(float wx, float wy)
+            {
+                if (!MapVillageData.IsLandGroup(Group(wx, wy))) return false;
+                return !(Sea > MapVillageData.NoSea * 0.5f) || H(wx, wy) > Sea + 0.02f;
+            }
         }
 
         /// <summary>Obrot elementu pochylony do normalnej terenu (normalna swiata -> uklad korzenia: obrot o -yaw), z zachowaniem skali elementu.</summary>
@@ -2029,16 +2790,20 @@ namespace Armoury
             float sp0 = SpreadAt(k, g, vis, px, py, alive, idx, g.Cx, g.Cy, h);
             if (sp0 <= max) return;
             _slopeVillages++;
-            float bestSp = sp0, bx = g.Cx, by = g.Cy, bdx = 0f, bdy = 0f;
-            bool water = k.HasWater;
+            float bestSp = sp0, bx = g.Cx, by = g.Cy, bdx = 0f, bdy = 0f, cx0 = g.Cx, cy0 = g.Cy;
+            bool water = k.HasWater, nearHit = false;
             foreach (float[] c in MapVillageData.ShiftCandidates(s.R.HalfLen, s.R.HalfWid, water))
             {
-                // przesuniecie w ukladzie obrazka (jedn. mapy) -> swiat
-                float wx = s.R.X + g.Ca * c[0] - g.Sa * c[1], wy = s.R.Y + g.Sa * c[0] + g.Ca * c[1];
+                // przesuniecie w ukladzie obrazka (jedn. mapy) -> swiat; wyglad 3: od srodka po ToLand / przesunieciu ku wodzie, tylko na lad
+                // i (recenzja) nie blizej innej wioski niz NeighborMinDist
+                float wx = cx0 + g.Ca * c[0] - g.Sa * c[1], wy = cy0 + g.Sa * c[0] + g.Ca * c[1];
+                if (!g.Land(wx, wy)) continue;
+                if (!FarFromOthers(s, wx, wy)) { nearHit = true; continue; }
                 float sp = SpreadAt(k, g, vis, px, py, alive, idx, wx, wy, null);
                 if (sp < bestSp - 0.02f) { bestSp = sp; bx = wx; by = wy; bdx = c[0]; bdy = c[1]; }
                 if (bestSp <= max) break;
             }
+            if (nearHit) _shiftNear++;
             bool shifted = bx != g.Cx || by != g.Cy;
             if (shifted) { g.Cx = bx; g.Cy = by; _slopeShift++; }
             bool squeezed = false;
@@ -2104,47 +2869,6 @@ namespace Armoury
             }
             finally { g.Cx = ox; g.Cy = oy; }
             return hi >= lo ? hi - lo : 0f;
-        }
-
-        /// <summary>Brzeg wody przed kepa (mlyn, rybacy): profil terenu co 0.25 jedn. mapy od przodu kepy (+Y), do 2.5; pierwszy spadek o 0.12
-        /// = brzeg (MapVillageData.FirstDrop). Mlyn staje kolem nad brzegiem, pomost od brzegu w strone wody, lodzie na brzegu. Elementy
-        /// przy wodzie przesuwane tylko do przodu (najwyzej 1.6 jedn. mapy) - brak spadku = zostaja przy kepie (liczone w logu).</summary>
-        /// <summary>Woda za kepa: profil od frontu kepy (+Y) bez brzegu, profil od jej tylu (-Y) z brzegiem (MapVillageData.WaterBehind), oba co
-        /// 0.25 jedn. mapy do 2.5 - jak ToBank. Profil tylu liczony tylko, gdy przed frontem brzegu nie ma (11 wywolan terenu wiecej).</summary>
-        private static bool WaterBehindKit(Kit k, Geo g)
-        {
-            float step = 0.25f / Math.Max(0.05f, g.Sy);
-            var hf = new List<float>();
-            for (int i = 0; i <= 10; i++) hf.Add(g.HK(0f, k.FrontY + i * step));
-            if (MapVillageData.FirstDrop(hf, 0.12f) >= 0) return false;
-            var hb = new List<float>();
-            for (int i = 0; i <= 10; i++) hb.Add(g.HK(0f, k.BackY - i * step));
-            return MapVillageData.WaterBehind(hf, hb, 0.12f);
-        }
-
-        private void ToBank(Kit k, Geo g, List<int> vis, float[] px, float[] py, bool[] alive)
-        {
-            float step = 0.25f / Math.Max(0.05f, g.Sy);
-            var h = new List<float>();
-            for (int i = 0; i <= 10; i++) h.Add(g.HK(0f, k.FrontY + i * step));
-            int d = MapVillageData.FirstDrop(h, 0.12f);
-            if (d < 0) { _bankMiss++; return; }
-            _bankFound++;
-            float bankY = k.FrontY + (d - 0.5f) * step;
-            float maxShift = 1.6f / Math.Max(0.05f, g.Sy);
-            for (int j = 0; j < vis.Count; j++)
-            {
-                if (!alive[j]) continue;
-                Piece p = k.Pieces[vis[j]];
-                if (!p.WaterSide) continue;
-                float cy = py[j] + p.Cy0;
-                float want = p.Ground == MapVillageData.GroundEnd ? bankY + 0.6f * p.Ry          // pomost: ladowy koniec tuz przed brzegiem
-                           : p.Ground == MapVillageData.GroundBeach ? bankY - 0.6f * p.Ry      // lodz: na brzegu
-                           : bankY - 0.7f * p.Ry;                                              // mlyn: przod z kolem nad brzegiem
-                float sh = want - cy;
-                if (sh > maxShift) sh = maxShift;
-                if (sh > 0f) py[j] += sh;
-            }
         }
 
         // ---------- v4: wzor obrazka na (okreg, model) - wspolny dla wiosek okregu, budowany raz ----------
@@ -2376,7 +3100,6 @@ namespace Armoury
                         k.Pieces.Add(p);
                     }
                 }
-                foreach (var p in k.Pieces) k.FrontY = Math.Max(k.FrontY, p.Local.origin.y + p.Cy0 + p.Ry);
                 return k.Pieces.Count > 0;
             }
             var pieces = new List<Piece>();
@@ -2387,7 +3110,7 @@ namespace Armoury
                 if (p == null) continue;
                 p.Role = MapVillageData.RoleHouse;
                 p.NoSeason = u.NoSeason;
-                p.Pivot = true;
+                p.PrefabZ = true;            // wyglad 3: wysokosc z dolu BB (ZOff tylko do logu korekty)
                 p.ZOff = u.F.origin.z;
                 pieces.Add(p);
                 LogUnit(u, k);
@@ -2429,7 +3152,6 @@ namespace Armoury
                 k.ThinX[i] = items[i].X;
                 k.ThinY[i] = items[i].Y;
                 k.ThinDetail[i] = p.Role == MapVillageData.RoleDetail || MapVillageData.IsDetailMesh(p.Name);
-                k.FrontY = Math.Max(k.FrontY, items[i].Y + p.Ry);
                 k.Pieces.Add(p);
             }
             return true;
@@ -2442,6 +3164,7 @@ namespace Armoury
             why = null;
             uint seed = MapVillageData.Fnv(d.Id + ":" + model.ToString(CultureInfo.InvariantCulture));
             var pieces = new List<Piece>();
+            var specs = new List<MapVillageData.PieceSpec>();   // przepis elementu (null = dom) - siatki doczepione
             var items = new List<MapVillageData.LayoutItem>();
             int nh = MapVillageData.HousesFor(model, 3);
             if (units != null)
@@ -2456,7 +3179,7 @@ namespace Armoury
                     if (p == null) continue;
                     p.Role = MapVillageData.RoleHouse;
                     p.NoSeason = u.NoSeason;
-                    p.Pivot = true;
+                    p.PrefabZ = true;        // wyglad 3: wysokosc z dolu BB (ZOff tylko do logu korekty)
                     p.ZOff = u.F.origin.z;
                     p.Local.origin = new Vec3(u.F.origin.x, u.F.origin.y, 0f, 1f);
                     all.Add(p);
@@ -2470,6 +3193,7 @@ namespace Armoury
                     Piece p = all[order[r]];
                     p.Levels = LevelsForHouse(model, r);
                     pieces.Add(p);
+                    specs.Add(null);
                     items.Add(new MapVillageData.LayoutItem { Slot = MapVillageData.SlotPreset, R = Math.Max(p.Rx, p.Ry), X = xs[order[r]], Y = ys[order[r]], Core = true });
                 }
                 Recenter(items);
@@ -2487,11 +3211,12 @@ namespace Armoury
                     if (p == null) continue;
                     p.Levels = LevelsForHouse(model, i);
                     pieces.Add(p);
+                    specs.Add(null);
                     items.Add(new MapVillageData.LayoutItem { Slot = sp.Slot, R = Math.Max(p.Rx, p.Ry), Core = true });
                 }
             }
             if (pieces.Count == 0) { why = "brak domow stylu " + st.Name; return false; }
-            int mill = -1;
+            int mill = -1, pier = -1;
             foreach (var sp in MapVillageData.Recipe(model, st))
             {
                 Piece p = SpecPiece(sp, k, t, unitScale, seed);
@@ -2504,7 +3229,9 @@ namespace Armoury
                 }
                 p.Levels = LevelsFrom(sp.MinLevel);
                 if (model == MapVillageData.ModelMill && sp.Role == MapVillageData.RoleSpecial) mill = pieces.Count;
+                if (model == MapVillageData.ModelFishing && sp.Ground == MapVillageData.GroundEnd && pier < 0) pier = pieces.Count;
                 pieces.Add(p);
+                specs.Add(sp);
                 items.Add(new MapVillageData.LayoutItem { Slot = sp.Slot, R = Math.Max(p.Rx, p.Ry), Core = false });
             }
             if (model == MapVillageData.ModelFishing)
@@ -2518,32 +3245,55 @@ namespace Armoury
             {
                 Piece p = pieces[i];
                 p.Local.origin = new Vec3(items[i].X - p.Cx0, items[i].Y - p.Cy0, 0f, 1f);
-                if (items[i].Core) { k.FrontY = Math.Max(k.FrontY, items[i].Y + p.Ry); k.BackY = Math.Min(k.BackY, items[i].Y - p.Ry); }
                 if (p.WaterSide) k.HasWater = true;
                 k.Pieces.Add(p);
             }
-            if (mill >= 0)
+            // siatki doczepione (kolo mlyna; skrzydla i schody wiatraka - wyglad 3): osobne kopie siatek jako dzieci encji budynku, ramka w
+            // jednostkach jego siatki jak dziecko w prefabie / scenie gry (bez skryptu WindMill, fizyki, czastek, dzwieku smigla)
+            for (int i = 0; i < pieces.Count; i++)
             {
-                // kolo mlyna: osobna siatka doczepiona do mlyna w ramce z prefabu battania_watermill (bez skryptu WindMill i bez czastek)
-                MetaMesh wm = KitMesh(MapVillageData.WatermillWheel);
-                if (wm != null)
+                var spc = specs[i];
+                if (spc == null || spc.Attach == null) continue;
+                Piece par = pieces[i];
+                float psc = Math.Abs(par.Local.rotation.GetScaleVector().x);
+                foreach (var at in spc.Attach)
                 {
-                    Mat3 wr = Mat3.Identity;
-                    wr.RotateAboutForward(MapVillageData.WheelFwd);
-                    var wp = new Piece
+                    if (at.ForMesh != par.Name) continue;   // zapas (np. wieza battania_windmill) - bez czesci innego modelu
+                    MetaMesh am = KitMesh(at.Mesh);
+                    if (am == null) { k.AttachMiss++; _attachMiss++; continue; }
+                    Mat3 ar = Mat3.Identity;
+                    if (at.RotUp != 0f) ar.RotateAboutUp(at.RotUp);
+                    if (at.RotFwd != 0f) ar.RotateAboutForward(at.RotFwd);
+                    k.Pieces.Add(new Piece
                     {
-                        Meshes = new[] { wm }, Local = new MatrixFrame(in wr, new Vec3(MapVillageData.WheelX, MapVillageData.WheelY, MapVillageData.WheelZ, 1f)),
-                        Parent = mill, Role = MapVillageData.RoleAttached, Ground = MapVillageData.GroundAttached, Levels = 14, Name = MapVillageData.WatermillWheel,
-                        NoSeason = t.NoSeason
-                    };
-                    k.Pieces.Add(wp);
-                    float msc = Math.Abs(k.Pieces[mill].Local.rotation.GetScaleVector().x);
+                        Meshes = new[] { am }, Local = new MatrixFrame(in ar, new Vec3(at.X, at.Y, at.Z, 1f)), Parent = i, Role = MapVillageData.RoleAttached,
+                        Ground = MapVillageData.GroundAttached, Levels = 14, Name = at.Mesh, NoSeason = par.NoSeason || t.NoSeason
+                    });
+                    if (at.Mesh == MapVillageData.WindmillFan) k.HasFan = true;
                     Vec3 b0, b1;
-                    if (MeshBox(wm, out b0, out b1))
-                        LogMesh(MapVillageData.WatermillWheel, "kolo mlyna (doczepione)", k, MapVillageData.SrcScene, b0, b1, msc,
-                                "jak mlyn (ramka z prefabu: 0.358, -5.333, 0; obrot -1.591 wokol osi Y)", Math.Max(b1.x - b0.x, b1.y - b0.y) * msc);
+                    if (!MeshBox(am, out b0, out b1)) continue;
+                    LogMesh(at.Mesh, "doczepione do " + par.Name, k, MapVillageData.SrcScene, b0, b1, psc,
+                            "jak " + par.Name + "; ramka (" + F2(at.X) + ", " + F2(at.Y) + ", " + F2(at.Z) + ") w jedn. jego siatki - " + at.Why,
+                            Math.Max(b1.x - b0.x, Math.Max(b1.y - b0.y, b1.z - b0.z)) * psc);
+                    if (at.Mesh == MapVillageData.WatermillWheel && i == mill)
+                    {
+                        // kotwica mlyna = srodek kola (ramka kola obrocona i przeskalowana jak mlyn, wzgledem jego origin); kolo: promien z BB (os
+                        // kola = lokalna Y kola: obrot wokol niej nie zmienia grubosci), grubosc wzdluz osi
+                        var wo = new Vec3(at.X, at.Y, at.Z);
+                        Vec3 off = par.Local.rotation.TransformToParent(in wo);
+                        k.AnchorDX = off.x;
+                        k.AnchorDY = off.y;
+                        k.WheelR = Math.Max(b1.x - b0.x, b1.z - b0.z) * 0.5f * psc;
+                        k.AnchorOut = 0.6f * (b1.y - b0.y) * 0.5f * psc;
+                    }
                 }
             }
+            if (mill >= 0)
+            {
+                k.Anchor = mill;
+                if (!(k.WheelR > 0f)) { k.AnchorDX = pieces[mill].Cx0; k.AnchorDY = pieces[mill].Cy0 + pieces[mill].Ry; k.AnchorOut = 0f; }   // bez kola: przod mlyna
+            }
+            else if (pier >= 0) k.Anchor = pier;
             return true;
         }
 
@@ -2567,7 +3317,7 @@ namespace Armoury
             MetaMesh mm = null;
             for (int i = 0; i < nm && mm == null; i++)
             {
-                string cand = sp.Meshes[(int)((seed + (uint)i) % (uint)nm)];
+                string cand = sp.Ordered ? sp.Meshes[i] : sp.Meshes[(int)((seed + (uint)i) % (uint)nm)];   // Ordered: pierwszy istniejacy po kolei
                 mm = KitMesh(cand);
                 if (mm != null) name = cand;
             }
@@ -2588,13 +3338,14 @@ namespace Armoury
             string how;
             bool pivot = sp.Pivot;
             float zoff = 0f;
+            bool prefabZ = false;
             if (clone != null)
             {
                 r0 = clone.F.rotation;
                 if (Math.Abs(sp.Natural - 1f) > 1e-3f) r0.ApplyScaleLocal(sp.Natural);
                 sc = Math.Abs(r0.GetScaleVector().x);
                 how = "jak ta siatka we wzorze wsi-matki" + (Math.Abs(sp.Natural - 1f) > 0.01f ? " x " + F2(sp.Natural) : "");
-                pivot = true;
+                prefabZ = true;   // wyglad 3: wysokosc z dolu BB (ZOff tylko do logu korekty)
                 zoff = clone.F.origin.z * sp.Natural;
             }
             else
@@ -2638,6 +3389,7 @@ namespace Armoury
                 case MapVillageData.TurnLongX: yaw = ey > ex ? (float)(Math.PI / 2) : 0f; break;
                 case MapVillageData.TurnLongY: yaw = ex > ey ? (float)(Math.PI / 2) : 0f; break;
                 case MapVillageData.TurnSeed: yaw = (MapVillageData.Fnv(name + ":" + seed.ToString(CultureInfo.InvariantCulture)) % 360u) * (float)Math.PI / 180f; break;
+                case MapVillageData.TurnCamera: yaw = 0f; break;   // wiatrak: obrot do kamery ustawia Create (zalezy od obrotu obrazka)
             }
             Mat3 ry = Mat3.Identity;
             ry.RotateAboutUp(yaw);
@@ -2650,6 +3402,8 @@ namespace Armoury
             p.WaterSide = sp.WaterSide;
             p.Pivot = pivot;
             p.ZOff = zoff;
+            p.PrefabZ = prefabZ;
+            p.FaceCamera = sp.Turn == MapVillageData.TurnCamera;
             p.NoSeason = (t != null && t.NoSeason) || (clone != null && clone.NoSeason);
             string role = sp.Role == MapVillageData.RoleHouse ? "dom" : sp.Role == MapVillageData.RoleSpecial ? "budynek glowny" : sp.Role == MapVillageData.RoleWater ? "przy wodzie" : "detal";
             LogMesh(name, role, k, clone != null ? MapVillageData.SrcHouse : sp.Source, b0, b1, sc, how, Math.Max(ex, ey));
@@ -2676,7 +3430,7 @@ namespace Armoury
                     Mat3 r = big.F.rotation;
                     r.ApplyScaleLocal(1.3f);
                     p = MakePiece(big.Meshes, r, big.Name);
-                    if (p != null) { p.Role = MapVillageData.RoleSpecial; p.Essential = true; p.NoSeason = big.NoSeason; p.Pivot = true; p.ZOff = big.F.origin.z * 1.3f; }
+                    if (p != null) { p.Role = MapVillageData.RoleSpecial; p.Essential = true; p.NoSeason = big.NoSeason; p.PrefabZ = true; p.ZOff = big.F.origin.z * 1.3f; }
                 }
             }
             if (p == null && st.Houses.Length > 0)
@@ -3628,7 +4382,7 @@ namespace Armoury
                             var s = l[j];
                             if (!s.Shown || s.Root == null) continue;
                             float cx = s.Placed ? s.Cx : s.R.X, cy = s.Placed ? s.Cy : s.R.Y;   // v4: srodek po przesunieciu ze stoku
-                            if (!MapVillageData.InFootprintAt(s.R, cx, cy, px, py, HoverMargin)) continue;
+                            if (!MapVillageData.InFootprintDeg(s.R, s.Placed ? s.Deg : s.R.FrontDeg, cx, cy, px, py, HoverMargin)) continue;
                             float dx = cx - px, dy = cy - py, dd = dx * dx + dy * dy;
                             if (dd < bestD) { bestD = dd; best = s; }
                         }
