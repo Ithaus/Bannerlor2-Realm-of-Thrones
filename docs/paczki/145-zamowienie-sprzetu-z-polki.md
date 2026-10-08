@@ -43,3 +43,5 @@ Chodzenie kowala za sztuke: miasto biedne (0.5) 0.3 d, srednie 0.6 d, Kings Land
 - Nie bylo autotestu w grze (zadne DLL nie wgrane).
 
 **Skladanie TOWARY 3:** b07458c i 16930b8 - bez konfliktow; komentarze "paczka 8" -> "paczka 145". Proba zamowien (TU\proba-zamowienia, kopia) na DLL calego lancucha: 130/130. Styk z odzieza wojska (150) sprawdzony - opis przy 150.
+
+**Poprawka po audycie TOWARY 3 (08.10):** opis MCM `TroopOrderMarkup` mowi, ze przy `TroopOrderFromShelf` narzut nie dziala (cena polki + chodzenie kowala).

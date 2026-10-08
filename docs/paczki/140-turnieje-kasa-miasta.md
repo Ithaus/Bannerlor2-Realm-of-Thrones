@@ -29,3 +29,5 @@
 **Ryzyko / co sprawdzic:** REGRESJE - zwykle zakonczenie (`TournamentFinished`) bez zmian. SPOJNOSC - kazde odwolanie oddaje pule ta sama regula. **Co Jeff zobaczy:** po oblezeniu miasta z ogloszonym turniejem pula wraca z komunikatem.
 
 **Skladanie TOWARY 3:** commit cb75543 - bez konfliktow.
+
+**Poprawka po audycie TOWARY 3 (08.10):** (1) pula gracza zdjeta przed `CreateTournament` / `AddTournament` wraca do gracza, gdy ogloszenie padnie wyjatkiem przed wpisem (Z6 audytu); (2) opisy MCM `HostBaseFee`, `HostFeeProsperityFactor`, `HostTakingsProsperityFactor`, `CancelledFeeRefund` - "(not used while Historical Town Rates is on)". ZAPIS (sprostowanie SKLAD.md sekcja 5): format i znaczenie czwartego pola `gt_events` sie NIE zmieniaja - juz w n120 bylo to `prizeGold` (pula gracza; n120 zdejmowal ja z kiesy w nicosc razem z oplata); zmienia sie rozliczenie: przy zakonczeniu pula idzie do zwyciezcy, przy odwolaniu wraca cala (`HistoricalTownRates`). Zapis z turniejem gracza ogloszonym w n120: pula zdjeta juz przez n120 trafi do zwyciezcy albo wroci cala - bilans zlota sie zgadza (zdjeta w n120, wyplacona w t3).

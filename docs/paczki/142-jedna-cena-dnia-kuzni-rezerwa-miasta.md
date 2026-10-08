@@ -16,3 +16,5 @@
 **Ryzyko / co sprawdzic:** SPOJNOSC - jedna cena dnia kuzni wszedzie; ta sama rezerwa miasta co w Armoury (odczyt przez refleksje). EKONOMIA - kuznia tansza niz dotad (3 d zamiast 7-15 d za projekt), kucie drogich sztuk nie placi wiecej za kuznie (placi materialem i czasem). **Co Jeff zobaczy:** "Forge hire N gold for every day of work" - te sama kwota przy kazdej robocie w danym miescie.
 
 **Skladanie TOWARY 3:** commit fdddb38 - bez konfliktow; build 3 modulow kod 0. Doba kuzni w jednym rejestrze z karnetem BK - poprawka po przegladzie opisana przy 141 (commit e933fd4).
+
+**Poprawka po audycie TOWARY 3 (08.10):** opis MCM `ForgeFeePerTier` mowi, ze przy `ForgeHireHistorical` dzien kuzni kosztuje tyle samo bez wzgledu na to, co kujesz.

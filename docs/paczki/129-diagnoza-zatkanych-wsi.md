@@ -69,3 +69,5 @@ Bledy: "ERROR in VillageClogDiag...", "potkniecia dzis" > 0, "zapis gry o wyjazd
 **Co Jeff zobaczy w grze (slowami gracza):** nic - gra dziala tak samo; w ustawieniach Armoury (grupa "The road to market") jest nowy przelacznik "Village Clog Diagnostics" (wlaczony), a w logu Armoury co dobe linia o tym, dlaczego wsie stoja z pelnymi spichrzami.
 
 **Skladanie TOWARY 3:** commit e496e9b - konflikt tylko w linii konstruktora `ArmouryBehavior()` (z 128: `SpoilsSeal.Reset()`) - obie listy Reset() zsumowane. Proba recenzenta na DLL calego lancucha: 69/69.
+
+**Poprawka po audycie TOWARY 3 (08.10):** przyklady pisza sie pod stalym prefiksem "Zatkane wsie (przyklad): dzien D - i/k z n - <wies> ..." (dotad liczniki w prefiksie - narzedzie logow widzialo kazda kombinacje jako osobny temat).

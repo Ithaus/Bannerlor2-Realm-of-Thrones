@@ -79,3 +79,5 @@
 - W GRZE SPRAWDZIC: na starcie "SpoilsCompany: ... wpiete: (8 drog, z "zamiana BK") | BRAK: nic"; gdy klan sluzy krolestwu - co dobe "zamiana BK (przywodca za zolnierza z niczego) 1 razy", a przywodca dalej "prowadzi druzyne"; co dobe linia "Spoils - klan najemnikow" ("klanu brak", dopoki klan nie istnieje); po zalozeniu: w polu kapitan sam (1 czlowiek), skarbiec = cala zaplacona kwota, komunikat Armoury po komunikacie Spoils; w kolejnych dniach "prawdziwy werbunek klanu: od notabli x, z karczmy y" > 0, a w "Ludzie:" ich werbunek w "od notabli do partii rodow" / "z karczmy"; "ZABLOKOWANO ... ochotnicy z mapy" > 0 tylko przy klanie zwolnionym z krolestwa.
 
 **Skladanie TOWARY 3:** commit b50d454 - bez konfliktow. Proba autora na DLL calego lancucha: 74/74.
+
+**Poprawka po audycie TOWARY 3 (08.10):** linia startowa "SpoilsCompany: ..." przy pelnym wpieciu konczy sie " | wszystkie drogi wpiete" zamiast " | BRAK: nic".
