@@ -719,3 +719,4 @@ cos, czego VolunteerKit nie widzi (do zbadania razem z projektem ekonomii).
 Pelny stan do podjecia: **docs/PRZEKAZANIE-2026-10-08.md** (co w grze, praca w toku 169 + workflow, co czeka na Jeffa: BEE wariant zbrojowni a/b, narzedzia).
 Jeff 08.10 ok. 12:15: "jak znika to zamykamy, ma byc logiczny system ekonomii, ze wszystko z czegos wynika" - BEE wariant (b) -ListaZFundamentu;
 akcje gracza BEE w nicosc zamknac latka Armoury (PRZEKAZANIE-2026-10-08.md rozdz. 7).
+Jeff 12:30: "tak potwierdzam" - zamek kupuje bron w miescie, rekrut bez kompletu z tym co ma, szkolenie wlasna bronia -> paczka 171 (PRZEKAZANIE rozdz. 10).

@@ -66,3 +66,9 @@ Repo Jeffa: `C:\Users\GAME\Bannerlor2-Realm-of-Thrones` (galaz claude/bannerlord
 - Propozycja (nowa paczka ekonomii, numer do nadania): zaloga zamku kupuje w najblizszym przyjaznym miescie (pan placi kasie miasta, woz wiezie do
   zamku jak MarketCarts); rekrut bez kompletu przychodzi z tym, co ma (gorszy sprzet / bez broni), dozbraja go pan z targu; szkolenie = codzienne cwiczenia
   wlasna bronia (bez obozu BEE z XP z niczego - zamyka 170).
+
+## 10. Jeff 12:30 "tak potwierdzam" -> paczka 171 ZBROJENIE ZALOG (w toku)
+- Drzewo SCRATCH\dzien-6/zaloga171/repo, galaz w-toku/171-zbrojenie-zalog (od 2e235ea), workflow - nazwa w STAN-PRAC/tu po starcie.
+- Zakres: (1) przyczyna ~95% werbunku "bez zapisu" (kto zmienia pule notabli poza VolunteerKit); (2) rekrut bez kompletu przychodzi z tym, co ma
+  (zamiast kompletu wzorca z niczego); (3) zaloga zamku kupuje w najblizszym przyjaznym miescie (pan placi miastu, towar jedzie do zamku);
+  (4) szkolenie = cwiczenia wlasna bronia (oboz BEE zamyka 170). Scalanie po kolei: 169 -> 170 -> 171 (konflikty w Settings/McmSettings/CHANGELOG).
