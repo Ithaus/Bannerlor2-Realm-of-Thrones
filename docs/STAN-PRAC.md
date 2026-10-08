@@ -696,3 +696,11 @@ od doby 4, karawany 324 -> 1037, bandyci 647 -> 1137, lordowie -> 654). "Widly" 
 Probkowanie stosu (Thread.Suspend) ZAWIESILO gre - usuniete. Autotest zamyka gre 4 s po zapisie koncowym (do poprawy).
 DO ZROBIENIA: 161 sprawdzic (zapis w kawalkach, ponowne wczytanie) -> "wgraj"; RecruitKit sprzatanie (komplety ochotnikow,
 ktorych nie ma w puli; zmarli notable); przyspieszenie MenPurse/AiWear/dziennego tiku Armoury (pomiar sekcjami wewnatrz).
+161 GOTOWA DO WGRANIA (08.10 11:45): galaz w-toku/161-zapis 2e235ea (na 160), Armoury c01a54ba (dll-final-5, kopia
+D:\Backup-Bannerlord\towary3-2026-10-08\dll-final-5) = 160 + 161. Wgranie dopiero na "wgraj". Testy: zapis z doby 360
+wczytany ratunkiem Armoury (3 napisy, najdluzszy 2.93 MB); nowy zapis 0 napisow > 32767 B; zapis w kawalkach wczytany bez
+ratunku (komplety 11 496/11 496); nowa kampania 4 doby OK, 0 bledow. Drugi blad znaleziony przy okazji: RecruitKit.Import
+szukal notabli w SyncData (bohaterow jeszcze nie ma) - KAZDE wczytanie gubilo wszystkie komplety; teraz ResolvePending w
+OnSessionLaunched (12 624 z 12 927) + Reconcile z pulami raz na dobe. DZIURA DO EKONOMII: ~95% werbunku AI tieru 2+ to
+ochotnicy "bez zapisu" (komplet wzorca z niczego): ok. 1000-1500 na dobe na starcie, ~500 po roku - pule notabli zmienia
+cos, czego VolunteerKit nie widzi (do zbadania razem z projektem ekonomii).
