@@ -1,0 +1,16 @@
+{
+  "_opis": "AT2 tryb zdjec autotestu. Wzor przelacznika Documents/Mount and Blade II Bannerlord/CrashScribe/autotest.json albo plik dla autotest.ps1 -PhotosFile / -Photos wioski (skrypt bierze z niego tylko photos, photo_shots, photo_hours). Cele 1-4: nazwane wioski Armoury z Modules/Armoury/ModuleData/arm_map_villages.tsv (x, y jak w pliku). Cel 5: wies gry Tumbledown (wies-matka Stony Holt) do porownania z ikona gry. photo_shots = wysokosci kamery nad celem, photo_hours = jasna pora (godziny gry).",
+  "run": "zdjecia-reczne",
+  "days": 2,
+  "save": false,
+  "quit": true,
+  "photos": [
+    { "name": "stony-holt",     "x": 426.51, "y": 865.59 },
+    { "name": "pennycross",     "x": 353.12, "y": 518.69 },
+    { "name": "sweet-bridge",   "x": 287.94, "y": 249.70 },
+    { "name": "widows-horn",    "x": 660.65, "y": 86.49 },
+    { "name": "tumbledown-gra", "settlement": "village_B2_1", "dx": 0, "dy": 0 }
+  ],
+  "photo_shots": "8,17,40",
+  "photo_hours": "9-15"
+}

@@ -18,6 +18,10 @@
     <Compile Include="src\**\*.cs" />
   </ItemGroup>
   <ItemGroup>
+    <!-- [AT2] tryb zdjec autotestu: BMP -> PNG i zrzut okna gry (System.Drawing z .NET Framework, w GAC) -->
+    <Reference Include="System.Drawing" />
+  </ItemGroup>
+  <ItemGroup>
     <Reference Include="MCMv5"><HintPath>$(GameLibs)/MCMv5.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="0Harmony"><HintPath>$(GameLibs)/0Harmony.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="TaleWorlds.CampaignSystem"><HintPath>$(GameLibs)/TaleWorlds.CampaignSystem.dll</HintPath><Private>false</Private></Reference>

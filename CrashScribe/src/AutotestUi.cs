@@ -38,6 +38,7 @@ namespace CrashScribe
             new[] { "ccCulture",  "TaleWorlds.CampaignSystem.ViewModelCollection", "TaleWorlds.CampaignSystem.ViewModelCollection.CharacterCreation.CharacterCreationCultureVM" },
             new[] { "ccOption",   "TaleWorlds.CampaignSystem.ViewModelCollection", "TaleWorlds.CampaignSystem.ViewModelCollection.CharacterCreation.CharacterCreationOptionVM" },
             new[] { "mapScreen",  "SandBox.View",                               "SandBox.View.Map.MapScreen" },
+            new[] { "mapCamera",  "SandBox.View",                               "SandBox.View.Map.MapCameraView" },   // [AT2] tryb zdjec
             new[] { "incView",    "SandBox.View",                               "SandBox.View.Map.MapIncidentView" },
             new[] { "incVm",      "SandBox.ViewModelCollection",                "SandBox.ViewModelCollection.Map.Incidents.MapIncidentVM" },
             new[] { "rotEvent",   "ROT",                                        "ROT.CampaignBehaviors.EventPopupState" },
@@ -611,6 +612,12 @@ namespace CrashScribe
             new[] { "ccOption", "ExecuteSelect()" }, new[] { "ccOption", "ActionText" },
             new[] { "mapScreen", "Instance" }, new[] { "mapScreen", "GetMapView<>" },
             new[] { "mapScreen", "IsEscapeMenuOpened" }, new[] { "mapScreen", "_escapeMenuView" }, new[] { "mapScreen", "CloseEscapeMenu()" },
+            // [AT2] tryb zdjec: kamera mapy
+            new[] { "mapScreen", "MapCameraView" }, new[] { "mapScreen", "IsReady" },
+            new[] { "mapCamera", "IdealCameraTarget" }, new[] { "mapCamera", "_cameraTarget" }, new[] { "mapCamera", "TargetCameraDistance" },
+            new[] { "mapCamera", "CameraDistance" }, new[] { "mapCamera", "AdditionalElevation" }, new[] { "mapCamera", "CameraBearing" },
+            new[] { "mapCamera", "CameraAnimationInProgress" }, new[] { "mapCamera", "Camera" },
+            new[] { "mapCamera", "SetCameraMode(1)" }, new[] { "mapCamera", "TeleportCameraToMainParty()" },
             new[] { "incVm", "Options" }, new[] { "incVm", "CanConfirm" }, new[] { "incVm", "ExecuteConfirm()" }, new[] { "incVm", "Title" },
             new[] { "rotPanel", "EventTitle" }, new[] { "rotPanel", "IsDoneEnabled" }, new[] { "rotPanel", "IsCancelEnabled" }, new[] { "rotPanel", "ExecuteDone()" }, new[] { "rotPanel", "ExecuteCancel()" },
             new[] { "bkUi", "instance" }, new[] { "bkUi", "mapView" }, new[] { "bkUi", "CloseUI()" },
@@ -634,6 +641,8 @@ namespace CrashScribe
                 string m = n[1];
                 if (m.EndsWith("<>"))
                     has = t.GetMethods(BindingFlags.Public | BindingFlags.Instance).Any(x => x.Name == m.Substring(0, m.Length - 2) && x.IsGenericMethodDefinition);
+                else if (m.EndsWith("(1)"))
+                    has = t.GetMethods(All).Any(x => x.Name == m.Substring(0, m.Length - 3) && x.GetParameters().Length == 1);
                 else if (m.EndsWith("()"))
                 {
                     has = false;

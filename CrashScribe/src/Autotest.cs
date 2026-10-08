@@ -37,6 +37,10 @@ namespace CrashScribe
     /// ForceAutoSave), a kazdy zapis o nazwie spoza "autotest-" jest przekierowany na
     /// "autotest-przekierowany-..." (latka na MBSaveLoad.OverwriteSaveAux - jedyna droga do
     /// pliku dla SaveAs, QuickSave i AutoSave) - saveauto1..3 Jeffa sa nietykalne.
+    ///
+    /// [AT2] TRYB ZDJEC (klucz "photos" w przelaczniku, AutotestPhotos.cs): po wejsciu na mape, przy jasnej
+    /// porze dnia, kamera mapy na kazdy cel z kilku wysokosci i zrzut ekranu do CrashScribe\zdjecia\<run>\;
+    /// potem zwykly bieg. Bez klucza "photos" ten etap nie istnieje.
     /// </summary>
     internal static class Autotest
     {
@@ -56,11 +60,14 @@ namespace CrashScribe
         internal static string RunId = "";
 
         internal static string LogPath;
+        internal static string Dir;                // katalog CrashScribe w Documents (log autotestu, zdjecia)
+        internal static long Frames;               // [AT2] klatki (kazde wywolanie Tick) - zdjecia czekaja tez na klatki, nie tylko sekundy
         internal static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
         private static readonly object LogGate = new object();
         private static readonly Stopwatch Clock = new Stopwatch();
 
-        internal enum Stage { Off, Menu, Creation, Settle, Run, Saving, Quitting, Done }
+        // [AT2] Photos przed Saving: porownania "Now < Stage.Saving" / ">= Stage.Saving" licza je jak bieg
+        internal enum Stage { Off, Menu, Creation, Settle, Run, Photos, Saving, Quitting, Done }
         internal static Stage Now = Stage.Off;
 
         private static double _lastTick = -1, _stageSince, _menuSince = -1;
@@ -71,6 +78,7 @@ namespace CrashScribe
         private static int _lastDay = -1;
         private static double _lastDayAt, _runStartAt;
         private static bool _firstPartial = true;
+        private static string _partialNote;        // [AT2] opis niepelnej doby (null = "bieg ruszyl w trakcie doby")
         private static readonly List<double> PerDay = new List<double>();
         private static double _lastTicks = -1;
         private static double _lastMoveAt, _lastStallDiag, _lastAction;
@@ -101,7 +109,7 @@ namespace CrashScribe
 
         internal static bool PreferDecline
         {
-            get { return Now == Stage.Settle || Now == Stage.Run || Now == Stage.Saving; }
+            get { return Now == Stage.Settle || Now == Stage.Run || Now == Stage.Photos || Now == Stage.Saving; }
         }
 
         // ------------------------------------------------------------------ wlacznik
@@ -132,6 +140,7 @@ namespace CrashScribe
                     try { Scribe.Line("AUTOTEST: przelacznika " + sw + " nie da sie zuzyc (" + e.GetType().Name + ": " + e.Message + ") - autotest NIE rusza."); } catch { }
                     return;
                 }
+                Dir = dir;
                 Parse(text);
                 LogPath = Path.Combine(dir, "autotest-" + DateTime.Now.ToString("yyyy-MM-dd", Inv) + ".log");
                 Active = true;
@@ -155,9 +164,10 @@ namespace CrashScribe
             StallQuitMin = Int(json, "stall_min", 10, 1, 240);
             LimitS = Int(json, "limit_s", 0, 0, 30 * 24 * 3600);
             RunId = Str(json, "run", "");
+            AutotestPhotos.Parse(json);   // [AT2] klucze photos / photo_shots / photo_hours; bez nich lista celow pusta
         }
 
-        private static string Raw(string json, string key)
+        internal static string Raw(string json, string key)
         {
             if (string.IsNullOrEmpty(json)) return null;
             var m = Regex.Match(json, "\"" + Regex.Escape(key) + "\"\\s*:\\s*(\"(?<s>[^\"]*)\"|(?<v>[^,}\\s]+))", RegexOptions.IgnoreCase);
@@ -190,7 +200,7 @@ namespace CrashScribe
             return def;
         }
 
-        private static string Str(string json, string key, string def)
+        internal static string Str(string json, string key, string def)
         {
             var r = Raw(json, key);
             return string.IsNullOrEmpty(r) ? def : Regex.Replace(r, "[^A-Za-z0-9_.:-]", "");
@@ -210,6 +220,8 @@ namespace CrashScribe
                  + (Days > 60 ? " | zapis kontrolny \"autotest-dlugi\" co " + CheckpointDays + " dob" : "")
                  + " | koniec przy postoju " + StallQuitMin + " min"
                  + (LimitS > 0 ? " | limit " + (LimitS / 60) + " min" : ""), true);
+            string ph = AutotestPhotos.Describe();
+            if (ph.Length > 0) Note("  zdjecia: " + ph, true);
         }
 
         // ------------------------------------------------------------------ log
@@ -385,6 +397,7 @@ namespace CrashScribe
         internal static void Tick(float dt)
         {
             if (!Active || Now == Stage.Done) return;
+            Frames++;
             double t = Clock.Elapsed.TotalSeconds;
             if (t - _lastTick < 0.25) return;
             _lastTick = t;
@@ -404,6 +417,7 @@ namespace CrashScribe
                     case Stage.Creation: StepCreation(t); break;
                     case Stage.Settle: StepSettle(t); break;
                     case Stage.Run: StepRun(t); break;
+                    case Stage.Photos: AutotestPhotos.Step(t); break;
                     case Stage.Saving: StepSaving(t); break;
                     case Stage.Quitting: StepQuit(t); break;
                 }
@@ -476,7 +490,14 @@ namespace CrashScribe
             }
             if (st is global::TaleWorlds.CampaignSystem.GameState.MapState)
             {
-                Go(Stage.Settle, t, "kampania: mapa po " + (int)(t - _stageSince) + " s od wyboru w menu (" + DayLabel() + ")");
+                string lbl = "kampania: mapa po " + (int)(t - _stageSince) + " s od wyboru w menu (" + DayLabel() + ")";
+                // [AT2] zdjecia od razu na mapie (gracz jeszcze poza miastem, czas STOP); ciemno albo menu - zdjecia z biegu
+                if (AutotestPhotos.Pending)
+                {
+                    Go(Stage.Photos, t, lbl + " -> zdjecia (" + AutotestPhotos.Plan() + ")");
+                    AutotestPhotos.Begin(t, false);
+                }
+                else Go(Stage.Settle, t, lbl);
                 return;
             }
             if (st is InitialState && Game.Current == null && t - _stageSince > 60)   // StartNewGame od razu wstawia GameLoadingState
@@ -665,7 +686,7 @@ namespace CrashScribe
         }
 
         /// <summary>Klika "wyjscie" z menu (opcja isLeave) - to samo, co gracz wybierajacy "Leave".</summary>
-        private static bool ClickLeave(MenuContext ctx)
+        internal static bool ClickLeave(MenuContext ctx)
         {
             var gm = Campaign.Current.GameMenuManager;
             int n = gm.GetVirtualMenuOptionAmount(ctx);
@@ -718,6 +739,7 @@ namespace CrashScribe
             _lastDayAt = t;
             _lastDay = (int)Math.Floor(DayNow());
             _firstPartial = true;
+            _partialNote = null;
             _lastTicks = CampaignTime.Now.ToMilliseconds;
             _stallTicks = Campaign.Current != null ? Campaign.Current.CurrentTickCount : 0;
             _lastMoveAt = t;
@@ -737,15 +759,25 @@ namespace CrashScribe
             }
             bool waiting = EnsureWaiting(t);
 
+            // [AT2] zdjecia odlozone przy wejsciu na mape (ciemno / menu): pierwsza jasna pora w miescie -> wyjscie
+            // spod bramy na czas zdjec (czas STOP), potem EnsureWaiting osadza gracza jak zwykle
+            if (waiting && AutotestPhotos.WantNow())
+            {
+                Go(Stage.Photos, t, "zdjecia: " + AutotestPhotos.Plan() + " - wychodze z miasta na czas zdjec (czas STOP)");
+                AutotestPhotos.Begin(t, true);
+                return;
+            }
+
             // doby
             int d = (int)Math.Floor(DayNow());
             if (d > _lastDay && _lastDay >= 0)
             {
                 double sec = t - _lastDayAt;
                 int jumped = d - _lastDay;
-                string mark = _firstPartial ? " (niepelna - bieg ruszyl w trakcie doby)" : (jumped > 1 ? " (" + jumped + " doby naraz)" : "");
+                string mark = _firstPartial ? " (" + (_partialNote ?? "niepelna - bieg ruszyl w trakcie doby") + ")" : (jumped > 1 ? " (" + jumped + " doby naraz)" : "");
                 if (!_firstPartial) for (int k = 0; k < jumped; k++) PerDay.Add(sec / jumped);
                 _firstPartial = false;
+                _partialNote = null;
                 _lastDay = d;
                 _lastDayAt = t;
                 int newErr = _errors - _errorsAtDay;
@@ -775,6 +807,31 @@ namespace CrashScribe
             }
             if (still > StallQuitMin * 60)
                 Finish("czas gry stoi " + (int)(still / 60) + " min mimo prob odblokowania (" + Where() + ")", false, t);
+        }
+
+        /// <summary>
+        /// [AT2] Koniec sesji zdjec (zrobione, przerwane albo odlozone). Z wejscia na mape -> osadzanie w miescie jak
+        /// zawsze; z biegu -> bieg dalej: gracz stoi pod brama, EnsureWaiting osadza go znowu (to samo miasto nie trafia
+        /// do odrzuconych), doba ze zdjeciami nie liczy sie do srednich, postoj liczony od teraz.
+        /// </summary>
+        internal static void PhotosOver(double t, bool fromRun, string why)
+        {
+            if (Now != Stage.Photos) return;
+            if (!fromRun)
+            {
+                Go(Stage.Settle, t, "miasto: " + why + " - osadzam gracza w miescie");
+                return;
+            }
+            _placedTown = null;
+            _waitingLogged = false;
+            _lastAction = 0;
+            _lastMoveAt = t;
+            _lastStallDiag = t;
+            _stallTicks = Campaign.Current != null ? Campaign.Current.CurrentTickCount : 0;
+            _lastTicks = Campaign.Current != null ? CampaignTime.Now.ToMilliseconds : _lastTicks;
+            _firstPartial = true;
+            _partialNote = "niepelna - zdjecia w trakcie doby";
+            Go(Stage.Run, t, "bieg: " + why + " - z powrotem do miasta (" + DayLabel() + ", " + Where() + ")");
         }
 
         private static string Averages(int d)
@@ -867,13 +924,15 @@ namespace CrashScribe
         internal static void Finish(string why, bool ok, double t)
         {
             if (Now >= Stage.Saving) return;
+            if (Now == Stage.Photos) AutotestPhotos.Abort("koniec biegu: " + why);   // [AT2] kamera wraca do druzyny przed zapisem
             _finishOk = ok;
             _finishWhy = why;
             string sum = "";
             if (PerDay.Count > 0) sum = " | " + PerDay.Count + " pelnych dob, srednio " + PerDay.Average().ToString("0.0", Inv) + " s/dobe";
             double runMin = _runStartAt > 0 ? (t - _runStartAt) / 60.0 : 0;
             Note((ok ? "KONIEC OK: " : "KONIEC BLAD: ") + why + " | czas od startu gry " + (t / 60.0).ToString("0.0", Inv)
-                 + " min, biegu " + runMin.ToString("0.0", Inv) + " min" + sum + " | okna zamkniete: " + _windows + " | bledy: " + _errors, true);
+                 + " min, biegu " + runMin.ToString("0.0", Inv) + " min" + sum + " | okna zamkniete: " + _windows + " | bledy: " + _errors
+                 + AutotestPhotos.Summary(), true);
             if (SaveAtEnd && Campaign.Current != null && Campaign.Current.SaveHandler != null
                 && ActiveState() is global::TaleWorlds.CampaignSystem.GameState.MapState)
             {
