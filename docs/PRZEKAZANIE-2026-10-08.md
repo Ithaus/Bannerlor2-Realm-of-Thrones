@@ -59,3 +59,10 @@ Repo Jeffa: `C:\Users\GAME\Bannerlor2-Realm-of-Thrones` (galaz claude/bannerlord
 - Zakres: akcje gracza BEE w nicosc (OPIS 1.2) wylaczone z powodem; bierne zrodla BEE z niczego po 13 kluczach (gotowe zbrojownie, wirtualny skarbiec
   zamku, XP obozow, ...) zatrzymane. Spec: docs/paczki/170-bee-domkniecie.md w drzewie. Jesli sesja padla: git log w drzewie + spec, dokonczyc faze.
 - Kolejnosc wgrania: 169 (test 40 dob) -> skrypt 13 kluczy z -ListaZFundamentu + 170 razem (jeden test) -> "wgraj".
+
+## 9. Pytanie Jeffa 12:25 "skad zamek zdobywa bron, aby wyszkolic i uzupelnic zaloge?" - odpowiedziane, PROPOZYCJA czeka na "tak"
+- Dzis: (1) ColdStart - zapas zbrojowni zalog raz na kampanie; (2) rekruci z kompletem od notabla, ale ~95% "bez zapisu" = komplet wzorca z niczego;
+  (3) AiGear.TryBuy: zaloga kupuje na polce SWOJEJ osady (zamek: st.ItemRoster zamku - zamek nie ma targu, polka zwykle pusta; DO ZMIERZENIA w 169/spisie).
+- Propozycja (nowa paczka ekonomii, numer do nadania): zaloga zamku kupuje w najblizszym przyjaznym miescie (pan placi kasie miasta, woz wiezie do
+  zamku jak MarketCarts); rekrut bez kompletu przychodzi z tym, co ma (gorszy sprzet / bez broni), dozbraja go pan z targu; szkolenie = codzienne cwiczenia
+  wlasna bronia (bez obozu BEE z XP z niczego - zamyka 170).
