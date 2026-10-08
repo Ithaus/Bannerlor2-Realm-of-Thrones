@@ -858,7 +858,7 @@ namespace Armoury
                 foreach (var name in new[] { "GetSkillXpForSmelting", "GetSkillXpForSmithingInFreeBuildMode", "GetSkillXpForSmithingInCraftingOrderMode" })
                 {
                     var m = AccessTools.Method(t, name, new[] { typeof(ItemObject) });
-                    if (m != null) { h.Patch(m, postfix: new HarmonyMethod(typeof(HistoricalPrices), nameof(XpPostfix))); n++; }
+                    if (m != null) { h.Patch(m, postfix: new HarmonyMethod(typeof(HistoricalPrices), nameof(XpPostfix)) { priority = Priority.High }); n++; }   // poprawka po audycie TOWARY 3: przeliczenie przed sufitami SmithAudit.SmeltXpPostfix / WeaponXpPatch (p400)
                 }
                 var tm = typeof(TaleWorlds.CampaignSystem.GameComponents.DefaultTournamentModel);
                 int p = 0;

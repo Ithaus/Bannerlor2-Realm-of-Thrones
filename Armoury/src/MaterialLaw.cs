@@ -199,7 +199,10 @@ namespace Armoury
                 var rf = AccessTools.Method(typeof(TaleWorlds.CampaignSystem.GameComponents.DefaultSmithingModel), "GetRefiningFormulas");
                 if (rf != null) h.Patch(rf, postfix: new HarmonyMethod(typeof(MaterialLaw), nameof(RefinePostfix)) { priority = Priority.High });
                 var rx = AccessTools.Method(typeof(TaleWorlds.CampaignSystem.GameComponents.DefaultSmithingModel), "GetSkillXpForRefining");
-                if (rx != null) h.Patch(rx, postfix: new HarmonyMethod(typeof(MaterialLaw), nameof(RefineXpPostfix)));
+                // poprawka po audycie TOWARY 3: przeliczenie XP od dawnej wartosci MUSI biec PRZED sufitem SmithAudit.RefineXpPostfix (p400) - przy
+                // rownym priorytecie sufit szedl pierwszy (ApplyAll SmithAudit przed nami) i przeliczenie x dawna/nowa wartosc wynosilo XP ponad
+                // RefineXpCap (stal: 133-200 zamiast 60). Priority.High - niezaleznie od kolejnosci ApplyAll.
+                if (rx != null) h.Patch(rx, postfix: new HarmonyMethod(typeof(MaterialLaw), nameof(RefineXpPostfix)) { priority = Priority.High });
                 int prod = 0;
                 var seen = new HashSet<Type>();
                 foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
