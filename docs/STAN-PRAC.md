@@ -666,3 +666,9 @@ jednorazowo -2.64 mln) - zloto znika z gry; kasy miast 17.0 mln -> 7.84 mln w 40
 TOWARY 3 WGRANE 08.10 ok. 08:20 (Jeff: "wgraj najpierw towary"): Armoury 5a7074c0, GT 1337433c, RC 3e04b89b, Armoury.json 35 / 13.33 / 2. ZATWIERDZONE OD TERAZ:
 Armoury 5a7074c0, GrandTourney 1337433c, RealisticCaptivity 3e04b89b, CrashScribe 11fa0214 (bez zmian). Galaz paczki/towary3 (5ccb0f5). Test roczny
 (punkt odniesienia przed poprawkami ekonomii) puszczony ponownie po wgraniu.
+
+160 GOTOWE po recenzji (08.10 ok. 10:00): kon wlasnoscia zolnierza - werbunek tylko dni zoldu (bez doplaty za konia, nic nie schodzi z polki), premia zoldu
+konnych x1.5 (MountedWageFactor; historycznie x2 dla tej samej sluzby, ale gra placi po tierze) w partiach rodow i garnizonach (karawany bez premii); BKROTPartyWageModel
+nie rozroznial konnych. t3-sklad 2bde2bf (w-toku/towary3-sklad), Armoury 2664b691 (dll-final-4, kopia D:\Backup-Bannerlord\towary3-2026-10-08\dll-final-4).
+Opis docs/paczki/w-toku/160-kon-wlasnoscia-zolnierza.md. Wgranie na "wgraj" (GT, RC bez zmian). Uwaga recenzji: zysk lordow tylko na starcie, potem jazda kosztuje
+tyle co w T3 - pilnowac Banku w dlugim tescie.
