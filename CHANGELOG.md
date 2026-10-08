@@ -3,7 +3,7 @@
 ## 2026-10-07 (W2) - WIOSKI NA MAPIE - WIDOK: 2449 nazwanych wiosek (wariant 4000 ludzi na wioske), dymek, ogien przy rabunku
 **Status:** WGRANE 2026-10-07 ok. 19:06 na slowo Jeffa ("wgraj mi wioski 2200, chce najpierw zobaczyc w grze") - na wersji z gry (n120 + W2,
 galaz paczki/w2-wioski-na-mapie 39b60a0), Armoury.dll md5 62e377956518a5f6f493e8839b9e700a (kopia poprzedniego 25b87631:
-Armoury.dll.bak-2026-10-07-przed-wioski + D:\Backup-Bannerlord\wioski-2026-10-07\zatwierdzony-przed), dane Modules\Armoury\ModuleData\narm_map_villages.tsv md5 08ab1f1635ebfff2586791257ded5acc (warianty 6000 / 8000 w D:\Backup-Bannerlord\wioski-2026-10-07 - podmiana pliku bez
+Armoury.dll.bak-2026-10-07-przed-wioski + D:\Backup-Bannerlord\wioski-2026-10-07\zatwierdzony-przed), dane Modules\Armoury\ModuleData\arm_map_villages.tsv md5 08ab1f1635ebfff2586791257ded5acc (warianty 6000 / 8000 w D:\Backup-Bannerlord\wioski-2026-10-07 - podmiana pliku bez
 przebudowy). Armoury.json bez zmian (MCM "Map villages": Map Villages Enabled = on, wylaczenie zdejmuje wioski od razu). Nic w zapisie gry.
 Autotesty: 17:40 (20 dob, ogien 18 razy, ale 0 obrazkow - "brak siatek"; poprawka 39b60a0: siatki po nazwie, bo Town Scene Manager ROT
 zabiera siatki osad) i 19:01 (5 dob: postawione 633, najwiecej naraz 301, wzory 128/128, 0 potkniec, 0 ERROR). Opis: docs/paczki/W2-wioski-na-mapie.md,
