@@ -388,6 +388,8 @@ narzedzia rozpoznal wszystkie linie. Grupa 1: OK 61, UWAGA 5; grupa 2: OK 31, UW
   przy rabunkach dziala (18 ogni w wioski.log), 0 potkniec, ALE postawione 0 - "brak siatek" (wzory wsi-matek 0 dobrych, 128 bez wzoru) - kod nie
   znajduje modeli domow wsi ROT. Poprawka w toku (workflow wioski-brak-siatek), potem krotki autotest i wgranie (Jeff: "wgraj"). Plik
   arm_map_villages.tsv (4000) lezy juz w Modules\Armoury\ModuleData (stary DLL go nie czyta).
+  WGRANE 07.10 ok. 19:06 (po autotescie 19:01: postawione 633, 0 bledow): Armoury.dll md5 62e37795 (n120 + W2), dane tsv 08ab1f16 (4000).
+  ZATWIERDZONY DLL W GRZE OD TERAZ = 62e37795 (autotest przywraca ten). TOWARY 3 musi dostac paczke W2 (commity 3b59c75 + 39b60a0) przy skladaniu.
 - CENA SPRZEDAZY SPRZETU (07.10 ok. 15:20; projekt docs/PROJEKT-CENA-SPRZEDAZY-SPRZETU-2026-10-07.md): (1) "tak, jesli to poprawia realizm ekonomii" -
   wgrac razem z 127 (kara BK x5 RAZ zamiast x25, podloga 2% od wartosci ZE STANEM); (2) "tak" - sufit: kupiec nie da wiecej niz 1/10 ceny nowej sztuki
   na tej polce; (3) "tak" - handel odnowionym sprzetem miedzy miastami zostaje. Paczka w toku (workflow cena-sprzedazy-paczka, galaz w127b-cena-sprzedazy),
