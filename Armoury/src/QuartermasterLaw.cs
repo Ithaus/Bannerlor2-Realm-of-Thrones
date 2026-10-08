@@ -1065,7 +1065,7 @@ namespace Armoury
                 // (liczone PRZED depozytem - ludzie nosza najlepsze, takze zuzyte)
                 if (s.TroopMendEnabled)
                 {
-                    int wornPieces = 0;
+                    int wornPieces = 0, wreckPieces = 0;
                     for (int i = 0; i < armory.Count; i++)
                     {
                         var el = armory[i];
@@ -1073,11 +1073,15 @@ namespace Armoury
                         var m = el.EquipmentElement.ItemModifier;
                         if (it != null && el.Amount > 0 && !ArmouryBehavior.NoWear(it)
                             && m != null && m.PriceMultiplier < 0.999f && m.PriceMultiplier > 0f)
+                        {
                             wornPieces += el.Amount;
+                            if (LootPrices.SmithRefuses(m)) wreckPieces += el.Amount;   // paczka 158: wraki na zlom
+                        }
                     }
                     if (wornPieces > 0)
                         InformationManager.DisplayMessage(new InformationMessage(
-                            "QM: " + wornPieces + " pcs battle-worn - the smith mends them (Work the forge).",
+                            "QM: " + wornPieces + " pcs battle-worn - the smith mends them (Work the forge)."
+                            + (wreckPieces > 0 ? " " + wreckPieces + " of them are wrecks - scrap now, no smith restores them for coin." : ""),
                             Colors.Yellow));
                 }
 

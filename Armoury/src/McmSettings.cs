@@ -716,7 +716,7 @@ namespace Armoury
         [SettingPropertyGroup("The law of the battlefield")]
         public bool SpoilsNoFreeGold { get; set; } = true;
 
-        [SettingPropertyBool("Spoils Quartermaster Repair", HintText = "the Spoils of War quartermaster's repairs are done by this town's smiths, like every other repair in Armoury: you pay into the town's coffers the smiths' work (with Smith Mend From Market on: its share of the days a master spent making the piece, at the town's day wage; off: a quarter of the worth it has lost), plus the materials they take from this market at its prices - iron (crude iron, scrap from wrecks or ore), wood, leather, linen or wool, more the worse the piece; with no such materials on the market the piece waits; wrecks (Mangled) are not restored here - mend them at a forge with your own materials, or salvage them (off = Spoils of War as before: its price, the coin vanishes, no materials, wrecks restored; the day's log line shows how much either way)")]
+        [SettingPropertyBool("Spoils Quartermaster Repair", HintText = "the Spoils of War quartermaster's repairs are done by this town's smiths, like every other repair in Armoury: you pay into the town's coffers the smiths' work (with Smith Mend From Market on: its share of the days a master spent making the piece, at the town's day wage; off: a quarter of the worth it has lost), plus the materials they take from this market at its prices - iron (crude iron, scrap from wrecks or ore), wood, leather, linen or wool, more the worse the piece; with no such materials on the market the piece waits; wrecks (Mangled, or worn to a tenth of their worth or less - see Wrecks To Scrap) are not restored here - mend them at a forge with your own materials, or salvage them (off = Spoils of War as before: its price, the coin vanishes, no materials, wrecks restored; the day's log line shows how much either way)")]
         [SettingPropertyGroup("The law of the battlefield")]
         public bool SpoilsQuartermasterRepair { get; set; } = true;
 
@@ -2580,7 +2580,7 @@ namespace Armoury
         [SettingPropertyGroup("The men's gear")]
         public bool TroopMendEnabled { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Troop Mend Wreck Share", 0.00f, 1.00f, "0.00", HintText = "a WRECK (1%) costs this share of the piece's worth - lighter wear costs proportionally less (60% condition = 4% of worth)")]
+        [SettingPropertyFloatingInteger("Troop Mend Wreck Share", 0.00f, 1.00f, "0.00", HintText = "with Smith Mend From Market off: mending a piece on the men's racks costs this share of the worth it has lost (60% condition = 4% of worth); wrecks themselves are not mended while Wrecks To Scrap is on (off: a WRECK at 1% costs this share of its worth)")]
         [SettingPropertyGroup("The men's gear")]
         public float TroopMendWreckShare { get; set; } = 0.10f;
 
@@ -2624,9 +2624,13 @@ namespace Armoury
         [SettingPropertyGroup("Time at the forge")]
         public float MendMaterialMaxShare { get; set; } = 0.20f;
 
-        [SettingPropertyBool("Smith Mend From Market", HintText = "the town smiths' rule for every repair in a town (the mending bench, the quartermaster, your men, the lords' men): the work is paid like the making of the piece - its share of the days a master spent forging it, at the master's historical day wage, as dear as the town is prosperous; the mending bench (and, with Mend Material Men And Lords, your men's and the lords' repairs) also charges the materials they take from this market at its prices - iron (crude iron, scrap from wrecks or ore), wood, leather, linen or wool, more the worse the piece; with no such materials on the market the piece waits; wrecks (Mangled) are not restored for coin - mend them yourself with your own materials, or melt them down (off = as before: the smith's price only, no materials, wrecks restored)")]
+        [SettingPropertyBool("Smith Mend From Market", HintText = "the town smiths' rule for every repair in a town (the mending bench, the quartermaster, your men, the lords' men): the work is paid like the making of the piece - its share of the days a master spent forging it, at the master's historical day wage, as dear as the town is prosperous; the mending bench (and, with Mend Material Men And Lords, your men's and the lords' repairs) also charges the materials they take from this market at its prices - iron (crude iron, scrap from wrecks or ore), wood, leather, linen or wool, more the worse the piece; with no such materials on the market the piece waits; wrecks (Mangled, or worn to a tenth of their worth or less - see Wrecks To Scrap) are not restored for coin - mend them yourself with your own materials, or melt them down (off = as before: the smith's price only, no materials, wrecks restored)")]
         [SettingPropertyGroup("Time at the forge")]
         public bool SmithMendFromMarket { get; set; } = true;
+
+        [SettingPropertyBool("Wrecks To Scrap", HintText = "wrecks go to the scrap heap: no town smith restores a wreck for coin on any road - not the mending bench, not 'Pick a piece', not the men's racks (with Smith Mend From Market on or off), not your harness, not your men's or the lords' repairs. A wreck is Mangled loot or any piece worn to a tenth of its worth or less (on your back: worn to 10% or less); it stays a wreck - melt it down (the smiths also take wrecks off the market as scrap iron for their mending), or mend it at your own anvil with your own materials (off = as before: wrecks below a tenth are refused, a piece at exactly a tenth is restored, and with Smith Mend From Market off the men's racks restore wrecks for Troop Mend Wreck Share of their worth)")]
+        [SettingPropertyGroup("Time at the forge")]
+        public bool WrecksToScrap { get; set; } = true;
 
         [SettingPropertyBool("Mend Material Men And Lords", HintText = "with Smith Mend From Market on: the repairs your men pay for from their own purse each hour in a town, and the repairs the lords' men pay for, also take the materials from this market at its prices - the same rule and the same price as the mending bench (iron, wood, leather, linen or wool, more the worse the piece); a piece the market has no material for waits, the next goes ahead; off = your men's and the lords' repairs are the work only, as before")]
         [SettingPropertyGroup("Time at the forge")]
@@ -3372,6 +3376,7 @@ namespace Armoury
             s.MendLootHoursPerPiece = MendLootHoursPerPiece;
             s.MendMaterialMaxShare = MendMaterialMaxShare;
             s.SmithMendFromMarket = SmithMendFromMarket;
+            s.WrecksToScrap = WrecksToScrap;
             s.MendMaterialMenAndLords = MendMaterialMenAndLords;
             s.TakeApartEnabled = TakeApartEnabled;
             s.TakeApartBaseChance = TakeApartBaseChance;

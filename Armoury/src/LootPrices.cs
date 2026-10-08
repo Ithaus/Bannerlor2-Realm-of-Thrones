@@ -36,12 +36,37 @@ namespace Armoury
             catch (Exception e) { Log.Error("LootPrices", e); }
         }
 
-        /// <summary>Wrak: tylko kowal z materialem albo przetop (ludzie i AI go nie lataja).</summary>
+        /// <summary>Wrak: tylko kowal z materialem albo przetop (ludzie i AI go nie lataja).
+        /// WRAKI NA ZLOM (paczka 158, decyzja Jeffa 07.10 "wraki ida na zlom"; wylacznik WrecksToScrap): wrakiem jest "Mangled" i KAZDY stan
+        /// sztuki <= 0.10 (ConditionScaling.ConditionOf - stan, nie cena: Spoils "Mangled" 0.10, najgorsze stany RBM plate_damage_*,
+        /// chain_damage_*, leather_damage_* = 0.1, ktore dotad - przy "< 0.1" - kowale odnawiali). Wylaczone: jak dotad (Mangled albo cena < 0.1).</summary>
         internal static bool IsWreck(ItemModifier m)
         {
             if (m == null) return false;
             if (m.StringId == "rl_looted_heavy_max") return true;
+            if (ScrapRule) return ConditionScaling.ConditionOf(m) <= WreckState + 0.0001f;
             return m.PriceMultiplier < 0.1f;
+        }
+
+        /// <summary>Paczka 158: stan, do ktorego (wlacznie) sztuka jest wrakiem - 10% (jak "Mangled").</summary>
+        internal const float WreckState = 0.10f;
+
+        /// <summary>Paczka 158: regula "wraki na zlom" czynna (WrecksToScrap).</summary>
+        internal static bool ScrapRule { get { var s = Settings.Current; return s != null && s.WrecksToScrap; } }
+
+        /// <summary>Paczka 158: kowale miasta nie odnawiaja tej sztuki za monete na zadnej drodze (takze przy wylaczonej regule kowali
+        /// SmithMendFromMarket - tam dotad wrak szedl za ulamek wartosci). Wlasne kowadlo gracza i przetop - tak.</summary>
+        internal static bool SmithRefuses(ItemModifier m) { return ScrapRule && IsWreck(m); }
+
+        /// <summary>Paczka 158: czesc uprzezy gracza jest wrakiem - modyfikator wraku albo stan w ksiedze zuzycia <= 10%.</summary>
+        internal static bool HarnessWreck(ItemModifier m, float cond) { return ScrapRule && (IsWreck(m) || cond <= WreckState * 100f + 0.001f); }
+
+        /// <summary>Napis dla gracza (po angielsku): co jest wrakiem i co z nim zrobic.</summary>
+        internal static string WreckWhatEn(int n)
+        {
+            return n == 1
+                ? " wreck (Mangled, or worn to a tenth of its worth or less) is not restored for coin by the town's smiths - a wreck is scrap: melt it down, or mend it at your own anvil with your own materials."
+                : " wrecks (Mangled, or worn to a tenth of their worth or less) are not restored for coin by the town's smiths - wrecks are scrap: melt them down, or mend them at your own anvil with your own materials.";
         }
     }
 }

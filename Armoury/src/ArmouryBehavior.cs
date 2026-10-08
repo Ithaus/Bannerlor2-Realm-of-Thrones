@@ -2223,11 +2223,31 @@ namespace Armoury
                     if (el.Item == null) continue;
                     float cond = GetConditionQuiet(slot);
                     if (cond >= 100f) continue;
+                    if (LootPrices.HarnessWreck(el.ItemModifier, cond)) continue;   // paczka 158: wrak na zlom - kowale miasta go nie odnawiaja
                     cost += HarnessLabor(el.Item, cond);
                 }
             }
             catch (Exception e) { Log.Error("RepairCost", e); }
             return cost;
+        }
+
+        /// <summary>Paczka 158: ile czesci na grzbiecie to wraki (modyfikator wraku albo stan <= 10%) - kowale miasta ich nie odnawiaja.</summary>
+        internal int HarnessWrecks()
+        {
+            int n = 0;
+            try
+            {
+                if (!LootPrices.ScrapRule) return 0;
+                var eq = Hero.MainHero.BattleEquipment;
+                for (int slot = 0; slot < 12; slot++)
+                {
+                    if (eq[slot].Item == null) continue;
+                    float cond = GetConditionQuiet(slot);
+                    if (cond < 100f && LootPrices.HarnessWreck(eq[slot].ItemModifier, cond)) n++;
+                }
+            }
+            catch (Exception e) { Log.Error("HarnessWrecks", e); }
+            return n;
         }
 
         /// <summary>Ile czesci na grzbiecie wymaga naprawy.</summary>
@@ -2350,6 +2370,7 @@ namespace Armoury
                     if (el.Item == null) continue;
                     float cond = GetConditionQuiet(slot);
                     if (cond >= 100f) continue;
+                    if (LootPrices.HarnessWreck(el.ItemModifier, cond)) { o.Wrecks++; continue; }   // paczka 158: wrak na zlom (AddLot widzi sztuke bez modyfikatora)
                     float missing = (100f - cond) / 100f;
                     int labor = HarnessLabor(el.Item, cond);   // ta sama robocizna co RepairCost
                     if (o.AddLot(new EquipmentElement(el.Item), MendMaterial.NeedsFor(el.Item, missing), labor, 1, long.MaxValue, int.MaxValue) > 0 && slots != null)
@@ -2364,7 +2385,7 @@ namespace Armoury
         /// zaplacone i nic nie zdjete z polki. Kowale robia tylko czesci, na ktore jest material (PlanRepair); reszta czeka.</summary>
         private static bool MarketRepairGo(MendMaterial.Order o, string town)
         {
-            if (o.Pieces == 0 && o.Wait == 0 && o.NoSmith == 0) { Log.Player("Your gear is sound. Nothing to mend."); return false; }
+            if (o.Pieces == 0 && o.Wait == 0 && o.NoSmith == 0 && o.Wrecks == 0) { Log.Player("Your gear is sound. Nothing to mend."); return false; }   // paczka 158: same wraki - ponizej, z napisem
             if (!o.Ok) { Log.Player("There are no town smiths here - nothing was mended.", true); return false; }
             if (o.Pieces == 0)
             {
@@ -2383,6 +2404,7 @@ namespace Armoury
                 // SmithMendFromMarket: kowale miasta robia tylko czesci, na ktore jest material na targu (PlanRepair) - robota jak dotad
                 // + material; reszta czeka. Przywracanie stanu - ta sama petla co dotad (jedna regula dla obu sciezek).
                 List<int> only = null;
+                int wrecksLeft = 0;   // paczka 158: wraki pominiete przy naprawie bez reguly kowali (z regula - order.Wrecks)
                 MendMaterial.Order order = null;
                 var here = Settlement.CurrentSettlement;
                 string town = here != null && here.Name != null ? here.Name.ToString() : "this town";
@@ -2398,6 +2420,7 @@ namespace Armoury
                 else
                 {
                     cost = RepairCost();
+                    if (cost <= 0 && HarnessWrecks() > 0) { Log.Player("The smith restores none of your harness for coin. " + HarnessWrecks() + LootPrices.WreckWhatEn(HarnessWrecks()), true); return; }   // paczka 158
                     if (cost <= 0) { Log.Player("Your gear is sound. Nothing to mend."); return; }
                     if (Hero.MainHero.Gold < cost) { Log.Player("You cannot pay the smith's price.", true); return; }
                 }
@@ -2409,6 +2432,7 @@ namespace Armoury
                     if (only != null && !only.Contains(slot)) continue;   // SmithMendFromMarket: ta czesc czeka na material albo jest cala
                     var el = eq[slot];
                     if (el.Item == null) continue;
+                    if (only == null && LootPrices.HarnessWreck(el.ItemModifier, GetConditionQuiet(slot))) { wrecksLeft++; continue; }   // paczka 158: bez reguly kowali - wrak tez zostaje
                     // ZBROJA Z KUZNI JAK BRON: kowal naprawia tylko sztuki zuzyte wedle ksiegi - te same, za ktore policzyl w RepairCost.
                     // Dotad kazda zalozona czesc dostawala "oryginalny" stan przegrodki: sztuka nigdy nie bita (zardzewiala zbroja
                     // z kuzni wychodzila zwykla za darmo, przy okazji naprawy butow) i sztuka o innej nazwie (dostawala stan
@@ -2427,8 +2451,8 @@ namespace Armoury
                     Log.Info("Lawa naprawcza (uprzaz) - kowale " + town + ": sloty " + string.Join(",", only) + "; " + order.LogPl());
                     return;
                 }
-                Log.Player("The smith has made your harness whole again for " + cost + " gold.");
-                Log.Info("Naprawa za " + cost);
+                Log.Player("The smith has made your harness whole again for " + cost + " gold." + (wrecksLeft > 0 ? " " + wrecksLeft + LootPrices.WreckWhatEn(wrecksLeft) : ""));
+                Log.Info("Naprawa za " + cost + (wrecksLeft > 0 ? ", wraki na zlom " + wrecksLeft : ""));
             }
             catch (Exception e) { Log.Error("RepairAll", e); }
         }

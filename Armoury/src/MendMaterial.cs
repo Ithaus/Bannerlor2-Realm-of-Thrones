@@ -247,8 +247,12 @@ namespace Armoury
                 var sb = new StringBuilder();
                 if (Wait > 0) sb.Append(' ').Append(Wait).Append(Wait == 1 ? " piece waits" : " pieces wait").Append(" for materials - the market of ").Append(town)
                                 .Append(" has not enough ").Append(KindsEn(WaitMask)).Append('.');
-                if (Wrecks > 0) sb.Append(' ').Append(Wrecks).Append(Wrecks == 1 ? " wreck (Mangled) is" : " wrecks (Mangled) are")
-                                  .Append(" not restored for coin - mend wrecks yourself with your own materials, or melt them down.");
+                if (Wrecks > 0)
+                {
+                    if (LootPrices.ScrapRule) sb.Append(' ').Append(Wrecks).Append(LootPrices.WreckWhatEn(Wrecks));   // paczka 158: wraki na zlom
+                    else sb.Append(' ').Append(Wrecks).Append(Wrecks == 1 ? " wreck (Mangled) is" : " wrecks (Mangled) are")
+                           .Append(" not restored for coin - mend wrecks yourself with your own materials, or melt them down.");
+                }
                 if (NoSmith > 0) sb.Append(' ').Append(NoSmith).Append(NoSmith == 1 ? " piece is no smith's work." : " pieces are no smith's work.");
                 if (Poor > 0) sb.Append(' ').Append(Poor).Append(Poor == 1 ? " piece awaits" : " pieces await").Append(" a fuller purse.");
                 return sb.ToString();

@@ -426,6 +426,7 @@ namespace Armoury
                 {
                     var el = roster.GetElementCopyAtIndex(i);
                     if (el.EquipmentElement.Item == null || !IsBattleWorn(el.EquipmentElement.Item, el.EquipmentElement.ItemModifier)) continue;
+                    if (LootPrices.SmithRefuses(el.EquipmentElement.ItemModifier)) continue;   // paczka 158: wrak na zlom - kowal za monete go nie odnawia
                     int per = PieceCost(el.EquipmentElement);
                     for (int k = 0; k < el.Amount; k++) costs.Add(per);
                 }
@@ -447,6 +448,23 @@ namespace Armoury
         // uprzaz: RepairCostFactor), material MendMaterial.Order (wedle stanu, z polki miasta albo zapasu kowali, po cenie targu);
         // brak materialu - sztuka czeka; wrak - tylko wlasne rece z materialem ("Mend it yourself") albo przetop. Wylacznik SmithMendFromMarket.
         internal static bool MarketRule { get { return MendMaterial.RuleOn; } }
+
+        /// <summary>Paczka 158: ile sztuk rostera to wraki, ktorych kowale miasta nie odnawiaja (WrecksToScrap) - do podpowiedzi i komunikatow
+        /// sciezek bez reguly kowali (sciezki z regula licza je w MendMaterial.Order).</summary>
+        private static int RefusedWrecks(TaleWorlds.CampaignSystem.Roster.ItemRoster roster)
+        {
+            int n = 0;
+            if (roster == null || !LootPrices.ScrapRule) return 0;
+            for (int i = 0; i < roster.Count; i++)
+            {
+                var el = roster.GetElementCopyAtIndex(i);
+                var ee = el.EquipmentElement;
+                if (el.Amount > 0 && ee.Item != null && IsBattleWorn(ee.Item, ee.ItemModifier) && LootPrices.SmithRefuses(ee.ItemModifier)) n += el.Amount;
+            }
+            return n;
+        }
+
+        private static string WreckNote(int n) { return n > 0 ? " " + n + LootPrices.WreckWhatEn(n) : ""; }
 
         internal static string TownName()
         {
@@ -513,6 +531,8 @@ namespace Armoury
         private static string SmithLine(MendMaterial.Order q, EquipmentElement ee)
         {
             string hrs = Settings.Current.MendLootHoursPerPiece.ToString("0.#") + "h";
+            const string scrap = "Smith: not for coin - a wreck (worn to a tenth of its worth or less) is scrap: melt it down, or mend it at your own anvil";   // paczka 158
+            if (LootPrices.SmithRefuses(ee.ItemModifier)) return scrap;
             int labor = PieceCost(ee);
             if (q == null) return "Smith: " + labor + " gold, " + hrs;
             int total, miss; float mat;
@@ -547,15 +567,18 @@ namespace Armoury
                 }
                 int can, canCost, all, allCost;
                 AffordableBattleWorn(out can, out canCost, out all, out allCost);
+                int wrecksL = RefusedWrecks(MobileParty.MainParty.ItemRoster);   // paczka 158: wraki na zlom
+                if (all == 0 && wrecksL > 0)
+                { args.IsEnabled = false; args.Tooltip = new TextObject("{=!}The smith restores none of it for coin." + WreckNote(wrecksL)); return true; }
                 if (all == 0)
                 { args.IsEnabled = false; args.Tooltip = new TextObject("{=!}No battle-worn loot in your bags."); return true; }
                 if (can == 0)
-                { args.IsEnabled = false; args.Tooltip = new TextObject("{=!}{ALL} worn pieces, {COST} gold for the lot - you cannot afford even the cheapest.").SetTextVariable("ALL", all).SetTextVariable("COST", allCost); return true; }
+                { args.IsEnabled = false; args.Tooltip = new TextObject("{=!}{ALL} worn pieces, {COST} gold for the lot - you cannot afford even the cheapest." + WreckNote(wrecksL)).SetTextVariable("ALL", all).SetTextVariable("COST", allCost); return true; }
                 if (can < all)
-                    args.Tooltip = new TextObject("{=!}{ALL} worn pieces ({COST} gold for the lot). For your purse the smith will mend the {CAN} cheapest for {CANCOST}.")
+                    args.Tooltip = new TextObject("{=!}{ALL} worn pieces ({COST} gold for the lot). For your purse the smith will mend the {CAN} cheapest for {CANCOST}." + WreckNote(wrecksL))
                         .SetTextVariable("ALL", all).SetTextVariable("COST", allCost).SetTextVariable("CAN", can).SetTextVariable("CANCOST", canCost);
                 else
-                    args.Tooltip = new TextObject("{=!}{ALL} battle-worn pieces. The smith will make them whole for {COST} gold.")
+                    args.Tooltip = new TextObject("{=!}{ALL} battle-worn pieces. The smith will make them whole for {COST} gold." + WreckNote(wrecksL))
                         .SetTextVariable("ALL", all).SetTextVariable("COST", allCost);
                 return true;
             }
@@ -586,6 +609,7 @@ namespace Armoury
                 if (worn.Count == 0) return;
                 int canN, canC, allN, allC;
                 AffordableBattleWorn(out canN, out canC, out allN, out allC);
+                if (allN == 0) { Log.Player("The smith restores none of it for coin." + WreckNote(RefusedWrecks(roster)), true); return; }   // paczka 158: same wraki
                 if (canN == 0) { Log.Player("You cannot pay for even the cheapest mend.", true); return; }
                 StartTimedWork(canN * Settings.Current.MendLootHoursPerPiece,
                     "The smith sorts the battle spoils and takes hammer to the worst of it.",
@@ -622,10 +646,12 @@ namespace Armoury
                 for (int i = 0; i < roster.Count; i++)
                 {
                     var el = roster.GetElementCopyAtIndex(i);
-                    if (el.EquipmentElement.Item != null && IsBattleWorn(el.EquipmentElement.Item, el.EquipmentElement.ItemModifier))
+                    if (el.EquipmentElement.Item != null && IsBattleWorn(el.EquipmentElement.Item, el.EquipmentElement.ItemModifier)
+                        && !LootPrices.SmithRefuses(el.EquipmentElement.ItemModifier))   // paczka 158: wrak na zlom
                         worn.Add(el);
                 }
-                if (worn.Count == 0) return;
+                int wrecksD = RefusedWrecks(roster);
+                if (worn.Count == 0) { if (wrecksD > 0) Log.Player("The smith restores none of it for coin." + WreckNote(wrecksD), true); return; }
                 // najtansze najpierw - za posiadane zloto naprawiamy ile sie da
                 worn.Sort((a, b) => PieceCost(a.EquipmentElement).CompareTo(PieceCost(b.EquipmentElement)));
                 int paid = 0, done = 0, skipped = 0;
@@ -647,10 +673,10 @@ namespace Armoury
                 }
                 if (done == 0) { Log.Player("You cannot pay for even the cheapest mend.", true); return; }
                 Pay.ToSettlement(paid);
-                Log.Player(skipped > 0
+                Log.Player((skipped > 0
                     ? "The smith mended the " + done + " cheapest pieces for " + paid + " gold. " + skipped + " await a fuller purse."
-                    : "The smith hammered " + done + " battle-worn pieces back to true for " + paid + " gold.");
-                Log.Info("Naprawa lupow: " + done + " szt. za " + paid + ", pominieto " + skipped);
+                    : "The smith hammered " + done + " battle-worn pieces back to true for " + paid + " gold.") + WreckNote(wrecksD));
+                Log.Info("Naprawa lupow: " + done + " szt. za " + paid + ", pominieto " + skipped + ", wraki na zlom " + wrecksD);
             }
             catch (Exception e) { Log.Error("DoMendLoot", e); }
         }
@@ -927,7 +953,14 @@ namespace Armoury
                 string smithTitle = "The smith mends it - " + smith + " gold";
                 string smithHint = Settings.Current.MendLootHoursPerPiece.ToString("0.#") + " hours. Coin does the sweating.";
                 bool smithOk = Hero.MainHero.Gold >= smith;
-                if (MarketRule)
+                if (LootPrices.SmithRefuses(ee.ItemModifier))
+                {
+                    // paczka 158 (decyzja Jeffa 07.10 "wraki ida na zlom"): na kazdej drodze, takze bez reguly kowali miasta
+                    smithOk = false;
+                    smithTitle = "The smiths will not restore a wreck for coin";
+                    smithHint = "A wreck (Mangled, or worn to a tenth of its worth or less) is scrap - it is mended only with your own materials at your own anvil, or melted down.";
+                }
+                else if (MarketRule)
                 {
                     // kowale miasta: robota + material z targu wedle stanu; wrak tylko wlasnymi rekami albo przetop
                     var q = new MendMaterial.Order(Settlement.CurrentSettlement);
@@ -1002,7 +1035,8 @@ namespace Armoury
             if (o.AddLot(ee, MendMaterial.Needs(ee), PieceCost(ee), 1, Hero.MainHero.Gold, 1) <= 0)
             {
                 string why = !o.Ok ? "There are no town smiths here - nothing was mended."
-                           : o.Wrecks > 0 ? "The smiths will not restore a wreck (Mangled) for coin - mend it yourself with your own materials, or melt it down."
+                           : o.Wrecks > 0 ? (LootPrices.ScrapRule ? "A" + LootPrices.WreckWhatEn(1)
+                                                                  : "The smiths will not restore a wreck (Mangled) for coin - mend it yourself with your own materials, or melt it down.")
                            : o.NoSmith > 0 ? "That is no smith's work - nothing was mended."
                            : o.Wait > 0 ? "The smiths of " + town + " ran short of " + MendMaterial.KindsEn(o.WaitMask) + " - the piece waits, nothing paid."
                            : "Your purse came up short.";
@@ -1020,6 +1054,8 @@ namespace Armoury
         {
             try
             {
+                if (bySmith && LootPrices.SmithRefuses(ee.ItemModifier))
+                { Log.Player("A" + LootPrices.WreckWhatEn(1), true); return; }   // paczka 158
                 MendMaterial.Order order = null;   // SmithMendFromMarket: zlecenie kowali (robota + material)
                 // slot -2 = magazyn wojska: naprawa zdejmuje zbita sztuke ze stanu
                 // i odklada czysta na stan (zolnierze dostana ja przy przydziale)
@@ -1154,6 +1190,7 @@ namespace Armoury
                     var el = armory.GetElementCopyAtIndex(i);
                     var ee = el.EquipmentElement;
                     if (ee.Item == null || !IsBattleWorn(ee.Item, ee.ItemModifier)) continue;
+                    if (LootPrices.SmithRefuses(ee.ItemModifier)) continue;   // paczka 158: wrak na zlom (dotad za TroopMendWreckShare wartosci)
                     for (int k = 0; k < el.Amount; k++) worn.Add(ee);
                     total += el.Amount;
                 }
@@ -1219,15 +1256,18 @@ namespace Armoury
                 }
                 int all, allCost, can, canCost, disc;
                 ScanTroopWorn(out all, out allCost, out can, out canCost, out disc);
+                int wrecksR = RefusedWrecks(QuartermasterLaw.DteArmory());   // paczka 158: wraki na zlom
+                if (all == 0 && wrecksR > 0)
+                { args.IsEnabled = false; args.Tooltip = new TextObject("{=!}The smith restores none of the men's gear for coin." + WreckNote(wrecksR)); return true; }
                 if (all == 0)
                 { args.IsEnabled = false; args.Tooltip = new TextObject("{=!}The men's racks hold nothing worn - every piece is sound."); return true; }
                 if (can == 0)
-                { args.IsEnabled = false; args.Tooltip = new TextObject("{=!}{ALL} worn pieces on the racks, {COST} gold for the lot (bulk discount {D}%) - you cannot afford even the cheapest.").SetTextVariable("ALL", all).SetTextVariable("COST", allCost).SetTextVariable("D", disc); return true; }
+                { args.IsEnabled = false; args.Tooltip = new TextObject("{=!}{ALL} worn pieces on the racks, {COST} gold for the lot (bulk discount {D}%) - you cannot afford even the cheapest." + WreckNote(wrecksR)).SetTextVariable("ALL", all).SetTextVariable("COST", allCost).SetTextVariable("D", disc); return true; }
                 if (can < all)
-                    args.Tooltip = new TextObject("{=!}{ALL} worn pieces on the men's racks ({COST} gold for the lot, bulk discount {D}%). For your purse the smith will mend the {CAN} cheapest for {CANCOST}.")
+                    args.Tooltip = new TextObject("{=!}{ALL} worn pieces on the men's racks ({COST} gold for the lot, bulk discount {D}%). For your purse the smith will mend the {CAN} cheapest for {CANCOST}." + WreckNote(wrecksR))
                         .SetTextVariable("ALL", all).SetTextVariable("COST", allCost).SetTextVariable("CAN", can).SetTextVariable("CANCOST", canCost).SetTextVariable("D", disc);
                 else
-                    args.Tooltip = new TextObject("{=!}{ALL} worn pieces on the men's racks. The smith and his apprentices will make them whole for {COST} gold (bulk discount {D}%).")
+                    args.Tooltip = new TextObject("{=!}{ALL} worn pieces on the men's racks. The smith and his apprentices will make them whole for {COST} gold (bulk discount {D}%)." + WreckNote(wrecksR))
                         .SetTextVariable("ALL", all).SetTextVariable("COST", allCost).SetTextVariable("D", disc);
                 return true;
             }
@@ -1295,9 +1335,10 @@ namespace Armoury
                 {
                     var el = armory.GetElementCopyAtIndex(i);
                     var ee = el.EquipmentElement;
-                    if (ee.Item != null && IsBattleWorn(ee.Item, ee.ItemModifier)) { worn.Add(el); total += el.Amount; }
+                    if (ee.Item != null && IsBattleWorn(ee.Item, ee.ItemModifier) && !LootPrices.SmithRefuses(ee.ItemModifier)) { worn.Add(el); total += el.Amount; }   // paczka 158: bez wrakow
                 }
-                if (worn.Count == 0) return;
+                int wrecksT = RefusedWrecks(armory);
+                if (worn.Count == 0) { if (wrecksT > 0) Log.Player("The smith restores none of the men's gear for coin." + WreckNote(wrecksT), true); return; }
                 // rabat liczony z CALEJ roboty - ta sama liczba co w podpowiedzi
                 float discount = TroopBulkDiscount(total);
                 worn.Sort((a, b) => TroopPieceCost(a.EquipmentElement, discount).CompareTo(TroopPieceCost(b.EquipmentElement, discount)));
@@ -1321,10 +1362,10 @@ namespace Armoury
                 }
                 if (done == 0) { Log.Player("You cannot pay for even the cheapest mend.", true); return; }
                 Pay.ToSettlement(paid);
-                Log.Player(skipped > 0
+                Log.Player((skipped > 0
                     ? "The men's " + done + " cheapest pieces are whole again for " + paid + " gold. " + skipped + " await a fuller purse."
-                    : "The men's racks are mended: " + done + " pieces made whole for " + paid + " gold.");
-                Log.Info("Naprawa zbrojowni wojska: " + done + " szt. za " + paid + ", pominieto " + skipped);
+                    : "The men's racks are mended: " + done + " pieces made whole for " + paid + " gold.") + WreckNote(wrecksT));
+                Log.Info("Naprawa zbrojowni wojska: " + done + " szt. za " + paid + ", pominieto " + skipped + ", wraki na zlom " + wrecksT);
             }
             catch (Exception e) { Log.Error("DoMendTroops", e); }
         }
@@ -2329,6 +2370,9 @@ namespace Armoury
                 var b = ArmouryBehavior.Instance;
                 if (b == null) return false;
                 int cost = b.RepairCost();
+                int hw = b.HarnessWrecks();   // paczka 158: wraki na grzbiecie (modyfikator wraku albo stan <= 10%)
+                if (cost <= 0 && hw > 0)
+                { args.IsEnabled = false; args.Tooltip = new TextObject("The smiths of " + TownName() + " restore none of your harness for coin." + WreckNote(hw)); return true; }
                 if (cost <= 0) return false;
                 if (MarketRule)
                 {
@@ -2344,7 +2388,7 @@ namespace Armoury
                     args.IsEnabled = Hero.MainHero.Gold >= o.Total;
                     return true;
                 }
-                args.Tooltip = new TextObject("The smith will make everything sound again for " + cost + " gold.");
+                args.Tooltip = new TextObject("The smith will make everything sound again for " + cost + " gold." + WreckNote(hw));
                 args.IsEnabled = Hero.MainHero.Gold >= cost;
                 return true;
             }
@@ -2358,6 +2402,7 @@ namespace Armoury
                 int pieces = ArmouryBehavior.Instance != null ? ArmouryBehavior.Instance.WornPieces() : 0;
                 if (pieces == 0) return;
                 if (MarketRule) pieces = Math.Max(1, ArmouryBehavior.Instance.PlanRepair(null).Pieces);   // godziny za czesci, ktore kowale wezma
+                else pieces = Math.Max(1, pieces - ArmouryBehavior.Instance.HarnessWrecks());           // paczka 158: wrakow kowal nie bierze
                 StartTimedWork(pieces * Settings.Current.SmithRepairHoursPerPiece,
                     "The smith lays your harness out and mends it piece by piece.",
                     delegate { ArmouryBehavior.Instance.RepairAll(); });
