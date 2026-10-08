@@ -72,3 +72,16 @@ Repo Jeffa: `C:\Users\GAME\Bannerlor2-Realm-of-Thrones` (galaz claude/bannerlord
 - Zakres: (1) przyczyna ~95% werbunku "bez zapisu" (kto zmienia pule notabli poza VolunteerKit); (2) rekrut bez kompletu przychodzi z tym, co ma
   (zamiast kompletu wzorca z niczego); (3) zaloga zamku kupuje w najblizszym przyjaznym miescie (pan placi miastu, towar jedzie do zamku);
   (4) szkolenie = cwiczenia wlasna bronia (oboz BEE zamyka 170). Scalanie po kolei: 169 -> 170 -> 171 (konflikty w Settings/McmSettings/CHANGELOG).
+
+## 11. STAN NA ODDANIE (08.10 ok. 12:40, konto 99%)
+Trzy workflowy biegly w tle tej sesji; po koncu limitu PRZERWANE. Wznowienie resumeFromRunId dziala tylko w tej samej sesji - nowe konto zaczyna
+dana faze od nowa, korzystajac z zapisanych wynikow:
+- **169** (wf_6488c056-dc9, drzewo SCRATCH\dzien-6\obieg169\repo): gotowe rozpoznanie 1/3 (nasz kod) -> **docs/rozpoznanie-2026-10-08/paczka-169-wynik-1.md**.
+  Brakuje: rozpoznanie 2 (okna w kodzie gry) i 3 (okna w BK/BEE), projekt, wykonanie, recenzje, poprawki. Skrypt do ponownego uzycia (prompty):
+  C:\Users\GAME\.claude\projects\C--Program-Files--x86--Steam-steamapps-common-Mount---Blade-II-Bannerlord\fa2fd7a6-a098-46e5-8d1b-3c099c38c1f8\workflows\scripts\paczka-169-ksiega-obiegu-wf_6488c056-dc9.js
+- **170** (wf_3681591a-583, drzewo SCRATCH\dzien-6\bee170\repo): rozpoznanie w toku (0/2 gotowe w chwili zapisu). Skrypt: ...\workflows\scripts\paczka-170-bee-domkniecie-wf_3681591a-583.js
+- **171** (wf_e42eab09-42b, drzewo SCRATCH\dzien-6\zaloga171\repo): rozpoznanie w toku (0/3). Skrypt: ...\workflows\scripts\paczka-171-zbrojenie-zalog-wf_e42eab09-42b.js
+- Kolejne gotowe wyniki zrzuca skrypt SCRATCH(fa2fd7a6)\zrzut_rozp.py do docs/rozpoznanie-2026-10-08/ (paczka-NNN-wynik-K.md); sprawdz tez drzewa
+  robocze (`git -C <drzewo> status`, docs/paczki/16x-*.md) - agent mogl zostawic czesciowa prace.
+- NIC z 169/170/171 nie jest wgrane. W grze: Armoury c01a54ba (160+161). Kolejnosc dalej: dokonczyc 169 -> test 40 dob -> 170 + skrypt BEE
+  -ListaZFundamentu -> 171 -> scalenie po kolei -> autotest -> "wgraj".
