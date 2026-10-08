@@ -121,3 +121,17 @@ dana faze od nowa, korzystajac z zapisanych wynikow:
   drzewo zaloga171, skrypt `...\7016f733-...\workflows\scripts\paczka-171-projekt-do-poprawek-wf_170b9c8b-c05.js`.
 - Scalanie i testy PO KOLEI: 169 (autotest 40 dob, wynik Jeffowi) -> 170 + skrypt BEE -ListaZFundamentu -> 171. Gdy sesja padnie: w drzewie `git log` +
   docs/paczki/17x-*.md (sekcja "Krytyka i odpowiedzi" = projekt po krytyce gotowy), dokonczyc brakujace fazy.
+
+## 16. PRACA NA NOC 08/09.10 (Jeff ok. 01:10 czasu warszawskiego = 16:10 zegara komputera; raport ok. 12:00 Warszawa = 03:00 zegara)
+- 16:08 limit tygodniowy odnowiony -> 169/170/171 wznowione: 169 `wf_6f6961dc-464`, 170 `wf_5166afca-96d`, 171 `wf_170b9c8b-c05` (te same skrypty).
+- **ZGODA JEFFA NA TA NOC: "Tak, wgraj sam"** - wgrac TYLKO to, co przejdzie autotest bez bledow, z kopia poprzedniej wersji (BEE: kopia ustawien); zapisy Jeffa
+  nietkniete; co nie przejdzie - czeka. Rzeczy wymagajace nowej kampanii albo zmieniajace kanon - NIE wgrywac, opisac w raporcie.
+- Zadania Jeffa na noc (doslownie w sesji 7016f733): pelny audyt ekonomii jako jednej symulacji swiata (dochody ludzi -> podatki pana/miasta -> wydatki na zycie
+  wedlug sredniowiecza; okupy; produkcja wsi glownej z ludnosci wsi pobocznych, spalona poboczna = mniej; surowce do napraw minimalne + bilans kazdego surowca;
+  rozklad produkcji wedlug krain - bez oliwek na Polnocy; AI lordow bez fali bankructw, zachowania jak w sredniowieczu/GoT); ekonomia wojny, zarzadzanie
+  wojskiem i armiami, lupy; Nieumarli wolniej (podboj po kilku latach jak w ksiazkach, nie 6 osad po roku); realne odleglosci marszu; obozy armii w marszu,
+  GODZINY OBOZU 24:00-06:00; drogi na mapie + zalegle zmiany wyglądu wiosek pobocznych (8 punktow PROJEKT-WIOSKI-LORE); pomysly, na ktore nie wpadlismy.
+- Audyt: workflow `wf_1bb21d75-b44` (10 badan -> synteza -> krytyka x2 -> synteza po krytyce), raporty w **docs/audyt-2026-10-09/** (00-AUDYT-SWIATA-2026-10-09.md
+  = synteza). Kod do czytania: worktree 2e235ea w SCRATCH nowej sesji `audyt\repo`. Skrypt: `...\7016f733-...\workflows\scripts\audyt-swiata-noc-0809-wf_1bb21d75-b44.js`.
+- Plan dalej: 169 -> autotest 40 dob -> 170 + BEE -> autotest -> 171 -> autotest -> wgranie; paczki "tej nocy" z audytu (male, testowalne) -> autotest -> wgranie;
+  raport dla Jeffa 12:00 Warszawa.
