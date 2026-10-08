@@ -40,7 +40,12 @@ namespace Armoury
                     __2.ChangeHeroGold(cost);
                     _toNotables += cost;
                     if (__0.LeaderHero != null) MoneyLedger.NoteLevyBack(cost);   // ksiega pieniadza (tylko licznik): gra skasowala te zaplate przez GiveGoldAction
-                    try { if (__3.IsMounted && Settings.Current.HistoricalRecruitCost && Settings.Current.HorsesAtMarketPrice) RecruitCost.NoteVolunteerHorse((int)RecruitCost.HorseCost(__3, __0.LeaderHero)); } catch { }   // linia "Konie rekrutow (157)" (tylko licznik)
+                    try
+                    {
+                        if (__3.IsMounted && RecruitCost.OwnHorseOn) RecruitCost.NoteOwnHorse(false, __1, 1);   // paczka 160: ochotnik z wlasnym koniem - w koszcie konia nie ma (tylko licznik)
+                        else if (__3.IsMounted && Settings.Current.HistoricalRecruitCost && Settings.Current.HorsesAtMarketPrice) RecruitCost.NoteVolunteerHorse((int)RecruitCost.HorseCost(__3, __0.LeaderHero));   // linia "Konie rekrutow (157)" (tylko licznik)
+                    }
+                    catch { }
                 }
                 else if (detail == "MercenaryFromTavern")
                 {
@@ -50,6 +55,8 @@ namespace Armoury
                     // (RecruitCost.HorseCost) - teraz ten kon naprawde schodzi z polki (po jednym na najemnika), a gdy koni na polce jest mniej niz
                     // najemnikow, nadplata za brakujace wraca do kiesy, ktora placila (lord - gra skasowala jego zaplate; karawana - kiesa partii).
                     // Polka bez takiego konia: w koszcie konia nie ma (najemnik z wlasnym koniem), nic nie schodzi, nic nie wraca.
+                    // PACZKA 160 (RecruitsOwnHorse): kon jest wlasnoscia zolnierza zawsze - w koszcie nie ma konia (RecruitCost), MercShelfOn
+                    // nieczynne, miasto dostaje caly koszt (dni zoldu, z premia konnego - MountedWage), nic nie schodzi z polki, nic nie wraca.
                     // Poprawka po recenzji 157: kon w koszcie to cena polki RAZY mnoznik kupujacego (perki, kultura, prawa i ranga klanu BK) - do kasy
                     // za konia z polki i z powrotem za konia, ktorego nie bylo, idzie ta sama kwota, ktora kupujacy za konia zaplacil (per = koszt ze
                     // sprzetem - koszt bez sprzetu); dotad zwrot liczyl sama cene polki: przy mnozniku < 1 kasa miasta oddawala lordowi za konie,
@@ -65,6 +72,7 @@ namespace Armoury
                         refund = (n - took) * per;
                         RecruitCost.NoteMercHorses(__1, took, n - took, per, refund, market == null || market.Town == null, false);
                     }
+                    else if (__3.IsMounted && RecruitCost.OwnHorseOn) RecruitCost.NoteOwnHorse(true, __1, n);   // paczka 160: najemnik z wlasnym koniem - w koszcie konia nie ma, z polki nic nie schodzi (tylko licznik)
                     if (refund > 0)
                     {
                         if (__0.IsCaravan) __0.PartyTradeGold += refund;

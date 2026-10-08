@@ -988,13 +988,25 @@ namespace Armoury
         [SettingPropertyGroup("A knight needs a horse")]
         public float AiMountBreederMarkup { get; set; } = 1.3f;
 
-        [SettingPropertyBool("Horses At Market Price", HintText = "a horse costs what the local town market asks for it: a mounted recruit is charged his own horse at that market price instead of the game's flat 150 or 500 (with Historical Recruit Cost on), and a lord ordering from the village breeders pays them the town's market price for that horse instead of a flat markup over its worth (off = as before)")]
+        [SettingPropertyBool("Horses At Market Price", HintText = "a horse costs what the local town market asks for it: a lord ordering from the village breeders pays them the town's market price for that horse instead of a flat markup over its worth, and - only with Recruits Own Horse off - a mounted recruit is charged his own horse at that market price instead of the game's flat 150 or 500 (with Historical Recruit Cost on) (off = as before)")]
         [SettingPropertyGroup("A knight needs a horse")]
         public bool HorsesAtMarketPrice { get; set; } = true;
 
-        [SettingPropertyBool("Merc Horse From Shelf", HintText = "a mounted hireling from a tavern costs a horse only if the town's market has one of the same breed on its shelf (the same horse, or one of the same kind and grade): that horse leaves the shelf with him and the town is paid for it what the hirer is charged for it (its market price, with the hirer's own discounts or surcharges). With no such horse he rides in on his own and costs only his days of pay; if more men are hired than horses stand on the shelf, what was charged for the missing horses goes back to the purse. Needs Historical Recruit Cost and Horses At Market Price (off = the market price of his horse is charged and paid to the town though no horse leaves the shelf)")]
+        [SettingPropertyBool("Merc Horse From Shelf", HintText = "only with Recruits Own Horse off: a mounted hireling from a tavern costs a horse only if the town's market has one of the same breed on its shelf (the same horse, or one of the same kind and grade): that horse leaves the shelf with him and the town is paid for it what the hirer is charged for it (its market price, with the hirer's own discounts or surcharges). With no such horse he rides in on his own and costs only his days of pay; if more men are hired than horses stand on the shelf, what was charged for the missing horses goes back to the purse. Needs Historical Recruit Cost and Horses At Market Price (off = the market price of his horse is charged and paid to the town though no horse leaves the shelf)")]
         [SettingPropertyGroup("A knight needs a horse")]
         public bool MercHorseFromShelf { get; set; } = true;
+
+        [SettingPropertyBool("Recruits Own Horse", HintText = "a mounted recruit - a hireling from a tavern or a volunteer from a notable, yours and the AI's - rides in on his own horse: taking him on costs his prest money (days of his pay) and nothing for the horse, and no horse leaves the town's shelf; a man who keeps a horse asks for more pay instead (Mounted Wage Premium). Needs Historical Recruit Cost (off = the horse is charged at recruitment as before: Horses At Market Price, Merc Horse From Shelf)")]
+        [SettingPropertyGroup("A knight needs a horse")]
+        public bool RecruitsOwnHorse { get; set; } = true;
+
+        [SettingPropertyBool("Mounted Wage Premium", HintText = "a soldier who keeps his own horse wants more pay: every mounted man in a lord's party (yours too) and in a garrison draws the wage of his tier times Mounted Wage Factor - in Edward III's armies of 1346 a mounted archer had 6 pence a day, an archer on foot 3. The pay goes the usual way (to the men's purses, a garrison's to its town) and his prest money follows his pay; caravan guards are paid as before (off = a rider costs what a footman of his tier costs)")]
+        [SettingPropertyGroup("A knight needs a horse")]
+        public bool MountedWagePremium { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Mounted Wage Factor", 0.00f, 6.00f, "0.00", HintText = "how much more a mounted soldier is paid than a footman of the same tier: 1.5 puts a tier 4 rider at 12 pence a day like a man-at-arms and a tier 6 knight at 26 like a knight's 24 (2.0 = the 1346 ratio of mounted to foot archer, 1.0 = no premium)")]
+        [SettingPropertyGroup("A knight needs a horse")]
+        public float MountedWageFactor { get; set; } = 1.5f;
 
         [SettingPropertyInteger("Ai Mount Market Share Percent", 0, 100, "0", HintText = "a lord may take at most this share of the horses on a town's shelf in one visit - the rest he orders from the breeder, so markets are not stripped bare (Jeff 15.09: no horses to buy anywhere)")]
         [SettingPropertyGroup("A knight needs a horse")]
@@ -2968,6 +2980,9 @@ namespace Armoury
             s.AiMountBreederMarkup = AiMountBreederMarkup;
             s.HorsesAtMarketPrice = HorsesAtMarketPrice;
             s.MercHorseFromShelf = MercHorseFromShelf;
+            s.RecruitsOwnHorse = RecruitsOwnHorse;
+            s.MountedWagePremium = MountedWagePremium;
+            s.MountedWageFactor = MountedWageFactor;
             s.AiMountMarketSharePercent = AiMountMarketSharePercent;
             s.AiMountShelfFloor = AiMountShelfFloor;
             s.LongYearEnabled = LongYearEnabled;

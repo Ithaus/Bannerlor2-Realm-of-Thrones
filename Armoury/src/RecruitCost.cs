@@ -38,6 +38,14 @@ namespace Armoury
     /// "Wlasny kon" dalej bierze sie z niczego (jak caly komplet najemnika) - do kroku "weterani" (skad najemnik ma sprzet i konia:
     /// z puli zolnierzy rozpuszczonych z armii, z lupu, z wlasnego kupna). Gdy najemnikow jest wiecej niz koni na polce, nadplata za
     /// brakujace konie wraca do kiesy (lord, karawana, gracz). Linia dnia "Konie rekrutow (157)" zamiast 8 probek wyceny.
+    ///
+    /// KON JEST WLASNOSCIA ZOLNIERZA (paczka 160, decyzja Jeffa 08.10: "po co ja mam placic za konia, albo najemnik ma konia, wtedy jest
+    /// konny, albo przychodzi bez konia, wtedy jest pieszy ... jak ma konia, to chce wiekszy zold pewnie"; wylacznik RecruitsOwnHorse):
+    /// przy werbunku (najemnik z karczmy, ochotnik od notabla, garnizon - gracz i AI) koszt to same dni zoldu - zadnej doplaty za konia
+    /// i zadnego zdejmowania konia z polki (143 i 157 nieczynne). Konny bierze za to wiekszy zold (MountedWage), a dni zoldu w cenie
+    /// werbunku licza sie z tego wiekszego zoldu. Wycena bez kupujacego i bez miejsca werbunku (okup jenca: DefaultRansomValueCalculationModel,
+    /// kupujacy null) - stala gry 150 / 500 jak dotad, to nie werbunek. Kon najemnika dalej bierze sie z wzorca (z niczego) - do kroku
+    /// "weterani"; kon ochotnika kupil notabl na targu przy awansie (VolunteerKit) - prawdziwy kon z polki.
     /// </summary>
     internal static class RecruitCost
     {
@@ -49,6 +57,9 @@ namespace Armoury
         private static int _dVolN, _dVolMin = int.MaxValue, _dVolMax, _dMercShelf, _dMercOwn, _dMercFlat, _dPlShelf, _dPlOwn, _dWired;
         private static long _dVolSum, _dMercShelfGold, _dMercRefund, _dPlShelfGold, _dPlRefund;
         private static readonly Dictionary<string, int> _dShelfTowns = new Dictionary<string, int>(), _dOwnTowns = new Dictionary<string, int>();
+        // paczka 160: rekruci konni AI z wlasnym koniem (bez doplaty za konia) - linia "Konie rekrutow (160)"
+        private static int _dOwnVol, _dOwnMerc;
+        private static readonly Dictionary<string, int> _dOwnMercTowns = new Dictionary<string, int>();
 
         internal static void Reset() { ClearDay(); }
 
@@ -57,12 +68,16 @@ namespace Armoury
             _dVolN = _dVolMax = _dMercShelf = _dMercOwn = _dMercFlat = _dPlShelf = _dPlOwn = 0; _dVolMin = int.MaxValue;
             _dVolSum = _dMercShelfGold = _dMercRefund = _dPlShelfGold = _dPlRefund = 0;
             _dShelfTowns.Clear(); _dOwnTowns.Clear();
+            _dOwnVol = _dOwnMerc = 0; _dOwnMercTowns.Clear();
         }
 
         internal static bool IsMerc(CharacterObject c) { return c != null && (c.Occupation == Occupation.Mercenary || c.Occupation == Occupation.Gangster || c.Occupation == Occupation.CaravanGuard); }
 
         /// <summary>Poprawka 157 czynna: kon najemnika tylko z polki (wymaga ceny werbunku z dni zoldu i konia po cenie targu).</summary>
-        internal static bool MercShelfOn { get { var s = Settings.Current; return s != null && s.HistoricalRecruitCost && s.HorsesAtMarketPrice && s.MercHorseFromShelf; } }
+        internal static bool MercShelfOn { get { var s = Settings.Current; return s != null && s.HistoricalRecruitCost && s.HorsesAtMarketPrice && s.MercHorseFromShelf && !s.RecruitsOwnHorse; } }
+
+        /// <summary>Paczka 160 czynna: rekrut konny z wlasnym koniem - w koszcie werbunku tylko dni zoldu (wymaga ceny werbunku z dni zoldu).</summary>
+        internal static bool OwnHorseOn { get { var s = Settings.Current; return s != null && s.HistoricalRecruitCost && s.RecruitsOwnHorse; } }
 
         public static void Prefix() { _depth++; }
         public static Exception Finalizer(Exception __exception) { if (_depth > 0) _depth--; return __exception; }
@@ -79,7 +94,9 @@ namespace Armoury
                 bool merc = __0.Occupation == Occupation.Mercenary || __0.Occupation == Occupation.Gangster || __0.Occupation == Occupation.CaravanGuard;
                 if (merc) days *= 2f;
                 float target = Math.Max(1f, wage * days);
-                if (!__2 && __0.IsMounted) target += HorseCost(__0, __1, merc);
+                // paczka 160: przy werbunku (kupujacy albo miejsce werbunku znane) kon jest wlasnoscia zolnierza - bez doplaty; wycena bez
+                // kupujacego i bez miejsca (okup jenca) - stala gry jak dotad
+                if (!__2 && __0.IsMounted && (!s.RecruitsOwnHorse || (__1 == null && _where == null))) target += HorseCost(__0, __1, merc);
                 float mult = 1f + __result.SumOfFactors;
                 if (mult <= 0.01f) return;
                 float baseNow = __result.ResultNumber / mult;
@@ -212,6 +229,13 @@ namespace Armoury
             int v; d.TryGetValue(k, out v); d[k] = v + n;
         }
 
+        /// <summary>Paczka 160: rekrut konny AI przyszedl z wlasnym koniem (LevyGold) - tylko licznik linii dnia.</summary>
+        internal static void NoteOwnHorse(bool merc, Settlement town, int n)
+        {
+            if (n <= 0) return;
+            if (merc) { _dOwnMerc += n; Bump(_dOwnMercTowns, town, n); } else _dOwnVol += n;
+        }
+
         /// <summary>Poprawka 157: liczniki prawdziwych werbunkow (LevyGold i zakup gracza).</summary>
         internal static void NoteVolunteerHorse(int price) { if (price <= 0) return; _dVolN++; _dVolSum += price; if (price < _dVolMin) _dVolMin = price; if (price > _dVolMax) _dVolMax = price; }
         internal static void NoteMercHorses(Settlement town, int shelf, int own, int horsePrice, int refund, bool flat, bool player)
@@ -235,6 +259,15 @@ namespace Armoury
             var s = Settings.Current;
             if (s == null) return;
             var inv = System.Globalization.CultureInfo.InvariantCulture;
+            if (OwnHorseOn)
+            {
+                // paczka 160: kon jest wlasnoscia zolnierza - zadnej doplaty, nic nie schodzi z polek (157 nieczynna)
+                Log.Info("Konie rekrutow (160, kon wlasnoscia zolnierza CZYNNY, bez doplaty za konia): dzien " + ((int)CampaignTime.Now.ToDays - 1)
+                         + " - werbunek AI z wlasnym koniem: ochotnicy konni od notabli " + _dOwnVol + ", najemnicy konni z karczmy " + _dOwnMerc + Top(_dOwnMercTowns)
+                         + "; z polek miast nie zeszedl zaden kon, za konia nikt nie zaplacil (kon najemnika z polki 157 nieczynny); latki zakupu gracza wpiete " + _dWired + "/2.");
+                ClearDay();
+                return;
+            }
             Log.Info("Konie rekrutow (157" + (MercShelfOn ? ", kon najemnika z polki CZYNNY" : ", kon najemnika z polki WYLACZONY (" + (!s.MercHorseFromShelf ? "MCM" : "wymaga Historical Recruit Cost i Horses At Market Price") + ")")
                      + "): dzien " + ((int)CampaignTime.Now.ToDays - 1) + " - ochotnicy konni od notabli " + _dVolN
                      + (_dVolN > 0 ? " (kon po cenie targu srednio " + (_dVolSum / _dVolN).ToString(inv) + ", od " + _dVolMin + " do " + _dVolMax + ", razem " + _dVolSum.ToString(inv) + " do notabli)" : "")
