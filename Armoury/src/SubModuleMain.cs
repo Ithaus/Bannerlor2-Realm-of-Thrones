@@ -32,6 +32,7 @@ namespace Armoury
                     _harmony.PatchAll(Assembly.GetExecutingAssembly());
                     _patched = true;
                     Log.Info("Harmony: patche zaaplikowane.");
+                    SaveText.InstallRescue(_harmony);   // 161: zapis z napisem > 32767 B wczytuje sie (przed pierwszym wczytaniem)
                 }
             }
             catch (Exception e) { Log.Error("OnSubModuleLoad", e); }

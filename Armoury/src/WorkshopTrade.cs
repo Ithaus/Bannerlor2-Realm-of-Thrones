@@ -1335,7 +1335,7 @@ namespace Armoury
             try
             {
                 string data = dataStore.IsSaving ? WorkshopTrade.Export() : null;
-                dataStore.SyncData("arm_wstrade", ref data);
+                SaveText.Sync(dataStore, "arm_wstrade", ref data);   // 161: dlugi napis w kawalkach
                 if (dataStore.IsLoading) WorkshopTrade.Import(data);
             }
             catch (Exception e) { Log.Error("WorkshopTrade.SyncData", e); }

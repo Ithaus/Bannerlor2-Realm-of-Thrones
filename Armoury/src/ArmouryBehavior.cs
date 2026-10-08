@@ -396,7 +396,7 @@ namespace Armoury
             try
             {
                 string startStock = StartStock.Export();
-                dataStore.SyncData("arm_startstock", ref startStock);
+                SaveText.Sync(dataStore, "arm_startstock", ref startStock);
                 if (dataStore.IsLoading) StartStock.Import(startStock);
             }
             catch (Exception e) { Log.Error("SyncData.StartStock", e); }
@@ -418,59 +418,59 @@ namespace Armoury
                 // dniowka w kuzni MUSI przezyc save/load - inaczej po wczytaniu
                 // gra znow kaze placic 25/h za oplacona juz dobe
                 string daypass = DayPass.Export();
-                dataStore.SyncData("arm_daypass", ref daypass);
+                SaveText.Sync(dataStore, "arm_daypass", ref daypass);
                 if (dataStore.IsLoading) DayPass.Import(daypass);
                 string nightrest = NightRest.Export();
-                dataStore.SyncData("arm_nightrest", ref nightrest);
+                SaveText.Sync(dataStore, "arm_nightrest", ref nightrest);
                 if (dataStore.IsLoading) NightRest.Import(nightrest);
                 // ludnosc krain: ludzi na punkt hearth/dobrobytu (Jeff 04.10)
                 string popk = PopulationLaw.Export();
-                dataStore.SyncData("arm_population", ref popk);
+                SaveText.Sync(dataStore, "arm_population", ref popk);
                 if (dataStore.IsLoading) PopulationLaw.Import(popk);
                 // prawo wyrzutkow: pula ludzi w regionach (Jeff 04.10)
                 string outlaws = OutlawLaw.Export();
-                dataStore.SyncData("arm_outlaws", ref outlaws);
+                SaveText.Sync(dataStore, "arm_outlaws", ref outlaws);
                 if (dataStore.IsLoading) OutlawLaw.Import(outlaws);
                 // klimat Westeros: historia por roku (Jeff 04.10)
                 // unikaty ROT: kopie startowe zdjete raz na kampanie (wpis 62)
                 // dorobek stuleci: zbrojownie i zapas kupiecki raz na kampanie (wpis 79)
                 // sakiewki ludzi (wpis 84)
                 string purse = MenPurse.Export();
-                dataStore.SyncData("arm_menpurse", ref purse);
+                SaveText.Sync(dataStore, "arm_menpurse", ref purse);
                 if (dataStore.IsLoading) MenPurse.Import(purse);
                 // 150: odziez wojska - potrzeba czekajaca na zakup (partie i zalogi)
                 string cloth = ArmyClothing.Export();
-                dataStore.SyncData("arm_armyclothing", ref cloth);
+                SaveText.Sync(dataStore, "arm_armyclothing", ref cloth);
                 if (dataStore.IsLoading) ArmyClothing.Import(cloth);
                 // tarcza zoldu: znaczniki zoldu w kasach miast (paczka zold; puste, gdy tarcza wylaczona)
                 string wagehold = SoldierPay.ExportHeld();
-                dataStore.SyncData("arm_wagehold", ref wagehold);
+                SaveText.Sync(dataStore, "arm_wagehold", ref wagehold);
                 if (dataStore.IsLoading) SoldierPay.ImportHeld(wagehold);
                 string rk = RecruitKit.Export();
-                dataStore.SyncData("arm_recruitkit", ref rk);
+                SaveText.Sync(dataStore, "arm_recruitkit", ref rk);
                 if (dataStore.IsLoading) RecruitKit.Import(rk);
                 string aiw = AiWear.Export();
-                dataStore.SyncData("arm_aiwear", ref aiw);
+                SaveText.Sync(dataStore, "arm_aiwear", ref aiw);
                 if (dataStore.IsLoading) AiWear.Import(aiw);
                 string cold = ColdStart.Export();
-                dataStore.SyncData("arm_coldstart", ref cold);
+                SaveText.Sync(dataStore, "arm_coldstart", ref cold);
                 if (dataStore.IsLoading) ColdStart.Import(cold);
                 string uniq = UniqueSpoils.Export();
-                dataStore.SyncData("arm_uniq_init", ref uniq);
+                SaveText.Sync(dataStore, "arm_uniq_init", ref uniq);
                 if (dataStore.IsLoading) UniqueSpoils.Import(uniq);
                 string climate = WesterosClimate.Export();
-                dataStore.SyncData("arm_climate", ref climate);
+                SaveText.Sync(dataStore, "arm_climate", ref climate);
                 if (dataStore.IsLoading) WesterosClimate.Import(climate);
                 // Bank Zelazny: dlugi rodow i kapital Banku (Jeff 04.10)
                 string bank = IronBank.Export();
-                dataStore.SyncData("arm_ironbank", ref bank);
+                SaveText.Sync(dataStore, "arm_ironbank", ref bank);
                 if (dataStore.IsLoading) IronBank.Import(bank);
                 string glut = MarketGlut.Export();
-                dataStore.SyncData("arm_glut", ref glut);
+                SaveText.Sync(dataStore, "arm_glut", ref glut);
                 if (dataStore.IsLoading) MarketGlut.Import(glut);
                 // wiedza luczarska: odkryte wzory lukow/kusz i punkty nauki
                 string lore = RangedLore.Export();
-                dataStore.SyncData("arm_rangedlore", ref lore);
+                SaveText.Sync(dataStore, "arm_rangedlore", ref lore);
                 if (dataStore.IsLoading) RangedLore.Import(lore);
                 // ksiega legend: raz wykuta legenda nigdy nie powstaje po raz drugi
                 var legends = Legends;
@@ -490,7 +490,7 @@ namespace Armoury
             try
             {
                 string mend = MendMaterial.Export();
-                dataStore.SyncData("arm_mendstock", ref mend);
+                SaveText.Sync(dataStore, "arm_mendstock", ref mend);
                 if (dataStore.IsLoading) MendMaterial.Import(mend);
             }
             catch (Exception e) { Log.Error("SyncData.MendStock", e); }
@@ -978,6 +978,7 @@ namespace Armoury
 
         private void OnSessionLaunched(CampaignGameStarter starter)
         {
+            SaveText.ReportAfterLoad();   // 161: ile dlugich napisow uratowal ratunek przy wczytaniu
             try { FixCharcoalWeight(); } catch (Exception e) { Log.Error("FixCharcoalWeight", e); }   // wpis 87 (audyt pkt 11d): waga wegla PRZED wycena
             try { LootPrices.Apply(); } catch (Exception e) { Log.Error("LootPrices", e); }   // wpis 97: cena lupu = stan
             try { McmSettings.Apply(); MaterialLaw.Apply(); ArmsPricing.Build(); HistoricalPrices.Apply(); StartStock.Run(); ArmsPricing.ClearCostCache(); MapClock.ApplySpeed(); UniqueSpoils.OnSessionLaunched(); ColdStart.Run(); } catch (Exception e) { Log.Error("MaterialLaw/ArmsPricing", e); }   // surowce PRZED wycena uzbrojenia; StartStock zaraz PO Apply (przelicznik ladunku juz obowiazuje)

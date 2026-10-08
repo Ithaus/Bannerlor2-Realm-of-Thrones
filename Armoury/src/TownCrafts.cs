@@ -514,7 +514,7 @@ namespace Armoury
             try
             {
                 string data = dataStore.IsSaving ? TownCrafts.Export() : null;
-                dataStore.SyncData("arm_towncrafts", ref data);
+                SaveText.Sync(dataStore, "arm_towncrafts", ref data);   // 161: dlugi napis w kawalkach
                 if (dataStore.IsLoading) TownCrafts.Import(data);
             }
             catch (Exception e) { Log.Error("TownCrafts.SyncData", e); }
