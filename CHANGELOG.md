@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-08 (160 + 161: kon najemnika, zapis bez dlugich napisow, komplety rekrutow) - WGRANE
+**Status:** WGRANE 2026-10-08 ok. 11:48 na slowo Jeffa ("wgraj"). Galaz paczki/161-zapis = w-toku/161-zapis 2e235ea (na T3 5ccb0f5: 160 df1c545 +
+2bde2bf, 161 1b20d5b + 2e235ea). Armoury.dll md5 c01a54ba (poprzedni T3 5a7074c0 - kopia Armoury.dll.bak-2026-10-08-przed-161 obok pliku i
+D:\Backup-Bannerlord\wgrane\2026-10-08-161-przed). GT i RC bez zmian. Armoury.json bez kluczy tych paczek (wartosci z kodu: RecruitsOwnHorse,
+MountedWagePremium, MountedWageFactor 1.5). Nowe klucze zapisu: <klucz>_parts (kawalki dlugich napisow).
+- 160: najemnik i ochotnik konny przychodzi z wlasnym koniem (werbunek bez doplaty za konia), konny ma wyzszy zold (x1.5).
+- 161: gra zapisuje dlugosc napisu na 2 bajtach - napis > 32767 B psul caly zapis (save034-039 Jeffa: komplety rekrutow 150-220 KB; po roku 2.9 MB).
+  SaveText: 19 kluczy napisowych w kawalkach po 8000 znakow + ratunek przy wczytaniu (stare zapisy wczytuja sie). RecruitKit: komplety
+  rozwiazywane po starcie sesji (dotad kazde wczytanie gubilo wszystkie) i raz na dobe uzgadniane z pulami ochotnikow.
+Testy (autotest, zapisy Jeffa nietkniete): zapis z doby 360 wczytany (3 napisy uratowane, najdluzszy 2.93 MB); nowy zapis 0 napisow > 32767 B;
+zapis w kawalkach wczytany (komplety 11 496/11 496); nowa kampania 4 doby, 0 bledow.
+
 ## 2026-10-08 (TOWARY 3: 127-159 + W2 v5) - GRUPA TOWARY 3 WGRANA
 **Status:** WGRANE 2026-10-08 ok. 08:20 na slowo Jeffa ("wgraj najpierw towary"). Galaz paczki/towary3 = t3-sklad 5ccb0f5 (n126 + 127-159 + W2 8518996; opisy
 paczek docs/paczki/127..159-*.md i wpisy CHANGELOG w tej galezi; docs/towary3/SKLAD.md, WYNIK.md, ANALIZA-AUTOTESTU-2026-10-08.md). DLL: Armoury

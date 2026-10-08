@@ -704,3 +704,4 @@ szukal notabli w SyncData (bohaterow jeszcze nie ma) - KAZDE wczytanie gubilo ws
 OnSessionLaunched (12 624 z 12 927) + Reconcile z pulami raz na dobe. DZIURA DO EKONOMII: ~95% werbunku AI tieru 2+ to
 ochotnicy "bez zapisu" (komplet wzorca z niczego): ok. 1000-1500 na dobe na starcie, ~500 po roku - pule notabli zmienia
 cos, czego VolunteerKit nie widzi (do zbadania razem z projektem ekonomii).
+160 + 161 WGRANE 08.10 ok. 11:48 (Armoury c01a54ba, poprzedni 5a7074c0 jako Armoury.dll.bak-2026-10-08-przed-161; CHANGELOG).
