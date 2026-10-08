@@ -10,6 +10,10 @@
 // (plik nie ma nazwy prefabu domow, a 264 wsie Essos / Calradii w ogole nie maja prefabu domow - siatki stoja wprost w scenie).
 // Zamiast tego to, co gra robi z namiotem partii (MobilePartyVisual.AddTentEntityForParty: CreateEmpty + AddMultiMesh(kopia) +
 // SetFrame + AddChild): tylko publiczne API, a widocznosc wedlug maski poziomu jak SettlementVisual.SetSettlementLevelVisibility.
+// POPRAWKA PO AUTOTESCIE 07.10 17:41 ("brak siatek" we wszystkich 41 wzorach): natywny skrypt mapy "Town Scene Manager" przy wczytaniu
+// sceny zbiera siatki osad do wspolnych ikon (rgl_log "Town scene manager: Total mesh: 23858, Total Unique Mesh: 304"), wiec encje
+// wsi-matek nie maja juz komponentow MetaMesh. Wzor powstaje teraz kilkoma drogami po kolei (BuildTemplate): drzewo matki z siatka
+// po nazwie encji, kopia prefabu bez sceny, prefab wsi kultury; trzy pierwsze matki wypisane drzewem do wioski.log.
 // Teksty w grze po angielsku (VillageTexts.cs), komentarze bez polskich znakow.
 using System;
 using System.Collections.Generic;
@@ -326,6 +330,91 @@ namespace Armoury
             float a = (float)(frontDeg * Math.PI / 180.0);
             return hasAxis ? a - axis : a;
         }
+
+        // ---------- siatki wsi-matek bez komponentow (poprawka po autotescie 07.10 17:41) ----------
+        // Skrypt mapy "Town Scene Manager" przy wczytaniu sceny zbiera siatki osad do wspolnych ikon (rgl_log: "Town scene manager:
+        // Total mesh: 23858, Total Unique Mesh: 304"; natywny rglTown_icon_component = GameEntity.ComponentType.TownIcon, bez klasy
+        // zarzadzanej) - encje zostaja z nazwami, ramkami i maskami, ale MultiMeshComponentCount = 0. Siatke encji bierzemy wtedy po
+        // NAZWIE (MetaMesh.GetCopy, jak namiot partii). Tablica wygenerowana ze sceny ROT 8.1.8 (ROT-Map\SceneObj\Main_map\scene.xscene
+        // + prefaby Native / ROT-Map; dzien-6\wioski-2200\proba-1741\gen_tablica.py): w 571 wsiach 94 nazwy encji z siatka, kazda z
+        // dokladnie jedna siatka, zadna niejednoznaczna. Tu tylko domy i ikony wsi (pola / kopalnie / stada i zgliszcza nie ida do wiosek);
+        // nazwa spoza tablicy: tylko lisc z nazwa domu ROT (andal_wm_* / fm_wm_*: nazwa encji = nazwa siatki).
+        private static readonly Dictionary<string, string> NameToMesh = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            { "andal_wm_house1", "andal_wm_house1" }, { "andal_wm_house2", "andal_wm_house2" }, { "andal_wm_house3", "andal_wm_house3" },
+            { "andal_wm_house4", "andal_wm_house4" }, { "andal_wm_house5", "andal_wm_house5" }, { "andal_wm_house6", "andal_wm_house6" },
+            { "andal_wm_well", "andal_wm_well" }, { "andal_wm_well2", "andal_wm_well2" },
+            { "dothraki_village_l1", "dothraki_village" }, { "dothraki_village_l2", "dothraki_village" }, { "dothraki_village_l3", "dothraki_village" },
+            { "fm_wm_hall_snow", "fm_wm_hall_snow" }, { "fm_wm_house_1", "fm_wm_house_1" }, { "fm_wm_house_1_snow", "fm_wm_house_1_snow" },
+            { "fm_wm_house_2", "fm_wm_house_2" }, { "fm_wm_shed", "fm_wm_shed" }, { "fm_wm_shed2", "fm_wm_shed2" },
+            { "fm_wm_shed2_snow", "fm_wm_shed2_snow" }, { "fm_wm_shed_snow", "fm_wm_shed_snow" },
+            { "map_icons_aserai_village_l1", "village_aserai_1" }, { "map_icons_aserai_village_l2", "village_aserai_2" },
+            { "map_icons_aserai_village_l3", "village_aserai_3" },
+            { "map_icons_battania_village_l1", "village_battania_1" }, { "map_icons_battania_village_l2", "village_battania_2" },
+            { "map_icons_battania_village_l3", "village_battania_3" },
+            { "map_icons_empire_village_l1", "village_empire_1" }, { "map_icons_empire_village_l2", "village_empire_2" },
+            { "map_icons_empire_village_l3", "village_empire_3" },
+            { "map_icons_khuzait_village_l1", "village_khuzait_1" }, { "map_icons_khuzait_village_l2", "village_khuzait_2" },
+            { "map_icons_khuzait_village_l3", "village_khuzait_3" },
+            { "map_icons_sturgia_village_l1", "village_sturgia_1" }, { "map_icons_sturgia_village_l2", "village_sturgia_2" },
+            { "map_icons_sturgia_village_l3", "village_sturgia_3" },
+            { "map_icons_vlandia_village_l1", "village_vlandia_1" }, { "map_icons_vlandia_village_l2", "village_vlandia_2" },
+            { "map_icons_vlandia_village_l3", "village_vlandia_3" }
+        };
+
+        // Zapas "kultura": prefab domow najczestszy w wsiach tej kultury w scenie ROT 8.1.8 (ten sam skrypt; prefab polaczony albo
+        // old_prefab_name). Kultury Essos / Calradii nie maja domow andal / fm - dla nich stary prefab samej matki (map_icon_full_*).
+        private static readonly Dictionary<string, string> CultureHouses = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            { "battania", "fm_village1" }, { "sturgia", "fm_village1" }, { "nightswatch", "fm_village3" }, { "skagosi", "fm_village3" },
+            { "crownlands", "andal_village3" }, { "reach", "andal_village3" }, { "vlandia", "andal_village3" },
+            { "dragonstone", "andal_village5" }, { "vale", "andal_village5" }, { "river", "andal_village10" }, { "stormlands", "andal_village7" }
+        };
+
+        internal const string LastResortPrefab = "andal_village3";   // ostatni zapas, gdy nic innego nie ma (ROT-Map\Prefabs\ROT_north.xml)
+
+        /// <summary>Encje, ktorych nie kopiujemy: kula kolizji i pomocniki (bo_*), czastki ognia oblezenia / zlupienia, zgliszcza (*_looted,
+        /// w scenie maska "looted" bez "civilian"), pola / kopalnie / stada produkcji wsi (map_icons_production*) - wioska to same domy.</summary>
+        internal static bool IsHelperName(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return false;
+            return name == "_bo" || name.StartsWith("bo_", StringComparison.Ordinal) || name.StartsWith("siege_", StringComparison.Ordinal)
+                   || name.IndexOf("particle", StringComparison.OrdinalIgnoreCase) >= 0
+                   || name.EndsWith("_looted", StringComparison.Ordinal) || name.StartsWith("map_icons_production", StringComparison.Ordinal);
+        }
+
+        /// <summary>Nazwa siatki dla encji bez komponentow MetaMesh: z tablicy, a spoza niej tylko lisc z nazwa domu ROT (andal_wm_* / fm_wm_*,
+        /// tam nazwa encji = nazwa siatki - na wypadek nowych domow w aktualizacji ROT); null = brak. Inne liscie sceny (proba: drop_point,
+        /// empty_object) to pomocniki edytora - nigdy nie ida do MetaMesh.GetCopy.</summary>
+        internal static string MeshForName(string entityName, bool leaf)
+        {
+            if (string.IsNullOrEmpty(entityName) || IsHelperName(entityName)) return null;
+            string m;
+            if (NameToMesh.TryGetValue(entityName, out m)) return m;
+            bool rotHouse = entityName.StartsWith("andal_wm_", StringComparison.Ordinal) || entityName.StartsWith("fm_wm_", StringComparison.Ordinal);
+            return leaf && rotHouse ? entityName : null;
+        }
+
+        /// <summary>Prefab domow kultury wsi (StringId kultury) albo null.</summary>
+        internal static string CultureHousePrefab(string cultureId)
+        {
+            string p;
+            return !string.IsNullOrEmpty(cultureId) && CultureHouses.TryGetValue(cultureId, out p) ? p : null;
+        }
+
+        /// <summary>Czy encja z maska m stoi przy masce wsi cur. Gra (SettlementVisual.SetSettlementLevelVisibility): (m &amp; cur) == cur.
+        /// Encja bez poziomow (m = 0; SceneLeveler.cs:218 "bez poziomu" = UpgradeLevelMask.None) stoi zawsze - w scenie bez &lt;levels&gt; sa
+        /// WSZYSTKIE domy andal / fm i ikony Dothrakow (dawny scisly warunek wycinal je w calosci). Zapas (lenient, tylko gdy scisle nic
+        /// nie wyszlo): poziom zgodny albo bez poziomow, ale nigdy zgliszcza / oblezenie bez "civilian".</summary>
+        internal static bool LevelVisible(uint m, uint cur, bool lenient, uint civil, uint looted, uint siege, uint levels)
+        {
+            if (m == 0) return true;
+            if ((m & cur) == cur) return true;
+            if (!lenient) return false;
+            if ((m & civil) == 0 && (m & (looted | siege)) != 0) return false;
+            uint lvCur = cur & levels;
+            return (m & levels) == 0 || (m & lvCur) != 0;
+        }
     }
 
     // =====================================================================================================
@@ -358,7 +447,12 @@ namespace Armoury
             public bool NoSeason;             // flaga not_affected_by_season encji matki
             public int LeafIndex = -1;        // numer liscia z siatka (do przerzedzenia), -1 = nie lisc
             public float RootX, RootY;        // polozenie w ukladzie korzenia matki (dluga os)
+            public int Src;                   // skad siatka: SrcComp komponent encji, SrcName po nazwie encji, SrcPrefab z kopii prefabu
         }
+
+        private const int SrcComp = 0, SrcName = 1, SrcPrefab = 2;
+        private const int WayTree = 1, WayPrefab = 2, WayCulture = 3;
+        private static readonly MetaMesh[] NoMeshes = new MetaMesh[0];
 
         private sealed class Template
         {
@@ -371,6 +465,18 @@ namespace Armoury
             public int LeafCount;
             public bool HasAxis;
             public float Axis;
+            public int Way;                   // droga, ktora dala wzor (WayTree / WayPrefab / WayCulture), 0 = zadna
+            public string WaySource = "";     // prefab drogi "kultura" (do logu)
+            public bool Lenient;              // wzor z zapasu maski
+            public int FromComp, FromName, FromPrefab;   // siatki poziomu 3 wedlug zrodla
+        }
+
+        /// <summary>Warunki przejscia drzewa: maska wsi, zapas maski, droga "prefaby" (encja z nazwa prefabu -> kopia prefabu bez sceny).</summary>
+        private sealed class WalkArgs
+        {
+            public uint Mask;
+            public bool Lenient;
+            public bool Prefabs;
         }
 
         private sealed class District
@@ -401,13 +507,19 @@ namespace Armoury
         private MapScreen _screen;
         private bool _active, _finalized, _wasOff, _firstFillDone;
         private float _acc, _sinceSummary;
-        private uint _maskCivil, _maskL1, _maskL2, _maskL3;
+        private uint _maskCivil, _maskL1, _maskL2, _maskL3, _maskLooted, _maskSiege;
         private readonly List<Slot> _slots = new List<Slot>();
         private readonly List<District> _districts = new List<District>();
         private readonly Dictionary<long, List<Slot>> _grid = new Dictionary<long, List<Slot>>();
         private readonly List<Slot> _shown = new List<Slot>();
         private readonly SortedDictionary<string, int> _skip = new SortedDictionary<string, int>(StringComparer.Ordinal);
         private int _created, _createdTotal, _shownMax, _fires, _smokes, _templatesOk, _templatesBad, _thinned, _axisTurned, _lenient;
+        // drogi wzoru (poprawka po autotescie 17:41): wzory wedlug drogi, siatki wzorow (poziom 3) wedlug zrodla, prefaby bez sceny, nazwy
+        private int _tplComp, _tplName, _tplPrefab, _tplCulture, _meshComp, _meshName, _meshPrefab, _prefabMade, _prefabNoMesh, _prefabMissing, _nameMiss;
+        private readonly Dictionary<string, MetaMesh> _meshByName = new Dictionary<string, MetaMesh>(StringComparer.Ordinal);   // nazwa siatki -> wzor (null = brak)
+        private readonly Dictionary<string, GameEntity> _prefabs = new Dictionary<string, GameEntity>(StringComparer.Ordinal);   // prefab -> kopia bez sceny (null = brak)
+        private int _diagMothers, _diagPrefabs, _stDiag;   // diagnostyka do wioski.log: drzewa 3 pierwszych wsi-matek (+ pierwszej bez wzoru) i 3 prefabow
+        private bool _diagFailDone;
         private long _createTicks;
         private int _stCreate, _stFx, _stHover, _stVis, _stTemplate, _stTick, _stRemove;
         private string _lastSummary = "";
@@ -502,6 +614,8 @@ namespace Armoury
             _maskL1 = ms.GetSceneLevel("level_1");
             _maskL2 = ms.GetSceneLevel("level_2");
             _maskL3 = ms.GetSceneLevel("level_3");
+            _maskLooted = ms.GetSceneLevel("looted");   // tylko do zapasu maski (zgliszcza / oblezenie nigdy nie ida do wiosek)
+            _maskSiege = ms.GetSceneLevel("siege");
             Vec2 bmin, bmax;
             float bh;
             ms.GetMapBorders(out bmin, out bmax, out bh);
@@ -541,6 +655,7 @@ namespace Armoury
                                           : "brak w pliku - sprawdzenie pominiete (scena gry " + sceneCrc + "; do naglowka: '# scene_xml_crc: " + sceneCrc + "')")
                      + "; pominiete od razu: brak wsi gry " + noMother + " (okregow " + noMotherDistricts + "), nie wies " + notVillage
                      + ", poza granica mapy " + outside + "; maski sceny civilian " + _maskCivil + ", level_1/2/3 " + _maskL1 + "/" + _maskL2 + "/" + _maskL3
+                     + ", looted/siege " + _maskLooted + "/" + _maskSiege
                      + "; czas " + sw.ElapsedMilliseconds + " ms. Obrazki powstaja przy kamerze (z <= "
                      + Settings.Current.MapVillagesHideAboveCameraHeight.ToString("0", CultureInfo.InvariantCulture) + "), nic nie idzie do zapisu gry.");
         }
@@ -627,8 +742,12 @@ namespace Armoury
                 foreach (var kv in _skip) { if (!first) sb.Append(", "); first = false; sb.Append(kv.Key).Append(' ').Append(kv.Value); }
                 sb.Append(')');
             }
-            sb.Append("; wzory wsi-matek ").Append(_templatesOk).Append(" dobrych, ").Append(_templatesBad).Append(" bez wzoru")
-              .Append(_lenient > 0 ? " (w tym " + _lenient + " z zapasu: encje bez maski poziomu)" : "")
+            sb.Append("; wzory wsi-matek ").Append(_templatesOk).Append(" dobrych (drzewo: komponenty ").Append(_tplComp).Append(", nazwy ").Append(_tplName)
+              .Append("; prefaby ").Append(_tplPrefab).Append("; kultura ").Append(_tplCulture).Append("), ").Append(_templatesBad).Append(" bez wzoru")
+              .Append(_lenient > 0 ? " (dobrych z zapasu maski: " + _lenient + ")" : "")
+              .Append("; siatki wzorow (poziom 3) z komponentow ").Append(_meshComp).Append(", z nazw ").Append(_meshName).Append(", z prefabow ").Append(_meshPrefab)
+              .Append("; prefaby bez sceny ").Append(_prefabMade).Append(" (bez siatek ").Append(_prefabNoMesh).Append(", brak ").Append(_prefabMissing).Append(')')
+              .Append("; nazwy bez siatki ").Append(_nameMiss)
               .Append("; przerzedzone (domy ROT) ").Append(_thinned).Append(", obrot do osi domow ").Append(_axisTurned);
             double ms = _createdTotal > 0 ? _createTicks * 1000.0 / System.Diagnostics.Stopwatch.Frequency / _createdTotal : 0;
             sb.Append("; sredni czas obrazka ").Append(ms.ToString("0.000", CultureInfo.InvariantCulture)).Append(" ms");
@@ -638,7 +757,7 @@ namespace Armoury
               .Append(" (teraz ").Append(smokeNow).Append(')');
             sb.Append("; potkniecia: tworzenie ").Append(_stCreate).Append(", wzor ").Append(_stTemplate).Append(", ogien ").Append(_stFx)
               .Append(", widocznosc ").Append(_stVis).Append(", dymek ").Append(_stHover).Append(", zdejmowanie ").Append(_stRemove)
-              .Append(", tick ").Append(_stTick).Append('.');
+              .Append(", tick ").Append(_stTick).Append(", diagnostyka ").Append(_stDiag).Append('.');
             return sb.ToString();
         }
 
@@ -949,6 +1068,15 @@ namespace Armoury
         }
 
         // ---------- wzor wsi-matki: uklad siatek widocznych przy danym poziomie (algorytm gry, bez kopiowania encji) ----------
+        // AUTOTEST 07.10 17:41: 41 wzorow, 0 dobrych - "brak siatek" (MultiMeshComponentCount = 0 na calym drzewie kazdej matki, tez
+        // przy zapasie maski). Natywny "Town Scene Manager" przy wczytaniu mapy zbiera siatki osad do wspolnych ikon (rgl_log 17:41:06
+        // "Town scene manager: Total mesh: 23858, Total Unique Mesh: 304"; rglTown_icon_component = ComponentType.TownIcon bez klasy
+        // zarzadzanej, GetComponentAtIndex dalby null). Encje, nazwy, ramki i maski zostaja. Drogi po kolei, kazda liczona w logu:
+        //  1 drzewo matki: siatka encji = jej komponenty MetaMesh, a gdy ich brak - siatka po nazwie encji (MapVillageData.MeshForName,
+        //    MetaMesh.GetCopy jak namiot partii); ramki i maski z encji w grze;
+        //  2 prefaby: encje matki z nazwa prefabu (GetPrefabName, potem GetOldPrefabName) -> kopia prefabu BEZ SCENY
+        //    (GameEntity.Instantiate(null, ...) jak DestructableComponent.cs:194 / MissionDeploymentBoundaryMarker.cs:184) i jej siatki;
+        //  3 kultura: prefab domow kultury wsi (Westeros), potem stary prefab samej matki (map_icon_full_*), na koncu andal_village3.
         private Template TemplateOf(District d)
         {
             if (d.TemplateTried) return d.T;
@@ -960,8 +1088,33 @@ namespace Armoury
                 d.T = new Template { Why = "blad wzoru" };
                 if (_stTemplate <= 5 || _stTemplate % 100 == 0) Log.Error("MapVillagesView.Template " + d.Id + " (potkniecie " + _stTemplate + ")", e);
             }
-            if (d.T.Ok) _templatesOk++; else _templatesBad++;
+            if (d.T.Ok)
+            {
+                _templatesOk++;
+                if (d.T.Lenient) _lenient++;
+                if (d.T.Way == WayTree) { if (d.T.FromName > 0) _tplName++; else _tplComp++; }
+                else if (d.T.Way == WayPrefab) _tplPrefab++;
+                else if (d.T.Way == WayCulture) _tplCulture++;
+                _meshComp += d.T.FromComp;
+                _meshName += d.T.FromName;
+                _meshPrefab += d.T.FromPrefab;
+            }
+            else _templatesBad++;
+            // diagnostyka (nastepny autotest rozstrzyga, jesli poprawka nie trafi): 3 pierwsze matki po wczytaniu + pierwsza bez wzoru
+            if (_diagMothers < 3 || (!d.T.Ok && !_diagFailDone))
+            {
+                if (_diagMothers >= 3) _diagFailDone = true;
+                _diagMothers++;
+                DiagMother(d);
+            }
             return d.T;
+        }
+
+        private static GameEntity MotherOf(Settlement s)
+        {
+            var svm = SettlementVisualManager.Current;
+            var vis = svm != null && s != null ? svm.GetVisualOfEntity(s.Party) as SettlementVisual : null;
+            return vis != null ? vis.StrategicEntity : null;
         }
 
         private Template BuildTemplate(District d)
@@ -970,21 +1123,28 @@ namespace Armoury
             Settlement s = d.S;
             if (s == null) { t.Why = "brak wsi gry"; return t; }
             if (!s.IsVillage) { t.Why = "nie wies"; return t; }
-            var svm = SettlementVisualManager.Current;
-            var vis = svm != null ? svm.GetVisualOfEntity(s.Party) as SettlementVisual : null;
-            GameEntity mother = vis != null ? vis.StrategicEntity : null;
+            GameEntity mother = MotherOf(s);
             if (mother == (GameEntity)null) { t.Why = "brak obrazka wsi gry"; return t; }
             MatrixFrame mg = mother.GetGlobalFrame();
             Vec3 sc = mg.rotation.GetScaleVector();
             t.Scale = new Vec3(Clamp(sc.x, 0.2f, 5f), Clamp(sc.y, 0.2f, 5f), Clamp(sc.z, 0.2f, 5f));
             t.NoSeason = (mother.EntityFlags & EntityFlags.NotAffectedBySeason) != 0;
-            for (int lv = 1; lv <= 3; lv++) t.Plans[lv] = BuildPlan(mother, _maskCivil | LevelMask(lv), false);
-            if (t.Plans[1].Length == 0 && t.Plans[2].Length == 0 && t.Plans[3].Length == 0)
+            // droga 1: drzewo matki (komponenty, a gdy ich brak - po nazwie encji); droga 2: prefaby encji matki bez sceny
+            if (FillPlans(t, mother, false, false)) t.Way = WayTree;
+            else if (FillPlans(t, mother, true, false)) t.Way = WayPrefab;
+            else
             {
-                // scisly algorytm gry nic nie dal (nie powinno sie zdarzyc - matka jest widoczna w grze): zapas, liczony w logu
-                for (int lv = 1; lv <= 3; lv++) t.Plans[lv] = BuildPlan(mother, _maskCivil | LevelMask(lv), true);
-                if (t.Plans[3].Length > 0 || t.Plans[2].Length > 0 || t.Plans[1].Length > 0) _lenient++;
+                // droga 3: prefab wsi kultury (Westeros: domy andal / fm), potem stary prefab samej matki, na koncu jeden staly
+                string cid = s.Culture != null ? s.Culture.StringId : "";
+                string[] cands = { MapVillageData.CultureHousePrefab(cid), PrefabNameOf(mother), MapVillageData.LastResortPrefab };
+                foreach (string p in cands)
+                {
+                    GameEntity tmp = PrefabTemplate(p);
+                    if (tmp == (GameEntity)null) continue;
+                    if (FillPlans(t, tmp, false, true)) { t.Way = WayCulture; t.WaySource = p; break; }
+                }
             }
+            if (t.Way == 0) { t.Why = "brak siatek"; return t; }
             // poziom bez siatek bierze najblizszy z siatkami (3 -> 2 -> 1, 1 -> 2 -> 3)
             for (int lv = 1; lv <= 3; lv++)
             {
@@ -992,19 +1152,44 @@ namespace Armoury
                 int[] order = lv == 1 ? new[] { 2, 3 } : lv == 2 ? new[] { 3, 1 } : new[] { 2, 1 };
                 foreach (int o in order) if (t.Plans[o].Length > 0) { t.Plans[lv] = t.Plans[o]; break; }
             }
-            if (t.Plans[3].Length == 0) { t.Why = "brak siatek"; return t; }
+            if (t.Plans[3].Length == 0) { t.Why = "brak siatek"; t.Way = 0; return t; }
             string s1 = Signature(t.Plans[1]), s2 = Signature(t.Plans[2]), s3 = Signature(t.Plans[3]);
             t.Flat = s1 == s2 && s2 == s3;
             t.LeafCount = 0;
-            foreach (var n in t.Plans[3]) if (n.LeafIndex >= 0) t.LeafCount++;
             var xs = new List<float>();
             var ys = new List<float>();
-            foreach (var n in t.Plans[3]) if (n.LeafIndex >= 0) { xs.Add(n.RootX); ys.Add(n.RootY); }
+            foreach (var n in t.Plans[3])
+            {
+                if (n.LeafIndex >= 0) { t.LeafCount++; xs.Add(n.RootX); ys.Add(n.RootY); }
+                if (n.Meshes.Length == 0) continue;
+                if (n.Src == SrcPrefab) t.FromPrefab += n.Meshes.Length;
+                else if (n.Src == SrcName) t.FromName += n.Meshes.Length;
+                else t.FromComp += n.Meshes.Length;
+            }
             float axis;
             t.HasAxis = MapVillageData.LongAxis(xs, ys, out axis);
             t.Axis = axis;
             t.Ok = true;
             return t;
+        }
+
+        /// <summary>Plany 1/2/3 z drzewa src: najpierw scisly warunek maski (gra + encje bez poziomow), gdy nic - zapas maski.
+        /// includeRoot = siatki samego src tez (kopia prefabu wsi kultury: korzen prefabu bywa jedyna siatka).</summary>
+        private bool FillPlans(Template t, GameEntity src, bool prefabs, bool includeRoot)
+        {
+            for (int pass = 0; pass < 2; pass++)
+            {
+                bool lenient = pass == 1;
+                bool any = false;
+                for (int lv = 1; lv <= 3; lv++)
+                {
+                    var a = new WalkArgs { Mask = _maskCivil | LevelMask(lv), Lenient = lenient, Prefabs = prefabs };
+                    t.Plans[lv] = BuildPlan(src, a, includeRoot);
+                    if (t.Plans[lv].Length > 0) any = true;
+                }
+                if (any) { t.Lenient = lenient; return true; }
+            }
+            return false;
         }
 
         private uint LevelMask(int lv)
@@ -1030,19 +1215,20 @@ namespace Armoury
             return sb.ToString();
         }
 
-        private static bool IsHelper(string name)
-        {
-            // kula kolizji i pomocniki (bo_*), czastki ognia oblezenia / zlupienia - nic z tego nie kopiujemy
-            return name == "_bo" || name.StartsWith("bo_", StringComparison.Ordinal) || name.StartsWith("siege_", StringComparison.Ordinal)
-                   || name.IndexOf("particle", StringComparison.OrdinalIgnoreCase) >= 0;
-        }
-
-        /// <summary>Encje matki widoczne przy masce poziomu (jak SettlementVisual.SetSettlementLevelVisibility: (maska encji &amp; maska) == maska),
-        /// w kolejnosci rodzic przed dzieckiem; galezie bez siatek wycinane; powtorzone liscie (ta sama siatka w tym samym miejscu) raz.</summary>
-        private static PlanNode[] BuildPlan(GameEntity mother, uint mask, bool lenient)
+        /// <summary>Encje src widoczne przy masce (MapVillageData.LevelVisible), w kolejnosci rodzic przed dzieckiem; galezie bez siatek
+        /// wycinane; powtorzone liscie (ta sama siatka w tym samym miejscu) raz.</summary>
+        private PlanNode[] BuildPlan(GameEntity src, WalkArgs a, bool includeRoot)
         {
             var raw = new List<PlanNode>();
-            Walk(mother, -1, mask, lenient, raw, 0);
+            int top = -1;
+            if (includeRoot)
+            {
+                int rs;
+                MetaMesh[] rm = MeshesOf(src, out rs);
+                raw.Add(new PlanNode { Parent = -1, Local = MatrixFrame.Identity, Meshes = rm, NoSeason = (src.EntityFlags & EntityFlags.NotAffectedBySeason) != 0, Src = SrcPrefab });
+                top = 0;
+            }
+            Walk(src, top, a, raw, 0, includeRoot);
             var keep = new bool[raw.Count];
             for (int i = raw.Count - 1; i >= 0; i--)
             {
@@ -1077,42 +1263,220 @@ namespace Armoury
             return outList.ToArray();
         }
 
-        private static void Walk(GameEntity src, int parent, uint mask, bool lenient, List<PlanNode> outList, int depth)
+        private void Walk(GameEntity src, int parent, WalkArgs a, List<PlanNode> outList, int depth, bool inPrefab)
         {
-            if (depth > 6) return;
+            if (depth > 8) return;
+            uint levels = _maskL1 | _maskL2 | _maskL3;
             var seen = new HashSet<string>(StringComparer.Ordinal);   // Dothrakowie: 4 x ta sama siatka w tym samym miejscu
             foreach (GameEntity c in src.GetChildren())
             {
                 if (c == (GameEntity)null) continue;
                 string name = c.Name ?? "";
-                if (IsHelper(name)) continue;
+                if (MapVillageData.IsHelperName(name)) continue;
                 uint m = (uint)c.GetUpgradeLevelMask();
-                // gra: widoczna, gdy (maska & biezaca) == biezaca; zapas "lenient": encja bez zadnej maski tez (tylko gdy scisle nic nie wyszlo)
-                if ((m & mask) != mask && !(lenient && m == 0)) continue;
-                var meshes = new List<MetaMesh>();
-                int mc = c.MultiMeshComponentCount;
-                for (int i = 0; i < mc; i++)
-                {
-                    MetaMesh mm = c.GetMetaMesh(i);
-                    if (mm != null && mm.IsValid) meshes.Add(mm);
-                }
+                if (!MapVillageData.LevelVisible(m, a.Mask, a.Lenient, _maskCivil, _maskLooted, _maskSiege, levels)) continue;
                 MatrixFrame lf = c.GetFrame();
-                if (meshes.Count > 0 && c.ChildCount == 0)
+                bool noSeason = (c.EntityFlags & EntityFlags.NotAffectedBySeason) != 0;
+                if (a.Prefabs && !inPrefab)
+                {
+                    // droga 2: encja z nazwa prefabu - zamiast jej dzieci w grze kopia prefabu bez sceny w ramce tej encji
+                    GameEntity tmp = PrefabTemplate(PrefabNameOf(c));
+                    if (tmp != (GameEntity)null)
+                    {
+                        int ts;
+                        MetaMesh[] tm = MeshesOf(tmp, out ts);
+                        int pi = outList.Count;
+                        outList.Add(new PlanNode { Parent = parent, Local = lf, Meshes = tm, NoSeason = noSeason, Src = SrcPrefab });
+                        Walk(tmp, pi, a, outList, depth + 1, true);
+                        continue;
+                    }
+                }
+                int s;
+                MetaMesh[] meshes = MeshesOf(c, out s);
+                if (meshes.Length > 0 && c.ChildCount == 0)
                 {
                     string sig = meshes[0].GetName() + "|" + Math.Round(lf.origin.x, 2).ToString(CultureInfo.InvariantCulture) + "|"
                                  + Math.Round(lf.origin.y, 2).ToString(CultureInfo.InvariantCulture) + "|" + Math.Round(lf.origin.z, 2).ToString(CultureInfo.InvariantCulture);
                     if (!seen.Add(sig)) continue;
                 }
                 int idx = outList.Count;
-                outList.Add(new PlanNode
-                {
-                    Parent = parent,
-                    Local = lf,
-                    Meshes = meshes.ToArray(),
-                    NoSeason = (c.EntityFlags & EntityFlags.NotAffectedBySeason) != 0
-                });
-                Walk(c, idx, mask, lenient, outList, depth + 1);
+                outList.Add(new PlanNode { Parent = parent, Local = lf, Meshes = meshes, NoSeason = noSeason, Src = inPrefab ? SrcPrefab : s });
+                Walk(c, idx, a, outList, depth + 1, inPrefab);
             }
+        }
+
+        /// <summary>Siatki encji: komponenty MetaMesh, a gdy ich brak (Town Scene Manager) - jedna siatka po nazwie encji.</summary>
+        private MetaMesh[] MeshesOf(GameEntity e, out int src)
+        {
+            src = SrcComp;
+            List<MetaMesh> list = null;
+            int mc = e.MultiMeshComponentCount;
+            for (int i = 0; i < mc; i++)
+            {
+                MetaMesh mm = e.GetMetaMesh(i);
+                if (mm == null || !mm.IsValid) continue;
+                if (list == null) list = new List<MetaMesh>();
+                list.Add(mm);
+            }
+            if (list != null) return list.ToArray();
+            MetaMesh byName = MeshByName(e.Name, e.ChildCount == 0);
+            if (byName == null) return NoMeshes;
+            src = SrcName;
+            return new[] { byName };
+        }
+
+        /// <summary>Wzor siatki po nazwie encji (MetaMesh.GetCopy bez bledow i z null, jak MobilePartyVisual namiot) - raz na nazwe siatki.</summary>
+        private MetaMesh MeshByName(string entityName, bool leaf)
+        {
+            string mesh = MapVillageData.MeshForName(entityName, leaf);
+            if (mesh == null) return null;
+            MetaMesh mm;
+            if (_meshByName.TryGetValue(mesh, out mm)) return mm;
+            _meshByName[mesh] = null;   // blad w srodku = ta nazwa juz nie probowana
+            mm = MetaMesh.GetCopy(mesh, false, true);
+            if (mm != null && !mm.IsValid) mm = null;
+            _meshByName[mesh] = mm;
+            if (mm == null) _nameMiss++;
+            return mm;
+        }
+
+        private static string PrefabNameOf(GameEntity e)
+        {
+            string p = e.GetPrefabName();
+            if (string.IsNullOrEmpty(p)) p = e.GetOldPrefabName();
+            return string.IsNullOrEmpty(p) ? null : p;
+        }
+
+        /// <summary>Kopia prefabu BEZ SCENY, bez skryptow i fizyki (tylko do odczytu siatek; nigdy nie trafia do sceny mapy) - raz na prefab.
+        /// PrefabExists najpierw (bez tego gra stawia czerwony TEMP - NightRest.cs:583-584).</summary>
+        private GameEntity PrefabTemplate(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return null;
+            GameEntity g;
+            if (_prefabs.TryGetValue(name, out g)) return g;
+            g = null;
+            _prefabs[name] = null;   // blad w srodku = ten prefab juz nie probowany
+            if (GameEntity.PrefabExists(name)) g = GameEntity.Instantiate((Scene)null, name, false, false, "");
+            if (g == (GameEntity)null) { _prefabMissing++; return null; }
+            List<GameEntity> all = new List<GameEntity>();
+            g.GetChildrenRecursive(ref all);
+            all.Add(g);
+            int meshes = 0;
+            foreach (var e in all) meshes += e.MultiMeshComponentCount;
+            if (meshes == 0) _prefabNoMesh++;   // zostaje: siatki po nazwach encji prefabu
+            _prefabMade++;
+            _prefabs[name] = g;
+            if (_diagPrefabs < 3)
+            {
+                _diagPrefabs++;
+                try { Log.Info("Wioski: drzewo prefabu " + name + " (kopia bez sceny, komponentow MetaMesh w drzewie " + meshes + "):" + TreeText(g, 40)); }
+                catch (Exception ex) { _stDiag++; if (_stDiag <= 3) Log.Error("MapVillagesView.DiagPrefab " + name, ex); }
+            }
+            return g;
+        }
+
+        // ---------- diagnostyka do wioski.log (tylko odczyt; nic nie zmienia w encjach) ----------
+        private static FieldInfo _fLevelMask;
+
+        private void DiagMother(District d)
+        {
+            try
+            {
+                GameEntity mother = MotherOf(d.S);
+                var t = d.T;
+                var sb = new StringBuilder();
+                sb.Append("Wioski: drzewo wsi-matki ").Append(d.Id).Append(" '").Append(d.S != null ? d.S.Name.ToString() : "?").Append("' kultura ")
+                  .Append(d.S != null && d.S.Culture != null ? d.S.Culture.StringId : "?").Append(": wynik ");
+                if (t.Ok)
+                {
+                    sb.Append(t.Way == WayTree ? "drzewo" : t.Way == WayPrefab ? "prefaby" : "kultura " + t.WaySource)
+                      .Append(t.Lenient ? " (zapas maski)" : "").Append(", siatki poziomu 3: komponenty ").Append(t.FromComp).Append(", nazwy ").Append(t.FromName)
+                      .Append(", prefaby ").Append(t.FromPrefab).Append(t.Flat ? ", jeden wyglad na 1/2/3 (przerzedzenie)" : "");
+                }
+                else sb.Append("BEZ WZORU (").Append(t.Why).Append(')');
+                for (int lv = 1; lv <= 3; lv++)
+                {
+                    var p = t.Plans[lv];
+                    int mm = 0;
+                    if (p != null) foreach (var n in p) mm += n.Meshes.Length;
+                    sb.Append(lv == 1 ? "; plan l1/l2/l3 wezlow/siatek " : " | ").Append(p != null ? p.Length : 0).Append('/').Append(mm);
+                }
+                sb.Append("; maski sceny civilian ").Append(_maskCivil).Append(" level_1/2/3 ").Append(_maskL1).Append('/').Append(_maskL2).Append('/').Append(_maskL3)
+                  .Append(" looted ").Append(_maskLooted).Append(" siege ").Append(_maskSiege);
+                if (mother == (GameEntity)null) { sb.Append("; brak encji matki"); Log.Info(sb.ToString()); return; }
+                try
+                {
+                    var svm = SettlementVisualManager.Current;
+                    var vis = svm != null ? svm.GetVisualOfEntity(d.S.Party) as SettlementVisual : null;
+                    if (_fLevelMask == null) _fLevelMask = typeof(SettlementVisual).GetField("_currentLevelMask", BindingFlags.Instance | BindingFlags.NonPublic);
+                    object v = vis != null && _fLevelMask != null ? _fLevelMask.GetValue(vis) : null;
+                    sb.Append("; maska wsi w grze teraz ").Append(v != null ? v.ToString() : "?");
+                }
+                catch { sb.Append("; maska wsi w grze teraz ?"); }
+                sb.Append("; skrypt 'Town Entity Manager' ").Append(mother.HasScriptComponent("Town Entity Manager") ? "tak" : "nie");
+                sb.Append(TreeText(mother, 80));
+                Log.Info(sb.ToString());
+            }
+            catch (Exception e)
+            {
+                _stDiag++;
+                if (_stDiag <= 3) Log.Error("MapVillagesView.DiagMother " + d.Id + " (potkniecie " + _stDiag + ")", e);
+            }
+        }
+
+        /// <summary>Drzewo encji, linia na encje: nazwa, prefab / stary prefab, maska (kumul., widocznosc poziomow z rodzicami), widoczna,
+        /// komponenty wedlug typu (MM swiatlo zlozony plotno czastki ikona-osady inny naklejka), siatki komponentow, pierwsza siatka,
+        /// rozmiar BB, ramka lokalna, dzieci, siatka po nazwie.</summary>
+        private static string TreeText(GameEntity root, int maxLines)
+        {
+            var sb = new StringBuilder();
+            int lines = 0;
+            TreeLine(sb, root, 0, ref lines, maxLines);
+            if (lines >= maxLines) sb.Append("\n    ... (ucieto po ").Append(maxLines).Append(" encjach)");
+            return sb.ToString();
+        }
+
+        private static void TreeLine(StringBuilder sb, GameEntity e, int depth, ref int lines, int maxLines)
+        {
+            if (lines >= maxLines || depth > 8) return;
+            lines++;
+            string name = e.Name ?? "";
+            sb.Append("\n    ").Append(' ', depth * 2).Append(name.Length > 0 ? name : "(bez nazwy)");
+            string pf = e.GetPrefabName(), op = e.GetOldPrefabName();
+            if (!string.IsNullOrEmpty(pf)) sb.Append(" | prefab ").Append(pf);
+            if (!string.IsNullOrEmpty(op)) sb.Append(" | stary prefab ").Append(op);
+            sb.Append(" | maska ").Append((uint)e.GetUpgradeLevelMask()).Append(" kumul ").Append((uint)e.GetUpgradeLevelMaskCumulative())
+              .Append(" z rodzicami ").Append(e.GetVisibilityLevelMaskIncludingParents())
+              .Append(" | widoczna ").Append(e.IsVisibleIncludeParents() ? 1 : 0)
+              .Append(" | flagi ").Append(((uint)e.EntityFlags).ToString("X"));
+            sb.Append(" | komp");
+            for (int ct = 0; ct <= 7; ct++) sb.Append(' ').Append(e.GetComponentCount((GameEntity.ComponentType)ct));
+            int subs = 0;
+            int mc = e.MultiMeshComponentCount;
+            for (int i = 0; i < mc; i++) { MetaMesh mm = e.GetMetaMesh(i); if (mm != null && mm.IsValid) subs += mm.MeshCount; }
+            sb.Append(" | siatek ").Append(subs);
+            Mesh fm = e.GetFirstMesh();
+            if (fm != null && fm.IsValid) sb.Append(" pierwsza ").Append(fm.Name);
+            Vec3 bmin = e.GlobalBoxMin, bmax = e.GlobalBoxMax;
+            sb.Append(" | BB ").Append(F2(bmax.x - bmin.x)).Append('x').Append(F2(bmax.y - bmin.y)).Append('x').Append(F2(bmax.z - bmin.z));
+            MatrixFrame lf = e.GetFrame();
+            Vec3 scl = lf.rotation.GetScaleVector();
+            sb.Append(" | ramka ").Append(F2(lf.origin.x)).Append(',').Append(F2(lf.origin.y)).Append(',').Append(F2(lf.origin.z))
+              .Append(" skala ").Append(F2(scl.x)).Append(',').Append(F2(scl.y)).Append(',').Append(F2(scl.z));
+            int cc = e.ChildCount;
+            sb.Append(" | dzieci ").Append(cc);
+            string byName = MapVillageData.MeshForName(name, cc == 0);
+            if (byName != null) sb.Append(" | po nazwie ").Append(byName);
+            foreach (GameEntity c in e.GetChildren())
+            {
+                if (c == (GameEntity)null) continue;
+                TreeLine(sb, c, depth + 1, ref lines, maxLines);
+            }
+        }
+
+        private static string F2(float v)
+        {
+            return v.ToString("0.00", CultureInfo.InvariantCulture);
         }
 
         // ---------- sprzatanie ----------
@@ -1136,6 +1500,7 @@ namespace Armoury
             _created = 0;
             foreach (var d in _districts) { d.T = null; d.TemplateTried = false; }   // wzory od nowa (siatki matek moga byc przeladowane)
             _templatesOk = _templatesBad = _lenient = _thinned = _axisTurned = 0;   // liczniki "teraz" razem z wzorami (bez podwojnego liczenia po wlaczeniu w MCM)
+            ClearTemplateCaches();
             return n;
         }
 
@@ -1145,6 +1510,17 @@ namespace Armoury
             foreach (var d in _districts) { d.T = null; d.TemplateTried = false; }
             _shown.Clear();
             _created = 0;
+            ClearTemplateCaches();
+        }
+
+        /// <summary>Wzory siatek po nazwie i kopie prefabow bez sceny razem z ich licznikami (nic z tego nie jest w scenie - samo puszczenie
+        /// odwolan, jak gra z kopia prefabu w DestructableComponent).</summary>
+        private void ClearTemplateCaches()
+        {
+            _meshByName.Clear();
+            _prefabs.Clear();
+            _tplComp = _tplName = _tplPrefab = _tplCulture = _meshComp = _meshName = _meshPrefab = 0;
+            _prefabMade = _prefabNoMesh = _prefabMissing = _nameMiss = 0;
         }
 
         // ---------- dymek po najechaniu: bez fizyki, punkt terenu pod kursorem w obroconym obrysie (krytyk K4) ----------
