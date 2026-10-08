@@ -1608,6 +1608,10 @@ namespace Armoury
         [SettingPropertyGroup("The road to market")]
         public float VillageCartTownMaxDays { get; set; } = 2f;
 
+        [SettingPropertyBool("Island Roads Fix", HintText = "caravans and lords on islands are no longer left standing by a Banner Kings order to a place they cannot reach over land: a party with ships goes to the same place by land and sea; a caravan without ships picks the best town it can reach by land - by Banner Kings' own trade reckoning, else its home or the nearest town by road - and Banner Kings no longer picks towns across the water for such a caravan at all; if its island has no other town, it waits in town as the game's own caravans do when no trip pays; a lord whose Banner Kings feast or estate order cannot be carried out gets his own will back instead of standing frozen in a castle or town. Only orders change - nothing is made or lost (off = as Banner Kings decides)")]
+        [SettingPropertyGroup("The road to market")]
+        public bool IslandRoadsFix { get; set; } = true;
+
         [SettingPropertyBool("Village Clog Diagnostics", HintText = "log only, changes nothing in the game: once a day the Armoury log says why village storehouses stand full (one and a half times their size stops all village work) - village types, what lies in them, where each village's villagers are (at home, on the road and for how long, in town, none at all) and how many villages filled up or emptied that day; ten examples every five days (off = no such lines)")]
         [SettingPropertyGroup("The road to market")]
         public bool VillageClogDiagnostics { get; set; } = true;
@@ -3097,6 +3101,7 @@ namespace Armoury
             s.MapRoadTableFix = MapRoadTableFix;
             s.VillageCartLeaveTown = VillageCartLeaveTown;
             s.VillageCartTownMaxDays = VillageCartTownMaxDays;
+            s.IslandRoadsFix = IslandRoadsFix;
             s.VillageClogDiagnostics = VillageClogDiagnostics;
             s.CaravanBulkEnabled = CaravanBulkEnabled;
             s.CaravanBulkStockDays = CaravanBulkStockDays;

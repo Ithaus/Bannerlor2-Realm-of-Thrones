@@ -66,7 +66,7 @@ namespace Armoury
         // ich jest i czy stoja na zawsze; po RoadMemoryFix w 3 osadach ma byc 0)
         private static readonly HashSet<MobileParty> _dLord = new HashSet<MobileParty>(), _dCaravan = new HashSet<MobileParty>(), _dOther = new HashSet<MobileParty>();
         private static int _rFace, _rSea, _rNoRoad, _rElse;
-        private sealed class Stand { public Settlement At; public double First, Last; public bool Lord; }
+        private sealed class Stand { public Settlement At; public double First, Last; public bool Lord; public int How; }
         private static readonly Dictionary<MobileParty, Stand> _stand = new Dictionary<MobileParty, Stand>();   // lord / karawana w osadzie -> od kiedy BK odrzuca jej rozkazy (w tej osadzie)
         internal const double StandWindowDays = 2.0;                                                            // "stoi z odrzuceniem" = nadal w tej osadzie i odrzucona w ostatnich 2 dobach
 
@@ -75,6 +75,7 @@ namespace Armoury
             _seen.Clear(); _sent.Clear(); _errSites.Clear(); _stand.Clear();
             _scanned = false; _force = false; _stumblesAll = 0;
             ClearDay();
+            IslandRoads.Reset();                                                     // latka wysp: stan w pamieci (ten sam straznik BK, ta sama linia dnia)
         }
 
         private static void ClearDay()
@@ -109,11 +110,29 @@ namespace Armoury
         /// <summary>
         /// Postfiks na BannerKings.Patches.AiDecisionTracePatches.GuardSettlementMove(MobileParty, Settlement, ref NavigationType).
         /// Gdy BK odrzucil rozkaz (false) wozowi wsi stojacemu w osadzie, a pamiec drog osada -> cel ma droge ladowa - rozkaz przechodzi.
-        /// Inaczej (lordowie, karawany, woz w polu, cel naprawde bez drogi) wynik BK bez zmian - tylko liczniki.
+        /// Lordowie, karawany i inne partie: najpierw latka wysp (IslandRoads.OnRejected - partia ze statkami ladem i morzem, karawana bez
+        /// statkow do miasta osiagalnego ladem), potem liczniki. Woz w polu i cel naprawde bez drogi - wynik BK bez zmian.
         /// </summary>
-        public static void GuardPostfix(MobileParty __0, Settlement __1, ref bool __result)
+        public static void GuardPostfix(MobileParty __0, Settlement __1, ref MobileParty.NavigationType __2, ref bool __result)
         {
-            if (__result) return;                                                   // BK przepuscil - nic (ogromna wiekszosc wywolan)
+            if (__result) { IslandRoads.NoteAccepted(__0); return; }               // BK przepuscil - nic (ogromna wiekszosc wywolan; znacznik dla latki wysp)
+            Rejected(__0, __1, ref __2, true, ref __result);
+        }
+
+        /// <summary>Ten sam postfiks, gdy straznik BK nie ma parametru ref NavigationType (inna wersja BK) - bez zmiany drogi.</summary>
+        public static void GuardPostfixNoNav(MobileParty __0, Settlement __1, ref bool __result)
+        {
+            if (__result) { IslandRoads.NoteAccepted(__0); return; }
+            var nav = MobileParty.NavigationType.Default;
+            Rejected(__0, __1, ref nav, false, ref __result);
+        }
+
+        private static void Rejected(MobileParty __0, Settlement __1, ref MobileParty.NavigationType nav, bool canNav, ref bool __result)
+        {
+            // latka wysp (IslandRoads, wylacznik IslandRoadsFix) - przed liczeniem i poza zamkiem (moze wydac karawanie rozkaz zastepczy);
+            // wozy wsi zostaja dla latki ponizej
+            int how = IslandRoads.None;
+            if (__0 != null && __1 != null && !__0.IsVillager) how = IslandRoads.OnRejected(__0, __1, ref nav, canNav, ref __result);
             lock (_lock)                                                            // rozkazy AI moga isc z kilku watkow - liczniki i slowniki pod zamkiem (tylko odrzucone przez BK)
             {
                 try
@@ -150,6 +169,7 @@ namespace Armoury
                             Stand st;
                             if (!_stand.TryGetValue(party, out st) || st.At != at) { st = new Stand { At = at, First = now, Lord = lord }; _stand[party] = st; }
                             st.Last = now;
+                            st.How = how;                                                // co z tym rozkazem zrobila latka wysp (tylko log)
                         }
                         return;
                     }
@@ -296,6 +316,7 @@ namespace Armoury
             // lordowie i karawany stojacy w osadzie, ktorym BK odrzuca rozkazy (w ostatnich StandWindowDays dobach) - ile ich i najdluzej
             int standL = 0, standC = 0; double standMax = -1; string standAt = "", standKind = "";
             var standTowns = new Dictionary<string, int>();
+            var standHow = new int[5];                                                // ostatni rozkaz stojacych po latce wysp: None, ToAll, Redirect, Wait, Kept
             double nowD = CampaignTime.Now.ToDays;
             List<MobileParty> left = null;
             foreach (var kv in _stand)
@@ -305,6 +326,7 @@ namespace Armoury
                 try { stays = p != null && p.IsActive && p.CurrentSettlement == st.At && nowD - st.Last <= StandWindowDays; } catch { }
                 if (!stays) { if (left == null) left = new List<MobileParty>(); left.Add(p); continue; }
                 if (st.Lord) standL++; else standC++;
+                if (st.How >= 0 && st.How < standHow.Length) standHow[st.How]++;
                 Bump(standTowns, Name(st.At));
                 double dur = nowD - st.First;
                 if (dur > standMax) { standMax = dur; standAt = Name(st.At); standKind = st.Lord ? "lord" : "karawana"; }
@@ -326,6 +348,8 @@ namespace Armoury
               .Append("; stoja w osadzie z odrzuceniem (ostatnie ").Append(StandWindowDays.ToString("0", inv)).Append(" doby): lordow ").Append(standL).Append(", karawan ").Append(standC)
               .Append(Top(standTowns, 4))
               .Append(", najdluzej ").Append(standMax >= 0 ? standMax.ToString("0.0", inv) + " dob - " + standKind + " w " + standAt : "-")
+              .Append(" (ostatni rozkaz po latce wysp: ladem i morzem ").Append(standHow[IslandRoads.ToAll]).Append(", inny cel ").Append(standHow[IslandRoads.Redirect])
+              .Append(", czeka ").Append(standHow[IslandRoads.Wait]).Append(", bez zmian ").Append(standHow[IslandRoads.Kept]).Append(", latka nie dotyczy / wylaczona ").Append(standHow[IslandRoads.None]).Append(")")
               .Append("; wozy wsi w miastach teraz ").Append(inTown)
               .Append(" (od wczoraj lub dluzej ").Append(townsNow.Values.Sum()).Append(Top(townsNow, 4))
               .Append("; najdluzej ").Append(longest >= 0 ? longest + " dob - " + longestAt : "-").Append(")")
@@ -345,6 +369,7 @@ namespace Armoury
             Log.Info(sb.ToString());
             ClearDay();
             }
+            try { IslandRoads.Daily(); } catch (Exception e) { Stumble("IslandRoads.Daily", e); }   // linia "Wyspy i drogi:" zaraz po "Wozy w miastach:"
         }
 
         internal static void ApplyAll(Harmony h)
@@ -362,7 +387,11 @@ namespace Armoury
                              + (_move != null ? "." : ", rozkaz prosty (brak metody gry)."));
                     return;
                 }
-                h.Patch(_guard, postfix: new HarmonyMethod(typeof(CartTownExit), nameof(GuardPostfix)));
+                // trzeci parametr ref NavigationType (BK z gry: GuardSettlementMove(party, settlement, ref navigationType) - ta sama zmienna, z ktora
+                // BK wola SetMoveGoToSettlement): latka wysp moze zmienic droge na ladem i morzem; inna sygnatura - postfiks bez zmiany drogi
+                bool navRef = ps.Length >= 3 && ps[2].ParameterType == typeof(MobileParty.NavigationType).MakeByRefType();
+                h.Patch(_guard, postfix: new HarmonyMethod(typeof(CartTownExit), navRef ? nameof(GuardPostfix) : nameof(GuardPostfixNoNav)));
+                IslandRoads.NavRef = navRef;
                 _wired = true;
                 var s = Settings.Current;
                 Log.Info("CartTownExit: latka wpieta - woz wsi stojacy w osadzie wyjezdza, gdy pamiec drog osada -> cel zna droge ladowa (straznik BK odrzucal rozkazy z bram poza pamiecia drog ROT: Wickenden, Lord Hewett's Town, Acorn Hall) ("
