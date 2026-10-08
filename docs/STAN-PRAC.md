@@ -647,3 +647,8 @@ TOWARY 3 musi przy skladaniu dostac W2 85215de (zamiast 3b59c75 + 39b60a0 + plik
 
 WIOSKI v5 WGRANE 08.10 ok. 06:30: Armoury b0e62e1f (n120 + W2 8518996), dane b742f307. ZATWIERDZONY DLL OD TERAZ = b0e62e1f. TOWARY 3 przy skladaniu musi dostac W2 do 8518996.
 Drobiazg na pozniej: mlyny czesciowo za bardzo w wodzie (przesunac ok. 0.5 jedn. ku ladowi).
+
+TOWARY 3 DOKONCZONE (08.10 ok. 06:50): t3-sklad 5ccb0f5 (GitHub w-toku/towary3-sklad) = c1e8bea + 154 wyspy, 155 cena sprzedazy, 156 poprawka 144 (drob poza
+dzielnikiem koni), 157 kon najemnika z polki (+ poprawka recenzji: kwota z mnoznikiem kupujacego), 158 wraki na zlom (+ poprawka: Pick a piece na grzbiecie),
+159 CleanseAmmo nie leczy koni (+ poprawka: TroopSelfMend pomija konie), W2 v4 i v5 (8518996). DLL dll-final-3: Armoury 5a7074c0, GT 1337433c, RC 3e04b89b
+(kopia D:\Backup-Bannerlord\towary3-2026-10-08\dll-final-3). Autotest 40 dob + zdjecia w toku. Potem propozycja "wgraj" (Armoury.json: 3 klucze 127).
