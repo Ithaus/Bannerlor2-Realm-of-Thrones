@@ -705,3 +705,12 @@ OnSessionLaunched (12 624 z 12 927) + Reconcile z pulami raz na dobe. DZIURA DO 
 ochotnicy "bez zapisu" (komplet wzorca z niczego): ok. 1000-1500 na dobe na starcie, ~500 po roku - pule notabli zmienia
 cos, czego VolunteerKit nie widzi (do zbadania razem z projektem ekonomii).
 160 + 161 WGRANE 08.10 ok. 11:48 (Armoury c01a54ba, poprzedni 5a7074c0 jako Armoury.dll.bak-2026-10-08-przed-161; CHANGELOG).
+
+## DECYZJE JEFFA 08.10 ok. 11:50
+- Ekonomia (PROJEKT-EKONOMIA-OBIEG rozdz. 14.1): gracz-wasal z lennem placi koronie jak wasal AI, dwor graczowi nie; dlug wymarlego rodu na nowego pana
+  wsi - tak; zalogi AI w pokoju o polowe - tak; karczmy na start z pula starych zolnierzy - tak. Kolejnosc paczek wg rozdz. 12 (169 KSIEGA OBIEGU pierwsza).
+- **OPTYMALIZACJA GRY NA KONIEC** ("zajmiemy sie na koncu, jak juz skonczymy ja modowac"). Do zrobienia wtedy (pomiar 08.10, sekcja "08.10 POPOLUDNIE"):
+  MenPurse.OnEntered (sprzedaz nadwyzek AI + AiWear.MendInTown przegladaja zbrojownie przy kazdym z ~9600 wejsc do miast na dobe, 17 ms/klatke po roku),
+  ArmouryBehavior.OnDailyTick (1.5 s naraz raz na dobe - rozlozyc albo przyspieszyc), AiGear.OnDailyTickParty (4 ms), tik godzinny Armoury (2.6 ms),
+  smieci (sprzatania gen0: warsztaty gry 29%, MenPurse 8%, dzienny tik 6%); cudze: AI lordow (gra) x44, ROT malzenstwa NPC, warsztaty gry; kafelki druzyn pod
+  tabliczka miasta po druzynach usunietych w srodku (UI). Narzedzia: autotest -LoadSave autotest-rok-360 -Profile -Census (repo autotestu at1-autotest c5c25ce).
