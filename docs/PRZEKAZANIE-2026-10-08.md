@@ -85,3 +85,11 @@ dana faze od nowa, korzystajac z zapisanych wynikow:
   robocze (`git -C <drzewo> status`, docs/paczki/16x-*.md) - agent mogl zostawic czesciowa prace.
 - NIC z 169/170/171 nie jest wgrane. W grze: Armoury c01a54ba (160+161). Kolejnosc dalej: dokonczyc 169 -> test 40 dob -> 170 + skrypt BEE
   -ListaZFundamentu -> 171 -> scalenie po kolei -> autotest -> "wgraj".
+
+## 12. AKTUALIZACJA (08.10, po 12:40)
+- **169: rozpoznanie KOMPLETNE (3/3)** - docs/rozpoznanie-2026-10-08/paczka-169-wynik-1.md (nasz kod: ksiegi, okna, D na rod), -wynik-2.md i -wynik-3.md
+  (okna w kodzie gry oraz w BK/BEE - kolejnosc plikow = kolejnosc ukonczenia, naglowek w pliku mowi, ktory to raport). Workflow przeszedl do projektu
+  (specyfikacja ma powstac w drzewie obieg169: docs/paczki/169-ksiega-obiegu.md - w chwili zapisu jeszcze jej nie ma, drzewo bez zmian).
+  Nowe konto: przy przerwaniu zaczyna od fazy PROJEKT, dajac projektantowi te 3 pliki jako wyniki rozpoznania (prompt projektanta w skrypcie workflow 169).
+- **170 i 171:** rozpoznanie w toku, brak gotowych wynikow; drzewa bez zmian. Nowe konto: zaczyna od ROZPOZNANIA (prompty w skryptach workflow).
+- Zapis automatyczny wynikow (co 2 min, commit + push + kopia D:) dziala do konca sesji.
