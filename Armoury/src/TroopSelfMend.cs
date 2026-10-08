@@ -46,7 +46,8 @@ namespace Armoury
         private static bool Mendable(ItemRosterElement el)
         {
             var mod = el.EquipmentElement.ItemModifier;
-            return el.Amount > 0 && el.EquipmentElement.Item != null && mod != null && mod.PriceMultiplier < 1f && !LootPrices.IsWreck(mod);   // wpis 97
+            return el.Amount > 0 && el.EquipmentElement.Item != null && mod != null && mod.PriceMultiplier < 1f && !LootPrices.IsWreck(mod)   // wpis 97
+                   && !ArmouryBehavior.IsBeast(el.EquipmentElement.Item);   // poprawka po recenzji 159: kon i zwierze zachowuja stan - kowal nie "leczy" kulawego konia (RBM lame_horse 0.5)
         }
 
         /// <summary>Ile kosztowalyby wszystkie zalegle naprawy (bez wrakow) - tyle ludzie trzymaja w sakiewce.</summary>
@@ -227,6 +228,7 @@ namespace Armoury
                     if (el.Amount <= 0 || mod == null || mod.PriceMultiplier >= 1f) continue;
                     if (LootPrices.IsWreck(mod)) continue;   // audyt pelny K2: wrak - tylko kowal z materialem albo przetop
                     if (el.EquipmentElement.Item == null) continue;
+                    if (ArmouryBehavior.IsBeast(el.EquipmentElement.Item)) continue;   // poprawka po recenzji 159: kon i zwierze zachowuja stan
                     worn.Add(el);
                 }
                 if (worn.Count == 0) return;

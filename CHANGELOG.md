@@ -1,5 +1,16 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-08 (159, poprawka po recenzji dokonczenia TOWARY 3) - KULAWY KON NIE ZDROWIEJE TAKZE U KOWALI MIASTA: naprawy ludzi gracza (TroopSelfMend) pomijaja konie i zwierzeta - przy wylaczonym Mend Material Men And Lords kowale "leczyli" kulawego konia w zbrojowni wojska za monete
+**Mod:** Armoury | **Pliki:** `TroopSelfMend.cs` (`Mendable` - takze `OutstandingCost` i `Hourly`; petla `Run`). Bez nowych ustawien, bez zapisu w grze.
+
+**Problem (recenzja dokonczenia 08.10; dowod - modyfikatory z gry i proba lawy, NOWA sekcja 19b):** opis 159 i WYNIK zakladaly, ze `lame_horse` ma cene 0.1 (Native), wiec od 158 jest "wrakiem" i `TroopSelfMend` bez materialu go nie rusza. W grze RBM nadpisuje `lame_horse`: `Modules\RBM\ModuleData\RBMCombat_item_modifiers.xml` - price_factor **0.5** (Native 0.1). Kulawy kon 0.5 nie jest wrakiem, nie ma tez filtra konia w `TroopSelfMend.Mendable` / `Run`: przy `MendMaterialMenAndLords` = false (albo `SmithMendFromMarket` = false) kowale miasta odnawiali kulawego konia w zbrojowni wojska za 1/4 utraconej wartosci z sakiewki ludzi (proba: kon wart 900, kulawy 0.5 - zdrowy za 112 zl; kulawy kon kupiony tanio i "wyleczony" u kowala = ten sam zarobek z niczego, ktory 159 zamknal w `CleanseAmmo`). Przy domyslnych ustawieniach (naprawy z materialem) kon nie ma receptury kowala i nie byl naprawiany - luka tylko za wylacznikiem. Inne drogi kowali (lawa, "Pick a piece", polki wojska, uprzaz - `NoWear` w `SmithMenu.IsBattleWorn`; AI - `AiWear` pomija konie; kwatermistrz - brak receptury) koni nie ruszaja.
+
+**Zmiana:** `TroopSelfMend.Mendable` i petla `Run` pomijaja `ArmouryBehavior.IsBeast` (kon, mul, wielblad, zwierze) - ta sama regula co `CleanseAmmo` (159) i `NoWear` na lawie. Amunicja i reszta sprzetu - jak dotad. Sprostowanie opisu 159 i WYNIK: "lame_horse 0.1 = wrak" dotyczy tylko Native; w grze (RBM) 0.5.
+
+**Proba (kopia proby lawy, sekcja 19b: zbrojownia wojska z kulawym koniem 0.5 i zbitym mieczem, sakiewka ludzi 5000, godzina w town_a, naprawy bez materialu):** PRZED 149 z 150 (kon "wyleczony", sakiewka -120 = 112 za konia + 8 za miecz); PO **150 z 150** - kon zostaje kulawy, miecz naprawiony za 8, sakiewka -8 = kasa +8.
+
+**Ryzyko / co sprawdzic:** `OutstandingCost` (rezerwa sakiewki ludzi) nie liczy juz koni - rezerwa mniejsza o ich "naprawe" (tylko przy wylaczonych naprawach z materialem). Przy domyslnych ustawieniach bez zmian w grze.
+
 ## 2026-10-08 (158, poprawka po recenzji dokonczenia TOWARY 3) - WRAKI NA ZLOM TAKZE W "PICK A PIECE" NA GRZBIECIE: sztuka zalozona, zuzyta w ksiedze do 10% lub mniej, jest wrakiem na kazdej drodze kowali miasta (dotad "Pick a piece" ja odnawial, a "Mend everything you wear" odmawial)
 **Mod:** Armoury | **Pliki:** `SmithMenu.cs` (NOWE `SmithRefusesHere`: `AskHowToMend`, `DoMendOne`, podpowiedz `SmithLine` dla sztuk [EQUIPPED]), `ArmouryBehavior.cs` (NOWE `SlotWreck`). Bez nowych ustawien, bez zapisu w grze.
 
