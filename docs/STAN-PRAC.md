@@ -672,3 +672,27 @@ konnych x1.5 (MountedWageFactor; historycznie x2 dla tej samej sluzby, ale gra p
 nie rozroznial konnych. t3-sklad 2bde2bf (w-toku/towary3-sklad), Armoury 2664b691 (dll-final-4, kopia D:\Backup-Bannerlord\towary3-2026-10-08\dll-final-4).
 Opis docs/paczki/w-toku/160-kon-wlasnoscia-zolnierza.md. Wgranie na "wgraj" (GT, RC bez zmian). Uwaga recenzji: zysk lordow tylko na starcie, potem jazda kosztuje
 tyle co w T3 - pilnowac Banku w dlugim tescie.
+
+## 08.10 POPOLUDNIE: TEST ROCZNY, ZAPISY, ZWALNIANIE
+
+Test roczny T3 (364 doby, OK; zapisy Jeffa i DLL w porzadku). Zloto rodow 62.3 -> 116.6 mln, rodow < 5000 zl 1 -> 46,
+wojsko ~100 tys. od doby 30, doba gry 11.7 s -> ~24 s, zapis 19.6 -> 31.5 MB. Projekt ekonomii (workflow wp16zd75l):
+docs/PROJEKT-EKONOMIA-OBIEG-2026-10-08.md (nieprzesledzony w repo), 4 pytania do Jeffa w rozdz. 0/14.
+
+ZAPISY USZKODZONE (P0): plik zapisu trzyma dlugosc napisu na 2 bajtach; napis > 32767 B psuje wczytanie calego zapisu.
+Nasze SyncData: RecruitKit (komplety rekrutow) 150-220 KB w save034-039 Jeffa -> TE ZAPISY SIE NIE WCZYTAJA bez latki;
+po roku RecruitKit 2.9 MB (12 927 kompletow u 2760 notabli), AiWear 1.8 MB (33 006 wpisow, 631 druzyn), OutlawLaw 150 KB.
+Paczka 161 (galaz w-toku/161-zapis, 1b20d5b na 160): SaveText.Sync (19 kluczy w kawalkach po 8000 znakow, klucz+"_parts")
++ ratunek przy wczytaniu (transpiler na ArchiveDeserializer.LoadFrom). Ratunek sprawdzony w grze: zapis z doby 360 wczytany.
+Narzedzie poza gra: autotest repo tools/zapis/napisy.py (ktore napisy > 32767 B).
+
+ZWALNIANIE (pomiar klatki AT3, autotest repo a3cd214): klatka 39 ms (nowa kampania, doby 1-8) -> 176 ms (doby 360-372),
+raz na dobe przyciecie 2-2.8 s. Wg modow po roku: gra 55 ms, silnik (ruch, czekanie na watki) 46, Armoury 36 (x11 wobec
+startu), ROT 13, BK 10.5, StrategicCampaignAI 6. Armoury: MenPurse.OnEntered 17 ms (x17; 9600 wejsc/dobe; sprzedaz nadwyzek
+i naprawy AI przegladaja zbrojownie), ArmouryBehavior.OnDailyTick 1.5 s naraz (x10), AiGear.OnDailyTickParty 4 ms (x16),
+tik godzinny 2.6 ms. Gra: AiMilitaryBehavior x44, werbunek x7; ROT malzenstwa x2.4. Druzyn 2071 -> 6213 (majatki BK 1390
+od doby 4, karawany 324 -> 1037, bandyci 647 -> 1137, lordowie -> 654). "Widly" pod The Eyrie = kafelki druzyn w osadzie
+(moneta karawana, widly ani lord ani karawana); w srodku bylo 7 - kafelki zostaja po druzynach usunietych w miescie (UI).
+Probkowanie stosu (Thread.Suspend) ZAWIESILO gre - usuniete. Autotest zamyka gre 4 s po zapisie koncowym (do poprawy).
+DO ZROBIENIA: 161 sprawdzic (zapis w kawalkach, ponowne wczytanie) -> "wgraj"; RecruitKit sprzatanie (komplety ochotnikow,
+ktorych nie ma w puli; zmarli notable); przyspieszenie MenPurse/AiWear/dziennego tiku Armoury (pomiar sekcjami wewnatrz).
