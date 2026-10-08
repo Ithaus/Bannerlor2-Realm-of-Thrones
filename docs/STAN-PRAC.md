@@ -382,6 +382,12 @@ narzedzia rozpoznal wszystkie linie. Grupa 1: OK 61, UWAGA 5; grupa 2: OK 31, UW
   (workflow v3 zatrzymany); przy niej pamietac (Jeff): "nie wszyscy ludzie zyja w wioskach - sa ludzie w miastach, podrozni, w samotniach,
   klasztorach itp." - liczba wiosek tylko z ludzi mieszkajacych we wsiach (udzial wedlug regionu: osadnictwo skupione vs rozproszone, zagrody,
   klasztory / septy, pustelnie, mlyny, karczmy, podrozni, ludzie w lesie z ksiegi).
+  STAN 07.10 17:50: paczka W2 (galaz w2-wioski-2200 3b59c75 na n120, MapVillagesView.cs) + dane wedlug ludnosci (agenci zrobili od razu warianty
+  4000 / 6000 / 8000 ludzi na wioske: 2449 / 1840 / 1459 wiosek; wybrany 4000 - najblizej "2200"; pliki D:\Backup-Bannerlord\wioski-2026-10-07).
+  AUTOTEST 17:40 (20 dob, OK, DLL Jeffa przywrocone 25b87631, zapisy nietkniete): plik wczytany (2449 w 422 okregach, 0 odrzuconych), ogien
+  przy rabunkach dziala (18 ogni w wioski.log), 0 potkniec, ALE postawione 0 - "brak siatek" (wzory wsi-matek 0 dobrych, 128 bez wzoru) - kod nie
+  znajduje modeli domow wsi ROT. Poprawka w toku (workflow wioski-brak-siatek), potem krotki autotest i wgranie (Jeff: "wgraj"). Plik
+  arm_map_villages.tsv (4000) lezy juz w Modules\Armoury\ModuleData (stary DLL go nie czyta).
 - CENA SPRZEDAZY SPRZETU (07.10 ok. 15:20; projekt docs/PROJEKT-CENA-SPRZEDAZY-SPRZETU-2026-10-07.md): (1) "tak, jesli to poprawia realizm ekonomii" -
   wgrac razem z 127 (kara BK x5 RAZ zamiast x25, podloga 2% od wartosci ZE STANEM); (2) "tak" - sufit: kupiec nie da wiecej niz 1/10 ceny nowej sztuki
   na tej polce; (3) "tak" - handel odnowionym sprzetem miedzy miastami zostaje. Paczka w toku (workflow cena-sprzedazy-paczka, galaz w127b-cena-sprzedazy),
