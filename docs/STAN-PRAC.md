@@ -652,3 +652,13 @@ TOWARY 3 DOKONCZONE (08.10 ok. 06:50): t3-sklad 5ccb0f5 (GitHub w-toku/towary3-s
 dzielnikiem koni), 157 kon najemnika z polki (+ poprawka recenzji: kwota z mnoznikiem kupujacego), 158 wraki na zlom (+ poprawka: Pick a piece na grzbiecie),
 159 CleanseAmmo nie leczy koni (+ poprawka: TroopSelfMend pomija konie), W2 v4 i v5 (8518996). DLL dll-final-3: Armoury 5a7074c0, GT 1337433c, RC 3e04b89b
 (kopia D:\Backup-Bannerlord\towary3-2026-10-08\dll-final-3). Autotest 40 dob + zdjecia w toku. Potem propozycja "wgraj" (Armoury.json: 3 klucze 127).
+
+DECYZJA JEFFA 08.10 ok. 08:00 (kon najemnika): "po co mam placic za konia - albo najemnik ma konia, wtedy jest konny, albo przychodzi bez konia, wtedy
+pieszy; jak ma konia, to chce wiekszy zold" + "skad bierze tego konia, system zamkniety, zeby konie nie pojawialy sie magicznie". -> paczka 160 w toku
+(werbunek bez doplaty za konia, konni z wiekszym zoldem - historycznie ok. x2); ZRODLO konia i calego najemnika = krok "WETERANI" (najemnicy w karczmie
+tylko z prawdziwych ludzi: zwolnieni z wojska, niedobitki, dezerterzy, wypuszczeni jency - z bronia, zbroja i koniem, ktore mieli) - zaprojektowac
+zaraz po 160 (dzis karczma rodzi najemnika z niczego - jak w grze).
+TABELA RODOW I KAS OSAD po autotescie T3 (strona dla Jeffa): https://claude.ai/artifact/XtGSMM926wzopigdJWBHNY . ZNALEZISKO: "regulator kasy"
+(GetTownGoldChange czynnego modelu gry / BK) kasuje srednio ok. 196 tys. zl na dobe z kas miast i ok. 132 tys. z kas zamkow (doby 2-39; doba 1
+jednorazowo -2.64 mln) - zloto znika z gry; kasy miast 17.0 mln -> 7.84 mln w 40 dob (tak samo w testach bez T3). Do zbadania i uszczelnienia
+(np. nadwyzka ponad cel idzie do pana / na rynek zamiast w nicosc).
