@@ -463,7 +463,8 @@ namespace CrashScribe
                          && ty != ItemObject.ItemTypeEnum.Horse && ty != ItemObject.ItemTypeEnum.HorseHarness)
                 {
                     int t = (int)Math.Round((g - 1) * _wpnStep);
-                    if (t > d) d = t;
+                    if (Mends.ExactTierWeapon(ty)) d = t;   // 09.10: bron biala, tarcze, rzucana - wymog dokladnie z tieru (jak WeaponTierLaw)
+                    else if (t > d) d = t;
                 }
             }
             catch { }
