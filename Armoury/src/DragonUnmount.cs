@@ -23,13 +23,22 @@ namespace Armoury
         /// zeby nie zalac logu przy kazdym spawnie kazdej bitwy.</summary>
         private static int _floorLog;
 
+        // Z16 E8: licznik linii logu zamian w zestawie zaciagu ROT (pierwsze 20 na sesje) i wlasciwosc z prywatnym setterem
+        private static int _e8Log;
+        private static System.Reflection.PropertyInfo _pMissionEq;
+
         internal static void ApplyAll(Harmony harmony)
         {
             try
             {
                 var m = AccessTools.Method(typeof(Mission), "SpawnAgent");
                 if (m == null) { Log.Info("DragonUnmount: nie znalazlem Mission.SpawnAgent - patch spi."); return; }
-                harmony.Patch(m, prefix: new HarmonyMethod(typeof(DragonUnmount), "StripDragonMount"));
+                // Z16 (E8): Priority.Low - ten prefiks ma isc PO prefiksach, ktore wydaja sprzet przy spawnie (ROT
+                // EnlistmentPatches.patch24 - zestaw zaciagu, DTE SpawnAgentPatch). Dotad tak bylo tylko dzieki kolejnosci
+                // wpinania (ROT i DTE w OnSubModuleLoad, my w OnBeforeInitialModuleScreenSetAsRoot) - teraz wprost.
+                var pre = new HarmonyMethod(typeof(DragonUnmount), "StripDragonMount");
+                pre.priority = Priority.Low;
+                harmony.Patch(m, prefix: pre);
                 Log.Info("DragonUnmount: smoki schodza ze slotu konia przed spawnem.");
             }
             catch (Exception e) { Log.Error("DragonUnmount.ApplyAll", e); }
@@ -175,6 +184,43 @@ namespace Armoury
                     }
                     else if (soldier != null && soldier.IsHero)
                     {
+                        // Z16 E8 (Jeff 09.10): ZACIAG ROT - w sluzbie lorda bohater klanu gracza dostaje na bitwe zestaw
+                        // jednostki swojej rangi (ROT EnlistmentPatches.patch24: AgentOverridenEquipment + gotowe
+                        // AgentOverridenSpawnMissionEquipment). Sztuka WYDANA (inna niz jego wlasna w tym slocie), ktorej
+                        // bohater nie udzwignie (ItemReq.MeetsHero: pancerz - Atletyka, bron - jej umiejetnosc, strzaly - Luk,
+                        // belty - Kusza), wraca na JEGO WLASNA z tego slotu. Wlasne sztuki - bez sita (NOSZENIE, decyzja 3).
+                        // Tylko tam, gdzie ROT wydaje zestaw: bohater klanu gracza, bitwa w polu / oblezenie / wypad, gotowa bron
+                        // agenta (AgentOverridenSpawnMissionEquipment - poza ROT ustawia ja tylko misja fabularna NavalDLC). Turnieje,
+                        // areny, bijatyki i pojedynki ROT (wlasny zestaw) - bez zmian.
+                        var w0 = new ItemObject[4];
+                        for (int slot = 0; slot < 4; slot++) w0[slot] = eq[(EquipmentIndex)slot].Item;
+                        var ownEq = soldier.HeroObject != null ? soldier.HeroObject.BattleEquipment : null;
+                        bool enlistKit = false;
+                        try
+                        {
+                            var mis = Mission.Current;
+                            enlistKit = ownEq != null && agentBuildData.AgentOverridenSpawnMissionEquipment != null
+                                && soldier.HeroObject.Clan != null && soldier.HeroObject.Clan == TaleWorlds.CampaignSystem.Clan.PlayerClan
+                                && mis != null && (mis.IsFieldBattle || mis.IsSiegeBattle || mis.IsSallyOutBattle);
+                        }
+                        catch { enlistKit = false; }
+                        if (enlistKit && Settings.Current != null && Settings.Current.HeroGearRequirements)
+                        {
+                            for (int slot = 0; slot <= 9; slot++)
+                            {
+                                if (slot == 4) continue;                       // sztandar
+                                var it = eq[(EquipmentIndex)slot].Item;
+                                if (it == null) continue;
+                                var mine = ownEq[(EquipmentIndex)slot];
+                                if (mine.Item == it) continue;
+                                string whyNot;
+                                if (ItemReq.MeetsHero(soldier, it, out whyNot)) continue;
+                                eq[(EquipmentIndex)slot] = mine;
+                                if (_e8Log++ < 20)
+                                    Log.Info("Z16: zaciag - bohater " + soldier.StringId + " nie udzwignie wydanego " + it.StringId
+                                             + " (" + whyNot + ") - bierze swoj " + (mine.Item != null ? mine.Item.StringId : "pusty slot") + ".");
+                            }
+                        }
                         // GEOGRAFIA WIERZCHOWCOW u bohatera (gracz tez): lord Polnocy
                         // nie wjezdza w bitwe na wielbladzie ani mamucie
                         var hm = eq[(EquipmentIndex)10].Item;
@@ -265,6 +311,23 @@ namespace Armoury
                             if (_floorLog++ < 20)
                                 Log.Info("ItemReq: bohater " + soldier.StringId + " nie udzwignie " + hm2.StringId
                                          + " (Riding) - " + (htop2 != null ? "dostaje " + htop2.StringId : "idzie pieszo") + ".");
+                        }
+                        // Z16 E8: ROT buduje bron agenta (AgentOverridenSpawnMissionEquipment) z zestawu PRZED nami - gra bierze
+                        // bron z niej, nie ze slotow 0-3 (Mission.SpawnAgent: InitializeMissionEquipment). Gdy w zestawie zaciagu
+                        // sloty broni sie zmienily (sito zaciagu albo podmiany wyzej), bron przebudowana z poprawionego zestawu -
+                        // tak samo jak robi to ROT (new MissionEquipment(zestaw, AgentBanner)); poza zaciagiem - bez zmian.
+                        bool wChanged = false;
+                        for (int slot = 0; slot < 4; slot++) if (eq[(EquipmentIndex)slot].Item != w0[slot]) wChanged = true;
+                        if (enlistKit && wChanged && agentBuildData.AgentOverridenSpawnMissionEquipment != null)
+                        {
+                            try
+                            {
+                                if (_pMissionEq == null)
+                                    _pMissionEq = AccessTools.Property(typeof(AgentBuildData), "AgentOverridenSpawnMissionEquipment");
+                                if (_pMissionEq != null)
+                                    _pMissionEq.SetValue(agentBuildData, new MissionEquipment(eq, agentBuildData.AgentBanner));
+                            }
+                            catch (Exception e8) { if (_e8Log++ < 20) Log.Error("DragonUnmount.E8 MissionEquipment", e8); }
                         }
                     }
                 }

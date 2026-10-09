@@ -54,6 +54,7 @@ namespace Armoury
             }
             catch (Exception e) { Log.Error("HeroGear.ApplyAll(ItemMenuVM)", e); }
             ApplySpoils(h);
+            ApplyGank(h);
         }
 
         /// <summary>Sztuka, ktorej wymog pilnuje tylko nasza regula (gra nie ma dla niej RelevantSkill): pancerz bez ladr,
@@ -230,6 +231,75 @@ namespace Armoury
                 _spoilsUpgrades++;
             }
             catch (Exception e) { Log.Error("HeroGear.SpoilsPostfix", e); }
+        }
+
+        // ---------------------------------------------------------------- Z16-4: ROT - bron zabrana jencowi
+        // ROT (ROT.CampaignBehaviors.ROTGankBehavior.TakeWeapon :109-138): gracz zabiera pojmanemu bohaterowi legendarna bron,
+        // a jeniec dostaje w ten slot losowa bron tego typu z GetRandomItem (:196-275, kultura jenca albo neutralna, potem
+        // dowolna) - bez patrzenia na umiejetnosc. POSTFIKS (metoda wola sama siebie z anyCulture - postfiks idzie po obu):
+        // gdy wylosowanej jeniec nie udzwignie (ItemReq.MeetsHero) - najlepsza bron tego typu, ktora udzwignie (tier, potem
+        // wartosc), z tych samych zrodel co ROT (kultura jenca albo neutralna, potem dowolna; bez listy broni specjalnych ROT
+        // i skradzionych, bez unikatow i legend). Gdy zadnej nie udzwignie - zostaje wylosowana (lorda nie rozbrajamy).
+        private static System.Reflection.FieldInfo _fGankSpecial, _fGankStolen;
+
+        private static void ApplyGank(Harmony h)
+        {
+            try
+            {
+                var t = AccessTools.TypeByName("ROT.CampaignBehaviors.ROTGankBehavior");
+                if (t == null) { Log.Info("Z16: ROTGankBehavior nieobecny - zamiennik broni jenca bez zmian."); return; }
+                var m = AccessTools.Method(t, "GetRandomItem");
+                var ps = m != null ? m.GetParameters() : null;
+                if (m == null || ps.Length < 2 || ps[0].ParameterType != typeof(CharacterObject)
+                    || ps[1].ParameterType != typeof(ItemObject.ItemTypeEnum) || m.ReturnType != typeof(EquipmentElement))
+                {
+                    Log.Info("Z16: ROTGankBehavior.GetRandomItem - inna sygnatura niz w ROT 8.1.8, sito zamiennika broni jenca spi.");
+                    return;
+                }
+                _fGankSpecial = AccessTools.Field(t, "_specialWeapons");
+                _fGankStolen = AccessTools.Field(t, "_stolenItems");
+                h.Patch(m, postfix: new HarmonyMethod(typeof(HeroGear), nameof(GankPostfix)));
+                Log.Info("Z16: ROT - jeniec, ktoremu zabierzesz legendarna bron, dostaje zamiennik w granicy swojej umiejetnosci.");
+            }
+            catch (Exception e) { Log.Error("HeroGear.ApplyGank", e); }
+        }
+
+        public static void GankPostfix(object __instance, CharacterObject __0, ItemObject.ItemTypeEnum __1, ref EquipmentElement __result)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || !s.HeroGearRequirements || __0 == null) return;
+                var got = __result.Item;
+                if (got == null || ItemReq.MeetsHero(__0, got)) return;
+                var special = _fGankSpecial != null ? _fGankSpecial.GetValue(__instance) as List<string> : null;
+                var stolen = _fGankStolen != null ? _fGankStolen.GetValue(__instance) as List<ItemObject> : null;
+                ItemObject best = BestGankItem(__0, __1, special, stolen, false) ?? BestGankItem(__0, __1, special, stolen, true);
+                if (best == null)
+                {
+                    Log.Info("Z16: ROT - jeniec " + __0.StringId + " nie udzwignie " + got.StringId + ", a lzejszej broni tego typu brak - zostaje przy niej.");
+                    return;
+                }
+                Log.Info("Z16: ROT - jeniec " + __0.StringId + " nie udzwignie " + got.StringId + " - dostaje " + best.StringId + ".");
+                __result = new EquipmentElement(best);
+            }
+            catch (Exception e) { Log.Error("HeroGear.GankPostfix", e); }
+        }
+
+        private static ItemObject BestGankItem(CharacterObject ch, ItemObject.ItemTypeEnum type, List<string> special, List<ItemObject> stolen, bool anyCulture)
+        {
+            ItemObject best = null;
+            foreach (var it in MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
+            {
+                if (it == null || it.ItemType != type || it.Culture == null || it.StringId == null) continue;
+                if (!anyCulture && it.Culture != ch.Culture && it.Culture.StringId != "neutral_culture") continue;
+                if (special != null && special.Contains(it.StringId)) continue;
+                if (stolen != null && stolen.Contains(it)) continue;
+                if (UniqueGear.Is(it) || LegendaryLaw.IsLegend(it)) continue;
+                if (!ItemReq.MeetsHero(ch, it)) continue;
+                if (best == null || it.Tier > best.Tier || (it.Tier == best.Tier && it.Value > best.Value)) best = it;
+            }
+            return best;
         }
 
         /// <summary>Samotest przy wczytaniu (plan testu Z16 pkt 4): 500 losowych par (bohater, sztuka z wymogiem) -
