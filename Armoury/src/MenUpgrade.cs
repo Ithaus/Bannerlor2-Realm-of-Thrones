@@ -24,6 +24,10 @@ namespace Armoury
     ///    kasa pusta - zostaje w zbrojowni jako zapas (pojdzie z nadwyzkami).
     ///  - sklad8-p (przeglad sklad8, uwaga 1): zakup z polki jak zakupy brakow (AiGear) - w miescie zostawia ostatnia sztuke pasma zbroi
     ///    (ShopReserve, 174b.4), liczy sie w popycie koszyka reguly zlomu (ArmsScrap, tylko AI) i w linii M2 "ZakupyAI wedlug kupujacego" (Measure174b).
+    ///  - sklad8-s S4 (MenUpgradeAmmoNeedsSurplus): strzaly i belty tylko na WYZSZY tier (sila = Effectiveness przepuszczala nizszy - 41% wymian
+    ///    amunicji w sklad8 schodzilo o tier) i tylko z koszyka bez braku na polce (SupplyDemand.Factor <= 1: cena nie wyzsza od wartosci) -
+    ///    zolnierz z pelnym kolczanem nie zabiera ostatnich snopow tym, ktorzy nie maja zadnego (zakupy brakow AiGear, notable dla ochotnikow).
+    ///    Jedna regula dla ludzi gracza, lordow i zalog; reszta sprzetu bez zmian.
     /// </summary>
     internal static class MenUpgrade
     {
@@ -38,6 +42,9 @@ namespace Armoury
         // K1 (przeglad): obrot w kolko - ta sama partia kupila i sprzedala sztuke tego samego id tej samej doby (autotest: 0)
         private static readonly HashSet<string> _boughtToday = new HashSet<string>(), _soldToday = new HashSet<string>();
         private static int _dChurn, _dWaitCart;   // poprawki sklad7: zamki bez wymiany do dostawy wozu z dozbrajaniem
+        // sklad8-s S4: amunicja - wymiany w gore / w dol lub ten sam tier (przy wylaczonym MenUpgradeAmmoNeedsSurplus), koszyki odrzucone: lepszy tylko
+        // nizszego lub tego samego tieru, lepszy tylko z koszyka z brakiem na polce (tylko log)
+        private static int _dAmmoUp, _dAmmoDown, _dAmmoLowTier, _dAmmoShort;
         private static readonly List<string> _churnIds = new List<string>();
 
         internal static void Reset()
@@ -51,6 +58,14 @@ namespace Armoury
             _dPlayerN = _dLordN = _dGarN = _dSold = _dKept = _dNoBetter = _dNoMoney = _dNoLift = _dHeld = _dGarWageN = _dGarGapN = _dBattleArmory = _dBattleTemplate = _dGarEmptyN = 0;
             _dPlayerGold = _dLordGold = _dGarGold = _dSoldGold = _dSaved = _dOverCap = _dGarWage = _dGarGapGold = _dGarEmptyGold = 0;
             _boughtToday.Clear(); _soldToday.Clear(); _dChurn = 0; _churnIds.Clear(); _dTempSlots = 0; _dBareSlots = 0; _dNoEmerg = 0; _dNothing = 0; _dLordLent = 0; _dWaitCart = 0;
+            _dAmmoUp = _dAmmoDown = _dAmmoLowTier = _dAmmoShort = 0;
+        }
+
+        /// <summary>sklad8-s S4: strzaly i belty - wymiana tylko na wyzszy tier i tylko z nadwyzki polki (wylacznik MenUpgradeAmmoNeedsSurplus).</summary>
+        private static bool AmmoRule(ItemObject.ItemTypeEnum t)
+        {
+            var s = Settings.Current;
+            return s != null && s.MenUpgradeAmmoNeedsSurplus && (t == ItemObject.ItemTypeEnum.Arrows || t == ItemObject.ItemTypeEnum.Bolts);
         }
 
         /// <summary>K1 (przeglad): zakup (buy=true) albo sprzedaz sztuki przez ludzi partii - licznik "kupione i sprzedane te same id tej
@@ -136,6 +151,9 @@ namespace Armoury
                              + "; zalogi w bitwie ze zbrojowni " + _dBattleArmory + " / we wzorcu " + _dBattleTemplate + " (sloty z wzorca jako tymczasowe " + _dTempSlots
                              + ", sloty wzorca bez sztuki - walcza bez " + _dBareSlots + ", bez zestawu awaryjnego DTE " + _dNoEmerg + ", bez pokrycia w zbrojowni zatrzymane " + _dNothing + ")"
                              + "; sloty lordow AI z niczego tylko na bitwe (nie wracaja do zbrojowni) " + _dLordLent
+                             + "; amunicja (sklad8-s S4, " + (Settings.Current != null && Settings.Current.MenUpgradeAmmoNeedsSurplus ? "tylko wyzszy tier i z nadwyzki" : "WYLACZONE - jak reszta sprzetu")
+                             + "): wymiany w gore " + _dAmmoUp + ", w dol lub ten sam tier " + _dAmmoDown + ", koszyki bez wymiany - lepszy tylko nizszego lub tego samego tieru " + _dAmmoLowTier
+                             + ", lepszy tylko w koszyku z brakiem na polce " + _dAmmoShort
                              + "; kupione i sprzedane te same id tej samej doby " + _dChurn + (_churnIds.Count > 0 ? " (" + string.Join(", ", _churnIds.ToArray()) + ")" : "")
                              + "; miasta bez zbroi korpusu t3+ na polce " + bare + " z " + towns + ".");
                 }
@@ -357,7 +375,7 @@ namespace Armoury
 
         // ------------------------------------------------------------ silnik
         private sealed class Cand { public ItemObject.ItemTypeEnum Type; public int Order; public SwapMath.Slot Slot; public CharacterObject Troop; public int Ceil; }
-        private sealed class Ware { public Settlement Shop; public EquipmentElement El; public int Price, Left, Tier; public long Power; public bool HasCls; public WeaponClass Cls; }
+        private sealed class Ware { public Settlement Shop; public EquipmentElement El; public int Price, Left, Tier; public long Power; public bool HasCls; public WeaponClass Cls; public float Fac = -1f; }   // Fac: sklad8-s S4, mnoznik polki koszyka (-1 = do policzenia)
         private sealed class Visit { public int N, Gold, Sold, SoldGold, Kept, Carted, CartGold; public List<string> Lines = new List<string>(); public List<string> Names = new List<string>(); }
 
         /// <summary>sklad7: cartFrom/cart - zaloga zamku kupujaca w miescie handlowym: sztuka z polki tego miasta idzie do zamowienia wozem (GarrisonCarts,
@@ -409,7 +427,7 @@ namespace Armoury
                     var w = Pick(c, oldP, oldEl, oldSell, gain, budget, wares, mp, shop1, shop2, player, out why, out heldAt);
                     if (w == null)
                     {
-                        if (k == 0) { if (why == 1) _dNoLift++; else if (why == 2) _dNoMoney++; else if (why == 3) _dHeld++; else _dNoBetter++; }
+                        if (k == 0) { if (why == 1) _dNoLift++; else if (why == 2) _dNoMoney++; else if (why == 3) _dHeld++; else if (why == 4) _dAmmoShort++; else { _dNoBetter++; if (why == 5) _dAmmoLowTier++; } }   // sklad8-s S4: 4 i 5
                         // sklad8-p (uwaga 1): rezerwa kramu 174b.4 - lepsza sztuka zostala na straganie (licznik "zatrzymane" linii M2, jak AiGear i notable:
                         // gdy wybor nic nie dal, a choc jeden kandydat odpadl na rezerwie)
                         if (heldAt != null) Measure174b.NoteHeld(BuyerOf(mp, player, heldAt, cart != null && heldAt == cartFrom), 1);
@@ -432,6 +450,7 @@ namespace Armoury
                     if (!player) ArmsScrap.NoteBuy(w.Shop, w.El.Item, 1);
                     Measure174b.NoteBuy(BuyerOf(mp, player, w.Shop, byCart), w.El.Item, 1, paid);
                     v.N++; v.Gold += paid;
+                    if (c.Type == ItemObject.ItemTypeEnum.Arrows || c.Type == ItemObject.ItemTypeEnum.Bolts) { if (w.Tier > oldP.Tier) _dAmmoUp++; else _dAmmoDown++; }   // sklad8-s S4 (tylko log)
                     // ceny hurtu (Jeff 09.10 08:00): kazda sztuka po swojej cenie - po zdjeciu sztuki ceny towaru tej polki w tym koszyku, w koszyku
                     // tier nizej (substytucja - sklad8-p) i w tej kategorii licz od nowa (Pick wycenia je przy nastepnym wyborze). Dotad od nowa tylko
                     // kupiona sztuka - inna sztuka tego koszyka szla po cenie sprzed zakupu (polka wieksza o kupione sztuki).
@@ -475,10 +494,10 @@ namespace Armoury
             foreach (var list in cache.Values)
                 foreach (var w in list)
                 {
-                    if (w.Price < 0 || w.Shop != shop) continue;
+                    if ((w.Price < 0 && w.Fac < 0f) || w.Shop != shop) continue;
                     var it = w.El.Item;
                     if (it == null) continue;
-                    if (it.ItemCategory == changed.ItemCategory || (it.ItemType == changed.ItemType && (w.Tier == t || w.Tier == t - 1))) w.Price = -1;
+                    if (it.ItemCategory == changed.ItemCategory || (it.ItemType == changed.ItemType && (w.Tier == t || w.Tier == t - 1))) { w.Price = -1; w.Fac = -1f; }   // sklad8-s S4: mnoznik polki koszyka tez od nowa
                 }
         }
 
@@ -500,12 +519,14 @@ namespace Armoury
 
         /// <summary>Najlepsza sztuka z polki dla tego slotu: najpierw shop1 (zamek: polka zamku), potem shop2. why: 0 brak lepszej,
         /// 1 nikt nie udzwignie, 2 za malo w sakiewce, 3 (sklad8-p) lepsza sztuka do udzwigniecia jest, ale to ostatnia sztuka pasma zbroi
-        /// w rezerwie kramu (174b.4; heldAt - targ, na ktorym zostala).</summary>
+        /// w rezerwie kramu (174b.4; heldAt - targ, na ktorym zostala); sklad8-s S4 (amunicja przy MenUpgradeAmmoNeedsSurplus): 4 lepszy kolczan do udzwigniecia
+        /// jest tylko w koszyku z brakiem na polce, 5 wyraznie lepszy jest tylko nizszego albo tego samego tieru.</summary>
         private static Ware Pick(Cand c, SwapMath.Piece oldP, EquipmentElement oldEl, int oldSell, double gain, int budget, Dictionary<string, List<Ware>> wares,
                                  MobileParty mp, Settlement shop1, Settlement shop2, bool player, out int why, out Settlement heldAt)
         {
             why = 0; heldAt = null;
-            bool better = false, lift = false, priced = false;
+            bool better = false, lift = false, priced = false, lowTier = false, shortage = false;
+            bool ammoRule = AmmoRule(c.Type);   // sklad8-s S4
             var oldIt = oldEl.Item;
             bool hasCls = oldIt.PrimaryWeapon != null;
             WeaponClass cls = hasCls ? oldIt.PrimaryWeapon.WeaponClass : default(WeaponClass);
@@ -520,12 +541,18 @@ namespace Armoury
                     if (w.Left <= 0) continue;
                     if (hasCls != w.HasCls || (hasCls && w.Cls != cls)) continue;                       // miecz za miecz, tarcza za tarcze
                     if (SwapMath.UpgradeVerdict(ceil, oldP.Tier, oldP.Power, w.Tier, w.Power, gain, true, 1, 1) != SwapMath.UpOk) continue;   // do sufitu, wyraznie lepsza
+                    // sklad8-s S4: kolczan tylko na WYZSZY tier - "sila" (Effectiveness) przepuszczala nizszy (t3 vlandic -> t1 range): stary szedl do kupca
+                    // za 1 zl, a koszyk wzorca zostawal tak samo pusty
+                    if (ammoRule && w.Tier <= oldP.Tier) { lowTier = true; continue; }
                     better = true;
                     if (!ItemReq.Meets(c.Troop, w.El.Item) || (c.Slot.Bucket.Mounted && !MountOk(w.El.Item))) continue;   // wymog i bron z siodla
                     lift = true;
                     // sklad8-p (uwaga 1): dozbrajanie kupuje dla oddzialu (lord, zaloga, ludzie gracza z sakiewki) - hurt jak zakupy brakow, wiec
                     // ostatnia sztuka pasma zbroi zostaje na straganie dla kupujacego osobiscie (ShopReserve; MAX = rezerwa nie dotyczy: zamek, nie zbroja)
                     if (ShopReserve.Free(shop, w.El.Item) <= 0) { if (heldAt == null) heldAt = shop; continue; }
+                    // sklad8-s S4: kolczan na wymiane tylko z nadwyzki - koszyk polki bez braku (mnoznik polki <= 1, cena nie wyzsza od wartosci); przy braku
+                    // ostatnie snopy zostaja dla tych, ktorzy nie maja zadnego (zakupy brakow, notable dla ochotnikow)
+                    if (ammoRule && SupplyDemand.Active && FacOf(w) > 1f) { shortage = true; continue; }
                     priced = true;
                     if (w.Price < 0) { try { w.Price = shop.Town.MarketData.GetPrice(w.El, mp, false, shop.Party); } catch { w.Price = 0; } }   // cena dopiero dla kandydata
                     if (SwapMath.UpgradeVerdict(ceil, oldP.Tier, oldP.Power, w.Tier, w.Power, gain, true, w.Price, budget) != SwapMath.UpOk) continue;
@@ -534,8 +561,19 @@ namespace Armoury
                 }
                 if (best != null) return best;
             }
-            why = !better ? 0 : (!lift ? 1 : (!priced && heldAt != null ? 3 : 2));
+            why = !better ? (lowTier ? 5 : 0) : (!lift ? 1 : (!priced && heldAt != null ? 3 : (!priced && shortage ? 4 : 2)));
             return null;
+        }
+
+        /// <summary>sklad8-s S4: mnoznik polki koszyka sztuki (SupplyDemand.Factor, kupno) - raz na sztuke towaru, od nowa po zmianie polki (Stale).</summary>
+        private static float FacOf(Ware w)
+        {
+            if (w.Fac < 0f)
+            {
+                try { float d; int sh; w.Fac = SupplyDemand.Factor(w.Shop, w.El.Item, false, out d, out sh); }
+                catch { w.Fac = 1f; }
+            }
+            return w.Fac;
         }
 
         private static List<Ware> Wares(Dictionary<string, List<Ware>> cache, ItemObject.ItemTypeEnum type, Settlement shop, MobileParty mp, bool player)

@@ -592,6 +592,10 @@ namespace Armoury
         [SettingPropertyGroup("The finished piece")]
         public bool MenUpgradeOneTierUp { get; set; } = true;
 
+        [SettingPropertyBool("Men Upgrade Ammo Needs Surplus", HintText = "arrows and bolts: the men swap a quiver only for one of a higher tier, and only from a stall that has enough of that kind (its price is not above worth) - a man with a full quiver does not take the last sheaves from those who have none; the same for your men, AI lords' men and garrisons (off: any clearly stronger quiver, as for the rest of their kit)")]
+        [SettingPropertyGroup("The finished piece")]
+        public bool MenUpgradeAmmoNeedsSurplus { get; set; } = true;
+
         [SettingPropertyBool("Garrison Purse Enabled", HintText = "garrisons keep a purse from their own pay: they buy what they lack and better kit at their own market (a castle orders from the town its villages trade with and the goods come by cart) and once a week sell their spare kit at their own town or castle - your garrisons too")]
         [SettingPropertyGroup("The finished piece")]
         public bool GarrisonPurseEnabled { get; set; } = true;
@@ -3335,6 +3339,7 @@ namespace Armoury
             s.MenUpgradeMinGainPercent = MenUpgradeMinGainPercent;
             s.MenUpgradeMaxPerVisit = MenUpgradeMaxPerVisit;
             s.MenUpgradeOneTierUp = MenUpgradeOneTierUp;
+            s.MenUpgradeAmmoNeedsSurplus = MenUpgradeAmmoNeedsSurplus;
             s.GarrisonPurseEnabled = GarrisonPurseEnabled;
             s.QuartermasterSwapOneForOne = QuartermasterSwapOneForOne;
             s.GarrisonKitMenu = GarrisonKitMenu;
