@@ -19,7 +19,9 @@ namespace Armoury
     /// w tej sesji) i ponad popyt polki (SupplyDemand.Demand) kowale miasta skupuja na zlom po OldStockScrapDailyShare dziennie (1%), najgorsze
     /// sztuki najpierw. Zlom to metal: OldStockScrapYield (0.5) rudy, z ktorej sztuke wykuto (WorkshopLaw.Needs), wraca na polke tego miasta jako ruda -
     /// nic z niczego (sztuka znika, metal zostaje w czesci). Bez zlota: kowale i kupcy to ta sama kasa miasta (jak strzelarze 172). Rozgrzewka:
-    /// regula rusza po 30 dobach pomiaru zakupow w sesji (srednia od zera nie moze udawac braku popytu). Linia "Zlom z nadmiaru (174, pytanie 4)".
+    /// regula rusza po 30 dobach pomiaru zakupow w sesji (srednia od zera nie moze udawac braku popytu); do 30 dob srednia arytmetyczna dni pomiaru
+    /// (recenzja 174). Pomiar to zakupy wojska (AiGear, notable) - gracz, handel dzienny i karawany nie wchodza; reszte popytu polki daje
+    /// SupplyDemand.Demand. Linia "Zlom z nadmiaru (174, pytanie 4)".
     /// </summary>
     internal static class ArmsScrap
     {
@@ -32,7 +34,14 @@ namespace Armoury
 
         internal static bool On { get { var s = Settings.Current; return s != null && s.OldStockToScrap; } }
 
-        internal static void Reset() { _ema.Clear(); _today.Clear(); _acc.Clear(); _oreAcc.Clear(); _days = 0; _lastDay = -1; _stumbles = 0; _ore = null; }
+        internal static void Reset() { _ema.Clear(); _today.Clear(); _acc.Clear(); _oreAcc.Clear(); _days = 0; _lastDay = -1; _stumbles = 0; _ore = null; _errSites.Clear(); }
+
+        private static readonly HashSet<string> _errSites = new HashSet<string>();
+        private static void Stumble(string where, Exception e)   // recenzja 174: Log.Error raz na miejsce, reszta w liczniku linii
+        {
+            _stumbles++;
+            if (_errSites.Add(where)) Log.Error("ArmsScrap." + where, e);
+        }
 
         private static long Key(Settlement st, int basket) { return ((long)st.Id.InternalValue << 8) ^ (uint)basket; }
 
@@ -53,14 +62,16 @@ namespace Armoury
             int day = (int)CampaignTime.Now.ToDays;
             if (day == _lastDay) return;
             _lastDay = day;
-            // srednia zakupow (ok. 30 dob)
+            // srednia zakupow (ok. 30 dob); recenzja 174: w pierwszych 30 dobach sesji srednia arytmetyczna dni pomiaru (krok 1/n), nie EMA od zera -
+            // EMA 1/30 po 30 dobach rozgrzewki miala ok. 63% prawdziwej wartosci, a skup bral wiecej niz "ponad rok popytu"
             try
             {
+                float div = Math.Min(_days + 1, 30);
                 var keys = new HashSet<long>(_ema.Keys); foreach (var k in _today.Keys) keys.Add(k);
-                foreach (var k in keys) { float e, t; _ema.TryGetValue(k, out e); _today.TryGetValue(k, out t); _ema[k] = e + (t - e) / 30f; }
+                foreach (var k in keys) { float e, t; _ema.TryGetValue(k, out e); _today.TryGetValue(k, out t); _ema[k] = e + (t - e) / div; }
                 _today.Clear(); _days++;
             }
-            catch (Exception e) { _stumbles++; Log.Error("ArmsScrap.Daily(srednia)", e); }
+            catch (Exception e) { Stumble("Daily(srednia)", e); }
             if (!On) return;
             var s = Settings.Current;
             if (_days < 30) { Log.Info("Zlom z nadmiaru (174, pytanie 4): dzien " + day + " - rozgrzewka " + _days + "/30 dob pomiaru zakupow w tej sesji, skup jeszcze nie rusza."); return; }
@@ -121,7 +132,7 @@ namespace Armoury
                         oreBack += ore;
                     }
                 }
-                catch (Exception e) { _stumbles++; Log.Error("ArmsScrap.Daily", e); }
+                catch (Exception e) { Stumble("Daily", e); }
                 finally { GoodsLedger.End(gf); }
             }
             var parts = new List<string>();

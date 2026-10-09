@@ -1,5 +1,19 @@
 import re, sys, os
 
+# zakresy suwakow zgodne z przycieciem w kodzie (recenzja 174): nazwa -> (min, max, format); reszta - wzor ogolny ponizej
+RANGES = {
+    'OldStockScrapYield': (0.0, 1.0, "0.00"),
+    'OldStockScrapDailyShare': (0.0, 0.1, "0.000"),
+    'WorkshopMunitionShare': (0.0, 1.0, "0.00"),
+    'WorkshopLineShortageShare': (0.0, 1.0, "0.00"),
+    'WorkshopPlanDays': (14.0, 120.0, "0"),
+    'WorkshopMunitionMaxTier': (1, 6, "0"),
+    'TownMaterialOrderDays': (1, 30, "0"),
+    'CarterPencePerKgPer100': (0.0, 0.15, "0.0000"),
+    'SeaFreightShare': (0.0, 1.0, "0.00"),
+    'TownMaterialOrderMinLoadKg': (0.0, 1000.0, "0"),
+}
+
 def gen(module_dir, ns, display):
     src = open(os.path.join(module_dir,'src','Settings.cs'), encoding='utf-8').read()
     group = "General"
@@ -33,7 +47,14 @@ def gen(module_dir, ns, display):
     for typ, name, default, hint, grp in props:
         label = re.sub(r'(?<!^)(?=[A-Z])', ' ', name)
         hint_txt = hint.replace('"', "'")
-        if typ == "bool":
+        if typ != "bool" and name in RANGES:
+            lo, hi, fmt = RANGES[name]
+            if typ == "int":
+                attr = '        [SettingPropertyInteger("%s", %d, %d, "%s", HintText = "%s")]' % (label, lo, hi, fmt, hint_txt)
+            else:
+                dec = len(fmt.split('.')[1]) if '.' in fmt else 2
+                attr = '        [SettingPropertyFloatingInteger("%s", %.*ff, %.*ff, "%s", HintText = "%s")]' % (label, max(2, dec), lo, max(2, dec), hi, fmt, hint_txt)
+        elif typ == "bool":
             attr = '        [SettingPropertyBool("%s", HintText = "%s")]' % (label, hint_txt)
         elif typ == "int":
             d = int(float(default))

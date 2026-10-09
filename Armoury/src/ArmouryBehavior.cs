@@ -507,7 +507,7 @@ namespace Armoury
             catch (Exception e) { Log.Error("SyncData.arm_unmet", e); }
             // 174.2: kontrakty surowca w drodze (karawana, cel, zrodlo, surowiec, ilosc) - zawsze, takze przy wylaczonym wylaczniku (po wczytaniu karawana zwolniona)
             try { string mo = dataStore.IsSaving ? MaterialOrders.Export() : null; SaveText.Sync(dataStore, "arm_matorders", ref mo); if (dataStore.IsLoading) MaterialOrders.Import(mo); }
-            catch (Exception e) { Log.Error("SyncData.arm_matorders", e); }
+            catch (Exception e) { Log.Error("SyncData.arm_matorders", e); try { if (dataStore.IsLoading) MaterialOrders.ImportFailed(); } catch { } }   // recenzja 174: linia, ze kontrakty pominiete
         }
 
         public override void RegisterEvents()

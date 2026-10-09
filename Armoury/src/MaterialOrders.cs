@@ -21,18 +21,24 @@ namespace Armoury
     /// A171: 38 miast bez rudy, 30 z nadwyzka, w miescie bez rudy pierwszy ladunek po 36-37 dobach; warsztat bierze surowiec tylko z polki
     /// wlasnego miasta; proba zmiany celu karawan BK nie zmienila liczby miast bez rudy (CaravanBulk.cs:73-76).
     /// Regula: miasto, w ktorym wczoraj warsztaty zbrojne, strzelarze (172) albo rzemioslo miasta (148) odpuscili cykl z braku surowca m, zamawia go
-    /// (najwyzej raz na TownMaterialOrderDays dob) w pobliskim niewrogim miescie albo zamku, ktore ma go ponad prog nadwyzki. Towar wiezie
-    /// karawana BK STOJACA w zrodle: kupuje go tam po cenie targu zrodla (SellItemsAction - zloto karawany do kasy zrodla), jedzie do zamawiajacego
-    /// (bandy moga ja rozbic - lup jak w grze) i tam sprzedaje po cenie targu (kasa miasta ponad rezerwe TownRentFloorGold -> karawana).
-    /// Kontrakt tylko przy oczekiwanej marzy >= koszt drogi (CarterPencePerKgPer100 od kg i odleglosci; morze x SeaFreightShare); brak karawany
-    /// w zrodle = brak kontraktu. Ruda tylko z bliska (TownMaterialOrderRangeOre, 2-3 doby - daleko wozono sztaby, nie rude), reszta do
-    /// TownMaterialOrderRange. Ile: zapas na 10 dob zuzycia miasta (wieksze z: zmierzone - srednia ok. 14 dob z warsztatow, strzelarzy i rzemiosla,
-    /// i szacunek karawan z rak - CaravanBulk) minus polka minus w drodze; najwyzej wolne miejsce w jukach i kiesa karawany.
-    /// Zrodlo sprzedaje tylko ponad max(Keep karawan wedlug dawnych rak, 10 dob wlasnego zuzycia); zamek - caly zapas (nie ma warsztatow).
-    /// Karawana z kontraktem: Ai.SetDoNotMakeNewDecisions(true) i rozkaz jazdy (wzor posilkow DTE) do przyjazdu; CaravanBulk, karawany bez amunicji
-    /// (172b) i latka wysp ja przepuszczaja; BK ReleaseCaravanFromHold (koniec oblezenia) nie zmienia jej celu. Wrogosc celu albo 30 dob -
-    /// zwolnienie (ladunek zostaje karawanie - prawdziwy towar). Karawana gracza (i jego rodu) nigdy nie dostaje kontraktu.
-    /// Zapis: "arm_matorders" (SaveText.Sync), po wczytaniu - kontrakt odtworzony albo karawana zwolniona.
+    /// (najwyzej raz na TownMaterialOrderDays dob) w pobliskim niewrogim MIESCIE, ktore ma go ponad prog nadwyzki. Towar wiezie
+    /// karawana BK STOJACA w zrodle: kupuje go tam po cenie targu zrodla (SellItemsAction - zwykly handel gry: zloto karawany idzie do kasy
+    /// miasta-zrodla, a czesc jako clo do TradeTaxAccumulated pana; w BK ok. 10%), jedzie do zamawiajacego (bandy moga ja rozbic - lup jak w grze)
+    /// i tam sprzedaje po cenie targu (kasa miasta ponad rezerwe TownRentFloorGold -> karawana).
+    /// Kontrakt tylko przy oczekiwanej marzy >= koszt drogi (CarterPencePerKgPer100 od kg i odleglosci; morze x SeaFreightShare) i ladunku
+    /// >= TownMaterialOrderMinLoadKg (recenzja 174: karawana nie jedzie 10 dob dla 2 sztuk lnu); brak karawany w zrodle = brak kontraktu.
+    /// Ruda tylko z bliska (TownMaterialOrderRangeOre, 2-3 doby - daleko wozono sztaby, nie rude), reszta do TownMaterialOrderRange. Ile: zapas na
+    /// 10 dob zuzycia miasta (wieksze z: zmierzone - srednia ok. 14 dob z warsztatow, strzelarzy i rzemiosla, i szacunek karawan z rak - CaravanBulk)
+    /// minus polka minus w drodze; najwyzej wolne miejsce w jukach i kiesa karawany. Zrodlo sprzedaje tylko ponad max(Keep karawan wedlug dawnych
+    /// rak, 10 dob wlasnego zuzycia). ZAMKI NIE SA ZRODLEM (recenzja 174): karawany BK do nich nie jezdza (CaravanBulk), a SellItemsAction ze
+    /// sprzedajacym zamkiem oddaje calosc zaplaty jako clo (GetVillageTaxRatio(null) - straznik BK 1.0) - zamek oddawalby surowiec za 0 d.
+    /// Karawana z kontraktem: rozkaz jazdy do celu; BK nie wybiera jej nowego celu (prefiks BKCaravansBehavior.HourlyTickParty, takze gry
+    /// CaravansCampaignBehavior bez BK), ale AI gry zostaje czynne - karawana ucieka przed bandami i wrogami jak kazda (recenzja 174: przy
+    /// DoNotMakeNewDecisions gra pomija ucieczke). Bez tej latki - wzor posilkow DTE (Ai.SetDoNotMakeNewDecisions(true)). CaravanBulk, karawany bez
+    /// amunicji (172b) i latka wysp ja przepuszczaja; BK ReleaseCaravanFromHold nie zmienia jej celu. Zwolnienie (ladunek zostaje karawanie -
+    /// prawdziwy towar): wrogosc celu, oblezenie celu (BK Shipping co godzine kieruje ja wtedy do bezpiecznego miasta - bez zwolnienia
+    /// byl ping-pong), rozwiazywanie karawany, cel zmieniony przez innych 2 razy, 30 dob. Karawana gracza (i jego rodu) nigdy nie dostaje kontraktu.
+    /// Zapis: "arm_matorders" (SaveText.Sync), po wczytaniu - kontrakt odtworzony albo karawana zwolniona (takze przy rekordzie nieczytelnym).
     /// </summary>
     internal static class MaterialOrders
     {
@@ -44,8 +50,10 @@ namespace Armoury
 
         private sealed class Contract
         {
-            public MobileParty Car; public string CarId; public Settlement Dest, Src; public int Mat, Qty, Day, Paid; public float Dist; public bool Naval;
+            public MobileParty Car; public string CarId; public Settlement Dest, Src; public int Mat, Qty, Day, Paid, Retarget; public float Dist; public bool Naval;
         }
+        private const int MaxRetarget = 2;   // recenzja 174: cel zmieniony przez innych (BK Shipping, porty) - po 2 przywroceniach zwolnienie, bez ping-pongu
+        internal static bool HourlyHooked;   // prefiks BK/gry HourlyTickParty wpiety - karawana z kontraktem bez DoNotMakeNewDecisions (ucieka jak kazda)
         private static readonly List<Contract> _contracts = new List<Contract>();
         private static readonly Dictionary<MobileParty, Contract> _byCar = new Dictionary<MobileParty, Contract>();
         private static readonly Dictionary<Town, int[]> _miss = new Dictionary<Town, int[]>();       // cykle "brak surowca" od ostatniej doby
@@ -58,6 +66,7 @@ namespace Armoury
         // liczniki doby (linia "Kontrakty surowca (174)")
         private static readonly int[] _dMade = new int[M], _dMadeQty = new int[M];
         private static int _dDone, _dLost, _dLostQty, _dRelHost, _dRel30, _dRelOther, _dNoCar, _dNoSrc, _dNoGain, _dNoRoad, _dRejected, _dPause, _dEnough, _dRetarget, _dKeptTarget, _stumbles, _stumblesAll;
+        private static int _dRelSiege, _dRelRetarget, _dRelDisband, _dShortPack, _dSmall, _dHoldMoved;   // recenzja 174
         private static long _dGold, _dMargin, _dPaidDest;
         private static double _dDays;
         private static readonly List<string> _dEx = new List<string>();
@@ -75,6 +84,7 @@ namespace Armoury
         {
             Array.Clear(_dMade, 0, M); Array.Clear(_dMadeQty, 0, M);
             _dDone = _dLost = _dLostQty = _dRelHost = _dRel30 = _dRelOther = _dNoCar = _dNoSrc = _dNoGain = _dNoRoad = _dRejected = _dPause = _dEnough = _dRetarget = _dKeptTarget = _stumbles = 0;
+            _dRelSiege = _dRelRetarget = _dRelDisband = _dShortPack = _dSmall = _dHoldMoved = 0;
             _dGold = _dMargin = _dPaidDest = 0; _dDays = 0; _dEx.Clear();
         }
 
@@ -180,7 +190,7 @@ namespace Armoury
             Line(day);
         }
 
-        /// <summary>Kontrakty w drodze: zniszczone, wrogosc, 30 dob, cel zmieniony (przywrocony).</summary>
+        /// <summary>Kontrakty w drodze: zniszczone, rozwiazywana, wrogosc, oblezenie celu, 30 dob, cel zmieniony (przywrocony najwyzej MaxRetarget razy).</summary>
         private static void Keep(int day)
         {
             for (int i = _contracts.Count - 1; i >= 0; i--)
@@ -189,16 +199,20 @@ namespace Armoury
                 try
                 {
                     var car = c.Car;
-                    if (car == null || !car.IsActive) { Drop(c); _dLost++; continue; }
+                    if (car == null || !car.IsActive) { Drop(c); _dLost++; _dLostQty += c.Qty; continue; }
                     if (car.MapEvent != null) continue;
-                    if (c.Dest.MapFaction != null && car.MapFaction != null && FactionManager.IsAtWarAgainstFaction(car.MapFaction, c.Dest.MapFaction)) { Release(c); _dRelHost++; continue; }
+                    if (car.IsDisbanding) { Release(c); _dRelDisband++; continue; }
+                    // wrogosc celu; recenzja 174: cel oblegany - BK Shipping co godzine kieruje karawane do bezpiecznego miasta; bez zwolnienia ping-pong do konca oblezenia
+                    if (DestLost(car, c)) { Release(c); continue; }
                     if (day - c.Day > 30) { Release(c); _dRel30++; continue; }
                     if (!On) { Release(c); _dRelOther++; continue; }
                     if (car.CurrentSettlement == c.Dest) { Deliver(car, c.Dest); continue; }   // stoi w celu (wjazd przed zapisem / bez zdarzenia)
                     if (car.TargetSettlement != c.Dest)
                     {
+                        if (car.CurrentSettlement != null && car.CurrentSettlement.IsUnderSiege) continue;   // nie wyprowadzamy jej z obleganego miasta prosto do obozu oblegajacych
+                        if (c.Retarget >= MaxRetarget) { Release(c); _dRelRetarget++; continue; }   // cel zmieniaja inni (BK Shipping, porty) - karawana zostaje z towarem
                         try { if (car.CurrentSettlement != null) LeaveSettlementAction.ApplyForParty(car); } catch (Exception e) { Stumble("Keep(wyjazd)", e); }   // jak posilki DTE
-                        if (Move(car, c.Dest, c.Naval)) _dRetarget++; else { Release(c); _dRelOther++; }
+                        if (Move(car, c.Dest, c.Naval)) { _dRetarget++; c.Retarget++; } else { Release(c); _dRelOther++; }
                     }
                 }
                 catch (Exception e) { Stumble("Keep", e); }
@@ -219,26 +233,28 @@ namespace Armoury
             float range = Math.Max(1f, m == Ore ? s.TownMaterialOrderRangeOre : s.TownMaterialOrderRange);
             float carter = Math.Max(0f, s.CarterPencePerKgPer100), sea = MBMath.ClampFloat(s.SeaFreightShare, 0f, 1f);
             float kg = Kg(item);
+            float minKg = Math.Max(0f, s.TownMaterialOrderMinLoadKg);
             var dm = Campaign.Current.Models.MapDistanceModel;
             var pos = dest.GetPosition2D;
             Settlement bestSrc = null; MobileParty bestCar = null; int bestQ = 0; float bestPerKg = 0f, bestDist = 0f, bestMargin = 0f; bool bestNaval = false;
-            bool anySrc = false, anyCar = false, anyRoad = false;
+            bool anySrc = false, anyCar = false, anyRoad = false, anySmall = false;
             foreach (var src in Settlement.All)
             {
-                if (src == null || src == dest || (!src.IsTown && !src.IsCastle) || src.Town == null || src.ItemRoster == null) continue;
+                // recenzja 174: tylko miasta - karawany BK nie jezdza do zamkow, a zamek sprzedajacy przez SellItemsAction oddaje cala zaplate jako clo
+                if (src == null || src == dest || !src.IsTown || src.Town == null || src.ItemRoster == null) continue;
                 if (pos.Distance(src.GetPosition2D) > range) continue;                        // droga >= linia prosta
                 if (src.IsUnderSiege || (src.MapFaction != null && dest.MapFaction != null && FactionManager.IsAtWarAgainstFaction(src.MapFaction, dest.MapFaction))) continue;
                 int have = src.ItemRoster.GetItemNumber(item);
                 if (have <= 0) continue;
-                int keep = src.IsTown ? Math.Max(SafeKeep(src.Town, item), (int)Math.Ceiling(10f * UseOf(src.Town, m))) : 0;   // zamek: caly zapas
+                int keep = Math.Max(SafeKeep(src.Town, item), (int)Math.Ceiling(10f * UseOf(src.Town, m)));
                 int surplus = have - keep;
                 if (surplus <= 0) continue;
                 anySrc = true;
-                // karawana stojaca w zrodle: nie gracza, handlujaca, bez kontraktu i bez rozkazu DTE, z najwiekszym wolnym miejscem
+                // karawana stojaca w zrodle: nie gracza, handlujaca, bez kontraktu i bez rozkazu DTE, nie w wojnie z celem, z najwiekszym wolnym miejscem
                 MobileParty car = null; float carFree = 0f;
                 foreach (var p in src.Parties)
                 {
-                    if (!Eligible(p)) continue;
+                    if (!Eligible(p, dest)) continue;
                     float free = p.InventoryCapacity - p.TotalWeightCarried;
                     if (free > carFree) { carFree = free; car = p; }
                 }
@@ -261,6 +277,7 @@ namespace Armoury
                 int q = Math.Min(Math.Min(want, surplus), (int)(carFree / kg));
                 q = Math.Min(q, car.PartyTradeGold / Math.Max(1, pSrc));
                 if (q <= 0) continue;
+                if (q * kg < minKg) { anySmall = true; continue; }   // recenzja 174: ladunek za maly na dni drogi bez handlu - czekamy, az brak urosnie
                 // zysk po dostawie: srodkowa sztuka w celu (polka rosnie) i w zrodle (polka maleje) - prawdziwy model cen; oplata od kg i odleglosci
                 int pDst = PriceAt(town, item, true, Math.Max(0, q - 1) / 2);
                 int pBuy = PriceAt(src.Town, item, false, -(Math.Max(0, q - 1) / 2));
@@ -273,7 +290,7 @@ namespace Armoury
             }
             if (bestSrc == null)
             {
-                if (!anySrc) _dNoSrc++; else if (!anyCar) _dNoCar++; else if (!anyRoad) _dNoRoad++; else _dNoGain++;
+                if (!anySrc) _dNoSrc++; else if (!anyCar) _dNoCar++; else if (!anyRoad) _dNoRoad++; else if (anySmall) _dSmall++; else _dNoGain++;
                 return;
             }
             last[m] = day;
@@ -282,11 +299,13 @@ namespace Armoury
 
         private static int SafeKeep(Town t, ItemObject it) { try { return CaravanBulk.KeepFor(t, it); } catch { return 0; } }
 
-        private static bool Eligible(MobileParty p)
+        private static bool Eligible(MobileParty p, Settlement dest)
         {
-            if (p == null || !p.IsCaravan || !p.IsActive || p.MapEvent != null || p.Army != null || !p.IsPartyTradeActive || p.ItemRoster == null || p.Party == null) return false;
+            if (p == null || !p.IsCaravan || !p.IsActive || p.IsDisbanding || p.MapEvent != null || p.Army != null || !p.IsPartyTradeActive || p.ItemRoster == null || p.Party == null) return false;
             if (p.IsCurrentlyUsedByAQuest || p.Ai == null || p.Ai.DoNotMakeNewDecisions || _byCar.ContainsKey(p)) return false;
             if (p == MobileParty.MainParty || p.ActualClan == Clan.PlayerClan || (p.Party.Owner != null && p.Party.Owner == Hero.MainHero)) return false;   // karawana gracza nigdy
+            // recenzja 174: karawana trzeciej frakcji w wojnie z zamawiajacym nie jedzie do wrogiego miasta
+            if (dest != null && dest.MapFaction != null && p.MapFaction != null && FactionManager.IsAtWarAgainstFaction(p.MapFaction, dest.MapFaction)) return false;
             return true;
         }
 
@@ -307,7 +326,8 @@ namespace Armoury
             catch (Exception e) { Stumble("PriceAt", e); return 0; }
         }
 
-        /// <summary>Kontrakt: zakup w zrodle (zloto karawany -> kasa zrodla), wyjazd, rozkaz jazdy do celu, AI karawany wstrzymane do przyjazdu.</summary>
+        /// <summary>Kontrakt: zakup w miescie-zrodle (zwykly handel gry: zloto karawany -> kasa zrodla minus clo pana), wyjazd, rozkaz jazdy do celu;
+        /// BK nie wybiera nowego celu do przyjazdu (prefiks HourlyTickParty), a bez tej latki - AI wstrzymane (wzor DTE).</summary>
         private static void Place(MobileParty car, Settlement src, Settlement dest, int m, int q, float dist, bool naval, float margin, int day)
         {
             var item = _items[m];
@@ -320,7 +340,10 @@ namespace Armoury
                 var el = srcRoster.GetElementCopyAtIndex(at);
                 if (el.Amount <= 0) break;
                 int price = Math.Max(1, src.Town.GetItemPrice(el.EquipmentElement, car, false));
-                int n = Math.Min(Math.Min(10, q - got), Math.Min(el.Amount, car.PartyTradeGold / price));
+                // recenzja 174: gra liczy cene sztuka po sztuce (polka zrodla maleje - cena rosnie), a GiveGoldAction obcina zaplate do kiesy -
+                // przy kiesie na styk (mniej niz cena paczki + 25%) kupujemy po sztuce, inaczej ostatnie sztuki szlyby czesciowo bez zaplaty
+                int n = Math.Min(Math.Min(10, q - got), el.Amount);
+                if ((long)(price + price / 4 + 1) * n > car.PartyTradeGold) n = car.PartyTradeGold >= price ? 1 : 0;
                 if (n <= 0) break;
                 int had = pack.GetItemNumber(item), purse = car.PartyTradeGold;
                 try { SellItemsAction.Apply(src.Town.Owner, car.Party, el, n, src); }
@@ -343,7 +366,7 @@ namespace Armoury
         {
             try
             {
-                car.Ai.SetDoNotMakeNewDecisions(true);
+                SetHold(car);
                 var nav = naval ? MobileParty.NavigationType.All : MobileParty.NavigationType.Default;
                 bool port = naval && dest.HasPort;
                 if (_setMove == null) _setMove = typeof(MobileParty).GetMethod("SetMoveGoToSettlement", new[] { typeof(Settlement), typeof(MobileParty.NavigationType), typeof(bool) });
@@ -357,6 +380,15 @@ namespace Armoury
                 return car.TargetSettlement == dest;
             }
             catch (Exception e) { Stumble("Move", e); return false; }
+        }
+
+        /// <summary>Recenzja 174: przy wpietym prefiksie HourlyTickParty karawana z kontraktem ma AI gry czynne (ucieczka przed bandami i wrogami - przy
+        /// DoNotMakeNewDecisions gra pomija GetBestInitiativeBehavior, MobilePartyAi.cs:486); bez latki - wzor posilkow DTE (AI wstrzymane).</summary>
+        private static void SetHold(MobileParty car)
+        {
+            if (car == null || car.Ai == null) return;
+            bool freeze = !HourlyHooked;
+            if (car.Ai.DoNotMakeNewDecisions != freeze) car.Ai.SetDoNotMakeNewDecisions(freeze);
         }
 
         private static void Drop(Contract c)
@@ -387,12 +419,16 @@ namespace Armoury
             Contract c;
             if (!_byCar.TryGetValue(mp, out c)) return;
             var town = st.Town; var item = _items[c.Mat];
-            int sold = 0; long got = 0;
+            int sold = 0, carried = c.Qty; long got = 0;
             try
             {
                 int reserve = (int)Math.Max(0f, Settings.Current.TownRentFloorGold);
                 var pack = mp.ItemRoster;
-                for (int guard = 0; guard < 100 && sold < c.Qty && town != null; guard++)
+                // recenzja 174: ladunku moglo ubyc po drodze (BK SellGoods i CaravanBulk przy wjezdzie do innego miasta, lup z karawany, ktora przezyla) -
+                // to osobna pozycja linii, nie "brak kasy miasta"
+                carried = Math.Min(c.Qty, Math.Max(0, pack.GetItemNumber(item)));
+                if (carried < c.Qty) _dShortPack += c.Qty - carried;
+                for (int guard = 0; guard < 100 && sold < carried && town != null; guard++)
                 {
                     int at = pack.FindIndexOfItem(item);
                     if (at < 0) break;
@@ -400,7 +436,7 @@ namespace Armoury
                     if (el.Amount <= 0) break;
                     int spare = town.Gold - reserve;
                     int price = Math.Max(1, town.GetItemPrice(el.EquipmentElement, mp, true));
-                    int n = Math.Min(Math.Min(10, c.Qty - sold), Math.Min(el.Amount, spare / price));
+                    int n = Math.Min(Math.Min(10, carried - sold), Math.Min(el.Amount, spare / price));
                     if (n <= 0) break;                                                    // miasto bez kasy ponad rezerwe - reszta zostaje karawanie
                     int had = el.Amount, purse = mp.PartyTradeGold;
                     try { SellItemsAction.Apply(mp.Party, town.Owner, el, n, st); }
@@ -412,7 +448,7 @@ namespace Armoury
             }
             catch (Exception e) { Stumble("Deliver", e); }
             _dDone++; _dDays += Math.Max(0.0, CampaignTime.Now.ToDays - c.Day); _dPaidDest += got;
-            if (sold < c.Qty) _dKeptTarget += c.Qty - sold;
+            if (sold < carried) _dKeptTarget += carried - sold;
             Release(c);
         }
 
@@ -435,10 +471,45 @@ namespace Armoury
             {
                 Contract c;
                 if (__0 == null || _byCar.Count == 0 || !_byCar.TryGetValue(__0, out c)) return true;
-                if (Move(__0, c.Dest, c.Naval)) { _dRetarget++; return false; }
+                if (DestLost(__0, c)) { Release(c); return true; }   // cel oblegany albo wrogi - BK wybiera cel sam
+                bool changed = __0.TargetSettlement != c.Dest;   // recenzja 174: BK wola to co godzine - licznik tylko przy prawdziwej zmianie celu
+                if (Move(__0, c.Dest, c.Naval)) { if (changed) _dRetarget++; return false; }
             }
             catch (Exception e) { Stumble("ReleasePrefix", e); }
             return true;
+        }
+
+        /// <summary>Cel oblegany albo wrogi karawanie (licznik zwolnien przy okazji).</summary>
+        private static bool DestLost(MobileParty car, Contract c)
+        {
+            if (c.Dest.IsUnderSiege) { _dRelSiege++; return true; }
+            if (c.Dest.MapFaction != null && car.MapFaction != null && FactionManager.IsAtWarAgainstFaction(car.MapFaction, c.Dest.MapFaction)) { _dRelHost++; return true; }
+            return false;
+        }
+
+        /// <summary>Recenzja 174: prefiks BKCaravansBehavior.HourlyTickParty (i gry CaravansCampaignBehavior.HourlyTickParty bez BK) - karawana z kontraktem
+        /// nie dostaje od BK nowego celu ani zakupow; AI gry zostaje czynne (ucieczka). Stoi (Hold) poza obleganym miastem - rozkaz jazdy do celu
+        /// (jak BK ReleaseCaravanFromHold); cel oblegany albo wrogi - zwolnienie, BK rusza w tej samej godzinie.</summary>
+        public static bool HourlyPrefix(MobileParty __0)
+        {
+            try
+            {
+                Contract c;
+                if (__0 == null || _byCar.Count == 0 || !_byCar.TryGetValue(__0, out c)) return true;
+                if (!__0.IsActive || __0.IsDisbanding) return true;
+                if (DestLost(__0, c)) { Release(c); return true; }
+                bool hold = __0.DefaultBehavior == AiBehavior.Hold || __0.ShortTermBehavior == AiBehavior.Hold;
+                if (hold && __0.MapEvent == null && (__0.TargetSettlement != c.Dest || __0.DefaultBehavior == AiBehavior.Hold)
+                    && (__0.CurrentSettlement == null || !__0.CurrentSettlement.IsUnderSiege) && __0.CurrentSettlement != c.Dest)
+                {
+                    bool changed = __0.TargetSettlement != c.Dest;
+                    if (changed && c.Retarget >= MaxRetarget) { Release(c); _dRelRetarget++; return true; }   // cel zmieniaja inni - jak w Keep
+                    try { if (__0.CurrentSettlement != null) LeaveSettlementAction.ApplyForParty(__0); } catch (Exception e) { Stumble("HourlyPrefix(wyjazd)", e); }   // jak Keep
+                    if (Move(__0, c.Dest, c.Naval) && changed) { _dHoldMoved++; c.Retarget++; }
+                }
+                return false;
+            }
+            catch (Exception e) { Stumble("HourlyPrefix", e); return true; }
         }
 
         // ------------------------------------------------------------ linia dnia
@@ -451,28 +522,36 @@ namespace Armoury
                 if (!On && _contracts.Count == 0 && _dDone + _dLost + _dRelOther == 0) return;
                 var sb = new StringBuilder();
                 int made = 0; foreach (var n in _dMade) made += n;
+                int rel = _dRelHost + _dRelSiege + _dRel30 + _dRelOther + _dRejected + _dRelRetarget + _dRelDisband;
                 sb.Append("Kontrakty surowca (174): dzien ").Append(day).Append(On ? "" : " (WYLACZONE - tylko zwolnienia)").Append(" - zawarto ").Append(made).Append(" [");
                 for (int m = 0; m < M; m++) { if (m > 0) sb.Append(", "); sb.Append(Names[m]).Append(' ').Append(_dMadeQty[m]); }
-                sb.Append(" sztuk] za ").Append(_dGold).Append(" d towaru (oczekiwana marza karawan ").Append(_dMargin).Append(" d); dojechalo ").Append(_dDone)
+                sb.Append(" sztuk] za ").Append(_dGold).Append(" d towaru (kasa miast-zrodel + clo panow; oczekiwana marza karawan ").Append(_dMargin).Append(" d); dojechalo ").Append(_dDone)
                   .Append(" (srednio ").Append(_dDone > 0 ? (_dDays / _dDone).ToString("0.0", CultureInfo.InvariantCulture) : "-").Append(" dob drogi; miasta zaplacily ").Append(_dPaidDest)
-                  .Append(" d; zostalo karawanom z braku kasy miasta ").Append(_dKeptTarget).Append(" szt.), w drodze ").Append(_contracts.Count).Append(", rozbite/pojmane ").Append(_dLost)
-                  .Append(" (sztuk ").Append(_dLostQty).Append("), zwolnione ").Append(_dRelHost + _dRel30 + _dRelOther + _dRejected).Append(" (wrogosc ").Append(_dRelHost).Append(", 30 dob ").Append(_dRel30)
-                  .Append(", rozkaz odrzucony ").Append(_dRejected).Append(", inne ").Append(_dRelOther).Append("); cel przywrocony ").Append(_dRetarget)
+                  .Append(" d; zostalo karawanom z braku kasy miasta ").Append(_dKeptTarget).Append(" szt.; ladunku brak w jukach przy dostawie ").Append(_dShortPack)
+                  .Append(" szt. - sprzedany albo zlupiony po drodze), w drodze ").Append(_contracts.Count).Append(", rozbite/pojmane ").Append(_dLost)
+                  .Append(" (sztuk ").Append(_dLostQty).Append("), zwolnione ").Append(rel).Append(" (wrogosc ").Append(_dRelHost).Append(", oblezenie celu ").Append(_dRelSiege)
+                  .Append(", cel zmieniany przez innych ").Append(_dRelRetarget).Append(", rozwiazana ").Append(_dRelDisband).Append(", 30 dob ").Append(_dRel30)
+                  .Append(", rozkaz odrzucony ").Append(_dRejected).Append(", inne ").Append(_dRelOther).Append("); cel przywrocony ").Append(_dRetarget).Append(", ruszona z postoju ").Append(_dHoldMoved)
+                  .Append(HourlyHooked ? " (AI gry czynne - ucieczka jak kazda karawana)" : " (AI wstrzymane - wzor DTE, bez latki HourlyTickParty)")
                   .Append("; bez kontraktu: brak karawany w zrodle ").Append(_dNoCar).Append(", brak zrodla w zasiegu ").Append(_dNoSrc).Append(", bez drogi ").Append(_dNoRoad)
+                  .Append(", ladunek ponizej ").Append(Math.Max(0f, s.TownMaterialOrderMinLoadKg).ToString("0", CultureInfo.InvariantCulture)).Append(" kg ").Append(_dSmall)
                   .Append(", bez zysku ").Append(_dNoGain).Append(", zapas i dostawy dosc ").Append(_dEnough).Append(", przerwa ").Append(_dPause)
                   .Append(" [").Append(_dEx.Count > 0 ? string.Join("; ", _dEx.ToArray()) : "-").Append("]");
-                int noOre = 0, noFlax = 0, noHides = 0, towns = 0;
-                foreach (var t in Town.AllTowns)
+                if (_items != null)   // recenzja 174: przed pierwszym Ready() (rudy jeszcze nie ma w MBObjectManager) bez NRE
                 {
-                    if (t == null || !t.IsTown || t.Owner == null || t.Owner.ItemRoster == null) continue;
-                    towns++;
-                    var r = t.Owner.ItemRoster;
-                    if (_items[Ore] != null && r.GetItemNumber(_items[Ore]) <= 0) noOre++;
-                    if (_items[4] != null && r.GetItemNumber(_items[4]) <= 0) noFlax++;
-                    if (_items[5] != null && r.GetItemNumber(_items[5]) <= 0) noHides++;
+                    int noOre = 0, noFlax = 0, noHides = 0, towns = 0;
+                    foreach (var t in Town.AllTowns)
+                    {
+                        if (t == null || !t.IsTown || t.Owner == null || t.Owner.ItemRoster == null) continue;
+                        towns++;
+                        var r = t.Owner.ItemRoster;
+                        if (_items[Ore] != null && r.GetItemNumber(_items[Ore]) <= 0) noOre++;
+                        if (_items[4] != null && r.GetItemNumber(_items[4]) <= 0) noFlax++;
+                        if (_items[5] != null && r.GetItemNumber(_items[5]) <= 0) noHides++;
+                    }
+                    sb.Append("; miast bez rudy ").Append(noOre).Append(" z ").Append(towns).Append(", bez lnu ").Append(noFlax).Append(", bez skor surowych ").Append(noHides);
                 }
-                sb.Append("; miast bez rudy ").Append(noOre).Append(" z ").Append(towns).Append(", bez lnu ").Append(noFlax).Append(", bez skor surowych ").Append(noHides)
-                  .Append("; potkniecia ").Append(_stumbles).Append(" (od wczytania ").Append(_stumblesAll).Append(").");
+                sb.Append("; potkniecia ").Append(_stumbles).Append(" (od wczytania ").Append(_stumblesAll).Append(").");
                 Log.Info(sb.ToString());
             }
             catch (Exception e) { Stumble("Line", e); }
@@ -482,19 +561,22 @@ namespace Armoury
         // ------------------------------------------------------------ zapis: karawana|cel|zrodlo|surowiec|ilosc|doba|zaplacone|odleglosc|morzem~
         internal static string Export()
         {
-            try
+            var sb = new StringBuilder();
+            try { if (_pending != null) ResolvePending("zapis przed startem sesji"); }
+            catch (Exception e) { Stumble("Export(ResolvePending)", e); }
+            foreach (var c in _contracts)
             {
-                if (_pending != null) ResolvePending("zapis przed startem sesji");
-                var sb = new StringBuilder();
-                foreach (var c in _contracts)
+                try   // recenzja 174: wyjatek jednego rekordu nie gubi reszty
                 {
                     if (c.Car == null || !c.Car.IsActive || string.IsNullOrEmpty(c.Car.StringId) || c.Dest == null) continue;
-                    sb.Append(c.Car.StringId).Append('|').Append(c.Dest.StringId).Append('|').Append(c.Src != null ? c.Src.StringId : "").Append('|').Append(Ids[c.Mat]).Append('|')
-                      .Append(c.Qty).Append('|').Append(c.Day).Append('|').Append(c.Paid).Append('|').Append(c.Dist.ToString("R", CultureInfo.InvariantCulture)).Append('|').Append(c.Naval ? 1 : 0).Append('~');
+                    var one = new StringBuilder();
+                    one.Append(c.Car.StringId).Append('|').Append(c.Dest.StringId).Append('|').Append(c.Src != null ? c.Src.StringId : "").Append('|').Append(Ids[c.Mat]).Append('|')
+                       .Append(c.Qty).Append('|').Append(c.Day).Append('|').Append(c.Paid).Append('|').Append(c.Dist.ToString("R", CultureInfo.InvariantCulture)).Append('|').Append(c.Naval ? 1 : 0).Append('~');
+                    sb.Append(one);
                 }
-                return sb.ToString();
+                catch (Exception e) { Stumble("Export", e); }
             }
-            catch (Exception e) { Stumble("Export", e); return ""; }
+            return sb.ToString();
         }
 
         internal static void Import(string s)
@@ -503,29 +585,56 @@ namespace Armoury
             _pending = string.IsNullOrEmpty(s) ? null : s;
         }
 
-        /// <summary>OnSessionLaunched: kontrakty z zapisu na karawany (po StringId); bez karawany - pominiete; wylaczone w MCM - karawana zwolniona.</summary>
+        /// <summary>Recenzja 174: wczytanie klucza arm_matorders rzucilo wyjatek - kontraktow nie ma. Przy wpietym prefiksie HourlyTickParty karawany
+        /// nie maja wstrzymanego AI, wiec BK prowadzi je dalej jak kazda; bez latki (wzor DTE) moga stac - linia to mowi.</summary>
+        internal static void ImportFailed()
+        {
+            _contracts.Clear(); _byCar.Clear(); _pending = null;
+            Log.Info("Kontrakty surowca (174): klucz zapisu arm_matorders NIECZYTELNY - kontrakty z zapisu pominiete" + (HourlyHooked
+                     ? " (karawany handluja dalej same - AI nie bylo wstrzymane)." : " (UWAGA: bez latki HourlyTickParty karawany kontraktowe z zapisu moga stac - AI wstrzymane wzorem DTE)."));
+        }
+
+        /// <summary>Recenzja 174: karawana z rekordu, ktorego nie da sie odtworzyc, nie moze zostac z wstrzymanym AI (gra zapisuje DoNotMakeNewDecisions).</summary>
+        private static bool FreeBroken(MobileParty car)
+        {
+            try
+            {
+                if (car == null || !car.IsActive || car.Ai == null || !car.Ai.DoNotMakeNewDecisions || car.IsCurrentlyUsedByAQuest) return false;
+                car.Ai.SetDoNotMakeNewDecisions(false); car.Ai.RethinkAtNextHourlyTick = true;
+                return true;
+            }
+            catch (Exception e) { Stumble("FreeBroken", e); return false; }
+        }
+
+        /// <summary>OnSessionLaunched: kontrakty z zapisu na karawany (po StringId); bez karawany - pominiete; rekord nieczytelny przy zywej karawanie -
+        /// karawana zwolniona (recenzja 174); wylaczone w MCM - karawana zwolniona.</summary>
         internal static void ResolvePending(string why)
         {
             var s = _pending;
             _pending = null;
             if (string.IsNullOrEmpty(s) || !Ready()) return;
-            int ok = 0, gone = 0, freed = 0;
+            int ok = 0, gone = 0, freed = 0, broken = 0;
             var byId = new Dictionary<string, MobileParty>();
             foreach (var p in MobileParty.AllCaravanParties) if (p != null && !string.IsNullOrEmpty(p.StringId)) byId[p.StringId] = p;
             var om = MBObjectManager.Instance;
             foreach (var rec in s.Split('~'))
             {
                 if (rec.Length == 0) continue;
+                MobileParty car = null;
                 try
                 {
                     var a = rec.Split('|');
-                    if (a.Length != 9) { gone++; continue; }
-                    MobileParty car; byId.TryGetValue(a[0], out car);
+                    byId.TryGetValue(a[0], out car);   // najpierw karawana - zly rekord tez zwalnia zywa karawane
                     Settlement dest = null, src = null;
-                    try { dest = om.GetObject<Settlement>(a[1]); } catch { }
-                    if (a[2].Length > 0) { try { src = om.GetObject<Settlement>(a[2]); } catch { } }
-                    int m = Array.IndexOf(Ids, a[3]);
-                    if (car == null || !car.IsActive || dest == null || m < 0) { gone++; continue; }
+                    int m = -1;
+                    if (a.Length == 9)
+                    {
+                        try { dest = om.GetObject<Settlement>(a[1]); } catch { }
+                        if (a[2].Length > 0) { try { src = om.GetObject<Settlement>(a[2]); } catch { } }
+                        m = Array.IndexOf(Ids, a[3]);
+                    }
+                    if (car == null || !car.IsActive) { gone++; continue; }
+                    if (a.Length != 9 || dest == null || m < 0) { if (FreeBroken(car)) broken++; else gone++; continue; }
                     int q, d0, paid; float dist;
                     int.TryParse(a[4], NumberStyles.Integer, CultureInfo.InvariantCulture, out q);
                     int.TryParse(a[5], NumberStyles.Integer, CultureInfo.InvariantCulture, out d0);
@@ -534,12 +643,17 @@ namespace Armoury
                     var c = new Contract { Car = car, CarId = a[0], Dest = dest, Src = src, Mat = m, Qty = q, Day = d0, Paid = paid, Dist = dist, Naval = a[8] == "1" };
                     _contracts.Add(c); _byCar[car] = c;
                     if (!On) { Release(c); freed++; continue; }
-                    if (car.Ai != null && !car.Ai.DoNotMakeNewDecisions) car.Ai.SetDoNotMakeNewDecisions(true);
+                    SetHold(car);   // przy wpietym prefiksie HourlyTickParty AI czynne (takze kontrakt z zapisu starszej wersji 174), bez latki - wzor DTE
                     ok++;
                 }
-                catch (Exception e) { Stumble("ResolvePending", e); gone++; }
+                catch (Exception e)
+                {
+                    Stumble("ResolvePending", e);
+                    if (car != null && !_byCar.ContainsKey(car) && FreeBroken(car)) broken++; else gone++;
+                }
             }
-            Log.Info("Kontrakty surowca (174): z zapisu (" + why + ") " + ok + " kontraktow w drodze; pominiete (karawany albo celu juz nie ma) " + gone + ", zwolnione (wylaczone w MCM) " + freed + ".");
+            Log.Info("Kontrakty surowca (174): z zapisu (" + why + ") " + ok + " kontraktow w drodze; pominiete (karawany albo celu juz nie ma) " + gone
+                     + ", karawany zwolnione - rekord nieczytelny " + broken + ", zwolnione (wylaczone w MCM) " + freed + ".");
         }
 
         // ------------------------------------------------------------ wpiecie
@@ -550,8 +664,19 @@ namespace Armoury
                 var t = QuartermasterLaw.FindType("BannerKings.Behaviours.BKCaravansBehavior");
                 var m = t != null ? AccessTools.Method(t, "ReleaseCaravanFromHold", new[] { typeof(MobileParty) }) : null;
                 if (m != null) { h.Patch(m, prefix: new HarmonyMethod(typeof(MaterialOrders), nameof(ReleasePrefix))); ReleaseHooked = true; }
+                // recenzja 174: decyzje karawany z kontraktem - zamiast DoNotMakeNewDecisions (gra pomija wtedy ucieczke) prefiks godzinnego ticku BK i gry
+                // z BK decyduje tick BK (tick gry wylacza latka BK CaravansCampaignBehavior_HourlyTickParty_Skip), bez BK - tick gry
+                try
+                {
+                    var mh = t != null ? AccessTools.Method(t, "HourlyTickParty", new[] { typeof(MobileParty) })
+                                       : AccessTools.Method(typeof(TaleWorlds.CampaignSystem.CampaignBehaviors.CaravansCampaignBehavior), "HourlyTickParty", new[] { typeof(MobileParty) });
+                    if (mh != null) { h.Patch(mh, prefix: new HarmonyMethod(typeof(MaterialOrders), nameof(HourlyPrefix))); HourlyHooked = true; }
+                }
+                catch (Exception e) { Log.Error("MaterialOrders.ApplyAll(HourlyTickParty)", e); }
                 Log.Info("MaterialOrders (174.2): kontrakty surowca dla prawdziwych karawan " + (On ? "CZYNNE" : "wylaczone w MCM") + "; BK ReleaseCaravanFromHold (cel po oblezeniu) "
-                         + (ReleaseHooked ? "wpiety - karawana z kontraktem jedzie dalej do celu" : (t == null ? "bez BK - nic do wpiecia" : "BRAK metody")) + ".");
+                         + (ReleaseHooked ? "wpiety - karawana z kontraktem jedzie dalej do celu" : (t == null ? "bez BK - nic do wpiecia" : "BRAK metody"))
+                         + "; HourlyTickParty karawan (" + (t != null ? "BK" : "gra") + ") " + (HourlyHooked ? "wpiety - karawana z kontraktem bez nowego celu, AI gry czynne (ucieczka)"
+                         : "BRAK - AI karawany z kontraktem wstrzymane wzorem DTE (nie ucieka)") + ".");
             }
             catch (Exception e) { Log.Error("MaterialOrders.ApplyAll", e); }
         }

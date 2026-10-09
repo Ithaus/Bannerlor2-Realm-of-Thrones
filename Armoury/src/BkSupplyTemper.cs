@@ -161,7 +161,7 @@ namespace Armoury
                     if (v != 0f) { set.Invoke(sup, new object[] { 0f }); ArmsLeaks.BkReset++; }
                 }
             }
-            catch (Exception e) { Log.Error("BkSupplyTemper.ArmsZero", e); }
+            catch (Exception e) { ArmsLeaks.Stumble("BkSupplyTemper.ArmsZero", e); }   // recenzja 174: raz w logu, reszta w liczniku linii "Uzbrojenie (ujscia 174)"
         }
 
         /// <summary>Recenzja 172: prefiks PartySupplies.BuyItems() (Tick i wejscie do osady). Partie z ludzmi ponizej MinimumSoldiersThreshold
@@ -193,7 +193,7 @@ namespace Armoury
                     if (sh != 0f) { _shieldSet.Invoke(__instance, new object[] { 0f }); ArmsLeaks.BkReset++; }
                 }
             }
-            catch (Exception e) { Log.Error("BkSupplyTemper.NeedsBuyPrefix(bron)", e); }
+            catch (Exception e) { ArmsLeaks.Stumble("BkSupplyTemper.NeedsBuyPrefix(bron)", e); }
         }
 
         internal static void ApplyAll(HarmonyLib.Harmony h)

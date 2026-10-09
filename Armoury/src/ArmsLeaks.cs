@@ -53,7 +53,7 @@ namespace Armoury
             _lastStacks = -1; _errSites.Clear();
         }
 
-        private static void Stumble(string where, Exception e)
+        internal static void Stumble(string where, Exception e)   // internal: BkSupplyTemper (bron i tarcze BK) liczy tu swoje potkniecia (recenzja 174)
         {
             _stumbles++; _stumblesAll++;
             if (_errSites.Add(where)) Log.Error("ArmsLeaks." + where, e);

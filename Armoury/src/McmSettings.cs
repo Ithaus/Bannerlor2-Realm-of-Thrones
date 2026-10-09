@@ -2840,27 +2840,27 @@ namespace Armoury
         [SettingPropertyGroup("Arms production")]
         public bool WorkshopChooseByShortage { get; set; } = true;
 
-        [SettingPropertyBool("Workshop Munition Grade", HintText = "when armour or arms of tier 1-3 are short, every second piece begun of that kind is the quickest of its kind and tier - munition harness, as Paris made 500 sets in under three months in 1384 beside its better work")]
+        [SettingPropertyBool("Workshop Munition Grade", HintText = "when armour of tier 1-3 is short, every second piece begun is the quickest of that kind and tier - munition harness, as Paris made 500 sets in under three months in 1384 beside its better work")]
         [SettingPropertyGroup("Arms production")]
         public bool WorkshopMunitionGrade { get; set; } = true;
 
-        [SettingPropertyInteger("Workshop Munition Max Tier", 0, 12, "0", HintText = "highest tier made for munition when short (1-6)")]
+        [SettingPropertyInteger("Workshop Munition Max Tier", 1, 6, "0", HintText = "highest tier made for munition when short (1-6)")]
         [SettingPropertyGroup("Arms production")]
         public int WorkshopMunitionMaxTier { get; set; } = 3;
 
-        [SettingPropertyFloatingInteger("Workshop Munition Share", 0.00f, 2.00f, "0.00", HintText = "share of the pieces begun in a short kind that are made for munition (0-1)")]
+        [SettingPropertyFloatingInteger("Workshop Munition Share", 0.00f, 1.00f, "0.00", HintText = "share of the pieces begun in a short kind that are made for munition (0-1)")]
         [SettingPropertyGroup("Arms production")]
         public float WorkshopMunitionShare { get; set; } = 0.5f;
 
-        [SettingPropertyFloatingInteger("Workshop Line Shortage Share", 0.00f, 3.00f, "0.00", HintText = "share of a craft's hands that follow the shortage of its lines; the rest is spread evenly, and a line with a piece in hand keeps at least an even share until it is finished (0-1)")]
+        [SettingPropertyFloatingInteger("Workshop Line Shortage Share", 0.00f, 1.00f, "0.00", HintText = "share of a craft's hands that follow the shortage of its lines; the rest is spread evenly, and a line with a piece in hand keeps at least an even share until it is finished (0-1)")]
         [SettingPropertyGroup("Arms production")]
         public float WorkshopLineShortageShare { get; set; } = 0.75f;
 
-        [SettingPropertyFloatingInteger("Workshop Plan Days", 0.00f, 240.00f, "0.00", HintText = "a workshop starts no piece it cannot finish within this many days with an even share of its craft's hands, and banks no more than this many days of work (14-120)")]
+        [SettingPropertyFloatingInteger("Workshop Plan Days", 14.00f, 120.00f, "0", HintText = "a workshop starts no piece it cannot finish within this many days with an even share of its craft's hands, and banks no more than this many days of work (14-120)")]
         [SettingPropertyGroup("Arms production")]
         public float WorkshopPlanDays { get; set; } = 60f;
 
-        [SettingPropertyBool("Town Material Orders", HintText = "a town whose smiths, fletchers, weavers or tanners stood idle for want of a raw material hires a caravan in a nearby friendly town that has more than it needs: the caravan buys the load there at the market price and carries it by road - a real party on the map that bandits can rob - and sells it to the town on arrival")]
+        [SettingPropertyBool("Town Material Orders", HintText = "a town whose smiths, fletchers, weavers or tanners stood idle for want of a raw material hires a caravan in a nearby friendly town that has more than it needs: the caravan buys the load there at the market price and carries it by road - a real party on the map that bandits can rob - and sells it to the town on arrival. Before removing the mod, switch this off and play one day")]
         [SettingPropertyGroup("Arms production")]
         public bool TownMaterialOrders { get; set; } = true;
 
@@ -2872,17 +2872,21 @@ namespace Armoury
         [SettingPropertyGroup("Arms production")]
         public float TownMaterialOrderRange { get; set; } = 600f;
 
-        [SettingPropertyInteger("Town Material Order Days", 0, 12, "0", HintText = "a town orders the same raw material at most once in this many days")]
+        [SettingPropertyInteger("Town Material Order Days", 1, 30, "0", HintText = "a town orders the same raw material at most once in this many days")]
         [SettingPropertyGroup("Arms production")]
         public int TownMaterialOrderDays { get; set; } = 3;
 
-        [SettingPropertyFloatingInteger("Carter Pence Per Kg Per100", 0.00f, 1.00f, "0.00", HintText = "cost of carrying one kilogram 100 leagues by road, which the caravan must earn before it takes the order (about 1.5 pence a ton a mile in 14th-century England)")]
+        [SettingPropertyFloatingInteger("Carter Pence Per Kg Per100", 0.0000f, 0.1500f, "0.0000", HintText = "cost of carrying one kilogram 100 leagues by road, which the caravan must earn before it takes the order (about 1.5 pence a ton a mile in 14th-century England)")]
         [SettingPropertyGroup("Arms production")]
         public float CarterPencePerKgPer100 { get; set; } = 0.0375f;
 
         [SettingPropertyFloatingInteger("Sea Freight Share", 0.00f, 1.00f, "0.00", HintText = "cost of a sea leg as a share of the same distance by road")]
         [SettingPropertyGroup("Arms production")]
         public float SeaFreightShare { get; set; } = 0.25f;
+
+        [SettingPropertyFloatingInteger("Town Material Order Min Load Kg", 0.00f, 1000.00f, "0", HintText = "smallest load (kilograms) worth a caravan leaving its trade for the road; a smaller shortage waits until it grows")]
+        [SettingPropertyGroup("Arms production")]
+        public float TownMaterialOrderMinLoadKg { get; set; } = 100f;
 
         [SettingPropertyBool("Workshop Hands By People", HintText = "a town's arms craftsmen are counted from the people of its market - the town and the villages that sell there, as the realm tables give them - and a richer town keeps more masters; no town has fewer than under the old rule. Off: the old rule only")]
         [SettingPropertyGroup("Arms production")]
@@ -2928,11 +2932,11 @@ namespace Armoury
         [SettingPropertyGroup("Arms production")]
         public bool OldStockToScrap { get; set; } = false;
 
-        [SettingPropertyFloatingInteger("Old Stock Scrap Daily Share", 0.00f, 1.00f, "0.00", HintText = "share of that old surplus scrapped each day (1%)")]
+        [SettingPropertyFloatingInteger("Old Stock Scrap Daily Share", 0.000f, 0.100f, "0.000", HintText = "share of that old surplus scrapped each day (1%)")]
         [SettingPropertyGroup("Arms production")]
         public float OldStockScrapDailyShare { get; set; } = 0.01f;
 
-        [SettingPropertyFloatingInteger("Old Stock Scrap Yield", 0.00f, 2.00f, "0.00", HintText = "share of the ore a piece was forged from that comes back from its scrap")]
+        [SettingPropertyFloatingInteger("Old Stock Scrap Yield", 0.00f, 1.00f, "0.00", HintText = "share of the ore a piece was forged from that comes back from its scrap")]
         [SettingPropertyGroup("Arms production")]
         public float OldStockScrapYield { get; set; } = 0.5f;
 
@@ -3660,6 +3664,7 @@ namespace Armoury
             s.TownMaterialOrderDays = TownMaterialOrderDays;
             s.CarterPencePerKgPer100 = CarterPencePerKgPer100;
             s.SeaFreightShare = SeaFreightShare;
+            s.TownMaterialOrderMinLoadKg = TownMaterialOrderMinLoadKg;
             s.WorkshopHandsByPeople = WorkshopHandsByPeople;
             s.WorkshopHandsPer1000People = WorkshopHandsPer1000People;
             s.WorkshopHandsMaxPerTown = WorkshopHandsMaxPerTown;

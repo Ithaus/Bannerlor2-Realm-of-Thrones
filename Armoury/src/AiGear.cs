@@ -83,52 +83,61 @@ namespace Armoury
                 foreach (var kv in slots) if (Melee(kv.Key)) gapMelee += kv.Value;
                 foreach (var kv in have) if (Melee(kv.Key)) gapMelee -= kv.Value;
                 { int sb, hb; slots.TryGetValue((int)ItemObject.ItemTypeEnum.BodyArmor, out sb); have.TryGetValue((int)ItemObject.ItemTypeEnum.BodyArmor, out hb); gapBody = sb - hb; }
+                if (gapMelee <= 0 && gapBody <= 0) return 0;
                 var shelf = market.ItemRoster;
+                // recenzja 174 (koszt): jedno przejscie polki na wizyte - kandydaci z cena liczona raz na stos, malejaco wedlug skutecznosci do ceny;
+                // przed zakupem cena wybranego stosu liczona na nowo (polka zmienia sie po kazdym zakupie)
+                var cands = new List<SubCand>();
+                for (int i = 0; i < shelf.Count; i++)
+                {
+                    var el = shelf.GetElementCopyAtIndex(i);
+                    var it = el.EquipmentElement.Item;
+                    if (el.Amount <= 0 || it == null || ArmsPricing.IsUnique(it)) continue;
+                    bool isM = melee && gapMelee > 0 && Melee((int)it.ItemType), isB = body && gapBody > 0 && it.ItemType == ItemObject.ItemTypeEnum.BodyArmor;
+                    if (!isM && !isB) continue;
+                    int price = market.Town.MarketData.GetPrice(el.EquipmentElement, buyer, false, market.Party);
+                    if (price <= 0) continue;
+                    bool cloth = isB && it.ArmorComponent != null && it.ArmorComponent.MaterialType == ArmorComponent.ArmorMaterialTypes.Cloth;
+                    cands.Add(new SubCand { El = el.EquipmentElement, Left = el.Amount, Tier = TierOf(it), Price = price, Melee = isM, Cloth = cloth,
+                                            Score = (it.Effectiveness > 0f ? it.Effectiveness : 1f) / price });
+                }
+                if (cands.Count == 0) return 0;
+                cands.Sort((x, y) => y.Score.CompareTo(x.Score));
                 var keys = new List<int>(need.Keys); keys.Sort((a, b) => (b % 10).CompareTo(a % 10));   // najwyzsze szczeble najpierw
                 foreach (var k in keys)
                 {
+                    // recenzja 174: need tylko czytany - sztuka zastepcza nie liczy sie do szczebla, wiec nie tlumi zamowien warsztatom (NoteUnmetOnce)
+                    // ani zamowienia zalogi zamku w miescie; pokrywa "ochrone" (luka dowolnego szczebla), nie sygnal szczebla
                     int ty = k / 10, t = k % 10, deficit = need[k];
                     bool isMelee = melee && Melee(ty) && gapMelee > 0, isBody = body && ty == (int)ItemObject.ItemTypeEnum.BodyArmor && gapBody > 0;
                     if (deficit <= 0 || (!isMelee && !isBody)) continue;
-                    while (deficit > 0 && pieces < maxPieces && spent < budget && (isMelee ? gapMelee : gapBody) > 0)
+                    for (int ci = 0; ci < cands.Count && deficit > 0 && pieces < maxPieces && spent < budget && (isMelee ? gapMelee : gapBody) > 0; ci++)
                     {
-                        int bestI = -1, bestPrice = 0; float bestScore = 0f;
-                        for (int i = 0; i < shelf.Count; i++)
-                        {
-                            var el = shelf.GetElementCopyAtIndex(i);
-                            var it = el.EquipmentElement.Item;
-                            if (el.Amount <= 0 || it == null || ArmsPricing.IsUnique(it)) continue;
-                            int ti = TierOf(it);
-                            if (isMelee) { if (!Melee((int)it.ItemType) || ti > t) continue; }
-                            else
-                            {
-                                if (it.ItemType != ItemObject.ItemTypeEnum.BodyArmor || ti > t) continue;
-                                bool cloth = it.ArmorComponent != null && it.ArmorComponent.MaterialType == ArmorComponent.ArmorMaterialTypes.Cloth;
-                                if (!cloth && ti > Math.Max(1, t - 2)) continue;   // przeszywanica tieru <= swojego albo zbroja 2 tiery nizej
-                            }
-                            int price = market.Town.MarketData.GetPrice(el.EquipmentElement, buyer, false, market.Party);
-                            if (price <= 0 || price > budget - spent) continue;
-                            float score = (it.Effectiveness > 0f ? it.Effectiveness : 1f) / price;
-                            if (score > bestScore) { bestScore = score; bestI = i; bestPrice = price; }
-                        }
-                        if (bestI < 0) break;
-                        var pick = shelf.GetElementCopyAtIndex(bestI);
-                        int n = Math.Min(Math.Min(deficit, pick.Amount), Math.Min(maxPieces - pieces, (budget - spent) / bestPrice));
+                        var c = cands[ci];
+                        if (c.Left <= 0 || c.Melee != isMelee || c.Tier > t) continue;
+                        if (!isMelee && !c.Cloth && c.Tier > Math.Max(1, t - 2)) continue;   // przeszywanica tieru <= swojego albo zbroja 2 tiery nizej
+                        int price = market.Town.MarketData.GetPrice(c.El, buyer, false, market.Party);
+                        if (price <= 0 || price > budget - spent) continue;
+                        int n = Math.Min(Math.Min(deficit, c.Left), Math.Min(maxPieces - pieces, (budget - spent) / price));
                         n = Math.Min(n, isMelee ? gapMelee : gapBody);
-                        if (n <= 0) break;
-                        shelf.AddToCounts(pick.EquipmentElement, -n);
-                        deliver(pick.EquipmentElement, n, k, bestPrice);
-                        ArmsScrap.NoteBuy(market, pick.EquipmentElement.Item, n);
-                        spent += bestPrice * n; pieces += n; deficit -= n;
+                        if (n <= 0) continue;
+                        shelf.AddToCounts(c.El, -n);
+                        c.Left -= n; cands[ci] = c;
+                        deliver(c.El, n, k, price);
+                        ArmsScrap.NoteBuy(market, c.El.Item, n);
+                        spent += price * n; pieces += n; deficit -= n;
                         if (isMelee) { gapMelee -= n; _daySubMelee += n; } else { gapBody -= n; _daySubBody += n; }
-                        if (bought.Count < 6) bought.Add(pick.EquipmentElement.Item.StringId + " " + bestPrice + " (zastepcza)");
+                        if (bought.Count < 6) bought.Add(c.El.Item.StringId + " " + price + " (zastepcza)");
                     }
-                    need[k] = deficit;
                 }
             }
-            catch (Exception e) { Log.Error("AiGear.BuySubstitutes", e); }
+            catch (Exception e) { _subStumbles++; if (_subErrLogged.Add("BuySubstitutes")) Log.Error("AiGear.BuySubstitutes", e); }
             return spent;
         }
+
+        private struct SubCand { public EquipmentElement El; public int Left, Tier, Price; public float Score; public bool Melee, Cloth; }
+        private static int _subStumbles;
+        private static readonly HashSet<string> _subErrLogged = new HashSet<string>();   // recenzja 174: Log.Error raz na miejsce, reszta w liczniku linii dnia
 
         private static bool Look()
         {
@@ -566,8 +575,8 @@ namespace Armoury
         {
             if (_dayStamp >= 0 && (_dayVisits > 0))
                 Log.Info("ZakupyAI: dzien " + _dayStamp + " - " + _dayVisits + " wizyt, " + _dayPieces + " szt. kupionych za " + _dayGold + " zlota; w tym garnizony " + _dayGarrison + " zakupow za " + _dayGarrisonGold
-                         + "; zastepcze (174, pytanie 2): bron biala " + _daySubMelee + (SubstituteMeleeOn ? "" : " (wylaczone)") + ", zbroja na tulow " + _daySubBody + (SubstituteBodyOn ? "" : " (wylaczone)") + ".");
-            _daySubMelee = 0; _daySubBody = 0;
+                         + "; zastepcze (174, pytanie 2): bron biala " + _daySubMelee + (SubstituteMeleeOn ? "" : " (wylaczone)") + ", zbroja na tulow " + _daySubBody + (SubstituteBodyOn ? "" : " (wylaczone)") + (_subStumbles > 0 ? "; potkniecia zastepczych " + _subStumbles : "") + ".");
+            _daySubMelee = 0; _daySubBody = 0; _subStumbles = 0;
             _dayPieces = 0; _dayGold = 0; _dayVisits = 0; _dayLogged = 0; _dayGarrison = 0; _dayGarrisonGold = 0;
         }
     }

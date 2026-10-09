@@ -275,9 +275,10 @@ namespace Armoury
                             if (r != 0) { reason = Math.Max(reason, r); continue; }
                             // (E) 174.1: nie zaczynaj sztuki, ktorej nie skonczysz w planie - podloga: rowny podzial rak cechu (linia ze sztuka w robocie ja ma)
                             if (planOn && c.Days > planCap) { _rejPlan++; planRej = true; continue; }
-                            // (C) 174.1: w koszyku z brakiem (tier <= WorkshopMunitionMaxTier) czesc rozpoczetych sztuk to najszybsza w robocie ("na amunicje")
+                            // (C) 174.1: w koszyku ZBROI z brakiem (tier <= WorkshopMunitionMaxTier) czesc rozpoczetych sztuk to najszybsza w robocie ("na amunicje");
+                            // recenzja 174: tylko zbroja (specyfikacja 3.2 C i pytanie 3 Jeffa) - bron, tarcze, luki i kusze bez zmian
                             bool mun = false;
-                            if (MunitionOn && c.Short > 0f && c.Basket % 10 <= MunitionMaxTier)
+                            if (MunitionOn && c.Short > 0f && c.Basket % 10 <= MunitionMaxTier && ArmourKind(c.Item))
                             {
                                 w.MunAcc += MunitionShare;
                                 if (w.MunAcc >= 1f)
@@ -500,9 +501,22 @@ namespace Armoury
 
         private static int TierOf(ItemObject it) { try { return Math.Max(1, Math.Min(6, (int)it.Tier + 1)); } catch { return 1; } }
 
+        /// <summary>Zbroja ludzi (helm, korpus, nogi, rece, plaszcz) - zakres (C) "na amunicje"; bez uprzezy koni.</summary>
+        private static bool ArmourKind(ItemObject it)
+        {
+            if (it == null) return false;
+            var t = it.ItemType;
+            return t == ItemObject.ItemTypeEnum.HeadArmor || t == ItemObject.ItemTypeEnum.BodyArmor || t == ItemObject.ItemTypeEnum.LegArmor
+                || t == ItemObject.ItemTypeEnum.HandArmor || t == ItemObject.ItemTypeEnum.Cape || t == ItemObject.ItemTypeEnum.ChestArmor;
+        }
+
         // ------------------------------------------------------------ 174.1: przedmioty cywilne bez zolnierza
-        // Civilian="true" i nieobecne w zadnym wzorcu oddzialu (BattleEquipments postaci nie-bohaterow) - lista raz na sesje. ladys_shoe (t1, SandBoxCore)
-        // nie wystepuje w zadnym wzorcu ROT: krawcy szyli 110-150 par dziennie jako "buty wojska" (A171). Poza liniami zbrojnymi i poza ColdStart.
+        // Civilian="true" i nieobecne w zadnym wzorcu oddzialu - lista raz na sesje. ladys_shoe (t1, SandBoxCore) nie wystepuje w zadnym wzorcu oddzialu ROT:
+        // krawcy szyli 110-150 par dziennie jako "buty wojska" (A171). Poza liniami zbrojnymi i poza ColdStart.
+        // Recenzja 174: WZORZEC ODDZIALU = postac nie-bohater o zawodzie zolnierskim (Soldier, Mercenary, Bandit, Gangster, CaravanGuard, Guard, PrisonGuard,
+        // BannerBearer) albo osiagalna z drzew kultur (BasicTroop, EliteBasicTroop i ich UpgradeTargets - oddzialy innych modow bez zawodu). Dotad brane byly
+        // wszystkie postaci nie-bohaterow: mieszczanki, wiesniaczki i dzieci maja ladys_shoe w bojowym EquipmentRoster (ROT notablesROT.xml townswoman_qartheen,
+        // SandBoxCore village_woman_empire), wiec filtr nie odcinal glownego celu.
         private static HashSet<ItemObject> _soldierItems;
         internal static bool CivilianOnly(ItemObject it)
         {
@@ -512,21 +526,41 @@ namespace Armoury
                 var set = new HashSet<ItemObject>();
                 try
                 {
-                    foreach (var ch in CharacterObject.All)
+                    var troops = new HashSet<CharacterObject>();
+                    foreach (var ch in CharacterObject.All) if (ch != null && !ch.IsHero && SoldierTrade(ch.Occupation)) troops.Add(ch);
+                    var stack = new Stack<CharacterObject>();
+                    foreach (var cu in MBObjectManager.Instance.GetObjectTypeList<CultureObject>())
                     {
-                        if (ch == null || ch.IsHero) continue;
+                        if (cu == null) continue;
+                        if (cu.BasicTroop != null) stack.Push(cu.BasicTroop);
+                        if (cu.EliteBasicTroop != null) stack.Push(cu.EliteBasicTroop);
+                    }
+                    var seen = new HashSet<CharacterObject>();
+                    while (stack.Count > 0)
+                    {
+                        var ch = stack.Pop();
+                        if (ch == null || ch.IsHero || !seen.Add(ch)) continue;
+                        troops.Add(ch);
+                        if (ch.UpgradeTargets != null) foreach (var u in ch.UpgradeTargets) if (u != null) stack.Push(u);
+                    }
+                    foreach (var ch in troops)
                         foreach (var eq in ch.BattleEquipments)
                         {
                             if (eq == null) continue;
                             for (int sl = 0; sl < 12; sl++) { var x = eq[(EquipmentIndex)sl].Item; if (x != null) set.Add(x); }
                         }
-                    }
                 }
                 catch (Exception e) { Log.Error("WorkshopLaw.CivilianOnly", e); }
                 if (set.Count == 0) return false;   // postaci jeszcze nie wczytane - nie zgadujemy
                 _soldierItems = set;
             }
             return !_soldierItems.Contains(it);
+        }
+
+        private static bool SoldierTrade(Occupation o)
+        {
+            return o == Occupation.Soldier || o == Occupation.Mercenary || o == Occupation.Bandit || o == Occupation.Gangster || o == Occupation.CaravanGuard
+                || o == Occupation.Guard || o == Occupation.PrisonGuard || o == Occupation.BannerBearer;
         }
 
         private static string LineKey(WorkshopType.Production p)
@@ -676,14 +710,18 @@ namespace Armoury
 
         // 174.3: ludzie rynku miasta z tabeli krain - pamiec dnia (jeden przebieg osad na dobe)
         private static readonly Dictionary<Town, float> _market = new Dictionary<Town, float>();
-        private static int _marketDay = -1;
+        private static int _marketDay = -1, _marketTries;
         private static float _marketOut;
+        private static bool _marketErrLogged;
         internal static float MarketPeople(Town town)
         {
             if (town == null) return 0f;
             int day = (int)CampaignTime.Now.ToDays;
-            if (day != _marketDay || _market.Count == 0)
+            // recenzja 174: pusta tabela (PopulationScale 0, wyjatek, ludnosc jeszcze nie gotowa) - najwyzej 3 przebiegi osad na dobe, nie przy kazdym TownHands
+            if (day != _marketDay || (_market.Count == 0 && _marketTries < 3))
             {
+                if (day != _marketDay) _marketTries = 0;
+                _marketTries++;
                 _market.Clear(); _marketOut = 0f; _marketDay = day;
                 try
                 {
@@ -700,7 +738,7 @@ namespace Armoury
                         float v; _market.TryGetValue(t, out v); _market[t] = v + p;
                     }
                 }
-                catch (Exception e) { Log.Error("WorkshopLaw.MarketPeople", e); }
+                catch (Exception e) { _planStumbles++; if (!_marketErrLogged) { _marketErrLogged = true; Log.Error("WorkshopLaw.MarketPeople", e); } }
             }
             float r; return _market.TryGetValue(town, out r) ? r : 0f;
         }
@@ -865,20 +903,28 @@ namespace Armoury
                     foreach (var g in nG.Keys) { wAct += GuildWeight(g); shortAll += shortG[g]; }
                     if (wAct <= 0f || wAll <= 0f) break;
                     float freed = H * Math.Max(0f, wAll - wAct) / wAll;
+                    // wpis 91 + 174.0 (e): kowale, ktorzy wczoraj naprawiali, i konserwacja zapasu na polce - mniej rak platnerzy i miecznikow (ukryty warsztat)
+                    float smithW = GuildWeight("platnerz") + GuildWeight("miecznik"), repairPool = 0f;
+                    if (workshop.WorkshopType.IsHidden && smithW > 0f)
+                        repairPool = (SmithHours.ManDaysYesterday(town) + ArmsLeaks.UpkeepManDays(town)) / Math.Max(1, ActiveSmithWorkshops(town));
+                    // recenzja 174: cech kowali nieczynny (miasto bez rudy) - jego czesc napraw i konserwacji odchodzi od rak zwolnionych, zanim pojda do innych
+                    // cechow (dotad te same rece liczyly sie dwa razy: naprawy w SmithHours i praca w innym cechu; konserwacja byla darmowa)
+                    if (repairPool > 0f)
+                        foreach (var g in GuildOrder)
+                        {
+                            if ((g != "platnerz" && g != "miecznik") || !guilds.Contains(g) || nG.ContainsKey(g)) continue;
+                            float cutI = Math.Min(Math.Min(freed, H * GuildWeight(g) / wAll), repairPool * GuildWeight(g) / smithW);
+                            freed -= cutI; repairs += cutI;
+                        }
                     foreach (var g in nG.Keys)
                     {
                         float own = H * GuildWeight(g) / wAll;
                         float extra = freedByShort && shortAll > 0f ? freed * shortG[g] / shortAll : freed * GuildWeight(g) / wAct;
                         float h = own + extra;
-                        // wpis 91 + 174.0 (e): kowale, ktorzy wczoraj naprawiali, i konserwacja zapasu na polce - mniej rak platnerzy i miecznikow
-                        if (workshop.WorkshopType.IsHidden && (g == "platnerz" || g == "miecznik"))
+                        if (repairPool > 0f && (g == "platnerz" || g == "miecznik"))
                         {
-                            float smithW = GuildWeight("platnerz") + GuildWeight("miecznik");
-                            if (smithW > 0f)
-                            {
-                                float cut = Math.Min(h, (SmithHours.ManDaysYesterday(town) + ArmsLeaks.UpkeepManDays(town)) * GuildWeight(g) / smithW / Math.Max(1, ActiveSmithWorkshops(town)));
-                                h -= cut; repairs += cut;
-                            }
+                            float cut = Math.Min(h, repairPool * GuildWeight(g) / smithW);
+                            h -= cut; repairs += cut;
                         }
                         hg[g] = h; extraG[g] = extra;
                     }
@@ -929,7 +975,7 @@ namespace Armoury
                 }
                 _hands += H; _handsLines += toLines; _handsRepair += repairs;
             }
-            catch (Exception e) { _planStumbles++; Log.Error("WorkshopLaw.BuildPlan", e); }
+            catch (Exception e) { _planStumbles++; if (!_planErrLogged) { _planErrLogged = true; Log.Error("WorkshopLaw.BuildPlan", e); } }   // recenzja 174: raz w logu, reszta w liczniku potkniec
             return plan;
         }
 
@@ -959,6 +1005,7 @@ namespace Armoury
         private static float _hands, _handsLines, _handsRepair, _devMax;
         private static readonly float[] _gAssigned = new float[6], _gFreed = new float[6], _gUsed = new float[6];
         private static int _rejPlan, _skipPlan, _planIdleLines, _civSkipped, _mun, _madeT56, _planStumbles;
+        private static bool _planErrLogged;   // recenzja 174: Log.Error planu raz na sesje gry (potkniecia liczy _planStumbles)
         private static readonly float[] _qMun = new float[7], _qAll = new float[7];
         private static readonly int[] _qMunN = new int[7], _qAllN = new int[7];
         private static readonly Dictionary<int, float[]> _worldBasket = new Dictionary<int, float[]>();   // koszyk -> [popyt, polka, w toku, brak] (suma miast, raz na miasto na dobe)
