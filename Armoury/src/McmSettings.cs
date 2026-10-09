@@ -720,6 +720,10 @@ namespace Armoury
         [SettingPropertyGroup("The law of the battlefield")]
         public bool SpoilsQuartermasterRepair { get; set; } = true;
 
+        [SettingPropertyBool("Living Economy Sealed", HintText = "BetterEconomy (Living Economy) may not make gold vanish nor conjure goods, men or experience out of nothing: its actions that would pay your gold into nothing (contributions to a town or castle treasury, town and village investments, market access, armory, training camp, paid drill) stay in its menus but are closed and say why, and the Lord wealth realism switch in its ledger stays off; finished armories stop turning market iron into weapons from nothing, AI training camps stop handing out free experience, villages stop their second production from nothing, and the taking of lords' gold and the AI's 5000 market-access fee stop (the fee only once BetterEconomy's own settings shut village trade diversion - until then the fee is the only thing holding it back; off = BetterEconomy as before; the log shows what was stopped)")]
+        [SettingPropertyGroup("The living economy")]
+        public bool LivingEconomySealed { get; set; } = true;
+
         [SettingPropertyBool("Plague Spares Your Men", HintText = "sickness may weaken your men - it will not kill them: any troop death caused by a disease system is refused for YOUR party (the rest of the world still buries its dead)")]
         [SettingPropertyGroup("Plague shield")]
         public bool PlagueSparesYourMen { get; set; } = true;
@@ -2911,6 +2915,7 @@ namespace Armoury
             s.SpoilsNoAutoSale = SpoilsNoAutoSale;
             s.SpoilsNoFreeGold = SpoilsNoFreeGold;
             s.SpoilsQuartermasterRepair = SpoilsQuartermasterRepair;
+            s.LivingEconomySealed = LivingEconomySealed;
             s.PlagueSparesYourMen = PlagueSparesYourMen;
             s.PlagueShieldLogEvery = PlagueShieldLogEvery;
             s.DesertionLawEnabled = DesertionLawEnabled;
