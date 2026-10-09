@@ -392,7 +392,7 @@ namespace Armoury
         }
         private Dictionary<string,int> _prisonerBaseline;
 
-        public ArmouryBehavior() { Instance = this; HistoricalPrices.Reset(); MaterialLaw.Reset(); WesterosClimate.Reset(); OutlawLaw.Reset(); PopulationLaw.Reset(); WorkshopLaw.Reset(); IronBank.Reset(); MarketGlut.Reset(); ArmsPricing.Reset(); StartKit.Reset(); AiGear.Reset(); Levy.Reset(); VolunteerKit.Reset(); LevyGold.Reset(); WearKeep.Reset(); UniqueSpoils.Reset(); BuildDiary.Reset(); BuildFunding.Reset(); KingdomLedger.Reset(); ColdStart.Reset(); MenPurse.Reset(); ArmyClothing.Reset(); AiWear.Reset(); SmithHours.Reset(); RecruitKit.Reset(); OreLedger.Reset(); GoodsLedger.Reset(); FreeSupplies.Reset(); VillageWoodlot.Reset(); SpoilsSeal.Reset(); MarketRoad.Reset(); MarketCarts.Reset(); VillageClogDiag.Reset(); CartTownExit.Reset(); MoneyLedger.Reset(); PeopleLedger.Reset(); CaravanBulk.Reset(); StartStock.Reset(); MineralOnce.Reset(); SoldierPay.Reset(); KingdomTreasury.Reset(); RecruitCost.Reset(); NightRest.ResetWorld(); WorldMeasure.Reset(); CirculationWindows.Reset(); ClanIncomeBook.Reset(); LosersFlee.Reset(); PrisonerLaw.Reset(); RecruitSources.Reset(); GarrisonCarts.Reset(); GarrisonArmory.Reset(); ArmsDrill.Reset(); CaravanAmmo.Reset(); ArmsLeaks.Reset(); SupplyDemand.ResetOrders(); MaterialOrders.Reset(); RawNoRot.Reset(); ArmsScrap.Reset(); MenUpgrade.Reset(); GarrisonKit.Reset(); QuartermasterLaw.Reset(); ShelfBuy.Reset(); Measure174b.Reset(); ShelfIndex.Reset(); Cost174.Reset(); }   // stan jednej kampanii nie przecieka do drugiej (audyt 04.10)
+        public ArmouryBehavior() { Instance = this; HistoricalPrices.Reset(); MaterialLaw.Reset(); WesterosClimate.Reset(); OutlawLaw.Reset(); PopulationLaw.Reset(); WorkshopLaw.Reset(); IronBank.Reset(); MarketGlut.Reset(); ArmsPricing.Reset(); StartKit.Reset(); AiGear.Reset(); Levy.Reset(); VolunteerKit.Reset(); LevyGold.Reset(); WearKeep.Reset(); UniqueSpoils.Reset(); BuildDiary.Reset(); BuildFunding.Reset(); KingdomLedger.Reset(); ColdStart.Reset(); MenPurse.Reset(); ArmyClothing.Reset(); AiWear.Reset(); SmithHours.Reset(); RecruitKit.Reset(); OreLedger.Reset(); GoodsLedger.Reset(); FreeSupplies.Reset(); VillageWoodlot.Reset(); SpoilsSeal.Reset(); MarketRoad.Reset(); MarketCarts.Reset(); VillageClogDiag.Reset(); CartTownExit.Reset(); MoneyLedger.Reset(); PeopleLedger.Reset(); CaravanBulk.Reset(); StartStock.Reset(); MineralOnce.Reset(); SoldierPay.Reset(); KingdomTreasury.Reset(); RecruitCost.Reset(); NightRest.ResetWorld(); WorldMeasure.Reset(); CirculationWindows.Reset(); ClanIncomeBook.Reset(); LosersFlee.Reset(); PrisonerLaw.Reset(); RecruitSources.Reset(); GarrisonCarts.Reset(); GarrisonArmory.Reset(); ArmsDrill.Reset(); CaravanAmmo.Reset(); ArmsLeaks.Reset(); SupplyDemand.ResetOrders(); MaterialOrders.Reset(); RawNoRot.Reset(); ArmsScrap.Reset(); MenUpgrade.Reset(); GarrisonKit.Reset(); QuartermasterLaw.Reset(); ShelfBuy.Reset(); Measure174b.Reset(); ShelfIndex.Reset(); Cost174.Reset(); Drill.Reset(); }   // stan jednej kampanii nie przecieka do drugiej (audyt 04.10)
 
         public override void SyncData(IDataStore dataStore)
         {
@@ -430,6 +430,10 @@ namespace Armoury
                 string nightrest = NightRest.Export();
                 SaveText.Sync(dataStore, "arm_nightrest", ref nightrest);
                 if (dataStore.IsLoading) NightRest.Import(nightrest);
+                // T10: ksiega snu partii AI (dlugi, odpoczynek doby, sen ciagly) - stary zapis bez klucza = AI bez dlugu
+                string nightAi = NightRest.ExportAi(dataStore.IsSaving);
+                SaveText.Sync(dataStore, "arm_nightrest_ai", ref nightAi);
+                if (dataStore.IsLoading) NightRest.ImportAi(nightAi);
                 // ludnosc krain: ludzi na punkt hearth/dobrobytu (Jeff 04.10)
                 string popk = PopulationLaw.Export();
                 SaveText.Sync(dataStore, "arm_population", ref popk);
@@ -538,6 +542,10 @@ namespace Armoury
             // (z probnym odczytem), brak klucza = zapis sprzed 174b (rozgrzewka od zera, jak dotad); rozwiazanie w OnSessionLaunched
             try { string sc = dataStore.IsSaving ? ArmsScrap.Export() : null; SaveText.Sync(dataStore, "arm_scrap", ref sc); if (dataStore.IsLoading) ArmsScrap.Import(sc); }
             catch (Exception e) { Log.Error("SyncData.arm_scrap", e); try { if (dataStore.IsLoading) ArmsScrap.ImportFailed(); } catch { } }
+            // musztra: zapas cwiczebny gracza, maska godzin ruchu gracza, liczniki zuzycia i zlom czekajacy na kowali, flaga zasilenia autotestu - wlasny try;
+            // Export tylko przy zapisie; brak klucza (stary zapis) = pusty zapas (linia "Musztra: start ... z zapisu: brak klucza")
+            try { string dr = dataStore.IsSaving ? Drill.Export() : null; SaveText.Sync(dataStore, "arm_drill", ref dr); if (dataStore.IsLoading) Drill.Import(dr); }
+            catch (Exception e) { Log.Error("SyncData.arm_drill", e); }
         }
 
         public override void RegisterEvents()
@@ -560,6 +568,12 @@ namespace Armoury
             CampaignEvents.DailyTickPartyEvent.AddNonSerializedListener(this, MenPurse.OnDailyTickParty);   // K1 (A4): doba postoju druzyny gracza w miescie - braki i lepsze za swoje
             CampaignEvents.DailyTickPartyEvent.AddNonSerializedListener(this, UniqueSpoils.OnDailyTickParty);
             CampaignEvents.DailyTickPartyEvent.AddNonSerializedListener(this, ArmyClothing.OnDailyTickParty);   // 150: zuzycie odziezy w partiach rodow
+            // musztra: sprzet wyrzucony na ekranach z bialej listy -> zapas cwiczebny; zlom z cwiczen do kowali przy wejsciu do miasta; godziny ruchu partii;
+            // zlom czekajacy w rozbitej partii przepada (licznik)
+            CampaignEvents.OnItemsDiscardedByPlayerEvent.AddNonSerializedListener(this, Drill.OnDiscarded);
+            CampaignEvents.SettlementEntered.AddNonSerializedListener(this, Drill.OnEntered);
+            CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, Drill.OnPartyDestroyed);
+            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, delegate { try { Drill.Hourly(); } catch (Exception e) { Log.Error("Drill.Hourly", e); } });
             // SUWAKI MCM NA ZYWO (Jeff 03.09: "nadal 1 predkosc, o co chodzi" -
             // World Pace Percent przestawiony w grze nie dzialal). McmSettings.Apply()
             // szlo TYLKO w OnGameStart, wiec kazda zmiana w Mod Options czekala
@@ -597,7 +611,7 @@ namespace Armoury
             CampaignEvents.OnTroopRecruitedEvent.AddNonSerializedListener(this, PeopleLedger.OnTroopRecruited);
             CampaignEvents.OnUnitRecruitedEvent.AddNonSerializedListener(this, PeopleLedger.OnUnitRecruited);
             CampaignEvents.OnTroopsDesertedEvent.AddNonSerializedListener(this, PeopleLedger.OnTroopsDeserted);
-            CampaignEvents.OnPrisonerReleasedEvent.AddNonSerializedListener(this, PrisonerLaw.OnReleased);   // I1: gracz wypuscil jencow - w krainie bez niewoli do domu / na Mur
+            CampaignEvents.OnPrisonerReleasedEvent.AddNonSerializedListener(this, PrisonerLaw.OnReleased);   // I1: gracz wypuscil jencow - w krainie bez niewoli do domu / na Mur (I1b: w krainie z niewola do domu)
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, delegate { try { OutlawLaw.Hourly(); } catch { } });
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, OnMapEventEnded);
             CampaignEvents.MapEventStarted.AddNonSerializedListener(this, OnMapEventStarted);
@@ -1043,10 +1057,12 @@ namespace Armoury
             try { GarrisonArmory.Restore("wczytanie"); } catch (Exception e) { Log.Error("GarrisonArmory.Restore", e); }   // sklad7: jedyne odtworzenie zbrojowni zalog (K1c GarrisonKit.RestoreArmories usuniete)
             try { RecruitSources.ApplyLate(); } catch (Exception e) { Log.Error("RecruitSources.ApplyLate", e); }
             try { ArmsDrill.EnsureHooks(); } catch (Exception e) { Log.Error("ArmsDrill.EnsureHooks", e); }
+            try { Drill.SessionStart(); } catch (Exception e) { Log.Error("Drill.SessionStart", e); }   // musztra: zapas z zapisu, opisy perkow kwatermistrza, linia startowa
             try { FixCharcoalWeight(); } catch (Exception e) { Log.Error("FixCharcoalWeight", e); }   // wpis 87 (audyt pkt 11d): waga wegla PRZED wycena
             try { LootPrices.Apply(); } catch (Exception e) { Log.Error("LootPrices", e); }   // wpis 97: cena lupu = stan
             try { McmSettings.Apply(); MaterialLaw.Apply(); ArmsPricing.Build(); HistoricalPrices.Apply(); StartStock.Run(); ArmsPricing.ClearCostCache(); MapClock.ApplySpeed(); UniqueSpoils.OnSessionLaunched(); ColdStart.Run(); } catch (Exception e) { Log.Error("MaterialLaw/ArmsPricing", e); }   // surowce PRZED wycena uzbrojenia; StartStock zaraz PO Apply (przelicznik ladunku juz obowiazuje)
             try { VillageClimate.Apply(); } catch (Exception e) { Log.Error("VillageClimate.Apply", e); }   // T8: typ wsi wedlug klimatu (PO McmSettings.Apply; bez zapisu)
+            try { PrisonerLaw.SessionLine(); } catch (Exception e) { Log.Error("PrisonerLaw.SessionLine", e); }   // I1b: krainy z niewola (warownie, krolestwa H3) - tylko log
             try { VillageWoodlot.Calibrate(true); } catch (Exception e) { Log.Error("VillageWoodlot.Calibrate", e); }   // T8: stala lasu wedlug klimatu PO zmianie typow (drwale)
             try { Stables.BuildRiderMap(); } catch (Exception e) { Log.Error("Stables.BuildRiderMap", e); }
             try { MountedWage.EnsureContextHooks(); } catch (Exception e) { Log.Error("MountedWage.EnsureContextHooks", e); }   // paczka 160: zold partii - karawany bez premii konnego (latka w kampanii)
@@ -1342,6 +1358,7 @@ namespace Armoury
             try { GarrisonKit.ClanFillOnce(); } catch (Exception e) { Log.Error("GarrisonKit.ClanFillOnce", e); }   // sklad7b-p: raz na sesje - wypelnienie zbrojowni partii Twojego rodu
             try { ArmsDrill.Daily(); } catch (Exception e) { Log.Error("ArmsDrill.Daily", e); }             // linie "Cwiczenia (171)" i co 5 dob "Pokrycie zbrojowni AI (171)" (tylko log)
             try { Measure174b.Daily(); } catch (Exception e) { Log.Error("Measure174b.Daily", e); }         // 174b.0: linie "Zbroja na polkach (174b)" i "ZakupyAI wedlug kupujacego (174b)" (tylko log)
+            try { Drill.Daily(); } catch (Exception e) { Log.Error("Drill.Daily", e); }                     // musztra: "Musztra (gracz)", "Musztra AI", co 5 dob "Musztra AI wedlug krolestw"; zasilenie zapasu w autotescie
             try { SupplyDemand.DailyTrade(); } catch (Exception e) { Log.Error("SupplyDemand.DailyTrade", e); }
             try { MoneyLedger.Mark(MoneyLedger.MRest); } catch { }   // 174.2: kasy osad przed kontraktami - pozostale moduly osobno
             try { MaterialOrders.Daily(); } catch (Exception e) { Log.Error("MaterialOrders.Daily", e); }   // 174.2: kontrakty surowca dla prawdziwych karawan (po handlu bronia i wozach zamkow), linia "Kontrakty surowca (174)"

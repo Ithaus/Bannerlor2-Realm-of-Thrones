@@ -68,11 +68,61 @@ namespace Armoury
         private const int VeteranTier = 4;
         // kultury z niewolnictwem wedlug Martina (decyzja Jeffa 07.10 pkt 5 i 6a; bez Pentos i Lorath) - jedna lista, ktora ma przejac
         // rabunek osada po osadzie: Zatoka Niewolnicza, Volantis, Lys, Myr, Tyrosh, Qohor, Norvos, Valyria, Dothrakowie (ROT: khuzait),
-        // Zelazni Ludzie (thralls; ROT: sturgia = Iron Islands)
+        // Zelazni Ludzie (thralls; ROT: sturgia = Iron Islands), Qarth (I1b: decyzja Jeffa 09.10 pkt 19; ADWD 16, 23 - Qarth zyje
+        // z niewolnikow; ROT: qartheen = Qarth, Nowe Ghis, Qarkash, Miasto Kosci, krolestwo qarth)
         private static readonly HashSet<string> SlaveCultureIds = new HashSet<string>
-            { "ghiscari", "volantine", "lyseni", "myrish", "tyroshi", "qohorik", "norvos", "valyrian", "khuzait", "sturgia" };
+            { "ghiscari", "volantine", "lyseni", "myrish", "tyroshi", "qohorik", "norvos", "valyrian", "khuzait", "sturgia", "qartheen" };
 
         internal static bool SlaveCulture(CultureObject c) { return c != null && c.StringId != null && SlaveCultureIds.Contains(c.StringId); }
+
+        /// <summary>
+        /// I1b: tekst linii startowej "Prawo jenca (I1b):" - warownie (miasta i zamki) kultur z listy wedlug kultury osady (prawo jenca I1)
+        /// i frakcje, ktorych kultura jest na liscie - krolestwa oraz rody bez krolestwa (H3: zwyciezca z taka kultura frakcji bierze w niewole
+        /// takze czesc taborow wsi). Kultura osady to kultura biezaca (BK zmienia ja po asymilacji i przy wczytaniu - w zapisie liczby moga
+        /// sie roznic od nowej kampanii). Id z listy bez zadnej warowni = literowka albo zmiana kultury przez BK - wypisane zamiast "-".
+        /// Tylko log, jeden przebieg po osadach, krolestwach i rodach.
+        /// </summary>
+        internal static string SlaveListText()
+        {
+            var byCul = new Dictionary<string, int>();
+            foreach (var id in SlaveCultureIds) byCul[id] = 0;
+            int sum = 0;
+            foreach (var st in Settlement.All)
+            {
+                if (st == null || !(st.IsTown || st.IsCastle)) continue;
+                var c = st.Culture;
+                if (c == null || c.StringId == null || !byCul.ContainsKey(c.StringId)) continue;
+                byCul[c.StringId]++; sum++;
+            }
+            var ids = new List<string>(byCul.Keys);
+            ids.Sort(StringComparer.Ordinal);
+            var none = new List<string>();
+            var sb = new StringBuilder();
+            for (int i = 0; i < ids.Count; i++)
+            {
+                if (i > 0) sb.Append(", ");
+                sb.Append(ids[i]).Append(' ').Append(byCul[ids[i]]);
+                if (byCul[ids[i]] == 0) none.Add(ids[i]);
+            }
+            sb.Append(" (razem ").Append(sum).Append("); id bez warowni: ").Append(none.Count == 0 ? "-" : string.Join(", ", none.ToArray()));
+            var ks = new List<string>();
+            foreach (var k in Kingdom.All)
+            {
+                if (k == null || !SlaveCulture(k.Culture)) continue;
+                ks.Add((k.Name != null ? k.Name.ToString() : "?") + " (" + k.StringId + "/" + k.Culture.StringId + (k.IsEliminated ? ", rozbite" : "") + ")");
+            }
+            sb.Append(" | krolestwa z niewola (H3, kultura krolestwa - zwyciezca bierze tez tabory wsi): ").Append(ks.Count == 0 ? "-" : string.Join(", ", ks.ToArray()));
+            // H3 patrzy na kulture FRAKCJI zwyciezcy (win.MapFaction); rod bez krolestwa jest wlasna frakcja (ROT: np. bright_banners,
+            // sons_of_the_harpy - ghiscari, is_minor_faction) - te tez biora w niewole tabory wsi
+            var cs = new List<string>();
+            foreach (var cl in Clan.All)
+            {
+                if (cl == null || cl.Kingdom != null || cl.IsEliminated || !SlaveCulture(cl.Culture)) continue;
+                cs.Add((cl.Name != null ? cl.Name.ToString() : "?") + " (" + cl.StringId + "/" + cl.Culture.StringId + ")");
+            }
+            sb.Append(" | rody bez krolestwa z niewola (H3, kultura rodu - tez biora tabory wsi): ").Append(cs.Count == 0 ? "-" : string.Join(", ", cs.ToArray()));
+            return sb.ToString();
+        }
 
         // ------------------------------------------------------------ latka
         private static AccessTools.FieldRef<MapEvent, bool> _appliedRef;

@@ -2112,7 +2112,7 @@ namespace Armoury
         [SettingPropertyGroup("Iron bank")]
         public float NonCombatantDeathPercent { get; set; } = 5f;
 
-        [SettingPropertyBool("Prisoner Law Enabled", HintText = "captives sold in a town or castle, or set free, in a land that keeps no slaves no longer become slaves: common men and soldiers go back to their own land, and in Westeros bandits and outlaws are sent to the Wall to take the black. Westeros but the Iron Islands, and Braavos, Pentos, Lorath and the other free lands, keep no slaves; Slaver's Bay, Volantis, Lys, Myr, Tyrosh, Qohor, Norvos, Valyria, the Dothraki and the Iron Islands (thralls) do, as before")]
+        [SettingPropertyBool("Prisoner Law Enabled", HintText = "captives sold in a town or castle, or set free, in a land that keeps no slaves no longer become slaves: common men and soldiers go back to their own land, and in Westeros bandits and outlaws are sent to the Wall to take the black. Westeros but the Iron Islands, and Braavos, Pentos, Lorath and the other free lands, keep no slaves; Slaver's Bay, Qarth (with New Ghys, Qarkash and the City of Bones), Volantis, Lys, Myr, Tyrosh, Qohor, Norvos, Valyria, the Dothraki and the Iron Islands (thralls) do: there captives sold, by the lords or by you at the ransom broker, become slaves of that town or castle, and captives you set free or leave behind after your battles go home. A land follows the present culture of its town or castle. In every land the criminal policy of the town or castle (yours to choose in your own fiefs) rules alike for the lords' sales and yours: Execution - the captives are put to death, Forgiveness - none are enslaved and they go home")]
         [SettingPropertyGroup("Iron bank")]
         public bool PrisonerLawEnabled { get; set; } = true;
 
@@ -2596,11 +2596,11 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public float AiTentRadius { get; set; } = 100f;
 
-        [SettingPropertyInteger("Ai Camp Skip Percent", 0, 60, "0", HintText = "this share of lord columns press on through any given night - not everyone pitches camp; army leaders are spared this roll while Army Leaders Always Camp is on")]
+        [SettingPropertyInteger("Ai Camp Skip Percent", 0, 60, "0", HintText = "this share of CARAVANS press on through any given night - not everyone pitches camp; lone lords roll it only while Ai Night March By Reason is off, army leaders never while Army Leaders Always Camp is on")]
         [SettingPropertyGroup("A night's rest")]
         public int AiCampSkipPercent { get; set; } = 15;
 
-        [SettingPropertyBool("Army Leaders Always Camp", HintText = "army leaders never skip the night camp - the whole host halts (only a nearby enemy, a chase or a siege keeps it marching); off = they roll the skip share like any lord")]
+        [SettingPropertyBool("Army Leaders Always Camp", HintText = "with Ai Night March By Reason off: army leaders never skip the night camp - the whole host halts (only a nearby enemy, a chase or a siege keeps it marching); off = they roll the skip share like any lord. With March By Reason on a host marches by night only for a reason, like a lone lord")]
         [SettingPropertyGroup("A night's rest")]
         public bool ArmyLeadersAlwaysCamp { get; set; } = true;
 
@@ -2608,13 +2608,25 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public bool BanditsRestByDay { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Ai Nights Awake In Chase", 0.00f, 4.00f, "0.00", HintText = "days a chasing or fleeing party may push on without sleep before it drops anyway (not in force yet: chasing and fleeing parties never sleep)")]
+        [SettingPropertyFloatingInteger("Ai Nights Awake In Chase", 0.00f, 4.00f, "0", HintText = "whole sleepless nights owed after which a lord no longer chases or rides to relief at night - the loss would outweigh the gain; fleeing is always allowed. 0 = only flight by night, 3 or more = only the collapse stops them")]
         [SettingPropertyGroup("A night's rest")]
         public float AiNightsAwakeInChase { get; set; } = 1f;
 
-        [SettingPropertyFloatingInteger("Ai Camp Danger Radius", 0.00f, 24.00f, "0.00", HintText = "a hostile party this close keeps them marching - pursuit knows no bedtime")]
+        [SettingPropertyFloatingInteger("Ai Camp Danger Radius", 0.00f, 24.00f, "0.00", HintText = "alarm radius: a STRONGER hostile party this close that is awake and coming at a camp (or at a lord resting in a village) rouses it - the lord flees or beds down again; 0 = no alarm at all (with Ai Night March By Reason off: any hostile party this close keeps them marching)")]
         [SettingPropertyGroup("A night's rest")]
         public float AiCampDangerRadius { get; set; } = 6f;
+
+        [SettingPropertyBool("Ai Night March By Reason", HintText = "lone lords and army leaders march through the camp hours only for a reason: a chase after an enemy lord, host or a band in a fight that they can finish tonight, the relief of their own village while it is being raided, or flight from a stronger foe - everyone else sleeps, and a lord in a town, castle or village stays under its roof till dawn (in a village a stronger foe coming at him wakes him); off = the old rules (a share of lone lords skips the camp, any enemy near keeps them marching) and the log only counts what would have happened")]
+        [SettingPropertyGroup("A night's rest")]
+        public bool AiNightMarchByReason { get; set; } = true;
+
+        [SettingPropertyBool("Ai Sleep Debt", HintText = "AI lord parties keep the same sleep ledger as you: a day without the base hours of rest (Sleep Hours Needed) costs speed and morale (-25/-40/-90% and -25/-40/-95%) until slept off, and a dawn met with that debt costs their men's drill until the next dawn (Drill Penalty Ai, Drill Law Ai); one night owed means making camp at 20:00 until the world breaks camp, two or more means sleeping where they stand until paid; off = the ledger is only counted in the log")]
+        [SettingPropertyGroup("A night's rest")]
+        public bool AiSleepDebt { get; set; } = true;
+
+        [SettingPropertyBool("Ai Night Relief Wider", HintText = "on: lords also march through the night to relieve a BESIEGED town or castle of their realm, and army leaders ride to relief too; off: only a lone lord, and only to stop a raid in progress")]
+        [SettingPropertyGroup("A night's rest")]
+        public bool AiNightReliefWider { get; set; } = false;
 
         [SettingPropertyBool("Camp Tent Icon", HintText = "pitched camps show a tent on the map (yours and theirs)")]
         [SettingPropertyGroup("A night's rest")]
@@ -2864,7 +2876,7 @@ namespace Armoury
         [SettingPropertyGroup("Northern fare")]
         public bool WoodlotByClimate { get; set; } = true;
 
-        [SettingPropertyBool("Village Climate Fix", HintText = "12 villages whose main produce cannot grow where they stand get one that can (cotton at the Wall, in Braavos, in the Vale mountains and in Sarnor, a vineyard in Lorath, dates on Tarth), and 5 warm villages (Qarth, Volantis, Lys, Tyrosh) take up cotton so the world keeps some; the 4 grain farms beyond the Wall turn to hunting and fishing (2 trappers in the forest, 2 fishers by the water) - the Free Folk keep no grain farms (every village still gathers a little grain). Applied at session start, nothing is written to the save (off = the map's own village types after the next load; fishing boats Storrold has already sent out stay)")]
+        [SettingPropertyBool("Village Climate Fix", HintText = "12 villages whose main produce cannot grow where they stand get one that can (no more cotton at the Wall, in Braavos, Norvos, the Vale mountains, the Riverlands, the Kingswood, the Crownlands and Sarnor, no vineyard in Lorath, no dates on Tarth), and 11 warm villages (Qarth, Volantis and the Rhoyne, Myr, Meereen, the old Valyrian lands, the Reach) take up cotton so the world keeps as much cotton as before; the 4 grain farms beyond the Wall turn to hunting and fishing (2 trappers in the forest, 2 fishers by the water) - the Free Folk keep no grain farms (every village still gathers a little grain). Applied at session start, nothing is written to the save (off = the map's own village types after the next load; fishing boats Storrold has already sent out stay)")]
         [SettingPropertyGroup("Northern fare")]
         public bool VillageClimateFix { get; set; } = true;
 
@@ -2963,6 +2975,38 @@ namespace Armoury
         [SettingPropertyBool("Arms Coverage Log", HintText = "every fifth day write a line to the log: how much of the arms and armour AI parties and garrisons need is in their armouries")]
         [SettingPropertyGroup("Arming the garrisons")]
         public bool ArmsCoverageLog { get; set; } = true;
+
+        [SettingPropertyBool("Drill Law", HintText = "your men drill every day out of battle, and so do your clan's parties and lords in your army (the game gave them no daily drill), by the one rule every lord's party follows: each man learns 10 + 2 x his tier a day, x1.5 on a day of rest (moved in fewer than 4 of the last 24 hours - an hour in a settlement, in a siege camp or barely moving rests, as for sleep), x0.9 on the march, not at all when starving or after a night without sleep (they met the dawn with sleep debt - no drill until the next dawn; training perks included); the pace follows the commander's Leadership (170 = normal, from half to one and a half). Off = as before")]
+        [SettingPropertyGroup("Drill")]
+        public bool DrillLaw { get; set; } = true;
+
+        [SettingPropertyBool("Drill Needs Arms Player", HintText = "your men's drill needs weapons too: as for AI lords, each troop learns (training perks included) in proportion to the share of its men who have a weapon of their kind and grade in your armoury (off = your men drill at full pace whatever they hold)")]
+        [SettingPropertyGroup("Drill")]
+        public bool DrillNeedsArmsPlayer { get; set; } = true;
+
+        [SettingPropertyBool("Drill Stock", HintText = "arms and armour you discard, leave on the game's loot screen or leave behind after collecting Spoils trophies go to your men's drill stock while there is room (two sets of one weapon and one piece of armour per three men) instead of being lost; your men's spare arms in the armoury count too. A full stock makes the drill up to 20% faster, Giving Hands and Paid in Promise up to 30%. The stock belongs to the men: it cannot be taken back, it wears out, and the smiths of the next town buy the scrap of worn pieces - the coin goes to the men's purse. Works only with Drill Law and Donation Xp Off on: the stock replaces the experience the game gave for gear you give away (off = discarded gear is lost as before)")]
+        [SettingPropertyGroup("Drill")]
+        public bool DrillStock { get; set; } = true;
+
+        [SettingPropertyBool("Drill Stock Ai", HintText = "AI lords' men drill with the spare arms and armour of their armoury by the same rule as your men's spare kit (their baggage - loot and Banner Kings supplies - does not count, just as your own packs do not): up to 20-30% faster, the stock wears out and the smiths of the next town buy the scrap - a third to the lord, the rest to the men (off = AI drill without a stock, as before)")]
+        [SettingPropertyGroup("Drill")]
+        public bool DrillStockAi { get; set; } = true;
+
+        [SettingPropertyBool("Drill Penalty Ai", HintText = "AI lords' men do not drill at all on a day they are starving or after a night without sleep (they met the dawn with sleep debt - no drill until the next dawn; training perks included, and no drill gear wears out) - the same penalty as your men's with Drill Law on (with Drill Law off your men drill by the game's rule, and hunger or lack of sleep takes nothing from them); the sleep debt is the same one that costs them speed and morale (Ai Sleep Debt), so without the AI sleep ledger (Ai Camps At Night off, equal camp hours or Ai Sleep Debt off) no lord loses drill for want of sleep - not even your clan's parties and the lords in your army - while you still do. With Drill Law Ai on the penalty applies anyway, as part of the rule (off = AI drill whatever their state, only while Drill Law Ai is off)")]
+        [SettingPropertyGroup("Drill")]
+        public bool DrillPenaltyAi { get; set; } = true;
+
+        [SettingPropertyBool("Drill Law Ai", HintText = "AI lords' parties drill by the same rule as yours - base 10 + 2 x tier for every lord, clan leaders included (the game gives a clan leader's men 15 + 3 x tier), the commander's Leadership, rest or march, no drill after a night without sleep (sleep debt at dawn - until the next dawn) or when starving; training perks on top as in the game. Off = the game's flat daily training, with the clan leader's bonus (the starving and sleep penalty then follows Drill Penalty Ai)")]
+        [SettingPropertyGroup("Drill")]
+        public bool DrillLawAi { get; set; } = true;
+
+        [SettingPropertyBool("Drill Log", HintText = "daily drill lines in Armoury.log: your men's experience today and its parts, the drill stock, and the AI measurement (log only)")]
+        [SettingPropertyGroup("Drill")]
+        public bool DrillLog { get; set; } = true;
+
+        [SettingPropertyBool("Drill Daily Message", HintText = "once a day, on a day your men drill by Drill Law, a short line in the game tells you what they learned and why: 'Drill today: N XP (n per man) - Leadership, at rest or marching, drill kit, armed share, perks'. A day lost to hunger or lack of sleep is announced as before (off = no daily drill line)")]
+        [SettingPropertyGroup("Drill")]
+        public bool DrillDailyMessage { get; set; } = true;
 
         [SettingPropertyBool("Arms Not Household Goods", HintText = "townsfolk do not use up arms, armour, shields and harness: these lie on the stalls until a soldier, a notable or a trader buys them (everyday clothing is still worn out by the townsfolk)")]
         [SettingPropertyGroup("Arms production")]
@@ -3801,6 +3845,9 @@ namespace Armoury
             s.BanditsRestByDay = BanditsRestByDay;
             s.AiNightsAwakeInChase = AiNightsAwakeInChase;
             s.AiCampDangerRadius = AiCampDangerRadius;
+            s.AiNightMarchByReason = AiNightMarchByReason;
+            s.AiSleepDebt = AiSleepDebt;
+            s.AiNightReliefWider = AiNightReliefWider;
             s.CampTentIcon = CampTentIcon;
             s.CoursePlotterEnabled = CoursePlotterEnabled;
             s.NightfallPromptEnabled = NightfallPromptEnabled;
@@ -3888,6 +3935,14 @@ namespace Armoury
             s.GarrisonDrillNeedsArms = GarrisonDrillNeedsArms;
             s.PartyDrillNeedsArms = PartyDrillNeedsArms;
             s.ArmsCoverageLog = ArmsCoverageLog;
+            s.DrillLaw = DrillLaw;
+            s.DrillNeedsArmsPlayer = DrillNeedsArmsPlayer;
+            s.DrillStock = DrillStock;
+            s.DrillStockAi = DrillStockAi;
+            s.DrillPenaltyAi = DrillPenaltyAi;
+            s.DrillLawAi = DrillLawAi;
+            s.DrillLog = DrillLog;
+            s.DrillDailyMessage = DrillDailyMessage;
             s.ArmsNotHouseholdGoods = ArmsNotHouseholdGoods;
             s.ArmsNoStallDecay = ArmsNoStallDecay;
             s.ArmsStallUpkeepManDaysPerPiece = ArmsStallUpkeepManDaysPerPiece;

@@ -311,27 +311,39 @@ namespace Armoury
         // ponad komplet + SurplusKeepPercent; w zapasie zostaja najlepsze wolne uzyteczne. Dotad liczenie po typie trzymalo T6, ktorej
         // nikt nie naciagnie, a sprzedawalo uzyteczne T3. Czesc gracza (ksiega, NAJGORSZE egzemplarze id) nietknieta - dotad
         // pomijane bylo cale id, gdy gracz mial w nim choc jedna sztuke.
+        /// <summary>K1 A9 - JEDNA definicja nadwyzki ludzi gracza w zbrojowni DTE: po dopasowaniu (przy wymianie 1:1 FitBest, inaczej Fit) Sell = co ponad
+        /// komplet + SurplusKeepPercent (najpierw sztuki, ktorych nikt nie udzwignie, potem najgorsze uzyteczne); czesc gracza (Own) nietknieta. Kolejnosc
+        /// WorseFirst; null - bez nadwyzki. Scalenie sklad8 (warunek scalenia K1 z naglowka Drill.cs): ta sama funkcja daje sprzedaz kupcom (SellPlayerSurplus)
+        /// i zuzycie musztry (Drill.PlayerSurplus) - musztra nie zuzywa sztuk, ktore K1 uznaje za potrzebne (bez petli zuzycia i odkupu).</summary>
+        internal static List<SwapMath.Piece> PlayerSurplusPlan(ItemRoster armory, ItemObject.ItemTypeEnum type)
+        {
+            var s = Settings.Current;
+            var main = MobileParty.MainParty;
+            if (armory == null || s == null || main == null || main.MemberRoster == null || type == ItemObject.ItemTypeEnum.Horse) return null;   // konie - Stajnia
+            var pieces = QuartermasterLaw.KitPieces(armory, type, true);
+            if (pieces.Count == 0) return null;
+            List<CharacterObject> troops; int[] men; SkillObject skill;
+            QuartermasterLaw.MenOf(main.MemberRoster, type, pieces, out troops, out men, out skill);
+            var meets = QuartermasterLaw.MeetsOf(troops);
+            // K1 (Jeff 09.10 04:40): kto co nosi - ta sama regula co wymiana (najlepsze najpierw; sztuka gracza tylko w puste rece albo
+            // w miejsce gorszej), inaczej ludzie sprzedawaliby lepsza sztuke, ktora nosza, bo "noszona" byla gorsza sztuka gracza
+            if (s.QuartermasterSwapOneForOne) SwapMath.FitBest(men, troops.Count, meets, pieces);
+            else SwapMath.Fit(men, troops.Count, meets, pieces);
+            if (SwapMath.SurplusPlan(pieces, men.Length, s.SurplusKeepPercent, p => SwapMath.Usable(men, meets, p)) <= 0) return null;
+            pieces.Sort(SwapMath.WorseFirst);
+            return pieces;
+        }
+
         private static void SellPlayerSurplus(Settlement st)
         {
             var armory = QuartermasterLaw.DteArmory();
             if (armory == null || QuartermasterEscrow.Active) return;
-            var s = Settings.Current;
             var main = MobileParty.MainParty;
             int sold = 0, gold = 0;
             foreach (var type in QuartermasterLaw.KitTypes)
             {
-                if (type == ItemObject.ItemTypeEnum.Horse) continue;   // konie - Stajnia
-                var pieces = QuartermasterLaw.KitPieces(armory, type, true);
-                if (pieces.Count == 0) continue;
-                List<CharacterObject> troops; int[] men; SkillObject skill;
-                QuartermasterLaw.MenOf(main.MemberRoster, type, pieces, out troops, out men, out skill);
-                var meets = QuartermasterLaw.MeetsOf(troops);
-                // K1 (Jeff 09.10 04:40): kto co nosi - ta sama regula co wymiana (najlepsze najpierw; sztuka gracza tylko w puste rece albo
-                // w miejsce gorszej), inaczej ludzie sprzedawaliby lepsza sztuke, ktora nosza, bo "noszona" byla gorsza sztuka gracza
-                if (s.QuartermasterSwapOneForOne) SwapMath.FitBest(men, troops.Count, meets, pieces);
-                else SwapMath.Fit(men, troops.Count, meets, pieces);
-                if (SwapMath.SurplusPlan(pieces, men.Length, s.SurplusKeepPercent, p => SwapMath.Usable(men, meets, p)) <= 0) continue;
-                pieces.Sort(SwapMath.WorseFirst);
+                var pieces = PlayerSurplusPlan(armory, type);   // K1 A9 - jedna definicja nadwyzki (konie - Stajnia)
+                if (pieces == null) continue;
                 foreach (var p in pieces)
                 {
                     if (p.Sell <= 0) continue;
@@ -428,6 +440,44 @@ namespace Armoury
         // na polke WLASNEJ osady (zamek - polka zamku, 171 Z6: kupcy wywoza ja do miast, bez teleportu do miasta); ludzie zalogi na patrolach BK licza sie
         // do potrzeby (roster - zaloga + patrole; ich sprzet lezy w twierdzy); bez sakiewki zalogi (GarrisonPurseEnabled off) cale zloto dostaje pan (171).
         // 174 pytanie 2a: przy AiAnyMeleeWhenShort bron biala liczona razem - sztuka zastepcza innego typu nie jest nadwyzka (limit grupy AiGear.MeleeGroupExtra).
+        /// <summary>K1 A9 + 174 pytanie 2a - JEDNA definicja nadwyzki zbrojowni AI (lordowie i zalogi): ile wolno oddac z calej grupy broni bialej przy
+        /// AiAnyMeleeWhenShort (int.MaxValue = bez grupy). Scalenie sklad8: sprzedaz (SellArmorySurplus) i zuzycie musztry AI (Drill.AiSurplus).</summary>
+        internal static int AiMeleeLeft(Dictionary<ItemObject, int> arm, TroopRoster roster)
+        {
+            var s = Settings.Current;
+            if (!AiGear.SubstituteMeleeOn || arm == null || roster == null || s == null) return int.MaxValue;
+            var have = new Dictionary<int, int>();
+            foreach (var kv in arm)
+            {
+                if (kv.Key == null || kv.Value <= 0 || !SupplyDemand.Equipmentish(kv.Key) || HorseKind(kv.Key) || ArmsPricing.IsUnique(kv.Key)) continue;
+                int k = (int)kv.Key.ItemType; int n; have.TryGetValue(k, out n); have[k] = n + kv.Value;
+            }
+            return AiGear.MeleeGroupExtra(have, GarrisonArmory.NeedByType(roster), s.SurplusKeepPercent);
+        }
+
+        /// <summary>K1 A9 - JEDNA definicja nadwyzki zbrojowni AI typu: po dopasowaniu (bron po slotach wzorca, FitBest) Sell = co ponad komplet
+        /// + SurplusKeepPercent (najpierw sztuki, ktorych nikt nie udzwignie, potem najgorsze uzyteczne). Kolejnosc WorseFirst; null - bez nadwyzki.
+        /// Scalenie sklad8 (warunek scalenia K1 z naglowka Drill.cs): ta sama funkcja daje sprzedaz kupcom (SellArmorySurplus) i zuzycie musztry AI
+        /// (Drill.AiSurplus) - musztra nie zuzywa sztuk, ktore K1 uznaje za potrzebne, a zakupy brakow ich nie odkupuja.</summary>
+        internal static List<SwapMath.Piece> AiSurplusPlan(Dictionary<ItemObject, int> arm, TroopRoster roster, ItemObject.ItemTypeEnum type)
+        {
+            var s = Settings.Current;
+            if (arm == null || roster == null || s == null || type == ItemObject.ItemTypeEnum.Horse || type == ItemObject.ItemTypeEnum.HorseHarness) return null;   // konie i rzedy - Stajnia
+            var pieces = MenUpgrade.AiPieces(arm, type);
+            if (pieces.Count == 0) return null;
+            List<CharacterObject> troops; int[] men; SkillObject skill;
+            // K1 (przeglad): bron po SLOTACH WZORCA (jak braki AiGear.Deficit i MenUpgrade.Buckets) - dotad 1 bron na czlowieka, wiec
+            // druga bron oddzialu szla do kupca, a zakupy brakow (dawniej K1 BuyGaps) odkupowaly ja tego samego dnia
+            QuartermasterLaw.MenOf(roster, type, pieces, out troops, out men, out skill, QuartermasterLaw.MenPerSlot, false);
+            var meets = QuartermasterLaw.MeetsOf(troops);
+            // K1 (Jeff 09.10 04:40, "to samo dla AI"): ludzie nosza najlepsze, co udzwigna (FitBest), a do kupca idzie najgorsze - dotad
+            // ciezki gorszy grat byl "noszony", a lepsza lzejsza sztuka szla do kupca (czlowiek zostawal z gorsza w miejsce lepszej)
+            SwapMath.FitBest(men, troops.Count, meets, pieces);
+            if (SwapMath.SurplusPlan(pieces, men.Length, s.SurplusKeepPercent, p => SwapMath.Usable(men, meets, p)) <= 0) return null;
+            pieces.Sort(SwapMath.WorseFirst);
+            return pieces;
+        }
+
         private static int SellArmorySurplus(MobileParty mp, Settlement st, Hero third, bool garrison, TroopRoster roster, out int gold)
         {
             gold = 0;
@@ -440,36 +490,15 @@ namespace Armoury
             float pct = garrison && !MenUpgrade.GarrisonPurseOn ? 100f : MBMath.ClampFloat(s.LordLootThirdPercent, 0f, 100f);   // bez sakiewki zalogi - wszystko panu
             int sold = 0;
             bool stop = false;
-            int meleeLeft = int.MaxValue;
-            if (AiGear.SubstituteMeleeOn)
-            {
-                var have = new Dictionary<int, int>();
-                foreach (var kv in arm)
-                {
-                    if (kv.Key == null || kv.Value <= 0 || !SupplyDemand.Equipmentish(kv.Key) || HorseKind(kv.Key) || ArmsPricing.IsUnique(kv.Key)) continue;
-                    int k = (int)kv.Key.ItemType; int n; have.TryGetValue(k, out n); have[k] = n + kv.Value;
-                }
-                meleeLeft = AiGear.MeleeGroupExtra(have, GarrisonArmory.NeedByType(roster), s.SurplusKeepPercent);
-            }
+            int meleeLeft = AiMeleeLeft(arm, roster);   // K1 A9 - jedna definicja nadwyzki (int.MaxValue = bez grupy broni bialej)
             foreach (var type in QuartermasterLaw.KitTypes)
             {
                 if (stop) break;
-                if (type == ItemObject.ItemTypeEnum.Horse || type == ItemObject.ItemTypeEnum.HorseHarness) continue;   // konie i rzedy - Stajnia
-                var pieces = MenUpgrade.AiPieces(arm, type);
-                if (pieces.Count == 0) continue;
-                List<CharacterObject> troops; int[] men; SkillObject skill;
-                // K1 (przeglad): bron po SLOTACH WZORCA (jak braki AiGear.Deficit i MenUpgrade.Buckets) - dotad 1 bron na czlowieka, wiec
-                // druga bron oddzialu szla do kupca, a zakupy brakow (dawniej K1 BuyGaps) odkupowaly ja tego samego dnia
-                QuartermasterLaw.MenOf(roster, type, pieces, out troops, out men, out skill, QuartermasterLaw.MenPerSlot, false);
-                var meets = QuartermasterLaw.MeetsOf(troops);
-                // K1 (Jeff 09.10 04:40, "to samo dla AI"): ludzie nosza najlepsze, co udzwigna (FitBest), a do kupca idzie najgorsze - dotad
-                // ciezki gorszy grat byl "noszony", a lepsza lzejsza sztuka szla do kupca (czlowiek zostawal z gorsza w miejsce lepszej)
-                SwapMath.FitBest(men, troops.Count, meets, pieces);
-                if (SwapMath.SurplusPlan(pieces, men.Length, s.SurplusKeepPercent, p => SwapMath.Usable(men, meets, p)) <= 0) continue;
+                var pieces = AiSurplusPlan(arm, roster, type);   // konie i rzedy - Stajnia
+                if (pieces == null) continue;
                 bool grp = AiGear.Melee((int)type) && meleeLeft != int.MaxValue;
                 int cap = grp ? meleeLeft : int.MaxValue, planned = 0;
                 if (cap <= 0) continue;
-                pieces.Sort(SwapMath.WorseFirst);
                 foreach (var p in pieces)
                 {
                     var it = QuartermasterLaw.ElOf(p).Item;

@@ -22,6 +22,8 @@ RANGES = {
     'ShelfIndexSelfCheckDays': (0, 30, "0"),
     'TownMaterialOrderSeaMaxRoute': (100.0, 3000.0, "0"),
     'ShopKeepPieces': (0, 3, "0"),
+    # T10 poprawka recenzji: prog dlugu snu w calych nocach (kod porownuje dlug calkowity) - suwak bez ulamkow w opisie
+    'AiNightsAwakeInChase': (0.0, 4.0, "0"),
 }
 
 def gen(module_dir, ns, display):

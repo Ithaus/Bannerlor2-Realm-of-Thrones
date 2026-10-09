@@ -27,6 +27,8 @@ namespace Armoury
     /// Linia "Pokrycie zbrojowni AI (171)" - pelny przeglad raz na 5 dob (krytyka 17), tylko log.
     /// Recenzja kodu 171: udzial uzbrojonych liczony wedlug SZCZEBLA broni (sztuka typu glownej broni o tierze >= t-1, jak AiGear.Deficit), dla partii na oddzial
     /// (element rosteru); cwiczenia wedlug broni tylko przy zakupach AI (AiGear.On, zaloga - takze GarrisonBuysGear); "Pokrycie" - takze strzaly, belty i przedmioty t3+.
+    /// MUSZTRA (Drill.cs, PROJEKT-MUSZTRA): TrainingPostfix najpierw daje Drill.Shape nowy wynik (B x L x D x S + P); partie Z14a (gracz, rod gracza,
+    /// armia gracza) dostaja udzial uzbrojonych wedlug Drill.ElemArmsGate (gracz - zbrojownia DTE gracza w ShareOf), AI z baza gry - jak dotad przez Gated.
     /// </summary>
     internal static class ArmsDrill
     {
@@ -138,9 +140,34 @@ namespace Armoury
             Share sh;
             if (_share.TryGetValue(mp, out sh)) return sh;
             sh = new Share();
-            var dict = AiGear.Armories();
+            // musztra (Z14a, decyzja Jeffa 1b): dla druzyny gracza zbrojownia DTE gracza (ItemRoster, suma po przedmiocie) - ten sam algorytm typ x tier >= t-1;
+            // AI - slownik zbrojowni partii DTE jak dotad. Brak zrodla (DTE nieobecny) = udzial 1.
+            Dictionary<ItemObject, int> arm = null;
+            bool known;
+            if (mp == MobileParty.MainParty)
+            {
+                var pr = QuartermasterLaw.DteArmory();
+                known = pr != null;
+                if (known)
+                {
+                    arm = new Dictionary<ItemObject, int>();
+                    for (int i = 0; i < pr.Count; i++)
+                    {
+                        var e = pr.GetElementCopyAtIndex(i);
+                        var it = e.EquipmentElement.Item;
+                        if (it == null || e.Amount <= 0) continue;
+                        int c0; arm.TryGetValue(it, out c0); arm[it] = c0 + e.Amount;
+                    }
+                }
+            }
+            else
+            {
+                var dict = AiGear.Armories();
+                known = dict != null;
+                if (known) dict.TryGetValue(mp.Id, out arm);
+            }
             var roster = mp.MemberRoster;
-            if (dict != null && roster != null)
+            if (known && roster != null)
             {
                 var need = new Dictionary<int, int>();
                 int total = 0;
@@ -157,8 +184,7 @@ namespace Armoury
                     // sztuki zbrojowni: typ -> liczba wedlug tieru 1..6 (tylko typy potrzebne)
                     var avail = new Dictionary<int, int[]>();
                     foreach (var k in need.Keys) if (!avail.ContainsKey(k / 10)) avail[k / 10] = new int[7];
-                    Dictionary<ItemObject, int> arm;
-                    if (dict.TryGetValue(mp.Id, out arm) && arm != null)
+                    if (arm != null)
                         foreach (var kv in arm)
                         {
                             int[] a;
@@ -227,13 +253,27 @@ namespace Armoury
             if (_tDepth > 1) return;
             try
             {
-                if (__result.ResultNumber <= 0f || __0 == null || !Gated(__0)) return;
-                if (!__0.IsGarrison && _counted.Add(__0)) { float all = ArmedShare(__0); _pParties++; _pSum += all; if (all <= 0f) _pZero++; else if (all >= 1f) _pFull++; }
-                // recenzja 171: udzial oddzialu (jego glowna bron i szczebel) - cwiczy wolniej ten, kogo nie ma czym uzbroic na jego szczeblu, nie cala druzyna
-                float share = ShareFor(__0, __1.Character);
-                if (share >= 1f) return;
-                if (!__0.IsGarrison && __1.Character != null && !__1.Character.IsHero) _pLost += __result.ResultNumber * (1f - share) * __1.Number;
-                __result = new ExplainedNumber(__result.ResultNumber * share);   // opisy gubimy swiadomie - partii AI nikt nie oglada
+                if (__0 == null) return;
+                // musztra (Drill): nowy wynik B x L x D x S + P przed udzialem uzbrojonych; 0 - nie dotyczy, 1 - AI wedlug jednego wzoru (albo bazy gry przy
+                // wylaczonym DrillLawAi), 2 - Z14a (gracz, rod gracza, armia gracza)
+                int how = Drill.Shape(__0, __1, ref __result);
+                float share = 1f;
+                if (how == 2)
+                {
+                    // Z14a: udzial uzbrojonych - gracz przy DrillNeedsArmsPlayer (zbrojownia DTE gracza), partie AI rodu i armii gracza jak Gated (AiGear.On && PartyDrillNeedsArms)
+                    if (__result.ResultNumber > 0f && Drill.ElemArmsGate) share = ShareFor(__0, __1.Character);
+                }
+                else if (__result.ResultNumber > 0f && Gated(__0))
+                {
+                    if (!__0.IsGarrison && _counted.Add(__0)) { float all = ArmedShare(__0); _pParties++; _pSum += all; if (all <= 0f) _pZero++; else if (all >= 1f) _pFull++; }
+                    // recenzja 171: udzial oddzialu (jego glowna bron i szczebel) - cwiczy wolniej ten, kogo nie ma czym uzbroic na jego szczeblu, nie cala druzyna
+                    share = ShareFor(__0, __1.Character);
+                    if (share < 1f && !__0.IsGarrison && __1.Character != null && !__1.Character.IsHero) _pLost += __result.ResultNumber * (1f - share) * __1.Number;
+                }
+                else if (how == 1 && Drill.ElemOffWithGameXp && Gated(__0))
+                    share = ShareFor(__0, __1.Character);   // MUSZTRA-j: dzien kary AI (wynik 0 zostaje 0) - udzial tylko do pomiaru "XP gry po broni" (gra kary nie zna)
+                if (share < 1f) __result = new ExplainedNumber(__result.ResultNumber * share);   // opisy gubimy swiadomie - treningu nikt nie oglada
+                if (how != 0) Drill.Done(__0, __result.ResultNumber, share);
             }
             catch (Exception e) { Stumble("TrainingPostfix", e); }
         }
