@@ -5,8 +5,13 @@
 #   python -I tools/p175_balans.py <bieg> [--baza <bieg B0>] [--okna 40 120] [--zmienione battania,khuzait,sturgia,pentos,qarth]
 #   python -I tools/p175_balans.py <bieg T5 +10> --t5 <bieg T5 0>           (N1/N2 - przewaga Polnocy, bieg celowany)
 # Bieg bez linii "Bitwa: B175" (np. kopiaT9-120 sprzed 175) - bitwy lordow z linii H3 (moc = ludzie x moc tieru gry, jak baza_balans.py).
-# Zrodla: "Bitwa: B175" (bitwy.log), balans-krolestw.csv (narastajaco od startu sesji), konie-krolestwa.csv (doba), budzet-rodow.csv
+# Zrodla: "Bitwa: B175" (bitwy.log), linie H3 (bitwy.log - zabici przez Dothrakow w D6), balans-krolestw.csv (narastajaco od startu
+# sesji), konie-krolestwa.csv (doba; wiersze krolestw = AI lordowie i AI zalogi, osobno rod_gracza i inne_partie), budzet-rodow.csv
 # (nazwy krolestw - mapa id=nazwa z linii "KingdomBalance (175.0): krolestwa id=nazwa" w logu Armoury).
+# PRZEGLAD 175: N1 (bitwy Polnocy o stosunku 0.9-1.1) w zwyklym biegu nie ma proby (baza: 14 z 520 bitew lord-lord swiata w tym
+# oknie, Polnoc 5 bitew w 120 dob) - hamulec +10% wynika z konstrukcji (autobitwa rozstrzyga sila); test progiem tylko w biegu T5
+# (wymuszona wojna, tryb -ForceWar autotestu - galaz narzedzi, NIE zbudowany w paczce 175: bez T5 N1/N2 = "brak danych").
+# W T5 obok N1 test N1b na WSZYSTKICH bitwach lordow Polnocy: srednia "wygrana - p(wygranej)" (WPO na bitwe) bieg +10 wobec 0, z sigma.
 import sys, os, re, math, csv, collections, glob
 
 def find(root, name):
@@ -19,14 +24,19 @@ KNOWN = {"battania": "The North", "khuzait": "Dothraki Horde", "sturgia": "Iron 
          "valyrian": "House Targaryen, Aegon", "freefolk": "Free Folk", "nightswatch": "Nights Watch", "dragonstone": "Dragonstone",
          "riverlands": "Riverlands", "stormlands": "Stormlands", "volantis": "Volantis", "bravos": "Braavos", "pentos": "Pentos",
          "norvos": "Norvos", "qohor": "Qohor", "myr": "Myr", "lys": "Lys", "tyrosh": "Tyrosh", "sarnor": "Sarnor", "skagosi": "Skagos",
-         "summer": "Summer Isles", "yiti": "Yi Ti Exiles", "qarth": "Qarth", "ibb": "Ibben"}
+         "summer": "Summer Isles", "yiti": "Yi Ti Exiles", "qarth": "Qarth", "ibb": "Ibben", "lorath": "Lorath"}
 FREE7 = ["pentos", "myr", "lys", "tyrosh", "norvos", "qohor", "lorath"]
+NOT_KINGDOM_ROWS = ("bez_krolestwa", "rod_gracza", "inne_partie")   # wiersze konie-krolestwa.csv, ktore nie sa krolestwami
 
-B175 = re.compile(r"Bitwa: B175 dzien (\d+)(?: \[GRACZ\])? \| (\w+)(?: morze)? \| kontekst (\w+) \| region (\S+) \((\S+)\)"
-                  r" \| A: krol=(\S+) rodzaj=(\w+) partii (\d+) ludzi (\d+) moc ([\d.]+) konni (\d+)% KL (\d+)% PolnocT3\+ (\d+)% straty (\d+)"
-                  r" \| O: krol=(\S+) rodzaj=(\w+) partii (\d+) ludzi (\d+) moc ([\d.]+) konni (\d+)% KL (\d+)% PolnocT3\+ (\d+)% straty (\d+)"
-                  r" \| stosunek sil ([\d.]+) \(([^)]*)\) \| wygrywa (\w+) \| lordowie (\w+) \| przewaga Polnocy: (\w+)(?: tak \(ciosow (\d+)\))?")
+# przeglad 175: PolnocT3+ to liczba ludzi i procent z jednym miejscem ("PolnocT3+ 75 (22.4%)"); pierwsza wersja pisala sam procent
+SIDE = (r"krol=(?P<k{0}>\S+) rodzaj=(?P<r{0}>\w+) partii (?P<p{0}>\d+) ludzi (?P<m{0}>\d+) moc (?P<pw{0}>[\d.]+) konni (?P<c{0}>\d+)% KL (?P<kl{0}>\d+)%"
+        r" PolnocT3\+ (?P<n{0}>\d+)(?:%| \((?P<np{0}>[\d.]+)%\)) straty (?P<s{0}>\d+)")
+B175 = re.compile(r"Bitwa: B175 dzien (?P<day>\d+)(?: \[GRACZ\])? \| (?P<typ>\w+)(?: morze)? \| kontekst (?P<ctx>\w+) \| region (?P<reg>\S+) \((?P<rc>\S+)\)"
+                  r" \| A: " + SIDE.format("a") + r" \| O: " + SIDE.format("d") +
+                  r" \| stosunek sil (?P<ratio>[\d.]+) \((?P<rk>[^)]*)\) \| wygrywa (?P<win>\w+) \| lordowie (?P<lord>\w+)"
+                  r" \| przewaga Polnocy: (?P<edge>\w+)(?: tak \(ciosow (?P<hits>\d+)\))?")
 H3SIDE = re.compile(r"(przegrany|zwyciezca) (.+?) \(([^()]*?)(?:, partii (\d+))?\) (\d+) ludzi \(konni ([\d.]+)%, tier ([\d.]+)\)")
+H3KILL = re.compile(r"\| H3: zabici (\d+)")
 NONK = ("Broken Men", "Wild Hares", "Looters", "Sea Raiders", "Forest Bandits", "Mountain Bandits", "Desert Bandits", "Steppe Bandits")
 
 def P(t): return (2 + t) * (10 + t) * 0.02
@@ -43,37 +53,44 @@ class Run:
                         if "=" in part:
                             i, n = part.split("=", 1); self.names[i.strip()] = n.strip()
         self.byname = {v: k for k, v in self.names.items()}
-        self.battles = []      # (dzien, krolA, krolO, mocA, mocD, wygrywa A/O, lordowie, typ, przewaga, ciosy, strataA, strataO, rodzajA, rodzajO)
+        self.battles = []      # slowniki: dzien, krolA/O, moc, zwyciezca, lordowie, typ, przewaga, ciosy, PolnocT3+ (ludzie), straty, rodzaj
         self.source = "brak"
+        self.h3_doth_kills = collections.Counter()   # D6: zabici przez Dothrakow w H3 (wsie i karawany 7 Wolnych Miast), wedlug dnia
         bl = find(root, "bitwy.log")
+        h3 = []
         if bl:
-            h3 = []
             for line in open(bl, encoding="utf-8", errors="replace"):
                 if "Bitwa: B175" in line:
                     m = B175.search(line)
                     if not m: continue
-                    g = m.groups()
-                    self.battles.append(dict(day=int(g[0]), typ=g[1], ctx=g[2], rc=g[4], ka=g[5], ra=g[6], pa=float(g[9]), na=int(g[12]), sa=int(g[13]),
-                                             kd=g[14], rd=g[15], pd=float(g[18]), nd=int(g[21]), sd=int(g[22]), win=g[25], lord=g[26] == "tak",
-                                             edge=g[27], hits=int(g[28] or 0)))
+                    g = m.groupdict()
+                    self.battles.append(dict(day=int(g["day"]), typ=g["typ"], ctx=g["ctx"], rc=g["rc"], ka=g["ka"], ra=g["ra"], pa=float(g["pwa"]),
+                                             na=int(g["na"]), sa=int(g["sa"]), kd=g["kd"], rd=g["rd"], pd=float(g["pwd"]), nd=int(g["nd"]),
+                                             sd=int(g["sd"]), win=g["win"], lord=g["lord"] == "tak", edge=g["edge"], hits=int(g["hits"] or 0)))
                 elif "Bitwa: H3" in line and "FieldBattle" in line:
                     h3.append(line)
-            if self.battles: self.source = "B175"
-            elif h3:
-                self.source = "H3"
-                for line in h3:
-                    md = re.search(r"dzien (\d+)", line); day = int(md.group(1)) if md else 0
-                    ms = H3SIDE.findall(line)
-                    if len(ms) < 2: continue
-                    (_, ln, lf, _a, lm, lk, lt), (_, wn, wf, _b, wm, wk, wt) = ms[0], ms[1]
-                    if ln.startswith("Villagers of") or "Caravan" in ln or ln.endswith("Patrol"): continue
-                    if wn.startswith("Villagers of") or "Caravan" in wn or wn.endswith("Patrol"): continue
-                    if lf == wf or lf == ln or wf == wn or lf in NONK or wf in NONK: continue
-                    lp, wp = int(lm) * P(float(lt)), int(wm) * P(float(wt))
-                    if lp <= 0 or wp <= 0: continue
-                    ka, kd = self.byname.get(wf, wf), self.byname.get(lf, lf)
-                    self.battles.append(dict(day=day, typ="FieldBattle", ctx="?", rc="?", ka=ka, ra="lord", pa=wp, na=0, sa=0, kd=kd, rd="lord", pd=lp, nd=0,
-                                             sd=0, win="A", lord=True, edge="nie", hits=0))
+        if self.battles: self.source = "B175"
+        elif h3: self.source = "H3"
+        free7names = {self.names.get(k, k) for k in FREE7}
+        doth = self.names.get("khuzait", "Dothraki Horde")
+        for line in h3:
+            md = re.search(r"dzien (\d+)", line); day = int(md.group(1)) if md else 0
+            ms = H3SIDE.findall(line)
+            if len(ms) < 2: continue
+            (_, ln, lf, _a, lm, lk, lt), (_, wn, wf, _b, wm, wk, wt) = ms[0], ms[1]
+            # D6: zwyciezca Dothrakowie, przegrany - tabor wsi albo karawana jednego z 7 Wolnych Miast
+            if wf == doth and lf in free7names and (ln.startswith("Villagers of") or "Caravan" in ln):
+                mk = H3KILL.search(line)
+                if mk: self.h3_doth_kills[day] += int(mk.group(1))
+            if self.source != "H3": continue
+            if ln.startswith("Villagers of") or "Caravan" in ln or ln.endswith("Patrol"): continue
+            if wn.startswith("Villagers of") or "Caravan" in wn or wn.endswith("Patrol"): continue
+            if lf == wf or lf == ln or wf == wn or lf in NONK or wf in NONK: continue
+            lp, wp = int(lm) * P(float(lt)), int(wm) * P(float(wt))
+            if lp <= 0 or wp <= 0: continue
+            ka, kd = self.byname.get(wf, wf), self.byname.get(lf, lf)
+            self.battles.append(dict(day=day, typ="FieldBattle", ctx="?", rc="?", ka=ka, ra="lord", pa=wp, na=0, sa=0, kd=kd, rd="lord", pd=lp, nd=0,
+                                     sd=0, win="A", lord=True, edge="nie", hits=0))
         self.days = sorted({b["day"] for b in self.battles})
         self.bal = self.csv("balans-krolestw.csv")
         self.horse = self.csv("konie-krolestwa.csv")
@@ -91,6 +108,9 @@ class Run:
 
     def lords(self, W):
         return [b for b in self.battles if b["lord"] and b["day"] < self.d0 + W]
+
+    def doth_kills(self, W):
+        return sum(v for d, v in self.h3_doth_kills.items() if d < self.d0 + W)
 
     def fit_k(self):
         rows = [b for b in self.battles if b["lord"] and b["pa"] > 0 and b["pd"] > 0]
@@ -129,10 +149,34 @@ class Run:
             if d >= self.d0 + W: continue
             k = r["krolestwo"]; days[k] += 1
             for c, v in r.items():
-                if c in ("dzien", "krolestwo"): continue
+                if c in ("dzien", "krolestwo") or v is None: continue
                 try: s[k][c] += float(v)
                 except ValueError: pass
         return s, days
+
+    def horse_rest(self, W):
+        """Przeglad 175 (projekt 4.2 'reszta'): zmiana konnych doba do doby minus znane przeplywy - straty w bitwach, niewola,
+        przeplywy zaloga-lord, odejscia. reszta = d(konni) - (naplyw ochotnicy+najemnicy+jency+inne + rot_plus - rot_minus
+        - straz_pieszy + wykonane). Wedlug klucza (krolestwo / rod_gracza), suma w oknie."""
+        by = collections.defaultdict(dict)
+        for r in self.horse:
+            d = int(r["dzien"])
+            if d >= self.d0 + W: continue
+            by[r["krolestwo"]][d] = r
+        out = {}
+        def f(r, c):
+            try: return float(r.get(c) or 0)
+            except ValueError: return 0.0
+        for k, rows in by.items():
+            ds = sorted(rows); tot = 0.0; n = 0
+            for a, b in zip(ds, ds[1:]):
+                if b != a + 1: continue
+                ra, rb = rows[a], rows[b]
+                flows = (f(rb, "naplyw_ochotnicy") + f(rb, "naplyw_najemnicy") + f(rb, "naplyw_jency") + f(rb, "naplyw_inne")
+                         + f(rb, "rot_plus") - f(rb, "rot_minus") - f(rb, "straz_pieszy") + f(rb, "wykonane"))
+                tot += (f(rb, "konni") - f(ra, "konni")) - flows; n += 1
+            out[k] = (tot, n)
+        return out
 
     def budget_at(self, W, lo=None):
         """Bankruci (ostatnia doba okna) i kiesy glow / saldo (srednia z dob lo..W) wedlug krolestwa (id)."""
@@ -182,12 +226,28 @@ def report(run, W, k):
     if hs:
         t = collections.Counter()
         for c in hs.values(): t.update(c)
-        print("Konie AI (suma swiata, okno): wykonane %d (do zbrojowni %d, przepadlo %d, z wolnych %d), odrzucone %d (skret %d), przyciete %d, zatrzymane %d;"
-              " kupione %d za %d (nieudane: zloto %d, brak %d); naplyw: ochotnicy %d, najemnicy %d, jency %d, ROT +%d/-%d (jeniec %d, najemnik %d, obcy %d,"
-              " swoj %d), awanse %d; straz Dothrakow: zbrojownia %d, tabor %d, pieszy %d, t6 %d" % tuple(int(t[c]) for c in (
-              "wykonane", "do_zbrojowni", "przepadlo", "awanse_z_wolnych", "odrzucone", "skret", "przyciete", "zatrzymane", "kupione", "zloto",
-              "nieudane_zloto", "nieudane_brak", "naplyw_ochotnicy", "naplyw_najemnicy", "naplyw_jency", "rot_plus", "rot_minus", "rot_plus_jeniec",
-              "rot_plus_najemnik", "rot_plus_obcy", "rot_plus_swoj", "awanse", "straz_zbrojownia", "straz_tabor", "straz_pieszy", "straz_t6")))
+        g = lambda c: int(t[c])
+        print("Konie AI (suma swiata, okno): wykonane %d (do zbrojowni %d, w tym nietrwalej %d, przepadlo %d, z wolnych %d), odrzucone %d (skret %d, czekaja %d),"
+              " przyciete %d, zatrzymane %d; kupione %d za %d (nieudane: zloto %d, brak %d = pusto %d + za drogie %d + polka zarezerwowana %d;"
+              " wizyty bez zakupu przy koniach innej kategorii %d); naplyw: ochotnicy %d, najemnicy %d, jency %d, ROT +%d/-%d (jeniec %d, najemnik %d, obcy %d,"
+              " swoj %d), awanse %d; straz Dothrakow: zbrojownia %d, tabor %d, pieszy %d (footman %d, z elity %d), t6 %d, pieszego brak w puli %d;"
+              " przecieki wolnych koni: zaloga %d, dezerterzy %d, echo ROT %d" % tuple(g(c) for c in (
+              "wykonane", "do_zbrojowni", "do_zbrojowni_nietrwalej", "przepadlo", "awanse_z_wolnych", "odrzucone", "skret", "czekaja_proby",
+              "przyciete", "zatrzymane", "kupione", "zloto", "nieudane_zloto", "nieudane_brak", "nieudane_pusto", "nieudane_za_drogie",
+              "nieudane_polka_zarezerwowana", "wizyty_bez_zakupu_konie_innej_kategorii", "naplyw_ochotnicy", "naplyw_najemnicy", "naplyw_jency",
+              "rot_plus", "rot_minus", "rot_plus_jeniec", "rot_plus_najemnik", "rot_plus_obcy", "rot_plus_swoj", "awanse", "straz_zbrojownia",
+              "straz_tabor", "straz_pieszy", "straz_pieszy_footman", "straz_pieszy_z_elity", "straz_t6", "straz_pieszego_brak_w_puli",
+              "wolne_po_jezdzcach_w_zalodze", "wolne_po_dezerterach", "konie_z_echa_rot")))
+        rest = run.horse_rest(W)
+        print("Konie AI wedlug krolestw (srednio na dobe: czeka / w tym mimo koni innej kategorii / wolne zwykle-bojowe-szlachetne; suma okna: czekaja (proby),"
+              " nieudane pusto/drogie/zarezerwowana, reszta konnych = d(konni) - znane przeplywy, footman netto po strazy):")
+        for key in sorted(hs, key=lambda x: -hs[x]["czeka"]):
+            h = hs[key]; nd = max(1, hd.get(key, 0)); rs = rest.get(key, (0.0, 0))
+            print("  %-14s czeka %6.1f / %6.1f | wolne %5.1f-%5.1f-%5.1f | czekaja %6d | nieudane %d/%d/%d | reszta %+8.0f (%d dob) | footman netto %+.0f"
+                  % (key[:14], h["czeka"] / nd, h["czeka_mimo_koni_innej_kategorii"] / nd, h["wolne_zwykle"] / nd, h["wolne_bojowe"] / nd,
+                     h["wolne_szlachetne"] / nd, h["czekaja_proby"], h["nieudane_pusto"], h["nieudane_za_drogie"], h["nieudane_polka_zarezerwowana"],
+                     rs[0], rs[1], (h["footman_dothrakow"] / nd) - h["straz_pieszy_footman"]))
+    print("Zabici przez Dothrakow w H3 (wsie i karawany 7 Wolnych Miast, okno): %d" % run.doth_kills(W))
 
 def sig(p0, n): return math.sqrt(max(p0 * (1 - p0), 1e-9) / n) if n else 0.0
 
@@ -238,6 +298,11 @@ def verdict(run, base, W, k, kb, changed):
         if r and r0 and float(r["tier_partii"]) < float(r0["tier_partii"]) - 0.3: add("D4", "sygnal", "khuzait", "tier partii %s wobec %s" % (r["tier_partii"], r0["tier_partii"]))
     except (KeyError, ValueError): pass
     h, h0 = hs.get("khuzait"), hs0.get("khuzait")
+    # D4 (przeglad 175): udzial "czeka na konia" (czeka / wszyscy) Dothrakow wobec B0 - zawsze w raporcie, sygnal przy > B0 + 10 pkt
+    if h and h0 and h["wszyscy"] > 0 and h0["wszyscy"] > 0:
+        c, c0 = h["czeka"] / h["wszyscy"], h0["czeka"] / h0["wszyscy"]
+        add("D4", "sygnal" if c > c0 + 0.10 else "info", "khuzait", "czeka na konia %.1f%% ludzi wobec %.1f%% w B0" % (100 * c, 100 * c0))
+    elif h is None or h0 is None: add("D4", "brak danych", "khuzait", "brak konie-krolestwa.csv w jednym z biegow")
     if h and h0 and h["konni"] > 0 and h0["konni"] > 0:
         a, a0 = h["bez_konia"] / h["konni"], h0["bez_konia"] / h0["konni"]
         if a > a0 + 0.10: add("D5", "sygnal", "khuzait", "konni bez konia %.0f%% wobec %.0f%%" % (100 * a, 100 * a0))
@@ -246,7 +311,10 @@ def verdict(run, base, W, k, kb, changed):
     raid = sum(int(bal[k]["wsie_karawany_rozbite_przez_dothrakow"]) for k in FREE7 if k in bal)
     raid0 = sum(int(bal0[k]["wsie_karawany_rozbite_przez_dothrakow"]) for k in FREE7 if k in bal0)
     men = sum(int(bal[k]["ludzie_partie"]) for k in FREE7 if k in bal); men0 = sum(int(bal0[k]["ludzie_partie"]) for k in FREE7 if k in bal0)
+    kill, kill0 = run.doth_kills(W), base.doth_kills(W)   # przeglad 175: zabici przez Dothrakow w H3 (czesc progu D6)
     if raid0 > 0 and raid > 2 * raid0: add("D6", "sygnal", "wolne miasta", "rozbite przez Dothrakow %d > 2 x %d" % (raid, raid0))
+    if kill0 > 0 and kill > 2 * kill0: add("D6", "sygnal", "wolne miasta", "zabici przez Dothrakow w H3 %d > 2 x %d" % (kill, kill0))
+    elif kill0 == 0 and kill > 0: add("D6", "info", "wolne miasta", "zabici przez Dothrakow w H3 %d (w B0 0)" % kill)
     if men0 > 0 and men < 0.8 * men0: add("D6", "sygnal", "wolne miasta", "ludzie w partiach %d < 80%% z %d" % (men, men0))
     if not out: print("  bez sygnalow (wszystkie progi 6.2 ponizej granic albo za malo danych - patrz tabela)")
     for code, kind, key, txt in sorted(out):
@@ -256,34 +324,51 @@ def verdict(run, base, W, k, kb, changed):
     print("  -> " + ("TWARDY prog: wylaczyc odpowiedzialna czesc i powtorzyc T3 (D1/D2 -> Army175DothrakiRide = NIE; B4/B5 zmienionego -> jego czesc)" if hard
                      else "sygnaly: drugi bieg T3'; ten sam sygnal dla tego samego krolestwa w obu biegach = jak TWARDY" if sigs
                      else "brak sygnalow (pozycje 'brak danych' - za mala proba, nie 'zaliczone')"))
+    print("  (N1/N2 - tylko bieg celowany T5 z --t5; w zwyklym biegu bitew Polnocy o stosunku 0.9-1.1 jest za malo - brak danych)")
+
+def north_side(b):
+    return "A" if b["ka"] == "battania" else "O" if b["kd"] == "battania" else None
 
 def t5(run, zero):
     print("\n== T5 (N1/N2): %s (+10) wobec %s (0)" % (run.root, zero.root))
+    k = zero.fit_k()   # jedno k dla obu biegow - z biegu bez przewagi
     for name, r in (("+10", run), ("0", zero)):
-        n = w = 0; own = foe = 0
+        n = w = 0; own = foe = 0; nb = 0; res = 0.0; var = 0.0
         for b in r.battles:
             if not b["lord"]: continue
-            side = "A" if b["ka"] == "battania" else "O" if b["kd"] == "battania" else None
+            side = north_side(b)
             if side is None: continue
             mine, other = (b["pa"], b["pd"]) if side == "A" else (b["pd"], b["pa"])
+            won = b["win"] == side
             if 0.9 <= mine / other <= 1.1:
-                n += 1; w += b["win"] == side
+                n += 1; w += won
+            # N1b (przeglad 175): wszystkie bitwy lordow Polnocy - wygrana minus p(wygranej) z mocy (WPO na bitwe)
+            p = 1 / (1 + math.exp(-k * math.log(mine / other)))
+            nb += 1; res += (1.0 if won else 0.0) - p; var += p * (1 - p)
         for b in r.battles:
             # ten sam warunek w obu biegach (w biegu 0 przewaga nie dziala, wiec nie "ciosy", tylko warunek NorthHomeEdge):
-            # bitwa polowa, snieg wszedzie albo las w regionie Polnocy, po jednej stronie piechota Polnocy t3+
+            # bitwa polowa, snieg wszedzie albo las w regionie Polnocy, po jednej stronie piechota Polnocy t3+ (liczba ludzi)
             if b["typ"] != "FieldBattle" or not (b["ctx"] == "SnowBattle" or (b["ctx"] == "ForestBattle" and b["rc"] == "battania")): continue
             if (b["na"] > 0) == (b["nd"] > 0): continue
             a = b["na"] > 0
             own += b["sa"] if a else b["sd"]; foe += b["sd"] if a else b["sa"]
-        print("  bieg %-3s: Polnoc w bitwach lordow o stosunku 0.9-1.1: %d, wygrane %s; straty w bitwach z warunkiem przewagi %d/%d (wspolczynnik %s)"
-              % (name, n, pct(w, n), own, foe, "%.2f" % (own / foe) if foe else "-"))
-        r._n1 = (n, w); r._n2 = own / foe if foe else None
+        print("  bieg %-3s: Polnoc w bitwach lordow o stosunku 0.9-1.1: %d, wygrane %s; wszystkich bitew lordow Polnocy %d, WPO na bitwe %s;"
+              " straty w bitwach z warunkiem przewagi %d/%d (wspolczynnik %s)"
+              % (name, n, pct(w, n), nb, "%+.3f" % (res / nb) if nb else "-", own, foe, "%.2f" % (own / foe) if foe else "-"))
+        r._n1 = (n, w); r._n2 = own / foe if foe else None; r._n1b = (nb, res, var)
     n, w = run._n1; n0, w0 = zero._n1
     if n >= 8:
         p0 = w0 / n0 if n0 >= 8 else 0.5
         p = w / n
         print("  N1: %.0f%% (n %d) wobec %.0f%% -> %s" % (100 * p, n, 100 * p0, "SYGNAL" if p > 0.75 or p - p0 > 2 * sig(p0, n) else "w normie"))
     else: print("  N1: brak danych (n %d < 8)" % n)
+    (nb, res, var), (nb0, res0, var0) = run._n1b, zero._n1b
+    if nb >= 8 and nb0 >= 8:
+        m, m0 = res / nb, res0 / nb0
+        s = math.sqrt(var / nb ** 2 + var0 / nb0 ** 2)
+        print("  N1b: WPO na bitwe %+.3f (n %d) wobec %+.3f (n %d), roznica %+.3f, sigma %.3f (k %.1f) -> %s"
+              % (m, nb, m0, nb0, m - m0, s, k, "SYGNAL" if s > 0 and m - m0 > 2 * s else "w normie"))
+    else: print("  N1b: brak danych (bitew lordow Polnocy %d / %d, potrzeba po 8)" % (nb, nb0))
     if run._n2 is not None and zero._n2:
         drop = 1 - run._n2 / zero._n2
         print("  N2: wspolczynnik strat %.2f wobec %.2f (spadek %.0f%%, oczekiwane ok. 12%%) -> %s" % (run._n2, zero._n2, 100 * drop, "SYGNAL" if drop > 0.25 else "w normie"))
@@ -310,6 +395,7 @@ def main(a):
         for W in okna: report(b, W, kb)
         for W in okna: verdict(run, b, W, k, kb, changed)
     if zero: t5(run, Run(zero))
+    else: print("\nT5 (N1/N2): brak biegu --t5 - brak danych (tryb -ForceWar autotestu nie jest czescia paczki 175).")
 
 if __name__ == "__main__":
     main(sys.argv[1:])

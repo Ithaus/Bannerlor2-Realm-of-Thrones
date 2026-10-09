@@ -1020,9 +1020,13 @@ namespace Armoury
         [SettingPropertyGroup("A knight needs a horse")]
         public int AiMountShelfFloor { get; set; } = 4;
 
-        [SettingPropertyBool("Ai Upgrade Horse To Armory", HintText = "the horse an AI lord or garrison pays for a man's upgrade to a mounted troop goes into that party's armoury for the new rider, just as yours does, instead of vanishing; and at the next upgrade a horse lying free in the armoury (more horses there than mounted men) is used first, before one is taken from the baggage or bought. Takes effect at once (off = the AI horse is gone on upgrade as before)")]
+        [SettingPropertyBool("Ai Upgrade Horse To Armory", HintText = "the horse an AI lord or garrison pays for a man's upgrade to a mounted troop goes into that party's armoury for the new rider, just as yours does, instead of vanishing. Takes effect at once (off = the AI horse is gone on upgrade as before)")]
         [SettingPropertyGroup("A knight needs a horse")]
         public bool AiUpgradeHorseToArmory { get; set; } = true;
+
+        [SettingPropertyBool("Ai Free Armory Horses First", HintText = "at an AI upgrade to a mounted troop (and when Realm of Thrones hands a Dothraki party a rider) a horse lying free in the party's armoury - more horses of that kind there than riders entitled to them - is used first, before one is taken from the baggage or bought. Off until the recruit belongings package is in: today riders left in garrisons, deserters and Realm of Thrones troop swaps leave horses there that nobody paid for. Takes effect at once")]
+        [SettingPropertyGroup("A knight needs a horse")]
+        public bool AiFreeArmoryHorsesFirst { get; set; } = false;
 
         [SettingPropertyBool("Long Year Enabled", HintText = "stretch the year so the world stops racing: children grow, lords age and seasons turn at a pace a long campaign can live with")]
         [SettingPropertyGroup("The turning year")]
@@ -2824,7 +2828,7 @@ namespace Armoury
         [SettingPropertyGroup("Armies of the realms (175)")]
         public int NorthHardySkillBonus { get; set; } = 25;
 
-        [SettingPropertyBool("Army175 Tier Gear", HintText = "every soldier type - all cultures, village and noble lines, house troops, militia, mercenaries and garrisons, never lords, companions or you - carries and wears in its pattern only weapons, shields, ammunition and armour up to its own tier: a piece above it is replaced by the same kind of piece of that tier. A man still uses only the gear his skills allow. Applied by CrashScribe, takes effect on the next load")]
+        [SettingPropertyBool("Army175 Tier Gear", HintText = "every soldier type - all cultures, village and noble lines, house troops, militia, mercenaries and garrisons, never lords, companions or you - carries and wears in its pattern only weapons, shields, ammunition and armour up to its own tier: a piece above it is replaced by the same kind of piece of that tier. A man still uses only the gear his skills allow. Applied by CrashScribe, takes effect on the next load; from then on the Armoury also keeps the battle pattern of your fights within the soldier's tier")]
         [SettingPropertyGroup("Armies of the realms (175)")]
         public bool Army175TierGear { get; set; } = true;
 
@@ -2844,7 +2848,7 @@ namespace Armoury
         [SettingPropertyGroup("Armies of the realms (175)")]
         public bool Army175DothrakiRide { get; set; } = true;
 
-        [SettingPropertyBool("Army175 Dothraki Horse Guard", HintText = "when Realm of Thrones swaps a man in a Dothraki party for a rider, he becomes a rider only if a horse is found for him - a free one in the armoury or one from the baggage; with none he becomes a Dothraki on foot of the same tier. Only with Army 175 Dothraki Ride on. Takes effect at once")]
+        [SettingPropertyBool("Army175 Dothraki Horse Guard", HintText = "when Realm of Thrones swaps a man in a Dothraki party for a rider, he becomes a rider only if a horse is found for him - one from the baggage (or a free one in the armoury, with Ai Free Armory Horses First); with none he becomes a Dothraki on foot of the same tier (if Realm of Thrones keeps that foot troop in the house's pool). Works only while CrashScribe has the Dothraki riding since the last load (Army 175 Dothraki Ride), so switching that off ends the guard at the next load together with the riding change. Takes effect at once")]
         [SettingPropertyGroup("Armies of the realms (175)")]
         public bool Army175DothrakiHorseGuard { get; set; } = true;
 
@@ -2868,7 +2872,7 @@ namespace Armoury
         [SettingPropertyGroup("Armies of the realms (175)")]
         public bool Army175MinorLore { get; set; } = false;
 
-        [SettingPropertyBool("Army175 Golden Bows", HintText = "waits for the armoury restocking package: Golden Company crossbowmen split into thirds - crossbows, recurve bows and yew longbows - and in battle each man takes the missile weapon of his drawn kit. Applied by CrashScribe and the Armoury, takes effect on the next load")]
+        [SettingPropertyBool("Army175 Golden Bows", HintText = "waits for the armoury restocking package: Golden Company crossbowmen split into thirds - crossbows, recurve bows and yew longbows - and in battle each man takes the missile weapon of his drawn kit. The kits are made by CrashScribe on the next load; the Armoury part (the drawn kit decides, only for the three Golden Company crossbow troops) acts at once")]
         [SettingPropertyGroup("Armies of the realms (175)")]
         public bool Army175GoldenBows { get; set; } = false;
 
@@ -3147,6 +3151,7 @@ namespace Armoury
             s.AiMountMarketSharePercent = AiMountMarketSharePercent;
             s.AiMountShelfFloor = AiMountShelfFloor;
             s.AiUpgradeHorseToArmory = AiUpgradeHorseToArmory;
+            s.AiFreeArmoryHorsesFirst = AiFreeArmoryHorsesFirst;
             s.LongYearEnabled = LongYearEnabled;
             s.WeeksPerSeason = WeeksPerSeason;
             s.MarchPaceEnabled = MarchPaceEnabled;

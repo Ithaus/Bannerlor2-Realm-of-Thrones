@@ -21,7 +21,7 @@ namespace Armoury
     /// symulacji (snieg z pogody), oblezen i sum wedlug krolestwa - jej linii NIE ruszamy (parsuja ja skrypty audytu). Dopisujemy:
     ///  - "Bitwa: B175" (do bitwy.log) dla kazdej bitwy krolestwa z krolestwem i kazdej bitwy z partia Polnocy (takze z bandami):
     ///    typ, kontekst symulacji, region, strony (krolestwo, rodzaj: lord/armia/wies/karawana/zaloga/banda, partie, ludzie, moc z gry
-    ///    = suma MilitaryPowerModel.GetTroopPower po skladzie sprzed bitwy, % konnych, % konnych lucznikow, % piechoty Polnocy t3+,
+    ///    = suma MilitaryPowerModel.GetTroopPower po skladzie sprzed bitwy, % konnych, % konnych lucznikow (od szeregowych), piechota Polnocy t3+ (ludzie i %),
     ///    straty), stosunek sil, zwyciezca, przewaga Polnocy (ciosy z mnoznikiem NorthHomeEdge), osada. Moc NIE zawiera przewagi Polnocy
     ///    (ta siedzi w ciosie) - dzieki temu "wygrane ponad oczekiwane" mierza jej skutek. Sklad sprzed bitwy = zdrowi w partii + ranni,
     ///    polegli i rozbici w bitwie - migawka w prefiksie CalculateAndCommitMapEventResults (Priority 801, PRZED H3, ktora przesuwa
@@ -50,7 +50,7 @@ namespace Armoury
             public int Forts; public long PartyMen, GarrMen, GarrRegs, PartyRegs; public double GarrTiers, PartyTiers;
         }
 
-        private sealed class SideSnap { public int Parties, Men, Mounted, HorseArchers, North, Loss; public double Power; }
+        private sealed class SideSnap { public int Parties, Men, Regs, Mounted, HorseArchers, North, Loss; public double Power; }   // Regs - szeregowi (procenty liczone od nich)
         private sealed class Snap { public SideSnap A, D; }
 
         private static readonly Dictionary<string, KRow> _rows = new Dictionary<string, KRow>();
@@ -71,7 +71,9 @@ namespace Armoury
         private static KRow RowOf(IFaction f) { return RowOf(HorseCensus.KeyOf(f)); }
 
         // ------------------------------------------------------------ sklad stron
-        private static void AddTroops(SideSnap ss, TroopRoster r, bool healthyOnly, MilitaryPowerModelProxy pm)
+        /// <summary>skipHeroesIn != null (przeglad 175): bohater, ktory jest w tym rosterze (DiedInBattle), jest pomijany - MapEventParty.OnTroopKilled
+        /// zdejmuje z MemberRoster tylko szeregowych, wiec polegly bohater zostaje w nim i bylby liczony drugi raz (ludzie i moc).</summary>
+        private static void AddTroops(SideSnap ss, TroopRoster r, bool healthyOnly, MilitaryPowerModelProxy pm, TroopRoster skipHeroesIn = null)
         {
             if (r == null) return;
             for (int i = 0; i < r.Count; i++)
@@ -79,11 +81,13 @@ namespace Armoury
                 var el = r.GetElementCopyAtIndex(i);
                 var c = el.Character;
                 if (c == null) continue;
+                if (c.IsHero && skipHeroesIn != null && skipHeroesIn.FindIndexOfTroop(c) >= 0) continue;
                 int n = healthyOnly ? el.Number - el.WoundedNumber : el.Number;
                 if (n <= 0) continue;
                 ss.Men += n;
                 ss.Power += pm.Power(c) * n;
                 if (c.IsHero) continue;
+                ss.Regs += n;
                 if (c.IsMounted) { ss.Mounted += n; if (c.IsRanged) ss.HorseArchers += n; }
                 if (NorthHomeEdge.InSet(c)) ss.North += n;
             }
@@ -123,7 +127,7 @@ namespace Armoury
                 if (mep == null || mep.Party == null) continue;
                 ss.Parties++;
                 // zdrowi na starcie = zdrowi teraz + ranni, polegli i rozbici w tej bitwie
-                AddTroops(ss, mep.Party.MemberRoster, true, pm);
+                AddTroops(ss, mep.Party.MemberRoster, true, pm, mep.DiedInBattle);
                 AddTroops(ss, mep.WoundedInBattle, false, pm);
                 AddTroops(ss, mep.DiedInBattle, false, pm);
                 AddTroops(ss, mep.RoutedInBattle, false, pm);
@@ -195,6 +199,7 @@ namespace Armoury
         }
 
         private static string Pc(int x, int of) { return of > 0 ? (100.0 * x / of).ToString("0", CultureInfo.InvariantCulture) + "%" : "0%"; }
+        private static string Pc1(int x, int of) { return of > 0 ? (100.0 * x / of).ToString("0.0", CultureInfo.InvariantCulture) + "%" : "0.0%"; }
 
         private static void SideText(StringBuilder sb, string tag, IFaction f, string kind, SideSnap s, int loss)
         {
@@ -202,8 +207,9 @@ namespace Armoury
             var k = f as Kingdom;
             sb.Append(" | ").Append(tag).Append(": krol=").Append(k != null ? k.StringId : "-(" + (f != null ? f.StringId : "?") + ")")
               .Append(" rodzaj=").Append(kind).Append(" partii ").Append(s.Parties).Append(" ludzi ").Append(s.Men)
-              .Append(" moc ").Append(s.Power.ToString("0.0", inv)).Append(" konni ").Append(Pc(s.Mounted, s.Men)).Append(" KL ").Append(Pc(s.HorseArchers, s.Men))
-              .Append(" PolnocT3+ ").Append(Pc(s.North, s.Men)).Append(" straty ").Append(loss);
+              .Append(" moc ").Append(s.Power.ToString("0.0", inv)).Append(" konni ").Append(Pc(s.Mounted, s.Regs)).Append(" KL ").Append(Pc(s.HorseArchers, s.Regs))
+              // przeglad 175: liczba ludzi zbioru 43 (procent zaokraglony do 0% wyrzucal z N2 bitwy z garstka piechoty Polnocy)
+              .Append(" PolnocT3+ ").Append(s.North).Append(" (").Append(Pc1(s.North, s.Regs)).Append(")").Append(" straty ").Append(loss);
         }
 
         /// <summary>MapEventEnded (z BattleChronicle - przed jej wyjsciem przy malych bitwach).</summary>
@@ -351,7 +357,10 @@ namespace Armoury
                 try { foreach (var k in Kingdom.All) if (k != null && k.StringId != null) names.Add(k.StringId + "=" + (k.Name != null ? k.Name.ToString().Replace(";", ",").Replace("|", "/") : "?")); } catch { }
                 Log.Info("KingdomBalance (175.0): krolestwa id=nazwa: " + string.Join("; ", names.ToArray()));
                 Log.Info("KingdomBalance (175.0): miara balansu krolestw czynna - " + n + " krolestw z twierdzami na starcie sesji, migawka skladu stron "
-                         + (_patched ? "wpieta (przed H3)" : "BRAK - sklad liczony przy MapEventEnded") + ", k = 12.6; zbior Polnocy " + NorthHomeEdge.SetCount + ".");
+                         + (_patched ? "wpieta (przed H3)" : "BRAK - sklad liczony przy MapEventEnded") + ", k = 12.6; zbior Polnocy " + NorthHomeEdge.SetCount
+                         + (NorthHomeEdge.SetCount == NorthHomeEdge.ExpectedSet ? "" : " - OSTRZEZENIE: ma byc " + NorthHomeEdge.ExpectedSet + " (porownaj z linia CS NorthHardy)") + "."
+                         + " Uwaga N1 (projekt 6.2): bitew lordow Polnocy o stosunku sil 0.9-1.1 jest w zwyklym biegu za malo (baza: 14 z 520 bitew lord-lord swiata w 0.9-1.1, Polnoc 5 bitew w 120 dob)"
+                         + " - hamulec +10% wynika z konstrukcji (autobitwa rozstrzyga sila), test progiem tylko w biegu celowanym T5.");
             }
             catch (Exception e) { Log.Error("KingdomBalance.SessionStart", e); }
         }

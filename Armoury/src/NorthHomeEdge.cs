@@ -26,14 +26,14 @@ namespace Armoury
     /// Warunek bitwy: bitwa polowa na ladzie (oblezenie - nigdy) i kontekst symulacji SnowBattle (wszedzie - snieg z terenu albo
     /// z pogody) albo ForestBattle w regionie Polnocy (najblizsza twierdza kultury battania, OutlawLaw.RegionAt) - odswiezany
     /// raz na godzine gry na bitwe (ConditionalWeakTable).
-    /// Zbior: piechota (default_group Infantry) t3-t6 kultury battania z drzew battanian_volunteer (wies), battanian_highborn_youth
-    /// (szlachta) i 9 szablonow Polnocy - liczony regula przy starcie sesji (ma byc 43, jak w CS NorthHardy), i partia bijacego
+    /// Zbior: piechota (default_group Infantry) t3-t6 kultury battania z drzew BasicTroop (wies) i EliteBasicTroop (szlachta) kultury
+    /// i 9 szablonow Polnocy, bez milicji - ta sama regula co CS NorthSet, liczona przy starcie sesji (ma byc 43), i partia bijacego
     /// nalezy do rodu kultury battania (zaloga - rod wlasciciela osady; zamyka przeciek umber_houseguard w partiach Clegane).
     /// Dziala tylko w bitwach prawie rownych (autobitwe wygrywa prawie zawsze silniejszy) - miara w KingdomBalance (linia B175).
     /// </summary>
     internal static class NorthHomeEdge
     {
-        private static readonly string[] Roots = { "battanian_volunteer", "battanian_highborn_youth" };
+        internal const int ExpectedSet = 43;   // projekt 3.2 / 6.1 pkt 4 (jednostki.csv + szablony.csv)
         private static readonly string[] Templates =
         {
             "kingdom_hero_party_battania_template", "clan_stark_party_template", "clan_bolton_party_template", "clan_karstark_party_template",
@@ -60,32 +60,53 @@ namespace Armoury
         internal static bool InSet(CharacterObject c) { var s = _set; return c != null && s != null && s.Contains(c); }
         internal static int SetCount { get { var s = _set; return s != null ? s.Count : 0; } }
 
-        /// <summary>Zbior 43 (regula z projektu 3.2; ta sama co skrypt a175/narz/polnoc.py i CS NorthSet).</summary>
+        private static void Tree(CharacterObject root, HashSet<CharacterObject> into)
+        {
+            if (root == null) return;
+            var stack = new Stack<CharacterObject>();
+            stack.Push(root);
+            while (stack.Count > 0)
+            {
+                var c = stack.Pop();
+                if (c == null || !into.Add(c)) continue;
+                var ups = c.UpgradeTargets;
+                if (ups != null) foreach (var u in ups) if (u != null) stack.Push(u);
+            }
+        }
+
+        /// <summary>
+        /// Zbior 43 (regula z projektu 3.2). PRZEGLAD 175: DOKLADNIE ta sama regula co CS Army175.NorthSet (dotad Armoury mialo na
+        /// sztywno korzenie battanian_volunteer / battanian_highborn_youth i nie wykluczalo drzew milicji - dzis oba daja 43, ale po
+        /// zmianie danych ROT +25 (CS) i +10% (tu) moglyby objac rozne jednostki): drzewa Culture.BasicTroop i EliteBasicTroop kultury
+        /// battania + 9 szablonow Polnocy, bez drzew milicji (Melee/Ranged(Elite)MilitiaTroop) i bohaterow, kultura battania,
+        /// default_group Infantry, tier 3-6. Liczba inna niz 43 - OSTRZEZENIE w logu (tu i w KingdomBalance.SessionStart).
+        /// </summary>
         internal static void BuildSet()
         {
             var set = new HashSet<CharacterObject>();
             var tree = new HashSet<CharacterObject>();
+            var mil = new HashSet<CharacterObject>();
             int missing = 0;
             try
             {
                 var om = MBObjectManager.Instance;
-                var stack = new Stack<CharacterObject>();
-                foreach (var id in Roots) { var c = om.GetObject<CharacterObject>(id); if (c != null) stack.Push(c); else missing++; }
+                var cu = om.GetObject<CultureObject>("battania");
+                if (cu != null)
+                {
+                    if (cu.BasicTroop != null) Tree(cu.BasicTroop, tree); else missing++;
+                    if (cu.EliteBasicTroop != null) Tree(cu.EliteBasicTroop, tree); else missing++;
+                    Tree(cu.MeleeMilitiaTroop, mil); Tree(cu.RangedMilitiaTroop, mil); Tree(cu.MeleeEliteMilitiaTroop, mil); Tree(cu.RangedEliteMilitiaTroop, mil);
+                }
+                else missing += 2;
                 foreach (var tid in Templates)
                 {
                     var t = om.GetObject<PartyTemplateObject>(tid);
                     if (t == null || t.Stacks == null) { missing++; continue; }
-                    foreach (var st in t.Stacks) if (st.Character != null) stack.Push(st.Character);
-                }
-                while (stack.Count > 0)
-                {
-                    var c = stack.Pop();
-                    if (c == null || !tree.Add(c)) continue;
-                    var ups = c.UpgradeTargets;
-                    if (ups != null) foreach (var u in ups) if (u != null) stack.Push(u);
+                    foreach (var st in t.Stacks) Tree(st.Character, tree);
                 }
                 foreach (var c in tree)
                 {
+                    if (c == null || mil.Contains(c)) continue;
                     if (c.IsHero || c.Culture == null || c.Culture.StringId != "battania") continue;
                     if (c.DefaultFormationClass != FormationClass.Infantry) continue;
                     int tier = c.Tier;
@@ -99,8 +120,9 @@ namespace Armoury
             foreach (var c in set) { List<string> l; if (!byTier.TryGetValue(c.Tier, out l)) { l = new List<string>(); byTier[c.Tier] = l; } l.Add(c.StringId); }
             var sb = new StringBuilder();
             foreach (var kv in byTier) { kv.Value.Sort(StringComparer.Ordinal); sb.Append(" t").Append(kv.Key).Append(" (").Append(kv.Value.Count).Append("): ").Append(string.Join(", ", kv.Value.ToArray())).Append(';'); }
-            Log.Info("NorthHomeEdge (175): zbior piechoty Polnocy t3-t6 (wies, szlachta, rody) - " + set.Count + " jednostek (ma byc 43, jak CS NorthHardy), drzewa "
-                     + tree.Count + (missing > 0 ? ", BRAK " + missing + " korzeni/szablonow" : "") + "; przewaga w autobitwie " + Percent + "% (snieg wszedzie, las Polnocy, nigdy oblezenie)"
+            Log.Info("NorthHomeEdge (175): zbior piechoty Polnocy t3-t6 (wies, szlachta, rody; regula CS NorthSet, bez milicji) - " + set.Count + " jednostek"
+                     + (set.Count == ExpectedSet ? " (jak ma byc - 43, jak CS NorthHardy)" : " - OSTRZEZENIE: ma byc " + ExpectedSet + " (dane ROT albo regula rozjechane; porownaj z linia CS NorthHardy)")
+                     + ", drzewa " + tree.Count + " (milicji wykluczonych " + mil.Count + ")" + (missing > 0 ? ", BRAK " + missing + " korzeni/szablonow" : "") + "; przewaga w autobitwie " + Percent + "% (snieg wszedzie, las Polnocy, nigdy oblezenie)"
                      + (_patched ? "" : " - LATKA NIEWPIETA, przewaga spi") + ";" + sb);
         }
 
