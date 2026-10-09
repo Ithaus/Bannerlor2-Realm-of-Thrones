@@ -17,8 +17,8 @@ namespace Armoury
     /// logiczny system ekonomii, ze wszystko z czegos wynika"). Specyfikacja: docs/paczki/170-bee-domkniecie.md (decyzje D1-D15,
     /// tabele 2.2 / 2.3, kod 3.x, krytyka rozdz. 11).
     /// Strone AI i swiata zamyka plik ustawien BEE (13 kluczy skryptu tools/bee/zamknij-ujscia-bee.ps1 -ListaZFundamentu + wpisy 18 i 49) -
-    /// ta klasa tego nie dubluje. Domyka to, czego klucze nie siegaja; 15 zaczepow Harmony, wszystko przez refleksje (bez BEE nic sie
-    /// nie wpina; inna wersja BEE niz v1.4.5 - nic sie nie wpina i log mowi to glosno):
+    /// ta klasa tego nie dubluje. Domyka to, czego klucze nie siegaja; 16 zaczepow Harmony (15 domykajacych + 1 tylko do logu), wszystko
+    /// przez refleksje (bez BEE nic sie nie wpina; inna wersja BEE niz v1.4.5 - nic sie nie wpina i log mowi to glosno):
     ///  - 8 postfiksow na CanPlayer* (akcje gracza wrzucajace zloto w nicosc: wplata do skarbca zamku i miasta, zbrojownia,
     ///    inwestycja w miasto 10/50/100 tys., inwestycja we wies 5/15/30 tys., dostep do targu 5 000, oboz szkoleniowy, szkolenie
     ///    wojsk) - wynik false i powod po angielsku; kazde wejscie (menu BEE, pickery BEE, ekrany BK, konsola BK) pyta najpierw Can*,
@@ -29,7 +29,12 @@ namespace Armoury
     ///    jako OFF z powodem, klik nic nie wlacza (user.cfg nietkniety);
     ///  - 5 prefiksow return false (Priority.Last - okna pomiaru 169 biegna przed nimi) na biernych zrodlach z niczego / w nicosc:
     ///    produkcja gotowych zbrojowni (wsad z targu w nicosc, bron z niczego), XP gotowych obozow AI, odblokowana druga produkcja
-    ///    wsi, oplata 5 000 za dostep do targu (ogon AI), zdejmowanie zlota panom (WealthAudit).
+    ///    wsi, oplata 5 000 za dostep do targu (ogon AI), zdejmowanie zlota panom (WealthAudit);
+    ///    oplate AI blokujemy TYLKO, gdy plik BEE zamyka odplyw towaru wsi (K4/K5) - bez nich ta oplata jest jedynym, co odplyw tlumi
+    ///    (VDev:628 -> :489), wiec wtedy ja przepuszczamy (mniejsze zlo) i linia kampanii mowi to glosno;
+    ///  - 1 postfiks tylko do logu na CompletePlayerTrainingSession - dokonczenie sesji szkolenia oplaconej w starym zapisie (D9,
+    ///    nie blokowane) widac w linii doby.
+    /// Przelacznik w ksiedze zamykamy tylko, gdy B5 (zdejmowanie zlota panom) jest wpiety - inaczej ksiega zostaje jak w BEE.
     /// Swiadome odstepstwo (D5): ekranow BK (Demesne) i konsoli BK nie latamy - przyciski BK nie maja wiazania IsEnabled, wiec
     /// zostaja klikalne; okno pyta o cene albo kwote, odmowa z powodem pada po zatwierdzeniu, zloto nie schodzi.
     /// Nasz kod NIGDY nie pisze stanu BEE (jedyny zapis do obiektu BEE: RowVM.OnClick - obiekt ekranu); zero kluczy zapisu.
@@ -53,8 +58,11 @@ namespace Armoury
         private const string T_WEALTH_CLICK = "Lord wealth realism is closed: gold taken from lords would simply vanish.";
 
         private const string L_WEALTH = "zdejmowanie zlota panom";   // etykieta celu B5 (linia kampanii sprawdza, czy wpiety)
+        private const string L_MARKET = "oplata za dostep do targu";  // etykieta celu B4 (linia kampanii: wstrzymana przy otwartych K4/K5)
+        private const int HookCount = 16;                            // 15 domykajacych + 1 tylko do logu (dokonczenie starej sesji szkolenia)
 
         private static readonly List<string> _wired = new List<string>(), _missing = new List<string>();
+        private static bool _wealthWired;   // B5 wpiety - tylko wtedy zamykamy przelacznik w ksiedze (inaczej ksiega jak w BEE)
 
         // pola i wlasciwosci BEE czytane przez refleksje (pobierane raz w ApplyAll; brak = licznik / raport "?", latka dziala)
         private static FieldInfo _fArmoryLevel, _fSecondItem, _fAllRows, _fOnClick, _fBkMode, _fRtLordWealth;
@@ -64,9 +72,11 @@ namespace Armoury
 
         private static readonly Action<bool> _noApply = delegate { ClosedClick(); };
 
-        // liczniki od poprzedniej linii doby (wywolania zablokowane przez prefiksy B1-B5)
+        // liczniki od poprzedniej linii doby (wywolania zablokowane przez prefiksy B1-B5; przepuszczone oplaty AI przy otwartych K4/K5;
+        // dokonczone stare sesje szkolenia - tylko log)
         private static int _day = -1, _armory, _camps, _second, _market, _marketPlayer, _wealthN, _stumbles;
-        private static long _wealthGold;
+        private static int _marketOpen, _trainDone, _trainTroops;
+        private static long _wealthGold, _trainXp;
         private static readonly HashSet<string> _stumbleLogged = new HashSet<string>();
 
         /// <summary>Wylacznik czytany przy kazdym wywolaniu - MCM przepisuje ustawienia co godzine gry (ArmouryBehavior).</summary>
@@ -157,7 +167,7 @@ namespace Armoury
 
         internal static void ApplyAll(Harmony h)
         {
-            _wired.Clear(); _missing.Clear();
+            _wired.Clear(); _missing.Clear(); _wealthWired = false;
             var tSub = QuartermasterLaw.FindType("BetterEconomy.BetterEconomySubModule");
             if (tSub == null) { Log.Info("BEE domkniecie (170): BetterEconomy nieobecny - nie ma czego domykac."); return; }
 
@@ -216,7 +226,7 @@ namespace Armoury
             catch (Exception e) { Log.Error("BeeSeal pola pomocnicze", e); }
 
             Type S = typeof(Settlement), H = typeof(Hero), I = typeof(int), B = typeof(bool), STR = typeof(string);
-            Type RS = typeof(string).MakeByRefType();
+            Type RS = typeof(string).MakeByRefType(), RI = typeof(int).MakeByRefType();
 
             // 8 akcji gracza - postfiksy Can* (Priority.Last)
             Wire(h, tCastle, "CanPlayerContributeTreasury", new[] { S, H, I, RS }, null, "TreasuryPost", true, "wplata do skarbca zamku");
@@ -236,10 +246,15 @@ namespace Armoury
             Wire(h, tTown, "TickArmoryProduction", new[] { S, tTownState, I }, "ArmoryPre", null, true, "produkcja gotowych zbrojowni");
             Wire(h, tCastle, "ApplyAiTrainingCampPassive", new[] { S, tCastleState }, "CampPre", null, true, "XP gotowych obozow AI");
             Wire(h, tVDev, "TickSecondaryProduction", new[] { S, tVilState, tPop, tLink, I }, "SecondPre", null, true, "druga produkcja wsi");
-            Wire(h, tVDev, "ApplyMarketAccess", new[] { S, H, B }, "MarketPre", null, true, "oplata za dostep do targu");
+            Wire(h, tVDev, "ApplyMarketAccess", new[] { S, H, B }, "MarketPre", null, true, L_MARKET);
             Wire(h, tWealth, "TryRemoveHeroGold", new[] { H, I }, "WealthPre", null, true, L_WEALTH);
+            _wealthWired = _wired.Contains(L_WEALTH);
 
-            Log.Info("BEE domkniecie (170): BetterEconomy " + ver + " - wpiete " + _wired.Count + "/15: " + string.Join(", ", _wired.ToArray())
+            // tylko log (D9 - nie blokujemy): dokonczenie sesji szkolenia oplaconej w starym zapisie (XP z niczego, Castle:474 -> :879)
+            Wire(h, tCastle, "CompletePlayerTrainingSession", new[] { S, tCastleState, RI, RI, RI, RI }, null, "TrainDonePost", false,
+                 "dokonczenie starej sesji szkolenia (tylko log)");
+
+            Log.Info("BEE domkniecie (170): BetterEconomy " + ver + " - wpiete " + _wired.Count + "/" + HookCount + ": " + string.Join(", ", _wired.ToArray())
                      + (_missing.Count > 0 ? " | BRAK: " + string.Join(", ", _missing.ToArray()) + " (te sciezki BEE BEZ ZMIAN)" : "")
                      + "; stan wylacznika i trybu zgodnosci BK - w linii \"BEE domkniecie (170): kampania\" (zmiana wylacznika w MCM dziala w ciagu godziny gry); linie dnia \"BEE domkniecie (170) doba\".");
         }
@@ -316,16 +331,18 @@ namespace Armoury
 
         // ---------------------------------------------------------------- ksiega BEE: przelacznik "Lord wealth realism"
 
+        /// <summary>Zamykamy przelacznik tylko przy wpietym B5 - bez niego BEE dalej zdejmuje zloto panom, a ksiega musi pokazywac
+        /// prawdziwy stan i dawac go wylaczyc (linia kampanii mowi wtedy "NIEWPIETA").</summary>
         private static void TogglePre(string key, ref string hint, ref bool current, ref Action<bool> apply)
         {
-            if (key != "lordwealth" || !On) return;
+            if (key != "lordwealth" || !_wealthWired || !On) return;
             try { hint = T_WEALTH; current = false; apply = _noApply; }
             catch (Exception e) { Stumble("ksiega lordwealth", e); }
         }
 
         private static void TogglePost(object __instance, string key)
         {
-            if (key != "lordwealth" || !On) return;
+            if (key != "lordwealth" || !_wealthWired || !On) return;
             try
             {
                 // wiersz dodany wlasnie przez AddToggle - klik pokazuje komunikat i NIE przestawia napisu na ON
@@ -380,13 +397,36 @@ namespace Armoury
             return false;
         }
 
-        /// <summary>B4: oplata 5 000 za dostep do targu w nicosc + relacje z niczego. Wolajacy AI i tak ustawia swoj cooldown.</summary>
+        /// <summary>B4: oplata 5 000 za dostep do targu w nicosc + relacje z niczego. Wolajacy AI i tak ustawia swoj cooldown.
+        /// Oplate AI blokujemy tylko przy zamknietym odplywie towaru wsi (K4/K5 w pliku BEE): bez nich jedynym hamulcem odplywu (towar
+        /// z niczego na targ obcego miasta, VDev:511 -> :551) jest wlasnie ta oplata (DiversionSuppressedUntilDay, VDev:628 -> :484-489),
+        /// wiec wtedy ja przepuszczamy i liczymy osobno. Gracz dochodzi tu tylko po Can* (G6 zamkniety) - jego wywolanie blokujemy zawsze.
+        /// K4/K5 czytane przy kazdym wywolaniu (rzadkie: cooldown AI) - Ctrl+Shift+M w BEE moze przeladowac plik w trakcie gry.</summary>
         private static bool MarketPre(bool player)
         {
             if (!On) return true;
-            try { Tick(); _market++; if (player) _marketPlayer++; }
+            try
+            {
+                Tick();
+                if (!player && !DiversionClosed()) { _marketOpen++; return true; }
+                _market++; if (player) _marketPlayer++;
+            }
             catch (Exception e) { Stumble("oplata za dostep do targu", e); }
             return false;
+        }
+
+        /// <summary>Tylko log (D9, nie blokujemy): BEE dokonczyl sesje szkolenia gracza oplacona przed zamknieciem - XP z niczego.
+        /// Liczone zawsze (takze przy wylaczonym wylaczniku), bo to prawdziwy skutek w armii gracza.</summary>
+        private static void TrainDonePost(ref int trained, ref int xpTotal)
+        {
+            try
+            {
+                Tick();
+                _trainDone++;
+                if (trained > 0) _trainTroops += trained;
+                if (xpTotal > 0) _trainXp += xpTotal;
+            }
+            catch (Exception e) { Stumble("dokonczenie starej sesji szkolenia", e); }
         }
 
         /// <summary>B5: WealthAudit - zloto panow AI w nicosc. Wynik false: wolajacy nie liczy pana jako "affected".</summary>
@@ -404,8 +444,14 @@ namespace Armoury
         private static void Reset()
         {
             _day = -1;
+            Zero();
+        }
+
+        private static void Zero()
+        {
             _armory = _camps = _second = _market = _marketPlayer = _wealthN = _stumbles = 0;
-            _wealthGold = 0;
+            _marketOpen = _trainDone = _trainTroops = 0;
+            _wealthGold = _trainXp = 0;
         }
 
         /// <summary>Leniwa linia doby: pierwsze wywolanie prefiksu w nowej dobie wypisuje poprzednia (tylko gdy cos zablokowano).</summary>
@@ -419,17 +465,18 @@ namespace Armoury
         {
             try
             {
-                long sum = (long)_armory + _camps + _second + _market + _wealthN;
+                long sum = (long)_armory + _camps + _second + _market + _wealthN + _marketOpen + _trainDone;
                 if (sum > 0 || _stumbles > 0)
                     Log.Info("BEE domkniecie (170) doba " + _day + ": wywolania zablokowane - produkcja zbrojowni: " + _armory
                              + " (miasta z gotowa zbrojownia), XP obozow AI: " + _camps + " (zamki AI z gotowym obozem), druga produkcja: " + _second
                              + " (wsie z odblokowana druga produkcja), oplata za dostep do targu: " + _market + " (w tym gracz " + _marketPlayer
                              + "), zdejmowanie zlota panom: " + _wealthN + " razy, " + _wealthGold + " zl"
+                             + (_marketOpen > 0 ? "; PRZEPUSZCZONE oplaty AI za dostep do targu (K4/K5 otwarte - tylko oplata tlumi odplyw towaru z niczego): " + _marketOpen : "")
+                             + (_trainDone > 0 ? "; dokonczone stare sesje szkolenia (D9, nie blokowane, XP z niczego): " + _trainDone + ", zolnierzy " + _trainTroops + ", XP " + _trainXp : "")
                              + (_stumbles > 0 ? "; potkniecia " + _stumbles : ""));
             }
             catch { }
-            _armory = _camps = _second = _market = _marketPlayer = _wealthN = _stumbles = 0;
-            _wealthGold = 0;
+            Zero();
         }
 
         /// <summary>Licz potkniecia, nie gas funkcji: pierwszy wyjatek kazdego miejsca do logu bledow, kolejne tylko licznik.</summary>
@@ -452,6 +499,10 @@ namespace Armoury
             public KeyRule(string name, int op, double target, string shown) { Name = name; Op = op; Target = target; Shown = shown; }
         }
 
+        // K4/K5 - odplyw towaru wsi z niczego (VDev:489); od nich zalezy tez B4 (MarketPre). Deklarowane przed Keys (kolejnosc inicjalizacji).
+        private static readonly KeyRule K4 = new KeyRule("VillageDiversionRelationThreshold", Le, -101, "-101");
+        private static readonly KeyRule K5 = new KeyRule("VillageDiversionGrievanceThreshold", Ge, 101, "101");
+
         // 18 wartosci + zbrojownia (wariant b / a) = 19; progi jak w skrypcie zamknij-ujscia-bee.ps1 i wpisach 18 / 49
         private static readonly KeyRule[] Keys =
         {
@@ -460,8 +511,8 @@ namespace Armoury
             new KeyRule("VillageSecondaryRequiredStableDays", Ge, 1e9, "1000000000"),
             new KeyRule("CaravanDeliveryMinGold", Ge, 1e9, "1000000000"),
             new KeyRule("CaravanEscortHireMinGold", Ge, 1e9, "1000000000"),
-            new KeyRule("VillageDiversionRelationThreshold", Le, -101, "-101"),
-            new KeyRule("VillageDiversionGrievanceThreshold", Ge, 101, "101"),
+            K4,
+            K5,
             new KeyRule("CaravanRecruitPromotionEnabled", Eq, 0, "0"),
             new KeyRule("RouteDangerMaxLossRatio", Le, 0, "0"),
             new KeyRule("TradeAgreementCustomsMin", Le, 0, "0"),
@@ -491,6 +542,20 @@ namespace Armoury
             catch { return null; }
         }
 
+        /// <summary>Wartosc klucza spelnia warunek zamkniecia (brak pola albo blad odczytu = NIE).</summary>
+        private static bool KeyClosed(KeyRule k, out string shown)
+        {
+            double? v = ReadKey(k.Name, out shown);
+            return v.HasValue && (k.Op == Ge ? v.Value >= k.Target : k.Op == Le ? v.Value <= k.Target : v.Value == k.Target);
+        }
+
+        /// <summary>Odplyw towaru wsi z niczego zamkniety plikiem BEE (K4 i K5) - warunek blokowania oplaty AI w B4.</summary>
+        private static bool DiversionClosed()
+        {
+            string s;
+            return KeyClosed(K4, out s) && KeyClosed(K5, out s);
+        }
+
         private static string KeysText()
         {
             if (_tSettings == null) return "? (brak BetterEconomySettings)";
@@ -499,8 +564,7 @@ namespace Armoury
             foreach (var k in Keys)
             {
                 string shown;
-                double? v = ReadKey(k.Name, out shown);
-                bool ok = v.HasValue && (k.Op == Ge ? v.Value >= k.Target : k.Op == Le ? v.Value <= k.Target : v.Value == k.Target);
+                bool ok = KeyClosed(k, out shown);
                 if (ok) closed++;
                 else open.Add(k.Name + "=" + shown + " (ma byc " + k.Shown + ")");
             }
@@ -550,8 +614,10 @@ namespace Armoury
             sb.Append("; wylacznik: ").Append(On ? "wlaczony" : "wylaczony");
             sb.Append("; tryb zgodnosci BK w BEE: ").Append(BkModeText());
             sb.Append("; klucze pliku BEE: ").Append(KeysText());
+            if (_wired.Contains(L_MARKET) && !DiversionClosed())
+                sb.Append("; B4 WSTRZYMANA - K4/K5 otwarte: oplata AI 5 000 za dostep do targu PRZEPUSZCZANA (zloto w nicosc), bo bez K4/K5 tylko ona tlumi odplyw towaru wsi z niczego - naprawa: skrypt kluczy, nie kod");
             sb.Append("; user.cfg LordWealthRealism=").Append(WealthCfgText());
-            if (!_wired.Contains(L_WEALTH)) sb.Append(" (latka 170 na zdejmowanie zlota NIEWPIETA - przy 1 BEE zdejmuje zloto panom w nicosc)");
+            if (!_wealthWired) sb.Append(" (latka 170 na zdejmowanie zlota NIEWPIETA - przy 1 BEE zdejmuje zloto panom w nicosc; przelacznik w ksiedze BEE zostaje jak w BEE)");
             else if (!On) sb.Append(" (latka 170 wylaczona wylacznikiem - przy 1 BEE zdejmuje zloto panom w nicosc)");
             else sb.Append(" (efekt i tak zamyka latka 170)");
             return sb.ToString();

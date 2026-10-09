@@ -1,7 +1,7 @@
 # Paczka 170 - BEE DOMKNIETE: akcje gracza BetterEconomy w nicosc i bierne zrodla z niczego zamkniete latkami Armoury
 
 Status: WYKONANE w drzewie roboczym (`Armoury/src/BeeSeal.cs`, build kod 0, rozdz. 12) - NIEWGRANE, DO SPRAWDZENIA razem ze skryptem
-`zamknij-ujscia-bee.ps1 -ListaZFundamentu`. Projekt po krytyce (8 uwag krytyka sprawdzonych w kodzie - rozdz. 11).
+`zamknij-ujscia-bee.ps1 -ListaZFundamentu`. Projekt po krytyce (8 uwag krytyka sprawdzonych w kodzie - rozdz. 11) i po recenzji wykonania (4 uwagi - rozdz. 11.2).
 Baza: galaz `w-toku/170-bee-domkniecie` od 2e235ea (= Armoury c01a54ba w grze).
 Decyzja Jeffa 08.10 (wiazaca, PRZEKAZANIE-2026-10-08 rozdz. 7): "jak znika to zamykamy, ma byc logiczny system ekonomii, ze wszystko
 z czegos wynika". Wariant zbrojowni BEE: **(b)** - `zamknij-ujscia-bee.ps1 -ListaZFundamentu` (zbrojownia zamknieta takze graczowi).
@@ -19,7 +19,7 @@ sa w `BetterEconomy.Behaviors`; stany w `BetterEconomy.Core`.
 
 - **Po stronie AI i swiata** wszystko zamykaja: 13 kluczy pliku BEE (`-ListaZFundamentu`) + wpisy 18 i 49 (juz w pliku). 170 tego nie dubluje.
 - **170 = nowy plik `Armoury/src/BeeSeal.cs`** (latki Harmony przez refleksje, bez BEE nic sie nie wpina) + 1 ustawienie MCM + 1 linia w
-  `SubModuleMain`. 15 zaczepow:
+  `SubModuleMain`. 16 zaczepow (15 domykajacych + 1 tylko do logu):
   - 8 postfiksow na `CanPlayer*` (akcje gracza: `__result = false`, `reason` = powod po angielsku) - zamykaja gracza na KAZDYM wejsciu
     (menu BEE, pickery BEE, ekrany BK, konsola BK), bo kazda sciezka placaca najpierw pyta `CanPlayer*`;
   - 1 postfiks na `SMB.OnSessionLaunched` - owija warunki 12 opcji menu BEE, zeby byly WIDOCZNE i NIEAKTYWNE z podpowiedzia (sam postfiks
@@ -27,7 +27,9 @@ sa w `BetterEconomy.Behaviors`; stany w `BetterEconomy.Core`.
   - 1 para prefiks + postfiks na `BetterEconomy.UI.Gauntlet.LedgerVM.AddToggle` - przelacznik "Lord wealth realism" w ksiedze BEE pokazany
     jako OFF z powodem, klik nic nie wlacza;
   - 5 prefiksow `return false` na biernych zrodlach (gotowe zbrojownie, XP gotowych obozow AI, odblokowana druga produkcja wsi, oplata 5 000
-    za dostep do targu, zdejmowanie zlota panom).
+    za dostep do targu, zdejmowanie zlota panom); oplate AI blokujemy tylko przy zamknietych K4/K5 (11.2 pkt 3);
+  - 1 postfiks tylko do logu na `Castle.CompletePlayerTrainingSession` - dokonczenie sesji szkolenia oplaconej w starym zapisie (D9) widac
+    w linii doby (11.2 pkt 1).
 - Zadnych nowych kluczy zapisu; stan BEE w zapisie nie jest ani razu pisany przez nasz kod. Wylacznik MCM wylaczony = BEE jak dawniej.
 - Linia logu raz na uruchomienie gry (co wpiete), raz na kampanie (menu + wylacznik + tryb zgodnosci BK w BEE + stan 19 wartosci pliku
   BEE + user.cfg) i linia dnia tylko wtedy, gdy latki biernych zrodel cos zablokowaly.
@@ -46,7 +48,7 @@ sa w `BetterEconomy.Behaviors`; stany w `BetterEconomy.Core`.
 | D6 | Przelacznik "Lord wealth realism": prefiks + postfiks na `LedgerVM.AddToggle` (klucz "lordwealth") ORAZ prefiks na `WealthAuditCampaignBehavior.TryRemoveHeroGold` | Zadanie wymaga widocznej opcji z powodem; samo zamkniecie efektu zostawiloby przelacznik klamiacy "ON", a sam przelacznik nie chroni przed wyzerowanym 21-bajtowym `better_economy_user.cfg` (wartosc wbudowana `LordWealthRealism = true`, be/BetterEconomy.Config/RuntimeSettings.cs:13). |
 | D7 | Bierne zrodla B1-B5: prefiks zwracajacy `false` (oryginal pominiety w calosci), z `Priority.Last` | Kazda z tych metod robi wylacznie rzecz z niczego / w nicosc (rozdz. 2, B1-B5 - przeczytane w calosci), a `Priority.Last` zostawia okna pomiaru paczki 169 nienaruszone (rozdz. 6). |
 | D8 | Gotowa zbrojownia: produkcja ZATRZYMANA, bez szukania platnika | Prawdziwy platnik oznaczalby nowy warsztat (kto placi za wsad, kto bierze utarg), a w wariancie (b) nowych zbrojowni i tak nie bedzie; bron w swiecie robia kowale i warsztaty Armoury. |
-| D9 | Oplacona w starym zapisie sesja szkolenia: anulowanie zostaje (bez latki na `CanPlayerCancelTraining`), dokonczenie tez zostaje | Zloto juz zniknelo i nie wroci, a odebranie skutku karaloby gracza bez logiki; to jednorazowy ogon najwyzej kilku dob (sesja postepuje tylko, gdy gracz stoi w zamku, Castle:465-469). |
+| D9 | Oplacona w starym zapisie sesja szkolenia: anulowanie zostaje (bez latki na `CanPlayerCancelTraining`), dokonczenie tez zostaje | Zloto juz zniknelo i nie wroci, a odebranie skutku karaloby gracza bez logiki; to jednorazowy ogon najwyzej kilku dob (sesja postepuje tylko, gdy gracz stoi w zamku, Castle:465-469). Ogon jest widoczny w logu: postfiks tylko do logu na `CompletePlayerTrainingSession` (Castle:474 -> :879, XP :924) dopisuje do linii doby "dokonczone stare sesje szkolenia (D9, nie blokowane, XP z niczego): N, zolnierzy T, XP M" (11.2 pkt 1). |
 | D10 | `BannerKingsAdapter.TryAddVillagePeasants` i `LordInvestmentCampaignBehavior.ApplyInvestment` BEZ latki | Jedyni wolajacy sa juz zamknieci wyzej (gracz: `Can*`; AI: klucz 2, a LordInvestment AI w trybie zgodnosci BK nie jest rejestrowany, BetterEconomySubModule.cs:94-97 - utrate tego trybu zglasza linia kampanii, D13) - dodatkowy bezpiecznik = kod "na wszelki wypadek" (zasada 3). |
 | D11 | Wszystko pod jednym wylacznikiem MCM `LivingEconomySealed` (domyslnie wlaczony) | Jedna zasada na jedno zjawisko: "BEE nie tworzy i nie niszczy zlota, towaru, ludzi ani XP"; dwa wylaczniki pozwalalyby na stan polowiczny (np. akcje zamkniete, bierne zrodla otwarte). |
 | D12 | Bramka wersji: latki tylko przy `BetterEconomy.BetterEconomySubModule.Version == "v1.4.5"` (odczyt odporny na zmiane `const` -> `static readonly`, 3.3 pkt 2); kazdy cel dodatkowo szukany z DOKLADNA lista typow parametrow | Prefiks `return false` na zmienionej metodzie innej wersji moglby blokowac cos innego; aktualizacja BEE i tak wymaga ponownego sprawdzenia kluczy (OPIS 7), a linia logu ma to powiedziec glosno takze wtedy, gdy nowa wersja zmieni rodzaj pola wersji. |
@@ -79,7 +81,7 @@ tej paczki (szczegoly kodu w rozdz. 3), **ZOSTAJE** = prawdziwy przeplyw albo st
 | A14 | TradeAgreement.AccrueCustoms :400-422 | clo z null dla krolow | krolowie | K11 `TradeAgreementCustomsMin = 0` + W49 (`TradeAgreementCustomsRate = 0`) |
 | A15 | TradeAgreement.ApplyEndpointProsperity :836-858 | dobrobyt z niczego | miasta korytarzy | K12 `TradeAgreementCorridorProsperityPerDay = 0` |
 | A16 | VillageSupply.ApplyRaidImpact :121-124 -> BannerKingsAdapter.TryApplyRaidFlight :138-160 | 8% chlopow BK w nicosc | swiat | K13 `RaidPeasantFlightFraction = 0` |
-| A17 | VDev.TickAiMarketAccess :575-613 -> ApplyMarketAccess :615-636 | 5 000 do null, relacje z niczego | AI | K4+K5 (placi tylko przy `DiversionFraction >= 0.1`, :599); **ogon** starego zapisu -> B4 |
+| A17 | VDev.TickAiMarketAccess :575-613 -> ApplyMarketAccess :615-636 | 5 000 do null, relacje z niczego | AI | K4+K5 (placi tylko przy `DiversionFraction >= 0.1`, :599); **ogon** starego zapisu -> B4. Bez K4/K5 B4 oplaty AI NIE blokuje (przepuszcza oryginal): wtedy tylko ta oplata tlumi odplyw towaru z niczego (DiversionSuppressedUntilDay :628 -> :484-489), a zablokowana przedluzylaby A9 (11.2 pkt 3) |
 | A18 | Feudal.TickEstateRent / PayEstateOwner :894-973 | renta z null | swiat | nieczynne przy BK (`IsEnabled = !HasBannerKings`, :39) + W49 (`EstateOwnerPayoutFraction = 0`) |
 | A19 | WealthAudit.OnDailyTick -> TryRemoveHeroGold :72-80, :197, :338-353 | zloto panow do null | AI | dzis tylko user.cfg `LordWealthRealism=0`; -> B5 + L170 przelacznik |
 
@@ -108,10 +110,10 @@ Parametry typow BEE w prefiksie deklarowac jako `object` po nazwie (Harmony przy
 
 | Nr | Cel - pelna nazwa, sygnatura (dokladne typy do `AccessTools.Method`) | Co robi (przeczytane w calosci) | Kto | Prefiks i licznik |
 |---|---|---|---|---|
-| B1 | `TownEconomyCampaignBehavior.TickArmoryProduction(Settlement settlement, BetterEconomy.Core.TownEconomyState state, int today) : void`, prywatna (Town:2152-2266, wolana z :1694) | gotowa zbrojownia: zelazo, drewno, skora, narzedzia z targu miasta w nicosc (:2220, nikt nie dostaje zaplaty) i bron z niczego na targ (:2254); bez warunku wlasciciela | swiat, AI i gracz (stare zapisy) | `static bool ArmoryPre(object state)`: gdy `state != null` i pole `ArmoryLevel` (public int, Core/TownEconomyState.cs:128) > 0 -> `_armory++`; `return false`. Oryginal i tak wychodzi przy poziomie 0 (:2154), wiec licznik = WYWOLANIA zablokowane w miastach z gotowa zbrojownia - nie kazde by cos wytworzylo (oryginal wychodzi bez skutku przy braku wsadu na targu :2190-2197 albo gdy nic nie zuzyl :2225-2227). |
-| B2 | `CastleEconomyCampaignBehavior.ApplyAiTrainingCampPassive(Settlement castle, BetterEconomy.Core.CastleEconomyState state) : void`, prywatna (Castle:486-545, wolana z TickTraining :454-457 tylko dla zamkow spoza rodu gracza z `TrainingCampLevel > 0`) | 1-3 XP na zdrowego zolnierza tieru < progu na tick, z niczego (`AddXpToTroop` :533) | AI | `static bool CampPre()`: `_camps++`; `return false`. Licznik = WYWOLANIA zablokowane w zamkach AI z gotowym obozem (takze z pustym garnizonem albo zerowym XP poziomu - oryginal wychodzi wtedy bez skutku, Castle:512, :517). |
+| B1 | `TownEconomyCampaignBehavior.TickArmoryProduction(Settlement settlement, BetterEconomy.Core.TownEconomyState state, int today) : void`, prywatna (Town:2152-2266, wolana z :1696) | gotowa zbrojownia: zelazo, drewno, skora, narzedzia z targu miasta w nicosc (:2220, nikt nie dostaje zaplaty) i bron z niczego na targ (:2254); bez warunku wlasciciela | swiat, AI i gracz (stare zapisy) | `static bool ArmoryPre(object state)`: gdy `state != null` i pole `ArmoryLevel` (public int, Core/TownEconomyState.cs:128) > 0 -> `_armory++`; `return false`. Oryginal i tak wychodzi przy poziomie 0 (:2154), wiec licznik = WYWOLANIA zablokowane w miastach z gotowa zbrojownia - nie kazde by cos wytworzylo (oryginal wychodzi bez skutku przy braku wsadu na targu :2190-2197 albo gdy nic nie zuzyl :2225-2227). |
+| B2 | `CastleEconomyCampaignBehavior.ApplyAiTrainingCampPassive(Settlement castle, BetterEconomy.Core.CastleEconomyState state) : void`, prywatna (Castle:486-545, wolana z TickTraining :457-460 tylko dla zamkow spoza rodu gracza z `TrainingCampLevel > 0`) | 1-3 XP na zdrowego zolnierza tieru < progu na tick, z niczego (`AddXpToTroop` :533) | AI | `static bool CampPre()`: `_camps++`; `return false`. Licznik = WYWOLANIA zablokowane w zamkach AI z gotowym obozem (takze z pustym garnizonem albo zerowym XP poziomu - oryginal wychodzi wtedy bez skutku, Castle:512, :517). |
 | B3 | `VillageDevelopmentCampaignBehavior.TickSecondaryProduction(Settlement settlement, BetterEconomy.Core.VillageDevelopmentState state, BetterEconomy.Core.SettlementPopulation pop, BetterEconomy.Core.VillageSupplyLink link, int today) : void`, prywatna (VDev:396-456, wolana z OnSettlementDailyTick :348) | do 8 szt. na tick z niczego do skladu wsi (:418), + kopia dla miasta (:438-446, juz 0 przez W18); poza tym tylko `LastSecondaryProductionDay` i licznik dnia | swiat, takze wsie gracza | `static bool SecondPre(object state)`: gdy pole `SecondaryItemId` (public string, Core/VillageDevelopmentState.cs:8) niepuste -> `_second++`; `return false`. Licznik = WYWOLANIA zablokowane we wsiach z odblokowana druga produkcja - takze tych, w ktorych oryginal nic by nie zrobil (`!IsSecondaryActive`, VDev:398: zawieszenie >= grace :679, hearth < 85% / chlopi < 75% progu :684, najazd :686). Bez dodatkowych warunkow (D14). |
-| B4 | `VillageDevelopmentCampaignBehavior.ApplyMarketAccess(Settlement settlement, Hero payer, bool player) : void`, prywatna (VDev:615-636) | 5 000 od platnika do null (:625), zal -, odplyw 0, relacje z niczego (:650) | AI (ogon A17), gracz (tylko gdyby G6 nie stal) | `static bool MarketPre(bool player)`: `_market++`, gdy `player` -> `_marketPlayer++`; `return false`. Wolajacy AI i tak ustawia `LastAiMarketAccessDay` (:610) - brak petli prob co tick. |
+| B4 | `VillageDevelopmentCampaignBehavior.ApplyMarketAccess(Settlement settlement, Hero payer, bool player) : void`, prywatna (VDev:615-636) | 5 000 od platnika do null (:625), zal -, odplyw 0, relacje z niczego (:650) | AI (ogon A17), gracz (tylko gdyby G6 nie stal) | `static bool MarketPre(bool player)`: gdy `!player` i NIE (K4 `VillageDiversionRelationThreshold <= -101` i K5 `VillageDiversionGrievanceThreshold >= 101`, odczyt pol przy kazdym wywolaniu - rzadkie) -> `_marketOpen++`, `return true` (oryginal biegnie, 11.2 pkt 3); inaczej `_market++`, gdy `player` -> `_marketPlayer++`; `return false`. Wolajacy AI i tak ustawia `LastAiMarketAccessDay` (:610) - brak petli prob co tick. |
 | B5 | `WealthAuditCampaignBehavior.TryRemoveHeroGold(Hero hero, int amount) : bool`, prywatna statyczna (WealthAudit:338-353) | `GiveGoldAction(pan, null, amount)` (:346) - zloto panow AI w nicosc | AI | `static bool WealthPre(ref bool __result, int amount)`: `_wealthN++; _wealthGold += amount; __result = false; return false;` Wolajacy liczy "affected" tylko przy true (:197), wiec log BEE pokaze 0. Metoda ma try/catch - JIT jej nie wkleja. |
 
 ### 2.4 Zostaje bez zmian (prawdziwy przeplyw, stan tylko na papierze albo nieczynne) - dowody
@@ -128,7 +130,8 @@ Parametry typow BEE w prefiksie deklarowac jako `object` po nazwie (Harmony przy
 | Umowa handlowa przez barter (TradeAgreementBarterPatch, TradeAgreementBarterable.Apply) | Nie rusza zlota; clo zamyka K11 (R1 D). |
 | Juz najeta eskorta karawan (Car:424-467) | Prawdziwi ludzie, kod tylko liczy (R2 C). |
 | RosterSanitizer :171/:181, PartyTrainingPatch | Techniczna naprawa uszkodzonych wpisow armii (R2 C). |
-| WorkshopProductionPatch (WorkshopProductionPatch.cs:17), pobor przy werbunku (RecruitmentPatch.cs:127), Population / Migration / LordInvestment AI (z `ApplyNeglectDecay`, LordInvestmentCampaignBehavior.cs:92, :192-219) / RecruitmentAudit, modele BEE (prosperity, produkcja wsi, ceny) | Nieczynne TYLKO w trybie zgodnosci BK: `BannerKingsAdapter.IsActive` = `HasBannerKings && BannerKingsCompatibilityMode != 0` (BannerKingsAdapter.cs:49-59), sprawdzane w BetterEconomySubModule.cs:72-111 i w kazdym wywolaniu WorkshopProductionPatch (:17). BK zeruje ten klucz w swoim OnSubModuleLoad (bk/BannerKings/Main.cs:331), a BEE przywraca 1 z XML (better_economy_settings.xml:23) tylko, gdy laduje sie PO BK - pilnuje tego linia kampanii (3.6, "tryb zgodnosci BK"). |
+| Pobor przy werbunku (`RecruitmentPatch.ApplyRecruitmentDrain`, RecruitmentPatch.cs:125-130) | Nieczynny ZAWSZE przy obecnym BK: warunek `ModCompatibility.HasBannerKings` (:127, sama obecnosc BK - ModCompatibility.cs:173), a nie `BannerKingsAdapter.IsActive`, wiec niezaleznie od trybu zgodnosci i kolejnosci ladowania. |
+| WorkshopProductionPatch (WorkshopProductionPatch.cs:17), Population / Migration / LordInvestment AI (z `ApplyNeglectDecay`, LordInvestmentCampaignBehavior.cs:92, :192-219) / RecruitmentAudit, modele BEE (prosperity, produkcja wsi, ceny) | Nieczynne TYLKO w trybie zgodnosci BK: `BannerKingsAdapter.IsActive` = `HasBannerKings && BannerKingsCompatibilityMode != 0` (BannerKingsAdapter.cs:49-59), sprawdzane w BetterEconomySubModule.cs:72-111 i w kazdym wywolaniu WorkshopProductionPatch (:17). BK zeruje ten klucz w swoim OnSubModuleLoad (bk/BannerKings/Main.cs:331), a BEE przywraca 1 z XML (better_economy_settings.xml:23) tylko, gdy laduje sie PO BK - pilnuje tego linia kampanii (3.6, "tryb zgodnosci BK"). |
 | Modele PartyWage, PartySizeLimit, MobilePartyFoodConsumption, PartySpeed; EconomicEvent, CulturalMarket (konwersja kultury wylaczona), RouteDanger, SettlementIntel, Stats | Opakowania modeli gry, mnozniki i odczyty - nie tworza zrodel (R2 C). |
 | `LordInvestmentCampaignBehavior.ApplyInvestment` (:128) | Jedyny zywy wolajacy to gracz po `Can` (SAS:664); AI :118 nierejestrowane w trybie BK (D10). |
 | `BannerKingsAdapter.TryAddVillagePeasants` (:114) | Jedyny wolajacy ApplyVillageEffects :403: gracz zamkniety G5, AI zamkniety K2 (D10). |
@@ -212,7 +215,7 @@ przy kazdym wywolaniu warunku. Teksty bez nawiasow klamrowych (TextObject).
    - `tTownState = FindType("BetterEconomy.Core.TownEconomyState")`, `tCastleState = ...CastleEconomyState`, `tVilState = ...VillageDevelopmentState`,
      `tPop = ...SettlementPopulation`, `tLink = ...VillageSupplyLink` (gdy ktorys null -> odpowiedni cel do BRAK, bez wyjatku);
    - `tStarter = typeof(CampaignGameStarter)`.
-5. 15 zaczepow (etykieta w logu po polsku):
+5. 16 zaczepow (etykieta w logu po polsku; 15 domykajacych + 1 tylko do logu):
 
 | Etykieta | Typ | Metoda, args | Rodzaj | Metoda latki |
 |---|---|---|---|---|
@@ -231,6 +234,7 @@ przy kazdym wywolaniu warunku. Teksty bez nawiasow klamrowych (TextObject).
 | "druga produkcja wsi" | VDev | TickSecondaryProduction, {S,tVilState,tPop,tLink,I} | prefiks | `SecondPre` |
 | "oplata za dostep do targu" | VDev | ApplyMarketAccess, {S,H,B} | prefiks | `MarketPre` |
 | "zdejmowanie zlota panom" | `BetterEconomy.Behaviors.WealthAuditCampaignBehavior` | TryRemoveHeroGold, {H,I} | prefiks | `WealthPre` |
+| "dokonczenie starej sesji szkolenia (tylko log)" | Castle | CompletePlayerTrainingSession, {S,tCastleState,RI,RI,RI,RI} (`RI = typeof(int).MakeByRefType()`, parametry `out int trained, wounded, xpTotal, retinues`) | postfiks (priorytet domyslny) | `TrainDonePost(ref int trained, ref int xpTotal)` |
 
 6. Pola pomocnicze (raz, w ApplyAll): `_fArmoryLevel = AccessTools.Field(tTownState, "ArmoryLevel")`, `_fSecondItem = AccessTools.Field(tVilState,
    "SecondaryItemId")`, `_fAllRows = AccessTools.Field(tLedgerVM = FindType("BetterEconomy.UI.Gauntlet.LedgerVM"), "_allRows")`, `_fOnClick = AccessTools.Field(FindType("BetterEconomy.UI.Gauntlet.RowVM"),
@@ -243,7 +247,7 @@ przy kazdym wywolaniu warunku. Teksty bez nawiasow klamrowych (TextObject).
    blokuje latki - wtedy tylko licznik albo raport mowi "?".
 7. Linia startowa (raz na uruchomienie gry, do glownego logu; BEZ stanu wylacznika - ta linia powstaje przed pierwszym `McmSettings.Apply`
    w OnGameStart, SubModuleMain.cs:205, wiec pokazywalaby wartosc z Armoury.settings.xml, nie z MCM; stan wylacznika ma linia kampanii):
-   `BEE domkniecie (170): BetterEconomy v1.4.5 - wpiete N/15: <etykiety> | BRAK: <...> (te sciezki BEE BEZ ZMIAN); stan wylacznika i trybu zgodnosci BK - w linii "BEE domkniecie (170): kampania" (zmiana wylacznika w MCM dziala w ciagu godziny gry); linie dnia "BEE domkniecie (170) doba".`
+   `BEE domkniecie (170): BetterEconomy v1.4.5 - wpiete N/16: <etykiety> | BRAK: <...> (te sciezki BEE BEZ ZMIAN); stan wylacznika i trybu zgodnosci BK - w linii "BEE domkniecie (170): kampania" (zmiana wylacznika w MCM dziala w ciagu godziny gry); linie dnia "BEE domkniecie (170) doba".`
 
 ### 3.4 Menu BEE: opcja widoczna i nieaktywna z powodem (`SessionPost`)
 
@@ -292,6 +296,8 @@ Linia kampanii (raz, na koncu SessionPost, rozdz. 3.6).
 
 ### 3.5 Ksiega BEE: przelacznik "Lord wealth realism"
 
+- Oba zaczepy dzialaja tylko, gdy B5 jest wpiety (`_wealthWired`, ustawiane w ApplyAll po `Wire` B5; 11.2 pkt 4) - bez B5 ksiega zostaje
+  dokladnie jak w BEE (prawdziwy stan i mozliwosc wylaczenia), a linia kampanii mowi "NIEWPIETA".
 - `static void TogglePre(string key, ref string hint, ref bool current, ref Action<bool> apply)`: gdy `On && key == "lordwealth"`:
   `hint = T_WEALTH; current = false; apply = _noApply;` (`_noApply = v => ClosedClick()` - pole statyczne tworzone raz).
 - `static void TogglePost(object __instance, string key)`: gdy `On && key == "lordwealth"`: `rows = _fAllRows?.GetValue(__instance) as System.Collections.IList`;
@@ -307,16 +313,17 @@ Linia kampanii (raz, na koncu SessionPost, rozdz. 3.6).
   nie gas funkcji").
 - `On` = `Settings.Current != null && Settings.Current.LivingEconomySealed` (wlasciwosc; czytana przy kazdym wywolaniu - MCM jest
   przepisywany co godzine gry, ArmouryBehavior.cs:517-523).
-- `Tick()` na poczatku kazdego prefiksu B1-B5 (tylko gdy `On`): `int d = (int)CampaignTime.Now.ToDays; if (d != _day) { Flush(); _day = d; }`.
+- `_marketOpen` (przepuszczone oplaty AI przy otwartych K4/K5), `_trainDone`, `_trainTroops` (int), `_trainXp` (long) - 11.2 pkt 1 i 3.
+- `Tick()` na poczatku kazdego prefiksu B1-B5 (tylko gdy `On`) i w postfiksie `TrainDonePost` (zawsze): `int d = (int)CampaignTime.Now.ToDays; if (d != _day) { Flush(); _day = d; }`.
   `Flush()`: gdy suma licznikow > 0 -> jedna linia, potem zerowanie:
-  `BEE domkniecie (170) doba <_day>: wywolania zablokowane - produkcja zbrojowni: <_armory> (miasta z gotowa zbrojownia), XP obozow AI: <_camps> (zamki AI z gotowym obozem), druga produkcja: <_second> (wsie z odblokowana druga produkcja), oplata za dostep do targu: <_market> (w tym gracz <_marketPlayer>), zdejmowanie zlota panom: <_wealthN> razy, <_wealthGold> zl[; potkniecia <_stumbles>]`.
+  `BEE domkniecie (170) doba <_day>: wywolania zablokowane - produkcja zbrojowni: <_armory> (miasta z gotowa zbrojownia), XP obozow AI: <_camps> (zamki AI z gotowym obozem), druga produkcja: <_second> (wsie z odblokowana druga produkcja), oplata za dostep do targu: <_market> (w tym gracz <_marketPlayer>), zdejmowanie zlota panom: <_wealthN> razy, <_wealthGold> zl[; PRZEPUSZCZONE oplaty AI za dostep do targu (K4/K5 otwarte - tylko oplata tlumi odplyw towaru z niczego): <_marketOpen>][; dokonczone stare sesje szkolenia (D9, nie blokowane, XP z niczego): <_trainDone>, zolnierzy <_trainTroops>, XP <_trainXp>][; potkniecia <_stumbles>]`.
   Pierwsze trzy liczby to wywolania, nie "zatrzymana produkcja": oryginal czesc z nich i tak zakonczylby bez skutku (2.3, B1-B3);
   dwie ostatnie sa praktycznie dokladne (B4 i B5 wychodza bez skutku tylko przy null albo kwocie <= 0 - VDev:620, WealthAudit:340;
   `_wealthGold` to kwota zadana przez BEE).
   Ostatnia doba sesji nie ma linii (swiadomie - brak zaczepu w ArmouryBehavior).
 - `Reset()` (z SessionPost): wszystkie liczniki 0, `_day = -1` (bez Flush - poprzednia kampania nie miesza sie z nowa).
 - Linia kampanii (koniec SessionPost; czyta tylko statyczne pola BEE i jedna wlasciwosc statyczna `IsActive` przez refleksje):
-  `BEE domkniecie (170): kampania - menu BEE: zamkniete z powodem <n>/12 (bee_town_menu a/5, bee_village_menu b/4, bee_castle_menu c/3)[; BRAK: ...]; wylacznik: wlaczony/wylaczony; tryb zgodnosci BK w BEE: TAK | NIE - OTWARTE: LordInvestment AI z zaniedbaniem, WorkshopProductionPatch, Population/Migration i modele BEE czynne (BannerKingsCompatibilityMode=<n>) - sprawdzic kolejnosc ladowania: BK przed BEE | ?; klucze pliku BEE: zamkniete <k>/19 (wariant zbrojowni: b / a / brak)[; OTWARTE: <Klucz>=<wartosc> (ma byc <docelowa>), ...]; user.cfg LordWealthRealism=<0/1> (efekt i tak zamyka latka 170)`.
+  `BEE domkniecie (170): kampania - menu BEE: zamkniete z powodem <n>/12 (bee_town_menu a/5, bee_village_menu b/4, bee_castle_menu c/3)[; BRAK: ...]; wylacznik: wlaczony/wylaczony; tryb zgodnosci BK w BEE: TAK | NIE - OTWARTE: LordInvestment AI z zaniedbaniem, WorkshopProductionPatch, Population/Migration i modele BEE czynne (BannerKingsCompatibilityMode=<n>) - sprawdzic kolejnosc ladowania: BK przed BEE | ?; klucze pliku BEE: zamkniete <k>/19 (wariant zbrojowni: b / a / brak)[; OTWARTE: <Klucz>=<wartosc> (ma byc <docelowa>), ...][; B4 WSTRZYMANA - K4/K5 otwarte: oplata AI 5 000 za dostep do targu PRZEPUSZCZANA (zloto w nicosc), bo bez K4/K5 tylko ona tlumi odplyw towaru wsi z niczego - naprawa: skrypt kluczy, nie kod]; user.cfg LordWealthRealism=<0/1> (efekt i tak zamyka latka 170)`.
   Tryb zgodnosci BK: `(bool)_pBkActive.GetValue(null)` w try/catch; `_pBkActive == null` albo wyjatek -> "?" (nie przerywa). Przy NIE
   dodatkowo odczyt pola `BetterEconomySettings.BannerKingsCompatibilityMode` (pole tej samej klasy co 19 kluczy, `_fBkMode` pobrane raz w ApplyAll) do nawiasu.
   Osobny czlon, a nie 20. pozycja licznika kluczy: skrypt `zamknij-ujscia-bee.ps1` tego klucza nie ustawia (zostaje 1 z XML, OPIS:237),
@@ -380,9 +387,9 @@ ODSTEPSTWO od litery "opcja nieaktywna" (D5): w BK opcja jest widoczna, nie znik
 | Gotowy oboz AI | Poziom zostaje, XP stoi (B2) | XP wraca |
 | Oboz w budowie (gracz albo AI) | Budowa sie konczy (Castle:420-446, bez zlota i XP); dalej jak gotowy | - |
 | Gotowy oboz gracza | Nowej sesji szkolenia nie da sie zaczac (G8) | Szkolenie znow mozliwe |
-| Oplacona sesja szkolenia gracza | Anulowanie dziala (bez zwrotu - tak jest w BEE); dokonczenie dziala, gdy gracz stoi w zamku (D9) | - |
+| Oplacona sesja szkolenia gracza | Anulowanie dziala (bez zwrotu - tak jest w BEE); dokonczenie dziala, gdy gracz stoi w zamku (D9) - widoczne w linii doby ("dokonczone stare sesje szkolenia") | - |
 | Odblokowana druga produkcja wsi (`SecondaryItemId`) | Wpis zostaje, produkcja stoi (B3); ekran BEE moze pokazywac "active" (kosmetyka) | Produkcja wraca od najblizszego ticku |
-| Ulamek odplywu wsi AI >= 0.1 (ogon A17) | Oplata zatrzymana (B4), wolajacy ustawia cooldown (:610); ulamek maleje 0.03 na tick (K4/K5) i znika sam | Najwyzej jedna oplata na wies (OPIS 5.3) |
+| Ulamek odplywu wsi AI >= 0.1 (ogon A17) | Przy K4/K5 w pliku: oplata zatrzymana (B4), wolajacy ustawia cooldown (:610); ulamek maleje 0.03 na tick (K4/K5) i znika sam. Bez K4/K5: oplata przepuszczona (jak w BEE), linia kampanii "B4 WSTRZYMANA" | Najwyzej jedna oplata na wies (OPIS 5.3) |
 | Patronat gracza we wsi, cooldowny inwestycji, zablokowane granty skarbca | Mnozniki wirtualne, wygasaja same | - |
 | `better_economy_user.cfg` | Nietkniety; `LordWealthRealism=1` (gdyby plik zniknal) nic nie zdejmuje (B5), BEE dalej robi dobowy spis kies (koszt BEE, nie nasz) | - |
 
@@ -413,25 +420,27 @@ naprawy. Nowa kampania niepotrzebna.
 
 1. `python tools/gen_mcm.py` -> w `Armoury/src/McmSettings.cs` jest `LivingEconomySealed` z grupa "The living economy" i przypisanie w `ApplyTo`.
 2. Build (komenda z zadania), kod wyjscia 0, `build.log` bez ostrzezen z BeeSeal.cs.
-3. Kontrola statyczna w kodzie: 15 wpisow `Wire(...)` z dokladnie tymi tablicami typow co w rozdz. 3.3; brak zapisu do pol stanu BEE (grep
+3. Kontrola statyczna w kodzie: 16 wpisow `Wire(...)` z dokladnie tymi tablicami typow co w rozdz. 3.3; brak zapisu do pol stanu BEE (grep
    `SetValue` w BeeSeal.cs = tylko `_fOnClick`); brak `SaveText`/`SyncData`; `Priority.Last` na 13 latkach (8 postfiksow Can + 5 prefiksow);
    teksty po angielsku, komentarze i log bez polskich znakow (`grep -P "[^\x00-\x7F]" Armoury/src/BeeSeal.cs` = pusto).
-4. Kontrola sygnatur na DLL z gry (tylko odczyt): `ilspycmd -t <typ> BetterEconomy.dll` dla 7 typow - kazda z 15 sygnatur jak w tabeli 3.3.
+4. Kontrola sygnatur na DLL z gry (tylko odczyt): `ilspycmd -t <typ> BetterEconomy.dll` dla 7 typow - kazda z 16 sygnatur jak w tabeli 3.3.
 
 ### 7.2 Autotest (pozniej, po scaleniu z 169, z probnym DLL; sesja glowna)
 
 Bieg A: `tools/autotest.ps1 -LoadSave autotest-rok-360 -Days 12` (zapis z doby 360, robiony przy OTWARTYCH ujsciach BEE - sa w nim gotowe
 zbrojownie, obozy i druga produkcja). Bieg B: nowa kampania `-Days 12` po skrypcie kluczy. W `Modules/Armoury/Armoury-<data>.log`:
-- start: `BEE domkniecie (170): BetterEconomy v1.4.5 - wpiete 15/15` i brak "BRAK";
+- start: `BEE domkniecie (170): BetterEconomy v1.4.5 - wpiete 16/16` i brak "BRAK";
 - kampania (oba biegi): `menu BEE: zamkniete z powodem 12/12`, `wylacznik: wlaczony`, `tryb zgodnosci BK w BEE: TAK` (NIE = kolejnosc
   ladowania BK/BEE odwrocona - test niewazny, najpierw kolejnosc); w biegu B `klucze pliku BEE: zamkniete 19/19 (wariant zbrojowni: b)`;
-  w biegu przed skryptem kluczy - lista OTWARTE (oczekiwane, nie blad);
+  w biegu przed skryptem kluczy - lista OTWARTE i czlon "B4 WSTRZYMANA - K4/K5 otwarte" (oczekiwane dla testu, ale ZNACZY: oplata AI
+  5 000 dalej znika, a 170 nie domyka ani odplywu, ani oplaty - stan przejsciowy, gra nie moze tak zostac); w biegu B tego czlonu NIE ma;
 - bieg A: linie `BEE domkniecie (170) doba N: wywolania zablokowane - ...` WARUNKOWO, wedlug tego, co jest w zapisie (liczby to wywolania,
   nie zatrzymana produkcja - 3.6): `produkcja zbrojowni` > 0 tylko, jesli zapis ma miasto z gotowa zbrojownia; `XP obozow AI` > 0 tylko,
   jesli ma zamek AI z gotowym obozem; `druga produkcja` > 0 tylko, jesli ma wies z `SecondaryItemId` (ekran BEE wsi: druga produkcja
   "<towar> (active|suspended, N% extra)", a nie "Locked (d/N stable days)", VDev:139-147) - przy dlawiku BKROT pierwsze odblokowanie wypada najwczesniej ok. 300. doby (OPIS 5.3), wiec 0 na zapisie
   z doby 360 NIE jest bledem; gdy zadnej linii dnia nie ma - sprawdzic te trzy rzeczy w ekranach BEE, zanim uzna sie test za nieudany;
-  `oplata za dostep do targu (w tym gracz 0)`; `zdejmowanie zlota panom: 0` przy user.cfg = 0;
+  `oplata za dostep do targu (w tym gracz 0)`; `zdejmowanie zlota panom: 0` przy user.cfg = 0; w biegu B brak "PRZEPUSZCZONE oplaty AI";
+  "dokonczone stare sesje szkolenia" tylko, jesli zapis ma oplacona sesje gracza i gracz stoi w tym zamku (autotest zwykle nie - brak = OK);
 - zero linii `ERROR in BeeSeal` i zero `potkniecia` w liniach dnia;
 - ksiega 169 / MoneyLedger: okno BEE "C4" = 0; "GiveGoldAction w nicosc" nie zawiera juz oplat 5 000 (porownac te same doby tego samego
   zapisu z wylacznikiem off, OPIS 5.2 - nie porownywac roznych dob);
@@ -446,7 +455,8 @@ zbrojownie, obozy i druga produkcja). Bieg B: nowa kampania `-Days 12` po skrypc
 3. Swoj zamek: "Contribute to castle treasury", "Build / Upgrade Training Camp", "Train troops" szare z powodem.
 4. Ekran BK (Demesne -> Military): "Contribute" / "Upgrade armory" -> NAJPIERW okno z kwota albo cena (tak ma byc - swiadome odstepstwo,
    D5: przyciski BK nie umieja byc szare), po zatwierdzeniu czerwony "Couldn't ...: Closed: ..."; zloto bez zmian.
-5. Ksiega BEE (klawisz ksiegi BEE) -> ustawienia: "Lord wealth realism" = OFF z "Closed: ..."; klik -> komunikat, dalej OFF.
+5. Ksiega BEE (klawisz ksiegi BEE) -> ustawienia: "Lord wealth realism" = OFF z "Closed: ..."; klik -> komunikat, dalej OFF
+   (tylko gdy linia startowa ma "zdejmowanie zlota panom" wsrod wpietych; inaczej przelacznik jak w BEE).
 6. MCM -> Armoury -> "The living economy" -> "Living Economy Sealed" off -> po chwili (do godziny gry) opcje znow aktywne; wlacz z powrotem.
 
 ## 8. Ryzyka / co sprawdzic
@@ -463,7 +473,7 @@ zbrojownie, obozy i druga produkcja). Bieg B: nowa kampania `-Days 12` po skrypc
    "nieaktywna" (przyciski BK bez wiazania IsEnabled), zloto nie schodzi; wpisane w CHANGELOG. Gdyby Jeffowi przeszkadzalo okno z cena -
    7 prefiksow na `Execute*` BK (lista w D5) zamieni je na sam komunikat, osobna mala zmiana.
 4. **Dlugie powody w tytulach pickerow BEE** ("Contribute 10000g - Closed: ...") moga sie zawijac - kosmetyka.
-5. **Stary zapis**: oplacona sesja szkolenia daje jeszcze raz XP z niczego (D9); gotowe zbrojownie/obozy/druga produkcja widoczne w ekranach BEE,
+5. **Stary zapis**: oplacona sesja szkolenia daje jeszcze raz XP z niczego (D9) - widac to w linii doby ("dokonczone stare sesje szkolenia: N, zolnierzy T, XP M"); gotowe zbrojownie/obozy/druga produkcja widoczne w ekranach BEE,
    choc stoja.
 6. **Okna 169**: zgodnosc zalezy od `Priority.Last` i kolejnosci ApplyAll (rozdz. 6) - sprawdzic przy scalaniu.
 7. **WealthAudit przy utraconym user.cfg**: zdejmowanie zatrzymane, ale BEE dalej robi dobowy spis wszystkich bohaterow (koszt BEE) - na liste
@@ -473,6 +483,9 @@ zbrojownie, obozy i druga produkcja). Bieg B: nowa kampania `-Days 12` po skrypc
    miast w nicosc, LordInvestmentCampaignBehavior.cs:192-219), Population/Migration, swoje modele, a WorkshopProductionPatch mnozy zloto
    warsztatow z niczego (WorkshopProductionPatch.cs:17-53) - zadna latka 170 tego nie zamyka, a 13 kluczy w pliku by to przegapilo. Wykrywa
    to linia kampanii ("tryb zgodnosci BK w BEE: NIE - OTWARTE ..."); naprawa = kolejnosc w launcherze, nie kod.
+8a. **170 bez kluczy K4/K5** (skrypt niepuszczony albo Steam "verify" przywrocil XML bez zmiany wersji BEE): B4 przepuszcza oplate AI
+   5 000 (zloto w nicosc), bo zablokowana zdjelaby jedyny hamulec odplywu towaru z niczego (A9) - mniejsze zlo; linia kampanii "B4
+   WSTRZYMANA - K4/K5 otwarte", linia doby "PRZEPUSZCZONE oplaty AI". Naprawa = skrypt kluczy, nie kod.
 9. **Podpowiedz w menu**: zalozenie, ze UI gry pokazuje Tooltip opcji nieaktywnej (tak dziala w menu gry, np. odmowy w menu miasta) -
    sprawdzic w kroku 7.3.1.
 10. **Nie sprawdzono w grze niczego** - wszystko z kodu (dekompilacja BEE v1.4.5, BK, gra 1.4.8, Harmony 2.4.2).
@@ -486,7 +499,7 @@ zbrojownie, obozy i druga produkcja). Bieg B: nowa kampania `-Days 12` po skrypc
 
 ## 10. Kontrola wg zasady 0 (CLAUDE.md 8.0)
 
-- **Regresje:** cele czytane/pisane przez nasz kod - zaden inny plik Armoury nie lata tych 15 metod (grep `Armoury/src` po nazwach: tylko
+- **Regresje:** cele czytane/pisane przez nasz kod - zaden inny plik Armoury nie lata tych 16 metod (grep `Armoury/src` po nazwach: tylko
   komentarze o BEE w GoodsLedger/RawPrice/WesterosClimate/WinterSource); GoodsLedger i MoneyLedger dalej widza swoje ramki i zdarzenia.
 - **Kolizje:** 169 - rozdz. 6; 171 - rozne cele; BK nie lata celow 170; zaden inny mod nie zawiera ich nazw (grep po DLL Modules).
 - **Spojnosc:** jedna zasada (BEE nie tworzy i nie niszczy zlota, towaru, ludzi, XP) dla AI (plik) i gracza (170); nic nie liczy sie dwa razy;
@@ -515,6 +528,18 @@ formie), 1 (pkt 8) wprowadzona w pierwszym z dwoch proponowanych wariantow (jawn
 Zakres paczki bez zmian: dalej 15 zaczepow, zero nowych kluczy zapisu, zero zapisow stanu BEE; doszedl tylko jeden odczyt (tryb zgodnosci
 BK, raz na kampanie) i poprawione teksty / linie logu / oczekiwania testu.
 
+### 11.2 Recenzja wykonania (commit 503ebc6) - 4 uwagi, wszystkie prawdziwe
+
+Kazda sprawdzona ponownie w `ore-supply/be` i w DLL BEE z gry (`ilspycmd -t`, md5 267ba08d). Zakres po poprawkach: 16 zaczepow
+(15 domykajacych + 1 tylko do logu), dalej zero kluczy zapisu i zero zapisow stanu BEE.
+
+| Nr | Waga | Uwaga (skrot) | Sprawdzenie w kodzie | Werdykt i co zmieniono |
+|---|---|---|---|---|
+| 1 | drobne | D9 zostawia dokonczenie oplaconej sesji szkolenia (XP z niczego), ale w logu Armoury go nie widac | `TickTraining` (Castle:448-483) -> `CompletePlayerTrainingSession` (:474 -> :879, `AddXpToTroop` :924); jedyny wolajacy; BEE pokazuje tylko komunikat na ekranie i `BEELog.Verbose` | PRAWDA - D9 zostaje; NOWY postfiks tylko do logu `TrainDonePost(ref int trained, ref int xpTotal)` (sygnatura w DLL z gry: `out int trained, out int wounded, out int xpTotal, out int retinues`), liczony zawsze; linia doby dopisuje "dokonczone stare sesje szkolenia (D9, nie blokowane, XP z niczego): N, zolnierzy T, XP M". |
+| 2 | drobne | Tabela 2.4: pobor przy werbunku nieczynny nie "tylko w trybie zgodnosci", lecz zawsze przy BK; zle numery linii wolajacych B1 i B2 | RecruitmentPatch.cs:127 `if (ModCompatibility.HasBannerKings || ...) return;` (wolajacy :26, :94, RecruitmentAudit:157); Town:1696 `TickArmoryProduction(...)`; Castle:457-460 warunek i wywolanie `ApplyAiTrainingCampPassive` | PRAWDA - osobny wiersz 2.4 dla RecruitmentPatch (HasBannerKings, niezaleznie od trybu i kolejnosci); B1 "wolana z :1696", B2 "TickTraining :457-460". Kod bez zmian (linia kampanii slusznie nie wymienia RecruitmentPatch). |
+| 3 | drobne | B4 bez K4/K5 zamienia jedna dziure na druga: blokada oplaty AI zdejmuje jedyny hamulec odplywu towaru z niczego | `ApplyMarketAccess` ustawia `DiversionSuppressedUntilDay` (VDev:628); tylko on w `TickGrievanceAndDiversion` (:484-489) gasi odplyw, gdy K4/K5 otwarte; `ApplyDiversionStock` (:511 -> :551) dodaje towar do targu obcego miasta bez zdjecia z wsi | PRAWDA - wybrany wariant kodowy: `MarketPre` przy `!player` sprawdza K4 (`<= -101`) i K5 (`>= 101`) przy kazdym wywolaniu (rzadkie - cooldown AI; uwzglednia przeladowanie pliku BEE Ctrl+Shift+M); gdy otwarte -> `return true` i licznik `_marketOpen`. Gracz blokowany zawsze (G6 i tak zamyka go wczesniej). Linia kampanii: "B4 WSTRZYMANA - K4/K5 otwarte ..."; linia doby: "PRZEPUSZCZONE oplaty AI ...". Uzasadnienie: bez kluczy 170 nie moze domknac obu dziur naraz; zablokowana oplata nie daje wsi 14 dob tlumienia, wiec towar z niczego plynalby do obcego miasta co tick - mniejszym zlem jest oplata (jak w BEE), do czasu skryptu kluczy. Opis wylacznika w MCM dopowiada ten warunek. |
+| 4 | drobne | Przelacznik "Lord wealth realism" zamykany bez sprawdzenia, czy B5 jest wpiety - ksiega pokazuje OFF, a BEE dalej zdejmuje zloto | `TogglePre`/`TogglePost` warunkowaly tylko `On` i klucz; `RuntimeSettings.LordWealthRealism = true` domyslnie (RuntimeSettings.cs:13), WealthAudit:197, :346 | PRAWDA - `_wealthWired` (ustawiane w ApplyAll po `Wire` B5) w obu zaczepach: bez B5 ksiega dokladnie jak w BEE; linia kampanii przy NIEWPIETA dopisuje "przelacznik w ksiedze BEE zostaje jak w BEE". Opcja "przepuscic klik w strone OFF" odrzucona: wymaga zapisu user.cfg przez BEE, a spec (3.5, 3.7) i zadanie tego zabraniaja; przy wpietym B5 skutek i tak zamyka latka. |
+
 ## 12. Wykonanie (08.10)
 
 - Pliki: NOWY `Armoury/src/BeeSeal.cs`; `Settings.cs` (blok "The living economy" przed "Plague shield"); `McmSettings.cs` z
@@ -537,3 +562,8 @@ BK, raz na kampanie) i poprawione teksty / linie logu / oczekiwania testu.
   5. `Wire` ma parametr `last` (Priority.Last dla 13 latek, domyslny priorytet dla menu i przelacznika) i zglasza brak typu parametru
      (np. `TownEconomyState`) jako BRAK z etykieta, bez wyjatku.
 - Nic nie uruchomione w grze, nic nie skopiowane do folderu gry; plik ustawien BEE i user.cfg nietkniete.
+- Poprawki po recenzji (11.2): `BeeSeal.cs` - 16. zaczep `TrainDonePost` (tylko log), `MarketPre` warunkowy na K4/K5 (`DiversionClosed`,
+  wspolny `KeyClosed` z linia kampanii), `_wealthWired` w `TogglePre`/`TogglePost`, czlon "B4 WSTRZYMANA" w linii kampanii, dopiski
+  w linii doby; `Settings.cs` - opis wylacznika (warunek oplaty AI) + `McmSettings.cs` z `python tools/gen_mcm.py` (Armoury 681, bez
+  nowych ustawien); build kod 0 (jedyne ostrzezenie stare, BattlefieldLaw.cs CS0169); sygnatura `CompletePlayerTrainingSession` i typ
+  pol K4/K5 (public static float) sprawdzone `ilspycmd -t` na DLL z gry (md5 267ba08d). Nic nie uruchomione w grze.
