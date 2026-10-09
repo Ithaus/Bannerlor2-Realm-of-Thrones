@@ -2916,6 +2916,26 @@ namespace Armoury
         [SettingPropertyGroup("Arms production")]
         public bool BkRawNoRot { get; set; } = true;
 
+        [SettingPropertyBool("Ai Any Melee When Short", HintText = "an AI soldier with no melee weapon of his grade, in a party short of melee weapons of any kind, buys any sword, axe or spear of his tier or lower from the stall - a weapon in his hand rather than none (drill and promotion still count only a weapon of his grade); bought only up to the party's real lack, so it is never sold back as surplus")]
+        [SettingPropertyGroup("Arms production")]
+        public bool AiAnyMeleeWhenShort { get; set; } = true;
+
+        [SettingPropertyBool("Ai Worse Body Armour When Short", HintText = "an AI soldier with no body armour of his grade, in a party short of body armour of any kind, buys a padded coat of his tier or lower, or armour two tiers lower (protection only, not for drill or promotion) - off until the test shows fewer than 75% of AI soldiers with anything on the body")]
+        [SettingPropertyGroup("Arms production")]
+        public bool AiWorseBodyArmourWhenShort { get; set; } = false;
+
+        [SettingPropertyBool("Old Stock To Scrap", HintText = "the town smiths slowly buy up for scrap the old arms and armour lying on their stalls beyond a year of what lords, garrisons and notables buy there - worst pieces first - and smelt their metal back into ore for their forges (off until you decide - question 4 of package 174: the old surplus of free kits stays on the stalls)")]
+        [SettingPropertyGroup("Arms production")]
+        public bool OldStockToScrap { get; set; } = false;
+
+        [SettingPropertyFloatingInteger("Old Stock Scrap Daily Share", 0.00f, 1.00f, "0.00", HintText = "share of that old surplus scrapped each day (1%)")]
+        [SettingPropertyGroup("Arms production")]
+        public float OldStockScrapDailyShare { get; set; } = 0.01f;
+
+        [SettingPropertyFloatingInteger("Old Stock Scrap Yield", 0.00f, 2.00f, "0.00", HintText = "share of the ore a piece was forged from that comes back from its scrap")]
+        [SettingPropertyGroup("Arms production")]
+        public float OldStockScrapYield { get; set; } = 0.5f;
+
         [SettingPropertyInteger("Workshop Pieces Per Cycle Max", 0, 256, "0", HintText = "most pieces one workshop line may finish in one cycle of the game (was 8) - a big town's spear-makers are not held back by the counter")]
         [SettingPropertyGroup("Arms production")]
         public int WorkshopPiecesPerCycleMax { get; set; } = 64;
@@ -3648,6 +3668,11 @@ namespace Armoury
             s.MineOutputStep = MineOutputStep;
             s.WoodlotStep = WoodlotStep;
             s.BkRawNoRot = BkRawNoRot;
+            s.AiAnyMeleeWhenShort = AiAnyMeleeWhenShort;
+            s.AiWorseBodyArmourWhenShort = AiWorseBodyArmourWhenShort;
+            s.OldStockToScrap = OldStockToScrap;
+            s.OldStockScrapDailyShare = OldStockScrapDailyShare;
+            s.OldStockScrapYield = OldStockScrapYield;
             s.WorkshopPiecesPerCycleMax = WorkshopPiecesPerCycleMax;
         }
 

@@ -247,6 +247,7 @@ namespace Armoury
             foreach (var e in picks)
             {
                 roster.AddToCounts(e, -1);
+                ArmsScrap.NoteBuy(market, e.Item, 1);   // 174 pytanie 4: popyt koszyka w miescie (tylko licznik)
                 if (e.Item != null && IsAmmoType(e.Item.ItemType)) TownFletchers.NoteNotable(e.Item.ItemType, 1);   // 172: kolczan z polki miasta (tylko licznik)
             }
             _lastBought.AddRange(picks);
@@ -276,6 +277,7 @@ namespace Armoury
                 }
                 var pe = roster.GetElementCopyAtIndex(best).EquipmentElement;
                 roster.AddToCounts(pe, -1);
+                ArmsScrap.NoteBuy(market, pe.Item, 1);   // 174 pytanie 4: popyt koszyka w miescie (tylko licznik)
                 if (pe.Item != null && IsAmmoType(pe.Item.ItemType)) TownFletchers.NoteNotable(pe.Item.ItemType, 1);   // 172: licznik
                 _lastBought.Add(pe);
                 GiveGoldAction.ApplyForCharacterToSettlement(notable, market, bestPrice, true);

@@ -325,11 +325,15 @@ namespace Armoury
             var needT = new Dictionary<int, int>();
             foreach (var nk in need) { int ty = nk.Key / 10; int v; needT.TryGetValue(ty, out v); needT[ty] = v + nk.Value; }
             int sold = 0, gold = 0;
+            bool meleeGroup = AiGear.SubstituteMeleeOn;   // 174 pytanie 2a: bron biala liczona razem (sztuka zastepcza innego typu nie jest nadwyzka)
+            int meleeLeft = meleeGroup ? AiGear.MeleeGroupExtra(have, needT, s.SurplusKeepPercent) : int.MaxValue;
             foreach (var hk in have.ToList())
             {
                 int nd; needT.TryGetValue(hk.Key, out nd);
                 int keep = (int)Math.Ceiling(nd * (1f + Math.Max(0f, s.SurplusKeepPercent) / 100f));
                 int extra = hk.Value - keep;
+                bool grp = meleeGroup && AiGear.Melee(hk.Key);
+                if (grp) { extra = Math.Min(extra, meleeLeft); meleeLeft -= Math.Max(0, extra); }
                 if (extra <= 0) continue;
                 var items = arm.Where(kv => kv.Key != null && kv.Value > 0 && SupplyDemand.Equipmentish(kv.Key) && !HorseKind(kv.Key) && (int)kv.Key.ItemType == hk.Key && !ArmsPricing.IsUnique(kv.Key))
                                .OrderBy(kv => kv.Key.Tier).ThenBy(kv => kv.Key.Value).Select(kv => kv.Key).ToList();

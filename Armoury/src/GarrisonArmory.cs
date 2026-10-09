@@ -270,11 +270,15 @@ namespace Armoury
             int sold = 0;
             bool wornBook = mp.IsLordParty || (mp.IsGarrison && AiWear.BookOn);   // recenzja 171: zaloga tez sprzedaje ze stanem z zapisu (obita nie idzie jako sprawna)
             bool synced = false;
+            bool meleeGroup = AiGear.SubstituteMeleeOn;   // 174 pytanie 2a: bron biala liczona razem (sztuka zastepcza innego typu nie jest nadwyzka)
+            int meleeLeft = meleeGroup ? AiGear.MeleeGroupExtra(have, needByType, keepPercent) : int.MaxValue;
             foreach (var hk in have.ToList())
             {
                 int nd = 0; if (needByType != null) needByType.TryGetValue(hk.Key, out nd);
                 int keep = (int)Math.Ceiling(nd * (1f + Math.Max(0f, keepPercent) / 100f));
                 int extra = hk.Value - keep;
+                bool grp = meleeGroup && AiGear.Melee(hk.Key);
+                if (grp) { extra = Math.Min(extra, meleeLeft); meleeLeft -= Math.Max(0, extra); }
                 if (extra <= 0) continue;
                 var items = arm.Where(kv => kv.Key != null && kv.Value > 0 && (int)kv.Key.ItemType == hk.Key && SupplyDemand.Equipmentish(kv.Key) && !MenPurse.HorseKind(kv.Key) && !ArmsPricing.IsUnique(kv.Key))
                                .OrderBy(kv => kv.Key.Tier).ThenBy(kv => kv.Key.Value).Select(kv => kv.Key).ToList();

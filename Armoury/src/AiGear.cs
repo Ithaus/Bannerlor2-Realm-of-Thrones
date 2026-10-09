@@ -43,6 +43,93 @@ namespace Armoury
 
         internal static bool On { get { var s = Settings.Current; return s != null && s.AiBuysGear; } }
 
+        // ------------------------------------------------------------ 174, pytanie 2: gorszy sprzet zamiast zadnego
+        // (a) AiAnyMeleeWhenShort (rekomendacja "tak"): zolnierz bez broni bialej swojego szczebla, gdy partia nie ma dosc broni bialej W OGOLE (suma typow
+        //     1H, 2H, drzewce w dowolnym tierze mniejsza niz sloty wzorcow), kupuje dowolna bron biala tieru <= swojego; (b) AiWorseBodyArmourWhenShort
+        //     (domyslnie WYLACZONE - wlaczyc po tescie, gdy "cokolwiek na tulow" < 75%): zbroja na tulow o 2 tiery nizej albo przeszywanica tieru <= swojego.
+        // Kupujemy tylko tyle, ile brakuje "dowolnego szczebla" - te sztuki nie sa nadwyzka dla MenPurse i GarrisonArmory (bron biala liczona tam
+        // grupa), wiec nie ma petli kup-sprzedaj. Do cwiczen i awansu liczy sie dalej tylko bron szczebla (ArmsDrill, AiGear.Deficit bez zmian).
+        internal static bool SubstituteMeleeOn { get { var s = Settings.Current; return s != null && s.AiAnyMeleeWhenShort; } }
+        private static bool SubstituteBodyOn { get { var s = Settings.Current; return s != null && s.AiWorseBodyArmourWhenShort; } }
+        private static int _daySubMelee, _daySubBody;
+
+        internal static bool Melee(int type)
+        {
+            return type == (int)ItemObject.ItemTypeEnum.OneHandedWeapon || type == (int)ItemObject.ItemTypeEnum.TwoHandedWeapon || type == (int)ItemObject.ItemTypeEnum.Polearm;
+        }
+
+        /// <summary>Sprzedaz nadwyzek wedlug typu (MenPurse, GarrisonArmory): przy AiAnyMeleeWhenShort bron biala liczona razem - ile wolno sprzedac z calej grupy.</summary>
+        internal static int MeleeGroupExtra(Dictionary<int, int> have, Dictionary<int, int> needByType, float keepPercent)
+        {
+            int h = 0, k = 0;
+            foreach (var kv in have) if (Melee(kv.Key)) h += kv.Value;
+            if (needByType != null) foreach (var kv in needByType) if (Melee(kv.Key)) k += (int)Math.Ceiling(kv.Value * (1f + Math.Max(0f, keepPercent) / 100f));
+            return Math.Max(0, h - k);
+        }
+
+        private static int BuySubstitutes(Settlement market, MobileParty buyer, Dictionary<ItemObject, int> armory, Dictionary<int, int> needOut, Dictionary<int, int> need,
+                                          int budget, int maxPieces, ref int pieces, List<string> bought, Deliver deliver)
+        {
+            int spent = 0;
+            try
+            {
+                bool melee = SubstituteMeleeOn, body = SubstituteBodyOn;
+                if ((!melee && !body) || market == null || market.ItemRoster == null || market.Town == null) return 0;
+                // "dowolny szczebel": sloty wzorcow wedlug typu wobec sztuk zbrojowni w dowolnym tierze
+                var slots = new Dictionary<int, int>(); var have = new Dictionary<int, int>();
+                foreach (var kv in needOut) { int ty = kv.Key / 10; int v; slots.TryGetValue(ty, out v); slots[ty] = v + kv.Value; }
+                if (armory != null) foreach (var kv in armory) { if (kv.Key == null || kv.Value <= 0) continue; int ty = (int)kv.Key.ItemType; int v; have.TryGetValue(ty, out v); have[ty] = v + kv.Value; }
+                int gapMelee = 0, gapBody = 0;
+                foreach (var kv in slots) if (Melee(kv.Key)) gapMelee += kv.Value;
+                foreach (var kv in have) if (Melee(kv.Key)) gapMelee -= kv.Value;
+                { int sb, hb; slots.TryGetValue((int)ItemObject.ItemTypeEnum.BodyArmor, out sb); have.TryGetValue((int)ItemObject.ItemTypeEnum.BodyArmor, out hb); gapBody = sb - hb; }
+                var shelf = market.ItemRoster;
+                var keys = new List<int>(need.Keys); keys.Sort((a, b) => (b % 10).CompareTo(a % 10));   // najwyzsze szczeble najpierw
+                foreach (var k in keys)
+                {
+                    int ty = k / 10, t = k % 10, deficit = need[k];
+                    bool isMelee = melee && Melee(ty) && gapMelee > 0, isBody = body && ty == (int)ItemObject.ItemTypeEnum.BodyArmor && gapBody > 0;
+                    if (deficit <= 0 || (!isMelee && !isBody)) continue;
+                    while (deficit > 0 && pieces < maxPieces && spent < budget && (isMelee ? gapMelee : gapBody) > 0)
+                    {
+                        int bestI = -1, bestPrice = 0; float bestScore = 0f;
+                        for (int i = 0; i < shelf.Count; i++)
+                        {
+                            var el = shelf.GetElementCopyAtIndex(i);
+                            var it = el.EquipmentElement.Item;
+                            if (el.Amount <= 0 || it == null || ArmsPricing.IsUnique(it)) continue;
+                            int ti = TierOf(it);
+                            if (isMelee) { if (!Melee((int)it.ItemType) || ti > t) continue; }
+                            else
+                            {
+                                if (it.ItemType != ItemObject.ItemTypeEnum.BodyArmor || ti > t) continue;
+                                bool cloth = it.ArmorComponent != null && it.ArmorComponent.MaterialType == ArmorComponent.ArmorMaterialTypes.Cloth;
+                                if (!cloth && ti > Math.Max(1, t - 2)) continue;   // przeszywanica tieru <= swojego albo zbroja 2 tiery nizej
+                            }
+                            int price = market.Town.MarketData.GetPrice(el.EquipmentElement, buyer, false, market.Party);
+                            if (price <= 0 || price > budget - spent) continue;
+                            float score = (it.Effectiveness > 0f ? it.Effectiveness : 1f) / price;
+                            if (score > bestScore) { bestScore = score; bestI = i; bestPrice = price; }
+                        }
+                        if (bestI < 0) break;
+                        var pick = shelf.GetElementCopyAtIndex(bestI);
+                        int n = Math.Min(Math.Min(deficit, pick.Amount), Math.Min(maxPieces - pieces, (budget - spent) / bestPrice));
+                        n = Math.Min(n, isMelee ? gapMelee : gapBody);
+                        if (n <= 0) break;
+                        shelf.AddToCounts(pick.EquipmentElement, -n);
+                        deliver(pick.EquipmentElement, n, k, bestPrice);
+                        ArmsScrap.NoteBuy(market, pick.EquipmentElement.Item, n);
+                        spent += bestPrice * n; pieces += n; deficit -= n;
+                        if (isMelee) { gapMelee -= n; _daySubMelee += n; } else { gapBody -= n; _daySubBody += n; }
+                        if (bought.Count < 6) bought.Add(pick.EquipmentElement.Item.StringId + " " + bestPrice + " (zastepcza)");
+                    }
+                    need[k] = deficit;
+                }
+            }
+            catch (Exception e) { Log.Error("AiGear.BuySubstitutes", e); }
+            return spent;
+        }
+
         private static bool Look()
         {
             if (_looked) return _dte != null && _armories != null && _add != null;
@@ -283,6 +370,7 @@ namespace Armoury
                         if (n <= 0) break;
                         shelf.AddToCounts(pick.EquipmentElement, -n);
                         deliver(pick.EquipmentElement, n, k, bestPrice);
+                        ArmsScrap.NoteBuy(market, pick.EquipmentElement.Item, n);   // 174 pytanie 4: popyt koszyka w miescie (tylko licznik)
                         if (type == ItemObject.ItemTypeEnum.Arrows || type == ItemObject.ItemTypeEnum.Bolts) TownFletchers.NoteBought(type, n);   // 172: linia strzelarzy (tylko licznik)
                         spent += bestPrice * n; pieces += n; deficit -= n;
                         if (bought.Count < 6) bought.Add(pick.EquipmentElement.Item.StringId + " " + bestPrice);
@@ -367,7 +455,8 @@ namespace Armoury
                 if (all != null) all.TryGetValue(mp.Id, out armory);
 
                 // potrzeby wedle wzorcow (bez koni) i stan zbrojowni - koszyki typ*10+tier
-                var need = Deficit(mp, armory);
+                var needOut = new Dictionary<int, int>();
+                var need = Deficit(mp, armory, needOut);
                 if (castleCart) GarrisonCarts.SubtractTransit(st, need);   // 171 C5: towar w drodze - inaczej zamek co dobe zamawialby to samo
 
                 int pieces = 0;
@@ -382,6 +471,21 @@ namespace Armoury
                     st.Town.ChangeGold(unit * n);
                     MoneyLedger.Note(MoneyLedger.NGear, st, unit * n);   // ksiega przeplywow osad (tylko licznik)
                 });
+                // 174 pytanie 2: gorszy sprzet zamiast zadnego - tylko z polki tej osady, tylko do pokrycia "dowolnego szczebla"
+                if (SubstituteMeleeOn || SubstituteBodyOn)
+                {
+                    Dictionary<ItemObject, int> armNow = null;
+                    if (all != null) all.TryGetValue(mp.Id, out armNow);
+                    spent += BuySubstitutes(st, mp, armNow, needOut, need, budget - spent, maxPieces, ref pieces, bought, (el, n, k, unit) =>
+                    {
+                        _add.Invoke(null, new object[] { mp.Id, el.Item, n });
+                        AiWear.NoteBought(mp, el, n);
+                        int cost = unit * n, fromPurse = garrison ? 0 : MenPurse.Take(mp, cost);
+                        lord.ChangeHeroGold(-(cost - fromPurse));
+                        st.Town.ChangeGold(unit * n);
+                        MoneyLedger.Note(MoneyLedger.NGear, st, unit * n);
+                    });
+                }
                 if (castleCart)
                 {
                     if (pieces > 0) GarrisonCarts.NoteOwnShelf(pieces, spent);
@@ -461,7 +565,9 @@ namespace Armoury
         private static void FlushDay()
         {
             if (_dayStamp >= 0 && (_dayVisits > 0))
-                Log.Info("ZakupyAI: dzien " + _dayStamp + " - " + _dayVisits + " wizyt, " + _dayPieces + " szt. kupionych za " + _dayGold + " zlota; w tym garnizony " + _dayGarrison + " zakupow za " + _dayGarrisonGold + ".");
+                Log.Info("ZakupyAI: dzien " + _dayStamp + " - " + _dayVisits + " wizyt, " + _dayPieces + " szt. kupionych za " + _dayGold + " zlota; w tym garnizony " + _dayGarrison + " zakupow za " + _dayGarrisonGold
+                         + "; zastepcze (174, pytanie 2): bron biala " + _daySubMelee + (SubstituteMeleeOn ? "" : " (wylaczone)") + ", zbroja na tulow " + _daySubBody + (SubstituteBodyOn ? "" : " (wylaczone)") + ".");
+            _daySubMelee = 0; _daySubBody = 0;
             _dayPieces = 0; _dayGold = 0; _dayVisits = 0; _dayLogged = 0; _dayGarrison = 0; _dayGarrisonGold = 0;
         }
     }
