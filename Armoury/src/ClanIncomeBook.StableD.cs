@@ -14,11 +14,11 @@ namespace Armoury
     /// <summary>
     /// PACZKA 169c - D STALY W LOGU (projekt etapu 2, rozdz. "169c", W-1 z audytu 12, uwagi K8, K12, K17, K34, K39, K40). Sam log i CSV -
     /// niczego nie zmienia w grze. Obok D169 (wplyw doby = a + b + Today) liczymy rozbicie tego samego wplywu na 8 czesci:
-    ///  - w D stalym: ZIEMIA (podatek wsi BK "Village Demesnes", renta wsi i zawor miast PopulationLaw bez czesci "wlasne", cla i podatek miast
-    ///    "Walled Demesnes"; zawor zamkow dojdzie z paczka 110), KORONA (polityki krola, zapomoga, zwrot zoldu, mennica i monopole), KONTRAKT
+    ///  - w D stalym: ZIEMIA (podatek wsi BK "Village Demesnes", renta wsi i zawor miast PopulationLaw oraz zawor zamkow CastlePurse (110) - bez
+    ///    czesci "wlasne", cla i podatek miast "Walled Demesnes"), KORONA (polityki krola, zapomoga, zwrot zoldu, mennica i monopole), KONTRAKT
     ///    (kontrakt najemnika gry), MAJATEK (warsztaty i zysk karawan rodu - prawdziwy platnik to handel);
-    ///  - poza D: WLASNE (pieniadze rodu wplacone wczoraj do kasy wlasnego miasta - zold i sprzet zalogi, wydatki swoich ludzi - ktore wrocily
-    ///    zaworem: wplata x czesc kasy, ktora zawor wzial dzis), JEDNORAZOWE (zdarzenia spoza rodu, trzecia), INNE Z MODELU (majatki BK, "za tier",
+    ///  - poza D: WLASNE (pieniadze rodu wplacone wczoraj do kasy wlasnego miasta albo zamku - zold i sprzet zalogi, wydatki swoich ludzi - ktore
+    ///    wrocily zaworem: wplata x czesc kasy, ktora zawor wzial dzis; zamek od 110, K8), JEDNORAZOWE (zdarzenia spoza rodu, trzecia), INNE Z MODELU (majatki BK, "za tier",
     ///    trybut, rada, podatki od wasali BK, wszystko, czego nie rozpoznalismy), PRZELEWY W RODZIE (10% kiesy partii czlonka rodu ponad 10 000
     ///    do glowy - wzor gry AddIncomeFromParty), w tym PODWOJNE (wyplaty majatkow BK widziane jako zdarzenie, choc model liczy je tez w linii
     ///    "Estate properties" - siedza w jednorazowych).
@@ -56,9 +56,11 @@ namespace Armoury
         private static readonly Dictionary<Settlement, Ring> _rVTax = new Dictionary<Settlement, Ring>();    // podatek wsi BK (wedlug posiadacza tytulu)
         private static readonly Dictionary<Settlement, Ring> _rRent = new Dictionary<Settlement, Ring>();    // renta wsi i zawor miasta bez "wlasnych" (wedlug wlasciciela)
         private static readonly Dictionary<Settlement, Ring> _rTown = new Dictionary<Settlement, Ring>();    // cla i podatek miasta / zamku (wedlug wlasciciela)
+        private static readonly Dictionary<Settlement, Ring> _rCastle = new Dictionary<Settlement, Ring>();  // 110: zawor zamku bez "wlasnych" (wedlug wlasciciela)
         private static readonly Dictionary<Clan, Ring> _rLoose = new Dictionary<Clan, Ring>();               // ziemia bez osady (nie do przypisania)
         private static readonly Dictionary<Settlement, long> _ownPaid = new Dictionary<Settlement, long>();  // wplaty rodu do kasy wlasnej osady od ostatniego Daily
         private static readonly Dictionary<Clan, long> _ownByClan = new Dictionary<Clan, long>();            // "wlasne" dzis (zawor oddal rodowi jego pieniadze)
+        private static readonly Dictionary<Clan, long> _ownCastleByClan = new Dictionary<Clan, long>();      // 110: "wlasne" dzis z zaworu zamkow
         private static readonly Dictionary<Clan, List<Settlement>> _villagesOf = new Dictionary<Clan, List<Settlement>>();   // dzis: wsie wedlug posiadacza (BK)
         private static readonly Dictionary<Clan, long> _vTaxOf = new Dictionary<Clan, long>();                // dzis: suma podatku wsi posiadacza (do porownania z linia modelu)
         private static readonly Dictionary<Clan, int> _cutToday = new Dictionary<Clan, int>();               // zold przyciety z braku w kiesie (SoldierPay) od ostatniego Daily
@@ -69,6 +71,7 @@ namespace Armoury
         private static readonly long[] _t = new long[Q];
 
         // sumy swiata doby (linia)
+        private static long _dRentC, _dOwnC;   // 110: zawor zamkow i jego "wlasne" (swiat, dzis)
         private static long _dVd, _dWd, _dRentV, _dRentT, _dOwn, _dPol, _dSup, _dRefund, _dMint, _dMerc, _dShop, _dCarPar, _dFamily, _dOther, _dOnce, _dDouble, _dInflow, _dVdCalc;
         private static int _dVdOff, _dLooseN, _dClans;
         // "inne z modelu" rozbite (przeglad 169c): znane linie spoza D, wplyw bez opisu (m.in. "za tier" gry - Add bez nazwy), nierozpoznane (modul)
@@ -92,7 +95,7 @@ namespace Armoury
 
         internal static void ResetStable()
         {
-            _parts.Clear(); _rVTax.Clear(); _rRent.Clear(); _rTown.Clear(); _rLoose.Clear(); _ownPaid.Clear(); _ownByClan.Clear();
+            _parts.Clear(); _rVTax.Clear(); _rRent.Clear(); _rTown.Clear(); _rLoose.Clear(); _ownPaid.Clear(); _ownByClan.Clear(); _rCastle.Clear(); _ownCastleByClan.Clear();
             _villagesOf.Clear(); _vTaxOf.Clear(); _cutToday.Clear(); _cutBlind.Clear(); _bankrupt.Clear(); _bankruptBlind.Clear(); _unknown.Clear(); DayEstates = 0;
             ZeroStableDay();
             LastTicksStableBegin = LastTicksStableClans = LastTicksStableLine = 0;
@@ -102,6 +105,7 @@ namespace Armoury
 
         private static void ZeroStableDay()
         {
+            _dRentC = _dOwnC = 0;
             _dVd = _dWd = _dRentV = _dRentT = _dOwn = _dPol = _dSup = _dRefund = _dMint = _dMerc = _dShop = _dCarPar = _dFamily = _dOther = _dOnce = _dDouble = _dInflow = _dVdCalc = 0;
             _dVdOff = _dLooseN = _dClans = 0;
             _dKnown = _dUnlisted = _dUnrec = _dUnrecAbs = 0;
@@ -243,7 +247,7 @@ namespace Armoury
 
         private static void StableBeginBody()
         {
-            _unknown.Clear(); _ownByClan.Clear(); _villagesOf.Clear(); _vTaxOf.Clear();
+            _unknown.Clear(); _ownByClan.Clear(); _ownCastleByClan.Clear(); _villagesOf.Clear(); _vTaxOf.Clear();
             ResolveNames();
             ResolveBk();
             // posiadacze wsi (BK: tytul) i podatek kazdej wsi - ta sama funkcja, ktora BK liczy linie "Village Demesnes"
@@ -317,12 +321,24 @@ namespace Armoury
                 }
                 catch (Exception e) { Stumble("StableBegin(podatek wsi)", e); }
             }
-            // renty i "wlasne": renta tej doby z PopulationLaw (na osade), wlasne = wplaty rodu od ostatniej doby x czesc kasy, ktora wzial zawor
+            // renty i "wlasne": renta tej doby z PopulationLaw (na osade), wlasne = wplaty rodu od ostatniej doby x czesc kasy, ktora wzial zawor;
+            // 110: zamek tak samo - czesc pana z zaworu CastlePurse i nadwyzka kasy ponad zapas, z ktorej ja wzieto (K8: "wlasne" kazdej osady rodu)
             foreach (var st in Settlement.All)
             {
                 try
                 {
-                    if (st == null || !(st.IsVillage || st.IsTown)) continue;
+                    if (st == null) continue;
+                    if (st.IsCastle)
+                    {
+                        long cpay, cspare, cpaid, cown = 0;
+                        CastlePurse.DuesOf(st, out cpay, out cspare);
+                        if (_ownPaid.TryGetValue(st, out cpaid) && cpaid > 0 && cpay > 0 && cspare > 0)
+                            cown = Math.Min(cpay, (long)(cpaid * Math.Min(1.0, (double)cpay / cspare)));
+                        if (cown > 0 && st.OwnerClan != null) { long o0; _ownCastleByClan.TryGetValue(st.OwnerClan, out o0); _ownCastleByClan[st.OwnerClan] = o0 + cown; }
+                        RingOf(_rCastle, st).Push(cpay - cown);
+                        continue;
+                    }
+                    if (!(st.IsVillage || st.IsTown)) continue;
                     long pay = 0, avail = 0;
                     PopulationLaw.RentOf(st, out pay, out avail);
                     long own = 0;
@@ -400,9 +416,15 @@ namespace Armoury
             long family = Math.Max(0L, Math.Min(FamilyTransfers(c), Math.Max(0L, carpar)));
             long rent = Math.Max(0, b);
             int rentV; PopulationLaw.RentVillageToday.TryGetValue(c, out rentV);
-            long rentT = Math.Max(0L, rent - Math.Max(0, rentV));
-            long own; _ownByClan.TryGetValue(c, out own);
-            own = Math.Max(0L, Math.Min(own, rentT));
+            // 110: czesc pana z zaworu zamkow siedzi w tych samych rentach (PopulationLaw.RentToday) - osobno od zaworu miast
+            int rentC0; CastlePurse.LordDuesToday.TryGetValue(c, out rentC0);
+            long rentC = Math.Max(0L, Math.Min((long)rentC0, rent - Math.Max(0, rentV)));
+            long rentT = Math.Max(0L, rent - Math.Max(0, rentV) - rentC);
+            long ownT; _ownByClan.TryGetValue(c, out ownT);
+            ownT = Math.Max(0L, Math.Min(ownT, rentT));
+            long ownC; _ownCastleByClan.TryGetValue(c, out ownC);
+            ownC = Math.Max(0L, Math.Min(ownC, rentC));
+            long own = ownT + ownC;
             long once = r.Today - r.TodayRefund - r.TodayCrown;     // trzecia + zdarzenia (+ reszta Today z zapisu)
             long other = a - (vd + wd + pol + sup + merc + shop + carpar);
             _t[QLand] = vd + wd + rent - own;
@@ -453,14 +475,14 @@ namespace Armoury
             RingOf(_rLoose, c).Push(loose);
             if (loose != 0) _dLooseN++;
             // sumy swiata (linia)
-            _dVd += vd; _dWd += wd; _dRentV += Math.Max(0, rentV); _dRentT += rentT; _dOwn += own; _dPol += pol; _dSup += sup; _dRefund += r.TodayRefund; _dMint += r.TodayCrown;
+            _dVd += vd; _dWd += wd; _dRentV += Math.Max(0, rentV); _dRentT += rentT; _dOwn += ownT; _dRentC += rentC; _dOwnC += ownC; _dPol += pol; _dSup += sup; _dRefund += r.TodayRefund; _dMint += r.TodayCrown;
             _dMerc += merc; _dShop += shop; _dCarPar += carpar; _dFamily += family; _dOther += other; _dOnce += once; _dDouble += _t[QDouble]; _dInflow += _t[QInflow]; _dClans++;
         }
 
         // ------------------------------------------------------------ D staly i czesci (odczyt - raport i API)
         internal struct StableParts
         {
-            public double D, Land, LandVTax, LandRent, LandTown, LandLoose, Crown, Contract, Assets;
+            public double D, Land, LandVTax, LandRent, LandTown, LandCastle, LandLoose, Crown, Contract, Assets;
             public double Own, Once, Double, Other, Family, Inflow, SumParts; public int Days;
         }
 
@@ -472,11 +494,17 @@ namespace Armoury
             List<Settlement> vs;
             if (_villagesOf.TryGetValue(c, out vs)) for (int i = 0; i < vs.Count; i++) { Ring r; if (_rVTax.TryGetValue(vs[i], out r)) p.LandVTax += r.Avg(); }
             var sts = c.Settlements;
-            if (sts != null) for (int i = 0; i < sts.Count; i++) { var st = sts[i]; Ring r; if (st != null && _rRent.TryGetValue(st, out r)) p.LandRent += r.Avg(); }
+            if (sts != null) for (int i = 0; i < sts.Count; i++)
+            {
+                var st = sts[i]; Ring r;
+                if (st == null) continue;
+                if (_rRent.TryGetValue(st, out r)) p.LandRent += r.Avg();
+                if (_rCastle.TryGetValue(st, out r)) p.LandCastle += r.Avg();   // 110: zawor zamku
+            }
             var fiefs = c.Fiefs;
             if (fiefs != null) for (int i = 0; i < fiefs.Count; i++) { var f = fiefs[i]; Ring r; if (f != null && f.Settlement != null && _rTown.TryGetValue(f.Settlement, out r)) p.LandTown += r.Avg(); }
             Ring rl; if (_rLoose.TryGetValue(c, out rl)) p.LandLoose = rl.Avg();
-            p.Land = p.LandVTax + p.LandRent + p.LandTown + p.LandLoose;
+            p.Land = p.LandVTax + p.LandRent + p.LandTown + p.LandCastle + p.LandLoose;
             p.Crown = pr.Avg(QCrown); p.Contract = pr.Avg(QContract); p.Assets = pr.Avg(QAssets);
             p.D = p.Land + p.Crown + p.Contract + p.Assets;
             p.Own = pr.Avg(QOwn); p.Once = pr.Avg(QOnce); p.Double = pr.Avg(QDouble); p.Other = pr.Avg(QOther); p.Family = pr.Avg(QFamily); p.Inflow = pr.Avg(QInflow);
@@ -527,6 +555,7 @@ namespace Armoury
         {
             var inv = CultureInfo.InvariantCulture;
             var dl = new List<double>(); var castleD = new List<double>(); var castleD169 = new List<double>();
+            double sCastle = 0;
             double sD = 0, sLand = 0, sVt = 0, sRent = 0, sTown = 0, sLoose = 0, sCrown = 0, sContr = 0, sAssets = 0, sOwn = 0, sOnce = 0, sDouble = 0, sOther = 0, sFam = 0, sInflow = 0, sParts = 0, sD169 = 0;
             int n = 0, bankrupt = 0, shortDays = 0, bankBlind = 0, bankIb = 0, bankBoth = 0, bankAny = 0;
             for (int i = 0; i < aiClans.Count; i++)
@@ -545,7 +574,7 @@ namespace Armoury
                     StableParts p;
                     if (!TryStable(c, out p)) continue;
                     n++; if (p.Days < Days) shortDays++;
-                    dl.Add(p.D); sD += p.D; sLand += p.Land; sVt += p.LandVTax; sRent += p.LandRent; sTown += p.LandTown; sLoose += p.LandLoose; sCrown += p.Crown; sContr += p.Contract;
+                    dl.Add(p.D); sD += p.D; sLand += p.Land; sVt += p.LandVTax; sRent += p.LandRent; sTown += p.LandTown; sCastle += p.LandCastle; sLoose += p.LandLoose; sCrown += p.Crown; sContr += p.Contract;
                     sAssets += p.Assets; sOwn += p.Own; sOnce += p.Once; sDouble += p.Double; sOther += p.Other; sFam += p.Family; sInflow += p.Inflow; sParts += p.SumParts;
                     var rr = Of(c); if (rr != null) sD169 += rr.D;
                     int towns = 0, castles = 0;
@@ -571,7 +600,7 @@ namespace Armoury
               .Append(" | panowie samych zamkow (").Append(castleD.Count).Append("): D staly mediana ").Append(N0(Pctl(castleD, 0.5))).Append(", D169 mediana ").Append(N0(Pctl(castleD169, 0.5)))
               .Append(" (prog testu 400-1300)")
               .Append(" | czesci D (swiat, srednio na dobe): ziemia ").Append(N0(sLand)).Append(" (podatek wsi BK ").Append(N0(sVt)).Append(", renta wsi i zawor miast bez wlasnych ").Append(N0(sRent))
-              .Append(", cla i podatek miast ").Append(N0(sTown)).Append(", bez osady ").Append(N0(sLoose)).Append("; zawor zamkow -), korona ").Append(N0(sCrown)).Append(", kontrakt ").Append(N0(sContr))
+              .Append(", cla i podatek miast ").Append(N0(sTown)).Append(", bez osady ").Append(N0(sLoose)).Append("; zawor zamkow bez wlasnych ").Append(N0(sCastle)).Append("), korona ").Append(N0(sCrown)).Append(", kontrakt ").Append(N0(sContr))
               .Append(", majatek ").Append(N0(sAssets))
               .Append(" | poza D: wlasne ").Append(N0(sOwn)).Append(", jednorazowe ").Append(N0(sOnce)).Append(" (w tym podwojne - majatki BK ").Append(N0(sDouble)).Append("), inne z modelu ").Append(N0(sOther))
               .Append(", przelewy w rodzie ").Append(N0(sFam)).Append(", zajete w D3 - (168)")
@@ -580,6 +609,7 @@ namespace Armoury
               .Append(" | dzis (swiat): linie modelu - podatek wsi ").Append(_dVd).Append(" (wedlug wsi BK ").Append(_dVdCalc).Append(", roznica u ").Append(_dVdOff).Append(" rodow), cla i podatek miast ").Append(_dWd)
               .Append(", polityki krolow ").Append(_dPol).Append(", zapomoga ").Append(_dSup).Append(", kontrakt ").Append(_dMerc).Append(", warsztaty ").Append(_dShop).Append(", karawany i partie ").Append(_dCarPar)
               .Append(" (w tym przelewy w rodzie ").Append(_dFamily).Append("), inne ").Append(_dOther).Append("; renta wsi ").Append(_dRentV).Append(", zawor miast ").Append(_dRentT).Append(" (wlasne ").Append(_dOwn).Append(')')
+              .Append(", zawor zamkow ").Append(_dRentC).Append(" (wlasne ").Append(_dOwnC).Append(')')
               .Append(", zwrot korony ").Append(_dRefund).Append(", mennica i monopole ").Append(_dMint).Append(", jednorazowe ").Append(_dOnce).Append(" (podwojne ").Append(_dDouble).Append("), ziemia bez osady u ").Append(_dLooseN).Append(" rodow")
               .Append(" | inne z modelu dzis: znane linie (majatki BK, rada BK, podatki od wasali BK, sluzba u lorda BK, trybut, wezwanie do wojny, umowy handlowe, perk, zaulki) ").Append(_dKnown)
               .Append(", wplyw bez opisu (m.in. 'za tier' gry) ").Append(_dUnlisted)

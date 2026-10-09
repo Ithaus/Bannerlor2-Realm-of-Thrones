@@ -2524,6 +2524,30 @@ namespace Armoury
         [SettingPropertyGroup("The soldier's pay")]
         public bool TownWageShield { get; set; } = true;
 
+        [SettingPropertyBool("Castle Purse Enabled", HintText = "a castle's purse holds real coin: the game no longer deletes what lies above its target each day (it still tops a purse up towards the working coin when it runs low), and the goods the castle folk use up no longer pay gold into it from nowhere (the goods are still used up). What the garrison's pay, the builders and the buyers bring in stays there until it is spent or leaves as the dues under the walls. Off = the game's daily regulator and purchases from nowhere, as before")]
+        [SettingPropertyGroup("The castle's purse")]
+        public bool CastlePurseEnabled { get; set; } = true;
+
+        [SettingPropertyInteger("Castle Purse Floor Gold", 0, 40000, "0", HintText = "working coin the sutlers under the castle walls keep before any dues are drawn - the fixed part (the game's own target for a castle purse is 10 000 plus 12 a point of prosperity, about 22 000 for a common castle)")]
+        [SettingPropertyGroup("The castle's purse")]
+        public int CastlePurseFloorGold { get; set; } = 10000;
+
+        [SettingPropertyFloatingInteger("Castle Purse Floor Per Prosperity", 0.00f, 48.00f, "0.00", HintText = "... and the part of the working coin that grows with the castle's prosperity, in coins a point")]
+        [SettingPropertyGroup("The castle's purse")]
+        public float CastlePurseFloorPerProsperity { get; set; } = 12f;
+
+        [SettingPropertyFloatingInteger("Castle Dues Share", 0.00f, 1.00f, "0.00", HintText = "share of the castle purse above the working coin that leaves it each day as the dues under the walls and goes to the castle's lord: the garrison spends its pay with his own people - alehouse, mill and stalls - as a town pays its rents; nothing is drawn from a besieged castle (0 = nothing is drawn and the purse only grows). Mind the side effect: in the long run a garrison in one's own castle costs its lord less, for part of its pay comes back to him")]
+        [SettingPropertyGroup("The castle's purse")]
+        public float CastleDuesShare { get; set; } = 0.07f;
+
+        [SettingPropertyBool("Castle Purse Trim At Start", HintText = "once per campaign, on its first day: the starting gift in every castle purse (20 000 plus Banner Kings' 40 a point of prosperity) is cut down to the working coin. The game's regulator deleted that gold within two weeks anyway; left in, the castle lords would draw about five million from nowhere. A save a few days old loses only what the regulator had not yet deleted; an old save loses nothing")]
+        [SettingPropertyGroup("The castle's purse")]
+        public bool CastlePurseTrimAtStart { get; set; } = true;
+
+        [SettingPropertyBool("Castle Carts Need Coin", HintText = "villagers whose market town lies beyond Market Max Distance sell at their lord's castle only when its purse holds enough above the working coin to pay for the whole cartload; otherwise they take the long road to the market town (off = they haul to the castle whether it can pay or not)")]
+        [SettingPropertyGroup("The castle's purse")]
+        public bool CastleCartsNeedCoin { get; set; } = true;
+
         [SettingPropertyBool("Army Clothing Enabled", HintText = "every soldier on pay wears out his shoes, clothes and linen: men in a lord's party (yours too) buy leather, felt (woollen cloth) and linen in the towns they leave - piece by piece at the market price, out of their own purse, before they spend the rest on food and drink; a town garrison takes them from its own town's market without paying, for its pay already went into that town's purse; a castle garrison has the castle purse buy them in the town its villages trade with. What cannot be had waits (Army Clothing Max Wait Days), then is only noted in the log. Banner Kings party supplies no longer buy or use up wool, linen or flax for the troops, and their 'Textiles supplies' morale penalty is gone - one rule for clothing, rags carry no penalty (off = no wear, Banner Kings textiles and their morale penalty as before)")]
         [SettingPropertyGroup("The soldier's clothes")]
         public bool ArmyClothingEnabled { get; set; } = true;
@@ -3990,6 +4014,12 @@ namespace Armoury
             s.CrownWageRefundPercent = CrownWageRefundPercent;
             s.CrownWageRefundGarrisons = CrownWageRefundGarrisons;
             s.TownWageShield = TownWageShield;
+            s.CastlePurseEnabled = CastlePurseEnabled;
+            s.CastlePurseFloorGold = CastlePurseFloorGold;
+            s.CastlePurseFloorPerProsperity = CastlePurseFloorPerProsperity;
+            s.CastleDuesShare = CastleDuesShare;
+            s.CastlePurseTrimAtStart = CastlePurseTrimAtStart;
+            s.CastleCartsNeedCoin = CastleCartsNeedCoin;
             s.ArmyClothingEnabled = ArmyClothingEnabled;
             s.ArmyClothingFieldLeatherKg = ArmyClothingFieldLeatherKg;
             s.ArmyClothingFieldClothKg = ArmyClothingFieldClothKg;

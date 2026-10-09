@@ -88,6 +88,7 @@ namespace Armoury
             try { IronBank.ZeroLast(); } catch (Exception e) { Stumble169("ClearLast169(IronBank)", e); }
             try { SoldierPay.ZeroLast(); } catch (Exception e) { Stumble169("ClearLast169(SoldierPay)", e); }
             try { PopulationLaw.ZeroDay169(); } catch (Exception e) { Stumble169("ClearLast169(PopulationLaw)", e); }
+            try { CastlePurse.ZeroLast(); } catch (Exception e) { Stumble169("ClearLast169(CastlePurse)", e); }   // 110: zawor kas zamkow (Last*)
         }
 
         // ------------------------------------------------------------ 169b: RB wedlug odcinkow naszego ticku (granice: Mark renty, budowy, korona, paser band)
@@ -259,14 +260,15 @@ namespace Armoury
             // reszta w naszym ticku (RB): dwa odczyty calego swiata wokol bloku minus pozycje nazwane w bloku (clo z licznika cel - w bloku)
             bool haveRb = _blockWorld0 != long.MinValue;
             long holdSum = 0; for (int i = 0; i < Holders; i++) holdSum += now[i];
-            long rb = haveRb ? (holdSum - _blockWorld0) - (CW.BlockNamed - u9) : 0;
+            long trim = TrimNow();                          // 110: dar startowy kas zamkow - nazwane ujscie w naszym ticku (w u0 przez OldBalance)
+            long rb = haveRb ? (holdSum - _blockWorld0) - (CW.BlockNamed - u9) + trim : 0;
             long rp = R - rb;
             // 169b: RB wedlug odcinkow (granice Mark); odcinek bez granicy laczy sie z nastepnym; clo z licznika cel (u9) - w odcinku z korona
             var segTxt = new StringBuilder(256); var segKeys = new StringBuilder(64);
             long segSum = 0;
             if (haveRb)
             {
-                long pw = _blockWorld0, pn = 0; bool u9Done = false; string merged = null;
+                long pw = _blockWorld0, pn = 0; bool u9Done = false, trimDone = false; string merged = null;
                 for (int i = 0; i <= SegMarks.Length; i++)
                 {
                     bool atEnd = i == SegMarks.Length;
@@ -274,6 +276,7 @@ namespace Armoury
                     long w = atEnd ? holdSum : _segW[i], n = atEnd ? CW.BlockNamed : _segN[i];
                     long seg = (w - pw) - (n - pn);
                     if (!u9Done && i >= 2) { seg += u9; u9Done = true; }
+                    if (!trimDone && i >= 1) { seg += trim; trimDone = true; }   // 110: CastlePurse.Daily miedzy migawka rent a migawka budow
                     segSum += seg;
                     if (segTxt.Length > 0) segTxt.Append(", ");
                     segTxt.Append(merged != null ? merged + " + " : "").Append(SegName[i]).Append(' ').Append(S(seg));
@@ -322,7 +325,9 @@ namespace Armoury
                 }
             }
             for (int k = 1; k < CW.Kinds; k++) if (!Listed(OutOrder, k) && !Listed(BeeKinds, k) && CW.Out[k] != 0) sb.Append(", ").Append(CW.KindOut[k]).Append(' ').Append(CW.Out[k]);
-            sb.Append(", inne ").Append(to - toW).Append(") minus zaplata za werbunek, ktora nasze rozliczenie oddalo sprzedajacym ").Append(_levyBack)
+            sb.Append(", inne ").Append(to - toW).Append(") minus zaplata za werbunek, ktora nasze rozliczenie oddalo sprzedajacym ").Append(_levyBack);
+            if (trim != 0) sb.Append(", dar startowy kas zamkow przyciety (110) ").Append(trim);
+            sb
               .Append(", zold karawan notabli ").Append(Wv(u1, CW.WCaravanWage)).Append(" (z kas karawan ").Append(u1c).Append(", z kies notabli ").Append(u1n).Append(')')
               .Append(", prowizja od sprzedazy partiom ").Append(Wv(u2, CW.WSell)).Append(" (wsie ").Append(u2v).Append(", miasta i zamki ").Append(u2t).Append(')')
               .Append(", BK porty ").Append(Wv(u3, CW.WPorts)).Append(", BK kopalnie ").Append(Wv(u4, CW.WMines)).Append(", BK konwoje ludnosci ").Append(Wv(u5, CW.WConvoys))
@@ -525,7 +530,8 @@ namespace Armoury
                   .Append(ledgerFromSp == _wage[WLord] ? " - zgodne" : " - roznica " + S(_wage[WLord] - ledgerFromSp)).Append(']');
             sb.Append(", zold karawan lordow ").Append(_wage[WCaravan]).Append(", powinnosci do korony ").Append(KingdomTreasury.LastDues)
               .Append(", budowy do kas osad ").Append(build).Append(", dwor -, sprzet i werbunek -")
-              .Append(" | rody dostaly [P]: renta wsi ").Append(PopulationLaw.DayVillageRent).Append(", zawor miast ").Append(PopulationLaw.DayTownRent).Append(", zawor zamkow -")
+              .Append(" | rody dostaly [P]: renta wsi ").Append(PopulationLaw.DayVillageRent).Append(", zawor miast ").Append(PopulationLaw.DayTownRent)
+              .Append(", zawor zamkow ").Append(CastlePurse.LastLordPaid)
               .Append(", zwrot zoldu od korony ").Append(KingdomTreasury.LastRefundGiven).Append(" (nalezny ").Append(KingdomTreasury.LastRefundDue).Append(')')
               .Append(", mennica i monopole krolow ").Append(KingdomTreasury.LastMint + KingdomTreasury.LastMonopoly)
               .Append(", trzecia lordow z nadwyzek ludzi ").Append(cib ? ClanIncomeBook.LastThird.ToString(Inv) : "-")
@@ -543,7 +549,10 @@ namespace Armoury
               .Append(", zold zalog do kas miast ").Append(SoldierPay.LastToTowns)
               .Append(", utarg taborow wsi zaplacony ").Append(_vPaid[CTown]).Append(" (").Append(_vVisits[CTown]).Append(" wizyt; towar niesprzedany ").Append(_vUnsold[CTown])
               .Append(" szt.), dosypka regulatora ").Append(_regIn[CTown]).Append(" (tryb 1 -), bezpiecznik korony -")
-              .Append(" | kasy zamkow [P]: stan ").Append(Dl(now, last, HCastles)).Append(", zold zalog do kas ").Append(SoldierPay.LastToCastles).Append(", zawor -")
+              .Append(" | kasy zamkow [P]: stan ").Append(Dl(now, last, HCastles)).Append(", zold zalog do kas ").Append(SoldierPay.LastToCastles)
+              .Append(", zawor do panow ").Append(CastlePurse.LastLordPaid)
+              .Append(", regulator: kasowanie zablokowane (110) ").Append(CastlePurse.LastRegDown).Append(", dosypka do zapasu (tryb 1) ").Append(CastlePurse.LastRegUp)
+              .Append(", \"zakupy\" z niczego cofniete ").Append(CastlePurse.LastConsBack)
               .Append(" | kiesy wsi [P]: stan ").Append(Dl(now, last, HVillages)).Append(", renta do panow ").Append(PopulationLaw.DayVillageRent)
               .Append(" | korona [P]: wplywy - powinnosci ").Append(KingdomTreasury.LastDues).Append(", danina wojenna ").Append(KingdomTreasury.LastSubsidy)
               .Append(", clo: z licznika cel zdjeto ").Append(KingdomTreasury.LastCustomsTaken).Append(" (w nicosc w calosci - licznik jest posiadaczem), skarbce dostaly ")

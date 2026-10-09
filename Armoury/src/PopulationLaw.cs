@@ -24,8 +24,11 @@ namespace Armoury
     /// hearth wsi i ilu na punkt dobrobytu miasta, tak zeby suma dala ludnosc krainy (czesc miejska
     /// wedle udzialu miast). Potem wies ma hearth x k ludzi - spalona wies ma mniej ludzi i daje mniej,
     /// rosnaca daje wiecej. Dochod: podatek miasta (CalculateTownTax) i dochod wsi BK
-    /// (CalculateVillageTaxFromIncome) = ludzie x `PopulationRentPerHead` / dni roku. Zamki bez zmian
+    /// (CalculateVillageTaxFromIncome) = ludzie x `PopulationRentPerHead` / dni roku. Dochod zamkow bez zmian
     /// (ich dochod to wsie). Cla od handlu bez zmian.
+    /// Uwaga (projekt etapu 2 rozdz. 6): "bez zmian" dotyczy DOCHODU zamku, nie jego kasy - kase zamku sciagal do celu regulator gry
+    /// (DefaultSettlementEconomyModel.GetTownGoldChange, opis w SoldierPay przy tarczy zoldu); od paczki 110 (CastlePurse) regulator zamku
+    /// dziala tylko w dol (dosypka do zapasu), a nadwyzke ponad zapas kupcow zdejmuje zawor zamku - do pana (dopisane do RentToday).
     /// </summary>
     internal static class PopulationLaw
     {

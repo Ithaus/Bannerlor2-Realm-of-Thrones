@@ -169,8 +169,8 @@ def baseline_of(lines, rows=None):
     cap = by_day(lines, "Niewola lordow i okupy (169c)")
     money = by_day(lines, "Pieniadz swiata: dzien")
 
-    def mean_of(d, pat):
-        vals = [num(pat, d[k]) for k in last_window(d)]
+    def mean_of(d, pat, cast=int):
+        vals = [num(pat, d[k], cast) for k in last_window(d)]
         vals = [v for v in vals if v is not None]
         return st.mean(vals) if vals else None
 
@@ -183,6 +183,19 @@ def baseline_of(lines, rows=None):
         base["krolestwa"].setdefault(k, {"wojsko_wojna": None, "wojsko_pokoj": None})["zalogi_wojna"] = v
     base["swiat"]["lordowie_ponad_60"] = mean_of(cap, r"ponad 60 dni (\d+)")
     base["swiat"]["pieniadz_zmiana"] = mean_of(money, r"razem \d+ \(([+-]?\d+)\)")
+    # krok B (110, 112, klucz 114): ujscia i zrodla, ktore B zamyka - z linii ksiegi pieniadza obecnych takze w biegu bazowym
+    # (plik bazowy zapisany przed B nie ma tych kluczy - zapisac go jeszcze raz z logu biegu bazowego: --zapisz-baze)
+    cas = by_day(lines, "Przeplywy osad (kasy zamkow): dzien")
+    base["swiat"]["zamki_zakupy"] = mean_of(cas, r'"zakupy" mieszkancow ([+-]?\d+)')
+    base["swiat"]["zamki_dosypal"] = mean_of(cas, r"dosypal (\d+), skasowal")
+    base["swiat"]["zamki_skasowal"] = mean_of(cas, r"skasowal (\d+);")
+    bal = by_day(lines, "Pieniadz swiata (bilans): dzien")
+    base["swiat"]["wsie_utarg_zniklo"] = mean_of(bal, r"z utargu wsi zniklo (-?\d+)")
+    cau = by_day(lines, "Pieniadz swiata (bilans - przyczyny): dzien")
+    base["swiat"]["wsie_prowizja"] = mean_of(cau, r"prowizja od sprzedazy partiom (?:-?\d+|-) \(wsie (-?\d+)")
+    base["swiat"]["tabory_kiesy_zniknely"] = mean_of(cau, r"kiesy partii bez wodza, ktore zniknely z mapy -?\d+ \(karawany -?\d+, tabory (-?\d+)")
+    vil = by_day(lines, "Przeplywy osad: dzien")
+    base["swiat"]["utarg_miasta"] = mean_of(vil, r"miasta zaplacily (-?\d+)")
     return base
 
 
@@ -465,6 +478,42 @@ def main(argv):
         else:
             why = skip[-1][:160] if skip else ("tylko 2b" if real["2b"] else "brak linii 2b/2c")
             rep.add("2.14: kurier prawdziwy w harnessie (krok 2b, 2c)", why, "2b i 2c OK (pominiety = NIE)", False)
+
+    # 16b. krok B (projekt etapu 2, "110 + 112 + klucz 114"; progi rozdz. 1 i test kroku B) - linie paczek, regulator zamkow, zawor, pieniadz swiata
+    zz = by_day(lines, "Zawor zamkow (110): dzien")
+    b_on = bool(zz)
+    rep.add("110: linia Zawor zamkow (110)", f"{len(zz)} dob" if zz else "brak (przed 110 albo Castle Purse Enabled wylaczone)", "obecna po wgraniu B", True if zz else None)
+    cas_b = by_day(lines, "Przeplywy osad (kasy zamkow): dzien")
+    sk = [num(r"skasowal (\d+);", cas_b[k]) for k in sorted(cas_b)]
+    sk = [x for x in sk if x is not None]
+    rep.add("110: regulator kas zamkow - skasowane (najwiecej w dobie)", max(sk) if sk else "brak linii", "0 (kasowanie zablokowane)",
+            (max(sk) == 0) if (sk and b_on) else None)
+    dos = [num(r"dosypka do zapasu \(tryb 1, zostaje do etapu 3\) (\d+)", zz[k]) for k in last_window(zz)]
+    dos = [x for x in dos if x is not None]
+    rep.add("110: dosypka regulatora do zapasu zamkow (tryb 1, 28 dob)", f"{st.mean(dos):.0f} na dobe" if dos else "brak linii", "INFO - ok. 3.7 tys./dobe (Z9, zamyka etap 3)", None)
+    pz = [num(r"z zaworu srednio (\d+)", zz[k]) for k in last_window(zz)]
+    pz = [x for x in pz if x is not None]
+    rep.add("110: pan samych zamkow - wplyw z zaworu (srednio, 28 dob)", f"{st.mean(pz):.0f} zl/dobe" if pz else "brak linii", "200-350 zl/dobe",
+            (200 <= st.mean(pz) <= 350) if pz else None)
+    # pieniadz swiata: zmiana tempa wobec biegu bazowego = zamkniete ujscia minus zamkniete zrodla (z logow obu biegow, srednie 28 dob):
+    # zamki - zloto z niczego netto ("zakupy" + dosypka - kasowanie) teraz wobec bazy (po 110: "zakupy" 0, kasowanie 0, zostaje dosypka trybu 1);
+    # wsie - to, co w biegu bazowym znikalo (utarg wsi, cena towaru kupionego we wsi, kiesy taborow, ktore zniknely z mapy), minus to, co znika dalej
+    keys = ("zamki_zakupy", "zamki_dosypal", "zamki_skasowal", "wsie_utarg_zniklo", "wsie_prowizja", "tabory_kiesy_zniknely")
+    if base and all(bw.get(k) is not None for k in keys) and all(sw.get(k) is not None for k in keys) and sw.get("pieniadz_zmiana") is not None \
+            and bw.get("pieniadz_zmiana") is not None:
+        e_cas = (sw["zamki_zakupy"] + sw["zamki_dosypal"] - sw["zamki_skasowal"]) - (bw["zamki_zakupy"] + bw["zamki_dosypal"] - bw["zamki_skasowal"])
+        e_vil = (bw["wsie_utarg_zniklo"] - sw["wsie_utarg_zniklo"]) + (bw["wsie_prowizja"] - sw["wsie_prowizja"]) \
+                + (bw["tabory_kiesy_zniknely"] - sw["tabory_kiesy_zniknely"])
+        dv = sw["pieniadz_zmiana"] - bw["pieniadz_zmiana"]
+        rep.add("B: pieniadz swiata - zmiana tempa wobec bazy minus zamkniete ujscia (28 dob)",
+                f"{dv - e_cas - e_vil:+.0f} (zmiana tempa {dv:+.0f}; zamkniete: zamki {e_cas:+.0f}, wsie i tabory {e_vil:+.0f})",
+                "+-30 tys./dobe (wiazace na biegu 120 dob)", (abs(dv - e_cas - e_vil) <= 30000) if b_on else None)
+    else:
+        rep.add("B: pieniadz swiata - zmiana tempa wobec bazy minus zamkniete ujscia (28 dob)", "brak bazy albo kluczy B w bazie (zapisz baze jeszcze raz z logu biegu bazowego)",
+                "+-30 tys./dobe", None)
+    v, b = sw.get("utarg_miasta"), bw.get("utarg_miasta")
+    rep.add("B: zakupy plonu przez miasta (utarg taborow, 28 dob)", f"{v:.0f}" + (f" wobec bazy {b:.0f} ({100.0 * v / b:.0f}%)" if b else " (bez bazy)") if v is not None else "brak linii",
+            ">= 95% bazy (bez zmian)", (v >= 0.95 * b) if (v is not None and b and b_on) else None)
 
     # 16. bledy naszych modow
     errs = [s for s in lines if s.startswith("ERROR in ")]

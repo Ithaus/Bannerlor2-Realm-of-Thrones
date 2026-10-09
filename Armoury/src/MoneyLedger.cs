@@ -49,8 +49,13 @@ namespace Armoury
     ///    ("zold oddany do obiegu"), bo SoldierPay wplaca ja juz po pomiarze rozliczenia rodu;
     ///  - nasze moduly poza tickiem dobowym: wywolania-liczniki Note (zakupy AI, najemnicy z karczmy, warsztaty zbrojne,
     ///    sprzet kupiony przez bandy u pasera);
-    ///  - nasz tick dobowy: migawki stanu kas miedzy modulami (BlockOpen / Mark) - renty, budowy, korona, wydatki band
-    ///    i kryjowek na zycie w miastach, skup lupu band u pasera (OutlawLaw robi swoje trzy migawki sam), reszta ticku.
+    ///  - nasz tick dobowy: migawki stanu kas miedzy modulami (BlockOpen / Mark) - renty, zawor kas zamkow (CastlePurse, paczka 110),
+    ///    budowy, korona, wydatki band i kryjowek na zycie w miastach, skup lupu band u pasera (OutlawLaw robi swoje trzy migawki sam),
+    ///    reszta ticku.
+    ///  Paczka 110 (CastlePurse) zeruje kasowanie regulatora (tylko w dol - dosypka do zapasu zostaje) i cofa "zakupy" w ZAMKACH wlasnymi
+    ///  postfiksami o priorytecie First - liczniki tej ksiegi (priorytet zwykly) biegna po nich i widza stan po zmianie: w linii kas zamkow
+    ///  "skasowal" i "zakupy" maja wtedy 0. Dar startowy kas zamkow przyciety raz na kampanie (MTrim) to jedyna migawka naszego ticku,
+    ///  ktora nie jest przelewem - w bilansie ujscie.
     /// </summary>
     internal static partial class MoneyLedger
     {
@@ -70,8 +75,10 @@ namespace Armoury
 
         // nasz tick dobowy (Mark)
         internal const int MRent = 0, MBuild = 1, MCrown = 2, MRest = 3, MFence = 4, MLife = 5, MOrders = 6;   // MOrders: 174.2 kontrakty surowca (zakup karawan w zrodlach)
-        private const int Marks = 7;
-        private static readonly string[] MName = { "renty", "budowy", "korona (danina, clo, mennica)", "pozostale moduly ticku", "paser band (skup lupu)", "bandy i kryjowki (zycie w miastach)", "kontrakty surowca (174)" };
+        internal const int MCastle = 7, MTrim = 8;                                                              // 110: zawor kas zamkow, dar startowy kas zamkow przyciety
+        private const int Marks = 9;
+        private static readonly string[] MName = { "renty", "budowy", "korona (danina, clo, mennica)", "pozostale moduly ticku", "paser band (skup lupu)", "bandy i kryjowki (zycie w miastach)", "kontrakty surowca (174)",
+                                                   "zawor kas zamkow (kasy zamkow -> panowie)", "dar startowy kas zamkow przyciety (raz na kampanie, w nicosc)" };
 
         // posiadacze zlota
         private const int HTowns = 0, HCastles = 1, HVillages = 2, HLeaders = 3, HLords = 4, HPlayer = 5, HNotables = 6, HWanderers = 7, HOtherHeroes = 8,
@@ -710,9 +717,12 @@ namespace Armoury
             for (int c = 0; c < Classes; c++) { from += _fromNothing[c]; to += _toNothing[c]; }
         }
 
+        /// <summary>110: dar startowy kas zamkow przyciety przez CastlePurse w tej dobie (zloto w nicosc; zwykle pierwsza doba ksiegi, ktora przeplywow nie drukuje).</summary>
+        private static long TrimNow() { long t = 0; for (int c = 0; c < Classes; c++) t -= _mark[c, MTrim]; return t; }
+
         /// <summary>
         /// Paczka 169: zmiana sumy posiadaczy (z), zrodla (s0) i ujscia (u0) starej ksiegi - wydzielone z BalanceLine, wolane przez stara
-        /// linie bilansu i nowa linie przyczyn (zero rozjazdu definicji; tekst starej linii bez zmian).
+        /// linie bilansu i nowa linie przyczyn (zero rozjazdu definicji; tekst starej linii bez zmian). 110: ujscia + dar startowy kas zamkow.
         /// </summary>
         private static void OldBalance(long[] now, long[] last, out long z, out long s0, out long u0)
         {
@@ -724,7 +734,7 @@ namespace Armoury
             long vanished = _vHanded - _vKept - _vTax - _vEstates;
             long routed = _wageToPurses + _wageToCoffers;
             s0 = cons + regIn + _clanUp + routed + from;
-            u0 = _clanDown + regOut + vanished + to - _levyBack;
+            u0 = _clanDown + regOut + vanished + to - _levyBack + TrimNow();
         }
 
         private static string BalanceLine(int day, long[] now, long[] last)
@@ -750,7 +760,8 @@ namespace Armoury
                    + "), GiveGoldAction z niczego poza rozliczeniami rodow " + from + ")"
                    + " - zmierzone ujscia w nicosc " + sinks + " [P] (rozliczenia rodow na minus " + _clanDown + " w " + _clanDownN + " rodach, regulator kas skasowal " + regOut
                    + ", z utargu wsi zniklo " + vanished
-                   + ", GiveGoldAction w nicosc poza rozliczeniami rodow " + to + " minus " + _levyBack + " oddane przez LevyGold notablom i miastom)"
+                   + ", GiveGoldAction w nicosc poza rozliczeniami rodow " + to + " minus " + _levyBack + " oddane przez LevyGold notablom i miastom"
+                   + (TrimNow() != 0 ? ", dar startowy kas zamkow przyciety przez CastlePurse (110) " + TrimNow() : "") + ")"
                    + " + reszta " + S(delta - sources + sinks) + " [R] (niezmierzone: BEE, BK poza rozliczeniami rodow, handel partii, liczniki cel rosnace przy handlu, kapital nowych karawan,"
                    + " smierc bohaterow, lupy w kryjowkach; ze znakiem minus: zysk warsztatow i karawan wyplacany notablom - gra zdejmuje go z kapitalu, a wyplate zglasza jak zloto z niczego"
                    + " (jest w zrodlach); rozliczenia rodow sa zmierzone w calosci)."
