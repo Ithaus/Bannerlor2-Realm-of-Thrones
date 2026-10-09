@@ -71,10 +71,12 @@ namespace Armoury
                                           int budget, int maxPieces, ref int pieces, List<string> bought, Deliver deliver)
         {
             int spent = 0;
+            long tc = Cost174.Begin(Cost174.SBuySub);   // 174b.5 F6 (probka 1/16, tylko log)
             try
             {
                 bool melee = SubstituteMeleeOn, body = SubstituteBodyOn;
                 if ((!melee && !body) || market == null || market.ItemRoster == null || market.Town == null) return 0;
+                if (pieces >= maxPieces || budget <= 0) return 0;   // 174b.5 F2: druga petla i tak nic nie kupi (ten sam warunek petli)
                 // "dowolny szczebel": sloty wzorcow wedlug typu wobec sztuk zbrojowni w dowolnym tierze
                 var slots = new Dictionary<int, int>(); var have = new Dictionary<int, int>();
                 foreach (var kv in needOut) { int ty = kv.Key / 10; int v; slots.TryGetValue(ty, out v); slots[ty] = v + kv.Value; }
@@ -84,6 +86,15 @@ namespace Armoury
                 foreach (var kv in have) if (Melee(kv.Key)) gapMelee -= kv.Value;
                 { int sb, hb; slots.TryGetValue((int)ItemObject.ItemTypeEnum.BodyArmor, out sb); have.TryGetValue((int)ItemObject.ItemTypeEnum.BodyArmor, out hb); gapBody = sb - hb; }
                 if (gapMelee <= 0 && gapBody <= 0) return 0;
+                // 174b.5 F2(a): bez koszyka z brakiem, ktory moglby kupic zastepcza (ten sam warunek co w drugiej petli) nic sie nie kupi - bez wyceny polki
+                bool anyNeed = false;
+                foreach (var kv in need)
+                {
+                    if (kv.Value <= 0) continue;
+                    int ty0 = kv.Key / 10;
+                    if ((melee && Melee(ty0) && gapMelee > 0) || (body && ty0 == (int)ItemObject.ItemTypeEnum.BodyArmor && gapBody > 0)) { anyNeed = true; break; }
+                }
+                if (!anyNeed) return 0;
                 var shelf = market.ItemRoster;
                 // recenzja 174 (koszt): jedno przejscie polki na wizyte - kandydaci z cena liczona raz na stos, malejaco wedlug skutecznosci do ceny;
                 // przed zakupem cena wybranego stosu liczona na nowo (polka zmienia sie po kazdym zakupie)
@@ -98,12 +109,13 @@ namespace Armoury
                     int price = market.Town.MarketData.GetPrice(el.EquipmentElement, buyer, false, market.Party);
                     if (price <= 0) continue;
                     bool cloth = isB && it.ArmorComponent != null && it.ArmorComponent.MaterialType == ArmorComponent.ArmorMaterialTypes.Cloth;
-                    cands.Add(new SubCand { El = el.EquipmentElement, Left = el.Amount, Tier = TierOf(it), Price = price, Melee = isM, Cloth = cloth,
+                    cands.Add(new SubCand { El = el.EquipmentElement, Left = el.Amount, Tier = TierOf(it), Price = price, Gen = 1, Melee = isM, Cloth = cloth,
                                             Score = (it.Effectiveness > 0f ? it.Effectiveness : 1f) / price });
                 }
                 if (cands.Count == 0) return 0;
                 cands.Sort((x, y) => y.Score.CompareTo(x.Score));
                 var keys = new List<int>(need.Keys); keys.Sort((a, b) => (b % 10).CompareTo(a % 10));   // najwyzsze szczeble najpierw
+                int gen = 1;   // 174b.5 F2(b): cena z pierwszego przejscia wazna do pierwszego zakupu (polka, kiesa i ksiega te same), potem liczona od nowa jak dotad
                 foreach (var k in keys)
                 {
                     // recenzja 174: need tylko czytany - sztuka zastepcza nie liczy sie do szczebla, wiec nie tlumi zamowien warsztatom (NoteUnmetOnce)
@@ -116,12 +128,15 @@ namespace Armoury
                         var c = cands[ci];
                         if (c.Left <= 0 || c.Melee != isMelee || c.Tier > t) continue;
                         if (!isMelee && !c.Cloth && c.Tier > Math.Max(1, t - 2)) continue;   // przeszywanica tieru <= swojego albo zbroja 2 tiery nizej
-                        int price = market.Town.MarketData.GetPrice(c.El, buyer, false, market.Party);
+                        int price;
+                        if (c.Gen == gen) price = c.Price;
+                        else { price = market.Town.MarketData.GetPrice(c.El, buyer, false, market.Party); c.Price = price; c.Gen = gen; cands[ci] = c; }
                         if (price <= 0 || price > budget - spent) continue;
                         int n = Math.Min(Math.Min(deficit, c.Left), Math.Min(maxPieces - pieces, (budget - spent) / price));
                         n = Math.Min(n, isMelee ? gapMelee : gapBody);
                         if (n <= 0) continue;
                         shelf.AddToCounts(c.El, -n);
+                        gen++;
                         c.Left -= n; cands[ci] = c;
                         deliver(c.El, n, k, price);
                         ArmsScrap.NoteBuy(market, c.El.Item, n);
@@ -132,10 +147,11 @@ namespace Armoury
                 }
             }
             catch (Exception e) { _subStumbles++; if (_subErrLogged.Add("BuySubstitutes")) Log.Error("AiGear.BuySubstitutes", e); }
+            finally { Cost174.End(Cost174.SBuySub, tc); }
             return spent;
         }
 
-        private struct SubCand { public EquipmentElement El; public int Left, Tier, Price; public float Score; public bool Melee, Cloth; }
+        private struct SubCand { public EquipmentElement El; public int Left, Tier, Price, Gen; public float Score; public bool Melee, Cloth; }
         private static int _subStumbles;
         private static readonly HashSet<string> _subErrLogged = new HashSet<string>();   // recenzja 174: Log.Error raz na miejsce, reszta w liczniku linii dnia
 
@@ -345,6 +361,10 @@ namespace Armoury
             int spent = 0;
             _lastBudgetStop = false;
             var shelf = market.ItemRoster;
+            // 174b.5 F2: cena stosu zapamietana do najblizszego zakupu (miedzy dwiema wycenami tego samego stosu bez zakupu polka, kiesa i ksiega sa te same;
+            // zakup zmienia polke i kolejnosc stosow - wtedy cala pamiec od nowa); kolejnosc i wybor kandydatow bez zmian
+            int[] memo = new int[shelf.Count], memoGen = new int[shelf.Count];
+            int gen = 1;
             foreach (var type in Order)
             {
                 for (int t = 6; t >= 1; t--)
@@ -364,7 +384,9 @@ namespace Armoury
                             int ti = TierOf(it);
                             if (ti != t && ti != t - 1) continue;
                             if (ArmsPricing.IsUnique(it)) continue;
-                            int price = market.Town.MarketData.GetPrice(el.EquipmentElement, buyer, false, market.Party);
+                            int price;
+                            if (i < memo.Length && memoGen[i] == gen) price = memo[i];
+                            else { price = market.Town.MarketData.GetPrice(el.EquipmentElement, buyer, false, market.Party); if (i < memo.Length) { memo[i] = price; memoGen[i] = gen; } }
                             if (price <= 0) continue;
                             if (price > budget - spent) { _lastBudgetStop = true; continue; }
                             float eff = it.Effectiveness > 0f ? it.Effectiveness : 1f;
@@ -378,6 +400,7 @@ namespace Armoury
                         n = Math.Min(n, (budget - spent) / bestPrice);
                         if (n <= 0) break;
                         shelf.AddToCounts(pick.EquipmentElement, -n);
+                        gen++;
                         deliver(pick.EquipmentElement, n, k, bestPrice);
                         ArmsScrap.NoteBuy(market, pick.EquipmentElement.Item, n);   // 174 pytanie 4: popyt koszyka w miescie (tylko licznik)
                         if (type == ItemObject.ItemTypeEnum.Arrows || type == ItemObject.ItemTypeEnum.Bolts) TownFletchers.NoteBought(type, n);   // 172: linia strzelarzy (tylko licznik)
@@ -404,9 +427,31 @@ namespace Armoury
         /// <summary>174.0: zakupy w ramce ksiegi towarow "zakupy uzbrojenia Armoury" - w ticku dobowym partii nie licza sie jako "inne ticki" (tylko licznik).</summary>
         private static void TryBuy(MobileParty mp, Settlement st)
         {
+            if (!WouldBuy(mp, st)) return;   // 174b.5 F5: tanie filtry przed ramka ksiegi (ramka bez AddToCounts rozlicza sie na zero - ksiega ta sama)
             var gf = GoodsLedger.Begin(GoodsLedger.FArmsBuy, mp);
+            long tc = Cost174.Begin(Cost174.STryBuy);
             try { TryBuyCore(mp, st); }
-            finally { GoodsLedger.End(gf); }
+            finally { Cost174.End(Cost174.STryBuy, tc); GoodsLedger.End(gf); }
+        }
+
+        /// <summary>174b.5 F5: te same wczesne wyjscia co TryBuyCore az do stempla doby (bez stempla i bez zmian stanu) - false = TryBuyCore i tak nic nie zrobi.</summary>
+        private static bool WouldBuy(MobileParty mp, Settlement st)
+        {
+            try
+            {
+                if (!On || mp == null || st == null) return false;
+                var s0 = Settings.Current;
+                bool garrison = mp.IsGarrison && mp.CurrentSettlement == st && s0.GarrisonBuysGear;
+                Hero payer = garrison ? (st.OwnerClan != null ? st.OwnerClan.Leader : null) : mp.LeaderHero;
+                if (garrison && payer == Hero.MainHero && !s0.GarrisonBuysGearPlayer) return false;
+                if (mp.IsMainParty || (!mp.IsLordParty && !garrison) || payer == null || !payer.IsAlive || !mp.IsActive || mp.MapEvent != null) return false;
+                if ((!st.IsTown && !st.IsCastle) || st.ItemRoster == null || st.Town == null) return false;
+                if (!garrison && st.IsCastle && GarrisonCarts.On) return false;
+                int last;
+                if (_lastDay.TryGetValue(mp, out last) && last == (int)CampaignTime.Now.ToDays) return false;
+                return true;
+            }
+            catch { return true; }   // w razie watpliwosci - jak dotad (TryBuyCore ma swoj try)
         }
 
         private static void TryBuyCore(MobileParty mp, Settlement st)
@@ -472,6 +517,7 @@ namespace Armoury
                 var bought = new List<string>();
                 // polka tej osady (zaloga zamku: wlasnego zamku - to, co tam lezy, oplacila juz kasa zamku i jest na miejscu)
                 int who = garrison ? (st.IsTown ? Measure174b.BTownGarrison : Measure174b.BCastleOwn) : Measure174b.BLord;   // 174b.0 M2: kupujacy (tylko licznik)
+                long tl = Cost174.Begin(Cost174.SBuyLoop);
                 int spent = BuyLoop(st, mp, need, budget, maxPieces, ref pieces, bought, (el, n, k, unit) =>
                 {
                     _add.Invoke(null, new object[] { mp.Id, el.Item, n });
@@ -482,6 +528,7 @@ namespace Armoury
                     st.Town.ChangeGold(unit * n);
                     MoneyLedger.Note(MoneyLedger.NGear, st, unit * n);   // ksiega przeplywow osad (tylko licznik)
                 });
+                Cost174.End(Cost174.SBuyLoop, tl);
                 // 174 pytanie 2: gorszy sprzet zamiast zadnego - tylko z polki tej osady, tylko do pokrycia "dowolnego szczebla"
                 if (SubstituteMeleeOn || SubstituteBodyOn)
                 {
@@ -513,6 +560,7 @@ namespace Armoury
                             var lines = new List<GarrisonCarts.Line>();
                             int paid = 0;
                             bool budgetStop = true;
+                            long to = Cost174.Begin(Cost174.SCastleOrder);   // 174b.5 F6 (probka 1/16, tylko log)
                             // recenzja 171: zamowienie powstaje takze, gdy BuyLoop rzuci wyjatek po kilku zakupach (np. cena z modelu innego moda) -
                             // oplacone sztuki zdjete z polki nie moga zniknac; wydane = suma oplaconych linii (to samo, co zwraca BuyLoop)
                             try
@@ -533,6 +581,7 @@ namespace Armoury
                             }
                             finally
                             {
+                                Cost174.End(Cost174.SCastleOrder, to);
                                 spent += paid;
                                 if (lines.Count > 0) GarrisonCarts.Place(st, market, st.OwnerClan, lines, paid, dist, pieces >= maxPieces, budgetStop);
                             }

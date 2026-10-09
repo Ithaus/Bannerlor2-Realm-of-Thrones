@@ -201,6 +201,8 @@ namespace Armoury
 
         public static bool CyclePrefix(WorkshopsCampaignBehavior __instance, WorkshopType.Production production, Workshop workshop, ref bool __result)
         {
+            long tc = Cost174.Begin(Cost174.SCycle);   // 174b.5 F6 (probka 1/16, tylko log)
+            MemoReset();                               // 174b.5 F4: pamiec cen i stanu surowca tylko w obrebie jednego cyklu
             try
             {
                 // paczka 172: linia "arrows" (strzaly i belty) - BK robi z niej towar handlowy (BKItemCategories :122), wiec szla droga gry
@@ -328,6 +330,55 @@ namespace Armoury
                 return false;
             }
             catch (Exception e) { Log.Error("WorkshopLaw.Cycle", e); return true; }
+            finally { MemoReset(); Cost174.End(Cost174.SCycle, tc); }
+        }
+
+        // ------------------------------------------------------------ 174b.5 F4: pamiec cen surowca i stanu polki w jednym cyklu
+        // Klucz waznosci: ta sama polka (referencja), VersionNo i Count - DoStart zmienia polke, wiec wszystko liczy sie od nowa. Cena surowca zalezy od
+        // przedmiotu, nie tylko od m (krytyka 11b: m = 3 to len albo welna) - miejsce w pamieci wedlug przedmiotu (ruda, drewno, skora, len, welna).
+        private static ItemRoster _mShelf;
+        private static int _mVer = -1, _mCnt = -1;
+        private static readonly float[] _mPrice = new float[5];
+        private static readonly int[] _mPriceM = new int[5], _mAvail = new int[5];
+        private static readonly bool[] _mHasPrice = new bool[5], _mHasAvail = new bool[5];
+
+        private static void MemoReset() { _mShelf = null; _mVer = -1; _mCnt = -1; }
+
+        private static int MemoSlot(ItemObject it)
+        {
+            if (it == null) return -1;
+            if (it == _ore) return 0;
+            if (it == _wood) return 1;
+            if (it == _leather) return 2;
+            if (it == _linen) return 3;
+            if (it == _wool) return 4;
+            return -1;
+        }
+
+        private static void MemoCheck(ItemRoster shelf)
+        {
+            int v = shelf.VersionNo, c = shelf.Count;
+            if (ReferenceEquals(shelf, _mShelf) && v == _mVer && c == _mCnt) return;
+            _mShelf = shelf; _mVer = v; _mCnt = c;
+            Array.Clear(_mHasPrice, 0, 5); Array.Clear(_mHasAvail, 0, 5);
+        }
+
+        private static int AvailableMemo(ItemRoster shelf, ItemObject it)
+        {
+            int k = MemoSlot(it);
+            if (k < 0 || shelf == null) return Available(shelf, it);
+            MemoCheck(shelf);
+            if (!_mHasAvail[k]) { _mAvail[k] = Available(shelf, it); _mHasAvail[k] = true; }
+            return _mAvail[k];
+        }
+
+        private static float MatPriceMemo(Town town, ItemRoster shelf, ItemObject it, int m)
+        {
+            int k = MemoSlot(it);
+            if (k < 0 || shelf == null) return MatPrice(town, it, m);
+            MemoCheck(shelf);
+            if (!_mHasPrice[k] || _mPriceM[k] != m) { _mPrice[k] = MatPrice(town, it, m); _mPriceM[k] = m; _mHasPrice[k] = true; }
+            return _mPrice[k];
         }
 
         // ------------------------------------------------------------ 174.1: start sztuki (wydzielone z petli bez zmiany warunkow)
@@ -337,6 +388,13 @@ namespace Armoury
         /// 0 = mozna; 1 bez zysku, 2 brak surowca (miss - ktore), 4 brak zlota.</summary>
         private static int TryStart(Cand c, ItemRoster shelf, float[] owed, Workshop workshop, Town town, float minProfit, out Start st, ref int miss, ref int[] shelfHave)
         {
+            long tc = Cost174.Begin(Cost174.STryStart);   // 174b.5 F6 (probka 1/16, tylko log)
+            try { return TryStartCore(c, shelf, owed, workshop, town, minProfit, out st, ref miss, ref shelfHave); }
+            finally { Cost174.End(Cost174.STryStart, tc); }
+        }
+
+        private static int TryStartCore(Cand c, ItemRoster shelf, float[] owed, Workshop workshop, Town town, float minProfit, out Start st, ref int miss, ref int[] shelfHave)
+        {
             st = new Start { Take = new int[4], Mats = new[] { _ore, _wood, _leather, _linen } };
             var need = c.Need;
             for (int m = 0; m < 4; m++)
@@ -345,8 +403,8 @@ namespace Armoury
                 st.Take[m] = (int)Math.Floor(want);
                 if (st.Take[m] <= 0) continue;
                 var mi = st.Mats[m];
-                int have = Available(shelf, mi);
-                if (m == 3 && have < st.Take[m] && _wool != null) { mi = _wool; have = Available(shelf, mi); st.Mats[m] = mi; }   // welna za len
+                int have = AvailableMemo(shelf, mi);   // 174b.5 F4: z pamieci cyklu (ta sama wersja polki)
+                if (m == 3 && have < st.Take[m] && _wool != null) { mi = _wool; have = AvailableMemo(shelf, mi); st.Mats[m] = mi; }   // welna za len
                 if (mi == null || have < st.Take[m])
                 {
                     try { if (shelfHave == null) shelfHave = ShelfHave(shelf); miss |= MissMask(shelfHave, owed, need); } catch { }
@@ -355,7 +413,7 @@ namespace Armoury
             }
             // koszt surowcow od zuzycia (ulamki tez), po cenie historycznej / targowej
             float matCost = 0f;
-            for (int m = 0; m < 4; m++) matCost += need[m] * MatPrice(town, st.Mats[m], m);
+            for (int m = 0; m < 4; m++) if (need[m] > 0f) matCost += need[m] * MatPriceMemo(town, shelf, st.Mats[m], m);   // 174b.5 F4: 0 x skonczona cena = 0 - tylko potrzebne surowce
             float revenue = Revenue(town, c.Item);
             if (revenue < (matCost + c.Days * DayWage(c.Item, town)) * minProfit) return 1;
             st.Mc = MBRandom.RoundRandomized(matCost);

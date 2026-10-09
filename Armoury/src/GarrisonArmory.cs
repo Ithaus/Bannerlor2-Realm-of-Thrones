@@ -425,7 +425,9 @@ namespace Armoury
         internal static void Daily()
         {
             int today = (int)CampaignTime.Now.ToDays;
+            long tc = Cost174.Begin(Cost174.SGarrison);   // 174b.5 F6 (tylko log)
             try { SellWeek(today); } catch (Exception e) { Stumble("SellWeek", e); }
+            finally { Cost174.End(Cost174.SGarrison, tc); }
             var s = Settings.Current;
             int moves = _dLeftMen + _dTakenMen + _dDisbandIn + _dDisbandGone + _dQueue + _stumbles;
             if (moves > 0 || (s != null && (s.KitMovesWithMen || s.GarrisonSellsSurplus)))

@@ -360,8 +360,9 @@ namespace Armoury
                 if (!Active) return;
                 if (town.InRebelliousState) { _dRebel++; return; }   // jak warsztaty gry: miasto w buncie nie pracuje
                 var gf = GoodsLedger.Begin(GoodsLedger.FFletch, town);   // ksiega towarow: ruda i drewno strzelarzy jako osobne ujscie (tylko licznik)
+                long tc = Cost174.Begin(Cost174.SFletch);                 // 174b.5 F6 (probka 1/16, tylko log)
                 try { Work(town); }
-                finally { GoodsLedger.End(gf); }
+                finally { Cost174.End(Cost174.SFletch, tc); GoodsLedger.End(gf); }
             }
             catch (Exception e) { Stumble("OnDailyTickTown", e); }
         }

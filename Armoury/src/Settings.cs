@@ -874,6 +874,8 @@ namespace Armoury
         public float OldStockScrapDailyShare = 0.01f;      // share of that old surplus scrapped each day (1%)
         public float OldStockScrapYield = 0.5f;            // share of the ore a piece was forged from that comes back from its scrap
         public int WorkshopPiecesPerCycleMax = 64;         // most pieces one workshop line may finish in one cycle of the game (was 8) - a big town's spear-makers are not held back by the counter
+        public bool ShelfIndexEnabled = true;              // prices of arms in towns count a stall from a remembered tally that is renewed whenever the stall changes, instead of going through the whole stall for every price - the same prices, less work for the game. Off: the old way
+        public int ShelfIndexSelfCheckDays = 1;            // for this many days after loading, every 64th count is checked against the whole stall (later every 4096th); a difference is written to the Armoury log
 
         public static void Load(string moduleDataDir)
         {

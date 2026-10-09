@@ -194,7 +194,11 @@ namespace Armoury
                     foreach (var kv in new List<KeyValuePair<Town, int[]>>(_miss))
                         for (int m = 0; m < M; m++)
                             if (kv.Value[m] > 0 && _items[m] != null)
+                            {
+                                long tc = Cost174.Begin(Cost174.SMoOrder);   // 174b.5 F6 (probka 1/16, tylko log)
                                 try { Order(kv.Key, m, day); } catch (Exception e) { Stumble("Order", e); }
+                                finally { Cost174.End(Cost174.SMoOrder, tc); }
+                            }
                 _miss.Clear();
             }
             catch (Exception e) { Stumble("Daily", e); }

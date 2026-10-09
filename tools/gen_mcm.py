@@ -16,6 +16,10 @@ RANGES = {
     'CarterPencePerKgPer100': (0.0, 0.15, "0.0000"),
     'SeaFreightShare': (0.0, 1.0, "0.00"),
     'TownMaterialOrderMinLoadKg': (0.0, 1000.0, "0"),
+    # 174b: suwaki zgodne z przycieciem w kodzie
+    'ShelfIndexSelfCheckDays': (0, 30, "0"),
+    'TownMaterialOrderSeaMaxRoute': (100.0, 3000.0, "0"),
+    'ShopKeepPieces': (0, 3, "0"),
 }
 
 def gen(module_dir, ns, display):

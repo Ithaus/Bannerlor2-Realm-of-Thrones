@@ -3048,6 +3048,14 @@ namespace Armoury
         [SettingPropertyGroup("Arms production")]
         public int WorkshopPiecesPerCycleMax { get; set; } = 64;
 
+        [SettingPropertyBool("Shelf Index Enabled", HintText = "prices of arms in towns count a stall from a remembered tally that is renewed whenever the stall changes, instead of going through the whole stall for every price - the same prices, less work for the game. Off: the old way")]
+        [SettingPropertyGroup("Arms production")]
+        public bool ShelfIndexEnabled { get; set; } = true;
+
+        [SettingPropertyInteger("Shelf Index Self Check Days", 0, 30, "0", HintText = "for this many days after loading, every 64th count is checked against the whole stall (later every 4096th); a difference is written to the Armoury log")]
+        [SettingPropertyGroup("Arms production")]
+        public int ShelfIndexSelfCheckDays { get; set; } = 1;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -3809,6 +3817,8 @@ namespace Armoury
             s.OldStockScrapDailyShare = OldStockScrapDailyShare;
             s.OldStockScrapYield = OldStockScrapYield;
             s.WorkshopPiecesPerCycleMax = WorkshopPiecesPerCycleMax;
+            s.ShelfIndexEnabled = ShelfIndexEnabled;
+            s.ShelfIndexSelfCheckDays = ShelfIndexSelfCheckDays;
         }
 
         internal static void Apply()
