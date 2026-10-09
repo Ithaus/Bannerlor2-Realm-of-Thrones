@@ -2916,15 +2916,19 @@ namespace Armoury
         [SettingPropertyGroup("Drill")]
         public bool DrillNeedsArmsPlayer { get; set; } = true;
 
-        [SettingPropertyBool("Drill Stock", HintText = "arms and armour you discard, leave on the game's loot screen or leave behind after collecting Spoils trophies go to your men's drill stock while there is room (two sets of one weapon and one piece of armour per three men) instead of being lost; your men's spare arms in the armoury count too. A full stock makes the drill up to 20% faster, Giving Hands and Paid in Promise up to 30%. The stock belongs to the men: it cannot be taken back, it wears out, and the smiths of the next town buy the scrap of worn pieces - the coin goes to the men's purse (off = discarded gear is lost as before)")]
+        [SettingPropertyBool("Drill Stock", HintText = "arms and armour you discard, leave on the game's loot screen or leave behind after collecting Spoils trophies go to your men's drill stock while there is room (two sets of one weapon and one piece of armour per three men) instead of being lost; your men's spare arms in the armoury count too. A full stock makes the drill up to 20% faster, Giving Hands and Paid in Promise up to 30%. The stock belongs to the men: it cannot be taken back, it wears out, and the smiths of the next town buy the scrap of worn pieces - the coin goes to the men's purse. Works only with Drill Law and Donation Xp Off on: the stock replaces the experience the game gave for gear you give away (off = discarded gear is lost as before)")]
         [SettingPropertyGroup("Drill")]
         public bool DrillStock { get; set; } = true;
 
-        [SettingPropertyBool("Drill Stock Ai", HintText = "AI lords' men drill with the spare arms and armour of their armoury and baggage by the same rule: up to 20-30% faster, the stock wears out and the smiths of the next town buy the scrap - a third to the lord, the rest to the men (off = AI drill without a stock, as before)")]
+        [SettingPropertyBool("Drill Stock Ai", HintText = "AI lords' men drill with the spare arms and armour of their armoury by the same rule as your men's spare kit (their baggage - loot and Banner Kings supplies - does not count, just as your own packs do not): up to 20-30% faster, the stock wears out and the smiths of the next town buy the scrap - a third to the lord, the rest to the men (off = AI drill without a stock, as before)")]
         [SettingPropertyGroup("Drill")]
         public bool DrillStockAi { get; set; } = true;
 
-        [SettingPropertyBool("Drill Law Ai", HintText = "AI lords' parties drill by the same rule as yours - commander's Leadership, rest or march, no drill when starving or short of sleep - instead of the game's flat daily training; off until measured: the log shows every day what it would change (off = the game's rule)")]
+        [SettingPropertyBool("Drill Penalty Ai", HintText = "AI lords' men do not drill at all on a day they are starving or short of sleep (training perks included, and no drill gear wears out) - the same penalty as yours; shortage of sleep counts once AI sleep is tracked (off = AI drill whatever their state)")]
+        [SettingPropertyGroup("Drill")]
+        public bool DrillPenaltyAi { get; set; } = true;
+
+        [SettingPropertyBool("Drill Law Ai", HintText = "AI lords' parties drill by the same rule as yours - commander's Leadership, rest or march, no drill when starving or short of sleep - instead of the game's flat daily training; off until measured: the log shows every day what it would change (off = the game's rule; the starving and sleep penalty follows Drill Penalty Ai)")]
         [SettingPropertyGroup("Drill")]
         public bool DrillLawAi { get; set; } = false;
 
@@ -3802,6 +3806,7 @@ namespace Armoury
             s.DrillNeedsArmsPlayer = DrillNeedsArmsPlayer;
             s.DrillStock = DrillStock;
             s.DrillStockAi = DrillStockAi;
+            s.DrillPenaltyAi = DrillPenaltyAi;
             s.DrillLawAi = DrillLawAi;
             s.DrillLog = DrillLog;
             s.ArmsNotHouseholdGoods = ArmsNotHouseholdGoods;

@@ -93,8 +93,9 @@ namespace Armoury
     ///     odchodza), tabor wroga i pozostalosci pola (lista zyje tylko do "Done" / "Leave" w menu: _baggageSearched nie pozwala wrocic do taboru,
     ///     FinishCollection i OnRemnantDoneConsequence zeruja liste, a zadna podpowiedz o tym nie mowi - pytanie gry to jedyna przestroga),
     ///     zwykly ekwipunek i ekrany innych modow.
-    /// 14. MUSZTRA (PROJEKT-MUSZTRA rozdz. 3, wylacznik DrillStock): przy "Leave" po trofeach bron i zbroje z _lootScreenRoster ida do zapasu cwiczebnego
-    ///     ludzi (Drill.AcceptTrophies, do limitu; zdjete z listy) PRZED pozostalosciami pola i resztkami; menu i podpowiedz "Leave" mowia o zapasie.
+    /// 14. MUSZTRA (PROJEKT-MUSZTRA rozdz. 3, Drill.StockOn = DrillStock przy DrillLaw i DonationXpOff): przy "Leave" po trofeach bron i zbroje z
+    ///     _lootScreenRoster ida do zapasu cwiczebnego ludzi (Drill.AcceptTrophies, do limitu; zdjete z listy) PRZED pozostalosciami pola i resztkami;
+    ///     menu i podpowiedz "Leave" mowia o zapasie tylko przy Drill.LeaveOn (zapas czynny i ten prefiks wpiety - DrillLeaveWired).
     /// Martwe w 1.8.4: zloto pozostalosci pola (BattlefieldRemnantsTemporarilyDisabled = true; i tak bralo z monet z cial).
     /// Bez zmian (to nie zloto z niczego): najem kwatermistrza, zalozenie / odnowienie / nowe druzyny klanu (zloto gracza
     /// czesciowo do nikad - ujscie), dary dla zalogi / milicji / zywnosc dla miasta (towar na wskazniki miasta), dzienny dochod
@@ -1174,13 +1175,14 @@ namespace Armoury
 
         private const string DrillSentence = "\nArms you leave behind go to your men's drill stock while there is room; the rest stay on the field.";
 
-        /// <summary>Wstawiane za stala napisu menu po zbieraniu trofeow: bez zdania o treningu; przy zapasie cwiczebnym (musztra) - zdanie o zapasie.</summary>
+        /// <summary>Wstawiane za stala napisu menu po zbieraniu trofeow: bez zdania o treningu; przy zapasie cwiczebnym (Drill.LeaveOn: DrillStock, DrillLaw,
+        /// DonationXpOff i wpiety prefiks Leave) - zdanie o zapasie. Przy wylaczonym Z1 zapas nic nie przyjmuje, wiec zostaje oryginal Spoils (XP z resztek).</summary>
         public static string MenuText(string s)
         {
             try
             {
                 if (s == null) return s;
-                if (Drill.StockOn) return s.Replace(TrainSentence, DrillSentence);
+                if (Drill.LeaveOn) return s.Replace(TrainSentence, DrillSentence);   // zapas czynny (musztra, Z1) i prefiks Leave wpiety - inaczej bez obietnicy
                 return DonationXpLaw.On ? s.Replace(TrainSentence, "") : s;
             }
             catch { return s; }
@@ -1191,7 +1193,7 @@ namespace Armoury
         {
             try
             {
-                if (Drill.StockOn) return Drill.TrophyTip();
+                if (Drill.LeaveOn) return Drill.TrophyTip();
                 return DonationXpLaw.On ? LeftBehindTip : s;
             }
             catch { return s; }
