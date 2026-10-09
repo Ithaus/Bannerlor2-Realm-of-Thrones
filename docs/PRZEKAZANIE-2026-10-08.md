@@ -161,3 +161,11 @@ dana faze od nowa, korzystajac z zapisanych wynikow:
   stoper < 1 ms, potkniec 0, bledow 0.
 - 18:24 scalenie 170 + T1-T8 = galaz noc/sklad dfc8786 (drzewo SCRATCH nowej sesji `sklad`; Armoury 1a4cd01c, CrashScribe 0c1e92a6 bez trybu autotestu;
   MCM 693 ustawienia). Autotest S1 (stos + CrashScribe at1+T2 + zdjecia mlynow) w toku.
+- 18:37 **AUTOTEST S1 OK** (stos 170+T1-T8, 40 dob, 13.4 s/dobe, zdjecia mlynow 8/8; analiza: SCRATCH nowej sesji s1kopia\, s1foto\): 170, T1, T2, T3, T6, T7
+  zaliczone; T5 dziala (rodzina 149 tys. przed pozyczkami, pozyczek -48); T4 bez przypadkow w 40 dobach. **T8 NIEZALICZONY**: bawelna ze wsi 75/d (bylo
+  116-124), aksamit -60% -> poprawka w toku. Trupy Innych w dobie 40: 1909 (bez kalendarza 702-1127) -> T2b (Inni bez dosypki z niczego) w toku.
+- 18:46 **AUTOTEST ZAPISU (doba 362 -> 372) na S1 OK**: 0 bledow Armoury, kalendarz Innych czynny (3 zdobyte osady zostaja), T8 podmienil 17 wsi,
+  T4 dziala (WarLedger 89 ludzi -> pula wyrzutkow i ksiega, potkniec 0), T5 dziala (rodzina 2 raty 31.5 tys.), 25.3 s/dobe.
+- 18:55 workflow `wf_d615d72a-31b`: poprawka T8 (bawelna, drzewo sklad) + T2b Inni bez dosypki (CrashScribe, drzewo noc\n10, galaz w-toku/n10-inni-wzrost).
+- 18:57 **WGRANIE 1 = 170 + T1..T7** (galaz noc/wgranie-1 = 1805521, drzewo SCRATCH nowej sesji wg1; Armoury 28a7456e, CrashScribe aff275de = baza + T2,
+  bez trybu autotestu): autotest 40 dob tej binarki w toku, potem wgranie (zgoda Jeffa na te noc).
