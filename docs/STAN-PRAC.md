@@ -904,3 +904,8 @@ obrazen (decyzja 5, po tescie T-B1). Uderzenie tarcza/glowica w Innego = 15% bez
 pana (w jego pulapie wojska, pan placi jak rycerzowi swity) albo w armii krolestwa; w pokoju siedza w majatku; ta sama regula dla wasali-rycerzy gracza. Etap 2.
 **JEFF 09.10 ok. 10:35 (strzaly):** "wykucie strzal to powinno byc grosze, strzal bylo mega duzo" -> strzaly tanie i liczne jak w historii (snop 24 ok. 16 d; grot kilkanascie g
 zelaza; korona 1341-1359 1.23 mln strzal). sklad8 mial 35 miast bez strzal -> diagnoza i naprawa produkcji (wf_eefb76a2-a24): cena, zelazo na grot, wydajnosc strzelarzy.
+**DECYZJE JEFFA 09.10 ok. 10:45 (projekt etapu 2):** (1) ile korona bierze za pojmanego krola/wodza armii - "nie wiem, a ile powinna?" -> Claude proponuje z historii
+(prawo korony do "wielkich jencow": krol/nastepca idzie do korony, zdobywca dostaje nagrode - np. David II 1346: Copeland 500 L + renta; Jan II 1356 odkupiony od zdobywcy).
+(2) "4% mniej wojska - NIE; to ma byc dynamiczne wedlug tego, czy stac na taka armie, i wedlug logiki AI, ze na czas wojny moga byc na minusie i splacac sie z lupow wojennych,
+tak jak to bylo na wojnach" -> budzet rodu 166: w wojnie lord moze isc ponad dochod na kredyt/dlug wojenny (z limitem zdolnosci splaty - lup, okupy, zastaw dochodu),
+po wojnie splaca z lupu i okupow i zwalnia nadwyzke; w pokoju wojsko wedlug dochodu. Bez stalego "-4%".
