@@ -386,7 +386,7 @@ namespace Armoury
         }
         private Dictionary<string,int> _prisonerBaseline;
 
-        public ArmouryBehavior() { Instance = this; HistoricalPrices.Reset(); MaterialLaw.Reset(); WesterosClimate.Reset(); OutlawLaw.Reset(); PopulationLaw.Reset(); WorkshopLaw.Reset(); IronBank.Reset(); MarketGlut.Reset(); ArmsPricing.Reset(); StartKit.Reset(); AiGear.Reset(); Levy.Reset(); VolunteerKit.Reset(); LevyGold.Reset(); WearKeep.Reset(); UniqueSpoils.Reset(); BuildDiary.Reset(); BuildFunding.Reset(); KingdomLedger.Reset(); ColdStart.Reset(); MenPurse.Reset(); ArmyClothing.Reset(); AiWear.Reset(); SmithHours.Reset(); RecruitKit.Reset(); OreLedger.Reset(); GoodsLedger.Reset(); FreeSupplies.Reset(); VillageWoodlot.Reset(); SpoilsSeal.Reset(); MarketRoad.Reset(); MarketCarts.Reset(); VillageClogDiag.Reset(); CartTownExit.Reset(); MoneyLedger.Reset(); PeopleLedger.Reset(); CaravanBulk.Reset(); StartStock.Reset(); MineralOnce.Reset(); SoldierPay.Reset(); KingdomTreasury.Reset(); RecruitCost.Reset(); RecruitSources.Reset(); GarrisonCarts.Reset(); GarrisonArmory.Reset(); ArmsDrill.Reset(); }   // stan jednej kampanii nie przecieka do drugiej (audyt 04.10)
+        public ArmouryBehavior() { Instance = this; HistoricalPrices.Reset(); MaterialLaw.Reset(); WesterosClimate.Reset(); OutlawLaw.Reset(); PopulationLaw.Reset(); WorkshopLaw.Reset(); IronBank.Reset(); MarketGlut.Reset(); ArmsPricing.Reset(); StartKit.Reset(); AiGear.Reset(); Levy.Reset(); VolunteerKit.Reset(); LevyGold.Reset(); WearKeep.Reset(); UniqueSpoils.Reset(); BuildDiary.Reset(); BuildFunding.Reset(); KingdomLedger.Reset(); ColdStart.Reset(); MenPurse.Reset(); ArmyClothing.Reset(); AiWear.Reset(); SmithHours.Reset(); RecruitKit.Reset(); OreLedger.Reset(); GoodsLedger.Reset(); FreeSupplies.Reset(); VillageWoodlot.Reset(); SpoilsSeal.Reset(); MarketRoad.Reset(); MarketCarts.Reset(); VillageClogDiag.Reset(); CartTownExit.Reset(); MoneyLedger.Reset(); PeopleLedger.Reset(); CaravanBulk.Reset(); StartStock.Reset(); MineralOnce.Reset(); SoldierPay.Reset(); KingdomTreasury.Reset(); RecruitCost.Reset(); RecruitSources.Reset(); GarrisonCarts.Reset(); GarrisonArmory.Reset(); ArmsDrill.Reset(); CaravanAmmo.Reset(); }   // stan jednej kampanii nie przecieka do drugiej (audyt 04.10)
 
         public override void SyncData(IDataStore dataStore)
         {
@@ -514,6 +514,7 @@ namespace Armoury
             CampaignEvents.SettlementEntered.AddNonSerializedListener(this, MenPurse.OnEntered);   // wpis 84: nadwyzki ludzi PRZED zakupami
             CampaignEvents.SettlementEntered.AddNonSerializedListener(this, AiGear.OnSettlementEntered);
             CampaignEvents.SettlementEntered.AddNonSerializedListener(this, CaravanBulk.OnEntered);   // wpis 103: karawana sprzedaje miastu surowiec masowy, ktorego mu brakuje
+            CampaignEvents.SettlementEntered.AddNonSerializedListener(this, CaravanAmmo.OnEntered);   // paczka 172b: amunicja z taborow karawany na polke miasta (cena rynkowa, kasa miasta)
             CampaignEvents.OnSettlementLeftEvent.AddNonSerializedListener(this, MenPurse.OnLeft);
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, delegate { try { TroopSelfMend.Hourly(); } catch { } });
             CampaignEvents.DailyTickPartyEvent.AddNonSerializedListener(this, AiGear.OnDailyTickParty);
@@ -999,6 +1000,7 @@ namespace Armoury
             try { MountedWage.EnsureContextHooks(); } catch (Exception e) { Log.Error("MountedWage.EnsureContextHooks", e); }   // paczka 160: zold partii - karawany bez premii konnego (latka w kampanii)
             try { RawPrice.SeedNewCampaign(); } catch (Exception e) { Log.Error("RawPrice.SeedNewCampaign", e); }   // cena surowcow: w nowej kampanii pamiec rynku z tickow startowych na nowa monete - PO HistoricalPrices.Apply i StartStock.Run
             try { TownCrafts.SessionStart(); } catch (Exception e) { Log.Error("TownCrafts.SessionStart", e); }   // paczka 148: proporcje rzemiosla miasta z wartosci - PO HistoricalPrices.Apply (linia startowa)
+            try { CaravanAmmo.SessionStart(); } catch (Exception e) { Log.Error("CaravanAmmo.SessionStart", e); }   // paczka 172b: kategorie amunicji i stan latek (linia startowa)
             try { TownFletchers.SessionStart(); } catch (Exception e) { Log.Error("TownFletchers.SessionStart", e); }   // paczka 172: kandydaci strzelarzy, koszyki wzorcow, linia startowa - PO HistoricalPrices.Apply i ColdStart
             // 124: kapital startowy warsztatow w nowej monecie - TU, po HistoricalPrices.Apply. Gra wola sluchaczy zdarzenia od ostatnio
             // dopisanego (MbEvent: lista z wstawianiem na poczatek), wiec WorkshopTradeBehavior (dodany po nas) szedl PRZED przeliczeniem cen
@@ -1264,6 +1266,7 @@ namespace Armoury
             try { MarketCarts.Daily(); } catch (Exception e) { Log.Error("MarketCarts.Daily", e); }   // poprawka 119: wozy wsi do najlepiej placacego miasta, cena ladunku sztuka po sztuce (log + porzadki wiesci z drogi)
             try { CartTownExit.Daily(); } catch (Exception e) { Log.Error("CartTownExit.Daily", e); }   // paczka 130: bezpiecznik (woz w miescie od N dob - do domu) i linia "Wozy w miastach:"
             try { CaravanBulk.Daily(); } catch (Exception e) { Log.Error("CaravanBulk.Daily", e); }   // wpis 103: surowce masowe w karawanach (przeliczenie swiata + log)
+            try { CaravanAmmo.Daily(); } catch (Exception e) { Log.Error("CaravanAmmo.Daily", e); }   // paczka 172b: linia "Karawany bez amunicji (172b)" (zablokowane, sprzedane z taborow, w taborach)
             try { KingdomTreasury.Daily(); KingdomTreasury.Levies(); KingdomTreasury.WageRefund(); KingdomLedger.Daily(); } catch (Exception e) { Log.Error("KingdomTreasury.Daily", e); }   // powinnosci wasali wobec korony (po rentach); potem zwrot zoldu w wojnie
             try { MoneyLedger.Mark(MoneyLedger.MCrown); } catch { }
             try { SoldierPay.Daily(); } catch (Exception e) { Log.Error("SoldierPay.Daily", e); }   // zold do obiegu: linia "Zold:" i liczniki doby (po zwrocie ze skarbca)
