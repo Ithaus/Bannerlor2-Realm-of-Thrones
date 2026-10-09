@@ -1,5 +1,22 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-09 (175-armie-cs, poprawki po przegladzie sklad9 - czesc CS: uwagi 2 i 3) - NORTHHARDY PO Z16b: OKNO KONTROLI ATLETYKI OD NOWEJ BAZY (RACHUNEK Z DANYCH), KOMENTARZE LADR U BOHATEROW
+**Mod:** CrashScribe | **Galaz:** `w-toku/175-armie-cs` (na d85b519 Z16b) | **Pliki:** `CrashScribe/src/Army175North.cs` (`NorthHardy`: odczyt krokow przed linia "pominiete", `aBase`/`aK`), `CrashScribe/src/Mends.cs` (tylko komentarze: naglowek Z16, `CanUseHero`). Rachunek: `scratchpad/rev-s9/z16b_north.py` (tylko odczyt: XML ROT + `a175/sprzet.json` + items-dump z gry). Czesc Armoury - drzewo `noc2/sklad9`, wpis sklad9-p tam. Bez SyncData, bez nowych ustawien.
+
+**Co zobaczysz w grze (prosto):** nic sie nie zmienia - tylko linia kontrolna w logu CrashScribe przy wczytaniu.
+
+**Problem (przeglad sklad9, uwagi dla CS):**
+- (2, wazne) "Cel 130/135 piechoty Polnocy skalibrowany na starych prawach pancerza (0.25 kg, tier 35); po Z16b SkillSinew podniesie Atletyke mniej, srednia przed dodatkiem wyraznie ponizej 130, wynik ponizej 135 i OSTRZEZENIE kontroli; przy kroku 0 okno IntendedEdge/expA nie pasuje; opis MCM nieaktualny." **CZESCIOWO PRAWDZIWE.** Sprawdzone rachunkiem z danych (`rev-s9/z16b_north.py`: zbior 43 + swiat bez Polnocy 275, zestawy po zamianie 175.2 z `sprzet.json`, wymog pancerza = round(waga / 0.333), ladry - Jazda): Atletyke piechoty t3-t5 Polnocy wyznacza XML ROT, nie pancerz (t3 XML 70-80 / pancerz z wagi ok. 30, t4 100 / 42, t5 130 / 45; t6 XML 230-250) - stare 105/140 dla t4/t5 dawalo prawo tieru. Srednia po naprawie: bron/Atletyka 131.0/129.9 -> 131.0/128.6, swiat bez Polnocy 121.9/120.5 -> 121.9/118.1. Z +5: 133.6 (cel 135 +-3 - BEZ ostrzezenia), przewaga Atletyki +13.1% wobec okna 11.6 +-3 (w oknie, margines 1.5). Teza "OSTRZEZENIE / wyraznie ponizej 130" - **FALSZYWA**. Prawdziwe: (a) baza okna Atletyki przy kroku 0 jest inna (8.9% zamiast 7.5%, przelicznik 100/118 = 0.85 zamiast 0.82); (b) linia "pominiete" brala dla Atletyki `IntendedEdge` liczone z sufitami prawa tieru, ktorych przy kroku 0 nie ma; (c) opis MCM w Armoury (poprawiony tam).
+- (3, drobne) Komentarze `Mends.CanUseHero` i naglowek Z16 ("ReqSkill liczy ladry dzis jako Atletyke - uwaga 7.1") nieprawdziwe po Z16b (`ReqSkill` daje ladrom Jazde). **PRAWDZIWE.**
+
+**Zmiana:**
+- `Army175.NorthHardy`: kroki `WeaponSkillPerTier` / `ArmourTierAthletics` czytane przed linia "pominiete"; okno Atletyki `expA = aBase + aK x (dodatek - strata na suficie)`, `aBase`/`aK` = 8.9/0.85 przy kroku 0 (Z16b, domyslne), 7.5/0.82 przy wlaczonym prawie tieru pancerza (jak dotad); linia "pominiete" przy kroku 0 podaje dla Atletyki `aBase + aK x dodatek` zamiast `IntendedEdge`. Bron bez zmian. Cel Jeffa 130/135 +-3 i domyslne 0/+5 bez zmian (rachunek: 131/134).
+- `Mends.cs`: dwa komentarze (wyjatek ladr u bohaterow = decyzja, nie obejscie Atletyki).
+
+**Ryzyko / co sprawdzic:** liczby okna to rachunek poza gra (pierwszy pomiar - autotest sklad9). Linia `Mends: NorthHardy (175c) - ... SREDNIE piechoty t3+ Polnocy bron/Atl ok. 131/129 -> 131/134 ... wobec swiata bez Polnocy ok. 122/118 - przewaga ok. +7.4%/+13%` bez OSTRZEZENIA. Gdyby srednia Atletyki odbiegla od 135 o wiecej niz 3 - przeliczyc dodatek od nowej bazy (suwak Armoury `NorthHardyAthleticsBonus`) i pokazac Jeffowi przed wgraniem. Build Release kod 0, 0 ostrzezen.
+
+**Status:** NIEWGRANE - DO SPRAWDZENIA (razem z Armoury sklad9-p). DLL (bez narzedzi autotestu) - scratchpad `test/CrashScribe-sklad9.dll`.
+
 ## 2026-10-09 (Z16-1c CS) - POPRAWKI PO RECENZJI Z16 (czesc CS): podniesienie umiejetnosci odblokowuje perki - opisane i mierzone (linia "Z16 perki"); podnoszenie tylko przy wlaczonym sicie HeroGearRequirements; potkniecia kolejki liczone; prawdziwa miara utraty sprzetu (puste sloty); czystka polek nie zjada sprzedanych unikatow sledzonych przez Armoury
 **Mod:** CrashScribe | **Projekt:** `docs/PROJEKT-Z16-WYMOGI-BOHATEROW-2026-10-09.md` (errata na gorze) | **Pliki:** `CrashScribe/src/Mends.cs` (nowe: `HeroRaiseOn`, `PerkSnap`, `PerkWatchBefore`, `TakePerkSnap`, `PerkWatchReport`, `EmptySlots`, `ArmouryUniqueIs`; zmienione: `RaiseHeroSkill`, `HeroSinewQueue`, `HeroSinewAll`, `UniqueWares`, komentarz Z16). Na Z16-1b (3e16aeb). Bez zapisu w grze (bez SyncData). Czesc Armoury - drzewo `a175arm`, wpis Z16-5 tam. Status: **NIEWGRANE**.
 

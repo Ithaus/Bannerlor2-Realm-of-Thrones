@@ -248,7 +248,12 @@ namespace CrashScribe
         /// [S] kryt175b/sila_odp.py), wiec 0/+5 daje cel Jeffa ok. 130/135. "+X ponad dzisiejsze" = ponad wartosci PO zamianie sprzetu
         /// (rozdz. 1). Tylko gdy 175.2 zadzialalo (inaczej dodatek szedlby na umiejetnosci napompowane sprzetem ponad tier). Cel z sufitem
         /// TierCap (bez przeskoku tieru), osobno dla broni i Atletyki; dodatek 0 = ta umiejetnosc bez zmian (zostaje max(obecna, wymog sprzetu)).
-        /// Stary klucz NorthHardySkillBonus nie jest czytany (175b nigdy nie wgrane; Armoury.json Jeffa nie ma zadnego klucza 175).</summary>
+        /// Stary klucz NorthHardySkillBonus nie jest czytany (175b nigdy nie wgrane; Armoury.json Jeffa nie ma zadnego klucza 175).
+        /// sklad9-p (przeglad sklad9, uwaga 2): przy Z16b (pancerz tylko z wagi 0.333 kg, ArmourTierAthletics 0) Atletyke piechoty t3-t5 Polnocy
+        /// wyznacza XML ROT, nie pancerz (np. t5 oathsworn: XML 130, pancerz 45) - rachunek SCR/rev-s9/z16b_north.py: srednia Polnocy po naprawie
+        /// ok. 131/129 (bylo 131/130), swiat bez Polnocy ok. 122/118 (bylo 122/121); 0/+5 daje ok. 131/134 (cel 130/135 +-3 trzymany), przewaga
+        /// Atletyki ok. +13% (bylo +12%). Przy kroku 0 sufit "bez przeskoku tieru" Atletyki nie tnie (TierCap) - okno kontroli Atletyki liczone
+        /// od nowej bazy (8.9 + 0.85 x dodatek); przy wlaczonym prawie tieru pancerza - stare okno (7.5 + 0.82 x dodatek po sufitach).</summary>
         internal static void NorthHardy()
         {
             if (NorthDone || !Mends.SinewApplied) return;
@@ -260,19 +265,21 @@ namespace CrashScribe
                 aBonus = aBonus < 0 ? 0 : (aBonus > 50 ? 50 : aBonus);
                 NorthDone = true;
                 string bon = "bron glowna +" + wBonus + ", Atletyka +" + aBonus;
+                float wStep = Mends.ArmouryFloat("WeaponSkillPerTier", 35f), aStep = Mends.ArmouryFloat("ArmourTierAthletics", 0f);
+                wStep = wStep < 0.5f ? 0f : (wStep > 100f ? 100f : wStep);
+                aStep = aStep < 0.5f ? 0f : (aStep > 100f ? 100f : aStep);
+                // sklad9-p: okno Atletyki - przy kroku 0 (Z16b, pancerz tylko z wagi) baza i przelicznik z rachunku SCR/rev-s9/z16b_north.py, bez sufitu
+                double aBase = aStep > 0f ? 7.5 : 8.9, aK = aStep > 0f ? 0.82 : 0.85;
                 if (wBonus == 0 && aBonus == 0) { Scribe.Line("Mends: NorthHardy (175c) - wylaczone (NorthHardyWeaponBonus 0, NorthHardyAthleticsBonus 0)."); return; }
                 if (!TierGearApplied)
                 {
                     string why = !TierGearWanted() ? _tgOffWhy : (_gaveUp ? "zamiana nie mogla zadzialac" : "zamiana nie zadzialala");
                     Scribe.Line("Mends: NorthHardy (175c) - pominiete: sprzet wedlug tieru (175.2) nie dziala w tej sesji (" + why + ") - " + bon
                                 + " liczyloby sie od umiejetnosci napompowanych sprzetem ponad tier (przewaga znacznie ponad zamierzone ok. +"
-                                + IntendedEdge(wBonus).ToString("0") + "%/+" + IntendedEdge(aBonus).ToString("0")
+                                + IntendedEdge(wBonus).ToString("0") + "%/+" + (aStep > 0f ? IntendedEdge(aBonus) : aBase + aK * aBonus).ToString("0")
                                 + "%; przy +25 bylo to +46%/+52% zamiast +28%, projekt 3.2).");
                     return;
                 }
-                float wStep = Mends.ArmouryFloat("WeaponSkillPerTier", 35f), aStep = Mends.ArmouryFloat("ArmourTierAthletics", 0f);
-                wStep = wStep < 0.5f ? 0f : (wStep > 100f ? 100f : wStep);
-                aStep = aStep < 0.5f ? 0f : (aStep > 100f ? 100f : aStep);
                 var set = NorthSet();
                 if (set.Count == 0) { Scribe.Line("Mends: NorthHardy (175c) - OSTRZEZENIE: pusty zbior piechoty Polnocy (brak kultury battania albo drzew)."); return; }
                 double preM = 0, preA = 0;
@@ -337,7 +344,8 @@ namespace CrashScribe
                 // +-3 pkt (7.5 = Polnoc po samej zamianie sprzetu, 0.82 = 100 / srednia swiata ok. 122; rachunek SCR\a175c\okno.py i
                 // SCR\a175b\sufit15.py - przy 0/+5 bez przyciec: bron +7.4% (okno 7.5), Atletyka ok. +11.6% (okno 11.6)).
                 // 175c: przy domyslnych 0/+5 dodatkowo srednie wobec celu Jeffa 130/135 (+-3) - po naprawie sprzetu jest ok. 131/130.
-                double expM = 7.5 + 0.82 * (wBonus - lossM), expA = 7.5 + 0.82 * (aBonus - lossA);
+                // sklad9-p: Atletyka przy kroku 0 (Z16b) - baza 8.9, przelicznik 0.85 (aBase/aK wyzej); po naprawie ok. 131/129, z 0/+5 ok. 131/134.
+                double expM = 7.5 + 0.82 * (wBonus - lossM), expA = aBase + aK * (aBonus - lossA);
                 var why2 = new List<string>();
                 if (set.Count != 43) why2.Add("zbior " + set.Count + " zamiast 43");
                 if (Math.Abs((postM - preM) - planM) > 0.5 || Math.Abs((postA - preA) - planA) > 0.5)
