@@ -135,21 +135,40 @@ namespace Armoury
             var eq = from.BattleEquipment;
             if (eq == null) return;
             var got = new List<string>();
+            var toBag = new List<string>();
+            var kept = new List<string>();
+            bool req = Settings.Current != null && Settings.Current.HeroGearRequirements;
             for (int i = 0; i < (int)EquipmentIndex.NumEquipmentSetSlots; i++)
             {
                 var slot = (EquipmentIndex)i;
                 var el = eq[slot];
                 if (el.IsEmpty || !Is(el.Item)) continue;
+                // Z16 (Jeff 09.10): lord AI ZAKLADA unikat tylko, gdy go udzwignie (ItemReq.MeetsHero); inaczej sztuka idzie
+                // do taboru jego partii (nic nie znika); zwyciezca bez partii (rzadkie) - sztuka zostaje na ofierze, bez zamiennika
+                // (przy smierci odchodzi z nia jak reszta jej sprzetu - linia kroniki nizej mowi o tym wprost)
+                ItemRoster bag = null;
+                bool wear = true;
+                if (!toPlayer && req && !ItemReq.MeetsHero(to.CharacterObject, el.Item))
+                {
+                    wear = false;
+                    bag = to.PartyBelongedTo != null ? to.PartyBelongedTo.ItemRoster : null;
+                    if (bag == null) { kept.Add(el.Item.StringId); continue; }
+                }
                 ItemObject stand = null;
-                try { stand = UniqueLaw.StandInFor(el.Item, from.Culture); } catch { }
+                try { stand = UniqueLaw.StandInFor(el.Item, from.Culture, from); } catch { }   // Z16: zamiennik w granicy umiejetnosci ofiary
                 eq[slot] = stand != null ? new EquipmentElement(stand) : EquipmentElement.Invalid;
                 if (toPlayer) MobileParty.MainParty.ItemRoster.AddToCounts(el, 1);
-                else Wear(to, el);
+                else if (wear) Wear(to, el);
+                else { bag.AddToCounts(el, 1); toBag.Add(el.Item.StringId); }
                 got.Add(el.Item.Name.ToString());
             }
+            if (kept.Count > 0)
+                Log.Info("Kronika unikatow: " + to.Name + " nie udzwignie i nie ma taboru - zostaje na " + from.Name + " (" + how + ")"
+                         + (from.IsDead ? " i odchodzi z nim" : "") + ": " + string.Join(", ", kept.ToArray()) + ".");
             if (got.Count == 0) return;
             string list = string.Join(", ", got.ToArray());
-            Log.Info("Kronika unikatow: " + from.Name + " -> " + to.Name + " (" + how + "): " + list + ".");
+            Log.Info("Kronika unikatow: " + from.Name + " -> " + to.Name + " (" + how + "): " + list
+                     + (toBag.Count > 0 ? " (ponad umiejetnosc - do taboru: " + string.Join(", ", toBag.ToArray()) + ")" : "") + ".");
             if (toPlayer) Log.Player("By the custom of war, the arms of " + from.Name + " are yours: " + list + ".");
             else if (from == Hero.MainHero) Log.Player(to.Name + " takes your arms by the custom of war: " + list + ".", true);
             // cudze zdobycze tylko w kronice (Jeff: za duzo smieci)
@@ -201,7 +220,10 @@ namespace Armoury
                     var el = shelf.GetElementCopyAtIndex(i);
                     var it = el.EquipmentElement.Item;
                     if (el.Amount <= 0 || !Is(it)) continue;
-                    if (it.Difficulty > 0 && it.RelevantSkill != null && lord.GetSkillValue(it.RelevantSkill) < it.Difficulty) continue;
+                    // Z16 (Jeff 09.10): kupuje tylko to, co udzwignie - CALY ekwipunek (pancerz: Atletyka), nie tylko RelevantSkill
+                    if (Settings.Current != null && Settings.Current.HeroGearRequirements)
+                    { if (!ItemReq.MeetsHero(lord.CharacterObject, it)) continue; }
+                    else if (it.Difficulty > 0 && it.RelevantSkill != null && lord.GetSkillValue(it.RelevantSkill) < it.Difficulty) continue;
                     var cur = lord.BattleEquipment[SlotFor(lord.BattleEquipment, it)];
                     if (!cur.IsEmpty && (Is(cur.Item) || cur.Item.Effectiveness >= it.Effectiveness)) continue;
                     int price = st.Town.MarketData.GetPrice(el.EquipmentElement, mp, false, st.Party);

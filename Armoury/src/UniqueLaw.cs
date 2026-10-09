@@ -181,9 +181,31 @@ namespace Armoury
         /// sesje - pary (unikat, kultura) jest kilkadziesiat.</summary>
         internal static ItemObject StandInFor(ItemObject uniq, BasicCultureObject cul)
         {
+            return StandInFor(uniq, cul, null);
+        }
+
+        /// <summary>Z16 (Jeff 09.10): zamiennik dla BOHATERA, ktory go zalozy (prawo unikatow - SweepHeroes, takze gracz;
+        /// zwyczaj wojenny - UniqueSpoils.Take, ofiara): tylko sztuki, ktore on udzwignie (ItemReq.MeetsHero) - zamiennik to
+        /// ZAKLADANIE nowej sztuki. Klucz pamieci = unikat | kultura | umiejetnosc noszacego (SkillFor unikatu = SkillFor
+        /// zamiennika: ten sam typ, dla broni ta sama klasa). Bez noszacego (magazyny, tabory) i przy wylaczonym
+        /// HeroGearRequirements - jak dotad.</summary>
+        internal static ItemObject StandInFor(ItemObject uniq, BasicCultureObject cul, Hero wearer)
+        {
             if (uniq == null) return null;
             string cid = cul != null && cul.StringId != null ? cul.StringId : "-";
-            string key = uniq.StringId + "|" + cid;
+            CharacterObject wearCo = null;
+            string wkey = "";
+            try
+            {
+                if (wearer != null && wearer.CharacterObject != null && Settings.Current != null && Settings.Current.HeroGearRequirements)
+                {
+                    wearCo = wearer.CharacterObject;
+                    var wsk = ItemReq.SkillFor(uniq);
+                    wkey = "|" + (wsk != null ? wsk.StringId + "=" + wearCo.GetSkillValue(wsk) : "-");
+                }
+            }
+            catch { wearCo = null; wkey = ""; }
+            string key = uniq.StringId + "|" + cid + wkey;
             lock (Repl)
             {
                 ItemObject cached;
@@ -206,6 +228,7 @@ namespace Armoury
                     if (it.StringId.EndsWith("_crown", StringComparison.Ordinal)) continue;
                     if (it.Tier > uniq.Tier) continue;
                     if (it.IsCivilian != uniq.IsCivilian) continue;
+                    if (wearCo != null && !ItemReq.MeetsHero(wearCo, it)) continue;   // Z16: noszacy musi go udzwignac
                     if (((it.ItemFlags & ItemFlags.NotUsableByMale) != 0) != female) continue;
                     if (uniq.HasWeaponComponent)
                     {
@@ -227,7 +250,7 @@ namespace Armoury
             }
             catch (Exception e) { Log.Error("UniqueLaw.StandInFor", e); }
             lock (Repl) { Repl[key] = best; }
-            Log.Info("UniqueLaw: zamiennik dla " + uniq.StringId + " (" + cid + ") -> "
+            Log.Info("UniqueLaw: zamiennik dla " + uniq.StringId + " (" + cid + (wearCo != null ? ", noszacy " + wearer.StringId + " " + wkey.Substring(1) : "") + ") -> "
                      + (best != null
                         ? best.StringId + " (t" + ((int)best.Tier + 1) + ", " + (best.Culture != null ? best.Culture.StringId : "bezkulturowy") + ")"
                         : "BRAK - sztuka znika") + ".");
@@ -476,7 +499,7 @@ namespace Armoury
                             ItemObject it;
                             try { it = eq[(EquipmentIndex)s].Item; } catch { continue; }
                             if (it == null || !UniqueGear.Is(it) || MayWear(h, it)) continue;
-                            var sub = StandInFor(it, h.Culture);
+                            var sub = StandInFor(it, h.Culture, h);   // Z16: w granicy umiejetnosci noszacego
                             eq[(EquipmentIndex)s] = sub != null ? new EquipmentElement(sub) : default(EquipmentElement);
                             if (sub != null) swapped++; else gone++;
                             touched = true;

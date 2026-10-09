@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.ViewModelCollection.Inventory;
 using TaleWorlds.Core;
 using TaleWorlds.Core.ViewModelCollection;
@@ -52,6 +53,7 @@ namespace Armoury
                 else Log.Info("Z16: ItemMenuVM.SetGeneralComponentTooltip / pola NIEZNALEZIONE - opis przedmiotu bez linii Requires dla pancerza i amunicji.");
             }
             catch (Exception e) { Log.Error("HeroGear.ApplyAll(ItemMenuVM)", e); }
+            ApplySpoils(h);
         }
 
         /// <summary>Sztuka, ktorej wymog pilnuje tylko nasza regula (gra nie ma dla niej RelevantSkill): pancerz bez ladr,
@@ -131,6 +133,103 @@ namespace Armoury
             bool ok = ch == null || it == null || global::Helpers.CharacterHelper.CanUseItem(ch, el);
             list.Add(new ItemMenuTooltipPropertyVM(comparison ? "" : RequiresText(), value, 0,
                 ok ? TaleWorlds.CampaignSystem.ViewModelCollection.UIColors.PositiveIndicator : TaleWorlds.CampaignSystem.ViewModelCollection.UIColors.NegativeIndicator, false, null, TooltipProperty.TooltipPropertyFlags.None));
+        }
+
+        // ---------------------------------------------------------------- Z16-3: Spoils "Auto-equip companions"
+        // Spoils of War (RealisticLoot.Models.AutoEquipPlanner.TryUpgradeSlot, Spoils 1.8.4, dekompilacja :85-163) wybiera towarzyszowi
+        // najlepsza sztuke z taboru gracza BEZ zadnej kontroli umiejetnosci (nawet broni) - plyta t6 z taboru wchodzila na
+        // kazdego. PREFIKS podmienia tabor (argument 0) na kopie z samymi sztukami, ktore TEN towarzysz udzwignie
+        // (ItemReq.MeetsHero); Spoils wybiera i zapisuje na kopii; POSTFIKS oddaje prawdziwemu taborowi to samo, co Spoils
+        // zrobil na kopii (wybrana sztuka -1, zdjeta +1). Bez ukrytych sztuk - Spoils pracuje na prawdziwym taborze jak dotad.
+        // Podwojenie sztuki cywilnej (:154-157, opcja UpdateCivilianEquipment) to osobna sprawa (projekt Z16 uwaga 7.3).
+        internal sealed class SpoilsSlotState
+        {
+            internal ItemRoster Real;
+            internal Hero Who;
+            internal EquipmentIndex Slot;
+            internal EquipmentElement Old;
+        }
+
+        private static int _spoilsHidden, _spoilsUpgrades, _spoilsCalls;
+
+        private static void ApplySpoils(Harmony h)
+        {
+            try
+            {
+                var t = AccessTools.TypeByName("RealisticLoot.Models.AutoEquipPlanner");
+                if (t == null) { Log.Info("Z16: Spoils of War (AutoEquipPlanner) nieobecny - auto-ekwipunek towarzyszy bez zmian."); return; }
+                var m = AccessTools.Method(t, "TryUpgradeSlot");
+                var ex = AccessTools.Method(t, "Execute");
+                var ps = m != null ? m.GetParameters() : null;
+                if (m == null || ps.Length < 3 || ps[0].ParameterType != typeof(ItemRoster) || ps[1].ParameterType != typeof(Hero)
+                    || ps[2].ParameterType != typeof(EquipmentIndex) || m.ReturnType != typeof(bool))
+                {
+                    Log.Info("Z16: Spoils AutoEquipPlanner.TryUpgradeSlot - inna sygnatura niz w Spoils 1.8.4, sito auto-ekwipunku spi.");
+                    return;
+                }
+                h.Patch(m, prefix: new HarmonyMethod(typeof(HeroGear), nameof(SpoilsPrefix)), postfix: new HarmonyMethod(typeof(HeroGear), nameof(SpoilsPostfix)));
+                if (ex != null) h.Patch(ex, prefix: new HarmonyMethod(typeof(HeroGear), nameof(SpoilsRunStart)), postfix: new HarmonyMethod(typeof(HeroGear), nameof(SpoilsRunEnd)));
+                Log.Info("Z16: Spoils 'Auto-equip companions' - towarzysz dostaje z taboru tylko to, co udzwignie (ItemReq.MeetsHero).");
+            }
+            catch (Exception e) { Log.Error("HeroGear.ApplySpoils", e); }
+        }
+
+        public static void SpoilsRunStart() { _spoilsHidden = 0; _spoilsUpgrades = 0; _spoilsCalls = 0; }
+
+        public static void SpoilsRunEnd()
+        {
+            try
+            {
+                if (_spoilsCalls > 0)
+                    Log.Info("Z16: Spoils auto-equip - " + _spoilsUpgrades + " zmian sprzetu przez sito (sloty z ukrytymi sztukami: " + _spoilsCalls
+                             + ", ukrytych sztuk ponad umiejetnosc lacznie " + _spoilsHidden + ").");
+            }
+            catch { }
+        }
+
+        public static void SpoilsPrefix(ref ItemRoster __0, Hero __1, EquipmentIndex __2, out SpoilsSlotState __state)
+        {
+            __state = null;
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || !s.HeroGearRequirements || __0 == null || __1 == null || __1.CharacterObject == null || __1.BattleEquipment == null) return;
+                var real = __0;
+                var co = __1.CharacterObject;
+                int hidden = 0;
+                for (int i = 0; i < real.Count; i++)
+                {
+                    var el = real.GetElementCopyAtIndex(i);
+                    var it = el.EquipmentElement.Item;
+                    if (el.Amount > 0 && it != null && !ItemReq.MeetsHero(co, it)) hidden += el.Amount;
+                }
+                if (hidden == 0) return;
+                var sieve = new ItemRoster();
+                for (int i = 0; i < real.Count; i++)
+                {
+                    var el = real.GetElementCopyAtIndex(i);
+                    var it = el.EquipmentElement.Item;
+                    if (el.Amount > 0 && it != null && ItemReq.MeetsHero(co, it)) sieve.AddToCounts(el.EquipmentElement, el.Amount);
+                }
+                __state = new SpoilsSlotState { Real = real, Who = __1, Slot = __2, Old = __1.BattleEquipment[__2] };
+                __0 = sieve;
+                _spoilsHidden += hidden;
+                _spoilsCalls++;
+            }
+            catch (Exception e) { __state = null; Log.Error("HeroGear.SpoilsPrefix", e); }
+        }
+
+        public static void SpoilsPostfix(bool __result, SpoilsSlotState __state)
+        {
+            if (__state == null || !__result) return;
+            try
+            {
+                var now = __state.Who.BattleEquipment[__state.Slot];
+                if (!now.IsEmpty) __state.Real.AddToCounts(now, -1);
+                if (!__state.Old.IsEmpty) __state.Real.AddToCounts(__state.Old, 1);
+                _spoilsUpgrades++;
+            }
+            catch (Exception e) { Log.Error("HeroGear.SpoilsPostfix", e); }
         }
 
         /// <summary>Samotest przy wczytaniu (plan testu Z16 pkt 4): 500 losowych par (bohater, sztuka z wymogiem) -

@@ -592,7 +592,7 @@ namespace Armoury
         [SettingPropertyGroup("Skills rule the gear")]
         public bool SkillsDecideEnabled { get; set; } = true;
 
-        [SettingPropertyBool("Hero Gear Requirements", HintText = "you and your companions cannot put on armour above your Athletics, nor take arrows above your Bow or bolts above your Crossbow - the same rule as for soldiers. On the inventory screen the card turns red, the game says 'You don't have enough Athletics skill to equip this item' and the description shows 'Requires: Athletics 175'. What you already wear stays on you. Horse barding is not checked. Off = only the game's own check of weapons, shields and horses")]
+        [SettingPropertyBool("Hero Gear Requirements", HintText = "you, your companions and the lords cannot put on armour above their Athletics, nor take arrows above their Bow or bolts above their Crossbow - the same rule as for soldiers. On the inventory screen the card turns red, the game says 'You don't have enough Athletics skill to equip this item' and the description shows 'Requires: Athletics 175'. The same holds for Spoils' auto-equip of companions, for a lord buying or taking a renowned piece by the custom of war (what he cannot carry goes to his baggage) and for the plain piece that replaces a renowned one. What anyone already wears stays on him. Horse barding is not checked. Off = only the game's own check of weapons, shields and horses")]
         [SettingPropertyGroup("Skills rule the gear")]
         public bool HeroGearRequirements { get; set; } = true;
 
