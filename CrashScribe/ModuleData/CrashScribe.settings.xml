@@ -72,6 +72,15 @@
   <NightKingRespectShackles>true</NightKingRespectShackles>
   <NightKingWallFromDay>2184</NightKingWallFromDay>
   <NightKingCallFromDay>728</NightKingCallFromDay>
+  <!-- The siege gate (needs NightKingCalendarEnabled): Realm of Thrones itself orders the Others to besiege
+       the Wall, Fist of the First Men and Craster's Keep, which have no shackles of their own, as soon as a band
+       has 500 healthy wights. With the gate on, no band of the Others can start, join or keep a siege, an assault
+       or a raid on a settlement before that settlement's day (a village counts by its castle or town): such an
+       order from the AI is dropped, a band arriving at the gates with one turns away to patrol around its clan's
+       seat, and a siege already under way (from a save) is lifted once a day and right after loading - the band
+       simply walks away, no men are lost. Sieges of every other faction, the Night's Watch included, are untouched.
+       Set NightKingCalendarSiegeGate to false to switch the gate off (such sieges are then only written to the log). -->
+  <NightKingCalendarSiegeGate>true</NightKingCalendarSiegeGate>
 
   <!-- The Others grow only from the dead: in the books the wights are the fallen and the captives of the
        Others, raised again - nobody hands the Night King an army out of thin air. Realm of Thrones does:

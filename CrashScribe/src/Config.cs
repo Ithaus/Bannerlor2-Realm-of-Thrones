@@ -48,6 +48,7 @@ namespace CrashScribe
         public static bool NightKingRespectShackles = true;  // kajdany ROT 300/400/500 x FabulaTimeScale takze dla Pochodu
         public static int NightKingWallFromDay = 2184;       // Mur od 7. roku (serial s7 ok. 304 AC)
         public static int NightKingCallFromDay = 728;        // Zew spi do pierwszego terminu
+        public static bool NightKingCalendarSiegeGate = true; // T2c (patrz NightKingGate.cs): Inni nie zaczynaja ani nie prowadza oblezenia / szturmu / rabunku zamknietego celu
 
         // --- Inni bez dosypki z niczego (T2b noc 08/09.10; patrz OthersGrowth.cs) ---
         public static bool OthersNoFreeGrowth = true;        // wylacznik calosci: Inni rosna tylko z nekromancji i odbitych jencow (+ szablon nowej bandy)
@@ -104,6 +105,7 @@ namespace CrashScribe
                         case "NightKingRespectShackles": NightKingRespectShackles = B(v); break;
                         case "NightKingWallFromDay": NightKingWallFromDay = I(v, NightKingWallFromDay); break;
                         case "NightKingCallFromDay": NightKingCallFromDay = I(v, NightKingCallFromDay); break;
+                        case "NightKingCalendarSiegeGate": NightKingCalendarSiegeGate = B(v); break;
                         case "OthersNoFreeGrowth": OthersNoFreeGrowth = B(v); break;
                         case "OthersStartDowryDays": OthersStartDowryDays = I(v, OthersStartDowryDays); break;
                         case "OthersNoBirthDowry": OthersNoBirthDowry = B(v); break;

@@ -52,6 +52,9 @@ namespace CrashScribe
         private static Settlement _theWall;
         private static bool _marchGreeted;
 
+        // T2c: liczniki blokady oblezen od zera przy kazdym starcie gry (zachowanie tworzone w OnGameStart)
+        public NightKingCall() { NightKingGate.ResetSession(); }
+
         public override void RegisterEvents()
         {
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, Daily);
@@ -70,13 +73,14 @@ namespace CrashScribe
         // Pochod nie wybiera celu przed jego dniem, Zew spi do NightKingCallFromDay, banda z rozkazem oblezenia
         // na zamkniety cel dostaje patrol przy siedzibie klanu. Zadnych kluczy zapisu: dzien liczony od startu
         // kampanii (ten sam zegar co ROT i Fabula), wiec w trwajacej kampanii dziala od razu. Zdobytych osad nie ruszamy.
+        // T2c: same oblezenia ROT (OnAiHourlyTick) blokuje NightKingGate (rozkaz AI i brama osady), TurnBack przerywa trwajace.
         // Kolejnosc w kalendarzu (do linii logu): Piesc, Craster, Rogowa Stopa, Mrozny Brzeg, Thenn, Kly Mrozu, Hardhome, Mur.
         // Id z ROT.Misc/ROTSettlements.cs:120, 118, 308, 396, 136, 132, 138, 16.
         private static readonly string[] CalendarIds =
             { "castle_S6", "castle_S5", "castle_N6", "ROT_castle45", "town_S6", "town_S4", "town_S7", "ROT_castle60" };
 
         /// <summary>Dzien od startu kampanii - ten sam zegar co kajdany ROT (ROT:1068-1088) i Fabula.DayNow.</summary>
-        private static double Day()
+        internal static double Day()
         {
             try { return (CampaignTime.Now - Campaign.Current.Models.CampaignTimeModel.CampaignStartTime).ToDays; }
             catch { return 0.0; }   // blad = wszystko zamkniete (bezpieczniej niz otwarte)
@@ -94,7 +98,7 @@ namespace CrashScribe
         }
 
         /// <summary>Od ktorego dnia kampanii Inni moga brac te osade. Nigdy wczesniej niz NightKingSiegeFromDay.</summary>
-        private static int OpenDay(Settlement s)
+        internal static int OpenDay(Settlement s)
         {
             int floor = Math.Max(0, Config.NightKingSiegeFromDay);
             if (s == null) return floor;
@@ -115,7 +119,7 @@ namespace CrashScribe
             return Math.Max(v, floor);
         }
 
-        private static bool Closed(Settlement s, double day)
+        internal static bool Closed(Settlement s, double day)
         {
             return Config.NightKingCalendarEnabled && s != null && day < OpenDay(s);
         }
@@ -142,7 +146,9 @@ namespace CrashScribe
                             + (!Config.NightKingRespectShackles ? " (bez kajdan ROT)"
                                : RotShacklesOn() ? " (kajdany ROT x" + ShackleK().ToString("0.00") + ")"
                                : " (kajdany wylaczone w ROT - OthersAIShackles = false)")
-                            + ". Zdobytych osad nie odbieramy.");
+                            + ". Zdobytych osad nie odbieramy."
+                            + (NightKingGate.Active ? " Blokada oblezen (T2c): czynna - Inni nie zaczynaja ani nie prowadza oblezenia, szturmu ani rabunku zamknietego celu."
+                               : " Blokada oblezen (T2c): wylaczona (NightKingCalendarSiegeGate = false)."));
                 Scribe.Line(CalendarState(Day(), -1));
                 _loadCheckPending = true;   // recenzja T2: TurnBack w pierwszej godzinie po wczytaniu
             }
@@ -185,11 +191,16 @@ namespace CrashScribe
         }
 
         /// <summary>Banda z rozkazem oblezenia na zamkniety cel (wolna, nie w bitwie) dostaje patrol przy siedzibie klanu.
-        /// Oblezenie juz trwajace na zamkniety cel nie jest przerywane, ale trafia do logu i do licznika (zwracany).
+        /// T2c: oblezenie juz trwajace na zamkniety cel jest PRZERYWANE (gdy nie trwa bitwa): banda dostaje ten sam patrol,
+        /// a gra sama zwija jej oboz (BesiegerCamp.CheckBesiegerPartiesAndMakeThemLeave w SiegeEvent.Tick - partia z rozkazem
+        /// innym niz oblezenie odchodzi, bez ostatniej partii oblezenie sie konczy; bez strat w ludziach). Oblezenie w trakcie
+        /// bitwy (szturm, wypad) - w logu i w liczniku (zwracany), przerwane po bitwie. Rozkaz rabunku wioski zamknietego celu - jak oblezenie.
+        /// Przy NightKingCalendarSiegeGate = false - zachowanie T2 (oblezenia nie przerywamy).
         /// Tanio: kilka band Innych raz na dobe (i raz w pierwszej godzinie po wczytaniu).</summary>
         private static int TurnBack(Clan ww, double day)
         {
             int early = 0, stumbles = 0;
+            bool gate = NightKingGate.Active;
             try
             {
                 foreach (var wp in ww.WarPartyComponents)
@@ -201,22 +212,41 @@ namespace CrashScribe
                         string who = mp.LeaderHero != null ? mp.LeaderHero.Name.ToString() : mp.Name.ToString();
                         if (Busy(mp))
                         {
-                            // recenzja T2: oblezenie przed terminem (ROT OnAiHourlyTick bez kajdan) - widac w logu, nie przerywamy
+                            // recenzja T2: oblezenie przed terminem (ROT OnAiHourlyTick bez kajdan) - widac w logu
                             if (mp.SiegeEvent != null)
                             {
                                 var sg = mp.BesiegedSettlement ?? mp.TargetSettlement;
                                 if (sg != null && !IsOthers(sg.OwnerClan) && Closed(sg, day))
                                 {
+                                    // T2c: bez bitwy (ani partii, ani osady) - przerywamy; w bitwie nie ruszamy (bez FinalizeEvent w polowie walki)
+                                    if (gate && mp.MapEvent == null && mp.AttachedTo == null && (sg.Party == null || sg.Party.MapEvent == null))
+                                    {
+                                        string where = NightKingGate.Redirect(mp, sg);
+                                        NightKingGate.CountBroken();
+                                        Scribe.Line("Kalendarz Innych: " + who + " PRZERYWA oblezenie " + sg.Name + " przed terminem (otwarta od dnia "
+                                                    + OpenDay(sg) + ", dzis " + (int)day + ") - " + where + "; gra zwija oboz bez strat.");
+                                        continue;
+                                    }
                                     early++;
                                     Scribe.Line("Kalendarz Innych: " + who + " OBLEZENIE " + sg.Name + " przed terminem (otwarta od dnia "
-                                                + OpenDay(sg) + ", dzis " + (int)day + ") - nie przerywamy.");
+                                                + OpenDay(sg) + ", dzis " + (int)day + ") - "
+                                                + (gate ? "trwa bitwa, przerwiemy po niej." : "nie przerywamy (NightKingCalendarSiegeGate = false)."));
                                 }
                             }
                             continue;
                         }
-                        if (mp.DefaultBehavior != AiBehavior.BesiegeSettlement) continue;
+                        // T2c: takze rozkaz rabunku wioski zamknietego celu (wioska liczy sie dniem swojego zamku / miasta)
+                        bool raidOrder = gate && mp.DefaultBehavior == AiBehavior.RaidSettlement;
+                        if (mp.DefaultBehavior != AiBehavior.BesiegeSettlement && !raidOrder) continue;
                         var tgt = mp.TargetSettlement;
-                        if (tgt == null || IsOthers(tgt.OwnerClan) || !Closed(tgt, day)) continue;
+                        if (tgt == null || IsOthers(tgt.OwnerClan) || !(raidOrder ? NightKingGate.GateClosed(tgt, day) : Closed(tgt, day))) continue;
+                        if (gate)
+                        {
+                            string where = NightKingGate.Redirect(mp, tgt);
+                            Scribe.Line("Kalendarz Innych: " + who + " zawrocony spod " + tgt.Name + (raidOrder ? " (rabunek)" : "") + " (otwarta od dnia "
+                                        + NightKingGate.OpenDayOf(tgt) + ", dzis " + (int)day + ") - " + where + ".");
+                            continue;
+                        }
                         var home = ww.HomeSettlement ?? mp.HomeSettlement;
                         if (home == null || home == tgt)
                         {
@@ -251,8 +281,10 @@ namespace CrashScribe
                 var ww = WhiteWalkers();
                 if (ww == null || ww.IsEliminated) return;
                 double day = Day();
+                int broke = NightKingGate.BrokenToday;
                 int early = TurnBack(ww, day);
-                Scribe.Line("Kalendarz Innych: przeglad band po wczytaniu (dzien " + (int)day + ") - oblezen przed terminem " + early + ".");
+                Scribe.Line("Kalendarz Innych: przeglad band po wczytaniu (dzien " + (int)day + ") - oblezen przed terminem " + early
+                            + (NightKingGate.Active ? ", przerwanych " + (NightKingGate.BrokenToday - broke) : "") + ".");
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "NightKingCall.Hourly", null); } catch { } }
         }
@@ -300,7 +332,7 @@ namespace CrashScribe
             catch { return null; }
         }
 
-        private static Clan WhiteWalkers()
+        internal static Clan WhiteWalkers()
         {
             try
             {
@@ -358,7 +390,7 @@ namespace CrashScribe
         }
 
         /// <summary>"Inny" w ROT to KULTURA, nie id klanu (ROT.Misc/Extensions.cs:10).</summary>
-        private static bool IsOthers(Clan c)
+        internal static bool IsOthers(Clan c)
         {
             try { return c != null && c.Culture != null && c.Culture.StringId == "whitewalker"; }
             catch { return false; }
@@ -571,6 +603,7 @@ namespace CrashScribe
                     double day = Day();
                     int early = TurnBack(ww, day);
                     Scribe.Line(CalendarState(day, early));
+                    if (NightKingGate.Active) Scribe.Line(NightKingGate.DailyLine());   // T2c: "oblezen zablokowanych N, przerwanych M"
                     callAsleep = day < Config.NightKingCallFromDay;
                 }
                 if (!Config.NightKingCallEnabled || callAsleep) return;
