@@ -1551,7 +1551,13 @@ namespace CrashScribe
         public static bool NoDragonGank(ref bool __result) { __result = false; return false; }
 
         /// <summary>Sprzet umarlych: lodowe bronie Innych i martwe wierzchowce.
-        /// Zywi tego nie tkna - lod topnieje, martwe ciało sie rozpada.</summary>
+        /// Zywi tego nie tkna - lod topnieje, martwe ciało sie rozpada.
+        /// 175c (recenzja 09.10): lodowe bronie Innych po DOKLADNYM id (ice_sword2, ice_spear;
+        /// oba i tak kultury whitewalker - ROTassets.xml:7813, :7838), nie po prefiksie "ice_":
+        /// prefiks lapal tez ice_sword = Lod Starkow (stal valyrianska, kultura battania,
+        /// ROTassets.xml:367) - MeltDeadLoot topil go w taborze gracza, MeltDeadArmory w zbrojowni,
+        /// straze DTE i Armoury QuartermasterLaw braly go za sprzet umarlych. Lod jest teraz
+        /// zwykla klinga lore jak Longclaw czy Oathkeeper (rejestr 177).</summary>
         internal static bool IsDeadGear(ItemObject it)
         {
             try
@@ -1560,7 +1566,7 @@ namespace CrashScribe
                 var cu = it.Culture != null ? (it.Culture.StringId ?? "") : "";
                 if (cu == "wights" || cu == "whitewalker") return true;
                 var id = it.StringId ?? "";
-                return id.StartsWith("ice_", StringComparison.Ordinal)
+                return id == "ice_sword2" || id == "ice_spear"
                     || id.StartsWith("wight_", StringComparison.Ordinal)
                     || id == "nightking_blade" || id == "white_walker_saddle";
             }
