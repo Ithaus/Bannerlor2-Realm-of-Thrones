@@ -888,3 +888,9 @@ straganu (AiGear, BuySubstitutes, RecruitKit, GarrisonArmory, MenUpgrade K1 itd.
 **DECYZJA JEFFA 09.10 ok. 08:05:** "bede gral, jak skonczymy projekt" -> Jeff NIE gra do konca projektu; po skonczeniu zaczyna NOWA kampanie. Paczki projektujemy pod nowa
 kampanie (zgodnosc ze starym zapisem drugorzedna; test na zapisie autotest-161-kawalki zostaje jako test dlugiej kampanii). Rzeczy "tylko w nowej kampanii" (kiesa ludu, ksiega
 ludzi, wytop przy kopalni itd.) mozna wlaczac domyslnie bez ochrony starego zapisu.
+**DECYZJE JEFFA 09.10 ok. 08:20 (MUSZTRA):** (1) dlug po krotkim snie zabiera kolejne dni, az sie wyspia - (a) ZOSTAWIC; (2) codzienna linia musztry w grze ("Drill today: ... XP
+- Leadership x.., at rest x.., drill kit x.., armed ..%, perks +..") - TAK (wylacznik MCM, dom. ON); Jeff pyta, czy Przywodztwo i perki (np. +XP dla tieru x) sie nie gryza
+-> wyjasnione: poziom Przywodztwa = mnoznik L, perki (Combat Tips, Raise the Meek t<3, Seven Veterans t4+, Drill Sergeant, Drills, Walk It Off, Bow Trainer itd.) = osobny
+dodatek P jak w grze, nie mnozony przez L ani postoj; glod/niewyspanie zeruja wszystko. "rob od razu" - Jeff kaze dzialac bez czekania na reset limitu 5h.
+SKLAD7B (08:20): noc/sklad7 23ad5d6 - zadnego sprzetu z niczego w bitwach (takze autobitwa gracza i lup), kon jako sztuka zbrojowni (jezdziec bez konia pieszo, kon za awans
+do zbrojowni AI, Stables.Remount - lord sadza na konie z taboru i dokupuje, ColdStart z konmi), linia w grze na poczatku bitwy (ilu bez broni/zbroi/konia).
