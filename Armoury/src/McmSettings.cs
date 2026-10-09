@@ -2012,9 +2012,13 @@ namespace Armoury
         [SettingPropertyGroup("Iron bank")]
         public float OutlawRoutedShare { get; set; } = 0.5f;
 
-        [SettingPropertyBool("Losers Flee Enabled", HintText = "battles fought without you: the beaten side mostly flees instead of dying - the slain follow the situation (horse to pursue, river or marsh behind, odds, seasoned men against levies), 5-65%; a few are taken; the rest go home or to the woods. The winner loses at most a few slain - the rest of his fallen are wounded. Your own battles are not touched")]
+        [SettingPropertyBool("Losers Flee Enabled", HintText = "battles fought without you: the beaten side mostly flees instead of dying - the slain follow the situation (horse to pursue, river or marsh behind, odds, seasoned men against levies), 5-65%; a few are taken; the rest go home or to the woods. The winner loses at most a few slain - the rest of his fallen are wounded. Your own battles fought on the field are not touched (auto-resolved ones: Losers Flee Player Auto)")]
         [SettingPropertyGroup("Iron bank")]
         public bool LosersFleeEnabled { get; set; } = true;
+
+        [SettingPropertyBool("Losers Flee Player Auto", HintText = "your own battles decided without you on the field (send troops / auto-resolve) follow the same rule as battles fought without you: the beaten side - theirs or yours - mostly flees, a few are taken, the slain follow the situation; the winner loses at most a few slain. Battles you fight on the field yourself are not touched")]
+        [SettingPropertyGroup("Iron bank")]
+        public bool LosersFleePlayerAuto { get; set; } = true;
 
         [SettingPropertyFloatingInteger("Winner Death Cap Percent", 0.00f, 20.00f, "0.00", HintText = "the winner of a battle fought without you loses at most this share of his men slain; the rest of his fallen live, wounded (history: 1-5%)")]
         [SettingPropertyGroup("Iron bank")]
@@ -3323,6 +3327,7 @@ namespace Armoury
             s.OutlawReturnPeacePercent = OutlawReturnPeacePercent;
             s.OutlawRoutedShare = OutlawRoutedShare;
             s.LosersFleeEnabled = LosersFleeEnabled;
+            s.LosersFleePlayerAuto = LosersFleePlayerAuto;
             s.WinnerDeathCapPercent = WinnerDeathCapPercent;
             s.LoserCaptiveVeteranPercent = LoserCaptiveVeteranPercent;
             s.LoserCaptiveCommonPercent = LoserCaptiveCommonPercent;
