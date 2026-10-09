@@ -735,6 +735,16 @@ namespace CrashScribe
 
                     Hero wearer = FindAliveHero(owner);
                     if (wearer == null) wearer = FindAliveHero(heir);
+                    // Z16: GRACZ zaklada sztuke kanonu tylko, gdy ja udzwignie (lustro Armoury ItemReq.MeetsHero) - inaczej
+                    // jedna sztuka na polke miasta (nic nie znika). Bohater AI zaklada zawsze (przydzial z kanonu), a
+                    // HeroSinewAll zaraz po tej metodzie podnosi mu Atletyke do nowego zestawu.
+                    if (wearer != null && wearer == Hero.MainHero && slotS.Length > 0 && HeroReqOn()
+                        && !CanUseHero(wearer.CharacterObject, item))
+                    {
+                        Scribe.Line("Mends: Z16 - " + wearer.Name + " (gracz) nie udzwignie " + id + " (wymog " + item.Difficulty
+                                    + ") - sztuka idzie na polke miasta.");
+                        wearer = null;
+                    }
                     if (wearer != null && slotS.Length > 0)
                     {
                         int slot = SlotOf(slotS);
@@ -2490,6 +2500,263 @@ namespace CrashScribe
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.SkillSinew", null); } catch { } }
         }
 
+        // ===== Z16: UMIEJETNOSC BOHATERA AI DO WLASNEGO SPRZETU (Jeff 09.10: 02:50, 03:05 SPROSTOWANIE, 03:55) =====
+        // "jak nie mam danej umiejetnosci, np. atletyki, nie moge zalozyc pancerza, ktory ma takie wymaganie" + zasada z 29.08
+        // "CALY ekwipunek". Zakladanie pilnuje Armoury (ItemReq.MeetsHero: ekran, Spoils, unikaty, zaciag ROT); TU - decyzja 2:
+        // lordom AI, towarzyszom i doroslej rodzinie gracza Atletyka (pancerz, sloty 5-9), Luk (strzaly) i Kusza (belty, sloty 0-3)
+        // podniesione do wymogu ich WLASNEGO zestawu bojowego, zeby nikt nie stracil zbroi - ta sama zasada co SkillSinew u zolnierzy
+        // (15.09: "nie zmieniaj sprzetu, podnies umiejetnosci"), tylko w gore, niczego nie zdejmujemy (decyzja 3). GRACZ nigdy.
+        // Dzieci (sprzet i umiejetnosci dostaja przy pelnoletnosci) i notable (nie wychodza w pole) - poza. Bez broni, koni i ladr
+        // (ladry liczone dzis jako Atletyka - uwaga 7.1 projektu Z16, poza paczka). Bez treningu Atletyki w zbroi (decyzja 03:55).
+        // SetInitialSkillLevel (gra 1.4.8, HeroDeveloper.cs:190-196) ustawia umiejetnosc i XP pod nia: bez awansu poziomu, bez perkow,
+        // bez komunikatu (tak robi RC przy zaniku miesni). Trzy chwile, jedna funkcja: (1) przy wczytaniu, PO DressTheNamesakes;
+        // (2) po przydziale z szablonu - postfiks na gardle EquipmentHelper.AssignHeroEquipmentFromEquipment tylko dopisuje bohatera
+        // do kolejki, liczonej w najblizszej godzinie (BK ubiera rycerza dwa razy, a gra po CreateSpecialHero jeszcze ustawia
+        // umiejetnosci startowe - liczy sie komplet koncowy); (3) raz na dobe przeglad wszystkich (drogi omijajace gardlo: zwolniony
+        // wedrowiec - Hero.ResetEquipments, sztuka usunieta z gry - Hero.HandleInvalidItem; normalnie 0 podniesien).
+        // Bez stanu w zapisie (podniesienie jest trwale w umiejetnosciach i idempotentne) - zadnego SyncData.
+        // Wylacznik: Armoury HeroSkillToOwnGear (bez Armoury - wlaczone); wylaczenie nie obniza juz podniesionych.
+
+        /// <summary>Z16: Armoury HeroSkillToOwnGear (domyslnie TAK; bez Armoury - TAK).</summary>
+        internal static bool HeroSkillOn() { return ArmouryFloat("HeroSkillToOwnGear", 1f) > 0.5f; }
+
+        /// <summary>Z16: Armoury HeroGearRequirements - sito u bohaterow (domyslnie TAK; bez Armoury - TAK).</summary>
+        internal static bool HeroReqOn() { return ArmouryFloat("HeroGearRequirements", 1f) > 0.5f; }
+
+        /// <summary>Z16: lustro Armoury ItemReq.MeetsHero - ten sam wymog co CanUse (ReqSkill + Difficulty), tylko ladry
+        /// konskie przepuszczone (ReqSkill liczy je dzis jako Atletyke, a prawo tieru zaklada Jazde - uwaga 7.1).</summary>
+        internal static bool CanUseHero(CharacterObject co, ItemObject it)
+        {
+            try { if (it != null && it.ItemType == ItemObject.ItemTypeEnum.HorseHarness) return true; } catch { }
+            return CanUse(co, it);
+        }
+
+        /// <summary>Z16: kogo podnosimy - zywy, dorosly bohater poza graczem, nie notable.</summary>
+        internal static bool IsAiHeroForSinew(Hero h)
+        {
+            try
+            {
+                return h != null && h != Hero.MainHero && h.IsAlive && !h.IsChild && !h.IsNotable
+                       && h.HeroDeveloper != null && h.CharacterObject != null;
+            }
+            catch { return false; }
+        }
+
+        private static bool IsWornArmourType(ItemObject.ItemTypeEnum t)
+        {
+            return t == ItemObject.ItemTypeEnum.HeadArmor || t == ItemObject.ItemTypeEnum.BodyArmor
+                || t == ItemObject.ItemTypeEnum.LegArmor || t == ItemObject.ItemTypeEnum.HandArmor
+                || t == ItemObject.ItemTypeEnum.Cape;
+        }
+
+        /// <summary>Z16: wymog ZESTAWU BOJOWEGO bohatera - Atletyka: pancerz w slotach 5-9 (helm, korpus, nogi, rece,
+        /// peleryna); Luk: strzaly, Kusza: belty w slotach 0-3 (to samo mapowanie co ReqSkill i Armoury ItemReq.SkillFor).
+        /// pieces = liczba zajetych slotow pancerza i amunicji (miara "nikt nie stracil sprzetu").</summary>
+        internal static void HeroGearNeed(Hero h, out int ath, out int bow, out int xbow, out int pieces)
+        {
+            ath = 0; bow = 0; xbow = 0; pieces = 0;
+            Equipment eq = null;
+            try { eq = h != null ? h.BattleEquipment : null; } catch { }
+            if (eq == null) return;
+            for (int s = 0; s <= 9; s++)
+            {
+                if (s == 4) continue;                                   // sztandar
+                ItemObject it;
+                try { it = eq[(EquipmentIndex)s].Item; } catch { continue; }
+                if (it == null) continue;
+                bool armour = s >= 5 && it.HasArmorComponent && IsWornArmourType(it.ItemType);
+                bool ammo = s <= 3 && (it.ItemType == ItemObject.ItemTypeEnum.Arrows || it.ItemType == ItemObject.ItemTypeEnum.Bolts);
+                if (!armour && !ammo) continue;
+                pieces++;
+                if (it.Difficulty <= 0) continue;
+                var rs = ReqSkill(it);
+                if (armour && rs == DefaultSkills.Athletics) { if (it.Difficulty > ath) ath = it.Difficulty; }
+                else if (ammo && rs == DefaultSkills.Bow) { if (it.Difficulty > bow) bow = it.Difficulty; }
+                else if (ammo && rs == DefaultSkills.Crossbow) { if (it.Difficulty > xbow) xbow = it.Difficulty; }
+            }
+        }
+
+        /// <summary>Z16: podnosi JEDNEMU bohaterowi AI Atletyke/Luk/Kusze do wymogu jego zestawu bojowego (tylko w gore,
+        /// sprzet nietkniety). gain: [Atletyka, Luk, Kusza] - suma podniesien (moze byc null). Zwraca opis albo null.</summary>
+        internal static string HeroSinew(Hero h, int[] gain, int[] raised)
+        {
+            if (!IsAiHeroForSinew(h)) return null;
+            int ath, bow, xbow, pieces;
+            HeroGearNeed(h, out ath, out bow, out xbow, out pieces);
+            string note = null;
+            note = RaiseHeroSkill(h, DefaultSkills.Athletics, ath, note, gain, raised, 0);
+            note = RaiseHeroSkill(h, DefaultSkills.Bow, bow, note, gain, raised, 1);
+            note = RaiseHeroSkill(h, DefaultSkills.Crossbow, xbow, note, gain, raised, 2);
+            return note;
+        }
+
+        private static string RaiseHeroSkill(Hero h, SkillObject sk, int need, string note, int[] gain, int[] raised, int idx)
+        {
+            if (sk == null || need <= 0) return note;
+            int have = h.GetSkillValue(sk);
+            if (have >= need) return note;
+            h.HeroDeveloper.SetInitialSkillLevel(sk, need);
+            if (gain != null && idx < gain.Length) gain[idx] += need - have;
+            if (raised != null && idx < raised.Length) raised[idx]++;
+            string part = sk.StringId + " " + have + "->" + need;
+            return note == null ? part : note + ", " + part;
+        }
+
+        private static string HeroLabel(Hero h)
+        {
+            try { return (h.Name != null ? h.Name.ToString() : "?") + " [" + h.StringId + "]"; }
+            catch { return "?"; }
+        }
+
+        // kolejka z gardla EquipmentHelper (przydzial z szablonu) - liczona w najblizszej godzinie; nie w zapisie
+        private static readonly System.Collections.Generic.HashSet<Hero> _sinewQueue = new System.Collections.Generic.HashSet<Hero>();
+
+        /// <summary>Z16: postfiks na Helpers.EquipmentHelper.AssignHeroEquipmentFromEquipment - tylko DOPISUJE bohatera do
+        /// kolejki. Harmony puszcza postfiks takze po DressedOrNot zwracajacym false (null w argumentach) - stad straznik.</summary>
+        public static void DressedQueue(Hero __0, Equipment __1)
+        {
+            try
+            {
+                if (__0 == null || __1 == null || __0 == Hero.MainHero) return;
+                lock (_sinewQueue) _sinewQueue.Add(__0);
+            }
+            catch { }
+        }
+
+        /// <summary>Z16: co godzine - bohaterowie ubrani z szablonu od ostatniej godziny (gra: nowy bohater, pelnoletnosc,
+        /// nowy wladca, towarzysz zostaje lordem; BK: towarzysz, rycerz, ziemianin, bohater bandy; BKROTPatch: rycerz).</summary>
+        internal static void HeroSinewQueue()
+        {
+            try
+            {
+                Hero[] list;
+                lock (_sinewQueue)
+                {
+                    if (_sinewQueue.Count == 0) return;
+                    list = new Hero[_sinewQueue.Count];
+                    _sinewQueue.CopyTo(list);
+                    _sinewQueue.Clear();
+                }
+                if (!HeroSkillOn()) return;
+                int n = 0;
+                var sb = new System.Text.StringBuilder();
+                foreach (var h in list)
+                {
+                    string note = null;
+                    try { note = HeroSinew(h, null, null); } catch { }
+                    if (note == null) continue;
+                    n++;
+                    if (n <= 20) sb.Append(n > 1 ? "; " : "").Append(HeroLabel(h)).Append(" ").Append(note);
+                }
+                if (n > 0)
+                    Scribe.Line("Mends: Z16 (przydzial z szablonu) - " + n + " z " + list.Length + " ubranych bohaterow AI dostalo umiejetnosc"
+                                + " do nowego zestawu: " + sb + (n > 20 ? "; ..." : "") + ".");
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.HeroSinewQueue", null); } catch { } }
+        }
+
+        /// <summary>Z16: przeglad wszystkich bohaterow AI. "wczytanie" - pelna linia przed/po (miara autotestu: po = 0,
+        /// sloty pancerza i amunicji przed = po, gracz bez zmian); "dzien" - linia tylko, gdy ktos zostal podniesiony
+        /// (normalnie 0 - liczba > 0 to droga omijajaca gardlo albo nowa droga do zbadania).</summary>
+        internal static void HeroSinewAll(string when)
+        {
+            try
+            {
+                bool load = when == "wczytanie";
+                if (load) lock (_sinewQueue) _sinewQueue.Clear();   // wczytanie liczy wszystkich; kolejka z poprzedniej kampanii precz
+                bool on = HeroSkillOn();
+                if (!on && !load) return;
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                var heroes = new System.Collections.Generic.List<Hero>();
+                foreach (var h in Hero.AllAliveHeroes) if (IsAiHeroForSinew(h)) heroes.Add(h);
+
+                int[] overBefore = new int[3], overAfter = new int[3];
+                int piecesBefore = 0, piecesAfter = 0;
+                int[] gain = new int[3], raised = new int[3];
+                int nLords = 0, nComp = 0, nOther = 0;
+                var big = new System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<int, string>>();
+                var names = new System.Text.StringBuilder();
+                int named = 0;
+                foreach (var h in heroes)
+                {
+                    int ath, bow, xbow, pc;
+                    HeroGearNeed(h, out ath, out bow, out xbow, out pc);
+                    piecesBefore += pc;
+                    int hAth = h.GetSkillValue(DefaultSkills.Athletics);
+                    if (ath > hAth) overBefore[0]++;
+                    if (bow > h.GetSkillValue(DefaultSkills.Bow)) overBefore[1]++;
+                    if (xbow > h.GetSkillValue(DefaultSkills.Crossbow)) overBefore[2]++;
+                    if (!on) continue;
+                    string note = null;
+                    try { note = HeroSinew(h, gain, raised); }
+                    catch (Exception e1) { try { Scribe.Report("CrashScribe", e1, "Mends.HeroSinew", null); } catch { } }
+                    if (note == null) continue;
+                    if (h.IsLord) nLords++;
+                    else if (h.CompanionOf != null || h.IsWanderer) nComp++;
+                    else nOther++;
+                    if (load) { if (ath > hAth) big.Add(new System.Collections.Generic.KeyValuePair<int, string>(ath - hAth, HeroLabel(h) + " " + note)); }
+                    else if (named++ < 20) names.Append(named > 1 ? "; " : "").Append(HeroLabel(h)).Append(" ").Append(note);
+                }
+                foreach (var h in heroes)
+                {
+                    int ath, bow, xbow, pc;
+                    HeroGearNeed(h, out ath, out bow, out xbow, out pc);
+                    piecesAfter += pc;
+                    if (ath > h.GetSkillValue(DefaultSkills.Athletics)) overAfter[0]++;
+                    if (bow > h.GetSkillValue(DefaultSkills.Bow)) overAfter[1]++;
+                    if (xbow > h.GetSkillValue(DefaultSkills.Crossbow)) overAfter[2]++;
+                }
+                int total = nLords + nComp + nOther;
+                if (!load)
+                {
+                    if (total > 0)
+                        Scribe.Line("Mends: Z16 (dzien " + (int)CampaignTime.Now.ToDays + ") - przeglad bohaterow AI: podniesiono " + total
+                                    + " (droga bez gardla EquipmentHelper albo nowa - zbadac): " + names + (total > 20 ? "; ..." : "") + ".");
+                    return;
+                }
+                string player = "gracz: brak";
+                try
+                {
+                    var mh = Hero.MainHero;
+                    if (mh != null)
+                    {
+                        int ath, bow, xbow, pc;
+                        HeroGearNeed(mh, out ath, out bow, out xbow, out pc);
+                        player = "gracz bez zmian (Atletyka " + mh.GetSkillValue(DefaultSkills.Athletics) + ", zestaw wymaga " + ath
+                                 + "; Luk " + mh.GetSkillValue(DefaultSkills.Bow) + "/" + bow
+                                 + "; Kusza " + mh.GetSkillValue(DefaultSkills.Crossbow) + "/" + xbow + ")";
+                    }
+                }
+                catch { }
+                var sb = new System.Text.StringBuilder("Mends: Z16 (wczytanie) - bohaterowie AI (" + heroes.Count + ", dorosli, bez gracza i notabli)");
+                sb.Append(" ponad wymog wlasnego zestawu bojowego PRZED: Atletyka ").Append(overBefore[0]).Append(", Luk ").Append(overBefore[1])
+                  .Append(", Kusza ").Append(overBefore[2]).Append("; ");
+                if (on)
+                {
+                    sb.Append("podniesiono ").Append(total).Append(" (lordow ").Append(nLords).Append(", towarzyszy ").Append(nComp)
+                      .Append(", innych ").Append(nOther).Append("): Atletyka ").Append(raised[0])
+                      .Append(raised[0] > 0 ? " (srednio +" + (gain[0] / raised[0]) + ")" : "")
+                      .Append(", Luk ").Append(raised[1]).Append(raised[1] > 0 ? " (srednio +" + (gain[1] / raised[1]) + ")" : "")
+                      .Append(", Kusza ").Append(raised[2]).Append(raised[2] > 0 ? " (srednio +" + (gain[2] / raised[2]) + ")" : "")
+                      .Append("; ");
+                }
+                else sb.Append("podnoszenie WYLACZONE (Armoury HeroSkillToOwnGear); ");
+                sb.Append("PO: Atletyka ").Append(overAfter[0]).Append(", Luk ").Append(overAfter[1]).Append(", Kusza ").Append(overAfter[2])
+                  .Append("; sloty pancerza i amunicji przed ").Append(piecesBefore).Append(" = po ").Append(piecesAfter)
+                  .Append("; ").Append(player).Append("; ").Append(sw.ElapsedMilliseconds).Append(" ms.");
+                Scribe.Line(sb.ToString());
+                if (big.Count > 0)
+                {
+                    big.Sort((a, b) => b.Key.CompareTo(a.Key));
+                    int show = Math.Min(15, big.Count);
+                    var sb2 = new System.Text.StringBuilder("Mends: Z16 - najwieksze podniesienia Atletyki: ");
+                    for (int i = 0; i < show; i++) { if (i > 0) sb2.Append("; "); sb2.Append(big[i].Value); }
+                    Scribe.Line(sb2.ToString());
+                }
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.HeroSinewAll", null); } catch { } }
+        }
+
         internal static void Install(Harmony harmony)
         {
             try
@@ -2746,6 +3013,15 @@ namespace CrashScribe
                     harmony.Patch(mDress, prefix: new HarmonyMethod(typeof(Mends), "DressedOrNot"));
                     Scribe.Line("Mends: ubieranie bohatera bez zestawu strojow nie kladzie juz gry - brakujacy szablon"
                                 + " (elekcja krola, narodziny dziecka) zostawia bohatera w jego wlasnym sprzecie.");
+                    // Z16: ten sam cel - POSTFIKS tylko dopisuje ubranego bohatera AI do kolejki podniesienia umiejetnosci
+                    // do nowego zestawu (HeroSinewQueue, co godzine); osobny try - jego wywrotka nie rusza prefiksu
+                    try
+                    {
+                        harmony.Patch(mDress, postfix: new HarmonyMethod(typeof(Mends), "DressedQueue"));
+                        Scribe.Line("Mends: Z16 - bohater AI ubrany z szablonu (EquipmentHelper) trafia do kolejki: Atletyka, Luk i Kusza"
+                                    + " do wymogu nowego zestawu w najblizszej godzinie.");
+                    }
+                    catch (Exception e2) { try { Scribe.Report("CrashScribe", e2, "Mends.Install(Z16 kolejka)", null); } catch { } }
                 }
                 else Scribe.Line("Mends: Helpers.EquipmentHelper.AssignHeroEquipmentFromEquipment NIEZNALEZIONE - elekcja krola nadal moze polozyc gre.");
             }
@@ -4702,7 +4978,7 @@ namespace CrashScribe
         {
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this,
                 delegate (CampaignGameStarter s)
-                { Mends.ArmorSanity(); Mends.AmmoSanity(); Army175.TierGearCheck(); Mends.WeightLaw(); Mends.ArmorTierLaw(); Mends.WeaponTierLaw(); Mends.SkillSinew(); Army175.NorthHardy(); Army175.DothrakiRiders(); Army175.OldArmouries(); Mends.UniqueWares(); Mends.LoreForgeGate(); Mends.DressTheNamesakes(); Mends.NorthernFare(); Mends.ItemDump(); Mends.ReligionAudit(); Mends.RulerRobesAudit(); });
+                { Mends.ArmorSanity(); Mends.AmmoSanity(); Army175.TierGearCheck(); Mends.WeightLaw(); Mends.ArmorTierLaw(); Mends.WeaponTierLaw(); Mends.SkillSinew(); Army175.NorthHardy(); Army175.DothrakiRiders(); Army175.OldArmouries(); Mends.UniqueWares(); Mends.LoreForgeGate(); Mends.DressTheNamesakes(); Mends.HeroSinewAll("wczytanie"); Mends.NorthernFare(); Mends.ItemDump(); Mends.ReligionAudit(); Mends.RulerRobesAudit(); });
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this,
                 delegate (TaleWorlds.CampaignSystem.MapEvents.MapEvent m) { Mends.MeltDeadLoot(m); Mends.WardReport(); OthersSteel.OnMapEventEnded(m); });
             // 175c: Wedrowcy obecni od poczatku bitwy (do linii "Inni (175c): bitwa")
@@ -4720,7 +4996,10 @@ namespace CrashScribe
                     Army175.PoolDaily();      // 175: stan postfiksu puli ROT (Dothrakowie), gdy cos sie dzialo
                     Army175.RespawnDaily();   // 175: partie lordow AI z szablonu (konni bez konia z odrodzenia)
                     OthersSteel.Daily();      // 175c: suwaki zasady stali Innych, linia dobowa bitew z Innymi
+                    Mends.HeroSinewAll("dzien");   // Z16: przeglad bohaterow AI (drogi omijajace gardlo; normalnie 0)
                 });
+            // Z16: bohaterowie AI ubrani z szablonu od ostatniej godziny - umiejetnosc do nowego zestawu
+            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, delegate { Mends.HeroSinewQueue(); });
             CampaignEvents.MobilePartyCreated.AddNonSerializedListener(this,
                 delegate (TaleWorlds.CampaignSystem.Party.MobileParty mp) { Army175.OnPartyCreated(mp); });
         }
