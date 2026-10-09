@@ -2056,7 +2056,7 @@ namespace Armoury
         [SettingPropertyGroup("Iron bank")]
         public float NonCombatantDeathPercent { get; set; } = 5f;
 
-        [SettingPropertyBool("Prisoner Law Enabled", HintText = "captives sold in a town or castle, or set free, in a land that keeps no slaves no longer become slaves: common men and soldiers go back to their own land, and in Westeros bandits and outlaws are sent to the Wall to take the black. Westeros but the Iron Islands, and Braavos, Pentos, Lorath and the other free lands, keep no slaves; Slaver's Bay, Volantis, Lys, Myr, Tyrosh, Qohor, Norvos, Valyria, the Dothraki and the Iron Islands (thralls) do, as before")]
+        [SettingPropertyBool("Prisoner Law Enabled", HintText = "captives sold in a town or castle, or set free, in a land that keeps no slaves no longer become slaves: common men and soldiers go back to their own land, and in Westeros bandits and outlaws are sent to the Wall to take the black. Westeros but the Iron Islands, and Braavos, Pentos, Lorath and the other free lands, keep no slaves; Slaver's Bay, Qarth and New Ghis, Volantis, Lys, Myr, Tyrosh, Qohor, Norvos, Valyria, the Dothraki and the Iron Islands (thralls) do: there captives sold, by the lords or by you at the ransom broker, become slaves of the town (in your own fiefs your criminal policy decides), and captives you set free or leave behind after your battles go home")]
         [SettingPropertyGroup("Iron bank")]
         public bool PrisonerLawEnabled { get; set; } = true;
 
@@ -2808,7 +2808,7 @@ namespace Armoury
         [SettingPropertyGroup("Northern fare")]
         public bool WoodlotByClimate { get; set; } = true;
 
-        [SettingPropertyBool("Village Climate Fix", HintText = "12 villages whose main produce cannot grow where they stand get one that can (cotton at the Wall, in Braavos, in the Vale mountains and in Sarnor, a vineyard in Lorath, dates on Tarth), and 5 warm villages (Qarth, Volantis, Lys, Tyrosh) take up cotton so the world keeps some; the 4 grain farms beyond the Wall turn to hunting and fishing (2 trappers in the forest, 2 fishers by the water) - the Free Folk keep no grain farms (every village still gathers a little grain). Applied at session start, nothing is written to the save (off = the map's own village types after the next load; fishing boats Storrold has already sent out stay)")]
+        [SettingPropertyBool("Village Climate Fix", HintText = "12 villages whose main produce cannot grow where they stand get one that can (no more cotton at the Wall, in Braavos, Norvos, the Vale mountains, the Riverlands, the Kingswood, the Crownlands and Sarnor, no vineyard in Lorath, no dates on Tarth), and 11 warm villages (Qarth, Volantis and the Rhoyne, Myr, Meereen, the old Valyrian lands, the Reach) take up cotton so the world keeps as much cotton as before; the 4 grain farms beyond the Wall turn to hunting and fishing (2 trappers in the forest, 2 fishers by the water) - the Free Folk keep no grain farms (every village still gathers a little grain). Applied at session start, nothing is written to the save (off = the map's own village types after the next load; fishing boats Storrold has already sent out stay)")]
         [SettingPropertyGroup("Northern fare")]
         public bool VillageClimateFix { get; set; } = true;
 
