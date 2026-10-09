@@ -50,9 +50,14 @@ namespace Armoury
 
         private sealed class Contract
         {
-            public MobileParty Car; public string CarId; public Settlement Dest, Src; public int Mat, Qty, Day, Paid, Retarget; public float Dist; public bool Naval;
+            public MobileParty Car; public string CarId; public Settlement Dest, Src; public int Mat, Qty, Day, Paid, Retarget, HoldStreak; public float Dist; public bool Naval;
         }
         private const int MaxRetarget = 2;   // recenzja 174: cel zmieniony przez innych (BK Shipping, porty) - po 2 przywroceniach zwolnienie, bez ping-pongu
+        // 174b.1 (krytyka 14): karawana z kontraktem stawiana na postoj co godzine przez cudzy kod - po tylu kolejnych godzinach ruszania z postoju
+        // zwolnienie "postoj wymuszany" (jedna linia z nazwa). Postoj po bitwie albo po oblezeniu to 1 godzina; nocny oboz nie liczy sie wcale.
+        private const int MaxHoldStreak = 6;
+        internal static bool ShipHooked;     // 174b.1: prefiks BK BKShippingBehavior.RouteCaravanHopByHop wpiety
+        private static MethodInfo _shipInvalidate, _shipGetBeh;   // BK InvalidateRedirectCache i Campaign.GetCampaignBehavior<BKShippingBehavior> (instancja przy kazdym wywolaniu)
         internal static bool HourlyHooked;   // prefiks BK/gry HourlyTickParty wpiety - karawana z kontraktem bez DoNotMakeNewDecisions (ucieka jak kazda)
         private static readonly List<Contract> _contracts = new List<Contract>();
         private static readonly Dictionary<MobileParty, Contract> _byCar = new Dictionary<MobileParty, Contract>();
@@ -67,6 +72,8 @@ namespace Armoury
         private static readonly int[] _dMade = new int[M], _dMadeQty = new int[M];
         private static int _dDone, _dLost, _dLostQty, _dRelHost, _dRel30, _dRelOther, _dNoCar, _dNoSrc, _dNoGain, _dNoRoad, _dRejected, _dPause, _dEnough, _dRetarget, _dKeptTarget, _stumbles, _stumblesAll;
         private static int _dRelSiege, _dRelRetarget, _dRelDisband, _dShortPack, _dSmall, _dHoldMoved;   // recenzja 174
+        private static int _dCampHours, _dShipBlocked, _dRelForcedHold;   // 174b.1: godziny kontraktow w obozie, BK Shipping zablokowany, zwolnienia "postoj wymuszany"
+        private static readonly List<string> _dRetEx = new List<string>();   // 174b.1: przyklady "cel = inne miasto" (karawana -> miasto, gdzie stoi)
         private static long _dGold, _dMargin, _dPaidDest;
         private static double _dDays;
         private static readonly List<string> _dEx = new List<string>();
@@ -92,6 +99,7 @@ namespace Armoury
             Array.Clear(_dMade, 0, M); Array.Clear(_dMadeQty, 0, M);
             _dDone = _dLost = _dLostQty = _dRelHost = _dRel30 = _dRelOther = _dNoCar = _dNoSrc = _dNoGain = _dNoRoad = _dRejected = _dPause = _dEnough = _dRetarget = _dKeptTarget = _stumbles = 0;
             _dRelSiege = _dRelRetarget = _dRelDisband = _dShortPack = _dSmall = _dHoldMoved = 0; _dCampSeen = 0;
+            _dCampHours = _dShipBlocked = _dRelForcedHold = 0; _dRetEx.Clear();
             _dGold = _dMargin = _dPaidDest = 0; _dDays = 0; _dEx.Clear();
         }
 
@@ -275,7 +283,7 @@ namespace Armoury
             _missOreSince.Clear(); _srcOreSince.Clear(); _namesSince = day;
         }
 
-        /// <summary>Kontrakty w drodze: zniszczone, rozwiazywana, wrogosc, oblezenie celu, 30 dob, cel zmieniony (przywrocony najwyzej MaxRetarget razy).</summary>
+        /// <summary>174b.1: przeglad doby - tylko limit 30 dob i wylacznik (logika celu jest w takcie godzinowym Hourly); zniszczona karawana - jak dotad.</summary>
         private static void Keep(int day)
         {
             for (int i = _contracts.Count - 1; i >= 0; i--)
@@ -285,24 +293,72 @@ namespace Armoury
                 {
                     var car = c.Car;
                     if (car == null || !car.IsActive) { Drop(c); _dLost++; _dLostQty += c.Qty; continue; }
-                    if (car.MapEvent != null) continue;
-                    if (car.IsDisbanding) { Release(c); _dRelDisband++; continue; }
-                    // wrogosc celu; recenzja 174: cel oblegany - BK Shipping co godzine kieruje karawane do bezpiecznego miasta; bez zwolnienia ping-pong do konca oblezenia
-                    if (DestLost(car, c)) { Release(c); continue; }
                     if (day - c.Day > 30) { Release(c); _dRel30++; continue; }
                     if (!On) { Release(c); _dRelOther++; continue; }
-                    if (car.CurrentSettlement == c.Dest) { Deliver(car, c.Dest); continue; }   // stoi w celu (wjazd przed zapisem / bez zdarzenia)
-                    if (car.TargetSettlement != c.Dest)
-                    {
-                        if (NightRest.IsCamping(car)) _dCampSeen++;   // 174b.0: pomiar - ile "cudzych celow" to nasz nocny oboz
-                        if (car.CurrentSettlement != null && car.CurrentSettlement.IsUnderSiege) continue;   // nie wyprowadzamy jej z obleganego miasta prosto do obozu oblegajacych
-                        if (c.Retarget >= MaxRetarget) { Release(c); _dRelRetarget++; continue; }   // cel zmieniaja inni (BK Shipping, porty) - karawana zostaje z towarem
-                        try { if (car.CurrentSettlement != null) LeaveSettlementAction.ApplyForParty(car); } catch (Exception e) { Stumble("Keep(wyjazd)", e); }   // jak posilki DTE
-                        if (Move(car, c.Dest, c.Naval)) { _dRetarget++; c.Retarget++; } else { Release(c); _dRelOther++; }
-                    }
+                    if (NightRest.IsCamping(car)) _dCampSeen++;   // 174b.0: pomiar (przeglad doby w godzinie obozu)
                 }
                 catch (Exception e) { Stumble("Keep", e); }
             }
+        }
+
+        /// <summary>
+        /// 174b.1 KONTRAKT TRZYMA CEL (docs/PROJEKT-174B rozdz. 3.1). Wolane w delegacie godzinowym ZARAZ PO NightRest.OnHourly (ArmouryBehavior) - stan obozu
+        /// tej godziny jest juz ustawiony. Dla kazdego kontraktu w tej kolejnosci: karawany nie ma - przepada; w bitwie - nic; rozwiazywana - zwolnienie;
+        /// cel oblegany albo wrogi - zwolnienie; stoi w celu - dostawa; SPI w nocnym obozie swiata - nic (jedna regula: karawana z kontraktem spi jak kazda,
+        /// swit odda jej cel - licznik godzin "w obozie"); w obleganym miescie - nic; cel = brak albo postoj (Hold: po bitwie MapEvent.cs:903, zmiana
+        /// wlasciciela miasta, oblezenie) - wyjazd z osady i rozkaz jazdy do celu BEZ licznika zmian celu ("ruszona z postoju"; po MaxHoldStreak kolejnych
+        /// godzinach - zwolnienie "postoj wymuszany"); cel = INNE miasto - jak dotad: po MaxRetarget przywroceniach zwolnienie "cel zmieniany przez innych",
+        /// inaczej rozkaz i "cel przywrocony". Dotad to samo robil raz na dobe Keep (doba w srodku obozu = kazda noc liczona jako cudzy cel) i prefiks BK
+        /// raz na dobe (dlawik BKROT).
+        /// </summary>
+        internal static void Hourly()
+        {
+            if (_pending != null) { try { ResolvePending("godzina przed startem sesji"); } catch (Exception e) { Stumble("Hourly(ResolvePending)", e); } }
+            if (_contracts.Count == 0) return;
+            long tc = Cost174.Begin(Cost174.SMoHourly);   // 174b.5 F6 (probka 1/16, tylko log)
+            try
+            {
+                for (int i = _contracts.Count - 1; i >= 0; i--)
+                {
+                    if (i >= _contracts.Count) continue;   // dostawa / zwolnienie usuwa z listy
+                    var c = _contracts[i];
+                    try
+                    {
+                        var car = c.Car;
+                        if (car == null || !car.IsActive) { Drop(c); _dLost++; _dLostQty += c.Qty; continue; }
+                        if (car.MapEvent != null) continue;
+                        if (car.IsDisbanding) { Release(c); _dRelDisband++; continue; }
+                        if (DestLost(car, c)) { Release(c); continue; }
+                        if (car.CurrentSettlement == c.Dest) { Deliver(car, c.Dest); continue; }
+                        if (NightRest.IsCamping(car)) { _dCampHours++; continue; }
+                        if (car.CurrentSettlement != null && car.CurrentSettlement.IsUnderSiege) continue;   // nie wyprowadzamy jej z obleganego miasta prosto do obozu oblegajacych
+                        bool idle = car.TargetSettlement == null || car.DefaultBehavior == AiBehavior.Hold;
+                        if (!idle && car.TargetSettlement == c.Dest) { c.HoldStreak = 0; continue; }   // jedzie do celu (ucieczka zmienia tylko cel krotkoterminowy)
+                        if (idle)
+                        {
+                            if (++c.HoldStreak > MaxHoldStreak)
+                            {
+                                Log.Info("Kontrakty surowca (174): " + car.Name + " - postoj wymuszany " + MaxHoldStreak + " godzin z rzedu (cel " + c.Dest.Name
+                                         + (car.CurrentSettlement != null ? ", stoi w " + car.CurrentSettlement.Name : ", w polu") + ") - kontrakt zwolniony, ladunek zostaje karawanie.");
+                                Release(c); _dRelForcedHold++; continue;
+                            }
+                            try { if (car.CurrentSettlement != null) LeaveSettlementAction.ApplyForParty(car); } catch (Exception e) { Stumble("Hourly(wyjazd)", e); }   // jak posilki DTE
+                            if (Move(car, c.Dest, c.Naval)) _dHoldMoved++; else { Release(c); _dRelOther++; }
+                            continue;
+                        }
+                        // cel = inne miasto
+                        c.HoldStreak = 0;
+                        if (c.Retarget >= MaxRetarget) { Release(c); _dRelRetarget++; continue; }   // cel zmieniaja inni - karawana zostaje z towarem
+                        if (_dRetEx.Count < 3)
+                            _dRetEx.Add(car.Name + " -> " + car.TargetSettlement.Name + " zamiast " + c.Dest.Name
+                                        + (car.CurrentSettlement != null ? " (w " + car.CurrentSettlement.Name + ")" : car.IsCurrentlyAtSea ? " (na morzu)" : " (w polu)"));
+                        try { if (car.CurrentSettlement != null) LeaveSettlementAction.ApplyForParty(car); } catch (Exception e) { Stumble("Hourly(wyjazd)", e); }
+                        if (Move(car, c.Dest, c.Naval)) { _dRetarget++; c.Retarget++; } else { Release(c); _dRelOther++; }
+                    }
+                    catch (Exception e) { Stumble("Hourly", e); }
+                }
+            }
+            finally { Cost174.End(Cost174.SMoHourly, tc); }
         }
 
         private static void Order(Town town, int m, int day)
@@ -441,6 +497,7 @@ namespace Armoury
             if (got <= 0) { _dNoGain++; return; }
             var c = new Contract { Car = car, CarId = car.StringId, Dest = dest, Src = src, Mat = m, Qty = got, Day = day, Paid = (int)paid, Dist = dist, Naval = naval };
             try { if (car.CurrentSettlement != null) LeaveSettlementAction.ApplyForParty(car); } catch (Exception e) { Stumble("Place(wyjazd)", e); }
+            ShipForget(car);   // 174b.1: stary stan "hop-by-hop" BK Shipping sprzed kontraktu nie prowadzi karawany do dawnego celu
             _contracts.Add(c); _byCar[car] = c;
             if (!Move(car, dest, naval)) { Release(c); _dRejected++; return; }   // rozkaz odrzucony (straznik drog) - karawana handluje dalej sama, z ladunkiem
             _dMade[m]++; _dMadeQty[m] += got; _dGold += paid; _dMargin += (long)margin;
@@ -481,7 +538,20 @@ namespace Armoury
         private static void Drop(Contract c)
         {
             _contracts.Remove(c);
-            if (c.Car != null) _byCar.Remove(c.Car);
+            if (c.Car != null) { _byCar.Remove(c.Car); NightRest.ForgetOrder(c.Car); }   // 174b.1 (krytyka 6): swit nie odda celu utraconego kontraktu
+        }
+
+        /// <summary>174b.1 (krytyka 1): BK InvalidateRedirectCache na instancji BKShippingBehavior TEJ kampanii (bez zapamietanej instancji - po wczytaniu
+        /// innego zapisu w tej samej sesji stara instancja trzymalaby w pamieci cala poprzednia kampanie).</summary>
+        private static void ShipForget(MobileParty car)
+        {
+            try
+            {
+                if (car == null || _shipInvalidate == null || _shipGetBeh == null || Campaign.Current == null) return;
+                var beh = _shipGetBeh.Invoke(Campaign.Current, null);
+                if (beh != null) _shipInvalidate.Invoke(beh, new object[] { car });
+            }
+            catch (Exception e) { Stumble("ShipForget", e); }
         }
 
         /// <summary>Zwolnienie: AI karawany wraca (BK wybierze cel przy najblizszym ticku), ladunek zostaje jej.</summary>
@@ -551,19 +621,42 @@ namespace Armoury
             catch (Exception e) { Stumble("OnPartyDestroyed", e); }
         }
 
-        /// <summary>Prefiks BK BKCaravansBehavior.ReleaseCaravanFromHold (koniec oblezenia, karawana bez rozkazu): karawana z kontraktem jedzie dalej do celu.</summary>
+        /// <summary>Prefiks BK BKCaravansBehavior.ReleaseCaravanFromHold (wczytanie gry - OnGameLoaded, PRZED OnSessionLaunched; koniec oblezenia; Hold w ticku BK):
+        /// karawana z kontraktem jedzie dalej do celu. 174b.1: (krytyka 2) najpierw kontrakty z zapisu - inaczej po wczytaniu _byCar jest pusty i BK dawal
+        /// wlasny cel karawanom, ktore zapisano w nocnym obozie albo po bitwie; spiaca w obozie - nic (swit odda cel); (krytyka 9) licznik wedlug tej samej
+        /// reguly co Hourly: cel brak albo Hold = "ruszona z postoju", inne miasto = "cel przywrocony" (po MaxRetarget - zwolnienie).</summary>
         public static bool ReleasePrefix(MobileParty __0)
         {
             try
             {
+                if (_pending != null) ResolvePending("wczytanie: BK ReleaseCaravanFromHold");
                 Contract c;
                 if (__0 == null || _byCar.Count == 0 || !_byCar.TryGetValue(__0, out c)) return true;
                 if (DestLost(__0, c)) { Release(c); return true; }   // cel oblegany albo wrogi - BK wybiera cel sam
-                bool changed = __0.TargetSettlement != c.Dest;   // recenzja 174: BK wola to co godzine - licznik tylko przy prawdziwej zmianie celu
-                if (Move(__0, c.Dest, c.Naval)) { if (changed) _dRetarget++; return false; }
+                if (NightRest.IsCamping(__0)) return false;          // spi - swit odda cel
+                bool idle = __0.TargetSettlement == null || __0.DefaultBehavior == AiBehavior.Hold;
+                bool other = !idle && __0.TargetSettlement != c.Dest;
+                if (other && c.Retarget >= MaxRetarget) { Release(c); _dRelRetarget++; return true; }
+                if (Move(__0, c.Dest, c.Naval)) { if (idle) _dHoldMoved++; else if (other) { _dRetarget++; c.Retarget++; } return false; }
             }
             catch (Exception e) { Stumble("ReleasePrefix", e); }
             return true;
+        }
+
+        /// <summary>174b.1 (krytyka 3): prefiks BK BKShippingBehavior.RouteCaravanHopByHop - KAZDA karawana z kontraktem (takze gdy BK wskazal nasz cel: BK
+        /// prowadzi wtedy przez wezel posredni i zapisuje stan hop-by-hop) - false bez zmiany celu; stary stan BK kasowany od razu (InvalidateRedirectCache na
+        /// instancji, ktora wola), wiec AdvanceHopByHopWaypoints juz nie wraca. Nasz rozkaz i tak sprawdza droge (straznik BK dla ladu, morze - All).</summary>
+        public static bool RouteHopPrefix(object __instance, MobileParty __0, ref bool __result)
+        {
+            try
+            {
+                if (__0 == null || _byCar.Count == 0 || !_byCar.ContainsKey(__0)) return true;
+                _dShipBlocked++;
+                try { if (_shipInvalidate != null && __instance != null) _shipInvalidate.Invoke(__instance, new object[] { __0 }); } catch (Exception e) { Stumble("RouteHopPrefix(stan BK)", e); }
+                __result = false;
+                return false;
+            }
+            catch (Exception e) { Stumble("RouteHopPrefix", e); return true; }
         }
 
         /// <summary>Cel oblegany albo wrogi karawanie (licznik zwolnien przy okazji).</summary>
@@ -575,25 +668,17 @@ namespace Armoury
         }
 
         /// <summary>Recenzja 174: prefiks BKCaravansBehavior.HourlyTickParty (i gry CaravansCampaignBehavior.HourlyTickParty bez BK) - karawana z kontraktem
-        /// nie dostaje od BK nowego celu ani zakupow; AI gry zostaje czynne (ucieczka). Stoi (Hold) poza obleganym miastem - rozkaz jazdy do celu
-        /// (jak BK ReleaseCaravanFromHold); cel oblegany albo wrogi - zwolnienie, BK rusza w tej samej godzinie.</summary>
+        /// nie dostaje od BK nowego celu ani zakupow; AI gry zostaje czynne (ucieczka). 174b.1: TYLKO blokada decyzji BK - ruch do celu i liczniki robi
+        /// Hourly co godzine (prefiks za dlawikiem BKROT biegl raz na dobe); cel oblegany albo wrogi - zwolnienie, BK rusza w tej samej godzinie.</summary>
         public static bool HourlyPrefix(MobileParty __0)
         {
             try
             {
+                if (_pending != null) ResolvePending("wczytanie: BK HourlyTickParty");
                 Contract c;
                 if (__0 == null || _byCar.Count == 0 || !_byCar.TryGetValue(__0, out c)) return true;
                 if (!__0.IsActive || __0.IsDisbanding) return true;
                 if (DestLost(__0, c)) { Release(c); return true; }
-                bool hold = __0.DefaultBehavior == AiBehavior.Hold || __0.ShortTermBehavior == AiBehavior.Hold;
-                if (hold && __0.MapEvent == null && (__0.TargetSettlement != c.Dest || __0.DefaultBehavior == AiBehavior.Hold)
-                    && (__0.CurrentSettlement == null || !__0.CurrentSettlement.IsUnderSiege) && __0.CurrentSettlement != c.Dest)
-                {
-                    bool changed = __0.TargetSettlement != c.Dest;
-                    if (changed && c.Retarget >= MaxRetarget) { Release(c); _dRelRetarget++; return true; }   // cel zmieniaja inni - jak w Keep
-                    try { if (__0.CurrentSettlement != null) LeaveSettlementAction.ApplyForParty(__0); } catch (Exception e) { Stumble("HourlyPrefix(wyjazd)", e); }   // jak Keep
-                    if (Move(__0, c.Dest, c.Naval) && changed) { _dHoldMoved++; c.Retarget++; }
-                }
                 return false;
             }
             catch (Exception e) { Stumble("HourlyPrefix", e); return true; }
@@ -609,7 +694,7 @@ namespace Armoury
                 if (!On && _contracts.Count == 0 && _dDone + _dLost + _dRelOther == 0) return;
                 var sb = new StringBuilder();
                 int made = 0; foreach (var n in _dMade) made += n;
-                int rel = _dRelHost + _dRelSiege + _dRel30 + _dRelOther + _dRejected + _dRelRetarget + _dRelDisband;
+                int rel = _dRelHost + _dRelSiege + _dRel30 + _dRelOther + _dRejected + _dRelRetarget + _dRelDisband + _dRelForcedHold;
                 sb.Append("Kontrakty surowca (174): dzien ").Append(day).Append(On ? "" : " (WYLACZONE - tylko zwolnienia)").Append(" - zawarto ").Append(made).Append(" [");
                 for (int m = 0; m < M; m++) { if (m > 0) sb.Append(", "); sb.Append(Names[m]).Append(' ').Append(_dMadeQty[m]); }
                 sb.Append(" sztuk] za ").Append(_dGold).Append(" d towaru (kasa miast-zrodel + clo panow; oczekiwana marza karawan ").Append(_dMargin).Append(" d); dojechalo ").Append(_dDone)
@@ -620,6 +705,9 @@ namespace Armoury
                   .Append(", cel zmieniany przez innych ").Append(_dRelRetarget).Append(", rozwiazana ").Append(_dRelDisband).Append(", 30 dob ").Append(_dRel30)
                   .Append(", rozkaz odrzucony ").Append(_dRejected).Append(", inne ").Append(_dRelOther).Append("); cel przywrocony ").Append(_dRetarget).Append(", ruszona z postoju ").Append(_dHoldMoved)
                   .Append(", w obozie przy przegladzie doby ").Append(_dCampSeen)
+                  .Append("; 174b.1: godzin kontraktow w nocnym obozie ").Append(_dCampHours).Append(", BK Shipping zablokowany ").Append(_dShipBlocked)
+                  .Append(ShipHooked ? "" : " (BRAK latki)").Append(", zwolnione: postoj wymuszany ").Append(_dRelForcedHold)
+                  .Append(", inny cel [").Append(_dRetEx.Count > 0 ? string.Join("; ", _dRetEx.ToArray()) : "-").Append("]")
                   .Append(HourlyHooked ? " (AI gry czynne - ucieczka jak kazda karawana)" : " (AI wstrzymane - wzor DTE, bez latki HourlyTickParty)")
                   .Append("; bez kontraktu: brak karawany w zrodle ").Append(_dNoCar).Append(", brak zrodla w zasiegu ").Append(_dNoSrc).Append(", bez drogi ").Append(_dNoRoad)
                   .Append(", ladunek ponizej ").Append(Math.Max(0f, s.TownMaterialOrderMinLoadKg).ToString("0", CultureInfo.InvariantCulture)).Append(" kg ").Append(_dSmall)
@@ -698,9 +786,10 @@ namespace Armoury
         /// karawana zwolniona (recenzja 174); wylaczone w MCM - karawana zwolniona.</summary>
         internal static void ResolvePending(string why)
         {
+            if (string.IsNullOrEmpty(_pending)) { _pending = null; return; }
+            if (!Ready()) return;   // 174b.1: przedmioty jeszcze niegotowe (wczesne wywolanie z prefiksu BK) - napis czeka na nastepna okazje
             var s = _pending;
             _pending = null;
-            if (string.IsNullOrEmpty(s) || !Ready()) return;
             int ok = 0, gone = 0, freed = 0, broken = 0;
             var byId = new Dictionary<string, MobileParty>();
             foreach (var p in MobileParty.AllCaravanParties) if (p != null && !string.IsNullOrEmpty(p.StringId)) byId[p.StringId] = p;
@@ -761,10 +850,28 @@ namespace Armoury
                     if (mh != null) { h.Patch(mh, prefix: new HarmonyMethod(typeof(MaterialOrders), nameof(HourlyPrefix))); HourlyHooked = true; }
                 }
                 catch (Exception e) { Log.Error("MaterialOrders.ApplyAll(HourlyTickParty)", e); }
+                // 174b.1 (krytyka 3): BK Shipping prowadzi karawane "hop-by-hop" po wjezdzie do obcego portu i ze starego stanu - prefiks blokuje to karawanom
+                // z kontraktem; InvalidateRedirectCache i GetCampaignBehavior<T> zapamietane jako metody, instancja brana przy kazdym wywolaniu (krytyka 1)
+                var ts = QuartermasterLaw.FindType("BannerKings.Behaviours.Shipping.BKShippingBehavior");
+                try
+                {
+                    if (ts != null)
+                    {
+                        var mr = AccessTools.Method(ts, "RouteCaravanHopByHop", new[] { typeof(MobileParty), typeof(Settlement) });
+                        if (mr != null && mr.ReturnType == typeof(bool)) { h.Patch(mr, prefix: new HarmonyMethod(typeof(MaterialOrders), nameof(RouteHopPrefix))); ShipHooked = true; }
+                        _shipInvalidate = AccessTools.Method(ts, "InvalidateRedirectCache", new[] { typeof(MobileParty) });
+                        var g = AccessTools.Method(typeof(Campaign), "GetCampaignBehavior");
+                        if (g != null && g.IsGenericMethodDefinition) _shipGetBeh = g.MakeGenericMethod(ts);
+                    }
+                }
+                catch (Exception e) { Log.Error("MaterialOrders.ApplyAll(BK Shipping)", e); }
                 Log.Info("MaterialOrders (174.2): kontrakty surowca dla prawdziwych karawan " + (On ? "CZYNNE" : "wylaczone w MCM") + "; BK ReleaseCaravanFromHold (cel po oblezeniu) "
                          + (ReleaseHooked ? "wpiety - karawana z kontraktem jedzie dalej do celu" : (t == null ? "bez BK - nic do wpiecia" : "BRAK metody"))
                          + "; HourlyTickParty karawan (" + (t != null ? "BK" : "gra") + ") " + (HourlyHooked ? "wpiety - karawana z kontraktem bez nowego celu, AI gry czynne (ucieczka)"
-                         : "BRAK - AI karawany z kontraktem wstrzymane wzorem DTE (nie ucieka)") + ".");
+                         : "BRAK - AI karawany z kontraktem wstrzymane wzorem DTE (nie ucieka)")
+                         + "; 174b.1: BK Shipping RouteCaravanHopByHop " + (ShipHooked ? "wpiety" : (ts == null ? "bez BK Shipping - nic do wpiecia" : "BRAK"))
+                         + ", InvalidateRedirectCache " + (_shipInvalidate != null && _shipGetBeh != null ? "znaleziony" : (ts == null ? "bez BK Shipping" : "BRAK"))
+                         + "; cel kontraktu pilnowany co godzine (MaterialOrders.Hourly po nocnym obozie).");
             }
             catch (Exception e) { Log.Error("MaterialOrders.ApplyAll", e); }
         }

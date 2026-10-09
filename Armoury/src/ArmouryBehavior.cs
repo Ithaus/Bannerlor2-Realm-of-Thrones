@@ -636,6 +636,7 @@ namespace Armoury
                     try { AdvanceProjects(); } catch (Exception e) { Log.Error("AdvanceProjects(h)", e); }
                     try { TryStripNewCaptives("hourly"); } catch { }
                     try { NightRest.OnHourly(); } catch { }
+                    try { MaterialOrders.Hourly(); } catch (Exception e) { Log.Error("MaterialOrders.Hourly", e); }   // 174b.1: kontrakt surowca trzyma cel - ZARAZ PO obozie tej godziny
                     try
                     {
                         // ekran lupow nie odebral kolejki w godzine - do sakw z nia

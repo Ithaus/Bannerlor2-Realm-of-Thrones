@@ -556,6 +556,13 @@ namespace Armoury
             catch { return false; }
         }
 
+        /// <summary>174b.1 (krytyka 6): kontrakt surowca zwolniony albo dostarczony w nocy - swit nie oddaje karawanie zapamietanego celu kontraktu
+        /// (np. obleganego albo wrogiego miasta); karawana budzi sie bez rozkazu i decyduje AI/BK. Spi dalej do switu jak kazda.</summary>
+        internal static void ForgetOrder(MobileParty mp)
+        {
+            try { if (mp != null && _orders.Count > 0) _orders.Remove(mp); } catch { }
+        }
+
         private static void RememberOrder(MobileParty mp)
         {
             try
