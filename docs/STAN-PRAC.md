@@ -777,3 +777,5 @@ NOWE ZADANIA 09.10: (1) audyt umiejetnosci - zwlaszcza: przekazywanie broni/miec
 **WGRANIE 8 (09.10 ok. 01:50):** CrashScribe e8d460c5 (= 269cc980 + E1 pokoj z biedy; galaz w-toku/e1-pokoj 5b4e551), Armoury 63640cb3. Poprzedni CS: CrashScribe.dll.bak-2026-10-09-przed-noc8
 + D:\Backup-Bannerlord\wgrane\2026-10-09-noc8-przed. Testy: 40 dob + zapis 362 - 0 bledow, 0 potkniec; SKUTEK NIESPRAWDZONY (0 glosowan o pokoj w 48 dobach; pokoje daje
 Diplomacy z wyczerpania; Diplomacy lata ConsiderPeace - moze wycinac wnioski AI). ZATWIERDZONE OD TERAZ: Armoury 63640cb3, CrashScribe e8d460c5.
+**DECYZJA JEFFA 09.10 (K, doprecyzowanie):** "chce oba mechanizmy" - (1) zolnierze (takze w druzynie gracza i w jego zalogach) SAMI sie dozbrajaja za swoje - z zoldu i lupow
+kupuja lepszy sprzet; (2) gracz moze ich dozbroic WYMIANA - daje lepsza zbroje/bron, a oni oddaja mu swoja gorsza (Jeff: "pisalem juz o tym"). Do zrobienia (paczka K1).
