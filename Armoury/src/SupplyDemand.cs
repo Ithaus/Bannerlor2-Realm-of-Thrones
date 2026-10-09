@@ -409,6 +409,9 @@ namespace Armoury
                 }
 
                 int moved = 0, deals = 0, stuck = 0; long paid = 0;
+                // 171 C8 (Z6): zamek nie jest targiem broni - kupcy nie wioza tam broni natychmiast, bez drogi; zaloga zamku zamawia w miescie
+                // (GarrisonCarts). Zamek zostaje ZRODLEM: jego zapas ponad popyt kupcy wywoza do miast
+                bool noCastles = GarrisonCarts.On;
                 foreach (var kv in sample)
                 {
                     int key = kv.Key; var probe = kv.Value;
@@ -436,6 +439,7 @@ namespace Armoury
                             foreach (var dst in places)
                             {
                                 if (dst == src || poor.Contains(dst)) continue;
+                                if (noCastles && dst.IsCastle) continue;
                                 float dist = srcPos.Distance(dst.GetPosition2D);
                                 if (dist > range) continue;
                                 int dh; stock[dst].TryGetValue(key, out dh);
