@@ -55,9 +55,152 @@ namespace CrashScribe
         public override void RegisterEvents()
         {
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, Daily);
+            CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this, OnSessionLaunched);   // T2: linia startowa kalendarza
         }
 
         public override void SyncData(IDataStore dataStore) { }
+
+        // --- KALENDARZ INNYCH (T2 noc 08/09.10; audyt 2026-10-09 rozdz. 4 T2, raport 06 N1) ---
+        // Jeff: "Nieumarli za szybko rosna, powinni zaczynac podboj dopiero po kilku latach, tak jak bylo w ksiazkach".
+        // Pochod nie wybiera celu przed jego dniem, Zew spi do NightKingCallFromDay, banda z rozkazem oblezenia
+        // na zamkniety cel dostaje patrol przy siedzibie klanu. Zadnych kluczy zapisu: dzien liczony od startu
+        // kampanii (ten sam zegar co ROT i Fabula), wiec w trwajacej kampanii dziala od razu. Zdobytych osad nie ruszamy.
+        // Kolejnosc w kalendarzu (do linii logu): Piesc, Craster, Rogowa Stopa, Mrozny Brzeg, Thenn, Kly Mrozu, Hardhome, Mur.
+        // Id z ROT.Misc/ROTSettlements.cs:120, 118, 308, 396, 136, 132, 138, 16.
+        private static readonly string[] CalendarIds =
+            { "castle_S6", "castle_S5", "castle_N6", "ROT_castle45", "town_S6", "town_S4", "town_S7", "ROT_castle60" };
+
+        /// <summary>Dzien od startu kampanii - ten sam zegar co kajdany ROT (ROT:1068-1088) i Fabula.DayNow.</summary>
+        private static double Day()
+        {
+            try { return (CampaignTime.Now - Campaign.Current.Models.CampaignTimeModel.CampaignStartTime).ToDays; }
+            catch { return 0.0; }   // blad = wszystko zamkniete (bezpieczniej niz otwarte)
+        }
+
+        /// <summary>Skala kajdan ROT: tak jak je naprawde liczy ROT - x FabulaTimeScale, gdy Fabula podmienia stale
+        /// (Fabula.OthersTranspiler instaluje sie tylko przy FabulaPacerEnabled), inaczej x1.</summary>
+        private static float ShackleK()
+        {
+            if (!Config.FabulaPacerEnabled) return 1f;
+            float k = Config.FabulaTimeScale;
+            if (k < 0.25f) k = 0.25f;
+            if (k > 6f) k = 6f;
+            return k;
+        }
+
+        /// <summary>Od ktorego dnia kampanii Inni moga brac te osade. Nigdy wczesniej niz NightKingSiegeFromDay.</summary>
+        private static int OpenDay(Settlement s)
+        {
+            int floor = Math.Max(0, Config.NightKingSiegeFromDay);
+            if (s == null) return floor;
+            int v = floor;
+            try
+            {
+                string id = s.StringId;
+                if (id == "ROT_castle60") v = Config.NightKingWallFromDay;                       // Mur
+                else if (Config.NightKingRespectShackles)
+                {
+                    float k = ShackleK();
+                    if (id == "ROT_castle45" || id == "castle_N6") v = (int)Math.Ceiling(300f * k);   // Mrozny Brzeg, Rogowa Stopa
+                    else if (id == "town_S6" || id == "town_S4") v = (int)Math.Ceiling(400f * k);     // Thenn, Kly Mrozu
+                    else if (id == "town_S7") v = (int)Math.Ceiling(500f * k);                        // Hardhome
+                }
+            }
+            catch { }
+            return Math.Max(v, floor);
+        }
+
+        private static bool Closed(Settlement s, double day)
+        {
+            return Config.NightKingCalendarEnabled && s != null && day < OpenDay(s);
+        }
+
+        /// <summary>Linia startowa: caly kalendarz z nazwami z gry.</summary>
+        private void OnSessionLaunched(CampaignGameStarter starter)
+        {
+            try
+            {
+                if (!Config.NightKingCalendarEnabled) { Scribe.Line("Kalendarz Innych: wylaczony (NightKingCalendarEnabled = false)."); return; }
+                var sb = new System.Text.StringBuilder();
+                foreach (var id in CalendarIds)
+                {
+                    Settlement s = null;
+                    try { s = Settlement.Find(id); } catch { }
+                    if (s == null) continue;
+                    if (sb.Length > 0) sb.Append(", ");
+                    sb.Append(s.Name).Append(" od ").Append(OpenDay(s));
+                    if (IsOthers(s.OwnerClan)) sb.Append(" (juz Innych)");
+                }
+                Scribe.Line("Kalendarz Innych: czynny - dzis dzien " + ((int)Day()) + "; cele: " + sb
+                            + "; inne osady za Murem od " + Math.Max(0, Config.NightKingSiegeFromDay)
+                            + "; Zew od " + Config.NightKingCallFromDay
+                            + (Config.NightKingRespectShackles ? " (kajdany ROT x" + ShackleK().ToString("0.00") + ")" : " (bez kajdan ROT)")
+                            + ". Zdobytych osad nie odbieramy.");
+                Scribe.Line(CalendarState(Day()));
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "NightKingCall.OnSessionLaunched", null); } catch { } }
+        }
+
+        /// <summary>Stan kalendarza na dzis (raz na dobe): Zew spi/czynny, najblizszy otwierany cel, ile zamknietych.</summary>
+        private static string CalendarState(double day)
+        {
+            var sb = new System.Text.StringBuilder();
+            int today = (int)day;
+            if (day < Config.NightKingCallFromDay)
+                sb.Append("Zew Nocnego Krola: spi do dnia ").Append(Config.NightKingCallFromDay).Append(" (dzis ").Append(today).Append("); Pochod czeka. ");
+            sb.Append("Kalendarz Innych: dzien ").Append(today);
+            Settlement next = null; int nextDay = int.MaxValue, closed = 0, owned = 0, known = 0;
+            foreach (var id in CalendarIds)
+            {
+                Settlement s = null;
+                try { s = Settlement.Find(id); } catch { }
+                if (s == null) continue;
+                known++;
+                if (IsOthers(s.OwnerClan)) { owned++; continue; }
+                int od = OpenDay(s);
+                if (day >= od) continue;
+                closed++;
+                if (od < nextDay) { nextDay = od; next = s; }
+            }
+            if (next != null)
+                sb.Append("; najblizszy otwierany cel ").Append(next.Name).Append(" od dnia ").Append(nextDay)
+                  .Append(" (za ").Append(Math.Max(0, nextDay - today)).Append(" dob)");
+            else sb.Append("; wszystkie cele z kalendarza otwarte");
+            sb.Append("; zamkniete ").Append(closed).Append(" z ").Append(known).Append(", juz Innych ").Append(owned);
+            if (day < Config.NightKingSiegeFromDay)
+                sb.Append("; pozostale osady za Murem od dnia ").Append(Math.Max(0, Config.NightKingSiegeFromDay));
+            sb.Append(".");
+            return sb.ToString();
+        }
+
+        /// <summary>Banda z rozkazem oblezenia na zamkniety cel (wolna, nie w bitwie) dostaje patrol przy siedzibie klanu.
+        /// Tanio: kilka band Innych raz na dobe.</summary>
+        private static void TurnBack(Clan ww, double day)
+        {
+            try
+            {
+                foreach (var wp in ww.WarPartyComponents)
+                {
+                    var mp = wp != null ? wp.MobileParty : null;
+                    if (mp == null || !mp.IsActive || mp.IsMainParty) continue;
+                    if (mp.DefaultBehavior != AiBehavior.BesiegeSettlement || Busy(mp)) continue;
+                    var tgt = mp.TargetSettlement;
+                    if (tgt == null || IsOthers(tgt.OwnerClan) || !Closed(tgt, day)) continue;
+                    var home = ww.HomeSettlement ?? mp.HomeSettlement;
+                    string who = mp.LeaderHero != null ? mp.LeaderHero.Name.ToString() : mp.Name.ToString();
+                    if (home == null || home == tgt)
+                    {
+                        Scribe.Line("Kalendarz Innych: " + who + " idzie na " + tgt.Name + " (otwarta od dnia " + OpenDay(tgt)
+                                    + "), ale brak siedziby do patrolu - rozkazu nie ruszamy.");
+                        continue;
+                    }
+                    SetPartyAiAction.GetActionForPatrollingAroundSettlement(mp, home, MobileParty.NavigationType.Default, false, false);
+                    Scribe.Line("Kalendarz Innych: " + who + " zawrocony spod " + tgt.Name + " (otwarta od dnia " + OpenDay(tgt)
+                                + ", dzis " + (int)day + ") - patrol przy " + home.Name + ".");
+                }
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "NightKingCall.TurnBack", null); } catch { } }
+        }
 
         private static object Others()
         {
@@ -189,11 +332,18 @@ namespace CrashScribe
         {
             int men = mp.MemberRoster.TotalManCount;
             Settlement best = null; float topOdds = -1f, bestDist = float.MaxValue;
+            double day = Day();
             foreach (var s in Candidates(beh))
             {
                 if (s == null || !s.IsFortification || s == _theWall) continue;   // Mur zostaje ROT
                 if (!Beyond(s)) continue;                                         // na poludnie nie idziemy
                 if (IsOthers(s.OwnerClan)) continue;                              // juz nasza
+                if (Closed(s, day))                                               // T2: kalendarz Innych
+                {
+                    if (table != null)
+                        table.Append("   ").Append(s.Name).Append(": zamknieta do dnia ").Append(OpenDay(s)).Append(Environment.NewLine);
+                    continue;
+                }
                 int guard = 1;
                 try { guard = s.Town != null ? Math.Max(1, s.Town.GetNumberOfTroops()) : 1; } catch { }
                 float odds = (float)men / guard;
@@ -335,11 +485,22 @@ namespace CrashScribe
         {
             try
             {
-                if (!Config.NightKingCallEnabled) return;
+                if (!Config.NightKingCallEnabled && !Config.NightKingCalendarEnabled) return;
                 var beh = Others();
                 if (beh == null) return;
                 var ww = WhiteWalkers();
                 if (ww == null || ww.IsEliminated) return;
+
+                // T2: kalendarz Innych - stan raz na dobe, zawrocenie band spod zamknietych celow, Zew spi do terminu
+                bool callAsleep = false;
+                if (Config.NightKingCalendarEnabled)
+                {
+                    double day = Day();
+                    Scribe.Line(CalendarState(day));
+                    TurnBack(ww, day);
+                    callAsleep = day < Config.NightKingCallFromDay;
+                }
+                if (!Config.NightKingCallEnabled || callAsleep) return;
                 Hero nk = null;
                 try { nk = _fNk != null ? _fNk.GetValue(beh) as Hero : null; } catch { }
                 int target = Math.Max(100, Config.NightKingCallTarget);
