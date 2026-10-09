@@ -824,3 +824,7 @@ Done/Cancel na War stockpile, trofeach, darze dla miasta. ZATWIERDZONE OD TERAZ:
 rosnie z marszu pieszo) -> Z16 bez +10/dobe. (15) obciazenie wsi docelowo 30-50% - OK. (24d) zloto Casterly Rock wyczerpane - OK (po naprawie dochodow rodow).
 (24a) Jeff pyta: "czyli chcesz dodac 7. tier stali, z ktorej mozna wykuc tylko legendarne i mityczne zbroje i miecze?" - odpowiedz w czacie (kuznia gry ma staly zestaw
 6 stali; material 6 -> "castle-forged steel"; stal valyrianska osobno, poza kuznia, tylko w istniejacych legendarnych mieczach, przekuwanie w Qohorze) - czeka na potwierdzenie.
+**DECYZJE JEFFA 09.10 ok. 04:00:** (1) samotne kolumny lordow: "maszeruja noca, gdy trzeba - spiesza sie, by przerwac rabunek, uciekaja przed armia - ale maja miec takie same
+kary jak gracz" -> T10: nocny marsz AI tylko z powodu (poscig/przechwycenie, obrona wlasnej wsi przed rabunkiem, ucieczka przed silniejszym), z tymi samymi karami co gracz.
+(2) tempo musztry z tabeli (t1->t6 na postoju ok. 1 rok przy Przywodztwie 255+, ok. 2,6 roku przy 100) - TAK. (24a) Jeff: "czyli nie wykuje valyrianskiego miecza?" - wyjasnione,
+czeka (propozycja: przekuwanie istniejacej stali valyrianskiej u mistrza w Qohorze jako jedyna droga).
