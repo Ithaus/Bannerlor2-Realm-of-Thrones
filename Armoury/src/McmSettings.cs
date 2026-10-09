@@ -2824,7 +2824,7 @@ namespace Armoury
         [SettingPropertyGroup("Armies of the realms (175)")]
         public int NorthHomeEdgePercent { get; set; } = 10;
 
-        [SettingPropertyInteger("North Hardy Skill Bonus", 0, 50, "0", HintText = "Northern infantry of tier 3 to 6 (village, noble and house lines, 43 troop types) gets this many points of its main weapon skill and of Athletics on top of what its own gear demands - the men of the North are built sterner. 15 makes them about a fifth (+20%) better than the infantry of tier 3 and up of the rest of the world, 25 about +28%, 50 about +48% (with 0 the North is about +7% better after the tier gear fix alone). Capped one point below the next tier's requirement, and only while Army 175 Tier Gear is at work. 0 = off. Applied by CrashScribe, takes effect on the next load")]
+        [SettingPropertyInteger("North Hardy Skill Bonus", 0, 50, "0", HintText = "Northern infantry of tier 3 to 6 (village, noble and house lines, 43 troop types) gets this many points of its main weapon skill and of Athletics on top of what its own gear demands - the men of the North are built sterner. 15 makes them about a fifth (+20%) better than the infantry of tier 3 and up of the rest of the world, 25 about +28% (with 0 the North is about +7% better after the tier gear fix alone). Each man is capped one point below the next tier's requirement, so above about 30 the cap holds most men back - 50 gives only about +35%. Works only while Army 175 Tier Gear is at work. 0 = off. Applied by CrashScribe, takes effect on the next load")]
         [SettingPropertyGroup("Armies of the realms (175)")]
         public int NorthHardySkillBonus { get; set; } = 15;
 
@@ -2868,7 +2868,7 @@ namespace Armoury
         [SettingPropertyGroup("Armies of the realms (175)")]
         public bool Army175NorthFoot { get; set; } = true;
 
-        [SettingPropertyBool("Army175 Volantis Norvos", HintText = "Volantis (the tiger cloaks are foot) and Norvos field more infantry and fewer archers and riders, as in the books; the Volantene elephants stay either way. Applied by CrashScribe, takes effect on the next load")]
+        [SettingPropertyBool("Army175 Volantis Norvos", HintText = "As in the books: Volantis fields more foot and fewer archers (the tiger cloaks are foot), Norvos more axemen and fewer riders; the Volantene riders and elephants stay as they are. Applied by CrashScribe, takes effect on the next load")]
         [SettingPropertyGroup("Armies of the realms (175)")]
         public bool Army175VolantisNorvos { get; set; } = true;
 
