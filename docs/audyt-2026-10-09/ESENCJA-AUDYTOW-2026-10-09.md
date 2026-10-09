@@ -156,10 +156,18 @@ Uwaga: konni Dothrakowie placa 26-49% wiecej zoldu, a glowy ich 16 rodow maja ra
 
 **Dalej:** armie wedlug tych decyzji; autotest liczy, kto ile bitew wygrywa.
 
-## Bilans panow zamkow (audyt 15 - w toku)
+## Bilans panow zamkow (audyt 15)
 
-<!-- AUDYT15 -->
-Wynik (ile z plonu okregu zamku dostaja pan, chlopi, kupcy i miasto) dopiszemy tutaj, gdy audyt bedzie gotowy.
+Masz racje: okreg zamku (zamek i 2 wsie) to baza produkcyjna - jego wsie robia 46% towaru wsi swiata, towar za ok. 1 190 zl dziennie, a pan bierze z tego ok. 650-680 zl.
+To nie jest za malo - to juz za duzo: pan bierze 68% utargu i prawie cala gotowke chlopow (historycznie pan z Kosciolem 30-50%). Sam zamek tez historycznie nic nie dawal.
+Bilans psuje wojsko: 525 ludzi przez caly rok kosztuje ok. 2 000 zl dziennie, 3 razy tyle, ile daje cala ziemia (historyczny pan trzymal w pokoju 20-50 ludzi, a wojne po 40 dniach placil krol).
+Do tego ucieka wartosc: co czwarta moneta towaru znika (Banner Kings, rozbite tabory), a zold i zakupy ludzi pana zostaja w miastach i plyna do panow miast.
+
+Twoje 30-50%: pan 35% utargu wsi (polityka podatkowa BK: 25, 35 albo 45%), sept 5%, wies zatrzymuje 60% i wydaje w miescie (kiesa ludu). Bez wyrownania panowie zamkow
+stracilyby 14% ludzi w wojnie i 32% w pokoju, wiec wyrownanie (Twoje "tak" w pytaniu E): pan miasta dzieli nadwyzke kupcow z korona po polowie, korona oddaje rentami
+wedlug lenna (miasto 2, zamek 1.5, wies 0.25). Skutek: pan zamku utrzyma ok. 415-455 ludzi w wojnie i ok. 130 w pokoju, bez bankructw w nowej kampanii; dzisiejsi bankruci splaca dlug z dochodu wsi.
+
+**Dalej:** razem z kiesa ludu (etap 5), po budzecie rodu.
 
 ## Kolejnosc prac
 
@@ -173,6 +181,8 @@ Wynik (ile z plonu okregu zamku dostaja pan, chlopi, kupcy i miasto) dopiszemy t
 8. **Tempo swiata z ksiazek**, potem drogi, zima, herb i menu okregu; optymalizacja na sam koniec.
 
 ## Decyzje dla Ciebie
+
+**Stan 09.10 ok. 04:50: na wszystkie pytania z tej tabeli juz odpowiedziales (03:45-04:40) - Twoje odpowiedzi sa w docs/STAN-PRAC.md i w PLAN-DO-KONCA-MODA. Tabela zostaje jako zapis tego, o co pytalismy. Nowe pytania z audytu 15 sa w czacie.**
 
 Wystarczy odpisac "rady tak" albo numer ze zmiana, np. "15b" albo "17c nie".
 
