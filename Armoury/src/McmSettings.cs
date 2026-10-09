@@ -2948,6 +2948,10 @@ namespace Armoury
         [SettingPropertyGroup("Drill")]
         public bool DrillLog { get; set; } = true;
 
+        [SettingPropertyBool("Drill Daily Message", HintText = "once a day, on a day your men drill by Drill Law, a short line in the game tells you what they learned and why: 'Drill today: N XP (n per man) - Leadership, at rest or marching, drill kit, armed share, perks'. A day lost to hunger or lack of sleep is announced as before (off = no daily drill line)")]
+        [SettingPropertyGroup("Drill")]
+        public bool DrillDailyMessage { get; set; } = true;
+
         [SettingPropertyBool("Arms Not Household Goods", HintText = "townsfolk do not use up arms, armour, shields and harness: these lie on the stalls until a soldier, a notable or a trader buys them (everyday clothing is still worn out by the townsfolk)")]
         [SettingPropertyGroup("Arms production")]
         public bool ArmsNotHouseholdGoods { get; set; } = true;
@@ -3824,6 +3828,7 @@ namespace Armoury
             s.DrillPenaltyAi = DrillPenaltyAi;
             s.DrillLawAi = DrillLawAi;
             s.DrillLog = DrillLog;
+            s.DrillDailyMessage = DrillDailyMessage;
             s.ArmsNotHouseholdGoods = ArmsNotHouseholdGoods;
             s.ArmsNoStallDecay = ArmsNoStallDecay;
             s.ArmsStallUpkeepManDaysPerPiece = ArmsStallUpkeepManDaysPerPiece;

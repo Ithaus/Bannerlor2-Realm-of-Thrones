@@ -139,6 +139,7 @@ namespace Armoury
             internal double B, P, Pre, Fin, ShN, N; internal long Computed, Accepted = -1, Cut;   // ShN, N - udzial uzbrojonych wazony liczba ludzi (A niezaleznie)
         }
         private static PlayerRec _pr, _prLast;
+        private static int _msgDay = -1;                   // MUSZTRA-m: doba ostatniej linii musztry gracza w grze (raz na dobe)
         private static readonly int[] _in = new int[4];
         private static int _noRoom, _pWornW, _pWornA, _pWornGiven, _pNoMetal, _pSoldU, _pSoldGold, _givenYday = -1;
         private static float _pOreAdd;
@@ -173,7 +174,7 @@ namespace Armoury
         {
             _tr.Clear(); _pendingMainMask = -1; _pendingMasks.Clear(); _acc.Clear(); _stock.Clear(); _ctx = null; _e = false; _eC = null; _tick = null; _room.Clear();
             _screen = null; _opening = 0; _dailyN = 0; _feedTries = 0; _fed = false; _pendingStock = null; _importNote = null; _importRejected = 0; _maskSegSeen = false;
-            _pr = null; _prLast = null; _givenYday = -1; ClearDay(); _k.Clear(); _stumbles = 0; _errDay = -1; _errWhere.Clear(); _clk = 0;
+            _pr = null; _prLast = null; _msgDay = -1; _givenYday = -1; ClearDay(); _k.Clear(); _stumbles = 0; _errDay = -1; _errWhere.Clear(); _clk = 0;
             _ore = null;   // przedmioty gry sa tworzone na nowo przy kazdej grze - nie trzymac obiektu z poprzedniej kampanii
         }
 
@@ -740,6 +741,7 @@ namespace Armoury
                         if (pc.Off && pc.Men > 0 && pc.Hungry)
                             Log.Player(pc.Sleepless ? "Your men were too hungry to drill today, and they met the dawn short of sleep besides - nobody learned anything, training perks included."
                                                     : "Your men were too hungry to drill today - nobody learned anything, training perks included.", true);
+                        else if (!pc.Off && pc.Men > 0 && s.DrillDailyMessage) DayMessage(_pr, pc);   // MUSZTRA-m: dzien cwiczen - wynik i czynniki wzoru
                     }
                     _pr = null;
                 }
@@ -750,6 +752,30 @@ namespace Armoury
             }
             catch (Exception e) { Stumble("TickPostfix", e); }
             finally { Unclk(); }
+        }
+
+        /// <summary>MUSZTRA-m (decyzja Jeffa 09.10 08:20): codzienna linia w grze o musztrze druzyny gracza - wynik dnia i czynniki wzoru z tych samych
+        /// pomiarow co linia "Musztra (gracz)" w logu. Tylko w dniu cwiczen (dzien stracony oglaszaja juz istniejace zdania: glod - TickPostfix, sen - swit
+        /// NightRest), raz na dobe (_msgDay), przy DrillDailyMessage. XP = przyjete przez roster (to, co ludzie naprawde dostali); uciete limitem awansu
+        /// - osobno, gdy > 0. Perki P i udzial uzbrojonych A - srednie na czlowieka (wazone liczba ludzi w oddzialach).</summary>
+        private static void DayMessage(PlayerRec r, Ctx c)
+        {
+            try
+            {
+                if (r == null || c == null || r.Day == _msgDay) return;
+                _msgDay = r.Day;
+                double men = r.N > 0 ? r.N : c.Men;
+                long xp = Math.Max(0L, r.Accepted);
+                double sk = c.StockOn ? c.S : 1.0;
+                double armed = r.N > 0 ? r.ShN / r.N : 1.0;
+                double perks = men > 0 ? r.P / men : 0;
+                var sb = new StringBuilder("Drill today: ").Append(xp).Append(" XP (").Append(F1(men > 0 ? xp / men : 0)).Append(" per man) - Leadership x").Append(F2(c.L))
+                    .Append(c.Rest ? ", at rest x" : ", marching x").Append(F2(c.D)).Append(", drill kit x").Append(F2(sk))
+                    .Append(", armed ").Append(Pct(armed, 1.0)).Append(", perks +").Append(F1(perks)).Append(" per man");
+                if (r.Cut > 0) sb.Append("; ").Append(r.Cut).Append(" XP lost - men are waiting to be upgraded");
+                Log.Player(sb.Append('.').ToString());
+            }
+            catch (Exception e) { Stumble("DayMessage", e); }
         }
 
         public static Exception TickFinalizer(Exception __exception) { _tick = null; _room.Clear(); return __exception; }

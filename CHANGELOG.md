@@ -1,5 +1,18 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-09 (MUSZTRA-m, decyzja Jeffa 08:20) - CODZIENNA LINIA MUSZTRY W GRZE DLA GRACZA
+**Mod:** Armoury | **Galaz:** `noc/grupa11` (od 4463a82) | **Pliki:** `Drill.cs` (NOWE `DayMessage`, `_msgDay`; `TickPostfix` - wywolanie), `Settings.cs` + `McmSettings.cs` (NOWE `DrillDailyMessage = true`; gen_mcm: Armoury 770 ustawien).
+
+**Co zobaczysz w grze (prosto):** raz na dobe, w dniu, w ktorym Twoi ludzie cwicza (Drill Law), w grze pojawia sie krotka linia, np. "Drill today: 1234 XP (8.2 per man) - Leadership x0.65, at rest x1.50, drill kit x1.04, armed 92%, perks +1.0 per man." Gdy czesc XP przepadla, bo ludzie czekaja na awans, dochodzi "; N XP lost - men are waiting to be upgraded". Dzien stracony (glod, noc bez snu) - bez nowej linii: mowia o nim istniejace zdania (glod - przy treningu, sen - o swicie). Wylacznik MCM "Drill Daily Message" (Drill), domyslnie wlaczony.
+
+**Problem:** decyzja Jeffa 09.10 08:20 (STAN-PRAC): gracz nie widzial w grze, ile jego ludzie nauczyli sie z musztry i dlaczego (recenzja MUSZTRA-j uwaga 7 - dotad tylko linia "Musztra (gracz)" w Armoury.log).
+
+**Zmiana:** `Drill.TickPostfix` - po treningu druzyny gracza wedlug musztry (`pc.Counted`), gdy nie ma kary (`!pc.Off`), ludzi > 0 i `DrillDailyMessage`: `DayMessage` (`Log.Player`, kolor zwykly). Liczby z tych samych pomiarow co linia logu (`PlayerRec`, `Ctx`): XP = przyjete przez roster (`Accepted`, nie mniej niz 0), na czlowieka = XP / ludzie w treningu (`N`); Leadership = L, at rest / marching = D (1.5 / 0.9), drill kit = S (1.00 przy wylaczonym zapasie), armed = udzial uzbrojonych A wazony ludzmi (`ShN / N`), perks = P na czlowieka; uciete limitem awansu (`Cut`) - tylko gdy > 0. Raz na dobe: `_msgDay` (doba `PlayerRec.Day`), zerowane w `Reset`. Bez zapisu (nowego napisu w SyncData nie ma); po wczytaniu w tej samej dobie gra drugi raz treningu nie robi. Glod: istniejace zdanie bez zmian (nie zalezy od nowego wylacznika).
+
+**Ryzyko / co sprawdzic:** zachowanie musztry bez zmian (tylko odczyt policzonych juz liczb, w try/catch - blad idzie do potkniec "Drill.DayMessage"). Partia gracza nieaktywna (niewola), Inni, wylaczony Drill Law - treningu wedlug musztry nie ma, linii tez nie. Autotest: jedna linia "Drill today" na dobe w dniu cwiczen; XP w linii = "przyjete przez roster" z linii "Musztra (gracz)" tej doby. Kod tylko zbudowany (Release kod 0) - NIE uruchomiony w grze.
+
+**Status:** NIEWGRANE - DO SPRAWDZENIA (commit lokalny na `noc/grupa11`, bez pushu).
+
 ## 2026-10-09 (NightRest-reset, recenzja MUSZTRA-j uwagi 6 i 13) - NOWA KAMPANIA BEZ DLUGU SNU GRACZA Z POPRZEDNIEJ
 **Mod:** Armoury | **Galaz:** `noc/grupa11` (od MUSZTRA-jp) | **Pliki:** `NightRest.cs` (`ResetWorld`).
 
