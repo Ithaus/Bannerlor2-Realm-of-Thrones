@@ -35,25 +35,26 @@ namespace CrashScribe
                 "sturgian_hardened_brigand=0", "sturgian_horse_raider=0", "sturgian_berzerker=3", "sturgian_shock_troop=2", "sturgian_ulfhednar=1", "sturgian_hunter=6" },
             new[] { "clan_greyjoy_party_template", "Army175IronbornFoot", "1",
                 "greyjoy_rider=0", "greyjoy_horseman=0", "greyjoy_houseguard=7", "greyjoy_fingerdancer=4" },
-            // 2.3 Polnoc - wiecej piechoty, mniej lucznikow, troche wiecej jazdy (decyzja 1C)
+            // 2.3 Polnoc - wiecej piechoty, mniej lucznikow, troche wiecej jazdy (decyzja 1C); w 8 szablonach rodow o 1 lucznika
+            // mniej niz w projekcie 2.3, zeby ludzi w stosach zostalo 53 (nie 54) - "Polnocnych jest MNIEJ", 175 nie dodaje ludzi
             new[] { "kingdom_hero_party_battania_template", "Army175NorthFoot", "1",
                 "battanian_trained_warrior=5", "battanian_picked_warrior=3", "battanian_skirmisher=6", "battanian_veteran_skirmisher=3", "battanian_horseman=3" },
             new[] { "clan_stark_party_template", "Army175NorthFoot", "1",
-                "stark_bowman=5", "stark_archer=4", "stark_footman=5", "stark_soldier=5", "stark_cavalry=3" },
+                "stark_bowman=4", "stark_archer=4", "stark_footman=5", "stark_soldier=5", "stark_cavalry=3" },
             new[] { "clan_bolton_party_template", "Army175NorthFoot", "1",
-                "bolton_archer=5", "bolton_elite_archer=4", "bolton_scout=5", "bolton_veteran=5", "bolton_knight=3" },
+                "bolton_archer=4", "bolton_elite_archer=4", "bolton_scout=5", "bolton_veteran=5", "bolton_knight=3" },
             new[] { "clan_karstark_party_template", "Army175NorthFoot", "1",
-                "karstark_archer=6", "karstark_elite_archer=4", "karstark_soldier=5", "karstark_ruffian=6", "karstark_shock_cavalry=3" },
+                "karstark_archer=5", "karstark_elite_archer=4", "karstark_soldier=5", "karstark_ruffian=6", "karstark_shock_cavalry=3" },
             new[] { "clan_glover_party_template", "Army175NorthFoot", "1",
-                "glover_archer=6", "glover_veteran_archer=4", "glover_footman=5", "glover_man_at_arms=6", "glover_horseman=3" },
+                "glover_archer=5", "glover_veteran_archer=4", "glover_footman=5", "glover_man_at_arms=6", "glover_horseman=3" },
             new[] { "clan_manderly_party_template", "Army175NorthFoot", "1",
-                "manderly_archer=6", "manderly_veteran_archer=3", "whiteharbor_footman=5", "manderly_man_at_arms=6", "whiteharbor_elite_knight=2" },
+                "manderly_archer=5", "manderly_veteran_archer=3", "whiteharbor_footman=5", "manderly_man_at_arms=6", "whiteharbor_elite_knight=2" },
             new[] { "clan_umber_party_template", "Army175NorthFoot", "1",
-                "umber_archer=7", "umber_marksman=2", "umber_footman=5", "umber_man_at_arms=5", "umber_horseman=3" },
+                "umber_archer=6", "umber_marksman=2", "umber_footman=5", "umber_man_at_arms=5", "umber_horseman=3" },
             new[] { "clan_mormont_party_template", "Army175NorthFoot", "1",
-                "mormont_trapper=7", "mormont_footman=5", "mormont_horseman=4" },
+                "mormont_trapper=6", "mormont_footman=5", "mormont_horseman=4" },
             new[] { "clan_cerwyn_party_template", "Army175NorthFoot", "1",
-                "cerwyn_archer=6", "cerwyn_veteran_archer=4", "cerwyn_soldier=5", "cerwyn_axeman=6", "cerwyn_horseman=3" },
+                "cerwyn_archer=5", "cerwyn_veteran_archer=4", "cerwyn_soldier=5", "cerwyn_axeman=6", "cerwyn_horseman=3" },
             // 2.4 Volantis i Norvos - propozycja audytu 4.6 bez decyzji Jeffa (dom. WYL.); slonie zostaja
             new[] { "kingdom_hero_party_volantine_template", "Army175VolantisNorvos", "0",
                 "volantine_bowman=4", "tigercloak_archer=2", "tigercloak_master_archer=1", "volantine_soldier=6", "tigercloak_warrior=4", "tigercloak_elite_warrior=2" },
@@ -78,6 +79,9 @@ namespace CrashScribe
             new[] { "patrol_party_sturgia_template_level_2", "Army175IronbornFoot", "1", "sturgian_horse_raider>sturgian_shock_troop", "sturgian_hardened_brigand>sturgian_berzerker" },
             new[] { "patrol_party_sturgia_template_level_3", "Army175IronbornFoot", "1", "sturgian_horse_raider>sturgian_shock_troop", "sturgian_hardened_brigand>sturgian_berzerker" },
             new[] { "vassal_reward_troops_sturgia", "Army175IronbornFoot", "1", "sturgian_hardened_brigand>sturgian_berzerker" },
+            // 2.1 nagroda wasalna Dothrakow (pieszy darkhan t5 -> konny heavy_lancer t5): piesi Dothrakowie tylko w milicji;
+            // nagroda i tak daje 5 konnych lucznikow bez koni i bez sprzetu (sprzet i konie - zbrojownia gracza)
+            new[] { "vassal_reward_troops_khuzait", "Army175DothrakiRide", "1", "khuzait_darkhan>khuzait_heavy_lancer" },
         };
 
         // (jednostka, wylacznik, domyslnie, nowe cele awansu...)
@@ -126,7 +130,7 @@ namespace CrashScribe
             var lines = new List<string>();
             var skipped = new List<string>();
             var missing = new List<string>();
-            int changedTpl = 0;
+            int changedTpl = 0, changedSwap = 0;
             var om = MBObjectManager.Instance;
 
             foreach (var row in StackPlan)
@@ -190,7 +194,7 @@ namespace CrashScribe
                     }
                     int men1; string b = Shape(tpl, out men1);
                     lines.Add("Mends: sklad 175 - " + row[0] + ": " + (done.Count > 0 ? string.Join(", ", done.ToArray()) : "bez zmian") + "; cel P/S/J/KL " + a + " -> " + b + ", ludzi " + men0 + " -> " + men1);
-                    changedTpl++;
+                    changedSwap++;
                 }
                 catch (Exception e) { missing.Add(row[0] + " potkniecie " + e.GetType().Name); }
             }
@@ -242,7 +246,8 @@ namespace CrashScribe
                 Scribe.Line("Mends: sklad 175 - Dothrakowie: piesi w puli ROT (" + _dothrakiFoot.Count + "), cel " + (kh != null ? Shape(kh, out dummy) : "?")
                             + "; postfiks puli ROT " + (_rotSettingsPatched ? "wpiety" : "NIE wpiety - piesi Dothrakowie wypadna z puli") + ".");
             }
-            Scribe.Line("Mends: sklad 175 - szablonow zmienionych " + changedTpl + ", drzew " + trees.Count
+            Scribe.Line("Mends: sklad 175 - szablonow zmienionych " + changedTpl + " (stosy, " + StackPlan.Length + " w planie), patroli i nagrod " + changedSwap
+                        + " (zamiany ten sam tier, " + SwapPlan.Length + " w planie), drzew " + trees.Count
                         + (skipped.Count > 0 ? "; pominiete przez wylacznik: " + string.Join(", ", skipped.ToArray()) : "")
                         + (missing.Count > 0 ? "; BRAK w danych (pominiete): " + string.Join(", ", missing.ToArray()) : "") + ".");
         }
@@ -251,6 +256,7 @@ namespace CrashScribe
 
         private static bool _rotSettingsPatched;
         private static System.Reflection.PropertyInfo _pPartyTemplate;
+        private static Type _pPartyTemplateType;
 
         /// <summary>Wpiecie postfiksu na ROT ROTTroopRecruiter.Settings(Hero, Settlement) (internal; refleksja po nazwie typu).</summary>
         internal static void Install(Harmony harmony)
@@ -267,28 +273,73 @@ namespace CrashScribe
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Army175.Install", null); } catch { } }
         }
 
+        // liczniki postfiksu puli ROT (sesja; linia raz na dobe, gdy cokolwiek sie dzialo)
+        private static int _poolCalls, _poolWithRoot, _poolPatched, _poolAdded, _poolStumbles, _poolLastStumbles;
+        private static bool _poolStumbleLogged;
+
+        private static void ResetPoolCounters()
+        {
+            _poolCalls = _poolWithRoot = _poolPatched = _poolAdded = _poolStumbles = _poolLastStumbles = 0;
+            _poolStumbleLogged = false;
+        }
+
+        private static void PoolStumble(string why)
+        {
+            _poolStumbles++;
+            if (_poolStumbleLogged) return;
+            _poolStumbleLogged = true;
+            try
+            {
+                Scribe.Line("Mends: sklad 175 - OSTRZEZENIE: postfiks puli ROT potknal sie (" + why + ") - piesi Dothrakowie moga wypasc z puli ROT "
+                            + "(ROT zamieni ich na konnych, straz konia Armoury z powrotem na pieszych); dalsze potkniecia tylko w liczniku dobowym.");
+            }
+            catch { }
+        }
+
         /// <summary>Postfiks: warunek po ZAWARTOSCI wyniku (ROT pamieta pule osady od pierwszego wywolania i nie
         /// czysci jej przy zmianie wlasciciela) - pula z khuzait_nomad (korzen drzewa wsi Dothrakow) dostaje
-        /// brakujacych z 7 pieszych. Idempotentnie (Contains). Composition (cel) bez zmian.</summary>
+        /// brakujacych z 7 pieszych. Idempotentnie (Contains). Composition (cel) bez zmian. Potkniecia licz, nie gas.</summary>
         public static void RotPoolKeepFoot(object __result)
         {
             try
             {
                 if (!DothrakiPoolActive || __result == null || _dothrakiRoot == null || _dothrakiFoot == null || _dothrakiFoot.Count == 0) return;
-                if (_pPartyTemplate == null) _pPartyTemplate = AccessTools.Property(__result.GetType(), "PartyTemplate");
-                var list = _pPartyTemplate != null ? _pPartyTemplate.GetValue(__result, null) as List<CharacterObject> : null;
-                if (list == null || !list.Contains(_dothrakiRoot)) return;
+                _poolCalls++;
+                var rt = __result.GetType();
+                if (_pPartyTemplateType != rt) { _pPartyTemplateType = rt; _pPartyTemplate = AccessTools.Property(rt, "PartyTemplate"); }   // raz na typ wyniku
+                if (_pPartyTemplate == null) { PoolStumble("brak wlasciwosci PartyTemplate w " + __result.GetType().FullName); return; }
+                var list = _pPartyTemplate.GetValue(__result, null) as List<CharacterObject>;
+                if (list == null) { PoolStumble("PartyTemplate nie jest List<CharacterObject>"); return; }
+                if (!list.Contains(_dothrakiRoot)) return;
+                _poolWithRoot++;
                 int added = 0;
                 for (int i = 0; i < _dothrakiFoot.Count; i++)
                     if (!list.Contains(_dothrakiFoot[i])) { list.Add(_dothrakiFoot[i]); added++; }
                 if (added > 0)
                 {
+                    _poolPatched++; _poolAdded += added;
                     if (!_poolFirstLogged)
                     {
                         _poolFirstLogged = true;
                         Scribe.Line("Mends: sklad 175 - Dothrakowie: pierwszy dopisek pieszych do puli ROT (" + added + " jednostek) - starzy piesi nie zamienia sie na konnych bez koni.");
                     }
                 }
+            }
+            catch (Exception e) { PoolStumble(e.GetType().Name); }
+        }
+
+        /// <summary>DailyTick: stan postfiksu puli ROT od startu sesji (pul z korzeniem Dothrakow, dopisanych, potkniec) -
+        /// tylko gdy przybylo wywolan albo potkniec od ostatniej linii.</summary>
+        private static int _poolLastCalls;
+        internal static void PoolDaily()
+        {
+            try
+            {
+                if (!DothrakiPoolActive) return;
+                if (_poolCalls == _poolLastCalls && _poolStumbles == _poolLastStumbles) return;
+                _poolLastCalls = _poolCalls; _poolLastStumbles = _poolStumbles;
+                Scribe.Line("Mends: sklad 175 - Dothrakowie: pula ROT od startu sesji - wywolan " + _poolCalls + ", pul z khuzait_nomad " + _poolWithRoot
+                            + ", pul z dopiskiem " + _poolPatched + " (pieszych dopisanych " + _poolAdded + "), potkniec " + _poolStumbles + ".");
             }
             catch { }
         }

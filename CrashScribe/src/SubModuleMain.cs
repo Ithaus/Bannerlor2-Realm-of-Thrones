@@ -119,7 +119,7 @@ namespace CrashScribe
         public override void AfterRegisterSubModuleObjects(bool isSavedCampaign)
         {
             base.AfterRegisterSubModuleObjects(isSavedCampaign);
-            try { Army175.OnObjectsRegistered(); }
+            try { Army175.OnObjectsRegistered(isSavedCampaign); }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "AfterRegisterSubModuleObjects.Army175", null); } catch { } }
         }
 

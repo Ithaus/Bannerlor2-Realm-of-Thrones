@@ -65,7 +65,9 @@ namespace CrashScribe
         }
 
         /// <summary>Zbior 3.2: kultura battania, default_group Infantry, tier 3-6, w drzewach wsi
-        /// (BasicTroop), szlachty (EliteBasicTroop) i 9 szablonow Polnocy; bez milicji i bohaterow. Ma byc 43.</summary>
+        /// (BasicTroop), szlachty (EliteBasicTroop) i 9 szablonow Polnocy; bez milicji i bohaterow, tylko Occupation Soldier
+        /// (jak WorldInfantryWithoutNorth). Ma byc 43. Armoury NorthHomeEdge.BuildSet liczy ten zbior osobno (korzenie na
+        /// sztywno, bez wykluczenia milicji) - przy scaleniu ujednolicic albo czytac NorthSet() refleksja.</summary>
         internal static List<CharacterObject> NorthSet()
         {
             var om = MBObjectManager.Instance;
@@ -78,6 +80,7 @@ namespace CrashScribe
             foreach (var co in all)
             {
                 if (co == null || co.IsHero || mil.Contains(co)) continue;
+                if (co.Occupation != Occupation.Soldier) continue;   // bez najemnikow i strazy karawan (jak WorldInfantryWithoutNorth)
                 if (co.Culture == null || co.Culture.StringId != "battania") continue;
                 if (!IsInfantryGroup(co)) continue;
                 int t = co.Tier;
@@ -215,9 +218,20 @@ namespace CrashScribe
             return res;
         }
 
+        /// <summary>Sufit "bez przeskoku tieru": wymog tieru T+1 (prawo tieru, T x krok) minus 1, nigdy ponizej podstawy.
+        /// K1b (MenUpgradeOneTierUp, Jeff 09.10) pozwala kupic o stopien wyzej, gdy zolnierz udzwignie - po 175 udzwignelaby
+        /// tylko Polnoc t3 (80 + 25 = 105 = wymog t4), wiec "twardsi" stalby sie przywilejem tieru. Krok 0 (prawo wyl.) albo t6 - bez sufitu.</summary>
+        private static int TierCap(int value, int floor, int tier, float step)
+        {
+            if (step <= 0f || tier >= 6) return value;
+            int lim = (int)Math.Round(tier * step) - 1;
+            return Math.Max(floor, Math.Min(value, lim));
+        }
+
         /// <summary>3.2: +bonus (suwak NorthHardySkillBonus, dom. 25, 0 = wyl.) do broni glownej i Atletyki
         /// piechoty Polnocy t3-t6. "+25 ponad dzisiejsze" = ponad wartosci PO zamianie sprzetu (rozdz. 1) -
-        /// interpretacja do potwierdzenia przez Jeffa przy "wgraj" (projekt rozdz. 0 pkt 4).</summary>
+        /// interpretacja do potwierdzenia przez Jeffa przy "wgraj" (projekt rozdz. 0 pkt 4). Tylko gdy 175.2 zadzialalo
+        /// (inaczej +25 szloby na umiejetnosci napompowane sprzetem ponad tier). Cel z sufitem TierCap (bez przeskoku tieru).</summary>
         internal static void NorthHardy()
         {
             if (NorthDone || !Mends.SinewApplied) return;
@@ -228,12 +242,24 @@ namespace CrashScribe
                 if (bonus > 50) bonus = 50;
                 NorthDone = true;
                 if (bonus == 0) { Scribe.Line("Mends: NorthHardy (175) - wylaczone (NorthHardySkillBonus 0)."); return; }
+                if (!TierGearApplied)
+                {
+                    string why = !TierGearWanted() ? _tgOffWhy : (_gaveUp ? "zamiana nie mogla zadzialac" : "zamiana nie zadzialala");
+                    Scribe.Line("Mends: NorthHardy (175) - pominiete: sprzet wedlug tieru (175.2) nie dziala w tej sesji (" + why + ") - +" + bonus
+                                + " liczyloby sie od umiejetnosci napompowanych sprzetem ponad tier (przewaga ok. +46%/+52% zamiast +28%, projekt 3.2).");
+                    return;
+                }
+                float wStep = Mends.ArmouryFloat("WeaponSkillPerTier", 35f), aStep = Mends.ArmouryFloat("ArmorAthleticsPerTier", 35f);
+                wStep = wStep < 0.5f ? 0f : (wStep > 100f ? 100f : wStep);
+                aStep = aStep < 0.5f ? 0f : (aStep > 100f ? 100f : aStep);
                 var set = NorthSet();
                 if (set.Count == 0) { Scribe.Line("Mends: NorthHardy (175) - OSTRZEZENIE: pusty zbior piechoty Polnocy (brak kultury battania albo drzew)."); return; }
                 double preM = 0, preA = 0;
                 foreach (var co in set) { preM += MaxMelee(co); preA += co.GetSkillValue(DefaultSkills.Athletics); }
                 preM /= set.Count; preA /= set.Count;
-                int done = 0, shared = 0, stumbles = 0;
+                int done = 0, shared = 0, stumbles = 0, capped = 0;
+                double planM = 0, planA = 0;
+                var planBySkills = new Dictionary<MBCharacterSkills, int[]>();
                 var ex = new List<string>();
                 foreach (var co in set)
                 {
@@ -242,18 +268,30 @@ namespace CrashScribe
                         var skills = co.GetDefaultCharacterSkills();
                         if (skills == null) { stumbles++; continue; }
                         object o;
-                        if (_northMark.TryGetValue(skills, out o)) { shared++; continue; }
+                        int[] pl;
+                        if (_northMark.TryGetValue(skills, out o))
+                        {
+                            shared++;
+                            if (planBySkills.TryGetValue(skills, out pl)) { planM += pl[0]; planA += pl[1]; }
+                            continue;
+                        }
                         var main = MainMelee(co);
+                        int T = UnitTier(co);
                         int curM = co.GetSkillValue(main), curA = co.GetSkillValue(DefaultSkills.Athletics);
-                        int tgtM = Math.Max(curM, OwnNeed(co, main)) + bonus;
-                        int tgtA = Math.Max(curA, OwnNeed(co, DefaultSkills.Athletics)) + bonus;
+                        int baseM = Math.Max(curM, OwnNeed(co, main)), baseA = Math.Max(curA, OwnNeed(co, DefaultSkills.Athletics));
+                        int tgtM = TierCap(baseM + bonus, baseM, T, wStep);
+                        int tgtA = TierCap(baseA + bonus, baseA, T, aStep);
+                        if (tgtM < baseM + bonus || tgtA < baseA + bonus) capped++;
                         if (!SetSkill(co, main, tgtM) || !SetSkill(co, DefaultSkills.Athletics, tgtA)) { stumbles++; continue; }
                         _northMark.Add(skills, Mark);
+                        planBySkills[skills] = new[] { tgtM - curM, tgtA - curA };
+                        planM += tgtM - curM; planA += tgtA - curA;
                         done++;
-                        if (ex.Count < 6) ex.Add(co.StringId + " " + main.StringId + " " + curM + "->" + tgtM + " Atl " + curA + "->" + tgtA);
+                        if (ex.Count < 6) ex.Add(co.StringId + " t" + T + " " + main.StringId + " " + curM + "->" + tgtM + " Atl " + curA + "->" + tgtA);
                     }
                     catch { stumbles++; }
                 }
+                planM /= set.Count; planA /= set.Count;
                 double postM = 0, postA = 0;
                 foreach (var co in set) { postM += MaxMelee(co); postA += co.GetSkillValue(DefaultSkills.Athletics); }
                 postM /= set.Count; postA /= set.Count;
@@ -263,21 +301,25 @@ namespace CrashScribe
                 if (w.Count > 0) { wM /= w.Count; wA /= w.Count; }
                 double advM = wM > 0 ? 100.0 * (postM / wM - 1.0) : 0, advA = wA > 0 ? 100.0 * (postA / wA - 1.0) : 0;
                 Scribe.Line("Mends: NorthHardy (175) - " + done + " jednostkom +" + bonus + " (bron glowna, Atletyka) z " + set.Count
+                            + ", z tego " + capped + " przycietych do sufitu bez przeskoku tieru (wymog t(T+1) minus 1; przy 35/tier: t3 104, t4 139, t5 174)"
                             + "; piechota t3+ Polnocy bron/Atl " + preM.ToString("0") + "/" + preA.ToString("0") + " -> " + postM.ToString("0") + "/" + postA.ToString("0")
                             + " wobec swiata bez Polnocy " + wM.ToString("0") + "/" + wA.ToString("0") + " (" + w.Count + " jednostek) - przewaga "
                             + advM.ToString("+0.0;-0.0") + "%/" + advA.ToString("+0.0;-0.0") + "%; wspolne umiejetnosci pominiete " + shared + ", potkniecia " + stumbles
                             + "; np. " + string.Join(", ", ex.ToArray()) + ".");
-                // KONTROLA POPRAWNOSCI (nie hamulec): liczebnosc zbioru, przyrost sredniej == bonus, przewaga w oknie
-                // oczekiwanym dla suwaka (rachunek projektu: 0 -> +7.5%, 15 -> +20%, 25 -> +28%, 50 -> +48%; +-3 pkt)
+                // KONTROLA POPRAWNOSCI (nie hamulec): liczebnosc zbioru, przyrost sredniej == zaplanowany (bonus po sufitach),
+                // przewaga w oknie oczekiwanym dla suwaka (rachunek projektu: 0 -> +7.5%, 15 -> +20%, 25 -> +28%, 50 -> +48%; +-3 pkt;
+                // sufit tieru przy 25 (rachunek na sprzet.json): 11 z 43 jednostek przycietych - highborn_warrior 90 -> 104 zamiast 115,
+                // 8 footmanow t3 i 2 pikinierow t5 o 1; srednia broni -0.5, Atletyki -0.2 pkt, przewaga ok. -0.4 pkt - w oknie)
                 double expect = 7.5 + 0.82 * bonus;
-                var why = new List<string>();
-                if (set.Count != 43) why.Add("zbior " + set.Count + " zamiast 43");
-                if (Math.Abs((postM - preM) - bonus) > 0.5 || Math.Abs((postA - preA) - bonus) > 0.5)
-                    why.Add("przyrost sredniej " + (postM - preM).ToString("0.0") + "/" + (postA - preA).ToString("0.0") + " zamiast " + bonus);
+                var why2 = new List<string>();
+                if (set.Count != 43) why2.Add("zbior " + set.Count + " zamiast 43");
+                if (Math.Abs((postM - preM) - planM) > 0.5 || Math.Abs((postA - preA) - planA) > 0.5)
+                    why2.Add("przyrost sredniej " + (postM - preM).ToString("0.0") + "/" + (postA - preA).ToString("0.0") + " zamiast zaplanowanego "
+                             + planM.ToString("0.0") + "/" + planA.ToString("0.0"));
                 if (Math.Abs(advM - expect) > 3 || Math.Abs(advA - expect) > 3)
-                    why.Add("przewaga poza oknem " + (expect - 3).ToString("0") + "-" + (expect + 3).ToString("0") + "%");
-                if (why.Count > 0)
-                    Scribe.Line("Mends: NorthHardy (175) - OSTRZEZENIE (kontrola poprawnosci): " + string.Join("; ", why.ToArray())
+                    why2.Add("przewaga poza oknem " + (expect - 3).ToString("0") + "-" + (expect + 3).ToString("0") + "%");
+                if (why2.Count > 0)
+                    Scribe.Line("Mends: NorthHardy (175) - OSTRZEZENIE (kontrola poprawnosci): " + string.Join("; ", why2.ToArray())
                                 + " - sprawdz podwojny bonus, zbior albo klase broni.");
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Army175.NorthHardy", null); } catch { } }
