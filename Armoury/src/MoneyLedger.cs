@@ -55,7 +55,9 @@ namespace Armoury
     ///  Paczka 110 (CastlePurse) zeruje kasowanie regulatora (tylko w dol - dosypka do zapasu zostaje) i cofa "zakupy" w ZAMKACH wlasnymi
     ///  postfiksami o priorytecie First - liczniki tej ksiegi (priorytet zwykly) biegna po nich i widza stan po zmianie: w linii kas zamkow
     ///  "skasowal" i "zakupy" maja wtedy 0. Dar startowy kas zamkow przyciety raz na kampanie (MTrim) to jedyna migawka naszego ticku,
-    ///  ktora nie jest przelewem - w bilansie ujscie.
+    ///  ktora nie jest przelewem - w bilansie ujscie. Klucz 114: zawor zamku placi panu i koronie w jednej petli - w ksiedze dwie pozycje
+    ///  kas ZAMKOW: "zawor kas zamkow" (kasy -> panowie) i "udzial korony z zaworu kas zamkow" (kasy -> skarbce; CastlePurse przenosi go
+    ///  przez SplitCastleMark).
     ///  Paczka 112 (VillageTakings): to, co paczka dopisala wsiom przy powrocie taboru, siedzi juz w oknie powrotu (kiesa wsi i licznik
     ///  podatku rosna przed AfterSettlementEntered) - "z utargu wsi zniklo" spada do zera samo; cene towaru kupionego we wsi oddana wsi
     ///  widzi okno "prowizja" ksiegi obiegu (finalizer po postfiksie paczki), a sakwy zniszczonych taborow - nasluch ksiegi obiegu, wpiety
@@ -80,9 +82,11 @@ namespace Armoury
         // nasz tick dobowy (Mark)
         internal const int MRent = 0, MBuild = 1, MCrown = 2, MRest = 3, MFence = 4, MLife = 5, MOrders = 6;   // MOrders: 174.2 kontrakty surowca (zakup karawan w zrodlach)
         internal const int MCastle = 7, MTrim = 8;                                                              // 110: zawor kas zamkow, dar startowy kas zamkow przyciety
-        private const int Marks = 9;
+        internal const int MCastleCrown = 9;                                                                    // 114: udzial korony z zaworu kas zamkow
+        private const int Marks = 10;
         private static readonly string[] MName = { "renty", "budowy", "korona (danina, clo, mennica)", "pozostale moduly ticku", "paser band (skup lupu)", "bandy i kryjowki (zycie w miastach)", "kontrakty surowca (174)",
-                                                   "zawor kas zamkow (kasy zamkow -> panowie)", "dar startowy kas zamkow przyciety (raz na kampanie, w nicosc)" };
+                                                   "zawor kas zamkow (kasy zamkow -> panowie)", "dar startowy kas zamkow przyciety (raz na kampanie, w nicosc)",
+                                                   "udzial korony z zaworu kas zamkow (kasy zamkow -> skarbce krolestw, 114)" };
 
         // posiadacze zlota
         private const int HTowns = 0, HCastles = 1, HVillages = 2, HLeaders = 3, HLords = 4, HPlayer = 5, HNotables = 6, HWanderers = 7, HOtherHeroes = 8,
@@ -489,6 +493,21 @@ namespace Armoury
                 MarkWorld169(kind, s);                      // paczka 169b: zloto swiata na granicy modulow (RB wedlug odcinkow) - wlasny try
             }
             catch (Exception e) { Log.Error("MoneyLedger.Mark", e); }
+        }
+
+        /// <summary>
+        /// 114: czesc zmiany kas ZAMKOW zlapanej migawka `from` nalezy do pozycji `to` (kwota `gone` > 0 = tyle zeszlo z kas): zawor zamku placi
+        /// panu i koronie w jednej petli (CastlePurse.Daily), a w ksiedze to dwie pozycje. Liczniki sie sumuja, wiec wolno wolac przed migawka
+        /// `from` albo po niej. Tylko liczniki, tylko w naszym ticku.
+        /// </summary>
+        internal static void SplitCastleMark(int from, int to, long gone)
+        {
+            try
+            {
+                if (!_inBlock || gone == 0 || from < 0 || from >= Marks || to < 0 || to >= Marks || from == to) return;
+                _mark[CCastle, from] += gone; _mark[CCastle, to] -= gone;
+            }
+            catch { _stumbles++; }
         }
 
         // ------------------------------------------------------------ postfiksy-liczniki (nie zmieniaja wyniku)

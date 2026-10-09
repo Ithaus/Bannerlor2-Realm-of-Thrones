@@ -35,6 +35,11 @@ namespace Armoury
     ///     "wlasnych" - pieniedzy rodu, ktore wrocily). Oblezony zamek nie placi. Kasa nie puchnie bez konca (stan ustalony:
     ///     zapas + doplyw / 7%) ani nie wysycha (zapas jest poza zaworem). Hak kiesy ludu (KL, etap 5): CastleDuesSuburbShare -
     ///     czesc zaworu dla podzamcza, dzis 0 (podzamcze nie ma jeszcze wlasnej kiesy - ta czesc zostaje w kasie zamku).
+    ///     KLUCZ 114 (projekt etapu 2, Z15-1; galaz `paczki/114-porzadki` a14efe8 - tylko klucz i poprawki ksiegi, podzial przez wspolny
+    ///     pomocnik ValveSplit.Split zamiast TownPurse.Split - S15): zawor dzielony z korona jak zawor miasta (K6) - pan CastleDuesLordShare
+    ///     (2/3), reszta do skarbca jego krolestwa (bez zdarzenia gry, jak udzial korony z zaworu miasta; korona oddaje to rodom zwrotem
+    ///     zoldu w wojnie); zamek rodu bez krolestwa i wylaczony podzial (CastleDuesSplitWithCrown) - calosc dla pana. Bez podzialu pan
+    ///     odzyskiwal caly zold zalogi wlasnego zamku; z podzialem zaloga "u siebie" kosztuje go trzecia czesc zoldu - w zamku jak w miescie.
     ///  4. Tabory: wies, ktorej targ lezy za MarketMaxDistance, dalej wozi do zamku pana - ale tylko wtedy, gdy zamek ma ponad
     ///     zapasem dosc na caly ladunek; inaczej tabor jedzie na daleki targ (MarketRoad pyta CanPayCart). Pusty zamek nie kupuje.
     ///  5. Start nowej kampanii: dar startowy w kasach zamkow (gra 20 000 + BK 40 x dobrobyt) jest raz, w pierwszej dobie, przycinany
@@ -81,21 +86,23 @@ namespace Armoury
         // na zamek: [czesc pana, nadwyzka kasy ponad zapas przed zaworem] - 169c: czesc "wlasne" (pieniadze rodu, ktore wrocily zaworem)
         private static readonly Dictionary<Settlement, long[]> _duesBy = new Dictionary<Settlement, long[]>();
         /// <summary>Liczby ostatniego Daily (ksiega pieniadza drukuje je po nas w tym samym ticku); zeruje MoneyLedger.ClearLast169 na poczatku bloku.</summary>
-        internal static long LastLordPaid, LastRegDown, LastRegUp, LastConsBack;
+        internal static long LastLordPaid, LastCrownPaid, LastRegDown, LastRegUp, LastConsBack;
+        /// <summary>114: udzial korony z zaworu zamkow dzis, na krolestwo (wplyw skarbca - dla 165 "wplywy dnia").</summary>
+        internal static readonly Dictionary<Kingdom, long> CrownToday = new Dictionary<Kingdom, long>();
         internal static int LastRegDownN, LastRegUpN;
 
         internal static void Reset()
         {
             _trimDone = false; _trimSkip = false; _offLogged = false; _errLogged = false;
             _consTown = null; _regDue = null;
-            LordDuesToday.Clear(); _duesBy.Clear();
+            LordDuesToday.Clear(); _duesBy.Clear(); CrownToday.Clear();
             ZeroLast();
             ClearDay();
         }
 
         internal static void ZeroLast()
         {
-            LastLordPaid = LastRegDown = LastRegUp = LastConsBack = 0;
+            LastLordPaid = LastCrownPaid = LastRegDown = LastRegUp = LastConsBack = 0;
             LastRegDownN = LastRegUpN = 0;
         }
 
@@ -148,6 +155,16 @@ namespace Armoury
             if (spare <= 0 || float.IsNaN(share) || share <= 0f) return 0;
             if (share >= 1f) return (int)Math.Min(spare, int.MaxValue);
             return (int)Math.Min(spare, (long)(spare * (double)share));
+        }
+
+        /// <summary>
+        /// 114: udzial pana w zaworze zamku nalezacego do rodu w krolestwie: CastleDuesLordShare (obciete do 0..1, NaN = 0 - jak udzial pana
+        /// w zaworze miasta), a przy wylaczonym podziale z korona 1 (pan bierze calosc - stan sprzed 114).
+        /// </summary>
+        internal static float LordShare(Settings s)
+        {
+            if (s == null || !s.CastleDuesSplitWithCrown) return 1f;
+            return ValveSplit.Unit(s.CastleDuesLordShare);
         }
 
         /// <summary>
@@ -263,7 +280,9 @@ namespace Armoury
                      + " - wpiete: " + (done.Count > 0 ? string.Join(", ", done.ToArray()) : "nic")
                      + (miss.Count > 0 ? "; BRAK: " + string.Join(", ", miss.ToArray()) : "")
                      + "; zapas kupcow " + (s != null ? s.CastlePurseFloorGold.ToString(CultureInfo.InvariantCulture) + " + " + s.CastlePurseFloorPerProsperity.ToString("0.##", CultureInfo.InvariantCulture) + " x dobrobyt" : "?")
-                     + ", zawor " + (s != null ? (s.CastleDuesShare * 100f).ToString("0.#", CultureInfo.InvariantCulture) : "?") + "% nadwyzki dziennie dla pana zamku"
+                     + ", zawor " + (s != null ? (s.CastleDuesShare * 100f).ToString("0.#", CultureInfo.InvariantCulture) : "?") + "% nadwyzki dziennie"
+                     + (s != null && s.CastleDuesSplitWithCrown ? ", z tego panu zamku " + (LordShare(s) * 100f).ToString("0.#", CultureInfo.InvariantCulture) + "% i reszta do skarbca krolestwa (114; zamek rodu bez krolestwa: calosc dla pana)"
+                                                                : " dla pana zamku (podzial z korona 114 wylaczony)")
                      + ", dar startowy przycinany w pierwszej dobie nowej kampanii: " + (s != null && s.CastlePurseTrimAtStart ? "tak" : "nie")
                      + ", tabor do zamku tylko gdy zamek ma czym zaplacic: " + (s != null && s.CastleCartsNeedCoin ? "tak" : "nie")
                      + "; hak kiesy ludu (etap 5) CastleDuesSuburbShare " + CastleDuesSuburbShare.ToString("0.##", CultureInfo.InvariantCulture) + ".");
@@ -338,7 +357,8 @@ namespace Armoury
             if (age < -0.01)
             {
                 Log.Info("CastlePurse (110): kampania ma wiek ujemny (" + age.ToString("0.0", CultureInfo.InvariantCulture)
-                         + " dni - data startu z innego kalendarza) - dar startowy w kasach zamkow BEZ przyciecia (flaga zapisana). Nadwyzke ponad zapas pobierze zawor.");
+                         + " dni - data startu z innego kalendarza) - dar startowy w kasach zamkow BEZ przyciecia (flaga zapisana). Nadwyzke ponad zapas pobierze zawor"
+                         + (s.CastleDuesSplitWithCrown ? " - panom i skarbcom ich krolestw (114)." : "."));
                 return;
             }
             // mloda kampania: regulator gry daru jeszcze nie ruszyl - przycinamy caly; starszy zapis wczytany pierwszy raz z ta zmiana:
@@ -379,7 +399,7 @@ namespace Armoury
         // ------------------------------------------------------------ raz na dobe: zawor i linia "Zawor zamkow (110)"
         internal static void Daily()
         {
-            LordDuesToday.Clear(); _duesBy.Clear();
+            LordDuesToday.Clear(); _duesBy.Clear(); CrownToday.Clear();
             var s = Settings.Current;
             if (s == null || Campaign.Current == null) return;
             int day = (int)CampaignTime.Now.ToDays;
@@ -387,8 +407,10 @@ namespace Armoury
             if (on) { try { TrimStartGift(s); } catch (Exception e) { Stumble("CastlePurse.TrimStartGift", e); } }
             float share = float.IsNaN(s.CastleDuesShare) ? 0f : Math.Max(0f, Math.Min(1f, s.CastleDuesShare));
             float suburbShare = ValveSplit.Unit(CastleDuesSuburbShare);
-            long gold = 0, reserveSum = 0, spareSum = 0, shortSum = 0, paid = 0, playerPaid = 0, suburbKept = 0;
-            int castles = 0, payers = 0, below = 0, siege = 0, noLord = 0, overBk = 0, maxSpare = 0; string maxName = null;
+            bool split = s.CastleDuesSplitWithCrown;             // 114: zawor dzielony z korona jak zawor miasta
+            float lordShare = LordShare(s);
+            long gold = 0, reserveSum = 0, spareSum = 0, shortSum = 0, paid = 0, playerPaid = 0, suburbKept = 0, crownPaid = 0, playerCrown = 0;
+            int castles = 0, payers = 0, below = 0, siege = 0, noLord = 0, overBk = 0, maxSpare = 0, crownPayers = 0, noCrown = 0; string maxName = null;
             var perClan = new Dictionary<Clan, long>();          // czesc pana na rod - srednia na pana samych zamkow (prog testu B: 200-350 zl/dobe)
             foreach (var st in Settlement.All)
             {
@@ -413,8 +435,14 @@ namespace Armoury
                             {
                                 // hak KL: czesc podzamcza zostaje w kasie zamku (dzis 0)
                                 int suburb = suburbShare > 0f ? (int)Math.Min(pay, (long)(pay * (double)suburbShare)) : 0;
-                                int lordPay = pay - suburb;
                                 suburbKept += suburb;
+                                // 114: podzial jak w zaworze miasta - korona (1 - udzial pana) w dol, pan reszte; suma = pay - suburb.
+                                // Zamek rodu bez krolestwa i wylaczony podzial: calosc dla pana
+                                var k = clan.Kingdom;
+                                bool crownTakes = split && k != null && !k.IsEliminated;
+                                int lordPay, crown;
+                                ValveSplit.Split(pay - suburb, crownTakes ? lordShare : 1f, out lordPay, out crown);
+                                if (split && !crownTakes) noCrown++;
                                 if (lordPay > 0)
                                 {
                                     // przelew kasa zamku -> pan (ta sama akcja gry co renty PopulationLaw; kwota nigdy nie przekracza kasy)
@@ -425,6 +453,20 @@ namespace Armoury
                                     _duesBy[st] = new long[] { lordPay, (long)before - reserve };
                                     paid += lordPay; payers++;
                                     if (lord == Hero.MainHero) playerPaid += lordPay;
+                                }
+                                if (crown > 0)
+                                {
+                                    // najpierw kasa, potem skarbiec: skarbiec dostaje dokladnie tyle, ile zeszlo z kasy (bez zdarzenia gry, jak udzial
+                                    // korony z zaworu miasta i danina wojenna KingdomTreasury); po wyjatku przy przelewie pana tu nie dochodzimy
+                                    int had = town.Gold;
+                                    town.ChangeGold(-crown);
+                                    int taken = had - town.Gold;
+                                    if (taken > 0)
+                                    {
+                                        k.KingdomBudgetWallet += taken; crownPaid += taken; crownPayers++;
+                                        long k0; CrownToday.TryGetValue(k, out k0); CrownToday[k] = k0 + taken;
+                                        if (lord == Hero.MainHero) playerCrown += taken;
+                                    }
                                 }
                             }
                         }
@@ -438,7 +480,10 @@ namespace Armoury
                 }
                 catch (Exception e) { Stumble("CastlePurse.Daily(" + st.StringId + ")", e); }
             }
-            LastLordPaid = paid; LastRegDown = _dRegDown; LastRegUp = _dRegUp; LastConsBack = _dConsBack; LastRegDownN = _dRegDownN; LastRegUpN = _dRegUpN;
+            // ksiega pieniadza: udzial korony zszedl z kas zamkow razem z czescia panow (jedna migawka MCastle zaraz po tej metodzie) - przenosimy
+            // go do wlasnej pozycji (tylko licznik; wlasny try w srodku)
+            if (crownPaid > 0) MoneyLedger.SplitCastleMark(MoneyLedger.MCastle, MoneyLedger.MCastleCrown, crownPaid);
+            LastLordPaid = paid; LastCrownPaid = crownPaid; LastRegDown = _dRegDown; LastRegUp = _dRegUp; LastConsBack = _dConsBack; LastRegDownN = _dRegDownN; LastRegUpN = _dRegUpN;
             try
             {
                 if (!on)
@@ -478,6 +523,10 @@ namespace Armoury
                              + " | \"zakupy\" ludnosci zamkow: zloto z niczego cofniete " + _dConsBack + " (w " + _dConsHit + " z " + _dConsN + " tickow; towar zjedzony jak dotad)"
                              + " | zawor: " + paid + " do panow z " + payers + " zamkow (" + (share * 100f).ToString("0.#", CultureInfo.InvariantCulture) + "% nadwyzki ponad zapas"
                              + (playerPaid > 0 ? "; w tym rod gracza " + playerPaid : "") + (suburbKept > 0 ? "; czesc podzamcza zostala w kasach " + suburbKept : "")
+                             + (split ? "; skarbcom krolestw " + crownPaid + " z " + crownPayers + " zamkow w " + CrownToday.Count + " krolestwach (114) - podzial z korona: panu "
+                                        + (lordShare * 100f).ToString("0.#", CultureInfo.InvariantCulture) + "%, reszta koronie" + (playerCrown > 0 ? ", z zamkow gracza " + playerCrown : "")
+                                        + ", zamkow rodow bez krolestwa z caloscia dla pana " + noCrown
+                                      : "; skarbcom krolestw 0 - podzial z korona WYLACZONY w MCM (Castle Dues Split With Crown): pan bierze calosc")
                              + "); bez poboru: kasa nie ponad zapasem " + below + ", oblezone " + siege + ", bez pana " + noLord
                              + " | pan samych zamkow (" + onlyN + " rodow AI): z zaworu srednio " + (onlyN > 0 ? (only / onlyN).ToString(CultureInfo.InvariantCulture) : "-")
                              + ", mediana " + (onlyN > 0 ? onlyList[onlyN / 2].ToString(CultureInfo.InvariantCulture) : "-") + " zl dzis"

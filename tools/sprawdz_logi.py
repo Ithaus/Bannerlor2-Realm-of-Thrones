@@ -542,6 +542,14 @@ def main(argv):
         else:
             rep.add(f"112: bandy - {name} (28 dob)", (f"{v:.3f}" if key == "bandy_tier" else f"{v:.0f}") + f" wobec bazy " + (f"{b:.3f}" if key == "bandy_tier" else f"{b:.0f}")
                     + f" ({100.0 * v / b - 100:+.0f}%)", "<= baza + 20% (S16)", (v <= 1.2 * b) if b_on else None)
+    # klucz 114: udzial korony w zaworze zamkow = 1 - CastleDuesLordShare (domyslnie 0.33) - suma 28 dob z linii 110
+    lp = cp = 0
+    for k in last_window(zz):
+        a1, c1 = num(r"zawor: (\d+) do panow", zz[k]), num(r"skarbcom krolestw (\d+) z", zz[k])
+        if a1 is not None and c1 is not None:
+            lp += a1; cp += c1
+    rep.add("114: udzial korony w zaworze zamkow (28 dob)", f"{100.0 * cp / (lp + cp):.1f}% (korona {cp}, panowie {lp})" if lp + cp > 0 else "brak linii (przed 114 albo podzial wylaczony)",
+            "ok. 33% (1 - Castle Dues Lord Share; zamki rodow bez krolestwa - calosc panu)", (28.0 <= 100.0 * cp / (lp + cp) <= 34.0) if (lp + cp > 0 and b_on) else None)
     v, b = sw.get("utarg_miasta"), bw.get("utarg_miasta")
     rep.add("B: zakupy plonu przez miasta (utarg taborow, 28 dob)", f"{v:.0f}" + (f" wobec bazy {b:.0f} ({100.0 * v / b:.0f}%)" if b else " (bez bazy)") if v is not None else "brak linii",
             ">= 95% bazy (bez zmian)", (v >= 0.95 * b) if (v is not None and b and b_on) else None)

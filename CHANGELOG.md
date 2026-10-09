@@ -1,5 +1,44 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-09 (klucz 114, etap 2 krok B; PLAN 2.2, 2.11) - ZAWOR ZAMKU DZIELONY Z KORONA JAK ZAWOR MIASTA: 2/3 DLA PANA, 1/3 DO SKARBCA KROLESTWA (ZAMEK RODU BEZ KROLESTWA - CALOSC PANU); WSPOLNY POMOCNIK PODZIALU BEZ TownPurse; POPRAWKI KSIEGI (POZYCJA KORONY W KASACH ZAMKOW)
+**Mod:** Armoury | **Galaz:** `w-toku/e2b` (po 110 i 112) | **Projekt:** `docs/PROJEKT-ETAP2-BANKRUCTWA-2026-10-09.md` rozdz. "110 + 112 + klucz 114" ("Z paczki 114 tylko klucz i poprawki ksiegi - podzial przez wspolny pomocnik bez `TownPurse.Split`"), 2.0b (jedna regula gracz/AI, Z8), 165 (1/3 zaworu zamkow we wplywach dnia); audyt 15 Z15-1; projekty.md S15. Z galezi `paczki/114-porzadki` (a14efe8) wziete tylko: `CastleDuesSplitWithCrown`, `CastleDuesLordShare` 0.67, podzial w `CastlePurse.Daily`, `LordShare`, `SplitCastleMark` + pozycja ksiegi korony; reszta 114 (napisy, naprawy, sakiewki, wyplaty notabli w ksiedze, `PayComesHome` w TownPurse) - nie (111' i porzadki sa w innych krokach; ksiega obiegu 169 mierzy juz wyplaty notabli i sakiewki oknami). **Pliki:** `CastlePurse.cs` (podzial, `LordShare`, `CrownToday` na krolestwo, linia), `ValveSplit.cs` (`Split`), `MoneyLedger.cs` (`MCastleCrown`, `SplitCastleMark`), `MoneyLedger.Obieg.cs` ("do skarbcow (114)" w kasach zamkow, "udzial z zaworu zamkow (114)" we wplywach korony), `Settings.cs` + `McmSettings.cs` (`python tools/gen_mcm.py`: Armoury 848), `tools/gen_mcm.py` (zakres suwaka `CastleDuesLordShare` 0..1), `tools/sprawdz_logi.py` (udzial korony). Bez nowych kluczy zapisu.
+
+**Co zobaczysz w grze (prosto):** z tego, co codziennie schodzi z kasy zamku, pan dostaje dwie trzecie, a jedna trzecia idzie do skarbca jego krolestwa - jak w miescie. Ty tak samo jak lordowie AI: zaloga trzymana we wlasnym zamku kosztuje Cie ok. trzeciej czesci zoldu (reszta wraca zaworem), a nie prawie nic. Zamek rodu bez krolestwa oddaje wszystko panu. Korona oddaje te pieniadze rodom zwrotem zoldu w wojnie.
+
+**Problem (projekt 110 + klucz 114, Z15-1):** bez podzialu pan zamku odzyskuje zaworem caly zold zalogi wlasnego zamku (Z8: z 1 zl zoldu zalogi wracalo 0.84-0.88 [S]) i korona nie ma z zamkow nic; zawor miasta dzieli sie z korona 2/3 : 1/3 (K6) - dwie reguly na jedno zjawisko.
+
+**Przyczyna:** galaz 110 dawala calosc zaworu panu; podzial byl w 114, ktora wymagala 111 (`TownPurse.Split`, `PayComesHome`) - 111' jest w etapie 5 (S15).
+
+**Zmiana:**
+- `ValveSplit.Split(kwota, udzialPana, out pan, out korona)`: korona (1 - udzial pana) w dol, pan reszte, suma = kwota (ta sama arytmetyka co `TownPurse.Split` w galezi 114). `CastlePurse.LordShare` = `CastleDuesLordShare` obciete do 0..1 (NaN = 0), przy wylaczonym podziale 1.
+- `CastlePurse.Daily`: zawor (po haku podzamcza, dzis 0) dzielony: pan - `GiveGoldAction` jak dotad (do `RentToday`, D staly, wlasne - czesc pana); korona - `town.ChangeGold(-x)`, potem `KingdomBudgetWallet += zdjete` (bez zdarzenia gry, jak danina wojenna i clo w `KingdomTreasury`); zamek rodu bez krolestwa (albo krolestwo wyeliminowane) - calosc panu. `CrownToday` (na krolestwo) i `LastCrownPaid` - odczyt dla 165 ("wplywy dnia": 1/3 zaworu zamkow) i dla ksiegi.
+- Ksiega: migawka `MCastle` dzielona `SplitCastleMark` na "zawor kas zamkow (kasy zamkow -> panowie)" i NOWA "udzial korony z zaworu kas zamkow (kasy zamkow -> skarbce krolestw, 114)"; "Obieg: dzien" - "kasy zamkow ... zawor do panow X, do skarbcow (114) Y" i "korona [P]: wplywy - ... udzial z zaworu zamkow (114) Y".
+- Linia "Zawor zamkow (110)": "skarbcom krolestw Y z N zamkow w K krolestwach (114) - podzial z korona: panu 67%, reszta koronie[, z zamkow gracza Z], zamkow rodow bez krolestwa z caloscia dla pana M"; przy wylaczonym - "podzial z korona WYLACZONY w MCM".
+- MCM, grupa "The castle's purse": `CastleDuesSplitWithCrown` (wlaczone), `CastleDuesLordShare` (0.67, suwak 0..1); opis `CastleDuesShare` - kto bierze zawor, ustawiaja te dwa klucze.
+- `tools/sprawdz_logi.py`: "114: udzial korony w zaworze zamkow (28 dob)" - prog 28-34% (1 - 0.67; zamki rodow bez krolestwa obnizaja).
+
+**Uwaga (zadanie wspomina skrypt BetterEconomy `tools/bee`):** klucz 114 to dwa ustawienia Armoury w MCM, nie klucz pliku `better_economy_settings.xml`. Sprawdzone w kodzie: projekt nie wiaze 114 z BEE; `tools/bee` (13 kluczy, nalozone 08.10 23:40) zamyka ujscia BEE i nie ma zwiazku z kasa zamku; BEE `CastleEconomyCampaignBehavior` nie rusza kasy zamku (`Town.Gold`) - tylko kiese pana (`:351`), wiec zawor 110/114 i BEE sie nie dubluja. Skryptu BEE nie zmieniam; w folderze gry nic nie trzeba zmieniac - nowe klucze MCM dzialaja z domyslnych `Settings.cs`, dopoki Jeff ich nie przestawi (M13).
+
+**Kontrola calosci (CLAUDE.md 8.0):**
+- Zamknieta ekonomia: podzial to dwa przelewy z kasy zamku (do pana - zdarzenie gry; do skarbca - stan), suma = zawor; kwota korony = to, co naprawde zeszlo z kasy. Pieniadz swiata bez zmian wobec 110 (przelew miedzy posiadaczami).
+- Kolizje: `KingdomBudgetWallet` zmieniaja tez powinnosci, danina wojenna (miasta i wsie - zamki nie), clo, zwrot zoldu, model gry (podatek BK) - kolejnosc w dobie: zawor zamku przed korona (`KingdomTreasury.Daily/Levies/WageRefund`) - 1/3 zaworu jest w skarbcu, zanim korona liczy zwrot zoldu (zwrot "dopoki ma z czego" - troche wiecej zwrotu w wojnie). Ksiega obiegu: zmiana skarbcow bez zdarzenia w naszym ticku - przelew miedzy posiadaczami (kasy zamkow -> skarbce), RB bez zmian.
+- Jedna regula gracz/AI i Z8: zamek gracza w krolestwie - 1/3 koronie jak u AI. Z8 (zaloga we wlasnym zamku): z 1 zl zoldu wraca zaworem ok. 0.66-0.70 [S, projekt]; w wojnie dochodzi zwrot korony 50% zoldu zalog (`CrownWageRefundGarrisons`, jak dzis) - razem moze przekroczyc 1 az do 165 (zwrot bez zalog, C1) - do `gracz2.py` przed C1 (projekt: prog Z8 sprawdzany przed C1).
+- `PayComesHome` (galaz 114: korona nie zwraca zoldu zalog, ktorych zold wraca zaworem) - NIE przeniesione: w kroku B zwrot zalog zostaje jak dzis, regule "zwrot bez zalog" wprowadza 165 (C1) - 2.0b Z8.
+
+**Ryzyko / co sprawdzic:**
+- Panowie zamkow dostaja 2/3 zaworu - prog 110 "pan samych zamkow 200-350 zl/dobe" liczy juz czesc pana (po podziale); projekt liczyl +270-310 zl/dobe z 2/3 (Z15-1).
+- `CastleDuesLordShare` 0 = calosc koronie (zaloga pana kosztuje go 100% zoldu); 1 = stan bez 114.
+- Klucze MCM nowe (M13) - domyslne dzialaja.
+
+**Linie logu do testu (autotest 40 dob + zapis 362; potem 120 dob):**
+- start: "CastlePurse (110): zawor kasy zamku CZYNNY ... zawor 7% nadwyzki dziennie, z tego panu zamku 67% i reszta do skarbca krolestwa (114 ...)".
+- "Zawor zamkow (110): dzien N": "skarbcom krolestw Y ... (114) - podzial z korona: panu 67%"; **Y / (zawor do panow + Y) 28-34% (28 dob)** - `sprawdz_logi.py` "114: udzial korony w zaworze zamkow".
+- "Przeplywy osad (kasy zamkow)": "Armoury tick dobowy ... zawor kas zamkow (kasy zamkow -> panowie) -X, udzial korony z zaworu kas zamkow (kasy zamkow -> skarbce krolestw, 114) -Y"; reszta kas zamkow bez skoku wobec 110.
+- "Obieg: dzien": "kasy zamkow ... do skarbcow (114) Y", "korona [P]: wplywy - ... udzial z zaworu zamkow (114) Y" - ta sama liczba co w linii 110.
+- "Skarbce:" - skarbce krolestw z zamkami rosna o ok. 1/3 zaworu ich zamkow; "Korona: niedoplata 28 dob (169c)" - w wojnie niedoplata nie wyzsza niz w biegu 110 bez podzialu (wiecej w skarbcu).
+
+**Status:** NIEWGRANE - DO SPRAWDZENIA (build Release kod 0; gra nie uruchamiana, autotest nie robiony; nic nie wgrane do gry; plik BEE i folder gry nietkniete).
+
 ## 2026-10-09 (112, etap 2 krok B; PLAN 2.2, 2.11) - UTARG WSI BEZ ZNIKANIA: PAN BIERZE PODATEK WEDLUG DEKRETU, CALA RESZTA ZOSTAJE W KIESIE WSI (DOTAD 15% UTARGU ZNIKALO); ZAPLATA LORDA ZA TOWAR KUPIONY WE WSI ZOSTAJE (DOTAD 100% W NICOSC); SAKWA ROZBITEGO TABORU DO ZWYCIEZCY, ROZWIAZANEGO - DO WSI; POMIAR BAND (S16)
 **Mod:** Armoury | **Galaz:** `w-toku/e2b` (po 110) | **Projekt:** `docs/PROJEKT-ETAP2-BANKRUCTWA-2026-10-09.md` rozdz. "110 + 112 + klucz 114", 2.0b (hak KL), 3 (Z15-3 reszta w etapie 3), 4 (R9); audyt 15 Z15-2, Z15-3; projekty.md S16; decyzja D (Jeff 09.10 04:25 - zloto taboru dla zwyciezcy). Kod z galezi `paczki/112-k7-utarg-wsi` (355aa6b) przeniesiony na dzisiejszy kod. **Pliki:** NOWE `VillageTakings.cs`, `ArmouryBehavior.cs` (Reset, nasluchy `MobilePartyDestroyed` - PRZED ksiega obiegu - i `HeroOrPartyTradedGold`, `VillageTakings.Daily` po ksiedze pieniadza), `SubModuleMain.cs` (`VillageTakings.ApplyAll`), `CirculationWindows.cs` (okno "prowizja": we wsi takze licznik podatku wsi), `MoneyLedger.cs` + `MoneyLedger.Obieg.cs` (linia "Przeplywy osad", pozycja `N169CartPurse`, opis prowizji wsi), `PopulationLaw.cs` (hak KL), `Settings.cs` + `McmSettings.cs` (`python tools/gen_mcm.py`: Armoury 846), `tools/sprawdz_logi.py` (112 i bandy). Bez nowych kluczy zapisu (liczniki tylko w pamieci doby).
 
@@ -68,7 +107,7 @@
 **Odstepstwa od galezi i projektu (swiadome):**
 - Regulator tylko w dol (S14) - galaz zerowala w obie strony.
 - Linia "Zawor zamkow (110): dzien N" (galaz: "Kasy zamkow:") - nazwa z testu projektu; dopisane "pan samych zamkow (N rodow AI): z zaworu srednio X, mediana Y" (prog testu 200-350).
-- Podzial z korona (2/3 pan, 1/3 skarbiec) - osobny wpis "klucz 114" nizej; w tym kroku calosc dla pana.
+- Podzial z korona (2/3 pan, 1/3 skarbiec) - osobny wpis "klucz 114" (wyzej); w samym 110 calosc zaworu dla pana.
 
 **Kontrola calosci (CLAUDE.md 8.0):**
 - Regresje: latki na `GetTownGoldChange` (MoneyLedger - postfiks zwykly; SoldierPay - tarcza, First, tylko MIASTA; Measure169c - licznik na miasto), `MakeConsumption` (BK prefiks zwraca false - postfiksy biegna; Measure169c prefiks-odczyt; MoneyLedger postfiks zwykly), `DeleteOverproducedItems` (ArmsLeaks prefiks - postfiksy biegna). CastlePurse (First) zmienia wynik przed licznikami ksiegi - "skasowal" i "zakupy" w kasach zamkow = 0 po wgraniu. Wylaczony `CastlePurseEnabled` - latki tylko wracaja.

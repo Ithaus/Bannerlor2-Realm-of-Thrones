@@ -31,6 +31,8 @@ RANGES = {
     'DothrakiRidingBonus': (0, 50, "0"),
     # 175c: zasada stali Innych
     'OthersCastleSteelPercent': (15, 100, "0"),
+    # 114: udzial pana w zaworze zamku (kod przycina do 0..1; regula ogolna dalaby 0..2.68)
+    'CastleDuesLordShare': (0.0, 1.0, "0.00"),
 }
 
 def gen(module_dir, ns, display):
