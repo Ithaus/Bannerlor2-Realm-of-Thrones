@@ -186,3 +186,8 @@ dana faze od nowa, korzystajac z zapisanych wynikow:
 - 172 STRZALY gotowe (galaz w-toku/172-strzaly 77ee649 na 171 349e393; GitHub): dzis strzaly robia warsztaty gry Z NICZEGO (BK kategoria arrows = towar),
   znikaja u mieszczan i w zaopatrzeniu BK; 172 zamyka to i daje strzelarzy w 97 miastach (drewno + ruda z polki miasta, 0.3 x reki warsztatow zbrojnych).
 - Scalenie 171+172 do noc/sklad3 fbe3f83 (Armoury aae2828b, CrashScribe 158dfad0 - kod CS bez zmian; MCM 713). Autotest 171+172 sama (40 dob) w toku, potem S4 + zapis.
+- 21:05 **ANALIZA 120 DOB** (wgranie 3): 0 bledow naszych, ok. 18 s/dobe bez narastania; T4 739 ludzi do puli, T2b -4306 trupow, T1 ok. 750 spi nocami.
+  ALE fala bankructw jak w TOWARY 3 (26 do doby 120, Bank 5 -> 1.75 mln, pusty ok. doby 160; skarbce Polnocy i KL puste od doby ok. 98, zalegly zold 7%) -
+  oczekiwane do czasu 165/166/168. NOWE: trybut/reparacje 11 mln w 120 dob (do 1.68 mln naraz), placilo 14 z 25 bankrutow, niedobor -> DebtToKingdom w nicosc.
+  Inni oblegali Mur od doby 55 (44 doby; Mur trzyma) - straznik T2 nie przerywa oblezen zaczetych przez ROT/SAI.
+- 21:06 workflow `wf_f5c29c01-5a9`: T2c (Inni bez oblezen zamknietych celow przed terminem; drzewo noc\n11, galaz w-toku/n11-mur) + badanie trybutu.
