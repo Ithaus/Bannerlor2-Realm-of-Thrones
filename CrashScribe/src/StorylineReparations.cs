@@ -4,6 +4,7 @@ using System.Reflection;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace CrashScribe
 {
@@ -29,10 +30,18 @@ namespace CrashScribe
     /// Kwota nie wplywa na decyzje (KingdomWalletCost.CanPayCost zawsze true; grep Diplomacy: tylko ApplyCost, UI, komunikaty),
     /// wiec AI Diplomacy i ROT decyduja o wojnie i pokoju jak dotad. Wojny niefabularne - bez zmian (paczka 165 / suwak Jeffa).
     /// Trybut dzienny (vanilla, StanceLink) - bez zmian; ponowne wypowiedzenie wojny i tak go zeruje (StanceLink.ResetStats).
+    /// Wojna ROT DANYS_REVENGE (Targaryen - klan gracza) NIE jest rozpoznawana przy pokoju krolestw: ROT wznawia tylko wiez
+    /// Targaryen - klan gracza (MakePeace krolestw jej nie rusza), wiec pokoj Targaryen - krolestwo gracza jest prawdziwy
+    /// i reparacje zostaja jak dotad.
     ///
-    /// Log: pokoj widzimy przez zdarzenie gry MakePeace (Diplomacy AcceptPeace -> MakePeaceAction.ApplyByKingdomDecision), a kwote
-    /// z postfiksu tuz przed nim (ApplyPeace liczy koszt i od razu go stosuje; przy pytaniu do gracza gra stoi). Liczenie dla ekranu
-    /// krolestwa bez pokoju nie daje linii - rekord czeka tylko do konca doby.
+    /// Log: pokoj widzimy przez zdarzenie gry MakePeace z detail ByKingdomDecision (Diplomacy AcceptPeace ->
+    /// MakePeaceAction.ApplyByKingdomDecision), a kwote z postfiksu przed nim. Pokoj AI: ApplyPeace liczy koszt i od razu go
+    /// stosuje. Pokoj z oknem dla gracza: okno pauzuje gre (czas kampanii stoi), AcceptPeace przychodzi po kliknieciu - moze juz
+    /// po naszej linii dobowej z tego samego DailyTick, dlatego rekord czeka 24 h czasu kampanii, a nie do konca doby.
+    /// Liczenie dla ekranu krolestwa bez pokoju nie daje linii. Zwrot lenn (Diplomacy DoReturnFiefs: zmiana wlasciciela
+    /// ByLeaveFaction tuz przed MakePeace) liczony do linii pokoju - tylko odczyt.
+    /// Pokoj fabularny czeka potem na wznowienie wojny (zdarzenie WarDeclared tej pary albo stan wojny przy linii dobowej);
+    /// gdy po drugiej pelnej dobie od pokoju wojny dalej brak - linia "NIE wznowiona" (np. pokoj w ostatniej dobie przed EndDay).
     /// Bledy: przy wyjatku oryginalna kwota zostaje (Diplomacy placi jak dotad), liczymy potkniecia, latka dziala dalej.
     /// Wylacznik: StorylineWarNoReparations w ModuleData/CrashScribe.settings.xml. Bez zapisu w grze.
     /// </summary>
@@ -46,23 +55,40 @@ namespace CrashScribe
         private static FieldInfo _fValue;         // zapas: <Value>k__BackingField
         private static PropertyInfo _pPayer, _pReceiver;   // KingdomWalletCost.PayingKingdom / ReceivingKingdom
 
-        // koszt policzony przez Diplomacy, czeka na zdarzenie MakePeace tej pary
+        // koszt policzony przez Diplomacy, czeka (do 24 h czasu kampanii) na zdarzenie MakePeace tej pary
         private sealed class Pending
         {
             public Kingdom A, B, Payer, Receiver;
             public long Z;          // kwota Diplomacy przed latka
             public bool Forced;     // wojna fabularna ROT - wyzerowane
             public CampaignTime At;
+            public int Fiefs;       // zwrot lenn tej pary w chwili FiefAt (DoReturnFiefs tuz przed MakePeace)
+            public CampaignTime FiefAt;
+            public List<string> FiefNames;
         }
         private static readonly List<Pending> _pending = new List<Pending>();
         private const int PendingMax = 64;
+        private const double PendingHours = 24.0;
+
+        // pokoj fabularny z wyzerowanymi reparacjami - czeka na wznowienie wojny przez ROT
+        private sealed class Watch
+        {
+            public Kingdom A, B;
+            public long Z;
+            public int PeaceDay;
+            public CampaignTime PeaceAt;
+            public int Ticks;       // linie dobowe pozniej niz pokoj (druga = ROT EnforceWars mial pelna dobe)
+            public bool Resumed;
+        }
+        private static readonly List<Watch> _watch = new List<Watch>();
+        private const int WatchMax = 64;
 
         // dzis (od ostatniej linii dobowej)
-        private static int _dayForced, _dayOther;
+        private static int _dayForced, _dayOther, _dayForcedFiefs, _dayResumed, _dayNotResumed;
         private static long _dayForcedSum, _dayOtherSum;
         // od wczytania (sesja kampanii)
-        private static int _totForced, _totOther;
-        private static long _totForcedSum, _totOtherSum;
+        private static int _totForced, _totOther, _totForcedFiefs, _totResumed, _totNotResumed;
+        private static long _totForcedSum, _totOtherSum, _totNotResumedSum;
         private static int _stumbles, _stumblesDay;
 
         private static void Stumble(string where, Exception e)
@@ -115,7 +141,7 @@ namespace CrashScribe
                 harmony.Patch(m, postfix: new HarmonyMethod(typeof(StorylineReparations), nameof(Postfix)));
                 _installed = true;
                 Scribe.Line("Reparacje (T9): wpiete 1/1 - Diplomacy DetermineReparationsForMakingPeace: pokoj w wojnie fabularnej, ktora ROT wymusza"
-                            + " (ROTStorylineWars.IsWarForced - ten sam warunek, z ktorym ROT EnforceWars wypowiada ja od nowa nastepnej doby), bez reparacji"
+                            + " (ROTStorylineWars.IsWarForced - ten sam warunek, ktory ROT EnforceWars sprawdza co dobe, by wypowiedziec ja od nowa), bez reparacji"
                             + " (0 dla placacego i dla odbiorcy, ekran krolestwa tez 0); pozostale pokoje i decyzje o wojnie i pokoju bez zmian.");
             }
             catch (Exception e) { Stumble("StorylineReparations.Install", e); }
@@ -154,19 +180,42 @@ namespace CrashScribe
             if ((float)_pValue.GetValue(cost, null) != 0f) throw new InvalidOperationException("KingdomWalletCost.Value nie wyzerowane");
         }
 
-        private static bool Same(Pending p, Kingdom a, Kingdom b)
+        private static bool Same(Kingdom pa, Kingdom pb, Kingdom a, Kingdom b)
         {
-            return (p.A == a && p.B == b) || (p.A == b && p.B == a);
+            return (pa == a && pb == b) || (pa == b && pb == a);
         }
 
         private static void Remember(Kingdom a, Kingdom b, Kingdom payer, Kingdom receiver, float z, bool forced)
         {
-            _pending.RemoveAll(p => Same(p, a, b));   // najnowsze liczenie tej pary wygrywa (ApplyPeace liczy tuz przed pokojem)
+            _pending.RemoveAll(p => Same(p.A, p.B, a, b));   // najnowsze liczenie tej pary wygrywa (ApplyPeace liczy tuz przed pokojem)
             if (_pending.Count >= PendingMax) _pending.RemoveAt(0);
             _pending.Add(new Pending { A = a, B = b, Payer = payer, Receiver = receiver, Z = (long)z, Forced = forced, At = CampaignTime.Now });
         }
 
-        /// <summary>Zdarzenie gry MakePeace: jesli Diplomacy wlasnie policzyl koszt tej pary - linia logu i liczniki.</summary>
+        /// <summary>Zdarzenie gry zmiany wlasciciela osady: zwrot lenn Diplomacy (DoReturnFiefs, ByLeaveFaction) tuz przed
+        /// MakePeace tej pary - tylko licznik do linii pokoju.</summary>
+        internal static void OnOwnerChanged(Settlement settlement, bool openToClaim, Hero newOwner, Hero oldOwner, Hero capturerHero,
+                                            ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail detail)
+        {
+            try
+            {
+                if (!_installed || !Config.StorylineWarNoReparations || _pending.Count == 0) return;
+                if (detail != ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail.ByLeaveFaction) return;
+                var nk = newOwner != null && newOwner.Clan != null ? newOwner.Clan.Kingdom : null;
+                var ok = oldOwner != null && oldOwner.Clan != null ? oldOwner.Clan.Kingdom : null;
+                if (nk == null || ok == null || nk == ok) return;
+                int i = _pending.FindIndex(x => Same(x.A, x.B, nk, ok));
+                if (i < 0) return;
+                var p = _pending[i];
+                var now = CampaignTime.Now;
+                if (p.FiefNames == null || p.FiefAt != now) { p.Fiefs = 0; p.FiefNames = new List<string>(); p.FiefAt = now; }
+                p.Fiefs++;
+                if (p.FiefNames.Count < 6) p.FiefNames.Add(settlement != null && settlement.Name != null ? settlement.Name.ToString() : "?");
+            }
+            catch (Exception e) { Stumble("StorylineReparations.OnOwnerChanged", e); }
+        }
+
+        /// <summary>Zdarzenie gry MakePeace: jesli to pokoj Diplomacy (AcceptPeace) i Diplomacy policzyl koszt tej pary - linia logu i liczniki.</summary>
         internal static void OnMakePeace(IFaction side1, IFaction side2, MakePeaceAction.MakePeaceDetail detail)
         {
             try
@@ -175,53 +224,117 @@ namespace CrashScribe
                 var a = side1 as Kingdom;
                 var b = side2 as Kingdom;
                 if (a == null || b == null) return;
-                int i = _pending.FindIndex(x => Same(x, a, b));
+                int i = _pending.FindIndex(x => Same(x.A, x.B, a, b));
                 if (i < 0) return;   // pokoj bez kosztu Diplomacy (nie z ApplyPeace) - nie nasza sprawa
                 var p = _pending[i];
-                _pending.RemoveAt(i);
-                if ((CampaignTime.Now - p.At).ToHours > 24.0) return;   // stary rekord z ekranu krolestwa
+                _pending.RemoveAt(i);   // po pokoju rekord tej pary jest nieaktualny, niezaleznie od sciezki
+                // Diplomacy AcceptPeace wola ApplyByKingdomDecision; MakePeaceAction.Apply (inne mody, ROT, bunty) kosztu Diplomacy nie stosuje
+                if (detail != MakePeaceAction.MakePeaceDetail.ByKingdomDecision) return;
+                var now = CampaignTime.Now;
+                if ((now - p.At).ToHours > PendingHours) return;   // stary rekord z ekranu krolestwa
+                int fiefs = p.FiefNames != null && p.FiefAt == now ? p.Fiefs : 0;
+                string fiefTxt = "zwrot lenn " + fiefs + (fiefs > 0 ? " (" + string.Join(", ", p.FiefNames.ToArray()) + (fiefs > p.FiefNames.Count ? ", ..." : "") + ")" : "");
 
                 if (p.Forced)
                 {
                     _dayForced++; _totForced++; _dayForcedSum += p.Z; _totForcedSum += p.Z;
+                    _dayForcedFiefs += fiefs; _totForcedFiefs += fiefs;
+                    if (_watch.Count >= WatchMax) _watch.RemoveAt(0);
+                    _watch.Add(new Watch { A = a, B = b, Z = p.Z, PeaceDay = Day(), PeaceAt = now });
                     Scribe.Line("Reparacje (T9): dzien " + Day() + " - pokoj " + N(a) + " - " + N(b) + ", wojna fabularna ROT - reparacje 0 zamiast " + p.Z
                                 + (p.Z != 0 ? " (placilby " + N(p.Payer) + ", dostalby " + N(p.Receiver) + ")" : " (Diplomacy i tak nic nie naliczyl)")
-                                + "; ROT wypowie te wojne od nowa najdalej nastepnej doby. Od wczytania: pokojow fabularnych " + _totForced
-                                + ", reparacji nie naliczono razem " + _totForcedSum + ".");
+                                + "; " + fiefTxt + ". ROT wymusza te wojne - jesli nie wroci w ciagu 2 dob, bedzie linia 'NIE wznowiona'."
+                                + " Od wczytania: pokojow fabularnych " + _totForced + ", reparacji nie naliczono razem " + _totForcedSum
+                                + ", zwrot lenn razem " + _totForcedFiefs + ".");
                 }
                 else
                 {
                     _dayOther++; _totOther++; _dayOtherSum += p.Z; _totOtherSum += p.Z;
                     Scribe.Line("Reparacje (T9): dzien " + Day() + " - pokoj " + N(a) + " - " + N(b) + ", wojna niefabularna - reparacje Diplomacy bez zmian " + p.Z
                                 + (p.Z != 0 ? " (placi " + N(p.Payer) + ", dostaje " + N(p.Receiver) + ")" : "")
-                                + ". Od wczytania: innych pokojow " + _totOther + ", reparacji naliczono razem " + _totOtherSum + ".");
+                                + "; " + fiefTxt + ". Od wczytania: innych pokojow " + _totOther + ", reparacji naliczono razem " + _totOtherSum + ".");
                 }
             }
             catch (Exception e) { Stumble("StorylineReparations.OnMakePeace", e); }
         }
 
-        /// <summary>Raz na dobe: podsumowanie dnia (tylko gdy byl taki pokoj albo potkniecie); stare rekordy precz.</summary>
+        /// <summary>Zdarzenie gry WarDeclared: wojna pary, ktora zawarla pokoj fabularny, wrocila (ROT EnforceWars albo kto inny).</summary>
+        internal static void OnWarDeclared(IFaction side1, IFaction side2, DeclareWarAction.DeclareWarDetail detail)
+        {
+            try
+            {
+                if (!_installed || !Config.StorylineWarNoReparations || _watch.Count == 0) return;
+                var a = side1 as Kingdom;
+                var b = side2 as Kingdom;
+                if (a == null || b == null) return;
+                foreach (var w in _watch)
+                    if (!w.Resumed && Same(w.A, w.B, a, b)) { w.Resumed = true; _dayResumed++; _totResumed++; }
+            }
+            catch (Exception e) { Stumble("StorylineReparations.OnWarDeclared", e); }
+        }
+
+        /// <summary>Linia dobowa: pokoje fabularne, w ktorych ROT nie wznowil wojny po drugiej pelnej dobie - linia "NIE wznowiona".</summary>
+        private static void CheckWatch(CampaignTime now)
+        {
+            for (int i = _watch.Count - 1; i >= 0; i--)
+            {
+                var w = _watch[i];
+                if ((now - w.PeaceAt).ToHours > 0.01) w.Ticks++;
+                if (w.Resumed) { _watch.RemoveAt(i); continue; }
+                if (FactionManager.IsAtWarAgainstFaction(w.A, w.B)) { w.Resumed = true; _dayResumed++; _totResumed++; _watch.RemoveAt(i); continue; }
+                // pierwsza doba po pokoju: nasza linia moze stac w kolejce DailyTick przed ROT EnforceWars - czekamy na druga
+                if (w.Ticks < 2) continue;
+                _watch.RemoveAt(i);
+                _dayNotResumed++; _totNotResumed++; _totNotResumedSum += w.Z;
+                string why;
+                if (w.A.IsEliminated || w.B.IsEliminated) why = "jedna ze stron zniszczona - ROT skreslil te wojne";
+                else
+                {
+                    bool? still = null;
+                    try { still = IsForced(w.A, w.B); } catch { }
+                    why = still == true ? "ROT dalej ja wymusza, a wojny brak - cos blokuje ponowne wypowiedzenie"
+                        : still == false ? "ROT juz jej nie wymusza (np. minal dzien konca wojny) - to prawdziwy pokoj, bez reparacji"
+                        : "stanu wymuszenia ROT nie udalo sie odczytac";
+                }
+                Scribe.Line("Reparacje (T9): dzien " + Day() + " - wojna fabularna " + N(w.A) + " - " + N(w.B) + " NIE wznowiona przez ROT po pokoju z dnia "
+                            + w.PeaceDay + " (" + why + "); wyzerowano wtedy " + w.Z + ". Od wczytania takich pokojow " + _totNotResumed
+                            + " (wyzerowano przy nich razem " + _totNotResumedSum + ").");
+            }
+        }
+
+        /// <summary>Raz na dobe: wznowienia wojen po pokojach fabularnych, podsumowanie dnia (tylko gdy cos sie dzialo albo bylo
+        /// potkniecie); rekordy kosztu starsze niz 24 h precz.</summary>
         internal static void DailyLine()
         {
             try
             {
-                _pending.Clear();
-                if (_installed && Config.StorylineWarNoReparations && (_dayForced + _dayOther + _stumblesDay) > 0)
-                    Scribe.Line("Reparacje (T9): dzien " + Day() + " - dzis pokojow w wojnach fabularnych ROT " + _dayForced + " (reparacji nie naliczono " + _dayForcedSum
-                                + "), innych pokojow z Diplomacy " + _dayOther + " (reparacje bez zmian " + _dayOtherSum + "); od wczytania: fabularne " + _totForced
-                                + " (nie naliczono " + _totForcedSum + "), inne " + _totOther + " (naliczono " + _totOtherSum + ")."
-                                + (_stumblesDay > 0 ? " Potkniecia dzis " + _stumblesDay + " (razem " + _stumbles + ", pierwsze w raporcie; przy potknieciu reparacje Diplomacy jak w modzie)." : ""));
+                var now = CampaignTime.Now;
+                _pending.RemoveAll(p => (now - p.At).ToHours > PendingHours);
+                if (_installed && Config.StorylineWarNoReparations)
+                {
+                    CheckWatch(now);
+                    if ((_dayForced + _dayOther + _dayResumed + _dayNotResumed + _stumblesDay) > 0)
+                        Scribe.Line("Reparacje (T9): dzien " + Day() + " - dzis pokojow w wojnach fabularnych ROT " + _dayForced + " (reparacji nie naliczono " + _dayForcedSum
+                                    + ", zwrot lenn " + _dayForcedFiefs + "), innych pokojow z Diplomacy " + _dayOther + " (reparacje bez zmian " + _dayOtherSum
+                                    + "); wojny fabularne wznowione po pokoju " + _dayResumed + ", NIE wznowione " + _dayNotResumed
+                                    + "; od wczytania: fabularne " + _totForced + " (nie naliczono " + _totForcedSum + ", zwrot lenn " + _totForcedFiefs
+                                    + ", wznowione " + _totResumed + ", NIE wznowione " + _totNotResumed + " - wyzerowano przy nich " + _totNotResumedSum
+                                    + "), inne " + _totOther + " (naliczono " + _totOtherSum + ")."
+                                    + (_stumblesDay > 0 ? " Potkniecia dzis " + _stumblesDay + " (razem " + _stumbles + ", pierwsze w raporcie; przy potknieciu reparacje Diplomacy jak w modzie)." : ""));
+                }
             }
             catch (Exception e) { Stumble("StorylineReparations.DailyLine", e); }
-            _dayForced = _dayOther = 0; _dayForcedSum = _dayOtherSum = 0; _stumblesDay = 0;
+            _dayForced = _dayOther = _dayForcedFiefs = _dayResumed = _dayNotResumed = 0; _dayForcedSum = _dayOtherSum = 0; _stumblesDay = 0;
         }
 
         /// <summary>Nowa gra / wczytanie: liczniki od zera (latka zostaje - zakladana raz przy starcie gry).</summary>
         internal static void ResetSession()
         {
             _pending.Clear();
+            _watch.Clear();
             _dayForced = _dayOther = _totForced = _totOther = 0;
-            _dayForcedSum = _dayOtherSum = _totForcedSum = _totOtherSum = 0;
+            _dayForcedFiefs = _totForcedFiefs = _dayResumed = _totResumed = _dayNotResumed = _totNotResumed = 0;
+            _dayForcedSum = _dayOtherSum = _totForcedSum = _totOtherSum = _totNotResumedSum = 0;
             _stumblesDay = 0;
         }
 
@@ -236,7 +349,7 @@ namespace CrashScribe
         }
     }
 
-    /// <summary>Zdarzenie MakePeace i linia dobowa "Reparacje (T9)" (bez zapisu w grze).</summary>
+    /// <summary>Zdarzenia MakePeace, WarDeclared, zmiana wlasciciela osady i linia dobowa "Reparacje (T9)" (bez zapisu w grze).</summary>
     internal sealed class StorylineReparationsBehavior : CampaignBehaviorBase
     {
         public StorylineReparationsBehavior() { StorylineReparations.ResetSession(); }
@@ -244,6 +357,8 @@ namespace CrashScribe
         public override void RegisterEvents()
         {
             CampaignEvents.MakePeace.AddNonSerializedListener(this, StorylineReparations.OnMakePeace);
+            CampaignEvents.WarDeclared.AddNonSerializedListener(this, StorylineReparations.OnWarDeclared);
+            CampaignEvents.OnSettlementOwnerChangedEvent.AddNonSerializedListener(this, StorylineReparations.OnOwnerChanged);
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, StorylineReparations.DailyLine);
         }
 
