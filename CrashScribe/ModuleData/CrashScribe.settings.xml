@@ -126,6 +126,22 @@
        the kingdoms in poverty once a day and every war or peace vote between kingdoms. Set PovertyPeace to false to switch it off. -->
   <PovertyPeace>true</PovertyPeace>
 
+  <!-- Peace proposals out of poverty (needs PovertyPeace). Lords rarely propose peace on their own: the game only lets them
+       propose it when Banner Kings' peace score for the realm is above zero, which a poor realm at war rarely reaches.
+       With this on, a realm whose treasury poverty is at least
+       0.5 (enough for about 60 days or less) puts a peace proposal to its lords at most once every 7 days: against the enemy
+       realm it is doing worst against (the game's war progress: kills, sieges, raids), choosing only among wars where the game
+       and Diplomacy allow a peace proposal and the game finds peace suitable; storyline wars of Realm of Thrones are never
+       chosen. The proposer is the poorest lord of the realm who already favours peace out of poverty and has the influence to
+       propose it (he pays the usual influence cost). The lords then vote as usual. Set PovertyPeaceProposals to false to leave
+       peace proposals to the game and Banner Kings. -->
+  <PovertyPeaceProposals>true</PovertyPeaceProposals>
+
+  <!-- How poverty of the crown is measured. false: by the treasury against what it has been losing over the last week (as above).
+       true: by how much of the war wage refund the crown owed its lords over the last 28 days it could not pay (Armoury), compared
+       with 25% and with the world average - meant for after the crown pays its refunds from current income. -->
+  <PovertyPeaceArrearsMeasure>false</PovertyPeaceArrearsMeasure>
+
   <!-- Siege camps do not rot while fed: RealisticBannerlord's SiegeAttritionBehavior kills 2-5 men
        of every besieging party each day (escalating) regardless of food and morale. With this on,
        the camp only suffers those losses while it is STARVING, and a besieged garrison only while

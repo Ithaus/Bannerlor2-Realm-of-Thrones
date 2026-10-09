@@ -62,6 +62,8 @@ namespace CrashScribe
 
         // --- Pokoj z biedy (E1 noc 09/10.10; patrz PovertyPeace.cs) ---
         public static bool PovertyPeace = true;  // krolestwo z pustym skarbcem: rzadziej wypowiada wojne (ocena BK), biedne rody chetniej glosuja za pokojem; wojny fabularne ROT bez zmian
+        public static bool PovertyPeaceProposals = true;        // E1b: krolestwo z bieda skarbca >= 0.5 raz na 7 dob sklada wniosek o pokoj z wrogiem o najgorszym wyniku wojny (wojny niefabularne); false = tylko wnioski gry i BK
+        public static bool PovertyPeaceArrearsMeasure = false;  // E1b: bieda z niedoplaty zwrotu zoldu korony (28 dob, wzgledem 25% i sredniej swiata) - wlaczyc po paczce 165; false = zapas skarbca (E1)
 
         // --- Oboz obleniczy (patrz Mends.RbSiegeCampFed) ---
         public static bool RbSiegeAttritionOnlyStarving = true; // straty obozu z RealisticBannerlord (2-5 dziennie, rosnace) tylko gdy oboz GLODUJE; garnizon - tylko gdy miasto bez zapasow // najsilniejsza banda pelna w tylu procentach limitu (ROT: oblezenie przy >= 0.8)
@@ -119,6 +121,8 @@ namespace CrashScribe
                         case "OthersNoMapVolunteers": OthersNoMapVolunteers = B(v); break;
                         case "StorylineWarNoReparations": StorylineWarNoReparations = B(v); break;
                         case "PovertyPeace": PovertyPeace = B(v); break;
+                        case "PovertyPeaceProposals": PovertyPeaceProposals = B(v); break;
+                        case "PovertyPeaceArrearsMeasure": PovertyPeaceArrearsMeasure = B(v); break;
                         case "RbSiegeAttritionOnlyStarving": RbSiegeAttritionOnlyStarving = B(v); break;
                     }
                 }
