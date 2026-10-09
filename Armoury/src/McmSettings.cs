@@ -2824,9 +2824,41 @@ namespace Armoury
         [SettingPropertyGroup("Arms production")]
         public bool WorkshopStateInSave { get; set; } = true;
 
-        [SettingPropertyBool("Bk Supplies No Arms Player", HintText = "the same for your own party: weapons, shields and arrows wear out by Armoury's rules only, not also by Banner Kings supplies (off until you decide - question 5 of package 174)")]
+        [SettingPropertyBool("Bk Supplies No Arms Player", HintText = "")]
         [SettingPropertyGroup("Arms production")]
         public bool BkSuppliesNoArmsPlayer { get; set; } = false;
+
+        [SettingPropertyBool("Workshop Hands Follow Material", HintText = "a workshop's hands go only to lines that can work today - a piece already in hand, or the ore, wood, leather and cloth for a new one on the town's stall (and a piece it can finish within Workshop Plan Days)")]
+        [SettingPropertyGroup("Arms production")]
+        public bool WorkshopHandsFollowMaterial { get; set; } = true;
+
+        [SettingPropertyBool("Workshop Freed Hands By Shortage", HintText = "hands of a craft that cannot work today (no ore, no cloth) help the other crafts of the town according to what the town lacks most - not by the fixed shares of Paris 1292")]
+        [SettingPropertyGroup("Arms production")]
+        public bool WorkshopFreedHandsByShortage { get; set; } = true;
+
+        [SettingPropertyBool("Workshop Choose By Shortage", HintText = "workshops first make what the town lacks most (empty stalls and unmet orders), and only then what pays best - the price cap no longer hides which shortage is worst. Civilian clothes that no soldier wears are left to the tailors of the town, not the armourers' lines")]
+        [SettingPropertyGroup("Arms production")]
+        public bool WorkshopChooseByShortage { get; set; } = true;
+
+        [SettingPropertyBool("Workshop Munition Grade", HintText = "when armour or arms of tier 1-3 are short, every second piece begun of that kind is the quickest of its kind and tier - munition harness, as Paris made 500 sets in under three months in 1384 beside its better work")]
+        [SettingPropertyGroup("Arms production")]
+        public bool WorkshopMunitionGrade { get; set; } = true;
+
+        [SettingPropertyInteger("Workshop Munition Max Tier", 0, 12, "0", HintText = "highest tier made for munition when short (1-6)")]
+        [SettingPropertyGroup("Arms production")]
+        public int WorkshopMunitionMaxTier { get; set; } = 3;
+
+        [SettingPropertyFloatingInteger("Workshop Munition Share", 0.00f, 2.00f, "0.00", HintText = "share of the pieces begun in a short kind that are made for munition (0-1)")]
+        [SettingPropertyGroup("Arms production")]
+        public float WorkshopMunitionShare { get; set; } = 0.5f;
+
+        [SettingPropertyFloatingInteger("Workshop Line Shortage Share", 0.00f, 3.00f, "0.00", HintText = "share of a craft's hands that follow the shortage of its lines; the rest is spread evenly, and a line with a piece in hand keeps at least an even share until it is finished (0-1)")]
+        [SettingPropertyGroup("Arms production")]
+        public float WorkshopLineShortageShare { get; set; } = 0.75f;
+
+        [SettingPropertyFloatingInteger("Workshop Plan Days", 0.00f, 240.00f, "0.00", HintText = "a workshop starts no piece it cannot finish within this many days with an even share of its craft's hands, and banks no more than this many days of work (14-120)        // the same for your own party: weapons, shields and arrows wear out by Armoury's rules only, not also by Banner Kings supplies (off until you decide - question 5 of package 174)")]
+        [SettingPropertyGroup("Arms production")]
+        public float WorkshopPlanDays { get; set; } = 60f;
 
         public void ApplyTo(Settings s)
         {
@@ -3534,6 +3566,14 @@ namespace Armoury
             s.BkSuppliesNoArms = BkSuppliesNoArms;
             s.WorkshopStateInSave = WorkshopStateInSave;
             s.BkSuppliesNoArmsPlayer = BkSuppliesNoArmsPlayer;
+            s.WorkshopHandsFollowMaterial = WorkshopHandsFollowMaterial;
+            s.WorkshopFreedHandsByShortage = WorkshopFreedHandsByShortage;
+            s.WorkshopChooseByShortage = WorkshopChooseByShortage;
+            s.WorkshopMunitionGrade = WorkshopMunitionGrade;
+            s.WorkshopMunitionMaxTier = WorkshopMunitionMaxTier;
+            s.WorkshopMunitionShare = WorkshopMunitionShare;
+            s.WorkshopLineShortageShare = WorkshopLineShortageShare;
+            s.WorkshopPlanDays = WorkshopPlanDays;
         }
 
         internal static void Apply()

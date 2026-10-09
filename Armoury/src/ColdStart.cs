@@ -141,6 +141,7 @@ namespace Armoury
             {
                 if (it == null || it.NotMerchandise || !SupplyDemand.Equipmentish(it)) continue;
                 if (ArmsPricing.IsUnique(it) || LegendaryLaw.IsLegend(it) || WorkshopLaw.Forbidden(it)) continue;
+                if (WorkshopLaw.ChooseByShortage && WorkshopLaw.CivilianOnly(it)) continue;   // 174.1: stroj mieszczan bez zolnierza (ladys_shoe) nie jest dorobkiem cechow zbrojnych
                 string g = GuildOfCategory(it); if (g == null) continue;
                 string c = it.Culture == null || it.Culture.StringId == "neutral_culture" ? "" : it.Culture.StringId;
                 Dictionary<string, List<ItemObject>[]> byG;

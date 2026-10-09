@@ -232,6 +232,19 @@ namespace Armoury
             return c;
         }
 
+        /// <summary>174.1: jakosc sztuki wzgledem mediany skutecznosci jej typu i tieru (q w dniach pracy, 0.6-1.8; 1 - brak danych). Tylko odczyt (log).</summary>
+        internal static float QualityOf(ItemObject it)
+        {
+            try
+            {
+                if (it == null) return 1f;
+                int t = TierOf(it); float med;
+                if (it.Effectiveness > 0f && _effMedian.TryGetValue((int)it.ItemType * 10 + t, out med) && med > 0f) return MBMath.ClampFloat(it.Effectiveness / med, 0.6f, 1.8f);
+            }
+            catch { }
+            return 1f;
+        }
+
         /// <summary>Podstawa ceny: wartosc z gry w granicach bezpiecznika, unikaty bez granic.</summary>
         internal static float BaseOf(ItemObject it)
         {

@@ -42,7 +42,7 @@ namespace Armoury
     internal static class WorkshopLaw
     {
         /// <summary>Nowa gra/wczytanie: stare przedmioty i pule z poprzedniej kampanii (audyt 04.10 - ryzyko zepsucia save).</summary>
-        internal static void Reset() { _pending = null; _ore = _wood = _leather = _linen = _wool = null; _owed.Clear(); _labor.Clear(); _rank.Clear(); _wip.Clear(); _guildCache.Clear(); _madeByType.Clear(); _dayStamp = -1; _made = _skipLoss = _skipMat = _skipLabor = _skipGold = 0; _dayRevenue = _dayCost = 0; Array.Clear(_skipMatBy, 0, _skipMatBy.Length);
+        internal static void Reset() { _pending = null; _ore = _wood = _leather = _linen = _wool = null; _owed.Clear(); _labor.Clear(); _rank.Clear(); _wip.Clear(); _plans.Clear(); _wipBasket.Clear(); NewDay174(); _soldierItems = null; _madeByType.Clear(); _dayStamp = -1; _made = _skipLoss = _skipMat = _skipLabor = _skipGold = 0; _dayRevenue = _dayCost = 0; Array.Clear(_skipMatBy, 0, _skipMatBy.Length);
             WorkshopTrade.Reset();   // warsztaty towarowe w nowej monecie: stan czyszczony razem z warsztatami zbrojnymi (ta metoda idzie z konstruktora ArmouryBehavior)
             TownCrafts.Reset();      // paczka 148: rzemioslo miasta - dlugi wsadu i rak, srednie zuzycia (przed SyncData wczytania)
             TownFletchers.Reset();   // paczka 172: strzelarze miasta - dlugi surowca i rak, kandydaci, liczniki (przed SyncData wczytania)
@@ -240,74 +240,62 @@ namespace Armoury
                 int day = (int)CampaignTime.Now.ToDays;
                 if (_dayStamp != day) { Flush(); _dayStamp = day; }
                 string line = LineKey(production);
-                float share = LineShare(__instance, workshop, production, town, day);
+                float floor;
+                float share = LineShare(__instance, workshop, production, town, day, out floor);
                 var key = new KeyValuePair<Workshop, string>(workshop, line);
                 Wip w;
                 if (!_wip.TryGetValue(key, out w)) { w = new Wip { Day = day, Labor = share }; _wip[key] = w; }
                 w.Labor += share * Math.Max(0, day - w.Day);
                 w.Day = day;
-                w.Labor = Math.Min(w.Labor, share * 60f + (w.Item != null ? w.Days : 0f));   // reka bez roboty nie odklada wiecej niz 2 miesiace
+                float planDays = PlanDays;   // 174.1: bank roboty i plan (E) z jednego klucza WorkshopPlanDays (domyslnie 60 - jak dotad)
+                w.Labor = Math.Min(w.Labor, share * planDays + (w.Item != null ? w.Days : 0f));   // reka bez roboty nie odklada wiecej niz plan (2 miesiace)
 
                 float[] owed;
                 if (!_owed.TryGetValue(workshop, out owed)) { owed = new float[4]; _owed[workshop] = owed; }
                 var shelf = town.Owner.ItemRoster;
                 bool any = false;
                 float minProfit = 1f + Math.Max(0f, s.WorkshopMinProfitPercent) / 100f;
+                bool planOn = FollowMaterial;
                 for (int guard = 0; guard < 8; guard++)
                 {
                     if (w.Item == null)
                     {
-                        // nowa sztuka: pierwsza z rankingu linii (zysk na roboczodzien), na ktora sa surowce i pieniadze
-                        int reason = 0; bool started = false;
+                        // nowa sztuka: pierwsza z rankingu linii, na ktora sa surowce i pieniadze (174.1: ranking wedlug braku koszyka, potem zysku
+                        // na roboczodzien - WorkshopChooseByShortage); bramka zysku, surowiec i kapital - jak dotad, po prawdziwej cenie polki
+                        int reason = 0; bool started = false, planRej = false;
                         int miss = 0; int[] shelfHave = null;      // licznik "brak surowca" wedlug surowca (tylko log)
-                        foreach (var it in Candidates(__instance, workshop, production, town, day))
+                        float planCap = w.Labor + Math.Max(share, floor) * planDays;
+                        var cands = Candidates(__instance, workshop, production, town, day);
+                        for (int ci = 0; ci < cands.Count && !started; ci++)
                         {
-                            float days;
-                            var need = Needs(it, out days);
-                            if (need == null) continue;
-                            var take = new int[4];
-                            var mats = new[] { _ore, _wood, _leather, _linen };
-                            bool ok = true; float matCost = 0f;
-                            for (int m = 0; m < 4; m++)
+                            var c = cands[ci];
+                            Start st;
+                            int r = TryStart(c, shelf, owed, workshop, town, minProfit, out st, ref miss, ref shelfHave);
+                            if (r != 0) { reason = Math.Max(reason, r); continue; }
+                            // (E) 174.1: nie zaczynaj sztuki, ktorej nie skonczysz w planie - podloga: rowny podzial rak cechu (linia ze sztuka w robocie ja ma)
+                            if (planOn && c.Days > planCap) { _rejPlan++; planRej = true; continue; }
+                            // (C) 174.1: w koszyku z brakiem (tier <= WorkshopMunitionMaxTier) czesc rozpoczetych sztuk to najszybsza w robocie ("na amunicje")
+                            bool mun = false;
+                            if (MunitionOn && c.Short > 0f && c.Basket % 10 <= MunitionMaxTier)
                             {
-                                float want = owed[m] + need[m];
-                                take[m] = (int)Math.Floor(want);
-                                if (take[m] <= 0) continue;
-                                var mi = mats[m];
-                                int have = Available(shelf, mi);
-                                if (m == 3 && have < take[m] && _wool != null) { mi = _wool; have = Available(shelf, mi); mats[m] = mi; }   // welna za len
-                                if (mi == null || have < take[m]) { ok = false; break; }
+                                w.MunAcc += MunitionShare;
+                                if (w.MunAcc >= 1f)
+                                {
+                                    w.MunAcc -= 1f;
+                                    Cand qc; Start qs;
+                                    if (Quickest(cands, c, shelf, owed, workshop, town, minProfit, planOn, planCap, out qc, out qs)) { c = qc; st = qs; }
+                                    mun = true;
+                                }
                             }
-                            if (!ok)
-                            {
-                                reason = Math.Max(reason, 2);
-                                try { if (shelfHave == null) shelfHave = ShelfHave(shelf); miss |= MissMask(shelfHave, owed, need); } catch { }
-                                continue;
-                            }
-                            // koszt surowcow od zuzycia (ulamki tez), po cenie historycznej / targowej
-                            for (int m = 0; m < 4; m++) matCost += need[m] * MatPrice(town, mats[m], m);
-                            float revenue = Revenue(town, it);
-                            if (revenue < (matCost + days * DayWage(it, town)) * minProfit) { reason = Math.Max(reason, 1); continue; }
-                            int mc = MBRandom.RoundRandomized(matCost);
-                            if (workshop.Capital < mc) { reason = Math.Max(reason, 4); continue; }
-                            for (int m = 0; m < 4; m++)
-                            {
-                                if (take[m] > 0 && mats[m] != null) { shelf.AddToCounts(mats[m], -take[m]); OreLedger.NoteWorkshop(mats[m], take[m]); }
-                                owed[m] = owed[m] + need[m] - take[m];
-                            }
-                            workshop.ChangeGold(-mc);
-                            town.ChangeGold(mc);                   // surowce kupione od miasta
-                            MoneyLedger.Note(MoneyLedger.NShop, workshop.Settlement, mc);       // ksiega przeplywow osad (tylko licznik)
-                            w.Item = it; w.Days = days; w.MatCost = mc;
-                            _started++;
+                            DoStart(c, st, shelf, owed, workshop, town, w, mun);
                             started = true;
-                            break;
                         }
                         if (!started)
                         {
                             if (reason == 1) _skipLoss++;
                             else if (reason == 2) { _skipMat++; for (int m = 0; m < 4; m++) if ((miss & (1 << m)) != 0) _skipMatBy[m]++; }
                             else if (reason == 4) _skipGold++;
+                            else if (planRej) _skipPlan++;
                             break;
                         }
                     }
@@ -329,6 +317,7 @@ namespace Armoury
                     int cost = w.MatCost + wagesI;
                     _made++; _dayRevenue += rev; _dayCost += cost; Note(w.Item, rev, cost);
                     int k; _madeByType.TryGetValue(w.Item.ItemType, out k); _madeByType[w.Item.ItemType] = k + 1;
+                    NoteFinished(town, w.Item, w.Days, production);   // 174.1: licznik koszyka w robocie, zrobione t5-6, zuzyte rece cechu, q t1-t3
                     w.Labor -= w.Days;
                     w.Item = null; w.Days = 0f; w.MatCost = 0;
                 }
@@ -338,27 +327,105 @@ namespace Armoury
             catch (Exception e) { Log.Error("WorkshopLaw.Cycle", e); return true; }
         }
 
-        private static FieldInfo _itemsInCategory;
-        private static readonly Dictionary<KeyValuePair<Workshop, string>, KeyValuePair<int, List<ItemObject>>> _rank = new Dictionary<KeyValuePair<Workshop, string>, KeyValuePair<int, List<ItemObject>>>();
+        // ------------------------------------------------------------ 174.1: start sztuki (wydzielone z petli bez zmiany warunkow)
+        private struct Start { public int[] Take; public ItemObject[] Mats; public int Mc; }
 
-        /// <summary>Ranking dnia: wszystko z linii uzbrojenia warsztatu (kultura miasta albo neutralne,
-        /// a gdy takich brak - wszystko), wedle szacunku zysku na roboczodzien przy dzisiejszych cenach.</summary>
-        private static List<ItemObject> Candidates(WorkshopsCampaignBehavior beh, Workshop workshop, WorkshopType.Production production, Town town, int day)
+        /// <summary>Warunki startu sztuki jak dotad: surowiec na polce (welna za len), zysk >= WorkshopMinProfitPercent po prawdziwej cenie, kapital na surowiec.
+        /// 0 = mozna; 1 bez zysku, 2 brak surowca (miss - ktore), 4 brak zlota.</summary>
+        private static int TryStart(Cand c, ItemRoster shelf, float[] owed, Workshop workshop, Town town, float minProfit, out Start st, ref int miss, ref int[] shelfHave)
         {
-            KeyValuePair<int, List<ItemObject>> cached;
+            st = new Start { Take = new int[4], Mats = new[] { _ore, _wood, _leather, _linen } };
+            var need = c.Need;
+            for (int m = 0; m < 4; m++)
+            {
+                float want = owed[m] + need[m];
+                st.Take[m] = (int)Math.Floor(want);
+                if (st.Take[m] <= 0) continue;
+                var mi = st.Mats[m];
+                int have = Available(shelf, mi);
+                if (m == 3 && have < st.Take[m] && _wool != null) { mi = _wool; have = Available(shelf, mi); st.Mats[m] = mi; }   // welna za len
+                if (mi == null || have < st.Take[m])
+                {
+                    try { if (shelfHave == null) shelfHave = ShelfHave(shelf); miss |= MissMask(shelfHave, owed, need); } catch { }
+                    return 2;
+                }
+            }
+            // koszt surowcow od zuzycia (ulamki tez), po cenie historycznej / targowej
+            float matCost = 0f;
+            for (int m = 0; m < 4; m++) matCost += need[m] * MatPrice(town, st.Mats[m], m);
+            float revenue = Revenue(town, c.Item);
+            if (revenue < (matCost + c.Days * DayWage(c.Item, town)) * minProfit) return 1;
+            st.Mc = MBRandom.RoundRandomized(matCost);
+            if (workshop.Capital < st.Mc) return 4;
+            return 0;
+        }
+
+        private static void DoStart(Cand c, Start st, ItemRoster shelf, float[] owed, Workshop workshop, Town town, Wip w, bool munition)
+        {
+            for (int m = 0; m < 4; m++)
+            {
+                if (st.Take[m] > 0 && st.Mats[m] != null) { shelf.AddToCounts(st.Mats[m], -st.Take[m]); OreLedger.NoteWorkshop(st.Mats[m], st.Take[m]); }
+                owed[m] = owed[m] + c.Need[m] - st.Take[m];
+            }
+            workshop.ChangeGold(-st.Mc);
+            town.ChangeGold(st.Mc);                   // surowce kupione od miasta
+            MoneyLedger.Note(MoneyLedger.NShop, workshop.Settlement, st.Mc);       // ksiega przeplywow osad (tylko licznik)
+            w.Item = c.Item; w.Days = c.Days; w.MatCost = st.Mc;
+            _started++;
+            WipBasketAdd(town, c.Basket, +1);
+            if (munition) NoteMunition(c.Item);
+        }
+
+        /// <summary>(C) najszybsza w robocie sztuka koszyka c0 (remis - zysk na dzien), ktora mozna dzis zaczac i skonczyc w planie.</summary>
+        private static bool Quickest(List<Cand> cands, Cand c0, ItemRoster shelf, float[] owed, Workshop workshop, Town town, float minProfit, bool planOn, float planCap, out Cand best, out Start bestSt)
+        {
+            best = null; bestSt = new Start();
+            int miss = 0; int[] have = null;
+            foreach (var c in cands)
+            {
+                if (c.Basket != c0.Basket || c == c0) continue;
+                if (best != null && (c.Days > best.Days || (c.Days == best.Days && c.PerDay <= best.PerDay))) continue;
+                if (c.Days > c0.Days || (c.Days == c0.Days && c.PerDay <= c0.PerDay)) continue;   // nie szybsza niz wybrana
+                if (planOn && c.Days > planCap) continue;
+                Start st;
+                if (TryStart(c, shelf, owed, workshop, town, minProfit, out st, ref miss, ref have) != 0) continue;
+                best = c; bestSt = st;
+            }
+            return best != null;
+        }
+
+        private static FieldInfo _itemsInCategory;
+        private static readonly Dictionary<KeyValuePair<Workshop, string>, KeyValuePair<int, List<Cand>>> _rank = new Dictionary<KeyValuePair<Workshop, string>, KeyValuePair<int, List<Cand>>>();
+
+        /// <summary>Pozycja rankingu dnia (174.1): przedmiot, koszyk (typ*10+tier), potrzeby i dni, przychod i koszt z tego samego przebiegu, popyt d i polka s
+        /// koszyka w tym miescie (z SupplyDemand.Factor, ktory juz liczy przychod - bez nowych wywolan), brak koszyka i waga braku.</summary>
+        private sealed class Cand
+        {
+            public ItemObject Item; public int Basket; public float[] Need; public float Days, Rev, Cost, MatCost, PerDay, D, Short, W; public int S;
+        }
+
+        /// <summary>Ranking dnia: wszystko z linii uzbrojenia warsztatu (kultura miasta albo neutralne, a gdy takich brak - wszystko). Dotad wedlug szacunku
+        /// zysku na roboczodzien przy dzisiejszych cenach; 174.1 (WorkshopChooseByShortage, Jeff 04.10 "co brakuje i ma najlepsza marze"): najpierw koszyki
+        /// wedlug braku - waga W = mnoznik polki bez sufitu / z sufitem (przy pustej polce i 60 zamowieniach ok. 2.1; sufit x4 nie odroznial "brak 60 zbroi"
+        /// od "brak 15 pantofli") razy najlepszy zysk na dzien w koszyku - potem w koszyku zysk na dzien. Przedmioty cywilne bez zolnierza (ladys_shoe i podobne)
+        /// poza liniami zbrojnymi. Filtr unikatow, legend i WorkshopForbiddenIds bez zmian.</summary>
+        private static List<Cand> Candidates(WorkshopsCampaignBehavior beh, Workshop workshop, WorkshopType.Production production, Town town, int day)
+        {
+            KeyValuePair<int, List<Cand>> cached;
             // CECHY (Jeff 04.10: "zbrojmistrz, platnerz i lucznik to zupelnie inne role - lucznik nie zrobi miecza"):
             // ranking tylko z LINII, ktorej cykl wlasnie biegnie - wczesniej ukryty "artisans" (97 miast, linie na wszystko)
             // wybieral najoplacalniejsza sztuke ze wszystkich linii i robil same luki
             string line = LineKey(production);
             var key = new KeyValuePair<Workshop, string>(workshop, line);
             if (_rank.TryGetValue(key, out cached) && cached.Key == day) return cached.Value;
-            var list = new List<ItemObject>();
+            var list = new List<Cand>();
             try
             {
                 if (_itemsInCategory == null) _itemsInCategory = AccessTools.Field(typeof(WorkshopsCampaignBehavior), "_itemsInCategory");
                 var dict = _itemsInCategory != null ? _itemsInCategory.GetValue(beh) as Dictionary<ItemCategory, List<ItemObject>> : null;
                 var pool = new List<ItemObject>(); var foreign = new List<ItemObject>();
                 var seen = new HashSet<ItemObject>();
+                bool byShort = ChooseByShortage;
                 if (dict != null)
                     foreach (var p in new[] { production })
                     {
@@ -370,6 +437,7 @@ namespace Armoury
                             foreach (var it in items)
                             {
                                 if (it == null || !seen.Add(it) || ArmsPricing.IsUnique(it) || LegendaryLaw.IsLegend(it) || Forbidden(it)) continue;   // Jeff 04.10: zadnych unikatow rodow, klingi valyrianskiej ani legend z warsztatu
+                                if (byShort && CivilianOnly(it)) { _civSkipped++; continue; }   // 174.1: stroj mieszczan (ladys_shoe) - nie wyrob linii zbrojnej
                                 bool local = it.Culture == null || it.Culture.StringId == "neutral_culture" || it.Culture == town.Culture;
                                 (local ? pool : foreign).Add(it);
                             }
@@ -379,27 +447,85 @@ namespace Armoury
                 // najwyzej WorkshopCandidates sztuk do rankingu (losowa probka, zeby dzien nie stal)
                 int max = Math.Max(5, Settings.Current.WorkshopCandidates);
                 while (pool.Count > max) pool.RemoveAt(MBRandom.RandomInt(pool.Count));
-                var scored = new List<KeyValuePair<float, ItemObject>>();
                 var s = Settings.Current;
                 Resolve();
                 float pOre = MatPrice(town, _ore, 0), pWood = MatPrice(town, _wood, 1), pLea = MatPrice(town, _leather, 2), pLin = MatPrice(town, _linen, 3);
+                float elast = MBMath.ClampFloat(s.SupplyDemandElasticity, 0.05f, 2f), lo = MBMath.ClampFloat(s.SupplyDemandMinFactor, 0.01f, 1f), hi = Math.Max(1f, s.SupplyDemandMaxFactor);
                 foreach (var it in pool)
                 {
                     float days;
                     var need = Needs(it, out days);
                     if (need == null) continue;
-                    float cost = need[0] * pOre + need[1] * pWood + need[2] * pLea + need[3] * pLin + days * DayWage(it, town);
-                    float revenue = Revenue(town, it);
+                    float mat = need[0] * pOre + need[1] * pWood + need[2] * pLea + need[3] * pLin;
+                    float cost = mat + days * DayWage(it, town);
+                    float d; int sh;
+                    float revenue = Revenue(town, it, out d, out sh);
                     float perDay = (revenue - cost) / Math.Max(0.1f, days);
-                    if (perDay > 0f) scored.Add(new KeyValuePair<float, ItemObject>(perDay, it));
+                    if (perDay <= 0f) continue;
+                    var c = new Cand { Item = it, Basket = (int)it.ItemType * 10 + TierOf(it), Need = need, Days = days, Rev = revenue, Cost = cost, MatCost = mat, PerDay = perDay, D = d, S = sh, W = 1f };
+                    // brak koszyka w miescie: popyt - polka - sztuki w robocie; waga braku = mnoznik bez sufitu / z sufitem (>= 1) liczony z sztukami w robocie
+                    int wipB = WipBasket(town, c.Basket);
+                    c.Short = Math.Max(0f, d - sh - wipB);
+                    if (c.Short > 0f)
+                    {
+                        float fn = (float)Math.Pow((d + 1f) / (sh + wipB + 1f), elast);
+                        float fc = MBMath.ClampFloat(fn, lo, hi);
+                        c.W = fc > 0f ? Math.Max(1f, fn / fc) : 1f;
+                    }
+                    NoteBasketDay(town, c);
+                    list.Add(c);
                 }
-                if (scored.Count == 0) NoteEmpty(workshop, line, town, pool, pOre, pWood, pLea, pLin);
-                scored.Sort((a, b) => b.Key.CompareTo(a.Key));
-                foreach (var kv in scored) list.Add(kv.Value);
+                if (list.Count == 0) NoteEmpty(workshop, line, town, pool, pOre, pWood, pLea, pLin);
+                if (byShort)
+                {
+                    // koszyki wedlug W x najlepszy zysk na dzien w koszyku (malejaco), w koszyku - zysk na dzien
+                    var bestPd = new Dictionary<int, float>();
+                    foreach (var c in list) { float b; if (!bestPd.TryGetValue(c.Basket, out b) || c.PerDay > b) bestPd[c.Basket] = c.PerDay; }
+                    list.Sort((x, y) =>
+                    {
+                        float kx = x.W * bestPd[x.Basket], ky = y.W * bestPd[y.Basket];
+                        int r = ky.CompareTo(kx);
+                        if (r != 0) return r;
+                        r = x.Basket.CompareTo(y.Basket);
+                        return r != 0 ? r : y.PerDay.CompareTo(x.PerDay);
+                    });
+                }
+                else list.Sort((x, y) => y.PerDay.CompareTo(x.PerDay));
             }
             catch (Exception e) { Log.Error("WorkshopLaw.Candidates", e); }
-            _rank[key] = new KeyValuePair<int, List<ItemObject>>(day, list);
+            _rank[key] = new KeyValuePair<int, List<Cand>>(day, list);
             return list;
+        }
+
+        private static int TierOf(ItemObject it) { try { return Math.Max(1, Math.Min(6, (int)it.Tier + 1)); } catch { return 1; } }
+
+        // ------------------------------------------------------------ 174.1: przedmioty cywilne bez zolnierza
+        // Civilian="true" i nieobecne w zadnym wzorcu oddzialu (BattleEquipments postaci nie-bohaterow) - lista raz na sesje. ladys_shoe (t1, SandBoxCore)
+        // nie wystepuje w zadnym wzorcu ROT: krawcy szyli 110-150 par dziennie jako "buty wojska" (A171). Poza liniami zbrojnymi i poza ColdStart.
+        private static HashSet<ItemObject> _soldierItems;
+        internal static bool CivilianOnly(ItemObject it)
+        {
+            if (it == null || !it.IsCivilian) return false;
+            if (_soldierItems == null)
+            {
+                var set = new HashSet<ItemObject>();
+                try
+                {
+                    foreach (var ch in CharacterObject.All)
+                    {
+                        if (ch == null || ch.IsHero) continue;
+                        foreach (var eq in ch.BattleEquipments)
+                        {
+                            if (eq == null) continue;
+                            for (int sl = 0; sl < 12; sl++) { var x = eq[(EquipmentIndex)sl].Item; if (x != null) set.Add(x); }
+                        }
+                    }
+                }
+                catch (Exception e) { Log.Error("WorkshopLaw.CivilianOnly", e); }
+                if (set.Count == 0) return false;   // postaci jeszcze nie wczytane - nie zgadujemy
+                _soldierItems = set;
+            }
+            return !_soldierItems.Contains(it);
         }
 
         private static string LineKey(WorkshopType.Production p)
@@ -410,9 +536,11 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ cechy (wpis 48)
-        private sealed class Wip { public ItemObject Item; public float Days, Labor; public int MatCost, Day; }
+        private sealed class Wip { public ItemObject Item; public float Days, Labor, MunAcc; public int MatCost, Day; }   // MunAcc: 174.1 (C) licznik sztuk "na amunicje" linii
         private static readonly Dictionary<KeyValuePair<Workshop, string>, Wip> _wip = new Dictionary<KeyValuePair<Workshop, string>, Wip>();
-        private static readonly Dictionary<Workshop, KeyValuePair<int, Dictionary<string, int>>> _guildCache = new Dictionary<Workshop, KeyValuePair<int, Dictionary<string, int>>>();
+        // 174.1: plan rak warsztatu na dobe - udzial i podloga kazdej linii (LineShare)
+        private sealed class LinePlan { public string Key, Guild; public bool Wip, Active; public float Short, Share, Floor, Labor; public List<Cand> Rank; }
+        private static readonly Dictionary<Workshop, KeyValuePair<int, Dictionary<string, LinePlan>>> _plans = new Dictionary<Workshop, KeyValuePair<int, Dictionary<string, LinePlan>>>();
         private static int _started;
 
         /// <summary>Cech linii wedle kategorii wyrobu.</summary>
@@ -464,9 +592,17 @@ namespace Armoury
         // miedzy warsztatem a miastem zaokraglana losowo (srednio co do grosza).
         private static float Revenue(Town town, ItemObject it)
         {
+            float d; int sh;
+            return Revenue(town, it, out d, out sh);
+        }
+
+        /// <summary>174.1: ten sam przychod, a z tego samego wywolania SupplyDemand.Factor popyt d i polka s koszyka (bez prawa podazy: 0 / 0).</summary>
+        private static float Revenue(Town town, ItemObject it, out float d, out int sh)
+        {
+            d = 0f; sh = 0;
             if (town == null || it == null) return 0f;
             float f = 1f;
-            try { float d; int sh; if (SupplyDemand.Active) f = SupplyDemand.Factor(town.Settlement, it, false, out d, out sh); } catch { }
+            try { if (SupplyDemand.Active) f = SupplyDemand.Factor(town.Settlement, it, false, out d, out sh); } catch { }
             float arms = 1f;   // wpis 88 (audyt pkt 9): drozejaca skora/ruda podnosi cene w sklepie - i zarobek warsztatu
             try { arms = ArmsPricing.Multiplier(town.Settlement, it); } catch { }
             return RevenueOf(it, f, arms);
@@ -519,38 +655,290 @@ namespace Armoury
             return MBMath.ClampFloat(town.Prosperity / per, Math.Max(0.1f, s.WorkshopArtisansMin), Math.Max(s.WorkshopArtisansMin, s.WorkshopArtisansMax));
         }
 
-        /// <summary>Czesc rak dla linii: rece / liczba czynnych cechow / liczba czynnych linii w cechu (czynna = ma dzis cos oplacalnego).</summary>
-        private static float LineShare(WorkshopsCampaignBehavior beh, Workshop workshop, WorkshopType.Production production, Town town, int day)
+        // ------------------------------------------------------------ 174.1: RECE IDA DO SUROWCA, WYROB WEDLUG BRAKU (te same rece, zero nowego surowca)
+        internal static bool FollowMaterial { get { var s = Settings.Current; return s != null && s.WorkshopHandsFollowMaterial; } }
+        internal static bool FreedByShortage { get { var s = Settings.Current; return s != null && s.WorkshopFreedHandsByShortage; } }
+        internal static bool ChooseByShortage { get { var s = Settings.Current; return s != null && s.WorkshopChooseByShortage; } }
+        private static bool MunitionOn { get { var s = Settings.Current; return s != null && s.WorkshopMunitionGrade && s.WorkshopMunitionShare > 0f; } }
+        private static int MunitionMaxTier { get { var s = Settings.Current; return s == null ? 3 : Math.Max(1, Math.Min(6, s.WorkshopMunitionMaxTier)); } }
+        private static float MunitionShare { get { var s = Settings.Current; return s == null ? 0.5f : MBMath.ClampFloat(s.WorkshopMunitionShare, 0f, 1f); } }
+        private static float PlanDays { get { var s = Settings.Current; return s == null ? 60f : MBMath.ClampFloat(s.WorkshopPlanDays, 14f, 120f); } }
+
+        /// <summary>
+        /// Czesc rak dla linii (roboczodni dziennie). floor = rowny podzial rak cechu miedzy jego czynne linie (podloga planu (E) i linii ze sztuka w robocie).
+        /// Dotad: rece / czynne cechy (wagi Paryza 1292) / czynne linie po rowno, czynna = ma cos oplacalnego PO CENACH - kowal bez rudy dostawal swoja czesc
+        /// i nic nie robil (624-980 cykli/d "brak rudy" = 25-35% rak swiata). 174.1:
+        ///  (A) czynna = sztuka w robocie albo start mozliwy DZIS (surowiec na polce, zysk, kapital) i (E) skonczy w planie (WorkshopHandsFollowMaterial);
+        ///      rece cechu bez czynnej linii ida do czynnych cechow wedlug braku ich koszykow (WorkshopFreedHandsByShortage; brak braku - wagi Paryza);
+        ///  (D) w cechu: WorkshopLineShortageShare rak wedlug braku linii, reszta po rowno; linia ze sztuka w robocie ma podloge rownego podzialu
+        ///      ("dokoncz zaczete"), pozostale skaluja sie tak, zeby suma = rece cechu (kontrola w logu).
+        /// Wylaczone klucze = dzisiejszy podzial. Plan liczony raz na warsztat na dobe.
+        /// </summary>
+        private static float LineShare(WorkshopsCampaignBehavior beh, Workshop workshop, WorkshopType.Production production, Town town, int day, out float floor)
         {
-            KeyValuePair<int, Dictionary<string, int>> c;
-            if (!_guildCache.TryGetValue(workshop, out c) || c.Key != day)
+            floor = 0f;
+            KeyValuePair<int, Dictionary<string, LinePlan>> c;
+            if (!_plans.TryGetValue(workshop, out c) || c.Key != day)
             {
-                var d = new Dictionary<string, int>();
+                c = new KeyValuePair<int, Dictionary<string, LinePlan>>(day, BuildPlan(beh, workshop, town, day));
+                _plans[workshop] = c;
+            }
+            LinePlan lp;
+            if (!c.Value.TryGetValue(LineKey(production), out lp) || !lp.Active) return 0f;
+            floor = lp.Floor;
+            return lp.Share;
+        }
+
+        private static readonly string[] GuildOrder = { "krawiec", "platnerz", "miecznik", "siodlarz", "lucznik", "tarczownik" };
+
+        private static Dictionary<string, LinePlan> BuildPlan(WorkshopsCampaignBehavior beh, Workshop workshop, Town town, int day)
+        {
+            var plan = new Dictionary<string, LinePlan>();
+            try
+            {
+                var s = Settings.Current;
+                bool follow = FollowMaterial, freedByShort = FreedByShortage;
+                float alpha = MBMath.ClampFloat(s.WorkshopLineShortageShare, 0f, 1f);
+                float planDays = PlanDays;
+                Resolve();
+                var shelf = town.Owner != null ? town.Owner.ItemRoster : null;
+                float[] owed; if (!_owed.TryGetValue(workshop, out owed)) owed = new float[4];
+                int[] have = shelf != null ? ShelfHave(shelf) : new int[5];
+                float minProfit = 1f + Math.Max(0f, s.WorkshopMinProfitPercent) / 100f;
+                int capital = workshop.Capital;
                 foreach (var p in workshop.WorkshopType.Productions)
                 {
                     if (!AllOutputsArms(p)) continue;
-                    if (Candidates(beh, workshop, p, town, day).Count == 0) continue;
-                    string g = GuildOf(p); int n; d.TryGetValue(g, out n); d[g] = n + 1;
+                    string key = LineKey(p);
+                    if (plan.ContainsKey(key)) continue;
+                    var lp = new LinePlan { Key = key, Guild = GuildOf(p), Rank = Candidates(beh, workshop, p, town, day) };
+                    Wip w;
+                    if (_wip.TryGetValue(new KeyValuePair<Workshop, string>(workshop, key), out w) && w != null) { lp.Wip = w.Item != null; lp.Labor = w.Labor; }
+                    var seenB = new HashSet<int>();
+                    foreach (var cnd in lp.Rank) if (cnd.Short > 0f && seenB.Add(cnd.Basket)) lp.Short += cnd.Short;
+                    plan[key] = lp;
                 }
-                c = new KeyValuePair<int, Dictionary<string, int>>(day, d);
-                _guildCache[workshop] = c;
+                if (plan.Count == 0) return plan;
+                // (A) czynna linia: sztuka w robocie albo start mozliwy dzis (pierwsze przejscie bez planu (E))
+                Func<LinePlan, float, bool> startable = (lp, cap) =>
+                {
+                    foreach (var cnd in lp.Rank)
+                    {
+                        if (cnd.Days > cap) continue;
+                        if (MissMask(have, owed, cnd.Need) != 0) continue;
+                        if (cnd.Rev < cnd.Cost * minProfit) continue;
+                        if (capital < (int)Math.Ceiling(cnd.MatCost)) continue;
+                        return true;
+                    }
+                    return false;
+                };
+                foreach (var lp in plan.Values) lp.Active = follow ? (lp.Wip || startable(lp, float.MaxValue)) : lp.Rank.Count > 0;
+                float H = Hands(workshop, town);
+                var hg = new Dictionary<string, float>(); var extraG = new Dictionary<string, float>(); var nG = new Dictionary<string, int>();
+                float repairs = 0f;
+                for (int round = 0; round < 3; round++)
+                {
+                    hg.Clear(); extraG.Clear(); nG.Clear(); repairs = 0f;
+                    var shortG = new Dictionary<string, float>();
+                    float wAll = 0f, wAct = 0f, shortAll = 0f;
+                    var guilds = new HashSet<string>();
+                    foreach (var lp in plan.Values)
+                    {
+                        if (guilds.Add(lp.Guild)) wAll += GuildWeight(lp.Guild);
+                        if (!lp.Active) continue;
+                        int n; nG.TryGetValue(lp.Guild, out n); nG[lp.Guild] = n + 1;
+                        float sg; shortG.TryGetValue(lp.Guild, out sg); shortG[lp.Guild] = sg + lp.Short;
+                    }
+                    foreach (var g in nG.Keys) { wAct += GuildWeight(g); shortAll += shortG[g]; }
+                    if (wAct <= 0f || wAll <= 0f) break;
+                    float freed = H * Math.Max(0f, wAll - wAct) / wAll;
+                    foreach (var g in nG.Keys)
+                    {
+                        float own = H * GuildWeight(g) / wAll;
+                        float extra = freedByShort && shortAll > 0f ? freed * shortG[g] / shortAll : freed * GuildWeight(g) / wAct;
+                        float h = own + extra;
+                        // wpis 91 + 174.0 (e): kowale, ktorzy wczoraj naprawiali, i konserwacja zapasu na polce - mniej rak platnerzy i miecznikow
+                        if (workshop.WorkshopType.IsHidden && (g == "platnerz" || g == "miecznik"))
+                        {
+                            float smithW = GuildWeight("platnerz") + GuildWeight("miecznik");
+                            if (smithW > 0f)
+                            {
+                                float cut = Math.Min(h, (SmithHours.ManDaysYesterday(town) + ArmsLeaks.UpkeepManDays(town)) * GuildWeight(g) / smithW / Math.Max(1, ActiveSmithWorkshops(town)));
+                                h -= cut; repairs += cut;
+                            }
+                        }
+                        hg[g] = h; extraG[g] = extra;
+                    }
+                    if (!follow || round == 2) break;
+                    // (E) plan: linia bez sztuki w robocie jest czynna, gdy cos skonczy w planie z rownego podzialu jako podloga
+                    bool changed = false;
+                    foreach (var lp in plan.Values)
+                    {
+                        if (!lp.Active || lp.Wip) continue;
+                        float h; int n;
+                        if (!hg.TryGetValue(lp.Guild, out h) || !nG.TryGetValue(lp.Guild, out n) || n <= 0) continue;
+                        if (!startable(lp, lp.Labor + h / n * planDays)) { lp.Active = false; changed = true; _planIdleLines++; }
+                    }
+                    if (!changed) break;
+                }
+                // (D) linie cechu wedlug braku, podloga dla zaczetych, suma = rece cechu
+                float toLines = 0f;
+                foreach (var g in hg.Keys)
+                {
+                    var lines = new List<LinePlan>();
+                    foreach (var lp in plan.Values) if (lp.Active && lp.Guild == g) lines.Add(lp);
+                    int n = lines.Count;
+                    if (n == 0) continue;
+                    float h = hg[g], fl = h / n, sumShort = 0f;
+                    foreach (var lp in lines) sumShort += lp.Short;
+                    var raw = new float[n];
+                    for (int i = 0; i < n; i++) raw[i] = alpha > 0f && sumShort > 0f ? h * ((1f - alpha) / n + alpha * lines[i].Short / sumShort) : fl;
+                    var fixd = new bool[n];
+                    for (int it = 0; it <= n; it++)
+                    {
+                        float rem = h, restRaw = 0f; int free = 0;
+                        for (int i = 0; i < n; i++) { if (fixd[i]) rem -= fl; else { restRaw += raw[i]; free++; } }
+                        bool changed = false;
+                        for (int i = 0; i < n; i++)
+                        {
+                            if (fixd[i]) { lines[i].Share = fl; continue; }
+                            lines[i].Share = restRaw > 0f ? raw[i] * rem / restRaw : (free > 0 ? rem / free : 0f);
+                            if (lines[i].Wip && lines[i].Share < fl - 1e-4f) { fixd[i] = true; changed = true; }
+                        }
+                        if (!changed) break;
+                    }
+                    float sum = 0f;
+                    foreach (var lp in lines) { lp.Floor = fl; sum += lp.Share; }
+                    if (h > 0.01f) _devMax = Math.Max(_devMax, Math.Abs(sum - h) / h);
+                    toLines += sum;
+                    int gi = Array.IndexOf(GuildOrder, g);
+                    if (gi >= 0) { _gAssigned[gi] += h; _gFreed[gi] += extraG[g]; }
+                }
+                _hands += H; _handsLines += toLines; _handsRepair += repairs;
             }
-            int lines; string gu = GuildOf(production);
-            if (c.Value.Count == 0 || !c.Value.TryGetValue(gu, out lines) || lines <= 0) return 0f;
-            // wpis 52: cechy wedle Paryza 1292 (krawcy 30%, platnerze 20%, miecznicy 20%, siodlarze 15%, lucznicy 10%,
-            // tarczownicy 5%) - udzial cechu wsrod CZYNNYCH cechow warsztatu (nieczynny oddaje rece pozostalym)
-            float sum = 0f; foreach (var g in c.Value.Keys) sum += GuildWeight(g);
-            if (sum <= 0f) return 0f;
-            float h = Hands(workshop, town) * GuildWeight(gu) / sum;
-            // wpis 91: kowale, ktorzy wczoraj naprawiali, nie kuli - mniej rak cechow platnerzy i miecznikow
-            if (workshop.WorkshopType.IsHidden && (gu == "platnerz" || gu == "miecznik"))
-            {
-                float smithW = GuildWeight("platnerz") + GuildWeight("miecznik");
-                // paczka 174.0 (e): sklad nie jest darmowy - czyszczenie i oliwienie uzbrojenia na polce miasta (ArmsStallUpkeepManDaysPerPiece na sztuke na rok)
-                if (smithW > 0f) h = Math.Max(0f, h - (SmithHours.ManDaysYesterday(town) + ArmsLeaks.UpkeepManDays(town)) * GuildWeight(gu) / smithW / Math.Max(1, ActiveSmithWorkshops(town)));
-            }
-            return h / lines;
+            catch (Exception e) { _planStumbles++; Log.Error("WorkshopLaw.BuildPlan", e); }
+            return plan;
         }
+
+        // ------------------------------------------------------------ 174.1: koszyki w robocie (miasto -> koszyk), liczniki doby
+        private static readonly Dictionary<Town, Dictionary<int, int>> _wipBasket = new Dictionary<Town, Dictionary<int, int>>();
+        private static int BasketOf(ItemObject it) { return it != null ? (int)it.ItemType * 10 + TierOf(it) : 0; }
+        private static int WipBasket(Town t, int b) { Dictionary<int, int> d; int n; return t != null && _wipBasket.TryGetValue(t, out d) && d.TryGetValue(b, out n) ? n : 0; }
+        private static void WipBasketAdd(Town t, int b, int delta)
+        {
+            if (t == null) return;
+            Dictionary<int, int> d;
+            if (!_wipBasket.TryGetValue(t, out d)) { d = new Dictionary<int, int>(); _wipBasket[t] = d; }
+            int n; d.TryGetValue(b, out n); d[b] = Math.Max(0, n + delta);
+        }
+        /// <summary>Po wczytaniu (174.0b): licznik koszykow w robocie z _wip.</summary>
+        private static void RebuildWipBasket()
+        {
+            _wipBasket.Clear();
+            foreach (var kv in _wip)
+            {
+                var ws = kv.Key.Key; var w = kv.Value;
+                var t = ws != null && ws.Settlement != null ? ws.Settlement.Town : null;
+                if (w != null && w.Item != null && t != null) WipBasketAdd(t, BasketOf(w.Item), +1);
+            }
+        }
+
+        private static float _hands, _handsLines, _handsRepair, _devMax;
+        private static readonly float[] _gAssigned = new float[6], _gFreed = new float[6], _gUsed = new float[6];
+        private static int _rejPlan, _skipPlan, _planIdleLines, _civSkipped, _mun, _madeT56, _planStumbles;
+        private static readonly float[] _qMun = new float[7], _qAll = new float[7];
+        private static readonly int[] _qMunN = new int[7], _qAllN = new int[7];
+        private static readonly Dictionary<int, float[]> _worldBasket = new Dictionary<int, float[]>();   // koszyk -> [popyt, polka, w toku, brak] (suma miast, raz na miasto na dobe)
+        private static readonly Dictionary<Town, HashSet<int>> _seenTB = new Dictionary<Town, HashSet<int>>();
+        private static readonly Dictionary<int, int> _madeBasket = new Dictionary<int, int>();
+
+        private static void NewDay174()
+        {
+            _hands = _handsLines = _handsRepair = _devMax = 0f;
+            Array.Clear(_gAssigned, 0, 6); Array.Clear(_gFreed, 0, 6); Array.Clear(_gUsed, 0, 6);
+            _rejPlan = _skipPlan = _planIdleLines = _civSkipped = _mun = _madeT56 = _planStumbles = 0;
+            Array.Clear(_qMun, 0, 7); Array.Clear(_qAll, 0, 7); Array.Clear(_qMunN, 0, 7); Array.Clear(_qAllN, 0, 7);
+            _worldBasket.Clear(); _seenTB.Clear(); _madeBasket.Clear();
+        }
+
+        private static void NoteBasketDay(Town town, Cand c)
+        {
+            try
+            {
+                HashSet<int> seen;
+                if (!_seenTB.TryGetValue(town, out seen)) { seen = new HashSet<int>(); _seenTB[town] = seen; }
+                if (!seen.Add(c.Basket)) return;
+                float[] a;
+                if (!_worldBasket.TryGetValue(c.Basket, out a)) { a = new float[5]; _worldBasket[c.Basket] = a; }
+                a[0] += c.D; a[1] += c.S; a[2] += WipBasket(town, c.Basket); a[3] += c.Short; if (c.Short > 0f) a[4] += 1f;
+            }
+            catch { }
+        }
+
+        private static void NoteFinished(Town town, ItemObject it, float days, WorkshopType.Production production)
+        {
+            try
+            {
+                int b = BasketOf(it), t = b % 10;
+                WipBasketAdd(town, b, -1);
+                int n; _madeBasket.TryGetValue(b, out n); _madeBasket[b] = n + 1;
+                if (t >= 5) _madeT56++;
+                int gi = Array.IndexOf(GuildOrder, GuildOf(production));
+                if (gi >= 0) _gUsed[gi] += days;
+                if (t >= 1 && t <= 3) { _qAll[t] += ArmsPricing.QualityOf(it); _qAllN[t]++; }
+            }
+            catch { }
+        }
+
+        private static void NoteMunition(ItemObject it)
+        {
+            try { _mun++; int t = BasketOf(it) % 10; if (t >= 1 && t <= 6) { _qMun[t] += ArmsPricing.QualityOf(it); _qMunN[t]++; } } catch { }
+        }
+
+        /// <summary>Dopisek 174.1 do linii "Warsztaty: dzien".</summary>
+        private static string Text174()
+        {
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
+            var sb = new StringBuilder();
+            float idle = Math.Max(0f, _hands - _handsLines - _handsRepair);
+            sb.Append(" | rece (174.1): ").Append(_hands.ToString("0", inv)).Append(" roboczodni (liniom ").Append(_handsLines.ToString("0", inv)).Append(", naprawy i konserwacja ")
+              .Append(_handsRepair.ToString("0", inv)).Append(", bezczynne ").Append(idle.ToString("0", inv)).Append(" = ").Append(_hands > 0f ? (100f * idle / _hands).ToString("0.0", inv) : "0").Append("%), cechy [");
+            for (int i = 0; i < 6; i++) { if (i > 0) sb.Append(", "); sb.Append(GuildOrder[i]).Append(' ').Append(_gAssigned[i].ToString("0", inv)).Append('/').Append(_gUsed[i].ToString("0", inv)); }
+            float freed = 0f; for (int i = 0; i < 6; i++) freed += _gFreed[i];
+            sb.Append("] (przydzielone/w zrobionych sztukach); rece przeniesione z cechow bez roboty: ").Append(freed.ToString("0", inv)).Append(" (");
+            for (int i = 0; i < 6; i++) { if (i > 0) sb.Append(", "); sb.Append(GuildOrder[i]).Append(' ').Append(_gFreed[i].ToString("0", inv)); }
+            sb.Append(FreedByShortage ? "; wedlug braku" : "; wagi Paryza").Append("); kontrola: suma udzialow linii = rece cechow (odchylenie max ").Append((100f * _devMax).ToString("0.00", inv)).Append("%)");
+            int shortB = 0; foreach (var a in _worldBasket.Values) shortB += (int)a[4];
+            sb.Append("; wybor: ").Append(ChooseByShortage ? "wedlug braku" : "wedlug zysku").Append(", koszyki z brakiem (miasto x koszyk) ").Append(shortB).Append(", sztuk \"na amunicje\" ").Append(_mun).Append(" (srednie q [");
+            for (int t = 1; t <= 3; t++) { if (t > 1) sb.Append(", "); sb.Append('t').Append(t).Append(' ').Append(_qMunN[t] > 0 ? (_qMun[t] / _qMunN[t]).ToString("0.00", inv) : "-"); }
+            sb.Append("]; wszystkich zrobionych t1-t3 [");
+            for (int t = 1; t <= 3; t++) { if (t > 1) sb.Append(", "); sb.Append('t').Append(t).Append(' ').Append(_qAllN[t] > 0 ? (_qAll[t] / _qAllN[t]).ToString("0.00", inv) : "-"); }
+            sb.Append("]), kandydatow odrzuconych \"nie skonczy w planie\" ").Append(_rejPlan).Append(" (cykli bez startu z tego powodu ").Append(_skipPlan).Append(", linii nieczynnych przez plan ").Append(_planIdleLines)
+              .Append("); zrobiono t5-6: ").Append(_madeT56).Append(" szt.; cywilnych pominietych ").Append(_civSkipped).Append(" (pozycji rankingu)");
+            if (_planStumbles > 0) sb.Append("; potkniecia planu ").Append(_planStumbles);
+            return sb.ToString();
+        }
+
+        /// <summary>Linia "Warsztaty (diagnoza): najwiekszy brak" - 6 koszykow swiata z najwiekszym brakiem (suma miast).</summary>
+        private static void DiagShort()
+        {
+            try
+            {
+                if (_worldBasket.Count == 0) return;
+                var l = new List<KeyValuePair<int, float[]>>(_worldBasket);
+                l.Sort((a, b) => b.Value[3].CompareTo(a.Value[3]));
+                var parts = new List<string>();
+                for (int i = 0; i < l.Count && i < 6; i++)
+                {
+                    var a = l[i].Value; int made; _madeBasket.TryGetValue(l[i].Key, out made);
+                    parts.Add((ItemObject.ItemTypeEnum)(l[i].Key / 10) + " t" + (l[i].Key % 10) + ": popyt " + (int)a[0] + ", polka " + (int)a[1] + ", w toku " + (int)a[2] + ", brak " + (int)a[3]
+                              + " w " + (int)a[4] + " miastach, zrobiono dzis " + made);
+                }
+                Log.Info("Warsztaty (diagnoza): najwiekszy brak - [" + string.Join("; ", parts.ToArray()) + "] (" + parts.Count + " koszykow swiata; popyt i polka z rankingow warsztatow - miasta, ktore dzis liczyly ten koszyk).");
+            }
+            catch { }
+        }
+
 
         /// <summary>Cena jednostki surowca dla warsztatu (m: 0 ruda, 1 drewno, 2 skora, 3 len/welna). Gra zna tylko pensy calkowite:
         /// ruda (0.75 d za 10 kg) i drewno (0.35 d) stoja na 1-2 d, czyli 2-5x historii - wtedy cena historyczna za kg x waga;
@@ -709,6 +1097,7 @@ namespace Armoury
                 }
                 catch (Exception e) { Log.Error("WorkshopLaw.ResolvePending", e); skipped++; }
             }
+            RebuildWipBasket();   // 174.1: licznik koszykow w robocie miasta z wczytanych sztuk
             var inv = CultureInfo.InvariantCulture;
             Log.Info("Warsztaty (zapis 174): " + why + " - wczytano sztuk w toku " + pieces + " (surowca: ruda " + mat[0].ToString("0.0", inv) + ", drewno " + mat[1].ToString("0.0", inv)
                      + ", skora " + mat[2].ToString("0.0", inv) + ", len " + mat[3].ToString("0.0", inv) + " jednostek rynku), linii z odlozona praca bez sztuki " + banks
@@ -728,9 +1117,11 @@ namespace Armoury
                          + "], koszt " + _dayCost + ", sprzedaz " + _dayRevenue + "; odpuszczone: bez zysku " + _skipLoss
                          + ", brak surowca " + _skipMat + " [ruda " + _skipMatBy[0] + ", drewno " + _skipMatBy[1] + ", skora " + _skipMatBy[2] + ", len/welna " + _skipMatBy[3]
                          + " - cykl liczony przy kazdym surowcu, ktorego zabraklo na ktoras sztuke z rankingu], w robocie (cykle) " + _skipLabor + ", brak zlota/kupca " + _skipGold + "; rozpoczete sztuki " + _started + ", w toku teraz " + InProgress()
-                         + (TownCrafts.Active ? " | garbowanie i tkanie 1:1 wylaczone (rzemioslo miasta 148 - linia \"Rzemioslo miasta\")" : " | rzemieslnicy miasta wygarbowali skor " + _tanned + ", utkali plotna " + _woven) + " | z niczego zablokowane: cykle rzemieslnikow " + _freeRawBlocked + ", sztabki/wegiel z losowania -> ruda/drewno " + _swappedSmith + ".");
+                         + (TownCrafts.Active ? " | garbowanie i tkanie 1:1 wylaczone (rzemioslo miasta 148 - linia \"Rzemioslo miasta\")" : " | rzemieslnicy miasta wygarbowali skor " + _tanned + ", utkali plotna " + _woven) + " | z niczego zablokowane: cykle rzemieslnikow " + _freeRawBlocked + ", sztabki/wegiel z losowania -> ruda/drewno " + _swappedSmith + Text174() + ".");
             }
             FlushDiag();
+            DiagShort();   // 174.1: najwiekszy brak swiata (koszyki)
+            NewDay174();
             _made = _skipLoss = _skipMat = _skipLabor = _skipGold = _freeRawBlocked = _swappedSmith = _started = _tanned = _woven = 0; _dayRevenue = _dayCost = 0; _madeByType.Clear();
             Array.Clear(_skipMatBy, 0, _skipMatBy.Length);
         }

@@ -813,7 +813,15 @@ namespace Armoury
         public float ArmsStallUpkeepManDaysPerPiece = 0.02f; // man-days a year a town's smiths spend cleaning and oiling each piece of arms on its stalls (the Tower, 1340s: 11 men oiled 3,200 bows in 5 days) - keeping stock is work, not free
         public bool BkSuppliesNoArms = true;               // Banner Kings supplies of AI parties no longer buy and use up weapons and shields: the wear of an AI army's weapons is counted by Armoury (battle wear and repairs) - one rule, not two
         public bool WorkshopStateInSave = true;            // work in progress at town workshops (pieces begun, raw material already bought, unmet orders) is kept in the save, so a long piece of armour survives saving and loading
-        public bool BkSuppliesNoArmsPlayer = false;        // the same for your own party: weapons, shields and arrows wear out by Armoury's rules only, not also by Banner Kings supplies (off until you decide - question 5 of package 174)
+        public bool BkSuppliesNoArmsPlayer = false;
+        public bool WorkshopHandsFollowMaterial = true;    // a workshop's hands go only to lines that can work today - a piece already in hand, or the ore, wood, leather and cloth for a new one on the town's stall (and a piece it can finish within Workshop Plan Days)
+        public bool WorkshopFreedHandsByShortage = true;   // hands of a craft that cannot work today (no ore, no cloth) help the other crafts of the town according to what the town lacks most - not by the fixed shares of Paris 1292
+        public bool WorkshopChooseByShortage = true;       // workshops first make what the town lacks most (empty stalls and unmet orders), and only then what pays best - the price cap no longer hides which shortage is worst. Civilian clothes that no soldier wears are left to the tailors of the town, not the armourers' lines
+        public bool WorkshopMunitionGrade = true;          // when armour or arms of tier 1-3 are short, every second piece begun of that kind is the quickest of its kind and tier - munition harness, as Paris made 500 sets in under three months in 1384 beside its better work
+        public int WorkshopMunitionMaxTier = 3;            // highest tier made for munition when short (1-6)
+        public float WorkshopMunitionShare = 0.5f;         // share of the pieces begun in a short kind that are made for munition (0-1)
+        public float WorkshopLineShortageShare = 0.75f;    // share of a craft's hands that follow the shortage of its lines; the rest is spread evenly, and a line with a piece in hand keeps at least an even share until it is finished (0-1)
+        public float WorkshopPlanDays = 60f;               // a workshop starts no piece it cannot finish within this many days with an even share of its craft's hands, and banks no more than this many days of work (14-120)        // the same for your own party: weapons, shields and arrows wear out by Armoury's rules only, not also by Banner Kings supplies (off until you decide - question 5 of package 174)
 
         public static void Load(string moduleDataDir)
         {
