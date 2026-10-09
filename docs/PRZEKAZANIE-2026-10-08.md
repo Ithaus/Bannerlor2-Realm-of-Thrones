@@ -248,3 +248,5 @@ KOLEJKA:
 4. Proby: zima (J) i drogi (H; galaz w-toku/p2-drogi-proba, plik danych arm_map_roads_probe.tsv do ModuleData na czas testu, zdjecia) - Jeff zgodzil sie.
 5. Audyty -> PDF (skrypt SCRATCH\pdf\zrob_pdf.py; Edge zapisuje PDF z opoznieniem): 12-DOCHODY-RODOW, 13-UMIEJETNOSCI, 14-ARMIE-KROLESTW -> SendUserFile rano.
 6. Raport poranny dla Jeffa (docs/RAPORT-NOCNY-2026-10-10.md): co wgrane, testy, odpowiedzi audytow, pytania.
+- 00:35 **AUTOTEST 171+172+172b OK** (Armoury 60b186e3, w-toku/172b-karawany 332d866; kopia SCRATCH kopia172b\): karawany w taborach 0 strzal / 0 beltow (bylo 4 157 / 1 764),
+  miast bez strzal 24/97 (bylo 48), awanse lucznikow cofniete 0, 0 bledow, 12.6 s/dobe. Wgranie 171+172+172b czeka na 174 (rynek zbroi w nowej kampanii).
