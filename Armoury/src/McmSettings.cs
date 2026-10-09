@@ -1520,7 +1520,7 @@ namespace Armoury
         [SettingPropertyGroup("Workshops")]
         public float TownCraftHandsPerArmsHand { get; set; } = 2f;
 
-        [SettingPropertyBool("Town Fletchers Enabled", HintText = "the town's own fletchers and arrowsmiths, in every town: arrows and bolts made from the ore and wood on their own town's stalls (the same recipe arms workshops use - the iron heads, the shafts, the charcoal of the bloomery and the forge; feathers, glue and thread are counted in the work), one quiver at a time, after the town's workshops have taken their share, whenever the quiver fetches enough to pay for its material, the work and a master's profit (Workshop Min Profit Percent) at today's prices; no coin changes hands - from stall to stall of the same town; lords buy them there. While on, workshops no longer make arrows out of thin air, townsfolk no longer eat them off the stalls and Banner Kings' party supplies no longer buy and burn them for AI parties (the player's own workshops and party as before). Needs Historical Prices")]
+        [SettingPropertyBool("Town Fletchers Enabled", HintText = "the town's own fletchers and arrowsmiths, in every town: arrows and bolts made from the ore and wood on their own town's stalls (the same recipe arms workshops use - the iron heads, the shafts, the charcoal of the bloomery and the forge; feathers, glue and thread are counted in the work), one quiver at a time, after the town's workshops have taken their share, whenever the quiver fetches enough to pay for its material, the work and a master's profit (Workshop Min Profit Percent) at today's prices; no coin changes hands - from stall to stall of the same town; lords buy them there. While on, workshops no longer make arrows out of thin air, townsfolk no longer eat them off the stalls and Banner Kings' party supplies no longer buy and burn them for AI parties (the player's own party as before; the player's own workshops - see Player Workshops Same Rule). Needs Historical Prices")]
         [SettingPropertyGroup("Workshops")]
         public bool TownFletchersEnabled { get; set; } = true;
 
@@ -3082,11 +3082,15 @@ namespace Armoury
 
         [SettingPropertyBool("Shop Keeps Last Armour", HintText = "buyers for a whole company (lords, garrisons, notables, your own men with their purse, traders shipping surplus) leave the last piece of each kind of armour (body, head, legs, hands; cheap, middling and dear apart) on a town stall for whoever buys in person")]
         [SettingPropertyGroup("Arms production")]
-        public bool ShopKeepsLastArmour { get; set; } = true;
+        public bool ShopKeepsLastArmour { get; set; } = false;
 
         [SettingPropertyInteger("Shop Keep Pieces", 0, 3, "0", HintText = "how many such pieces stay on the stall (0-3)")]
         [SettingPropertyGroup("Arms production")]
         public int ShopKeepPieces { get; set; } = 1;
+
+        [SettingPropertyBool("Player Workshops Same Rule", HintText = "your own workshops follow the same rules as everyone else's: they make no armour and no arrows out of nothing (the Banner Kings armorsmithy and fletcher lines without any input stay idle), and when a town lacks arrows their iron ore goes to whoever earns more on it - your workshop or the town's fletchers. Off: your workshops as in the game")]
+        [SettingPropertyGroup("Arms production")]
+        public bool PlayerWorkshopsSameRule { get; set; } = true;
 
         public void ApplyTo(Settings s)
         {
@@ -3859,6 +3863,7 @@ namespace Armoury
             s.FletchersBidForOre = FletchersBidForOre;
             s.ShopKeepsLastArmour = ShopKeepsLastArmour;
             s.ShopKeepPieces = ShopKeepPieces;
+            s.PlayerWorkshopsSameRule = PlayerWorkshopsSameRule;
         }
 
         internal static void Apply()

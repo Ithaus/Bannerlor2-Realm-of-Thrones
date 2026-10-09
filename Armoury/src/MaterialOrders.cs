@@ -55,6 +55,7 @@ namespace Armoury
         private sealed class Contract
         {
             public MobileParty Car; public string CarId; public Settlement Dest, Src; public int Mat, Qty, Day, Paid, Retarget, HoldStreak, PackStart = -1; public float Dist; public bool Naval, Packs;
+            public double Start = -1.0;   // poprawka 174b (recenzja): chwila zawarcia (doby z ulamkiem) - dni drogi bez fazy taktu doby; -1 = rekord 9-polowy
         }
         private const int MaxRetarget = 2;   // recenzja 174: cel zmieniony przez innych (BK Shipping, porty) - po 2 przywroceniach zwolnienie, bez ping-pongu
         // 174b.1 (krytyka 15): karawana z kontraktem stawiana na postoj co godzine przez cudzy kod - po tylu kolejnych godzinach ruszania z postoju
@@ -62,6 +63,7 @@ namespace Armoury
         private const int MaxHoldStreak = 6;
         internal static bool ShipHooked;     // 174b.1: prefiks BK BKShippingBehavior.RouteCaravanHopByHop wpiety
         private static MethodInfo _shipInvalidate, _shipGetBeh;   // BK InvalidateRedirectCache i Campaign.GetCampaignBehavior<BKShippingBehavior> (instancja przy kazdym wywolaniu)
+        private static MethodInfo _bkRelease, _bkGetBeh;          // poprawka 174b (recenzja): BK ReleaseCaravanFromHold i GetCampaignBehavior<BKCaravansBehavior> - pobudka o swicie
         internal static bool HourlyHooked;   // prefiks BK/gry HourlyTickParty wpiety - karawana z kontraktem bez DoNotMakeNewDecisions (ucieka jak kazda)
         private static readonly List<Contract> _contracts = new List<Contract>();
         private static readonly Dictionary<MobileParty, Contract> _byCar = new Dictionary<MobileParty, Contract>();
@@ -82,6 +84,12 @@ namespace Armoury
         private static readonly int[] _dNoRoadBy = new int[4];
         private static int _dSea, _dSeaQty, _dPacks, _dPacksQty, _dAhead, _dDoneSea, _dDonePacks, _dAudit, _auditAll;
         private static readonly Dictionary<Town, float[]> _trip = new Dictionary<Town, float[]>();   // dni drogi 3 ostatnich dostaw (miasto x surowiec)
+        // poprawka 174b (recenzja, wazna 1): prog nadwyzki zrodla (SourceKeep) zapamietany na jedno wywolanie Daily - w trakcie Daily jest staly (srednie zuzycia
+        // policzone przed zamowieniami, rece i warsztaty bez zmian, _trip zmienia tylko dostawa); polke zrodla (have) czytamy zawsze swiezo, bo Place ja zmienia
+        private static readonly Dictionary<Town, int[]> _keepDay = new Dictionary<Town, int[]>();
+        // poprawka 174b (recenzja): przewoznik stoi w zrodle, ale bez miejsca w jukach albo kiesy (to nie "bez drogi"); karawany zwolnione w nocnym obozie
+        // i obudzone o swicie decyzja BK (ReleaseCaravanFromHold) zamiast postoju do najblizszego ticku BK
+        private static int _dNoRoom, _dWokeBk;
         private static readonly List<string> _dRetEx = new List<string>();   // 174b.1: przyklady "cel = inne miasto" (karawana -> miasto, gdzie stoi)
         private static long _dGold, _dMargin, _dPaidDest;
         private static double _dDays;
@@ -100,7 +108,7 @@ namespace Armoury
         internal static void Reset()
         {
             _items = null; _ix.Clear(); _contracts.Clear(); _byCar.Clear(); _miss.Clear(); _useToday.Clear(); _useAvg.Clear(); _last.Clear(); _pending = null;
-            _missOreSince.Clear(); _srcOreSince.Clear(); _dstOreSince.Clear(); _namesSince = -1; _trip.Clear(); _auditAll = 0;
+            _missOreSince.Clear(); _srcOreSince.Clear(); _dstOreSince.Clear(); _namesSince = -1; _trip.Clear(); _auditAll = 0; _keepDay.Clear();
             NewDay(); _stumblesAll = 0; _errSites.Clear();
         }
 
@@ -111,6 +119,7 @@ namespace Armoury
             _dRelSiege = _dRelRetarget = _dRelDisband = _dShortPack = _dSmall = _dHoldMoved = 0; _dCampSeen = 0;
             _dCampHours = _dShipBlocked = _dRelForcedHold = 0; _dRetEx.Clear();
             Array.Clear(_dNoRoadBy, 0, 4); _dSea = _dSeaQty = _dPacks = _dPacksQty = _dAhead = _dDoneSea = _dDonePacks = _dAudit = 0;
+            _dNoRoom = _dWokeBk = 0;
             _dGold = _dMargin = _dPaidDest = 0; _dDays = 0; _dEx.Clear();
         }
 
@@ -204,6 +213,7 @@ namespace Armoury
         internal static void Daily()
         {
             int day = (int)CampaignTime.Now.ToDays;
+            _keepDay.Clear();   // poprawka 174b (recenzja, wazna 1): prog nadwyzki zrodel liczony na nowo raz na Daily
             try
             {
                 if (!Ready()) return;
@@ -300,7 +310,7 @@ namespace Armoury
                     if (have > 0) stock.Add(new KeyValuePair<string, int>(nm, have));
                     int mo; if (_missOreSince.TryGetValue(t, out mo) && mo > 0) miss.Add(new KeyValuePair<string, int>(nm, mo));
                     int dq; if (_dstOreSince.TryGetValue(t, out dq) && dq > 0) got.Add(new KeyValuePair<string, int>(nm, dq));
-                    int keep = SourceKeep(t, Ore);
+                    int keep = SourceKeepDay(t, Ore);
                     int surplus = have - keep;
                     if (surplus > 0)
                     {
@@ -368,6 +378,7 @@ namespace Armoury
                         var car = c.Car;
                         if (car == null || !car.IsActive) { Drop(c); _dLost++; _dLostQty += c.Qty; continue; }
                         if (car.MapEvent != null) continue;
+                        if (!On) { Release(c); _dRelOther++; continue; }   // poprawka 174b (recenzja): wylacznik w MCM dziala w ciagu godziny, nie dopiero w przegladzie doby
                         if (car.IsDisbanding) { Release(c); _dRelDisband++; continue; }
                         if (DestLost(car, c)) { Release(c); continue; }
                         if (car.CurrentSettlement == c.Dest) { Deliver(car, c.Dest); continue; }
@@ -437,7 +448,7 @@ namespace Armoury
             var pos = dest.GetPosition2D;
             var dstPrice = new Dictionary<int, int>();   // cena srodkowej sztuki w celu wedlug przesuniecia (ta sama dla wszystkich zrodel)
             Settlement bestSrc = null; MobileParty bestCar = null; int bestQ = 0; float bestPerKg = 0f, bestDist = 0f, bestMargin = 0f; bool bestNaval = false, bestPacks = false;
-            bool anySrc = false, anyRoute = false, anyCar = false, anySmall = false, landNoCar = false;
+            bool anySrc = false, anyRoute = false, anyCar = false, anySmall = false, landNoCar = false, carNoRoom = false;
             int why = 0;   // bez drogi: 1 wyspa / inna czesc ladu bez portu, 2 droga ladem > zasieg, 3 morze poza zasiegiem albo dlugoscia (4 brak konwoju - nizej)
             foreach (var t in Town.AllTowns)
             {
@@ -448,20 +459,18 @@ namespace Armoury
                 bool landTry = line <= range, seaTry = ports && line <= seaLine;            // droga i rejs >= linia prosta
                 if (!landTry && !seaTry) continue;
                 if (src.IsUnderSiege || (src.MapFaction != null && dest.MapFaction != null && FactionManager.IsAtWarAgainstFaction(src.MapFaction, dest.MapFaction))) continue;
-                int have = src.ItemRoster.GetItemNumber(item);
-                int surplus = have > 0 ? have - SourceKeep(t, m) : 0;
-                // przewoznicy stojacy w zrodle: lad / morze x zakup (najwiecej wolnego miejsca) / z jukow (najwiecej tego surowca w jukach)
+                // przewoznicy stojacy w zrodle: lad / morze x zakup (najwiecej wolnego miejsca) / z jukow (najwiecej tego surowca w jukach).
+                // Poprawka 174b (recenzja, wazna 1): NAJPIERW przewoznicy (tanie: Eligible, wolne miejsce, juki), dopiero potem prog nadwyzki zrodla (SourceKeep -
+                // trzy przejscia CaravanBulk) i trasy. Wolne miejsce liczone dla kazdej karawany, a przy braku nadwyzki przewoznik zakupu jest kasowany nizej -
+                // ten sam wybor co dotad.
                 MobileParty cL = null, cS = null, pL = null, pS = null; float fL = 0f, fS = 0f; int nL = 0, nS = 0;
                 foreach (var p in src.Parties)
                 {
                     if (!Eligible(p, dest)) continue;
                     bool land = p.HasLandNavigationCapability, ship = p.HasNavalNavigationCapability;
-                    if (surplus > 0)
-                    {
-                        float free = p.InventoryCapacity - p.TotalWeightCarried;   // konwoj w porcie: ladownia (IsCurrentlyAtSea), krytyka 8
-                        if (land && free > fL) { fL = free; cL = p; }
-                        if (ship && free > fS) { fS = free; cS = p; }
-                    }
+                    float free = p.InventoryCapacity - p.TotalWeightCarried;   // konwoj w porcie: ladownia (IsCurrentlyAtSea), krytyka 8
+                    if (land && free > fL) { fL = free; cL = p; }
+                    if (ship && free > fS) { fS = free; cS = p; }
                     if (packsOn)
                     {
                         int inPack = p.ItemRoster.GetItemNumber(item);
@@ -472,6 +481,12 @@ namespace Armoury
                         }
                     }
                 }
+                // zrodlo bez zadnego przewoznika zmienia tylko liczniki "bez kontraktu" (zrodlo, droga, brak karawany); gdy wszystkie trzy sa juz ustawione,
+                // niczego nie zmieni - pomijamy je bez progu nadwyzki i bez tras (wynik i liczniki te same)
+                if (cL == null && cS == null && pL == null && pS == null && anySrc && anyRoute && landNoCar) continue;
+                int have = src.ItemRoster.GetItemNumber(item);
+                int surplus = have > 0 ? have - SourceKeepDay(t, m) : 0;
+                if (surplus <= 0) { cL = cS = null; fL = fS = 0f; }   // przewoznik zakupu tylko przy nadwyzce (jak dotad)
                 if (surplus <= 0 && pL == null && pS == null) continue;   // nie ma czego wiezc
                 anySrc = true;
                 // trasy
@@ -506,13 +521,13 @@ namespace Armoury
                     else
                     {
                         float free = naval ? fS : fL;
-                        if (free < kg) continue;
+                        if (free < kg) { carNoRoom = true; continue; }   // poprawka 174b (recenzja): przewoznik jest, ale bez miejsca - nie "bez drogi"
                         pSrc = PriceAt(t, item, false, 0);
-                        if (pSrc <= 0) continue;
+                        if (pSrc <= 0) { carNoRoom = true; continue; }
                         q = Math.Min(Math.Min(want, surplus), (int)(free / kg));
                         q = Math.Min(q, car.PartyTradeGold / Math.Max(1, pSrc));
                     }
-                    if (q <= 0) continue;
+                    if (q <= 0) { carNoRoom = true; continue; }   // bez miejsca albo kiesy na choc jedna sztuke
                     anyCar = true;
                     if (q * kg < minKg) { anySmall = true; continue; }   // recenzja 174: ladunek za maly na dni drogi bez handlu - czekamy, az brak urosnie
                     // ilosc wedlug zysku (krytyka 174b: polowienie, gdy duzy ladunek zbija cene celu ponizej zakupu + oplaty)
@@ -539,7 +554,12 @@ namespace Armoury
             {
                 if (!anySrc) _dNoSrc++;
                 else if (!anyRoute) { _dNoRoad++; if (why >= 1 && why <= 4) _dNoRoadBy[why - 1]++; }
-                else if (!anyCar) { if (landNoCar) _dNoCar++; else { _dNoRoad++; _dNoRoadBy[3]++; } }   // trasa tylko morska, a w porcie zrodla nie ma konwoju
+                else if (!anyCar)
+                {
+                    if (landNoCar) _dNoCar++;
+                    else if (carNoRoom) _dNoRoom++;                    // poprawka 174b (recenzja): przewoznik jest (lad albo konwoj), ale bez miejsca albo kiesy
+                    else { _dNoRoad++; _dNoRoadBy[3]++; }               // trasa tylko morska, a w porcie zrodla nie ma konwoju
+                }
                 else if (anySmall) _dSmall++;
                 else _dNoGain++;
                 return;
@@ -586,6 +606,16 @@ namespace Armoury
             int keep = Math.Max(SafeKeep(t, _items[m]), (int)Math.Ceiling(10f * UseOf(t, m)));
             if (Settings.Current.TownMaterialOrderAhead) keep = Math.Max(keep, (int)Math.Ceiling((TravelDays(t, m) + 2f) * UseDest(t, m)));
             return keep;
+        }
+
+        /// <summary>Poprawka 174b (recenzja, wazna 1): SourceKeep zapamietany na jedno wywolanie Daily (czyszczony na poczatku Daily i w Reset) - zamowienia
+        /// i linia nazw licza prog nadwyzki miasta najwyzej raz na surowiec (97 x 7), a nie przy kazdym zamowieniu dla kazdego zrodla w zasiegu.</summary>
+        private static int SourceKeepDay(Town t, int m)
+        {
+            int[] a;
+            if (!_keepDay.TryGetValue(t, out a)) { a = new int[M]; for (int k = 0; k < M; k++) a[k] = -1; _keepDay[t] = a; }
+            if (a[m] < 0) a[m] = Math.Max(0, SourceKeep(t, m));
+            return a[m];
         }
 
         private static bool Eligible(MobileParty p, Settlement dest)
@@ -648,7 +678,8 @@ namespace Armoury
                 got += moved; paid += Math.Max(0, purse - car.PartyTradeGold);
             }
             if (got <= 0) { _dNoGain++; return; }
-            var c = new Contract { Car = car, CarId = car.StringId, Dest = dest, Src = src, Mat = m, Qty = got, Day = day, Paid = (int)paid, Dist = dist, Naval = naval, Packs = packs, PackStart = packs ? packStart : -1 };
+            var c = new Contract { Car = car, CarId = car.StringId, Dest = dest, Src = src, Mat = m, Qty = got, Day = day, Paid = (int)paid, Dist = dist, Naval = naval, Packs = packs, PackStart = packs ? packStart : -1,
+                                   Start = CampaignTime.Now.ToDays };
             try { if (car.CurrentSettlement != null) LeaveSettlementAction.ApplyForParty(car); } catch (Exception e) { Stumble("Place(wyjazd)", e); }
             ShipForget(car);   // 174b.1: stary stan "hop-by-hop" BK Shipping sprzed kontraktu nie prowadzi karawany do dawnego celu
             _contracts.Add(c); _byCar[car] = c;
@@ -693,7 +724,27 @@ namespace Armoury
         private static void Drop(Contract c)
         {
             _contracts.Remove(c);
-            if (c.Car != null) { _byCar.Remove(c.Car); NightRest.ForgetOrder(c.Car); }   // 174b.1 (krytyka 6): swit nie odda celu utraconego kontraktu
+            // 174b.1 (krytyka 6): swit nie odda celu utraconego kontraktu. Poprawka 174b (recenzja): zywa karawana zwolniona w nocnym obozie nie budzi sie na
+            // postoju (bez rozkazu czekalaby na tick BK, ktory dlawik BKROT puszcza raz na dobe) - zamiast celu kontraktu swit wola decyzje BK
+            // (WakeAtDawn -> ReleaseCaravanFromHold: stary cel, jesli nie jest oblegany ani wrogi, inaczej nowy - jak kazda karawana BK po postoju)
+            if (c.Car != null) { _byCar.Remove(c.Car); NightRest.ForgetOrder(c.Car, c.Car.IsActive); }
+        }
+
+        /// <summary>Poprawka 174b (recenzja): pobudka o swicie (albo przy nocnym alarmie) karawany, ktorej kontrakt zwolniono w nocnym obozie - decyzja BK
+        /// ReleaseCaravanFromHold (ten sam wybor celu, ktory BK robi kazdej karawanie na postoju); bez BK - AI gry przy najblizszym ticku (Rethink).</summary>
+        internal static void WakeAtDawn(MobileParty mp)
+        {
+            try
+            {
+                if (mp == null || !mp.IsActive || mp.Ai == null || mp.MapEvent != null || mp.CurrentSettlement != null || _byCar.ContainsKey(mp)) return;
+                if (_bkRelease != null && _bkGetBeh != null && Campaign.Current != null)
+                {
+                    var beh = _bkGetBeh.Invoke(Campaign.Current, null);
+                    if (beh != null) { _bkRelease.Invoke(beh, new object[] { mp }); _dWokeBk++; return; }
+                }
+                mp.Ai.RethinkAtNextHourlyTick = true;
+            }
+            catch (Exception e) { Stumble("WakeAtDawn", e); }
         }
 
         /// <summary>174b.1 (krytyka 1): BK InvalidateRedirectCache na instancji BKShippingBehavior TEJ kampanii (bez zapamietanej instancji - po wczytaniu
@@ -765,7 +816,9 @@ namespace Armoury
             if (c.Naval) _dDoneSea++;
             if (c.Packs) _dDonePacks++;
             if (c.Mat == Ore && sold > 0 && town != null) { int dq; _dstOreSince.TryGetValue(town, out dq); _dstOreSince[town] = dq + sold; }
-            NoteTrip(town, c.Mat, (float)(CampaignTime.Now.ToDays - c.Day));
+            // poprawka 174b (recenzja): dni drogi od chwili zawarcia (Start), nie od doby ucietej do int - bez fazy taktu doby (w sklad6 ok. +0.2 doby);
+            // srednia "dob drogi" w linii dnia liczy dalej od c.Day (porownywalna z sklad6)
+            NoteTrip(town, c.Mat, (float)(CampaignTime.Now.ToDays - (c.Start >= 0.0 ? c.Start : c.Day)));
             if (sold < carried) _dKeptTarget += carried - sold;
             Release(c);
         }
@@ -806,7 +859,9 @@ namespace Armoury
 
         /// <summary>174b.1 (krytyka 3): prefiks BK BKShippingBehavior.RouteCaravanHopByHop - KAZDA karawana z kontraktem (takze gdy BK wskazal nasz cel: BK
         /// prowadzi wtedy przez wezel posredni i zapisuje stan hop-by-hop) - false bez zmiany celu; stary stan BK kasowany od razu (InvalidateRedirectCache na
-        /// instancji, ktora wola), wiec AdvanceHopByHopWaypoints juz nie wraca. Nasz rozkaz i tak sprawdza droge (straznik BK dla ladu, morze - All).</summary>
+        /// instancji, ktora wola), wiec AdvanceHopByHopWaypoints juz nie wraca. Nasz rozkaz i tak sprawdza droge: lad - straznik BK (Default); morze - rozkaz
+        /// NavigationType.Naval + port (Move), jak BK ReleaseCaravanFromHold: konwoj nie ma ladu, wiec rozkaz All/Default bylby dla niego zly (174b.2; projekt 3.2
+        /// pkt 2 mowi jeszcze "All" - sprostowanie w CHANGELOG). NIE zmieniac na All.</summary>
         public static bool RouteHopPrefix(object __instance, MobileParty __0, ref bool __result)
         {
             try
@@ -874,8 +929,10 @@ namespace Armoury
                   .Append(", bez drogi [wyspa lub inna czesc ladu bez portu ").Append(_dNoRoadBy[0]).Append(", droga ladem > zasieg ").Append(_dNoRoadBy[1])
                   .Append(", morze poza zasiegiem albo dlugoscia ").Append(_dNoRoadBy[2]).Append(", brak konwoju w porcie zrodla ").Append(_dNoRoadBy[3])
                   .Append("], audyt ilosci: rozjazdy ").Append(_dAudit).Append(" (od wczytania ").Append(_auditAll).Append(")")
+                  .Append("; poprawka 174b: zwolnione w nocnym obozie i obudzone o swicie decyzja BK ").Append(_dWokeBk)
                   .Append(HourlyHooked ? " (AI gry czynne - ucieczka jak kazda karawana)" : " (AI wstrzymane - wzor DTE, bez latki HourlyTickParty)")
                   .Append("; bez kontraktu: brak karawany w zrodle ").Append(_dNoCar).Append(", brak zrodla w zasiegu ").Append(_dNoSrc).Append(", bez drogi ").Append(_dNoRoad)
+                  .Append(", przewoznik bez miejsca w jukach lub kiesy ").Append(_dNoRoom)
                   .Append(", ladunek ponizej ").Append(Math.Max(0f, s.TownMaterialOrderMinLoadKg).ToString("0", CultureInfo.InvariantCulture)).Append(" kg ").Append(_dSmall)
                   .Append(", bez zysku ").Append(_dNoGain).Append(", zapas i dostawy dosc ").Append(_dEnough).Append(", przerwa ").Append(_dPause)
                   .Append(" [").Append(_dEx.Count > 0 ? string.Join("; ", _dEx.ToArray()) : "-").Append("]");
@@ -900,7 +957,10 @@ namespace Armoury
             finally { NewDay(); }
         }
 
-        // ------------------------------------------------------------ zapis: karawana|cel|zrodlo|surowiec|ilosc|doba|zaplacone|odleglosc|morzem~
+        // ------------------------------------------------------------ zapis: karawana|cel|zrodlo|surowiec|ilosc|doba|zaplacone|odleglosc|morzem|juki,przywrocen,postoj,start~
+        // Poprawka 174b (recenzja): 10. pole (stan jukow przy zawarciu - -1 = kontrakt z zakupu, licznik przywrocen celu, godziny postoju wymuszanego, chwila
+        // zawarcia) - po wczytaniu kontrakt "z jukow" liczy sie jak w biegu (linia, audyt), a limity przywrocen i postoju nie startuja od zera. Odczyt przyjmuje
+        // 9 albo 10 pol (zapis sprzed poprawki); starszy DLL na rekordzie 10-polowym zwalnia karawane (FreeBroken / pominiety) - ladunek zostaje karawanie.
         internal static string Export()
         {
             var sb = new StringBuilder();
@@ -913,7 +973,9 @@ namespace Armoury
                     if (c.Car == null || !c.Car.IsActive || string.IsNullOrEmpty(c.Car.StringId) || c.Dest == null) continue;
                     var one = new StringBuilder();
                     one.Append(c.Car.StringId).Append('|').Append(c.Dest.StringId).Append('|').Append(c.Src != null ? c.Src.StringId : "").Append('|').Append(Ids[c.Mat]).Append('|')
-                       .Append(c.Qty).Append('|').Append(c.Day).Append('|').Append(c.Paid).Append('|').Append(c.Dist.ToString("R", CultureInfo.InvariantCulture)).Append('|').Append(c.Naval ? 1 : 0).Append('~');
+                       .Append(c.Qty).Append('|').Append(c.Day).Append('|').Append(c.Paid).Append('|').Append(c.Dist.ToString("R", CultureInfo.InvariantCulture)).Append('|').Append(c.Naval ? 1 : 0)
+                       .Append('|').Append(c.Packs ? c.PackStart : -1).Append(',').Append(c.Retarget).Append(',').Append(c.HoldStreak).Append(',')
+                       .Append((c.Start >= 0.0 ? c.Start : (double)c.Day).ToString("R", CultureInfo.InvariantCulture)).Append('~');
                     sb.Append(one);
                 }
                 catch (Exception e) { Stumble("Export", e); }
@@ -970,20 +1032,32 @@ namespace Armoury
                     byId.TryGetValue(a[0], out car);   // najpierw karawana - zly rekord tez zwalnia zywa karawane
                     Settlement dest = null, src = null;
                     int m = -1;
-                    if (a.Length == 9)
+                    bool shape = a.Length == 9 || a.Length == 10;   // poprawka 174b: 10. pole opcjonalne
+                    if (shape)
                     {
                         try { dest = om.GetObject<Settlement>(a[1]); } catch { }
                         if (a[2].Length > 0) { try { src = om.GetObject<Settlement>(a[2]); } catch { } }
                         m = Array.IndexOf(Ids, a[3]);
                     }
                     if (car == null || !car.IsActive) { gone++; continue; }
-                    if (a.Length != 9 || dest == null || m < 0) { if (FreeBroken(car)) broken++; else gone++; continue; }
+                    if (!shape || dest == null || m < 0) { if (FreeBroken(car)) broken++; else gone++; continue; }
                     int q, d0, paid; float dist;
                     int.TryParse(a[4], NumberStyles.Integer, CultureInfo.InvariantCulture, out q);
                     int.TryParse(a[5], NumberStyles.Integer, CultureInfo.InvariantCulture, out d0);
                     int.TryParse(a[6], NumberStyles.Integer, CultureInfo.InvariantCulture, out paid);
                     float.TryParse(a[7], NumberStyles.Float, CultureInfo.InvariantCulture, out dist);
                     var c = new Contract { Car = car, CarId = a[0], Dest = dest, Src = src, Mat = m, Qty = q, Day = d0, Paid = paid, Dist = dist, Naval = a[8] == "1" };
+                    if (a.Length == 10)   // poprawka 174b: juki przy zawarciu, przywrocenia celu, postoj wymuszany, chwila zawarcia; nieczytelne pole = jak rekord 9-polowy
+                    {
+                        var x = a[9].Split(',');
+                        int ps, rt, hs; double st;
+                        if (x.Length == 4 && int.TryParse(x[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out ps) && int.TryParse(x[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out rt)
+                            && int.TryParse(x[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out hs) && double.TryParse(x[3], NumberStyles.Float, CultureInfo.InvariantCulture, out st))
+                        {
+                            c.Packs = ps >= 0; c.PackStart = ps >= 0 ? ps : -1; c.Retarget = Math.Max(0, rt); c.HoldStreak = Math.Max(0, hs);
+                            if (!double.IsNaN(st) && !double.IsInfinity(st) && st >= 0.0) c.Start = st;
+                        }
+                    }
                     _contracts.Add(c); _byCar[car] = c;
                     if (!On) { Release(c); freed++; continue; }
                     SetHold(car);   // przy wpietym prefiksie HourlyTickParty AI czynne (takze kontrakt z zapisu starszej wersji 174), bez latki - wzor DTE
@@ -1007,6 +1081,15 @@ namespace Armoury
                 var t = QuartermasterLaw.FindType("BannerKings.Behaviours.BKCaravansBehavior");
                 var m = t != null ? AccessTools.Method(t, "ReleaseCaravanFromHold", new[] { typeof(MobileParty) }) : null;
                 if (m != null) { h.Patch(m, prefix: new HarmonyMethod(typeof(MaterialOrders), nameof(ReleasePrefix))); ReleaseHooked = true; }
+                // poprawka 174b (recenzja): pobudka o swicie karawany zwolnionej w nocnym obozie - ta sama metoda BK, instancja przy kazdym wywolaniu
+                try
+                {
+                    _bkRelease = m;
+                    var gb = AccessTools.Method(typeof(Campaign), "GetCampaignBehavior");
+                    if (t != null && gb != null && gb.IsGenericMethodDefinition) _bkGetBeh = gb.MakeGenericMethod(t);
+                    NightRest.WakeHandler = WakeAtDawn;
+                }
+                catch (Exception e) { Log.Error("MaterialOrders.ApplyAll(pobudka BK)", e); }
                 // recenzja 174: decyzje karawany z kontraktem - zamiast DoNotMakeNewDecisions (gra pomija wtedy ucieczke) prefiks godzinnego ticku BK i gry
                 // z BK decyduje tick BK (tick gry wylacza latka BK CaravansCampaignBehavior_HourlyTickParty_Skip), bez BK - tick gry
                 try
@@ -1037,7 +1120,8 @@ namespace Armoury
                          : "BRAK - AI karawany z kontraktem wstrzymane wzorem DTE (nie ucieka)")
                          + "; 174b.1: BK Shipping RouteCaravanHopByHop " + (ShipHooked ? "wpiety" : (ts == null ? "bez BK Shipping - nic do wpiecia" : "BRAK"))
                          + ", InvalidateRedirectCache " + (_shipInvalidate != null && _shipGetBeh != null ? "znaleziony" : (ts == null ? "bez BK Shipping" : "BRAK"))
-                         + "; cel kontraktu pilnowany co godzine (MaterialOrders.Hourly po nocnym obozie).");
+                         + "; cel kontraktu pilnowany co godzine (MaterialOrders.Hourly po nocnym obozie); karawana zwolniona w obozie budzona o swicie "
+                         + (_bkRelease != null && _bkGetBeh != null ? "decyzja BK (ReleaseCaravanFromHold)" : "przez AI gry (bez BK)") + ".");
             }
             catch (Exception e) { Log.Error("MaterialOrders.ApplyAll", e); }
         }

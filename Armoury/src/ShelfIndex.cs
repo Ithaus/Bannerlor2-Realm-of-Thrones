@@ -28,6 +28,8 @@ namespace Armoury
         private static readonly ConditionalWeakTable<ItemRoster, Holder>.CreateValueCallback Make = r => new Holder();
         private static readonly int Types;
         internal static long Hits, Builds, Checks, Mismatch;
+        internal static long Stumbles;      // poprawka 174b (recenzja): wyjatki odczytu od startu sesji - Log.Error tylko pierwszy (goraca sciezka cen)
+        private static bool _errLogged;
         private static double _sessionStart = -1.0;
         private static int _calls;
         private static bool _mismatchLogged;
@@ -45,7 +47,8 @@ namespace Armoury
         internal static void Reset()
         {
             _t = new ConditionalWeakTable<ItemRoster, Holder>();
-            Hits = Builds = Checks = Mismatch = 0; _sessionStart = -1.0; _calls = 0; _mismatchLogged = false;
+            ShopReserve.Reset();   // poprawka 174b: licznik potkniec rezerwy kramu - ta sama chwila co pamiec polki
+            Hits = Builds = Checks = Mismatch = 0; _sessionStart = -1.0; _calls = 0; _mismatchLogged = false; Stumbles = 0; _errLogged = false;
         }
 
         private static int TierOf(ItemObject it) { try { return Math.Max(1, Math.Min(6, (int)it.Tier + 1)); } catch { return 1; } }
@@ -134,7 +137,7 @@ namespace Armoury
                 }
                 return v;
             }
-            catch (Exception e) { Log.Error("ShelfIndex.Count", e); return -1; }
+            catch (Exception e) { Stumbles++; if (!_errLogged) { _errLogged = true; Log.Error("ShelfIndex.Count", e); } return -1; }   // poprawka 174b: raz w logu, reszta w liczniku
         }
 
         /// <summary>Sztuk pasma zbroi (t1-2 / t3-4 / t5-6) bez unikatow - rezerwa kramu (174b.4). -1 = indeks wylaczony.</summary>
@@ -149,7 +152,8 @@ namespace Armoury
 
         internal static string Text()
         {
-            return "pamiec polki: odczytow z pamieci " + Hits + ", przebudow " + Builds + ", samokontroli " + Checks + ", rozjazdow od startu sesji " + Mismatch + (On ? "" : " (WYLACZONA w MCM)");
+            return "pamiec polki: odczytow z pamieci " + Hits + ", przebudow " + Builds + ", samokontroli " + Checks + ", rozjazdow od startu sesji " + Mismatch + (On ? "" : " (WYLACZONA w MCM)")
+                   + "; potkniecia od startu sesji: pamiec polki " + Stumbles + ", rezerwa kramu " + ShopReserve.Stumbles;
         }
 
         internal static void ClearDay() { Hits = Builds = Checks = 0; }

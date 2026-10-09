@@ -121,6 +121,9 @@ namespace Armoury
                         float a; _acc.TryGetValue(k, out a);
                         a += excess * share;
                         int n = (int)a; _acc[k] = a - n;
+                        // poprawka 174b (recenzja): klucz zapisu takze dla koszyka bez zakupow (stary nadmiar bez popytu - wlasnie ten idzie na zlom); bez tego
+                        // Export pomijal jego ulamek skupu, a probny odczyt mowil "zgodny" (zapis i odczyt pomijaly to samo)
+                        if (!_keys.ContainsKey(k)) _keys[k] = new KeyValuePair<Settlement, int>(t.Settlement, kv.Key);
                         if (n <= 0) continue;
                         kv.Value.Sort((x, y) => x.EquipmentElement.ItemValue.CompareTo(y.EquipmentElement.ItemValue));   // najgorsze sztuki najpierw
                         foreach (var el in kv.Value)

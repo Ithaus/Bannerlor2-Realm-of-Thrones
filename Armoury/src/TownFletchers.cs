@@ -24,7 +24,7 @@ namespace Armoury
     /// (budzet BK kategorii 10/10), zaopatrzenie BK kupowalo ja partiom AI za zloto lorda (zloto w nicosc) i niszczylo.
     ///
     /// Regula (czynne = wlacznik, rece > 0, ceny historyczne, kandydaci):
-    ///  - linie arrows warsztatow notabli zamkniete (WorkshopLaw.CyclePrefix -> ClosesLine/NoteClosed); warsztat gracza - jak w grze;
+    ///  - linie arrows warsztatow notabli zamkniete (WorkshopLaw.CyclePrefix -> ClosesLine/NoteClosed); warsztat gracza - poprawka 174b: tez zamkniete przy PlayerWorkshopsSameRule (WorkshopLaw.PlayerCyclePrefix);
     ///  - mieszczanie: budzet kategorii strzal 0 (HistoricalPrices.BudgetPostfix -> HouseUse); BK: potrzeba strzal partii AI 0 (BkSupplyTemper);
     ///  - strzelarze: rece = TownFletcherHandsPerArmsHand x WorkshopLaw.TownHands; po warsztatach miasta (postfiks DailyTickTown), krokami po snopie,
     ///    receptura i ceny wspolne z warsztatami zbrojnymi (WorkshopLaw.Needs / RevenueOf / MatPrice / DayWage), bramka zysku WorkshopMinProfitPercent;
@@ -194,11 +194,15 @@ namespace Armoury
             catch { return false; }
         }
 
-        /// <summary>Czy ta linia tego warsztatu jest zamknieta przez 172: linia arrows warsztatu notabla (ukryty artisans, fletcher) przy czynnych
-        /// strzelarzach. Warsztat gracza - jak w grze (decyzja Jeffa: funkcje gracza bez zmian).</summary>
+        /// <summary>Czy ta linia tego warsztatu jest zamknieta przez 172: linia arrows warsztatu (ukryty artisans, fletcher) przy czynnych strzelarzach.
+        /// Poprawka 174b (recenzja; jedna regula gracz/AI i "nic z niczego", Jeff 09.10): takze warsztat GRACZA, gdy PlayerWorkshopsSameRule (prefiks
+        /// WorkshopLaw.PlayerCyclePrefix); wylaczone - warsztat gracza jak w grze (dawna decyzja "funkcje gracza bez zmian").</summary>
         internal static bool ClosesLine(WorkshopType.Production p, Workshop w)
         {
-            return w != null && IsArrowsLine(p) && w.Owner != Hero.MainHero && Active;
+            if (w == null || !IsArrowsLine(p) || !Active) return false;
+            if (w.Owner != Hero.MainHero) return true;
+            var s = Settings.Current;
+            return s != null && s.PlayerWorkshopsSameRule;
         }
 
         /// <summary>Licznik zamknietego cyklu (WorkshopLaw.CyclePrefix): cykle i snopy z receptury (przed mnoznikiem BK). Zamki BK (TickCastle wola
@@ -474,7 +478,9 @@ namespace Armoury
                         if (mm != 0)
                         {
                             blocked = true; stepMiss |= mm;                          // oplacalny, ale surowca brak na polce
-                            if ((mm & 1) != 0 && need[0] > 0f) { float pl = (rev - cost) / need[0]; if (pl > stepOffer) { stepOffer = pl; stepDays = days; stepNeed = need[0]; } }   // 174b.3
+                            // 174b.3; poprawka (recenzja): oferta tylko ze snopa, ktoremu brakuje WYLACZNIE rudy (mm == 1) - przy braku takze drewna zatrzymana ruda
+                            // lezalaby dobe bezczynnie (strzelarze i tak nie rusza), a oferta wygasalaby co drugi dzien
+                            if (mm == 1 && need[0] > 0f) { float pl = (rev - cost) / need[0]; if (pl > stepOffer) { stepOffer = pl; stepDays = days; stepNeed = need[0]; } }
                             continue;
                         }
                         float score = (rev - cost) / Math.Max(0.1f, days);
@@ -517,7 +523,11 @@ namespace Armoury
                 if (reason == 2 && (miss & 1) != 0 && offer > 0f && offerDays > 0f && s.FletchersBidForOre)
                 {
                     st.OfferDay = today0; st.OfferPerLoad = offer;
-                    st.OfferLoads = Math.Max(1, Math.Min(MaxReservedLoads, (int)Math.Ceiling(Math.Max(0f, hands) / offerDays * offerNeed - owed[0])));
+                    // poprawka 174b (recenzja): ile ladunkow zdejma pozostale rece. Snop zdejmuje floor(dlug + ruda na snop), dlug (ulamek zuzytej, a jeszcze nie
+                    // zdjetej rudy, zawsze w [0, 1)) przechodzi dalej - k snopow zdejmie floor(dlug + k x ruda na snop). Dlug sie DODAJE (dotad odejmowany - przy
+                    // dlugu bliskim 1 o ladunek za malo). k = liczba snopow, ktore petla zacznie: dopoki rece > MinHands, takze ostatni ponad rece (dlug rak na jutro).
+                    int snops = hands > MinHands ? (int)Math.Ceiling((hands - MinHands) / offerDays) : 0;
+                    st.OfferLoads = Math.Max(1, Math.Min(MaxReservedLoads, (int)Math.Floor(owed[0] + snops * offerNeed + 1e-4f)));
                     _dOffers++; _dOfferSum += offer;
                 }
                 st.Labor = Math.Max(0f, -hands);                          // rece bez roboty nie odkladaja sie; zaczety snop ponad dzisiejsze rece - dlug na jutro

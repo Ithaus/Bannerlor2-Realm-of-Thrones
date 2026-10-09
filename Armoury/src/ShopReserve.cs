@@ -20,6 +20,11 @@ namespace Armoury
     /// </summary>
     internal static class ShopReserve
     {
+        internal static long Stumbles;      // poprawka 174b (recenzja): wyjatki od startu sesji - Log.Error tylko pierwszy (goraca sciezka zakupow), licznik w linii "Koszt 171-174 (doba)"
+        private static bool _errLogged;
+
+        /// <summary>Nowa gra / wczytanie (z ShelfIndex.Reset - konstruktor ArmouryBehavior).</summary>
+        internal static void Reset() { Stumbles = 0; _errLogged = false; }
         /// <summary>Ile ostatnich sztuk pasma zostaje na straganie dla kupujacego osobiscie; 0 = rezerwa wylaczona.</summary>
         internal static int Pieces
         {
@@ -54,7 +59,7 @@ namespace Armoury
                 if (n < 0) n = Scan(market.ItemRoster, type, band);
                 return Math.Max(0, n - keep);
             }
-            catch (Exception e) { Log.Error("ShopReserve.FreeBand", e); return int.MaxValue; }
+            catch (Exception e) { Stumbles++; if (!_errLogged) { _errLogged = true; Log.Error("ShopReserve.FreeBand", e); } return int.MaxValue; }   // poprawka 174b: raz w logu
             finally { Cost174.End(Cost174.SReserve, tc); }
         }
 

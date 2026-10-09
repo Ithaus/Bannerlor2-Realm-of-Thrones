@@ -37,12 +37,14 @@ namespace Armoury
     ///     roboczodzien - zostaja w miescie), miasto placi warsztatowi cene wyrobu z targu;
     ///  5. produkuje TYLKO z zyskiem >= WorkshopMinProfitPercent - zawalona polka obniza cene i hamuje
     ///     produkcje, wojna i braki ja nakrecaja, droga ruda zatrzymuje drogie zbroje.
-    /// Linie z towarami (mieso, narzedzia, wino...) i warsztaty GRACZA zostaja vanilla.
+    /// Linie z towarami (mieso, narzedzia, wino...) i warsztaty GRACZA zostaja vanilla - poza poprawka 174b (PlayerWorkshopsSameRule): linie bez wsadu
+    /// (zbroja, strzaly) zamkniete i ruda dla strzelarzy tak jak u notabli (PlayerCyclePrefix, PlayerGatePostfix).
     /// </summary>
     internal static class WorkshopLaw
     {
         /// <summary>Nowa gra/wczytanie: stare przedmioty i pule z poprzedniej kampanii (audyt 04.10 - ryzyko zepsucia save).</summary>
         internal static void Reset() { _pending = null; _market.Clear(); _marketDay = -1; _handsStart = -1f; _handsDay = -1; _ore = _wood = _leather = _linen = _wool = null; _owed.Clear(); _labor.Clear(); _rank.Clear(); _wip.Clear(); _plans.Clear(); _wipBasket.Clear(); NewDay174(); _soldierItems = null; _madeByType.Clear(); _dayStamp = -1; _made = _skipLoss = _skipMat = _skipLabor = _skipGold = _skipFletch = 0; _dayRevenue = _dayCost = 0; Array.Clear(_skipMatBy, 0, _skipMatBy.Length);
+            _plFree = _plHeld = _plStumbles = 0; _plErrLogged = false;
             WorkshopTrade.Reset();   // warsztaty towarowe w nowej monecie: stan czyszczony razem z warsztatami zbrojnymi (ta metoda idzie z konstruktora ArmouryBehavior)
             TownCrafts.Reset();      // paczka 148: rzemioslo miasta - dlugi wsadu i rak, srednie zuzycia (przed SyncData wczytania)
             TownFletchers.Reset();   // paczka 172: strzelarze miasta - dlugi surowca i rak, kandydaci, liczniki (przed SyncData wczytania)
@@ -52,6 +54,8 @@ namespace Armoury
         private static readonly Dictionary<Workshop, float[]> _owed = new Dictionary<Workshop, float[]>();     // ruda, drewno, skora, len
         private static readonly Dictionary<Workshop, KeyValuePair<float, int>> _labor = new Dictionary<Workshop, KeyValuePair<float, int>>();
         private static int _dayStamp = -1, _made, _skipLoss, _skipMat, _skipLabor, _skipGold, _skipFletch;
+        private static int _plFree, _plHeld, _plStumbles;   // poprawka 174b (recenzja): warsztaty gracza - cykle linii bez wsadu zamkniete, cykle czekajace na strzelarzy
+        private static bool _plErrLogged;
         private static long _dayRevenue, _dayCost;
         private static readonly Dictionary<ItemObject.ItemTypeEnum, int> _madeByType = new Dictionary<ItemObject.ItemTypeEnum, int>();
 
@@ -207,7 +211,7 @@ namespace Armoury
             {
                 // paczka 172: linia "arrows" (strzaly i belty) - BK robi z niej towar handlowy (BKItemCategories :122), wiec szla droga gry
                 // BEZ wsadu (artisans x4, fletcher x1) i z mnoznikiem BK - snopy z niczego. Przy czynnych strzelarzach miasta (TownFletchers)
-                // zamknieta w warsztatach notabli: jedna droga amunicji - z rudy i drewna. Warsztat gracza tu nie przychodzi (ForPlayerWorkshop).
+                // zamknieta w warsztatach notabli: jedna droga amunicji - z rudy i drewna. Warsztat gracza tu nie przychodzi (ForPlayerWorkshop - poprawka 174b: PlayerCyclePrefix).
                 if (TownFletchers.ClosesLine(production, workshop)) { TownFletchers.NoteClosed(production, workshop); __result = false; return false; }
                 // KONIEC SUROWCOW Z NICZEGO (Jeff 04.10, docs/AUDYT-TOWARY.md 6.2): ukryty warsztat BK
                 // "artisans" w kazdym miescie mial linie BEZ wsadu, ktore robily drewno, rude, skory surowe,
@@ -1351,7 +1355,7 @@ namespace Armoury
         private static void Flush()
         {
             if (_dayStamp < 0) return;
-            if (_made > 0 || _skipLoss + _skipMat + _skipLabor + _skipGold + _freeRawBlocked + _swappedSmith + _skipFletch > 0)
+            if (_made > 0 || _skipLoss + _skipMat + _skipLabor + _skipGold + _freeRawBlocked + _swappedSmith + _skipFletch + _plFree + _plHeld > 0)
             {
                 var parts = new List<string>();
                 foreach (var kv in _madeByType) parts.Add(kv.Key + " " + kv.Value);
@@ -1359,12 +1363,15 @@ namespace Armoury
                          + "], koszt " + _dayCost + ", sprzedaz " + _dayRevenue + "; odpuszczone: bez zysku " + _skipLoss
                          + ", brak surowca " + _skipMat + " [ruda " + _skipMatBy[0] + ", drewno " + _skipMatBy[1] + ", skora " + _skipMatBy[2] + ", len/welna " + _skipMatBy[3]
                          + " - cykl liczony przy kazdym surowcu, ktorego zabraklo na ktoras sztuke z rankingu], czeka na strzelarzy (ruda dla strzelarzy, 174b.3) " + _skipFletch + ", w robocie (cykle) " + _skipLabor + ", brak zlota/kupca " + _skipGold + "; rozpoczete sztuki " + _started + ", w toku teraz " + InProgress()
-                         + (TownCrafts.Active ? " | garbowanie i tkanie 1:1 wylaczone (rzemioslo miasta 148 - linia \"Rzemioslo miasta\")" : " | rzemieslnicy miasta wygarbowali skor " + _tanned + ", utkali plotna " + _woven) + " | z niczego zablokowane: cykle rzemieslnikow " + _freeRawBlocked + ", sztabki/wegiel z losowania -> ruda/drewno " + _swappedSmith + Text174() + ".");
+                         + (TownCrafts.Active ? " | garbowanie i tkanie 1:1 wylaczone (rzemioslo miasta 148 - linia \"Rzemioslo miasta\")" : " | rzemieslnicy miasta wygarbowali skor " + _tanned + ", utkali plotna " + _woven) + " | z niczego zablokowane: cykle rzemieslnikow " + _freeRawBlocked + ", sztabki/wegiel z losowania -> ruda/drewno " + _swappedSmith + Text174()
+                         + " | warsztaty gracza (poprawka 174b, jedna regula" + (Settings.Current != null && Settings.Current.PlayerWorkshopsSameRule ? "" : " - WYLACZONA") + "): cykle linii bez wsadu (zbroja, strzaly) zamkniete "
+                         + _plFree + ", czeka na strzelarzy " + _plHeld + (_plStumbles > 0 ? ", potkniecia " + _plStumbles : "") + ".");
             }
             FlushDiag();
             DiagShort();   // 174.1: najwiekszy brak swiata (koszyki)
             NewDay174();
             _made = _skipLoss = _skipMat = _skipLabor = _skipGold = _freeRawBlocked = _swappedSmith = _started = _tanned = _woven = _skipFletch = 0; _dayRevenue = _dayCost = 0; _madeByType.Clear();
+            _plFree = _plHeld = _plStumbles = 0;
             Array.Clear(_skipMatBy, 0, _skipMatBy.Length);
         }
 
@@ -1482,6 +1489,72 @@ namespace Armoury
             catch { }
         }
 
+        // ------------------------------------------------------------ poprawka 174b (recenzja, wazna): warsztaty GRACZA - ta sama regula
+        // Warsztat gracza szedl sciezka gry (TickOneProductionCycleForPlayerWorkshop), a dwa typy BK, ktore gracz moze kupic, maja linie z pustym <Inputs>
+        // (workshops.xml: armorsmithy - light_armor x1 przy 1.5, fletcher - arrows x1 przy 1.5): zbroja i strzaly z niczego, akurat te towary, ktorych brak
+        // leczy 174b. U notabli te linie sa zamkniete (ClosesLine) albo zastapione prawdziwa produkcja z surowca (AllOutputsArms -> CyclePrefix). Jedna
+        // regula gracz/AI i "nic z niczego" (Jeff 09.10): przy PlayerWorkshopsSameRule linia strzal przy czynnych strzelarzach (ClosesLine) i linia uzbrojenia
+        // BEZ wsadu przy czynnym WorkshopLaw nie robia cyklu takze u gracza. Linie gracza Z wsadem zostaja sciezka gry (prawdziwy surowiec z polki albo magazynu).
+        private static void PlayerStumble(Exception e)
+        {
+            _plStumbles++;
+            if (!_plErrLogged) { _plErrLogged = true; Log.Error("WorkshopLaw.PlayerWorkshop", e); }   // raz w logu, reszta w liczniku potkniec
+        }
+
+        private static void RollDay()
+        {
+            int d0 = (int)CampaignTime.Now.ToDays;
+            if (_dayStamp != d0) { Flush(); _dayStamp = d0; }
+        }
+
+        public static bool PlayerCyclePrefix(WorkshopType.Production __0, Workshop __1, ref bool __result)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || !s.PlayerWorkshopsSameRule || __1 == null || __1.Settlement == null) return true;
+                bool noInput = __0.Inputs == null || __0.Inputs.Count == 0;   // Production to struct
+                if (!TownFletchers.ClosesLine(__0, __1) && !(noInput && On && AllOutputsArms(__0))) return true;
+                RollDay();
+                _plFree++;
+                __result = false;
+                return false;
+            }
+            catch (Exception e) { PlayerStumble(e); return true; }
+        }
+
+        /// <summary>Postfiks CanPlayerWorkshopProduceThisCycle (gra sama policzyla koszt wsadu z polki miasta i utarg cyklu): 174b.3 dla warsztatu gracza - ta
+        /// sama regula co TryStart notabla. Gdy linia bierze rude z POLKI miasta (koszt wsadu > 0; wsad z magazynu gracza ma koszt 0 i polki nie rusza), oferta
+        /// strzelarzy jest wazna, po cyklu zostaloby na polce mniej rudy niz ich ladunki, a zysk cyklu na ladunek rudy (utarg - wsad; warsztat gracza nie ma
+        /// plac od cyklu - placi stale utrzymanie) jest mniejszy niz oferta - cykl czeka (licznik "czeka na strzelarzy" warsztatow gracza).</summary>
+        public static void PlayerGatePostfix(WorkshopType.Production __0, Workshop __1, int __2, int __3, ref bool __result)
+        {
+            if (!__result) return;
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || !s.PlayerWorkshopsSameRule || !s.FletchersBidForOre || __2 <= 0 || __1 == null || __1.Settlement == null) return;
+                var town = __1.Settlement.Town;
+                if (town == null || town.Owner == null || town.Owner.ItemRoster == null || __0.Inputs == null) return;
+                Resolve();
+                if (_ore == null || _ore.ItemCategory == null) return;
+                int oreIn = 0;
+                foreach (var i in __0.Inputs) if (i.Item1 == _ore.ItemCategory) oreIn += Math.Max(0, i.Item2);
+                if (oreIn <= 0) return;
+                float offer; int loads;
+                if (!TownFletchers.OreOffer(town, out offer, out loads)) return;
+                if (Available(town.Owner.ItemRoster, _ore) - oreIn >= loads) return;
+                float mine = (float)(__3 - __2) / oreIn;
+                if (offer <= mine) return;
+                __result = false;
+                RollDay();
+                _plHeld++;
+                TownFletchers.NoteHeld(town);
+                MaterialOrders.NoteMissMask(town, 1, false);   // jak u notabli: sygnal zamowienia rudy, bez listy miast z cyklami "brak rudy"
+            }
+            catch (Exception e) { PlayerStumble(e); }
+        }
+
         internal static void ApplyAll(Harmony h)
         {
             try
@@ -1489,6 +1562,19 @@ namespace Armoury
                 var m = AccessTools.Method(typeof(WorkshopsCampaignBehavior), "TickOneProductionCycleForNotableWorkshop");
                 if (m == null) { Log.Info("WorkshopLaw: brak TickOneProductionCycleForNotableWorkshop - warsztaty vanilla."); return; }
                 h.Patch(m, prefix: new HarmonyMethod(typeof(WorkshopLaw), nameof(CyclePrefix)));
+                // poprawka 174b (recenzja): warsztaty gracza - ta sama regula (wylacznik PlayerWorkshopsSameRule w samych latkach)
+                bool plCyc = false, plGate = false;
+                try
+                {
+                    var mp = AccessTools.Method(typeof(WorkshopsCampaignBehavior), "TickOneProductionCycleForPlayerWorkshop");
+                    if (mp != null) { h.Patch(mp, prefix: new HarmonyMethod(typeof(WorkshopLaw), nameof(PlayerCyclePrefix))); plCyc = true; }
+                    var mg = AccessTools.Method(typeof(WorkshopsCampaignBehavior), "CanPlayerWorkshopProduceThisCycle");
+                    if (mg != null && mg.GetParameters().Length >= 4 && mg.GetParameters()[2].ParameterType == typeof(int) && mg.GetParameters()[3].ParameterType == typeof(int))
+                    { h.Patch(mg, postfix: new HarmonyMethod(typeof(WorkshopLaw), nameof(PlayerGatePostfix))); plGate = true; }
+                }
+                catch (Exception e) { Log.Error("WorkshopLaw.ApplyAll(warsztaty gracza)", e); }
+                Log.Info("WorkshopLaw: warsztaty gracza (poprawka 174b, jedna regula) - linie bez wsadu " + (plCyc ? "wpiete" : "BRAK TickOneProductionCycleForPlayerWorkshop")
+                         + ", ruda dla strzelarzy " + (plGate ? "wpieta" : "BRAK CanPlayerWorkshopProduceThisCycle") + "; " + (Settings.Current != null && Settings.Current.PlayerWorkshopsSameRule ? "CZYNNE" : "wylaczone w MCM (jak w grze)") + ".");
                 var ri = AccessTools.Method(typeof(WorkshopsCampaignBehavior), "GetRandomItemAux");
                 if (ri != null) h.Patch(ri, postfix: new HarmonyMethod(typeof(WorkshopLaw), nameof(RandomItemPostfix)));
                 Log.Info("WorkshopLaw: koniec surowcow z niczego - rzemieslnicy bez wsadu " + (Settings.Current != null && Settings.Current.WorkshopNoFreeRaw ? "ZABLOKOWANI" : "wolni (MCM)")

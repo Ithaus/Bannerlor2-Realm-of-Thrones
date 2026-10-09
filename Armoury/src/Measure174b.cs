@@ -13,7 +13,9 @@ namespace Armoury
     ///  M1 "Zbroja na polkach (174b)" (codziennie): zbroja tulowia, glowy, nog i rak na polkach MIAST w pasmach t1-2 / t3-4 / t5-6 (bez unikatow) -
     ///     sztuk, miast z co najmniej 1 sztuka i (krytyka 174b, P5) miast, do ktorych w ostatnich 7 dobach trafila NOWA sztuka pasma: wyrob warsztatu,
     ///     dostawa kupcow (SupplyDemand.DailyTrade), odsprzedaz z sakiewek ludzi, nadwyzka albo zawrocony towar zalogi, a takze kazdy przyrost polki
-    ///     pasma miedzy spisami (np. lup sprzedany przez gre). Sztuki w rezerwie kramu (174b.4) osobno, bez progu.
+    ///     pasma miedzy spisami (np. lup sprzedany przez gre). Sztuki w rezerwie kramu (174b.4) osobno, bez progu. Poprawka 174b (recenzja): to samo
+    ///     "bez przerzutu" - bez sztuk, ktore przyjechaly bez partii na mapie (SupplyDemand.DailyTrade, zawrocone wozy zamkow GarrisonCarts) - zeby P5 pokazal,
+    ///     ile nowych sztuk dla gracza daje sam przerzut (rozdz. 9 projektu: przerzut uzbrojenia bez partii - do decyzji po 174b).
     ///  M2 "ZakupyAI wedlug kupujacego (174b)" (codziennie): sztuki i zloto wedlug kupujacego (lordowie, zalogi miast, zalogi zamkow z wlasnej polki,
     ///     zamowienia zamkow w miescie, notable dla ochotnikow, ludzie gracza z sakiewki) x grupa (korpus, helm, reszta zbroi, tarcza, bron biala,
     ///     bron strzelecka, amunicja, konie i rzedy, inne); M3 w tej samej linii - nadwyzki sprzedane z sakiewek ludzi wedlug grup.
@@ -39,6 +41,8 @@ namespace Armoury
         private const int Slots = 12;   // 4 rodzaje zbroi x 3 pasma
         private static readonly Dictionary<Town, int[]> _prev = new Dictionary<Town, int[]>();
         private static readonly Dictionary<Town, int[]> _lastNew = new Dictionary<Town, int[]>();
+        private static readonly Dictionary<Town, int[]> _lastOwn = new Dictionary<Town, int[]>();   // poprawka 174b: nowa sztuka bez przerzutu bez partii
+        private static readonly Dictionary<Town, int[]> _xfer = new Dictionary<Town, int[]>();      // sztuki przerzutu bez partii od ostatniego spisu (miasto x pasmo)
         private static int _stumbles;
         private static readonly HashSet<string> _errSites = new HashSet<string>();
 
@@ -46,6 +50,7 @@ namespace Armoury
         {
             Array.Clear(_buyN, 0, _buyN.Length); Array.Clear(_buyG, 0, _buyG.Length); Array.Clear(_sellN, 0, Groups); Array.Clear(_sellG, 0, Groups);
             Array.Clear(_held, 0, Buyers); Array.Clear(_arr, 0, ArrKinds); _prev.Clear(); _lastNew.Clear(); _stumbles = 0; _errSites.Clear();
+            _lastOwn.Clear(); _xfer.Clear();
         }
 
         private static void Stumble(string where, Exception e)
@@ -119,8 +124,9 @@ namespace Armoury
         /// <summary>174b.4: zakup hurtowy zatrzymany na rezerwie kramu (sztuka zostala na straganie).</summary>
         internal static void NoteHeld(int buyer, int n) { if (buyer >= 0 && buyer < Buyers && n > 0) _held[buyer] += n; }
 
-        /// <summary>M1: nowa sztuka zbroi na polce miasta (zrodlo kind). Unikaty i zamki pomijane.</summary>
-        internal static void NoteArrival(Settlement st, ItemObject it, int n, int kind)
+        /// <summary>M1: nowa sztuka zbroi na polce miasta (zrodlo kind). Unikaty i zamki pomijane. unseen (poprawka 174b) - sztuka przyjechala bez partii na
+        /// mapie (wozy zamkow GarrisonCarts); handel dzienny kupcow (ArrTrade) liczy sie tak zawsze.</summary>
+        internal static void NoteArrival(Settlement st, ItemObject it, int n, int kind, bool unseen = false)
         {
             try
             {
@@ -128,15 +134,22 @@ namespace Armoury
                 int k = ArmourKind(it);
                 if (k < 0 || ArmsPricing.IsUnique(it)) return;
                 if (kind >= 0 && kind < ArrKinds) _arr[kind] += n;
-                Mark(st.Town, k * 3 + Band(it), (int)CampaignTime.Now.ToDays);
+                int slot = k * 3 + Band(it), day = (int)CampaignTime.Now.ToDays;
+                Mark(_lastNew, st.Town, slot, day);
+                if (kind == ArrTrade || unseen)
+                {
+                    int[] x; if (!_xfer.TryGetValue(st.Town, out x)) { x = new int[Slots]; _xfer[st.Town] = x; }
+                    x[slot] += n;
+                }
+                else Mark(_lastOwn, st.Town, slot, day);
             }
             catch (Exception e) { Stumble("NoteArrival", e); }
         }
 
-        private static void Mark(Town t, int slot, int day)
+        private static void Mark(Dictionary<Town, int[]> d, Town t, int slot, int day)
         {
             int[] last;
-            if (!_lastNew.TryGetValue(t, out last)) { last = new int[Slots]; for (int i = 0; i < Slots; i++) last[i] = int.MinValue / 2; _lastNew[t] = last; }
+            if (!d.TryGetValue(t, out last)) { last = new int[Slots]; for (int i = 0; i < Slots; i++) last[i] = int.MinValue / 2; d[t] = last; }
             last[slot] = day;
         }
 
@@ -153,7 +166,7 @@ namespace Armoury
 
         private static void Census(int day)
         {
-            var total = new long[Slots]; var towns = new int[Slots]; var fresh = new int[Slots];
+            var total = new long[Slots]; var towns = new int[Slots]; var fresh = new int[Slots]; var freshOwn = new int[Slots];
             var reserve = new long[4];
             int keep = ShopReserve.Pieces;   // 0 = rezerwa wylaczona
             int nTowns = 0;
@@ -174,16 +187,24 @@ namespace Armoury
                         if (k < 0 || ArmsPricing.IsUnique(it)) continue;
                         c[k * 3 + Band(it)] += el.Amount;
                     }
-                    int[] prev;
+                    int[] prev, xf;
+                    _xfer.TryGetValue(t, out xf);
                     if (_prev.TryGetValue(t, out prev))
-                        for (int i = 0; i < Slots; i++) if (c[i] > prev[i]) { Mark(t, i, day); _arr[ArrNet] += c[i] - prev[i]; }
+                        for (int i = 0; i < Slots; i++)
+                            if (c[i] > prev[i])
+                            {
+                                Mark(_lastNew, t, i, day); _arr[ArrNet] += c[i] - prev[i];
+                                if (c[i] - prev[i] > (xf != null ? xf[i] : 0)) Mark(_lastOwn, t, i, day);   // przyrost ponad przerzut bez partii
+                            }
                     _prev[t] = c;
-                    int[] last; _lastNew.TryGetValue(t, out last);
+                    if (xf != null) Array.Clear(xf, 0, Slots);
+                    int[] last, own; _lastNew.TryGetValue(t, out last); _lastOwn.TryGetValue(t, out own);
                     for (int i = 0; i < Slots; i++)
                     {
                         total[i] += c[i];
                         if (c[i] > 0) towns[i]++;
                         if (last != null && day - last[i] < 7) fresh[i]++;
+                        if (own != null && day - own[i] < 7) freshOwn[i]++;
                         if (keep > 0) reserve[i / 3] += Math.Min(c[i], keep);
                     }
                 }
@@ -200,6 +221,8 @@ namespace Armoury
                     sb.Append(b == 0 ? " " : ", ").Append(BandNames[b]).Append(' ').Append(total[i]).Append(" szt./").Append(towns[i]).Append(" miast/nowa w 7 dob ").Append(fresh[i]);
                 }
             }
+            sb.Append("; nowa w 7 dob bez przerzutu bez partii (kupcy dzienni, wozy zamkow) t1-2/t3-4/t5-6:");   // poprawka 174b (recenzja): P5 bez przerzutu
+            for (int k = 0; k < 4; k++) sb.Append(k == 0 ? " " : ", ").Append(KindNames[k]).Append(' ').Append(freshOwn[k * 3]).Append('/').Append(freshOwn[k * 3 + 1]).Append('/').Append(freshOwn[k * 3 + 2]);
             if (keep > 0) sb.Append("; rezerwa kramu: sztuk ").Append(reserve[0] + reserve[1] + reserve[2] + reserve[3]).Append(" (korpus ").Append(reserve[0]).Append(", helm ").Append(reserve[1])
                              .Append(", nogi ").Append(reserve[2]).Append(", rece ").Append(reserve[3]).Append(')');
             else sb.Append("; rezerwa kramu: wylaczona");

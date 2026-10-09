@@ -155,7 +155,20 @@ def main():
             bad.append((num(r"dzien (\d+)", s), int(m.group(1)), int(m.group(2))))
     if Z:
         rez = num(r"rezerwa kramu: sztuk (\d+)", Z[-1])
+        rez = rez if rez is not None else ("wylaczona" if "rezerwa kramu: wylaczona" in Z[-1] else None)
         out("P5", len(Z) > start and not bad, "dni ponizej progu (t1-2 >= 49, t3-4 >= 24, od %d. spisu): %s; w rezerwie (ostatni spis) %s szt. (INFO, <= 1164)" % (start + 1, bad[:5] if bad else "brak", rez))
+        # poprawka 174b (recenzja): to samo bez przerzutu bez partii na mapie (SupplyDemand.DailyTrade, zawrocone wozy zamkow) - ile P5 zawdziecza przerzutowi
+        own_bad, own_n = [], 0
+        for i, s in enumerate(Z):
+            if i < start:
+                continue
+            m = re.search(r"bez przerzutu bez partii \(kupcy dzienni, wozy zamkow\) t1-2/t3-4/t5-6: korpus (\d+)/(\d+)/(\d+)", s)
+            if not m:
+                continue
+            own_n += 1
+            if int(m.group(1)) < 49 or int(m.group(2)) < 24:
+                own_bad.append((num(r"dzien (\d+)", s), int(m.group(1)), int(m.group(2))))
+        out("INFO", None, "P5 bez przerzutu (kupcy dzienni, wozy zamkow): spisow %d, dni ponizej progu %s" % (own_n, own_bad[:5] if own_bad else "brak") if own_n else "P5 bez przerzutu: brak segmentu w linii (stary log)")
     else:
         out("P5", None, "brak linii 'Zbroja na polkach (174b)'")
 
@@ -185,10 +198,19 @@ def main():
     if KO:
         pct = [num(r"nasze 171-174b [0-9.]+ ms \(([0-9.]+)% doby", s, float) for s in KO]
         pct = [p for p in pct if p is not None]
+        # poprawka 174b (recenzja): mianownik linii to zegar miedzy taktami doby - obejmuje pauzy, ekran zapisu i menu, wiec srednia procentow zanizala koszt.
+        # P13 = srednie ms "nasze" / MEDIANA dlugosci doby (mediana nie widzi dob z autozapisem i pauza); procenty z linii - INFO.
+        wall = [num(r" - doba (\d+) ms \(zegar\)", s, float) for s in KO]
+        ours = [num(r"nasze 171-174b ([0-9.]+) ms", s, float) for s in KO]
+        pairs = [(w, o) for w, o in zip(wall, ours) if w is not None and o is not None and w > 0]
+        p13 = 100.0 * mean([o for _, o in pairs]) / st.median([w for w, _ in pairs]) if pairs else None
         mis = num(r"rozjazdow od startu sesji (\d+)", KO[-1])
         rozj = len(lines_of(path, "Pamiec polki (174b.5): ROZJAZD"))
         out("P9", (mis == 0) and rozj == 0, "pamiec polki: rozjazdow od startu sesji %s, linii ROZJAZD %d" % (mis, rozj))
-        out("P13", bool(pct) and mean(pct) <= 1.0, "nasze 171-174b: srednio %s%% doby, mediana %s%%, maks. %s%% (prog srednio <= 1%%)" % (fmt(mean(pct), 2), fmt(st.median(pct), 2) if pct else "-", fmt(max(pct), 2) if pct else "-"))
+        out("P13", p13 is not None and p13 <= 1.0,
+            "nasze 171-174b: srednio %s ms / mediana doby %s ms = %s%% (prog <= 1%%); z linii (zegar z pauzami - INFO): srednio %s%%, mediana %s%%, maks. %s%%"
+            % (fmt(mean([o for _, o in pairs]), 1) if pairs else "-", fmt(st.median([w for w, _ in pairs]), 0) if pairs else "-", fmt(p13, 2),
+               fmt(mean(pct), 2), fmt(st.median(pct), 2) if pct else "-", fmt(max(pct), 2) if pct else "-"))
     else:
         out("P9/P13", None, "brak linii 'Koszt 171-174 (doba)'")
 
