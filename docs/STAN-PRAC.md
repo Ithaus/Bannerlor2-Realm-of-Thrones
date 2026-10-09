@@ -842,3 +842,4 @@ E wyrownanie dla panow zamkow (1/2 nadwyzki, renty), takze u gracza - TAK; F tar
 H wytop przy kopalni tylko w nowej kampanii - TAK; I/J Dorne: PIASKOWE RUMAKI (nie wielblady), proporcje winnic i oliwek - "rzeczywiste proporcje ustal" (Claude dobiera z historii);
 K rycerz z koniem - OK (liczby po tescie); L napisy na mapie tylko nad SPALONYMI wioskami; M namioty i ogniska przy napadzie na oboz - WLACZYC; N kuznia (okienko wyboru
 rodzaju zbroi jak przy broni czy filtr ForgeView) - "nie rozumiem" (wyjasnione, czeka); O pasek gotowosci zbrojowni DTE (sypie bledem) - WYLACZYC.
+**DECYZJA JEFFA 09.10 ok. 04:35 (N, kuznia):** "zostawic filtr" - bez okienka wyboru rodzaju zbroi w zakladce Craft; wystarcza filtr kategorii ForgeView (krok 5 paczki 129 skreslony).
