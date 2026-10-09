@@ -117,7 +117,50 @@ namespace Armoury
             _noted = 0;
         }
 
-        internal static void ResetOrders() { _unmet.Clear(); _noted = 0; _onceSeen.Clear(); _loggedHour.Clear(); }
+        internal static void ResetOrders() { _unmet.Clear(); _noted = 0; _onceSeen.Clear(); _loggedHour.Clear(); _imported = -1; _importedPieces = 0f; }
+
+        // 174.0b: zamowienia (sygnal popytu dla warsztatow) w zapisie gry - klucz "arm_unmet" (SaveText.Sync); dotad startowaly od zera po kazdym wczytaniu.
+        // Klucz zamowienia ("osada|typ|tier") nie zalezy od obiektow gry - wczytanie od razu w SyncData. Wylacznik WorkshopStateInSave.
+        private static int _imported = -1; private static float _importedPieces;
+        internal static int OrdersCount() { return _unmet.Count; }
+
+        internal static string ExportOrders()
+        {
+            if (!WorkshopLaw.SaveOn) return "";
+            var sb = new System.Text.StringBuilder();
+            foreach (var kv in _unmet)
+            {
+                if (kv.Key.IndexOf('=') >= 0 || kv.Key.IndexOf('~') >= 0) continue;
+                sb.Append(kv.Key).Append('=').Append(kv.Value.ToString("R", System.Globalization.CultureInfo.InvariantCulture)).Append('~');
+            }
+            return sb.ToString();
+        }
+
+        internal static void ImportOrders(string s)
+        {
+            _imported = -1; _importedPieces = 0f;
+            if (string.IsNullOrEmpty(s) || !WorkshopLaw.SaveOn) return;
+            _unmet.Clear(); _imported = 0;
+            float cap = Math.Max(1f, Settings.Current.SupplyDemandOrderCap);
+            foreach (var rec in s.Split('~'))
+            {
+                int i = rec.LastIndexOf('=');
+                if (i <= 0) continue;
+                float v;
+                if (!float.TryParse(rec.Substring(i + 1), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out v) || v <= 0f) continue;
+                _unmet[rec.Substring(0, i)] = Math.Min(v, cap);
+                _imported++; _importedPieces += Math.Min(v, cap);
+            }
+        }
+
+        /// <summary>Opis wczytanych zamowien do linii "Warsztaty (zapis 174)" (raz; null - nic nie wczytano).</summary>
+        internal static string ImportReport()
+        {
+            if (_imported < 0) return null;
+            string r = "zamowien " + _imported + " (szt. " + (int)_importedPieces + ")";
+            _imported = -1;
+            return r;
+        }
 
         // wpis 81 (audyt 05.10, pkt 1 - petla drozenia): ten sam niezaspokojony kupiec (garnizon co dzien, notabl z cofnietym
         // awansem co dzien) wpisywal to samo zamowienie od nowa - przy wygaszaniu 15% stan rosl do ~6.7x dziennego wpisu,
@@ -133,6 +176,7 @@ namespace Armoury
             _onceSeen[k] = day;
             if (_onceSeen.Count > 20000) _onceSeen.Clear();
             NoteUnmet(market, type, tier, n);
+            if (type == ItemObject.ItemTypeEnum.Arrows || type == ItemObject.ItemTypeEnum.Bolts) TownFletchers.NoteUnmet(type);   // 172: "AI bez towaru" (tylko licznik)
         }
 
         internal static float Demand(Settlement st, ItemObject it)
@@ -409,9 +453,14 @@ namespace Armoury
                 }
 
                 int moved = 0, deals = 0, stuck = 0; long paid = 0;
+                // 171 C8 (Z6): zamek nie jest targiem broni - kupcy nie wioza tam broni natychmiast, bez drogi; zaloga zamku zamawia w miescie
+                // (GarrisonCarts). Zamek zostaje ZRODLEM: jego zapas ponad popyt kupcy wywoza do miast
+                bool noCastles = GarrisonCarts.On;
                 foreach (var kv in sample)
                 {
                     int key = kv.Key; var probe = kv.Value;
+                    // recenzja 171: tylko bron i zbroje - konie i rzedy kupcy woza do zamkow jak dotad (zaloga ich nie zamawia, gracz kupuje je na polce zamku)
+                    bool noCastlesHere = noCastles && !MenPurse.HorseKind(probe);
                     foreach (var src in places)
                     {
                         int have; stock[src].TryGetValue(key, out have);
@@ -436,6 +485,7 @@ namespace Armoury
                             foreach (var dst in places)
                             {
                                 if (dst == src || poor.Contains(dst)) continue;
+                                if (noCastlesHere && dst.IsCastle) continue;
                                 float dist = srcPos.Distance(dst.GetPosition2D);
                                 if (dist > range) continue;
                                 int dh; stock[dst].TryGetValue(key, out dh);

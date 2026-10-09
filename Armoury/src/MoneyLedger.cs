@@ -69,9 +69,9 @@ namespace Armoury
                                                    "odziez wojska" };   // 150: sakiewki ludzi i kasy zamkow -> kasy miast
 
         // nasz tick dobowy (Mark)
-        internal const int MRent = 0, MBuild = 1, MCrown = 2, MRest = 3, MFence = 4, MLife = 5;
-        private const int Marks = 6;
-        private static readonly string[] MName = { "renty", "budowy", "korona (danina, clo, mennica)", "pozostale moduly ticku", "paser band (skup lupu)", "bandy i kryjowki (zycie w miastach)" };
+        internal const int MRent = 0, MBuild = 1, MCrown = 2, MRest = 3, MFence = 4, MLife = 5, MOrders = 6;   // MOrders: 174.2 kontrakty surowca (zakup karawan w zrodlach)
+        private const int Marks = 7;
+        private static readonly string[] MName = { "renty", "budowy", "korona (danina, clo, mennica)", "pozostale moduly ticku", "paser band (skup lupu)", "bandy i kryjowki (zycie w miastach)", "kontrakty surowca (174)" };
 
         // posiadacze zlota
         private const int HTowns = 0, HCastles = 1, HVillages = 2, HLeaders = 3, HLords = 4, HPlayer = 5, HNotables = 6, HWanderers = 7, HOtherHeroes = 8,

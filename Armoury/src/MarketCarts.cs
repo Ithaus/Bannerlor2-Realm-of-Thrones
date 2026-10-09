@@ -335,7 +335,7 @@ namespace Armoury
 
         /// <summary>Jednostek drogi na dobe taboru wsi: oszacowanie gry (Campaign.EstimatedAverageVillagerPartySpeed, 3.43 na godzine)
         /// x tempo swiata (WorldPace) x godzin doby (24). Pomiar z logu 06.10 (tempo 75%): ok. 61 jednostek na dobe.</summary>
-        private static double PerDay(Settings s)
+        internal static double PerDay(Settings s)
         {
             var c = Campaign.Current;
             float v = c != null ? c.EstimatedAverageVillagerPartySpeed : 0f;

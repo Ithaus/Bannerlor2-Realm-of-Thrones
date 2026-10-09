@@ -1,8 +1,22 @@
 import re, sys, os
 
-# T1: zakresy suwakow int, ktorych regula ogolna [0, max(10, 4 x domyslna)] nie obejmuje
-# (godzina obozu 0 dawala suwak 0..10 - nie dalo sie ustawic 22)
-RANGES = {"CampStartHour": (0, 23), "CampEndHour": (0, 23)}
+# zakresy suwakow zgodne z przycieciem w kodzie: nazwa -> (min, max, format); reszta - wzor ogolny ponizej
+# T1: godziny obozu (regula ogolna [0, max(10, 4 x domyslna)] dawala przy domyslnej 0 suwak 0..10 - nie dalo sie ustawic 22)
+# recenzja 174: suwaki 174 zgodne z przycieciem w kodzie
+RANGES = {
+    'CampStartHour': (0, 23, "0"),
+    'CampEndHour': (0, 23, "0"),
+    'OldStockScrapYield': (0.0, 1.0, "0.00"),
+    'OldStockScrapDailyShare': (0.0, 0.1, "0.000"),
+    'WorkshopMunitionShare': (0.0, 1.0, "0.00"),
+    'WorkshopLineShortageShare': (0.0, 1.0, "0.00"),
+    'WorkshopPlanDays': (14.0, 120.0, "0"),
+    'WorkshopMunitionMaxTier': (1, 6, "0"),
+    'TownMaterialOrderDays': (1, 30, "0"),
+    'CarterPencePerKgPer100': (0.0, 0.15, "0.0000"),
+    'SeaFreightShare': (0.0, 1.0, "0.00"),
+    'TownMaterialOrderMinLoadKg': (0.0, 1000.0, "0"),
+}
 
 def gen(module_dir, ns, display):
     src = open(os.path.join(module_dir,'src','Settings.cs'), encoding='utf-8').read()
@@ -37,13 +51,19 @@ def gen(module_dir, ns, display):
     for typ, name, default, hint, grp in props:
         label = re.sub(r'(?<!^)(?=[A-Z])', ' ', name)
         hint_txt = hint.replace('"', "'")
-        if typ == "bool":
+        if typ != "bool" and name in RANGES:
+            lo, hi, fmt = RANGES[name]
+            if typ == "int":
+                attr = '        [SettingPropertyInteger("%s", %d, %d, "%s", HintText = "%s")]' % (label, lo, hi, fmt, hint_txt)
+            else:
+                dec = len(fmt.split('.')[1]) if '.' in fmt else 2
+                attr = '        [SettingPropertyFloatingInteger("%s", %.*ff, %.*ff, "%s", HintText = "%s")]' % (label, max(2, dec), lo, max(2, dec), hi, fmt, hint_txt)
+        elif typ == "bool":
             attr = '        [SettingPropertyBool("%s", HintText = "%s")]' % (label, hint_txt)
         elif typ == "int":
             d = int(float(default))
             lo = min(0, d*3) if d < 0 else 0
             hi = max(10, abs(d)*4) if d >= 0 else 0
-            if name in RANGES: lo, hi = RANGES[name]
             attr = '        [SettingPropertyInteger("%s", %d, %d, "0", HintText = "%s")]' % (label, lo, hi, hint_txt)
         else:
             d = float(default.rstrip('f'))

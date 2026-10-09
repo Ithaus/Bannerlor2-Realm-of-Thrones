@@ -91,6 +91,111 @@ namespace Armoury
             catch (Exception e) { ArmyClothing.Stumble("BkSupplyTemper.ClothZeroPostfix", e); }
         }
 
+        // ------------------------------------------------------------ 172: strzaly zaopatrzenia BK = 0 dla partii AI (jedna droga amunicji)
+        // BK PartySupplies: ArrowsNeed rosnie co dobe o BKPartyNeedsModel.CalculateArrowsNeed (0.003 x PartySuppliesFactor snopa na lucznika),
+        // BuyItems kupuje kategorie "arrows" z polki osady za zloto lorda (zloto w nicosc), ConsumeItems(ArrowsNeed x 2) niszczy z jukow.
+        // Amunicje partii AI liczy Armoury: zakupy AiGear wedlug wzorcow, zuzycie w bitwie i odzysk. Przy czynnych strzelarzach (TownFletchers)
+        // i zakupach AI wynik = 0 i zapisana potrzeba zerowana (jak tekstylia 150); partia gracza - bez zmian (BK jak dotad).
+        internal static bool ArrowsHooked, ArrowsResetReady;
+        private static System.Reflection.MethodInfo _arrowsGet, _arrowsSet, _partyGet;
+
+        public static void ArrowsZeroPostfix(object __0, ref TaleWorlds.CampaignSystem.ExplainedNumber __result)
+        {
+            try
+            {
+                if (__0 == null) return;
+                var party = _partyGet != null ? _partyGet.Invoke(__0, null) as TaleWorlds.CampaignSystem.Party.MobileParty : null;
+                if (party == null || !ArrowsClosedFor(party)) return;
+                __result.LimitMin(0f);
+                __result.LimitMax(0f);
+                bool reset = false;
+                if (ArrowsResetReady)
+                {
+                    float v = (float)_arrowsGet.Invoke(__0, null);
+                    if (v != 0f) { _arrowsSet.Invoke(__0, new object[] { 0f }); reset = true; }
+                }
+                TownFletchers.NoteBk(reset);
+            }
+            catch (Exception e) { TownFletchers.Stumble("BkSupplyTemper.ArrowsZeroPostfix", e); }
+        }
+
+        /// <summary>172 + 174.0: strzaly BK zamkniete dla tej partii - AI przy czynnych strzelarzach i zakupach AI; gracz tylko przy BkSuppliesNoArmsPlayer (Q5).</summary>
+        private static bool ArrowsClosedFor(TaleWorlds.CampaignSystem.Party.MobileParty party)
+        {
+            if (party == TaleWorlds.CampaignSystem.Party.MobileParty.MainParty) { var s = Settings.Current; return s != null && s.BkSuppliesNoArmsPlayer; }
+            return TownFletchers.BkArrowsClosed;
+        }
+
+        // ------------------------------------------------------------ 174.0: bron i tarcze zaopatrzenia BK = 0 (jedna regula zuzycia broni armii AI)
+        // BK PartySupplies: WeaponsNeed i ShieldsNeed rosna co dobe o CalculateWeaponsNeed / CalculateShieldsNeed (0.006 / 0.003 na zolnierza),
+        // BuyItems kupuje kategorie MeleeWeapons2/3 i Shield2/3 z polki osady za zloto lorda (zloto w nicosc), ConsumeItems(potrzeba x 2) niszczy z jukow.
+        // Zuzycie broni armii AI liczy Armoury (AiWear, naprawy kowali, wraki) - przy BkSuppliesNoArms i zakupach AI wynik = 0, zapisana potrzeba zerowana
+        // (wzor strzal 172). Partia gracza: osobny wylacznik BkSuppliesNoArmsPlayer (pytanie 5 - domyslnie wylaczony, czeka na Jeffa).
+        internal static bool ArmsHooked, ArmsResetReady, NeedsBuyHooked;
+        private static System.Reflection.MethodInfo _weapGet, _weapSet, _shieldGet, _shieldSet;
+
+        private static bool ArmsClosedFor(TaleWorlds.CampaignSystem.Party.MobileParty party)
+        {
+            var s = Settings.Current;
+            if (s == null || party == null) return false;
+            if (party == TaleWorlds.CampaignSystem.Party.MobileParty.MainParty) return s.BkSuppliesNoArmsPlayer;
+            return s.BkSuppliesNoArms && AiGear.On;
+        }
+
+        public static void WeaponsZeroPostfix(object __0, ref TaleWorlds.CampaignSystem.ExplainedNumber __result) { ArmsZero(__0, ref __result, _weapGet, _weapSet); }
+        public static void ShieldsZeroPostfix(object __0, ref TaleWorlds.CampaignSystem.ExplainedNumber __result) { ArmsZero(__0, ref __result, _shieldGet, _shieldSet); }
+
+        private static void ArmsZero(object sup, ref TaleWorlds.CampaignSystem.ExplainedNumber result, System.Reflection.MethodInfo get, System.Reflection.MethodInfo set)
+        {
+            try
+            {
+                if (sup == null || _partyGet == null) return;
+                var party = _partyGet.Invoke(sup, null) as TaleWorlds.CampaignSystem.Party.MobileParty;
+                if (!ArmsClosedFor(party)) return;
+                result.LimitMin(0f);
+                result.LimitMax(0f);
+                ArmsLeaks.BkZeroCalls++;
+                if (ArmsResetReady && get != null && set != null)
+                {
+                    float v = (float)get.Invoke(sup, null);
+                    if (v != 0f) { set.Invoke(sup, new object[] { 0f }); ArmsLeaks.BkReset++; }
+                }
+            }
+            catch (Exception e) { ArmsLeaks.Stumble("BkSupplyTemper.ArmsZero", e); }   // recenzja 174: raz w logu, reszta w liczniku linii "Uzbrojenie (ujscia 174)"
+        }
+
+        /// <summary>Recenzja 172: prefiks PartySupplies.BuyItems() (Tick i wejscie do osady). Partie z ludzmi ponizej MinimumSoldiersThreshold
+        /// nie wolaja CalculateArrowsNeed, a po wczytaniu BuyItems przy wejsciu do osady moze isc przed pierwszym Tick - stara ArrowsNeed
+        /// (zapis sprzed 172) kupilaby strzaly za zloto lorda w nicosc. Zerowana tu, przed zakupem, dla partii AI przy czynnych strzelarzach.</summary>
+        // 174.0: ten sam prefiks zeruje tez zapisane WeaponsNeed i ShieldsNeed (NeedsBuyPrefix) - partie ponizej progu ludzi nie przeliczaja potrzeb.
+        public static void NeedsBuyPrefix(object __instance)
+        {
+            if (__instance == null || _partyGet == null) return;
+            TaleWorlds.CampaignSystem.Party.MobileParty party = null;
+            try { party = _partyGet.Invoke(__instance, null) as TaleWorlds.CampaignSystem.Party.MobileParty; } catch { }
+            if (party == null) return;
+            try
+            {
+                if (ArrowsResetReady && ArrowsClosedFor(party))
+                {
+                    float v = (float)_arrowsGet.Invoke(__instance, null);
+                    if (v != 0f) { _arrowsSet.Invoke(__instance, new object[] { 0f }); TownFletchers.NoteBkBuyReset(); }
+                }
+            }
+            catch (Exception e) { TownFletchers.Stumble("BkSupplyTemper.NeedsBuyPrefix(strzaly)", e); }
+            try
+            {
+                if (ArmsResetReady && ArmsClosedFor(party))
+                {
+                    float w = (float)_weapGet.Invoke(__instance, null);
+                    if (w != 0f) { _weapSet.Invoke(__instance, new object[] { 0f }); ArmsLeaks.BkReset++; }
+                    float sh = (float)_shieldGet.Invoke(__instance, null);
+                    if (sh != 0f) { _shieldSet.Invoke(__instance, new object[] { 0f }); ArmsLeaks.BkReset++; }
+                }
+            }
+            catch (Exception e) { ArmsLeaks.Stumble("BkSupplyTemper.NeedsBuyPrefix(bron)", e); }
+        }
+
         internal static void ApplyAll(HarmonyLib.Harmony h)
         {
             try
@@ -127,9 +232,59 @@ namespace Armoury
                         if (!ClothResetReady) { _clothGet = null; _clothSet = null; }
                     }
                     catch (Exception e) { Log.Error("BkSupplyTemper.ApplyAll(CalculateClothNeed)", e); }
+                    // 172: strzaly = 0 dla partii AI przy czynnych strzelarzach - po czapce (Priority.Last)
+                    try
+                    {
+                        var arrows = HarmonyLib.AccessTools.Method(tModel, "CalculateArrowsNeed");
+                        _partyGet = HarmonyLib.AccessTools.PropertyGetter(t, "Party");
+                        if (arrows != null && arrows.ReturnType == typeof(TaleWorlds.CampaignSystem.ExplainedNumber) && _partyGet != null)
+                        {
+                            h.Patch(arrows, postfix: new HarmonyLib.HarmonyMethod(typeof(BkSupplyTemper), "ArrowsZeroPostfix") { priority = HarmonyLib.Priority.Last });
+                            ArrowsHooked = true;
+                        }
+                        _arrowsGet = HarmonyLib.AccessTools.PropertyGetter(t, "ArrowsNeed");
+                        _arrowsSet = HarmonyLib.AccessTools.PropertySetter(t, "ArrowsNeed");
+                        ArrowsResetReady = _arrowsGet != null && _arrowsSet != null && _arrowsGet.ReturnType == typeof(float);
+                        // recenzja 172: zerowanie zapisanej ArrowsNeed takze przed zakupem (BuyItems() bez parametrow - wola go Tick i wejscie do osady)
+                    }
+                    catch (Exception e) { Log.Error("BkSupplyTemper.ApplyAll(CalculateArrowsNeed)", e); }
+                    // 174.0: bron i tarcze = 0 dla partii AI (BkSuppliesNoArms) i gracza (BkSuppliesNoArmsPlayer) - po czapce (Priority.Last)
+                    try
+                    {
+                        if (_partyGet == null) _partyGet = HarmonyLib.AccessTools.PropertyGetter(t, "Party");
+                        var weap = HarmonyLib.AccessTools.Method(tModel, "CalculateWeaponsNeed");
+                        var shld = HarmonyLib.AccessTools.Method(tModel, "CalculateShieldsNeed");
+                        if (weap != null && shld != null && weap.ReturnType == typeof(TaleWorlds.CampaignSystem.ExplainedNumber) && shld.ReturnType == typeof(TaleWorlds.CampaignSystem.ExplainedNumber) && _partyGet != null)
+                        {
+                            h.Patch(weap, postfix: new HarmonyLib.HarmonyMethod(typeof(BkSupplyTemper), "WeaponsZeroPostfix") { priority = HarmonyLib.Priority.Last });
+                            h.Patch(shld, postfix: new HarmonyLib.HarmonyMethod(typeof(BkSupplyTemper), "ShieldsZeroPostfix") { priority = HarmonyLib.Priority.Last });
+                            ArmsHooked = true;
+                        }
+                        _weapGet = HarmonyLib.AccessTools.PropertyGetter(t, "WeaponsNeed");
+                        _weapSet = HarmonyLib.AccessTools.PropertySetter(t, "WeaponsNeed");
+                        _shieldGet = HarmonyLib.AccessTools.PropertyGetter(t, "ShieldsNeed");
+                        _shieldSet = HarmonyLib.AccessTools.PropertySetter(t, "ShieldsNeed");
+                        ArmsResetReady = _weapGet != null && _weapSet != null && _shieldGet != null && _shieldSet != null && _weapGet.ReturnType == typeof(float) && _shieldGet.ReturnType == typeof(float);
+                    }
+                    catch (Exception e) { Log.Error("BkSupplyTemper.ApplyAll(CalculateWeaponsNeed)", e); }
+                    // recenzja 172 + 174.0: zerowanie zapisanych potrzeb takze przed zakupem (BuyItems() bez parametrow - wola go Tick i wejscie do osady)
+                    try
+                    {
+                        var buy = HarmonyLib.AccessTools.Method(t, "BuyItems", Type.EmptyTypes);
+                        if (buy != null && (ArrowsResetReady || ArmsResetReady) && _partyGet != null)
+                        {
+                            h.Patch(buy, prefix: new HarmonyLib.HarmonyMethod(typeof(BkSupplyTemper), "NeedsBuyPrefix"));
+                            NeedsBuyHooked = true;
+                        }
+                    }
+                    catch (Exception e) { Log.Error("BkSupplyTemper.ApplyAll(BuyItems)", e); }
                 }
                 Log.Info("BkSupplyTemper: tekstylia zaopatrzenia BK (CalculateClothNeed) = 0 przy odziezy wojska (150, MCM Army Clothing Enabled) - "
                          + (ClothHooked ? "wpiete" : "BRAK latki (BK kupi tekstylia jak dotad)") + ", zerowanie zapisanej potrzeby ClothNeed " + (ClothResetReady ? "wpiete" : "BRAK") + ".");
+                Log.Info("BkSupplyTemper: strzaly zaopatrzenia BK (CalculateArrowsNeed) = 0 dla partii AI przy czynnych strzelarzach (172) - "
+                         + (ArrowsHooked ? "wpiete" : "BRAK latki (BK kupi i zuzyje strzaly jak dotad)") + ", zerowanie zapisanej potrzeby ArrowsNeed " + (ArrowsResetReady ? "wpiete" : "BRAK") + " (przed zakupem BuyItems " + (NeedsBuyHooked ? "wpiete" : "BRAK") + ").");
+                Log.Info("BkSupplyTemper: bron i tarcze zaopatrzenia BK (CalculateWeaponsNeed, CalculateShieldsNeed) = 0 (174.0; partie AI przy BkSuppliesNoArms i zakupach AI, gracz przy BkSuppliesNoArmsPlayer) - "
+                         + (ArmsHooked ? "wpiete" : "BRAK latki (BK kupi i zuzyje bron i tarcze jak dotad)") + ", zerowanie zapisanych WeaponsNeed i ShieldsNeed " + (ArmsResetReady ? "wpiete" : "BRAK") + ".");
                 Log.Info("BkSupplyTemper: sakwy AI ograniczone (dni=" + (Settings.Current != null ? Settings.Current.BkSupplyDaysCap : 4)
                          + ", sufit sztuk=" + (Settings.Current != null ? Settings.Current.BkSupplyMaxPieces : 15)
                          + ", czapka w " + capped + " modelach potrzeb).");

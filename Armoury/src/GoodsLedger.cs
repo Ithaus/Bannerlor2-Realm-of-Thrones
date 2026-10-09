@@ -56,10 +56,10 @@ namespace Armoury
         // ------------------------------------------------------------ rodzaje ramek
         internal const int FVillage = 0, FVillageFood = 1, FCycle = 2, FCons = 3, FFood = 4, FSupplyUse = 5, FSupplyBuy = 6, FBkSettle = 7,
                            FBkParty = 8, FWagon = 9, FSell = 10, FCaravanLeave = 11, FBuild = 12, FForage = 13, FBee = 14,
-                           FTickParty = 15, FTickSettle = 16, FTickTown = 17, FTownCraft = 18, FArmyCloth = 19, FMend = 20, Kinds = 21;   // FTownCraft: paczka 148 (rzemioslo miasta), FArmyCloth: paczka 150 (odziez wojska), FMend: material napraw kowali miasta (135, poprawka po audycie TOWARY 3)
+                           FTickParty = 15, FTickSettle = 16, FTickTown = 17, FTownCraft = 18, FArmyCloth = 19, FMend = 20, FFletch = 21, FDecay = 22, FArmsBuy = 23, FScrap = 24, Kinds = 25;   // FDecay, FArmsBuy: paczka 174.0 (kasowanie gry DeleteOverproducedItems; zakupy uzbrojenia Armoury w tickach dobowych - AiGear, notable), FScrap: 174 pytanie 4 (zlom); FFletch: paczka 172 (strzelarze miasta - ruda i drewno); FTownCraft: paczka 148 (rzemioslo miasta), FArmyCloth: paczka 150 (odziez wojska), FMend: material napraw kowali miasta (135, poprawka po audycie TOWARY 3)
         private static readonly string[] KindName = { "produkcja wsi", "zywnosc wsi", "cykle warsztatow", "konsumpcja osad", "jedzenie partii",
             "zaopatrzenie BK (zuzycie)", "zaopatrzenie BK (zakupy)", "tick osady BK", "tick partii BK", "sprzedaz wozow", "handel partii",
-            "wyjazd karawany (BK)", "budowy", "furaz", "BetterEconomy", "tick partii", "tick osady", "tick miasta", "rzemioslo miasta (148)", "odziez wojska (150)", "naprawy kowali miasta" };
+            "wyjazd karawany (BK)", "budowy", "furaz", "BetterEconomy", "tick partii", "tick osady", "tick miasta", "rzemioslo miasta (148)", "odziez wojska (150)", "naprawy kowali miasta", "strzelarze (172)", "kasowanie gry", "zakupy uzbrojenia Armoury", "zlom z nadmiaru (174)" };
 
         // ------------------------------------------------------------ posiadacze zapasu
         private const int HTown = 0, HCastle = 1, HVillage = 2, HStash = 3, HOtherSettl = 4, HWagon = 5, HCaravan = 6, HLord = 7, HPlayer = 8, HOtherParty = 9, Holders = 10;
@@ -73,9 +73,9 @@ namespace Armoury
                              GShopIn = "linie warsztatow", GArms = "warsztaty zbrojne", GBuild = "budowy", GTown = "mieszczanie", GCastle = "zamki",
                              GFood = "zywnosc partii", GSlaughter = "uboj w partiach", GSupply = "zaopatrzenie BK", GBkSettle = "BK osady", GBkParty = "BK partie",
                              GBee = "BetterEconomy", GForage = "furaz armii (Armoury)", GLost = "przepadlo z rozbitymi partiami", GNoBuyer = "sprzedane bez kupca",
-                             GTick = "inne ticki dobowe", GRest = "handel (reszta)", GArmyCloth = "odziez wojska (150)", GMend = "naprawy kowali miasta (135)";
-        private static readonly string[] SrcOrder = { GVil, GWoodlot, GShop, GArt, GTanW, GCraft, GSlaughter, GBkParty, GBkSettle, GBee, GForage, GTick };
-        private static readonly string[] SinkOrder = { GShopIn, GArt, GTanW, GCraft, GArms, GBuild, GTown, GCastle, GArmyCloth, GMend, GFood, GSupply, GBkSettle, GBkParty, GBee, GLost, GNoBuyer, GTick };
+                             GTick = "inne ticki dobowe", GRest = "handel (reszta)", GArmyCloth = "odziez wojska (150)", GMend = "naprawy kowali miasta (135)", GFletch = "strzelarze (172)", GDecay = "kasowanie gry (5% stosow z modyfikatorem)", GScrap = "zlom z nadmiaru (174)";
+        private static readonly string[] SrcOrder = { GVil, GWoodlot, GShop, GArt, GTanW, GCraft, GScrap, GSlaughter, GBkParty, GBkSettle, GBee, GForage, GTick };
+        private static readonly string[] SinkOrder = { GShopIn, GArt, GTanW, GCraft, GArms, GBuild, GTown, GCastle, GDecay, GArmyCloth, GMend, GFletch, GFood, GSupply, GBkSettle, GBkParty, GBee, GLost, GNoBuyer, GTick };
 
         // ------------------------------------------------------------ ramka
         internal sealed class Frame
@@ -89,6 +89,7 @@ namespace Armoury
             public int[] Arms;                   // cykl warsztatu: sztuki zdjete przez WorkshopLaw (OreLedger.NoteWorkshop) - "warsztaty zbrojne"
             public bool[] Mark;
             public readonly List<int> Touched = new List<int>();
+            public readonly Dictionary<int, int> ArmsNet = new Dictionary<int, int>();   // 174.0: uzbrojenie w ramce (ArmsLeaks.KeyOf -> zmiana sztuk na rosterach swiata)
             public int Wood;                     // drewno lasu wsi (126) dopisane w tej ramce (OreLedger.NoteWoodlot)
             public long Gold0;                   // sprzedaz wozu: kiesa taboru przed sprzedaza
             public int Thread;
@@ -104,6 +105,7 @@ namespace Armoury
             {
                 foreach (var i in Touched) { Net[i] = 0; InA[i] = 0; InB[i] = 0; Price[i] = 0; Arms[i] = 0; Mark[i] = false; }
                 Touched.Clear();
+                if (ArmsNet.Count > 0) ArmsNet.Clear();
                 A = B = Info = null; RA = RB = null; Parent = null; Wood = 0; Gold0 = 0;
             }
 
@@ -165,7 +167,7 @@ namespace Armoury
 
         // liczniki doby (tylko log)
         private static readonly int[] _framesN = new int[Kinds];
-        private static long _tapAll, _tapIn, _tapRec, _ticksFrames, _lostParties;
+        private static long _tapAll, _tapIn, _tapRec, _tapArms, _ticksFrames, _lostParties;
         private static int _orphans, _overflow, _stumbles, _stumblesAll, _offThread;
         private static readonly HashSet<string> _errSites = new HashSet<string>();
         private static int _lastDay = -1;
@@ -180,7 +182,7 @@ namespace Armoury
         {
             _items = null; _idx = null; _acc = null; _top = null; _depth = 0; _lines.Clear();
             for (int k = 0; k < Kinds; k++) _framesN[k] = 0;
-            _tapAll = _tapIn = _tapRec = _ticksFrames = _lostParties = 0; _orphans = _overflow = _stumbles = _offThread = 0;
+            _tapAll = _tapIn = _tapRec = _tapArms = _ticksFrames = _lostParties = 0; _orphans = _overflow = _stumbles = _offThread = 0;
             _woodLeft = 0; _armsLeft = 0; _wagonGold = 0; _wagonSales = 0;
             _lastDay = -1; _wasOn = false;
         }
@@ -324,6 +326,8 @@ namespace Armoury
             {
                 if (Environment.CurrentManagedThreadId != f.Thread) { _offThread++; return; }
                 _tapIn++;
+                int ak = ArmsLeaks.KeyOf(it);   // 174.0: uzbrojenie - zbiorczo wedlug typu i tieru w ramce (tylko licznik)
+                if (ak >= 0) { int av; f.ArmsNet.TryGetValue(ak, out av); f.ArmsNet[ak] = av + n; _tapArms++; }
                 int i;
                 if (it == null || _idx == null || !_idx.TryGetValue(it, out i)) return;
                 _tapRec++;
@@ -384,6 +388,7 @@ namespace Armoury
         /// <summary>Rozlicza zamknieta ramke: zmiany na rosterach swiata -> pozycje produkcji, zuzycia i przewozu.</summary>
         private static void Settle(Frame f)
         {
+            if (f.ArmsNet.Count > 0) ArmsLeaks.SettleFrame(f.Kind, f.A, f.ArmsNet, Kinds, FSupplyUse, SupplyParty);   // 174.0: ksiega uzbrojenia (tylko licznik)
             if (f.Touched.Count == 0 && f.Wood == 0) return;
             switch (f.Kind)
             {
@@ -465,7 +470,7 @@ namespace Armoury
                     foreach (var i in f.Touched) Book(i, GSupply, null, f.Net[i]);
                     return;
                 case FBkSettle:
-                    foreach (var i in f.Touched) { long n = f.Net[i]; Book(i, GBkSettle, n > 0 ? "dokup z nadwyzki rak i zywnosci" : "gnicie i nadprodukcja", n); }
+                    foreach (var i in f.Touched) { long n = f.Net[i]; Book(i, GBkSettle, n > 0 ? "dokup z nadwyzki rak i zywnosci" : (RawNoRot.On ? "gnicie (174.3: drewno, len, welna 0.2%)" : "gnicie i nadprodukcja"), n); }
                     return;
                 case FBkParty:
                     foreach (var i in f.Touched) Book(i, GBkParty, null, f.Net[i]);
@@ -484,6 +489,18 @@ namespace Armoury
                     return;
                 case FMend:        // 135 (poprawka po audycie TOWARY 3): ruda, drewno, skora, len i welna zdjete z polki przez kowali miasta na naprawy (MendMaterial.Bench.Commit)
                     foreach (var i in f.Touched) Book(i, GMend, null, f.Net[i]);
+                    return;
+                case FFletch:      // 172: ruda i drewno zdjete z polki przez strzelarzy miasta (TownFletchers.Work); amunicja nie jest towarem ksiegi
+                    foreach (var i in f.Touched) Book(i, GFletch, null, f.Net[i]);
+                    return;
+                case FDecay:       // 174.0: kasowanie gry (ItemConsumptionBehavior.DeleteOverproducedItems) - dotad liczone razem z "mieszczanie"
+                    foreach (var i in f.Touched) Book(i, GDecay, null, f.Net[i]);
+                    return;
+                case FScrap:       // 174, pytanie 4: ruda ze zlomu starego nadmiaru (ArmsScrap) - zrodlo
+                    foreach (var i in f.Touched) Book(i, GScrap, null, f.Net[i]);
+                    return;
+                case FArmsBuy:     // 174.0: zakupy uzbrojenia Armoury (AiGear, notable) - towar ksiegi tu sie nie rusza
+                    foreach (var i in f.Touched) Book(i, GRest, "zakupy uzbrojenia Armoury", f.Net[i]);
                     return;
                 case FBee:
                     {
@@ -707,6 +724,19 @@ namespace Armoury
             catch (Exception e) { Stumble("SupplyBuyPre", e); }
         }
 
+        /// <summary>174.0: partia zaopatrzenia BK (PartySupplies.Party) - podzial AI / gracz w ksiedze uzbrojenia.</summary>
+        private static MobileParty SupplyParty(object supplies)
+        {
+            try { return supplies != null && _supplyParty != null ? _supplyParty.GetValue(supplies, null) as MobileParty : null; }
+            catch { return null; }
+        }
+
+        public static void DecayPre(Town __0, out Frame __state)
+        {
+            __state = null;
+            try { if (__0 != null) __state = Begin(FDecay, __0); } catch (Exception e) { Stumble("DecayPre", e); }
+        }
+
         public static void BkSettlePre(Settlement __0, out Frame __state)
         {
             __state = null;
@@ -759,6 +789,7 @@ namespace Armoury
             try
             {
                 if (mp == null || !On || !EnsureItems()) return;
+                ArmsLeaks.NoteLost(mp);   // 174.0: uzbrojenie w jukach rozbitej partii (tylko licznik)
                 var r = mp.ItemRoster;
                 if (r == null) return;
                 string sub = HolderName[PartyClass(mp)];
@@ -853,11 +884,18 @@ namespace Armoury
                 var inv = CultureInfo.InvariantCulture;
                 // ---- zapas wedlug posiadacza
                 foreach (var a in _acc) Array.Clear(a.Hold, 0, Holders);
+                int armsStacks = 0; long armsPieces = 0;
                 foreach (var st in Settlement.All)
                 {
                     if (st == null) continue;
                     int c = SettlClass(st);
                     Count(st.ItemRoster, c);
+                    if ((c == HTown || c == HCastle) && st.ItemRoster != null)   // 174.0: stosy uzbrojenia na polkach (przedmiot + modyfikator)
+                        for (int k = 0; k < st.ItemRoster.Count; k++)
+                        {
+                            var el = st.ItemRoster.GetElementCopyAtIndex(k);
+                            if (el.Amount > 0 && ArmsLeaks.ArmsPiece(el.EquipmentElement.Item)) { armsStacks++; armsPieces += el.Amount; }
+                        }
                     if (st.Stash != null && !ReferenceEquals(st.Stash, st.ItemRoster)) Count(st.Stash, HStash);
                 }
                 foreach (var mp in MobileParty.All)
@@ -969,7 +1007,7 @@ namespace Armoury
                 long tAll = Stopwatch.GetTimestamp() - t0;
                 bl.Append("; koszt: zapas ").Append((tStock * f).ToString("0.0", inv)).Append(" ms, ramki ").Append((_ticksFrames * f).ToString("0.0", inv))
                   .Append(" ms, linie ").Append(((tAll - tStock) * f).ToString("0.0", inv)).Append(" ms; AddToCounts: wszystkich ").Append(_tapAll)
-                  .Append(", w ramkach ").Append(_tapIn).Append(" (towary ").Append(_tapRec).Append(")");
+                  .Append(", w ramkach ").Append(_tapIn).Append(" (towary ").Append(_tapRec).Append(", uzbrojenie ").Append(_tapArms).Append(")");
                 if (_orphans + _overflow + _offThread + _woodLeft + _armsLeft > 0)
                     bl.Append("; ramki osierocone ").Append(_orphans).Append(", za glebokie ").Append(_overflow).Append(", poza watkiem glownym ").Append(_offThread).Append(", drewno lasu poza drewnem ramki ").Append(_woodLeft)
                       .Append(", wsad warsztatow zbrojnych poza ramka cyklu ").Append(_armsLeft);
@@ -978,6 +1016,9 @@ namespace Armoury
 
                 // jeden zapis do pliku: kazda linia ma wlasny znacznik czasu, jak z osobnych Log.Info (40-60 linii dziennie - jeden dostep do dysku)
                 all.Append(Environment.NewLine).Append('[').Append(ts).Append("] ").Append(bl);
+                // 174.0: linia "Uzbrojenie (ujscia 174)" - te same ramki, ta sama doba
+                string arms = ArmsLeaks.DailyLine(day, armsStacks, armsPieces, KindName, FCons, FDecay, FSupplyUse, new[] { FTickParty, FTickSettle, FTickTown });
+                if (arms != null) all.Append(Environment.NewLine).Append('[').Append(ts).Append("] ").Append(arms);
                 Log.Info(all.ToString());
 
                 // ---- nowa doba
@@ -988,7 +1029,7 @@ namespace Armoury
                     a.Last = now; a.NewDay();
                 }
                 for (int k = 0; k < Kinds; k++) _framesN[k] = 0;
-                _tapAll = _tapIn = _tapRec = _ticksFrames = _lostParties = 0; _orphans = _overflow = _offThread = _stumbles = 0; _woodLeft = 0; _armsLeft = 0;
+                _tapAll = _tapIn = _tapRec = _tapArms = _ticksFrames = _lostParties = 0; _orphans = _overflow = _offThread = _stumbles = 0; _woodLeft = 0; _armsLeft = 0;
                 _wagonGold = 0; _wagonSales = 0;
                 _lastDay = day; _wasOn = true;
             }
@@ -1055,6 +1096,8 @@ namespace Armoury
             frame("cykl warsztatu notabla", AccessTools.Method(ws, "TickOneProductionCycleForNotableWorkshop"), nameof(CyclePre));
             frame("cykl warsztatu gracza", AccessTools.Method(ws, "TickOneProductionCycleForPlayerWorkshop"), nameof(CyclePre));
             frame("konsumpcja osady", AccessTools.Method(typeof(ItemConsumptionBehavior), "MakeConsumptionInTown"), nameof(ConsPre));
+            frame("kasowanie gry", AccessTools.Method(typeof(ItemConsumptionBehavior), "DeleteOverproducedItems"), nameof(DecayPre));   // 174.0: wewnatrz konsumpcji osady
+            ArmsLeaks.SetLeakKinds(new[] { FCons, FDecay, FSupplyUse, FBkSettle, FBkParty, FBee, FTickParty, FTickSettle, FTickTown });
             frame("jedzenie partii", AccessTools.Method(typeof(FoodConsumptionBehavior), "PartyConsumeFood"), nameof(FoodPre));
             var sellGoods = AccessTools.Method(typeof(SellGoodsForTradeAction), "ApplyInternal");
             var sgp = sellGoods != null ? sellGoods.GetParameters() : null;

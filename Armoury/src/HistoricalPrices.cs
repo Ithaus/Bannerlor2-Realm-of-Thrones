@@ -758,6 +758,7 @@ namespace Armoury
         // dla ceny surowcow (RawPrice): czy przeliczenie tej sesji juz obowiazuje i ile starych denarow to jeden nowy w danej
         // kategorii (0 = kategoria nieprzeliczona); slownik jest pisany tylko w Apply, potem sam odczyt
         internal static bool Applied { get { return _applied; } }
+        internal static bool BudgetHooked;   // 174.0: postfiks BK CalculateBudget wpiety (linia startowa ArmsLeaks)
         internal static float CoinRatio(ItemCategory cat)
         {
             float r;
@@ -793,7 +794,11 @@ namespace Armoury
         {
             try
             {
-                if (!_applied || town == null || category == null) return;
+                if (town == null || category == null) return;
+                // paczka 174.0: bron, zbroja, tarcze i uprzaz to nie towar domowy - budzet mieszczan 0 (BK ItemConsumptionPatch bierze z polki tylko
+                // kategorie z budzetem); miasta i zamki, takze przy wylaczonym TownHouseholdUse i bez cen historycznych. Odziez "garment" i "arrows" - bez zmian
+                if (ArmsLeaks.ZeroTownBudget(category)) { __result = 0f; return; }
+                if (!_applied) return;
                 var s = Settings.Current;
                 float idx = Math.Max(0.01f, town.GetItemCategoryPriceIndex(category));
                 float extra = town.Prosperity / 1000f / idx;
@@ -801,6 +806,10 @@ namespace Armoury
                 if (s.HistDemandScaling && _catRatio.TryGetValue(category, out r) && r > 1f)
                     __result = __result - extra + extra / r;
                 if (s.TownHouseholdUse) __result *= TownUse(category.StringId);
+                // paczka 172: strzaly i belty (kategoria "arrows" - BK ma ja za towar z popytem 10/10) mieszczanie zjadali z polek w nicosc;
+                // przy czynnych strzelarzach miasta budzet 0 - takze przy wylaczonym TownHouseholdUse (mysliwskie strzaly sa poza skala)
+                else if (category.StringId == "arrows") __result *= TownFletchers.HouseUse();
+                if (category.StringId == "arrows") TownFletchers.NoteHouse();   // licznik linii 172 tylko tu (TownUse/HouseShare bez efektu ubocznego)
             }
             catch { }
         }
@@ -817,6 +826,7 @@ namespace Armoury
                 case "leather": return Math.Max(0f, s.TownUseLeather);
                 case "linen": return Math.Max(0f, s.TownUseLinen);
                 case "hardwood": return Math.Max(0f, s.TownUseHardwood);
+                case "arrows": return TownFletchers.HouseUse();   // paczka 172: mieszczanin nie zuzywa wojennych grotow - 0 przy czynnych strzelarzach (inaczej 1, jak dotad)
                 default: return 1f;
             }
         }
@@ -952,7 +962,7 @@ namespace Armoury
                 Log.Info("HistoricalPrices: ROT-RBM luki (ROTRBMCompatibility.ModifyBowsAndArrows) " + (rot != null ? "przechwycone" : "nie znalezione") + ".");
                 Log.Info("HistoricalPrices: blokada cen przeliczonych przedmiotow " + (vs != null ? "wpieta (setter Value)" : "BRAK settera") + "; zapis wprost do pola omija ja - wtedy dzienna kontrola.");
                 var bud = AccessTools.Method("BannerKings.Patches.EconomyPatches:CalculateBudget");
-                if (bud != null) h.Patch(bud, postfix: new HarmonyMethod(typeof(HistoricalPrices), nameof(BudgetPostfix)));
+                if (bud != null) { h.Patch(bud, postfix: new HarmonyMethod(typeof(HistoricalPrices), nameof(BudgetPostfix))); BudgetHooked = true; }
                 Log.Info("HistoricalPrices: zakupy mieszczan (BK CalculateBudget) - " + (bud != null ? "domowa czesc surowcow i dodatek BK w nowej monecie wpiete" : "BRAK BK CalculateBudget") + ".");
                 // wartosc z definicji towarow BK (opis przy _defValue): BKItems.InitializeTradeGood(ItemObject, TextObject, string, ItemCategory, int, float, ItemTypeEnum, bool)
                 // - prywatna statyczna; definiuje nia BK swoje towary (Initialize) i futro (AdjustPrices). Parametry po pozycji, typy sprawdzane.

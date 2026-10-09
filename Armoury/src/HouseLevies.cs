@@ -71,6 +71,8 @@ namespace Armoury
                         if (!IsElite(troop)) continue;                    // tylko szlacheckie sloty - ta sama zasada co elity
                         var repl = Pick(tree, troop.Tier, settlement.Culture);
                         if (repl == null || repl == troop) continue;
+                        // 171 A2: ten sam czlowiek w barwach rodu - zapis jego kompletu przechodzi z X na Y (dotad sierota, a Y bral wzorzec z niczego)
+                        try { RecruitKit.OnSwap(notable, troop, repl); } catch (Exception e) { RecruitKit.Stumble("OnSwap", e); }
                         slots[i] = repl;
                         _swappedToday++;
                     }

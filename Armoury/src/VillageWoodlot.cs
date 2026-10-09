@@ -51,7 +51,7 @@ namespace Armoury
         private static double _startKg;
 
         /// <summary>Stawka z suwaka (ladunki 100 kg na wies na dobe); 0 albo mniej = wylaczone.</summary>
-        internal static float Rate { get { var s = Settings.Current; return s != null && s.VillageWoodlotLoads > 0f ? s.VillageWoodlotLoads : 0f; } }
+        internal static float Rate { get { var s = Settings.Current; return s != null && s.VillageWoodlotLoads > 0f ? s.VillageWoodlotLoads * (s.WoodlotStep > 0f ? s.WoodlotStep : 1f) : 0f; } }   // 174.3: x WoodlotStep (1.6 - wegiel dla kuzni)
 
         /// <summary>Las wsi tnie: obie latki wpiete (produkcja i magazyn - jedna bez drugiej nic nie zmienia), suwak powyzej 0 i RBL nie
         /// dosypuje drewna z niczego.</summary>

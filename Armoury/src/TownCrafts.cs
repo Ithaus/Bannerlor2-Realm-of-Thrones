@@ -307,6 +307,7 @@ namespace Armoury
                     if (best == null) break;
                     var a = acc[best.Ix];
                     shelf.AddToCounts(best.In, -bestTake);
+                    MaterialOrders.NoteUse(town, best.In, bestTake);   // 174.2: zmierzone zuzycie miasta
                     shelf.AddToCounts(best.Out, 1);
                     a[0] = a[0] + best.Ratio - bestTake;
                     hands -= labor[best.Ix];
@@ -336,7 +337,7 @@ namespace Armoury
                         }
                         catch (Exception e) { Stumble("Zdarzenia", e); }
                     }
-                    if (reason[i] == 1) _dNoProfit[i]++; else if (reason[i] == 2) _dNoInput[i]++; else if (reason[i] == 3) _dNoHands[i]++;
+                    if (reason[i] == 1) _dNoProfit[i]++; else if (reason[i] == 2) { _dNoInput[i]++; MaterialOrders.NoteMiss(town, p.In); } else if (reason[i] == 3) _dNoHands[i]++;   // 174.2: sygnal zamowienia (len, skory, welna)
                 }
             }
             catch (Exception e) { Stumble("Work", e); }
