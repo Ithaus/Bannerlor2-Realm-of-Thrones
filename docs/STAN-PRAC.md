@@ -873,3 +873,6 @@ i w lupach): a) tak jak jest, b) tylko pozyczony na bitwe (LordBattleKitIsLent, 
 dane danego lorda i wychodzi, jak szybko" -> JEDEN WZOR musztry dla gracza, lordow AI i glow rodow AI (bez osobnej bazy glowy rodu 15+3xtier): baza 10+2xtier x dowodca
 (Przywodztwo) x dzien (postoj/marsz/glod/sen) x bron ludzi (171) x zapas do cwiczen x perki; Z14b (AI na tym samym wzorze) WLACZYC; skutek dla armii AI zmierzyc i pokazac.
 (2) niewyspanie: "noc bez snu = nastepny dzien bez cwiczen", liczone od switu (b) - dla gracza i AI.
+**DECYZJE JEFFA 09.10 ok. 07:35 (sprzet DTE z niczego):** (1) zolnierz gracza bez sztuki - "nie, jesli nie ma sprzetu, to nie ma sprzetu, nic nie dostaje z kosmosu" -> bez
+awaryjnego sprzetu chlopa DTE (walczy tym, co ma); (2) ludzie lordow AI w bitwach gracza - (c) "walcza tylko tym, co maja" (bez dopelniania wzorca z niczego; nowa kampania:
+na poczatku czesc bez zbroi/tarcz - Jeff akceptuje); (3) przenoszenie sprzetu z ludzmi takze dla partii towarzyszy (Manage Troops) - TAK. Do wdrozenia na noc/sklad7.
