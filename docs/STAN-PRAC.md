@@ -835,3 +835,10 @@ valyrianskiego = PRZEKUCIE istniejacej stali u mistrza w Qohorze (za oplata dla 
 **ZGODA JEFFA 09.10 ok. 04:15 - STALA:** "zgoda na cala prace, wgrywaj po tescie, aby na mnie nie czekac" -> od teraz kazda paczka po udanym autotescie (nowa kampania 40 dob
 + zapis; progi z projektu) idzie do gry bez czekania, z kopia (bak + D:), md5, wpis WGRANIE N. Nadal: nie gdy Jeff gra; zapisy Jeffa nietkniete; zmiany rozgrywki spoza
 decyzji - pytac; optymalizacja na koniec.
+**DECYZJE JEFFA 09.10 ok. 04:25 (pytania z PLANU DO KONCA MODA, rozdz. 2):** 20 drogi - najpierw pokazac proba (zdjecia), "gdzie wioska, tam droga";
+A (K1) bogaty zolnierz kupuje o stopien wyzej - TAK, jesli go stac i sztuka jest na rynku (wymog umiejetnosci dalej obowiazuje); B (K1) zaloga ze sprzetem dla < 75% ludzi -
+"reszta walczy po prostu bez uzbrojenia" (TAK - tylko tym, co ma); C dezercja wedlug poziomu takze u AI - TAK; D zwyciezca bierze cale zloto taboru i bandy - TAK;
+E wyrownanie dla panow zamkow (1/2 nadwyzki, renty), takze u gracza - TAK; F targ przy zamku - TAK; G BetterEconomy: prawdziwa wplata do kasy miasta + dar dla notabli - TAK;
+H wytop przy kopalni tylko w nowej kampanii - TAK; I/J Dorne: PIASKOWE RUMAKI (nie wielblady), proporcje winnic i oliwek - "rzeczywiste proporcje ustal" (Claude dobiera z historii);
+K rycerz z koniem - OK (liczby po tescie); L napisy na mapie tylko nad SPALONYMI wioskami; M namioty i ogniska przy napadzie na oboz - WLACZYC; N kuznia (okienko wyboru
+rodzaju zbroi jak przy broni czy filtr ForgeView) - "nie rozumiem" (wyjasnione, czeka); O pasek gotowosci zbrojowni DTE (sypie bledem) - WYLACZYC.
