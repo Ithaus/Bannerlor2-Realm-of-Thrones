@@ -853,3 +853,7 @@ spelnia wymog; gorsza/rowna/za trudna zostaje w oknie DTE jako sztuka gracza, lu
 **DECYZJE JEFFA 09.10 ok. 05:15 (I1b):** (1) Qohor ZOSTAJE z niewola (kanon: Nieskalani w strazy, TWOIAF), Lorath bez niewoli - TAK (zmienia wczesniejsze "24b Qohor i Lorath
 bez niewoli": Qohor z niewola). (2) Polityka karna BK we wlasnym miescie/zamku gracza dziala tak samo w kazdej krainie (a) - przy "Execution" jency sprzedani tam u posrednika
 sa straceni takze w Westeros; przy domyslnym "Enslavement" bez zmian. I1b w obecnej postaci (1590deb) zgodne z decyzjami.
+**DECYZJE JEFFA 09.10 ok. 05:50 (175 ARMIE, pytania po wykonaniu):** (2) WLACZYC wylaczone propozycje audytu: sklad Volantis i Norvos wedlug ksiazek (slonie zostaja),
+ciezsza piechota Qohoru, lzejsza piechota Dorne, mniej jazdy u Wolnych Ludzi i na Smoczej Skale. (3) najprostsze oszczepy dostaja tier 2 (Dornijczycy t2-3 z oszczepami,
+nie z toporkami) - OK. (1) Polnoc: Jeff chcial widziec, co znaczy +15 w statystykach (wyjasnione tabela: +15 do broni glownej i Atletyki 43 rodzajom piechoty t3-t6;
+srednio ok. +20% wobec swiata) - bez wyraznego wyboru; ustawiam domyslnie +15 (rada Claude, suwak NorthHardySkillBonus 0-50), do zmiany na slowo Jeffa.
