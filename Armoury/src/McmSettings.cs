@@ -2780,7 +2780,7 @@ namespace Armoury
         [SettingPropertyGroup("Northern fare")]
         public bool WoodlotByClimate { get; set; } = true;
 
-        [SettingPropertyBool("Village Climate Fix", HintText = "12 villages whose main produce cannot grow where they stand get one that can (cotton at the Wall, in Braavos, in the Vale mountains and in Sarnor, a vineyard in Lorath, dates on Tarth), and 5 warm villages (Qarth, Volantis, Lys, Tyrosh) take up cotton so the world keeps some; the 4 grain farms beyond the Wall turn to hunting and fishing (2 trappers in the forest, 2 fishers by the water) - the Free Folk do not farm. Applied at session start, nothing is written to the save (off = the map's own village types after the next load)")]
+        [SettingPropertyBool("Village Climate Fix", HintText = "12 villages whose main produce cannot grow where they stand get one that can (cotton at the Wall, in Braavos, in the Vale mountains and in Sarnor, a vineyard in Lorath, dates on Tarth), and 5 warm villages (Qarth, Volantis, Lys, Tyrosh) take up cotton so the world keeps some; the 4 grain farms beyond the Wall turn to hunting and fishing (2 trappers in the forest, 2 fishers by the water) - the Free Folk keep no grain farms (every village still gathers a little grain). Applied at session start, nothing is written to the save (off = the map's own village types after the next load; fishing boats Storrold has already sent out stay)")]
         [SettingPropertyGroup("Northern fare")]
         public bool VillageClimateFix { get; set; } = true;
 

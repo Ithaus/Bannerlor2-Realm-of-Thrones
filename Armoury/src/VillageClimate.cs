@@ -23,9 +23,16 @@ namespace Armoury
     /// Crowgrave morze 49.5 / rzeka 53.3, las 100% (puszcza) -> traperzy; Storrold port, morze 2.0 -> rybacy; Ghostcreek morze 7.7 / rzeka
     /// 19.3, las 100% (puszcza) -> traperzy; Frostbank morze 6.0 / rzeka 8.7, bez lasu (sniezna rownina) -> rybacy. Miara: 62 wsie rybakow ROT
     /// maja wode (blizsze z morza i rzeki) mediana 4.0, 75% do 6.4; 23 wsie traperow mediana 12.7. Za Murem po D.4: traperzy 5, rybacy 4,
-    /// zboza 0 (zostaje "zboze 3", ktore gra daje KAZDEMU typowi wsi - osobny krok, audyt 02 C4/N3). Zywnosc warowni: gra liczy wsie z poziomu
-    /// ognisk, nie z typu (DefaultSettlementFoodModel, x6 na wies) - zmienia sie tylko zboze sprzedane na targu (ryby tez sa zywnoscia, futra
-    /// nie): Thenn ok. -47/d, Hardhome ok. -66/d, Frostfang's Camp ok. -19/d przy bilansie warowni +130..+200/d w najgorszej dobie 4 autotestow.
+    /// farm zboza 0 - ale NIE "bez zboza": gra daje "zboze 3" KAZDEMU typowi wsi (18 wsi x 3 = ok. 54/d wobec ok. 242/d przed D.4), a Skirling
+    /// (castle_S5, flax_plant) dalej uprawia len; zdjecie "zboza 3" z wsi za Murem to osobny krok (audyt 02 C4/N3, filtr w MineralOnce).
+    /// Co daja typy (gra DefaultVillageTypes + BK PopulationManager.GetProductions): trapper = zboze 3 + futra 1.4 + miod BK 0.5 (wiecej z pasieka
+    /// Skeps); fisherman = zboze 3 + ryby 28; wheat_farm = zboze 50 + krowa 0.2, owca 0.4, swinia 0.8 (gra) + jablka 2, marchew 2 i drob
+    /// (kurczak 1, ges 1 - klasa Cropland) z BK; chleb BK = 10% pierwszego zboza listy (farma 5, inne 0.3). Odrzucone whaler / walrus_hunter
+    /// (NavalDLC: ryby 5 + tran 1.8 albo kly morsa 1.4) - rybacy daja 28 ryb. Miesa z polowan nie daje zaden typ wsi (traperzy sprzedaja futra).
+    /// Zywnosc warowni: gra liczy wsie z poziomu ognisk, nie z typu (DefaultSettlementFoodModel, x6 na wies) - zmienia sie tylko jedzenie
+    /// sprzedane na targu (BonusToFoodStores: mniej zboza, jablek, marchwi i chleba; wiecej ryb i miodu; futra to nie jedzenie). Na farme:
+    /// -> traperzy ok. -55/d, -> rybacy ok. -28/d (poziom ognisk 1): Thenn ok. -55/d, Hardhome ok. -83/d, Frostfang's Camp ok. -28/d, przy
+    /// bilansie warowni +130..+200/d w najgorszej dobie 4 autotestow sprzed D.4 (przy poziomie 2 x1.5 - dalej na plusie).
     /// Gdzie: typ wsi (Village.VillageType) to zwykle pole BEZ zapisu w grze - gra ustawia je z settlements.xml przy kazdym wczytaniu
     /// (Village.Deserialize), a wszyscy czytaja je na biezaco (model produkcji gry, lista BK GetProductions, magazyn i tabor wsi,
     /// nasze GoodsLedger, VillageWoodlot, VillageClogDiag). Jedno miejsce: podmiana raz przy starcie sesji (ArmouryBehavior.OnSessionLaunched,
@@ -120,7 +127,7 @@ namespace Armoury
                     catch (Exception e) { st0++; if (st0 <= 3) Log.Error("VillageClimate.Apply(" + row[0] + ")", e); }
                 }
                 Log.Info("Klimat wsi (T8): WYLACZONY w ustawieniach (Village Climate Fix) - typy wsi z mapy ROT (" + Table.Length + " wsi z tabeli bez zmian; po wylaczeniu w trwajacej sesji typy wracaja przy nastepnym wczytaniu); "
-                         + "wsi bawelny na mapie " + CountType(Cotton, ref st0) + ", " + LiveCotton(ref st0) + "; " + BeyondWall(ref st0) + "; " + bk.Summary() + "; " + retired
+                         + "wsi bawelny na mapie " + CountType(Cotton, ref st0) + ", " + LiveCotton(ref st0) + "; " + BeyondWall(false, ref st0) + "; " + bk.Summary() + "; " + retired
                          + "; potkniecia " + (st0 + bk.Stumbles + retStumbles) + ".");
                 return;
             }
@@ -159,7 +166,7 @@ namespace Armoury
             if (other.Count > 0) line += "; inny typ niz w tabeli (NIE ruszane): " + string.Join(", ", other.ToArray());
             if (missing.Count > 0) line += "; brak w tej kampanii: " + string.Join(", ", missing.ToArray());
             line += "; " + Balance(applied, ref stumbles);
-            line += "; " + BeyondWall(ref stumbles) + "; " + bk.Summary() + "; " + retired + "; potkniecia " + (stumbles + bk.Stumbles + retStumbles)
+            line += "; " + BeyondWall(true, ref stumbles) + "; " + bk.Summary() + "; " + retired + "; potkniecia " + (stumbles + bk.Stumbles + retStumbles)
                     + ". Typ wsi nie idzie do zapisu gry, klasa wsi BK idzie (wyrownana do typu).";
             Log.Info(line);
         }
@@ -245,13 +252,15 @@ namespace Armoury
             { "town_S4", "town_S6", "town_S7", "castle_S5", "castle_S6", "castle_N6", "ROT_castle45" };
 
         /// <summary>D.4: wsie za Murem (18 wsi 7 warowni z WallBounds) wedlug typu, przy starcie sesji. Po D.4: farm zboza 0,
-        /// traperzy 5, rybacy 4 (przy wylaczonym VillageClimateFix: zboze 4, traperzy 3, rybacy 2).</summary>
-        private static string BeyondWall(ref int stumbles)
+        /// traperzy 5, rybacy 4 (przy wylaczonym VillageClimateFix: zboze 4, traperzy 3, rybacy 2). Naglowek zalezy od wylacznika
+        /// (on = "D.4 czynne"), zeby autotest nie bral linii WYLACZONY za potwierdzenie; autotest sprawdza "D.4 czynne" i "farm zboza 0".</summary>
+        private static string BeyondWall(bool on, ref int stumbles)
         {
+            string head = on ? "ZA MUREM (D.4 czynne, myslistwo i ryby)" : "ZA MUREM (D.4 wylaczone, typy z mapy)";
             try
             {
                 var all = Village.All;
-                if (all == null) return "ZA MUREM (D.4): brak listy wsi";
+                if (all == null) return head + ": brak listy wsi";
                 var by = new SortedDictionary<string, int>(StringComparer.Ordinal);
                 int n = 0;
                 foreach (var v in all)
@@ -268,13 +277,14 @@ namespace Armoury
                 by.TryGetValue("wheat_farm", out wheat);
                 var parts = new List<string>();
                 foreach (var kv in by) parts.Add(kv.Key + " " + kv.Value);
-                return "ZA MUREM (D.4, myslistwo i ryby): wsi " + n + " (" + string.Join(", ", parts.ToArray()) + "), farm zboza " + wheat;
+                return head + ": wsi " + n + " (" + string.Join(", ", parts.ToArray()) + "), farm zboza " + wheat
+                       + " (zboze 3 z kazdej wsi zostaje - osobny krok N3)";
             }
             catch (Exception e)
             {
                 stumbles++;
                 if (stumbles <= 3) Log.Error("VillageClimate.BeyondWall", e);
-                return "ZA MUREM (D.4): blad liczenia";
+                return head + ": blad liczenia";
             }
         }
 
