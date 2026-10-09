@@ -101,6 +101,17 @@
   <OthersNoDailyWights>true</OthersNoDailyWights>
   <OthersNoMapVolunteers>true</OthersNoMapVolunteers>
 
+  <!-- No war reparations in Realm of Thrones storyline wars (needs Diplomacy and Realm of Thrones). When Diplomacy's
+       war exhaustion forces a peace in a war that Realm of Thrones enforces (the list under Edit Storyline Wars, for
+       example the Reach and Dorne, Dragonstone and the Stormlands, the Night's Watch and the Free Folk), Realm of Thrones
+       declares that same war again at the next daily tick - yet Diplomacy still bills the loser full war reparations:
+       the losing lords pay them out of their own purses within about three days and that gold simply vanishes, while
+       the winner gets the whole sum at once, out of thin air. With this on, such a peace costs no reparations at all
+       (0 for both sides; the kingdom screen shows 0 as well). Every other peace keeps Diplomacy's reparations exactly
+       as before, and nothing changes in who goes to war or makes peace. The log shows one "Reparacje (T9)" line for
+       every peace Diplomacy settles. Set StorylineWarNoReparations to false to restore Diplomacy's reparations. -->
+  <StorylineWarNoReparations>true</StorylineWarNoReparations>
+
   <!-- Siege camps do not rot while fed: RealisticBannerlord's SiegeAttritionBehavior kills 2-5 men
        of every besieging party each day (escalating) regardless of food and morale. With this on,
        the camp only suffers those losses while it is STARVING, and a besieged garrison only while
