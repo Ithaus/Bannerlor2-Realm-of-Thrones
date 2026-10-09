@@ -2564,7 +2564,7 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public bool AiNightMarchByReason { get; set; } = true;
 
-        [SettingPropertyBool("Ai Sleep Debt", HintText = "AI lord parties keep the same sleep ledger as you: a day without the base hours of rest (Sleep Hours Needed) costs speed and morale (-25/-40/-90% and -25/-40/-95%) until slept off; one night owed means making camp at 20:00 until the world breaks camp, two or more means sleeping where they stand until paid; off = the ledger is only counted in the log")]
+        [SettingPropertyBool("Ai Sleep Debt", HintText = "AI lord parties keep the same sleep ledger as you: a day without the base hours of rest (Sleep Hours Needed) costs speed and morale (-25/-40/-90% and -25/-40/-95%) and the day's drill (Drill Penalty Ai) until slept off; one night owed means making camp at 20:00 until the world breaks camp, two or more means sleeping where they stand until paid; off = the ledger is only counted in the log")]
         [SettingPropertyGroup("A night's rest")]
         public bool AiSleepDebt { get; set; } = true;
 
@@ -2936,7 +2936,7 @@ namespace Armoury
         [SettingPropertyGroup("Drill")]
         public bool DrillStockAi { get; set; } = true;
 
-        [SettingPropertyBool("Drill Penalty Ai", HintText = "AI lords' men do not drill at all on a day they are starving or short of sleep (training perks included, and no drill gear wears out) - the same penalty as yours; shortage of sleep counts once AI sleep is tracked (off = AI drill whatever their state)")]
+        [SettingPropertyBool("Drill Penalty Ai", HintText = "AI lords' men do not drill at all on a day they are starving or short of sleep (training perks included, and no drill gear wears out) - the same penalty as yours; short of sleep means the same sleep debt that costs them speed and morale (Ai Sleep Debt) (off = AI drill whatever their state)")]
         [SettingPropertyGroup("Drill")]
         public bool DrillPenaltyAi { get; set; } = true;
 

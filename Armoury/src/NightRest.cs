@@ -98,7 +98,10 @@ namespace Armoury
                 { Debt = 0; _restTonight = 0f; return; }
 
                 var pos = mp.GetPosition2D;
-                bool moved = _hadPos && pos.Distance(_lastPos) > 0.35f;
+                // grupa11: krok godziny i prog "ruszyl sie" wspolne z musztra i ksiega AI (Drill.RestStep, Drill.RestHour);
+                // bez poprzedniego odczytu krok 0 - godzina postoju jak dotad
+                float step = _hadPos ? pos.Distance(_lastPos) : 0f;
+                bool moved = step > Drill.RestStep;
                 _lastPos = pos; _hadPos = true;
                 if (moved && PlayerCamped)
                 {
@@ -115,8 +118,9 @@ namespace Armoury
                 // poprawka recenzji: rowne godziny (brak obozu swiata) nie przesuwaja swita gracza - wtedy stary swit 6:00
                 int dawn = PlayerDawn;
                 bool night = h >= 21 || h <= Math.Min(dawn, 12);
-                bool resting = mp.CurrentSettlement != null
-                               || !moved
+                // grupa11: czesc wspolna z musztra (osada, oboz obleznikow, krok <= 0.35 jedn.) - jedna funkcja Drill.RestHour;
+                // morze i sluzba ROT to zasady snu (nie postoju) - dochodza tylko tutaj
+                bool resting = Drill.RestHour(mp, step)
                                || (s.SleepAtSeaFree && mp.IsCurrentlyAtSea)
                                || RotEnlisted();
                 // spac mozna O KAZDEJ porze - noc liczy sie w calosci, dzien slabiej
@@ -1103,6 +1107,21 @@ namespace Armoury
             var pen = _aiPenalty;
             int d;
             return pen != null && pen.Count > 0 && pen.TryGetValue(mobileParty, out d) ? d : 0;
+        }
+
+        /// <summary>
+        /// grupa11 - JEDNO ZRODLO PRAWDY "KTO SPAL": dlug snu partii, ktory naprawde dziala - ten sam, ktory zabiera predkosc i morale
+        /// (SpeedPostfix, MoralePostfix): gracz - jego ksiega (Debt), kazda inna partia lorda - ksiega snu AI T10 (R2), takze lordowie
+        /// doczepieni do armii gracza (ida z nim noca, wiec ich ksiega liczy te same nieprzespane noce). 0 przy wylaczonym NightRestEnabled,
+        /// przy wylaczonym AiSleepDebt / obozie swiata i w DLL na sucho (wtedy AI dlugu nie ma). Czyta musztra (Drill.SleepDebt) - kara
+        /// "niewyspani nie cwicza" dla gracza i AI tak samo. Czyta podmieniany w calosci slownik kar - bezpieczne z kazdego watku.
+        /// </summary>
+        internal static int DebtOf(MobileParty mp)
+        {
+            if (mp == null) return 0;
+            var s = Settings.Current;
+            if (s == null || !s.NightRestEnabled) return 0;   // przelacznik glowny wylaczony = kary nie dzialaja, dlugu nie ma (jak SpeedPostfix)
+            return DebtFor(mp);
         }
 
         internal static void SpeedPostfix(MobileParty mobileParty, ref ExplainedNumber __result)

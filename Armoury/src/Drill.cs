@@ -26,8 +26,10 @@ namespace Armoury
     ///  B - baza gry (10 + 2 x tier; glowa rodu AI 15 + 3 x tier; gracz 10 + 2 x tier - tabela Jeffa); w bitwie 0 jak w grze.
     ///  L - dowodca: Przywodztwo / 170 w granicach 0.5-1.5 (bez dowodcy 0.5).
     ///  D - dzien: 1.5 postoj (mniej niz 4 godziny ruchu z 24), 0.9 marsz. Godzina postoju = RestHour: osada, oboz obleznikow albo ruch <= 0.35 jedn./h
-    ///      (czesc wspolna z ksiega snu NightRest.OnHourly i T10 R2; sen dolicza po swojej stronie morze i sluzbe ROT - to zasady snu, nie postoju);
-    ///      godzina niezaobserwowana = ruch (wczytanie nie daje postoju).
+    ///      (czesc wspolna z ksiega snu NightRest.OnHourly i T10 R2 - obie wolaja RestHour od scalenia grupa11; sen dolicza po swojej stronie morze,
+    ///      sluzbe ROT i oboz swiata - to zasady snu, nie postoju); godzina niezaobserwowana = ruch (wczytanie nie daje postoju).
+    ///  Dlug snu (kara "niewyspani nie cwicza") - jedno zrodlo prawdy NightRest.DebtOf (grupa11): gracz z jego ksiegi, kazda inna partia lorda
+    ///      z ksiegi snu AI T10 - ten sam dlug, ktory zabiera predkosc i morale.
     ///  S - zapas do cwiczen: 1 + 0.10 x uB x kB + 0.10 x uZ x kZ; u = zapas / pelny (pelny = sztuka na 3 ludzi), k = 1.5 z perkiem kwatermistrza
     ///      (Giving Hands - bron, Paid in Promise - zbroja).
     ///  P - perki gry i BK w treningu (wynik modelu ponad baze); A - udzial uzbrojonych z 171 (ArmsDrill).
@@ -48,15 +50,11 @@ namespace Armoury
         // ------------------------------------------------------------ stale (projekt rozdz. 2)
         private const float RestDay = 1.5f, MarchDay = 0.9f, LeadNorm = 170f, LeadMin = 0.5f, LeadMax = 1.5f;
         private const float StockBonus = 0.10f, PerkMult = 1.5f, WearDays = 200f;
-        internal const float RestStep = 0.35f;            // ten sam prog co ksiega snu (NightRest.OnHourly) i T10 R2
+        internal const float RestStep = 0.35f;            // jedna stala dla musztry, ksiegi snu gracza (NightRest.OnHourly) i ksiegi AI T10 R2 (RestMoveLimit)
         private const int RestBelowHours = 4, MenPerPiece = 3, IntakeSets = 2, AllHours = 0xFFFFFF;
         private const int GW = 0, GA = 1;                 // grupy zapasu: bron (z tarczami), zbroje
         internal const int SrcDiscard = 0, SrcLoot = 1, SrcTrophies = 2, SrcAutotest = 3;
         private static readonly string[] SrcName = { "wyrzucone", "lup", "trofea", "autotest" };
-
-        /// <summary>Hak T10: dlug snu partii AI (0..3). Domyslnie 0; wpina go ten, kto scala drugi (PROJEKT-MUSZTRA rozdz. 8, PROJEKT-T10 dopisek).
-        /// Gracz i partie doczepione do jego armii biora NightRest.Debt bez haka.</summary>
-        internal static Func<MobileParty, int> SleepDebtOf = mp => 0;
 
         /// <summary>Zapas gracza czynny: DrillStock, ale tylko przy DrillLaw (bez musztry zapas nic nie daje, wiec niczego nie przyjmuje) i przy Z1
         /// (DonationXpOff): zapas zastepuje XP za oddany sprzet - przy wylaczonym Z1 gra daje XP za oddanie, wiec zapas nie przyjmuje (albo XP, albo zapas).
@@ -254,8 +252,8 @@ namespace Armoury
 
         // ------------------------------------------------------------ godziny ruchu (maska 24 bitow: 1 = godzina ruchu)
         /// <summary>Godzina postoju: osada, oboz obleznikow albo ruch najwyzej 0.35 jedn. od poprzedniej godziny (ten sam prog i ta sama granica co
-        /// NightRest.OnHourly: tam "ruszyl sie" = krok > 0.35). To czesc wspolna z ksiega snu gracza i T10 R2 - przy scaleniu T10 obie wolaja te funkcje,
-        /// a sen dolicza po swojej stronie morze (SleepAtSeaFree - zaloga spi na wachty) i sluzbe ROT (o snie decyduje lord). Dla musztry to nie postoj:
+        /// NightRest.OnHourly: tam "ruszyl sie" = krok > 0.35). To czesc wspolna z ksiega snu gracza i T10 R2 - od scalenia grupa11 obie wolaja te funkcje,
+        /// a sen dolicza po swojej stronie morze (SleepAtSeaFree - zaloga spi na wachty), sluzbe ROT (o snie decyduje lord) i oboz swiata T10. Dla musztry to nie postoj:
         /// partia na morzu plynie, a w sluzbie ROT idzie z lordem - ruch jest w kroku. Oboz obleznikow stoi, wiec miesci sie tez w kroku.</summary>
         internal static bool RestHour(MobileParty mp, float step)
         {
@@ -337,15 +335,12 @@ namespace Armoury
             return 10f + 2f * t;
         }
 
-        private static int SleepDebt(MobileParty mp, Settings s)
+        /// <summary>Dlug snu partii z jednego zrodla prawdy (grupa11): NightRest.DebtOf - gracz z jego ksiegi, kazda inna partia lorda (takze doczepiona
+        /// do armii gracza - idzie z nim noca, wiec jej ksiega liczy te same nieprzespane noce) z ksiegi snu AI T10; ten sam dlug zabiera predkosc i morale.</summary>
+        private static int SleepDebt(MobileParty mp)
         {
-            try
-            {
-                if (mp == MobileParty.MainParty || mp.AttachedTo == MobileParty.MainParty) return s.NightRestEnabled ? NightRest.Debt : 0;   // krytyka 5: armia gracza idzie z nim noca
-                var f = SleepDebtOf;
-                return f != null ? f(mp) : 0;
-            }
-            catch (Exception e) { Stumble("SleepDebt", e); return 0; }   // zepsuty hak T10 = AI bez kary snu - musi byc widac w potknieciach
+            try { return NightRest.DebtOf(mp); }
+            catch (Exception e) { Stumble("SleepDebt", e); return 0; }   // blad odczytu = partia bez kary snu - musi byc widac w potknieciach
         }
 
         private static Ctx CtxOf(MobileParty mp, bool noBase, Settings s)
@@ -362,7 +357,7 @@ namespace Armoury
                 c.Moved = MovedHours(mp);
                 c.Rest = c.Moved < RestBelowHours;
                 c.Hungry = mp.Party != null && mp.Party.IsStarving;
-                c.Debt = SleepDebt(mp, s);
+                c.Debt = SleepDebt(mp);
                 c.Sleepless = c.Debt >= 1;
                 c.Zero = c.Hungry || c.Sleepless;
                 c.Off = c.Zero && (c.Main || c.NoBase || PenaltyAi(s));   // kara naprawde zastosowana: Z14a zawsze, AI przy DrillPenaltyAi albo Z14b
@@ -1024,6 +1019,8 @@ namespace Armoury
                      + "; Z14a (Drill Law) " + On(s.DrillLaw) + ", bron gracza " + On(s.DrillNeedsArmsPlayer) + ", zapas gracza " + On(s.DrillStock)
                      + (s.DrillStock && !StockOn ? " (NIECZYNNY - wymaga Drill Law i Donation Xp Off)" : "") + ", zapas AI " + On(s.DrillStockAi)
                      + ", kara AI glod/sen (Drill Penalty Ai) " + On(s.DrillPenaltyAi) + (PenaltyAi(s) ? "" : " - AI cwiczy glodne i niewyspane")
+                     + "; dlug snu z ksiegi NightRest (grupa11, ten sam co kara predkosci i morale): gracz " + On(s.NightRestEnabled)
+                     + ", AI " + (NightRest.AiDebtLive(s) ? "TAK" : "nie - AI bez dlugu snu (Night Rest / Ai Camps At Night / Ai Sleep Debt albo DLL na sucho)")
                      + ", Z14b (Drill Law Ai) " + On(s.DrillLawAi) + "; stale: postoj x" + F2(RestDay) + " (ruch < " + RestBelowHours + " h z 24, godzina postoju: osada, oboz, <= "
                      + F2(RestStep) + " jedn./h), marsz x" + F2(MarchDay) + ", dowodca Przywodztwo/" + (int)LeadNorm + " [" + F2(LeadMin) + "-" + F2(LeadMax) + "], zapas +"
                      + (int)(StockBonus * 100) + "% za grupe (perk x" + F2(PerkMult) + "), sztuka sluzy " + (int)WearDays + " dni cwiczen, zlom x" + F2(Yield())

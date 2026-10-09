@@ -43,7 +43,7 @@ namespace Armoury
         private const bool DryBuild = false;
 #endif
         private const int DebtCampHour = 20;          // oboz splaty dlugu 1: ticki 21..6 = 10 h pelnej stawki (1 h zapasu nad 9 h)
-        private const float RestMoveLimit = 0.35f;    // jak gracz (OnHourly): ponizej - partia stoi
+        private const float RestMoveLimit = Drill.RestStep;   // jak gracz (OnHourly) i musztra (grupa11: jedna stala 0.35): ponizej - partia stoi
         private const double AlarmGraceHours = 0.5;   // AI sprawdza inicjatywe co ok. 0.15-0.18 h (AiCheckInterval 0.25 x 0.6-0.7)
         private const int AiSaveCap = 1500;           // wpisow ksiegi w zapisie (lordow ROT ok. 500-700)
 
@@ -183,17 +183,11 @@ namespace Armoury
 
         private static void EnableAi(MobileParty mp) { try { mp.Ai.EnableAi(); } catch { } }
 
-        /// <summary>Dlug snu partii AI z ksiegi R2, ktory naprawde dziala (0 przy wylaczonym AiSleepDebt i na sucho) - hak dla musztry
-        /// (paczka MUSZTRA: Drill.SleepDebtOf = NightRest.AiDebtOf przy scaleniu). Czyta podmieniany w calosci slownik kar - bezpieczne z kazdego watku.</summary>
-        internal static int AiDebtOf(MobileParty mp)
-        {
-            if (mp == null) return 0;
-            var s = Settings.Current;
-            if (s == null || !s.NightRestEnabled) return 0;   // poprawka recenzji: przelacznik glowny wylaczony = kary nie dzialaja, dlugu nie ma
-            var pen = _aiPenalty;
-            int d;
-            return pen != null && pen.TryGetValue(mp, out d) ? d : 0;
-        }
+        // grupa11: hak dla musztry (dawne AiDebtOf) zastapiony jedna funkcja NightRest.DebtOf (NightRest.cs, sekcja kar) - gracz i AI z tej samej
+        // ksiegi, ktora zabiera predkosc i morale; musztra wola ja wprost (Drill.SleepDebt), bez haka wpinanego przy starcie.
+
+        /// <summary>grupa11: ksiega daje AI prawdziwy dlug (przelacznik glowny, oboz swiata, AiSleepDebt, nie na sucho) - tylko do linii startowej musztry.</summary>
+        internal static bool AiDebtLive(Settings s) { return s != null && s.NightRestEnabled && DebtOn(s); }
 
         /// <summary>
         /// AI partii trzyma INNY mod dluzej niz nasza godzina: DisableAi (uczta / statek BK - "nigdy") albo DisableForHours z dluzszym
@@ -796,10 +790,13 @@ namespace Armoury
                         bool known = e.Stamp == stamp - 1;
                         // poprawka recenzji (krytyczne): jak gracz (OnHourly: moved = _hadPos && ...) - bez poprzedniego odczytu (nowa partia,
                         // pierwszy tick po wczytaniu) godzina liczy sie jako postoj; known zostaje tylko dla pomiaru ruchu
-                        bool moved = known && pos.Distance(e.Pos) > RestMoveLimit;
+                        float step = known ? pos.Distance(e.Pos) : 0f;
+                        bool moved = step > RestMoveLimit;
                         // doczepiony do wodza we snie ciaglym spi razem z nim - ten sam licznik (swit go nie zeruje)
                         if (e.Acc < 0f && SleepsWithLeader(mp)) e.Acc = e.Rest;
-                        bool resting = mp.CurrentSettlement != null || !moved || (s.SleepAtSeaFree && mp.IsCurrentlyAtSea)
+                        // grupa11: czesc wspolna z gracza i musztra - Drill.RestHour (osada, oboz obleznikow, krok <= 0.35 jedn.);
+                        // morze, oboz swiata (_bedPos) i sen dlugu to zasady snu - dochodza tylko tutaj
+                        bool resting = Drill.RestHour(mp, step) || (s.SleepAtSeaFree && mp.IsCurrentlyAtSea)
                                        || _bedPos.ContainsKey(mp) || _debtSleep.ContainsKey(mp);
                         if (resting)
                         {
