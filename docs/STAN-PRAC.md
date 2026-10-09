@@ -869,3 +869,7 @@ sakiewka zalogi placi za zakupy notabla; dorobek startowy zbrojowni zalog przy p
 rozszerzenie decyzji 7). Zapisy zrobione na sklad6 (tylko testowe) nie sa wspierane. DLL SCRATCH test\Armoury-sklad7.dll (b7d7c2b9). Pytania do Jeffa: (1) zolnierz gracza bez
 sztuki - DTE daje sprzet chlopa z niczego na bitwe (+kara morale) czy walczy tym, co ma; (2) ludzie lordow AI w bitwach gracza - DTE dopelnia wzorzec z niczego (zostaje u lorda
 i w lupach): a) tak jak jest, b) tylko pozyczony na bitwe (LordBattleKitIsLent, gotowe, OFF), c) tylko to, co maja; (3) przenoszenie sprzetu z ludzmi takze dla partii towarzyszy.
+**DECYZJE JEFFA 09.10 ok. 07:10 (MUSZTRA):** (1) "to ma zalezec od wielu czynnikow - przywodztwa, zmeczenia itp.; jest jedna zasada, wzor dla wszystkich, pod ten wzor podpinaja sie
+dane danego lorda i wychodzi, jak szybko" -> JEDEN WZOR musztry dla gracza, lordow AI i glow rodow AI (bez osobnej bazy glowy rodu 15+3xtier): baza 10+2xtier x dowodca
+(Przywodztwo) x dzien (postoj/marsz/glod/sen) x bron ludzi (171) x zapas do cwiczen x perki; Z14b (AI na tym samym wzorze) WLACZYC; skutek dla armii AI zmierzyc i pokazac.
+(2) niewyspanie: "noc bez snu = nastepny dzien bez cwiczen", liczone od switu (b) - dla gracza i AI.
