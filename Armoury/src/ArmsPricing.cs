@@ -65,7 +65,13 @@ namespace Armoury
         private static readonly float[] DaysShield = { 1f, 1.5f, 2f, 3f, 4f, 5f };
         private static readonly float[] DaysBow = { 2f, 3f, 4f, 6f, 8f, 12f };
         private static readonly float[] DaysXbow = { 3f, 4f, 6f, 8f, 10f, 14f };
-        private static readonly float[] DaysAmmo = { 0.3f, 0.33f, 0.36f, 0.4f, 0.45f, 0.5f };   // wpis 52: snop t6 nie 3x drozszy od t1 (12-16 d)
+        // wpis 52: snop t6 nie 3x drozszy od t1 (12-16 d). sklad8-s S2: grot bodkin i grot plaski to ta sama robota - t1-4 jednakowo,
+        // t5-6 (grot stalowany) +17% jak w 1341 (14 d za snop wobec 12 d, Close Rolls); dotad 0.30-0.50 (+67%)
+        private static readonly float[] DaysAmmo = { 0.3f, 0.3f, 0.3f, 0.3f, 0.35f, 0.35f };
+        // sklad8-s S2: grot kuty z preta traci glownie zgorzeline (15-25%), nie 40% jak blacha - sredni grot 14 g + 2.8 g straty (groty 10-20 g)
+        private const float AmmoHeadLoss = 1.2f;
+        // sklad8-s S2: rozrzut ceny snopa 12-16 d (+-15%) - jakosc strzal i beltow w dniach pracy najwyzej 1.15 (dotad 1.8: kolczan t6 7.2 dnia)
+        private const float AmmoQualityMax = 1.15f;
         private static readonly float[] DaysCape = { 0.5f, 1f, 1.5f, 2f, 4f, 6f };
 
         internal static bool PricingOn { get { var s = Settings.Current; return s != null && s.ArmsCostPricingEnabled; } }
@@ -91,6 +97,20 @@ namespace Armoury
             if (it == null) return 0f;
             float w = it.Weight > 0.01f ? it.Weight : 1f;
             return it.Value / w;
+        }
+
+        /// <summary>sklad8-s S2: gatunek GROTU strzal i beltow - groty masowe z zelaza (Towton 1461, Holm Hill 1471: prawie bez stali, "ilosc ponad
+        /// jakosc" - Starley i Cubitt, Historical Metallurgy 48), t5-6 grot stalowany = zelazo ze stalowym ostrzem (70% zelaza x 2.5 d/kg + 30% stali
+        /// x 6 d/kg = ok. 3.5 d/kg = Iron3). Dotad jak bron i zbroja (t4 Iron4, t5-6 Iron5 - stal szlachetna: 2x rudy). Tylko Arrows/Bolts;
+        /// bron miotana (Thrown), bron i zbroja - GradeFor bez zmian.</summary>
+        private static CraftingMaterials AmmoGrade(int tier)
+        {
+            return tier <= 4 ? CraftingMaterials.Iron2 : CraftingMaterials.Iron3;
+        }
+
+        private static bool ArrowsOrBolts(ItemObject it)
+        {
+            return it != null && (it.ItemType == ItemObject.ItemTypeEnum.Arrows || it.ItemType == ItemObject.ItemTypeEnum.Bolts);
         }
 
         private static CraftingMaterials GradeFor(int tier)
@@ -170,7 +190,9 @@ namespace Armoury
             {
                 int t = TierOf(it);
                 float w = Math.Max(0.01f, it.Weight);
-                var metalItem = Recipes.MaterialItem(GradeFor(t));
+                bool ammo = ArrowsOrBolts(it);
+                var grade = ammo ? AmmoGrade(t) : GradeFor(t);   // sklad8-s S2: grot strzaly z zelaza (t5-6 stalowany), reszta jak dotad
+                var metalItem = Recipes.MaterialItem(grade);
                 var charItem = Recipes.MaterialItem(CraftingMaterials.Charcoal);
                 float metalKg = 0f, leatherKg = 0f, linenKg = 0f, woodKg = 0f, days = 0f, special = 0f;
                 var mat = it.ArmorComponent != null ? it.ArmorComponent.MaterialType : ArmorComponent.ArmorMaterialTypes.None;
@@ -207,7 +229,7 @@ namespace Armoury
                         metalKg = w * 0.3f * 1.4f; woodKg = w * 0.7f * 1.5f; days = DaysXbow[t - 1]; break;
                     case ItemObject.ItemTypeEnum.Arrows:
                     case ItemObject.ItemTypeEnum.Bolts:
-                        { int n = Stack(it); metalKg = w * n * 0.15f * 1.4f; woodKg = w * n * 0.85f * 1.5f; days = DaysAmmo[t - 1]; }
+                        { int n = Stack(it); metalKg = w * n * 0.15f * AmmoHeadLoss; woodKg = w * n * 0.85f * 1.5f; days = DaysAmmo[t - 1]; }   // sklad8-s S2: strata kucia grotu 1.2 (dotad 1.4)
                         break;
                     default:
                         return null;
@@ -216,14 +238,14 @@ namespace Armoury
                 float q = 1f;
                 float med;
                 if (it.Effectiveness > 0f && _effMedian.TryGetValue((int)it.ItemType * 10 + t, out med) && med > 0f)
-                    q = MBMath.ClampFloat(it.Effectiveness / med, 0.6f, 1.8f);
+                    q = MBMath.ClampFloat(it.Effectiveness / med, 0.6f, ammo ? AmmoQualityMax : 1.8f);   // sklad8-s S2: strzaly i belty do 1.15
                 c.Metal = metalKg * KgPrice(metalItem);
                 c.Charcoal = metalKg * (charItem != null ? charItem.Value * 2f * 0.5f : 9f);   // ~1 szt. (0.5 kg) wegla na kg metalu
                 c.Leather = leatherKg * KgPrice(_leather);
                 c.Linen = linenKg * KgPrice(_linen);
                 c.Wood = woodKg * KgPrice(_wood);
                 c.Special = special;
-                c.MetalKg = metalKg; c.LeatherKg = leatherKg; c.LinenKg = linenKg; c.WoodKg = woodKg; c.Days = days * q; c.Grade = GradeFor(t);
+                c.MetalKg = metalKg; c.LeatherKg = leatherKg; c.LinenKg = linenKg; c.WoodKg = woodKg; c.Days = days * q; c.Grade = grade;
                 c.Labor = days * q * Math.Max(0f, s.SmithDayWage);
                 float raw = c.Metal + c.Charcoal + c.Leather + c.Linen + c.Wood + c.Special + c.Labor;
                 c.Total = raw * (1f + Math.Max(0f, s.SmithProfitPercent) / 100f);
@@ -239,7 +261,7 @@ namespace Armoury
             {
                 if (it == null) return 1f;
                 int t = TierOf(it); float med;
-                if (it.Effectiveness > 0f && _effMedian.TryGetValue((int)it.ItemType * 10 + t, out med) && med > 0f) return MBMath.ClampFloat(it.Effectiveness / med, 0.6f, 1.8f);
+                if (it.Effectiveness > 0f && _effMedian.TryGetValue((int)it.ItemType * 10 + t, out med) && med > 0f) return MBMath.ClampFloat(it.Effectiveness / med, 0.6f, ArrowsOrBolts(it) ? AmmoQualityMax : 1.8f);   // sklad8-s S2: jak w Compute
             }
             catch { }
             return 1f;
