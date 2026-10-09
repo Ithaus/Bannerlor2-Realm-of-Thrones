@@ -294,6 +294,7 @@ namespace Armoury
                 }
                 Take(mp, life);
                 st.Town.ChangeGold(life);           // karczma, jedzenie, gra, kobiety - pieniadze zostaja w miescie
+                ClanIncomeBook.NoteOwnPaid(st, mp.ActualClan, life);   // 169c: "wlasne" D stalego - wydatki ludzi rodu w jego miescie (tylko licznik)
                 MoneyLedger.Note(MoneyLedger.NLife, st, life);   // ksiega przeplywow osad (tylko licznik)
                 SoldierPay.Hold(st, life);          // tarcza zoldu (gdy wlaczona): regulator kasy nie skasuje tych pieniedzy, zanim zawor renty odda je panu
                 _dayLife += life;

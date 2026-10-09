@@ -352,6 +352,7 @@ namespace Armoury
                     }
                     if (shortfall > 0) { _dCutClans++; _dCut += Math.Min(shortfall, owed); }
                 }
+                if (shortfall > 0) ClanIncomeBook.NoteWageCut(clan, Math.Min(shortfall, owed), blind);   // 169c: miara bankructwa K39 (tylko licznik, wlasny try); blind - saldo nieznane, liczone osobno
             }
             // takze gdy nic nie zeszlo z kies: Route dolicza zold naliczony (linia "Zold:" ma sie zgadzac z licznikiem ksiegi pieniadza)
             for (int i = 0; i < _recs.Count; i++)
@@ -398,6 +399,7 @@ namespace Armoury
                 if (coffers > 0)
                 {
                     town.ChangeGold(coffers);                           // zaloga wydaje zold na miejscu - kasa jej miasta albo zamku
+                    ClanIncomeBook.NoteOwnPaid(st, clan, coffers);      // 169c: "wlasne" D stalego - zold zalogi rodu w kasie jego osady (tylko licznik)
                     if (st.IsTown) { _dToTowns += coffers; _dToTownsN++; Hold(st, coffers); } else { _dToCastles += coffers; _dToCastlesN++; }
                     MoneyLedger.Note(MoneyLedger.NWage, st, coffers);   // ksiega przeplywow osad (tylko licznik)
                     MoneyLedger.NoteWageRouted(false, coffers);
@@ -574,6 +576,12 @@ namespace Armoury
                 float v = _held[id] * (1f - Math.Min(1f, rate));
                 if (v < 1f) _held.Remove(id); else _held[id] = v;
             }
+        }
+
+        /// <summary>169c (tylko odczyt): znacznik tarczy zoldu w kasie miasta (zl "w drodze do pana").</summary>
+        internal static long HeldOf(Settlement st)
+        {
+            try { float v; return st != null && st.StringId != null && _held.TryGetValue(st.StringId, out v) ? (long)v : 0; } catch { return 0; }
         }
 
         internal static string ExportHeld()

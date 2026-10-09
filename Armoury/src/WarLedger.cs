@@ -28,9 +28,11 @@ namespace Armoury
         private static readonly Dictionary<MobileParty, int> _unpaidDays = new Dictionary<MobileParty, int>();
         private static int _leftStumbles;      // T4: ludzie zdjeci, ktorych nie dalo sie wpisac do rosteru odchodzacych (doba)
         private static bool _errLeft;          // T4: ten blad tylko raz do logu
+        internal static int LastGoneAi, LastGoneClan;   // 169c (tylko log): zdjeci dzis za zalegly zold - partie AI / gracza i jego rodu
 
         internal static void OnDaily()
         {
+            LastGoneAi = 0; LastGoneClan = 0;
             try
             {
                 var s = Settings.Current;
@@ -127,6 +129,7 @@ namespace Armoury
                             : "; prawo wyrzutkow wylaczone - " + gone + " ludzi znika (tylko ksiega ludzi " + toPeople + ")";
                     }
                     dayParties++; dayGone += gone;
+                    if (mp.ActualClan == Clan.PlayerClan) LastGoneClan += gone; else LastGoneAi += gone;   // 169c (tylko licznik)
                     // KAZDY ubytek do PLIKU, takze u gracza. Do 19.09 strata gracza szla wylacznie
                     // przez Log.Player, ktory pokazuje komunikat w grze i NIC nie zapisuje - przez to
                     // w logu nie bylo po niej ani sladu i szukanie winnego trwalo dwa dni.

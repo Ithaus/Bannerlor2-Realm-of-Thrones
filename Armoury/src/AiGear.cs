@@ -699,6 +699,7 @@ namespace Armoury
                     MenUpgrade.NoteChurn(mp, el.Item, true);
                     pay(cost);   // ceny hurtu (09.10): cost - suma cen sztuk (ShelfBuy), nie cena pierwszej x n
                     st.Town.ChangeGold(cost);
+                    ClanIncomeBook.NoteOwnPaid(st, lord != null ? lord.Clan : null, cost);   // 169c: "wlasne" D stalego - sprzet rodu kupiony w jego osadzie (tylko licznik)
                     MoneyLedger.Note(MoneyLedger.NGear, st, cost);   // ksiega przeplywow osad (tylko licznik)
                     return true;
                 };

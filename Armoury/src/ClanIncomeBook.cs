@@ -18,7 +18,7 @@ namespace Armoury
     /// klucz Clan.StringId). Budzet (pulap zoldu, zwolnienia) i dlugi (szczeble, zajecie, pozyczki wg 8.2) TYLKO liczone i logowane -
     /// niczego nie zmienia w grze; paczki 166/168 zaczna te liczby stosowac. IronBank.Limit NIE jest wolany (D21).
     /// </summary>
-    internal static class ClanIncomeBook
+    internal static partial class ClanIncomeBook
     {
         internal const int KRefund = 0, KCrownLevies = 1, KThird = 2;
         private const int Days = 28;
@@ -36,6 +36,7 @@ namespace Armoury
             public readonly int[] Ring = new int[Days];    // wplyw kolejnych dob (int, przyciety do int.MaxValue)
             public int Head, Filled, Seed = -1, Streak;     // Seed = G/60 przy pierwszym zobaczeniu rodu; Streak = doby z zoldem > 1.10 x pulap
             public long Today, TodayRefund, TodayCrown, TodayEvtNone, TodayEvtSettl, TodayEvtOther, TodayThird;   // od ostatniego Daily
+            public long TodayEstates;                                  // 169c: w tym wyplaty majatkow BK widziane jako zdarzenie (podwojne) - tylko pamiec
             public long WageAccLord, WageAccGar, WageAccCar;          // w biezacym rozliczeniu rodu
             public int WageLastLord, WageLastGar, WageLastCar;        // z ostatniego pelnego rozliczenia rodu
             public bool HadTick;                                       // bylo choc jedno zmierzone rozliczenie
@@ -83,6 +84,7 @@ namespace Armoury
             LastTicks = 0; IncomeToday.Clear(); _importN = -1; _importBad = 0; _csvPath = null; _stumbles = 0; _errSites.Clear();
             LastTicksModel = LastTicksReport = LastTicksCsv = LastTicksCmp = LastCmpDiff = LastCmpAbs = 0; LastOwnCalls = LastCmpN = LastCmpNe = 0;   // 169b
             _modelSeen.Clear(); _modelSeenDay = -1; _ticksCsv = 0;
+            ResetStable();   // 169c
         }
 
         private static void Stumble(string where, Exception e)
@@ -124,7 +126,7 @@ namespace Armoury
         }
 
         /// <summary>MoneyLedger.OnGoldTraded: zdarzenie gry do zywego czlonka rodu od platnika spoza rodu, poza rozliczeniem rodu i naszym tickiem.</summary>
-        internal static void OnEvent(Hero gh, PartyBase gp, Hero rh, int a, bool gNone, bool inClan, bool inBlock)
+        internal static void OnEvent(Hero gh, PartyBase gp, Hero rh, int a, bool gNone, bool inClan, bool inBlock, bool estate)
         {
             try
             {
@@ -135,7 +137,7 @@ namespace Armoury
                 var r = Of(c);
                 if (r == null) return;
                 r.Today += a;
-                if (gNone) { r.TodayEvtNone += a; DayEvtNone += a; }
+                if (gNone) { r.TodayEvtNone += a; DayEvtNone += a; if (estate) { r.TodayEstates += a; DayEstates += a; } }   // 169c: majatek BK (podwojne)
                 else if (gh == null && gp != null && gp.IsSettlement) { r.TodayEvtSettl += a; DayEvtSettl += a; }
                 else { r.TodayEvtOther += a; DayEvtOther += a; }
             }
@@ -268,6 +270,9 @@ namespace Armoury
                 ran = true;
                 var model = Campaign.Current.Models.ClanFinanceModel;
                 IncomeToday.Clear(); _seen.Clear(); _byId.Clear(); _today.Clear();
+                // 169c: D staly - wsie, renty i "wlasne" tej doby przed petla rodow (wlasny try; blad wylacza tylko rozbicie na dzis)
+                bool sd = StableDOn;
+                if (sd) { try { StableBegin(); } catch (Exception e) { sd = false; Stumble("StableBegin", e); } }
                 long modelSum = 0, rentSum = 0;
                 // 169b (po recenzji): dochod modelu (a) liczony TU dla kazdego rodu - ta sama chwila co w 169 (po powinnosciach, clach, zwrocie
                 // zoldu i Banku tej doby), wiec ten sam wynik; liczba z KingdomTreasury.Daily tylko do porownania (koszt i roznica - do decyzji)
@@ -287,7 +292,14 @@ namespace Armoury
                         if (r.Seed < 0) r.Seed = (int)Math.Min(int.MaxValue, g / 60);
                         float a = 0f, seen;
                         long ts = Stopwatch.GetTimestamp();
-                        try { a = Math.Max(0f, model.CalculateClanIncome(c, false, false, false).ResultNumber); } catch { }
+                        // 169c: z opisami linii (wynik ten sam - opisy nie zmieniaja rachunku modelu), zeby rozbic (a) na czesci D stalego
+                        ExplainedNumber en = default(ExplainedNumber); bool haveEn = false;
+                        try
+                        {
+                            if (sd) { en = model.CalculateClanIncome(c, true, false, false); haveEn = true; a = Math.Max(0f, en.ResultNumber); }
+                            else a = Math.Max(0f, model.CalculateClanIncome(c, false, false, false).ResultNumber);
+                        }
+                        catch { haveEn = false; }
                         long dt = Stopwatch.GetTimestamp() - ts;
                         tModel += dt; own++;
                         if (seenToday && _modelSeen.TryGetValue(c, out seen))
@@ -304,7 +316,8 @@ namespace Armoury
                         r.Filled = Math.Min(Days, r.Filled + 1);
                         r.Inflow = inflow; r.A = (long)a; r.B = b; r.Refund = r.TodayRefund; r.Crown = r.TodayCrown; r.Third = r.TodayThird;
                         r.Evt = r.TodayEvtNone + r.TodayEvtSettl + r.TodayEvtOther;
-                        r.Today = r.TodayRefund = r.TodayCrown = r.TodayEvtNone = r.TodayEvtSettl = r.TodayEvtOther = r.TodayThird = 0;
+                        if (sd) { try { StableClan(c, r, en, haveEn, (long)a, b); } catch (Exception e) { Stumble("StableClan", e); } }   // 169c: przed zerowaniem Today*
+                        r.Today = r.TodayRefund = r.TodayCrown = r.TodayEvtNone = r.TodayEvtSettl = r.TodayEvtOther = r.TodayThird = r.TodayEstates = 0;
                         r.D = DOf(r); r.G = g;
                         modelSum += (long)a; rentSum += b;
                         _today.Add(c);
@@ -344,6 +357,7 @@ namespace Armoury
                     LastRefund = LastCrown = LastEvtNone = LastEvtSettl = LastEvtOther = LastThird = LastModelIncomeSum = LastRentSum = -1;
                 }
                 DayRefund = DayCrown = DayEvtNone = DayEvtSettl = DayEvtOther = DayThird = 0;
+                DayEstates = 0; _cutToday.Clear(); _cutBlind.Clear();   // 169c
                 LastTicks = Stopwatch.GetTimestamp() - t0;
             }
         }
@@ -411,10 +425,13 @@ namespace Armoury
             int over15N = 0; double over15Sum = 0, limitBank = 0, limit82 = 0;
             int r1a = 0, r1b = 0, r1c = 0, r1d = 0, r1e = 0;
             var inv = CultureInfo.InvariantCulture;
-            var csv = new StringBuilder(_today.Count * 220);
+            var csv = new StringBuilder(_today.Count * 300);
+            bool sdOn = StableDOn;
+            var aiList = new List<Clan>();   // 169c: rody AI do linii "D staly"
             for (int idx = 0; idx < _today.Count; idx++)
             {
                 var c = _today[idx];
+                if (IsUndeadClan(c)) continue;   // 169c (K40): Inni poza linia i CSV - kiesa zawsze 0
                 int rowStart = csv.Length;
                 try
                 {
@@ -493,6 +510,7 @@ namespace Armoury
                     {
                         // statystyki linii 6.9
                         ai++;
+                        aiList.Add(c);
                         if (atWar) war++; else peace++;
                         if (c.IsUnderMercenaryService || c.IsMinorFaction) mercMinor++;
                         if (!r.HadTick) noTick++;
@@ -573,8 +591,9 @@ namespace Armoury
                        .Append(player ? "" : (onCeil ? "1" : "0")).Append(';').Append(bud ? r.Streak.ToString(inv) : "").Append(';').Append(bud ? released.ToString(inv) : "").Append(';')
                        .Append(player ? "" : N0(R)).Append(';')
                        .Append(hasDebt ? N0(principal) : "").Append(';').Append(hasDebt ? missed.ToString(inv) : "").Append(';').Append(hasDebt ? (defaulted ? "1" : "0") : "").Append(';')
-                       .Append(debtCrown).Append(';').Append(tier).Append(';').Append(cand).Append(';').Append(isAi ? N0(lim82) : "")
-                       .Append(Environment.NewLine);
+                       .Append(debtCrown).Append(';').Append(tier).Append(';').Append(cand).Append(';').Append(isAi ? N0(lim82) : "");
+                    StableCsv(csv, c, leaderGold, sdOn);   // 169c: kolumny D stalego, zold przyciety, doby bankruta
+                    csv.Append(Environment.NewLine);
                 }
                 catch (Exception e) { csv.Length = rowStart; Stumble("Report(rod)", e); }
             }
@@ -584,7 +603,7 @@ namespace Armoury
             for (int i = 0; i < tops.Count && i < 3; i++) topTxt.Add(tops[i].Name + " " + N0(tops[i].V));
             string path = null;
             long tcsv = Stopwatch.GetTimestamp();
-            try { path = Log.Csv("budzet-rodow.csv", CsvHeader, csv.ToString()); } catch (Exception e) { Stumble("Report(csv)", e); }
+            try { path = Log.Csv("budzet-rodow.csv", CsvHeader + CsvHeaderStable, csv.ToString()); } catch (Exception e) { Stumble("Report(csv)", e); }
             _ticksCsv = Stopwatch.GetTimestamp() - tcsv;
             if (path != null && path != _csvPath) { _csvPath = path; Log.Info("Budzet rodow: plik CSV " + path + "."); }
             var sb = new StringBuilder(2048);
@@ -608,7 +627,7 @@ namespace Armoury
               .Append(" | na suficie partii (90% limitu wielkosci): ").Append(onCeilN).Append(" rodow")
               .Append(" | ponizej rezerwy wojny R: ").Append(belowR).Append(" rodow")
               .Append(" | glowy < 5000: ").Append(poorHeads).Append(" (z miastem ").Append(poorTown).Append(", z zamkiem ").Append(poorCastle).Append(", bez lenna ").Append(poorNone)
-              .Append("), rodziny < 5000: ").Append(poorFam).Append(" (bez dworzan BK)")
+              .Append("), rodziny < 5000: ").Append(poorFam).Append(" (bez dworzan BK i Innych - 169c)")
               .Append(" | najwiekszy nadmiar: ").Append(topTxt.Count > 0 ? string.Join(", ", topTxt.ToArray()) : "-")
               .Append(" | zalegly zold: ").Append(MoneyLedger.WageShortParties).Append(" partii i zalog z ").Append(MoneyLedger.WagePaidParties)
               .Append(" rozliczonych dzis (").Append(MoneyLedger.WagePaidParties > 0 ? (100.0 * MoneyLedger.WageShortParties / MoneyLedger.WagePaidParties).ToString("0.0", inv) : "0.0")
@@ -636,6 +655,7 @@ namespace Armoury
               .Append(" | zapas kiesy w dniach zoldu: ponizej 10: ").Append(r1a).Append(", 10-20: ").Append(r1b).Append(", 20-45: ").Append(r1c).Append(", 45-90: ").Append(r1d)
               .Append(", ponad 90: ").Append(r1e).Append('.');
             Log.Info(sb.ToString());
+            if (sdOn) { try { Log.Info(StableLine(day, aiList)); } catch (Exception e) { Stumble("StableLine", e); } }   // 169c
         }
 
         private const string CsvHeader = "dzien;dzien_gry;rod_id;rod;krolestwo;rodzaj;wojna;kiesa_glowy;G;D;dni_pomiaru;wplyw_doby;dochod_modelu;saldo_modelu;renty;zwrot_korony;"

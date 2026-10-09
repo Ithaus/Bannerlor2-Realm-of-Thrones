@@ -1568,6 +1568,10 @@ namespace Armoury
         [SettingPropertyGroup("Army purchases")]
         public bool ClanIncomeBookEnabled { get; set; } = true;
 
+        [SettingPropertyBool("Clan Income Book Stable D", HintText = "with the clan income book: also split every clan's income into the parts of its steady income (land of the fiefs it holds today, crown, contract, workshops and caravans) and the parts left out of it (its own money coming back through its own town purse, one-off gains, other model income, money sent within the house, estates counted twice), and write the stage 2 measures (captive lords and ransoms, garrison growth, town purses, knights' spending, desertion by cause, Banner Kings population, marriages, travellers' goods, the Others, the historical measure) - log and CSV only, changes nothing in the game")]
+        [SettingPropertyGroup("Army purchases")]
+        public bool ClanIncomeBookStableD { get; set; } = true;
+
         [SettingPropertyBool("Paid Construction", HintText = "buildings rise only as fast as their owner pays: wages and carting go to the town or castle purse, materials are bought off the market")]
         [SettingPropertyGroup("Army purchases")]
         public bool PaidConstruction { get; set; } = true;
@@ -2195,6 +2199,18 @@ namespace Armoury
         [SettingPropertyBool("Prisoner Law Enabled", HintText = "captives sold in a town or castle, or set free, in a land that keeps no slaves no longer become slaves: common men and soldiers go back to their own land, and in Westeros bandits and outlaws are sent to the Wall to take the black. Westeros but the Iron Islands, and Braavos, Pentos, Lorath and the other free lands, keep no slaves; Slaver's Bay, Qarth (with New Ghys, Qarkash and the City of Bones), Volantis, Lys, Myr, Tyrosh, Qohor, Norvos, Valyria, the Dothraki and the Iron Islands (thralls) do: there captives sold, by the lords or by you at the ransom broker, become slaves of that town or castle, and captives you set free or leave behind after your battles go home. A land follows the present culture of its town or castle. In every land the criminal policy of the town or castle (yours to choose in your own fiefs) rules alike for the lords' sales and yours: Execution - the captives are put to death, Forgiveness - none are enslaved and they go home")]
         [SettingPropertyGroup("Iron Bank")]
         public bool PrisonerLawEnabled { get; set; } = true;
+
+        [SettingPropertyBool("Player Ransom To Captor", HintText = "the ransom you pay from the captivity menu goes to your captor: the leader of the party that holds you, the head of its house if it has no leader, a bandit gang's hideout purse, or the lord of the town or castle whose dungeon holds you (failing them the head of the captor's house, then the purse of the nearest town) - off = the game's way, the money simply disappears")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool PlayerRansomToCaptor { get; set; } = true;
+
+        [SettingPropertyBool("Ransom Courier No Top Up", HintText = "when you accept a courier's ransom offer for a prisoner you hold, the paying house pays out of its own purse - the game no longer hands it the missing gold out of nothing; if it cannot raise the price the offer lapses and the prisoner stays with you (off = the game tops the payer up)")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool RansomCourierNoTopUp { get; set; } = true;
+
+        [SettingPropertyBool("Ransom Harness In Autotest", HintText = "during the automatic test only: check the ransom rules once without putting you in captivity - a small real ransom from your purse to an AI lord on the 5th day of the session, the courier rules on the 8th - log only, does nothing outside the automatic test")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool RansomHarnessInAutotest { get; set; } = true;
 
         [SettingPropertyFloatingInteger("Outlaw Band Routed Share", 0.00f, 2.00f, "0.00", HintText = "share of outlaws fleeing a lost fight who go back to the woods; the rest - mostly villagers driven out by want - go home to the villages")]
         [SettingPropertyGroup("Iron Bank")]
@@ -3735,6 +3751,7 @@ namespace Armoury
             s.CirculationLedgerEnabled = CirculationLedgerEnabled;
             s.CirculationProbeEnabled = CirculationProbeEnabled;
             s.ClanIncomeBookEnabled = ClanIncomeBookEnabled;
+            s.ClanIncomeBookStableD = ClanIncomeBookStableD;
             s.PaidConstruction = PaidConstruction;
             s.PaidConstructionPlayer = PaidConstructionPlayer;
             s.BuildIncomeShare = BuildIncomeShare;
@@ -3892,6 +3909,9 @@ namespace Armoury
             s.LoserCaptiveCommonPercent = LoserCaptiveCommonPercent;
             s.NonCombatantDeathPercent = NonCombatantDeathPercent;
             s.PrisonerLawEnabled = PrisonerLawEnabled;
+            s.PlayerRansomToCaptor = PlayerRansomToCaptor;
+            s.RansomCourierNoTopUp = RansomCourierNoTopUp;
+            s.RansomHarnessInAutotest = RansomHarnessInAutotest;
             s.OutlawBandRoutedShare = OutlawBandRoutedShare;
             s.OutlawRaidFleePercent = OutlawRaidFleePercent;
             s.OutlawHearthPerMan = OutlawHearthPerMan;
