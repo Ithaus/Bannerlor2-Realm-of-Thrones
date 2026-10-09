@@ -2032,6 +2032,10 @@ namespace Armoury
         [SettingPropertyGroup("Iron bank")]
         public float NonCombatantDeathPercent { get; set; } = 5f;
 
+        [SettingPropertyBool("Prisoner Law Enabled", HintText = "captives sold in a town or castle, or set free, in a land that keeps no slaves no longer become slaves: common men and soldiers go back to their own land, and in Westeros bandits and outlaws are sent to the Wall to take the black. Westeros but the Iron Islands, and Braavos, Pentos, Lorath and the other free lands, keep no slaves; Slaver's Bay, Volantis, Lys, Myr, Tyrosh, Qohor, Norvos, Valyria, the Dothraki and the Iron Islands (thralls) do, as before")]
+        [SettingPropertyGroup("Iron bank")]
+        public bool PrisonerLawEnabled { get; set; } = true;
+
         [SettingPropertyFloatingInteger("Outlaw Band Routed Share", 0.00f, 2.00f, "0.00", HintText = "share of outlaws fleeing a lost fight who go back to the woods; the rest - mostly villagers driven out by want - go home to the villages")]
         [SettingPropertyGroup("Iron bank")]
         public float OutlawBandRoutedShare { get; set; } = 0.5f;
@@ -3327,6 +3331,7 @@ namespace Armoury
             s.LoserCaptiveVeteranPercent = LoserCaptiveVeteranPercent;
             s.LoserCaptiveCommonPercent = LoserCaptiveCommonPercent;
             s.NonCombatantDeathPercent = NonCombatantDeathPercent;
+            s.PrisonerLawEnabled = PrisonerLawEnabled;
             s.OutlawBandRoutedShare = OutlawBandRoutedShare;
             s.OutlawRaidFleePercent = OutlawRaidFleePercent;
             s.OutlawHearthPerMan = OutlawHearthPerMan;
