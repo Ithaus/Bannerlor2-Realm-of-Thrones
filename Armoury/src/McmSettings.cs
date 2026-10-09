@@ -1420,6 +1420,30 @@ namespace Armoury
         [SettingPropertyGroup("Army purchases")]
         public float HistValyrianPerMeasure { get; set; } = 60000f;
 
+        [SettingPropertyBool("Qohor Rework Enabled", HintText = "the masters of Qohor rework Valyrian steel - the only way to a new Valyrian sword: bring a blade from your baggage to Qohor, pay the guild and wait; a blade of one measure becomes one sword of a new shape, a greatsword of two measures (such as Ice) becomes two swords; nothing is added and nothing is lost (off = no new orders; collecting and taking back still work)")]
+        [SettingPropertyGroup("Army purchases")]
+        public bool QohorReworkEnabled { get; set; } = true;
+
+        [SettingPropertyBool("Qohor Ai Rework", HintText = "a lord whose party stands in Qohor and who bears a Valyrian greatsword won from another house may have it reforged into two swords by the same rule - the same fee to Qohor's treasury, the same days (as Tywin Lannister did with Ice)")]
+        [SettingPropertyGroup("Army purchases")]
+        public bool QohorAiRework { get; set; } = true;
+
+        [SettingPropertyInteger("Qohor Days", 0, 28, "0", HintText = "days of the masters' work on one order - shortened for the game; in the books it took months")]
+        [SettingPropertyGroup("Army purchases")]
+        public int QohorDays { get; set; } = 7;
+
+        [SettingPropertyInteger("Qohor Crew", 0, 16, "0", HintText = "masters of the guild at one order - each day takes their hours from the town's smiths (the same hands that mend and make arms in Qohor)")]
+        [SettingPropertyGroup("Army purchases")]
+        public int QohorCrew { get; set; } = 4;
+
+        [SettingPropertyFloatingInteger("Qohor Toll Percent", 0.00f, 25.00f, "0.00", HintText = "the guild's toll, percent of the worth of the steel that goes into the fire - the only guild in the world that knows the art takes its share as a lord's mill took its multure (a sixteenth); paid with the masters' wages to Qohor's treasury")]
+        [SettingPropertyGroup("Army purchases")]
+        public float QohorTollPercent { get; set; } = 6.25f;
+
+        [SettingPropertyInteger("Qohor Charcoal Per Measure", 0, 10, "0", HintText = "charcoal the masters take from Qohor's stalls for each measure of steel; with none on the stalls the order waits")]
+        [SettingPropertyGroup("Army purchases")]
+        public int QohorCharcoalPerMeasure { get; set; } = 2;
+
         [SettingPropertyFloatingInteger("Valyrian Greatsword Min Cm", 0.00f, 420.00f, "0.00", HintText = "a two-handed Valyrian blade at least this long (cm) is a greatsword of two measures - steel enough for two swords, as Ice gave Oathkeeper and Widow's Wail (Ice 140, Heartsbane 114, Blackfyre 111, Brightroar 108); shorter blades are one measure (takes effect after reloading the game)")]
         [SettingPropertyGroup("Army purchases")]
         public float ValyrianGreatswordMinCm { get; set; } = 105f;
@@ -3438,6 +3462,12 @@ namespace Armoury
             s.UniqueNeverLost = UniqueNeverLost;
             s.NoConjuredLegends = NoConjuredLegends;
             s.HistValyrianPerMeasure = HistValyrianPerMeasure;
+            s.QohorReworkEnabled = QohorReworkEnabled;
+            s.QohorAiRework = QohorAiRework;
+            s.QohorDays = QohorDays;
+            s.QohorCrew = QohorCrew;
+            s.QohorTollPercent = QohorTollPercent;
+            s.QohorCharcoalPerMeasure = QohorCharcoalPerMeasure;
             s.ValyrianGreatswordMinCm = ValyrianGreatswordMinCm;
             s.BattleRealMinSide = BattleRealMinSide;
             s.UniqueMaxWearers = UniqueMaxWearers;

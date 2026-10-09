@@ -290,7 +290,12 @@ namespace Armoury
                 int tplBlades = tpl.Values.Sum();
                 if (_reg == null)
                 {
-                    if (_markLoaded)
+                    // zabezpieczenie: szablony bez zadnej klingi przy klingach w swiecie = odczyt stanu startowego zawiodl (np. szablony juz
+                    // przeczyszczone w tym procesie) - rejestr z niego zamienilby KAZDA klinge w zwykla stal; wtedy bezpieczny domysl jak nizej
+                    int present = Gather().Values.Sum(x => x.Count);
+                    bool tplFailed = tplBlades == 0 && present > 0;
+                    if (tplFailed) Log.Error("ValyrianBlades.OnSession", new InvalidOperationException("Stal valyrianska: szablony postaci bez zadnej klingi przy " + present + " klingach w swiecie - stanu startowego nie odczytano; bezpieczny domysl (rejestr = obecny stan), nic nie zamieniane"));
+                    if (_markLoaded || tplFailed)
                     {
                         // zgubiony klucz rejestru przy obecnym znaczniku 177: bezpieczny domysl - nic nie zamieniamy
                         var now = Gather();
@@ -352,6 +357,7 @@ namespace Armoury
             if (dte != null) RosterCopies(dte, 3, "magazyn DTE gracza", true, add);
             ArmoryCopies(add);
             StockpileCopies(add);
+            QohorMasters.AddCensus((id, where) => add(new Copy { Id = id, Kind = K.Fixed, Pri = 4, Where = where }));   // 177-3: klingi u mistrzow (wejscie do wydania)
             return map;
         }
 
