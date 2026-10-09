@@ -938,11 +938,30 @@ t2-t3 z oszczepem toporek (zapas 1.4). CS `Army175.SimpleJavelins` przy wczytani
 z kutego zelaza Iron2, drzewce sosnowe), id gry `_t2`. Rachunek `SCR\a175b` (kopia `sprzet.py` z latka tieru): sam Pine Javelin daje oszczep 24 z 24
 rodzajow t2-t3 (6 swoj, 18 zamiennik: m.in. 4 Dornijczykow t3, Braavos, Sarnor, Qohor, Tyrosh, Smocza Skala, najemnicy, piraci) przy 0 zmian umiejetnosci;
 dodanie dwoch "dartow" `_t2` dawalo 8 rodzajom t4 spadek Rzutu o 5-15 (ich wlasny dart przestaje wymagac 105). Skutki: wymog Rzutu 35 zamiast 105;
-cena historyczna Armoury (start sesji, `ArmsPricing` wedlug tieru: kute zelazo zamiast stali, mniej dni pracy) ok. 54 -> 25-40 d [S]; zakupy AI i
-wzorzec DTE t2-t3 biora Pine Javelin; pary zapasu 1.4 63 -> 42 (oszczepy 21 -> 0), slotow ponad tier 2552 -> 2544, jednostek 893 bez zmian.
+cena historyczna Armoury (start sesji, `ArmsPricing` wedlug tieru: kute zelazo zamiast stali, mniej dni pracy) ok. 54 -> 25-40 d [S]; wzorce t2-t3 (175.2) i wzorzec
+DTE w bitwach z graczem biora Pine Javelin (zakupy i zbrojownie AI - NIEPEWNE, ponizej "Poprawki po recenzji 175b"); pary zapasu 1.4 63 -> 42 (oszczepy 21 -> 0), slotow ponad tier 2552 -> 2544, jednostek 893 bez zmian.
 Bramki 6.1 do poprawki: linia 175.2 "zapas innej klasy ... oszczepy 0" (zamiast ok. 79 wystapien zapasu - mniej o oszczepy), NorthHardy "+20% +-3" (bylo +28%),
 nowa linia "najprostszy oszczep tier 2 (175b) - northern_javelin_1_t2 (Pine Javelin) t4 -> t2"; w T2/T3 (domyslne) progi 6.2 licza teraz takze Volantis,
 Norvos, Wolnych Ludzi, Smocza Skale, Dorne i Qohor.
 
 **Po 175b (STAN-PRAC 09.10 ok. 05:55 i 06:00, zapisane po zleceniu 175b):** Jeff - "zrob 130/135 piechota Polnocy srednio": dodatek do broni 0,
 do Atletyki +5, dwa osobne suwaki zamiast `NorthHardySkillBonus` - do zrobienia jako nastepny krok (CS `NorthHardy` + Armoury `Settings.cs`).
+
+**Poprawki po recenzji 175b (09.10 ok. 07:15; 6 uwag, wszystkie prawdziwe, zadna odrzucona; commity lokalne CS `a175cs` 287db44 i Armoury `a175arm` 315f48d,
+NIEWGRANE; DLL probne `SCR\test\Armoury-175b.dll` i `SCR\test\CrashScribe-at-175b.dll` z trybem autotestu):**
+- **Obieg sprzetu AI (decyzja 3) - opis, bez kodu:** Pine Javelin ma w grze kulture `sturgia` (Zelazne Wyspy). Armoury `WorkshopLaw` bierze obca kulture tylko przy
+  pustej puli lokalnej, a `AiGear` kupuje koszykiem "typ x tier" (nie przedmiot ze wzorca) - w Dorne i Essos koszyk Rzut t2 zapelni w praktyce lokalny toporek,
+  DTE w bitwie z graczem da toporek ze zbrojowni; odwrotnie jednostki z toporkiem t2-t3 we wzorcu moga kupic Pine Javelin. Decyzja 3 dziala we WZORCACH (24 z 24).
+  **Do decyzji Jeffa (przy scaleniu ze 174, nie w 175b):** czy oszczepy maja byc naprawde w rekach AI - wtedy `WorkshopLaw.Candidates` uznaje za "lokalne" takze
+  przedmioty noszone we wzorcach zolnierzy kultury miasta. Bramki T3: wyroby `northern_javelin_1_t2` wedlug kultury miasta, Pine Javelin wobec toporkow w zbrojowniach
+  lordow Dorne/Braavos/Sarnor/Qohor/Tyrosh (doba 30 i 120), log DTE Dornijskiego Wlocznika t3.
+- **Kategoria towaru (kod CS):** `SimpleJavelins` ustawia tez `ItemCategory` za tierem (`ranged_weapons_4` -> `ranged_weapons_2`) - `CraftedItem` nie czyta
+  `tier_override`, a kategoria z wczytania zostawala t4 (warsztaty w linii t4, indeks ceny i popyt kategorii t4). Linia logu: "kategoria ranged_weapons_4 -> ranged_weapons_2".
+- **Oszczep t2 tylko gdy 175.2 moze zadzialac (kod CS):** takze pola refleksji rosterow (jak `TierGear`); przy "3 doby bez zestawow" linia OSTRZEZENIE mowi, ze oszczep zostal t2.
+- **NorthHardy (kod CS + opis MCM):** sufit "bez przeskoku tieru" od ok. +30 tnie wiekszosc (35 i wiecej: 37 z 43) - przewaga 25 -> +27.5%, 35 -> +32.3%, 50 -> +34.3%
+  (nie +48%). Opis MCM: "above about 30 the cap holds most men back - 50 gives only about +35%". Okno kontroli w CS = 7.5 + 0.82 x (bonus - srednia strata na
+  suficie), osobno bron i Atletyka - bez falszywego OSTRZEZENIA przy duzym suwaku. Domyslne 15 bez zmian (+19.7%/+20.2%). Nastepny krok (dwa suwaki, bron 0 / Atletyka +5) i tak przepisze.
+- **Qohor ciezej (opis):** ciezszy korpus ustawia sie w sesji, PO Armoury `ColdStart` - zbrojownie startowe nowej kampanii maja stary korpus, a koszyk AI (ten sam tier)
+  go nie wymieni; w bitwie z graczem DTE ubierze Qohorczykow t4-t5 w stary pancerz. Bramka T3: korpus t4-t5 w zbrojowniach lordow Qohoru wobec wzorca.
+  Ciezszy korpus w rekach AI wymagalby osobnego rozwiazania kolejnosci - poza 175b.
+- **Volantis i Norvos (opis MCM):** Volantis traci tylko lucznikow (jezdzcy i mahouci zostaja), Norvos tylko jazde (lucznicy bez zmian) - opis MCM poprawiony.
