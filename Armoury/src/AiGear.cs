@@ -258,11 +258,16 @@ namespace Armoury
                     Equipment eq = null;
                     try { eq = ch.Equipment; } catch { }
                     if (eq == null) continue;
+                    // K1c (przeglad K1b, Jeff 09.10 P1 "ten sam sufit dla ludzi gracza i AI"): brak kupowany najwyzej do sufitu jednostki
+                    // (SwapMath.CeilingTier: tier jednostki, z MenUpgradeOneTierUp o jeden wyzej) - koszyk wzorca ponad sufit liczy sie jako koszyk
+                    // sufitu. Dotad t4 z tarcza t6 we wzorcu (przed paczka 175) kupowal na brak t6. Ten sam tier w potrzebie i w pokryciu zapasem,
+                    // wiec bez petli "tier nizej" z wpisu 89 (sztuka sufitu pokrywa koszyk sufitu nazajutrz).
+                    int ceil = SwapMath.CeilingTier(MenUpgrade.TroopTier(ch), s0.MenUpgradeOneTierUp);
                     for (int sl = 0; sl < 10; sl++)
                     {
                         var it = eq[(EquipmentIndex)sl].Item;
                         if (it == null || !SupplyDemand.Equipmentish(it)) continue;
-                        int k = (int)it.ItemType * 10 + TierOf(it);
+                        int k = (int)it.ItemType * 10 + Math.Min(TierOf(it), ceil);
                         int n; need.TryGetValue(k, out n); need[k] = n + el.Number;
                         List<CharacterObject> lt;
                         if (!lifters.TryGetValue(k, out lt)) lifters[k] = lt = new List<CharacterObject>();

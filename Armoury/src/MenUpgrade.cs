@@ -48,7 +48,7 @@ namespace Armoury
             _dLogged = 0;
             _dPlayerN = _dLordN = _dGarN = _dSold = _dKept = _dNoBetter = _dNoMoney = _dNoLift = _dGarWageN = _dGarGapN = _dBattleArmory = _dBattleTemplate = _dGarEmptyN = 0;
             _dPlayerGold = _dLordGold = _dGarGold = _dSoldGold = _dSaved = _dOverCap = _dGarWage = _dGarGapGold = _dGarEmptyGold = 0;
-            _boughtToday.Clear(); _soldToday.Clear(); _dChurn = 0; _churnIds.Clear(); _dTempSlots = 0; _dBareSlots = 0; _dNoEmerg = 0;
+            _boughtToday.Clear(); _soldToday.Clear(); _dChurn = 0; _churnIds.Clear(); _dTempSlots = 0; _dBareSlots = 0; _dNoEmerg = 0; _dNothing = 0;
         }
 
         /// <summary>K1 (przeglad): zakup (buy=true) albo sprzedaz sztuki przez ludzi partii - licznik "kupione i sprzedane te same id tej
@@ -78,7 +78,9 @@ namespace Armoury
         // K1 (Jeff 09.10, P2): zaloga walczy tylko tym, co ma - sloty wzorca bez sztuki (walcza bez niej) i rozdzielacze bez zestawu awaryjnego DTE
         internal static void NoteBareSlots(int n) { if (n <= 0) return; Touch(); _dBareSlots += n; }
         internal static void NoteNoEmergency() { Touch(); _dNoEmerg++; }
-        private static int _dBareSlots, _dNoEmerg;
+        // K1c (przeglad K1b): straz "nic z niczego" - sloty przydzialow zalog bez pokrycia w zbrojowni zalogi (podmiany strazy CrashScribe)
+        internal static void NoteNothingSlots(int n) { if (n <= 0) return; Touch(); _dNothing += n; }
+        private static int _dBareSlots, _dNoEmerg, _dNothing;
 
         /// <summary>Nowa doba: linia poprzedniej. Wolane przy kazdym liczniku i z DailyTickEvent (linia codziennie).</summary>
         internal static void Touch()
@@ -127,7 +129,7 @@ namespace Armoury
                              + "; zold zalog do sakiewek " + _dGarWage + " (" + _dGarWageN + " zalog), w sakiewkach zalog " + garPurses + " (" + garN + " zalog)"
                              + "; braki zalog z ich sakiewek " + _dGarGapGold + " (" + _dGarGapN + " zakupow), sakiewki pustych zalog do kas osad " + _dGarEmptyGold + " (" + _dGarEmptyN + ")"
                              + "; zalogi w bitwie ze zbrojowni " + _dBattleArmory + " / we wzorcu " + _dBattleTemplate + " (sloty z wzorca jako tymczasowe " + _dTempSlots
-                             + ", sloty wzorca bez sztuki - walcza bez " + _dBareSlots + ", bez zestawu awaryjnego DTE " + _dNoEmerg + ")"
+                             + ", sloty wzorca bez sztuki - walcza bez " + _dBareSlots + ", bez zestawu awaryjnego DTE " + _dNoEmerg + ", bez pokrycia w zbrojowni zatrzymane " + _dNothing + ")"
                              + "; kupione i sprzedane te same id tej samej doby " + _dChurn + (_churnIds.Count > 0 ? " (" + string.Join(", ", _churnIds.ToArray()) + ")" : "")
                              + "; miasta bez zbroi korpusu t3+ na polce " + bare + " z " + towns + ".");
                 }
@@ -480,6 +482,21 @@ namespace Armoury
             }
             catch (Exception e) { Log.Error("MenUpgrade.Wares", e); }
             return list;
+        }
+
+        /// <summary>K1c (przeglad K1b, P1): sufity zakupu (SwapMath.CeilingTier) ludzi bez sztuki - po jednym na czlowieka, od najwyzszego.
+        /// Braki ludzi gracza: k-ty zakup typu najwyzej do k-tego sufitu (rekrut bez zbroi nie kupi plyty, rycerz bez zbroi - do swojego).</summary>
+        internal static List<int> CeilingsOf(Dictionary<CharacterObject, int> unfitByTroop, bool oneUp)
+        {
+            var l = new List<int>();
+            if (unfitByTroop != null)
+                foreach (var kv in unfitByTroop)
+                {
+                    int c = SwapMath.CeilingTier(TroopTier(kv.Key), oneUp);
+                    for (int i = 0; i < kv.Value; i++) l.Add(c);
+                }
+            l.Sort((a, b) => b.CompareTo(a));
+            return l;
         }
 
         /// <summary>K1-A (P1): tier jednostki (CharacterObject.Tier, 0..6+); blad - 1.</summary>

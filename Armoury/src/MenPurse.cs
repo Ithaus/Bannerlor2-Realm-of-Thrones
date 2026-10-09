@@ -376,15 +376,21 @@ namespace Armoury
                 var fit = QuartermasterLaw.FitFor(armory, type);
                 int gap = fit.UnfitMen;
                 int maxReq = fit.UnfitMinSkill;
+                // K1c (przeglad K1b, Jeff 09.10 P1, "rekrut nie kupi plyty"): k-ty zakup typu najwyzej do k-tego sufitu ludzi bez sztuki
+                // (SwapMath.CeilingTier, od najwyzszego); dotad braki nie mialy zadnego limitu tieru
+                var ceils = MenUpgrade.CeilingsOf(fit.UnfitByTroop, Settings.Current.MenUpgradeOneTierUp);
+                int gap0 = gap;
                 while (gap > 0 && pieces < maxPieces && spent < budget)
                 {
                     int best = -1, bestPrice = 0; float bestScore = 0f;
+                    int maxTier = ceils.Count > 0 ? ceils[Math.Min(gap0 - gap, ceils.Count - 1)] : int.MaxValue;
                     for (int i = 0; i < shelf.Count; i++)
                     {
                         var el = shelf.GetElementCopyAtIndex(i);
                         var it = el.EquipmentElement.Item;
                         if (el.Amount <= 0 || !QuartermasterLaw.CountsAsKit(it, type) || ArmsPricing.IsUnique(it)) continue;
                         if (it.Difficulty > 0 && ItemReq.SkillFor(it) != null && it.Difficulty > maxReq) continue;   // najslabszy bez sztuki ja udzwignie
+                        if (AiGear.TierOf(it) > maxTier) continue;   // K1c (P1): nie ponad sufit czlowieka, dla ktorego ten zakup
                         if (ArmouryBehavior.StockOf(it.StringId) > 0) continue;   // K1 (przeglad): ksiega per id - zakup ludzi przesunalby Twoja czesc na gorszy egzemplarz
                         int price = st.Town.MarketData.GetPrice(el.EquipmentElement, main, false, st.Party);
                         if (price <= 0 || price > budget - spent) continue;

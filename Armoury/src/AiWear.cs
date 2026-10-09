@@ -225,6 +225,28 @@ namespace Armoury
             return Mod(worst);
         }
 
+        /// <summary>K1c (przeglad K1b, "Hand kit to the garrison"): ile sztuk przedmiotu w zbrojowni partii jest obitych i w jakim stanie - bez
+        /// zdejmowania (TakeCondition zdejmuje). Po spisie (Sync), jak TakeCondition. Wylaczone zuzycie - pusto.</summary>
+        internal static List<KeyValuePair<ItemModifier, int>> WornSplit(MobileParty mp, ItemObject it)
+        {
+            var list = new List<KeyValuePair<ItemModifier, int>>();
+            if (!On || mp == null || it == null) return list;
+            try
+            {
+                Sync(mp);
+                Dictionary<string, Dictionary<string, int>> byItem; Dictionary<string, int> byMod;
+                if (!_worn.TryGetValue(mp.StringId, out byItem) || !byItem.TryGetValue(it.StringId, out byMod)) return list;
+                foreach (var kv in byMod)
+                {
+                    if (kv.Value <= 0) continue;
+                    var m = Mod(kv.Key);
+                    if (m != null) list.Add(new KeyValuePair<ItemModifier, int>(m, kv.Value));
+                }
+            }
+            catch { list.Clear(); }
+            return list;
+        }
+
         /// <summary>K1: sztuka wzieta przez TakeCondition nie poszla do kupca (kasa miasta pusta) - wraca do zbrojowni ze swoim stanem.</summary>
         internal static void PutBack(MobileParty mp, ItemObject it, ItemModifier mod)
         {

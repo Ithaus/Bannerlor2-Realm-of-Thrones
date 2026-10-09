@@ -38,6 +38,9 @@ namespace Armoury
             public object Tag;            // adapter: EquipmentElement / ItemObject
             // wyniki
             public int UsedBefore, Used, OwnWorn, Back, Target, Sell, Index;
+            // K1c (przeglad K1b): nienoszona czesc gracza TEGO egzemplarza i powod (jak SwapResult.KeptWorse / KeptHard) - komunikat
+            // po zamknieciu mowi o wkladach z tej sesji, nie o calym schowku
+            public int KeptWorse, KeptHard;
             public int MenTotal { get { return Math.Max(0, Total - Own); } }
             public int MenWorn { get { return Math.Min(Used, MenTotal); } }   // przy identycznym egzemplarzu ludzie nosza najpierw swoje
             public int MenFree { get { return MenTotal - MenWorn; } }
@@ -195,6 +198,7 @@ namespace Armoury
             var r = new SwapResult { Need = group.Length, UnfitMan = new bool[group.Length] };
             pieces.Sort(FitOrder);
             var ok = new Meets(groups, pieces, meets);
+            foreach (var p in pieces) { p.KeptWorse = 0; p.KeptHard = 0; }
             if (!oneForOne)
             {
                 r.Unfit = FitCore(group, ok, pieces, false, r.UnfitMan);
@@ -232,9 +236,51 @@ namespace Armoury
                 if (p.Barred) continue;
                 int kept = p.Own - p.OwnWorn;
                 r.KeptOwn += kept; r.MenSpare += p.MenFree - p.Back;
-                if (kept > 0) { if (gr.WantedBySomeone(p)) r.KeptHard += kept; else r.KeptWorse += kept; }
+                if (kept > 0)
+                {
+                    if (gr.WantedBySomeone(p)) { r.KeptHard += kept; p.KeptHard = kept; }
+                    else { r.KeptWorse += kept; p.KeptWorse = kept; }
+                }
             }
             return r;
+        }
+
+        // ------------------------------------------------------------ K1c: wklady z tej sesji ekranu
+        /// <summary>K1c (przeglad K1b): co stalo sie z wkladami tej sesji (klucz id|mod -&gt; ile wlozono), po Swap z oneForOne.</summary>
+        internal sealed class DepositTally
+        {
+            public int Worn, KeptWorse, KeptHard, KeptBarred, Moved;
+            public readonly List<KeyValuePair<Piece, int>> Kept = new List<KeyValuePair<Piece, int>>();
+            public readonly List<KeyValuePair<Piece, int>> MovedPieces = new List<KeyValuePair<Piece, int>>();
+            public int Kept0 { get { return KeptWorse + KeptHard + KeptBarred; } }
+        }
+
+        /// <summary>K1c (przeglad K1b, Jeff 09.10 04:40 "zostaje po prostu w okienku DTE"): rozliczenie TYLKO wkladow z tej sesji - dotad
+        /// komunikat liczyl KeptOwn calej ksiegi (stary schowek, dawne zwroty X, konie). Na egzemplarz wlozony (klucz z deps):
+        ///  - na = min(wlozone, Own) - tyle wkladow zostalo czescia gracza tego egzemplarza; noszone najpierw wklady (min(na, OwnWorn)),
+        ///    reszta zostaje w oknie z powodem egzemplarza (KeptHard - wymog, KeptWorse - nikt nie chcial, Barred - nie wydawane);
+        ///  - Moved = wlozone - na: ksiega gracza jest per id i obejmuje NAJGORSZE egzemplarze (AllocateOwn), wiec lepszy egzemplarz
+        ///    (np. "Fine X") wlozony obok gorszego egzemplarza ludzi tego samego id przechodzi na ludzi, a Twoja czescia staje sie ich
+        ///    gorszy egzemplarz - to wymiana, nie "nikt nie chcial".</summary>
+        internal static void TallyDeposits(List<Piece> pieces, IDictionary<string, int> deps, DepositTally t)
+        {
+            if (pieces == null || deps == null || deps.Count == 0 || t == null) return;
+            foreach (var p in pieces)
+            {
+                int d;
+                if (!deps.TryGetValue(p.Key, out d) || d <= 0) continue;
+                int on = Math.Min(d, Math.Max(0, p.Own));
+                int moved = d - on;
+                int worn = Math.Min(on, Math.Max(0, p.OwnWorn));
+                int kept = on - worn;
+                t.Worn += worn;
+                if (moved > 0) { t.Moved += moved; t.MovedPieces.Add(new KeyValuePair<Piece, int>(p, moved)); }
+                if (kept <= 0) continue;
+                if (p.Barred) t.KeptBarred += kept;
+                else if (p.KeptHard > 0) t.KeptHard += kept;
+                else t.KeptWorse += kept;
+                t.Kept.Add(new KeyValuePair<Piece, int>(p, kept));
+            }
         }
 
         /// <summary>
