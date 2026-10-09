@@ -1692,6 +1692,7 @@ namespace Armoury
                 bool yours = OrderIsYours(item.StringId, k);   // K1 (B4): zaplaciles - to Twoj wklad, rozliczy go wymiana 1:1
                 Log.Player(k + " x " + item.Name + " delivered to the " + (yours ? "armoury as your pieces" : "men's racks") + " for " + pay + " gold" + (k < n ? " - the market had no more." : ".")
                            + (yours ? OrderYoursNote : ""));
+                if (yours) QuartermasterEscrow.ShoutIfNoUse(item);   // K1 (przeglad, B4): nikt nie udzwignie - mowimy od razu (zostaje Twoja)
                 Log.Info("Zamowienie dla wojska: " + k + "/" + n + "x " + item.StringId + " za " + pay + " (z targu " + (st != null ? st.Name.ToString() : "?") + ")");
             }
             catch (Exception e) { Log.Error("DoOrderKit", e); }
@@ -1971,6 +1972,11 @@ namespace Armoury
                            + " for the goods off the stall and " + fee + " for the smith's legwork."
                            + (unmet > 0 ? " The stalls of " + st.Name + " had no more: word of the other " + unmet + " goes to the workshops." : "")
                            + (shortPurse ? " Your purse would stretch no further." : "") + (yours ? OrderYoursNote : ""));
+                if (yours)   // K1 (przeglad, B4): nikt nie udzwignie - mowimy od razu (zostaje Twoja), raz na przedmiot
+                {
+                    var told = new HashSet<ItemObject>();
+                    foreach (var p in picks) if (p.El.Item != null && told.Add(p.El.Item)) QuartermasterEscrow.ShoutIfNoUse(p.El.Item);
+                }
                 LogShelfOrder(st, type, tier, n, picks, goods, fee, unmet, shortPurse);
             }
             catch (Exception e) { Log.Error("DoOrderShelf", e); }

@@ -572,7 +572,7 @@ namespace Armoury
         [SettingPropertyGroup("The finished piece")]
         public bool MenUpgradeGear { get; set; } = true;
 
-        [SettingPropertyInteger("Men Gear Save Percent", 0, 100, "0", HintText = "share of what the men have left on leaving a town that they put by for better kit (the rest they spend there); garrisons put this share of their pay into their own purse")]
+        [SettingPropertyInteger("Men Gear Save Percent", 0, 100, "0", HintText = "share of what the men earned since their last town that they put by for better kit when leaving (savings stay put; the rest they spend there); garrisons put this share of their pay into their own purse")]
         [SettingPropertyGroup("The finished piece")]
         public int MenGearSavePercent { get; set; } = 50;
 

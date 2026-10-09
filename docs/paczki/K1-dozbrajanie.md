@@ -1,6 +1,6 @@
 # K1 - DOZBRAJANIE: zolnierze za swoje + wymiana z graczem (specyfikacja)
 
-**Status:** WYKONANE W KODZIE 09.10 (K1-A, K1-B, K1-C; wpis CHANGELOG "K1"), NIEWGRANE - DO SPRAWDZENIA (build kod 0, proba poza gra 22/22; autotest i proby reczne R1-R8 przed wgraniem). Swiadome odstepstwa - w CHANGELOG (K1, "Swiadome odstepstwa"). Drzewo `noc2/k1`, galaz `w-toku/k1-dozbrajanie`, baza `noc/sklad5` d486813
+**Status:** WYKONANE W KODZIE 09.10 (K1-A, K1-B, K1-C; wpis CHANGELOG "K1"), NIEWGRANE - DO SPRAWDZENIA (build kod 0, proba poza gra 22/22, po poprawkach z przegladu kodu 25/25 - 16 uwag, opis w CHANGELOG "K1", "Poprawki po przegladzie kodu"; autotest i proby reczne R1-R8 przed wgraniem). Swiadome odstepstwa - w CHANGELOG (K1, "Swiadome odstepstwa"). Drzewo `noc2/k1`, galaz `w-toku/k1-dozbrajanie`, baza `noc/sklad5` d486813
 (= Armoury w grze 63640cb3). `src/...` oznacza `Armoury/src/...` w tym drzewie, numery linii z d486813.
 **Decyzja Jeffa 09.10 (K):** "chce oba mechanizmy: ze za swoje sami sie zbroja z lupow i zoldu, i ja rowniez moge ich dozbroic na zasadzie
 wrzuc im lepsza zbroje, a oni wydaja mi swoja gorsza jako wymiane". Dotyczy jego druzyny i jego zalog. AI dziala wedlug tej samej reguly.

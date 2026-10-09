@@ -32,6 +32,10 @@ namespace Armoury
         private static int _dStamp = -1, _dLogged;
         private static int _dPlayerN, _dLordN, _dGarN, _dSold, _dKept, _dNoBetter, _dNoMoney, _dNoLift, _dGarWageN, _dGarGapN, _dBattleArmory, _dBattleTemplate, _dGarEmptyN;
         private static long _dPlayerGold, _dLordGold, _dGarGold, _dSoldGold, _dSaved, _dOverCap, _dGarWage, _dGarGapGold, _dGarEmptyGold;
+        // K1 (przeglad): obrot w kolko - ta sama partia kupila i sprzedala sztuke tego samego id tej samej doby (autotest: 0)
+        private static readonly HashSet<string> _boughtToday = new HashSet<string>(), _soldToday = new HashSet<string>();
+        private static int _dChurn;
+        private static readonly List<string> _churnIds = new List<string>();
 
         internal static void Reset()
         {
@@ -43,6 +47,22 @@ namespace Armoury
             _dLogged = 0;
             _dPlayerN = _dLordN = _dGarN = _dSold = _dKept = _dNoBetter = _dNoMoney = _dNoLift = _dGarWageN = _dGarGapN = _dBattleArmory = _dBattleTemplate = _dGarEmptyN = 0;
             _dPlayerGold = _dLordGold = _dGarGold = _dSoldGold = _dSaved = _dOverCap = _dGarWage = _dGarGapGold = _dGarEmptyGold = 0;
+            _boughtToday.Clear(); _soldToday.Clear(); _dChurn = 0; _churnIds.Clear(); _dTempSlots = 0;
+        }
+
+        /// <summary>K1 (przeglad): zakup (buy=true) albo sprzedaz sztuki przez ludzi partii - licznik "kupione i sprzedane te same id tej
+        /// samej doby" w linii "Dozbrajanie: dzien" (zakupy brakow, lepsze, nadwyzki; gracz, lordowie, zalogi). Tylko log.</summary>
+        internal static void NoteChurn(MobileParty mp, ItemObject it, bool buy)
+        {
+            try
+            {
+                if (mp == null || it == null) return;
+                Touch();
+                string k = (mp.StringId ?? "") + "|" + (it.StringId ?? "");
+                if ((buy ? _soldToday : _boughtToday).Contains(k)) { _dChurn++; if (_churnIds.Count < 4 && !_churnIds.Contains(k)) _churnIds.Add(k); }
+                (buy ? _boughtToday : _soldToday).Add(k);
+            }
+            catch { }
         }
 
         // ------------------------------------------------------------ liczniki z innych miejsc (tylko log)
@@ -51,6 +71,9 @@ namespace Armoury
         internal static void NoteGarrisonGap(int fromPurse) { if (fromPurse <= 0) return; Touch(); _dGarGapGold += fromPurse; _dGarGapN++; }
         internal static void NoteGarrisonEmpty(int purse) { if (purse <= 0) return; Touch(); _dGarEmptyGold += purse; _dGarEmptyN++; }
         internal static void NoteBattle(bool fromArmory) { Touch(); if (fromArmory) _dBattleArmory++; else _dBattleTemplate++; }
+        // K1 (przeglad): sloty ludzi zalog wypelnione w bitwie przez DTE "z niczego" i oznaczone jako tymczasowe (nie wracaja do zbrojowni)
+        internal static void NoteTempSlots(int n) { if (n <= 0) return; Touch(); _dTempSlots += n; }
+        private static int _dTempSlots;
 
         /// <summary>Nowa doba: linia poprzedniej. Wolane przy kazdym liczniku i z DailyTickEvent (linia codziennie).</summary>
         internal static void Touch()
@@ -98,7 +121,8 @@ namespace Armoury
                              + "; odlozone przy wyjazdach " + _dSaved + ", ponad limit na zycie " + _dOverCap
                              + "; zold zalog do sakiewek " + _dGarWage + " (" + _dGarWageN + " zalog), w sakiewkach zalog " + garPurses + " (" + garN + " zalog)"
                              + "; braki zalog z ich sakiewek " + _dGarGapGold + " (" + _dGarGapN + " zakupow), sakiewki pustych zalog do kas osad " + _dGarEmptyGold + " (" + _dGarEmptyN + ")"
-                             + "; zalogi w bitwie ze zbrojowni " + _dBattleArmory + " / we wzorcu " + _dBattleTemplate
+                             + "; zalogi w bitwie ze zbrojowni " + _dBattleArmory + " / we wzorcu " + _dBattleTemplate + " (sloty z wzorca jako tymczasowe " + _dTempSlots + ")"
+                             + "; kupione i sprzedane te same id tej samej doby " + _dChurn + (_churnIds.Count > 0 ? " (" + string.Join(", ", _churnIds.ToArray()) + ")" : "")
                              + "; miasta bez zbroi korpusu t3+ na polce " + bare + " z " + towns + ".");
                 }
                 ClearDay();
@@ -191,7 +215,7 @@ namespace Armoury
         private interface IKit
         {
             List<SwapMath.Piece> Pieces(ItemObject.ItemTypeEnum type);
-            void Add(EquipmentElement el);
+            bool Add(EquipmentElement el);
             bool TakeOld(SwapMath.Piece p, out EquipmentElement el);
             void PutBackOld(SwapMath.Piece p, EquipmentElement el);
         }
@@ -202,7 +226,7 @@ namespace Armoury
             internal PlayerKit(ItemRoster a) { _a = a; }
             // sztuki LUDZI: czesc gracza (ksiega, najgorsze egzemplarze) wypada przez MenTotal - nigdy nie idzie do kupca
             public List<SwapMath.Piece> Pieces(ItemObject.ItemTypeEnum type) { return QuartermasterLaw.KitPieces(_a, type, true); }
-            public void Add(EquipmentElement el) { _a.AddToCounts(el, 1); }
+            public bool Add(EquipmentElement el) { _a.AddToCounts(el, 1); return true; }
             public bool TakeOld(SwapMath.Piece p, out EquipmentElement el)
             {
                 el = QuartermasterLaw.ElOf(p);
@@ -220,10 +244,11 @@ namespace Armoury
             private readonly MobileParty _mp; private readonly Dictionary<ItemObject, int> _arm; private readonly bool _garrison;
             internal AiKit(MobileParty mp, Dictionary<ItemObject, int> arm, bool garrison) { _mp = mp; _arm = arm; _garrison = garrison; }
             public List<SwapMath.Piece> Pieces(ItemObject.ItemTypeEnum type) { return AiPieces(_arm, type); }
-            public void Add(EquipmentElement el)
+            public bool Add(EquipmentElement el)
             {
-                AiGear.AddToArmory(_mp, el.Item, 1);
-                if (!_garrison) AiWear.NoteBought(_mp, el, 1);   // jak AiGear: sprawna sztuka z polki
+                if (!AiGear.AddToArmory(_mp, el.Item, 1)) return false;   // K1 (przeglad): DTE odrzucil (czarna lista) - nikt nie placi
+                AiWear.NoteBought(_mp, el, 1);   // jak AiGear: sprawna sztuka z polki; K1 (przeglad): takze zaloga (AiWear sledzi jej bitwy)
+                return true;
             }
             public bool TakeOld(SwapMath.Piece p, out EquipmentElement el)
             {
@@ -355,7 +380,8 @@ namespace Armoury
                     }
                     int price = w.Price;
                     w.Shop.ItemRoster.AddToCounts(w.El, -1); w.Left--;
-                    kit.Add(w.El);
+                    if (!kit.Add(w.El)) { w.Shop.ItemRoster.AddToCounts(w.El, 1); w.Left = 0; continue; }   // K1 (przeglad): sztuka wraca na polke
+                    NoteChurn(mp, w.El.Item, true);
                     int paid = MenPurse.Take(mp, price);
                     budget -= price;
                     w.Shop.Town.ChangeGold(paid);
@@ -376,6 +402,7 @@ namespace Armoury
                     MoneyLedger.Note169(MoneyLedger.N169Surplus, sellTo, -unit);   // paczka 169: linia kas (tylko licznik)
                     MenPurse.Add(mp, unit);
                     budget += unit;
+                    NoteChurn(mp, soldEl.Item, false);
                     v.Sold++; v.SoldGold += unit; _dSold++; _dSoldGold += unit;
                     SellByCondition.NoteSale(SellByCondition.Men, soldEl, 1, unit);   // ksiega skupu sprzetu (tylko log)
                 }
@@ -433,6 +460,9 @@ namespace Armoury
                     var it = el.EquipmentElement.Item;
                     if (it == null || el.Amount <= 0 || it.ItemType != type) continue;
                     if (ArmsPricing.IsUnique(it) || QuartermasterLaw.BarredInBattle(it)) continue;
+                    // K1 (przeglad): ksiega gracza jest per id i obejmuje NAJGORSZE egzemplarze - zakup ludzi id, w ktorym gracz ma czesc
+                    // (np. Masterwork), przesunalby wlasnosc gracza na zwykly egzemplarz bez slowa; ludzie kupuja inne id
+                    if (player && ArmouryBehavior.StockOf(it.StringId) > 0) continue;
                     var m = el.EquipmentElement.ItemModifier;
                     // sprawna: gracz - bez modyfikatora < 1; AI - bez modyfikatora (zbrojownia AI nie zna stanow na plus, sztuka stracilaby wartosc)
                     if (player ? (m != null && m.PriceMultiplier < 1f) : m != null) continue;

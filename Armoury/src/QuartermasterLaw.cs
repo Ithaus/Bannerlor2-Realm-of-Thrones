@@ -6,6 +6,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Inventory;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 
@@ -450,6 +451,25 @@ namespace Armoury
         /// jako grupy po oddziale; men = indeksy grup, od najwyzszego skilla (skill pierwszej sztuki ze skillem - jak dotad FitFor).</summary>
         internal static void MenOf(TroopRoster r, ItemObject.ItemTypeEnum type, List<SwapMath.Piece> pieces, out List<CharacterObject> troops, out int[] men, out SkillObject skill)
         {
+            MenOf(r, type, pieces, out troops, out men, out skill, MenClassic, false);
+        }
+
+        /// <summary>K1 (przeglad): tryby liczenia ludzi. MenClassic - jak dotad (druzyna gracza: bron 1 na czlowieka, amunicja i oszczepy
+        /// po slotach). MenPerSlot - lordowie AI i zalogi: KAZDA bron po slotach wzorca, jak koszyki zakupow brakow (AiGear.NeedBuckets) -
+        /// dotad nadwyzki trzymaly 1 bron na czlowieka, wiec druga bron oddzialu szla do kupca, a BuyGaps odkupowal ja tego samego dnia;
+        /// pancerz jak dotad u kazdego (DTE ubiera z zbrojowni takze sloty pancerza, ktorych wzorzec nie ma - AssignEquipmentType).
+        /// MenTemplate - prog K1-C: jak MenPerSlot, ale pancerz tylko u oddzialow z tym slotem we wzorcu (plaszcz i rekawice spoza wzorca
+        /// nie zanizaja pokrycia - zakupy zalogi ich nigdy nie kupia, a piechota bez nich miala najwyzej 5/7 = 71% przy progu 75%).</summary>
+        internal const int MenClassic = 0, MenPerSlot = 1, MenTemplate = 2;
+
+        /// <summary>healthy=true - bez rannych (DTE ubiera do bitwy tylko zdrowych).</summary>
+        internal static void MenOf(TroopRoster r, ItemObject.ItemTypeEnum type, List<SwapMath.Piece> pieces, out List<CharacterObject> troops, out int[] men, out SkillObject skill,
+                                   int mode, bool healthy)
+        {
+            bool armour = type == ItemObject.ItemTypeEnum.HeadArmor || type == ItemObject.ItemTypeEnum.BodyArmor || type == ItemObject.ItemTypeEnum.LegArmor
+                          || type == ItemObject.ItemTypeEnum.HandArmor || type == ItemObject.ItemTypeEnum.Cape;
+            bool horse = type == ItemObject.ItemTypeEnum.Horse || type == ItemObject.ItemTypeEnum.HorseHarness;
+            bool ammo = type == ItemObject.ItemTypeEnum.Arrows || type == ItemObject.ItemTypeEnum.Bolts || type == ItemObject.ItemTypeEnum.Thrown;
             troops = new List<CharacterObject>();
             var counts = new List<int>();
             skill = null;
@@ -462,10 +482,12 @@ namespace Armoury
                     {
                         var el = r.GetElementCopyAtIndex(i);
                         var c = el.Character;
-                        if (c == null || c.IsHero || el.Number <= 0 || !NeedsType(c, type)) continue;
-                        int mult = (type == ItemObject.ItemTypeEnum.Arrows || type == ItemObject.ItemTypeEnum.Bolts
-                                    || type == ItemObject.ItemTypeEnum.Thrown) ? SlotsOfType(c, type) : 1;
-                        troops.Add(c); counts.Add(el.Number * mult);
+                        int num = healthy ? el.Number - el.WoundedNumber : el.Number;
+                        if (c == null || c.IsHero || num <= 0) continue;
+                        if (mode == MenTemplate && armour) { if (TemplateSlots(c, type) <= 0) continue; }
+                        else if (!NeedsType(c, type)) continue;
+                        int mult = (ammo || (mode != MenClassic && !armour && !horse)) ? SlotsOfType(c, type) : 1;
+                        troops.Add(c); counts.Add(num * mult);
                     }
             }
             catch { }
@@ -478,6 +500,23 @@ namespace Armoury
             men = new int[total];
             int k = 0;
             foreach (var g in order) for (int j = 0; j < counts[g]; j++) men[k++] = g;
+        }
+
+        /// <summary>K1 (przeglad): ile slotow wzorca (bron 0-3, pancerz, plaszcz) trzyma ten typ - 0, gdy wzorzec go nie ma.</summary>
+        internal static int TemplateSlots(CharacterObject c, ItemObject.ItemTypeEnum type)
+        {
+            int n = 0;
+            try
+            {
+                var eq = c.Equipment;
+                for (int s = 0; s < 10; s++)
+                {
+                    var it = eq[(EquipmentIndex)s].Item;
+                    if (it != null && it.ItemType == type) n++;
+                }
+            }
+            catch { }
+            return n;
         }
 
         /// <summary>Skill typu, gdy na polce nie ma ani jednej sztuki (kolejnosc ludzi i tak bez znaczenia - przydaje sie koszykom A7).</summary>
@@ -527,7 +566,7 @@ namespace Armoury
                 var perType = new List<string>();
                 // K1: wymiana 1:1 - liczniki calego przebiegu, nazwy obu stron i podzial egzemplarzy dla ekranu (HoldReserve, BookPostfix)
                 bool swapRule = false;
-                int sWorn = 0, sX = 0, sFilled = 0, sKept = 0, sSpare = 0, sPlayerVis = 0;
+                int sWorn = 0, sX = 0, sFilled = 0, sKept = 0, sSpare = 0, sPlayerVis = 0, sNotBetter = 0;
                 var wornNames = new List<string>(); var backNames = new List<string>();
                 int wornKinds = 0, backKinds = 0;
                 var split = new Dictionary<string, int[]>();   // klucz id|mod -> [noszone, czesc gracza, razem]
@@ -537,7 +576,9 @@ namespace Armoury
                 try
                 {
                     string pins = MusterBook.DescribePins(12);
-                    if (pins.Length > 0) Log.Info("Kwatermistrz: rozkazy z ksiegi musztry: " + pins + ".");
+                    // K1 (przeglad): porzadek biegnie teraz takze przy kazdym wjezdzie i dobie w miescie - linia tylko, gdy rozkazy sie zmienily
+                    if (pins.Length > 0 && pins != _lastPins) Log.Info("Kwatermistrz: rozkazy z ksiegi musztry: " + pins + ".");
+                    _lastPins = pins;
                 }
                 catch { }
                 foreach (var type in KitTypes)
@@ -555,7 +596,7 @@ namespace Armoury
                     if (f.Swap != null && f.OneForOne)
                     {
                         var sw = f.Swap;
-                        sWorn += sw.Worn; sX += sw.X; sFilled += sw.Filled; sKept += sw.KeptOwn; sSpare += sw.MenSpare;
+                        sWorn += sw.Worn; sX += sw.X; sFilled += sw.Filled; sKept += sw.KeptOwn; sSpare += sw.MenSpare; sNotBetter += sw.NotBetter;
                         foreach (var p in f.Pieces) sPlayerVis += p.Target;
                         if (sw.Worn > 0 || sw.X > 0)
                         {
@@ -572,7 +613,8 @@ namespace Armoury
                                     if (back.Count < 8) back.Add(p.Id + (p.Mod.Length > 0 ? "(" + p.Mod + ")" : "") + " x" + p.Back);
                                 }
                             }
-                            Log.Info("Wymiana: " + type + ": wklady noszone " + sw.Worn + " (braki " + sw.Filled + ", wymiana " + sw.X + "), graczowi: "
+                            Log.Info("Wymiana: " + type + ": wklady noszone " + sw.Worn + " (braki " + sw.Filled + ", wymiana " + sw.X
+                                     + (sw.NotBetter > 0 ? ", gorsze od wypartej bez zwrotu " + sw.NotBetter : "") + "), graczowi: "
                                      + (back.Count > 0 ? string.Join(", ", back.ToArray()) : "nic") + "; wklady nienoszone " + sw.KeptOwn
                                      + " zostaja gracza; zapas ludzi " + sw.MenSpare + ".");
                         }
@@ -630,7 +672,7 @@ namespace Armoury
                                  + (perId.Count > 10 ? ", ..." : ""));
                     }
                 }
-                _lastSplit = split; _lastX = sX;
+                _lastSplit = split; _lastX = sX; _xUnseen += sX;
                 if (pinnedWorn.Count > 0 || pinnedKept > 0)
                     Log.Info("Kwatermistrz: rozkazy - noszone z rozkazem na stan wojska: "
                              + (pinnedWorn.Count > 0 ? string.Join(", ", pinnedWorn.ToArray()) : "(brak)")
@@ -642,11 +684,12 @@ namespace Armoury
                 {
                     if (sWorn > 0 || sX > 0)
                     {
-                        Log.Info("Wymiana: razem ludzie wzieli " + sWorn + ", oddali " + sX + " gorszych, braki " + sFilled
+                        Log.Info("Wymiana: razem ludzie wzieli " + sWorn + ", oddali " + sX + " gorszych, braki " + sFilled + ", gorsze od wypartej bez zwrotu " + sNotBetter
                                  + "; widoczne: gracza " + sPlayerVis + ", zapas ludzi " + sSpare + ".");
                         // K1 B3 (Jeff 29.08: "otwieram i zamiast moich lukow leza wymienione"): obie strony wymiany w jednym zdaniu
                         string took = "QM: the men took " + sWorn + " pcs of yours (" + string.Join(", ", wornNames.ToArray())
-                                      + (wornKinds > wornNames.Count ? ", ..." : "") + "): " + sFilled + " filled empty hands, " + sX + " replaced worse kit";
+                                      + (wornKinds > wornNames.Count ? ", ..." : "") + "): " + sFilled + " filled empty hands, " + sX + " replaced worse kit"
+                                      + (sNotBetter > 0 ? ", " + sNotBetter + " pushed out better kit of theirs (nothing comes back for those)" : "");
                         string back = sX > 0
                             ? " - those " + sX + " worse pcs are yours in the stash (" + string.Join(", ", backNames.ToArray()) + (backKinds > backNames.Count ? ", ..." : "") + ")"
                             : "";
@@ -682,6 +725,12 @@ namespace Armoury
         internal static Dictionary<string, int[]> LastSplit { get { return _lastSplit; } }
         internal static int LastX { get { return _lastX; } }
         internal static void ClearSplit() { _lastSplit = null; _lastX = 0; }
+        // K1 (przeglad): zwroty z wymiany od ostatniego otwarcia ekranu - wymiana liczy sie zwykle przy ZAMKNIECIU (albo przy wjezdzie do
+        // miasta), a komunikat ekranu przy nastepnym otwarciu pokazywal X z porzadku otwarcia (prawie zawsze 0)
+        private static int _xUnseen;
+        private static string _lastPins;
+        internal static int TakeUnseenX() { int x = _xUnseen; _xUnseen = 0; return x; }
+        internal static void Reset() { _lastSplit = null; _lastX = 0; _xUnseen = 0; _lastPins = null; }
 
         /// <summary>Ile sztuk tego typu jest WLASNOSCIA WOJSKA (calosc polek
         /// minus ksiega wkladow gracza). Po tym liczymy, ile jeszcze uniosa
@@ -895,6 +944,9 @@ namespace Armoury
                 var armory = DteArmory();
                 if (rosters == null || rosters.Length == 0 || armory == null || rosters[0] != armory) return true;
 
+                // K1 (przeglad): zapas LUDZI tylko za pieniadze, ktore masz - takze prosto na towarzysza (lewa strona -> slot ekwipunku)
+                if (transferCommand.FromSide == InventoryLogic.InventorySide.OtherInventory && !CanPayMen(transferCommand)) { __result = new List<TransferCommandResult>(); return false; }
+
                 if (QuartermasterEscrow.Active) return true;   // lista juz pokazuje tylko wklady gracza
                 if (transferCommand.FromSide != InventoryLogic.InventorySide.OtherInventory) return true;   // wkladasz - wolno zawsze
 
@@ -926,6 +978,35 @@ namespace Armoury
                 return false;                                                  // sprzet w uzyciu nie wychodzi
             }
             catch (Exception e) { Log.Error("QuartermasterLaw", e); return true; }
+        }
+
+        /// <summary>K1 (przeglad): wziecie z zapasu LUDZI (ponad Twoja darmowa czesc) przechodzi tylko, gdy kiesa pokryje juz wziete w tej
+        /// sesji i te sztuki. Dotad przy braku zlota SettleBuys oddawal sztuke z sakw do zbrojowni, a sztuka zalozona od razu na towarzysza
+        /// w sakwach nie lezy - zostawala za darmo (wpis 84; od K1 caly zapas ludzi jest na sprzedaz).</summary>
+        private static bool CanPayMen(TransferCommand tc)
+        {
+            try
+            {
+                if (!MenPurse.On) return true;
+                var el = tc.ElementToTransfer.EquipmentElement;
+                var it = el.Item;
+                if (it == null || it.StringId == null) return true;
+                int n = Math.Max(1, tc.Amount), free;
+                if (!QuartermasterEscrow.PeekFree(KeyOf(el), n, out free)) free = Math.Min(n, Math.Max(0, ArmouryBehavior.StockOf(it.StringId)));
+                int paid = n - free;
+                if (paid <= 0) return true;
+                var st = Settlement.CurrentSettlement;
+                long owe = MenPurse.PendingCost(st) + (long)MenPurse.SellPrice(el, st, MobileParty.MainParty) * paid;
+                if (Hero.MainHero.Gold >= owe) return true;
+                if ((DateTime.Now - _lastShout).TotalMilliseconds > 700)
+                {
+                    _lastShout = DateTime.Now;
+                    InformationManager.DisplayMessage(new InformationMessage("Quartermaster: that is the men's kit - they want " + owe + " denars on closing for what you took, and your purse holds "
+                                                                             + Hero.MainHero.Gold + ".", Colors.Red));
+                }
+                return false;
+            }
+            catch (Exception e) { Log.Error("QuartermasterLaw.CanPayMen", e); return true; }
         }
 
         /// <summary>
@@ -1109,6 +1190,16 @@ namespace Armoury
             return true;
         }
 
+        /// <summary>K1 (przeglad): to samo co TakeFree, ale bez zdejmowania - do sprawdzenia przed transferem (QuartermasterLaw.CanPayMen).</summary>
+        internal static bool PeekFree(string key, int n, out int free)
+        {
+            free = 0;
+            if (!_freeOn || key == null || !_kitKeys.Contains(key)) return false;
+            int v; _free.TryGetValue(key, out v);
+            free = Math.Min(n, Math.Max(0, v));
+            return true;
+        }
+
         /// <summary>K1: wklad odlozony w sesji - mozna go zabrac z powrotem za darmo.</summary>
         internal static void AddFree(string key, int n, bool kit)
         {
@@ -1235,12 +1326,13 @@ namespace Armoury
                 }
                 if (_freeOn) _freeAtOpen = new Dictionary<string, int>(_free);
                 bool swapMsg = split != null && s.QuartermasterSwapOneForOne;
+                int xBack = Math.Min(visOwn, QuartermasterLaw.TakeUnseenX());   // K1 (przeglad): zwroty od ostatniego otwarcia, nie z porzadku otwarcia
                 if (swapMsg)
                 {
-                    Log.Info("Wymiana: ekran zbrojowni - widoczne sztuki gracza " + visOwn + " (w tym zwroty z wymiany " + QuartermasterLaw.LastX + "), zapas ludzi " + visSpare + " (do kupienia).");
+                    Log.Info("Wymiana: ekran zbrojowni - widoczne sztuki gracza " + visOwn + " (w tym zwroty z wymiany od ostatniego otwarcia " + xBack + "), zapas ludzi " + visSpare + " (do kupienia).");
                     if (visOwn + visSpare > 0)
                         InformationManager.DisplayMessage(new InformationMessage(
-                            "QM: free to take - " + visOwn + " pcs that are yours (" + QuartermasterLaw.LastX + " of them handed back in exchange); the men's spare ("
+                            "QM: free to take - " + visOwn + " pcs that are yours" + (xBack > 0 ? " (" + xBack + " of them handed back in exchange)" : "") + "; the men's spare ("
                             + visSpare + " pcs) is theirs - take it and you pay them the merchant's price on closing.", Colors.Yellow));
                 }
                 Active = _held.Count > 0;
@@ -1395,7 +1487,7 @@ namespace Armoury
         /// </summary>
         /// <summary>Czy ktokolwiek w kompanii udzwignie ten przedmiot
         /// (zasada nadrzedna). Wypluwa tez najlepszy posiadany skill.</summary>
-        private static bool AnyoneCanUse(ItemObject item, out int bestSkill, out string skillName)
+        internal static bool AnyoneCanUse(ItemObject item, out int bestSkill, out string skillName)
         {
             bestSkill = 0; skillName = "";
             try
@@ -1414,6 +1506,19 @@ namespace Armoury
                 return bestSkill >= item.Difficulty;
             }
             catch { return true; }
+        }
+
+        /// <summary>K1 (przeglad, B4): dostawa od kowala to Twoj wklad poza ekranem - ten sam komunikat co przy wkladzie na ekranie, gdy nikt
+        /// jej nie udzwignie (zostaje Twoja); reszte rozliczy najblizszy porzadek (wjazd do miasta, ekran zbrojowni).</summary>
+        internal static void ShoutIfNoUse(ItemObject it)
+        {
+            try
+            {
+                int best; string sk;
+                if (it != null && !AnyoneCanUse(it, out best, out sk))
+                    Log.Player("QM: no man can use " + it.Name + " (needs " + sk + " " + it.Difficulty + ", best " + best + ") - stays yours.", true);
+            }
+            catch (Exception e) { Log.Error("Escrow.ShoutIfNoUse", e); }
         }
 
         private static void ProcessSwaps(ItemRoster armory)

@@ -93,6 +93,8 @@ namespace Armoury
         // co sam wrzucilem - lupy 60% to wlasnosc wojska"): itemId -> ile sztuk
         // nalezy do gracza; ekran zbrojowni pokazuje wylacznie te sztuki
         private Dictionary<string,int> _playerStock = new Dictionary<string,int>();
+        // K1 (przeglad): licznik zmian ksiegi (MenPurse.SettlePlayerBook liczy porzadek tylko po zmianie) - tylko w pamieci
+        internal static int StockVersion;
 
         internal static int StockOf(string id)
         {
@@ -113,6 +115,7 @@ namespace Armoury
                 if (self == null || string.IsNullOrEmpty(id) || n <= 0) return;
                 int v; self._playerStock.TryGetValue(id, out v);
                 self._playerStock[id] = v + n;
+                StockVersion++;
             }
             catch { }
         }
@@ -287,6 +290,7 @@ namespace Armoury
                 int v; self._playerStock.TryGetValue(id, out v);
                 v -= n;
                 if (v <= 0) self._playerStock.Remove(id); else self._playerStock[id] = v;
+                StockVersion++;
             }
             catch { }
         }
@@ -311,6 +315,7 @@ namespace Armoury
                 var self = Instance;
                 if (self == null || snap == null) return;
                 self._playerStock = new Dictionary<string, int>(snap);
+                StockVersion++;
             }
             catch { }
         }
@@ -377,6 +382,7 @@ namespace Armoury
                     if (book <= have) continue;
                     ghost += book - have;
                     if (have <= 0) self._playerStock.Remove(id); else self._playerStock[id] = have;
+                    StockVersion++;
                 }
                 if (ghost > 0)
                     Log.Info("ReconcileStock(" + why + "): ksiega gracza przycieta o " + ghost
@@ -386,7 +392,7 @@ namespace Armoury
         }
         private Dictionary<string,int> _prisonerBaseline;
 
-        public ArmouryBehavior() { Instance = this; HistoricalPrices.Reset(); MaterialLaw.Reset(); WesterosClimate.Reset(); OutlawLaw.Reset(); PopulationLaw.Reset(); WorkshopLaw.Reset(); IronBank.Reset(); MarketGlut.Reset(); ArmsPricing.Reset(); StartKit.Reset(); AiGear.Reset(); Levy.Reset(); VolunteerKit.Reset(); LevyGold.Reset(); WearKeep.Reset(); UniqueSpoils.Reset(); BuildDiary.Reset(); BuildFunding.Reset(); KingdomLedger.Reset(); ColdStart.Reset(); MenPurse.Reset(); ArmyClothing.Reset(); AiWear.Reset(); SmithHours.Reset(); RecruitKit.Reset(); OreLedger.Reset(); GoodsLedger.Reset(); FreeSupplies.Reset(); VillageWoodlot.Reset(); SpoilsSeal.Reset(); MarketRoad.Reset(); MarketCarts.Reset(); VillageClogDiag.Reset(); CartTownExit.Reset(); MoneyLedger.Reset(); PeopleLedger.Reset(); CaravanBulk.Reset(); StartStock.Reset(); MineralOnce.Reset(); SoldierPay.Reset(); KingdomTreasury.Reset(); RecruitCost.Reset(); NightRest.ResetWorld(); WorldMeasure.Reset(); CirculationWindows.Reset(); ClanIncomeBook.Reset(); LosersFlee.Reset(); PrisonerLaw.Reset(); MenUpgrade.Reset(); GarrisonKit.Reset(); }   // stan jednej kampanii nie przecieka do drugiej (audyt 04.10)
+        public ArmouryBehavior() { Instance = this; HistoricalPrices.Reset(); MaterialLaw.Reset(); WesterosClimate.Reset(); OutlawLaw.Reset(); PopulationLaw.Reset(); WorkshopLaw.Reset(); IronBank.Reset(); MarketGlut.Reset(); ArmsPricing.Reset(); StartKit.Reset(); AiGear.Reset(); Levy.Reset(); VolunteerKit.Reset(); LevyGold.Reset(); WearKeep.Reset(); UniqueSpoils.Reset(); BuildDiary.Reset(); BuildFunding.Reset(); KingdomLedger.Reset(); ColdStart.Reset(); MenPurse.Reset(); ArmyClothing.Reset(); AiWear.Reset(); SmithHours.Reset(); RecruitKit.Reset(); OreLedger.Reset(); GoodsLedger.Reset(); FreeSupplies.Reset(); VillageWoodlot.Reset(); SpoilsSeal.Reset(); MarketRoad.Reset(); MarketCarts.Reset(); VillageClogDiag.Reset(); CartTownExit.Reset(); MoneyLedger.Reset(); PeopleLedger.Reset(); CaravanBulk.Reset(); StartStock.Reset(); MineralOnce.Reset(); SoldierPay.Reset(); KingdomTreasury.Reset(); RecruitCost.Reset(); NightRest.ResetWorld(); WorldMeasure.Reset(); CirculationWindows.Reset(); ClanIncomeBook.Reset(); LosersFlee.Reset(); PrisonerLaw.Reset(); MenUpgrade.Reset(); GarrisonKit.Reset(); QuartermasterLaw.Reset(); }   // stan jednej kampanii nie przecieka do drugiej (audyt 04.10)
 
         public override void SyncData(IDataStore dataStore)
         {
@@ -405,6 +411,7 @@ namespace Armoury
                 dataStore.SyncData("arm_condition", ref _condition);
                 dataStore.SyncData("arm_projects", ref _projects);
                 dataStore.SyncData("arm_player_stock", ref _playerStock);
+                StockVersion++;
                 dataStore.SyncData("arm_ammo_refund_v1", ref _ammoRefundDone);
                 dataStore.SyncData("arm_lore_purge_v1", ref _lorePurged);
                 if (dataStore.IsSaving) _armoryWear = BuildArmoryWearSnapshot();
@@ -438,6 +445,14 @@ namespace Armoury
                 string purse = MenPurse.Export();
                 SaveText.Sync(dataStore, "arm_menpurse", ref purse);
                 if (dataStore.IsLoading) MenPurse.Import(purse);
+                // K1 (przeglad, A3): ile z sakiewek ludzie odlozyli na lepszy sprzet (stary zapis bez klucza - zero, jak dotad)
+                try
+                {
+                    string saved = MenPurse.ExportSaved();
+                    SaveText.Sync(dataStore, "arm_mensaved", ref saved);
+                    if (dataStore.IsLoading) MenPurse.ImportSaved(saved);
+                }
+                catch (Exception e) { Log.Error("SyncData.MenSaved", e); }
                 // 150: odziez wojska - potrzeba czekajaca na zakup (partie i zalogi)
                 string cloth = ArmyClothing.Export();
                 SaveText.Sync(dataStore, "arm_armyclothing", ref cloth);

@@ -630,7 +630,8 @@ namespace Armoury
             {
                 // paczka 169: liczby doby dla linii "Obieg" - przed zerowaniem (bez zmian logiki)
                 LastLordAcc = _dLordAcc; LastLordTaken = _dLordTaken; LastGarAcc = _dGarAcc; LastGarTaken = _dGarTaken;
-                LastToPurse = _dToPurse + _dGarToPurse; LastToTowns = _dToTowns;   // K1: sakiewki ludzi - takze zalog LastToCastles = _dToCastles; LastOther = _dOther;
+                LastToPurse = _dToPurse + _dGarToPurse; LastToTowns = _dToTowns;   // K1: sakiewki ludzi - takze zalog
+                LastToCastles = _dToCastles; LastOther = _dOther;
                 LastLordN = _dLordN; LastGarN = _dGarN;                                                                    // 169b
                 LastToLordN = _dToLordN; LastToLordGold = _dToLordGold; LastFromLordN = _dFromLordN; LastFromLordGold = _dFromLordGold;
                 LastDupLordN = _dDupLordN; LastDupLordGold = _dDupLordGold; LastOutLordN = _dOutLordN; LastOutLordGold = _dOutLordGold;

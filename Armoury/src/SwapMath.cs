@@ -42,6 +42,7 @@ namespace Armoury
         internal sealed class SwapResult
         {
             public int Need, Unfit, Worn, Displaced, X, Filled, KeptOwn, MenSpare;
+            public int NotBetter;         // K1 (przeglad): noszone wklady, ktore wyparly LEPSZA sztuke ludzi - bez zwrotu (zadnego prania sztuk)
             public bool[] UnfitMan;       // kto (indeks czlowieka) zostal bez uzytecznej sztuki w dopasowaniu PO
         }
 
@@ -92,10 +93,16 @@ namespace Armoury
         {
             int unfit = 0;
             foreach (var p in sorted) { if (before) p.UsedBefore = 0; else p.Used = 0; }
+            // K1 (przeglad, koszt): ludzie jednej grupy stoja w group[] obok siebie (MenOf) - nastepny z tej samej grupy zaczyna od sztuki,
+            // ktora wzial poprzedni: wczesniejsze byly dla tej grupy wyczerpane albo nie do udzwigniecia i takie zostaja (wynik ten sam,
+            // koszt O(grupy x sztuki + ludzie) zamiast O(ludzie x sztuki))
+            int lastG = -1, from = 0;
             for (int m = 0; m < group.Length; m++)
             {
+                if (group[m] != lastG) { lastG = group[m]; from = 0; }
                 Piece pick = null;
-                for (int i = 0; i < sorted.Count; i++)
+                int i = from;
+                for (; i < sorted.Count; i++)
                 {
                     var p = sorted[i];
                     if (p.Barred) continue;
@@ -103,6 +110,7 @@ namespace Armoury
                     if (!ok.Ok(group[m], p)) continue;
                     pick = p; break;
                 }
+                from = i;
                 if (pick == null) { unfit++; if (unfitOut != null) unfitOut[m] = true; }
                 else if (before) pick.UsedBefore++; else pick.Used++;
             }
@@ -163,7 +171,11 @@ namespace Armoury
                 return r;
             }
             foreach (var p in pieces) r.Displaced += Math.Max(0, p.UsedBefore - p.MenWorn);
-            int x = Math.Min(r.Worn, r.Displaced);
+            // K1 (przeglad): porzadek dopasowania stawia WYMOG przed sila (19.09), wiec tani ciezki wklad (wyzszy wymog, nizsza sila) nosi
+            // najzdolniejszy i wypiera jego lepsza sztuke. Taki wklad przechodzi na ludzi bez zwrotu - zwrot X tylko za wklad NIE GORSZY
+            // (WorseFirst, Jeff 30.08 "za sztuke LEPSZA") od wypartej: najwieksze parowanie wkladow z wypartymi, obie listy od najgorszej
+            int x = Math.Min(Math.Min(r.Worn, r.Displaced), PairNotWorse(pieces));
+            r.NotBetter = Math.Min(r.Worn, r.Displaced) - x;
             if (x > 0 && group.Length > 0)
             {
                 var cand = new List<Piece>();
@@ -176,13 +188,40 @@ namespace Armoury
                     p.Back = k; x -= k; r.X += k;
                 }
             }
-            r.Filled = r.Worn - r.X;
+            r.Filled = r.Worn - Math.Min(r.Worn, r.Displaced);   // puste rece (bez zwrotu); NotBetter - osobno
             foreach (var p in pieces)
             {
                 p.Target = p.Barred ? p.Total : (p.Own - p.OwnWorn) + p.Back;
                 if (!p.Barred) { r.KeptOwn += p.Own - p.OwnWorn; r.MenSpare += p.MenFree - p.Back; }
             }
             return r;
+        }
+
+        /// <summary>K1 (przeglad): ile noszonych wkladow (OwnWorn) da sie sparowac z wypartymi sztukami ludzi (UsedBefore - MenWorn) tak,
+        /// zeby wklad nie byl gorszy (WorseFirst) od swojej wypartej. Zachlannie od najgorszych - najwieksze mozliwe parowanie.</summary>
+        private static int PairNotWorse(List<Piece> pieces)
+        {
+            var dep = new List<Piece>(); var dis = new List<Piece>();
+            foreach (var p in pieces)
+            {
+                if (p.OwnWorn > 0) dep.Add(p);
+                if (p.UsedBefore - p.MenWorn > 0) dis.Add(p);
+            }
+            if (dep.Count == 0 || dis.Count == 0) return 0;
+            dep.Sort(WorseFirst); dis.Sort(WorseFirst);
+            int i = 0, j = 0, x = 0;
+            int di = dis[0].UsedBefore - dis[0].MenWorn, dj = dep[0].OwnWorn;
+            while (i < dis.Count && j < dep.Count)
+            {
+                if (WorseFirst(dep[j], dis[i]) >= 0)
+                {
+                    int k = Math.Min(di, dj); x += k; di -= k; dj -= k;
+                    if (di <= 0 && ++i < dis.Count) di = dis[i].UsedBefore - dis[i].MenWorn;
+                    if (dj <= 0 && ++j < dep.Count) dj = dep[j].OwnWorn;
+                }
+                else if (++j < dep.Count) dj = dep[j].OwnWorn;   // wklad slabszy od najslabszej wypartej - nie paruje sie z zadna
+            }
+            return x;
         }
 
         // ------------------------------------------------------------ A7: koszyki typ x tier

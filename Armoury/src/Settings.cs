@@ -172,7 +172,7 @@ namespace Armoury
         public float SurplusKeepPercent = 10f;             // spare kit the stores keep above what the men wear before the rest goes to the merchants
         public float LordLootThirdPercent = 33f;           // an AI lord's cut (the captain's third) when his men sell their spare kit in a town
         public bool MenUpgradeGear = true;                 // the men buy better kit with their own coin (pay and their share of the spoils): in a town they swap their worst piece for a clearly better one of their own grade and sell the old one to the merchant - your men, AI lords' men and garrisons alike
-        public int MenGearSavePercent = 50;                // share of what the men have left on leaving a town that they put by for better kit (the rest they spend there); garrisons put this share of their pay into their own purse
+        public int MenGearSavePercent = 50;                // share of what the men earned since their last town that they put by for better kit when leaving (savings stay put; the rest they spend there); garrisons put this share of their pay into their own purse
         public int MenGearSaveDays = 30;                   // the men never hoard more than this many days of their pay - anything above goes on food and drink in town
         public int MenUpgradeMinGainPercent = 10;          // a new piece must be at least this much stronger than the old one (or of a higher tier) before the men pay for it
         public int MenUpgradeMaxPerVisit = 20;             // at most this many better pieces per party per day in town

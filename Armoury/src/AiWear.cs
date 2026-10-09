@@ -178,7 +178,9 @@ namespace Armoury
                     foreach (var mep in side.Parties)
                     {
                         var mp = mep != null && mep.Party != null ? mep.Party.MobileParty : null;
-                        if (mp == null || mp.IsMainParty || !mp.IsLordParty || !mp.IsActive) continue;
+                        // K1 (przeglad): takze zalogi - od K1-C dostaja w bitwie gracza lup DTE i walcza sprzetem ze zbrojowni (dotad lup zalogi
+                        // wchodzil jako sprawny, a jej sprzet nie obijal sie w walce; taki "sprawny" lup szedl do kupca albo graczowi jako zwrot B6)
+                        if (mp == null || mp.IsMainParty || !(mp.IsLordParty || mp.IsGarrison) || !mp.IsActive) continue;
                         _battleSince.Add(mp.StringId);   // przybytek do nastepnego spisu = lup (DTE doklada go w tym samym zdarzeniu)
                         if (share <= 0f) continue;
                         // zuzycie walki: czesc sztuk W UZYCIU (do liczby ludzi) - sprawne staja sie obite
