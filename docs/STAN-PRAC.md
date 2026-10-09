@@ -765,3 +765,9 @@ tym wplyw na gospodarke i dobrobyt". Projekt (173 + 165): stawka wojenna ustalan
 zbytki, potem odziez, jedzenie na koncu) -> mniejszy utarg kupcow i rzemieslnikow -> wolniejszy wzrost dobrobytu; (2) obciazenie ponad "znosny" poziom -> spadek
 zadowolenia (podpiac pod mechanizm BK polityki podatkowej - sprawdzic w kodzie); (3) wysokie obciazenie + glod -> niepokoje/bunt (BK); AI krol dobiera stawke
 wedlug potrzeby wojny i niepokojow. Historycznie: poll tax 1381 (Bunt Chlopski), Jacquerie 1358.
+**DECYZJE JEFFA 09.10 ok. 00:10 (lista A-L):** A glod ma skutki TAK; B dziesiecina TAK; C mniej wojska AI NIE -> podatek wojenny korony (ze skutkami dla gospodarki);
+D za Murem bez zboza -> MYSLISTWO I RYBY; E pokoj z biedy TAK; F "przegrani uchodza" takze przy autobitwie gracza TAK; G Mur najwczesniej w 6. roku TAK (jest: doba 2184);
+H proba drog TAK + po drodze szybciej (+15%) TAK; I jency w Westeros: DO DOMU, przestepcy NA MUR; J proba zimy TAK; K domyslne 171 TAK (Jeff pyta, jak jego zalogi
+"zostaja poza systemem" - wyjasnione w czacie); L TEJ NOCY (09.10) WGRYWAC SAMEMU to, co przejdzie autotest (z kopia) - TAK.
+NOWE ZADANIA 09.10: (1) audyt umiejetnosci - zwlaszcza: przekazywanie broni/mieczy daje doswiadczenie (do zmiany) + calosciowy audyt umiejetnosci wobec naszych zmian;
+(2) audyt armii kazdego krolestwa - tabele wojsk, balans, zgodnosc z lore (np. Polnoc swietna piechota).
