@@ -182,3 +182,7 @@ dana faze od nowa, korzystajac z zapisanych wynikow:
   (notable), koszt budzetu rodow 34 ms/dobe -> paczka 169b (wf_f774ccb1-f44, drzewo obieg169).
 - 19:58 **AUTOTEST S3 OK** (noc/sklad2 1254cd7 = wgranie 2 + 169; Armoury 04d1cc99): 40/40, 13.1 s/dobe, 0 bledow; reszta w dobie 40 -38 tys. Test zapisu S3 w toku.
 - 20:08 **WGRANIE 3 W GRZE**: Armoury 04d1cc99 (+169), CrashScribe cfb33950 bez zmian; galaz noc/sklad2 (1254cd7); kopia przed: Armoury.dll.bak-2026-10-09-przed-noc3.
+- 20:47 autotest 120 dob wersji z gry (wgranie 3) OK: 120/120, 18.6 s/dobe sr., 9 bledow CS - analiza w toku (SCRATCH nowej sesji kopia120\).
+- 172 STRZALY gotowe (galaz w-toku/172-strzaly 77ee649 na 171 349e393; GitHub): dzis strzaly robia warsztaty gry Z NICZEGO (BK kategoria arrows = towar),
+  znikaja u mieszczan i w zaopatrzeniu BK; 172 zamyka to i daje strzelarzy w 97 miastach (drewno + ruda z polki miasta, 0.3 x reki warsztatow zbrojnych).
+- Scalenie 171+172 do noc/sklad3 fbe3f83 (Armoury aae2828b, CrashScribe 158dfad0 - kod CS bez zmian; MCM 713). Autotest 171+172 sama (40 dob) w toku, potem S4 + zapis.
