@@ -206,3 +206,7 @@ dana faze od nowa, korzystajac z zapisanych wynikow:
 - 21:30 **AUTOTEST H3 SAM OK** (Armoury e9b567ab; kopia SCRATCH nowej sesji kopiaH3\): 13.2 s/dobe, 0 bledow; doba 40: bitew objetych 28, przegrani zabici 19.4%
   (gra dalaby 50.2%), jency 5.7%, rozbici 74.9% (do puli/wsi/BK); zwyciezcy zabici 2.3% (gra 6.7%). noc/sklad4 0ced2cd (= sklad2 + 169b + H3; Armoury 0f8a80b0,
   MCM 702). Autotest S5 (sklad4) w toku.
+- 21:50 **WGRANIE 4 W GRZE**: Armoury 0f8a80b0 (+169b +H3), CrashScribe cfb33950; galaz noc/sklad4; kopia przed: Armoury.dll.bak-2026-10-09-przed-noc4.
+  T2c gotowe (w-toku/n11-mur f6d4e51, CrashScribe; zrodlo oblezen = ROT OnAiHourlyTick, Mur bez kajdan ROT). Trybut: SCRATCH nowej sesji noc\trybut.md (reparacje Diplomacy
+  + ROT wznawia wojne fabularna tej samej doby; 93% kwoty z pokojow <= 1 doba) -> T9 (bez reparacji za wojny fabularne ROT, w-toku/n12-reparacje, wf_fc2601d0-5c5) w toku;
+  suwak Diplomacy "Scaling War Reparations Gold Cost Multiplier" 50 -> 10 = rekomendacja dla Jeffa (jego MCM).

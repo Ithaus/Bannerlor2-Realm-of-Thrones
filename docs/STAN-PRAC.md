@@ -734,3 +734,7 @@ ZATWIERDZONE OD TERAZ: Armoury 3bf72dfd, CrashScribe cfb33950.
 **WGRANIE 3 (08.10 ok. 20:08):** Armoury 04d1cc99 (= wgranie 2 + 169 KSIEGA OBIEGU, sam log; galaz noc/sklad2 1254cd7 w klonie lancuch), CrashScribe bez zmian cfb33950.
 Poprzedni Armoury 3bf72dfd: Armoury.dll.bak-2026-10-09-przed-noc3 + D:\Backup-Bannerlord\wgrane\2026-10-09-noc3-przed. ZATWIERDZONE OD TERAZ: Armoury 04d1cc99, CrashScribe cfb33950.
 Testy: 169 sama 40 dob (gra niezmieniona, reszta swiata -38 tys./d zamiast -215 tys.), S3 40 dob, S3 zapis doby 362 - 0 bledow. Znane braki pomiaru -> 169b w toku.
+**WGRANIE 4 (08.10 ok. 21:50):** Armoury 0f8a80b0 (= wgranie 3 + 169b poprawki pomiaru + H3 PRZEGRANI UCHODZA; galaz noc/sklad4 0ced2cd), CrashScribe bez zmian cfb33950.
+Poprzedni Armoury 04d1cc99: Armoury.dll.bak-2026-10-09-przed-noc4 + D:\Backup-Bannerlord\wgrane\2026-10-09-noc4-przed. ZATWIERDZONE OD TERAZ: Armoury 0f8a80b0, CrashScribe cfb33950.
+Testy: H3 sam 40 dob (przegrani zabici 19.4% zamiast 50.2%, zwyciezcy 2.3% zamiast 6.7%), S5 40 dob (13.3 s/dobe, 0 bledow, reszta swiata -27 tys./d), S5 zapis doby 362 (24.2 s/dobe, 0 bledow).
+NIE wgrane: 171 + 172 (niezaliczone progi - rynek, strzaly w karawanach; decyzja Jeffa), T2c i T9 (w toku).
