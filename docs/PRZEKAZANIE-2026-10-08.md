@@ -316,3 +316,4 @@ E1b pokoj z biedy (CS), 2.14 okup gracza do porywacza) -> bieg bazowy 120 dob ->
 182 dary) -> C2 (180 renty) -> C3 (179 rycerze bez lenna, 183 dezercja AI) -> D (168 dlug/kredyt wojenny, 178 okupy/wielcy jency; okup krola ze skarbca - odpowiedz Jeffa
 11:05) -> test 2 lata + bieg z wymuszonym pokojem. ETAP 3 (szczelnosc) dopiero po etapie 2 (decyzja Jeffa 11:15).
 LIMITY 13:30: 5h 32%, TYDZIEN 82% (reset 15.10) - przy 100% tygodnia przejsc na inne konto (Jeff: limit tygodnia nie jest powodem do oszczedzania).
+- (13:35) ETAP 2 KROK A (Armoury) w toku: workflow wf_2907b3b3-4a7, drzewo SCRATCH noc2\e2a (galaz w-toku/e2a od noc/sklad8): 169c pomiary, 2.6 powinnosci, 2.14 okup gracza -> SCRATCH test\Armoury-e2a.dll. E1b (pokoj z biedy, CS) - po sklad9 (ten sam CS). Rownolegle WGRANIE 11 (wf_06eea4b7-5d2).
