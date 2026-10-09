@@ -932,3 +932,10 @@ bo Armoury.json Jeffa ma stare 0.25/35). DLL SCRATCH test\Armoury-z16b.dll, Cras
 S (liczby, progi, teksty, male poprawki - sam + autotest, minuty), M (nowa mechanika w 1 obszarze, blad o nieznanej przyczynie - 1 workflow: krotkie rozpoznanie, kod,
 1 recenzja, autotest, ok. 1 h), L (paczki calej ekonomii - pelny lancuch z krytykami i testem 120 dob). Dane przed decyzja, bez powtarzania badan, eskalacja przy ryzyku,
 zadnego wgrania bez autotestu, tor i czas mowione Jeffowi na starcie. (Pamiec: jeff-zasada-doboru-glebokosci-pracy.)
+**WGRANIE 10 (09.10 ok. 12:25 zegara komp.; stala zgoda Jeffa):** Armoury 2aec1a1b (noc/sklad8 2ca2f2b = 17a700d7 + 171 zbrojenie zalog + 172 strzaly + 172b karawany bez
+strzal + 174 produkcja uzbrojenia + 174b dowoz rudy (kontrakty, morzem, rezerwa kramu) + K1/K1b/K1c dozbrajanie za swoje i wymiana (A/B/C) + sklad7b zadnego sprzetu z niczego
+w bitwach, konie w zbrojowni + ceny po sztuce (bez rabatu AI i kupcow) + musztra jeden wzor (Z14a/b, zapas do cwiczen, sen od switu, linia "Drill today") + T10 nocny marsz AI
++ I1b Qarth z niewola + strzaly tanie (receptura, strzelarzy x2 = 0.6)), CrashScribe bez zmian e8d460c5. Poprzedni: Armoury.dll.bak-2026-10-09-przed-noc10 +
+D:\Backup-Bannerlord\wgrane\2026-10-09-noc10-przed. Testy: nowa kampania 40 dob OK (14.2 s/dobe, 0 bledow; strzaly: miast bez 15.3; kontrakty 96.3%; zbroja na polkach OK;
+cokolwiek na tulowiu 80%; miast bez rudy 41.5 - do etapu 6), zapis 362 8 dob OK (26.3 s/dobe, 0 bledow). ZATWIERDZONE OD TERAZ: Armoury 2aec1a1b, CrashScribe e8d460c5.
+Baza Armoury dla dalszych scalen: noc/sklad8.
