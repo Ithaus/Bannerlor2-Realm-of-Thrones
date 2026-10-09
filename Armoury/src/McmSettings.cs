@@ -2016,7 +2016,7 @@ namespace Armoury
         [SettingPropertyGroup("Iron bank")]
         public bool LosersFleeEnabled { get; set; } = true;
 
-        [SettingPropertyBool("Losers Flee Player Auto", HintText = "your own battles decided without you on the field (send troops / auto-resolve) follow the same rule as battles fought without you: the beaten side - theirs or yours - mostly flees, a few are taken, the slain follow the situation; the winner loses at most a few slain. Battles you fight on the field yourself are not touched")]
+        [SettingPropertyBool("Losers Flee Player Auto", HintText = "your own battles decided without you on the field (send troops / auto-resolve) follow the same rule as battles fought without you: the beaten side - theirs or yours - mostly flees, a few are taken, the slain follow the situation; the winner, you too, loses at most a few slain. Battles you fight on the field yourself, even in part, are not touched (needs Losers Flee Enabled)")]
         [SettingPropertyGroup("Iron bank")]
         public bool LosersFleePlayerAuto { get; set; } = true;
 

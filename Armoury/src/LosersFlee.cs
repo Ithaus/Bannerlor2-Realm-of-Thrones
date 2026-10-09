@@ -31,7 +31,8 @@ namespace Armoury
     /// pomijane). Postfiks na tej samej metodzie tylko mierzy (jency wzieci = j, przegrani bez szeregowych). Bitwy gracza w polu (walka
     /// reczna), oblezenia, rabunki, morze, odwrot, poddanie i Inni - bez zmian (licznik). Bohaterowie - jak w grze. Zapisu nie ma (liczniki dnia).
     /// F1 (decyzja Jeffa 09.10 "F"): bitwa gracza rozstrzygnieta symulacja (wyslij wojsko / autobitwa) - ten sam plan co bitwa AI
-    /// (przegrani gracza albo wroga, zwyciezca z limitem zabitych), wylacznik LosersFleePlayerAuto; rozpoznanie - PlayerAuto.
+    /// (przegrani gracza albo wroga, zwyciezca z limitem zabitych), wylacznik LosersFleePlayerAuto; rozpoznanie - PlayerAuto; bitwa,
+    /// w ktorej gracz walczyl w polu (misja), a potem dal "wyslij wojsko" - jak walka w polu (NoteMission, licznik "mieszane").
     ///
     /// SendHome - jedna funkcja pochodzenia: tabor wsi / rybacy -> hearth swojej wsi (odwrotnosc VillagerCampaignBehavior:179);
     /// karawany, zalogi, milicje, patrole i straz karawan -> "z szablonu" (gra tworzy ich z niczego - licznik do E7 / 108);
@@ -79,9 +80,11 @@ namespace Armoury
 
         // ------------------------------------------------------------ liczniki dnia
         private static int _battles, _skipPlayer, _skipNotField, _skipRetreat, _skipSurr, _skipUndead;
-        // F1: autobitwy gracza objete (wliczone tez w _battles i liczby przegranych / zwyciezcow) i pominiete (nie w polu, odwrot, Inni)
-        private static int _autoCovered, _autoSkip;
+        // F1: autobitwy gracza objete (wliczone tez w _battles i liczby przegranych / zwyciezcow), pominiete (nie w polu - takze szturm
+        // wyslanym wojskiem, odwrot, Inni) i mieszane (najpierw walka w polu, potem wyslij wojsko - jak walka w polu, licznik "z graczem")
+        private static int _autoCovered, _autoSkip, _autoMixed;
         private static MapEvent _lastAutoMe;          // ostatnia objeta autobitwa gracza - naglowek linii rozbitych przy MapEventEnded
+        private static MapEvent _fieldMe;             // ostatnia bitwa gracza, w ktorej byla misja (walka w polu) - NoteMission
         private static readonly int[] _kMen = new int[Kinds], _kDead = new int[Kinds], _kCapt = new int[Kinds], _kRouted = new int[Kinds], _kDead0 = new int[Kinds];
         private static int _lMen, _lDead, _lDead0, _lCapt, _lRouted; private static double _lCapt0;
         private static int _wMen, _wDead, _wDead0, _wRevived;
@@ -125,14 +128,14 @@ namespace Armoury
             _keyKind.Clear(); _keyTroop.Clear(); _battleHome.Clear(); _poolHome.Clear(); _poolHomeDay = -1;
             _homes = null; _homeOf = null; _homesDay = -1;
             _bkTried = false; _popMgr = null; _getPopData = null; _fromSoldiers = null; _updateType = null; _typeCount = null; _isRetinue = null; _totalPop = null; _serfs = null; _nobles = null;
-            _lastWorldPop = -1; _ownersLogged = false; _csvPath = null; _cur = null; _lastAutoMe = null;
+            _lastWorldPop = -1; _ownersLogged = false; _csvPath = null; _cur = null; _lastAutoMe = null; _fieldMe = null;
             _errCalc = _errApply = _errHome = _errPost = false;
         }
 
         private static void ClearDay()
         {
             _battles = _skipPlayer = _skipNotField = _skipRetreat = _skipSurr = _skipUndead = 0;
-            _autoCovered = _autoSkip = 0;
+            _autoCovered = _autoSkip = _autoMixed = 0;
             Array.Clear(_kMen, 0, Kinds); Array.Clear(_kDead, 0, Kinds); Array.Clear(_kCapt, 0, Kinds); Array.Clear(_kRouted, 0, Kinds); Array.Clear(_kDead0, 0, Kinds);
             _lMen = _lDead = _lDead0 = _lCapt = _lRouted = 0; _lCapt0 = 0;
             _wMen = _wDead = _wDead0 = _wRevived = 0;
@@ -441,7 +444,7 @@ namespace Armoury
 
         // ------------------------------------------------------------ plan bitwy
         private sealed class TP { public CharacterObject T; public int D, R, M, W, Wb, Wbw, K, J, F; }
-        private sealed class LP { public MapEventParty Mep; public MobileParty Mp; public int Kind; public float P; public readonly List<TP> Types = new List<TP>(); public int N, K, J, F, D0; public double J0; }
+        private sealed class LP { public MapEventParty Mep; public MobileParty Mp; public int Kind; public float P; public readonly List<TP> Types = new List<TP>(); public int N, K, J, F, D0; public double J0; public bool Applied; }
         private sealed class WP { public MapEventParty Mep; public readonly List<KeyValuePair<CharacterObject, int>> X = new List<KeyValuePair<CharacterObject, int>>(); public int N, D, Rev; }
         private sealed class FP { public TroopRoster Roster; public CharacterObject T; public int N; }
         private sealed class BP
@@ -611,6 +614,10 @@ namespace Armoury
         /// - walka w polu: MenuHelper -> PlayerEncounter.StartAttackMission ustawia CampaignBattleResult != null; zeruje go tylko ContinueBattle
         ///   (bitwa trwa dalej), wiec przy wyniku z pola jest != null, a przy wyniku z symulacji (DoWait: "BattleSimulation != null && wynik") null;
         /// - BattleSimulation znika dopiero w PlayerEncounter.Finish / LeaveBattle - po CalculateAndCommitMapEventResults (DoApplyMapEventResults).
+        /// - bitwa mieszana (poprawka po przegladzie): gracz walczy w polu, wycofuje sie, bitwa trwa (ContinueBattle zeruje CampaignBattleResult),
+        ///   potem "wyslij wojsko" - InitSimulation tworzy NOWA symulacje, a listy MapEventParty sumuja obie rundy. Taka bitwa = walka w polu
+        ///   (H3 nie rusza): _fieldMe z NoteMission (kazda misja w czasie bitwy gracza; pomylka tylko w strone "jak w grze"); sprawdza to
+        ///   ResultsPrefix (licznik "mieszane"), ta funkcja mowi tylko, czy wynik pochodzi z symulacji.
         /// </summary>
         internal static bool PlayerAuto(MapEvent me)
         {
@@ -624,6 +631,12 @@ namespace Armoury
             catch { return false; }
         }
 
+        /// <summary>Misja (walka w polu) w czasie bitwy gracza - z SubModuleMain.OnMissionBehaviorInitialize. Tanie: jedno pole.</summary>
+        internal static void NoteMission()
+        {
+            try { var me = MapEvent.PlayerMapEvent; if (me != null) _fieldMe = me; } catch { }
+        }
+
         /// <summary>Bitwa poza H3: AI - licznik powodu i uwolnieni jency (tylko licznik); autobitwa gracza - tylko licznik F1 (jak dotad bitwa gracza).</summary>
         private static void SkipOut(MapEvent me, bool auto, ref int counter)
         {
@@ -632,15 +645,19 @@ namespace Armoury
             CountFreedOutside(me);
         }
 
-        /// <summary>Komunikat w grze po autobitwie gracza (po angielsku): ilu pokonanych ucieklo, ilu zabitych, ilu wzietych.</summary>
+        /// <summary>Komunikat w grze po autobitwie gracza (po angielsku): ilu pokonanych ucieklo, ilu zabitych, ilu wzietych - tylko partie
+        /// zastosowane bez bledu (LP.Applied); gdy gracz wygral - ilu poleglych jego strony przezylo jako ranni (WinRev z zastosowania).</summary>
         private static string AutoMessage(BP bp)
         {
             int n = 0, k = 0, j = 0, f = 0;
-            foreach (var lp in bp.Losers) { n += lp.N; k += lp.K; j += lp.J; f += lp.F; }
+            foreach (var lp in bp.Losers) { if (!lp.Applied) continue; n += lp.N; k += lp.K; j += lp.J; f += lp.F; }
             if (n <= 0) return null;
             bool mine = false;
             try { mine = bp.Me.DefeatedSide == bp.Me.PlayerSide; } catch { }
-            return f + (mine ? " of your beaten men fled the field (" : " of the defeated fled the field (") + k + " slain, " + j + " taken).";
+            string who = mine ? "of your side" : "of the defeated";
+            string s = (f > 0 ? f + " " + who : "None " + who) + " fled the field (" + k + " slain, " + j + " taken)";
+            if (!mine && bp.WinRev > 0) s += "; " + bp.WinRev + " of your side's fallen survived, wounded";
+            return s + ".";
         }
 
         // ------------------------------------------------------------ prefiks / postfiks
@@ -659,7 +676,12 @@ namespace Armoury
                 bool auto = false;
                 if (me.IsPlayerMapEvent)
                 {
-                    if (!PlayerAutoOn || !PlayerAuto(me)) { _skipPlayer++; return; }
+                    bool sim = PlayerAutoOn && PlayerAuto(me);
+                    // mieszana: najpierw walka w polu (misja), potem wyslij wojsko - jak walka w polu
+                    if (sim && me == _fieldMe) { _skipPlayer++; _autoMixed++; return; }
+                    // szturm / morze wyslanym wojskiem: DoWait przy IsSiegeAssault sam ustawia CampaignBattleResult - poza H3, licznik F1 "nie w polu"
+                    if (!sim && PlayerAutoOn && me.IsPlayerSimulation && me != _fieldMe && (!me.IsFieldBattle || me.IsNavalMapEvent)) { _autoSkip++; return; }
+                    if (!sim) { _skipPlayer++; return; }
                     auto = true;
                 }
                 if (!me.IsFieldBattle || me.IsNavalMapEvent) { SkipOut(me, auto, ref _skipNotField); return; }
@@ -886,6 +908,7 @@ namespace Armoury
                     bp.LoseDeadAll += lp.K - lp.D0;
                     _kMen[lp.Kind] += lp.N; _kDead[lp.Kind] += lp.K; _kCapt[lp.Kind] += lp.J; _kRouted[lp.Kind] += lp.F; _kDead0[lp.Kind] += lp.D0;
                     _lMen += lp.N; _lDead += lp.K; _lDead0 += lp.D0; _lCapt += lp.J; _lRouted += lp.F; _lCapt0 += lp.J0;
+                    lp.Applied = true;                                     // komunikat w grze liczy tylko partie zastosowane bez bledu
                 }
                 catch (Exception e)
                 {
@@ -1124,7 +1147,7 @@ namespace Armoury
               .Append(" | zwyciezca: zabici gry ").Append(wd0).Append(" (").Append(Pc(wd0, wn)).Append(") -> ").Append(wdNow).Append(" (").Append(Pc(wdNow, wn)).Append("), +").Append(rev).Append(" rannych")
               .Append(" | jency wzieci ").Append(got).Append(bp.Covered ? " (zgubieni przez gre " + (bp.SumJ - got) + ")" : " (bez sprawdzenia - partia przegrana poza planem)")
               .Append(", uwolnieni bez odbiorcy ").Append(bp.FreedN);
-            if (bp.Auto) sb.Append(" | komunikat w grze: ").Append(msg ?? "brak (przegrani bez szeregowych)");
+            if (bp.Auto) sb.Append(" | komunikat w grze: ").Append(msg ?? "brak (przegrani bez szeregowych albo blad zastosowania)");
             sb.Append('.');
             Log.Info(sb.ToString());
         }
@@ -1156,7 +1179,8 @@ namespace Armoury
                 var sb = new StringBuilder();
                 sb.Append(auto ? "Bitwa: H3 autobitwa gracza - rozbici przy koncu bitwy, dzien " : "Bitwa: H3 pominieta (gracz) dzien ").Append((int)CampaignTime.Now.ToDays)
                   .Append(" - ").Append(me.EventType).Append(Where(me)).Append(": ")
-                  .Append(auto ? "autobitwa (H3 objela)" : (me.IsPlayerSimulation ? "symulacja" : "pole")).Append(" | gra: ");
+                  .Append(auto ? "autobitwa (H3 objela)" : me == _fieldMe ? (me.IsPlayerSimulation ? "pole i symulacja (mieszana - jak pole)" : "pole")
+                         : me.IsPlayerSimulation ? (me.IsFieldBattle && !me.IsNavalMapEvent ? "symulacja" : "symulacja nie w polu (poza H3)") : "pole").Append(" | gra: ");
                 bool first = true;
                 foreach (var side in new[] { me.AttackerSide, me.DefenderSide })
                 {
@@ -1244,7 +1268,8 @@ namespace Armoury
                 sb.Append(" - bitew objetych ").Append(_battles).Append(" (pominiete: z graczem ").Append(_skipPlayer).Append(", nie w polu ").Append(_skipNotField)
                   .Append(" [oblezenie, rabunek, wypad, morze], odwrot ").Append(_skipRetreat).Append(", poddanie ").Append(_skipSurr).Append(", z Innymi ").Append(_skipUndead).Append(')');
                 sb.Append(" | autobitwy gracza (F1): ");
-                if (PlayerAutoOn) sb.Append("objete ").Append(_autoCovered).Append(" (wliczone w objete i liczby nizej), pominiete ").Append(_autoSkip).Append(" (nie w polu, odwrot, Inni)");
+                if (PlayerAutoOn) sb.Append("objete ").Append(_autoCovered).Append(" (wliczone w objete i liczby nizej), pominiete ").Append(_autoSkip).Append(" (nie w polu - takze szturm wyslanym wojskiem, odwrot, Inni), mieszane ")
+                                    .Append(_autoMixed).Append(" (najpierw walka w polu, potem wyslij wojsko - jak walka w polu, w \"z graczem\")");
                 else sb.Append("WYLACZONE (jak walka w polu - w \"z graczem\")");
                 sb.Append(" | przegrani ").Append(_lMen).Append(" ludzi: zabici ").Append(_lDead).Append(" (").Append(Pc(_lDead, _lMen)).Append("; gra dalaby ").Append(_lDead0).Append(", ").Append(Pc(_lDead0, _lMen))
                   .Append("), jency ").Append(_lCapt).Append(" (").Append(Pc(_lCapt, _lMen)).Append("; gra ok. ").Append((int)Math.Round(_lCapt0)).Append("), rozbici ").Append(_lRouted).Append(" (").Append(Pc(_lRouted, _lMen)).Append(") -");

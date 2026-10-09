@@ -169,7 +169,7 @@
 | morze (`IsNavalMapEvent`) | nie | statki, tonacy - osobna mechanika NavalDLC |
 | z udzialem Innych (`Undead.Party`, `Undead.cs:50`) | nie | Inni nie biora jencow, umarli wstaja - watek R2/R4/T2. Rozbici z takiej bitwy (podzial 3.2 biegnie przy KAZDEJ bitwie): zywi - jak wszedzie; **wighty - ani w las, ani do domu** (z niczego, do niczego; po przegladzie kodu, rozdz. 15 uwaga 6) |
 | z graczem w polu (misja) | nie - **walka decyduje**; tylko rozbici nie znikaja (2.4) | decyzja Jeffa |
-| symulacja z graczem (autobitwa, "wyslij wojsko") | nie w fazie 1 | pytanie 10.1 |
+| symulacja z graczem (autobitwa, "wyslij wojsko") | TAK - F1, decyzja Jeffa 09.10 F, `LosersFleePlayerAuto` (bitwa z walka w polu, potem "wyslij wojsko" - jak pole) | pytanie 10.1 - rozstrzygniete |
 
 ### 2.2 Ilu przegranych ginie
 Dla strony przegranej (szeregowi, bez bohaterow; sklad = to, co partia miala przed bitwa: w partii + polegli + rozbici):
