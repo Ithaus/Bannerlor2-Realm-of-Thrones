@@ -1041,7 +1041,7 @@ namespace CrashScribe
         // ---- STRAZ SKILLI W PRZYDZIALE DTE (Jeff 14.09: "niech nie przyjmuja
         // strzal, ktorych nie moga uzyc - z polki schodzi tylko to, do czego
         // ludzie maja skill") ----
-        private static SkillObject ReqSkill(ItemObject it)
+        internal static SkillObject ReqSkill(ItemObject it)
         {
             if (it == null) return null;
             var rs = it.RelevantSkill;
@@ -1133,7 +1133,7 @@ namespace CrashScribe
         /// <summary>Jak DTE ItemObjectExtension.IsSuitableForMount: bron bez uzycia
         /// "RequiresNoMount" i bez flagi "CantReloadOnHorseback" - jezdziec nie dostanie
         /// dlugiego luku ani kuszy nie do przeladowania z siodla.</summary>
-        private static bool MountOk(ItemObject it)
+        internal static bool MountOk(ItemObject it)
         {
             try
             {
@@ -1718,7 +1718,7 @@ namespace CrashScribe
 
         /// <summary>Najwyzszy tier broni z wzorcow bojowych jednostki (tarcze
         /// nie sa stala bojowa i nie licza sie). PULAPKA: ItemTiers.Tier1 == 0.</summary>
-        private static int BestWeaponTier(CharacterObject c)
+        internal static int BestWeaponTier(CharacterObject c)
         {
             try
             {
@@ -1758,7 +1758,9 @@ namespace CrashScribe
             {
                 if (__result.ResultNumber <= 1f) return;
                 if (!WalkerBlood(__1)) return;                   // __1 = trafiany
-                if (BestWeaponTier(__0) >= 6) return;            // __0 = bijacy
+                // 175: tier z MIGAWKI wzorca sprzed zamiany sprzetu wedlug tieru (Army175.PreTierBest) -
+                // walka z Innymi zostaje dokladnie jak przed 175 (projekt 1.7 [a2], 1.9)
+                if (Army175.PreTierBest(__0) >= 6) return;       // __0 = bijacy
                 float cut = __result.ResultNumber * 0.15f;
                 if (cut < 1f) cut = 1f;
                 __result = new ExplainedNumber(cut);
@@ -1796,7 +1798,7 @@ namespace CrashScribe
         /// </summary>
         /// <summary>Odczyt pola float z ustawien Armoury (suwaki MCM) refleksja
         /// - wspolny wzorzec dla praw kuzni.</summary>
-        private static float ArmouryFloat(string field, float def)
+        internal static float ArmouryFloat(string field, float def)
         {
             try
             {
@@ -2402,6 +2404,9 @@ namespace CrashScribe
 
         internal static void SkillSinew()
         {
+            // 175 (09.10, decyzja 8b): wzorce zolnierzy sa juz W TIERZE jednostki (Army175.TierGear przy
+            // wczytaniu), wiec "umiejetnosc do wlasnego sprzetu" nie podnosi juz t2-t4 pod tarcze i belty t6.
+            // Zasada bez zmian: raise, never lower. Po niej Army175.NorthHardy / DothrakiRiders (bonusy 175).
             try
             {
                 int fixedN = 0, seen = 0, fixedSkills = 0;
@@ -4690,13 +4695,19 @@ namespace CrashScribe
         {
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this,
                 delegate (CampaignGameStarter s)
-                { Mends.ArmorSanity(); Mends.AmmoSanity(); Mends.WeightLaw(); Mends.ArmorTierLaw(); Mends.WeaponTierLaw(); Mends.SkillSinew(); Mends.UniqueWares(); Mends.LoreForgeGate(); Mends.DressTheNamesakes(); Mends.NorthernFare(); Mends.ItemDump(); Mends.ReligionAudit(); Mends.RulerRobesAudit(); });
+                { Mends.ArmorSanity(); Mends.AmmoSanity(); Army175.TierGearCheck(); Mends.WeightLaw(); Mends.ArmorTierLaw(); Mends.WeaponTierLaw(); Mends.SkillSinew(); Army175.NorthHardy(); Army175.DothrakiRiders(); Mends.UniqueWares(); Mends.LoreForgeGate(); Mends.DressTheNamesakes(); Mends.NorthernFare(); Mends.ItemDump(); Mends.ReligionAudit(); Mends.RulerRobesAudit(); });
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this,
                 delegate (TaleWorlds.CampaignSystem.MapEvents.MapEvent m) { Mends.MeltDeadLoot(m); Mends.WardReport(); });
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this,
                 delegate (CampaignGameStarter s) { Mends.DragonPurge(true); Mends.MeltDeadArmory("po wczytaniu"); });
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this,
-                delegate { Mends.DragonPurge(false); if (!Mends.SinewApplied) Mends.SkillSinew(); });
+                delegate
+                {
+                    Mends.DragonPurge(false);
+                    Army175.DailyCatchUp();   // 175: zamiana wedlug tieru, gdy przy wczytaniu zestawy byly puste
+                    if (!Mends.SinewApplied) Mends.SkillSinew();
+                    if (Mends.SinewApplied) { Army175.NorthHardy(); Army175.DothrakiRiders(); }   // raz (znacznik), potem nic
+                });
         }
 
         public override void SyncData(IDataStore dataStore)

@@ -93,6 +93,7 @@ namespace CrashScribe
                 NightKingGate.Install(_harmony);  // T2c: Inni bez oblezen zamknietych celow przed dniem z kalendarza
                 StorylineReparations.Install(_harmony);  // T9: pokoj w wojnie fabularnej ROT bez reparacji Diplomacy
                 PovertyPeace.Install(_harmony);  // E1: pokoj z biedy (glos rodu o pokoj + ocena wojny BK)
+                Army175.Install(_harmony);       // 175: dopisek pieszych Dothrakow do puli ROT (postfiks ROTTroopRecruiter.Settings)
                 Scribe.Line("Net ready.");
                 Watchdog.Start();
                 // Sampler WYLACZONY 29.08: Suspend+StackTrace co 0.5 s na FF potrafi
@@ -111,6 +112,17 @@ namespace CrashScribe
             }
         }
 
+        /// <summary>175 (09.10): pierwszy moment z wczytanymi przedmiotami, rosterami, szablonami partii i jednostkami
+        /// (po XSLT ROT), a jeszcze przed SyncData, partiami i zalogami nowej gry i przed kazdym OnSessionLaunched
+        /// (Armoury TroopFit/ColdStart). CrashScribe laduje sie przed Sandbox, wiec biegnie tez przed jego
+        /// InitializeCharactersAfterLoad - stad zawsze nowy roster dla zmienianej jednostki (Army175.Rewrite).</summary>
+        public override void AfterRegisterSubModuleObjects(bool isSavedCampaign)
+        {
+            base.AfterRegisterSubModuleObjects(isSavedCampaign);
+            try { Army175.OnObjectsRegistered(); }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "AfterRegisterSubModuleObjects.Army175", null); } catch { } }
+        }
+
         protected override void OnApplicationTick(float dt)
         {
             base.OnApplicationTick(dt);
@@ -122,6 +134,7 @@ namespace CrashScribe
             base.OnGameStart(game, gameStarterObject);
             try { Scribe.Line("=== New game / save loaded: " + game.GameType.GetType().Name + " ==="); Trail.Drop("game", "start " + game.GameType.GetType().Name); }
             catch { }
+            try { Army175.Reset(); } catch { }   // 175: stan sesji (wybory zamiennikow, flagi, znaczniki) - przed AfterRegister
             try
             {
                 var cgs = gameStarterObject as TaleWorlds.CampaignSystem.CampaignGameStarter;
