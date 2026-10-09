@@ -1,5 +1,12 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-09 (noc) WGRANIE 2: 170 + T1..T8 (z poprawka bawelny) + T2b - Armoury 3bf72dfd, CrashScribe cfb33950
+
+**Status:** WGRANE 2026-10-09 ok. 19:33 (zegar komputera) na zgode Jeffa na te noc (tylko po udanym autotescie). Galaz noc/sklad = a389a5e. Dochodzi wobec wgrania 1: T8 krainy (papirus i las wedlug klimatu, 23 wsie, bawelna 14 wsi tylko w cieplych krainach) i T2b (Inni bez dosypki z niczego: bez +100 przy narodzinach bandy poza 2 pierwszymi dobami kampanii, bez +2 dziennie, bez ochotnikow z mapy).
+Poprzednie (wgranie 1): Armoury 28a7456e, CrashScribe aff275de - *.bak-2026-10-09-przed-noc2 obok plikow i D:\Backup-Bannerlord\wgrane\2026-10-09-noc2-przed.
+Autotesty: S2 nowa kampania 40/40 (13.0 s/dobe, 0 bledow, bawelna ze wsi 128/d, nie dosypano Innym 1033 trupow), S2 zapis doby 362 -> 370 (0 bledow, klasy wsi BK wyrownane 18, T2b dziala).
+Wpisy T8 (z poprawka) i T2b maja od teraz status WGRANE. Armoury.json i CrashScribe.settings.xml w grze bez zmian (domyslne z kodu).
+
 ## 2026-10-09 (T2b noc 08/09.10) - INNI BEZ DOSYPKI Z NICZEGO: bez +100 trupow ROT przy narodzinach bandy, bez +2 trupow dziennie na bande, bez "ochotnikow z mapy"; nekromancja z poleglych i odbici jency bez zmian (wersja minimalna, bez ksiegi ludzi 108)
 **Mod:** CrashScribe | **Pliki:** NOWY `CrashScribe/src/OthersGrowth.cs` (`OthersGrowth.Install`, prefiksy `BirthPrefix`, `DailyPrefix`, `MapVolunteerPrefix`, `DailyLine`; `OthersGrowthBehavior`), `CrashScribe/src/Config.cs` (4 klucze + `Load`), `CrashScribe/src/SubModuleMain.cs` (`OthersGrowth.Install` po `Fabula.Install`, `OthersGrowthBehavior` w `OnGameStart`), `CrashScribe/ModuleData/CrashScribe.settings.xml` (4 klucze z opisem). Bez zapisu w grze, bez nowej kampanii. Galaz od T2 (kalendarz Innych).
 
