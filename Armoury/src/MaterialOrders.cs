@@ -136,6 +136,15 @@ namespace Armoury
 
         private static float Kg(ItemObject it) { return it != null && it.Weight > 0.05f ? it.Weight : 10f; }
 
+        /// <summary>174b.2: sztuk przedmiotu we wszystkich stosach rosteru (GetItemNumber liczy tylko pierwszy stos) - do audytu ilosci kontraktu.</summary>
+        private static int Total(ItemRoster r, ItemObject it)
+        {
+            int n = 0;
+            if (r == null || it == null) return 0;
+            for (int i = 0; i < r.Count; i++) { var el = r.GetElementCopyAtIndex(i); if (el.EquipmentElement.Item == it && el.Amount > 0) n += el.Amount; }
+            return n;
+        }
+
         // ------------------------------------------------------------ sygnal i zuzycie (wolane z warsztatow, strzelarzy i rzemiosla miasta)
         /// <summary>Brak surowca w cyklu (bit 0 ruda, 1 drewno, 2 skora, 3 len/plotno - maska WorkshopLaw i TownFletchers).</summary>
         internal static void NoteMissMask(Town town, int mask, bool names = true)
@@ -616,7 +625,7 @@ namespace Armoury
             var item = _items[m];
             var srcRoster = src.ItemRoster; var pack = car.ItemRoster;
             int got = 0; long paid = 0;
-            int packStart = pack.GetItemNumber(item);
+            int packStart = Total(pack, item);
             if (packs) got = Math.Min(q, packStart);   // 174b.2: surowiec, ktory karawana juz wiezie - bez zakupu (prawdziwy towar, prawdziwa droga)
             for (int guard = 0; guard < 100 && got < q && !packs; guard++)
             {
@@ -630,11 +639,11 @@ namespace Armoury
                 int n = Math.Min(Math.Min(10, q - got), el.Amount);
                 if ((long)(price + price / 4 + 1) * n > car.PartyTradeGold) n = car.PartyTradeGold >= price ? 1 : 0;
                 if (n <= 0) break;
-                int had = pack.GetItemNumber(item), purse = car.PartyTradeGold, shelfHad = srcRoster.GetItemNumber(item);
+                int had = pack.GetItemNumber(item), purse = car.PartyTradeGold, packAll = Total(pack, item), shelfAll = Total(srcRoster, item);
                 try { SellItemsAction.Apply(src.Town.Owner, car.Party, el, n, src); }
                 catch (Exception e) { Stumble("Place(zakup)", e); break; }
-                int moved = pack.GetItemNumber(item) - had;
-                if (moved != shelfHad - srcRoster.GetItemNumber(item)) { _dAudit++; _auditAll++; }   // 174b.2 audyt (krytyka 20): przyrost jukow == ubytek polki zrodla
+                int moved = Total(pack, item) - packAll;   // 174b.2: wszystkie stosy
+                if (moved != shelfAll - Total(srcRoster, item)) { _dAudit++; _auditAll++; }   // 174b.2 audyt (krytyka 20): przyrost jukow == ubytek polki zrodla (wszystkie stosy)
                 if (moved <= 0) break;
                 got += moved; paid += Math.Max(0, purse - car.PartyTradeGold);
             }
@@ -729,7 +738,7 @@ namespace Armoury
                 var pack = mp.ItemRoster;
                 // recenzja 174: ladunku moglo ubyc po drodze (BK SellGoods i CaravanBulk przy wjezdzie do innego miasta, lup z karawany, ktora przezyla) -
                 // to osobna pozycja linii, nie "brak kasy miasta"
-                carried = Math.Min(c.Qty, Math.Max(0, pack.GetItemNumber(item)));
+                carried = Math.Min(c.Qty, Math.Max(0, Total(pack, item)));   // 174b.2: wszystkie stosy (z jukow moze byc kilka)
                 if (carried < c.Qty) _dShortPack += c.Qty - carried;
                 for (int guard = 0; guard < 100 && sold < carried && town != null; guard++)
                 {
@@ -741,11 +750,11 @@ namespace Armoury
                     int price = Math.Max(1, town.GetItemPrice(el.EquipmentElement, mp, true));
                     int n = Math.Min(Math.Min(10, carried - sold), Math.Min(el.Amount, spare / price));
                     if (n <= 0) break;                                                    // miasto bez kasy ponad rezerwe - reszta zostaje karawanie
-                    int had = el.Amount, purse = mp.PartyTradeGold, shelfHad = town.Owner.ItemRoster.GetItemNumber(item);
+                    int had = el.Amount, purse = mp.PartyTradeGold, packAll = Total(pack, item), shelfAll = Total(town.Owner.ItemRoster, item);
                     try { SellItemsAction.Apply(mp.Party, town.Owner, el, n, st); }
                     catch (Exception e) { Stumble("Deliver(sprzedaz)", e); break; }
-                    int moved = had - pack.GetItemNumber(item);
-                    if (moved != town.Owner.ItemRoster.GetItemNumber(item) - shelfHad) { _dAudit++; _auditAll++; }   // 174b.2 audyt: ubytek jukow == przyrost polki celu
+                    int moved = packAll - Total(pack, item);   // 174b.2: wszystkie stosy (oprozniony stos zmienia kolejnosc w rosterze)
+                    if (moved != Total(town.Owner.ItemRoster, item) - shelfAll) { _dAudit++; _auditAll++; }   // 174b.2 audyt: ubytek jukow == przyrost polki celu (wszystkie stosy)
                     if (moved <= 0) break;
                     sold += moved; got += Math.Max(0, mp.PartyTradeGold - purse);
                 }
