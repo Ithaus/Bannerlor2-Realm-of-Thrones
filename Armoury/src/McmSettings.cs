@@ -1080,6 +1080,10 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public bool SpeedAuditEnabled { get; set; } = true;
 
+        [SettingPropertyBool("World Measure Log", HintText = "once a day Armoury.log measures the world: how many km a day the AI lords' hosts really march (median and 90th percentile, big hosts, army leaders and all-mounted parties, the world pace in force) and how many days of food every town and castle has left, the North apart - log only, changes nothing in the game")]
+        [SettingPropertyGroup("The marching column")]
+        public bool WorldMeasureLog { get; set; } = true;
+
         [SettingPropertyInteger("Siege Pace Percent", 0, 200, "0", HintText = "siege engine construction speed - 50% makes sieges last twice as long, so starving a fortress out matters again")]
         [SettingPropertyGroup("The marching column")]
         public int SiegePacePercent { get; set; } = 50;
@@ -3029,6 +3033,7 @@ namespace Armoury
             s.PlagueWatchEnabled = PlagueWatchEnabled;
             s.InfluenceWatchEnabled = InfluenceWatchEnabled;
             s.SpeedAuditEnabled = SpeedAuditEnabled;
+            s.WorldMeasureLog = WorldMeasureLog;
             s.SiegePacePercent = SiegePacePercent;
             s.SiegeSicknessEnabled = SiegeSicknessEnabled;
             s.SiegeSicknessIncubationDays = SiegeSicknessIncubationDays;
