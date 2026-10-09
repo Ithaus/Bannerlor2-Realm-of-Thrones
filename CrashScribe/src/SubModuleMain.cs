@@ -92,6 +92,7 @@ namespace CrashScribe
                 OthersGrowth.Install(_harmony);   // T2b: Inni bez dosypki z niczego (Jeff 07.10 H2)
                 NightKingGate.Install(_harmony);  // T2c: Inni bez oblezen zamknietych celow przed dniem z kalendarza
                 StorylineReparations.Install(_harmony);  // T9: pokoj w wojnie fabularnej ROT bez reparacji Diplomacy
+                PovertyPeace.Install(_harmony);  // E1: pokoj z biedy (glos rodu o pokoj + ocena wojny BK)
                 Scribe.Line("Net ready.");
                 Watchdog.Start();
                 // Sampler WYLACZONY 29.08: Suspend+StackTrace co 0.5 s na FF potrafi
@@ -130,6 +131,7 @@ namespace CrashScribe
                 if (cgs != null) cgs.AddBehavior(new NightKingCall());   // Zew Nocnego Krola (Jeff 16.09)
                 if (cgs != null) cgs.AddBehavior(new OthersGrowthBehavior());   // T2b: linia dobowa "Inni bez dosypki"
                 if (cgs != null) cgs.AddBehavior(new StorylineReparationsBehavior());   // T9: linie "Reparacje (T9)" (pokoj + doba)
+                if (cgs != null) cgs.AddBehavior(new PovertyPeaceBehavior());   // E1: linie "Pokoj z biedy (E1)" (decyzje + doba)
                 if (cgs != null) cgs.AddBehavior(new EconomyAudit());    // audyt ekonomii rodow (Jeff 04.10), tylko odczyt
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "OnGameStart.WarReport", null); } catch { } }

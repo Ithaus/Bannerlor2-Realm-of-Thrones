@@ -60,6 +60,9 @@ namespace CrashScribe
         // --- Reparacje w wojnach fabularnych ROT (T9 noc 08/09.10; patrz StorylineReparations.cs) ---
         public static bool StorylineWarNoReparations = true;  // pokoj w wojnie, ktora ROT i tak wypowiada od nowa nastepnej doby - bez reparacji Diplomacy (inne pokoje bez zmian)
 
+        // --- Pokoj z biedy (E1 noc 09/10.10; patrz PovertyPeace.cs) ---
+        public static bool PovertyPeace = true;  // krolestwo z pustym skarbcem: rzadziej wypowiada wojne (ocena BK), biedne rody chetniej glosuja za pokojem; wojny fabularne ROT bez zmian
+
         // --- Oboz obleniczy (patrz Mends.RbSiegeCampFed) ---
         public static bool RbSiegeAttritionOnlyStarving = true; // straty obozu z RealisticBannerlord (2-5 dziennie, rosnace) tylko gdy oboz GLODUJE; garnizon - tylko gdy miasto bez zapasow // najsilniejsza banda pelna w tylu procentach limitu (ROT: oblezenie przy >= 0.8)
 
@@ -115,6 +118,7 @@ namespace CrashScribe
                         case "OthersNoDailyWights": OthersNoDailyWights = B(v); break;
                         case "OthersNoMapVolunteers": OthersNoMapVolunteers = B(v); break;
                         case "StorylineWarNoReparations": StorylineWarNoReparations = B(v); break;
+                        case "PovertyPeace": PovertyPeace = B(v); break;
                         case "RbSiegeAttritionOnlyStarving": RbSiegeAttritionOnlyStarving = B(v); break;
                     }
                 }

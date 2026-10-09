@@ -112,6 +112,18 @@
        every peace Diplomacy settles. Set StorylineWarNoReparations to false to restore Diplomacy's reparations. -->
   <StorylineWarNoReparations>true</StorylineWarNoReparations>
 
+  <!-- Peace out of poverty: a realm that cannot pay for a war seeks peace. Once a day each kingdom's treasury is measured
+       against what it has been losing over the last week: enough for 28 days or less counts as an empty treasury, enough for
+       a whole season (91 days) or more as no poverty at all, with a gradual scale in between. A lord counts as poor below
+       5000 gold for each of his realm's wars, and as able to afford it from 50000 (Banner Kings' own "cannot afford a war").
+       With this on: (1) the realm's wish to declare or keep a war (Banner Kings' war score, which drives war proposals,
+       votes and its war support) is lowered in proportion to the empty treasury - the tooltip shows "The royal treasury cannot
+       pay for a war"; (2) in a vote on peace, a lord whose own poverty plus the treasury's adds up to more than one votes for
+       peace. Rich lords in a poor realm and poor lords in a rich one vote as before. Storyline wars of Realm of Thrones
+       are left alone, and so are Diplomacy's war exhaustion and reparations. The log shows "Pokoj z biedy (E1)" lines:
+       the kingdoms in poverty once a day and every war or peace vote between kingdoms. Set PovertyPeace to false to switch it off. -->
+  <PovertyPeace>true</PovertyPeace>
+
   <!-- Siege camps do not rot while fed: RealisticBannerlord's SiegeAttritionBehavior kills 2-5 men
        of every besieging party each day (escalating) regardless of food and morale. With this on,
        the camp only suffers those losses while it is STARVING, and a besieged garrison only while
