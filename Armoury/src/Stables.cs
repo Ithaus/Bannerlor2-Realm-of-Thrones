@@ -557,12 +557,14 @@ namespace Armoury
                     }
                     if (best < 0 || bestPrice > budget - paid) break;
                     var chosen = shelf[best];
-                    int take = Math.Min(needMarket, chosen.Amount);
-                    if (take * bestPrice > budget - paid) take = Math.Max(1, (budget - paid) / Math.Max(1, bestPrice));
+                    var cel = chosen.EquipmentElement;
+                    // ceny hurtu (Jeff 09.10 08:00): kazdy kon po swojej cenie - po zdjeciu konia z polki nastepny wyceniany od nowa (ShelfBuy);
+                    // dotad cena pierwszego x liczba koni. Pierwszy - cena z przegladu polki (ta sama polka).
+                    int cost, first, lastP;
+                    int take = ShelfBuy.Take(shelf, cel, Math.Min(needMarket, chosen.Amount), budget - paid, () => PriceOf(settlement, cel), out cost, out first, out lastP, bestPrice);
                     if (take <= 0) break;
-                    shelf.AddToCounts(chosen.EquipmentElement, -take);
-                    party.ItemRoster.AddToCounts(chosen.EquipmentElement, take);
-                    paid += take * bestPrice; bought += take; need -= take; needMarket -= take;
+                    party.ItemRoster.AddToCounts(cel, take);
+                    paid += cost; bought += take; need -= take; needMarket -= take;
                     var cid = chosen.EquipmentElement.Item != null ? chosen.EquipmentElement.Item.StringId : "?";
                     if (what == null) what = cid; else if (!what.Contains(cid)) what += "," + cid;
                 }

@@ -421,7 +421,10 @@ namespace Armoury
                     if (player) MoneyLedger.Note169(MoneyLedger.N169Kit, w.Shop, paid);   // jak braki gracza (paczka 169: linia kas)
                     else MoneyLedger.Note(MoneyLedger.NGear, w.Shop, paid);               // jak zakupy AiGear (ksiega przeplywow osad)
                     v.N++; v.Gold += paid;
-                    try { w.Price = w.Shop.Town.MarketData.GetPrice(w.El, mp, false, w.Shop.Party); } catch { }
+                    // ceny hurtu (Jeff 09.10 08:00): kazda sztuka po swojej cenie - po zdjeciu sztuki ceny towaru tej polki w tym koszyku i tej kategorii
+                    // licz od nowa (Pick wycenia je przy nastepnym wyborze). Dotad od nowa tylko kupiona sztuka - inna sztuka tego koszyka szla po cenie
+                    // sprzed zakupu (polka wieksza o kupione sztuki).
+                    Stale(wares, w.Shop, w.El.Item);
                     string ln = c.Type + " t" + oldP.Tier + "->t" + w.Tier + " " + oldP.Id + "->" + (w.El.Item.StringId ?? "?") + " " + paid;
                     if (v.Lines.Count < 6) v.Lines.Add(ln);
                     if (v.Names.Count < 3) v.Names.Add(w.El.Item.Name + " for " + oldEl.Item.Name);
@@ -432,6 +435,7 @@ namespace Armoury
                     int unit = MenPurse.SellPriceHere(soldEl, sellTo, mp);
                     if (!SwapMath.MerchantPays(sellTo.Town.Gold, unit)) { kit.PutBackOld(oldP, soldEl); v.Kept++; _dKept++; continue; }
                     sellTo.ItemRoster.AddToCounts(soldEl, 1);
+                    Stale(wares, sellTo, soldEl.Item);   // ceny hurtu (09.10): sztuka doszla na polke - ceny tego koszyka i kategorii od nowa
                     sellTo.Town.ChangeGold(-unit);
                     MoneyLedger.Note169(MoneyLedger.N169Surplus, sellTo, -unit);   // paczka 169: linia kas (tylko licznik)
                     MenPurse.Add(mp, unit);
@@ -442,6 +446,26 @@ namespace Armoury
                 }
             }
             return v;
+        }
+
+        /// <summary>
+        /// Ceny hurtu (09.10): polka sklepu zmienila sie o sztuke "changed" - ceny towaru tej polki do policzenia od nowa (Price = -1, Pick wycenia
+        /// kandydata przy nastepnym wyborze). Cena sztuki zalezy od polki tylko przez koszyk typ x tier (SupplyDemand.Stock - mnoznik polki) i przez
+        /// wartosc polki w kategorii (dane rynku gry - InStoreValue kategorii, gdy cena nie idzie od wartosci sztuki); reszta (popyt, surowce,
+        /// wartosc sztuki) od zakupu sie nie zmienia - stad tylko ten koszyk i ta kategoria, nie cala polka.
+        /// </summary>
+        private static void Stale(Dictionary<string, List<Ware>> cache, Settlement shop, ItemObject changed)
+        {
+            if (cache == null || shop == null || changed == null) return;
+            int t = AiGear.TierOf(changed);
+            foreach (var list in cache.Values)
+                foreach (var w in list)
+                {
+                    if (w.Price < 0 || w.Shop != shop) continue;
+                    var it = w.El.Item;
+                    if (it == null) continue;
+                    if (it.ItemCategory == changed.ItemCategory || (it.ItemType == changed.ItemType && w.Tier == t)) w.Price = -1;
+                }
         }
 
         private static void AddLine(List<GarrisonCarts.Line> cart, EquipmentElement el)

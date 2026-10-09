@@ -93,7 +93,7 @@ namespace Armoury
                 if (gapMelee <= 0 && gapBody <= 0) return 0;
                 var shelf = market.ItemRoster;
                 // recenzja 174 (koszt): jedno przejscie polki na wizyte - kandydaci z cena liczona raz na stos, malejaco wedlug skutecznosci do ceny;
-                // przed zakupem cena wybranego stosu liczona na nowo (polka zmienia sie po kazdym zakupie)
+                // przy zakupie cena wybranego stosu liczona na nowo przed kazda sztuka (ShelfBuy - polka zmienia sie po kazdej sztuce)
                 var cands = new List<SubCand>();
                 for (int i = 0; i < shelf.Count; i++)
                 {
@@ -125,18 +125,19 @@ namespace Armoury
                         if (c.Left <= 0 || c.Melee != isMelee || c.Tier > t) continue;
                         if (!isMelee && !c.Cloth && c.Tier > Math.Max(1, t - 2)) continue;   // przeszywanica tieru <= swojego albo zbroja 2 tiery nizej
                         if (!Lift(who, c.El.Item)) continue;   // sklad7 (K1): tylko sztuka, ktora ktos z koszyka udzwignie - inaczej nadwyzki sprzedaja ja nazajutrz
-                        int price = market.Town.MarketData.GetPrice(c.El, buyer, false, market.Party);
-                        if (price <= 0 || price > budget - spent) continue;
-                        int n = Math.Min(Math.Min(deficit, c.Left), Math.Min(maxPieces - pieces, (budget - spent) / price));
-                        n = Math.Min(n, isMelee ? gapMelee : gapBody);
+                        int maxN = Math.Min(Math.Min(deficit, c.Left), Math.Min(maxPieces - pieces, isMelee ? gapMelee : gapBody));
+                        if (maxN <= 0) continue;
+                        // ceny hurtu (Jeff 09.10 08:00): kazda sztuka po swojej cenie - wycena od nowa po zdjeciu poprzedniej (ShelfBuy); dotad cena pierwszej x n
+                        var cel = c.El;
+                        int cost, first, last;
+                        int n = ShelfBuy.Take(shelf, cel, maxN, budget - spent, () => market.Town.MarketData.GetPrice(cel, buyer, false, market.Party), out cost, out first, out last);
                         if (n <= 0) continue;
-                        shelf.AddToCounts(c.El, -n);
-                        if (!deliver(c.El, n, k, price)) { shelf.AddToCounts(c.El, n); c.Left = 0; cands[ci] = c; continue; }   // K1: DTE odrzucil - wraca na polke
+                        if (!deliver(cel, n, k, cost)) { ShelfBuy.PutBack(shelf, cel, n, cost, first); c.Left = 0; cands[ci] = c; continue; }   // K1: DTE odrzucil - wraca na polke
                         c.Left -= n; cands[ci] = c;
                         ArmsScrap.NoteBuy(market, c.El.Item, n);
-                        spent += price * n; pieces += n; deficit -= n;
+                        spent += cost; pieces += n; deficit -= n;
                         if (isMelee) { gapMelee -= n; _daySubMelee += n; } else { gapBody -= n; _daySubBody += n; }
-                        if (bought.Count < 6) bought.Add(c.El.Item.StringId + " " + price + " (zastepcza)");
+                        if (bought.Count < 6) bought.Add(c.El.Item.StringId + " " + ShelfBuy.Prices(n, first, last) + " (zastepcza)");
                     }
                 }
             }
@@ -434,8 +435,9 @@ namespace Armoury
         }
 
         /// <summary>171: dostawa kupionej partii sztuk (zloto i miejsce) - bucket = koszyk potrzeby, na ktory kupiono. sklad7 (K1): false - dostawa
-        /// sie nie udala (DTE odrzucil sztuke z czarnej listy), BuyLoop oddaje sztuki na polke, nikt nie placi.</summary>
-        private delegate bool Deliver(EquipmentElement el, int n, int bucket, int unitPrice);
+        /// sie nie udala (DTE odrzucil sztuke z czarnej listy), BuyLoop oddaje sztuki na polke, nikt nie placi. Ceny hurtu (09.10): cost = suma cen
+        /// n sztuk, kazda po swojej cenie (ShelfBuy.Take) - dotad cena jednej sztuki, mnozona przez n.</summary>
+        private delegate bool Deliver(EquipmentElement el, int n, int bucket, int cost);
         private static bool _lastBudgetStop;   // ostatni BuyLoop: byl kandydat, ale za drogi na reszte budzetu (linia "Zaopatrzenie zamkow")
 
         /// <summary>
@@ -483,22 +485,24 @@ namespace Armoury
                         }
                         if (bestI < 0) break;
                         var pick = shelf.GetElementCopyAtIndex(bestI);
-                        int n = Math.Min(deficit, pick.Amount);
-                        n = Math.Min(n, maxPieces - pieces);
-                        n = Math.Min(n, (budget - spent) / bestPrice);
+                        var pel = pick.EquipmentElement;
+                        int maxN = Math.Min(Math.Min(deficit, pick.Amount), maxPieces - pieces);
+                        // ceny hurtu (Jeff 09.10 08:00): kazda sztuka po swojej cenie - po zdjeciu sztuki z polki nastepna wyceniana od nowa (ShelfBuy, jak
+                        // gra w SellItemsAction); dotad cena pierwszej sztuki x n. Pierwsza - cena z przegladu polki (ta sama polka, bez drugiej wyceny).
+                        int cost, first, last;
+                        int n = ShelfBuy.Take(shelf, pel, maxN, budget - spent, () => market.Town.MarketData.GetPrice(pel, buyer, false, market.Party), out cost, out first, out last, bestPrice);
                         if (n <= 0) break;
-                        shelf.AddToCounts(pick.EquipmentElement, -n);
-                        if (!deliver(pick.EquipmentElement, n, k, bestPrice))
+                        if (!deliver(pel, n, k, cost))
                         {
-                            shelf.AddToCounts(pick.EquipmentElement, n);   // K1 (przeglad): DTE odrzucil - sztuka wraca na polke, nikt nie placi
+                            ShelfBuy.PutBack(shelf, pel, n, cost, first);   // K1 (przeglad): DTE odrzucil - sztuka wraca na polke, nikt nie placi
                             if (refused == null) refused = new HashSet<ItemObject>();
-                            refused.Add(pick.EquipmentElement.Item);
+                            refused.Add(pel.Item);
                             continue;
                         }
-                        ArmsScrap.NoteBuy(market, pick.EquipmentElement.Item, n);   // 174 pytanie 4: popyt koszyka w miescie (tylko licznik)
+                        ArmsScrap.NoteBuy(market, pel.Item, n);   // 174 pytanie 4: popyt koszyka w miescie (tylko licznik)
                         if (type == ItemObject.ItemTypeEnum.Arrows || type == ItemObject.ItemTypeEnum.Bolts) TownFletchers.NoteBought(type, n);   // 172: linia strzelarzy (tylko licznik)
-                        spent += bestPrice * n; pieces += n; deficit -= n;
-                        if (bought.Count < 6) bought.Add(pick.EquipmentElement.Item.StringId + " " + bestPrice);
+                        spent += cost; pieces += n; deficit -= n;
+                        if (bought.Count < 6) bought.Add(pel.Item.StringId + " " + ShelfBuy.Prices(n, first, last));
                     }
                     need[k] = deficit;   // wpis 67: co zostalo niezaspokojone
                 }
@@ -613,13 +617,12 @@ namespace Armoury
                     return fromPurse;
                 };
                 // polka tej osady (zaloga zamku: wlasnego zamku - to, co tam lezy, oplacila juz kasa zamku i jest na miejscu)
-                Deliver here = (el, n, k, unit) =>
+                Deliver here = (el, n, k, cost) =>
                 {
                     if (!AddToArmory(mp, el.Item, n)) return false;   // K1 (przeglad): DTE odrzucil - nikt nie placi
                     AiWear.NoteBought(mp, el, n);   // wpis 89: zuzyta z polki zostaje zuzyta; 171/K1 (recenzje): takze w zalodze
                     MenUpgrade.NoteChurn(mp, el.Item, true);
-                    int cost = unit * n;
-                    pay(cost);
+                    pay(cost);   // ceny hurtu (09.10): cost - suma cen sztuk (ShelfBuy), nie cena pierwszej x n
                     st.Town.ChangeGold(cost);
                     MoneyLedger.Note(MoneyLedger.NGear, st, cost);   // ksiega przeplywow osad (tylko licznik)
                     return true;
@@ -654,10 +657,9 @@ namespace Armoury
                             {
                                 if (budget - spent > 0)
                                 {
-                                    BuyLoop(market, mp, need, lifters, budget - spent, maxPieces, ref pieces, bought, (el, n, k, unit) =>
+                                    BuyLoop(market, mp, need, lifters, budget - spent, maxPieces, ref pieces, bought, (el, n, k, cost) =>
                                     {
-                                        int cost = unit * n;
-                                        int fromPurse = pay(cost);
+                                        int fromPurse = pay(cost);   // ceny hurtu (09.10): cost - suma cen sztuk (ShelfBuy)
                                         market.Town.ChangeGold(cost);
                                         MoneyLedger.Note(MoneyLedger.NGear, market, cost);
                                         lines.Add(new GarrisonCarts.Line { El = el, N = n, Bucket = k });

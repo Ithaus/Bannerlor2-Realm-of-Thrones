@@ -240,9 +240,14 @@ namespace Armoury
                     int n = Math.Min(have, (int)((budget - spent) / price / (3 - pass)) + (pass == 2 ? 0 : 1));
                     n = Math.Min(n, (int)((budget - spent) / price));
                     if (n <= 0) continue;
-                    roster.AddToCounts(it, -n);
+                    // ceny hurtu (Jeff 09.10 08:00): n jak dotad (podzial budzetu na przejscia wedle ceny pierwszej sztuki), ale kazda sztuka po swojej
+                    // cenie - wycena od nowa po zdjeciu poprzedniej (ShelfBuy); partia konczy sie, gdy kolejna sztuka nie miesci sie w budzecie
+                    var mel = new EquipmentElement(it);
+                    int cost, first, last;
+                    n = ShelfBuy.Take(roster, mel, n, (int)(budget - spent), () => Math.Max(1, market.Town.GetItemPrice(mel, null, false)), out cost, out first, out last, price);
+                    if (n <= 0) continue;
                     OreLedger.NoteBuild(it, n);   // ksiega rudy i drewna: pozycja "budowy" (tylko licznik)
-                    spent += n * price;
+                    spent += cost;
                     if (spent >= budget) break;
                 }
             return spent;

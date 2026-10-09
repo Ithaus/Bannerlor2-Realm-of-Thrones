@@ -215,8 +215,13 @@ namespace Armoury
             if (market == null || market.Town == null || market.ItemRoster == null) return need.Count == 0;   // bez targu: tylko gdy nic kluczowego nie trzeba
             var roster = market.ItemRoster;
             var picks = new List<EquipmentElement>();
-            var taken = new Dictionary<int, int>();
             int total = 0;
+            // ceny hurtu (Jeff 09.10 08:00): kazda sztuka kompletu po swojej cenie, jak u gracza - wybrana sztuka schodzi z polki od razu, wiec
+            // nastepna (np. drugi kolczan, druga sztuka tego samego koszyka) jest wyceniana przy polce juz bez niej. Dotad wszystkie sztuki
+            // wyceniane przy nietknietej polce (licznik "taken" tylko pilnowal liczby). Komplet niepelny albo za drogi - zdjete sztuki wracaja
+            // na polke (nikt nie placi), jak dotad awans cofniety. Wyjatek w trakcie wyboru - sztuki tez wracaja (dotad wybor nie ruszal polki).
+            try
+            {
             foreach (var it in need)
             {
                 int best = -1, bestPrice = int.MaxValue;
@@ -227,26 +232,28 @@ namespace Armoury
                     if (cand == null || cand.ItemType != it.ItemType || cand.Tier < it.Tier) continue;
                     if (ArmsPricing.IsUnique(cand)) continue;   // wpis 87 (audyt pkt 6): unikat nie znika w puli ochotnikow
                     if (cand.ItemType == ItemObject.ItemTypeEnum.Horse && cand.HorseComponent != null && cand.HorseComponent.IsPackAnimal) continue;
-                    int used; taken.TryGetValue(i, out used);
-                    if (el.Amount - used <= 0) continue;
+                    if (el.Amount <= 0) continue;
                     int price;
                     try { price = market.Town.MarketData.GetPrice(el.EquipmentElement, null, false, market.Party); } catch { price = cand.Value; }
                     if (price < bestPrice) { bestPrice = price; best = i; }
                 }
                 if (best < 0)
                 {
+                    PutBack(roster, picks);   // ceny hurtu: wczesniej wybrane sztuki kompletu wracaja na polke
                     SupplyDemand.NoteUnmetOnce(notable, market, it.ItemType, (int)it.Tier + 1, 1f);   // nie ma czego kupic - zamowienie (wpis 67)
                     if (countWhy) { Why(it.ItemType + " t" + ((int)it.Tier + 1)); if (IsAmmoType(it.ItemType)) TownFletchers.NoteNotableRevert(it.ItemType); }   // 172: awans cofniety z braku amunicji
                     return false;
                 }
-                int u; taken.TryGetValue(best, out u); taken[best] = u + 1;
-                picks.Add(roster.GetElementCopyAtIndex(best).EquipmentElement);
+                var pickEl = roster.GetElementCopyAtIndex(best).EquipmentElement;
+                roster.AddToCounts(pickEl, -1);   // ceny hurtu: z polki od razu - nastepna sztuka wyceniana bez niej
+                picks.Add(pickEl);
                 total += bestPrice;
             }
-            if (notable.Gold < total) { if (countWhy) Why("zloto notabla (" + notable.Gold + " < " + total + ")"); return false; }   // nie stac go
+            }
+            catch { PutBack(roster, picks); throw; }
+            if (notable.Gold < total) { PutBack(roster, picks); if (countWhy) Why("zloto notabla (" + notable.Gold + " < " + total + ")"); return false; }   // nie stac go - sztuki wracaja
             foreach (var e in picks)
             {
-                roster.AddToCounts(e, -1);
                 ArmsScrap.NoteBuy(market, e.Item, 1);   // 174 pytanie 4: popyt koszyka w miescie (tylko licznik)
                 if (e.Item != null && IsAmmoType(e.Item.ItemType)) TownFletchers.NoteNotable(e.Item.ItemType, 1);   // 172: kolczan z polki miasta (tylko licznik)
             }
@@ -284,6 +291,13 @@ namespace Armoury
                 _gold += bestPrice; _pieces++;
             }
             return true;
+        }
+
+        /// <summary>Ceny hurtu (09.10): komplet nie doszedl do skutku - sztuki zdjete juz z polki wracaja (w odwrotnej kolejnosci), nikt nie placi.</summary>
+        private static void PutBack(ItemRoster roster, List<EquipmentElement> picks)
+        {
+            for (int i = picks.Count - 1; i >= 0; i--) roster.AddToCounts(picks[i], 1);
+            picks.Clear();
         }
 
         // wpis 70: diagnoza cofnietych awansow - czego brakowalo
