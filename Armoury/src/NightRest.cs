@@ -189,8 +189,17 @@ namespace Armoury
             if (Debt > 0)
             {
                 Debt = 0;   // odespali baze i wszystkie odsetki naraz
-                Msg("The debt is paid in full - the men wake fresh again.", Colors.Green);
+                // MUSZTRA-jp (recenzja 8): dzien cwiczen rozstrzyga swit (DawnDebt) - splata zdejmuje kare marszu od reki, a musztra wraca od nastepnego
+                // switu (przespana baza jest juz w _restTonight, wiec swit nie doliczy dlugu); bez tego zdania "wake fresh" kloci sie z dniem bez cwiczen
+                Msg("The debt is paid in full - the men wake fresh again." + (DawnDebt > 0 && s != null && s.DrillLaw ? " Drill resumes at the next dawn." : ""), Colors.Green);
             }
+        }
+
+        /// <summary>MUSZTRA-jp (recenzja 5, 8): zdanie o musztrze do komunikatu switu - swit z dlugiem snu zabiera dzien cwiczen (Drill.SleepDebt czyta
+        /// DawnDebt), a niesplacony do nastepnego switu dlug zabiera tez nastepny. Tylko przy Drill Law (bez niej musztry gracza nie ma).</summary>
+        private static string DrillNote(Settings s)
+        {
+            return Debt > 0 && s != null && s.DrillLaw ? " No drill today - sleep the debt off before the next dawn, or tomorrow's drill is lost too." : "";
         }
 
         // ------------------------------------------------------------ swiat tez spi
@@ -1075,22 +1084,22 @@ namespace Armoury
                 }
                 if (Debt > 0 && !paidInFull)
                     Msg("The men slept, but old weariness lingers - a full rest takes "
-                        + (int)Math.Ceiling(NeededHours()) + " hours.", Colors.Yellow);
+                        + (int)Math.Ceiling(NeededHours()) + " hours." + DrillNote(s), Colors.Yellow);
                 return;
             }
 
             Debt = Math.Min(3, Debt + 1);
             if (Debt == 1)
                 Msg("The men marched through the night. One sleepless night - speed -" + SpdPenalty[1] + "%, morale -"
-                    + MorPenalty[1] + "%; paying it back will take " + (int)Math.Ceiling(NeededHours()) + " hours of rest.", Colors.Yellow);
+                    + MorPenalty[1] + "%; paying it back will take " + (int)Math.Ceiling(NeededHours()) + " hours of rest." + DrillNote(s), Colors.Yellow);
             else if (Debt == 2)
                 Msg("Second night without sleep - the column staggers (speed -" + SpdPenalty[2] + "%, morale -"
-                    + MorPenalty[2] + "%). A full rest now takes " + (int)Math.Ceiling(NeededHours()) + " hours.", Colors.Red);
+                    + MorPenalty[2] + "%). A full rest now takes " + (int)Math.Ceiling(NeededHours()) + " hours." + DrillNote(s), Colors.Red);
             else
             {
                 Msg("Third sleepless night - the company collapses where it stands (speed -" + SpdPenalty[3]
                     + "%, morale -" + MorPenalty[3] + "%). They need " + (int)Math.Ceiling(NeededHours())
-                    + " hours of rest.", Colors.Red);
+                    + " hours of rest." + DrillNote(s), Colors.Red);
                 // wojsko ZASYPIA: kolumna staje w miejscu (raz, przy zapasci -
                 // jesli gracz mimo to pogna dalej, powlecze sie na 10% predkosci)
                 try

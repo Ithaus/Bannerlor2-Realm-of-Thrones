@@ -32,7 +32,10 @@ namespace Armoury
     ///  L - dowodca: Przywodztwo / 170 w granicach 0.5-1.5 (bez dowodcy 0.5).
     ///  D - dzien: 1.5 postoj (mniej niz 4 godziny ruchu z 24), 0.9 marsz. Godzina postoju = RestHour: osada, oboz obleznikow albo ruch <= 0.35 jedn./h
     ///      (czesc wspolna z ksiega snu NightRest.OnHourly i T10 R2 - obie wolaja RestHour od scalenia grupa11; sen dolicza po swojej stronie morze,
-    ///      sluzbe ROT i oboz swiata - to zasady snu, nie postoju); godzina niezaobserwowana = ruch (wczytanie nie daje postoju).
+    ///      sluzbe ROT i oboz swiata - to zasady snu, nie postoju); godzina niezaobserwowana = ruch (wczytanie nie daje postoju). Maski wszystkich partii
+    ///      lordow ida do zapisu (gracz - pole M=, pozostali od MUSZTRA-jp - segment T=), wiec po wczytaniu kazda partia liczy D z wlasnych godzin.
+    /// Kogo wzor nie obejmuje: zalogi, bandy, karawany; Inni (umarli - nie spia, nie znaja zmeczenia: zostaja przy treningu gry); partia nieaktywna
+    /// (poza mapa: niewola, rejs BK, sluzba ROT) przy wzorze nie cwiczy wcale - Z14a jak dotad, AI przy DrillLawAi od MUSZTRA-jp (bez obserwacji nie ma D).
     ///  Dlug snu (kara "noc bez snu = nastepny dzien bez cwiczen", Jeff 07:10 pkt 2) - DLUG O OSTATNIM SWICIE, NightRest.DawnDebtOf: gracz z jego
     ///      ksiegi (DawnDebt ustawiany w SettleNight), kazda inna partia lorda z ksiegi snu AI T10 (AiSleep.DawnDebt, SettleAi) - ten sam dlug, ktory
     ///      zabiera predkosc i morale; rozni sie tylko chwila odczytu (predkosc i morale - dlug biezacy, dzien cwiczen - swit), niezaleznie od godziny ticku.
@@ -82,6 +85,10 @@ namespace Armoury
         private sealed class Track { internal Vec2 Pos; internal long Stamp = -1; internal int Mask = AllHours; }
         private static readonly Dictionary<MobileParty, Track> _tr = new Dictionary<MobileParty, Track>();
         private static int _pendingMainMask = -1;
+        // MUSZTRA-jp (recenzja 1): maski godzin ruchu WSZYSTKICH partii lordow poza graczem z zapisu (segment "T=" napisu arm_drill): id -> maska, wiek
+        // (godziny od ostatniej obserwacji w chwili zapisu); odtwarzane w SessionStart jak maska gracza - po wczytaniu kazda partia liczy postoj
+        // i marsz z wlasnych danych, nie "cala doba marszu" (godziny spoza zapisu dalej = ruch)
+        private static readonly Dictionary<string, KeyValuePair<int, int>> _pendingMasks = new Dictionary<string, KeyValuePair<int, int>>();
 
         private sealed class Acc { internal float WW, WA, Ore; }   // liczniki zuzycia (bron, zbroje) i zlom czekajacy na kowali (sztuki ludzi)
         private static readonly Dictionary<string, Acc> _acc = new Dictionary<string, Acc>();
@@ -123,6 +130,7 @@ namespace Armoury
         private static bool _fed;
         private static string _pendingStock, _importNote;
         private static int _importRejected;
+        private static bool _maskSegSeen;                  // MUSZTRA-jp: w zapisie byl segment T= (maski partii lordow) - tylko do linii startowej
 
         // ------------------------------------------------------------ liczniki doby
         private sealed class PlayerRec
@@ -163,8 +171,8 @@ namespace Armoury
 
         internal static void Reset()
         {
-            _tr.Clear(); _pendingMainMask = -1; _acc.Clear(); _stock.Clear(); _ctx = null; _e = false; _eC = null; _tick = null; _room.Clear();
-            _screen = null; _opening = 0; _dailyN = 0; _feedTries = 0; _fed = false; _pendingStock = null; _importNote = null; _importRejected = 0;
+            _tr.Clear(); _pendingMainMask = -1; _pendingMasks.Clear(); _acc.Clear(); _stock.Clear(); _ctx = null; _e = false; _eC = null; _tick = null; _room.Clear();
+            _screen = null; _opening = 0; _dailyN = 0; _feedTries = 0; _fed = false; _pendingStock = null; _importNote = null; _importRejected = 0; _maskSegSeen = false;
             _pr = null; _prLast = null; _givenYday = -1; ClearDay(); _k.Clear(); _stumbles = 0; _errDay = -1; _errWhere.Clear(); _clk = 0;
             _ore = null;   // przedmioty gry sa tworzone na nowo przy kazdej grze - nie trzymac obiektu z poprzedniej kampanii
         }
@@ -379,10 +387,16 @@ namespace Armoury
             catch (Exception e) { Stumble("SleepDebt", e); return 0; }   // blad odczytu = partia bez kary snu - musi byc widac w potknieciach
         }
 
-        /// <summary>Dlug biezacy (NightRest.DebtOf - predkosc i morale) - tylko do linii: "splacone przed treningiem" i kontrola "teraz > o swicie".</summary>
+        /// <summary>Dlug biezacy (NightRest.DebtOf - predkosc i morale) - tylko do linii: "splacone przed treningiem" i kontrola "teraz > o swicie".
+        /// MUSZTRA-jp (recenzja 3): partie AI za ta sama bramka co dlug o swicie (NightRest.AiDebtLive, jak DawnDebtOf) - po wylaczeniu dlugu AI w MCM
+        /// slownik kar zyje jeszcze do najblizszego ticku ksiegi (do 1 h), a kontrola pokazalaby falszywy BLAD.</summary>
         private static int SleepDebtNow(MobileParty mp)
         {
-            try { return NightRest.DebtOf(mp); }
+            try
+            {
+                if (mp != null && mp != MobileParty.MainParty && !NightRest.AiDebtLive(Settings.Current)) return 0;
+                return NightRest.DebtOf(mp);
+            }
             catch (Exception e) { Stumble("SleepDebtNow", e); return 0; }
         }
 
@@ -544,17 +558,25 @@ namespace Armoury
                 var ch = el.Character;
                 if (s == null || mp == null || ch == null || ch.IsHero || ch.Culture == null || el.Number <= 0 || !mp.IsLordParty) return 0;
                 bool noBase = NoGameBase(mp);
-                if (noBase) { if (!s.DrillLaw || !mp.IsActive) return 0; }
+                if (noBase) { if (!s.DrillLaw) return 0; }
                 else if (!s.DrillStockAi && !s.DrillLawAi && !s.DrillPenaltyAi && !s.DrillLog) return 0;
+                // Inni (umarli) - swiadomy wyjatek od jednego wzoru: nie spia, nie znaja zmeczenia (Undead.cs, Jeff: "Inni moga nie spac i nie maja staminy"),
+                // wiec zostaja przy treningu gry (wynik modelu bez zmian, 171 ich nie bramkuje)
                 if (Undead.Party(mp)) return 0;
+                bool law = noBase || s.DrillLawAi;                     // Z14a zawsze (DrillLaw sprawdzone wyzej), AI przy Z14b (domyslnie TAK)
+                // MUSZTRA-jp (recenzja 4a): jedna regula dla partii nieaktywnej (poza mapa: niewola, rejs BK, sluzba ROT) przy wzorze - Z14a i AI przy Z14b:
+                // nie cwiczy wcale (XP 0). Gra i tak daje perki tylko partii aktywnej (DefaultPartyTrainingModel.cs:31-87), a D bez obserwacji nie istnieje
+                // (Observe pomija nieaktywne - maska zamrozona). Dawniej tylko Z14a; AI dostawalo caly wzor z zamrozonej maski. Wylaczony Z14b - jak dotad.
+                if (law && !mp.IsActive) { if (res.ResultNumber != 0f) res = new ExplainedNumber(0f); return 0; }
                 var c = CtxOf(mp, noBase, s);
                 float game = res.ResultNumber;
                 float gb = GameBase(mp, ch, noBase);                   // baza gry (0 / 15 + 3 x tier / 10 + 2 x tier) - tylko do wydzielenia P i pomiaru
-                bool noModel = game < gb - 0.01f;                      // model nie dal bazy (wyjatek BK w TryCatch) - perkow nie ma, nic z niczego
+                // model nie dal bazy (wyjatek BK w TryCatch): perki 0 (nic z niczego - nie zgadujemy perkow z niepelnego wyniku), baza ze wzoru (przy law)
+                // albo to, co model dal (wylaczony Z14b); licznik "model bez bazy" w linii AI - oczekiwane 0
+                bool noModel = game < gb - 0.01f;
                 float P = noModel ? 0f : game - gb;                    // perki gry i BK
                 float gbGiven = noModel ? Math.Max(0f, game) : gb;     // baza gry naprawde dana (pomiar; plaska regula przy wylaczonym DrillLawAi)
                 float rb = mp.MapEvent == null ? RuleBase(ch) : 0f;    // B wzoru; w bitwie gra nie daje bazy - wzor tez nie
-                bool law = noBase || s.DrillLawAi;                     // Z14a zawsze (DrillLaw sprawdzone wyzej), AI przy Z14b (domyslnie TAK)
                 float B = law ? rb : gbGiven;
                 float sk = c.StockOn ? c.S : 1f;                       // S tylko przy czynnym zapasie (gracz StockOn, AI DrillStockAi)
                 // kara (glod, dlug o swicie): Z14a zawsze, AI przy DrillPenaltyAi albo Z14b - niezalezna od pomiaru L x D (c.Off)
@@ -713,10 +735,11 @@ namespace Armoury
                     if (pc != null && pc.Counted)
                     {
                         _prLast = _pr;   // trening gracza wedlug musztry odbyl sie
-                        // jedyna wiadomosc w grze o musztrze w zwykly dzien: dzien bez cwiczen (glod albo dlug snu) - inaczej zmiana bylaby niewidoczna
-                        if (pc.Off && pc.Men > 0)
-                            Log.Player(pc.Hungry ? "Your men were too hungry to drill today - nobody learned anything, training perks included."
-                                                 : "Your men met the dawn short of sleep - no drill until the next dawn: nobody learned anything today, training perks included.", true);
+                        // wiadomosc w grze w dzien bez cwiczen. MUSZTRA-jp (recenzja 8, 17a): dzien stracony przez sen oglasza juz swit (NightRest.SettleNightCore -
+                        // "No drill today ...", splata w ciagu dnia - "Drill resumes at the next dawn"), wiec tu tylko glod; glod i sen naraz - oba powody
+                        if (pc.Off && pc.Men > 0 && pc.Hungry)
+                            Log.Player(pc.Sleepless ? "Your men were too hungry to drill today, and they met the dawn short of sleep besides - nobody learned anything, training perks included."
+                                                    : "Your men were too hungry to drill today - nobody learned anything, training perks included.", true);
                     }
                     _pr = null;
                 }
@@ -1064,6 +1087,7 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Stumble("SessionStart(maska)", e); }
+            string masks = RestoreMasks();
             int w, a; GivenCounts(out w, out a);
             string spoils = SpoilsSeal.Present ? (SpoilsSeal.DrillLeaveWired ? "Spoils 1/1 (trofea przy Leave)" : "Spoils 0/1 - NIE WPIETE (trofea jak dotad)") : "Spoils nieobecny";
             Log.Info("Musztra: start - ekrany zapasu wpiete " + ((_hookDiscard ? 1 : 0) + (_hookLoot ? 1 : 0)) + "/2 + " + spoils + "; trening gry " + (_tickHooked ? "wpiety" : "NIE WPIETY")
@@ -1077,13 +1101,47 @@ namespace Armoury
                      + ", AI " + (NightRest.AiDebtLive(s) ? "TAK" : "nie - AI bez dlugu snu (Night Rest / Ai Camps At Night / Ai Sleep Debt, rowne godziny obozu"
                                   + " (Camp Start = Camp End) albo DLL na sucho): lordowie w armii gracza i partie rodu gracza (Z14a) tez bez kary snu w musztrze"
                                   + (s.NightRestEnabled ? ", gracz z kara" : ""))
-                     + ", Z14b (Drill Law Ai) " + On(s.DrillLawAi) + "; stale: postoj x" + F2(RestDay) + " (ruch < " + RestBelowHours + " h z 24, godzina postoju: osada, oboz, <= "
+                     + ", Z14b (Drill Law Ai) " + On(s.DrillLawAi) + "; " + masks + "; stale: postoj x" + F2(RestDay) + " (ruch < " + RestBelowHours + " h z 24, godzina postoju: osada, oboz, <= "
                      + F2(RestStep) + " jedn./h), marsz x" + F2(MarchDay) + ", dowodca Przywodztwo/" + (int)LeadNorm + " [" + F2(LeadMin) + "-" + F2(LeadMax) + "], zapas +"
                      + (int)(StockBonus * 100) + "% za grupe (perk x" + F2(PerkMult) + "), sztuka sluzy " + (int)WearDays + " dni cwiczen, zlom x" + F2(Yield())
                      + "; zapas od gracza: bron " + w + ", zbroje " + a + (imp != null ? "; " + imp : "") + ".");
         }
 
         private static string On(bool b) { return b ? "TAK" : "nie"; }
+
+        /// <summary>MUSZTRA-jp (recenzja 1): maski godzin ruchu partii lordow z zapisu (segment T= napisu arm_drill) - jak maska gracza: pozycja z chwili
+        /// wczytania (= z chwili zapisu), Stamp = biezaca godzina minus wiek z zapisu (godziny nieobserwowane przed zapisem zostaja nieobserwowane - Observe
+        /// policzy je jako ruch, jak bez zapisu). Partii, ktorej juz nie ma, nie ma czego odtwarzac. Stary zapis (bez segmentu): partie AI jak dotad -
+        /// pierwsza doba po wczytaniu liczy sie jako marsz.</summary>
+        private static string RestoreMasks()
+        {
+            int had = _pendingMasks.Count, n = 0;
+            try
+            {
+                if (had > 0)
+                {
+                    long now = (long)Math.Floor(CampaignTime.Now.ToHours);
+                    var main = MobileParty.MainParty;
+                    var all = MobileParty.AllLordParties;
+                    if (all != null)
+                        for (int i = 0; i < all.Count; i++)
+                        {
+                            var mp = all[i];
+                            if (mp == null || mp == main || mp.StringId == null || _tr.ContainsKey(mp)) continue;
+                            KeyValuePair<int, int> v;
+                            if (!_pendingMasks.TryGetValue(mp.StringId, out v)) continue;
+                            _tr[mp] = new Track { Pos = mp.GetPosition2D, Stamp = now - v.Value, Mask = v.Key & AllHours };
+                            n++;
+                        }
+                }
+            }
+            catch (Exception e) { Stumble("RestoreMasks", e); }
+            finally { _pendingMasks.Clear(); }
+            if (!_maskSegSeen)
+                return "maski godzin ruchu partii lordow: brak w zapisie (nowa gra albo zapis sprzed MUSZTRA-jp - partie AI bez historii ruchu, pierwsza doba jako marsz)";
+            return "maski godzin ruchu partii lordow z zapisu: odtworzone " + n + " z " + had + (had - n > 0 ? " (partii juz nie ma albo juz obserwowane: " + (had - n) + ")" : "")
+                   + ", reszta partii bez maski (cala doba ruchu w zapisie albo brak obserwacji) - jak dotad";
+        }
 
         private const string GivingHandsText = "Weapons and shields in your men's drill stock (gear you discard or leave on the field, and their spare arms) count 50% more in their daily drill.";
         private const string PaidInPromiseText = "Armour in your men's drill stock (gear you discard or leave on the field, and their spare armour) counts 50% more in their daily drill.";
@@ -1152,9 +1210,28 @@ namespace Armoury
                     parties++;
                     if (main != null && kv.Key == main.StringId) oreMain = a.Ore;
                 }
+                // MUSZTRA-jp (recenzja 1): maski godzin ruchu pozostalych partii lordow - "id,maska,wiek" (wiek = godziny od ostatniej obserwacji, < 24).
+                // Pomijane: gracz (pole M=, format bez zmian), maska calej doby ruchu (= brak maski) i obserwacja starsza niz doba. Stary DLL segment
+                // pomija (Import czyta tylko znane przedrostki). Napis idzie przez SaveText.Sync ("arm_drill", ArmouryBehavior) - kawalki po 8000 zn.
+                sb.Append("|T=");
+                first = true; int masks = 0;
+                long nowH = (long)Math.Floor(CampaignTime.Now.ToHours);
+                foreach (var kv in _tr)
+                {
+                    var mp = kv.Key; var tr = kv.Value;
+                    if (mp == null || mp == main || tr == null || !Safe(mp.StringId)) continue;
+                    long age = nowH - tr.Stamp;
+                    int m = tr.Mask & AllHours;
+                    if (tr.Stamp < 0 || age < 0 || age >= 24 || m == AllHours) continue;
+                    if (!first) sb.Append(';');
+                    first = false;
+                    sb.Append(mp.StringId).Append(',').Append(m.ToString(inv)).Append(',').Append(age.ToString(inv));
+                    masks++;
+                }
                 int w, ar; GivenCounts(out w, out ar);
                 Log.Info("Musztra: zapis - zapas od gracza " + pcs + " szt. (bron " + w + ", zbroje " + ar + "), godzin ruchu gracza " + (mask >= 0 ? Pop(mask).ToString() : "-")
-                         + " z 24, zlom gracza czeka " + F2(oreMain) + " rudy, partii z licznikami " + parties + ", zasilenie autotestu " + (_fed ? "tak" : "nie") + ".");
+                         + " z 24, maski godzin ruchu partii lordow AI " + masks + " (z " + Math.Max(0, _tr.Count - (main != null && _tr.ContainsKey(main) ? 1 : 0)) + " obserwowanych), napis "
+                         + sb.Length + " zn., zlom gracza czeka " + F2(oreMain) + " rudy, partii z licznikami " + parties + ", zasilenie autotestu " + (_fed ? "tak" : "nie") + ".");
                 return sb.ToString();
             }
             catch (Exception e) { Stumble("Export", e); return null; }
@@ -1166,12 +1243,25 @@ namespace Armoury
         {
             try
             {
-                _pendingStock = null; _importNote = null; _importRejected = 0;
+                _pendingStock = null; _importNote = null; _importRejected = 0; _pendingMasks.Clear(); _maskSegSeen = false;
                 if (string.IsNullOrEmpty(v)) { _importNote = "z zapisu: brak klucza (stary zapis) - zapas pusty, godziny ruchu nieznane (ruch)"; return; }
                 var inv = CultureInfo.InvariantCulture;
                 foreach (var part in v.Split('|'))
                 {
                     if (part.StartsWith("M=")) { int m; if (int.TryParse(part.Substring(2), NumberStyles.Integer, inv, out m) && m >= 0) _pendingMainMask = m & AllHours; }
+                    else if (part.StartsWith("T="))
+                    {
+                        // MUSZTRA-jp: maski partii lordow "id,maska,wiek" - odtwarzane w SessionStart (RestoreMasks); zle wpisy pomijane
+                        _maskSegSeen = true;
+                        foreach (var x in part.Substring(2).Split(';'))
+                        {
+                            var f = x.Split(',');
+                            int m, age;
+                            if (f.Length != 3 || f[0].Length == 0 || !int.TryParse(f[1], NumberStyles.Integer, inv, out m) || !int.TryParse(f[2], NumberStyles.Integer, inv, out age)
+                                || m < 0 || age < 0 || age >= 24) continue;
+                            _pendingMasks[f[0]] = new KeyValuePair<int, int>(m & AllHours, age);
+                        }
+                    }
                     else if (part.StartsWith("F=")) _fed = part.Substring(2) == "1";
                     else if (part.StartsWith("S=")) _pendingStock = part.Substring(2);
                     else if (part.StartsWith("A="))
@@ -1416,7 +1506,8 @@ namespace Armoury
             var sb = new StringBuilder("Musztra AI: dzien ").Append(day).Append(" - partii ").Append(_aParties).Append(", ludzi ").Append(_aMen)
               .Append("; wazone baza gry (").Append(((long)_aW).ToString(inv)).Append(" XP): dowodca ").Append(X(_aWL, _aW)).Append(" (Przywodztwo ").Append(lead)
               .Append(", bez dowodcy ").Append(_aNoLead).Append("), dzien ").Append(X(_aWD, _aW)).Append(" (postoj ").Append(Pct(_aWRest, _aW)).Append(", marsz ").Append(Pct(_aWMarch, _aW))
-              .Append(", glod ").Append(Pct(_aWHungry, _aW)).Append(", sen od switu ").Append(Pct(_aWSleep, _aW)).Append("), dowodca x dzien ").Append(X(_aWLD, _aW))
+              // MUSZTRA-jp (recenzja 2/10): etykieta "sen " bez zmian (regexy SCR\jedenwzor\parse.py, swit.py); "od switu" mowi segment "sen od switu: partii N"
+              .Append(", glod ").Append(Pct(_aWHungry, _aW)).Append(", sen ").Append(Pct(_aWSleep, _aW)).Append("), dowodca x dzien ").Append(X(_aWLD, _aW))
               .Append(s.DrillLawAi ? " (Z14b CZYNNA)" : " (Z14b WYLACZONA - pomiar)").Append("; zapas ").Append(X(_aWS, _aW)).Append(s.DrillStockAi ? " (CZYNNY" : " (wylaczony - pomiar")
               .Append("; pelny u ").Append(_aFullStock).Append(" partii, pusty u ").Append(_aNoStock).Append("); razem ").Append(X(_aWLDS, _aW))
               .Append("; razem przy progu postoju 4/8/12 h: ").Append(X(_aWT[0], _aW)).Append('/').Append(X(_aWT[1], _aW)).Append('/').Append(X(_aWT[2], _aW))
