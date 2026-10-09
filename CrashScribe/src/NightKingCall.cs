@@ -56,7 +56,12 @@ namespace CrashScribe
         {
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, Daily);
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this, OnSessionLaunched);   // T2: linia startowa kalendarza
+            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, Hourly);                     // T2: przeglad band raz po wczytaniu
         }
+
+        private static bool _loadCheckPending;                          // T2: TurnBack w pierwszej godzinie sesji
+        private static System.Reflection.PropertyInfo _pRotShackles;    // T2: ROT.ROTSettings.OthersAIShackles
+        private static bool _rotShacklesLooked;
 
         public override void SyncData(IDataStore dataStore) { }
 
@@ -98,7 +103,7 @@ namespace CrashScribe
             {
                 string id = s.StringId;
                 if (id == "ROT_castle60") v = Config.NightKingWallFromDay;                       // Mur
-                else if (Config.NightKingRespectShackles)
+                else if (Config.NightKingRespectShackles && RotShacklesOn())   // recenzja T2: tylko gdy kajdany wlaczone w ROT
                 {
                     float k = ShackleK();
                     if (id == "ROT_castle45" || id == "castle_N6") v = (int)Math.Ceiling(300f * k);   // Mrozny Brzeg, Rogowa Stopa
@@ -134,19 +139,24 @@ namespace CrashScribe
                 Scribe.Line("Kalendarz Innych: czynny - dzis dzien " + ((int)Day()) + "; cele: " + sb
                             + "; inne osady za Murem od " + Math.Max(0, Config.NightKingSiegeFromDay)
                             + "; Zew od " + Config.NightKingCallFromDay
-                            + (Config.NightKingRespectShackles ? " (kajdany ROT x" + ShackleK().ToString("0.00") + ")" : " (bez kajdan ROT)")
+                            + (!Config.NightKingRespectShackles ? " (bez kajdan ROT)"
+                               : RotShacklesOn() ? " (kajdany ROT x" + ShackleK().ToString("0.00") + ")"
+                               : " (kajdany wylaczone w ROT - OthersAIShackles = false)")
                             + ". Zdobytych osad nie odbieramy.");
-                Scribe.Line(CalendarState(Day()));
+                Scribe.Line(CalendarState(Day(), -1));
+                _loadCheckPending = true;   // recenzja T2: TurnBack w pierwszej godzinie po wczytaniu
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "NightKingCall.OnSessionLaunched", null); } catch { } }
         }
 
         /// <summary>Stan kalendarza na dzis (raz na dobe): Zew spi/czynny, najblizszy otwierany cel, ile zamknietych.</summary>
-        private static string CalendarState(double day)
+        private static string CalendarState(double day, int earlySieges)
         {
             var sb = new System.Text.StringBuilder();
             int today = (int)day;
-            if (day < Config.NightKingCallFromDay)
+            if (!Config.NightKingCallEnabled)
+                sb.Append("Zew Nocnego Krola: wylaczony (NightKingCallEnabled = false); Pochod bez Zewu nie rusza. ");
+            else if (day < Config.NightKingCallFromDay)
                 sb.Append("Zew Nocnego Krola: spi do dnia ").Append(Config.NightKingCallFromDay).Append(" (dzis ").Append(today).Append("); Pochod czeka. ");
             sb.Append("Kalendarz Innych: dzien ").Append(today);
             Settlement next = null; int nextDay = int.MaxValue, closed = 0, owned = 0, known = 0;
@@ -169,37 +179,100 @@ namespace CrashScribe
             sb.Append("; zamkniete ").Append(closed).Append(" z ").Append(known).Append(", juz Innych ").Append(owned);
             if (day < Config.NightKingSiegeFromDay)
                 sb.Append("; pozostale osady za Murem od dnia ").Append(Math.Max(0, Config.NightKingSiegeFromDay));
+            if (earlySieges >= 0) sb.Append("; oblezen przed terminem ").Append(earlySieges);
             sb.Append(".");
             return sb.ToString();
         }
 
         /// <summary>Banda z rozkazem oblezenia na zamkniety cel (wolna, nie w bitwie) dostaje patrol przy siedzibie klanu.
-        /// Tanio: kilka band Innych raz na dobe.</summary>
-        private static void TurnBack(Clan ww, double day)
+        /// Oblezenie juz trwajace na zamkniety cel nie jest przerywane, ale trafia do logu i do licznika (zwracany).
+        /// Tanio: kilka band Innych raz na dobe (i raz w pierwszej godzinie po wczytaniu).</summary>
+        private static int TurnBack(Clan ww, double day)
         {
+            int early = 0, stumbles = 0;
             try
             {
                 foreach (var wp in ww.WarPartyComponents)
                 {
-                    var mp = wp != null ? wp.MobileParty : null;
-                    if (mp == null || !mp.IsActive || mp.IsMainParty) continue;
-                    if (mp.DefaultBehavior != AiBehavior.BesiegeSettlement || Busy(mp)) continue;
-                    var tgt = mp.TargetSettlement;
-                    if (tgt == null || IsOthers(tgt.OwnerClan) || !Closed(tgt, day)) continue;
-                    var home = ww.HomeSettlement ?? mp.HomeSettlement;
-                    string who = mp.LeaderHero != null ? mp.LeaderHero.Name.ToString() : mp.Name.ToString();
-                    if (home == null || home == tgt)
+                    try   // per banda: jedna zla banda nie zatrzymuje reszty (licz potkniecia)
                     {
-                        Scribe.Line("Kalendarz Innych: " + who + " idzie na " + tgt.Name + " (otwarta od dnia " + OpenDay(tgt)
-                                    + "), ale brak siedziby do patrolu - rozkazu nie ruszamy.");
-                        continue;
+                        var mp = wp != null ? wp.MobileParty : null;
+                        if (mp == null || !mp.IsActive || mp.IsMainParty) continue;
+                        string who = mp.LeaderHero != null ? mp.LeaderHero.Name.ToString() : mp.Name.ToString();
+                        if (Busy(mp))
+                        {
+                            // recenzja T2: oblezenie przed terminem (ROT OnAiHourlyTick bez kajdan) - widac w logu, nie przerywamy
+                            if (mp.SiegeEvent != null)
+                            {
+                                var sg = mp.BesiegedSettlement ?? mp.TargetSettlement;
+                                if (sg != null && !IsOthers(sg.OwnerClan) && Closed(sg, day))
+                                {
+                                    early++;
+                                    Scribe.Line("Kalendarz Innych: " + who + " OBLEZENIE " + sg.Name + " przed terminem (otwarta od dnia "
+                                                + OpenDay(sg) + ", dzis " + (int)day + ") - nie przerywamy.");
+                                }
+                            }
+                            continue;
+                        }
+                        if (mp.DefaultBehavior != AiBehavior.BesiegeSettlement) continue;
+                        var tgt = mp.TargetSettlement;
+                        if (tgt == null || IsOthers(tgt.OwnerClan) || !Closed(tgt, day)) continue;
+                        var home = ww.HomeSettlement ?? mp.HomeSettlement;
+                        if (home == null || home == tgt)
+                        {
+                            Scribe.Line("Kalendarz Innych: " + who + " idzie na " + tgt.Name + " (otwarta od dnia " + OpenDay(tgt)
+                                        + "), ale brak siedziby do patrolu - rozkazu nie ruszamy.");
+                            continue;
+                        }
+                        SetPartyAiAction.GetActionForPatrollingAroundSettlement(mp, home, MobileParty.NavigationType.Default, false, false);
+                        Scribe.Line("Kalendarz Innych: " + who + " zawrocony spod " + tgt.Name + " (otwarta od dnia " + OpenDay(tgt)
+                                    + ", dzis " + (int)day + ") - patrol przy " + home.Name + ".");
                     }
-                    SetPartyAiAction.GetActionForPatrollingAroundSettlement(mp, home, MobileParty.NavigationType.Default, false, false);
-                    Scribe.Line("Kalendarz Innych: " + who + " zawrocony spod " + tgt.Name + " (otwarta od dnia " + OpenDay(tgt)
-                                + ", dzis " + (int)day + ") - patrol przy " + home.Name + ".");
+                    catch (Exception e)
+                    {
+                        if (stumbles++ == 0) { try { Scribe.Report("CrashScribe", e, "NightKingCall.TurnBack.band", null); } catch { } }
+                    }
                 }
+                if (stumbles > 1) Scribe.Line("Kalendarz Innych: potkniecia przy bandach dzis " + stumbles + " (pierwsze w raporcie).");
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "NightKingCall.TurnBack", null); } catch { } }
+            return early;
+        }
+
+        /// <summary>Recenzja T2: po wczytaniu zapisu TurnBack rusza w pierwszej godzinie, a nie dopiero przy DailyTick
+        /// (do 24 h gry, w ktorych banda z rozkazem z zapisu moglaby dojsc i zaczac oblezenie). Raz na sesje.</summary>
+        private void Hourly()
+        {
+            if (!_loadCheckPending) return;
+            _loadCheckPending = false;
+            try
+            {
+                if (!Config.NightKingCalendarEnabled) return;
+                var ww = WhiteWalkers();
+                if (ww == null || ww.IsEliminated) return;
+                double day = Day();
+                int early = TurnBack(ww, day);
+                Scribe.Line("Kalendarz Innych: przeglad band po wczytaniu (dzien " + (int)day + ") - oblezen przed terminem " + early + ".");
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "NightKingCall.Hourly", null); } catch { } }
+        }
+
+        /// <summary>Recenzja T2: kajdany ROT obowiazuja tylko, gdy sa wlaczone w ROT (ROTSettings.OthersAIShackles,
+        /// ROT:1064). Odczyt przez refleksje; blad albo brak ROT = wlaczone (bezpieczniej).</summary>
+        private static bool RotShacklesOn()
+        {
+            try
+            {
+                if (!_rotShacklesLooked)
+                {
+                    _rotShacklesLooked = true;
+                    var t = Type.GetType("ROT.ROTSettings, ROT");
+                    _pRotShackles = t != null ? AccessTools.Property(t, "OthersAIShackles") : null;
+                }
+                if (_pRotShackles == null) return true;
+                return Convert.ToBoolean(_pRotShackles.GetValue(null, null));
+            }
+            catch { return true; }
         }
 
         private static object Others()
@@ -496,8 +569,8 @@ namespace CrashScribe
                 if (Config.NightKingCalendarEnabled)
                 {
                     double day = Day();
-                    Scribe.Line(CalendarState(day));
-                    TurnBack(ww, day);
+                    int early = TurnBack(ww, day);
+                    Scribe.Line(CalendarState(day, early));
                     callAsleep = day < Config.NightKingCallFromDay;
                 }
                 if (!Config.NightKingCallEnabled || callAsleep) return;

@@ -63,7 +63,8 @@
        clan's seat instead, and the Night King's Call sleeps until NightKingCallFromDay.
        Fist of the First Men, Craster's Keep and every other target: NightKingSiegeFromDay (728 = start of year 3).
        With NightKingRespectShackles, Realm of Thrones' own AI shackles apply on top, stretched by FabulaTimeScale:
-       Hornfoot and Frozen Shore 300 x 4.33 = 1299, Thenn and Frostfang's Camp 1732, Hardhome 2165.
+       Hornfoot and Frozen Shore 300 x 4.33 = 1299, Thenn and Frostfang's Camp 1732, Hardhome 2165
+       (only while "Others AI shackles" is on in Realm of Thrones' own settings; off there = day 728 for these too).
        The Wall: NightKingWallFromDay (2184 = start of year 7). Settlements the Others already hold are never
        taken away. Set NightKingCalendarEnabled to false to switch the whole calendar off. -->
   <NightKingCalendarEnabled>true</NightKingCalendarEnabled>
