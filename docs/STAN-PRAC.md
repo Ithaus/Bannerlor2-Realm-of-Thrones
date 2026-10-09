@@ -894,3 +894,6 @@ ludzi, wytop przy kopalni itd.) mozna wlaczac domyslnie bez ochrony starego zapi
 dodatek P jak w grze, nie mnozony przez L ani postoj; glod/niewyspanie zeruja wszystko. "rob od razu" - Jeff kaze dzialac bez czekania na reset limitu 5h.
 SKLAD7B (08:20): noc/sklad7 23ad5d6 - zadnego sprzetu z niczego w bitwach (takze autobitwa gracza i lup), kon jako sztuka zbrojowni (jezdziec bez konia pieszo, kon za awans
 do zbrojowni AI, Stables.Remount - lord sadza na konie z taboru i dokupuje, ColdStart z konmi), linia w grze na poczatku bitwy (ilu bez broni/zbroi/konia).
+**DECYZJE JEFFA 09.10 ok. 08:40 (175c, Inni):** (1) autobitwa AI liczy bron PO naprawie 175 (jedna zasada) - TAK; (2) "tier 6 strzaly rania normalnie, czy belty, ale nie kamienie" ->
+pociski: tier liczony z AMUNICJI - strzaly i belty tieru 6 jak stal t6 (50%), nizsze 15%; kamienie (proce, glazy) zawsze 15%; (3) smocze szklo dla Nocnej Strazy - NIE (zostawiamy);
+(4) komunikat przy pierwszym ciosie w Nocnego Krola bronia inna niz stal valyrianska - TAK; (5) minimum obrazen w autobitwie - decyzja po tescie.
