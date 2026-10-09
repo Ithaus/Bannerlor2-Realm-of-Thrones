@@ -919,3 +919,8 @@ z okupow = rok dochodu rodu, kolejny okup ponad pulap mniejszy - TAK; (3) okup z
 **DECYZJE JEFFA 09.10 ok. 12:15 (Z16):** (2) suknie, szaty, czapki i ubrania ROT jako zbroja t6 - "to jakas bzdura" -> wymog ubran (sukno, bez metalu) liczony z WAGI, nie z tieru
 (dotyczy wszystkich: gracz, bohaterowie, zolnierze); (3) unikat, ktorego lord nie udzwignie, zostaje UNIKATEM w taborze (nie zamienia sie w zwykly przy wczytaniu) - TAK.
 (1) podnoszenie umiejetnosci lordow - Jeff pyta, o co chodzi ("maja startowe zbroje, ktorych nie moga nosic?") - wyjasnione, czeka.
+**DECYZJA JEFFA 09.10 ok. 12:25 (prawo tieru pancerza):** "trzeba obnizyc atletyke dla helmow, rekawic i nogawic i ogolnie obnizyc tier 6 do 150, plus peleryny, bo nawet dziecko
+udzwignie rekawice - ten system nie ma sensu; jak najszybciej naprawic, zeby nie przebudowywac calej gry" -> PRAWO TIERU PANCERZA wedlug czesci: korpus (tier-1) x 30 (t6 150);
+helm i nogawice polowa korpusu (t6 75) albo z wagi, gdy wiecej; rekawice i peleryny tylko z wagi; ubrania/suknie z wagi; ladry konskie - Jazda (nie Atletyka). Lordowie: BEZ
+wyrownywania do 175 (Jeff: "nie kazdy lord lordowi rowny") - zostaja ze swoimi umiejetnosciami; kto dalej nie udzwignie korpusu - na starcie kampanii zbroja na miare (ten sam
+rodzaj z tieru, ktory udzwignie); podnoszenie Luku/Kuszy - nie. Na galeziach 175 (CS Mends prawa tieru + Z16).
