@@ -221,3 +221,11 @@ dana faze od nowa, korzystajac z zapisanych wynikow:
 - 09.10 ~00:05 Jeff: "zaudytuj dochody, czy sa odpowiednie" -> workflow `wf_a0239869-fc4` (pomiar 120 dob wedlug rodzaju rodu, kod kazdego zrodla dochodu,
   historia/lore -> synteza z propozycja liczb wpieta w 165/166/168 -> 2 krytyki), wynik: docs/audyt-2026-10-09/12-DOCHODY-RODOW.md. W toku tez: 172b karawany bez
   strzal (wf_edafb659-b79, drzewo noc\n172b), projekt 174 produkcja uzbrojenia (wf_42ffe0c8-8e0) - Jeff: "jak brakuje, sprawdz produkcje i rzemieslnikow, nic z niczego".
+
+## 17. NOC 09/10.10 (Jeff: "tak wgrywaj tej samej nocy jak przejdzie autotest")
+- W grze: Armoury 0f8a80b0, CrashScribe 269cc980, skrypt BEE nalozony, Diplomacy reparacje x10. Decyzje Jeffa A-L w STAN-PRAC (09.10).
+- W toku: 172b karawany bez strzal (wf_edafb659-b79, noc\n172b); 174 projekt produkcji uzbrojenia (wf_42ffe0c8-8e0); audyt dochodow rodow (wf_a0239869-fc4 ->
+  docs/audyt-2026-10-09/12-DOCHODY-RODOW.md); audyt umiejetnosci (13-UMIEJETNOSCI.md) i armii krolestw (14-ARMIE-KROLESTW.md) (wf_beae7ea4-055);
+  male paczki D1 za Murem mysliwi/rybacy, I1 jency do domu/na Mur, F1 H3 przy autobitwie gracza, E1 pokoj z biedy (wf_4750c307-a2b, drzewa SCRATCH nowej sesji noc2\*,
+  galezie w-toku/d1-zamurem, i1-jency, f1-h3gracz (od noc/sklad4), e1-pokoj (od w-toku/n12-reparacje - CrashScribe)).
+- Potem: proby zimy (J) i drog (H) za zgoda Jeffa; testy + wgrania; rano raport + PDF audytow.
