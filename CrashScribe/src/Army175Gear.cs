@@ -84,7 +84,7 @@ namespace CrashScribe
             _preWeapons = null; _valyrianT6 = 0;
             _rej1 = _rej2 = _rej3 = _rej4 = _rej5 = 0;
             _tgWanted = -1; _tgOffWhy = ""; _isSaved = null; _gaveUp = false; _catchUpTries = 0; _snapshotOk = false;
-            _atLoad = null; _newRosters = null; _rostersInstalled = 0; _qohorDone = false;
+            _atLoad = null; _newRosters = null; _rostersInstalled = 0; _qohorDone = false; _javT2 = false;
             NorthDone = false; DothrakiDone = false;
             CompositionApplied = false; DothrakiPoolActive = false; _poolFirstLogged = false;
             ResetPoolCounters();
@@ -184,7 +184,9 @@ namespace CrashScribe
                 else if (!_gaveUp && _catchUpTries >= 3)
                 {
                     _gaveUp = true;
-                    Scribe.Line("Mends: sprzet wedlug tieru (175) - OSTRZEZENIE: 3 doby bez zestawow bojowych jednostek - koniec prob w tej sesji (wzorce ROT bez zmian, NorthHardy pominiete).");
+                    // 175b: oszczep t2 ustawiony przy wczytaniu zostaje (prawa tieru juz go wziely; cofanie w polowie sesji = drugi stan) - mowimy to wprost
+                    Scribe.Line("Mends: sprzet wedlug tieru (175) - OSTRZEZENIE: 3 doby bez zestawow bojowych jednostek - koniec prob w tej sesji (wzorce ROT bez zmian, NorthHardy pominiete"
+                                + (_javT2 ? "; najprostszy oszczep (175b, Pine Javelin) zostal t2 - jednostki z nim we wzorcu ROT maja wymog Rzutu 35, nie 105" : "") + ").");
                 }
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Army175.DailyCatchUp", null); } catch { } }
@@ -755,14 +757,23 @@ namespace CrashScribe
         /// wszystkie czesci kuzni tieru 2 (grot "Javelin Head" z kutego zelaza Iron2, drzewce sosnowe), id gry "_t2". Wystarcza, zeby
         /// wszystkie 24 rodzaje t2-t3 z oszczepem we wzorcu mialy oszczep (6 wlasny, 18 zamiennik), a zaden rodzaj nie traci
         /// umiejetnosci; lzejsze "darty" (western/eastern_javelin_1_t2) dawalyby 4-8 rodzajom t4 spadek Rzutu o 5-15.
-        /// Zmienia sie TIER PRZEDMIOTU (TierfOverride - jak atrybut XML tier_override) i jego cena gry (DetermineValue - jak przy
-        /// wczytaniu XML z tier_override), NIE umiejetnosci. Przy wczytaniu, przed TierGear (pula 175.2 widzi t2), przed prawami
-        /// tieru (WeaponTierLaw da wymog 35 zamiast 105) i przed SkillSinew. Tylko razem z 175.2 (TierGearWanted - zapis bez K1
-        /// zostaje bez zmian). Obiekty przedmiotow sa nowe w kazdej grze - wylacznik dziala od nastepnego wczytania.</summary>
+        /// Zmienia sie TIER PRZEDMIOTU (TierfOverride), jego cena gry (DetermineValue) i kategoria towaru (ItemCategory z selektora
+        /// gry wedlug nowego tieru: ranged_weapons_4 -> ranged_weapons_2), NIE umiejetnosci. Tak dziala atrybut XML tier_override
+        /// na zwyklym Item (Deserialize: TierfOverride, potem DetermineValue, na koncu DetermineItemCategoryForItem z tieru);
+        /// CraftedItem (a Pine Javelin nim jest) tego atrybutu nie czyta, a DetermineItemCategoryForItem ustawia kategorie tylko,
+        /// gdy jest null - dlatego kategorie ustawiamy wprost (poprawka po recenzji 175b: bez tego warsztaty robily go w linii
+        /// ranged_weapons_4, a indeks ceny i popyt kategorii liczyly go jak t4). Przy wczytaniu, przed TierGear (pula 175.2 widzi
+        /// t2), przed prawami tieru (WeaponTierLaw da wymog 35 zamiast 105), przed SkillSinew i przed zbudowaniem list kategorii
+        /// warsztatow gry (WorkshopsCampaignBehavior.FillItemsInAllCategories - nowa gra i OnGameLoaded). Tylko razem z 175.2
+        /// (TierGearWanted - zapis bez K1 zostaje bez zmian - i pola refleksji jak w TierGear). Obiekty przedmiotow sa nowe w kazdej
+        /// grze - wylacznik dziala od nastepnego wczytania. Kultura przedmiotu (sturgia = Zelazne Wyspy) bez zmian: WorkshopLaw robi go
+        /// z pierwszenstwem w miastach tej kultury, a AiGear kupuje koszykiem typ x tier - CHANGELOG 175b "Kto dostaje".</summary>
         private static readonly string[] SimpleJavelinIds = { "northern_javelin_1_t2" };
         private const int SimpleJavelinTier = 2;
         private static readonly System.Reflection.MethodInfo MSetTierfOverride = AccessTools.PropertySetter(typeof(ItemObject), "TierfOverride");
         private static readonly System.Reflection.MethodInfo MDetermineValue = AccessTools.Method(typeof(ItemObject), "DetermineValue");
+        private static readonly System.Reflection.MethodInfo MSetItemCategory = AccessTools.PropertySetter(typeof(ItemObject), "ItemCategory");
+        private static bool _javT2;                     // 175b: w tej sesji co najmniej jeden oszczep dostal tier 2 (do linii "3 doby bez zestawow")
 
         internal static void SimpleJavelins()
         {
@@ -770,6 +781,14 @@ namespace CrashScribe
             {
                 if (!Wanted("Army175SimpleJavelins", 1f)) { Scribe.Line("Mends: najprostszy oszczep tier 2 (175b) - wylaczone (Army175SimpleJavelins), oszczepy z tierem gry."); return; }
                 if (!TierGearWanted()) { Scribe.Line("Mends: najprostszy oszczep tier 2 (175b) - pominiete (" + _tgOffWhy + "; dziala tylko razem z 175.2)."); return; }
+                // ten sam warunek co TierGear: bez pol rosterow 175.2 nie zadziala, a oszczep t2 bez niego obnizylby wymog Rzutu
+                // 6 rodzajom t2-t3 z wlasnym Pine Javelin we wzorcu ROT (SkillSinew nie podnioslby Rzutu do 105, np. sea_hounds 105 -> 40,
+                // sturgian_brigand 105 -> 70) - wzorce i umiejetnosci maja wtedy zostac bez zmian
+                if (FRoster == null || FEquipments == null)
+                {
+                    Scribe.Line("Mends: najprostszy oszczep tier 2 (175b) - pominiete (brak pol refleksji rosterow - 175.2 nie zadziala w tej sesji), oszczepy z tierem gry.");
+                    return;
+                }
                 if (MSetTierfOverride == null)
                 {
                     Scribe.Line("Mends: najprostszy oszczep tier 2 (175b) - OSTRZEZENIE: brak ItemObject.TierfOverride (inna wersja gry) - oszczepy z tierem gry.");
@@ -777,6 +796,8 @@ namespace CrashScribe
                 }
                 bool valueModel = false;
                 try { valueModel = Game.Current != null && Game.Current.BasicModels != null && Game.Current.BasicModels.ItemValueModel != null; } catch { }
+                ItemCategorySelector catSel = null;
+                try { catSel = Game.Current != null && Game.Current.BasicModels != null ? Game.Current.BasicModels.ItemCategorySelector : null; } catch { }
                 var parts = new List<string>();
                 foreach (var id in SimpleJavelinIds)
                 {
@@ -792,6 +813,7 @@ namespace CrashScribe
                         int g0 = (int)it.Tier + 1, v0 = it.Value;
                         // Tierf = TierfOverride - 1 = 2 -> ItemTiers.Tier2 (PULAPKA CLAUDE.md 7: Tier1 == 0, wyswietlany tier = (int)Tier + 1)
                         MSetTierfOverride.Invoke(it, new object[] { SimpleJavelinTier + 1f });
+                        _javT2 = true;
                         string val;
                         if (MDetermineValue == null || !valueModel) val = ", cena gry bez zmian (brak modelu wartosci)";
                         else
@@ -799,14 +821,29 @@ namespace CrashScribe
                             try { MDetermineValue.Invoke(it, null); val = ", cena gry " + v0 + " -> " + it.Value; }
                             catch (Exception e) { val = ", cena gry bez zmian (" + e.GetType().Name + ")"; }
                         }
-                        parts.Add(id + " (" + it.Name + ") t" + g0 + " -> t" + ((int)it.Tier + 1) + val);
+                        // kategoria towaru za tierem (jak XML tier_override na zwyklym Item): selektor gry liczy ja z it.Tier (juz t2)
+                        string cat;
+                        string c0 = it.ItemCategory != null ? it.ItemCategory.StringId : "brak";
+                        if (MSetItemCategory == null || catSel == null) cat = ", kategoria bez zmian " + c0 + " (brak selektora kategorii)";
+                        else
+                        {
+                            try
+                            {
+                                var nc = catSel.GetItemCategoryForItem(it);
+                                if (nc == null) cat = ", kategoria bez zmian " + c0 + " (selektor bez wyniku)";
+                                else if (nc == it.ItemCategory) cat = ", kategoria " + c0 + " (bez zmian)";
+                                else { MSetItemCategory.Invoke(it, new object[] { nc }); cat = ", kategoria " + c0 + " -> " + nc.StringId; }
+                            }
+                            catch (Exception e) { cat = ", kategoria bez zmian " + c0 + " (" + e.GetType().Name + ")"; }
+                        }
+                        parts.Add(id + " (" + it.Name + ") t" + g0 + " -> t" + ((int)it.Tier + 1) + val + cat);
                     }
                     catch (Exception e) { parts.Add(id + " potkniecie " + e.GetType().Name); }
                 }
                 _tierCache = null;   // TierGear liczy tiery od nowa (PreparePass) - tu na wszelki wypadek po zmianie tieru
                 Scribe.Line("Mends: najprostszy oszczep tier 2 (175b) - " + string.Join("; ", parts.ToArray())
                             + " (wymog Rzutu po prawie tieru 35 zamiast 105; cena historyczna Armoury liczona przy starcie sesji z tieru 2; "
-                            + "w linii 175.2 'zapas innej klasy ... oszczepy' ma byc 0).");
+                            + "w linii 175.2 'zapas innej klasy ... oszczepy' ma byc 0; kultura przedmiotu bez zmian - warsztaty z pierwszenstwem kultury miasta, zakupy AI koszykiem typ x tier).");
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Army175.SimpleJavelins", null); } catch { } }
         }

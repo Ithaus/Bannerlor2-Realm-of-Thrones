@@ -228,6 +228,20 @@ namespace CrashScribe
             return Math.Max(floor, Math.Min(value, lim));
         }
 
+        /// <summary>Zamierzona przewaga broni glownej piechoty t3+ Polnocy nad swiatem przy suwaku (po sufitach "bez przeskoku tieru"),
+        /// tylko do linii "pominiete" (gdy 175.2 nie dziala, planu po sufitach nie ma z czego policzyc). Rachunek SCR\a175b\sufit15.py
+        /// (dane 09.10, poprawka po recenzji 175b): 0 -> 7.4, 15 -> 19.7, 25 -> 27.5, 30 -> 30.4, 35 -> 32.3, 50 -> 34.3; miedzy
+        /// punktami liniowo. Do 30 prawie rowne 7.5 + 0.82 x bonus, wyzej sufit tnie wiekszosc jednostek.</summary>
+        private static double IntendedEdge(int bonus)
+        {
+            int[] b = { 0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50 };
+            double[] e = { 7.4, 11.5, 15.6, 19.7, 23.7, 27.5, 30.4, 32.3, 33.0, 33.8, 34.3 };
+            if (bonus <= b[0]) return e[0];
+            for (int i = 1; i < b.Length; i++)
+                if (bonus <= b[i]) return e[i - 1] + (e[i] - e[i - 1]) * (bonus - b[i - 1]) / (double)(b[i] - b[i - 1]);
+            return e[e.Length - 1];
+        }
+
         /// <summary>3.2: +bonus (suwak NorthHardySkillBonus, dom. 15 od 175b - bylo 25; 0 = wyl.) do broni glownej i Atletyki
         /// piechoty Polnocy t3-t6. "+bonus ponad dzisiejsze" = ponad wartosci PO zamianie sprzetu (rozdz. 1) -
         /// interpretacja do potwierdzenia przez Jeffa przy "wgraj" (projekt rozdz. 0 pkt 4). Tylko gdy 175.2 zadzialalo
@@ -250,7 +264,7 @@ namespace CrashScribe
                     string why = !TierGearWanted() ? _tgOffWhy : (_gaveUp ? "zamiana nie mogla zadzialac" : "zamiana nie zadzialala");
                     Scribe.Line("Mends: NorthHardy (175) - pominiete: sprzet wedlug tieru (175.2) nie dziala w tej sesji (" + why + ") - +" + bonus
                                 + " liczyloby sie od umiejetnosci napompowanych sprzetem ponad tier (przewaga znacznie ponad zamierzone ok. +"
-                                + (7.5 + 0.82 * bonus).ToString("0") + "%; przy +25 bylo to +46%/+52% zamiast +28%, projekt 3.2).");
+                                + IntendedEdge(bonus).ToString("0") + "%; przy +25 bylo to +46%/+52% zamiast +28%, projekt 3.2).");
                     return;
                 }
                 float wStep = Mends.ArmouryFloat("WeaponSkillPerTier", 35f), aStep = Mends.ArmouryFloat("ArmorAthleticsPerTier", 35f);
@@ -262,7 +276,7 @@ namespace CrashScribe
                 foreach (var co in set) { preM += MaxMelee(co); preA += co.GetSkillValue(DefaultSkills.Athletics); }
                 preM /= set.Count; preA /= set.Count;
                 int done = 0, shared = 0, stumbles = 0, capped = 0;
-                double planM = 0, planA = 0;
+                double planM = 0, planA = 0, lossM = 0, lossA = 0;   // loss = ile sufit "bez przeskoku tieru" ucial z +bonus (do okna kontroli)
                 var planBySkills = new Dictionary<MBCharacterSkills, int[]>();
                 var ex = new List<string>();
                 foreach (var co in set)
@@ -276,7 +290,7 @@ namespace CrashScribe
                         if (_northMark.TryGetValue(skills, out o))
                         {
                             shared++;
-                            if (planBySkills.TryGetValue(skills, out pl)) { planM += pl[0]; planA += pl[1]; }
+                            if (planBySkills.TryGetValue(skills, out pl)) { planM += pl[0]; planA += pl[1]; lossM += pl[2]; lossA += pl[3]; }
                             continue;
                         }
                         var main = MainMelee(co);
@@ -286,16 +300,18 @@ namespace CrashScribe
                         int tgtM = TierCap(baseM + bonus, baseM, T, wStep);
                         int tgtA = TierCap(baseA + bonus, baseA, T, aStep);
                         if (tgtM < baseM + bonus || tgtA < baseA + bonus) capped++;
+                        // strata na suficie liczona PRZED SetSkill: nieudany zapis ma dalej obnizac wynik wobec okna (potkniecie widac)
+                        lossM += baseM + bonus - tgtM; lossA += baseA + bonus - tgtA;
                         if (!SetSkill(co, main, tgtM) || !SetSkill(co, DefaultSkills.Athletics, tgtA)) { stumbles++; continue; }
                         _northMark.Add(skills, Mark);
-                        planBySkills[skills] = new[] { tgtM - curM, tgtA - curA };
+                        planBySkills[skills] = new[] { tgtM - curM, tgtA - curA, baseM + bonus - tgtM, baseA + bonus - tgtA };
                         planM += tgtM - curM; planA += tgtA - curA;
                         done++;
                         if (ex.Count < 6) ex.Add(co.StringId + " t" + T + " " + main.StringId + " " + curM + "->" + tgtM + " Atl " + curA + "->" + tgtA);
                     }
                     catch { stumbles++; }
                 }
-                planM /= set.Count; planA /= set.Count;
+                planM /= set.Count; planA /= set.Count; lossM /= set.Count; lossA /= set.Count;
                 double postM = 0, postA = 0;
                 foreach (var co in set) { postM += MaxMelee(co); postA += co.GetSkillValue(DefaultSkills.Athletics); }
                 postM /= set.Count; postA /= set.Count;
@@ -315,14 +331,21 @@ namespace CrashScribe
                 // sufit tieru przy 25 (rachunek na sprzet.json): 11 z 43 jednostek przycietych - highborn_warrior 90 -> 104 zamiast 115,
                 // 8 footmanow t3 i 2 pikinierow t5 o 1; srednia broni -0.5, Atletyki -0.2 pkt, przewaga ok. -0.4 pkt - w oknie;
                 // przy 15 (domyslne od 175b): 1 z 43 przyciety (highborn_warrior 90 -> 104), przewaga +19.7%/+20.2% - w oknie 19.8 +-3)
-                double expect = 7.5 + 0.82 * bonus;
+                // POPRAWKA PO RECENZJI 175b: od ok. +30 sufit tnie wiekszosc (35 i wiecej: 37 z 43), wiec liniowe 7.5 + 0.82 x bonus
+                // (50 -> 48.5) dawalo falszywe OSTRZEZENIE (naprawde ok. +34/+35%). Okno = 7.5 + 0.82 x (bonus - srednia strata na
+                // suficie), osobno bron i Atletyka: bez przyciec to samo co dotad; stale 7.5 (Polnoc po samej zamianie sprzetu) i 0.82
+                // (= 100 / srednia swiata ok. 122) dalej sprawdzaja zbior swiata i stan przed bonusem, wiec kontrola nie staje sie
+                // tautologia. Rachunek SCR\a175c\okno.py: 15 -> +19.7/+20.2 (okno 19.8/19.8), 35 -> +32.3/+33.8 (okno 32.4/33.2), 50 -> +34.3/+35.5 (okno 34.5/34.9).
+                double expM = 7.5 + 0.82 * (bonus - lossM), expA = 7.5 + 0.82 * (bonus - lossA);
                 var why2 = new List<string>();
                 if (set.Count != 43) why2.Add("zbior " + set.Count + " zamiast 43");
                 if (Math.Abs((postM - preM) - planM) > 0.5 || Math.Abs((postA - preA) - planA) > 0.5)
                     why2.Add("przyrost sredniej " + (postM - preM).ToString("0.0") + "/" + (postA - preA).ToString("0.0") + " zamiast zaplanowanego "
                              + planM.ToString("0.0") + "/" + planA.ToString("0.0"));
-                if (Math.Abs(advM - expect) > 3 || Math.Abs(advA - expect) > 3)
-                    why2.Add("przewaga poza oknem " + (expect - 3).ToString("0") + "-" + (expect + 3).ToString("0") + "%");
+                if (Math.Abs(advM - expM) > 3 || Math.Abs(advA - expA) > 3)
+                    why2.Add("przewaga poza oknem " + (expM - 3).ToString("0") + "-" + (expM + 3).ToString("0") + "% (bron) / "
+                             + (expA - 3).ToString("0") + "-" + (expA + 3).ToString("0") + "% (Atletyka; okno po sufitach: srednio -"
+                             + lossM.ToString("0.0") + "/-" + lossA.ToString("0.0") + " pkt z +" + bonus + ")");
                 if (why2.Count > 0)
                     Scribe.Line("Mends: NorthHardy (175) - OSTRZEZENIE (kontrola poprawnosci): " + string.Join("; ", why2.ToArray())
                                 + " - sprawdz podwojny bonus, zbior albo klase broni.");
