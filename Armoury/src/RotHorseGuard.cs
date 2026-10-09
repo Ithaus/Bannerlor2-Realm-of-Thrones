@@ -164,7 +164,7 @@ namespace Armoury
                         var taken = new List<KeyValuePair<EquipmentElement, int>>();
                         Stables.Consume(party, cat, fromRoster, taken);
                         int mn, mpos;
-                        Stables.BankToArmory(mp, taken, fix, out lost, out mn, out mpos);
+                        Stables.BankToArmory(mp, taken, fix, false, out lost, out mn, out mpos);   // sklad9-p: licznik straznika ROT, nie "konie za awans"
                         HorseCensus.Add(key, HorseCensus.CKonModUjemny, mn);
                         HorseCensus.Add(key, HorseCensus.CKonModDodatni, mpos);
                     }

@@ -11,7 +11,7 @@ namespace Armoury
     /// SPRZET STARTOWY, KTORY DA SIE NOSIC (Jeff 04.10: "dostalem mase sprzetu, jak zaczalem
     /// gre, ale nie moge go nosic - nie powinienem dostawac rzeczy, ktorych nie moge nosic").
     /// Kreator postaci (pochodzenie ROT/BK) daje komplet wedle pochodzenia - np. plyte rycerza-
-    /// rabusia - a Prawo Wagi CrashScribe (Atletyka 35/tier) stawia mu wymagania, ktorych nowa
+    /// rabusia - a Prawo Wagi CrashScribe (od 09.10 Atletyka = waga / 0.333 kg) stawia mu wymagania, ktorych nowa
     /// postac nie ma. Gra zrzuca to do taboru na czerwono.
     ///
     /// Raz, w pierwszej godzinie po kreatorze (wszystkie mody juz rozdaly swoje): kazda sztuke
@@ -35,23 +35,15 @@ namespace Armoury
             try { EnforceStartGold(); } catch (Exception e) { Log.Error("StartKit.Gold", e); }
         }
 
-        private static SkillObject ReqSkill(ItemObject it)
-        {
-            if (it == null) return null;
-            if (it.RelevantSkill != null) return it.RelevantSkill;
-            if (it.ItemType == ItemObject.ItemTypeEnum.Arrows) return DefaultSkills.Bow;
-            if (it.ItemType == ItemObject.ItemTypeEnum.Bolts) return DefaultSkills.Crossbow;
-            if (it.HasArmorComponent) return DefaultSkills.Athletics;      // Prawo Wagi CrashScribe
-            return null;
-        }
-
+        /// <summary>sklad9-p: jedno zrodlo prawdy - sito bohaterow ItemReq.MeetsHero (ItemReq.SkillFor: bron i kon z danych, pancerz -
+        /// Atletyka, strzaly Luk, belty Kusza; ladry konskie bohaterom nie sprawdzane - jak na ekranie i w opisie MCM). Dotad wlasna kopia
+        /// bez galezi ladr: ladry (ArmorComponent) mierzone Atletyka wobec Difficulty z XML ROT.</summary>
         private static bool CanUse(Hero h, ItemObject it)
         {
             try
             {
                 if (h == null || it == null || it.Difficulty <= 0) return true;
-                var rs = ReqSkill(it);
-                return rs == null || h.GetSkillValue(rs) >= it.Difficulty;
+                return ItemReq.MeetsHero(h.CharacterObject, it);
             }
             catch { return true; }
         }

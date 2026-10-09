@@ -21,7 +21,7 @@ namespace Armoury
     /// WeaponComponentData.GetRelevantSkillFromWeaponClass: Arrow -> Bow, Bolt -> Crossbow; POPRAWKA Z16-5 po recenzji - wczesniej
     /// opis mowil, ze amunicja przechodzila). Przechodzil tylko PANCERZ (RelevantSkill = null), wiec gracz i towarzysze zakladali
     /// kazda zbroje. Etap 2 (ekran): postfiks na CanUseItem (3-arg - 2-arg wola 3-arg) dodaje brakujacy wiersz tej samej reguly
-    /// co u zolnierzy: pancerz - Atletyka (ItemReq.MeetsHero, ladry przepuszczone - uwaga 7.1); strzaly i belty pilnuje sama gra.
+    /// co u zolnierzy: pancerz - Atletyka (ItemReq.MeetsHero, ladry przepuszczone - decyzja, patrz ItemReq.MeetsHero); strzaly i belty pilnuje sama gra.
     /// Ekran (SPInventoryVM.IsItemEquipmentPossible / CanCharacterUseItem) zrobi z tego sam czerwona karte i komunikat gry
     /// "You don't have enough {SKILL_NAME} skill to equip this item". Nigdy "nie" -> "tak". Opis przedmiotu (ItemMenuVM)
     /// dostaje linie "Requires: Athletics 175" w tym samym miejscu, co gra pisze wymog broni (po wadze). To, co bohater juz

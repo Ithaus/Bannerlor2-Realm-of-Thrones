@@ -94,8 +94,9 @@ namespace Armoury
                                 bool ok = basic != null && basic != y && Buy(n, market, basic, y, false);
                                 try { RecruitKit.OnFresh(n, y, ok ? new List<EquipmentElement>(_lastBought) : null); } catch (Exception e) { RecruitKit.Stumble("OnFresh", e); }
                                 if (castle) _castleFresh++;
-                                // sklad9 (175 pkt 19): swiezy konny ochotnik t2+ - kon kupiony przez notabla albo bez konia (ochotnik zostaje, wariant lagodny 171)
-                                if (y.IsMounted) HorseCensus.OnVolunteerRider(settlement, n, ok);
+                                // sklad9 (175 pkt 19): swiezy konny ochotnik t2+ - kon kupiony przez notabla albo bez konia (ochotnik zostaje, wariant lagodny 171);
+                                // sklad9-p: bez konia - kolumna "bez konia zostaja", nie "cofnieci" (takze basic == null - bez proby zakupu)
+                                if (y.IsMounted) HorseCensus.OnVolunteerRider(settlement, n, ok, !ok);
                             }
                             continue;                                     // tier 1 - wlasny dobytek
                         }

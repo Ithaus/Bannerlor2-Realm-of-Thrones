@@ -36,6 +36,10 @@ namespace Armoury
     ///     zamiennika nie maja (regalia, patrz Uniques) - znikaja.
     /// (2) SWEEP przy wczytaniu: magazyn DTE gracza, magazyny partii AI, tabor
     ///     gracza, tabory AI - kazda kopia -> zamiennik, liczba sztuk bez zmian.
+    ///     sklad9-p (Jeff 09.10 12:15 pkt 3): w taborach (gracz i AI) unikat sledzony przez
+    ///     zwyczaj wojenny (UniqueSpoils.Is) zostaje unikatem - patrz SweepRoster.
+    ///     Bohaterowie (3) bez zmian: zdobycz NOSZONA przez nie-wlasciciela dalej schodzi
+    ///     przy wczytaniu (rozjazd 16.09 / 04.10 - pytanie do Jeffa).
     /// (3) BOHATEROWIE, gracz tez: unikat na kims, kto nie jest wlascicielem,
     ///     schodzi na rzecz zamiennika w kulturze bohatera. Wlasciciel = ma ten
     ///     item we WLASNYM szablonie (ROT: Sandor Clegane = ROTwanderer3 z hound_*,
@@ -122,20 +126,21 @@ namespace Armoury
             {
                 if (!Settings.Current.UniqueGearLawEnabled) { Log.Info("UniqueLaw: wylaczone w ustawieniach."); return; }
                 var pc = PlayerCulture();
-                int g1, g2, g3 = 0, s3 = 0;
-                int s1 = SweepRoster(DteArmory(), pc, out g1);
-                int s2 = SweepRoster(MobileParty.MainParty != null ? MobileParty.MainParty.ItemRoster : null, pc, out g2);
+                int g1, g2, g3 = 0, s3 = 0, k1, k2, k3 = 0;
+                int s1 = SweepRoster(DteArmory(), pc, false, out g1, out k1);
+                int s2 = SweepRoster(MobileParty.MainParty != null ? MobileParty.MainParty.ItemRoster : null, pc, true, out g2, out k2);
                 int aiBags = 0;
                 foreach (var mp in MobileParty.All)
                 {
                     if (mp == null || mp == MobileParty.MainParty || mp.ItemRoster == null) continue;
-                    int g;
-                    int s = SweepRoster(mp.ItemRoster, PartyCulture(mp), out g);
+                    int g, k;
+                    int s = SweepRoster(mp.ItemRoster, PartyCulture(mp), true, out g, out k);
                     if (s > 0 || g > 0) aiBags++;
-                    s3 += s; g3 += g;
+                    s3 += s; g3 += g; k3 += k;
                 }
                 Log.Info("UniqueLaw (wczytanie): magazyn DTE gracza - " + s1 + " szt. zamienionych, " + g1 + " znikly; tabor gracza - "
-                         + s2 + " zamienionych, " + g2 + " znikly; tabory AI - " + s3 + " zamienionych, " + g3 + " znikly w " + aiBags + " partiach.");
+                         + s2 + " zamienionych, " + g2 + " znikly; tabory AI - " + s3 + " zamienionych, " + g3 + " znikly w " + aiBags + " partiach"
+                         + "; unikaty zwyczaju wojennego zostawione w taborach (sklad9-p, Jeff 09.10 12:15) - gracz " + k2 + ", AI " + k3 + ".");
                 if (s1 + s2 > 0)
                     Log.Player("The quartermaster exchanged " + (s1 + s2) + " pieces of named heroes' gear for honest equipment of your own people.");
                 else if (g1 + g2 > 0)
@@ -282,10 +287,15 @@ namespace Armoury
         // ---------------------------------------------------------------- sweepy
 
         /// <summary>Kazda kopia unikatu w rosterze -> zamiennik (ta sama liczba
-        /// sztuk, bez modyfikatora - modyfikator plyty na skorze bylby bez sensu).</summary>
-        private static int SweepRoster(ItemRoster roster, BasicCultureObject cul, out int gone)
+        /// sztuk, bez modyfikatora - modyfikator plyty na skorze bylby bez sensu).
+        /// sklad9-p (Jeff 09.10 12:15 pkt 3: "unikat, ktorego lord nie udzwignie, zostaje UNIKATEM w taborze"): keepSpoils - w TABORACH
+        /// (gracz i AI) unikat sledzony przez zwyczaj wojenny (UniqueSpoils.Is) zostaje soba: tam kladzie go UniqueSpoils (Park - lord
+        /// nie udzwignie, zdobycz gracza, tabor rozbitej partii), a kopii z zaopatrzenia nie ma (NotMerchandise, kopie startowe zdjete raz
+        /// na kampanie). Ta sama regula co czystka polek CS (Mends.UniqueWares, Z16-1c). Magazyn DTE gracza - bez zmian (nabor IntakePlayer
+        /// i tak zamienia unikat w drzwiach). kept - ile sztuk zostawiono.</summary>
+        private static int SweepRoster(ItemRoster roster, BasicCultureObject cul, bool keepSpoils, out int gone, out int kept)
         {
-            gone = 0;
+            gone = 0; kept = 0;
             int swapped = 0;
             if (roster == null) return 0;
             try
@@ -295,6 +305,9 @@ namespace Armoury
                     var el = roster.GetElementCopyAtIndex(i);
                     var it = el.EquipmentElement.Item;
                     if (it == null || el.Amount <= 0 || !UniqueGear.Is(it)) continue;
+                    bool spoil = false;
+                    try { spoil = keepSpoils && UniqueSpoils.Is(it); } catch { }   // blad spisu - jak dotad (zamiana)
+                    if (spoil) { kept += el.Amount; continue; }
                     int n = el.Amount;
                     roster.AddToCounts(el.EquipmentElement, -n);
                     var sub = StandInFor(it, cul);

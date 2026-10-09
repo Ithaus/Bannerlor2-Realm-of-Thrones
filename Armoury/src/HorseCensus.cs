@@ -56,8 +56,10 @@ namespace Armoury
             // przeglad 175 (tylko na koncu - skrypty czytaja po nazwie kolumny)
             CCzekaInnaKat = 46, CCzekajaProby = 47, CNieudanePusto = 48, CNieudaneDrogie = 49, CNieudaneRezerwa = 50, CWizytyInnaKat = 51,
             CDoZbrojowniNietrwalej = 52, CWolneZaloga = 53, CWolneDezercja = 54, CKonieEcho = 55, CStrazPieszyFootman = 56,
-            CStrazPieszyElita = 57, CStrazBrakPuli = 58, CWolneZwykle = 59, CWolneBojowe = 60, CWolneSzlachetne = 61;
-        private const int N = 62;
+            CStrazPieszyElita = 57, CStrazBrakPuli = 58, CWolneZwykle = 59, CWolneBojowe = 60, CWolneSzlachetne = 61,
+            // sklad9-p (przeglad sklad9, uwaga 5b): swiezy konny ochotnik t2+ bez kupionego konia ZOSTAJE (wariant lagodny 171) - nie "cofniety"
+            COchotnikZostaje = 62;
+        private const int N = 63;
         private const string Header = "dzien;krolestwo;konni;wszyscy;czeka;odrzucone;skret;przyciete;wykonane;do_zbrojowni;przepadlo;kupione;zloto;"
             + "nieudane_zloto;nieudane_brak;bez_konia;naplyw_ochotnicy;naplyw_najemnicy;naplyw_jency;rot_plus;rot_minus;awanse;wolne_w_zbrojowni;"
             + "awanse_z_wolnych;straz_zbrojownia;straz_tabor;straz_pieszy;straz_t6;rot_plus_jeniec;rot_plus_najemnik;rot_plus_obcy;rot_zloto;"
@@ -66,12 +68,13 @@ namespace Armoury
             + "wizyty_z_potrzeba;kupione_targ;kupione_wsie;straz_przepadlo;"
             + "czeka_mimo_koni_innej_kategorii;czekaja_proby;nieudane_pusto;nieudane_za_drogie;nieudane_polka_zarezerwowana;"
             + "wizyty_bez_zakupu_konie_innej_kategorii;do_zbrojowni_nietrwalej;wolne_po_jezdzcach_w_zalodze;wolne_po_dezerterach;"
-            + "konie_z_echa_rot;straz_pieszy_footman;straz_pieszy_z_elity;straz_pieszego_brak_w_puli;wolne_zwykle;wolne_bojowe;wolne_szlachetne";
+            + "konie_z_echa_rot;straz_pieszy_footman;straz_pieszy_z_elity;straz_pieszego_brak_w_puli;wolne_zwykle;wolne_bojowe;wolne_szlachetne;"
+            + "ochotnik_konny_bez_konia_zostaje";
         internal const string NoKingdom = "bez_krolestwa", PlayerClanKey = "rod_gracza", OtherPartiesKey = "inne_partie";
         internal const int FailNoGold = 0, FailEmpty = 1, FailTooDear = 2, FailShelfReserved = 3;
 
         private static readonly Dictionary<string, long[]> _day = new Dictionary<string, long[]>();
-        private static long _volKhuzaitBought, _volKhuzaitReverted;   // ochotnicy-jezdzcy u notabli kultury khuzait (linia dnia)
+        private static long _volKhuzaitBought, _volKhuzaitReverted, _volKhuzaitStays;   // ochotnicy-jezdzcy u notabli kultury khuzait (linia dnia)
         private static int _stumbles, _daysWritten;
         private static string _patches = "nie wpiete";
 
@@ -79,7 +82,7 @@ namespace Armoury
 
         internal static void Reset()
         {
-            _day.Clear(); _volKhuzaitBought = _volKhuzaitReverted = 0; _stumbles = 0; _daysWritten = 0;
+            _day.Clear(); _volKhuzaitBought = _volKhuzaitReverted = _volKhuzaitStays = 0; _stumbles = 0; _daysWritten = 0;
             _inRot = 0; _ctxOn = false; _ctxSettlement = null; _ctxSource = null;
             RotHorseGuard.Reset();
         }
@@ -201,14 +204,16 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ ochotnicy u notabli (VolunteerKit)
-        internal static void OnVolunteerRider(Settlement st, Hero notable, bool bought)
+        /// <summary>stays (sklad9-p): ochotnik bez kupionego konia zostaje w puli (swiezy ochotnik t2+, 171 OnFresh - takze bez proby zakupu,
+        /// gdy brak jednostki bazowej) - osobna kolumna, nie "cofniety" (to tylko awans cofniety do x).</summary>
+        internal static void OnVolunteerRider(Settlement st, Hero notable, bool bought, bool stays = false)
         {
             if (!On) return;
             try
             {
-                Add(st != null ? st.MapFaction : null, bought ? COchotnikKupiony : COchotnikCofniety, 1);
+                Add(st != null ? st.MapFaction : null, bought ? COchotnikKupiony : (stays ? COchotnikZostaje : COchotnikCofniety), 1);
                 if (notable != null && notable.Culture != null && notable.Culture.StringId == "khuzait")
-                { if (bought) _volKhuzaitBought++; else _volKhuzaitReverted++; }
+                { if (bought) _volKhuzaitBought++; else if (stays) _volKhuzaitStays++; else _volKhuzaitReverted++; }
             }
             catch { _stumbles++; }
         }
@@ -530,7 +535,7 @@ namespace Armoury
         // ------------------------------------------------------------ linia dnia i CSV
         internal static void Daily()
         {
-            if (!On) { _day.Clear(); _volKhuzaitBought = _volKhuzaitReverted = 0; return; }
+            if (!On) { _day.Clear(); _volKhuzaitBought = _volKhuzaitReverted = _volKhuzaitStays = 0; return; }
             var inv = CultureInfo.InvariantCulture;
             int day = (int)CampaignTime.Now.ToDays;
             // kazde krolestwo ma wiersz (takze bez zdarzen)
@@ -562,7 +567,8 @@ namespace Armoury
               .Append(", na pieszych ").Append(t[CStrazPieszy]).Append(" (w tym na khuzait_footman ").Append(t[CStrazPieszyFootman]).Append(", z linii elity ").Append(t[CStrazPieszyElita])
               .Append("), t6 bez zmiany ").Append(t[CStrazT6]).Append(", pieszego brak w puli ").Append(t[CStrazBrakPuli]).Append(", kon przepadl ").Append(t[CStrazPrzepadlo])
               .Append(" | ochotnicy na konnego u notabli: kupiony kon ").Append(t[COchotnikKupiony]).Append(", cofnieci ").Append(t[COchotnikCofniety])
-              .Append(" (notable khuzait ").Append(_volKhuzaitBought).Append("/").Append(_volKhuzaitReverted).Append(")")
+              .Append(", bez konia zostaja (swiezy t2+) ").Append(t[COchotnikZostaje])
+              .Append(" (notable khuzait ").Append(_volKhuzaitBought).Append("/").Append(_volKhuzaitReverted).Append("/").Append(_volKhuzaitStays).Append(")")
               .Append(" | khuzait_footman w partiach i zalogach ").Append(t[CFootmanDothrakow])
               .Append(" | konie z modyfikatorem do zbrojowni: gorsze ").Append(t[CKonModUjemny]).Append(", lepsze ").Append(t[CKonModDodatni])
               .Append(" | wiersze: krolestwa (AI lordowie i zalogi), ").Append(PlayerClanKey).Append(", ").Append(OtherPartiesKey)
@@ -582,7 +588,7 @@ namespace Armoury
                 if (Log.Csv("konie-krolestwa.csv", Header, rows.ToString()) != null) _daysWritten++;
             }
             catch { _stumbles++; }
-            _day.Clear(); _volKhuzaitBought = _volKhuzaitReverted = 0;
+            _day.Clear(); _volKhuzaitBought = _volKhuzaitReverted = _volKhuzaitStays = 0;
         }
     }
 

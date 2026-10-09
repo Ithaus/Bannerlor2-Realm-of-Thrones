@@ -652,7 +652,7 @@ namespace Armoury
         [SettingPropertyGroup("Skills rule the gear")]
         public bool SkillsDecideEnabled { get; set; } = true;
 
-        [SettingPropertyBool("Hero Gear Requirements", HintText = "you, your companions and the lords cannot put on armour above their Athletics - the same rule as for soldiers (arrows above Bow and bolts above Crossbow the game itself already refuses). On the inventory screen the card turns red, the game says 'You don't have enough Athletics skill to equip this item' and the description shows 'Requires: Athletics 175'. Armour asks Athletics by its weight only (Kg Per Athletics Point), so gowns, robes, hats and gloves ask almost nothing. The same holds for Spoils' auto-equip of companions, for a lord buying or taking a renowned piece by the custom of war (what he cannot carry goes to his baggage), for the plain piece that replaces a renowned one, for the troop kit you and your companions are handed when enlisted in a lord's service (a piece you cannot carry is swapped for your own of the same kind, or for the best one you can carry) and for the weapon a captive gets when you take his famed one. What anyone already wears stays on him, in battle too. Horse barding is not checked. Off = only the game's own check of weapons, shields, arrows, bolts and horses")]
+        [SettingPropertyBool("Hero Gear Requirements", HintText = "you, your companions and the lords cannot put on armour above their Athletics - the same rule as for soldiers (arrows above Bow and bolts above Crossbow the game itself already refuses). On the inventory screen the card turns red, the game says 'You don't have enough Athletics skill to equip this item' and the description shows 'Requires: Athletics 175'. Armour asks Athletics by its weight only (Armour Kg Per Athletics), so gowns, robes, hats and gloves ask almost nothing. The same holds for Spoils' auto-equip of companions, for a lord buying or taking a renowned piece by the custom of war (what he cannot carry goes to his baggage and stays the renowned piece there), for the plain piece that replaces a renowned one, for the troop kit you and your companions are handed when enlisted in a lord's service (a piece you cannot carry is swapped for your own of the same kind, or for the best one you can carry) and for the weapon a captive gets when you take his famed one. What anyone already wears stays on him, in battle too. Horse barding is not checked. Off = only the game's own check of weapons, shields, arrows, bolts and horses")]
         [SettingPropertyGroup("Skills rule the gear")]
         public bool HeroGearRequirements { get; set; } = true;
 
@@ -836,7 +836,7 @@ namespace Armoury
         [SettingPropertyGroup("Desertion")]
         public bool DesertionLawForAi { get; set; } = false;
 
-        [SettingPropertyBool("Unique Gear Law Enabled", HintText = "named heroes' gear (Ramsay, the Hound, the Mountain, Brienne, Renly...) belongs to its owner alone: copies in armouries, packs and on other heroes become same-tier gear of the wearer's own culture, and DTE swaps them on the way into any armoury")]
+        [SettingPropertyBool("Unique Gear Law Enabled", HintText = "named heroes' gear (Ramsay, the Hound, the Mountain, Brienne, Renly...) belongs to its owner alone: copies in armouries, packs and on other heroes become same-tier gear of the wearer's own culture, and DTE swaps them on the way into any armoury. A renowned piece taken by the custom of war stays itself in a baggage train (yours or a lord's); worn by anyone but its owner it is still swapped on load")]
         [SettingPropertyGroup("The law of the battlefield")]
         public bool UniqueGearLawEnabled { get; set; } = true;
 
@@ -2984,7 +2984,7 @@ namespace Armoury
         [SettingPropertyGroup("Armies of the realms (175)")]
         public int NorthHardyWeaponBonus { get; set; } = 0;
 
-        [SettingPropertyInteger("North Hardy Athletics Bonus", 0, 50, "0", HintText = "the same Northern infantry of tier 3 to 6 gets this many points of Athletics on top of what its own gear demands - the men of the North are built sterner and march harder. 5 brings their average Athletics from about 130 to about 135 (the rest of the world about 121: +12% instead of +8%). Each man is capped one point below the next tier's requirement. Works only while Army 175 Tier Gear is at work. 0 = off. Applied by CrashScribe, takes effect on the next load")]
+        [SettingPropertyInteger("North Hardy Athletics Bonus", 0, 50, "0", HintText = "the same Northern infantry of tier 3 to 6 gets this many points of Athletics on top of what its own gear demands - the men of the North are built sterner and march harder. 5 brings their average Athletics from about 129 to about 134 (the rest of the world about 118: +13% instead of +9%). With armour asking Athletics by its weight only (Armour Tier Athletics 0, the default) there is no tier cap on Athletics; with the Armour Tier Law on, each man is capped one point below the next tier's requirement. Works only while Army 175 Tier Gear is at work. 0 = off. Applied by CrashScribe, takes effect on the next load")]
         [SettingPropertyGroup("Armies of the realms (175)")]
         public int NorthHardyAthleticsBonus { get; set; } = 5;
 

@@ -431,16 +431,19 @@ namespace Armoury
         // sklad9: (1) robi jedna droga 175.1 - PayInHorses -> Consume -> BankToArmory (AiFix = AiUpgradeHorseToArmory albo TroopsFightWithOwnKitOnly);
         // dawne BankAiHorses (sklad7b-p) usuniete, jego regula odmowy DTE (kon wraca do taboru) i liczniki tej linii przeszly do BankToArmory.
         // (2) i (3) - tylko przy TroopsFightWithOwnKitOnly, jak w grze.
-        private static int _dStamp = -1, _dPaid, _dPaidRefused, _dToArm, _dToBag, _dNoHorse;
+        // sklad9-p (przeglad sklad9, uwaga 5a): konie straznika ROT (RotHorseGuard - zamiana na konnego Dothrakow) liczone osobno (_dRot*),
+        // dotad wpadaly w "konie za awans" i rozjezdzaly porownanie z kolumna do_zbrojowni linii 175 (ta liczy tylko awanse).
+        private static int _dStamp = -1, _dPaid, _dPaidRefused, _dRot, _dRotRefused, _dToArm, _dToBag, _dNoHorse;
 
         private static void DayFlush()
         {
             int d = (int)CampaignTime.Now.ToDays;
             if (d == _dStamp) return;
-            if (_dStamp >= 0 && _dPaid + _dPaidRefused + _dToArm + _dToBag + _dNoHorse > 0)
+            if (_dStamp >= 0 && _dPaid + _dPaidRefused + _dRot + _dRotRefused + _dToArm + _dToBag + _dNoHorse > 0)
                 Log.Info("Stajnia AI (sklad7b-p): dzien " + _dStamp + " - konie za awans do zbrojowni partii " + _dPaid + (_dPaidRefused > 0 ? " (DTE nie przyjal " + _dPaidRefused + " - wrocily do taboru)" : "")
+                         + ", przy zamianach ROT (straz konia Dothrakow) do zbrojowni " + _dRot + (_dRotRefused > 0 ? " (DTE nie przyjal " + _dRotRefused + " - wrocily do taboru)" : "")
                          + ", z taboru pod jezdzcow bez konia " + _dToArm + ", nadmiar ze zbrojowni do taboru " + _dToBag + "; jezdzcy bez konia po dosadzeniu (suma przy postojach) " + _dNoHorse + ".");
-            _dPaid = _dPaidRefused = _dToArm = _dToBag = _dNoHorse = 0;
+            _dPaid = _dPaidRefused = _dRot = _dRotRefused = _dToArm = _dToBag = _dNoHorse = 0;
             _dStamp = d;
         }
 
@@ -529,9 +532,11 @@ namespace Armoury
         /// w grze: nic w nicosc; po filtrze IsPlainMount w Consume odmowa zostaje praktycznie tylko przy braku DTE) - licznik "DTE nie przyjal"
         /// w linii "Stajnia AI (sklad7b-p)". modNeg / modPos - konie z modyfikatorem (kulawy, stary / rasowy): zbrojownia AI trzyma ItemObject
         /// bez modyfikatora (znane odstepstwo od gracza, ktory zachowuje EquipmentElement).
+        /// sklad9-p: upgrade - kon za awans (PayInHorses: liczniki "konie za awans" i HorseCensus.OnBanked = "w tym nietrwalej" kolumny
+        /// do_zbrojowni, ktora liczy tylko awanse); false - kon zdjety przez straz konia przy zamianie ROT (RotHorseGuard: osobny licznik).
         /// </summary>
         internal static int BankToArmory(MobileParty mp, System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<EquipmentElement, int>> taken,
-                                         bool bank, out int lost, out int modNeg, out int modPos)
+                                         bool bank, bool upgrade, out int lost, out int modNeg, out int modPos)
         {
             int banked = 0; lost = 0; modNeg = 0; modPos = 0;
             if (taken == null) return 0;
@@ -541,14 +546,15 @@ namespace Armoury
                 if (kv.Value <= 0 || kv.Key.Item == null) continue;
                 if (bank && mp != null && AiGear.AddToArmory(mp, kv.Key.Item, kv.Value))
                 {
-                    banked += kv.Value; _dPaid += kv.Value;
+                    banked += kv.Value;
+                    if (upgrade) _dPaid += kv.Value; else _dRot += kv.Value;
                     var mod = kv.Key.ItemModifier;   // tylko konie, ktore naprawde weszly do zbrojowni (tam bez modyfikatora)
                     if (mod != null) { if (mod.PriceMultiplier < 1f) modNeg += kv.Value; else if (mod.PriceMultiplier > 1f) modPos += kv.Value; }
                 }
-                else if (bank && mp != null && mp.ItemRoster != null) { mp.ItemRoster.AddToCounts(kv.Key, kv.Value); _dPaidRefused += kv.Value; }
+                else if (bank && mp != null && mp.ItemRoster != null) { mp.ItemRoster.AddToCounts(kv.Key, kv.Value); if (upgrade) _dPaidRefused += kv.Value; else _dRotRefused += kv.Value; }
                 else lost += kv.Value;
             }
-            if (banked > 0) HorseCensus.OnBanked(mp, banked);   // przeglad 175: ile weszlo do zbrojowni, ktorej DTE nie zapisuje / kasuje co dobe
+            if (banked > 0 && upgrade) HorseCensus.OnBanked(mp, banked);   // przeglad 175: ile weszlo do zbrojowni, ktorej DTE nie zapisuje / kasuje co dobe (sklad9-p: tylko awanse - "w tym" kolumny do_zbrojowni)
             return banked;
         }
 
@@ -667,7 +673,7 @@ namespace Armoury
                 var taken = new System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<EquipmentElement, int>>();
                 if (fromRoster > 0) Consume(party, cat, fromRoster, taken);
                 int lost, modNeg, modPos;
-                int banked = BankToArmory(party.MobileParty, taken, fix, out lost, out modNeg, out modPos);
+                int banked = BankToArmory(party.MobileParty, taken, fix, true, out lost, out modNeg, out modPos);
                 HorseCensus.OnUpgradePaid(party, cat, need, fromFree, banked, lost, modNeg, modPos);
                 return true;
             }

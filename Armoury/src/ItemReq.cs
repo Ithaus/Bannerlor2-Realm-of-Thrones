@@ -39,9 +39,9 @@ namespace Armoury
 
         /// <summary>
         /// Z16 (Jeff 09.10): SITO BOHATEROW - gracz, towarzysze, lordowie AI. To samo co Meets, z jednym wyjatkiem:
-        /// ladry konskie (HorseHarness) przechodza. SkillFor liczy dzis kazda sztuke z ArmorComponent jako Atletyke,
-        /// takze ladry, a prawo tieru pancerza zaklada dla nich Jazde - to osobna decyzja (projekt Z16, uwaga 7.1),
-        /// wiec bohaterom ladr nie blokujemy. Jedna metoda dla wszystkich drog zakladania u bohaterow: ekran
+        /// ladry konskie (HorseHarness) przechodza. To DECYZJA, nie obejscie: od Z16b SkillFor daje ladrom Jazde (zolnierze,
+        /// K1, kwatermistrz), a bohaterom ladr nie sprawdzamy (opis MCM HeroGearRequirements: "Horse barding is not checked").
+        /// Jedna metoda dla wszystkich drog zakladania u bohaterow (sklad9-p: takze sprzet startowy gracza - StartKit): ekran
         /// (HeroGear), Spoils auto-equip, unikaty (UniqueSpoils, UniqueLaw.StandInFor), zaciag ROT (DragonUnmount),
         /// zamiennik broni zabranej jencowi (ROT gank). Lustro w CrashScribe: Mends.CanUseHero.
         /// </summary>
