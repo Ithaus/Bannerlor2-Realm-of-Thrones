@@ -11,8 +11,10 @@ namespace Armoury
     /// T8 (noc 08/09.10): KLIMAT WSI - towar glowny wsi, ktory nie moze rosnac tam, gdzie wies stoi (Jeff: "czy rozklad produkcji ma sens
     /// i jest uzasadniony regionem"). Audyt 02 tabela D.1: 12 wsi z towarem niemozliwym w klimacie (bawelna przy Murze, w Braavos, w gorach
     /// Doliny, w Sarnorze, w Dorzeczu, w Krolewskim Lesie, w Norvos i Ziemiach Korony; winnica w Lorath; daktyle na Tarth) dostaje towar
-    /// swojej krainy; D.2: 5 cieplych wsi (Qarth 2, delta Rhoyne, Lys, Tyrosh) przechodzi na bawelne, zeby swiat mial jej dalej troche
-    /// (bawelna 13 -> 8 wsi, wszystkie w strefie cieplej). 4 farmy zboza za Murem z D.1 ZOSTAJA (pytanie do Jeffa 6.2-1).
+    /// swojej krainy; D.2: 5 cieplych wsi (Qarth 2, delta Rhoyne, Lys, Tyrosh) przechodzi na bawelne. Poprawka (autotest S1): 5 wsi za 10
+    /// zabranych to bylo za malo (bawelna ze wsi 75-80/d wobec 110-130/d, aksamit -60%) - D.3 doklada 5 cieplych wsi (Selhorys, Myr, Meereen,
+    /// Chroyane, Sunspear) z towarow, ktorych D.1 dodala. Bawelna 13 -> 13 wsi (10 zabranych, 10 dodanych), wszystkie w strefie cieplej -
+    /// suma swiata bez zmian. 4 farmy zboza za Murem z D.1 ZOSTAJA (pytanie do Jeffa 6.2-1).
     /// Gdzie: typ wsi (Village.VillageType) to zwykle pole BEZ zapisu w grze - gra ustawia je z settlements.xml przy kazdym wczytaniu
     /// (Village.Deserialize), a wszyscy czytaja je na biezaco (model produkcji gry, lista BK GetProductions, magazyn i tabor wsi,
     /// nasze GoodsLedger, VillageWoodlot, VillageClogDiag). Jedno miejsce: podmiana raz przy starcie sesji (ArmouryBehavior.OnSessionLaunched,
@@ -20,7 +22,7 @@ namespace Armoury
     /// z tabeli ("bylo") - jesli ktos inny juz go zmienil, nie ruszamy (linia logu to pokaze). Pliki ROT bez zmian.
     /// KLASA WSI BK (recenzja T8): BK trzyma w SWOIM zapisie klase wsi (LandData.VillageClass, [SaveableProperty(8)]) ustalona z typu wsi
     /// (DefaultVillageClasses.GetClass) i wpisuje ja tylko, gdy jest Unset - po zmianie typu klasa zostalaby stara (dochod majatkow BK,
-    /// klastry, polityka majatkow AI). Dlatego przy kazdym starcie sesji, dla 17 wsi z tabeli, wyrownujemy ja do biezacego typu: gdy klasa
+    /// klastry, polityka majatkow AI). Dlatego przy kazdym starcie sesji, dla 22 wsi z tabeli, wyrownujemy ja do biezacego typu: gdy klasa
     /// = klasa typu "bylo" -> klasa typu "jest" (przy wylaczonym VillageClimateFix odwrotnie: typ wrocil z mapy, klasa wraca do typu z mapy).
     /// Klasy innej niz obie (dekret BK ClassTransition, inny mod) nie ruszamy. Klasa Unset albo brak danych BK - BK ustawi ja sam z
     /// biezacego typu. Zapis BK trzyma wiec tylko klase zgodna z typem; wylaczenie dziala od nastepnego wczytania (typy i klasy wracaja).
@@ -51,6 +53,14 @@ namespace Armoury
             new[] { "village_ES4_1",         "lumberjack", "silk_plant",         "Sagora (Volantis, delta Rhoyne)" },
             new[] { "ROT_town11_village1",   "date_farm",  "silk_plant",         "Abar (Lys)" },
             new[] { "ROT_castle47_village2", "date_farm",  "silk_plant",         "Tyrono (Tyrosh)" },
+            // D.3 (poprawka noc 08/09.10, autotest S1): D.2 dawala 5 wsi za 10 zabranych - bawelna ze wsi 75-80/d wobec 110-130/d bez T8.
+            // Jedna wies bawelny daje ok. 9.5-10 bel na dobe niezaleznie od miejsca (8 wsi 78/d, 13 wsi 122/d), wiec brakuje dokladnie 5 wsi.
+            // Biore je z towarow, ktorych D.1 dodala (owce +3, len +3, bydlo +2, ryby +2) - bilans tych towarow wraca blizej zera.
+            new[] { "village_ES5_1",         "sheep_farm", "silk_plant",         "Lanthas (Selhorys, dolina Rhoyne)" },
+            new[] { "ROT_town12_village2",   "sheep_farm", "silk_plant",         "Tasko (Myr)" },
+            new[] { "village_K1_2",          "flax_plant", "silk_plant",         "Ulaan (Meereen, Zatoka Niewolnicza)" },
+            new[] { "castle_village_A8_1",   "cattle_farm","silk_plant",         "Tamnuh (Chroyane, Rhoyne)" },
+            new[] { "village_A1_1",          "fisherman",  "silk_plant",         "Spottswood Village (Sunspear, ujscie Greenblood)" },
         };
 
         /// <summary>Raz przy starcie sesji: podmiana typu wsi wedlug tabeli (wylacznik VillageClimateFix), wyrownanie klasy wsi BK do
@@ -77,13 +87,14 @@ namespace Armoury
                     catch (Exception e) { st0++; if (st0 <= 3) Log.Error("VillageClimate.Apply(" + row[0] + ")", e); }
                 }
                 Log.Info("Klimat wsi (T8): WYLACZONY w ustawieniach (Village Climate Fix) - typy wsi z mapy ROT (" + Table.Length + " wsi z tabeli bez zmian; po wylaczeniu w trwajacej sesji typy wracaja przy nastepnym wczytaniu); "
-                         + bk.Summary() + "; potkniecia " + (st0 + bk.Stumbles) + ".");
+                         + "wsi bawelny na mapie " + CountType(Cotton, ref st0) + "; " + bk.Summary() + "; potkniecia " + (st0 + bk.Stumbles) + ".");
                 return;
             }
             var done = new List<string>();
             var already = new List<string>();
             var other = new List<string>();
             var missing = new List<string>();
+            var applied = new List<string[]>();   // wiersze z typem "jest" po przebiegu (podmienione teraz albo juz wczesniej) - do bilansu
             int stumbles = 0;
             foreach (var row in Table)
             {
@@ -93,12 +104,13 @@ namespace Armoury
                     if (st == null || st.Village == null) { missing.Add(row[0]); continue; }
                     var cur = st.Village.VillageType;
                     string curId = cur != null ? cur.StringId : "null";
-                    if (curId == row[2]) { already.Add(row[3]); bk.Align(st, row[3], Type(row[1]), cur); continue; }   // klasa BK takze tu (stary zapis, nowa kampania)
+                    if (curId == row[2]) { already.Add(row[3]); applied.Add(row); bk.Align(st, row[3], Type(row[1]), cur); continue; }   // klasa BK takze tu (stary zapis, nowa kampania)
                     if (curId != row[1]) { other.Add(row[3] + " ma " + curId); continue; }   // ktos juz zmienil - nie ruszamy
                     var vt = Type(row[2]);
                     if (vt == null) { missing.Add("typ " + row[2]); continue; }
                     st.Village.VillageType = vt;
                     done.Add(row[3] + ": " + row[1] + " -> " + row[2]);
+                    applied.Add(row);
                     bk.Align(st, row[3], cur, vt);
                 }
                 catch (Exception e)
@@ -112,9 +124,63 @@ namespace Armoury
             if (already.Count > 0) line += "; juz z nowym typem: " + string.Join(", ", already.ToArray());
             if (other.Count > 0) line += "; inny typ niz w tabeli (NIE ruszane): " + string.Join(", ", other.ToArray());
             if (missing.Count > 0) line += "; brak w tej kampanii: " + string.Join(", ", missing.ToArray());
+            line += "; " + Balance(applied, ref stumbles);
             line += "; za Murem bez zmian (pytanie do Jeffa); " + bk.Summary() + "; potkniecia " + (stumbles + bk.Stumbles)
                     + ". Typ wsi nie idzie do zapisu gry, klasa wsi BK idzie (wyrownana do typu).";
             Log.Info(line);
+        }
+
+        private const string Cotton = "silk_plant";
+
+        /// <summary>Bilans podmian, ktore dzis obowiazuja: ile wsi bawelny zabrano i ile dodano, wsie bawelny na mapie teraz,
+        /// i zmiana liczby wsi kazdego innego typu (0 = towar bez zmian w sumie swiata).</summary>
+        private static string Balance(List<string[]> applied, ref int stumbles)
+        {
+            try
+            {
+                int taken = 0, added = 0;
+                var delta = new SortedDictionary<string, int>(StringComparer.Ordinal);
+                foreach (var row in applied)
+                {
+                    if (row[1] == Cotton) taken++;
+                    if (row[2] == Cotton) added++;
+                    int v;
+                    delta.TryGetValue(row[1], out v); delta[row[1]] = v - 1;
+                    delta.TryGetValue(row[2], out v); delta[row[2]] = v + 1;
+                }
+                var parts = new List<string>();
+                foreach (var kv in delta)
+                    if (kv.Key != Cotton) parts.Add(kv.Key + " " + (kv.Value > 0 ? "+" : "") + kv.Value);
+                return "BILANS bawelny: zabrano " + taken + " wsi, dodano " + added + " (netto " + (added - taken >= 0 ? "+" : "") + (added - taken)
+                       + "; wsi bawelny na mapie teraz " + CountType(Cotton, ref stumbles) + ", ok. 9.5-10 bel na wies na dobe; plan 10 zabranych / 10 dodanych)"
+                       + "; inne typy (liczba wsi): " + (parts.Count > 0 ? string.Join(", ", parts.ToArray()) : "bez zmian");
+            }
+            catch (Exception e)
+            {
+                stumbles++;
+                if (stumbles <= 3) Log.Error("VillageClimate.Balance", e);
+                return "BILANS bawelny: blad liczenia";
+            }
+        }
+
+        /// <summary>Ile wsi na mapie ma dzis dany typ (-1 = nie da sie policzyc).</summary>
+        private static int CountType(string id, ref int stumbles)
+        {
+            try
+            {
+                var all = Village.All;
+                if (all == null) return -1;
+                int n = 0;
+                foreach (var v in all)
+                    if (v != null && v.VillageType != null && v.VillageType.StringId == id) n++;
+                return n;
+            }
+            catch (Exception e)
+            {
+                stumbles++;
+                if (stumbles <= 3) Log.Error("VillageClimate.CountType", e);
+                return -1;
+            }
         }
 
         private static VillageType Type(string id)
@@ -122,7 +188,7 @@ namespace Armoury
             return MBObjectManager.Instance != null ? MBObjectManager.Instance.GetObject<VillageType>(id) : null;
         }
 
-        /// <summary>Klasa wsi BK (LandData.VillageClass) przez refleksje - tylko przy starcie sesji, 17 wsi. Bez BK nic nie robi.</summary>
+        /// <summary>Klasa wsi BK (LandData.VillageClass) przez refleksje - tylko przy starcie sesji, 22 wsie z tabeli. Bez BK nic nie robi.</summary>
         private sealed class BkClass
         {
             private readonly object _pm;
