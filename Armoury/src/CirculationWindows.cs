@@ -127,6 +127,8 @@ namespace Armoury
         internal static readonly int[] ProbeN = new int[Windows], ProbeBad = new int[Windows];
         internal static readonly long[] ProbeDiff = new long[Windows];
         internal static long ProbeTicks;
+        internal static int GoldCalls, GoldSampled;                                        // koszt nasluchu zdarzen zlota (OnGold) - probka 1/256
+        internal static long GoldTicks;
         internal static int ProbeScans;                                                    // pelne przeglady swiata w probkach dzis
         private static int _probesToday;
         internal static readonly int[] ProbeNSess = new int[Windows], ProbeBadSess = new int[Windows];   // od startu sesji (Reset, nie ClearDay)
@@ -212,6 +214,7 @@ namespace Armoury
                 Array.Clear(ProbeN, 0, Windows); Array.Clear(ProbeBad, 0, Windows); Array.Clear(ProbeDiff, 0, Windows);
                 OffThread = Stumbles = Nested = InClanSkipped = ProbeStale = 0;
                 BlockNamed = 0; ProbeTicks = 0; ProbeScans = 0; _probesToday = 0;
+                GoldCalls = GoldSampled = 0; GoldTicks = 0;
                 // probka nie moze byc otwarta na koniec doby (nasz tick nie biegnie w zadnym oknie) - zostala tylko po wyjatku bez zamkniecia
                 if (_probeOn) { _probeOn = false; ProbeStale++; }
             }
@@ -250,16 +253,33 @@ namespace Armoury
             if (!On || !Live) return false;
             if (Environment.CurrentManagedThreadId != _main) { OffThread++; return false; }
             Calls[w]++;
+            _gT = (Calls[w] & 15) == 1 ? Stopwatch.GetTimestamp() : 0L;   // probka kosztu (1/16) - od bramki
             return true;
         }
 
-        /// <summary>Probka czasu 1/256 otwartych okien (koszt - kontrolka 6.8).</summary>
-        private static long CostStart(int w) { return (++Opened[w] & 255) == 0 ? Stopwatch.GetTimestamp() : 0L; }
+        // Koszt okien (kontrolka 6.8): czas SAMYCH naszych cial - prefiks od bramki do CostStart i finalizer od CostResume do CostEnd.
+        // Metoda gry, cudze latki i probki swiata (wlasny licznik ProbeTicks) sa poza pomiarem. Probka: co 16. wywolanie od pierwszego
+        // w dobie (1, 17, 33...), wiec kazde okno wolane w dobie ma co najmniej jedna probke.
+        private static long _gT;                           // znacznik czasu z bramki (0 = wywolanie bez probki)
 
-        private static void CostEnd(int w, long t0)
+        /// <summary>Koniec mierzonej czesci prefiksu (liczy otwarte okno). Zwraca 1, gdy to probka - finalizer zmierzy tez swoje cialo.</summary>
+        private static long CostStart(int w)
         {
-            if (t0 == 0 || w < 0) return;
-            Ticks[w] += Stopwatch.GetTimestamp() - t0; Sampled[w]++;
+            Opened[w]++;
+            long t = _gT; _gT = 0;
+            if (t == 0 || w < 0) return 0L;
+            Ticks[w] += Stopwatch.GetTimestamp() - t; Sampled[w]++;
+            return 1L;
+        }
+
+        /// <summary>Poczatek ciala finalizera (tylko w probce).</summary>
+        private static long CostResume(long mark) { return mark != 0 ? Stopwatch.GetTimestamp() : 0L; }
+
+        /// <summary>Koniec ciala finalizera - przed ProbeClose.</summary>
+        private static void CostEnd(int w, long t1)
+        {
+            if (t1 == 0 || w < 0) return;
+            Ticks[w] += Stopwatch.GetTimestamp() - t1;
         }
 
         // ------------------------------------------------------------ pozycje bilansu
@@ -349,10 +369,12 @@ namespace Armoury
         /// <summary>Kazdy GiveGoldAction (kwota juz dodatnia, strony juz zamienione przez MoneyLedger). Rozbicie flag, prowizja, migawki, N5.</summary>
         internal static void OnGold(Hero gh, PartyBase gp, Hero rh, PartyBase rp, int a, bool gNone, bool rNone, int gc, int rc, bool inClan, bool inBlock, bool counted)
         {
+            long tg = 0;
             try
             {
                 if (!On) return;
                 if (Environment.CurrentManagedThreadId != _main) { OffThread++; return; }
+                tg = (++GoldCalls & 255) == 1 ? Stopwatch.GetTimestamp() : 0L;   // koszt nasluchu (probka 1/256)
                 // szybka sciezka: zdarzenia samych partii przechodza dalej tylko przy otwartym oknie
                 if (_ctx == 0 && _sellSt == null && _snapHero == null && !_snapLeaders && gh == null && rh == null) return;
                 // N5: przelewy od i do bohaterow poza swiatem (ich zloto nie jest w posiadaczach)
@@ -394,6 +416,7 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Stumble("OnGold", e); }
+            finally { if (tg != 0) { GoldTicks += Stopwatch.GetTimestamp() - tg; GoldSampled++; } }
         }
 
         // ------------------------------------------------------------ okna flagowe (F) - wspolny szkielet
@@ -410,6 +433,7 @@ namespace Armoury
         public static void FlagFin(Ctx __state)
         {
             if (!__state.Active) return;                    // okno sie nie otworzylo - nic nie liczy i nic nie przywraca
+            long tf = CostResume(__state.T0);       // koszt: cialo finalizera (bez metody gry, bez probki swiata)
             try
             {
                 if (__state.M)
@@ -432,7 +456,7 @@ namespace Armoury
             }
             catch (Exception e) { Stumble("FlagFin", e); }
             _ctx = __state.Kind; _ctxSide = __state.Side; _ctxW = __state.W;
-            try { CostEnd(__state.Me, __state.T0); } catch { }
+            try { CostEnd(__state.Me, tf); } catch { }
             if (__state.P) ProbeClose(__state.Me, __state.W0, __state.N0);
         }
 
@@ -627,6 +651,7 @@ namespace Armoury
         public static void CaravanWageFin(Hero __0, CaravanState __state)
         {
             if (!__state.On) return;
+            long tf = CostResume(__state.T0);       // koszt: cialo finalizera (bez metody gry, bez probki swiata)
             try
             {
                 var cs = __0 != null ? __0.OwnedCaravans : null;
@@ -651,7 +676,7 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Stumble("CaravanWageFin", e); }
-            try { CostEnd(WCaravanWage, __state.T0); } catch { }
+            try { CostEnd(WCaravanWage, tf); } catch { }
             if (__state.P) ProbeClose(WCaravanWage, __state.W0, __state.N0);
         }
 
@@ -676,6 +701,7 @@ namespace Armoury
         public static void SellFin(SellState __state)
         {
             if (!__state.On) return;                        // prefiks nie ruszyl _sellSt / _sellIn - okno zewnetrzne nietkniete
+            long tf = CostResume(__state.T0);       // koszt: cialo finalizera (bez metody gry, bez probki swiata)
             try
             {
                 var st = __state.St;
@@ -692,7 +718,7 @@ namespace Armoury
             }
             catch (Exception e) { Stumble("SellFin", e); }
             _sellSt = null; _sellIn = 0;
-            try { CostEnd(WSell, __state.T0); } catch { }
+            try { CostEnd(WSell, tf); } catch { }
             if (__state.P) ProbeClose(WSell, __state.W0, __state.N0);
         }
 
@@ -704,9 +730,9 @@ namespace Armoury
             st.P = ProbeOpen(w, out st.W0, out st.N0);
         }
 
-        private static void KasaClose(KasaState st, int w)
+        private static void KasaClose(KasaState st, int w, long tf)
         {
-            try { CostEnd(w, st.T0); } catch { }
+            try { CostEnd(w, tf); } catch { }
             if (st.P) ProbeClose(w, st.W0, st.N0);
         }
 
@@ -731,6 +757,7 @@ namespace Armoury
         public static void LootFin(KasaState __state)
         {
             if (!__state.On) return;
+            long tf = CostResume(__state.T0);       // koszt: cialo finalizera (bez metody gry, bez probki swiata)
             try
             {
                 long d = (long)__state.Mp.PartyTradeGold - __state.V;
@@ -738,7 +765,7 @@ namespace Armoury
                 if (d != 0) Hits[WLoot]++;
             }
             catch (Exception e) { Stumble("LootFin", e); }
-            KasaClose(__state, WLoot);
+            KasaClose(__state, WLoot, tf);
         }
 
         // O18 - BK rynek osady (BKSettlementBehavior.HandleMarketGold): kasa osady + kiesy jej notabli
@@ -765,6 +792,7 @@ namespace Armoury
         public static void MarketFin(KasaState __state)
         {
             if (!__state.On) return;
+            long tf = CostResume(__state.T0);       // koszt: cialo finalizera (bez metody gry, bez probki swiata)
             try
             {
                 long dK = Gold(__state.St) - __state.V, dN = NotablesGold(__state.St) - __state.V2;
@@ -774,7 +802,7 @@ namespace Armoury
                 if (dK != 0 || dN != 0) Hits[WMarket]++;
             }
             catch (Exception e) { Stumble("MarketFin", e); }
-            KasaClose(__state, WMarket);
+            KasaClose(__state, WMarket, tf);
         }
 
         // O19 - BK porty (BKBuildingsBehavior.RunPorts): ryba z niczego na polke, kasa w nicosc
@@ -793,6 +821,7 @@ namespace Armoury
         public static void PortsFin(KasaState __state)
         {
             if (!__state.On) return;
+            long tf = CostResume(__state.T0);       // koszt: cialo finalizera (bez metody gry, bez probki swiata)
             try
             {
                 long dK = Gold(__state.St) - __state.V;
@@ -802,7 +831,7 @@ namespace Armoury
                 if (dK != 0) { Hits[WPorts]++; Sum[IPortsN]++; }
             }
             catch (Exception e) { Stumble("PortsFin", e); }
-            KasaClose(__state, WPorts);
+            KasaClose(__state, WPorts, tf);
         }
 
         // O20 - BK kopalnie (BKBuildingsBehavior.RunMines): kasa netto po placach gornikow (BuildFunding.MineRevenuePostfix w oknie)
@@ -822,6 +851,7 @@ namespace Armoury
         public static void MinesFin(KasaState __state)
         {
             if (!__state.On) return;
+            long tf = CostResume(__state.T0);       // koszt: cialo finalizera (bez metody gry, bez probki swiata)
             _minesOpen = false;
             try
             {
@@ -832,7 +862,7 @@ namespace Armoury
                 if (dK != 0) Hits[WMines]++;
             }
             catch (Exception e) { Stumble("MinesFin", e); }
-            KasaClose(__state, WMines);
+            KasaClose(__state, WMines, tf);
         }
 
         // O21 - BK konwoje ludnosci (BKPartyBehavior.AddPopulationPartyBehavior): kasa miasta placi za towar konwoju
@@ -853,6 +883,7 @@ namespace Armoury
         public static void ConvoyFin(KasaState __state)
         {
             if (!__state.On) return;
+            long tf = CostResume(__state.T0);       // koszt: cialo finalizera (bez metody gry, bez probki swiata)
             try
             {
                 long dK = Gold(__state.St) - __state.V;
@@ -862,7 +893,7 @@ namespace Armoury
                 if (dK != 0) { Hits[WConvoys]++; Sum[IConvoysN]++; }
             }
             catch (Exception e) { Stumble("ConvoyFin", e); }
-            KasaClose(__state, WConvoys);
+            KasaClose(__state, WConvoys, tf);
         }
 
         // O23 - BK rynek wsi (BKBuildingsBehavior.OnDailyTickSettlement -> HandleVillage): kiesa wsi i kasa jej osady macierzystej (Bound)
@@ -883,6 +914,7 @@ namespace Armoury
         public static void VillageMarketFin(KasaState __state)
         {
             if (!__state.On) return;
+            long tf = CostResume(__state.T0);       // koszt: cialo finalizera (bez metody gry, bez probki swiata)
             try
             {
                 long dV = Gold(__state.St) - __state.V, dT = __state.St2 != null ? Gold(__state.St2) - __state.V2 : 0;
@@ -896,7 +928,7 @@ namespace Armoury
                 if (dV != 0 || dT != 0) Hits[WVillageMarket]++;
             }
             catch (Exception e) { Stumble("VillageMarketFin", e); }
-            KasaClose(__state, WVillageMarket);
+            KasaClose(__state, WVillageMarket, tf);
         }
 
         // ------------------------------------------------------------ O17 - kapital nowych karawan (D18)
@@ -917,6 +949,7 @@ namespace Armoury
         public static void CapFin(Hero __0, MobileParty __result, CapState __state)
         {
             if (!__state.On) return;
+            long tf = CostResume(__state.T0);       // koszt: cialo finalizera (bez metody gry, bez probki swiata)
             try
             {
                 if (_capSeen)
@@ -932,7 +965,7 @@ namespace Armoury
             }
             catch (Exception e) { Stumble("CapFin", e); }
             _capOpen = __state.PrevOpen; _capSeen = __state.PrevSeen; _capGiven = __state.PrevGiven;
-            try { CostEnd(WCaravanNew, __state.T0); } catch { }
+            try { CostEnd(WCaravanNew, tf); } catch { }
             if (__state.P) ProbeClose(WCaravanNew, __state.W0, __state.N0);
         }
 
@@ -979,6 +1012,7 @@ namespace Armoury
         public static void SnapFin(SnapState __state)
         {
             if (!__state.On) return;                        // bez przywracania - stan okna zewnetrznego zostaje nietkniety
+            long tf = CostResume(__state.T0);       // koszt: cialo finalizera (bez metody gry, bez probki swiata)
             try
             {
                 long now = __state.Me == WDilemma ? LeadersGold() : (__state.H != null ? __state.H.Gold : 0L);
@@ -990,7 +1024,7 @@ namespace Armoury
             }
             catch (Exception e) { Stumble("SnapFin", e); }
             _snapHero = null; _snapLeaders = false; _snapEvt = 0;
-            try { CostEnd(__state.Me, __state.T0); } catch { }
+            try { CostEnd(__state.Me, tf); } catch { }
             if (__state.P) ProbeClose(__state.Me, __state.W0, __state.N0);
         }
 
@@ -1158,6 +1192,7 @@ namespace Armoury
         public static void TollFin(TollState __state)
         {
             if (!__state.On) return;
+            long tf = CostResume(__state.T0);       // koszt: cialo finalizera (bez metody gry, bez probki swiata)
             try
             {
                 // licznik cel w oknie minus prowizja dopisana przez sprzedaz w tym samym oknie (O15)
@@ -1166,7 +1201,7 @@ namespace Armoury
                 if (z5 != 0) { Hits[WTolls]++; Sum[ITollN]++; }
             }
             catch (Exception e) { Stumble("TollFin", e); }
-            try { CostEnd(WTolls, __state.T0); } catch { }
+            try { CostEnd(WTolls, tf); } catch { }
             if (__state.P) ProbeClose(WTolls, __state.W0, __state.N0);
         }
 
@@ -1191,7 +1226,7 @@ namespace Armoury
         internal static void WorkshopOutPost(Workshop w)
         {
             if (_woW == null || !ReferenceEquals(w, _woW)) return;
-            bool p = _woP; long w0 = _woW0, n0 = _woN0, t0 = _woT0;
+            bool p = _woP; long w0 = _woW0, n0 = _woN0, t0 = CostResume(_woT0);   // koszt: cialo Post
             try
             {
                 long dK = Gold(_woSt) - _woK0, dC = (long)w.Capital - _woC0;
@@ -1224,12 +1259,13 @@ namespace Armoury
         internal static void WorkshopInPost(Town town, Workshop w)
         {
             if (_wiW == null || !ReferenceEquals(w, _wiW)) return;
-            bool p = _wiP; long w0 = _wiW0, n0 = _wiN0, t0 = _wiT0;
+            bool p = _wiP; long w0 = _wiW0, n0 = _wiN0, t0 = CostResume(_wiT0);   // koszt: cialo Post
             try
             {
                 long dK = Gold(_wiSt) - _wiK0, dC = (long)w.Capital - _wiC0;
                 int c = ClassOf(_wiSt);
-                if (c >= 0 && !MoneyLedger.InBlock) Cls[c, LWorkshopIn] += dK;
+                // wsad dodatkowych cykli rzemieslnikow BK (ArtisanInputs.Decide) stara linia kas juz zna (NoteArtisans) - tu tylko swiat (N3)
+                if (c >= 0 && !MoneyLedger.InBlock && !ArtisanInputs.InDecide) Cls[c, LWorkshopIn] += dK;
                 AddWorld(NWorkshopInKasa, dK, +1); AddWorld(NWorkshopInCap, dC, +1);
                 if (dK != 0 || dC != 0) Hits[WWorkshopIn]++;
             }
@@ -1442,6 +1478,10 @@ namespace Armoury
                 if (t == null) { miss.Add(label + " BRAK (brak typu " + typeName + ")"); return; }
                 MethodInfo m = args != null ? AccessTools.Method(t, method, args) : AccessTools.Method(t, method);
                 if (m == null) { miss.Add(label + " BRAK (brak metody " + method + ")"); return; }
+                // parametry latek bierzemy po pozycji (__0, __1...), a Harmony sprawdza tylko numer, nie typ - inna sygnatura w innej wersji
+                // modu dalaby latce obiekt innego typu; wtedy okno sie nie wpina (BRAK z powodem), gra bez zmian
+                string bad = SignatureMismatch(m, pre) ?? SignatureMismatch(m, fin) ?? SignatureMismatch(m, post);
+                if (bad != null) { miss.Add(label + " BRAK (inna sygnatura " + method + ": " + bad + ")"); return; }
                 h.Patch(m,
                         prefix: pre != null ? new HarmonyMethod(typeof(CirculationWindows), pre) { priority = Priority.First } : null,
                         postfix: post != null ? new HarmonyMethod(typeof(CirculationWindows), post) : null,
@@ -1450,6 +1490,43 @@ namespace Armoury
                 done.Add(label);
             }
             catch (Exception e) { miss.Add(label + " BRAK (blad: " + e.Message + ")"); }
+        }
+
+        /// <summary>
+        /// Czy parametry naszej latki pasuja do metody: __N - typ parametru N metody rowny typowi w latce (object - dowolna klasa),
+        /// __instance - metoda instancji typu latki, __result - ten sam typ wyniku. null = pasuje, inaczej opis niezgodnosci.
+        /// </summary>
+        private static string SignatureMismatch(MethodInfo m, string patch)
+        {
+            if (patch == null) return null;
+            var pm = AccessTools.Method(typeof(CirculationWindows), patch);
+            if (pm == null) return "brak latki " + patch;
+            var ps = m.GetParameters();
+            foreach (var pp in pm.GetParameters())
+            {
+                string n = pp.Name;
+                Type want = pp.ParameterType;
+                if (n == "__state" || n == "__exception" || n == "__originalMethod") continue;
+                if (n == "__instance")
+                {
+                    if (m.IsStatic || !want.IsAssignableFrom(m.DeclaringType)) return n + " (" + want.Name + ")";
+                    continue;
+                }
+                if (n == "__result")
+                {
+                    if (m.ReturnType != want) return n + ": " + m.ReturnType.Name + " zamiast " + want.Name;
+                    continue;
+                }
+                int idx;
+                if (n.Length > 2 && n.StartsWith("__", StringComparison.Ordinal) && int.TryParse(n.Substring(2), out idx))
+                {
+                    if (idx < 0 || idx >= ps.Length) return n + ": metoda ma " + ps.Length + " parametrow";
+                    var have = ps[idx].ParameterType;
+                    bool ok = want == typeof(object) ? (!have.IsValueType && !have.IsByRef) : have == want;
+                    if (!ok) return n + ": " + have.Name + " zamiast " + want.Name;
+                }
+            }
+            return null;
         }
 
         /// <summary>Czy istniejaca latka WorkshopTrade (prefiks o danej nazwie) siedzi na metodzie - okna O35/O36 jada na niej.</summary>

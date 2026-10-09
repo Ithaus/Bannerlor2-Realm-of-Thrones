@@ -104,6 +104,10 @@ namespace Armoury
         private static readonly long[,] _mark = new long[Classes, Marks];
         private static readonly long[] _wage = new long[Wages];
         private static readonly int[] _wageN = new int[Wages], _wageShort = new int[Wages];
+        /// <summary>Paczka 169 (tylko odczyt, przed ClearDay - ClanIncomeBook.Daily biegnie przed Daily ksiegi): partie lordow i zalogi
+        /// rozliczone dzis oraz te z zaleglym zoldem (HasUnpaidWages po rozliczeniu).</summary>
+        internal static int WagePaidParties { get { return _wageN[WLord] + _wageN[WGarrison]; } }
+        internal static int WageShortParties { get { return _wageShort[WLord] + _wageShort[WGarrison]; } }
         private static long _wageToPurses, _wageToCoffers; // zold, ktory nie zniknal: SoldierPay przekazal go do sakiewek ludzi i kas osad
         private static int _stumbles;                      // potkniecia licznikow (wyjatek zlapany przy jednym zdarzeniu) - liczymy, nie gasimy
 
@@ -925,10 +929,20 @@ namespace Armoury
                     Log.Info(BalanceLine(day, hold, _lastHold));
                     // paczka 169 (tylko log): nowe linie zaraz po starych - kazda we wlasnym try, blad jednej nie gasi reszty
                     bool on169 = CirculationWindows.On;
-                    long t169 = on169 ? System.Diagnostics.Stopwatch.GetTimestamp() : 0L;
-                    if (on169) { try { Log.Info(BalanceCausesLine(day, hold, _lastHold)); } catch (Exception e) { Log.Error("MoneyLedger.BalanceCausesLine", e); } }
+                    long t169 = 0;   // czas SAMYCH nowych linii (stare linie miedzy nimi poza pomiarem)
+                    if (on169)
+                    {
+                        long ts = System.Diagnostics.Stopwatch.GetTimestamp();
+                        try { Log.Info(BalanceCausesLine(day, hold, _lastHold)); } catch (Exception e) { Log.Error("MoneyLedger.BalanceCausesLine", e); }
+                        t169 += System.Diagnostics.Stopwatch.GetTimestamp() - ts;
+                    }
                     Log.Info(ClanLine(day));
-                    if (on169) { try { Log.Info(ClanCausesLine(day)); } catch (Exception e) { Log.Error("MoneyLedger.ClanCausesLine", e); } }
+                    if (on169)
+                    {
+                        long ts = System.Diagnostics.Stopwatch.GetTimestamp();
+                        try { Log.Info(ClanCausesLine(day)); } catch (Exception e) { Log.Error("MoneyLedger.ClanCausesLine", e); }
+                        t169 += System.Diagnostics.Stopwatch.GetTimestamp() - ts;
+                    }
                     Log.Info(VillagerLine(day));
                     var golds = new List<int>[Classes];
                     for (int c = 0; c < Classes; c++) golds[c] = new List<int>();
@@ -941,11 +955,13 @@ namespace Armoury
                     for (int c = 0; c < Classes; c++) Log.Info(ClassLine(day, c, end[c], end[c] - _lastSnap[c], golds[c]));
                     if (on169)
                     {
+                        long ts = System.Diagnostics.Stopwatch.GetTimestamp();
                         try { Log.Info(ClassCausesLine(day)); } catch (Exception e) { Log.Error("MoneyLedger.ClassCausesLine", e); }
                         try { Log.Info(ObiegLine(day, hold, _lastHold)); } catch (Exception e) { Log.Error("MoneyLedger.ObiegLine", e); }
                         try { Log.Info(ObiegNotablesLine(day, hold, _lastHold)); } catch (Exception e) { Log.Error("MoneyLedger.ObiegNotablesLine", e); }
                         try { Log.Info(ObiegBkLine(day)); } catch (Exception e) { Log.Error("MoneyLedger.ObiegBkLine", e); }
-                        try { Log.Info(ObiegWindowsLine(day, t169)); } catch (Exception e) { Log.Error("MoneyLedger.ObiegWindowsLine", e); }
+                        t169 += System.Diagnostics.Stopwatch.GetTimestamp() - ts;
+                        try { Log.Info(ObiegWindowsLine(day, t169)); } catch (Exception e) { Log.Error("MoneyLedger.ObiegWindowsLine", e); }   // dolicza wlasny czas
                     }
                 }
                 _lastSnap = end; _lastHold = hold; _first = false;

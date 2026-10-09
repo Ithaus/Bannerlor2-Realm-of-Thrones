@@ -77,12 +77,16 @@ namespace Armoury
                     if (!win.IsMainParty) ClanIncomeBook.NoteInflow(win.LeaderHero, purse / 3, ClanIncomeBook.KThird);   // paczka 169: D rodu (tylko licznik)
                     MoneyLedger.NotePurseGone(purse, false);                                                             // paczka 169: linia "Obieg" (tylko licznik)
                 }
-                else { var t = NearestTown(mp); if (t != null && t.Town != null) t.Town.ChangeGold(purse); }
-                if (!(win != null && win.LeaderHero != null && win.LeaderHero.IsAlive) && CirculationWindows.On)
+                else
                 {
-                    // paczka 169 (tylko licznik): ta sama osada co wyzej - NearestTown liczy z pozycji tej samej partii
-                    var t2 = NearestTown(mp);
-                    if (t2 != null && t2.Town != null) { MoneyLedger.NotePurseGone(purse, true); MoneyLedger.Note169(MoneyLedger.N169PurseGone, t2, purse); }
+                    var t = NearestTown(mp);
+                    if (t != null && t.Town != null)
+                    {
+                        t.Town.ChangeGold(purse);
+                        // paczka 169 (tylko liczniki, obie metody z wlasnym try i bramka CirculationWindows.On) - ta sama osada, bez drugiego przegladu
+                        MoneyLedger.NotePurseGone(purse, true);
+                        MoneyLedger.Note169(MoneyLedger.N169PurseGone, t, purse);
+                    }
                 }
             }
             catch (Exception e) { Log.Error("MenPurse.OnPartyDestroyed", e); }

@@ -362,7 +362,7 @@ def main(argv):
         ib = (b.mod.get("IronBank: dzien") or [""])[-1]
         if ib:
             m1 = re.search(r"nowe pozyczki (\d+) \((\d+)\), splaty (\d+) \((\d+)\)", ib)
-            m2 = re.search(r"Bank \[P\]: pozyczki (\d+) \((\d+)\), splaty (\d+) \((\d+)\)", o)
+            m2 = re.search(r"Bank \[P\]: pozyczki (\d+) na (\d+) zl, splaty (\d+) na (\d+) zl", o)
             if m1 and m2 and m1.groups() != m2.groups():
                 bad.append("%s: Bank" % b.day)
         stan = b.lines.get("stan", "")
@@ -422,7 +422,7 @@ def main(argv):
         ib = (b.mod.get("IronBank: dzien") or [""])[-1]
         if d and ib:
             n1 = find(r"dluznikow (\d+) \(bankrutow", ib); s1 = find(r"dlug razem (\d+)", ib)
-            n2 = find(r"Bank dzis a 8\.2: dluznikow (\d+)", d); s2 = find(r"Bank dzis a 8\.2: dluznikow \d+, dlug (\d+)", d)
+            n2 = find(r"Bank dzis a plan: dluznikow (\d+)", d); s2 = find(r"Bank dzis a plan: dluznikow \d+, dlug (\d+)", d)
             if None not in (n1, n2) and n1 != n2:
                 bad.append("%s: dluznikow %d != Bank %d" % (b.day, n2, n1))
             if None not in (s1, s2) and abs(s1 - s2) > n1:
@@ -452,7 +452,9 @@ def main(argv):
     for b in full:
         o = b.lines.get("okna", "")
         okn = find(r"okna ok\. ([\d.]+) ms", o, float); day_ = find(r"przeliczenie doby ([\d.]+) ms", o, float); pr = find(r"probki swiata ([\d.]+) ms \(", o, float)
-        if okn is not None and okn >= 50: bad.append("%s: okna %.1f ms" % (b.day, okn))
+        gold = find(r"nasluch zdarzen zlota ok\. ([\d.]+) ms", o, float) or 0.0
+        # okna = same nasze latki (bez metod gry); do progu 50 ms doliczamy nasluch zdarzen zlota
+        if okn is not None and okn + gold >= 50: bad.append("%s: okna %.1f ms + nasluch %.1f ms" % (b.day, okn, gold))
         if day_ is not None and day_ >= 30: bad.append("%s: doba %.1f ms" % (b.day, day_))
         if pr is not None and pr >= 20: bad.append("%s: probki %.1f ms" % (b.day, pr))
     results.append(res("T13", "OK" if not bad else "CZESCIOWO", "koszt%s (dlugosc doby gry - porownanie z T3 recznie)" % (("; " + "; ".join(bad[:6])) if bad else "")))

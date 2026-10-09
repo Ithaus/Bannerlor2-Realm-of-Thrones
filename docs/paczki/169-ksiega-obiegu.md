@@ -205,6 +205,9 @@ internal static class CirculationWindows
 - Pomiar kosztu (zakres e): licznik `Calls[w]++`; gdy `(Calls[w] & 255) == 0` prefiks zapisuje `Stopwatch.GetTimestamp()` w polu `T0`
   stanu (jest w `Ctx`, `CaravanState`, `SellState`, `SnapState` i stanach migawek `int`, ktore przechodza na male struktury `{ int V; long T0; bool P; long W0, N0; }`),
   finalizer dodaje roznice do `Ticks[w]` i `Sampled[w]++` (probka 1/256).
+  POPRAWKA PO RECENZJI: przedzial prefiks-finalizer mierzyl metode gry i cudze latki. W kodzie: znacznik czasu w bramce (`Gate`, co 16. wywolanie od 1.),
+  `CostStart` zamyka odcinek prefiksu (przed `ProbeOpen`), finalizer mierzy swoje cialo od `CostResume` do `CostEnd` (przed `ProbeClose`) - suma do `Ticks[w]`;
+  osobno nasluch `OnGold` (probka 1/256). "przeliczenie doby" = suma czasow samych nowych linii + `ClanIncomeBook.Daily`.
 - Probka swiata (2.4): w prefiksie po bramce `if (ProbeArm(w)) { P = true; W0 = MoneyLedger.WorldNow(); N0 = NamedRun; }`; w finalizerze
   `if (P) ProbeClose(w, W0, N0)` jako OSTATNIA instrukcja (po zapisaniu pozycji okna).
 - `Hits[w]++`, gdy okno zmierzylo niezerowa kwote.
@@ -658,7 +661,7 @@ Obieg: okna (kontrolka): dzien 41 | notable-dochod 6120/3388, karawany-notabli 3
 ```
 Format pozycji: `nazwa wywolan/trafien`; okno niewpiete: `nazwa BRAK`. "probki swiata": dzisiejsze probki 2.4 (zgodne = `dw == dn` co do zlotowki;
 rozjazd = nazwa okna i `dw - dn`), plus licznik od startu sesji i lista okien z rozjazdem (`ProbeBad` sumowane w polu sesji, nie zerowane w `ClearDay`).
-Koszt okien = suma `Ticks[w] * Calls[w] / max(1, Sampled[w])` w ms
+Koszt okien = suma `Ticks[w] * Opened[w] / max(1, Sampled[w])` w ms - same nasze ciala latek (poprawka po recenzji, patrz 3.1)
 (`Stopwatch.Frequency`). "przeliczenie doby" = Stopwatch wokol `ClanIncomeBook.Daily` + nowych linii `MoneyLedger.Daily`.
 "bohaterowie Disabled" = petla raz na dobe po `Campaign.Current.CampaignObjectManager.DeadOrDisabledHeroes` z `HeroState == Disabled`
 (tylko informacja do R6).
