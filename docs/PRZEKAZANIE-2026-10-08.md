@@ -212,3 +212,5 @@ dana faze od nowa, korzystajac z zapisanych wynikow:
   suwak Diplomacy "Scaling War Reparations Gold Cost Multiplier" 50 -> 10 = rekomendacja dla Jeffa (jego MCM).
 - 21:56 **AUTOTEST T2c (zapis doby 362, 10 dob) OK**: CrashScribe probny 13fd98de (= w grze + T2c + tryb autotestu); "wpiete 2/2", Nocny Krol PRZERYWA oblezenie
   Craster's Keep po wczytaniu (bez strat), potem rozkazy ROT usuwane; 0 "OBLEZENIE przed terminem", 0 osad zdobytych (bez T2c w tym samym zapisie: 3), 0 bledow.
+- 22:09 **AUTOTEST T2c nowa kampania 40 dob OK**: 13.1 s/dobe, 0 bledow, 0 oblezen przed terminem, 0 "RUSZA NA", trupy w dobie 40: 1037 (S2 1651, S1 1909), 0 osad.
+  Raport roboczy: docs/RAPORT-NOCNY-2026-10-09.md; badanie reparacji: docs/audyt-2026-10-09/11-trybut-reparacje.md. T9 w poprawkach.
