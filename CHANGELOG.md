@@ -1,5 +1,16 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-09 (noc 08/09.10: 170, T1-T8, T2b, T2c, T9, 169, 169b, H3) - WGRANE w 6 krokach (zgoda Jeffa na te noc: "Tak, wgraj sam" po udanym autotescie)
+**Status:** WGRANE 2026-10-08 19:07-23:00 (zegar komputera). W GRZE KONCOWO: Armoury 0f8a80b0 (galaz noc/sklad4 0ced2cd), CrashScribe 269cc980 (galaz w-toku/n12-reparacje d3ad3b0).
+Kroki: 1) 170+T1..T7 (28a7456e/aff275de) 2) +T8 z poprawka bawelny +T2b (3bf72dfd/cfb33950) 3) +169 (04d1cc99) 4) +169b +H3 (0f8a80b0) 5) +T2c (CS 4552ceaf) 6) +T9 (CS 269cc980).
+Kopie kazdej poprzedniej wersji: *.bak-2026-10-09-przed-nocN obok plikow i D:\Backup-Bannerlord\wgrane\2026-10-09-nocN-przed. Pelne wpisy kazdej paczki: CHANGELOG.md w galeziach paczek.
+- 170 BetterEconomy domkniete (akcje gracza w nicosc szare z powodem; bierne zrodla z niczego zatrzymane). T1 oboz swiata 0:00-6:00, wodz armii zawsze obozuje.
+- T2 kalendarz Innych (warownie od doby 728, Mur od 2184), T2b bez dosypki z niczego, T2c bez oblezen zamknietych celow przed terminem. T3 metal napraw wedlug rodzaju.
+- T4 dezerterzy WarLedger do puli. T5 rodzina splaca rate Banku. T6 miara marszu (log). T7 mlyny na brzegu, dymek "held by". T8 krainy (klimat). H3 przegrani uchodza.
+- 169/169b ksiega obiegu (sam log). T9 bez reparacji Diplomacy za wojny fabularne ROT (wznawiane tej samej doby).
+Testy: kazde wgranie = nowa kampania 40 dob + zapis doby 362 tej binarki, 0 bledow; 120 dob koncowej wersji: 0 bledow, 15.5 s/dobe, bankrutow 15 (przed noca 23), 14.1 mln reparacji nie naliczono.
+NIE wgrane: 171+172 (progi niezaliczone), skrypt BEE (zablokowany), proby zimy i drog. Raport: docs/RAPORT-NOCNY-2026-10-09.md.
+
 ## 2026-10-08 (160 + 161: kon najemnika, zapis bez dlugich napisow, komplety rekrutow) - WGRANE
 **Status:** WGRANE 2026-10-08 ok. 11:48 na slowo Jeffa ("wgraj"). Galaz paczki/161-zapis = w-toku/161-zapis 2e235ea (na T3 5ccb0f5: 160 df1c545 +
 2bde2bf, 161 1b20d5b + 2e235ea). Armoury.dll md5 c01a54ba (poprzedni T3 5a7074c0 - kopia Armoury.dll.bak-2026-10-08-przed-161 obok pliku i

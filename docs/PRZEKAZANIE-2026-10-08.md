@@ -217,3 +217,4 @@ dana faze od nowa, korzystajac z zapisanych wynikow:
 - 22:13 **WGRANIE 5 W GRZE**: CrashScribe 4552ceaf (+T2c), Armoury 0f8a80b0; kopia przed: CrashScribe.dll.bak-2026-10-09-przed-noc5.
 - 22:20 T9 gotowe (galaz w-toku/n12-reparacje d3ad3b0 na T2c; GitHub): pokoj w wojnie fabularnej ROT (ROTStorylineWars.IsWarForced) = reparacje Diplomacy 0;
   inne pokoje bez zmian. Test zapisu doby 362 OK (wpiete 1/1, 2 pokoje niefabularne - reparacje bez zmian, 0 bledow). Test 120 dob (wgranie 5 + T9) w toku.
+- 23:00 **WGRANIE 6 W GRZE**: CrashScribe 269cc980 (+T9), Armoury 0f8a80b0. Test 120 dob: OK (szczegoly w STAN-PRAC). KONIEC PRAC NOCY - raport: docs/RAPORT-NOCNY-2026-10-09.md.

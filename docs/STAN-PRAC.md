@@ -742,3 +742,7 @@ NIE wgrane: 171 + 172 (niezaliczone progi - rynek, strzaly w karawanach; decyzja
 przerywane bez strat; galaz w-toku/n11-mur f6d4e51), Armoury bez zmian 0f8a80b0. Poprzedni CrashScribe cfb33950: CrashScribe.dll.bak-2026-10-09-przed-noc5 +
 D:\Backup-Bannerlord\wgrane\2026-10-09-noc5-przed. ZATWIERDZONE OD TERAZ: Armoury 0f8a80b0, CrashScribe 4552ceaf.
 Testy T2c: zapis doby 362 (10 dob; Nocny Krol przerwal oblezenie Craster's Keep, 0 osad zdobytych - bez T2c 3) i nowa kampania 40 dob - 0 bledow.
+**WGRANIE 6 (08.10 ok. 23:00):** CrashScribe 269cc980 (= 4552ceaf + T9 bez reparacji Diplomacy za wojny fabularne ROT; galaz w-toku/n12-reparacje d3ad3b0), Armoury 0f8a80b0.
+Poprzedni CrashScribe 4552ceaf: CrashScribe.dll.bak-2026-10-09-przed-noc6 + D:\Backup-Bannerlord\wgrane\2026-10-09-noc6-przed.
+**ZATWIERDZONE OD TERAZ: Armoury 0f8a80b0, CrashScribe 269cc980** (GT 1337433c, RC 3e04b89b bez zmian). Test 120 dob tej wersji: 0 bledow, 15.5 s/dobe, 21 pokojow
+fabularnych bez reparacji (nie naliczono 14.1 mln), bankrutow w dobie 120: 15 (przed noca 23), glow < 5000: 32 (40), Inni 0 osad. Raport: docs/RAPORT-NOCNY-2026-10-09.md.
