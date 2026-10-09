@@ -814,3 +814,9 @@ Paczka Z16 PO 175 (te same miejsca w Mends.cs) - na galeziach 175.
   (samotne kolumny / Inni w 1. roku / myto) - zapytane. 24 kanon: a stal valyrianska - pyta, czy wtedy nie bedzie tieru 6 (wyjasnione: material 6 w ROT nazywa sie
   "Valyrian steel" - propozycja: material 6 = "castle-forged steel" z normalnego lancucha, prawdziwa valyrianska tylko istniejace miecze + przekuwanie w Qohorze),
   b Qohor i Lorath bez niewoli TAK (UWAGA: Qohor w kanonie kupowal Nieskalanych - sprawdzic przed wdrozeniem), c smoki jedza owce TAK, d zloto Casterly Rock - wyjasnione, czeka.
+**WGRANIE 9 (09.10 ok. 03:30 zegara komp.; zgoda Jeffa na noc 09/10):** Armoury 17a700d7 (= 63640cb3 + Z1 oddany sprzet nie daje XP (perki Giving Hands / Paid in Promise,
+Spoils: uzbrojenie dowodcy, dar dla miasta, dar jedzenia, resztki trofeow), Spoils Cancel nic nie oddaje (7/7 ekranow), handel BK liczy tylko sprzedane, napisy bez obietnicy
+treningu ("Equip the leader"), Z1b: Done bez pytania "You are discarding items" tylko na War stockpile i trofeach (tabor wroga zostaje z pytaniem - tam rzeczy przepadaja);
+galaz w-toku/z1-xp-dary 8cbfc73), CrashScribe bez zmian e8d460c5. Poprzedni: Armoury.dll.bak-2026-10-09-przed-noc9 + D:\Backup-Bannerlord\wgrane\2026-10-09-noc9-przed.
+Testy: nowa kampania 40 dob OK (13.1 s/dobe, 0 bledow Armoury, CS 8 startowych), zapis doby 362 8 dob OK (21.8 s/dobe). Autotest nie klika ekranow Spoils - Jeff: sprawdzic
+Done/Cancel na War stockpile, trofeach, darze dla miasta. ZATWIERDZONE OD TERAZ: Armoury 17a700d7, CrashScribe e8d460c5. Baza Armoury dla dalszych scalen: w-toku/z1-xp-dary.
