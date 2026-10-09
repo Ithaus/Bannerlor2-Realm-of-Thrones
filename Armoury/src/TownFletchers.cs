@@ -35,7 +35,7 @@ namespace Armoury
     /// </summary>
     internal static class TownFletchers
     {
-        private const int MaxSteps = 200;              // bezpiecznik petli jednego miasta na dobe (60 rak / 2.4 dnia = 25 krokow)
+        private const int MaxSteps = 200;              // bezpiecznik petli jednego miasta na dobe (sklad8-s S3: najwieksze miasto przy 0.9 ok. 320 roboczodni / ok. 2.3 dnia = ok. 140 krokow)
         private const float MinHands = 0.01f;          // jak 148: sztuka zaczyna sie, gdy zostala choc setna dnia pracy
         private const int PerBasket = 4;               // najwyzej tyle wyrobow na koszyk typ x tier w miescie (rozne nazwy)
 
