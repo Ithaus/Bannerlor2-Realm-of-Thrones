@@ -42,7 +42,7 @@ namespace Armoury
     internal static class WorkshopLaw
     {
         /// <summary>Nowa gra/wczytanie: stare przedmioty i pule z poprzedniej kampanii (audyt 04.10 - ryzyko zepsucia save).</summary>
-        internal static void Reset() { _pending = null; _market.Clear(); _marketDay = -1; _handsStart = -1f; _handsDay = -1; _ore = _wood = _leather = _linen = _wool = null; _owed.Clear(); _labor.Clear(); _rank.Clear(); _wip.Clear(); _plans.Clear(); _wipBasket.Clear(); NewDay174(); _soldierItems = null; _madeByType.Clear(); _dayStamp = -1; _made = _skipLoss = _skipMat = _skipLabor = _skipGold = 0; _dayRevenue = _dayCost = 0; Array.Clear(_skipMatBy, 0, _skipMatBy.Length);
+        internal static void Reset() { _pending = null; _market.Clear(); _marketDay = -1; _handsStart = -1f; _handsDay = -1; _ore = _wood = _leather = _linen = _wool = null; _owed.Clear(); _labor.Clear(); _rank.Clear(); _wip.Clear(); _plans.Clear(); _wipBasket.Clear(); NewDay174(); _soldierItems = null; _madeByType.Clear(); _dayStamp = -1; _made = _skipLoss = _skipMat = _skipLabor = _skipGold = _skipFletch = 0; _dayRevenue = _dayCost = 0; Array.Clear(_skipMatBy, 0, _skipMatBy.Length);
             WorkshopTrade.Reset();   // warsztaty towarowe w nowej monecie: stan czyszczony razem z warsztatami zbrojnymi (ta metoda idzie z konstruktora ArmouryBehavior)
             TownCrafts.Reset();      // paczka 148: rzemioslo miasta - dlugi wsadu i rak, srednie zuzycia (przed SyncData wczytania)
             TownFletchers.Reset();   // paczka 172: strzelarze miasta - dlugi surowca i rak, kandydaci, liczniki (przed SyncData wczytania)
@@ -51,7 +51,7 @@ namespace Armoury
         private static readonly int[] _skipMatBy = new int[4];      // "brak surowca" wedlug surowca: ruda, drewno, skora, len albo welna (tylko licznik)
         private static readonly Dictionary<Workshop, float[]> _owed = new Dictionary<Workshop, float[]>();     // ruda, drewno, skora, len
         private static readonly Dictionary<Workshop, KeyValuePair<float, int>> _labor = new Dictionary<Workshop, KeyValuePair<float, int>>();
-        private static int _dayStamp = -1, _made, _skipLoss, _skipMat, _skipLabor, _skipGold;
+        private static int _dayStamp = -1, _made, _skipLoss, _skipMat, _skipLabor, _skipGold, _skipFletch;
         private static long _dayRevenue, _dayCost;
         private static readonly Dictionary<ItemObject.ItemTypeEnum, int> _madeByType = new Dictionary<ItemObject.ItemTypeEnum, int>();
 
@@ -265,7 +265,7 @@ namespace Armoury
                     {
                         // nowa sztuka: pierwsza z rankingu linii, na ktora sa surowce i pieniadze (174.1: ranking wedlug braku koszyka, potem zysku
                         // na roboczodzien - WorkshopChooseByShortage); bramka zysku, surowiec i kapital - jak dotad, po prawdziwej cenie polki
-                        int reason = 0; bool started = false, planRej = false;
+                        int reason = 0; bool started = false, planRej = false, held = false;   // 174b.3: held - ktoras sztuke zatrzymala oferta strzelarzy
                         int miss = 0; int[] shelfHave = null;      // licznik "brak surowca" wedlug surowca (tylko log)
                         float planCap = w.Labor + Math.Max(share, floor) * planDays;
                         var cands = Candidates(__instance, workshop, production, town, day);
@@ -274,6 +274,7 @@ namespace Armoury
                             var c = cands[ci];
                             Start st;
                             int r = TryStart(c, shelf, owed, workshop, town, minProfit, out st, ref miss, ref shelfHave);
+                            if (r == 5) { held = true; continue; }
                             if (r != 0) { reason = Math.Max(reason, r); continue; }
                             // (E) 174.1: nie zaczynaj sztuki, ktorej nie skonczysz w planie - podloga: rowny podzial rak cechu (linia ze sztuka w robocie ja ma)
                             if (planOn && c.Days > planCap) { _rejPlan++; planRej = true; continue; }
@@ -296,9 +297,12 @@ namespace Armoury
                         }
                         if (!started)
                         {
-                            if (reason == 1) _skipLoss++;
+                            if (reason == 1 && !held) _skipLoss++;
                             else if (reason == 2) { _skipMat++; for (int m = 0; m < 4; m++) if ((miss & (1 << m)) != 0) _skipMatBy[m]++; MaterialOrders.NoteMissMask(town, miss); }   // 174.2: sygnal zamowienia surowca
                             else if (reason == 4) _skipGold++;
+                            // 174b.3: ruda zostala strzelarzom - osobny licznik (nie "brak surowca"); sygnal zamowienia rudy idzie (miastu naprawde brakuje rudy dla obu cechow),
+                            // ale bez licznika miast z "brakiem rudy" w linii nazw (krytyka 7)
+                            else if (held) { _skipFletch++; TownFletchers.NoteHeld(town); MaterialOrders.NoteMissMask(town, 1, false); }
                             else if (planRej) _skipPlan++;
                             break;
                         }
@@ -418,6 +422,19 @@ namespace Armoury
             if (revenue < (matCost + c.Days * DayWage(c.Item, town)) * minProfit) return 1;
             st.Mc = MBRandom.RoundRandomized(matCost);
             if (workshop.Capital < st.Mc) return 4;
+            // 174b.3 (FletchersBidForOre): ruda dla tego, kto wiecej na niej zarobi. Wczorajsza oferta strzelarzy miasta (pracuja w postfiksie DailyTickTown,
+            // PO warsztatach - "oferta z dzis" nie istnieje w chwili pracy warsztatu) = zysk strzelarzy na ladunek rudy i ile ladunkow ich dzisiejsze rece zuzyja.
+            // Gdy po starcie tej sztuki na polce zostaloby mniej rudy niz te ladunki, a zysk tej sztuki na ladunek rudy jest mniejszy niz oferta - sztuka czeka
+            // (kod 5, "czeka na strzelarzy"; nie wlicza sie do "brak surowca"). Bez stalego limitu ladunkow - sam rachunek zysku i rece strzelarzy.
+            if (st.Take[0] > 0 && need[0] > 0f)
+            {
+                float offer; int loads;
+                if (TownFletchers.OreOffer(town, out offer, out loads) && AvailableMemo(shelf, st.Mats[0]) - st.Take[0] < loads)
+                {
+                    float mine = (revenue - matCost - c.Days * DayWage(c.Item, town)) / need[0];
+                    if (offer > mine) return 5;
+                }
+            }
             return 0;
         }
 
@@ -1334,20 +1351,20 @@ namespace Armoury
         private static void Flush()
         {
             if (_dayStamp < 0) return;
-            if (_made > 0 || _skipLoss + _skipMat + _skipLabor + _skipGold + _freeRawBlocked + _swappedSmith > 0)
+            if (_made > 0 || _skipLoss + _skipMat + _skipLabor + _skipGold + _freeRawBlocked + _swappedSmith + _skipFletch > 0)
             {
                 var parts = new List<string>();
                 foreach (var kv in _madeByType) parts.Add(kv.Key + " " + kv.Value);
                 Log.Info("Warsztaty: dzien " + _dayStamp + " - wykonano " + _made + " szt. [" + string.Join(", ", parts.ToArray())
                          + "], koszt " + _dayCost + ", sprzedaz " + _dayRevenue + "; odpuszczone: bez zysku " + _skipLoss
                          + ", brak surowca " + _skipMat + " [ruda " + _skipMatBy[0] + ", drewno " + _skipMatBy[1] + ", skora " + _skipMatBy[2] + ", len/welna " + _skipMatBy[3]
-                         + " - cykl liczony przy kazdym surowcu, ktorego zabraklo na ktoras sztuke z rankingu], w robocie (cykle) " + _skipLabor + ", brak zlota/kupca " + _skipGold + "; rozpoczete sztuki " + _started + ", w toku teraz " + InProgress()
+                         + " - cykl liczony przy kazdym surowcu, ktorego zabraklo na ktoras sztuke z rankingu], czeka na strzelarzy (ruda dla strzelarzy, 174b.3) " + _skipFletch + ", w robocie (cykle) " + _skipLabor + ", brak zlota/kupca " + _skipGold + "; rozpoczete sztuki " + _started + ", w toku teraz " + InProgress()
                          + (TownCrafts.Active ? " | garbowanie i tkanie 1:1 wylaczone (rzemioslo miasta 148 - linia \"Rzemioslo miasta\")" : " | rzemieslnicy miasta wygarbowali skor " + _tanned + ", utkali plotna " + _woven) + " | z niczego zablokowane: cykle rzemieslnikow " + _freeRawBlocked + ", sztabki/wegiel z losowania -> ruda/drewno " + _swappedSmith + Text174() + ".");
             }
             FlushDiag();
             DiagShort();   // 174.1: najwiekszy brak swiata (koszyki)
             NewDay174();
-            _made = _skipLoss = _skipMat = _skipLabor = _skipGold = _freeRawBlocked = _swappedSmith = _started = _tanned = _woven = 0; _dayRevenue = _dayCost = 0; _madeByType.Clear();
+            _made = _skipLoss = _skipMat = _skipLabor = _skipGold = _freeRawBlocked = _swappedSmith = _started = _tanned = _woven = _skipFletch = 0; _dayRevenue = _dayCost = 0; _madeByType.Clear();
             Array.Clear(_skipMatBy, 0, _skipMatBy.Length);
         }
 

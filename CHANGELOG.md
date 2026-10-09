@@ -1,5 +1,28 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-09 (174b.3) - RUDA DLA TEGO, KTO WIECEJ NA NIEJ ZAROBI: platnerz nie zabiera strzelarzom rudy, ktora ich rece by zuzyly, gdy strzelarze zarabiaja na ladunku wiecej (miasto bez strzal)
+**Mod:** Armoury | **Pliki:** `TownFletchers.cs` (oferta za ladunek rudy w stanie miasta, `OreOffer`, `NoteHeld`, liczniki w linii "Strzelarze (172)"), `WorkshopLaw.cs` (`TryStartCore` - kod 5 "czeka na strzelarzy", licznik w linii "Warsztaty"), `MaterialOrders.cs` (`NoteMissMask` z flaga linii nazw), `Settings.cs` + `McmSettings.cs` (NOWE `FletchersBidForOre` = true; gen_mcm: 767 ustawien). Bez kluczy zapisu (oferta to stan sesji).
+
+**Co zobaczysz w grze (prosto):** gdy w miescie brakuje strzal, ruda trafia do tego, kto na niej wiecej zarobi - platnerza albo strzelarzy - a nie zawsze do platnerza, bo pracuje pierwszy.
+
+**Problem:** test sklad6: miast bez strzal 31 na d40 (sr. d31-40 31.9; 172b 24); strzelarze koncza prace "brak surowca" w 42-53 miastach, z tego ruda 31-38; bezczynne rece strzelarzy 956 roboczodni/d.
+
+**Przyczyna:** snop strzal potrzebuje ok. 0.06 ladunku rudy, a strzelarze pracuja w postfiksie `DailyTickTown` PO warsztatach (`TownFletchers.cs:234-235`) - platnerz zabiera kazdy ladunek pierwszy, niezaleznie od tego, kto na nim wiecej zarobi. Kolejnosc w kodzie, nie rynek.
+
+**Zmiana (wylacznik `FletchersBidForOre`):**
+- Strzelarze (`Work`): gdy krok konczacy prace stoi na braku rudy, a sa oplacalne snopy - oferta = najwiekszy zysk na ladunek rudy `(przychod - koszt) / ruda na snop` i liczba ladunkow, ktore ich pozostale dzis rece zuzyja (`ceil(rece / dni na snop x ruda na snop - dlug)`, bezpiecznik 5); stan miasta, doba oferty.
+- Warsztaty (`TryStartCore`, po bramce zysku i kapitalu): gdy sztuka bierze rude, oferta strzelarzy z wczoraj (strzelarze pracuja po warsztatach, wiec "oferta z dzis" nie istnieje - krytyka 7; zapasowy sluchacz przed warsztatami - takze z dzis) jest wazna, po starcie na polce zostaloby mniej rudy niz ladunki strzelarzy, a zysk sztuki na ladunek rudy `(przychod - surowce - place) / ruda na sztuke` jest mniejszy niz oferta - sztuka czeka (kod 5). Bez stalego limitu "1 ladunek" - rachunek zysku i rece strzelarzy (krytyka 20).
+- Liczenie (krytyka 7 i 20): cykl z kodem 5 to "czeka na strzelarzy" (linia "Warsztaty"), NIE "brak surowca" i nie do listy miast z cyklami "brak rudy"; sygnal zamowienia rudy idzie (miastu brakuje rudy dla obu cechow). Linia "Strzelarze (172)": "ruda dla strzelarzy (174b.3): ofert N (srednio X d zysku na ladunek), cykli platnerzy zatrzymanych N w M miastach, ladunkow wzietych z zatrzymanych N".
+
+**Ryzyko / co sprawdzic (kontrola calosci):**
+- Wyciek (krytyka 7): zatrzymany ladunek moga zabrac linie nie-zbrojne gry na rudzie (narzedzia) i warsztat gracza - wtedy oferta nic strzelarzom nie daje; miara "ladunkow wzietych z zatrzymanych" to pokaze.
+- Regresja kowali: platnerze traca najwyzej tyle rudy, ile strzelarze zuzyja, i tylko w miastach z oferta (brak strzal) - pomocniczy prog produkcji korpusu >= 200/d w d31-40.
+- Oferta to stan sesji - po wczytaniu 1 doba bez oferty (zachowanie jak dotad).
+- Koszt: odczyt slownika na `TryStart` z ruda - pomijalny.
+- Kod tylko zbudowany (kod 0) - NIE uruchomiony w grze.
+
+**Status:** NIEWGRANE - DO SPRAWDZENIA (P3: miast bez strzal sr. d31-40 <= 24; "czeka na strzelarzy" > 0 tylko w miastach z oferta; "ladunkow wzietych z zatrzymanych" > 0; produkcja korpusu >= 200/d).
+
 ## 2026-10-09 (174b.2) - DOWOZ RUDY: NAJPIERW TRASA, POTEM KARAWANA - ladem albo morzem (konwoj z portu, ktory piraci moga zlupic), mniejszy ladunek, gdy duzy sie nie oplaca, surowiec z jukow karawany, zamowienie zanim polka zejdzie do zera, karawany rodu gracza jak wszystkie
 **Mod:** Armoury | **Pliki:** `MaterialOrders.cs` (`Order` przepisane, NOWE `UseDest`, `TravelDays`, `NoteTrip`, `SourceKeep`, `OrderTimed`; `Place` z jukow + audyt; `Deliver` audyt i dni drogi; `Move` konwoj Naval; `Eligible`; linia), `CaravanBulk.cs` (NOWE `UseNow` - zuzycie z obecnych rak), `Settings.cs` + `McmSettings.cs` (NOWE: `TownMaterialOrderBySea` = true, `TownMaterialOrderSeaMaxRoute` = 1000, `TownMaterialOrderFromPacks` = true, `TownMaterialOrderAhead` = true, `TownMaterialOrderPlayerCaravans` = true; gen_mcm: 766 ustawien). Format zapisu `arm_matorders` bez zmian.
 

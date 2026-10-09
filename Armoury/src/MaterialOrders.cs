@@ -137,13 +137,13 @@ namespace Armoury
 
         // ------------------------------------------------------------ sygnal i zuzycie (wolane z warsztatow, strzelarzy i rzemiosla miasta)
         /// <summary>Brak surowca w cyklu (bit 0 ruda, 1 drewno, 2 skora, 3 len/plotno - maska WorkshopLaw i TownFletchers).</summary>
-        internal static void NoteMissMask(Town town, int mask)
+        internal static void NoteMissMask(Town town, int mask, bool names = true)
         {
             if (town == null || mask == 0) return;
             try
             {
                 for (int m = 0; m < 4; m++) if ((mask & (1 << m)) != 0) Bump(_miss, town, m);
-                if ((mask & 1) != 0) { int n; _missOreSince.TryGetValue(town, out n); _missOreSince[town] = n + 1; }   // 174b.0: tylko do linii nazw
+                if (names && (mask & 1) != 0) { int n; _missOreSince.TryGetValue(town, out n); _missOreSince[town] = n + 1; }   // 174b.0: tylko do linii nazw (174b.3: bez rudy zatrzymanej dla strzelarzy)
             }
             catch (Exception e) { Stumble("NoteMissMask", e); }
         }

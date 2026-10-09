@@ -3076,6 +3076,10 @@ namespace Armoury
         [SettingPropertyGroup("Arms production")]
         public bool TownMaterialOrderPlayerCaravans { get; set; } = true;
 
+        [SettingPropertyBool("Fletchers Bid For Ore", HintText = "when a town lacks arrows, its iron ore goes to whoever earns more on it - the armourers or the fletchers - as far as the fletchers' hands can use it")]
+        [SettingPropertyGroup("Arms production")]
+        public bool FletchersBidForOre { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -3844,6 +3848,7 @@ namespace Armoury
             s.TownMaterialOrderFromPacks = TownMaterialOrderFromPacks;
             s.TownMaterialOrderAhead = TownMaterialOrderAhead;
             s.TownMaterialOrderPlayerCaravans = TownMaterialOrderPlayerCaravans;
+            s.FletchersBidForOre = FletchersBidForOre;
         }
 
         internal static void Apply()

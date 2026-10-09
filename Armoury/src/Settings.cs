@@ -881,6 +881,7 @@ namespace Armoury
         public bool TownMaterialOrderFromPacks = true;     // a caravan that already carries the material may take the order and deliver it, if that pays better than selling it where it stands
         public bool TownMaterialOrderAhead = true;         // a town that uses a raw material orders it before its stall runs empty - when what it has and what is on the way would last less than the journey plus two days
         public bool TownMaterialOrderPlayerCaravans = true; // the caravans of your clan may take such orders like any other caravan (the profit goes to their purse); your own party never does
+        public bool FletchersBidForOre = true;             // when a town lacks arrows, its iron ore goes to whoever earns more on it - the armourers or the fletchers - as far as the fletchers' hands can use it
 
         public static void Load(string moduleDataDir)
         {
