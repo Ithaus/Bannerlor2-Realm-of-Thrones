@@ -1,6 +1,7 @@
 <!-- PROJEKT paczki H3 (noc 08/09.10, n9), galaz w-toku/n9-przegrani-uchodza od 2e235ea (= DLL w grze, 160 + 161).
      Status: SPECYFIKACJA PO KRYTYCE (15 uwag: 14 przyjetych, 1 czesciowo, 0 odrzuconych - rozdz. 13); KOD w drzewie n9-h3
-     (Armoury/src/LosersFlee.cs + OutlawLaw.cs, build kod 0, NIEWGRANE - DO SPRAWDZENIA; roznice wobec projektu - rozdz. 14).
+     (Armoury/src/LosersFlee.cs + OutlawLaw.cs, build kod 0, NIEWGRANE - DO SPRAWDZENIA; roznice wobec projektu - rozdz. 14;
+     poprawki po przegladzie kodu - 8 uwag, 8 przyjetych - rozdz. 15).
      Decyzja Jeffa jest (07.10, STAN-PRAC "Decyzje Jeffa 07.10", pyt. 5, hamulec H3).
      Wiazace: docs/audyt-2026-10-09/00-AUDYT-SWIATA-2026-10-09.md (2.8 "Straty w bitwie", E10, S16, R10), raport 04 W1,
      docs/HISTORIA-RABUNKU-I-BITEW-2026-10-07.md rozdz. 4 (13 bitew, wzor). Oznaczenia: [K] kod sprawdzony, [P] pomiar z logu,
@@ -166,7 +167,7 @@
 | poddanie bez walki (`IsSurrendered`) | nie | nie bylo bitwy |
 | szturm (`Siege`), wypad, bitwa pod murami, blokada, rabunek wsi (`Raid`) | nie (faza 1) | po szturmie inne prawo (rzez albo kapitulacja); rabunek ma paczke 113 |
 | morze (`IsNavalMapEvent`) | nie | statki, tonacy - osobna mechanika NavalDLC |
-| z udzialem Innych (`Undead.Party`, `Undead.cs:50`) | nie | Inni nie biora jencow, umarli wstaja - watek R2/R4/T2 |
+| z udzialem Innych (`Undead.Party`, `Undead.cs:50`) | nie | Inni nie biora jencow, umarli wstaja - watek R2/R4/T2. Rozbici z takiej bitwy (podzial 3.2 biegnie przy KAZDEJ bitwie): zywi - jak wszedzie; **wighty - ani w las, ani do domu** (z niczego, do niczego; po przegladzie kodu, rozdz. 15 uwaga 6) |
 | z graczem w polu (misja) | nie - **walka decyduje**; tylko rozbici nie znikaja (2.4) | decyzja Jeffa |
 | symulacja z graczem (autobitwa, "wyslij wojsko") | nie w fazie 1 | pytanie 10.1 |
 
@@ -376,8 +377,13 @@ BattleSideEnum.None`; strona pokonana nie poddala sie (`MapEventSide.IsSurrender
 6. **Niezalezne sprawdzenie (postfiks, po krytyce):** w prefiksie zapamietujemy liczbe szeregowych w `RosterToReceiveLootPrisoners`
    kazdego zwyciezcy (bez dubli - zaloga i milicja tej samej osady maja wspolny loch), w postfiksie odczyt po: **przyrost = suma j**
    (uwolnieni jency pokonanych ida do zwyciezcow jako LUDZIE, `RosterToReceiveLootMembers`, wiec nie mieszaja sie z jencami).
-   Roznica = "jency zgubieni przez gre" (null w losowaniu, 1.3) - licznik dnia, oczekiwane ok. 0. Po postfiksie tez: w kazdej
-   partii przegranej zero szeregowych w `MemberRoster`.
+   Roznica = "jency zgubieni przez gre" (null w losowaniu, 1.3) - licznik dnia, oczekiwane ok. 0. **Po przegladzie kodu (rozdz. 15
+   uwaga 2):** liczone tylko w bitwach, w ktorych plan objal kazda partie przegrana z szeregowymi w partii i zastosowanie przeszlo bez
+   bledu (inaczej gra bierze jencow z partii spoza planu po staremu i roznica wychodzi ujemna, maskujac prawdziwe zgubienia); reszta -
+   licznik "bez sprawdzenia". Dawne "w kazdej partii przegranej zero szeregowych po postfiksie" nie moglo nic wykryc (gra zeruje kazda
+   partie przegrana, `MapEvent.cs:2034`) - zastapione **prawdziwym sprawdzeniem list**: na koncu zastosowania odczyt list gry typ po typie
+   (zabici = k, ranni-jency = j, rozbici = f, w partii j, z tego j rannych) i w postfiksie jeszcze raz zabici i rozbici (gra ich w tej
+   metodzie nie zmienia - zmiana to cudza latka); licznik "listy gry inne niz plan: typow (ludzi)".
 7. Liczniki dnia (przed / po: zabici, ranni, rozbici, jency, ludzie; srednie C, T, O, Q, F; udzial bitew z T = 1; "prawdziwe bitwy")
    i jedna linia "Bitwa: H3 ..." (trafia do `bitwy.log` - `Log.cs:100` kieruje tam kazdy napis od "Bitwa:"), rozdz. 5.
 - **try/catch na partie** w fazie liczenia (wyzej); faza zastosowania to same `AddToCounts` na sprawdzonych liczbach - wyjatek tam
@@ -393,8 +399,13 @@ BattleSideEnum.None`; strona pokonana nie poddala sie (`MapEventSide.IsSurrender
   tabor wsi / rybacy -> 100% `SendHome` (hearth swojej wsi); karawana -> 100% "z szablonu"; zaloga / milicja / patrol ->
   `RoundRandomized(n x OutlawRoutedShare)` do puli, reszta "z szablonu"; partie rodow i inne -> `RoundRandomized(n x OutlawRoutedShare)`
   do puli, reszta `SendHome`; czego `SendHome` nie przyjal (tylko zolnierze do BK) -> do puli ("bez domu").
-- **Prawo wyrzutkow wylaczone (`!On`) przy wlaczonym H3** (po krytyce): nikt do puli - kazdy rozbity idzie `SendHome` wedlug pochodzenia
-  (bandyta do hearth jako prosty), "bez domu" -> licznik "znikneli (prawo wyrzutkow wylaczone)". I **vanilla dezerterzy zablokowani**:
+- **Inni (po przegladzie kodu, rozdz. 15 uwaga 6):** partia Innych (`Undead.Party`) i kazdy wight w innej partii (`Undead.Character`) -
+  ani do puli, ani `SendHome`: z niczego, do niczego, licznik "Inni (wighty - do niczego)". Wight ma w ROT `occupation="Soldier"`
+  (`ROT-Troops.xml`, 12 jednostek `Culture.whitewalker`), wiec bez filtra szedlby do ludnosci BK osady zywych.
+- **Prawo wyrzutkow wylaczone (`!On`) przy wlaczonym H3** (po krytyce): nikt do puli - kazdy rozbity idzie `SendHome` wedlug pochodzenia,
+  "bez domu" -> licznik "znikneli (prawo wyrzutkow wylaczone)". **Bandyta wtedy "z szablonu", nie do hearth** (po przegladzie kodu, uwaga 5):
+  przy wylaczonym prawie bramki band przepuszczaja gre, bandy rodza sie z szablonu, nie z hearth - "bandyta do hearth jako prosty" jest
+  prawdziwe tylko przy wlaczonym prawie wyrzutkow. I **vanilla dezerterzy zablokowani**:
   `OutlawLaw.SkipVanillaDeserters` zwraca `!On && !LosersFlee.On` (dzis `!On`) - inaczej gra sklada partie dezerterow z
   `RoutedInBattle + DiedInBattle` pokonanych partii rodow (`DesertersCampaignBehavior.cs:101-121`), czyli z tych samych ludzi,
   ktorych H3 odsyla do domu (podwojnie). Gdy oba wylaczone - gra jak dzis.
@@ -411,7 +422,13 @@ bandyci, ktorzy pochodza z hearth, 1.5):
 - typy `Soldier`, `Mercenary` (dezerterzy, rozbici, jency rozwiazanych band) -> **ludnosc BK** (`SendHome` bez partii: osada BK
   regionu, a gdy kultura sie nie zgadza - najblizsza osada kultury jednostki, 2.4 pkt 4); liczba calkowita `RoundRandomized`, z puli
   zdejmujemy dokladnie tyle, ile BK przyjal; reszta zostaje w puli do jutra;
-- typy `CaravanGuard` -> "z szablonu" (licznik).
+- typy `CaravanGuard` -> "z szablonu" (licznik);
+- typy Innych (`Undead.Character`, klucz `KeyUndead` - po przegladzie kodu) -> wygasaja w tym samym tempie do niczego (licznik "wighty do
+  niczego"); nigdy do ludnosci BK. Stare klucze wightow sa w puli z czasow przed H3 (polowa rozbitych szla do puli bez filtra) - bandy
+  moga je dalej werbowac przez `Draw` / `DrawOnly` (stara dziura, nie H3 - do STAN-PRAC przy wdrozeniu, rozdz. 15);
+- **reszta klucza zolnierza ponizej 1 czlowieka** (po przegladzie kodu, uwaga 8; stare klucze z ulamkami - dawny podzial rozbitych x 0.5
+  i dawny powrot d x rate): z szansa rate na dobe klucz sie zamyka - z szansa d jeden caly czlowiek do ludnosci BK, inaczej nikt
+  (oczekiwanie = d, bez ludzi z niczego i w nicosc); dom nie przyjal - klucz czeka. Bez tego reszta < 1 zostawalaby w puli na zawsze.
 Bez tego podzialu rozwiazana banda (prosci z hearth pod kluczem bandyty) wracalaby do BK (+1 czlowiek), a hearth by ich nie odzyskal;
 powroty z puli to dzis 3-7 dziennie po 40 dobach, ale 55-63 dziennie po roku (log 18-38-27), a po H3 pula rosnie. Z drugiej strony
 zolnierz do hearth to ok. 100 ludzi ksiegi (1.5). Zawod jest w danych jednostki - nic nowego w zapisie. Przy wylaczonym H3 - jak dzis.
@@ -433,6 +450,10 @@ Jedna funkcja pochodzenia dla bitwy (3.2), powrotu z puli (3.3) i uwolnionych je
    `Nobles = 0`). Rzadkie; liczymy je odczytem `GetTypeCount(Nobles)` przed i po, gdy jednostka nie jest z drzewa elitarnego
    (`BannerKings.Utils.Helpers.IsRetinueTroop`) - licznik "jako szlachta (kaprys BK)", bez poprawiania.
 4. Pozostale zawody (`Bandit`, `Villager`, ...) -> `OutlawLaw.ReturnHome(region miejsca, n)` (0.5 hearth na czlowieka); licznik "do wsi (prosci)".
+Po przegladzie kodu (rozdz. 15) przed pkt 1 i miedzy 2 a 3: **0.** wight Innych (`Undead.Character`) -> nic, przyjeto n, licznik "Inni"
+(zabezpieczenie dla uwolnionych jencow i powrotu z puli; rozbitych pomija juz 3.2); **2a.** `Bandit` przy wylaczonym prawie wyrzutkow ->
+"z szablonu" (licznik "bandyci przy wylaczonym prawie"). Liczniki domow sa dodatkowo rozbite wedlug zrodla (rozbici z bitew / uwolnieni
+jency / powrot z puli), bo powrot z puli biegnie w `OutlawLaw.Daily` PO linii "Przegrani (H3)" i trafia do linii nastepnej doby.
 Liczniki dnia: do wsi (tabory), do wsi (prosci), do domu (ludnosc BK), zastepczo jako chlopi, jako szlachta, z szablonu, bez domu,
 BK przyjal inaczej. **Plik `h3-domy.csv`** (`Log.Csv`, wiersz na region na dobe - region jak w `ludzie-regiony.csv`, `OutlawLaw.RegionFor`):
 `dzien;region_id;region;do_domu_bk;do_wsi_ludzi;do_wsi_hearth;w_las;z_szablonu;uwolnieni` - porownanie z kolumna `zwerbowani_dzis`
@@ -516,6 +537,23 @@ Przegrani (H3): dzien D - bitew objetych N (pominiete: z graczem a, nie w polu b
   do wsi (tabory) h2 ludzi = h2h hearth, do wsi (prosci) h3, z szablonu z, bez domu b | ludnosc BK swiata P (zmiana dP) |
   wcieleni jency AI (partie rodow) wj | potkniecia: liczenie S1, zastosowanie S2 | czas T ms.
 ```
+**Po przegladzie kodu (rozdz. 15) linia dnia w kodzie wyglada tak** (fragmenty zmienione; reszta jak wyzej):
+```
+... | sprawdzenia: jency wzieci T - j J = T-J (zgubieni przez gre G, bitew sprawdzonych C, bez sprawdzenia - partia przegrana poza
+  planem U), listy gry po zmianie inne niz plan: a typow (b ludzi), po wyniku gry c typow (d ludzi), BK przyjal inaczej niz przyrost
+  TotalPop: e wywolan (roznica f); kontrola kodu k + j + f - n = 0 | uwolnieni ... | domy: do domu BK h1 (...), ..., z szablonu z
+  (garnizony zg, bandyci przy wylaczonym prawie wyrzutkow zb, z puli straz karawan zs), bez domu b (do puli) |
+  domy wedlug zrodla: rozbici z bitew - BK r1, wies r2, z szablonu r3; uwolnieni jency - BK u1, wies u2, z szablonu u3;
+  z puli (linia "Wyrzutki:" doby D-1) - BK p1 | Inni (wighty - z niczego, do niczego, nigdy do BK ani wsi): rozbici w1, inna droga w2 |
+  dziura werbunku (partie lordow AI, ludzie bez werbunku u notabli): nowe partie z szablonu klanu s1 ludzi (s2 partii), z zalog do lordow
+  g1, od lordow do zalog g2 (netto z zalog g1-g2) | ludnosc BK swiata ... | wcieleni jency AI ... | potkniecia ... |
+  czas T ms (wynik bitwy i doba t1, rozbici przy koncu bitwy t2, powrot z puli - doba wczesniej t3).
+```
+"rozbici z bitew" (r1, r2, r3) tej doby = "ludnosc BK", "do wsi", "z szablonu" z dopisku H3 linii "Wyrzutki:" TEJ SAMEJ doby; "z puli" (p1)
+= "do ludnosci BK" z linii "Wyrzutki:" doby D-1 (powrot z puli biegnie w `OutlawLaw.Daily` po linii "Przegrani (H3)"). Przy wylaczonym H3
+linia "WYLACZONE" ma tez "dziura werbunku" i pelny "czas". W linii "Bitwa: H3" czlon F jest wypisany jako wartosc czynna `F x (1 - T)`,
+a przy T = 1 i F > 0 z dopiskiem "(F x nie liczy sie przy T = 1)"; "jency wzieci" bitwy spoza pelnego planu - "(bez sprawdzenia - partia
+przegrana poza planem)".
 Linie "gra dalaby" licza sie z list PRZED zmiana w tej samej bitwie - porownanie z dzisiejszymi 46% / 14% w jednym przebiegu.
 Linia bitwy zaczyna sie od "Bitwa: H3" (a nie "Bitwa: dzien"), wiec parsery liczace bitwy po "Bitwa: dzien" (`sprawdz_logi.py`,
 skrypty audytu) nie licza jej drugi raz - przy wdrozeniu sprawdzic, czy zaden parser nie liczy po samym "Bitwa:".
@@ -523,6 +561,9 @@ skrypty audytu) nie licza jej drugi raz - przy wdrozeniu sprawdzic, czy zaden pa
 bandytow B, prostych P)" zamiast dzisiejszego "zolnierzy" = kazdy klucz inny niz `"~"`); "naplyw: ... rozbitkowie N (wojsko F1,
 bandy F2, zalogi F3) ... | rozbici do domu: ludnosc BK H, do wsi W, z szablonu S, bez domu (do puli) B | powrot z puli: do hearth X
 (prosci X1, bandyci X2), do ludnosci BK Y, z szablonu Y2" i sprawdzenie "rozbici z bitew dzis R = do puli P + do domu (H + W + S) + bez domu B".
+Po przegladzie kodu: w skladzie puli "Inni (wighty, stare)", w sumie rozbitych "+ Inni (wighty - do niczego) U", a "roznica" nazywa sie
+"kontrola kodu - roznica" (liczy sie z tych samych licznikow, ktore dzieli - wychwyci tylko wyjatek w srodku elementu, to NIE jest
+niezalezne sprawdzenie); w powrocie z puli "(w tym z reszt ponizej 1 czlowieka s: zamkniete klucze k, ulamki razem u)" i "wighty do niczego".
 
 ## 6. Zapis, koszt
 - **Zapis: nic nowego.** H3 nie ma stanu miedzy dobami (liczniki dnia jak `BattleChronicle`); pula wyrzutkow zapisuje sie juz
@@ -532,6 +573,11 @@ bandy F2, zalogi F3) ... | rozbici do domu: ludnosc BK H, do wsi W, z szablonu S
   z pamiecia na bitwe; refleksja BK raz na (partia, typ) rozbitych do domu + odczyt `TotalPop` przed i po. Postfiks: odczyt lochow
   zwyciezcow. Raz na dobe: suma `TotalPop` po osadach z danymi BK (ok. tysiac odczytow). Szacunek < 1 ms na bitwe, < 30 ms na dobe -
   mierzone `Stopwatch`, wypisywane w linii dnia. Powrot z puli: ta sama petla co dzis + odczyt zawodu klucza (pamiec typow na sesje).
+- **Po przegladzie kodu (uwaga 7):** "czas" w linii dnia liczy teraz WSZYSTKIE czesci H3 - takze rozbitych przy `MapEventEnded`
+  (`RoutedH3`: `SendHome`, refleksja BK, `FindHome` po ok. 800 osadach z danymi BK na kazda pare frakcja / kultura, pamiec na bitwe)
+  i galaz H3 powrotu z puli (doba wczesniej). Szacunek przegladu ok. 0.1-0.3 ms na bitwe z rozbitymi zolnierzami. Pamieci `FindHome`
+  na dobe (klucz: region bitwy + frakcja + kultura) NIE dodaje - decyzja Jeffa 08.10 "optymalizacja na koniec"; gdy pomiar pokaze
+  ponad 50 ms na dobe, to pierwszy kandydat.
 
 ## 7. Test - A/B na tym samym DLL i tym samym zapisie (40 dob), potem rok
 **Uklad (po krytyce, obowiazkowy):** jeden DLL (z H3), jeden zapis startowy (ten sam, z ktorego szly przebiegi 08.10, doba ok. 108 836),
@@ -553,16 +599,20 @@ ok. 52 hearth dziennie), "z szablonu" (karawany) ok. 32; zwyciezcy zabici 97 -> 
 | przegrani razem (wagi ludzie): zabici / jency | 49% / ok. 46% | **15-35% / 3-15%** |
 | tabory wsi: zabici / jency | 85% / 15% | **<= 7% / <= 1%** (jency tylko od kultur z niewolnictwem) |
 | karawany: zabici | 54% | **20-50%** (wzor jak wojsko) |
-| **sprawdzenia niezalezne** (po krytyce): jency wzieci - j; przyrost `TotalPop` - przyjeci; szeregowi w partiach przegranych po bitwie | - | **0 / 0 / 0** kazdej doby; "zgubieni przez gre" <= 0.1% j; potkniecia liczenia i zastosowania 0 |
+| **sprawdzenia niezalezne** (po krytyce; po przegladzie kodu rozdz. 15 uwaga 2): jency wzieci - j (tylko bitwy z pelnym planem); przyrost `TotalPop` - przyjeci; listy gry po zmianie i po wyniku gry wobec planu (typow / ludzi) | - | **0 / 0 / 0** kazdej doby; "zgubieni przez gre" w przedziale **0 .. 0.1% j** (ujemne = blad pomiaru); "bez sprawdzenia" <= 1% bitew objetych; potkniecia liczenia i zastosowania 0 |
+| kontrola kodu (NIE niezalezna): k + j + f - n; "kontrola kodu - roznica" w dopisku H3 linii "Wyrzutki:" | - | 0 (wychwyci tylko wyjatek w srodku elementu) |
 | "Bitwy:" zabitych dziennie (wszystkie starcia, srednia 40 dob) | 457-556 | B wobec A: spadek **30-50%** |
 | "Ludzie:" zabici w partiach rodow dziennie (srednia 40 dob) | 216-298 | B wobec A: spadek **>= 25%** |
 | jency w partiach (doba 40) | 3 129-4 528 | **<= 50%** A |
 | "Wyrzutki:" rozbitkowie dziennie | ok. 0-20 | **60-250**; "bez domu" <= 2% zolnierzy do domu |
-| rozbici z bitew = do puli + do domu (BK + wies + z szablonu) + bez domu | - | **roznica 0** |
+| rozbici z bitew = do puli + do domu (BK + wies + z szablonu) + bez domu + Inni (kontrola kodu) | - | **roznica 0** |
+| "domy wedlug zrodla" (linia "Przegrani (H3)") wobec dopisku H3 "Wyrzutki:" | - | rozbici z bitew BK / wies / z szablonu doby D = "ludnosc BK" / "do wsi" / "z szablonu" w "Wyrzutki:" doby D; "z puli - BK" doby D = "do ludnosci BK" w "Wyrzutki:" doby D-1 (kazdej doby, roznica 0) |
+| Inni (wighty) do ludnosci BK albo wsi (po przegladzie kodu, uwaga 6) | dzis 50-500 w 40 dob (polowa rozbitych Innych przez `SendHome`) | **0**: "Inni ... rozbici" > 0 w dobach bitew z Innymi (np. wypady pod Hornfoot), a w `h3-domy.csv` i "do domu BK" ich nie ma; w skladzie puli "Inni (wighty, stare)" tylko maleje |
 | pula wyrzutkow | doba 40: 553-1 343 | doba 40 **<= 8 000** i nachylenie dob 30-40 **<= +100 dziennie**; po roku **<= 2 x A** |
 | bandy - ludzi | doba 40: 6 114-6 546 | doba 40 **<= 1.3 x A**; po roku **<= 1.25 x A** (A po roku ok. 22.7 tys.) |
 | hearth swiata (CSV, doba 1 -> 40) | +9.6% | **<= A + 1.5 pkt** (tabory wracaja do swoich wsi: ok. +52 hearth dziennie = ok. +0.9 pkt w 40 dobach); roznica B - A = suma "do wsi (hearth)" z linii dnia +-20% |
-| ludnosc BK swiata (`LosersFlee.Daily`, doba 1 -> 40) | - | **B - A <= suma "do domu (ludnosc BK)"** (nikt z niczego); B - A >= ta suma minus dodatkowy werbunek u notabli B - A |
+| ludnosc BK swiata (`LosersFlee.Daily`, doba 1 -> 40) | - | **B - A <= suma "do domu BK"**; B - A >= ta suma minus dodatkowy werbunek u notabli B - A. To NIE dowodzi "nikt z niczego" (po przegladzie kodu, uwaga 1): ludzie, ktorzy weszli do partii lordow bez werbunku BK (szablon nowej partii, zalogi), siedza wewnatrz tej sumy |
+| **dziura werbunku** (NOWE, po przegladzie kodu, uwaga 1): "nowe partie z szablonu klanu" + "netto z zalog" (linia "Przegrani (H3)", suma 40 dob) | mierzy dopiero ten DLL (tez w A) | jawna gorna granica: **"do domu BK" <= werbunek BK u notabli ("Ludzie:" od notabli do partii rodow) + szablon + netto z zalog**. Gdy szablon + netto z zalog > **20%** "do domu BK" - nastepny krok (osobna decyzja, nie ta paczka): zolnierzy partii, ktore nie werbowaly u notabli (klany bez osad, najemnicy), traktowac w `SendHome` jak "z szablonu" |
 | osady domowe (`h3-domy.csv` obok `zwerbowani_dzis` z `ludzie-regiony.csv`, 40 dob) | - | **>= 70%** "do domu BK" w regionach, w ktorych w tych 40 dobach werbowano; zaden region **> 5%** calosci |
 | partie rodow - ludzi (doba 40) | 102-105 tys. | **>= A** (zwyciezcy maja wiecej rannych, ktorzy wracaja) |
 | "Ludzie:" od notabli do partii rodow (srednia 40 dob) | 1 620-1 630/d | B wobec A **-10% .. +20%** (rozdz. 8: oczekiwane -3..+11%) |
@@ -570,7 +620,8 @@ ok. 52 hearth dziennie), "z szablonu" (karawany) ok. 32; zwyciezcy zabici 97 -> 
 | kategoria "bez osady" w "Ludzie:" | 1 836-1 847/d | **nie uzywac** - to w wiekszosci echo ROT (rozdz. 8) |
 | udzial bitew H3 z T = 1 | - | **10-30%**; ponizej 5% albo ponad 50% - promien terenu do poprawy (jedna stala) |
 | linia startowa: wlasciciele latek 4 metod | - | tylko oczekiwani (Armoury, ROT `LootCollectorPatch`, RBM); inny - sprawdzic przed dalszym testem |
-| czas H3 (linia dnia) | - | **<= 50 ms** na dobe; doba gry nie wolniejsza o wiecej niz 2% |
+| czas H3 (linia dnia; po przegladzie kodu WSZYSTKIE czesci: wynik bitwy i doba + rozbici przy koncu bitwy + powrot z puli) | - | **<= 50 ms** na dobe razem; doba gry nie wolniejsza o wiecej niz 2% |
+| reszty kluczy zolnierzy ponizej 1 czlowieka (dopisek H3 "Wyrzutki:", po przegladzie kodu, uwaga 8) | - | "zamkniete klucze" > 0 w pierwszych dobach na starym zapisie i maleje; suma 40 dob "z reszt ... do ludnosci BK" = suma "ulamki razem" +- 30% (gdy zamknietych kluczy razem >= 50; losowanie - przy malej liczbie kluczy rozrzut wiekszy) |
 | bledy (CrashScribe, "Armoury ERROR") | 0 | **0** nowych |
 | reczna proba gracza (CHANGELOG): bitwa w polu + autobitwa | - | linia "H3 pominieta (gracz)" przy kazdej; sklad partii gracza jak bez H3 |
 
@@ -604,6 +655,16 @@ z rannymi) - nie stroic wag bez dowodu.
   zalogi karawan nigdzie. Werbunek od notabli zdejmuje ok. 1 600 dziennie, wiec bilans BK z wojny dalej mocno ujemny. Ci, co weszli
   do partii rodu "z niczego" (nowa partia z szablonu, wcielony jeniec z zalogi karawany), przy powrocie dopisuja sie do BK - to dziura
   po stronie werbunku (zamyka 108 / E7), nie H3; H3 nie dopisuje tylko tych rodzajow partii, ktore sa W CALOSCI z szablonu (2.4 pkt 2).
+  **Po przegladzie kodu (uwaga 1) - sprostowanie:** przed H3 tacy ludzie gineli albo znikali, wiec ludnosc BK sie nie zmieniala; po H3
+  dopisuja sie do BK - czyli H3 otwiera NOWY strumien ludzi z niczego do BK, a test "B - A <= do domu BK" go nie widzi (ci ludzie sa
+  wewnatrz sumy). Skala jest teraz mierzona (pomiar, bez zmiany zachowania): postfiks na
+  `LordPartyComponent.InitializationArgs.InitializeLordPartyProperties` (nowa partia lorda AI spoza rodu gracza: szeregowi z szablonu
+  klanu - `LordPartyComponent.cs:38-39`; szablony lordow ROT maja 53-56 ludzi; `Priority.Last`, wiec po zdjeciu szablonu klanu Spoils
+  przez `SpoilsCompany`) i na `GarrisonTroopsCampaignBehavior.TakeTroopsFromGarrison` / `LeaveTroopsToGarrison` (`:542-610`; przekazania
+  z zalog, ktore rosna z niczego, +32.8 tys. na rok). Linia dnia "dziura werbunku" i prog w rozdz. 7 (20% "do domu BK" - wtedy osobna
+  decyzja: zolnierze partii, ktore nie werbowaly u notabli, "z szablonu"). Inne znane drogi z niczego do partii lordow (nie mierzone tu):
+  "ochotnicy z mapy" mniejszych frakcji (`RecruitmentCampaignBehavior.HourlyTickParty`, liczy `SpoilsCompany` przy Spoils) i wcieleni
+  jency z zalog karawan.
   Osada domowa = najblizsza bitwie osada frakcji i kultury jednostki (2.4 pkt 4), a nie siedziba wodza - ludzie nie splywaja do kilkudziesieciu stolic.
 - **Sakiewka ludzi rozbitej partii (decyzja po krytyce):** `MenPurse.OnPartyDestroyed` (`MenPurse.cs:63-79`) oddaje cala sakiewke ludzi
   pokonanej partii zwyciezcy (trzecia wodzowi, reszta jego ludziom), chociaz po H3 ok. 70% ludzi przezywa i ucieka. **Zostaje tak,
@@ -736,6 +797,22 @@ Sygnatury sprawdzone w DLL gry 1.4.8 (libs = gra, md5 zgodne) i w RBM / ROT (CHA
    dom znany jest dopiero tam; jest przy kazdej bitwie gracza (takze bez wyniku i ponizej `BattleChronicleMinMen`).
 7. **"gra dalaby" jency** w linii dnia to wartosc oczekiwana (ranni + 0.25 x stojacy, gdy zwyciezca bierze jencow), nie losowanie.
 8. **Powrot zolnierza z puli do BK:** n = min(`RoundRandomized(udzial)`, cale osoby w kluczu) - klucz z mniej niz jednym czlowiekiem
-   czeka w puli (bez ulamkow ludzi w ludnosci BK).
+   czeka w puli (bez ulamkow ludzi w ludnosci BK). **Po przegladzie kodu (uwaga 8):** "czeka" znaczylo "na zawsze" (bandy tez nie biora
+   ulamkow) - reszta < 1 zamyka sie teraz losowo (3.3): z szansa rate na dobe; wtedy z szansa d jeden czlowiek do BK, inaczej nikt.
 9. **Uwolnieni jency bez odbiorcy:** dom bez frakcji (pochodzenie nieznane) - najblizsza osada BK kultury jednostki, dalej warownia
    regionu bitwy; tabor wsi jency (gdy zwyciezca z kultury z niewolnictwem) - ta sama regula tieru co reszta (30% / 5%; chlopi to tier < 4).
+
+## 15. Przeglad kodu (noc 08/09.10, 8 uwag) - werdykty i poprawki
+Kazda uwaga sprawdzona w kodzie drzewa n9-h3, w dekompilacji gry 1.4.8 (`ore-supply/cs`), w `ROT-Troops.xml` i w `bitwy.log` 08.10.
+Falszywych nie bylo - wszystkie 8 przyjete. Build kod 0, gra nie uruchomiona.
+
+| # | Waga | Uwaga (skrot) | Werdykt i dowod | Co zmienione |
+|---|---|---|---|---|
+| 1 | wazne | zolnierze lordow z szablonu / z zalog ida przez `SendHome` do BK - nowy strumien ludzi z niczego, test BK go nie widzi | **Przyjeta.** [K] `LordPartyComponent.cs:29-40` (`InitializeMobilePartyAroundPosition(DefaultPartyTemplate)` dla lordow spoza rodu gracza); `GarrisonTroopsCampaignBehavior.cs:542-610`; BK / ROT / BEE / BKROTPatch tych metod nie lataja (szukane) | Pomiar (bez zmiany zachowania): 3 postfiksy z prefiksem (`InitializeLordPartyProperties` `Priority.Last`, `TakeTroopsFromGarrison`, `LeaveTroopsToGarrison`), linia "dziura werbunku" (takze przy WYLACZONE); 7 - wiersz BK poprawiony, nowy wiersz z progiem 20%; 8 - sprostowanie |
+| 2 | drobne | "partie przegranych z szeregowymi po bitwie" zawsze 0; "roznica" tautologiczna; "zgubieni" wlicza partie spoza planu | **Przyjeta.** [K] `MapEvent.cs:2034` (`AddToCountsAtIndex(-Number, -WoundedNumber)` dla kazdego szeregowego kazdej partii przegranej); `OutlawLaw.H3Segment` liczy roznice z tych samych licznikow | `_losersLeft` usuniety; nowe sprawdzenie list typ po typie na koncu zastosowania (5 list) i w postfiksie (zabici, rozbici); "zgubieni" tylko z bitew z pelnym planem (`BP.Covered`), licznik "bez sprawdzenia"; "roznica" nazwana "kontrola kodu" (3.1 krok 6, 5, 7) |
+| 3 | drobne | liczniki domow mieszaja trzy zrodla; powrot z puli doby D w linii D+1 | **Przyjeta.** [K] `ArmouryBehavior.cs:1230` (`LosersFlee.Daily`) przed `:1259` (`OutlawLaw.Daily`) | Liczniki wedlug zrodla (`_bkBy` / `_hearthBy` / `_tplBy`), segment "domy wedlug zrodla" z jawna doba linii "Wyrzutki:" dla puli; kolejnosci Daily NIE zmieniam (linia "Przegrani (H3)" ma byc zaraz po "Bitwy:") |
+| 4 | drobne | "- 0.10xF" wypisywane przy T = 1, choc nie dziala | **Przyjeta.** [K] `LosersFlee.cs` wzor `- WF x F x (1 - T)` | Wypisana wartosc czynna `F x (1 - T)`, przy T = 1 i F > 0 dopisek "(F x nie liczy sie przy T = 1)" |
+| 5 | drobne | przy wylaczonym prawie wyrzutkow bandyta do hearth, choc bandy sa z szablonu | **Przyjeta.** [K] `OutlawLaw.GateClan` / `GateGlobal` zwracaja true przy `!On`, `RosterPostfix` wychodzi przy `!On` | `SendHome` 2a: `Bandit` przy `!OutlawLaw.On` -> "z szablonu" (licznik); takze uwolnieni jency-bandyci; 3.2, 3.4 |
+| 6 | wazne | wighty Innych z rozbitych do ludnosci BK (occupation Soldier) | **Przyjeta.** [K] `ROT-Troops.xml:24682-25088` (`occupation="Soldier"`, `Culture.whitewalker`); `RoutedH3` bez filtra Innych; [P] `bitwy.log` 17-44-34: "SallyOut pod Hornfoot ... Quort's Party (Others) ... rozbici 341" | `RoutedH3`: partia Innych i wighty - ani do puli, ani do domu (licznik "Inni - do niczego"; decyzja: polowa do puli NIE - wight to nie czlowiek, a bandy werbowalyby go z puli); `SendHome` 0: wight -> nic (zabezpieczenie); `KeyKind`: NOWY `KeyUndead` (nie `KeySoldier`) - stare klucze wygasaja do niczego. **Do STAN-PRAC przy wdrozeniu:** stare wighty w puli moga byc dalej werbowane przez bandy (`Draw` / `DrawOnly`), a przy wylaczonym H3 polowa rozbitych wightow dalej idzie do puli - stara dziura sprzed H3 |
+| 7 | drobne | "czas" bez `RoutedH3` i powrotu z puli; `FindHome` skanuje ok. 800 osad na bitwe | **Przyjeta.** [K] `Stopwatch` tylko w prefiksie, postfiksie i `Daily` | `LosersFlee.AddTicks`: czas `RoutedH3` i galezi H3 powrotu z puli; "czas" w linii dnia = suma z rozbiciem na trzy czesci. Pamieci `FindHome` na dobe nie dodaje (decyzja Jeffa 08.10: optymalizacja na koniec) - rozdz. 6 |
+| 8 | drobne | klucz zolnierza z d < 1 nigdy nie wraca i nie znika | **Przyjeta** (z inna poprawka niz pierwsza propozycja przegladu: "z szansa m wyslij 1 i usun klucz" daje w calym zyciu klucza oczekiwanie 1 czlowieka na d < 1 - ludzie z niczego). [K] `OutlawLaw.Daily` galaz `KeySoldier`: `Floor(d) = 0` -> n = 0, `continue` omija `d -= m`; `DrawOnly` bierze tylko `Floor` | Reszta < 1: z szansa rate na dobe klucz sie zamyka - z szansa d jeden czlowiek do BK (`SendHome`), inaczej nikt; oczekiwanie = d. Licznik w dopisku "Wyrzutki:" (3.3, 14 pkt 8) |

@@ -9,6 +9,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
@@ -32,6 +33,9 @@ namespace Armoury
     /// SendHome - jedna funkcja pochodzenia: tabor wsi / rybacy -> hearth swojej wsi (odwrotnosc VillagerCampaignBehavior:179);
     /// karawany, zalogi, milicje, patrole i straz karawan -> "z szablonu" (gra tworzy ich z niczego - licznik do E7 / 108);
     /// Soldier / Mercenary -> ludnosc BK najblizszej bitwie osady swojej frakcji i kultury; reszta (bandyci, chlopi) -> hearth regionu.
+    /// Poprawki po przegladzie kodu (rozdz. 15 projektu): wighty Innych (w ROT occupation="Soldier") nigdy do ludnosci BK - z niczego,
+    /// do niczego; bandyta przy wylaczonym prawie wyrzutkow "z szablonu" (bandy rodza sie wtedy z szablonu gry, nie z hearth);
+    /// prawdziwe sprawdzenie list po zmianie; liczniki domow wedlug zrodla; pomiar dziury werbunku (ludzie lordow AI z szablonu i z zalog).
     /// </summary>
     internal static class LosersFlee
     {
@@ -44,8 +48,10 @@ namespace Armoury
         internal const int SrcRouted = 0, SrcFreed = 1, SrcPool = 2;
         // dokad trafil: ludnosc BK, hearth wsi, "z szablonu"
         internal const int CatBk = 0, CatVillage = 1, CatTemplate = 2;
-        // zawod klucza puli wyrzutkow
-        internal const int KeyCommon = 0, KeyBandit = 1, KeySoldier = 2, KeyGuard = 3;
+        // zawod klucza puli wyrzutkow (KeyUndead - wighty Innych: z niczego, wracaja do niczego, nigdy do ludnosci BK)
+        internal const int KeyCommon = 0, KeyBandit = 1, KeySoldier = 2, KeyGuard = 3, KeyUndead = 4;
+        // czas: wynik bitwy i doba (prefiks, postfiks, Daily), rozbici przy MapEventEnded (OutlawLaw.RoutedH3), powrot z puli (OutlawLaw.Daily)
+        internal const int TickRouted = 0, TickPool = 1;
 
         // wzor (HISTORIA 4.3 + czlon F z audytu 2.8 / E10 / R10): p = 0.15 + 0.35C + 0.15T + 0.15O + 0.20Q - 0.10F(1-T), granice 5-65%
         private const float PBase = 0.15f, WC = 0.35f, WT = 0.15f, WO = 0.15f, WQ = 0.20f, WF = 0.10f, PMin = 0.05f, PMax = 0.65f;
@@ -74,13 +80,24 @@ namespace Armoury
         private static int _wMen, _wDead, _wDead0, _wRevived;
         private static double _realLose, _realLose0, _realWin, _realWin0; private static int _realN;
         private static double _sumP, _sumC, _sumT, _sumO, _sumQ, _sumF; private static int _trapBattles;
-        private static int _sumJ, _taken, _lostByGame, _losersLeft, _controlDiff, _checked;
+        private static int _sumJChk, _taken, _lostByGame, _controlDiff, _checked, _unchecked;
+        // prawdziwe sprawdzenie list (poprawka po przegladzie): stan list gry po zmianie wobec planu (k / j / f na typ) - w prefiksie
+        // (zabici, ranni-jency, rozbici, w partii, ranni w partii) i po wyniku gry w postfiksie (zabici, rozbici - gra ich nie rusza)
+        private static int _oddApplyTypes, _oddApplyMen, _oddPostTypes, _oddPostMen;
         private static int _freed, _freedOutside;
-        private static int _toBk, _asSerfs, _asNobles, _toVillageMen, _toCommon, _template, _templateGarr, _homeless, _vanished, _bkOddCalls, _bkOddDiff;
+        private static int _toBk, _asSerfs, _asNobles, _toVillageMen, _toCommon, _template, _templateGarr, _templateBandit, _homeless, _vanished, _bkOddCalls, _bkOddDiff;
         private static float _toVillageHearth, _toCommonHearth, _templateFloat;
+        // domy wedlug zrodla (SrcRouted / SrcFreed / SrcPool): ludnosc BK, wies (tabory + prosci + bandyci), z szablonu
+        private static readonly int[] _bkBy = new int[3], _hearthBy = new int[3], _tplBy = new int[3];
+        // Inni (wighty): rozbici pominieci w RoutedH3 i wighty, ktore doszly do SendHome inna droga - z niczego, do niczego
+        private static int _undeadRouted, _undeadHome;
+        // dziura werbunku (uwaga 1 przegladu): ludzie, ktorzy weszli do partii lordow AI bez werbunku u notabli - gorna granica tego,
+        // co H3 moze dopisac do ludnosci BK ponad werbunek BK (nowa partia z szablonu klanu, przekazania z zalog)
+        private static int _tplLordParties, _tplLordMen, _garrToLord, _lordToGarr;
         private static int _recruitedPrisoners;
         private static int _stumbleCalc, _stumbleApply, _stumbleHome, _stumblePost;
         private static long _ticks;
+        private static readonly long[] _ticksH3 = new long[2];
         private static bool _errCalc, _errApply, _errHome, _errPost;
         private static long _lastWorldPop = -1;
         private static bool _ownersLogged;
@@ -113,13 +130,17 @@ namespace Armoury
             _wMen = _wDead = _wDead0 = _wRevived = 0;
             _realLose = _realLose0 = _realWin = _realWin0 = 0; _realN = 0;
             _sumP = _sumC = _sumT = _sumO = _sumQ = _sumF = 0; _trapBattles = 0;
-            _sumJ = _taken = _lostByGame = _losersLeft = _controlDiff = _checked = 0;
+            _sumJChk = _taken = _lostByGame = _controlDiff = _checked = _unchecked = 0;
+            _oddApplyTypes = _oddApplyMen = _oddPostTypes = _oddPostMen = 0;
             _freed = _freedOutside = 0;
-            _toBk = _asSerfs = _asNobles = _toVillageMen = _toCommon = _template = _templateGarr = _homeless = _vanished = _bkOddCalls = _bkOddDiff = 0;
+            _toBk = _asSerfs = _asNobles = _toVillageMen = _toCommon = _template = _templateGarr = _templateBandit = _homeless = _vanished = _bkOddCalls = _bkOddDiff = 0;
             _toVillageHearth = _toCommonHearth = _templateFloat = 0f;
+            Array.Clear(_bkBy, 0, 3); Array.Clear(_hearthBy, 0, 3); Array.Clear(_tplBy, 0, 3);
+            _undeadRouted = _undeadHome = 0;
+            _tplLordParties = _tplLordMen = _garrToLord = _lordToGarr = 0;
             _recruitedPrisoners = 0;
             _stumbleCalc = _stumbleApply = _stumbleHome = _stumblePost = 0;
-            _ticks = 0;
+            _ticks = 0; Array.Clear(_ticksH3, 0, 2);
             _rows.Clear();
         }
 
@@ -151,7 +172,8 @@ namespace Armoury
             if (_keyKind.TryGetValue(key, out k)) return k;
             k = KeyCommon;
             var ch = TroopOf(key);
-            if (ch != null)
+            if (ch != null && Undead.Character(ch)) k = KeyUndead;        // wight ma w ROT occupation="Soldier" - nie moze isc do ludnosci BK
+            else if (ch != null)
             {
                 var o = ch.Occupation;
                 if (o == Occupation.Soldier || o == Occupation.Mercenary) k = KeySoldier;
@@ -285,6 +307,9 @@ namespace Armoury
         internal static void NoteWoods(Settlement region, int n) { if (n > 0) Row(region).Woods += n; }
         internal static void NoteHomeless(int n, bool toPool) { if (n <= 0) return; _homeless += n; if (!toPool) _vanished += n; }
         internal static void NoteTemplateFloat(float m) { if (m > 0f) _templateFloat += m; }
+        internal static void NoteUndead(int n) { if (n > 0) _undeadRouted += n; }
+        /// <summary>Czas czesci H3 poza ta klasa (rozbici w OutlawLaw.RoutedH3, powrot z puli w OutlawLaw.Daily) - do linii dnia.</summary>
+        internal static void AddTicks(int which, long t) { if (which >= 0 && which < _ticksH3.Length && t > 0) _ticksH3[which] += t; }
 
         /// <summary>
         /// Jedna funkcja pochodzenia (2.4, 3.4): rozbici z bitwy, uwolnieni jency bez odbiorcy, powrot z puli. Zwraca, ilu przyjeto;
@@ -294,8 +319,17 @@ namespace Armoury
         {
             cat = CatVillage;
             if (troop == null || troop.IsHero || n <= 0) return 0;
+            if (src < 0 || src > SrcPool) src = SrcRouted;
             try
             {
+                // 0. wight Innych (ROT: occupation="Soldier", kultura whitewalker) - z niczego, wraca do niczego; nigdy ludnosc BK ani hearth
+                // (RoutedH3 pomija ich wczesniej; to zabezpieczenie dla uwolnionych jencow i powrotu z puli)
+                if (Undead.Character(troop))
+                {
+                    cat = CatTemplate;
+                    _undeadHome += n;
+                    return n;
+                }
                 // 1. tabor wsi i rybacy -> hearth wlasnej wsi (dokladna odwrotnosc zdjecia przy wysylaniu taboru); ludnosci BK nie dopisujemy
                 if (party != null && party.IsVillager)
                 {
@@ -305,18 +339,23 @@ namespace Armoury
                     {
                         float h = VillagerHearthPerMan * n;
                         v.Hearth += h;
-                        _toVillageMen += n; _toVillageHearth += h;
+                        _toVillageMen += n; _toVillageHearth += h; _hearthBy[src] += n;
                         var row = Row(OutlawLaw.RegionFor(v.Settlement)); row.VillageMen += n; row.VillageHearth += h;
                         return n;
                     }
-                    return ToCommon(n, pos, true);           // wies nieznana - najbiedniejsza wies regionu
+                    return ToCommon(n, pos, true, src);      // wies nieznana - najbiedniejsza wies regionu
                 }
-                // 2. z szablonu: karawany, zalogi, milicje, patrole (gra tworzy ich bez ubytku ludnosci) i straz karawan poza karawana
+                // 2. z szablonu: karawany, zalogi, milicje, patrole (gra tworzy ich bez ubytku ludnosci) i straz karawan poza karawana;
+                // 2a. bandyta przy WYLACZONYM prawie wyrzutkow - bandy rodza sie wtedy z szablonu gry (bramki OutlawLaw przepuszczaja),
+                // a nie z hearth, wiec bandyta nie ma wsi, do ktorej wraca (przy wlaczonym prawie - pkt 4, hearth)
                 bool garr = party != null && party.IsGarrison;
-                if ((party != null && (party.IsCaravan || garr || party.IsMilitia || party.IsPatrolParty)) || troop.Occupation == Occupation.CaravanGuard)
+                bool banditTpl = !OutlawLaw.On && troop.Occupation == Occupation.Bandit;
+                if ((party != null && (party.IsCaravan || garr || party.IsMilitia || party.IsPatrolParty)) || troop.Occupation == Occupation.CaravanGuard || banditTpl)
                 {
                     cat = CatTemplate;
-                    _template += n; if (garr) _templateGarr += n;
+                    _template += n; _tplBy[src] += n;
+                    if (garr) _templateGarr += n;
+                    if (banditTpl) _templateBandit += n;
                     Row(OutlawLaw.RegionAt(pos)).Template += n;
                     return n;
                 }
@@ -328,7 +367,7 @@ namespace Armoury
                     return ToBk(troop, n, pos, fac, src);
                 }
                 // 4. bandyci, chlopi i reszta -> hearth regionu (symetrycznie do TakeCommoners, skad bandyta w wiekszosci pochodzi)
-                return ToCommon(n, pos, false);
+                return ToCommon(n, pos, false, src);
             }
             catch (Exception e)
             {
@@ -338,13 +377,14 @@ namespace Armoury
             }
         }
 
-        private static int ToCommon(int n, Vec2 pos, bool villager)
+        private static int ToCommon(int n, Vec2 pos, bool villager, int src)
         {
             var region = OutlawLaw.HearthRegionAt(pos);
             if (region == null) return 0;
             OutlawLaw.ReturnHome(region, n);
             float h = n * Settings.Current.OutlawHearthPerMan;
             if (villager) { _toVillageMen += n; _toVillageHearth += h; } else { _toCommon += n; _toCommonHearth += h; }
+            _hearthBy[src] += n;
             var row = Row(region); row.VillageMen += n; row.VillageHearth += h;
             return n;
         }
@@ -386,7 +426,7 @@ namespace Armoury
                 int nob1 = TypeCount(home.Pd, _nobles);
                 if (nob1 > nob0) _asNobles += Math.Min(got, nob1 - nob0);                 // kaprys BK: pusta lista klas -> Nobles (bez poprawiania)
             }
-            _toBk += got;
+            _toBk += got; _bkBy[src] += got;
             if (got > 0) Row(OutlawLaw.RegionFor(home.St)).Bk += got;
             return got;
         }
@@ -409,6 +449,9 @@ namespace Armoury
             public int LoseDeadAll0, LoseDeadAll, WinDeadAll0, WinDeadAll;
             public int WinN, WinD0, WinRev;        // zwyciezcy (szeregowi): ludzie, polegli wedlug gry, z poleglych ranni
             public int G_W, G_R, G_Stand;         // gra przed zmiana: ranni, rozbici, stali (szeregowi przegranych)
+            // plan objal kazda partie przegrana, ktora ma szeregowych w partii, i zastosowanie przeszlo bez bledu - tylko wtedy przyrost
+            // lochow zwyciezcow = suma j (inaczej gra bierze jencow z partii spoza planu po staremu i "zgubieni" wychodza falszywie)
+            public bool Covered = true;
         }
 
         private static BP _cur;
@@ -624,7 +667,12 @@ namespace Armoury
                     bp.LoseDeadAll0 += mep != null && mep.DiedInBattle != null ? mep.DiedInBattle.TotalManCount : 0;
                     if (mep == null || mep.Party == null) continue;
                     var mp = mep.Party.MobileParty;
-                    if (mp == null || !mp.IsActive) continue;
+                    if (mp == null || !mp.IsActive)
+                    {
+                        // partia po staremu - gra wezmie jej rannych i 25% zdrowych; sprawdzenie jencow tej bitwy nic by nie znaczylo
+                        if (mep.Party.MemberRoster != null && mep.Party.MemberRoster.TotalRegulars > 0) bp.Covered = false;
+                        continue;
+                    }
                     var lp = new LP { Mep = mep, Mp = mp, Kind = KindOf(mp) };
                     lp.P = lp.Kind == KVillager ? nonComb : bp.P;
                     var map = new Dictionary<CharacterObject, TP>();
@@ -655,6 +703,7 @@ namespace Armoury
                 catch (Exception e)
                 {
                     _stumbleCalc++;
+                    bp.Covered = false;
                     if (!_errCalc) { _errCalc = true; Log.Error("LosersFlee.Plan (partia po staremu)", e); }
                 }
             }
@@ -760,7 +809,19 @@ namespace Armoury
                         int mn = tp.J - tp.M, mw = tp.J - tp.W;
                         if (mn != 0 || mw != 0) member.AddToCounts(tp.T, mn, false, mw);
                     }
-                    _controlDiff += lp.K + lp.J + lp.F - lp.N;          // kontrola kodu (z definicji 0); prawdziwe sprawdzenie - postfiks
+                    _controlDiff += lp.K + lp.J + lp.F - lp.N;          // kontrola kodu (z definicji 0)
+                    // prawdziwe sprawdzenie (po przegladzie): odczyt list gry po zmianie, typ po typie - zabici = k, ranni-jency = j,
+                    // rozbici = f, w partii dokladnie j (wszyscy ranni). Gra po pojmaniu zeruje kazda partie przegrana, wiec "szeregowi
+                    // w partii po bitwie" niczego nie sprawdzali - to sprawdzenie zastapilo tamto
+                    for (int t = 0; t < lp.Types.Count; t++)
+                    {
+                        var tp = lp.Types[t];
+                        int idx = member.FindIndexOfTroop(tp.T);
+                        int mNow = idx >= 0 ? member.GetElementNumber(idx) : 0, wNow = idx >= 0 ? member.GetElementWoundedNumber(idx) : 0;
+                        int bad = Math.Abs(mep.DiedInBattle.GetTroopCount(tp.T) - tp.K) + Math.Abs(mep.WoundedInBattle.GetTroopCount(tp.T) - tp.J)
+                                  + Math.Abs(mep.RoutedInBattle.GetTroopCount(tp.T) - tp.F) + Math.Abs(mNow - tp.J) + Math.Abs(wNow - tp.J);
+                        if (bad != 0) { _oddApplyTypes++; _oddApplyMen += bad; }
+                    }
                     bp.SumJ += lp.J;
                     bp.LoseDeadAll += lp.K - lp.D0;
                     _kMen[lp.Kind] += lp.N; _kDead[lp.Kind] += lp.K; _kCapt[lp.Kind] += lp.J; _kRouted[lp.Kind] += lp.F; _kDead0[lp.Kind] += lp.D0;
@@ -769,6 +830,7 @@ namespace Armoury
                 catch (Exception e)
                 {
                     _stumbleApply++;
+                    bp.Covered = false;
                     if (!_errApply) { _errApply = true; Log.Error("LosersFlee.Apply (przegrany)", e); }
                 }
             }
@@ -830,7 +892,6 @@ namespace Armoury
             _battles++;
             _sumP += bp.P; _sumC += bp.C; _sumT += bp.T; _sumO += bp.O; _sumQ += bp.Q; _sumF += bp.F;
             if (bp.T > 0.5f) _trapBattles++;
-            _sumJ += bp.SumJ;
             int minSide = Math.Max(1, Settings.Current.BattleRealMinSide);
             if (bp.LMen >= minSide && bp.WMen >= minSide && Math.Min(bp.LMen, bp.WMen) * 4 >= Math.Max(bp.LMen, bp.WMen))
             {
@@ -849,16 +910,22 @@ namespace Armoury
             try
             {
                 // niezalezne sprawdzenie: przyrost szeregowych w lochach zwyciezcow = suma j (uwolnieni jency pokonanych ida do zwyciezcow
-                // jako LUDZIE, wiec sie tu nie mieszaja); roznica = jency zgubieni przez gre (null w losowaniu)
+                // jako LUDZIE, wiec sie tu nie mieszaja); roznica = jency zgubieni przez gre (null w losowaniu). Tylko bitwy, w ktorych plan
+                // objal kazda partie przegrana z szeregowymi - inaczej gra bierze jencow z partii spoza planu i roznica wychodzi ujemna
                 int after = 0;
                 foreach (var r in bp.Prisons) after += r.TotalRegulars;
                 int got = after - bp.PrisonBefore;
-                _taken += got; _lostByGame += bp.SumJ - got; _checked++;
-                // po pojmaniu w kazdej partii przegranej zero szeregowych
-                for (int i = 0; i < bp.Lose.Parties.Count; i++)
+                if (bp.Covered) { _taken += got; _sumJChk += bp.SumJ; _lostByGame += bp.SumJ - got; _checked++; }
+                else _unchecked++;
+                // listy zabitych i rozbitych po wyniku gry dalej = plan (gra ich w tej metodzie nie zmienia - zmiana tu to cudza latka)
+                foreach (var lp in bp.Losers)
                 {
-                    var mep = bp.Lose.Parties[i];
-                    if (mep != null && mep.Party != null && mep.Party.MemberRoster != null && mep.Party.MemberRoster.TotalRegulars > 0) _losersLeft++;
+                    for (int t = 0; t < lp.Types.Count; t++)
+                    {
+                        var tp = lp.Types[t];
+                        int bad = Math.Abs(lp.Mep.DiedInBattle.GetTroopCount(tp.T) - tp.K) + Math.Abs(lp.Mep.RoutedInBattle.GetTroopCount(tp.T) - tp.F);
+                        if (bad != 0) { _oddPostTypes++; _oddPostMen += bad; }
+                    }
                 }
                 BattleLine(bp, got);
             }
@@ -875,9 +942,71 @@ namespace Armoury
             try { if (__0 != null && __2 > 0 && __0.IsLordParty && __0 != MobileParty.MainParty) _recruitedPrisoners += __2; } catch { }
         }
 
+        // ------------------------------------------------------------ dziura werbunku - tylko pomiar (uwaga 1 przegladu)
+        // Gra daje nowej partii lorda AI ludzi z szablonu klanu (LordPartyComponent.InitializationArgs.InitializeLordPartyProperties ->
+        // InitializeMobilePartyAroundPosition(DefaultPartyTemplate), LordPartyComponent.cs:38-39), a lordowie biora tez ludzi z zalog
+        // (GarrisonTroopsCampaignBehavior.TakeTroopsFromGarrison, :583-610), ktore rosna z niczego. Tacy ludzie, rozbici w bitwie, ida
+        // przez SendHome do ludnosci BK jak zwerbowani - te liczniki daja jawna gorna granice tej dziury. Nic nie zmieniaja.
+
+        private static bool AiLordParty(MobileParty mp)
+        {
+            try { return mp != null && mp != MobileParty.MainParty && mp.IsLordParty && mp.ActualClan != Clan.PlayerClan; } catch { return false; }
+        }
+
+        public static void LordInitPrefix(MobileParty __0, out int __state)
+        {
+            __state = -1;
+            try { if (__0 != null && __0.MemberRoster != null) __state = __0.MemberRoster.TotalRegulars; } catch { }
+        }
+
+        /// <summary>Postfiks Priority.Last - po SpoilsCompany (klan Spoils: szablon zdjety przy wlaczniku), wiec liczy tylko tych, co zostali.</summary>
+        public static void LordInitPostfix(MobileParty __0, Hero __1, int __state)
+        {
+            try
+            {
+                if (__state < 0 || __0 == null || __1 == null || __0 == MobileParty.MainParty || __1.Clan == Clan.PlayerClan) return;
+                int add = __0.MemberRoster.TotalRegulars - __state;
+                if (add <= 0) return;
+                _tplLordParties++; _tplLordMen += add;
+            }
+            catch { }
+        }
+
+        public static void GarrisonPrefix(MobileParty __0, out int __state)
+        {
+            __state = -1;
+            try { if (AiLordParty(__0)) __state = __0.MemberRoster.TotalRegulars; } catch { }
+        }
+
+        public static void TakeFromGarrisonPostfix(MobileParty __0, int __state)
+        {
+            try { if (__state >= 0 && __0 != null) { int d = __0.MemberRoster.TotalRegulars - __state; if (d > 0) _garrToLord += d; } } catch { }
+        }
+
+        public static void LeaveToGarrisonPostfix(MobileParty __0, int __state)
+        {
+            try { if (__state >= 0 && __0 != null) { int d = __state - __0.MemberRoster.TotalRegulars; if (d > 0) _lordToGarr += d; } } catch { }
+        }
+
         // ------------------------------------------------------------ logi
         private static string F2(float v) { return v.ToString("0.00", CultureInfo.InvariantCulture); }
         private static string Pc(double x, double of) { return of > 0 ? (100.0 * x / of).ToString("0.#", CultureInfo.InvariantCulture) + "%" : "-"; }
+        private static string Ms(long ticks) { return (ticks * 1000.0 / Stopwatch.Frequency).ToString("0.0", CultureInfo.InvariantCulture); }
+
+        /// <summary>Czas H3 w linii dnia - wszystkie czesci (poprawka po przegladzie: dawniej tylko prefiks, postfiks i doba).</summary>
+        private static string TimeText(long dailyNow)
+        {
+            long a = _ticks + dailyNow, b = _ticksH3[TickRouted], c = _ticksH3[TickPool];
+            return " | czas " + Ms(a + b + c) + " ms (wynik bitwy i doba " + Ms(a) + ", rozbici przy koncu bitwy " + Ms(b) + ", powrot z puli - doba wczesniej " + Ms(c) + ")";
+        }
+
+        /// <summary>Dziura werbunku (uwaga 1 przegladu): ludzie, ktorzy weszli do partii lordow AI spoza rodu gracza bez werbunku BK u notabli.
+        /// To gorna granica tego, ile z "do domu BK" moze byc ludzmi z niczego: test - do domu BK <= werbunek u notabli + ta liczba.</summary>
+        private static string HoleText()
+        {
+            return " | dziura werbunku (partie lordow AI, ludzie bez werbunku u notabli): nowe partie z szablonu klanu " + _tplLordMen + " ludzi (" + _tplLordParties
+                   + " partii), z zalog do lordow " + _garrToLord + ", od lordow do zalog " + _lordToGarr + " (netto z zalog " + (_garrToLord - _lordToGarr) + ")";
+        }
 
         private static string Who(MapEventSide side)
         {
@@ -915,11 +1044,13 @@ namespace Armoury
               .Append(") vs zwyciezca ").Append(Who(bp.Win)).Append(' ').Append(bp.WMen).Append(" ludzi (konni ").Append(Pc(bp.WMount, 1)).Append(", tier ")
               .Append(bp.WTier.ToString("0.0", CultureInfo.InvariantCulture)).Append(") | p = 0.15 + 0.35xC ").Append(F2(bp.C)).Append(" + 0.15xT ").Append(bp.T > 0.5f ? "1" : "0")
               .Append(" (teren: srodek ").Append(bp.Center).Append(", woda ").Append(bp.TrapPts).Append("/8) + 0.15xO ").Append(F2(bp.O)).Append(" + 0.20xQ ").Append(F2(bp.Q))
-              .Append(" - 0.10xF ").Append(F2(bp.F)).Append(" = ").Append(Pc(bp.P, 1))
+              .Append(" - 0.10xF ").Append(F2(bp.F * (1f - bp.T)))                 // wartosc czynna: F liczy sie tylko przy T = 0
+              .Append(bp.T > 0.5f && bp.F > 0f ? " (F " + F2(bp.F) + " nie liczy sie przy T = 1)" : "").Append(" = ").Append(Pc(bp.P, 1))
               .Append(" | gra: zabici ").Append(d0).Append(" (").Append(Pc(d0, n)).Append("), ranni ").Append(bp.G_W).Append(", rozbici ").Append(bp.G_R).Append(", stali ").Append(bp.G_Stand)
               .Append(" | H3: zabici ").Append(k).Append(" (").Append(Pc(k, n)).Append("), jency ").Append(j).Append(" (").Append(Pc(j, n)).Append("), rozbici ").Append(f).Append(" (").Append(Pc(f, n)).Append(')')
               .Append(" | zwyciezca: zabici gry ").Append(wd0).Append(" (").Append(Pc(wd0, wn)).Append(") -> ").Append(wdNow).Append(" (").Append(Pc(wdNow, wn)).Append("), +").Append(rev).Append(" rannych")
-              .Append(" | jency wzieci ").Append(got).Append(" (zgubieni przez gre ").Append(bp.SumJ - got).Append("), uwolnieni bez odbiorcy ").Append(bp.FreedN).Append('.');
+              .Append(" | jency wzieci ").Append(got).Append(bp.Covered ? " (zgubieni przez gre " + (bp.SumJ - got) + ")" : " (bez sprawdzenia - partia przegrana poza planem)")
+              .Append(", uwolnieni bez odbiorcy ").Append(bp.FreedN).Append('.');
             Log.Info(sb.ToString());
         }
 
@@ -940,7 +1071,7 @@ namespace Armoury
         }
 
         /// <summary>Bitwa gracza (misja albo symulacja): H3 jej nie rusza - jedna linia z liczbami gry i podzialem rozbitych (3.2).</summary>
-        internal static void PlayerLine(MapEvent me, int pool, int bk, int village, int template, int homeless, bool toPool)
+        internal static void PlayerLine(MapEvent me, int pool, int bk, int village, int template, int homeless, bool toPool, int undead)
         {
             try
             {
@@ -965,7 +1096,8 @@ namespace Armoury
                     sb.Append(side == me.AttackerSide ? "atakujacy" : "obronca").Append(" zabici ").Append(dead).Append(", ranni ").Append(wounded).Append(", rozbici ").Append(routed);
                 }
                 sb.Append(" | rozbici: do puli ").Append(pool).Append(", do domu ").Append(bk + village).Append(" (BK ").Append(bk).Append(", wies ").Append(village)
-                  .Append("), z szablonu ").Append(template).Append(", bez domu ").Append(homeless).Append(homeless > 0 ? (toPool ? " (do puli)" : " (znikneli - prawo wyrzutkow wylaczone)") : "").Append('.');
+                  .Append("), z szablonu ").Append(template).Append(", bez domu ").Append(homeless).Append(homeless > 0 ? (toPool ? " (do puli)" : " (znikneli - prawo wyrzutkow wylaczone)") : "")
+                  .Append(undead > 0 ? ", Inni (wighty - z niczego, do niczego) " + undead : "").Append('.');
                 Log.Info(sb.ToString());
             }
             catch { }
@@ -1026,7 +1158,7 @@ namespace Armoury
                 if (!On)
                 {
                     sb.Append(" - WYLACZONE (gra jak dzis) | ludnosc BK swiata ").Append(worldTxt).Append(" | wcieleni jency AI (partie rodow) ").Append(_recruitedPrisoners)
-                      .Append(" | czas ").Append(((_ticks + sw.ElapsedTicks) * 1000.0 / Stopwatch.Frequency).ToString("0.0", ci)).Append(" ms.");
+                      .Append(HoleText()).Append(TimeText(sw.ElapsedTicks)).Append('.');
                     Log.Info(sb.ToString());
                     return;
                 }
@@ -1050,18 +1182,28 @@ namespace Armoury
                     sb.Append(" | srednie p ").Append(F2((float)(_sumP / _battles))).Append(": C ").Append(F2((float)(_sumC / _battles))).Append(", T ").Append(F2((float)(_sumT / _battles)))
                       .Append(", O ").Append(F2((float)(_sumO / _battles))).Append(", Q ").Append(F2((float)(_sumQ / _battles))).Append(", F ").Append(F2((float)(_sumF / _battles)))
                       .Append("; bitew z T = 1: ").Append(Pc(_trapBattles, _battles));
-                sb.Append(" | sprawdzenia: jency wzieci ").Append(_taken).Append(" - j ").Append(_sumJ).Append(" = ").Append(_taken - _sumJ).Append(" (zgubieni przez gre ").Append(_lostByGame)
-                  .Append(", bitew sprawdzonych ").Append(_checked).Append("), BK przyjal inaczej niz przyrost TotalPop: ").Append(_bkOddCalls).Append(" wywolan (roznica ").Append(_bkOddDiff)
-                  .Append("), partie przegranych z szeregowymi po bitwie ").Append(_losersLeft).Append("; kontrola kodu k + j + f - n = ").Append(_controlDiff);
+                sb.Append(" | sprawdzenia: jency wzieci ").Append(_taken).Append(" - j ").Append(_sumJChk).Append(" = ").Append(_taken - _sumJChk).Append(" (zgubieni przez gre ").Append(_lostByGame)
+                  .Append(", bitew sprawdzonych ").Append(_checked).Append(", bez sprawdzenia - partia przegrana poza planem ").Append(_unchecked)
+                  .Append("), listy gry po zmianie inne niz plan: ").Append(_oddApplyTypes).Append(" typow (").Append(_oddApplyMen).Append(" ludzi), po wyniku gry ")
+                  .Append(_oddPostTypes).Append(" typow (").Append(_oddPostMen).Append(" ludzi), BK przyjal inaczej niz przyrost TotalPop: ").Append(_bkOddCalls).Append(" wywolan (roznica ").Append(_bkOddDiff)
+                  .Append("); kontrola kodu k + j + f - n = ").Append(_controlDiff);
                 sb.Append(" | uwolnieni jency bez odbiorcy ").Append(_freed).Append(" (w bitwach poza H3 tylko liczeni: ").Append(_freedOutside).Append(')');
                 sb.Append(" | domy: do domu BK ").Append(_toBk).Append(" (w tym jako chlopi ").Append(_asSerfs).Append(", jako szlachta - kaprys BK ").Append(_asNobles)
                   .Append("), do wsi (tabory) ").Append(_toVillageMen).Append(" ludzi = ").Append(_toVillageHearth.ToString("0.0", ci)).Append(" hearth, do wsi (prosci i bandyci) ").Append(_toCommon)
                   .Append(" ludzi = ").Append(_toCommonHearth.ToString("0.0", ci)).Append(" hearth, z szablonu ").Append(_template).Append(" (garnizony ").Append(_templateGarr)
+                  .Append(", bandyci przy wylaczonym prawie wyrzutkow ").Append(_templateBandit)
                   .Append(", z puli straz karawan ").Append(_templateFloat.ToString("0.0", ci)).Append("), bez domu ").Append(_homeless)
                   .Append(_vanished > 0 ? " (znikneli - prawo wyrzutkow wylaczone " + _vanished + ")" : " (do puli)");
+                // ta sama suma wedlug zrodla: "rozbici z bitew" tej doby = dopisek H3 linii "Wyrzutki:" tej samej doby (ludnosc BK, do wsi,
+                // z szablonu); "z puli" pochodzi z powrotu w OutlawLaw.Daily, ktory biegnie PO tej linii - to liczba z linii "Wyrzutki:" doby wczesniej
+                sb.Append(" | domy wedlug zrodla: rozbici z bitew - BK ").Append(_bkBy[SrcRouted]).Append(", wies ").Append(_hearthBy[SrcRouted]).Append(", z szablonu ").Append(_tplBy[SrcRouted])
+                  .Append("; uwolnieni jency - BK ").Append(_bkBy[SrcFreed]).Append(", wies ").Append(_hearthBy[SrcFreed]).Append(", z szablonu ").Append(_tplBy[SrcFreed])
+                  .Append("; z puli (linia \"Wyrzutki:\" doby ").Append(day - 1).Append(") - BK ").Append(_bkBy[SrcPool]);
+                sb.Append(" | Inni (wighty - z niczego, do niczego, nigdy do BK ani wsi): rozbici ").Append(_undeadRouted).Append(", inna droga ").Append(_undeadHome);
+                sb.Append(HoleText());
                 sb.Append(" | ludnosc BK swiata ").Append(worldTxt).Append(" | wcieleni jency AI (partie rodow) ").Append(_recruitedPrisoners);
                 sb.Append(" | potkniecia: liczenie ").Append(_stumbleCalc).Append(", zastosowanie ").Append(_stumbleApply).Append(", dom ").Append(_stumbleHome).Append(", pomiar ").Append(_stumblePost);
-                sb.Append(" | czas ").Append(((_ticks + sw.ElapsedTicks) * 1000.0 / Stopwatch.Frequency).ToString("0.0", ci)).Append(" ms.");
+                sb.Append(TimeText(sw.ElapsedTicks)).Append('.');
                 Log.Info(sb.ToString());
                 WriteCsv(day - 1);
             }
@@ -1123,7 +1265,37 @@ namespace Armoury
                 else rec = "licznik wcielonych jencow AI: brak metody";
             }
             catch (Exception e) { rec = "licznik wcielonych jencow AI: blad (" + e.Message + ")"; }
-            Log.Info("LosersFlee (H3): " + res + "; " + rec + " | wlasciciele latek: " + Owners() + ".");
+            // dziura werbunku - tylko pomiar (postfiksy licza, nic nie zmieniaja); brak metody = licznik zostaje 0 i linia startowa to mowi
+            var hole = new List<string>();
+            try
+            {
+                var mi = AccessTools.Method(typeof(LordPartyComponent.InitializationArgs), "InitializeLordPartyProperties", new[] { typeof(MobileParty), typeof(Hero) });
+                if (mi != null)
+                {
+                    h.Patch(mi, prefix: new HarmonyMethod(typeof(LosersFlee), nameof(LordInitPrefix)) { priority = Priority.First },
+                                postfix: new HarmonyMethod(typeof(LosersFlee), nameof(LordInitPostfix)) { priority = Priority.Last });
+                    hole.Add("szablon nowej partii lorda");
+                }
+                else hole.Add("szablon nowej partii lorda: BRAK METODY");
+                var gt = AccessTools.TypeByName("TaleWorlds.CampaignSystem.CampaignBehaviors.GarrisonTroopsCampaignBehavior");
+                var ga = new[] { typeof(MobileParty), typeof(Settlement), typeof(int), typeof(bool) };
+                var take = gt != null ? AccessTools.Method(gt, "TakeTroopsFromGarrison", ga) : null;
+                var leave = gt != null ? AccessTools.Method(gt, "LeaveTroopsToGarrison", ga) : null;
+                if (take != null)
+                {
+                    h.Patch(take, prefix: new HarmonyMethod(typeof(LosersFlee), nameof(GarrisonPrefix)), postfix: new HarmonyMethod(typeof(LosersFlee), nameof(TakeFromGarrisonPostfix)));
+                    hole.Add("z zalog do lordow");
+                }
+                else hole.Add("z zalog do lordow: BRAK METODY");
+                if (leave != null)
+                {
+                    h.Patch(leave, prefix: new HarmonyMethod(typeof(LosersFlee), nameof(GarrisonPrefix)), postfix: new HarmonyMethod(typeof(LosersFlee), nameof(LeaveToGarrisonPostfix)));
+                    hole.Add("od lordow do zalog");
+                }
+                else hole.Add("od lordow do zalog: BRAK METODY");
+            }
+            catch (Exception e) { hole.Add("blad (" + e.Message + ")"); }
+            Log.Info("LosersFlee (H3): " + res + "; " + rec + "; pomiar dziury werbunku: " + string.Join(", ", hole.ToArray()) + " | wlasciciele latek: " + Owners() + ".");
         }
 
         internal static bool Patched { get { return _patched; } }
