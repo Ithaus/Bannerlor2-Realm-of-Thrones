@@ -51,6 +51,9 @@ namespace Armoury
         // Wlasna bramka CropClimateFilter, sprawdzana PRZED bramka mineralow - wylaczenie jednej nie gasi drugiej (krytyka S17).
         // Waga zdjetego wpisu przechodzi na pierwszy wpis listy (glowny plon farmy) - suma wag listy bez zmian, jak przy dublu mineralu.
         // Id kultur sprawdzone w ROT-Content/ModuleData/spcultures.xml (aserai = Dorne). Gdy zadnej z nich nie ma w grze - nie filtrujemy.
+        // Recenzja T8: klimat idzie za biezaca kultura wsi, a BK ja zmienia (kultura dominujaca przy starcie sesji, asymilacja) - wies
+        // zasymilowana przez Dorne zacznie rodzic papirus. Filtr zmienia tylko liste BK: VillageType.Productions farmy zboza (BK dopisal
+        // tam papirus) dalej licza magazyn wsi (GetWarehouseCapacity: +5 dob papirusu) i Village.IsProducing - opisane w CHANGELOG.
         private static readonly HashSet<string> HotSouth = new HashSet<string>(StringComparer.Ordinal)
         { "aserai", "ghiscari", "qartheen", "volantine", "lyseni", "myrish", "tyroshi", "valyrian", "summer" };
         private static readonly HashSet<Village> _papyrusOff = new HashSet<Village>();   // wsie, ktorym od ostatniej linii zdjeto papirus
@@ -218,7 +221,8 @@ namespace Armoury
             string what;
             lock (Gate)
             {
-                if (!_patched) what = "latka NIE wpieta (brak BannerKings, inna postac GetProductions albo MaterialLaw poza modelami produkcji - patrz linia MineralOnce przy starcie gry) - BK dopisuje mineral po swojemu";
+                if (!_patched && _wired) what = "czesc mineralow NIEAKTYWNA (MaterialLaw poza modelami produkcji - zdjetego wpisu nie byloby czym oddac) - postfiks GetProductions wpiety tylko dla filtra klimatu upraw (T8); BK dopisuje mineral po swojemu";
+                else if (!_patched) what = "latka NIE wpieta (brak BannerKings, inna postac GetProductions albo MaterialLaw poza modelami produkcji - patrz linia MineralOnce przy starcie gry) - BK dopisuje mineral po swojemu";
                 else if (!s.MineralsCountedOnce) what = "LATKA WYLACZONA w ustawieniach - BK dopisuje mineral wsi gorniczej dwa razy na dobe";
                 else if (_removed == 0) what = "zadnego powtorzenia na listach produkcji wsi (BK nie pytal o listy albo niczego nie dubluje)";
                 else
