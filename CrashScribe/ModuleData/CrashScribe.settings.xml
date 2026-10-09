@@ -73,6 +73,25 @@
   <NightKingWallFromDay>2184</NightKingWallFromDay>
   <NightKingCallFromDay>728</NightKingCallFromDay>
 
+  <!-- The Others grow only from the dead: in the books the wights are the fallen and the captives of the
+       Others, raised again - nobody hands the Night King an army out of thin air. Realm of Thrones does:
+       every new band of the Others gets 100 extra wights at birth (on top of its 53-man template), every
+       band gets 2 more wights each day until it is full, and the base game lets them pick up 3-7 "volunteers
+       from the map" now and then, like any minor faction outside a settlement. With OthersNoFreeGrowth on,
+       those three sources are shut: OthersNoBirthDowry (the +100 at birth), OthersNoDailyWights (the +2 a day)
+       and OthersNoMapVolunteers (volunteers from the map). Raising the dead after a battle and freed prisoners
+       are left exactly as Realm of Thrones has them. A new band still starts with its template and its leader.
+       Bands already in the field keep their men. Set OthersNoFreeGrowth to false to switch all of it off.
+       OthersStartDowryDays: the old dead the Others already have when the story begins - during the first N
+       days of a new campaign the +100 at birth is still given (the first 4 bands start at about 154 each,
+       616 in all), so the Night King's call and march have something to start from. 0 = no exception.
+       In a campaign older than N days it does nothing. -->
+  <OthersNoFreeGrowth>true</OthersNoFreeGrowth>
+  <OthersNoBirthDowry>true</OthersNoBirthDowry>
+  <OthersStartDowryDays>2</OthersStartDowryDays>
+  <OthersNoDailyWights>true</OthersNoDailyWights>
+  <OthersNoMapVolunteers>true</OthersNoMapVolunteers>
+
   <!-- Siege camps do not rot while fed: RealisticBannerlord's SiegeAttritionBehavior kills 2-5 men
        of every besieging party each day (escalating) regardless of food and morale. With this on,
        the camp only suffers those losses while it is STARVING, and a besieged garrison only while
