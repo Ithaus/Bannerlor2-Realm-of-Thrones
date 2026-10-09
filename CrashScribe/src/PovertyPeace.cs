@@ -25,7 +25,11 @@ namespace CrashScribe
     ///    (Diplomacy: tylko warunki; DeclareWarDecision.CalculateSupport > 50) -> BK podmienia na BKDeclareWarDecision -> glos rodow.
     ///    Wszystkie te liczby biora sie z jednej funkcji: BKDiplomacyModel.GetScoreOfDeclaringWar (6 arg., ExplainedNumber) - model
     ///    gry i BannerKingsConfig.DiplomacyModel (BKROTDiplomacyModel jej nie nadpisuje). Ta sama funkcja daje poparcie wojny
-    ///    w nacisku pokoju BK (BKDiplomacyBehavior.GetWarSupport -> CalculatePeacePressure).
+    ///    w nacisku pokoju BK (BKDiplomacyBehavior.GetWarSupport -> CalculatePeacePressure), ale NIEPEWNIE: w trwajacej wojnie
+    ///    BK liczy tam BKDeclareWarDecision dla pary juz w wojnie; gdy model zgod gry (KingdomDecisionPermissionModel) to
+    ///    Diplomacy z warunkiem AtPeace, BK daje -50000 i nasz czlon tam nie dziala (pomijamy -50000); gdy model zgod BK -
+    ///    dziala, i wtedy bieda skarbca wchodzi do glosu o pokoj takze przez nacisk BK (obok naszego czlonu glosu, ktory
+    ///    i tak nie wychodzi ponad 200). Linia startu sesji wypisuje model zgod - autotest rozstrzyga, ktory przypadek.
     ///  - Pokoj: wniosek (ConsiderPeace: prog BK GetScoreOfDeclaringPeace >= 0, potem MakePeaceKingdomDecision.DetermineSupport
     ///    wnioskodawcy > 0; albo wniosek BK ForceProposePeaceFromLosingSide przy nacisku >= 0.5) -> glos rodow
     ///    MakePeaceKingdomDecision.DetermineSupport (vanilla 0 albo 200, za + przeciw = 200; BK dodaje +-240 x nacisk, suma dalej 200)
@@ -45,11 +49,18 @@ namespace CrashScribe
     /// Czlony:
     ///  - wojna: wynik BK += -0.75 x T x max(|wynik|, 600) (skala BK: 600 = jej minimum, 0.75 = waga zmeczenia w wyniku pokoju BK).
     ///    Bez czlonu P - BK ma juz "cannot afford a war" dla glowy oceniajacego rodu (nie liczymy drugi raz).
+    ///    Znak zmienia tylko slabym wojnom (wynik < 450 x T); przy wyniku >= 600 zostaje s x (1 - 0.75T) > 0 - mniej wojen
+    ///    na granicy oplacalnosci i slabsze glosy, nie mniej wojen w ogole. Linia dobowa liczy oceny, ktorym czlon zmienil znak.
     ///  - glos o pokoju (ai rod, nie gracz, nie najemnik): gdy T + P > 1 - za pokojem +100 x (T + P), przeciw -100 x (T + P),
     ///    ale bez wyjscia poza wiekszy z (wynik, 200) dla "za" i mniejszy z (wynik, 0) dla "przeciw": rod przekonany juz wczesniej
     ///    (przez gre albo nacisk BK) nie dostaje wiecej, a mocno wojowniczy (nacisk BK < 0) moze zostac przy wojnie. Postfiks
-    ///    zakladany po BK (ta sama waga, pozniej) - widzi juz jego nacisk. Bogaty rod w biednym krolestwie i biedny w bogatym
-    ///    - bez zmian. Wniosek o pokoj (ConsiderPeace: glos wnioskodawcy > 0) nasz czlon dodaje tylko przy T + P > 1.
+    ///    z Priority.Last: BK zaklada swoje latki dopiero w Main.OnGameStart, a my w menu glownym - przy rownej wadze (400)
+    ///    Harmony puscilby nasz postfiks PRZED BK; z Priority.Last idzie po nim i widzi jego nacisk. Bogaty rod w biednym
+    ///    krolestwie i biedny w bogatym - bez zmian. Przy T + P > 1 zawsze x > 100, wiec rod przy grze 0/200 zawsze zmienia
+    ///    strone; "im biedniej, tym mocniej" dotyczy wagi glosu (wplyw), nie strony. T > 0 wystarczy rodowi z P bliskim 1.
+    ///    Wniosek o pokoj (ConsiderPeace: glos wnioskodawcy > 0) nasz czlon dodaje tylko przy T + P > 1.
+    ///    Gdy gra uznaje pokoj za nieodpowiedni (IsPeaceSuitable == false: wojna < 150 dob i wrog daleko w przodzie) i wniosek
+    ///    nie jest od wroga - czlonu nie ma (gra daje wtedy 0/200; nie otwieramy pokoju, ktorego gra by nie dopuscila).
     /// Bledy: try/catch per wywolanie (wynik gry zostaje), potkniecia liczone (pierwsze w raporcie), latka dziala dalej.
     /// Wylacznik: PovertyPeace w ModuleData/CrashScribe.settings.xml. Bez zapisu w grze (historia skarbca od wczytania).
     /// </summary>
@@ -66,13 +77,16 @@ namespace CrashScribe
         private const float VoteUnit = 100f;
         private const float VoteFull = 200f;
         private const float BkForbidden = -49999f;   // BK: -50000 = wojna niedozwolona / ta sama frakcja
-        private const double FlipKeepDays = 6.0;     // decyzja zyje do 5 dob (KingdomDecisionProposalBehavior.DailyTick)
+        private const double FlipKeepDays = 6.0;     // decyzja w krolestwie gracza zyje do rozstrzygniecia; AI glosuje od razu (Kingdom.AddDecision -> StartElection)
+        // Odwrocenia licza sie tez z ConsiderPeace (glos wnioskodawcy) i obliczen prawdopodobienstwa - licznik przyblizony (tylko log).
+        // Filtr "decyzja w k.UnresolvedDecisions" nie zadziala: decyzje krolestw AI nigdy tam nie trafiaja.
 
         private static bool _voteOn, _warOn, _rotOn;
         private static FieldInfo _fWars;     // ROT SubModule.StorylineWars
         private static MethodInfo _mForced;  // ROT ROTStorylineWars.IsWarForced(IFaction, IFaction)
         private static TextObject _warText;
         private static MethodInfo _mVote, _mWar;   // cele latek - do linii startu sesji (kto jeszcze je latka)
+        private static AccessTools.FieldRef<MakePeaceKingdomDecision, bool> _fOpp;   // gra: _isProposedByOpponent (brak = traktujemy jak false)
 
         private sealed class KState
         {
@@ -90,6 +104,7 @@ namespace CrashScribe
         // dzis / od wczytania
         private static int _dWar, _tWar, _dFlip, _tFlip, _dPeaceDec, _tPeaceDec, _dPeacePoor, _tPeacePoor, _dPeaceYes, _tPeaceYes, _dPeaceYesPoor, _tPeaceYesPoor;
         private static int _dWarDec, _tWarDec, _dWarPoor, _tWarPoor, _dWarYes, _tWarYes, _dWarYesPoor, _tWarYesPoor;
+        private static int _dWarSign, _tWarSign, _dUnsuit, _tUnsuit;   // oceny wojny ze zmienionym znakiem; glosy bez czlonu (gra: pokoj nieodpowiedni)
         private static double _dWarSum, _tWarSum;
         private static int _stumbles, _stumblesDay;
 
@@ -112,8 +127,11 @@ namespace CrashScribe
                 var mVote = AccessTools.Method(typeof(MakePeaceKingdomDecision), "DetermineSupport", new[] { typeof(Clan), typeof(DecisionOutcome) });
                 if (mVote != null)
                 {
-                    harmony.Patch(mVote, postfix: new HarmonyMethod(typeof(PovertyPeace), nameof(PeaceVotePostfix)));
+                    // Priority.Last: BK zaklada latki dopiero w OnGameStart (po nas) - przy rownej wadze bylibysmy przed jego naciskiem
+                    harmony.Patch(mVote, postfix: new HarmonyMethod(typeof(PovertyPeace), nameof(PeaceVotePostfix)) { priority = Priority.Last });
                     _voteOn = true; _mVote = mVote;
+                    try { if (AccessTools.Field(typeof(MakePeaceKingdomDecision), "_isProposedByOpponent") != null) _fOpp = AccessTools.FieldRefAccess<MakePeaceKingdomDecision, bool>("_isProposedByOpponent"); } catch { _fOpp = null; }
+                    if (_fOpp == null) miss.Add("gra MakePeaceKingdomDecision._isProposedByOpponent (wniosek wroga traktowany jak wlasny)");
                 }
                 else miss.Add("gra MakePeaceKingdomDecision.DetermineSupport");
 
@@ -144,7 +162,7 @@ namespace CrashScribe
                 if (!_rotOn) miss.Add("ROT IsWarForced (wojny fabularne nierozpoznawane - czlon dziala na wszystkie wojny)");
 
                 int ok = (_voteOn ? 1 : 0) + (_warOn ? 1 : 0);
-                Scribe.Line("Pokoj z biedy (E1): wpiete " + ok + "/2 - " + (_voteOn ? "glos rodu o pokoj (MakePeaceKingdomDecision.DetermineSupport: gdy bieda skarbca + bieda rodu > 1, za pokojem 100 x suma)" : "glos o pokoj NIE")
+                Scribe.Line("Pokoj z biedy (E1): wpiete " + ok + "/2 - " + (_voteOn ? "glos rodu o pokoj (MakePeaceKingdomDecision.DetermineSupport, Priority.Last - po nacisku BK: gdy bieda skarbca + bieda rodu > 1, za pokojem 100 x suma; bez czlonu, gdy gra uznaje pokoj za nieodpowiedni)" : "glos o pokoj NIE")
                             + "; " + (_warOn ? "ocena wypowiedzenia wojny BK (GetScoreOfDeclaringWar: -0.75 x bieda skarbca x max(|wynik|, 600); wynik pokoju BK bez zmian)" : "ocena wojny NIE")
                             + "; bieda skarbca: zapas <= " + RunwayEmpty + " dob = 1, >= " + RunwayFull + " dob = 0; bieda rodu: kiesa na wojne < " + HeadPoor + " = 1, >= " + HeadRich + " = 0"
                             + "; wojny fabularne ROT " + (_rotOn ? "bez zmian" : "NIEROZPOZNAWANE") + (miss.Count > 0 ? " | brak: " + string.Join("; ", miss.ToArray()) : "") + ".");
@@ -172,7 +190,8 @@ namespace CrashScribe
                 float term = -WarWeight * T * Math.Max(Math.Abs(s), WarFloor);
                 if (_warText == null) _warText = new TextObject("{=!}The royal treasury cannot pay for a war");
                 __result.Add(term, _warText);
-                lock (_lock) { _dWar++; _tWar++; _dWarSum += term; _tWarSum += term; }
+                bool sign = s > 0f && s + term <= 0f;   // czlon zmienil znak oceny (tylko slabe wojny: s < 450 x T)
+                lock (_lock) { _dWar++; _tWar++; _dWarSum += term; _tWarSum += term; if (sign) { _dWarSign++; _tWarSign++; } }
             }
             catch (Exception e) { Stumble("PovertyPeace.WarScorePostfix", e); }
         }
@@ -194,6 +213,13 @@ namespace CrashScribe
                 float w = T + ClanPoverty(clan.Gold, en);
                 if (w <= 1f) return;
                 if (Forced(k, e)) return;
+                // jak gra: pokoj nieodpowiedni (mloda wojna, wrog daleko w przodzie) i wniosek nie od wroga - bez czlonu
+                bool opp = _fOpp != null && _fOpp(__instance);
+                if (!opp && !Campaign.Current.Models.DiplomacyModel.IsPeaceSuitable(k, e))
+                {
+                    lock (_lock) { _dUnsuit++; _tUnsuit++; }
+                    return;
+                }
                 float x = VoteUnit * Math.Min(w, 2f);
                 float orig = __result;
                 if (o.ShouldPeaceBeDeclared)
@@ -319,11 +345,21 @@ namespace CrashScribe
             {
                 if (!On) return;
                 var list = Refresh();
-                string model = "?";
-                try { var dm = Campaign.Current.Models.DiplomacyModel; model = dm != null ? dm.GetType().FullName : "brak"; } catch { }
+                string model = "?", perm = "?";
+                bool bkModel = true;
+                try
+                {
+                    var dm = Campaign.Current.Models.DiplomacyModel;
+                    model = dm != null ? dm.GetType().FullName : "brak";
+                    // podklasa BK z innej przestrzeni nazw tez liczy przez latana metode bazowa
+                    bkModel = _mWar != null && dm != null && _mWar.DeclaringType.IsInstanceOfType(dm);
+                }
+                catch { }
+                try { var pm = Campaign.Current.Models.KingdomDecisionPermissionModel; perm = pm != null ? pm.GetType().FullName : "brak"; } catch { }
                 Scribe.Line("Pokoj z biedy (E1): start sesji - model dyplomacji gry " + model
-                            + (_warOn && model.IndexOf("BannerKings", StringComparison.Ordinal) < 0 ? " (NIE BK - wniosek o wojne vanilla liczy bez czlonu bieda, glosy BK z czlonem)" : "")
-                            + "; postfiksy glosu o pokoj: " + Owners(_mVote) + "; postfiksy oceny wojny BK: " + Owners(_mWar)
+                            + (_warOn && !bkModel ? " (NIE BK - wniosek o wojne vanilla liczy bez czlonu bieda, glosy BK z czlonem)" : "")
+                            + "; model zgod gry " + perm + " (Diplomacy = czlon wojny nie dziala w nacisku pokoju BK w trwajacej wojnie; BK = dziala)"
+                            + "; postfiksy glosu o pokoj (wlasciciel/waga, kolejnosc Harmony: wyzsza waga pierwsza): " + Owners(_mVote) + "; postfiksy oceny wojny BK: " + Owners(_mWar)
                             + "; krolestw " + list.Count + ", w biedzie (z samego skarbca, bez ubytku) " + list.Count(p => p.Value.T > 0f) + ".");
             }
             catch (Exception e) { Stumble("PovertyPeace.OnSessionLaunched", e); }
@@ -336,7 +372,7 @@ namespace CrashScribe
             {
                 var info = Harmony.GetPatchInfo(m);
                 if (info == null || info.Postfixes == null || info.Postfixes.Count == 0) return "brak";
-                return string.Join(", ", info.Postfixes.Select(x => x.owner).ToArray());
+                return string.Join(", ", info.Postfixes.Select(x => x.owner + "/" + x.priority).ToArray());
             }
             catch { return "?"; }
         }
@@ -380,7 +416,7 @@ namespace CrashScribe
                     }
                     Scribe.Line("Pokoj z biedy (E1): dzien " + Day() + " - decyzja o pokoju " + N(k) + " z " + N(e) + ": " + (yes ? "POKOJ" : "BEZ POKOJU")
                                 + " (popierajacych wybrana opcje " + (chosen != null && chosen.SupporterList != null ? chosen.SupporterList.Count : 0) + (isPlayerInvolved ? ", gracz bral udzial" : "") + "); "
-                                + N(k) + ": " + (s != null ? Desc(s) : "stan nieznany") + "; rodow odwroconych na pokoj przez biede " + fl
+                                + N(k) + ": " + (s != null ? Desc(s) : "stan nieznany") + "; rodow odwroconych na pokoj przez biede (przyblizone) " + fl
                                 + (fl > 0 ? " (" + string.Join(", ", names.ToArray()) + (fl > names.Count ? ", ..." : "") + ")" : "") + ".");
                     return;
                 }
@@ -423,12 +459,12 @@ namespace CrashScribe
                     string sumW;
                     lock (_lock)
                     {
-                        sumW = "dzis: ocen wojny z czlonem bieda " + _dWar + (_dWar > 0 ? " (sredni czlon " + ((int)(_dWarSum / _dWar)) + ")" : "")
-                               + ", rodow odwroconych na pokoj " + _dFlip
+                        sumW = "dzis: ocen wojny z czlonem bieda " + _dWar + (_dWar > 0 ? " (sredni czlon " + ((int)(_dWarSum / _dWar)) + ")" : "") + ", w tym zmienionych na ujemne " + _dWarSign
+                               + ", rodow odwroconych na pokoj (przyblizone) " + _dFlip + ", glosow bez czlonu (gra: pokoj nieodpowiedni) " + _dUnsuit
                                + ", decyzji o pokoju " + _dPeaceDec + " (pokoj " + _dPeaceYes + "; w krolestwach w biedzie " + _dPeacePoor + ", pokoj " + _dPeaceYesPoor + ")"
                                + ", decyzji o wojnie " + _dWarDec + " (wojna " + _dWarYes + "; w krolestwach w biedzie " + _dWarPoor + ", wojna " + _dWarYesPoor + ")"
-                               + "; od wczytania: ocen wojny z czlonem " + _tWar + (_tWar > 0 ? " (sredni " + ((int)(_tWarSum / _tWar)) + ")" : "")
-                               + ", rodow odwroconych " + _tFlip
+                               + "; od wczytania: ocen wojny z czlonem " + _tWar + (_tWar > 0 ? " (sredni " + ((int)(_tWarSum / _tWar)) + ")" : "") + ", zmienionych na ujemne " + _tWarSign
+                               + ", rodow odwroconych " + _tFlip + ", glosow bez czlonu (pokoj nieodpowiedni) " + _tUnsuit
                                + ", decyzji o pokoju " + _tPeaceDec + " (pokoj " + _tPeaceYes + "; w biedzie " + _tPeacePoor + ", pokoj " + _tPeaceYesPoor + ")"
                                + ", decyzji o wojnie " + _tWarDec + " (wojna " + _tWarYes + "; w biedzie " + _tWarPoor + ", wojna " + _tWarYesPoor + ")"
                                + (_stumblesDay > 0 ? "; potkniecia dzis " + _stumblesDay + " (razem " + _stumbles + ", pierwsze w raporcie; przy potknieciu wynik gry bez zmian)" : "");
@@ -443,6 +479,7 @@ namespace CrashScribe
             {
                 _dWar = _dFlip = _dPeaceDec = _dPeacePoor = _dPeaceYes = _dPeaceYesPoor = 0;
                 _dWarDec = _dWarPoor = _dWarYes = _dWarYesPoor = 0;
+                _dWarSign = _dUnsuit = 0;
                 _dWarSum = 0; _stumblesDay = 0;
             }
         }
@@ -455,6 +492,7 @@ namespace CrashScribe
                 _k.Clear(); _forced.Clear(); _flips.Clear();
                 _dWar = _tWar = _dFlip = _tFlip = _dPeaceDec = _tPeaceDec = _dPeacePoor = _tPeacePoor = _dPeaceYes = _tPeaceYes = _dPeaceYesPoor = _tPeaceYesPoor = 0;
                 _dWarDec = _tWarDec = _dWarPoor = _tWarPoor = _dWarYes = _tWarYes = _dWarYesPoor = _tWarYesPoor = 0;
+                _dWarSign = _tWarSign = _dUnsuit = _tUnsuit = 0;
                 _dWarSum = _tWarSum = 0; _stumblesDay = 0;
             }
         }

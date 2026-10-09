@@ -116,10 +116,12 @@
        against what it has been losing over the last week: enough for 28 days or less counts as an empty treasury, enough for
        a whole season (91 days) or more as no poverty at all, with a gradual scale in between. A lord counts as poor below
        5000 gold for each of his realm's wars, and as able to afford it from 50000 (Banner Kings' own "cannot afford a war").
-       With this on: (1) the realm's wish to declare or keep a war (Banner Kings' war score, which drives war proposals,
-       votes and its war support) is lowered in proportion to the empty treasury - the tooltip shows "The royal treasury cannot
-       pay for a war"; (2) in a vote on peace, a lord whose own poverty plus the treasury's adds up to more than one votes for
-       peace. Rich lords in a poor realm and poor lords in a rich one vote as before. Storyline wars of Realm of Thrones
+       With this on: (1) the realm's wish to declare a war (Banner Kings' war score, which drives war proposals and votes)
+       is lowered in proportion to the empty treasury - the tooltip shows "The royal treasury cannot pay for a war"; it mostly
+       stops wars that were barely worth it. Whether it also lowers Banner Kings' support for an ongoing war depends on which
+       mod supplies the kingdom decision rules (with Diplomacy's "at peace" rule it does not); (2) in a vote on peace, a lord
+       whose own poverty plus the treasury's adds up to more than one votes for peace, unless the game itself finds peace
+       unsuitable (a young war with the enemy far ahead). Rich lords in a poor realm and poor lords in a rich one vote as before. Storyline wars of Realm of Thrones
        are left alone, and so are Diplomacy's war exhaustion and reparations. The log shows "Pokoj z biedy (E1)" lines:
        the kingdoms in poverty once a day and every war or peace vote between kingdoms. Set PovertyPeace to false to switch it off. -->
   <PovertyPeace>true</PovertyPeace>
