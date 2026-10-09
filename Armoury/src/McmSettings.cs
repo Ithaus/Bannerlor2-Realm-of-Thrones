@@ -592,6 +592,14 @@ namespace Armoury
         [SettingPropertyGroup("Skills rule the gear")]
         public bool SkillsDecideEnabled { get; set; } = true;
 
+        [SettingPropertyBool("Hero Gear Requirements", HintText = "you and your companions cannot put on armour above your Athletics, nor take arrows above your Bow or bolts above your Crossbow - the same rule as for soldiers. On the inventory screen the card turns red, the game says 'You don't have enough Athletics skill to equip this item' and the description shows 'Requires: Athletics 175'. What you already wear stays on you. Horse barding is not checked. Off = only the game's own check of weapons, shields and horses")]
+        [SettingPropertyGroup("Skills rule the gear")]
+        public bool HeroGearRequirements { get; set; } = true;
+
+        [SettingPropertyBool("Hero Skill To Own Gear", HintText = "AI lords, companions and your grown family get the Athletics, Bow and Crossbow their own battle gear demands (armour, arrows, bolts) - raised, never lowered - so that nobody loses his armour to Hero Gear Requirements: on load, whenever the game dresses a hero from a template, and in a daily check. You are never raised. Applied by CrashScribe; turning it off does not lower skills already raised")]
+        [SettingPropertyGroup("Skills rule the gear")]
+        public bool HeroSkillToOwnGear { get; set; } = true;
+
         [SettingPropertyInteger("Weapon Skill Per Tier", 0, 140, "0", HintText = "Weapon Tier Law: a weapon or shield needs at least (tier - 1) x this in its skill, whatever the data says - a tier 6 blade wants 175, so a One Handed 30 bandit never 'qualifies' for it; 0 turns the law off. Applied at session start")]
         [SettingPropertyGroup("Skills rule the gear")]
         public int WeaponSkillPerTier { get; set; } = 35;
@@ -3059,6 +3067,8 @@ namespace Armoury
             s.TroopSelfMendPercentPerDay = TroopSelfMendPercentPerDay;
             s.TroopSkillAutoFit = TroopSkillAutoFit;
             s.SkillsDecideEnabled = SkillsDecideEnabled;
+            s.HeroGearRequirements = HeroGearRequirements;
+            s.HeroSkillToOwnGear = HeroSkillToOwnGear;
             s.WeaponSkillPerTier = WeaponSkillPerTier;
             s.ElephantQuarantineEnabled = ElephantQuarantineEnabled;
             s.HideoutPurgeEnabled = HideoutPurgeEnabled;
