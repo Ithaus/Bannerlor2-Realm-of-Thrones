@@ -172,12 +172,15 @@ namespace Armoury
         /// wiec jedyna droga do odkucia legendy to POSIADAC i rozebrac oryginal:
         /// wtedy wszystkie jej czesci zostaja odkryte i odblokowane.
         /// </summary>
-        public static void DoSmeltingPostfix(CraftingCampaignBehavior __instance, Hero currentCraftingHero, EquipmentElement equipmentElement)
+        public static void DoSmeltingPostfix(CraftingCampaignBehavior __instance, Hero currentCraftingHero, EquipmentElement equipmentElement, bool __runOriginal)
         {
             try
             {
                 var item = equipmentElement.Item;
                 if (item == null || item.WeaponDesign == null) return;
+                // 177-2 (krytyka pkt 5): Harmony wola postfiks takze, gdy prefiks zablokowal przetop (ValyrianBlades.SmeltPrefix) - bez przetopu nic
+                // nie odkrywamy; stali valyrianskiej nigdy (jej czesci ukryte zawsze - jedyna droga to przekucie w Qohorze)
+                if (!__runOriginal || ValyrianBlades.Is(item)) return;
                 if (!LegendaryLaw.IsLegend(item)) return;
                 var design = item.WeaponDesign;
                 var template = AccessTools.Field(typeof(WeaponDesign), "Template").GetValue(design) as CraftingTemplate;

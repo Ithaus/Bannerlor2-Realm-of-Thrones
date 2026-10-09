@@ -392,7 +392,7 @@ namespace Armoury
         }
         private Dictionary<string,int> _prisonerBaseline;
 
-        public ArmouryBehavior() { Instance = this; HistoricalPrices.Reset(); MaterialLaw.Reset(); WesterosClimate.Reset(); OutlawLaw.Reset(); PopulationLaw.Reset(); WorkshopLaw.Reset(); IronBank.Reset(); MarketGlut.Reset(); ArmsPricing.Reset(); StartKit.Reset(); AiGear.Reset(); Levy.Reset(); VolunteerKit.Reset(); LevyGold.Reset(); WearKeep.Reset(); UniqueSpoils.Reset(); BuildDiary.Reset(); BuildFunding.Reset(); KingdomLedger.Reset(); ColdStart.Reset(); MenPurse.Reset(); ArmyClothing.Reset(); AiWear.Reset(); SmithHours.Reset(); RecruitKit.Reset(); OreLedger.Reset(); GoodsLedger.Reset(); FreeSupplies.Reset(); VillageWoodlot.Reset(); SpoilsSeal.Reset(); MarketRoad.Reset(); MarketCarts.Reset(); VillageClogDiag.Reset(); CartTownExit.Reset(); MoneyLedger.Reset(); PeopleLedger.Reset(); CaravanBulk.Reset(); StartStock.Reset(); MineralOnce.Reset(); SoldierPay.Reset(); KingdomTreasury.Reset(); RecruitCost.Reset(); NightRest.ResetWorld(); WorldMeasure.Reset(); CirculationWindows.Reset(); ClanIncomeBook.Reset(); LosersFlee.Reset(); PrisonerLaw.Reset(); RecruitSources.Reset(); GarrisonCarts.Reset(); GarrisonArmory.Reset(); ArmsDrill.Reset(); CaravanAmmo.Reset(); ArmsLeaks.Reset(); SupplyDemand.ResetOrders(); MaterialOrders.Reset(); RawNoRot.Reset(); ArmsScrap.Reset(); MenUpgrade.Reset(); GarrisonKit.Reset(); QuartermasterLaw.Reset(); ShelfBuy.Reset(); Measure174b.Reset(); ShelfIndex.Reset(); Cost174.Reset(); Drill.Reset(); HorseCensus.Reset(); KingdomBalance.Reset(); NorthHomeEdge.Reset(); ArmoryFit.Reset(); }   // stan jednej kampanii nie przecieka do drugiej (audyt 04.10)
+        public ArmouryBehavior() { Instance = this; HistoricalPrices.Reset(); MaterialLaw.Reset(); WesterosClimate.Reset(); OutlawLaw.Reset(); PopulationLaw.Reset(); WorkshopLaw.Reset(); IronBank.Reset(); MarketGlut.Reset(); ArmsPricing.Reset(); StartKit.Reset(); AiGear.Reset(); Levy.Reset(); VolunteerKit.Reset(); LevyGold.Reset(); WearKeep.Reset(); UniqueSpoils.Reset(); BuildDiary.Reset(); BuildFunding.Reset(); KingdomLedger.Reset(); ColdStart.Reset(); MenPurse.Reset(); ArmyClothing.Reset(); AiWear.Reset(); SmithHours.Reset(); RecruitKit.Reset(); OreLedger.Reset(); GoodsLedger.Reset(); FreeSupplies.Reset(); VillageWoodlot.Reset(); SpoilsSeal.Reset(); MarketRoad.Reset(); MarketCarts.Reset(); VillageClogDiag.Reset(); CartTownExit.Reset(); MoneyLedger.Reset(); PeopleLedger.Reset(); CaravanBulk.Reset(); StartStock.Reset(); MineralOnce.Reset(); SoldierPay.Reset(); KingdomTreasury.Reset(); RecruitCost.Reset(); NightRest.ResetWorld(); WorldMeasure.Reset(); CirculationWindows.Reset(); ClanIncomeBook.Reset(); LosersFlee.Reset(); PrisonerLaw.Reset(); RecruitSources.Reset(); GarrisonCarts.Reset(); GarrisonArmory.Reset(); ArmsDrill.Reset(); CaravanAmmo.Reset(); ArmsLeaks.Reset(); SupplyDemand.ResetOrders(); MaterialOrders.Reset(); RawNoRot.Reset(); ArmsScrap.Reset(); MenUpgrade.Reset(); GarrisonKit.Reset(); QuartermasterLaw.Reset(); ShelfBuy.Reset(); Measure174b.Reset(); ShelfIndex.Reset(); Cost174.Reset(); Drill.Reset(); HorseCensus.Reset(); KingdomBalance.Reset(); NorthHomeEdge.Reset(); ArmoryFit.Reset(); CastleSteel.Reset(); ValyrianBlades.Reset(); QohorMasters.Reset(); }   // stan jednej kampanii nie przecieka do drugiej (audyt 04.10)
 
         public override void SyncData(IDataStore dataStore)
         {
@@ -406,6 +406,24 @@ namespace Armoury
                 if (dataStore.IsLoading) StartStock.Import(startStock);
             }
             catch (Exception e) { Log.Error("SyncData.StartStock", e); }
+            // unikaty ROT: kopie startowe zdjete raz na kampanie (wpis 62) - 177-2: we wlasnym try (krytyka 177 pkt 6: zgubiona flaga = druga
+            // czystka startowa; od 177 omija ona stal valyrianska, ale inne unikaty sprzedane na polke zdjelaby znowu)
+            try
+            {
+                string uniq = UniqueSpoils.Export();
+                SaveText.Sync(dataStore, "arm_uniq_init", ref uniq);
+                if (dataStore.IsLoading) UniqueSpoils.Import(uniq);
+            }
+            catch (Exception e) { Log.Error("SyncData.arm_uniq_init", e); }
+            // 177-2: stal valyrianska - znacznik (zapis z 177) i rejestr (ile sztuk kazdego wzoru jest w swiecie), kazdy klucz we wlasnym try;
+            // znacznik bez rejestru = bezpieczny domysl przy starcie sesji (nic nie zamieniane)
+            try { string vm = dataStore.IsSaving ? ValyrianBlades.ExportMark() : null; SaveText.Sync(dataStore, "arm_vs_mark", ref vm); if (dataStore.IsLoading) ValyrianBlades.ImportMark(vm); }
+            catch (Exception e) { Log.Error("SyncData.arm_vs_mark", e); }
+            try { string vr = dataStore.IsSaving ? ValyrianBlades.Export() : null; SaveText.Sync(dataStore, "arm_vs_registry", ref vr); if (dataStore.IsLoading) ValyrianBlades.Import(vr); }
+            catch (Exception e) { Log.Error("SyncData.arm_vs_registry", e); }
+            // 177-3: zlecenia u mistrzow Qohoru (klingi wejscia zyja tylko w tym napisie az do wydania) - wlasny try
+            try { string qo = dataStore.IsSaving ? QohorMasters.Export() : null; SaveText.Sync(dataStore, "arm_qohor_orders", ref qo); if (dataStore.IsLoading) QohorMasters.Import(qo); }
+            catch (Exception e) { Log.Error("SyncData.arm_qohor_orders", e); }
             try
             {
                 dataStore.SyncData("arm_condition", ref _condition);
@@ -474,9 +492,6 @@ namespace Armoury
                 string cold = ColdStart.Export();
                 SaveText.Sync(dataStore, "arm_coldstart", ref cold);
                 if (dataStore.IsLoading) ColdStart.Import(cold);
-                string uniq = UniqueSpoils.Export();
-                SaveText.Sync(dataStore, "arm_uniq_init", ref uniq);
-                if (dataStore.IsLoading) UniqueSpoils.Import(uniq);
                 string climate = WesterosClimate.Export();
                 SaveText.Sync(dataStore, "arm_climate", ref climate);
                 if (dataStore.IsLoading) WesterosClimate.Import(climate);
@@ -567,6 +582,8 @@ namespace Armoury
             CampaignEvents.DailyTickPartyEvent.AddNonSerializedListener(this, AiGear.OnDailyTickParty);
             CampaignEvents.DailyTickPartyEvent.AddNonSerializedListener(this, MenPurse.OnDailyTickParty);   // K1 (A4): doba postoju druzyny gracza w miescie - braki i lepsze za swoje
             CampaignEvents.DailyTickPartyEvent.AddNonSerializedListener(this, UniqueSpoils.OnDailyTickParty);
+            CampaignEvents.DailyTickPartyEvent.AddNonSerializedListener(this, QohorMasters.OnDailyTickParty);   // 177-3: lord AI w Qohorze - ta sama regula przekucia (gotowe odsyla QohorMasters.Daily)
+            CampaignEvents.SettlementEntered.AddNonSerializedListener(this, QohorMasters.OnEntered);           // 177-3: "Your Valyrian steel is ready" przy wejsciu do Qohoru
             CampaignEvents.DailyTickPartyEvent.AddNonSerializedListener(this, ArmyClothing.OnDailyTickParty);   // 150: zuzycie odziezy w partiach rodow
             // musztra: sprzet wyrzucony na ekranach z bialej listy -> zapas cwiczebny; zlom z cwiczen do kowali przy wejsciu do miasta; godziny ruchu partii;
             // zlom czekajacy w rozbitej partii przepada (licznik)
@@ -598,6 +615,7 @@ namespace Armoury
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, BattleChronicle.OnMapEventEnded);
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, AiWear.OnMapEventEnded);   // wpis 85
             CampaignEvents.VillageLooted.AddNonSerializedListener(this, OutlawLaw.OnVillageLooted);
+            CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, UniqueSpoils.OnPartyDestroyed);   // 177-2: unikaty i stal valyrianska z taboru znikajacej partii - zwyciezcy, wlascicielowi albo na polke (ksiega towarow liczy tylko towary - kolejnosc bez znaczenia)
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, GoodsLedger.OnPartyDestroyed);  // paczka 146: towar, ktory przepada z partia (tylko log)
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, MaterialOrders.OnPartyDestroyed);   // 174.2: kontrakt przepada z rozbita karawana (ladunek - jak w grze)
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, OutlawLaw.OnPartyDestroyed);
@@ -635,6 +653,8 @@ namespace Armoury
             CampaignEvents.OnPrisonerTakenEvent.AddNonSerializedListener(this, OnPrisonerTaken);
             CampaignEvents.HeroPrisonerTaken.AddNonSerializedListener(this, UniqueSpoils.OnPrisonerTaken);
             CampaignEvents.HeroKilledEvent.AddNonSerializedListener(this, UniqueSpoils.OnHeroKilled);
+            CampaignEvents.OnBeforePlayerCharacterChangedEvent.AddNonSerializedListener(this, UniqueSpoils.OnBeforePlayerChanged);   // recenzja 177: stal valyrianska z zestawu ukrycia gracza (gra go nie przekazuje) ...
+            CampaignEvents.OnPlayerCharacterChangedEvent.AddNonSerializedListener(this, UniqueSpoils.OnPlayerChanged);               // ... trafia do taboru nastepcy
             // DIAGNOSTYKA (Jeff 29.08: "awans wycina sprzet z magazynu?") -
             // ani DTE, ani my nie sluchamy awansow, wiec logujemy sume
             // magazynu przy kazdym awansie: jak suma spada miedzy wpisami,
@@ -834,7 +854,9 @@ namespace Armoury
                         }
                         // legendy zalegajace z dawnych lupow w NASZYM magazynie
                         // (screen Jeffa: [STORES] Lady Forlorn) - precz
-                        if (LegendaryLaw.IsLegend(it))
+                        // 177-2 (krytyka 177 pkt 1): NIE unikaty ROT i stal valyrianska - ta czystka idzie przy KAZDYM menu, wiec klinga zdjeta
+                        // do taboru (np. Lod niesiony do Qohoru), zdobyta (Take) albo odziedziczona znikala w nicosc; kopie lapie spis ValyrianBlades
+                        if (LegendaryLaw.IsLegend(it) && !ValyrianBlades.Is(it) && !UniqueSpoils.Is(it))
                         {
                             roster.AddToCounts(el.EquipmentElement, -el.Amount);
                             cut += el.Amount;
@@ -1094,10 +1116,11 @@ namespace Armoury
             try { CleanseDragonStables(true); } catch (Exception e) { Log.Error("CleanseDragonStables", e); }
             try { CleanseTrashInBags(); } catch (Exception e) { Log.Error("CleanseTrashInBags", e); }
             try { QualityRich.Enrich(); } catch (Exception e) { Log.Error("QualityRich.Enrich", e); }
-            try { ValyrianSteel.Rename(); } catch (Exception e) { Log.Error("ValyrianSteel.Rename", e); }
+            try { CastleSteel.Rename(); } catch (Exception e) { Log.Error("CastleSteel.Rename", e); }   // 177-1: Iron6 = "Castle-forged Steel", perk Steel Maker 3, "Thamaskene" w nazwach
             try { Restitution0831(); } catch (Exception e) { Log.Error("Restitution0831", e); }
             try { IronBank.AddMenus(starter); } catch (Exception e) { Log.Error("IronBank.AddMenus", e); }
             try { GarrisonKit.AddMenus(starter); } catch (Exception e) { Log.Error("GarrisonKit.AddMenus", e); }   // K1 (B6): "Hand kit to the garrison"
+            try { QohorMasters.AddMenus(starter); } catch (Exception e) { Log.Error("QohorMasters.AddMenus", e); }   // 177-3: mistrzowie Qohoru - przekuwanie stali valyrianskiej
             try { SmithMenu.Add(starter); Log.Info("Menu kowala dodane."); }
             catch (Exception e) { Log.Error("OnSessionLaunched", e); }
             try { CleanseAmmo(); } catch (Exception e) { Log.Error("CleanseAmmo", e); }
@@ -1344,6 +1367,8 @@ namespace Armoury
             try { GoodsLedger.Daily(); } catch (Exception e) { Log.Error("GoodsLedger.Daily", e); }   // paczka 146: ksiega towarow (tylko log) - zaraz po ksiedze rudy (kontrola tymi samymi liczbami)
             try { FreeSupplies.Daily(); } catch (Exception e) { Log.Error("FreeSupplies.Daily", e); }   // paczka 125: dosypka RBL zablokowana / przepuszczona (tylko log)
             try { RawNoRot.Daily(); } catch (Exception e) { Log.Error("RawNoRot.Daily", e); }   // 174.3: linia "BK gnicie surowcow (174.3)" (tylko log)
+            try { CastleSteel.Daily(); } catch (Exception e) { Log.Error("CastleSteel.Daily", e); }   // 177-1: linia "Wedrowcy BK" - sztaby i wegiel zdjete z ladunku wedrowcow
+            try { QohorMasters.Daily(); } catch (Exception e) { Log.Error("QohorMasters.Daily", e); }   // 177-3: dzien pracy mistrzow Qohoru (rece kowali, wegiel z polki)
             try { VillageWoodlot.Daily(); } catch (Exception e) { Log.Error("VillageWoodlot.Daily", e); }   // paczka 126: las wsi - drewno kazdej wsi bez drwali (tylko log)
             try { SpoilsSeal.Daily(); } catch (Exception e) { Log.Error("SpoilsSeal.Daily", e); }   // paczka 128: Spoils of War bez sprzedazy automatycznej i bez zlota z niczego (tylko log)
             try { SpoilsCompany.Daily(); } catch (Exception e) { Log.Error("SpoilsCompany.Daily", e); }   // klan najemnikow Spoils tylko z prawdziwych zolnierzy (tylko log)

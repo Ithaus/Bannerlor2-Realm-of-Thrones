@@ -670,15 +670,15 @@ namespace Armoury
 
         /// <summary>Co wraca z przetopu - tylko metal, i to nie caly.
         /// Jeff 30.08: przetop zwraca NAJWYZEJ POLOWE receptury (zadnych 90%
-        /// przy wysokim skillu), a stal valyrianska (Iron6) dodatkowo polowe
-        /// z polowy - "pancerz koni dawal 18/18/18, ma dawac 9/9/4".</summary>
+        /// przy wysokim skillu). 177-1: Iron6 to stal zamkowa - wraca jak kazda
+        /// inna stal (dawne dodatkowe "/2" dla "stali valyrianskiej" zdjete).</summary>
         internal static List<Part> SmeltYield(Recipe r, float share)
         {
             var list = new List<Part>();
             try
             {
                 share = MathF.Min(share, 0.5f);
-                var valyrian = MaterialItem(CraftingMaterials.Iron6);
+                var castle = MaterialItem(CraftingMaterials.Iron6);
                 foreach (var p in r.Parts)
                 {
                     if (p.Item == null) continue;
@@ -687,9 +687,8 @@ namespace Armoury
                         p.Item != MaterialItem(CraftingMaterials.Iron3) &&
                         p.Item != MaterialItem(CraftingMaterials.Iron4) &&
                         p.Item != MaterialItem(CraftingMaterials.Iron5) &&
-                        p.Item != valyrian) continue;
+                        p.Item != castle) continue;
                     int amount = MathF.Max(1, (int)(p.Count * share));
-                    if (p.Item == valyrian) amount = Math.Max(1, amount / 2);
                     list.Add(new Part(p.Item, amount));
                 }
             }

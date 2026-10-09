@@ -120,7 +120,10 @@ namespace Armoury
                 case 1: case 2: return CraftingMaterials.Iron2;
                 case 3: return CraftingMaterials.Iron3;
                 case 4: return CraftingMaterials.Iron4;
-                default: return CraftingMaterials.Iron5;     // t6 w ROT to nie stal valyrianska
+                case 5: return CraftingMaterials.Iron5;
+                // 177-1 (Jeff 09.10, 24a): t6 = stal zamkowa (Iron6), jak w kuzni gracza (Recipes.IronForTier) - jedna regula tieru 6 dla warsztatow,
+                // napraw i wyceny; wylaczone Tier6CastleSteel - stara regula (t6 ze stali szlachetnej). Cache CostOf - zmiana dopiero po wczytaniu.
+                default: return Settings.Current != null && Settings.Current.Tier6CastleSteel ? CraftingMaterials.Iron6 : CraftingMaterials.Iron5;
             }
         }
 

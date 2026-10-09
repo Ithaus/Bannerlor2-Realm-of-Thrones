@@ -159,7 +159,7 @@ namespace Armoury
         // a diagnostyka blokady (40 wpisow) wyczerpywala sie na cale uruchomienie gry
         // Konstruktor ArmouryBehavior (OnGameStart) biegnie PRZED definicjami przedmiotow tej kampanii (Campaign: OnGameStart ->
         // InitializeDefaultCampaignObjects -> DefaultItems -> BKItems.Initialize), wiec czyszczenie definicji niczego nie gubi.
-        internal static void Reset() { _target.Clear(); _orig.Clear(); _origWeight.Clear(); _blockedLogged.Clear(); _defValue.Clear(); _defLeft.Clear(); _defUsed.Clear(); _errDefine = false; _stDefine = 0; _shelfWorth.Clear(); _shelfByValue.Clear(); _mixed.Clear(); _errShelf = false; _stShelf = 0; _applied = false; RawPrice.Reset(); }   // RawPrice: cena surowcow liczy na tym przeliczeniu - czysci sie razem z nim; wagi polki (paczka 121) - nowe przedmioty kampanii
+        internal static void Reset() { _target.Clear(); _orig.Clear(); _origWeight.Clear(); _blockedLogged.Clear(); _defValue.Clear(); _defLeft.Clear(); _defUsed.Clear(); _errDefine = false; _stDefine = 0; _shelfWorth.Clear(); _shelfByValue.Clear(); _mixed.Clear(); _vsShelf = 0; _errShelf = false; _stShelf = 0; _applied = false; RawPrice.Reset(); }   // RawPrice: cena surowcow liczy na tym przeliczeniu - czysci sie razem z nim; wagi polki (paczka 121) - nowe przedmioty kampanii
 
         // ------------------------------------------------------------ wartosc z definicji przedmiotu (paczka "towary w nowej monecie")
         // Test 06.10 14:08 (log, linia "surowce kuzni"): chleb 0 -> 6, jajka 0 -> 8, miod 0 -> 14, owoce 0 -> 2..10, garum 0 -> 20,
@@ -231,7 +231,7 @@ namespace Armoury
                 case CraftingMaterials.Iron3: return s.HistIronPerKg;
                 case CraftingMaterials.Iron4: return s.HistSteelPerKg;
                 case CraftingMaterials.Iron5: return s.HistFineSteelPerKg;
-                default: return s.HistValyrianPerKg;
+                default: return s.HistCastleSteelPerKg;   // 177-1: stal zamkowa (dawniej HistValyrianPerKg 200 - "skarb")
             }
         }
 
@@ -466,7 +466,9 @@ namespace Armoury
                     if (def != kv.Value) { _defUsed.Add(cat); defLog.Add(kv.Key.StringId + " " + kv.Value + " -> " + def); }
                     int old = fromDef ? def : kv.Value;
                     if (old <= 0) { zeroLog.Add(kv.Key.StringId + " (" + cat.StringId + ")"); continue; }
-                    double l; sumLog.TryGetValue(cat, out l); sumLog[cat] = l + Math.Log((double)old / kv.Key.Value * BulkScale(kv.Key));   // za kg - ladunek to tyle samo towaru co 10 starych sztuk
+                    // 177-1 (krytyka pkt 8): sztaba 6 liczy sie do przelicznika kategorii po dawnej cenie (100 d) - tania stal zamkowa (6 d) nie
+                    // przesuwa popytu miast na cala kategorie "iron" (ruda i sztaby; bez tego /23.5 -> ok. /35); CastleSteel.RatioValue = Value dla reszty
+                    double l; sumLog.TryGetValue(cat, out l); sumLog[cat] = l + Math.Log((double)old / Math.Max(1, CastleSteel.RatioValue(kv.Key)) * BulkScale(kv.Key));   // za kg - ladunek to tyle samo towaru co 10 starych sztuk
                     int k; cnt.TryGetValue(cat, out k); cnt[cat] = k + 1;
                 }
                 var cats = new List<string>();
@@ -495,6 +497,40 @@ namespace Armoury
                                                                                         + (beastOutLog.Count > 0 ? string.Join(", ", beastOutLog.ToArray()) : "zadne")
                                                                                       : "po wartosci gry (HistLivestockPrices wylaczone)") + ".");
                 MixedShelf(s, fromDef);   // paczka 121: wagi sztuk na polce w kategoriach mieszanych - po przeliczniku kategorii, ten sam skladnik przedmiotu
+                // 177-2 (krytyka pkt 22): STAL VALYRIANSKA - SKONCZONY ZASOB, WLASNA WYCENA (nie z kosztu stali zamkowej: tak wychodzilo 742-1 377 d,
+                // czyli kazdy lord i gracz kupowal klinge z polki za 1-2 nagrody turniejowe - wbrew kanonowi: Tywin trzy razy nie kupil). Wartosc =
+                // miary x HistValyrianPerMeasure (60 tys. = mediana kiesy glowy rodu po 2 miesiacach testu 120 dob, 58 894 [P]: typowy lord oddalby
+                // cala kiese, a zasada zakupu z polki - 2 x cena w kiesie - przepuszcza tylko najbogatszych). PO przeliczniku popytu (krok 3) i
+                // wagach polki: przelicznik kategorii broni liczy klinge jak przed 177 (koszt x prestiz), a na polce klinga wazy swoj koszt wykonania
+                // (_shelfWorth) - jedna klinga za 60 tys. nie zalewa podazy calej kategorii w miescie (InStoreValue)
+                if (s.HistValyrianPerMeasure > 0f)
+                {
+                    var vs = new List<string>();
+                    foreach (var id in ValyrianBlades.AllIds)
+                    {
+                        var it = ValyrianBlades.Item(id);
+                        if (it == null) continue;
+                        int making = Math.Max(1, it.Value);
+                        int m = Math.Max(1, ValyrianBlades.Measures(it));
+                        set(it, m * s.HistValyrianPerMeasure);
+                        _target[it] = it.Value;
+                        if (!_shelfWorth.ContainsKey(it)) _vsShelf++;
+                        _shelfWorth[it] = making;
+                        if (vs.Count < 8) vs.Add(id + " " + making + " -> " + it.Value + " (miar " + m + ")");
+                    }
+                    int rebuilt = 0;
+                    foreach (var t in Town.AllTowns)
+                    {
+                        var r = t != null && t.Owner != null ? t.Owner.ItemRoster : null;
+                        if (r == null || t.MarketData == null) continue;
+                        bool has = false;
+                        for (int i = 0; i < r.Count && !has; i++) has = r.GetElementCopyAtIndex(i).Amount > 0 && ValyrianBlades.Is(r.GetElementCopyAtIndex(i).EquipmentElement.Item);
+                        if (!has) continue;
+                        try { t.MarketData.UpdateStores(); rebuilt++; } catch { }
+                    }
+                    Log.Info("HistoricalPrices: stal valyrianska - " + _vsShelf + " wzorow wyceniona jako skonczony zasob (" + s.HistValyrianPerMeasure.ToString("0", CultureInfo.InvariantCulture)
+                             + " d za miare; na polce wazy koszt wykonania): " + string.Join(", ", vs.ToArray()) + (rebuilt > 0 ? "; dane rynku przeliczone w " + rebuilt + " miastach z klinga na polce" : "") + ".");
+                }
             }
             catch (Exception e) { Log.Error("HistoricalPrices.Apply", e); }
         }
@@ -544,13 +580,14 @@ namespace Armoury
 
         /// <summary>Kategorie mieszane tej sesji (linia dnia "Ceny surowcow"); Active = wagi czynne.</summary>
         internal static List<MixedCat> MixedCategories() { return new List<MixedCat>(_mixed); }
-        internal static bool MixedActive { get { return _shelfWorth.Count > 0; } }
+        internal static bool MixedActive { get { return _shelfWorth.Count > _vsShelf; } }   // 177-2: wpisy stali valyrianskiej to nie kategorie mieszane
+        private static int _vsShelf;   // 177-2: ile wpisow _shelfWorth to stal valyrianska (waga na polce = koszt wykonania, nie wartosc zasobu)
 
         private static void MixedShelf(Settings s, bool fromDef)
         {
             try
             {
-                _shelfWorth.Clear(); _shelfByValue.Clear(); _mixed.Clear();
+                _shelfWorth.Clear(); _shelfByValue.Clear(); _mixed.Clear(); _vsShelf = 0;
                 // 1. przelicznik kazdego przeliczonego towaru handlowego - ten sam skladnik, z ktorego Apply liczy przelicznik kategorii
                 var own = new Dictionary<ItemObject, double>(); var sum = new Dictionary<ItemCategory, double>(); var cnt = new Dictionary<ItemCategory, int>();
                 foreach (var kv in _orig)
@@ -561,7 +598,9 @@ namespace Armoury
                     if (old <= 0) continue;
                     double l = Math.Log((double)old / it.Value * BulkScale(it));
                     own[it] = l;
-                    double a; sum.TryGetValue(cat, out a); sum[cat] = a + l;
+                    // 177-1: srednia kategorii (moneta popytu) z tym samym skladnikiem co przelicznik w Apply - sztaba 6 po dawnej cenie; waga sztuki (own) z prawdziwej
+                    double lr = CastleSteel.RatioValue(it) != it.Value ? Math.Log((double)old / Math.Max(1, CastleSteel.RatioValue(it)) * BulkScale(it)) : l;
+                    double a; sum.TryGetValue(cat, out a); sum[cat] = a + lr;
                     int k; cnt.TryGetValue(cat, out k); cnt[cat] = k + 1;
                 }
                 // 2. moneta popytu kategorii (logarytm): ten przelicznik, ktorym DemandPostfix naprawde dzieli popyt (_catRatio); kategorii

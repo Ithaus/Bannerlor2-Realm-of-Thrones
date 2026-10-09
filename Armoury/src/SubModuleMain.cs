@@ -56,7 +56,7 @@ namespace Armoury
                 FairXpPatch.ApplyAll(_harmony);
                 DonationXpLaw.ApplyAll(_harmony);   // audyt 13 Z1 (Jeff 09.10): oddany sprzet nie uczy - XP perkow Giving Hands / Paid in Promise = 0, migawka handlu BK przy kazdym otwarciu handlu
                 ChargeTemperPatch.ApplyAll(_harmony);
-                ValyrianSteel.ApplyAll(_harmony);
+                CastleSteel.ApplyAll(_harmony);   // 177-1: wedrowcy BK bez sztab i wegla z niczego (dawny ValyrianSteel.DearRefine zdjety - stal zamkowa to zwykly stopien)
                 SmithAudit.ApplyAll(_harmony);
                 QuartermasterLaw.ApplyAll(_harmony);
                 try { GarrisonKit.ApplyAll(_harmony); } catch (Exception e) { Log.Error("GarrisonKit.ApplyAll", e); }   // K1 (A10): zaloga w bitwie gracza walczy sprzetem ze swojej zbrojowni (latka DTE)
@@ -133,6 +133,8 @@ namespace Armoury
                 SmeltTab.ApplyAll(_harmony);
                 DressCode.ApplyAll(_harmony);
                 UniqueLaw.ApplyAll(_harmony);        // unikaty imienne: nabor do magazynow DTE zamienia kopie na zamienniki
+                try { UniqueSpoils.ApplyAll(_harmony); } catch (Exception e) { Log.Error("UniqueSpoils.ApplyAll", e); }     // 177-2: przebranie bohatera przez gre zostawia unikaty i stal valyrianska w rekach
+                try { ValyrianBlades.ApplyAll(_harmony); } catch (Exception e) { Log.Error("ValyrianBlades.ApplyAll", e); } // 177-2: przetop VS zablokowany, karawana DTE i nagroda turniejowa bez legend z niczego
                 MountMeshGuard.ApplyAll(_harmony);   // uprzaz z cudzej rodziny = natywny crash w AddMountMesh
                 CaptiveRags.ApplyAll(_harmony);
                 SightRange.ApplyAll(_harmony);

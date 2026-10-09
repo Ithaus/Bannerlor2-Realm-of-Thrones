@@ -61,7 +61,7 @@ namespace Armoury
         // robimy to samo, ze slownikiem odswiezanym przy chybieniu.
         private static Dictionary<MBGUID, MobileParty> _byId;
 
-        private static MobileParty FindParty(MBGUID id)
+        internal static MobileParty FindParty(MBGUID id)   // 177-2: takze ValyrianBlades (wodz partii, w ktorej magazynie DTE lezy klinga)
         {
             try
             {
