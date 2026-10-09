@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using HarmonyLib;
+using Helpers;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Map;
@@ -38,11 +39,14 @@ namespace CrashScribe
     ///     zakonczylby bitwe w polowie przez FinalizeEvent).
     ///  2. BRAMA - prefiks EncounterManager.StartSettlementEncounter: partia Innych z rozkazem oblezenia / szturmu / rabunku TEJ
     ///     osady, zamknietej - spotkanie nie zachodzi (ani nowe oblezenie, ani dolaczenie do obozu, ani szturm, ani rabunek),
-    ///     banda dostaje patrol przy siedzibie klanu (jak TurnBack z T2; brak siedziby - postoj). Lapie rozkazy spoza AI
+    ///     banda dostaje patrol przy siedzibie klanu (jak TurnBack z T2; brak siedziby albo siedziba to ten cel - patrol przy
+    ///     najblizszej osadzie Innych / za Murem, postoj dopiero na koniec). Lapie rozkazy spoza AI
     ///     (z zapisu, z innych modow). Gdy banda juz oblegala (szturm z obozu) - oblezenie przerwane (gra zwija oboz).
     ///  3. TRWAJACE OBLEZENIE - NightKingCall.TurnBack (raz na dobe i w 1. godzinie po wczytaniu): banda oblegajaca zamkniety cel,
     ///     bez bitwy - ten sam patrol; gra sama zwija jej oboz (SiegeEvent.Tick -> BesiegerCamp.CheckBesiegerPartiesAndMakeThemLeave:
     ///     partia z rozkazem innym niz oblezenie odchodzi, bez ostatniej partii oblezenie sie konczy) - bez strat w ludziach.
+    ///     Przeglad obejmuje bandy klanu ROTclan_126 i kazda inna partie Innych z obozem oblezniczym (MobileParty.All);
+    ///     oblezenie w bitwie - powtorka co godzine, az bitwa sie skonczy (recenzja T2c).
     /// Wylacznik: NightKingCalendarSiegeGate (CrashScribe.settings.xml), dziala tylko przy NightKingCalendarEnabled.
     /// Oblezen innych frakcji (Nocna Straz, Wolni Ludzie, krolestwa) nie dotyka. Bez zapisu w grze.
     /// </summary>
@@ -50,13 +54,21 @@ namespace CrashScribe
     {
         private const string OthersClanId = "ROTclan_126";   // ROT ROTClans.WhiteWalkers => GetClanByID("ROTclan_126")
 
-        // dzis (od ostatniej linii dobowej)
+        // dzis (od ostatniej linii dobowej): surowe liczby usuniec / zatrzyman (rozkaz AI wraca co ok. 6 h na bande)
         private static int _aiSieges, _aiRaids, _gateSieges, _gateRaids, _broken;
-        // od wczytania (sesja kampanii)
+        // dzis: rozne pary banda-osada (recenzja T2c: "oblezen zablokowanych N" = tyle oblezen, a nie tyle myslen AI)
+        private static readonly HashSet<string> _siegePairs = new HashSet<string>();
+        private static readonly HashSet<string> _raidPairs = new HashSet<string>();
+        // od wczytania (sesja kampanii): suma dziennych par
         private static int _totBlocked, _totRaids, _totBroken;
         private static int _stumbles, _stumblesDay;
         // linia logu raz na dobe na pare banda-osada-rodzaj (rozkaz AI wraca co ok. 6 h)
         private static readonly HashSet<string> _told = new HashSet<string>();
+
+        private static string PairKey(MobileParty mp, Settlement s)
+        {
+            try { return mp.StringId + "|" + s.StringId; } catch { return "?|?"; }
+        }
 
         /// <summary>Blokada czynna: kalendarz T2 i jej wlasny wylacznik.</summary>
         internal static bool Active { get { return Config.NightKingCalendarEnabled && Config.NightKingCalendarSiegeGate; } }
@@ -147,20 +159,46 @@ namespace CrashScribe
             return p as Settlement;
         }
 
-        /// <summary>Banda Innych odchodzi spod zamknietego celu: patrol przy siedzibie klanu (jak TurnBack z T2),
-        /// a gdy siedziby brak albo to ta sama osada - postoj (AI wybierze cos innego, bez oblezenia). Zwraca opis do logu.</summary>
+        /// <summary>Osada "u bram" celu: sam cel albo jego wioska (patrol tam = stanie pod zamknietym celem).</summary>
+        private static bool AtGate(Settlement s, Settlement from)
+        {
+            return from != null && s != null && (s == from || CalendarTarget(s) == from);
+        }
+
+        /// <summary>Banda Innych odchodzi spod zamknietego celu: patrol przy siedzibie klanu (jak TurnBack z T2).
+        /// Recenzja T2c: gdy siedziby brak albo siedziba to ten cel (lub jego wioska) - patrol przy najblizszej (droga) osadzie
+        /// Innych, a gdy jej nie ma - przy najblizszej osadzie za Murem (ROT IsBeyondTheWall, jak wybor celu ROT), innej niz cel.
+        /// Postoj dopiero, gdy i takiej nie ma (sam postoj pod zamknietym celem trwalby bez konca - AI nie da nowego rozkazu,
+        /// bo oblezenie tego celu usuwamy z listy). Zwraca opis do logu.</summary>
         internal static string Redirect(MobileParty mp, Settlement from)
         {
             Settlement home = null;
             try { var c = mp.ActualClan; if (c != null) home = c.HomeSettlement; } catch { }
             if (home == null) { try { home = mp.HomeSettlement; } catch { } }
-            if (home != null && home != from)
+            if (home != null && !AtGate(home, from))
             {
                 SetPartyAiAction.GetActionForPatrollingAroundSettlement(mp, home, MobileParty.NavigationType.Default, false, false);
                 return "patrol przy " + home.Name;
             }
+            string why = home == null ? "brak siedziby" : "siedziba to ten cel";
+            Settlement alt = null; bool altOthers = false;
+            try
+            {
+                alt = SettlementHelper.FindNearestSettlementToMobileParty(mp, MobileParty.NavigationType.Default,
+                          s => s != null && !s.IsHideout && !AtGate(s, from) && NightKingCall.IsOthers(s.OwnerClan));
+                altOthers = alt != null;
+                if (alt == null)
+                    alt = SettlementHelper.FindNearestSettlementToMobileParty(mp, MobileParty.NavigationType.Default,
+                              s => s != null && !s.IsHideout && !AtGate(s, from) && NightKingCall.BeyondWall(s));
+            }
+            catch (Exception e) { alt = null; Stumble("NightKingGate.Redirect", e); }
+            if (alt != null)
+            {
+                SetPartyAiAction.GetActionForPatrollingAroundSettlement(mp, alt, MobileParty.NavigationType.Default, false, false);
+                return "patrol przy " + alt.Name + " (" + why + "; " + (altOthers ? "najblizsza osada Innych" : "najblizsza osada za Murem") + ")";
+            }
             mp.SetMoveModeHold();
-            return "postoj (brak siedziby do patrolu)";
+            return "postoj (" + why + ", brak osady Innych i osady za Murem do patrolu)";
         }
 
         internal static void CountBroken() { _broken++; _totBroken++; }
@@ -199,7 +237,7 @@ namespace CrashScribe
                     if (!GateClosed(s, day)) continue;
                     list.RemoveAt(i);
                     bool raid = b == AiBehavior.RaidSettlement;
-                    if (raid) { _aiRaids++; _totRaids++; } else { _aiSieges++; _totBlocked++; }
+                    if (raid) { _aiRaids++; _raidPairs.Add(PairKey(__0, s)); } else { _aiSieges++; _siegePairs.Add(PairKey(__0, s)); }
                     Tell(__0, s, raid ? "rabunek" : "oblezenie", "ai", day, "rozkaz AI zablokowany");
                 }
             }
@@ -231,12 +269,12 @@ namespace CrashScribe
                 }
                 else if (raid && !siege && !assault)
                 {
-                    _gateRaids++; _totRaids++;
+                    _gateRaids++; _raidPairs.Add(PairKey(mp, s));
                     Tell(mp, s, "rabunek", "brama", day, "zablokowany u bram - " + where);
                 }
                 else
                 {
-                    _gateSieges++; _totBlocked++;
+                    _gateSieges++; _siegePairs.Add(PairKey(mp, s));
                     Tell(mp, s, "oblezenie", "brama", day, "zablokowane u bram - " + where);
                 }
                 return false;
@@ -244,21 +282,30 @@ namespace CrashScribe
             catch (Exception e) { Stumble("NightKingGate.Encounter", e); return true; }
         }
 
-        /// <summary>Raz na dobe (NightKingCall.Daily): "Kalendarz Innych: oblezen zablokowanych N, przerwanych M (...)".</summary>
-        internal static string DailyLine()
+        /// <summary>Raz na dobe (NightKingCall.Daily): "Kalendarz Innych: oblezen zablokowanych N, przerwanych M (...)".
+        /// N = rozne pary banda-osada dzis (jedna banda pod jednym celem = 1, choc ROT ponawia rozkaz co ok. 6 h);
+        /// surowa liczba usunietych rozkazow AI osobno. Zawsze zeruje liczniki dnia i _told (recenzja T2c: wolane takze
+        /// przy wczesnym wyjsciu z Daily). <paramref name="onlyIfAny"/> = true: null, gdy nic dzis nie zliczono.</summary>
+        internal static string DailyLine(bool onlyIfAny)
         {
-            string line;
+            string line = null;
             try
             {
-                line = "Kalendarz Innych: oblezen zablokowanych " + (_aiSieges + _gateSieges) + ", przerwanych " + _broken
-                       + " (dzis: rozkazy AI na oblezenie " + _aiSieges + ", u bram " + _gateSieges
-                       + "; rabunkow zablokowanych " + (_aiRaids + _gateRaids)
-                       + "; od wczytania: oblezen zablokowanych " + _totBlocked + ", przerwanych " + _totBroken + ", rabunkow " + _totRaids + ")"
-                       + (_stumblesDay > 0 ? "; potkniecia dzis " + _stumblesDay + " (razem " + _stumbles + ", pierwsze w raporcie)" : "")
-                       + ".";
+                int sieges = _siegePairs.Count, raids = _raidPairs.Count;
+                _totBlocked += sieges; _totRaids += raids;
+                bool any = sieges + raids + _broken + _aiSieges + _gateSieges + _aiRaids + _gateRaids + _stumblesDay > 0;
+                if (!onlyIfAny || any)
+                    line = "Kalendarz Innych: oblezen zablokowanych " + sieges + ", przerwanych " + _broken
+                           + " (dzis: zablokowane = rozne pary banda-osada; rozkazow AI na oblezenie usunietych " + _aiSieges
+                           + " - ROT ponawia je co ok. 6 h, zatrzyman u bram " + _gateSieges
+                           + "; rabunkow zablokowanych " + raids
+                           + "; od wczytania: oblezen zablokowanych " + _totBlocked + ", przerwanych " + _totBroken + ", rabunkow " + _totRaids + ")"
+                           + (_stumblesDay > 0 ? "; potkniecia dzis " + _stumblesDay + " (razem " + _stumbles + ", pierwsze w raporcie)" : "")
+                           + ".";
             }
             catch { line = "Kalendarz Innych: oblezen zablokowanych ?, przerwanych ? (blad linii)."; }
             _aiSieges = _aiRaids = _gateSieges = _gateRaids = _broken = 0;
+            _siegePairs.Clear(); _raidPairs.Clear();
             _stumblesDay = 0;
             _told.Clear();
             return line;
@@ -268,6 +315,7 @@ namespace CrashScribe
         internal static void ResetSession()
         {
             _aiSieges = _aiRaids = _gateSieges = _gateRaids = _broken = 0;
+            _siegePairs.Clear(); _raidPairs.Clear();
             _totBlocked = _totRaids = _totBroken = 0;
             _stumblesDay = 0;
             _told.Clear();
