@@ -670,9 +670,7 @@ namespace Armoury
                     else if (ss.Garrison)
                         Log.Player(men + " men joined " + name + " with no kit of their own in your stores"
                                    + (GarrisonKit.BareOn ? " - in battle the garrison fights only with what its stores hold." : "."), true);
-                    else
-                        Log.Player(men + " men joined " + name + " with no kit of their own in your stores"
-                                   + (GarrisonKit.OwnKitOn ? " - in battle they fight only with what that party's stores hold." : "."), true);
+                    else NoKitMessage(men, name, g);
                 }
                 if (toMain.Count > 0)
                 {
@@ -715,10 +713,23 @@ namespace Armoury
                 _dNewPartyMen += men; _dNewPartyPcs += pcs;
                 string name = np.Name != null ? np.Name.ToString() : np.StringId;
                 if (pcs > 0) Log.Player(men + " men joined " + name + " and took " + pcs + " pieces of their own kit from your stores.");
-                else Log.Player(men + " men joined " + name + " with no kit of their own in your stores"
-                                + (GarrisonKit.OwnKitOn ? " - in battle they fight only with what that party's stores hold." : "."), true);
+                else NoKitMessage(men, name, np);
             }
             catch (Exception e) { Stumble("CreatePartyPostfix", e); }
+        }
+
+        /// <summary>sklad7b-p (uwaga 17): ludzie przeszli do partii lorda bez kompletu z Twojej zbrojowni. Partia bez zadnej sztuki (nowa partia rodu,
+        /// pusta zbrojownia) - wprost, ze beda walczyc golymi rekami, dopoki czegos nie kupi; partia z zapasem - ze walcza tym, co ma jej zbrojownia.</summary>
+        private static void NoKitMessage(int men, string name, MobileParty p)
+        {
+            if (!GarrisonKit.OwnKitOn) { Log.Player(men + " men joined " + name + " with no kit of their own in your stores.", true); return; }
+            var arm = ArmoryOf(p);
+            int have = 0;
+            if (arm != null) foreach (var v in arm.Values) if (v > 0) have += v;
+            if (have <= 0)
+                Log.Player(men + " men joined " + name + " with no kit of their own in your stores - the party has no arms yet, so they will fight bare-handed until it buys some.", true);
+            else
+                Log.Player(men + " men joined " + name + " with no kit of their own in your stores - in battle they fight only with what that party's stores hold.", true);
         }
 
         /// <summary>Ludzie (oddzial -> ilu), ktorzy ubyli po stronie A i przybyli po stronie B - min z obu (awans i werbunek jencow to nie przeniesienie).</summary>
@@ -737,7 +748,9 @@ namespace Armoury
 
         /// <summary>Druzyna -> zaloga: komplety z czesci LUDZI zbrojowni druzyny (bez Twojej ksiegi, koni, unikatow i sztuk z modyfikatorem na plus -
         /// zbrojownia AI nie zna stanow na plus, sztuka stracilaby wartosc; zostaja w druzynie jako zapas ludzi). Obita idzie obita (AiWear). Zwraca sztuki.
-        /// sklad7b: g to kazda partia ze zbrojownia DTE - zaloga albo partia lorda (towarzysze, rod gracza, "Donate Troops", nowa partia rodu).</summary>
+        /// sklad7b: g to kazda partia ze zbrojownia DTE - zaloga albo partia lorda (towarzysze, rod gracza, "Donate Troops", nowa partia rodu).
+        /// sklad7b-p: przy TroopsFightWithOwnKitOnly takze kon i rzad jezdzca (kon jest sztuka zbrojowni, jak w MoveKits AI) - inaczej ten sam kon
+        /// zostawal u Ciebie, a jezdziec u AI jechal na koniu pozyczonym ze wzorca (jeden kon z niczego).</summary>
         private static int KitsToGarrison(MobileParty g, Dictionary<CharacterObject, int> moved)
         {
             var armory = QuartermasterLaw.DteArmory();
@@ -745,9 +758,10 @@ namespace Armoury
             if (armory == null || main == null || QuartermasterEscrow.Active) return 0;
             var pool = new Dictionary<ItemObject, int>();
             var copies = new Dictionary<ItemObject, List<SwapMath.Piece>>();
+            bool horses = GarrisonKit.OwnKitOn;   // sklad7b-p (uwagi 3 i 15): kon i rzad ida z jezdzcem (jak MoveKits AI); wylaczone - Stajnia, jak dotad
             foreach (var type in QuartermasterLaw.KitTypes)
             {
-                if (type == ItemObject.ItemTypeEnum.Horse || type == ItemObject.ItemTypeEnum.HorseHarness) continue;   // konie i rzedy - Stajnia
+                if (!horses && (type == ItemObject.ItemTypeEnum.Horse || type == ItemObject.ItemTypeEnum.HorseHarness)) continue;   // konie i rzedy - Stajnia
                 foreach (var p in QuartermasterLaw.KitPieces(armory, type, true))   // Own = Twoja ksiega na najgorszych egzemplarzach id
                 {
                     var el = QuartermasterLaw.ElOf(p); var it = el.Item; var m = el.ItemModifier;
@@ -784,7 +798,8 @@ namespace Armoury
         /// <summary>sklad7b: takze partia lorda -> druzyna (st = null: bez patroli BK).
         /// Zaloga -> druzyna: komplety ludzi zabranych z zalogi (regula A7; sprzet ludzi na patrolach BK zostaje) do zbrojowni druzyny jako czesc
         /// LUDZI, obite ze stanem (udzial obitych jak AiWear.MoveWorn). Id, w ktorym masz czesc w ksiedze, zostaje w zalodze - ta sama regula co zakupy
-        /// ludzi (dopisany egzemplarz przesunalby Twoja czesc na gorszy). Bez koni i rzedow (Stajnia). Zwraca sztuki.</summary>
+        /// ludzi (dopisany egzemplarz przesunalby Twoja czesc na gorszy). Bez koni i rzedow (Stajnia) - sklad7b-p: przy TroopsFightWithOwnKitOnly
+        /// jezdziec wraca z koniem i rzedem, jesli jego partia je ma. Zwraca sztuki.</summary>
         private static int KitsToMain(MobileParty g, Settlement st, Dictionary<CharacterObject, int> moved)
         {
             var armory = QuartermasterLaw.DteArmory();
@@ -793,10 +808,11 @@ namespace Armoury
             var needLeft = NeedByType(g.MemberRoster);   // roster zalogi PO ekranie
             AddExtra(needLeft, PatrolNeed(st));
             var pool = new Dictionary<ItemObject, int>();
+            bool horses = GarrisonKit.OwnKitOn;   // sklad7b-p (uwagi 3 i 15): jezdziec wraca ze swoim koniem i rzedem, jesli jego partia je ma
             foreach (var kv in arm)
             {
                 var it = kv.Key;
-                if (it == null || kv.Value <= 0 || !SupplyDemand.Equipmentish(it) || ArmsPricing.IsUnique(it) || MenPurse.HorseKind(it)) continue;
+                if (it == null || kv.Value <= 0 || !SupplyDemand.Equipmentish(it) || ArmsPricing.IsUnique(it) || (!horses && MenPurse.HorseKind(it))) continue;
                 if (ArmouryBehavior.StockOf(it.StringId) > 0) { _dScrBook++; continue; }
                 pool[it] = kv.Value;
             }

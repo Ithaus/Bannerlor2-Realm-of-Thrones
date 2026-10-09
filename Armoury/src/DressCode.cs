@@ -25,6 +25,8 @@ namespace Armoury
     /// (takze towarzyszy i partii rodu) - GarrisonKit.OwnKitSpawn (tam tez ostatnia
     /// straz "nic z niczego" przy spawnie). Po bitwie DTE oddawal nasze dolozki do
     /// zbrojowni (zwrot liczy sie z ekwipunku agenta), wiec ubranie bylo mennica.
+    /// sklad7b-p: ludzi partii z ta regula, ktorych straz nie widziala (GarrisonKit.OutsideGuard),
+    /// tez nie ubieramy - w strone braku, z licznikiem w linii bitwy.
     /// Zostaja: partie bez zbrojowni DTE (bandyci, karawany, milicja...) i umarli.
     /// </summary>
     internal static class DressCode
@@ -35,20 +37,23 @@ namespace Armoury
             EquipmentIndex.Gloves, EquipmentIndex.Cape
         };
 
-        public static void Prefix(AgentBuildData agentBuildData)
+        public static void Prefix(Mission __instance, AgentBuildData agentBuildData)
         {
             try
             {
                 if (agentBuildData == null) return;
                 var eq = agentBuildData.AgentOverridenSpawnEquipment;
-                if (eq == null) return;                                   // bez nadpisu vanilla ubierze sama
                 // K1c (przeglad K1b, Jeff 09.10 P2 "reszta walczy bez uzbrojenia po prostu"): zaloga w trybie "tylko to, co ma" walczy
                 // tylko sprzetem ze swojej zbrojowni - pusty slot zostaje pusty. Dotad ubieralismy go ze wzorca (z niczego, na klonie,
                 // bez oznaczenia jako tymczasowy), a po bitwie DTE oddawal te sztuki do zbrojowni zalogi.
                 // sklad7b: takze druzyna gracza i lordowie AI (TroopsFightWithOwnKitOnly) - i tu ostatnia straz "nic z niczego"
-                if (GarrisonKit.OwnKitSpawn(eq)) return;
+                if (eq != null && GarrisonKit.OwnKitSpawn(eq)) return;
                 var ch = agentBuildData.AgentCharacter;
                 if (ch == null || ch.IsHero) return;
+                // sklad7b-p (uwagi 7, 9 i 16): czlowiek partii z regula "tylko to, co ma", ktorego straz nie widziala (inny mod podmienil
+                // ekwipunek, DTE nie dal przydzialu, latka DTE niewpieta) - nie ubieramy ze wzorca (mennica przez zwrot DTE), tylko liczymy
+                if (GarrisonKit.OutsideGuard(__instance, agentBuildData, eq != null)) return;
+                if (eq == null) return;                                   // bez nadpisu vanilla ubierze sama
 
                 Equipment tpl = null;                                     // wzorzec bojowy oddzialu
                 try

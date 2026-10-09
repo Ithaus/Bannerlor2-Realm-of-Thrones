@@ -616,7 +616,7 @@ namespace Armoury
         [SettingPropertyGroup("The finished piece")]
         public int GarrisonArmoryMinFillPercent { get; set; } = 75;
 
-        [SettingPropertyBool("Troops Fight With Own Kit Only", HintText = "in your battles every soldier - yours and AI lords' (your companions' and clan parties' too) - fights only with the kit his party's stores hold: a man with no piece for a slot fights without it. Dynamic Troop Equipment no longer gives your men emergency peasant kit nor fills AI lords' men's empty slots with template kit out of thin air, and in auto-resolved battles you loot only what they really had. An AI rider still rides his own horse (paid for when he was promoted), lent for the battle and never added to the stores; heroes keep their own gear; the dead of the Night King are not affected (off: as before - see Lord Battle Kit Is Lent)")]
+        [SettingPropertyBool("Troops Fight With Own Kit Only", HintText = "in your battles every soldier - yours and AI lords' (your companions' and clan parties' too) - fights only with the kit his party's stores hold: a man with no piece for a slot fights without it. Dynamic Troop Equipment no longer gives your men emergency peasant kit nor fills AI lords' men's empty slots with template kit out of thin air, and in auto-resolved battles you loot only what they really had. A rider rides only a horse his party's stores hold, or goes on foot - yours and the AI's alike: the horse paid for a promotion goes into the stores, lords put their riders on horses from the baggage and buy more, new campaigns start with the riders' horses, and a horse goes with its rider when you move men between parties; heroes keep their own gear; the dead of the Night King are not affected (off: as before - see Lord Battle Kit Is Lent)")]
         [SettingPropertyGroup("The finished piece")]
         public bool TroopsFightWithOwnKitOnly { get; set; } = true;
 
@@ -1016,7 +1016,7 @@ namespace Armoury
         [SettingPropertyGroup("The master's parry")]
         public bool AutoParryMirrorSides { get; set; } = true;
 
-        [SettingPropertyBool("Cavalry Needs Mounts", HintText = "upgrading a man into a MOUNTED troop takes a mount from the party inventory - yours and the AI's alike, one horse per man, gone on upgrade")]
+        [SettingPropertyBool("Cavalry Needs Mounts", HintText = "upgrading a man into a MOUNTED troop takes a mount from the party inventory - yours and the AI's alike, one horse per man; it goes into the troop armoury where the new rider finds it (the AI's too with Troops Fight With Own Kit Only)")]
         [SettingPropertyGroup("A knight needs a horse")]
         public bool CavalryNeedsMounts { get; set; } = true;
 
@@ -2944,7 +2944,7 @@ namespace Armoury
         [SettingPropertyGroup("Arming the garrisons")]
         public bool GarrisonArmoryRestoreOldSave { get; set; } = true;
 
-        [SettingPropertyBool("Kit Moves With Men", HintText = "when a lord leaves men in a garrison or takes men from it, when you move men between your party and a garrison or another party on the party screen (Manage garrison, Manage Troops of your companions' and clan parties, Donate Troops, creating a clan party), or a disbanded party joins a garrison, the men's arms go with them (from your stores only the men's own kit - never yours, horses stay with the stables); men of a disbanded party who go home take their own kit and the spare is sold for their house (off = as before: men move without their arms)")]
+        [SettingPropertyBool("Kit Moves With Men", HintText = "when a lord leaves men in a garrison or takes men from it, when you move men between your party and a garrison or another party on the party screen (Manage garrison, Manage Troops of your companions' and clan parties, Donate Troops, creating a clan party), or a disbanded party joins a garrison, the men's arms go with them (from your stores only the men's own kit - never yours; a rider takes his horse and harness along only with Troops Fight With Own Kit Only, otherwise horses stay with the stables); men of a disbanded party who go home take their own kit and the spare is sold for their house (off = as before: men move without their arms)")]
         [SettingPropertyGroup("Arming the garrisons")]
         public bool KitMovesWithMen { get; set; } = true;
 

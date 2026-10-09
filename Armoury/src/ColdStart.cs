@@ -64,7 +64,8 @@ namespace Armoury
             Log.Info("ColdStart: zbrojownie - " + parties + " partii (w tym garnizonow " + garrisons + ") dostalo " + pieces + " szt. kompletu swoich ludzi (dorobek stuleci, nie z targu).");
         }
 
-        /// <summary>171 C9a: brakujace sztuki kompletu ludzi partii (wzorce, koszyki typ x tier jak AiGear, bez koni) do jej zbrojowni DTE;
+        /// <summary>171 C9a: brakujace sztuki kompletu ludzi partii (wzorce, koszyki typ x tier jak AiGear, bez koni - sklad7b-p: z konmi i rzedami przy
+        /// TroopsFightWithOwnKitOnly) do jej zbrojowni DTE;
         /// zwraca dolozone sztuki. Wydzielone z Armories() bez zmian - ColdStart i odtworzenie zalog po starym zapisie (GarrisonArmory).</summary>
         internal static int FillToTemplate(MobileParty mp)
         {
@@ -75,6 +76,9 @@ namespace Armoury
         private static int FillToTemplate(MobileParty mp, Dictionary<MBGUID, Dictionary<ItemObject, int>> dict)
         {
                 // braki w koszykach typ x tier (jak AiGear)
+                // sklad7b-p (uwagi 3 i 11): przy TroopsFightWithOwnKitOnly kon jest sztuka zbrojowni (jezdziec bez konia w zbrojowni idzie pieszo) -
+                // dorobek obejmuje takze konia (slot 10) i rzad (11, tylko z koniem) jezdzcow; wylaczone - jak dotad, bez koni (Stajnia)
+                int last = GarrisonKit.OwnKitOn ? 12 : 10;
                 var need = new Dictionary<int, int>();
                 var roster = mp.MemberRoster;
                 for (int i = 0; i < roster.Count; i++)
@@ -84,10 +88,11 @@ namespace Armoury
                     if (ch == null || ch.IsHero || el.Number <= 0) continue;
                     Equipment eq = null; try { eq = ch.Equipment; } catch { }
                     if (eq == null) continue;
-                    for (int sl = 0; sl < 10; sl++)
+                    for (int sl = 0; sl < last; sl++)
                     {
                         var it = eq[(EquipmentIndex)sl].Item;
                         if (it == null || !SupplyDemand.Equipmentish(it)) continue;
+                        if (sl == 11 && eq[EquipmentIndex.Horse].Item == null) continue;
                         int k = AiGear.Bucket(it); int n; need.TryGetValue(k, out n); need[k] = n + el.Number;
                     }
                 }
@@ -106,10 +111,11 @@ namespace Armoury
                     if (ch == null || ch.IsHero || el.Number <= 0) continue;
                     Equipment eq = null; try { eq = ch.Equipment; } catch { }
                     if (eq == null) continue;
-                    for (int sl = 0; sl < 10; sl++)
+                    for (int sl = 0; sl < last; sl++)
                     {
                         var it = eq[(EquipmentIndex)sl].Item;
                         if (it == null || !SupplyDemand.Equipmentish(it)) continue;
+                        if (sl == 11 && eq[EquipmentIndex.Horse].Item == null) continue;
                         int k = AiGear.Bucket(it); int d;
                         if (!need.TryGetValue(k, out d) || d <= 0) continue;
                         int n = Math.Min(d, el.Number);

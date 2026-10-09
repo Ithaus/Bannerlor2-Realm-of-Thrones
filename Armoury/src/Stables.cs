@@ -227,9 +227,10 @@ namespace Armoury
             return n;
         }
 
-        /// <summary>Najtansze konie ida pod siodlo pierwsze - lepsze rumaki czekaja na wyzsze awanse.</summary>
-        private static void Consume(PartyBase party, ItemCategory cat, int count)
+        /// <summary>Najtansze konie ida pod siodlo pierwsze - lepsze rumaki czekaja na wyzsze awanse. sklad7b-p: zwraca, co zdjeto z taboru.</summary>
+        private static System.Collections.Generic.List<Tuple<EquipmentElement, int>> Consume(PartyBase party, ItemCategory cat, int count)
         {
+            var took = new System.Collections.Generic.List<Tuple<EquipmentElement, int>>();
             try
             {
                 var r = party.ItemRoster;
@@ -243,14 +244,132 @@ namespace Armoury
                         if (it == null || it.ItemCategory != cat || el.Amount <= 0) continue;
                         if (it.Value < bestVal) { bestVal = it.Value; best = i; }
                     }
-                    if (best < 0) return;
+                    if (best < 0) return took;
                     var elBest = r[best];
                     int take = Math.Min(count, elBest.Amount);
                     r.AddToCounts(elBest.EquipmentElement, -take);
+                    took.Add(Tuple.Create(elBest.EquipmentElement, take));
                     count -= take;
                 }
             }
             catch { }
+            return took;
+        }
+
+        // ------------------------------------------------------------ sklad7b-p: kon AI jako sztuka zbrojowni (jak u gracza)
+        // Przeglad sklad7b (uwagi 3, 11, 15; Jeff 09.10 07:35 wariant c: "walcza tylko tym, co maja" - bez pozyczki na bitwe): kon jezdzca jest sztuka
+        // zbrojowni DTE jego partii, jedna regula z graczem (BankPaidHorses). Dotad kon zaplacony przy awansie AI znikal z taboru w nicosc, a w bitwie
+        // jezdziec AI dostawal konia ze wzorca (sklad7b: "pozyczonego" - wiecznego, nigdy w lupie). Teraz: (1) kon za awans AI -> zbrojownia partii;
+        // (2) Remount - jezdzcy bez konia w zbrojowni dostaja konie z taboru lorda, nadmiar koni w zbrojowni (polegli jezdzcy) wraca do taboru
+        // (na awanse); (3) Stajnia AI dokupuje konie takze dla jezdzcow bez konia (nie tylko na awanse). Tylko przy TroopsFightWithOwnKitOnly.
+        private static int _dStamp = -1, _dPaid, _dPaidRefused, _dToArm, _dToBag, _dNoHorse;
+
+        private static void DayFlush()
+        {
+            int d = (int)CampaignTime.Now.ToDays;
+            if (d == _dStamp) return;
+            if (_dStamp >= 0 && _dPaid + _dPaidRefused + _dToArm + _dToBag + _dNoHorse > 0)
+                Log.Info("Stajnia AI (sklad7b-p): dzien " + _dStamp + " - konie za awans do zbrojowni partii " + _dPaid + (_dPaidRefused > 0 ? " (DTE nie przyjal " + _dPaidRefused + " - wrocily do taboru)" : "")
+                         + ", z taboru pod jezdzcow bez konia " + _dToArm + ", nadmiar ze zbrojowni do taboru " + _dToBag + "; jezdzcy bez konia po dosadzeniu (suma przy postojach) " + _dNoHorse + ".");
+            _dPaid = _dPaidRefused = _dToArm = _dToBag = _dNoHorse = 0;
+            _dStamp = d;
+        }
+
+        /// <summary>sklad7b-p: kon zdjety z taboru przy awansie AI -> zbrojownia DTE partii (jak BankPaidHorses gracza). Odmowa DTE - kon wraca do taboru.</summary>
+        private static void BankAiHorses(PartyBase party, System.Collections.Generic.List<Tuple<EquipmentElement, int>> took)
+        {
+            try
+            {
+                var mp = party != null ? party.MobileParty : null;
+                if (mp == null || mp.IsMainParty || took == null || took.Count == 0 || !GarrisonKit.OwnKitOn) return;
+                DayFlush();
+                foreach (var t in took)
+                {
+                    if (t == null || t.Item2 <= 0 || t.Item1.Item == null) continue;
+                    if (AiGear.AddToArmory(mp, t.Item1.Item, t.Item2)) _dPaid += t.Item2;
+                    else { party.ItemRoster.AddToCounts(t.Item1, t.Item2); _dPaidRefused += t.Item2; }
+                }
+            }
+            catch (Exception e) { Log.Error("Stables.BankAiHorses", e); }
+        }
+
+        /// <summary>sklad7b-p: ilu jezdzcow (nie-bohaterowie, ktorych wzorzec ma zwyklego wierzchowca - IsPlainMount; takze ranni) ma partia.
+        /// Wielblady, slonie i smoki wzorca - poza Stajnia (MountLaw), jak w zakupach.</summary>
+        private static int Riders(MobileParty mp)
+        {
+            int n = 0;
+            var r = mp.MemberRoster;
+            if (r == null) return 0;
+            for (int i = 0; i < r.Count; i++)
+            {
+                var el = r.GetElementCopyAtIndex(i);
+                var ch = el.Character;
+                if (ch == null || ch.IsHero || el.Number <= 0) continue;
+                bool mounted = false;
+                try { var eq = ch.Equipment; mounted = eq != null && IsPlainMount(eq[EquipmentIndex.Horse].Item); } catch { }
+                if (mounted) n += el.Number;
+            }
+            return n;
+        }
+
+        /// <summary>sklad7b-p: jezdzcy bez konia w zbrojowni DTE partii lorda AI dostaja konie z jej taboru (najtansze najpierw - lepsze czekaja na
+        /// awanse); nadmiar koni w zbrojowni (polegli jezdzcy) wraca do taboru, skad placi sie konmi za awanse. Wierzchowiec jak w zbrojowni gracza
+        /// (IsPlainMount - QuartermasterLaw.CountsAsKit). Zwraca, ilu jezdzcom dalej brakuje konia (Stajnia dokupi). Tylko przy
+        /// TroopsFightWithOwnKitOnly; partie lordow z wodzem (takze Twojego rodu), nie gracz, nie umarli.</summary>
+        internal static int Remount(MobileParty mp)
+        {
+            try
+            {
+                if (!GarrisonKit.OwnKitOn || mp == null || mp.IsMainParty || !mp.IsLordParty || mp.LeaderHero == null || mp.MapEvent != null || Undead.Party(mp)) return 0;
+                var all = AiGear.Armories();
+                if (all == null) return 0;
+                DayFlush();
+                System.Collections.Generic.Dictionary<ItemObject, int> arm; all.TryGetValue(mp.Id, out arm);
+                int have = 0;
+                if (arm != null) foreach (var kv in arm) if (kv.Value > 0 && IsPlainMount(kv.Key)) have += kv.Value;
+                int riders = Riders(mp);
+                var bag = mp.ItemRoster;
+                if (bag == null) return Math.Max(0, riders - have);
+                if (have > riders && arm != null)
+                {
+                    // nadmiar - najtansze do taboru (lepsze zostaja pod jezdzcami)
+                    int extra = have - riders;
+                    var keys = new System.Collections.Generic.List<ItemObject>();
+                    foreach (var kv in arm) if (kv.Value > 0 && IsPlainMount(kv.Key)) keys.Add(kv.Key);
+                    keys.Sort((a, b) => a.Value.CompareTo(b.Value));
+                    foreach (var it in keys)
+                    {
+                        if (extra <= 0) break;
+                        int c; if (!arm.TryGetValue(it, out c) || c <= 0) continue;
+                        int k = Math.Min(extra, c);
+                        if (c - k > 0) arm[it] = c - k; else arm.Remove(it);
+                        bag.AddToCounts(new EquipmentElement(it), k);
+                        extra -= k; _dToBag += k;
+                    }
+                    return 0;
+                }
+                int lack = riders - have;
+                while (lack > 0)
+                {
+                    int best = -1, bestVal = int.MaxValue;
+                    for (int i = 0; i < bag.Count; i++)
+                    {
+                        var el = bag[i];
+                        var it = el.EquipmentElement.Item;
+                        if (it == null || el.Amount <= 0 || !IsPlainMount(it)) continue;
+                        if (it.Value < bestVal) { bestVal = it.Value; best = i; }
+                    }
+                    if (best < 0) break;
+                    var e = bag[best];
+                    int take = Math.Min(lack, e.Amount);
+                    if (!AiGear.AddToArmory(mp, e.EquipmentElement.Item, take)) break;   // DTE nie przyjal - zostaje w taborze
+                    bag.AddToCounts(e.EquipmentElement, -take);
+                    lack -= take; _dToArm += take;
+                }
+                _dNoHorse += Math.Max(0, lack);
+                return Math.Max(0, lack);
+            }
+            catch (Exception e) { Log.Error("Stables.Remount", e); return 0; }
         }
 
         /// <summary>
@@ -329,7 +448,8 @@ namespace Armoury
                 int need = tr.Field("PossibleUpgradeCount").GetValue<int>();
                 if (need <= 0) return true;
                 if (CountInRoster(party, cat) < need) return false;   // konie wybrane - czekaja (XP zostaje)
-                Consume(party, cat, need);
+                var took = Consume(party, cat, need);
+                BankAiHorses(party, took);   // sklad7b-p: kon za awans -> zbrojownia partii (jak u gracza), nie w nicosc
                 return true;
             }
             catch (Exception e) { Log.Error("Stables.Pay", e); return true; }
@@ -355,9 +475,12 @@ namespace Armoury
             try
             {
                 var c = Settings.Current;
-                if (c == null || !c.CavalryNeedsMounts || !c.AiBuysMounts) return;
-                if (party == null || settlement == null || party.IsMainParty) return;
+                if (c == null || party == null || settlement == null || party.IsMainParty) return;
                 if (!party.IsLordParty || party.LeaderHero == null) return;
+                // sklad7b-p: kon jest sztuka zbrojowni - przy kazdym postoju lord dosadza jezdzcow bez konia koniami z taboru (nadmiar do taboru);
+                // ilu dalej brakuje konia - Stajnia dokupi razem z konmi na awanse
+                int lack = Remount(party);
+                if (!c.CavalryNeedsMounts || !c.AiBuysMounts) return;
                 if (!settlement.IsTown && !settlement.IsVillage) return;
 
                 // KONIOKRADZTWO GOSPODARCZE: bez przerwy miedzy zakupami powstawala
@@ -380,7 +503,7 @@ namespace Armoury
                 // sto koni "na zapas", odsprzedawal je jako zwykly towar
                 // i kupowal znowu. Teraz liczymy glowy, nie procenty: nikt nie
                 // czeka na awans - nikt nie kupuje ani jednego konia.
-                int want = NeedForUpgrades(party.Party);
+                int want = NeedForUpgrades(party.Party) + lack;   // sklad7b-p: + jezdzcy bez konia w zbrojowni
                 if (want <= 0) return;
                 want += Math.Max(0, c.AiMountSpareBuffer);      // kilka luzem na straty
                 int have = CountAnyMounts(party.Party);
@@ -479,10 +602,12 @@ namespace Armoury
 
                 if (bought <= 0) return;
                 _lastBuy[pid] = today;
+                if (lack > 0) Remount(party);   // sklad7b-p: kupione konie najpierw pod jezdzcow bez konia, reszta czeka w taborze na awanse
                 if (paid > 0) TaleWorlds.CampaignSystem.Actions.GiveGoldAction.ApplyForCharacterToSettlement(lord, settlement, paid);
                 Log.Info("Stajnia AI: " + lord.Name + " kupil " + bought + " koni ["
                          + (what ?? "?") + "] w " + settlement.Name
-                         + " za " + paid + (toVillages > 0 ? " (+ " + toVillages + " wsiom-hodowcom" + (c.HorsesAtMarketPrice ? " po cenie targu" : "") + ")" : "") + " (czekalo na awans " + (want - Math.Max(0, c.AiMountSpareBuffer))
+                         + " za " + paid + (toVillages > 0 ? " (+ " + toVillages + " wsiom-hodowcom" + (c.HorsesAtMarketPrice ? " po cenie targu" : "") + ")" : "") + " (czekalo na awans " + (want - Math.Max(0, c.AiMountSpareBuffer) - lack)
+                         + ", jezdzcow bez konia " + lack
                          + ", mial " + have + "; z targu " + fromMarket + " przy polce " + shelfMounts + ").");
             }
             catch (Exception e) { Log.Error("Stables.AiBuy", e); }

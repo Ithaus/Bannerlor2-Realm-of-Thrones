@@ -1332,6 +1332,7 @@ namespace Armoury
             // 171: zawrocony towar i nadwyzki zalog na polkach PRZED handlem kupcow (kupcy wywioza nadwyzke zamkow tego samego dnia)
             try { GarrisonCarts.Daily(); } catch (Exception e) { Log.Error("GarrisonCarts.Daily", e); }     // zamowienia zamkow w drodze: dostawy, zawrocenia, linia "Zaopatrzenie zamkow (171)"
             try { GarrisonArmory.Daily(); } catch (Exception e) { Log.Error("GarrisonArmory.Daily", e); }   // nadwyzki zalog raz w tygodniu, linia "Zbrojownie zalog (171): dzien"
+            try { GarrisonKit.ClanFillOnce(); } catch (Exception e) { Log.Error("GarrisonKit.ClanFillOnce", e); }   // sklad7b-p: raz na sesje - wypelnienie zbrojowni partii Twojego rodu
             try { ArmsDrill.Daily(); } catch (Exception e) { Log.Error("ArmsDrill.Daily", e); }             // linie "Cwiczenia (171)" i co 5 dob "Pokrycie zbrojowni AI (171)" (tylko log)
             try { SupplyDemand.DailyTrade(); } catch (Exception e) { Log.Error("SupplyDemand.DailyTrade", e); }
             try { MoneyLedger.Mark(MoneyLedger.MRest); } catch { }   // 174.2: kasy osad przed kontraktami - pozostale moduly osobno

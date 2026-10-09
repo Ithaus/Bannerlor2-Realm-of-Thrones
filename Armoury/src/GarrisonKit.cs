@@ -37,12 +37,16 @@ namespace Armoury
     ///    TA SAMA regula "tylko to, co ma" w bitwie gracza dla druzyny gracza i partii lordow AI (takze towarzyszy i partii rodu gracza) -
     ///    TroopsFightWithOwnKitOnly. Druzyna gracza: bez zestawu awaryjnego DTE (ApplyEmergencyLoadout - sprzet podstawowego zolnierza kultury
     ///    z niczego). Lordowie AI: bez zestawu awaryjnego i bez dopelniania wzorca (FillEmptySlots); lord bez wpisu w zbrojowniach DTE dostaje
-    ///    pusty wpis (jak zaloga - inaczej DTE puszcza go w pelnym wzorcu z niczego). Kon i rzad jezdzca AI: jego wlasny (oplacony przy awansie -
-    ///    Stajnia, kon jest wlasnoscia zolnierza), ze wzorca, pozyczony na bitwe (slot tymczasowy - nie wraca do zbrojowni ani do lupu). Straz
-    ///    "nic z niczego" przy samym spawnie (OwnKitSpawn z DressCode, Priority.Last - po DTE, strazach CrashScribe RealmWard/ArmourWard i
-    ///    DragonUnmount): kazda sztuka slotow 0-3 i 5-9 musi miec pokrycie w zbrojowni partii, inaczej slot pusty. DressCode tych ludzi nie
-    ///    ubiera. Autorozstrzygniecie gracza (lup DTE z ludzi lordow AI i zalog): bez dopelniania wzorca i ze straza na cala partie.
-    ///    Bohaterowie bez zmian (DTE ich nie ubiera). Umarli (Nocny Krol) bez zmian - sprzet umarlych jest poza gospodarka.
+    ///    pusty wpis (jak zaloga - inaczej DTE puszcza go w pelnym wzorcu z niczego). Straz "nic z niczego" przy samym spawnie (OwnKitSpawn
+    ///    z DressCode, Priority.Last - po DTE, strazach CrashScribe RealmWard/ArmourWard i DragonUnmount): kazda sztuka slotow 0-3 i 5-11 musi
+    ///    miec pokrycie w zbrojowni partii, inaczej slot pusty. DressCode tych ludzi nie ubiera. Autorozstrzygniecie gracza (lup DTE z ludzi
+    ///    lordow AI i zalog): bez dopelniania wzorca i ze straza na cala partie. Bohaterowie bez zmian (DTE ich nie ubiera). Umarli (Nocny Krol)
+    ///    bez zmian - sprzet umarlych jest poza gospodarka.
+    ///  - sklad7b-p (przeglad 17 uwag): KON jest sztuka zbrojowni partii, jak u gracza - jezdziec bez konia w zbrojowni idzie pieszo (gracz i AI
+    ///    jedna regula; bez "pozyczki na bitwe", ktorej Jeff nie wybral - wariant c). Kon zaplacony przy awansie AI trafia do zbrojowni partii
+    ///    (Stables.PayInHorses), lord dosadza jezdzcow bez konia koniami z taboru i dokupuje je w Stajni (Stables.Remount), dorobek startowy
+    ///    (ColdStart) obejmuje konie i rzedy jezdzcow, a kon idzie z jezdzcem na ekranie druzyny (GarrisonArmory). Jeden predykat partii z regula
+    ///    dla misji i autorozstrzygniecia (LordRule/DteDresses), takze partia lorda bez wodza; pusty wpis przegranym przed lupem autorozstrzygniecia.
     /// </summary>
     internal static class GarrisonKit
     {
@@ -71,10 +75,24 @@ namespace Armoury
         /// <summary>sklad7b (Jeff 09.10 07:35): regula "tylko to, co ma" dla druzyny gracza i partii lordow AI w bitwie gracza (zalogi - BareOn).</summary>
         internal static bool OwnKitOn { get { var s = Settings.Current; return s != null && s.TroopsFightWithOwnKitOnly; } }
 
+        /// <summary>sklad7b-p (uwagi 2, 5, 9): JEDEN predykat dla misji, autorozstrzygniecia i pustych wpisow - partia, ktora DTE ubiera przy spawnie
+        /// z rozdzielacza (SpawnAgentPatch.IsPartyValidForProcessing: nie karawana, wies, milicja, bandyci ani patrol); bez gracza, zalog (BareOn)
+        /// i umarlych (Nocny Krol - sprzet umarlych poza gospodarka). Wodz nie jest wymagany.</summary>
+        internal static bool DteDresses(MobileParty mp)
+        {
+            return mp != null && !mp.IsMainParty && !mp.IsGarrison && !mp.IsCaravan && !mp.IsVillager && !mp.IsMilitia && !mp.IsBandit && !mp.IsPatrolParty && !Undead.Party(mp);
+        }
+
+        /// <summary>sklad7b-p: partia lorda w gospodarce zbrojowni (AiGear kupuje tylko partiom lordow i zalogom) - takze bez wodza (wodz w niewoli,
+        /// partia rozwiazywana); bez wpisu DTE dostaje pusty wpis (kto nie ma sztuki, walczy bez niej). Inne partie z wodzem-bohaterem (wlasne
+        /// komponenty BK/ROT) bez wpisu zostaja poza regula - nie kupuja sprzetu, wiec z pustym wpisem walczylyby nago na zawsze.</summary>
+        internal static bool LordRule(MobileParty mp) { return DteDresses(mp) && mp.IsLordParty; }
+
         internal static void Reset()
         {
             _screen = null; _screenSt = null; _hintKey = null; _hint = null; _lastLogic = null; _garAssign.Clear(); _lordAssign.Clear(); _bareDist = null; _bareMission = false;
-            _spawn.Clear(); _asgParty.Clear(); _guardLog = 0; _ownAssign.Clear(); _simParty = null; _battleMission = null; ClearBattle();
+            _spawn.Clear(); _spawnAsg.Clear(); _asgParty.Clear(); _guardLog = 0; _outsideLog = 0; _ownAssign.Clear(); _simParty = null; _simMade.Clear(); _battleMission = null; _dteMissionRef = null;
+            _clanFillDone = false; ClearBattle();
         }
 
         private static MobileParty GarrisonOf(Settlement st)
@@ -100,7 +118,7 @@ namespace Armoury
                 // poprawki sklad7: osobna linia kontrolna dla LordBattleKitIsLent (nowe zachowanie spoza scalenia - domyslnie WYLACZONE do decyzji Jeffa)
                 // sklad7b: regula "tylko to, co ma" dla druzyny gracza i lordow AI (TroopsFightWithOwnKitOnly); LordBattleKitIsLent dziala tylko przy niej wylaczonej
                 Log.Info("GarrisonKit: latka DTE (zaloga w bitwie) " + _battle + "; menu zalogi wpiete; nic z niczego w bitwie gracza (TroopsFightWithOwnKitOnly, sklad7b): "
-                         + (OwnKitOn ? "TAK - druzyna gracza bez zestawu awaryjnego DTE, lordowie AI (takze towarzysze i partie rodu) tylko tym, co maja, kon jezdzca AI pozyczony"
+                         + (OwnKitOn ? "TAK - druzyna gracza bez zestawu awaryjnego DTE, lordowie AI (takze towarzysze, partie rodu i partie bez wodza) tylko tym, co maja; kon tylko ze zbrojowni partii (sklad7b-p: jezdziec bez konia pieszo, gracz i AI)"
                                      : "nie; sloty lordow AI z niczego tylko pozyczone na bitwe (LordBattleKitIsLent): " + (s != null && s.LordBattleKitIsLent ? "WLACZONE" : "wylaczone (jak przed sklad7)"))
                          + "; zaloga tylko tym, co ma: " + (BareOn ? "TAK" : "nie (prog)") + ".");
             }
@@ -408,32 +426,41 @@ namespace Armoury
         // _asgParty: przydzial -> Id partii (zalogi, sklad7b: takze lorda AI) dla strazy "nic z niczego" (Guard).
         private sealed class SpawnInfo
         {
-            internal readonly object Asg; internal readonly int Kind; internal readonly MBGUID Party;   // Kind: 0 druzyna gracza, 1 lord AI, 2 zaloga
-            internal SpawnInfo(object asg, int kind, MBGUID party) { Asg = asg; Kind = kind; Party = party; }
+            // Kind: 0 druzyna gracza, 1 lord AI, 2 zaloga; Clan - partia Twojego rodu (towarzysze, partie rodu; sklad7b-p - osobny licznik)
+            internal readonly object Asg; internal readonly int Kind; internal readonly MBGUID Party; internal readonly bool Clan;
+            internal SpawnInfo(object asg, int kind, MBGUID party, bool clan) { Asg = asg; Kind = kind; Party = party; Clan = clan; }
         }
         private static readonly Dictionary<object, SpawnInfo> _spawn = new Dictionary<object, SpawnInfo>(RefEq.I);
+        // sklad7b-p (uwaga 7): te same przydzialy po samym przydziale - licznik wystawionych przez DTE (RegisterSpawnedAgentAssignment) wobec strazy
+        private static readonly HashSet<object> _spawnAsg = new HashSet<object>(RefEq.I);
         private static readonly Dictionary<object, MBGUID> _asgParty = new Dictionary<object, MBGUID>(RefEq.I);
         // sklad7b: przydzialy partii lordow AI (takze towarzyszy i partii rodu gracza) w trybie "tylko to, co ma" (FillPrefix: bez dopelniania wzorca)
         private static readonly HashSet<object> _ownAssign = new HashSet<object>();
         private static FieldInfo _fDistParty, _fDistMission;
         private static MethodInfo _canMount;
-        private static bool _mountsOk;
+        private static bool _mountsOk, _regHooked;
         // sklad7b: autorozstrzygniecie gracza (EveryoneCampaignBehavior.DistributePlayerSimulationLoot -> CreateMapEventAssignments): partia, ktorej
         // przydzialy licza lup tylko z tego, co ma (null - poza tym wywolaniem albo partia bez reguly)
         private static MobileParty _simParty;
         private static int _simSkipped;
+        // sklad7b-p (uwagi 1 i 10): przegrani autorozstrzygniecia, ktorym zalozylismy pusty wpis przed lupem (bez niego DTE liczy lup z pelnego wzorca)
+        private static readonly HashSet<MBGUID> _simMade = new HashSet<MBGUID>();
         // sklad7b: liczniki jednej bitwy gracza (linia "Bitwa gracza (sklad7b)" na koniec misji)
         private static WeakReference _battleMission;
-        private static int _bPlayerMen, _bPlayerMiss, _bLordMen, _bLordMiss, _bGarMen, _bGarMiss, _bGuardP, _bGuardL, _bGuardG, _bNoEmergP, _bNoEmergL, _bHorses, _bNoEntry, _bUndead;
+        private static int _bPlayerMen, _bPlayerMiss, _bLordMen, _bLordMiss, _bGarMen, _bGarMiss, _bGuardP, _bGuardL, _bGuardG, _bNoEmergP, _bNoEmergL, _bNoEntry, _bUndead;
+        // sklad7b-p: Twoj rod osobno (uwaga 13), jezdzcy pieszo (uwagi 3 i 11), partie bez wodza (uwagi 2 i 9), ludzie partii z regula poza straza
+        // (uwagi 7, 9 i 16: inny mod podmienil ekwipunek albo DTE nie dal przydzialu), wystawieni przez DTE z naszym przydzialem (uwaga 7)
+        private static int _bClanMen, _bClanMiss, _bFootP, _bFootL, _bFootG, _bNoLeader, _bOutside, _bOutsideTpl, _bDte;
 
         private static void ClearBattle()
         {
-            _bPlayerMen = _bPlayerMiss = _bLordMen = _bLordMiss = _bGarMen = _bGarMiss = _bGuardP = _bGuardL = _bGuardG = _bNoEmergP = _bNoEmergL = _bHorses = _bNoEntry = _bUndead = 0;
+            _bPlayerMen = _bPlayerMiss = _bLordMen = _bLordMiss = _bGarMen = _bGarMiss = _bGuardP = _bGuardL = _bGuardG = _bNoEmergP = _bNoEmergL = _bNoEntry = _bUndead = 0;
+            _bClanMen = _bClanMiss = _bFootP = _bFootL = _bFootG = _bNoLeader = _bOutside = _bOutsideTpl = _bDte = 0;
         }
 
         private static bool BattleTouched()
         {
-            return _bPlayerMen + _bLordMen + _bGarMen + _bGuardP + _bGuardL + _bGuardG + _bNoEmergP + _bNoEmergL + _bHorses + _bNoEntry + _bUndead > 0;
+            return _bPlayerMen + _bLordMen + _bGarMen + _bGuardP + _bGuardL + _bGuardG + _bNoEmergP + _bNoEmergL + _bNoEntry + _bUndead + _bNoLeader + _bOutside + _bDte > 0;
         }
 
         private sealed class RefEq : IEqualityComparer<object>
@@ -485,7 +512,7 @@ namespace Armoury
                 _fDistParty = AccessTools.Field(tDist, "_party");
                 _fDistMission = AccessTools.Field(tDist, "_mission");
                 _canMount = AccessTools.PropertyGetter(tAssign, "CanUseMountEquipment");
-                string sim = "BRAK", end = "BRAK";
+                string sim = "BRAK", end = "BRAK", entry = "BRAK", reg = "BRAK";
                 try
                 {
                     // sklad7b: autorozstrzygniecie gracza - lup DTE z ludzi lordow AI i zalog liczony z ich przydzialow (z dopelnieniem wzorca z niczego)
@@ -500,13 +527,30 @@ namespace Armoury
                 catch (Exception e) { Log.Error("GarrisonKit.ApplyAll(sim)", e); }
                 try
                 {
+                    // sklad7b-p (uwagi 1 i 10): przegrany bez wpisu DTE - DTE nie wola CreateMapEventAssignments i liczy lup z RandomBattleEquipment (pelny
+                    // wzorzec z niczego); pusty wpis przed lupem - wtedy przydzialy (bez dopelniania) i lup tylko z tego, co mial (czyli nic)
+                    var mLoot = AccessTools.Method(tEvery, "DistributePlayerSimulationLoot");
+                    if (mLoot != null) { h.Patch(mLoot, prefix: new HarmonyMethod(typeof(GarrisonKit), nameof(SimLootPrefix))); entry = "wpiety"; }
+                }
+                catch (Exception e) { Log.Error("GarrisonKit.ApplyAll(simEntry)", e); }
+                try
+                {
                     var mEnd = AccessTools.Method(tLogic, "OnEndMission");
                     if (mEnd != null) { h.Patch(mEnd, postfix: new HarmonyMethod(typeof(GarrisonKit), nameof(EndMissionPostfix))); end = "wpieta"; }
                 }
                 catch (Exception e) { Log.Error("GarrisonKit.ApplyAll(end)", e); }
+                try
+                {
+                    // sklad7b-p (uwaga 7): kazdy czlowiek wystawiony przez DTE z naszym przydzialem - licznik wobec strazy przy spawnie (inny mod podmienil
+                    // ekwipunek na kopie -> straz go nie widzi -> linia bitwy "NIEZGODNE")
+                    var mReg = AccessTools.Method(tLogic, "RegisterSpawnedAgentAssignment");
+                    if (mReg != null) { h.Patch(mReg, postfix: new HarmonyMethod(typeof(GarrisonKit), nameof(RegisterPostfix))); reg = "wpiety"; _regHooked = true; }
+                }
+                catch (Exception e) { Log.Error("GarrisonKit.ApplyAll(reg)", e); }
                 _battle = "wpieta, bez zestawu awaryjnego DTE " + _emerg + ", straz nic z niczego wpieta; sloty lordow AI z niczego tylko na bitwe (sklad7) wpiete"
                           + "; nic z niczego (sklad7b): rozdzielacz->partia " + (_fDistParty != null && _fDistMission != null ? "jest" : "BRAK (druzyna gracza i lordowie z zestawem awaryjnym)")
-                          + ", kon jezdzca AI " + (_canMount != null ? "wedlug przydzialu i misji" : "tylko wedlug misji") + ", lup autorozstrzygniecia " + sim + ", linia bitwy " + end;
+                          + ", kon tylko ze zbrojowni (sklad7b-p) " + (_canMount != null ? "wedlug przydzialu i misji" : "tylko wedlug misji") + ", lup autorozstrzygniecia " + sim
+                          + ", pusty wpis przegranych przed lupem (sklad7b-p) " + entry + ", licznik wystawionych przez DTE " + reg + ", linia bitwy " + end;
             }
             catch (Exception e) { _battle = "BRAK (" + e.Message + ")"; Log.Error("GarrisonKit.ApplyAll", e); }
         }
@@ -529,7 +573,7 @@ namespace Armoury
                 if (_lastLogic != null && ReferenceEquals(_lastLogic.Target, __instance)) return;
                 if (!(bool)_fInit.GetValue(__instance)) return;
                 _lastLogic = new WeakReference(__instance);
-                _garAssign.Clear(); _spawn.Clear(); _asgParty.Clear(); _lordAssign.Clear(); _ownAssign.Clear();   // nowa misja - przydzialy poprzedniej nieaktualne
+                _garAssign.Clear(); _spawn.Clear(); _spawnAsg.Clear(); _asgParty.Clear(); _lordAssign.Clear(); _ownAssign.Clear();   // nowa misja - przydzialy poprzedniej nieaktualne
                 var me = MapEvent.PlayerMapEvent;
                 var dists = _fDist.GetValue(__instance) as IDictionary;
                 var sides = _fSides.GetValue(__instance) as IDictionary;
@@ -541,7 +585,17 @@ namespace Armoury
                 // sklad7b: jedna regula dla druzyny gracza i lordow AI (OwnKitOn); "tylko pozyczone" (LordBattleKitIsLent) tylko bez niej
                 if (OwnKitOn) OwnAssignments(dists, sides, me, mission);   // PRZED rozdzielaczami zalog - te dochodza nizej
                 else if (s.LordBattleKitIsLent) LordAssignments(dists);
-                if (!s.GarrisonArmoryInBattle) return;
+                try { if (s.GarrisonArmoryInBattle) GarrisonDistributors(s, me, dists, sides, mission); }
+                finally { if (OwnKitOn) BattleNotice(sides); }   // sklad7b-p (uwaga 12): jedno zdanie w grze - czemu ludzie ida bez sprzetu
+            }
+            catch (Exception e) { Log.Error("GarrisonKit.DistributorsPostfix", e); }
+        }
+
+        /// <summary>K1/K1c (wydzielone w sklad7b-p bez zmiany logiki poza umarlymi): rozdzielacze zalog bioracych udzial w bitwie gracza.</summary>
+        private static void GarrisonDistributors(Settings s, MapEvent me, IDictionary dists, IDictionary sides, Mission mission)
+        {
+            try
+            {
                 int min = Math.Max(0, Math.Min(100, s.GarrisonArmoryMinFillPercent));
                 bool bare = BareOn;
                 if (s.GarrisonFightsWithArmoryOnly && !bare)
@@ -557,9 +611,10 @@ namespace Armoury
                         if (g == null || !g.IsGarrison || !g.IsActive || g.LeaderHero != null || dists.Contains(g.Id)) continue;
                         var st = g.CurrentSettlement ?? g.HomeSettlement;
                         string name = st != null ? st.Name.ToString() : g.StringId;
-                        if (Undead.Party(g))
+                        if (OwnKitOn && Undead.Party(g))
                         {
-                            // sklad7b: umarli poza gospodarka (bez zakupow, zoldu, sprzedazy) - bez naszego rozdzielacza, jak przed K1
+                            // sklad7b: umarli poza gospodarka (bez zakupow, zoldu, sprzedazy) - bez naszego rozdzielacza, jak przed K1;
+                            // sklad7b-p (uwaga 6): tylko przy TroopsFightWithOwnKitOnly - wylaczone = jak K1c (rozdzielacz zbrojowni jak kazdej zalogi)
                             _bUndead++;
                             Log.Info("Zaloga w bitwie: " + name + " - umarli (Nocny Krol), bez rozdzielacza zbrojowni (jak przed K1).");
                             continue;
@@ -599,7 +654,7 @@ namespace Armoury
                                 if (a == null) continue;
                                 _garAssign.Add(a);
                                 _asgParty[a] = g.Id;
-                                if (bare) { var eq = _fEq.GetValue(a); if (eq != null) _spawn[eq] = new SpawnInfo(a, 2, g.Id); }
+                                if (bare) { var eq = _fEq.GetValue(a); if (eq != null) { _spawn[eq] = new SpawnInfo(a, 2, g.Id, false); _spawnAsg.Add(a); } }
                             }
                         dists[g.Id] = d;
                         sides[g.Id] = pb.Side;
@@ -610,7 +665,67 @@ namespace Armoury
                     catch (Exception e) { if (++_stumbles <= 3) Log.Error("GarrisonKit.DistributorsPostfix(zaloga)", e); }
                 }
             }
-            catch (Exception e) { Log.Error("GarrisonKit.DistributorsPostfix", e); }
+            catch (Exception e) { Log.Error("GarrisonKit.GarrisonDistributors", e); }
+        }
+
+        /// <summary>sklad7b-p (uwaga 12): JEDNO zdanie w grze na poczatku bitwy - ilu Twoich ludzi idzie bez broni, bez zbroi i pieszo (jezdzcy bez konia
+        /// w zbrojowni), bo zbrojownia nie ma dla nich sztuki; zbiorczo sojusznicy i wrog bez broni. Liczone z przydzialow DTE po rozdaniu zbrojowni
+        /// (przed spawnem - wszyscy zdrowi z partii, nie tylko wystawieni). Tylko gdy liczby > 0. Linia logu z tymi samymi liczbami.</summary>
+        private static void BattleNotice(IDictionary sides)
+        {
+            try
+            {
+                if (_spawn.Count == 0) return;
+                var main = MobileParty.MainParty;
+                object mySide = main != null && sides != null && sides.Contains(main.Id) ? sides[main.Id] : null;
+                int noWeapon = 0, noBody = 0, onFoot = 0, men = 0, allyBare = 0, enemyBare = 0;
+                foreach (var si in _spawn.Values)
+                {
+                    if (si == null) continue;
+                    var eq = _fEq.GetValue(si.Asg) as Equipment;
+                    var rf = _getRef != null ? _getRef.Invoke(si.Asg, null) as Equipment : null;
+                    if (eq == null) continue;
+                    bool bare = true;
+                    for (int i = 0; i < 4; i++) { var e = eq[(EquipmentIndex)i]; if (!e.IsEmpty && e.Item != null) { bare = false; break; } }
+                    if (si.Kind == 0)
+                    {
+                        men++;
+                        if (bare) noWeapon++;
+                        if (rf != null)
+                        {
+                            var rb = rf[EquipmentIndex.Body]; var eb = eq[EquipmentIndex.Body];
+                            if (!rb.IsEmpty && rb.Item != null && (eb.IsEmpty || eb.Item == null)) noBody++;
+                            if (RiderOnFoot(si.Asg, eq, rf)) onFoot++;
+                        }
+                        continue;
+                    }
+                    if (!bare) continue;
+                    object side = sides != null && sides.Contains(si.Party) ? sides[si.Party] : null;
+                    if (side != null && mySide != null && side.Equals(mySide)) allyBare++; else enemyBare++;
+                }
+                Log.Info("Bitwa gracza (sklad7b-p, start): Twoich ludzi " + men + " - bez broni " + noWeapon + ", bez zbroi " + noBody + ", jezdzcy pieszo " + onFoot
+                         + "; bez broni u sojusznikow " + allyBare + ", u wroga " + enemyBare + " (przydzialy DTE przed spawnem).");
+                var parts = new List<string>();
+                if (noWeapon > 0) parts.Add(noWeapon + " have no weapon");
+                if (noBody > 0) parts.Add(noBody + " no body armour");
+                if (onFoot > 0) parts.Add(onFoot + " riders no horse");
+                if (parts.Count > 0)
+                    Log.Player("Your stores are short for this battle - of your men, " + string.Join(", ", parts.ToArray()) + "; they fight with what they have.", true);
+                if (allyBare > 0) Log.Player("Your allies' men are short of arms too: " + allyBare + " fight bare-handed - their stores hold no more.");
+                if (enemyBare > 0) Log.Player("The enemy's men are short of arms: " + enemyBare + " fight bare-handed - their stores hold no more.");
+            }
+            catch (Exception e) { if (++_stumbles <= 3) Log.Error("GarrisonKit.BattleNotice", e); }
+        }
+
+        /// <summary>sklad7b-p: jezdziec (wzorzec ma konia) bez konia w przydziale tam, gdzie DTE wpuszcza konie - idzie pieszo, bo zbrojownia nie ma konia.</summary>
+        private static bool RiderOnFoot(object asg, Equipment eq, Equipment rf)
+        {
+            if (!_mountsOk || eq == null || rf == null) return false;
+            var rh = rf[EquipmentIndex.Horse];
+            if (rh.IsEmpty || rh.Item == null) return false;
+            try { if (_canMount != null && !(bool)_canMount.Invoke(asg, null)) return false; } catch { return false; }
+            var h = eq[EquipmentIndex.Horse];
+            return h.IsEmpty || h.Item == null;
         }
 
         /// <summary>sklad7: przydzialy rozdzielaczy DTE partii lordow AI (wszystkie poza druzyna gracza; zalog DTE nie tworzy - robi je DistributorsPostfix).</summary>
@@ -631,19 +746,13 @@ namespace Armoury
             catch (Exception ex) { if (++_stumbles <= 3) Log.Error("GarrisonKit.LordAssignments", ex); }
         }
 
-        /// <summary>sklad7b: partia lorda AI w bitwie gracza, ktora DTE ubiera z jej zbrojowni (jak DTE: wodz-bohater, nie karawana, wies, milicja,
-        /// bandyci ani patrol); takze towarzysze i partie rodu gracza; bez umarlych (Nocny Krol - sprzet umarlych poza gospodarka).</summary>
-        private static bool LordInBattle(MobileParty mp)
-        {
-            return mp != null && mp.IsActive && mp.IsLordParty && mp.LeaderHero != null && mp.LeaderHero != Hero.MainHero && !mp.IsMainParty
-                   && !mp.IsGarrison && !mp.IsCaravan && !mp.IsVillager && !mp.IsMilitia && !mp.IsBandit && !mp.IsPatrolParty && !Undead.Party(mp);
-        }
-
         /// <summary>sklad7b (Jeff 09.10 07:35, (1) i (2c)): przydzialy rozdzielaczy DTE druzyny gracza i partii lordow AI (takze towarzyszy i partii
         /// rodu gracza) w trybie "tylko to, co ma" - lordowie: FillPrefix bez dopelniania wzorca; wszyscy: straz przy spawnie (OwnKitSpawn) i DressCode
-        /// ich nie ubiera. Najpierw partie lordow bez wpisu w zbrojowniach DTE (nowa partia po LevyGold - bez darmowego kompletu - dopoki nic nie
-        /// kupi): DTE nie robi im rozdzielacza, wiec ich ludzie szli w PELNYM wzorcu z niczego; teraz pusty wpis i rozdzielacz, jak zalogi (K1c) -
-        /// nic nie maja, walcza bez. Zalogi dochodza pozniej (DistributorsPostfix), umarli bez zmian.</summary>
+        /// ich nie ubiera. Najpierw partie lordow bez rozdzielacza DTE (LordRule): bez wpisu w zbrojowniach DTE (nowa partia po LevyGold - bez
+        /// darmowego kompletu - dopoki nic nie kupi) albo - sklad7b-p (uwagi 2 i 9) - bez wodza (wodz w niewoli, partia rozwiazywana: wpis jest,
+        /// bo chroni go AiGear.KeepGarrisonArmory, ale DTE robi rozdzielacz tylko partii z LeaderHero). Ich ludzie szli w PELNYM wzorcu gry z niczego,
+        /// a co zabili Twoi ludzie, DTE dopisywal do Twojego lupu; teraz rozdzielacz (pusty wpis, gdy go brak), jak zalogi (K1c). Zalogi dochodza
+        /// pozniej (DistributorsPostfix), umarli bez zmian. sklad7b-p (uwaga 4): osobny try na kazdy rozdzielacz - wyjatek w strone braku.</summary>
         private static void OwnAssignments(IDictionary dists, IDictionary sides, MapEvent me, Mission mission)
         {
             var main = MobileParty.MainParty;
@@ -658,32 +767,40 @@ namespace Armoury
                         var mp = pb != null ? pb.MobileParty : null;
                         if (mp == null) continue;
                         byId[mp.Id] = mp;
-                        if (all == null || mp == main || !LordInBattle(mp) || dists.Contains(mp.Id)) continue;
-                        Dictionary<ItemObject, int> arm;
-                        if (!all.TryGetValue(mp.Id, out arm) || arm == null) { arm = new Dictionary<ItemObject, int>(); all[mp.Id] = arm; }
+                        if (all == null || mp == main || !mp.IsActive || !LordRule(mp) || dists.Contains(mp.Id)) continue;
+                        var arm = _sanitize.Invoke(null, new object[] { mp.Id }) as Dictionary<ItemObject, int>;
+                        bool made = arm == null;
+                        if (made) { arm = new Dictionary<ItemObject, int>(); all[mp.Id] = arm; }
                         var d = _ctor.Invoke(new object[] { mission, mp, arm });
                         _run.Invoke(d, null);   // zestaw awaryjny DTE - EmergencyPrefix (OwnKitOn) go nie da
                         dists[mp.Id] = d;
                         sides[mp.Id] = pb.Side;
-                        _bNoEntry++;
-                        Log.Info("Bitwa gracza: " + mp.Name + " - bez wpisu w zbrojowniach DTE (dotad pelny wzorzec z niczego) - pusty wpis, walcza tym, co maja.");
+                        if (made) _bNoEntry++; else _bNoLeader++;
+                        Log.Info("Bitwa gracza: " + mp.Name + (made ? " - bez wpisu w zbrojowniach DTE (dotad pelny wzorzec z niczego) - pusty wpis"
+                                                                    : " - " + (mp.LeaderHero == null ? "bez wodza" : "bez rozdzielacza DTE") + " (dotad pelny wzorzec z niczego) - rozdzielacz Armoury z jej zbrojowni")
+                                 + ", walcza tym, co maja.");
                     }
-                    catch (Exception e) { if (++_stumbles <= 3) Log.Error("GarrisonKit.OwnAssignments(lord bez wpisu)", e); }
+                    catch (Exception e) { if (++_stumbles <= 3) Log.Error("GarrisonKit.OwnAssignments(lord bez rozdzielacza)", e); }
                 }
             }
             catch (Exception e) { if (++_stumbles <= 3) Log.Error("GarrisonKit.OwnAssignments(wpisy)", e); }
-            try
+            var entries = new List<DictionaryEntry>();
+            try { foreach (DictionaryEntry e in dists) entries.Add(e); }
+            catch (Exception ex) { if (++_stumbles <= 3) Log.Error("GarrisonKit.OwnAssignments(lista)", ex); }
+            foreach (var e in entries)
             {
-                foreach (DictionaryEntry e in dists)
+                if (e.Value == null || !(e.Key is MBGUID)) continue;
+                var id = (MBGUID)e.Key;
+                bool isMain = main != null && id == main.Id;
+                try
                 {
-                    if (e.Value == null || !(e.Key is MBGUID)) continue;
-                    var id = (MBGUID)e.Key;
-                    bool isMain = main != null && id == main.Id;
                     MobileParty mp;
                     if (isMain) mp = main;
                     else if (!byId.TryGetValue(id, out mp)) mp = _fDistParty != null ? _fDistParty.GetValue(e.Value) as MobileParty : null;
                     if (mp == null || mp.IsGarrison) continue;   // zalogi - DistributorsPostfix (BareOn)
                     if (Undead.Party(mp)) { _bUndead++; continue; }   // umarli - jak dotad (DTE dopelnia wzorzec)
+                    if (!isMain && !DteDresses(mp)) continue;   // sklad7b-p (uwaga 5): karawany itp. - DTE ich nie ubiera z rozdzielacza (jak w autorozstrzygnieciu)
+                    bool clan = !isMain && mp.ActualClan == Clan.PlayerClan;
                     var al = _fAssigns.GetValue(e.Value) as IEnumerable;
                     if (al == null) continue;
                     foreach (var a in al)
@@ -691,11 +808,18 @@ namespace Armoury
                         if (a == null) continue;
                         if (!isMain) { _ownAssign.Add(a); _asgParty[a] = id; }
                         var eq = _fEq.GetValue(a);
-                        if (eq != null) _spawn[eq] = new SpawnInfo(a, isMain ? 0 : 1, id);
+                        if (eq != null) { _spawn[eq] = new SpawnInfo(a, isMain ? 0 : 1, id, clan); _spawnAsg.Add(a); }
                     }
                 }
+                catch (Exception ex)
+                {
+                    if (++_stumbles <= 3) Log.Error("GarrisonKit.OwnAssignments", ex);
+                    // sklad7b-p (uwaga 4): wyjatek w strone braku, nie mennicy - przydzialy tej partii (poza Twoja) do _ownAssign, zeby FillPrefix nie dopelnil wzorca
+                    if (!isMain)
+                        try { var al = _fAssigns.GetValue(e.Value) as IEnumerable; if (al != null) foreach (var a in al) if (a != null) _ownAssign.Add(a); }
+                        catch { }
+                }
             }
-            catch (Exception ex) { if (++_stumbles <= 3) Log.Error("GarrisonKit.OwnAssignments", ex); }
         }
 
         /// <summary>sklad7b: czy DTE w tej misji wpuszcza konie (jak FillEmptySlots: nie morze, kryjowka ani oblezenie).</summary>
@@ -724,13 +848,20 @@ namespace Armoury
             _battleMission = new WeakReference(mission);
         }
 
-        /// <summary>sklad7b: linia jednej bitwy gracza (do autotestu: ile slotow wzorca zostalo pustych - gracz / lordowie AI / zalogi).</summary>
+        /// <summary>sklad7b: linia jednej bitwy gracza (do autotestu: ile slotow wzorca zostalo pustych - gracz / lordowie AI / zalogi).
+        /// sklad7b-p: Twoj rod osobno (w lordach AI), jezdzcy pieszo, partie bez wodza, ludzie partii z regula poza straza i zgodnosc strazy z DTE.</summary>
         private static void BattleLine(string why)
         {
+            int guarded = _bPlayerMen + _bLordMen + _bGarMen;
+            string check = !_regHooked ? "licznik DTE nie wpiety" : _bDte > guarded ? "NIEZGODNE - straz nie widziala " + (_bDte - guarded) + " ludzi (inny mod podmienil ekwipunek?)" : "zgodne";
             Log.Info("Bitwa gracza (sklad7b, nic z niczego; " + why + "): sloty wzorca bez sztuki (walcza bez) - gracz " + _bPlayerMiss + " (ludzi " + _bPlayerMen
-                     + "), lordowie AI " + _bLordMiss + " (ludzi " + _bLordMen + "), zalogi " + _bGarMiss + " (ludzi " + _bGarMen + "); straz 'nic z niczego' zatrzymala - gracz "
-                     + _bGuardP + ", lordowie " + _bGuardL + ", zalogi " + _bGuardG + "; bez zestawu awaryjnego DTE - druzyna gracza " + _bNoEmergP + ", partie lordow " + _bNoEmergL
-                     + "; konie i rzedy jezdzcow AI pozyczone na bitwe " + _bHorses + "; lordowie bez wpisu DTE (pusty wpis) " + _bNoEntry + "; umarli bez zmian " + _bUndead + ".");
+                     + "), lordowie AI " + _bLordMiss + " (ludzi " + _bLordMen + "; w tym Twoj rod " + _bClanMiss + ", ludzi " + _bClanMen + "), zalogi " + _bGarMiss + " (ludzi " + _bGarMen
+                     + "); jezdzcy pieszo (brak konia w zbrojowni) - gracz " + _bFootP + ", lordowie " + _bFootL + ", zalogi " + _bFootG
+                     + "; straz 'nic z niczego' zatrzymala - gracz " + _bGuardP + ", lordowie " + _bGuardL + ", zalogi " + _bGuardG
+                     + "; przez straz " + guarded + " z " + _bDte + " wystawionych przez DTE z przydzialem regul (" + check + ")"
+                     + "; poza straza (partie z regula bez przydzialu, nie ubrani) " + _bOutside + ", w tym we wzorcu gry " + _bOutsideTpl
+                     + "; bez zestawu awaryjnego DTE - druzyna gracza " + _bNoEmergP + ", partie lordow " + _bNoEmergL
+                     + "; lordowie bez wpisu DTE (pusty wpis) " + _bNoEntry + ", bez wodza (rozdzielacz Armoury) " + _bNoLeader + "; umarli bez zmian " + _bUndead + ".");
         }
 
         /// <summary>sklad7b: po DTE DynamicTroopMissionLogic.OnEndMission (zwroty juz policzone) - linia bitwy i koniec przydzialow tej misji.</summary>
@@ -739,7 +870,14 @@ namespace Armoury
             try { if (BattleTouched()) BattleLine("koniec misji"); }
             catch (Exception e) { Log.Error("GarrisonKit.EndMission", e); }
             ClearBattle(); _battleMission = null;
-            _spawn.Clear(); _ownAssign.Clear(); _garAssign.Clear(); _lordAssign.Clear(); _asgParty.Clear();
+            _spawn.Clear(); _spawnAsg.Clear(); _ownAssign.Clear(); _garAssign.Clear(); _lordAssign.Clear(); _asgParty.Clear();
+        }
+
+        /// <summary>sklad7b-p (uwaga 7): postfiks DTE DynamicTroopMissionLogic.RegisterSpawnedAgentAssignment - czlowiek wystawiony z przydzialem
+        /// objetym regula (ten sam przydzial, ktory straz przy spawnie powinna byla zobaczyc).</summary>
+        public static void RegisterPostfix(object __1)
+        {
+            try { if (__1 != null && _spawnAsg.Count > 0 && _spawnAsg.Contains(__1)) _bDte++; } catch { }
         }
 
         /// <summary>K1 (przeglad): DTE przy spawnie czlowieka partii innej niz gracza wola Assignment.FillEmptySlots - kazdy pusty slot dostaje
@@ -752,9 +890,9 @@ namespace Armoury
         /// K1 (P2, tryb "tylko to, co ma"): oryginal nie biegnie - pusty slot zostaje pusty. Stan (__state): [0..11] sloty puste przed,
         /// [12] tryb "tylko to, co ma"; null - nie przydzial zalogi. K1c (przeglad K1b): wyjatek zawodzi w strone braku (oryginal nie biegnie),
         /// nie mennicy - dotad catch puszczal oryginal bez stanu, wiec wypelnione sloty nie byly oznaczane jako tymczasowe.
-        /// sklad7b: lordowie AI przy OwnKitOn (_ownAssign) - jak zaloga w trybie "tylko to, co ma" ([14] = lord AI); kon i rzad jezdzca AI
-        /// (zaloga i lord) - jego wlasny, pozyczony (LendMount). Autorozstrzygniecie gracza (_simParty): oryginal nie biegnie (lup tylko z tego,
-        /// co mieli; straz na cala partie - SimPostfix).</summary>
+        /// sklad7b: lordowie AI przy OwnKitOn (_ownAssign) - jak zaloga w trybie "tylko to, co ma" ([14] = lord AI). Autorozstrzygniecie gracza
+        /// (_simParty): oryginal nie biegnie (lup tylko z tego, co mieli; straz na cala partie - SimPostfix). sklad7b-p: kon i rzad tylko ze zbrojowni
+        /// (bez pozyczki ze wzorca) - jezdziec bez konia w zbrojowni idzie pieszo, jak u gracza.</summary>
         public static bool FillPrefix(object __instance, out bool[] __state)
         {
             __state = null;
@@ -794,9 +932,7 @@ namespace Armoury
                             }
                         MenUpgrade.NoteBareSlots(bareN);
                     }
-                    // sklad7b: kon jezdzca AI jest jego (Stajnia: oplacony przy awansie) - pozyczony na bitwe, nie do zbrojowni
-                    try { _bHorses += LendMount(__instance, eq); }
-                    catch (Exception ex) { if (++_stumbles <= 3) Log.Error("GarrisonKit.LendMount", ex); }
+                    // sklad7b-p (uwagi 3 i 11): bez "pozyczki" konia ze wzorca - kon tylko ze zbrojowni partii (jak u gracza), inaczej pieszo
                 }
                 else
                     for (int i = 0; i < 12; i++) { var e = eq[(EquipmentIndex)i]; st[i] = e.IsEmpty || e.Item == null; }
@@ -827,49 +963,6 @@ namespace Armoury
                 return false;
             }
             catch { return true; }
-        }
-
-        /// <summary>sklad7b: kon i rzad jezdzca AI (lord, zaloga) w trybie "tylko to, co ma" - jego wlasny (oplacony przy awansie - Stajnia; konny
-        /// ochotnik ma swojego - paczka 160), a zbrojownie AI koni nie trzymaja (ColdStart, 171, MenPurse - "bez koni"). Gdy DTE nie dal mu konia
-        /// ze zbrojowni, slot dostaje konia (i rzad tej samej rodziny) wzorca jako TYMCZASOWY: jedzie na nim, spawn go nie zdejmuje, a zwrot i lup
-        /// DTE go nie oddaja (dotad FillEmptySlots dawal go jako zwykla sztuke - kazda bitwa dopisywala konie do zbrojowni lorda). Tylko tam,
-        /// gdzie DTE wpuszcza konie (jak FillEmptySlots: nie morze, kryjowka ani oblezenie). Zwraca liczbe slotow.</summary>
-        private static int LendMount(object asg, Equipment eq)
-        {
-            if (!_mountsOk || asg == null || eq == null || _getRef == null || _setEq == null || _markTemp == null) return 0;
-            if (_canMount != null && !(bool)_canMount.Invoke(asg, null)) return 0;
-            var rf = _getRef.Invoke(asg, null) as Equipment;
-            if (rf == null) return 0;
-            int n = 0;
-            var horse = eq[EquipmentIndex.Horse];
-            var rh = rf[EquipmentIndex.Horse];
-            if ((horse.IsEmpty || horse.Item == null) && !rh.IsEmpty && rh.Item != null)
-            {
-                _setEq.Invoke(asg, new object[] { EquipmentIndex.Horse, new EquipmentElement(rh.Item) });
-                _markTemp.Invoke(asg, new object[] { EquipmentIndex.Horse, rh.Item });
-                horse = eq[EquipmentIndex.Horse];
-                n++;
-            }
-            var harn = eq[EquipmentIndex.HorseHarness];
-            var rr = rf[EquipmentIndex.HorseHarness];
-            if (!horse.IsEmpty && horse.Item != null && (harn.IsEmpty || harn.Item == null) && !rr.IsEmpty && rr.Item != null && SameFamily(horse.Item, rr.Item))
-            {
-                _setEq.Invoke(asg, new object[] { EquipmentIndex.HorseHarness, new EquipmentElement(rr.Item) });
-                _markTemp.Invoke(asg, new object[] { EquipmentIndex.HorseHarness, rr.Item });
-                n++;
-            }
-            return n;
-        }
-
-        /// <summary>Rzad tej samej rodziny co wierzchowiec (DragonUnmount, crash 14.09: inna rodzina = AccessViolation w AddMountMesh).</summary>
-        private static bool SameFamily(ItemObject horse, ItemObject harness)
-        {
-            try
-            {
-                var mc = horse != null && horse.HorseComponent != null ? horse.HorseComponent.Monster : null;
-                return mc != null && harness != null && harness.ArmorComponent != null && harness.ArmorComponent.FamilyType == mc.FamilyType;
-            }
-            catch { return false; }
         }
 
         /// <summary>Po FillEmptySlots (Priority.Last - po strazach CrashScribe): sloty wypelnione z niczego jako tymczasowe (nie w trybie
@@ -913,15 +1006,19 @@ namespace Armoury
         /// umarlych, pancerz ponad Atletyke); po bitwie DTE oddawal taka sztuke do zbrojowni zalogi (mennica), a w trybie "tylko to, co ma"
         /// zaloga walczyla czyms, czego nie ma. Kazda nietymczasowa sztuka slotow 0-3 i 5-9 musi miec pokrycie w zbrojowni zalogi (licznik
         /// w obrebie czlowieka); bez pokrycia: tryb "tylko to, co ma" - slot pusty, inaczej - slot tymczasowy (walczy tym, spawn nie zdejmuje,
-        /// zwrot nie oddaje). Kon i rzad (10-11) poza straza - do zbrojowni zalogi nie trafiaja, a dopelnienie FillEmptySlots jest wyzej
-        /// oznaczane jako tymczasowe. Zwraca liczbe zatrzymanych slotow.</summary>
+        /// zwrot nie oddaje). Kon i rzad (10-11) poza ta straza - w trybie "tylko to, co ma" pochodza tylko z rozdania zbrojowni (sklad7b-p: kon
+        /// jest sztuka zbrojowni; podmiany przy spawnie lapie SpawnGuard), a dopelnienie FillEmptySlots w trybie progu jest wyzej oznaczane jako
+        /// tymczasowe. Zwraca liczbe zatrzymanych slotow.</summary>
         private static int Guard(object asg, Equipment eq, bool bare)
         {
             MBGUID gid;
             if (asg == null || eq == null || !_asgParty.TryGetValue(asg, out gid)) return 0;
             var all = AiGear.Armories();
+            // sklad7b-p (uwaga 14): zbrojownie nieczytelne - bez strazy, jak SpawnGuard (nie rozbieramy ludzi przez blad odczytu); brak wpisu przy
+            // czytelnym slowniku dalej znaczy "pusta zbrojownia"
+            if (all == null) return 0;
             Dictionary<ItemObject, int> arm = null;
-            if (all != null) all.TryGetValue(gid, out arm);
+            all.TryGetValue(gid, out arm);
             Dictionary<string, int> used = null;
             int n = 0;
             foreach (int i in BareSlots)
@@ -961,33 +1058,155 @@ namespace Armoury
         // ------------------------------------------------------------ sklad7b: straz przy spawnie, autorozstrzygniecie
         /// <summary>sklad7b: wolane z DressCode.Prefix (Mission.SpawnAgent, Priority.Last - po prefiksie DTE, FillEmptySlots ze strazami CrashScribe
         /// i DragonUnmount). Ekwipunek przydzialu w trybie "tylko to, co ma" (druzyna gracza, lord AI, zaloga): ostatnia straz "nic z niczego"
-        /// (SpawnGuard) i liczniki bitwy. true - DressCode go nie ubiera (kto nie ma sztuki, walczy bez niej).</summary>
+        /// (SpawnGuard) i liczniki bitwy. true - DressCode go nie ubiera (kto nie ma sztuki, walczy bez niej).
+        /// sklad7b-p (uwaga 6): zaloga (rodzaj 2) - druga straz tylko przy TroopsFightWithOwnKitOnly (wylaczone = jak K1c).</summary>
         internal static bool OwnKitSpawn(Equipment eq)
         {
             SpawnInfo si;
             if (eq == null || _spawn.Count == 0 || !_spawn.TryGetValue(eq, out si) || si == null) return false;
             try
             {
-                int g = SpawnGuard(si, eq);
+                int g = si.Kind != 2 || OwnKitOn ? SpawnGuard(si, eq) : 0;
                 int miss = Missing(si.Asg, eq);
-                if (si.Kind == 0) { _bPlayerMen++; _bPlayerMiss += miss; _bGuardP += g; }
-                else if (si.Kind == 1) { _bLordMen++; _bLordMiss += miss; _bGuardL += g; }
-                else { _bGarMen++; _bGarMiss += miss; _bGuardG += g; }
+                var rf = _getRef != null ? _getRef.Invoke(si.Asg, null) as Equipment : null;
+                int foot = RiderOnFoot(si.Asg, eq, rf) ? 1 : 0;
+                if (si.Kind == 0) { _bPlayerMen++; _bPlayerMiss += miss; _bGuardP += g; _bFootP += foot; }
+                else if (si.Kind == 1)
+                {
+                    _bLordMen++; _bLordMiss += miss; _bGuardL += g; _bFootL += foot;
+                    if (si.Clan) { _bClanMen++; _bClanMiss += miss; }
+                }
+                else { _bGarMen++; _bGarMiss += miss; _bGuardG += g; _bFootG += foot; }
             }
             catch (Exception e) { if (++_stumbles <= 3) Log.Error("GarrisonKit.OwnKitSpawn", e); }
             return true;
         }
 
+        private static WeakReference _dteMissionRef;
+        private static bool _dteMissionVal;
+        private static int _outsideLog;
+
+        /// <summary>sklad7b-p (uwagi 7, 9 i 16): wolane z DressCode.Prefix dla nie-bohatera, ktorego ekwipunku nie ma w _spawn. Czlowiek partii z regula
+        /// "tylko to, co ma" (druzyna gracza i partie lordow/z wpisem DTE - TroopsFightWithOwnKitOnly; zaloga - BareOn) w bitwie, w ktorej DTE ubiera
+        /// z rozdzielaczy, a mimo to poza straza: inny mod podmienil ekwipunek na kopie (Mission.SpawnAgent miedzy DTE a DressCode), DTE nie dal mu
+        /// przydzialu (wzorzec gry z niczego) albo nasza latka DTE nie jest wpieta ("BRAK"). Dotad DressCode ubieral go ze wzorca (po bitwie DTE
+        /// oddawal to do zbrojowni - mennica). Teraz: nie ubieramy (w strone braku), liczymy - linia bitwy "poza straza". true - nie ubierac.</summary>
+        internal static bool OutsideGuard(Mission m, AgentBuildData abd, bool overridden)
+        {
+            try
+            {
+                bool own = OwnKitOn, bare = BareOn;
+                if ((!own && !bare) || abd == null || MapEvent.PlayerMapEvent == null || !DteMission(m)) return false;
+                var mp = AgentParty(abd.AgentOrigin);
+                if (mp == null || mp.IsCaravan || mp.IsVillager || mp.IsMilitia || mp.IsBandit || mp.IsPatrolParty) return false;
+                bool rule;
+                if (mp.IsMainParty) rule = own;
+                else if (mp.IsGarrison) rule = bare && !(own && Undead.Party(mp));
+                else if (!own || Undead.Party(mp)) rule = false;
+                else if (mp.IsLordParty) rule = true;
+                else { var all = AiGear.Armories(); rule = all != null && all.ContainsKey(mp.Id); }
+                if (!rule) return false;
+                BattleFor(m);
+                _bOutside++;
+                if (!overridden) _bOutsideTpl++;
+                if (_outsideLog < 5)
+                {
+                    _outsideLog++;
+                    Log.Info("Bitwa gracza: " + (abd.AgentCharacter != null ? abd.AgentCharacter.Name.ToString() : "?") + " z " + mp.Name + " - poza straza 'nic z niczego' ("
+                             + (overridden ? "ekwipunek spoza przydzialu regul - inny mod albo latka niewpieta" : "bez przydzialu DTE - wzorzec gry") + "); DressCode go nie ubiera.");
+                }
+                return true;
+            }
+            catch { return false; }
+        }
+
+        /// <summary>sklad7b-p: misja, w ktorej DTE ubiera ludzi z rozdzielaczy (jak SpawnAgentPatch.Prefix: logika DTE w misji i IMissionAgentSpawnLogic
+        /// albo zasadzka w kryjowce). Raz na misje.</summary>
+        private static bool DteMission(Mission m)
+        {
+            if (m == null) return false;
+            if (_dteMissionRef != null && ReferenceEquals(_dteMissionRef.Target, m)) return _dteMissionVal;
+            bool dte = false, spawn = false;
+            try
+            {
+                foreach (var b in m.MissionBehaviors)
+                {
+                    if (b == null) continue;
+                    var n = b.GetType().Name;
+                    if (n == "DynamicTroopMissionLogic") dte = true;
+                    if (b is IMissionAgentSpawnLogic || n == "HideoutAmbushMissionController") spawn = true;
+                }
+            }
+            catch { }
+            _dteMissionRef = new WeakReference(m);
+            _dteMissionVal = dte && spawn;
+            return _dteMissionVal;
+        }
+
+        /// <summary>Partia czlowieka (jak DTE Global.GetAgentParty).</summary>
+        private static MobileParty AgentParty(IAgentOriginBase o)
+        {
+            PartyBase pb = null;
+            var a = o as TaleWorlds.CampaignSystem.AgentOrigins.PartyAgentOrigin;
+            if (a != null) pb = a.Party;
+            else
+            {
+                var g = o as TaleWorlds.CampaignSystem.AgentOrigins.PartyGroupAgentOrigin;
+                if (g != null) pb = g.Party;
+                else { var s = o as TaleWorlds.CampaignSystem.AgentOrigins.SimpleAgentOrigin; if (s != null) pb = s.Party; }
+            }
+            return pb != null ? pb.MobileParty : null;
+        }
+
+        private static bool _clanFillDone;
+
+        /// <summary>sklad7b-p (uwaga 13): raz na sesje (pierwsza doba po wczytaniu) - wypelnienie zbrojowni kazdej partii Twojego rodu (towarzysze,
+        /// partie rodu) wobec wzorca ich ludzi. Od sklad7b walcza w Twoich bitwach tylko tym, co ich partia ma; partie zalozone przed sklad7b
+        /// dostawaly ludzi bez kompletow (zostawaly w Twojej zbrojowni), wiec moga byc chude. Ponizej 60% - komunikat w grze.</summary>
+        internal static void ClanFillOnce()
+        {
+            if (_clanFillDone || !OwnKitOn) return;
+            _clanFillDone = true;
+            try
+            {
+                var all = AiGear.Armories();
+                if (all == null || Clan.PlayerClan == null) return;
+                var line = new List<string>(); var low = new List<string>();
+                int lowN = 0, lowFill = 0; string lowName = null;
+                foreach (var mp in MobileParty.AllLordParties)
+                {
+                    try
+                    {
+                        if (mp == null || !mp.IsActive || mp.IsMainParty || mp.ActualClan != Clan.PlayerClan || Undead.Party(mp) || mp.MemberRoster == null || mp.MemberRoster.TotalRegulars <= 0) continue;
+                        Dictionary<ItemObject, int> arm; all.TryGetValue(mp.Id, out arm);
+                        int fill = FillPercent(mp, arm, null);
+                        string name = mp.Name != null ? mp.Name.ToString() : mp.StringId;
+                        line.Add(name + " " + fill + "%");
+                        if (fill < 60) { lowN++; lowName = name; lowFill = fill; if (low.Count < 3) low.Add(name + " (" + fill + "%)"); }
+                    }
+                    catch (Exception e) { if (++_stumbles <= 3) Log.Error("GarrisonKit.ClanFillOnce(partia)", e); }
+                }
+                Log.Info("Partie Twojego rodu (sklad7b-p, raz na sesje): wypelnienie zbrojowni wobec wzorca ludzi - " + (line.Count > 0 ? string.Join(", ", line.ToArray()) : "brak partii") + ".");
+                if (lowN == 1)
+                    Log.Player(lowName + " has kit for only " + lowFill + "% of its men - in battle they fight with what its stores hold until it buys more.", true);
+                else if (lowN > 1)
+                    Log.Player(lowN + " parties of your clan have kit for few of their men: " + string.Join(", ", low.ToArray()) + (lowN > low.Count ? " and more" : "")
+                               + " - in battle they fight with what their stores hold until they buy more.", true);
+            }
+            catch (Exception e) { Log.Error("GarrisonKit.ClanFillOnce", e); }
+        }
+
         /// <summary>sklad7b - STRAZ "NIC Z NICZEGO" PRZY SPAWNIE, jedna dla druzyny gracza, lordow AI i zalog (lordowie i zalogi maja tez Guard
         /// w FillPostfix; tu dochodza podmiany DragonUnmount - legenda, sprzet olbrzymow, bron i pancerz ponad umiejetnosc, kon ponad Jazde - robione
         /// na tym samym ekwipunku z niczego, a u druzyny gracza RealmWard - sztuka wzorca w miejsce obcej zza Waskiego Morza). Zbrojownia jest tu
-        /// pomniejszona o wczesniej wystawionych ludzi (DTE zdejmuje sztuki w postfiksie spawnu). Sloty 0-3 i 5-9: kazda nietymczasowa sztuka
-        /// musi miec pokrycie (licznik w obrebie czlowieka), inaczej slot pusty. Kon i rzad: druzyna gracza - tylko ze zbrojowni (bez pokrycia
-        /// pieszo, rzad schodzi z koniem); jezdziec AI - jego wlasny: bez pokrycia slot tymczasowy (pozyczony). Zbrojownia nieznana - bez strazy
-        /// (nie rozbieramy ludzi przez blad odczytu). Zwraca liczbe zatrzymanych slotow 0-9.</summary>
+        /// pomniejszona o wczesniej wystawionych ludzi (DTE zdejmuje sztuki w postfiksie spawnu). Sloty 0-3 i 5-11: kazda nietymczasowa sztuka
+        /// musi miec pokrycie (licznik w obrebie czlowieka), inaczej slot pusty; kon bez pokrycia - pieszo, rzad schodzi z koniem (sklad7b-p: jedna
+        /// regula dla gracza i AI - bez pozyczki konia ze wzorca). Zbrojownie nieczytelne - bez strazy (nie rozbieramy ludzi przez blad odczytu);
+        /// brak wpisu partii AI przy czytelnym slowniku - pusta zbrojownia. sklad7b-p (uwaga 7): wyjatek w polowie - sloty bez sprawdzonego pokrycia
+        /// puste (w strone braku, bez refleksji). Zwraca liczbe zatrzymanych slotow 0-9.</summary>
         private static int SpawnGuard(SpawnInfo si, Equipment eq)
         {
-            if (_isTemp == null || _setEq == null || _markTemp == null) return 0;
+            if (_isTemp == null || _setEq == null) return 0;
             Func<ItemObject, int> have;
             if (si.Kind == 0)
             {
@@ -998,40 +1217,54 @@ namespace Armoury
             else
             {
                 var all = AiGear.Armories();
+                if (all == null) return 0;
                 Dictionary<ItemObject, int> arm = null;
-                if (all == null || !all.TryGetValue(si.Party, out arm) || arm == null) return 0;
+                all.TryGetValue(si.Party, out arm);
                 have = it => Have(arm, it);
             }
             var used = new Dictionary<string, int>();
-            int n = 0;
-            for (int k = 0; k < 12; k++)
+            int n = 0, k = 0;
+            try
             {
-                if (k == 4) continue;   // proporzec
-                var idx = (EquipmentIndex)k;
-                var e = eq[idx]; var it = e.Item;
-                if (e.IsEmpty || it == null) continue;
-                if ((bool)_isTemp.Invoke(si.Asg, new object[] { idx, it })) continue;
-                string id = it.StringId ?? "";
-                int u; used.TryGetValue(id, out u);
-                if (u < have(it)) { used[id] = u + 1; continue; }
-                if (k >= 10 && si.Kind != 0)
+                for (k = 0; k < 12; k++)
                 {
-                    _markTemp.Invoke(si.Asg, new object[] { idx, it });   // kon/rzad jezdzca AI - jego wlasny, pozyczony
-                    _bHorses++;
-                    continue;
+                    if (k == 4) continue;   // proporzec
+                    var idx = (EquipmentIndex)k;
+                    var e = eq[idx]; var it = e.Item;
+                    if (e.IsEmpty || it == null) continue;
+                    if ((bool)_isTemp.Invoke(si.Asg, new object[] { idx, it })) continue;
+                    string id = it.StringId ?? "";
+                    int u; used.TryGetValue(id, out u);
+                    if (u < have(it)) { used[id] = u + 1; continue; }
+                    _setEq.Invoke(si.Asg, new object[] { idx, default(EquipmentElement) });
+                    if (k == 10)
+                    {
+                        var hr = eq[EquipmentIndex.HorseHarness];
+                        if (!hr.IsEmpty && hr.Item != null) _setEq.Invoke(si.Asg, new object[] { EquipmentIndex.HorseHarness, default(EquipmentElement) });
+                    }
+                    if (k < 10) n++;
+                    if (_guardLog < 10)
+                    {
+                        _guardLog++;
+                        Log.Info("Bitwa gracza: straz nic z niczego przy spawnie - " + id + " (slot " + k + ", " + (si.Kind == 0 ? "druzyna gracza" : si.Kind == 1 ? "lord AI" : "zaloga")
+                                 + ") bez pokrycia w zbrojowni - slot pusty" + (k == 10 ? " (pieszo)." : "."));
+                    }
                 }
-                _setEq.Invoke(si.Asg, new object[] { idx, default(EquipmentElement) });
-                if (k == 10)
+            }
+            catch (Exception ex)
+            {
+                if (++_stumbles <= 3) Log.Error("GarrisonKit.SpawnGuard", ex);
+                for (int j = Math.Max(0, k); j < 12; j++)
                 {
-                    var hr = eq[EquipmentIndex.HorseHarness];
-                    if (!hr.IsEmpty && hr.Item != null) _setEq.Invoke(si.Asg, new object[] { EquipmentIndex.HorseHarness, default(EquipmentElement) });
-                }
-                if (k < 10) n++;
-                if (_guardLog < 10)
-                {
-                    _guardLog++;
-                    Log.Info("Bitwa gracza: straz nic z niczego przy spawnie - " + id + " (slot " + k + ", " + (si.Kind == 0 ? "druzyna gracza" : si.Kind == 1 ? "lord AI" : "zaloga")
-                             + ") bez pokrycia w zbrojowni - slot pusty.");
+                    if (j == 4) continue;
+                    try
+                    {
+                        var e2 = eq[(EquipmentIndex)j];
+                        if (e2.IsEmpty || e2.Item == null) continue;
+                        eq.AddEquipmentToSlotWithoutAgent((EquipmentIndex)j, default(EquipmentElement));
+                        if (j < 10) n++;
+                    }
+                    catch { }
                 }
             }
             return n;
@@ -1088,10 +1321,51 @@ namespace Armoury
             try { if (SimRule(__0)) _simParty = __0; } catch { _simParty = null; }
         }
 
+        /// <summary>sklad7b-p (uwagi 5 i 6): ten sam predykat co w misji - zaloga (BareOn, bez umarlych) albo partia, ktora DTE ubiera z rozdzielacza
+        /// (DteDresses: bez karawan, wsi, milicji, bandytow, patroli, umarlych); dotad kazda partia z wpisem DTE poza zaloga, wiec ta sama banda
+        /// z wpisem dawala w misji lup ze wzorca, a w autorozstrzygnieciu - ze zbrojowni. Calosc tylko przy TroopsFightWithOwnKitOnly
+        /// (wylaczone = jak przed sklad7b).</summary>
         private static bool SimRule(MobileParty mp)
         {
-            if (mp == null || mp.IsMainParty || Undead.Party(mp)) return false;
-            return mp.IsGarrison ? BareOn : OwnKitOn;
+            if (mp == null || mp.IsMainParty || !OwnKitOn) return false;
+            if (mp.IsGarrison) return BareOn && !Undead.Party(mp);
+            return DteDresses(mp);
+        }
+
+        /// <summary>sklad7b-p (uwagi 1 i 10, krytyczne): prefiks DTE EveryoneCampaignBehavior.DistributePlayerSimulationLoot (wygrane
+        /// autorozstrzygniecie gracza). DTE wola CreateMapEventAssignments tylko dla przegranego z wpisem w zbrojowniach (IsValid + SanitizePartyArmory);
+        /// bez wpisu bierze RandomBattleEquipment - pelny wzorzec z niczego - do Twojego lupu albo zbrojowni zwyciezcow. Bez wpisu bywaja: nowa
+        /// partia lorda (LevyGold - bez darmowego kompletu), lord i zaloga z pusta zbrojownia po wczytaniu (DTE i GarrisonArmory.Export nie zapisuja
+        /// pustych). Tu - jak w misji (OwnAssignments, K1c dla zalog) - pusty wpis dla przegranych objetych regula: partia lorda (LordRule, takze
+        /// bez wodza) i zaloga (BareOn), bez umarlych. Wtedy SimPrefix/SimPostfix dzialaja, a lup to tylko to, co mieli. DTE pustych wpisow nie zapisuje.</summary>
+        public static void SimLootPrefix(MBReadOnlyList<MapEventParty> __2)
+        {
+            _simMade.Clear();
+            try
+            {
+                if (__2 == null || !OwnKitOn) return;
+                var all = AiGear.Armories();
+                if (all == null) return;
+                var names = new List<string>();
+                foreach (var mep in __2)
+                {
+                    try
+                    {
+                        var mp = mep != null && mep.Party != null ? mep.Party.MobileParty : null;
+                        if (mp == null || mp.IsMainParty || all.ContainsKey(mp.Id)) continue;
+                        bool rule = mp.IsGarrison ? BareOn && !Undead.Party(mp) : LordRule(mp);
+                        if (!rule) continue;
+                        all[mp.Id] = new Dictionary<ItemObject, int>();
+                        _simMade.Add(mp.Id);
+                        if (names.Count < 5) names.Add(mp.Name != null ? mp.Name.ToString() : mp.StringId);
+                    }
+                    catch (Exception e) { if (++_stumbles <= 3) Log.Error("GarrisonKit.SimLootPrefix(partia)", e); }
+                }
+                if (_simMade.Count > 0)
+                    Log.Info("Autorozstrzygniecie gracza (sklad7b-p, lup): pusty wpis zalozony " + _simMade.Count + " przegranym bez wpisu w zbrojowniach DTE (dotad lup z pelnego wzorca z niczego): "
+                             + string.Join(", ", names.ToArray()) + (_simMade.Count > names.Count ? " i inni" : "") + ".");
+            }
+            catch (Exception e) { if (++_stumbles <= 3) Log.Error("GarrisonKit.SimLootPrefix", e); }
         }
 
         /// <summary>sklad7b: po CreateMapEventAssignments - straz "nic z niczego" na cala partie (bez spawnu nic nie schodzi ze zbrojowni, wiec licznik
@@ -1126,7 +1400,7 @@ namespace Armoury
                 }
                 if (men > 0)
                     Log.Info("Autorozstrzygniecie gracza (sklad7b, lup): " + mp.Name + " - ludzi " + men + ", bez dopelniania wzorca z niczego " + _simSkipped
-                             + ", straz zatrzymala " + n + " szt. (lup tylko z ich zbrojowni).");
+                             + ", straz zatrzymala " + n + " szt. (lup tylko z ich zbrojowni" + (_simMade.Contains(mp.Id) ? "; pusty wpis zalozony przed lupem - sklad7b-p" : "") + ").");
             }
             catch (Exception e) { if (++_stumbles <= 3) Log.Error("GarrisonKit.SimPostfix", e); }
         }
