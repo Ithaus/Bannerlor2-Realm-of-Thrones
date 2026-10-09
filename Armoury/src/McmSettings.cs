@@ -2732,6 +2732,14 @@ namespace Armoury
         [SettingPropertyGroup("Map villages")]
         public bool MapVillageNamesOnHover { get; set; } = true;
 
+        [SettingPropertyBool("Mill On Bank", HintText = "water mills stand on the river bank, not in the stream: the wheel sits at the water's edge and the mill village is set half a step back towards land. Off = the wheel a little out in the water, as before")]
+        [SettingPropertyGroup("Map villages")]
+        public bool MillOnBank { get; set; } = true;
+
+        [SettingPropertyBool("Village Tip Held By", HintText = "the map village tooltip names who holds the land, live from the game: 'A village of the Tumbledown lands, held by House Stark of Winterfell' ('your fief' for your own). Off = 'A village of the X district', as before")]
+        [SettingPropertyGroup("Map villages")]
+        public bool VillageTipHeldBy { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -3414,6 +3422,8 @@ namespace Armoury
             s.MapVillagesEnabled = MapVillagesEnabled;
             s.MapVillagesHideAboveCameraHeight = MapVillagesHideAboveCameraHeight;
             s.MapVillageNamesOnHover = MapVillageNamesOnHover;
+            s.MillOnBank = MillOnBank;
+            s.VillageTipHeldBy = VillageTipHeldBy;
         }
 
         internal static void Apply()

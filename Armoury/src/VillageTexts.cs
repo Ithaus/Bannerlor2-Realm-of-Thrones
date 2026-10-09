@@ -13,6 +13,11 @@ namespace Armoury.Villages
         public const string VilRebuilt = "{=arm_vil_rebuilt}{VILLAGE} has been rebuilt";
         public const string VilAbandoned = "{=arm_vil_abandoned}{VILLAGE} lies abandoned";
         public const string VilTipDistrict = "{=arm_vil_tip_district}A village of the {DISTRICT} district";
+        // T7 (noc 08/09.10, raport 08 W-2): linia pana na zywo z gry - dopisane recznie (VillageTexts.xml / teksty_cs.py nie ma w repo)
+        public const string VilTipHeld = "{=arm_vil_tip_held}A village of {LANDS}, held by {HOUSE} of {SEAT}";
+        public const string VilTipHeldOwn = "{=arm_vil_tip_held_own}A village of {LANDS}, your fief";
+        public const string VilLands = "{=arm_vil_lands}the {NAME} lands";
+        public const string VilLandsOf = "{=arm_vil_lands_of}the lands of {NAME}";
         public const string VilTipPeople = "{=arm_vil_tip_people}{PEOPLE} souls in {SETTLEMENTS} settlements";
         public const string VilTipBurning = "{=arm_vil_tip_burning}{RAIDER} is putting it to the torch.";
         public const string VilTipBurned = "{=arm_vil_tip_burned}Burned {DAYS} days ago. {RETURNED} of {PEOPLE} souls have come back.";
