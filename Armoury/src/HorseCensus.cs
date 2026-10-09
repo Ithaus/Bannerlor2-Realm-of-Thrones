@@ -515,6 +515,7 @@ namespace Armoury
                 Func<bool, string> yn = b => b ? "TAK" : "NIE";
                 Log.Info("Armie 175 (Armoury) - wylaczniki przy starcie sesji: pomiar Army175Measure " + yn(s.Army175Measure)
                          + " | kon za awans AI do zbrojowni AiUpgradeHorseToArmory " + yn(s.AiUpgradeHorseToArmory)
+                         + " (sklad9: takze przy TroopsFightWithOwnKitOnly " + yn(s.TroopsFightWithOwnKitOnly) + " - dziala: " + yn(s.AiUpgradeHorseToArmory || s.TroopsFightWithOwnKitOnly) + ")"
                          + " | wolne konie zbrojowni najpierw AiFreeArmoryHorsesFirst " + yn(s.AiFreeArmoryHorsesFirst)
                          + " | straz konia Dothrakow Army175DothrakiHorseGuard " + yn(s.Army175DothrakiHorseGuard) + " (dziala: " + yn(RotHorseGuard.On)
                          + "; CS 2.1 piesi w puli ROT: " + CsMarks.Describe("DothrakiPoolActive") + ")"
