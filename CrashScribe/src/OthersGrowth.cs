@@ -25,8 +25,14 @@ namespace CrashScribe
     ///  trupow; dla rodu bez krolestwa praktycznie nieosiagalny - audyt 05.10).
     ///
     /// Latki (prefiksy Harmony):
-    ///  - OnMobilePartyCreated: partia Innych - oryginal nie biegnie (licznik +100). Cudzy prefiks BKROTPatch
-    ///    (ROTOthersCampaignBehaviorNullPatch: _wight jeszcze null) zostaje - oba tylko pomijaja ten sam AddToCounts.
+    ///  - OnMobilePartyCreated: partia klanu ROTClans.WhiteWalkers (StringId ROTclan_126 - ten sam warunek co ROT:1301)
+    ///    z _wight != null - oryginal nie biegnie (licznik +100, osobno bandy lordow i inne partie klanu: bandyci z kryjowek,
+    ///    partie niestandardowe). Cudzy prefiks BKROTPatch (ROTOthersCampaignBehaviorNullPatch: _wight jeszcze null)
+    ///    zostaje - przy _wight == null przepuszczamy i nic nie liczymy.
+    ///    WYJATEK - BILANS OTWARCIA (Jeff 07.10, STAN-PRAC pytanie 2: "616 dawnych umarlych na start - TAK"; projekt R2,
+    ///    REGULY-KRAIN-I-DLUGU 4.2 A pkt 1): w pierwszych OthersStartDowryDays dobach kampanii (domyslnie 2) +100 przechodzi
+    ///    i liczy sie osobno jako "bilans otwarcia" - 4 bandy startu po 154 = 616, inaczej Zew (cel 520) i Pochod (prog 500)
+    ///    nie mialyby z czego ruszyc. Do czasu puli cial (R4). W kampanii starszej niz te doby wyjatek nie dziala.
     ///  - OnDailyTickParty: partia Innych - oryginal nie biegnie (licznik +2, gdy warunek ROT bylby spelniony).
     ///  - RecruitmentCampaignBehavior.ApplyInternal (nie GetRecruitVolunteerFromMap - jednolinijkowa, JIT moze ja wkleic
     ///    w HourlyTickParty i latka by nie dzialala): VolunteerFromMap dla klanu Innych - nic nie zachodzi (ani ludzi, ani
@@ -39,7 +45,8 @@ namespace CrashScribe
     internal static class OthersGrowth
     {
         // liczniki od ostatniej linii dobowej
-        private static int _births, _birthWights;
+        private static int _births, _birthWights, _birthsOther;   // _births = bandy lordow, _birthsOther = inne partie klanu Innych
+        private static int _openTimes;                             // bilans otwarcia (+100 przepuszczone na starcie kampanii)
         private static int _dailyTimes, _dailyWights;
         private static int _mapTimes, _mapMen;
         // od wczytania (sesja kampanii)
@@ -50,6 +57,9 @@ namespace CrashScribe
         {
             return c != null && c.Culture != null && c.Culture.StringId == "whitewalker";   // to samo co ROT Extensions.IsWhiteWalker
         }
+
+        private const string OthersClanId = "ROTclan_126";   // ROT ROTClans.WhiteWalkers => GetClanByID("ROTclan_126")
+        private static System.Reflection.FieldInfo _wightField;   // ROTOthersCampaignBehavior._wight (BKROTPatch: null = ROT nic nie da)
 
         private static void Stumble(string where, Exception e)
         {
@@ -80,7 +90,14 @@ namespace CrashScribe
                     if (m == null) parts.Add("narodziny +100 NIEZNALEZIONE");
                     else
                     {
-                        try { harmony.Patch(m, prefix: new HarmonyMethod(typeof(OthersGrowth), nameof(BirthPrefix))); hooked++; parts.Add("narodziny +100 wpiete"); }
+                        _wightField = AccessTools.Field(tOth, "_wight");
+                        try
+                        {
+                            harmony.Patch(m, prefix: new HarmonyMethod(typeof(OthersGrowth), nameof(BirthPrefix))); hooked++;
+                            parts.Add("narodziny +100 wpiete" + (Config.OthersStartDowryDays > 0
+                                ? " (bilans otwarcia: +100 przepuszczone w pierwszych " + Config.OthersStartDowryDays + " dobach kampanii)"
+                                : " (bez bilansu otwarcia, OthersStartDowryDays = 0)"));
+                        }
                         catch (Exception e) { parts.Add("narodziny +100 BLAD"); Stumble("OthersGrowth.Install(birth)", e); }
                     }
                 }
@@ -117,14 +134,23 @@ namespace CrashScribe
             catch (Exception e) { Stumble("OthersGrowth.Install", e); }
         }
 
-        /// <summary>Prefiks ROTOthersCampaignBehavior.OnMobilePartyCreated: nowa partia Innych bez +100 trupow.</summary>
-        public static bool BirthPrefix(MobileParty __0)
+        /// <summary>Prefiks ROTOthersCampaignBehavior.OnMobilePartyCreated: nowa partia Innych bez +100 trupow
+        /// (poza bilansem otwarcia w pierwszych dobach kampanii).</summary>
+        public static bool BirthPrefix(object __instance, MobileParty __0)
         {
             try
             {
                 if (!Config.OthersNoFreeGrowth || !Config.OthersNoBirthDowry) return true;
-                if (__0 == null || !IsOthers(__0.ActualClan)) return true;   // ROT i tak nic nie robi
-                _births++; _birthWights += 100; _totalWights += 100;
+                // tylko gdy ROT naprawde by dosypal: klan dokladnie ROTClans.WhiteWalkers i _wight juz jest
+                if (__0 == null || __0.ActualClan == null || __0.ActualClan.StringId != OthersClanId) return true;
+                if (_wightField != null && __instance != null && _wightField.GetValue(__instance) == null) return true;
+                if (Config.OthersStartDowryDays > 0)
+                {
+                    float elapsed = Campaign.Current.Models.CampaignTimeModel.CampaignStartTime.ElapsedDaysUntilNow;
+                    if (elapsed < Config.OthersStartDowryDays) { _openTimes++; return true; }   // bilans otwarcia (Jeff 07.10: 616 na start)
+                }
+                if (__0.IsLordParty) _births++; else _birthsOther++;
+                _birthWights += 100; _totalWights += 100;
                 return false;
             }
             catch (Exception e) { Stumble("OthersGrowth.Birth", e); return true; }
@@ -171,20 +197,22 @@ namespace CrashScribe
                 int day = 0;
                 try { day = (int)(CampaignTime.Now - Campaign.Current.Models.CampaignTimeModel.CampaignStartTime).ToDays; } catch { }
                 int sum = _birthWights + _dailyWights + _mapMen;
-                Scribe.Line("Inni bez dosypki: dzien " + day + " - nie dosypano " + sum + " trupow (narodziny band: " + _births + " x100 = " + _birthWights
+                Scribe.Line("Inni bez dosypki: dzien " + day + " - nie dosypano " + sum + " trupow (narodziny: bandy lordow " + _births
+                            + " + inne partie Innych " + _birthsOther + " = " + (_births + _birthsOther) + " x100 = " + _birthWights
                             + "; +2 dziennie: " + _dailyTimes + " band = " + _dailyWights + "; ochotnicy z mapy: " + _mapTimes + " razy = " + _mapMen
                             + " ludzi); od wczytania razem " + _totalWights + "."
+                            + (_openTimes > 0 ? " Bilans otwarcia (przepuszczone, nie wliczone): " + _openTimes + " x100 = " + (_openTimes * 100) + "." : "")
                             + (_stumblesDay > 0 ? " Potkniecia dzis " + _stumblesDay + " (razem " + _stumbles + ", pierwsze w raporcie)." : ""));
             }
             catch (Exception e) { Stumble("OthersGrowth.DailyLine", e); }
-            _births = _birthWights = _dailyTimes = _dailyWights = _mapTimes = _mapMen = 0;
+            _births = _birthWights = _birthsOther = _openTimes = _dailyTimes = _dailyWights = _mapTimes = _mapMen = 0;
             _stumblesDay = 0;
         }
 
         /// <summary>Nowa gra / wczytanie: liczniki od zera (latki zostaja - zakladane raz przy starcie gry).</summary>
         internal static void ResetSession()
         {
-            _births = _birthWights = _dailyTimes = _dailyWights = _mapTimes = _mapMen = 0;
+            _births = _birthWights = _birthsOther = _openTimes = _dailyTimes = _dailyWights = _mapTimes = _mapMen = 0;
             _totalWights = 0; _stumblesDay = 0;
         }
     }

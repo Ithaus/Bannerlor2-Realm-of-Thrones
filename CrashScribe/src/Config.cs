@@ -52,6 +52,7 @@ namespace CrashScribe
         // --- Inni bez dosypki z niczego (T2b noc 08/09.10; patrz OthersGrowth.cs) ---
         public static bool OthersNoFreeGrowth = true;        // wylacznik calosci: Inni rosna tylko z nekromancji i odbitych jencow (+ szablon nowej bandy)
         public static bool OthersNoBirthDowry = true;        // bez +100 trupow ROT przy narodzinach bandy (zostaje szablon 53 + wodz)
+        public static int OthersStartDowryDays = 2;          // bilans otwarcia: +100 przepuszczone w pierwszych N dobach kampanii (Jeff 07.10: 616 na start; 0 = bez wyjatku)
         public static bool OthersNoDailyWights = true;       // bez +2 trupow ROT dziennie na bande
         public static bool OthersNoMapVolunteers = true;     // bez "ochotnikow z mapy" gry (3-7 BasicTroop poza osada)
 
@@ -104,6 +105,7 @@ namespace CrashScribe
                         case "NightKingWallFromDay": NightKingWallFromDay = I(v, NightKingWallFromDay); break;
                         case "NightKingCallFromDay": NightKingCallFromDay = I(v, NightKingCallFromDay); break;
                         case "OthersNoFreeGrowth": OthersNoFreeGrowth = B(v); break;
+                        case "OthersStartDowryDays": OthersStartDowryDays = I(v, OthersStartDowryDays); break;
                         case "OthersNoBirthDowry": OthersNoBirthDowry = B(v); break;
                         case "OthersNoDailyWights": OthersNoDailyWights = B(v); break;
                         case "OthersNoMapVolunteers": OthersNoMapVolunteers = B(v); break;

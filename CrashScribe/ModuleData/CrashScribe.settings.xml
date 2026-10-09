@@ -81,9 +81,14 @@
        those three sources are shut: OthersNoBirthDowry (the +100 at birth), OthersNoDailyWights (the +2 a day)
        and OthersNoMapVolunteers (volunteers from the map). Raising the dead after a battle and freed prisoners
        are left exactly as Realm of Thrones has them. A new band still starts with its template and its leader.
-       Bands already in the field keep their men. Set OthersNoFreeGrowth to false to switch all of it off. -->
+       Bands already in the field keep their men. Set OthersNoFreeGrowth to false to switch all of it off.
+       OthersStartDowryDays: the old dead the Others already have when the story begins - during the first N
+       days of a new campaign the +100 at birth is still given (the first 4 bands start at about 154 each,
+       616 in all), so the Night King's call and march have something to start from. 0 = no exception.
+       In a campaign older than N days it does nothing. -->
   <OthersNoFreeGrowth>true</OthersNoFreeGrowth>
   <OthersNoBirthDowry>true</OthersNoBirthDowry>
+  <OthersStartDowryDays>2</OthersStartDowryDays>
   <OthersNoDailyWights>true</OthersNoDailyWights>
   <OthersNoMapVolunteers>true</OthersNoMapVolunteers>
 
