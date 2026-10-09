@@ -2908,6 +2908,30 @@ namespace Armoury
         [SettingPropertyGroup("Arming the garrisons")]
         public bool ArmsCoverageLog { get; set; } = true;
 
+        [SettingPropertyBool("Drill Law", HintText = "your men drill every day out of battle, and so do your clan's parties and lords in your army (the game gave them no daily drill): x1.5 on a day of rest (moved in fewer than 4 of the last 24 hours - an hour in a settlement, in a siege camp or barely moving rests, as for sleep), x0.9 on the march, not at all when starving or short of sleep (training perks included); the pace follows the commander's Leadership (170 = normal, from half to one and a half). Off = as before")]
+        [SettingPropertyGroup("Drill")]
+        public bool DrillLaw { get; set; } = true;
+
+        [SettingPropertyBool("Drill Needs Arms Player", HintText = "your men's drill needs weapons too: as for AI lords, each troop learns (training perks included) in proportion to the share of its men who have a weapon of their kind and grade in your armoury (off = your men drill at full pace whatever they hold)")]
+        [SettingPropertyGroup("Drill")]
+        public bool DrillNeedsArmsPlayer { get; set; } = true;
+
+        [SettingPropertyBool("Drill Stock", HintText = "arms and armour you discard, leave on the game's loot screen or leave behind after collecting Spoils trophies go to your men's drill stock while there is room (two sets of one weapon and one piece of armour per three men) instead of being lost; your men's spare arms in the armoury count too. A full stock makes the drill up to 20% faster, Giving Hands and Paid in Promise up to 30%. The stock belongs to the men: it cannot be taken back, it wears out, and the smiths of the next town buy the scrap of worn pieces - the coin goes to the men's purse (off = discarded gear is lost as before)")]
+        [SettingPropertyGroup("Drill")]
+        public bool DrillStock { get; set; } = true;
+
+        [SettingPropertyBool("Drill Stock Ai", HintText = "AI lords' men drill with the spare arms and armour of their armoury and baggage by the same rule: up to 20-30% faster, the stock wears out and the smiths of the next town buy the scrap - a third to the lord, the rest to the men (off = AI drill without a stock, as before)")]
+        [SettingPropertyGroup("Drill")]
+        public bool DrillStockAi { get; set; } = true;
+
+        [SettingPropertyBool("Drill Law Ai", HintText = "AI lords' parties drill by the same rule as yours - commander's Leadership, rest or march, no drill when starving or short of sleep - instead of the game's flat daily training; off until measured: the log shows every day what it would change (off = the game's rule)")]
+        [SettingPropertyGroup("Drill")]
+        public bool DrillLawAi { get; set; } = false;
+
+        [SettingPropertyBool("Drill Log", HintText = "daily drill lines in Armoury.log: your men's experience today and its parts, the drill stock, and the AI measurement (log only)")]
+        [SettingPropertyGroup("Drill")]
+        public bool DrillLog { get; set; } = true;
+
         [SettingPropertyBool("Arms Not Household Goods", HintText = "townsfolk do not use up arms, armour, shields and harness: these lie on the stalls until a soldier, a notable or a trader buys them (everyday clothing is still worn out by the townsfolk)")]
         [SettingPropertyGroup("Arms production")]
         public bool ArmsNotHouseholdGoods { get; set; } = true;
@@ -3774,6 +3798,12 @@ namespace Armoury
             s.GarrisonDrillNeedsArms = GarrisonDrillNeedsArms;
             s.PartyDrillNeedsArms = PartyDrillNeedsArms;
             s.ArmsCoverageLog = ArmsCoverageLog;
+            s.DrillLaw = DrillLaw;
+            s.DrillNeedsArmsPlayer = DrillNeedsArmsPlayer;
+            s.DrillStock = DrillStock;
+            s.DrillStockAi = DrillStockAi;
+            s.DrillLawAi = DrillLawAi;
+            s.DrillLog = DrillLog;
             s.ArmsNotHouseholdGoods = ArmsNotHouseholdGoods;
             s.ArmsNoStallDecay = ArmsNoStallDecay;
             s.ArmsStallUpkeepManDaysPerPiece = ArmsStallUpkeepManDaysPerPiece;
