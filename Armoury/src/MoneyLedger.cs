@@ -473,6 +473,7 @@ namespace Armoury
                 var s = Snap();
                 for (int c = 0; c < Classes; c++) _mark[c, kind] += s[c] - _blockSnap[c];
                 _blockSnap = s;
+                MarkWorld169(kind, s);                      // paczka 169b: zloto swiata na granicy modulow (RB wedlug odcinkow) - wlasny try
             }
             catch (Exception e) { Log.Error("MoneyLedger.Mark", e); }
         }

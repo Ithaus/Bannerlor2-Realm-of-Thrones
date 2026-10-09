@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Paczka 169 - KSIEGA OBIEGU: sprawdzian logu autotestu (docs/paczki/169-ksiega-obiegu.md, rozdz. 11, testy T1-T17).
+Paczka 169 - KSIEGA OBIEGU: sprawdzian logu autotestu (docs/paczki/169-ksiega-obiegu.md, rozdz. 11, testy T1-T17;
+169b: T18 skok reszty (odszkodowania Diplomacy), T19 "inne" zrodel z niczego (majatki BK/BEE), T20 RB wedlug odcinkow naszego ticku).
 
 Uzycie (z korzenia repo):
     python tools/obieg169_sprawdz.py <Armoury-*.log> [--csv <budzet-rodow.csv>] [--od 11] [--do 40]
@@ -192,8 +193,13 @@ def main(argv):
             bad.append("%s: R0 %s != stara reszta %s" % (b.day, k.get("R0"), r0old))
             continue
         try:
-            zs = sum(k["Z%d" % j] for j in range(1, 6))
-            us = sum(k["U%d" % j] for j in range(1, 10))
+            # pozycje Z1.., U1.., N1.. (169b: U10, N8, N9; S0/U0 to stara ksiega - poza suma)
+            zs = sum(v for n, v in k.items() if re.match(r"^Z[1-9]\d*$", n) and v is not None)
+            us = sum(v for n, v in k.items() if re.match(r"^U[1-9]\d*$", n) and v is not None)
+            ns = sum(v for n, v in k.items() if re.match(r"^N[1-9]\d*$", n) and v is not None)
+            if ns != k["N"]:
+                bad.append("%s: suma N1..Nn %d != N %d" % (b.day, ns, k["N"]))
+                continue
             if k["R0"] - k["R"] != zs - us + k["N"] - k["K1"]:
                 bad.append("%s: R0-R nie zgadza sie z pozycjami" % b.day)
         except Exception:
@@ -242,7 +248,8 @@ def main(argv):
     # T6 kontrolki okien
     must = ["notable-dochod", "karawany-notabli", "pasmo-notabli", "awanse", "werbunek", "prowizja", "lup-z-cial", "nowe-karawany",
             "kapital-karawan", "warsztaty-wyrob", "warsztaty-wsad", "stan-bohatera", "partie-znikaja", "linie-modelu", "porty", "kopalnie",
-            "rynek-osady", "konwoje", "kupno-BK", "myto"]
+            "rynek-osady", "konwoje", "kupno-BK", "myto",
+            "majatki-BK", "BEE-eskorta", "BEE-drogi"]                      # 169b: majatki BK (kazda wies co dobe), karawany BEE
     calls = {}
     hits = {}
     missing = set()
@@ -303,11 +310,14 @@ def main(argv):
         bout = find(r"nadwyzka w nicosc -(\d+)", t) or 0
         inc = find(r"wyplata zgloszona jako z niczego \+(\d+)", t) or 0
         new = find(r"nowi notable \+(\d+)", t) or 0
+        est = (find(r"BK dochod z produkcji [-+]?\d+ \(w tym do notabli \+?(\d+)\)", t) or 0) + \
+              (find(r"BetterEconomy renta majatkow [-+]?\d+ \(w tym do notabli \+?(\d+)\)", t) or 0)   # 169b
+        new += est
         if X:
             r = (bin_ + inc + new) / float(X)
             if not (0.90 <= r <= 1.00):
                 if st == "OK": st = "CZESCIOWO"
-                notes.append("%s: pasmo+dochod+nowi / X = %.2f" % (b.day, r))
+                notes.append("%s: pasmo+dochod+nowi+majatki / X = %.2f" % (b.day, r))
         if Y:
             r = bout / float(Y)
             if not (0.90 <= r <= 1.00):
@@ -331,6 +341,14 @@ def main(argv):
         zl = find(r"partie rodow: naliczony (\d+)", z)
         if pl is not None and zl is not None and pl != zl:
             bad.append("%s: zold partii %d != Zold %d" % (b.day, pl, zl))
+        # 169b: ten sam zbior partii - liczba partii jak w linii Zold; licznik ksiegi uzgodniony (roznica = blad pomiaru)
+        pn = find(r"zold partii \d+ \((\d+) partii", o)
+        zn = find(r"partie rodow: naliczony \d+, z kies zeszlo \d+ \((\d+) partii\)", z)
+        if pn is not None and zn is not None and pn != zn:
+            bad.append("%s: partii %d != Zold %d" % (b.day, pn, zn))
+        rr = find(r"uzgodnienie partii: [^\]]* - roznica ([-+]?\d+)\]", o)
+        if rr is not None:
+            bad.append("%s: licznik ksiegi a SoldierPay - roznica %d" % (b.day, rr))
         lud = (b.mod.get("Ludnosc: dzien") or [""])[-1]
         rz = find(r"renty zaplacone (\d+)", lud)
         rv = find(r"renta wsi (\d+)", o); rt = find(r"zawor miast (\d+)", o)
@@ -457,6 +475,8 @@ def main(argv):
         if okn is not None and okn + gold >= 50: bad.append("%s: okna %.1f ms + nasluch %.1f ms" % (b.day, okn, gold))
         if day_ is not None and day_ >= 30: bad.append("%s: doba %.1f ms" % (b.day, day_))
         if pr is not None and pr >= 20: bad.append("%s: probki %.1f ms" % (b.day, pr))
+        bud = find(r"w tym budzet rodow ([\d.]+) ms", o, float)
+        if bud is not None and bud >= 10 and in_range(b, 2, hi, first): bad.append("%s: budzet rodow %.1f ms (cel 169b < 10)" % (b.day, bud))
     results.append(res("T13", "OK" if not bad else "CZESCIOWO", "koszt%s (dlugosc doby gry - porownanie z T3 recznie)" % (("; " + "; ".join(bad[:6])) if bad else "")))
 
     # T14 wylacznik
@@ -511,6 +531,62 @@ def main(argv):
         if multi:
             st = "FAIL"; notes.append("okna z rozjazdem w > 1 probce: " + "; ".join("%s %s" % (k, ",".join(v[:4])) for k, v in multi.items()))
         results.append(res("T16", st, "probki %d, zgodne %d%s" % (tot, okn, ("; " + "; ".join(notes)) if notes else "")))
+
+    # T18 (169b) skok reszty: odszkodowania wojenne Diplomacy (dzien 34 autotestu 169: +1.1 mln do skarbcow bez nazwy)
+    bad = []
+    rep_days = []
+    for b in full:
+        k = kv(b.lines["przyczyny"])
+        if k.get("R") is not None and abs(k["R"]) > 250000 and b.day not in aborted_days:
+            bad.append("%s: R %d (N8 %s)" % (b.day, k["R"], k.get("N8")))
+        if k.get("N8"):
+            rep_days.append("%s: N8 %d" % (b.day, k["N8"]))
+    tr = 0
+    for b in full:
+        m = find(r"trybut zaplacony w rozliczeniach (\d+)\)", b.lines.get("rodyp", ""))
+        if m is not None:
+            tr = m
+    results.append(res("T18", "OK" if not bad else "FAIL", "skok reszty |R| <= 250000 kazdej doby%s; odszkodowania: %s; trybut zaplacony od startu %d" % (
+        ("; " + "; ".join(bad[:5])) if bad else "", ", ".join(rep_days[:5]) if rep_days else "brak pokoju z odszkodowaniem", tr)))
+
+    # T19 (169b) "inne" zrodel z niczego (bylo ok. 285 tys./dobe) - majatki BK i BEE, wyplaty skarbcow BEE nazwane
+    vals = []
+    for b in full:
+        if not in_range(b, lo, hi, first):
+            continue
+        k = kv(b.lines["przyczyny"])
+        if k.get("from") is not None and k.get("fromW") is not None:
+            vals.append(k["from"] - k["fromW"])
+    if not vals:
+        results.append(res("T19", "POMINIETY", "brak dob %d-%d" % (lo, hi)))
+    else:
+        m = sum(vals) / float(len(vals))
+        st = "OK" if m < 50000 else ("CZESCIOWO" if m < 150000 else "FAIL")
+        results.append(res("T19", st, "srednie \"inne\" zrodel z niczego %.0f na dobe (cel < 50000; przed 169b ok. 285000)" % m))
+
+    # T20 (169b) RB wedlug odcinkow naszego ticku - suma odcinkow = RB, najwiekszy odcinek nazwany
+    seg = {}
+    badsum = []
+    for b in full:
+        if not in_range(b, lo, hi, first):
+            continue
+        k = kv(b.lines["przyczyny"])
+        if "RBSUMA" in k:
+            badsum.append(str(b.day))
+        for j in range(1, 6):
+            v = k.get("RB%d" % j)
+            if v is not None:
+                seg.setdefault(j, []).append(v)
+    names = {1: "renty", 2: "budowy", 3: "od budow do korony", 4: "od korony do pasera", 5: "po paserze"}
+    if not seg:
+        results.append(res("T20", "POMINIETY", "brak odcinkow RB (log sprzed 169b?)"))
+    else:
+        means = dict((j, sum(v) / float(len(v))) for j, v in seg.items())
+        worst = max(means.items(), key=lambda x: abs(x[1]))
+        st = "FAIL" if badsum else ("OK" if abs(worst[1]) < 2000 else "CZESCIOWO")
+        results.append(res("T20", st, "RB wedlug odcinkow (srednio): %s; najwiekszy: %s %.0f%s" % (
+            ", ".join("%s %.0f" % (names.get(j, j), v) for j, v in sorted(means.items())), names.get(worst[0], worst[0]), worst[1],
+            ("; suma odcinkow != RB w dobach " + ", ".join(badsum[:5])) if badsum else "")))
 
     # T17 okno rodu
     results.append(res("T17", "OK" if not aborted_days else "FAIL", "rozliczenia przerwane wyjatkiem: %s" % (sorted(aborted_days) if aborted_days else "0")))

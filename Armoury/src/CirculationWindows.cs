@@ -28,7 +28,7 @@ namespace Armoury
     ///    dostaja wlasna pozycje bilansu (Z* zrodla, U* ujscia, N* netto, K1 korekta zrodel);
     ///  - nasluchy zdarzen gry (L): partie i krolestwa znikaja, bohaterowie wychodza ze swiata i wracaja;
     ///  - linie czynnego modelu finansow rodu (ML): trybut, najemnicy, dlug, rada, podatek BK - tylko informacja rodow.
-    /// Probki swiata (2.4): najwyzej 8 na dobe, kazde okno raz na 3 doby - zmiana CALEGO swiata w oknie wobec pozycji nazwanych
+    /// Probki swiata (2.4): najwyzej ProbesPerDay (12; 169b - bylo 8, okien przybylo 8) na dobe, kazde okno raz na 3 doby - zmiana CALEGO swiata w oknie wobec pozycji nazwanych
     /// w tej samej chwili; to jedyna prawdziwa kontrola okien (tozsamosc linii jest z budowy).
     /// Wszystko O(1) na wywolanie, bez LINQ i bez alokacji w goracych sciezkach; pelne przeglady swiata tylko w probkach.
     /// Kazde cialo w try/catch - okno nigdy nie rzuca do gry; bledy liczone (Stumbles), pierwszy na miejsce do logu; okna nie gasimy.
@@ -50,38 +50,46 @@ namespace Armoury
                            WCaravanCap = 17, WMarket = 18, WPorts = 19, WMines = 20, WConvoys = 21, WSlaves = 22, WVillageMarket = 23, WTitles = 24,
                            WKnight = 25, WCourt = 26, WDilemma = 27, WMoveCourt = 28, WRecruitKnight = 29, WImperial = 30, WBuildMat = 31, WLordBuy = 32,
                            WTolls = 33, WWorkshopOut = 34, WWorkshopIn = 35, WHeroState = 36, WPartyGone = 37, WKingdomGone = 38, WModelLines = 39,
-                           Windows = 40;
+                           // 169b: odszkodowania wojenne Diplomacy, majatki BK, BetterEconomy (renta majatkow, wyplaty skarbcow, karawany)
+                           WReparations = 40, WBkEstates = 41, WBeeEstates = 42, WBeePayout = 43, WBeeEscort = 44, WBeePromote = 45, WBeeDeliver = 46,
+                           WBeeDanger = 47,
+                           Windows = 48;
         internal static readonly string[] WinName =
         {
             "notable-dochod", "karawany-notabli", "pasmo-notabli", "nowy-notabl", "awanse", "werbunek", "statki", "statki-inne",
             "jency", "oblezenie", "turniej", "rabunek-BK", "BEE", "bitwy", "prowizja", "lup-z-cial", "nowe-karawany",
             "kapital-karawan", "rynek-osady", "porty", "kopalnie", "konwoje", "niewolnicy", "rynek-wsi", "tytuly",
             "pasowanie", "dwor", "dylematy", "przeniesienie-dworu", "rycerz-BKROT", "donatywa", "material-budowy", "kupno-BK",
-            "myto", "warsztaty-wyrob", "warsztaty-wsad", "stan-bohatera", "partie-znikaja", "krolestwa", "linie-modelu"
+            "myto", "warsztaty-wyrob", "warsztaty-wsad", "stan-bohatera", "partie-znikaja", "krolestwa", "linie-modelu",
+            "odszkodowania", "majatki-BK", "renta-majatkow-BEE", "wyplaty-BEE", "BEE-eskorta", "BEE-awanse", "BEE-dostawy", "BEE-drogi"
         };
 
         // ------------------------------------------------------------ przyczyny rozbicia from/to (okna flagowe, 3.2); 0 = brak flagi
         internal const int KNotableBand = 1, KNotableNew = 2, KNotableIncome = 3, KUpgrade = 4, KRecruitTavern = 5, KRecruitNotable = 6, KRecruitMap = 7,
                            KShips = 8, KShipsOther = 9, KPrisonersParty = 10, KPrisonersFort = 11, KSiege = 12, KTournament = 13, KRaidCapture = 14,
-                           KBeeContribute = 15, KBeeCamp = 16, KBeeInvest = 17, KBeeMarket = 18, KBattle = 19, Kinds = 20;
+                           KBeeContribute = 15, KBeeCamp = 16, KBeeInvest = 17, KBeeMarket = 18, KBattle = 19,
+                           KReparations = 20, KBkEstates = 21, KBeeEstateRent = 22, KBeePayout = 23, Kinds = 24;   // 169b
         internal static readonly string[] KindIn =
         {
             "", "pasmo notabli", "nowi notable", "wyplata dochodu notablom", "awanse", "werbunek najemnikow", "werbunek ochotnikow od notabli",
             "ochotnicy z mapy", "statki: sprzedaz osadom i premie zarzadcow", "statki NavalDLC inne", "jency sprzedani przez partie",
             "jency do kas twierdz", "lup z oblezen", "nagrody turniejow", "jency z rabunkow BK", "BetterEconomy: skarbce zamkow",
-            "BetterEconomy: obozy", "BetterEconomy: inwestycje we wsie", "BetterEconomy: dostep do targu", "bitwy"
+            "BetterEconomy: obozy", "BetterEconomy: inwestycje we wsie", "BetterEconomy: dostep do targu", "bitwy",
+            "odszkodowania wojenne (Diplomacy) dla glowy krolestwa, najemnikow i gracza", "majatki BK - dochod z produkcji dla wlascicieli",
+            "BetterEconomy: renta majatkow dla wlascicieli", "BetterEconomy: wyplaty ze skarbcow miast i z umow handlowych"
         };
         internal static readonly string[] KindOut =
         {
             "", "pasmo notabli", "nowi notable", "wyplata dochodu notablom", "awanse", "werbunek najemnikow", "werbunek ochotnikow od notabli",
             "ochotnicy z mapy", "statki: kupno od osad", "statki NavalDLC inne", "jency sprzedani przez partie",
             "jency do kas twierdz", "lup z oblezen", "nagrody turniejow", "jency z rabunkow BK", "skarbce zamkow",
-            "obozy", "inwestycje we wsie", "dostep do targu", "bitwy"
+            "obozy", "inwestycje we wsie", "dostep do targu", "bitwy",
+            "odszkodowania wojenne (Diplomacy)", "majatki BK", "BetterEconomy: renta majatkow", "BetterEconomy: wyplaty skarbcow"
         };
         internal static readonly int[] KindWin =
         {
             -1, WNotableBand, WNotableNew, WNotableIncome, WUpgrade, WRecruit, WRecruit, WRecruit, WShips, WShipsOther, WPrisoners, WPrisoners,
-            WSiege, WTournament, WRaid, WBee, WBee, WBee, WBee, WBattle
+            WSiege, WTournament, WRaid, WBee, WBee, WBee, WBee, WBattle, WReparations, WBkEstates, WBeeEstates, WBeePayout
         };
 
         // ------------------------------------------------------------ pozycje Sum[] (3.4): Z* zrodlo +, U* ujscie +, N* zmiana swiata ze znakiem,
@@ -101,7 +109,16 @@ namespace Armoury
                            NWorkshopOutCap = 59, NWorkshopInKasa = 60, NWorkshopInCap = 61, NWorkshopBuyCap = 62, IWorkshopBuyN = 63,
                            NBattleNoEvent = 64, NDeadTransfers = 65, NKingdomGone = 66, INotableIncomeN = 67,
                            ICaravanNewNotableN = 68, IPartyGoneCaravanN = 69, IPartyGoneVillagerN = 70, IPartyGoneBanditN = 71, IPartyGoneGarrisonN = 72,
-                           IPartyGoneOtherN = 73, Items = 74;
+                           IPartyGoneOtherN = 73,
+                           // 169b: odszkodowania Diplomacy (skarbce bez zdarzenia - netto swiata; informacje: do skarbcow, ze skarbcow, dlug trybutu placacych)
+                           NReparations = 74, IReparationsIn = 75, IReparationsOut = 76, IReparationsDebt = 77, IReparationsN = 78,
+                           // 169b: karawany BetterEconomy (kasa karawany bez zdarzenia): eskorta, awanse zalogi, straty na drogach (ujscia), dostawy kontraktow (netto)
+                           UBeeEscort = 79, UBeePromote = 80, NBeeDeliver = 81, UBeeDanger = 82, IBeeEscortN = 83, IBeeDeliverN = 84, IBeeDangerN = 85,
+                           // 169b: nasze moduly (ChangeHeroGold bez zdarzenia) z bohaterem poza swiatem - czesc N5 (informacja)
+                           IDeadDirectN = 86, IDeadDirect = 87,
+                           // 169b: z majatkow (BK, BEE) do notabli - informacja do porownania z licznikiem "do notabli z niczego" (WorkshopTrade)
+                           IEstatesNotBk = 88, IEstatesNotBee = 89,
+                           Items = 90;
 
         // pozycje linii kas (Cls[klasa, *]) - zmiany kas osad nazwane w oknach, tylko poza naszym tickiem dobowym (tam lapia je migawki Mark)
         internal const int LCommission = 0, LCommissionToCounter = 1, LWorkshopOut = 2, LWorkshopIn = 3, LPorts = 4, LMines = 5, LConvoys = 6, LMarket = 7,
@@ -131,6 +148,9 @@ namespace Armoury
         internal static long GoldTicks;
         internal static int ProbeScans;                                                    // pelne przeglady swiata w probkach dzis
         private static int _probesToday;
+        // 169b: 12 probek na dobe (24 przeglady swiata, ok. 10 ms) - bylo 8; przy 8 nowych oknach rzadziej probkowane okna dziennego ticku
+        // bohaterow (dochod i karawany notabli - po 6-8 probek na 40 dob w autotescie 169) spadlyby ponizej 5 probek
+        private const int ProbesPerDay = 12;
         internal static readonly int[] ProbeNSess = new int[Windows], ProbeBadSess = new int[Windows];   // od startu sesji (Reset, nie ClearDay)
         private static readonly int[] _probeDay = new int[Windows];                       // ostatnia doba probki okna (Reset: -1000)
         private static bool _probeOn;
@@ -182,8 +202,8 @@ namespace Armoury
         internal struct SnapState { public bool On; public Hero H; public long G0; public int Item, Me; public Settlement St; public long X; public int Cnt; public long T0; public bool P; public long W0, N0; }
         internal struct CapState { public bool On, PrevOpen, PrevSeen; public int PrevGiven; public long T0; public bool P; public long W0, N0; }
         internal struct TollState { public bool On; public Town T; public long C0, R0; public long T0; public bool P; public long W0, N0; }
-        /// <summary>Migawka kas osad / kiesy partii (O16, O18-O21, O23).</summary>
-        internal struct KasaState { public bool On; public Settlement St, St2; public MobileParty Mp; public long V, V2; public long T0; public bool P; public long W0, N0; }
+        /// <summary>Migawka kas osad / kiesy partii (O16, O18-O21, O23; 169b: karawany BEE - Me = okno).</summary>
+        internal struct KasaState { public bool On; public Settlement St, St2; public MobileParty Mp; public long V, V2; public int Me; public long T0; public bool P; public long W0, N0; }
 
         // ------------------------------------------------------------ porzadki
         internal static void Reset()
@@ -192,7 +212,7 @@ namespace Armoury
             {
                 ClearDay();
                 _ctx = 0; _ctxW = -1; _ctxSide = null; _sellSt = null; _sellIn = 0; _snapHero = null; _snapLeaders = false; _snapEvt = 0;
-                _capOpen = false; _capSeen = false; _capGiven = 0; _minesOpen = false;
+                _capOpen = false; _capSeen = false; _capGiven = 0; _minesOpen = false; _repOpen = false;
                 _woW = null; _wiW = null; _woSt = null; _wiSt = null; _woP = false; _wiP = false;
                 NamedRun = 0; ToCounterRun = 0; _probeOn = false;
                 for (int w = 0; w < Windows; w++) { ProbeNSess[w] = 0; ProbeBadSess[w] = 0; _probeDay[w] = -1000; }
@@ -330,13 +350,30 @@ namespace Armoury
             catch (Exception e) { Stumble("NoteMineWages", e); }
         }
 
+        /// <summary>
+        /// 169b: nasz modul zmienil kiese bohatera BEZ zdarzenia gry (ChangeHeroGold - KingdomTreasury, IronBank, BuildFunding). Gdy bohater
+        /// jest poza swiatem (Dead albo Disabled - jego kiesa nie jest w posiadaczach), zloto naprawde wyszlo ze swiata albo do niego weszlo:
+        /// ta sama pozycja N5 co zdarzenia gry z bohaterem poza swiatem. delta ze znakiem jak ChangeHeroGold. Tylko licznik.
+        /// </summary>
+        internal static void NoteHeroGold(Hero h, long delta)
+        {
+            try
+            {
+                if (h == null || delta == 0 || !On || !OutOfWorld(h)) return;
+                if (Environment.CurrentManagedThreadId != _main) { OffThread++; return; }
+                AddWorld(NDeadTransfers, -delta, +1);
+                Sum[IDeadDirect] += -delta; Sum[IDeadDirectN]++;
+            }
+            catch (Exception e) { Stumble("NoteHeroGold", e); }
+        }
+
         // ------------------------------------------------------------ probki swiata (2.4)
         private static bool ProbeOpen(int w, out long w0, out long n0)
         {
             w0 = 0; n0 = 0;
             try
             {
-                if (_probeOn || _probesToday >= 8 || !ProbeOn) return false;
+                if (_probeOn || _probesToday >= ProbesPerDay || !ProbeOn) return false;
                 if (MoneyLedger.InBlock || MoneyLedger.InClanTick || MoneyLedger.WinOpenNow) return false;
                 int day = (int)CampaignTime.Now.ToDays;
                 if (day - _probeDay[w] < 3) return false;
@@ -392,6 +429,7 @@ namespace Armoury
                         int k = _ctx;
                         if (k == KPrisonersParty && gNone && rc >= 0) k = KPrisonersFort;   // twierdza sprzedaje jencow do wlasnej kasy
                         if (gNone) In[k] += a; else Out[k] += a;
+                        if (gNone && (k == KBkEstates || k == KBeeEstateRent) && rh != null && rh.IsNotable) Sum[k == KBkEstates ? IEstatesNotBk : IEstatesNotBee] += a;   // 169b
                         if (_ctxW >= 0) Hits[_ctxW]++;
                     }
                 }
@@ -452,9 +490,10 @@ namespace Armoury
                         AddWorld(NBattleNoEvent, d, +1);
                         if (d != 0) Hits[WBattle]++;
                     }
+                    else if (__state.Me == WReparations) ReparationsClose(__state.A0);
                 }
             }
-            catch (Exception e) { Stumble("FlagFin", e); }
+            catch (Exception e) { _repOpen = false; Stumble("FlagFin", e); }
             _ctx = __state.Kind; _ctxSide = __state.Side; _ctxW = __state.W;
             try { CostEnd(__state.Me, tf); } catch { }
             if (__state.P) ProbeClose(__state.Me, __state.W0, __state.N0);
@@ -1275,6 +1314,161 @@ namespace Armoury
             if (p) ProbeClose(WWorkshopIn, w0, n0);
         }
 
+        // ------------------------------------------------------------ 169b: odszkodowania wojenne Diplomacy (KingdomWalletCost.ApplyCost)
+        // Diplomacy przy pokoju (KingdomPeaceAction.AcceptPeace -> HybridCost.ApplyCost) wola GiveGoldToKingdomAction z portfelem "Reparations":
+        // placacy oddaje skarbiec ponad 2 mln BEZ zdarzenia, reszte zapisuje jako dlug TributeWallet (rody splacaja go potem w rozliczeniach -
+        // linia modelu "trybut zaplacony"); odbiorca dostaje Z GORY: 1/3 glowa krolestwa i do 1/6 najemnicy - zdarzeniem z niczego (flaga),
+        // reszta do skarbca krolestwa BEZ zdarzenia (pozycja N8). Okno rzadkie (tylko przy pokoju): migawka skarbcow wszystkich krolestw.
+        private static Kingdom[] _repK = new Kingdom[64];
+        private static int[] _repW0 = new int[64], _repT0 = new int[64];
+        private static int _repN;
+        private static bool _repOpen;
+
+        /// <summary>Skarbce krolestw w swiecie (jak ReadHolders: bez wyeliminowanych) + zapis portfeli do porownania w finalizerze.</summary>
+        private static long ReparationsSnap()
+        {
+            var all = Kingdom.All;
+            int n = all.Count;
+            if (_repK.Length < n) { _repK = new Kingdom[n]; _repW0 = new int[n]; _repT0 = new int[n]; }
+            long s = 0;
+            for (int i = 0; i < n; i++)
+            {
+                var k = all[i];
+                _repK[i] = k;
+                if (k == null) continue;
+                _repW0[i] = k.KingdomBudgetWallet; _repT0[i] = k.TributeWallet;
+                if (!k.IsEliminated) s += k.KingdomBudgetWallet;
+            }
+            _repN = n; _repOpen = true;
+            return s;
+        }
+
+        public static void ReparationsPre(out Ctx __state)
+        {
+            __state = default(Ctx);
+            try
+            {
+                if (!Gate(WReparations)) return;
+                if (!_repOpen) { __state.M = true; __state.A0 = ReparationsSnap(); }   // zagniezdzenie (gra tego nie robi) - tylko flaga
+                OpenFlag(ref __state, WReparations, KReparations, null);
+            }
+            catch (Exception e) { _repOpen = false; __state.M = false; Stumble("ReparationsPre", e); }
+        }
+
+        /// <summary>Zmiana skarbcow krolestw w oknie (bez zdarzenia) = N8; do skarbcow / ze skarbcow i nowy dlug trybutu - informacja.</summary>
+        private static void ReparationsClose(long w0)
+        {
+            try
+            {
+                var all = Kingdom.All;
+                long now = 0, inW = 0, outW = 0, debt = 0;
+                bool same = all.Count == _repN;
+                for (int i = 0; i < all.Count; i++)
+                {
+                    var k = all[i];
+                    if (k == null) continue;
+                    if (!k.IsEliminated) now += k.KingdomBudgetWallet;
+                    if (!same || !ReferenceEquals(k, _repK[i])) { same = false; continue; }
+                    long d = (long)k.KingdomBudgetWallet - _repW0[i];
+                    if (!k.IsEliminated) { if (d > 0) inW += d; else outW -= d; }
+                    long dt = (long)k.TributeWallet - _repT0[i];
+                    if (dt < 0) debt -= dt;
+                }
+                AddWorld(NReparations, now - w0, +1);
+                if (same) { Sum[IReparationsIn] += inW; Sum[IReparationsOut] += outW; Sum[IReparationsDebt] += debt; }
+                Sum[IReparationsN]++;
+                if (now != w0) Hits[WReparations]++;
+            }
+            catch (Exception e) { Stumble("ReparationsClose", e); }
+            finally { _repOpen = false; for (int i = 0; i < _repN && i < _repK.Length; i++) _repK[i] = null; }
+        }
+
+        // ------------------------------------------------------------ 169b: zloto z niczego dla wlascicieli majatkow i z skarbcow BEE (okna flagowe)
+        // BK EstateData.DailyProductionIncome (BKSettlementBehavior, kazda wies raz na dobe): GiveGoldAction nic -> wlasciciel majatku (notabl
+        // albo lord); BEE FeudalEconomyCampaignBehavior.TickEstateRent: renta majatku dla wlasciciela (notabl lokalny albo glowa rodu) z niczego;
+        // BEE TownEconomyCampaignBehavior.TryPayTreasurySurplus i TradeAgreementCampaignBehavior.AccrueCustoms: wyplaty ze skarbcow BEE (poza
+        // swiatem) dla glow rodow i krolestw. Wszystkie dotad w "inne" zrodel z niczego. Prefiksy bez parametrow (zadnych typow BK/BEE).
+        public static void BkEstatesPre(out Ctx __state)
+        {
+            __state = default(Ctx);
+            try { if (Gate(WBkEstates)) OpenFlag(ref __state, WBkEstates, KBkEstates, null); }
+            catch (Exception e) { Stumble("BkEstatesPre", e); }
+        }
+        public static void BeeEstatesPre(out Ctx __state)
+        {
+            __state = default(Ctx);
+            try { if (Gate(WBeeEstates)) OpenFlag(ref __state, WBeeEstates, KBeeEstateRent, null); }
+            catch (Exception e) { Stumble("BeeEstatesPre", e); }
+        }
+        public static void BeePayoutPre(out Ctx __state)
+        {
+            __state = default(Ctx);
+            try { if (Gate(WBeePayout)) OpenFlag(ref __state, WBeePayout, KBeePayout, null); }
+            catch (Exception e) { Stumble("BeePayoutPre", e); }
+        }
+
+        // ------------------------------------------------------------ 169b: karawany BetterEconomy (CaravanCampaignBehavior)
+        // BEE przy wjezdzie karawany do miasta (OnSettlementEntered) najmuje eskorte (TryHireEscort: 190 za konnego, 95 za pieszego), awansuje
+        // zaloge (TryPromoteRoster) i rozlicza dostawe kontraktu (TryDeliverContract: kasa karawany - koszt + przychod ze skarbcow BEE), a raz
+        // na dobe zabiera kasie karawany straty na niebezpiecznej drodze (ApplyDangerPressure). Wszystko przez PartyTradeGold BEZ zdarzenia i bez
+        // odbiorcy w swiecie - to byl rozjazd probek okna nowych karawan (nowa karawana najmuje eskorte przy pierwszym wjezdzie). Migawka kasy
+        // karawany; prefiks deklaruje tylko MobileParty __0 (typy BEE nie sa deklarowane).
+        private static void BeeCarOpen(MobileParty mp, ref KasaState st, int w)
+        {
+            if (!Gate(w) || mp == null || !mp.IsActive) return;
+            st.Mp = mp; st.V = mp.PartyTradeGold; st.Me = w;
+            KasaOpen(ref st, w);
+        }
+        public static void BeeEscortPre(MobileParty __0, out KasaState __state)
+        {
+            __state = default(KasaState);
+            try { BeeCarOpen(__0, ref __state, WBeeEscort); }
+            catch (Exception e) { __state.On = false; Stumble("BeeEscortPre", e); }
+        }
+        public static void BeePromotePre(MobileParty __0, out KasaState __state)
+        {
+            __state = default(KasaState);
+            try { BeeCarOpen(__0, ref __state, WBeePromote); }
+            catch (Exception e) { __state.On = false; Stumble("BeePromotePre", e); }
+        }
+        public static void BeeDeliverPre(MobileParty __0, out KasaState __state)
+        {
+            __state = default(KasaState);
+            try { BeeCarOpen(__0, ref __state, WBeeDeliver); }
+            catch (Exception e) { __state.On = false; Stumble("BeeDeliverPre", e); }
+        }
+        public static void BeeDangerPre(MobileParty __0, out KasaState __state)
+        {
+            __state = default(KasaState);
+            try { BeeCarOpen(__0, ref __state, WBeeDanger); }
+            catch (Exception e) { __state.On = false; Stumble("BeeDangerPre", e); }
+        }
+
+        /// <summary>Wspolny finalizer okien karawan BEE: zmiana kasy karawany bez zdarzenia (BEE nie wola GiveGoldAction w tych metodach).</summary>
+        public static void BeeCarFin(KasaState __state)
+        {
+            if (!__state.On) return;
+            long tf = CostResume(__state.T0);       // koszt: cialo finalizera (bez metody BEE, bez probki swiata)
+            try
+            {
+                var mp = __state.Mp;
+                if (mp != null && mp.IsActive)
+                {
+                    long d = (long)mp.PartyTradeGold - __state.V;
+                    switch (__state.Me)
+                    {
+                        case WBeeEscort: AddWorld(UBeeEscort, -d, -1); if (d != 0) Sum[IBeeEscortN]++; break;
+                        case WBeePromote: AddWorld(UBeePromote, -d, -1); break;
+                        case WBeeDeliver: AddWorld(NBeeDeliver, d, +1); if (d != 0) Sum[IBeeDeliverN]++; break;
+                        case WBeeDanger: AddWorld(UBeeDanger, -d, -1); if (d != 0) Sum[IBeeDangerN]++; break;
+                    }
+                    if (d != 0) Hits[__state.Me]++;
+                }
+            }
+            catch (Exception e) { Stumble("BeeCarFin", e); }
+            KasaClose(__state, __state.Me, tf);
+        }
+
         // ------------------------------------------------------------ O37 - stan bohatera (CampaignObjectManager.HeroStateChanged)
         public static void HeroStatePostfix(Hero __0, Hero.CharacterStates __1)
         {
@@ -1617,6 +1811,22 @@ namespace Armoury
             Wire(h, WBee, "BEE (obozy)", AccessTools.TypeByName(beeCastle), beeCastle, "TryAiBuildTrainingCamp", null, nameof(BeeCampPre), nameof(FlagFin), null, done, miss);
             Wire(h, WBee, "BEE (inwestycje we wsie)", AccessTools.TypeByName(beeInv), beeInv, "TryApplyLordInvestment", null, nameof(BeeInvestPre), nameof(FlagFin), null, done, miss);
             Wire(h, WBee, "BEE (dostep do targu)", AccessTools.TypeByName(beeDev), beeDev, "ApplyMarketAccess", null, nameof(BeeMarketPre), nameof(FlagFin), null, done, miss);
+            // 169b: BetterEconomy - renta majatkow, wyplaty skarbcow, karawany (eskorta, awanse, dostawy, straty na drogach)
+            const string beeFeud = "BetterEconomy.Behaviors.FeudalEconomyCampaignBehavior", beeTown = "BetterEconomy.Behaviors.TownEconomyCampaignBehavior",
+                         beeTrade = "BetterEconomy.Behaviors.TradeAgreementCampaignBehavior", beeCar = "BetterEconomy.Behaviors.CaravanCampaignBehavior";
+            Wire(h, WBeeEstates, "renta-majatkow-BEE", AccessTools.TypeByName(beeFeud), beeFeud, "TickEstateRent", null, nameof(BeeEstatesPre), nameof(FlagFin), null, done, miss);
+            Wire(h, WBeePayout, "wyplaty-BEE (nadwyzka skarbca miasta)", AccessTools.TypeByName(beeTown), beeTown, "TryPayTreasurySurplus", null, nameof(BeePayoutPre), nameof(FlagFin), null, done, miss);
+            Wire(h, WBeePayout, "wyplaty-BEE (umowy handlowe)", AccessTools.TypeByName(beeTrade), beeTrade, "AccrueCustoms", null, nameof(BeePayoutPre), nameof(FlagFin), null, done, miss);
+            Wire(h, WBeeEscort, "BEE-eskorta", AccessTools.TypeByName(beeCar), beeCar, "TryHireEscort", null, nameof(BeeEscortPre), nameof(BeeCarFin), null, done, miss);
+            Wire(h, WBeePromote, "BEE-awanse", AccessTools.TypeByName(beeCar), beeCar, "TryPromoteRoster", null, nameof(BeePromotePre), nameof(BeeCarFin), null, done, miss);
+            Wire(h, WBeeDeliver, "BEE-dostawy", AccessTools.TypeByName(beeCar), beeCar, "TryDeliverContract", null, nameof(BeeDeliverPre), nameof(BeeCarFin), null, done, miss);
+            Wire(h, WBeeDanger, "BEE-drogi", AccessTools.TypeByName(beeCar), beeCar, "ApplyDangerPressure", null, nameof(BeeDangerPre), nameof(BeeCarFin), null, done, miss);
+            // 169b: BannerKings - dochod majatkow z produkcji (nic -> wlasciciel, kazda wies raz na dobe)
+            const string bkEst = "BannerKings.Managers.Populations.Estates.EstateData";
+            Wire(h, WBkEstates, "majatki-BK", AccessTools.TypeByName(bkEst), bkEst, "DailyProductionIncome", Type.EmptyTypes, nameof(BkEstatesPre), nameof(FlagFin), null, done, miss);
+            // 169b: Diplomacy - odszkodowania wojenne przy pokoju (KingdomWalletCost.ApplyCost - wirtualna, wolana przez HybridCost)
+            const string dipCost = "Diplomacy.Costs.KingdomWalletCost";
+            Wire(h, WReparations, "odszkodowania", AccessTools.TypeByName(dipCost), dipCost, "ApplyCost", Type.EmptyTypes, nameof(ReparationsPre), nameof(FlagFin), null, done, miss);
             // warsztaty: okna na istniejacych latkach WorkshopTrade (wpiete wczesniej w SubModuleMain)
             Wired[WWorkshopOut] = HasOurPrefix(AccessTools.Method(typeof(WorkshopsCampaignBehavior), "ProduceAnOutputToTown"), "OutPrefix");
             Wired[WWorkshopIn] = HasOurPrefix(AccessTools.Method(typeof(WorkshopsCampaignBehavior), "ConsumeInputFromTownMarket"), "InPrefix");
@@ -1631,7 +1841,7 @@ namespace Armoury
             bool toSeller = Settings.Current != null && Settings.Current.RecruitGoldToSeller;
             Log.Info("Obieg (169): ksiega obiegu (tylko log) - okna wpiete " + before + ": " + (done.Count > 0 ? string.Join(", ", done.ToArray()) : "zadne")
                      + (miss.Count > 0 ? "; BRAK: " + string.Join("; ", miss.ToArray()) : "")
-                     + "; latki zakladane zawsze, liczenie przy CirculationLedgerEnabled i LogEnabled, probki swiata przy CirculationProbeEnabled (najwyzej 8 na dobe)"
+                     + "; latki zakladane zawsze, liczenie przy CirculationLedgerEnabled i LogEnabled, probki swiata przy CirculationProbeEnabled (najwyzej " + ProbesPerDay + " na dobe)"
                      + "; linie modelu finansow i kapital karawan - w kampanii (osobne linie)"
                      + "; zaplata karawan za najemnikow do miast (RecruitGoldToSeller): " + (toSeller ? "tak" : "nie - najem przez karawane zostaje w reszcie")
                      + "; okno rodu z finalizerem: " + (MoneyLedger.ClanFinalizerWired ? "tak" : "nie") + ".");

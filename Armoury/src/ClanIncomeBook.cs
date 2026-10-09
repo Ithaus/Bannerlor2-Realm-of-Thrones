@@ -53,6 +53,13 @@ namespace Armoury
         internal static long DayRefund, DayCrown, DayEvtNone, DayEvtSettl, DayEvtOther, DayThird;
         internal static long LastRefund, LastCrown, LastEvtNone, LastEvtSettl, LastEvtOther, LastThird, LastModelIncomeSum, LastRentSum;
         internal static long LastTicks;                     // koszt ostatniego Daily (kontrolka 6.8)
+        // 169b: rozbicie kosztu i dochod modelu brany z KingdomTreasury (ten sam model, te same argumenty, ten sam blok - raz na rod na dobe, D21)
+        internal static long LastTicksModel, LastTicksReport, LastTicksCsv, LastSampleDiff, LastSampleAbs;
+        internal static int LastOwnCalls, LastReused, LastSampleN;
+        private static long _ticksCsv;
+        private static readonly Dictionary<Clan, float> _modelSeen = new Dictionary<Clan, float>();   // dochod modelu policzony dzis przez KingdomTreasury.Daily
+        private static int _modelSeenDay = -1;
+        private const int SampleMax = 8, SampleEvery = 37;  // probka kontrolna: ok. 8 rodow na dobe liczonych drugi raz w chwili Daily
 
         private static readonly Dictionary<Clan, float> IncomeToday = new Dictionary<Clan, float>();   // (a) raz na rod na dobe (D21)
         private static int _importN = -1, _importBad;
@@ -74,6 +81,8 @@ namespace Armoury
             DayRefund = DayCrown = DayEvtNone = DayEvtSettl = DayEvtOther = DayThird = 0;
             LastRefund = LastCrown = LastEvtNone = LastEvtSettl = LastEvtOther = LastThird = LastModelIncomeSum = LastRentSum = 0;
             LastTicks = 0; IncomeToday.Clear(); _importN = -1; _importBad = 0; _csvPath = null; _stumbles = 0; _errSites.Clear();
+            LastTicksModel = LastTicksReport = LastTicksCsv = LastSampleDiff = LastSampleAbs = 0; LastOwnCalls = LastReused = LastSampleN = 0;   // 169b
+            _modelSeen.Clear(); _modelSeenDay = -1; _ticksCsv = 0;
         }
 
         private static void Stumble(string where, Exception e)
@@ -131,6 +140,22 @@ namespace Armoury
                 else { r.TodayEvtOther += a; DayEvtOther += a; }
             }
             catch (Exception e) { Stumble("OnEvent", e); }
+        }
+
+        /// <summary>
+        /// 169b: KingdomTreasury.Daily policzyl dochod brutto czynnego modelu (CalculateClanIncome(rod, false, false, false)) - ta sama
+        /// definicja co (a) w D (D19, D21: raz na rod na dobe). Daily bierze te liczbe zamiast liczyc drugi raz (koszt). Tylko zapis liczby.
+        /// </summary>
+        internal static void NoteModelIncome(Clan c, float income)
+        {
+            try
+            {
+                if (!On || c == null) return;
+                int d = (int)CampaignTime.Now.ToDays;
+                if (d != _modelSeenDay) { _modelSeen.Clear(); _modelSeenDay = d; }
+                _modelSeen[c] = income;
+            }
+            catch (Exception e) { Stumble("NoteModelIncome", e); }
         }
 
         // ------------------------------------------------------------ zold rodu z rozliczenia (okno rodu MoneyLedger)
@@ -242,6 +267,10 @@ namespace Armoury
                 var model = Campaign.Current.Models.ClanFinanceModel;
                 IncomeToday.Clear(); _seen.Clear(); _byId.Clear(); _today.Clear();
                 long modelSum = 0, rentSum = 0;
+                // 169b: dochod modelu z KingdomTreasury.Daily tej doby (ten sam model i argumenty, ten sam blok), inaczej liczony tu jak dotad
+                int gameDay = (int)CampaignTime.Now.ToDays;
+                bool seenToday = gameDay == _modelSeenDay && _modelSeen.Count > 0;
+                long tModel = 0, sDiff = 0, sAbs = 0; int own = 0, reused = 0, sampleN = 0;
                 foreach (var c in Clan.All)
                 {
                     try
@@ -253,8 +282,26 @@ namespace Armoury
                         if (r == null) continue;
                         long g = FamilyGold(c);
                         if (r.Seed < 0) r.Seed = (int)Math.Min(int.MaxValue, g / 60);
-                        float a = 0f;
-                        try { a = Math.Max(0f, model.CalculateClanIncome(c, false, false, false).ResultNumber); } catch { }
+                        float a = 0f, seen;
+                        if (seenToday && _modelSeen.TryGetValue(c, out seen))
+                        {
+                            a = Math.Max(0f, seen); reused++;
+                            // probka kontrolna: ten rod liczony drugi raz teraz - roznica pokazuje, ile zmienil moment (clo, zwrot zoldu, Bank tej doby)
+                            if (sampleN < SampleMax && (reused + gameDay) % SampleEvery == 0)
+                            {
+                                long ts = Stopwatch.GetTimestamp();
+                                float bNow = 0f;
+                                try { bNow = Math.Max(0f, model.CalculateClanIncome(c, false, false, false).ResultNumber); } catch { }
+                                tModel += Stopwatch.GetTimestamp() - ts;
+                                long dd = (long)a - (long)bNow; sDiff += dd; sAbs += Math.Abs(dd); sampleN++;
+                            }
+                        }
+                        else
+                        {
+                            long ts = Stopwatch.GetTimestamp();
+                            try { a = Math.Max(0f, model.CalculateClanIncome(c, false, false, false).ResultNumber); } catch { }
+                            tModel += Stopwatch.GetTimestamp() - ts; own++;
+                        }
                         IncomeToday[c] = a;
                         int b; PopulationLaw.RentToday.TryGetValue(c, out b);
                         long inflow = (long)a + Math.Max(0, b) + r.Today;
@@ -281,10 +328,15 @@ namespace Armoury
                     for (int i = 0; i < stale.Count; i++) _byClan.Remove(stale[i]);
                 }
                 LastModelIncomeSum = modelSum; LastRentSum = rentSum;
+                LastTicksModel = tModel; LastOwnCalls = own; LastReused = reused; LastSampleN = sampleN; LastSampleDiff = sDiff; LastSampleAbs = sAbs;   // 169b
+                _modelSeen.Clear(); _modelSeenDay = -1;     // liczby tej doby zuzyte
+                LastTicksReport = 0; LastTicksCsv = 0;
                 var s = Settings.Current;
                 if (s == null || !s.LogEnabled) return;     // D11: przy wylaczonym logu tylko pierscien D
                 if (_importN >= 0) { Log.Info("Budzet rodow: wczytano " + _importN + " rodow (bledne " + _importBad + ")."); _importN = -1; }
+                long tr = Stopwatch.GetTimestamp(); _ticksCsv = 0;
                 Report(s);
+                LastTicksCsv = _ticksCsv; LastTicksReport = Stopwatch.GetTimestamp() - tr - _ticksCsv;
             }
             catch (Exception e) { Stumble("Daily", e); }
             finally
@@ -323,7 +375,21 @@ namespace Armoury
         }
 
         private static string N0(double v) { return double.IsNaN(v) || double.IsInfinity(v) ? "-" : Math.Round(v).ToString("0", CultureInfo.InvariantCulture); }
-        private static string Clean(string s) { return string.IsNullOrEmpty(s) ? "" : s.Replace(';', ',').Replace('\n', ' ').Replace('\r', ' '); }
+        private static readonly char[] CsvBad = { ';', '\n', '\r' };
+        /// <summary>Pole CSV bez separatora i konca linii (169b: bez kopiowania, gdy nie ma czego zamieniac - ten sam wynik).</summary>
+        private static string Clean(string s) { return string.IsNullOrEmpty(s) ? "" : (s.IndexOfAny(CsvBad) < 0 ? s : s.Replace(';', ',').Replace('\n', ' ').Replace('\r', ' ')); }
+
+        // 169b: nazwa krolestwa raz na raport (ten sam obiekt i ta sama chwila - ten sam napis); rody - nazwa raz na rod
+        private static readonly Dictionary<Kingdom, string> _kName = new Dictionary<Kingdom, string>();
+        private static string KingdomName(Kingdom k)
+        {
+            if (k == null || k.Name == null) return "";
+            string n;
+            if (_kName.TryGetValue(k, out n)) return n;
+            n = Clean(k.Name.ToString());
+            _kName[k] = n;
+            return n;
+        }
 
         private struct Top { public string Name; public double V; }
 
@@ -331,7 +397,7 @@ namespace Armoury
         private static void Report(Settings s)
         {
             int day = (int)CampaignTime.Now.ToDays - 1, gameDay = (int)CampaignTime.Now.ToDays;
-            _war.Clear();
+            _war.Clear(); _kName.Clear();
             try { IronBank.DefaultedKingdoms(_defaulted, _byId); } catch (Exception e) { _defaulted.Clear(); Stumble("Report(bankruci)", e); }
             // linia 6.9
             int ai = 0, peace = 0, war = 0, mercMinor = 0, noTick = 0, ringFull = 0; long ringDays = 0;
@@ -360,6 +426,7 @@ namespace Armoury
                 {
                     var r = Of(c);
                     if (r == null) continue;
+                    string cname = c.Name != null ? c.Name.ToString() : null;   // 169b: raz na rod (CSV, najwiekszy nadmiar, prognoza splaty)
                     bool player = c == Clan.PlayerClan;
                     bool courtier = c.StringId.StartsWith("bk_courtiers_", StringComparison.Ordinal);
                     bool isAi = !player && !courtier;
@@ -446,7 +513,7 @@ namespace Armoury
                             {
                                 overN++; overSum += wage - ceiling;
                                 if (onCeil) overOnCeil++;
-                                tops.Add(new Top { Name = c.Name != null ? c.Name.ToString() : c.StringId, V = wage - ceiling });
+                                tops.Add(new Top { Name = cname ?? c.StringId, V = wage - ceiling });
                             }
                             if (wage > BudgetHysteresis * ceiling) over110++;
                             if (r.Streak >= BudgetHysteresisDays) over3++;
@@ -472,7 +539,7 @@ namespace Armoury
                                 if (ss != null) for (int i = 0; i < ss.Count; i++) if (ss[i] != null && ss[i].IsVillage) seizeVillages++;
                                 double pd = principal / Math.Max(1, rentV);
                                 payDays.Add(pd);
-                                if (pd > payMax) { payMax = pd; payMaxName = c.Name != null ? c.Name.ToString() : c.StringId; }
+                                if (pd > payMax) { payMax = pd; payMaxName = cname ?? c.StringId; }
                             }
                             if (principal > IronBankIncomeDays82 * D) { over15N++; over15Sum += principal - IronBankIncomeDays82 * D; }
                         }
@@ -500,8 +567,8 @@ namespace Armoury
                     }
                     // wiersz CSV (wzor PeopleLedger: wiersz z bledem nie trafia do pliku)
                     bool bud = budget;
-                    csv.Append(day).Append(';').Append(gameDay).Append(';').Append(Clean(c.StringId)).Append(';').Append(Clean(c.Name != null ? c.Name.ToString() : "")).Append(';')
-                       .Append(Clean(c.Kingdom != null && c.Kingdom.Name != null ? c.Kingdom.Name.ToString() : "")).Append(';').Append(kind).Append(';').Append(atWar ? 1 : 0).Append(';')
+                    csv.Append(day).Append(';').Append(gameDay).Append(';').Append(Clean(c.StringId)).Append(';').Append(Clean(cname ?? "")).Append(';')
+                       .Append(KingdomName(c.Kingdom)).Append(';').Append(kind).Append(';').Append(atWar ? 1 : 0).Append(';')
                        .Append(leaderGold).Append(';').Append(N0(G)).Append(';').Append(N0(D)).Append(';').Append(r.Filled).Append(';').Append(r.Inflow).Append(';').Append(r.A).Append(';')
                        .Append(r.SaldoSeen ? r.SaldoLast.ToString(inv) : "").Append(';').Append(r.B).Append(';').Append(r.Refund).Append(';').Append(r.Crown).Append(';')
                        .Append(r.Evt).Append(';').Append(r.Third).Append(';')
@@ -522,7 +589,9 @@ namespace Armoury
             var topTxt = new List<string>();
             for (int i = 0; i < tops.Count && i < 3; i++) topTxt.Add(tops[i].Name + " " + N0(tops[i].V));
             string path = null;
+            long tcsv = Stopwatch.GetTimestamp();
             try { path = Log.Csv("budzet-rodow.csv", CsvHeader, csv.ToString()); } catch (Exception e) { Stumble("Report(csv)", e); }
+            _ticksCsv = Stopwatch.GetTimestamp() - tcsv;
             if (path != null && path != _csvPath) { _csvPath = path; Log.Info("Budzet rodow: plik CSV " + path + "."); }
             var sb = new StringBuilder(2048);
             sb.Append("Budzet rodow (na sucho): dzien ").Append(day)
@@ -534,6 +603,9 @@ namespace Armoury
               .Append(", ujemne u ").Append(saldoMinusN).Append(", razem ").Append(saldoMinus)
               .Append("; pierscien: pelny u ").Append(ringFull).Append(" rodow, srednio ").Append(ai > 0 ? Math.Round((double)ringDays / ai).ToString("0", inv) : "0")
               .Append(" zmierzonych dob z 28 (brakujace doby = G/60)")
+              .Append("; dochod modelu: wziety z KingdomTreasury (ten sam model, ta sama doba) u ").Append(LastReused).Append(" rodow, liczony tu u ").Append(LastOwnCalls)
+              .Append(", probka kontrolna ").Append(LastSampleN).Append(" rodow liczonych drugi raz teraz: roznica ").Append(LastSampleDiff >= 0 ? "+" : "").Append(LastSampleDiff)
+              .Append(" (bezwzgl. ").Append(LastSampleAbs).Append(')')
               .Append(" | pulap zoldu wg planu budzetu razem ").Append(N0(ceilSum)).Append(" a zold naliczony (partie + zalogi) ").Append(wageSum)
               .Append(" (").Append(ceilSum > 0 ? (100.0 * wageSum / ceilSum).ToString("0", inv) + "%" : "-").Append(')')
               .Append(" | ponad pulapem ").Append(overN).Append(" rodow (ponad 1.10 x: ").Append(over110).Append(", od 3 dob: ").Append(over3).Append("), nadwyzka zoldu ")

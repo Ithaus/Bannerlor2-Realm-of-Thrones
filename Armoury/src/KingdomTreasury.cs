@@ -57,7 +57,12 @@ namespace Armoury
                     if (c == null || c.IsEliminated || c.Kingdom == null || c.Leader == null || !c.Leader.IsAlive) continue;
                     if (c.IsUnderMercenaryService || c == c.Kingdom.RulingClan || c.IsBanditFaction) continue;
                     float income = 0f;
-                    try { income = model.CalculateClanIncome(c, false, false, false).ResultNumber; } catch { }
+                    try
+                    {
+                        income = model.CalculateClanIncome(c, false, false, false).ResultNumber;
+                        ClanIncomeBook.NoteModelIncome(c, income);   // paczka 169b: (a) dla D rodu - ta sama liczba, bez drugiego wyliczenia (tylko zapis; wlasny try)
+                    }
+                    catch { }
                     int rent; PopulationLaw.RentToday.TryGetValue(c, out rent);
                     income += rent;
                     if (income <= 0f) continue;
@@ -68,6 +73,7 @@ namespace Armoury
                     if (pay <= 0) continue;
                     c.Leader.ChangeHeroGold(-pay);
                     c.Kingdom.KingdomBudgetWallet += pay;
+                    CirculationWindows.NoteHeroGold(c.Leader, -pay);   // paczka 169b: glowa poza swiatem (Disabled) - zloto weszlo do swiata (tylko licznik)
                     total += pay; payers++;
                     if (c == TaleWorlds.CampaignSystem.Clan.PlayerClan) playerPaid = pay;
                 }
@@ -190,6 +196,7 @@ namespace Armoury
                             var h = list[i].Key;
                             k.KingdomBudgetWallet -= give[i];   // najpierw skarbiec, potem platnik: skarbiec oddaje dokladnie tyle, ile dostal platnik
                             h.ChangeHeroGold(give[i]);
+                            CirculationWindows.NoteHeroGold(h, give[i]);   // paczka 169b: platnik poza swiatem (Disabled) - zloto wyszlo ze swiata (tylko licznik)
                             ClanIncomeBook.NoteInflow(h, give[i], ClanIncomeBook.KRefund);   // paczka 169: D rodu (tylko licznik)
                             given += give[i];
                             clans.Add(h.Clan); allClans.Add(h.Clan);
@@ -282,6 +289,7 @@ namespace Armoury
                         {
                             int x = (int)(spare * Math.Max(0f, s.DebasementShare));
                             if (x > 0) { st.SettlementComponent.ChangeGold(-x); ruler.ChangeHeroGold(x); deb += x; spare -= x; }
+                            if (x > 0) CirculationWindows.NoteHeroGold(ruler, x);   // paczka 169b (tylko licznik)
                             if (x > 0) ClanIncomeBook.NoteInflow(ruler, x, ClanIncomeBook.KCrownLevies);   // paczka 169: D rodu (tylko licznik)
                         }
                         // monopole: 5% zysku warsztatow w miastach rodu krola, z KAPITALU warsztatu
@@ -291,6 +299,7 @@ namespace Armoury
                                 if (w == null || w.Owner == null || w.Owner == ruler) continue;
                                 int x = Math.Min((int)(w.ProfitMade * 0.05f), Math.Max(0, w.Capital));
                                 if (x > 0) { w.ChangeGold(-x); ruler.ChangeHeroGold(x); mon += x; }
+                                if (x > 0) CirculationWindows.NoteHeroGold(ruler, x);   // paczka 169b (tylko licznik)
                                 if (x > 0) ClanIncomeBook.NoteInflow(ruler, x, ClanIncomeBook.KCrownLevies);   // paczka 169: D rodu (tylko licznik)
                             }
                     }

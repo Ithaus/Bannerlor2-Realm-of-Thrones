@@ -955,3 +955,20 @@ Kazda uwaga sprawdzona w kodzie drzewa 2e235ea i w dekompilacjach (gra 1.4.8, BK
 | K14 | `ApplyAll` w jednym try (drobne) | PRZYJETA | Kazde okno przez `Wire(...)` we wlasnym try, `Wired[w]` i powod `BRAK` osobno (5.11, 6.1). |
 | K15 | D brutto zamiast "dodatniego salda modelu" bez slowa (drobne) | PRZYJETA | Zapisane wprost (D19, rozdz. 7) z uzasadnieniem: saldo po zoldzie daje sprzezenie pulap <-> zold. Saldo naliczone (O40) drukowane obok w CSV i w 6.9 - bez drugiego pierscienia (wybor nalezy do 166). |
 | K16 | D7: okno rodu zamyka postfiks, nie finalizer (drobne) | PRZYJETA (wariant finalizera) | `ClanOpen` = `_clanNow != null && _clanTime == Now` (`MoneyLedger.cs:297`); postfiks nie biegnie po wyjatku. `MbEvent` nie lapie wyjatkow, wiec scenariusz wymaga, by wyzej zlapal je inny mod - malo prawdopodobne, ale finalizer jest tani (D16, O41, T17). Wariant "169 traktuje stare `_clanNow` jako zamkniete" odrzucony: stara ksiega dalej liczylaby te zdarzenia jako "w rozliczeniu", a flagi 169 nie - "inne" wyszloby ujemne (T4). |
+
+---
+
+## 15. Paczka 169b - poprawki pomiaru po autotescie 40 dob (08/09.10)
+
+Nadal SAM LOG. Wszystkie zmiany - wpis "169b" w `CHANGELOG.md` (problem, przyczyna z dekompilacji, ryzyko). Skrot dla wykonawcy kolejnych paczek:
+
+| # | Objaw w autotescie 169 | Przyczyna | Pomiar 169b |
+|---|---|---|---|
+| 1 | doba 34: +1.12 mln do skarbcow bez nazwy, "trybut przyjety" 0 przy 1.41 mln "trybutu zaplaconego" | Diplomacy: odszkodowania przy pokoju (`KingdomWalletCost.ApplyCost`, portfel Reparations) - odbiorca z gory (skarbiec bez zdarzenia, glowa i najemnicy zdarzeniem z niczego), placacy dostaje dlug `TributeWallet`, ktory jego rody splacaja w rozliczeniach (linia "trybut zaplacony") | okno O47 `odszkodowania` (W40): flaga `KReparations` + migawka skarbcow wszystkich krolestw -> N8; informacje: do / ze skarbcow, dlug trybutu; sumy od startu sesji w linii "rody - przyczyny" |
+| 2 | probki `nowe-karawany`: -665 / -1225 / -2130 | BEE `CaravanCampaignBehavior.OnSettlementEntered`: najem eskorty (190/95 zl), awanse zalogi - kasa karawany bez zdarzenia i bez odbiorcy | okna O48-O51 (W44-W47) `BEE-eskorta`, `BEE-awanse`, `BEE-drogi` -> U10 (ujscie), `BEE-dostawy` -> N9 (netto) - migawka `PartyTradeGold` karawany |
+| 3 | "inne" zrodel z niczego ok. 285 tys. na dobe | BK `EstateData.DailyProductionIncome` (dochod majatkow), BEE `TickEstateRent` (renta majatkow), BEE `TryPayTreasurySurplus` / `AccrueCustoms` (wyplaty skarbcow BEE) - wszystko zdarzeniami "nic -> bohater" | okna flagowe O52-O54 (W41-W43) `majatki-BK`, `renta-majatkow-BEE`, `wyplaty-BEE` - rozbicie "w tym" (D14), bez nowej pozycji bilansu; do notabli osobno (T7) |
+| 4 | budzet rodow 33.5 ms | ~330 x `CalculateClanIncome` (BK `AddIncomes`) | (a) z `KingdomTreasury.Daily` tej doby (`ClanIncomeBook.NoteModelIncome` - ta sama liczba, D21), wlasne wyliczenia tylko dla rodow, ktorych KingdomTreasury nie liczy; probka kontrolna ok. 8 rodow; koszt rozbity w kontrolce |
+| 5 | RB ok. -2..-2.7 tys. na dobe od wojen | hipoteza: `ChangeHeroGold` naszych modulow dla bohatera poza swiatem (Disabled) - np. zwrot zoldu | `CirculationWindows.NoteHeroGold` -> N5 ("w tym nasze moduly"); RB wedlug odcinkow (granice `Mark`) - klucze `RB1..RB5` |
+| 6 | T8: zold partii Obieg != Zold | dwa zbiory partii (ksiega: kazde wywolanie modelu, rodzaj przy naliczeniu; SoldierPay: rekord na partie, rodzaj przy rozdziale) | "Obieg" z SoldierPay (z liczba partii) + uzgodnienie z licznikiem ksiegi (zmiana rodzaju, powtorzenia, poza oknem) |
+
+Probki swiata: 12 na dobe (bylo 8). Nowe testy narzedzia: T18 (skok reszty |R| > 250 000), T19 ("inne" zrodel z niczego, cel < 50 000), T20 (RB wedlug odcinkow).
