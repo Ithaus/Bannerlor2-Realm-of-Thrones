@@ -760,3 +760,8 @@ Audyt w PDF: docs/audyt-2026-10-09/AUDYT-SWIATA-2026-10-09-SKROT.pdf (39 str.) i
 **DECYZJE JEFFA 09.10 (KIESA LUDU, paczka 173):** (A) glod ma skutki - TAK (tydzien bez stac na jedzenie -> spada zadowolenie BK, za nim dobrobyt; nie w pierwszych
 120 dniach kampanii; osobny wylacznik); (B) dziesiecina dla septow - TAK (5% utargu wsi, 1-3% dochodu ludzi; polowa jalmuzna, polowa budowa septow);
 (C) ok. 5% mniej wojska AI - Jeff pyta "czemu?" (wyjasnione w czacie; czeka na decyzje).
+**DECYZJA JEFFA 09.10 (C): PODATEK WOJENNY KORONY OD LUDZI - TAK** (zamiast ok. 5% mniej wojska AI przy kiesie ludu), z warunkiem Jeffa: "im wyzsze podatki,
+tym wplyw na gospodarke i dobrobyt". Projekt (173 + 165): stawka wojenna ustalana przez korone wedlug potrzeby; skutki: (1) z kiesy ludu mniej na zakupy (najpierw
+zbytki, potem odziez, jedzenie na koncu) -> mniejszy utarg kupcow i rzemieslnikow -> wolniejszy wzrost dobrobytu; (2) obciazenie ponad "znosny" poziom -> spadek
+zadowolenia (podpiac pod mechanizm BK polityki podatkowej - sprawdzic w kodzie); (3) wysokie obciazenie + glod -> niepokoje/bunt (BK); AI krol dobiera stawke
+wedlug potrzeby wojny i niepokojow. Historycznie: poll tax 1381 (Bunt Chlopski), Jacquerie 1358.
