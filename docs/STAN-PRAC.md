@@ -738,3 +738,7 @@ Testy: 169 sama 40 dob (gra niezmieniona, reszta swiata -38 tys./d zamiast -215 
 Poprzedni Armoury 04d1cc99: Armoury.dll.bak-2026-10-09-przed-noc4 + D:\Backup-Bannerlord\wgrane\2026-10-09-noc4-przed. ZATWIERDZONE OD TERAZ: Armoury 0f8a80b0, CrashScribe cfb33950.
 Testy: H3 sam 40 dob (przegrani zabici 19.4% zamiast 50.2%, zwyciezcy 2.3% zamiast 6.7%), S5 40 dob (13.3 s/dobe, 0 bledow, reszta swiata -27 tys./d), S5 zapis doby 362 (24.2 s/dobe, 0 bledow).
 NIE wgrane: 171 + 172 (niezaliczone progi - rynek, strzaly w karawanach; decyzja Jeffa), T2c i T9 (w toku).
+**WGRANIE 5 (08.10 ok. 22:13):** CrashScribe 4552ceaf (= cfb33950 + T2c: Inni nie obleagaja i nie rabuja zamknietych celow przed terminem kalendarza, trwajace oblezenia
+przerywane bez strat; galaz w-toku/n11-mur f6d4e51), Armoury bez zmian 0f8a80b0. Poprzedni CrashScribe cfb33950: CrashScribe.dll.bak-2026-10-09-przed-noc5 +
+D:\Backup-Bannerlord\wgrane\2026-10-09-noc5-przed. ZATWIERDZONE OD TERAZ: Armoury 0f8a80b0, CrashScribe 4552ceaf.
+Testy T2c: zapis doby 362 (10 dob; Nocny Krol przerwal oblezenie Craster's Keep, 0 osad zdobytych - bez T2c 3) i nowa kampania 40 dob - 0 bledow.

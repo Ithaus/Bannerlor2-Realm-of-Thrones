@@ -214,3 +214,4 @@ dana faze od nowa, korzystajac z zapisanych wynikow:
   Craster's Keep po wczytaniu (bez strat), potem rozkazy ROT usuwane; 0 "OBLEZENIE przed terminem", 0 osad zdobytych (bez T2c w tym samym zapisie: 3), 0 bledow.
 - 22:09 **AUTOTEST T2c nowa kampania 40 dob OK**: 13.1 s/dobe, 0 bledow, 0 oblezen przed terminem, 0 "RUSZA NA", trupy w dobie 40: 1037 (S2 1651, S1 1909), 0 osad.
   Raport roboczy: docs/RAPORT-NOCNY-2026-10-09.md; badanie reparacji: docs/audyt-2026-10-09/11-trybut-reparacje.md. T9 w poprawkach.
+- 22:13 **WGRANIE 5 W GRZE**: CrashScribe 4552ceaf (+T2c), Armoury 0f8a80b0; kopia przed: CrashScribe.dll.bak-2026-10-09-przed-noc5.
