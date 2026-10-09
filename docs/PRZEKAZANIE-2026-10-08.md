@@ -229,3 +229,22 @@ dana faze od nowa, korzystajac z zapisanych wynikow:
   male paczki D1 za Murem mysliwi/rybacy, I1 jency do domu/na Mur, F1 H3 przy autobitwie gracza, E1 pokoj z biedy (wf_4750c307-a2b, drzewa SCRATCH nowej sesji noc2\*,
   galezie w-toku/d1-zamurem, i1-jency, f1-h3gracz (od noc/sklad4), e1-pokoj (od w-toku/n12-reparacje - CrashScribe)).
 - Potem: proby zimy (J) i drog (H) za zgoda Jeffa; testy + wgrania; rano raport + PDF audytow.
+
+## 18. LISTA KROKOW NA RESZTE NOCY 09/10.10 (na wypadek skrocenia rozmowy) - Jeff: wgrywac samemu po udanym autotescie (z kopia)
+STAN W GRZE: Armoury 0f8a80b0 (galaz noc/sklad4), CrashScribe 269cc980 (galaz w-toku/n12-reparacje). SCRATCH = C:\Users\GAME\AppData\Local\Temp\claude\
+C--Program-Files--x86--Steam-steamapps-common-Mount---Blade-II-Bannerlord\7016f733-d379-418e-b700-f66fd52e4d2b\scratchpad ; klon git: 3cf3e0ac-...\scratchpad\lancuch.
+PROCEDURY:
+- Autotest (gra zamknieta, Jeff nie gra): cd <3cf3e0ac SCRATCH>\dzien-6\autotest\repo; powershell -NoProfile -ExecutionPolicy Bypass -File tools\autotest.ps1
+  -CrashScribeDll <CS z trybem autotestu> -ArmouryDll <probny Armoury> -Days 40 [-LoadSave autotest-161-kawalki -Days 8-10]; wynik w pliku wyjscia; skrypt sam
+  przywraca zatwierdzone DLL (md5). CS z trybem autotestu dla danej galezi: worktree galezi + `git apply -3 SCRATCH\test\at1-cs.diff` (diff 2e235ea..c5c25ce -- CrashScribe)
+  + build CrashScribe. Gotowe: SCRATCH\test\CrashScribe-at-T9.dll (= CS w grze + autotest), CrashScribe-spis.dll (baza).
+- Wgranie: tasklist (gra zamknieta) -> sprawdz md5 w grze = oczekiwany -> kopia do D:\Backup-Bannerlord\wgrane\2026-10-09-nocN-przed + *.bak-...-przed-nocN obok ->
+  cp -> md5 -> STAN-PRAC "WGRANIE N" + PRZEKAZANIE + push + kopia D:. Nastepne N = 7.
+KOLEJKA:
+1. Test 171+172+172b (Armoury SCRATCH\test\Armoury-172b.dll, 40 dob, w toku) -> analiza (karawany ~0 strzal, polki, awanse lucznikow).
+2. 174 PRODUKCJA UZBROJENIA: projekt wf_42ffe0c8-8e0 -> docs/PROJEKT-174-PRODUKCJA-UZBROJENIA-2026-10-09.md -> wykonanie na w-toku/172b-karawany (nowe drzewo) ->
+   recenzje -> poprawki -> scalenie 171+172+172b+174 do noc/sklad4 (nowa galaz sklad5) -> test 40 dob + zapis 362 -> wgranie, jesli progi OK (rynek, pokrycie).
+3. Male paczki wf_4750c307-a2b: D1/I1/F1 (Armoury, od sklad4), E1 (CrashScribe, od n12) -> scalic, testowac, wgrac.
+4. Proby: zima (J) i drogi (H; galaz w-toku/p2-drogi-proba, plik danych arm_map_roads_probe.tsv do ModuleData na czas testu, zdjecia) - Jeff zgodzil sie.
+5. Audyty -> PDF (skrypt SCRATCH\pdf\zrob_pdf.py; Edge zapisuje PDF z opoznieniem): 12-DOCHODY-RODOW, 13-UMIEJETNOSCI, 14-ARMIE-KROLESTW -> SendUserFile rano.
+6. Raport poranny dla Jeffa (docs/RAPORT-NOCNY-2026-10-10.md): co wgrane, testy, odpowiedzi audytow, pytania.
