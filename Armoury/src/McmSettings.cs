@@ -1804,6 +1804,18 @@ namespace Armoury
         [SettingPropertyGroup("The road to market")]
         public bool VillageCartFairPrice { get; set; } = true;
 
+        [SettingPropertyBool("Village Takings Whole", HintText = "what a village's carts bring home from market no longer vanishes: after the lord's tax (Banner Kings: 70 percent, or 50 / 90 by the fief's tax decree) and the estate owners' cut, the village purse keeps the whole remainder - until now half of that remainder was simply deleted. The lord's tax, the estates and his tax counter stay exactly as Banner Kings sets them. Off = half the remainder vanishes as before")]
+        [SettingPropertyGroup("The road to market")]
+        public bool VillageTakingsWhole { get; set; } = true;
+
+        [SettingPropertyBool("Village Food Sales Kept", HintText = "coin a lord's party pays a village for what it buys there (food above all) no longer vanishes (the game took the whole price back out of the village purse as a tax nobody received): it is shared like the carts' takings - the lord's share by his tax decree goes to the village tax counter he draws from, the rest stays in the village purse. Off = the price vanishes as before")]
+        [SettingPropertyGroup("The road to market")]
+        public bool VillageFoodSalesKept { get; set; } = true;
+
+        [SettingPropertyBool("Villager Purse Survives", HintText = "the purse of a village cart party that is wiped off the map no longer vanishes with it: beaten in battle, what the game left after the victors' tenth goes to the victor as well - to the winning party's leader (to you, if you beat them) or into a bandit band's purse - just as villagers who surrender hand you the whole purse; disbanded, or with no victor able to take it, the purse goes home and is shared like takings. Off = the purse vanishes as before")]
+        [SettingPropertyGroup("The road to market")]
+        public bool VillagerPurseSurvives { get; set; } = true;
+
         [SettingPropertyBool("Map Road Table Fix", HintText = "the map's road table is completed when a campaign loads: the Realm of Thrones map was reworked after its road table was made, and the new spots by Wickenden, Lord Hewett's Town, Acorn Hall, Griffin's Roost, Pinkmaiden and a hideout had no entry, so every party standing there - in those settlements or on the road beside them - looked cut off from the whole world: Banner Kings refused all its orders, caravans thought every town too far, and lords, caravans and villagers stood there for good. Each spot the road table never saw gets the nearest gate by road, worked out exactly as the game's own map tool does; spots the tool saw and left empty (no road to any settlement) stay as they are. Nothing goes into the save - the table is read anew at every load (off = the table as the map ships it)")]
         [SettingPropertyGroup("The road to market")]
         public bool MapRoadTableFix { get; set; } = true;
@@ -3834,6 +3846,9 @@ namespace Armoury
             s.VillageCartWholeStore = VillageCartWholeStore;
             s.VillageCartRoadNews = VillageCartRoadNews;
             s.VillageCartFairPrice = VillageCartFairPrice;
+            s.VillageTakingsWhole = VillageTakingsWhole;
+            s.VillageFoodSalesKept = VillageFoodSalesKept;
+            s.VillagerPurseSurvives = VillagerPurseSurvives;
             s.MapRoadTableFix = MapRoadTableFix;
             s.VillageCartLeaveTown = VillageCartLeaveTown;
             s.VillageCartTownMaxDays = VillageCartTownMaxDays;

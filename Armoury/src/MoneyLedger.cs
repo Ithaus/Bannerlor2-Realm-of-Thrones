@@ -56,6 +56,10 @@ namespace Armoury
     ///  postfiksami o priorytecie First - liczniki tej ksiegi (priorytet zwykly) biegna po nich i widza stan po zmianie: w linii kas zamkow
     ///  "skasowal" i "zakupy" maja wtedy 0. Dar startowy kas zamkow przyciety raz na kampanie (MTrim) to jedyna migawka naszego ticku,
     ///  ktora nie jest przelewem - w bilansie ujscie.
+    ///  Paczka 112 (VillageTakings): to, co paczka dopisala wsiom przy powrocie taboru, siedzi juz w oknie powrotu (kiesa wsi i licznik
+    ///  podatku rosna przed AfterSettlementEntered) - "z utargu wsi zniklo" spada do zera samo; cene towaru kupionego we wsi oddana wsi
+    ///  widzi okno "prowizja" ksiegi obiegu (finalizer po postfiksie paczki), a sakwy zniszczonych taborow - nasluch ksiegi obiegu, wpiety
+    ///  po nasluchu paczki (widzi sakwe juz oddana).
     /// </summary>
     internal static partial class MoneyLedger
     {
@@ -811,8 +815,11 @@ namespace Armoury
               .Append(" | powrot do wsi: tabory oddaly ").Append(_vHanded).Append(" [P] w ").Append(_vReturns).Append(" powrotach = pan (licznik podatku wsi) ")
               .Append(_vTax).Append(" [P] (").Append(Pct(_vTax, _vHanded)).Append(") + wlasciciele majatkow BK ").Append(_vEstates).Append(" [P] (").Append(Pct(_vEstates, _vHanded))
               .Append(") + kiesa wsi ").Append(_vKept).Append(" [P] (").Append(Pct(_vKept, _vHanded)).Append(") + zniklo ").Append(vanished).Append(" [R] (")
-              .Append(Pct(vanished, _vHanded)).Append(")")
-              .Append(" | zold naliczony przy rozliczeniach rodow [P]: ");
+              .Append(Pct(vanished, _vHanded)).Append(")");
+            // 112 (VillageTakings): to, co paczka dopisala wsiom przy powrocie taboru, siedzi juz w "kiesa wsi" i "pan" (okno powrotu obejmuje jej postfiks)
+            if (VillageTakings.TakingsToPurse + VillageTakings.TakingsToTax != 0)
+                sb.Append("; w tym dopisane wsiom przez 112: do kies ").Append(VillageTakings.TakingsToPurse).Append(", na liczniki panow ").Append(VillageTakings.TakingsToTax).Append(" [P]");
+            sb.Append(" | zold naliczony przy rozliczeniach rodow [P]: ");
             long wages = 0;
             for (int k = 0; k < Wages; k++)
             {

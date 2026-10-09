@@ -24,8 +24,9 @@ namespace Armoury
     {
         // ------------------------------------------------------------ nasze przeplywy kas bez licznika (Note169, D13)
         internal const int N169Repair = 0, N169Surplus = 1, N169Kit = 2, N169PurseGone = 3, N169Other = 4;
-        private const int N169 = 5;
-        private static readonly string[] N169Name = { "naprawy", "skup nadwyzek zbrojowni", "komplety gracza", "sakiewki rozbitych partii", "inne" };
+        internal const int N169CartPurse = 5;                // 112: sakwa rozwiazanego taboru (albo bez zwyciezcy) wraca do kiesy wsi
+        private const int N169 = 6;
+        private static readonly string[] N169Name = { "naprawy", "skup nadwyzek zbrojowni", "komplety gracza", "sakiewki rozbitych partii", "inne", "sakwy taborow wsi (112)" };
         private static readonly long[,] _n169In = new long[Classes, N169], _n169Out = new long[Classes, N169];
         private static long _purseGoneWin, _purseGoneTown;  // sakiewki rozbitych partii: do zwyciezcow (i ich lordow) / do kas miast
         private static readonly long[] _classRest = new long[Classes];   // reszta starej linii kas (ClassLine) - do linii przyczyn
@@ -443,7 +444,8 @@ namespace Armoury
                     else zeros++;
                 }
                 long com = C[c, CW.LCommission], toCtr = C[c, CW.LCommissionToCounter];
-                if (c == CVill) Add("prowizja od zakupow we wsi" + (com != 0 ? " (100% w nicosc)" : ""), com, CW.Wired[CW.WSell]);
+                // 112: czesc ceny skasowanej przez gre wraca do kiesy wsi (w "com") i na licznik podatku wsi (toCtr) - w nicosc tylko reszta
+                if (c == CVill) Add("prowizja od zakupow we wsi" + (com != 0 || toCtr != 0 ? " (w nicosc " + (-com - toCtr) + (toCtr != 0 ? ", na licznik panow (112) " + toCtr : "") + ")" : ""), com, CW.Wired[CW.WSell]);
                 else Add("prowizja od sprzedazy partiom" + (com != 0 || town ? " (do licznika cel " + toCtr + ", w nicosc " + (-com - toCtr) + ")" : ""), com, CW.Wired[CW.WSell]);
                 Add("warsztaty BK - kasa placi za wyroby", C[c, CW.LWorkshopOut], CW.Wired[CW.WWorkshopOut]);
                 Add("warsztaty placa za wsad", C[c, CW.LWorkshopIn], CW.Wired[CW.WWorkshopIn]);

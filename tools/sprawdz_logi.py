@@ -196,6 +196,16 @@ def baseline_of(lines, rows=None):
     base["swiat"]["tabory_kiesy_zniknely"] = mean_of(cau, r"kiesy partii bez wodza, ktore zniknely z mapy -?\d+ \(karawany -?\d+, tabory (-?\d+)")
     vil = by_day(lines, "Przeplywy osad: dzien")
     base["swiat"]["utarg_miasta"] = mean_of(vil, r"miasta zaplacily (-?\d+)")
+    # 112 (S16, R9): bandy - awanse u pasera (linia "Wyrzutki"), rozbite tabory (linia "Dowoz"), kiesy band (linia "Pieniadz swiata"),
+    # sredni tier (linia "Utarg wsi (112)" - w biegu bazowym jej nie ma)
+    wyr = by_day(lines, "Wyrzutki: dzien")
+    base["swiat"]["bandy_awanse_paser"] = mean_of(wyr, r"od pasera (\d+) \(\d+ zl\)")
+    base["swiat"]["bandy_paser_zl"] = mean_of(wyr, r"od pasera \d+ \((\d+) zl\)")
+    dow = by_day(lines, "Dowoz: dzien")
+    base["swiat"]["tabory_rozbite_bandy"] = mean_of(dow, r"w tym przez bandy (\d+)")
+    base["swiat"]["bandy_zloto"] = mean_of(money, r", bandy (\d+)")
+    utw = by_day(lines, "Utarg wsi (112): dzien")
+    base["swiat"]["bandy_tier"] = mean_of(utw, r"sredni tier ([\d.]+)", float)
     return base
 
 
@@ -511,6 +521,27 @@ def main(argv):
     else:
         rep.add("B: pieniadz swiata - zmiana tempa wobec bazy minus zamkniete ujscia (28 dob)", "brak bazy albo kluczy B w bazie (zapisz baze jeszcze raz z logu biegu bazowego)",
                 "+-30 tys./dobe", None)
+    # 112: utarg wsi, towar kupiony we wsi, sakwy taborow; bandy najwyzej +20% wobec bazy (S16)
+    ut = by_day(lines, "Utarg wsi (112): dzien")
+    rep.add("112: linia Utarg wsi (112)", f"{len(ut)} dob" if ut else "brak (przed 112)", "obecna po wgraniu B", True if ut else None)
+    zn = [num(r"z utargu wsi zniklo (-?\d+)", s2) for s2 in by_day(lines, "Pieniadz swiata (bilans): dzien").values()]
+    zn = [x for x in zn if x is not None]
+    rep.add("112: z utargu wsi zniklo (srednio na dobe)", f"{st.mean(zn):.0f}" + (f" (baza {bw['wsie_utarg_zniklo']:.0f})" if bw.get("wsie_utarg_zniklo") is not None else "") if zn else "brak linii",
+            "INFO - po 112 ok. 0 (reszta nieprzypisana w linii 112)", None)
+    zam = [num(r"zamkniete ujscia razem \(dopisane wsiom, panom i zwyciezcom\): (\d+)", ut[k]) for k in last_window(ut)]
+    zam = [x for x in zam if x is not None]
+    rep.add("112: zamkniete ujscia (oddane wsiom, panom i zwyciezcom, 28 dob)", f"{st.mean(zam):.0f} na dobe" if zam else "brak linii",
+            "INFO - projekt: ok. +47 tys./dobe do kies wsi + zywnosc i sakwy", None)
+    for key, name in (("bandy_tier", "sredni tier ludzi band"), ("bandy_zloto", "kiesy band"), ("bandy_awanse_paser", "awanse band u pasera"),
+                      ("bandy_paser_zl", "zloto band u pasera"), ("tabory_rozbite_bandy", "tabory rozbite przez bandy na dobe")):
+        v, b = sw.get(key), bw.get(key)
+        if v is None:
+            rep.add(f"112: bandy - {name} (28 dob)", "brak linii", "<= baza + 20% (S16)", None)
+        elif b is None or b == 0:
+            rep.add(f"112: bandy - {name} (28 dob)", f"{v:.3f}" if key == "bandy_tier" else f"{v:.0f}", "<= baza + 20% (S16); brak w bazie - porownac z biegiem z Villager Purse Survives wylaczonym", None)
+        else:
+            rep.add(f"112: bandy - {name} (28 dob)", (f"{v:.3f}" if key == "bandy_tier" else f"{v:.0f}") + f" wobec bazy " + (f"{b:.3f}" if key == "bandy_tier" else f"{b:.0f}")
+                    + f" ({100.0 * v / b - 100:+.0f}%)", "<= baza + 20% (S16)", (v <= 1.2 * b) if b_on else None)
     v, b = sw.get("utarg_miasta"), bw.get("utarg_miasta")
     rep.add("B: zakupy plonu przez miasta (utarg taborow, 28 dob)", f"{v:.0f}" + (f" wobec bazy {b:.0f} ({100.0 * v / b:.0f}%)" if b else " (bez bazy)") if v is not None else "brak linii",
             ">= 95% bazy (bez zmian)", (v >= 0.95 * b) if (v is not None and b and b_on) else None)

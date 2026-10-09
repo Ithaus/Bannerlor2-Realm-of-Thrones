@@ -730,7 +730,8 @@ namespace Armoury
                 if (_sellSt != null) { Nested++; return; }      // okno juz otwarte - wewnetrzne sie NIE otwiera i niczego nie zmienia
                 if (__0 == null || !__0.IsSettlement || __0.Settlement == null || __0.Settlement.SettlementComponent == null) return;
                 var st = __0.Settlement;
-                __state.St = st; __state.S0 = st.SettlementComponent.Gold; __state.Tax0 = st.Town != null ? st.Town.TradeTaxAccumulated : 0;
+                // 112: we wsi takze licznik podatku wsi - VillageTakings oddaje tam czesc pana z ceny skasowanej przez gre (postfiks przed tym finalizerem)
+                __state.St = st; __state.S0 = st.SettlementComponent.Gold; __state.Tax0 = st.Town != null ? st.Town.TradeTaxAccumulated : (st.Village != null ? st.Village.TradeTaxAccumulated : 0);
                 _sellSt = st; _sellIn = 0; __state.On = true;
                 __state.T0 = CostStart(WSell);
                 __state.P = ProbeOpen(WSell, out __state.W0, out __state.N0);
@@ -745,11 +746,11 @@ namespace Armoury
             try
             {
                 var st = __state.St;
-                long s1 = st.SettlementComponent.Gold, t1 = st.Town != null ? st.Town.TradeTaxAccumulated : 0;
+                long s1 = st.SettlementComponent.Gold, t1 = st.Town != null ? st.Town.TradeTaxAccumulated : (st.Village != null ? st.Village.TradeTaxAccumulated : 0);
                 long num2 = __state.S0 + _sellIn - s1;      // kasa osady stracila bez zdarzenia
                 long toCounter = t1 - __state.Tax0;          // prowizja dopisana do licznika cel (posiadacz swiata)
                 long lost = num2 - toCounter;                // w nicosc
-                ToCounterRun += toCounter;
+                if (st.Town != null) ToCounterRun += toCounter;   // licznik cel miast (okno myta O46); licznik podatku wsi (112) - nie
                 int c = ClassOf(st);
                 if (c == CVill) AddWorld(UCommissionVillage, lost, -1);
                 else { AddWorld(UCommissionTownLost, lost, -1); Sum[ICommissionToCounter] += toCounter; }

@@ -366,6 +366,8 @@ namespace Armoury
                     totalDue += (long)rent;
                     try
                     {
+                        // hak kiesy ludu (112, KL etap 5): renta wsi ustepuje stalym oplatom 173 - do etapu 5 false (renta jak dotad)
+                        if (st.IsVillage && VillageTakings.VillageRentYieldsToFees) continue;
                         if (st.IsVillage && (st.Village.VillageState == Village.VillageStates.Looted || st.Village.VillageState == Village.VillageStates.BeingRaided)) continue;
                         var lord = st.OwnerClan != null ? st.OwnerClan.Leader : null;
                         if (lord == null || !lord.IsAlive) continue;
