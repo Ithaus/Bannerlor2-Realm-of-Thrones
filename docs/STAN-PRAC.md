@@ -939,3 +939,10 @@ w bitwach, konie w zbrojowni + ceny po sztuce (bez rabatu AI i kupcow) + musztra
 D:\Backup-Bannerlord\wgrane\2026-10-09-noc10-przed. Testy: nowa kampania 40 dob OK (14.2 s/dobe, 0 bledow; strzaly: miast bez 15.3; kontrakty 96.3%; zbroja na polkach OK;
 cokolwiek na tulowiu 80%; miast bez rudy 41.5 - do etapu 6), zapis 362 8 dob OK (26.3 s/dobe, 0 bledow). ZATWIERDZONE OD TERAZ: Armoury 2aec1a1b, CrashScribe e8d460c5.
 Baza Armoury dla dalszych scalen: noc/sklad8.
+**WGRANIE 11 (09.10 ok. 13:45 zegara komp.; stala zgoda Jeffa):** Armoury 799a877d (noc/sklad9 5f170fd = sklad8 + 175 armie (sprzet wedlug tieru, sklad wedlug lore, Dothrakowie
+konni, Polnoc +0/+5, Volantis/Norvos, Qohor ciezej, Dorne lzej, Pine Javelin t2, konie AI do zbrojowni, Inni - stal valyrianska/t6 50%/reszta 15%) + Z16 wymogi bohaterow + Z16b
+pancerz wedlug wagi (0.333 kg/pkt, ladry - Jazda, bez podnoszenia bohaterow) + 177 stal valyrianska (castle-forged steel, mistrzowie Qohoru, rejestr klng)), CrashScribe
+891503f6 (w-toku/175-armie-cs b54a245 = e1-pokoj + 175 CS + 175b/c/d + Z16/Z16b). Poprzednie: *.bak-2026-10-09-przed-noc11 + D:\Backup-Bannerlord\wgrane\2026-10-09-noc11-przed.
+Testy: nowa kampania 40 dob OK (14.0 s/dobe, 0 bledow Armoury, CS 8 startowych), zapis 362 8 dob OK (26.4 s/dobe). Polnoc w grze 138/134 wobec swiata 129/119 (+7%/+13% jak w
+planie; bezwzgledne wyzej niz rachunek) - OSTRZEZENIE kontroli w logu CS; do sprawdzenia (tor S): czesc jednostek Polnocy t3 ma Drzewce 140 (np. cerwyn_soldier, glover_footman)
+- zamiana broni wedlug tieru moze nie objac drzewc. ZATWIERDZONE OD TERAZ: Armoury 799a877d, CrashScribe 891503f6. Bazy: Armoury noc/sklad9, CS w-toku/175-armie-cs.
