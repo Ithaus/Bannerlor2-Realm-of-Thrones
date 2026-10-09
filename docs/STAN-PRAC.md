@@ -820,3 +820,7 @@ treningu ("Equip the leader"), Z1b: Done bez pytania "You are discarding items" 
 galaz w-toku/z1-xp-dary 8cbfc73), CrashScribe bez zmian e8d460c5. Poprzedni: Armoury.dll.bak-2026-10-09-przed-noc9 + D:\Backup-Bannerlord\wgrane\2026-10-09-noc9-przed.
 Testy: nowa kampania 40 dob OK (13.1 s/dobe, 0 bledow Armoury, CS 8 startowych), zapis doby 362 8 dob OK (21.8 s/dobe). Autotest nie klika ekranow Spoils - Jeff: sprawdzic
 Done/Cancel na War stockpile, trofeach, darze dla miasta. ZATWIERDZONE OD TERAZ: Armoury 17a700d7, CrashScribe e8d460c5. Baza Armoury dla dalszych scalen: w-toku/z1-xp-dary.
+**DECYZJE JEFFA 09.10 ok. 03:55:** (8) trening Atletyki w zbroi - NIE potrzebny: "to juz jest, jak wlaczysz chodzenie na piechote albo chodzisz po mapie pieszo" (audyt 13: Atletyka
+rosnie z marszu pieszo) -> Z16 bez +10/dobe. (15) obciazenie wsi docelowo 30-50% - OK. (24d) zloto Casterly Rock wyczerpane - OK (po naprawie dochodow rodow).
+(24a) Jeff pyta: "czyli chcesz dodac 7. tier stali, z ktorej mozna wykuc tylko legendarne i mityczne zbroje i miecze?" - odpowiedz w czacie (kuznia gry ma staly zestaw
+6 stali; material 6 -> "castle-forged steel"; stal valyrianska osobno, poza kuznia, tylko w istniejacych legendarnych mieczach, przekuwanie w Qohorze) - czeka na potwierdzenie.
