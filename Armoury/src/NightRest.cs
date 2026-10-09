@@ -1182,6 +1182,8 @@ namespace Armoury
                 var s = Settings.Current;
                 if (s == null) return;
                 if (Campaign.Current != null) MasterSwitch(s);   // T10 poprawka recenzji: NightRestEnabled wylaczony w trakcie gry
+                // grupa11-p: ksiega snu AI z zapisu od pierwszej klatki po wczytaniu (kary AI od reki, jak dlug gracza) - raz, potem _aiPending == null
+                if (Campaign.Current != null) AiImportNow(s);
 
                 // straznik co klatke: namiot nie jezdzi po mapie - gracz ruszyl,
                 // wizerunek schodzi od reki (tick godzinowy bywal o godzine za pozno)

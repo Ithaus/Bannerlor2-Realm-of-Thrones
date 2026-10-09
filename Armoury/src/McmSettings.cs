@@ -2936,7 +2936,7 @@ namespace Armoury
         [SettingPropertyGroup("Drill")]
         public bool DrillStockAi { get; set; } = true;
 
-        [SettingPropertyBool("Drill Penalty Ai", HintText = "AI lords' men do not drill at all on a day they are starving or short of sleep (training perks included, and no drill gear wears out) - the same penalty as yours; short of sleep means the same sleep debt that costs them speed and morale (Ai Sleep Debt) (off = AI drill whatever their state)")]
+        [SettingPropertyBool("Drill Penalty Ai", HintText = "AI lords' men do not drill at all on a day they are starving or short of sleep (training perks included, and no drill gear wears out) - the same penalty as your men's with Drill Law on (with Drill Law off your men drill by the game's rule, and hunger or lack of sleep takes nothing from them); short of sleep means the same sleep debt that costs them speed and morale (Ai Sleep Debt), so without the AI sleep ledger (Ai Camps At Night off, equal camp hours or Ai Sleep Debt off) no lord loses drill for want of sleep - not even your clan's parties and the lords in your army - while you still do (off = AI drill whatever their state)")]
         [SettingPropertyGroup("Drill")]
         public bool DrillPenaltyAi { get; set; } = true;
 

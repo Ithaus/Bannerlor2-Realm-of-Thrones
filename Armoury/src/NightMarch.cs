@@ -212,12 +212,16 @@ namespace Armoury
             catch (Exception ex) { AiStumble("ForeignHold", mp, ex); return false; }
         }
 
-        /// <summary>Doczepiony do wodza, ktory spi snem ciaglym (sen dlugu, dlug 2-3) - spi razem z nim (poprawka recenzji: ten sam licznik).</summary>
+        /// <summary>Doczepiony do wodza, ktory spi snem ciaglym (sen dlugu, dlug 2-3) - spi razem z nim (poprawka recenzji: ten sam licznik).
+        /// grupa11-p: wodzem moze byc gracz spiacy w menu ("Bed down", _sleeping) - jego lordowie spia z nim przez swit tak jak on (SettleNight: kto spi,
+        /// dlugu nie dostaje; LeaveSleep: caly sen do doby), inaczej o swicie gracz bez dlugu, a jego lordowie z dlugiem (morale i dzien musztry).</summary>
         private static bool SleepsWithLeader(MobileParty mp)
         {
-            DebtSleeper ds;
             var lead = mp != null ? mp.AttachedTo : null;
-            return lead != null && _debtSleep.TryGetValue(lead, out ds) && ds.Kind == 2;
+            if (lead == null) return false;
+            if (lead == MobileParty.MainParty) return _sleeping;
+            DebtSleeper ds;
+            return _debtSleep.TryGetValue(lead, out ds) && ds.Kind == 2;
         }
 
         /// <summary>
@@ -793,7 +797,12 @@ namespace Armoury
                         float step = known ? pos.Distance(e.Pos) : 0f;
                         bool moved = step > RestMoveLimit;
                         // doczepiony do wodza we snie ciaglym spi razem z nim - ten sam licznik (swit go nie zeruje)
-                        if (e.Acc < 0f && SleepsWithLeader(mp)) e.Acc = e.Rest;
+                        bool withLead = SleepsWithLeader(mp);
+                        if (e.Acc < 0f) { if (withLead) e.Acc = e.Rest; }
+                        // grupa11-p: gracz wstal (LeaveSleep) - jego doczepieni koncza sen ciagly od reki, przed switem tej godziny, jak gracz (LeaveSleep
+                        // dopisuje sen do doby od razu, wiec swit liczy juz tylko odpoczynek doby); AiDebtCamp robilby to dopiero po swicie i tylko przy
+                        // czynnym dlugu AI. Bez czynnego dlugu (na sucho, AiSleepDebt wylaczony) sen ciagly bierze sie tylko od gracza - konczy sie tu kazdy.
+                        else if (!withLead && (mp.AttachedTo == main || !on) && !_debtSleep.ContainsKey(mp)) LeaveAcc(e);
                         // grupa11: czesc wspolna z gracza i musztra - Drill.RestHour (osada, oboz obleznikow, krok <= 0.35 jedn.);
                         // morze, oboz swiata (_bedPos) i sen dlugu to zasady snu - dochodza tylko tutaj
                         bool resting = Drill.RestHour(mp, step) || (s.SleepAtSeaFree && mp.IsCurrentlyAtSea)
@@ -1383,7 +1392,21 @@ namespace Armoury
             catch { }
         }
 
-        /// <summary>Napis z zapisu -> wpisy ksiegi (przy pierwszym ticku po wczytaniu, gdy partie juz istnieja).</summary>
+        /// <summary>
+        /// grupa11-p: ksiega snu AI z zapisu od reki - z pierwszej klatki po wczytaniu (NightRest.OnTick, watek glowny, partie juz istnieja), nie dopiero
+        /// w pierwszym ticku godzinowym: do tej chwili slownik kar byl pusty, wiec partie AI z dlugiem nie tracily predkosci, morale ani dnia musztry
+        /// (tick treningu wypada o roznych godzinach), a dlug gracza dzialal od razu (Import). Tylko przy czynnej ksiedze (jak dotad: przelacznik glowny
+        /// i oboz swiata) - inaczej napis czeka i ExportAi oddaje go bez zmian. _aiImportFresh zostaje do pierwszego AiSleepLedger, a jego ResolveImport
+        /// jest wtedy pusty (_aiPending == null).
+        /// </summary>
+        private static void AiImportNow(Settings s)
+        {
+            if (_aiPending == null || s == null || !s.NightRestEnabled || !LedgerOn(s)) return;
+            try { if (ResolveImport()) RebuildPenalties(DebtOn(s)); }
+            catch (Exception e) { Log.Error("NightRest.AiImportNow", e); }
+        }
+
+        /// <summary>Napis z zapisu -> wpisy ksiegi (przy pierwszej klatce po wczytaniu - AiImportNow - albo w pierwszym ticku, gdy partie juz istnieja).</summary>
         private static bool ResolveImport()
         {
             if (_aiPending == null) return false;

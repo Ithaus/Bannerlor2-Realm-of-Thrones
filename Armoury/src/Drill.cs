@@ -1020,7 +1020,9 @@ namespace Armoury
                      + (s.DrillStock && !StockOn ? " (NIECZYNNY - wymaga Drill Law i Donation Xp Off)" : "") + ", zapas AI " + On(s.DrillStockAi)
                      + ", kara AI glod/sen (Drill Penalty Ai) " + On(s.DrillPenaltyAi) + (PenaltyAi(s) ? "" : " - AI cwiczy glodne i niewyspane")
                      + "; dlug snu z ksiegi NightRest (grupa11, ten sam co kara predkosci i morale): gracz " + On(s.NightRestEnabled)
-                     + ", AI " + (NightRest.AiDebtLive(s) ? "TAK" : "nie - AI bez dlugu snu (Night Rest / Ai Camps At Night / Ai Sleep Debt albo DLL na sucho)")
+                     + ", AI " + (NightRest.AiDebtLive(s) ? "TAK" : "nie - AI bez dlugu snu (Night Rest / Ai Camps At Night / Ai Sleep Debt, rowne godziny obozu"
+                                  + " (Camp Start = Camp End) albo DLL na sucho): lordowie w armii gracza i partie rodu gracza (Z14a) tez bez kary snu w musztrze"
+                                  + (s.NightRestEnabled ? ", gracz z kara" : ""))
                      + ", Z14b (Drill Law Ai) " + On(s.DrillLawAi) + "; stale: postoj x" + F2(RestDay) + " (ruch < " + RestBelowHours + " h z 24, godzina postoju: osada, oboz, <= "
                      + F2(RestStep) + " jedn./h), marsz x" + F2(MarchDay) + ", dowodca Przywodztwo/" + (int)LeadNorm + " [" + F2(LeadMin) + "-" + F2(LeadMax) + "], zapas +"
                      + (int)(StockBonus * 100) + "% za grupe (perk x" + F2(PerkMult) + "), sztuka sluzy " + (int)WearDays + " dni cwiczen, zlom x" + F2(Yield())
