@@ -390,6 +390,7 @@ namespace Armoury
             finally
             {
                 if (due > 0) { town.ChangeGold(-due); payee.ChangeHeroGold(due); t.Paid += due; }
+                if (due > 0) MoneyLedger.Note169(MoneyLedger.N169Other, town.Settlement, -due);   // paczka 169: linia kas (tylko licznik)
                 if (poor) t.Poor++;
             }
             return due;

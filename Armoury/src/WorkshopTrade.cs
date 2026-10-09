@@ -421,10 +421,15 @@ namespace Armoury
         /// Pierwszenstwo First: prefiks BK pomija oryginal (false), a Harmony wola dalsze prefiksy bez wyniku PO nim - odczyt kapitalu
         /// musi isc przed BK, inaczej widzialby kapital juz po zaplacie (sprawdzone na Harmony 2.4.2).</summary>
         [HarmonyPriority(Priority.First)]
-        public static void InPrefix(Workshop __3, out int __state) { __state = _cyc != null && __3 == _cyc ? __3.Capital : int.MinValue; }
-
-        public static void InPostfix(Workshop __3, int __state)
+        public static void InPrefix(Town __2, Workshop __3, out int __state)
         {
+            CirculationWindows.WorkshopInPre(__2, __3);    // paczka 169: okno O36 (tylko log, wlasny try)
+            __state = _cyc != null && __3 == _cyc ? __3.Capital : int.MinValue;
+        }
+
+        public static void InPostfix(Town __2, Workshop __3, int __state)
+        {
+            CirculationWindows.WorkshopInPost(__2, __3);   // paczka 169: okno O36 (tylko log, wlasny try) - pierwsza linia
             try { if (__state != int.MinValue && _cyc != null && __3 == _cyc) _cycIn += (long)__state - __3.Capital; }
             catch (Exception e) { Stumble("WorkshopTrade.InPostfix", e); }
         }
@@ -435,12 +440,14 @@ namespace Armoury
         [HarmonyPriority(Priority.First)]
         public static void OutPrefix(EquipmentElement __0, Workshop __1, out int __state)
         {
+            CirculationWindows.WorkshopOutPre(__1);        // paczka 169: okno O35 (tylko log, wlasny try) - przed ArtisanInputs.OutPre
             ArtisanInputs.OutPre(__0, __1);
             __state = _cyc != null && __1 == _cyc ? __1.Capital : int.MinValue;
         }
 
         public static void OutPostfix(WorkshopsCampaignBehavior __instance, Workshop __1, int __state)
         {
+            CirculationWindows.WorkshopOutPost(__1);       // paczka 169: okno O35 - PRZED wplatami rzemieslnikow 147 (ArtisanInputs.OutPost), wlasny try
             try { if (__state != int.MinValue && _cyc != null && __1 == _cyc) { _cycCredit += (long)__1.Capital - __state; _cycOut++; } }
             catch (Exception e) { Stumble("WorkshopTrade.OutPostfix", e); }
             ArtisanInputs.OutPost(__instance, __1);

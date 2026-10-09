@@ -48,6 +48,10 @@ namespace Armoury
         private static MethodInfo _sufficient, _consume;
         private static bool _wired;
 
+        /// <summary>Paczka 169 (tylko log): true, gdy Decide kupuje wsad dodatkowych cykli przez ConsumeInputFromTownMarket. Okno O36
+        /// (CirculationWindows.WorkshopInPost) nie dopisuje wtedy zmiany kasy miasta do linii kas - stara ksiega zna te kwote z NoteArtisans.</summary>
+        internal static bool InDecide;
+
         // biezacy cykl rzemieslnikow - gra wola cykle po kolei w jednym watku (jak rachunek cyklu 123)
         private static Workshop _w;
         private static WorkshopType.Production _p;
@@ -202,6 +206,7 @@ namespace Armoury
         private static int Decide(WorkshopsCampaignBehavior beh, Workshop w, Town town, ItemRoster roster, int extra)
         {
             int made = 0;
+            InDecide = true;   // paczka 169: tylko znacznik dla okna O36 (niczego nie zmienia w cyklu)
             try
             {
                 for (int j = 0; j < extra; j++)
@@ -228,6 +233,7 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Stumble("ArtisanInputs.Decide", e); }
+            finally { InDecide = false; }
             return made;
         }
 

@@ -52,7 +52,7 @@ namespace Armoury
     ///  - nasz tick dobowy: migawki stanu kas miedzy modulami (BlockOpen / Mark) - renty, budowy, korona, wydatki band
     ///    i kryjowek na zycie w miastach, skup lupu band u pasera (OutlawLaw robi swoje trzy migawki sam), reszta ticku.
     /// </summary>
-    internal static class MoneyLedger
+    internal static partial class MoneyLedger
     {
         // klasy osad
         private const int CTown = 0, CCastle = 1, CVill = 2, Classes = 3;
@@ -104,6 +104,10 @@ namespace Armoury
         private static readonly long[,] _mark = new long[Classes, Marks];
         private static readonly long[] _wage = new long[Wages];
         private static readonly int[] _wageN = new int[Wages], _wageShort = new int[Wages];
+        /// <summary>Paczka 169 (tylko odczyt, przed ClearDay - ClanIncomeBook.Daily biegnie przed Daily ksiegi): partie lordow i zalogi
+        /// rozliczone dzis oraz te z zaleglym zoldem (HasUnpaidWages po rozliczeniu).</summary>
+        internal static int WagePaidParties { get { return _wageN[WLord] + _wageN[WGarrison]; } }
+        internal static int WageShortParties { get { return _wageShort[WLord] + _wageShort[WGarrison]; } }
         private static long _wageToPurses, _wageToCoffers; // zold, ktory nie zniknal: SoldierPay przekazal go do sakiewek ludzi i kas osad
         private static int _stumbles;                      // potkniecia licznikow (wyjatek zlapany przy jednym zdarzeniu) - liczymy, nie gasimy
 
@@ -138,6 +142,7 @@ namespace Armoury
             _winParty = null; _winVillage = false; _shelfTown = null; _regExpect = null; _regModel = null; _regDecl = null;
             _clanNow = null; _clanErrLogged = false;
             ClearDay();
+            Reset169();                                     // paczka 169: pierscien reszty 28 dob, zloto swiata na poczatku bloku
         }
 
         private static void ClearDay()
@@ -159,9 +164,17 @@ namespace Armoury
             Array.Clear(_wage, 0, Wages); Array.Clear(_wageN, 0, Wages); Array.Clear(_wageShort, 0, Wages);
             _wageToPurses = _wageToCoffers = 0;
             _stumbles = 0; _winStale = 0;
+            CirculationWindows.ClearDay();                  // paczka 169: liczniki okien obiegu (wlasny try)
+            ClearDay169();                                  // paczka 169: pola MoneyLedger.Obieg.cs (wlasny try)
         }
 
         private static bool Live { get { var c = Campaign.Current; return c != null && c.GameStarted; } }
+
+        // paczka 169: odczyty dla okien obiegu (CirculationWindows) - tylko akcesory, bez zmian stanu
+        internal static bool InBlock { get { return _inBlock; } }
+        internal static bool InClanTick { get { return ClanOpen; } }
+        internal static bool InClanTickFor(Clan c) { return ClanOpen && ReferenceEquals(_clanNow, c); }
+        internal static bool WinOpenNow { get { return WinOpen; } }
 
         private static int ClassOf(Settlement st)
         {
@@ -262,6 +275,7 @@ namespace Armoury
                 if (a < 0) { var th = gh; gh = rh; rh = th; var tp = gp; gp = rp; rp = tp; a = -a; }   // gra zapisuje "osada -> bohater" ujemna kwota w druga strone
                 bool gNone = gh == null && gp == null, rNone = rh == null && rp == null;
                 if (gNone && rNone) return;
+                ClanIncomeBook.OnEvent(gh, gp, rh, a, gNone, ClanOpen, _inBlock);   // paczka 169: wplywy rodow spoza rodu (D) - wlasny try, tylko licznik
                 // utarg wsi: wyplata dla wlasciciela majatku BK w oknie POWROTU taboru do wsi to czesc utargu, nie zloto z niczego
                 // (okno wizyty w miescie albo zamku tego nie lapie - tam nikt utargu nie dzieli)
                 if (gNone && rh != null && _winVillage && WinOpen) { _winEstates += a; return; }
@@ -270,6 +284,10 @@ namespace Armoury
                 // w trakcie rozliczenia rodu zloto "z niczego" i "w nicosc" jest juz w roznicy stanu zlota swiata (ClanTickPrefix /
                 // ClanTickPostfix) - do bilansu swiata nie wchodzi drugi raz; saldo dopisane glowie rodu notujemy osobno (informacja)
                 var clan = ClanOpen ? _clanNow : null;
+                // paczka 169 (tylko log): czy to zdarzenie liczy sie w from/to bilansu swiata (rozdz. 2.2 projektu) - te same warunki co nizej
+                bool counted = clan == null && (gNone ? (rc < 0 || !_inBlock) : rNone ? (gc < 0 || !_inBlock) : true);
+                CirculationWindows.OnGold(gh, gp, rh, rp, a, gNone, rNone, gc, rc, clan != null, _inBlock, counted);   // rozbicie wedlug przyczyny - wlasny try
+                CirculationWindows.NoteCounted(a, gNone, rNone, counted, _inBlock);                                     // probki swiata i RB - wlasny try
                 if (gNone)
                 {
                     if (rc >= 0) { if (!_inBlock) { _fromNothing[rc] += a; if (clan != null) _clanClsFrom += a; } }
@@ -308,6 +326,7 @@ namespace Armoury
                 if (__0 == null || __0.IsBanditFaction || !Live) return;
                 _clanBefore = WorldTotal();
                 _clanTime = CampaignTime.Now; _clanNow = __0;
+                ClanTickOpen169(__0);                       // paczka 169: dlug wobec korony i skarbiec przed (O41), D rodu - wlasny try
             }
             catch (Exception e) { _clanNow = null; ClanStumble("MoneyLedger.ClanTickPrefix", e); }
         }
@@ -325,6 +344,7 @@ namespace Armoury
                 if (d > 0) { _clanUp += d; _clanUpN++; }
                 else if (d < 0) { _clanDown -= d; _clanDownN++; }
                 else _clanFlatN++;
+                ClanTickClose169(c);                        // paczka 169: dlug nowy / splacony, skarbiec w rozliczeniu (O41), zold rodu do D - wlasny try
             }
             catch (Exception e) { ClanStumble("MoneyLedger.ClanTickPostfix", e); }
         }
@@ -357,7 +377,11 @@ namespace Armoury
         /// policzone w "GiveGoldAction w nicosc"). Wolac TYLKO wtedy, gdy gra naprawde kasowala przez GiveGoldAction: karawana
         /// placi za najemnika z kiesy partii bez zdarzenia - jej zaplata to zwykly przelew karawana -> miasto, nie zwrot. Tylko licznik.
         /// </summary>
-        internal static void NoteLevyBack(int amount) { if (amount > 0) _levyBack += amount; }
+        internal static void NoteLevyBack(int amount)
+        {
+            if (amount > 0) _levyBack += amount;
+            CirculationWindows.NoteLevy(amount);            // paczka 169: probki swiata i RB (wlasny try)
+        }
 
         /// <summary>SoldierPay przekazal zaplacony zold dalej (sakiewka ludzi albo kasa osady) - w bilansie osobne zrodlo "zold oddany do obiegu". Tylko licznik.</summary>
         internal static void NoteWageRouted(bool toPurse, int amount)
@@ -434,8 +458,10 @@ namespace Armoury
         /// <summary>Poczatek naszego rozliczenia doby: stan kas przed pierwszym modulem.</summary>
         internal static void BlockOpen()
         {
+            ClearLast169();                                 // paczka 169 (D20): liczby dnia Last* modulow bloku zeruje JEDNO miejsce - wlasny try
             try { _blockSnap = Snap(); _inBlock = true; }
             catch (Exception e) { _inBlock = false; _blockSnap = null; Log.Error("MoneyLedger.BlockOpen", e); }
+            BlockWorld169();                                // paczka 169 (D10): zloto swiata przed naszym tickiem (RB) - wlasny try
         }
 
         /// <summary>Po module naszego ticku: zmiana kas od poprzedniej migawki idzie na jego konto.</summary>
@@ -522,6 +548,7 @@ namespace Armoury
                 if (!__2 || __0 == null || !Live) return;
                 int k = __0.IsGarrison ? WGarrison : (__0.IsCaravan ? WCaravan : (__0.IsLordParty ? WLord : WOther));
                 _wage[k] += __result; _wageN[k]++;
+                ClanIncomeBook.NoteWage(ClanOpen ? _clanNow : null, k, __result);   // paczka 169: zold rodu do budzetu na sucho - wlasny try
                 if (__0.HasUnpaidWages > 0f) _wageShort[k]++;
             }
             catch { _stumbles++; }
@@ -580,9 +607,11 @@ namespace Armoury
                 var tick = AccessTools.Method(typeof(ClanVariablesCampaignBehavior), "DailyTickClan");
                 if (tick != null)
                 {
+                    // paczka 169 (D16): finalizer zamyka okno rodu, gdy cudzy kod rzuci wyjatek w srodku rozliczenia (bez wyjatku nic nie robi)
                     h.Patch(tick, prefix: new HarmonyMethod(typeof(MoneyLedger), nameof(ClanTickPrefix)) { priority = Priority.First },
-                                  postfix: new HarmonyMethod(typeof(MoneyLedger), nameof(ClanTickPostfix)) { priority = Priority.Low });
-                    _clanHooked = true;
+                                  postfix: new HarmonyMethod(typeof(MoneyLedger), nameof(ClanTickPostfix)) { priority = Priority.Low },
+                                  finalizer: new HarmonyMethod(typeof(MoneyLedger), nameof(ClanTickFinalizer)));
+                    _clanHooked = true; ClanFinalizerWired = true;
                     done.Add("rozliczenie rodow");
                 }
                 else miss.Add("rozliczenie rodow");
@@ -666,16 +695,40 @@ namespace Armoury
                    + ". Wszystko [P] - stan na koniec doby, w nawiasach zmiana dobowa.";
         }
 
-        private static string BalanceLine(int day, long[] now, long[] last)
+        /// <summary>
+        /// GiveGoldAction z niczego / w nicosc POZA rozliczeniami rodow: te z rozliczen siedza w roznicy stanu (_clanUp / _clanDown);
+        /// z licznikow kas osad (wspolnych z liniami "Przeplywy osad") odejmujemy czesc zlapana w trakcie rozliczen.
+        /// Paczka 169: jedna definicja dla starej linii bilansu i nowej linii przyczyn.
+        /// </summary>
+        private static void OldFromTo(out long from, out long to)
+        {
+            from = _worldFromNothing - _clanClsFrom; to = _worldToNothing - _clanClsTo;
+            for (int c = 0; c < Classes; c++) { from += _fromNothing[c]; to += _toNothing[c]; }
+        }
+
+        /// <summary>
+        /// Paczka 169: zmiana sumy posiadaczy (z), zrodla (s0) i ujscia (u0) starej ksiegi - wydzielone z BalanceLine, wolane przez stara
+        /// linie bilansu i nowa linie przyczyn (zero rozjazdu definicji; tekst starej linii bez zmian).
+        /// </summary>
+        private static void OldBalance(long[] now, long[] last, out long z, out long s0, out long u0)
         {
             long total = 0, lastTotal = 0;
             for (int i = 0; i < Holders; i++) { total += now[i]; lastTotal += last[i]; }
-            long delta = total - lastTotal;
+            z = total - lastTotal;
             long cons = _cons[CTown] + _cons[CCastle], regIn = _regIn[CTown] + _regIn[CCastle], regOut = _regOut[CTown] + _regOut[CCastle];
-            // GiveGoldAction z niczego / w nicosc POZA rozliczeniami rodow: te z rozliczen siedza w roznicy stanu (_clanUp / _clanDown);
-            // z licznikow kas osad (wspolnych z liniami "Przeplywy osad") odejmujemy czesc zlapana w trakcie rozliczen
-            long from = _worldFromNothing - _clanClsFrom, to = _worldToNothing - _clanClsTo;
-            for (int c = 0; c < Classes; c++) { from += _fromNothing[c]; to += _toNothing[c]; }
+            long from, to; OldFromTo(out from, out to);
+            long vanished = _vHanded - _vKept - _vTax - _vEstates;
+            long routed = _wageToPurses + _wageToCoffers;
+            s0 = cons + regIn + _clanUp + routed + from;
+            u0 = _clanDown + regOut + vanished + to - _levyBack;
+        }
+
+        private static string BalanceLine(int day, long[] now, long[] last)
+        {
+            long delta, sources, sinks;
+            OldBalance(now, last, out delta, out sources, out sinks);
+            long cons = _cons[CTown] + _cons[CCastle], regIn = _regIn[CTown] + _regIn[CCastle], regOut = _regOut[CTown] + _regOut[CCastle];
+            long from, to; OldFromTo(out from, out to);
             long wages = 0; for (int k = 0; k < Wages; k++) wages += _wage[k];
             long vanished = _vHanded - _vKept - _vTax - _vEstates;
             // zold NIE jest osobnym ujsciem: partii glowy rodu siedzi w saldzie, pozostalych - w kiesach wyrownywanych z salda;
@@ -687,8 +740,6 @@ namespace Armoury
             // Last, nasz Low): sakiewki ludzi i kasy osad rosna poza roznica stanu rozliczenia - to osobne zrodlo, nie "minus" w ujsciach
             // (rozliczenia na minus to tylko czesc rodow; odjecie calego przekazanego zoldu dawaloby ujemne ujscia)
             long routed = _wageToPurses + _wageToCoffers;
-            long sources = cons + regIn + _clanUp + routed + from;
-            long sinks = _clanDown + regOut + vanished + to - _levyBack;
             return "Pieniadz swiata (bilans): dzien " + day + " | zmiana sumy " + S(delta) + " [P] = zmierzone zrodla z niczego +" + sources
                    + " [P] (\"zakupy\" mieszkancow miast i zamkow " + cons + ", regulator kas dosypal " + regIn + ", rozliczenia rodow na plus " + _clanUp + " w " + _clanUpN
                    + " rodach, zold oddany do obiegu przez SoldierPay " + routed + " (sakiewki ludzi " + _wageToPurses + ", kasy osad " + _wageToCoffers
@@ -836,6 +887,7 @@ namespace Armoury
                 int poor = 0; foreach (var g in golds) if (g < 1000) poor++;
                 spread = " | rozklad [P]: osad " + golds.Count + ", min " + golds[0] + ", mediana " + golds[golds.Count / 2] + ", max " + golds[golds.Count - 1] + ", ponizej 1000 zlota " + poor;
             }
+            _classRest[c] = delta - known;                  // paczka 169: reszta tej klasy do linii "Przeplywy osad (przyczyny)"
             return "Przeplywy osad (" + CName[c] + "): dzien " + day + " | stan " + now + ", zmiana " + S(delta) + " [P], w tym: "
                    + string.Join("; ", parts.ToArray()) + spread + ".";
         }
@@ -875,7 +927,22 @@ namespace Armoury
                 {
                     Log.Info(StateLine(day, hold, _lastHold));
                     Log.Info(BalanceLine(day, hold, _lastHold));
+                    // paczka 169 (tylko log): nowe linie zaraz po starych - kazda we wlasnym try, blad jednej nie gasi reszty
+                    bool on169 = CirculationWindows.On;
+                    long t169 = 0;   // czas SAMYCH nowych linii (stare linie miedzy nimi poza pomiarem)
+                    if (on169)
+                    {
+                        long ts = System.Diagnostics.Stopwatch.GetTimestamp();
+                        try { Log.Info(BalanceCausesLine(day, hold, _lastHold)); } catch (Exception e) { Log.Error("MoneyLedger.BalanceCausesLine", e); }
+                        t169 += System.Diagnostics.Stopwatch.GetTimestamp() - ts;
+                    }
                     Log.Info(ClanLine(day));
+                    if (on169)
+                    {
+                        long ts = System.Diagnostics.Stopwatch.GetTimestamp();
+                        try { Log.Info(ClanCausesLine(day)); } catch (Exception e) { Log.Error("MoneyLedger.ClanCausesLine", e); }
+                        t169 += System.Diagnostics.Stopwatch.GetTimestamp() - ts;
+                    }
                     Log.Info(VillagerLine(day));
                     var golds = new List<int>[Classes];
                     for (int c = 0; c < Classes; c++) golds[c] = new List<int>();
@@ -886,6 +953,16 @@ namespace Armoury
                         if (c >= 0) golds[c].Add(st.SettlementComponent.Gold);
                     }
                     for (int c = 0; c < Classes; c++) Log.Info(ClassLine(day, c, end[c], end[c] - _lastSnap[c], golds[c]));
+                    if (on169)
+                    {
+                        long ts = System.Diagnostics.Stopwatch.GetTimestamp();
+                        try { Log.Info(ClassCausesLine(day)); } catch (Exception e) { Log.Error("MoneyLedger.ClassCausesLine", e); }
+                        try { Log.Info(ObiegLine(day, hold, _lastHold)); } catch (Exception e) { Log.Error("MoneyLedger.ObiegLine", e); }
+                        try { Log.Info(ObiegNotablesLine(day, hold, _lastHold)); } catch (Exception e) { Log.Error("MoneyLedger.ObiegNotablesLine", e); }
+                        try { Log.Info(ObiegBkLine(day)); } catch (Exception e) { Log.Error("MoneyLedger.ObiegBkLine", e); }
+                        t169 += System.Diagnostics.Stopwatch.GetTimestamp() - ts;
+                        try { Log.Info(ObiegWindowsLine(day, t169)); } catch (Exception e) { Log.Error("MoneyLedger.ObiegWindowsLine", e); }   // dolicza wlasny czas
+                    }
                 }
                 _lastSnap = end; _lastHold = hold; _first = false;
             }

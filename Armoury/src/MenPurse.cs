@@ -74,8 +74,20 @@ namespace Armoury
                 {
                     if (win.IsMainParty) Add(win, purse);   // ludzie gracza - do ich sakiewki
                     else { int third = purse / 3; win.LeaderHero.ChangeHeroGold(third); Add(win, purse - third); }
+                    if (!win.IsMainParty) ClanIncomeBook.NoteInflow(win.LeaderHero, purse / 3, ClanIncomeBook.KThird);   // paczka 169: D rodu (tylko licznik)
+                    MoneyLedger.NotePurseGone(purse, false);                                                             // paczka 169: linia "Obieg" (tylko licznik)
                 }
-                else { var t = NearestTown(mp); if (t != null && t.Town != null) t.Town.ChangeGold(purse); }
+                else
+                {
+                    var t = NearestTown(mp);
+                    if (t != null && t.Town != null)
+                    {
+                        t.Town.ChangeGold(purse);
+                        // paczka 169 (tylko liczniki, obie metody z wlasnym try i bramka CirculationWindows.On) - ta sama osada, bez drugiego przegladu
+                        MoneyLedger.NotePurseGone(purse, true);
+                        MoneyLedger.Note169(MoneyLedger.N169PurseGone, t, purse);
+                    }
+                }
             }
             catch (Exception e) { Log.Error("MenPurse.OnPartyDestroyed", e); }
         }
@@ -252,6 +264,7 @@ namespace Armoury
                     armory.AddToCounts(el.EquipmentElement, -n);
                     st.ItemRoster.AddToCounts(el.EquipmentElement, n);
                     st.Town.ChangeGold(-unit * n);
+                    MoneyLedger.Note169(MoneyLedger.N169Surplus, st, -unit * n);   // paczka 169: linia kas (tylko licznik)
                     Add(main, unit * n);
                     sold += n; gold += unit * n; extra -= n;
                     SellByCondition.NoteSale(SellByCondition.Men, el.EquipmentElement, n, unit);   // ksiega skupu sprzetu (tylko log)
@@ -299,6 +312,7 @@ namespace Armoury
                     armory.AddToCounts(pick, 1);
                     Take(main, bestPrice);
                     st.Town.ChangeGold(bestPrice);
+                    MoneyLedger.Note169(MoneyLedger.N169Kit, st, bestPrice);   // paczka 169: linia kas (tylko licznik)
                     spent += bestPrice; pieces++; gap--;
                 }
             }
@@ -344,8 +358,10 @@ namespace Armoury
                         cnt--; extra--;
                         st.ItemRoster.AddToCounts(el, 1);
                         st.Town.ChangeGold(-unit);
+                        MoneyLedger.Note169(MoneyLedger.N169Surplus, st, -unit);   // paczka 169: linia kas (tylko licznik)
                         int third = (int)Math.Round(unit * MBMath.ClampFloat(s.LordLootThirdPercent, 0f, 100f) / 100f);
                         mp.LeaderHero.ChangeHeroGold(third);
+                        ClanIncomeBook.NoteInflow(mp.LeaderHero, third, ClanIncomeBook.KThird);   // paczka 169: D rodu (tylko licznik)
                         Add(mp, unit - third);
                         sold++; gold += unit; _dayLord += third;
                         SellByCondition.NoteSale(SellByCondition.Men, el, 1, unit);   // ksiega skupu sprzetu (tylko log)

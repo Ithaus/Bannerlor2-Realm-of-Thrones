@@ -115,6 +115,7 @@ namespace Armoury
                         int unit = UnitCost(el.EquipmentElement, st);
                         if (MenPurse.Get(main) < unit) { broke = true; break; }
                         MenPurse.Take(main, unit); st.Town.ChangeGold(unit);
+                        MoneyLedger.Note169(MoneyLedger.N169Repair, st, unit);   // paczka 169: linia kas (tylko licznik)
                         _bench -= per; left--; fixedN++; paid += unit;
                     }
                     if (fixedN > 0)
@@ -177,6 +178,7 @@ namespace Armoury
                 }
                 paid = MenPurse.Take(main, o.Total);
                 st.Town.ChangeGold(paid);
+                MoneyLedger.Note169(MoneyLedger.N169Repair, st, paid);   // paczka 169: linia kas (tylko licznik)
                 for (int k = 0; k < MendMaterial.Kinds; k++) _hourKg[k] += o.Bench.UsedKg[k];
                 _hourMat += o.MatGold;
             }

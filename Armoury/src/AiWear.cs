@@ -299,6 +299,7 @@ namespace Armoury
                     int unit = UnitCost(item, Mod(j.Value), st);
                     if (MenPurse.Get(mp) < unit) break;
                     MenPurse.Take(mp, unit); st.Town.ChangeGold(unit);
+                    MoneyLedger.Note169(MoneyLedger.N169Repair, st, unit);   // paczka 169: linia kas (tylko licznik)
                     AddWorn(mp.StringId, j.Key, j.Value, -1);
                     done++; paid += unit;
                 }
@@ -338,6 +339,7 @@ namespace Armoury
                 foreach (var job in o.Jobs) { AddWorn(mp.StringId, job.El.Item.StringId, job.El.ItemModifier.StringId, -job.N); done += job.N; MetalTally(job); }
                 paid = MenPurse.Take(mp, o.Total);
                 st.Town.ChangeGold(paid);
+                MoneyLedger.Note169(MoneyLedger.N169Repair, st, paid);   // paczka 169: linia kas (tylko licznik)
                 _dayMat += o.MatGold; _dayTowns++;
                 for (int k = 0; k < MendMaterial.Kinds; k++) _dayKg[k] += o.Bench.UsedKg[k];
             }

@@ -209,6 +209,7 @@ namespace Armoury
                     shelf.AddToCounts(el.EquipmentElement, -1);
                     lord.ChangeHeroGold(-price);
                     st.Town.ChangeGold(price);
+                    MoneyLedger.Note169(MoneyLedger.N169Other, st, price);   // paczka 169: linia kas (tylko licznik)
                     Wear(lord, el.EquipmentElement);
                     Log.Info("Kronika unikatow: " + lord.Name + " kupil " + it.StringId + " w " + st.Name + " za " + price + ".");
 

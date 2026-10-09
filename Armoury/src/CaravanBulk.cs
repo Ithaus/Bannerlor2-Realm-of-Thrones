@@ -627,6 +627,7 @@ namespace Armoury
                     // polka wrocila do stanu sprzed gabki, wiec cena jest ta sama, ktora BK pomnozyl przez liczbe sztuk
                     int refund = Math.Min(town.Gold, (int)(extra * (float)town.GetItemPrice(new EquipmentElement(g.Item), __0, false)));
                     if (refund > 0) { town.ChangeGold(-refund); __0.PartyTradeGold += refund; _refunded += refund; }
+                    if (refund > 0) MoneyLedger.Note169(MoneyLedger.N169Other, __1, -refund);   // paczka 169: linia kas (tylko licznik)
                     g.Undone += extra;
                 }
             }
