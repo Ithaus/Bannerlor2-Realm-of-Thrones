@@ -832,3 +832,6 @@ czeka (propozycja: przekuwanie istniejacej stali valyrianskiej u mistrza w Qohor
 lancucha (tier 6 zostaje); prawdziwa stal valyrianska tylko w istniejacych legendarnych mieczach/zbrojach ROT; nikt nie wytapia nowej; jedyna droga do nowego miecza
 valyrianskiego = PRZEKUCIE istniejacej stali u mistrza w Qohorze (za oplata dla kowala/miasta, kilka dni; wielki miecz -> dwa mniejsze jak Lod). Sztaby "valyrianskie" z niczego
 (wedrowcy BK ok. 45/dobe) - zamknac (to tez czesc 164). Numeracja: 176 = werbunek gracza jak AI, 177 = stal valyrianska.
+**ZGODA JEFFA 09.10 ok. 04:15 - STALA:** "zgoda na cala prace, wgrywaj po tescie, aby na mnie nie czekac" -> od teraz kazda paczka po udanym autotescie (nowa kampania 40 dob
++ zapis; progi z projektu) idzie do gry bez czekania, z kopia (bak + D:), md5, wpis WGRANIE N. Nadal: nie gdy Jeff gra; zapisy Jeffa nietkniete; zmiany rozgrywki spoza
+decyzji - pytac; optymalizacja na koniec.
