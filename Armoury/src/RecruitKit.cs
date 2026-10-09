@@ -44,6 +44,7 @@ namespace Armoury
         private static int _dGarMen, _dGarRec, _dGarOwn, _dGarT1, _dGarPcs, _dGarT1Pcs, _dGarPlayer, _stumbles, _errDay = -1;
         // recenzja 171: pan zalogi placi notablowi za kupione rzeczy (A5); rzeczy na targ bez zaplaty (kasa pusta); brak Y wobec X przy echu ROT
         private static int _dGarPaid, _dGarPaidGold, _dGarUnpaid, _daySoldFree, _dEchoKnown;
+        private static int _dGarPaidPurse, _dGarPaidLord;   // poprawki sklad7: z tego z sakiewki zalogi / od pana
         private static long _dEchoGap;
         private static readonly HashSet<Settlement> _dGarTowns = new HashSet<Settlement>();
         private static readonly HashSet<string> _errWhere = new HashSet<string>();
@@ -68,7 +69,7 @@ namespace Armoury
             _dOwnNotable = _dOwnMerc = _dOwnNoSource = _dPrisoner = _dEcho = _dRecPcs = _dOwnPcs = _dMercHorsePcs = _dMountedNoHorse = 0;
             _dFreshBought = _dFreshOwn = _dFreshPcs = _dSwap = _dSwapNoKit = 0;
             _dGarMen = _dGarRec = _dGarOwn = _dGarT1 = _dGarPcs = _dGarT1Pcs = _dGarPlayer = 0;
-            _dGarPaid = _dGarPaidGold = _dGarUnpaid = _daySoldFree = _dEchoKnown = 0; _dEchoGap = 0;
+            _dGarPaid = _dGarPaidGold = _dGarUnpaid = _daySoldFree = _dEchoKnown = 0; _dEchoGap = 0; _dGarPaidPurse = _dGarPaidLord = 0;
             _dGarTowns.Clear();
             Array.Clear(_tRec, 0, 7); Array.Clear(_tOwn, 0, 7); Array.Clear(_tPrisoner, 0, 7); Array.Clear(_tEcho, 0, 7);
         }
@@ -246,7 +247,7 @@ namespace Armoury
             if (bought != null) { _dFreshBought++; _dFreshPcs += bought.Count; } else _dFreshOwn++;
         }
 
-        /// <summary>171 A5: autowerbunek zalogi wzial X z puli notabla - jego rzeczy do zbrojowni zalogi (zalogi gracza - poza systemem jak dotad).</summary>
+        /// <summary>171 A5: autowerbunek zalogi wzial X z puli notabla - jego rzeczy do zbrojowni zalogi (zaloga poza systemem - GarrisonArmory.InSystem - notabl sprzedaje je jak dotad).</summary>
         internal static void OnGarrisonTook(Hero n, CharacterObject x, MobileParty garrison, Settlement place)
         {
             if (!On || n == null || x == null) return;
@@ -267,9 +268,13 @@ namespace Armoury
                 if (k != null)
                 {
                     _dGarRec++;
-                    // recenzja 171: rzeczy, ktore notabl KUPIL, nie przechodza do zalogi za darmo - pan zalogi placi za nie notablowi cene skupu jego targu
-                    // (tyle, ile notabl dostawal dotad, gdy sprzedawal je przy odejsciu ochotnika); czego pan nie oplaci - notabl sprzedaje na targu jak dotad
-                    var unpaid = PayForBought(n, k.Items, owner != null ? owner.Leader : null);
+                    // recenzja 171: rzeczy, ktore notabl KUPIL, nie przechodza do zalogi za darmo - zaloga placi za nie notablowi cene skupu jego targu
+                    // (tyle, ile notabl dostawal dotad, gdy sprzedawal je przy odejsciu ochotnika); czego nie oplaci - notabl sprzedaje na targu jak dotad.
+                    // Poprawki sklad7: ta sama regula co AiGear.TryBuyCore - najpierw sakiewka zalogi (GarrisonPurseEnabled), potem kiesa pana, ale
+                    // Twoja kiesa tylko przy GarrisonBuysGearPlayer (dotad placil zawsze pan, takze Ty - bez wylacznika i bez komunikatu)
+                    var lordHero = owner != null ? owner.Leader : null;
+                    bool lordPays = !(lordHero != null && lordHero == Hero.MainHero && (s == null || !s.GarrisonBuysGearPlayer));
+                    var unpaid = PayForBought(n, k.Items, lordHero, garrison, lordPays);
                     k.Items = new List<EquipmentElement>();
                     items = Materialize(k);   // dobytek i dorobek stuleci - rzeczy czlowieka
                     items.AddRange(_paidItems);
@@ -290,24 +295,30 @@ namespace Armoury
         private static readonly List<EquipmentElement> _paidItems = new List<EquipmentElement>();
 
         /// <summary>
-        /// Recenzja 171 (A5): pan zalogi kupuje od notabla rzeczy, ktore ten kupil ochotnikowi - cena skupu targu notabla (MenPurse.SellPrice), sztuka po sztuce,
-        /// dopoki starcza mu zlota. Oplacone -> _paidItems, reszta (zwracana) - notabl sprzeda na targu. Przelew pan -> notabl (nic nie powstaje).
+        /// Recenzja 171 (A5): zaloga kupuje od notabla rzeczy, ktore ten kupil ochotnikowi - cena skupu targu notabla (MenPurse.SellPrice), sztuka po sztuce,
+        /// dopoki starcza zlota. Poprawki sklad7 (regula AiGear.TryBuyCore, K1 A6): najpierw sakiewka zalogi (przy GarrisonPurseOn), reszta kiesa pana
+        /// tylko gdy lordPays (zaloga AI albo GarrisonBuysGearPlayer). Oplacone -> _paidItems, reszta (zwracana) - notabl sprzeda na targu.
+        /// Przelew sakiewka/pan -> notabl (nic nie powstaje).
         /// </summary>
-        private static List<EquipmentElement> PayForBought(Hero notable, List<EquipmentElement> bought, Hero payer)
+        private static List<EquipmentElement> PayForBought(Hero notable, List<EquipmentElement> bought, Hero payer, MobileParty garrison, bool lordPays)
         {
             _paidItems.Clear();
             var unpaid = new List<EquipmentElement>();
             if (bought == null || bought.Count == 0) return unpaid;
             var market = MarketOfNotable(notable);
+            bool purseOn = garrison != null && MenUpgrade.GarrisonPurseOn;
+            bool lordOk = lordPays && payer != null && payer.IsAlive;
             foreach (var e in bought)
             {
                 if (e.Item == null) continue;
-                int price = MenPurse.SellPrice(e, market, null);
-                if (payer == null || !payer.IsAlive || payer.Gold < price || notable == null) { unpaid.Add(e); continue; }
-                payer.ChangeHeroGold(-price);
+                int price = Math.Max(0, MenPurse.SellPrice(e, market, null));
+                long can = (purseOn ? MenPurse.Get(garrison) : 0) + (lordOk ? Math.Max(0, payer.Gold) : 0);
+                if (notable == null || can < price) { unpaid.Add(e); continue; }
+                int fromPurse = purseOn ? MenPurse.Take(garrison, price) : 0;
+                if (price - fromPurse > 0) payer.ChangeHeroGold(-(price - fromPurse));   // can >= price: reszta jest u pana (lordOk)
                 notable.ChangeHeroGold(price);
                 _paidItems.Add(e);
-                _dGarPaid++; _dGarPaidGold += price;
+                _dGarPaid++; _dGarPaidGold += price; _dGarPaidPurse += fromPurse; _dGarPaidLord += price - fromPurse;
             }
             _dGarUnpaid += unpaid.Count;
             return unpaid;
@@ -584,8 +595,8 @@ namespace Armoury
                 Log.Info("Pule ochotnikow (171): dzien " + _dayStamp + " - swiezi ochotnicy t2+ " + (_dFreshBought + _dFreshOwn) + " (notabl kupil " + _dFreshBought
                          + ", z tym co ma " + _dFreshOwn + "; szt. " + _dFreshPcs + "); HouseLevies: komplet przeniesiony " + _dSwap + ", bez zapisu " + _dSwapNoKit
                          + "; autowerbunek zalog: ludzi " + _dGarMen + " w " + _dGarTowns.Count + " twierdzach (z zapisu " + _dGarRec + ", z tym co ma " + _dGarOwn
-                         + ", tier 1 " + _dGarT1 + "), do zbrojowni zalog " + _dGarPcs + " szt. (w tym dobytek tieru 1 " + _dGarT1Pcs + "; kupione przez notabla oplacone przez pana "
-                         + _dGarPaid + " szt. za " + _dGarPaidGold + " zl, bez zaplaty - na targ " + _dGarUnpaid + "); zalogi gracza poza systemem "
+                         + ", tier 1 " + _dGarT1 + "), do zbrojowni zalog " + _dGarPcs + " szt. (w tym dobytek tieru 1 " + _dGarT1Pcs + "; kupione przez notabla oplacone "
+                         + _dGarPaid + " szt. za " + _dGarPaidGold + " zl (z sakiewki zalogi " + _dGarPaidPurse + " / od pana " + _dGarPaidLord + "), bez zaplaty - na targ " + _dGarUnpaid + "); zalogi gracza poza systemem "
                          + _dGarPlayer + "; potkniecia " + st + ".");
             }
         }

@@ -44,6 +44,20 @@ namespace Armoury
 
         private static bool MenuOn { get { var s = Settings.Current; return s != null && s.GarrisonKitMenu && s.ArmouryProtectUsed; } }
 
+        /// <summary>
+        /// Poprawki sklad7: tryb "tylko to, co ma" (K1 P2, GarrisonFightsWithArmoryOnly) tylko wtedy, gdy zbrojownie zalog naprawde trwaja: przy
+        /// wylaczonych zakupach AI (AiBuysGear) DTE GarbageCollectParties kasuje je co dobe (AiGear.KeepGarrisonArmory dziala tylko przy AiGear.On),
+        /// a bez GarrisonArmorySurvivesSave kazde wczytanie zostawia je puste - w obu razach wszystkie zalogi walczylyby nago. Wtedy tryb progu.
+        /// </summary>
+        internal static bool BareOn
+        {
+            get
+            {
+                var s = Settings.Current;
+                return s != null && s.GarrisonArmoryInBattle && s.GarrisonFightsWithArmoryOnly && s.GarrisonArmorySurvivesSave && AiGear.On;
+            }
+        }
+
         internal static void Reset() { _screen = null; _screenSt = null; _hintKey = null; _hint = null; _lastLogic = null; _garAssign.Clear(); _lordAssign.Clear(); _bareDist = null; _bareMission = false; _bareEq.Clear(); _asgParty.Clear(); _guardLog = 0; }
 
         private static MobileParty GarrisonOf(Settlement st)
@@ -65,7 +79,10 @@ namespace Armoury
             {
                 foreach (var menu in new[] { "town", "castle" })
                     starter.AddGameMenuOption(menu, "arm_garrison_kit_" + menu, "{=!}Hand kit to the garrison", Condition, Consequence, false, 5);
-                Log.Info("GarrisonKit: latka DTE (zaloga w bitwie) " + _battle + "; menu zalogi wpiete.");
+                var s = Settings.Current;
+                // poprawki sklad7: osobna linia kontrolna dla LordBattleKitIsLent (nowe zachowanie spoza scalenia - domyslnie WYLACZONE do decyzji Jeffa)
+                Log.Info("GarrisonKit: latka DTE (zaloga w bitwie) " + _battle + "; menu zalogi wpiete; sloty lordow AI z niczego tylko pozyczone na bitwe (LordBattleKitIsLent): "
+                         + (s != null && s.LordBattleKitIsLent ? "WLACZONE" : "wylaczone (jak przed sklad7)") + "; zaloga tylko tym, co ma: " + (BareOn ? "TAK" : "nie (prog)") + ".");
             }
             catch (Exception e) { Log.Error("GarrisonKit.AddMenus", e); }
         }
@@ -449,7 +466,10 @@ namespace Armoury
                 if (s.LordBattleKitIsLent) LordAssignments(dists);   // PRZED rozdzielaczami zalog - te dochodza nizej
                 if (!s.GarrisonArmoryInBattle) return;
                 int min = Math.Max(0, Math.Min(100, s.GarrisonArmoryMinFillPercent));
-                bool bare = s.GarrisonFightsWithArmoryOnly;
+                bool bare = BareOn;
+                if (s.GarrisonFightsWithArmoryOnly && !bare)
+                    Log.Info("Zaloga w bitwie: tryb 'tylko to, co ma' WYLACZONY na te bitwe - zbrojownie zalog nie przetrwaja (Ai Buys Gear " + (AiGear.On ? "wl." : "WYL.")
+                             + ", Garrison Armory Survives Save " + (s.GarrisonArmorySurvivesSave ? "wl." : "WYL.") + ") - prog " + min + "% slotow wzorca, ponizej we wzorcu.");
                 _bareMission = bare;
                 foreach (var pb in me.InvolvedParties)
                 {
@@ -530,9 +550,10 @@ namespace Armoury
         /// <summary>K1 (przeglad): DTE przy spawnie czlowieka partii innej niz gracza wola Assignment.FillEmptySlots - kazdy pusty slot dostaje
         /// sztuke wzorca albo losowa sztuke tego typu, tieru i kultury, NIE oznaczona jako tymczasowa. Spawn zdejmuje ze zbrojowni tylko to,
         /// co w niej jest, a po bitwie ReturnEquipmentFromAgents i ItemsToRecover oddaja do zbrojowni partii wszystko nietymczasowe - sprzet
-        /// z niczego, ktory potem szedl do kupca (GarrisonDay) albo graczowi jako zwrot B6. Dla przydzialow rozdzielaczy ZALOG zapamietujemy
+        /// z niczego, ktory potem szedl do kupca (dawniej K1 GarrisonDay, od sklad7 tygodniowe nadwyzki GarrisonArmory.SellWeek) albo graczowi jako zwrot B6. Dla przydzialow rozdzielaczy ZALOG zapamietujemy
         /// puste sloty przed i oznaczamy wypelnione po (MarkSlotAsTemporary - tak, jak DTE robi to sam w ApplyEmergencyLoadout): czlowiek walczy
-        /// tym, ale ani spawn tego nie zdejmuje, ani zwrot nie oddaje. Lordowie AI - bez zmian (mennica DTE sprzed K1, poza ta paczka).
+        /// tym, ale ani spawn tego nie zdejmuje, ani zwrot nie oddaje. Lordowie AI - to samo tylko przy LordBattleKitIsLent (sklad7, _lordAssign;
+        /// domyslnie WYLACZONE do decyzji Jeffa - bez tego mennica DTE sprzed K1 zostaje).
         /// K1 (P2, tryb "tylko to, co ma"): oryginal nie biegnie - pusty slot zostaje pusty. Stan (__state): [0..11] sloty puste przed,
         /// [12] tryb "tylko to, co ma"; null - nie przydzial zalogi. K1c (przeglad K1b): wyjatek zawodzi w strone braku (oryginal nie biegnie),
         /// nie mennicy - dotad catch puszczal oryginal bez stanu, wiec wypelnione sloty nie byly oznaczane jako tymczasowe.</summary>

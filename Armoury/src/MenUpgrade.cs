@@ -35,7 +35,7 @@ namespace Armoury
         private static long _dPlayerGold, _dLordGold, _dGarGold, _dSoldGold, _dSaved, _dOverCap, _dGarWage, _dGarGapGold, _dGarEmptyGold;
         // K1 (przeglad): obrot w kolko - ta sama partia kupila i sprzedala sztuke tego samego id tej samej doby (autotest: 0)
         private static readonly HashSet<string> _boughtToday = new HashSet<string>(), _soldToday = new HashSet<string>();
-        private static int _dChurn;
+        private static int _dChurn, _dWaitCart;   // poprawki sklad7: zamki bez wymiany do dostawy wozu z dozbrajaniem
         private static readonly List<string> _churnIds = new List<string>();
 
         internal static void Reset()
@@ -48,7 +48,7 @@ namespace Armoury
             _dLogged = 0;
             _dPlayerN = _dLordN = _dGarN = _dSold = _dKept = _dNoBetter = _dNoMoney = _dNoLift = _dGarWageN = _dGarGapN = _dBattleArmory = _dBattleTemplate = _dGarEmptyN = 0;
             _dPlayerGold = _dLordGold = _dGarGold = _dSoldGold = _dSaved = _dOverCap = _dGarWage = _dGarGapGold = _dGarEmptyGold = 0;
-            _boughtToday.Clear(); _soldToday.Clear(); _dChurn = 0; _churnIds.Clear(); _dTempSlots = 0; _dBareSlots = 0; _dNoEmerg = 0; _dNothing = 0; _dLordLent = 0;
+            _boughtToday.Clear(); _soldToday.Clear(); _dChurn = 0; _churnIds.Clear(); _dTempSlots = 0; _dBareSlots = 0; _dNoEmerg = 0; _dNothing = 0; _dLordLent = 0; _dWaitCart = 0;
         }
 
         /// <summary>K1 (przeglad): zakup (buy=true) albo sprzedaz sztuki przez ludzi partii - licznik "kupione i sprzedane te same id tej
@@ -126,7 +126,7 @@ namespace Armoury
                     }
                     catch { }
                     Log.Info("Dozbrajanie: dzien " + _dStamp + " - gracz " + _dPlayerN + "/" + _dPlayerGold + ", lordowie " + _dLordN + "/" + _dLordGold
-                             + ", zalogi " + _dGarN + "/" + _dGarGold + " (szt./zloto); stare sprzedane " + _dSold + " za " + _dSoldGold + " (do zbrojowni " + _dKept + ")"
+                             + ", zalogi " + _dGarN + "/" + _dGarGold + " (szt./zloto; zamki czekaja na woz z dozbrajaniem " + _dWaitCart + "); stare sprzedane " + _dSold + " za " + _dSoldGold + " (do zbrojowni " + _dKept + ")"
                              + "; pominiete koszyki: brak lepszej na polce " + _dNoBetter + ", za malo w sakiewce " + _dNoMoney + ", nikt nie udzwignie " + _dNoLift
                              + "; odlozone przy wyjazdach " + _dSaved + ", ponad limit na zycie " + _dOverCap
                              + "; zold zalog do sakiewek " + _dGarWage + " (" + _dGarWageN + " zalog), w sakiewkach zalog " + garPurses + " (" + garN + " zalog)"
@@ -194,6 +194,9 @@ namespace Armoury
                 if (all == null || !all.TryGetValue(mp.Id, out arm) || arm == null || arm.Count == 0) return;
                 int purse0 = MenPurse.Get(mp);
                 if (purse0 <= 0) return;
+                // poprawki sklad7: do zamku jedzie juz woz z dozbrajaniem - zadnej wymiany do dostawy, takze z polki zamku (shop1); inaczej ta sama stara
+                // sztuka, na ktora juz jedzie nowa, bylaby wymieniona drugi raz, a po dostawie dwie nowe na jeden slot (jedna w nadwyzkach ze strata)
+                if (garrison && st.IsCastle && GarrisonCarts.UpgradeInTransit(st)) { Touch(); _dWaitCart++; return; }
                 if (!Gate(mp)) return;
                 Touch();
                 int budget = purse0 - AiWear.OutstandingCost(mp, st.IsTown ? st : null);
@@ -497,6 +500,7 @@ namespace Armoury
                     var it = el.EquipmentElement.Item;
                     if (it == null || el.Amount <= 0 || it.ItemType != type) continue;
                     if (ArmsPricing.IsUnique(it) || QuartermasterLaw.BarredInBattle(it)) continue;
+                    if (!player && !AiGear.DteTakes(it)) continue;   // poprawki sklad7: zbrojownia AI (DTE) jej nie przyjmie - takze linia wozu do zamku
                     // K1 (przeglad): ksiega gracza jest per id i obejmuje NAJGORSZE egzemplarze - zakup ludzi id, w ktorym gracz ma czesc
                     // (np. Masterwork), przesunalby wlasnosc gracza na zwykly egzemplarz bez slowa; ludzie kupuja inne id
                     if (player && ArmouryBehavior.StockOf(it.StringId) > 0) continue;

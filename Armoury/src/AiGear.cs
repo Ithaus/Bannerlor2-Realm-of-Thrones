@@ -40,7 +40,7 @@ namespace Armoury
     /// </summary>
     internal static class AiGear
     {
-        internal static void Reset() { _lastDay.Clear(); }
+        internal static void Reset() { _lastDay.Clear(); _dteRefused.Clear(); _dteOk.Clear(); }
         private static Type _dte;
         private static FieldInfo _armories;
         private static MethodInfo _add;
@@ -99,7 +99,7 @@ namespace Armoury
                 {
                     var el = shelf.GetElementCopyAtIndex(i);
                     var it = el.EquipmentElement.Item;
-                    if (el.Amount <= 0 || it == null || ArmsPricing.IsUnique(it)) continue;
+                    if (el.Amount <= 0 || it == null || ArmsPricing.IsUnique(it) || !DteTakes(it)) continue;
                     bool isM = melee && gapMelee > 0 && Melee((int)it.ItemType), isB = body && gapBody > 0 && it.ItemType == ItemObject.ItemTypeEnum.BodyArmor;
                     if (!isM && !isB) continue;
                     int price = market.Town.MarketData.GetPrice(el.EquipmentElement, buyer, false, market.Party);
@@ -163,6 +163,9 @@ namespace Armoury
                 {
                     _armories = _dte.GetField("PartyArmories", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
                     _add = _dte.GetMethod("AddItemToPartyArmory", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                    // poprawki sklad7: ten sam test, ktory DTE robi w AddItemToPartyArmory (rozpoznanie sztuki + blacklist.json) - przed zakupem
+                    var bl = _dte.Assembly.GetType("DynamicTroopEquipmentReupload.ItemBlackList");
+                    _blTest = bl != null ? bl.GetMethod("Test", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic, null, new[] { typeof(ItemObject) }, null) : null;
                 }
             }
             catch { }
@@ -255,7 +258,12 @@ namespace Armoury
                 if (mp.IsGarrison) MenPurse.GarrisonDay(mp, st);   // K1 (A11): zaloga bez ludzi - sakiewka do kasy osady (nadwyzki: GarrisonArmory.SellWeek)
                 // K1 (przeglad): zaloga zamku naprawia u kowali najblizszego miasta handlowego (jak zakupy) - od K1 jej sprzet obija sie
                 // w bitwach (AiWear), a bez kowali rezerwa sakiewki na naprawy wisialaby wiecznie i blokowala zakupy
-                AiWear.MendInTown(mp, mp.IsGarrison && st.IsCastle && !st.IsUnderSiege ? (ArmyClothing.MarketTown(st) ?? st) : st);
+                // Poprawki sklad7: naprawy to usluga (obite sztuki jada do kowala miasta i wracaja), nie zakup towaru - swiadome odstepstwo od reguly
+                // "z miasta do zamku tylko wozem", ale tylko gdy droga wozu jest otwarta: te same warunki co zamowienie (GarrisonCarts.MarketFor - miasto
+                // handlowe, droga, odleglosc MarketMaxDistance, bez oblezenia i wojny); inaczej zamek bez napraw (nie ma kowali)
+                Settlement mendAt = st;
+                if (mp.IsGarrison && st.IsCastle && AiWear.BookOn) { float d; string why; mendAt = GarrisonCarts.MarketFor(st, out d, out why, false) ?? st; }
+                AiWear.MendInTown(mp, mendAt);
                 TryBuy(mp, st);
             }
             catch { }
@@ -283,9 +291,36 @@ namespace Armoury
                 var all = _armories.GetValue(null) as Dictionary<MBGUID, Dictionary<ItemObject, int>>;
                 long before = ArmTotal(all, mp.Id);
                 _add.Invoke(null, new object[] { mp.Id, it, n });
-                return ArmTotal(all, mp.Id) - before == n;
+                bool ok = ArmTotal(all, mp.Id) - before == n;
+                if (!ok) { _dteRefused.Add(it); _dteOk.Remove(it); }   // poprawki sklad7: zapamietane na sesje - zakupy (BuyLoop, BuySubstitutes, MenUpgrade) juz jej nie biora
+                return ok;
             }
             catch { return false; }
+        }
+
+        // poprawki sklad7 (petla "DTE nie przyjal"): zamek kupowal w miescie sztuke z czarnej listy DTE (suknia, korona, dp_*) do zamowienia wozem; przy dostawie
+        // DTE jej nie przyjmowal (na polke zamku), brak zostawal otwarty i co GarrisonOrderDays dob ta sama sztuka byla kupowana znowu - sakiewka i pan
+        // placili miastu, a suknie wedrowaly z polek miast na polki zamkow. Teraz przed zakupem: test DTE ItemBlackList.Test (refleksja) i zbior odmow sesji.
+        private static MethodInfo _blTest;
+        private static readonly HashSet<ItemObject> _dteRefused = new HashSet<ItemObject>(), _dteOk = new HashSet<ItemObject>();
+        /// <summary>Ile roznych przedmiotow jest w zbiorze "DTE nie przyjmie" tej sesji (linia "Zaopatrzenie zamkow").</summary>
+        internal static int DteRefusedIds { get { return _dteRefused.Count; } }
+
+        /// <summary>Poprawki sklad7: czy zbrojownia DTE przyjmie te sztuke (do zbrojowni partii AI i zalog). Wynik testu raz na przedmiot i sesje
+        /// (czarna lista DTE sie nie zmienia); blad testu - tak (nie blokujemy zakupow).</summary>
+        internal static bool DteTakes(ItemObject it)
+        {
+            if (it == null) return false;
+            if (_dteRefused.Contains(it)) return false;
+            if (_dteOk.Contains(it)) return true;
+            try
+            {
+                if (_blTest == null && !Look()) return true;
+                if (_blTest != null && !(bool)_blTest.Invoke(null, new object[] { it })) { _dteRefused.Add(it); return false; }
+                if (_blTest != null) _dteOk.Add(it);
+            }
+            catch { }
+            return true;
         }
 
         private static long ArmTotal(Dictionary<MBGUID, Dictionary<ItemObject, int>> all, MBGUID id)
@@ -437,6 +472,7 @@ namespace Armoury
                             if (ti != t && ti != t - 1) continue;
                             if (ArmsPricing.IsUnique(it)) continue;
                             if (refused != null && refused.Contains(it)) continue;
+                            if (!DteTakes(it)) continue;   // poprawki sklad7: takze zamowienie wozem (tam sztuka idzie do DTE dopiero przy dostawie)
                             if (!Lift(who, it)) continue;
                             int price = market.Town.MarketData.GetPrice(el.EquipmentElement, buyer, false, market.Party);
                             if (price <= 0) continue;
@@ -566,11 +602,13 @@ namespace Armoury
 
                 int pieces = 0;
                 var bought = new List<string>();
+                int lordPart = 0;   // poprawki sklad7: ile dolozyl pan (Twoja zaloga - Twoja kiesa: komunikat w grze)
                 // zaplata: najpierw sakiewka ludzi (lord AI zawsze, zaloga przy GarrisonPurseEnabled), reszta kiesa pana; zwraca czesc z sakiewki
                 Func<int, int> pay = cost =>
                 {
                     int fromPurse = (!garrison || gPurse) ? MenPurse.Take(mp, cost) : 0;
                     lord.ChangeHeroGold(-(cost - fromPurse));
+                    lordPart += cost - fromPurse;
                     if (garrison) MenUpgrade.NoteGarrisonGap(fromPurse);
                     return fromPurse;
                 };
@@ -659,6 +697,9 @@ namespace Armoury
                     }
                 }
                 if (pieces <= 0) return;
+                // poprawki sklad7: Twoja kiesa nie zmienia sie bez slowa - tylko gdy Twoja kiesa doplacila (GarrisonBuysGearPlayer); raz na dobe na zaloge (stempel _lastDay)
+                if (garrison && lord == Hero.MainHero && lordPart > 0)
+                    Log.Player("Your garrison of " + st.Name + " bought " + pieces + " pieces of kit for " + spent + " denars (their purse " + (spent - lordPart) + ", your coin " + lordPart + ").");
                 _dayPieces += pieces; _dayGold += spent; _dayVisits++; if (garrison) { _dayGarrison++; _dayGarrisonGold += spent; }
                 if (_dayLogged < Math.Max(0, s.AiGearLogPerDay))
                 {

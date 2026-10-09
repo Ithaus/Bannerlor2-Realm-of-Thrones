@@ -61,6 +61,7 @@ namespace Armoury
             _dLeftMen = _dLeftPcs = _dTakenMen = _dTakenPcs = _dDisbandIn = _dDisbandInPcs = _dDisbandGone = _dDisbandGoneKit = _dDisbandSold = _dDisbandGold = 0;
             _dQueue = _dSoldGarrisons = _dSoldPcs = _dSoldGold = _dPatrolCounted = 0;
             _dKeptLeaderless = 0;
+            _dScrToMen = _dScrToPcs = _dScrFromMen = _dScrFromPcs = _dScrPlus = _dScrBook = _dScrRefused = 0;
         }
 
         private static void Stumble(string where, Exception e)
@@ -154,17 +155,51 @@ namespace Armoury
             if (from == null || to == null || moved == null || moved.Count == 0) return 0;
             var arm = ArmoryOf(from);
             if (arm == null || arm.Count == 0) return 0;
-            var needMoved = new Dictionary<int, int>();
-            foreach (var kv in moved) AddNeed(needMoved, kv.Key, kv.Value);
             var needLeft = NeedByType(from);   // roster dawcy PO przeniesieniu
             // recenzja 171: ludzie zalogi na patrolu BK - ich sprzet lezy w zbrojowni zalogi i zostaje dla nich (jak w C10)
-            if (extraLeft != null) foreach (var kv in extraLeft) { int v; needLeft.TryGetValue(kv.Key, out v); needLeft[kv.Key] = v + kv.Value; }
+            AddExtra(needLeft, extraLeft);
+            var pool = new Dictionary<ItemObject, int>();
+            foreach (var kv in arm)
+                if (kv.Key != null && kv.Value > 0 && SupplyDemand.Equipmentish(kv.Key) && !ArmsPricing.IsUnique(kv.Key)) pool[kv.Key] = kv.Value;
+            var taken = PlanKits(pool, moved, needLeft);
+            int pcs = 0;
+            bool synced = false;
+            foreach (var kv in taken)
+            {
+                if (kv.Value <= 0 || !AiGear.AddToArmory(to, kv.Key, kv.Value)) continue;
+                int c; arm.TryGetValue(kv.Key, out c);
+                // recenzja 171: stan sztuk idzie z nimi (zapis obitych - takze zalog), przed zdjeciem ze zbrojowni dawcy; spis dawcy raz na przeniesienie
+                try { AiWear.MoveWorn(from, to, kv.Key, kv.Value, c, !synced); synced = true; } catch (Exception e) { Stumble("MoveWorn", e); }
+                c -= kv.Value;
+                if (c > 0) arm[kv.Key] = c; else arm.Remove(kv.Key);
+                pcs += kv.Value;
+            }
+            return pcs;
+        }
+
+        private static void AddExtra(Dictionary<int, int> need, Dictionary<int, int> extra)
+        {
+            if (need == null || extra == null) return;
+            foreach (var kv in extra) { int v; need.TryGetValue(kv.Key, out v); need[kv.Key] = v + kv.Value; }
+        }
+
+        /// <summary>
+        /// A7 (wydzielone w poprawkach sklad7 - ta sama regula dla sciezek AI i ekranu druzyny gracza): ktore sztuki z puli dawcy (przedmiot -> ile,
+        /// juz po odsianiu tego, czego nie wolno ruszyc) ida z przeniesionymi ludzmi. needLeft - potrzeba po typach ludzi, ktorzy zostaja u dawcy.
+        /// </summary>
+        private static Dictionary<ItemObject, int> PlanKits(Dictionary<ItemObject, int> pool, Dictionary<CharacterObject, int> moved, Dictionary<int, int> needLeft)
+        {
+            var taken = new Dictionary<ItemObject, int>();
+            if (pool == null || pool.Count == 0 || moved == null || moved.Count == 0) return taken;
+            if (needLeft == null) needLeft = new Dictionary<int, int>();
+            var needMoved = new Dictionary<int, int>();
+            foreach (var kv in moved) AddNeed(needMoved, kv.Key, kv.Value);
             var have = new Dictionary<int, int>();
             var byType = new Dictionary<int, List<ItemObject>>();
             var avail = new Dictionary<ItemObject, int>();
-            foreach (var kv in arm)
+            foreach (var kv in pool)
             {
-                if (kv.Key == null || kv.Value <= 0 || !SupplyDemand.Equipmentish(kv.Key) || ArmsPricing.IsUnique(kv.Key)) continue;
+                if (kv.Key == null || kv.Value <= 0) continue;
                 int t = (int)kv.Key.ItemType; int v; have.TryGetValue(t, out v); have[t] = v + kv.Value;
                 List<ItemObject> l; if (!byType.TryGetValue(t, out l)) byType[t] = l = new List<ItemObject>(); l.Add(kv.Key);
                 avail[kv.Key] = kv.Value;
@@ -184,7 +219,6 @@ namespace Armoury
                     l.Add(new KeyValuePair<ItemObject, int>(it, kv.Value));
                 }
             }
-            var taken = new Dictionary<ItemObject, int>();
             foreach (var nk in needMoved)
             {
                 int type = nk.Key, nm = nk.Value, h, nl;
@@ -210,19 +244,7 @@ namespace Armoury
                     if (share <= 0) break;
                 }
             }
-            int pcs = 0;
-            bool synced = false;
-            foreach (var kv in taken)
-            {
-                if (kv.Value <= 0 || !AiGear.AddToArmory(to, kv.Key, kv.Value)) continue;
-                int c; arm.TryGetValue(kv.Key, out c);
-                // recenzja 171: stan sztuk idzie z nimi (zapis obitych - takze zalog), przed zdjeciem ze zbrojowni dawcy; spis dawcy raz na przeniesienie
-                try { AiWear.MoveWorn(from, to, kv.Key, kv.Value, c, !synced); synced = true; } catch (Exception e) { Stumble("MoveWorn", e); }
-                c -= kv.Value;
-                if (c > 0) arm[kv.Key] = c; else arm.Remove(kv.Key);
-                pcs += kv.Value;
-            }
-            return pcs;
+            return taken;
         }
 
         /// <summary>Sztuka dla przedmiotu wzorca: dokladnie ten, potem ten sam tier, wyzsze rosnaco, nizsze malejaco.</summary>
@@ -445,10 +467,12 @@ namespace Armoury
             int today = (int)CampaignTime.Now.ToDays;
             try { SellWeek(today); } catch (Exception e) { Stumble("SellWeek", e); }
             var s = Settings.Current;
-            int moves = _dLeftMen + _dTakenMen + _dDisbandIn + _dDisbandGone + _dQueue + _stumbles;
+            int moves = _dLeftMen + _dTakenMen + _dDisbandIn + _dDisbandGone + _dQueue + _stumbles + _dScrToMen + _dScrFromMen;
             if (moves > 0 || (s != null && (s.KitMovesWithMen || s.GarrisonSellsSurplus)))
                 Log.Info("Zbrojownie zalog (171): dzien " + today + " - komplet z ludzmi: lordowie zostawili w zalogach " + _dLeftMen + " ludzi (" + _dLeftPcs + " szt.), zabrali z zalog "
-                         + _dTakenMen + " ludzi (" + _dTakenPcs + " szt.), rozwiazane partie do zalog " + _dDisbandIn + " (" + _dDisbandInPcs + " szt.), rozwiazane - ludzie odeszli "
+                         + _dTakenMen + " ludzi (" + _dTakenPcs + " szt.), ekran druzyny gracza (poprawki sklad7): do zalog " + _dScrToMen + " ludzi (" + _dScrToPcs + " szt.), z zalog "
+                         + _dScrFromMen + " ludzi (" + _dScrFromPcs + " szt.; pominiete: na plus zostaja w druzynie " + _dScrPlus + " szt., id z Twoja czescia w ksiedze " + _dScrBook
+                         + ", DTE nie przyjal " + _dScrRefused + " szt.), rozwiazane partie do zalog " + _dDisbandIn + " (" + _dDisbandInPcs + " szt.), rozwiazane - ludzie odeszli "
                          + _dDisbandGone + " (komplety z ludzmi " + _dDisbandGoneKit + " szt., tabor sprzedany " + _dDisbandSold + " szt. za " + _dDisbandGold + " zl); nadwyzki zalog: sprzedalo "
                          + _dSoldGarrisons + " z " + _dQueue + " zalog w kolejce, " + _dSoldPcs + " szt. za " + _dSoldGold + " zl (kasy osad -> trzecia panom, reszta sakiewkom zalog; w tym ludzie na patrolach BK policzeni "
                          + _dPatrolCounted + " zalogi); partie lordow bez wodza albo rozwiazywane - zbrojownia zachowana " + _dKeptLeaderless + "; potkniecia " + _stumbles + ".");
@@ -488,10 +512,16 @@ namespace Armoury
                     // sklad7 (scalenie 171 C10 + K1 A9): JEDNA sprzedaz nadwyzek zalogi - regula K1 (po dopasowaniu: najpierw sztuki, ktorych nikt
                     // nie udzwignie, potem najgorsze ponad komplet + zapas; ta sama co u lordow AI), w kolejce i na polke wlasnej osady z 171
                     int gold;
+                    bool mine = payee != null && payee == Hero.MainHero;
+                    int before = mine ? Hero.MainHero.Gold : 0;
                     int sold = MenPurse.SellGarrisonSurplus(g, st, payee, roster, out gold);
                     if (sold > 0) { _dSoldGarrisons++; _dSoldPcs += sold; _dSoldGold += gold; }
+                    // poprawki sklad7: Twoja kiesa nie zmienia sie bez slowa (raz na tydzien na zaloge - kolejka C10)
+                    if (sold > 0 && mine)
+                        Log.Player("Your garrison of " + st.Name + " sold " + sold + " spare pieces of kit for " + gold + " denars; your third: " + Math.Max(0, Hero.MainHero.Gold - before) + ".");
                 }
-                catch (Exception e) { Stumble("SellWeek(" + st.StringId + ")", e); }
+                // poprawki sklad7: jedno miejsce w logu na dobe (dotad osobno dla kazdej zalogi, a MenPurse.SellGarrisonSurplus logowal jeszcze raz sam) - reszta w liczniku potkniec
+                catch (Exception e) { Stumble("SellWeek(zaloga)", e); }
             }
         }
 
@@ -554,6 +584,178 @@ namespace Armoury
             return d;
         }
 
+        // ------------------------------------------------------------ poprawki sklad7 (uwaga krytyczna): ekran druzyny gracza
+        // Gracz przenosi ludzi miedzy druzyna a zaloga ekranem druzyny: "Manage garrison" (PartyScreenHelper.OpenScreenAsManageTroopsAndPrisoners - lewa
+        // strona to zywy roster zalogi) i "Donate troops" do zalogi cudzej twierdzy (OpenScreenAsDonateGarrisonWithCurrentSettlement - lewa strona pusta,
+        // gra dopisuje ludzi do zalogi w funkcji Done). Sciezki A7 (Leave/Take/Disband) sa tylko AI, a DTE nie ma latki na ekran druzyny - dotad posilki
+        // stawaly w zalodze bez sprzetu (przy GarrisonFightsWithArmoryOnly walczyly nago), ich komplety zostawaly w zbrojowni druzyny (MenPurse sprzedawal je
+        // w miescie jako nadwyzke), a ludzie zabrani z zalogi zostawiali komplety (SellWeek sprzedawal je, trzecia dla Ciebie). Teraz ta sama regula A7
+        // (PlanKits) w obie strony: czesc LUDZI zbrojowni druzyny DTE (ArmyArmory.Armory; Twoja ksiega nietknieta - KitPieces/MenTotal, Twoja czesc to
+        // najgorsze egzemplarze id) <-> slownik zbrojowni zalogi. Konie i rzedy - Stajnia (bez zmian). Rostery ekranu sa zywe (partie zmienione przed Done),
+        // wiec stan "przed" bierzemy z PartyScreenLogic._initialData (kopie rosterow z otwarcia ekranu albo z ostatniego Done).
+        private static System.Reflection.FieldInfo _fInitial;
+        private static bool _screenHooked;
+        private static int _dScrToMen, _dScrToPcs, _dScrFromMen, _dScrFromPcs, _dScrPlus, _dScrBook, _dScrRefused;
+
+        private sealed class ScreenState { internal MobileParty G; internal Settlement St; internal Dictionary<CharacterObject, int> GBefore, MainBefore; }
+
+        /// <summary>Prefiks PartyScreenLogic.DoneLogic: zaloga po lewej (albo "Donate troops") - stan rosterow przed ekranem.</summary>
+        public static void ScreenDonePrefix(PartyScreenLogic __instance, ref object __state)
+        {
+            __state = null;
+            try
+            {
+                if (__instance == null || _fInitial == null || !KitMoves) return;
+                if (MobileParty.MainParty == null || __instance.RightOwnerParty != PartyBase.MainParty) return;
+                var left = __instance.LeftOwnerParty;
+                MobileParty g = null; bool live = false;
+                if (left != null && left.IsMobile && left.MobileParty != null && left.MobileParty.IsGarrison) { g = left.MobileParty; live = true; }
+                else if (left == null)
+                {
+                    var gsm = Game.Current != null ? Game.Current.GameStateManager : null;
+                    var ps = gsm != null ? gsm.ActiveState as TaleWorlds.CampaignSystem.GameState.PartyState : null;
+                    var cur = Settlement.CurrentSettlement;
+                    if (ps != null && ps.IsDonating && ps.PartyScreenMode == Helpers.PartyScreenHelper.PartyScreenMode.TroopsManage && cur != null && cur.Town != null)
+                        g = cur.Town.GarrisonParty;
+                }
+                if (g == null || g.MemberRoster == null) return;
+                var init = _fInitial.GetValue(__instance) as PartyScreenData;
+                if (init == null || init.RightMemberRoster == null || (live && init.LeftMemberRoster == null)) return;
+                __state = new ScreenState { G = g, St = g.CurrentSettlement ?? g.HomeSettlement, GBefore = Snapshot(live ? init.LeftMemberRoster : g.MemberRoster), MainBefore = Snapshot(init.RightMemberRoster) };
+            }
+            catch (Exception e) { __state = null; Stumble("ScreenDonePrefix", e); }
+        }
+
+        /// <summary>Postfiks DoneLogic (tylko zatwierdzony ekran): komplety ida z ludzmi w obie strony.</summary>
+        public static void ScreenDonePostfix(bool __result, object __state)
+        {
+            var ss = __state as ScreenState;
+            if (!__result || ss == null) return;
+            try
+            {
+                var main = MobileParty.MainParty;
+                var g = ss.G;
+                if (main == null || main.MemberRoster == null || g == null || g.MemberRoster == null) return;
+                var gNow = Snapshot(g.MemberRoster); var mNow = Snapshot(main.MemberRoster);
+                var toG = Crossed(ss.MainBefore, mNow, ss.GBefore, gNow);
+                var toMain = Crossed(ss.GBefore, gNow, ss.MainBefore, mNow);
+                string name = ss.St != null ? ss.St.Name.ToString() : g.StringId;
+                if (toG.Count > 0)
+                {
+                    int men = 0; foreach (var v in toG.Values) men += v;
+                    int pcs = KitsToGarrison(g, toG);
+                    _dScrToMen += men; _dScrToPcs += pcs;
+                    if (pcs > 0) Log.Player(men + " men joined the garrison of " + name + " and took " + pcs + " pieces of their own kit from your stores.");
+                    else Log.Player(men + " men joined the garrison of " + name + " with no kit of their own in your stores"
+                                    + (GarrisonKit.BareOn ? " - in battle the garrison fights only with what its stores hold." : "."), true);
+                }
+                if (toMain.Count > 0)
+                {
+                    int men = 0; foreach (var v in toMain.Values) men += v;
+                    int pcs = KitsToMain(g, ss.St, toMain);
+                    _dScrFromMen += men; _dScrFromPcs += pcs;
+                    Log.Player(men + " men left the garrison of " + name + (pcs > 0 ? " and brought " + pcs + " pieces of their kit to your stores." : " - its stores held no kit of theirs."));
+                }
+            }
+            catch (Exception e) { Stumble("ScreenDonePostfix", e); }
+        }
+
+        /// <summary>Ludzie (oddzial -> ilu), ktorzy ubyli po stronie A i przybyli po stronie B - min z obu (awans i werbunek jencow to nie przeniesienie).</summary>
+        private static Dictionary<CharacterObject, int> Crossed(Dictionary<CharacterObject, int> aBefore, Dictionary<CharacterObject, int> aNow,
+                                                              Dictionary<CharacterObject, int> bBefore, Dictionary<CharacterObject, int> bNow)
+        {
+            var d = new Dictionary<CharacterObject, int>();
+            foreach (var kv in aBefore)
+            {
+                int an, bb, bn; aNow.TryGetValue(kv.Key, out an); bBefore.TryGetValue(kv.Key, out bb); bNow.TryGetValue(kv.Key, out bn);
+                int c = Math.Min(kv.Value - an, bn - bb);
+                if (c > 0) d[kv.Key] = c;
+            }
+            return d;
+        }
+
+        /// <summary>Druzyna -> zaloga: komplety z czesci LUDZI zbrojowni druzyny (bez Twojej ksiegi, koni, unikatow i sztuk z modyfikatorem na plus -
+        /// zbrojownia AI nie zna stanow na plus, sztuka stracilaby wartosc; zostaja w druzynie jako zapas ludzi). Obita idzie obita (AiWear). Zwraca sztuki.</summary>
+        private static int KitsToGarrison(MobileParty g, Dictionary<CharacterObject, int> moved)
+        {
+            var armory = QuartermasterLaw.DteArmory();
+            var main = MobileParty.MainParty;
+            if (armory == null || main == null || QuartermasterEscrow.Active) return 0;
+            var pool = new Dictionary<ItemObject, int>();
+            var copies = new Dictionary<ItemObject, List<SwapMath.Piece>>();
+            foreach (var type in QuartermasterLaw.KitTypes)
+            {
+                if (type == ItemObject.ItemTypeEnum.Horse || type == ItemObject.ItemTypeEnum.HorseHarness) continue;   // konie i rzedy - Stajnia
+                foreach (var p in QuartermasterLaw.KitPieces(armory, type, true))   // Own = Twoja ksiega na najgorszych egzemplarzach id
+                {
+                    var el = QuartermasterLaw.ElOf(p); var it = el.Item; var m = el.ItemModifier;
+                    if (it == null || p.MenTotal <= 0 || !SupplyDemand.Equipmentish(it) || ArmsPricing.IsUnique(it)) continue;
+                    if (m != null && m.PriceMultiplier > 1f) { _dScrPlus += p.MenTotal; continue; }
+                    int v; pool.TryGetValue(it, out v); pool[it] = v + p.MenTotal;
+                    List<SwapMath.Piece> l; if (!copies.TryGetValue(it, out l)) copies[it] = l = new List<SwapMath.Piece>(); l.Add(p);
+                }
+            }
+            var taken = PlanKits(pool, moved, NeedByType(main.MemberRoster));   // roster druzyny PO ekranie
+            int pcs = 0;
+            foreach (var kv in taken)
+            {
+                List<SwapMath.Piece> l;
+                if (kv.Value <= 0 || !copies.TryGetValue(kv.Key, out l)) continue;
+                if (!AiGear.AddToArmory(g, kv.Key, kv.Value)) { _dScrRefused += kv.Value; continue; }   // DTE nie przyjal - zostaje w druzynie
+                l.Sort((a, b) => SwapMath.WorseFirst(b, a));   // najlepsze egzemplarze ludzi najpierw (Twoja czesc to najgorsze)
+                int left = kv.Value;
+                foreach (var p in l)
+                {
+                    if (left <= 0) break;
+                    int k = Math.Min(left, p.MenTotal);
+                    if (k <= 0) continue;
+                    var el = QuartermasterLaw.ElOf(p);
+                    armory.AddToCounts(el, -k);
+                    try { AiWear.NoteBought(g, el, k); } catch { }   // obita zostaje obita w zalodze
+                    left -= k;
+                }
+                pcs += kv.Value - left;
+            }
+            return pcs;
+        }
+
+        /// <summary>Zaloga -> druzyna: komplety ludzi zabranych z zalogi (regula A7; sprzet ludzi na patrolach BK zostaje) do zbrojowni druzyny jako czesc
+        /// LUDZI, obite ze stanem (udzial obitych jak AiWear.MoveWorn). Id, w ktorym masz czesc w ksiedze, zostaje w zalodze - ta sama regula co zakupy
+        /// ludzi (dopisany egzemplarz przesunalby Twoja czesc na gorszy). Bez koni i rzedow (Stajnia). Zwraca sztuki.</summary>
+        private static int KitsToMain(MobileParty g, Settlement st, Dictionary<CharacterObject, int> moved)
+        {
+            var armory = QuartermasterLaw.DteArmory();
+            var arm = ArmoryOf(g);
+            if (armory == null || arm == null || arm.Count == 0 || QuartermasterEscrow.Active) return 0;
+            var needLeft = NeedByType(g.MemberRoster);   // roster zalogi PO ekranie
+            AddExtra(needLeft, PatrolNeed(st));
+            var pool = new Dictionary<ItemObject, int>();
+            foreach (var kv in arm)
+            {
+                var it = kv.Key;
+                if (it == null || kv.Value <= 0 || !SupplyDemand.Equipmentish(it) || ArmsPricing.IsUnique(it) || MenPurse.HorseKind(it)) continue;
+                if (ArmouryBehavior.StockOf(it.StringId) > 0) { _dScrBook++; continue; }
+                pool[it] = kv.Value;
+            }
+            var taken = PlanKits(pool, moved, needLeft);
+            int pcs = 0;
+            bool synced = false;
+            foreach (var kv in taken)
+            {
+                int c;
+                if (kv.Value <= 0 || !arm.TryGetValue(kv.Key, out c) || c <= 0) continue;
+                int n = Math.Min(kv.Value, c);
+                var worn = AiWear.TakeWornShare(g, kv.Key, n, c, !synced);   // PRZED zdjeciem ze slownika (jak MoveWorn)
+                synced = true;
+                int w = 0;
+                foreach (var x in worn) { if (x.Value <= 0 || w + x.Value > n) continue; armory.AddToCounts(new EquipmentElement(kv.Key, x.Key), x.Value); w += x.Value; }
+                if (n - w > 0) armory.AddToCounts(new EquipmentElement(kv.Key), n - w);
+                if (c - n > 0) arm[kv.Key] = c - n; else arm.Remove(kv.Key);
+                pcs += n;
+            }
+            return pcs;
+        }
+
         // ------------------------------------------------------------ C9: zapis
         /// <summary>v1| + osada>przedmiot:ile,...~ ; v1|off - zapis bez zbrojowni (wylacznik); id = StringId, bez modyfikatorow (DTE ich nie trzyma).</summary>
         internal static string Export()
@@ -563,7 +765,7 @@ namespace Armoury
             var dict = AiGear.Armories();
             if (s == null || !s.GarrisonArmorySurvivesSave || dict == null) return "v1|off";
             var sb = new StringBuilder("v1|");
-            int garrisons = 0, pcs = 0;
+            int garrisons = 0, pcs = 0, badId = 0;   // poprawki sklad7: id ze znakami separatorow zapisu (',', '~', '>') - pomijane i liczone (jak K1c Sep)
             foreach (var st in Settlement.All)
             {
                 try
@@ -571,10 +773,12 @@ namespace Armoury
                     if (st == null || !st.IsFortification || st.Town == null || st.Town.GarrisonParty == null) continue;
                     Dictionary<ItemObject, int> arm;
                     if (!dict.TryGetValue(st.Town.GarrisonParty.Id, out arm) || arm == null || arm.Count == 0) continue;
+                    if (BadId(st.StringId)) { foreach (var v in arm.Values) if (v > 0) badId += v; continue; }
                     bool first = true;
                     foreach (var kv in arm)
                     {
                         if (kv.Key == null || kv.Value <= 0 || kv.Key.StringId == null) continue;
+                        if (BadId(kv.Key.StringId)) { badId += kv.Value; continue; }
                         sb.Append(first ? st.StringId + ">" : ",").Append(kv.Key.StringId).Append(':').Append(kv.Value);
                         first = false; pcs += kv.Value;
                     }
@@ -592,10 +796,12 @@ namespace Armoury
                     if (mp == null || !mp.IsActive || mp.IsMainParty || mp.StringId == null || DteSaves(mp)) continue;
                     Dictionary<ItemObject, int> arm;
                     if (!dict.TryGetValue(mp.Id, out arm) || arm == null || arm.Count == 0) continue;
+                    if (BadId(mp.StringId)) { foreach (var v in arm.Values) if (v > 0) badId += v; continue; }
                     bool first = true;
                     foreach (var kv in arm)
                     {
                         if (kv.Key == null || kv.Value <= 0 || kv.Key.StringId == null) continue;
+                        if (BadId(kv.Key.StringId)) { badId += kv.Value; continue; }
                         sb.Append(first ? "@" + mp.StringId + ">" : ",").Append(kv.Key.StringId).Append(':').Append(kv.Value);
                         first = false; ppcs += kv.Value;
                     }
@@ -603,8 +809,25 @@ namespace Armoury
                 }
                 catch (Exception e) { Stumble("Export(partia)", e); }
             }
-            Log.Info("Zbrojownie zalog (171): zapis - " + garrisons + " zalog, " + pcs + " szt.; partie lordow bez wodza albo rozwiazywane (DTE ich nie zapisuje) " + parties + ", " + ppcs + " szt.");
+            Log.Info("Zbrojownie zalog (171): zapis - " + garrisons + " zalog, " + pcs + " szt.; partie lordow bez wodza albo rozwiazywane (DTE ich nie zapisuje) " + parties + ", " + ppcs + " szt."
+                     + "; pominiete (id ze znakami separatorow zapisu) " + badId + " szt.");
             return sb.ToString();
+        }
+
+        private static readonly char[] SepChars = { ',', '~', '>' };
+        private static bool BadId(string id) { return string.IsNullOrEmpty(id) || id.IndexOfAny(SepChars) >= 0; }
+
+        /// <summary>
+        /// Poprawki sklad7: przedmiot z zapisu - po StringId, a gdy go nie ma - wyrob kowala po kodzie wzoru (ta sama droga co DTE
+        /// ArmyArmory.ResolveArmoryItem i dawny K1c RestoreArmories). Od K1 B6 gracz moze oddac zalodze wlasny wyrob kowala.
+        /// </summary>
+        private static ItemObject ResolveItem(MBObjectManager om, string id)
+        {
+            if (string.IsNullOrEmpty(id)) return null;
+            ItemObject it = null;
+            try { it = om.GetObject<ItemObject>(id); } catch { }
+            if (it == null) try { it = ItemObject.GetCraftedItemObjectFromHashedCode(id); } catch { }
+            return it;
         }
 
         /// <summary>Warunek DTE ShouldPersistParty (EveryoneCampaignBehavior): partia z zywym, czynnym wodzem-bohaterem (nie graczem), wlascicielem, ludzmi i nie rozwiazywana.</summary>
@@ -669,7 +892,7 @@ namespace Armoury
                     {
                         int c = tok.LastIndexOf(':'); if (c <= 0) continue;
                         int n; if (!int.TryParse(tok.Substring(c + 1), out n) || n <= 0) continue;
-                        ItemObject it = null; try { it = om.GetObject<ItemObject>(tok.Substring(0, c)); } catch { }
+                        var it = ResolveItem(om, tok.Substring(0, c));
                         if (it == null) { unknown += n; continue; }
                         if (AiGear.AddToArmory(g, it, n)) got += n;
                     }
@@ -713,6 +936,9 @@ namespace Armoury
             }
             Log.Info("Zbrojownie zalog (171): stary zapis bez zbrojowni zalog (" + why + ") - jednorazowy dorobek startowy (regula ColdStart, wzorce ich ludzi): " + garrisons + " zalog z " + seen
                      + ", " + pcs + " szt.; w tym zalogi gracza " + mine + ", " + minePcs + " szt. (sklad7: zaloga walczy tylko tym, co ma - bez dorobku bronilaby sie nago).");
+            // poprawki sklad7: swiadome rozszerzenie decyzji 7 (dorobek startowy) na trwajaca kampanie - Jeff ma to zobaczyc w grze, nie tylko w logu
+            if (mine > 0)
+                Log.Player("Your " + mine + " garrisons received the kit of their men once (" + minePcs + " pieces), like the stores of a new campaign - from now on a garrison fights only with what its stores hold.");
         }
 
         /// <summary>sklad7: zapis z DLL probnej K1c (ten sam klucz, format "osada,przedmiot,ile;") - te zbrojownie odtwarzamy jak v1 (zastepujac to, co dal DTE).</summary>
@@ -736,7 +962,7 @@ namespace Armoury
                         if (dict.TryGetValue(g.Id, out arm) && arm != null && arm.Count > 0) { foreach (var v in arm.Values) if (v > 0) replaced += v; arm.Clear(); }
                         garrisons++;
                     }
-                    ItemObject it = null; try { it = om.GetObject<ItemObject>(a[1]); } catch { }
+                    var it = ResolveItem(om, a[1]);
                     if (it == null) { unknown += n; continue; }
                     if (AiGear.AddToArmory(g, it, n)) pcs += n;
                 }
@@ -779,9 +1005,25 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Log.Error("GarrisonArmory.ApplyAll(Disband)", e); }
+            try
+            {
+                // poprawki sklad7: ekran druzyny gracza ("Manage garrison", "Donate troops") - komplety z ludzmi jak w sciezkach AI
+                if (!_screenHooked)
+                {
+                    _fInitial = AccessTools.Field(typeof(PartyScreenLogic), "_initialData");
+                    var m = AccessTools.Method(typeof(PartyScreenLogic), "DoneLogic", new[] { typeof(bool) });
+                    if (m != null && _fInitial != null)
+                    {
+                        h.Patch(m, prefix: new HarmonyMethod(typeof(GarrisonArmory), nameof(ScreenDonePrefix)), postfix: new HarmonyMethod(typeof(GarrisonArmory), nameof(ScreenDonePostfix)));
+                        _screenHooked = true;
+                    }
+                }
+            }
+            catch (Exception e) { Log.Error("GarrisonArmory.ApplyAll(Screen)", e); }
             try { _bkPatrolType = AccessTools.TypeByName("BannerKings.Components.GarrisonPartyComponent"); } catch { _bkPatrolType = null; }
             Log.Info("GarrisonArmory: komplet z ludzmi - zostawienie " + (_leaveHooked ? "wpiete" : "BRAK") + ", zabranie " + (_takeHooked ? "wpiete" : "BRAK")
-                     + ", rozwiazanie partii " + (_disbandHooked ? "wpiete" : "BRAK") + "; patrole BK: typ " + (_bkPatrolType != null ? "znaleziony" : "brak") + ".");
+                     + ", rozwiazanie partii " + (_disbandHooked ? "wpiete" : "BRAK") + ", ekran druzyny gracza (poprawki sklad7) " + (_screenHooked ? "wpiety" : "BRAK")
+                     + "; patrole BK: typ " + (_bkPatrolType != null ? "znaleziony" : "brak") + ".");
         }
     }
 }

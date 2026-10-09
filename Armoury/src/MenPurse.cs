@@ -453,8 +453,8 @@ namespace Armoury
                 var pieces = MenUpgrade.AiPieces(arm, type);
                 if (pieces.Count == 0) continue;
                 List<CharacterObject> troops; int[] men; SkillObject skill;
-                // K1 (przeglad): bron po SLOTACH WZORCA (jak AiGear.BuyGaps i MenUpgrade.Buckets) - dotad 1 bron na czlowieka, wiec
-                // druga bron oddzialu szla do kupca, a BuyGaps odkupowal ja tego samego dnia
+                // K1 (przeglad): bron po SLOTACH WZORCA (jak braki AiGear.Deficit i MenUpgrade.Buckets) - dotad 1 bron na czlowieka, wiec
+                // druga bron oddzialu szla do kupca, a zakupy brakow (dawniej K1 BuyGaps) odkupowaly ja tego samego dnia
                 QuartermasterLaw.MenOf(roster, type, pieces, out troops, out men, out skill, QuartermasterLaw.MenPerSlot, false);
                 var meets = QuartermasterLaw.MeetsOf(troops);
                 // K1 (Jeff 09.10 04:40, "to samo dla AI"): ludzie nosza najlepsze, co udzwigna (FitBest), a do kupca idzie najgorsze - dotad
@@ -510,9 +510,11 @@ namespace Armoury
         /// reszta do sakiewki zalogi (bez sakiewki - wszystko panu). roster - zaloga razem z ludzmi na patrolach BK. Zwraca sprzedane sztuki.</summary>
         internal static int SellGarrisonSurplus(MobileParty g, Settlement st, Hero lord, TroopRoster roster, out int gold)
         {
+            // poprawki sklad7: bez wlasnego catch - wyjatek idzie do GarrisonArmory.SellWeek (Stumble: jedna linia bledu na dobe, reszta w liczniku
+            // potkniec); dotad Log.Error przy kazdej zalodze, do ok. 32 linii na dobe przy bledzie systematycznym
             gold = 0;
-            try { Day(); return SellArmorySurplus(g, st, lord, true, roster, out gold); }
-            catch (Exception e) { Log.Error("MenPurse.SellGarrisonSurplus", e); return 0; }
+            Day();
+            return SellArmorySurplus(g, st, lord, true, roster, out gold);
         }
 
         /// <summary>K1 (A11): doba zalogi - zaloga bez ludzi oddaje sakiewke do kasy osady. sklad7: nadwyzki zalog sprzedaje raz w tygodniu

@@ -608,7 +608,7 @@ namespace Armoury
         [SettingPropertyGroup("The finished piece")]
         public bool GarrisonArmoryInBattle { get; set; } = true;
 
-        [SettingPropertyBool("Garrison Fights With Armory Only", HintText = "a garrison in your battles fights only with what its stores hold, however little: a man with no piece for a slot fights without it - no free template kit and no emergency kit (off: below the fill threshold it fights in its full template)")]
+        [SettingPropertyBool("Garrison Fights With Armory Only", HintText = "a garrison in your battles fights only with what its stores hold, however little: a man with no piece for a slot fights without it - no free template kit and no emergency kit (off: below the fill threshold it fights in its full template; the threshold also applies while Ai Buys Gear or Garrison Armory Survives Save is off, because then the stores do not last)")]
         [SettingPropertyGroup("The finished piece")]
         public bool GarrisonFightsWithArmoryOnly { get; set; } = true;
 
@@ -618,7 +618,7 @@ namespace Armoury
 
         [SettingPropertyBool("Lord Battle Kit Is Lent", HintText = "in your battles Dynamic Troop Equipment fills an AI lord's soldier's empty slots with his template kit out of thin air: that kit is only lent for the battle and no longer goes into the lord's stores afterwards (nor into your spoils from them); the men still fight with it (off: as before, it stays in the lord's stores)")]
         [SettingPropertyGroup("The finished piece")]
-        public bool LordBattleKitIsLent { get; set; } = true;
+        public bool LordBattleKitIsLent { get; set; } = false;
 
         [SettingPropertyBool("Ai Wear Enabled", HintText = "AI lords' kit wears too: battle wear on pieces in use, loot comes in battered, town smiths mend it day by day from the men's purse")]
         [SettingPropertyGroup("The finished piece")]
@@ -2936,15 +2936,15 @@ namespace Armoury
         [SettingPropertyGroup("Arming the garrisons")]
         public bool GarrisonArmorySurvivesSave { get; set; } = true;
 
-        [SettingPropertyBool("Garrison Armory Restore Old Save", HintText = "the first time a save made before this change is loaded, every garrison (yours too) gets the kit of its men that Dynamic Troop Equipment failed to save - once, like the stores of a new campaign; a garrison fights only with what its stores hold, so without this it would face the first assault bare (off = they stand empty and buy it all again)")]
+        [SettingPropertyBool("Garrison Armory Restore Old Save", HintText = "the first time a save made before this change is loaded, every garrison (yours too) gets its men's kit once, like the stores of a new campaign (Dynamic Troop Equipment never saved garrison stores, and your garrisons never bought any); a garrison fights only with what its stores hold, so without this it would face the first assault bare (off = they stand empty and buy it all again)")]
         [SettingPropertyGroup("Arming the garrisons")]
         public bool GarrisonArmoryRestoreOldSave { get; set; } = true;
 
-        [SettingPropertyBool("Kit Moves With Men", HintText = "when a lord leaves men in a garrison or takes men from it, or a disbanded party joins a garrison, the men's arms go with them; men of a disbanded party who go home take their own kit and the spare is sold for their house (off = as before: men move without their arms)")]
+        [SettingPropertyBool("Kit Moves With Men", HintText = "when a lord leaves men in a garrison or takes men from it, when you move men between your party and a garrison on the party screen, or a disbanded party joins a garrison, the men's arms go with them (from your stores only the men's own kit - never yours, horses stay with the stables); men of a disbanded party who go home take their own kit and the spare is sold for their house (off = as before: men move without their arms)")]
         [SettingPropertyGroup("Arming the garrisons")]
         public bool KitMovesWithMen { get; set; } = true;
 
-        [SettingPropertyBool("Garrison Sells Surplus", HintText = "once a week a garrison sells the arms it holds beyond what its men can use and wear (and a tenth spare; men out on patrol count) to the stall of its own town or castle, at the merchant's buying price; a third of the coin goes to the lord of the place, the rest to the garrison's purse (without garrison purses all of it to the lord); your garrisons too when they keep a purse")]
+        [SettingPropertyBool("Garrison Sells Surplus", HintText = "once a week a garrison sells the arms it holds beyond what its men can use and wear (and a tenth spare; men out on patrol count) to the stall of its own town or castle, at the merchant's buying price; a third of the coin goes to the lord of the place, the rest to the garrison's purse (without garrison purses all of it to the lord); your garrisons too when they keep a purse or with Garrison Buys Gear Player")]
         [SettingPropertyGroup("Arming the garrisons")]
         public bool GarrisonSellsSurplus { get; set; } = true;
 

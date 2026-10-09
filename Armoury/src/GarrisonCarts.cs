@@ -21,7 +21,7 @@ namespace Armoury
     /// W drodze: zamek oblezony albo bez zalogi - czeka; zamek padl (wojna z rodem placacym) albo rod wymarl, a zamek zmienil strone - zawraca
     /// (towar na polke miasta-zrodla, zwrot zaplaty z kasy miasta, nie wiecej niz kasa); po 30 dobach - zawraca jak woz wsi (MarketCarts).
     /// sklad7 (scalenie K1): JEDYNA droga towaru z miasta do zamku - placi najpierw sakiewka zalogi (K1 A6), potem pan; zwrot czesci z sakiewki wraca do
-    /// sakiewki (zamek dalej nasz); dozbrajanie za swoje (MenUpgrade) jedzie tym samym wozem (linie UpgradeBucket, poza "towarem w drodze" brakow);
+    /// sakiewki (zamek dalej nasz; poprawki sklad7: zamek stracony albo bez zalogi - do kasy zamku, jak sakiewka pustej zalogi); dozbrajanie za swoje (MenUpgrade) jedzie tym samym wozem (linie UpgradeBucket, poza "towarem w drodze" brakow);
     /// sztuka, ktorej DTE nie przyjmie do zbrojowni, zostaje na polce zamku. K1 A4 (zakup w miescie "od razu, wozem pana bez kosztu") usuniete.
     /// </summary>
     internal static class GarrisonCarts
@@ -47,7 +47,7 @@ namespace Armoury
         private static int _dArrived, _dArrivedPieces, _dArrivedDays, _dWaitSiege, _dWaitNoGarrison;
         private static int _dBack, _dBackPieces, _dRefund, _dBackHostile, _dBackForeign, _dBack30, _dBackNoRefund, _dBackPeace;
         private static int _dNoTown, _dNoRoad, _dTooFar, _dSiegeWar, _dPause, _dUnmet, _stumbles, _errDay = -1;
-        private static int _dRefusedPcs, _dUpOrders, _dUpPieces, _dUpGold, _dPurseGold, _dPurseRefund;   // sklad7: DTE nie przyjal przy dostawie; dozbrajanie (K1) wozem; sakiewki zalog
+        private static int _dRefusedPcs, _dUpOrders, _dUpPieces, _dUpGold, _dPurseGold, _dPurseRefund, _dPurseToCastle;   // sklad7: DTE nie przyjal przy dostawie; dozbrajanie (K1) wozem; sakiewki zalog
         internal const int UpgradeBucket = -1;   // sklad7: linie dozbrajania (lepsza sztuka za swoje, MenUpgrade) - poza "towarem w drodze" brakow (C5)
         private static readonly HashSet<Settlement> _dTowns = new HashSet<Settlement>();
         private static readonly HashSet<string> _errWhere = new HashSet<string>();
@@ -64,7 +64,7 @@ namespace Armoury
             _dArrived = _dArrivedPieces = _dArrivedDays = _dWaitSiege = _dWaitNoGarrison = 0;
             _dBack = _dBackPieces = _dRefund = _dBackHostile = _dBackForeign = _dBack30 = _dBackNoRefund = _dBackPeace = 0;
             _dNoTown = _dNoRoad = _dTooFar = _dSiegeWar = _dPause = _dUnmet = 0;
-            _dRefusedPcs = _dUpOrders = _dUpPieces = _dUpGold = _dPurseGold = _dPurseRefund = 0;
+            _dRefusedPcs = _dUpOrders = _dUpPieces = _dUpGold = _dPurseGold = _dPurseRefund = _dPurseToCastle = 0;
             _dTowns.Clear();
         }
 
@@ -250,18 +250,23 @@ namespace Armoury
             if (!refund) return;
             var leader = o.PayerClan != null && !o.PayerClan.IsEliminated ? o.PayerClan.Leader : null;
             if (leader != null && !leader.IsAlive) leader = null;
-            // sklad7 (K1): czesc z sakiewki zalogi wraca do sakiewki zalogi - tylko gdy zamek jest dalej w rekach strony, ktora zamawiala (ludzie ci sami);
-            // zamek stracony - ludzi zalogi juz tam nie ma, zwrot dostaje pan (jak cala zaplata w 171)
+            // sklad7 (K1): czesc z sakiewki zalogi wraca do sakiewki zalogi - tylko gdy zamek jest dalej w rekach strony, ktora zamawiala (ludzie ci sami).
+            // Poprawki sklad7 (jedna regula dla zlota ludzi, ktorych juz nie ma): zamek stracony albo bez zalogi - czesc sakiewki idzie do KASY ZAMKU, tak jak
+            // sakiewka pustej zalogi (MenPurse.GarrisonDay); kto wzial zamek, ma jego kase (jak lup sakiewki rozbitej partii u zwyciezcy). Dotad dostawal ja pan.
+            // Czesc pana - panu, jak dotad.
             var g = o.Castle != null && o.Castle.Town != null ? o.Castle.Town.GarrisonParty : null;
+            var castleTown = o.Castle != null ? o.Castle.Town : null;
             bool toPurse = o.PursePaid > 0 && g != null && o.Castle.MapFaction == o.FactionAtOrder;
-            if ((leader == null && !toPurse) || o.Market == null || o.Market.Town == null) { _dBackNoRefund++; return; }
+            bool toCastle = o.PursePaid > 0 && !toPurse && castleTown != null;
+            if ((leader == null && !toPurse && !toCastle) || o.Market == null || o.Market.Town == null) { _dBackNoRefund++; return; }
             int r = Math.Min(o.Paid, Math.Max(0, o.Market.Town.Gold));
             if (r <= 0) return;
-            int rp = toPurse ? Math.Min(r, o.PursePaid) : 0, rl = r - rp;
+            int rp = (toPurse || toCastle) ? Math.Min(r, o.PursePaid) : 0, rl = r - rp;
             if (leader == null) rl = 0;   // bez pana - tylko czesc sakiewki (reszta zostaje w kasie miasta, jak przy wymarlym rodzie)
             if (rp + rl <= 0) return;
             o.Market.Town.ChangeGold(-(rp + rl));
-            if (rp > 0) { MenPurse.Add(g, rp); _dPurseRefund += rp; }
+            if (rp > 0 && toPurse) { MenPurse.Add(g, rp); _dPurseRefund += rp; }
+            else if (rp > 0) { castleTown.ChangeGold(rp); MoneyLedger.Note(MoneyLedger.NGear, o.Castle, rp); _dPurseToCastle += rp; }
             if (rl > 0) leader.ChangeHeroGold(rl);
             MoneyLedger.Note(MoneyLedger.NGear, o.Market, -(rp + rl));
             _dRefund += rp + rl;
@@ -286,8 +291,8 @@ namespace Armoury
               .Append(", za daleko ").Append(_dTooFar).Append(", przerwa (co ").Append(Math.Max(1, Settings.Current.GarrisonOrderDays)).Append(" doby) ").Append(_dPause)
               .Append("; brak towaru w miescie: ").Append(_dUnmet).Append(" koszykow (zamowienia dla warsztatow)")
               .Append("; sklad7: dozbrajanie wozem (lepsze za swoje) ").Append(_dUpOrders).Append(" zamowien, ").Append(_dUpPieces).Append(" szt. za ").Append(_dUpGold)
-              .Append(" zl; z sakiewek zalog ").Append(_dPurseGold).Append(" zl (zwrot do sakiewek ").Append(_dPurseRefund).Append("); DTE nie przyjal przy dostawie - na polke zamku ")
-              .Append(_dRefusedPcs).Append(" szt.; potkniecia ").Append(_stumbles).Append('.');
+              .Append(" zl; z sakiewek zalog ").Append(_dPurseGold).Append(" zl (zwrot do sakiewek ").Append(_dPurseRefund).Append(", zamek stracony albo bez zalogi - do kasy zamku ").Append(_dPurseToCastle).Append("); DTE nie przyjal przy dostawie - na polke zamku ")
+              .Append(_dRefusedPcs).Append(" szt. (poprawki sklad7: przed zakupem pomijane - zbior 'DTE nie przyjmie' ").Append(AiGear.DteRefusedIds).Append(" id; kilka dob z rzedu > 0 = petla)").Append("; potkniecia ").Append(_stumbles).Append('.');
             Log.Info(sb.ToString());
             ClearDay(); _stumbles = 0;
         }

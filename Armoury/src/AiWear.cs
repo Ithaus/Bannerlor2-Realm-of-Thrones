@@ -190,6 +190,44 @@ namespace Armoury
             Known(from, it, -n);
         }
 
+        /// <summary>
+        /// Poprawki sklad7 (ekran druzyny gracza): n sztuk przedmiotu wychodzi ze zbrojowni AI (zaloga) do zbrojowni druzyny gracza, ktora trzyma stan
+        /// w modyfikatorze sztuki. Ten sam udzial obitych co MoveWorn (proporcjonalnie, nie mniej niz trzeba, nie wiecej niz n) - zdjety z zapisu dawcy
+        /// i zwrocony (stan, ile); reszta sztuk jest sprawna. Wolac PRZED zdjeciem sztuk ze slownika dawcy (countBefore = ile mial).
+        /// </summary>
+        internal static List<KeyValuePair<ItemModifier, int>> TakeWornShare(MobileParty from, ItemObject it, int n, int countBefore, bool sync = true)
+        {
+            var list = new List<KeyValuePair<ItemModifier, int>>();
+            if (!On || from == null || it == null || n <= 0) return list;
+            if (sync) Sync(from);
+            if (!ArmouryBehavior.NoWear(it) && !MenPurse.HorseKind(it))
+            {
+                string pf = from.StringId, id = it.StringId;
+                int w = WornOf(pf, id);
+                if (w > 0)
+                {
+                    int c = Math.Max(1, countBefore);
+                    int k = (int)Math.Round(w * (double)n / c);
+                    k = Math.Max(k, w - Math.Max(0, countBefore - n));
+                    k = Math.Min(k, Math.Min(w, n));
+                    Dictionary<string, Dictionary<string, int>> byItem; Dictionary<string, int> byMod;
+                    if (k > 0 && _worn.TryGetValue(pf, out byItem) && byItem.TryGetValue(id, out byMod))
+                        foreach (var m in byMod.Keys.ToList())
+                        {
+                            if (k <= 0) break;
+                            int t = Math.Min(k, byMod[m]);
+                            if (t <= 0) continue;
+                            AddWorn(pf, id, m, -t);
+                            var mod = Mod(m);
+                            if (mod != null) list.Add(new KeyValuePair<ItemModifier, int>(mod, t));   // nieznany stan - sztuka idzie jako sprawna
+                            k -= t;
+                        }
+                }
+            }
+            Known(from, it, -n);
+            return list;
+        }
+
         /// <summary>AiGear dolozyl kupione sztuki - sprawne, spis od razu.</summary>
         internal static void NoteSound(MobileParty mp, ItemObject it, int n)
         {

@@ -23,7 +23,7 @@ namespace Armoury
     ///    a wiec popytu na sprzet; jedyny hamulec, ktory bez tworzenia czegokolwiek z niczego dopasowuje tempo awansow do ilosci broni w swiecie.
     /// Latki modeli zakladane w kampanii (OnSessionLaunched, raz na klase - flagi na caly proces): BK BKPartyTrainningModel czyta statyczne
     /// singletony BK, a Harmony kompiluje metode juz przy zakladaniu latki (pulapka z SoldierPay/MountedWage). Licznik zagniezdzenia: NavalDLC
-    /// tylko przekazuje do modelu BK - liczymy raz, na zewnatrz. Gracz, jego rod i Inni - bez zmian (zalogi gracza tylko przy GarrisonBuysGearPlayer).
+    /// tylko przekazuje do modelu BK - liczymy raz, na zewnatrz. Gracz, jego rod i Inni - bez zmian (zalogi gracza: GarrisonArmory.InSystem - sakiewka albo GarrisonBuysGearPlayer).
     /// Linia "Pokrycie zbrojowni AI (171)" - pelny przeglad raz na 5 dob (krytyka 17), tylko log.
     /// Recenzja kodu 171: udzial uzbrojonych liczony wedlug SZCZEBLA broni (sztuka typu glownej broni o tierze >= t-1, jak AiGear.Deficit), dla partii na oddzial
     /// (element rosteru); cwiczenia wedlug broni tylko przy zakupach AI (AiGear.On, zaloga - takze GarrisonBuysGear); "Pokrycie" - takze strzaly, belty i przedmioty t3+.
@@ -185,7 +185,7 @@ namespace Armoury
         }
 
         /// <summary>
-        /// Kto cwiczy wedlug broni: zaloga - nie Innych, nie gracza (chyba ze GarrisonBuysGearPlayer); partia - rod AI (nie gracz, nie Inni). Recenzja 171: tylko gdy
+        /// Kto cwiczy wedlug broni: zaloga - nie Innych, zaloga gracza tylko w systemie (GarrisonArmory.InSystem: sakiewka albo GarrisonBuysGearPlayer); partia - rod AI (nie gracz, nie Inni). Recenzja 171: tylko gdy
         /// AI kupuje bron (AiGear.On; zaloga - takze GarrisonBuysGear) - bez zakupow zbrojownie zalog kasuje co dobe DTE, a zalogi nie maja skad uzupelnic broni,
         /// wiec "cwiczenia wlasna bronia" zatrzymalyby szkolenie wszystkich zalog AI.
         /// </summary>
@@ -421,8 +421,8 @@ namespace Armoury
             if (AiGear.Armories() == null) return;
             var sw = Stopwatch.StartNew();
             var s = Settings.Current;
-            var lords = new Cov(); var gar = new Cov();
-            int castles = 0, castlesLow = 0;
+            var lords = new Cov(); var gar = new Cov(); var mine = new Cov();
+            int castles = 0, castlesLow = 0, mineN = 0;
             foreach (var mp in MobileParty.AllLordParties)
             {
                 try
@@ -438,7 +438,14 @@ namespace Armoury
                 {
                     if (st == null || !st.IsFortification || st.Town == null || st.Town.GarrisonParty == null) continue;
                     var g = st.Town.GarrisonParty;
-                    if ((st.OwnerClan == Clan.PlayerClan && !s.GarrisonBuysGearPlayer) || Undead.Party(g) || g.MemberRoster == null) continue;
+                    if (Undead.Party(g) || g.MemberRoster == null) continue;
+                    // poprawki sklad7: suma "zalogi AI" swiadomie wedlug reguly 171 (zalogi gracza tylko przy GarrisonBuysGearPlayer) - porownanie z baza 171;
+                    // zalogi gracza w systemie przez sama sakiewke (GarrisonArmory.InSystem) - osobno, poza suma
+                    if (st.OwnerClan == Clan.PlayerClan && !s.GarrisonBuysGearPlayer)
+                    {
+                        if (GarrisonArmory.InSystem(st)) { mine.Add(g); mineN++; }
+                        continue;
+                    }
                     gar.Add(g);
                     if (st.IsCastle) { castles++; if (ArmedShare(g) < 0.5f) castlesLow++; }
                 }
@@ -447,7 +454,9 @@ namespace Armoury
             sw.Stop();
             Log.Info("Pokrycie zbrojowni AI (171): dzien " + today + " - " + lords.Text("partie rodow AI") + "; " + gar.Text("zalogi AI") + "; zamki z pokryciem glownej broni < 50%: "
                      + castlesLow + " z " + castles + "; brakuje razem " + (lords.LackAll + gar.LackAll) + " szt. (korpus " + (lords.LackBody + gar.LackBody) + ", bron "
-                     + (lords.LackWeapon + gar.LackWeapon) + "); w drodze do zamkow " + GarrisonCarts.InTransitPieces() + " szt.; czas przegladu " + sw.ElapsedMilliseconds + " ms.");
+                     + (lords.LackWeapon + gar.LackWeapon) + "); w drodze do zamkow " + GarrisonCarts.InTransitPieces() + " szt."
+                     + (mineN > 0 ? "; osobno, poza suma (regula 171 dla porownania z baza): " + mine.Text("zalogi gracza w systemie przez sakiewke (" + mineN + ")") : "")
+                     + "; czas przegladu " + sw.ElapsedMilliseconds + " ms.");
         }
     }
 }
