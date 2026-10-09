@@ -2268,7 +2268,7 @@ namespace Armoury
         [SettingPropertyGroup("Iron bank")]
         public int IronBankLogPerDay { get; set; } = 15;
 
-        [SettingPropertyBool("Iron Bank Family Pays", HintText = "AI houses only: before the Iron Bank marks an instalment as missed or lends anew, the grown members of the house hand their head what is lacking - only what each holds above 5000 gold or ten days of his own party's wages, whichever is more")]
+        [SettingPropertyBool("Iron Bank Family Pays", HintText = "AI houses only: before the Iron Bank marks an instalment as missed or lends anew, the grown members of the house hand their head what is lacking - only what each holds above 5000 gold or Iron Bank Wage Days (default 10) of his own party's wages, whichever is more")]
         [SettingPropertyGroup("Iron bank")]
         public bool IronBankFamilyPays { get; set; } = true;
 

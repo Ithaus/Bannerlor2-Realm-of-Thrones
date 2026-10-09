@@ -633,7 +633,7 @@ namespace Armoury
         public float IronBankRateAfterDefault = 15f;       // extra yearly interest for a house that has defaulted before (percentage points)
         public float IronBankPlayerDefaultRenown = 100f;   // renown you lose when the Bank writes your name among those who did not pay
         public int IronBankLogPerDay = 15;                 // how many loans and repayments are written to the log each day (the daily total always is)
-        public bool IronBankFamilyPays = true;             // AI houses only: before the Iron Bank marks an instalment as missed or lends anew, the grown members of the house hand their head what is lacking - only what each holds above 5000 gold or ten days of his own party's wages, whichever is more
+        public bool IronBankFamilyPays = true;             // AI houses only: before the Iron Bank marks an instalment as missed or lends anew, the grown members of the house hand their head what is lacking - only what each holds above 5000 gold or Iron Bank Wage Days (default 10) of his own party's wages, whichever is more
 
         // --- The soldier's pay ---
         public bool SoldierPayToPurse = true;              // the wages a party is actually paid no longer vanish: they go to the purse of its men, who spend them in the towns (mending, missing kit, food and drink) - your own men too; needs Men Purse Enabled
