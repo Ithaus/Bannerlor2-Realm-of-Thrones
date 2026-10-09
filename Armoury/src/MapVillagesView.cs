@@ -1352,6 +1352,7 @@ namespace Armoury
         private const int FxNone = 0, FxSmoke = 1, FxFire = 2;
         private const string FireFx = "psys_fire_smoke_env_point";        // ogien + dym rabowanej wsi gry (SettlementVisual.cs:416)
         private const string SmokeFx = "map_icon_village_plunder_fx";     // dym nad zlupiona wsia (SettlementVisual.cs:427)
+        private const float MillLandBack = 0.5f;      // T7: mlyn przy rzece - obrazek o tyle jedn. mapy ku ladowi (ok. 1/3 szerokosci mlyna)
 
         private sealed class PlanNode
         {
@@ -1414,6 +1415,10 @@ namespace Armoury
             public Template T;
             public bool TemplateTried;
             public Kit[] Kits;                // v4: wzor obrazka na (okreg, model) - wspolny dla wszystkich wiosek okregu z tym modelem
+            public Clan TipClan;              // T7 (W-2): pan, dla ktorego policzono TipText (nowy pan = nowy tekst)
+            public Settlement TipSeat;        // T7 poprawka: siedziba z TipText (nowa siedziba rodu = nowy tekst)
+            public TextObject TipName;        // T7 poprawka: nazwa rodu z TipText (Clan.ChangeClanName = nowy tekst)
+            public string TipText;            // T7 (W-2): linia pana w dymku
         }
 
         private sealed class Slot
@@ -1528,6 +1533,8 @@ namespace Armoury
                     _shoreRiver, _shoreSea, _noWaterMill, _noWaterFish, _wheelWater, _wheelDry, _wheelCam, _wheelTouch, _millNoWheel,
                     _boatsWater, _boatsBeach, _pierShore, _diagWater, _fanOn, _fanOff, _attachMiss,
                     _landNear, _shiftNear;   // recenzja: przeniesione na lad blizej sasiada (brak ladu z odstepem); przesuniecie ku wodzie / ze stoku skrocone przez sasiada
+        private int _millBodyWet, _millBodyCorners, _millBodyChecked;   // T7: budynek mlyna nad woda (rog BB pod poziomem wody), rogow pod woda, sprawdzonych mlynow
+        private int _millBodyTurned, _wheelNear, _shiftBack;   // T7 poprawka: w tym obroconych (6b), kolo do 0.6 jedn. od wody, przesuniecia obrazka ku ladowi
         private float _corrMin = float.MaxValue, _corrMax = float.MinValue, _corrSum, _shiftSum, _shiftMax;
         private readonly HashSet<string> _hLogged = new HashSet<string>(StringComparer.Ordinal);   // domy wzoru z korekta wysokosci juz w wioski.log
         private readonly HashSet<string> _meshLogged = new HashSet<string>(StringComparer.Ordinal);   // siatki obrazkow juz opisane w wioski.log
@@ -1595,6 +1602,7 @@ namespace Armoury
 
         private void Load(System.Diagnostics.Stopwatch sw)
         {
+            _stHeld = 0;   // T7 poprawka: pole statyczne - potkniecia linii pana liczone od nowa dla kazdej mapy / wczytania
             string path = DataPath();
             if (path == null || !System.IO.File.Exists(path))
             {
@@ -1677,6 +1685,7 @@ namespace Armoury
                      + "; drzewa encji w wioski.log: " + (_diagOn ? "tak (autotest)" : "nie (tylko w autotescie)")
                      + "; czas " + sw.ElapsedMilliseconds + " ms. Obrazki powstaja przy kamerze (z <= "
                      + Settings.Current.MapVillagesHideAboveCameraHeight.ToString("0", CultureInfo.InvariantCulture) + "), nic nie idzie do zapisu gry.");
+            LogHeldSamples();   // T7 (W-2): przyklady linii pana do sprawdzenia w autotescie
         }
 
         private static int _autotest = -1;   // -1 nie sprawdzone, 0 nie, 1 tak
@@ -1821,9 +1830,12 @@ namespace Armoury
               .Append(", przesuniecia skrocone przez sasiada ").Append(_shiftNear)
               .Append("; woda (mlyn / rybacy): brzeg rzeki / jeziora ").Append(_shoreRiver).Append(", morza ").Append(_shoreSea)
               .Append(", brak wody w ").Append(F2(MapVillageData.ShoreMaxR)).Append(" jedn.: mlyn->wiatrak ").Append(_noWaterMill).Append(", rybacy->wioska ").Append(_noWaterFish)
-              .Append("; przesuniecie obrazka ku wodzie srednio ").Append(F2(_shoreRiver + _shoreSea > 0 ? _shiftSum / (_shoreRiver + _shoreSea) : 0f)).Append(" (najwiecej ").Append(F2(_shiftMax)).Append(')')
+              .Append("; przesuniecie obrazka ku wodzie srednio ").Append(F2(_shoreRiver + _shoreSea > 0 ? _shiftSum / (_shoreRiver + _shoreSea) : 0f)).Append(" (najwiecej ").Append(F2(_shiftMax)).Append(", w tym ku ladowi ").Append(_shiftBack).Append(')')
               .Append("; kolo mlyna nad woda ").Append(_wheelWater).Append(", nad ladem ").Append(_wheelDry).Append(" (dotyka wody ").Append(_wheelTouch)
-              .Append(", od strony kamery ").Append(_wheelCam).Append("), mlyn bez kola ").Append(_millNoWheel)
+              .Append(", od strony kamery ").Append(_wheelCam).Append(", do 0.6 jedn. od wody ").Append(_wheelNear).Append("), mlyn bez kola ").Append(_millNoWheel)
+              .Append(", budynek mlyna nad woda ").Append(_millBodyWet).Append(" z ").Append(_millBodyChecked).Append(" (rogow pod woda ").Append(_millBodyCorners)
+              .Append(", w tym obroconych ").Append(_millBodyTurned)
+              .Append("; mlyn na brzegu T7 ").Append(Settings.Current.MillOnBank ? "CZYNNY" : "wylaczony").Append(')')
               .Append("; pomost od brzegu ").Append(_pierShore).Append(", lodzie na wodzie ").Append(_boatsWater).Append(", na brzegu ").Append(_boatsBeach)
               .Append("; wiatraki ze skrzydlami ").Append(_fanOn).Append(", bez skrzydel ").Append(_fanOff).Append("; brak siatek doczepionych ").Append(_attachMiss);
             double ms = _createdTotal > 0 ? _createTicks * 1000.0 / System.Diagnostics.Stopwatch.Frequency / _createdTotal : 0;
@@ -1834,7 +1846,7 @@ namespace Armoury
               .Append(" (teraz ").Append(smokeNow).Append(')');
             sb.Append("; potkniecia: tworzenie ").Append(_stCreate).Append(", wzor ").Append(_stTemplate).Append(", ogien ").Append(_stFx)
               .Append(", widocznosc ").Append(_stVis).Append(", dymek ").Append(_stHover).Append(", zdejmowanie ").Append(_stRemove)
-              .Append(", tick ").Append(_stTick).Append(", diagnostyka ").Append(_stDiag).Append('.');
+              .Append(", tick ").Append(_stTick).Append(", diagnostyka ").Append(_stDiag).Append(", pan w dymku ").Append(_stHeld).Append('.');
             return sb.ToString();
         }
 
@@ -2156,6 +2168,9 @@ namespace Armoury
                 {
                     float ay = AnchorY(k.Pieces[vis[ja]], ja, py, cy0, ryj, ady);
                     float want = shore.Edge + AnchorOutW(k, k.Pieces[vis[ja]], ja, shore.Sea, ryj, g) - ay * g.Sy;
+                    // T7 (MillOnBank): mlyn przy rzece - caly obrazek pol jedn. ku ladowi (brzeg rzeki z wachlarza jest niedokladny, budynek
+                    // wchodzil w koryto); PlaceAtWater stawia potem mlyn tez MillLandBack za brzegiem swojej linii (mlyn zostaje przy domach)
+                    if (!shore.Sea && k.Model == MapVillageData.ModelMill && Settings.Current.MillOnBank) want -= MillLandBack;
                     shift = Clamp(want, -MapVillageData.ShoreMaxBack, MapVillageData.ShoreMaxShift);
                     // srodek obrazka zostaje na ladzie (kotwica jest przed srodkiem; gdy nie - mniejsze przesuniecie); recenzja: i nie blizej
                     // innej wioski niz NeighborMinDist (przesuniecie do 3.5 jedn. stawialo mlyn przy sasiedzie) - wtedy tez mniejsze przesuniecie,
@@ -2177,6 +2192,7 @@ namespace Armoury
                 if (shore.Sea) _shoreSea++; else _shoreRiver++;
                 _shiftSum += Math.Abs(shift);
                 if (Math.Abs(shift) > _shiftMax) _shiftMax = Math.Abs(shift);
+                if (shift < -0.01f) _shiftBack++;   // T7 poprawka: przesuniecia ku ladowi (glownie mlyn przy rzece z MillOnBank) - osobno w podsumowaniu
             }
             // 5. stok / brzeg (wyglad 2) - przesuniecia srodka tylko na lad
             Settle(s, k, g, vis, px, py, alive, minKeep);
@@ -2187,6 +2203,7 @@ namespace Armoury
             // 6b. mlyn z woda na polnoc (kamera mapy patrzy na polnoc - kolo za mlynem): mlyn obrocony o 50 st. wokol kola (kolo zostaje nad
             // woda), budynek w strone ladu na wschod albo zachod - kolo widac obok mlyna, nie za nim
             float millTurn = 0f;
+            float millRx = ja >= 0 ? rxj[ja] : 0f, millRy = ja >= 0 ? ryj[ja] : 0f;   // T7 poprawka: polboki budynku sprzed obrotu 6b (licznik rogow)
             if (water && ja >= 0 && alive[ja] && k.Pieces[vis[ja]].Ground == MapVillageData.GroundLand && k.WheelR > 0f && shore.Dy > 0.35f)
                 millTurn = TurnMill(s, g, ja, px, py, rot, cx0, cy0, rxj, ryj, adx, ady, wz[ja]);
             // 7. wiatrak: skrzydla (lokalne -Y wiatraka) od strony kamery mapy (swiat -Y), +-25 st. z ziarna wioski; srodek BB zostaje
@@ -2294,7 +2311,7 @@ namespace Armoury
                 frames[j] = f;
             }
             if (kept <= 0) throw new InvalidOperationException("brak elementow obrazka po terenie");
-            if (water) WaterNote(s, k, g, vis, px, py, alive, cx0, cy0, ryj, wz, orgW, shore, ja, shift, boatsW, boatsB, notes, adx, ady, millTurn);
+            if (water) WaterNote(s, k, g, vis, px, py, alive, cx0, cy0, ryj, wz, orgW, shore, ja, shift, boatsW, boatsB, notes, adx, ady, millTurn, millRx, millRy);
             else if (notes.Length > 0 && _diagLand < 15)
             {
                 _diagLand++;
@@ -2513,11 +2530,14 @@ namespace Armoury
         }
 
         /// <summary>O ile kotwica staje za brzegiem wody (jedn. mapy, + w wode): mlyn - 0.6 polgrubosci kola (kolo nad woda; bez kola przod 0.05
-        /// przed brzegiem); pomost - ladowy koniec 0.05 na ladzie (morze) albo pol pomostu na ladzie (rzeka); lodz - cala na wodzie (+0.05).</summary>
+        /// przed brzegiem), przy rzece z MillOnBank (T7) srodek kola na samym brzegu (0) - odsuniecie ku ladowi MillLandBack osobno w Create
+        /// krok 4 i PlaceAtWater; pomost - ladowy koniec 0.05 na ladzie (morze) albo pol pomostu na ladzie (rzeka); lodz - cala na wodzie (+0.05).</summary>
         private static float AnchorOutW(Kit k, Piece p, int j, bool sea, float[] ryj, Geo g)
         {
             float sy = Math.Max(0.05f, g.Sy);
-            if (p.Ground == MapVillageData.GroundLand) return k.WheelR > 0f ? k.AnchorOut * sy : -0.05f;
+            // T7 (MillOnBank): przy rzece srodek kola na samym brzegu (0.0 zamiast 0.6 polgrubosci kola za brzegiem); morze / ujscie - jak dotad;
+            // pole AnchorOut zostaje (wylacznik)
+            if (p.Ground == MapVillageData.GroundLand) return k.WheelR > 0f ? (Settings.Current.MillOnBank && !sea ? 0f : k.AnchorOut * sy) : -0.05f;
             if (p.Ground == MapVillageData.GroundEnd) return sea ? -0.05f : -ryj[j] * sy;
             return 0.05f;
         }
@@ -2553,6 +2573,10 @@ namespace Armoury
                     edge = back + wa;
                 }
                 float d = (edge + AnchorOutW(k, p, j, shore.Sea, ryj, g) - back) / sy;
+                // T7 poprawka (recenzja): mlyn przy rzece - sam mlyn (kotwica = srodek kola, kolo jest jego czescia) tez MillLandBack ku ladowi;
+                // bez tego PlaceAtWater wracal mlyn na brzeg i 0.5 z kroku 4 odsuwalo tylko domy od mlyna
+                if (j == ja && !shore.Sea && k.Model == MapVillageData.ModelMill && p.Ground == MapVillageData.GroundLand && Settings.Current.MillOnBank)
+                    d -= MillLandBack / sy;
                 float lim = 1.0f / sy;
                 if (d > lim) d = lim;
                 if (d < -lim) d = -lim;
@@ -2624,7 +2648,8 @@ namespace Armoury
         /// <summary>Mlyn / rybacy - do wioski.log (15 pierwszych): brzeg wody, obrot i przesuniecie obrazka, kolo mlyna (siatka, gdzie stoi, nad
         /// woda / ladem, czy dotyka wody, od strony kamery), pomost i lodzie; liczniki kola w podsumowaniu.</summary>
         private void WaterNote(Slot s, Kit k, Geo g, List<int> vis, float[] px, float[] py, bool[] alive, float[] cx0, float[] cy0, float[] ryj, float[] wz,
-            float[] orgW, MapVillageData.ShoreHit shore, int ja, float shift, int boatsW, int boatsB, StringBuilder notes, float[] adx, float[] ady, float millTurn)
+            float[] orgW, MapVillageData.ShoreHit shore, int ja, float shift, int boatsW, int boatsB, StringBuilder notes, float[] adx, float[] ady, float millTurn,
+            float millRx, float millRy)
         {
             double az = Math.Atan2(shore.Dx, shore.Dy) * 180.0 / Math.PI;
             if (az < 0) az += 360.0;
@@ -2638,6 +2663,37 @@ namespace Armoury
               .Append("; obrazek frontem do wody, przesuniety ku wodzie o ").Append(F2(shift)).Append(notes);
             if (k.Model == MapVillageData.ModelMill)
             {
+                // T7: budynek mlyna nad woda - grunt w 4 rogach BB (0.8 polboku, jak podloga mlyna) nizej niz poziom wody przy mlynie;
+                // poprawka: polboki sprzed obrotu 6b, rogi obrocone o millTurn wokol srodka budynku (po obrocie rxj = ryj = dluzszy bok)
+                if (ja >= 0 && alive[ja] && !float.IsNaN(wz[ja]))
+                {
+                    try
+                    {
+                        float bx = px[ja] + cx0[ja], by = py[ja] + cy0[ja], brx = millRx * 0.8f, bry = millRy * 0.8f;
+                        float ta = millTurn * (float)Math.PI / 180f, tc = (float)Math.Cos(ta), ts = (float)Math.Sin(ta);
+                        int wet = 0;
+                        for (int q = 0; q < 4; q++)
+                        {
+                            float ox = (q & 1) == 0 ? -brx : brx, oy = (q & 2) == 0 ? -bry : bry;
+                            if (g.HK(bx + tc * ox - ts * oy, by + ts * ox + tc * oy) < wz[ja] - 0.02f) wet++;
+                        }
+                        _millBodyChecked++;
+                        _millBodyCorners += wet;
+                        if (wet > 0) { _millBodyWet++; if (millTurn != 0f) _millBodyTurned++; }
+                        sb.Append("; budynek mlyna: rogow pod woda ").Append(wet).Append(" z 4");
+                        // T7 poprawka: kolo przy wodzie - woda (teren pod poziomem wody) najdalej 0.6 jedn. mapy przed srodkiem kola (front obrazka);
+                        // przy MillOnBank srodek kola stoi MillLandBack za brzegiem, wiec "nad woda" spada z definicji - ten licznik mowi, czy kolo nadal przy wodzie
+                        if (k.WheelR > 0f)
+                        {
+                            Piece pm = k.Pieces[vis[ja]];
+                            float wkx = AnchorX(pm, ja, px, cx0, adx), wky = AnchorY(pm, ja, py, cy0, ryj, ady);
+                            float wa = MapVillageData.WaterAlong(g.H, wz[ja], g.WX(wkx, wky), g.WY(wkx, wky), -g.Sa, g.Ca, MillLandBack + 0.1f, 0.1f);
+                            if (wa >= 0f) _wheelNear++;
+                            sb.Append(wa >= 0f ? "; woda " + F2(wa) + " jedn. przed srodkiem kola" : "; brak wody do 0.6 jedn. przed srodkiem kola");
+                        }
+                    }
+                    catch (Exception e) { _stDiag++; if (_stDiag <= 3) Log.Error("MapVillagesView.MillBody " + s.R.Uid + " (potkniecie " + _stDiag + ")", e); }
+                }
                 if (ja < 0 || !alive[ja]) sb.Append("; mlyn NIE STOI na tym poziomie");
                 else if (!(k.WheelR > 0f)) sb.Append("; kolo: siatki ").Append(MapVillageData.WatermillWheel).Append(" BRAK w grze (mlyn bez kola)");
                 else
@@ -4358,6 +4414,119 @@ namespace Armoury
             _fitMin = float.MaxValue;
         }
 
+        // ---------- T7 (noc 08/09.10, raport 08 W-2): linia pana w dymku - na zywo z gry, liczona przy pokazaniu, trzymana do zmiany pana ----------
+        private static int _stHeld;   // potkniecia linii pana (wtedy stary tekst "district")
+
+        /// <summary>Linia pana albo null (stary tekst); blad liczony, nigdy nie gasi dymka ani funkcji.</summary>
+        private static string HeldLineSafe(District d)
+        {
+            try { return HeldLine(d); }
+            catch (Exception e)
+            {
+                _stHeld++;
+                if (_stHeld <= 3 || _stHeld % 200 == 0) Log.Error("MapVillagesView.HeldLine " + (d != null ? d.Id : "?") + " (potkniecie " + _stHeld + ")", e);
+                return null;
+            }
+        }
+
+        /// <summary>"A village of the Tumbledown lands, held by House Stark of Winterfell": pan = rod wlasciciela wsi gry (Village.Bound.OwnerClan),
+        /// siedziba = Clan.HomeSettlement, zapas: zamek / miasto okregu (Bound); rod gracza - "your fief" (bez herbu). Brak pana - null (stary
+        /// tekst). Tekst trzymany w okregu do zmiany pana (O(1) przy kolejnych najechaniach).</summary>
+        private static string HeldLine(District d)
+        {
+            Settlement v = d != null ? d.S : null;
+            if (v == null || v.Village == null) return null;
+            Settlement bound = v.Village.Bound;
+            Clan c = bound != null ? bound.OwnerClan : null;
+            if (c == null) return null;
+            // T7 poprawka: pamiec tekstu do zmiany pana, siedziby rodu (Clan.ConsiderAndUpdateHomeSettlement, BKROTPatch) albo nazwy rodu
+            // (Clan.ChangeClanName) - trzy porownania referencji, O(1)
+            Settlement seat = c.HomeSettlement ?? bound;
+            if (ReferenceEquals(d.TipClan, c) && ReferenceEquals(d.TipSeat, seat) && ReferenceEquals(d.TipName, c.Name) && d.TipText != null) return d.TipText;
+            TextObject lands = LandsText(v.Name != null ? v.Name.ToString() : d.Id);
+            string text;
+            if (ReferenceEquals(c, Clan.PlayerClan)) text = VillageTexts.Make(VillageTexts.VilTipHeldOwn, "LANDS", lands).ToString();
+            else
+            {
+                if (seat == null || seat.Name == null) return null;
+                text = VillageTexts.Make(VillageTexts.VilTipHeld, "LANDS", lands, "HOUSE", HouseName(c), "SEAT", seat.Name).ToString();
+            }
+            d.TipClan = c;
+            d.TipSeat = seat;
+            d.TipName = c.Name;
+            d.TipText = text;
+            return text;
+        }
+
+        /// <summary>Kraina okregu (projekt lore 1.2): "the Tumbledown lands"; wies gry nazwana jak wies / gospoda (Worm Village, Wendish Town,
+        /// Cider Hall, Crossroads Inn, Cornhall's, The Inn of the Kneeling Man) - "the lands of ...".</summary>
+        private static TextObject LandsText(string name)
+        {
+            string n = (name ?? "").Trim();
+            bool the = n.StartsWith("The ", StringComparison.Ordinal);
+            bool of = the || n.EndsWith(" Village", StringComparison.Ordinal) || n.EndsWith(" Town", StringComparison.Ordinal)
+                      || n.EndsWith(" Hall", StringComparison.Ordinal) || n.EndsWith(" Inn", StringComparison.Ordinal) || n.EndsWith("'s", StringComparison.Ordinal);
+            if (the) n = "the " + n.Substring(4);
+            return VillageTexts.Make(of ? VillageTexts.VilLandsOf : VillageTexts.VilLands, "NAME", n);
+        }
+
+        /// <summary>Nazwa rodu do dymka: czlon przed przecinkiem ("Tully,Blackfish" -> Tully); "House X" dla rodow; Dothrakowie - "the khalasar
+        /// of X"; Wolni Ludzie - sama nazwa; kompanie i bractwa (frakcja pomniejsza, najemnicy, "Second Sons", "Company of the Cat") - "the X".</summary>
+        private static string HouseName(Clan c)
+        {
+            string n = c.Name != null ? c.Name.ToString() : "";
+            int comma = n.IndexOf(',');
+            if (comma > 0) n = n.Substring(0, comma);
+            n = n.Trim();
+            if (n.Length == 0) return "?";
+            if (n.StartsWith("the ", StringComparison.OrdinalIgnoreCase)) return "the " + n.Substring(4);
+            if (n.StartsWith("House ", StringComparison.OrdinalIgnoreCase)) return n;
+            string cul = c.Culture != null ? c.Culture.StringId : "";
+            if (cul == "nightswatch") return "the Night's Watch";   // T7 poprawka: Mormont-Nights Watch, Snow, Tollett, Pyke, Thorne (spclans.xml ROT)
+            if (cul == "khuzait") return "the khalasar of " + n;
+            if (cul == "freefolk" || cul == "qartheen") return n;  // T7 poprawka: Qarth bez "House" (Qar Deeth, Emeros, Qaraxos, Mallarawan)
+            bool band = n.IndexOf(' ') > 0 && (n.EndsWith("s", StringComparison.Ordinal) || n.Contains(" of ") || n.Contains(" without "));
+            if (c.IsMinorFaction || c.IsClanTypeMercenary || band) return "the " + n;
+            return "House " + n;
+        }
+
+        /// <summary>T7: do logu przy wczytaniu mapy (start kampanii i kazde wczytanie) - 5 przykladow linii pana z roznych krain (kultura wsi
+        /// gry), przyklad "the lands of", wariant gracza, liczba okregow / wiosek bez pana. Jeden przebieg po okregach (ok. 425).</summary>
+        private void LogHeldSamples()
+        {
+            try
+            {
+                if (!Settings.Current.VillageTipHeldBy) { Log.Info("Wioski: pan w dymku (T7) WYLACZONY w MCM - dymek ze starym tekstem 'district'."); return; }
+                int districts = 0, noLord = 0, noLordVillages = 0, noSeat = 0, own = 0, nulls = 0;
+                var seen = new HashSet<string>(StringComparer.Ordinal);
+                var samples = new List<string>();
+                string ofSample = null, firstName = null;
+                foreach (var d in _districts)
+                {
+                    if (d.S == null || !d.S.IsVillage || d.S.Village == null) continue;
+                    districts++;
+                    Settlement bound = d.S.Village.Bound;
+                    Clan c = bound != null ? bound.OwnerClan : null;
+                    if (c == null) { noLord++; noLordVillages += d.ByOrder.Count; continue; }
+                    if (ReferenceEquals(c, Clan.PlayerClan)) own++;
+                    else if (c.HomeSettlement == null) noSeat++;
+                    string t = HeldLineSafe(d);
+                    if (t == null) { nulls++; continue; }
+                    string name = d.S.Name != null ? d.S.Name.ToString() : d.Id;
+                    if (firstName == null) firstName = name;
+                    string region = d.S.Culture != null ? d.S.Culture.StringId : "?";
+                    if (samples.Count < 5 && seen.Add(region)) samples.Add(name + " [" + region + "]: \"" + t + "\"");
+                    if (ofSample == null && LandsText(name).ToString().StartsWith("the lands of", StringComparison.Ordinal)) ofSample = name + ": \"" + t + "\"";
+                }
+                string ownSample = firstName != null ? VillageTexts.Make(VillageTexts.VilTipHeldOwn, "LANDS", LandsText(firstName)).ToString() : "-";
+                Log.Info("Wioski: pan w dymku (T7) - okregow (wsi gry) " + districts + ", bez pana " + noLord + " (wiosek na mapie " + noLordVillages
+                         + " - tam stary tekst 'district'), bez tekstu " + nulls + ", siedziba z zapasu (zamek / miasto okregu) " + noSeat + ", rodu gracza " + own
+                         + ", potkniecia " + _stHeld + "; przyklady: " + (samples.Count > 0 ? string.Join(" | ", samples) : "-")
+                         + "; 'the lands of': " + (ofSample ?? "-") + "; wariant gracza: \"" + ownSample + "\".");
+            }
+            catch (Exception e) { Log.Error("MapVillagesView.LogHeldSamples", e); }
+        }
+
         // ---------- dymek po najechaniu: bez fizyki, punkt terenu pod kursorem w obroconym obrysie (krytyk K4) ----------
         // MapScreen.HandleMouse (:1599-1605): komponenty po kolei wedlug Priority, petla staje na pierwszym, ktory zwroci true;
         // ustawiamy tylko hoveredVisual (selectedVisual zostaje null - klik idzie w teren, :1623-1628) i zawsze zwracamy false.
@@ -4422,7 +4591,8 @@ namespace Armoury
                     var list = new List<TooltipProperty>();
                     list.Add(new TooltipProperty("", _s.R.Name, 0, false, TooltipProperty.TooltipPropertyFlags.Title));
                     TextObject district = _s.D.S != null ? _s.D.S.Name : new TextObject(_s.D.Id);
-                    list.Add(new TooltipProperty("", VillageTexts.Make(VillageTexts.VilTipDistrict, "DISTRICT", district).ToString(), 0));
+                    string held = Settings.Current.VillageTipHeldBy ? HeldLineSafe(_s.D) : null;   // T7 (W-2); null = stary tekst
+                    list.Add(new TooltipProperty("", held ?? VillageTexts.Make(VillageTexts.VilTipDistrict, "DISTRICT", district).ToString(), 0));
                     int people = _s.R.Settlements * 250;   // osada = ok. 250 ludzi (PROJEKT-RABUNEK pkt 1)
                     list.Add(new TooltipProperty("", VillageTexts.Make(VillageTexts.VilTipPeople, "PEOPLE", people.ToString("N0", CultureInfo.InvariantCulture),
                         "SETTLEMENTS", _s.R.Settlements).ToString(), 0));
