@@ -728,3 +728,6 @@ W GRZE od 08.10 ok. 19:07 (zegar komputera): **Armoury 28a7456e + CrashScribe af
 Armoury 28a7456e, CrashScribe aff275de (autotest przywraca te). NIE w grze: T8 (poprawka bawelny), 169, 171, H3, T2b; skrypt BEE -ListaZFundamentu (zablokowany
 przez zabezpieczenia Claude Code - Jeff uruchamia sam: powershell -NoProfile -ExecutionPolicy Bypass -File tools\bee\zamknij-ujscia-bee.ps1 -ListaZFundamentu).
 Szczegoly: docs/PRZEKAZANIE-2026-10-08.md rozdz. 15-16, audyt docs/audyt-2026-10-09/.
+**WGRANIE 2 (08.10 ok. 19:33):** Armoury 3bf72dfd + CrashScribe cfb33950 = wgranie 1 + T8 krainy (z poprawka bawelny) + T2b Inni bez dosypki z niczego.
+Galaz paczki/noc-wgranie-2. Poprzednie (28a7456e / aff275de): *.bak-2026-10-09-przed-noc2 + D:\Backup-Bannerlord\wgrane\2026-10-09-noc2-przed.
+ZATWIERDZONE OD TERAZ: Armoury 3bf72dfd, CrashScribe cfb33950.

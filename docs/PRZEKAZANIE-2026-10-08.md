@@ -174,3 +174,5 @@ dana faze od nowa, korzystajac z zapisanych wynikow:
 - 19:20 T8 poprawiony (sklad 8727c87: bawelna 14 wsi tylko w cieplych krainach, baza 112=112) + T2b (galaz w-toku/n10-inni-wzrost bd2841a: Inni bez +100/+2/ochotnikow
   z mapy; 616 na start zostaje) scalony do sklad (a389a5e). Autotest S2 (Armoury 3bf72dfd, CrashScribe probny = stos + autotest 1f51f30a) w toku.
 - Zablokowane przez zabezpieczenia Claude Code (do Jeffa): skrypt BEE na pliku ustawien gry; probna zima (zmiana domyslnych w probnej kopii).
+- 19:33 **WGRANIE 2 W GRZE**: Armoury 3bf72dfd + CrashScribe cfb33950 (= wgranie 1 + T8 z poprawka + T2b); galaz paczki/noc-wgranie-2; kopie przed: *.bak-2026-10-09-przed-noc2.
+  Testy: S2 40 dob OK, S2 zapis doby 362 OK. W toku: 172 STRZALY (na 171, wf_13aea1a6-b50), scalenie 169 do noc/sklad2 (agent), H3/kiesa/drogi (wf_03018328-39c).
