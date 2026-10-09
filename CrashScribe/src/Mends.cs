@@ -80,6 +80,9 @@ namespace CrashScribe
         /// (dom. 50), reszta 15% - klasa ciosu i liczniki w OthersSteel. Wylacznik
         /// OthersSteelRule = stara zasada wyzej. Ogien jezdzca smoka (cios ROT bez broni,
         /// atakujacy = czlowiek) dotad wpadal w 15% - teraz pelne w obu trybach.
+        /// Recenzja 175c: pocisk przy wlaczonej zasadzie - bron rzucana wedlug siebie, amunicja
+        /// wedlug swojej wyrzutni (zmiana broni w locie bez wplywu), kamien/machina = reszta;
+        /// cios wlasny (wlasciciel = ofiara: odbicie wlasnego ciosu) poza licznikami bitwy.
         /// </summary>
         public static void ValyrianWard(TaleWorlds.MountAndBlade.Agent __instance,
                                         ref TaleWorlds.MountAndBlade.Blow blow)
@@ -93,11 +96,13 @@ namespace CrashScribe
                 var mission = TaleWorlds.MountAndBlade.Mission.Current;
                 OthersSteel.MissionCheck(mission);               // raz na misje: suwaki z Armoury, kubelek licznikow pola
                 var att = mission != null ? mission.FindAgentWithIndex(blow.OwnerId) : null;
-                int k = OthersSteel.FieldClass(att, blow.WeaponRecord, mission);
+                int note;
+                int k = OthersSteel.FieldClass(att, blow.WeaponRecord, mission, out note);
                 int pre = blow.InflictedDamage;
                 int post = OthersSteel.Apply(k, pre);
                 blow.InflictedDamage = post;
-                OthersSteel.CountField(k, pre, post, v);
+                if (att != null && ReferenceEquals(att, v)) OthersSteel.CountSelf();   // odbicie wlasnego ciosu - nie bitwa
+                else OthersSteel.CountField(k, pre, post, v, note);
             }
             catch { }                                            // per-cios: zadnego raportowania
         }
@@ -1733,10 +1738,13 @@ namespace CrashScribe
         /// 15% jak w polu. Smoki celowo NIE sa ciete: ROT nadpisuje ich wynik
         /// PO nas (DragonDamageScaling) - smoczy ogien pali Innych, jak w lore.
         /// 175c: klasa trafienia z OthersSteel.SimClass (bohater - jego zestaw bojowy,
-        /// zolnierz - migawka 175 i PreTierBest bez zmiany definicji); smok liczony jako
-        /// ogien i nie ciety (ROT i tak nadpisuje); __5 = MapEvent (liczniki bitwy).
+        /// zolnierz - migawka 175; przy wlaczonej zasadzie tier broni BEZ amunicji - recenzja
+        /// 175c, jak pole; przy wylaczonej PreTierBest jak dotad); smok liczony jako ogien
+        /// i nie ciety (ROT i tak nadpisuje); __3 = partia trafionego (rundy z samym
+        /// Wedrowcem), __5 = MapEvent (liczniki bitwy).
         /// </summary>
         public static void ValyrianWardSim(CharacterObject __0, CharacterObject __1, ref ExplainedNumber __result,
+                                           TaleWorlds.CampaignSystem.Party.PartyBase __3,
                                            TaleWorlds.CampaignSystem.MapEvents.MapEvent __5)
         {
             try
@@ -1744,12 +1752,13 @@ namespace CrashScribe
                 float pre = __result.ResultNumber;
                 if (pre <= 1f) return;
                 if (!WalkerBlood(__1)) return;                   // __1 = trafiany
-                // 175: tier z MIGAWKI wzorca sprzed zamiany sprzetu wedlug tieru (Army175.PreTierBest) -
-                // 175 nie zmienia walki z Innymi (projekt 1.7 [a2], 1.9); 175c zmienia tylko, ile bije t6
-                int k = OthersSteel.SimClass(__0);               // __0 = bijacy
+                // 175: bron z MIGAWKI wzorca sprzed zamiany sprzetu wedlug tieru - 175 nie zmienia
+                // walki z Innymi (projekt 1.7 [a2], 1.9); 175c zmienia, ile bije t6, i (przy zasadzie) tier bez amunicji
+                int note;
+                int k = OthersSteel.SimClass(__0, out note);     // __0 = bijacy
                 float post = OthersSteel.ApplyF(k, pre);
                 if (post != pre) __result = new ExplainedNumber(post);
-                OthersSteel.CountSim(__5, k, pre, post, __1);
+                OthersSteel.CountSim(__5, k, pre, post, __1, __3, note);
             }
             catch { }
         }

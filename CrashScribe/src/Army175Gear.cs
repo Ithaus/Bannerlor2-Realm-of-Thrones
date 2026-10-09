@@ -750,7 +750,8 @@ namespace CrashScribe
         }
 
         /// <summary>175c: bron z migawki (sloty 0-3 bez tarcz) sprzed zamiany - OthersSteel.SimClass szuka w niej stali valyrianskiej
-        /// i smoczego szkla (tier dalej z PreTierBest). null = brak wpisu (bohater, nowa postac) - wzorzec na zywo.</summary>
+        /// i smoczego szkla, a przy wlaczonej zasadzie stali Innych liczy z niej tier BEZ amunicji (recenzja 175c; PreTierBest - z amunicja -
+        /// tylko przy wylaczonej). null = brak wpisu (bohater, nowa postac) - wzorzec na zywo.</summary>
         internal static ItemObject[] PreWeapons(CharacterObject c)
         {
             try
@@ -1095,7 +1096,7 @@ namespace CrashScribe
         }
 
         /// <summary>Linia kontroli (bramki 6.1 pkt 2 i 10): sloty ponad tier, q (z PIERWSZEGO przebiegu), klucze bez
-        /// zamiennika, migawka valyrianska liczona po rozsadku tak jak ValyrianWardSim, bohaterowie z nowym rosterem,
+        /// zamiennika, migawka valyrianska liczona po rozsadku tak jak ValyrianWardSim przy wylaczonej zasadzie stali Innych, bohaterowie z nowym rosterem,
         /// rostery, zgodnosc listy Essos z Armoury.</summary>
         private static void ControlLine(string when, int over, string sample, int q, int noReplFirst)
         {
@@ -1121,7 +1122,7 @@ namespace CrashScribe
                         + (over > 0 ? " (" + sample + ")" : "")
                         + "; zamienionych na zapas, choc po rozsadku by sie miescily (q, pierwszy przebieg): " + (q >= 0 ? q.ToString() : "n/d")
                         + "; kluczy bez zamiennika: " + (noReplFirst >= 0 ? "pierwszy przebieg " + noReplFirst + ", " : "") + "teraz " + (_noRepl != null ? _noRepl.Count : 0)
-                        + "; migawka valyrianska po rozsadku: " + vPost + " jednostek z bronia t6 (tak liczy ValyrianWardSim; dzis ok. 223; " + OthersSteel.T6Text() + ")"
+                        + "; migawka valyrianska po rozsadku: " + vPost + " jednostek z bronia t6 (tak liczy autobitwa przy WYLACZONEJ zasadzie stali Innych; dzis ok. 223; " + OthersSteel.T6Text() + ")"
                         + "; bohaterowie z nowym rosterem " + heroesNew + (hex.Count > 0 ? " (np. " + string.Join(", ", hex.ToArray()) + ")" : "")
                         + " (tylko wzorzec po InitializeHeroBasicCharacterOnAfterLoad, nie ich ekwipunek); nowych rosterow w sesji " + _rostersInstalled
                         + "; lista Essos: " + EssosCheck() + ".");
