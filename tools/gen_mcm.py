@@ -4,7 +4,9 @@ import re, sys, os
 # (godzina obozu 0 dawala suwak 0..10 - nie dalo sie ustawic 22)
 RANGES = {"CampStartHour": (0, 23), "CampEndHour": (0, 23),
           # paczka 175: suwaki z projektu (rozdz. 5)
-          "NorthHardySkillBonus": (0, 50), "NorthHomeEdgePercent": (0, 25), "DothrakiRidingBonus": (0, 50)}
+          "NorthHardyWeaponBonus": (0, 50), "NorthHardyAthleticsBonus": (0, 50), "NorthHomeEdgePercent": (0, 25), "DothrakiRidingBonus": (0, 50),
+          # 175c: zasada stali Innych
+          "OthersCastleSteelPercent": (15, 100)}
 
 def gen(module_dir, ns, display):
     src = open(os.path.join(module_dir,'src','Settings.cs'), encoding='utf-8').read()

@@ -2824,9 +2824,13 @@ namespace Armoury
         [SettingPropertyGroup("Armies of the realms (175)")]
         public int NorthHomeEdgePercent { get; set; } = 10;
 
-        [SettingPropertyInteger("North Hardy Skill Bonus", 0, 50, "0", HintText = "Northern infantry of tier 3 to 6 (village, noble and house lines, 43 troop types) gets this many points of its main weapon skill and of Athletics on top of what its own gear demands - the men of the North are built sterner. 15 makes them about a fifth (+20%) better than the infantry of tier 3 and up of the rest of the world, 25 about +28% (with 0 the North is about +7% better after the tier gear fix alone). Each man is capped one point below the next tier's requirement, so above about 30 the cap holds most men back - 50 gives only about +35%. Works only while Army 175 Tier Gear is at work. 0 = off. Applied by CrashScribe, takes effect on the next load")]
+        [SettingPropertyInteger("North Hardy Weapon Bonus", 0, 50, "0", HintText = "Northern infantry of tier 3 to 6 (village, noble and house lines, 43 troop types) gets this many points of its main weapon skill on top of what its own gear demands. 0 = none: after the tier gear fix their main weapon already averages about 131, against about 122 for the infantry of tier 3 and up of the rest of the world (+7%); +10 makes it about +16%, +25 about +28%. Each man is capped one point below the next tier's requirement, so he never outgrows his tier. Works only while Army 175 Tier Gear is at work. Applied by CrashScribe, takes effect on the next load")]
         [SettingPropertyGroup("Armies of the realms (175)")]
-        public int NorthHardySkillBonus { get; set; } = 15;
+        public int NorthHardyWeaponBonus { get; set; } = 0;
+
+        [SettingPropertyInteger("North Hardy Athletics Bonus", 0, 50, "0", HintText = "the same Northern infantry of tier 3 to 6 gets this many points of Athletics on top of what its own gear demands - the men of the North are built sterner and march harder. 5 brings their average Athletics from about 130 to about 135 (the rest of the world about 121: +12% instead of +8%). Each man is capped one point below the next tier's requirement. Works only while Army 175 Tier Gear is at work. 0 = off. Applied by CrashScribe, takes effect on the next load")]
+        [SettingPropertyGroup("Armies of the realms (175)")]
+        public int NorthHardyAthleticsBonus { get; set; } = 5;
 
         [SettingPropertyBool("Army175 Tier Gear", HintText = "every soldier type - all cultures, village and noble lines, house troops, militia, mercenaries and garrisons, never lords, companions or you - carries and wears in its pattern only weapons, shields, ammunition and armour up to its own tier: a piece above it is replaced by the same kind of piece of that tier. A man still uses only the gear his skills allow. Applied by CrashScribe, takes effect on the next load; from then on the Armoury also keeps the battle pattern of your fights within the soldier's tier")]
         [SettingPropertyGroup("Armies of the realms (175)")]
@@ -2879,6 +2883,14 @@ namespace Armoury
         [SettingPropertyBool("Army175 Golden Bows", HintText = "waits for the armoury restocking package: Golden Company crossbowmen split into thirds - crossbows, recurve bows and yew longbows - and in battle each man takes the missile weapon of his drawn kit. The kits are made by CrashScribe on the next load; the Armoury part (the drawn kit decides, only for the three Golden Company crossbow troops) acts at once")]
         [SettingPropertyGroup("Armies of the realms (175)")]
         public bool Army175GoldenBows { get; set; } = false;
+
+        [SettingPropertyBool("Others Steel Rule", HintText = "As in the books: the Others - the White Walkers and the Night King - take full damage only from Valyrian steel, dragonglass and dragonfire; castle-forged steel of tier 6 (the best any smith can make) deals Others Castle Steel Percent of its damage, everything else 15%. Common wights still fall to anything. Works in your battles and in auto-resolved ones. Off = the old rule: any tier 6 weapon deals full damage, the rest 15%. Dragonfire burns them fully either way. Applied by CrashScribe, takes effect the next day or in the next battle")]
+        [SettingPropertyGroup("The others and valyrian steel (175c)")]
+        public bool OthersSteelRule { get; set; } = true;
+
+        [SettingPropertyInteger("Others Castle Steel Percent", 15, 100, "0", HintText = "share of its damage that castle-forged steel of tier 6 deals to the White Walkers and the Night King while Others Steel Rule is on (Valyrian steel, dragonglass and dragonfire always deal full damage, any lesser weapon 15%). 100 = tier 6 counts as Valyrian steel, as before. Applied by CrashScribe, takes effect the next day or in the next battle")]
+        [SettingPropertyGroup("The others and valyrian steel (175c)")]
+        public int OthersCastleSteelPercent { get; set; } = 50;
 
         [SettingPropertyBool("Map Villages Enabled", HintText = "named villages on the campaign map between the game's own villages, castles and towns - each one a cluster of its district's settlements, standing where a village had reason to stand (bridge, ford, crossroads, road, river, coast); off = none drawn. Nothing is written to the save")]
         [SettingPropertyGroup("Map villages")]
@@ -3605,7 +3617,8 @@ namespace Armoury
             s.LogEnabled = LogEnabled;
             s.Army175Measure = Army175Measure;
             s.NorthHomeEdgePercent = NorthHomeEdgePercent;
-            s.NorthHardySkillBonus = NorthHardySkillBonus;
+            s.NorthHardyWeaponBonus = NorthHardyWeaponBonus;
+            s.NorthHardyAthleticsBonus = NorthHardyAthleticsBonus;
             s.Army175TierGear = Army175TierGear;
             s.Army175LoreArmor = Army175LoreArmor;
             s.Army175LoreArmorExtra = Army175LoreArmorExtra;
@@ -3619,6 +3632,8 @@ namespace Armoury
             s.Army175VolantisNorvos = Army175VolantisNorvos;
             s.Army175MinorLore = Army175MinorLore;
             s.Army175GoldenBows = Army175GoldenBows;
+            s.OthersSteelRule = OthersSteelRule;
+            s.OthersCastleSteelPercent = OthersCastleSteelPercent;
             s.MapVillagesEnabled = MapVillagesEnabled;
             s.MapVillagesHideAboveCameraHeight = MapVillagesHideAboveCameraHeight;
             s.MapVillageNamesOnHover = MapVillageNamesOnHover;
