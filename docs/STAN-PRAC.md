@@ -902,3 +902,5 @@ Uwaga: wylaczenie OthersSteelRule NIE przywraca autobitwy sprzed 175 (AI zawsze 
 obrazen (decyzja 5, po tescie T-B1). Uderzenie tarcza/glowica w Innego = 15% bez komunikatu; komunikat tylko dla ciosow gracza i jego ludzi.
 **DECYZJA JEFFA 09.10 ok. 10:20 (rycerze bez lenna - potwierdzenie po wyjasnieniu):** TAK - 85 rodow BK "gentry" nie prowadzi wlasnych druzyn; na wojne jada w druzynie swojego
 pana (w jego pulapie wojska, pan placi jak rycerzowi swity) albo w armii krolestwa; w pokoju siedza w majatku; ta sama regula dla wasali-rycerzy gracza. Etap 2.
+**JEFF 09.10 ok. 10:35 (strzaly):** "wykucie strzal to powinno byc grosze, strzal bylo mega duzo" -> strzaly tanie i liczne jak w historii (snop 24 ok. 16 d; grot kilkanascie g
+zelaza; korona 1341-1359 1.23 mln strzal). sklad8 mial 35 miast bez strzal -> diagnoza i naprawa produkcji (wf_eefb76a2-a24): cena, zelazo na grot, wydajnosc strzelarzy.
