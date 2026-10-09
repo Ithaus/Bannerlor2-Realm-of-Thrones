@@ -779,3 +779,12 @@ NOWE ZADANIA 09.10: (1) audyt umiejetnosci - zwlaszcza: przekazywanie broni/miec
 Diplomacy z wyczerpania; Diplomacy lata ConsiderPeace - moze wycinac wnioski AI). ZATWIERDZONE OD TERAZ: Armoury 63640cb3, CrashScribe e8d460c5.
 **DECYZJA JEFFA 09.10 (K, doprecyzowanie):** "chce oba mechanizmy" - (1) zolnierze (takze w druzynie gracza i w jego zalogach) SAMI sie dozbrajaja za swoje - z zoldu i lupow
 kupuja lepszy sprzet; (2) gracz moze ich dozbroic WYMIANA - daje lepsza zbroje/bron, a oni oddaja mu swoja gorsza (Jeff: "pisalem juz o tym"). Do zrobienia (paczka K1).
+**DECYZJE JEFFA 09.10 ok. 02:35 (ARMIE, pytania audytu 14 rozdz. 5 + sprzet wedlug tieru) -> paczka 175 ARMIE:**
+(1) "Swietna piechota" Polnocy = wariant C (lore: Polnocnych jest MNIEJ, ale sa twardsi; +25 broni/Atletyki piechoty t3-t6 i przewaga w autobitwie na sniegu/w lesie),
+z warunkiem Jeffa: "zeby nie zepsuc rownowagi gry, zeby nagle jedna armia nie bila wszystkich" (autotest: udzial wygranych bitew lordow wedlug krolestw, bez dominacji).
+(2) Rycerz z koniem: OK na plan - najpierw pomiar awansow AI czekajacych na konia, decyzja po pomiarze; naprawic: kon oddany przez AI za awans trafia do zbrojowni
+nowego jezdzca (jak u gracza), a nie znika. (3) Dothrakowie pod murami: (a) oblegaja jak wszyscy (kara jazdy przy oblezeniu), z autotestem; Dothrakowie konni (4.1).
+(4) Pentos: (a) pelna armia, slabsza przez sprzet wedlug tieru. (5) Wyspy Letnie: ZOSTAWIC jazde (bez 4.7). (6) Zelazne Wyspy: (a) tylko jezdzcy Harlaw, reszta piechota.
+(7) Slonie Volantis: (a) zostaja. (8) Sprzet wedlug tieru: (b) - Jeff: "kto zrobil, ze tier 4 dostawal tarcze tieru 6 i pod to umiejetnosc podnoszono, to jakas bzdura,
+trzeba wszedzie poprawic" -> zasada "umiejetnosc do sprzetu" zostaje, ale WSZYSTKIE jednostki we wzorcach dostaja bron, tarcze, amunicje i pancerz swojego tieru
+(nie wyzej); dotyczy wszystkich kultur i drzew.
