@@ -843,3 +843,6 @@ H wytop przy kopalni tylko w nowej kampanii - TAK; I/J Dorne: PIASKOWE RUMAKI (n
 K rycerz z koniem - OK (liczby po tescie); L napisy na mapie tylko nad SPALONYMI wioskami; M namioty i ogniska przy napadzie na oboz - WLACZYC; N kuznia (okienko wyboru
 rodzaju zbroi jak przy broni czy filtr ForgeView) - "nie rozumiem" (wyjasnione, czeka); O pasek gotowosci zbrojowni DTE (sypie bledem) - WYLACZYC.
 **DECYZJA JEFFA 09.10 ok. 04:35 (N, kuznia):** "zostawic filtr" - bez okienka wyboru rodzaju zbroi w zakladce Craft; wystarcza filtr kategorii ForgeView (krok 5 paczki 129 skreslony).
+**DECYZJA JEFFA 09.10 ok. 04:40 (K1 WYMIANA, doprecyzowanie):** "jesli dasz cos taniego, ale gorszego od tego, co maja - oni tego tez nie biora, zostaje po prostu w okienku
+DTE, co oznacza, ze maja wszyscy lepszy sprzet albo wymagania byly za duze i nie spelniaja np. atletyki" -> sztuka gracza wypiera sztuke ludzi TYLKO, gdy jest lepsza i czlowiek
+spelnia wymog; gorsza/rowna/za trudna zostaje w oknie DTE jako sztuka gracza, ludzie zatrzymuja swoja lepsza (koniec "pushed out better kit"). K1b = A + B + C (wf_013d4f17-3c8).
