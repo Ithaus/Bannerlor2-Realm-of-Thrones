@@ -1,5 +1,16 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-09 (175d-1 ARMOURY) - POPRAWKI PO RECENZJI 175d: opis OthersSteelRule mowi wprost, ze "Off" liczy stara regule na broni PO Army175 Tier Gear (wylaczenie NIE przywraca autobitwy sprzed 175), i ze uderzenie tarcza zadaje 15%
+**Mod:** Armoury (tylko opis MCM, kod gry bez zmian) | **Projekt:** `docs/PROJEKT-175-ARMIE-2026-10-09.md` rozdz. 13 / 13.1 | **Pliki:** `Armoury/src/Settings.cs` (opis `OthersSteelRule`, notka 175d-1), `Armoury/src/McmSettings.cs` (`python tools/gen_mcm.py`: 725 ustawien jak dotad; zmienia sie tylko ta podpowiedz; RealisticCaptivity 104 i GrandTourney 40 - pliki bez zmian). Na 3616dc7 (175d). Kod - drzewo CS `a175cs` (wpis 175d-1 tam). Status: **NIEWGRANE**.
+
+**Problem (recenzja 175d, uwaga 1 - wazne, i 5):** od CS 175d autobitwa liczy bron po zamianie 175 w OBU trybach zasady (decyzja Jeffa pkt 1, "jedna zasada"), wiec wylaczenie `OthersSteelRule` nie przywraca dawnej sily AI przeciw Innym w autobitwie (t6 ok. 27 rodzajow zamiast ok. 196) - opis "Off = the old rule" mogl sugerowac pelne cofniecie. CS 175d-1: uderzenie tarcza albo glowica przy wlaczonej zasadzie = 15% (tarcza nie jest stala zamkowa, jak w autobitwie).
+
+**Zmiana (po angielsku, w grze):** `OthersSteelRule` - "sling stones, thrown stones, boulders, fire pots, shield bashes and anything shot by a siege engine always deal 15%"; "Off = the old rule on the same gear: any tier 6 weapon deals full damage (in auto-resolve tier 6 ammunition too), the rest 15% - auto-resolve still uses the gear after the Army175 Tier Gear fix, so turning this off does not bring back the old auto-resolve strength against the Others." Klucze, domyslne i zakresy bez zmian.
+
+**Ryzyko / co sprawdzic (kontrola calosci):** MCM trzyma wartosci po kluczu - ustawienia Jeffa nie gina. Kod Armoury bez zmian; build kod 0 (1 stare ostrzezenie CS0169 `BattlefieldLaw._vanillaHandledSetter`); nowy tekst jest w DLL (atrybut `HintText`). Opis zgodny z CS 175d-1 (`OthersSteel.FieldClass` - tarcza/glowica, `SimClass` przy wylaczonej zasadzie - `Mends.BestWeaponTier` na wzorcu po zamianie). Test: MCM, grupa "The Others and Valyrian steel (175c)" - podpowiedz `Others Steel Rule`.
+
+**Status:** NIEWGRANE (wgrac razem z CS 175c/175c-1/175c-2/175d/175d-1, Armoury 175c/175c-2/175d i 177).
+
 ## 2026-10-09 (175d ARMOURY) - OPISY MCM DO DECYZJI JEFFA 09.10 ok. 08:40 (Inni): OthersSteelRule i OthersCastleSteelPercent mowia, ze strzaly i belty licza sie wedlug wlasnego tieru, kamienie i machiny zawsze 15%, autobitwa wedlug broni PO Army175 Tier Gear, i ze gracz dostaje komunikat
 **Mod:** Armoury (tylko opisy MCM, kod gry bez zmian) | **Projekt:** `docs/PROJEKT-175-ARMIE-2026-10-09.md` rozdz. 13 / 13.1 | **Pliki:** `Armoury/src/Settings.cs` (opisy `OthersSteelRule`, `OthersCastleSteelPercent`, notka 175d), `Armoury/src/McmSettings.cs` (`python tools/gen_mcm.py`: 725 ustawien jak dotad; zmieniaja sie tylko te dwie podpowiedzi; RealisticCaptivity 104 i GrandTourney 40 - pliki bez zmian). Galaz `w-toku/175-armie-arm` (na f178053). Zgranie: CS 175d (drzewo `a175cs`, galaz `w-toku/175-armie-cs`) - tam pelny opis, liczby i ryzyko. Status: **NIEWGRANE**.
 
