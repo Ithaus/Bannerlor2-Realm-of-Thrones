@@ -897,3 +897,6 @@ do zbrojowni AI, Stables.Remount - lord sadza na konie z taboru i dokupuje, Cold
 **DECYZJE JEFFA 09.10 ok. 08:40 (175c, Inni):** (1) autobitwa AI liczy bron PO naprawie 175 (jedna zasada) - TAK; (2) "tier 6 strzaly rania normalnie, czy belty, ale nie kamienie" ->
 pociski: tier liczony z AMUNICJI - strzaly i belty tieru 6 jak stal t6 (50%), nizsze 15%; kamienie (proce, glazy) zawsze 15%; (3) smocze szklo dla Nocnej Strazy - NIE (zostawiamy);
 (4) komunikat przy pierwszym ciosie w Nocnego Krola bronia inna niz stal valyrianska - TAK; (5) minimum obrazen w autobitwie - decyzja po tescie.
+**175d (09.10 ok. 09:30):** CS w-toku/175-armie-cs 537e93f, Armoury w-toku/175-armie-arm 1402107 (DLL SCRATCH test\Armoury-175d.dll aa0ff2c6, CrashScribe-at-175d.dll 34656904).
+Uwaga: wylaczenie OthersSteelRule NIE przywraca autobitwy sprzed 175 (AI zawsze liczy bron po naprawie - decyzja Jeffa 1); jedyna dzwignia na Innych w autobitwie = minimum
+obrazen (decyzja 5, po tescie T-B1). Uderzenie tarcza/glowica w Innego = 15% bez komunikatu; komunikat tylko dla ciosow gracza i jego ludzi.
