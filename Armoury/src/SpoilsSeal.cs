@@ -82,15 +82,17 @@ namespace Armoury
     ///     jednego z 7 ekranow (rozpoznany po funkcji zamkniecia ekranu i po referencji listy), cala lewa strona wraca do taboru - funkcje
     ///     Spoils dostaja pusta liste i nic nie robia. War stockpile i trofea poza lista celowo (tam Cancel niczego nie oddaje).
     ///     Uzbrojenie dowodcy bez partii (Spoils: rzeczy przepadaly) -> prefiks: rzeczy wracaja do taboru.
-    /// 13. DONE BEZ PYTANIA O WYRZUCANIE TAM, GDZIE NIC NIE GINIE (wylacznik DonationXpOff - skutek uboczny Z1): gra (SPInventoryVM.HandleDone)
-    ///     pyta "You are discarding items. Are you sure?" przy Done na kazdym ekranie w trybie Default z rzeczami po lewej, gdy XP z oddania
-    ///     = 0 (XpGainFromDonations rosnie tylko przy przekladaniu broni / zbroi w lewo z perkiem; po Z1 zawsze 0). Spoils otwiera 11 ekranow
-    ///     w tym trybie; na 4 lewa strona to zrodlo, ktore zostaje: magazyn wojenny (QuartermasterBehavior.OnStockpileScreenClosed zapisuje
-    ///     lewa strone z powrotem do magazynu), trofea, tabor wroga i pozostalosci pola (lista zostaje w LootCollectionBehavior - "Inspect
-    ///     trophies" / "Take supplies" otwiera ja znowu; to, co zostanie przy "Leave", menu opisuje osobno). Tam nic sie nie wyrzuca, a pytanie
-    ///     widzial dotad kazdy gracz bez perku i gracz z perkiem, ktory nic w lewo nie wlozyl. -> transpiler na HandleDone: liczba rzeczy po
-    ///     lewej (InventoryLogic.GetElementCountOnSide) przez bramke - na tych 4 ekranach 0, wiec Done zamyka bez pytania. Na 7 ekranach "take
-    ///     back" (rzeczy po lewej naprawde odchodza), w zwyklym ekwipunku i na ekranach innych modow pytanie zostaje.
+    /// 13. DONE BEZ PYTANIA O WYRZUCANIE TAM, GDZIE DONE NICZEGO NIE WYRZUCA (wylacznik DonationXpOff - skutek uboczny Z1): gra
+    ///     (SPInventoryVM.HandleDone) pyta "You are discarding items. Are you sure?" przy Done na kazdym ekranie w trybie Default z rzeczami
+    ///     po lewej, gdy XP z oddania = 0 (XpGainFromDonations rosnie tylko przy przekladaniu broni / zbroi w lewo z perkiem; po Z1 zawsze 0).
+    ///     Spoils otwiera 11 ekranow w tym trybie; na 2 lewa strona zostaje: magazyn wojenny (QuartermasterBehavior.OnStockpileScreenClosed
+    ///     zapisuje lewa strone z powrotem do magazynu) i trofea (_lootScreenRoster zostaje - "Inspect trophies" otwiera ja znowu; ile zostanie
+    ///     na polu przy "Leave", mowi podpowiedz Leave - 11/Z3). Tam Done nic nie wyrzuca, a pytanie widzial dotad kazdy gracz bez perku i gracz
+    ///     z perkiem, ktory nic w lewo nie wlozyl. -> transpiler na HandleDone: liczba rzeczy po lewej (InventoryLogic.GetElementCountOnSide)
+    ///     przez bramke - na tych 2 ekranach 0, wiec Done zamyka bez pytania. Pytanie zostaje: 7 ekranow "take back" (rzeczy po lewej naprawde
+    ///     odchodza), tabor wroga i pozostalosci pola (lista zyje tylko do "Done" / "Leave" w menu: _baggageSearched nie pozwala wrocic do taboru,
+    ///     FinishCollection i OnRemnantDoneConsequence zeruja liste, a zadna podpowiedz o tym nie mowi - pytanie gry to jedyna przestroga),
+    ///     zwykly ekwipunek i ekrany innych modow.
     /// Martwe w 1.8.4: zloto pozostalosci pola (BattlefieldRemnantsTemporarilyDisabled = true; i tak bralo z monet z cial).
     /// Bez zmian (to nie zloto z niczego): najem kwatermistrza, zalozenie / odnowienie / nowe druzyny klanu (zloto gracza
     /// czesciowo do nikad - ujscie), dary dla zalogi / milicji / zywnosc dla miasta (towar na wskazniki miasta), dzienny dochod
@@ -1359,12 +1361,12 @@ namespace Armoury
             catch (Exception e) { Stumble("SpoilsSeal.EquipLeader", e); }
         }
 
-        // ------------------------------------------------------------ 13. Done bez pytania o wyrzucanie tam, gdzie nic nie ginie (DonationXpOff)
+        // ------------------------------------------------------------ 13. Done bez pytania o wyrzucanie tam, gdzie Done niczego nie wyrzuca (DonationXpOff)
 
         private static readonly Dictionary<string, KeepScreen> _kept = new Dictionary<string, KeepScreen>();   // "Typ.FunkcjaZamkniecia" -> ekran z trwala lewa strona
         private static MethodInfo _mCountOnSide;   // InventoryLogic.GetElementCountOnSide
 
-        /// <summary>Ekran Spoils z trwala lewa strona (magazyn wojenny, trofea, tabor wroga, pozostalosci pola), na ktorym jest ten InventoryLogic -
+        /// <summary>Ekran Spoils z trwala lewa strona (magazyn wojenny, trofea), na ktorym jest ten InventoryLogic -
         /// nazwa do logu; inaczej null. Rozpoznanie jak w CancelPostfix: funkcja zamkniecia ekranu (InventoryState.DoneLogicExtrasDelegate) i referencja
         /// listy lewej strony - cudzy ekran z ta sama funkcja, ale inna lista, nie przejdzie.</summary>
         private static string KeptLeftScreen(InventoryLogic logic)
@@ -1384,7 +1386,7 @@ namespace Armoury
 
         /// <summary>Wstawiane przez transpiler w SPInventoryVM.HandleDone w miejsce InventoryLogic.GetElementCountOnSide(OtherInventory) - liczby rzeczy
         /// po lewej, od ktorej gra pyta "You are discarding items. Are you sure?" (tylko tryb Default i XP z oddania = 0). Na ekranie Spoils z trwala
-        /// lewa strona 0 - Done zamyka bez pytania (nic nie ginie). Wszedzie indziej i przy wylaczonym DonationXpOff - liczba z gry.</summary>
+        /// lewa strona 0 - Done zamyka bez pytania (Done niczego nie wyrzuca). Wszedzie indziej i przy wylaczonym DonationXpOff - liczba z gry.</summary>
         public static int DiscardAskCount(InventoryLogic logic, InventoryLogic.InventorySide side)
         {
             int n = logic.GetElementCountOnSide(side);   // oryginal (logic == null - wyjatek jak w grze)
@@ -1394,7 +1396,7 @@ namespace Armoury
                 string name = KeptLeftScreen(logic);
                 if (name == null) return n;
                 Log.Info("SpoilsSeal: Done na ekranie Spoils \"" + name + "\" bez pytania \"You are discarding items\" - " + n
-                         + " rodzajow po lewej zostaje w zrodle, nic nie ginie (Donation Xp Off).");
+                         + " rodzajow po lewej zostaje w zrodle, Done niczego nie wyrzuca (Donation Xp Off).");
                 return 0;
             }
             catch (Exception e) { Stumble("SpoilsSeal.DiscardAsk", e); return n; }
@@ -1664,8 +1666,8 @@ namespace Armoury
                     {
                         new[] { "QuartermasterBehavior", "OnStockpileScreenClosed", "_stockpileScreenRoster", "War stockpile" },
                         new[] { "LootCollectionBehavior", "OnLootScreenClosed", "_lootScreenRoster", "Inspect trophies" },
-                        new[] { "LootCollectionBehavior", "OnBaggageLootScreenClosed", "_baggageScreenRoster", "Enemy baggage train" },
-                        new[] { "LootCollectionBehavior", "OnRemnantLootScreenClosed", "_remnantLootRoster", "Battlefield remnants" },
+                        // tabor wroga (OnBaggageLootScreenClosed) i pozostalosci pola (OnRemnantLootScreenClosed) celowo poza lista: po "Done" /
+                        // "Leave" w menu reszta przepada bez podpowiedzi (_baggageSearched, FinishCollection, OnRemnantDoneConsequence) - pytanie gry zostaje
                     };
                     var keptMissing = new List<string>();
                     LoadScreens(kept, _kept, keptMissing, "Done");
