@@ -17,6 +17,9 @@ namespace Armoury
     /// magazynu (postfix zdejmuje przydzielone sztuki z polek) nie widzi
     /// naszych dolozek i niczego nie gubi. Nikt nie walczy nago - ani
     /// wrog, ani nasi, w zadnej misji.
+    /// WYJATEK K1c (Jeff 09.10, P2): zaloga w trybie GarrisonFightsWithArmoryOnly
+    /// walczy tylko tym, co ma w zbrojowni - jej przydzialow nie ubieramy
+    /// (GarrisonKit.IsBareEquipment).
     /// </summary>
     internal static class DressCode
     {
@@ -33,6 +36,10 @@ namespace Armoury
                 if (agentBuildData == null) return;
                 var eq = agentBuildData.AgentOverridenSpawnEquipment;
                 if (eq == null) return;                                   // bez nadpisu vanilla ubierze sama
+                // K1c (przeglad K1b, Jeff 09.10 P2 "reszta walczy bez uzbrojenia po prostu"): zaloga w trybie "tylko to, co ma" walczy
+                // tylko sprzetem ze swojej zbrojowni - pusty slot zostaje pusty. Dotad ubieralismy go ze wzorca (z niczego, na klonie,
+                // bez oznaczenia jako tymczasowy), a po bitwie DTE oddawal te sztuki do zbrojowni zalogi.
+                if (GarrisonKit.IsBareEquipment(eq)) return;
                 var ch = agentBuildData.AgentCharacter;
                 if (ch == null || ch.IsHero) return;
 

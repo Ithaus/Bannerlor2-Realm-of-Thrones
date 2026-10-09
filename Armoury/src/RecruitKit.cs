@@ -253,7 +253,7 @@ namespace Armoury
             Day();
             var s = Settings.Current;
             var owner = place != null ? place.OwnerClan : null;
-            if (garrison == null || (owner == Clan.PlayerClan && !s.GarrisonBuysGearPlayer))
+            if (garrison == null || !GarrisonArmory.InSystem(place))   // sklad7: zaloga gracza w systemie, gdy ma sakiewke (K1) albo GarrisonBuysGearPlayer
             {
                 OnVanished(n, x, MarketOfNotable(n));   // jak dotad, tylko od razu (bez czekania na Reconcile)
                 if (garrison != null) _dGarPlayer++;

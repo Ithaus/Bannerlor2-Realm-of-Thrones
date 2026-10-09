@@ -50,6 +50,46 @@ namespace Armoury
                    && !ArmouryBehavior.IsBeast(el.EquipmentElement.Item);   // poprawka po recenzji 159: kon i zwierze zachowuja stan - kowal nie "leczy" kulawego konia (RBM lame_horse 0.5)
         }
 
+        /// <summary>K1 (przeglad): obite sztuki LUDZI do naprawy za ich pieniadze. Ksiega wkladow gracza jest per id i obejmuje NAJGORSZE
+        /// egzemplarze (ta sama regula co SwapMath.AllocateOwn w QuartermasterLaw.KitPieces: wrak, potem gorszy stan), wiec kowale brali
+        /// dotad od najgorszej sztuki - czyli najpierw Twoja - a placila sakiewka ludzi; rezerwa na te naprawy zjadala im budzet na braki
+        /// i lepszy sprzet. Teraz Twoja czesc kazdego id jest pomijana (naprawiasz ja sam u kowala).</summary>
+        internal static List<ItemRosterElement> MenWorn(ItemRoster armory)
+        {
+            var worn = new List<ItemRosterElement>();
+            if (armory == null) return worn;
+            var mine = new Dictionary<string, List<ItemRosterElement>>();
+            for (int i = 0; i < armory.Count; i++)
+            {
+                var el = armory.GetElementCopyAtIndex(i);
+                var it = el.EquipmentElement.Item;
+                if (el.Amount <= 0 || it == null || it.StringId == null) continue;
+                if (ArmouryBehavior.StockOf(it.StringId) <= 0) { if (Mendable(el)) worn.Add(el); continue; }
+                List<ItemRosterElement> l;
+                if (!mine.TryGetValue(it.StringId, out l)) mine[it.StringId] = l = new List<ItemRosterElement>();
+                l.Add(el);
+            }
+            foreach (var kv in mine)
+            {
+                var l = kv.Value;
+                l.Sort((a, b) =>
+                {
+                    var ma = a.EquipmentElement.ItemModifier; var mb = b.EquipmentElement.ItemModifier;
+                    int d = (mb != null && LootPrices.IsWreck(mb) ? 1 : 0).CompareTo(ma != null && LootPrices.IsWreck(ma) ? 1 : 0); if (d != 0) return d;
+                    d = (ma != null ? ma.PriceMultiplier : 1f).CompareTo(mb != null ? mb.PriceMultiplier : 1f); if (d != 0) return d;
+                    return string.CompareOrdinal(ma != null ? ma.StringId ?? "" : "", mb != null ? mb.StringId ?? "" : "");
+                });
+                int left = ArmouryBehavior.StockOf(kv.Key);
+                foreach (var el in l)
+                {
+                    int own = Math.Min(el.Amount, Math.Max(0, left)); left -= own;
+                    int men = el.Amount - own;
+                    if (men > 0 && Mendable(el)) worn.Add(new ItemRosterElement(el.EquipmentElement, men));
+                }
+            }
+            return worn;
+        }
+
         /// <summary>Ile kosztowalyby wszystkie zalegle naprawy (bez wrakow) - tyle ludzie trzymaja w sakiewce.</summary>
         internal static int OutstandingCost() { return OutstandingCost(null); }
 
@@ -64,10 +104,8 @@ namespace Armoury
                 var armory = QuartermasterLaw.DteArmory();
                 if (armory == null) return 0;
                 MendMaterial.Bench bench = MendMaterial.MenAndLordsOn && st != null && st.IsTown ? new MendMaterial.Bench(st) : null;
-                for (int i = 0; i < armory.Count; i++)
+                foreach (var el in MenWorn(armory))   // K1 (przeglad): bez Twojej czesci
                 {
-                    var el = armory.GetElementCopyAtIndex(i);
-                    if (!Mendable(el)) continue;
                     int unit = UnitCost(el.EquipmentElement);
                     if (bench != null && bench.Ok)
                     {
@@ -95,8 +133,7 @@ namespace Armoury
                 if (s.WorkshopNightRest) { int hh = TaleWorlds.CampaignSystem.CampaignTime.Now.GetHourOfDay; if (hh >= 23 || hh < 5) return; }
                 var armory = QuartermasterLaw.DteArmory();
                 if (armory == null) return;
-                var worn = new List<ItemRosterElement>();
-                for (int i = 0; i < armory.Count; i++) { var el = armory.GetElementCopyAtIndex(i); if (Mendable(el)) worn.Add(el); }
+                var worn = MenWorn(armory);   // K1 (przeglad): tylko sztuki ludzi - Twoja czesc kazdego id (najgorsze egzemplarze) pomijana
                 if (worn.Count == 0) { _bench = 0f; return; }
                 worn.Sort((a, b) => a.EquipmentElement.ItemModifier.PriceMultiplier.CompareTo(b.EquipmentElement.ItemModifier.PriceMultiplier));
                 // godziny kowali na godzine: rece miasta x (platnerze + miecznicy) / wszystkie cechy

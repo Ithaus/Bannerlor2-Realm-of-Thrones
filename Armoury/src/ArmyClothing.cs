@@ -247,7 +247,7 @@ namespace Armoury
         }
 
         /// <summary>Miasto, w ktorym zamek kupuje: miasto handlowe jego wsi (TradeBound gry), inaczej najblizsze miasto, z ktorym zamek nie jest w wojnie.</summary>
-        internal static Settlement MarketTown(Settlement castle)
+        internal static Settlement MarketTown(Settlement castle)   // 171 i K1: ta sama regula dla zakupow zalog zamkow (AiGear, GarrisonCarts, MenUpgrade) i ich napraw (AiWear)
         {
             var f = castle.MapFaction;
             if (castle.BoundVillages != null)

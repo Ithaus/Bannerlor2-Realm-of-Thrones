@@ -30,6 +30,13 @@ namespace Armoury
     /// AiGearBudgetPercent zlota na wizyte, zostawiajac AiGearGoldReserve. Wybor: tier ten sam albo
     /// o jeden nizszy, najlepszy stosunek skutecznosci (Effectiveness) do ceny; unikaty pomija
     /// (prestiz to nie ochrona). Kolejnosc: korpus, bron, tarcza, helm, amunicja, nogi, rece, plaszcz.
+    ///
+    /// sklad7 (scalenie 171 + K1) - JEDNA regula zakupow brakow (TryBuyCore) dla lordow AI i zalog:
+    ///  - placi najpierw sakiewka ludzi (lord AI: lup; zaloga: jej zold - K1 A6), potem kiesa pana (zaloga gracza - tylko z GarrisonBuysGearPlayer);
+    ///  - brak liczony do sufitu jednostki (K1c, SwapMath.CeilingTier) i tylko sztuka, ktora ktos z koszyka udzwignie (K1, ItemReq);
+    ///  - zaloga zamku: polka wlasnego zamku codziennie, reszta zamowieniem w miescie handlowym raz na GarrisonOrderDays dob, towar jedzie wozem (171 C2,
+    ///    GarrisonCarts) - K1 A4 (zakup w miescie od razu, "woz pana bez kosztu") usuniete: dwie drogi tego samego zakupu, druga bez drogi towaru;
+    ///  - DTE odrzucil sztuke (czarna lista) - wraca na polke, nikt nie placi (K1); 174: sztuki zastepcze tylko z polki tej osady.
     /// </summary>
     internal static class AiGear
     {
@@ -47,8 +54,8 @@ namespace Armoury
         // (a) AiAnyMeleeWhenShort (rekomendacja "tak"): zolnierz bez broni bialej swojego szczebla, gdy partia nie ma dosc broni bialej W OGOLE (suma typow
         //     1H, 2H, drzewce w dowolnym tierze mniejsza niz sloty wzorcow), kupuje dowolna bron biala tieru <= swojego; (b) AiWorseBodyArmourWhenShort
         //     (domyslnie WYLACZONE - wlaczyc po tescie, gdy "cokolwiek na tulow" < 75%): zbroja na tulow o 2 tiery nizej albo przeszywanica tieru <= swojego.
-        // Kupujemy tylko tyle, ile brakuje "dowolnego szczebla" - te sztuki nie sa nadwyzka dla MenPurse i GarrisonArmory (bron biala liczona tam
-        // grupa), wiec nie ma petli kup-sprzedaj. Do cwiczen i awansu liczy sie dalej tylko bron szczebla (ArmsDrill, AiGear.Deficit bez zmian).
+        // Kupujemy tylko tyle, ile brakuje "dowolnego szczebla" - te sztuki nie sa nadwyzka dla MenPurse (bron biala liczona tam grupa), wiec nie ma
+        // petli kup-sprzedaj. Do cwiczen i awansu liczy sie dalej tylko bron szczebla (ArmsDrill, AiGear.Deficit bez zmian).
         internal static bool SubstituteMeleeOn { get { var s = Settings.Current; return s != null && s.AiAnyMeleeWhenShort; } }
         private static bool SubstituteBodyOn { get { var s = Settings.Current; return s != null && s.AiWorseBodyArmourWhenShort; } }
         private static int _daySubMelee, _daySubBody;
@@ -58,7 +65,7 @@ namespace Armoury
             return type == (int)ItemObject.ItemTypeEnum.OneHandedWeapon || type == (int)ItemObject.ItemTypeEnum.TwoHandedWeapon || type == (int)ItemObject.ItemTypeEnum.Polearm;
         }
 
-        /// <summary>Sprzedaz nadwyzek wedlug typu (MenPurse, GarrisonArmory): przy AiAnyMeleeWhenShort bron biala liczona razem - ile wolno sprzedac z calej grupy.</summary>
+        /// <summary>Sprzedaz nadwyzek wedlug typu (MenPurse.SellArmorySurplus - lordowie i zalogi): przy AiAnyMeleeWhenShort bron biala liczona razem - ile wolno sprzedac z calej grupy.</summary>
         internal static int MeleeGroupExtra(Dictionary<int, int> have, Dictionary<int, int> needByType, float keepPercent)
         {
             int h = 0, k = 0;
@@ -68,7 +75,7 @@ namespace Armoury
         }
 
         private static int BuySubstitutes(Settlement market, MobileParty buyer, Dictionary<ItemObject, int> armory, Dictionary<int, int> needOut, Dictionary<int, int> need,
-                                          int budget, int maxPieces, ref int pieces, List<string> bought, Deliver deliver)
+                                          Dictionary<int, List<CharacterObject>> lifters, int budget, int maxPieces, ref int pieces, List<string> bought, Deliver deliver)
         {
             int spent = 0;
             try
@@ -111,19 +118,21 @@ namespace Armoury
                     int ty = k / 10, t = k % 10, deficit = need[k];
                     bool isMelee = melee && Melee(ty) && gapMelee > 0, isBody = body && ty == (int)ItemObject.ItemTypeEnum.BodyArmor && gapBody > 0;
                     if (deficit <= 0 || (!isMelee && !isBody)) continue;
+                    List<CharacterObject> who = null; if (lifters != null) lifters.TryGetValue(k, out who);
                     for (int ci = 0; ci < cands.Count && deficit > 0 && pieces < maxPieces && spent < budget && (isMelee ? gapMelee : gapBody) > 0; ci++)
                     {
                         var c = cands[ci];
                         if (c.Left <= 0 || c.Melee != isMelee || c.Tier > t) continue;
                         if (!isMelee && !c.Cloth && c.Tier > Math.Max(1, t - 2)) continue;   // przeszywanica tieru <= swojego albo zbroja 2 tiery nizej
+                        if (!Lift(who, c.El.Item)) continue;   // sklad7 (K1): tylko sztuka, ktora ktos z koszyka udzwignie - inaczej nadwyzki sprzedaja ja nazajutrz
                         int price = market.Town.MarketData.GetPrice(c.El, buyer, false, market.Party);
                         if (price <= 0 || price > budget - spent) continue;
                         int n = Math.Min(Math.Min(deficit, c.Left), Math.Min(maxPieces - pieces, (budget - spent) / price));
                         n = Math.Min(n, isMelee ? gapMelee : gapBody);
                         if (n <= 0) continue;
                         shelf.AddToCounts(c.El, -n);
+                        if (!deliver(c.El, n, k, price)) { shelf.AddToCounts(c.El, n); c.Left = 0; cands[ci] = c; continue; }   // K1: DTE odrzucil - wraca na polke
                         c.Left -= n; cands[ci] = c;
-                        deliver(c.El, n, k, price);
                         ArmsScrap.NoteBuy(market, c.El.Item, n);
                         spent += price * n; pieces += n; deficit -= n;
                         if (isMelee) { gapMelee -= n; _daySubMelee += n; } else { gapBody -= n; _daySubBody += n; }
@@ -228,14 +237,31 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ zakupy
-        internal static void OnSettlementEntered(MobileParty mp, Settlement st, Hero hero) { TryBuy(mp, st); }
+        internal static void OnSettlementEntered(MobileParty mp, Settlement st, Hero hero)
+        {
+            // K1 (A5): lord AI w MIESCIE - nadwyzki, naprawy, braki i lepsze w JEDNYM zdarzeniu i w tej kolejnosci (MenPurse.OnEntered
+            // wola TryBuy po sprzedazy nadwyzek i naprawach). Gra wola sluchaczy od ostatnio dopisanego (MbEvent), wiec ten sluchacz
+            // biegl dotad PRZED MenPurse.OnEntered - braki kupowane przed sprzedaza nadwyzek, wbrew opisowi "nadwyzki PRZED zakupami".
+            if (MenPurse.On && mp != null && st != null && st.IsTown && mp.IsLordParty && !mp.IsMainParty) return;
+            TryBuy(mp, st);
+        }
 
         internal static void OnDailyTickParty(MobileParty mp)
         {
-            try { if (mp != null && mp.CurrentSettlement != null) { AiWear.MendInTown(mp, mp.CurrentSettlement); TryBuy(mp, mp.CurrentSettlement); } } catch { }
+            try
+            {
+                if (mp == null || mp.CurrentSettlement == null) return;
+                var st = mp.CurrentSettlement;
+                if (mp.IsGarrison) MenPurse.GarrisonDay(mp, st);   // K1 (A11): zaloga bez ludzi - sakiewka do kasy osady (nadwyzki: GarrisonArmory.SellWeek)
+                // K1 (przeglad): zaloga zamku naprawia u kowali najblizszego miasta handlowego (jak zakupy) - od K1 jej sprzet obija sie
+                // w bitwach (AiWear), a bez kowali rezerwa sakiewki na naprawy wisialaby wiecznie i blokowala zakupy
+                AiWear.MendInTown(mp, mp.IsGarrison && st.IsCastle && !st.IsUnderSiege ? (ArmyClothing.MarketTown(st) ?? st) : st);
+                TryBuy(mp, st);
+            }
+            catch { }
         }
 
-        private static readonly ItemObject.ItemTypeEnum[] Order =
+        internal static readonly ItemObject.ItemTypeEnum[] Order =
         {
             ItemObject.ItemTypeEnum.BodyArmor, ItemObject.ItemTypeEnum.OneHandedWeapon, ItemObject.ItemTypeEnum.TwoHandedWeapon,
             ItemObject.ItemTypeEnum.Polearm, ItemObject.ItemTypeEnum.Bow, ItemObject.ItemTypeEnum.Crossbow,
@@ -247,9 +273,27 @@ namespace Armoury
         // wpis 79: dla ColdStart (dorobek stuleci w zbrojowniach)
         internal static Dictionary<MBGUID, Dictionary<ItemObject, int>> Armories() { return Look() ? _armories.GetValue(null) as Dictionary<MBGUID, Dictionary<ItemObject, int>> : null; }
         internal static int Bucket(ItemObject it) { return (int)it.ItemType * 10 + TierOf(it); }
+        /// <summary>K1 (przeglad): true tylko, gdy zbrojownia naprawde urosla o n - DTE AddItemToPartyArmory po cichu odrzuca sztuke z czarnej
+        /// listy (blacklist.json: korony, suknie, dp_*) albo nierozpoznana; dotad wynik byl true, a sztuka (zaplacona albo zdjeta z ekranu) znikala.</summary>
         internal static bool AddToArmory(MobileParty mp, ItemObject it, int n)
         {
-            try { if (!Look() || n <= 0) return false; _add.Invoke(null, new object[] { mp.Id, it, n }); return true; } catch { return false; }
+            try
+            {
+                if (!Look() || mp == null || it == null || n <= 0) return false;
+                var all = _armories.GetValue(null) as Dictionary<MBGUID, Dictionary<ItemObject, int>>;
+                long before = ArmTotal(all, mp.Id);
+                _add.Invoke(null, new object[] { mp.Id, it, n });
+                return ArmTotal(all, mp.Id) - before == n;
+            }
+            catch { return false; }
+        }
+
+        private static long ArmTotal(Dictionary<MBGUID, Dictionary<ItemObject, int>> all, MBGUID id)
+        {
+            Dictionary<ItemObject, int> a; long t = 0;
+            if (all == null || !all.TryGetValue(id, out a) || a == null) return 0;
+            foreach (var v in a.Values) t += v;
+            return t;
         }
 
         /// <summary>wpis 84: potrzeby partii w koszykach typ x tier (komplety ludzi, bez koni).</summary>
@@ -275,18 +319,31 @@ namespace Armoury
             return need;
         }
 
-        private static int TierOf(ItemObject it)
+        internal static int TierOf(ItemObject it)
         {
             try { return Math.Max(1, Math.Min(6, (int)it.Tier + 1)); } catch { return 1; }
         }
 
         /// <summary>
-        /// 171 (wydzielone z TryBuy bez zmian): potrzeby wedle wzorcow (bez koni) minus zbrojownia - koszyki typ*10+tier, po zastepstwie tierow
-        /// (wpis 89: zapas w innym tierze tego samego typu pokrywa brak - najpierw wyzsze, potem t-1). needOut - potrzeba przed odjeciem (linia "Pokrycie").
+        /// sklad7 (scalenie 171 + K1c): JEDNA miara braku - koszyk potrzeby = typ x tier sztuki wzorca, ale najwyzej SUFIT JEDNOSTKI (K1c, Jeff 09.10 P1
+        /// "ten sam sufit dla ludzi gracza i AI": SwapMath.CeilingTier - tier jednostki, z MenUpgradeOneTierUp o jeden wyzej). Ta sama miara w zakupach brakow
+        /// (TryBuyCore), w cwiczeniach i linii "Pokrycie" (ArmsDrill) - brak, ktory zakupy uznaja za pokryty, cwiczenia tez.
         /// </summary>
-        internal static Dictionary<int, int> Deficit(MobileParty mp, Dictionary<ItemObject, int> armory, Dictionary<int, int> needOut = null)
+        internal static int NeedKey(CharacterObject ch, ItemObject it, bool oneUp)
+        {
+            return (int)it.ItemType * 10 + Math.Min(TierOf(it), SwapMath.CeilingTier(MenUpgrade.TroopTier(ch), oneUp));
+        }
+
+        /// <summary>
+        /// 171 (wydzielone z TryBuy): potrzeby wedle wzorcow (bez koni) minus zbrojownia - koszyki NeedKey (typ*10+tier do sufitu jednostki), po zastepstwie
+        /// tierow (wpis 89: zapas w innym tierze tego samego typu pokrywa brak - najpierw wyzsze, potem t-1). needOut - potrzeba przed odjeciem (linia "Pokrycie");
+        /// liftersOut - oddzialy koszyka (K1: kupiona sztuka musi pasowac komus z nich).
+        /// </summary>
+        internal static Dictionary<int, int> Deficit(MobileParty mp, Dictionary<ItemObject, int> armory, Dictionary<int, int> needOut = null, Dictionary<int, List<CharacterObject>> liftersOut = null)
         {
             var need = new Dictionary<int, int>();
+            var s = Settings.Current;
+            bool oneUp = s != null && s.MenUpgradeOneTierUp;
             var roster = mp.MemberRoster;
             for (int i = 0; i < roster.Count; i++)
             {
@@ -296,12 +353,21 @@ namespace Armoury
                 Equipment eq = null;
                 try { eq = ch.Equipment; } catch { }
                 if (eq == null) continue;
+                // K1c (przeglad K1b, Jeff 09.10 P1): brak kupowany najwyzej do sufitu jednostki - koszyk wzorca ponad sufit liczy sie jako koszyk sufitu.
+                // Dotad t4 z tarcza t6 we wzorcu (przed paczka 175) kupowal na brak t6. Ten sam tier w potrzebie i w pokryciu zapasem, wiec bez petli
+                // "tier nizej" z wpisu 89 (sztuka sufitu pokrywa koszyk sufitu nazajutrz).
                 for (int sl = 0; sl < 10; sl++)
                 {
                     var it = eq[(EquipmentIndex)sl].Item;
                     if (it == null || !SupplyDemand.Equipmentish(it)) continue;
-                    int k = (int)it.ItemType * 10 + TierOf(it);
+                    int k = NeedKey(ch, it, oneUp);
                     int n; need.TryGetValue(k, out n); need[k] = n + el.Number;
+                    if (liftersOut != null)
+                    {
+                        List<CharacterObject> lt;
+                        if (!liftersOut.TryGetValue(k, out lt)) liftersOut[k] = lt = new List<CharacterObject>();
+                        if (!lt.Contains(ch)) lt.Add(ch);
+                    }
                 }
             }
             if (needOut != null) foreach (var kv in need) { int v; needOut.TryGetValue(kv.Key, out v); needOut[kv.Key] = v + kv.Value; }
@@ -332,19 +398,24 @@ namespace Armoury
             return need;
         }
 
-        /// <summary>171: dostawa kupionej partii sztuk (zloto i miejsce) - bucket = koszyk potrzeby, na ktory kupiono.</summary>
-        private delegate void Deliver(EquipmentElement el, int n, int bucket, int unitPrice);
+        /// <summary>171: dostawa kupionej partii sztuk (zloto i miejsce) - bucket = koszyk potrzeby, na ktory kupiono. sklad7 (K1): false - dostawa
+        /// sie nie udala (DTE odrzucil sztuke z czarnej listy), BuyLoop oddaje sztuki na polke, nikt nie placi.</summary>
+        private delegate bool Deliver(EquipmentElement el, int n, int bucket, int unitPrice);
         private static bool _lastBudgetStop;   // ostatni BuyLoop: byl kandydat, ale za drogi na reszte budzetu (linia "Zaopatrzenie zamkow")
 
         /// <summary>
-        /// 171 (wydzielone z TryBuy bez zmian): zakup z polki targu wedle brakow. Kolejnosc typow Order, tiery 6..1, kandydaci t i t-1 bez unikatow,
+        /// 171 (wydzielone z TryBuy): zakup z polki targu wedle brakow. Kolejnosc typow Order, tiery 6..1, kandydaci t i t-1 bez unikatow,
         /// najlepsza skutecznosc do ceny; limit sztuk (pieces - licznik wspolny dla wywolan) i budzetu. Zwraca wydane zloto; need - co zostalo.
+        /// K1 (przeglad): tylko sztuka, ktora udzwignie ktos z oddzialow koszyka (ItemReq - jak braki gracza i MenUpgrade); nadwyzki (MenPurse) oddaja
+        /// najpierw sztuki, ktorych nikt nie udzwignie - bez tego warunku zaloga kupowala ciezka zbroje ponad swoja atletyke, a nazajutrz ja sprzedawala.
         /// </summary>
-        private static int BuyLoop(Settlement market, MobileParty buyer, Dictionary<int, int> need, int budget, int maxPieces, ref int pieces, List<string> bought, Deliver deliver)
+        private static int BuyLoop(Settlement market, MobileParty buyer, Dictionary<int, int> need, Dictionary<int, List<CharacterObject>> lifters, int budget, int maxPieces,
+                                   ref int pieces, List<string> bought, Deliver deliver)
         {
             int spent = 0;
             _lastBudgetStop = false;
             var shelf = market.ItemRoster;
+            HashSet<ItemObject> refused = null;   // DTE nie przyjal (czarna lista) - nie kupujemy drugi raz
             foreach (var type in Order)
             {
                 for (int t = 6; t >= 1; t--)
@@ -352,6 +423,7 @@ namespace Armoury
                     int k = (int)type * 10 + t;
                     int deficit;
                     if (!need.TryGetValue(k, out deficit) || deficit <= 0) continue;
+                    List<CharacterObject> who = null; if (lifters != null) lifters.TryGetValue(k, out who);
                     // kandydaci: ten sam typ, tier t albo t-1, bez unikatow; najlepsza skutecznosc do ceny
                     while (deficit > 0 && pieces < maxPieces && spent < budget)
                     {
@@ -364,6 +436,8 @@ namespace Armoury
                             int ti = TierOf(it);
                             if (ti != t && ti != t - 1) continue;
                             if (ArmsPricing.IsUnique(it)) continue;
+                            if (refused != null && refused.Contains(it)) continue;
+                            if (!Lift(who, it)) continue;
                             int price = market.Town.MarketData.GetPrice(el.EquipmentElement, buyer, false, market.Party);
                             if (price <= 0) continue;
                             if (price > budget - spent) { _lastBudgetStop = true; continue; }
@@ -378,7 +452,13 @@ namespace Armoury
                         n = Math.Min(n, (budget - spent) / bestPrice);
                         if (n <= 0) break;
                         shelf.AddToCounts(pick.EquipmentElement, -n);
-                        deliver(pick.EquipmentElement, n, k, bestPrice);
+                        if (!deliver(pick.EquipmentElement, n, k, bestPrice))
+                        {
+                            shelf.AddToCounts(pick.EquipmentElement, n);   // K1 (przeglad): DTE odrzucil - sztuka wraca na polke, nikt nie placi
+                            if (refused == null) refused = new HashSet<ItemObject>();
+                            refused.Add(pick.EquipmentElement.Item);
+                            continue;
+                        }
                         ArmsScrap.NoteBuy(market, pick.EquipmentElement.Item, n);   // 174 pytanie 4: popyt koszyka w miescie (tylko licznik)
                         if (type == ItemObject.ItemTypeEnum.Arrows || type == ItemObject.ItemTypeEnum.Bolts) TownFletchers.NoteBought(type, n);   // 172: linia strzelarzy (tylko licznik)
                         spent += bestPrice * n; pieces += n; deficit -= n;
@@ -388,6 +468,14 @@ namespace Armoury
                 }
             }
             return spent;
+        }
+
+        /// <summary>K1 (przeglad): czy ktos z oddzialow koszyka udzwignie sztuke (brak listy - bez warunku, jak dotad).</summary>
+        private static bool Lift(List<CharacterObject> who, ItemObject it)
+        {
+            if (who == null || who.Count == 0) return true;
+            foreach (var c in who) if (ItemReq.Meets(c, it)) return true;
+            return false;
         }
 
         /// <summary>Czy na polce lezy sztuka typu i tieru (t albo t-1), bez unikatow - "za drogie" to nie brak towaru (wpis 81).</summary>
@@ -401,11 +489,14 @@ namespace Armoury
             return false;
         }
 
-        /// <summary>174.0: zakupy w ramce ksiegi towarow "zakupy uzbrojenia Armoury" - w ticku dobowym partii nie licza sie jako "inne ticki" (tylko licznik).</summary>
-        private static void TryBuy(MobileParty mp, Settlement st)
+        /// <summary>
+        /// K1 (A5): najpierw braki (A6, TryBuyCore), potem lepsze za swoje (A7, MenUpgrade - wlasna bramka raz na dobe). 174.0: oba w ramce ksiegi towarow
+        /// "zakupy uzbrojenia Armoury" - w ticku dobowym partii nie licza sie jako "inne ticki" (tylko licznik).
+        /// </summary>
+        internal static void TryBuy(MobileParty mp, Settlement st)
         {
             var gf = GoodsLedger.Begin(GoodsLedger.FArmsBuy, mp);
-            try { TryBuyCore(mp, st); }
+            try { TryBuyCore(mp, st); MenUpgrade.ForAi(mp, st); }
             finally { GoodsLedger.End(gf); }
         }
 
@@ -415,11 +506,15 @@ namespace Armoury
             {
                 if (!On || mp == null || st == null || !Look()) return;
                 // wpis 57 (Jeff 04.10: "a co z garnizonem, skad oni maja miec bron?"): garnizon kupuje brakujacy sprzet na targu
-                // SWOJEJ osady, placi pan osady ze swojej kiesy, zloto idzie do kasy miasta (jak u partii lorda)
+                // SWOJEJ osady, zloto idzie do kasy miasta (jak u partii lorda)
+                // K1 (A6): placi NAJPIERW sakiewka zalogi (jej zold), potem kiesa pana osady; Twoja kiesa doplaca do Twoich zalog tylko
+                // przy GarrisonBuysGearPlayer (dotad ten wylacznik zatrzymywal zakupy Twoich zalog w ogole)
                 var s0 = Settings.Current;
                 bool garrison = mp.IsGarrison && mp.CurrentSettlement == st && s0.GarrisonBuysGear;
                 Hero payer = garrison ? (st.OwnerClan != null ? st.OwnerClan.Leader : null) : mp.LeaderHero;
-                if (garrison && payer == Hero.MainHero && !s0.GarrisonBuysGearPlayer) return;
+                bool gPurse = garrison && MenUpgrade.GarrisonPurseOn;
+                bool lordPays = !(garrison && payer == Hero.MainHero && !s0.GarrisonBuysGearPlayer);
+                if (garrison && !lordPays && !gPurse) return;
                 if (mp.IsMainParty || (!mp.IsLordParty && !garrison) || payer == null || !payer.IsAlive || !mp.IsActive || mp.MapEvent != null) return;
                 if ((!st.IsTown && !st.IsCastle) || st.ItemRoster == null || st.Town == null) return;
                 if (FactionManager.IsAtWarAgainstFaction(mp.MapFaction, st.MapFaction)) return;
@@ -436,7 +531,8 @@ namespace Armoury
                 var s = Settings.Current;
                 var lord = payer;
                 int reserve = Math.Max(0, s.AiGearGoldReserve);
-                int budget = (int)((lord.Gold - reserve) * Math.Max(0f, Math.Min(100f, s.AiGearBudgetPercent)) / 100f);
+                double p = Math.Max(0f, Math.Min(100f, s.AiGearBudgetPercent)) / 100.0;
+                int budget = lordPays ? (int)((lord.Gold - reserve) * p) : 0;
                 int maxPieces = Math.Max(1, s.AiGearMaxPiecesPerVisit);
                 // 171 C6 (krytyka 4): zaloga zamku zamawia w miescie raz na D dob - zamowienie obejmuje wszystkie te doby: budzet 1-(1-p)^D kiesy
                 // ponad rezerwe (tyle, ile wydalyby D dziennych zakupow, nie wiecej) i limit sztuk x D; polka wlasnego zamku - codziennie jak dotad
@@ -447,14 +543,13 @@ namespace Armoury
                     if (orderDay)
                     {
                         int D = Math.Max(1, s.GarrisonOrderDays);
-                        double p = Math.Max(0f, Math.Min(100f, s.AiGearBudgetPercent)) / 100.0;
-                        budget = (int)((lord.Gold - reserve) * (1.0 - Math.Pow(1.0 - p, D)));
+                        if (lordPays) budget = (int)((lord.Gold - reserve) * (1.0 - Math.Pow(1.0 - p, D)));
                         maxPieces = maxPieces * D;
                     }
                     else GarrisonCarts.NotePause();
                 }
-                // wpis 84: ludzie dokupuja braki ze swojej sakiewki (lup), dopiero potem kiesa lorda
-                int purse = garrison ? 0 : Math.Max(0, MenPurse.Get(mp) - AiWear.OutstandingCost(mp, st));   // wpis 89: naprawy maja pierwszenstwo (z materialem - szacunek z polki miasta)
+                // wpis 84: ludzie dokupuja braki ze swojej sakiewki (lup), dopiero potem kiesa lorda; K1: zaloga - ze swojej sakiewki (zold)
+                int purse = (!garrison || gPurse) ? Math.Max(0, MenPurse.Get(mp) - AiWear.OutstandingCost(mp, st)) : 0;   // wpis 89: naprawy maja pierwszenstwo (z materialem - szacunek z polki miasta)
                 budget = Math.Max(0, budget) + purse;
                 if (budget <= 0) return;
                 if (orderDay) GarrisonCarts.MarkTried(st);   // jedno zamowienie (i jeden budzet D dob) na D dob, takze gdy proba sie nie uda
@@ -463,43 +558,48 @@ namespace Armoury
                 Dictionary<ItemObject, int> armory = null;
                 if (all != null) all.TryGetValue(mp.Id, out armory);
 
-                // potrzeby wedle wzorcow (bez koni) i stan zbrojowni - koszyki typ*10+tier
+                // potrzeby wedle wzorcow (bez koni) i stan zbrojowni - koszyki typ*10+tier (do sufitu jednostki), z oddzialami koszyka (udzwig)
                 var needOut = new Dictionary<int, int>();
-                var need = Deficit(mp, armory, needOut);
+                var lifters = new Dictionary<int, List<CharacterObject>>();
+                var need = Deficit(mp, armory, needOut, lifters);
                 if (castleCart) GarrisonCarts.SubtractTransit(st, need);   // 171 C5: towar w drodze - inaczej zamek co dobe zamawialby to samo
 
                 int pieces = 0;
                 var bought = new List<string>();
-                // polka tej osady (zaloga zamku: wlasnego zamku - to, co tam lezy, oplacila juz kasa zamku i jest na miejscu)
-                int spent = BuyLoop(st, mp, need, budget, maxPieces, ref pieces, bought, (el, n, k, unit) =>
+                // zaplata: najpierw sakiewka ludzi (lord AI zawsze, zaloga przy GarrisonPurseEnabled), reszta kiesa pana; zwraca czesc z sakiewki
+                Func<int, int> pay = cost =>
                 {
-                    _add.Invoke(null, new object[] { mp.Id, el.Item, n });
-                    AiWear.NoteBought(mp, el, n);   // wpis 89: zuzyta z polki zostaje zuzyta; 171 (recenzja): takze w zalodze - inaczej obita sztuka wychodzila z zalogi jako sprawna
-                    int cost = unit * n, fromPurse = garrison ? 0 : MenPurse.Take(mp, cost);
+                    int fromPurse = (!garrison || gPurse) ? MenPurse.Take(mp, cost) : 0;
                     lord.ChangeHeroGold(-(cost - fromPurse));
-                    st.Town.ChangeGold(unit * n);
-                    MoneyLedger.Note(MoneyLedger.NGear, st, unit * n);   // ksiega przeplywow osad (tylko licznik)
-                });
+                    if (garrison) MenUpgrade.NoteGarrisonGap(fromPurse);
+                    return fromPurse;
+                };
+                // polka tej osady (zaloga zamku: wlasnego zamku - to, co tam lezy, oplacila juz kasa zamku i jest na miejscu)
+                Deliver here = (el, n, k, unit) =>
+                {
+                    if (!AddToArmory(mp, el.Item, n)) return false;   // K1 (przeglad): DTE odrzucil - nikt nie placi
+                    AiWear.NoteBought(mp, el, n);   // wpis 89: zuzyta z polki zostaje zuzyta; 171/K1 (recenzje): takze w zalodze
+                    MenUpgrade.NoteChurn(mp, el.Item, true);
+                    int cost = unit * n;
+                    pay(cost);
+                    st.Town.ChangeGold(cost);
+                    MoneyLedger.Note(MoneyLedger.NGear, st, cost);   // ksiega przeplywow osad (tylko licznik)
+                    return true;
+                };
+                int spent = BuyLoop(st, mp, need, lifters, budget, maxPieces, ref pieces, bought, here);
                 // 174 pytanie 2: gorszy sprzet zamiast zadnego - tylko z polki tej osady, tylko do pokrycia "dowolnego szczebla"
                 if (SubstituteMeleeOn || SubstituteBodyOn)
                 {
                     Dictionary<ItemObject, int> armNow = null;
                     if (all != null) all.TryGetValue(mp.Id, out armNow);
-                    spent += BuySubstitutes(st, mp, armNow, needOut, need, budget - spent, maxPieces, ref pieces, bought, (el, n, k, unit) =>
-                    {
-                        _add.Invoke(null, new object[] { mp.Id, el.Item, n });
-                        AiWear.NoteBought(mp, el, n);
-                        int cost = unit * n, fromPurse = garrison ? 0 : MenPurse.Take(mp, cost);
-                        lord.ChangeHeroGold(-(cost - fromPurse));
-                        st.Town.ChangeGold(unit * n);
-                        MoneyLedger.Note(MoneyLedger.NGear, st, unit * n);
-                    });
+                    spent += BuySubstitutes(st, mp, armNow, needOut, need, lifters, budget - spent, maxPieces, ref pieces, bought, here);
                 }
+                string where = st.Name.ToString();
                 if (castleCart)
                 {
                     if (pieces > 0) GarrisonCarts.NoteOwnShelf(pieces, spent);
-                    // 171 C2.4: reszte brakow zaloga zamku zamawia w miescie swoich wsi - zloto pana do kasy miasta, towar schodzi z polki miasta
-                    // w chwili zakupu i jedzie do zamku (GarrisonCarts); zamowienia dla warsztatow - w tym miescie, wedle JEGO polki (krytyka 15)
+                    // 171 C2.4: reszte brakow zaloga zamku zamawia w miescie swoich wsi - zloto (sakiewka zalogi, potem pan) do kasy miasta, towar schodzi
+                    // z polki miasta w chwili zakupu i jedzie do zamku (GarrisonCarts); zamowienia dla warsztatow - w tym miescie, wedle JEGO polki (krytyka 15)
                     bool left = false; foreach (var v in need.Values) if (v > 0) { left = true; break; }
                     if (orderDay && left)
                     {
@@ -508,7 +608,7 @@ namespace Armoury
                         if (market != null)
                         {
                             var lines = new List<GarrisonCarts.Line>();
-                            int paid = 0;
+                            int paid = 0, pursePaid = 0;
                             bool budgetStop = true;
                             // recenzja 171: zamowienie powstaje takze, gdy BuyLoop rzuci wyjatek po kilku zakupach (np. cena z modelu innego moda) -
                             // oplacone sztuki zdjete z polki nie moga zniknac; wydane = suma oplaconych linii (to samo, co zwraca BuyLoop)
@@ -516,13 +616,15 @@ namespace Armoury
                             {
                                 if (budget - spent > 0)
                                 {
-                                    BuyLoop(market, mp, need, budget - spent, maxPieces, ref pieces, bought, (el, n, k, unit) =>
+                                    BuyLoop(market, mp, need, lifters, budget - spent, maxPieces, ref pieces, bought, (el, n, k, unit) =>
                                     {
-                                        lord.ChangeHeroGold(-unit * n);
-                                        market.Town.ChangeGold(unit * n);
-                                        MoneyLedger.Note(MoneyLedger.NGear, market, unit * n);
+                                        int cost = unit * n;
+                                        int fromPurse = pay(cost);
+                                        market.Town.ChangeGold(cost);
+                                        MoneyLedger.Note(MoneyLedger.NGear, market, cost);
                                         lines.Add(new GarrisonCarts.Line { El = el, N = n, Bucket = k });
-                                        paid += unit * n;
+                                        paid += cost; pursePaid += fromPurse;
+                                        return true;
                                     });
                                     budgetStop = _lastBudgetStop;
                                 }
@@ -530,7 +632,7 @@ namespace Armoury
                             finally
                             {
                                 spent += paid;
-                                if (lines.Count > 0) GarrisonCarts.Place(st, market, st.OwnerClan, lines, paid, dist, pieces >= maxPieces, budgetStop);
+                                if (lines.Count > 0) { GarrisonCarts.Place(st, market, st.OwnerClan, lines, paid, dist, pieces >= maxPieces, budgetStop, pursePaid); where += " i zamowienie z " + market.Name; }
                             }
                             int unmet = 0;
                             foreach (var kv in need)
@@ -561,8 +663,8 @@ namespace Armoury
                 if (_dayLogged < Math.Max(0, s.AiGearLogPerDay))
                 {
                     _dayLogged++;
-                    Log.Info("ZakupyAI: " + (garrison ? "garnizon " + st.Name + " (placi " + lord.Name + ")" : lord.Name.ToString()) + " (" + mp.MemberRoster.TotalManCount + " ludzi) w " + st.Name + ": " + pieces
-                             + " szt. za " + spent + " (budzet " + budget + ", zloto " + (lord.Gold + spent) + " -> " + lord.Gold + "); np. "
+                    Log.Info("ZakupyAI: " + (garrison ? "garnizon " + st.Name + " (placi " + lord.Name + (gPurse ? " i sakiewka zalogi" : "") + ")" : lord.Name.ToString()) + " (" + mp.MemberRoster.TotalManCount + " ludzi) w " + where + ": " + pieces
+                             + " szt. za " + spent + " (budzet " + budget + ", zloto pana po zakupach " + lord.Gold + ", sakiewka " + MenPurse.Get(mp) + "); np. "
                              + string.Join(", ", bought.ToArray()) + ".");
                 }
             }

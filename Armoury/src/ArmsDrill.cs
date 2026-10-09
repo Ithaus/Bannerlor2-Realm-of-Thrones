@@ -97,7 +97,10 @@ namespace Armoury
             int k;
             if (_mainKey.TryGetValue(ch, out k)) return k;
             var it = MainWeapon(ch);
-            k = it != null ? AiGear.Bucket(it) : -1;
+            // sklad7 (scalenie K1c): koszyk do sufitu jednostki (AiGear.NeedKey) - ta sama miara co zakupy brakow; dotad wzorzec t6 u czlowieka t4
+            // wymagal sztuki t5+, a zakupy (sufit K1c) kupowaly mu t5 albo t4 - t4 nie "uzbrajala" go do cwiczen
+            var s = Settings.Current;
+            k = it != null ? AiGear.NeedKey(ch, it, s != null && s.MenUpgradeOneTierUp) : -1;
             _mainKey[ch] = k;
             return k;
         }
@@ -194,7 +197,7 @@ namespace Armoury
             {
                 if (!s.GarrisonDrillNeedsArms || !s.GarrisonBuysGear) return false;
                 var st = mp.CurrentSettlement ?? mp.HomeSettlement;
-                return st == null || st.OwnerClan != Clan.PlayerClan || s.GarrisonBuysGearPlayer;
+                return GarrisonArmory.InSystem(st);   // sklad7: zaloga gracza w systemie, gdy ma sakiewke (K1) albo GarrisonBuysGearPlayer
             }
             return s.PartyDrillNeedsArms && mp.IsLordParty && mp != MobileParty.MainParty && mp.ActualClan != Clan.PlayerClan;
         }

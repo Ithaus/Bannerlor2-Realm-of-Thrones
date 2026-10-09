@@ -20,6 +20,9 @@ namespace Armoury
     /// przyjazdu = droga / predkosc wozu wsi (MarketCarts.PerDay - te same wozy, ktore woza plon). Bandyci nie rozbijaja dostawy (uproszczenie).
     /// W drodze: zamek oblezony albo bez zalogi - czeka; zamek padl (wojna z rodem placacym) albo rod wymarl, a zamek zmienil strone - zawraca
     /// (towar na polke miasta-zrodla, zwrot zaplaty z kasy miasta, nie wiecej niz kasa); po 30 dobach - zawraca jak woz wsi (MarketCarts).
+    /// sklad7 (scalenie K1): JEDYNA droga towaru z miasta do zamku - placi najpierw sakiewka zalogi (K1 A6), potem pan; zwrot czesci z sakiewki wraca do
+    /// sakiewki (zamek dalej nasz); dozbrajanie za swoje (MenUpgrade) jedzie tym samym wozem (linie UpgradeBucket, poza "towarem w drodze" brakow);
+    /// sztuka, ktorej DTE nie przyjmie do zbrojowni, zostaje na polce zamku. K1 A4 (zakup w miescie "od razu, wozem pana bez kosztu") usuniete.
     /// </summary>
     internal static class GarrisonCarts
     {
@@ -31,6 +34,7 @@ namespace Armoury
         {
             internal Settlement Castle, Market; internal Clan PayerClan; internal IFaction FactionAtOrder;   // FactionAtOrder = frakcja zamku przy zamowieniu (C4)
             internal int DayOrdered, DayDue, Paid; internal List<Line> Lines = new List<Line>();
+            internal int PursePaid;   // sklad7 (K1): czesc zaplaty z sakiewki zalogi (zwrot przy zawroceniu wraca do niej, nie do pana)
             internal int Pieces { get { int n = 0; foreach (var l in Lines) n += l.N; return n; } }
         }
         private static readonly List<Order> _orders = new List<Order>();
@@ -43,6 +47,8 @@ namespace Armoury
         private static int _dArrived, _dArrivedPieces, _dArrivedDays, _dWaitSiege, _dWaitNoGarrison;
         private static int _dBack, _dBackPieces, _dRefund, _dBackHostile, _dBackForeign, _dBack30, _dBackNoRefund, _dBackPeace;
         private static int _dNoTown, _dNoRoad, _dTooFar, _dSiegeWar, _dPause, _dUnmet, _stumbles, _errDay = -1;
+        private static int _dRefusedPcs, _dUpOrders, _dUpPieces, _dUpGold, _dPurseGold, _dPurseRefund;   // sklad7: DTE nie przyjal przy dostawie; dozbrajanie (K1) wozem; sakiewki zalog
+        internal const int UpgradeBucket = -1;   // sklad7: linie dozbrajania (lepsza sztuka za swoje, MenUpgrade) - poza "towarem w drodze" brakow (C5)
         private static readonly HashSet<Settlement> _dTowns = new HashSet<Settlement>();
         private static readonly HashSet<string> _errWhere = new HashSet<string>();
 
@@ -58,6 +64,7 @@ namespace Armoury
             _dArrived = _dArrivedPieces = _dArrivedDays = _dWaitSiege = _dWaitNoGarrison = 0;
             _dBack = _dBackPieces = _dRefund = _dBackHostile = _dBackForeign = _dBack30 = _dBackNoRefund = _dBackPeace = 0;
             _dNoTown = _dNoRoad = _dTooFar = _dSiegeWar = _dPause = _dUnmet = 0;
+            _dRefusedPcs = _dUpOrders = _dUpPieces = _dUpGold = _dPurseGold = _dPurseRefund = 0;
             _dTowns.Clear();
         }
 
@@ -90,6 +97,22 @@ namespace Armoury
         /// <summary>Stempel proby zamowienia - takze nieudanej (bez miasta, bez drogi, brak towaru): przeglad polki miasta raz na D dob.</summary>
         internal static void MarkTried(Settlement castle) { if (castle != null) _lastOrder[castle] = Today(); }
 
+        /// <summary>sklad7 (K1 + 171): dzien zamowienia zamku - albo juz dzis zamawial (braki, AiGear), albo dzis moze; dozbrajanie wozem tylko wtedy.</summary>
+        internal static bool OrderDay(Settlement castle)
+        {
+            int d;
+            if (castle != null && _lastOrder.TryGetValue(castle, out d) && d == Today()) return true;
+            return CanOrderToday(castle);
+        }
+
+        /// <summary>sklad7: czy do zamku jedzie juz dozbrajanie (linie UpgradeBucket) - nowe dopiero po dostawie, inaczej przed przyjazdem wozu
+        /// ludzie kupowaliby lepsza sztuke drugi raz w miejsce tej samej starej.</summary>
+        internal static bool UpgradeInTransit(Settlement castle)
+        {
+            Dictionary<int, int> tr; int w;
+            return castle != null && _transit.TryGetValue(castle, out tr) && tr.TryGetValue(UpgradeBucket, out w) && w > 0;
+        }
+
         internal static void NotePause() { _dPause++; }
         internal static void NoteOwnShelf(int pieces, int gold) { _dOwnPieces += pieces; _dOwnGold += gold; }
         internal static void NoteUnmet(int buckets) { _dUnmet += buckets; }
@@ -107,24 +130,24 @@ namespace Armoury
         }
 
         /// <summary>C1: miasto handlowe wsi zamku (TradeBound gry), inaczej najblizsze niewrogie; w chwili zamowienia: bez oblezenia i wojny, droga ladem albo ladem i morzem.</summary>
-        internal static Settlement MarketFor(Settlement castle, out float dist, out string why)
+        internal static Settlement MarketFor(Settlement castle, out float dist, out string why, bool count = true)
         {
             dist = -1f; why = null;
             try
             {
                 var market = castle != null ? ArmyClothing.MarketTown(castle) : null;
-                if (market == null || market.Town == null || market.ItemRoster == null) { why = "bez miasta"; _dNoTown++; return null; }
+                if (market == null || market.Town == null || market.ItemRoster == null) { why = "bez miasta"; if (count) _dNoTown++; return null; }
                 if (market.IsUnderSiege || castle.IsUnderSiege
                     || (castle.MapFaction != null && market.MapFaction != null && FactionManager.IsAtWarAgainstFaction(castle.MapFaction, market.MapFaction)))
-                { why = "oblezenie albo wojna"; _dSiegeWar++; return null; }
+                { why = "oblezenie albo wojna"; if (count) _dSiegeWar++; return null; }
                 var m = Campaign.Current.Models.MapDistanceModel;
                 float d;
                 try { d = m.GetDistance(market, castle, false, false, MobileParty.NavigationType.Default); } catch { d = -1f; }
                 if (!(d >= 0f && d < CartTownExit.BkLimit))   // brak drogi ladowej (wyspa) - ladem i morzem
                     try { d = m.GetDistance(market, castle, market.HasPort, castle.HasPort, MobileParty.NavigationType.All); } catch { d = -1f; }
-                if (!(d >= 0f && d < CartTownExit.BkLimit)) { why = "bez drogi"; _dNoRoad++; return null; }
+                if (!(d >= 0f && d < CartTownExit.BkLimit)) { why = "bez drogi"; if (count) _dNoRoad++; return null; }
                 var s = Settings.Current;
-                if (s.MarketMaxDistance > 0f && d > s.MarketMaxDistance) { why = "za daleko"; _dTooFar++; return null; }
+                if (s.MarketMaxDistance > 0f && d > s.MarketMaxDistance) { why = "za daleko"; if (count) _dTooFar++; return null; }
                 dist = d;
                 return market;
             }
@@ -132,7 +155,7 @@ namespace Armoury
         }
 
         /// <summary>C3: zamowienie w drodze - zloto juz w kasie miasta, sztuki zdjete z jego polki.</summary>
-        internal static void Place(Settlement castle, Settlement market, Clan payer, List<Line> lines, int paid, float dist, bool atPieceLimit = false, bool atBudgetLimit = false)
+        internal static void Place(Settlement castle, Settlement market, Clan payer, List<Line> lines, int paid, float dist, bool atPieceLimit = false, bool atBudgetLimit = false, int pursePaid = 0)
         {
             try
             {
@@ -141,10 +164,14 @@ namespace Armoury
                 double perDay = Math.Max(1.0, MarketCarts.PerDay(s));
                 int days = Math.Max(1, (int)Math.Ceiling(Math.Max(0f, dist) / perDay));
                 int today = Today();
-                var o = new Order { Castle = castle, Market = market, PayerClan = payer, FactionAtOrder = castle.MapFaction, DayOrdered = today, DayDue = today + days, Paid = paid };
+                var o = new Order { Castle = castle, Market = market, PayerClan = payer, FactionAtOrder = castle.MapFaction, DayOrdered = today, DayDue = today + days, Paid = paid,
+                                    PursePaid = Math.Max(0, Math.Min(paid, pursePaid)) };
                 o.Lines.AddRange(lines);
                 _orders.Add(o);
                 AddTransit(o, +1);
+                _dPurseGold += o.PursePaid;
+                bool up = lines.TrueForAll(l => l.Bucket == UpgradeBucket);
+                if (up) { _dUpOrders++; _dUpPieces += o.Pieces; _dUpGold += paid; _dTowns.Add(market); return; }   // dozbrajanie - osobny licznik
                 _dOrders++; _dTowns.Add(market); _dPieces += o.Pieces; _dGold += paid;
                 if (atPieceLimit) _dPieceLimit++; else if (atBudgetLimit) _dBudgetLimit++;
             }
@@ -193,11 +220,17 @@ namespace Armoury
                     // dostawa (zmiana pana w tym samym krolestwie / pan zginal - towar jest dla ludzi zalogi, przechodzi z zamkiem)
                     int pcs = 0;
                     foreach (var l in o.Lines)
-                        if (l.El.Item != null && l.N > 0 && AiGear.AddToArmory(g, l.El.Item, l.N))
+                    {
+                        if (l.El.Item == null || l.N <= 0) continue;
+                        if (AiGear.AddToArmory(g, l.El.Item, l.N))
                         {
                             pcs += l.N;
                             try { AiWear.NoteBought(g, l.El, l.N); } catch { }   // recenzja 171: obita z polki miasta dojezdza obita (zapis zuzycia zalogi)
                         }
+                        // sklad7 (K1: AddToArmory mowi prawde) - DTE nie przyjal sztuki (czarna lista): dojechala, ale zbrojownia jej nie bierze -
+                        // zostaje na polce zamku (kupcy wywioza ja do miast), zamiast zniknac
+                        else if (o.Castle.ItemRoster != null) { o.Castle.ItemRoster.AddToCounts(l.El, l.N); _dRefusedPcs += l.N; }
+                    }
                     _dArrived++; _dArrivedPieces += pcs; _dArrivedDays += today - o.DayOrdered;
                     done.Add(o);
                 }
@@ -216,13 +249,22 @@ namespace Armoury
             _dBack++; _dBackPieces += pcs;
             if (!refund) return;
             var leader = o.PayerClan != null && !o.PayerClan.IsEliminated ? o.PayerClan.Leader : null;
-            if (leader == null || !leader.IsAlive || o.Market == null || o.Market.Town == null) { _dBackNoRefund++; return; }
+            if (leader != null && !leader.IsAlive) leader = null;
+            // sklad7 (K1): czesc z sakiewki zalogi wraca do sakiewki zalogi - tylko gdy zamek jest dalej w rekach strony, ktora zamawiala (ludzie ci sami);
+            // zamek stracony - ludzi zalogi juz tam nie ma, zwrot dostaje pan (jak cala zaplata w 171)
+            var g = o.Castle != null && o.Castle.Town != null ? o.Castle.Town.GarrisonParty : null;
+            bool toPurse = o.PursePaid > 0 && g != null && o.Castle.MapFaction == o.FactionAtOrder;
+            if ((leader == null && !toPurse) || o.Market == null || o.Market.Town == null) { _dBackNoRefund++; return; }
             int r = Math.Min(o.Paid, Math.Max(0, o.Market.Town.Gold));
             if (r <= 0) return;
-            o.Market.Town.ChangeGold(-r);
-            leader.ChangeHeroGold(r);
-            MoneyLedger.Note(MoneyLedger.NGear, o.Market, -r);
-            _dRefund += r;
+            int rp = toPurse ? Math.Min(r, o.PursePaid) : 0, rl = r - rp;
+            if (leader == null) rl = 0;   // bez pana - tylko czesc sakiewki (reszta zostaje w kasie miasta, jak przy wymarlym rodzie)
+            if (rp + rl <= 0) return;
+            o.Market.Town.ChangeGold(-(rp + rl));
+            if (rp > 0) { MenPurse.Add(g, rp); _dPurseRefund += rp; }
+            if (rl > 0) leader.ChangeHeroGold(rl);
+            MoneyLedger.Note(MoneyLedger.NGear, o.Market, -(rp + rl));
+            _dRefund += rp + rl;
         }
 
         private static void Flush(int today)
@@ -242,12 +284,15 @@ namespace Armoury
               .Append(", zamek u obcych po pokoju ").Append(_dBackPeace).Append(", rod wymarly i zamek u obcych ").Append(_dBackForeign).Append(", 30 dob ").Append(_dBack30).Append(", bez odbiorcy zwrotu ").Append(_dBackNoRefund)
               .Append("); bez zamowienia: bez miasta ").Append(_dNoTown).Append(", oblezenie albo wojna ").Append(_dSiegeWar).Append(", bez drogi ").Append(_dNoRoad)
               .Append(", za daleko ").Append(_dTooFar).Append(", przerwa (co ").Append(Math.Max(1, Settings.Current.GarrisonOrderDays)).Append(" doby) ").Append(_dPause)
-              .Append("; brak towaru w miescie: ").Append(_dUnmet).Append(" koszykow (zamowienia dla warsztatow); potkniecia ").Append(_stumbles).Append('.');
+              .Append("; brak towaru w miescie: ").Append(_dUnmet).Append(" koszykow (zamowienia dla warsztatow)")
+              .Append("; sklad7: dozbrajanie wozem (lepsze za swoje) ").Append(_dUpOrders).Append(" zamowien, ").Append(_dUpPieces).Append(" szt. za ").Append(_dUpGold)
+              .Append(" zl; z sakiewek zalog ").Append(_dPurseGold).Append(" zl (zwrot do sakiewek ").Append(_dPurseRefund).Append("); DTE nie przyjal przy dostawie - na polke zamku ")
+              .Append(_dRefusedPcs).Append(" szt.; potkniecia ").Append(_stumbles).Append('.');
             Log.Info(sb.ToString());
             ClearDay(); _stumbles = 0;
         }
 
-        // ------------------------------------------------------------ zapis: zamek|miasto|rod|frakcja|dobaZam|dobaPrzyj|zaplacone|przedmiot:modyfikator:ile:koszyk;...~
+        // ------------------------------------------------------------ zapis: zamek|miasto|rod|frakcja|dobaZam|dobaPrzyj|zaplacone[/z sakiewki]|przedmiot:modyfikator:ile:koszyk;...~
         internal static string Export()
         {
             if (_pending != null) ResolvePending("zapis przed startem sesji");
@@ -257,7 +302,7 @@ namespace Armoury
                 if (o.Castle == null || o.Market == null) continue;
                 sb.Append(o.Castle.StringId).Append('|').Append(o.Market.StringId).Append('|').Append(o.PayerClan != null ? o.PayerClan.StringId : "")
                   .Append('|').Append(o.FactionAtOrder != null ? o.FactionAtOrder.StringId : "").Append('|').Append(o.DayOrdered).Append('|').Append(o.DayDue)
-                  .Append('|').Append(o.Paid).Append('|');
+                  .Append('|').Append(o.Paid).Append(o.PursePaid > 0 ? "/" + o.PursePaid : "").Append('|');   // sklad7: "zaplacone/z sakiewki"
                 foreach (var l in o.Lines)
                 {
                     if (l.El.Item == null || l.N <= 0) continue;
@@ -304,8 +349,10 @@ namespace Armoury
                     int d0, d1, paid;
                     int.TryParse(a[4], NumberStyles.Integer, CultureInfo.InvariantCulture, out d0);
                     int.TryParse(a[5], NumberStyles.Integer, CultureInfo.InvariantCulture, out d1);
-                    int.TryParse(a[6], NumberStyles.Integer, CultureInfo.InvariantCulture, out paid);
-                    var o = new Order { Castle = castle, Market = market, PayerClan = payer, FactionAtOrder = fac, DayOrdered = d0, DayDue = d1, Paid = paid };
+                    int purse = 0; var pp = a[6].Split('/');
+                    int.TryParse(pp[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out paid);
+                    if (pp.Length > 1) int.TryParse(pp[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out purse);
+                    var o = new Order { Castle = castle, Market = market, PayerClan = payer, FactionAtOrder = fac, DayOrdered = d0, DayDue = d1, Paid = paid, PursePaid = Math.Max(0, Math.Min(paid, purse)) };
                     foreach (var tok in a[7].Split(';'))
                     {
                         if (tok.Length == 0) continue;

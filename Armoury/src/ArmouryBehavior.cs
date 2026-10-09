@@ -93,6 +93,8 @@ namespace Armoury
         // co sam wrzucilem - lupy 60% to wlasnosc wojska"): itemId -> ile sztuk
         // nalezy do gracza; ekran zbrojowni pokazuje wylacznie te sztuki
         private Dictionary<string,int> _playerStock = new Dictionary<string,int>();
+        // K1 (przeglad): licznik zmian ksiegi (MenPurse.SettlePlayerBook liczy porzadek tylko po zmianie) - tylko w pamieci
+        internal static int StockVersion;
 
         internal static int StockOf(string id)
         {
@@ -113,6 +115,7 @@ namespace Armoury
                 if (self == null || string.IsNullOrEmpty(id) || n <= 0) return;
                 int v; self._playerStock.TryGetValue(id, out v);
                 self._playerStock[id] = v + n;
+                StockVersion++;
             }
             catch { }
         }
@@ -287,6 +290,7 @@ namespace Armoury
                 int v; self._playerStock.TryGetValue(id, out v);
                 v -= n;
                 if (v <= 0) self._playerStock.Remove(id); else self._playerStock[id] = v;
+                StockVersion++;
             }
             catch { }
         }
@@ -311,6 +315,7 @@ namespace Armoury
                 var self = Instance;
                 if (self == null || snap == null) return;
                 self._playerStock = new Dictionary<string, int>(snap);
+                StockVersion++;
             }
             catch { }
         }
@@ -377,6 +382,7 @@ namespace Armoury
                     if (book <= have) continue;
                     ghost += book - have;
                     if (have <= 0) self._playerStock.Remove(id); else self._playerStock[id] = have;
+                    StockVersion++;
                 }
                 if (ghost > 0)
                     Log.Info("ReconcileStock(" + why + "): ksiega gracza przycieta o " + ghost
@@ -386,7 +392,7 @@ namespace Armoury
         }
         private Dictionary<string,int> _prisonerBaseline;
 
-        public ArmouryBehavior() { Instance = this; HistoricalPrices.Reset(); MaterialLaw.Reset(); WesterosClimate.Reset(); OutlawLaw.Reset(); PopulationLaw.Reset(); WorkshopLaw.Reset(); IronBank.Reset(); MarketGlut.Reset(); ArmsPricing.Reset(); StartKit.Reset(); AiGear.Reset(); Levy.Reset(); VolunteerKit.Reset(); LevyGold.Reset(); WearKeep.Reset(); UniqueSpoils.Reset(); BuildDiary.Reset(); BuildFunding.Reset(); KingdomLedger.Reset(); ColdStart.Reset(); MenPurse.Reset(); ArmyClothing.Reset(); AiWear.Reset(); SmithHours.Reset(); RecruitKit.Reset(); OreLedger.Reset(); GoodsLedger.Reset(); FreeSupplies.Reset(); VillageWoodlot.Reset(); SpoilsSeal.Reset(); MarketRoad.Reset(); MarketCarts.Reset(); VillageClogDiag.Reset(); CartTownExit.Reset(); MoneyLedger.Reset(); PeopleLedger.Reset(); CaravanBulk.Reset(); StartStock.Reset(); MineralOnce.Reset(); SoldierPay.Reset(); KingdomTreasury.Reset(); RecruitCost.Reset(); NightRest.ResetWorld(); WorldMeasure.Reset(); CirculationWindows.Reset(); ClanIncomeBook.Reset(); LosersFlee.Reset(); PrisonerLaw.Reset(); RecruitSources.Reset(); GarrisonCarts.Reset(); GarrisonArmory.Reset(); ArmsDrill.Reset(); CaravanAmmo.Reset(); ArmsLeaks.Reset(); SupplyDemand.ResetOrders(); MaterialOrders.Reset(); RawNoRot.Reset(); ArmsScrap.Reset(); }   // stan jednej kampanii nie przecieka do drugiej (audyt 04.10)
+        public ArmouryBehavior() { Instance = this; HistoricalPrices.Reset(); MaterialLaw.Reset(); WesterosClimate.Reset(); OutlawLaw.Reset(); PopulationLaw.Reset(); WorkshopLaw.Reset(); IronBank.Reset(); MarketGlut.Reset(); ArmsPricing.Reset(); StartKit.Reset(); AiGear.Reset(); Levy.Reset(); VolunteerKit.Reset(); LevyGold.Reset(); WearKeep.Reset(); UniqueSpoils.Reset(); BuildDiary.Reset(); BuildFunding.Reset(); KingdomLedger.Reset(); ColdStart.Reset(); MenPurse.Reset(); ArmyClothing.Reset(); AiWear.Reset(); SmithHours.Reset(); RecruitKit.Reset(); OreLedger.Reset(); GoodsLedger.Reset(); FreeSupplies.Reset(); VillageWoodlot.Reset(); SpoilsSeal.Reset(); MarketRoad.Reset(); MarketCarts.Reset(); VillageClogDiag.Reset(); CartTownExit.Reset(); MoneyLedger.Reset(); PeopleLedger.Reset(); CaravanBulk.Reset(); StartStock.Reset(); MineralOnce.Reset(); SoldierPay.Reset(); KingdomTreasury.Reset(); RecruitCost.Reset(); NightRest.ResetWorld(); WorldMeasure.Reset(); CirculationWindows.Reset(); ClanIncomeBook.Reset(); LosersFlee.Reset(); PrisonerLaw.Reset(); RecruitSources.Reset(); GarrisonCarts.Reset(); GarrisonArmory.Reset(); ArmsDrill.Reset(); CaravanAmmo.Reset(); ArmsLeaks.Reset(); SupplyDemand.ResetOrders(); MaterialOrders.Reset(); RawNoRot.Reset(); ArmsScrap.Reset(); MenUpgrade.Reset(); GarrisonKit.Reset(); QuartermasterLaw.Reset(); }   // stan jednej kampanii nie przecieka do drugiej (audyt 04.10)
 
         public override void SyncData(IDataStore dataStore)
         {
@@ -405,6 +411,7 @@ namespace Armoury
                 dataStore.SyncData("arm_condition", ref _condition);
                 dataStore.SyncData("arm_projects", ref _projects);
                 dataStore.SyncData("arm_player_stock", ref _playerStock);
+                StockVersion++;
                 dataStore.SyncData("arm_ammo_refund_v1", ref _ammoRefundDone);
                 dataStore.SyncData("arm_lore_purge_v1", ref _lorePurged);
                 if (dataStore.IsSaving) _armoryWear = BuildArmoryWearSnapshot();
@@ -438,6 +445,14 @@ namespace Armoury
                 string purse = MenPurse.Export();
                 SaveText.Sync(dataStore, "arm_menpurse", ref purse);
                 if (dataStore.IsLoading) MenPurse.Import(purse);
+                // K1 (przeglad, A3): ile z sakiewek ludzie odlozyli na lepszy sprzet (stary zapis bez klucza - zero, jak dotad)
+                try
+                {
+                    string saved = MenPurse.ExportSaved();
+                    SaveText.Sync(dataStore, "arm_mensaved", ref saved);
+                    if (dataStore.IsLoading) MenPurse.ImportSaved(saved);
+                }
+                catch (Exception e) { Log.Error("SyncData.MenSaved", e); }
                 // 150: odziez wojska - potrzeba czekajaca na zakup (partie i zalogi)
                 string cloth = ArmyClothing.Export();
                 SaveText.Sync(dataStore, "arm_armyclothing", ref cloth);
@@ -504,6 +519,8 @@ namespace Armoury
             }
             catch (Exception e) { Log.Error("SyncData.MendStock", e); }
             // 171: zamowienia zamkow w drodze i zbrojownie zalog (DTE ich nie zapisuje) - kazdy klucz we wlasnym try; Export tylko przy zapisie
+            // sklad7 (scalenie K1): JEDEN zapis zbrojowni zalog - klucz "arm_garrisonarmory" prowadzi tylko GarrisonArmory (format v1|); K1c zapisywal
+            // ten sam klucz drugi raz (GarrisonKit.ExportArmories, inny format) - usuniete; GarrisonArmory.Restore czyta tez dawny format K1c
             // (krytyka 8: przy wczytaniu Export przechodzilby osady i zbrojownie DTE w trakcie deserializacji); brak klucza = null
             try { string gc = dataStore.IsSaving ? GarrisonCarts.Export() : null; SaveText.Sync(dataStore, "arm_garrisoncarts", ref gc); if (dataStore.IsLoading) GarrisonCarts.Import(gc); }
             catch (Exception e) { Log.Error("SyncData.arm_garrisoncarts", e); }
@@ -536,6 +553,7 @@ namespace Armoury
             CampaignEvents.OnSettlementLeftEvent.AddNonSerializedListener(this, MenPurse.OnLeft);
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, delegate { try { TroopSelfMend.Hourly(); } catch { } });
             CampaignEvents.DailyTickPartyEvent.AddNonSerializedListener(this, AiGear.OnDailyTickParty);
+            CampaignEvents.DailyTickPartyEvent.AddNonSerializedListener(this, MenPurse.OnDailyTickParty);   // K1 (A4): doba postoju druzyny gracza w miescie - braki i lepsze za swoje
             CampaignEvents.DailyTickPartyEvent.AddNonSerializedListener(this, UniqueSpoils.OnDailyTickParty);
             CampaignEvents.DailyTickPartyEvent.AddNonSerializedListener(this, ArmyClothing.OnDailyTickParty);   // 150: zuzycie odziezy w partiach rodow
             // SUWAKI MCM NA ZYWO (Jeff 03.09: "nadal 1 predkosc, o co chodzi" -
@@ -1016,7 +1034,7 @@ namespace Armoury
             try { GarrisonCarts.ResolvePending("wczytanie"); } catch (Exception e) { Log.Error("GarrisonCarts.ResolvePending", e); }
             try { WorkshopLaw.ResolvePending("wczytanie"); } catch (Exception e) { Log.Error("WorkshopLaw.ResolvePending", e); }   // 174.0b: robota w toku warsztatow z zapisu (przed pierwszym cyklem)
             try { MaterialOrders.ResolvePending("wczytanie"); } catch (Exception e) { Log.Error("MaterialOrders.ResolvePending", e); }   // 174.2: kontrakty surowca na karawany z zapisu
-            try { GarrisonArmory.Restore("wczytanie"); } catch (Exception e) { Log.Error("GarrisonArmory.Restore", e); }
+            try { GarrisonArmory.Restore("wczytanie"); } catch (Exception e) { Log.Error("GarrisonArmory.Restore", e); }   // sklad7: jedyne odtworzenie zbrojowni zalog (K1c GarrisonKit.RestoreArmories usuniete)
             try { RecruitSources.ApplyLate(); } catch (Exception e) { Log.Error("RecruitSources.ApplyLate", e); }
             try { ArmsDrill.EnsureHooks(); } catch (Exception e) { Log.Error("ArmsDrill.EnsureHooks", e); }
             try { FixCharcoalWeight(); } catch (Exception e) { Log.Error("FixCharcoalWeight", e); }   // wpis 87 (audyt pkt 11d): waga wegla PRZED wycena
@@ -1047,6 +1065,7 @@ namespace Armoury
             try { ValyrianSteel.Rename(); } catch (Exception e) { Log.Error("ValyrianSteel.Rename", e); }
             try { Restitution0831(); } catch (Exception e) { Log.Error("Restitution0831", e); }
             try { IronBank.AddMenus(starter); } catch (Exception e) { Log.Error("IronBank.AddMenus", e); }
+            try { GarrisonKit.AddMenus(starter); } catch (Exception e) { Log.Error("GarrisonKit.AddMenus", e); }   // K1 (B6): "Hand kit to the garrison"
             try { SmithMenu.Add(starter); Log.Info("Menu kowala dodane."); }
             catch (Exception e) { Log.Error("OnSessionLaunched", e); }
             try { CleanseAmmo(); } catch (Exception e) { Log.Error("CleanseAmmo", e); }
@@ -1260,6 +1279,7 @@ namespace Armoury
             // wchodzilo o poziom glebiej i rozpiska pokazywala gole liczby vanilli
             try { TerrainEase.DailyAudit(); } catch (Exception e) { Log.Error("SpeedAudit", e); }
             try { WorldMeasure.Daily(); } catch (Exception e) { Log.Error("WorldMeasure.Daily", e); }   // T6: linia "Miara: marsz" (tylko log)
+            try { MenUpgrade.Touch(); } catch (Exception e) { Log.Error("MenUpgrade.Touch", e); }   // K1: linia "Dozbrajanie: dzien" (poprzednia doba, codziennie)
             try { PlagueWatch.DailyReport(); } catch (Exception e) { Log.Error("PlagueWatch", e); }
             try { InfluenceWatch.DailyReport(); } catch (Exception e) { Log.Error("InfluenceWatch", e); }
             try { WesterosClimate.Daily(); } catch (Exception e) { Log.Error("WesterosClimate.Daily", e); }   // biale kruki: koniec pory roku

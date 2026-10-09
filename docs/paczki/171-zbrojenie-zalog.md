@@ -2,6 +2,7 @@
 
 Status: SAM PROJEKT PO KRYTYCE (08.10.2026, noc; odpowiedzi na 17 uwag - rozdz. 17). Nic nie zbudowane, nic nie wgrane, nic nie zacommitowane - commit robi wykonawca.
 Wykonanie (08.10.2026): zaimplementowane w tym drzewie razem z ta specyfikacja (build kod 0, NIEWGRANE - DO SPRAWDZENIA w autotescie); odchylenia wykonawcy - wpis 171 w CHANGELOG.md, akapit "Odchylenia od specyfikacji".
+sklad7 (scalenie z K1, 09.10): C9a obejmuje takze zalogi gracza (od K1 zaloga walczy tylko tym, co ma); C10 sprzedaje regula K1 (po dopasowaniu, trzecia panu, reszta do sakiewki zalogi) w kolejce 171; C2 placi najpierw sakiewka zalogi; zalogi gracza w systemie przy sakiewce (`GarrisonArmory.InSystem`), nie tylko przy `GarrisonBuysGearPlayer`; D4 - koszyk do sufitu jednostki K1c. Szczegoly: CHANGELOG "sklad7".
 Drzewo robocze (jedyne miejsce zmian): `SCR3\dzien-6\zaloga171\repo`, galaz `w-toku/171-zbrojenie-zalog` od `2e235ea` (= wersja w grze, Armoury c01a54ba).
 SCR3 = `C:\Users\GAME\AppData\Local\Temp\claude\C--Program-Files--x86--Steam-steamapps-common-Mount---Blade-II-Bannerlord\3cf3e0ac-5529-4b68-a794-0edec69cfda7\scratchpad`.
 Build: `cd "<drzewo>/Armoury" && dotnet build Armoury.csproj -c Release -v q --nologo "-p:GameLibs=C:/Users/GAME/Bannerlor2-Realm-of-Thrones/libs" > build.log 2>&1; echo rc=$?`

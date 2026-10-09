@@ -1384,6 +1384,14 @@ namespace Armoury
             return ReferenceEquals(ks.List.GetValue(d.Target), rosters[0]) ? ks.Name : null;
         }
 
+        /// <summary>sklad7: czy ten InventoryLogic to ekran K1 "Hand kit to the garrison" (lewa strona = lista GarrisonKit).</summary>
+        private static bool GarrisonScreen(InventoryLogic logic)
+        {
+            if (logic == null || _fInvRosters == null) return false;
+            var rosters = _fInvRosters.GetValue(logic) as ItemRoster[];
+            return rosters != null && rosters.Length > 0 && GarrisonKit.IsScreenRoster(rosters[0]);
+        }
+
         /// <summary>Wstawiane przez transpiler w SPInventoryVM.HandleDone w miejsce InventoryLogic.GetElementCountOnSide(OtherInventory) - liczby rzeczy
         /// po lewej, od ktorej gra pyta "You are discarding items. Are you sure?" (tylko tryb Default i XP z oddania = 0). Na ekranie Spoils z trwala
         /// lewa strona 0 - Done zamyka bez pytania (Done niczego nie wyrzuca). Wszedzie indziej i przy wylaczonym DonationXpOff - liczba z gry.</summary>
@@ -1392,7 +1400,15 @@ namespace Armoury
             int n = logic.GetElementCountOnSide(side);   // oryginal (logic == null - wyjatek jak w grze)
             try
             {
-                if (n <= 0 || side != InventoryLogic.InventorySide.OtherInventory || !DonationXpLaw.On) return n;
+                if (n <= 0 || side != InventoryLogic.InventorySide.OtherInventory) return n;
+                // sklad7 (scalenie K1 + Z1b): ekran K1 "Hand kit to the garrison" (tryb Default, XP z oddania zgaszone) - Done nic nie wyrzuca: lewa strona
+                // idzie do zalogi albo wraca do sakw (GarrisonKit.OnDone); dotad gra pytala tam "You are discarding items"
+                if (GarrisonScreen(logic))
+                {
+                    Log.Info("SpoilsSeal: Done na ekranie zalogi (Hand kit to the garrison) bez pytania \"You are discarding items\" - " + n + " rodzajow po lewej idzie do zalogi albo wraca do sakw.");
+                    return 0;
+                }
+                if (!DonationXpLaw.On) return n;
                 string name = KeptLeftScreen(logic);
                 if (name == null) return n;
                 Log.Info("SpoilsSeal: Done na ekranie Spoils \"" + name + "\" bez pytania \"You are discarding items\" - " + n

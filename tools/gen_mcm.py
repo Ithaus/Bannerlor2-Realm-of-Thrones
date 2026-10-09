@@ -2,7 +2,7 @@ import re, sys, os
 
 # zakresy suwakow zgodne z przycieciem w kodzie: nazwa -> (min, max, format); reszta - wzor ogolny ponizej
 # T1: godziny obozu (regula ogolna [0, max(10, 4 x domyslna)] dawala przy domyslnej 0 suwak 0..10 - nie dalo sie ustawic 22)
-# recenzja 174: suwaki 174 zgodne z przycieciem w kodzie
+# recenzja 174: suwaki 174 zgodne z przycieciem w kodzie; K1: odsetki 0..100 (regula ogolna dawala 0..200 i 0..300)
 RANGES = {
     'CampStartHour': (0, 23, "0"),
     'CampEndHour': (0, 23, "0"),
@@ -16,6 +16,8 @@ RANGES = {
     'CarterPencePerKgPer100': (0.0, 0.15, "0.0000"),
     'SeaFreightShare': (0.0, 1.0, "0.00"),
     'TownMaterialOrderMinLoadKg': (0.0, 1000.0, "0"),
+    'MenGearSavePercent': (0, 100, "0"),
+    'GarrisonArmoryMinFillPercent': (0, 100, "0"),
 }
 
 def gen(module_dir, ns, display):

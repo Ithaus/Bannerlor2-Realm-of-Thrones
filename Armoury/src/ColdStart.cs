@@ -16,7 +16,7 @@ namespace Armoury
     /// A. Zbrojownie: DTE daje partii sprzet startowy przy jej utworzeniu (OnMobilePartyCreated), ale w nowej grze jego
     ///    OnNewGameCreated czysci PartyArmories PO utworzeniu partii startowych - wszyscy lordowie i garnizony zaczynali z pusta
     ///    zbrojownia, AiGear liczyl cale wojsko jako gole i pierwszego dnia wykupowal 5 296 sztuk z targow (sesja 02:55).
-    ///    Teraz: kazda partia lorda AI i garnizon dostaje do zbrojowni brakujace sztuki kompletu swoich ludzi (to, co juz nosza).
+    ///    Teraz: kazda partia lorda AI i garnizon (sklad7: takze garnizon gracza) dostaje do zbrojowni brakujace sztuki kompletu swoich ludzi (to, co juz nosza).
     /// B. Zapas kupiecki: kazde miasto dostaje na polki ColdStartMarketDays dni pracy swoich rzemieslnikow (rece wedle dobrobytu
     ///    x udzialy cechow), sztuki kultury miasta, glownie nizszych tierow; roboczodni na sztuke z Needs (jak w warsztatach).
     /// </summary>
@@ -55,7 +55,9 @@ namespace Armoury
                 if (mp == null || !mp.IsActive || mp.IsMainParty || mp.MemberRoster == null) continue;
                 bool garrison = mp.IsGarrison;
                 if (!mp.IsLordParty && !garrison) continue;
-                if (garrison && mp.CurrentSettlement != null && mp.CurrentSettlement.OwnerClan == Clan.PlayerClan) continue;
+                // sklad7 (scalenie K1, jedna regula gracz/AI): zaloga gracza tez dostaje dorobek - od K1 jest w systemie (sakiewka z zoldu) i walczy tylko tym,
+                // co ma w zbrojowni (GarrisonFightsWithArmoryOnly); dotad pomijana, bo poza systemem DTE kasowal jej zbrojownie co dobe. Nowa gra zwykle
+                // nie daje graczowi twierdzy - dotyczy startow z lennem.
                 int added = FillToTemplate(mp, dict);
                 if (added > 0) { parties++; pieces += added; if (garrison) garrisons++; }
             }

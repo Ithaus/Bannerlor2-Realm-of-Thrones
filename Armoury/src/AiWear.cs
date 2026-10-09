@@ -214,7 +214,9 @@ namespace Armoury
                     foreach (var mep in side.Parties)
                     {
                         var mp = mep != null && mep.Party != null ? mep.Party.MobileParty : null;
-                        if (mp == null || mp.IsMainParty || !mp.IsLordParty || !mp.IsActive) continue;
+                        // K1 (przeglad): takze zalogi - od K1-C dostaja w bitwie gracza lup DTE i walcza sprzetem ze zbrojowni (dotad lup zalogi
+                        // wchodzil jako sprawny, a jej sprzet nie obijal sie w walce; taki "sprawny" lup szedl do kupca albo graczowi jako zwrot B6)
+                        if (mp == null || mp.IsMainParty || !(mp.IsLordParty || mp.IsGarrison) || !mp.IsActive) continue;
                         _battleSince.Add(mp.StringId);   // przybytek do nastepnego spisu = lup (DTE doklada go w tym samym zdarzeniu)
                         if (share <= 0f) continue;
                         // zuzycie walki: czesc sztuk W UZYCIU (do liczby ludzi) - sprawne staja sie obite
@@ -260,6 +262,36 @@ namespace Armoury
             AddWorn(mp.StringId, it.StringId, worst, -1);
             Known(mp, it, -1);
             return Mod(worst);
+        }
+
+        /// <summary>K1c (przeglad K1b, "Hand kit to the garrison"): ile sztuk przedmiotu w zbrojowni partii jest obitych i w jakim stanie - bez
+        /// zdejmowania (TakeCondition zdejmuje). Po spisie (Sync), jak TakeCondition. Wylaczone zuzycie - pusto.</summary>
+        internal static List<KeyValuePair<ItemModifier, int>> WornSplit(MobileParty mp, ItemObject it)
+        {
+            var list = new List<KeyValuePair<ItemModifier, int>>();
+            if (!On || mp == null || it == null) return list;
+            try
+            {
+                Sync(mp);
+                Dictionary<string, Dictionary<string, int>> byItem; Dictionary<string, int> byMod;
+                if (!_worn.TryGetValue(mp.StringId, out byItem) || !byItem.TryGetValue(it.StringId, out byMod)) return list;
+                foreach (var kv in byMod)
+                {
+                    if (kv.Value <= 0) continue;
+                    var m = Mod(kv.Key);
+                    if (m != null) list.Add(new KeyValuePair<ItemModifier, int>(m, kv.Value));
+                }
+            }
+            catch { list.Clear(); }
+            return list;
+        }
+
+        /// <summary>K1: sztuka wzieta przez TakeCondition nie poszla do kupca (kasa miasta pusta) - wraca do zbrojowni ze swoim stanem.</summary>
+        internal static void PutBack(MobileParty mp, ItemObject it, ItemModifier mod)
+        {
+            if (!On || mp == null || it == null) return;
+            if (mod != null && mod.PriceMultiplier < 1f && !MenPurse.HorseKind(it) && !ArmouryBehavior.NoWear(it)) AddWorn(mp.StringId, it.StringId, mod.StringId, 1);
+            Known(mp, it, 1);
         }
 
         private static void Known(MobileParty mp, ItemObject it, int d)

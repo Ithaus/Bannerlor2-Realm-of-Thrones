@@ -19,11 +19,14 @@ namespace Armoury
     ///    wczytaniu zalogi staly puste, a panowie kupowali wszystko od nowa (log 10-54-00: 490-870 tys. zl dziennie przez 12 dob, ok. 7.8 mln,
     ///    kapital Banku 700 -> 70 tys.). Armoury zapisuje zbrojownie wszystkich zalog (takze gracza) i po wczytaniu ustawia je z zapisu.
     ///  - C9a: pierwsze wczytanie zapisu sprzed 171 (brak klucza) - zalogi AI raz uzupelnione do wzorca swoich ludzi (ColdStart.FillToTemplate):
-    ///    to naprawa skutku bledu DTE (ten sprzet byl oplacony i lezal w zalogach przed zapisem), nie dosypka; zalogi gracza bez zmian.
+    ///    to naprawa skutku bledu DTE (ten sprzet byl oplacony i lezal w zalogach przed zapisem), nie dosypka. sklad7: takze zalogi gracza (od K1
+    ///    zaloga walczy tylko tym, co ma - bez dorobku bronilaby sie nago).
     ///  - A7 (Z2): lord zostawia ludzi w zalodze albo ich zabiera, rozwiazana partia wchodzi do zalogi - sprzet idzie z ludzmi miedzy zbrojowniami
     ///    DTE (gra przenosi samych ludzi); ludzie rozwiazanej partii, ktorzy odchodza, biora swoje komplety, a tabor ponad nie sprzedaje sie dla rodu.
     ///  - C10 (Z9): raz w tygodniu zaloga AI sprzedaje to, co ma ponad potrzebe swoich ludzi (i ludzi na patrolach BK) oraz zapas, na polke
-    ///    wlasnej osady po cenie skupu; zloto dostaje pan (ta sama regula co nadwyzki partii lorda - MenPurse).
+    ///    wlasnej osady po cenie skupu. sklad7 (scalenie K1): sprzedaje MenPurse.SellArmorySurplus - ta sama regula co nadwyzki partii lorda
+    ///    (po dopasowaniu, K1 A9): trzecia panu, reszta do sakiewki zalogi (bez sakiewki - wszystko panu); zalogi gracza w systemie (InSystem).
+    /// sklad7: JEDEN zapis zbrojowni zalog (klucz arm_garrisonarmory) - ten plik; K1c GarrisonKit.ExportArmories/RestoreArmories usuniete (LegacyK1c czyta ich format).
     /// Recenzja kodu 171: (1) zbrojownie partii lordow bez wodza / rozwiazywanych chroni AiGear.KeepGarrisonArmory (DTE kasowal je w dobie czekania na
     /// rozwiazanie, wiec A7 pkt 2 przenosil 0 szt.) i zapisuje Export (rekord "@partia" - DTE ich nie zapisuje); (2) stan sztuk (zapis obitych AiWear) idzie
     /// z ludzmi takze do i z zalog, C10 sprzedaje ze stanem; (3) lord zabierajacy ludzi zostawia sprzet ludzi zalogi na patrolach BK.
@@ -97,13 +100,27 @@ namespace Armoury
         }
 
         /// <summary>Typ (ItemType) -> sztuk wzorcow ludzi partii (bez bohaterow).</summary>
-        internal static Dictionary<int, int> NeedByType(MobileParty mp)
+        internal static Dictionary<int, int> NeedByType(MobileParty mp) { return NeedByType(mp != null ? mp.MemberRoster : null); }
+
+        /// <summary>sklad7: to samo dla rosteru (zaloga razem z ludzmi na patrolach BK - MenPurse.SellArmorySurplus).</summary>
+        internal static Dictionary<int, int> NeedByType(TroopRoster roster)
         {
             var need = new Dictionary<int, int>();
-            var roster = mp != null ? mp.MemberRoster : null;
             if (roster == null) return need;
             for (int i = 0; i < roster.Count; i++) { var el = roster.GetElementCopyAtIndex(i); AddNeed(need, el.Character, el.Number); }
             return need;
+        }
+
+        /// <summary>
+        /// sklad7 (scalenie 171 + K1) - JEDNA regula "kto jest w systemie zbrojenia zalog" (zakupy brakow i lepszego, zamowienia zamku, nadwyzki, cwiczenia
+        /// wedlug broni, autowerbunek z kompletem): zaloga AI zawsze; zaloga gracza - gdy ma sakiewke z zoldu (K1, GarrisonPurseEnabled - Jeff 09.10 K:
+        /// "dotyczy jego druzyny i jego zalog") albo GarrisonBuysGearPlayer (doplata z Twojej kiesy). Dotad 171 wpuszczal zalogi gracza tylko przy
+        /// GarrisonBuysGearPlayer, a K1 kupowal im z sakiewki - dwie reguly dla tej samej zalogi.
+        /// </summary>
+        internal static bool InSystem(Settlement st)
+        {
+            var s = Settings.Current;
+            return st == null || st.OwnerClan != Clan.PlayerClan || (s != null && (s.GarrisonBuysGearPlayer || MenUpgrade.GarrisonPurseOn));
         }
 
         private static Dictionary<CharacterObject, int> Snapshot(TroopRoster roster)
@@ -254,6 +271,8 @@ namespace Armoury
         /// Nadwyzka ponad potrzebe (po typach) i zapas keepPercent na polke targu po cenie skupu, najwyzej tyle, ile kasa udzwignie; zloto do payee.
         /// Najgorsze sztuki najpierw (tier, potem wartosc), bez koni i rzedow (Stajnia) i bez unikatow. Sztuka w stanie z ksiegi AiWear (partia lorda
         /// i - recenzja 171 - zaloga: zakupy, dostawy wozem, przeniesienia i autowerbunek zapisuja jej obite); zaloga przy wylaczonym AiWear - sprawna.
+        /// sklad7: juz TYLKO tabor rozwiazanej partii, ktorej ludzie odchodza (A7, keepPercent 0, zloto dla rodu). Nadwyzki zalog sprzedaje
+        /// MenPurse.SellArmorySurplus (SellWeek) - ta sama regula co nadwyzki lordow.
         /// </summary>
         internal static int SellSurplus(MobileParty mp, Dictionary<int, int> needByType, Settlement market, Hero payee, float keepPercent, string why, out int gold)
         {
@@ -431,7 +450,7 @@ namespace Armoury
                 Log.Info("Zbrojownie zalog (171): dzien " + today + " - komplet z ludzmi: lordowie zostawili w zalogach " + _dLeftMen + " ludzi (" + _dLeftPcs + " szt.), zabrali z zalog "
                          + _dTakenMen + " ludzi (" + _dTakenPcs + " szt.), rozwiazane partie do zalog " + _dDisbandIn + " (" + _dDisbandInPcs + " szt.), rozwiazane - ludzie odeszli "
                          + _dDisbandGone + " (komplety z ludzmi " + _dDisbandGoneKit + " szt., tabor sprzedany " + _dDisbandSold + " szt. za " + _dDisbandGold + " zl); nadwyzki zalog: sprzedalo "
-                         + _dSoldGarrisons + " z " + _dQueue + " zalog w kolejce, " + _dSoldPcs + " szt. za " + _dSoldGold + " zl (kasy osad -> panowie; w tym ludzie na patrolach BK policzeni "
+                         + _dSoldGarrisons + " z " + _dQueue + " zalog w kolejce, " + _dSoldPcs + " szt. za " + _dSoldGold + " zl (kasy osad -> trzecia panom, reszta sakiewkom zalog; w tym ludzie na patrolach BK policzeni "
                          + _dPatrolCounted + " zalogi); partie lordow bez wodza albo rozwiazywane - zbrojownia zachowana " + _dKeptLeaderless + "; potkniecia " + _stumbles + ".");
             ClearDay(); _stumbles = 0;
         }
@@ -448,28 +467,51 @@ namespace Armoury
                 if (g == null || (int)(g.Id.InternalValue % 7) != today % 7) continue;   // kazda zaloga raz na 7 dob (jak DTE GarbageCollectEquipments)
                 try
                 {
-                    if (st.OwnerClan == Clan.PlayerClan && !s.GarrisonBuysGearPlayer) continue;
+                    if (!InSystem(st)) continue;   // sklad7: zaloga gracza w systemie, gdy ma sakiewke (K1) albo GarrisonBuysGearPlayer
                     if (Undead.Party(g) || st.IsUnderSiege || g.MapEvent != null) continue;
                     var payee = st.OwnerClan != null ? st.OwnerClan.Leader : null;
-                    if (payee == null || !payee.IsAlive || st.ItemRoster == null) continue;
+                    if (payee != null && !payee.IsAlive) payee = null;
+                    // bez sakiewki zalogi cale zloto dostaje pan (171) - bez pana nie ma komu sprzedac; z sakiewka trzecia panu, reszta zalodze (K1 A9)
+                    if ((payee == null && !MenUpgrade.GarrisonPurseOn) || st.ItemRoster == null || st.Town == null) continue;
                     var arm = ArmoryOf(g);
                     if (arm == null || arm.Count == 0) continue;
                     _dQueue++;
-                    var need = NeedByType(g);
                     // ludzie zalogi na patrolu BK - sprzet zostal w twierdzy (GarrisonPartyComponent.CreateParty), nie sprzedajemy go
+                    TroopRoster roster = g.MemberRoster;
                     if (patrols == null) patrols = PatrolsToday();
                     List<MobileParty> pl;
                     if (patrols.TryGetValue(st, out pl) && pl.Count > 0)
                     {
-                        foreach (var p in pl) { var pn = NeedByType(p); foreach (var kv in pn) { int v; need.TryGetValue(kv.Key, out v); need[kv.Key] = v + kv.Value; } }
+                        roster = WithPatrols(g.MemberRoster, pl);
                         _dPatrolCounted++;
                     }
+                    // sklad7 (scalenie 171 C10 + K1 A9): JEDNA sprzedaz nadwyzek zalogi - regula K1 (po dopasowaniu: najpierw sztuki, ktorych nikt
+                    // nie udzwignie, potem najgorsze ponad komplet + zapas; ta sama co u lordow AI), w kolejce i na polke wlasnej osady z 171
                     int gold;
-                    int sold = SellSurplus(g, need, st, payee, s.SurplusKeepPercent, "zaloga", out gold);
+                    int sold = MenPurse.SellGarrisonSurplus(g, st, payee, roster, out gold);
                     if (sold > 0) { _dSoldGarrisons++; _dSoldPcs += sold; _dSoldGold += gold; }
                 }
                 catch (Exception e) { Stumble("SellWeek(" + st.StringId + ")", e); }
             }
+        }
+
+        /// <summary>sklad7: roster zalogi razem z ludzmi jej patroli BK (bez bohaterow) - do dopasowania nadwyzek (ich sprzet lezy w twierdzy).</summary>
+        private static TroopRoster WithPatrols(TroopRoster garrison, List<MobileParty> patrols)
+        {
+            var r = TroopRoster.CreateDummyTroopRoster();
+            var all = new List<TroopRoster> { garrison };
+            foreach (var p in patrols) if (p != null && p.MemberRoster != null) all.Add(p.MemberRoster);
+            foreach (var src in all)
+            {
+                if (src == null) continue;
+                for (int i = 0; i < src.Count; i++)
+                {
+                    var el = src.GetElementCopyAtIndex(i);
+                    if (el.Character == null || el.Character.IsHero || el.Number <= 0) continue;
+                    r.AddToCounts(el.Character, el.Number);
+                }
+            }
+            return r;
         }
 
         /// <summary>Recenzja 171: potrzeba (po typach) ludzi zalogi tej osady na patrolach BK - dla A7 (lord zabiera ludzi); mapa patroli raz na dobe.</summary>
@@ -590,6 +632,7 @@ namespace Armoury
             var dict = AiGear.Armories();
             if (dict == null) { Log.Info("Zbrojownie zalog (171): Dynamic Troop Equipment niedostepny - bez odtworzenia (" + why + ")."); return; }
             if (p == "v1|off") { Log.Info("Zbrojownie zalog (171): zapis zrobiony bez zbrojowni zalog (wylaczone w MCM przy zapisie) - jak przed 171."); return; }
+            if (p != null && !p.StartsWith("v1|", StringComparison.Ordinal) && p.IndexOf('>') < 0 && p.IndexOf(';') > 0) { LegacyK1c(p, dict, why); return; }   // sklad7: zapis z DLL probnej K1c
             if (p == null || !p.StartsWith("v1|", StringComparison.Ordinal)) { OldSave(why); return; }
             if (s == null || !s.GarrisonArmorySurvivesSave) { Log.Info("Zbrojownie zalog (171): zapis ma zbrojownie zalog, ale Garrison Armory Survives Save wylaczone - nie ustawiam (" + why + ")."); return; }
             var om = MBObjectManager.Instance;
@@ -638,7 +681,13 @@ namespace Armoury
                      + " szt., nieznane przedmioty " + unknown + "); partie lordow bez wodza albo rozwiazywane " + parties + ", " + ppcs + " szt. (partii juz nie ma " + noParty + ").");
         }
 
-        /// <summary>C9a: zapis sprzed 171 - zalogi AI raz uzupelnione do wzorca swoich ludzi (zalogi gracza i Innych bez zmian).</summary>
+        /// <summary>
+        /// C9a: zapis sprzed 171 - zalogi raz uzupelnione do wzorca swoich ludzi (ta sama regula co ColdStart - decyzja Jeffa 7 "dorobek startowy zostaje").
+        /// sklad7 (scalenie K1): TAKZE zalogi gracza. Od K1 (Jeff 09.10 B, GarrisonFightsWithArmoryOnly) zaloga w bitwie walczy tylko tym, co ma w zbrojowni,
+        /// a w zapisie sprzed tej wersji zbrojownie wszystkich zalog sa puste (DTE ich nie zapisywal; zalogi gracza nic nie kupowaly) - bez dorobku zalogi
+        /// Jeffa bronilyby sie nago przy pierwszym szturmie, ktory toczy osobiscie (dotad walczyly w pelnym wzorcu za darmo). Jedna regula gracz/AI.
+        /// Inni - bez zmian (nie kupuja sprzetu).
+        /// </summary>
         private static void OldSave(string why)
         {
             var s = Settings.Current;
@@ -647,22 +696,54 @@ namespace Armoury
                 Log.Info("Zbrojownie zalog (171): stary zapis - brak klucza, odtworzenie wylaczone w MCM; zalogi bez zbrojowni do pierwszego zapisu z 171.");
                 return;
             }
-            int garrisons = 0, pcs = 0, seen = 0;
+            int garrisons = 0, pcs = 0, seen = 0, mine = 0, minePcs = 0;
             foreach (var st in Settlement.All)
             {
                 try
                 {
                     if (st == null || !st.IsFortification || st.Town == null || st.Town.GarrisonParty == null) continue;
                     var g = st.Town.GarrisonParty;
-                    if (st.OwnerClan == Clan.PlayerClan || Undead.Party(g)) continue;
+                    if (Undead.Party(g)) continue;
+                    bool player = st.OwnerClan == Clan.PlayerClan;
                     seen++;
                     int n = ColdStart.FillToTemplate(g);
-                    if (n > 0) { garrisons++; pcs += n; }
+                    if (n > 0) { garrisons++; pcs += n; if (player) { mine++; minePcs += n; } }
                 }
                 catch (Exception e) { Stumble("OldSave", e); }
             }
-            Log.Info("Zbrojownie zalog (171): stary zapis bez zbrojowni zalog (" + why + ") - odtworzone po bledzie DTE " + garrisons + " zalog AI z " + seen + ", " + pcs
-                     + " szt. (wzorce ich ludzi, jednorazowo; zalogi gracza bez zmian).");
+            Log.Info("Zbrojownie zalog (171): stary zapis bez zbrojowni zalog (" + why + ") - jednorazowy dorobek startowy (regula ColdStart, wzorce ich ludzi): " + garrisons + " zalog z " + seen
+                     + ", " + pcs + " szt.; w tym zalogi gracza " + mine + ", " + minePcs + " szt. (sklad7: zaloga walczy tylko tym, co ma - bez dorobku bronilaby sie nago).");
+        }
+
+        /// <summary>sklad7: zapis z DLL probnej K1c (ten sam klucz, format "osada,przedmiot,ile;") - te zbrojownie odtwarzamy jak v1 (zastepujac to, co dal DTE).</summary>
+        private static void LegacyK1c(string p, Dictionary<MBGUID, Dictionary<ItemObject, int>> dict, string why)
+        {
+            var om = MBObjectManager.Instance;
+            var done = new HashSet<MobileParty>();
+            int garrisons = 0, pcs = 0, noGarrison = 0, replaced = 0, unknown = 0;
+            foreach (var rec in p.Split(';'))
+            {
+                try
+                {
+                    var a = rec.Split(','); int n;
+                    if (a.Length != 3 || a[0].Length == 0 || a[1].Length == 0 || !int.TryParse(a[2], out n) || n <= 0) continue;
+                    Settlement st = null; try { st = om.GetObject<Settlement>(a[0]); } catch { }
+                    var g = st != null && st.Town != null ? st.Town.GarrisonParty : null;
+                    if (g == null) { noGarrison++; continue; }
+                    if (done.Add(g))
+                    {
+                        Dictionary<ItemObject, int> arm;
+                        if (dict.TryGetValue(g.Id, out arm) && arm != null && arm.Count > 0) { foreach (var v in arm.Values) if (v > 0) replaced += v; arm.Clear(); }
+                        garrisons++;
+                    }
+                    ItemObject it = null; try { it = om.GetObject<ItemObject>(a[1]); } catch { }
+                    if (it == null) { unknown += n; continue; }
+                    if (AiGear.AddToArmory(g, it, n)) pcs += n;
+                }
+                catch (Exception e) { Stumble("LegacyK1c", e); }
+            }
+            Log.Info("Zbrojownie zalog (171): zapis w dawnym formacie K1c (" + why + ") - przywrocone " + garrisons + " zalog, " + pcs + " szt. (bez zalogi " + noGarrison
+                     + ", zastapione z DTE " + replaced + " szt., nieznane przedmioty " + unknown + ").");
         }
 
         // ------------------------------------------------------------ wpiecie (flagi na caly proces)
