@@ -231,7 +231,7 @@ namespace Armoury
                 case CraftingMaterials.Iron3: return s.HistIronPerKg;
                 case CraftingMaterials.Iron4: return s.HistSteelPerKg;
                 case CraftingMaterials.Iron5: return s.HistFineSteelPerKg;
-                default: return s.HistValyrianPerKg;
+                default: return s.HistCastleSteelPerKg;   // 177-1: stal zamkowa (dawniej HistValyrianPerKg 200 - "skarb")
             }
         }
 
@@ -466,7 +466,9 @@ namespace Armoury
                     if (def != kv.Value) { _defUsed.Add(cat); defLog.Add(kv.Key.StringId + " " + kv.Value + " -> " + def); }
                     int old = fromDef ? def : kv.Value;
                     if (old <= 0) { zeroLog.Add(kv.Key.StringId + " (" + cat.StringId + ")"); continue; }
-                    double l; sumLog.TryGetValue(cat, out l); sumLog[cat] = l + Math.Log((double)old / kv.Key.Value * BulkScale(kv.Key));   // za kg - ladunek to tyle samo towaru co 10 starych sztuk
+                    // 177-1 (krytyka pkt 8): sztaba 6 liczy sie do przelicznika kategorii po dawnej cenie (100 d) - tania stal zamkowa (6 d) nie
+                    // przesuwa popytu miast na cala kategorie "iron" (ruda i sztaby; bez tego /23.5 -> ok. /35); CastleSteel.RatioValue = Value dla reszty
+                    double l; sumLog.TryGetValue(cat, out l); sumLog[cat] = l + Math.Log((double)old / Math.Max(1, CastleSteel.RatioValue(kv.Key)) * BulkScale(kv.Key));   // za kg - ladunek to tyle samo towaru co 10 starych sztuk
                     int k; cnt.TryGetValue(cat, out k); cnt[cat] = k + 1;
                 }
                 var cats = new List<string>();
@@ -561,7 +563,9 @@ namespace Armoury
                     if (old <= 0) continue;
                     double l = Math.Log((double)old / it.Value * BulkScale(it));
                     own[it] = l;
-                    double a; sum.TryGetValue(cat, out a); sum[cat] = a + l;
+                    // 177-1: srednia kategorii (moneta popytu) z tym samym skladnikiem co przelicznik w Apply - sztaba 6 po dawnej cenie; waga sztuki (own) z prawdziwej
+                    double lr = CastleSteel.RatioValue(it) != it.Value ? Math.Log((double)old / Math.Max(1, CastleSteel.RatioValue(it)) * BulkScale(it)) : l;
+                    double a; sum.TryGetValue(cat, out a); sum[cat] = a + lr;
                     int k; cnt.TryGetValue(cat, out k); cnt[cat] = k + 1;
                 }
                 // 2. moneta popytu kategorii (logarytm): ten przelicznik, ktorym DemandPostfix naprawde dzieli popyt (_catRatio); kategorii

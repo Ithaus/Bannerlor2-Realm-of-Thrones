@@ -375,7 +375,9 @@ namespace Armoury
         public int IronValue = 157;                        // worth of one bar of iron (0.5 kg)
         public int SteelValue = 210;                       // worth of one bar of steel (0.5 kg)
         public int FineSteelValue = 281;                   // worth of one bar of fine steel (0.5 kg)
-        public int ValyrianSteelValue = 1000;              // worth of one bar of Valyrian steel (0.5 kg)
+        public int CastleSteelValue = 375;                 // worth of one bar of castle-forged steel (0.5 kg), the last grade of the ordinary chain
+        public bool TravellersNoIngots = true;             // Banner Kings travellers (craftsmen, serfs, nobles on the road) no longer carry iron bars of any grade or charcoal out of thin air - bars come only from smelting; the rest of their load is drawn exactly as before (off = Banner Kings as before)
+        public bool Tier6CastleSteel = true;               // tier 6 arms and armour count castle-forged steel as their metal everywhere - your forge, town workshops, repairs and their worth (one rule for tier 6; off = workshops and prices count fine steel for tier 6 as before; takes effect after reloading the game)
         public bool MineralsCountedOnce = true;            // Banner Kings lists the mineral of a mining village twice and so credited it twice a day (iron ore, salt, clay, silver); this strikes the second entry and counts the first one twice instead - the village digs exactly as much as before, but mines, village storehouses and village carts now all reckon with the same true output
         public float MineOutputMultiplier = 3f;            // iron mines dig this many times the old output - the workshops of the realm were starving for ore
         public float LumberOutputMultiplier = 3f;          // woodcutters fell this many times the old output - charcoal burners need wood by the cartload (a forge burns ~5 loads of wood per load of ore)
@@ -517,7 +519,7 @@ namespace Armoury
         public float HistIronPerKg = 3.5f;                 // refined iron, pence per kg
         public float HistSteelPerKg = 6f;                  // steel, pence per kg (estimate)
         public float HistFineSteelPerKg = 8f;              // fine steel, pence per kg (estimate)
-        public float HistValyrianPerKg = 200f;             // Valyrian steel, pence per kg - a lost art, priced as a rare treasure
+        public float HistCastleSteelPerKg = 12f;           // castle-forged steel, pence per kg (fine steel plus a fifth of the metal lost and double charcoal)
         public float HistLeatherPerKg = 4f;                // tanned leather, pence per kg
         public float HistLinenPerKg = 10f;                 // linen and canvas for padding, pence per kg
         public float HistSpecialFactor = 0.1f;             // horn, sinew and glue of bows, against the old game-scale bill

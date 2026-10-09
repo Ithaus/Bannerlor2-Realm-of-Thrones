@@ -19,8 +19,8 @@ namespace Armoury
     ///
     /// 1. Ceny (Value) wegla i sztabek z MCM, liczone lancuchem od drewna i rudy
     ///    (wegiel 9, surowka 87, zelazo kute 118, zelazo 157, stal 210, stal szl. 281,
-    ///    valyrianska 1000). Oryginaly zapamietane - XP za przetop liczymy od nich.
-    /// 2. Przetopy (postfix na GetRefiningFormulas, PRZED ValyrianSteel.DearRefine):
+    ///    stal zamkowa 375 - 177-1, dawniej "valyrianska" 1000). Oryginaly zapamietane - XP za przetop liczymy od nich.
+    /// 2. Przetopy (postfix na GetRefiningFormulas; 177-1: bez dawnego podwojnego wsadu stali 6 - ValyrianSteel.DearRefine zdjety):
     ///    1 drewno -> 4 wegla (perk CharcoalMaker 5); 1 ruda + 20 wegla -> 3 surowki
     ///    (perk IronMaker 4); dalej 5 sztabek nizszych + wegiel -> 4 wyzsze (strata metalu
     ///    jak przy zgrzewaniu - Jeff 04.10: 20% na stopien, 5 sztabek -> 4), progi perkow SteelMaker 1/2/3 jak w vanilla.
@@ -64,7 +64,7 @@ namespace Armoury
                     new KeyValuePair<CraftingMaterials, int>(CraftingMaterials.Iron3, s.IronValue),
                     new KeyValuePair<CraftingMaterials, int>(CraftingMaterials.Iron4, s.SteelValue),
                     new KeyValuePair<CraftingMaterials, int>(CraftingMaterials.Iron5, s.FineSteelValue),
-                    new KeyValuePair<CraftingMaterials, int>(CraftingMaterials.Iron6, s.ValyrianSteelValue),
+                    new KeyValuePair<CraftingMaterials, int>(CraftingMaterials.Iron6, s.CastleSteelValue),   // 177-1: stal zamkowa, zwykly stopien lancucha
                 };
                 var parts = new List<string>();
                 foreach (var kv in plan)

@@ -56,7 +56,7 @@ namespace Armoury
                 FairXpPatch.ApplyAll(_harmony);
                 DonationXpLaw.ApplyAll(_harmony);   // audyt 13 Z1 (Jeff 09.10): oddany sprzet nie uczy - XP perkow Giving Hands / Paid in Promise = 0, migawka handlu BK przy kazdym otwarciu handlu
                 ChargeTemperPatch.ApplyAll(_harmony);
-                ValyrianSteel.ApplyAll(_harmony);
+                CastleSteel.ApplyAll(_harmony);   // 177-1: wedrowcy BK bez sztab i wegla z niczego (dawny ValyrianSteel.DearRefine zdjety - stal zamkowa to zwykly stopien)
                 SmithAudit.ApplyAll(_harmony);
                 QuartermasterLaw.ApplyAll(_harmony);
                 MarketGlut.ApplyAll(_harmony);

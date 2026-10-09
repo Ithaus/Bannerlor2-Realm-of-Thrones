@@ -1276,9 +1276,17 @@ namespace Armoury
         [SettingPropertyGroup("Smithing materials")]
         public int FineSteelValue { get; set; } = 281;
 
-        [SettingPropertyInteger("Valyrian Steel Value", 0, 4000, "0", HintText = "worth of one bar of Valyrian steel (0.5 kg)")]
+        [SettingPropertyInteger("Castle Steel Value", 0, 1500, "0", HintText = "worth of one bar of castle-forged steel (0.5 kg), the last grade of the ordinary chain")]
         [SettingPropertyGroup("Smithing materials")]
-        public int ValyrianSteelValue { get; set; } = 1000;
+        public int CastleSteelValue { get; set; } = 375;
+
+        [SettingPropertyBool("Travellers No Ingots", HintText = "Banner Kings travellers (craftsmen, serfs, nobles on the road) no longer carry iron bars of any grade or charcoal out of thin air - bars come only from smelting; the rest of their load is drawn exactly as before (off = Banner Kings as before)")]
+        [SettingPropertyGroup("Smithing materials")]
+        public bool TravellersNoIngots { get; set; } = true;
+
+        [SettingPropertyBool("Tier6 Castle Steel", HintText = "tier 6 arms and armour count castle-forged steel as their metal everywhere - your forge, town workshops, repairs and their worth (one rule for tier 6; off = workshops and prices count fine steel for tier 6 as before; takes effect after reloading the game)")]
+        [SettingPropertyGroup("Smithing materials")]
+        public bool Tier6CastleSteel { get; set; } = true;
 
         [SettingPropertyBool("Minerals Counted Once", HintText = "Banner Kings lists the mineral of a mining village twice and so credited it twice a day (iron ore, salt, clay, silver); this strikes the second entry and counts the first one twice instead - the village digs exactly as much as before, but mines, village storehouses and village carts now all reckon with the same true output")]
         [SettingPropertyGroup("Smithing materials")]
@@ -1796,9 +1804,9 @@ namespace Armoury
         [SettingPropertyGroup("Iron bank")]
         public float HistFineSteelPerKg { get; set; } = 8f;
 
-        [SettingPropertyFloatingInteger("Hist Valyrian Per Kg", 0.00f, 800.00f, "0.00", HintText = "Valyrian steel, pence per kg - a lost art, priced as a rare treasure")]
+        [SettingPropertyFloatingInteger("Hist Castle Steel Per Kg", 0.00f, 48.00f, "0.00", HintText = "castle-forged steel, pence per kg (fine steel plus a fifth of the metal lost and double charcoal)")]
         [SettingPropertyGroup("Iron bank")]
-        public float HistValyrianPerKg { get; set; } = 200f;
+        public float HistCastleSteelPerKg { get; set; } = 12f;
 
         [SettingPropertyFloatingInteger("Hist Leather Per Kg", 0.00f, 16.00f, "0.00", HintText = "tanned leather, pence per kg")]
         [SettingPropertyGroup("Iron bank")]
@@ -3366,7 +3374,9 @@ namespace Armoury
             s.IronValue = IronValue;
             s.SteelValue = SteelValue;
             s.FineSteelValue = FineSteelValue;
-            s.ValyrianSteelValue = ValyrianSteelValue;
+            s.CastleSteelValue = CastleSteelValue;
+            s.TravellersNoIngots = TravellersNoIngots;
+            s.Tier6CastleSteel = Tier6CastleSteel;
             s.MineralsCountedOnce = MineralsCountedOnce;
             s.MineOutputMultiplier = MineOutputMultiplier;
             s.LumberOutputMultiplier = LumberOutputMultiplier;
@@ -3496,7 +3506,7 @@ namespace Armoury
             s.HistIronPerKg = HistIronPerKg;
             s.HistSteelPerKg = HistSteelPerKg;
             s.HistFineSteelPerKg = HistFineSteelPerKg;
-            s.HistValyrianPerKg = HistValyrianPerKg;
+            s.HistCastleSteelPerKg = HistCastleSteelPerKg;
             s.HistLeatherPerKg = HistLeatherPerKg;
             s.HistLinenPerKg = HistLinenPerKg;
             s.HistSpecialFactor = HistSpecialFactor;
