@@ -1,0 +1,44 @@
+<prefabs>
+	<game_entity name="arm_decal_battania_path_a" old_prefab_name="">
+		<transform position="0.000, 0.000, 0.000" rotation_euler="0.000, 0.000, 0.000"/>
+		<physics mass="1.000"/>
+		<components>
+			<decal_component material="decal_battania_path_a" argument="0.530, 0.530, 0.480, 0.010"/>
+		</components>
+	</game_entity>
+	<game_entity name="arm_decal_battania_path_b" old_prefab_name="">
+		<transform position="0.000, 0.000, 0.000" rotation_euler="0.000, 0.000, 0.000"/>
+		<physics mass="1.000"/>
+		<components>
+			<decal_component material="decal_battania_path_b" argument="0.530, 0.530, -0.010, 0.010"/>
+		</components>
+	</game_entity>
+	<game_entity name="arm_decal_empire_path_a" old_prefab_name="">
+		<transform position="0.000, 0.000, 0.000" rotation_euler="0.000, 0.000, 0.000"/>
+		<physics mass="1.000"/>
+		<components>
+			<decal_component material="decal_empire_path_a" argument="0.530, 0.530, 0.480, 0.010"/>
+		</components>
+	</game_entity>
+	<game_entity name="arm_decal_empire_path_b" old_prefab_name="">
+		<transform position="0.000, 0.000, 0.000" rotation_euler="0.000, 0.000, 0.000"/>
+		<physics mass="1.000"/>
+		<components>
+			<decal_component material="decal_empire_path_b" argument="0.530, 0.530, 0.000, 0.010"/>
+		</components>
+	</game_entity>
+	<game_entity name="arm_decal_khuzait_path_a" old_prefab_name="">
+		<transform position="0.000, 0.000, 0.000" rotation_euler="0.000, 0.000, 0.000"/>
+		<physics mass="1.000"/>
+		<components>
+			<decal_component material="decal_khuzait_path_a" argument="0.530, 0.530, 0.500, 0.010"/>
+		</components>
+	</game_entity>
+	<game_entity name="arm_decal_khuzait_path_b" old_prefab_name="">
+		<transform position="0.000, 0.000, 0.000" rotation_euler="0.000, 0.000, 0.000"/>
+		<physics mass="1.000"/>
+		<components>
+			<decal_component material="decal_khuzait_path_b" argument="0.530, 0.530, 0.000, 0.010"/>
+		</components>
+	</game_entity>
+</prefabs>

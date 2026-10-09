@@ -2732,6 +2732,10 @@ namespace Armoury
         [SettingPropertyGroup("Map villages")]
         public bool MapVillageNamesOnHover { get; set; } = true;
 
+        [SettingPropertyBool("Map Roads Probe Enabled", HintText = "TEST ONLY: unpaved roads drawn as path decals in two small map areas (around Fairmarket and Winterfell), read from the file arm_map_roads_probe.tsv in the module's ModuleData folder. Visual only - roads do not change speed or routes. Off = nothing drawn")]
+        [SettingPropertyGroup("Map roads (test)")]
+        public bool MapRoadsProbeEnabled { get; set; } = false;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -3414,6 +3418,7 @@ namespace Armoury
             s.MapVillagesEnabled = MapVillagesEnabled;
             s.MapVillagesHideAboveCameraHeight = MapVillagesHideAboveCameraHeight;
             s.MapVillageNamesOnHover = MapVillageNamesOnHover;
+            s.MapRoadsProbeEnabled = MapRoadsProbeEnabled;
         }
 
         internal static void Apply()

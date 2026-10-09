@@ -786,6 +786,9 @@ namespace Armoury
         public float MapVillagesHideAboveCameraHeight = 160f; // map villages vanish when the camera rises above this height - from afar only the game's villages, castles and towns remain
         public bool MapVillageNamesOnHover = true;         // Map Village Names - hover only: point at a map village to see its name, its district, its settlements and people. Labels over burning villages come in a later update
 
+        // --- Map roads (test) ---
+        public bool MapRoadsProbeEnabled = false;          // TEST ONLY: unpaved roads drawn as path decals in two small map areas (around Fairmarket and Winterfell), read from the file arm_map_roads_probe.tsv in the module's ModuleData folder. Visual only - roads do not change speed or routes. Off = nothing drawn
+
         public static void Load(string moduleDataDir)
         {
             var file = Path.Combine(moduleDataDir, "Armoury.settings.xml");
