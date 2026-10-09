@@ -228,16 +228,19 @@ namespace CrashScribe
             return Math.Max(floor, Math.Min(value, lim));
         }
 
-        /// <summary>3.2: +bonus (suwak NorthHardySkillBonus, dom. 25, 0 = wyl.) do broni glownej i Atletyki
-        /// piechoty Polnocy t3-t6. "+25 ponad dzisiejsze" = ponad wartosci PO zamianie sprzetu (rozdz. 1) -
+        /// <summary>3.2: +bonus (suwak NorthHardySkillBonus, dom. 15 od 175b - bylo 25; 0 = wyl.) do broni glownej i Atletyki
+        /// piechoty Polnocy t3-t6. "+bonus ponad dzisiejsze" = ponad wartosci PO zamianie sprzetu (rozdz. 1) -
         /// interpretacja do potwierdzenia przez Jeffa przy "wgraj" (projekt rozdz. 0 pkt 4). Tylko gdy 175.2 zadzialalo
-        /// (inaczej +25 szloby na umiejetnosci napompowane sprzetem ponad tier). Cel z sufitem TierCap (bez przeskoku tieru).</summary>
+        /// (inaczej bonus szedlby na umiejetnosci napompowane sprzetem ponad tier). Cel z sufitem TierCap (bez przeskoku tieru).
+        /// 175b (09.10 ok. 05:50): Jeff chcial zobaczyc, co znaczy +15 (tabela: ok. +20% wobec swiata) - bez wyraznego wyboru,
+        /// domyslnie +15 (rada Claude); rachunek SCR\a175b\sufit15.py: przy +15 sufit tnie 1 z 43 (highborn_warrior t3 90 -> 104
+        /// zamiast 105), przewaga +19.7% bron / +20.2% Atletyka - w oknie kontroli 19.8 +-3.</summary>
         internal static void NorthHardy()
         {
             if (NorthDone || !Mends.SinewApplied) return;
             try
             {
-                int bonus = (int)Math.Round(Mends.ArmouryFloat("NorthHardySkillBonus", 25f));
+                int bonus = (int)Math.Round(Mends.ArmouryFloat("NorthHardySkillBonus", 15f));
                 if (bonus < 0) bonus = 0;
                 if (bonus > 50) bonus = 50;
                 NorthDone = true;
@@ -246,7 +249,8 @@ namespace CrashScribe
                 {
                     string why = !TierGearWanted() ? _tgOffWhy : (_gaveUp ? "zamiana nie mogla zadzialac" : "zamiana nie zadzialala");
                     Scribe.Line("Mends: NorthHardy (175) - pominiete: sprzet wedlug tieru (175.2) nie dziala w tej sesji (" + why + ") - +" + bonus
-                                + " liczyloby sie od umiejetnosci napompowanych sprzetem ponad tier (przewaga ok. +46%/+52% zamiast +28%, projekt 3.2).");
+                                + " liczyloby sie od umiejetnosci napompowanych sprzetem ponad tier (przewaga znacznie ponad zamierzone ok. +"
+                                + (7.5 + 0.82 * bonus).ToString("0") + "%; przy +25 bylo to +46%/+52% zamiast +28%, projekt 3.2).");
                     return;
                 }
                 float wStep = Mends.ArmouryFloat("WeaponSkillPerTier", 35f), aStep = Mends.ArmouryFloat("ArmorAthleticsPerTier", 35f);
@@ -309,7 +313,8 @@ namespace CrashScribe
                 // KONTROLA POPRAWNOSCI (nie hamulec): liczebnosc zbioru, przyrost sredniej == zaplanowany (bonus po sufitach),
                 // przewaga w oknie oczekiwanym dla suwaka (rachunek projektu: 0 -> +7.5%, 15 -> +20%, 25 -> +28%, 50 -> +48%; +-3 pkt;
                 // sufit tieru przy 25 (rachunek na sprzet.json): 11 z 43 jednostek przycietych - highborn_warrior 90 -> 104 zamiast 115,
-                // 8 footmanow t3 i 2 pikinierow t5 o 1; srednia broni -0.5, Atletyki -0.2 pkt, przewaga ok. -0.4 pkt - w oknie)
+                // 8 footmanow t3 i 2 pikinierow t5 o 1; srednia broni -0.5, Atletyki -0.2 pkt, przewaga ok. -0.4 pkt - w oknie;
+                // przy 15 (domyslne od 175b): 1 z 43 przyciety (highborn_warrior 90 -> 104), przewaga +19.7%/+20.2% - w oknie 19.8 +-3)
                 double expect = 7.5 + 0.82 * bonus;
                 var why2 = new List<string>();
                 if (set.Count != 43) why2.Add("zbior " + set.Count + " zamiast 43");

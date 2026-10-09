@@ -30,6 +30,8 @@ namespace CrashScribe
     /// bez K1); ranking "scisly przed kaskada" z wymogiem SKUTECZNYM (jak po prawach); migawka valyrianska tylko dla
     /// jednostek z zestawami (i przed kazda zmiana); postacie spoza wczytania (BK CustomTroop) poza zakresem;
     /// Qohor ciezej w sesji po rozsadku; lore i Zlota Kompania tylko razem z 175.2.
+    /// 175b (decyzje Jeffa 09.10 ok. 05:50): najprostszy oszczep gry ma tier 2 (SimpleJavelins, przed TierGear) - oszczepnicy
+    /// t2-t3 dostaja oszczep zamiast toporka; Dorne lzej i Qohor ciezej (Army175LoreArmorExtra) domyslnie WLACZONE.
     /// </summary>
     internal static partial class Army175
     {
@@ -103,6 +105,9 @@ namespace CrashScribe
             catch { _atLoad = null; }
             try { Composition(); } catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Army175.Composition", null); } catch { } }
             try { ValyrianSnapshot(); } catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Army175.ValyrianSnapshot", null); } catch { } }
+            // 175b: tier oszczepu PRZED pula 175.2 (TierGear), prawami tieru i SkillSinew; migawka wyzej trzyma przedmioty,
+            // nie tiery, a oszczepy nie sa t6 - zasada Innych (PreTierBest >= 6) bez zmian
+            try { SimpleJavelins(); } catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Army175.SimpleJavelins", null); } catch { } }
             try { TierGear("przy wczytaniu, przed sesja"); } catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Army175.TierGear", null); } catch { } }
             try { LoreArmor(); } catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Army175.LoreArmor", null); } catch { } }
             try { GoldenBows(); } catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Army175.GoldenBows", null); } catch { } }
@@ -741,6 +746,71 @@ namespace CrashScribe
             return Mends.BestWeaponTier(c);
         }
 
+        // ---------------- [b0] najprostszy oszczep tier 2 (175b) ----------------
+
+        /// <summary>175b (decyzja Jeffa 09.10 ok. 05:50 pkt 3): "najprostsze oszczepy dostaja tier 2" - Dornijczycy t2-t3 i inni
+        /// oszczepnicy t2-t3 maja oszczepy, nie toporki. Przelicznik tieru RBM (obrazenia x szybkosc) stawia KAZDY oszczep gry
+        /// na t4-t5, wiec 175.2 nie mialo dla t2-t3 zadnego oszczepu i bralo zapas 1.4 (topor do rzucania, raz kamien).
+        /// Wybor (rachunek SCR\a175b, CHANGELOG 175b): JEDEN oszczep - northern_javelin_1_t2 "Pine Javelin": najtanszy oszczep gry,
+        /// wszystkie czesci kuzni tieru 2 (grot "Javelin Head" z kutego zelaza Iron2, drzewce sosnowe), id gry "_t2". Wystarcza, zeby
+        /// wszystkie 24 rodzaje t2-t3 z oszczepem we wzorcu mialy oszczep (6 wlasny, 18 zamiennik), a zaden rodzaj nie traci
+        /// umiejetnosci; lzejsze "darty" (western/eastern_javelin_1_t2) dawalyby 4-8 rodzajom t4 spadek Rzutu o 5-15.
+        /// Zmienia sie TIER PRZEDMIOTU (TierfOverride - jak atrybut XML tier_override) i jego cena gry (DetermineValue - jak przy
+        /// wczytaniu XML z tier_override), NIE umiejetnosci. Przy wczytaniu, przed TierGear (pula 175.2 widzi t2), przed prawami
+        /// tieru (WeaponTierLaw da wymog 35 zamiast 105) i przed SkillSinew. Tylko razem z 175.2 (TierGearWanted - zapis bez K1
+        /// zostaje bez zmian). Obiekty przedmiotow sa nowe w kazdej grze - wylacznik dziala od nastepnego wczytania.</summary>
+        private static readonly string[] SimpleJavelinIds = { "northern_javelin_1_t2" };
+        private const int SimpleJavelinTier = 2;
+        private static readonly System.Reflection.MethodInfo MSetTierfOverride = AccessTools.PropertySetter(typeof(ItemObject), "TierfOverride");
+        private static readonly System.Reflection.MethodInfo MDetermineValue = AccessTools.Method(typeof(ItemObject), "DetermineValue");
+
+        internal static void SimpleJavelins()
+        {
+            try
+            {
+                if (!Wanted("Army175SimpleJavelins", 1f)) { Scribe.Line("Mends: najprostszy oszczep tier 2 (175b) - wylaczone (Army175SimpleJavelins), oszczepy z tierem gry."); return; }
+                if (!TierGearWanted()) { Scribe.Line("Mends: najprostszy oszczep tier 2 (175b) - pominiete (" + _tgOffWhy + "; dziala tylko razem z 175.2)."); return; }
+                if (MSetTierfOverride == null)
+                {
+                    Scribe.Line("Mends: najprostszy oszczep tier 2 (175b) - OSTRZEZENIE: brak ItemObject.TierfOverride (inna wersja gry) - oszczepy z tierem gry.");
+                    return;
+                }
+                bool valueModel = false;
+                try { valueModel = Game.Current != null && Game.Current.BasicModels != null && Game.Current.BasicModels.ItemValueModel != null; } catch { }
+                var parts = new List<string>();
+                foreach (var id in SimpleJavelinIds)
+                {
+                    try
+                    {
+                        var it = MBObjectManager.Instance.GetObject<ItemObject>(id);
+                        if (it == null) { parts.Add(id + " brak w grze"); continue; }
+                        if (it.ItemType != ItemObject.ItemTypeEnum.Thrown || it.PrimaryWeapon == null || it.PrimaryWeapon.WeaponClass != WeaponClass.Javelin)
+                        {
+                            parts.Add(id + " nie jest oszczepem (" + it.ItemType + ") - pominiety");
+                            continue;
+                        }
+                        int g0 = (int)it.Tier + 1, v0 = it.Value;
+                        // Tierf = TierfOverride - 1 = 2 -> ItemTiers.Tier2 (PULAPKA CLAUDE.md 7: Tier1 == 0, wyswietlany tier = (int)Tier + 1)
+                        MSetTierfOverride.Invoke(it, new object[] { SimpleJavelinTier + 1f });
+                        string val;
+                        if (MDetermineValue == null || !valueModel) val = ", cena gry bez zmian (brak modelu wartosci)";
+                        else
+                        {
+                            try { MDetermineValue.Invoke(it, null); val = ", cena gry " + v0 + " -> " + it.Value; }
+                            catch (Exception e) { val = ", cena gry bez zmian (" + e.GetType().Name + ")"; }
+                        }
+                        parts.Add(id + " (" + it.Name + ") t" + g0 + " -> t" + ((int)it.Tier + 1) + val);
+                    }
+                    catch (Exception e) { parts.Add(id + " potkniecie " + e.GetType().Name); }
+                }
+                _tierCache = null;   // TierGear liczy tiery od nowa (PreparePass) - tu na wszelki wypadek po zmianie tieru
+                Scribe.Line("Mends: najprostszy oszczep tier 2 (175b) - " + string.Join("; ", parts.ToArray())
+                            + " (wymog Rzutu po prawie tieru 35 zamiast 105; cena historyczna Armoury liczona przy starcie sesji z tieru 2; "
+                            + "w linii 175.2 'zapas innej klasy ... oszczepy' ma byc 0).");
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Army175.SimpleJavelins", null); } catch { } }
+        }
+
         // ---------------- [b] sprzet wedlug tieru ----------------
 
         internal static void TierGear(string when)
@@ -1106,7 +1176,8 @@ namespace CrashScribe
         {
             try
             {
-                bool main = Wanted("Army175LoreArmor", 1f), extra = Wanted("Army175LoreArmorExtra", 0f);
+                // 175b: Dorne lzej i Qohor ciezej domyslnie WLACZONE (Jeff 09.10 ok. 05:50: "wlacz" - propozycje audytu 4.9 i 4.11)
+                bool main = Wanted("Army175LoreArmor", 1f), extra = Wanted("Army175LoreArmorExtra", 1f);
                 if (!main && !extra) { Scribe.Line("Mends: sprzet wedlug tieru (175) - lore w granicy tieru wylaczone (Army175LoreArmor, Army175LoreArmorExtra)."); return; }
                 // lore to DRUGI przebieg po zamianie 175.2 (1.6) - bez niej (wylacznik, zapis bez K1) Pentos/Qarth/Dorne bez zmian
                 if (!TierGearWanted()) { Scribe.Line("Mends: sprzet wedlug tieru (175) - lore w granicy tieru pominiete (" + _tgOffWhy + "; dziala tylko razem z 175.2)."); return; }
@@ -1148,7 +1219,7 @@ namespace CrashScribe
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Army175.LoreArmor", null); } catch { } }
         }
 
-        /// <summary>Qohor ciezej (Army175LoreArmorExtra, dom. WYL.) - w SESJI, po ArmorSanity (TierGearCheck, zapasy):
+        /// <summary>Qohor ciezej (Army175LoreArmorExtra, dom. TAK od 175b - Jeff 09.10 ok. 05:50) - w SESJI, po ArmorSanity (TierGearCheck, zapasy):
         /// "najciezszy korpus" i "ciezszy niz dzis" liczone na ochronie PO rozsadku i tierach na zywo; przy wczytaniu
         /// wygrywalyby sztuki ROT z ochrona oderwana od wagi, ktore ArmorSanity tnie. Przed prawami i SkillSinew.
         /// Koszt kolejnosci: Armoury TroopFit/ColdStart moga zobaczyc stary korpus tych 4 jednostek (tylko w gore / zbrojownie startowe).</summary>
@@ -1157,7 +1228,7 @@ namespace CrashScribe
             try
             {
                 if (_qohorDone) return;
-                if (!Wanted("Army175LoreArmorExtra", 0f)) { _qohorDone = true; return; }
+                if (!Wanted("Army175LoreArmorExtra", 1f)) { _qohorDone = true; return; }
                 if (!TierGearWanted() || !TierGearApplied) return;
                 _qohorDone = true;
                 if (_pool == null || _choice == null) PreparePass();

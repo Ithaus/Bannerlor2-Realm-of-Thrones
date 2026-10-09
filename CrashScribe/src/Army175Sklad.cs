@@ -55,19 +55,19 @@ namespace CrashScribe
                 "mormont_trapper=6", "mormont_footman=5", "mormont_horseman=4" },
             new[] { "clan_cerwyn_party_template", "Army175NorthFoot", "1",
                 "cerwyn_archer=5", "cerwyn_veteran_archer=4", "cerwyn_soldier=5", "cerwyn_axeman=6", "cerwyn_horseman=3" },
-            // 2.4 Volantis i Norvos - propozycja audytu 4.6 bez decyzji Jeffa (dom. WYL.); slonie zostaja
-            new[] { "kingdom_hero_party_volantine_template", "Army175VolantisNorvos", "0",
+            // 2.4 Volantis i Norvos - propozycja audytu 4.6, WLACZONA przez Jeffa 09.10 ok. 05:50 (175b, dom. TAK); slonie zostaja
+            new[] { "kingdom_hero_party_volantine_template", "Army175VolantisNorvos", "1",
                 "volantine_bowman=4", "tigercloak_archer=2", "tigercloak_master_archer=1", "volantine_soldier=6", "tigercloak_warrior=4", "tigercloak_elite_warrior=2" },
-            new[] { "kingdom_hero_party_norvos_template", "Army175VolantisNorvos", "0",
+            new[] { "kingdom_hero_party_norvos_template", "Army175VolantisNorvos", "1",
                 "norvos_horseman=2", "norvos_cavalry=1", "norvos_axeman=5", "norvos_master_axeman=2" },
-            // 2.5 Wolni Ludzie, Smocza Skala - propozycja audytu 4.12 bez decyzji Jeffa (dom. WYL.)
-            new[] { "kingdom_hero_party_freefolk_template", "Army175MinorLore", "0", "freefolk_horseman=1" },
-            new[] { "clan_rayder_party_template", "Army175MinorLore", "0", "freefolk_horseman=1" },
-            new[] { "kingdom_hero_party_dragonstone_template", "Army175MinorLore", "0",
+            // 2.5 Wolni Ludzie, Smocza Skala - propozycja audytu 4.12, WLACZONA przez Jeffa 09.10 ok. 05:50 (175b, dom. TAK)
+            new[] { "kingdom_hero_party_freefolk_template", "Army175MinorLore", "1", "freefolk_horseman=1" },
+            new[] { "clan_rayder_party_template", "Army175MinorLore", "1", "freefolk_horseman=1" },
+            new[] { "kingdom_hero_party_dragonstone_template", "Army175MinorLore", "1",
                 "dragonstone_rider=1", "dragonstone_horseman=1", "dragonstone_man_at_arms=4", "dragonstone_brute=5" },
-            new[] { "clan_velaryon_party_template", "Army175MinorLore", "0",
+            new[] { "clan_velaryon_party_template", "Army175MinorLore", "1",
                 "velaryon_scout=2", "velaryon_horseman=1", "velaryon_warrior=5" },
-            new[] { "clan_celtigar_party_template", "Army175MinorLore", "0",
+            new[] { "clan_celtigar_party_template", "Army175MinorLore", "1",
                 "celtigar_horseman=2", "celtigar_knight=1", "celtigar_man_at_arms=7" },
         };
 
