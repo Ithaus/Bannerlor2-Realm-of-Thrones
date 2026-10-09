@@ -1,5 +1,20 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-09 (NightRest-reset, recenzja MUSZTRA-j uwagi 6 i 13) - NOWA KAMPANIA BEZ DLUGU SNU GRACZA Z POPRZEDNIEJ
+**Mod:** Armoury | **Galaz:** `noc/grupa11` (od MUSZTRA-jp) | **Pliki:** `NightRest.cs` (`ResetWorld`).
+
+**Co zobaczysz w grze (prosto):** gdy w jednym uruchomieniu gry zaczniesz nowa kampanie po grze z niewyspana druzyna, nowa kampania zaczyna sie wyspana - bez kary predkosci i morale i bez straconego pierwszego dnia musztry.
+
+**Problem:** `NightRest.ResetWorld` (konstruktor `ArmouryBehavior`, przed `SyncData`) nie zerowal `Debt`, `DawnDebt`, `_restTonight`, `_credited`; nowa gra nie wola `Import`, wiec dlug gracza z poprzedniej kampanii przechodzil do nowej (opisane jako "istniejace wczesniej" we wpisie MUSZTRA-j; od MUSZTRA-j zabiera tez pierwszy dzien musztry - "met the dawn short of sleep" bez zadnej nocy). Lamie CLAUDE.md 8.0 ("stan czyszczony miedzy kampaniami"). Bez dowodu z logu (kod; autotest zawsze startuje z nowego procesu gry).
+
+**Przyczyna:** `ResetWorld` czyscil tylko stan obozu, namiotow i ksiegi AI.
+
+**Zmiana:** `ResetWorld`: `Debt = 0; DawnDebt = 0; _restTonight = 0f; _credited = false;`. Wczytanie bez zmian: `Import` (w `SyncData`, po konstruktorze) ustawia pola z zapisu; zapis bez klucza `arm_nightrest` - zostaje 0 (dotad: wartosc z poprzedniej sesji).
+
+**Ryzyko / co sprawdzic:** `ResetWorld` wolany tylko w konstruktorze `ArmouryBehavior` (`ArmouryBehavior.cs:389`; grep) - przed kazdym `Import`, wiec niczego z zapisu nie zeruje. `CampPromptMode` (wybor gracza z popupu zmierzchu) i `_sleeping` nietkniete - `_sleeping` dalej nie jest zerowany przy wczytaniu innego zapisu w trakcie snu (znane, wpis grupa11-p, osobna sprawa). Kod tylko zbudowany (Release kod 0) - NIE uruchomiony w grze.
+
+**Status:** NIEWGRANE - DO SPRAWDZENIA (commit lokalny na `noc/grupa11`, bez pushu).
+
 ## 2026-10-09 (MUSZTRA-jp, poprawki po recenzji MUSZTRA-j - 17 uwag) - MASKI RUCHU WSZYSTKICH LORDOW W ZAPISIE, PARTIA POZA MAPA NIE CWICZY (TAKZE AI), SWIT MOWI O DNIU BEZ MUSZTRY, LINIA "MUSZTRA AI" ZNOW CZYTELNA DLA SKRYPTOW
 **Mod:** Armoury | **Galaz:** `noc/grupa11` (od afeb7cb) | **Pliki:** `Drill.cs` (NOWE `RestoreMasks`, `_pendingMasks`, `_maskSegSeen`, segment `T=` w `Export`/`Import`; `Shape` - jeden warunek partii nieaktywnej, komentarz `noModel`, komentarz o Innych; `SleepDebtNow` - bramka AI; `TickPostfix` - komunikat; `AiLine` - etykieta "sen"; naglowek, linia startowa i linia zapisu), `NightRest.cs` (NOWE `DrillNote`; komunikaty switu i splaty dlugu). Projekt: `docs/PROJEKT-MUSZTRA-2026-10-09.md` rozdz. 11, 14 ("Dla Jeffa", 14.3, 14.5, 14.6) i NOWY 14.7 - werdykty 17 uwag (repo glowne).
 

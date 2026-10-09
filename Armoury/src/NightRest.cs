@@ -261,6 +261,10 @@ namespace Armoury
                 // T10 poprawka recenzji: pozycja gracza z poprzedniej kampanii nie liczy sie jako ruch - pierwsza godzina po wczytaniu
                 // to postoj, tak samo dla gracza i dla partii AI (ksiega AI: brak poprzedniego odczytu = postoj)
                 _hadPos = false;
+                // recenzja MUSZTRA-j (uwagi 6, 13; CLAUDE.md 8.0 "stan czyszczony miedzy kampaniami"): dlug snu gracza nie przechodzi do nowej kampanii
+                // w tym samym uruchomieniu gry (nowa gra nie wola Import) - inaczej zabieralby predkosc, morale i pierwszy dzien musztry bez zadnej nocy.
+                // Wczytanie: Import (SyncData, po konstruktorze) ustawia te pola z zapisu jak dotad
+                Debt = 0; DawnDebt = 0; _restTonight = 0f; _credited = false;
                 ResetHourCounters();
                 ResetAi();   // T10: ksiega snu AI, snu dluznikow, alarmy, wstrzymani w osadach
             }
