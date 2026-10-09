@@ -135,3 +135,9 @@ dana faze od nowa, korzystajac z zapisanych wynikow:
   = synteza). Kod do czytania: worktree 2e235ea w SCRATCH nowej sesji `audyt\repo`. Skrypt: `...\7016f733-...\workflows\scripts\audyt-swiata-noc-0809-wf_1bb21d75-b44.js`.
 - Plan dalej: 169 -> autotest 40 dob -> 170 + BEE -> autotest -> 171 -> autotest -> wgranie; paczki "tej nocy" z audytu (male, testowalne) -> autotest -> wgranie;
   raport dla Jeffa 12:00 Warszawa.
+- 17:37 **170 GOTOWE**: galaz w-toku/170-bee-domkniecie db3f672 (GitHub), build OK, recenzje bez krytycznych/waznych; spec docs/paczki/170-bee-domkniecie.md
+  w drzewie bee170; test wedlug "TEST PLAN" w wyniku workflow (bieg z zapisem doby 360 i nowa kampania po skrypcie BEE -ListaZFundamentu); pytania P1/P2 (domyslnie nie).
+- 17:45 **AUDYT GOTOWY**: docs/audyt-2026-10-09/00-AUDYT-SWIATA-2026-10-09.md (synteza po krytyce, paczki tej nocy T1-T8, pozniej E0-E24, pytania do Jeffa) + 10 raportow.
+- 17:50 **T1-T8** (poprawki z audytu) - workflow `wf_afd15a92-ceb` (pipeline: wykonanie -> 2 recenzje -> poprawki), drzewa w SCRATCH nowej sesji `noc\n1-obozy ..
+  n8-krainy` (galezie w-toku/n1-obozy .. w-toku/n8-krainy w klonie lancuch, od 2e235ea). T2 = CrashScribe (klucze tez w CrashScribe.settings.xml w grze przy wgraniu).
+  Dodane przez glowna sesje ponad audyt: T7 + dymek "held by" (W-2) z probkami w logu; T8 + 16 wsi z uprawa niezgodna z klimatem (VillageClimateFix).
