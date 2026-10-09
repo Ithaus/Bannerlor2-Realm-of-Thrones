@@ -78,8 +78,10 @@ namespace CrashScribe
 
         // W2 (09.10): tier broni przy wczytaniu (to, co widzi TierGear) - porownanie z tierem przy starcie sesji (to, co widza
         // WeaponTierLaw i SkillSinew); zamiany bez warunku couch/brace (suma przebiegow sesji)
+        // W2-p: _w2Brace - z tego zamiany bez couch, ale z podparciem (kopia -> wlocznia z bracing); _regStumbles - przedmioty
+        // pominiete w migawce tierow (wyjatek), wypisywane w linii W2
         private static Dictionary<ItemObject, int> _regTier;
-        private static int _w2Slots, _w2Mounted;
+        private static int _w2Slots, _w2Mounted, _w2Brace, _regStumbles;
 
         /// <summary>Stan sesji - wolane z SubModuleMain.OnGameStart (przed AfterRegister).</summary>
         internal static void Reset()
@@ -90,7 +92,7 @@ namespace CrashScribe
             _rej1 = _rej2 = _rej3 = _rej4 = _rej5 = 0;
             _tgWanted = -1; _tgOffWhy = ""; _isSaved = null; _gaveUp = false; _catchUpTries = 0; _snapshotOk = false;
             _atLoad = null; _newRosters = null; _rostersInstalled = 0; _qohorDone = false; _javT2 = false;
-            _regTier = null; _w2Slots = 0; _w2Mounted = 0;
+            _regTier = null; _w2Slots = 0; _w2Mounted = 0; _w2Brace = 0; _regStumbles = 0;
             NorthDone = false; DothrakiDone = false;
             CompositionApplied = false; DothrakiPoolActive = false; _poolFirstLogged = false;
             ResetPoolCounters();
@@ -345,8 +347,9 @@ namespace CrashScribe
         }
 
         // Kind: 1 scisly, 2 luzny, 3 zapas innej klasy; PairKey - para (przedmiot, sufit, kultura) jak w sprzet.py; Gap - sufit minus tier zamiennika;
-        // NoUsage (W2) - zamiennik z drugiego przebiegu, bez warunku couch/brace (w tierze nie bylo kopii/piki z tym uzyciem)
-        private sealed class Pick { public ItemObject Item; public int Kind; public string PairKey; public int Gap; public bool NoUsage; }
+        // Relax (W2, W2-p) - z ktorego przebiegu zamiennik: 0 pelne warunki; 1 bez couch, z bracing (kopia ma oba uzycia - piesi
+        // zachowuja podparcie); 2 bez couch i bracing (w tierze nie bylo kandydata z tymi uzyciami)
+        private sealed class Pick { public ItemObject Item; public int Kind; public string PairKey; public int Gap; public int Relax; }
 
         private struct Cand
         {
@@ -395,8 +398,10 @@ namespace CrashScribe
         }
 
         /// <summary>Twarde warunki (dane XML ich nie znaja): 0 ok, 1 siodlo, 2 couch/brace, 3 plec, 4 bandyta, 5 cywilne.
-        /// W2: couch/brace (usage) Choose zdejmuje w drugim przebiegu, gdy w tierze nie ma kandydata z tym uzyciem.</summary>
-        private static int Reject(ItemObject orig, ItemObject c, Unit u, bool usage)
+        /// W2/W2-p: couch/brace - relax 0 oba warunki, 1 tylko bracing, 2 zaden (Choose luzuje je po kolei, gdy w tierze nie ma
+        /// kandydata). Siodlo (1) dziala tylko, gdy oryginal jest MountOk - kopia nie jest (uzycie polearm_bracing ma
+        /// requires_no_mount), wiec u konnych z kopia warunek siodla nic nie odrzuca.</summary>
+        private static int Reject(ItemObject orig, ItemObject c, Unit u, int relax)
         {
             if (IsBanditGear(c) && !u.Bandit) return 4;
             if (c.HasArmorComponent && c.IsCivilian && (orig == null || !orig.IsCivilian)) return 5;
@@ -404,9 +409,9 @@ namespace CrashScribe
             if (u.Female && (fl & ItemFlags.NotUsableByFemale) != 0) return 3;
             if (!u.Female && (fl & ItemFlags.NotUsableByMale) != 0) return 3;
             if (u.Mounted && orig != null && Mends.MountOk(orig) && !Mends.MountOk(c)) return 1;
-            if (usage && orig != null)
+            if (relax < 2 && orig != null)
             {
-                if (HasUsage(orig, "couch") && !HasUsage(c, "couch")) return 2;
+                if (relax < 1 && HasUsage(orig, "couch") && !HasUsage(c, "couch")) return 2;
                 if (HasUsage(orig, "bracing") && !HasUsage(c, "bracing")) return 2;
             }
             return 0;
@@ -514,7 +519,10 @@ namespace CrashScribe
         /// W2 (09.10, zasada Jeffa "kazda jednostka ma sprzet najwyzej swojego tieru"): gdy przedmiot z couch/bracing
         /// nie ma w tierze ZADNEGO kandydata z tym samym uzyciem (w grze z RBM kazda kopia ma tier 5-6), drugi przebieg
         /// bez warunku couch/brace (reszta twardych warunkow bez zmian) - dotad taki slot zostawal ponad tier
-        /// ("bez zamiennika"), prawo tieru broni dawalo wymog 140-175, a SkillSinew pompowal zolnierzom t2-t4 umiejetnosc.</summary>
+        /// ("bez zamiennika"), prawo tieru broni dawalo wymog 140-175, a SkillSinew pompowal zolnierzom t2-t4 umiejetnosc.
+        /// W2-p (przeglad W2, uwaga 4): luzowanie po kolei - u pieszych najpierw tylko couch (kopia ma tez bracing: piechota z kopia
+        /// dostaje wlocznie z podparciem, jesli taka jest w tierze), dopiero potem oba warunki. W ROT couch i bracing maja tez wlocznie
+        /// kultur i domow (weapon_descriptions.xslt ROT-Content dopisuje ich czesci do TwoHandedPolearm_Couchable/_Bracing).</summary>
         private static Pick Choose(ItemObject orig, int cap, Unit u)
         {
             string key = ChoiceKey(orig, cap, u);
@@ -522,10 +530,13 @@ namespace CrashScribe
             if (_choice.TryGetValue(key, out p)) return p;
             p = new Pick();
             p.PairKey = orig.StringId + "|" + cap + "|" + u.Cult;
-            for (int pass = 0; pass < 2 && p.Item == null; pass++)
+            bool oCouch = HasUsage(orig, "couch"), oBrace = HasUsage(orig, "bracing");
+            for (int relax = 0; relax < 3 && p.Item == null; relax++)
             {
-                bool usage = pass == 0;
-                if (!usage && !UsageBound(orig)) break;   // W2: drugi przebieg tylko dla couch/bracing
+                // W2-p: posredni przebieg tylko dla pieszych i tylko, gdy przedmiot ma oba uzycia - konny i tak nie podpiera w siodle
+                // (polearm_bracing ma requires_no_mount), a w zapasie 1.4 tego przebiegu moglby dostac pike bez uzycia z siodla
+                if (relax == 1 && (u.Mounted || !(oCouch && oBrace))) continue;
+                if (relax == 2 && !UsageBound(orig)) break;         // W2: przebieg bez couch/brace tylko dla couch/bracing
                 bool hasBest = false; Cand best = default(Cand);
                 List<ItemObject> lst;
                 if (_pool.TryGetValue(WKey(orig), out lst))
@@ -535,13 +546,13 @@ namespace CrashScribe
                         if (c == orig) continue;
                         int g = TierOf(c);
                         if (g > cap || !PeasantOk(c, orig, cap)) continue;
-                        int r = Reject(orig, c, u, usage);
-                        if (r != 0) { if (usage) CountReject(r); continue; }   // odrzuceni liczeni raz (pierwszy przebieg)
+                        int r = Reject(orig, c, u, relax);
+                        if (r != 0) { if (relax == 0) CountReject(r); continue; }   // odrzuceni liczeni raz (pierwszy przebieg)
                         var cd = MakeCand(c, g, orig, cap, u, Strict(orig, c));
                         if (!hasBest || CmpCand(cd, best) < 0) { best = cd; hasBest = true; }
                     }
                 }
-                if (hasBest) { p.Item = best.Item; p.Kind = best.Strict ? 1 : 2; p.NoUsage = !usage; }
+                if (hasBest) { p.Item = best.Item; p.Kind = best.Strict ? 1 : 2; p.Relax = relax; }
                 else if (IsWeaponType(orig.ItemType))
                 {
                     // ZAPAS (1.4): ta sama umiejetnosc i ten sam typ (miecz rekruta -> topor/buzdygan 1H,
@@ -565,14 +576,14 @@ namespace CrashScribe
                             }
                             int g = TierOf(c);
                             if (g > cap || !PeasantOk(c, orig, cap)) continue;
-                            // twarde warunki takze w zapasie (couch/brace jak w 1.3); W2: w drugim przebiegu bez couch/brace
-                            int r = Reject(orig, c, u, usage);
-                            if (r != 0) { if (usage) CountReject(r); continue; }
+                            // twarde warunki takze w zapasie (couch/brace jak w 1.3); W2/W2-p: luzowane tak samo jak wyzej
+                            int r = Reject(orig, c, u, relax);
+                            if (r != 0) { if (relax == 0) CountReject(r); continue; }
                             var cd = MakeCand(c, g, orig, cap, u, false);
                             if (!hasBest || CmpCand(cd, best) < 0) { best = cd; hasBest = true; }
                         }
                     }
-                    if (hasBest) { p.Item = best.Item; p.Kind = 3; p.NoUsage = !usage; }
+                    if (hasBest) { p.Item = best.Item; p.Kind = 3; p.Relax = relax; }
                 }
             }
             if (p.Item != null) p.Gap = cap - TierOf(p.Item);
@@ -915,6 +926,9 @@ namespace CrashScribe
                 int sWeap = 0, sShield = 0, sAmmo = 0, sArmor = 0, strict = 0, loose = 0, fb = 0, fbSling = 0, fbJav = 0, fbSword = 0;
                 int noRepl = 0, stones = 0, stonesOver = 0, occ0 = 0, occ1 = 0, occ2 = 0;
                 int noReplWeap = 0, relaxed = 0, relaxedMounted = 0;   // W2: bron bez zamiennika; zamiennik bez couch/brace (i u konnych)
+                int relaxedBrace = 0;                                  // W2-p: z tego bez couch, ale z podparciem (posredni przebieg)
+                var relaxedUnits = new HashSet<string>(StringComparer.Ordinal);
+                var relaxedItems = new Dictionary<string, int>(StringComparer.Ordinal);   // W2-p: ktore przedmioty (kopie, wlocznie kultur) i ile slotow
                 var relaxedEx = new List<string>();
                 var relaxedSeen = new HashSet<string>(StringComparer.Ordinal);
                 int rost0 = _rostersInstalled;
@@ -995,10 +1009,13 @@ namespace CrashScribe
                                     else if (it.PrimaryWeapon != null && it.PrimaryWeapon.WeaponClass == WeaponClass.Javelin) fbJav++;
                                     else if (it.ItemType == ItemObject.ItemTypeEnum.OneHandedWeapon) fbSword++;
                                 }
-                                if (p.NoUsage)
+                                if (p.Relax > 0)
                                 {
                                     relaxed++;
+                                    if (p.Relax == 1) relaxedBrace++;
                                     if (u.Mounted) relaxedMounted++;
+                                    relaxedUnits.Add(co.StringId ?? "");
+                                    int ri; relaxedItems.TryGetValue(it.StringId ?? "", out ri); relaxedItems[it.StringId ?? ""] = ri + 1;
                                     if (relaxedEx.Count < 6 && relaxedSeen.Add(it.StringId + ">" + p.Item.StringId))
                                         relaxedEx.Add(it.StringId + " t" + g + " -> " + p.Item.StringId + " t" + TierOf(p.Item) + " (" + co.StringId + " t" + u.T + (u.Mounted ? ", konny" : "") + ")");
                                 }
@@ -1020,7 +1037,12 @@ namespace CrashScribe
                     Scribe.Line("Mends: sprzet wedlug tieru (175) - zestawy jednostek jeszcze puste (" + when + "), powtorze pozniej.");
                     return;
                 }
-                _w2Slots += relaxed; _w2Mounted += relaxedMounted;   // suma przebiegow sesji (drugi przebieg liczy tylko nowe sloty)
+                _w2Slots += relaxed; _w2Mounted += relaxedMounted; _w2Brace += relaxedBrace;   // suma przebiegow sesji (drugi przebieg liczy tylko nowe sloty)
+                var rItems = new List<KeyValuePair<string, int>>(relaxedItems);
+                rItems.Sort((a, b) => b.Value != a.Value ? b.Value.CompareTo(a.Value) : string.CompareOrdinal(a.Key, b.Key));
+                var rSb = new System.Text.StringBuilder();
+                for (int i = 0; i < rItems.Count && i < 25; i++) rSb.Append(i > 0 ? ", " : "").Append(rItems[i].Key).Append(" x").Append(rItems[i].Value);
+                if (rItems.Count > 25) rSb.Append(", ... (razem " + rItems.Count + ")");
                 // pary jak w sprzet.py: (przedmiot, tier jednostki, kultura); roznica tierow - gorszy wariant cech (konny/plec/bandyta)
                 var pairGap = new Dictionary<string, int>(StringComparer.Ordinal);
                 var pairNone = new HashSet<string>(StringComparer.Ordinal);
@@ -1038,8 +1060,9 @@ namespace CrashScribe
                 Scribe.Line("Mends: sprzet wedlug tieru (175, " + when + ") - jednostek " + units + " z " + soldiers + " zolnierskich, slotow "
                             + (sWeap + sShield + sAmmo + sArmor) + " (bron " + sWeap + ", tarcze " + sShield + ", amunicja " + sAmmo + ", pancerz " + sArmor
                             + "); zamiennik scisly " + strict + ", luzny " + loose + ", zapas innej klasy " + fb + " (proce " + fbSling + ", oszczepy " + fbJav
-                            + ", miecze rekrutow " + fbSword + "); z tego bez warunku couch/brace (W2 - w tierze jednostki nie ma kopii/piki z tym uzyciem) " + relaxed
-                            + " slotow (u konnych " + relaxedMounted + ")" + (relaxedEx.Count > 0 ? ", np. " + string.Join(", ", relaxedEx.ToArray()) : "")
+                            + ", miecze rekrutow " + fbSword + "); z tego bez warunku couch/brace (W2 - w tierze jednostki nie ma kandydata z tym uzyciem; w ROT couch i bracing maja kopie oraz wlocznie kultur i domow) " + relaxed
+                            + " slotow u " + relaxedUnits.Count + " jednostek (u konnych " + relaxedMounted + " slotow; podparcie zachowane " + relaxedBrace + ", bez couch i bracing " + (relaxed - relaxedBrace) + ")"
+                            + (rSb.Length > 0 ? ", przedmioty: " + rSb : "") + (relaxedEx.Count > 0 ? ", np. " + string.Join(", ", relaxedEx.ToArray()) : "")
                             + "; pary (przedmiot, tier, kultura) " + pairGap.Count + ": zamiennik w tierze jednostki " + p0
                             + ", T-1 " + p1 + ", nizej " + p2 + " (wystapienia " + occ0 + "/" + occ1 + "/" + occ2 + "), par bez zamiennika " + pairNone.Count
                             + "; kamienie procy za kamienie do rzucania " + stones + " (z tego ponad tier " + stonesOver + ", wliczone w amunicje)"
@@ -1185,6 +1208,7 @@ namespace CrashScribe
         private static void SnapRegTiers()
         {
             var d = new Dictionary<ItemObject, int>();
+            int st = 0;
             foreach (var it in MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
             {
                 try
@@ -1194,16 +1218,20 @@ namespace CrashScribe
                     if (ty == ItemObject.ItemTypeEnum.Banner || ty == ItemObject.ItemTypeEnum.Horse || ty == ItemObject.ItemTypeEnum.HorseHarness) continue;
                     d[it] = LiveTier(it);
                 }
-                catch { }
+                catch { st++; }   // W2-p: potkniecie liczone (przedmiot wypada z porownania tierow - widac w linii W2)
             }
             _regTier = d;
+            _regStumbles = st;
         }
 
         /// <summary>W2 - kontrola BEZ WYJATKOW (linia kontroli wyzej pomija klucze "bez zamiennika", wiec przy kopiach
         /// pokazywala 0, choc cerwyn_soldier t3 mial kopie t5): (1) jednostki zolnierskie z bronia ponad tier (sloty 0-3,
         /// tier na zywo - ten, ktory za chwile wezmie prawo tieru broni i SkillSinew); ma byc 0; tarcze, amunicja i pancerz
         /// ponad tier bez zamiennika - osobno; (2) ile broni ma inny tier przy wczytaniu (TierGear) i teraz, osobno skladane
-        /// (CraftedItem) - sprawdzenie, czy TierGear i prawo tieru broni widza ten sam tier.</summary>
+        /// (CraftedItem) - sprawdzenie, czy TierGear i prawo tieru broni widza ten sam tier.
+        /// W2-p (przeglad W2): potkniecia liczone i wypisane (jednostka z wyjatkiem nie moze dac falszywego 0); tarcze ponad tier
+        /// tez maja byc 0 (wymog tarczy jest dokladnie z tieru jak bron - zasada Jeffa obejmuje caly sprzet), pancerz i amunicja
+        /// - informacyjnie.</summary>
         private static void W2Line(string when)
         {
             try
@@ -1225,8 +1253,9 @@ namespace CrashScribe
                         if (ex.Count < 8) ex.Add(it.StringId + " t" + kv.Value + "->t" + now + (crafted ? " (skladana)" : ""));
                     }
                 }
-                int units = 0, slotsW = 0, sh = 0, am = 0, ar = 0;
+                int units = 0, slotsW = 0, sh = 0, am = 0, ar = 0, st = 0;
                 var sample = new System.Text.StringBuilder();
+                var shSample = new System.Text.StringBuilder();
                 foreach (var co in MBObjectManager.Instance.GetObjectTypeList<CharacterObject>())
                 {
                     try
@@ -1253,21 +1282,28 @@ namespace CrashScribe
                                         sample.Append(sample.Length > 0 ? ", " : "").Append(co.StringId).Append(" t").Append(u.T).Append(": ").Append(it.StringId).Append(" t").Append(g);
                                     over = true;
                                 }
-                                else if (c == 1) sh++;
+                                else if (c == 1)
+                                {
+                                    sh++;
+                                    if (shSample.Length < 200)
+                                        shSample.Append(shSample.Length > 0 ? ", " : "").Append(co.StringId).Append(" t").Append(u.T).Append(": ").Append(it.StringId).Append(" t").Append(g);
+                                }
                                 else if (c == 2) am++;
                                 else ar++;
                             }
                         if (over) units++;
                     }
-                    catch { }
+                    catch { st++; }   // W2-p: licz potkniecia, nie gas (wypisane w linii)
                 }
                 Scribe.Line("Mends: sprzet wedlug tieru (175, W2) - kontrola bez wyjatkow (" + when + "): jednostek z bronia ponad tier " + units
                             + " (slotow " + slotsW + "; ma byc 0" + (units > 0 ? ": " + sample : "") + "); ponad tier bez zamiennika: tarcze " + sh
-                            + ", amunicja " + am + ", pancerz " + ar + " slotow; tier broni przy wczytaniu (TierGear) a teraz (prawo tieru broni, SkillSinew): "
+                            + " slotow (ma byc 0" + (sh > 0 ? ": " + shSample : "") + "), amunicja " + am + ", pancerz " + ar
+                            + " slotow (informacyjnie); tier broni przy wczytaniu (TierGear) a teraz (na zywo - tym samym wzorem prawo tieru broni i SkillSinew): "
                             + (_regTier == null ? "brak migawki przy wczytaniu"
                                : "skladane inny " + cDiff + " z " + cTot + ", pozostala bron inny " + oDiff + " z " + oTot + ", amunicja inny " + aDiff + " z " + aTot
                                  + (ex.Count > 0 ? " (np. " + string.Join(", ", ex.ToArray()) + ")" : ""))
-                            + "; zamiany bez warunku couch/brace w sesji " + _w2Slots + " slotow (u konnych " + _w2Mounted + ").");
+                            + "; zamiany bez warunku couch/brace w sesji " + _w2Slots + " slotow (u konnych " + _w2Mounted + ", podparcie zachowane " + _w2Brace + ")"
+                            + "; potkniecia " + st + " jednostek, migawka tierow " + _regStumbles + " przedmiotow (ma byc 0).");
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Army175.W2Line", null); } catch { } }
         }
@@ -1352,7 +1388,7 @@ namespace CrashScribe
                 foreach (var c in lst)
                 {
                     if (c == it || TierOf(c) != T) continue;
-                    if (Reject(it, c, u, false) != 0) continue;
+                    if (Reject(it, c, u, 2) != 0) continue;
                     int lv = Level(c, T, T, u, SameTroopCult(c, u.Cult));
                     int sum = ArmorSum(c); float w = c.Weight;
                     bool better = lv < bestLevel
@@ -1454,7 +1490,7 @@ namespace CrashScribe
             {
                 int g = TierOf(c);
                 if (g > cap || !PeasantOk(c, null, cap) || !ok(c)) continue;
-                if (Reject(null, c, u, false) != 0) continue;
+                if (Reject(null, c, u, 2) != 0) continue;
                 var cd = MakeCand(c, g, null, cap, u, true);
                 if (!has || CmpCand(cd, best) < 0) { best = cd; has = true; }
             }
