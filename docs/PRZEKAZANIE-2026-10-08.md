@@ -152,3 +152,7 @@ dana faze od nowa, korzystajac z zapisanych wynikow:
 - 18:11 **AUTOTEST T2 OK** (CrashScribe probny = at1-autotest + T2, 7455006c; Armoury zatwierdzony): kalendarz czynny, Zew spi do 728, 0 "RUSZA NA",
   0 osad, 0 oblezen przed terminem, 0 bledow. Trupy w dobie 40: 2049 (przed: 1535 - nie gina w szturmach; przyrost z niczego +2/d/banda zostaje do R2/R4).
 - 18:10 scalanie 170 + T1-T8 w drzewie SCRATCH nowej sesji `sklad` (galaz noc/sklad) - agent w tle.
+- 18:15 autotest T1 sam (Armoury probny f59c6852 = n1-obozy b30d701) w toku.
+- 18:20 workflow `wf_03018328-39c`: (A) H3 PRZEGRANI UCHODZA (decyzja Jeffa 07.10) - pelny cykl w drzewie `noc\n9-h3` (galaz w-toku/n9-przegrani-uchodza);
+  (B) projekt KIESA LUDU z symulacja 4 lat -> docs/PROJEKT-KIESA-LUDU-2026-10-09.md (tylko projekt; wdrozenie z grupa C i nowa kampania);
+  (C) PROBA DROG P2 (nie do wgrania) w drzewie `noc\p2-drogi-proba` + dane lore wiosek przeliczone na uklad z gry (SCRATCH nowej sesji `drogi`).
