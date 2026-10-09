@@ -250,6 +250,21 @@ namespace Armoury
             return 0f;
         }
 
+        /// <summary>174b.2 (krytyka 15): zuzycie dobowe surowca w miescie z OBECNYCH rak (WorkshopLaw.TownHands) - ilosc zamowienia miasta-celu;
+        /// prog nadwyzki zrodla i cel zapasu karawan liczy dalej Use (dawne rece przy CaravanBulkLegacyHands). 0 = spoza tabeli albo zamek.</summary>
+        internal static float UseNow(Town town, ItemObject item)
+        {
+            var s = Settings.Current;
+            if (s == null || town == null || item == null || !town.IsTown || !Ready()) return 0f;
+            foreach (var g in _goods)
+            {
+                if (g.Item != item) continue;
+                float crafts = TownCrafts.Active ? TownCrafts.UseOf(town, g.Item) : g.PerCycle * Math.Max(0, s.ArtisanTanWeavePerCycle);
+                return WorkshopLaw.TownHands(town) * g.PerHand + g.Fixed + crafts + ShopUse(town, g);
+            }
+            return 0f;
+        }
+
         /// <summary>174.3: suma zapasow docelowych i progow nadwyzki miast dla surowca (linia startowa "Rece (174)").</summary>
         internal static void SumsFor(string id, out int target, out int keep)
         {

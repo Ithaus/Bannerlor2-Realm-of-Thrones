@@ -1,5 +1,36 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-09 (174b.2) - DOWOZ RUDY: NAJPIERW TRASA, POTEM KARAWANA - ladem albo morzem (konwoj z portu, ktory piraci moga zlupic), mniejszy ladunek, gdy duzy sie nie oplaca, surowiec z jukow karawany, zamowienie zanim polka zejdzie do zera, karawany rodu gracza jak wszystkie
+**Mod:** Armoury | **Pliki:** `MaterialOrders.cs` (`Order` przepisane, NOWE `UseDest`, `TravelDays`, `NoteTrip`, `SourceKeep`, `OrderTimed`; `Place` z jukow + audyt; `Deliver` audyt i dni drogi; `Move` konwoj Naval; `Eligible`; linia), `CaravanBulk.cs` (NOWE `UseNow` - zuzycie z obecnych rak), `Settings.cs` + `McmSettings.cs` (NOWE: `TownMaterialOrderBySea` = true, `TownMaterialOrderSeaMaxRoute` = 1000, `TownMaterialOrderFromPacks` = true, `TownMaterialOrderAhead` = true, `TownMaterialOrderPlayerCaravans` = true; gen_mcm: 766 ustawien). Format zapisu `arm_matorders` bez zmian.
+
+**Co zobaczysz w grze (prosto):** do wysp i dalekich wybrzezy ruda plynie prawdziwym statkiem kupieckim z portu, ktory ma jej za duzo (piraci moga go zlupic); kupiec bierze mniejszy ladunek, gdy duzy by sie nie oplacil, i moze zawiezc rude, ktora juz ma w jukach; miasto zamawia rude, zanim jej zabraknie, a nie dopiero gdy kowale staja. Twoje karawany tez moga brac takie zlecenia (zysk do ich kiesy) - to pytanie 2 do Ciebie, domyslnie TAK.
+
+**Problem:** test sklad6: miast bez rudy 36 na d40 (sr. d31-40 37.3; 172b 36); bez kontraktu najczesciej "bez drogi" (98/d w d31-40); kontrakty wiozly ok. 23 ladunki rudy/d; 16 "rozkaz odrzucony"; "bez zysku" takze na krotkich trasach. Rudy nie brakuje (zapas swiata rosnie o ok. 126 ladunkow/d) - nie dojezdza (diagnozy A i B).
+
+**Przyczyna (`MaterialOrders.Order` 174):** (1) kandydaci z linii prostej, przewoznik = karawana z najwiekszym wolnym miejscem bez wzgledu na droge - konwoj (statki bez ladu, `CaravanPartyComponent.cs:54`) dostawal rozkaz ladowy, straznik BK go odrzucal, ruda zostawala w konwoju (16 "rozkaz odrzucony"); (2) morze tylko, gdy w ogole nie ma drogi ladowej i tylko gdy WYBRANA karawana ma statki; zasieg sprawdzany na pelnej dlugosci rejsu; (3) marza tylko dla ladunku q0 (srodkowa sztuka duzego q zbija cene celu); (4) surowiec w jukach nie mogl byc dowieziony; (5) zamowienie dopiero po cyklu "brak surowca" i ilosc z dawnych rak (5 953 rak dzis wobec 2 740) - dostawa starczala na 4-5 dni, potem miasto stalo na zerze (krytyka 15).
+
+**Zmiana (regula "kontrakt tylko z zyskiem ponad koszt drogi" i wzor oplaty bez zmian):**
+- Zrodla z `Town.AllTowns` (97 zamiast 1 065 osad - zrodlem i tak moze byc tylko miasto).
+- **Trasa przed karawana**: lad - pamiec drog gry (Default), koszt = droga <= zasieg; morze (oba miasta z portem, `TownMaterialOrderBySea`) - pamiec drog Naval, rejs <= `TownMaterialOrderSeaMaxRoute` (1 000 = ok. 15 dob, polowa limitu 30 dob) i rejs x `SeaFreightShare` (0.25) <= zasieg. Przewoznik dobrany do trasy: lad - karawana z ladem, morze - karawana ze statkami (konwoj; w porcie gra liczy mu ladownie - `IsCurrentlyAtSea` zostaje true, wzor wolnego miejsca bez zmian, krytyka 8). Rozkaz morski jak BK: `NavigationType.Naval` + port.
+- **Ilosc wedlug zysku**: q0 jak dotad; gdy marza q0 <= 0 - q0/2, q0/4, ... dopoki ladunek >= `TownMaterialOrderMinLoadKg`; pierwsze q z marza > 0. Cena celu dla danego q liczona raz na zamowienie.
+- **Surowiec z jukow** (`TownMaterialOrderFromPacks`): przewoznikiem moze byc karawana stojaca w dowolnym miescie w zasiegu, ktora ma surowiec w jukach (>= 100 kg) - bez zakupu, marza wobec sprzedazy na miejscu (`PriceAt(selling: true)`), kontrakt z `Paid = 0`, dostawa jak dotad.
+- **Punkt zamowienia** (`TownMaterialOrderAhead`, krytyka 15): codziennie miasto, ktore surowca uzywa, zamawia, gdy zapas + w drodze < (D + 2) x zuzycie (D = srednia dob drogi 3 ostatnich dostaw tego surowca do miasta, domyslnie 4); ilosc = zapas na max(10, D + 4) dob zuzycia z OBECNYCH rak (`CaravanBulk.UseNow`) minus polka minus w drodze. Prog nadwyzki zrodla dalej z dawnych rak (zrodla nie znikaja), ale nie ponizej wlasnego punktu zamowienia zrodla (`SourceKeep` - miasto nie sprzedaje tego, co zaraz samo by zamowilo).
+- **Karawany rodu gracza** (`TownMaterialOrderPlayerCaravans`, krytyka 28 - pytanie 2 do Jeffa, domyslnie rekomendacja TAK): moga brac kontrakty jak karawany AI; druzyna gracza nigdy.
+- **Audyt ilosci** (krytyka 19): przy zakupie przyrost jukow == ubytek polki zrodla, przy dostawie ubytek jukow == przyrost polki celu, z jukow - dostarczono <= bylo w jukach przy zawarciu; linia "audyt ilosci: rozjazdy N" (P11 = 0).
+- Linia "Kontrakty surowca (174)": "174b.2: morzem zawarto N (sztuk, dojechalo), z jukow zawarto N (sztuk, dojechalo), z wyprzedzeniem N, bez drogi [wyspa lub inna czesc ladu bez portu, droga ladem > zasieg, morze poza zasiegiem albo dlugoscia, brak konwoju w porcie zrodla], audyt ilosci: rozjazdy N".
+
+**Ryzyko / co sprawdzic (kontrola calosci):**
+- `CaravanBulk` (`:205`), `CaravanAmmo`, `IslandRoads` juz przepuszczaja karawane z kontraktem (`HasContract`) - kontrakt morski i "z jukow" tez. Konwoj na morzu nie obozuje. BK wysyla konwoje tylko do portow - cel morski zawsze ma port.
+- Ksiega towarow: kontrakt z jukow nie ma zakupu w zrodle, sprzedaz w celu przez `SellItemsAction` jak dotad - nic z niczego (audyt ilosci). Kontrola "ruda ZGODNA" porownuje produkcje, zuzycie i zapas - kontrakt jej nie dotyka; dlatego osobny audyt.
+- Punkt zamowienia: do 97 x 7 sprawdzen na dobe (odczyt polki i kontraktow w drodze), wywolan `Order` najwyzej raz na `TownMaterialOrderDays` (3) na miasto i surowiec; rachunek marzy sam hamuje nadmiar (cena celu spada z zapasem). Koszt `Order` w linii "Koszt 171-174" (MaterialOrders.Order).
+- Miasto nie bywa naraz zrodlem i zamawiajacym tego samego surowca (`SourceKeep`).
+- Brak pamieci drog Naval w grze - wyjatek zlapany, `Log.Error` raz ("Order(pamiec drog Naval)"), morze nieczynne.
+- Karawany rodu gracza: BK nie ma dla nich osobnej logiki ani rozkazow gracza (`BKCaravansBehavior.AddDialogs` pusty) - prowadzi je AI jak karawany AI.
+- Nowe klucze MCM: Jeff ich nie ma w `Armoury.json` - dzialaja wartosci domyslne.
+- Kod tylko zbudowany (kod 0) - NIE uruchomiony w grze.
+
+**Status:** NIEWGRANE - DO SPRAWDZENIA (P2: miast bez rudy sr. d31-40 <= 25; kontrakty morskie > 0 i "z jukow" > 0; "rozkaz odrzucony" 0; "audyt ilosci: rozjazdy 0"; brak `Log.Error` "pamiec drog Naval").
+
 ## 2026-10-09 (174b.1) - KONTRAKT SUROWCA TRZYMA CEL: karawana z kontraktem spi w nocnym obozie jak kazda (sen to nie "cudzy cel"), cel pilnowany co godzine zaraz po obozie, BK Shipping nie prowadzi jej "hop-by-hop", po wczytaniu kontrakty wracaja przed decyzja BK, swit nie oddaje celu utraconego kontraktu
 **Mod:** Armoury | **Pliki:** `MaterialOrders.cs` (NOWE `Hourly`, `RouteHopPrefix`, `ShipForget`; `Keep` tylko 30 dob i wylacznik; `HourlyPrefix` tylko blokada BK; `ReleasePrefix`; `ResolvePending` czeka na gotowe przedmioty; linia i wpiecie), `NightRest.cs` (NOWE `ForgetOrder`), `ArmouryBehavior.cs` (wywolanie w takcie godzinowym). Bez nowych ustawien, format zapisu `arm_matorders` bez zmian.
 

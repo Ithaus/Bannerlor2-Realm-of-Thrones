@@ -876,6 +876,11 @@ namespace Armoury
         public int WorkshopPiecesPerCycleMax = 64;         // most pieces one workshop line may finish in one cycle of the game (was 8) - a big town's spear-makers are not held back by the counter
         public bool ShelfIndexEnabled = true;              // prices of arms in towns count a stall from a remembered tally that is renewed whenever the stall changes, instead of going through the whole stall for every price - the same prices, less work for the game. Off: the old way
         public int ShelfIndexSelfCheckDays = 1;            // for this many days after loading, every 64th count is checked against the whole stall (later every 4096th); a difference is written to the Armoury log
+        public bool TownMaterialOrderBySea = true;         // a town short of a raw material may also hire a merchant ship in a port that has it to spare: the sea leg costs a quarter of the same distance by road, and the ship can be taken by pirates
+        public float TownMaterialOrderSeaMaxRoute = 1000f; // longest sea voyage (map distance) for such an order - about two weeks under sail
+        public bool TownMaterialOrderFromPacks = true;     // a caravan that already carries the material may take the order and deliver it, if that pays better than selling it where it stands
+        public bool TownMaterialOrderAhead = true;         // a town that uses a raw material orders it before its stall runs empty - when what it has and what is on the way would last less than the journey plus two days
+        public bool TownMaterialOrderPlayerCaravans = true; // the caravans of your clan may take such orders like any other caravan (the profit goes to their purse); your own party never does
 
         public static void Load(string moduleDataDir)
         {
