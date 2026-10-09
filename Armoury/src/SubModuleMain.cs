@@ -54,6 +54,7 @@ namespace Armoury
                 TrueArmourCost.ApplyAll(_harmony);
                 ThrownWobblePatch.ApplyAll(_harmony);
                 FairXpPatch.ApplyAll(_harmony);
+                DonationXpLaw.ApplyAll(_harmony);   // audyt 13 Z1 (Jeff 09.10): oddany sprzet nie uczy - XP perkow Giving Hands / Paid in Promise = 0, migawka handlu BK przy kazdym otwarciu handlu
                 ChargeTemperPatch.ApplyAll(_harmony);
                 ValyrianSteel.ApplyAll(_harmony);
                 SmithAudit.ApplyAll(_harmony);
