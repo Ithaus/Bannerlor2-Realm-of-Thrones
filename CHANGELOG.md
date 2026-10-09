@@ -1,5 +1,27 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-09 (174b.6) - ZLOM ZE STAREGO NADMIARU PAMIETA ROZGRZEWKE W ZAPISIE: doby pomiaru, ostatnia doba, srednie zakupow koszykow, ulamki skupu i ulamki rudy ze zlomu w kluczu "arm_scrap" (z probnym odczytem przy kazdym zapisie)
+**Mod:** Armoury | **Pliki:** `ArmsScrap.cs` (Export / Import / ImportFailed / ResolvePending, rejestr kluczy, parser), `ArmouryBehavior.cs` (SyncData `arm_scrap`, OnSessionLaunched). Bez nowych ustawien.
+
+**Co zobaczysz w grze (prosto):** skup starego nadmiaru na zlom (decyzja Jeffa 09.10) liczy swoje 30 dni rozgrzewki w zapisie gry - w Twojej kampanii ruszy po 30 dniach gry raz, a nie dopiero po 30 dniach bez wczytywania. Ulamki rudy ze zlomu nie przepadaja przy wczytaniu.
+
+**Problem:** test sklad6 - na zapisie 362 po 8 dobach "rozgrzewka 8/30": licznik `_days`, srednie zakupow (`_ema`), dzisiejsze zakupy, ulamki skupu i rudy (`_oreAcc`) zyly tylko w sesji (`ArmsScrap.cs:28-32`). Krytyka 174b (uwaga 10): `_lastDay` tez nie szedl do zapisu, a gra po wczytaniu przesuwa faze doby (`Campaign.CreateCampaignEvents`: pierwsze odczekanie z reszty) - pierwsza doba po wczytaniu moze miec ten sam numer co ostatnia przed zapisem i `Daily` liczyl ja drugi raz (dzien pomiaru + 1% skupu).
+
+**Zmiana:**
+- Klucz `arm_scrap` przez `SaveText.Sync` (kawalki po 8 000 znakow), wlasny `try` w `SyncData`, `Export` tylko przy zapisie. Format `1|doby|ostatnia doba~osada:koszyk=srednia,dzis,ulamek;...~miasto=ruda;...`, liczby 4 cyfry znaczace, pary z srednia < 0.001 i bez zakupow dzis pomijane (<= 0.36 sztuki roku popytu), tylko miasta (zamki nie maja skupu).
+- Klucze wedlug StringId osady + koszyk (rejestr klucz sesji -> osada, koszyk w `NoteBuy`), po wczytaniu przeliczone na klucze sesji (`MBGUID.InternalValue` zyje tylko w sesji). Rozwiazanie w `OnSessionLaunched` obok `MaterialOrders.ResolvePending`, a gdyby doba albo zapis przyszly wczesniej - na ich poczatku (krytyka 10: `Export` rozwiazuje nierozwiazany napis jak `MaterialOrders.Export`).
+- `_lastDay` w zapisie - po wczytaniu ta sama doba nie liczy sie drugi raz.
+- Probny odczyt przy kazdym zapisie (krytyka 25): napis -> ten sam parser co przy wczytaniu -> porownanie liczby par, rudy, dob i sumy srednich i rudy; linia "Zlom z nadmiaru (zapis 174b): zapisano N par z M miast ... probny odczyt zgodny / ROZJAZD". Po wczytaniu: "odtworzono N par z M miast ... rozgrzewka X/30"; brak klucza: "brak klucza w zapisie (zapis sprzed 174b) - rozgrzewka od zera"; zly napis: "klucz zapisu nieczytelny - rozgrzewka od zera" + `Log.Error` raz.
+
+**Ryzyko / co sprawdzic (kontrola calosci):**
+- Rozmiar: realnie kilka tysiecy par x ok. 25 znakow = do ok. 150 KB - `SaveText.Sync` dzieli na kawalki ponizej limitu 32 KB na napis (paczka 161). Koszt tylko przy zapisie i wczytaniu (+ probny odczyt przy zapisie).
+- Osada, ktorej po wczytaniu nie ma (inny zestaw modow) - para pominieta i policzona w linii.
+- `Reset` w konstruktorze `ArmouryBehavior` (przed `SyncData`) czysci tez rejestr kluczy i napis odlozony - stan jednej kampanii nie przecieka do drugiej.
+- U Jeffa: po wgraniu 174b rozgrzewka 30 dni gry raz (stary zapis nie ma pomiaru), potem skup dziala po kazdym wczytaniu.
+- Kod tylko zbudowany (kod 0) - NIE uruchomiony w grze.
+
+**Status:** NIEWGRANE - DO SPRAWDZENIA (P10: przy kazdym autozapisie "probny odczyt zgodny"; zapis 362 - "brak klucza w zapisie - rozgrzewka od zera", bez bledow; nowa kampania z zapisem i wczytaniem - "odtworzono N par", bez "rozgrzewka 1/30").
+
 ## 2026-10-09 (174b.0) - POMIARY DOWOZU I RYNKU ZBROI: nazwy miast bez rudy i strzal, zrodla rudy z konwojami w porcie, zbroja na polkach w pasmach z "nowa sztuka w 7 dob", zakupy AI wedlug kupujacego, "razem" pokrycia wazone liczba ludzi (sam log)
 **Mod:** Armoury | **Pliki:** NOWY `Measure174b.cs` (M1, M2, M3), NOWY `ShopReserve.cs` (zaslepka - rezerwa kramu w 174b.4), `MaterialOrders.cs` (linia nazw co 5 dob, liczniki), `NightRest.cs` (`IsCamping`), `ArmsDrill.cs` ("razem" w linii pokrycia), liczniki w `AiGear.cs`, `VolunteerKit.cs`, `MenPurse.cs`, `SupplyDemand.cs`, `WorkshopLaw.cs`, `GarrisonArmory.cs`, `GarrisonCarts.cs`, `ArmouryBehavior.cs` (wywolanie i Reset). Bez nowych ustawien, bez kluczy zapisu, bez zmiany rozgrywki.
 

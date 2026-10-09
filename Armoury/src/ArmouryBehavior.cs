@@ -517,6 +517,10 @@ namespace Armoury
             // 174.2: kontrakty surowca w drodze (karawana, cel, zrodlo, surowiec, ilosc) - zawsze, takze przy wylaczonym wylaczniku (po wczytaniu karawana zwolniona)
             try { string mo = dataStore.IsSaving ? MaterialOrders.Export() : null; SaveText.Sync(dataStore, "arm_matorders", ref mo); if (dataStore.IsLoading) MaterialOrders.Import(mo); }
             catch (Exception e) { Log.Error("SyncData.arm_matorders", e); try { if (dataStore.IsLoading) MaterialOrders.ImportFailed(); } catch { } }   // recenzja 174: linia, ze kontrakty pominiete
+            // 174b.6: zlom ze starego nadmiaru - rozgrzewka (doby pomiaru), ostatnia doba, srednie zakupow koszykow, ulamki skupu i rudy; Export tylko przy zapisie
+            // (z probnym odczytem), brak klucza = zapis sprzed 174b (rozgrzewka od zera, jak dotad); rozwiazanie w OnSessionLaunched
+            try { string sc = dataStore.IsSaving ? ArmsScrap.Export() : null; SaveText.Sync(dataStore, "arm_scrap", ref sc); if (dataStore.IsLoading) ArmsScrap.Import(sc); }
+            catch (Exception e) { Log.Error("SyncData.arm_scrap", e); try { if (dataStore.IsLoading) ArmsScrap.ImportFailed(); } catch { } }
         }
 
         public override void RegisterEvents()
@@ -1016,6 +1020,7 @@ namespace Armoury
             try { GarrisonCarts.ResolvePending("wczytanie"); } catch (Exception e) { Log.Error("GarrisonCarts.ResolvePending", e); }
             try { WorkshopLaw.ResolvePending("wczytanie"); } catch (Exception e) { Log.Error("WorkshopLaw.ResolvePending", e); }   // 174.0b: robota w toku warsztatow z zapisu (przed pierwszym cyklem)
             try { MaterialOrders.ResolvePending("wczytanie"); } catch (Exception e) { Log.Error("MaterialOrders.ResolvePending", e); }   // 174.2: kontrakty surowca na karawany z zapisu
+            try { ArmsScrap.ResolvePending("wczytanie"); } catch (Exception e) { Log.Error("ArmsScrap.ResolvePending", e); }   // 174b.6: zlom - pomiar zakupow i rozgrzewka z zapisu
             try { GarrisonArmory.Restore("wczytanie"); } catch (Exception e) { Log.Error("GarrisonArmory.Restore", e); }
             try { RecruitSources.ApplyLate(); } catch (Exception e) { Log.Error("RecruitSources.ApplyLate", e); }
             try { ArmsDrill.EnsureHooks(); } catch (Exception e) { Log.Error("ArmsDrill.EnsureHooks", e); }
