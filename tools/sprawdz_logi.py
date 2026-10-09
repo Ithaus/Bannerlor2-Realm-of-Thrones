@@ -500,7 +500,24 @@ def main(argv):
             (max(sk) == 0) if (sk and b_on) else None)
     dos = [num(r"dosypka do zapasu \(tryb 1, zostaje do etapu 3\) (\d+)", zz[k]) for k in last_window(zz)]
     dos = [x for x in dos if x is not None]
-    rep.add("110: dosypka regulatora do zapasu zamkow (tryb 1, 28 dob)", f"{st.mean(dos):.0f} na dobe" if dos else "brak linii", "INFO - ok. 3.7 tys./dobe (Z9, zamyka etap 3)", None)
+    # 110-p: prog zamiast INFO. Projekt liczyl dosypke ok. 3.7 tys./dobe; bieg bazowy (kopia-baza120, doby 31-120) ma w kasach zamkow "zakupy" +55 tys.,
+    # dosypke 26 tys. i kasowanie 34 tys., a prawdziwe przeplywy netto -40 tys./dobe - po 110 dosypka trybu 1 moze przejac role "zakupow" (zloto z niczego
+    # w zamkach bez spadku). TAK, gdy dosypka <= 10 tys./dobe (Z9) albo zloto z niczego netto w kasach zamkow ("zakupy" + dosypka - kasowanie, linia
+    # "Przeplywy osad (kasy zamkow)") nie wyzsze niz w biegu bazowym; inaczej NIE
+    def cas_net(w):
+        if any(w.get(k) is None for k in ("zamki_zakupy", "zamki_dosypal", "zamki_skasowal")):
+            return None
+        return w["zamki_zakupy"] + w["zamki_dosypal"] - w["zamki_skasowal"]
+    net_now, net_base = cas_net(sw), cas_net(bw)
+    if dos:
+        dm = st.mean(dos)
+        ok_dos = dm <= 10000 or (net_now is not None and net_base is not None and net_now <= net_base)
+        rep.add("110: dosypka regulatora do zapasu zamkow (tryb 1, 28 dob)",
+                f"{dm:.0f} na dobe; zloto z niczego netto w kasach zamkow " + (f"{net_now:+.0f}" if net_now is not None else "-")
+                + (f" wobec bazy {net_base:+.0f}" if net_base is not None else " (bez bazy)"),
+                "<= 10 tys./dobe (Z9) albo z niczego netto w kasach zamkow <= baza (projekt: ok. 3.7 tys.)", ok_dos if b_on else None)
+    else:
+        rep.add("110: dosypka regulatora do zapasu zamkow (tryb 1, 28 dob)", "brak linii", "<= 10 tys./dobe (Z9) albo z niczego netto w kasach zamkow <= baza", None)
     pz = [num(r"z zaworu srednio (\d+)", zz[k]) for k in last_window(zz)]
     pz = [x for x in pz if x is not None]
     rep.add("110: pan samych zamkow - wplyw z zaworu (srednio, 28 dob)", f"{st.mean(pz):.0f} zl/dobe" if pz else "brak linii", "200-350 zl/dobe",

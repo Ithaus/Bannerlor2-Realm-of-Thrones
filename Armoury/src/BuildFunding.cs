@@ -174,8 +174,13 @@ namespace Armoury
                     labourI = Math.Min(labourI, Math.Max(0, lord.Gold - matSpent));
                     lord.ChangeHeroGold(-(matSpent + labourI));
                     CirculationWindows.NoteHeroGold(lord, -(matSpent + labourI));   // paczka 169b: glowa poza swiatem - zloto weszlo do swiata (tylko licznik)
-                    if (market != null && market.Town != null) market.Town.ChangeGold(matSpent);
+                    if (market != null && market.Town != null)
+                    {
+                        market.Town.ChangeGold(matSpent);
+                        ClanIncomeBook.NoteOwnPaid(market, clan, matSpent);   // 110-p (K8): "wlasne" D stalego - materialy kupione w miescie rodu (tylko licznik; obca osada - nic)
+                    }
                     st.Town.ChangeGold(labourI);                 // place murarzy, robotnikow, woznic - do kasy osady
+                    ClanIncomeBook.NoteOwnPaid(st, clan, labourI);   // 110-p (K8): "wlasne" D stalego - place budowy w kasie wlasnego zamku albo miasta wracaja zaworem (tylko licznik)
                     float pts = PointsFor(matSpent, labourI, ppp, market);
                     _wageIdxSum += WageIdx(market); _wageIdxN++;
                     _funded[st.Town] = pts;

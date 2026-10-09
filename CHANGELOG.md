@@ -1,5 +1,54 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-09 (110-p, poprawki po przegladzie kroku B - uwagi do 110: 1, 6, 7, 8, 9) - DOSYPKA DO ZAPASU ZAMKOW Z PROGIEM ZAMIAST INFO; LICZBY PROJEKTU DLA ZAMKOW PRZELICZONE Z BIEGU BAZOWEGO 120 DOB (NIE POTWIERDZAJA SIE); ZAPAS KUPCOW NIE PONIZEJ CELU GRY; PRZYCIECIE DARU PO ZAWORZE BEZ PRZYCIECIA; "WLASNE" Z PLAC BUDOWY; NUMER DOBY W LINII 110
+**Mod:** Armoury | **Galaz:** `w-toku/e2b` (po 110, 112, 114) | **Projekt:** `docs/PROJEKT-ETAP2-BANKRUCTWA-2026-10-09.md` rozdz. "110 + 112 + klucz 114" (liczby i test), 2.0b (Z8, K8), OB Z9. **Pliki:** `CastlePurse.cs` (zapas, przyciecie, numer doby, opis), `BuildFunding.cs` (licznik "wlasne"), `Measure169c.cs` (adnotacja), `Settings.cs` + `McmSettings.cs` (`python tools/gen_mcm.py`: Armoury 848, bez nowych kluczy - tylko opisy), `tools/sprawdz_logi.py` (prog dosypki). Klucz zapisu bez zmian (`arm_castlepurse` przez `SaveText.Sync`), nowa wartosc `"on:<wiek>"` obok `"done"`.
+
+**Co zobaczysz w grze (prosto):** przy domyslnych ustawieniach rozgrywka bez zmian wobec 110. Zapasu kupcow w zamku nie da sie juz w MCM ustawic ponizej tego, do czego gra sama dosypuje kase - inaczej panowie dostawaliby zloto z niczego. Przyciecie daru startowego wlaczone pozniej w kampanii zdejmuje tylko to, co z daru jeszcze zostalo.
+
+**Problem (przeglad kroku B):**
+1. **(wazne) Liczby projektu dla zamkow sie nie potwierdzaja.** Projekt: regulator kasuje w zamkach ok. 105 tys./dobe, dosypka po 110 ok. 3.7 tys., pan zamku +270-310 zl/dobe. Log `kopia-sklad10`, "Przeplywy osad (kasy zamkow)" doba 108875: stan 3 032 382 w 130 zamkach (srednio ok. 23 tys. = zapas), "zakupy" mieszkancow +44 420, regulator dosypal 28 652, skasowal 26 654, zold garnizonow +27 242, odziez -9 682, pozostale moduly ticku -60 009, zmiana +6 527 [P]. Bieg bazowy kroku A (`kopia-baza120`, przeliczone skryptem z linii "Przeplywy osad (kasy zamkow)", srednie na dobe) [P]:
+
+   | okno | "zakupy" | dosypal | skasowal | z niczego netto | zold zalog | odziez | budowy | pozostale moduly ticku | tabory, GiveGold | prawdziwe netto |
+   |---|---|---|---|---|---|---|---|---|---|---|
+   | doby 31-120 | +55 185 | 25 913 | 33 739 | +47 359 | +31 055 | -6 521 | +2 342 | -61 150 | -5 560 | -39 784 |
+   | ostatnie 28 dob (plik bazowy) | +62 466 | 18 877 | 42 786 | +38 556 | +34 688 | -6 656 | +2 256 | -56 949 | -6 337 | -32 921 |
+
+   Po 110 "zakupy" = 0 i kasowanie = 0. Jesli nasze moduly wydaja z kas zamkow tyle co dzis, kasy traca ok. 33-40 tys./dobe prawdziwych pieniedzy i schodza do zapasu; wtedy zawor placi malo (tylko zamki z dodatnim wlasnym saldem), a role "zakupow" przejmuje dosypka trybu 1: ok. 30-40 tys./dobe zamiast 3.7 tys. [S]. Zloto z niczego w zamkach spada z ok. +39-47 tys. do ok. +33-40 tys./dobe, nie do zera. Prog testu "pan samych zamkow 200-350 zl/dobe" prawdopodobnie NIE [S]. Liczby projektu pochodza z wczesniejszych logow (projekt nie podaje okna); bieg bazowy ich nie potwierdza. Narzedzie traktowalo dosypke jako INFO, wiec bieg 120 dob nie zatrzymalby sie na tej rozbieznosci.
+2. (drobne, K8) Place budowy, ktore pan wplaca do kasy wlasnego zamku (`BuildFunding.cs:178`), wracaja od 110 zaworem, a D staly liczyl je jako "ziemia", nie "wlasne" (w miastach tak bylo juz w kroku A).
+3. (drobne) Zapas kupcow z MCM mogl zejsc ponizej celu regulatora gry (10 000 + 12 x dobrobyt): regulator dosypywal wtedy z niczego do swojego celu, a zawor bral 7% wszystkiego ponad nizszy zapas - dosypka z niczego trafiala do panow i koron. Przy domyslnych wartosciach (rownych celowi gry) problemu nie bylo.
+4. (drobne) Przyciecie daru zakladalo, ze regulator kasowal dar (0.75 dziennie). Gdy 110 biegl od startu z wylaczonym przycieciem (kasowanie zablokowane), pozniejsze wlaczenie przycinalo tylko 0.75^wiek daru. Druga strona: zapis sprzed 110 wczytany pierwszy raz (pierwsza doba po wczytaniu ma wiek >= 2.0) dostawal pelne przyciecie (prog 2.0), choc regulator zdazyl zdjac czesc daru.
+5. (drobne) "Zawor zamkow (110): dzien N" liczyl N = `ToDays`, a ksiega pieniadza ("Przeplywy osad", w ktorej siedzi ten sam zawor) i "Utarg wsi (112)" - `ToDays - 1`. "Kasy miast (169c)" pisala "do korony - (162m, 110)", a 110/114 nie daja koronie nic z kas miast.
+
+**Przyczyna:** projekt liczyl zamki z wczesniejszych logow, nie z biegu bazowego; prog dosypki w narzedziu zostawiony jako INFO; `Reserve` bez dolnej granicy; flaga `arm_castlepurse` tylko "done"; brak `NoteOwnPaid` w `BuildFunding`; numer doby i adnotacja z galezi.
+
+**Zmiana:**
+- `tools/sprawdz_logi.py`: "110: dosypka regulatora do zapasu zamkow (tryb 1, 28 dob)" - **prog zamiast INFO**: TAK, gdy dosypka <= 10 tys./dobe (Z9) albo zloto z niczego netto w kasach zamkow ("zakupy" + dosypka - kasowanie z linii "Przeplywy osad (kasy zamkow)") nie wyzsze niz w biegu bazowym; inaczej NIE. W wierszu obie liczby (dosypka, netto teraz i w bazie).
+- `CastlePurse.Reserve` = max(ustawienia, 10 000 + 12 x dobrobyt) - ustawienia moga zapas tylko podniesc; linia startowa podaje dolna granice; opis `CastlePurseFloorGold` w MCM.
+- Przyciecie daru: przy wylaczonym `CastlePurseTrimAtStart` zawor zapisuje dobe startu (`arm_castlepurse` = `"on:<wiek>"`, ta sama droga `SaveText.Sync`); przyciecie wlaczone pozniej liczy spadek daru od regulatora tylko do tej doby, a dalej od zaworu ((1 - CastleDuesShare) dziennie). Prog "mlodej kampanii" 2.0 -> 1.5 (nowa kampania - pierwszy tick ok. 1.0, pelne przyciecie jak dotad; zapis wczytany pierwszy raz - wiek >= 2.0, spadek 0.75^wiek). Opis `CastlePurseTrimAtStart` w MCM.
+- `BuildFunding`: `ClanIncomeBook.NoteOwnPaid(st, clan, place)` po wplacie plac do kasy osady i `NoteOwnPaid(targ, clan, materialy)` (liczy sie tylko, gdy targ jest miastem tego rodu - jak zakupy sprzetu w `AiGear`). Tylko licznik.
+- "Zawor zamkow (110): dzien N" - N = `ToDays - 1` (doba zakonczona, jak "Przeplywy osad" i "Utarg wsi (112)"). "Kasy miast (169c)": "do korony - (162m, 111')".
+- Opis klasy `CastlePurse`: liczby z biegu bazowego obok liczby projektu.
+
+**Kontrola calosci (CLAUDE.md 8.0):**
+- Regresje: przy domyslnych ustawieniach `Reserve` daje to samo (10 000 + 12 x dobrobyt). `StartGiftCut` ma jednego wolajacego (`TrimStartGift`). `Import` czyta stare wartosci ("done", "") jak dotad. `NoteOwnPaid` - tylko licznik D stalego (czesc "wlasne" rosnie, "zawor zamkow bez wlasnych" i "zawor miast bez wlasnych" spadaja u panow, ktorzy buduja u siebie - to wlasnie poprawka K8).
+- Kolizje: numer doby linii 110 czyta tylko `sprawdz_logi.py` (okna 28 dob, bez laczenia z innymi liniami po dobie) - bez wplywu. Adnotacji "(162m, ...)" narzedzia nie czytaja.
+- Zamknieta ekonomia: zapas nie ponizej celu gry zamyka droge "dosypka z niczego -> zawor -> pan".
+
+**Odrzucone:** nic. Dla uwagi 1 progi testu kroku B (200-350 zl/dobe) zostaja - projekt ich nie zmienia; rozbieznosc pokazac Jeffowi przed biegiem 120 dob (nizej).
+
+**Ryzyko / co sprawdzic:**
+- **Dla Jeffa przed biegiem 120 dob:** z biegu bazowego wynika, ze 110 zamyka w zamkach glownie "zakupy" z niczego, a ich miejsce zajmie dosypka gry do zapasu (tez z niczego) - panowie zamkow dostana z zaworu mniej, niz liczyl projekt. Jesli bieg to potwierdzi (dosypka > 10 tys. i netto z niczego w zamkach >= baza), 110 nie spelnia swojego celu w zamkach bez zmniejszenia wydatkow modulow z kas zamkow albo bez zamkniecia trybu 1 (etap 3, Z9) - decyzja po biegu.
+- Zapis z doby 1-2 sprzed 110: teraz przyciecie 0.75^2 (ok. 56% daru) zamiast calosci.
+
+**Linie logu do testu (autotest 40 dob + zapis 362; potem 120 dob; progi wobec biegu bazowego 120 dob `kopia-baza120`, plik bazowy zapisany jeszcze raz: `--zapisz-baze`):**
+- start: "CastlePurse (110): zawor kasy zamku CZYNNY ... zapas kupcow 10000 + 12 x dobrobyt (nie mniej niz cel regulatora gry 10000 + 12 x dobrobyt)".
+- "Zawor zamkow (110): dzien N" (N = doba zakonczona): "dosypka do zapasu (tryb 1, zostaje do etapu 3) Y" - **`sprawdz_logi.py` "110: dosypka ..." TAK: srednia 28 dob <= 10 000 albo z niczego netto w kasach zamkow <= baza (+38 556/dobe w `kopia-baza120`)**; "pan samych zamkow ... srednio Z" - **200-350 zl/dobe**.
+- "Przeplywy osad (kasy zamkow): dzien N": "skasowal 0" (**prog 0**), "\"zakupy\" mieszkancow +0"; "dosypal" = Y z linii 110 tej samej doby (ten sam numer doby).
+- "D staly (169c)": u panow budujacych we wlasnym zamku "wlasne" > 0 takze bez zalogi.
+- przy wylaczonym przycieciu: "CastlePurse (110): przyciecie daru startowego WYLACZONE ... zawor czynny od X. doby"; po wlaczeniu: "przyciecie wlaczone w Y. dobie kampanii, zawor biegl bez przyciecia od X. doby (regulator i zawor zostawili ok. P% daru)".
+
+**Status:** NIEWGRANE - DO SPRAWDZENIA (build Release kod 0; gra nie uruchamiana, autotest nie robiony; nic nie wgrane do gry).
+
 ## 2026-10-09 (klucz 114, etap 2 krok B; PLAN 2.2, 2.11) - ZAWOR ZAMKU DZIELONY Z KORONA JAK ZAWOR MIASTA: 2/3 DLA PANA, 1/3 DO SKARBCA KROLESTWA (ZAMEK RODU BEZ KROLESTWA - CALOSC PANU); WSPOLNY POMOCNIK PODZIALU BEZ TownPurse; POPRAWKI KSIEGI (POZYCJA KORONY W KASACH ZAMKOW)
 **Mod:** Armoury | **Galaz:** `w-toku/e2b` (po 110 i 112) | **Projekt:** `docs/PROJEKT-ETAP2-BANKRUCTWA-2026-10-09.md` rozdz. "110 + 112 + klucz 114" ("Z paczki 114 tylko klucz i poprawki ksiegi - podzial przez wspolny pomocnik bez `TownPurse.Split`"), 2.0b (jedna regula gracz/AI, Z8), 165 (1/3 zaworu zamkow we wplywach dnia); audyt 15 Z15-1; projekty.md S15. Z galezi `paczki/114-porzadki` (a14efe8) wziete tylko: `CastleDuesSplitWithCrown`, `CastleDuesLordShare` 0.67, podzial w `CastlePurse.Daily`, `LordShare`, `SplitCastleMark` + pozycja ksiegi korony; reszta 114 (napisy, naprawy, sakiewki, wyplaty notabli w ksiedze, `PayComesHome` w TownPurse) - nie (111' i porzadki sa w innych krokach; ksiega obiegu 169 mierzy juz wyplaty notabli i sakiewki oknami). **Pliki:** `CastlePurse.cs` (podzial, `LordShare`, `CrownToday` na krolestwo, linia), `ValveSplit.cs` (`Split`), `MoneyLedger.cs` (`MCastleCrown`, `SplitCastleMark`), `MoneyLedger.Obieg.cs` ("do skarbcow (114)" w kasach zamkow, "udzial z zaworu zamkow (114)" we wplywach korony), `Settings.cs` + `McmSettings.cs` (`python tools/gen_mcm.py`: Armoury 848), `tools/gen_mcm.py` (zakres suwaka `CastleDuesLordShare` 0..1), `tools/sprawdz_logi.py` (udzial korony). Bez nowych kluczy zapisu.
 

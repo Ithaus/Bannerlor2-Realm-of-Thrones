@@ -353,7 +353,7 @@ namespace Armoury
             return "Kasy miast (169c): dzien " + day + " | miast " + n + ": kasy " + gold + " wobec celu regulatora gry (10 000 + 12 x dobrobyt) " + target
                    + " (kasa/cel: mediana " + (ratios.Count > 0 ? ratios[ratios.Count / 2].ToString("0.00", Inv) : "-") + ", ponad celem " + over + ", ponizej " + under + ", ponizej polowy " + half + ")"
                    + " | regulator dzis: skasowal " + cut + ", dosypal " + add + " | pod tarcza zoldu (zold i wydatki ludzi w drodze do pana) " + held
-                   + " | zawor do pana dzis " + valve + " | dwor -, do korony - (162m, 110) | plik kasy-miast.csv (miasto po miescie).";
+                   + " | zawor do pana dzis " + valve + " | dwor -, do korony - (162m, 111') | plik kasy-miast.csv (miasto po miescie).";
         }
 
         private static string Clean(string s) { return string.IsNullOrEmpty(s) ? "" : s.Replace(';', ',').Replace('\n', ' ').Replace('\r', ' '); }

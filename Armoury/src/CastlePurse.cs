@@ -19,7 +19,9 @@ namespace Armoury
     /// Dotad kasa zamku byla atrapa: regulator gry (DefaultSettlementEconomyModel.GetTownGoldChange) co dobe sciagal ja do celu
     /// 10 000 + 12 x dobrobyt (cwierc roznicy dziennie - w gore z niczego, w dol w nicosc), a "zakupy" ludnosci zamku dopisywaly do niej
     /// cene zjedzonego towaru z niczego. Do kasy zamku wplywa prawdziwy zold zalogi (SoldierPay), sprzet AI i zaplaty za towar
-    /// - regulator kasowal ok. 105 tys. dziennie w 130 zamkach.
+    /// - regulator kasowal ok. 105 tys. dziennie w 130 zamkach (projekt, starsze logi). 110-p: bieg bazowy kroku A (kopia-baza120, doby 31-120)
+    /// ma mniej: kasowanie 34 tys., dosypka 26 tys., "zakupy" +55 tys. dziennie, a prawdziwe przeplywy kas zamkow netto -40 tys. (nasze moduly
+    /// wydaja z nich wiecej, niz wplywa) - po 110 dosypka trybu 1 moze byc wielokrotnie wieksza niz 3.7 tys. z projektu (prog w sprawdz_logi).
     ///
     /// Co robimy (wszystko pod jednym wlacznikiem CastlePurseEnabled; wylaczony = gra jak dotad):
     ///  1. Regulator: postfiks (First) na GetTownGoldChange kazdego modelu kasy osad - dla ZAMKU wynik ujemny (kasowanie nadwyzki) = 0;
@@ -45,8 +47,10 @@ namespace Armoury
     ///  5. Start nowej kampanii: dar startowy w kasach zamkow (gra 20 000 + BK 40 x dobrobyt) jest raz, w pierwszej dobie, przycinany
     ///     do zapasu. Dotad regulator kasowal go w ok. 12 dob; zostawiony splynalby zaworem do panow zamkow (ok. 5 mln z niczego).
     ///     Przycinamy najwyzej tyle, ile wynosil sam dar - to, co wplynelo od startu, zostaje. Flaga w zapisie (arm_castlepurse,
-    ///     SaveText.Sync). Zapis starszy niz dwie doby, wczytany pierwszy raz z ta zmiana: przycinamy najwyzej to, co z daru zostawil
-    ///     regulator gry (nadwyzka daru x 0.75 do potegi wieku w dobach - po 12 dobach 3%, po 40 nic).
+    ///     SaveText.Sync). Zapis wczytany pierwszy raz z ta zmiana (pierwsza doba po wczytaniu ma wiek >= 2): przycinamy najwyzej to, co z daru
+    ///     zostawil regulator gry (nadwyzka daru x 0.75 do potegi wieku w dobach - po 12 dobach 3%, po 40 nic). 110-p: zawor czynny bez
+    ///     przyciecia (CastlePurseTrimAtStart wylaczone) zapisuje dobe startu ("on:<wiek>") - przyciecie wlaczone pozniej liczy spadek daru
+    ///     od regulatora tylko do tej doby, a dalej od zaworu (CastleDuesShare dziennie). Zapas kupcow nigdy ponizej celu regulatora gry.
     ///
     /// Czego NIE robimy: zaplaty za budowy i sprzet w zamku zostaja w kasie zamku (zawor je oddaje). Poza zakresem zostaja dwa przecieki
     /// BK: -1% dziennie od kasy ponad 50 000 + 12 x dobrobyt (zawor trzyma kase ponizej - linia liczy zamki ponad limitem) i cotygodniowy
@@ -59,16 +63,25 @@ namespace Armoury
         private const float BkStartGoldPerProsperity = 40f;  // BK BKCampaignStartBehavior.GiveTownsResources: ChangeGold((int)(Prosperity * 40f)) po kreatorze postaci
         private const int BkLimitBase = 50000;               // BK BKEconomyModel.GetSettlementMarketGoldLimit: zamek 50 000 + 12 x dobrobyt; ponad tym HandleMarketGold zdejmuje 1% dziennie
         private const float BkLimitPerProsperity = 12f;
-        private const double FreshAgeDays = 2.0;             // pierwszy tick dobowy nowej kampanii przypada w wieku 1.0 doby, zapisu z pierwszej doby - przed 2.0: regulator gry daru jeszcze nie ruszyl
+        // 110-p: pierwszy tick dobowy nowej kampanii przypada w wieku ok. 1.0 doby (dar nieruszony - zalozenie galezi 110); zapis wczytany pierwszy
+        // raz ma pierwszy tick w wieku >= 2.0 - regulator gry mial juz co najmniej dobe, wiec liczymy spadek (dotad prog 2.0 dawal takiemu zapisowi pelne przyciecie)
+        private const double FreshAgeDays = 1.5;
         private const double RegulatorKeeps = 0.75;          // regulator gry zdejmuje cwierc nadwyzki dziennie (DefaultSettlementEconomyModel.GetTownGoldChange)
+        // 110-p: cel regulatora gry dla kasy osady (DefaultSettlementEconomyModel.GetTownGoldChange: 10 000 + 12 x dobrobyt). Zapas kupcow nie schodzi
+        // ponizej - inaczej regulator dosypywalby z niczego do swojego celu, a zawor oddawal te dosypke panom i koronom
+        private const int GameTargetGold = 10000;
+        private const float GameTargetPerProsperity = 12f;
 
         /// <summary>Hak kiesy ludu (KL, etap 5; projekt etapu 2 rozdz. 2.0b): czesc zaworu zamku dla kiesy podzamcza (KL: 15%). Do etapu 5 = 0 -
         /// podzamcze nie ma wlasnej kiesy; czesc podzamcza zostaje w kasie zamku.</summary>
         internal static readonly float CastleDuesSuburbShare = 0f;
 
         // ------------------------------------------------------------ stan kampanii
-        private static bool _trimDone;                       // dar startowy rozliczony (zapis: arm_castlepurse)
-        private static bool _trimSkip;                       // wieku kampanii nie da sie odczytac - w tej sesji nie probujemy dalej (jedna linia logu)
+        private static bool _trimDone;                       // dar startowy rozliczony (zapis: arm_castlepurse "done")
+        // 110-p: wiek kampanii, w ktorym zawor ruszyl BEZ przyciecia daru (CastlePurseTrimAtStart wylaczone) - od tej doby regulator nie kasowal
+        // daru, bral go zawor (zapis: arm_castlepurse "on:<wiek>"); NaN = nie bylo takiej doby
+        private static double _liveAge = double.NaN;
+        private static bool _trimSkip;                    // wieku kampanii nie da sie odczytac - w tej sesji nie probujemy dalej (jedna linia logu)
         private static bool _offLogged;                      // linia "wylaczone" raz na sesje
 
         // ------------------------------------------------------------ nawias dziennego ticku zamku (konsumpcja -> regulator)
@@ -93,7 +106,7 @@ namespace Armoury
 
         internal static void Reset()
         {
-            _trimDone = false; _trimSkip = false; _offLogged = false; _errLogged = false;
+            _trimDone = false; _liveAge = double.NaN; _trimSkip = false; _offLogged = false; _errLogged = false;
             _consTown = null; _regDue = null;
             LordDuesToday.Clear(); _duesBy.Clear(); CrownToday.Clear();
             ZeroLast();
@@ -112,8 +125,21 @@ namespace Armoury
             _dRegUpN = _dRegDownN = _dConsN = _dConsHit = _dCartPaid = _dCartSent = _stumbles = 0;
         }
 
-        internal static string Export() { return _trimDone ? "done" : ""; }
-        internal static void Import(string s) { _trimDone = s == "done"; }
+        internal static string Export()
+        {
+            if (_trimDone) return "done";
+            return double.IsNaN(_liveAge) ? "" : "on:" + _liveAge.ToString("0.###", CultureInfo.InvariantCulture);
+        }
+
+        internal static void Import(string s)
+        {
+            _trimDone = s == "done";
+            _liveAge = double.NaN;
+            double a;
+            if (!_trimDone && s != null && s.StartsWith("on:", StringComparison.Ordinal)
+                && double.TryParse(s.Substring(3), NumberStyles.Float, CultureInfo.InvariantCulture, out a) && !double.IsNaN(a) && !double.IsInfinity(a))
+                _liveAge = Math.Max(0.0, a);
+        }
 
         private static bool On { get { var s = Settings.Current; return s != null && s.CastlePurseEnabled; } }
 
@@ -140,11 +166,18 @@ namespace Armoury
             return float.IsNaN(p) || float.IsInfinity(p) || p < 0f ? 0f : p;
         }
 
-        /// <summary>Zapas kupcow podzamcza: tej czesci kasy zawor nie bierze i tabory na nia nie licza (domyslnie = cel regulatora gry).</summary>
+        /// <summary>
+        /// Zapas kupcow podzamcza: tej czesci kasy zawor nie bierze i tabory na nia nie licza (domyslnie = cel regulatora gry).
+        /// 110-p: nigdy ponizej celu regulatora gry (10 000 + 12 x dobrobyt) - ponizej niego regulator dosypuje z niczego (tryb 1), a zawor
+        /// liczony od nizszego zapasu oddawalby te dosypke panom i koronom. Ustawienia moga zapas tylko podniesc.
+        /// </summary>
         internal static int Reserve(Town town)
         {
             var s = Settings.Current;
-            double r = Math.Max(0, s.CastlePurseFloorGold) + (double)Math.Max(0f, s.CastlePurseFloorPerProsperity) * Prosperity(town);
+            float p = Prosperity(town);
+            double r = Math.Max(0, s.CastlePurseFloorGold) + (double)Math.Max(0f, s.CastlePurseFloorPerProsperity) * p;
+            double game = GameTargetGold + (double)GameTargetPerProsperity * p;
+            if (r < game) r = game;
             return r >= int.MaxValue ? int.MaxValue : (int)r;
         }
 
@@ -169,13 +202,13 @@ namespace Armoury
 
         /// <summary>
         /// Ile daru startowego lezy w kasie ponad zapasem: najwyzej tyle, ile dar (gra 20 000 + BK 40 x dobrobyt) przekracza zapas,
-        /// pomniejszone o to, co regulator gry zdazyl skasowac przez regulatorDays dob (cwierc nadwyzki dziennie; 0 = nic).
-        /// Nigdy wiecej niz nadwyzka kasy ponad zapas - doplyw od startu kampanii zostaje.
+        /// razy `left` - czesc daru, ktorej nie zdjal jeszcze regulator gry (cwierc dziennie) ani zawor (110-p: CastleDuesShare dziennie, gdy
+        /// zawor biegl bez przyciecia); 1 = caly dar. Nigdy wiecej niz nadwyzka kasy ponad zapas - doplyw od startu kampanii zostaje.
         /// </summary>
-        internal static int StartGiftCut(int gold, int reserve, float prosperity, double regulatorDays)
+        internal static int StartGiftCut(int gold, int reserve, float prosperity, double left)
         {
             long gift = VanillaStartGold + (long)(Math.Max(0f, prosperity) * BkStartGoldPerProsperity);
-            double left = regulatorDays > 0.0 ? Math.Pow(RegulatorKeeps, regulatorDays) : 1.0;
+            if (double.IsNaN(left) || left < 0.0) left = 0.0; else if (left > 1.0) left = 1.0;
             long giftOver = (long)(Math.Max(0L, gift - reserve) * left);
             long cut = Math.Min((long)gold - reserve, giftOver);
             return cut > 0 ? (int)Math.Min(cut, int.MaxValue) : 0;
@@ -280,6 +313,7 @@ namespace Armoury
                      + " - wpiete: " + (done.Count > 0 ? string.Join(", ", done.ToArray()) : "nic")
                      + (miss.Count > 0 ? "; BRAK: " + string.Join(", ", miss.ToArray()) : "")
                      + "; zapas kupcow " + (s != null ? s.CastlePurseFloorGold.ToString(CultureInfo.InvariantCulture) + " + " + s.CastlePurseFloorPerProsperity.ToString("0.##", CultureInfo.InvariantCulture) + " x dobrobyt" : "?")
+                     + " (nie mniej niz cel regulatora gry " + GameTargetGold + " + " + GameTargetPerProsperity.ToString("0", CultureInfo.InvariantCulture) + " x dobrobyt)"
                      + ", zawor " + (s != null ? (s.CastleDuesShare * 100f).ToString("0.#", CultureInfo.InvariantCulture) : "?") + "% nadwyzki dziennie"
                      + (s != null && s.CastleDuesSplitWithCrown ? ", z tego panu zamku " + (LordShare(s) * 100f).ToString("0.#", CultureInfo.InvariantCulture) + "% i reszta do skarbca krolestwa (114; zamek rodu bez krolestwa: calosc dla pana)"
                                                                 : " dla pana zamku (podzial z korona 114 wylaczony)")
@@ -343,7 +377,9 @@ namespace Armoury
         // ------------------------------------------------------------ raz na kampanie: dar startowy
         private static void TrimStartGift(Settings s)
         {
-            if (_trimDone || _trimSkip || !s.CastlePurseTrimAtStart) return;   // wylaczone: flagi nie zapisujemy (wlaczenie w pierwszej dobie jeszcze zadziala)
+            if (_trimDone || _trimSkip) return;
+            bool trimOn = s.CastlePurseTrimAtStart;
+            if (!trimOn && !double.IsNaN(_liveAge)) return;     // przyciecie wylaczone, doba startu zaworu bez przyciecia juz zapisana
             double age = double.NaN;
             try { age = (CampaignTime.Now - Campaign.Current.Models.CampaignTimeModel.CampaignStartTime).ToDays; }
             catch (Exception e) { Log.Error("CastlePurse.Age", e); }
@@ -351,6 +387,16 @@ namespace Armoury
             {
                 _trimSkip = true;
                 Log.Info("CastlePurse (110): wieku kampanii nie da sie odczytac - dar startowy w kasach zamkow bez przyciecia (flaga nie zapisana).");
+                return;
+            }
+            if (!trimOn)
+            {
+                // 110-p: zawor rusza bez przyciecia - od tej doby regulator nie kasuje daru, bierze go zawor. Zapisujemy wiek (flaga "on:<wiek>"),
+                // zeby przyciecie wlaczone pozniej zdjelo tylko to, co z daru naprawde zostalo (regulator do tej doby, potem zawor)
+                _liveAge = Math.Max(0.0, age);
+                Log.Info("CastlePurse (110): przyciecie daru startowego WYLACZONE (MCM Castle Purse Trim At Start) - zawor czynny od "
+                         + age.ToString("0.0", CultureInfo.InvariantCulture) + ". doby kampanii bez przyciecia: dar ponad zapas kupcow pobierze zawor ("
+                         + (s.CastleDuesSplitWithCrown ? "panom i skarbcom krolestw" : "panom") + "). Wlaczone pozniej, przyciecie zdejmie tylko to, czego z daru nie wzial jeszcze regulator ani zawor (flaga on:wiek w sejwie).");
                 return;
             }
             _trimDone = true;                                    // flaga PRZED robota: przerwanego przyciecia nie powtarzamy (drugie zdjeloby prawdziwy doplyw)
@@ -362,9 +408,13 @@ namespace Armoury
                 return;
             }
             // mloda kampania: regulator gry daru jeszcze nie ruszyl - przycinamy caly; starszy zapis wczytany pierwszy raz z ta zmiana:
-            // tylko to, co z daru zostawil regulator (cwierc nadwyzki dziennie)
-            double regDays = age <= FreshAgeDays ? 0.0 : age;   // kazdy zamek ma swoja pore dziennego ticku - srednio tyle tickow regulatora, ile dob
-            double left = regDays > 0.0 ? Math.Pow(RegulatorKeeps, regDays) : 1.0;
+            // tylko to, co z daru zostawil regulator (cwierc nadwyzki dziennie). 110-p: gdy zawor biegl wczesniej bez przyciecia (flaga on:<wiek>),
+            // regulator kasowal dar tylko do tamtej doby, a potem dar bral zawor (CastleDuesShare nadwyzki dziennie)
+            double regAge = double.IsNaN(_liveAge) ? age : Math.Min(age, _liveAge);
+            double regDays = regAge <= FreshAgeDays ? 0.0 : regAge;   // kazdy zamek ma swoja pore dziennego ticku - srednio tyle tickow regulatora, ile dob
+            double valveDays = double.IsNaN(_liveAge) ? 0.0 : Math.Max(0.0, age - _liveAge);
+            float valveShare = float.IsNaN(s.CastleDuesShare) ? 0f : Math.Max(0f, Math.Min(1f, s.CastleDuesShare));
+            double left = (regDays > 0.0 ? Math.Pow(RegulatorKeeps, regDays) : 1.0) * (valveDays > 0.0 ? Math.Pow(1.0 - valveShare, valveDays) : 1.0);
             long before = 0, after = 0, cutSum = 0, reserveSum = 0; int castles = 0, cutN = 0, maxCut = 0; string maxName = null;
             foreach (var st in Settlement.All)
             {
@@ -374,7 +424,7 @@ namespace Armoury
                     var town = st.Town;
                     int gold = town.Gold, reserve = Reserve(town);
                     castles++; before += gold; reserveSum += reserve;
-                    int cut = StartGiftCut(gold, reserve, Prosperity(town), regDays);
+                    int cut = StartGiftCut(gold, reserve, Prosperity(town), left);
                     if (cut > 0)
                     {
                         town.ChangeGold(-cut);
@@ -387,7 +437,9 @@ namespace Armoury
             }
             // ksiega pieniadza: ta zmiana kas to zloto w nicosc, nie zawor - osobna migawka (poprzednia stoi tuz przed CastlePurse.Daily)
             MoneyLedger.Mark(MoneyLedger.MTrim);                 // tylko licznik; wlasny try w srodku
-            Log.Info("CastlePurse (110): " + (regDays > 0.0 ? "zapis z " + age.ToString("0.0", CultureInfo.InvariantCulture) + ". doby kampanii wczytany pierwszy raz z ta zmiana (regulator gry zostawil ok. "
+            Log.Info("CastlePurse (110): " + (valveDays > 0.0 ? "przyciecie wlaczone w " + age.ToString("0.0", CultureInfo.InvariantCulture) + ". dobie kampanii, zawor biegl bez przyciecia od "
+                                                          + _liveAge.ToString("0.0", CultureInfo.InvariantCulture) + ". doby (regulator i zawor zostawili ok. " + (left * 100.0).ToString("0.#", CultureInfo.InvariantCulture) + "% daru)"
+                                            : regDays > 0.0 ? "zapis z " + age.ToString("0.0", CultureInfo.InvariantCulture) + ". doby kampanii wczytany pierwszy raz z ta zmiana (regulator gry zostawil ok. "
                                                         + (left * 100.0).ToString("0.#", CultureInfo.InvariantCulture) + "% daru)"
                                                       : "poczatek kampanii (doba " + age.ToString("0.00", CultureInfo.InvariantCulture) + ")")
                      + " - dar startowy w kasach zamkow (gra " + VanillaStartGold + " + BK "
@@ -402,7 +454,7 @@ namespace Armoury
             LordDuesToday.Clear(); _duesBy.Clear(); CrownToday.Clear();
             var s = Settings.Current;
             if (s == null || Campaign.Current == null) return;
-            int day = (int)CampaignTime.Now.ToDays;
+            int day = (int)CampaignTime.Now.ToDays - 1;          // 110-p: numer doby jak w ksiedze pieniadza ("Przeplywy osad") i w linii "Utarg wsi (112)" - doba zakonczona
             bool on = s.CastlePurseEnabled;
             if (on) { try { TrimStartGift(s); } catch (Exception e) { Stumble("CastlePurse.TrimStartGift", e); } }
             float share = float.IsNaN(s.CastleDuesShare) ? 0f : Math.Max(0f, Math.Min(1f, s.CastleDuesShare));

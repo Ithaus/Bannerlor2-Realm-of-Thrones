@@ -2540,7 +2540,7 @@ namespace Armoury
         [SettingPropertyGroup("The castle's purse")]
         public bool CastlePurseEnabled { get; set; } = true;
 
-        [SettingPropertyInteger("Castle Purse Floor Gold", 0, 40000, "0", HintText = "working coin the sutlers under the castle walls keep before any dues are drawn - the fixed part (the game's own target for a castle purse is 10 000 plus 12 a point of prosperity, about 22 000 for a common castle)")]
+        [SettingPropertyInteger("Castle Purse Floor Gold", 0, 40000, "0", HintText = "working coin the sutlers under the castle walls keep before any dues are drawn - the fixed part (the game's own target for a castle purse is 10 000 plus 12 a point of prosperity, about 22 000 for a common castle); the working coin never falls below that target, whatever these two settings say - below it the game tops a purse up from nowhere and the dues would hand that top-up to the lords, so these settings can only raise it")]
         [SettingPropertyGroup("The castle's purse")]
         public int CastlePurseFloorGold { get; set; } = 10000;
 
@@ -2560,7 +2560,7 @@ namespace Armoury
         [SettingPropertyGroup("The castle's purse")]
         public float CastleDuesLordShare { get; set; } = 0.67f;
 
-        [SettingPropertyBool("Castle Purse Trim At Start", HintText = "once per campaign, on its first day: the starting gift in every castle purse (20 000 plus Banner Kings' 40 a point of prosperity) is cut down to the working coin. The game's regulator deleted that gold within two weeks anyway; left in, the castle lords would draw about five million from nowhere. A save a few days old loses only what the regulator had not yet deleted; an old save loses nothing")]
+        [SettingPropertyBool("Castle Purse Trim At Start", HintText = "once per campaign, on its first day: the starting gift in every castle purse (20 000 plus Banner Kings' 40 a point of prosperity) is cut down to the working coin. The game's regulator deleted that gold within two weeks anyway; left in, the castle lords would draw about five million from nowhere. A save a few days old loses only what the regulator had not yet deleted; an old save loses nothing. Turned on later in a campaign that ran the castle purse without it, it removes only what the dues have not yet drawn from the gift (they draw Castle Dues Share of it a day, most of it within a month)")]
         [SettingPropertyGroup("The castle's purse")]
         public bool CastlePurseTrimAtStart { get; set; } = true;
 
