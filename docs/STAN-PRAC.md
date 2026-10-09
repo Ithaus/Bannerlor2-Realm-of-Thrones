@@ -857,3 +857,5 @@ sa straceni takze w Westeros; przy domyslnym "Enslavement" bez zmian. I1b w obec
 ciezsza piechota Qohoru, lzejsza piechota Dorne, mniej jazdy u Wolnych Ludzi i na Smoczej Skale. (3) najprostsze oszczepy dostaja tier 2 (Dornijczycy t2-3 z oszczepami,
 nie z toporkami) - OK. (1) Polnoc: Jeff chcial widziec, co znaczy +15 w statystykach (wyjasnione tabela: +15 do broni glownej i Atletyki 43 rodzajom piechoty t3-t6;
 srednio ok. +20% wobec swiata) - bez wyraznego wyboru; ustawiam domyslnie +15 (rada Claude, suwak NorthHardySkillBonus 0-50), do zmiany na slowo Jeffa.
+**DECYZJA JEFFA 09.10 ok. 05:55 (Polnoc):** "131/130 jest wystarczajace po naprawie sprzetu" -> NorthHardySkillBonus = 0 (bez dodatku umiejetnosci; Polnoc ok. +7.5% wobec
+swiata po samej naprawie sprzetu wedlug tieru). Zostaje: sklad z przewaga piechoty i +10% w autobitwie na sniegu i w lasach Polnocy. (175b liczy z 15 - po nim ustawic 0.)
