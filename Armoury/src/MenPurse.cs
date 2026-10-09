@@ -348,18 +348,26 @@ namespace Armoury
                 {
                     if (p.Sell <= 0) continue;
                     var el = QuartermasterLaw.ElOf(p);
-                    int unit = SellPrice(el, st, main);
-                    int n = Math.Min(p.Sell, Math.Max(0, st.Town.Gold) / Math.Max(1, unit));
+                    // sklad8-p (przeglad sklad8, uwagi 5 i 11): sztuka po sztuce, cena od nowa po kazdej sztuce dodanej na polke - jak nadwyzki lordow AI
+                    // i zalog (SellArmorySurplus) i jak gracz na ekranie handlu; kasa miasta sprawdzana przed kazda sztuka. Dotad cena pierwszej x n
+                    // (kupiec przeplacal ludziom gracza za partie). Kasa pusta na te sztuke - nastepny egzemplarz (tanszy moze sie zmiescic), jak dotad.
+                    int n = 0, paidN = 0;
+                    for (int k = 0; k < p.Sell; k++)
+                    {
+                        int unit = SellPrice(el, st, main);
+                        if (unit <= 0 || st.Town.Gold < unit) break;
+                        armory.AddToCounts(el, -1);
+                        st.ItemRoster.AddToCounts(el, 1);
+                        st.Town.ChangeGold(-unit);
+                        Measure174b.NoteSurplusSale(el.Item, 1, unit);                          // 174b.0 M3 (tylko licznik)
+                        SellByCondition.NoteSale(SellByCondition.Men, el, 1, unit);             // ksiega skupu sprzetu (tylko log)
+                        n++; paidN += unit;
+                    }
                     if (n <= 0) continue;
-                    armory.AddToCounts(el, -n);
-                    st.ItemRoster.AddToCounts(el, n);
-                    Measure174b.NoteSurplusSale(el.Item, n, unit);                          // 174b.0 M3 (tylko licznik)
                     Measure174b.NoteArrival(st, el.Item, n, Measure174b.ArrPurse);          // 174b.0 M1: nowa sztuka na polce
-                    st.Town.ChangeGold(-unit * n);
-                    MoneyLedger.Note169(MoneyLedger.N169Surplus, st, -unit * n);   // paczka 169: linia kas (tylko licznik)
-                    Add(main, unit * n);
-                    sold += n; gold += unit * n;
-                    SellByCondition.NoteSale(SellByCondition.Men, el, n, unit);   // ksiega skupu sprzetu (tylko log)
+                    MoneyLedger.Note169(MoneyLedger.N169Surplus, st, -paidN);   // paczka 169: linia kas (tylko licznik)
+                    Add(main, paidN);
+                    sold += n; gold += paidN;
                     MenUpgrade.NoteChurn(main, el.Item, false);                   // K1 (przeglad): kupione i sprzedane tej samej doby (autotest: 0)
                 }
             }

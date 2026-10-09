@@ -10,7 +10,9 @@ namespace Armoury
     /// wylacznik ShopKeepsLastArmour, liczba ShopKeepPieces = 1).
     /// Regula: w MIESCIE (zamek to nie targ - 171 C2.3) kupujacy HURTEM dla oddzialu nie zabiera ostatnich ShopKeepPieces sztuk (bez unikatow) pasma t1-2 /
     /// t3-4 / t5-6 zbroi: tulow, glowa, nogi, rece. Hurt: AiGear.BuyLoop (takze zamowienia zamkow na polce miasta), AiGear.BuySubstitutes, VolunteerKit.BuyCore
-    /// (notable dla ochotnikow), MenPurse.BuyPlayerGaps (sakiewka ludzi GRACZA - jak ludzie lorda), SupplyDemand.DailyTrade (wywoz kupcow z polki zrodla).
+    /// (notable dla ochotnikow), MenPurse.BuyPlayerGaps (sakiewka ludzi GRACZA - jak ludzie lorda), SupplyDemand.DailyTrade (wywoz kupcow z polki zrodla),
+    /// MenUpgrade.Pick (dozbrajanie K1 za swoje: ludzie lordow, zalog i gracza; takze zamowienie wozem zamku w miescie - sklad8-p, uwaga 1).
+    /// Wylacznik domyslnie WLACZONY (decyzja Jeffa 09.10 ok. 07:45: "hurtownicy zostawiaja ostatnia sztuke ... - TAK").
     /// Zakup osobisty przy straganie (ekran handlu) - bez limitu. W grze kupuje tak tylko gracz, wiec to WYJATEK od "jednej reguly" (krytyka 21) - przywilej
     /// kupujacego osobiscie (prawo miejskie przeciw wykupywaniu - forestalling, engrossing - chronilo klienta z ulicy przed hurtownikiem); wariant "wedlug
     /// wielkosci zakupu" (takze gracz hurtem na ekranie handlu) wymaga latki ekranu handlu - pytanie 1 do Jeffa.

@@ -711,7 +711,6 @@ namespace Armoury
         public int SupplyDemandOrderRepeatDays = 7;       // one buyer (a garrison, a lord, a notable) places an order for the same kind of gear in a town at most once in this many days - an order is a need, not a count of attempts
         public float SupplyDemandTradePercent = 15f;       // each day traders carry this % of a stall's surplus to the nearest town or castle that lacks it - nothing vanishes, the buyer pays
         public float SupplyDemandTradeRange = 250f;        // how far (map distance) traders will haul arms to a market that lacks them
-        public float SupplyDemandTradePricePercent = 50f;  // wholesale price between towns, as % of worth times the glutted source's price factor
 
         // --- The glutted market ---
         public bool MarketGlutEnabled = true;              // a merchant needs only so many of one thing: each extra piece of a type you sell him fetches less. With supply and demand on (and One Scrap Floor) it steps aside - the stall's own supply and demand prices the glut and Min Sell Percent Of Value is the only floor
@@ -909,7 +908,7 @@ namespace Armoury
         public bool TownMaterialOrderAhead = true;         // a town that uses a raw material orders it before its stall runs empty - when what it has and what is on the way would last less than the journey plus two days
         public bool TownMaterialOrderPlayerCaravans = true; // the caravans of your clan may take such orders like any other caravan (the profit goes to their purse); your own party never does
         public bool FletchersBidForOre = true;             // when a town lacks arrows, its iron ore goes to whoever earns more on it - the armourers or the fletchers - as far as the fletchers' hands can use it
-        public bool ShopKeepsLastArmour = false;           // buyers for a whole company (lords, garrisons, notables, your own men with their purse, traders shipping surplus) leave the last piece of each kind of armour (body, head, legs, hands; cheap, middling and dear apart) on a town stall for whoever buys in person
+        public bool ShopKeepsLastArmour = true;            // buyers for a whole company (lords, garrisons, notables, your own men with their purse, traders shipping surplus) leave the last piece of each kind of armour (body, head, legs, hands; cheap, middling and dear apart) on a town stall for whoever buys in person
         public int ShopKeepPieces = 1;                     // how many such pieces stay on the stall (0-3)
         public bool PlayerWorkshopsSameRule = true;        // your own workshops follow the same rules as everyone else's: they make no armour and no arrows out of nothing (the Banner Kings armorsmithy and fletcher lines without any input stay idle), and when a town lacks arrows their iron ore goes to whoever earns more on it - your workshop or the town's fletchers. Off: your workshops as in the game
 

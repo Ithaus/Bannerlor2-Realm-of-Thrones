@@ -424,16 +424,21 @@ namespace Armoury
                 c.Off = c.Zero && (c.Main || c.NoBase || PenaltyAi(s));   // kara naprawde zastosowana: Z14a zawsze, AI przy DrillPenaltyAi albo Z14b
                 c.D = c.Zero ? 0f : (c.Rest ? RestDay : MarchDay);
                 c.StockOn = c.Main ? StockOn : s.DrillStockAi;
+                // sklad8-p (przeglad sklad8, uwaga 8): bramka broni przed pomiarem zapasu - wyjatek w planie K1 (MenOf, FitBest) nie moze jej pominac
+                // (partia cwiczylaby bez bramki broni, czyli z wiekszym XP)
+                c.ArmsGate = c.Main ? s.DrillNeedsArmsPlayer : (AiGear.On && s.PartyDrillNeedsArms);
                 bool measure = c.StockOn || (!c.Main && !c.NoBase && s.DrillLog);   // AI przy wylaczonym zapasie: S tylko do linii pomiaru
                 if (measure && c.Men > 0)
                 {
-                    if (c.Main) CountPlayerStock(c); else CountAiStock(c, mp);
+                    // sklad8-p (uwaga 8): zapas liczy plan K1 (wiecej miejsc, ktore moga rzucic wyjatek) - osobny try: przy bledzie zapas z nadwyzki = 0
+                    // (bez premii i bez zuzycia), a perki i S licza sie dalej; slad w liczniku potkniec (Stumble "CtxOf.Stock")
+                    try { if (c.Main) CountPlayerStock(c); else CountAiStock(c, mp); }
+                    catch (Exception e) { c.SurW = 0; c.SurA = 0; Stumble("CtxOf.Stock", e); }
                     c.PerkW = mp.HasPerk(DefaultPerks.Steward.GivingHands);
                     c.PerkA = mp.HasPerk(DefaultPerks.Steward.PaidInPromise, true);
                     float uB = Math.Min(1f, c.StockW / (float)c.Full), uZ = Math.Min(1f, c.StockA / (float)c.Full);
                     c.S = 1f + StockBonus * uB * (c.PerkW ? PerkMult : 1f) + StockBonus * uZ * (c.PerkA ? PerkMult : 1f);
                 }
-                c.ArmsGate = c.Main ? s.DrillNeedsArmsPlayer : (AiGear.On && s.PartyDrillNeedsArms);
             }
             catch (Exception e) { Stumble("CtxOf", e); }
             _ctx = c;

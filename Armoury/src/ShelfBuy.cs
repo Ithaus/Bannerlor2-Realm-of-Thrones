@@ -37,9 +37,10 @@ namespace Armoury
         /// uzywalo dotad), sztuka tylko gdy cena miesci sie w reszcie budzetu. known &gt; 0 - cena pierwszej sztuki policzona przed chwila
         /// przy tej samej polce (przeglad kandydatow), bez drugiej wyceny. Zwraca liczbe zdjetych sztuk; cost - ich suma, first i last -
         /// cena pierwszej i ostatniej. Wyjatek w wycenie konczy partie na sztukach juz zdjetych (wolajacy je oplaca). Sztuki zostaja zdjete -
-        /// przy nieudanej dostawie wolajacy oddaje je przez PutBack.
+        /// przy nieudanej dostawie wolajacy oddaje je przez PutBack. tally = false (sklad8-p: wywoz kupcow SupplyDemand.DailyTrade) - bez licznikow
+        /// linii "Ceny hurtu" (ta linia mierzy zakupy AI, Stajni i budow; wywoz ma swoja linie "PodazPopyt").
         /// </summary>
-        internal static int Take(ItemRoster shelf, EquipmentElement el, int maxN, int budget, Func<int> price, out int cost, out int first, out int last, int known = 0)
+        internal static int Take(ItemRoster shelf, EquipmentElement el, int maxN, int budget, Func<int> price, out int cost, out int first, out int last, int known = 0, bool tally = true)
         {
             cost = 0; first = 0; last = 0;
             if (shelf == null || el.Item == null || price == null || maxN <= 0 || budget <= 0) return 0;
@@ -57,7 +58,7 @@ namespace Armoury
                     else
                     {
                         try { p = price(); } catch { break; }
-                        if (n > 0) _dEvals++;   // wycena po zdjeciu sztuki - tej dawna regula (cena pierwszej x n) nie robila
+                        if (n > 0 && tally) _dEvals++;   // wycena po zdjeciu sztuki - tej dawna regula (cena pierwszej x n) nie robila
                     }
                     if (p <= 0 || p > budget - cost) break;
                     bool gone = true;
@@ -74,8 +75,8 @@ namespace Armoury
                     last = p; cost += p; n++;
                 }
             }
-            finally { _dTicks += Stopwatch.GetTimestamp() - t0; }
-            if (n > 0)
+            finally { if (tally) _dTicks += Stopwatch.GetTimestamp() - t0; }
+            if (n > 0 && tally)
             {
                 _dBatches++; _dPieces += n; _dCost += cost; _dFlat += (long)first * n;
                 if (n > 1) _dMulti++;

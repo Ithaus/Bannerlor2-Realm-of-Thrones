@@ -452,10 +452,14 @@ namespace Armoury
         /// WYWOZ NADWYZKI (Jeff 04.10: "jak kupuja, to gdzie potem sprzedaja - nie znika
         /// 15% w prozni"). Nic nie znika: co dzien kupcy zabieraja TradePercent nadwyzki
         /// koszyka ponad popyt z zawalonej polki i wioza ja do NAJBLIZSZEJ osady (w zasiegu
-        /// TradeRange), ktorej w tym koszyku brakuje. Osada docelowa PLACI osadzie zrodlowej
-        /// (TradePricePercent wartosci x mnoznik zawalonego rynku zrodla - hurt z nadmiaru
-        /// jest tani); bez zlota nie kupuje. Gdy nikt w zasiegu nie potrzebuje - towar zostaje
+        /// TradeRange), ktorej w tym koszyku brakuje. Osada docelowa PLACI osadzie zrodlowej;
+        /// bez zlota nie kupuje. Gdy nikt w zasiegu nie potrzebuje - towar zostaje
         /// na polce i cena zostaje niska, az ktos kupi.
+        /// sklad8-p (przeglad sklad8, uwaga 3; decyzja Jeffa 09.10 ok. 08:00 "jedna zasada dla wszystkich: kazda kupowana sztuka po swojej cenie
+        /// z popytu i podazy, bez ukrytego rabatu hurtowego AI"): kupiec placi cene straganu zrodla sztuka po sztuce - cena (TownMarketData.GetPrice,
+        /// jak gracz na straganie; z mnoznikiem polki, surowcami i stanem sztuki), zdjecie sztuki, cena nastepnej od nowa (ShelfBuy.Take). Dotad:
+        /// jedna cena za cala partie stosu = wartosc x SupplyDemandTradePricePercent (50%) x mnoznik zawalonej polki zrodla (ustawienie usuniete).
+        /// Wybor celu (arbitraz) bez zmian - i tak liczyl cene zrodla bez rabatu (srcIdx).
         /// </summary>
         internal static void DailyTrade()
         {
@@ -466,7 +470,7 @@ namespace Armoury
                 float share = MBMath.ClampFloat(c.SupplyDemandTradePercent, 0f, 100f) / 100f;
                 if (share <= 0f) return;
                 float range = Math.Max(1f, c.SupplyDemandTradeRange);
-                float pricePct = MBMath.ClampFloat(c.SupplyDemandTradePricePercent, 0f, 200f) / 100f;
+                long t0 = System.Diagnostics.Stopwatch.GetTimestamp();   // sklad8-p: czas wywozu (wyceny sztuka po sztuce) - tylko log
 
                 // stan: osada -> koszyk -> sztuk; probka przedmiotu koszyka do liczenia popytu
                 var places = new List<Settlement>();
@@ -490,7 +494,7 @@ namespace Armoury
                     stock[st] = b;
                 }
 
-                int moved = 0, deals = 0, stuck = 0; long paid = 0;
+                int moved = 0, deals = 0, stuck = 0, tradeEvals = 0; long paid = 0;
                 // 171 C8 (Z6): zamek nie jest targiem broni - kupcy nie wioza tam broni natychmiast, bez drogi; zaloga zamku zamawia w miescie
                 // (GarrisonCarts). Zamek zostaje ZRODLEM: jego zapas ponad popyt kupcy wywoza do miast
                 bool noCastles = GarrisonCarts.On;
@@ -543,24 +547,26 @@ namespace Armoury
                             want = Math.Min(want, resFree);
                             int got = 0;
                             var shelf = src.ItemRoster;
+                            var market = src;   // zrodlo do wyceny (zmienna lokalna dla lambdy)
                             for (int i = shelf.Count - 1; i >= 0 && got < want; i--)
                             {
                                 var el = shelf.GetElementCopyAtIndex(i);
                                 var it = el.EquipmentElement.Item;
                                 if (el.Amount <= 0 || it == null || (int)it.ItemType * 10 + TierOf(it) != key) continue;
-                                // B4 (07.10): hurt od wartosci ZE STANEM - odbiorca nie placi za wrak jak za czysta sztuke (wylacznik SellPriceByCondition: jak w 127)
-                                int worth = SellByCondition.On ? el.EquipmentElement.ItemValue : it.Value;
-                                int unit = Math.Max(1, (int)(worth * pricePct * srcFactor * ArmsPricing.Multiplier(src, it)));
-                                int n = Math.Min(want - got, el.Amount);
-                                int afford = best.Town.Gold / unit;
-                                if (afford <= 0) break;
-                                if (n > afford) n = afford;
-                                shelf.AddToCounts(el.EquipmentElement, -n);
-                                best.ItemRoster.AddToCounts(el.EquipmentElement, n);
+                                // sklad8-p (uwaga 3, ceny hurtu Jeffa 09.10 08:00): kazda sztuka po cenie straganu zrodla, liczonej od nowa po zdjeciu poprzedniej
+                                // (ShelfBuy.Take - jak gra w SellItemsAction); sztuka tylko, gdy odbiorce stac na nia z reszty kasy. Stan sztuki w cenie (wartosc
+                                // ze stanem - ItemValue - jak B4). Dotad: wartosc x 50% x mnoznik zawalonej polki, jedna cena za n sztuk stosu.
+                                var eel = el.EquipmentElement;
+                                int cost, first, last;
+                                int n = ShelfBuy.Take(shelf, eel, Math.Min(want - got, el.Amount), best.Town.Gold,
+                                                      () => market.Town.MarketData.GetPrice(eel, null, false, market.Party), out cost, out first, out last, 0, false);
+                                if (n <= 0) break;   // odbiorcy nie stac na kolejna sztuke (jak dotad przy afford <= 0)
+                                tradeEvals += n;
+                                best.ItemRoster.AddToCounts(eel, n);
                                 Measure174b.NoteArrival(best, it, n, Measure174b.ArrTrade);   // 174b.0 M1: nowa sztuka na polce (tylko licznik)
-                                best.Town.ChangeGold(-unit * n);
-                                src.Town.ChangeGold(unit * n);
-                                got += n; paid += (long)unit * n;
+                                best.Town.ChangeGold(-cost);
+                                src.Town.ChangeGold(cost);
+                                got += n; paid += cost;
                             }
                             if (got <= 0) { poor.Add(best); continue; }   // biedny odbiorca - pomijamy go dzis
                             int sh; stock[src].TryGetValue(key, out sh); stock[src][key] = sh - got;
@@ -571,7 +577,9 @@ namespace Armoury
                 }
                 if (moved > 0 || stuck > 0)
                     Log.Info("PodazPopyt: kupcy wywiezli " + moved + " szt. nadwyzki uzbrojenia w " + deals + " transakcjach miedzy osadami (zaplacone "
-                             + paid + " zlota); " + stuck + " szt. bez odbiorcy w zasiegu " + (int)range + " - zostaja na polkach.");
+                             + paid + " zlota, kazda sztuka po cenie straganu zrodla - wycen " + tradeEvals + ", czas wywozu "
+                             + ((System.Diagnostics.Stopwatch.GetTimestamp() - t0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)
+                             + " ms); " + stuck + " szt. bez odbiorcy w zasiegu " + (int)range + " - zostaja na polkach.");
             }
             catch (Exception e) { Log.Error("SupplyDemand.DailyTrade", e); }
         }

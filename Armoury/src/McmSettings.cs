@@ -2516,10 +2516,6 @@ namespace Armoury
         [SettingPropertyGroup("Supply and demand")]
         public float SupplyDemandTradeRange { get; set; } = 250f;
 
-        [SettingPropertyFloatingInteger("Supply Demand Trade Price Percent", 0.00f, 200.00f, "0.00", HintText = "wholesale price between towns, as % of worth times the glutted source's price factor")]
-        [SettingPropertyGroup("Supply and demand")]
-        public float SupplyDemandTradePricePercent { get; set; } = 50f;
-
         [SettingPropertyBool("Market Glut Enabled", HintText = "a merchant needs only so many of one thing: each extra piece of a type you sell him fetches less. With supply and demand on (and One Scrap Floor) it steps aside - the stall's own supply and demand prices the glut and Min Sell Percent Of Value is the only floor")]
         [SettingPropertyGroup("The glutted market")]
         public bool MarketGlutEnabled { get; set; } = true;
@@ -3182,7 +3178,7 @@ namespace Armoury
 
         [SettingPropertyBool("Shop Keeps Last Armour", HintText = "buyers for a whole company (lords, garrisons, notables, your own men with their purse, traders shipping surplus) leave the last piece of each kind of armour (body, head, legs, hands; cheap, middling and dear apart) on a town stall for whoever buys in person")]
         [SettingPropertyGroup("Arms production")]
-        public bool ShopKeepsLastArmour { get; set; } = false;
+        public bool ShopKeepsLastArmour { get; set; } = true;
 
         [SettingPropertyInteger("Shop Keep Pieces", 0, 3, "0", HintText = "how many such pieces stay on the stall (0-3)")]
         [SettingPropertyGroup("Arms production")]
@@ -3820,7 +3816,6 @@ namespace Armoury
             s.SupplyDemandOrderRepeatDays = SupplyDemandOrderRepeatDays;
             s.SupplyDemandTradePercent = SupplyDemandTradePercent;
             s.SupplyDemandTradeRange = SupplyDemandTradeRange;
-            s.SupplyDemandTradePricePercent = SupplyDemandTradePricePercent;
             s.MarketGlutEnabled = MarketGlutEnabled;
             s.MarketGlutStartPercent = MarketGlutStartPercent;
             s.MarketGlutDropPP = MarketGlutDropPP;
