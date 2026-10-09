@@ -42,44 +42,61 @@ namespace Armoury
         // Historycznie (Anglia XIII-XIV w.): w pokoju wasal dawal glownie sluzbe i okazjonalne "pomoce" - male
         // pieniadze; wielkie podatki (pietnastka i dziesiecina od ruchomosci, tarczowe zamiast sluzby) korona
         // dostawala na WOJNE. Stad dwie stawki od dziennego dochodu rodu (model finansow + nasze renty od ludnosci):
-        // pokoj `CrownDuesPeacePercent` (2%), wojna krolestwa `CrownDuesWarPercent` (10%). Placa rody wasalne, takze
-        // gracza; nie rod krola (to jego skarbiec), nie najemnicy. Zloto od glowy rodu do skarbca krolestwa.
+        // pokoj `CrownDuesPeacePercent` (2%), wojna krolestwa `CrownDuesWarPercent` (3% - Settings; 2.6: bylo tu "10%", stara wartosc). Placa rody
+        // wasalne, takze gracza; nie rod krola (to jego skarbiec), nie najemnicy. Zloto od glowy rodu do skarbca krolestwa.
+        // 2.6 (projekt etapu 2): kazdy rod we wlasnym try - wyjatek przy jednym rodzie nie przerywa poboru u nastepnych; potkniecia liczone
+        // w linii "Korona" (pierwszy blad kazdego miejsca do logu), funkcji nie gasimy. Podstawa i stawki bez zmian do C1.
+        private static int _duesSkippedSess, _duesModelErrSess;
+        private static readonly HashSet<string> _duesErrLogged = new HashSet<string>();
+
+        private static void DuesError(string site, Clan c, Exception e)
+        {
+            try { if (_duesErrLogged.Add(site)) Log.Error("KingdomTreasury.Daily(" + site + ", rod " + (c != null && c.Name != null ? c.Name.ToString() : "?") + ")", e); } catch { }
+        }
+
         internal static void Daily()
         {
             var s = Settings.Current;
             if (s == null || !s.CrownDuesEnabled || TaleWorlds.CampaignSystem.Campaign.Current == null) return;
             try
             {
-                long total = 0; int payers = 0; int playerPaid = 0;
+                long total = 0; int payers = 0; int playerPaid = 0, skipped = 0, modelErr = 0;
                 var model = TaleWorlds.CampaignSystem.Campaign.Current.Models.ClanFinanceModel;
                 foreach (var c in TaleWorlds.CampaignSystem.Clan.All)
                 {
-                    if (c == null || c.IsEliminated || c.Kingdom == null || c.Leader == null || !c.Leader.IsAlive) continue;
-                    if (c.IsUnderMercenaryService || c == c.Kingdom.RulingClan || c.IsBanditFaction) continue;
-                    float income = 0f;
                     try
                     {
-                        income = model.CalculateClanIncome(c, false, false, false).ResultNumber;
-                        ClanIncomeBook.NoteModelIncome(c, income);   // paczka 169b: tylko do porownania z (a) w D (inna chwila - D jej nie bierze); tylko zapis, wlasny try
+                        if (c == null || c.IsEliminated || c.Kingdom == null || c.Leader == null || !c.Leader.IsAlive) continue;
+                        if (c.IsUnderMercenaryService || c == c.Kingdom.RulingClan || c.IsBanditFaction) continue;
+                        float income = 0f;
+                        try
+                        {
+                            income = model.CalculateClanIncome(c, false, false, false).ResultNumber;
+                            ClanIncomeBook.NoteModelIncome(c, income);   // paczka 169b: tylko do porownania z (a) w D (inna chwila - D jej nie bierze); tylko zapis, wlasny try
+                        }
+                        catch (Exception e) { income = 0f; modelErr++; DuesError("model", c, e); }   // jak dotad: podstawa bez dochodu modelu (same renty) - teraz liczone
+                        int rent; PopulationLaw.RentToday.TryGetValue(c, out rent);
+                        income += rent;
+                        if (income <= 0f) continue;
+                        bool war = false;
+                        try { foreach (var k in TaleWorlds.CampaignSystem.Kingdom.All) if (k != c.Kingdom && !k.IsEliminated && c.Kingdom.IsAtWarWith(k)) { war = true; break; } } catch { }
+                        float rate = (war ? s.CrownDuesWarPercent : s.CrownDuesPeacePercent) / 100f;
+                        int pay = (int)Math.Min(income * rate, Math.Max(0, c.Leader.Gold));
+                        if (pay <= 0) continue;
+                        c.Leader.ChangeHeroGold(-pay);
+                        c.Kingdom.KingdomBudgetWallet += pay;
+                        CirculationWindows.NoteHeroGold(c.Leader, -pay);   // paczka 169b: glowa poza swiatem (Disabled) - zloto weszlo do swiata (tylko licznik)
+                        total += pay; payers++;
+                        if (c == TaleWorlds.CampaignSystem.Clan.PlayerClan) playerPaid = pay;
                     }
-                    catch { }
-                    int rent; PopulationLaw.RentToday.TryGetValue(c, out rent);
-                    income += rent;
-                    if (income <= 0f) continue;
-                    bool war = false;
-                    try { foreach (var k in TaleWorlds.CampaignSystem.Kingdom.All) if (k != c.Kingdom && !k.IsEliminated && c.Kingdom.IsAtWarWith(k)) { war = true; break; } } catch { }
-                    float rate = (war ? s.CrownDuesWarPercent : s.CrownDuesPeacePercent) / 100f;
-                    int pay = (int)Math.Min(income * rate, Math.Max(0, c.Leader.Gold));
-                    if (pay <= 0) continue;
-                    c.Leader.ChangeHeroGold(-pay);
-                    c.Kingdom.KingdomBudgetWallet += pay;
-                    CirculationWindows.NoteHeroGold(c.Leader, -pay);   // paczka 169b: glowa poza swiatem (Disabled) - zloto weszlo do swiata (tylko licznik)
-                    total += pay; payers++;
-                    if (c == TaleWorlds.CampaignSystem.Clan.PlayerClan) playerPaid = pay;
+                    catch (Exception e) { skipped++; DuesError("rod", c, e); }   // 2.6: rod pominiety, petla idzie dalej
                 }
+                _duesSkippedSess += skipped; _duesModelErrSess += modelErr;
                 LastDues = total;                           // paczka 169: linia "Obieg" (tylko log)
                 Log.Info("Korona: dzien " + (int)TaleWorlds.CampaignSystem.CampaignTime.Now.ToDays + " - powinnosci wasali " + total + " zl od " + payers + " rodow do skarbcow krolestw"
-                         + (playerPaid > 0 ? " (rod gracza " + playerPaid + ")" : "") + ".");
+                         + (playerPaid > 0 ? " (rod gracza " + playerPaid + ")" : "")
+                         + "; potkniecia " + (skipped + modelErr) + " (rodow pominietych przez blad " + skipped + ", blad modelu dochodu - podstawa z samych rent " + modelErr
+                         + "; od startu sesji " + (_duesSkippedSess + _duesModelErrSess) + ").");
             }
             catch (Exception e) { Log.Error("KingdomTreasury.Daily", e); }
         }
@@ -95,7 +112,7 @@ namespace Armoury
         internal struct RefundRow { public long Paid, Due, Given; public int Clans; }
         private static readonly Dictionary<Kingdom, RefundRow> _refund = new Dictionary<Kingdom, RefundRow>();
 
-        internal static void Reset() { _refund.Clear(); _refundErr = false; ZeroLast(); _arrear.Clear(); }
+        internal static void Reset() { _refund.Clear(); _refundErr = false; ZeroLast(); _arrear.Clear(); _duesSkippedSess = 0; _duesModelErrSess = 0; _duesErrLogged.Clear(); }
 
         // 169c (tylko log): niedoplata korony na krolestwo z 28 dob (1 - zwrot dany / nalezny) - miara progu etapu 2 i wejscia E1b; tylko pamiec sesji
         private sealed class ArrearRing { public readonly long[] Due = new long[28], Given = new long[28]; public int Head, Filled; }

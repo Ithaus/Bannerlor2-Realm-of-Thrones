@@ -1348,7 +1348,11 @@ namespace Armoury
             try { CartTownExit.Daily(); } catch (Exception e) { Log.Error("CartTownExit.Daily", e); }   // paczka 130: bezpiecznik (woz w miescie od N dob - do domu) i linia "Wozy w miastach:"
             try { CaravanBulk.Daily(); } catch (Exception e) { Log.Error("CaravanBulk.Daily", e); }   // wpis 103: surowce masowe w karawanach (przeliczenie swiata + log)
             try { CaravanAmmo.Daily(); } catch (Exception e) { Log.Error("CaravanAmmo.Daily", e); }   // paczka 172b: linia "Karawany bez amunicji (172b)" (zablokowane, sprzedane z taborow, w taborach)
-            try { KingdomTreasury.Daily(); KingdomTreasury.Levies(); KingdomTreasury.WageRefund(); KingdomLedger.Daily(); } catch (Exception e) { Log.Error("KingdomTreasury.Daily", e); }   // powinnosci wasali wobec korony (po rentach); potem zwrot zoldu w wojnie
+            // 2.6 (projekt etapu 2; zasada wpisu 86): kazdy krok korony we wlasnym try - wyjatek w jednym nie zatrzymuje reszty rozliczenia korony
+            try { KingdomTreasury.Daily(); } catch (Exception e) { Log.Error("KingdomTreasury.Daily", e); }            // powinnosci wasali wobec korony (po rentach)
+            try { KingdomTreasury.Levies(); } catch (Exception e) { Log.Error("KingdomTreasury.Levies", e); }          // danina wojenna, clo, mennica, monopole
+            try { KingdomTreasury.WageRefund(); } catch (Exception e) { Log.Error("KingdomTreasury.WageRefund", e); }  // zwrot zoldu w wojnie (i linia niedoplaty 169c)
+            try { KingdomLedger.Daily(); } catch (Exception e) { Log.Error("KingdomLedger.Daily", e); }                // linia "Skarbce:"
             try { MoneyLedger.Mark(MoneyLedger.MCrown); } catch { }
             try { SoldierPay.Daily(); } catch (Exception e) { Log.Error("SoldierPay.Daily", e); }   // zold do obiegu: linia "Zold:" i liczniki doby (po zwrocie ze skarbca)
             try { ArmyClothing.Daily(); } catch (Exception e) { Log.Error("ArmyClothing.Daily", e); }   // 150: linia "Odziez wojska (150):" (zlota nie rusza)
