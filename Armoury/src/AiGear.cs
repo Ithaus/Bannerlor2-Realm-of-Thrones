@@ -75,13 +75,15 @@ namespace Armoury
         }
 
         private static int BuySubstitutes(Settlement market, MobileParty buyer, Dictionary<ItemObject, int> armory, Dictionary<int, int> needOut, Dictionary<int, int> need,
-                                          Dictionary<int, List<CharacterObject>> lifters, int budget, int maxPieces, ref int pieces, List<string> bought, Deliver deliver)
+                                          Dictionary<int, List<CharacterObject>> lifters, int budget, int maxPieces, ref int pieces, List<string> bought, Deliver deliver, int who)
         {
             int spent = 0;
+            long tc = Cost174.Begin(Cost174.SBuySub);   // 174b.5 F6 (probka 1/16, tylko log)
             try
             {
                 bool melee = SubstituteMeleeOn, body = SubstituteBodyOn;
                 if ((!melee && !body) || market == null || market.ItemRoster == null || market.Town == null) return 0;
+                if (pieces >= maxPieces || budget <= 0) return 0;   // 174b.5 F2: druga petla i tak nic nie kupi (ten sam warunek petli)
                 // "dowolny szczebel": sloty wzorcow wedlug typu wobec sztuk zbrojowni w dowolnym tierze
                 var slots = new Dictionary<int, int>(); var have = new Dictionary<int, int>();
                 foreach (var kv in needOut) { int ty = kv.Key / 10; int v; slots.TryGetValue(ty, out v); slots[ty] = v + kv.Value; }
@@ -91,10 +93,20 @@ namespace Armoury
                 foreach (var kv in have) if (Melee(kv.Key)) gapMelee -= kv.Value;
                 { int sb, hb; slots.TryGetValue((int)ItemObject.ItemTypeEnum.BodyArmor, out sb); have.TryGetValue((int)ItemObject.ItemTypeEnum.BodyArmor, out hb); gapBody = sb - hb; }
                 if (gapMelee <= 0 && gapBody <= 0) return 0;
+                // 174b.5 F2(a): bez koszyka z brakiem, ktory moglby kupic zastepcza (ten sam warunek co w drugiej petli) nic sie nie kupi - bez wyceny polki
+                bool anyNeed = false;
+                foreach (var kv in need)
+                {
+                    if (kv.Value <= 0) continue;
+                    int ty0 = kv.Key / 10;
+                    if ((melee && Melee(ty0) && gapMelee > 0) || (body && ty0 == (int)ItemObject.ItemTypeEnum.BodyArmor && gapBody > 0)) { anyNeed = true; break; }
+                }
+                if (!anyNeed) return 0;
                 var shelf = market.ItemRoster;
                 // recenzja 174 (koszt): jedno przejscie polki na wizyte - kandydaci z cena liczona raz na stos, malejaco wedlug skutecznosci do ceny;
                 // przy zakupie cena wybranego stosu liczona na nowo przed kazda sztuka (ShelfBuy - polka zmienia sie po kazdej sztuce)
                 var cands = new List<SubCand>();
+                bool subHeld = false;
                 for (int i = 0; i < shelf.Count; i++)
                 {
                     var el = shelf.GetElementCopyAtIndex(i);
@@ -102,15 +114,17 @@ namespace Armoury
                     if (el.Amount <= 0 || it == null || ArmsPricing.IsUnique(it) || !DteTakes(it)) continue;
                     bool isM = melee && gapMelee > 0 && Melee((int)it.ItemType), isB = body && gapBody > 0 && it.ItemType == ItemObject.ItemTypeEnum.BodyArmor;
                     if (!isM && !isB) continue;
+                    if (isB && ShopReserve.Free(market, it) <= 0) { subHeld = true; continue; }   // 174b.4: ostatnia sztuka pasma zostaje na straganie
                     int price = market.Town.MarketData.GetPrice(el.EquipmentElement, buyer, false, market.Party);
                     if (price <= 0) continue;
                     bool cloth = isB && it.ArmorComponent != null && it.ArmorComponent.MaterialType == ArmorComponent.ArmorMaterialTypes.Cloth;
-                    cands.Add(new SubCand { El = el.EquipmentElement, Left = el.Amount, Tier = TierOf(it), Price = price, Melee = isM, Cloth = cloth,
+                    cands.Add(new SubCand { El = el.EquipmentElement, Left = el.Amount, Tier = TierOf(it), Price = price, Gen = 1, Melee = isM, Cloth = cloth,
                                             Score = (it.Effectiveness > 0f ? it.Effectiveness : 1f) / price });
                 }
-                if (cands.Count == 0) return 0;
+                if (cands.Count == 0) { if (subHeld) Measure174b.NoteHeld(who, 1); return 0; }
                 cands.Sort((x, y) => y.Score.CompareTo(x.Score));
                 var keys = new List<int>(need.Keys); keys.Sort((a, b) => (b % 10).CompareTo(a % 10));   // najwyzsze szczeble najpierw
+                int gen = 1;   // 174b.5 F2(b): cena z pierwszego przejscia wazna do pierwszego zakupu (polka, kiesa i ksiega te same), potem liczona od nowa jak dotad
                 foreach (var k in keys)
                 {
                     // recenzja 174: need tylko czytany - sztuka zastepcza nie liczy sie do szczebla, wiec nie tlumi zamowien warsztatom (NoteUnmetOnce)
@@ -118,20 +132,28 @@ namespace Armoury
                     int ty = k / 10, t = k % 10, deficit = need[k];
                     bool isMelee = melee && Melee(ty) && gapMelee > 0, isBody = body && ty == (int)ItemObject.ItemTypeEnum.BodyArmor && gapBody > 0;
                     if (deficit <= 0 || (!isMelee && !isBody)) continue;
-                    List<CharacterObject> who = null; if (lifters != null) lifters.TryGetValue(k, out who);
+                    List<CharacterObject> lift = null; if (lifters != null) lifters.TryGetValue(k, out lift);
                     for (int ci = 0; ci < cands.Count && deficit > 0 && pieces < maxPieces && spent < budget && (isMelee ? gapMelee : gapBody) > 0; ci++)
                     {
                         var c = cands[ci];
                         if (c.Left <= 0 || c.Melee != isMelee || c.Tier > t) continue;
                         if (!isMelee && !c.Cloth && c.Tier > Math.Max(1, t - 2)) continue;   // przeszywanica tieru <= swojego albo zbroja 2 tiery nizej
-                        if (!Lift(who, c.El.Item)) continue;   // sklad7 (K1): tylko sztuka, ktora ktos z koszyka udzwignie - inaczej nadwyzki sprzedaja ja nazajutrz
+                        if (!Lift(lift, c.El.Item)) continue;   // sklad7 (K1): tylko sztuka, ktora ktos z koszyka udzwignie - inaczej nadwyzki sprzedaja ja nazajutrz
+                        // 174b.5 F2(b): cena z pamieci wazna do pierwszego zakupu (gen), potem od nowa - i jako cena PIERWSZEJ sztuki partii w ShelfBuy (known)
+                        int price;
+                        if (c.Gen == gen) price = c.Price;
+                        else { price = market.Town.MarketData.GetPrice(c.El, buyer, false, market.Party); c.Price = price; c.Gen = gen; cands[ci] = c; }
+                        if (price <= 0 || price > budget - spent) continue;
                         int maxN = Math.Min(Math.Min(deficit, c.Left), Math.Min(maxPieces - pieces, isMelee ? gapMelee : gapBody));
+                        // 174b.4: rezerwa kramu ogranicza partie; licznik "zatrzymane" jak w 174b - szacunek po cenie pierwszej sztuki (tylko licznik)
+                        if (!isMelee && maxN > 0) { int fr = ShopReserve.Free(market, c.El.Item); if (fr < maxN) { Measure174b.NoteHeld(who, Math.Min(maxN, (budget - spent) / price) - Math.Max(0, fr)); maxN = Math.Max(0, fr); } }
                         if (maxN <= 0) continue;
                         // ceny hurtu (Jeff 09.10 08:00): kazda sztuka po swojej cenie - wycena od nowa po zdjeciu poprzedniej (ShelfBuy); dotad cena pierwszej x n
                         var cel = c.El;
                         int cost, first, last;
-                        int n = ShelfBuy.Take(shelf, cel, maxN, budget - spent, () => market.Town.MarketData.GetPrice(cel, buyer, false, market.Party), out cost, out first, out last);
+                        int n = ShelfBuy.Take(shelf, cel, maxN, budget - spent, () => market.Town.MarketData.GetPrice(cel, buyer, false, market.Party), out cost, out first, out last, price);
                         if (n <= 0) continue;
+                        gen++;   // 174b.5 F2(b): polka sie zmienila - ceny kandydatow od nowa
                         if (!deliver(cel, n, k, cost)) { ShelfBuy.PutBack(shelf, cel, n, cost, first); c.Left = 0; cands[ci] = c; continue; }   // K1: DTE odrzucil - wraca na polke
                         c.Left -= n; cands[ci] = c;
                         ArmsScrap.NoteBuy(market, c.El.Item, n);
@@ -142,10 +164,11 @@ namespace Armoury
                 }
             }
             catch (Exception e) { _subStumbles++; if (_subErrLogged.Add("BuySubstitutes")) Log.Error("AiGear.BuySubstitutes", e); }
+            finally { Cost174.End(Cost174.SBuySub, tc); }
             return spent;
         }
 
-        private struct SubCand { public EquipmentElement El; public int Left, Tier, Price; public float Score; public bool Melee, Cloth; }
+        private struct SubCand { public EquipmentElement El; public int Left, Tier, Price, Gen; public float Score; public bool Melee, Cloth; }
         private static int _subStumbles;
         private static readonly HashSet<string> _subErrLogged = new HashSet<string>();   // recenzja 174: Log.Error raz na miejsce, reszta w liczniku linii dnia
 
@@ -447,12 +470,17 @@ namespace Armoury
         /// najpierw sztuki, ktorych nikt nie udzwignie - bez tego warunku zaloga kupowala ciezka zbroje ponad swoja atletyke, a nazajutrz ja sprzedawala.
         /// </summary>
         private static int BuyLoop(Settlement market, MobileParty buyer, Dictionary<int, int> need, Dictionary<int, List<CharacterObject>> lifters, int budget, int maxPieces,
-                                   ref int pieces, List<string> bought, Deliver deliver)
+                                   ref int pieces, List<string> bought, Deliver deliver, int who)
         {
             int spent = 0;
             _lastBudgetStop = false;
             var shelf = market.ItemRoster;
             HashSet<ItemObject> refused = null;   // DTE nie przyjal (czarna lista) - nie kupujemy drugi raz
+            // 174b.5 F2: cena stosu zapamietana do najblizszego zakupu (miedzy dwiema wycenami tego samego stosu bez zakupu polka, kiesa i ksiega sa te same;
+            // zakup zmienia polke i kolejnosc stosow - wtedy cala pamiec od nowa); kolejnosc i wybor kandydatow bez zmian. Scalenie sklad8: kazda zmiana
+            // polki (ShelfBuy.Take, takze cofnieta PutBack) - gen++
+            int[] memo = new int[shelf.Count], memoGen = new int[shelf.Count];
+            int gen = 1;
             foreach (var type in Order)
             {
                 for (int t = 6; t >= 1; t--)
@@ -460,11 +488,12 @@ namespace Armoury
                     int k = (int)type * 10 + t;
                     int deficit;
                     if (!need.TryGetValue(k, out deficit) || deficit <= 0) continue;
-                    List<CharacterObject> who = null; if (lifters != null) lifters.TryGetValue(k, out who);
+                    List<CharacterObject> lift = null; if (lifters != null) lifters.TryGetValue(k, out lift);
                     // kandydaci: ten sam typ, tier t albo t-1, bez unikatow; najlepsza skutecznosc do ceny
                     while (deficit > 0 && pieces < maxPieces && spent < budget)
                     {
                         int bestI = -1; float bestScore = 0f; int bestPrice = 0;
+                        bool resHit = false;   // 174b.4: kandydat pominiety, bo zostala sama rezerwa kramu
                         for (int i = 0; i < shelf.Count; i++)
                         {
                             var el = shelf.GetElementCopyAtIndex(i);
@@ -475,23 +504,29 @@ namespace Armoury
                             if (ArmsPricing.IsUnique(it)) continue;
                             if (refused != null && refused.Contains(it)) continue;
                             if (!DteTakes(it)) continue;   // poprawki sklad7: takze zamowienie wozem (tam sztuka idzie do DTE dopiero przy dostawie)
-                            if (!Lift(who, it)) continue;
-                            int price = market.Town.MarketData.GetPrice(el.EquipmentElement, buyer, false, market.Party);
+                            if (!Lift(lift, it)) continue;
+                            if (ShopReserve.Free(market, it) <= 0) { resHit = true; continue; }   // 174b.4: ostatnia sztuka pasma zostaje na straganie
+                            int price;
+                            if (i < memo.Length && memoGen[i] == gen) price = memo[i];
+                            else { price = market.Town.MarketData.GetPrice(el.EquipmentElement, buyer, false, market.Party); if (i < memo.Length) { memo[i] = price; memoGen[i] = gen; } }
                             if (price <= 0) continue;
                             if (price > budget - spent) { _lastBudgetStop = true; continue; }
                             float eff = it.Effectiveness > 0f ? it.Effectiveness : 1f;
                             float score = eff / price;
                             if (score > bestScore) { bestScore = score; bestI = i; bestPrice = price; }
                         }
-                        if (bestI < 0) break;
+                        if (bestI < 0) { if (resHit) Measure174b.NoteHeld(who, 1); break; }
                         var pick = shelf.GetElementCopyAtIndex(bestI);
                         var pel = pick.EquipmentElement;
                         int maxN = Math.Min(Math.Min(deficit, pick.Amount), maxPieces - pieces);
+                        // 174b.4: rezerwa kramu ogranicza partie; licznik "zatrzymane" jak w 174b - szacunek po cenie pierwszej sztuki (tylko licznik)
+                        { int fr = ShopReserve.Free(market, pel.Item); if (fr < maxN) { Measure174b.NoteHeld(who, Math.Min(maxN, (budget - spent) / bestPrice) - Math.Max(0, fr)); maxN = Math.Max(0, fr); } }
                         // ceny hurtu (Jeff 09.10 08:00): kazda sztuka po swojej cenie - po zdjeciu sztuki z polki nastepna wyceniana od nowa (ShelfBuy, jak
                         // gra w SellItemsAction); dotad cena pierwszej sztuki x n. Pierwsza - cena z przegladu polki (ta sama polka, bez drugiej wyceny).
                         int cost, first, last;
                         int n = ShelfBuy.Take(shelf, pel, maxN, budget - spent, () => market.Town.MarketData.GetPrice(pel, buyer, false, market.Party), out cost, out first, out last, bestPrice);
                         if (n <= 0) break;
+                        gen++;   // 174b.5 F2: polka sie zmienila - pamiec cen od nowa
                         if (!deliver(pel, n, k, cost))
                         {
                             ShelfBuy.PutBack(shelf, pel, n, cost, first);   // K1 (przeglad): DTE odrzucil - sztuka wraca na polke, nikt nie placi
@@ -518,13 +553,15 @@ namespace Armoury
             return false;
         }
 
-        /// <summary>Czy na polce lezy sztuka typu i tieru (t albo t-1), bez unikatow - "za drogie" to nie brak towaru (wpis 81).</summary>
-        private static bool OnShelf(ItemRoster shelf, ItemObject.ItemTypeEnum ty, int tr)
+        /// <summary>Czy na polce lezy sztuka typu i tieru (t albo t-1), bez unikatow - "za drogie" to nie brak towaru (wpis 81). 174b.4: tylko sztuki PONAD
+        /// rezerwe kramu - gdy zostala sama rezerwa, zamowienie dla kowali idzie jak przy pustej polce.</summary>
+        private static bool OnShelf(Settlement market, ItemObject.ItemTypeEnum ty, int tr)
         {
+            var shelf = market.ItemRoster;
             for (int i = 0; i < shelf.Count; i++)
             {
                 var el = shelf.GetElementCopyAtIndex(i); var it = el.EquipmentElement.Item;
-                if (el.Amount > 0 && it != null && it.ItemType == ty && !ArmsPricing.IsUnique(it)) { int ti = TierOf(it); if (ti == tr || ti == tr - 1) return true; }
+                if (el.Amount > 0 && it != null && it.ItemType == ty && !ArmsPricing.IsUnique(it)) { int ti = TierOf(it); if ((ti == tr || ti == tr - 1) && ShopReserve.Free(market, it) > 0) return true; }
             }
             return false;
         }
@@ -535,9 +572,45 @@ namespace Armoury
         /// </summary>
         internal static void TryBuy(MobileParty mp, Settlement st)
         {
+            // 174b.5 F5: tanie filtry przed ramka ksiegi (ramka bez AddToCounts rozlicza sie na zero - ksiega ta sama). Scalenie sklad8: WouldBuy
+            // filtruje tylko braki (TryBuyCore); lepsze za swoje (MenUpgrade.ForAi) maja wlasne warunki i bramke doby - wolane jak w sklad7
+            bool core = WouldBuy(mp, st);
+            if (!core && !MenUpgrade.On) return;
             var gf = GoodsLedger.Begin(GoodsLedger.FArmsBuy, mp);
-            try { TryBuyCore(mp, st); MenUpgrade.ForAi(mp, st); }
+            try
+            {
+                if (core)
+                {
+                    long tc = Cost174.Begin(Cost174.STryBuy);
+                    try { TryBuyCore(mp, st); }
+                    finally { Cost174.End(Cost174.STryBuy, tc); }
+                }
+                MenUpgrade.ForAi(mp, st);
+            }
             finally { GoodsLedger.End(gf); }
+        }
+
+        /// <summary>174b.5 F5: te same wczesne wyjscia co TryBuyCore az do stempla doby (bez stempla i bez zmian stanu) - false = TryBuyCore i tak nic nie zrobi.
+        /// Scalenie sklad8: zaloga gracza jak w TryBuyCore sklad7 - w systemie takze przez sama sakiewke zalogi (GarrisonPurseEnabled), bez GarrisonBuysGearPlayer.</summary>
+        private static bool WouldBuy(MobileParty mp, Settlement st)
+        {
+            try
+            {
+                if (!On || mp == null || st == null) return false;
+                var s0 = Settings.Current;
+                bool garrison = mp.IsGarrison && mp.CurrentSettlement == st && s0.GarrisonBuysGear;
+                Hero payer = garrison ? (st.OwnerClan != null ? st.OwnerClan.Leader : null) : mp.LeaderHero;
+                bool gPurse = garrison && MenUpgrade.GarrisonPurseOn;
+                bool lordPays = !(garrison && payer == Hero.MainHero && !s0.GarrisonBuysGearPlayer);
+                if (garrison && !lordPays && !gPurse) return false;
+                if (mp.IsMainParty || (!mp.IsLordParty && !garrison) || payer == null || !payer.IsAlive || !mp.IsActive || mp.MapEvent != null) return false;
+                if ((!st.IsTown && !st.IsCastle) || st.ItemRoster == null || st.Town == null) return false;
+                if (!garrison && st.IsCastle && GarrisonCarts.On) return false;
+                int last;
+                if (_lastDay.TryGetValue(mp, out last) && last == (int)CampaignTime.Now.ToDays) return false;
+                return true;
+            }
+            catch { return true; }   // w razie watpliwosci - jak dotad (TryBuyCore ma swoj try)
         }
 
         private static void TryBuyCore(MobileParty mp, Settlement st)
@@ -616,10 +689,12 @@ namespace Armoury
                     if (garrison) MenUpgrade.NoteGarrisonGap(fromPurse);
                     return fromPurse;
                 };
+                int who = garrison ? (st.IsTown ? Measure174b.BTownGarrison : Measure174b.BCastleOwn) : Measure174b.BLord;   // 174b.0 M2: kupujacy (tylko licznik)
                 // polka tej osady (zaloga zamku: wlasnego zamku - to, co tam lezy, oplacila juz kasa zamku i jest na miejscu)
                 Deliver here = (el, n, k, cost) =>
                 {
                     if (!AddToArmory(mp, el.Item, n)) return false;   // K1 (przeglad): DTE odrzucil - nikt nie placi
+                    Measure174b.NoteBuySum(who, el.Item, n, cost);   // 174b.0 M2 (tylko licznik); ceny hurtu: suma cen sztuk
                     AiWear.NoteBought(mp, el, n);   // wpis 89: zuzyta z polki zostaje zuzyta; 171/K1 (recenzje): takze w zalodze
                     MenUpgrade.NoteChurn(mp, el.Item, true);
                     pay(cost);   // ceny hurtu (09.10): cost - suma cen sztuk (ShelfBuy), nie cena pierwszej x n
@@ -627,13 +702,15 @@ namespace Armoury
                     MoneyLedger.Note(MoneyLedger.NGear, st, cost);   // ksiega przeplywow osad (tylko licznik)
                     return true;
                 };
-                int spent = BuyLoop(st, mp, need, lifters, budget, maxPieces, ref pieces, bought, here);
+                long tl = Cost174.Begin(Cost174.SBuyLoop);
+                int spent = BuyLoop(st, mp, need, lifters, budget, maxPieces, ref pieces, bought, here, who);
+                Cost174.End(Cost174.SBuyLoop, tl);
                 // 174 pytanie 2: gorszy sprzet zamiast zadnego - tylko z polki tej osady, tylko do pokrycia "dowolnego szczebla"
                 if (SubstituteMeleeOn || SubstituteBodyOn)
                 {
                     Dictionary<ItemObject, int> armNow = null;
                     if (all != null) all.TryGetValue(mp.Id, out armNow);
-                    spent += BuySubstitutes(st, mp, armNow, needOut, need, lifters, budget - spent, maxPieces, ref pieces, bought, here);
+                    spent += BuySubstitutes(st, mp, armNow, needOut, need, lifters, budget - spent, maxPieces, ref pieces, bought, here, who);
                 }
                 string where = st.Name.ToString();
                 if (castleCart)
@@ -651,6 +728,7 @@ namespace Armoury
                             var lines = new List<GarrisonCarts.Line>();
                             int paid = 0, pursePaid = 0;
                             bool budgetStop = true;
+                            long to = Cost174.Begin(Cost174.SCastleOrder);   // 174b.5 F6 (probka 1/16, tylko log)
                             // recenzja 171: zamowienie powstaje takze, gdy BuyLoop rzuci wyjatek po kilku zakupach (np. cena z modelu innego moda) -
                             // oplacone sztuki zdjete z polki nie moga zniknac; wydane = suma oplaconych linii (to samo, co zwraca BuyLoop)
                             try
@@ -660,17 +738,19 @@ namespace Armoury
                                     BuyLoop(market, mp, need, lifters, budget - spent, maxPieces, ref pieces, bought, (el, n, k, cost) =>
                                     {
                                         int fromPurse = pay(cost);   // ceny hurtu (09.10): cost - suma cen sztuk (ShelfBuy)
+                                        Measure174b.NoteBuySum(Measure174b.BCastleOrder, el.Item, n, cost);   // 174b.0 M2 (tylko licznik)
                                         market.Town.ChangeGold(cost);
                                         MoneyLedger.Note(MoneyLedger.NGear, market, cost);
                                         lines.Add(new GarrisonCarts.Line { El = el, N = n, Bucket = k });
                                         paid += cost; pursePaid += fromPurse;
                                         return true;
-                                    });
+                                    }, Measure174b.BCastleOrder);
                                     budgetStop = _lastBudgetStop;
                                 }
                             }
                             finally
                             {
+                                Cost174.End(Cost174.SCastleOrder, to);
                                 spent += paid;
                                 if (lines.Count > 0) { GarrisonCarts.Place(st, market, st.OwnerClan, lines, paid, dist, pieces >= maxPieces, budgetStop, pursePaid); where += " i zamowienie z " + market.Name; }
                             }
@@ -679,7 +759,7 @@ namespace Armoury
                             {
                                 if (kv.Value <= 0) continue;
                                 var ty = (ItemObject.ItemTypeEnum)(kv.Key / 10); int tr = kv.Key % 10;
-                                if (!OnShelf(market.ItemRoster, ty, tr)) { SupplyDemand.NoteUnmetOnce(mp, market, ty, tr, Math.Min(10, kv.Value)); unmet++; }
+                                if (!OnShelf(market, ty, tr)) { SupplyDemand.NoteUnmetOnce(mp, market, ty, tr, Math.Min(10, kv.Value)); unmet++; }
                             }
                             if (unmet > 0) GarrisonCarts.NoteUnmet(unmet);
                         }
@@ -695,7 +775,7 @@ namespace Armoury
                     {
                         if (kv.Value <= 0) continue;
                         var ty = (ItemObject.ItemTypeEnum)(kv.Key / 10); int tr = kv.Key % 10;
-                        if (!OnShelf(shelf, ty, tr)) SupplyDemand.NoteUnmetOnce(mp, st, ty, tr, Math.Min(10, kv.Value));
+                        if (!OnShelf(st, ty, tr)) SupplyDemand.NoteUnmetOnce(mp, st, ty, tr, Math.Min(10, kv.Value));
                     }
                 }
                 if (pieces <= 0) return;

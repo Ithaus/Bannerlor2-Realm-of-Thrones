@@ -223,7 +223,8 @@ namespace Armoury
         internal static float CycleLabour(Workshop w, WorkshopType.Production p)
         {
             if (w == null || w.WorkshopType == null || w.WorkshopType.IsHidden || !IsTradeLine(p)) return 0f;
-            float sum = TradeSpeed(w.WorkshopType, w.Owner != Hero.MainHero && TownFletchers.Active);   // 172: warsztat notabla bez zamknietej linii strzal
+            // 172: warsztat notabla bez zamknietej linii strzal; poprawka 174b: warsztat gracza tez, gdy jego linia strzal zamknieta (PlayerWorkshopsSameRule)
+            float sum = TradeSpeed(w.WorkshopType, TownFletchers.Active && (w.Owner != Hero.MainHero || (Settings.Current != null && Settings.Current.PlayerWorkshopsSameRule)));
             if (sum <= 0f) return 0f;
             var s = Settings.Current;
             return Math.Max(0f, s.WorkshopWorkers) * Math.Max(0f, s.WorkshopWagePerDay) * WageIndex(w) / sum * BulkFactor(p);   // place czeladnikow x poziom plac miasta

@@ -117,7 +117,7 @@ namespace Armoury
             _noted = 0;
         }
 
-        internal static void ResetOrders() { _unmet.Clear(); _noted = 0; _onceSeen.Clear(); _loggedHour.Clear(); _imported = -1; _importedPieces = 0f; }
+        internal static void ResetOrders() { _unmet.Clear(); _noted = 0; _onceSeen.Clear(); _loggedHour.Clear(); _imported = -1; _importedPieces = 0f; _keys = new System.Runtime.CompilerServices.ConditionalWeakTable<Settlement, string[]>(); _topRef = null; _topOpen = false; }
 
         // 174.0b: zamowienia (sygnal popytu dla warsztatow) w zapisie gry - klucz "arm_unmet" (SaveText.Sync); dotad startowaly od zera po kazdym wczytaniu.
         // Klucz zamowienia ("osada|typ|tier") nie zalezy od obiektow gry - wczytanie od razu w SyncData. Wylacznik WorkshopStateInSave.
@@ -200,8 +200,23 @@ namespace Armoury
             catch { }
             tier = Math.Max(1, Math.Min(6, tier));
             float orders = 0f;
-            try { var m = st != null && st.IsVillage && st.Village != null && st.Village.Bound != null ? st.Village.Bound : st; _unmet.TryGetValue(Key(m, type, tier), out orders); } catch { }
+            try { var m = st != null && st.IsVillage && st.Village != null && st.Village.Bound != null ? st.Village.Bound : st; if (_unmet.Count > 0) _unmet.TryGetValue(KeyCached(m, type, tier), out orders); } catch { }
             return Math.Max(0.1f, Math.Max(0f, c.SupplyDemandBase) * prosp * TierWeight[tier - 1] + orders * Math.Max(0f, c.SupplyDemandOrderWeight));
+        }
+
+        // 174b.5 F1: klucz zamowienia bez sklejania napisu przy kazdej cenie - napis "osada|typ|tier" (ten sam co Key) budowany raz na osade i koszyk;
+        // slownik _unmet i format zapisu arm_unmet bez zmian
+        private static System.Runtime.CompilerServices.ConditionalWeakTable<Settlement, string[]> _keys = new System.Runtime.CompilerServices.ConditionalWeakTable<Settlement, string[]>();
+        private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Settlement, string[]>.CreateValueCallback MakeKeys = st => new string[64 * 8];
+        private static string KeyCached(Settlement st, ItemObject.ItemTypeEnum type, int tier)
+        {
+            int ty = (int)type;
+            if (st == null || ty < 0 || ty >= 64 || tier < 1 || tier > 6) return Key(st, type, tier);
+            var a = _keys.GetValue(st, MakeKeys);
+            int i = ty * 8 + tier;
+            var k = a[i];
+            if (k == null) { k = Key(st, type, tier); a[i] = k; }
+            return k;
         }
 
         /// <summary>SUBSTYTUCJA (Jeff 04.10: "wojsko patrzy, jaki jest najlepszy pancerz do ceny"):
@@ -220,11 +235,18 @@ namespace Armoury
                 var view = ShelfView(shelf);
                 if (view != null) { foreach (var kv in view) if (kv.Key.ItemType == it.ItemType && TierOf(kv.Key) == t + 1) { higher += kv.Value; break; } }
                 else
-                for (int i = 0; i < shelf.Count; i++)
                 {
-                    var el = shelf.GetElementCopyAtIndex(i);
-                    var x = el.EquipmentElement.Item;
-                    if (el.Amount > 0 && x != null && x.ItemType == it.ItemType && TierOf(x) == t + 1) { higher += el.Amount; break; }
+                    higher = ShelfIndex.Count(shelf, it.ItemType, t + 1);   // 174b.5 F1: koszyk t+1 z pamieci polki (ta sama definicja: jest sztuka -> > 0)
+                    if (higher < 0)
+                    {
+                        higher = 0;
+                        for (int i = 0; i < shelf.Count; i++)
+                        {
+                            var el = shelf.GetElementCopyAtIndex(i);
+                            var x = el.EquipmentElement.Item;
+                            if (el.Amount > 0 && x != null && x.ItemType == it.ItemType && TierOf(x) == t + 1) { higher += el.Amount; break; }
+                        }
+                    }
                 }
                 if (higher > 0) return 0f;
                 return MBMath.ClampFloat(c.SubstitutionShare, 0f, 1f) * Demand(st, it.ItemType, t + 1);
@@ -238,12 +260,20 @@ namespace Armoury
         // stan polki bierzemy z chwili jego otwarcia; po zamknieciu wraca zywy stan.
         private static readonly Dictionary<ItemRoster, List<KeyValuePair<ItemObject, int>>> _frozen = new Dictionary<ItemRoster, List<KeyValuePair<ItemObject, int>>>();
 
+        // 174b.5 F1 (krytyka 11c): wynik zapamietany tylko dla tej samej referencji TopScreen - ekran otwarty w srodku klatki zmienia referencje,
+        // wiec migawka _frozen powstaje przy pierwszym wywolaniu po otwarciu, jak dotad
+        private static object _topRef;
+        private static bool _topOpen;
+
         private static bool TradeScreenOpen()
         {
             try
             {
                 var top = TaleWorlds.ScreenSystem.ScreenManager.TopScreen;
-                return top != null && top.GetType().Name.IndexOf("Inventory", StringComparison.OrdinalIgnoreCase) >= 0;
+                if (ReferenceEquals(top, _topRef)) return _topOpen;
+                bool open = top != null && top.GetType().Name.IndexOf("Inventory", StringComparison.OrdinalIgnoreCase) >= 0;
+                _topRef = top; _topOpen = open;
+                return open;
             }
             catch { return false; }
         }
@@ -286,10 +316,15 @@ namespace Armoury
             var view = ShelfView(shelf);
             int frozen = -1;
             if (view != null) { frozen = 0; foreach (var kv in view) if (SameBucket(kv.Key, it)) frozen += kv.Value; }
-            for (int i = 0; i < shelf.Count; i++)
+            n = it != null ? ShelfIndex.Count(shelf, it.ItemType, TierOf(it)) : -1;   // 174b.5 F1: zywa polka z pamieci (ten sam warunek: Amount > 0, typ i tier)
+            if (n < 0)
             {
-                var el = shelf.GetElementCopyAtIndex(i);
-                if (el.Amount > 0 && SameBucket(el.EquipmentElement.Item, it)) n += el.Amount;
+                n = 0;
+                for (int i = 0; i < shelf.Count; i++)
+                {
+                    var el = shelf.GetElementCopyAtIndex(i);
+                    if (el.Amount > 0 && SameBucket(el.EquipmentElement.Item, it)) n += el.Amount;
+                }
             }
             if (_heldShelf != null && ReferenceEquals(shelf, _heldShelf) && SameBucket(_heldBucket, it)) n = Math.Max(0, n - _held);   // paczka 145: wycena
             // Audyt ponowny K1: wlasne transakcje gracza w ekranie handlu tylko mu szkodza:
@@ -340,10 +375,12 @@ namespace Armoury
         public static void PricePostfix(TradeItemPriceFactorModel __instance, EquipmentElement __0, MobileParty __1, PartyBase __2, bool __3, float __4, float __5, float __6, ref int __result)
         {
             if (_depth > 1) return;                                     // wewnetrzny model - zewnetrzny policzy
+            long tc = 0;
             try
             {
                 var item = __0.Item;
                 if (!Prices(__2, item)) { SellByCondition.Seen(__0, __3, __result, -1); return; }   // ksiega skupu (tylko log): sprzedaz poza prawem podazy
+                tc = Cost174.Begin(Cost174.SPrice); Cost174.NotePriceArms();   // 174b.5 F6: koszt naszej warstwy ceny (probka 1/16, tylko log)
                 var st = __2.Settlement;
                 float d; int s;
                 float shelfF = Factor(st, item, __3, out d, out s);
@@ -408,6 +445,7 @@ namespace Armoury
                 }
             }
             catch { }
+            finally { Cost174.End(Cost174.SPrice, tc); }
         }
 
         /// <summary>
@@ -499,6 +537,10 @@ namespace Armoury
                             if (best == null) { stuck += toShip; break; }
                             // przenosimy sztuki koszyka ze zrodla (od konca polki), placi odbiorca
                             int want = Math.Min(toShip, bestCap);
+                            // 174b.4: wywoz kupcow to tez hurt - z polki MIASTA-zrodla nie zabiera ostatniej sztuki pasma zbroi (rezerwa kramu)
+                            int resFree = ShopReserve.FreeBand(src, probe.ItemType, TierOf(probe));
+                            if (resFree <= 0) { stuck += toShip; break; }
+                            want = Math.Min(want, resFree);
                             int got = 0;
                             var shelf = src.ItemRoster;
                             for (int i = shelf.Count - 1; i >= 0 && got < want; i--)
@@ -515,6 +557,7 @@ namespace Armoury
                                 if (n > afford) n = afford;
                                 shelf.AddToCounts(el.EquipmentElement, -n);
                                 best.ItemRoster.AddToCounts(el.EquipmentElement, n);
+                                Measure174b.NoteArrival(best, it, n, Measure174b.ArrTrade);   // 174b.0 M1: nowa sztuka na polce (tylko licznik)
                                 best.Town.ChangeGold(-unit * n);
                                 src.Town.ChangeGold(unit * n);
                                 got += n; paid += (long)unit * n;

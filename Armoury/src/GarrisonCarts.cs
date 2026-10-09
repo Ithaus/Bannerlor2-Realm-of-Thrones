@@ -17,7 +17,8 @@ namespace Armoury
     /// do zamkow natychmiast, bez drogi. Teraz: zaloga zamku kupuje z polki WLASNEGO zamku (to, co tam lezy, oplacila kasa zamku), a reszte
     /// zamawia raz na GarrisonOrderDays dob w miescie handlowym wsi zamku (ArmyClothing.MarketTown - TradeBound gry, bez miast wroga).
     /// Towar schodzi z polki miasta w chwili zakupu, zloto pana idzie do kasy miasta, a zamowienie jedzie "wozem bez partii": zapis z data
-    /// przyjazdu = droga / predkosc wozu wsi (MarketCarts.PerDay - te same wozy, ktore woza plon). Bandyci nie rozbijaja dostawy (uproszczenie).
+    /// przyjazdu = droga / predkosc wozu wsi (MarketCarts.PerDay - te same wozy, ktore woza plon). Bandyci nie rozbijaja dostawy (uproszczenie; recenzja 174b:
+    /// przerzut bez partii na mapie jak SupplyDemand.DailyTrade - do decyzji po 174b, czy ma jezdzic prawdziwa partia; M1 liczy go osobno jako przerzut).
     /// W drodze: zamek oblezony albo bez zalogi - czeka; zamek padl (wojna z rodem placacym) albo rod wymarl, a zamek zmienil strone - zawraca
     /// (towar na polke miasta-zrodla, zwrot zaplaty z kasy miasta, nie wiecej niz kasa); po 30 dobach - zawraca jak woz wsi (MarketCarts).
     /// sklad7 (scalenie K1): JEDYNA droga towaru z miasta do zamku - placi najpierw sakiewka zalogi (K1 A6), potem pan; zwrot czesci z sakiewki wraca do
@@ -245,7 +246,7 @@ namespace Armoury
         {
             int pcs = 0;
             if (o.Market != null && o.Market.ItemRoster != null)
-                foreach (var l in o.Lines) if (l.El.Item != null && l.N > 0) { o.Market.ItemRoster.AddToCounts(l.El, l.N); pcs += l.N; }
+                foreach (var l in o.Lines) if (l.El.Item != null && l.N > 0) { o.Market.ItemRoster.AddToCounts(l.El, l.N); pcs += l.N; Measure174b.NoteArrival(o.Market, l.El.Item, l.N, Measure174b.ArrGarrison, true); }   // 174b.0 M1 (tylko licznik); poprawka 174b: woz bez partii - przerzut
             _dBack++; _dBackPieces += pcs;
             if (!refund) return;
             var leader = o.PayerClan != null && !o.PayerClan.IsEliminated ? o.PayerClan.Leader : null;

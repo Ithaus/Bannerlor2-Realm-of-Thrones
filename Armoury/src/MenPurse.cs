@@ -341,6 +341,8 @@ namespace Armoury
                     if (n <= 0) continue;
                     armory.AddToCounts(el, -n);
                     st.ItemRoster.AddToCounts(el, n);
+                    Measure174b.NoteSurplusSale(el.Item, n, unit);                          // 174b.0 M3 (tylko licznik)
+                    Measure174b.NoteArrival(st, el.Item, n, Measure174b.ArrPurse);          // 174b.0 M1: nowa sztuka na polce
                     st.Town.ChangeGold(-unit * n);
                     MoneyLedger.Note169(MoneyLedger.N169Surplus, st, -unit * n);   // paczka 169: linia kas (tylko licznik)
                     Add(main, unit * n);
@@ -384,6 +386,7 @@ namespace Armoury
                 {
                     int best = -1, bestPrice = 0; float bestScore = 0f;
                     int maxTier = ceils.Count > 0 ? ceils[Math.Min(gap0 - gap, ceils.Count - 1)] : int.MaxValue;
+                    bool resHit = false;
                     for (int i = 0; i < shelf.Count; i++)
                     {
                         var el = shelf.GetElementCopyAtIndex(i);
@@ -392,15 +395,17 @@ namespace Armoury
                         if (it.Difficulty > 0 && ItemReq.SkillFor(it) != null && it.Difficulty > maxReq) continue;   // najslabszy bez sztuki ja udzwignie
                         if (AiGear.TierOf(it) > maxTier) continue;   // K1c (P1): nie ponad sufit czlowieka, dla ktorego ten zakup
                         if (ArmouryBehavior.StockOf(it.StringId) > 0) continue;   // K1 (przeglad): ksiega per id - zakup ludzi przesunalby Twoja czesc na gorszy egzemplarz
+                        if (ShopReserve.Free(st, it) <= 0) { resHit = true; continue; }   // 174b.4: ludzie gracza kupuja hurtem jak ludzie lorda - ostatnia sztuka pasma zostaje
                         int price = st.Town.MarketData.GetPrice(el.EquipmentElement, main, false, st.Party);
                         if (price <= 0 || price > budget - spent) continue;
                         float score = (it.Effectiveness > 0f ? it.Effectiveness : 1f) / price;
                         if (score > bestScore) { bestScore = score; best = i; bestPrice = price; }
                     }
-                    if (best < 0) break;
+                    if (best < 0) { if (resHit) Measure174b.NoteHeld(Measure174b.BPlayerMen, 1); break; }
                     var pick = shelf.GetElementCopyAtIndex(best).EquipmentElement;
                     shelf.AddToCounts(pick, -1);
                     armory.AddToCounts(pick, 1);
+                    Measure174b.NoteBuy(Measure174b.BPlayerMen, pick.Item, 1, bestPrice);   // 174b.0 M2 (tylko licznik)
                     Take(main, bestPrice);
                     st.Town.ChangeGold(bestPrice);
                     MoneyLedger.Note169(MoneyLedger.N169Kit, st, bestPrice);   // paczka 169: linia kas (tylko licznik)
@@ -477,6 +482,8 @@ namespace Armoury
                         if (st.Town.Gold < unit) { AiWear.PutBack(mp, it, el.ItemModifier); stop = true; break; }   // kasa pusta - koniec na dzis (stan wraca)
                         if (cnt > 1) arm[it] = cnt - 1; else arm.Remove(it);
                         st.ItemRoster.AddToCounts(el, 1);
+                        Measure174b.NoteSurplusSale(it, 1, unit);                          // 174b.0 M3 (tylko licznik)
+                        Measure174b.NoteArrival(st, it, 1, garrison ? Measure174b.ArrGarrison : Measure174b.ArrPurse);   // 174b.0 M1: nowa sztuka na polce (scalenie sklad8: nadwyzki zalog ida tu - zrodlo "zalogi" jak w 174b)
                         st.Town.ChangeGold(-unit);
                         MoneyLedger.Note169(MoneyLedger.N169Surplus, st, -unit);   // paczka 169: linia kas (tylko licznik)
                         int cut = third != null && third.IsAlive ? (int)Math.Round(unit * pct / 100f) : 0;

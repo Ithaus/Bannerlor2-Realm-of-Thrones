@@ -1576,7 +1576,7 @@ namespace Armoury
         [SettingPropertyGroup("Workshops")]
         public float TownCraftHandsPerArmsHand { get; set; } = 2f;
 
-        [SettingPropertyBool("Town Fletchers Enabled", HintText = "the town's own fletchers and arrowsmiths, in every town: arrows and bolts made from the ore and wood on their own town's stalls (the same recipe arms workshops use - the iron heads, the shafts, the charcoal of the bloomery and the forge; feathers, glue and thread are counted in the work), one quiver at a time, after the town's workshops have taken their share, whenever the quiver fetches enough to pay for its material, the work and a master's profit (Workshop Min Profit Percent) at today's prices; no coin changes hands - from stall to stall of the same town; lords buy them there. While on, workshops no longer make arrows out of thin air, townsfolk no longer eat them off the stalls and Banner Kings' party supplies no longer buy and burn them for AI parties (the player's own workshops and party as before). Needs Historical Prices")]
+        [SettingPropertyBool("Town Fletchers Enabled", HintText = "the town's own fletchers and arrowsmiths, in every town: arrows and bolts made from the ore and wood on their own town's stalls (the same recipe arms workshops use - the iron heads, the shafts, the charcoal of the bloomery and the forge; feathers, glue and thread are counted in the work), one quiver at a time, after the town's workshops have taken their share, whenever the quiver fetches enough to pay for its material, the work and a master's profit (Workshop Min Profit Percent) at today's prices; no coin changes hands - from stall to stall of the same town; lords buy them there. While on, workshops no longer make arrows out of thin air, townsfolk no longer eat them off the stalls and Banner Kings' party supplies no longer buy and burn them for AI parties (the player's own party as before; the player's own workshops - see Player Workshops Same Rule). Needs Historical Prices")]
         [SettingPropertyGroup("Workshops")]
         public bool TownFletchersEnabled { get; set; } = true;
 
@@ -3104,6 +3104,50 @@ namespace Armoury
         [SettingPropertyGroup("Arms production")]
         public int WorkshopPiecesPerCycleMax { get; set; } = 64;
 
+        [SettingPropertyBool("Shelf Index Enabled", HintText = "prices of arms in towns count a stall from a remembered tally that is renewed whenever the stall changes, instead of going through the whole stall for every price - the same prices, less work for the game. Off: the old way")]
+        [SettingPropertyGroup("Arms production")]
+        public bool ShelfIndexEnabled { get; set; } = true;
+
+        [SettingPropertyInteger("Shelf Index Self Check Days", 0, 30, "0", HintText = "for this many days after loading, every 64th count is checked against the whole stall (later every 4096th); a difference is written to the Armoury log")]
+        [SettingPropertyGroup("Arms production")]
+        public int ShelfIndexSelfCheckDays { get; set; } = 1;
+
+        [SettingPropertyBool("Town Material Order By Sea", HintText = "a town short of a raw material may also hire a merchant ship in a port that has it to spare: the sea leg costs a quarter of the same distance by road, and the ship can be taken by pirates")]
+        [SettingPropertyGroup("Arms production")]
+        public bool TownMaterialOrderBySea { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Town Material Order Sea Max Route", 100.00f, 3000.00f, "0", HintText = "longest sea voyage (map distance) for such an order - about two weeks under sail")]
+        [SettingPropertyGroup("Arms production")]
+        public float TownMaterialOrderSeaMaxRoute { get; set; } = 1000f;
+
+        [SettingPropertyBool("Town Material Order From Packs", HintText = "a caravan that already carries the material may take the order and deliver it, if that pays better than selling it where it stands")]
+        [SettingPropertyGroup("Arms production")]
+        public bool TownMaterialOrderFromPacks { get; set; } = true;
+
+        [SettingPropertyBool("Town Material Order Ahead", HintText = "a town that uses a raw material orders it before its stall runs empty - when what it has and what is on the way would last less than the journey plus two days")]
+        [SettingPropertyGroup("Arms production")]
+        public bool TownMaterialOrderAhead { get; set; } = true;
+
+        [SettingPropertyBool("Town Material Order Player Caravans", HintText = "the caravans of your clan may take such orders like any other caravan (the profit goes to their purse); your own party never does")]
+        [SettingPropertyGroup("Arms production")]
+        public bool TownMaterialOrderPlayerCaravans { get; set; } = true;
+
+        [SettingPropertyBool("Fletchers Bid For Ore", HintText = "when a town lacks arrows, its iron ore goes to whoever earns more on it - the armourers or the fletchers - as far as the fletchers' hands can use it")]
+        [SettingPropertyGroup("Arms production")]
+        public bool FletchersBidForOre { get; set; } = true;
+
+        [SettingPropertyBool("Shop Keeps Last Armour", HintText = "buyers for a whole company (lords, garrisons, notables, your own men with their purse, traders shipping surplus) leave the last piece of each kind of armour (body, head, legs, hands; cheap, middling and dear apart) on a town stall for whoever buys in person")]
+        [SettingPropertyGroup("Arms production")]
+        public bool ShopKeepsLastArmour { get; set; } = false;
+
+        [SettingPropertyInteger("Shop Keep Pieces", 0, 3, "0", HintText = "how many such pieces stay on the stall (0-3)")]
+        [SettingPropertyGroup("Arms production")]
+        public int ShopKeepPieces { get; set; } = 1;
+
+        [SettingPropertyBool("Player Workshops Same Rule", HintText = "your own workshops follow the same rules as everyone else's: they make no armour and no arrows out of nothing (the Banner Kings armorsmithy and fletcher lines without any input stay idle), and when a town lacks arrows their iron ore goes to whoever earns more on it - your workshop or the town's fletchers. Off: your workshops as in the game")]
+        [SettingPropertyGroup("Arms production")]
+        public bool PlayerWorkshopsSameRule { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -3879,6 +3923,17 @@ namespace Armoury
             s.OldStockScrapDailyShare = OldStockScrapDailyShare;
             s.OldStockScrapYield = OldStockScrapYield;
             s.WorkshopPiecesPerCycleMax = WorkshopPiecesPerCycleMax;
+            s.ShelfIndexEnabled = ShelfIndexEnabled;
+            s.ShelfIndexSelfCheckDays = ShelfIndexSelfCheckDays;
+            s.TownMaterialOrderBySea = TownMaterialOrderBySea;
+            s.TownMaterialOrderSeaMaxRoute = TownMaterialOrderSeaMaxRoute;
+            s.TownMaterialOrderFromPacks = TownMaterialOrderFromPacks;
+            s.TownMaterialOrderAhead = TownMaterialOrderAhead;
+            s.TownMaterialOrderPlayerCaravans = TownMaterialOrderPlayerCaravans;
+            s.FletchersBidForOre = FletchersBidForOre;
+            s.ShopKeepsLastArmour = ShopKeepsLastArmour;
+            s.ShopKeepPieces = ShopKeepPieces;
+            s.PlayerWorkshopsSameRule = PlayerWorkshopsSameRule;
         }
 
         internal static void Apply()

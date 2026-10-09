@@ -219,6 +219,7 @@ namespace Armoury
         {
             __state = null;
             if (__0 == null || __1 == null || !__0.IsCaravan || __1.Town == null || __0.ItemRoster == null) return;   // ta sama bramka co w gabce BK
+            long tc = Cost174.Begin(Cost174.SCaravanAmmo);   // 174b.5 F6 (probka 1/16, tylko log)
             try
             {
                 if (!On()) return;
@@ -236,6 +237,7 @@ namespace Armoury
                 __state = list;
             }
             catch (Exception e) { __state = null; Stumble("LeftPrefix", e); }
+            finally { Cost174.End(Cost174.SCaravanAmmo, tc); }
         }
 
         /// <summary>Postfiks gabki: amunicja, ktora BK dokupil, wraca na polke miasta, a zloto z kasy miasta do kiesy karawany.</summary>
@@ -269,6 +271,7 @@ namespace Armoury
         internal static void OnEntered(MobileParty mp, Settlement st, Hero hero)
         {
             if (mp == null || st == null || !mp.IsCaravan || !st.IsTown) return;   // tanie wyjscie: zdarzenie pada dla kazdej partii i kazdego bohatera
+            long tc = Cost174.Begin(Cost174.SCaravanAmmo);   // 174b.5 F6 (probka 1/16, tylko log)
             try
             {
                 if (st.Town == null || !On() || !Trades(mp)) return;
@@ -276,6 +279,7 @@ namespace Armoury
                 if (ammo != null) Unload(mp, st.Town, ammo);
             }
             catch (Exception e) { Stumble("OnEntered", e); }
+            finally { Cost174.End(Cost174.SCaravanAmmo, tc); }
         }
 
         /// <summary>Sprzedaz miastu po cenie rynkowej (SellItemsAction: cena liczona sztuka po sztuce, kasa miasta placi kiesie karawany),

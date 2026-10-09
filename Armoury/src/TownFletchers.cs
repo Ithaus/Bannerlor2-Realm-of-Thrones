@@ -24,7 +24,7 @@ namespace Armoury
     /// (budzet BK kategorii 10/10), zaopatrzenie BK kupowalo ja partiom AI za zloto lorda (zloto w nicosc) i niszczylo.
     ///
     /// Regula (czynne = wlacznik, rece > 0, ceny historyczne, kandydaci):
-    ///  - linie arrows warsztatow notabli zamkniete (WorkshopLaw.CyclePrefix -> ClosesLine/NoteClosed); warsztat gracza - jak w grze;
+    ///  - linie arrows warsztatow notabli zamkniete (WorkshopLaw.CyclePrefix -> ClosesLine/NoteClosed); warsztat gracza - poprawka 174b: tez zamkniete przy PlayerWorkshopsSameRule (WorkshopLaw.PlayerCyclePrefix);
     ///  - mieszczanie: budzet kategorii strzal 0 (HistoricalPrices.BudgetPostfix -> HouseUse); BK: potrzeba strzal partii AI 0 (BkSupplyTemper);
     ///  - strzelarze: rece = TownFletcherHandsPerArmsHand x WorkshopLaw.TownHands; po warsztatach miasta (postfiks DailyTickTown), krokami po snopie,
     ///    receptura i ceny wspolne z warsztatami zbrojnymi (WorkshopLaw.Needs / RevenueOf / MatPrice / DayWage), bramka zysku WorkshopMinProfitPercent;
@@ -39,7 +39,14 @@ namespace Armoury
         private const float MinHands = 0.01f;          // jak 148: sztuka zaczyna sie, gdy zostala choc setna dnia pracy
         private const int PerBasket = 4;               // najwyzej tyle wyrobow na koszyk typ x tier w miescie (rozne nazwy)
 
-        private sealed class St { public float Labor; public readonly float[] Owed = new float[4]; }
+        private sealed class St
+        {
+            public float Labor; public readonly float[] Owed = new float[4];
+            // 174b.3 (stan sesji, bez zapisu): oferta za ladunek rudy z ostatniej doby, w ktorej rudy zabraklo (zysk strzelarzy na ladunek, ile ladunkow zuzyja
+            // ich rece) i doba, w ktorej warsztaty zatrzymaly dla nich rude
+            public int OfferDay = int.MinValue / 2, HeldDay = int.MinValue / 2; public float OfferPerLoad; public int OfferLoads;
+        }
+        private const int MaxReservedLoads = 5;          // 174b.3: bezpiecznik - najwiecej ladunkow rudy zatrzymanych dla strzelarzy jednego miasta
 
         private sealed class TownCands
         {
@@ -70,6 +77,7 @@ namespace Armoury
         private static int _dClosedCycles, _dClosedUnits, _dProbeCycles, _dProbeUnits, _dHouse, _dBkCalls, _dBkReset;
         private static int _dClosedCastle, _dProbeCastle, _dBkBuyReset;                // recenzja 172: zamki osobno; zerowanie ArrowsNeed przed BuyItems
         private static readonly int[] _dNotable = new int[2], _dNotableRevert = new int[2];   // recenzja 172: kolczany ochotnikow (VolunteerKit)
+        private static int _dOffers, _dHeldCycles, _dHeldTowns, _dTookHeld; private static float _dOfferSum;   // 174b.3: oferty za rude, zatrzymane cykle platnerzy, wziete ladunki
 
         internal static bool Enabled { get { var s = Settings.Current; return s != null && s.TownFletchersEnabled && s.TownFletcherHandsPerArmsHand > 0f; } }
 
@@ -103,6 +111,41 @@ namespace Armoury
             Array.Clear(_dBought, 0, 2); Array.Clear(_dUnmet, 0, 2); Array.Clear(_dNotable, 0, 2); Array.Clear(_dNotableRevert, 0, 2);
             _dClosedCycles = _dClosedUnits = _dProbeCycles = _dProbeUnits = _dHouse = _dBkCalls = _dBkReset = 0;
             _dClosedCastle = _dProbeCastle = _dBkBuyReset = 0;
+            _dOffers = _dHeldCycles = _dHeldTowns = _dTookHeld = 0; _dOfferSum = 0f;
+        }
+
+        /// <summary>174b.3: wczorajsza (albo dzisiejsza - zapasowy sluchacz przed warsztatami) oferta strzelarzy miasta za ladunek rudy. false = brak oferty,
+        /// wylaczone (FletchersBidForOre) albo strzelarze nieczynni.</summary>
+        internal static bool OreOffer(Town town, out float perLoad, out int loads)
+        {
+            perLoad = 0f; loads = 0;
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || !s.FletchersBidForOre || town == null || town.Settlement == null || _st.Count == 0) return false;
+                St st;
+                if (!_st.TryGetValue(town.Settlement.StringId, out st)) return false;
+                int day = (int)CampaignTime.Now.ToDays;
+                if (st.OfferLoads <= 0 || day < st.OfferDay || day - st.OfferDay > 1 || !Active) return false;
+                perLoad = st.OfferPerLoad; loads = st.OfferLoads;
+                return true;
+            }
+            catch (Exception e) { Stumble("OreOffer", e); return false; }
+        }
+
+        /// <summary>174b.3: warsztat miasta zostawil rude strzelarzom (cykl z kodem 5) - licznik linii dnia i doba zatrzymania.</summary>
+        internal static void NoteHeld(Town town)
+        {
+            try
+            {
+                Roll();
+                _dHeldCycles++;
+                St st;
+                if (town == null || town.Settlement == null || !_st.TryGetValue(town.Settlement.StringId, out st)) return;
+                int day = (int)CampaignTime.Now.ToDays;
+                if (st.HeldDay != day) { st.HeldDay = day; _dHeldTowns++; }
+            }
+            catch (Exception e) { Stumble("NoteHeld", e); }
         }
 
         /// <summary>Recenzja 172: przejscie doby przed kazdym licznikiem (cykle warsztatow pierwszego miasta biegna PRZED postfiksem jego
@@ -151,11 +194,15 @@ namespace Armoury
             catch { return false; }
         }
 
-        /// <summary>Czy ta linia tego warsztatu jest zamknieta przez 172: linia arrows warsztatu notabla (ukryty artisans, fletcher) przy czynnych
-        /// strzelarzach. Warsztat gracza - jak w grze (decyzja Jeffa: funkcje gracza bez zmian).</summary>
+        /// <summary>Czy ta linia tego warsztatu jest zamknieta przez 172: linia arrows warsztatu (ukryty artisans, fletcher) przy czynnych strzelarzach.
+        /// Poprawka 174b (recenzja; jedna regula gracz/AI i "nic z niczego", Jeff 09.10): takze warsztat GRACZA, gdy PlayerWorkshopsSameRule (prefiks
+        /// WorkshopLaw.PlayerCyclePrefix); wylaczone - warsztat gracza jak w grze (dawna decyzja "funkcje gracza bez zmian").</summary>
         internal static bool ClosesLine(WorkshopType.Production p, Workshop w)
         {
-            return w != null && IsArrowsLine(p) && w.Owner != Hero.MainHero && Active;
+            if (w == null || !IsArrowsLine(p) || !Active) return false;
+            if (w.Owner != Hero.MainHero) return true;
+            var s = Settings.Current;
+            return s != null && s.PlayerWorkshopsSameRule;
         }
 
         /// <summary>Licznik zamknietego cyklu (WorkshopLaw.CyclePrefix): cykle i snopy z receptury (przed mnoznikiem BK). Zamki BK (TickCastle wola
@@ -360,8 +407,9 @@ namespace Armoury
                 if (!Active) return;
                 if (town.InRebelliousState) { _dRebel++; return; }   // jak warsztaty gry: miasto w buncie nie pracuje
                 var gf = GoodsLedger.Begin(GoodsLedger.FFletch, town);   // ksiega towarow: ruda i drewno strzelarzy jako osobne ujscie (tylko licznik)
+                long tc = Cost174.Begin(Cost174.SFletch);                 // 174b.5 F6 (probka 1/16, tylko log)
                 try { Work(town); }
-                finally { GoodsLedger.End(gf); }
+                finally { Cost174.End(Cost174.SFletch, tc); GoodsLedger.End(gf); }
             }
             catch (Exception e) { Stumble("OnDailyTickTown", e); }
         }
@@ -398,12 +446,14 @@ namespace Armoury
                 var fac = new Dictionary<int, float>();
                 var made = new Dictionary<ItemObject, int>();
                 var price = new float[4];
-                int steps = 0, reason = 0, miss = 0;
+                int steps = 0, reason = 0, miss = 0, oreTaken = 0;
+                float offer = 0f, offerDays = 0f, offerNeed = 0f;   // 174b.3: najlepszy zysk na ladunek rudy wsrod oplacalnych snopow zablokowanych ruda (krok konczacy prace)
                 var owed = st.Owed;
                 while (hands > MinHands && steps < MaxSteps)
                 {
                     for (int m = 0; m < 4; m++) price[m] = -1f;   // ceny surowcow liczone na krok, tylko te potrzebne
                     int best = -1; float bestScore = float.MinValue; bool blocked = false; int stepMiss = 0;
+                    float stepOffer = 0f, stepDays = 0f, stepNeed = 0f;
                     for (int i = 0; i < n; i++)
                     {
                         var it = items[i];
@@ -425,11 +475,18 @@ namespace Armoury
                             if (take <= 0) continue;
                             if (mats[m] == null || shelf.GetItemNumber(mats[m]) < take) mm |= 1 << m;
                         }
-                        if (mm != 0) { blocked = true; stepMiss |= mm; continue; }  // oplacalny, ale surowca brak na polce
+                        if (mm != 0)
+                        {
+                            blocked = true; stepMiss |= mm;                          // oplacalny, ale surowca brak na polce
+                            // 174b.3; poprawka (recenzja): oferta tylko ze snopa, ktoremu brakuje WYLACZNIE rudy (mm == 1) - przy braku takze drewna zatrzymana ruda
+                            // lezalaby dobe bezczynnie (strzelarze i tak nie rusza), a oferta wygasalaby co drugi dzien
+                            if (mm == 1 && need[0] > 0f) { float pl = (rev - cost) / need[0]; if (pl > stepOffer) { stepOffer = pl; stepDays = days; stepNeed = need[0]; } }
+                            continue;
+                        }
                         float score = (rev - cost) / Math.Max(0.1f, days);
                         if (score > bestScore) { bestScore = score; best = i; }
                     }
-                    if (best < 0) { reason = blocked ? 2 : 1; miss = stepMiss; break; }
+                    if (best < 0) { reason = blocked ? 2 : 1; miss = stepMiss; offer = stepOffer; offerDays = stepDays; offerNeed = stepNeed; break; }
                     var pick = items[best];
                     var nd = _need[pick];
                     for (int m = 0; m < 4; m++)
@@ -441,6 +498,7 @@ namespace Armoury
                             OreLedger.NoteFletch(mats[m], take);    // ksiega rudy i drewna: pozycja "strzelarze (172)"
                             MaterialOrders.NoteUse(town, mats[m], take);   // 174.2: zmierzone zuzycie miasta
                             _dTaken[m] += take;
+                            if (m == 0) oreTaken += take;
                         }
                         owed[m] = owed[m] + nd[m] - Math.Max(0, take);
                         _dWanted[m] += nd[m];
@@ -459,6 +517,19 @@ namespace Armoury
                 else if (reason == 2) { _dNoInput++; for (int m = 0; m < 4; m++) if ((miss & (1 << m)) != 0) _dMissBy[m]++; MaterialOrders.NoteMissMask(town, miss); }   // 174.2: sygnal zamowienia surowca
                 else _dNoHands++;
                 float idle = Math.Max(0f, hands);
+                // 174b.3: ile z rudy zatrzymanej dzis przez warsztaty strzelarze naprawde wzieli; potem nowa oferta na jutro (tylko przy braku rudy w kroku konczacym)
+                int today0 = (int)CampaignTime.Now.ToDays;
+                if (st.HeldDay == today0 && oreTaken > 0) _dTookHeld += Math.Min(oreTaken, Math.Max(1, st.OfferLoads));
+                if (reason == 2 && (miss & 1) != 0 && offer > 0f && offerDays > 0f && s.FletchersBidForOre)
+                {
+                    st.OfferDay = today0; st.OfferPerLoad = offer;
+                    // poprawka 174b (recenzja): ile ladunkow zdejma pozostale rece. Snop zdejmuje floor(dlug + ruda na snop), dlug (ulamek zuzytej, a jeszcze nie
+                    // zdjetej rudy, zawsze w [0, 1)) przechodzi dalej - k snopow zdejmie floor(dlug + k x ruda na snop). Dlug sie DODAJE (dotad odejmowany - przy
+                    // dlugu bliskim 1 o ladunek za malo). k = liczba snopow, ktore petla zacznie: dopoki rece > MinHands, takze ostatni ponad rece (dlug rak na jutro).
+                    int snops = hands > MinHands ? (int)Math.Ceiling((hands - MinHands) / offerDays) : 0;
+                    st.OfferLoads = Math.Max(1, Math.Min(MaxReservedLoads, (int)Math.Floor(owed[0] + snops * offerNeed + 1e-4f)));
+                    _dOffers++; _dOfferSum += offer;
+                }
                 st.Labor = Math.Max(0f, -hands);                          // rece bez roboty nie odkladaja sie; zaczety snop ponad dzisiejsze rece - dlug na jutro
                 _dIdle += idle; _dUsedHands += today - idle; _dDebt += st.Labor;
                 foreach (var kv in made)
@@ -627,6 +698,9 @@ namespace Armoury
                 }
                 sb.Append("; koniec pracy w miastach (bez zysku / brak surowca / rece) ").Append(_dNoProfit).Append("/").Append(_dNoInput).Append("/").Append(_dNoHands)
                   .Append(" [brak: ruda ").Append(_dMissBy[0]).Append(", drewno ").Append(_dMissBy[1]).Append("]");
+                sb.Append("; ruda dla strzelarzy (174b.3): ofert ").Append(_dOffers).Append(" (srednio ").Append(F1(_dOffers > 0 ? _dOfferSum / _dOffers : 0f))
+                  .Append(" d zysku na ladunek), cykli platnerzy zatrzymanych ").Append(_dHeldCycles).Append(" w ").Append(_dHeldTowns).Append(" miastach, ladunkow wzietych z zatrzymanych ").Append(_dTookHeld)
+                  .Append(Settings.Current != null && Settings.Current.FletchersBidForOre ? "" : " (WYLACZONE w MCM)");
                 if (_dGuard > 0) sb.Append(" (bezpiecznik petli w ").Append(_dGuard).Append(" miastach)");
                 float pct = _dHands > 0f ? 100f * _dUsedHands / _dHands : 0f;
                 sb.Append("; rece: zajete ").Append(F1(_dUsedHands)).Append(" z ").Append(F1(_dHands)).Append(" roboczodni (").Append(pct.ToString("0", CultureInfo.InvariantCulture))

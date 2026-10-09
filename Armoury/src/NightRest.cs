@@ -536,10 +536,44 @@ namespace Armoury
             public TaleWorlds.CampaignSystem.Party.AiBehavior Behavior;
             public TaleWorlds.CampaignSystem.Settlements.Settlement Settlement;
             public MobileParty Party;
+            public bool Wake;   // poprawka 174b (recenzja): zamiast rozkazu - pobudka przez WakeHandler (karawana, ktorej kontrakt zwolniono w nocy)
         }
+
+        /// <summary>Poprawka 174b (recenzja): pobudka partii ze znacznikiem Wake (MaterialOrders.WakeAtDawn - decyzja BK ReleaseCaravanFromHold).</summary>
+        internal static System.Action<MobileParty> WakeHandler;
 
         private static readonly System.Collections.Generic.Dictionary<MobileParty, NightOrder> _orders =
             new System.Collections.Generic.Dictionary<MobileParty, NightOrder>();
+
+        /// <summary>174b: partia spi w nocnym obozie swiata (rozkaz zapamietany przed snem, swit go odda). Odczyt slownika O(1).
+        /// Krytyka 174b (5): _orders czysci tylko galaz switu w AiNightCamp, a OnHourly wychodzi wczesniej przy NightRestEnabled = false
+        /// albo martwym bohaterze gracza - stary wpis nie moze wtedy udawac snu, wiec sprawdzamy tez wylaczniki i godzine obozu.</summary>
+        internal static bool IsCamping(MobileParty mp)
+        {
+            try
+            {
+                if (mp == null || _orders.Count == 0) return false;
+                var s = Settings.Current;
+                if (s == null || !s.NightRestEnabled || !s.AiCampsAtNight || !InCamp(CampaignTime.Now.GetHourOfDay)) return false;
+                return _orders.ContainsKey(mp);
+            }
+            catch { return false; }
+        }
+
+        /// <summary>174b.1 (krytyka 6): kontrakt surowca zwolniony albo dostarczony w nocy - swit nie oddaje karawanie zapamietanego celu kontraktu
+        /// (np. obleganego albo wrogiego miasta). Spi dalej do switu jak kazda. Poprawka 174b (recenzja): wake = true (zywa karawana) - zamiast skasowania
+        /// wpis dostaje znacznik pobudki: o swicie (albo przy nocnym alarmie) WakeHandler wola decyzje BK. Samo skasowanie dawalo o swicie postoj (nastepna
+        /// godzina obozu zapamietywala juz Hold), a BK ruszal karawane dopiero w swoim ticku - dlawik BKROT raz na dobe, do ok. 23 h stania.</summary>
+        internal static void ForgetOrder(MobileParty mp, bool wake = false)
+        {
+            try
+            {
+                if (mp == null || _orders.Count == 0 || !_orders.ContainsKey(mp)) return;
+                if (wake && WakeHandler != null) _orders[mp] = new NightOrder { Behavior = TaleWorlds.CampaignSystem.Party.AiBehavior.Hold, Wake = true };
+                else _orders.Remove(mp);
+            }
+            catch { }
+        }
 
         private static void RememberOrder(MobileParty mp)
         {
@@ -564,6 +598,7 @@ namespace Armoury
                 if (mp == null || !_orders.TryGetValue(mp, out o)) return;
                 _orders.Remove(mp);
                 if (!mp.IsActive || mp.MapEvent != null || mp.CurrentSettlement != null) return;
+                if (o.Wake) { var wh = WakeHandler; if (wh != null) wh(mp); return; }   // poprawka 174b: kontrakt zwolniony w nocy - decyzja BK
                 var nav = MobileParty.NavigationType.Default;
                 var st = o.Settlement; var tp = o.Party;
                 switch (o.Behavior)

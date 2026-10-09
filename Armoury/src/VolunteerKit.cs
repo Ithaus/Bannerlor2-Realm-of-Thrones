@@ -32,10 +32,11 @@ namespace Armoury
         internal static bool On { get { var s = Settings.Current; return s != null && s.VolunteerKitEnabled; } }
 
         private static int _bought, _reverted, _gold, _pieces, _extraMissing, _dayStamp = -1;
+        private static int _revReserve;   // 174b.4 (krytyka 13): awanse cofniete, bo zostala sama rezerwa kramu
         private static int _castleBought, _castleReverted, _castleFresh;   // 171 A4: zamki BK (tylko licznik)
         private static readonly Dictionary<Settlement, Settlement> _market = new Dictionary<Settlement, Settlement>();
 
-        internal static void Reset() { SupplyDemand.ResetOrders(); _market.Clear(); _bought = _reverted = _gold = _pieces = _extraMissing = 0; _castleBought = _castleReverted = _castleFresh = 0; _dayStamp = -1; }
+        internal static void Reset() { SupplyDemand.ResetOrders(); _market.Clear(); _bought = _reverted = _gold = _pieces = _extraMissing = _revReserve = 0; _castleBought = _castleReverted = _castleFresh = 0; _dayStamp = -1; }
 
         public static void Prefix(Settlement settlement, out Dictionary<Hero, CharacterObject[]> __state)
         {
@@ -196,8 +197,9 @@ namespace Armoury
         private static bool Buy(Hero notable, Settlement market, CharacterObject x, CharacterObject y, bool countWhy = true)
         {
             var gf = GoodsLedger.Begin(GoodsLedger.FArmsBuy, notable);   // 174.0: ramka ksiegi "zakupy uzbrojenia Armoury" (tylko licznik)
+            long tc = Cost174.Begin(Cost174.SVolunteer);                  // 174b.5 F6 (probka 1/16, tylko log)
             try { return BuyCore(notable, market, x, y, countWhy); }
-            finally { GoodsLedger.End(gf); }
+            finally { Cost174.End(Cost174.SVolunteer, tc); GoodsLedger.End(gf); }
         }
 
         private static bool BuyCore(Hero notable, Settlement market, CharacterObject x, CharacterObject y, bool countWhy)
@@ -215,16 +217,22 @@ namespace Armoury
             if (market == null || market.Town == null || market.ItemRoster == null) return need.Count == 0;   // bez targu: tylko gdy nic kluczowego nie trzeba
             var roster = market.ItemRoster;
             var picks = new List<EquipmentElement>();
+            var pickPrices = new List<int>();   // 174b.0 M2: cena kazdej sztuki (tylko licznik)
             int total = 0;
             // ceny hurtu (Jeff 09.10 08:00): kazda sztuka kompletu po swojej cenie, jak u gracza - wybrana sztuka schodzi z polki od razu, wiec
             // nastepna (np. drugi kolczan, druga sztuka tego samego koszyka) jest wyceniana przy polce juz bez niej. Dotad wszystkie sztuki
             // wyceniane przy nietknietej polce (licznik "taken" tylko pilnowal liczby). Komplet niepelny albo za drogi - zdjete sztuki wracaja
             // na polke (nikt nie placi), jak dotad awans cofniety. Wyjatek w trakcie wyboru - sztuki tez wracaja (dotad wybor nie ruszal polki).
+            // 174b.5 F3 (scalenie sklad8): pamiec cen stosow wazna do zmiany polki - po kazdej zdjetej sztuce gen++ (zdjecie zmienia cene i kolejnosc
+            // stosow); w petli dodatkow tez po kazdym zamowieniu (NoteUnmetOnce zmienia popyt, wiec i cene)
+            int[] memo = new int[roster.Count], memoGen = new int[roster.Count];
+            int gen = 1;
             try
             {
             foreach (var it in need)
             {
                 int best = -1, bestPrice = int.MaxValue;
+                bool resHit = false;
                 for (int i = 0; i < roster.Count; i++)
                 {
                     var el = roster.GetElementCopyAtIndex(i);
@@ -233,57 +241,82 @@ namespace Armoury
                     if (ArmsPricing.IsUnique(cand)) continue;   // wpis 87 (audyt pkt 6): unikat nie znika w puli ochotnikow
                     if (cand.ItemType == ItemObject.ItemTypeEnum.Horse && cand.HorseComponent != null && cand.HorseComponent.IsPackAnimal) continue;
                     if (el.Amount <= 0) continue;
+                    // 174b.4: sztuka z rezerwy kramu nie jest kandydatem; scalenie sklad8: wybrane sztuki kompletu sa juz zdjete z polki (ceny hurtu),
+                    // wiec Free liczy je samo - bez osobnego licznika pasma wybranych (174b takenBand liczylby je drugi raz)
+                    if (ShopReserve.Free(market, cand) <= 0) { resHit = true; continue; }
                     int price;
-                    try { price = market.Town.MarketData.GetPrice(el.EquipmentElement, null, false, market.Party); } catch { price = cand.Value; }
+                    if (i < memo.Length && memoGen[i] == gen) price = memo[i];
+                    else
+                    {
+                        try { price = market.Town.MarketData.GetPrice(el.EquipmentElement, null, false, market.Party); } catch { price = cand.Value; }
+                        if (i < memo.Length) { memo[i] = price; memoGen[i] = gen; }
+                    }
                     if (price < bestPrice) { bestPrice = price; best = i; }
                 }
                 if (best < 0)
                 {
                     PutBack(roster, picks);   // ceny hurtu: wczesniej wybrane sztuki kompletu wracaja na polke
                     SupplyDemand.NoteUnmetOnce(notable, market, it.ItemType, (int)it.Tier + 1, 1f);   // nie ma czego kupic - zamowienie (wpis 67)
-                    if (countWhy) { Why(it.ItemType + " t" + ((int)it.Tier + 1)); if (IsAmmoType(it.ItemType)) TownFletchers.NoteNotableRevert(it.ItemType); }   // 172: awans cofniety z braku amunicji
+                    if (resHit) Measure174b.NoteHeld(Measure174b.BNotable, 1);
+                    // 174b.4 (krytyka 13): awans cofniety przez rezerwe kramu - osobny powod i licznik
+                    if (countWhy) { Why((resHit ? "rezerwa kramu " : "") + it.ItemType + " t" + ((int)it.Tier + 1)); if (resHit) _revReserve++; if (IsAmmoType(it.ItemType)) TownFletchers.NoteNotableRevert(it.ItemType); }   // 172: awans cofniety z braku amunicji
                     return false;
                 }
                 var pickEl = roster.GetElementCopyAtIndex(best).EquipmentElement;
                 roster.AddToCounts(pickEl, -1);   // ceny hurtu: z polki od razu - nastepna sztuka wyceniana bez niej
+                gen++;                            // 174b.5 F3: polka zmieniona - ceny od nowa
                 picks.Add(pickEl);
+                pickPrices.Add(bestPrice);
                 total += bestPrice;
             }
             }
             catch { PutBack(roster, picks); throw; }
             if (notable.Gold < total) { PutBack(roster, picks); if (countWhy) Why("zloto notabla (" + notable.Gold + " < " + total + ")"); return false; }   // nie stac go - sztuki wracaja
-            foreach (var e in picks)
+            for (int pi = 0; pi < picks.Count; pi++)
             {
+                var e = picks[pi];
+                Measure174b.NoteBuy(Measure174b.BNotable, e.Item, 1, pickPrices[pi]);   // 174b.0 M2 (tylko licznik)
                 ArmsScrap.NoteBuy(market, e.Item, 1);   // 174 pytanie 4: popyt koszyka w miescie (tylko licznik)
                 if (e.Item != null && IsAmmoType(e.Item.ItemType)) TownFletchers.NoteNotable(e.Item.ItemType, 1);   // 172: kolczan z polki miasta (tylko licznik)
             }
             _lastBought.AddRange(picks);
+            gen++;   // polka zmieniona
             if (total > 0) GiveGoldAction.ApplyForCharacterToSettlement(notable, market, total, true);
             _gold += total; _pieces += picks.Count;
             // dodatki: najtansze z targu, jesli sa i starczy zlota; brak nie cofa awansu
             foreach (var it in extra)
             {
                 int best = -1, bestPrice = int.MaxValue;
+                bool resHit2 = false;
                 for (int i = 0; i < roster.Count; i++)
                 {
                     var el = roster.GetElementCopyAtIndex(i);
                     var cand = el.EquipmentElement.Item;
                     if (cand == null || el.Amount <= 0 || cand.ItemType != it.ItemType || cand.Tier < it.Tier) continue;
                     if (ArmsPricing.IsUnique(cand)) continue;
+                    if (ShopReserve.Free(market, cand) <= 0) { resHit2 = true; continue; }   // 174b.4
                     if (cand.ItemType == ItemObject.ItemTypeEnum.Horse && cand.HorseComponent != null && cand.HorseComponent.IsPackAnimal) continue;
                     int price;
-                    try { price = market.Town.MarketData.GetPrice(el.EquipmentElement, null, false, market.Party); } catch { price = cand.Value; }
+                    if (i < memo.Length && memoGen[i] == gen) price = memo[i];
+                    else
+                    {
+                        try { price = market.Town.MarketData.GetPrice(el.EquipmentElement, null, false, market.Party); } catch { price = cand.Value; }
+                        if (i < memo.Length) { memo[i] = price; memoGen[i] = gen; }
+                    }
                     if (price < bestPrice) { bestPrice = price; best = i; }
                 }
                 if (best < 0 || notable.Gold < bestPrice)
                 {
                     _extraMissing++;
-                    if (best < 0) SupplyDemand.NoteUnmetOnce(notable, market, it.ItemType, (int)it.Tier + 1, 1f);
+                    if (best < 0 && resHit2) Measure174b.NoteHeld(Measure174b.BNotable, 1);
+                    if (best < 0) { SupplyDemand.NoteUnmetOnce(notable, market, it.ItemType, (int)it.Tier + 1, 1f); gen++; }   // 174b.5 F3: zamowienie zmienia popyt - ceny od nowa
                     WhyExtra(it.ItemType + " t" + ((int)it.Tier + 1));
                     continue;
                 }
                 var pe = roster.GetElementCopyAtIndex(best).EquipmentElement;
                 roster.AddToCounts(pe, -1);
+                gen++;   // 174b.5 F3: polka zmieniona (kolejnosc stosow tez) - ceny od nowa
+                Measure174b.NoteBuy(Measure174b.BNotable, pe.Item, 1, bestPrice);   // 174b.0 M2 (tylko licznik)
                 ArmsScrap.NoteBuy(market, pe.Item, 1);   // 174 pytanie 4: popyt koszyka w miescie (tylko licznik)
                 if (pe.Item != null && IsAmmoType(pe.Item.ItemType)) TownFletchers.NoteNotable(pe.Item.ItemType, 1);   // 172: licznik
                 _lastBought.Add(pe);
@@ -310,7 +343,7 @@ namespace Armoury
         {
             if (_dayStamp < 0 || _bought + _reverted + _pieces + _castleFresh == 0) return;
             Log.Info("Ochotnicy: dzien " + _dayStamp + " - awanse z kupionym sprzetem " + _bought + " (" + _pieces + " szt. za " + _gold
-                     + " zl z kiesy notabli do miast), cofniete (brak towaru albo zlota) " + _reverted + "; dodatkow nie dokupiono " + _extraMissing
+                     + " zl z kiesy notabli do miast), cofniete (brak towaru albo zlota) " + _reverted + " (w tym przez rezerwe kramu 174b.4: " + _revReserve + "); dodatkow nie dokupiono " + _extraMissing
                      + "; w tym zamki BK: awanse " + _castleBought + ", cofniete " + _castleReverted + ", swiezi t2+ " + _castleFresh + ".");
             if (_whyExtra.Count > 0)
             {
@@ -326,7 +359,7 @@ namespace Armoury
                 Log.Info("Ochotnicy (diagnoza): powody cofniec - " + string.Join(", ", parts.ToArray()) + ".");
                 _why.Clear();
             }
-            _bought = _reverted = _gold = _pieces = _extraMissing = 0;
+            _bought = _reverted = _gold = _pieces = _extraMissing = _revReserve = 0;
             _castleBought = _castleReverted = _castleFresh = 0;
         }
 

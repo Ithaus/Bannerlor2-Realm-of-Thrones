@@ -235,6 +235,243 @@
 
 **Status:** NIEWGRANE - DO SPRAWDZENIA (autotest i proby reczne jak wyzej; DLL probna `Armoury-sklad7.dll` w `scratchpad/test`).
 
+## 2026-10-09 (174b, poprawki po recenzji) - koszt zamowien surowca bez regresu, ruda dla strzelarzy policzona dobrze, warsztaty gracza ta sama regula, rezerwa kramu domyslnie WYLACZONA (czeka na Jeffa), kontrakt w zapisie pelny, pobudka karawany zwolnionej w nocy, P5 bez przerzutu, P13 z mediany doby
+**Mod:** Armoury + narzedzia | **Pliki:** `MaterialOrders.cs`, `NightRest.cs`, `TownFletchers.cs`, `WorkshopLaw.cs`, `WorkshopTrade.cs`, `ArmsScrap.cs`, `ShelfIndex.cs`, `ShopReserve.cs`, `Measure174b.cs`, `GarrisonCarts.cs`, `Settings.cs` + `McmSettings.cs` (`ShopKeepsLastArmour` domyslnie **false**; NOWE `PlayerWorkshopsSameRule` = true; gen_mcm: 770 ustawien), `tools/p174b_progi.py`. Klucz zapisu `arm_matorders` - rekord z opcjonalnym 10. polem (odczyt 9 albo 10 pol).
+
+**Co zobaczysz w grze (prosto):** (1) ostatnia sztuka zbroi na straganie NIE jest juz domyslnie zostawiana dla Ciebie - to wyjatek od "jednej reguly" i czeka na Twoja odpowiedz (pytanie 1; wlacznik "Shop Keeps Last Armour" w MCM); (2) Twoje warsztaty dzialaja jak warsztaty notabli: platnerz i strzelarz Banner Kings nie robia juz lekkiej zbroi ani strzal z niczego (linie bez surowca stoja), a gdy w miescie brakuje strzal, Twoj warsztat oddaje rude strzelarzom, jesli oni zarobia na niej wiecej (wylacznik "Player Workshops Same Rule"); (3) karawana, ktorej zlecenie na rude wygasa w nocy, rusza o swicie jak kazda inna, a nie stoi do nastepnego dnia.
+
+**Problem / Przyczyna (uwagi recenzji 174b - wszystkie sprawdzone w kodzie, zadna nie odrzucona):**
+1. (wazna) `Order` liczyl prog nadwyzki zrodla (`SourceKeep` = 3 przejscia `CaravanBulk`) i trasy dla kazdego miasta-zrodla w zasiegu, zanim sprawdzil, czy stoi tam przewoznik; 174b.2 poszerzyl zasieg morski (ruda 200 -> 800, reszta 600 -> 1000). Ok. 270 zamowien/d x 30-60 zrodel - szacunek 0.1-0.3 s/d wobec budzetu P13 ok. 0.13 s/d.
+2. `OfferLoads` odejmowal dlug rudy strzelarzy (`ceil(rece/dni x ruda - dlug)`), a snop zdejmuje `floor(dlug + ruda)` - dlug sie DODAJE; przy dlugu bliskim 1 o ladunek za malo.
+3. Oferta za rude powstawala takze ze snopa, ktoremu brakowalo jednoczesnie drewna - zatrzymana ruda lezala dobe bezczynnie.
+4. (= 15) `ArmsScrap`: ulamek skupu koszyka bez zakupow (stary nadmiar) nie mial klucza w `_keys`, wiec `Export` go pomijal; probny odczyt i tak mowil "zgodny".
+5. `ShelfIndex.Count` i `ShopReserve.FreeBand` wolaly `Log.Error` przy kazdym wyjatku w goracej sciezce (kazda cena sprzetu, kazdy kandydat zakupu).
+6. Przewoznik w zrodle bez miejsca w jukach albo kiesy liczyl sie jako "bez drogi: brak konwoju w porcie zrodla" - psulo miare "bez drogi".
+7. (= 16) Zapis kontraktu (9 pol) gubil `Packs`/`PackStart`, `Retarget`, `HoldStreak` - po wczytaniu kontrakt "z jukow" liczyl sie jak zakupowy (linia, audyt P11a), limity przywrocen i postoju od zera.
+8. Kontrakt zwolniony w godzinach nocnego obozu (`Keep` - 30 dob/wylacznik - wypada zwykle w nocy, doba ok. 5:00; `DestLost` w `Hourly`) kasowal zapamietany rozkaz (`ForgetOrder`), nastepna godzina obozu zapamietywala juz postoj (Hold), swit nic nie oddawal - karawana stala do ticku BK `HourlyTickParty`, ktory dlawik BKROT puszcza raz na dobe (do ok. 23 h).
+9. `Hourly` nie sprawdzal wylacznika `TownMaterialOrders` - po wylaczeniu w MCM karawany jechaly do celu az do przegladu doby.
+10. `NoteTrip` liczyl dni drogi od `c.Day` (doba ucieta do int) - zawyzone o faze taktu doby (sklad6 ok. +0.2), wiec punkt zamowienia (D+2) i ilosc (D+4) nieco za duze.
+11. Komentarz `RouteHopPrefix` (i projekt 174b rozdz. 3.2 pkt 2) mowil "morze - All", a kod daje rozkaz `NavigationType.Naval` + port (jak BK `ReleaseCaravanFromHold`) - i to jest dobre (konwoj nie ma ladu).
+12. P13 w `p174b_progi.py` = srednia procentow z linii, a mianownik linii to zegar miedzy taktami doby (z pauzami, ekranem zapisu, menu) - procent zanizony, prog przechodzil latwiej.
+13. (wazna) `ShopKeepsLastArmour` domyslnie true, choc to wyjatek od wiazacej reguly Jeffa "jedna regula gracz/AI" i pytanie 1 jest bez odpowiedzi (wzor paczki 174: pytania czekajace na Jeffa - za wylacznikiem domyslnie wylaczonym).
+14. (wazna) Warsztaty GRACZA szly sciezka gry (`TickOneProductionCycleForPlayerWorkshop`), a BK `workshops.xml` ma u dwoch typow, ktore gracz moze kupic, linie z pustym `<Inputs>`: armorsmithy (light_armor x1, szybkosc 1.5) i fletcher (arrows x1, 1.5) - zbroja i strzaly z niczego; regula 174b.3 (ruda dla strzelarzy) nie wiazala warsztatu gracza. Lamie "nic z niczego" i "jedna regula" (Jeff 09.10). Blad starszy niz 174b (WorkshopLaw / 172), ale wchodzi w tej samej paczce.
+17. M1/P5 liczyl jako "nowa sztuka" takze przyjazdy bez partii na mapie: `SupplyDemand.DailyTrade` (ArrTrade) i zawrocone wozy zamkow `GarrisonCarts` (przerzut, ktorego nie da sie obrabowac).
+
+**Zmiana:**
+- (1) `Order`: najpierw przewoznicy stojacy w zrodle (tanie), zrodlo bez zadnego przewoznika pomijane bez progu i tras, gdy liczniki "bez kontraktu" (zrodlo, droga, brak karawany) sa juz ustawione - wynik i liczniki te same; `SourceKeepDay` - prog nadwyzki zapamietany na jedno wywolanie `Daily` (czyszczony na poczatku `Daily` i w `Reset`; w trakcie `Daily` staly - srednie zuzycia przed zamowieniami, rece/dobrobyt i warsztaty bez zmian, `_trip` zmienia tylko dostawa), takze w linii nazw; polka zrodla czytana swiezo. Koszt `SourceKeep` najwyzej 97 x 7 na dobe.
+- (2) `OfferLoads = max(1, min(5, floor(dlug + k x ruda na snop)))`, k = snopy, ktore petla zacznie (`ceil((rece - MinHands) / dni na snop)`).
+- (3) oferta tylko ze snopa, ktoremu brakuje wylacznie rudy (`mm == 1`).
+- (4) `ArmsScrap.Daily`: klucz `_keys` dopisywany przy `_acc[k]`.
+- (5) oba `catch`: `Log.Error` raz, potem licznik; liczniki w linii "Koszt 171-174 (doba)" ("potkniecia od startu sesji: pamiec polki N, rezerwa kramu N"). Wynik zastepczy bez zmian.
+- (6) nowy licznik "przewoznik bez miejsca w jukach lub kiesy" w "bez kontraktu" linii "Kontrakty surowca (174)"; "bez drogi: brak konwoju" tylko, gdy konwoju naprawde nie ma.
+- (7) `arm_matorders`: 10. pole `juki,przywrocen,postoj,start` (juki -1 = kontrakt z zakupu); odczyt przyjmuje 9 albo 10 pol, nieczytelne 10. pole = rekord 9-polowy. Starszy DLL na rekordzie 10-polowym zwalnia karawane (`FreeBroken`/pominiety) - ladunek zostaje karawanie.
+- (8) `Drop` zywej karawany: `NightRest.ForgetOrder(car, wake: true)` - wpis nocny dostaje znacznik pobudki zamiast skasowania; o swicie (albo przy nocnym alarmie) `MaterialOrders.WakeAtDawn` wola BK `ReleaseCaravanFromHold` (stary cel, jesli nie oblegany i nie wrogi, inaczej `ThinkNextDestination` - jak kazda karawana BK po postoju); bez BK - `RethinkAtNextHourlyTick`. Licznik "zwolnione w nocnym obozie i obudzone o swicie decyzja BK" w linii kontraktow; linia startowa MaterialOrders mowi, czy pobudka BK jest wpieta.
+- (9) `Hourly`: `if (!On) Release` (po sprawdzeniu bitwy) - wylacznik dziala w ciagu godziny.
+- (10) kontrakt pamieta `Start` (doby z ulamkiem przy zawarciu; z 10. pola po wczytaniu); `NoteTrip` liczy od niego. Srednia "dob drogi" w linii dnia dalej od `c.Day` (porownywalna z sklad6).
+- (11) komentarz `RouteHopPrefix`: morze = `Naval` + port jak BK, "NIE zmieniac na All". **Sprostowanie projektu** (`docs/PROJEKT-174B-DOWOZ-2026-10-09.md` w repo glownym, rozdz. 3.2 pkt 2, linia "rozkaz jak dzis: morze = NavigationType.All + port"): wykonane jest `NavigationType.Naval` + port, z uzasadnieniem jak wyzej - plik projektu poza drzewem paczki, do poprawienia przy scalaniu.
+- (12) `p174b_progi.py` P13 = srednie ms "nasze 171-174b" / MEDIANA dlugosci doby z linii (<= 1%); procenty z linii (zegar z pauzami) zostaja jako INFO.
+- (13) `ShopKeepsLastArmour` = **false** do odpowiedzi Jeffa (pytanie 1). Linie M1-M3 i P5 dzialaja bez rezerwy ("rezerwa kramu: wylaczona").
+- (14) NOWE `PlayerWorkshopsSameRule` (= true): prefiks `TickOneProductionCycleForPlayerWorkshop` (`WorkshopLaw.PlayerCyclePrefix`) - linia strzal przy czynnych strzelarzach (`ClosesLine` bez warunku "nie gracz") i linia uzbrojenia BEZ wsadu przy czynnym WorkshopLaw nie robia cyklu (`__result = false`); postfiks `CanPlayerWorkshopProduceThisCycle` (`PlayerGatePostfix`) - linia bioraca rude z POLKI miasta (koszt wsadu > 0; wsad z magazynu gracza ma koszt 0) czeka na strzelarzy tak jak `TryStart` notabla (oferta wazna, po cyklu zostaloby mniej rudy niz ladunki strzelarzy, zysk cyklu na ladunek rudy = (utarg - wsad) / ruda < oferta) - `TownFletchers.NoteHeld`, sygnal zamowienia rudy. `WorkshopTrade.CycleLabour` i `Expected` (przez `ClosesLine`) nie licza zamknietej linii strzal takze u gracza. Linie gracza Z wsadem - sciezka gry jak dotad. Linia "Warsztaty": "warsztaty gracza (poprawka 174b, jedna regula): cykle linii bez wsadu (zbroja, strzaly) zamkniete N, czeka na strzelarzy N"; linia startowa WorkshopLaw: wpiete / BRAK.
+- (17) `Measure174b`: "nowa w 7 dob bez przerzutu bez partii (kupcy dzienni, wozy zamkow) t1-2/t3-4/t5-6: korpus a/b/c, helm ..., nogi ..., rece ..." (przyjazdy `ArrTrade` i `GarrisonCarts.Back` - `NoteArrival(..., unseen: true)` - nie licza sie; przyrost polki miedzy spisami tylko ponad przerzut); `p174b_progi.py` - INFO "P5 bez przerzutu". **Poza paczka** (dopisac w rozdz. 9 projektu obok `DailyTrade`): `GarrisonCarts` (171) to tez przerzut bez partii ("Bandyci nie rozbijaja dostawy") - do decyzji po 174b, czy prawdziwy woz/partia.
+
+**Ryzyko / co sprawdzic (kontrola calosci):**
+- (1) Wynik zamowien bez zmian z konstrukcji (zrodlo bez przewoznika nie moze dac kontraktu; pomijane tylko, gdy nie zmieni zadnego licznika); stalosc `SourceKeep` w `Daily` sprawdzona w kodzie (`CaravanBulk.Use/Keep/UseNow` - rece z dobrobytu, `TownCrafts.UseOf` - srednia, `ShopUse` - typy warsztatow; `Place` zmienia tylko polke i kiese). Koszt widac w "Koszt 171-174 (doba)" pozycja `MaterialOrders.Order`.
+- (2)(3) Oferta strzelarzy rzadsza (tylko czysty brak rudy) i o ladunek wieksza przy dlugu bliskim 1 - "ladunkow wzietych z zatrzymanych" powinno rosnac wobec "cykli zatrzymanych".
+- (4) Napis `arm_scrap` dluzszy (koszyki starego nadmiaru) - idzie przez `SaveText.Sync` (kawalki < 32 KB); probny odczyt liczy pary z obu stron.
+- (7) Format zapisu: nowy DLL czyta stare rekordy; stary DLL (cofniecie) zwalnia kontraktowe karawany z nowego zapisu - bezpiecznie (bez wstrzymanego AI, ladunek zostaje).
+- (8) Pobudka BK to ta sama metoda, ktora BK wola sam (postoj, wczytanie, koniec oblezenia); nasz `ReleasePrefix` przepuszcza karawane bez kontraktu. Kontrakt zawarty w tej samej nocy (karawana w miescie) - `WakeAtDawn` nic nie robi (`_byCar`), dalej prowadzi `Hourly`.
+- (13) Bez rezerwy P5 moze nie przejsc (projekt liczyl ja jako krok do P5) - wtedy decyzja Jeffa (pytanie 1), nie zmiana progu. Linia "P5 bez przerzutu" pokaze, ile daje przerzut.
+- (14) Zmiana rozgrywki gracza: kupiony armorsmithy/fletcher BK traci linie "z niczego" (zostaja linie ze skor i drewna), warsztat gracza na rudzie moze czekac w miescie bez strzal. Wylacznik `PlayerWorkshopsSameRule` = false - jak w grze. W autotescie gracz nie ma warsztatow - liczniki "warsztaty gracza" = 0 to wynik oczekiwany; sprawdzic w grze kupionym warsztatem. Kolizje: `WorkshopTrade` (transpiler progu i place na tych samych metodach - przy `false` bez plac), `GoodsLedger` (ramka "cykl warsztatu gracza" - pominiety cykl jak u notabli), `ArtisanInputs.CycleEnd` w postfiksie - zamyka rachunek.
+- Kod tylko zbudowany (kod 0) - NIE uruchomiony w grze.
+
+**Status:** NIEWGRANE - DO SPRAWDZENIA razem z 174b (P1-P13; dodatkowo: "przewoznik bez miejsca w jukach lub kiesy" > 0 i "bez drogi" mniejsze o tyle; "obudzone o swicie decyzja BK" > 0 przy zwolnieniach w nocy; "Koszt 171-174" - `MaterialOrders.Order` nie wiecej niz w sklad6 mimo morza; "potkniecia od startu sesji" 0; "warsztaty gracza: wpiete" w linii startowej).
+
+## 2026-10-09 (174b, skrypty progow) - tools/p174b_progi.py, p174b_doby.py, p174b_koszty.py; linia nazw z ruda dostarczona kontraktami wedlug miasta
+**Mod:** Armoury (sam log) + narzedzia | **Pliki:** NOWE `tools/p174b_progi.py` (progi P1-P13 rozdz. 6 projektu po krytyce, tryb nowej kampanii i `--zapis`, `--baza`), `tools/p174b_doby.py` (tempo: srednia i mediana bez pierwszej doby sesji - doba samokontroli pamieci polki; porownanie parami z logiem Z1b, P8 = mediana 174b <= mediana Z1b + 1 s), `tools/p174b_koszty.py` (ranking z linii "Koszt 171-174 (doba)" i starszych linii kosztu); `MaterialOrders.cs` (linia "Miasta bez rudy i strzal (174b)": "ruda dostarczona kontraktami od ... (N miast): miasto sztuk, ..." - prog P2 na zapisie). Numeracja uwag krytyki w komentarzach i wpisach 174b ujednolicona z rozdz. 11 projektu (1-26).
+
+**Co zobaczysz w grze (prosto):** nic - narzedzia do oceny testu.
+
+**Zmiana:** skrypty przeniesione z diagnoz (`a174b/tempo-skrypty/doby.py`, `koszty.py`) i napisane od nowa dla progow 174b (Python 3, `python -I`, tylko odczyt logu). Sprawdzone na logach sklad6 i 172b: P6 z logu sklad6 daje dokladnie stale krytyki (partie 71.7%, razem 79.8%), P11 - sklad6 "ruda bez wyjasnienia" suma dodatnich dob 9, reszta R 4 692 d (zapis 362: 11 149 d), 172b - 14; tempo sklad6 d2-40 srednio 14.26 / mediana 14.0 s, d31-39 17.25 / 17.0 s, zapis 6 pelnych dob mediana 25.5 s.
+
+**Ryzyko / co sprawdzic:** wzorce linii zgodne z kodem 174b; pierwszy prawdziwy bieg moze pokazac rozjazd formatu - wtedy poprawic skrypt, nie progi. Skryptu rynku z diagnozy C (`a174b/skrypty/rynek.py`) nie przenoszono (sciezki na sztywno, miary M1-M3 sa teraz w logu).
+
+**Status:** NIEWGRANE (narzedzia; linia nazw - DO SPRAWDZENIA razem z 174b.0).
+
+## 2026-10-09 (174b.4) - REZERWA KRAMU DLA ZBROI: kto kupuje hurtem dla oddzialu (lordowie, zalogi, notable, kupcy wywozacy nadwyzke, takze Twoi ludzie z sakiewki), zostawia w miescie ostatnia sztuke kazdego pasma zbroi (tulow, glowa, nogi, rece; t1-2 / t3-4 / t5-6) dla kupujacego osobiscie
+**Mod:** Armoury | **Pliki:** `ShopReserve.cs` (zaslepka 174b.0 zastapiona regula), `AiGear.cs` (`BuyLoop`, `BuySubstitutes` - parametr kupujacego, `OnShelf` tylko ponad rezerwe), `VolunteerKit.cs` (kandydat bez rezerwy, osobny powod i licznik cofnietych awansow), `MenPurse.cs` (`BuyPlayerGaps`), `SupplyDemand.cs` (`DailyTrade` - wywoz z polki miasta-zrodla), `Settings.cs` + `McmSettings.cs` (NOWE `ShopKeepsLastArmour` = true, `ShopKeepPieces` = 1, suwak 0-3; gen_mcm: 769 ustawien). Bez kluczy zapisu.
+
+**Co zobaczysz w grze (prosto):** w miescie, gdzie lezy jeszcze zbroja danego rodzaju, ostatnia sztuka zostaje na straganie - lordowie, zalogi, notable, kupcy i Twoi ludzie kupujacy ze swojej sakiewki jej nie zabieraja; kupisz ja Ty na ekranie handlu (drogo, bo cena dalej liczy, ze towaru malo). To pytanie 1 do Ciebie (domyslnie wlaczone, wylacznik w MCM): w grze osobiscie przy straganie kupujesz tylko Ty, wiec to wyjatek od "jednej reguly".
+
+**Problem:** test sklad6: zbroja korpusu na polkach miast d10/20/30/40 2 862 / 872 / 331 / 1 998 (172b 8 860 / 6 115 / 1 983 / 1 067), od d25 ponizej 400 szt.; zbroi na tulow t3 na polkach calego swiata 0-5 szt., t4 0-1 (diagnoza C `a174b/rynek.md`). Zakupow w kolko nie ma (AI zdejmuje 58-114% doplywu) - zolnierze lordow nosza wszystko, co kowale zrobia; gracz nie ma czego kupic.
+
+**Zmiana (wylacznik `ShopKeepsLastArmour`, liczba `ShopKeepPieces`):**
+- `ShopReserve.Free` / `FreeBand`: w MIESCIE (zamek to nie targ) kupujacy hurtem moze zdjac tylko sztuki pasma ponad `ShopKeepPieces` (bez unikatow; licznik z pamieci polki 174b.5 `ShelfIndex.Band`, przy wylaczonej pamieci - przejscie polki). Bron, tarcze, amunicja, konie - bez rezerwy.
+- Hurt: `AiGear.BuyLoop` (takze zamowienia zamkow na polce miasta), `AiGear.BuySubstitutes` (zbroja zastepcza), `VolunteerKit.BuyCore` (notable dla ochotnikow - z liczeniem sztuk pasma wybranych w tym samym wywolaniu), `MenPurse.BuyPlayerGaps` (sakiewka ludzi GRACZA - jak ludzie lorda), `SupplyDemand.DailyTrade` (wywoz z polki miasta-zrodla). Ekran handlu gracza - bez limitu (kod go nie dotyka).
+- Sygnal dla kowali bez zmian: `OnShelf` liczy tylko sztuki ponad rezerwe (zamowienie `NoteUnmetOnce` jak przy pustej polce); `VolunteerKit` - sztuka z rezerwy nie jest kandydatem, zamowienie jak dotad, awans cofniety z powodem "rezerwa kramu ..." i osobnym licznikiem w linii "Ochotnicy" (krytyka 13). Cena bez zmian (`Stock` liczy cala polke).
+- Linie: "Zbroja na polkach (174b)" - "rezerwa kramu: sztuk N (korpus, helm, nogi, rece)"; "ZakupyAI wedlug kupujacego (174b)" - "zatrzymane na rezerwie kramu N szt. [wedlug kupujacego]"; koszt w "Koszt 171-174" (rezerwa kramu).
+
+**Ryzyko / co sprawdzic (kontrola calosci):**
+- Jedna regula (krytyka 21): podzial "hurt / zakup osobisty" pokrywa sie w praktyce z podzialem AI / gracz (AI nie ma drogi zakupu osobistego zbroi; gracz na ekranie handlu moze kupic hurtem takze ostatnia sztuke). Zapisane wprost jako WYJATEK i pytanie 1 do Jeffa z wariantem (a) "wedlug wielkosci zakupu, takze gracz" - wymaga latki ekranu handlu (osobna praca).
+- Petli nie ma: rezerwa tylko zmniejsza zakupy hurtowe; sztuka z rezerwy nie trafia do zbrojowni AI, wiec nie wraca jako nadwyzka. Straznik w tescie: nadwyzki korpusu sprzedane z sakiewek (M3) > 50% kupionego korpusu (M2) przez 5 dob przy lupie < 1 tys./d - zbadac.
+- Koszt dla wojska jednorazowo <= ok. 600 sztuk korpusu i helmow na swiat (<= ok. 0.3 pp "cokolwiek na tulowiu"), potem strumien bez zmian.
+- `ArmsScrap` moze skupic sztuke rezerwy tylko w koszyku ponad rok popytu (kowale miasta, nie hurt) - zamierzone. `GarrisonArmory` nie kupuje z polki.
+- Kod tylko zbudowany (kod 0) - NIE uruchomiony w grze.
+
+**Status:** NIEWGRANE - DO SPRAWDZENIA (P5 - nowa sztuka t1-2 w >= 49 miastach i t3-4 w >= 24 w oknie 7 dob od d15; P6 bez spadku ponad 1.5 pp wobec sklad6; "sztuk w rezerwie" <= 1 164; straznik M3/M2).
+
+## 2026-10-09 (174b.3) - RUDA DLA TEGO, KTO WIECEJ NA NIEJ ZAROBI: platnerz nie zabiera strzelarzom rudy, ktora ich rece by zuzyly, gdy strzelarze zarabiaja na ladunku wiecej (miasto bez strzal)
+**Mod:** Armoury | **Pliki:** `TownFletchers.cs` (oferta za ladunek rudy w stanie miasta, `OreOffer`, `NoteHeld`, liczniki w linii "Strzelarze (172)"), `WorkshopLaw.cs` (`TryStartCore` - kod 5 "czeka na strzelarzy", licznik w linii "Warsztaty"), `MaterialOrders.cs` (`NoteMissMask` z flaga linii nazw), `Settings.cs` + `McmSettings.cs` (NOWE `FletchersBidForOre` = true; gen_mcm: 767 ustawien). Bez kluczy zapisu (oferta to stan sesji).
+
+**Co zobaczysz w grze (prosto):** gdy w miescie brakuje strzal, ruda trafia do tego, kto na niej wiecej zarobi - platnerza albo strzelarzy - a nie zawsze do platnerza, bo pracuje pierwszy.
+
+**Problem:** test sklad6: miast bez strzal 31 na d40 (sr. d31-40 31.9; 172b 24); strzelarze koncza prace "brak surowca" w 42-53 miastach, z tego ruda 31-38; bezczynne rece strzelarzy 956 roboczodni/d.
+
+**Przyczyna:** snop strzal potrzebuje ok. 0.06 ladunku rudy, a strzelarze pracuja w postfiksie `DailyTickTown` PO warsztatach (`TownFletchers.cs:234-235`) - platnerz zabiera kazdy ladunek pierwszy, niezaleznie od tego, kto na nim wiecej zarobi. Kolejnosc w kodzie, nie rynek.
+
+**Zmiana (wylacznik `FletchersBidForOre`):**
+- Strzelarze (`Work`): gdy krok konczacy prace stoi na braku rudy, a sa oplacalne snopy - oferta = najwiekszy zysk na ladunek rudy `(przychod - koszt) / ruda na snop` i liczba ladunkow, ktore ich pozostale dzis rece zuzyja (`ceil(rece / dni na snop x ruda na snop - dlug)`, bezpiecznik 5); stan miasta, doba oferty.
+- Warsztaty (`TryStartCore`, po bramce zysku i kapitalu): gdy sztuka bierze rude, oferta strzelarzy z wczoraj (strzelarze pracuja po warsztatach, wiec "oferta z dzis" nie istnieje - krytyka 7; zapasowy sluchacz przed warsztatami - takze z dzis) jest wazna, po starcie na polce zostaloby mniej rudy niz ladunki strzelarzy, a zysk sztuki na ladunek rudy `(przychod - surowce - place) / ruda na sztuke` jest mniejszy niz oferta - sztuka czeka (kod 5). Bez stalego limitu "1 ladunek" - rachunek zysku i rece strzelarzy (krytyka 22).
+- Liczenie (krytyka 7 i 22): cykl z kodem 5 to "czeka na strzelarzy" (linia "Warsztaty"), NIE "brak surowca" i nie do listy miast z cyklami "brak rudy"; sygnal zamowienia rudy idzie (miastu brakuje rudy dla obu cechow). Linia "Strzelarze (172)": "ruda dla strzelarzy (174b.3): ofert N (srednio X d zysku na ladunek), cykli platnerzy zatrzymanych N w M miastach, ladunkow wzietych z zatrzymanych N".
+
+**Ryzyko / co sprawdzic (kontrola calosci):**
+- Wyciek (krytyka 7): zatrzymany ladunek moga zabrac linie nie-zbrojne gry na rudzie (narzedzia) i warsztat gracza - wtedy oferta nic strzelarzom nie daje; miara "ladunkow wzietych z zatrzymanych" to pokaze.
+- Regresja kowali: platnerze traca najwyzej tyle rudy, ile strzelarze zuzyja, i tylko w miastach z oferta (brak strzal) - pomocniczy prog produkcji korpusu >= 200/d w d31-40.
+- Oferta to stan sesji - po wczytaniu 1 doba bez oferty (zachowanie jak dotad).
+- Koszt: odczyt slownika na `TryStart` z ruda - pomijalny.
+- Kod tylko zbudowany (kod 0) - NIE uruchomiony w grze.
+
+**Status:** NIEWGRANE - DO SPRAWDZENIA (P3: miast bez strzal sr. d31-40 <= 24; "czeka na strzelarzy" > 0 tylko w miastach z oferta; "ladunkow wzietych z zatrzymanych" > 0; produkcja korpusu >= 200/d).
+
+## 2026-10-09 (174b.2) - DOWOZ RUDY: NAJPIERW TRASA, POTEM KARAWANA - ladem albo morzem (konwoj z portu, ktory piraci moga zlupic), mniejszy ladunek, gdy duzy sie nie oplaca, surowiec z jukow karawany, zamowienie zanim polka zejdzie do zera, karawany rodu gracza jak wszystkie
+**Mod:** Armoury | **Pliki:** `MaterialOrders.cs` (`Order` przepisane, NOWE `UseDest`, `TravelDays`, `NoteTrip`, `SourceKeep`, `OrderTimed`; `Place` z jukow + audyt; `Deliver` audyt i dni drogi; `Move` konwoj Naval; `Eligible`; linia), `CaravanBulk.cs` (NOWE `UseNow` - zuzycie z obecnych rak), `Settings.cs` + `McmSettings.cs` (NOWE: `TownMaterialOrderBySea` = true, `TownMaterialOrderSeaMaxRoute` = 1000, `TownMaterialOrderFromPacks` = true, `TownMaterialOrderAhead` = true, `TownMaterialOrderPlayerCaravans` = true; gen_mcm: 766 ustawien). Format zapisu `arm_matorders` bez zmian.
+
+**Co zobaczysz w grze (prosto):** do wysp i dalekich wybrzezy ruda plynie prawdziwym statkiem kupieckim z portu, ktory ma jej za duzo (piraci moga go zlupic); kupiec bierze mniejszy ladunek, gdy duzy by sie nie oplacil, i moze zawiezc rude, ktora juz ma w jukach; miasto zamawia rude, zanim jej zabraknie, a nie dopiero gdy kowale staja. Twoje karawany tez moga brac takie zlecenia (zysk do ich kiesy) - to pytanie 2 do Ciebie, domyslnie TAK.
+
+**Problem:** test sklad6: miast bez rudy 36 na d40 (sr. d31-40 37.3; 172b 36); bez kontraktu najczesciej "bez drogi" (98/d w d31-40); kontrakty wiozly ok. 23 ladunki rudy/d; 16 "rozkaz odrzucony"; "bez zysku" takze na krotkich trasach. Rudy nie brakuje (zapas swiata rosnie o ok. 126 ladunkow/d) - nie dojezdza (diagnozy A i B).
+
+**Przyczyna (`MaterialOrders.Order` 174):** (1) kandydaci z linii prostej, przewoznik = karawana z najwiekszym wolnym miejscem bez wzgledu na droge - konwoj (statki bez ladu, `CaravanPartyComponent.cs:54`) dostawal rozkaz ladowy, straznik BK go odrzucal, ruda zostawala w konwoju (16 "rozkaz odrzucony"); (2) morze tylko, gdy w ogole nie ma drogi ladowej i tylko gdy WYBRANA karawana ma statki; zasieg sprawdzany na pelnej dlugosci rejsu; (3) marza tylko dla ladunku q0 (srodkowa sztuka duzego q zbija cene celu); (4) surowiec w jukach nie mogl byc dowieziony; (5) zamowienie dopiero po cyklu "brak surowca" i ilosc z dawnych rak (5 953 rak dzis wobec 2 740) - dostawa starczala na 4-5 dni, potem miasto stalo na zerze (krytyka 16).
+
+**Zmiana (regula "kontrakt tylko z zyskiem ponad koszt drogi" i wzor oplaty bez zmian):**
+- Zrodla z `Town.AllTowns` (97 zamiast 1 065 osad - zrodlem i tak moze byc tylko miasto).
+- **Trasa przed karawana**: lad - pamiec drog gry (Default), koszt = droga <= zasieg; morze (oba miasta z portem, `TownMaterialOrderBySea`) - pamiec drog Naval, rejs <= `TownMaterialOrderSeaMaxRoute` (1 000 = ok. 15 dob, polowa limitu 30 dob) i rejs x `SeaFreightShare` (0.25) <= zasieg. Przewoznik dobrany do trasy: lad - karawana z ladem, morze - karawana ze statkami (konwoj; w porcie gra liczy mu ladownie - `IsCurrentlyAtSea` zostaje true, wzor wolnego miejsca bez zmian, krytyka 8). Rozkaz morski jak BK: `NavigationType.Naval` + port.
+- **Ilosc wedlug zysku**: q0 jak dotad; gdy marza q0 <= 0 - q0/2, q0/4, ... dopoki ladunek >= `TownMaterialOrderMinLoadKg`; pierwsze q z marza > 0. Cena celu dla danego q liczona raz na zamowienie.
+- **Surowiec z jukow** (`TownMaterialOrderFromPacks`): przewoznikiem moze byc karawana stojaca w dowolnym miescie w zasiegu, ktora ma surowiec w jukach (>= 100 kg) - bez zakupu, marza wobec sprzedazy na miejscu (`PriceAt(selling: true)`), kontrakt z `Paid = 0`, dostawa jak dotad.
+- **Punkt zamowienia** (`TownMaterialOrderAhead`, krytyka 16): codziennie miasto, ktore surowca uzywa, zamawia, gdy zapas + w drodze < (D + 2) x zuzycie (D = srednia dob drogi 3 ostatnich dostaw tego surowca do miasta, domyslnie 4); ilosc = zapas na max(10, D + 4) dob zuzycia z OBECNYCH rak (`CaravanBulk.UseNow`) minus polka minus w drodze. Prog nadwyzki zrodla dalej z dawnych rak (zrodla nie znikaja), ale nie ponizej wlasnego punktu zamowienia zrodla (`SourceKeep` - miasto nie sprzedaje tego, co zaraz samo by zamowilo).
+- **Karawany rodu gracza** (`TownMaterialOrderPlayerCaravans`, krytyka 26 - pytanie 2 do Jeffa, domyslnie rekomendacja TAK): moga brac kontrakty jak karawany AI; druzyna gracza nigdy.
+- **Audyt ilosci** (krytyka 20): przy zakupie przyrost jukow == ubytek polki zrodla, przy dostawie ubytek jukow == przyrost polki celu, z jukow - dostarczono <= bylo w jukach przy zawarciu; linia "audyt ilosci: rozjazdy N" (P11 = 0). Ilosci liczone po WSZYSTKICH stosach surowca w rosterze (`GetItemNumber` liczy tylko pierwszy stos, a oprozniony stos zmienia kolejnosc) - takze "przewieziono" przy zakupie i dostawie oraz ladunek w jukach przy dostawie (poprawka w tej samej paczce).
+- Linia "Kontrakty surowca (174)": "174b.2: morzem zawarto N (sztuk, dojechalo), z jukow zawarto N (sztuk, dojechalo), z wyprzedzeniem N, bez drogi [wyspa lub inna czesc ladu bez portu, droga ladem > zasieg, morze poza zasiegiem albo dlugoscia, brak konwoju w porcie zrodla], audyt ilosci: rozjazdy N".
+
+**Ryzyko / co sprawdzic (kontrola calosci):**
+- `CaravanBulk` (`:205`), `CaravanAmmo`, `IslandRoads` juz przepuszczaja karawane z kontraktem (`HasContract`) - kontrakt morski i "z jukow" tez. Konwoj na morzu nie obozuje. BK wysyla konwoje tylko do portow - cel morski zawsze ma port.
+- Ksiega towarow: kontrakt z jukow nie ma zakupu w zrodle, sprzedaz w celu przez `SellItemsAction` jak dotad - nic z niczego (audyt ilosci). Kontrola "ruda ZGODNA" porownuje produkcje, zuzycie i zapas - kontrakt jej nie dotyka; dlatego osobny audyt.
+- Punkt zamowienia: do 97 x 7 sprawdzen na dobe (odczyt polki i kontraktow w drodze), wywolan `Order` najwyzej raz na `TownMaterialOrderDays` (3) na miasto i surowiec; rachunek marzy sam hamuje nadmiar (cena celu spada z zapasem). Koszt `Order` w linii "Koszt 171-174" (MaterialOrders.Order).
+- Miasto nie bywa naraz zrodlem i zamawiajacym tego samego surowca (`SourceKeep`).
+- Brak pamieci drog Naval w grze - wyjatek zlapany, `Log.Error` raz ("Order(pamiec drog Naval)"), morze nieczynne.
+- Karawany rodu gracza: BK nie ma dla nich osobnej logiki ani rozkazow gracza (`BKCaravansBehavior.AddDialogs` pusty) - prowadzi je AI jak karawany AI.
+- Nowe klucze MCM: Jeff ich nie ma w `Armoury.json` - dzialaja wartosci domyslne.
+- Kod tylko zbudowany (kod 0) - NIE uruchomiony w grze.
+
+**Status:** NIEWGRANE - DO SPRAWDZENIA (P2: miast bez rudy sr. d31-40 <= 25; kontrakty morskie > 0 i "z jukow" > 0; "rozkaz odrzucony" 0; "audyt ilosci: rozjazdy 0"; brak `Log.Error` "pamiec drog Naval").
+
+## 2026-10-09 (174b.1) - KONTRAKT SUROWCA TRZYMA CEL: karawana z kontraktem spi w nocnym obozie jak kazda (sen to nie "cudzy cel"), cel pilnowany co godzine zaraz po obozie, BK Shipping nie prowadzi jej "hop-by-hop", po wczytaniu kontrakty wracaja przed decyzja BK, swit nie oddaje celu utraconego kontraktu
+**Mod:** Armoury | **Pliki:** `MaterialOrders.cs` (NOWE `Hourly`, `RouteHopPrefix`, `ShipForget`; `Keep` tylko 30 dob i wylacznik; `HourlyPrefix` tylko blokada BK; `ReleasePrefix`; `ResolvePending` czeka na gotowe przedmioty; linia i wpiecie), `NightRest.cs` (NOWE `ForgetOrder`), `ArmouryBehavior.cs` (wywolanie w takcie godzinowym). Bez nowych ustawien, format zapisu `arm_matorders` bez zmian.
+
+**Co zobaczysz w grze (prosto):** karawana wiozaca rude na zamowienie miasta staje na noc jak kazda i rano jedzie dalej do tego samego miasta - nie traci zlecenia po trzeciej nocy w drodze. Po bitwie rusza w ciagu godziny, a nie po dobie.
+
+**Problem:** test sklad6: ze 132 zwolnionych kontraktow 113 to "cel zmieniany przez innych", dojechalo 164 z 296 zakonczonych (55%); "cel przywrocony" 340 w 40 dob (zapis 362: 1 w 8 dob). Diagnoza A (`a174b/kontrakty.md`).
+
+**Przyczyna:** (1) nasz nocny oboz: `NightRest.AiNightCamp` stawia karawane na Hold (cel = brak), a doba gry w nowej kampanii wypadala miedzy taktem 5:00 a switem - `Keep` widzial cel != Dest, liczyl "cel przywrocony", a trzeciej nocy zwalnial kontrakt; blad sesyjny (godzina doby zalezy od chwili utworzenia/wczytania kampanii). (2) nasz prefiks BK `HourlyTickParty` siedzi za dlawikiem BKROT (Harmony 2.4.2 pomija kolejne prefiksy po `false`) - biegl raz na dobe; postoj po bitwie trwal do 24 h. (3) BK Shipping `RouteCaravanHopByHop` (po wjezdzie do obcego portu i ze starego stanu `hopByHopState`) zmienial cel karawany z kontraktem.
+
+**Zmiana:**
+- `MaterialOrders.Hourly()` w delegacie godzinowym ZARAZ PO `NightRest.OnHourly()` (stan obozu tej godziny juz ustawiony): karawany nie ma - przepada; bitwa - nic; rozwiazywana - zwolnienie; cel oblegany/wrogi - zwolnienie; stoi w celu - dostawa; **spi w obozie (`NightRest.IsCamping`) - nic** (licznik "godzin kontraktow w nocnym obozie"); w obleganym miescie - nic; **cel = brak albo Hold - wyjazd z osady i rozkaz BEZ licznika zmian celu** ("ruszona z postoju"); po 6 kolejnych godzinach postoju (krytyka 15) - zwolnienie "postoj wymuszany" z jedna linia z nazwa karawany; **cel = inne miasto - jak dotad** (po 2 przywroceniach "cel zmieniany przez innych", przyklady "karawana -> miasto zamiast celu (w osadzie / na morzu / w polu)").
+- `Keep` (doba): tylko limit 30 dob i wylacznik. `HourlyPrefix`: tylko blokada decyzji BK (cel utracony - zwolnienie, BK rusza w tej samej godzinie).
+- `ReleasePrefix` (BK `ReleaseCaravanFromHold`): **najpierw kontrakty z zapisu** (krytyka 2 - BK wola to w `OnGameLoaded`, PRZED `OnSessionLaunched`, gdy `_byCar` byl jeszcze pusty i BK dawal wlasny cel karawanom zapisanym w obozie albo po bitwie); spiaca w obozie - nic (swit odda cel); licznik wedlug reguly `Hourly` (krytyka 9: Hold/brak = "ruszona z postoju", inne miasto = "cel przywrocony").
+- **BK Shipping** (krytyka 3): prefiks na `BKShippingBehavior.RouteCaravanHopByHop` - dla KAZDEJ karawany z kontraktem `false` bez zmiany celu i od razu `InvalidateRedirectCache` na instancji, ktora wola (stary stan nie wraca przez `AdvanceHopByHopWaypoints`); licznik "BK Shipping zablokowany". W `Place` po wyjezdzie `InvalidateRedirectCache` na instancji brane przy kazdym wywolaniu (`Campaign.Current.GetCampaignBehavior<T>` przez `MakeGenericMethod` raz) - krytyka 1: zapamietana instancja trzymalaby po wczytaniu innego zapisu cala poprzednia kampanie.
+- `NightRest.ForgetOrder` przy kazdym zwolnieniu i zniszczeniu kontraktu (krytyka 6): swit nie kieruje karawany do obleganego albo wrogiego celu; budzi sie bez rozkazu i decyduje AI/BK.
+- `ResolvePending` nie gubi napisu, gdy przedmioty nie sa jeszcze gotowe (wczesne wywolanie z prefiksu BK).
+- Linia "Kontrakty surowca (174)": dopisek "174b.1: godzin kontraktow w nocnym obozie N, BK Shipping zablokowany N, zwolnione: postoj wymuszany N, inny cel [przyklady]"; linia startowa: "BK Shipping RouteCaravanHopByHop wpiety / BRAK, InvalidateRedirectCache znaleziony / BRAK".
+
+**Ryzyko / co sprawdzic (kontrola calosci):**
+- Kolejnosc w godzinie stala (oboz -> kontrakty), jedna regula snu. `HoldSleepers` nie walczy z nami (spiacych nie ruszamy). Alarm nocny oddaje cel od reki - karawana nie jest juz "w obozie", takt kontraktu widzi cel = Dest. Kontrakt zawarty w godzinach obozu: wyjazd + rozkaz, przy nastepnym takcie oboz zapamietuje cel Dest.
+- `IsCamping` z warunkami wylacznikow i godziny (krytyka 5) - wpis `_orders`, ktorego nikt nie wyczyscil (oboz wylaczony w MCM w nocy, martwy bohater gracza), nie udaje snu w dzien.
+- Prefiks BK Shipping dziala tylko dla karawan z kontraktem; jedyni wolajacy `RouteCaravanHopByHop` to `AfterSettlementEntered_Caravan` (BK loguje wtedy "leaving target unchanged") i `AdvanceHopByHopWaypoints` (wynik ignoruje). Ratunku BK (cel oblegany/wrogi, konwoj na mieliznie) nie ruszamy - `DestLost` zwalnia kontrakt w tej samej godzinie.
+- Koszt `Hourly`: <= 50 kontraktow x 24 h odczytow pol - ponizej 1 ms/d (pozycja "MaterialOrders.Hourly" w "Koszt 171-174").
+- Kod tylko zbudowany (kod 0) - NIE uruchomiony w grze.
+
+**Status:** NIEWGRANE - DO SPRAWDZENIA (P4: dojechalo >= 80% zakonczonych, "cel zmieniany przez innych" <= 5%; po wczytaniu zapisu 362 "cel przywrocony" ok. 0; P12: linia startowa z "RouteCaravanHopByHop wpiety", "InvalidateRedirectCache znaleziony", bez "BRAK").
+
+## 2026-10-09 (174b.5) - TEMPO: MNIEJ LICZENIA CEN, TEN SAM WYNIK - pamiec polki (indeks koszykow typ x tier na kazda polke, wazny do zmiany polki), ceny zapamietane do najblizszego zakupu w zakupach AI i notabli, ceny surowca w jednym cyklu warsztatu, ramka ksiegi po tanich filtrach; nowa linia "Koszt 171-174 (doba)" z progiem 1% doby
+**Mod:** Armoury | **Pliki:** NOWY `ShelfIndex.cs` (F1), NOWY `Cost174.cs` (F6), `SupplyDemand.cs` (`Stock`, `Substitution`, klucz zamowienia bez sklejania napisu, `TradeScreenOpen` zapamietany dla tej samej referencji ekranu, pomiar ceny), `AiGear.cs` (F2, F5, pomiar), `VolunteerKit.cs` (F3, pomiar), `WorkshopLaw.cs` (F4, pomiar), pomiar w `TownFletchers.cs`, `CaravanAmmo.cs`, `GarrisonArmory.cs`, `MaterialOrders.cs`; `ArmouryBehavior.cs` (linia na poczatku doby, Reset); `Settings.cs` + `McmSettings.cs` (NOWE `ShelfIndexEnabled` = true, `ShelfIndexSelfCheckDays` = 1; gen_mcm: 761 ustawien), `tools/gen_mcm.py` (zakresy suwakow 174b).
+
+**Co zobaczysz w grze (prosto):** nic sie nie zmienia w cenach ani w tym, co kto kupuje - gra ma mniej liczenia przy kazdej cenie broni i zbroi w miescie. Test ma pokazac, ze doba nie jest wolniejsza niz w wersji, ktora masz w grze.
+
+**Problem:** test sklad6 (diagnoza D `a174b/tempo.md`): nowa kampania 14.21 s/dobe wobec 13.03 wersji w grze (Z1b), d31-39 17.11 wobec 15.22, zapis 362 28.0 (mediana 27) wobec 22.1 (mediana 22) przy tym samym swiecie - regres to kod 171-174. Zasada Jeffa: paczka nie moze sama spowalniac gry.
+
+**Przyczyna:** kazda cena sprzetu w osadzie (`SupplyDemand.PricePostfix` -> `Factor`) przechodzila CALA polke w `Stock` i drugi raz w `Substitution`, sklejala napis klucza zamowienia i dwa razy pytala o ekran; na zapisie Jeffa ok. 300 stosow na miasto. Petle 171-174 mnoza liczbe cen: `AiGear.BuySubstitutes` (przejscie polki z wycena przy kazdej wizycie, takze gdy i tak nic nie kupi), `BuyLoop` (te same stosy wyceniane przy koszyku t i t-1), `VolunteerKit.BuyCore` (cena stosu przy kazdej potrzebie), `WorkshopLaw.TryStart` (4 ceny surowca, takze dla surowca, ktorego sztuka nie potrzebuje).
+
+**Zmiana (zadna nie zmienia liczby, ceny ani wyboru kupowanej sztuki):**
+- **F1 pamiec polki** (`ShelfIndex`, wylacznik `ShelfIndexEnabled`): na kazdy `ItemRoster` (ConditionalWeakTable) indeks sztuk wedlug koszyka typ x tier (wszystkie i bez unikatow - dla rezerwy 174b.4); waznosc (VersionNo, Count) - w grze 1.4.8 kazda zmiana rosteru idzie przez `AddToCounts`/`AddNewElement`/`Clear` -> `UpdateVersion` (`ItemRoster.cs:181, :218, :282`). Przebudowa do nowego obiektu i podmiana referencji w uchwycie (net472 nie ma `AddOrUpdate`); VersionNo i Count czytane PRZED budowa (krytyka 11a). `Stock` (zywa polka) i `Substitution` ("jest sztuka tieru t+1") czytaja koszyk; zamrozona polka ekranu handlu i korekta wyceny zamowienia `_heldShelf` bez zmian. Klucz zamowienia (ten sam napis "osada|typ|tier") budowany raz na osade i koszyk; `_unmet` i format `arm_unmet` bez zmian. `TradeScreenOpen` zapamietany tylko dla tej samej referencji `ScreenManager.TopScreen` (krytyka 11c - ekran otwarty w srodku klatki zmienia referencje, migawka `_frozen` powstaje jak dotad).
+- **Samokontrola probkowana** (krytyka 4): w pierwszych `ShelfIndexSelfCheckDays` (1) dobach sesji co 64. odczyt, potem co 4096., liczony tez pelnym przejsciem polki; rozjazd -> wynik z przejscia, przebudowa, jedna linia "Pamiec polki (174b.5): ROZJAZD" i licznik w linii kosztu. Koszt samokontroli ok. 1/64 dawnego liczenia - nie zmienia werdyktu tempa.
+- **F2 `AiGear`**: `BuySubstitutes` wychodzi przed przejsciem polki, gdy druga petla i tak nic nie kupi (ten sam warunek koszyka z brakiem; limit sztuk i budzetu); cena kandydata z pierwszego przejscia wazna do pierwszego zakupu, potem jak dotad. `BuyLoop`: cena stosu zapamietana do najblizszego zakupu (zakup zmienia polke i kolejnosc stosow - pamiec od nowa). Kolejnosc kandydatow i niestabilny `Sort` nietkniete.
+- **F3 `VolunteerKit.BuyCore`**: cena stosu raz na wywolanie w petli potrzeb; w petli dodatkow pamiec kasowana po kazdym zakupie i po kazdym zamowieniu (`NoteUnmetOnce` zmienia popyt, wiec cene).
+- **F4 `WorkshopLaw.TryStart`**: koszt surowcow tylko dla `need[m] > 0` (0 x skonczona cena = 0); `MatPrice` i `Available` z pamieci jednego cyklu (`CyclePrefix`) wedlug polki, VersionNo i Count, miejsce wedlug PRZEDMIOTU (krytyka 11b: m = 3 to len albo welna).
+- **F5 `AiGear.TryBuy`**: ramka ksiegi towarow dopiero po tanich filtrach (te same wczesne wyjscia co `TryBuyCore` az do stempla doby) - ramka bez `AddToCounts` rozlicza sie na zero, ksiega ta sama.
+- **F6 linia "Koszt 171-174 (doba)"** (`Cost174`, na poczatku `OnDailyTick`, za dobe od poprzedniego taktu): `Stopwatch.GetTimestamp()` co 16. wywolanie x (wywolan / probek), bez `Thread.Suspend`. Suma "nasze 171-174b" (rozlaczne: BuySubstitutes, zamowienia zamkow, VolunteerKit.BuyCore, WorkshopLaw.CyclePrefix, TownFletchers.Work, CaravanAmmo, MaterialOrders, GarrisonArmory) wobec czasu doby z zegara i % doby - prog P13 <= 1% (krytyka 17); osobno (zagniezdzone albo starsze niz 171): TryBuyCore, BuyLoop lorda, TryStart, rezerwa kramu (174b.4), ceny sprzetu (PricePostfix, z liczba cen w osadach); stan pamieci polki.
+
+**Ryzyko / co sprawdzic (kontrola calosci):**
+- F1: zmiana rosteru przez refleksje innego moda bez `UpdateVersion` - lapie ja klucz Count tylko przy zmianie liczby stosow; po to samokontrola (P9: 0 rozjazdow). Indeks w CWT znika z polka; `Reset` w konstruktorze `ArmouryBehavior` daje nowa tablice (kampanie sie nie mieszaja). `ArmsPricing.IsUnique` przy budowie (slownik) - wycena biegnie w watku gry, jak dotad (`_frozen`, `_loggedHour` i pamiec `IsUnique` tez nie sa wielowatkowe).
+- F2-F4: pamiec tylko do najblizszej zmiany polki, zakupu albo zamowienia - to samo wejscie, ten sam wynik. Ceny gry i modow zaleza od polki (kategoria targu przelicza sie przy kazdej zmianie rosteru), nie od zlota kupca.
+- Liczniki "ksiegi skupu" (`SellByCondition.Seen` przy kazdej cenie) i liczba ramek ksiegi towarow spadna razem z liczba cen - to tylko log.
+- Wylacznik `ShelfIndexEnabled` = false przywraca petle po polce (wynik ten sam). Nowe klucze MCM: Jeff ich nie ma w `Armoury.json` - dzialaja wartosci domyslne.
+- Kod tylko zbudowany (kod 0) - NIE uruchomiony w grze.
+
+**Status:** NIEWGRANE - DO SPRAWDZENIA (P7/P8 tempo parami z Z1b, mediany - `tools/p174b_doby.py`; P9 "rozjazdow od startu sesji 0" i brak linii "ROZJAZD"; P13 "nasze 171-174b" <= 1% doby).
+
+## 2026-10-09 (174b.6) - ZLOM ZE STAREGO NADMIARU PAMIETA ROZGRZEWKE W ZAPISIE: doby pomiaru, ostatnia doba, srednie zakupow koszykow, ulamki skupu i ulamki rudy ze zlomu w kluczu "arm_scrap" (z probnym odczytem przy kazdym zapisie)
+**Mod:** Armoury | **Pliki:** `ArmsScrap.cs` (Export / Import / ImportFailed / ResolvePending, rejestr kluczy, parser), `ArmouryBehavior.cs` (SyncData `arm_scrap`, OnSessionLaunched). Bez nowych ustawien.
+
+**Co zobaczysz w grze (prosto):** skup starego nadmiaru na zlom (decyzja Jeffa 09.10) liczy swoje 30 dni rozgrzewki w zapisie gry - w Twojej kampanii ruszy po 30 dniach gry raz, a nie dopiero po 30 dniach bez wczytywania. Ulamki rudy ze zlomu nie przepadaja przy wczytaniu.
+
+**Problem:** test sklad6 - na zapisie 362 po 8 dobach "rozgrzewka 8/30": licznik `_days`, srednie zakupow (`_ema`), dzisiejsze zakupy, ulamki skupu i rudy (`_oreAcc`) zyly tylko w sesji (`ArmsScrap.cs:28-32`). Krytyka 174b (uwaga 10): `_lastDay` tez nie szedl do zapisu, a gra po wczytaniu przesuwa faze doby (`Campaign.CreateCampaignEvents`: pierwsze odczekanie z reszty) - pierwsza doba po wczytaniu moze miec ten sam numer co ostatnia przed zapisem i `Daily` liczyl ja drugi raz (dzien pomiaru + 1% skupu).
+
+**Zmiana:**
+- Klucz `arm_scrap` przez `SaveText.Sync` (kawalki po 8 000 znakow), wlasny `try` w `SyncData`, `Export` tylko przy zapisie. Format `1|doby|ostatnia doba~osada:koszyk=srednia,dzis,ulamek;...~miasto=ruda;...`, liczby 4 cyfry znaczace, pary z srednia < 0.001 i bez zakupow dzis pomijane (<= 0.36 sztuki roku popytu), tylko miasta (zamki nie maja skupu).
+- Klucze wedlug StringId osady + koszyk (rejestr klucz sesji -> osada, koszyk w `NoteBuy`), po wczytaniu przeliczone na klucze sesji (`MBGUID.InternalValue` zyje tylko w sesji). Rozwiazanie w `OnSessionLaunched` obok `MaterialOrders.ResolvePending`, a gdyby doba albo zapis przyszly wczesniej - na ich poczatku (krytyka 10: `Export` rozwiazuje nierozwiazany napis jak `MaterialOrders.Export`).
+- `_lastDay` w zapisie - po wczytaniu ta sama doba nie liczy sie drugi raz.
+- Probny odczyt przy kazdym zapisie (krytyka 25): napis -> ten sam parser co przy wczytaniu -> porownanie liczby par, rudy, dob i sumy srednich i rudy; linia "Zlom z nadmiaru (zapis 174b): zapisano N par z M miast ... probny odczyt zgodny / ROZJAZD". Po wczytaniu: "odtworzono N par z M miast ... rozgrzewka X/30"; brak klucza: "brak klucza w zapisie (zapis sprzed 174b) - rozgrzewka od zera"; zly napis: "klucz zapisu nieczytelny - rozgrzewka od zera" + `Log.Error` raz.
+
+**Ryzyko / co sprawdzic (kontrola calosci):**
+- Rozmiar: realnie kilka tysiecy par x ok. 25 znakow = do ok. 150 KB - `SaveText.Sync` dzieli na kawalki ponizej limitu 32 KB na napis (paczka 161). Koszt tylko przy zapisie i wczytaniu (+ probny odczyt przy zapisie).
+- Osada, ktorej po wczytaniu nie ma (inny zestaw modow) - para pominieta i policzona w linii.
+- `Reset` w konstruktorze `ArmouryBehavior` (przed `SyncData`) czysci tez rejestr kluczy i napis odlozony - stan jednej kampanii nie przecieka do drugiej.
+- U Jeffa: po wgraniu 174b rozgrzewka 30 dni gry raz (stary zapis nie ma pomiaru), potem skup dziala po kazdym wczytaniu.
+- Kod tylko zbudowany (kod 0) - NIE uruchomiony w grze.
+
+**Status:** NIEWGRANE - DO SPRAWDZENIA (P10: przy kazdym autozapisie "probny odczyt zgodny"; zapis 362 - "brak klucza w zapisie - rozgrzewka od zera", bez bledow; nowa kampania z zapisem i wczytaniem - "odtworzono N par", bez "rozgrzewka 1/30").
+
+## 2026-10-09 (174b.0) - POMIARY DOWOZU I RYNKU ZBROI: nazwy miast bez rudy i strzal, zrodla rudy z konwojami w porcie, zbroja na polkach w pasmach z "nowa sztuka w 7 dob", zakupy AI wedlug kupujacego, "razem" pokrycia wazone liczba ludzi (sam log)
+**Mod:** Armoury | **Pliki:** NOWY `Measure174b.cs` (M1, M2, M3), NOWY `ShopReserve.cs` (zaslepka - rezerwa kramu w 174b.4), `MaterialOrders.cs` (linia nazw co 5 dob, liczniki), `NightRest.cs` (`IsCamping`), `ArmsDrill.cs` ("razem" w linii pokrycia), liczniki w `AiGear.cs`, `VolunteerKit.cs`, `MenPurse.cs`, `SupplyDemand.cs`, `WorkshopLaw.cs`, `GarrisonArmory.cs`, `GarrisonCarts.cs`, `ArmouryBehavior.cs` (wywolanie i Reset). Bez nowych ustawien, bez kluczy zapisu, bez zmiany rozgrywki.
+
+**Co zobaczysz w grze (prosto):** nic - to tylko nowe linie w logu, zeby nastepny test pokazal po nazwach, ktore miasta nie maja rudy i strzal, skad ruda moglaby przyplynac i kto wykupuje zbroje.
+
+**Problem:** test sklad6 (`kopia-sklad6/ANALIZA.md`): log podaje tylko liczby miast bez rudy (36) i bez strzal (31), bez nazw; polki zbroi tylko jako sume; zakupy AI bez podzialu na kupujacych; prog "cokolwiek na tulowiu razem" liczony recznie. Projekt 174b (`docs/PROJEKT-174B-DOWOZ-2026-10-09.md` rozdz. 3.0 i "Krytyka i odpowiedzi" uwagi 14, 16, 18, 19) potrzebuje tych miar do progow P2-P6.
+
+**Zmiana (tylko log):**
+- "Miasta bez rudy i strzal (174b)" - pierwsza doba sesji i co 5 dob: nazwy miast bez rudy, bez strzal, czesc wspolna (sprawdza zalozenie diagnozy B, ze to te same miasta), liczba bez beltow, 10 miast z najwiecej cyklami "brak rudy" (warsztaty i strzelarze) od ostatniej linii, 10 z najwiekszym zapasem rudy, zrodla rudy z nadwyzka: zapas/nadwyzka, ruda wywieziona kontraktami od ostatniej linii, konwoje (karawany ze statkami) stojace w porcie.
+- "Zbroja na polkach (174b)" codziennie: tulow, glowa, nogi, rece w pasmach t1-2 / t3-4 / t5-6 na polkach miast (bez unikatow) - sztuk, miast z >= 1 sztuka i miast, do ktorych w 7 dobach trafila NOWA sztuka pasma (wyrob warsztatu, dostawa kupcow DailyTrade, odsprzedaz z sakiewek, nadwyzka albo zawrocony towar zalogi, kazdy przyrost polki pasma miedzy spisami - np. lup sprzedany przez gre); nowe sztuki wedlug zrodla.
+- "ZakupyAI wedlug kupujacego (174b)" codziennie: sztuki i zloto wedlug kupujacego (lordowie, zalogi miast, zalogi zamkow z wlasnej polki, zamowienia zamkow w miescie, notable dla ochotnikow, ludzie gracza) x grupa (korpus, helm, reszta zbroi, tarcza, bron biala, bron strzelecka, amunicja, konie i rzedy, inne) oraz nadwyzki sprzedane z sakiewek ludzi wedlug grup (M3).
+- "Pokrycie zbrojowni AI (171)": dopisek "razem (partie i zalogi wazone liczba ludzi): cokolwiek na tulowiu X%, korpus szczebla Y%" (wzor progu P6).
+- "Kontrakty surowca (174)": "w obozie przy przegladzie doby N" - ile razy przeglad doby zastal karawane z kontraktem w nocnym obozie (`NightRest.IsCamping`: wpis rozkazu przed snem + wlaczony oboz + godzina obozu - krytyka 174b uwaga 5).
+
+**Ryzyko / co sprawdzic (kontrola calosci):**
+- Same liczniki i odczyty; jedyny nowy koszt: spis M1 raz na dobe (97 miast, ok. 300 stosow) i linia nazw co 5 dob - kilka ms na dobe.
+- Liczniki M2 biegna miedzy taktami doby gry (`DailyTickEvent`), linia gry "ZakupyAI: dzien" zamyka sie przy pierwszym zakupie nastepnej doby - roznica kilku godzin gry, sumy wielodniowe te same.
+- "Nowa sztuka w 7 dob" startuje od zera w kazdej sesji (stan tylko w pamieci) - na zapisie 362 prog P5 dopiero od 8. doby.
+- `ShopReserve` to zaslepka (0 = rezerwa wylaczona) do 174b.4.
+- Kod tylko zbudowany (kod 0) - NIE uruchomiony w grze.
+
+**Status:** NIEWGRANE - DO SPRAWDZENIA (linie "Miasta bez rudy i strzal (174b)", "Zbroja na polkach (174b)", "ZakupyAI wedlug kupujacego (174b)", "razem" w "Pokrycie zbrojowni AI (171)"; 0 potkniec Measure174b).
+
 ## 2026-10-09 (Z1b, poprawka do Z1) - DONE BEZ PYTANIA "YOU ARE DISCARDING ITEMS" TAM, GDZIE DONE NICZEGO NIE WYRZUCA: Spoils "War stockpile" i "Inspect trophies" zamykaja sie bez okna; na ekranach, gdzie rzeczy po lewej naprawde odchodza (takze tabor wroga "Take supplies"), okno zostaje
 **Mod:** Armoury | **Pliki:** `SpoilsSeal.cs` (NOWA sekcja 13: transpiler na `SPInventoryVM.HandleDone`, bramka `DiscardAskCount`, rozpoznanie ekranu `KeptLeftScreen`; NOWY wspolny `LoadScreens` - sekcja 12 korzysta z niego bez zmiany dzialania), `DonationXpLaw.cs` (sam komentarz), `Settings.cs` + `McmSettings.cs` (sam opis `DonationXpOff`, gen_mcm: 706 ustawien). Bez nowych ustawien, bez kluczy zapisu, bez stanu.
 
