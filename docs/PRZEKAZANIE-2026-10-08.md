@@ -250,3 +250,4 @@ KOLEJKA:
 6. Raport poranny dla Jeffa (docs/RAPORT-NOCNY-2026-10-10.md): co wgrane, testy, odpowiedzi audytow, pytania.
 - 00:35 **AUTOTEST 171+172+172b OK** (Armoury 60b186e3, w-toku/172b-karawany 332d866; kopia SCRATCH kopia172b\): karawany w taborach 0 strzal / 0 beltow (bylo 4 157 / 1 764),
   miast bez strzal 24/97 (bylo 48), awanse lucznikow cofniete 0, 0 bledow, 12.6 s/dobe. Wgranie 171+172+172b czeka na 174 (rynek zbroi w nowej kampanii).
+- 01:00 male paczki gotowe: D1 9ed1ca1, I1 6a90ffd, F1 9fa2553 (Armoury, od sklad4), E1 5b4e551 (CrashScribe, od n12); scalanie D1+I1+F1 -> noc/sklad5 (agent).
