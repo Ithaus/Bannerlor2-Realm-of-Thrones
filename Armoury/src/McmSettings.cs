@@ -2916,9 +2916,9 @@ namespace Armoury
         [SettingPropertyGroup("Arms production")]
         public bool BkSuppliesNoArms { get; set; } = true;
 
-        [SettingPropertyBool("Bk Supplies No Arms Player", HintText = "the same for your own party: weapons, shields and arrows wear out by Armoury's rules only, not also by Banner Kings supplies (off until you decide - question 5 of package 174)")]
+        [SettingPropertyBool("Bk Supplies No Arms Player", HintText = "the same for your own party: weapons, shields and arrows wear out by Armoury's rules only, not also by Banner Kings supplies")]
         [SettingPropertyGroup("Arms production")]
-        public bool BkSuppliesNoArmsPlayer { get; set; } = false;
+        public bool BkSuppliesNoArmsPlayer { get; set; } = true;
 
         [SettingPropertyBool("Workshop State In Save", HintText = "work in progress at town workshops (pieces begun, raw material already bought, unmet orders) is kept in the save, so a long piece of armour survives saving and loading")]
         [SettingPropertyGroup("Arms production")]
@@ -3020,13 +3020,13 @@ namespace Armoury
         [SettingPropertyGroup("Arms production")]
         public bool AiAnyMeleeWhenShort { get; set; } = true;
 
-        [SettingPropertyBool("Ai Worse Body Armour When Short", HintText = "an AI soldier with no body armour of his grade, in a party short of body armour of any kind, buys a padded coat of his tier or lower, or armour two tiers lower (protection only, not for drill or promotion) - off until the test shows fewer than 75% of AI soldiers with anything on the body")]
+        [SettingPropertyBool("Ai Worse Body Armour When Short", HintText = "an AI soldier with no body armour of his grade, in a party short of body armour of any kind, buys a padded coat of his tier or lower, or armour two tiers lower (protection only, not for drill or promotion)")]
         [SettingPropertyGroup("Arms production")]
-        public bool AiWorseBodyArmourWhenShort { get; set; } = false;
+        public bool AiWorseBodyArmourWhenShort { get; set; } = true;
 
-        [SettingPropertyBool("Old Stock To Scrap", HintText = "the town smiths slowly buy up for scrap the old arms and armour lying on their stalls beyond a year of what lords, garrisons and notables buy there - worst pieces first - and smelt their metal back into ore for their forges (off until you decide - question 4 of package 174: the old surplus of free kits stays on the stalls)")]
+        [SettingPropertyBool("Old Stock To Scrap", HintText = "the town smiths slowly buy up for scrap the old arms and armour lying on their stalls beyond a year of what lords, garrisons and notables buy there - worst pieces first - and smelt their metal back into ore for their forges")]
         [SettingPropertyGroup("Arms production")]
-        public bool OldStockToScrap { get; set; } = false;
+        public bool OldStockToScrap { get; set; } = true;
 
         [SettingPropertyFloatingInteger("Old Stock Scrap Daily Share", 0.000f, 0.100f, "0.000", HintText = "share of that old surplus scrapped each day (1%)")]
         [SettingPropertyGroup("Arms production")]
