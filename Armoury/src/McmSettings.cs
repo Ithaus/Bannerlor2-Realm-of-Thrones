@@ -2824,9 +2824,9 @@ namespace Armoury
         [SettingPropertyGroup("Armies of the realms (175)")]
         public int NorthHomeEdgePercent { get; set; } = 10;
 
-        [SettingPropertyInteger("North Hardy Skill Bonus", 0, 50, "0", HintText = "Northern infantry of tier 3 to 6 (village, noble and house lines, 43 troop types) gets this many points of its main weapon skill and of Athletics on top of what its own gear demands - the men of the North are built sterner. 0 = off. Applied by CrashScribe, takes effect on the next load")]
+        [SettingPropertyInteger("North Hardy Skill Bonus", 0, 50, "0", HintText = "Northern infantry of tier 3 to 6 (village, noble and house lines, 43 troop types) gets this many points of its main weapon skill and of Athletics on top of what its own gear demands - the men of the North are built sterner. 15 makes them about a fifth (+20%) better than the infantry of tier 3 and up of the rest of the world, 25 about +28%, 50 about +48% (with 0 the North is about +7% better after the tier gear fix alone). Capped one point below the next tier's requirement, and only while Army 175 Tier Gear is at work. 0 = off. Applied by CrashScribe, takes effect on the next load")]
         [SettingPropertyGroup("Armies of the realms (175)")]
-        public int NorthHardySkillBonus { get; set; } = 25;
+        public int NorthHardySkillBonus { get; set; } = 15;
 
         [SettingPropertyBool("Army175 Tier Gear", HintText = "every soldier type - all cultures, village and noble lines, house troops, militia, mercenaries and garrisons, never lords, companions or you - carries and wears in its pattern only weapons, shields, ammunition and armour up to its own tier: a piece above it is replaced by the same kind of piece of that tier. A man still uses only the gear his skills allow. Applied by CrashScribe, takes effect on the next load; from then on the Armoury also keeps the battle pattern of your fights within the soldier's tier")]
         [SettingPropertyGroup("Armies of the realms (175)")]
@@ -2836,11 +2836,15 @@ namespace Armoury
         [SettingPropertyGroup("Armies of the realms (175)")]
         public bool Army175LoreArmor { get; set; } = true;
 
-        [SettingPropertyBool("Army175 Lore Armor Extra", HintText = "proposal, not yet decided: heavier Qohor infantry of tier 4 and 5 and a lighter Dornish spear line of tier 3 and 4, within their tier. Applied by CrashScribe, takes effect on the next load")]
+        [SettingPropertyBool("Army175 Lore Armor Extra", HintText = "Qohor, the city of armourers, gives its infantry of tier 4 and 5 the heaviest body armour of their tier, while the Dornish footmen, spearmen and guards of tier 3 and 4 wear body armour one step lighter, within their tier. Applied by CrashScribe, takes effect on the next load")]
         [SettingPropertyGroup("Armies of the realms (175)")]
-        public bool Army175LoreArmorExtra { get; set; } = false;
+        public bool Army175LoreArmorExtra { get; set; } = true;
 
-        [SettingPropertyBool("Army175 Composition", HintText = "master switch for the troop mix of the realms below (Dothraki, Iron Islands, the North and the proposals): party templates and upgrade trees as the books have them. Applied by CrashScribe, takes effect on the next load")]
+        [SettingPropertyBool("Army175 Simple Javelins", HintText = "the simplest javelin of the game - the Pine Javelin, a wrought iron head on a pine shaft and the cheapest of them all - counts as tier 2 gear instead of tier 4: it needs only 35 Throwing and is priced as tier 2, so javelin men of tier 2 and 3 (Dornish, Braavosi, Sarnori, sellswords, Ironborn, Northern woodsmen and others) carry javelins in their pattern instead of throwing axes. Works only together with Army 175 Tier Gear. Applied by CrashScribe, takes effect on the next load")]
+        [SettingPropertyGroup("Armies of the realms (175)")]
+        public bool Army175SimpleJavelins { get; set; } = true;
+
+        [SettingPropertyBool("Army175 Composition", HintText = "master switch for the troop mix of the realms below (Dothraki, Iron Islands, the North, Volantis and Norvos, the Free Folk and Dragonstone): party templates and upgrade trees as the books have them. Applied by CrashScribe, takes effect on the next load")]
         [SettingPropertyGroup("Armies of the realms (175)")]
         public bool Army175Composition { get; set; } = true;
 
@@ -2864,13 +2868,13 @@ namespace Armoury
         [SettingPropertyGroup("Armies of the realms (175)")]
         public bool Army175NorthFoot { get; set; } = true;
 
-        [SettingPropertyBool("Army175 Volantis Norvos", HintText = "proposal, not yet decided: Volantis (the tiger cloaks are foot) and Norvos field more infantry and fewer archers and riders; the Volantene elephants stay either way. Applied by CrashScribe, takes effect on the next load")]
+        [SettingPropertyBool("Army175 Volantis Norvos", HintText = "Volantis (the tiger cloaks are foot) and Norvos field more infantry and fewer archers and riders, as in the books; the Volantene elephants stay either way. Applied by CrashScribe, takes effect on the next load")]
         [SettingPropertyGroup("Armies of the realms (175)")]
-        public bool Army175VolantisNorvos { get; set; } = false;
+        public bool Army175VolantisNorvos { get; set; } = true;
 
-        [SettingPropertyBool("Army175 Minor Lore", HintText = "proposal, not yet decided: the Free Folk with fewer horsemen, and Dragonstone, Velaryon and Celtigar with horse at about a tenth of their men. Applied by CrashScribe, takes effect on the next load")]
+        [SettingPropertyBool("Army175 Minor Lore", HintText = "the Free Folk with fewer horsemen, and Dragonstone, Velaryon and Celtigar with horse at about a tenth of their men. Applied by CrashScribe, takes effect on the next load")]
         [SettingPropertyGroup("Armies of the realms (175)")]
-        public bool Army175MinorLore { get; set; } = false;
+        public bool Army175MinorLore { get; set; } = true;
 
         [SettingPropertyBool("Army175 Golden Bows", HintText = "waits for the armoury restocking package: Golden Company crossbowmen split into thirds - crossbows, recurve bows and yew longbows - and in battle each man takes the missile weapon of his drawn kit. The kits are made by CrashScribe on the next load; the Armoury part (the drawn kit decides, only for the three Golden Company crossbow troops) acts at once")]
         [SettingPropertyGroup("Armies of the realms (175)")]
@@ -3605,6 +3609,7 @@ namespace Armoury
             s.Army175TierGear = Army175TierGear;
             s.Army175LoreArmor = Army175LoreArmor;
             s.Army175LoreArmorExtra = Army175LoreArmorExtra;
+            s.Army175SimpleJavelins = Army175SimpleJavelins;
             s.Army175Composition = Army175Composition;
             s.Army175DothrakiRide = Army175DothrakiRide;
             s.Army175DothrakiHorseGuard = Army175DothrakiHorseGuard;

@@ -77,7 +77,7 @@ namespace Armoury
         /// <summary>
         /// Zbior 43 (regula z projektu 3.2). PRZEGLAD 175: DOKLADNIE ta sama regula co CS Army175.NorthSet (dotad Armoury mialo na
         /// sztywno korzenie battanian_volunteer / battanian_highborn_youth i nie wykluczalo drzew milicji - dzis oba daja 43, ale po
-        /// zmianie danych ROT +25 (CS) i +10% (tu) moglyby objac rozne jednostki): drzewa Culture.BasicTroop i EliteBasicTroop kultury
+        /// zmianie danych ROT NorthHardy (CS) i +10% (tu) moglyby objac rozne jednostki): drzewa Culture.BasicTroop i EliteBasicTroop kultury
         /// battania + 9 szablonow Polnocy, bez drzew milicji (Melee/Ranged(Elite)MilitiaTroop) i bohaterow, kultura battania,
         /// default_group Infantry, tier 3-6. Liczba inna niz 43 - OSTRZEZENIE w logu (tu i w KingdomBalance.SessionStart).
         /// </summary>
