@@ -746,3 +746,6 @@ Testy T2c: zapis doby 362 (10 dob; Nocny Krol przerwal oblezenie Craster's Keep,
 Poprzedni CrashScribe 4552ceaf: CrashScribe.dll.bak-2026-10-09-przed-noc6 + D:\Backup-Bannerlord\wgrane\2026-10-09-noc6-przed.
 **ZATWIERDZONE OD TERAZ: Armoury 0f8a80b0, CrashScribe 269cc980** (GT 1337433c, RC 3e04b89b bez zmian). Test 120 dob tej wersji: 0 bledow, 15.5 s/dobe, 21 pokojow
 fabularnych bez reparacji (nie naliczono 14.1 mln), bankrutow w dobie 120: 15 (przed noca 23), glow < 5000: 32 (40), Inni 0 osad. Raport: docs/RAPORT-NOCNY-2026-10-09.md.
+**09.10 (rano) - Jeff: 1) "tak" skrypt BEE, 2) "nie rozumiem" (suwak reparacji Diplomacy - do wyjasnienia), 3) "nie" - karawany NIE handluja strzalami, 4) "tak" tempo
+swiata wariant ksiazkowy, ale po naprawach ekonomii.** SKRYPT BEE NALOZONY 08.10 23:40 (zegar komp.): zamknij-ujscia-bee.ps1 -ListaZFundamentu, 13 wartosci, SHA 1f963cfa ->
+3a24554b; kopia: *.bak-<data>-przed-BEE-ujscia obok pliku + D:\Backup-Bannerlord\bee-2026-10-08\. Cofniecie: tools\bee\cofnij-ujscia-bee.ps1 (gra zamknieta).
