@@ -43,7 +43,9 @@ namespace Armoury
     ///     Owners (Mends.NamesakeGear ubiera Ramsaya, Cersei, Stannisa... w rzeczy,
     ///     ktorych szablon moze nie miec).
     /// (4) Targow miast NIE tykamy - Mends.UniqueWares czysci je co sesje, a
-    ///     relikwie z NamesakeGear leza tam CELOWO po jednej sztuce.
+    ///     relikwie z NamesakeGear leza tam CELOWO po jednej sztuce. Od Z16-1c CS
+    ///     czystka pomija unikaty sledzone przez UniqueSpoils (Jeff 04.10: sprzedany
+    ///     unikat lezy na polce, a lord moze go kupic).
     /// Lista unikatow: UniqueGear (= Mends.UniquePrefixes + zestaw Gory).
     /// </summary>
     internal sealed class UniqueLaw : CampaignBehaviorBase

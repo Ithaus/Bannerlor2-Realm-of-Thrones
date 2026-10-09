@@ -44,6 +44,19 @@ namespace Armoury
             catch (Exception e) { Log.Error("DragonUnmount.ApplyAll", e); }
         }
 
+        /// <summary>Z16-5: lustro drugiego warunku ROT patch24 (EnlistmentPatches.cs ok. :609-628) - zestaw zaciagu idzie
+        /// takze na walke w sali lorda: PlayerEncounter.Current.EncounterSettlementAux.CurrentSiegeState == InTheLordsHall.</summary>
+        private static bool InLordsHall()
+        {
+            try
+            {
+                var pe = TaleWorlds.CampaignSystem.Encounters.PlayerEncounter.Current;
+                var st = pe != null ? pe.EncounterSettlementAux : null;
+                return st != null && st.CurrentSiegeState == TaleWorlds.CampaignSystem.Settlements.Settlement.SiegeState.InTheLordsHall;
+            }
+            catch { return false; }
+        }
+
         public static void StripDragonMount(AgentBuildData agentBuildData)
         {
             try
@@ -188,23 +201,31 @@ namespace Armoury
                         // jednostki swojej rangi (ROT EnlistmentPatches.patch24: AgentOverridenEquipment + gotowe
                         // AgentOverridenSpawnMissionEquipment). Sztuka WYDANA (inna niz jego wlasna w tym slocie), ktorej
                         // bohater nie udzwignie (ItemReq.MeetsHero: pancerz - Atletyka, bron - jej umiejetnosc, strzaly - Luk,
-                        // belty - Kusza), wraca na JEGO WLASNA z tego slotu. Wlasne sztuki - bez sita (NOSZENIE, decyzja 3).
-                        // Tylko tam, gdzie ROT wydaje zestaw: bohater klanu gracza, bitwa w polu / oblezenie / wypad, gotowa bron
-                        // agenta (AgentOverridenSpawnMissionEquipment - poza ROT ustawia ja tylko misja fabularna NavalDLC). Turnieje,
-                        // areny, bijatyki i pojedynki ROT (wlasny zestaw) - bez zmian.
+                        // belty - Kusza): (a) gdy w tym slocie nosi wlasna sztuke TEGO SAMEGO typu - wraca jego wlasna;
+                        // (b) inaczej najlepsza sztuka tego typu w granicy jego umiejetnosci (pancerz - TopArmor, bron i amunicja -
+                        // PatternFor; typ slotu zostaje, wiec luk zostaje ze strzalami, kusza z beltami, a pusty wlasny slot nie
+                        // robi z bohatera golego); (c) gdy takiej brak - zostaje wydana (podloga sprzetu, Jeff 31.08: nikt nie
+                        // walczy nago). POPRAWKA Z16-5 (recenzja): dotad sztuka wracala na wlasna z tego slotu takze, gdy slot byl
+                        // pusty albo innego typu (gola glowa, luk bez strzal). Wlasne sztuki - bez sita (NOSZENIE, decyzja 3); przy
+                        // wlaczonym HeroGearRequirements pomija je takze regula sceny 14.09 nizej. Tylko tam, gdzie ROT wydaje
+                        // zestaw: bohater klanu gracza, bitwa w polu / oblezenie / wypad albo walka w sali lorda (lustro warunku ROT
+                        // patch24: PlayerEncounter...CurrentSiegeState == InTheLordsHall), gotowa bron agenta
+                        // (AgentOverridenSpawnMissionEquipment - poza ROT ustawia ja tylko misja fabularna NavalDLC). Turnieje,
+                        // areny, bijatyki i pojedynki ROT - bez zmian.
                         var w0 = new ItemObject[4];
                         for (int slot = 0; slot < 4; slot++) w0[slot] = eq[(EquipmentIndex)slot].Item;
                         var ownEq = soldier.HeroObject != null ? soldier.HeroObject.BattleEquipment : null;
+                        bool heroReq = Settings.Current != null && Settings.Current.HeroGearRequirements;
                         bool enlistKit = false;
                         try
                         {
                             var mis = Mission.Current;
                             enlistKit = ownEq != null && agentBuildData.AgentOverridenSpawnMissionEquipment != null
                                 && soldier.HeroObject.Clan != null && soldier.HeroObject.Clan == TaleWorlds.CampaignSystem.Clan.PlayerClan
-                                && mis != null && (mis.IsFieldBattle || mis.IsSiegeBattle || mis.IsSallyOutBattle);
+                                && mis != null && (mis.IsFieldBattle || mis.IsSiegeBattle || mis.IsSallyOutBattle || InLordsHall());
                         }
                         catch { enlistKit = false; }
-                        if (enlistKit && Settings.Current != null && Settings.Current.HeroGearRequirements)
+                        if (enlistKit && heroReq)
                         {
                             for (int slot = 0; slot <= 9; slot++)
                             {
@@ -215,10 +236,32 @@ namespace Armoury
                                 if (mine.Item == it) continue;
                                 string whyNot;
                                 if (ItemReq.MeetsHero(soldier, it, out whyNot)) continue;
-                                eq[(EquipmentIndex)slot] = mine;
+                                string got;
+                                if (!mine.IsEmpty && mine.Item.ItemType == it.ItemType)
+                                {
+                                    eq[(EquipmentIndex)slot] = mine;
+                                    got = "bierze swoj " + mine.Item.StringId;
+                                }
+                                else
+                                {
+                                    ItemObject best;
+                                    if (slot >= 5)
+                                        best = SkillsDecide.TopArmor(it.ItemType, soldier.GetSkillValue(TaleWorlds.Core.DefaultSkills.Athletics), soldier.Culture);
+                                    else
+                                    {
+                                        var rsk0 = ItemReq.SkillFor(it);
+                                        best = SkillsDecide.PatternFor(it.ItemType, rsk0 != null ? soldier.GetSkillValue(rsk0) : 0);
+                                    }
+                                    if (best != null)
+                                    {
+                                        eq[(EquipmentIndex)slot] = new EquipmentElement(best);
+                                        got = "dostaje " + best.StringId + " (najlepsza tego typu w granicy umiejetnosci)";
+                                    }
+                                    else got = "lzejszej sztuki tego typu brak - zostaje przy wydanej";
+                                }
                                 if (_e8Log++ < 20)
                                     Log.Info("Z16: zaciag - bohater " + soldier.StringId + " nie udzwignie wydanego " + it.StringId
-                                             + " (" + whyNot + ") - bierze swoj " + (mine.Item != null ? mine.Item.StringId : "pusty slot") + ".");
+                                             + " (" + whyNot + ") - " + got + ".");
                             }
                         }
                         // GEOGRAFIA WIERZCHOWCOW u bohatera (gracz tez): lord Polnocy
@@ -271,10 +314,16 @@ namespace Armoury
                         // NAZWANE klingi i zbroje person (legendy, unikaty) zostaja - to lore,
                         // nie lup. Gdy nie ma czym podmienic, bohater zostaje przy swoim
                         // (lorda nie rozbrajamy). Tylko na scenie - ekwipunek w save nietkniety.
+                        // Z16-5 (decyzja 3 Jeffa 09.10: "zbroja juz noszona NIE jest zdejmowana na sile"): przy wlaczonym
+                        // HeroGearRequirements regula sceny pomija WLASNE sztuki bohatera (ta sama sztuka co w jego zestawie
+                        // bojowym w tym slocie) - dotyczy to lotu smokiem gracza (ROT klonuje jego zestaw), wlasnych slotow
+                        // zaciagu (GearOverrides) i pojedynkow ROT; sito zostaje dla sztuk WYDANYCH. Przy wylaczonym - jak 14.09.
+                        bool keepOwn = heroReq && ownEq != null;
                         for (int slot = 0; slot < 4; slot++)
                         {
                             var w = eq[(EquipmentIndex)slot].Item;
                             if (w == null || LegendaryLaw.IsLegend(w) || UniqueGear.Is(w) || GiantGear.Is(w)) continue;
+                            if (keepOwn && ownEq[(EquipmentIndex)slot].Item == w) continue;   // Z16-5: wlasna - zostaje
                             string whyNot;
                             if (ItemReq.Meets(soldier, w, out whyNot)) continue;
                             var rsk = ItemReq.SkillFor(w);
@@ -290,6 +339,7 @@ namespace Armoury
                         {
                             var a = eq[(EquipmentIndex)slot].Item;
                             if (a == null || UniqueGear.Is(a) || GiantGear.Is(a) || a.NotMerchandise) continue;   // zbroje person zostaja
+                            if (keepOwn && ownEq[(EquipmentIndex)slot].Item == a) continue;   // Z16-5: wlasna - zostaje (decyzja 3)
                             if (ItemReq.Meets(soldier, a)) continue;
                             var top = SkillsDecide.TopArmor(a.ItemType, hath, soldier.Culture);
                             if (top == null) continue;

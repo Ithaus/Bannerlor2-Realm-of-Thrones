@@ -16,10 +16,12 @@ namespace Armoury
     /// <summary>
     /// Z16 - WYMOGI SPRZETU U BOHATEROW (Jeff 09.10, 02:50: "jak nie mam danej umiejetnosci, np. atletyki, nie moge zalozyc
     /// pancerza, ktory ma takie wymaganie"; zasada 29.08 "CALY ekwipunek"; SPROSTOWANIE 03:05). Gra pilnuje u bohatera tylko
-    /// przedmiotow z umiejetnoscia w danych (bron, tarcze, konie: Helpers.CharacterHelper.CanUseItem, 1.4.8 :566-587 sprawdza
-    /// RelevantSkill) - PANCERZ (RelevantSkill = null) i AMUNICJA przechodzily, wiec gracz i towarzysze zakladali kazda zbroje.
-    /// Etap 2 (ekran): postfiks na CanUseItem (3-arg - 2-arg wola 3-arg) dodaje dwa brakujace wiersze tej samej reguly co
-    /// u zolnierzy: pancerz - Atletyka, strzaly - Luk, belty - Kusza (ItemReq.MeetsHero, ladry przepuszczone - uwaga 7.1).
+    /// przedmiotow z umiejetnoscia w danych (Helpers.CharacterHelper.CanUseItem, 1.4.8 :566-587 sprawdza RelevantSkill + Difficulty):
+    /// bron, tarcze, konie ORAZ amunicje - strzaly i belty maja RelevantSkill z klasy broni (TaleWorlds.Core
+    /// WeaponComponentData.GetRelevantSkillFromWeaponClass: Arrow -> Bow, Bolt -> Crossbow; POPRAWKA Z16-5 po recenzji - wczesniej
+    /// opis mowil, ze amunicja przechodzila). Przechodzil tylko PANCERZ (RelevantSkill = null), wiec gracz i towarzysze zakladali
+    /// kazda zbroje. Etap 2 (ekran): postfiks na CanUseItem (3-arg - 2-arg wola 3-arg) dodaje brakujacy wiersz tej samej reguly
+    /// co u zolnierzy: pancerz - Atletyka (ItemReq.MeetsHero, ladry przepuszczone - uwaga 7.1); strzaly i belty pilnuje sama gra.
     /// Ekran (SPInventoryVM.IsItemEquipmentPossible / CanCharacterUseItem) zrobi z tego sam czerwona karte i komunikat gry
     /// "You don't have enough {SKILL_NAME} skill to equip this item". Nigdy "nie" -> "tak". Opis przedmiotu (ItemMenuVM)
     /// dostaje linie "Requires: Athletics 175" w tym samym miejscu, co gra pisze wymog broni (po wadze). To, co bohater juz
@@ -38,7 +40,7 @@ namespace Armoury
                     new[] { typeof(BasicCharacterObject), typeof(EquipmentElement), typeof(TextObject).MakeByRefType() });
                 if (m != null) h.Patch(m, postfix: new HarmonyMethod(typeof(HeroGear), nameof(CanUsePostfix)));
                 Log.Info("Z16: ekran ekwipunku " + (m != null
-                    ? "pilnuje pancerza (Athletics), strzal (Bow) i beltow (Crossbow) u bohaterow - ta sama regula co u zolnierzy."
+                    ? "pilnuje pancerza (Athletics) u bohaterow - ta sama regula co u zolnierzy; strzaly (Bow) i belty (Crossbow) pilnuje sama gra."
                     : "- CharacterHelper.CanUseItem(3) NIEZNALEZIONE, sito ekranu spi."));
             }
             catch (Exception e) { Log.Error("HeroGear.ApplyAll(CanUseItem)", e); }
@@ -50,15 +52,16 @@ namespace Armoury
                 _fCharacter = AccessTools.Field(typeof(ItemMenuVM), "_character");
                 if (t != null && _fTarget != null && _fCharacter != null)
                     h.Patch(t, postfix: new HarmonyMethod(typeof(HeroGear), nameof(TooltipPostfix)));
-                else Log.Info("Z16: ItemMenuVM.SetGeneralComponentTooltip / pola NIEZNALEZIONE - opis przedmiotu bez linii Requires dla pancerza i amunicji.");
+                else Log.Info("Z16: ItemMenuVM.SetGeneralComponentTooltip / pola NIEZNALEZIONE - opis przedmiotu bez linii Requires dla pancerza.");
             }
             catch (Exception e) { Log.Error("HeroGear.ApplyAll(ItemMenuVM)", e); }
             ApplySpoils(h);
             ApplyGank(h);
         }
 
-        /// <summary>Sztuka, ktorej wymog pilnuje tylko nasza regula (gra nie ma dla niej RelevantSkill): pancerz bez ladr,
-        /// strzaly, belty. Bron, tarcze i konie pilnuje gra - tym samym wierszem i komunikatem.</summary>
+        /// <summary>Sztuka, ktorej wymog pilnuje tylko nasza regula (gra nie ma dla niej RelevantSkill): pancerz bez ladr.
+        /// Bron, tarcze, konie, strzaly i belty (RelevantSkill Bow/Crossbow z klasy broni) pilnuje gra - tym samym wierszem
+        /// i komunikatem; dla nich warunek RelevantSkill != null zwraca false (Z16-5: opis poprawiony, dzialanie bez zmian).</summary>
         internal static bool OursOnly(ItemObject it)
         {
             if (it == null || it.RelevantSkill != null) return false;
@@ -78,13 +81,28 @@ namespace Armoury
                 if (!OursOnly(it)) return;
                 var co = __0 as CharacterObject;
                 if (co == null || ItemReq.MeetsHero(co, it)) return;
-                var sk = ItemReq.SkillFor(it);
-                var why = new TextObject("{=rgqA29b8}You don't have enough {SKILL_NAME} skill to equip this item");
-                why.SetTextVariable("SKILL_NAME", sk.Name);
-                __2 = why;
+                __2 = WhyFor(ItemReq.SkillFor(it));
                 __result = false;
             }
             catch { }
+        }
+
+        // Z16-5 (recenzja, wydajnosc): jeden gotowy powod na umiejetnosc - ekran wola CanUseItem dla kazdej karty przy kazdej
+        // zmianie postaci, a wersja 2-arg powod i tak wyrzuca; SKILL_NAME to TextObject nazwy, wiec jezyk liczy sie przy ToString
+        private static readonly Dictionary<SkillObject, TextObject> _why = new Dictionary<SkillObject, TextObject>();
+        private static TextObject WhyFor(SkillObject sk)
+        {
+            lock (_why)
+            {
+                TextObject t;
+                if (!_why.TryGetValue(sk, out t))
+                {
+                    t = new TextObject("{=rgqA29b8}You don't have enough {SKILL_NAME} skill to equip this item");
+                    t.SetTextVariable("SKILL_NAME", sk.Name);
+                    _why[sk] = t;
+                }
+                return t;
+            }
         }
 
         private static string _requires;
@@ -99,7 +117,8 @@ namespace Armoury
         }
 
         /// <summary>Postfiks ItemMenuVM.SetGeneralComponentTooltip (wolane z RefreshItemTooltips - przy SetItem i przy
-        /// zmianie uzycia broni): linia "Requires: Athletics 175" dla pancerza / "Bow N" strzal / "Crossbow N" beltow,
+        /// zmianie uzycia broni): linia "Requires: Athletics 175" dla pancerza (strzalom i beltom "Requires: Bow N" /
+        /// "Crossbow N" pisze sama gra - maja RelevantSkill),
         /// zaraz po wadze - tam, gdzie gra pisze wymog broni (AddSkillRequirement). Kolor jak w grze: zielony, gdy
         /// CanUseItem (juz z naszym postfiksem) mowi "moze", inaczej czerwony; porownywana sztuka - tak samo, bez napisu.</summary>
         public static void TooltipPostfix(ItemMenuVM __instance)
@@ -139,9 +158,10 @@ namespace Armoury
         // ---------------------------------------------------------------- Z16-3: Spoils "Auto-equip companions"
         // Spoils of War (RealisticLoot.Models.AutoEquipPlanner.TryUpgradeSlot, Spoils 1.8.4, dekompilacja :85-163) wybiera towarzyszowi
         // najlepsza sztuke z taboru gracza BEZ zadnej kontroli umiejetnosci (nawet broni) - plyta t6 z taboru wchodzila na
-        // kazdego. PREFIKS podmienia tabor (argument 0) na kopie z samymi sztukami, ktore TEN towarzysz udzwignie
-        // (ItemReq.MeetsHero); Spoils wybiera i zapisuje na kopii; POSTFIKS oddaje prawdziwemu taborowi to samo, co Spoils
-        // zrobil na kopii (wybrana sztuka -1, zdjeta +1). Bez ukrytych sztuk - Spoils pracuje na prawdziwym taborze jak dotad.
+        // kazdego. PREFIKS podmienia tabor (argument 0) na kopie z samymi sztukami pasujacymi do slotu, ktore TEN towarzysz
+        // udzwignie (ItemReq.MeetsHero); Spoils wybiera i zapisuje na kopii; POSTFIKS oddaje prawdziwemu taborowi to samo, co
+        // Spoils zrobil na kopii (wybrana sztuka -1, zdjeta +1). Bez ukrytych sztuk w tym slocie - Spoils pracuje na prawdziwym
+        // taborze jak dotad.
         // Podwojenie sztuki cywilnej (:154-157, opcja UpdateCivilianEquipment) to osobna sprawa (projekt Z16 uwaga 7.3).
         internal sealed class SpoilsSlotState
         {
@@ -197,12 +217,14 @@ namespace Armoury
                 if (s == null || !s.HeroGearRequirements || __0 == null || __1 == null || __1.CharacterObject == null || __1.BattleEquipment == null) return;
                 var real = __0;
                 var co = __1.CharacterObject;
+                // Z16-5 (recenzja, wydajnosc): Spoils bierze pod uwage tylko sztuki pasujace do slotu (Equipment.IsItemFitsToSlot,
+                // dekompilacja :126) - wiec liczymy i kopiujemy tylko je; kopia powstaje, gdy w TYM slocie jest cos do ukrycia
                 int hidden = 0;
                 for (int i = 0; i < real.Count; i++)
                 {
                     var el = real.GetElementCopyAtIndex(i);
                     var it = el.EquipmentElement.Item;
-                    if (el.Amount > 0 && it != null && !ItemReq.MeetsHero(co, it)) hidden += el.Amount;
+                    if (el.Amount > 0 && it != null && Equipment.IsItemFitsToSlot(__2, it) && !ItemReq.MeetsHero(co, it)) hidden += el.Amount;
                 }
                 if (hidden == 0) return;
                 var sieve = new ItemRoster();
@@ -210,7 +232,8 @@ namespace Armoury
                 {
                     var el = real.GetElementCopyAtIndex(i);
                     var it = el.EquipmentElement.Item;
-                    if (el.Amount > 0 && it != null && ItemReq.MeetsHero(co, it)) sieve.AddToCounts(el.EquipmentElement, el.Amount);
+                    if (el.Amount > 0 && it != null && Equipment.IsItemFitsToSlot(__2, it) && ItemReq.MeetsHero(co, it))
+                        sieve.AddToCounts(el.EquipmentElement, el.Amount);
                 }
                 __state = new SpoilsSlotState { Real = real, Who = __1, Slot = __2, Old = __1.BattleEquipment[__2] };
                 __0 = sieve;
@@ -237,9 +260,11 @@ namespace Armoury
         // ROT (ROT.CampaignBehaviors.ROTGankBehavior.TakeWeapon :109-138): gracz zabiera pojmanemu bohaterowi legendarna bron,
         // a jeniec dostaje w ten slot losowa bron tego typu z GetRandomItem (:196-275, kultura jenca albo neutralna, potem
         // dowolna) - bez patrzenia na umiejetnosc. POSTFIKS (metoda wola sama siebie z anyCulture - postfiks idzie po obu):
-        // gdy wylosowanej jeniec nie udzwignie (ItemReq.MeetsHero) - najlepsza bron tego typu, ktora udzwignie (tier, potem
-        // wartosc), z tych samych zrodel co ROT (kultura jenca albo neutralna, potem dowolna; bez listy broni specjalnych ROT
-        // i skradzionych, bez unikatow i legend). Gdy zadnej nie udzwignie - zostaje wylosowana (lorda nie rozbrajamy).
+        // gdy wylosowanej jeniec nie udzwignie (ItemReq.MeetsHero) - losujemy JAK ROT (ta sama waga 1/(max(100, cena) + 100),
+        // czyli tansze czesciej, i losowy modyfikator z grupy przedmiotu), tylko wsrod broni tego typu, ktore udzwignie, z tych
+        // samych zrodel co ROT (kultura jenca albo neutralna, potem dowolna; bez listy broni specjalnych ROT i skradzionych, bez
+        // unikatow i legend). POPRAWKA Z16-5 (recenzja): dotad brana byla NAJLEPSZA dozwolona (tier, cena) - jeniec dostawal
+        // systematycznie lepsza bron, niz dalby mu ROT. Gdy zadnej nie udzwignie - zostaje wylosowana (lorda nie rozbrajamy).
         private static System.Reflection.FieldInfo _fGankSpecial, _fGankStolen;
 
         private static void ApplyGank(Harmony h)
@@ -274,21 +299,32 @@ namespace Armoury
                 if (got == null || ItemReq.MeetsHero(__0, got)) return;
                 var special = _fGankSpecial != null ? _fGankSpecial.GetValue(__instance) as List<string> : null;
                 var stolen = _fGankStolen != null ? _fGankStolen.GetValue(__instance) as List<ItemObject> : null;
-                ItemObject best = BestGankItem(__0, __1, special, stolen, false) ?? BestGankItem(__0, __1, special, stolen, true);
-                if (best == null)
+                ItemObject pick = RandomGankItem(__0, __1, special, stolen, false) ?? RandomGankItem(__0, __1, special, stolen, true);
+                if (pick == null)
                 {
                     Log.Info("Z16: ROT - jeniec " + __0.StringId + " nie udzwignie " + got.StringId + ", a lzejszej broni tego typu brak - zostaje przy niej.");
                     return;
                 }
-                Log.Info("Z16: ROT - jeniec " + __0.StringId + " nie udzwignie " + got.StringId + " - dostaje " + best.StringId + ".");
-                __result = new EquipmentElement(best);
+                ItemModifier mod = null;
+                try
+                {
+                    var grp = pick.ItemComponent != null ? pick.ItemComponent.ItemModifierGroup : null;
+                    if (grp != null) mod = grp.GetRandomItemModifierProductionScoreBased();   // jak ROT GetRandomItem
+                }
+                catch { mod = null; }
+                Log.Info("Z16: ROT - jeniec " + __0.StringId + " nie udzwignie " + got.StringId + " - dostaje " + pick.StringId
+                         + " (losowo jak ROT, w granicy umiejetnosci).");
+                __result = new EquipmentElement(pick, mod);
             }
             catch (Exception e) { Log.Error("HeroGear.GankPostfix", e); }
         }
 
-        private static ItemObject BestGankItem(CharacterObject ch, ItemObject.ItemTypeEnum type, List<string> special, List<ItemObject> stolen, bool anyCulture)
+        /// <summary>Z16-5: losowanie jak ROT GetRandomItem (:196-275) - jedno przejscie, kazda pasujaca sztuka z waga
+        /// 1/(max(100, Value) + 100) (losowanie "rezerwuarowe" jak w ROT) - tylko wsrod sztuk, ktore jeniec udzwignie.</summary>
+        private static ItemObject RandomGankItem(CharacterObject ch, ItemObject.ItemTypeEnum type, List<string> special, List<ItemObject> stolen, bool anyCulture)
         {
-            ItemObject best = null;
+            ItemObject pick = null;
+            float sum = 0f;
             foreach (var it in MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
             {
                 if (it == null || it.ItemType != type || it.Culture == null || it.StringId == null) continue;
@@ -297,9 +333,11 @@ namespace Armoury
                 if (stolen != null && stolen.Contains(it)) continue;
                 if (UniqueGear.Is(it) || LegendaryLaw.IsLegend(it)) continue;
                 if (!ItemReq.MeetsHero(ch, it)) continue;
-                if (best == null || it.Tier > best.Tier || (it.Tier == best.Tier && it.Value > best.Value)) best = it;
+                float w = 1f / (Math.Max(100, it.Value) + 100f);
+                if (MBRandom.RandomFloat * (sum + w) >= sum) pick = it;
+                sum += w;
             }
-            return best;
+            return pick;
         }
 
         /// <summary>Samotest przy wczytaniu (plan testu Z16 pkt 4): 500 losowych par (bohater, sztuka z wymogiem) -
@@ -337,7 +375,7 @@ namespace Armoury
                         bad.Add(h.StringId + "/" + it.StringId + " (" + ItemReq.SkillFor(it).StringId + " " + co.GetSkillValue(ItemReq.SkillFor(it))
                                 + " vs " + it.Difficulty + "): ekran " + (got ? "TAK" : "NIE") + ", regula " + (want ? "TAK" : "NIE"));
                 }
-                Log.Info("Z16 samotest: CanUseItem zgodny z ItemReq.MeetsHero w " + agree + "/" + n + " par (w tym pancerz/amunicja "
+                Log.Info("Z16 samotest: CanUseItem zgodny z ItemReq.MeetsHero w " + agree + "/" + n + " par (w tym pancerz - wiersz Z16 - "
                          + ours + ", odmowy " + refused + ", sito " + (on ? "wlaczone" : "WYLACZONE") + ")"
                          + (bad.Count > 0 ? " - NIEZGODNE: " + string.Join("; ", bad.ToArray()) : "") + ".");
             }
