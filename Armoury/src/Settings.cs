@@ -322,6 +322,7 @@ namespace Armoury
         public bool PlagueWatchEnabled = true;             // a daily word when YOU are the one who is ill - the disease mod tells the player nothing outside a town hospital
         public bool InfluenceWatchEnabled = true;          // diagnostic: log the full daily breakdown of your clan influence - the game itself never shows it anywhere
         public bool SpeedAuditEnabled = true;              // once a day the full speed breakdown of your party is written to Armoury.log (before the marching-column cap and sleep debt)
+        public bool WorldMeasureLog = true;                // once a day Armoury.log measures the world: how many km a day the AI lords' hosts really march (median and 90th percentile, big hosts, army leaders and all-mounted parties, the world pace in force) and how many days of food every town and castle has left, the North apart - log only, changes nothing in the game
         public int SiegePacePercent = 50;                  // siege engine construction speed - 50% makes sieges last twice as long, so starving a fortress out matters again
         public bool SiegeSicknessEnabled = true;           // camp fever: long sieges breed dysentery - the sick go down as wounded, some die; medicine is the shield
         public int SiegeSicknessIncubationDays = 9;        // clean-camp grace period before the fever wakes

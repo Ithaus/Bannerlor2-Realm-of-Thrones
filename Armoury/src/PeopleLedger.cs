@@ -46,6 +46,7 @@ namespace Armoury
             public float PeopleNode, PeopleVillages, Hearth, Pool, Burden = -1f;
             public int Villages, Looted, Garrison, Militia, Bands, BandMen;
             public float FoodChange; public bool HasFood;
+            public float FoodStocks;                         // T6: zapas warowni (odczyt w tej samej petli co FoodChange)
             public float People { get { return PeopleNode + PeopleVillages; } }
         }
 
@@ -176,6 +177,57 @@ namespace Armoury
         private static string F(float v, string fmt) { return v.ToString(fmt, CultureInfo.InvariantCulture); }
         private static string Clean(string s) { return string.IsNullOrEmpty(s) ? "" : s.Replace(';', ',').Replace('\n', ' ').Replace('\r', ' '); }
 
+        // ------------------------------------------------------------ T6 (d): zapasy warowni w dniach (sam odczyt, wylacznik WorldMeasureLog)
+        private const string NorthCulture = "battania";      // kultura "North" w ROT (ROT-Content/ModuleData/spcultures.xml, id battania)
+
+        // dni zapasu = FoodStocks / -FoodChange; FoodChange >= 0 = "bez ubytku" (osobno, nie w medianie)
+        private static string StockPart(List<Row> rows, bool north)
+        {
+            var days = new List<float>();
+            int all = 0, steady = 0, below90 = 0, below30 = 0; float min = float.MaxValue; string minName = "";
+            foreach (var r in rows)
+            {
+                try
+                {
+                    if (!r.HasFood) continue;
+                    if (north && (r.St.Culture == null || r.St.Culture.StringId != NorthCulture)) continue;
+                    all++;
+                    if (r.FoodChange >= 0f) { steady++; continue; }
+                    float d = Math.Max(0f, r.FoodStocks) / -r.FoodChange;
+                    days.Add(d);
+                    if (d < 90f) below90++;
+                    if (d < 30f) below30++;
+                    if (d < min) { min = d; minName = r.St.Name != null ? r.St.Name.ToString() : r.St.StringId; }
+                }
+                catch { _stumbles++; }
+            }
+            var sb = new StringBuilder();
+            sb.Append(all).Append(" warowni, z ubytkiem ").Append(days.Count);
+            if (days.Count > 0)
+            {
+                days.Sort();
+                int n = days.Count;
+                float med = (n % 2 == 1) ? days[n / 2] : 0.5f * (days[n / 2 - 1] + days[n / 2]);
+                sb.Append(": dni zapasu mediana ").Append(F(med, "0")).Append(", minimum ").Append(F(min, "0")).Append(" (").Append(Clean(minName)).Append(')');
+            }
+            sb.Append(", ponizej 90 dni ").Append(below90).Append(", ponizej 30 dni ").Append(below30).Append(", bez ubytku ").Append(steady);
+            return sb.ToString();
+        }
+
+        private static string StockNote(List<Row> rows)
+        {
+            try
+            {
+                var c = Settings.Current;
+                if (c == null || !c.WorldMeasureLog) return "";
+                int before = _stumbles;
+                string s = " | Zapasy warowni (T6): swiat " + StockPart(rows, false) + "; Polnoc (" + NorthCulture + ") " + StockPart(rows, true);
+                if (_stumbles > before) s += ", potkniecia zapasow " + (_stumbles - before);   // wypisane tu - licznik ksiegi juz poszedl w linii
+                return s + ".";
+            }
+            catch { return " | Zapasy warowni (T6): wyjatek."; }
+        }
+
         internal static void Daily()
         {
             try
@@ -260,6 +312,7 @@ namespace Armoury
                             fiefs++;
                             if (r.St.IsStarving) starving++;
                             r.FoodChange = r.St.Town.FoodChange; r.HasFood = true;      // model zywnosci - raz na warownie na dobe
+                            r.FoodStocks = r.St.Town.FoodStocks;                        // T6: dni zapasu (sam odczyt)
                             if (r.FoodChange < 0f) foodMinus++;
                         }
                     }
@@ -311,6 +364,7 @@ namespace Armoury
                       .Append(" (bez ludnosci w ksiedze ").Append(noPeople).Append(')');
                 sb.Append(" | warownie glodne ").Append(starving).Append(", z ujemnym bilansem zywnosci ").Append(foodMinus).Append(" z ").Append(fiefs).Append('.');
                 if (_stumbles > 0) sb.Append(" Potkniecia ksiegi: ").Append(_stumbles).Append('.');
+                sb.Append(StockNote(order));                                         // T6 (d): zawsze NA KONCU linii - poczatek parsuje sprawdz_logi.py
                 int reported = _stumbles;
                 Log.Info(sb.ToString());
 
