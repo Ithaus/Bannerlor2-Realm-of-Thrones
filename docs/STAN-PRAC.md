@@ -752,3 +752,8 @@ swiata wariant ksiazkowy, ale po naprawach ekonomii.** SKRYPT BEE NALOZONY 08.10
 **09.10 - Jeff: "ok zgadzam sie" (suwak reparacji):** Diplomacy MCM ScalingWarReparationsGoldCostMultiplier 50 -> 10 w DiplomacySettings_v1.2.json (gra zamknieta);
 kopia: DiplomacySettings_v1.2.json.bak-2026-10-09-przed-reparacje10 obok + D:\Backup-Bannerlord\diplomacy-2026-10-09\. Dotyczy wojen niefabularnych (fabularne - T9 = 0).
 Cofniecie: przywrocic kopie albo w grze Mod Options -> Diplomacy -> Scaling War Reparations Gold Cost Multiplier = 50.
+**DECYZJE JEFFA 09.10 (ok. 00:00):** (3) OKUPY WEDLUG MAJATKU - TAK (jedna regula dla gracza i AI: glowa rodu ok. pol roku dochodu rodu, lord ok. 2 miesiace,
+gotowka z nadwyzki, reszta na raty) + PRAWO TRZECICH - TAK (korona, ktora placi zold, bierze 1/3 okupow i sprzedanego lupu wasali; za krola/wodza 2/3) -> do 165/168.
+(4) ODBUDOWA SPALONEJ WIOSKI: 1 ROK (nie 2-3) - dotyczy wiosek pobocznych (kazda ma swoich ludzi i swoja czesc plonu okregu) i glownej -> do 108/113.
+Wczesniej tej nocy: suwak reparacji Diplomacy 10 (tak), karawany bez strzal ("nie"), tempo swiata ksiazkowe po naprawach ekonomii ("tak"), skrypt BEE ("tak" - nalozony).
+Audyt w PDF: docs/audyt-2026-10-09/AUDYT-SWIATA-2026-10-09-SKROT.pdf (39 str.) i -PELNY.pdf (126 str.).
