@@ -876,3 +876,9 @@ dane danego lorda i wychodzi, jak szybko" -> JEDEN WZOR musztry dla gracza, lord
 **DECYZJE JEFFA 09.10 ok. 07:35 (sprzet DTE z niczego):** (1) zolnierz gracza bez sztuki - "nie, jesli nie ma sprzetu, to nie ma sprzetu, nic nie dostaje z kosmosu" -> bez
 awaryjnego sprzetu chlopa DTE (walczy tym, co ma); (2) ludzie lordow AI w bitwach gracza - (c) "walcza tylko tym, co maja" (bez dopelniania wzorca z niczego; nowa kampania:
 na poczatku czesc bez zbroi/tarcz - Jeff akceptuje); (3) przenoszenie sprzetu z ludzmi takze dla partii towarzyszy (Manage Troops) - TAK. Do wdrozenia na noc/sklad7.
+**DECYZJE JEFFA 09.10 ok. 07:45:** (177-1) Inni: (b) pelne obrazenia Bialym Wedrowcom i Nocnemu Krolowi tylko od stali valyrianskiej, smoczego szkla i smoczego ognia; bron t6 (stal
+zamkowa) np. 50%, reszta 15% (jak w ksiazkach; Inni silniejsi - zmierzyc ich pochod/kalendarz). (177-2) wlasny miecz z Qohoru wedlug projektu z kuzni i z wlasna nazwa - TAK
+(osobna paczka, pozniej). (177-3) "nie patrz na to, bede gral od nowa" -> Jeff zacznie NOWA KAMPANIE; obecny zapis nie wymaga ochrony (zgodnosc wstecz mniej wazna; zapytac,
+kiedy startuje). (174b) hurtownicy zostawiaja ostatnia sztuke kazdego rodzaju zbroi na straganie dla kupujacych osobiscie - TAK (ShopKeepsLastArmour = true).
+Pytanie Jeffa: "czy jak kupuje hurtowo, ma lepsze ceny, czy ceny zaleza od popytu i podazy?" -> odpowiedz w czacie (cena z popytu i podazy; AI dzis placi cene
+z chwili zakupu za cala partie - do wyrownania: kazda sztuka jak u gracza).
