@@ -731,3 +731,6 @@ Szczegoly: docs/PRZEKAZANIE-2026-10-08.md rozdz. 15-16, audyt docs/audyt-2026-10
 **WGRANIE 2 (08.10 ok. 19:33):** Armoury 3bf72dfd + CrashScribe cfb33950 = wgranie 1 + T8 krainy (z poprawka bawelny) + T2b Inni bez dosypki z niczego.
 Galaz paczki/noc-wgranie-2. Poprzednie (28a7456e / aff275de): *.bak-2026-10-09-przed-noc2 + D:\Backup-Bannerlord\wgrane\2026-10-09-noc2-przed.
 ZATWIERDZONE OD TERAZ: Armoury 3bf72dfd, CrashScribe cfb33950.
+**WGRANIE 3 (08.10 ok. 20:08):** Armoury 04d1cc99 (= wgranie 2 + 169 KSIEGA OBIEGU, sam log; galaz noc/sklad2 1254cd7 w klonie lancuch), CrashScribe bez zmian cfb33950.
+Poprzedni Armoury 3bf72dfd: Armoury.dll.bak-2026-10-09-przed-noc3 + D:\Backup-Bannerlord\wgrane\2026-10-09-noc3-przed. ZATWIERDZONE OD TERAZ: Armoury 04d1cc99, CrashScribe cfb33950.
+Testy: 169 sama 40 dob (gra niezmieniona, reszta swiata -38 tys./d zamiast -215 tys.), S3 40 dob, S3 zapis doby 362 - 0 bledow. Znane braki pomiaru -> 169b w toku.

@@ -181,3 +181,4 @@ dana faze od nowa, korzystajac z zapisanych wynikow:
   kod 1 (T8, T16 - precyzja pomiaru, nie gra). Braki pomiaru: trybut (+1.12 mln w dobie 34 bez okna), nowe karawany -1.2 tys./karawana, "inne" z niczego ok. 290 tys./d
   (notable), koszt budzetu rodow 34 ms/dobe -> paczka 169b (wf_f774ccb1-f44, drzewo obieg169).
 - 19:58 **AUTOTEST S3 OK** (noc/sklad2 1254cd7 = wgranie 2 + 169; Armoury 04d1cc99): 40/40, 13.1 s/dobe, 0 bledow; reszta w dobie 40 -38 tys. Test zapisu S3 w toku.
+- 20:08 **WGRANIE 3 W GRZE**: Armoury 04d1cc99 (+169), CrashScribe cfb33950 bez zmian; galaz noc/sklad2 (1254cd7); kopia przed: Armoury.dll.bak-2026-10-09-przed-noc3.
