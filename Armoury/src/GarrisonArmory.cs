@@ -62,6 +62,7 @@ namespace Armoury
             _dQueue = _dSoldGarrisons = _dSoldPcs = _dSoldGold = _dPatrolCounted = 0;
             _dKeptLeaderless = 0;
             _dScrToMen = _dScrToPcs = _dScrFromMen = _dScrFromPcs = _dScrPlus = _dScrBook = _dScrRefused = 0;
+            _dScrToPartyMen = _dScrToPartyPcs = _dScrFromPartyMen = _dScrFromPartyPcs = _dNewPartyMen = _dNewPartyPcs = 0;
         }
 
         private static void Stumble(string where, Exception e)
@@ -467,12 +468,14 @@ namespace Armoury
             int today = (int)CampaignTime.Now.ToDays;
             try { SellWeek(today); } catch (Exception e) { Stumble("SellWeek", e); }
             var s = Settings.Current;
-            int moves = _dLeftMen + _dTakenMen + _dDisbandIn + _dDisbandGone + _dQueue + _stumbles + _dScrToMen + _dScrFromMen;
+            int moves = _dLeftMen + _dTakenMen + _dDisbandIn + _dDisbandGone + _dQueue + _stumbles + _dScrToMen + _dScrFromMen + _dScrToPartyMen + _dScrFromPartyMen + _dNewPartyMen;
             if (moves > 0 || (s != null && (s.KitMovesWithMen || s.GarrisonSellsSurplus)))
                 Log.Info("Zbrojownie zalog (171): dzien " + today + " - komplet z ludzmi: lordowie zostawili w zalogach " + _dLeftMen + " ludzi (" + _dLeftPcs + " szt.), zabrali z zalog "
                          + _dTakenMen + " ludzi (" + _dTakenPcs + " szt.), ekran druzyny gracza (poprawki sklad7): do zalog " + _dScrToMen + " ludzi (" + _dScrToPcs + " szt.), z zalog "
                          + _dScrFromMen + " ludzi (" + _dScrFromPcs + " szt.; pominiete: na plus zostaja w druzynie " + _dScrPlus + " szt., id z Twoja czescia w ksiedze " + _dScrBook
-                         + ", DTE nie przyjal " + _dScrRefused + " szt.), rozwiazane partie do zalog " + _dDisbandIn + " (" + _dDisbandInPcs + " szt.), rozwiazane - ludzie odeszli "
+                         + ", DTE nie przyjal " + _dScrRefused + " szt.; sklad7b: do partii towarzyszy/rodu/lordow " + _dScrToPartyMen + " ludzi (" + _dScrToPartyPcs
+                         + " szt.), z partii " + _dScrFromPartyMen + " ludzi (" + _dScrFromPartyPcs + " szt.), nowe partie rodu " + _dNewPartyMen + " ludzi (" + _dNewPartyPcs
+                         + " szt.)), rozwiazane partie do zalog " + _dDisbandIn + " (" + _dDisbandInPcs + " szt.), rozwiazane - ludzie odeszli "
                          + _dDisbandGone + " (komplety z ludzmi " + _dDisbandGoneKit + " szt., tabor sprzedany " + _dDisbandSold + " szt. za " + _dDisbandGold + " zl); nadwyzki zalog: sprzedalo "
                          + _dSoldGarrisons + " z " + _dQueue + " zalog w kolejce, " + _dSoldPcs + " szt. za " + _dSoldGold + " zl (kasy osad -> trzecia panom, reszta sakiewkom zalog; w tym ludzie na patrolach BK policzeni "
                          + _dPatrolCounted + " zalogi); partie lordow bez wodza albo rozwiazywane - zbrojownia zachowana " + _dKeptLeaderless + "; potkniecia " + _stumbles + ".");
@@ -593,13 +596,27 @@ namespace Armoury
         // (PlanKits) w obie strony: czesc LUDZI zbrojowni druzyny DTE (ArmyArmory.Armory; Twoja ksiega nietknieta - KitPieces/MenTotal, Twoja czesc to
         // najgorsze egzemplarze id) <-> slownik zbrojowni zalogi. Konie i rzedy - Stajnia (bez zmian). Rostery ekranu sa zywe (partie zmienione przed Done),
         // wiec stan "przed" bierzemy z PartyScreenLogic._initialData (kopie rosterow z otwarcia ekranu albo z ostatniego Done).
+        // sklad7b (Jeff 09.10 07:35, (3) "tak"): ta sama regula dla partii Twoich towarzyszy i rodu ("Manage Troops" - OpenScreenAsManageTroops
+        // i OpenScreenAsManageTroopsAndPrisoners z partia po lewej), dla lorda innego rodu ("Donate Troops" - OpenScreenAsDonateTroops, lewa strona
+        // to zywy roster jego partii) i dla nowej partii rodu (OpenScreenAsCreateClanPartyForHero - ludzie przechodza w funkcji zamkniecia ekranu,
+        // po DoneLogic). Dotad ludzie szli do partii towarzysza bez kompletow (a od sklad7b walczyliby bez nich), komplety zostawaly w Twojej
+        // zbrojowni i szly do kupca jako nadwyzka ludzi; ludzie zabrani z partii zostawiali tam swoje.
         private static System.Reflection.FieldInfo _fInitial;
-        private static bool _screenHooked;
+        private static bool _screenHooked, _createHooked;
         private static int _dScrToMen, _dScrToPcs, _dScrFromMen, _dScrFromPcs, _dScrPlus, _dScrBook, _dScrRefused;
+        private static int _dScrToPartyMen, _dScrToPartyPcs, _dScrFromPartyMen, _dScrFromPartyPcs, _dNewPartyMen, _dNewPartyPcs;
 
-        private sealed class ScreenState { internal MobileParty G; internal Settlement St; internal Dictionary<CharacterObject, int> GBefore, MainBefore; }
+        private sealed class ScreenState { internal MobileParty G; internal Settlement St; internal bool Garrison; internal string Name; internal Dictionary<CharacterObject, int> GBefore, MainBefore; }
 
-        /// <summary>Prefiks PartyScreenLogic.DoneLogic: zaloga po lewej (albo "Donate troops") - stan rosterow przed ekranem.</summary>
+        /// <summary>sklad7b: partia po lewej stronie ekranu druzyny, z ktora ludzie wymieniaja komplety - partia lorda (towarzysze i partie rodu gracza,
+        /// lord innego rodu przy "Donate Troops"); bez umarlych (sprzet umarlych poza gospodarka).</summary>
+        private static bool PartyTakesKit(MobileParty mp)
+        {
+            return mp != null && mp != MobileParty.MainParty && mp.IsActive && mp.IsLordParty && mp.LeaderHero != null && !mp.IsGarrison && !Undead.Party(mp);
+        }
+
+        /// <summary>Prefiks PartyScreenLogic.DoneLogic: zaloga po lewej (albo "Donate troops") - stan rosterow przed ekranem. sklad7b: takze partia
+        /// lorda po lewej (towarzysze i partie rodu gracza - "Manage Troops"; lord innego rodu - "Donate Troops").</summary>
         public static void ScreenDonePrefix(PartyScreenLogic __instance, ref object __state)
         {
             __state = null;
@@ -609,7 +626,8 @@ namespace Armoury
                 if (MobileParty.MainParty == null || __instance.RightOwnerParty != PartyBase.MainParty) return;
                 var left = __instance.LeftOwnerParty;
                 MobileParty g = null; bool live = false;
-                if (left != null && left.IsMobile && left.MobileParty != null && left.MobileParty.IsGarrison) { g = left.MobileParty; live = true; }
+                var lm = left != null && left.IsMobile ? left.MobileParty : null;
+                if (lm != null && (lm.IsGarrison || PartyTakesKit(lm))) { g = lm; live = true; }
                 else if (left == null)
                 {
                     var gsm = Game.Current != null ? Game.Current.GameStateManager : null;
@@ -621,7 +639,10 @@ namespace Armoury
                 if (g == null || g.MemberRoster == null) return;
                 var init = _fInitial.GetValue(__instance) as PartyScreenData;
                 if (init == null || init.RightMemberRoster == null || (live && init.LeftMemberRoster == null)) return;
-                __state = new ScreenState { G = g, St = g.CurrentSettlement ?? g.HomeSettlement, GBefore = Snapshot(live ? init.LeftMemberRoster : g.MemberRoster), MainBefore = Snapshot(init.RightMemberRoster) };
+                bool gar = g.IsGarrison;
+                var st = gar ? (g.CurrentSettlement ?? g.HomeSettlement) : null;   // sklad7b: osada (patrole BK) tylko dla zalogi
+                string name = gar ? (st != null ? "the garrison of " + st.Name : "the garrison") : (g.Name != null ? g.Name.ToString() : g.StringId);
+                __state = new ScreenState { G = g, St = st, Garrison = gar, Name = name, GBefore = Snapshot(live ? init.LeftMemberRoster : g.MemberRoster), MainBefore = Snapshot(init.RightMemberRoster) };
             }
             catch (Exception e) { __state = null; Stumble("ScreenDonePrefix", e); }
         }
@@ -639,25 +660,65 @@ namespace Armoury
                 var gNow = Snapshot(g.MemberRoster); var mNow = Snapshot(main.MemberRoster);
                 var toG = Crossed(ss.MainBefore, mNow, ss.GBefore, gNow);
                 var toMain = Crossed(ss.GBefore, gNow, ss.MainBefore, mNow);
-                string name = ss.St != null ? ss.St.Name.ToString() : g.StringId;
+                string name = ss.Name ?? g.StringId;
                 if (toG.Count > 0)
                 {
                     int men = 0; foreach (var v in toG.Values) men += v;
                     int pcs = KitsToGarrison(g, toG);
-                    _dScrToMen += men; _dScrToPcs += pcs;
-                    if (pcs > 0) Log.Player(men + " men joined the garrison of " + name + " and took " + pcs + " pieces of their own kit from your stores.");
-                    else Log.Player(men + " men joined the garrison of " + name + " with no kit of their own in your stores"
-                                    + (GarrisonKit.BareOn ? " - in battle the garrison fights only with what its stores hold." : "."), true);
+                    if (ss.Garrison) { _dScrToMen += men; _dScrToPcs += pcs; } else { _dScrToPartyMen += men; _dScrToPartyPcs += pcs; }
+                    if (pcs > 0) Log.Player(men + " men joined " + name + " and took " + pcs + " pieces of their own kit from your stores.");
+                    else if (ss.Garrison)
+                        Log.Player(men + " men joined " + name + " with no kit of their own in your stores"
+                                   + (GarrisonKit.BareOn ? " - in battle the garrison fights only with what its stores hold." : "."), true);
+                    else
+                        Log.Player(men + " men joined " + name + " with no kit of their own in your stores"
+                                   + (GarrisonKit.OwnKitOn ? " - in battle they fight only with what that party's stores hold." : "."), true);
                 }
                 if (toMain.Count > 0)
                 {
                     int men = 0; foreach (var v in toMain.Values) men += v;
                     int pcs = KitsToMain(g, ss.St, toMain);
-                    _dScrFromMen += men; _dScrFromPcs += pcs;
-                    Log.Player(men + " men left the garrison of " + name + (pcs > 0 ? " and brought " + pcs + " pieces of their kit to your stores." : " - its stores held no kit of theirs."));
+                    if (ss.Garrison) { _dScrFromMen += men; _dScrFromPcs += pcs; } else { _dScrFromPartyMen += men; _dScrFromPartyPcs += pcs; }
+                    Log.Player(men + " men left " + name + (pcs > 0 ? " and brought " + pcs + " pieces of their kit to your stores." : " - its stores held no kit of theirs."));
                 }
             }
             catch (Exception e) { Stumble("ScreenDonePostfix", e); }
+        }
+
+        /// <summary>sklad7b: nowa partia rodu (Clan -> Parties -> Create new party: PartyScreenHelper.OpenScreenAsCreateClanPartyForHeroPartyScreenClosed
+        /// tworzy partie i przenosi do niej ludzi z Twojej druzyny PO DoneLogic, na rosterach-kopiach ekranu) - stan Twojej druzyny przed.</summary>
+        public static void CreatePartyPrefix(out Dictionary<CharacterObject, int> __state)
+        {
+            __state = null;
+            try { var main = MobileParty.MainParty; if (main != null && KitMoves) __state = Snapshot(main.MemberRoster); }
+            catch (Exception e) { __state = null; Stumble("CreatePartyPrefix", e); }
+        }
+
+        /// <summary>sklad7b: po utworzeniu partii rodu - ludzie, ktorzy z Twojej druzyny przeszli do niej, biora swoje komplety (ta sama regula co
+        /// ekran druzyny: KitsToGarrison - czesc LUDZI Twojej zbrojowni, bez Twojej ksiegi, koni i sztuk na plus). Bez tego nowa partia nie ma
+        /// zbrojowni wcale (LevyGold: bez darmowego kompletu DTE), a od sklad7b jej ludzie walczylby w Twoich bitwach bez niczego.</summary>
+        public static void CreatePartyPostfix(TroopRoster __1, bool __6, Dictionary<CharacterObject, int> __state)
+        {
+            if (__6 || __state == null || __1 == null) return;
+            try
+            {
+                var main = MobileParty.MainParty;
+                if (main == null) return;
+                Hero hero = null;
+                for (int i = 0; i < __1.Count; i++) { var ch = __1.GetCharacterAtIndex(i); if (ch != null && ch.IsHero && ch.HeroObject != null) hero = ch.HeroObject; }
+                var np = hero != null ? hero.PartyBelongedTo : null;
+                if (np == null || np == main || np.MemberRoster == null) return;
+                var moved = Crossed(__state, Snapshot(main.MemberRoster), new Dictionary<CharacterObject, int>(), Snapshot(np.MemberRoster));
+                if (moved.Count == 0) return;
+                int men = 0; foreach (var v in moved.Values) men += v;
+                int pcs = KitsToGarrison(np, moved);
+                _dNewPartyMen += men; _dNewPartyPcs += pcs;
+                string name = np.Name != null ? np.Name.ToString() : np.StringId;
+                if (pcs > 0) Log.Player(men + " men joined " + name + " and took " + pcs + " pieces of their own kit from your stores.");
+                else Log.Player(men + " men joined " + name + " with no kit of their own in your stores"
+                                + (GarrisonKit.OwnKitOn ? " - in battle they fight only with what that party's stores hold." : "."), true);
+            }
+            catch (Exception e) { Stumble("CreatePartyPostfix", e); }
         }
 
         /// <summary>Ludzie (oddzial -> ilu), ktorzy ubyli po stronie A i przybyli po stronie B - min z obu (awans i werbunek jencow to nie przeniesienie).</summary>
@@ -675,7 +736,8 @@ namespace Armoury
         }
 
         /// <summary>Druzyna -> zaloga: komplety z czesci LUDZI zbrojowni druzyny (bez Twojej ksiegi, koni, unikatow i sztuk z modyfikatorem na plus -
-        /// zbrojownia AI nie zna stanow na plus, sztuka stracilaby wartosc; zostaja w druzynie jako zapas ludzi). Obita idzie obita (AiWear). Zwraca sztuki.</summary>
+        /// zbrojownia AI nie zna stanow na plus, sztuka stracilaby wartosc; zostaja w druzynie jako zapas ludzi). Obita idzie obita (AiWear). Zwraca sztuki.
+        /// sklad7b: g to kazda partia ze zbrojownia DTE - zaloga albo partia lorda (towarzysze, rod gracza, "Donate Troops", nowa partia rodu).</summary>
         private static int KitsToGarrison(MobileParty g, Dictionary<CharacterObject, int> moved)
         {
             var armory = QuartermasterLaw.DteArmory();
@@ -719,7 +781,8 @@ namespace Armoury
             return pcs;
         }
 
-        /// <summary>Zaloga -> druzyna: komplety ludzi zabranych z zalogi (regula A7; sprzet ludzi na patrolach BK zostaje) do zbrojowni druzyny jako czesc
+        /// <summary>sklad7b: takze partia lorda -> druzyna (st = null: bez patroli BK).
+        /// Zaloga -> druzyna: komplety ludzi zabranych z zalogi (regula A7; sprzet ludzi na patrolach BK zostaje) do zbrojowni druzyny jako czesc
         /// LUDZI, obite ze stanem (udzial obitych jak AiWear.MoveWorn). Id, w ktorym masz czesc w ksiedze, zostaje w zalodze - ta sama regula co zakupy
         /// ludzi (dopisany egzemplarz przesunalby Twoja czesc na gorszy). Bez koni i rzedow (Stajnia). Zwraca sztuki.</summary>
         private static int KitsToMain(MobileParty g, Settlement st, Dictionary<CharacterObject, int> moved)
@@ -1020,9 +1083,24 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Log.Error("GarrisonArmory.ApplyAll(Screen)", e); }
+            try
+            {
+                // sklad7b: nowa partia rodu - ludzie przechodza w funkcji zamkniecia ekranu (po DoneLogic)
+                if (!_createHooked)
+                {
+                    var m = AccessTools.Method(typeof(Helpers.PartyScreenHelper), "OpenScreenAsCreateClanPartyForHeroPartyScreenClosed");
+                    if (m != null)
+                    {
+                        h.Patch(m, prefix: new HarmonyMethod(typeof(GarrisonArmory), nameof(CreatePartyPrefix)), postfix: new HarmonyMethod(typeof(GarrisonArmory), nameof(CreatePartyPostfix)));
+                        _createHooked = true;
+                    }
+                }
+            }
+            catch (Exception e) { Log.Error("GarrisonArmory.ApplyAll(CreateParty)", e); }
             try { _bkPatrolType = AccessTools.TypeByName("BannerKings.Components.GarrisonPartyComponent"); } catch { _bkPatrolType = null; }
             Log.Info("GarrisonArmory: komplet z ludzmi - zostawienie " + (_leaveHooked ? "wpiete" : "BRAK") + ", zabranie " + (_takeHooked ? "wpiete" : "BRAK")
-                     + ", rozwiazanie partii " + (_disbandHooked ? "wpiete" : "BRAK") + ", ekran druzyny gracza (poprawki sklad7) " + (_screenHooked ? "wpiety" : "BRAK")
+                     + ", rozwiazanie partii " + (_disbandHooked ? "wpiete" : "BRAK") + ", ekran druzyny gracza (poprawki sklad7; sklad7b: takze partie towarzyszy, rodu i \"Donate Troops\") "
+                     + (_screenHooked ? "wpiety" : "BRAK") + ", nowa partia rodu (sklad7b) " + (_createHooked ? "wpieta" : "BRAK")
                      + "; patrole BK: typ " + (_bkPatrolType != null ? "znaleziony" : "brak") + ".");
         }
     }

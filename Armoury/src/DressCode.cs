@@ -18,8 +18,14 @@ namespace Armoury
     /// naszych dolozek i niczego nie gubi. Nikt nie walczy nago - ani
     /// wrog, ani nasi, w zadnej misji.
     /// WYJATEK K1c (Jeff 09.10, P2): zaloga w trybie GarrisonFightsWithArmoryOnly
-    /// walczy tylko tym, co ma w zbrojowni - jej przydzialow nie ubieramy
-    /// (GarrisonKit.IsBareEquipment).
+    /// walczy tylko tym, co ma w zbrojowni - jej przydzialow nie ubieramy.
+    /// sklad7b (Jeff 09.10 07:35: "jesli nie ma sprzetu, to nie ma sprzetu, nic
+    /// nie dostaje z kosmosu"; lordowie AI "walcza tylko tym, co maja"): przy
+    /// TroopsFightWithOwnKitOnly to samo dla druzyny gracza i partii lordow AI
+    /// (takze towarzyszy i partii rodu) - GarrisonKit.OwnKitSpawn (tam tez ostatnia
+    /// straz "nic z niczego" przy spawnie). Po bitwie DTE oddawal nasze dolozki do
+    /// zbrojowni (zwrot liczy sie z ekwipunku agenta), wiec ubranie bylo mennica.
+    /// Zostaja: partie bez zbrojowni DTE (bandyci, karawany, milicja...) i umarli.
     /// </summary>
     internal static class DressCode
     {
@@ -39,7 +45,8 @@ namespace Armoury
                 // K1c (przeglad K1b, Jeff 09.10 P2 "reszta walczy bez uzbrojenia po prostu"): zaloga w trybie "tylko to, co ma" walczy
                 // tylko sprzetem ze swojej zbrojowni - pusty slot zostaje pusty. Dotad ubieralismy go ze wzorca (z niczego, na klonie,
                 // bez oznaczenia jako tymczasowy), a po bitwie DTE oddawal te sztuki do zbrojowni zalogi.
-                if (GarrisonKit.IsBareEquipment(eq)) return;
+                // sklad7b: takze druzyna gracza i lordowie AI (TroopsFightWithOwnKitOnly) - i tu ostatnia straz "nic z niczego"
+                if (GarrisonKit.OwnKitSpawn(eq)) return;
                 var ch = agentBuildData.AgentCharacter;
                 if (ch == null || ch.IsHero) return;
 
@@ -103,7 +110,7 @@ namespace Armoury
                 var m = AccessTools.Method(typeof(Mission), "SpawnAgent");
                 if (m == null) { Log.Info("DressCode: brak Mission.SpawnAgent."); return; }
                 h.Patch(m, prefix: new HarmonyMethod(typeof(DressCode), "Prefix") { priority = Priority.Last });
-                Log.Info("DressCode: nikt nie walczy nago - pusty przydzial pancerza dostaje ubranie ze wzorca.");
+                Log.Info("DressCode: pusty przydzial pancerza dostaje ubranie ze wzorca - poza ludzmi, ktorzy walcza tylko tym, co maja (zalogi; sklad7b: druzyna gracza i lordowie AI przy Troops Fight With Own Kit Only).");
             }
             catch (Exception e) { Log.Error("DressCode.ApplyAll", e); }
         }

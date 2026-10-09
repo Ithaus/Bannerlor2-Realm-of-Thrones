@@ -616,7 +616,11 @@ namespace Armoury
         [SettingPropertyGroup("The finished piece")]
         public int GarrisonArmoryMinFillPercent { get; set; } = 75;
 
-        [SettingPropertyBool("Lord Battle Kit Is Lent", HintText = "in your battles Dynamic Troop Equipment fills an AI lord's soldier's empty slots with his template kit out of thin air: that kit is only lent for the battle and no longer goes into the lord's stores afterwards (nor into your spoils from them); the men still fight with it (off: as before, it stays in the lord's stores)")]
+        [SettingPropertyBool("Troops Fight With Own Kit Only", HintText = "in your battles every soldier - yours and AI lords' (your companions' and clan parties' too) - fights only with the kit his party's stores hold: a man with no piece for a slot fights without it. Dynamic Troop Equipment no longer gives your men emergency peasant kit nor fills AI lords' men's empty slots with template kit out of thin air, and in auto-resolved battles you loot only what they really had. An AI rider still rides his own horse (paid for when he was promoted), lent for the battle and never added to the stores; heroes keep their own gear; the dead of the Night King are not affected (off: as before - see Lord Battle Kit Is Lent)")]
+        [SettingPropertyGroup("The finished piece")]
+        public bool TroopsFightWithOwnKitOnly { get; set; } = true;
+
+        [SettingPropertyBool("Lord Battle Kit Is Lent", HintText = "only when Troops Fight With Own Kit Only is off: in your battles Dynamic Troop Equipment fills an AI lord's soldier's empty slots with his template kit out of thin air: that kit is only lent for the battle and no longer goes into the lord's stores afterwards (nor into your spoils from them); the men still fight with it (off: as before, it stays in the lord's stores)")]
         [SettingPropertyGroup("The finished piece")]
         public bool LordBattleKitIsLent { get; set; } = false;
 
@@ -2940,7 +2944,7 @@ namespace Armoury
         [SettingPropertyGroup("Arming the garrisons")]
         public bool GarrisonArmoryRestoreOldSave { get; set; } = true;
 
-        [SettingPropertyBool("Kit Moves With Men", HintText = "when a lord leaves men in a garrison or takes men from it, when you move men between your party and a garrison on the party screen, or a disbanded party joins a garrison, the men's arms go with them (from your stores only the men's own kit - never yours, horses stay with the stables); men of a disbanded party who go home take their own kit and the spare is sold for their house (off = as before: men move without their arms)")]
+        [SettingPropertyBool("Kit Moves With Men", HintText = "when a lord leaves men in a garrison or takes men from it, when you move men between your party and a garrison or another party on the party screen (Manage garrison, Manage Troops of your companions' and clan parties, Donate Troops, creating a clan party), or a disbanded party joins a garrison, the men's arms go with them (from your stores only the men's own kit - never yours, horses stay with the stables); men of a disbanded party who go home take their own kit and the spare is sold for their house (off = as before: men move without their arms)")]
         [SettingPropertyGroup("Arming the garrisons")]
         public bool KitMovesWithMen { get; set; } = true;
 
@@ -3253,6 +3257,7 @@ namespace Armoury
             s.GarrisonArmoryInBattle = GarrisonArmoryInBattle;
             s.GarrisonFightsWithArmoryOnly = GarrisonFightsWithArmoryOnly;
             s.GarrisonArmoryMinFillPercent = GarrisonArmoryMinFillPercent;
+            s.TroopsFightWithOwnKitOnly = TroopsFightWithOwnKitOnly;
             s.LordBattleKitIsLent = LordBattleKitIsLent;
             s.AiWearEnabled = AiWearEnabled;
             s.MineWagesStayInTown = MineWagesStayInTown;
