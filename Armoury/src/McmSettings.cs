@@ -2820,13 +2820,13 @@ namespace Armoury
         [SettingPropertyGroup("Arms production")]
         public bool BkSuppliesNoArms { get; set; } = true;
 
+        [SettingPropertyBool("Bk Supplies No Arms Player", HintText = "the same for your own party: weapons, shields and arrows wear out by Armoury's rules only, not also by Banner Kings supplies (off until you decide - question 5 of package 174)")]
+        [SettingPropertyGroup("Arms production")]
+        public bool BkSuppliesNoArmsPlayer { get; set; } = false;
+
         [SettingPropertyBool("Workshop State In Save", HintText = "work in progress at town workshops (pieces begun, raw material already bought, unmet orders) is kept in the save, so a long piece of armour survives saving and loading")]
         [SettingPropertyGroup("Arms production")]
         public bool WorkshopStateInSave { get; set; } = true;
-
-        [SettingPropertyBool("Bk Supplies No Arms Player", HintText = "")]
-        [SettingPropertyGroup("Arms production")]
-        public bool BkSuppliesNoArmsPlayer { get; set; } = false;
 
         [SettingPropertyBool("Workshop Hands Follow Material", HintText = "a workshop's hands go only to lines that can work today - a piece already in hand, or the ore, wood, leather and cloth for a new one on the town's stall (and a piece it can finish within Workshop Plan Days)")]
         [SettingPropertyGroup("Arms production")]
@@ -2856,9 +2856,33 @@ namespace Armoury
         [SettingPropertyGroup("Arms production")]
         public float WorkshopLineShortageShare { get; set; } = 0.75f;
 
-        [SettingPropertyFloatingInteger("Workshop Plan Days", 0.00f, 240.00f, "0.00", HintText = "a workshop starts no piece it cannot finish within this many days with an even share of its craft's hands, and banks no more than this many days of work (14-120)        // the same for your own party: weapons, shields and arrows wear out by Armoury's rules only, not also by Banner Kings supplies (off until you decide - question 5 of package 174)")]
+        [SettingPropertyFloatingInteger("Workshop Plan Days", 0.00f, 240.00f, "0.00", HintText = "a workshop starts no piece it cannot finish within this many days with an even share of its craft's hands, and banks no more than this many days of work (14-120)")]
         [SettingPropertyGroup("Arms production")]
         public float WorkshopPlanDays { get; set; } = 60f;
+
+        [SettingPropertyBool("Town Material Orders", HintText = "a town whose smiths, fletchers, weavers or tanners stood idle for want of a raw material hires a caravan in a nearby friendly town that has more than it needs: the caravan buys the load there at the market price and carries it by road - a real party on the map that bandits can rob - and sells it to the town on arrival")]
+        [SettingPropertyGroup("Arms production")]
+        public bool TownMaterialOrders { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Town Material Order Range Ore", 0.00f, 800.00f, "0.00", HintText = "farthest (map distance) iron ore is carried - two or three days; ore travelled short, iron came from afar as bars")]
+        [SettingPropertyGroup("Arms production")]
+        public float TownMaterialOrderRangeOre { get; set; } = 200f;
+
+        [SettingPropertyFloatingInteger("Town Material Order Range", 0.00f, 2400.00f, "0.00", HintText = "farthest timber, leather, cloth, flax, hides and wool are carried - about ten days on the road")]
+        [SettingPropertyGroup("Arms production")]
+        public float TownMaterialOrderRange { get; set; } = 600f;
+
+        [SettingPropertyInteger("Town Material Order Days", 0, 12, "0", HintText = "a town orders the same raw material at most once in this many days")]
+        [SettingPropertyGroup("Arms production")]
+        public int TownMaterialOrderDays { get; set; } = 3;
+
+        [SettingPropertyFloatingInteger("Carter Pence Per Kg Per100", 0.00f, 1.00f, "0.00", HintText = "cost of carrying one kilogram 100 leagues by road, which the caravan must earn before it takes the order (about 1.5 pence a ton a mile in 14th-century England)")]
+        [SettingPropertyGroup("Arms production")]
+        public float CarterPencePerKgPer100 { get; set; } = 0.0375f;
+
+        [SettingPropertyFloatingInteger("Sea Freight Share", 0.00f, 1.00f, "0.00", HintText = "cost of a sea leg as a share of the same distance by road")]
+        [SettingPropertyGroup("Arms production")]
+        public float SeaFreightShare { get; set; } = 0.25f;
 
         public void ApplyTo(Settings s)
         {
@@ -3564,8 +3588,8 @@ namespace Armoury
             s.ArmsNoStallDecay = ArmsNoStallDecay;
             s.ArmsStallUpkeepManDaysPerPiece = ArmsStallUpkeepManDaysPerPiece;
             s.BkSuppliesNoArms = BkSuppliesNoArms;
-            s.WorkshopStateInSave = WorkshopStateInSave;
             s.BkSuppliesNoArmsPlayer = BkSuppliesNoArmsPlayer;
+            s.WorkshopStateInSave = WorkshopStateInSave;
             s.WorkshopHandsFollowMaterial = WorkshopHandsFollowMaterial;
             s.WorkshopFreedHandsByShortage = WorkshopFreedHandsByShortage;
             s.WorkshopChooseByShortage = WorkshopChooseByShortage;
@@ -3574,6 +3598,12 @@ namespace Armoury
             s.WorkshopMunitionShare = WorkshopMunitionShare;
             s.WorkshopLineShortageShare = WorkshopLineShortageShare;
             s.WorkshopPlanDays = WorkshopPlanDays;
+            s.TownMaterialOrders = TownMaterialOrders;
+            s.TownMaterialOrderRangeOre = TownMaterialOrderRangeOre;
+            s.TownMaterialOrderRange = TownMaterialOrderRange;
+            s.TownMaterialOrderDays = TownMaterialOrderDays;
+            s.CarterPencePerKgPer100 = CarterPencePerKgPer100;
+            s.SeaFreightShare = SeaFreightShare;
         }
 
         internal static void Apply()

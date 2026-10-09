@@ -202,7 +202,7 @@ namespace Armoury
         {
             return Campaign.Current != null && Campaign.Current.GameStarted      // przed startem SellItemsAction nie przenosi zlota karawan
                    && mp.IsActive && mp.IsPartyTradeActive && mp.MapEvent == null && mp.ItemRoster != null && mp.Party != null
-                   && (mp.Ai == null || !mp.Ai.DoNotMakeNewDecisions);            // karawany posilkow DTE nie handluja
+                   && (mp.Ai == null || !mp.Ai.DoNotMakeNewDecisions || MaterialOrders.HasContract(mp));   // karawany posilkow DTE nie handluja; 174.2: karawana z kontraktem surowca handluje
         }
 
         /// <summary>Zapas docelowy miasta w sztukach rynku. Zamek nie ma rzemieslnikow ani warsztatow - nie trzyma nic dla siebie.</summary>
@@ -238,6 +238,24 @@ namespace Armoury
                 return true;
             }
             return false;
+        }
+
+        /// <summary>174.2: zuzycie dobowe surowca w miescie (szacunek z rak - ten sam, z ktorego karawany licza zapas docelowy); 0 = spoza tabeli albo zamek.</summary>
+        internal static float UseFor(Town town, ItemObject item)
+        {
+            var s = Settings.Current;
+            if (s == null || town == null || item == null || !town.IsTown || !Ready()) return 0f;
+            foreach (var g in _goods) if (g.Item == item) return Use(town, g, s);
+            return 0f;
+        }
+
+        /// <summary>174.2: prog nadwyzki miasta (ponizej niego nie sprzedaje karawanom) - prog zrodla kontraktow surowca; 0 = spoza tabeli albo zamek.</summary>
+        internal static int KeepFor(Town town, ItemObject item)
+        {
+            var s = Settings.Current;
+            if (s == null || town == null || item == null || !town.IsTown || !Ready()) return 0;
+            foreach (var g in _goods) if (g.Item == item) return Keep(town, g, s);
+            return 0;
         }
 
         /// <summary>Kategorie surowcow masowych z tabeli (dla ceny surowcow i jej logu), w kolejnosci tabeli. Pusta = przedmioty nie wczytane.</summary>
@@ -358,7 +376,7 @@ namespace Armoury
             foreach (var g in _goods) if (g.Buyers > 0) g.SellPrice /= g.Buyers;      // nikt nie kupuje = 0, a wtedy nikt tez nie kupuje na wywoz
             foreach (var c in MobileParty.AllCaravanParties)
             {
-                if (c == null || !c.IsActive || c.ItemRoster == null || !c.IsPartyTradeActive || (c.Ai != null && c.Ai.DoNotMakeNewDecisions)) continue;   // tylko karawany, ktore handluja
+                if (c == null || !c.IsActive || c.ItemRoster == null || !c.IsPartyTradeActive || (c.Ai != null && c.Ai.DoNotMakeNewDecisions && !MaterialOrders.HasContract(c))) continue;   // tylko karawany, ktore handluja (174.2: z kontraktem tez)
                 caravans++;
                 bool stands = c.CurrentSettlement != null;
                 if (stands) inTown++;

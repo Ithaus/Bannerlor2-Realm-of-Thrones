@@ -153,7 +153,7 @@ namespace Armoury
         {
             return Campaign.Current != null && Campaign.Current.GameStarted
                    && mp.IsActive && mp.IsPartyTradeActive && mp.MapEvent == null && mp.ItemRoster != null && mp.Party != null
-                   && (mp.Ai == null || !mp.Ai.DoNotMakeNewDecisions);
+                   && (mp.Ai == null || !mp.Ai.DoNotMakeNewDecisions || MaterialOrders.HasContract(mp));   // 174.2: karawana z kontraktem surowca handluje
         }
 
         /// <summary>Amunicja w taborach (pozycja z modyfikatorem osobno). null = brak.</summary>
@@ -387,7 +387,7 @@ namespace Armoury
                         }
                         if (here <= 0) continue;
                         carriers++;
-                        if (mp.Ai != null && mp.Ai.DoNotMakeNewDecisions) idle += here;
+                        if (mp.Ai != null && mp.Ai.DoNotMakeNewDecisions && !MaterialOrders.HasContract(mp)) idle += here;
                     }
                 }
                 var sb = new StringBuilder();

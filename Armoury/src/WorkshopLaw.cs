@@ -293,7 +293,7 @@ namespace Armoury
                         if (!started)
                         {
                             if (reason == 1) _skipLoss++;
-                            else if (reason == 2) { _skipMat++; for (int m = 0; m < 4; m++) if ((miss & (1 << m)) != 0) _skipMatBy[m]++; }
+                            else if (reason == 2) { _skipMat++; for (int m = 0; m < 4; m++) if ((miss & (1 << m)) != 0) _skipMatBy[m]++; MaterialOrders.NoteMissMask(town, miss); }   // 174.2: sygnal zamowienia surowca
                             else if (reason == 4) _skipGold++;
                             else if (planRej) _skipPlan++;
                             break;
@@ -364,7 +364,7 @@ namespace Armoury
         {
             for (int m = 0; m < 4; m++)
             {
-                if (st.Take[m] > 0 && st.Mats[m] != null) { shelf.AddToCounts(st.Mats[m], -st.Take[m]); OreLedger.NoteWorkshop(st.Mats[m], st.Take[m]); }
+                if (st.Take[m] > 0 && st.Mats[m] != null) { shelf.AddToCounts(st.Mats[m], -st.Take[m]); OreLedger.NoteWorkshop(st.Mats[m], st.Take[m]); MaterialOrders.NoteUse(town, st.Mats[m], st.Take[m]); }
                 owed[m] = owed[m] + c.Need[m] - st.Take[m];
             }
             workshop.ChangeGold(-st.Mc);

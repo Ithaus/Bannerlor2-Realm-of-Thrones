@@ -208,7 +208,7 @@ namespace Armoury
             int how = None;
             try
             {
-                if (_redir != null || !On() || p.IsMainParty || p.IsVillager) how = None;   // nasz wlasny rozkaz zastepczy / wylaczone / gracz / woz wsi (CartTownExit)
+                if (_redir != null || !On() || p.IsMainParty || p.IsVillager || MaterialOrders.HasContract(p)) how = None;   // nasz wlasny rozkaz zastepczy / wylaczone / gracz / woz wsi (CartTownExit) / 174.2: kontrakt surowca (odrzucony rozkaz = zwolnienie, nie inny cel)
                 else
                 {
                     // (c) jedna regula dla wszystkich partii: kto ma statki i lad, jedzie tam, gdzie kazal BK, ladem i morzem

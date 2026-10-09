@@ -439,6 +439,7 @@ namespace Armoury
                         {
                             shelf.AddToCounts(mats[m], -take);
                             OreLedger.NoteFletch(mats[m], take);    // ksiega rudy i drewna: pozycja "strzelarze (172)"
+                            MaterialOrders.NoteUse(town, mats[m], take);   // 174.2: zmierzone zuzycie miasta
                             _dTaken[m] += take;
                         }
                         owed[m] = owed[m] + nd[m] - Math.Max(0, take);
@@ -455,7 +456,7 @@ namespace Armoury
                 if (steps >= MaxSteps) _dGuard++;
                 if (reason == 0) reason = 3;                                // skonczyly sie rece (albo bezpiecznik)
                 if (reason == 1) _dNoProfit++;
-                else if (reason == 2) { _dNoInput++; for (int m = 0; m < 4; m++) if ((miss & (1 << m)) != 0) _dMissBy[m]++; }
+                else if (reason == 2) { _dNoInput++; for (int m = 0; m < 4; m++) if ((miss & (1 << m)) != 0) _dMissBy[m]++; MaterialOrders.NoteMissMask(town, miss); }   // 174.2: sygnal zamowienia surowca
                 else _dNoHands++;
                 float idle = Math.Max(0f, hands);
                 st.Labor = Math.Max(0f, -hands);                          // rece bez roboty nie odkladaja sie; zaczety snop ponad dzisiejsze rece - dlug na jutro

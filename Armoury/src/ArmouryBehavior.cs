@@ -386,7 +386,7 @@ namespace Armoury
         }
         private Dictionary<string,int> _prisonerBaseline;
 
-        public ArmouryBehavior() { Instance = this; HistoricalPrices.Reset(); MaterialLaw.Reset(); WesterosClimate.Reset(); OutlawLaw.Reset(); PopulationLaw.Reset(); WorkshopLaw.Reset(); IronBank.Reset(); MarketGlut.Reset(); ArmsPricing.Reset(); StartKit.Reset(); AiGear.Reset(); Levy.Reset(); VolunteerKit.Reset(); LevyGold.Reset(); WearKeep.Reset(); UniqueSpoils.Reset(); BuildDiary.Reset(); BuildFunding.Reset(); KingdomLedger.Reset(); ColdStart.Reset(); MenPurse.Reset(); ArmyClothing.Reset(); AiWear.Reset(); SmithHours.Reset(); RecruitKit.Reset(); OreLedger.Reset(); GoodsLedger.Reset(); FreeSupplies.Reset(); VillageWoodlot.Reset(); SpoilsSeal.Reset(); MarketRoad.Reset(); MarketCarts.Reset(); VillageClogDiag.Reset(); CartTownExit.Reset(); MoneyLedger.Reset(); PeopleLedger.Reset(); CaravanBulk.Reset(); StartStock.Reset(); MineralOnce.Reset(); SoldierPay.Reset(); KingdomTreasury.Reset(); RecruitCost.Reset(); RecruitSources.Reset(); GarrisonCarts.Reset(); GarrisonArmory.Reset(); ArmsDrill.Reset(); CaravanAmmo.Reset(); ArmsLeaks.Reset(); SupplyDemand.ResetOrders(); }   // stan jednej kampanii nie przecieka do drugiej (audyt 04.10)
+        public ArmouryBehavior() { Instance = this; HistoricalPrices.Reset(); MaterialLaw.Reset(); WesterosClimate.Reset(); OutlawLaw.Reset(); PopulationLaw.Reset(); WorkshopLaw.Reset(); IronBank.Reset(); MarketGlut.Reset(); ArmsPricing.Reset(); StartKit.Reset(); AiGear.Reset(); Levy.Reset(); VolunteerKit.Reset(); LevyGold.Reset(); WearKeep.Reset(); UniqueSpoils.Reset(); BuildDiary.Reset(); BuildFunding.Reset(); KingdomLedger.Reset(); ColdStart.Reset(); MenPurse.Reset(); ArmyClothing.Reset(); AiWear.Reset(); SmithHours.Reset(); RecruitKit.Reset(); OreLedger.Reset(); GoodsLedger.Reset(); FreeSupplies.Reset(); VillageWoodlot.Reset(); SpoilsSeal.Reset(); MarketRoad.Reset(); MarketCarts.Reset(); VillageClogDiag.Reset(); CartTownExit.Reset(); MoneyLedger.Reset(); PeopleLedger.Reset(); CaravanBulk.Reset(); StartStock.Reset(); MineralOnce.Reset(); SoldierPay.Reset(); KingdomTreasury.Reset(); RecruitCost.Reset(); RecruitSources.Reset(); GarrisonCarts.Reset(); GarrisonArmory.Reset(); ArmsDrill.Reset(); CaravanAmmo.Reset(); ArmsLeaks.Reset(); SupplyDemand.ResetOrders(); MaterialOrders.Reset(); }   // stan jednej kampanii nie przecieka do drugiej (audyt 04.10)
 
         public override void SyncData(IDataStore dataStore)
         {
@@ -505,6 +505,9 @@ namespace Armoury
             catch (Exception e) { Log.Error("SyncData.arm_workshops", e); }
             try { string un = dataStore.IsSaving ? SupplyDemand.ExportOrders() : null; SaveText.Sync(dataStore, "arm_unmet", ref un); if (dataStore.IsLoading) SupplyDemand.ImportOrders(un); }
             catch (Exception e) { Log.Error("SyncData.arm_unmet", e); }
+            // 174.2: kontrakty surowca w drodze (karawana, cel, zrodlo, surowiec, ilosc) - zawsze, takze przy wylaczonym wylaczniku (po wczytaniu karawana zwolniona)
+            try { string mo = dataStore.IsSaving ? MaterialOrders.Export() : null; SaveText.Sync(dataStore, "arm_matorders", ref mo); if (dataStore.IsLoading) MaterialOrders.Import(mo); }
+            catch (Exception e) { Log.Error("SyncData.arm_matorders", e); }
         }
 
         public override void RegisterEvents()
@@ -520,6 +523,7 @@ namespace Armoury
             CampaignEvents.SettlementEntered.AddNonSerializedListener(this, AiGear.OnSettlementEntered);
             CampaignEvents.SettlementEntered.AddNonSerializedListener(this, CaravanAmmo.OnEntered);   // paczka 172b: amunicja z taborow karawany na polke miasta (cena rynkowa, kasa miasta); dopisana PRZED CaravanBulk, wiec idzie PO nim - surowce, ktorych miastu brakuje, pierwsze do kasy miasta
             CampaignEvents.SettlementEntered.AddNonSerializedListener(this, CaravanBulk.OnEntered);   // wpis 103: karawana sprzedaje miastu surowiec masowy, ktorego mu brakuje
+            CampaignEvents.SettlementEntered.AddNonSerializedListener(this, MaterialOrders.OnEntered);   // 174.2: dostawa kontraktu surowca - dopisana PO CaravanBulk, wiec idzie PRZED nim (najpierw zamowiony ladunek)
             CampaignEvents.OnSettlementLeftEvent.AddNonSerializedListener(this, MenPurse.OnLeft);
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, delegate { try { TroopSelfMend.Hourly(); } catch { } });
             CampaignEvents.DailyTickPartyEvent.AddNonSerializedListener(this, AiGear.OnDailyTickParty);
@@ -545,6 +549,7 @@ namespace Armoury
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, AiWear.OnMapEventEnded);   // wpis 85
             CampaignEvents.VillageLooted.AddNonSerializedListener(this, OutlawLaw.OnVillageLooted);
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, GoodsLedger.OnPartyDestroyed);  // paczka 146: towar, ktory przepada z partia (tylko log)
+            CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, MaterialOrders.OnPartyDestroyed);   // 174.2: kontrakt przepada z rozbita karawana (ladunek - jak w grze)
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, OutlawLaw.OnPartyDestroyed);
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, MenPurse.OnPartyDestroyed);   // wpis 89
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, ArmyClothing.OnPartyDestroyed);   // 150
@@ -996,6 +1001,7 @@ namespace Armoury
             // echo ROT, gdy typu nie bylo przy starcie; cwiczenia wlasna bronia - latki modeli w kampanii (modele BK czytaja singletony BK)
             try { GarrisonCarts.ResolvePending("wczytanie"); } catch (Exception e) { Log.Error("GarrisonCarts.ResolvePending", e); }
             try { WorkshopLaw.ResolvePending("wczytanie"); } catch (Exception e) { Log.Error("WorkshopLaw.ResolvePending", e); }   // 174.0b: robota w toku warsztatow z zapisu (przed pierwszym cyklem)
+            try { MaterialOrders.ResolvePending("wczytanie"); } catch (Exception e) { Log.Error("MaterialOrders.ResolvePending", e); }   // 174.2: kontrakty surowca na karawany z zapisu
             try { GarrisonArmory.Restore("wczytanie"); } catch (Exception e) { Log.Error("GarrisonArmory.Restore", e); }
             try { RecruitSources.ApplyLate(); } catch (Exception e) { Log.Error("RecruitSources.ApplyLate", e); }
             try { ArmsDrill.EnsureHooks(); } catch (Exception e) { Log.Error("ArmsDrill.EnsureHooks", e); }
@@ -1285,6 +1291,9 @@ namespace Armoury
             try { GarrisonArmory.Daily(); } catch (Exception e) { Log.Error("GarrisonArmory.Daily", e); }   // nadwyzki zalog raz w tygodniu, linia "Zbrojownie zalog (171): dzien"
             try { ArmsDrill.Daily(); } catch (Exception e) { Log.Error("ArmsDrill.Daily", e); }             // linie "Cwiczenia (171)" i co 5 dob "Pokrycie zbrojowni AI (171)" (tylko log)
             try { SupplyDemand.DailyTrade(); } catch (Exception e) { Log.Error("SupplyDemand.DailyTrade", e); }
+            try { MoneyLedger.Mark(MoneyLedger.MRest); } catch { }   // 174.2: kasy osad przed kontraktami - pozostale moduly osobno
+            try { MaterialOrders.Daily(); } catch (Exception e) { Log.Error("MaterialOrders.Daily", e); }   // 174.2: kontrakty surowca dla prawdziwych karawan (po handlu bronia i wozach zamkow), linia "Kontrakty surowca (174)"
+            try { MoneyLedger.Mark(MoneyLedger.MOrders); } catch { }
             try { SellByCondition.Daily(); } catch (Exception e) { Log.Error("SellByCondition.Daily", e); }   // cena sprzedazy sprzetu: linia "Skup sprzetu" wedlug sprzedajacego (tylko log)
             try { RecruitCost.Daily(); } catch (Exception e) { Log.Error("RecruitCost.Daily", e); }   // poprawka 157 / paczka 160: linia "Konie rekrutow" (tylko log)
             try { MountedWage.Daily(); } catch (Exception e) { Log.Error("MountedWage.Daily", e); }   // paczka 160: linia "Zold konnych (160)" - sklad wojska i premia konnego (tylko log)
