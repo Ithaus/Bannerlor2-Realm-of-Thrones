@@ -2602,6 +2602,21 @@ namespace CrashScribe
             return note == null ? part : note + ", " + part;
         }
 
+        /// <summary>Z16: umiejetnosci gracza wobec wymogu jego zestawu bojowego - "Atletyka 60 (zestaw wymaga 175); Luk ...".</summary>
+        private static string PlayerSkillsText()
+        {
+            try
+            {
+                var mh = Hero.MainHero;
+                if (mh == null) return "brak gracza";
+                int ath, bow, xbow, pc;
+                HeroGearNeed(mh, out ath, out bow, out xbow, out pc);
+                return "Atletyka " + mh.GetSkillValue(DefaultSkills.Athletics) + " (zestaw wymaga " + ath + "); Luk "
+                       + mh.GetSkillValue(DefaultSkills.Bow) + "/" + bow + "; Kusza " + mh.GetSkillValue(DefaultSkills.Crossbow) + "/" + xbow;
+            }
+            catch { return "?"; }
+        }
+
         private static string HeroLabel(Hero h)
         {
             try { return (h.Name != null ? h.Name.ToString() : "?") + " [" + h.StringId + "]"; }
@@ -2610,6 +2625,10 @@ namespace CrashScribe
 
         // kolejka z gardla EquipmentHelper (przydzial z szablonu) - liczona w najblizszej godzinie; nie w zapisie
         private static readonly System.Collections.Generic.HashSet<Hero> _sinewQueue = new System.Collections.Generic.HashSet<Hero>();
+
+        // pierwszy dzienny przeglad po wczytaniu ma wlasna etykiete: na nowej kampanii to "jeszcze raz z pierwszym dniem"
+        // (jak SinewApplied u zolnierzy) - podniesienia tam nie sa nieznana droga
+        private static bool _sinewFirstDay = true;
 
         /// <summary>Z16: postfiks na Helpers.EquipmentHelper.AssignHeroEquipmentFromEquipment - tylko DOPISUJE bohatera do
         /// kolejki. Harmony puszcza postfiks takze po DressedOrNot zwracajacym false (null w argumentach) - stad straznik.</summary>
@@ -2663,12 +2682,13 @@ namespace CrashScribe
             try
             {
                 bool load = when == "wczytanie";
-                if (load) lock (_sinewQueue) _sinewQueue.Clear();   // wczytanie liczy wszystkich; kolejka z poprzedniej kampanii precz
+                if (load) { lock (_sinewQueue) _sinewQueue.Clear(); _sinewFirstDay = true; }   // wczytanie liczy wszystkich; kolejka z poprzedniej kampanii precz
                 bool on = HeroSkillOn();
                 if (!on && !load) return;
                 var sw = System.Diagnostics.Stopwatch.StartNew();
                 var heroes = new System.Collections.Generic.List<Hero>();
                 foreach (var h in Hero.AllAliveHeroes) if (IsAiHeroForSinew(h)) heroes.Add(h);
+                string playerBefore = PlayerSkillsText();
 
                 int[] overBefore = new int[3], overAfter = new int[3];
                 int piecesBefore = 0, piecesAfter = 0;
@@ -2709,25 +2729,19 @@ namespace CrashScribe
                 int total = nLords + nComp + nOther;
                 if (!load)
                 {
+                    bool first = _sinewFirstDay;
+                    _sinewFirstDay = false;
                     if (total > 0)
                         Scribe.Line("Mends: Z16 (dzien " + (int)CampaignTime.Now.ToDays + ") - przeglad bohaterow AI: podniesiono " + total
-                                    + " (droga bez gardla EquipmentHelper albo nowa - zbadac): " + names + (total > 20 ? "; ..." : "") + ".");
+                                    + (first ? " (pierwsza doba po wczytaniu - na nowej kampanii sprzet/umiejetnosci ustawione po starcie sesji)"
+                                             : " (droga bez gardla EquipmentHelper albo nowa - zbadac)")
+                                    + ": " + names + (total > 20 ? "; ..." : "") + ".");
                     return;
                 }
-                string player = "gracz: brak";
-                try
-                {
-                    var mh = Hero.MainHero;
-                    if (mh != null)
-                    {
-                        int ath, bow, xbow, pc;
-                        HeroGearNeed(mh, out ath, out bow, out xbow, out pc);
-                        player = "gracz bez zmian (Atletyka " + mh.GetSkillValue(DefaultSkills.Athletics) + ", zestaw wymaga " + ath
-                                 + "; Luk " + mh.GetSkillValue(DefaultSkills.Bow) + "/" + bow
-                                 + "; Kusza " + mh.GetSkillValue(DefaultSkills.Crossbow) + "/" + xbow + ")";
-                    }
-                }
-                catch { }
+                string playerAfter = PlayerSkillsText();
+                string player = playerBefore == playerAfter
+                    ? "gracz bez zmian (" + playerAfter + ")"
+                    : "GRACZ ZMIENIONY - BLAD (przed " + playerBefore + ", po " + playerAfter + ")";
                 var sb = new System.Text.StringBuilder("Mends: Z16 (wczytanie) - bohaterowie AI (" + heroes.Count + ", dorosli, bez gracza i notabli)");
                 sb.Append(" ponad wymog wlasnego zestawu bojowego PRZED: Atletyka ").Append(overBefore[0]).Append(", Luk ").Append(overBefore[1])
                   .Append(", Kusza ").Append(overBefore[2]).Append("; ");

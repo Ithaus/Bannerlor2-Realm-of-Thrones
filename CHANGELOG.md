@@ -1,5 +1,16 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-09 (Z16-1b CS) - POPRAWKI SAMOPRZEGLADU Z16-1 (tylko logi): gracz w linii wczytania porownany PRZED i PO przegladzie, pierwsza doba po wczytaniu z wlasna etykieta
+**Mod:** CrashScribe | **Projekt:** `docs/PROJEKT-Z16-WYMOGI-BOHATEROW-2026-10-09.md` rozdz. 3.2, 6 (pkt 1 i 3) | **Pliki:** `CrashScribe/src/Mends.cs` (`HeroSinewAll`, nowe `PlayerSkillsText`, pole `_sinewFirstDay`). Na Z16-1. Status: **NIEWGRANE**.
+
+**Problem (samoprzeglad po Z16-1):** (1) linia "Z16 (wczytanie)" pisala "gracz bez zmian" na sztywno - bez porownania, wiec pkt 1 planu testu ("gracz: Atletyka, Luk, Kusza przed = po") nie dalo sie z niej sprawdzic. (2) Pierwszy dzienny przeglad po wczytaniu nowej kampanii jest celowo "jeszcze raz z pierwszym dniem" (projekt 3.2 pkt 1) - gdyby tam ktos zostal podniesiony, linia mowilaby "droga bez gardla ... zbadac", czyli falszywy alarm.
+
+**Zmiana:** (1) umiejetnosci gracza wobec wymogu jego zestawu (`PlayerSkillsText`: "Atletyka P (zestaw wymaga W); Luk p/w; Kusza p/w") liczone przed i po przegladzie; linia mowi "gracz bez zmian (...)" tylko, gdy oba napisy sa rowne, inaczej "GRACZ ZMIENIONY - BLAD (przed ..., po ...)". (2) pierwszy dzienny przeglad po wczytaniu (`_sinewFirstDay`, ustawiane przy wczytaniu) - etykieta "pierwsza doba po wczytaniu - na nowej kampanii sprzet/umiejetnosci ustawione po starcie sesji"; kolejne doby jak dotad ("droga bez gardla EquipmentHelper albo nowa - zbadac").
+
+**Ryzyko / co sprawdzic:** tylko tekst logu; podnoszenie, kolejka i warunki bez zmian. Build kod 0, 0 ostrzezen.
+
+**Status:** NIEWGRANE (razem z Z16-1).
+
 ## 2026-10-09 (Z16-1 CS) - WYMOGI SPRZETU U BOHATEROW, ETAP 1: lordom AI, towarzyszom i doroslej rodzinie gracza Atletyka, Luk i Kusza podniesione do wymogu ich WLASNEGO zestawu bojowego (tylko w gore, nic nie zdejmujemy, gracz nigdy) - przy wczytaniu, po kazdym przydziale z szablonu i w dziennym przegladzie; gracz zaklada sztuke kanonu tylko, gdy ja udzwignie
 **Mod:** CrashScribe | **Projekt:** `docs/PROJEKT-Z16-WYMOGI-BOHATEROW-2026-10-09.md` rozdz. 1.2-1.4, 2.2, 2.4 (U4), 3, 5 (etap 1) | **Pliki:** `CrashScribe/src/Mends.cs` (nowe: `HeroSkillOn`, `HeroReqOn`, `CanUseHero`, `IsAiHeroForSinew`, `HeroGearNeed`, `HeroSinew`, `DressedQueue`, `HeroSinewQueue`, `HeroSinewAll`; `DressTheNamesakes` - gracz jako noszacy; `Install` - postfiks kolejki na gardle EquipmentHelper; `MendsBehavior` - wczytanie, doba, nowa godzina). Na 537e93f (175d-1). Bez zapisu w grze (bez SyncData). Sito na ekranie i w drogach AI - drzewo Armoury `a175arm` (wpisy Z16-2..Z16-4 tam). Status: **NIEWGRANE**.
 
