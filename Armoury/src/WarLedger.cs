@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
@@ -84,8 +85,20 @@ namespace Armoury
                     if (MBRandom.RandomFloat < exp - leave) leave++;
                     if (leave <= 0) continue;
 
-                    int gone = DesertElitesFirst(mp, leave);
+                    // T4 (noc 08/09.10): odchodzacy zbierani do rosteru, zeby nie znikali w nicosc
+                    bool toOutlaws = s.WarLedgerToOutlaws;
+                    var left = toOutlaws ? TroopRoster.CreateDummyTroopRoster() : null;
+                    int gone = DesertElitesFirst(mp, leave, left);
                     if (gone <= 0) continue;
+                    // T4: dezerterzy ida do puli wyrzutkow regionu i do ksiegi ludzi jak kazdy dezerter gry.
+                    // Wolamy sluchaczy WPROST, bez CampaignEvents.OnTroopsDeserted - gra tych ludzi nie
+                    // widziala (AddToCounts nie strzela zdarzeniem), wiec nic nie liczy sie dwa razy,
+                    // a cudzych sluchaczy (BK, DTE i in.) nie budzimy.
+                    if (left != null)
+                    {
+                        try { OutlawLaw.OnTroopsDeserted(mp, left); } catch (Exception e) { Log.Error("WarLedger.ToOutlaws", e); }
+                        try { PeopleLedger.OnTroopsDeserted(mp, left); } catch (Exception e) { Log.Error("WarLedger.ToPeopleLedger", e); }
+                    }
                     // KAZDY ubytek do PLIKU, takze u gracza. Do 19.09 strata gracza szla wylacznie
                     // przez Log.Player, ktory pokazuje komunikat w grze i NIC nie zapisuje - przez to
                     // w logu nie bylo po niej ani sladu i szukanie winnego trwalo dwa dni.
@@ -94,7 +107,7 @@ namespace Armoury
                     Log.Info("WarLedger: " + (mp == MobileParty.MainParty ? "PARTIA GRACZA" : mp.StringId)
                              + " traci " + gone + " ludzi (zold niewyplacony " + d + " dni, liczone jak " + over
                              + "; zalegosc " + mp.HasUnpaidWages.ToString("0.##") + ", dzienny zold " + mp.TotalWage
-                             + ", kasa klanu " + purse + ").");
+                             + ", kasa klanu " + purse + ")" + (left != null ? (OutlawLaw.On ? "; do puli wyrzutkow " : "; do ksiegi ludzi (prawo wyrzutkow wylaczone) ") + left.TotalManCount : "") + ".");
                     if (mp == MobileParty.MainParty)
                         Log.Player("Unpaid and unbound: " + gone + " men desert in the night - the best-paid first.", true);
                 }
@@ -110,7 +123,7 @@ namespace Armoury
         }
 
         /// <summary>Najemnik zna swoja cene: dezerteruja od najwyzszego tieru.</summary>
-        private static int DesertElitesFirst(MobileParty mp, int count)
+        private static int DesertElitesFirst(MobileParty mp, int count, TroopRoster left)
         {
             int gone = 0;
             try
@@ -132,6 +145,7 @@ namespace Armoury
                     int take = Math.Min(count, roster.GetElementNumber(best));
                     roster.AddToCounts(c, -take);
                     gone += take; count -= take;
+                    if (left != null) { try { left.AddToCounts(c, take); } catch { } }   // T4: kto odszedl
                 }
             }
             catch { }

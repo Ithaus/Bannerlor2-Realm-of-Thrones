@@ -1,5 +1,18 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-09 (T4 noc 08/09.10) - DEZERTERZY Z NIEZAPLACONYCH ARMII NIE ZNIKAJA: ludzie, ktorych WarLedger zdejmuje za zalegly zold, ida do puli wyrzutkow regionu i do ksiegi ludzi, jak kazdy dezerter gry
+**Mod:** Armoury | **Pliki:** `WarLedger.cs` (`OnDaily`, `DesertElitesFirst` - nowy parametr `TroopRoster left`), `Settings.cs` + `McmSettings.cs` (NOWE `WarLedgerToOutlaws` = true w grupie "The marching column"; 680 -> 681 ustawien). Bez zapisu w grze.
+
+**Problem (audyt swiata 09.10, raport 05 A2 / L6; dowod - rok `Armoury-2026-10-08_08-18-38.log`, `grep WarLedger ... traci`):** 4 417 wpisow, 5 710 ludzi usunietych w roku bez sladu - nie trafiaja do puli wyrzutkow ani do ksiegi ludzi. Lamie zasade Jeffa "jak znika, to zamykamy" (ludzie) i Z6 projektu.
+
+**Przyczyna:** `WarLedger.DesertElitesFirst` zdejmuje ludzi `roster.AddToCounts(c, -take)` bez zdarzenia dezercji; pula wyrzutkow (`OutlawLaw.OnTroopsDeserted`) i ksiega ludzi (`PeopleLedger.OnTroopsDeserted`) sluchaja tylko `CampaignEvents.OnTroopsDesertedEvent`.
+
+**Zmiana:** `DesertElitesFirst` zbiera odchodzacych do rosteru (`TroopRoster.CreateDummyTroopRoster`); po zdjeciu WarLedger wola WPROST `OutlawLaw.OnTroopsDeserted(mp, roster)` (pula regionu najblizszego partii, licznik `_inDesert`) i `PeopleLedger.OnTroopsDeserted(mp, roster)` (`_desLord` - WarLedger obejmuje tylko `IsLordParty`). Bez strzelania zdarzeniem gry - nie budzimy cudzych sluchaczy (BK, DTE i in.). Liczenia dwa razy nie ma: gra tych ludzi nie widziala (`AddToCounts` nie wola `OnTroopsDeserted`; dezercja gry - `DesertionCampaignBehavior` / nasz `DesertionLaw` - to inni ludzie i ma wlasne zdarzenie), a `WarLedger.OnDaily` idzie w dobie przed `OutlawLaw.Daily` i `PeopleLedger.Daily`, wiec licznik dnia je obejmuje. Linia "WarLedger: ... traci N ludzi (...)" ma dopisek "; do puli wyrzutkow N". Dotyczy takze partii gracza (jego dezerterzy tez ida do lasu). Sprzet dezerterow zostaje w partii / zbrojowni jak dotad (sprawa 108). Wylacznik `WarLedgerToOutlaws` (false = jak przed T4: ludzie znikaja).
+
+**Ryzyko / co sprawdzic:** male, ale **zmienia rozgrywke** (krytyka S11): ok. +5.7 tys. ludzi rocznie do puli wyrzutkow, czyli ok. +50% jej rocznego przyrostu - wiecej band i strat karawan w drugiej polowie roku (odplyw puli 0.5% dziennie `OutlawReturnBasePercent`; bandy werbuja do 2 ludzi dziennie). W "Ludzie:" (PeopleLedger) "reszta" w bilansie partii rodow maleje o tyle, o ile rosnie "dezercja" - to przeniesienie, nie nowy ubytek. Test: suma "WarLedger: ... traci N" danego dnia = przyrost "dezercja ... (partie rodow X)" w PeopleLedger i wejscie do puli wyrzutkow tego dnia; 0 wyjatkow "WarLedger.ToOutlaws" / "WarLedger.ToPeopleLedger". W 40 dobach skutku prawie nie bedzie (WarLedger dziala glownie w 2. polowie roku) - test sprawdza zgodnosc licznikow; pelny skutek w rocznym autotescie ("wyrzutki w puli", bandy) wobec 08-18-38 (pula 221 -> 10 747, bandy 6 272 -> 22 751 ludzi w roku). `WarLedgerToOutlaws` nie ma w Armoury.json Jeffa - domyslna z kodu zadziala; pula dziala tylko przy `OutlawLawEnabled` (ksiega ludzi niezaleznie).
+
+**Status:** NIEWGRANE - DO SPRAWDZENIA w autotescie.
+
 ## 2026-10-08 (160, poprawka po recenzji) - RACHUNEK PREMII KONNEGO W TEMPIE DOBY, NIE TYLKO SUMA 40 DOB: lordowie zyskuja wobec TOWARY 3 tylko w pierwszych ok. 30 dobach, potem jazda kosztuje ich tyle co w T3 albo wiecej; zold z BK (x1.25) w porownaniu z pensami 1346 - bez zmian w kodzie
 **Mod:** Armoury | **Pliki:** tylko opis `docs/paczki/160-kon-wlasnoscia-zolnierza.md` (sprostowania w "Dlaczego x1.5" i "Rachunek lordow", co sprawdzic w dluzszym biegu, akapit "Recenzja niezalezna") i ten wpis. Kod, ustawienia, MCM (680) i DLL bez zmian wobec 160.
 
