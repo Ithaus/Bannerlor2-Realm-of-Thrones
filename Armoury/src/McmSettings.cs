@@ -2704,6 +2704,18 @@ namespace Armoury
         [SettingPropertyGroup("Northern fare")]
         public bool NorthernFareEnabled { get; set; } = true;
 
+        [SettingPropertyBool("Crop Climate Filter", HintText = "papyrus, a reed of hot marshes, grows only on grain farms of the hot south (Dorne, Ghis, Qarth, Volantis, Lys, Myr, Tyrosh, Valyria, the Summer Isles); Banner Kings gave it to every grain farm, even at the Wall - elsewhere the farm no longer yields it (grain output unchanged)")]
+        [SettingPropertyGroup("Northern fare")]
+        public bool CropClimateFilter { get; set; } = true;
+
+        [SettingPropertyBool("Woodlot By Climate", HintText = "the village woodlot (Village Woodlot Loads) fells by climate: deserts 0.3, Dothraki steppe 0.5, Mediterranean lands 0.8, forest lands 1.2, the rest 1.0 - scaled so the world as a whole fells as much timber as before")]
+        [SettingPropertyGroup("Northern fare")]
+        public bool WoodlotByClimate { get; set; } = true;
+
+        [SettingPropertyBool("Village Climate Fix", HintText = "12 villages whose main produce cannot grow where they stand get one that can (cotton at the Wall, in Braavos, in the Vale mountains and in Sarnor, a vineyard in Lorath, dates on Tarth), and 5 warm villages (Qarth, Volantis, Lys, Tyrosh) take up cotton so the world keeps some; grain farms beyond the Wall are left as they are. Applied at session start, nothing is written to the save (off = the map's own village types after the next load)")]
+        [SettingPropertyGroup("Northern fare")]
+        public bool VillageClimateFix { get; set; } = true;
+
         [SettingPropertyBool("Bandit Cheer Enabled", HintText = "villages near your victory over bandits thank you - relations with their notables improve")]
         [SettingPropertyGroup("Grateful villages")]
         public bool BanditCheerEnabled { get; set; } = true;
@@ -3407,6 +3419,9 @@ namespace Armoury
             s.HideoutFlagDays = HideoutFlagDays;
             s.HouseLeviesEnabled = HouseLeviesEnabled;
             s.NorthernFareEnabled = NorthernFareEnabled;
+            s.CropClimateFilter = CropClimateFilter;
+            s.WoodlotByClimate = WoodlotByClimate;
+            s.VillageClimateFix = VillageClimateFix;
             s.BanditCheerEnabled = BanditCheerEnabled;
             s.BanditCheerRadius = BanditCheerRadius;
             s.BanditCheerRelation = BanditCheerRelation;
