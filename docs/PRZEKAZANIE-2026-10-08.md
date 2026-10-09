@@ -169,3 +169,8 @@ dana faze od nowa, korzystajac z zapisanych wynikow:
 - 18:55 workflow `wf_d615d72a-31b`: poprawka T8 (bawelna, drzewo sklad) + T2b Inni bez dosypki (CrashScribe, drzewo noc\n10, galaz w-toku/n10-inni-wzrost).
 - 18:57 **WGRANIE 1 = 170 + T1..T7** (galaz noc/wgranie-1 = 1805521, drzewo SCRATCH nowej sesji wg1; Armoury 28a7456e, CrashScribe aff275de = baza + T2,
   bez trybu autotestu): autotest 40 dob tej binarki w toku, potem wgranie (zgoda Jeffa na te noc).
+- 19:07 **WGRANIE 1 W GRZE**: Armoury 28a7456e + CrashScribe aff275de (170 + T1..T7), galaz paczki/noc-wgranie-1 b1d8c58; kopie przed: *.bak-2026-10-09-przed-noc1
+  + D:\Backup-Bannerlord\wgrane\2026-10-09-noc1-przed (STAN-PRAC "NOC 08/09.10"). Autotest tej binarki: 40/40, 13.0 s/dobe, 0 bledow.
+- 19:20 T8 poprawiony (sklad 8727c87: bawelna 14 wsi tylko w cieplych krainach, baza 112=112) + T2b (galaz w-toku/n10-inni-wzrost bd2841a: Inni bez +100/+2/ochotnikow
+  z mapy; 616 na start zostaje) scalony do sklad (a389a5e). Autotest S2 (Armoury 3bf72dfd, CrashScribe probny = stos + autotest 1f51f30a) w toku.
+- Zablokowane przez zabezpieczenia Claude Code (do Jeffa): skrypt BEE na pliku ustawien gry; probna zima (zmiana domyslnych w probnej kopii).
