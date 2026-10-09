@@ -568,7 +568,7 @@ namespace Armoury
         [SettingPropertyGroup("The finished piece")]
         public float LordLootThirdPercent { get; set; } = 33f;
 
-        [SettingPropertyBool("Men Upgrade Gear", HintText = "the men buy better kit with their own coin (pay and their share of the spoils): in a town they swap their worst piece for a clearly better one of their own grade and sell the old one to the merchant - your men, AI lords' men and garrisons alike")]
+        [SettingPropertyBool("Men Upgrade Gear", HintText = "the men buy better kit with their own coin (pay and their share of the spoils): in a town they swap their worst piece for a clearly better one of their own tier (or one above, see Men Upgrade One Tier Up) and sell the old one to the merchant - your men, AI lords' men and garrisons alike")]
         [SettingPropertyGroup("The finished piece")]
         public bool MenUpgradeGear { get; set; } = true;
 
@@ -588,15 +588,19 @@ namespace Armoury
         [SettingPropertyGroup("The finished piece")]
         public int MenUpgradeMaxPerVisit { get; set; } = 20;
 
+        [SettingPropertyBool("Men Upgrade One Tier Up", HintText = "a soldier who can afford it may buy kit one tier above his own rank, if the market has it and he meets its skill requirement - the same for your men, AI lords' men and garrisons (off: only kit up to his own tier)")]
+        [SettingPropertyGroup("The finished piece")]
+        public bool MenUpgradeOneTierUp { get; set; } = true;
+
         [SettingPropertyBool("Garrison Purse Enabled", HintText = "garrisons keep a purse from their own pay: they buy what they lack and better kit at their own market (a castle buys in the nearest town) and sell their spare kit there")]
         [SettingPropertyGroup("The finished piece")]
         public bool GarrisonPurseEnabled { get; set; } = true;
 
-        [SettingPropertyBool("Quartermaster Swap One For One", HintText = "swap in the stores: for every piece of yours that pushed out one of theirs the men hand you their worst piece of that kind; pieces that filled empty hands go free; the men's spare is theirs - take it and you pay them the merchant's price")]
+        [SettingPropertyBool("Quartermaster Swap One For One", HintText = "swap in the stores: the men take a piece of yours only if it fills empty hands or beats the one they wear (and they meet its skill requirement); for every piece that replaced one of theirs they hand you their worst piece of that kind; worse, equal or too heavy pieces stay yours in the stash; the men's spare is theirs - take it and you pay them the merchant's price")]
         [SettingPropertyGroup("The finished piece")]
         public bool QuartermasterSwapOneForOne { get; set; } = true;
 
-        [SettingPropertyBool("Garrison Kit Menu", HintText = "'Hand kit to the garrison' in the menu of your towns and castles: drop better kit on the garrison and get their worse pieces back")]
+        [SettingPropertyBool("Garrison Kit Menu", HintText = "'Hand kit to the garrison' in the menu of your towns and castles: drop kit on the garrison - they take what fills empty hands or beats their own and give you their worse pieces back; the rest comes back to you")]
         [SettingPropertyGroup("The finished piece")]
         public bool GarrisonKitMenu { get; set; } = true;
 
@@ -604,7 +608,11 @@ namespace Armoury
         [SettingPropertyGroup("The finished piece")]
         public bool GarrisonArmoryInBattle { get; set; } = true;
 
-        [SettingPropertyInteger("Garrison Armory Min Fill Percent", 0, 100, "0", HintText = "below this share of filled template slots a garrison still fights in its template (old saves had their garrison stores wiped)")]
+        [SettingPropertyBool("Garrison Fights With Armory Only", HintText = "a garrison in your battles fights only with what its stores hold, however little: a man with no piece for a slot fights without it - no free template kit and no emergency kit (off: below the fill threshold it fights in its full template)")]
+        [SettingPropertyGroup("The finished piece")]
+        public bool GarrisonFightsWithArmoryOnly { get; set; } = true;
+
+        [SettingPropertyInteger("Garrison Armory Min Fill Percent", 0, 100, "0", HintText = "only when Garrison Fights With Armory Only is off: below this share of filled template slots a garrison still fights in its full template")]
         [SettingPropertyGroup("The finished piece")]
         public int GarrisonArmoryMinFillPercent { get; set; } = 75;
 
@@ -3014,10 +3022,12 @@ namespace Armoury
             s.MenGearSaveDays = MenGearSaveDays;
             s.MenUpgradeMinGainPercent = MenUpgradeMinGainPercent;
             s.MenUpgradeMaxPerVisit = MenUpgradeMaxPerVisit;
+            s.MenUpgradeOneTierUp = MenUpgradeOneTierUp;
             s.GarrisonPurseEnabled = GarrisonPurseEnabled;
             s.QuartermasterSwapOneForOne = QuartermasterSwapOneForOne;
             s.GarrisonKitMenu = GarrisonKitMenu;
             s.GarrisonArmoryInBattle = GarrisonArmoryInBattle;
+            s.GarrisonFightsWithArmoryOnly = GarrisonFightsWithArmoryOnly;
             s.GarrisonArmoryMinFillPercent = GarrisonArmoryMinFillPercent;
             s.AiWearEnabled = AiWearEnabled;
             s.MineWagesStayInTown = MineWagesStayInTown;

@@ -1,6 +1,7 @@
 # K1 - DOZBRAJANIE: zolnierze za swoje + wymiana z graczem (specyfikacja)
 
-**Status:** WYKONANE W KODZIE 09.10 (K1-A, K1-B, K1-C; wpis CHANGELOG "K1"), NIEWGRANE - DO SPRAWDZENIA (build kod 0, proba poza gra 22/22, po poprawkach z przegladu kodu 25/25 - 16 uwag, opis w CHANGELOG "K1", "Poprawki po przegladzie kodu"; autotest i proby reczne R1-R8 przed wgraniem). Swiadome odstepstwa - w CHANGELOG (K1, "Swiadome odstepstwa"). Drzewo `noc2/k1`, galaz `w-toku/k1-dozbrajanie`, baza `noc/sklad5` d486813
+**Status:** WYKONANE W KODZIE 09.10 (K1-A, K1-B, K1-C; wpis CHANGELOG "K1"), NIEWGRANE - DO SPRAWDZENIA (build kod 0, proba poza gra 22/22, po poprawkach z przegladu kodu 25/25 - 16 uwag, opis w CHANGELOG "K1", "Poprawki po przegladzie kodu"; autotest i proby reczne R1-R12 przed wgraniem).
+**K1b (decyzje Jeffa 09.10 A, B, C - w kodzie, ta sama galaz):** P1 i P2 rozstrzygniete (rozdz. 6), B1/B2 poprawione wedlug zasady WYMIANY z 04:40, A7 (sufit +1), A10 (zaloga walczy tylko tym, co ma); build kod 0, proba poza gra 42/42 (`noc2/k1fix/proba`, proba3.log). Wpis CHANGELOG "K1", blok "K1b". Swiadome odstepstwa - w CHANGELOG (K1, "Swiadome odstepstwa"). Drzewo `noc2/k1`, galaz `w-toku/k1-dozbrajanie`, baza `noc/sklad5` d486813
 (= Armoury w grze 63640cb3). `src/...` oznacza `Armoury/src/...` w tym drzewie, numery linii z d486813.
 **Decyzja Jeffa 09.10 (K):** "chce oba mechanizmy: ze za swoje sami sie zbroja z lupow i zoldu, i ja rowniez moge ich dozbroic na zasadzie
 wrzuc im lepsza zbroje, a oni wydaja mi swoja gorsza jako wymiane". Dotyczy jego druzyny i jego zalog. AI dziala wedlug tej samej reguly.
@@ -9,10 +10,10 @@ Ekonomia jest zamknieta: kazda sztuka pochodzi z prawdziwej polki, kazdy denar z
 ## 0. Dla Jeffa - w pieciu zdaniach
 
 1. Twoi ludzie, tak jak ludzie kazdego lorda, odkladaja czesc zoldu i lupu. W miescie kupuja za to lepsza sztuke w miejsce swojej najslabszej, a stara sprzedaja kupcowi.
-2. Kupuja najwyzej sprzet swojego stopnia (rekrut nie kupi plyty) i tylko taki, ktory udzwigna. Kupuja tylko wtedy, gdy nowa sztuka jest wyraznie lepsza (o co najmniej 10%).
+2. Kupuja najwyzej sprzet o jeden stopien wyzszy niz ich wlasny (Jeff 09.10, P1: "tak, jesli go na to stac i jest dostepna"; rekrut nie kupi plyty) i tylko taki, ktory udzwigna. Kupuja tylko wtedy, gdy nowa sztuka jest wyraznie lepsza (o co najmniej 10%).
 3. Twoje zalogi dostaja wlasna sakiewke z polowy swojego zoldu i zbroja sie tak samo, na targu swojej osady. Nie placa z Twojej kiesy.
-4. Wymiana w zbrojowni: za kazda Twoja sztuke, ktora wyparla ich sztuke, dostajesz za darmo jedna ich najgorsza sztuke tego rodzaju. To, co wypelnilo puste rece, oddajesz bez zwrotu, a czego nikt nie wezmie, zostaje Twoje. Reszta ich zapasu nalezy do nich: mozesz ja od nich kupic po cenie kupca.
-5. Zalogom dajesz sprzet przez nowa opcje w menu osady, "Hand kit to the garrison". Gorsze sztuki wracaja od razu do Twoich sakw, a zaloga walczy tym, co ma w zbrojowni.
+4. Wymiana w zbrojowni: ludzie biora Twoja sztuke tylko w puste rece albo wtedy, gdy jest LEPSZA od tej, ktora nosza, i ja udzwigna. Za kazda Twoja sztuke, ktora wyparla ich sztuke, dostajesz za darmo jedna ich najgorsza sztuke tego rodzaju. To, co wypelnilo puste rece, oddajesz bez zwrotu. Sztuka gorsza, rowna albo za trudna zostaje w oknie jako Twoja (Jeff 09.10 04:40) - komunikat mowi, ile zostalo, bo nikt jej nie chcial albo nie udzwignal. Reszta ich zapasu nalezy do nich: mozesz ja od nich kupic po cenie kupca.
+5. Zalogom dajesz sprzet przez nowa opcje w menu osady, "Hand kit to the garrison" (ta sama regula). Gorsze sztuki wracaja od razu do Twoich sakw, a zaloga walczy TYLKO tym, co ma w zbrojowni - kto nie ma sztuki, walczy bez niej (Jeff 09.10, P2).
 
 ## 1. Co jest dzis, czego brakuje (skrot rozpoznania)
 
@@ -96,17 +97,17 @@ Ekonomia jest zamknieta: kazda sztuka pochodzi z prawdziwej polki, kazdy denar z
 2. *Kandydat do wymiany* to najslabsza sztuka koszyka. Bierzemy go pod uwage tylko wtedy, gdy koszyk jest pelny (najpierw braki).
 3. *Zakup z polki miasta.* Wymagania:
    - ten sam typ i ta sama klasa broni (`PrimaryWeapon.WeaponClass`: miecz za miecz, tarcza za tarcze tej samej klasy);
-   - tier nie wyzszy niz tier koszyka ("w swoim stopniu");
+   - tier nie wyzszy niz sufit: tier JEDNOSTKI, a przy `MenUpgradeOneTierUp` (domyslnie) o jeden wyzej - P1 rozstrzygniete 09.10 (`SwapMath.CeilingTier`; najmniej 1; ten sam sufit dla ludzi gracza, lordow AI i zalog; paczka 175 daje wzorcom sprzet ich tieru);
    - sila >= sila starej x (1 + `MenUpgradeMinGainPercent`/100) albo wyzszy tier;
    - `ItemReq` spelnione dla oddzialu z tego koszyka;
    - jesli w koszyku sa jezdzcy - bron, ktorej da sie uzyc z siodla (jak `Mends.MountOk`);
    - bez unikatow i tylko sztuki sprawne (bez modyfikatora < 1).
 4. *Wybor:* najwiecej sily za denara netto, czyli (sila nowej - sila starej) / (cena nowej - cena skupu starej).
-5. *Kolejnosc:* najpierw koszyki z najwieksza roznica "tier koszyka - tier najslabszej sztuki", potem typy w kolejnosci `AiGear.Order` (korpus, bron, tarcza, helm, ...).
+5. *Kolejnosc:* najpierw sloty z najwieksza roznica "sufit jednostki - tier najslabszej sztuki", potem typy w kolejnosci `AiGear.Order` (korpus, bron, tarcza, helm, ...).
 6. *Limit:* `MenUpgradeMaxPerVisit` (20) sztuk na zdarzenie. Polke przegladamy raz na typ.
 
 *Dlaczego:*
-- Regula "najslabsza sztuka koszyka na lepsza w swoim tierze" stale podnosi sprzet, ale nie pozwala przeskakiwac stopnia - wyzszy stopien przychodzi z awansem.
+- Regula "najslabsza sztuka koszyka na lepsza, najwyzej o stopien ponad tier jednostki" stale podnosi sprzet, ale nie pozwala przeskakiwac wiecej niz o jeden stopien - dalsze przychodza z awansem.
 - Prog 10% nie pozwala kupowac w kolko.
 - Ta sama klasa broni chroni przed sprzetem, ktorego bitwa nie wyda - DTE i straz wydaja bron wedlug klasy.
 
@@ -125,7 +126,7 @@ Ekonomia jest zamknieta: kazda sztuka pochodzi z prawdziwej polki, kazdy denar z
 **A9. Nadwyzki - poprawka.**
 - Dotyczy gracza (`SellPlayerSurplus :213-280`) i lorda AI (`SellAiSurplus :328-374`).
 - NOWE dla zalogi: raz na dobe, ta sama regula. Trzecia czesc (`LordLootThirdPercent`) dostaje pan osady, reszta idzie do sakiewki zalogi.
-- Sprzedaz liczymy po dopasowaniu, a nie po liczbie sztuk:
+- Sprzedaz liczymy po dopasowaniu (K1b: `SwapMath.FitBest` - ten sam porzadek "najlepsze najpierw" co wymiana; u gracza przy wylaczonej wymianie 1:1 dawny `Fit`), a nie po liczbie sztuk:
   1. najpierw sztuki, ktorych nikt nie udzwignie;
   2. potem najgorsze uzyteczne sztuki ponad komplet + `SurplusKeepPercent`.
 - W zapasie zostaja najlepsze wolne sztuki uzyteczne.
@@ -135,7 +136,8 @@ Ekonomia jest zamknieta: kazda sztuka pochodzi z prawdziwej polki, kazdy denar z
 **A10. Zaloga w bitwie (K1-C).**
 - Latka na DTE `DynamicTroopMissionLogic.TryInitializeDistributors` (postfix przez refleksje; bez DTE nic sie nie wpina).
 - Dla zalogi bioracej udzial w bitwie gracza tworzymy `PartyEquipmentDistributor` z jej zbrojowni (`SanitizePartyArmory`), tak jak dla partii lorda (`:108-119`).
-- Warunek: zbrojownia pokrywa >= `GarrisonArmoryMinFillPercent` (75%) slotow wzorca, liczone dopasowaniem `SwapMath`. Ponizej progu zaloga walczy we wzorcu jak dzis i zostaje linia w logu.
+- ~~Warunek: zbrojownia pokrywa >= `GarrisonArmoryMinFillPercent` (75%) slotow wzorca, liczone dopasowaniem `SwapMath`. Ponizej progu zaloga walczy we wzorcu jak dzis i zostaje linia w logu.~~
+- **P2 rozstrzygniete 09.10 (Jeff: "reszta walczy bez uzbrojenia po prostu") - `GarrisonFightsWithArmoryOnly` (domyslnie):** rozdzielacz dla kazdej zalogi, bez progu (takze przy pustej zbrojowni). Zaloga walczy TYLKO tym, co ma: kto nie ma sztuki, walczy bez niej. DTE nie dopelnia pustych slotow (`Assignment.FillEmptySlots` pominiete dla przydzialow zalog) i nie daje zestawu awaryjnego (`PartyEquipmentDistributor.ApplyEmergencyLoadout` pominiete dla rozdzielacza zalogi). Wylaczone - jak wyzej (prog 75%, ponizej wzorzec).
 - Straz `SkillLawWard` z CrashScribe obejmie ja sama, bo jest postfiksem na kazdym rozdzielaczu.
 - *Dlaczego:* bez tego sprzet dany zalodze (A6-A8, B6) nic nie zmienia w walce. Prog chroni przed nagle bezbronnymi zalogami w starych zapisach, w ktorych zbrojownie zalog byly kasowane az do wpisu 89.
 
@@ -152,18 +154,22 @@ Ekonomia jest zamknieta: kazda sztuka pochodzi z prawdziwej polki, kazdy denar z
 
 ## 4. (B) Wymiana z graczem
 
-**B1. Regula (druzyna i zaloga).** Liczona po zamknieciu ekranu, osobno dla kazdego typu:
+**B1. Regula (druzyna i zaloga).** Liczona po zamknieciu ekranu, osobno dla kazdego typu.
+**Poprawione 09.10 wedlug decyzji Jeffa (04:40, WYMIANA):** "jesli dasz cos taniego, ale gorszego od tego, co maja - oni tego tez nie biora, zostaje po prostu w okienku DTE, co oznacza, ze maja wszyscy lepszy sprzet albo wymagania byly za duze i nie spelniaja np. atletyki".
+- Twoja sztuka moze wyprzec sztuke ludzi TYLKO wtedy, gdy jest od niej LEPSZA (porzadek "gorsza/najgorsza" z rozdz. 2: tier, sila, wrak, jakosc - bez rozstrzygania po id, wiec rowna nie jest lepsza) i czlowiek spelnia jej wymog (`ItemReq`).
 - Twoja sztuka, ktora ktos nosi wedlug dopasowania, przechodzi na ludzi.
 - Za kazda taka sztuke, ktora WYPARLA sztuke ludzi (ktos ja nosil przed Twoim wkladem, a teraz nikt), dostajesz JEDNA sztuke ludzi tego typu. Jest to najgorsza sposrod ich wolnych UZYTECZNYCH sztuk (wypartych i zapasu). Ludzie zatrzymuja lepszy zapas, zgodnie z regula z 30.08.
-- Twoja sztuka, ktora wypelnila puste rece, przechodzi bez zwrotu (najpierw braki).
-- Twoja sztuka, ktorej nikt nie nosi (za trudna, nie lepsza, ponad potrzebe), zostaje Twoja.
+- Twoja sztuka, ktora wypelnila puste rece, przechodzi bez zwrotu (najpierw braki - Jeff 14.09). Puste rece wypelnia kazda uzyteczna sztuka, takze gorsza.
+- Twoja sztuka gorsza, rowna albo za trudna NIE jest noszona - zostaje w oknie DTE jako Twoja (do zabrania), a ludzie zatrzymuja swoj lepszy sprzet. Dotychczasowy przypadek "wklad wyparl lepsza sztuke ludzi, bez zwrotu" ("pushed out better kit of theirs") nie moze sie zdarzyc.
+- Komunikat po zamknieciu mowi, ile Twoich sztuk zostalo w oknie, bo nikt ich nie chcial (ludzie maja rowne albo lepsze) albo nie udzwignal (ten, komu bylyby lepsze, nie spelnia wymogu).
+- Twoja sztuka ponad potrzebe (wszyscy maja rowne albo lepsze) zostaje Twoja.
 - Przy identycznym egzemplarzu (to samo id i stan) najpierw nosza ludzie swoje sztuki, a Twoja zostaje Twoja.
 - Reszta wolnych sztuk ludzi nalezy do LUDZI: sprzedadza je w miescie albo Ty je od nich kupisz (B3).
 
 *Dlaczego:* to doslownie zasady Jeffa z 29.08, 30.08, 14.09 i 19.09 (1:1, najgorsza tego samego typu, najpierw braki, stary luk wraca). Darmowy zapas ludzi lamal regule "nic z niczego" i decyzje z 05.10.
 
 **B2. Liczenie (`SwapMath`).**
-- Dwa dopasowania tym samym algorytmem co dzis w `FitFor`: ludzie od najwyzszego skilla, sztuki wedlug wymogu malejaco, potem RangedRank, jakosc, id.
+- Dwa dopasowania tym samym algorytmem. ~~Jak dzis w `FitFor`: ludzie od najwyzszego skilla, sztuki wedlug wymogu malejaco, potem RangedRank, jakosc, id.~~ **Od K1b:** "najlepsze najpierw" (`SwapMath.Greedy`): sztuki (osobno czesc ludzi i czesc gracza egzemplarza) od najlepszej (tier, sila, wrak, jakosc), przy rownych najpierw sztuki ludzi; sztuka wchodzi, jesli da sie ja dolozyc do przydzialu bez zdejmowania wczesniejszych (sciezka powiekszajaca). To zachlanna baza matroidu przydzialow: tylu ludzi ze sztuka, ilu w FitCore (najwiecej), a do tego najlepsze sztuki, jakie udzwigna. Z kolejnosci wynika B1: kazda wyparta sztuka ludzi ma noszony wklad od niej lepszy, a gorszy albo rowny wklad wchodzi tylko w puste rece.
   - PRZED = tylko sztuki ludzi (Total - Own).
   - PO = cala polka.
 - Na egzemplarz e:
@@ -178,7 +184,8 @@ Ekonomia jest zamknieta: kazda sztuka pochodzi z prawdziwej polki, kazdy denar z
 **B3. Druzyna - UI (bez nowego ekranu).** Miasto -> menu DTE "Army armory", jak dzis.
 1. *Otwarcie.* Noszone sztuki sa schowane jak dzis, ale liczone per egzemplarz (`Used_e`), a nie per id. Widac Twoje sztuki (za darmo) i wolny zapas ludzi.
    Komunikat: `QM: free to take - N pcs that are yours (M of them handed back in exchange); the men's spare (K pcs) is theirs - take it and you pay them the merchant's price on closing.`
-2. *Wkladasz lepsze i zamykasz.* Komunikat: `QM: the men took N pcs of yours (...): B filled empty hands, X replaced worse kit - those X worse pcs are yours in the stash (...); C pcs of yours no man wears stay yours.`
+2. *Wkladasz lepsze i zamykasz.* Komunikat: `QM: the men took N pcs of yours (...): B filled empty hands, X replaced worse kit - those X worse pcs are yours in the stash (...); C pcs of yours stay in the stash: W nobody wanted (the men have as good or better, or no use for them), H nobody who would gain from them can use them (skill requirement).`
+   Gdy nie wzieli nic (same gorsze albo za trudne): `QM: the men took nothing - C pcs of yours stay in the stash: ...`.
    Gdy nikt nie udzwignie sztuki, zostaje dzisiejszy komunikat "no man can use ... stays yours".
 3. *Otwierasz ponownie.* Gorsze sztuki leza na liscie jako Twoje (Jeff 29.08: "otwieram i zamiast moich lukow leza wymienione"). Zabierasz je i sprzedajesz.
 4. *Bierzesz cos z zapasu ludzi.* Przy zamknieciu placisz im cene kupca (istniejace `MenPurse.NoteBuy/SettleBuys`, wpis 84 pkt 5). Czego nie mozesz oplacic, wraca na polke.
@@ -220,7 +227,7 @@ Zmiany w kodzie:
      - noszone wklady -> `AiGear.AddToArmory` (+ `AiWear.NoteBought` ze stanem);
      - X gorszych sztuk -> ze zbrojowni zalogi (z najgorszym stanem przez `AiWear.TakeCondition`) do `MainParty.ItemRoster`;
      - nienoszone wklady -> z powrotem do sakw.
-  4. Komunikat: `The garrison of X took N pcs (...): B filled empty hands, X replaced worse kit - you got the worse ones back (...). C pcs went back to your bags (no man there can use them, or no better than theirs).`
+  4. Komunikat: `The garrison of X took N pcs (...): B filled empty hands, X replaced worse kit - you got the worse ones back (...). C pcs went back to your bags: W nobody wanted (...), H nobody who would gain from them can use them (skill requirement).` (K1b: ta sama regula B1 - gorsza, rowna albo za trudna wraca do sakw.)
 - *Zapas:* gdyby ekran nie przyjmowal przeciagania w lewo, uzywamy `OpenScreenAsStash(roster tymczasowy)` i rozliczamy w `ReleasePostfix`, jak w zbrojowni DTE.
 - *Dlaczego:* zaloga nie ma ekranu DTE. Natychmiastowy zwrot do sakw nie wymaga drugiej ksiegi (zadnej trwalej "polki gracza" w zalodze), a dzieki K1-C ten sprzet liczy sie w obronie.
 
@@ -247,7 +254,7 @@ Zmiany w kodzie:
 - *Wymiana z zaloga:*
   `Wymiana zalogi <osada>: przyjete A (ids), braki B, oddane graczowi X (ids), zwrocone C, odrzucone R (kon/unikat/plus/nie sprzet).`
 - *K1-C:*
-  `Zaloga w bitwie: <osada> zbrojownia F% (prog 75) - walczy tym, co ma | we wzorcu (za malo).`
+  `Zaloga w bitwie: <osada> zbrojownia F% (prog 75) - walczy tym, co ma | we wzorcu (za malo).` K1b (P2): `Zaloga w bitwie: <osada> zbrojownia F% - walczy tylko tym, co ma (kto nie ma sztuki, walczy bez niej).`; w linii doby `sloty wzorca bez sztuki - walcza bez N, bez zestawu awaryjnego DTE M`.
   Przy starcie: `GarrisonKit: latka DTE (zaloga w bitwie) wpieta|BRAK; menu zalogi wpiete.`
 - *Komunikaty gracza (EN):* te z B3 i B6, a ponadto:
   - `Your men bought N better pieces with their own coin for X denars (Mail Hauberk for Padded Coat, ...); the old ones fetched Y.`
@@ -266,7 +273,9 @@ Zmiany w kodzie:
 | `QuartermasterSwapOneForOne` | true | B1-B4 (false = regula z dzis) |
 | `GarrisonKitMenu` | true | B6 |
 | `GarrisonArmoryInBattle` | true | A10 |
-| `GarrisonArmoryMinFillPercent` | 75 | A10 - prog |
+| `GarrisonArmoryMinFillPercent` | 75 | A10 - prog (tylko przy wylaczonym `GarrisonFightsWithArmoryOnly`) |
+| `MenUpgradeOneTierUp` | true | K1b, P1: sufit zakupu o jeden stopien ponad tier jednostki |
+| `GarrisonFightsWithArmoryOnly` | true | K1b, P2: zaloga walczy tylko tym, co ma (bez progu, bez wzorca i zestawu awaryjnego) |
 
 - `GarrisonBuysGearPlayer` zostaje. Od teraz oznacza tylko doplate z Twojej kiesy do brakow Twoich zalog.
 - Czesc A dziala tylko przy wlaczonym `MenPurseEnabled`, czesc B przy `ArmouryProtectUsed`.
@@ -310,6 +319,7 @@ Zmiany w kodzie:
   - U4: wymog sztuki powyzej skilla koszyka -> nic nie kupuja.
   - U5: cena wyzsza niz budzet -> nic nie kupuja.
   - U6: kasa miasta 0 -> stara sztuka zostaje w zbrojowni jako zapas.
+  - K1b (proba3.log, 42/42): W11 zmienione (tani ciezki luk gorszy od t3 ludzi - zostaje gracza); C1 tanie gorsze - nie biora (nikt nie chcial); C2 lepsza, ale wymog 175 - zostaje (nie udzwigneli); C3 rowna - nie wypiera; C4 braki + gorsze + lepsze; C5 gorsza w puste rece; C6 slaby czlowiek tylko t1; C7 lancuch (wraca najgorsza); C8 za trudna dla potrzebujacego; C9 drugi przebieg 0; CA i U7-U9 sufit +1 (t3 kupi t4, nie t5, tylko jesli go stac); A9b nadwyzki po FitBest; FZ 3000 losowych przypadkow (niezmienniki B7, kazda wyparta ma lepszy wklad, liczba jak FitCore, zachlanna baza sprawdzona niezaleznym doborem Kuhna, drugi przebieg 0).
 - **Autotest** (DLL probny; gra zamknieta przed i po; zasady z "zgody na autotest"): nowa kampania 40 dob + 8 dob z zapisu `autotest-161-kawalki`. Progi:
   - 0 bledow Armoury i CrashScribe;
   - czas doby <= 13.8 s (baza 13.1 s + 5%);
@@ -330,13 +340,17 @@ Zmiany w kodzie:
   - R6: zaloga - 5 lepszych helmow + 1 Masterwork -> gorsze helmy w sakwach, Masterwork wraca; w logu `Wymiana zalogi`.
   - R7: bitwa z udzialem zalogi (obrona wlasnej osady albo szturm zamku AI) -> w logu `Zaloga w bitwie: ... F%`.
   - R8: Reset i Cancel na obu ekranach -> nic sie nie zmienia.
+  - R9 (K1b): wloz tanie sztuki gorsze od sprzetu ludzi -> "QM: the men took nothing - N pcs of yours stay in the stash: N nobody wanted ..."; sztuki zostaja w oknie.
+  - R10 (K1b): zbroja lepsza, ale z wymogiem Atletyki ponad ludzi -> "... nobody who would gain from them can use them (skill requirement)".
+  - R11 (K1b): to samo przez "Hand kit to the garrison" - gorsze i za trudne wracaja do sakw z powodem.
+  - R12 (K1b): bitwa z zaloga o zbrojowni < 75% -> "Zaloga w bitwie: ... walczy tylko tym, co ma"; ludzie bez sztuki walcza bez niej (bez sprzetu wzorca).
 
 **C6. Ryzyka.**
 1. *Polki:* ludzie AI kupujacy lepsze sztuki moga wymiesc t3-t5 z polek; ceny rosna (SupplyDemand), a dla gracza zostaje mniej. Chronia limit 20 sztuk i prog 10%; mierzy to prog rynku w autotescie.
 2. *Kasy miast:* skup starych sztuk zabiera zloto, ale tylko do wysokosci kasy, a zakupy oddaja wiecej - miasto netto zyskuje. Sprawdzic w linii kas 169.
 3. *DTE "Loyal Equipments"* (domyslnie wlaczone) daje w bitwie sztuke ze wzorca albo najblizsza mu sila, z sufitem tieru +2 (`PartyEquipmentDistributor.cs:1210-1390, 1769-1779`). Dopiero straz `SkillLawWard` z CrashScribe rozdziela wedlug wymogu. Bez CrashScribe kupione sztuki moga lezec nieuzywane; sufit "tier koszyka" utrzymuje zakupy w granicach tego, co DTE i tak wyda.
 4. *Widoczna zmiana:* zapas ludzi przestaje byc darmowy w zbrojowni i jest teraz na sprzedaz. Jeff to zauwazy; tak wynika z jego decyzji z 05.10 (wpis 84).
-5. *K1-C:* zaloga AI z dziurawa zbrojownia (powyzej progu 75%) bedzie przy obleganiu walczyc slabiej niz dzis.
+5. *K1-C:* zaloga AI z dziurawa zbrojownia (powyzej progu 75%) bedzie przy obleganiu walczyc slabiej niz dzis. K1b (P2): takze ponizej progu i przy pustej zbrojowni - ludzie bez sztuki walcza bez niej (Jeff swiadomie: "reszta walczy bez uzbrojenia po prostu").
 6. *Ksiega per id:* przy tym samym id gracz zawsze ma najgorsze egzemplarze. Wlozony Masterwork X obok zwyklego X ludzi liczy sie wiec jak zwykly. Pelne rozwiazanie to ksiega per id i stan, ale to poza K1, bo `StockOf` jest uzywany w wielu miejscach.
 7. *Wydajnosc:* dwa dopasowania przy ekranie, MenUpgrade raz na dobe na partie w miescie, polka przegladana raz na typ. Mierzymy czas doby.
 8. *Kolizja z Z1* (`noc2/z1` 290d3d2: SpoilsSeal.cs +278 linii, DonationXpLaw.cs): K1 nie dotyka Spoils. Konflikty moga byc tylko w Settings.cs, McmSettings.cs, ArmouryBehavior.cs i SubModuleMain.cs - przy scaleniu zachowac zmiany z obu stron. Ekran zalogi (B6) nie daje XP, bo dziala w trybie Default, a nie Loot (`InventoryLogic.InitializeXpGainFromDonations`).
@@ -344,8 +358,11 @@ Zmiany w kodzie:
 
 ## 6. Pytania do Jeffa (tylko takie, ktore zmieniaja rozgrywke)
 
-- **P1 - stopien.** Twoi zolnierze kupuja najwyzej sprzet swojego stopnia: zbrojny T3 kupi najlepsza zbroje T3, ale nie T4. Lepszy sprzet przychodzi z awansem, od Ciebie albo z lupu. Czy bogaty zolnierz moze kupic sprzet o jeden stopien wyzej? *Domyslnie: NIE.*
-- **P2 - zaloga w bitwie.** Od K1 zaloga walczy sprzetem ze swojej zbrojowni, jesli ma go dla co najmniej 75% ludzi. Ponizej tego progu walczy jak dzis, w pelnym wzorcu za darmo. Czy ponizej 75% tez ma walczyc tylko tym, co ma? Wtedy zamki AI, ktorych panow nie stac na sprzet, bronia sie slabiej - i Twoje tez, jesli ich nie dozbroisz. *Domyslnie: prog 75%.*
+- **P1 - stopien. ROZSTRZYGNIETE 09.10 (Jeff: "tak, jesli go na to stac i jest dostepna"):** zolnierz moze kupic sprzet o JEDEN stopien wyzej niz tier jednostki, jesli ma pieniadze w sakiewce i sztuka jest na rynku; wymog umiejetnosci przedmiotu (`ItemReq.Meets`) nadal obowiazuje; ten sam sufit dla ludzi gracza, lordow AI i zalog (`MenUpgradeOneTierUp`, domyslnie wlaczone; A7.3).
+  ~~Twoi zolnierze kupuja najwyzej sprzet swojego stopnia: zbrojny T3 kupi najlepsza zbroje T3, ale nie T4. Czy bogaty zolnierz moze kupic sprzet o jeden stopien wyzej? Domyslnie: NIE.~~
+- **P2 - zaloga w bitwie. ROZSTRZYGNIETE 09.10 (Jeff: "reszta walczy bez uzbrojenia po prostu"):** zaloga walczy TYLKO tym, co ma w zbrojowni, takze ponizej 75% - kto nie ma sztuki, walczy bez niej (bez pelnego wzorca za darmo i bez zestawu awaryjnego DTE; `GarrisonFightsWithArmoryOnly`, domyslnie wlaczone; A10).
+  ~~Ponizej progu 75% zaloga walczy jak dzis, w pelnym wzorcu za darmo. Czy ponizej 75% tez ma walczyc tylko tym, co ma? Domyslnie: prog 75%.~~
+- **WYMIANA (doprecyzowanie Jeffa 09.10 04:40):** sztuka gracza gorsza, rowna albo za trudna nie jest noszona i zostaje w oknie DTE - B1 i B2 poprawione.
 
 ## 7. Etapy i wpis
 

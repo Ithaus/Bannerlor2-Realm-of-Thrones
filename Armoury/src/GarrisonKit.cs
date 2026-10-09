@@ -27,8 +27,11 @@ namespace Armoury
     ///    modyfikatorem na plus (zbrojownia AI nie zna stanow na plus - stracilyby wartosc) wracaja od razu z komunikatem.
     ///    Zadnej trwalej "polki gracza" w zalodze - nic do zapisu.
     ///  - A10: zaloga w bitwie gracza walczy sprzetem ze swojej zbrojowni (rozdzielacz DTE jak dla partii lorda - DTE robi go tylko
-    ///    partiom z LeaderHero), gdy zbrojownia pokrywa >= GarrisonArmoryMinFillPercent slotow wzorca (dopasowanie SwapMath); ponizej -
-    ///    we wzorcu jak dotad (stare zapisy: zbrojownie zalog kasowane do wpisu 89). Straz SkillLawWard (CrashScribe) obejmie ja sama.
+    ///    partiom z LeaderHero). K1 (Jeff 09.10, P2 "reszta walczy bez uzbrojenia po prostu", GarrisonFightsWithArmoryOnly): TYLKO tym, co
+    ///    ma, przy kazdym pokryciu - kto nie ma sztuki, walczy bez niej (bez zestawu awaryjnego DTE i bez dopelniania wzorca). Wylaczone -
+    ///    jak dotad: >= GarrisonArmoryMinFillPercent slotow wzorca ze zbrojowni, ponizej we wzorcu. Straz SkillLawWard (CrashScribe) obejmie ja sama.
+    ///  - B6 (Jeff 09.10 04:40): zaloga bierze sztuke gracza tylko w puste rece albo gdy jest LEPSZA od jej sztuki i ktos ja udzwignie;
+    ///    gorsza, rowna albo za trudna wraca do sakw z powodem.
     /// </summary>
     internal static class GarrisonKit
     {
@@ -40,7 +43,7 @@ namespace Armoury
 
         private static bool MenuOn { get { var s = Settings.Current; return s != null && s.GarrisonKitMenu && s.ArmouryProtectUsed; } }
 
-        internal static void Reset() { _screen = null; _screenSt = null; _hintKey = null; _hint = null; _lastLogic = null; _garAssign.Clear(); }
+        internal static void Reset() { _screen = null; _screenSt = null; _hintKey = null; _hint = null; _lastLogic = null; _garAssign.Clear(); _bareDist = null; _bareMission = false; }
 
         private static MobileParty GarrisonOf(Settlement st)
         {
@@ -85,7 +88,7 @@ namespace Armoury
                     var shorts = new List<string>();
                     int fill = FillPercent(g, ArmoryOf(g), shorts);
                     _hint = "Garrison kit: " + fill + "% of slots filled" + (shorts.Count > 0 ? "; short: " + string.Join(", ", shorts.ToArray()) : "")
-                            + ". Drop better kit on the left - for every piece that pushes out one of theirs, they hand you their worst of that kind.";
+                            + ". Drop kit on the left - they take what fills empty hands or beats their own (if they meet its skill requirement) and hand you their worst of that kind for each piece it replaced; the rest comes back to you.";
                     _hintKey = key;
                 }
                 args.Tooltip = new TextObject("{=!}" + _hint);
@@ -171,7 +174,7 @@ namespace Armoury
             if (rHorse + rUnique + rOther > 0)
                 Log.Player((rHorse + rUnique + rOther) + " pcs went straight back to your bags - horses and harness belong to the stables, heirlooms and the dead's kit are not issued, and the rest is no war gear.");
             // 2) wymiana 1:1 per typ (SwapMath.Swap - ta sama regula co zbrojownia druzyny)
-            int worn = 0, filled = 0, x = 0, notBetter = 0, failedAdd = 0;
+            int worn = 0, filled = 0, x = 0, keptWorse = 0, keptHard = 0, failedAdd = 0;
             var takenIds = new List<string>(); var backIds = new List<string>(); var takenNames = new List<string>(); var backNames = new List<string>();
             foreach (var type in QuartermasterLaw.KitTypes)
             {
@@ -208,7 +211,7 @@ namespace Armoury
                 }
                 arm = ArmoryOf(g);   // DTE mogl dopiero teraz zalozyc zbrojownie
                 if (failed) continue;   // K1 (przeglad): wklad tego typu nie wszedl - bez zwrotow (inaczej gorsze sztuki zalogi za nic)
-                filled += sw.Filled; notBetter += sw.NotBetter;
+                filled += sw.Filled; keptWorse += sw.KeptWorse; keptHard += sw.KeptHard;   // K1 (Jeff 09.10 04:40): co zalogi nie wziela i dlaczego
                 // X gorszych sztuk zalogi -> do sakw gracza, kazda ze swoim stanem (najgorsza obita najpierw)
                 foreach (var p in pieces)
                 {
@@ -236,14 +239,17 @@ namespace Armoury
             // B7.1: liczba sztuk w zbrojowni i w sakwach przed i po ta sama (zwroty X wyszly ze zbrojowni do sakw)
             int armBefore = before - (worn + returned + rejected);   // lewa strona ekranu = odrzucone + noszone + zwrocone
             bool ok = after == armBefore + worn - x;
+            // K1 (Jeff 09.10 04:40): gorsza, rowna albo za trudna sztuka nie jest brana - wraca do sakw z powodem (nikt jej nie chcial albo
+            // nie udzwignal); reszta zwrotow to typy, ktorych zbrojownia DTE nie przyjela
+            int refused = Math.Max(0, returned - keptWorse - keptHard);
+            string why = QuartermasterLaw.KeptWhy(keptWorse, keptHard, refused, "the stores would not take");
             if (worn > 0 || x > 0)
                 Log.Player("The garrison of " + st.Name + " took " + worn + " pcs (" + string.Join(", ", takenNames.ToArray()) + "): " + filled + " filled empty hands, "
-                           + x + " replaced worse kit" + (x > 0 ? " - you got the worse ones back (" + string.Join(", ", backNames.ToArray()) + ")" : "")
-                           + (notBetter > 0 ? ", " + notBetter + " pushed out better kit of theirs (nothing comes back for those)" : "") + ". "
-                           + returned + " pcs went back to your bags (no man there can use them, or no better than theirs).");
+                           + x + " replaced worse kit" + (x > 0 ? " - you got the worse ones back (" + string.Join(", ", backNames.ToArray()) + ")" : "") + "."
+                           + (returned > 0 ? " " + returned + " pcs went back to your bags" + why + "." : ""));
             else if (returned > 0)
-                Log.Player("The garrison of " + st.Name + " took nothing - " + returned + " pcs went back to your bags (no man there can use them, or no better than theirs).");
-            Log.Info("Wymiana zalogi " + st.Name + ": przyjete " + worn + " (" + string.Join(", ", takenIds.ToArray()) + "), braki " + filled + ", gorsze od wypartej bez zwrotu " + notBetter
+                Log.Player("The garrison of " + st.Name + " took nothing - " + returned + " pcs went back to your bags" + why + ".");
+            Log.Info("Wymiana zalogi " + st.Name + ": przyjete " + worn + " (" + string.Join(", ", takenIds.ToArray()) + "), braki " + filled + ", nie lepsze od ich " + keptWorse + ", za trudne " + keptHard
                      + (failedAdd > 0 ? ", DTE NIE PRZYJAL " + failedAdd + " (wrocily do sakw, bez zwrotow tego typu)" : "") + ", oddane graczowi " + x
                      + " (" + string.Join(", ", backIds.ToArray()) + "), zwrocone " + returned + ", odrzucone " + rejected + " (kon " + rHorse + "/unikat " + rUnique + "/plus " + rPlus
                      + "/nie sprzet " + rOther + "); zbrojownia " + armBefore + " -> " + after + (ok ? "" : " - NIEZMIENNIK: oczekiwano " + (armBefore + worn - x)) + ".");
@@ -308,9 +314,14 @@ namespace Armoury
         // jako tymczasowe (patrz FillPostfix)
         private static readonly HashSet<object> _garAssign = new HashSet<object>();
         private static FieldInfo _fAssigns, _fEq;
-        private static MethodInfo _markTemp;
+        private static MethodInfo _markTemp, _getRef;
         private static int _stumbles;
         private static bool _tempErr;
+        // K1 (Jeff 09.10, P2: "reszta walczy bez uzbrojenia po prostu"): GarrisonFightsWithArmoryOnly - rozdzielacz zalogi bez progu, bez
+        // zestawu awaryjnego DTE (_bareDist na czas RunAsync) i bez dopelniania wzorca przy spawnie (_bareMission)
+        private static object _bareDist;
+        private static bool _bareMission;
+        private static string _emerg = "BRAK";
 
         internal static void ApplyAll(Harmony h)
         {
@@ -339,13 +350,19 @@ namespace Armoury
                 { _battle = "BRAK (zmienione DTE - brak oznaczania slotow tymczasowych)"; return; }
                 h.Patch(mFill, prefix: new HarmonyMethod(typeof(GarrisonKit), nameof(FillPrefix)), postfix: new HarmonyMethod(typeof(GarrisonKit), nameof(FillPostfix)));
                 h.Patch(m, postfix: new HarmonyMethod(typeof(GarrisonKit), nameof(DistributorsPostfix)));
-                _battle = "wpieta";
+                // K1 (P2): zestaw awaryjny DTE (sprzet podstawowego zolnierza kultury w puste sloty, z niczego) nie dla rozdzielaczy zalog
+                _getRef = AccessTools.PropertyGetter(tAssign, "ReferenceEquipment");
+                var mEmerg = AccessTools.Method(tDist, "ApplyEmergencyLoadout");
+                if (mEmerg != null) { h.Patch(mEmerg, prefix: new HarmonyMethod(typeof(GarrisonKit), nameof(EmergencyPrefix))); _emerg = "wpieta"; }
+                _battle = "wpieta, bez zestawu awaryjnego DTE " + _emerg;
             }
             catch (Exception e) { _battle = "BRAK (" + e.Message + ")"; Log.Error("GarrisonKit.ApplyAll", e); }
         }
 
-        /// <summary>Po TryInitializeDistributors DTE (bitwa gracza): rozdzielacz ze zbrojowni dla kazdej zalogi bioracej udzial, o ile
-        /// zbrojownia pokrywa prog slotow wzorca. Raz na misje - DTE wola TryInitializeDistributors przy kazdym spawnie.</summary>
+        /// <summary>Po TryInitializeDistributors DTE (bitwa gracza): rozdzielacz ze zbrojowni dla kazdej zalogi bioracej udzial. K1 (Jeff 09.10,
+        /// P2): przy GarrisonFightsWithArmoryOnly zawsze, bez progu - zaloga walczy TYLKO tym, co ma w zbrojowni, kto nie ma sztuki, walczy
+        /// bez niej (bez zestawu awaryjnego DTE i bez dopelniania wzorca); wylaczone - jak dotad: ponizej progu slotow wzorca zaloga walczy
+        /// we wzorcu za darmo. Raz na misje - DTE wola TryInitializeDistributors przy kazdym spawnie.</summary>
         public static void DistributorsPostfix(object __instance)
         {
             try
@@ -363,6 +380,8 @@ namespace Armoury
                 var mission = mb != null ? mb.Mission : null;
                 if (me == null || dists == null || sides == null || mission == null) return;
                 int min = Math.Max(0, Math.Min(100, s.GarrisonArmoryMinFillPercent));
+                bool bare = s.GarrisonFightsWithArmoryOnly;
+                _bareMission = bare;
                 foreach (var pb in me.InvolvedParties)
                 {
                     // K1 (przeglad): osobny try na zaloge - potkniecie jednej nie zatrzymuje rozdzielaczy pozostalych
@@ -374,19 +393,23 @@ namespace Armoury
                         string name = st != null ? st.Name.ToString() : g.StringId;
                         var arm = _sanitize.Invoke(null, new object[] { g.Id }) as Dictionary<ItemObject, int>;
                         int fill = arm != null ? FillPercent(g, arm, null, true) : 0;   // tylko zdrowi - jak DTE
-                        if (arm == null || arm.Count == 0 || fill < min)
+                        if (!bare && (arm == null || arm.Count == 0 || fill < min))
                         {
                             Log.Info("Zaloga w bitwie: " + name + " zbrojownia " + fill + "% (prog " + min + ") - we wzorcu (za malo).");
                             MenUpgrade.NoteBattle(false);
                             continue;
                         }
+                        if (arm == null) arm = new Dictionary<ItemObject, int>();   // P2: bez zbrojowni - nikt nie ma sztuki, walcza bez
                         var d = _ctor.Invoke(new object[] { mission, g, arm });
-                        _run.Invoke(d, null);
+                        _bareDist = bare ? d : null;
+                        try { _run.Invoke(d, null); }
+                        finally { _bareDist = null; }
                         var al = _fAssigns.GetValue(d) as IEnumerable;
                         if (al != null) foreach (var a in al) if (a != null) _garAssign.Add(a);
                         dists[g.Id] = d;
                         sides[g.Id] = pb.Side;
-                        Log.Info("Zaloga w bitwie: " + name + " zbrojownia " + fill + "% (prog " + min + ") - walczy tym, co ma.");
+                        Log.Info("Zaloga w bitwie: " + name + " zbrojownia " + fill + "%"
+                                 + (bare ? " - walczy tylko tym, co ma (kto nie ma sztuki, walczy bez niej)." : " (prog " + min + ") - walczy tym, co ma."));
                         MenUpgrade.NoteBattle(true);
                     }
                     catch (Exception e) { if (++_stumbles <= 3) Log.Error("GarrisonKit.DistributorsPostfix(zaloga)", e); }
@@ -401,19 +424,46 @@ namespace Armoury
         /// z niczego, ktory potem szedl do kupca (GarrisonDay) albo graczowi jako zwrot B6. Dla przydzialow rozdzielaczy ZALOG zapamietujemy
         /// puste sloty przed i oznaczamy wypelnione po (MarkSlotAsTemporary - tak, jak DTE robi to sam w ApplyEmergencyLoadout): czlowiek walczy
         /// tym, ale ani spawn tego nie zdejmuje, ani zwrot nie oddaje. Lordowie AI - bez zmian (mennica DTE sprzed K1, poza ta paczka).</summary>
-        public static void FillPrefix(object __instance, out bool[] __state)
+        public static bool FillPrefix(object __instance, out bool[] __state)
         {
             __state = null;
             try
             {
-                if (_garAssign.Count == 0 || __instance == null || !_garAssign.Contains(__instance)) return;
+                if (_garAssign.Count == 0 || __instance == null || !_garAssign.Contains(__instance)) return true;
                 var eq = _fEq.GetValue(__instance) as Equipment;
-                if (eq == null) return;
+                if (eq == null) return true;
+                if (_bareMission)
+                {
+                    // K1 (Jeff 09.10, P2): zaloga walczy tylko tym, co ma - pusty slot zostaje pusty (bez sztuki wzorca i bez losowej z niczego);
+                    // licznik: sloty broni i pancerza, ktore wzorzec ma, a czlowiek nie (tylko log)
+                    int bareN = 0;
+                    var rf = _getRef != null ? _getRef.Invoke(__instance, null) as Equipment : null;
+                    if (rf != null)
+                        foreach (int i in BareSlots)
+                        {
+                            var e = eq[(EquipmentIndex)i]; var r = rf[(EquipmentIndex)i];
+                            if ((e.IsEmpty || e.Item == null) && !r.IsEmpty && r.Item != null) bareN++;
+                        }
+                    MenUpgrade.NoteBareSlots(bareN);
+                    return false;
+                }
                 var empty = new bool[12];
                 for (int i = 0; i < 12; i++) { var e = eq[(EquipmentIndex)i]; empty[i] = e.IsEmpty || e.Item == null; }
                 __state = empty;
             }
             catch { __state = null; }
+            return true;
+        }
+
+        private static readonly int[] BareSlots = { 0, 1, 2, 3, 5, 6, 7, 8, 9 };   // bron 0-3, pancerz i plaszcz (bez proporca i konia)
+
+        /// <summary>K1 (Jeff 09.10, P2): DTE po rozdaniu zbrojowni wklada w puste sloty sprzet podstawowego zolnierza kultury (ApplyEmergencyLoadout,
+        /// z niczego, jako tymczasowy). Rozdzielacz zalogi przy GarrisonFightsWithArmoryOnly go nie dostaje - kto nie ma sztuki, walczy bez niej.</summary>
+        public static bool EmergencyPrefix(object __instance)
+        {
+            if (_bareDist == null || !ReferenceEquals(__instance, _bareDist)) return true;
+            MenUpgrade.NoteNoEmergency();
+            return false;
         }
 
         public static void FillPostfix(object __instance, bool[] __state)

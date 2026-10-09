@@ -326,7 +326,10 @@ namespace Armoury
                 List<CharacterObject> troops; int[] men; SkillObject skill;
                 QuartermasterLaw.MenOf(main.MemberRoster, type, pieces, out troops, out men, out skill);
                 var meets = QuartermasterLaw.MeetsOf(troops);
-                SwapMath.Fit(men, troops.Count, meets, pieces);
+                // K1 (Jeff 09.10 04:40): kto co nosi - ta sama regula co wymiana (najlepsze najpierw; sztuka gracza tylko w puste rece albo
+                // w miejsce gorszej), inaczej ludzie sprzedawaliby lepsza sztuke, ktora nosza, bo "noszona" byla gorsza sztuka gracza
+                if (s.QuartermasterSwapOneForOne) SwapMath.FitBest(men, troops.Count, meets, pieces);
+                else SwapMath.Fit(men, troops.Count, meets, pieces);
                 if (SwapMath.SurplusPlan(pieces, men.Length, s.SurplusKeepPercent, p => SwapMath.Usable(men, meets, p)) <= 0) continue;
                 pieces.Sort(SwapMath.WorseFirst);
                 foreach (var p in pieces)
@@ -429,7 +432,9 @@ namespace Armoury
                 // druga bron oddzialu szla do kupca, a BuyGaps odkupowal ja tego samego dnia
                 QuartermasterLaw.MenOf(mp.MemberRoster, type, pieces, out troops, out men, out skill, QuartermasterLaw.MenPerSlot, false);
                 var meets = QuartermasterLaw.MeetsOf(troops);
-                SwapMath.Fit(men, troops.Count, meets, pieces);
+                // K1 (Jeff 09.10 04:40, "to samo dla AI"): ludzie nosza najlepsze, co udzwigna (FitBest), a do kupca idzie najgorsze - dotad
+                // ciezki gorszy grat byl "noszony", a lepsza lzejsza sztuka szla do kupca (czlowiek zostawal z gorsza w miejsce lepszej)
+                SwapMath.FitBest(men, troops.Count, meets, pieces);
                 if (SwapMath.SurplusPlan(pieces, men.Length, s.SurplusKeepPercent, p => SwapMath.Usable(men, meets, p)) <= 0) continue;
                 pieces.Sort(SwapMath.WorseFirst);
                 foreach (var p in pieces)

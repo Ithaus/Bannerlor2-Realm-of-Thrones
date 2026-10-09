@@ -16,8 +16,9 @@ namespace Armoury
     ///  - Kto: ludzie gracza, ludzie lordow AI (w MIESCIE, przy wjezdzie i raz na dobe postoju) i zalogi (raz na dobe, targ swojej
     ///    osady; zamek - najpierw polka zamku, potem najblizsze miasto handlowe).
     ///  - Co: sztuki ludzi ida do koszykow typ x tier wzorca (SwapMath.Assign); w PELNYM koszyku (najpierw braki) najslabsza sztuka
-    ///    moze ustapic lepszej z polki: ten sam typ i klasa broni, tier nie wyzszy niz tier koszyka, sila >= stara x (1 + prog) albo
-    ///    wyzszy tier, wymog spelniony, z siodla dla jezdzcow, bez unikatow, sprawna. Wybor: najwiecej sily za denara netto.
+    ///    moze ustapic lepszej z polki: ten sam typ i klasa broni, tier nie wyzszy niz sufit (SwapMath.CeilingTier: tier JEDNOSTKI,
+    ///    a z MenUpgradeOneTierUp o jeden wyzej - Jeff 09.10 P1 "tak, jesli go na to stac i jest dostepna"), sila >= stara x (1 + prog)
+    ///    albo wyzszy tier, wymog spelniony (ItemReq), z siodla dla jezdzcow, bez unikatow, sprawna. Wybor: najwiecej sily za denara netto.
     ///  - Za ile: cena polki, placi sakiewka ludzi (bez rezerwy na zalegle naprawy) do kasy miasta; lord i pan zalogi NIE doplacaja.
     ///    Stara sztuka od razu do kupca po cenie skupu w tym stanie (nie wiecej niz ma kasa) - pieniadze do sakiewki, sztuka na polke;
     ///    kasa pusta - zostaje w zbrojowni jako zapas (pojdzie z nadwyzkami).
@@ -47,7 +48,7 @@ namespace Armoury
             _dLogged = 0;
             _dPlayerN = _dLordN = _dGarN = _dSold = _dKept = _dNoBetter = _dNoMoney = _dNoLift = _dGarWageN = _dGarGapN = _dBattleArmory = _dBattleTemplate = _dGarEmptyN = 0;
             _dPlayerGold = _dLordGold = _dGarGold = _dSoldGold = _dSaved = _dOverCap = _dGarWage = _dGarGapGold = _dGarEmptyGold = 0;
-            _boughtToday.Clear(); _soldToday.Clear(); _dChurn = 0; _churnIds.Clear(); _dTempSlots = 0;
+            _boughtToday.Clear(); _soldToday.Clear(); _dChurn = 0; _churnIds.Clear(); _dTempSlots = 0; _dBareSlots = 0; _dNoEmerg = 0;
         }
 
         /// <summary>K1 (przeglad): zakup (buy=true) albo sprzedaz sztuki przez ludzi partii - licznik "kupione i sprzedane te same id tej
@@ -74,6 +75,10 @@ namespace Armoury
         // K1 (przeglad): sloty ludzi zalog wypelnione w bitwie przez DTE "z niczego" i oznaczone jako tymczasowe (nie wracaja do zbrojowni)
         internal static void NoteTempSlots(int n) { if (n <= 0) return; Touch(); _dTempSlots += n; }
         private static int _dTempSlots;
+        // K1 (Jeff 09.10, P2): zaloga walczy tylko tym, co ma - sloty wzorca bez sztuki (walcza bez niej) i rozdzielacze bez zestawu awaryjnego DTE
+        internal static void NoteBareSlots(int n) { if (n <= 0) return; Touch(); _dBareSlots += n; }
+        internal static void NoteNoEmergency() { Touch(); _dNoEmerg++; }
+        private static int _dBareSlots, _dNoEmerg;
 
         /// <summary>Nowa doba: linia poprzedniej. Wolane przy kazdym liczniku i z DailyTickEvent (linia codziennie).</summary>
         internal static void Touch()
@@ -121,7 +126,8 @@ namespace Armoury
                              + "; odlozone przy wyjazdach " + _dSaved + ", ponad limit na zycie " + _dOverCap
                              + "; zold zalog do sakiewek " + _dGarWage + " (" + _dGarWageN + " zalog), w sakiewkach zalog " + garPurses + " (" + garN + " zalog)"
                              + "; braki zalog z ich sakiewek " + _dGarGapGold + " (" + _dGarGapN + " zakupow), sakiewki pustych zalog do kas osad " + _dGarEmptyGold + " (" + _dGarEmptyN + ")"
-                             + "; zalogi w bitwie ze zbrojowni " + _dBattleArmory + " / we wzorcu " + _dBattleTemplate + " (sloty z wzorca jako tymczasowe " + _dTempSlots + ")"
+                             + "; zalogi w bitwie ze zbrojowni " + _dBattleArmory + " / we wzorcu " + _dBattleTemplate + " (sloty z wzorca jako tymczasowe " + _dTempSlots
+                             + ", sloty wzorca bez sztuki - walcza bez " + _dBareSlots + ", bez zestawu awaryjnego DTE " + _dNoEmerg + ")"
                              + "; kupione i sprzedane te same id tej samej doby " + _dChurn + (_churnIds.Count > 0 ? " (" + string.Join(", ", _churnIds.ToArray()) + ")" : "")
                              + "; miasta bez zbroi korpusu t3+ na polce " + bare + " z " + towns + ".");
                 }
@@ -327,7 +333,7 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ silnik
-        private sealed class Cand { public ItemObject.ItemTypeEnum Type; public int Order; public SwapMath.Slot Slot; public CharacterObject Troop; }
+        private sealed class Cand { public ItemObject.ItemTypeEnum Type; public int Order; public SwapMath.Slot Slot; public CharacterObject Troop; public int Ceil; }
         private sealed class Ware { public Settlement Shop; public EquipmentElement El; public int Price, Left, Tier; public long Power; public bool HasCls; public WeaponClass Cls; }
         private sealed class Visit { public int N, Gold, Sold, SoldGold, Kept; public List<string> Lines = new List<string>(); public List<string> Names = new List<string>(); }
 
@@ -338,6 +344,7 @@ namespace Armoury
             int max = Math.Max(0, s.MenUpgradeMaxPerVisit);
             if (max == 0 || budget <= 0 || mp.MemberRoster == null) return v;
             double gain = Math.Max(0f, s.MenUpgradeMinGainPercent) / 100.0;
+            bool oneUp = s.MenUpgradeOneTierUp;
             var cands = new List<Cand>();
             for (int ti = 0; ti < AiGear.Order.Length; ti++)
             {
@@ -349,13 +356,13 @@ namespace Armoury
                 if (pieces.Count == 0) continue;
                 // najpierw braki (Jeff 14.09): tylko PELNE koszyki maja kandydata do wymiany
                 foreach (var sl in SwapMath.Assign(buckets, pieces, QuartermasterLaw.MeetsOf(troops)))
-                    if (sl.Bucket.Full) cands.Add(new Cand { Type = type, Order = ti, Slot = sl, Troop = troops[sl.Group] });
+                    if (sl.Bucket.Full) cands.Add(new Cand { Type = type, Order = ti, Slot = sl, Troop = troops[sl.Group], Ceil = SwapMath.CeilingTier(TroopTier(troops[sl.Group]), oneUp) });
             }
             if (cands.Count == 0) return v;
-            // najpierw koszyki z najwieksza roznica "tier koszyka - tier sztuki", potem typy (korpus, bron, tarcza, helm, ...), najslabsze najpierw
+            // najpierw sloty z najwieksza roznica "sufit jednostki - tier sztuki", potem typy (korpus, bron, tarcza, helm, ...), najslabsze najpierw
             cands.Sort((a, b) =>
             {
-                int d = (b.Slot.Bucket.Tier - b.Slot.Piece.Tier).CompareTo(a.Slot.Bucket.Tier - a.Slot.Piece.Tier);
+                int d = (b.Ceil - b.Slot.Piece.Tier).CompareTo(a.Ceil - a.Slot.Piece.Tier);
                 if (d != 0) return d;
                 d = a.Order.CompareTo(b.Order);
                 return d != 0 ? d : SwapMath.WorseFirst(a.Slot.Piece, b.Slot.Piece);
@@ -420,7 +427,7 @@ namespace Armoury
             var oldIt = oldEl.Item;
             bool hasCls = oldIt.PrimaryWeapon != null;
             WeaponClass cls = hasCls ? oldIt.PrimaryWeapon.WeaponClass : default(WeaponClass);
-            int bucketTier = c.Slot.Bucket.Tier;
+            int ceil = c.Ceil;   // K1-A (P1): sufit od tieru jednostki (+1 z MenUpgradeOneTierUp), ten sam dla ludzi gracza, lordow i zalog
             foreach (var shop in new[] { shop1, shop2 })
             {
                 if (shop == null || shop.Town == null || shop.ItemRoster == null) continue;
@@ -430,12 +437,12 @@ namespace Armoury
                 {
                     if (w.Left <= 0) continue;
                     if (hasCls != w.HasCls || (hasCls && w.Cls != cls)) continue;                       // miecz za miecz, tarcza za tarcze
-                    if (SwapMath.UpgradeVerdict(bucketTier, oldP.Tier, oldP.Power, w.Tier, w.Power, gain, true, 1, 1) != SwapMath.UpOk) continue;   // w swoim stopniu, wyraznie lepsza
+                    if (SwapMath.UpgradeVerdict(ceil, oldP.Tier, oldP.Power, w.Tier, w.Power, gain, true, 1, 1) != SwapMath.UpOk) continue;   // do sufitu, wyraznie lepsza
                     better = true;
                     if (!ItemReq.Meets(c.Troop, w.El.Item) || (c.Slot.Bucket.Mounted && !MountOk(w.El.Item))) continue;   // wymog i bron z siodla
                     lift = true;
                     if (w.Price < 0) { try { w.Price = shop.Town.MarketData.GetPrice(w.El, mp, false, shop.Party); } catch { w.Price = 0; } }   // cena dopiero dla kandydata
-                    if (SwapMath.UpgradeVerdict(bucketTier, oldP.Tier, oldP.Power, w.Tier, w.Power, gain, true, w.Price, budget) != SwapMath.UpOk) continue;
+                    if (SwapMath.UpgradeVerdict(ceil, oldP.Tier, oldP.Power, w.Tier, w.Power, gain, true, w.Price, budget) != SwapMath.UpOk) continue;
                     double score = SwapMath.UpgradeScore(oldP.Power, w.Power, w.Price, oldSell);
                     if (score > bestScore) { bestScore = score; best = w; }
                 }
@@ -473,6 +480,12 @@ namespace Armoury
             }
             catch (Exception e) { Log.Error("MenUpgrade.Wares", e); }
             return list;
+        }
+
+        /// <summary>K1-A (P1): tier jednostki (CharacterObject.Tier, 0..6+); blad - 1.</summary>
+        internal static int TroopTier(CharacterObject c)
+        {
+            try { return c != null ? c.Tier : 1; } catch { return 1; }
         }
 
         /// <summary>Jak CrashScribe Mends.MountOk / DTE IsSuitableForMount: bron bez "RequiresNoMount" i bez "CantReloadOnHorseback".</summary>

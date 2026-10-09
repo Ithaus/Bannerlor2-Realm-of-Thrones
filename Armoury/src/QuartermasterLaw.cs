@@ -359,7 +359,8 @@ namespace Armoury
                 var s = Settings.Current;
                 bool oneForOne = swap && s != null && s.QuartermasterSwapOneForOne;
                 // PORZADEK CALKOWITY (Jeff 19.09): wymog malejaco, RangedRank (pod RBM naciag), jakosc modyfikatora, id, mod -
-                // SwapMath.FitOrder; bitwa tego nie wyda (Barred) - papier tez nie
+                // SwapMath.FitOrder; bitwa tego nie wyda (Barred) - papier tez nie. K1 (Jeff 09.10 04:40): przy wymianie 1:1 dopasowanie
+                // "najlepsze najpierw" (SwapMath.Greedy) - wklad gracza tylko w puste rece albo w miejsce GORSZEJ sztuki ludzi
                 var sw = SwapMath.Swap(men, troops.Count, MeetsOf(troops), pieces, oneForOne);
                 f.Pieces = pieces; f.Swap = sw; f.OneForOne = oneForOne;
                 f.Usable = men.Length - sw.Unfit;
@@ -552,8 +553,13 @@ namespace Armoury
         /// na ludzi; za kazdy, ktory WYPARL sztuke ludzi, gracz dostaje jedna ich najgorsza wolna uzyteczna sztuke tego typu; wklad,
         /// ktory wypelnil puste rece, przechodzi bez zwrotu; nienoszony wklad zostaje gracza; reszta wolnych sztuk ludzi jest LUDZI
         /// (gracz moze je od nich kupic). Wylaczone - jak przed K1: sztuki nie na ludziach na liste gracza, noszone na stan wojska.
-        /// Rozkazy z ksiegi musztry nietykane. Zwraca liczbe sztuk oddanych graczowi.</summary>
-        internal static int PurgeUnusable(ItemRoster armory)
+        /// Rozkazy z ksiegi musztry nietykane. Zwraca liczbe sztuk oddanych graczowi.
+        /// K1 (Jeff 09.10 04:40): wklad wypiera sztuke ludzi tylko, gdy jest LEPSZY i ktos go udzwignie; gorszy, rowny albo za trudny zostaje
+        /// w oknie DTE jako sztuka gracza. deposits=true (zamkniecie ekranu z wkladami tej sesji) - komunikat takze wtedy, gdy ludzie nic nie
+        /// wzieli: ile sztuk zostalo, bo nikt ich nie chcial (gorsze) albo nie udzwignal (wymog).</summary>
+        internal static int PurgeUnusable(ItemRoster armory) { return PurgeUnusable(armory, false); }
+
+        internal static int PurgeUnusable(ItemRoster armory, bool deposits)
         {
             int toPlayer = 0, toMen = 0;
             try
@@ -566,7 +572,7 @@ namespace Armoury
                 var perType = new List<string>();
                 // K1: wymiana 1:1 - liczniki calego przebiegu, nazwy obu stron i podzial egzemplarzy dla ekranu (HoldReserve, BookPostfix)
                 bool swapRule = false;
-                int sWorn = 0, sX = 0, sFilled = 0, sKept = 0, sSpare = 0, sPlayerVis = 0, sNotBetter = 0;
+                int sWorn = 0, sX = 0, sFilled = 0, sKept = 0, sSpare = 0, sPlayerVis = 0, sKeptWorse = 0, sKeptHard = 0;
                 var wornNames = new List<string>(); var backNames = new List<string>();
                 int wornKinds = 0, backKinds = 0;
                 var split = new Dictionary<string, int[]>();   // klucz id|mod -> [noszone, czesc gracza, razem]
@@ -596,7 +602,7 @@ namespace Armoury
                     if (f.Swap != null && f.OneForOne)
                     {
                         var sw = f.Swap;
-                        sWorn += sw.Worn; sX += sw.X; sFilled += sw.Filled; sKept += sw.KeptOwn; sSpare += sw.MenSpare; sNotBetter += sw.NotBetter;
+                        sWorn += sw.Worn; sX += sw.X; sFilled += sw.Filled; sKept += sw.KeptOwn; sSpare += sw.MenSpare; sKeptWorse += sw.KeptWorse; sKeptHard += sw.KeptHard;
                         foreach (var p in f.Pieces) sPlayerVis += p.Target;
                         if (sw.Worn > 0 || sw.X > 0)
                         {
@@ -613,10 +619,9 @@ namespace Armoury
                                     if (back.Count < 8) back.Add(p.Id + (p.Mod.Length > 0 ? "(" + p.Mod + ")" : "") + " x" + p.Back);
                                 }
                             }
-                            Log.Info("Wymiana: " + type + ": wklady noszone " + sw.Worn + " (braki " + sw.Filled + ", wymiana " + sw.X
-                                     + (sw.NotBetter > 0 ? ", gorsze od wypartej bez zwrotu " + sw.NotBetter : "") + "), graczowi: "
+                            Log.Info("Wymiana: " + type + ": wklady noszone " + sw.Worn + " (braki " + sw.Filled + ", wymiana " + sw.X + "), graczowi: "
                                      + (back.Count > 0 ? string.Join(", ", back.ToArray()) : "nic") + "; wklady nienoszone " + sw.KeptOwn
-                                     + " zostaja gracza; zapas ludzi " + sw.MenSpare + ".");
+                                     + " zostaja gracza (nie lepsze od ich " + sw.KeptWorse + ", za trudne " + sw.KeptHard + "); zapas ludzi " + sw.MenSpare + ".");
                         }
                     }
                     // KSIEGA JEST PER ID, dopasowanie per sztuka (modyfikator!) - sumujemy
@@ -682,22 +687,33 @@ namespace Armoury
                              + " szt. na stan wojska [" + string.Join(", ", perType.ToArray()) + "].");
                 if (swapRule)
                 {
+                    // K1 (Jeff 09.10 04:40): sztuki gracza, ktorych nikt nie nosi, zostaja w oknie - z powodem: nikt ich nie chcial (gorsze albo rowne)
+                    // albo ten, komu bylyby lepsze, ich nie udzwignie (wymog)
+                    string kept = sKept > 0 ? sKept + " pcs of yours stay in the stash" + KeptWhy(sKeptWorse, sKeptHard, 0, "") : "";
                     if (sWorn > 0 || sX > 0)
                     {
-                        Log.Info("Wymiana: razem ludzie wzieli " + sWorn + ", oddali " + sX + " gorszych, braki " + sFilled + ", gorsze od wypartej bez zwrotu " + sNotBetter
-                                 + "; widoczne: gracza " + sPlayerVis + ", zapas ludzi " + sSpare + ".");
+                        Log.Info("Wymiana: razem ludzie wzieli " + sWorn + ", oddali " + sX + " gorszych, braki " + sFilled + "; nienoszone wklady gracza " + sKept
+                                 + " (nie lepsze od ich " + sKeptWorse + ", za trudne " + sKeptHard + "); widoczne: gracza " + sPlayerVis + ", zapas ludzi " + sSpare + ".");
                         // K1 B3 (Jeff 29.08: "otwieram i zamiast moich lukow leza wymienione"): obie strony wymiany w jednym zdaniu
                         string took = "QM: the men took " + sWorn + " pcs of yours (" + string.Join(", ", wornNames.ToArray())
-                                      + (wornKinds > wornNames.Count ? ", ..." : "") + "): " + sFilled + " filled empty hands, " + sX + " replaced worse kit"
-                                      + (sNotBetter > 0 ? ", " + sNotBetter + " pushed out better kit of theirs (nothing comes back for those)" : "");
+                                      + (wornKinds > wornNames.Count ? ", ..." : "") + "): " + sFilled + " filled empty hands, " + sX + " replaced worse kit";
                         string back = sX > 0
                             ? " - those " + sX + " worse pcs are yours in the stash (" + string.Join(", ", backNames.ToArray()) + (backKinds > backNames.Count ? ", ..." : "") + ")"
                             : "";
-                        Log.Player(took + back + "; " + sKept + " pcs of yours no man wears stay yours.");
+                        Log.Player(took + back + (kept.Length > 0 ? "; " + kept : "") + ".");
                     }
-                    else if (toPlayer > 0)
-                        Log.Player("QM: " + toPlayer + " pcs the men may not carry into battle are yours in the stash ("
-                                   + string.Join(", ", names.ToArray()) + (nameKinds > names.Count ? ", ..." : "") + ").");
+                    else
+                    {
+                        if (deposits && sKept > 0)
+                        {
+                            // Jeff 09.10 04:40: "oni tego tez nie biora, zostaje po prostu w okienku DTE"
+                            Log.Info("Wymiana: ludzie nie wzieli nic; nienoszone wklady gracza " + sKept + " (nie lepsze od ich " + sKeptWorse + ", za trudne " + sKeptHard + ").");
+                            Log.Player("QM: the men took nothing - " + kept + ".");
+                        }
+                        if (toPlayer > 0)
+                            Log.Player("QM: " + toPlayer + " pcs the men may not carry into battle are yours in the stash ("
+                                       + string.Join(", ", names.ToArray()) + (nameKinds > names.Count ? ", ..." : "") + ").");
+                    }
                 }
                 else if (toPlayer > 0 || toMen > 0)
                 {
@@ -730,6 +746,18 @@ namespace Armoury
         private static int _xUnseen;
         private static string _lastPins;
         internal static int TakeUnseenX() { int x = _xUnseen; _xUnseen = 0; return x; }
+
+        /// <summary>K1 (Jeff 09.10 04:40: "zostaje po prostu w okienku DTE, co oznacza, ze maja wszyscy lepszy sprzet albo wymagania byly za duze"):
+        /// powod, dla ktorego sztuki gracza zostaly - worse: nikt ich nie chcial (kazdy, kto je udzwignie, ma rowna albo lepsza), hard: ten, komu
+        /// bylyby lepsze, ich nie udzwignie (wymog), other: inny powod (otherWhy). Pusty, gdy wszystko zero.</summary>
+        internal static string KeptWhy(int worse, int hard, int other, string otherWhy)
+        {
+            var parts = new List<string>();
+            if (worse > 0) parts.Add(worse + " nobody wanted (the men have as good or better, or no use for them)");
+            if (hard > 0) parts.Add(hard + " nobody who would gain from them can use them (skill requirement)");
+            if (other > 0) parts.Add(other + " " + otherWhy);
+            return parts.Count > 0 ? ": " + string.Join(", ", parts.ToArray()) : "";
+        }
         internal static void Reset() { _lastSplit = null; _lastX = 0; _xUnseen = 0; _lastPins = null; }
 
         /// <summary>Ile sztuk tego typu jest WLASNOSCIA WOJSKA (calosc polek
@@ -1545,7 +1573,7 @@ namespace Armoury
                         Log.Player("QM: no man can use " + it.Name + " (needs " + skillName + " " + it.Difficulty
                                    + ", best " + bestSkill + ") - stays yours.", true);
                 }
-                QuartermasterLaw.PurgeUnusable(armory);
+                QuartermasterLaw.PurgeUnusable(armory, _pendingSwaps.Count > 0);   // K1 (Jeff 09.10 04:40): komunikat takze, gdy nic nie wzieli
             }
             catch (Exception e) { Log.Error("Escrow.ProcessSwaps", e); }
             finally { _pendingSwaps.Clear(); }
