@@ -1020,3 +1020,13 @@ albo w STAN-PRAC. Wynik: wszystkie 51 przyjete w calosci albo w istocie; czesci 
   `ClanVariablesCampaignBehavior.cs`, `DefaultClanFinanceModel.cs`, `DefaultPartyDesertionModel.cs`, `GarrisonPartyComponent.cs`, `PartiesSellLootCampaignBehavior.cs`,
   `PlayerEncounter.cs`, `Hero.cs`; BK `BKGentryBehavior.cs`, `CallBannersGoal.cs`, `BKVillageSupplyAutoBehavior.cs`, `BKEstateAutoSlavePurchaseBehavior.cs`;
   Naval `NavalShipDistributionCampaignBehavior.cs`, `ChangeShipOwnerAction.cs`; galezie `paczki/110-k5-kasa-zamku`, `paczki/112-k7-utarg-wsi`, `paczki/114-porzadki`.
+
+---
+
+## Odpowiedzi Jeffa (09.10 ok. 11:05) - wiazace przy wykonaniu
+
+1. Podloga 30 ludzi w druzynie przy niezaplaconym zoldzie - takze dla druzyny gracza (jedna regula).
+2. Pulap dlugu z okupow: razem najwyzej rok stalego dochodu rodu; kolejny okup ponad pulap mniejszy (porywacz dostaje mniej).
+3. Okup za KROLA placi SKARBIEC jego krolestwa (wariant b, jak w historii), nie jego rod; okup wiekszy - ok. 2-2.5 mln zl u duzego krolestwa (wylicz z tego samego wzoru
+   majatku, ale od dochodu korony); gdy skarbca nie starcza - raty z biezacych podatkow korony (jak "okup krola Jana" w ratach) i dlug korony wobec porywacza.
+   Nastepca tronu i pozostali czlonkowie rodu krolewskiego - jak glowa/lord rodu (placi rod); przejecie przez korone zdobywcy (decyzja 10:50) bez zmian.
