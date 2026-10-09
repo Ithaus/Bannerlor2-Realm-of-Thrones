@@ -749,3 +749,6 @@ fabularnych bez reparacji (nie naliczono 14.1 mln), bankrutow w dobie 120: 15 (p
 **09.10 (rano) - Jeff: 1) "tak" skrypt BEE, 2) "nie rozumiem" (suwak reparacji Diplomacy - do wyjasnienia), 3) "nie" - karawany NIE handluja strzalami, 4) "tak" tempo
 swiata wariant ksiazkowy, ale po naprawach ekonomii.** SKRYPT BEE NALOZONY 08.10 23:40 (zegar komp.): zamknij-ujscia-bee.ps1 -ListaZFundamentu, 13 wartosci, SHA 1f963cfa ->
 3a24554b; kopia: *.bak-<data>-przed-BEE-ujscia obok pliku + D:\Backup-Bannerlord\bee-2026-10-08\. Cofniecie: tools\bee\cofnij-ujscia-bee.ps1 (gra zamknieta).
+**09.10 - Jeff: "ok zgadzam sie" (suwak reparacji):** Diplomacy MCM ScalingWarReparationsGoldCostMultiplier 50 -> 10 w DiplomacySettings_v1.2.json (gra zamknieta);
+kopia: DiplomacySettings_v1.2.json.bak-2026-10-09-przed-reparacje10 obok + D:\Backup-Bannerlord\diplomacy-2026-10-09\. Dotyczy wojen niefabularnych (fabularne - T9 = 0).
+Cofniecie: przywrocic kopie albo w grze Mod Options -> Diplomacy -> Scaling War Reparations Gold Cost Multiplier = 50.
