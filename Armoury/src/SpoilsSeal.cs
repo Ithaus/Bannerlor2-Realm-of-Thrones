@@ -2,11 +2,14 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Reflection.Emit;
 using System.Text;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.GameState;
+using TaleWorlds.CampaignSystem.Inventory;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -55,6 +58,24 @@ namespace Armoury
     ///     (MendMaterial: skora, plotno, drewno, metal z surowki, zlomu albo rudy) po cenie targu, wszystko do kasy miasta; brak
     ///     materialu - sztuka czeka; wrakow kwatermistrz nie odnawia. Wycena w menu (CalculateRepairCosts, opis, podpowiedz) mowi to samo.
     ///     Zaplata przez GiveGoldAction (jak lawa naprawcza - Pay.ToSettlement); wycena, wykonanie i budzet dzialaja tylko razem.
+    /// 11. ODDANY SPRZET NIE UCZY (audyt 13 Z2/Z3, Jeff 09.10; wylacznik DonationXpOff, ten sam co DonationXpLaw - perki kwatermistrza):
+    ///     - "Equip and train the leader" (SubClanBehavior.OnEquipLeaderScreenClosed): XP dowodcy = wartosc x 0.05 za sztuke, wedlug typu
+    ///       (kon i uprzaz - Riding; konie nie sa przeliczone na pensy, rumak 20 000 d = ok. 1 000 XP) -> transpiler: wywolanie
+    ///       GetSkillObjectForItemType zastapione bramka zwracajaca null (Spoils sam pomija XP przy pustej umiejetnosci, komunikat "Training
+    ///       XP: 0"); rzeczy dalej ida do taboru dowodcy. Transpiler w metodzie wolajacej, nie postfiks na malej metodzie statycznej - JIT
+    ///       moglby ja wkleic i postfiks by nie zadzialal.
+    ///     - resztki trofeow przy "Leave" (LootCollectionBehavior.GiveLeftoverXpToTroops: wartosc / 10 jako XP wojska) -> prefiks, nic.
+    ///     - dar dla miasta (DonateEquipmentBehavior.OnDonateScreenClosed: +3 Trade i +2 Charm za sztuke) i dar jedzenia
+    ///       (QuartermasterBehavior.OnFoodScreenClosed: +2 Charm za jednostke) -> transpiler: Hero.AddSkillXp przez bramke; bezpieczenstwo,
+    ///       milicja, dobrobyt, lojalnosc i relacje bez zmian.
+    ///     - napisy: menu po zbieraniu trofeow ("Items you leave behind will be used to train your soldiers.") i podpowiedz "Leave"
+    ///       ("Remaining N items will be used to train soldiers.") -> transpiler na stalej napisu (po angielsku gra bierze napis z kodu).
+    /// 12. CANCEL NIC NIE ODDAJE (audyt 13 Z5/Z5b; wylacznik SpoilsCancelKeeps): na 7 ekranach "take back what you want to keep" Spoils
+    ///     zdejmuje rzeczy z taboru na lewa strone, a Cancel = InventoryLogic.Reset (stan z otwarcia: wszystko po lewej) i potem i tak
+    ///     funkcja zamkniecia Spoils - Cancel oddawal WSZYSTKO. Postfiks na InventoryLogic.Reset(fromCancel): gdy lewa strona to lista
+    ///     jednego z 7 ekranow (rozpoznany po funkcji zamkniecia ekranu i po referencji listy), cala lewa strona wraca do taboru - funkcje
+    ///     Spoils dostaja pusta liste i nic nie robia. War stockpile i trofea poza lista celowo (tam Cancel niczego nie oddaje).
+    ///     Uzbrojenie dowodcy bez partii (Spoils: rzeczy przepadaly) -> prefiks: rzeczy wracaja do taboru.
     /// Martwe w 1.8.4: zloto pozostalosci pola (BattlefieldRemnantsTemporarilyDisabled = true; i tak bralo z monet z cial).
     /// Bez zmian (to nie zloto z niczego): najem kwatermistrza, zalozenie / odnowienie / nowe druzyny klanu (zloto gracza
     /// czesciowo do nikad - ujscie), dary dla zalogi / milicji / zywnosc dla miasta (towar na wskazniki miasta), dzienny dochod
@@ -1092,6 +1113,198 @@ namespace Armoury
             return sb.ToString();
         }
 
+        // ------------------------------------------------------------ 11. oddany sprzet nie uczy (Z2, Z3 - DonationXpOff)
+
+        private const string TrainSentence = "\nItems you leave behind will be used to train your soldiers.";   // koniec napisu {=RL_Menu_Complete}
+        private const string LeftBehindTip = "{=RL_Tip_LeftBehind}Remaining {COUNT} items will be left on the field.";
+        private static Type _tDon;
+        private static FieldInfo _fLootScreen;
+        private static MethodInfo _mSkillForType, _mAddSkillXp;
+        private static int _tpCount;   // zamiany zrobione przez transpiler przy ostatnim WireT (Harmony wola transpiler synchronicznie w Patch)
+
+        /// <summary>Wstawiane przez transpiler w OnEquipLeaderScreenClosed w miejsce GetSkillObjectForItemType: przy DonationXpOff brak
+        /// umiejetnosci (Spoils nie daje XP, "Training XP: 0"), inaczej oryginal Spoils.</summary>
+        public static SkillObject LeaderSkill(ItemObject.ItemTypeEnum type)
+        {
+            try
+            {
+                if (DonationXpLaw.On) return null;
+                return _mSkillForType.Invoke(null, new object[] { type }) as SkillObject;
+            }
+            catch (Exception e) { Stumble("SpoilsSeal.LeaderSkill", e); return null; }
+        }
+
+        /// <summary>Wstawiane przez transpiler w miejsce Hero.AddSkillXp w darze dla miasta i darze jedzenia: przy DonationXpOff bez XP.</summary>
+        public static void GiftSkillXp(Hero hero, SkillObject skill, float xp)
+        {
+            try
+            {
+                if (DonationXpLaw.On)
+                {
+                    Log.Info("SpoilsSeal: dar Spoils bez XP - " + (skill != null ? skill.StringId : "?") + " " + (int)xp + " nie przyznane (Donation Xp Off).");
+                    return;
+                }
+                if (hero != null) hero.AddSkillXp(skill, xp);
+            }
+            catch (Exception e) { Stumble("SpoilsSeal.GiftSkillXp", e); }
+        }
+
+        /// <summary>Wstawiane za stala napisu menu po zbieraniu trofeow: bez zdania o treningu.</summary>
+        public static string MenuText(string s)
+        {
+            try { return DonationXpLaw.On && s != null ? s.Replace(TrainSentence, "") : s; }
+            catch { return s; }
+        }
+
+        /// <summary>Wstawiane za stala podpowiedzi "Leave": resztki zostaja na polu.</summary>
+        public static string TipText(string s)
+        {
+            try { return DonationXpLaw.On ? LeftBehindTip : s; }
+            catch { return s; }
+        }
+
+        private static bool IsCall(CodeInstruction c, MethodInfo m)
+        {
+            return m != null && (c.opcode == OpCodes.Call || c.opcode == OpCodes.Callvirt) && c.operand is MethodInfo && Equals(c.operand, m);
+        }
+
+        public static IEnumerable<CodeInstruction> LeaderSkillTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            var gate = AccessTools.Method(typeof(SpoilsSeal), nameof(LeaderSkill));
+            foreach (var c in instructions)
+            {
+                if (gate != null && IsCall(c, _mSkillForType)) { c.opcode = OpCodes.Call; c.operand = gate; _tpCount++; }   // etykiety i bloki zostaja na tej samej instrukcji
+                yield return c;
+            }
+        }
+
+        public static IEnumerable<CodeInstruction> GiftXpTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            var gate = AccessTools.Method(typeof(SpoilsSeal), nameof(GiftSkillXp));
+            foreach (var c in instructions)
+            {
+                if (gate != null && IsCall(c, _mAddSkillXp)) { c.opcode = OpCodes.Call; c.operand = gate; _tpCount++; }   // stos: bohater, umiejetnosc, XP - ten sam
+                yield return c;
+            }
+        }
+
+        public static IEnumerable<CodeInstruction> MenuTextTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            var gate = AccessTools.Method(typeof(SpoilsSeal), nameof(MenuText));
+            foreach (var c in instructions)
+            {
+                yield return c;
+                var s = c.opcode == OpCodes.Ldstr ? c.operand as string : null;
+                if (gate != null && s != null && s.StartsWith("{=RL_Menu_Complete}") && s.Contains(TrainSentence))
+                { _tpCount++; yield return new CodeInstruction(OpCodes.Call, gate); }
+            }
+        }
+
+        public static IEnumerable<CodeInstruction> TipTextTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            var gate = AccessTools.Method(typeof(SpoilsSeal), nameof(TipText));
+            foreach (var c in instructions)
+            {
+                yield return c;
+                var s = c.opcode == OpCodes.Ldstr ? c.operand as string : null;
+                if (gate != null && s != null && s.StartsWith("{=RL_Tip_LeftBehind}") && s.Contains("train"))
+                { _tpCount++; yield return new CodeInstruction(OpCodes.Call, gate); }
+            }
+        }
+
+        /// <summary>Prefiks LootCollectionBehavior.GiveLeftoverXpToTroops (metoda robi tylko XP wojska i komunikat): przy DonationXpOff nic.</summary>
+        public static bool LeftoverPrefix(object __instance)
+        {
+            try
+            {
+                if (!DonationXpLaw.On) return true;
+                var rest = _fLootScreen != null ? _fLootScreen.GetValue(__instance) as ItemRoster : null;
+                int n = Count(rest);
+                if (n > 0) Log.Info("SpoilsSeal: resztki trofeow (" + n + " szt.) zostaja na polu - bez XP dla wojska (Donation Xp Off).");
+                return false;
+            }
+            catch (Exception e) { Stumble("SpoilsSeal.Leftover", e); return true; }
+        }
+
+        private static int Count(ItemRoster r)
+        {
+            int n = 0;
+            if (r == null) return 0;
+            for (int i = 0; i < r.Count; i++) { var el = r.GetElementCopyAtIndex(i); if (el.Amount > 0) n += el.Amount; }
+            return n;
+        }
+
+        // ------------------------------------------------------------ 12. Cancel nic nie oddaje (Z5, Z5b - SpoilsCancelKeeps)
+
+        /// <summary>Ekran "take back what you want to keep": pole listy w zachowaniu Spoils i nazwa do logu.</summary>
+        private sealed class KeepScreen { public FieldInfo List; public string Name; }
+        private static readonly Dictionary<string, KeepScreen> _keep = new Dictionary<string, KeepScreen>();   // "Typ.FunkcjaZamkniecia" -> ekran
+        private static FieldInfo _fInvRosters, _fScEquip, _fScTarget;
+        private static MethodInfo _mScFindParty;
+
+        internal static bool CancelKeeps { get { var s = Settings.Current; return s == null || s.SpoilsCancelKeeps; } }
+
+        /// <summary>Postfiks InventoryLogic.Reset(fromCancel): Cancel na jednym z 7 ekranow Spoils "take back" - cala lewa strona (to, co Spoils
+        /// zdjal z taboru przy otwarciu; Reset wlasnie przywrocil stan z otwarcia) wraca na prawa (Twoj tabor). Funkcja zamkniecia Spoils
+        /// dostaje pusta liste i nic nie robi (liczy tylko Amount > 0). Ekran rozpoznany po funkcji zamkniecia (InventoryState.DoneLogicExtrasDelegate)
+        /// i po referencji listy - cudzej listy nie ruszy.</summary>
+        public static void CancelPostfix(InventoryLogic __instance, bool fromCancel)
+        {
+            if (!fromCancel || _fInvRosters == null || _keep.Count == 0) return;
+            try
+            {
+                if (!CancelKeeps) return;
+                var gsm = Game.Current != null ? Game.Current.GameStateManager : null;
+                var state = gsm != null ? gsm.ActiveState as InventoryState : null;
+                if (state == null || state.InventoryLogic != __instance) return;
+                var d = state.DoneLogicExtrasDelegate;
+                if (d == null || d.Target == null || d.Method == null || d.Method.DeclaringType == null) return;
+                KeepScreen ks;
+                if (!_keep.TryGetValue(d.Method.DeclaringType.FullName + "." + d.Method.Name, out ks)) return;
+                var rosters = _fInvRosters.GetValue(__instance) as ItemRoster[];
+                if (rosters == null || rosters.Length < 2 || rosters[0] == null || rosters[1] == null) return;
+                var left = rosters[0]; var right = rosters[1];
+                if (!ReferenceEquals(ks.List.GetValue(d.Target), left)) return;   // lewa strona to nie lista tego ekranu Spoils
+                int n = 0, kinds = 0;
+                for (int i = left.Count - 1; i >= 0; i--)
+                {
+                    if (i >= left.Count) continue;
+                    var el = left.GetElementCopyAtIndex(i);
+                    if (el.Amount <= 0) continue;
+                    right.AddToCounts(el.EquipmentElement, el.Amount);
+                    left.AddToCounts(el.EquipmentElement, -el.Amount);
+                    n += el.Amount; kinds++;
+                }
+                if (n <= 0) return;
+                Say("Cancelled - nothing was given away: " + n + " items stay in your baggage.",
+                    "[Cancel] Armoury: \"" + ks.Name + "\" cancelled - " + n + " items back to baggage, nothing given away");
+                Log.Info("SpoilsSeal: Cancel na ekranie Spoils \"" + ks.Name + "\" - " + n + " szt. (" + kinds + " rodzajow) wraca do taboru, nic nie oddane (Spoils Cancel Keeps).");
+            }
+            catch (Exception e) { Stumble("SpoilsSeal.Cancel", e); }
+        }
+
+        /// <summary>Prefiks SubClanBehavior.OnEquipLeaderScreenClosed: dowodca bez partii (albo bez dowodcy) - Spoils kladl rzeczy donikad,
+        /// tu wracaja do taboru (funkcja Spoils dostaje pusta liste). Z partia - bez zmian.</summary>
+        public static void EquipLeaderPrefix(object __instance)
+        {
+            try
+            {
+                if (!CancelKeeps) return;
+                var screen = _fScEquip.GetValue(__instance) as ItemRoster;
+                int n = Count(screen);
+                if (n <= 0) return;
+                var hero = _fScTarget.GetValue(__instance) as Hero;
+                var party = hero != null ? _mScFindParty.Invoke(__instance, new object[] { hero }) as MobileParty : null;
+                if (party != null) return;
+                ReturnRest(screen);
+                string who = hero != null && hero.Name != null ? hero.Name.ToString() : "The company's leader";
+                Say(who + " has no party to carry the gear - " + n + " items stay in your baggage.",
+                    "[SubClan] Armoury: leader without a party - " + n + " items back to baggage");
+                Log.Info("SpoilsSeal: uzbrojenie dowodcy " + who + " bez partii - " + n + " szt. wraca do taboru (Spoils je gubil; Spoils Cancel Keeps).");
+            }
+            catch (Exception e) { Stumble("SpoilsSeal.EquipLeader", e); }
+        }
+
         // ------------------------------------------------------------ wpiecie
 
         private static Type Find(string name) { return QuartermasterLaw.FindType(name); }
@@ -1108,6 +1321,20 @@ namespace Armoury
             if (label == "naprawa: wykonanie") _repWired = true;
             if (label == "naprawa: wycena") _repCostWired = true;
             if (label == "naprawa w budzecie") _repBudWired = true;
+        }
+
+        /// <summary>Transpiler: wpiety tylko, gdy znalazl swoje miejsce w kodzie Spoils (licznik zamian); inaczej zdjety i "BRAK" w linii startowej.</summary>
+        private static void WireT(Harmony h, Type t, string method, string transpiler, string label, bool ready)
+        {
+            var m = t != null ? AccessTools.Method(t, method) : null;
+            if (m == null) { _missing.Add(label + " (brak metody " + (t != null ? t.Name : "?") + "." + method + ")"); return; }
+            if (!ready) { _missing.Add(label + " (brak skladowych " + t.Name + ")"); return; }
+            var tm = AccessTools.Method(typeof(SpoilsSeal), transpiler);
+            _tpCount = 0;
+            h.Patch(m, transpiler: new HarmonyMethod(tm));
+            if (_tpCount > 0) { _wired.Add(label); return; }
+            try { h.Unpatch(m, tm); } catch { }
+            _missing.Add(label + " (nie znaleziono miejsca w " + t.Name + "." + method + ")");
         }
 
         internal static void ApplyAll(Harmony h)
@@ -1213,12 +1440,61 @@ namespace Armoury
                 Wire(h, _tQm, "OnRepairMenuInit", null, "RepairMenuPostfix", "naprawa: opis w menu", rep);
                 Wire(h, _tQm, "OnRepairCondition", null, "RepairOptionPostfix", "naprawa: podpowiedz opcji", rep);
 
+                // 11-12 we wlasnym try: wywrotka nowych latek nie moze zgasic linii startowej ani latek 1-10 (juz wpietych)
+                try
+                {
+                    // 11. oddany sprzet nie uczy (Z2, Z3 - DonationXpOff): uzbrojenie dowodcy, dar dla miasta, dar jedzenia, resztki trofeow, napisy
+                    _tDon = Find("RealisticLoot.Behaviors.DonateEquipmentBehavior");
+                    _mSkillForType = _tSub != null ? AccessTools.Method(_tSub, "GetSkillObjectForItemType") : null;
+                    _mAddSkillXp = AccessTools.Method(typeof(Hero), "AddSkillXp", new[] { typeof(SkillObject), typeof(float) });
+                    _fLootScreen = _tLoot != null ? AccessTools.Field(_tLoot, "_lootScreenRoster") : null;
+                    WireT(h, _tSub, "OnEquipLeaderScreenClosed", nameof(LeaderSkillTranspiler), "uzbrojenie dowodcy bez XP", _mSkillForType != null && _mSkillForType.IsStatic);
+                    WireT(h, _tDon, "OnDonateScreenClosed", nameof(GiftXpTranspiler), "dar dla miasta bez XP", _mAddSkillXp != null);
+                    WireT(h, _tQm, "OnFoodScreenClosed", nameof(GiftXpTranspiler), "dar jedzenia bez XP", _mAddSkillXp != null);
+                    Wire(h, _tLoot, "GiveLeftoverXpToTroops", "LeftoverPrefix", null, "resztki trofeow bez XP", true);
+                    WireT(h, _tLoot, "UpdateCompleteText", nameof(MenuTextTranspiler), "menu trofeow bez obietnicy treningu", true);
+                    WireT(h, _tLoot, "OnCompleteLeaveCondition", nameof(TipTextTranspiler), "podpowiedz Leave bez obietnicy treningu", true);
+
+                    // 12. Cancel nic nie oddaje (Z5b) i rzeczy dowodcy bez partii wracaja (Z5) - SpoilsCancelKeeps
+                    _keep.Clear();
+                    var screens = new[]
+                    {
+                        new[] { "QuartermasterBehavior", "OnGarrisonScreenClosed", "_garrisonScreenRoster", "Equip garrison" },
+                        new[] { "QuartermasterBehavior", "OnMilitiaScreenClosed", "_militiaScreenRoster", "Supply militia" },
+                        new[] { "QuartermasterBehavior", "OnFoodScreenClosed", "_foodScreenRoster", "Donate food" },
+                        new[] { "QuartermasterBehavior", "OnSalvageScreenClosed", "_salvageScreenRoster", "Salvage" },
+                        new[] { "SubClanBehavior", "OnDonateGearScreenClosed", "_donateScreenRoster", "Donate gear to clan" },
+                        new[] { "SubClanBehavior", "OnEquipLeaderScreenClosed", "_equipLeaderScreenRoster", "Equip the leader" },
+                        new[] { "DonateEquipmentBehavior", "OnDonateScreenClosed", "_donateScreenRoster", "Donate to town" },
+                    };
+                    var keepMissing = new List<string>();
+                    foreach (var sc in screens)
+                    {
+                        var t = Find("RealisticLoot.Behaviors." + sc[0]);
+                        var close = t != null ? AccessTools.Method(t, sc[1]) : null;
+                        var list = t != null ? AccessTools.Field(t, sc[2]) : null;
+                        if (close == null || list == null || list.IsStatic || list.FieldType != typeof(ItemRoster)) { keepMissing.Add(sc[3]); continue; }
+                        _keep[close.DeclaringType.FullName + "." + close.Name] = new KeepScreen { List = list, Name = sc[3] };
+                    }
+                    _fInvRosters = AccessTools.Field(typeof(InventoryLogic), "_rosters");
+                    Wire(h, typeof(InventoryLogic), "Reset", null, "CancelPostfix", "Cancel nic nie oddaje (ekranow " + _keep.Count + "/7)", _keep.Count > 0 && _fInvRosters != null);
+                    if (keepMissing.Count > 0) _missing.Add("Cancel - nierozpoznane ekrany: " + string.Join(", ", keepMissing.ToArray()));
+                    if (_tSub != null)
+                    {
+                        _fScEquip = AccessTools.Field(_tSub, "_equipLeaderScreenRoster"); _fScTarget = AccessTools.Field(_tSub, "_equipTargetHero");
+                        _mScFindParty = AccessTools.Method(_tSub, "FindHeroParty");
+                    }
+                    Wire(h, _tSub, "OnEquipLeaderScreenClosed", "EquipLeaderPrefix", null, "rzeczy dowodcy bez partii wracaja", _fScEquip != null && _fScTarget != null && _mScFindParty != null);
+                }
+                catch (Exception e) { Log.Error("SpoilsSeal.ApplyAll (11-12)", e); _missing.Add("11-12: wyjatek przy wpinaniu - patrz blad wyzej"); }
+
                 string ver = "?";
                 try { var sm = Find("RealisticLoot.RealisticLootSubModule"); var f = sm != null ? sm.GetField("Version") : null; if (f != null) ver = f.GetRawConstantValue() as string; } catch { }
                 Log.Info("SpoilsSeal: Spoils of War (RealisticLoot " + ver + ") - wpiete: " + string.Join(", ", _wired.ToArray())
                          + (_missing.Count > 0 ? " | BRAK (te sciezki Spoils BEZ ZMIAN - sprawdzic dekompilacje): " + string.Join(", ", _missing.ToArray()) : " | wszystkie sciezki wpiete")
                          + " - sprzedaz automatyczna magazynu wojennego blokowana wedle wlacznika Spoils No Auto Sale, reszta zlota z niczego wedle Spoils No Free Gold,"
-                         + " naprawa u kwatermistrza przez kowali miasta z materialem z targu wedle Spoils Quartermaster Repair"
+                         + " naprawa u kwatermistrza przez kowali miasta z materialem z targu wedle Spoils Quartermaster Repair,"
+                         + " XP za oddany sprzet (dowodca, resztki, dary, napisy) wedle Donation Xp Off, Cancel na ekranach \"take back\" wedle Spoils Cancel Keeps"
                          + " (wszystkie domyslnie wlaczone; reszta Spoils bez zmian); liczby - linie dnia \"Spoils of War (128)\" i \"Spoils - naprawa u kwatermistrza\".");
             }
             catch (Exception e) { Log.Error("SpoilsSeal.ApplyAll", e); }

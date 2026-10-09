@@ -720,6 +720,14 @@ namespace Armoury
         [SettingPropertyGroup("The law of the battlefield")]
         public bool SpoilsQuartermasterRepair { get; set; } = true;
 
+        [SettingPropertyBool("Donation Xp Off", HintText = "gear you give away no longer trains anyone: no troop experience for weapons and armour you leave or discard on any screen (the quartermaster perks Giving Hands and Paid in Promise keep only their other half), no skill experience for gear handed to a Spoils of War company leader (horses too), for trophies left on the field or for gear and food given to a town (its security, militia, prosperity and relations still rise); trade skill counts only what you sold at that stall, not what you gave away since your last market visit (off = as before)")]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool DonationXpOff { get; set; } = true;
+
+        [SettingPropertyBool("Spoils Cancel Keeps", HintText = "Cancel on the Spoils of War screens that say 'take back what you want to keep' (equip a leader, donate gear to your company, donate food, equip the garrison, supply the militia, salvage, donate to the town) leaves everything as it was: all items stay in your baggage and nothing is given away; gear for a company leader who has no party comes back to you instead of vanishing (off = as before: Cancel gave everything away)")]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool SpoilsCancelKeeps { get; set; } = true;
+
         [SettingPropertyBool("Living Economy Sealed", HintText = "BetterEconomy (Living Economy) may not make gold vanish nor conjure goods, men or experience out of nothing: its actions that would pay your gold into nothing (contributions to a town or castle treasury, town and village investments, market access, armory, training camp, paid drill) stay in its menus but are closed and say why, and the Lord wealth realism switch in its ledger stays off; finished armories stop turning market iron into weapons from nothing, AI training camps stop handing out free experience, villages stop their second production from nothing, and the taking of lords' gold and the AI's 5000 market-access fee stop (the fee only once BetterEconomy's own settings shut village trade diversion - until then the fee is the only thing holding it back; off = BetterEconomy as before; the log shows what was stopped)")]
         [SettingPropertyGroup("The living economy")]
         public bool LivingEconomySealed { get; set; } = true;
@@ -3007,6 +3015,8 @@ namespace Armoury
             s.SpoilsNoAutoSale = SpoilsNoAutoSale;
             s.SpoilsNoFreeGold = SpoilsNoFreeGold;
             s.SpoilsQuartermasterRepair = SpoilsQuartermasterRepair;
+            s.DonationXpOff = DonationXpOff;
+            s.SpoilsCancelKeeps = SpoilsCancelKeeps;
             s.LivingEconomySealed = LivingEconomySealed;
             s.PlagueSparesYourMen = PlagueSparesYourMen;
             s.PlagueShieldLogEvery = PlagueShieldLogEvery;
