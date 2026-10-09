@@ -18,12 +18,15 @@ namespace Armoury
     /// 169c: prefiksy licza do linii "Niewola lordow i okupy (169c)".
     /// 2.14 (projekt etapu 2, rozdz. "2.14"; zasada 2.0b - nic z niczego, nic w nicosc, zapasowy odbiorca):
     ///  - `PlayerRansomToCaptor`: ta sama kwota idzie do porywacza - wodz partii porywacza; partia bez wodza - glowa jej rodu; banda - kasa
-    ///    jej kryjowki; loch osady - pan osady (kryjowka - jej kasa); zapasowy odbiorca: glowa rodu porywacza, potem kasa najblizszego miasta;
+    ///    jej kryjowki; loch osady - pan osady (kryjowka - jej kasa); zapasowy odbiorca: glowa rodu porywacza, potem pan (glowa rodu wlasciciela)
+    ///    najblizszego miasta spoza rodu gracza, na koncu kasa tego miasta (przeglad 2.14: kasa miasta ponad cel regulatora gry jest kasowana);
     ///    licznik "bez odbiorcy" (prog 0). Prefiks robi to, co oryginal (przelew + EndCaptivityAction.ApplyByRansom), i pomija go - tylko gdy
-    ///    przelew sie udal; inaczej oryginal jak dotad (w nicosc, liczone).
+    ///    przelew sie udal (takze gdy wyjatek padl juz po przelewie - kiesa gracza mniejsza o kwote); inaczej oryginal jak dotad (w nicosc, liczone).
     ///  - `RansomCourierNoTopUp`: placacy AI ma cene, ale mniej niz cena + 1000 - oryginal biegnie, postfiks zdejmuje mu dosypke gry (placi
-    ///    z wlasnej kiesy); nie ma ceny - oferta przepada jak po "Decline" (DeclineRansomOffer gry), jeniec zostaje. Gracz placacy - bez zmian.
-    ///  Kwoty bez zmian (do 178). Harness w autotescie (CrashScribe.Autotest.Active, `RansomHarnessInAutotest`): bez prawdziwej niewoli gracza.
+    ///    z wlasnej kiesy; nic, gdy oryginal nie biegl); nie ma ceny - oferta znika (SetCurrentRansomHero(null) gry, bez wpisu na liste odmow -
+    ///    gracz przyjal), jeniec zostaje. Gracz placacy - bez zmian.
+    ///  Kwoty bez zmian (do 178). Harness w autotescie (CrashScribe.Autotest.Active, `RansomHarnessInAutotest`): bez prawdziwej niewoli gracza;
+    ///  kurier - prawdziwe AcceptRansomOffer gry na lordzie AI w druzynie gracza.
     /// Kazde cialo w try; bledy liczone.
     /// </summary>
     internal static class RansomFlows
@@ -36,11 +39,12 @@ namespace Armoury
         // liczniki doby linii "Okupy (2.14)" (zerowane w Daily)
         private static long _dToCaptor, _dToNothing, _dTopUpBlocked, _dTopUpGiven, _dLapsedGold, _dNoRecipientGold;
         private static int _dToCaptorN, _dTopUpBlockedN, _dLapsedN, _dNoRecipientN;
-        private static readonly int[] _dRoute = new int[6];
-        private static readonly string[] RouteName = { "wodz partii", "glowa rodu partii bez wodza", "kasa kryjowki bandy", "pan osady (loch)", "zapasowy: glowa rodu porywacza", "zapasowy: kasa najblizszego miasta" };
+        private static readonly int[] _dRoute = new int[7];
+        private static readonly string[] RouteName = { "wodz partii", "glowa rodu partii bez wodza", "kasa kryjowki bandy", "pan osady (loch)", "zapasowy: glowa rodu porywacza",
+                                                       "zapasowy: pan najblizszego miasta", "zapasowy: kasa najblizszego miasta" };
 
         private static FieldInfo _fHero, _fPayer;
-        private static MethodInfo _mDecline;
+        private static MethodInfo _mAccept;
         private static bool _menuWired, _courierWired;
 
         internal static void ZeroDay() { DayPlayerPaid = DayPlayerToNothing = DayCourierIn = DayCourierOut = DayTopUp = 0; DayPlayerN = DayCourierN = DayTopUpN = 0; }
@@ -91,7 +95,8 @@ namespace Armoury
                     if (clan != null && Live(clan.Leader)) { hero = clan.Leader; route = 3; return; }
                 }
             }
-            // zapasowy odbiorca (2.0b): glowa rodu porywacza (rod bandy - nie), potem kasa najblizszego miasta
+            // zapasowy odbiorca (2.0b): glowa rodu porywacza (rod bandy - nie), potem pan najblizszego miasta spoza rodu gracza (przeglad 2.14:
+            // banda bez kryjowki - np. maruderzy - dawala okup do kasy miasta, a nadwyzke ponad cel regulator gry kasuje), na koncu kasa tego miasta
             if (clan != null && !clan.IsBanditFaction && Live(clan.Leader)) { hero = clan.Leader; route = 4; return; }
             Settlement best = null; float bd = float.MaxValue;
             try
@@ -101,13 +106,16 @@ namespace Armoury
                         : (MobileParty.MainParty != null ? MobileParty.MainParty.Position.ToVec2() : default(TaleWorlds.Library.Vec2));
                 foreach (var st in Settlement.All)
                 {
-                    if (st == null || !st.IsTown || st.Town == null) continue;
+                    if (st == null || !st.IsTown || st.Town == null || st.OwnerClan == Clan.PlayerClan) continue;   // gracz nie placi sam sobie
                     float d = st.GetPosition2D.DistanceSquared(pos);
                     if (d < bd) { bd = d; best = st; }
                 }
             }
             catch { best = null; }
-            if (best != null) { purse = best; route = 5; }
+            if (best == null) return;
+            var owner = best.OwnerClan;
+            if (owner != null && !owner.IsBanditFaction && Live(owner.Leader)) { hero = owner.Leader; route = 5; return; }
+            purse = best; route = 6;
         }
 
         /// <summary>Okup gracza do porywacza: przelew (zdarzenie gry - ksiega obiegu go widzi). true - przelew zrobiony.</summary>
@@ -118,11 +126,17 @@ namespace Armoury
             if (me == null || amount <= 0) return false;
             Hero h; Settlement st; int route;
             ResolveRecipient(captor, out h, out st, out route);
-            if (h != null) { GiveGoldAction.ApplyBetweenCharacters(me, h, amount); to = Name(h) + " (" + RouteName[route] + ")"; }
-            else if (st != null) { GiveGoldAction.ApplyForCharacterToSettlement(me, st, amount); to = "kasa " + st.Name + " (" + RouteName[route] + ")"; }
+            if (h != null) GiveGoldAction.ApplyBetweenCharacters(me, h, amount);
+            else if (st != null) GiveGoldAction.ApplyForCharacterToSettlement(me, st, amount);
             else { _dNoRecipientN++; _dNoRecipientGold += amount; return false; }
-            _dToCaptor += amount; _dToCaptorN++; _dRoute[route]++;
-            Log.Info("Okupy (2.14): okup gracza " + amount + " zl (" + why + ") -> " + to + "; porywacz: " + Describe(captor) + "; w nicosc 0.");
+            // przelew zrobiony - liczniki i log we wlasnym try (przeglad 2.14: wyjatek po przelewie nie moze puscic oryginalu, ktory zabralby drugi raz)
+            try
+            {
+                to = h != null ? Name(h) + " (" + RouteName[route] + ")" : "kasa " + st.Name + " (" + RouteName[route] + ")";
+                _dToCaptor += amount; _dToCaptorN++; _dRoute[route]++;
+                Log.Info("Okupy (2.14): okup gracza " + amount + " zl (" + why + ") -> " + to + "; porywacz: " + Describe(captor) + "; w nicosc 0.");
+            }
+            catch (Exception e) { Stumbles++; Log.Error("RansomFlows.PayPlayerRansom(log)", e); }
             return true;
         }
 
@@ -146,8 +160,14 @@ namespace Armoury
             bool paid = false;
             if (s != null && s.PlayerRansomToCaptor)
             {
+                long g0 = Hero.MainHero != null ? Hero.MainHero.Gold : 0;
                 try { string to; paid = PayPlayerRansom(amt, captor, "menu niewoli", out to); }
-                catch (Exception e) { Stumbles++; Log.Error("RansomFlows.PayPlayerRansom", e); paid = false; }
+                catch (Exception e)
+                {
+                    Stumbles++; Log.Error("RansomFlows.PayPlayerRansom", e);
+                    // przeglad 2.14: wyjatek mogl pasc juz po przelewie (np. sluchacz zdarzenia gry) - wtedy oryginal nie moze zabrac kwoty drugi raz
+                    paid = Hero.MainHero != null && Hero.MainHero.Gold <= g0 - amt;
+                }
             }
             if (!paid)
             {
@@ -216,22 +236,26 @@ namespace Armoury
                              + "); dosypka gry " + topUp + " zl zdjeta po wyplacie; w nicosc 0.");
                     return true;
                 }
-                // dec == 2: placacy nie ma ceny - oferta przepada jak po odmowie gracza, jeniec zostaje
+                // dec == 2: placacy nie ma ceny - oferta znika, jeniec zostaje. Przeglad 2.14: nie DeclineRansomOffer gry (wpisuje jenca na liste
+                // odmow - kolejna oferta z szansa 0.12 zamiast 0.2, choc gracz przyjal), tylko to, czym Decline konczy: publiczne SetCurrentRansomHero(null)
                 _dLapsedN++; _dLapsedGold += price;
+                DayCourierIn -= price;   // przeglad 2.14 (harness uruchamia te droge): linia 169c "gracz dostal" - oferta przepadla, gracz nic nie dostal
                 Log.Info("Okupy (2.14): kurier - " + Name(hero) + ": " + Name(payer) + " (rod " + clan + ") ma " + payer.Gold + " < cena " + price
-                         + " - oferta przepada, jeniec zostaje u gracza (gra dosypalaby " + topUp + " zl z niczego); w nicosc 0.");
-                if (_mDecline != null) _mDecline.Invoke(__instance, null);
+                         + " - oferta przepada (bez wpisu na liste odmow), jeniec zostaje u gracza (gra dosypalaby " + topUp + " zl z niczego); w nicosc 0.");
+                var beh = __instance as RansomOfferCampaignBehavior;
+                if (beh != null) beh.SetCurrentRansomHero(null);
                 Log.Player("The courier's masters could not raise the " + price + " denars they offered for " + Name(hero) + ". The offer lapses and " + Name(hero) + " stays your prisoner.", true);
                 return false;
             }
             catch (Exception e) { Stumbles++; Log.Error("RansomFlows.AcceptPrefix", e); __state = null; return true; }
         }
 
-        public static void AcceptPostfix(TopUpState __state)
+        public static void AcceptPostfix(TopUpState __state, bool __runOriginal)
         {
             try
             {
-                if (__state == null || __state.Payer == null || __state.Take <= 0) return;
+                // przeglad 2.14: dosypke zdejmujemy tylko, gdy oryginal naprawde biegl (inny prefiks moglby go pominac - wtedy zdjecie szloby w nicosc)
+                if (!__runOriginal || __state == null || __state.Payer == null || __state.Take <= 0) return;
                 int take = Math.Min(__state.Take, Math.Max(0, __state.Payer.Gold));
                 if (take > 0) __state.Payer.ChangeHeroGold(-take);   // dosypka gry (Gold = cena + 1000, bez zdarzenia) wraca w nicosc - placacy zaplacil z wlasnego
             }
@@ -257,9 +281,9 @@ namespace Armoury
                 {
                     _fHero = AccessTools.Field(typeof(RansomOfferCampaignBehavior), "_currentRansomHero");
                     _fPayer = AccessTools.Field(typeof(RansomOfferCampaignBehavior), "_currentRansomPayer");
-                    _mDecline = AccessTools.Method(typeof(RansomOfferCampaignBehavior), "DeclineRansomOffer");
                     var m = AccessTools.Method(typeof(RansomOfferCampaignBehavior), "AcceptRansomOffer", new[] { typeof(int) });
-                    if (m != null && _fHero != null && _fPayer != null && _mDecline != null)
+                    _mAccept = m;   // harness kuriera w autotescie wola ta sama (zalatana) metode
+                    if (m != null && _fHero != null && _fPayer != null)
                     {
                         h.Patch(m, prefix: new HarmonyMethod(typeof(RansomFlows), nameof(AcceptPrefix)) { priority = Priority.First },
                                    postfix: new HarmonyMethod(typeof(RansomFlows), nameof(AcceptPostfix)) { priority = Priority.Last });
@@ -320,8 +344,10 @@ namespace Armoury
         /// Harness niewoli (projekt 2.14, K29) - tylko w autotescie i przy `RansomHarnessInAutotest`. BEZ prawdziwej niewoli gracza: TakePrisonerAction
         /// na glownym bohaterze otwiera menu niewoli i okna RC (slowo honoru - InformationManager.ShowInquiry z pauza), na ktore autotest nie ma kto odpowiedziec.
         /// Doba sesji 5: ta sama funkcja co menu okupu (PayPlayerRansom) placi prawdziwie min(1000, kiesa gracza) wodzowi partii lorda AI - kiesy w parze,
-        /// 0 zl w nicosc; odbiorcy na sucho dla lochu miasta i dla bandy. Doba sesji 8: decyzja kuriera (CourierDecide) dla placacego bogatego i biednego
-        /// (na sucho - bez przelewu) i wpiecie obu latek. Kazdy krok konczy sie "OK" albo "BLAD".
+        /// 0 zl w nicosc; odbiorcy na sucho dla lochu miasta i dla bandy. Doba sesji 8: decyzja kuriera (CourierDecide) na sucho i wpiecie obu latek,
+        /// potem (przeglad 2.14, K29) PRAWDZIWE AcceptRansomOffer gry (z latkami) na lordzie AI w druzynie gracza (juz jencu albo wzietym TakePrisonerAction -
+        /// to nie otwiera okien RC, te sa tylko dla niewoli gracza): krok 2b cena = kiesa placacego + 1 (oferta przepada, jeniec zostaje, kiesy bez zmian),
+        /// krok 2c cena = kiesa placacego - 500 (placacy -cena, gracz +cena, dosypka 0, jeniec wolny). Kazdy krok konczy sie "OK" albo "BLAD".
         /// </summary>
         private static void Harness()
         {
@@ -380,6 +406,85 @@ namespace Armoury
                 bool ok = d1 == 1 && t1 == 500 && d2 == 2 && d3 == 0 && t3 == 0;
                 Log.Info("Harness niewoli (2.14): krok 2 - kurier na sucho: placacy 5000 / cena 4500 -> " + (d1 == 1 ? "placi sam, dosypka " + t1 + " zdjeta" : "?") + "; placacy 1000 -> "
                          + (d2 == 2 ? "oferta przepada" : "?") + "; placacy 9000 -> " + (d3 == 0 ? "jak w grze" : "?") + "; latki: " + Wired + " - " + (ok && _menuWired && _courierWired ? "OK" : "BLAD") + ".");
+                CourierHarness(s);
+            }
+        }
+
+        /// <summary>Lord AI do harnessu kuriera: already - juz jeniec w druzynie gracza; inaczej wolny lord bez partii (nie glowa rodu, nie krol,
+        /// nie gubernator), ktorego glowa rodu (placacy, jak w grze) ma 2 000 - 10 mln.</summary>
+        private static bool HarnessCandidate(Hero h, bool already)
+        {
+            if (h == null || !h.IsAlive || h == Hero.MainHero || !h.IsLord || h.IsChild) return false;
+            var c = h.Clan;
+            if (c == null || c == Clan.PlayerClan || c.IsBanditFaction || c.IsEliminated || ClanIncomeBook.IsUndeadClan(c)) return false;
+            var lead = c.Leader;
+            if (lead == null || lead == h || !lead.IsAlive || lead.IsPrisoner || lead == Hero.MainHero || lead.Gold < 2000 || lead.Gold > 10000000) return false;
+            if (already) return h.IsPrisoner && h.PartyBelongedToAsPrisoner == PartyBase.MainParty;
+            if (h.IsPrisoner || h.HeroState != Hero.CharacterStates.Active || h.PartyBelongedTo != null || h.GovernorOf != null) return false;
+            return c.Kingdom == null || c.Kingdom.Leader != h;
+        }
+
+        private static bool InMainParty(Hero h) { return h != null && h.IsPrisoner && h.PartyBelongedToAsPrisoner == PartyBase.MainParty; }
+
+        /// <summary>Krok 2b i 2c harnessu: prawdziwe AcceptRansomOffer gry (przez refleksje - biegna latki AcceptPrefix/AcceptPostfix).</summary>
+        private static void CourierHarness(Settings s)
+        {
+            const string pre = "Harness niewoli (2.14): krok 2b/2c - kurier prawdziwy (AcceptRansomOffer gry): ";
+            var me = Hero.MainHero;
+            var beh = Campaign.Current != null ? Campaign.Current.GetCampaignBehavior<RansomOfferCampaignBehavior>() : null;
+            if (!s.RansomCourierNoTopUp) { Log.Info(pre + "pominiety (RansomCourierNoTopUp wylaczone)."); return; }
+            if (beh == null || _mAccept == null || _fHero == null || !_courierWired) { Log.Info(pre + "brak zachowania gry albo latki kuriera - BLAD."); return; }
+            if (_fHero.GetValue(beh) != null) { Log.Info(pre + "pominiety (trwa prawdziwa oferta okupu)."); return; }
+            if (me == null || me.IsPrisoner || PartyBase.MainParty == null) { Log.Info(pre + "pominiety (gracz w niewoli albo bez druzyny)."); return; }
+            Hero prisoner = null; bool taken = false;
+            foreach (var h in Hero.AllAliveHeroes) if (HarnessCandidate(h, true)) { prisoner = h; break; }
+            if (prisoner == null) foreach (var h in Hero.AllAliveHeroes) if (HarnessCandidate(h, false)) { prisoner = h; break; }
+            if (prisoner == null) { Log.Info(pre + "pominiety (brak lorda AI bez partii z placacym 2 000 - 10 mln)."); return; }
+            var payer = prisoner.Clan.Leader;
+            try
+            {
+                if (!prisoner.IsPrisoner) { TakePrisonerAction.Apply(PartyBase.MainParty, prisoner); taken = true; }
+                if (!InMainParty(prisoner)) { Log.Info(pre + Name(prisoner) + " nie trafil do druzyny gracza - BLAD."); return; }
+                string who = Name(prisoner) + " (rod " + (prisoner.Clan != null ? prisoner.Clan.Name.ToString() : "-") + (taken ? ", wziety w niewole przez harness" : ", jeniec gracza") + "), placacy " + Name(payer);
+                // 2b: placacy nie ma ceny - oferta przepada, jeniec zostaje, kiesy bez zmian
+                try
+                {
+                    long q0 = payer.Gold, p0 = me.Gold; int lapsed0 = _dLapsedN;
+                    int price = (int)Math.Min(int.MaxValue, q0 + 1);
+                    beh.SetCurrentRansomHero(prisoner, payer);
+                    _mAccept.Invoke(beh, new object[] { price });
+                    bool gone = _fHero.GetValue(beh) == null, stays = InMainParty(prisoner);
+                    bool ok = gone && stays && me.Gold == p0 && payer.Gold == q0 && _dLapsedN == lapsed0 + 1;
+                    Log.Info("Harness niewoli (2.14): krok 2b - kurier prawdziwy, cena = kiesa placacego + 1: " + who + " ma " + q0 + ", cena " + price + " -> oferta " + (gone ? "przepadla" : "WISI")
+                             + ", jeniec " + (stays ? "zostaje u gracza" : "UWOLNIONY") + ", kiesa gracza " + p0 + " -> " + me.Gold + ", kiesa placacego " + q0 + " -> " + payer.Gold + " - " + (ok ? "OK" : "BLAD") + ".");
+                }
+                catch (Exception e) { Stumbles++; Log.Error("RansomFlows.Harness(2b)", e); Log.Info("Harness niewoli (2.14): krok 2b - wyjatek (" + e.GetType().Name + ") - BLAD."); }
+                // 2c: placacy ma cene, ale mniej niz cena + 1000 - gra dosypalaby 500; placi z wlasnej kiesy, gracz dostaje cene, jeniec wolny
+                try
+                {
+                    if (!InMainParty(prisoner)) { Log.Info("Harness niewoli (2.14): krok 2c - jeniec nie jest juz w druzynie gracza po kroku 2b - BLAD."); return; }
+                    long q0 = payer.Gold, p0 = me.Gold;
+                    int price = (int)Math.Min(int.MaxValue, q0 - 500);
+                    beh.SetCurrentRansomHero(prisoner, payer);
+                    _mAccept.Invoke(beh, new object[] { price });
+                    long paidBy = q0 - payer.Gold, got = me.Gold - p0;
+                    bool free = !prisoner.IsPrisoner, gone = _fHero.GetValue(beh) == null;
+                    bool ok = paidBy == price && got == price && free && gone;
+                    Log.Info("Harness niewoli (2.14): krok 2c - kurier prawdziwy, cena = kiesa placacego - 500: " + who + " ma " + q0 + ", cena " + price + " -> placacy zaplacil " + paidBy
+                             + ", gracz dostal " + got + ", z niczego " + (got - paidBy) + " (dosypka gry zdjeta), jeniec " + (free ? "wolny" : "DALEJ W NIEWOLI") + ", oferta " + (gone ? "zamknieta" : "WISI")
+                             + " - " + (ok ? "OK" : "BLAD") + ".");
+                }
+                catch (Exception e) { Stumbles++; Log.Error("RansomFlows.Harness(2c)", e); Log.Info("Harness niewoli (2.14): krok 2c - wyjatek (" + e.GetType().Name + ") - BLAD."); }
+            }
+            finally
+            {
+                // sprzatanie: jeniec wziety przez harness nie zostaje u gracza (gdy krok 2c go nie uwolnil); oferta nie wisi
+                try
+                {
+                    if (taken && InMainParty(prisoner)) { EndCaptivityAction.ApplyByReleasedByChoice(prisoner); Log.Info("Harness niewoli (2.14): sprzatanie - " + Name(prisoner) + " uwolniony."); }
+                    if (_fHero.GetValue(beh) != null) beh.SetCurrentRansomHero(null);
+                }
+                catch (Exception e) { Stumbles++; Log.Error("RansomFlows.Harness(sprzatanie)", e); }
             }
         }
     }

@@ -439,13 +439,32 @@ def main(argv):
     st26 = [x for x in st26 if x is not None]
     rep.add("2.6: rody pominiete przez blad (powinnosci)", max(st26) if st26 else "brak licznika (przed 2.6)", "0", (max(st26) == 0) if st26 else None)
 
-    # 15. 2.14 - harness niewoli i przeplywy okupu
+    # 15. 2.14 - przeplywy okupu i harness niewoli (krok 1/1b - okup gracza i odbiorcy; krok 2 - kurier na sucho; 2b/2c - PRAWDZIWE AcceptRansomOffer)
     h = [s for s in lines if s.startswith("Okupy (2.14)")]
     void = [num(r"w nicosc (\d+)", s) for s in h]
     void = [x for x in void if x is not None]
     rep.add("2.14: okup gracza w nicosc / dosypka kuriera", max(void) if void else "brak linii (przed 2.14)", "0 zl", (max(void) == 0) if void else None)
+    town = sum(num(r"zapasowy: kasa najblizszego miasta (\d+)", s) or 0 for s in h if s.startswith("Okupy (2.14): dzien"))
+    hide = sum(num(r"kasa kryjowki bandy (\d+)", s) or 0 for s in h if s.startswith("Okupy (2.14): dzien"))
+    rep.add("2.14: okup do kasy osady (kryjowka / miasto bez pana)", f"kryjowka {hide}, kasa miasta {town}" if h else "brak linii", "INFO (kasa miasta ponad cel regulatora gry jest kasowana)", None)
     harn = [s for s in lines if s.startswith("Harness niewoli (2.14)")]
-    rep.add("2.14: harness niewoli w autotescie", f"{len(harn)} linii" + (" - " + harn[-1][:160] if harn else ""), "wynik OK w kazdym kroku", (all(" OK" in s for s in harn) and len(harn) > 0) if harn else None)
+    if not harn:
+        rep.add("2.14: harness niewoli (krok 1 i 2)", "brak linii (nie autotest albo RansomHarnessInAutotest wylaczone)", "wynik OK w kazdym kroku", None)
+        rep.add("2.14: kurier prawdziwy w harnessie (krok 2b, 2c)", "brak linii", "2b i 2c OK", None)
+    else:
+        base_steps = [s for s in harn if not s.startswith("Harness niewoli (2.14): krok 2b") and not s.startswith("Harness niewoli (2.14): krok 2c - ")
+                      and not s.startswith("Harness niewoli (2.14): sprzatanie")]
+        bad = [s for s in base_steps if " OK" not in s]
+        rep.add("2.14: harness niewoli (krok 1, 1b, 2 na sucho)", f"{len(base_steps)} linii" + (" - " + bad[0][:160] if bad else ""), "wynik OK w kazdym kroku",
+                (not bad) and len(base_steps) > 0)
+        real = {k: [s for s in harn if s.startswith("Harness niewoli (2.14): krok " + k + " - ")] for k in ("2b", "2c")}
+        skip = [s for s in harn if s.startswith("Harness niewoli (2.14): krok 2b/2c")]
+        if real["2b"] and real["2c"]:
+            okr = all(s.rstrip(".").endswith(" OK") for k in ("2b", "2c") for s in real[k])
+            rep.add("2.14: kurier prawdziwy w harnessie (krok 2b, 2c)", " / ".join(k + ": ..." + real[k][-1][-120:] for k in ("2b", "2c")), "2b i 2c OK", okr)
+        else:
+            why = skip[-1][:160] if skip else ("tylko 2b" if real["2b"] else "brak linii 2b/2c")
+            rep.add("2.14: kurier prawdziwy w harnessie (krok 2b, 2c)", why, "2b i 2c OK (pominiety = NIE)", False)
 
     # 16. bledy naszych modow
     errs = [s for s in lines if s.startswith("ERROR in ")]
