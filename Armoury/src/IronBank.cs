@@ -37,7 +37,43 @@ namespace Armoury
     /// </summary>
     internal static class IronBank
     {
-        internal static void Reset() { _debts.Clear(); _capital = -1; _lastDay = -1; _logged = 0; }
+        internal static void Reset() { _debts.Clear(); _capital = -1; _lastDay = -1; _logged = 0; ZeroLast(); }
+
+        // paczka 169 (tylko log): liczby doby dla linii "Obieg" - zerowane TYLKO w Reset i w MoneyLedger.ClearLast169() (D20)
+        internal static int LastLent, LastPaidN, LastMissed, LastDefaults;
+        internal static long LastLentSum, LastPaidSum;
+
+        internal static void ZeroLast() { LastLent = LastPaidN = LastMissed = LastDefaults = 0; LastLentSum = LastPaidSum = 0; }
+
+        /// <summary>Paczka 169: dlug rodu (odczyt O(1)); false, gdy brak albo ponizej 1.</summary>
+        internal static bool TryGetDebt(Clan c, out double principal, out int missed, out bool defaulted, out int dueDay)
+        {
+            principal = 0; missed = 0; defaulted = false; dueDay = 0;
+            var d = Of(c, false);
+            if (d == null || d.Principal < 1) return false;
+            principal = d.Principal; missed = d.Missed; defaulted = d.Defaulted; dueDay = d.DueDay;
+            return true;
+        }
+
+        /// <summary>Paczka 169: wiarygodnosc rodu jak w Limit (bankrut 0, bez ksiegi 1) - do limitu na sucho; true, gdy rod ma wpis w Banku.</summary>
+        internal static bool TryGetTrust(Clan c, out float trust)
+        {
+            var d = Of(c, false);
+            trust = d != null ? (d.Defaulted ? 0f : d.Trust) : 1f;
+            return d != null;
+        }
+
+        /// <summary>Paczka 169: krolestwa rodow-bankrutow (raz na dobe; rod przez slownik StringId -> Clan zbudowany przez wolajacego - bez Clan.FindFirst).</summary>
+        internal static void DefaultedKingdoms(HashSet<Kingdom> into, Dictionary<string, Clan> byId)
+        {
+            into.Clear();
+            foreach (var kv in _debts)
+            {
+                if (!kv.Value.Defaulted) continue;
+                Clan c;
+                if (byId != null && byId.TryGetValue(kv.Key, out c) && c != null && c.Kingdom != null) into.Add(c.Kingdom);
+            }
+        }
         internal sealed class Debt
         {
             public double Principal;      // dlug glowny + doliczone odsetki niesplacone
@@ -98,6 +134,7 @@ namespace Armoury
             return false;
         }
 
+        // wzor jak IronBank.Limit / ClanIncomeBook (paczka 169 liczy ten sam limit na sucho bez wolania tej metody - zmiana wzoru tu = zmiana tam)
         internal static int Limit(Clan c)
         {
             try
@@ -281,6 +318,7 @@ namespace Armoury
 
                 long total = 0; int debtors = 0, bankrupt = 0;
                 foreach (var kv in _debts) { if (kv.Value.Principal >= 1) { total += (long)kv.Value.Principal; debtors++; if (kv.Value.Defaulted) bankrupt++; } }
+                LastLent = lent; LastPaidN = paid; LastMissed = missed; LastDefaults = defaults; LastLentSum = lentSum; LastPaidSum = paidSum;   // paczka 169 (tylko log)
                 Log.Info("IronBank: dzien " + today + " - nowe pozyczki " + lent + " (" + lentSum + "), splaty " + paid + " (" + paidSum + "), spoznienia " + missed
                          + ", bankructwa dzis " + defaults + "; dluznikow " + debtors + " (bankrutow " + bankrupt + "), dlug razem " + total + ", kapital Banku " + (long)_capital + ".");
             }

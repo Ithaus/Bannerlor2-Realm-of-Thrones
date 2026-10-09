@@ -87,6 +87,7 @@ namespace Armoury
                 if (market.Town.Gold < price) break;
                 market.ItemRoster.AddToCounts(e, 1);
                 market.Town.ChangeGold(-price);
+                MoneyLedger.Note169(MoneyLedger.N169Other, market, -price);   // paczka 169: linia kas (tylko licznik)
                 n.ChangeHeroGold(price);
                 _daySold++;
                 sold++;

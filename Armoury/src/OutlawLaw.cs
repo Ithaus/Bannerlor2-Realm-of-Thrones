@@ -1145,6 +1145,7 @@ namespace Armoury
                     if (town == null || town.Town == null || spend <= 0) continue;
                     p.PartyTradeGold = purse - spend;
                     town.Town.ChangeGold(spend);
+                    MoneyLedger.Note169(MoneyLedger.N169Other, town, spend);   // paczka 169: linia kas (tylko licznik; w bloku wraca sam)
                     _lifeBands += spend;
                 }
                 catch (Exception e) { _lifeStumbles++; if (!_errLife) { _errLife = true; Log.Error("OutlawLaw.LifeDay(banda)", e); } }
@@ -1327,6 +1328,7 @@ namespace Armoury
                     if (b.Moved <= 0) continue;
                     int pay = (int)b.Due;                                   // ulamek monety zostaje u pasera
                     if (pay > 0) { b.Town.ChangeGold(-pay); p.PartyTradeGold += pay; }
+                    if (pay > 0) MoneyLedger.Note169(MoneyLedger.N169Other, b.St, -pay);   // paczka 169: linia kas (tylko licznik; w bloku wraca sam)
                     _sellUnits += b.Moved; _sellPaid += pay; _sellWorth += b.Worth;
                     int zone = b.Real <= ZoneNear ? 0 : (b.Real <= ZoneMid ? 1 : 2);
                     _zoneUnits[zone] += b.Moved; _zonePaid[zone] += pay;

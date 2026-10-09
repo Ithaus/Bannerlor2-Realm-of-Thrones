@@ -96,6 +96,7 @@ namespace Armoury
         public static void MineRevenuePostfix(Town town, int revenue)
         {
             try { if (town != null && revenue > 0 && Settings.Current.MineWagesStayInTown) town.ChangeGold(revenue); } catch { }
+            try { if (town != null && revenue > 0 && Settings.Current.MineWagesStayInTown) CirculationWindows.NoteMineWages(revenue); } catch { }   // paczka 169: okno O20 (tylko licznik)
         }
 
         // wpis 86 (audyt pkt 3): BK zeruje materialExpenses na POCZATKU RunMaterials, a my pomijamy cala metode - na save sprzed

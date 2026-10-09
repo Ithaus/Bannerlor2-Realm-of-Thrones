@@ -73,7 +73,7 @@ namespace Armoury
 
         internal static void Reset()
         {
-            _k.Clear(); RentToday.Clear();
+            _k.Clear(); RentToday.Clear(); ZeroDay169();
             // wpis 87 (audyt pkt 4): BK tworzy nowe PopulationManager/PolicyManager przy kazdej grze - stare referencje dawaly
             // dekret podatkowy zawsze Standard i pomijaly autonomie po wczytaniu drugiego save'a bez restartu
             _bkResolved = false; _popMgr = null; _popData = null; _polResolved = false; _policyMgr = null; _getPolicy = null;
@@ -142,6 +142,13 @@ namespace Armoury
 
         /// <summary>Renty zaplacone dzis kazdemu rodowi (do powinnosci wobec korony).</summary>
         internal static readonly Dictionary<Clan, int> RentToday = new Dictionary<Clan, int>();
+
+        /// <summary>Paczka 169 (tylko log): renty dzis - wsie i zawor miast osobno, renta wsi kazdego rodu (zajecie na sucho, rozdz. 8).
+        /// Zerowane tam, gdzie RentToday, i przez MoneyLedger.ClearLast169() na poczatku bloku.</summary>
+        internal static long DayVillageRent, DayTownRent;
+        internal static readonly Dictionary<Clan, int> RentVillageToday = new Dictionary<Clan, int>();
+
+        internal static void ZeroDay169() { DayVillageRent = 0; DayTownRent = 0; RentVillageToday.Clear(); }
 
         // ------------------------------------------------------------ podatek ludnosci miasta BK -> renta (wpis 49)
         [ThreadStatic] private static int _taxDepth;
@@ -272,6 +279,7 @@ namespace Armoury
         internal static void Daily()
         {
             RentToday.Clear();   // wpis 86 (audyt pkt 7): przy wylaczonych rentach nie zostaja stare kwoty w dochodzie
+            ZeroDay169();        // paczka 169 (tylko log)
             if (!On) return;
             try
             {
@@ -281,6 +289,7 @@ namespace Armoury
                 var due = new Dictionary<string, float>();
                 var paid = new Dictionary<string, float>();
                 RentToday.Clear();
+                ZeroDay169();
                 long totalPaid = 0, totalDue = 0;
                 foreach (var st in Settlement.All)
                 {
@@ -314,6 +323,8 @@ namespace Armoury
                         if (pay <= 0) continue;
                         GiveGoldAction.ApplyForSettlementToCharacter(st, lord, pay, true);
                         { int r0; RentToday.TryGetValue(st.OwnerClan, out r0); RentToday[st.OwnerClan] = r0 + pay; }
+                        if (st.IsVillage) { DayVillageRent += pay; int v0; RentVillageToday.TryGetValue(st.OwnerClan, out v0); RentVillageToday[st.OwnerClan] = v0 + pay; }   // paczka 169 (tylko licznik)
+                        else DayTownRent += pay;
                         paid.TryGetValue(c, out v); paid[c] = v + pay;
                         totalPaid += pay;
                     }

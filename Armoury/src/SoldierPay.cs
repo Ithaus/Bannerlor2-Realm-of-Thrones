@@ -78,6 +78,17 @@ namespace Armoury
         private static int _dLordN, _dGarN, _dToPurseN, _dToTownsN, _dToCastlesN, _dCutClans, _dBlind, _dDupes, _stumbles, _dDebtClans;
         private static bool _errLogged;
 
+        // paczka 169 (tylko log): liczby doby dla linii "Obieg" (MoneyLedger.Daily czyta je pozniej w tym samym bloku);
+        // zerowane w Reset i przez MoneyLedger.ClearLast169() na poczatku bloku (D20)
+        internal static long LastLordAcc, LastLordTaken, LastGarAcc, LastGarTaken, LastToPurse, LastToTowns, LastToCastles, LastOther;
+        internal static bool LastWatching;
+
+        internal static void ZeroLast()
+        {
+            LastLordAcc = LastLordTaken = LastGarAcc = LastGarTaken = LastToPurse = LastToTowns = LastToCastles = LastOther = 0;
+            LastWatching = false;
+        }
+
         private static readonly Type[] NetArgs = { typeof(Clan), typeof(bool), typeof(bool), typeof(bool) };
 
         // ------------------------------------------------------------ latki na modelach: zakladane w kampanii, raz na proces (Reset ich nie rusza)
@@ -94,6 +105,7 @@ namespace Armoury
             _held.Clear(); _regModel = null; _regDecl = null;
             _netTriedFor = null; _regTriedFor = null; _regReady = false;   // nowa kampania = nowe obiekty modeli (latki zostaja w procesie)
             ClearDay();
+            ZeroLast();                                     // paczka 169
         }
 
         private static void ClearDay()
@@ -535,7 +547,14 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Stumble("SoldierPay.Daily", e); }
-            finally { ClearDay(); }
+            finally
+            {
+                // paczka 169: liczby doby dla linii "Obieg" - przed zerowaniem (bez zmian logiki)
+                LastLordAcc = _dLordAcc; LastLordTaken = _dLordTaken; LastGarAcc = _dGarAcc; LastGarTaken = _dGarTaken;
+                LastToPurse = _dToPurse; LastToTowns = _dToTowns; LastToCastles = _dToCastles; LastOther = _dOther;
+                try { LastWatching = Watching; } catch { LastWatching = false; }
+                ClearDay();
+            }
             try { DecayHeld(); } catch (Exception e) { Stumble("SoldierPay.DecayHeld", e); }
         }
 

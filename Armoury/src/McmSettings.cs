@@ -1400,6 +1400,18 @@ namespace Armoury
         [SettingPropertyGroup("Army purchases")]
         public bool GoodsLedgerEnabled { get; set; } = true;
 
+        [SettingPropertyBool("Circulation Ledger Enabled", HintText = "write the daily money circulation ledger: which named causes create or destroy gold in the world (notable caravan wages, sales commission, battlefield loot, Banner Kings and BetterEconomy spending, ship trade, prisoner sales, sieges, deaths), what clans paid and earned, the crown, the Iron Bank and the notables - log only, changes nothing in the game")]
+        [SettingPropertyGroup("Army purchases")]
+        public bool CirculationLedgerEnabled { get; set; } = true;
+
+        [SettingPropertyBool("Circulation Probe Enabled", HintText = "check the circulation ledger against the whole world: at most 8 times a day count all gold in the world just before and just after one measured game action and compare the change with the causes the ledger named for it - log only, costs two full counts of the world per check")]
+        [SettingPropertyGroup("Army purchases")]
+        public bool CirculationProbeEnabled { get; set; } = true;
+
+        [SettingPropertyBool("Clan Income Book Enabled", HintText = "keep every clan's steady income (average of its last 28 days, saved with the game) and write a dry run of the planned clan budget and debt rules: wage ceiling against wages paid, clans over the ceiling, men who would be released, clans that would borrow or face seizure - log only, changes nothing in the game")]
+        [SettingPropertyGroup("Army purchases")]
+        public bool ClanIncomeBookEnabled { get; set; } = true;
+
         [SettingPropertyBool("Paid Construction", HintText = "buildings rise only as fast as their owner pays: wages and carting go to the town or castle purse, materials are bought off the market")]
         [SettingPropertyGroup("Army purchases")]
         public bool PaidConstruction { get; set; } = true;
@@ -3081,6 +3093,9 @@ namespace Armoury
             s.FinanceLedgerPoor = FinanceLedgerPoor;
             s.FinanceLedgerPoorest = FinanceLedgerPoorest;
             s.GoodsLedgerEnabled = GoodsLedgerEnabled;
+            s.CirculationLedgerEnabled = CirculationLedgerEnabled;
+            s.CirculationProbeEnabled = CirculationProbeEnabled;
+            s.ClanIncomeBookEnabled = ClanIncomeBookEnabled;
             s.PaidConstruction = PaidConstruction;
             s.PaidConstructionPlayer = PaidConstructionPlayer;
             s.BuildIncomeShare = BuildIncomeShare;
