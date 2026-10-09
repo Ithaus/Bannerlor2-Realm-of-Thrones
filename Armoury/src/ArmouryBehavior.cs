@@ -1253,7 +1253,7 @@ namespace Armoury
                         : MathF.Max(1f, rr.Tier * Settings.Current.DaysPerTier * Project.TimeFactor(p.Tempo));
                     if (atForge && p.Kind != "bk")   // XP tylko za wlasna prace przy kowadle (bk: XP dal BK przy kliknieciu)
                         Hero.MainHero.HeroDeveloper.AddSkillXp(DefaultSkills.Crafting,
-                            Forge.ProjectXp(rr) * Settings.Current.XpShareWhileWorking / totalDays / 24f);
+                            Forge.ProjectXp(rr) * Settings.Current.XpShareWhileWorking / totalDays / 24f * Forge.AmmoXpMul(p.Item));   // sklad8-s (przeglad, uwaga 2): amunicja x0.05 takze w trakcie pracy
 
                     // wpis 89 (audyt): zapis W MIEJSCU - dotad Remove + Add przesuwal tykajaca sztuke na koniec listy,
                     // wiec "najstarsza" zmieniala sie co godzine i cala kolejka szla na zmiane, konczac sie razem

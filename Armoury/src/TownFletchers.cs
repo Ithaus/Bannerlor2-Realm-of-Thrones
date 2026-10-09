@@ -35,7 +35,10 @@ namespace Armoury
     /// </summary>
     internal static class TownFletchers
     {
-        private const int MaxSteps = 200;              // bezpiecznik petli jednego miasta na dobe (sklad8-s S3: najwieksze miasto przy 0.9 ok. 320 roboczodni / ok. 2.3 dnia = ok. 140 krokow)
+        // bezpiecznik petli jednego miasta na dobe (krok = jeden snop). sklad8-s (przeglad, uwaga 7): najwieksze miasto przy 0.9 ma ok. 320 roboczodni
+        // (0.9 x 355 rak broni), najkrotszy snop 0.30 dnia x q 0.6 x HistAmmoLaborMultiplier 8 = 1.44 dnia - do ok. 222 krokow (srednio ok. 140);
+        // 200 mogloby uciac reszte rak najwiekszego miasta, wiec 300 (zapas ok. 35% na wzrost rak z dobrobytem). Bezpiecznik ma sie nie wlaczac.
+        private const int MaxSteps = 300;
         private const float MinHands = 0.01f;          // jak 148: sztuka zaczyna sie, gdy zostala choc setna dnia pracy
         private const int PerBasket = 4;               // najwyzej tyle wyrobow na koszyk typ x tier w miescie (rozne nazwy)
 

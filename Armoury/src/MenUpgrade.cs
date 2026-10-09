@@ -45,11 +45,13 @@ namespace Armoury
         // sklad8-s S4: amunicja - wymiany w gore / w dol lub ten sam tier (przy wylaczonym MenUpgradeAmmoNeedsSurplus), koszyki odrzucone: lepszy tylko
         // nizszego lub tego samego tieru, lepszy tylko z koszyka z brakiem na polce (tylko log)
         private static int _dAmmoUp, _dAmmoDown, _dAmmoLowTier, _dAmmoShort;
+        // sklad8-s (przeglad, uwaga 6): blad SupplyDemand.Factor w FacOf - potkniecia doby i od startu sesji, pierwszy wyjatek do logu (licz, nie gas)
+        private static int _dAmmoFacErr, _ammoFacErrAll; private static bool _ammoFacErrLogged;
         private static readonly List<string> _churnIds = new List<string>();
 
         internal static void Reset()
         {
-            _lastDay.Clear(); _dStamp = -1; ClearDay();
+            _lastDay.Clear(); _dStamp = -1; ClearDay(); _ammoFacErrAll = 0; _ammoFacErrLogged = false;
         }
 
         private static void ClearDay()
@@ -58,7 +60,7 @@ namespace Armoury
             _dPlayerN = _dLordN = _dGarN = _dSold = _dKept = _dNoBetter = _dNoMoney = _dNoLift = _dHeld = _dGarWageN = _dGarGapN = _dBattleArmory = _dBattleTemplate = _dGarEmptyN = 0;
             _dPlayerGold = _dLordGold = _dGarGold = _dSoldGold = _dSaved = _dOverCap = _dGarWage = _dGarGapGold = _dGarEmptyGold = 0;
             _boughtToday.Clear(); _soldToday.Clear(); _dChurn = 0; _churnIds.Clear(); _dTempSlots = 0; _dBareSlots = 0; _dNoEmerg = 0; _dNothing = 0; _dLordLent = 0; _dWaitCart = 0;
-            _dAmmoUp = _dAmmoDown = _dAmmoLowTier = _dAmmoShort = 0;
+            _dAmmoUp = _dAmmoDown = _dAmmoLowTier = _dAmmoShort = _dAmmoFacErr = 0;
         }
 
         /// <summary>sklad8-s S4: strzaly i belty - wymiana tylko na wyzszy tier i tylko z nadwyzki polki (wylacznik MenUpgradeAmmoNeedsSurplus).</summary>
@@ -154,6 +156,7 @@ namespace Armoury
                              + "; amunicja (sklad8-s S4, " + (Settings.Current != null && Settings.Current.MenUpgradeAmmoNeedsSurplus ? "tylko wyzszy tier i z nadwyzki" : "WYLACZONE - jak reszta sprzetu")
                              + "): wymiany w gore " + _dAmmoUp + ", w dol lub ten sam tier " + _dAmmoDown + ", koszyki bez wymiany - lepszy tylko nizszego lub tego samego tieru " + _dAmmoLowTier
                              + ", lepszy tylko w koszyku z brakiem na polce " + _dAmmoShort
+                             + ", potkniecia mnoznika polki (blad - wymiana jak bez braku) " + _dAmmoFacErr + " (od startu " + _ammoFacErrAll + ")"
                              + "; kupione i sprzedane te same id tej samej doby " + _dChurn + (_churnIds.Count > 0 ? " (" + string.Join(", ", _churnIds.ToArray()) + ")" : "")
                              + "; miasta bez zbroi korpusu t3+ na polce " + bare + " z " + towns + ".");
                 }
@@ -571,7 +574,13 @@ namespace Armoury
             if (w.Fac < 0f)
             {
                 try { float d; int sh; w.Fac = SupplyDemand.Factor(w.Shop, w.El.Item, false, out d, out sh); }
-                catch { w.Fac = 1f; }
+                catch (Exception e)
+                {
+                    // sklad8-s (przeglad, uwaga 6): jak TownFletchers.Fac - 1 (bez braku), ale z potknieciem w linii "Dozbrajanie" i pierwszym bledem w logu;
+                    // dotad warunek "tylko z nadwyzki" znikal po cichu
+                    w.Fac = 1f; _dAmmoFacErr++; _ammoFacErrAll++;
+                    if (!_ammoFacErrLogged) { _ammoFacErrLogged = true; Log.Error("MenUpgrade.FacOf", e); }
+                }
             }
             return w.Fac;
         }

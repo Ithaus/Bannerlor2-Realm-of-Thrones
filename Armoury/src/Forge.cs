@@ -315,6 +315,15 @@ namespace Armoury
             return MathF.Max(1f, r.Tier * s.DaysPerTier);
         }
 
+        /// <summary>Mnoznik XP kowalstwa za amunicje: wiazka strzal to nauka na 5 minut, nie dzielo - XP / 20. sklad8-s (przeglad, uwaga 2):
+        /// JEDEN dla calego XP roboty amunicji - godzinowe przy kowadle (ArmouryBehavior), pekniecie, pomocnik i oddanie (Finish), kucie od reki
+        /// (Smith). Dotad 0.05 tylko przy oddaniu i w Smith: projekt t6 placil 40% pelnego XP w trakcie pracy (ok. 1 550 XP za serie t6), a po S1
+        /// (kwit 5 x Iron3 zamiast 21 x Iron6) byla to najtansza droga do XP kowalstwa.</summary>
+        internal static float AmmoXpMul(ItemObject item)
+        {
+            return item != null && (item.ItemType == ItemObject.ItemTypeEnum.Arrows || item.ItemType == ItemObject.ItemTypeEnum.Bolts) ? 0.05f : 1f;
+        }
+
         /// <summary>
         /// XP za caly projekt. Placimy za czas przy kowadle i za trudnosc, nie za cene wyrobu -
         /// inaczej kucie drogich rzeczy bylo by drukarka poziomow. Gra sama tepi nauke ponad
@@ -447,7 +456,7 @@ namespace Armoury
 
                 if (MBRandom.RandomFloat < FailureChance(r, tempo))
                 {
-                    Hero.MainHero.HeroDeveloper.AddSkillXp(DefaultSkills.Crafting, ProjectXp(r) * 0.3f);
+                    Hero.MainHero.HeroDeveloper.AddSkillXp(DefaultSkills.Crafting, ProjectXp(r) * 0.3f * AmmoXpMul(item));   // sklad8-s (przeglad, uwaga 2): amunicja x0.05 jak przy oddaniu
                     Log.Player("After all that work, the piece cracked at the quench. Nothing to show for it.", true);
                     Banner("The " + item.Name + " cracked at the quench - nothing to show for the work.");
                     Log.Info("Kucie nieudane po czasie: " + item.StringId);
@@ -466,12 +475,11 @@ namespace Armoury
                 var doneHelper = Helper.Find();
                 float doneRel = Helper.Relief(doneHelper);
                 if (doneHelper != null)
-                    Helper.GiveXp(doneHelper, ProjectXp(r) * (0.15f + 0.4f * doneRel));
+                    Helper.GiveXp(doneHelper, ProjectXp(r) * (0.15f + 0.4f * doneRel) * AmmoXpMul(item));   // sklad8-s (przeglad, uwaga 2): pomocnik tez x0.05 za amunicje
                 if (Recipes.IsLegendary(item) && !ArmouryBehavior.Legends.Contains(item.StringId))
                     ArmouryBehavior.Legends.Add(item.StringId);
                 RangedLore.OnCrafted(item);
-                float xpMulF = (item.ItemType == ItemObject.ItemTypeEnum.Arrows
-                             || item.ItemType == ItemObject.ItemTypeEnum.Bolts) ? 0.05f : 1f;
+                float xpMulF = AmmoXpMul(item);
                 Hero.MainHero.HeroDeveloper.AddSkillXp(DefaultSkills.Crafting,
                     ProjectXp(r) * (1f - Settings.Current.XpShareWhileWorking) * xpMulF);
 
@@ -556,9 +564,8 @@ namespace Armoury
                 var hero = who ?? Hero.MainHero;
                 var r = Recipes.For(item);
                 int skill = hero.GetSkillValue(DefaultSkills.Crafting);
-                // wiazka strzal to nauka na 5 minut, nie dzielo: XP / 20
-                float xpMul = (item.ItemType == ItemObject.ItemTypeEnum.Arrows
-                            || item.ItemType == ItemObject.ItemTypeEnum.Bolts) ? 0.05f : 1f;
+                // wiazka strzal to nauka na 5 minut, nie dzielo: XP / 20 (sklad8-s: jeden mnoznik z projektem - AmmoXpMul)
+                float xpMul = AmmoXpMul(item);
 
                 string legendWhy;
                 if (!LegendAllowed(item, out legendWhy))

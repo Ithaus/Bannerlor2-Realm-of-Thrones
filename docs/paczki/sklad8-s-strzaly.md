@@ -2,7 +2,7 @@
 
 Jeff 09.10 10:35: "wykucie strzal to powinno byc grosze, strzal bylo mega duzo".
 (Kopia projektu z 09.10; sciezki `strzaly/...` i `kopia-*` to pliki robocze sesji 7016f733 w scratchpad, poza repo.
-Wdrozenie: CHANGELOG "sklad8-s", commity S0-S4 na `noc/sklad8`.)
+Wdrozenie: CHANGELOG "sklad8-s", commity S0-S4 na `noc/sklad8`; poprawki po przegladzie (8 uwag) - wpis "sklad8-s-p".)
 Podstawa: `strzaly/logi.md` (logi 174b, grupa11, sklad8), `strzaly/kod-historia.md` (kod HEAD 0e17915 + zrodla),
 `docs/HISTORIA-STRZALY.md`. Model liczb: `strzaly/projekt-skrypty/model2.py` (ta sama arytmetyka co `ArmsPricing.Compute`,
 `WorkshopLaw.Needs`, `HistoricalPrices.HistCost`, ustawienia domyslne; w `Armoury.json` Jeffa jest tylko `AmmoBatchStacks: 3`,
@@ -80,7 +80,21 @@ Skutek na kolczan 30 strzal (q = 1; `model2.py`):
 
 Przy mieszance tierow z d31-40: **ruda -28%, drewno -23%, roboczodni -14% na kolczan**; jeden ladunek rudy daje
 ok. 39% wiecej kolczanow. Wartosc: zwykla strzala 0.35-0.42 d, stalowana 0.41-0.50 d, stosunek stalowana/zwykla 1.17 -
-dokladnie 14/12 z 1341. Bramka zysku strzelarzy sie nie przesuwa (wartosc i koszt z tej samej receptury).
+dokladnie 14/12 z 1341.
+Bramka zysku strzelarzy (poprawione po przegladzie, uwaga 4 - dotad pisalo "sie nie przesuwa"): przesuwa sie dla t4-t6.
+Wartosc liczyla metal grotu po cenie stali (t4 Iron4 6 d/kg, t5-6 Iron5 8 d/kg), a warsztat placi rude po ok. 1.5 d za kg
+metalu - ta rezerwa obnizala prog. Prog mnoznika polki (przychod = prog x 1.05 kosztu; `scratchpad/rev-s8s/gate.py`):
+
+| Kolczan | Poziom plac 1: przed -> po S2 | Poziom plac 1.5: przed -> po S2 |
+|---|---|---|
+| lekki 50 g t1-t3 | 0.87-0.88 -> 0.89 | 1.27-1.28 -> 1.29 |
+| lekki 50 g t4-t6 | 0.83-0.84 -> 0.88-0.89 | 1.19-1.21 -> 1.28-1.29 |
+| ciezki 125 g t1-t3 | 0.82-0.83 -> 0.83 | 1.13-1.16 -> 1.17 |
+| ciezki 125 g t4-t6 | 0.73-0.75 -> 0.83 | 1.00-1.04 -> 1.15-1.17 |
+
+Prog > 1 zaczyna sie przy poziomie plac ok. 1.15-1.27 (`TownWage.Index` = dobrobyt / 4 800, czyli dobrobyt powyzej
+ok. 5 500-6 100): tam wlasna produkcja nie zbije mnoznika strzal do 1 - S4 blokuje K1 dla amunicji, `DailyTrade` nic
+stamtad nie wywozi, lord placi 15-29% ponad wartosc. Kod bez zmian przed pomiarem (progi testu - rozdz. 4).
 
 **Czego NIE ruszam i czemu**: `HistAmmoLaborMultiplier` zostaje 8 (12.5 strzal na roboczodzien dla zwyklej strzaly).
 To miedzy wydajnoscia z ceny 1341 (12 d za snop przy 3 d dniowki = 6-10 strzal na roboczodzien z grotem [S]) a gorna
@@ -97,8 +111,14 @@ i ruszyl tez bron miotana (`HistoricalPrices.IsAmmo` liczy Thrown). Wiecej strza
   pasma 0.3-0.6 z komentarza `WorkshopLaw.TownHands`.
 - Moc: najmniejsze miasto 1.8 -> 5.4 roboczodnia (ok. 2.4 kolczana dziennie), mediana 12.3 -> 37 (ok. 16 kolczanow).
   Teoretycznie ok. 2 400 kolczanow dziennie; realnie ogranicza ruda, drewno i bramka zysku.
-- Nadmiar rak nic nie kosztuje: bramka zysku staje przy mnozniku polki ok. 0.93 (polka ok. 1.16 x popyt), wolne rece
-  sie nie odkladaja, zlota nie ma. Wartosc i cena sztuki sie nie zmieniaja.
+- Nadmiar rak nic nie kosztuje: bramka zysku staje przy mnozniku polki ok. 0.83-0.89 przy poziomie plac 1 (0.93 to gorna
+  granica - poprawione po przegladzie, uwaga 4; w bogatych miastach prog > 1, tabela w S2), wolne rece sie nie odkladaja,
+  zlota nie ma. Wartosc i cena sztuki sie nie zmieniaja.
+- Bezpiecznik petli (`TownFletchers.MaxSteps`): najwieksze miasto ok. 320 roboczodni, najkrotszy snop 0.30 x q 0.6 x 8 =
+  1.44 dnia - do ok. 222 krokow; po przegladzie (uwaga 7) 300 zamiast 200.
+- Czego S3 NIE naprawi (przeglad, uwaga 1): log sklad8 d38-40 - rece zajete 48-62%, koniec pracy z braku rak 52-56 miast,
+  z braku surowca 40-45 (ruda 28-31, drewno 10-17); spis 174b d40 - 28 miast bez strzal, z tego 13 bez rudy w ogole.
+  S3 dziala tylko w grupie "rece"; grupa "surowiec" czeka na S5a (ponizej).
 - Do tego: poprawic nieaktualny komentarz `Settings.cs:461` (pisze 850, jest 1 831) z rachunkiem 1359 i `python tools/gen_mcm.py`.
   Klucza nie ma w `Armoury.json` Jeffa - nowa domyslna zadziala.
 
@@ -112,10 +132,26 @@ i ruszyl tez bron miotana (`HistoricalPrices.IsAmmo` liczy Thrown). Wiecej strza
 - Spodziewany skutek: obrot K1 w amunicji z 190-550 do ok. 60-110 kolczanow dziennie; znika netto 35-85 kolczanow
   dziennie zdejmowanych z miast z brakiem [S]. Czesc roznicy sklad8 - 174b (+11 miast bez strzal).
 
-### Zapasowe (tylko gdy po S4 miast bez strzal > 15 - decyduje linia S0)
-- **S5a** (wiekszosc pustych miast: "ruda" albo "drewno"): bramka zysku strzelarzy w miescie z surowcem liczy tez cene
-  u sasiada w zasiegu kupcow minus droga (`TradeTransportPercentPer100`) - robota "na wywoz" jak dostawy szeryfow do Tower;
-  wywoz zalatwia `SupplyDemand.DailyTrade` (juz obejmuje strzaly).
+### Zapasowe (gdy po S4 grupa "surowiec" w linii S0 > 10 albo miast bez strzal > 15)
+- **S5a - PRZYGOTOWANY po przegladzie (uwaga 1), do wdrozenia osobnym commitem po tescie S3/S4.** Miasta bez rudy albo
+  drewna dostana strzaly tylko z wywozu, a wywoz (`SupplyDemand.DailyTrade`) bierze 15% dziennie nadwyzki ponad popyt
+  zrodla - bramka zysku zostawia jej 1-3 kolczany na koszyk (ok. 1 kolczan na dobe na koszyk). Robota "na wywoz" jak
+  dostawy szeryfow do Tower (1359: strzaly zbierane w hrabstwach i wiezione do Londynu):
+  - gdzie: `TownFletchers.Work`, tylko bramka zysku (`rev`) - receptura, surowiec z polki, rece, ceny bez zmian;
+  - przychod snopa = max(`RevenueOf(it, Fac(koszyk), mult)`, przychod na wywoz); przychod na wywoz = wartosc x
+    `WorkshopSellShare` x max po odbiorcach w zasiegu `SupplyDemandTradeRange` (te same co w `DailyTrade`: miasta, zamki
+    tylko bez `GarrisonCarts`) z (mnoznik polki odbiorcy po dostawie x `ArmsPricing.Multiplier(odbiorca)` - `TradeTransportPercentPer100`
+    / 100 / 100 x droga) - dokladnie zysk kupca z `DailyTrade` bez ceny zrodla, czyli najwiecej, ile kupiec moze zrodlu zaplacic;
+  - limit: snop "na wywoz" w koszyku tylko, dopoki nadwyzka zrodla (polka - popyt) < luka odbiorcow w zasiegu
+    (suma max(0, popyt - polka) tych, do ktorych wywoz sie oplaca) - inaczej zrodlo zawali sie strzalami;
+  - koszt: raz na dobe tabela popyt/polka 12 koszykow amunicji x 97 miast (ok. 1 200 wywolan `Demand`), potem na miasto
+    tylko odbiorcy w zasiegu (pamiec doby, jak `fac`); bez nowego stanu w zapisie;
+  - log: w linii "Strzelarze (172)" NOWE "na wywoz: snopow N (koszykow K, miast M)", w linii S0 bez zmian;
+  - skutki do sprawdzenia: zrodlo ma mnoznik strzal < 1 (tansze strzaly tam, K1 z S4 sie otwiera), wiecej rudy i drewna
+    z polek miast z surowcem (P2, ruda strzelarzy <= 50 ladunkow/d), wywoz w linii "PodazPopyt" rosnie;
+  - progi: grupa "surowiec" w linii S0 <= 8, miast bez strzal <= 15, P2 <= 38, P5 bez dni ponizej progu, P6 jak w S3.
+  Decyzja projektu (nie parametr dla Jeffa): wywoz 15% dziennie zostaje jeden dla calego uzbrojenia; jesli po S5a grupa
+  "surowiec" zostanie > 8, kolejny krok to szybszy wywoz amunicji, nie wiecej strzelarzy.
 - **S5b** (puste miasta z "bez zysku" w ostatnich dniach - polka za plytka na zakup lorda 100+ kolczanow): glebokosc
   popytu na amunicje `SupplyDemandBase` x 3 dla Arrows/Bolts. Ryzyko: w czasie braku wyzszy mnoznik ceny.
 
@@ -123,7 +159,7 @@ i ruszyl tez bron miotana (`HistoricalPrices.IsAmmo` liczy Thrown). Wiecej strza
 
 | Miara | Po S2 | Po S3 | Po S4 (cel) |
 |---|---|---|---|
-| Miast bez strzal z 97 (35.0) | 28-33 | 12-18 | **<= 15** |
+| Miast bez strzal z 97 (35.0) | 28-33 | 20-28 (grupa "rece" <= 5; poprawione po przegladzie) | **<= 24; <= 15 dopiero z S5a** |
 | Zrobione kolczany s+b dziennie d11-30 (216) | 250-280 | 700-1 100 | jak S3 |
 | Mediana mnoznika ceny strzal (2.51) | 2.3-2.5 | 1.0-1.4 | **<= 1.4** |
 | Cena kolczana 30 strzal u lorda (30.7 d) | 25-30 d | 11-17 d | **<= 17 d = 0.35-0.57 d za strzale** (1341: 0.50-0.58) |
@@ -143,17 +179,26 @@ i ruszyl tez bron miotana (`HistoricalPrices.IsAmmo` liczy Thrown). Wiecej strza
 - d31-40: ruda na kolczan (`skrypty/zuzycie.py`) <= 4.6 kg (5.3-6.4), roboczodni na kolczan <= 2.35 (2.65);
 - miast bez strzal <= 33; zrobione s+b >= 400 dziennie (373); linia S0 obecna co dobe; potkniecia 0.
 
-**S3**:
-- miast bez strzal d31-40 <= 18 (cel 15); > 24 = porazka, analiza linii S0;
-- zrobione s+b srednio d11-30 >= 550; mediana mnoznika strzal d31-40 <= 1.4; lord placi za kolczan d31-40 <= 17 d;
+**S3** (poprawione po przegladzie, uwagi 1, 3, 4, 7):
+- linia S0, srednio d31-40: grupa "rece/zysk/bezpiecznik" <= 5, > 10 = porazka S3; grupa "surowiec" (ruda, drewno) INFO
+  (S3 jej nie zmienia - S5a); razem nie wiecej niz w sklad8 (35);
+- `python -I tools/p174b_progi.py <log> --baza kopia-sklad8/Armoury-2026-10-09_09-56-41.log`: P2 miast bez rudy
+  <= 38 (sklad8 35.3; liczba, nie TAK/NIE), P5 bez dni ponizej progu (jak sklad8), P6 spadek <= 1.5 pp (partie >= 70.5%,
+  razem >= 79.1%);
+- bezpiecznik petli w linii S0: 0 (w HEAD `MaxSteps` 300; na commicie S3 jeszcze 200 - tam do 2 miast INFO); czas SFletch INFO;
+- zrobione s+b srednio d11-30 >= 550; mediana mnoznika strzal d31-40 <= 1.4; lord placi za kolczan d31-40 <= 17 d
+  w miastach z poziomem plac <= 1.15 (bogatsze INFO: prog bramki 1.15-1.29);
 - pokrycie strzal lordow AI d40 >= 70%, zalog >= 94%; "AI bez towaru" strzaly <= 50/d (98); awanse cofniete <= 25/d (51);
 - ruda strzelarzy <= 50 ladunkow/d; zapas rudy miast d40 >= 2 500 i rosnie w d31-40; cykle platnerzy zatrzymane dla
   strzelarzy <= 30/d (0-9); zbroja korpus t3-4 na polkach d40 >= 80 szt. (90);
 - drewno strzelarzy <= 450 ladunkow/d; miast bez drewna <= 12 (9-10); potkniecia 0.
-- Jesli zbroja albo ruda przekroczy prog, a miast bez strzal <= 15 - cofnac do 0.6 i powtorzyc.
+- Jesli zbroja albo ruda przekroczy prog albo P2 > 38 albo P5 ma dni ponizej progu, a miast bez strzal <= 15 - cofnac do 0.6
+  i powtorzyc (gdy miast bez strzal > 15 - najpierw analiza ofert 174b.3).
 
-**S4**: wymian amunicji K1 w dol 0; zakupy amunicji K1 d31-40 <= 115/d (189); miast bez strzal d31-40 **<= 15**;
-pokrycie lordow nie nizsze niz po S3; licznik "kupione i sprzedane te same id tej samej doby" nizszy niz w sklad8 (114).
+**S4**: wymian amunicji K1 w dol 0; zakupy amunicji K1 d31-40 <= 115/d (189); miast bez strzal d31-40 **<= 24**
+(grupa "rece/zysk/bezpiecznik" <= 5; <= 15 dopiero z S5a); pokrycie lordow nie nizsze niz po S3; licznik "kupione i
+sprzedane te same id tej samej doby" nizszy niz w sklad8 (114); "potkniecia mnoznika polki" 0; P2/P5/P6 jak w S3.
+Licznik "lepszy tylko w koszyku z brakiem na polce" w bogatych miastach to skutek bramki (prog > 1), nie blad S4.
 
 ## 5. Ryzyko / co sprawdzic przy wdrozeniu (zasada 0 CLAUDE.md)
 
@@ -164,10 +209,16 @@ pokrycie lordow nie nizsze niz po S3; licznik "kupione i sprzedane te same id te
   bron miotana (`DaysThrown`, `HistAmmoLaborMultiplier`) bez zmian.
 - S1: wszystkie miejsca z `Recipes.For` dla amunicji - `Patches.cs:169` (materialy CRAFT BK), `ArmouryBehavior.cs:1244`
   (zegar kuzni i XP od `rr.Tier` - bez zmian), `SmithMenu` (wyswietlanie), `SmeltTab` (amunicji nie przetapia).
-  Sprawdzic, czy tanszy kwit nie robi z amunicji taniej drogi do XP kowalstwa (stamina amunicji juz x0.05).
-- S3: wiecej krokow petli strzelarzy (do ok. 140 w najwiekszym miescie, bezpiecznik 200) - czas w linii Cost174 SFletch.
+  Sprawdzone w przegladzie (uwaga 2): robil - XP godzinowe (40% projektu), pekniecie i pomocnik byly bez mnoznika
+  amunicji x0.05, seria t6 dawala ok. 1 550 XP za ok. 25-40 d. Poprawione: `Forge.AmmoXpMul` w calym XP roboty amunicji
+  (seria t6 ok. 180 XP). Czas i czynsz kuzni gracza dla amunicji dalej rosna z tierem (t6 6 dni, czynsz 9-27 d) -
+  stan sprzed paczki (uwaga 5), mozliwa osobna paczka: dni z `CostOf.Days`.
+- S3: wiecej krokow petli strzelarzy (srednio ok. 140, najwyzej ok. 222 w najwiekszym miescie; bezpiecznik po przegladzie 300)
+  - czas w linii Cost174 SFletch.
   `FletchersBidForOre` przy braku strzal oferuje rudzie platnerzy - z S2 strzelarze zarabiaja wiecej na ladunku, wiec
-  w pierwszych tygodniach moga zabrac wiecej rudy (limit 5 ladunkow na miasto na dobe). Prog zbroi w S3.
+  w pierwszych tygodniach moga zabrac wiecej rudy (limit 5 ladunkow na miasto na dobe; przy mnozniku 1.5-2.5 oferta za
+  ladunek lekkiego kolczana 564-610 -> 654-694 d, ciezkiego ok. 310 -> 330-346 d). Prog zbroi i P2/P5/P6 w S3.
+- Piora (przeglad, uwaga 8): zelazo i drewno sa towarem z polki, piora i klej - w robocie (jak przed paczka; towaru brak).
 - S4: K1 jest tez dla ludzi gracza - ta sama regula; `SupplyDemand.Factor` liczyc raz na koszyk w `Pick`. Zamek: polka zamku
   ma wlasny popyt (polowa) - warunek dziala tak samo.
 - Zadnego nowego stanu w zapisie (S0 i S4 to liczniki sesji). Cen po sztuce, K1 (poza amunicja), sklad7b, 172b - bez zmian.
