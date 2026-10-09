@@ -792,3 +792,9 @@ trzeba wszedzie poprawic" -> zasada "umiejetnosc do sprzetu" zostaje, ale WSZYST
 ktory ma takie wymaganie". -> Paczka 175 zmienia TYLKO wzorce zolnierzy (co dostaja), NIE wymogi przedmiotow: prawa tieru (pancerz (tier-1) x 35 Atletyki, bron/tarcze/amunicja
 35 na tier, konie - Jazda) zostaja bez zmian dla gracza, towarzyszy, lordow i zolnierzy. Ta sama zasada w K1 (zolnierz kupuje / bierze od gracza w wymianie tylko to,
 do czego ma umiejetnosc) i Z1 - sprawdzic przy recenzji obu paczek.
+**SPROSTOWANIE 09.10 ok. 03:05 (wymogi sprzetu u bohaterow):** sprawdzone w kodzie - gra pilnuje wymogu u bohaterow (Jeff, towarzysze, lordowie) tylko dla przedmiotow
+z umiejetnoscia w danych silnika (bron, tarcze -> Jednoreczna, konie -> Jazda; CharacterHelper.CanUseItem); PANCERZ (Atletyka) i AMUNICJA pilnuje tylko nasz ItemReq
+przy zolnierzach - bohater zalozy kazda zbroje. Wypowiedz Jeffa z 02:50 + jego zasada z 29.08 ("CALY ekwipunek") = TAK dla Z16 (audyt 13 pytanie b): zakaz takze
+u bohaterow (postfiks CanUseItem przez ItemReq.Meets dla pancerza i amunicji); lordom i towarzyszom Atletyka do wlasnego sprzetu (SkillSinew dla bohaterow, nigdy
+w dol), gracz bez podnoszenia; zalozona juz zbroja nie jest zdejmowana na sile. Trening Atletyki w zbroi na postoju (+10 dziennie) - pytanie do Jeffa.
+Paczka Z16 PO 175 (te same miejsca w Mends.cs) - na galeziach 175.
