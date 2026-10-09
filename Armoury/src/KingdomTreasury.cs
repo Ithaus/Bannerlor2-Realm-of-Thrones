@@ -95,7 +95,40 @@ namespace Armoury
         internal struct RefundRow { public long Paid, Due, Given; public int Clans; }
         private static readonly Dictionary<Kingdom, RefundRow> _refund = new Dictionary<Kingdom, RefundRow>();
 
-        internal static void Reset() { _refund.Clear(); _refundErr = false; ZeroLast(); }
+        internal static void Reset() { _refund.Clear(); _refundErr = false; ZeroLast(); _arrear.Clear(); }
+
+        // 169c (tylko log): niedoplata korony na krolestwo z 28 dob (1 - zwrot dany / nalezny) - miara progu etapu 2 i wejscia E1b; tylko pamiec sesji
+        private sealed class ArrearRing { public readonly long[] Due = new long[28], Given = new long[28]; public int Head, Filled; }
+        private static readonly Dictionary<Kingdom, ArrearRing> _arrear = new Dictionary<Kingdom, ArrearRing>();
+
+        private static string ArrearLine()
+        {
+            long wDue = 0, wGiven = 0; int over50 = 0, warK = 0;
+            var parts = new List<KeyValuePair<double, string>>();
+            foreach (var k in Kingdom.All)
+            {
+                if (k == null || k.IsEliminated) continue;
+                ArrearRing a;
+                if (!_arrear.TryGetValue(k, out a)) { a = new ArrearRing(); _arrear[k] = a; }
+                RefundRow r; bool have = _refund.TryGetValue(k, out r);
+                a.Due[a.Head] = have ? r.Due : 0; a.Given[a.Head] = have ? r.Given : 0;
+                a.Head = (a.Head + 1) % 28; if (a.Filled < 28) a.Filled++;
+                long due = 0, given = 0;
+                for (int i = 0; i < 28; i++) { due += a.Due[i]; given += a.Given[i]; }
+                wDue += due; wGiven += given;
+                if (due <= 0) continue;
+                double n = 1.0 - (double)given / due;
+                bool war = AtWar(k);
+                if (war) { warK++; if (n > 0.5) over50++; }
+                parts.Add(new KeyValuePair<double, string>(n, (k.Name != null ? k.Name.ToString() : "?") + " " + (100 * n).ToString("0", System.Globalization.CultureInfo.InvariantCulture) + "%" + (war ? "" : " (pokoj)")));
+            }
+            parts.Sort((x, y) => y.Key.CompareTo(x.Key));
+            var txt = new List<string>(); foreach (var p in parts) txt.Add(p.Value);
+            double wn = wDue > 0 ? 1.0 - (double)wGiven / wDue : 0;
+            return "Korona: niedoplata 28 dob (169c): swiat " + (wDue > 0 ? (100 * wn).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + "%" : "-") + " (dany " + wGiven + " / nalezny " + wDue
+                   + "; wyplacone " + (wDue > 0 ? (100 * (1 - wn)).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + "%" : "-") + ") | krolestw w wojnie " + warK + ", z niedoplata > 50%: " + over50
+                   + " | na krolestwo: " + (txt.Count > 0 ? string.Join(", ", txt.ToArray()) : "-") + ".";
+        }
 
         // paczka 169 (tylko log): liczby doby dla linii "Obieg" - zerowane w Reset i przez MoneyLedger.ClearLast169() na poczatku bloku (D20)
         internal static long LastDues, LastRefundGiven, LastRefundDue, LastRefundPaid, LastSubsidy, LastCustoms, LastCustomsTaken, LastMint, LastMonopoly;
@@ -227,6 +260,7 @@ namespace Armoury
                          + (stumbles > 0 ? " Potkniecia: wyjatek przy " + stumbles + " krolestwach." : ""));
                 if (playerGot > 0)
                     Log.Player("The crown repaid your house " + playerGot + " denars of the wages it paid today - the realm is at war.");
+                if (ClanIncomeBook.StableDOn) { try { Log.Info(ArrearLine()); } catch (Exception e) { Log.Error("KingdomTreasury.ArrearLine", e); } }   // 169c (tylko log)
             }
             catch (Exception e) { Log.Error("KingdomTreasury.WageRefund", e); }
         }
@@ -397,6 +431,7 @@ namespace Armoury
             catch { }
         }
         private static readonly TaleWorlds.Localization.TextObject _txtPolicy = new TaleWorlds.Localization.TextObject("{=!}Crown dues are collected from the towns, villages and workshops themselves");
+        internal static TaleWorlds.Localization.TextObject TxtPolicy { get { return _txtPolicy; } }   // 169c: nazwa linii (rozbicie D stalego - korona)
 
         public static void CaravanVisitPostfix(ref int __result) { var s = Settings.Current; if (s != null && s.PolicyIncomeConserved) __result = 0; }
         public static bool TaxOfficePrefix() { var s = Settings.Current; return s == null || !s.PolicyIncomeConserved; }

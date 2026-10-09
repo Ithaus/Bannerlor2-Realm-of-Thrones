@@ -200,7 +200,15 @@ namespace Armoury
         internal static long DayVillageRent, DayTownRent;
         internal static readonly Dictionary<Clan, int> RentVillageToday = new Dictionary<Clan, int>();
 
-        internal static void ZeroDay169() { DayVillageRent = 0; DayTownRent = 0; RentVillageToday.Clear(); }
+        internal static void ZeroDay169() { DayVillageRent = 0; DayTownRent = 0; RentVillageToday.Clear(); _rentBy.Clear(); }
+
+        // 169c (tylko log): renta tej doby na osade i kasa, z ktorej ja wzieto (miasto: ponad prog) - czesc "wlasne" D stalego
+        private static readonly Dictionary<Settlement, long[]> _rentBy = new Dictionary<Settlement, long[]>();
+        internal static void RentOf(Settlement st, out long pay, out long avail)
+        {
+            long[] v;
+            if (st != null && _rentBy.TryGetValue(st, out v)) { pay = v[0]; avail = v[1]; } else { pay = 0; avail = 0; }
+        }
 
         // ------------------------------------------------------------ podatek ludnosci miasta BK -> renta (wpis 49)
         [ThreadStatic] private static int _taxDepth;
@@ -374,6 +382,7 @@ namespace Armoury
                         int pay = (int)Math.Min(rent * decree, gold * takeShare * decree);
                         if (pay <= 0) continue;
                         GiveGoldAction.ApplyForSettlementToCharacter(st, lord, pay, true);
+                        _rentBy[st] = new long[] { pay, gold };   // 169c (tylko licznik)
                         { int r0; RentToday.TryGetValue(st.OwnerClan, out r0); RentToday[st.OwnerClan] = r0 + pay; }
                         if (st.IsVillage) { DayVillageRent += pay; int v0; RentVillageToday.TryGetValue(st.OwnerClan, out v0); RentVillageToday[st.OwnerClan] = v0 + pay; }   // paczka 169 (tylko licznik)
                         else DayTownRent += pay;

@@ -445,6 +445,7 @@ namespace Armoury
                     int paid = MenPurse.Take(mp, price);
                     budget -= price;
                     w.Shop.Town.ChangeGold(paid);
+                    ClanIncomeBook.NoteOwnPaid(w.Shop, mp.ActualClan, paid);   // 169c: "wlasne" D stalego - dozbrajanie ludzi rodu w jego miescie (tylko licznik)
                     if (player) MoneyLedger.Note169(MoneyLedger.N169Kit, w.Shop, paid);   // jak braki gracza (paczka 169: linia kas)
                     else MoneyLedger.Note(MoneyLedger.NGear, w.Shop, paid);               // jak zakupy AiGear (ksiega przeplywow osad)
                     // sklad8-p (uwaga 1): dozbrajanie to zakup z polki jak zakupy brakow - liczy sie w tych samych miarach 174/174b:

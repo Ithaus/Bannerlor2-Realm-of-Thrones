@@ -158,6 +158,7 @@ namespace Armoury
 
         // ------------------------------------------------------------ stan okien
         private static int _ctx, _ctxW = -1;                // okno flagowe: przyczyna (0 = brak) i indeks okna
+        internal static int CurrentKind { get { return _ctx; } }   // 169c: przyczyna otwartego okna flagowego (tylko odczyt)
         private static Hero _ctxSide;                       // oczekiwana strona przelewu (null = dowolna)
         private static Settlement _sellSt;                  // okno prowizji (O15): osada sprzedajaca
         private static long _sellIn;                        // zdarzenia gry netto do kasy tej osady w oknie

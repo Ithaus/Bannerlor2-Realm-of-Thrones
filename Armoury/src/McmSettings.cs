@@ -1492,6 +1492,10 @@ namespace Armoury
         [SettingPropertyGroup("Army purchases")]
         public bool ClanIncomeBookEnabled { get; set; } = true;
 
+        [SettingPropertyBool("Clan Income Book Stable D", HintText = "with the clan income book: also split every clan's income into the parts of its steady income (land of the fiefs it holds today, crown, contract, workshops and caravans) and the parts left out of it (its own money coming back through its own town purse, one-off gains, other model income, money sent within the house, estates counted twice), and write the stage 2 measures (captive lords and ransoms, garrison growth, town purses, knights' spending, desertion by cause, Banner Kings population, marriages, travellers' goods, the Others, the historical measure) - log and CSV only, changes nothing in the game")]
+        [SettingPropertyGroup("Army purchases")]
+        public bool ClanIncomeBookStableD { get; set; } = true;
+
         [SettingPropertyBool("Paid Construction", HintText = "buildings rise only as fast as their owner pays: wages and carting go to the town or castle purse, materials are bought off the market")]
         [SettingPropertyGroup("Army purchases")]
         public bool PaidConstruction { get; set; } = true;
@@ -3564,6 +3568,7 @@ namespace Armoury
             s.CirculationLedgerEnabled = CirculationLedgerEnabled;
             s.CirculationProbeEnabled = CirculationProbeEnabled;
             s.ClanIncomeBookEnabled = ClanIncomeBookEnabled;
+            s.ClanIncomeBookStableD = ClanIncomeBookStableD;
             s.PaidConstruction = PaidConstruction;
             s.PaidConstructionPlayer = PaidConstructionPlayer;
             s.BuildIncomeShare = BuildIncomeShare;

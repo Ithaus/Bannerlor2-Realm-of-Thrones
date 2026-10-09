@@ -275,7 +275,9 @@ namespace Armoury
                 if (a < 0) { var th = gh; gh = rh; rh = th; var tp = gp; gp = rp; rp = tp; a = -a; }   // gra zapisuje "osada -> bohater" ujemna kwota w druga strone
                 bool gNone = gh == null && gp == null, rNone = rh == null && rp == null;
                 if (gNone && rNone) return;
-                ClanIncomeBook.OnEvent(gh, gp, rh, a, gNone, ClanOpen, _inBlock);   // paczka 169: wplywy rodow spoza rodu (D) - wlasny try, tylko licznik
+                // 169c: wyplata majatku BK (okno powrotu taboru do wsi albo okno produkcji majatkow BK) - w D169 liczy sie drugi raz (podwojne)
+                bool estate = gNone && rh != null && ((_winVillage && WinOpen) || CirculationWindows.CurrentKind == CirculationWindows.KBkEstates);
+                ClanIncomeBook.OnEvent(gh, gp, rh, a, gNone, ClanOpen, _inBlock, estate);   // paczka 169: wplywy rodow spoza rodu (D) - wlasny try, tylko licznik
                 // utarg wsi: wyplata dla wlasciciela majatku BK w oknie POWROTU taboru do wsi to czesc utargu, nie zloto z niczego
                 // (okno wizyty w miescie albo zamku tego nie lapie - tam nikt utargu nie dzieli)
                 if (gNone && rh != null && _winVillage && WinOpen) { _winEstates += a; return; }
@@ -520,6 +522,7 @@ namespace Armoury
                 int c = __0.IsTown ? CTown : CCastle;
                 if (__result >= 0) _regIn[c] += __result; else _regOut[c] -= __result;
                 _regTicks[c]++;
+                Measure169c.NoteRegulator(__0, __result);   // 169c: linia "Kasy miast" na miasto (tylko licznik, wlasny try)
             }
             catch { _stumbles++; }
         }
