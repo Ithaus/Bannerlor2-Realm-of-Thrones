@@ -788,3 +788,7 @@ nowego jezdzca (jak u gracza), a nie znika. (3) Dothrakowie pod murami: (a) oble
 (7) Slonie Volantis: (a) zostaja. (8) Sprzet wedlug tieru: (b) - Jeff: "kto zrobil, ze tier 4 dostawal tarcze tieru 6 i pod to umiejetnosc podnoszono, to jakas bzdura,
 trzeba wszedzie poprawic" -> zasada "umiejetnosc do sprzetu" zostaje, ale WSZYSTKIE jednostki we wzorcach dostaja bron, tarcze, amunicje i pancerz swojego tieru
 (nie wyzej); dotyczy wszystkich kultur i drzew.
+**DECYZJA JEFFA 09.10 ok. 02:50 (wymogi sprzetu ZOSTAJA):** "tylko zasada, ze jak nie mam danej umiejetnosci, np. atletyki, nadal obowiazuje, ze nie moge zalozyc pancerza,
+ktory ma takie wymaganie". -> Paczka 175 zmienia TYLKO wzorce zolnierzy (co dostaja), NIE wymogi przedmiotow: prawa tieru (pancerz (tier-1) x 35 Atletyki, bron/tarcze/amunicja
+35 na tier, konie - Jazda) zostaja bez zmian dla gracza, towarzyszy, lordow i zolnierzy. Ta sama zasada w K1 (zolnierz kupuje / bierze od gracza w wymianie tylko to,
+do czego ma umiejetnosc) i Z1 - sprawdzic przy recenzji obu paczek.
