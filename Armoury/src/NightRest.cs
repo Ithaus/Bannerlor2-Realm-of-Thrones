@@ -107,7 +107,9 @@ namespace Armoury
                 // T1: tick o godzinie h liczy godzine, ktora wlasnie minela - tick
                 // konca obozu (6:00) liczy godzine 5-6 jako noc (inaczej oboz 0-6
                 // dawal 5.6 h i dlug); sufit 12, zeby zle ustawienie nie robilo nocy z calej doby
-                bool night = h >= 21 || h <= Math.Min(CampEnd, 12);
+                // poprawka recenzji: rowne godziny (brak obozu swiata) nie przesuwaja swita gracza - wtedy stary swit 6:00
+                int dawn = PlayerDawn;
+                bool night = h >= 21 || h <= Math.Min(dawn, 12);
                 bool resting = mp.CurrentSettlement != null
                                || !moved
                                || (s.SleepAtSeaFree && mp.IsCurrentlyAtSea)
@@ -154,7 +156,7 @@ namespace Armoury
                     else NightfallAsk();
                 }
 
-                if (h == CampEnd) SettleNight(s);
+                if (h == dawn) SettleNight(s);
                 AiNightCamp(s, h);
                 AiBanditRest(s, h);
             }
@@ -190,6 +192,8 @@ namespace Armoury
         internal static int CampStart { get { var s = Settings.Current; return Mod24(s != null ? s.CampStartHour : 0); } }
         internal static int CampEnd { get { var s = Settings.Current; return Mod24(s != null ? s.CampEndHour : 6); } }
         private static int Mod24(int h) { return ((h % 24) + 24) % 24; }
+        /// <summary>Swit rachunku snu gracza: koniec obozu, a przy rownych godzinach (swiat nie obozuje) stary swit 6:00.</summary>
+        internal static int PlayerDawn { get { int st = CampStart, e = CampEnd; return st == e ? 6 : e; } }
 
         /// <summary>Czy tick o godzinie h jest godzina obozu (s..e-1, takze przez polnoc; s == e = nigdy).</summary>
         internal static bool InCamp(int h)
@@ -213,6 +217,11 @@ namespace Armoury
         private static int _tentDropsHour; private static float _tentDropMax;
         // stoper: czas HoldSleepers i DropMovedTents w ms na godzine gry
         private static int _holdCalls, _dropCalls; private static double _holdMsSum, _holdMsMax, _dropMsSum, _dropMsMax;
+        // poprawki recenzji: faktyczny odstep przegladow w h gry (zjazd zalezy od niego, nie tylko od kroku 0.1),
+        // potkniecia per partia (dlawiony log) i linia ustawien obozu przy kazdej zmianie
+        private static double _holdDhMax, _dropDhMax;
+        private static int _guardStumbles;
+        private static int _cfgSig = -1;
 
         /// <summary>Nowa gra albo wczytanie (konstruktor ArmouryBehavior): stan nocy jednej
         /// kampanii nie przecieka do drugiej; zegary od zera = straznik rusza od reki.</summary>
@@ -222,6 +231,7 @@ namespace Armoury
             {
                 _camping.Clear(); _tented.Clear(); _bedPos.Clear(); _stillPos.Clear(); _tentPos.Clear(); _orders.Clear();
                 _lastHoldSweep = CampaignTime.Zero; _lastTentDrop = CampaignTime.Zero; _lastTentRefresh = DateTime.MinValue;
+                _cfgSig = -1;
                 ResetHourCounters();
             }
             catch { }
@@ -232,6 +242,33 @@ namespace Armoury
             _wokenHour = 0; _wokenDriftSum = 0f; _wokenDriftMax = 0f; _wokenHold = 0; _wokenOurOrder = 0; _wokenOther = 0;
             _tentDropsHour = 0; _tentDropMax = 0f;
             _holdCalls = 0; _dropCalls = 0; _holdMsSum = 0; _holdMsMax = 0; _dropMsSum = 0; _dropMsMax = 0;
+            _holdDhMax = 0; _dropDhMax = 0;
+        }
+
+        /// <summary>Potkniecie na jednej partii w straznikach: liczymy, log pierwsze 3 i co setne (bez gaszenia straznika).</summary>
+        private static void GuardStumble(string where, MobileParty mp, Exception e)
+        {
+            _guardStumbles++;
+            if (_guardStumbles <= 3 || _guardStumbles % 100 == 0)
+            {
+                string who = "?";
+                try { who = mp != null ? mp.StringId : "null"; } catch { }
+                Log.Error(where + " (partia " + who + ", potkniecie " + _guardStumbles + " w sesji)", e);
+            }
+        }
+
+        /// <summary>Linia ustawien obozu swiata - przy pierwszym ticku i przy kazdej zmianie (MCM / Armoury.json).</summary>
+        private static void LogCampConfig(Settings s)
+        {
+            int st = CampStart, e = CampEnd;
+            int sig = st * 10000 + e * 100 + (s.AiCampsAtNight ? 10 : 0) + (s.ArmyLeadersAlwaysCamp ? 1 : 0)
+                      + Math.Max(0, Math.Min(95, s.AiCampSkipPercent)) * 1000000;
+            if (sig == _cfgSig) return;
+            _cfgSig = sig;
+            Log.Info("NightRest: oboz swiata " + (st == e ? "WYLACZONY (rowne godziny " + st + "/" + e + ")" : st + ":00-" + e + ":00")
+                     + " (AiCampsAtNight=" + s.AiCampsAtNight + ", ArmyLeadersAlwaysCamp=" + s.ArmyLeadersAlwaysCamp
+                     + ", AiCampSkipPercent=" + s.AiCampSkipPercent + ", swit gracza " + PlayerDawn + ":00, krok straznika "
+                     + GuardStepHours.ToString("0.00", CultureInfo.InvariantCulture) + " h gry).");
         }
 
         private static string HourCountersText()
@@ -244,7 +281,9 @@ namespace Armoury
                    + ". Namioty zdjete po zjezdzie: " + _tentDropsHour + " (maks. zjazd " + _tentDropMax.ToString("0.00", ci) + ")."
                    + " Stoper: HoldSleepers " + _holdCalls + " x, sr. " + (_holdCalls > 0 ? _holdMsSum / _holdCalls : 0).ToString("0.000", ci)
                    + " ms, maks. " + _holdMsMax.ToString("0.000", ci) + " ms; DropMovedTents " + _dropCalls + " x, sr. "
-                   + (_dropCalls > 0 ? _dropMsSum / _dropCalls : 0).ToString("0.000", ci) + " ms, maks. " + _dropMsMax.ToString("0.000", ci) + " ms.";
+                   + (_dropCalls > 0 ? _dropMsSum / _dropCalls : 0).ToString("0.000", ci) + " ms, maks. " + _dropMsMax.ToString("0.000", ci) + " ms."
+                   + " Odstep przegladow maks.: HoldSleepers " + _holdDhMax.ToString("0.000", ci) + " h, DropMovedTents "
+                   + _dropDhMax.ToString("0.000", ci) + " h gry. Potkniecia straznikow w sesji: " + _guardStumbles + ".";
         }
 
         private static double MsSince(long t0)
@@ -254,11 +293,16 @@ namespace Armoury
 
         /// <summary>Zegar gry: true, gdy od ostatniego przegladu minelo >= 0.1 h gry
         /// albo roznica jest ujemna (wczytany wczesniejszy zapis / nowa kampania).</summary>
-        private static bool GuardDue(ref CampaignTime last)
+        private static bool GuardDue(ref CampaignTime last, ref double dhMax)
         {
             var now = CampaignTime.Now;
             double dh = (now - last).ToHours;
-            if (dh >= GuardStepHours || dh < 0) { last = now; return true; }
+            if (dh >= GuardStepHours || dh < 0)
+            {
+                // odstep > 1 h = pierwszy przeglad nocy / po wczytaniu - nie jest odstepem straznika
+                if (dh <= 1.0 && dh > dhMax) dhMax = dh;
+                last = now; return true;
+            }
             return false;
         }
 
@@ -276,15 +320,24 @@ namespace Armoury
                 for (int i = _tented.Count - 1; i >= 0; i--)
                 {
                     var t = _tented[i];
-                    if (t == null || t == MobileParty.MainParty) continue;
-                    Vec2 at;
-                    if (!_tentPos.TryGetValue(t, out at)) continue;
-                    float moved = t.GetPosition2D.Distance(at);
-                    if (moved <= 0.3f) continue;
-                    Tent(t, false);
-                    _tented.RemoveAt(i);
-                    _tentDropsHour++;
-                    if (moved > _tentDropMax) _tentDropMax = moved;
+                    try
+                    {
+                        if (t == null || t == MobileParty.MainParty) continue;
+                        Vec2 at;
+                        if (!_tentPos.TryGetValue(t, out at)) continue;
+                        float moved = t.GetPosition2D.Distance(at);
+                        if (moved <= 0.3f) continue;
+                        Tent(t, false);
+                        _tented.RemoveAt(i);
+                        _tentDropsHour++;
+                        if (moved > _tentDropMax) _tentDropMax = moved;
+                    }
+                    catch (Exception e)
+                    {
+                        // jedna partia nie urywa przegladu; zepsuta wypada z listy, zeby nie potykac sie co 0.1 h
+                        GuardStumble("DropMovedTents", t, e);
+                        try { if (i < _tented.Count && _tented[i] == t) { _tented.RemoveAt(i); if (t != null) Tent(t, false); } } catch { }
+                    }
                 }
             }
             catch (Exception e) { Log.Error("DropMovedTents", e); }
@@ -318,36 +371,45 @@ namespace Armoury
                 for (int i = _camping.Count - 1; i >= 0; i--)
                 {
                     var mp = _camping[i];
-                    if (mp == null || !mp.IsActive) { _camping.RemoveAt(i); continue; }
-                    if (mp.MapEvent != null || mp.CurrentSettlement != null) continue;   // bitwa/osada - nie nasza sprawa
-                    Vec2 bed;
-                    if (!_bedPos.TryGetValue(mp, out bed)) { bed = mp.GetPosition2D; _bedPos[mp] = bed; }
-                    float drift = mp.GetPosition2D.Distance(bed);
-                    bool ordered = mp.DefaultBehavior != TaleWorlds.CampaignSystem.Party.AiBehavior.Hold
-                                   || mp.TargetSettlement != null || mp.TargetParty != null;
-                    if (!ordered && drift <= 0.3f) continue;
+                    try
+                    {
+                        if (mp == null || !mp.IsActive) { _camping.RemoveAt(i); continue; }
+                        if (mp.MapEvent != null || mp.CurrentSettlement != null) continue;   // bitwa/osada - nie nasza sprawa
+                        Vec2 bed;
+                        if (!_bedPos.TryGetValue(mp, out bed)) { bed = mp.GetPosition2D; _bedPos[mp] = bed; }
+                        float drift = mp.GetPosition2D.Distance(bed);
+                        bool ordered = mp.DefaultBehavior != TaleWorlds.CampaignSystem.Party.AiBehavior.Hold
+                                       || mp.TargetSettlement != null || mp.TargetParty != null;
+                        if (!ordered && drift <= 0.3f) continue;
 
-                    string what = mp.DefaultBehavior.ToString()
-                        + (mp.TargetSettlement != null ? " -> " + mp.TargetSettlement.Name : "")
-                        + (mp.TargetParty != null ? " -> " + mp.TargetParty.Name : "");
-                    // T1: rodzaj obudzenia (przed SetMoveModeHold) - sam zjazd na Hold,
-                    // rozkaz taki jak nasz zapamietany przed snem, albo inny cudzy rozkaz
-                    NightOrder mine;
-                    if (!ordered) _wokenHold++;
-                    else if (_orders.TryGetValue(mp, out mine) && mine != null && mine.Behavior == mp.DefaultBehavior
-                             && mine.Settlement == mp.TargetSettlement && mine.Party == mp.TargetParty) _wokenOurOrder++;
-                    else _wokenOther++;
-                    _wokenDriftSum += drift; if (drift > _wokenDriftMax) _wokenDriftMax = drift;
-                    mp.Ai.DisableForHours(1);
-                    mp.SetMoveModeHold();
-                    _bedPos[mp] = mp.GetPosition2D;   // spi tam, gdzie go zlapalismy
-                    _wokenHour++; _wokenSession++;
-                    // pierwsze trzy w calosci, potem co dwudziesty - liczniki biegna zawsze
-                    if (_wokenSession <= 3 || _wokenSession % 20 == 0)
-                        Log.Info("AiNightCamp: obudzony cudza reka " + mp.Name + " (rozkaz " + what
-                                 + ", zjechal " + drift.ToString("0.00", CultureInfo.InvariantCulture)
-                                 + (mp.Army != null ? ", wodz armii" : "")
-                                 + ") - klade z powrotem. Razem w sesji: " + _wokenSession + ".");
+                        string what = mp.DefaultBehavior.ToString()
+                            + (mp.TargetSettlement != null ? " -> " + mp.TargetSettlement.Name : "")
+                            + (mp.TargetParty != null ? " -> " + mp.TargetParty.Name : "");
+                        // T1: rodzaj obudzenia (przed SetMoveModeHold) - sam zjazd na Hold,
+                        // rozkaz taki jak nasz zapamietany przed snem, albo inny cudzy rozkaz
+                        NightOrder mine;
+                        if (!ordered) _wokenHold++;
+                        else if (_orders.TryGetValue(mp, out mine) && mine != null && mine.Behavior == mp.DefaultBehavior
+                                 && mine.Settlement == mp.TargetSettlement && mine.Party == mp.TargetParty) _wokenOurOrder++;
+                        else _wokenOther++;
+                        _wokenDriftSum += drift; if (drift > _wokenDriftMax) _wokenDriftMax = drift;
+                        mp.Ai.DisableForHours(1);
+                        mp.SetMoveModeHold();
+                        _bedPos[mp] = mp.GetPosition2D;   // spi tam, gdzie go zlapalismy
+                        _wokenHour++; _wokenSession++;
+                        // pierwsze trzy w calosci, potem co dwudziesty - liczniki biegna zawsze
+                        if (_wokenSession <= 3 || _wokenSession % 20 == 0)
+                            Log.Info("AiNightCamp: obudzony cudza reka " + mp.Name + " (rozkaz " + what
+                                     + ", zjechal " + drift.ToString("0.00", CultureInfo.InvariantCulture)
+                                     + (mp.Army != null ? ", wodz armii" : "")
+                                     + ") - klade z powrotem. Razem w sesji: " + _wokenSession + ".");
+                    }
+                    catch (Exception e)
+                    {
+                        // jedna partia nie urywa przegladu; zepsuta wypada z listy (noc odnowi ja o pelnej godzinie)
+                        GuardStumble("HoldSleepers", mp, e);
+                        try { if (i < _camping.Count && _camping[i] == mp) _camping.RemoveAt(i); } catch { }
+                    }
                 }
             }
             catch (Exception e) { Log.Error("HoldSleepers", e); }
@@ -422,7 +484,10 @@ namespace Armoury
         // T1 (uwaga S3): prog liczony od uplywu czasu GRY od pomiaru - "stoi" =
         // przesuniecie < 0.1 jedn. na godzine gry (najmniej 0.01 jedn.); przy x8
         // 2 s realne to kilka godzin gry i staly prog 0.08 przepuszczal wolne kolumny
-        private struct StillMark { public Vec2 Pos; public CampaignTime At; }
+        // poprawka recenzji: pomiar blizej niz 0.05 h gry od poprzedniego (pauza, dwa odswiezenia
+        // w jednej klatce) nie jest pomiarem - zwraca poprzedni werdykt i nie nadpisuje bazy
+        private const double StillMinHours = 0.05;
+        private struct StillMark { public Vec2 Pos; public CampaignTime At; public bool Still; }
         private static readonly System.Collections.Generic.Dictionary<MobileParty, StillMark> _stillPos =
             new System.Collections.Generic.Dictionary<MobileParty, StillMark>();
 
@@ -434,12 +499,13 @@ namespace Armoury
                 var now = CampaignTime.Now;
                 StillMark prev;
                 bool known = _stillPos.TryGetValue(mp, out prev);
-                _stillPos[mp] = new StillMark { Pos = pos, At = now };
-                if (!known) return false;                          // pierwszy pomiar - nie stoi
-                double dh = (now - prev.At).ToHours;
-                if (dh < 0 || dh > 6) return false;                // wczytanie albo stary pomiar - od nowa
-                float limit = Math.Max(0.01f, 0.1f * (float)dh);
-                return prev.Pos.Distance(pos) < limit;
+                double dh = known ? (now - prev.At).ToHours : -1;
+                if (known && dh >= 0 && dh < StillMinHours) return prev.Still;   // za krotko - poprzedni werdykt
+                bool still = false;                                // pierwszy pomiar, wczytanie albo stary pomiar - nie stoi
+                if (known && dh >= 0 && dh <= 6)
+                    still = prev.Pos.Distance(pos) < Math.Max(0.01f, 0.1f * (float)dh);
+                _stillPos[mp] = new StillMark { Pos = pos, At = now, Still = still };
+                return still;
             }
             catch { return false; }
         }
@@ -536,11 +602,13 @@ namespace Armoury
         {
             try
             {
+                try { LogCampConfig(s); } catch { }   // poprawka recenzji: jakie godziny naprawde obowiazuja
                 bool night = InCamp(h);   // T1: ticki 0..5 -> spia 0:00-6:00, o 6:00 pobudka
                 if (!s.AiCampsAtNight || !night)
                 {
-                    // T1: obudzenia z ostatniej godziny obozu (np. 5-6) - osobna linia, nie "AiNightCamp"
-                    if (_wokenHour > 0 || _tentDropsHour > 0)
+                    // T1: obudzenia z ostatniej godziny obozu (np. 5-6) - osobna linia, nie "AiNightCamp";
+                    // poprawka recenzji: takze gdy byly same przeglady (stoper ostatniej godziny w logu)
+                    if (_wokenHour > 0 || _tentDropsHour > 0 || _holdCalls > 0 || _dropCalls > 0)
                         Log.Info("NightRest swit " + h + ":00: obudzonych cudza reka od poprzedniej godziny: " + _wokenHour + "." + HourCountersText());
                     if (_wokenHour > 0 || _tentDropsHour > 0 || _holdCalls > 0 || _dropCalls > 0) ResetHourCounters();
                     _tentPos.Clear();
@@ -581,7 +649,8 @@ namespace Armoury
                     // (deterministycznie per partia i noc, zeby nie migotalo co godzine)
                     // T1 (uwaga S6): WODZ ARMII nie korzysta z pomijania - armia staje
                     // zawsze, chyba ze wrog blisko albo poscig / ucieczka (nizej)
-                    bool armyLeader = mp.Army != null && mp.Army.LeaderParty == mp;
+                    // poprawka recenzji: wlasny wylacznik ArmyLeadersAlwaysCamp (wylaczony = wodz losuje jak kazdy lord)
+                    bool armyLeader = s.ArmyLeadersAlwaysCamp && mp.Army != null && mp.Army.LeaderParty == mp;
                     if (!armyLeader && s.AiCampSkipPercent > 0 &&
                         (mp.Id.InternalValue + (uint)CampaignTime.Now.ToDays) % 100u
                             < (uint)Math.Max(0, Math.Min(95, s.AiCampSkipPercent))) continue;
@@ -1001,7 +1070,7 @@ namespace Armoury
                 // T1: straznik snu co 0.1 h GRY (byl co ~1 s realna): cudze rozkazy
                 // i przesuniecia wracaja na Hold; ujemna roznica = wczytanie - od reki
                 if (s.AiCampsAtNight && Campaign.Current != null && _camping.Count > 0
-                    && GuardDue(ref _lastHoldSweep))
+                    && GuardDue(ref _lastHoldSweep, ref _holdDhMax))
                 {
                     int hs = CampaignTime.Now.GetHourOfDay;
                     if (InCamp(hs)) HoldSleepers();
@@ -1009,7 +1078,7 @@ namespace Armoury
 
                 // T1: namioty z kolumn, ktore ruszyly, schodza co 0.1 h GRY
                 if (s.AiCampsAtNight && s.CampTentIcon && Campaign.Current != null && _tented.Count > 0
-                    && GuardDue(ref _lastTentDrop))
+                    && GuardDue(ref _lastTentDrop, ref _dropDhMax))
                     DropMovedTents();
 
                 if (!s.QuickCampKey || _askOpen) return;

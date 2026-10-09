@@ -692,11 +692,12 @@ namespace Armoury
         public bool SleepAtSeaFree = true;                 // crews sleep in watches - sailing through the night builds no sleep debt
         public bool AiCampsAtNight = true;                 // the world sleeps too: lord parties and caravans halt for the night (camp hours) unless chased or in action
         public int CampStartHour = 0;                      // hour the world makes camp (lords, armies, caravans, day-hunting bands, your nightfall prompt); 0 and 6 = midnight to six; equal hours = no camp
-        public int CampEndHour = 6;                        // hour the world breaks camp and marches on; 0 and 6 = midnight to six; equal hours = no camp
+        public int CampEndHour = 6;                        // hour the world breaks camp and marches on; 0 and 6 = midnight to six; equal hours = no camp (your own sleep then still settles at 6)
         public bool AiBanditsCampToo = false;               // brigands sleep as well - hideout by day, their own fire in the field by night
         public int AiTentCap = 60;                         // at most this many AI camps get a tent icon on the map - the rest still sleep, just without the picture
         public float AiTentRadius = 100f;                   // tent icons appear only this close to your party - the world beyond still sleeps, just without the picture
-        public int AiCampSkipPercent = 15;                 // this share of lord columns press on through any given night - not everyone pitches camp; army leaders always camp
+        public int AiCampSkipPercent = 15;                 // this share of lord columns press on through any given night - not everyone pitches camp; army leaders are spared this roll while Army Leaders Always Camp is on
+        public bool ArmyLeadersAlwaysCamp = true;          // army leaders never skip the night camp - the whole host halts (only a nearby enemy, a chase or a siege keeps it marching); off = they roll the skip share like any lord
         public bool BanditsRestByDay = true;               // every band has a nature: three in four are night hunters (lie low 10-16), one in four hunts by day and beds down at night (camp hours)
         public float AiNightsAwakeInChase = 1f;            // days a chasing or fleeing party may push on without sleep before it drops anyway (not in force yet: chasing and fleeing parties never sleep)
         public float AiCampDangerRadius = 6f;              // a hostile party this close keeps them marching - pursuit knows no bedtime

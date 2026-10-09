@@ -2444,7 +2444,7 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public int CampStartHour { get; set; } = 0;
 
-        [SettingPropertyInteger("Camp End Hour", 0, 23, "0", HintText = "hour the world breaks camp and marches on; 0 and 6 = midnight to six; equal hours = no camp")]
+        [SettingPropertyInteger("Camp End Hour", 0, 23, "0", HintText = "hour the world breaks camp and marches on; 0 and 6 = midnight to six; equal hours = no camp (your own sleep then still settles at 6)")]
         [SettingPropertyGroup("A night's rest")]
         public int CampEndHour { get; set; } = 6;
 
@@ -2460,9 +2460,13 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public float AiTentRadius { get; set; } = 100f;
 
-        [SettingPropertyInteger("Ai Camp Skip Percent", 0, 60, "0", HintText = "this share of lord columns press on through any given night - not everyone pitches camp; army leaders always camp")]
+        [SettingPropertyInteger("Ai Camp Skip Percent", 0, 60, "0", HintText = "this share of lord columns press on through any given night - not everyone pitches camp; army leaders are spared this roll while Army Leaders Always Camp is on")]
         [SettingPropertyGroup("A night's rest")]
         public int AiCampSkipPercent { get; set; } = 15;
+
+        [SettingPropertyBool("Army Leaders Always Camp", HintText = "army leaders never skip the night camp - the whole host halts (only a nearby enemy, a chase or a siege keeps it marching); off = they roll the skip share like any lord")]
+        [SettingPropertyGroup("A night's rest")]
+        public bool ArmyLeadersAlwaysCamp { get; set; } = true;
 
         [SettingPropertyBool("Bandits Rest By Day", HintText = "every band has a nature: three in four are night hunters (lie low 10-16), one in four hunts by day and beds down at night (camp hours)")]
         [SettingPropertyGroup("A night's rest")]
@@ -3355,6 +3359,7 @@ namespace Armoury
             s.AiTentCap = AiTentCap;
             s.AiTentRadius = AiTentRadius;
             s.AiCampSkipPercent = AiCampSkipPercent;
+            s.ArmyLeadersAlwaysCamp = ArmyLeadersAlwaysCamp;
             s.BanditsRestByDay = BanditsRestByDay;
             s.AiNightsAwakeInChase = AiNightsAwakeInChase;
             s.AiCampDangerRadius = AiCampDangerRadius;
