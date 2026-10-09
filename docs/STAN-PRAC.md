@@ -720,3 +720,11 @@ Pelny stan do podjecia: **docs/PRZEKAZANIE-2026-10-08.md** (co w grze, praca w t
 Jeff 08.10 ok. 12:15: "jak znika to zamykamy, ma byc logiczny system ekonomii, ze wszystko z czegos wynika" - BEE wariant (b) -ListaZFundamentu;
 akcje gracza BEE w nicosc zamknac latka Armoury (PRZEKAZANIE-2026-10-08.md rozdz. 7).
 Jeff 12:30: "tak potwierdzam" - zamek kupuje bron w miescie, rekrut bez kompletu z tym co ma, szkolenie wlasna bronia -> paczka 171 (PRZEKAZANIE rozdz. 10).
+
+## NOC 08/09.10 (sesja 7016f733) - WGRANIE 1 (Jeff: "Tak, wgraj sam" - tylko po udanym autotescie)
+W GRZE od 08.10 ok. 19:07 (zegar komputera): **Armoury 28a7456e + CrashScribe aff275de** = 2e235ea + 170 (BEE domkniete) + T1 obozy 0-6 + T2 kalendarz Innych
++ T3 metal napraw + T4 dezerterzy do puli + T5 rodzina splaca Bank + T6 miara marszu (log) + T7 mlyny na brzegu i "held by" w dymku. Galaz paczki/noc-wgranie-1
+(b1d8c58). Poprzednie (c01a54ba / 11fa0214): *.bak-2026-10-09-przed-noc1 obok plikow + D:\Backup-Bannerlord\wgrane\2026-10-09-noc1-przed. ZATWIERDZONE OD TERAZ:
+Armoury 28a7456e, CrashScribe aff275de (autotest przywraca te). NIE w grze: T8 (poprawka bawelny), 169, 171, H3, T2b; skrypt BEE -ListaZFundamentu (zablokowany
+przez zabezpieczenia Claude Code - Jeff uruchamia sam: powershell -NoProfile -ExecutionPolicy Bypass -File tools\bee\zamknij-ujscia-bee.ps1 -ListaZFundamentu).
+Szczegoly: docs/PRZEKAZANIE-2026-10-08.md rozdz. 15-16, audyt docs/audyt-2026-10-09/.
