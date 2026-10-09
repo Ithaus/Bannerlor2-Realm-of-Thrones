@@ -141,3 +141,8 @@ dana faze od nowa, korzystajac z zapisanych wynikow:
 - 17:50 **T1-T8** (poprawki z audytu) - workflow `wf_afd15a92-ceb` (pipeline: wykonanie -> 2 recenzje -> poprawki), drzewa w SCRATCH nowej sesji `noc\n1-obozy ..
   n8-krainy` (galezie w-toku/n1-obozy .. w-toku/n8-krainy w klonie lancuch, od 2e235ea). T2 = CrashScribe (klucze tez w CrashScribe.settings.xml w grze przy wgraniu).
   Dodane przez glowna sesje ponad audyt: T7 + dymek "held by" (W-2) z probkami w logu; T8 + 16 wsi z uprawa niezgodna z klimatem (VillageClimateFix).
+- 17:56 **AUTOTEST 170 OK** (nowa kampania 40/40 dob, 13.2 s/dobe, run at-20261008-174421, log Armoury-2026-10-08_17-44-34.log): "wpiete 16/16", menu BEE
+  12/12 zamkniete z powodem, tryb zgodnosci BK TAK, 0 bledow BeeSeal; bledy CrashScribe 8 = te same co w kazdym autotescie (start). DLL probny 52aea39c.
+  UWAGA: skrypt BEE (zamknij-ujscia-bee.ps1 -ListaZFundamentu) ZABLOKOWANY przez zabezpieczenia Claude Code ("Production Deploy") - test bez kluczy
+  (klucze 6/19, B4 wstrzymana zgodnie z projektem). Skrypt do nalozenia przez Jeffa (gra zamknieta): powershell -NoProfile -ExecutionPolicy Bypass -File
+  tools\bee\zamknij-ujscia-bee.ps1 -ListaZFundamentu (kopia ustawien: D:\Backup-Bannerlord\bee-2026-10-08\better_economy_settings.xml.przed-testem-170, SHA 1f963cfa).
