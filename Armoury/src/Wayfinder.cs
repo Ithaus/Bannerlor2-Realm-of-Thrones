@@ -60,16 +60,52 @@ namespace Armoury
             if (!same)
             {
                 float speed = MathF.Max(0.5f, main.Speed);
-                float rideH = dist / speed;
-                float clockH = rideH * 24f / 18f;              // 6 h snu na dobe
-                float days = clockH / 24f;
+                // T1 (audyt 07, 3.12): partia robi speed / 1.2 jedn. na godzine
+                // (MobileParty, Campaign) - meldunek zanizal czas jazdy o 20%
+                float rideH = dist * 1.2f / speed;
+                // dni drogi: H godzin marszu na dobe (24 - godziny obozu - utrata
+                // nocnej kary w ciemnosci 22-02 poza obozem); predkosc dzienna
+                // z chwili klikniecia (noca + kara nocna), wiec dni nie zaleza od pory
+                bool nightNow = false;
+                try { nightNow = Campaign.Current.IsNight && !main.IsCurrentlyAtSea; } catch { }
+                float daySpeed = DaySpeed(speed, nightNow, s);
+                float days = dist * 1.2f / daySpeed / MarchHoursPerDay(daySpeed, main.IsCurrentlyAtSea, s);
                 int km = (int)Math.Round(dist * KmPerUnit);
                 string name = dest != null ? dest.Name.ToString() : "the marked ground";
                 Log.Player("Course set for " + name + ": ~" + km + " km - about "
-                           + (int)Math.Round(rideH) + " h in the saddle, "
+                           + (int)Math.Round(rideH) + " h in the saddle" + (nightNow ? " (night pace)" : "") + ", "
                            + days.ToString("0.#") + " days on the road.", false);
             }
             Flag(dest);
+        }
+
+        // T1: predkosc dzienna - noca oddajemy kare nocna (TerrainEase: plaska
+        // NightSpeedPenalty; bez TerrainEase vanilla -25%)
+        private static float DaySpeed(float speed, bool nightNow, Settings s)
+        {
+            if (!nightNow) return speed;
+            if (s.TerrainEaseEnabled) return speed + MathF.Max(0f, s.NightSpeedPenalty);
+            return speed / 0.75f;
+        }
+
+        // T1: godziny marszu na dobe przy obozie CampStartHour-CampEndHour
+        // (0-6: 24 - 6 - utrata w 22-24); ciemnosc gry 22-02 (ROT SunSet 22 /
+        // SunRise 2), kazda godzina ciemnosci poza obozem traci ulamek kary nocnej
+        private static float MarchHoursPerDay(float daySpeed, bool atSea, Settings s)
+        {
+            float frac = 0f;
+            if (!atSea)
+                frac = s.TerrainEaseEnabled
+                    ? MBMath.ClampFloat(MathF.Max(0f, s.NightSpeedPenalty) / MathF.Max(0.5f, daySpeed), 0f, 1f)
+                    : 0.25f;
+            float h = 0f;
+            for (int i = 0; i < 24; i++)
+            {
+                if (NightRest.InCamp(i)) continue;   // godzina obozu (oboz swiata i nocleg gracza)
+                bool dark = i >= 22 || i < 2;
+                h += dark ? 1f - frac : 1f;
+            }
+            return MathF.Max(1f, h);
         }
 
         private static void Flag(Settlement dest)

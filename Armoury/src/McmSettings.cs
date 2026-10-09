@@ -2436,9 +2436,17 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public bool SleepAtSeaFree { get; set; } = true;
 
-        [SettingPropertyBool("Ai Camps At Night", HintText = "the world sleeps too: lord parties and caravans halt for the night (22-4) unless chased or in action")]
+        [SettingPropertyBool("Ai Camps At Night", HintText = "the world sleeps too: lord parties and caravans halt for the night (camp hours) unless chased or in action")]
         [SettingPropertyGroup("A night's rest")]
         public bool AiCampsAtNight { get; set; } = true;
+
+        [SettingPropertyInteger("Camp Start Hour", 0, 23, "0", HintText = "hour the world makes camp (lords, armies, caravans, day-hunting bands, your nightfall prompt); 0 and 6 = midnight to six; equal hours = no camp")]
+        [SettingPropertyGroup("A night's rest")]
+        public int CampStartHour { get; set; } = 0;
+
+        [SettingPropertyInteger("Camp End Hour", 0, 23, "0", HintText = "hour the world breaks camp and marches on; 0 and 6 = midnight to six; equal hours = no camp")]
+        [SettingPropertyGroup("A night's rest")]
+        public int CampEndHour { get; set; } = 6;
 
         [SettingPropertyBool("Ai Bandits Camp Too", HintText = "brigands sleep as well - hideout by day, their own fire in the field by night")]
         [SettingPropertyGroup("A night's rest")]
@@ -2452,15 +2460,15 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public float AiTentRadius { get; set; } = 100f;
 
-        [SettingPropertyInteger("Ai Camp Skip Percent", 0, 60, "0", HintText = "this share of lord columns press on through any given night - not everyone pitches camp")]
+        [SettingPropertyInteger("Ai Camp Skip Percent", 0, 60, "0", HintText = "this share of lord columns press on through any given night - not everyone pitches camp; army leaders always camp")]
         [SettingPropertyGroup("A night's rest")]
         public int AiCampSkipPercent { get; set; } = 15;
 
-        [SettingPropertyBool("Bandits Rest By Day", HintText = "every band has a nature: three in four are night hunters (lie low 10-16), one in four hunts by day and beds down at night (23-5)")]
+        [SettingPropertyBool("Bandits Rest By Day", HintText = "every band has a nature: three in four are night hunters (lie low 10-16), one in four hunts by day and beds down at night (camp hours)")]
         [SettingPropertyGroup("A night's rest")]
         public bool BanditsRestByDay { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Ai Nights Awake In Chase", 0.00f, 4.00f, "0.00", HintText = "days a chasing or fleeing party may push on without sleep before it drops anyway")]
+        [SettingPropertyFloatingInteger("Ai Nights Awake In Chase", 0.00f, 4.00f, "0.00", HintText = "days a chasing or fleeing party may push on without sleep before it drops anyway (not in force yet: chasing and fleeing parties never sleep)")]
         [SettingPropertyGroup("A night's rest")]
         public float AiNightsAwakeInChase { get; set; } = 1f;
 
@@ -2476,7 +2484,7 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public bool CoursePlotterEnabled { get; set; } = true;
 
-        [SettingPropertyBool("Nightfall Prompt Enabled", HintText = "at dusk a marching column is asked to make camp; the popup lets you set always-camp or never-ask (choice lives in the save)")]
+        [SettingPropertyBool("Nightfall Prompt Enabled", HintText = "when the camp hour strikes a marching column is asked to make camp; the popup lets you set always-camp or never-ask (choice lives in the save)")]
         [SettingPropertyGroup("A night's rest")]
         public bool NightfallPromptEnabled { get; set; } = true;
 
@@ -3341,6 +3349,8 @@ namespace Armoury
             s.QuickCampKey = QuickCampKey;
             s.SleepAtSeaFree = SleepAtSeaFree;
             s.AiCampsAtNight = AiCampsAtNight;
+            s.CampStartHour = CampStartHour;
+            s.CampEndHour = CampEndHour;
             s.AiBanditsCampToo = AiBanditsCampToo;
             s.AiTentCap = AiTentCap;
             s.AiTentRadius = AiTentRadius;

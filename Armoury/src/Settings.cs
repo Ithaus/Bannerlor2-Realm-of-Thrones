@@ -690,17 +690,19 @@ namespace Armoury
         public float DayRestFactor = 0.6f;                 // sleep by daylight counts at this rate (camp noise, heat, light) - night hours count in full
         public bool QuickCampKey = true;                   // press O on the campaign map to pitch the BannerKings camp on the spot
         public bool SleepAtSeaFree = true;                 // crews sleep in watches - sailing through the night builds no sleep debt
-        public bool AiCampsAtNight = true;                 // the world sleeps too: lord parties and caravans halt for the night (22-4) unless chased or in action
+        public bool AiCampsAtNight = true;                 // the world sleeps too: lord parties and caravans halt for the night (camp hours) unless chased or in action
+        public int CampStartHour = 0;                      // hour the world makes camp (lords, armies, caravans, day-hunting bands, your nightfall prompt); 0 and 6 = midnight to six; equal hours = no camp
+        public int CampEndHour = 6;                        // hour the world breaks camp and marches on; 0 and 6 = midnight to six; equal hours = no camp
         public bool AiBanditsCampToo = false;               // brigands sleep as well - hideout by day, their own fire in the field by night
         public int AiTentCap = 60;                         // at most this many AI camps get a tent icon on the map - the rest still sleep, just without the picture
         public float AiTentRadius = 100f;                   // tent icons appear only this close to your party - the world beyond still sleeps, just without the picture
-        public int AiCampSkipPercent = 15;                 // this share of lord columns press on through any given night - not everyone pitches camp
-        public bool BanditsRestByDay = true;               // every band has a nature: three in four are night hunters (lie low 10-16), one in four hunts by day and beds down at night (23-5)
-        public float AiNightsAwakeInChase = 1f;            // days a chasing or fleeing party may push on without sleep before it drops anyway
+        public int AiCampSkipPercent = 15;                 // this share of lord columns press on through any given night - not everyone pitches camp; army leaders always camp
+        public bool BanditsRestByDay = true;               // every band has a nature: three in four are night hunters (lie low 10-16), one in four hunts by day and beds down at night (camp hours)
+        public float AiNightsAwakeInChase = 1f;            // days a chasing or fleeing party may push on without sleep before it drops anyway (not in force yet: chasing and fleeing parties never sleep)
         public float AiCampDangerRadius = 6f;              // a hostile party this close keeps them marching - pursuit knows no bedtime
         public bool CampTentIcon = true;                   // pitched camps show a tent on the map (yours and theirs)
         public bool CoursePlotterEnabled = true;           // clicking a destination reports the route: kilometres, hours in the saddle and days on the road, and flags a settlement target on the map
-        public bool NightfallPromptEnabled = true;         // at dusk a marching column is asked to make camp; the popup lets you set always-camp or never-ask (choice lives in the save)
+        public bool NightfallPromptEnabled = true;         // when the camp hour strikes a marching column is asked to make camp; the popup lets you set always-camp or never-ask (choice lives in the save)
         public bool AnvilShiftEnabled = true;              // waiting at the forge runs in day shifts: after AnvilShiftHours of work the smith beds down for his needed sleep (6h, more with sleep debt), then returns to the hammer
         public float AnvilShiftHours = 18f;                // hours of work at the anvil before the smith must sleep
         public bool WorkshopNightRest = true;              // the apprentices sleep too: forge projects make no progress between 23:00 and 5:00 - a day of work is a day at the anvil
