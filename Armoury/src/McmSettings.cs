@@ -1188,6 +1188,10 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public int WagesDesertMaxDays { get; set; } = 8;
 
+        [SettingPropertyBool("War Ledger To Outlaws", HintText = "men who walk off over unpaid wages join the outlaw pool of the region (and the people ledger) instead of vanishing - needs Outlaw Law enabled, without it they still vanish")]
+        [SettingPropertyGroup("The marching column")]
+        public bool WarLedgerToOutlaws { get; set; } = true;
+
         [SettingPropertyBool("Sack Scar Enabled", HintText = "a settlement taken by siege loses prosperity and loyalty - conquest is a ruin you must rebuild")]
         [SettingPropertyGroup("The marching column")]
         public bool SackScarEnabled { get; set; } = true;
@@ -3048,6 +3052,7 @@ namespace Armoury
             s.WagesGraceDays = WagesGraceDays;
             s.WagesDesertPercentPerDay = WagesDesertPercentPerDay;
             s.WagesDesertMaxDays = WagesDesertMaxDays;
+            s.WarLedgerToOutlaws = WarLedgerToOutlaws;
             s.SackScarEnabled = SackScarEnabled;
             s.SackProsperityCutPercent = SackProsperityCutPercent;
             s.SackLoyaltyHit = SackLoyaltyHit;

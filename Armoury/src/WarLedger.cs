@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
@@ -25,6 +26,8 @@ namespace Armoury
     internal static class WarLedger
     {
         private static readonly Dictionary<MobileParty, int> _unpaidDays = new Dictionary<MobileParty, int>();
+        private static int _leftStumbles;      // T4: ludzie zdjeci, ktorych nie dalo sie wpisac do rosteru odchodzacych (doba)
+        private static bool _errLeft;          // T4: ten blad tylko raz do logu
 
         internal static void OnDaily()
         {
@@ -34,6 +37,10 @@ namespace Armoury
                 if (s == null || !s.WagesDueEnabled) return;
 
                 var seen = new List<MobileParty>();
+                // T4: liczniki doby (wszystkie dezercje WarLedger zachodza w tym jednym wywolaniu)
+                int dayParties = 0, dayGone = 0, dayPeople = 0; float dayPool = 0f;
+                int peopleStumbles0 = PeopleLedger.StumblesToday;
+                _leftStumbles = 0;
                 foreach (var mp in MobileParty.All)
                 {
                     if (mp == null || !mp.IsActive || !mp.IsLordParty) continue;
@@ -84,8 +91,42 @@ namespace Armoury
                     if (MBRandom.RandomFloat < exp - leave) leave++;
                     if (leave <= 0) continue;
 
-                    int gone = DesertElitesFirst(mp, leave);
+                    // T4 (noc 08/09.10): odchodzacy zbierani do rosteru, zeby nie znikali w nicosc
+                    bool toOutlaws = s.WarLedgerToOutlaws;
+                    var left = toOutlaws ? TroopRoster.CreateDummyTroopRoster() : null;
+                    int gone = DesertElitesFirst(mp, leave, left);
                     if (gone <= 0) continue;
+                    // T4: dezerterzy ida do puli wyrzutkow regionu i do ksiegi ludzi jak kazdy dezerter gry.
+                    // Wolamy sluchaczy WPROST, bez CampaignEvents.OnTroopsDeserted - gra tych ludzi nie
+                    // widziala (AddToCounts nie strzela zdarzeniem), wiec nic nie liczy sie dwa razy,
+                    // a cudzych sluchaczy (BK, DTE i in.) nie budzimy.
+                    // Dopisek w logu MIERZY (stan puli regionu i licznik ksiegi przed i po), nie powtarza "gone".
+                    string where = "";
+                    if (left != null)
+                    {
+                        float added = 0f; int toPeople = 0;
+                        try
+                        {
+                            var reg = OutlawLaw.RegionAt(mp.Position.ToVec2());
+                            float before = OutlawLaw.PoolIn(reg);
+                            OutlawLaw.OnTroopsDeserted(mp, left);
+                            added = OutlawLaw.PoolIn(reg) - before;
+                            if (reg != null) where = reg.StringId;
+                        }
+                        catch (Exception e) { Log.Error("WarLedger.ToOutlaws", e); }
+                        try
+                        {
+                            int p0 = PeopleLedger.DesertedLordToday;
+                            PeopleLedger.OnTroopsDeserted(mp, left);
+                            toPeople = PeopleLedger.DesertedLordToday - p0;
+                        }
+                        catch (Exception e) { Log.Error("WarLedger.ToPeopleLedger", e); }
+                        dayPool += added; dayPeople += toPeople;
+                        where = OutlawLaw.On
+                            ? "; do puli wyrzutkow " + added.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + " (region " + (where.Length > 0 ? where : "brak") + "), do ksiegi ludzi " + toPeople
+                            : "; prawo wyrzutkow wylaczone - " + gone + " ludzi znika (tylko ksiega ludzi " + toPeople + ")";
+                    }
+                    dayParties++; dayGone += gone;
                     // KAZDY ubytek do PLIKU, takze u gracza. Do 19.09 strata gracza szla wylacznie
                     // przez Log.Player, ktory pokazuje komunikat w grze i NIC nie zapisuje - przez to
                     // w logu nie bylo po niej ani sladu i szukanie winnego trwalo dwa dni.
@@ -94,10 +135,16 @@ namespace Armoury
                     Log.Info("WarLedger: " + (mp == MobileParty.MainParty ? "PARTIA GRACZA" : mp.StringId)
                              + " traci " + gone + " ludzi (zold niewyplacony " + d + " dni, liczone jak " + over
                              + "; zalegosc " + mp.HasUnpaidWages.ToString("0.##") + ", dzienny zold " + mp.TotalWage
-                             + ", kasa klanu " + purse + ").");
+                             + ", kasa klanu " + purse + ")" + where + ".");
                     if (mp == MobileParty.MainParty)
                         Log.Player("Unpaid and unbound: " + gone + " men desert in the night - the best-paid first.", true);
                 }
+                // T4: jedna linia na dobe - autotest porownuje "zdjeto" z "do puli" bez mieszania z dezercja gry
+                if (dayGone > 0 && s.WarLedgerToOutlaws)
+                    Log.Info("WarLedger doba: zdjeto " + dayGone + " ludzi w " + dayParties + " partiach; do puli wyrzutkow "
+                             + dayPool.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)
+                             + (OutlawLaw.On ? "" : " (prawo wyrzutkow wylaczone)") + ", do ksiegi ludzi " + dayPeople
+                             + ", potkniecia " + (_leftStumbles + Math.Max(0, PeopleLedger.StumblesToday - peopleStumbles0)) + ".");
                 if (_unpaidDays.Count > seen.Count + 50)
                 {
                     var drop = new List<MobileParty>();
@@ -110,7 +157,7 @@ namespace Armoury
         }
 
         /// <summary>Najemnik zna swoja cene: dezerteruja od najwyzszego tieru.</summary>
-        private static int DesertElitesFirst(MobileParty mp, int count)
+        private static int DesertElitesFirst(MobileParty mp, int count, TroopRoster left)
         {
             int gone = 0;
             try
@@ -132,6 +179,12 @@ namespace Armoury
                     int take = Math.Min(count, roster.GetElementNumber(best));
                     roster.AddToCounts(c, -take);
                     gone += take; count -= take;
+                    if (left != null)
+                    {
+                        // T4: kto odszedl; blad tu = czlowiek zdjety, ale nie przekazany - liczymy potkniecie
+                        try { left.AddToCounts(c, take); }
+                        catch (Exception e) { _leftStumbles += take; if (!_errLeft) { _errLeft = true; Log.Error("WarLedger.LeftRoster", e); } }
+                    }
                 }
             }
             catch { }
