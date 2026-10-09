@@ -2268,6 +2268,10 @@ namespace Armoury
         [SettingPropertyGroup("Iron bank")]
         public int IronBankLogPerDay { get; set; } = 15;
 
+        [SettingPropertyBool("Iron Bank Family Pays", HintText = "AI houses only: before the Iron Bank marks an instalment as missed or lends anew, the grown members of the house hand their head what is lacking - only what each holds above 5000 gold or ten days of his own party's wages, whichever is more")]
+        [SettingPropertyGroup("Iron bank")]
+        public bool IronBankFamilyPays { get; set; } = true;
+
         [SettingPropertyBool("Soldier Pay To Purse", HintText = "the wages a party is actually paid no longer vanish: they go to the purse of its men, who spend them in the towns (mending, missing kit, food and drink) - your own men too; needs Men Purse Enabled")]
         [SettingPropertyGroup("The soldier's pay")]
         public bool SoldierPayToPurse { get; set; } = true;
@@ -3298,6 +3302,7 @@ namespace Armoury
             s.IronBankRateAfterDefault = IronBankRateAfterDefault;
             s.IronBankPlayerDefaultRenown = IronBankPlayerDefaultRenown;
             s.IronBankLogPerDay = IronBankLogPerDay;
+            s.IronBankFamilyPays = IronBankFamilyPays;
             s.SoldierPayToPurse = SoldierPayToPurse;
             s.GarrisonPayToCoffers = GarrisonPayToCoffers;
             s.CrownWageRefundEnabled = CrownWageRefundEnabled;
