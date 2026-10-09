@@ -774,3 +774,6 @@ NOWE ZADANIA 09.10: (1) audyt umiejetnosci - zwlaszcza: przekazywanie broni/miec
 **WGRANIE 7 (09.10 ok. 01:30 zegara komp.; zgoda Jeffa na noc 09/10):** Armoury 63640cb3 (= 0f8a80b0 + D1 za Murem mysliwi i rybacy + I1 jency w Westeros do domu / na Mur
 + F1 H3 przy autobitwie gracza; galaz noc/sklad5 d486813), CrashScribe bez zmian 269cc980. Poprzedni: Armoury.dll.bak-2026-10-09-przed-noc7 + D:\Backup-Bannerlord\wgrane\
 2026-10-09-noc7-przed. Testy: nowa kampania 40 dob OK (13.1 s/dobe, 0 bledow), zapis doby 362 8 dob OK. ZATWIERDZONE OD TERAZ: Armoury 63640cb3, CrashScribe 269cc980.
+**WGRANIE 8 (09.10 ok. 01:50):** CrashScribe e8d460c5 (= 269cc980 + E1 pokoj z biedy; galaz w-toku/e1-pokoj 5b4e551), Armoury 63640cb3. Poprzedni CS: CrashScribe.dll.bak-2026-10-09-przed-noc8
++ D:\Backup-Bannerlord\wgrane\2026-10-09-noc8-przed. Testy: 40 dob + zapis 362 - 0 bledow, 0 potkniec; SKUTEK NIESPRAWDZONY (0 glosowan o pokoj w 48 dobach; pokoje daje
+Diplomacy z wyczerpania; Diplomacy lata ConsiderPeace - moze wycinac wnioski AI). ZATWIERDZONE OD TERAZ: Armoury 63640cb3, CrashScribe e8d460c5.
