@@ -782,6 +782,9 @@ namespace Armoury
 
         // --- Northern fare ---
         public bool NorthernFareEnabled = true;            // vineyards in the North and at the Wall (Farsfog, Tumbledown, Olden Oak, Queenscrown) become fishers, cattle and swine farms - grapes do not grow in snow; wine presses in Winterfell and Castle Black turn into breweries. Applied at session start
+        public bool CropClimateFilter = true;              // papyrus, a reed of hot marshes, grows only on grain farms of the hot south (Dorne, Ghis, Qarth, Volantis, Lys, Myr, Tyrosh, Valyria, the Summer Isles); Banner Kings gave it to every grain farm, even at the Wall - elsewhere the farm no longer yields it (grain output unchanged)
+        public bool WoodlotByClimate = true;               // the village woodlot (Village Woodlot Loads) fells by climate: deserts 0.3, Dothraki steppe 0.5, Mediterranean lands 0.8, forest lands 1.2, the rest 1.0 - scaled so the world as a whole fells as much timber as before
+        public bool VillageClimateFix = true;              // 12 villages whose main produce cannot grow where they stand get one that can (cotton at the Wall, in Braavos, in the Vale mountains and in Sarnor, a vineyard in Lorath, dates on Tarth), and 5 warm villages (Qarth, Volantis, Lys, Tyrosh) take up cotton so the world keeps some; grain farms beyond the Wall are left as they are. Applied at session start, nothing is written to the save (off = the map's own village types after the next load)
 
         // --- Grateful villages ---
         public bool BanditCheerEnabled = true;             // villages near your victory over bandits thank you - relations with their notables improve

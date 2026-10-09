@@ -63,6 +63,94 @@ namespace Armoury
             _made = 0; _villages = 0; _notNormal = 0; _stumbles = 0; _stumblesDay = 0; _startPasses = 0; _startKg = 0.0;
             lock (_lumber) _lumber.Clear();
             _wood = null;
+            _climateK = -1f;
+            _cls = null;
+            Array.Clear(_clsLoads, 0, 5); Array.Clear(_clsVil, 0, 5);
+        }
+
+        // --- T8 (noc 08/09.10): LAS WSI WEDLUG KLIMATU (audyt 02 C3/N4) ---
+        // Dotad kazda wies bez drwali tnie tyle samo, takze na pustyniach Dorne, Qarthu i Zatoki Niewolniczej (audyt 02 L9). Wspolczynnik
+        // z kultury wsi ROT (id sprawdzone w ROT-Content spcultures.xml): pustynia 0.3, step Dothrakow 0.5, srodziemnomorskie 0.8,
+        // lesne 1.2, reszta 1.0; stala wyrownujaca K = liczba wsi z lasem / suma wspolczynnikow - swiat razem tnie tyle samo co dotad
+        // (drewno ma juz lekki deficyt, wiec wyrownanie zamiast ciecia). K liczona raz przy starcie sesji (po zmianie typow wsi T8)
+        // i wypisana w logu; przed tym (ticki startowe nowej kampanii) - leniwie przy pierwszym uzyciu. Wylacznik WoodlotByClimate.
+        // Recenzja T8: klasa klimatu kazdej wsi zapamietana w tym samym przebiegu co K (zdjecie _cls) - BK zmienia kulture wsi w trakcie
+        // gry (kultura dominujaca przy starcie sesji, asymilacja >= 0.55 co dobe), a K i wspolczynniki musza pochodzic z jednego zdjecia,
+        // zeby suma swiata sie domykala. Zdjecie odswieza sie przy nastepnym starcie sesji.
+        private static readonly float[] ClassF = { 0.3f, 0.5f, 0.8f, 1.0f, 1.2f };
+        private static readonly string[] ClassName = { "pustynia", "step", "srodziemnomorskie", "reszta", "lesne" };
+        private const int ClassRest = 3;
+        private static readonly Dictionary<string, int> ClimateIdx = new Dictionary<string, int>(StringComparer.Ordinal)
+        {
+            { "aserai", 0 }, { "ghiscari", 0 }, { "qartheen", 0 },                                  // pustynie (Dorne, Ghis, Qarth)
+            { "khuzait", 1 },                                                                     // step Dothrakow
+            { "lyseni", 2 }, { "tyroshi", 2 }, { "myrish", 2 }, { "volantine", 2 }, { "valyrian", 2 },   // srodziemnomorskie
+            { "battania", 4 }, { "river", 4 }, { "vale", 4 }, { "qohorik", 4 }, { "ibbenese", 4 }, { "nord", 4 }, { "freefolk", 4 }   // lesne (battania = Polnoc, nord = Lorath)
+        };
+        private static float _climateK = -1f;     // -1 = nieliczona, 0 = nie da sie policzyc (wtedy wspolczynnik 1)
+        private static volatile Dictionary<Village, int> _cls;   // zdjecie klas klimatu z Calibrate (podmieniane w calosci - czytelnicy bez zamka)
+        private static readonly int[] _clsLoads = new int[5], _clsVil = new int[5];   // licznik doby: ladunki i wsie z tickiem lasu wedlug klasy
+
+        private static int RawClass(Village v)
+        {
+            var c = v != null && v.Settlement != null ? v.Settlement.Culture : null;
+            int i;
+            return c != null && c.StringId != null && ClimateIdx.TryGetValue(c.StringId, out i) ? i : ClassRest;
+        }
+
+        /// <summary>Klasa klimatu wsi ze zdjecia startowego (Calibrate); wies spoza zdjecia - z biezacej kultury.</summary>
+        private static int ClassOf(Village v)
+        {
+            var m = _cls;
+            int i;
+            return m != null && v != null && m.TryGetValue(v, out i) ? i : RawClass(v);
+        }
+
+        /// <summary>Mnoznik lasu tej wsi: K x wspolczynnik klimatu; 1, gdy WoodlotByClimate wylaczony albo K nie dala sie policzyc.</summary>
+        internal static float ClimateFactor(Village v)
+        {
+            var s = Settings.Current;
+            if (s == null || !s.WoodlotByClimate || v == null) return 1f;
+            if (_climateK < 0f) Calibrate(false);
+            return _climateK > 0f ? _climateK * ClassF[ClassOf(v)] : 1f;
+        }
+
+        /// <summary>Stala wyrownujaca K i zdjecie klas z obecnych typow i kultur wsi (pelny przeglad wsi - tylko przy starcie sesji).
+        /// log = linia startowa ze wspolczynnikami.</summary>
+        internal static void Calibrate(bool log)
+        {
+            try
+            {
+                int n = 0; double sum = 0.0;
+                var byC = new int[5];
+                var map = new Dictionary<Village, int>();
+                foreach (var v in Village.All)
+                {
+                    if (v == null || v.Settlement == null || IsLumber(v)) continue;
+                    int c = RawClass(v);
+                    map[v] = c;
+                    n++; sum += ClassF[c]; byC[c]++;
+                }
+                _climateK = n > 0 && sum > 0.0 ? (float)(n / sum) : 0f;
+                _cls = map;
+                if (!log) return;
+                var inv = CultureInfo.InvariantCulture;
+                var s = Settings.Current;
+                var sb = new StringBuilder("Las wsi wedlug klimatu (T8): ");
+                if (s == null || !s.WoodlotByClimate) sb.Append("WYLACZONY w ustawieniach (Woodlot By Climate) - kazda wies tnie stawke bez wspolczynnika");
+                else if (!On) sb.Append("NIEAKTYWNY - las wsi nie tnie (suwak Village Woodlot Loads = 0, RBL dosypuje albo latki nie wpiete - linia startowa VillageWoodlot i linia dnia \"Las wsi (126)\"); K policzona na zapas");
+                else sb.Append("CZYNNY");
+                sb.Append("; wsi z lasem (bez drwali) ").Append(n).Append(", stala wyrownujaca K = ").Append(_climateK.ToString("0.000", inv))
+                  .Append(" (wsi / suma wspolczynnikow ").Append(sum.ToString("0.0", inv)).Append("); wspolczynnik x K -> wsi:");
+                for (int i = 0; i < 5; i++)
+                    if (byC[i] > 0)
+                        sb.Append(' ').Append(ClassName[i]).Append(' ').Append(ClassF[i].ToString("0.0", inv)).Append(" x K = ").Append((ClassF[i] * _climateK).ToString("0.000", inv)).Append(" -> ").Append(byC[i]).Append(';');
+                sb.Append(" pustynia (aserai, ghiscari, qartheen), step (khuzait), srodziemnomorskie (lyseni, tyroshi, myrish, volantine, valyrian), lesne (battania, river, vale, qohorik, ibbenese, nord, freefolk)")
+                  .Append("; klasa wsi zapamietana do nastepnego startu sesji (kultura zmieniona przez BK w trakcie gry liczy sie od nastepnego wczytania)")
+                  .Append("; suma swiata bez zmian: ").Append(n).Append(" x ").Append(Rate.ToString("0.##", inv)).Append(" ladunku na dobe.");
+                Log.Info(sb.ToString());
+            }
+            catch (Exception e) { _climateK = 0f; Log.Error("VillageWoodlot.Calibrate", e); }
         }
 
         /// <summary>Drewno gry - ten sam przedmiot, ktory dosypywal RBL i ktory blokuje FreeSupplies (DefaultItems.HardWood = "hardwood").</summary>
@@ -94,11 +182,13 @@ namespace Armoury
             return r;
         }
 
-        /// <summary>Sztuki drewna na dobe w jednostce chwili (ladunek 100 kg = 1 sztuka po HistoricalPrices, 10 sztuk przed).</summary>
-        private static float PiecesPerDay(ItemObject wood)
+        /// <summary>Sztuki drewna na dobe w jednostce chwili (ladunek 100 kg = 1 sztuka po HistoricalPrices, 10 sztuk przed).
+        /// T8: dla wsi (v != null) razy mnoznik klimatu ClimateFactor; v = null - stawka swiata bez klimatu (linia dnia).</summary>
+        private static float PiecesPerDay(ItemObject wood, Village v)
         {
             float kg = wood != null && wood.Weight > 0.05f ? wood.Weight : LoadKg;
-            return Rate * LoadKg / kg;
+            float d = Rate * LoadKg / kg;
+            return v != null ? d * ClimateFactor(v) : d;
         }
 
         /// <summary>Postfiks VillageGoodProductionCampaignBehavior.TickGoodProduction(Village, bool): gra wola go raz na dobe dla wsi
@@ -115,7 +205,8 @@ namespace Armoury
                 if (v.VillageState != Village.VillageStates.Normal) { if (!__1) _notNormal++; return; }
                 var wood = Wood();
                 if (wood == null) return;
-                int n = MBRandom.RoundRandomized(PiecesPerDay(wood));
+                int n = MBRandom.RoundRandomized(PiecesPerDay(wood, v));
+                if (!__1) { int c = ClassOf(v); _clsVil[c]++; if (n > 0) _clsLoads[c] += n; }   // T8: licznik doby wedlug klasy klimatu (takze wies z 0 sztuk dzis)
                 if (n <= 0) return;
                 if (__1)
                 {
@@ -145,7 +236,7 @@ namespace Armoury
             {
                 var v = __instance;
                 if (v == null || IsLumber(v) || v.VillageState != Village.VillageStates.Normal) return;
-                float d = PiecesPerDay(Wood());
+                float d = PiecesPerDay(Wood(), v);
                 if (d > 0f) __result += (int)Math.Ceiling(5f * d - 1e-4f);
             }
             catch { }
@@ -184,10 +275,14 @@ namespace Armoury
                 else if (!On) sb.Append("NIEAKTYWNY - latki nie wpiete (linia startowa VillageWoodlot)");
                 else
                 {
-                    float d = PiecesPerDay(Wood());
+                    float d = PiecesPerDay(Wood(), null);
+                    var stc = Settings.Current;
                     sb.Append("CZYNNY: wsie (bez wsi drwali) dopisaly ").Append(_made).Append(" ladunkow drewna w ").Append(_villages).Append(" wsiach")
-                      .Append(" (stawka ").Append(Rate.ToString("0.##", inv)).Append(" ladunku 100 kg na wies na dobe; magazyn wsi W +").Append((int)Math.Ceiling(5f * d - 1e-4f))
-                      .Append(" szt.); wsi z lasem w stanie Normal ").Append(able).Append(", w tym z magazynem >= 1.5 W (dzis nie tna) ").Append(clogged)
+                      .Append(" (stawka swiata bez klimatu ").Append(Rate.ToString("0.##", inv)).Append(" ladunku 100 kg na wies na dobe; magazyn wsi W +").Append((int)Math.Ceiling(5f * d - 1e-4f))
+                      .Append(" szt. przy stawce bez klimatu");
+                    if (stc != null && stc.WoodlotByClimate && _climateK > 0f)   // T8: magazyn wsi liczy las z klimatem - zakres od pustyni do lasu
+                        sb.Append(", z klimatem od +").Append((int)Math.Ceiling(5f * d * _climateK * ClassF[0] - 1e-4f)).Append(" do +").Append((int)Math.Ceiling(5f * d * _climateK * ClassF[4] - 1e-4f));
+                    sb.Append("); wsi z lasem w stanie Normal ").Append(able).Append(", w tym z magazynem >= 1.5 W (dzis nie tna) ").Append(clogged)
                       .Append("; nie tna: spladrowane ").Append(deserted).Append(", najezdzane albo przymuszone ").Append(other)
                       .Append(" (tick produkcji poza stanem Normal: ").Append(_notNormal).Append(")")
                       .Append("; wsi drwali (drewno z listy typu wsi, x").Append(Settings.Current != null ? Settings.Current.LumberOutputMultiplier.ToString("0.0", inv) : "?").Append(") ").Append(lumber);
@@ -196,10 +291,26 @@ namespace Armoury
                     sb.Append("; start kampanii: rozdanie startowe gry (5 przebiegow produkcji wsi do miast) - las wsi dal miastom handlowym ")
                       .Append((_startKg / LoadKg).ToString("0", inv)).Append(" ladunkow 100 kg w ").Append(_startPasses).Append(" przebiegach wsi");
                 sb.Append("; potkniecia dzis ").Append(_stumblesDay).Append(" (od wczytania ").Append(_stumbles).Append(").");
+                {   // T8: stan lasu wedlug klimatu na koncu linii (poczatek linii bez zmian dla parserow)
+                    var st = Settings.Current;
+                    sb.Append(" Klimat lasu (T8): ").Append(st != null && st.WoodlotByClimate
+                        ? (_climateK > 0f ? "CZYNNY, K = " + _climateK.ToString("0.000", inv) : "NIEAKTYWNY (K nie policzona - wspolczynnik 1)")
+                        : "WYLACZONY");
+                    if (On)   // recenzja T8: liczby, ktore odrozniaja czynny klimat od nieczynnego (srednio na wies z tickiem lasu, w stawkach swiata)
+                    {
+                        float d0 = PiecesPerDay(Wood(), null);
+                        sb.Append("; wedlug klasy (ladunki w wsiach z tickiem lasu = srednio na wies x stawka):");
+                        for (int i = 0; i < 5; i++)
+                            if (_clsVil[i] > 0)
+                                sb.Append(' ').Append(ClassName[i]).Append(' ').Append(_clsLoads[i]).Append(" lad. w ").Append(_clsVil[i]).Append(" wsi = ")
+                                  .Append(d0 > 0f ? ((double)_clsLoads[i] / _clsVil[i] / d0).ToString("0.00", inv) : "?").Append(" x;");
+                    }
+                    sb.Append('.');
+                }
                 Log.Info(sb.ToString());
             }
             catch (Exception e) { Log.Error("VillageWoodlot.Daily", e); }
-            finally { _made = 0; _villages = 0; _notNormal = 0; _stumblesDay = 0; _startPasses = 0; _startKg = 0.0; }
+            finally { _made = 0; _villages = 0; _notNormal = 0; _stumblesDay = 0; _startPasses = 0; _startKg = 0.0; Array.Clear(_clsLoads, 0, 5); Array.Clear(_clsVil, 0, 5); }
         }
 
         internal static void ApplyAll(Harmony h)
