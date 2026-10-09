@@ -176,6 +176,8 @@ namespace Armoury
             base.OnMissionBehaviorInitialize(mission);
             try
             {
+                // F1 (H3 w autobitwie gracza): bitwa gracza z misja nie jest autobitwa, nawet gdy potem "wyslij wojsko"
+                if (Campaign.Current != null) LosersFlee.NoteMission();
                 if (Settings.Current.FieldCraftEnabled && Campaign.Current != null && mission != null)
                     mission.AddMissionBehavior(new FieldCraft());
                 if (Settings.Current.HitScribeEnabled && mission != null)
