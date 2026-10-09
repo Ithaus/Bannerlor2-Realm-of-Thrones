@@ -823,12 +823,19 @@ namespace CrashScribe
         /// <summary>Przy starcie sesji: unikaty schodza z handlu (NotMerchandise,
         /// wiec targi przestaja je LOSOWAC) i znikaja z polek istniejacych miast.
         /// Ekwipunek bohaterow, stash i sakwy gracza - nietykane: zdobyty
-        /// egzemplarz pozostaje jedyny na swiecie.</summary>
+        /// egzemplarz pozostaje jedyny na swiecie.
+        /// POPRAWKA Z16-1c (recenzja Z16): czystka polek POMIJA unikaty, ktorych droge po swiecie sledzi Armoury UniqueSpoils
+        /// (Armoury.UniqueSpoils.Is - spis RotUniques bez "strojow" noszonych przez wielu). Jeff 04.10: "jesli sprzedam, to bedzie
+        /// gdzies w swiecie... jak sprzedam, moze pojawia sie gdzies indziej, bo ktos sprzeda albo jakis lord kupi" - a ta czystka
+        /// przy kazdym wczytaniu zjadala z polek sprzedane unikaty z listy UniqueGear (sprzedane przez gracza i przez lordow AI,
+        /// ktorzy od Z16 odkladaja do taboru unikat, ktorego nie udzwigna - gra sprzedaje tabor w miescie). Kopie startowe tych
+        /// sztuk Armoury zdejmuje sam, raz na kampanie (flaga w zapisie). Bez Armoury - czystka jak dotad.</summary>
         internal static void UniqueWares()
         {
             try
             {
-                int flagged = 0, purged = 0;
+                int flagged = 0, purged = 0, tracked = 0;
+                var armouryIs = ArmouryUniqueIs();
                 var setter = AccessTools.PropertySetter(typeof(ItemObject), "NotMerchandise");
                 foreach (var it in TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
                 {
@@ -846,14 +853,39 @@ namespace CrashScribe
                         if (it == null || !IsUniqueGear(it)) continue;
                         if (RelicIds.Contains(it.StringId)) continue;   // relikwie polozone celowo - nie zjadac
                         int n = ro.GetElementNumber(i);
+                        bool keep = false;
+                        if (armouryIs != null) { try { keep = armouryIs(it); } catch { keep = false; } }
+                        if (keep) { tracked += n; continue; }           // Z16-1c: sprzedany unikat sledzony przez Armoury - lezy dalej
                         purged += n;
                         ro.AddToCounts(ro.GetElementCopyAtIndex(i).EquipmentElement, -n);
                     }
                 }
                 Scribe.Line("Mends: unikaty imienne - " + flagged + " itemow zeszlo z handlu, "
-                            + purged + " kopii zdjetych z targow miast.");
+                            + purged + " kopii zdjetych z targow miast"
+                            + (armouryIs != null ? ", " + tracked + " zostawionych na polkach (unikaty sledzone przez Armoury - sprzedane, Jeff 04.10)"
+                                                 : " (bez Armoury - czystka wszystkich)") + ".");
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.UniqueWares", null); } catch { } }
+        }
+
+        /// <summary>Z16-1c: Armoury.UniqueSpoils.Is (refleksja) - unikat, ktorego droge po swiecie sledzi Armoury (spis RotUniques
+        /// bez "strojow"); null bez Armoury albo przy innej sygnaturze.</summary>
+        private static Func<ItemObject, bool> ArmouryUniqueIs()
+        {
+            try
+            {
+                foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+                {
+                    if (asm.GetName().Name != "Armoury") continue;
+                    var t = asm.GetType("Armoury.UniqueSpoils");
+                    var m = t != null ? t.GetMethod("Is", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public
+                                                          | System.Reflection.BindingFlags.Static, null, new[] { typeof(ItemObject) }, null) : null;
+                    if (m == null || m.ReturnType != typeof(bool)) return null;
+                    return (Func<ItemObject, bool>)Delegate.CreateDelegate(typeof(Func<ItemObject, bool>), m);
+                }
+            }
+            catch { }
+            return null;
         }
 
         /// <summary>
@@ -2508,20 +2540,35 @@ namespace CrashScribe
         // (15.09: "nie zmieniaj sprzetu, podnies umiejetnosci"), tylko w gore, niczego nie zdejmujemy (decyzja 3). GRACZ nigdy.
         // Dzieci (sprzet i umiejetnosci dostaja przy pelnoletnosci) i notable (nie wychodza w pole) - poza. Bez broni, koni i ladr
         // (ladry liczone dzis jako Atletyka - uwaga 7.1 projektu Z16, poza paczka). Bez treningu Atletyki w zbroi (decyzja 03:55).
-        // SetInitialSkillLevel (gra 1.4.8, HeroDeveloper.cs:190-196) ustawia umiejetnosc i XP pod nia: bez awansu poziomu, bez perkow,
-        // bez komunikatu (tak robi RC przy zaniku miesni). Trzy chwile, jedna funkcja: (1) przy wczytaniu, PO DressTheNamesakes;
+        // SetInitialSkillLevel (gra 1.4.8, HeroDeveloper.cs:190-196) ustawia umiejetnosc i XP pod nia: bez awansu poziomu i bez
+        // komunikatu (tak robi RC przy zaniku miesni). PERKI (POPRAWKA Z16-1c po recenzji - dotad stalo tu "bez perkow"): sam
+        // SetInitialSkillLevel ich nie daje, ale gra dobiera je bohaterom spoza klanu gracza CODZIENNIE
+        // (CharacterDevelopmentCampaignBehavior.DailyTickHero -> HeroDeveloper.DevelopCharacterStats -> SelectPerks,
+        // HeroDeveloper.cs:441-453: kazdy perk z RequiredSkillValue <= umiejetnosc, z pary 50/50), wiec podniesienie odblokowuje perki
+        // do nowego progu (25/50/.../175): np. Atletyka 77 -> 175 to 4 perki (Powerful albo Sprint, Surging Blow albo Braced, Walk It
+        // Off albo A Good Days Rest, Durable albo Energetic), a przejscie przez Atletyke 75 (Imposing Stature) i Luk 100 (Merry Men)
+        // daje dowodcy +5 rozmiaru partii (DefaultPartySizeLimitModel.cs:311-317). Towarzysze i rodzina gracza: przy wylaczonym
+        // AutoAllocateClanMemberPerks - wolne wybory perkow na ekranie postaci, przy wlaczonym gra wybiera sama. Pomiar: linia
+        // "Mends: Z16 perki" w drugim dziennym przegladzie po wczytaniu. Skutek decyzji 2 - do oceny Jeffa przed wgraniem.
+        // Trzy chwile, jedna funkcja: (1) przy wczytaniu, PO DressTheNamesakes;
         // (2) po przydziale z szablonu - postfiks na gardle EquipmentHelper.AssignHeroEquipmentFromEquipment tylko dopisuje bohatera
         // do kolejki, liczonej w najblizszej godzinie (BK ubiera rycerza dwa razy, a gra po CreateSpecialHero jeszcze ustawia
         // umiejetnosci startowe - liczy sie komplet koncowy); (3) raz na dobe przeglad wszystkich (drogi omijajace gardlo: zwolniony
         // wedrowiec - Hero.ResetEquipments, sztuka usunieta z gry - Hero.HandleInvalidItem; normalnie 0 podniesien).
         // Bez stanu w zapisie (podniesienie jest trwale w umiejetnosciach i idempotentne) - zadnego SyncData.
-        // Wylacznik: Armoury HeroSkillToOwnGear (bez Armoury - wlaczone); wylaczenie nie obniza juz podniesionych.
+        // Wylacznik: Armoury HeroSkillToOwnGear (bez Armoury - wlaczone); wylaczenie nie obniza juz podniesionych. POPRAWKA Z16-1c
+        // (recenzja): podnoszenie dziala tylko przy wlaczonym sicie HeroGearRequirements - podniesienie ma sens tylko po to, zeby przy
+        // sicie nikt nie stracil zbroi; przy sicie wylaczonym gracz mogl zalozyc towarzyszowi plyte t6, a dzienny przeglad dawal mu
+        // nastepnego dnia Atletyke 175 i perki "z niczego".
 
         /// <summary>Z16: Armoury HeroSkillToOwnGear (domyslnie TAK; bez Armoury - TAK).</summary>
         internal static bool HeroSkillOn() { return ArmouryFloat("HeroSkillToOwnGear", 1f) > 0.5f; }
 
         /// <summary>Z16: Armoury HeroGearRequirements - sito u bohaterow (domyslnie TAK; bez Armoury - TAK).</summary>
         internal static bool HeroReqOn() { return ArmouryFloat("HeroGearRequirements", 1f) > 0.5f; }
+
+        /// <summary>Z16-1c: podnoszenie - tylko przy obu wlacznikach (HeroSkillToOwnGear i HeroGearRequirements).</summary>
+        internal static bool HeroRaiseOn() { return HeroSkillOn() && HeroReqOn(); }
 
         /// <summary>Z16: lustro Armoury ItemReq.MeetsHero - ten sam wymog co CanUse (ReqSkill + Difficulty), tylko ladry
         /// konskie przepuszczone (ReqSkill liczy je dzis jako Atletyke, a prawo tieru zaklada Jazde - uwaga 7.1).</summary>
@@ -2551,7 +2598,8 @@ namespace CrashScribe
 
         /// <summary>Z16: wymog ZESTAWU BOJOWEGO bohatera - Atletyka: pancerz w slotach 5-9 (helm, korpus, nogi, rece,
         /// peleryna); Luk: strzaly, Kusza: belty w slotach 0-3 (to samo mapowanie co ReqSkill i Armoury ItemReq.SkillFor).
-        /// pieces = liczba zajetych slotow pancerza i amunicji (miara "nikt nie stracil sprzetu").</summary>
+        /// pieces = liczba zajetych slotow pancerza i amunicji (tylko informacyjnie - Z16-1c: "przed = po" w linii wczytania bylo
+        /// zawsze prawdziwe, bo HeroSinew sprzetu nie rusza; miara utraty to puste sloty, EmptySlots).</summary>
         internal static void HeroGearNeed(Hero h, out int ath, out int bow, out int xbow, out int pieces)
         {
             ath = 0; bow = 0; xbow = 0; pieces = 0;
@@ -2595,6 +2643,7 @@ namespace CrashScribe
             if (sk == null || need <= 0) return note;
             int have = h.GetSkillValue(sk);
             if (have >= need) return note;
+            PerkWatchBefore(h);                                   // Z16-1c: zrzut perkow PRZED pierwszym podniesieniem
             h.HeroDeveloper.SetInitialSkillLevel(sk, need);
             if (gain != null && idx < gain.Length) gain[idx] += need - have;
             if (raised != null && idx < raised.Length) raised[idx]++;
@@ -2656,13 +2705,20 @@ namespace CrashScribe
                     _sinewQueue.CopyTo(list);
                     _sinewQueue.Clear();
                 }
-                if (!HeroSkillOn()) return;
-                int n = 0;
+                if (!HeroRaiseOn()) return;
+                int n = 0, bad = 0;
+                string firstBad = null;
                 var sb = new System.Text.StringBuilder();
                 foreach (var h in list)
                 {
                     string note = null;
-                    try { note = HeroSinew(h, null, null); } catch { }
+                    // Z16-1c (recenzja; CLAUDE.md "licz potkniecia, nie gas"): wywrotka na jednym bohaterze liczona, nie polykana
+                    try { note = HeroSinew(h, null, null); }
+                    catch (Exception e1)
+                    {
+                        bad++;
+                        if (firstBad == null) firstBad = HeroLabel(h) + ": " + e1.GetType().Name + " " + e1.Message;
+                    }
                     if (note == null) continue;
                     n++;
                     if (n <= 20) sb.Append(n > 1 ? "; " : "").Append(HeroLabel(h)).Append(" ").Append(note);
@@ -2670,20 +2726,129 @@ namespace CrashScribe
                 if (n > 0)
                     Scribe.Line("Mends: Z16 (przydzial z szablonu) - " + n + " z " + list.Length + " ubranych bohaterow AI dostalo umiejetnosc"
                                 + " do nowego zestawu: " + sb + (n > 20 ? "; ..." : "") + ".");
+                if (bad > 0)
+                    Scribe.Line("Mends: Z16 kolejka - " + bad + " potkniec z " + list.Length + " (pierwsze: " + firstBad + ").");
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.HeroSinewQueue", null); } catch { } }
         }
 
+        // ---- Z16-1c: POMIAR PERKOW po podniesieniu (recenzja Z16: gra dobiera bohaterom AI perki do nowej umiejetnosci co dobe).
+        // Zrzut perkow Atletyki, Luku i Kuszy kazdego bohatera PRZED jego pierwszym podniesieniem w sesji (wczytanie, kolejka, doba),
+        // raport raz - w drugim dziennym przegladzie po wczytaniu (dobowy tick bohaterow gra rozklada na godziny doby, wiec po
+        // drugiej dobie przeszli go wszyscy). Tylko log, bez zapisu (SyncData nie potrzebne).
+        private sealed class PerkSnap { internal int Ath, Bow, Xbow, Free; internal bool Imposing, Merry; }
+        private static System.Collections.Generic.Dictionary<Hero, PerkSnap> _perkWatch;
+        private static System.Collections.Generic.List<TaleWorlds.CampaignSystem.CharacterDevelopment.PerkObject> _z16Perks;
+        private static int _perkWatchDays;
+
+        private static void PerkWatchBefore(Hero h)
+        {
+            try
+            {
+                if (_perkWatch == null || h == null || _perkWatch.ContainsKey(h)) return;
+                _perkWatch[h] = TakePerkSnap(h);
+            }
+            catch { }
+        }
+
+        private static PerkSnap TakePerkSnap(Hero h)
+        {
+            if (_z16Perks == null)
+            {
+                var list = new System.Collections.Generic.List<TaleWorlds.CampaignSystem.CharacterDevelopment.PerkObject>();
+                foreach (var p in TaleWorlds.CampaignSystem.CharacterDevelopment.PerkObject.All)
+                    if (p != null && (p.Skill == DefaultSkills.Athletics || p.Skill == DefaultSkills.Bow || p.Skill == DefaultSkills.Crossbow))
+                        list.Add(p);
+                _z16Perks = list;
+            }
+            var s = new PerkSnap();
+            foreach (var p in _z16Perks)
+            {
+                if (h.GetPerkValue(p))
+                {
+                    if (p.Skill == DefaultSkills.Athletics) s.Ath++;
+                    else if (p.Skill == DefaultSkills.Bow) s.Bow++;
+                    else s.Xbow++;
+                }
+                else if (h.GetSkillValue(p.Skill) >= p.RequiredSkillValue
+                         && (p.AlternativePerk == null
+                             || (!h.GetPerkValue(p.AlternativePerk) && string.CompareOrdinal(p.StringId, p.AlternativePerk.StringId) < 0)))
+                    s.Free++;                                   // wolny wybor (para liczona raz)
+            }
+            s.Imposing = h.GetPerkValue(TaleWorlds.CampaignSystem.CharacterDevelopment.DefaultPerks.Athletics.ImposingStature);
+            s.Merry = h.GetPerkValue(TaleWorlds.CampaignSystem.CharacterDevelopment.DefaultPerks.Bow.MerryMen);
+            return s;
+        }
+
+        private static void PerkWatchReport()
+        {
+            try
+            {
+                if (_perkWatch == null) return;
+                int n = _perkWatch.Count, gained = 0, a = 0, b = 0, x = 0, imp = 0, impLead = 0, mer = 0, merLead = 0;
+                int clanN = 0, freeBefore = 0, freeNow = 0;
+                foreach (var kv in _perkWatch)
+                {
+                    var h = kv.Key;
+                    var s0 = kv.Value;
+                    if (h == null || !h.IsAlive) continue;
+                    var s1 = TakePerkSnap(h);
+                    int da = Math.Max(0, s1.Ath - s0.Ath), db = Math.Max(0, s1.Bow - s0.Bow), dx = Math.Max(0, s1.Xbow - s0.Xbow);
+                    if (da + db + dx > 0) gained++;
+                    a += da; b += db; x += dx;
+                    bool lead = h.PartyBelongedTo != null && h.PartyBelongedTo.LeaderHero == h;
+                    if (s1.Imposing && !s0.Imposing) { imp++; if (lead) impLead++; }
+                    if (s1.Merry && !s0.Merry) { mer++; if (lead) merLead++; }
+                    if (h.Clan == Clan.PlayerClan) { clanN++; freeBefore += s0.Free; freeNow += s1.Free; }
+                }
+                bool auto = false;
+                try { auto = CampaignOptions.AutoAllocateClanMemberPerks; } catch { }
+                Scribe.Line("Mends: Z16 perki (" + _perkWatchDays + ". przeglad dzienny po wczytaniu, dzien " + (int)CampaignTime.Now.ToDays + ") - z " + n
+                            + " podniesionych bohaterow nowe perki Atletyki/Luku/Kuszy dostalo " + gained + ": Atletyka +" + a + ", Luk +" + b
+                            + ", Kusza +" + x + "; Imposing Stature +" + imp + " (dowodcy partii " + impLead + "), Merry Men +" + mer
+                            + " (dowodcy partii " + merLead + ") - kazdy z tych dwoch to +5 rozmiaru partii dowodcy; klan gracza (" + clanN
+                            + " podniesionych): wolne wybory perkow tych umiejetnosci przed " + freeBefore + ", teraz " + freeNow
+                            + (auto ? " (AutoAllocateClanMemberPerks wlaczone - gra wybiera sama)" : "") + ".");
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.PerkWatchReport", null); } catch { } }
+            finally { _perkWatch = null; }
+        }
+
+        /// <summary>Z16-1c: puste sloty pancerza (5-9) i bohater bez zadnej broni (0-3) - miara utraty sprzetu porownywana miedzy
+        /// wczytaniami (recenzja: "sloty przed = po" w jednej funkcji bylo zawsze prawdziwe).</summary>
+        private static void EmptySlots(Hero h, ref int armour, ref int noWeapon)
+        {
+            try
+            {
+                var eq = h.BattleEquipment;
+                if (eq == null) return;
+                for (int s = 5; s <= 9; s++) if (eq[(EquipmentIndex)s].IsEmpty) armour++;
+                bool any = false;
+                for (int s = 0; s < 4; s++) if (!eq[(EquipmentIndex)s].IsEmpty) { any = true; break; }
+                if (!any) noWeapon++;
+            }
+            catch { }
+        }
+
         /// <summary>Z16: przeglad wszystkich bohaterow AI. "wczytanie" - pelna linia przed/po (miara autotestu: po = 0,
-        /// sloty pancerza i amunicji przed = po, gracz bez zmian); "dzien" - linia tylko, gdy ktos zostal podniesiony
-        /// (normalnie 0 - liczba > 0 to droga omijajaca gardlo albo nowa droga do zbadania).</summary>
+        /// gracz bez zmian, puste sloty pancerza i bez broni - do porownania miedzy wczytaniami); "dzien" - linia tylko, gdy ktos
+        /// zostal podniesiony (normalnie 0 - liczba > 0 to droga omijajaca gardlo albo nowa droga do zbadania); w drugim dziennym
+        /// przegladzie po wczytaniu - raz linia "Z16 perki" (Z16-1c).</summary>
         internal static void HeroSinewAll(string when)
         {
             try
             {
                 bool load = when == "wczytanie";
                 if (load) { lock (_sinewQueue) _sinewQueue.Clear(); _sinewFirstDay = true; }   // wczytanie liczy wszystkich; kolejka z poprzedniej kampanii precz
-                bool on = HeroSkillOn();
+                bool on = HeroRaiseOn();                       // Z16-1c: tylko przy wlaczonym sicie HeroGearRequirements
+                if (load)
+                {
+                    // Z16-1c: pomiar perkow od nowa (obiekty perkow sa per kampania)
+                    _perkWatch = on ? new System.Collections.Generic.Dictionary<Hero, PerkSnap>() : null;
+                    _perkWatchDays = 0;
+                    _z16Perks = null;
+                }
+                else if (_perkWatch != null && ++_perkWatchDays >= 2) PerkWatchReport();
                 if (!on && !load) return;
                 var sw = System.Diagnostics.Stopwatch.StartNew();
                 var heroes = new System.Collections.Generic.List<Hero>();
@@ -2691,7 +2856,7 @@ namespace CrashScribe
                 string playerBefore = PlayerSkillsText();
 
                 int[] overBefore = new int[3], overAfter = new int[3];
-                int piecesBefore = 0, piecesAfter = 0;
+                int emptyArmour = 0, noWeapon = 0;
                 int[] gain = new int[3], raised = new int[3];
                 int nLords = 0, nComp = 0, nOther = 0;
                 var big = new System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<int, string>>();
@@ -2701,7 +2866,7 @@ namespace CrashScribe
                 {
                     int ath, bow, xbow, pc;
                     HeroGearNeed(h, out ath, out bow, out xbow, out pc);
-                    piecesBefore += pc;
+                    if (load) EmptySlots(h, ref emptyArmour, ref noWeapon);
                     int hAth = h.GetSkillValue(DefaultSkills.Athletics);
                     if (ath > hAth) overBefore[0]++;
                     if (bow > h.GetSkillValue(DefaultSkills.Bow)) overBefore[1]++;
@@ -2721,7 +2886,6 @@ namespace CrashScribe
                 {
                     int ath, bow, xbow, pc;
                     HeroGearNeed(h, out ath, out bow, out xbow, out pc);
-                    piecesAfter += pc;
                     if (ath > h.GetSkillValue(DefaultSkills.Athletics)) overAfter[0]++;
                     if (bow > h.GetSkillValue(DefaultSkills.Bow)) overAfter[1]++;
                     if (xbow > h.GetSkillValue(DefaultSkills.Crossbow)) overAfter[2]++;
@@ -2754,9 +2918,10 @@ namespace CrashScribe
                       .Append(", Kusza ").Append(raised[2]).Append(raised[2] > 0 ? " (srednio +" + (gain[2] / raised[2]) + ")" : "")
                       .Append("; ");
                 }
-                else sb.Append("podnoszenie WYLACZONE (Armoury HeroSkillToOwnGear); ");
+                else sb.Append("podnoszenie WYLACZONE (Armoury HeroSkillToOwnGear albo HeroGearRequirements); ");
                 sb.Append("PO: Atletyka ").Append(overAfter[0]).Append(", Luk ").Append(overAfter[1]).Append(", Kusza ").Append(overAfter[2])
-                  .Append("; sloty pancerza i amunicji przed ").Append(piecesBefore).Append(" = po ").Append(piecesAfter)
+                  .Append("; puste sloty pancerza (5-9) ").Append(emptyArmour).Append(", bez zadnej broni (0-3) ").Append(noWeapon)
+                  .Append(" (porownac miedzy wczytaniami - Z16 sprzetu nie zdejmuje)")
                   .Append("; ").Append(player).Append("; ").Append(sw.ElapsedMilliseconds).Append(" ms.");
                 Scribe.Line(sb.ToString());
                 if (big.Count > 0)
