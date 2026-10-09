@@ -695,7 +695,7 @@ namespace CrashScribe
             _valyrianT6 = t6;
             Scribe.Line("Mends: sprzet wedlug tieru (175) - migawka valyrianska: " + t6 + " jednostek z bronia t6 we wzorcu sprzed zamiany (z " + units
                         + " jednostek z zestawami bojowymi; od 175d autobitwa z Innymi liczy wzorzec PO zamianie, migawka tylko do porownania; "
-                        + OthersSteel.T6Text() + ")"
+                        + OthersSteel.T6Text(false) + ")"
                         + (sets == 0 ? " - zestawy jeszcze puste, migawka powtorzona przed zamiana" : "") + ".");
         }
 
@@ -1123,7 +1123,7 @@ namespace CrashScribe
                         + (over > 0 ? " (" + sample + ")" : "")
                         + "; zamienionych na zapas, choc po rozsadku by sie miescily (q, pierwszy przebieg): " + (q >= 0 ? q.ToString() : "n/d")
                         + "; kluczy bez zamiennika: " + (noReplFirst >= 0 ? "pierwszy przebieg " + noReplFirst + ", " : "") + "teraz " + (_noRepl != null ? _noRepl.Count : 0)
-                        + "; migawka valyrianska po rozsadku: " + vPost + " jednostek z bronia t6 liczac z amunicja (wzorzec sprzed zamiany - od 175d tylko porownanie, autobitwa liczy wzorzec po zamianie w obu trybach zasady stali Innych; dzis ok. 223; " + OthersSteel.T6Text() + ")"
+                        + "; migawka valyrianska po rozsadku: " + vPost + " jednostek z bronia t6 liczac z amunicja (wzorzec sprzed zamiany - od 175d tylko porownanie, autobitwa liczy wzorzec po zamianie w obu trybach zasady stali Innych; dzis ok. 223; " + OthersSteel.T6Text(true) + ")"
                         + "; bohaterowie z nowym rosterem " + heroesNew + (hex.Count > 0 ? " (np. " + string.Join(", ", hex.ToArray()) + ")" : "")
                         + " (tylko wzorzec po InitializeHeroBasicCharacterOnAfterLoad, nie ich ekwipunek); nowych rosterow w sesji " + _rostersInstalled
                         + "; lista Essos: " + EssosCheck() + ".");

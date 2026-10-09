@@ -86,6 +86,8 @@ namespace CrashScribe
         /// 175d (Jeff 09.10 ok. 08:40): pocisk wedlug tieru AMUNICJI (strzaly, belty; luk i kusza sie
         /// nie licza), kamienie, glazy, garnki i pociski machin zawsze 15%, bron rzucana wedlug siebie;
         /// pierwszy cios gracza albo jego ludzi bronia, ktora tnie - komunikat raz na misje (OthersSteel.Warn).
+        /// Recenzja 175d: uderzenie tarcza/glowica (Blow.AttackType Bash) i cios tarcza - reszta, bez komunikatu;
+        /// pocisk strzelca usunietego z misji (att == null) wedlug przedmiotu pocisku, nie gole rece.
         /// </summary>
         public static void ValyrianWard(TaleWorlds.MountAndBlade.Agent __instance,
                                         ref TaleWorlds.MountAndBlade.Blow blow)
@@ -100,7 +102,7 @@ namespace CrashScribe
                 OthersSteel.MissionCheck(mission);               // raz na misje: suwaki z Armoury, kubelek licznikow pola
                 var att = mission != null ? mission.FindAgentWithIndex(blow.OwnerId) : null;
                 int note;
-                int k = OthersSteel.FieldClass(att, blow.WeaponRecord, mission, out note);
+                int k = OthersSteel.FieldClass(att, blow.WeaponRecord, blow.AttackType, mission, out note);
                 int pre = blow.InflictedDamage;
                 int post = OthersSteel.Apply(k, pre);
                 blow.InflictedDamage = post;
@@ -108,7 +110,7 @@ namespace CrashScribe
                 else
                 {
                     OthersSteel.CountField(k, pre, post, v, note);
-                    OthersSteel.Warn(att, v, k);                 // 175d: komunikat dla gracza, raz na misje
+                    OthersSteel.Warn(att, v, k, note);           // 175d: komunikat dla gracza, raz na misje
                 }
             }
             catch { }                                            // per-cios: zadnego raportowania
