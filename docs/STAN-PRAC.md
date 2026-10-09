@@ -916,3 +916,6 @@ od razu nagrode ok. 1/10 okupu ze skarbca korony; wszyscy inni jency (takze wodz
 z okupow = rok dochodu rodu, kolejny okup ponad pulap mniejszy - TAK; (3) okup za KROLA placi SKARBIEC KROLESTWA (b), jak w historii (Ryszard I - podatek z calej Anglii), wiekszy
 (ok. 2-2.5 mln zl u duzego krolestwa) - wpisac do projektu etapu 2 (krok dlugi i okupy).
 **DECYZJA JEFFA 09.10 ok. 11:15:** projekt etapu 3 (szczelnosc) - "poczekaj, az skonczy sie etap 2" -> nie zaczynac etapu 3 (ani projektu) przed zakonczeniem etapu 2.
+**DECYZJE JEFFA 09.10 ok. 12:15 (Z16):** (2) suknie, szaty, czapki i ubrania ROT jako zbroja t6 - "to jakas bzdura" -> wymog ubran (sukno, bez metalu) liczony z WAGI, nie z tieru
+(dotyczy wszystkich: gracz, bohaterowie, zolnierze); (3) unikat, ktorego lord nie udzwignie, zostaje UNIKATEM w taborze (nie zamienia sie w zwykly przy wczytaniu) - TAK.
+(1) podnoszenie umiejetnosci lordow - Jeff pyta, o co chodzi ("maja startowe zbroje, ktorych nie moga nosic?") - wyjasnione, czeka.
