@@ -35,6 +35,9 @@ namespace Armoury
     {
         // dlug snu 0..5 i przespane godziny biezacej nocy
         internal static int Debt;
+        // MUSZTRA-j (decyzja Jeffa 09.10 07:10 pkt 2, "noc bez snu = nastepny dzien bez cwiczen", od switu): dlug gracza zaraz po ostatnim swicie
+        // (koniec SettleNight) - czyta tylko musztra (DawnDebtOf); predkosc i morale licza dlug biezacy (Debt). Jak AiSleep.DawnDebt w ksiedze AI.
+        internal static int DawnDebt;
         private static float _restTonight;
         private static bool _credited;                  // dzisiejszy sen juz rozliczony (od reki, nie o swicie)
         private static Vec2 _lastPos;
@@ -95,7 +98,7 @@ namespace Armoury
                 if (mp == null || Hero.MainHero == null || !Hero.MainHero.IsAlive) return;
                 // umarli nie spia: armia Innych nie zna dlugu snu
                 if (Undead.Party(mp) || Undead.Character(Hero.MainHero.CharacterObject))
-                { Debt = 0; _restTonight = 0f; return; }
+                { Debt = 0; DawnDebt = 0; _restTonight = 0f; return; }
 
                 var pos = mp.GetPosition2D;
                 // grupa11: krok godziny i prog "ruszyl sie" wspolne z musztra i ksiega AI (Drill.RestStep, Drill.RestHour);
@@ -1036,7 +1039,15 @@ namespace Armoury
             catch { }
         }
 
+        /// <summary>Swit ksiegi gracza. MUSZTRA-j: na kazdej sciezce (sluzba ROT -> 0, przespana baza -> dlug bez zmian, dlug +1) na koncu dlug o swicie
+        /// = dlug po rozliczeniu (jak SettleAi: e.DawnDebt = e.Debt) - od tego switu do nastepnego musztra czyta DawnDebt.</summary>
         private static void SettleNight(Settings s)
+        {
+            try { SettleNightCore(s); }
+            finally { DawnDebt = Debt; }
+        }
+
+        private static void SettleNightCore(Settings s)
         {
             // splata calego dlugu idzie OD REKI (CreditRest, prog NeededHours);
             // swit zamyka dobe: kto nie przespal nawet BAZY, temu rosnie dlug.
@@ -1113,8 +1124,8 @@ namespace Armoury
         /// grupa11 - JEDNO ZRODLO PRAWDY "KTO SPAL": dlug snu partii, ktory naprawde dziala - ten sam, ktory zabiera predkosc i morale
         /// (SpeedPostfix, MoralePostfix): gracz - jego ksiega (Debt), kazda inna partia lorda - ksiega snu AI T10 (R2), takze lordowie
         /// doczepieni do armii gracza (ida z nim noca, wiec ich ksiega liczy te same nieprzespane noce). 0 przy wylaczonym NightRestEnabled,
-        /// przy wylaczonym AiSleepDebt / obozie swiata i w DLL na sucho (wtedy AI dlugu nie ma). Czyta musztra (Drill.SleepDebt) - kara
-        /// "niewyspani nie cwicza" dla gracza i AI tak samo. Czyta podmieniany w calosci slownik kar - bezpieczne z kazdego watku.
+        /// przy wylaczonym AiSleepDebt / obozie swiata i w DLL na sucho (wtedy AI dlugu nie ma). MUSZTRA-j: kare musztry liczy juz dlug o swicie
+        /// (DawnDebtOf ponizej); stad musztra bierze tylko dlug biezacy do linii (kontrola). Czyta podmieniany w calosci slownik kar - bezpieczne z kazdego watku.
         /// </summary>
         internal static int DebtOf(MobileParty mp)
         {
@@ -1122,6 +1133,27 @@ namespace Armoury
             var s = Settings.Current;
             if (s == null || !s.NightRestEnabled) return 0;   // przelacznik glowny wylaczony = kary nie dzialaja, dlugu nie ma (jak SpeedPostfix)
             return DebtFor(mp);
+        }
+
+        /// <summary>
+        /// MUSZTRA-j - dlug snu partii O OSTATNIM SWICIE (decyzja Jeffa 09.10 07:10 pkt 2: "noc bez snu = nastepny dzien bez cwiczen", od switu do switu,
+        /// niezaleznie od godziny ticku treningu; gracz i AI tak samo). Czyta TYLKO musztra (Drill.SleepDebt). Gracz - DawnDebt (koniec SettleNight),
+        /// kazda inna partia lorda - ksiega snu AI T10 (AiSleep.DawnDebt, ustawiany w SettleAi). Ta sama ksiega i ten sam dlug co DebtOf (predkosc i morale),
+        /// rozni sie tylko chwila odczytu: splata w ciagu dnia zdejmuje kare marszu od reki, a dzien cwiczen jest juz stracony. 0 w tych samych warunkach
+        /// co DebtOf: wylaczony NightRestEnabled, ksiega AI bez czynnego dlugu (AiDebtLive), a takze w chwili miedzy wlaczeniem dlugu AI w MCM a pierwszym
+        /// tickiem ksiegi (_debtWasOn == false - slownik kar jest wtedy jeszcze pusty, ResetDebts zeruje DawnDebt dopiero w tym ticku).
+        /// UWAGA: czyta slownik ksiegi _ai (zmieniany w ticku godzinowym) - TYLKO z watku glownego (tick treningu partii jest na glownym). Nie wolac
+        /// z predkosci (liczona rownolegle) - ta czyta podmieniany w calosci slownik kar (DebtFor).
+        /// </summary>
+        internal static int DawnDebtOf(MobileParty mp)
+        {
+            if (mp == null) return 0;
+            var s = Settings.Current;
+            if (s == null || !s.NightRestEnabled) return 0;
+            if (mp == MobileParty.MainParty) return DawnDebt;
+            if (!AiDebtLive(s) || _debtWasOn == false) return 0;
+            AiSleep e;
+            return _ai.TryGetValue(mp, out e) && e != null ? e.DawnDebt : 0;
         }
 
         internal static void SpeedPostfix(MobileParty mobileParty, ref ExplainedNumber __result)
@@ -1615,10 +1647,12 @@ namespace Armoury
         // ------------------------------------------------------------ save
         internal static string Export()
         {
+            // MUSZTRA-j: piate pole - dlug o swicie (stary DLL czyta pola 0-3 i piate pomija; napis idzie przez SaveText.Sync - ArmouryBehavior "arm_nightrest")
             return Debt.ToString(CultureInfo.InvariantCulture) + ";" +
                    _restTonight.ToString(CultureInfo.InvariantCulture) + ";" +
                    (_credited ? "1" : "0") + ";" +
-                   CampPromptMode.ToString(CultureInfo.InvariantCulture);
+                   CampPromptMode.ToString(CultureInfo.InvariantCulture) + ";" +
+                   DawnDebt.ToString(CultureInfo.InvariantCulture);
         }
 
         internal static void Import(string data)
@@ -1634,6 +1668,9 @@ namespace Armoury
                 if (parts.Length > 3) int.TryParse(parts[3], NumberStyles.Any, CultureInfo.InvariantCulture, out CampPromptMode);
                 if (CampPromptMode < 0 || CampPromptMode > 2) CampPromptMode = 0;
                 Debt = Math.Max(0, Math.Min(3, Debt));   // stara skala szla do 5 - przytnij
+                // MUSZTRA-j: dlug o swicie z piatego pola; stary zapis (bez pola) - dlug o swicie = dlug (jak ksiega AI: ResolveImport)
+                int dd;
+                DawnDebt = parts.Length > 4 && int.TryParse(parts[4], NumberStyles.Integer, CultureInfo.InvariantCulture, out dd) ? Math.Max(0, Math.Min(3, dd)) : Debt;
             }
             catch { }
         }

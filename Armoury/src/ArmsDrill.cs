@@ -251,7 +251,8 @@ namespace Armoury
             try
             {
                 if (__0 == null) return;
-                // musztra (Drill): nowy wynik B x L x D x S + P przed udzialem uzbrojonych; 0 - nie dotyczy, 1 - AI z baza gry, 2 - Z14a (gracz, rod gracza, armia gracza)
+                // musztra (Drill): nowy wynik B x L x D x S + P przed udzialem uzbrojonych; 0 - nie dotyczy, 1 - AI wedlug jednego wzoru (albo bazy gry przy
+                // wylaczonym DrillLawAi), 2 - Z14a (gracz, rod gracza, armia gracza)
                 int how = Drill.Shape(__0, __1, ref __result);
                 float share = 1f;
                 if (how == 2)
@@ -266,6 +267,8 @@ namespace Armoury
                     share = ShareFor(__0, __1.Character);
                     if (share < 1f && !__0.IsGarrison && __1.Character != null && !__1.Character.IsHero) _pLost += __result.ResultNumber * (1f - share) * __1.Number;
                 }
+                else if (how == 1 && Drill.ElemOffWithGameXp && Gated(__0))
+                    share = ShareFor(__0, __1.Character);   // MUSZTRA-j: dzien kary AI (wynik 0 zostaje 0) - udzial tylko do pomiaru "XP gry po broni" (gra kary nie zna)
                 if (share < 1f) __result = new ExplainedNumber(__result.ResultNumber * share);   // opisy gubimy swiadomie - treningu nikt nie oglada
                 if (how != 0) Drill.Done(__0, __result.ResultNumber, share);
             }

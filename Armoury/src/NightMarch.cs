@@ -63,7 +63,8 @@ namespace Armoury
             public byte State; public long StateStamp = -1;
             public byte AlarmEnd;            // wynik alarmu: 1 ucieczka, 2 spi dalej, 3 inny marsz
             public int NightFlags;           // bity NReason marszu w godzinach obozu tej doby (8 = alarm -> ucieczka)
-            public int DawnDebt;             // poprawka recenzji (P5): dlug zaraz po poprzednim swicie - losy dlugu 1 do nastepnego switu
+            public int DawnDebt;             // poprawka recenzji (P5): dlug zaraz po poprzednim swicie - losy dlugu 1 do nastepnego switu; MUSZTRA-j: kara
+                                             // musztry "noc bez snu = dzien bez cwiczen" (NightRest.DawnDebtOf), w zapisie szoste pole wpisu
             public bool PaidSinceDawn;       // splata od reki od poprzedniego switu
         }
 
@@ -185,8 +186,10 @@ namespace Armoury
 
         // grupa11: hak dla musztry (dawne AiDebtOf) zastapiony jedna funkcja NightRest.DebtOf (NightRest.cs, sekcja kar) - gracz i AI z tej samej
         // ksiegi, ktora zabiera predkosc i morale; musztra wola ja wprost (Drill.SleepDebt), bez haka wpinanego przy starcie.
+        // MUSZTRA-j: musztra czyta juz dlug O SWICIE (NightRest.DawnDebtOf - AiSleep.DawnDebt z SettleAi); DebtOf tylko do linii (kontrola).
 
-        /// <summary>grupa11: ksiega daje AI prawdziwy dlug (przelacznik glowny, oboz swiata, AiSleepDebt, nie na sucho) - tylko do linii startowej musztry.</summary>
+        /// <summary>grupa11: ksiega daje AI prawdziwy dlug (przelacznik glowny, oboz swiata, AiSleepDebt, nie na sucho) - linia startowa musztry i (MUSZTRA-j)
+        /// warunek NightRest.DawnDebtOf.</summary>
         internal static bool AiDebtLive(Settings s) { return s != null && s.NightRestEnabled && DebtOn(s); }
 
         /// <summary>
@@ -1060,7 +1063,8 @@ namespace Armoury
                 Log.Info("NocnyMarsz: gracz o swicie - odpoczynek doby " + F1(rest) + " h (baza " + F1(baza) + ", sen w menu "
                          + (sleeping ? "tak" : "nie") + ", splata od reki w tej dobie " + (credited ? "tak" : "nie")
                          + (enlisted ? ", w sluzbie ROT" : "") + "), dlug przed " + before + ", po " + Debt
-                         + " - wzor (dlug +1, gdy < baza i nie spi; maks. 3): " + (expect == Debt ? "zgodny" : "NIEZGODNY, oczekiwany " + expect) + ".");
+                         + " - wzor (dlug +1, gdy < baza i nie spi; maks. 3): " + (expect == Debt ? "zgodny" : "NIEZGODNY, oczekiwany " + expect)
+                         + "; dlug o swicie (musztra) " + DawnDebt + (DawnDebt == Debt ? "" : " - NIEZGODNY z dlugiem po") + ".");
             }
             catch { }
         }
@@ -1354,27 +1358,30 @@ namespace Armoury
                 {
                     var e = kv.Value;
                     if (kv.Key == null) continue;   // poprawka recenzji: partia chwilowo nieaktywna (rejs BK) tez idzie do zapisu
-                    if (e.Debt > 0 || e.Rest > 0.05f || e.Acc >= 0f || e.Credited) list.Add(kv);
+                    // MUSZTRA-j: takze wpis z samym dlugiem o swicie (dlug splacony w ciagu dnia - dzien cwiczen dalej stracony do nastepnego switu)
+                    if (e.Debt > 0 || e.DawnDebt > 0 || e.Rest > 0.05f || e.Acc >= 0f || e.Credited) list.Add(kv);
                 }
                 list.Sort((a, b) => a.Value.Debt != b.Value.Debt ? b.Value.Debt.CompareTo(a.Value.Debt) : b.Value.Rest.CompareTo(a.Value.Rest));
                 var ci = CultureInfo.InvariantCulture;
                 var sb = new StringBuilder("v1|");
-                int n = 0, debts = 0, sleeps = 0, skipped = 0;
+                int n = 0, debts = 0, sleeps = 0, skipped = 0, dawn = 0;
                 foreach (var kv in list)
                 {
                     if (n >= AiSaveCap) break;
                     string id = kv.Key.StringId;
                     if (string.IsNullOrEmpty(id) || id.IndexOf(':') >= 0 || id.IndexOf(';') >= 0 || id.IndexOf('|') >= 0) { skipped++; continue; }
                     var e = kv.Value;
+                    // MUSZTRA-j: szoste pole - dlug o swicie; format "v1" zostaje (stary DLL czyta pola 0-4 i szoste pomija, nowy czyta je, jesli jest)
                     sb.Append(id).Append(':').Append(e.Debt).Append(':').Append(e.Rest.ToString("0.##", ci)).Append(':')
-                      .Append(e.Credited ? '1' : '0').Append(':').Append(e.Acc.ToString("0.##", ci)).Append(';');
+                      .Append(e.Credited ? '1' : '0').Append(':').Append(e.Acc.ToString("0.##", ci)).Append(':').Append(e.DawnDebt).Append(';');
                     n++;
                     if (e.Debt > 0) debts++;
                     if (e.Acc >= 0f) sleeps++;
+                    if (e.DawnDebt > 0) dawn++;
                 }
                 string str = sb.ToString();
                 if (saving)
-                    Log.Info("NocnyMarsz: zapis ksiegi snu AI - wpisow " + n + " (z dlugiem " + debts + ", w snie ciaglym " + sleeps + "), napis "
+                    Log.Info("NocnyMarsz: zapis ksiegi snu AI - wpisow " + n + " (z dlugiem " + debts + ", z dlugiem o swicie " + dawn + ", w snie ciaglym " + sleeps + "), napis "
                              + str.Length + " zn." + (list.Count - n - skipped > 0 ? ", POMINIETO " + (list.Count - n - skipped) + " (limit " + AiSaveCap
                              + ": najmniejszy dlug i odpoczynek)" : "") + (skipped > 0 ? ", zle id " + skipped : "") + ".");
                 return str;
@@ -1426,7 +1433,7 @@ namespace Armoury
                 if (bar < 0 || data.Substring(0, bar) != "v1") { Log.Info("NocnyMarsz: ksiega snu AI w zapisie w nieznanej wersji - pominieta."); return false; }
                 var ci = CultureInfo.InvariantCulture;
                 double nowH = NowH();
-                int n = 0, missing = 0, bad = 0, sleeps = 0; int[] debts = new int[4];
+                int n = 0, missing = 0, bad = 0, sleeps = 0, dawn = 0, noDawnField = 0; int[] debts = new int[4];
                 foreach (var part in data.Substring(bar + 1).Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries))
                 {
                     var f = part.Split(':');
@@ -1438,12 +1445,16 @@ namespace Armoury
                         || !float.TryParse(f[4], NumberStyles.Float, ci, out a)) { bad++; continue; }
                     // Stamp = -1: pierwsza godzina po wczytaniu liczy sie jako postoj (jak gracz po wczytaniu - _hadPos zerowane w ResetWorld)
                     var e = new AiSleep { Debt = Math.Max(0, Math.Min(3, d)), Rest = Math.Max(0f, r), Credited = f[3] == "1", Acc = a >= 0f ? a : -1f, SinceH = nowH - 48.0 };
-                    e.DawnDebt = e.Debt;
+                    // MUSZTRA-j: dlug o swicie z szostego pola; stary zapis (bez pola) - dlug o swicie = dlug (jak dotad)
+                    int dd;
+                    if (f.Length > 5 && int.TryParse(f[5], NumberStyles.Integer, ci, out dd)) e.DawnDebt = Math.Max(0, Math.Min(3, dd));
+                    else { e.DawnDebt = e.Debt; noDawnField++; }
                     _ai[mp] = e;
-                    n++; debts[e.Debt]++; if (e.Acc >= 0f) sleeps++;
+                    n++; debts[e.Debt]++; if (e.Acc >= 0f) sleeps++; if (e.DawnDebt > 0) dawn++;
                 }
                 _aiImportFresh = true;
                 Log.Info("NocnyMarsz: wczytano ksiege snu AI - wpisow " + n + " (z dlugiem 1/2/3: " + debts[1] + "/" + debts[2] + "/" + debts[3]
+                         + ", z dlugiem o swicie " + dawn + (noDawnField > 0 ? " - stary zapis bez pola u " + noDawnField + ": dlug o swicie = dlug" : "")
                          + ", w snie ciaglym " + sleeps + "; partii juz nie ma " + missing + ", zlych wpisow " + bad
                          + "); partie spoza zapisu bez dlugu, z pelna doba.");
                 return n > 0;

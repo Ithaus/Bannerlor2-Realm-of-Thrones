@@ -21,21 +21,27 @@ using TaleWorlds.ObjectSystem;
 namespace Armoury
 {
     /// <summary>
-    /// MUSZTRA (docs/PROJEKT-MUSZTRA-2026-10-09.md, wersja 2 po krytyce; audyt 13 Z14a, Z14b; decyzje Jeffa 09.10 03:45 pkt 1-2, 04:00 pkt 1-2).
-    /// Doswiadczenie oddzialu partii lorda na czlowieka na dobe: XP = (B x L x D x S + P) x A, a przy glodzie albo dlugu snu XP = 0 (takze perki - "wcale").
-    ///  B - baza gry (10 + 2 x tier; glowa rodu AI 15 + 3 x tier; gracz 10 + 2 x tier - tabela Jeffa); w bitwie 0 jak w grze.
+    /// MUSZTRA (docs/PROJEKT-MUSZTRA-2026-10-09.md, wersja 2 po krytyce; audyt 13 Z14a, Z14b; decyzje Jeffa 09.10 03:45 pkt 1-2, 04:00 pkt 1-2;
+    /// MUSZTRA-j - rozdz. 14 "Jeden wzor", decyzje Jeffa 09.10 07:10 pkt 1-2).
+    /// JEDEN WZOR dla gracza, rodu gracza, lordow AI i glow rodow AI - pod wzor podpinaja sie dane danego lorda (Jeff 07:10: "jest jedna zasada, wzor dla
+    /// wszystkich"). Doswiadczenie oddzialu partii lorda na czlowieka na dobe: XP = (B x L x D x S + P) x A, a w dobie, ktora zaczela sie od switu z dlugiem
+    /// snu, albo przy glodzie XP = 0 (takze perki - "wcale", zapas sie nie zuzywa).
+    ///  B - 10 + 2 x tier dla kazdego (RuleBase) - takze glowy rodu AI: baza glowy rodu gry i BK (15 + 3 x tier) nie dziala; w bitwie 0 jak w grze.
+    ///      Baza gry (GameBase - ten sam predykat co gra i BK) sluzy juz tylko do wydzielenia perkow P z wyniku modelu, do pomiaru "baza gry" i do
+    ///      wylaczonego DrillLawAi (cofniecie: plaski trening gry).
     ///  L - dowodca: Przywodztwo / 170 w granicach 0.5-1.5 (bez dowodcy 0.5).
     ///  D - dzien: 1.5 postoj (mniej niz 4 godziny ruchu z 24), 0.9 marsz. Godzina postoju = RestHour: osada, oboz obleznikow albo ruch <= 0.35 jedn./h
     ///      (czesc wspolna z ksiega snu NightRest.OnHourly i T10 R2 - obie wolaja RestHour od scalenia grupa11; sen dolicza po swojej stronie morze,
     ///      sluzbe ROT i oboz swiata - to zasady snu, nie postoju); godzina niezaobserwowana = ruch (wczytanie nie daje postoju).
-    ///  Dlug snu (kara "niewyspani nie cwicza") - jedno zrodlo prawdy NightRest.DebtOf (grupa11): gracz z jego ksiegi, kazda inna partia lorda
-    ///      z ksiegi snu AI T10 - ten sam dlug, ktory zabiera predkosc i morale.
+    ///  Dlug snu (kara "noc bez snu = nastepny dzien bez cwiczen", Jeff 07:10 pkt 2) - DLUG O OSTATNIM SWICIE, NightRest.DawnDebtOf: gracz z jego
+    ///      ksiegi (DawnDebt ustawiany w SettleNight), kazda inna partia lorda z ksiegi snu AI T10 (AiSleep.DawnDebt, SettleAi) - ten sam dlug, ktory
+    ///      zabiera predkosc i morale; rozni sie tylko chwila odczytu (predkosc i morale - dlug biezacy, dzien cwiczen - swit), niezaleznie od godziny ticku.
     ///  S - zapas do cwiczen: 1 + 0.10 x uB x kB + 0.10 x uZ x kZ; u = zapas / pelny (pelny = sztuka na 3 ludzi), k = 1.5 z perkiem kwatermistrza
     ///      (Giving Hands - bron, Paid in Promise - zbroja).
-    ///  P - perki gry i BK w treningu (wynik modelu ponad baze); A - udzial uzbrojonych z 171 (ArmsDrill).
-    /// Z14a (DrillLaw): partie, ktorym gra nie daje bazy (gracz, rod gracza, lordowie w armii gracza) - cala regula. AI poza Z14a: B x [L x D przy
-    /// DrillLawAi] x [S przy DrillStockAi] + P; kara (XP = 0 przy glodzie albo dlugu snu, takze perki) przy DrillPenaltyAi (domyslnie wlaczona - "takie same
-    /// kary jak gracz", Jeff 09.10 04:00 i ponownie) albo DrillLawAi - niezalezna od pomiaru L x D. Zapas gracza (DrillStock przy DrillLaw i Z1): sprzet
+    ///  P - perki gry i BK w treningu (wynik modelu ponad baze gry); A - udzial uzbrojonych z 171 (ArmsDrill).
+    /// Z14a (DrillLaw): partie, ktorym gra nie daje bazy (gracz, rod gracza, lordowie w armii gracza) - caly wzor. AI poza Z14a: caly wzor przy DrillLawAi
+    /// (Z14b, domyslnie TAK od MUSZTRA-j); wylaczony = plaska baza gry x [S przy DrillStockAi] + P. Kara (XP = 0 przy glodzie albo dlugu o swicie, takze
+    /// perki) przy DrillPenaltyAi (domyslnie wlaczona - "takie same kary jak gracz", Jeff 09.10 04:00 i ponownie) albo DrillLawAi. Zapas gracza (DrillStock przy DrillLaw i Z1): sprzet
     /// wyrzucony na zwyklym ekranie ekwipunku, zostawiony na ekranie lupu gry i trofea Spoils zostawione przy "Leave" (do 2 x pelny na grupe) + nadwyzka
     /// ludzi w zbrojowni DTE; AI: tylko nadwyzka zbrojowni ponad komplet (tabor - lup i zaopatrzenie BK - sie nie liczy, jak sakwy gracza). Zapas zuzywa
     /// sie (sztuka w uzyciu sluzy 200 dni cwiczen), zlom (polowa rudy sztuki) odkupuja kowale miasta przy wizycie, zaplata dla ludzi (AI: trzecia lordowi);
@@ -53,6 +59,8 @@ namespace Armoury
         internal const float RestStep = 0.35f;            // jedna stala dla musztry, ksiegi snu gracza (NightRest.OnHourly) i ksiegi AI T10 R2 (RestMoveLimit)
         private const int RestBelowHours = 4, MenPerPiece = 3, IntakeSets = 2, AllHours = 0xFFFFFF;
         private const int GW = 0, GA = 1;                 // grupy zapasu: bron (z tarczami), zbroje
+        // MUSZTRA-j: doby t1 -> t6 przy bazie wzoru x1 (koszty awansu BK TroopUpgradeXp 3.0: 900/1650/2700/3900/5100, projekt rozdz. 2 i 14.3) - tylko do linii
+        private const double PromoteDays = 900.0 / 12 + 1650.0 / 14 + 2700.0 / 16 + 3900.0 / 18 + 5100.0 / 20;
         internal const int SrcDiscard = 0, SrcLoot = 1, SrcTrophies = 2, SrcAutotest = 3;
         private static readonly string[] SrcName = { "wyrzucone", "lup", "trofea", "autotest" };
 
@@ -83,7 +91,9 @@ namespace Armoury
         {
             internal MobileParty Party; internal double At;
             internal bool Main, NoBase, Rest, Hungry, Sleepless, Zero, Off, StockOn, ArmsGate, PerkW, PerkA, Counted;
+            internal bool ClanHead;                        // MUSZTRA-j: glowa rodu AI, ktorej gra (i BK) daje 15 + 3 x tier - tylko do linii (wzor jej tego nie daje)
             internal int Men, Lead = -1, Moved, Debt, Full, GivenW, GivenA, SurW, SurA;
+            internal int DebtNow;                          // MUSZTRA-j: Debt = dlug o ostatnim swicie (kara); DebtNow = dlug biezacy (predkosc, morale) - tylko do linii
             internal float L = LeadMin, D = MarchDay, S = 1f;
             internal int StockW { get { return GivenW + SurW; } }
             internal int StockA { get { return GivenA + SurA; } }
@@ -91,8 +101,11 @@ namespace Armoury
         private static Ctx _ctx;                           // kontekst partii w biezacym ticku (L, D, S liczone raz na partie)
 
         // element w toku (Shape -> Done; watek glowny)
-        private static bool _e; private static Ctx _eC; private static float _eB, _eP, _ePre, _eGame; private static int _eN; private static CharacterObject _eCh;
+        // _eB - baza naprawde uzyta (wzor albo plaska baza gry), _eGB - baza gry naprawde dana (pomiar), _eRB - baza wzoru (pomiar, takze przy wylaczonym Z14b)
+        private static bool _e, _eNoModel; private static Ctx _eC; private static float _eB, _eGB, _eRB, _eP, _ePre, _eGame; private static int _eN; private static CharacterObject _eCh;
         internal static bool ElemArmsGate { get { return _e && _eC != null && _eC.ArmsGate; } }
+        /// <summary>MUSZTRA-j: dzien kary partii AI (wynik 0) - ArmsDrill liczy udzial uzbrojonych tylko do pomiaru "XP gry po broni" (gra kary nie zna).</summary>
+        internal static bool ElemOffWithGameXp { get { return _e && _eC != null && _eC.Off && !_eC.NoBase && _eGame > 0f; } }
 
         // tick treningu (latka MobilePartyTrainingBehavior.OnDailyTickParty)
         private static bool _tickHooked;
@@ -125,6 +138,11 @@ namespace Armoury
         private static int _aParties, _aMen, _aNoLead, _aFullStock, _aNoStock, _aWornW, _aWornA, _aNoMetal, _aSoldU, _aSoldGold, _aSoldLord, _aSoldPurse, _aOff;
         private static float _aOreAdd, _oreLost;
         private static double _aW, _aWL, _aWD, _aWS, _aWLD, _aWLDS, _aWRest, _aWMarch, _aWHungry, _aWSleep, _aGame, _aRule, _aPenalty, _aWn, _aWLDn;
+        // MUSZTRA-j (jeden wzor): baza wzoru, baza gry glow rodow, perki P, XP po broni "gra" (baza gry + perki, bez kary - jak dzis w grze) i "teraz"
+        // (wynik czynnej regule), ludzio-dni; elementy, w ktorych model nie dal bazy; sen od switu: partie z dlugiem o swicie, w tym splacone przed
+        // treningiem, oraz kontrola "dlug teraz > dlug o swicie" (ma byc 0; wszystkie partie lordow poza graczem)
+        private static double _aRuleBase, _aHeadBase, _aPerks, _aXpGame, _aXpNow, _aManN;
+        private static int _aNoModel, _aSleepDawn, _aSleepPaid, _sleepNowAbove;
         private static readonly double[] _aWT = new double[3];   // razem (z zapasem i dniami kary) przy progu postoju 4 / 8 / 12 h
         private static readonly double[] _aWTn = new double[3];  // dowodca x dzien BEZ zapasu, tylko dni bez kary, przy progu 4 / 8 / 12 h (prog Z14b)
         private static readonly int[] Thresholds = { 4, 8, 12 };
@@ -133,6 +151,7 @@ namespace Armoury
         private sealed class KAcc
         {
             internal string Name; internal int PartyDays; internal double W, WLD, WS, Wn;
+            internal double XpG, XpN, ManN, RB, HB;               // MUSZTRA-j: jak _aXpGame, _aXpNow, _aManN, _aRuleBase, _aHeadBase - wedlug krolestw
             internal readonly double[] WTn = new double[3];       // jak _aWTn - wedlug krolestw
             internal readonly int[] Hb = new int[4];
         }
@@ -157,6 +176,7 @@ namespace Armoury
             _aParties = _aMen = _aNoLead = _aFullStock = _aNoStock = _aWornW = _aWornA = _aNoMetal = _aSoldU = _aSoldGold = _aSoldLord = _aSoldPurse = _aOff = 0;
             _aOreAdd = 0f; _oreLost = 0f;
             _aW = _aWL = _aWD = _aWS = _aWLD = _aWLDS = _aWRest = _aWMarch = _aWHungry = _aWSleep = _aGame = _aRule = _aPenalty = _aWn = _aWLDn = 0;
+            _aRuleBase = _aHeadBase = _aPerks = _aXpGame = _aXpNow = _aManN = 0; _aNoModel = _aSleepDawn = _aSleepPaid = _sleepNowAbove = 0;
             Array.Clear(_aWT, 0, _aWT.Length); Array.Clear(_aWTn, 0, _aWTn.Length); Array.Clear(_hb, 0, _hb.Length); _leads.Clear(); _ticks = 0;
         }
 
@@ -328,19 +348,42 @@ namespace Armoury
             catch (Exception e) { Stumble("NoGameBase", e); return false; }
         }
 
-        private static float BaseOf(MobileParty mp, CharacterObject ch)
+        /// <summary>MUSZTRA-j - B wzoru: 10 + 2 x tier dla kazdego (gracz, rod gracza, lordowie AI i glowy rodow AI - decyzja Jeffa 07:10 pkt 1); bitwe
+        /// (B = 0) rozstrzyga Shape.</summary>
+        private static float RuleBase(CharacterObject ch) { return 10f + 2f * ch.Tier; }
+
+        /// <summary>Glowa rodu wedlug gry: przywodca partii jest przywodca swojego rodu (DefaultPartyTrainingModel.cs:23, BKPartyTrainningModel.cs:43).</summary>
+        private static bool ClanHead(MobileParty mp)
         {
-            int t = ch.Tier;
-            if (mp != MobileParty.MainParty && mp.LeaderHero != null && mp.ActualClan != null && mp.LeaderHero == mp.ActualClan.Leader) return 15f + 3f * t;
-            return 10f + 2f * t;
+            var h = mp != null ? mp.LeaderHero : null;
+            return h != null && mp.ActualClan != null && h == mp.ActualClan.Leader;
         }
 
-        /// <summary>Dlug snu partii z jednego zrodla prawdy (grupa11): NightRest.DebtOf - gracz z jego ksiegi, kazda inna partia lorda (takze doczepiona
-        /// do armii gracza - idzie z nim noca, wiec jej ksiega liczy te same nieprzespane noce) z ksiegi snu AI T10; ten sam dlug zabiera predkosc i morale.</summary>
+        /// <summary>MUSZTRA-j - baza, ktora daje model gry (DefaultPartyTrainingModel.cs:21-29) i BK (BKPartyTrainningModel.cs:41-49), ten sam predykat:
+        /// 0 bez bazy gry (Z14a: armia gracza, rod gracza) i w bitwie; glowa rodu 15 + 3 x tier; reszta 10 + 2 x tier. Wzor tej bazy NIE daje - sluzy tylko
+        /// do wydzielenia perkow P z wyniku modelu, do pomiaru ("baza gry", "glowy rodow") i do wylaczonego DrillLawAi (plaski trening gry).</summary>
+        private static float GameBase(MobileParty mp, CharacterObject ch, bool noBase)
+        {
+            if (noBase || mp.MapEvent != null) return 0f;
+            int t = ch.Tier;
+            return ClanHead(mp) ? 15f + 3f * t : 10f + 2f * t;
+        }
+
+        /// <summary>MUSZTRA-j - dlug snu partii o OSTATNIM SWICIE (decyzja Jeffa 07:10 pkt 2: "noc bez snu = nastepny dzien bez cwiczen", od switu do switu,
+        /// niezaleznie od godziny ticku treningu): NightRest.DawnDebtOf - gracz z jego ksiegi, kazda inna partia lorda (takze doczepiona do armii gracza - idzie
+        /// z nim noca, wiec jej ksiega liczy te same nieprzespane noce) z ksiegi snu AI T10. Ta sama ksiega i ten sam dlug, ktory zabiera predkosc i morale
+        /// (te licza dlug biezacy - splata zdejmuje kare marszu od reki, a dzien cwiczen jest juz stracony).</summary>
         private static int SleepDebt(MobileParty mp)
         {
-            try { return NightRest.DebtOf(mp); }
+            try { return NightRest.DawnDebtOf(mp); }
             catch (Exception e) { Stumble("SleepDebt", e); return 0; }   // blad odczytu = partia bez kary snu - musi byc widac w potknieciach
+        }
+
+        /// <summary>Dlug biezacy (NightRest.DebtOf - predkosc i morale) - tylko do linii: "splacone przed treningiem" i kontrola "teraz > o swicie".</summary>
+        private static int SleepDebtNow(MobileParty mp)
+        {
+            try { return NightRest.DebtOf(mp); }
+            catch (Exception e) { Stumble("SleepDebtNow", e); return 0; }
         }
 
         private static Ctx CtxOf(MobileParty mp, bool noBase, Settings s)
@@ -357,8 +400,10 @@ namespace Armoury
                 c.Moved = MovedHours(mp);
                 c.Rest = c.Moved < RestBelowHours;
                 c.Hungry = mp.Party != null && mp.Party.IsStarving;
-                c.Debt = SleepDebt(mp);
+                c.Debt = SleepDebt(mp);                    // MUSZTRA-j: dlug o ostatnim swicie - o dniu cwiczen decyduje swit
+                c.DebtNow = SleepDebtNow(mp);
                 c.Sleepless = c.Debt >= 1;
+                c.ClanHead = !c.Main && !noBase && ClanHead(mp);
                 c.Zero = c.Hungry || c.Sleepless;
                 c.Off = c.Zero && (c.Main || c.NoBase || PenaltyAi(s));   // kara naprawde zastosowana: Z14a zawsze, AI przy DrillPenaltyAi albo Z14b
                 c.D = c.Zero ? 0f : (c.Rest ? RestDay : MarchDay);
@@ -484,8 +529,10 @@ namespace Armoury
 
         // ------------------------------------------------------------ wynik modelu (ArmsDrill.TrainingPostfix)
         /// <summary>
-        /// Nowy wynik przed udzialem uzbrojonych: 0 - nie dotyczy (171 jak dotad), 1 - AI z baza gry (171 Gated dalej), 2 - Z14a (udzial wedlug
-        /// ElemArmsGate). Wolane z zewnetrznego modelu (ArmsDrill pilnuje _tDepth).
+        /// Nowy wynik przed udzialem uzbrojonych: 0 - nie dotyczy (171 jak dotad), 1 - AI (wedlug jednego wzoru albo plaskiej bazy gry przy wylaczonym
+        /// DrillLawAi; 171 Gated dalej), 2 - Z14a (udzial wedlug ElemArmsGate). Wolane z zewnetrznego modelu (ArmsDrill pilnuje _tDepth).
+        /// MUSZTRA-j: jedna galaz dla wszystkich - XP = B x L x D x S + P (albo 0 w dniu kary). Ktory model (gra czy BK) i z jaka baza policzyl trening,
+        /// nie ma znaczenia: z jego wyniku bierzemy tylko perki P = wynik - baza gry (Z14a: baza gry 0, P = caly wynik - jak dotad).
         /// </summary>
         internal static int Shape(MobileParty mp, TroopRosterElement el, ref ExplainedNumber res)
         {
@@ -502,23 +549,19 @@ namespace Armoury
                 if (Undead.Party(mp)) return 0;
                 var c = CtxOf(mp, noBase, s);
                 float game = res.ResultNumber;
-                float B = mp.MapEvent == null ? BaseOf(mp, ch) : 0f;   // w bitwie gra nie daje bazy
-                float P, pre, sk = c.StockOn ? c.S : 1f;              // S tylko przy czynnym zapasie (gracz StockOn, AI DrillStockAi)
-                if (noBase)
-                {
-                    P = game;                                          // gra nie dala bazy - caly wynik to perki
-                    pre = c.Off ? 0f : B * c.L * c.D * sk + P;
-                }
-                else
-                {
-                    if (game < B - 0.01f) { B = Math.Max(0f, game); P = 0f; }   // model nie dal bazy (wyjatek BK) - nic nie dokladamy
-                    else P = game - B;
-                    float f = (s.DrillLawAi ? c.L * c.D : 1f) * sk;
-                    pre = c.Off ? 0f : B * f + P;                      // kara (glod, dlug snu) przy DrillPenaltyAi albo Z14b - niezalezna od pomiaru L x D
-                }
+                float gb = GameBase(mp, ch, noBase);                   // baza gry (0 / 15 + 3 x tier / 10 + 2 x tier) - tylko do wydzielenia P i pomiaru
+                bool noModel = game < gb - 0.01f;                      // model nie dal bazy (wyjatek BK w TryCatch) - perkow nie ma, nic z niczego
+                float P = noModel ? 0f : game - gb;                    // perki gry i BK
+                float gbGiven = noModel ? Math.Max(0f, game) : gb;     // baza gry naprawde dana (pomiar; plaska regula przy wylaczonym DrillLawAi)
+                float rb = mp.MapEvent == null ? RuleBase(ch) : 0f;    // B wzoru; w bitwie gra nie daje bazy - wzor tez nie
+                bool law = noBase || s.DrillLawAi;                     // Z14a zawsze (DrillLaw sprawdzone wyzej), AI przy Z14b (domyslnie TAK)
+                float B = law ? rb : gbGiven;
+                float sk = c.StockOn ? c.S : 1f;                       // S tylko przy czynnym zapasie (gracz StockOn, AI DrillStockAi)
+                // kara (glod, dlug o swicie): Z14a zawsze, AI przy DrillPenaltyAi albo Z14b - niezalezna od pomiaru L x D (c.Off)
+                float pre = c.Off ? 0f : B * (law ? c.L * c.D : 1f) * sk + P;
                 if (pre < 0f) pre = 0f;
                 if (Math.Abs(pre - game) > 0.0001f) res = new ExplainedNumber(pre);   // opisy gubimy swiadomie (jak 171) - treningu nikt nie oglada
-                _e = true; _eC = c; _eB = B; _eP = P; _ePre = pre; _eGame = game; _eN = el.Number; _eCh = ch;
+                _e = true; _eC = c; _eB = B; _eGB = gbGiven; _eRB = rb; _eNoModel = noModel; _eP = P; _ePre = pre; _eGame = game; _eN = el.Number; _eCh = ch;
                 return noBase ? 2 : 1;
             }
             catch (Exception e) { Stumble("Shape", e); _e = false; return 0; }
@@ -551,18 +594,24 @@ namespace Armoury
                 else if (c.NoBase) _cXp += final * n;
                 else
                 {
-                    _aGame += _eB * n;
+                    _aGame += _eGB * n;                                // baza gry naprawde dana (jak przed MUSZTRA-j)
                     if (c.Off) _aPenalty += _eGame * n;               // XP gry (baza + perki, przed udzialem broni) zabrane kara glodu albo snu
                     else _aRule += (_ePre - _eP) * n;                  // czesc bazowa po czynnej regule (dni bez kary)
-                    if (_eB > 0f)
+                    // MUSZTRA-j: jeden wzor wobec gry - baza wzoru, glowy rodow, perki, XP po broni gra (bez kary, jak dzis w grze) i teraz, ludzio-dni
+                    double xg = _eGame * share * n;
+                    _aRuleBase += _eRB * n; _aPerks += _eP * n; _aXpGame += xg; _aXpNow += final * n; _aManN += n;
+                    if (c.ClanHead) _aHeadBase += _eGB * n;
+                    if (_eNoModel) _aNoModel++;
+                    var k = KOf(mp);
+                    if (k != null) { k.XpG += xg; k.XpN += final * n; k.ManN += n; k.RB += _eRB * n; if (c.ClanHead) k.HB += _eGB * n; }
+                    if (_eGB > 0f)
                     {
-                        double w = _eB * n;
+                        double w = _eGB * n;
                         _aW += w; _aWL += w * c.L; _aWS += w * c.S;
                         float d = c.Zero ? 0f : (c.Rest ? RestDay : MarchDay);
                         _aWD += w * d; _aWLD += w * c.L * d; _aWLDS += w * c.L * d * c.S;
                         for (int i = 0; i < Thresholds.Length; i++) { float dt = c.Zero ? 0f : (c.Moved < Thresholds[i] ? RestDay : MarchDay); _aWT[i] += w * c.L * dt * c.S; }
                         if (c.Hungry) _aWHungry += w; else if (c.Sleepless) _aWSleep += w; else if (c.Rest) _aWRest += w; else _aWMarch += w;
-                        var k = KOf(mp);
                         if (k != null) { k.W += w; k.WLD += w * c.L * d; k.WS += w * c.S; }
                         if (!c.Zero)
                         {
@@ -602,8 +651,10 @@ namespace Armoury
         {
             var mp = c.Party;
             if (c.Main) return;
+            if (c.DebtNow > c.Debt) _sleepNowAbove++;   // MUSZTRA-j kontrola: dlug rosnie tylko o swicie (SettleNight, SettleAi) - ma byc 0
             if (c.NoBase) { _cParties++; _cMen += c.Men; _cL += c.L; if (c.Rest && !c.Zero) _cRest++; if (c.Off) _cOff++; return; }
             _aParties++; _aMen += c.Men; if (c.Off) _aOff++;
+            if (c.Sleepless) { _aSleepDawn++; if (c.DebtNow == 0) _aSleepPaid++; }   // sen od switu; splacone przed treningiem - przed MUSZTRA-j moglyby cwiczyc
             if (c.Lead >= 0) _leads.Add(c.Lead); else _aNoLead++;
             int b = Bucket(c.Moved); _hb[b]++;
             if (c.Full > 0) { if (c.StockW >= c.Full && c.StockA >= c.Full) _aFullStock++; else if (c.StockW + c.StockA == 0) _aNoStock++; }
@@ -665,7 +716,7 @@ namespace Armoury
                         // jedyna wiadomosc w grze o musztrze w zwykly dzien: dzien bez cwiczen (glod albo dlug snu) - inaczej zmiana bylaby niewidoczna
                         if (pc.Off && pc.Men > 0)
                             Log.Player(pc.Hungry ? "Your men were too hungry to drill today - nobody learned anything, training perks included."
-                                                 : "Your men were too tired to drill today after a night without sleep - nobody learned anything, training perks included.", true);
+                                                 : "Your men met the dawn short of sleep - no drill until the next dawn: nobody learned anything today, training perks included.", true);
                     }
                     _pr = null;
                 }
@@ -686,7 +737,7 @@ namespace Armoury
             if (!c.StockOn || c.Men <= 0 || c.Full <= 0 || c.Off) return;   // dzien kary (glod, sen) - nikt nie cwiczy, nic sie nie zuzywa
             var mp = c.Party;
             bool law = c.NoBase || s.DrillLawAi;
-            float dw = law ? c.D : 1f;                     // AI bez Z14b cwiczy plasko jak w grze
+            float dw = law ? c.D : 1f;                     // AI bez Z14b cwiczy plasko jak w grze; od MUSZTRA-j Z14b domyslnie TAK - zuzycie AI x D (1.5 / 0.9)
             if (dw <= 0f) return;
             var a = AccOf(mp, true);
             if (a == null) return;
@@ -1018,8 +1069,11 @@ namespace Armoury
             Log.Info("Musztra: start - ekrany zapasu wpiete " + ((_hookDiscard ? 1 : 0) + (_hookLoot ? 1 : 0)) + "/2 + " + spoils + "; trening gry " + (_tickHooked ? "wpiety" : "NIE WPIETY")
                      + "; Z14a (Drill Law) " + On(s.DrillLaw) + ", bron gracza " + On(s.DrillNeedsArmsPlayer) + ", zapas gracza " + On(s.DrillStock)
                      + (s.DrillStock && !StockOn ? " (NIECZYNNY - wymaga Drill Law i Donation Xp Off)" : "") + ", zapas AI " + On(s.DrillStockAi)
-                     + ", kara AI glod/sen (Drill Penalty Ai) " + On(s.DrillPenaltyAi) + (PenaltyAi(s) ? "" : " - AI cwiczy glodne i niewyspane")
-                     + "; dlug snu z ksiegi NightRest (grupa11, ten sam co kara predkosci i morale): gracz " + On(s.NightRestEnabled)
+                     + ", kara AI glod/sen (Drill Penalty Ai) " + On(s.DrillPenaltyAi) + (PenaltyAi(s) ? (s.DrillPenaltyAi ? "" : " (czynna przez Z14b)") : " - AI cwiczy glodne i niewyspane")
+                     + "; jeden wzor (MUSZTRA-j): " + (s.DrillLawAi ? "baza 10 + 2 x tier dla wszystkich (baza glowy rodu gry/BK 15 + 3 x tier wylaczona), Z14b (Drill Law Ai) TAK"
+                                                   : "Z14b (Drill Law Ai) nie - AI plasko z baza gry (glowa rodu 15 + 3 x tier), wzor tylko u Ciebie i Z14a")
+                     + "; niewyspanie: dlug snu o ostatnim swicie (noc bez snu = dzien bez cwiczen od switu do switu; ta sama ksiega NightRest co kara predkosci"
+                     + " i morale, ktore licza dlug biezacy): gracz " + On(s.NightRestEnabled)
                      + ", AI " + (NightRest.AiDebtLive(s) ? "TAK" : "nie - AI bez dlugu snu (Night Rest / Ai Camps At Night / Ai Sleep Debt, rowne godziny obozu"
                                   + " (Camp Start = Camp End) albo DLL na sucho): lordowie w armii gracza i partie rodu gracza (Z14a) tez bez kary snu w musztrze"
                                   + (s.NightRestEnabled ? ", gracz z kara" : ""))
@@ -1287,7 +1341,7 @@ namespace Armoury
                 {
                     PlayerLine(day, s, w, a, bal);
                     AiLine(day, s);
-                    if (day % 5 == 0) KingdomLine(day);
+                    if (day % 5 == 0) KingdomLine(day, s);
                 }
             }
             catch (Exception e) { Stumble("Daily", e); }
@@ -1314,7 +1368,7 @@ namespace Armoury
                 double aMen = r.N > 0 ? r.ShN / r.N : 1;           // A niezaleznie: udzial uzbrojonych z 171 wazony liczba ludzi (nie Fin/Pre)
                 double check = c.Off ? 0 : (prod + r.P) * aMen;    // kontrola przyblizona: A rozne w oddzialach, wiec +-kilka %
                 sb.Append("ludzi ").Append(c.Men).Append("; B ").Append(F1(r.B)).Append(" x dowodca ").Append(F3(c.L)).Append(" (Przywodztwo ").Append(c.Lead).Append(") x dzien ")
-                  .Append(F2(c.D)).Append(" (").Append(c.Hungry ? "GLOD - bez cwiczen" : (c.Sleepless ? "DLUG SNU " + c.Debt + " - bez cwiczen" : (c.Rest ? "postoj" : "marsz")))
+                  .Append(F2(c.D)).Append(" (").Append(c.Hungry ? "GLOD - bez cwiczen" : (c.Sleepless ? "DLUG SNU O SWICIE " + c.Debt + ", teraz " + c.DebtNow + " - bez cwiczen" : (c.Rest ? "postoj" : "marsz")))
                   .Append(", ruch ").Append(c.Moved).Append(" h z 24) x zapas ").Append(F3(sk)).Append(" = ").Append(F1(prod));
                 if (c.Off) sb.Append("; perki P ").Append(F1(r.P)).Append(" -> 0 (glod/sen - perki tez 0)");
                 else sb.Append("; + perki P ").Append(F1(r.P)).Append(" = ").Append(F1(r.Pre));
@@ -1362,7 +1416,7 @@ namespace Armoury
             var sb = new StringBuilder("Musztra AI: dzien ").Append(day).Append(" - partii ").Append(_aParties).Append(", ludzi ").Append(_aMen)
               .Append("; wazone baza gry (").Append(((long)_aW).ToString(inv)).Append(" XP): dowodca ").Append(X(_aWL, _aW)).Append(" (Przywodztwo ").Append(lead)
               .Append(", bez dowodcy ").Append(_aNoLead).Append("), dzien ").Append(X(_aWD, _aW)).Append(" (postoj ").Append(Pct(_aWRest, _aW)).Append(", marsz ").Append(Pct(_aWMarch, _aW))
-              .Append(", glod ").Append(Pct(_aWHungry, _aW)).Append(", sen ").Append(Pct(_aWSleep, _aW)).Append("), dowodca x dzien ").Append(X(_aWLD, _aW))
+              .Append(", glod ").Append(Pct(_aWHungry, _aW)).Append(", sen od switu ").Append(Pct(_aWSleep, _aW)).Append("), dowodca x dzien ").Append(X(_aWLD, _aW))
               .Append(s.DrillLawAi ? " (Z14b CZYNNA)" : " (Z14b WYLACZONA - pomiar)").Append("; zapas ").Append(X(_aWS, _aW)).Append(s.DrillStockAi ? " (CZYNNY" : " (wylaczony - pomiar")
               .Append("; pelny u ").Append(_aFullStock).Append(" partii, pusty u ").Append(_aNoStock).Append("); razem ").Append(X(_aWLDS, _aW))
               .Append("; razem przy progu postoju 4/8/12 h: ").Append(X(_aWT[0], _aW)).Append('/').Append(X(_aWT[1], _aW)).Append('/').Append(X(_aWT[2], _aW))
@@ -1371,8 +1425,18 @@ namespace Armoury
               .Append("; godziny ruchu w dobie (partie): 0 h ").Append(_hb[0]).Append(", 1-3 h ").Append(_hb[1]).Append(", 4-11 h ").Append(_hb[2]).Append(", 12+ h ").Append(_hb[3])
               .Append("; kara glod/sen ").Append(PenaltyAi(s) ? "CZYNNA" : "WYLACZONA").Append(" (partii bez cwiczen ").Append(_aOff).Append(", zabrane XP gry ")
               .Append(((long)_aPenalty).ToString(inv)).Append(")")
-              .Append("; XP: baza gry ").Append(((long)_aGame).ToString(inv)).Append(", po czynnej regule (dni bez kary, czesc bazowa) ").Append(((long)_aRule).ToString(inv))
-              .Append("; zuzyto ").Append(_aWornW + _aWornA).Append(" szt. (bron ").Append(_aWornW).Append(", zbroje ").Append(_aWornA).Append("; bez metalu ").Append(_aNoMetal)
+              .Append("; XP: baza gry ").Append(((long)_aGame).ToString(inv)).Append(", po czynnej regule (dni bez kary, czesc bazowa) ").Append(((long)_aRule).ToString(inv));
+            // MUSZTRA-j: jeden wzor wobec gry (po segmencie "XP:" - wczesniejsze segmenty bez zmian, porownywalne z kopia-grupa11)
+            string now = s.DrillLawAi ? "wzor" : "czynna regula (Z14b wylaczona)";
+            sb.Append("; JEDEN WZOR: baza wzoru 10 + 2 x tier ").Append(((long)_aRuleBase).ToString(inv)).Append(" (").Append(X(_aRuleBase, _aGame))
+              .Append(" bazy gry; glowy rodow ").Append(Pct(_aHeadBase, _aGame)).Append(" bazy gry), perki P ").Append(((long)_aPerks).ToString(inv))
+              .Append(", model bez bazy (elementy) ").Append(_aNoModel)
+              .Append("; XP po broni (171): gra ").Append(((long)_aXpGame).ToString(inv)).Append(" -> ").Append(now).Append(' ').Append(((long)_aXpNow).ToString(inv))
+              .Append(" (").Append(X(_aXpNow, _aXpGame)).Append("), na glowe na dobe gra ").Append(_aManN > 0 ? F1(_aXpGame / _aManN) : "-").Append(" -> ")
+              .Append(_aManN > 0 ? F1(_aXpNow / _aManN) : "-").Append(" (ludzio-dni ").Append(((long)_aManN).ToString(inv)).Append(")")
+              .Append("; sen od switu: partii ").Append(_aSleepDawn).Append(" (w tym splacone przed treningiem ").Append(_aSleepPaid)
+              .Append(" - dawniej moglyby cwiczyc), dlug teraz > dlug o swicie (takze Z14a) ").Append(_sleepNowAbove).Append(_sleepNowAbove > 0 ? " - BLAD (ma byc 0)" : "");
+            sb.Append("; zuzyto ").Append(_aWornW + _aWornA).Append(" szt. (bron ").Append(_aWornW).Append(", zbroje ").Append(_aWornA).Append("; bez metalu ").Append(_aNoMetal)
               .Append("), zlom +").Append(F1(_aOreAdd)).Append(" rudy, czeka razem ").Append(F1(ore)).Append(", sprzedano ").Append(_aSoldU).Append(" ladunkow za ").Append(_aSoldGold)
               .Append(" d (lordowie ").Append(_aSoldLord).Append(", sakiewki ").Append(_aSoldPurse).Append("), przepadlo z rozbitymi ").Append(F1(_oreLost))
               .Append("; potkniecia ").Append(_stumbles).Append("; koszt ").Append((_ticks * 1000.0 / Stopwatch.Frequency).ToString("0.0", inv))
@@ -1380,9 +1444,11 @@ namespace Armoury
             Log.Info(sb.ToString());
         }
 
-        /// <summary>Co 5 dob: wedlug krolestw - "dowodca x dzien" i zapas z ostatnich dob, godziny ruchu, oraz stan armii AI dzis (sredni tier, t3+, konni).</summary>
-        private static void KingdomLine(int day)
+        /// <summary>Co 5 dob: wedlug krolestw - "dowodca x dzien" i zapas z ostatnich dob, godziny ruchu, oraz stan armii AI dzis (sredni tier, t3+, konni);
+        /// MUSZTRA-j: XP na glowe na dobe gra -> wzor, glowy rodow, t1 -> t6 przy tym tempie (z dob od ostatniej linii).</summary>
+        private static void KingdomLine(int day, Settings s)
         {
+            string now = s.DrillLawAi ? "wzor" : "czynna regula";
             var men = new Dictionary<string, long[]>();   // id -> [ludzi, suma tierow, t3+, konni, partii]
             var names = new Dictionary<string, string>();
             foreach (var mp in MobileParty.AllLordParties)
@@ -1422,9 +1488,21 @@ namespace Armoury
                   .Append(", prog Z14b (bez zapasu, dni bez kary) 4/8/12 h: ").Append(k != null ? X(k.WTn[0], k.Wn) + "/" + X(k.WTn[1], k.Wn) + "/" + X(k.WTn[2], k.Wn) : "-");
                 if (k != null) sb.Append(", godziny ruchu 0/1-3/4-11/12+: ").Append(k.Hb[0]).Append('/').Append(k.Hb[1]).Append('/').Append(k.Hb[2]).Append('/').Append(k.Hb[3]);
                 sb.Append(", sredni tier ").Append(v[0] > 0 ? F2(v[1] / (double)v[0]) : "-").Append(", t3+ ").Append(Pct(v[2], v[0])).Append(", konni ").Append(Pct(v[3], v[0]));
+                // MUSZTRA-j (po "konni" - wczesniejsze pola bez zmian): XP na glowe na dobe po broni gra -> wzor, udzial glow rodow w bazie gry, t1 -> t6 przy tym tempie
+                if (k != null && k.ManN > 0)
+                    sb.Append(", XP na glowe na dobe (po broni) gra ").Append(F1(k.XpG / k.ManN)).Append(" -> ").Append(now).Append(' ').Append(F1(k.XpN / k.ManN))
+                      .Append(" (").Append(X(k.XpN, k.XpG)).Append("), glowy rodow ").Append(Pct(k.HB, k.W)).Append(" bazy gry, t1->t6 przy tym tempie gra ")
+                      .Append(Days(k.XpG, k.RB)).Append(" -> ").Append(now).Append(' ').Append(Days(k.XpN, k.RB)).Append(" dob");
             }
             Log.Info(sb.ToString());
             _k.Clear();
+        }
+
+        /// <summary>MUSZTRA-j: doby t1 -> t6 przy tempie "XP / baza wzoru" (koszty BK, PromoteDays; z perkami i udzialem broni, bez bitew).</summary>
+        private static string Days(double xp, double ruleBase)
+        {
+            if (xp <= 0 || ruleBase <= 0) return "-";
+            return (PromoteDays / (xp / ruleBase)).ToString("0", CultureInfo.InvariantCulture);
         }
     }
 }

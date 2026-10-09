@@ -2564,7 +2564,7 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public bool AiNightMarchByReason { get; set; } = true;
 
-        [SettingPropertyBool("Ai Sleep Debt", HintText = "AI lord parties keep the same sleep ledger as you: a day without the base hours of rest (Sleep Hours Needed) costs speed and morale (-25/-40/-90% and -25/-40/-95%) and the day's drill (Drill Penalty Ai) until slept off; one night owed means making camp at 20:00 until the world breaks camp, two or more means sleeping where they stand until paid; off = the ledger is only counted in the log")]
+        [SettingPropertyBool("Ai Sleep Debt", HintText = "AI lord parties keep the same sleep ledger as you: a day without the base hours of rest (Sleep Hours Needed) costs speed and morale (-25/-40/-90% and -25/-40/-95%) until slept off, and a dawn met with that debt costs their men's drill until the next dawn (Drill Penalty Ai, Drill Law Ai); one night owed means making camp at 20:00 until the world breaks camp, two or more means sleeping where they stand until paid; off = the ledger is only counted in the log")]
         [SettingPropertyGroup("A night's rest")]
         public bool AiSleepDebt { get; set; } = true;
 
@@ -2920,7 +2920,7 @@ namespace Armoury
         [SettingPropertyGroup("Arming the garrisons")]
         public bool ArmsCoverageLog { get; set; } = true;
 
-        [SettingPropertyBool("Drill Law", HintText = "your men drill every day out of battle, and so do your clan's parties and lords in your army (the game gave them no daily drill): x1.5 on a day of rest (moved in fewer than 4 of the last 24 hours - an hour in a settlement, in a siege camp or barely moving rests, as for sleep), x0.9 on the march, not at all when starving or short of sleep (training perks included); the pace follows the commander's Leadership (170 = normal, from half to one and a half). Off = as before")]
+        [SettingPropertyBool("Drill Law", HintText = "your men drill every day out of battle, and so do your clan's parties and lords in your army (the game gave them no daily drill), by the one rule every lord's party follows: each man learns 10 + 2 x his tier a day, x1.5 on a day of rest (moved in fewer than 4 of the last 24 hours - an hour in a settlement, in a siege camp or barely moving rests, as for sleep), x0.9 on the march, not at all when starving or after a night without sleep (they met the dawn with sleep debt - no drill until the next dawn; training perks included); the pace follows the commander's Leadership (170 = normal, from half to one and a half). Off = as before")]
         [SettingPropertyGroup("Drill")]
         public bool DrillLaw { get; set; } = true;
 
@@ -2936,13 +2936,13 @@ namespace Armoury
         [SettingPropertyGroup("Drill")]
         public bool DrillStockAi { get; set; } = true;
 
-        [SettingPropertyBool("Drill Penalty Ai", HintText = "AI lords' men do not drill at all on a day they are starving or short of sleep (training perks included, and no drill gear wears out) - the same penalty as your men's with Drill Law on (with Drill Law off your men drill by the game's rule, and hunger or lack of sleep takes nothing from them); short of sleep means the same sleep debt that costs them speed and morale (Ai Sleep Debt), so without the AI sleep ledger (Ai Camps At Night off, equal camp hours or Ai Sleep Debt off) no lord loses drill for want of sleep - not even your clan's parties and the lords in your army - while you still do (off = AI drill whatever their state)")]
+        [SettingPropertyBool("Drill Penalty Ai", HintText = "AI lords' men do not drill at all on a day they are starving or after a night without sleep (they met the dawn with sleep debt - no drill until the next dawn; training perks included, and no drill gear wears out) - the same penalty as your men's with Drill Law on (with Drill Law off your men drill by the game's rule, and hunger or lack of sleep takes nothing from them); the sleep debt is the same one that costs them speed and morale (Ai Sleep Debt), so without the AI sleep ledger (Ai Camps At Night off, equal camp hours or Ai Sleep Debt off) no lord loses drill for want of sleep - not even your clan's parties and the lords in your army - while you still do. With Drill Law Ai on the penalty applies anyway, as part of the rule (off = AI drill whatever their state, only while Drill Law Ai is off)")]
         [SettingPropertyGroup("Drill")]
         public bool DrillPenaltyAi { get; set; } = true;
 
-        [SettingPropertyBool("Drill Law Ai", HintText = "AI lords' parties drill by the same rule as yours - commander's Leadership, rest or march, no drill when starving or short of sleep - instead of the game's flat daily training; off until measured: the log shows every day what it would change (off = the game's rule; the starving and sleep penalty follows Drill Penalty Ai)")]
+        [SettingPropertyBool("Drill Law Ai", HintText = "AI lords' parties drill by the same rule as yours - base 10 + 2 x tier for every lord, clan leaders included (the game gives a clan leader's men 15 + 3 x tier), the commander's Leadership, rest or march, no drill after a night without sleep (sleep debt at dawn - until the next dawn) or when starving; training perks on top as in the game. Off = the game's flat daily training, with the clan leader's bonus (the starving and sleep penalty then follows Drill Penalty Ai)")]
         [SettingPropertyGroup("Drill")]
-        public bool DrillLawAi { get; set; } = false;
+        public bool DrillLawAi { get; set; } = true;
 
         [SettingPropertyBool("Drill Log", HintText = "daily drill lines in Armoury.log: your men's experience today and its parts, the drill stock, and the AI measurement (log only)")]
         [SettingPropertyGroup("Drill")]
