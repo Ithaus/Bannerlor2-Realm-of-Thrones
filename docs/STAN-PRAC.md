@@ -949,3 +949,9 @@ planie; bezwzgledne wyzej niz rachunek) - OSTRZEZENIE kontroli w logu CS; do spr
 **DECYZJA JEFFA 09.10 ok. 13:50 (bron wedlug tieru, tor S):** TAK - wymog broni bialej, tarcz i broni rzucanej DOKLADNIE (tier-1) x 35, takze w dol (koniec wymogow ROT
 bez zwiazku z tierem, np. drzewce t3 = 140); luki, kusze, proce i amunicja - tylko w gore jak dotad. CS w-toku/175-armie-cs (W1). Do nastepnego wgrania (z krokiem A etapu 2);
 po tescie sprawdzic srednie Polnocy (cel 130/135) i balans kultur.
+**WGRANIE 12 (09.10 ok. 15:30 zegara komp.; stala zgoda Jeffa):** Armoury 1cc7890a (noc/sklad10 d3e749e = sklad9 + etap 2 krok A: 169c pomiary etapu 2 i D staly, 2.6 powinnosci
+bez przerwanej petli, 2.14 okup gracza do porywacza / kurier bez dosypki), CrashScribe d68532a6 (w-toku/175-armie-cs 02d3584 = b54a245 + W1 bron biala/tarcze/rzucana wedlug tieru
+dokladnie (30 broni obnizonych) + E1b pokoj z biedy (wniosek tylko od chetnego pana, staly dzien tygodnia, bez niszczenia krolestw bez lenn)). Poprzednie: *.bak-2026-10-09-przed-noc12
++ D:\Backup-Bannerlord\wgrane\2026-10-09-noc12-przed. Testy: nowa kampania 40 dob OK (14.1-14.2 s, 0 bledow, harness okupu 2b/2c OK), zapis 9 dob OK (26.2 s). E1b: 0 wnioskow
+z biedy (biedne krolestwa w wojnach fabularnych ROT - pomijane wedlug T9); gra sama 14 wnioskow o pokoj w 9 dobach. Polnoc nadal 138/134 - przyczyna: bron skladana (np.
+vlandia_lance_1_t3 = tier 5) poza zamiana 175 -> W2 w toku. ZATWIERDZONE OD TERAZ: Armoury 1cc7890a, CrashScribe d68532a6.
