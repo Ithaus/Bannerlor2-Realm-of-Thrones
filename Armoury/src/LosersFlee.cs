@@ -125,7 +125,7 @@ namespace Armoury
             _keyKind.Clear(); _keyTroop.Clear(); _battleHome.Clear(); _poolHome.Clear(); _poolHomeDay = -1;
             _lawHome.Clear(); _lawHomeDay = -1; _wallHomes = null; _wallDay = -1;
             _homes = null; _homeOf = null; _homesDay = -1;
-            _bkTried = false; _popMgr = null; _getPopData = null; _fromSoldiers = null; _updateType = null; _typeCount = null; _isRetinue = null; _totalPop = null; _serfs = null; _nobles = null;
+            _bkTried = false; _popMgr = null; _getPopData = null; _fromSoldiers = null; _updateType = null; _typeCount = null; _isRetinue = null; _totalPop = null; _serfs = null; _nobles = null; _slavesT = null;
             _lastWorldPop = -1; _ownersLogged = false; _csvPath = null; _cur = null;
             _errCalc = _errApply = _errHome = _errPost = false;
         }
@@ -194,7 +194,7 @@ namespace Armoury
 
         // ------------------------------------------------------------ ludnosc BK (refleksja - wzor Levy.Resolve / PopulationLaw)
         private static bool _bkTried;
-        private static object _popMgr, _serfs, _nobles;
+        private static object _popMgr, _serfs, _nobles, _slavesT;
         private static MethodInfo _getPopData, _fromSoldiers, _updateType, _typeCount, _isRetinue;
         private static PropertyInfo _totalPop;
 
@@ -217,7 +217,7 @@ namespace Armoury
                 _updateType = AccessTools.Method(pdT, "UpdatePopType");
                 _typeCount = AccessTools.Method(pdT, "GetTypeCount");
                 var popT = _updateType != null ? _updateType.GetParameters()[0].ParameterType : null;
-                if (popT != null && popT.IsEnum) { _serfs = Enum.Parse(popT, "Serfs"); _nobles = Enum.Parse(popT, "Nobles"); }
+                if (popT != null && popT.IsEnum) { _serfs = Enum.Parse(popT, "Serfs"); _nobles = Enum.Parse(popT, "Nobles"); _slavesT = Enum.Parse(popT, "Slaves"); }
                 var helpT = AccessTools.TypeByName("BannerKings.Utils.Helpers");
                 _isRetinue = helpT != null ? AccessTools.Method(helpT, "IsRetinueTroop", new[] { typeof(CharacterObject) }) : null;
                 return _totalPop != null;
@@ -511,6 +511,28 @@ namespace Armoury
                 _stumbleHome++;
                 if (!_errHome) { _errHome = true; Log.Error("LosersFlee.ToWall", e); }
                 return 0;
+            }
+        }
+
+        /// <summary>
+        /// I1 (uwaga przegladu): n niewolnikow do ludnosci BK osady st - to samo, co BK SendOffPrisoners przy polityce Enslavement
+        /// (PopulationData.UpdatePopType(Slaves, n)), ale kazdy czlowiek RAZ: BK liczy Helpers.GetRosterCount = Number + WoundedNumber,
+        /// a Number juz zawiera rannych. Zwraca, ilu dopisano (0 - osada bez danych BK, BK tez nic); -1 - nie da sie (wolajacy oddaje
+        /// sprawe BK, jak dotad).
+        /// </summary>
+        internal static int AddSlaves(Settlement st, int n)
+        {
+            if (st == null || n <= 0) return 0;                  // BK z liczba 0 dzieli przez zero (StateSlaves) - nic do dopisania
+            if (!BkResolve() || _updateType == null || _slavesT == null) return -1;
+            object pd;
+            try { pd = _getPopData.Invoke(_popMgr, new object[] { st }); } catch { return -1; }
+            if (pd == null) return 0;
+            int before = TypeCount(pd, _slavesT);
+            try { _updateType.Invoke(pd, new object[] { _slavesT, n, false }); return n; }
+            catch
+            {
+                int d = TypeCount(pd, _slavesT) - before;       // wyjatek po dopisaniu (most BK do innej ekonomii) - BK nie moze dopisac drugi raz
+                return d > 0 ? d : -1;
             }
         }
 

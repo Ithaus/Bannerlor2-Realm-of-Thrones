@@ -25,6 +25,8 @@ namespace Armoury
     ///    (sprzedajacy MainParty, kupujacy null), wiec ludzie znikaja.
     ///  - BKPartyBehavior.AddPatrolBehavior: patrol BK z garnizonu ("Patrol from X") wraca do domu - jency zawsze niewolnikami osady.
     ///  - Wypuszczenie przez gracza (ekran oddzialu, EndCaptivityAction.ApplyByReleasedByChoice) - szeregowi znikaja.
+    ///  - Ekran Aftermath po bitwie gracza: jency i uwolnieni, ktorych gracz nie wzial, znikaja (PlayerEncounter czysci listy).
+    ///  - BK przy Enslavement dopisuje Number + WoundedNumber - ranni (juz w Number) drugi raz, z niczego.
     ///
     /// Teraz, w krainie BEZ niewoli (kultura osady / regionu spoza listy LosersFlee.SlaveCulture - jedna lista z H3):
     ///  - Westeros bez Zelaznych Wysp: przestepca (zawod Bandit albo kultura bandycka - bandyci, wyrzutki z band) idzie na Mur:
@@ -34,8 +36,10 @@ namespace Armoury
     ///    Yi Ti) wraca do domu jedna funkcja pochodzenia H3 (LosersFlee.SendHome, zrodlo SrcLaw): dom = najblizsza miejscu osada
     ///    kultury jenca; zolnierz -> ludnosc BK tej osady, prosty czlowiek -> hearth jej regionu, straz karawan "z szablonu";
     ///    czego dom nie przyjal - do puli wyrzutkow regionu miejsca (prawo wyrzutkow wylaczone - licznik "znikneli").
-    /// Gracz wybral w swojej osadzie polityke "Execution" - BK jak dotad (straceni, licznik). W krainie z niewola wszystko bez zmian
-    /// (licznik K). NIE ruszamy: polityki karnej BK (lojalnosc, bezpieczenstwo, cena niewolnika), zlota za jencow (164b), rabunku BK
+    /// Ekran Aftermath (prefiks na PlayerEncounter.OnPlayerLootMembersAndPrisonerEnd): zostawieni jency jak wypuszczeni przez gracza,
+    /// zostawieni ludzie (uwolnieni jency pokonanych) - wolni, do domu.
+    /// Gracz wybral w swojej osadzie polityke "Execution" - BK jak dotad (straceni, licznik). W krainie z niewola bez zmian (licznik K),
+    /// tylko niewolnikow ze sprzedazy (Enslavement) dopisujemy sami, kazdego raz (LosersFlee.AddSlaves). NIE ruszamy: polityki karnej BK (lojalnosc, bezpieczenstwo, cena niewolnika), zlota za jencow (164b), rabunku BK
     /// (BKRaidCaptureBehavior), jencow bohaterow. Zapisu nie ma (liczniki dnia + suma sesji).
     /// </summary>
     internal static class PrisonerLaw
@@ -47,20 +51,29 @@ namespace Armoury
             { "battania", "river", "reach", "aserai", "vlandia", "vale", "stormlands", "crownlands", "dragonstone", "nightswatch", "skagosi" };
 
         private const int LandNone = -1, LandSlave = 0, LandWesteros = 1, LandFree = 2;
-        // zrodla: sprzedaz w warowni (partie AI, loch osady, rozwiazanie, patrol gry), sprzedaz gracza, patrol BK, wypuszczeni przez gracza
-        private const int SSale = 0, SPlayerSale = 1, SPatrolBk = 2, SRelease = 3, Ss = 4;
-        private static readonly string[] SName = { "sprzedaz w warowni (partie AI, lochy)", "sprzedaz gracza", "patrol BK", "wypuszczeni przez gracza" };
+        // zrodla: sprzedaz w warowni (partie AI, loch osady, rozwiazanie, patrol gry), sprzedaz gracza, patrol BK, wypuszczeni przez gracza,
+        // jency zostawieni po bitwie gracza (ekran Aftermath: nie wzieci i wypuszczeni tam), uwolnieni jency pokonanych, ktorych gracz nie wzial
+        private const int SSale = 0, SPlayerSale = 1, SPatrolBk = 2, SRelease = 3, SLoot = 4, SLootFreed = 5, Ss = 6;
+        private static readonly string[] SName = { "sprzedaz w warowni (partie AI, lochy)", "sprzedaz gracza", "patrol BK", "wypuszczeni przez gracza",
+                                                   "jency zostawieni po bitwie gracza", "uwolnieni po bitwie gracza (nie wzieci)" };
 
         // liczniki doby
         private static readonly int[] _in = new int[Ss];
         private static int _westeros, _freeOther, _home, _homeBk, _homeVillage, _homeTpl, _wall, _wallMissing, _pool, _vanished, _undead, _executed;
         private static int _slaves, _slavesPatrol, _slaveOther, _slavePlayer, _slaveReleased, _stumbles;
+        // uwaga przegladu: ranni sprzedani w niewole policzeni raz (BK dopisywal ich drugi raz z niczego); BK po staremu (nie dalo sie dopisac samemu)
+        private static int _woundedOnce, _slavesBkOld, _slavesBkOldWounded;
+        // bitwa gracza: wypuszczeni na ekranie Aftermath (OnPrisonerReleasedEvent pominiety - ci sami ludzie sa w lewej liscie, liczy LootEndPrefix)
+        private static int _lootRelSkipped;
         private static readonly Dictionary<string, int> _wallBy = new Dictionary<string, int>();
         private static readonly Dictionary<string, int> _slavesBy = new Dictionary<string, int>();
         // suma sesji
         private static long _totHome, _totWall, _totSlaves;
         private static long _ticks;                                              // czas Route (doba)
-        private static bool _err, _salePatched, _patrolPatched;
+        private static bool _err, _salePatched, _patrolPatched, _lootPatched;
+        // PartyScreenLogic.PartyScreenClosedEvent (pole zdarzenia) - rozpoznanie ekranu Aftermath bitwy gracza
+        private static FieldInfo _closedEvt;
+        private const string LootEndName = "OnPlayerLootMembersAndPrisonerEnd";
 
         // polityka karna BK (refleksja; BK tworzy nowy PolicyManager przy kazdej grze - Reset)
         private static bool _polTried;
@@ -81,6 +94,7 @@ namespace Armoury
             Array.Clear(_in, 0, Ss);
             _westeros = _freeOther = _home = _homeBk = _homeVillage = _homeTpl = _wall = _wallMissing = _pool = _vanished = _undead = _executed = 0;
             _slaves = _slavesPatrol = _slaveOther = _slavePlayer = _slaveReleased = _stumbles = 0;
+            _woundedOnce = _slavesBkOld = _slavesBkOldWounded = _lootRelSkipped = 0;
             _wallBy.Clear(); _slavesBy.Clear();
             _ticks = 0;
         }
@@ -122,13 +136,16 @@ namespace Armoury
             catch { return null; }
         }
 
-        private static int Regulars(TroopRoster r)
+        private static int Regulars(TroopRoster r) { int w; return Regulars(r, out w); }
+
+        /// <summary>Szeregowi listy (Number - juz z rannymi); wounded - ilu z nich rannych (BK GetRosterCount dodaje ich drugi raz).</summary>
+        private static int Regulars(TroopRoster r, out int wounded)
         {
-            int n = 0;
+            int n = 0; wounded = 0;
             for (int i = 0; i < r.Count; i++)
             {
                 var e = r.GetElementCopyAtIndex(i);
-                if (e.Character != null && !e.Character.IsHero && e.Number > 0) n += e.Number;
+                if (e.Character != null && !e.Character.IsHero && e.Number > 0) { n += e.Number; wounded += e.WoundedNumber; }
             }
             return n;
         }
@@ -150,7 +167,8 @@ namespace Armoury
                 _in[src] += n;
                 if (westeros) _westeros += n; else _freeOther += n;
                 if (Undead.Character(troop)) { _undead += n; return; }          // wight - z niczego, do niczego (jak H3)
-                if (westeros && Criminal(troop))
+                // bandyta przy WYLACZONYM prawie wyrzutkow jest "z szablonu" gry (H3 SendHome pkt 2a) - nie dopisujemy go na Murze z niczego
+                if (westeros && Criminal(troop) && (OutlawLaw.On || troop.Occupation != Occupation.Bandit))
                 {
                     Settlement wall;
                     int w = LosersFlee.ToWall(troop, n, pos, out wall);
@@ -194,7 +212,7 @@ namespace Armoury
         public static bool SendOffPrefix(TroopRoster __0, Settlement __1)
         {
             if (!On || __0 == null) return true;
-            Settlement st; bool player = false; int land; string pol;
+            Settlement st; bool player = false, done = false; int land; string pol;
             try
             {
                 st = __1;
@@ -210,15 +228,23 @@ namespace Armoury
                 if (land == LandNone) return true;
                 if (land == LandSlave)
                 {
-                    int n = Regulars(__0);
-                    if (player) _slavePlayer += n;                                  // BK bez osady - znikaja jak dotad
-                    else
+                    int w;
+                    int n = Regulars(__0, out w);
+                    if (player) { _slavePlayer += n; return true; }                 // BK bez osady - znikaja jak dotad
+                    pol = Policy(st);
+                    if (pol != "Enslavement") { _slaveOther += n; return true; }    // osada gracza z inna polityka / nieodczytana - BK jak dotad
+                    // niewolnicy dopisani przez nas, kazdy czlowiek raz (BK: Number + WoundedNumber - ranni drugi raz z niczego)
+                    int got = LosersFlee.AddSlaves(st, n);
+                    if (got < 0)
                     {
-                        pol = Policy(st);
-                        if (pol == null || pol == "Enslavement") { _slaves += n; _totSlaves += n; AddBy(_slavesBy, st.Culture.StringId, n); }
-                        else _slaveOther += n;                                      // osada gracza z inna polityka - BK jak dotad
+                        _slaves += n + w; _totSlaves += n + w; _slavesBkOld += n + w; _slavesBkOldWounded += w;   // BK po staremu - liczymy jak BK
+                        AddBy(_slavesBy, st.Culture.StringId, n + w);
+                        return true;
                     }
-                    return true;
+                    done = true;                                                    // dopisani - BK nie moze drugi raz, nawet po bledzie nizej
+                    _slaves += got; _totSlaves += got; _woundedOnce += w;
+                    AddBy(_slavesBy, st.Culture.StringId, got);
+                    return false;
                 }
                 if (!player && Policy(st) == "Execution") { _executed += Regulars(__0); return true; }   // wybor gracza w jego osadzie
             }
@@ -226,7 +252,7 @@ namespace Armoury
             {
                 _stumbles++;
                 if (!_err) { _err = true; Log.Error("PrisonerLaw.SendOffPrefix", e); }
-                return true;                                                        // nic jeszcze nie zrobione - BK jak dotad
+                return !done;                                                       // nic jeszcze nie zrobione - BK jak dotad
             }
             // od tej chwili ludzie juz ida do domu - BK nie moze ich dopisac drugi raz (Route ma wlasny try na kazdy typ)
             var pos = st.GetPosition2D;
@@ -290,12 +316,8 @@ namespace Armoury
             if (!On || roster == null) return;
             try
             {
-                var mp = MobileParty.MainParty;
-                if (mp == null) return;
-                var st = mp.CurrentSettlement;
-                Vec2 pos = st != null ? st.GetPosition2D : mp.GetPosition2D;
-                var landSt = st ?? OutlawLaw.RegionAt(pos);
-                int land = Land(landSt);
+                Vec2 pos;
+                int land = PlayerLand(out pos);
                 var counts = new Dictionary<CharacterObject, int>();
                 foreach (var el in roster)
                 {
@@ -303,7 +325,10 @@ namespace Armoury
                     if (t == null || t.IsHero) continue;
                     int v; counts.TryGetValue(t, out v); counts[t] = v + 1;
                 }
-                if (counts.Count == 0 || land == LandNone) return;
+                if (counts.Count == 0) return;
+                // ekran Aftermath bitwy gracza: wypuszczeni tam laduja w lewej liscie jencow, ktora LootEndPrefix oddaje w calosci - tu nie (bez dubla)
+                if (EncounterLootOpen()) { _lootRelSkipped += counts.Values.Sum(); return; }
+                if (land == LandNone) return;
                 if (land == LandSlave) { _slaveReleased += counts.Values.Sum(); return; }   // jak dotad - znikaja
                 bool wes = land == LandWesteros;
                 foreach (var kv in counts) Route(kv.Key, kv.Value, pos, wes, SRelease);
@@ -313,6 +338,109 @@ namespace Armoury
                 _stumbles++;
                 if (!_err) { _err = true; Log.Error("PrisonerLaw.OnReleased", e); }
             }
+        }
+
+        /// <summary>Kraina gracza: osada, w ktorej stoi, albo region jego miejsca na mapie; pos - punkt.</summary>
+        private static int PlayerLand(out Vec2 pos)
+        {
+            pos = Vec2.Zero;
+            var mp = MobileParty.MainParty;
+            if (mp == null) return LandNone;
+            var st = mp.CurrentSettlement;
+            pos = st != null ? st.GetPosition2D : mp.GetPosition2D;
+            return Land(st ?? OutlawLaw.RegionAt(pos));
+        }
+
+        /// <summary>Otwarty ekran Aftermath bitwy gracza (tryb Loot, zamkniecie -> PlayerEncounter.OnPlayerLootMembersAndPrisonerEnd).
+        /// Inne ekrany Loot (karawany, wsie, BK) - nie: ich wypuszczonych liczy OnReleased jak dotad.</summary>
+        private static bool EncounterLootOpen()
+        {
+            if (!_lootPatched || _closedEvt == null) return false;
+            try
+            {
+                var gsm = Game.Current != null ? Game.Current.GameStateManager : null;
+                var ps = gsm != null ? gsm.ActiveState as TaleWorlds.CampaignSystem.GameState.PartyState : null;
+                if (ps == null || ps.PartyScreenMode != Helpers.PartyScreenHelper.PartyScreenMode.Loot || ps.PartyScreenLogic == null) return false;
+                var d = _closedEvt.GetValue(ps.PartyScreenLogic) as Delegate;
+                if (d == null) return false;
+                foreach (var x in d.GetInvocationList()) if (x.Method != null && x.Method.Name == LootEndName) return true;
+                return false;
+            }
+            catch { _stumbles++; return false; }
+        }
+
+        /// <summary>
+        /// Prefiks na PlayerEncounter.OnPlayerLootMembersAndPrisonerEnd(leftOwnerParty, leftMemberRoster __1, leftPrisonRoster __2, ...)
+        /// - zamkniecie ekranu Aftermath po bitwie gracza; zaraz potem gra czysci obie lewe listy (ludzie w nicosc). Lewa lista jencow
+        /// (nie wzieci + wypuszczeni na tym ekranie; po Anuluj - stan poczatkowy) - jak wypuszczeni przez gracza (Route, kraina miejsca);
+        /// lewa lista ludzi (uwolnieni jency pokonanych i odprawieni tam wlasni) - wolni, do domu wedlug kultury (SendHome SrcLaw: dom
+        /// liczony od punktu, pamiec H3 bitwy _battleHome nalezy do innej bitwy), bez Muru i bez niewoli. Ludzie H3 (rozbici, uwolnieni
+        /// bez odbiorcy) zeszli z list przed tym ekranem - zbiory rozlaczne, takze z paczka F (przegrani uchodza przy bitwie gracza).
+        /// </summary>
+        public static void LootEndPrefix(TroopRoster __1, TroopRoster __2)
+        {
+            if (!On) return;
+            try
+            {
+                Vec2 pos;
+                int land = PlayerLand(out pos);
+                if (__2 != null && land != LandNone)
+                {
+                    bool wes = land == LandWesteros;
+                    for (int i = 0; i < __2.Count; i++)
+                    {
+                        var e = __2.GetElementCopyAtIndex(i);
+                        if (e.Character == null || e.Character.IsHero || e.Number <= 0) continue;
+                        if (land == LandSlave) { _in[SLoot] += e.Number; _slaveReleased += e.Number; continue; }   // jak wypuszczeni - znikaja jak dotad
+                        Route(e.Character, e.Number, pos, wes, SLoot);
+                    }
+                }
+                if (__1 != null)
+                {
+                    for (int i = 0; i < __1.Count; i++)
+                    {
+                        var e = __1.GetElementCopyAtIndex(i);
+                        if (e.Character == null || e.Character.IsHero || e.Number <= 0) continue;
+                        Free(e.Character, e.Number, pos);
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                _stumbles++;
+                if (!_err) { _err = true; Log.Error("PrisonerLaw.LootEndPrefix", e); }
+            }
+        }
+
+        /// <summary>Wolny czlowiek zostawiony po bitwie gracza: do domu (H3 SendHome), bez domu - do puli wyrzutkow miejsca.</summary>
+        private static void Free(CharacterObject troop, int n, Vec2 pos)
+        {
+            long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
+            try
+            {
+                _in[SLootFreed] += n;
+                if (Undead.Character(troop)) { _undead += n; return; }
+                int cat;
+                int got = LosersFlee.SendHome(null, troop, n, pos, null, LosersFlee.SrcLaw, out cat);
+                if (got > 0)
+                {
+                    _home += got; _totHome += got;
+                    if (cat == LosersFlee.CatBk) _homeBk += got; else if (cat == LosersFlee.CatTemplate) _homeTpl += got; else _homeVillage += got;
+                }
+                int left = n - got;
+                if (left > 0)
+                {
+                    var region = OutlawLaw.PoolRegionAt(pos);
+                    if (OutlawLaw.On && region != null) { OutlawLaw.PoolAdd(region, troop, left); _pool += left; }
+                    else _vanished += left;
+                }
+            }
+            catch (Exception e)
+            {
+                _stumbles++;
+                if (!_err) { _err = true; Log.Error("PrisonerLaw.Free", e); }
+            }
+            finally { _ticks += System.Diagnostics.Stopwatch.GetTimestamp() - t0; }
         }
 
         // ------------------------------------------------------------ log
@@ -345,11 +473,15 @@ namespace Armoury
                 for (int i = 0; i < Ss; i++) sb.Append(i == 0 ? " " : ", ").Append(SName[i]).Append(' ').Append(_in[i]);
                 sb.Append(" | Westeros ").Append(_westeros).Append(", inne krainy bez niewoli ").Append(_freeOther);
                 sb.Append(" | krainy z niewola: niewolnikow ").Append(_slaves).Append(" (z patroli BK ").Append(_slavesPatrol).Append("; ").Append(Join(_slavesBy)).Append(')')
-                  .Append(", inna polityka BK (osady gracza) ").Append(_slaveOther)
+                  .Append(", w tym ranni policzeni raz ").Append(_woundedOnce).Append(" (BK dopisywal ich drugi raz z niczego)")
+                  .Append(", BK po staremu (nie dalo sie dopisac samemu) ").Append(_slavesBkOld).Append(" (ranni dwa razy ").Append(_slavesBkOldWounded).Append(')')
+                  .Append(", inna albo nieodczytana polityka BK (osady gracza) ").Append(_slaveOther)
                   .Append(", sprzedaz gracza - BK bez osady (znikaja jak dotad) ").Append(_slavePlayer)
-                  .Append(", wypuszczeni przez gracza (znikaja jak dotad) ").Append(_slaveReleased);
+                  .Append(", wypuszczeni przez gracza i zostawieni po jego bitwie (znikaja jak dotad) ").Append(_slaveReleased);
+                sb.Append(" | Aftermath: wypuszczeni tam (liczeni w \"jency zostawieni po bitwie gracza\", nie w \"wypuszczeni przez gracza\") ").Append(_lootRelSkipped);
                 sb.Append(" | sesja: do domu ").Append(_totHome).Append(", na Mur ").Append(_totWall).Append(", niewolnikow ").Append(_totSlaves);
-                sb.Append(" | latki: sprzedaz ").Append(_salePatched ? "tak" : "NIE").Append(", patrol BK ").Append(_patrolPatched ? "tak" : "NIE");
+                sb.Append(" | latki: sprzedaz ").Append(_salePatched ? "tak" : "NIE").Append(", patrol BK ").Append(_patrolPatched ? "tak" : "NIE")
+                  .Append(", Aftermath bitwy gracza ").Append(_lootPatched ? "tak" : "NIE");
                 sb.Append(" | potkniecia ").Append(_stumbles).Append(" | czas ").Append((_ticks * 1000.0 / System.Diagnostics.Stopwatch.Frequency).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)).Append(" ms.");
                 Log.Info(sb.ToString());
             }
@@ -389,7 +521,25 @@ namespace Armoury
                 else patrol = "patrol BK: BRAK METODY AddPatrolBehavior - jency patroli BK niewolnikami jak dotad";
             }
             catch (Exception e) { patrol = "patrol BK: blad (" + e.Message + ")"; }
-            Log.Info("Prawo jenca (I1): " + sale + "; " + patrol + "; wypuszczeni przez gracza - nasluch OnPrisonerReleasedEvent. Westeros bez niewoli: "
+            string loot;
+            try
+            {
+                // obie rzeczy albo nic: bez rozpoznania ekranu Aftermath OnReleased i ten prefiks liczylyby wypuszczonych tam dwa razy
+                _closedEvt = AccessTools.Field(typeof(TaleWorlds.CampaignSystem.Party.PartyScreenLogic), "PartyScreenClosedEvent");
+                var t = AccessTools.TypeByName("TaleWorlds.CampaignSystem.Encounters.PlayerEncounter");
+                var m = t != null ? AccessTools.Method(t, LootEndName) : null;
+                var ps = m != null ? m.GetParameters() : null;
+                if (_closedEvt != null && typeof(Delegate).IsAssignableFrom(_closedEvt.FieldType) && m != null && !m.IsStatic && ps.Length == 7
+                    && ps[1].ParameterType == typeof(TroopRoster) && ps[2].ParameterType == typeof(TroopRoster))
+                {
+                    h.Patch(m, prefix: new HarmonyMethod(typeof(PrisonerLaw), nameof(LootEndPrefix)));
+                    _lootPatched = true;
+                    loot = "Aftermath bitwy gracza (PlayerEncounter." + LootEndName + ") wpiety";
+                }
+                else loot = "Aftermath bitwy gracza: BRAK METODY albo pola zdarzenia - zostawieni tam znikaja jak dotad";
+            }
+            catch (Exception e) { loot = "Aftermath bitwy gracza: blad (" + e.Message + ")"; }
+            Log.Info("Prawo jenca (I1): " + sale + "; " + patrol + "; " + loot + "; wypuszczeni przez gracza - nasluch OnPrisonerReleasedEvent. Westeros bez niewoli: "
                      + string.Join(", ", WesterosIds.ToArray()) + "; krainy z niewola - lista H3 (LosersFlee.SlaveCulture); reszta bez niewoli, przestepcy tylko z Westeros na Mur.");
         }
     }
