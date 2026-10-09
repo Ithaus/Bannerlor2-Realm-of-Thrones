@@ -928,3 +928,7 @@ rodzaj z tieru, ktory udzwignie); podnoszenie Luku/Kuszy - nie. Na galeziach 175
 XML ROT: helmy 140, suknie 175-200 znikaja); prawo tieru pancerza wylaczone (0); ladry - Jazda; bohaterowie bez podnoszenia (HeroSkillToOwnGear OFF) - lordowie zostaja soba.
 Zrobione szybko (bez workflow - Jeff: "nie mozesz tego szybciej sprawdzic"): CS d85b519, Armoury ffb6cef na galeziach 175 (nowe klucze ArmourKgPerAthletics/ArmourTierAthletics,
 bo Armoury.json Jeffa ma stare 0.25/35). DLL SCRATCH test\Armoury-z16b.dll, CrashScribe-at-z16b.dll. Wejdzie w WGRANIE 11 (sklad9).
+**ZASADA PRACY (Jeff 09.10 ok. 12:45 - "madre ocenianie pracy i przydzial zasobow bez utraty jakosci"):** kazde zadanie dostaje tor wedlug RYZYKA:
+S (liczby, progi, teksty, male poprawki - sam + autotest, minuty), M (nowa mechanika w 1 obszarze, blad o nieznanej przyczynie - 1 workflow: krotkie rozpoznanie, kod,
+1 recenzja, autotest, ok. 1 h), L (paczki calej ekonomii - pelny lancuch z krytykami i testem 120 dob). Dane przed decyzja, bez powtarzania badan, eskalacja przy ryzyku,
+zadnego wgrania bez autotestu, tor i czas mowione Jeffowi na starcie. (Pamiec: jeff-zasada-doboru-glebokosci-pracy.)
