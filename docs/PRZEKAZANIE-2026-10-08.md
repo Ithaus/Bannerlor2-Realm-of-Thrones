@@ -191,3 +191,10 @@ dana faze od nowa, korzystajac z zapisanych wynikow:
   oczekiwane do czasu 165/166/168. NOWE: trybut/reparacje 11 mln w 120 dob (do 1.68 mln naraz), placilo 14 z 25 bankrutow, niedobor -> DebtToKingdom w nicosc.
   Inni oblegali Mur od doby 55 (44 doby; Mur trzyma) - straznik T2 nie przerywa oblezen zaczetych przez ROT/SAI.
 - 21:06 workflow `wf_f5c29c01-5a9`: T2c (Inni bez oblezen zamknietych celow przed terminem; drzewo noc\n11, galaz w-toku/n11-mur) + badanie trybutu.
+- 21:25 **AUTOTEST 171+172 sama** (analiza SCRATCH nowej sesji a171\, kopia171\): 171 dziala (bez zapisu 0 zamiast ~970/d, 969 zamowien zamkow, zalogi 92% broni),
+  172 robi strzaly z drewna/rudy, 0 bledow - ALE NIEZALICZONE progi: pokrycie partii (korpus 50%, tarcze 23%, strzaly 43%), rynek nowej kampanii pustoszeje (zbroja
+  korpusu do 0 ok. doby 48), karawany trzymaja 81-95% amunicji (BK: strzaly = towar handlowy), polowa miast bez strzal, awanse lucznikow cofniete 66-88%,
+  ruda waskim gardlem. **171/172 NIE WGRYWANE** - do decyzji Jeffa (karawany a strzaly; skala produkcji). S4 (sklad3 = stos + 171 + 172) 40 dob OK technicznie
+  (15.7 s/dobe - wolny start kampanii), test zapisu S4 w toku tylko jako informacja.
+- H3 gotowe (galaz w-toku/n9-przegrani-uchodza 9a793f0, GitHub); KIESA LUDU projekt: docs/PROJEKT-KIESA-LUDU-2026-10-09.md (numer paczki 173 - 172 zajety przez strzaly).
+- Plan: H3 sam 40 dob -> sklad4 = sklad2 + H3 + 169b + T2c -> test -> wgranie 4.
