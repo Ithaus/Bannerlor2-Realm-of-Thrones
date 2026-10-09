@@ -1512,6 +1512,14 @@ namespace Armoury
         [SettingPropertyGroup("Workshops")]
         public float TownCraftHandsPerArmsHand { get; set; } = 2f;
 
+        [SettingPropertyBool("Town Fletchers Enabled", HintText = "the town's own fletchers and arrowsmiths, in every town: arrows and bolts made from the ore and wood on their own town's stalls (the same recipe arms workshops use - the iron heads, the shafts, the charcoal of the bloomery and the forge; feathers, glue and thread are counted in the work), one quiver at a time, after the town's workshops have taken their share, whenever the quiver fetches enough to pay for its material, the work and a master's profit (Workshop Min Profit Percent) at today's prices; no coin changes hands - from stall to stall of the same town; lords buy them there. While on, workshops no longer make arrows out of thin air, townsfolk no longer eat them off the stalls and Banner Kings' party supplies no longer buy and burn them for AI parties (the player's own workshops and party as before). Needs Historical Prices")]
+        [SettingPropertyGroup("Workshops")]
+        public bool TownFletchersEnabled { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Town Fletcher Hands Per Arms Hand", 0.00f, 1.20f, "0.00", HintText = "hands of a town's fletchers and arrowsmiths for each hand of its arms craftsmen (Workshop Prosperity Per Hand) - about 850 man-days a day for the world, some 280 quivers of 30 at full work; enough for the rearming of the first months, later many stand idle when the stalls are full (England 1340-1360: the crown alone bought 65,000 arrows a year); 0 = off, arrows as before")]
+        [SettingPropertyGroup("Workshops")]
+        public float TownFletcherHandsPerArmsHand { get; set; } = 0.3f;
+
         [SettingPropertyFloatingInteger("Workshop Sell Share", 0.00f, 3.60f, "0.00", HintText = "a craftsman sells his wares at the market price buyers pay, less this merchant's cut (0.9 = he keeps 90%); with the maker's profit of 25% built into worth, at a normal price he earns 1.125x his cost")]
         [SettingPropertyGroup("Workshops")]
         public float WorkshopSellShare { get; set; } = 0.9f;
@@ -1736,9 +1744,9 @@ namespace Armoury
         [SettingPropertyGroup("Iron bank")]
         public bool ColdStartEnabled { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Cold Start Market Days", 0.00f, 56.00f, "0.00", HintText = "new campaign only: how many days of the town craftsmen's work lie on the stalls at the start (mostly common gear of the town's culture)")]
+        [SettingPropertyFloatingInteger("Cold Start Market Days", 0.00f, 240.00f, "0.00", HintText = "new campaign only: how many days of the town craftsmen's work lie on the stalls at the start (mostly common gear of the town's culture); two months of stock, because recruits no longer bring a second kit from thin air")]
         [SettingPropertyGroup("Iron bank")]
-        public float ColdStartMarketDays { get; set; } = 14f;
+        public float ColdStartMarketDays { get; set; } = 60f;
 
         [SettingPropertyBool("Historical Prices Enabled", HintText = "the whole world in historical prices (1 coin = 1 medieval penny): arms and armour priced from their real making cost, smithing materials at medieval prices - wages and incomes already sit at this scale")]
         [SettingPropertyGroup("Iron bank")]
@@ -2796,6 +2804,66 @@ namespace Armoury
         [SettingPropertyGroup("Map villages")]
         public bool VillageTipHeldBy { get; set; } = true;
 
+        [SettingPropertyBool("Rot Swap Same Man", HintText = "when Realm of Thrones turns a lord's new recruit into a man of the lord's house, it is still the same man: he keeps the kit he came with and no second kit appears from thin air (off = the swap is treated as a new man from nowhere: what he owns, or a full kit when Recruit Brings What He Has is off)")]
+        [SettingPropertyGroup("Arming the garrisons")]
+        public bool RotSwapSameMan { get; set; } = true;
+
+        [SettingPropertyBool("Recruit Brings What He Has", HintText = "an AI recruit whose gear nobody bought - a hireling from a tavern, a volunteer without a record, a man from the roads - brings only what he owns at home (the gear of his line's first rank that his troop also wears; a hireling also his own horse), a captive brings nothing; his lord buys the rest at a market (off = as before: a full kit of his troop from thin air)")]
+        [SettingPropertyGroup("Arming the garrisons")]
+        public bool RecruitBringsWhatHeHas { get; set; } = true;
+
+        [SettingPropertyBool("Fresh Volunteer Kit", HintText = "a volunteer who appears above the first rank (a noble youth) has his notable buy his key gear on the town market, as for a promotion; if the stall or the purse fails, he keeps what he owns and still waits in the pool (off = as before: no record, his kit is decided at recruitment)")]
+        [SettingPropertyGroup("Arming the garrisons")]
+        public bool FreshVolunteerKit { get; set; } = true;
+
+        [SettingPropertyBool("House Levies Keep Kit", HintText = "when House Levies makes a noble volunteer a man of the house that owns the land, the gear recorded for him goes with him (off = the record is lost and the notable sells the gear)")]
+        [SettingPropertyGroup("Arming the garrisons")]
+        public bool HouseLeviesKeepKit { get; set; } = true;
+
+        [SettingPropertyBool("Volunteer Kit Castles", HintText = "castle volunteers (Banner Kings) rise to a better troop only with the gear their notable buys, like volunteers of towns and villages (off = as before: castle promotions cost nothing)")]
+        [SettingPropertyGroup("Arming the garrisons")]
+        public bool VolunteerKitCastles { get; set; } = true;
+
+        [SettingPropertyBool("Garrison Recruit Keeps Kit", HintText = "a volunteer the garrison takes in by auto-recruitment brings his gear into the garrison's armoury - what his notable bought for him, or his own belongings (off = as before: the garrison gets nothing and the notable sells his gear)")]
+        [SettingPropertyGroup("Arming the garrisons")]
+        public bool GarrisonRecruitKeepsKit { get; set; } = true;
+
+        [SettingPropertyBool("Garrison Gear From Town", HintText = "a castle's garrison buys what its men lack in the town its villages trade with: the lord of the castle pays that town, the goods leave its stalls and reach the castle by cart in the days the road takes; arms are no longer shipped to castles by traders (horses still are) and lords buy arms only in towns (off = as before: the garrison buys from the castle's own stall)")]
+        [SettingPropertyGroup("Arming the garrisons")]
+        public bool GarrisonGearFromTown { get; set; } = true;
+
+        [SettingPropertyInteger("Garrison Order Days", 0, 12, "0", HintText = "a castle sends an order for arms to its market town at most once in this many days; one order covers all those days (their pieces and their share of the lord's purse); what lies on the castle's own stall it buys every day")]
+        [SettingPropertyGroup("Arming the garrisons")]
+        public int GarrisonOrderDays { get; set; } = 3;
+
+        [SettingPropertyBool("Garrison Armory Survives Save", HintText = "garrison armouries are kept in the save game: Dynamic Troop Equipment does not save them, so after every load all garrisons stood empty and their lords bought all their arms again")]
+        [SettingPropertyGroup("Arming the garrisons")]
+        public bool GarrisonArmorySurvivesSave { get; set; } = true;
+
+        [SettingPropertyBool("Garrison Armory Restore Old Save", HintText = "the first time a save made before this change is loaded, the AI garrisons get back the kit of their men that Dynamic Troop Equipment failed to save - once, instead of their lords buying it all again (off = they stand empty and their lords buy)")]
+        [SettingPropertyGroup("Arming the garrisons")]
+        public bool GarrisonArmoryRestoreOldSave { get; set; } = true;
+
+        [SettingPropertyBool("Kit Moves With Men", HintText = "when a lord leaves men in a garrison or takes men from it, or a disbanded party joins a garrison, the men's arms go with them; men of a disbanded party who go home take their own kit and the spare is sold for their house (off = as before: men move without their arms)")]
+        [SettingPropertyGroup("Arming the garrisons")]
+        public bool KitMovesWithMen { get; set; } = true;
+
+        [SettingPropertyBool("Garrison Sells Surplus", HintText = "once a week a garrison sells the arms it holds beyond what its men wear (and a tenth spare) to the stall of its own town or castle, at the merchant's buying price; the coin goes to the lord of the place (AI garrisons; yours only with Garrison Buys Gear Player)")]
+        [SettingPropertyGroup("Arming the garrisons")]
+        public bool GarrisonSellsSurplus { get; set; } = true;
+
+        [SettingPropertyBool("Garrison Drill Needs Arms", HintText = "a garrison's daily drill (training fields, drills) teaches only the men who have a weapon of their kind and grade in the armoury - the experience is scaled by the share of armed men (AI garrisons; yours only with Garrison Buys Gear Player; only while AI lords and garrisons buy their gear)")]
+        [SettingPropertyGroup("Arming the garrisons")]
+        public bool GarrisonDrillNeedsArms { get; set; } = true;
+
+        [SettingPropertyBool("Party Drill Needs Arms", HintText = "an AI lord's daily training of his men needs weapons: each troop's experience is scaled by the share of its men who have a weapon of their kind and grade in the armoury - men with nothing fit for their rank promote slower (only while AI lords buy their gear)")]
+        [SettingPropertyGroup("Arming the garrisons")]
+        public bool PartyDrillNeedsArms { get; set; } = true;
+
+        [SettingPropertyBool("Arms Coverage Log", HintText = "every fifth day write a line to the log: how much of the arms and armour AI parties and garrisons need is in their armouries")]
+        [SettingPropertyGroup("Arming the garrisons")]
+        public bool ArmsCoverageLog { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -3173,6 +3241,8 @@ namespace Armoury
             s.ArtisanTanWeavePerCycle = ArtisanTanWeavePerCycle;
             s.TownCraftsEnabled = TownCraftsEnabled;
             s.TownCraftHandsPerArmsHand = TownCraftHandsPerArmsHand;
+            s.TownFletchersEnabled = TownFletchersEnabled;
+            s.TownFletcherHandsPerArmsHand = TownFletcherHandsPerArmsHand;
             s.WorkshopSellShare = WorkshopSellShare;
             s.GuildShareTailor = GuildShareTailor;
             s.GuildShareArmourer = GuildShareArmourer;
@@ -3494,6 +3564,21 @@ namespace Armoury
             s.MapVillageNamesOnHover = MapVillageNamesOnHover;
             s.MillOnBank = MillOnBank;
             s.VillageTipHeldBy = VillageTipHeldBy;
+            s.RotSwapSameMan = RotSwapSameMan;
+            s.RecruitBringsWhatHeHas = RecruitBringsWhatHeHas;
+            s.FreshVolunteerKit = FreshVolunteerKit;
+            s.HouseLeviesKeepKit = HouseLeviesKeepKit;
+            s.VolunteerKitCastles = VolunteerKitCastles;
+            s.GarrisonRecruitKeepsKit = GarrisonRecruitKeepsKit;
+            s.GarrisonGearFromTown = GarrisonGearFromTown;
+            s.GarrisonOrderDays = GarrisonOrderDays;
+            s.GarrisonArmorySurvivesSave = GarrisonArmorySurvivesSave;
+            s.GarrisonArmoryRestoreOldSave = GarrisonArmoryRestoreOldSave;
+            s.KitMovesWithMen = KitMovesWithMen;
+            s.GarrisonSellsSurplus = GarrisonSellsSurplus;
+            s.GarrisonDrillNeedsArms = GarrisonDrillNeedsArms;
+            s.PartyDrillNeedsArms = PartyDrillNeedsArms;
+            s.ArmsCoverageLog = ArmsCoverageLog;
         }
 
         internal static void Apply()

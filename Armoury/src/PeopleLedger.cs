@@ -61,7 +61,8 @@ namespace Armoury
         private static readonly Dictionary<string, int> _killedIn = new Dictionary<string, int>(), _recruitedIn = new Dictionary<string, int>();
         private static int _fights, _wounded, _routed;
         private static int _rNotableParty, _rNotableOther, _rTavern, _rNoPlace, _rPlayer, _rLed, _desLord, _desOther;
-        private static int _stumbles;              // potkniecia nasluchow - liczymy, nie gasimy
+        private static int _rRotEcho;              // 171 A1: echo werbunku ROT (ten sam czlowiek) - nie liczony jako nowy
+        private static int _stumbles;             // potkniecia nasluchow - liczymy, nie gasimy
         // T4: odczyt dla WarLedger (pomiar przed/po, tylko czyta)
         internal static int DesertedLordToday { get { return _desLord; } }
         internal static int StumblesToday { get { return _stumbles; } }
@@ -77,6 +78,7 @@ namespace Armoury
             Array.Clear(_killed, 0, Kinds); _killedIn.Clear(); _recruitedIn.Clear();
             _fights = _wounded = _routed = 0;
             _rNotableParty = _rNotableOther = _rTavern = _rNoPlace = _rPlayer = _rLed = _desLord = _desOther = 0;
+            _rRotEcho = 0;
             _stumbles = 0;
         }
 
@@ -139,6 +141,7 @@ namespace Armoury
         {
             try
             {
+                if (RecruitSources.IsRotEcho(settlement, source)) { _rRotEcho += amount; return; }   // 171 A1: ten sam czlowiek, zmiana oznaki - nie nowy werbunek
                 if (amount <= 0) return;
                 if (recruiter != null && recruiter == Hero.MainHero) _rPlayer += amount;
                 else if (source != null) { if (recruiter != null) _rNotableParty += amount; else _rNotableOther += amount; }
@@ -355,6 +358,7 @@ namespace Armoury
                   .Append("; zwerbowani ").Append(recruited).Append(" (od notabli do partii rodow ").Append(_rNotableParty)
                   .Append(", od notabli bez wodza - garnizony, karawany ").Append(_rNotableOther).Append(", z karczmy ").Append(_rTavern)
                   .Append(", bez osady - jency albo ochotnicy z mapy ").Append(_rNoPlace).Append(", gracz ").Append(_rPlayer)
+                  .Append(", duplikaty ROT (ten sam czlowiek, nie liczeni) ").Append(_rRotEcho)
                   .Append("); dezercja ").Append(_desLord + _desOther).Append(" (partie rodow ").Append(_desLord).Append(')');
                 if (_haveLast)
                 {

@@ -32,9 +32,10 @@ namespace Armoury
         internal static bool On { get { var s = Settings.Current; return s != null && s.VolunteerKitEnabled; } }
 
         private static int _bought, _reverted, _gold, _pieces, _extraMissing, _dayStamp = -1;
+        private static int _castleBought, _castleReverted, _castleFresh;   // 171 A4: zamki BK (tylko licznik)
         private static readonly Dictionary<Settlement, Settlement> _market = new Dictionary<Settlement, Settlement>();
 
-        internal static void Reset() { SupplyDemand.ResetOrders(); _market.Clear(); _bought = _reverted = _gold = _pieces = _extraMissing = 0; _dayStamp = -1; }
+        internal static void Reset() { SupplyDemand.ResetOrders(); _market.Clear(); _bought = _reverted = _gold = _pieces = _extraMissing = 0; _castleBought = _castleReverted = _castleFresh = 0; _dayStamp = -1; }
 
         public static void Prefix(Settlement settlement, out Dictionary<Hero, CharacterObject[]> __state)
         {
@@ -42,6 +43,7 @@ namespace Armoury
             try
             {
                 if (!On || settlement == null) return;
+                if (settlement.IsCastle && !Settings.Current.VolunteerKitCastles) return;   // 171 A4: zamki BK - wylacznik (jak dotad: awanse za darmo)
                 __state = new Dictionary<Hero, CharacterObject[]>();
                 foreach (var n in settlement.Notables)
                     if (n != null && n.VolunteerTypes != null) __state[n] = (CharacterObject[])n.VolunteerTypes.Clone();
@@ -52,11 +54,16 @@ namespace Armoury
         public static void Postfix(Settlement settlement, Dictionary<Hero, CharacterObject[]> __state)
         {
             if (__state == null) return;
+            // 171 (krytyka 5): tylko w trwajacej grze - przy tworzeniu kampanii gra napelnia pule raz dla kazdej osady PRZED ColdStart
+            // (OnNewGameCreatedPartialFollowUpEnd); tych ochotnikow obejmuje dorobek stuleci (RecruitKit.SeedCampaignStart)
+            if (Campaign.Current == null || !Campaign.Current.GameStarted) return;
             try
             {
                 int day = (int)CampaignTime.Now.ToDays;
                 if (_dayStamp != day) { Flush(); _dayStamp = day; }
-                var market = MarketOf(settlement);
+                bool castle = settlement.IsCastle;
+                // 171 A4 (krytyka 12): notabl zamku kupuje w miescie handlowym wsi zamku (droga, wlasna frakcja, bez miast wroga) - to samo co C1
+                var market = castle ? (ArmyClothing.MarketTown(settlement) ?? MarketOf(settlement)) : MarketOf(settlement);
                 foreach (var kv in __state)
                 {
                     var n = kv.Key;
@@ -76,10 +83,22 @@ namespace Armoury
                     {
                         var y = after[i];
                         var x = gone.FirstOrDefault(g => g.UpgradeTargets != null && g.UpgradeTargets.Contains(y));
-                        if (x == null) continue;                          // nowy ochotnik (tier 1) - wlasny dobytek
+                        if (x == null)
+                        {
+                            // 171 A3: swiezy ochotnik tieru 2+ (szlachcic BK, kaplan druidow) - jak awans z BasicTroop kultury: notabl kupuje czesci
+                            // kluczowe; bez towaru albo zlota ochotnik ZOSTAJE z tym, co ma (wariant lagodny - pule bez zmian)
+                            if (y.Tier >= 2 && RecruitKit.FreshOn)
+                            {
+                                var basic = BasicOf(y, n);
+                                bool ok = basic != null && basic != y && Buy(n, market, basic, y, false);
+                                try { RecruitKit.OnFresh(n, y, ok ? new List<EquipmentElement>(_lastBought) : null); } catch (Exception e) { RecruitKit.Stumble("OnFresh", e); }
+                                if (castle) _castleFresh++;
+                            }
+                            continue;                                     // tier 1 - wlasny dobytek
+                        }
                         gone.Remove(x);
-                        if (!Buy(n, market, x, y)) { after[i] = x; _reverted++; }
-                        else { _bought++; RecruitKit.OnUpgrade(n, x, y, new List<EquipmentElement>(_lastBought)); }
+                        if (!Buy(n, market, x, y)) { after[i] = x; _reverted++; if (castle) _castleReverted++; }
+                        else { _bought++; if (castle) _castleBought++; RecruitKit.OnUpgrade(n, x, y, new List<EquipmentElement>(_lastBought)); }
                     }
                     // wpis 92: ochotnik zniknal z puli bez awansu (gra go podmienila) - jego kupione rzeczy wracaja na targ
                     foreach (var g in gone) if (g != null && g.Tier >= 2) RecruitKit.OnVanished(n, g, market);
@@ -163,7 +182,18 @@ namespace Armoury
 
         private static readonly List<EquipmentElement> _lastBought = new List<EquipmentElement>();   // wpis 92: dla kompletu rekruta
 
-        private static bool Buy(Hero notable, Settlement market, CharacterObject x, CharacterObject y)
+        private static bool IsAmmoType(ItemObject.ItemTypeEnum t) { return t == ItemObject.ItemTypeEnum.Arrows || t == ItemObject.ItemTypeEnum.Bolts; }
+
+        /// <summary>171 A3: oddzial, z ktorego "awansuje" swiezy ochotnik tieru 2+ - podstawowy rekrut jego kultury (albo kultury notabla).</summary>
+        private static CharacterObject BasicOf(CharacterObject y, Hero n)
+        {
+            var b = y != null && y.Culture != null ? y.Culture.BasicTroop : null;
+            if (b == null && n != null && n.Culture != null) b = n.Culture.BasicTroop;
+            return b;
+        }
+
+        /// <summary>countWhy = false (171 A3, swiezy ochotnik): brak nie liczy sie w "powodach cofniec" (nic nie cofamy); zamowienie dla warsztatow zostaje.</summary>
+        private static bool Buy(Hero notable, Settlement market, CharacterObject x, CharacterObject y, bool countWhy = true)
         {
             _lastBought.Clear();
             var all = Missing(x, y);
@@ -196,13 +226,22 @@ namespace Armoury
                     try { price = market.Town.MarketData.GetPrice(el.EquipmentElement, null, false, market.Party); } catch { price = cand.Value; }
                     if (price < bestPrice) { bestPrice = price; best = i; }
                 }
-                if (best < 0) { SupplyDemand.NoteUnmetOnce(notable, market, it.ItemType, (int)it.Tier + 1, 1f); Why(it.ItemType + " t" + ((int)it.Tier + 1)); return false; }   // nie ma czego kupic - zamowienie (wpis 67)
+                if (best < 0)
+                {
+                    SupplyDemand.NoteUnmetOnce(notable, market, it.ItemType, (int)it.Tier + 1, 1f);   // nie ma czego kupic - zamowienie (wpis 67)
+                    if (countWhy) { Why(it.ItemType + " t" + ((int)it.Tier + 1)); if (IsAmmoType(it.ItemType)) TownFletchers.NoteNotableRevert(it.ItemType); }   // 172: awans cofniety z braku amunicji
+                    return false;
+                }
                 int u; taken.TryGetValue(best, out u); taken[best] = u + 1;
                 picks.Add(roster.GetElementCopyAtIndex(best).EquipmentElement);
                 total += bestPrice;
             }
-            if (notable.Gold < total) { Why("zloto notabla (" + notable.Gold + " < " + total + ")"); return false; }   // nie stac go
-            foreach (var e in picks) roster.AddToCounts(e, -1);
+            if (notable.Gold < total) { if (countWhy) Why("zloto notabla (" + notable.Gold + " < " + total + ")"); return false; }   // nie stac go
+            foreach (var e in picks)
+            {
+                roster.AddToCounts(e, -1);
+                if (e.Item != null && IsAmmoType(e.Item.ItemType)) TownFletchers.NoteNotable(e.Item.ItemType, 1);   // 172: kolczan z polki miasta (tylko licznik)
+            }
             _lastBought.AddRange(picks);
             if (total > 0) GiveGoldAction.ApplyForCharacterToSettlement(notable, market, total, true);
             _gold += total; _pieces += picks.Count;
@@ -230,6 +269,7 @@ namespace Armoury
                 }
                 var pe = roster.GetElementCopyAtIndex(best).EquipmentElement;
                 roster.AddToCounts(pe, -1);
+                if (pe.Item != null && IsAmmoType(pe.Item.ItemType)) TownFletchers.NoteNotable(pe.Item.ItemType, 1);   // 172: licznik
                 _lastBought.Add(pe);
                 GiveGoldAction.ApplyForCharacterToSettlement(notable, market, bestPrice, true);
                 _gold += bestPrice; _pieces++;
@@ -245,9 +285,10 @@ namespace Armoury
 
         private static void Flush()
         {
-            if (_dayStamp < 0 || _bought + _reverted == 0) return;
+            if (_dayStamp < 0 || _bought + _reverted + _pieces + _castleFresh == 0) return;
             Log.Info("Ochotnicy: dzien " + _dayStamp + " - awanse z kupionym sprzetem " + _bought + " (" + _pieces + " szt. za " + _gold
-                     + " zl z kiesy notabli do miast), cofniete (brak towaru albo zlota) " + _reverted + "; dodatkow nie dokupiono " + _extraMissing + ".");
+                     + " zl z kiesy notabli do miast), cofniete (brak towaru albo zlota) " + _reverted + "; dodatkow nie dokupiono " + _extraMissing
+                     + "; w tym zamki BK: awanse " + _castleBought + ", cofniete " + _castleReverted + ", swiezi t2+ " + _castleFresh + ".");
             if (_whyExtra.Count > 0)
             {
                 var l2 = new List<KeyValuePair<string, int>>(_whyExtra); l2.Sort((a, b) => b.Value.CompareTo(a.Value));
@@ -263,6 +304,7 @@ namespace Armoury
                 _why.Clear();
             }
             _bought = _reverted = _gold = _pieces = _extraMissing = 0;
+            _castleBought = _castleReverted = _castleFresh = 0;
         }
 
         internal static void ApplyAll(Harmony h)
@@ -271,7 +313,17 @@ namespace Armoury
             {
                 var m = AccessTools.Method(typeof(RecruitmentCampaignBehavior), "UpdateVolunteersOfNotablesInSettlement");
                 if (m != null) h.Patch(m, prefix: new HarmonyMethod(typeof(VolunteerKit), nameof(Prefix)), postfix: new HarmonyMethod(typeof(VolunteerKit), nameof(Postfix)));
-                Log.Info("VolunteerKit: awans ochotnika tylko z kupionym sprzetem " + (m != null ? "wpiety" : "BRAK UpdateVolunteersOfNotablesInSettlement") + ".");
+                // 171 A4: pule zamkow BK (BKNotableBehavior.UpdateVolunteers(Settlement settlement), prywatna; gra wola swoja metode tylko dla miast i wsi)
+                System.Reflection.MethodInfo bk = null;
+                try
+                {
+                    var bkt = AccessTools.TypeByName("BannerKings.Behaviours.BKNotableBehavior");
+                    bk = bkt != null ? AccessTools.Method(bkt, "UpdateVolunteers", new[] { typeof(Settlement) }) : null;
+                    if (bk != null) h.Patch(bk, prefix: new HarmonyMethod(typeof(VolunteerKit), nameof(Prefix)), postfix: new HarmonyMethod(typeof(VolunteerKit), nameof(Postfix)));
+                }
+                catch (Exception e) { bk = null; Log.Error("VolunteerKit.ApplyAll(BK)", e); }
+                Log.Info("VolunteerKit: awans ochotnika tylko z kupionym sprzetem " + (m != null ? "wpiety" : "BRAK UpdateVolunteersOfNotablesInSettlement")
+                         + "; zamki BK (UpdateVolunteers) " + (bk != null ? "wpiete" : "BRAK") + ".");
             }
             catch (Exception e) { Log.Error("VolunteerKit.ApplyAll", e); }
         }

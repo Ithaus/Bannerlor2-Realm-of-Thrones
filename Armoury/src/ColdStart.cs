@@ -41,7 +41,7 @@ namespace Armoury
             catch { }
             try { Armories(); } catch (Exception e) { Log.Error("ColdStart.Armories", e); }
             try { Markets(); } catch (Exception e) { Log.Error("ColdStart.Markets", e); }
-            try { int k = RecruitKit.SeedCampaignStart(); Log.Info("ColdStart: ochotnicy tieru 2+ w pulach notabli maja komplety (dorobek stuleci): " + k + "."); } catch (Exception e) { Log.Error("ColdStart.RecruitKit", e); }
+            try { int k = RecruitKit.SeedCampaignStart(); Log.Info("ColdStart: ochotnicy tieru 2+ w pulach notabli maja komplety (dorobek stuleci): " + k + "; zapisy sprzed startu zamienione na dorobek " + RecruitKit.SeedConverted + "."); } catch (Exception e) { Log.Error("ColdStart.RecruitKit", e); }
         }
 
         // ------------------------------------------------------------ A. zbrojownie
@@ -56,6 +56,22 @@ namespace Armoury
                 bool garrison = mp.IsGarrison;
                 if (!mp.IsLordParty && !garrison) continue;
                 if (garrison && mp.CurrentSettlement != null && mp.CurrentSettlement.OwnerClan == Clan.PlayerClan) continue;
+                int added = FillToTemplate(mp, dict);
+                if (added > 0) { parties++; pieces += added; if (garrison) garrisons++; }
+            }
+            Log.Info("ColdStart: zbrojownie - " + parties + " partii (w tym garnizonow " + garrisons + ") dostalo " + pieces + " szt. kompletu swoich ludzi (dorobek stuleci, nie z targu).");
+        }
+
+        /// <summary>171 C9a: brakujace sztuki kompletu ludzi partii (wzorce, koszyki typ x tier jak AiGear, bez koni) do jej zbrojowni DTE;
+        /// zwraca dolozone sztuki. Wydzielone z Armories() bez zmian - ColdStart i odtworzenie zalog po starym zapisie (GarrisonArmory).</summary>
+        internal static int FillToTemplate(MobileParty mp)
+        {
+            var dict = AiGear.Armories();
+            return dict != null && mp != null && mp.MemberRoster != null ? FillToTemplate(mp, dict) : 0;
+        }
+
+        private static int FillToTemplate(MobileParty mp, Dictionary<MBGUID, Dictionary<ItemObject, int>> dict)
+        {
                 // braki w koszykach typ x tier (jak AiGear)
                 var need = new Dictionary<int, int>();
                 var roster = mp.MemberRoster;
@@ -98,9 +114,7 @@ namespace Armoury
                         if (AiGear.AddToArmory(mp, it, n)) { need[k] = d - n; added += n; }
                     }
                 }
-                if (added > 0) { parties++; pieces += added; if (garrison) garrisons++; }
-            }
-            Log.Info("ColdStart: zbrojownie - " + parties + " partii (w tym garnizonow " + garrisons + ") dostalo " + pieces + " szt. kompletu swoich ludzi (dorobek stuleci, nie z targu).");
+                return added;
         }
 
         // ------------------------------------------------------------ B. zapas kupiecki

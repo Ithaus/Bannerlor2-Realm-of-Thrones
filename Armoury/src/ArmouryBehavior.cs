@@ -386,7 +386,7 @@ namespace Armoury
         }
         private Dictionary<string,int> _prisonerBaseline;
 
-        public ArmouryBehavior() { Instance = this; HistoricalPrices.Reset(); MaterialLaw.Reset(); WesterosClimate.Reset(); OutlawLaw.Reset(); PopulationLaw.Reset(); WorkshopLaw.Reset(); IronBank.Reset(); MarketGlut.Reset(); ArmsPricing.Reset(); StartKit.Reset(); AiGear.Reset(); Levy.Reset(); VolunteerKit.Reset(); LevyGold.Reset(); WearKeep.Reset(); UniqueSpoils.Reset(); BuildDiary.Reset(); BuildFunding.Reset(); KingdomLedger.Reset(); ColdStart.Reset(); MenPurse.Reset(); ArmyClothing.Reset(); AiWear.Reset(); SmithHours.Reset(); RecruitKit.Reset(); OreLedger.Reset(); GoodsLedger.Reset(); FreeSupplies.Reset(); VillageWoodlot.Reset(); SpoilsSeal.Reset(); MarketRoad.Reset(); MarketCarts.Reset(); VillageClogDiag.Reset(); CartTownExit.Reset(); MoneyLedger.Reset(); PeopleLedger.Reset(); CaravanBulk.Reset(); StartStock.Reset(); MineralOnce.Reset(); SoldierPay.Reset(); KingdomTreasury.Reset(); RecruitCost.Reset(); NightRest.ResetWorld(); WorldMeasure.Reset(); CirculationWindows.Reset(); ClanIncomeBook.Reset(); }   // stan jednej kampanii nie przecieka do drugiej (audyt 04.10)
+        public ArmouryBehavior() { Instance = this; HistoricalPrices.Reset(); MaterialLaw.Reset(); WesterosClimate.Reset(); OutlawLaw.Reset(); PopulationLaw.Reset(); WorkshopLaw.Reset(); IronBank.Reset(); MarketGlut.Reset(); ArmsPricing.Reset(); StartKit.Reset(); AiGear.Reset(); Levy.Reset(); VolunteerKit.Reset(); LevyGold.Reset(); WearKeep.Reset(); UniqueSpoils.Reset(); BuildDiary.Reset(); BuildFunding.Reset(); KingdomLedger.Reset(); ColdStart.Reset(); MenPurse.Reset(); ArmyClothing.Reset(); AiWear.Reset(); SmithHours.Reset(); RecruitKit.Reset(); OreLedger.Reset(); GoodsLedger.Reset(); FreeSupplies.Reset(); VillageWoodlot.Reset(); SpoilsSeal.Reset(); MarketRoad.Reset(); MarketCarts.Reset(); VillageClogDiag.Reset(); CartTownExit.Reset(); MoneyLedger.Reset(); PeopleLedger.Reset(); CaravanBulk.Reset(); StartStock.Reset(); MineralOnce.Reset(); SoldierPay.Reset(); KingdomTreasury.Reset(); RecruitCost.Reset(); NightRest.ResetWorld(); WorldMeasure.Reset(); CirculationWindows.Reset(); ClanIncomeBook.Reset(); RecruitSources.Reset(); GarrisonCarts.Reset(); GarrisonArmory.Reset(); ArmsDrill.Reset(); }   // stan jednej kampanii nie przecieka do drugiej (audyt 04.10)
 
         public override void SyncData(IDataStore dataStore)
         {
@@ -503,6 +503,12 @@ namespace Armoury
                 if (dataStore.IsLoading) MendMaterial.Import(mend);
             }
             catch (Exception e) { Log.Error("SyncData.MendStock", e); }
+            // 171: zamowienia zamkow w drodze i zbrojownie zalog (DTE ich nie zapisuje) - kazdy klucz we wlasnym try; Export tylko przy zapisie
+            // (krytyka 8: przy wczytaniu Export przechodzilby osady i zbrojownie DTE w trakcie deserializacji); brak klucza = null
+            try { string gc = dataStore.IsSaving ? GarrisonCarts.Export() : null; SaveText.Sync(dataStore, "arm_garrisoncarts", ref gc); if (dataStore.IsLoading) GarrisonCarts.Import(gc); }
+            catch (Exception e) { Log.Error("SyncData.arm_garrisoncarts", e); }
+            try { string ga = dataStore.IsSaving ? GarrisonArmory.Export() : null; SaveText.Sync(dataStore, "arm_garrisonarmory", ref ga); if (dataStore.IsLoading) GarrisonArmory.Import(ga); }
+            catch (Exception e) { Log.Error("SyncData.arm_garrisonarmory", e); }
         }
 
         public override void RegisterEvents()
@@ -993,6 +999,12 @@ namespace Armoury
         {
             SaveText.ReportAfterLoad();   // 161: ile dlugich napisow uratowal ratunek przy wczytaniu
             try { RecruitKit.ResolvePending("wczytanie"); } catch (Exception e) { Log.Error("RecruitKit.ResolvePending", e); }   // 161: komplety rekrutow dopiero teraz (w SyncData bohaterow nie ma)
+            // 171: zamowienia zamkow w drodze; zbrojownie zalog z zapisu (DTE skonczyl OnGameLoaded) albo jednorazowe odtworzenie po starym zapisie - PRZED ColdStart.Run;
+            // echo ROT, gdy typu nie bylo przy starcie; cwiczenia wlasna bronia - latki modeli w kampanii (modele BK czytaja singletony BK)
+            try { GarrisonCarts.ResolvePending("wczytanie"); } catch (Exception e) { Log.Error("GarrisonCarts.ResolvePending", e); }
+            try { GarrisonArmory.Restore("wczytanie"); } catch (Exception e) { Log.Error("GarrisonArmory.Restore", e); }
+            try { RecruitSources.ApplyLate(); } catch (Exception e) { Log.Error("RecruitSources.ApplyLate", e); }
+            try { ArmsDrill.EnsureHooks(); } catch (Exception e) { Log.Error("ArmsDrill.EnsureHooks", e); }
             try { FixCharcoalWeight(); } catch (Exception e) { Log.Error("FixCharcoalWeight", e); }   // wpis 87 (audyt pkt 11d): waga wegla PRZED wycena
             try { LootPrices.Apply(); } catch (Exception e) { Log.Error("LootPrices", e); }   // wpis 97: cena lupu = stan
             try { McmSettings.Apply(); MaterialLaw.Apply(); ArmsPricing.Build(); HistoricalPrices.Apply(); StartStock.Run(); ArmsPricing.ClearCostCache(); MapClock.ApplySpeed(); UniqueSpoils.OnSessionLaunched(); ColdStart.Run(); } catch (Exception e) { Log.Error("MaterialLaw/ArmsPricing", e); }   // surowce PRZED wycena uzbrojenia; StartStock zaraz PO Apply (przelicznik ladunku juz obowiazuje)
@@ -1003,6 +1015,7 @@ namespace Armoury
             try { CirculationWindows.EnsureModelHooks(); } catch (Exception e) { Log.Error("CirculationWindows.EnsureModelHooks", e); }   // paczka 169: linie modelu finansow i kapital nowych karawan (latki w kampanii, tylko log)
             try { RawPrice.SeedNewCampaign(); } catch (Exception e) { Log.Error("RawPrice.SeedNewCampaign", e); }   // cena surowcow: w nowej kampanii pamiec rynku z tickow startowych na nowa monete - PO HistoricalPrices.Apply i StartStock.Run
             try { TownCrafts.SessionStart(); } catch (Exception e) { Log.Error("TownCrafts.SessionStart", e); }   // paczka 148: proporcje rzemiosla miasta z wartosci - PO HistoricalPrices.Apply (linia startowa)
+            try { TownFletchers.SessionStart(); } catch (Exception e) { Log.Error("TownFletchers.SessionStart", e); }   // paczka 172: kandydaci strzelarzy, koszyki wzorcow, linia startowa - PO HistoricalPrices.Apply i ColdStart
             // 124: kapital startowy warsztatow w nowej monecie - TU, po HistoricalPrices.Apply. Gra wola sluchaczy zdarzenia od ostatnio
             // dopisanego (MbEvent: lista z wstawianiem na poczatek), wiec WorkshopTradeBehavior (dodany po nas) szedl PRZED przeliczeniem cen
             try { var seed = WorkshopTrade.SeedNewCampaign(); if (seed != null) Log.Info("WorkshopTrade: " + seed); } catch (Exception e) { Log.Error("WorkshopTrade.SeedNewCampaign", e); }
@@ -1275,6 +1288,10 @@ namespace Armoury
             try { OutlawLaw.Daily(); } catch (Exception e) { Log.Error("OutlawLaw.Daily", e); }   // wyrzutki: bieda, powroty, werbunek band
             try { IronBank.Daily(); } catch (Exception e) { Log.Error("IronBank.Daily", e); }   // Bank Zelazny: pozyczki AI, raty, bankructwa
             try { ClanIncomeBook.Daily(); } catch (Exception e) { Log.Error("ClanIncomeBook.Daily", e); }   // paczka 169: D rodow, budzet i dlugi na sucho (tylko log) - po rentach, zwrocie, mennicy i Banku dnia
+            // 171: zawrocony towar i nadwyzki zalog na polkach PRZED handlem kupcow (kupcy wywioza nadwyzke zamkow tego samego dnia)
+            try { GarrisonCarts.Daily(); } catch (Exception e) { Log.Error("GarrisonCarts.Daily", e); }     // zamowienia zamkow w drodze: dostawy, zawrocenia, linia "Zaopatrzenie zamkow (171)"
+            try { GarrisonArmory.Daily(); } catch (Exception e) { Log.Error("GarrisonArmory.Daily", e); }   // nadwyzki zalog raz w tygodniu, linia "Zbrojownie zalog (171): dzien"
+            try { ArmsDrill.Daily(); } catch (Exception e) { Log.Error("ArmsDrill.Daily", e); }             // linie "Cwiczenia (171)" i co 5 dob "Pokrycie zbrojowni AI (171)" (tylko log)
             try { SupplyDemand.DailyTrade(); } catch (Exception e) { Log.Error("SupplyDemand.DailyTrade", e); }
             try { SellByCondition.Daily(); } catch (Exception e) { Log.Error("SellByCondition.Daily", e); }   // cena sprzedazy sprzetu: linia "Skup sprzetu" wedlug sprzedajacego (tylko log)
             try { RecruitCost.Daily(); } catch (Exception e) { Log.Error("RecruitCost.Daily", e); }   // poprawka 157 / paczka 160: linia "Konie rekrutow" (tylko log)

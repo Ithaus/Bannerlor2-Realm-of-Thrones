@@ -37,6 +37,7 @@ namespace Armoury
             public readonly string Id, Name, TownSource, LineName;
             public int Villages, Towns, Lines, Shops, Builds;      // dopisane wsiom / miastom i zamkom, zuzyte przez linie towarowe / warsztaty zbrojne / budowy
             public int Woodlot;                                    // paczka 126: drewno z lasu wsi (VillageWoodlot) - osobno od wydobycia drwali ("wsie dopisaly" i "model")
+            public int Fletch;                                     // paczka 172: ruda i drewno strzelarzy miasta (TownFletchers) - osobno od warsztatow zbrojnych
             public float Model;
             public readonly HashSet<Settlement> Makers = new HashSet<Settlement>();
             public readonly HashSet<Settlement> WoodlotMakers = new HashSet<Settlement>();
@@ -45,7 +46,7 @@ namespace Armoury
             public int[] Shown; public int ShownDay = -1;           // paczka 146: liczby ostatniej wydrukowanej linii - kontrola ksiegi towarow (GoodsLedger)
 
             public Book(string id, string name, string townSource, string lineName) { Id = id; Name = name; TownSource = townSource; LineName = lineName; }
-            public void NewDay() { Villages = 0; Towns = 0; Lines = 0; Shops = 0; Builds = 0; Woodlot = 0; Model = 0f; Makers.Clear(); WoodlotMakers.Clear(); Modelled.Clear(); }
+            public void NewDay() { Villages = 0; Towns = 0; Lines = 0; Shops = 0; Builds = 0; Woodlot = 0; Fletch = 0; Model = 0f; Makers.Clear(); WoodlotMakers.Clear(); Modelled.Clear(); }
             public void Reset() { NewDay(); LastAll = -1; LastTowns = -1; Shown = null; ShownDay = -1; }
         }
 
@@ -149,6 +150,14 @@ namespace Armoury
             if (b != null && loads > 0) b.Shops += loads;
         }
 
+        /// <summary>Paczka 172: ruda i drewno zdjete z polki przez strzelarzy miasta (TownFletchers). Osobna pozycja - nie "warsztaty zbrojne"
+        /// (te porownuje kontrola ksiegi towarow z ramka cyklu warsztatu); ksiega towarow liczy je w ramce "strzelarze (172)". Tylko licznik.</summary>
+        internal static void NoteFletch(ItemObject item, int loads)
+        {
+            try { var b = Of(item); if (b != null && loads > 0) b.Fletch += loads; }
+            catch { }
+        }
+
         /// <summary>Material zdjety z targu przez nasze budowy (BuildFunding.BuyMaterials / BuyOneCheapest). Tylko licznik.</summary>
         internal static void NoteBuild(ItemObject item, int loads)
         {
@@ -200,6 +209,7 @@ namespace Armoury
             if (b == _wood) sb.Append(", las wsi (126) +").Append(b.Woodlot).Append(" (").Append(b.WoodlotMakers.Count).Append(" wsi)");
             sb.Append("; zuzycie: warsztaty zbrojne ").Append(b.Shops).Append(", linie towarowe (").Append(b.LineName).Append(") ").Append(b.Lines)
               .Append(", budowy ").Append(b.Builds)
+              .Append(", strzelarze (172) ").Append(b.Fletch)
               .Append("; zapas: miasta ").Append(towns);
             if (b.LastTowns >= 0) sb.Append(" (").Append(Signed(towns - b.LastTowns)).Append(")");
             sb.Append(", zamki ").Append(castles).Append(", wsie ").Append(villages).Append(", tabory ").Append(road)
@@ -208,7 +218,7 @@ namespace Armoury
             if (b.LastAll >= 0)
             {
                 int delta = all - b.LastAll;
-                int known = b.Villages + b.Woodlot + b.Towns - b.Shops - b.Lines - b.Builds;
+                int known = b.Villages + b.Woodlot + b.Towns - b.Shops - b.Lines - b.Builds - b.Fletch;
                 sb.Append(" (").Append(Signed(delta)).Append(", bez wyjasnienia ").Append(Signed(delta - known)).Append(")");
             }
             sb.Append("; miast bez towaru ").Append(empty).Append(" z ").Append(townCount)

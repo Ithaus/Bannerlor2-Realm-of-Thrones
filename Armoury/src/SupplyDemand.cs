@@ -133,6 +133,7 @@ namespace Armoury
             _onceSeen[k] = day;
             if (_onceSeen.Count > 20000) _onceSeen.Clear();
             NoteUnmet(market, type, tier, n);
+            if (type == ItemObject.ItemTypeEnum.Arrows || type == ItemObject.ItemTypeEnum.Bolts) TownFletchers.NoteUnmet(type);   // 172: "AI bez towaru" (tylko licznik)
         }
 
         internal static float Demand(Settlement st, ItemObject it)
@@ -409,9 +410,14 @@ namespace Armoury
                 }
 
                 int moved = 0, deals = 0, stuck = 0; long paid = 0;
+                // 171 C8 (Z6): zamek nie jest targiem broni - kupcy nie wioza tam broni natychmiast, bez drogi; zaloga zamku zamawia w miescie
+                // (GarrisonCarts). Zamek zostaje ZRODLEM: jego zapas ponad popyt kupcy wywoza do miast
+                bool noCastles = GarrisonCarts.On;
                 foreach (var kv in sample)
                 {
                     int key = kv.Key; var probe = kv.Value;
+                    // recenzja 171: tylko bron i zbroje - konie i rzedy kupcy woza do zamkow jak dotad (zaloga ich nie zamawia, gracz kupuje je na polce zamku)
+                    bool noCastlesHere = noCastles && !MenPurse.HorseKind(probe);
                     foreach (var src in places)
                     {
                         int have; stock[src].TryGetValue(key, out have);
@@ -436,6 +442,7 @@ namespace Armoury
                             foreach (var dst in places)
                             {
                                 if (dst == src || poor.Contains(dst)) continue;
+                                if (noCastlesHere && dst.IsCastle) continue;
                                 float dist = srcPos.Distance(dst.GetPosition2D);
                                 if (dist > range) continue;
                                 int dh; stock[dst].TryGetValue(key, out dh);

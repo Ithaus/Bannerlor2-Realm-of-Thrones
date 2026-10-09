@@ -76,6 +76,7 @@ namespace Armoury
         private static readonly Dictionary<Workshop, Rec> _rec = new Dictionary<Workshop, Rec>();
         private static readonly Dictionary<string, string[]> _saved = new Dictionary<string, string[]>();   // z zapisu: klucz -> typ, srednia, doby
         private static readonly Dictionary<WorkshopType, float> _tradeSpeed = new Dictionary<WorkshopType, float>();
+        private static readonly Dictionary<WorkshopType, float> _tradeSpeedOpen = new Dictionary<WorkshopType, float>();   // 172: bez zamknietej linii strzal
         private static readonly Dictionary<ItemCategory, ItemObject> _sample = new Dictionary<ItemCategory, ItemObject>();
         private static readonly Dictionary<string, TypeStat> _dType = new Dictionary<string, TypeStat>();
         private static readonly HashSet<string> _errOnce = new HashSet<string>();
@@ -102,7 +103,7 @@ namespace Armoury
         /// <summary>Nowa gra / wczytanie: wolane z WorkshopLaw.Reset(), czyli z konstruktora ArmouryBehavior.</summary>
         internal static void Reset()
         {
-            _rec.Clear(); _saved.Clear(); _tradeSpeed.Clear(); _sample.Clear(); _errOnce.Clear(); _oreItem = null;
+            _rec.Clear(); _saved.Clear(); _tradeSpeed.Clear(); _tradeSpeedOpen.Clear(); _sample.Clear(); _errOnce.Clear(); _oreItem = null;
             _bkTried = false; _bkModel = null; _bkTax = null;
             _cyc = null; _cycIn = _cycWare = _cycCredit = 0; _cycOut = 0;
             ClearDay();
@@ -200,15 +201,18 @@ namespace Armoury
             return true;
         }
 
-        /// <summary>Suma szybkosci linii towarowych typu: tyle cykli na dobe robi zaloga, gdy ida wszystkie.</summary>
-        private static float TradeSpeed(WorkshopType t)
+        /// <summary>Suma szybkosci linii towarowych typu: tyle cykli na dobe robi zaloga, gdy ida wszystkie. Paczka 172: skipArrows - bez linii
+        /// "arrows" (BK ma ja za towar), zamknietej w warsztatach notabli przy czynnych strzelarzach miasta - place pozostalych linii warsztatu
+        /// "fletcher" nie dziela sie z linia, ktora nie dziala.</summary>
+        private static float TradeSpeed(WorkshopType t, bool skipArrows = false)
         {
             float v;
             if (t == null) return 0f;
-            if (_tradeSpeed.TryGetValue(t, out v)) return v;
+            var cache = skipArrows ? _tradeSpeedOpen : _tradeSpeed;
+            if (cache.TryGetValue(t, out v)) return v;
             v = 0f;
-            foreach (var p in t.Productions) if (IsTradeLine(p)) v += Math.Max(0f, p.ConversionSpeed);
-            _tradeSpeed[t] = v;
+            foreach (var p in t.Productions) if (IsTradeLine(p) && !(skipArrows && TownFletchers.IsArrowsLine(p))) v += Math.Max(0f, p.ConversionSpeed);
+            cache[t] = v;
             return v;
         }
 
@@ -219,7 +223,7 @@ namespace Armoury
         internal static float CycleLabour(Workshop w, WorkshopType.Production p)
         {
             if (w == null || w.WorkshopType == null || w.WorkshopType.IsHidden || !IsTradeLine(p)) return 0f;
-            float sum = TradeSpeed(w.WorkshopType);
+            float sum = TradeSpeed(w.WorkshopType, w.Owner != Hero.MainHero && TownFletchers.Active);   // 172: warsztat notabla bez zamknietej linii strzal
             if (sum <= 0f) return 0f;
             var s = Settings.Current;
             return Math.Max(0f, s.WorkshopWorkers) * Math.Max(0f, s.WorkshopWagePerDay) * WageIndex(w) / sum * BulkFactor(p);   // place czeladnikow x poziom plac miasta
@@ -984,6 +988,7 @@ namespace Armoury
                 foreach (var p in type.Productions)
                 {
                     if (!IsTradeLine(p) || p.ConversionSpeed <= 0f) continue;
+                    if (TownFletchers.ClosesLine(p, w)) continue;   // 172: linia strzal warsztatu notabla zamknieta - nic nie zarobi
                     int inCost = 0; bool ok = true;
                     if (p.Inputs != null)
                         foreach (var inp in p.Inputs)
