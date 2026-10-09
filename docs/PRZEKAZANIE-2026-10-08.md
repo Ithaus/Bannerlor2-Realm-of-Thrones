@@ -218,3 +218,6 @@ dana faze od nowa, korzystajac z zapisanych wynikow:
 - 22:20 T9 gotowe (galaz w-toku/n12-reparacje d3ad3b0 na T2c; GitHub): pokoj w wojnie fabularnej ROT (ROTStorylineWars.IsWarForced) = reparacje Diplomacy 0;
   inne pokoje bez zmian. Test zapisu doby 362 OK (wpiete 1/1, 2 pokoje niefabularne - reparacje bez zmian, 0 bledow). Test 120 dob (wgranie 5 + T9) w toku.
 - 23:00 **WGRANIE 6 W GRZE**: CrashScribe 269cc980 (+T9), Armoury 0f8a80b0. Test 120 dob: OK (szczegoly w STAN-PRAC). KONIEC PRAC NOCY - raport: docs/RAPORT-NOCNY-2026-10-09.md.
+- 09.10 ~00:05 Jeff: "zaudytuj dochody, czy sa odpowiednie" -> workflow `wf_a0239869-fc4` (pomiar 120 dob wedlug rodzaju rodu, kod kazdego zrodla dochodu,
+  historia/lore -> synteza z propozycja liczb wpieta w 165/166/168 -> 2 krytyki), wynik: docs/audyt-2026-10-09/12-DOCHODY-RODOW.md. W toku tez: 172b karawany bez
+  strzal (wf_edafb659-b79, drzewo noc\n172b), projekt 174 produkcja uzbrojenia (wf_42ffe0c8-8e0) - Jeff: "jak brakuje, sprawdz produkcje i rzemieslnikow, nic z niczego".
