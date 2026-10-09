@@ -1584,9 +1584,9 @@ namespace Armoury
         [SettingPropertyGroup("Workshops")]
         public bool TownFletchersEnabled { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Town Fletcher Hands Per Arms Hand", 0.00f, 3.60f, "0.00", HintText = "hands of a town's fletchers and arrowsmiths for each hand of its arms craftsmen (Workshop Prosperity Per Hand) - about 5,500 man-days a day for the world, some 0.1 fletchers per 1,000 people, up to about 2,400 quivers of 30 a day at full work; they work only while a quiver pays for its ore, wood and work, so most stand idle once the stalls are full (England 1359: 850,000 arrows came to the Tower for the crown alone - about 275 fletchers at full work, 0.1 per 1,000 people); 0 = off, arrows as before")]
+        [SettingPropertyFloatingInteger("Town Fletcher Hands Per Arms Hand", 0.00f, 2.40f, "0.00", HintText = "hands of a town's fletchers and arrowsmiths for each hand of its arms craftsmen (Workshop Prosperity Per Hand) - about 3,700 man-days a day for the world, some 0.07 fletchers per 1,000 people, up to about 1,600 quivers of 30 a day at full work (0.9 left 43 towns without ore in the 09.10 test - fletchers outbid the armourers); they work only while a quiver pays for its ore, wood and work, so most stand idle once the stalls are full (England 1359: 850,000 arrows came to the Tower for the crown alone - about 275 fletchers at full work, 0.1 per 1,000 people); 0 = off, arrows as before")]
         [SettingPropertyGroup("Workshops")]
-        public float TownFletcherHandsPerArmsHand { get; set; } = 0.9f;
+        public float TownFletcherHandsPerArmsHand { get; set; } = 0.6f;
 
         [SettingPropertyFloatingInteger("Workshop Sell Share", 0.00f, 3.60f, "0.00", HintText = "a craftsman sells his wares at the market price buyers pay, less this merchant's cut (0.9 = he keeps 90%); with the maker's profit of 25% built into worth, at a normal price he earns 1.125x his cost")]
         [SettingPropertyGroup("Workshops")]
