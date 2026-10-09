@@ -1680,7 +1680,7 @@ namespace Armoury
         [SettingPropertyGroup("The road to market")]
         public float CaravanBulkFillLimit { get; set; } = 1f;
 
-        [SettingPropertyBool("Caravans No Ammo Trade", HintText = "caravans do not trade arrows and bolts: Banner Kings caravans (notables', lords' and your own) no longer buy them for trade nor take them out of towns when leaving, so quivers stay on the stalls where lords and garrisons buy them; arrows and bolts a caravan already carries are sold to the next town it enters, at the market price, from the town's purse above its rent reserve (whatever the town cannot pay for goes to the next town) - nothing is made or lost (off = caravans trade arrows and bolts as in Banner Kings)")]
+        [SettingPropertyBool("Caravans No Ammo Trade", HintText = "caravans do not trade arrows and bolts: Banner Kings caravans (notables', lords' and your own) no longer buy them for trade, take them out of towns when leaving or head for towns just because arrows are cheap there, so quivers stay on the stalls where lords and garrisons buy them; arrows and bolts a caravan already carries are sold to the next town it enters, at the market price, from the town's purse above its rent reserve (whatever the town cannot pay for goes to the next town) - nothing is made or lost (off = caravans trade arrows and bolts as in Banner Kings)")]
         [SettingPropertyGroup("The road to market")]
         public bool CaravansNoAmmoTrade { get; set; } = true;
 

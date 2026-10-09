@@ -188,7 +188,7 @@ doplyw gry. Jesli X (doba) > 2x pojemnosci strzelarzy (ok. 280) - suwak rak do d
 - **Karawany (recenzja 7):** kategoria "arrows" jest dla gry towarem handlowym, karawany kupuja snopy z polek (placac miastu - nie z niczego) i wywoza je;
   snopy w taborach sa poza AiGear i poza ksiegami, przy rozbitej karawanie moga przepasc. Pomiar w linii dnia ("w taborach karawan"); decyzja po tescie:
   zdjac flage towaru z kategorii arrows albo wylaczyc ja z koszyka karawan.
-  ROZSTRZYGNIETE (Jeff 09.10, paczka 172b, `CaravanAmmo.cs`): karawany nie handluja amunicja - BK nie wycenia jej zakupu (postfiks `CalculateBuyValue`),
+  ROZSTRZYGNIETE (Jeff 09.10, paczka 172b, `CaravanAmmo.cs`): karawany nie handluja amunicja - BK nie wycenia jej zakupu (postfiks `CalculateBuyValue`) ani nie liczy jej w ocenie celu (`CalculateTownBuyScoreForCategory`),
   gabka BK przy wyjezdzie oddaje ja miastu, amunicja juz w taborach idzie na polke miasta przy wjezdzie (cena rynkowa, kasa miasta). Flaga towaru zostaje.
   Dowod z autotestu 171+172 (doba 40): w taborach 4 157 strzal i 1 764 beltow wobec 239 i 406 na polkach.
 - **Stara `ArrowsNeed` (recenzja 4):** zerowana przy przeliczeniu BK i przed kazdym `BuyItems()` partii AI - po wczytaniu nie kupuje juz za zloto w nicosc.

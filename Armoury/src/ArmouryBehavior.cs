@@ -513,8 +513,8 @@ namespace Armoury
             CampaignEvents.WarDeclared.AddNonSerializedListener(this, ArmsPricing.OnWarDeclared);
             CampaignEvents.SettlementEntered.AddNonSerializedListener(this, MenPurse.OnEntered);   // wpis 84: nadwyzki ludzi PRZED zakupami
             CampaignEvents.SettlementEntered.AddNonSerializedListener(this, AiGear.OnSettlementEntered);
+            CampaignEvents.SettlementEntered.AddNonSerializedListener(this, CaravanAmmo.OnEntered);   // paczka 172b: amunicja z taborow karawany na polke miasta (cena rynkowa, kasa miasta); dopisana PRZED CaravanBulk, wiec idzie PO nim - surowce, ktorych miastu brakuje, pierwsze do kasy miasta
             CampaignEvents.SettlementEntered.AddNonSerializedListener(this, CaravanBulk.OnEntered);   // wpis 103: karawana sprzedaje miastu surowiec masowy, ktorego mu brakuje
-            CampaignEvents.SettlementEntered.AddNonSerializedListener(this, CaravanAmmo.OnEntered);   // paczka 172b: amunicja z taborow karawany na polke miasta (cena rynkowa, kasa miasta)
             CampaignEvents.OnSettlementLeftEvent.AddNonSerializedListener(this, MenPurse.OnLeft);
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, delegate { try { TroopSelfMend.Hourly(); } catch { } });
             CampaignEvents.DailyTickPartyEvent.AddNonSerializedListener(this, AiGear.OnDailyTickParty);
