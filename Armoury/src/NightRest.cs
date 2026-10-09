@@ -31,7 +31,7 @@ namespace Armoury
     /// W sluzbie ROT (SLUZBA) dlugu nie liczymy - o marszach decyduje lord.
     /// Umarli (Undead) dlugu nie znaja wcale.
     /// </summary>
-    internal static class NightRest
+    internal static partial class NightRest   // T10: czesc AI (ksiega snu AI, powody nocnego marszu) w NightMarch.cs
     {
         // dlug snu 0..5 i przespane godziny biezacej nocy
         internal static int Debt;
@@ -85,7 +85,12 @@ namespace Armoury
             try
             {
                 var s = Settings.Current;
+                MasterSwitch(s);   // T10 poprawka recenzji: przelacznik glowny wylaczony w trakcie gry - jednorazowo wszystko na stare
                 if (s == null || !s.NightRestEnabled) return;
+                // T10 (uwaga krytyki 9, A07 3.10): swiat AI nie zalezy od stanu gracza - ksiega snu AI, oboz splaty
+                // dlugu, oboz swiata i bandy biegna PRZED wyjsciami gracza (martwy gracz, gracz-Nieumarly);
+                // ponizsze wyjscia dotycza juz tylko ksiegi gracza
+                try { AiHourly(s, CampaignTime.Now.GetHourOfDay); } catch (Exception e) { Log.Error("NightRest.AiHourly", e); }
                 var mp = MobileParty.MainParty;
                 if (mp == null || Hero.MainHero == null || !Hero.MainHero.IsAlive) return;
                 // umarli nie spia: armia Innych nie zna dlugu snu
@@ -156,9 +161,14 @@ namespace Armoury
                     else NightfallAsk();
                 }
 
-                if (h == dawn) SettleNight(s);
-                AiNightCamp(s, h);
-                AiBanditRest(s, h);
+                if (h == dawn)
+                {
+                    // T10 (uwaga krytyki 5, P10): linia ksiegi gracza o swicie - sam log, SettleNight bez zmian
+                    int debtBefore = Debt; float restBefore = _restTonight; bool sleepingNow = _sleeping, creditedBefore = _credited;
+                    SettleNight(s);
+                    LogPlayerDawn(s, restBefore, debtBefore, sleepingNow, creditedBefore);
+                }
+                // T10: AiNightCamp i AiBanditRest przeniesione do AiHourly (przed wyjscia gracza)
             }
             catch (Exception e) { Log.Error("NightRest.OnHourly", e); }
         }
@@ -232,7 +242,11 @@ namespace Armoury
                 _camping.Clear(); _tented.Clear(); _bedPos.Clear(); _stillPos.Clear(); _tentPos.Clear(); _orders.Clear();
                 _lastHoldSweep = CampaignTime.Zero; _lastTentDrop = CampaignTime.Zero; _lastTentRefresh = DateTime.MinValue;
                 _cfgSig = -1;
+                // T10 poprawka recenzji: pozycja gracza z poprzedniej kampanii nie liczy sie jako ruch - pierwsza godzina po wczytaniu
+                // to postoj, tak samo dla gracza i dla partii AI (ksiega AI: brak poprzedniego odczytu = postoj)
+                _hadPos = false;
                 ResetHourCounters();
+                ResetAi();   // T10: ksiega snu AI, snu dluznikow, alarmy, wstrzymani w osadach
             }
             catch { }
         }
@@ -263,12 +277,23 @@ namespace Armoury
             int st = CampStart, e = CampEnd;
             int sig = st * 10000 + e * 100 + (s.AiCampsAtNight ? 10 : 0) + (s.ArmyLeadersAlwaysCamp ? 1 : 0)
                       + Math.Max(0, Math.Min(95, s.AiCampSkipPercent)) * 1000000;
+            // T10: nowe przelaczniki i progi w tym samym podpisie (zmiana w MCM = nowa linia)
+            sig = sig * 31 + (s.AiNightMarchByReason ? 1 : 0) * 8 + (s.AiSleepDebt ? 1 : 0) * 4 + (s.AiNightReliefWider ? 1 : 0) * 2 + (DryBuild ? 1 : 0);
+            sig = sig * 31 + (int)Math.Round(s.AiNightsAwakeInChase * 100f) * 7 + (int)Math.Round(s.AiCampDangerRadius * 10f);
             if (sig == _cfgSig) return;
             _cfgSig = sig;
             Log.Info("NightRest: oboz swiata " + (st == e ? "WYLACZONY (rowne godziny " + st + "/" + e + ")" : st + ":00-" + e + ":00")
                      + " (AiCampsAtNight=" + s.AiCampsAtNight + ", ArmyLeadersAlwaysCamp=" + s.ArmyLeadersAlwaysCamp
                      + ", AiCampSkipPercent=" + s.AiCampSkipPercent + ", swit gracza " + PlayerDawn + ":00, krok straznika "
-                     + GuardStepHours.ToString("0.00", CultureInfo.InvariantCulture) + " h gry).");
+                     + GuardStepHours.ToString("0.00", CultureInfo.InvariantCulture) + " h gry)."
+                     + " T10: AiNightMarchByReason=" + s.AiNightMarchByReason + ", AiSleepDebt=" + s.AiSleepDebt
+                     + ", AiNightReliefWider=" + s.AiNightReliefWider + ", AiNightsAwakeInChase="
+                     + s.AiNightsAwakeInChase.ToString("0.##", CultureInfo.InvariantCulture) + ", promien alarmu "
+                     + s.AiCampDangerRadius.ToString("0.#", CultureInfo.InvariantCulture) + " jedn., poscig do " + CampLen()
+                     + " h marszu, odsiecz do " + (2 * CampLen()) + " h, oboz splaty dlugu 1 od " + DebtCampHour + ":00"
+                     + (DryBuild ? " - DLL NA SUCHO (T10_DRY): tylko log, zachowanie i kary jak w T1" : "")
+                     + (!DryBuild && !s.AiNightMarchByReason ? " - powody nocnego marszu tylko w logu (na sucho)" : "")
+                     + (!DryBuild && !s.AiSleepDebt ? " - ksiega snu AI tylko w logu (na sucho)" : "") + ".");
         }
 
         private static string HourCountersText()
@@ -563,23 +588,40 @@ namespace Armoury
                 NightOrder o;
                 if (mp == null || !_orders.TryGetValue(mp, out o)) return;
                 _orders.Remove(mp);
-                if (!mp.IsActive || mp.MapEvent != null || mp.CurrentSettlement != null) return;
+                ApplyOrder(mp, o, false);
+            }
+            catch { }
+        }
+
+        /// <summary>Oddaje zapamietany rozkaz (T10: wspolne dla obozu swiata i snu dluznikow; inSettlement = takze partii
+        /// w osadzie - dluznik zwolniony w osadzie, gdy rozkaz zapamietano w polu).</summary>
+        private static void ApplyOrder(MobileParty mp, NightOrder o, bool inSettlement)
+        {
+            try
+            {
+                if (mp == null || o == null) return;
+                if (!mp.IsActive || mp.MapEvent != null || (mp.CurrentSettlement != null && !inSettlement)) return;
                 var nav = MobileParty.NavigationType.Default;
                 var st = o.Settlement; var tp = o.Party;
+                // T10 poprawka recenzji: rozkaz sprzed snu (do ok. 29 h przy snie dlugu) moze byc juz niewazny - pokoj, osada przeszla na nasza
+                // strone, cel juz nie wrog. Gra nie sprawdza wojny przy wejsciu w oblezenie (EncounterManager.StartSettlementEncounter), wiec
+                // niewazny rozkaz nie wraca - AI decyduje od nowa
+                var mf = mp.MapFaction;
+                bool stWar = st != null && mf != null && st.MapFaction != null && st.MapFaction != mf && mf.IsAtWarWith(st.MapFaction);
                 switch (o.Behavior)
                 {
                     case TaleWorlds.CampaignSystem.Party.AiBehavior.GoToSettlement:
                         if (st != null) mp.SetMoveGoToSettlement(st, nav, false); break;
                     case TaleWorlds.CampaignSystem.Party.AiBehavior.BesiegeSettlement:
-                        if (st != null) mp.SetMoveBesiegeSettlement(st, nav); break;
+                        if (st != null && stWar) mp.SetMoveBesiegeSettlement(st, nav); break;
                     case TaleWorlds.CampaignSystem.Party.AiBehavior.RaidSettlement:
-                        if (st != null) mp.SetMoveRaidSettlement(st, nav, false); break;
+                        if (st != null && stWar) mp.SetMoveRaidSettlement(st, nav, false); break;
                     case TaleWorlds.CampaignSystem.Party.AiBehavior.DefendSettlement:
-                        if (st != null) mp.SetMoveDefendSettlement(st, false, nav); break;
+                        if (st != null && st.MapFaction == mf) mp.SetMoveDefendSettlement(st, false, nav); break;
                     case TaleWorlds.CampaignSystem.Party.AiBehavior.PatrolAroundPoint:
                         if (st != null) mp.SetMovePatrolAroundSettlement(st, nav, false); break;
                     case TaleWorlds.CampaignSystem.Party.AiBehavior.EngageParty:
-                        if (tp != null && tp.IsActive) mp.SetMoveEngageParty(tp, nav); break;
+                        if (tp != null && tp.IsActive && Hostile(mp, tp)) mp.SetMoveEngageParty(tp, nav); break;
                     case TaleWorlds.CampaignSystem.Party.AiBehavior.EscortParty:
                         if (tp != null && tp.IsActive) mp.SetMoveEscortParty(tp, nav, false); break;
                     case TaleWorlds.CampaignSystem.Party.AiBehavior.GoAroundParty:
@@ -587,7 +629,7 @@ namespace Armoury
                     default: break;   // Hold/None i reszta - niech AI zdecyduje na swiezo
                 }
             }
-            catch { }
+            catch (Exception e) { AiStumble("ApplyOrder", mp, e); }   // T10 poprawka recenzji: liczone, nie polykane
         }
 
         /// <summary>
@@ -620,16 +662,20 @@ namespace Armoury
                     _camping.Clear();
                     _bedPos.Clear();
                     // SWIT: kazdy uspiony lord dostaje z powrotem swoj rozkaz
+                    // (T10: snu dluznikow ta galaz nie rusza - osobny slownik _debtSleep; lordowie wstrzymani w osadzie maja
+                    // tylko AI wylaczone na godzine - rozkaz nietkniety, wiec nie ma czego oddawac)
                     if (_orders.Count > 0)
                     {
                         var wake = new System.Collections.Generic.List<MobileParty>(_orders.Keys);
                         foreach (var mp in wake) GiveOrderBack(mp);
                         _orders.Clear();
                     }
+                    _townHold.Clear();
                     return;
                 }
 
-                // zagrozenia: partie lordow i bandytow (pogon nie zna pory snu)
+                // zagrozenia: partie lordow i bandytow (pogon nie zna pory snu) - stara sciezka T1 (karawany, bandy,
+                // lordowie przy wylaczonym AiNightMarchByReason); T10 dla lordow szuka zagrozen przez lokator mapy (AlarmThreat)
                 var threats = new System.Collections.Generic.List<MobileParty>();
                 foreach (var mp in MobileParty.All)
                 {
@@ -637,6 +683,11 @@ namespace Armoury
                     if (mp.IsLordParty || mp.IsBandit) threats.Add(mp);
                 }
 
+                // T10: kto spal w chwili ticku (migawka - _camping zmienia sie w petli), tryb i liczniki godziny
+                var campSet = new System.Collections.Generic.HashSet<MobileParty>(_camping);
+                bool byReason = ByReason(s);
+                bool debtOn = DebtOn(s);
+                var tally = new NightTally();
                 foreach (var mp in MobileParty.All)
                 {
                     if (mp == null || !mp.IsActive || mp == MobileParty.MainParty) continue;
@@ -644,39 +695,84 @@ namespace Armoury
                     // domyslnie OFF) - to wlaczenie ich hurtem polozylo gre 25.08,
                     // wiec wraca ostroznie i bez namiotow ponad limit
                     if (!mp.IsLordParty && !mp.IsCaravan && !(s.AiBanditsCampToo && mp.IsBandit)) continue;
-                    if (mp.CurrentSettlement != null || mp.MapEvent != null || mp.BesiegerCamp != null) continue;
+                    AiSleep e = null;
+                    if (mp.IsLordParty) _ai.TryGetValue(mp, out e);
+                    // T10: lord w osadzie w godzinie obozu bez powodu nie wyjezdza (spi pod dachem - jak gracz, ktory nie rusza noca)
+                    if (mp.IsLordParty && byReason && mp.CurrentSettlement != null && mp.MapEvent == null)
+                    {
+                        TownNight(mp, s, e, debtOn, campSet, tally);
+                        continue;
+                    }
+                    if (mp.CurrentSettlement != null || mp.MapEvent != null || mp.BesiegerCamp != null)
+                    {
+                        if (e != null) Mark(e, StSkip);
+                        continue;
+                    }
+                    if (mp.IsLordParty) _townHold.Remove(mp);   // wyjechal z osady (cudzy rozkaz) - dalej jak kazdy w polu
+                    // T10: dluznik spi pod ksiega dlugu (AiDebtCamp) - oboz swiata go nie rusza
+                    if (mp.IsLordParty && _debtSleep.ContainsKey(mp))
+                    {
+                        tally.DebtField++;
+                        if (e != null) Mark(e, StDebt);
+                        continue;
+                    }
+                    // T10: samotny lord i wodz armii - nocny marsz tylko z powodu (R1)
+                    if (mp.IsLordParty && byReason)
+                    {
+                        LordNight(mp, s, e, campSet, debtOn, tally);
+                        continue;
+                    }
+
+                    // ---- stara sciezka T1 (bez zmian w dzialaniu); dla lordow T10 liczy obok "na sucho", co by bylo ----
                     // nie kazda kolumna staje - czesc maszeruje przez cala noc
                     // (deterministycznie per partia i noc, zeby nie migotalo co godzine)
                     // T1 (uwaga S6): WODZ ARMII nie korzysta z pomijania - armia staje
                     // zawsze, chyba ze wrog blisko albo poscig / ucieczka (nizej)
                     // poprawka recenzji: wlasny wylacznik ArmyLeadersAlwaysCamp (wylaczony = wodz losuje jak kazdy lord)
                     bool armyLeader = s.ArmyLeadersAlwaysCamp && mp.Army != null && mp.Army.LeaderParty == mp;
+                    // T10 na sucho: co powiedzialaby regula powodow - liczone PRZED skutkami starej sciezki (rozkaz spiacego jeszcze w _orders)
+                    NReason dryR = NReason.None; bool dryAlarm = false, dryApplies = false;
+                    if (mp.IsLordParty) { try { dryApplies = DryClassify(mp, s, e, campSet, out dryR, out dryAlarm); } catch (Exception ex) { dryApplies = false; AiStumble("DryClassify", mp, ex); } }
+                    string cause = null;
                     if (!armyLeader && s.AiCampSkipPercent > 0 &&
                         (mp.Id.InternalValue + (uint)CampaignTime.Now.ToDays) % 100u
-                            < (uint)Math.Max(0, Math.Min(95, s.AiCampSkipPercent))) continue;
-                    if (mp.IsCurrentlyAtSea) continue;
-                    if (mp.Army != null && mp.Army.LeaderParty != mp) continue;   // eskorta idzie za wodzem
-                    if (Undead.Party(mp)) continue;                               // Inni maszeruja noca
-                    string stb = mp.ShortTermBehavior.ToString();
-                    if (stb.StartsWith("Flee") || stb.StartsWith("Engage")) continue;   // ucieczka i pogon
-
-                    bool danger = false;
-                    var mf = mp.MapFaction;
-                    foreach (var t in threats)
+                            < (uint)Math.Max(0, Math.Min(95, s.AiCampSkipPercent))) cause = "los";
+                    else if (mp.IsCurrentlyAtSea) cause = "morze";
+                    else if (mp.Army != null && mp.Army.LeaderParty != mp) cause = "armia";   // eskorta idzie za wodzem
+                    else if (Undead.Party(mp)) cause = "umarli";                                // Inni maszeruja noca
+                    else
                     {
-                        if (t == mp || t.MapFaction == mf) continue;
-                        bool hostile = t.IsBandit || (mf != null && t.MapFaction != null && mf.IsAtWarWith(t.MapFaction));
-                        if (!hostile) continue;
-                        if (mp.GetPosition2D.Distance(t.GetPosition2D) <= s.AiCampDangerRadius) { danger = true; break; }
+                        string stb = mp.ShortTermBehavior.ToString();
+                        if (stb.StartsWith("Flee")) cause = "ucieczka";                          // ucieczka i pogon
+                        else if (stb.StartsWith("Engage")) cause = "poscig";
                     }
-                    if (danger)
+                    if (cause == null)
                     {
-                        if (_tented.Contains(mp)) { Tent(mp, false); _tented.Remove(mp); }
-                        _camping.Remove(mp);
-                        _bedPos.Remove(mp);
-                        GiveOrderBack(mp);          // alarm w nocy - rozkaz wraca od reki
-                        continue;                   // wrog blisko - zwijaja sie i ida
+                        bool danger = false;
+                        var mf = mp.MapFaction;
+                        foreach (var t in threats)
+                        {
+                            if (t == mp || t.MapFaction == mf) continue;
+                            bool hostile = t.IsBandit || (mf != null && t.MapFaction != null && mf.IsAtWarWith(t.MapFaction));
+                            if (!hostile) continue;
+                            if (mp.GetPosition2D.Distance(t.GetPosition2D) <= s.AiCampDangerRadius) { danger = true; break; }
+                        }
+                        if (danger)
+                        {
+                            if (_tented.Contains(mp)) { Tent(mp, false); _tented.Remove(mp); }
+                            _camping.Remove(mp);
+                            _bedPos.Remove(mp);
+                            GiveOrderBack(mp);          // alarm w nocy - rozkaz wraca od reki
+                            cause = "wrog";             // wrog blisko - zwijaja sie i ida
+                        }
                     }
+                    if (mp.IsLordParty)
+                    {
+                        if (dryApplies) DryCount(mp, cause, dryR, dryAlarm, tally);
+                        if (e != null) Mark(e, cause == null ? StSlept : (cause == "los" ? StOldLot : StOldOther));
+                    }
+                    else if (mp.IsCaravan && cause == "los") tally.CaravansLot++;
+                    if (cause != null) continue;
 
                     RememberOrder(mp);              // po co wyszedl - zapisane przed snem
                     mp.Ai.DisableForHours(1);       // spia godzine; nocny tick odnowi
@@ -699,6 +795,7 @@ namespace Armoury
                          + ", karawan " + caravans + ", band " + bandits + ", w tym wodzow armii " + armies
                          + "); obudzonych cudza reka od poprzedniej godziny: " + _wokenHour + "." + HourCountersText());
                 ResetHourCounters();   // T1: wszystkie liczniki godziny (byl sam _wokenHour)
+                try { LogNightTally(h, byReason, tally); } catch (Exception e2) { Log.Error("AiNightCamp.T10", e2); }
             }
             catch (Exception e) { Log.Error("AiNightCamp", e); }
         }
@@ -997,19 +1094,36 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ kary
+        // T10 (R2, ta sama kara co gracz): dlug partii AI z ksiegi snu AI (slownik _aiPenalty, tylko dlug > 0).
+        // Predkosc liczona ROWNOLEGLE (CampaignTickCacheDataStore.RealTick -> TWParallel) - slownik nigdy nie jest
+        // zmieniany po publikacji: ksiega buduje NOWY obiekt w ticku godzinowym (watek glowny) i podmienia referencje.
+        private static int DebtFor(MobileParty mobileParty)
+        {
+            if (mobileParty == MobileParty.MainParty) return Debt;
+            var pen = _aiPenalty;
+            int d;
+            return pen != null && pen.Count > 0 && pen.TryGetValue(mobileParty, out d) ? d : 0;
+        }
+
         internal static void SpeedPostfix(MobileParty mobileParty, ref ExplainedNumber __result)
         {
             try
             {
                 var s = Settings.Current;
-                if (s == null || !s.NightRestEnabled || Debt < 1) return;
-                if (mobileParty == null || mobileParty != MobileParty.MainParty) return;
+                if (s == null || !s.NightRestEnabled || mobileParty == null) return;
+                int d = DebtFor(mobileParty);
+                if (d < 1) return;
                 if (!SpeedDepth.OutermostFinal) return;          // lancuch modeli (ROT->RB->vanilla): kara tylko raz
                 // kara od WYNIKU (po suficie kolumny MarchPace - nasz postfix
                 // biegnie ostatni), nie od bazy: -25% ma byc widoczne takze
                 // w wolnej, objuczonej kolumnie. Vanillowy LimitMin(1) trzyma.
-                float cut = __result.ResultNumber * SpdPenalty[Math.Min(3, Debt)] / 100f;
-                if (cut > 0f) __result.Add(-cut, _txtSleepless);
+                // T10 (uwaga krytyki 5): Add() doklada do BAZY, ktora gra mnozy potem przez (1 + suma wspolczynnikow) -
+                // wpis "-cut" zdejmowal cut x (1 + suma), np. -28.5% zamiast -25% przy +14%. Dzielimy jak MarchPace,
+                // wiec kara jest dokladnie z tablicy (gracz i AI).
+                // poprawka recenzji: DLL na sucho (T10_DRY) zostawia stary wzor - P0 porownuje sie z baza T1 bez innej kary gracza
+                float cut = __result.ResultNumber * SpdPenalty[Math.Min(3, d)] / 100f;
+                float f = DryBuild ? 1f : 1f + __result.SumOfFactors;
+                if (cut > 0f) __result.Add(f > 0.01f ? -cut / f : -cut, _txtSleepless);
             }
             catch { }
         }
@@ -1019,13 +1133,17 @@ namespace Armoury
             try
             {
                 var s = Settings.Current;
-                if (s == null || !s.NightRestEnabled || Debt < 1) return;
-                if (mobileParty == null || mobileParty != MobileParty.MainParty) return;
+                if (s == null || !s.NightRestEnabled || mobileParty == null) return;
+                int d = DebtFor(mobileParty);
+                if (d < 1) return;
                 if (!SpeedDepth.OutermostMorale) return;         // lancuch modeli morale: kara tylko raz
                 // procentowo ("morale spada o 95%"), nie punktowo - przy zapasci
                 // z bazowego ~50 zostaje ~2-3, ponizej progu dezercji: spiacego
                 // wojska pilnowac trzeba jak ognia
-                __result.AddFactor(-MorPenalty[Math.Min(3, Debt)] / 100f, _txtSleepless);
+                // T10: wspolczynnik razy (1 + suma wspolczynnikow) - kara rowno z tablicy takze przy innych mnoznikach (jak Rations)
+                float f = DryBuild ? 1f : 1f + __result.SumOfFactors;   // na sucho stary wzor (jak wyzej)
+                float pct = MorPenalty[Math.Min(3, d)] / 100f;
+                __result.AddFactor(f > 0.01f ? -pct * f : -pct, _txtSleepless);
             }
             catch { }
         }
@@ -1044,6 +1162,7 @@ namespace Armoury
             {
                 var s = Settings.Current;
                 if (s == null) return;
+                if (Campaign.Current != null) MasterSwitch(s);   // T10 poprawka recenzji: NightRestEnabled wylaczony w trakcie gry
 
                 // straznik co klatke: namiot nie jezdzi po mapie - gracz ruszyl,
                 // wizerunek schodzi od reki (tick godzinowy bywal o godzine za pozno)
@@ -1080,6 +1199,22 @@ namespace Armoury
                 if (s.AiCampsAtNight && s.CampTentIcon && Campaign.Current != null && _tented.Count > 0
                     && GuardDue(ref _lastTentDrop, ref _dropDhMax))
                     DropMovedTents();
+
+                // T10: straznik snu dluznikow (o kazdej godzinie - oboz splaty od 20:00, sen ciagly przez dzien)
+                // i rozstrzygniecie alarmow (ucieczka albo z powrotem spac) - co 0.1 h GRY
+                // poprawka recenzji: tylko przy wlaczonym przelaczniku glownym (wylaczony = MasterSwitch zwolnil wszystkich); stoper do linii switu
+                if (s.NightRestEnabled && Campaign.Current != null && _debtSleep.Count > 0 && GuardDue(ref _lastDebtSweep, ref _debtDhMax))
+                {
+                    long tg = System.Diagnostics.Stopwatch.GetTimestamp();
+                    HoldDebtSleepers();
+                    GuardTime(tg);
+                }
+                if (s.NightRestEnabled && Campaign.Current != null && _alarmed.Count > 0 && GuardDue(ref _lastAlarmSweep, ref _alarmDhMax))
+                {
+                    long tg = System.Diagnostics.Stopwatch.GetTimestamp();
+                    GuardAlarmed();
+                    GuardTime(tg);
+                }
 
                 if (!s.QuickCampKey || _askOpen) return;
                 bool down = Input.IsKeyDown(InputKey.O);

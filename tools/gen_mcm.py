@@ -16,6 +16,8 @@ RANGES = {
     'CarterPencePerKgPer100': (0.0, 0.15, "0.0000"),
     'SeaFreightShare': (0.0, 1.0, "0.00"),
     'TownMaterialOrderMinLoadKg': (0.0, 1000.0, "0"),
+    # T10 poprawka recenzji: prog dlugu snu w calych nocach (kod porownuje dlug calkowity) - suwak bez ulamkow w opisie
+    'AiNightsAwakeInChase': (0.0, 4.0, "0"),
 }
 
 def gen(module_dir, ns, display):
