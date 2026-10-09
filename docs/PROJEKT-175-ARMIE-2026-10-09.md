@@ -978,7 +978,7 @@ zmierzyc ich pochod/kalendarz)". Commity lokalne: CS `a175cs` **fe37585** (galaz
 | `NorthHardySkillBonus` (0-50) | 15 | **usuniety** | 175b nigdy nie wgrane; `Armoury.json` Jeffa nie ma kluczy 175; CS go nie czyta |
 | `NorthHardyWeaponBonus` (0-50, NOWY) | - | **0** | 3.2: dodatek do broni glownej 43 jednostek piechoty t3-t6 Polnocy |
 | `NorthHardyAthleticsBonus` (0-50, NOWY) | - | **5** | 3.2: dodatek do Atletyki tych samych 43 |
-| `OthersSteelRule` (NOWY, grupa MCM "The others and valyrian steel (175c)") | - | **TAK** | zasada stali Innych; NIE = stara zasada t6 (ogien smoka pelny w obu trybach) |
+| `OthersSteelRule` (NOWY, grupa MCM "The Others and Valyrian steel (175c)" - od 175c-2, bylo "The others and valyrian steel") | - | **TAK** | zasada stali Innych; NIE = stara zasada t6 (ogien smoka pelny w obu trybach) |
 | `OthersCastleSteelPercent` (15-100, NOWY) | - | **50** | ile bije t6 bez stali valyrianskiej przy wlaczonej zasadzie; 100 = jak przed 175c |
 CS ma te same domyslne, gdy pola w Armoury brak. Ustawienia (B) czytane przy starcie sesji, raz na dobe i przy pierwszym ciosie w Wedrowca w nowej misji.
 
@@ -993,15 +993,21 @@ niz 3 pkt od 130/135 = OSTRZEZENIE. Sufit "bez przeskoku tieru", kolejnosc (po `
 - Kogo chroni - bez zmian (`Mends.WalkerBlood`): Nocny Krol, lordowie Innych (whitewalker2/3/4: Lenyl, Dormund, Gerrick), lordowie wskrzeszeni przez ROT, gracz-Inny;
   NIE wighty (padaja od wszystkiego). Kobiety przemienione (w ROT rasa wight, kultura whitewalker) chronione jak dotad - rzadkie, zostawione.
 - Klasa ciosu (pierwsza pasujaca): (1) ogien smoka - pelne (agent-smok; czlowiek na smoku z ciosem bez broni = ogien ROT; w symulacji kon-smok w slocie 10);
-  (2) stal valyrianska / smocze szklo w broni, broni rzucanej albo amunicji - pelne; (3) narzedzie t6 (stal zamkowa; pocisk - luk/kusza w rece, decyzja 02.09) - 50%;
-  (4) reszta i gole rece - 15% (min 1). Symulacja: bohater - jego zestaw bojowy; zolnierz - bron z migawki 175 i `PreTierBest` bez zmiany definicji.
+  (2) stal valyrianska / smocze szklo w broni, broni rzucanej albo amunicji - pelne; (3) narzedzie t6 (stal zamkowa; pocisk - od 175c-2 bron rzucana wedlug siebie,
+  strzala/belt/kamien z procy wedlug wyrzutni tej amunicji z chwili strzalu, decyzja 02.09) - 50%; (4) reszta i gole rece - 15% (min 1); kamienie, glazy, garnki i pociski
+  machin - reszta (od 175c-2). Symulacja: bohater - jego zestaw bojowy; zolnierz - bron z migawki 175; od 175c-2 przy wlaczonej zasadzie tier BEZ amunicji (luk/kusza/proca
+  wedlug wlasnego tieru, jak pole), `PreTierBest` (z amunicja) bez zmian i tylko dla wylaczonej zasady.
 - BLAD naprawiony przy okazji decyzji (osobno w CHANGELOG): ogien jezdzca smoka byl ciety do 15% (ROT tworzy cios ognia jako `new Blow(jezdziec.Index)` bez broni;
   wyjatek 31.08 lapal tylko agenta-smoka) - przy `DragonDamageScaling` 10 Jeffa ogien zadawal Wedrowcowi 1 punkt. Teraz pelny w obu trybach.
 - Listy: stal valyrianska - 29 id rejestru 177 (19 nazwanych + 10 seryjnych; wszystkie t6), kopia w CS "AKTUALIZUJ OBIE RAZEM"; po scaleniu 177 CS bierze liste
   `Armoury.ValyrianBlades.AllIds` i pisze zgodnosc w linii startu. Smocze szklo - "dragonglass"/"obsidian" w id przedmiotu albo kawalka klingi; w ROT jeden przedmiot
-  (`dragonglass_axe`, t5) i nikt go nie ma. Ogien - tylko smoki ROT-Dragon (ROT nie ma strzal zapalajacych ani dzikiego ognia).
+  (`dragonglass_axe`, t5) i nikt go nie ma. Ogien - tylko smoki ROT-Dragon. SPROSTOWANIE (recenzja): w tym zestawie modow sa strzaly i belty zapalajace (RBM
+  `fire_arrows`, `fire_bolts` - RBMCombat_arrow_visuals.xml:466, :475) i garnki ognia machin (RBM `pot`, `grapeshot_fire_*`) - to NIE smoczy ogien: strzaly wedlug luku,
+  garnki i pociski machin od 175c-2 jako reszta 15% (dotad wedlug broni w rece obslugi).
 - Skutek w liczbach (bez biegu - do zmierzenia): pole - kazdy cios bronia t6 bez VS w Wedrowca o polowe slabszy; symulacja - ok. 223 rodzajow jednostek "t6"
   (migawka; wedlug RBM takze proce, `bolt_a` od t1, `woodland_longbow`) bije Wedrowcow w 50% zamiast 100%. Reszta swiata bez zmian (wighty, bitwy bez Wedrowcow).
+  Od 175c-2 (rachunek `SCR\c175d\t6_175c2.py`, 1072 rodzaje zolnierzy): "t6" w symulacji 196 -> 160 (36 "t6 tylko przez amunicje" spada do 15%, m.in. kusznicy Nocnej
+  Strazy), z 160: 24 tylko przez luk/kusze/proce, 135 tylko we wzorcu sprzed 175.2 (w polu juz nie t6) - patrz 13.1.
 
 **Log (nowe linie CS):** start sesji `Mends: zasada stali Innych (175c) - WLACZONA: ... (29 wzorow, w grze N; lista ...), smocze szklo (N przedmiotow: ...) i ogien smoka;
 stal t6 50%, reszta 15% (min 1); dotyczy N zywych Wedrowcow (...) - wighty bez zmian ...`; po kazdej bitwie z Innymi `Inni (175c): bitwa dzien N pole|pole + symulacja|
@@ -1024,9 +1030,37 @@ Linie 175 "migawka valyrianska" i "kontrola" mowia teraz "t6 = 50% przy zasadzie
   zabitych pod Murem, NightKingGate.cs:17-18), droga hordy. Przed biegiem sprawdzic, czy ROT nie trzyma Innych wlasnymi flagami (`IsInvasionStarted`, kajdany x `FabulaTimeScale`).
 - **Recznie (Jeff):** bitwa z banda Innych - ciosy VS, t6 i zwykla bronia; odczyt linii "Inni (175c): bitwa".
 
-**Znalezisko poboczne (NIE naprawione w 175c - osobny wpis):** `Mends.IsDeadGear` (Mends.cs:1580-1592, prefiks "ice_") lapie tez `ice_sword` = Lod Starkow (VS, 2 miary,
+**Znalezisko poboczne (NAPRAWIONE w 175c-1, CS 50f83f0):** `Mends.IsDeadGear` (Mends.cs:1580-1592 przed 175c, 1555-1568 w fe37585; prefiks "ice_") lapie tez `ice_sword` = Lod Starkow (VS, 2 miary,
 kultura battania) - `MeltDeadLoot` topi go w taborze gracza po kazdej bitwie, `MeltDeadArmory` w zbrojowni, straze DTE i Armoury QuartermasterLaw biora go za sprzet umarlych;
 przy rejestrze 177 (dziedziczenie, Qohor) = UBYTEK. Poprawka: dokladne id `ice_sword2` i `ice_spear` zamiast prefiksu.
 
 **Do decyzji Jeffa:** (1) smoczego szkla praktycznie nie ma w swiecie (`dragonglass_axe` bez wlasciciela) - zrodlo (np. Smocza Skala) to osobna paczka; (2) "t6" w symulacji
-liczy tez proce, `bolt_a` i `woodland_longbow` (RBM) - "t6 bez amunicji i proc" to osobna zmiana definicji `PreTierBest`, nie w 175c.
+liczy tez proce, `bolt_a` i `woodland_longbow` (RBM) - "t6 bez amunicji i proc" to osobna zmiana definicji `PreTierBest`, nie w 175c. -> (2) amunicja ZALATWIONA w 175c-2
+(bez zmiany `PreTierBest`); otwarte zostaja pytania z 13.1.
+
+### 13.1 Po recenzji 175c (09.10 ok. 08:45) - 19 uwag: 16 prawdziwych, 2 czesciowo, 1 falszywa; commity CS 50f83f0 (175c-1), 60945d9 (175c-2), Armoury f178053 (175c-2), NIEWGRANE
+Pelny opis, plik:linia i ryzyko - wpisy "175c-1" i "175c-2" w CHANGELOG obu drzew. Build CS kod 0 (0 ostrzezen), Armoury kod 0 (1 stare CS0169); probne DLL:
+`SCR\test\Armoury-175c.dll` i `SCR\test\CrashScribe-at-175c.dll` (drzewo `noc2\a175cs-at3` = 60945d9 + `test\at1-cs.diff`, tryb autotestu NIE commitowany). Gry nie uruchamialem.
+- **Poprawione w kodzie:** Lod Starkow nie jest juz "sprzetem umarlych" (`IsDeadGear` po id `ice_sword2`/`ice_spear`); autobitwa przy wlaczonej zasadzie liczy t6 BEZ amunicji
+  (wyrzutnia wedlug wlasnego tieru, jak pole); pocisk w polu wedlug broni rzucanej albo pasujacej wyrzutni (koniec "pusta reka po ostatnim oszczepie", zmiany broni w locie
+  i VS z reki przy braku pocisku); kamienie, garnki i pociski machin = reszta; kubelki pola per bitwa mapy; obrazenia symulacji w licznikach po (int) jak w grze;
+  linia bitwy: czas, rundy z samym Wedrowcem, spadek HP Wedrowcow wobec sumy "po" (wykrywa cudza latke po nas, np. zaciemniona `SimulateHitPatch` AIInfluence);
+  linia dobowa: najdluzsza bitwa, "ponad 24 h", "stal t6 oszczedzila X HP (ok. Y zycia)"; linia startu: walczacy osobno od notabli/dzieci, kto nosi smocze szklo;
+  MCM: opis OthersSteelRule (autobitwa wedlug broni sprzed 175.2, amunicja nie jest stala, szkla nikt nie ma), nazwy grup bez psucia nazw wlasnych.
+- **Czesciowe / odrzucone:** "cios 0 obrazen = 1 punkt" FALSZ (ValyrianWard wychodzi przy `InflictedDamage <= 1`); "tupniecie smoka i upadek liczone wedlug broni Wedrowca"
+  - te dwa nie dochodza do zasady (1 punkt, `IsFallDamage`), dochodzi tylko odbicie wlasnego ciosu - teraz poza licznikami, obrazenia bez zmian; mala litera opisu MCM - styl repo.
+- **Polnoc 130/135:** to srednia 43 RODZAJOW; wazona skladem szablonow Polnocy (`SCR\rev175c-skutki\wazona.py`) piechota t3+ ma ok. **101 / 105** (t3 49%, t4 33%, t5 14%,
+  t6 4%) - przecietny piechur w partii jest slabszy niz 130/135; przewaga nad swiatem (+7.4% / +11.9%) liczona tak samo z obu stron.
+- **Gracz a Nocny Krol:** bez stali valyrianskiej najlepsza stal gracza (t6) zadaje Nocnemu Krolowi i Wedrowcom polowe obrazen (dotad pelne); przegrana bitwa z Nocnym Krolem
+  w ROT zabija gracza i robi z niego wighta (ROTDuelsBehavior.cs:176-185). Autotest tego nie pokaze - recznie.
+- **T-B1 - poprawki planu:** czesc "pole" (klasy VS/t6/reszta w `RegisterBlow`, ogien jezdzca smoka) autotest NIE sprawdzi - recznie (Jeff) albo custom battle (Wedrowiec
+  przeciw VS, t6, t5 i smokowi z jezdzcem; bramka: ogien pelne, t6 50%, reszta 15%); puste bramki pola to NIE zaliczenie. Nowe bramki symulacji: bitwy z Innymi bez gracza
+  maja ciosy "symulacja" > 0, a spadek HP Wedrowcow ~ suma "po"; "ponad 24 h: 0" (jesli nie - Jeff wybiera miedzy minimum 2 punktow dla klasy 15% a zostawieniem).
+- **Faza oblezen (propozycja, kalendarz moda NIETKNIETY):** osobny bieg TYLKO w buildzie autotestu - klucz `others_open_day` w `autotest.json` (na ten bieg w pamieci
+  `Config.NightKingSiegeFromDay/CallFromDay/WallFromDay`, linia OSTRZEZENIE, DLL przywracany po tescie) z `"load":"autotest-161-kawalki"` (dzien 362, ok. 2400 trupow) zamiast
+  nowej kampanii; w tym samym biegu A/B `OthersSteelRule` wl./wyl. Miary deterministyczne: "stal t6 oszczedzila X HP (Y zycia)" na dobe obok krzywej trupow (UMARLI) i wygranych
+  Innych; 175c dziala tylko na bohaterow-Wedrowcow (jeden na bande), wiec na 40 dobach A/B efekt zginie w szumie - liczy sie ta linia, nie roznica wynikow.
+- **Pytania do Jeffa (zmiany rozgrywki spoza decyzji):** (a) autobitwa liczy bron sprzed zamiany 175.2 (zasada "175 nie zmienia walki z Innymi"), pole - po: 135 rodzajow AI
+  bije Wedrowcow w 50% tylko dzieki starej broni, a te same oddzialy gracza w polu w 15% - zostawic czy liczyc z wzorca po 175.2 (AI slabsze wobec Innych)? (b) proce RBM
+  (wszystkie trzy t6) i luki t6 licza sie jak stal zamkowa (50%) - zostawic? (c) smocze szklo dla Nocnej Strazy (obsydianowe groty/sztylety w Castle Black albo skrytka na
+  Piesci) - osobna paczka? (d) komunikat po angielsku przy pierwszym ciosie w Nocnego Krola bronia bez VS?
