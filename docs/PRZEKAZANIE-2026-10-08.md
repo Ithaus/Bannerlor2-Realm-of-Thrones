@@ -210,3 +210,5 @@ dana faze od nowa, korzystajac z zapisanych wynikow:
   T2c gotowe (w-toku/n11-mur f6d4e51, CrashScribe; zrodlo oblezen = ROT OnAiHourlyTick, Mur bez kajdan ROT). Trybut: SCRATCH nowej sesji noc\trybut.md (reparacje Diplomacy
   + ROT wznawia wojne fabularna tej samej doby; 93% kwoty z pokojow <= 1 doba) -> T9 (bez reparacji za wojny fabularne ROT, w-toku/n12-reparacje, wf_fc2601d0-5c5) w toku;
   suwak Diplomacy "Scaling War Reparations Gold Cost Multiplier" 50 -> 10 = rekomendacja dla Jeffa (jego MCM).
+- 21:56 **AUTOTEST T2c (zapis doby 362, 10 dob) OK**: CrashScribe probny 13fd98de (= w grze + T2c + tryb autotestu); "wpiete 2/2", Nocny Krol PRZERYWA oblezenie
+  Craster's Keep po wczytaniu (bez strat), potem rozkazy ROT usuwane; 0 "OBLEZENIE przed terminem", 0 osad zdobytych (bez T2c w tym samym zapisie: 3), 0 bledow.
