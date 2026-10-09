@@ -882,6 +882,8 @@ namespace Armoury
         public bool TownMaterialOrderAhead = true;         // a town that uses a raw material orders it before its stall runs empty - when what it has and what is on the way would last less than the journey plus two days
         public bool TownMaterialOrderPlayerCaravans = true; // the caravans of your clan may take such orders like any other caravan (the profit goes to their purse); your own party never does
         public bool FletchersBidForOre = true;             // when a town lacks arrows, its iron ore goes to whoever earns more on it - the armourers or the fletchers - as far as the fletchers' hands can use it
+        public bool ShopKeepsLastArmour = true;            // buyers for a whole company (lords, garrisons, notables, your own men with their purse, traders shipping surplus) leave the last piece of each kind of armour (body, head, legs, hands; cheap, middling and dear apart) on a town stall for whoever buys in person
+        public int ShopKeepPieces = 1;                     // how many such pieces stay on the stall (0-3)
 
         public static void Load(string moduleDataDir)
         {

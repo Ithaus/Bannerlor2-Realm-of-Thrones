@@ -537,6 +537,10 @@ namespace Armoury
                             if (best == null) { stuck += toShip; break; }
                             // przenosimy sztuki koszyka ze zrodla (od konca polki), placi odbiorca
                             int want = Math.Min(toShip, bestCap);
+                            // 174b.4: wywoz kupcow to tez hurt - z polki MIASTA-zrodla nie zabiera ostatniej sztuki pasma zbroi (rezerwa kramu)
+                            int resFree = ShopReserve.FreeBand(src, probe.ItemType, TierOf(probe));
+                            if (resFree <= 0) { stuck += toShip; break; }
+                            want = Math.Min(want, resFree);
                             int got = 0;
                             var shelf = src.ItemRoster;
                             for (int i = shelf.Count - 1; i >= 0 && got < want; i--)

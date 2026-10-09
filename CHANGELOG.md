@@ -1,5 +1,27 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-09 (174b.4) - REZERWA KRAMU DLA ZBROI: kto kupuje hurtem dla oddzialu (lordowie, zalogi, notable, kupcy wywozacy nadwyzke, takze Twoi ludzie z sakiewki), zostawia w miescie ostatnia sztuke kazdego pasma zbroi (tulow, glowa, nogi, rece; t1-2 / t3-4 / t5-6) dla kupujacego osobiscie
+**Mod:** Armoury | **Pliki:** `ShopReserve.cs` (zaslepka 174b.0 zastapiona regula), `AiGear.cs` (`BuyLoop`, `BuySubstitutes` - parametr kupujacego, `OnShelf` tylko ponad rezerwe), `VolunteerKit.cs` (kandydat bez rezerwy, osobny powod i licznik cofnietych awansow), `MenPurse.cs` (`BuyPlayerGaps`), `SupplyDemand.cs` (`DailyTrade` - wywoz z polki miasta-zrodla), `Settings.cs` + `McmSettings.cs` (NOWE `ShopKeepsLastArmour` = true, `ShopKeepPieces` = 1, suwak 0-3; gen_mcm: 769 ustawien). Bez kluczy zapisu.
+
+**Co zobaczysz w grze (prosto):** w miescie, gdzie lezy jeszcze zbroja danego rodzaju, ostatnia sztuka zostaje na straganie - lordowie, zalogi, notable, kupcy i Twoi ludzie kupujacy ze swojej sakiewki jej nie zabieraja; kupisz ja Ty na ekranie handlu (drogo, bo cena dalej liczy, ze towaru malo). To pytanie 1 do Ciebie (domyslnie wlaczone, wylacznik w MCM): w grze osobiscie przy straganie kupujesz tylko Ty, wiec to wyjatek od "jednej reguly".
+
+**Problem:** test sklad6: zbroja korpusu na polkach miast d10/20/30/40 2 862 / 872 / 331 / 1 998 (172b 8 860 / 6 115 / 1 983 / 1 067), od d25 ponizej 400 szt.; zbroi na tulow t3 na polkach calego swiata 0-5 szt., t4 0-1 (diagnoza C `a174b/rynek.md`). Zakupow w kolko nie ma (AI zdejmuje 58-114% doplywu) - zolnierze lordow nosza wszystko, co kowale zrobia; gracz nie ma czego kupic.
+
+**Zmiana (wylacznik `ShopKeepsLastArmour`, liczba `ShopKeepPieces`):**
+- `ShopReserve.Free` / `FreeBand`: w MIESCIE (zamek to nie targ) kupujacy hurtem moze zdjac tylko sztuki pasma ponad `ShopKeepPieces` (bez unikatow; licznik z pamieci polki 174b.5 `ShelfIndex.Band`, przy wylaczonej pamieci - przejscie polki). Bron, tarcze, amunicja, konie - bez rezerwy.
+- Hurt: `AiGear.BuyLoop` (takze zamowienia zamkow na polce miasta), `AiGear.BuySubstitutes` (zbroja zastepcza), `VolunteerKit.BuyCore` (notable dla ochotnikow - z liczeniem sztuk pasma wybranych w tym samym wywolaniu), `MenPurse.BuyPlayerGaps` (sakiewka ludzi GRACZA - jak ludzie lorda), `SupplyDemand.DailyTrade` (wywoz z polki miasta-zrodla). Ekran handlu gracza - bez limitu (kod go nie dotyka).
+- Sygnal dla kowali bez zmian: `OnShelf` liczy tylko sztuki ponad rezerwe (zamowienie `NoteUnmetOnce` jak przy pustej polce); `VolunteerKit` - sztuka z rezerwy nie jest kandydatem, zamowienie jak dotad, awans cofniety z powodem "rezerwa kramu ..." i osobnym licznikiem w linii "Ochotnicy" (krytyka 13). Cena bez zmian (`Stock` liczy cala polke).
+- Linie: "Zbroja na polkach (174b)" - "rezerwa kramu: sztuk N (korpus, helm, nogi, rece)"; "ZakupyAI wedlug kupujacego (174b)" - "zatrzymane na rezerwie kramu N szt. [wedlug kupujacego]"; koszt w "Koszt 171-174" (rezerwa kramu).
+
+**Ryzyko / co sprawdzic (kontrola calosci):**
+- Jedna regula (krytyka 21): podzial "hurt / zakup osobisty" pokrywa sie w praktyce z podzialem AI / gracz (AI nie ma drogi zakupu osobistego zbroi; gracz na ekranie handlu moze kupic hurtem takze ostatnia sztuke). Zapisane wprost jako WYJATEK i pytanie 1 do Jeffa z wariantem (a) "wedlug wielkosci zakupu, takze gracz" - wymaga latki ekranu handlu (osobna praca).
+- Petli nie ma: rezerwa tylko zmniejsza zakupy hurtowe; sztuka z rezerwy nie trafia do zbrojowni AI, wiec nie wraca jako nadwyzka. Straznik w tescie: nadwyzki korpusu sprzedane z sakiewek (M3) > 50% kupionego korpusu (M2) przez 5 dob przy lupie < 1 tys./d - zbadac.
+- Koszt dla wojska jednorazowo <= ok. 600 sztuk korpusu i helmow na swiat (<= ok. 0.3 pp "cokolwiek na tulowiu"), potem strumien bez zmian.
+- `ArmsScrap` moze skupic sztuke rezerwy tylko w koszyku ponad rok popytu (kowale miasta, nie hurt) - zamierzone. `GarrisonArmory` nie kupuje z polki.
+- Kod tylko zbudowany (kod 0) - NIE uruchomiony w grze.
+
+**Status:** NIEWGRANE - DO SPRAWDZENIA (P5 - nowa sztuka t1-2 w >= 49 miastach i t3-4 w >= 24 w oknie 7 dob od d15; P6 bez spadku ponad 1.5 pp wobec sklad6; "sztuk w rezerwie" <= 1 164; straznik M3/M2).
+
 ## 2026-10-09 (174b.3) - RUDA DLA TEGO, KTO WIECEJ NA NIEJ ZAROBI: platnerz nie zabiera strzelarzom rudy, ktora ich rece by zuzyly, gdy strzelarze zarabiaja na ladunku wiecej (miasto bez strzal)
 **Mod:** Armoury | **Pliki:** `TownFletchers.cs` (oferta za ladunek rudy w stanie miasta, `OreOffer`, `NoteHeld`, liczniki w linii "Strzelarze (172)"), `WorkshopLaw.cs` (`TryStartCore` - kod 5 "czeka na strzelarzy", licznik w linii "Warsztaty"), `MaterialOrders.cs` (`NoteMissMask` z flaga linii nazw), `Settings.cs` + `McmSettings.cs` (NOWE `FletchersBidForOre` = true; gen_mcm: 767 ustawien). Bez kluczy zapisu (oferta to stan sesji).
 

@@ -68,7 +68,7 @@ namespace Armoury
         }
 
         private static int BuySubstitutes(Settlement market, MobileParty buyer, Dictionary<ItemObject, int> armory, Dictionary<int, int> needOut, Dictionary<int, int> need,
-                                          int budget, int maxPieces, ref int pieces, List<string> bought, Deliver deliver)
+                                          int budget, int maxPieces, ref int pieces, List<string> bought, Deliver deliver, int who)
         {
             int spent = 0;
             long tc = Cost174.Begin(Cost174.SBuySub);   // 174b.5 F6 (probka 1/16, tylko log)
@@ -99,6 +99,7 @@ namespace Armoury
                 // recenzja 174 (koszt): jedno przejscie polki na wizyte - kandydaci z cena liczona raz na stos, malejaco wedlug skutecznosci do ceny;
                 // przed zakupem cena wybranego stosu liczona na nowo (polka zmienia sie po kazdym zakupie)
                 var cands = new List<SubCand>();
+                bool subHeld = false;
                 for (int i = 0; i < shelf.Count; i++)
                 {
                     var el = shelf.GetElementCopyAtIndex(i);
@@ -106,13 +107,14 @@ namespace Armoury
                     if (el.Amount <= 0 || it == null || ArmsPricing.IsUnique(it)) continue;
                     bool isM = melee && gapMelee > 0 && Melee((int)it.ItemType), isB = body && gapBody > 0 && it.ItemType == ItemObject.ItemTypeEnum.BodyArmor;
                     if (!isM && !isB) continue;
+                    if (isB && ShopReserve.Free(market, it) <= 0) { subHeld = true; continue; }   // 174b.4: ostatnia sztuka pasma zostaje na straganie
                     int price = market.Town.MarketData.GetPrice(el.EquipmentElement, buyer, false, market.Party);
                     if (price <= 0) continue;
                     bool cloth = isB && it.ArmorComponent != null && it.ArmorComponent.MaterialType == ArmorComponent.ArmorMaterialTypes.Cloth;
                     cands.Add(new SubCand { El = el.EquipmentElement, Left = el.Amount, Tier = TierOf(it), Price = price, Gen = 1, Melee = isM, Cloth = cloth,
                                             Score = (it.Effectiveness > 0f ? it.Effectiveness : 1f) / price });
                 }
-                if (cands.Count == 0) return 0;
+                if (cands.Count == 0) { if (subHeld) Measure174b.NoteHeld(who, 1); return 0; }
                 cands.Sort((x, y) => y.Score.CompareTo(x.Score));
                 var keys = new List<int>(need.Keys); keys.Sort((a, b) => (b % 10).CompareTo(a % 10));   // najwyzsze szczeble najpierw
                 int gen = 1;   // 174b.5 F2(b): cena z pierwszego przejscia wazna do pierwszego zakupu (polka, kiesa i ksiega te same), potem liczona od nowa jak dotad
@@ -134,6 +136,7 @@ namespace Armoury
                         if (price <= 0 || price > budget - spent) continue;
                         int n = Math.Min(Math.Min(deficit, c.Left), Math.Min(maxPieces - pieces, (budget - spent) / price));
                         n = Math.Min(n, isMelee ? gapMelee : gapBody);
+                        if (!isMelee && n > 0) { int fr = ShopReserve.Free(market, c.El.Item); if (fr < n) { Measure174b.NoteHeld(who, n - Math.Max(0, fr)); n = Math.Max(0, fr); } }   // 174b.4
                         if (n <= 0) continue;
                         shelf.AddToCounts(c.El, -n);
                         gen++;
@@ -356,7 +359,7 @@ namespace Armoury
         /// 171 (wydzielone z TryBuy bez zmian): zakup z polki targu wedle brakow. Kolejnosc typow Order, tiery 6..1, kandydaci t i t-1 bez unikatow,
         /// najlepsza skutecznosc do ceny; limit sztuk (pieces - licznik wspolny dla wywolan) i budzetu. Zwraca wydane zloto; need - co zostalo.
         /// </summary>
-        private static int BuyLoop(Settlement market, MobileParty buyer, Dictionary<int, int> need, int budget, int maxPieces, ref int pieces, List<string> bought, Deliver deliver)
+        private static int BuyLoop(Settlement market, MobileParty buyer, Dictionary<int, int> need, int budget, int maxPieces, ref int pieces, List<string> bought, Deliver deliver, int who)
         {
             int spent = 0;
             _lastBudgetStop = false;
@@ -376,6 +379,7 @@ namespace Armoury
                     while (deficit > 0 && pieces < maxPieces && spent < budget)
                     {
                         int bestI = -1; float bestScore = 0f; int bestPrice = 0;
+                        bool resHit = false;   // 174b.4: kandydat pominiety, bo zostala sama rezerwa kramu
                         for (int i = 0; i < shelf.Count; i++)
                         {
                             var el = shelf.GetElementCopyAtIndex(i);
@@ -384,6 +388,7 @@ namespace Armoury
                             int ti = TierOf(it);
                             if (ti != t && ti != t - 1) continue;
                             if (ArmsPricing.IsUnique(it)) continue;
+                            if (ShopReserve.Free(market, it) <= 0) { resHit = true; continue; }   // 174b.4: ostatnia sztuka pasma zostaje na straganie
                             int price;
                             if (i < memo.Length && memoGen[i] == gen) price = memo[i];
                             else { price = market.Town.MarketData.GetPrice(el.EquipmentElement, buyer, false, market.Party); if (i < memo.Length) { memo[i] = price; memoGen[i] = gen; } }
@@ -393,11 +398,12 @@ namespace Armoury
                             float score = eff / price;
                             if (score > bestScore) { bestScore = score; bestI = i; bestPrice = price; }
                         }
-                        if (bestI < 0) break;
+                        if (bestI < 0) { if (resHit) Measure174b.NoteHeld(who, 1); break; }
                         var pick = shelf.GetElementCopyAtIndex(bestI);
                         int n = Math.Min(deficit, pick.Amount);
                         n = Math.Min(n, maxPieces - pieces);
                         n = Math.Min(n, (budget - spent) / bestPrice);
+                        { int fr = ShopReserve.Free(market, pick.EquipmentElement.Item); if (fr < n) { Measure174b.NoteHeld(who, n - Math.Max(0, fr)); n = Math.Max(0, fr); } }   // 174b.4
                         if (n <= 0) break;
                         shelf.AddToCounts(pick.EquipmentElement, -n);
                         gen++;
@@ -413,13 +419,15 @@ namespace Armoury
             return spent;
         }
 
-        /// <summary>Czy na polce lezy sztuka typu i tieru (t albo t-1), bez unikatow - "za drogie" to nie brak towaru (wpis 81).</summary>
-        private static bool OnShelf(ItemRoster shelf, ItemObject.ItemTypeEnum ty, int tr)
+        /// <summary>Czy na polce lezy sztuka typu i tieru (t albo t-1), bez unikatow - "za drogie" to nie brak towaru (wpis 81). 174b.4: tylko sztuki PONAD
+        /// rezerwe kramu - gdy zostala sama rezerwa, zamowienie dla kowali idzie jak przy pustej polce.</summary>
+        private static bool OnShelf(Settlement market, ItemObject.ItemTypeEnum ty, int tr)
         {
+            var shelf = market.ItemRoster;
             for (int i = 0; i < shelf.Count; i++)
             {
                 var el = shelf.GetElementCopyAtIndex(i); var it = el.EquipmentElement.Item;
-                if (el.Amount > 0 && it != null && it.ItemType == ty && !ArmsPricing.IsUnique(it)) { int ti = TierOf(it); if (ti == tr || ti == tr - 1) return true; }
+                if (el.Amount > 0 && it != null && it.ItemType == ty && !ArmsPricing.IsUnique(it)) { int ti = TierOf(it); if ((ti == tr || ti == tr - 1) && ShopReserve.Free(market, it) > 0) return true; }
             }
             return false;
         }
@@ -527,7 +535,7 @@ namespace Armoury
                     lord.ChangeHeroGold(-(cost - fromPurse));
                     st.Town.ChangeGold(unit * n);
                     MoneyLedger.Note(MoneyLedger.NGear, st, unit * n);   // ksiega przeplywow osad (tylko licznik)
-                });
+                }, who);
                 Cost174.End(Cost174.SBuyLoop, tl);
                 // 174 pytanie 2: gorszy sprzet zamiast zadnego - tylko z polki tej osady, tylko do pokrycia "dowolnego szczebla"
                 if (SubstituteMeleeOn || SubstituteBodyOn)
@@ -543,7 +551,7 @@ namespace Armoury
                         lord.ChangeHeroGold(-(cost - fromPurse));
                         st.Town.ChangeGold(unit * n);
                         MoneyLedger.Note(MoneyLedger.NGear, st, unit * n);
-                    });
+                    }, who);
                 }
                 if (castleCart)
                 {
@@ -575,7 +583,7 @@ namespace Armoury
                                         MoneyLedger.Note(MoneyLedger.NGear, market, unit * n);
                                         lines.Add(new GarrisonCarts.Line { El = el, N = n, Bucket = k });
                                         paid += unit * n;
-                                    });
+                                    }, Measure174b.BCastleOrder);
                                     budgetStop = _lastBudgetStop;
                                 }
                             }
@@ -590,7 +598,7 @@ namespace Armoury
                             {
                                 if (kv.Value <= 0) continue;
                                 var ty = (ItemObject.ItemTypeEnum)(kv.Key / 10); int tr = kv.Key % 10;
-                                if (!OnShelf(market.ItemRoster, ty, tr)) { SupplyDemand.NoteUnmetOnce(mp, market, ty, tr, Math.Min(10, kv.Value)); unmet++; }
+                                if (!OnShelf(market, ty, tr)) { SupplyDemand.NoteUnmetOnce(mp, market, ty, tr, Math.Min(10, kv.Value)); unmet++; }
                             }
                             if (unmet > 0) GarrisonCarts.NoteUnmet(unmet);
                         }
@@ -606,7 +614,7 @@ namespace Armoury
                     {
                         if (kv.Value <= 0) continue;
                         var ty = (ItemObject.ItemTypeEnum)(kv.Key / 10); int tr = kv.Key % 10;
-                        if (!OnShelf(shelf, ty, tr)) SupplyDemand.NoteUnmetOnce(mp, st, ty, tr, Math.Min(10, kv.Value));
+                        if (!OnShelf(st, ty, tr)) SupplyDemand.NoteUnmetOnce(mp, st, ty, tr, Math.Min(10, kv.Value));
                     }
                 }
                 if (pieces <= 0) return;

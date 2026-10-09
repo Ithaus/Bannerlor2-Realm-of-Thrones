@@ -3080,6 +3080,14 @@ namespace Armoury
         [SettingPropertyGroup("Arms production")]
         public bool FletchersBidForOre { get; set; } = true;
 
+        [SettingPropertyBool("Shop Keeps Last Armour", HintText = "buyers for a whole company (lords, garrisons, notables, your own men with their purse, traders shipping surplus) leave the last piece of each kind of armour (body, head, legs, hands; cheap, middling and dear apart) on a town stall for whoever buys in person")]
+        [SettingPropertyGroup("Arms production")]
+        public bool ShopKeepsLastArmour { get; set; } = true;
+
+        [SettingPropertyInteger("Shop Keep Pieces", 0, 3, "0", HintText = "how many such pieces stay on the stall (0-3)")]
+        [SettingPropertyGroup("Arms production")]
+        public int ShopKeepPieces { get; set; } = 1;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -3849,6 +3857,8 @@ namespace Armoury
             s.TownMaterialOrderAhead = TownMaterialOrderAhead;
             s.TownMaterialOrderPlayerCaravans = TownMaterialOrderPlayerCaravans;
             s.FletchersBidForOre = FletchersBidForOre;
+            s.ShopKeepsLastArmour = ShopKeepsLastArmour;
+            s.ShopKeepPieces = ShopKeepPieces;
         }
 
         internal static void Apply()

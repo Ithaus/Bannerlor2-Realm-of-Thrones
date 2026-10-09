@@ -298,17 +298,19 @@ namespace Armoury
                 while (gap > 0 && pieces < maxPieces && spent < budget)
                 {
                     int best = -1, bestPrice = 0; float bestScore = 0f;
+                    bool resHit = false;
                     for (int i = 0; i < shelf.Count; i++)
                     {
                         var el = shelf.GetElementCopyAtIndex(i);
                         var it = el.EquipmentElement.Item;
                         if (el.Amount <= 0 || !QuartermasterLaw.CountsAsKit(it, type) || ArmsPricing.IsUnique(it)) continue;
+                        if (ShopReserve.Free(st, it) <= 0) { resHit = true; continue; }   // 174b.4: ludzie gracza kupuja hurtem jak ludzie lorda - ostatnia sztuka pasma zostaje
                         int price = st.Town.MarketData.GetPrice(el.EquipmentElement, main, false, st.Party);
                         if (price <= 0 || price > budget - spent) continue;
                         float score = (it.Effectiveness > 0f ? it.Effectiveness : 1f) / price;
                         if (score > bestScore) { bestScore = score; best = i; bestPrice = price; }
                     }
-                    if (best < 0) break;
+                    if (best < 0) { if (resHit) Measure174b.NoteHeld(Measure174b.BPlayerMen, 1); break; }
                     var pick = shelf.GetElementCopyAtIndex(best).EquipmentElement;
                     shelf.AddToCounts(pick, -1);
                     armory.AddToCounts(pick, 1);

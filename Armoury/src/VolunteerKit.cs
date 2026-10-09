@@ -32,10 +32,11 @@ namespace Armoury
         internal static bool On { get { var s = Settings.Current; return s != null && s.VolunteerKitEnabled; } }
 
         private static int _bought, _reverted, _gold, _pieces, _extraMissing, _dayStamp = -1;
+        private static int _revReserve;   // 174b.4 (krytyka 13): awanse cofniete, bo zostala sama rezerwa kramu
         private static int _castleBought, _castleReverted, _castleFresh;   // 171 A4: zamki BK (tylko licznik)
         private static readonly Dictionary<Settlement, Settlement> _market = new Dictionary<Settlement, Settlement>();
 
-        internal static void Reset() { SupplyDemand.ResetOrders(); _market.Clear(); _bought = _reverted = _gold = _pieces = _extraMissing = 0; _castleBought = _castleReverted = _castleFresh = 0; _dayStamp = -1; }
+        internal static void Reset() { SupplyDemand.ResetOrders(); _market.Clear(); _bought = _reverted = _gold = _pieces = _extraMissing = _revReserve = 0; _castleBought = _castleReverted = _castleFresh = 0; _dayStamp = -1; }
 
         public static void Prefix(Settlement settlement, out Dictionary<Hero, CharacterObject[]> __state)
         {
@@ -183,6 +184,7 @@ namespace Armoury
         private static readonly List<EquipmentElement> _lastBought = new List<EquipmentElement>();   // wpis 92: dla kompletu rekruta
 
         private static bool IsAmmoType(ItemObject.ItemTypeEnum t) { return t == ItemObject.ItemTypeEnum.Arrows || t == ItemObject.ItemTypeEnum.Bolts; }
+        private static int BandKey(ItemObject it) { return (int)it.ItemType * 3 + Measure174b.Band(it); }
 
         /// <summary>171 A3: oddzial, z ktorego "awansuje" swiezy ochotnik tieru 2+ - podstawowy rekrut jego kultury (albo kultury notabla).</summary>
         private static CharacterObject BasicOf(CharacterObject y, Hero n)
@@ -223,9 +225,11 @@ namespace Armoury
             // w petli dodatkow pamiec kasowana po kazdym zakupie i po kazdym zamowieniu (NoteUnmetOnce zmienia popyt, wiec i cene)
             int[] memo = new int[roster.Count], memoGen = new int[roster.Count];
             int gen = 1;
+            var takenBand = new Dictionary<int, int>();   // 174b.4: sztuki pasma zbroi wybrane w tym wywolaniu (zdejmowane z polki dopiero po petli)
             foreach (var it in need)
             {
                 int best = -1, bestPrice = int.MaxValue;
+                bool resHit = false;
                 for (int i = 0; i < roster.Count; i++)
                 {
                     var el = roster.GetElementCopyAtIndex(i);
@@ -235,6 +239,8 @@ namespace Armoury
                     if (cand.ItemType == ItemObject.ItemTypeEnum.Horse && cand.HorseComponent != null && cand.HorseComponent.IsPackAnimal) continue;
                     int used; taken.TryGetValue(i, out used);
                     if (el.Amount - used <= 0) continue;
+                    int fr = ShopReserve.Free(market, cand);   // 174b.4: sztuka z rezerwy kramu nie jest kandydatem
+                    if (fr != int.MaxValue) { int tb; takenBand.TryGetValue(BandKey(cand), out tb); if (fr - tb <= 0) { resHit = true; continue; } }
                     int price;
                     if (i < memo.Length && memoGen[i] == gen) price = memo[i];
                     else
@@ -247,10 +253,13 @@ namespace Armoury
                 if (best < 0)
                 {
                     SupplyDemand.NoteUnmetOnce(notable, market, it.ItemType, (int)it.Tier + 1, 1f);   // nie ma czego kupic - zamowienie (wpis 67)
-                    if (countWhy) { Why(it.ItemType + " t" + ((int)it.Tier + 1)); if (IsAmmoType(it.ItemType)) TownFletchers.NoteNotableRevert(it.ItemType); }   // 172: awans cofniety z braku amunicji
+                    if (resHit) Measure174b.NoteHeld(Measure174b.BNotable, 1);
+                    // 174b.4 (krytyka 13): awans cofniety przez rezerwe kramu - osobny powod i licznik
+                    if (countWhy) { Why((resHit ? "rezerwa kramu " : "") + it.ItemType + " t" + ((int)it.Tier + 1)); if (resHit) _revReserve++; if (IsAmmoType(it.ItemType)) TownFletchers.NoteNotableRevert(it.ItemType); }   // 172: awans cofniety z braku amunicji
                     return false;
                 }
                 int u; taken.TryGetValue(best, out u); taken[best] = u + 1;
+                { var bi = roster.GetElementCopyAtIndex(best).EquipmentElement.Item; if (ShopReserve.Free(market, bi) != int.MaxValue) { int k = BandKey(bi), tb; takenBand.TryGetValue(k, out tb); takenBand[k] = tb + 1; } }
                 picks.Add(roster.GetElementCopyAtIndex(best).EquipmentElement);
                 pickPrices.Add(bestPrice);
                 total += bestPrice;
@@ -272,12 +281,14 @@ namespace Armoury
             foreach (var it in extra)
             {
                 int best = -1, bestPrice = int.MaxValue;
+                bool resHit2 = false;
                 for (int i = 0; i < roster.Count; i++)
                 {
                     var el = roster.GetElementCopyAtIndex(i);
                     var cand = el.EquipmentElement.Item;
                     if (cand == null || el.Amount <= 0 || cand.ItemType != it.ItemType || cand.Tier < it.Tier) continue;
                     if (ArmsPricing.IsUnique(cand)) continue;
+                    if (ShopReserve.Free(market, cand) <= 0) { resHit2 = true; continue; }   // 174b.4
                     if (cand.ItemType == ItemObject.ItemTypeEnum.Horse && cand.HorseComponent != null && cand.HorseComponent.IsPackAnimal) continue;
                     int price;
                     if (i < memo.Length && memoGen[i] == gen) price = memo[i];
@@ -291,6 +302,7 @@ namespace Armoury
                 if (best < 0 || notable.Gold < bestPrice)
                 {
                     _extraMissing++;
+                    if (best < 0 && resHit2) Measure174b.NoteHeld(Measure174b.BNotable, 1);
                     if (best < 0) { SupplyDemand.NoteUnmetOnce(notable, market, it.ItemType, (int)it.Tier + 1, 1f); gen++; }   // 174b.5 F3: zamowienie zmienia popyt - ceny od nowa
                     WhyExtra(it.ItemType + " t" + ((int)it.Tier + 1));
                     continue;
@@ -318,7 +330,7 @@ namespace Armoury
         {
             if (_dayStamp < 0 || _bought + _reverted + _pieces + _castleFresh == 0) return;
             Log.Info("Ochotnicy: dzien " + _dayStamp + " - awanse z kupionym sprzetem " + _bought + " (" + _pieces + " szt. za " + _gold
-                     + " zl z kiesy notabli do miast), cofniete (brak towaru albo zlota) " + _reverted + "; dodatkow nie dokupiono " + _extraMissing
+                     + " zl z kiesy notabli do miast), cofniete (brak towaru albo zlota) " + _reverted + " (w tym przez rezerwe kramu 174b.4: " + _revReserve + "); dodatkow nie dokupiono " + _extraMissing
                      + "; w tym zamki BK: awanse " + _castleBought + ", cofniete " + _castleReverted + ", swiezi t2+ " + _castleFresh + ".");
             if (_whyExtra.Count > 0)
             {
@@ -334,7 +346,7 @@ namespace Armoury
                 Log.Info("Ochotnicy (diagnoza): powody cofniec - " + string.Join(", ", parts.ToArray()) + ".");
                 _why.Clear();
             }
-            _bought = _reverted = _gold = _pieces = _extraMissing = 0;
+            _bought = _reverted = _gold = _pieces = _extraMissing = _revReserve = 0;
             _castleBought = _castleReverted = _castleFresh = 0;
         }
 
