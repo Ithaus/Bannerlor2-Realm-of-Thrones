@@ -105,6 +105,15 @@ namespace Armoury
                     if (mainRanged && candRanged) continue;   // luk + kusza to nie zapas
                     second = r.Key; break;
                 }
+                // 175.G (Army175GoldenBows, dom. NIE - czeka na K1 i na zgode Jeffa na wyjatek od zasady 28.08): gdy zestawy jednostki
+                // maja ROZNE klasy dystansowe (CS GoldenBows: Zlota Kompania - kusza / luk dwukrzywy / luk cisowy), glowna bron
+                // dystansowa = klasa z WYLOSOWANEGO zestawu (referencja DTE), nie najwyzsza umiejetnosc - inaczej wszyscy dostaliby
+                // kusze (Kusza 110 > Luk 105). Zapas (bron reczna) bez zmian - po glownej strzeleckiej i tak nie moze byc dystansowy.
+                if ((main == "bow" || main == "xbow") && Settings.Current.Army175GoldenBows)
+                {
+                    string drawn = RangedClassOf(reference);
+                    if (drawn != null && drawn != main && MixedRanged(ch)) main = drawn;
+                }
 
                 // tarcza z szablonu zostaje (charakter jednostki), jesli glowna nie dwureczna
                 ItemObject shield = null;
@@ -236,6 +245,39 @@ namespace Armoury
                 if (pinHar != null) reference[(EquipmentIndex)11] = new EquipmentElement(pinHar);
             }
             catch (Exception e) { Log.Error("SkillsDecide.RearmBySkill", e); }
+        }
+
+        /// <summary>175.G: klasa dystansowa zestawu (sloty broni 0-3): "bow", "xbow" albo null.</summary>
+        private static string RangedClassOf(Equipment eq)
+        {
+            if (eq == null) return null;
+            for (int i = 0; i < 4; i++)
+            {
+                var it = eq[(EquipmentIndex)i].Item;
+                if (it == null) continue;
+                if (it.ItemType == ItemObject.ItemTypeEnum.Bow) return "bow";
+                if (it.ItemType == ItemObject.ItemTypeEnum.Crossbow) return "xbow";
+            }
+            return null;
+        }
+
+        /// <summary>175.G: czy zestawy bojowe jednostki maja rozne klasy dystansowe (luk w jednym, kusza w drugim). Bez pamieci
+        /// podrecznej: wolane tylko przy wlaczonym Army175GoldenBows, gdy wylosowany zestaw nie zgadza sie z najwyzsza umiejetnoscia,
+        /// a zestawy zmienia latka CS przy wczytaniu.</summary>
+        private static bool MixedRanged(CharacterObject ch)
+        {
+            string first = null;
+            try
+            {
+                foreach (var eq in ch.BattleEquipments)
+                {
+                    var c = RangedClassOf(eq);
+                    if (c == null) continue;
+                    if (first == null) first = c; else if (c != first) return true;
+                }
+            }
+            catch { }
+            return false;
         }
 
         private static int SkillFor(CharacterObject ch, string cls)

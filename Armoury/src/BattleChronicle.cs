@@ -54,6 +54,8 @@ namespace Armoury
             try
             {
                 if (me == null) return;
+                // 175.0: miara balansu krolestw (linia "Bitwa: B175") - przed wyjsciem przy malych bitwach, liczy kazda bitwe krolestw
+                try { KingdomBalance.OnBattle(me); } catch (Exception e) { Log.Error("KingdomBalance.OnBattle", e); }
                 var a = Sum(me.AttackerSide); var d = Sum(me.DefenderSide);
                 bool player = me.IsPlayerMapEvent;
                 if (a.Dead + a.Wounded + d.Dead + d.Wounded == 0 && !player) return;      // bez walki (ucieczka, poddanie)

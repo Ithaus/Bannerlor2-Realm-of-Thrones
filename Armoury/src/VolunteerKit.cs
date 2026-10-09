@@ -78,8 +78,11 @@ namespace Armoury
                         var x = gone.FirstOrDefault(g => g.UpgradeTargets != null && g.UpgradeTargets.Contains(y));
                         if (x == null) continue;                          // nowy ochotnik (tier 1) - wlasny dobytek
                         gone.Remove(x);
-                        if (!Buy(n, market, x, y)) { after[i] = x; _reverted++; }
+                        bool ok = Buy(n, market, x, y);
+                        if (!ok) { after[i] = x; _reverted++; }
                         else { _bought++; RecruitKit.OnUpgrade(n, x, y, new List<EquipmentElement>(_lastBought)); }
+                        // 175.0 (pomiar, Army175Measure): ochotnik awansowany na konnego - z koniem kupionym przez notabla albo cofniety
+                        if (y.IsMounted && !x.IsMounted) HorseCensus.OnVolunteerRider(settlement, n, ok);
                     }
                     // wpis 92: ochotnik zniknal z puli bez awansu (gra go podmienila) - jego kupione rzeczy wracaja na targ
                     foreach (var g in gone) if (g != null && g.Tier >= 2) RecruitKit.OnVanished(n, g, market);

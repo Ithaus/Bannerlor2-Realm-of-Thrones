@@ -203,14 +203,93 @@ namespace Armoury
         {
             var c = Settings.Current;
             int tier = (int)target.Tier;
+            // 175.1: u AI szlachetny rumak moze tez lezec wolny w zbrojowni (Have liczy tabor + wolne)
             if (tier >= c.NobleHorseFromTier)
-                return (party != null && CountInRoster(party, DefaultItemCategories.NobleHorse) > 0)
+                return (party != null && Have(party, DefaultItemCategories.NobleHorse) > 0)
                     ? DefaultItemCategories.NobleHorse : DefaultItemCategories.WarHorse;
             if (tier >= c.WarHorseFromTier) return DefaultItemCategories.WarHorse;
             return DefaultItemCategories.Horse;
         }
 
-        private static int CountInRoster(PartyBase party, ItemCategory cat)
+        // ------------------------------------------------------------ 175.1: zbrojownia AI (decyzja Jeffa 09.10 pkt 2)
+        /// <summary>
+        /// KON ZA AWANS AI TRAFIA DO ZBROJOWNI NOWEGO JEZDZCA, JAK U GRACZA (Jeff 09.10: "naprawic: kon, ktory lord AI oddaje
+        /// za awans, ma trafic do zbrojowni nowego jezdzca, nie znikac"). Dotad PayInHorses zdejmowal konia z taboru i na tym
+        /// koniec (AddToCounts(-n)) - kon znikal, a u gracza ten sam kon idzie do zbrojowni DTE (BankPaidHorses). Teraz u AI
+        /// (lordowie, partie towarzyszy, zalogi - wszystko, co awansuje przez PartyUpgraderCampaignBehavior) kon idzie do
+        /// zbrojowni DTE partii (AiGear.AddToArmory). Do tego WOLNE KONIE: kon po poleglym jezdzcu zostaje w zbrojowni, wiec
+        /// przy nastepnym awansie lord bierze najpierw jego (wolne = konie pod siodlo w zbrojowni minus konni w partii, nie
+        /// mniej niz 0), dopiero potem z taboru - gracz robi to recznie (przenosi konia ze zbrojowni do taboru). Jedna zasada:
+        /// kon musi istniec w partii (30.08). Brak DTE / zbrojowni -> kon schodzi z taboru jak dotad (licznik "przepadlo"),
+        /// nigdy nie wraca do taboru (awans bylby darmowy). Wylacznik AiUpgradeHorseToArmory.
+        /// </summary>
+        internal static bool AiFix(PartyBase party)
+        {
+            var s = Settings.Current;
+            return s != null && s.AiUpgradeHorseToArmory && party != null && party != PartyBase.MainParty && party.MobileParty != null;
+        }
+
+        /// <summary>Konie pod siodlo (IsPlainMount) w zbrojowni DTE partii; cat != null - tylko tej kategorii.</summary>
+        internal static int ArmoryMounts(MobileParty mp, ItemCategory cat = null)
+        {
+            int n = 0;
+            try
+            {
+                var all = AiGear.Armories();
+                System.Collections.Generic.Dictionary<ItemObject, int> arm;
+                if (all == null || mp == null || !all.TryGetValue(mp.Id, out arm) || arm == null) return 0;
+                foreach (var kv in arm)
+                {
+                    if (kv.Key == null || kv.Value <= 0) continue;
+                    if (cat != null && kv.Key.ItemCategory != cat) continue;
+                    if (!IsPlainMount(kv.Key)) continue;
+                    n += kv.Value;
+                }
+            }
+            catch { }
+            return n;
+        }
+
+        /// <summary>Konni szeregowi partii (IsMounted, z rannymi).</summary>
+        internal static int MountedMen(MobileParty mp)
+        {
+            int n = 0;
+            try
+            {
+                var r = mp.MemberRoster;
+                for (int i = 0; i < r.Count; i++)
+                {
+                    var el = r.GetElementCopyAtIndex(i);
+                    if (el.Character != null && !el.Character.IsHero && el.Number > 0 && el.Character.IsMounted) n += el.Number;
+                }
+            }
+            catch { }
+            return n;
+        }
+
+        /// <summary>
+        /// Wolne konie zbrojowni: konie pod siodlo minus konni w partii (nie mniej niz 0); cat != null - nie wiecej niz koni tej
+        /// kategorii. newRiders = konni, ktorzy wlasnie weszli do rostera i nie maja jeszcze konia (straz konia ROT) - nie zajmuja wolnych.
+        /// </summary>
+        internal static int FreeArmory(MobileParty mp, ItemCategory cat, int newRiders = 0)
+        {
+            if (mp == null) return 0;
+            int all = ArmoryMounts(mp);
+            if (all <= 0) return 0;
+            int free = all - Math.Max(0, MountedMen(mp) - Math.Max(0, newRiders));
+            if (free <= 0) return 0;
+            return cat == null ? free : Math.Min(free, ArmoryMounts(mp, cat));
+        }
+
+        /// <summary>Konie kategorii, ktore partia ma do awansu: tabor, a u AI (175.1) takze wolne w zbrojowni.</summary>
+        internal static int Have(PartyBase party, ItemCategory cat)
+        {
+            int n = CountInRoster(party, cat);
+            if (AiFix(party)) n += FreeArmory(party.MobileParty, cat);
+            return n;
+        }
+
+        internal static int CountInRoster(PartyBase party, ItemCategory cat)
         {
             int n = 0;
             try
@@ -227,8 +306,10 @@ namespace Armoury
             return n;
         }
 
-        /// <summary>Najtansze konie ida pod siodlo pierwsze - lepsze rumaki czekaja na wyzsze awanse.</summary>
-        private static void Consume(PartyBase party, ItemCategory cat, int count)
+        /// <summary>Najtansze konie ida pod siodlo pierwsze - lepsze rumaki czekaja na wyzsze awanse.
+        /// 175.1: taken != null - dopisuje, co zdjal z taboru (z modyfikatorem), zeby kon trafil do zbrojowni.</summary>
+        internal static void Consume(PartyBase party, ItemCategory cat, int count,
+                                     System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<EquipmentElement, int>> taken = null)
         {
             try
             {
@@ -246,11 +327,37 @@ namespace Armoury
                     if (best < 0) return;
                     var elBest = r[best];
                     int take = Math.Min(count, elBest.Amount);
-                    r.AddToCounts(elBest.EquipmentElement, -take);
+                    var ee = elBest.EquipmentElement;
+                    r.AddToCounts(ee, -take);
+                    if (taken != null) taken.Add(new System.Collections.Generic.KeyValuePair<EquipmentElement, int>(ee, take));
                     count -= take;
                 }
             }
             catch { }
+        }
+
+        /// <summary>
+        /// 175.1: konie zdjete z taboru AI ida do zbrojowni DTE partii (jak u gracza). Zwraca, ile weszlo; reszta (brak DTE,
+        /// brak partii) przepada jak dotad - nigdy nie wraca do taboru. modNeg / modPos - konie z modyfikatorem (kulawy, stary /
+        /// rasowy): zbrojownia AI trzyma ItemObject bez modyfikatora (znane odstepstwo od gracza, ktory zachowuje EquipmentElement).
+        /// </summary>
+        internal static int BankToArmory(MobileParty mp, System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<EquipmentElement, int>> taken,
+                                         bool bank, out int lost, out int modNeg, out int modPos)
+        {
+            int banked = 0; lost = 0; modNeg = 0; modPos = 0;
+            if (taken == null) return 0;
+            foreach (var kv in taken)
+            {
+                if (kv.Value <= 0 || kv.Key.Item == null) continue;
+                if (bank && mp != null && AiGear.AddToArmory(mp, kv.Key.Item, kv.Value))
+                {
+                    banked += kv.Value;
+                    var mod = kv.Key.ItemModifier;   // tylko konie, ktore naprawde weszly do zbrojowni (tam bez modyfikatora)
+                    if (mod != null) { if (mod.PriceMultiplier < 1f) modNeg += kv.Value; else if (mod.PriceMultiplier > 1f) modPos += kv.Value; }
+                }
+                else lost += kv.Value;
+            }
+            return banked;
         }
 
         /// <summary>
@@ -267,6 +374,7 @@ namespace Armoury
                 if (c == null || !c.CavalryNeedsMounts) return;
                 var list = __result as IList;
                 if (list == null || list.Count == 0 || party == null) return;
+                int refused = 0, trimmed = 0;   // 175.0: pomiar (HorseCensus) - proby odrzucone i przyciete z braku konia
                 for (int i = list.Count - 1; i >= 0; i--)
                 {
                     var boxed = list[i];
@@ -278,12 +386,12 @@ namespace Armoury
                     var srcT = tr.Field("Target").GetValue<CharacterObject>();
                     if (srcT != null && !srcT.IsHero && srcT.IsMounted) continue;
                     ItemCategory cat = null;
-                    // wprost po TABORZE TEJ partii (getter mierzy stajnia gracza)
+                    // wprost po TABORZE TEJ partii (getter mierzy stajnia gracza); 175.1: u AI tabor + wolne konie zbrojowni
                     try { cat = target.IsMounted && !target.IsHero ? RequiredMountFor(party, target) : target.UpgradeRequiresItemFromCategory; } catch { }
                     if (cat == null) continue;
-                    int have = CountInRoster(party, cat);
-                    if (have <= 0) { list.RemoveAt(i); continue; }
+                    int have = Have(party, cat);
                     int need = tr.Field("PossibleUpgradeCount").GetValue<int>();
+                    if (have <= 0) { refused += Math.Max(0, need); list.RemoveAt(i); continue; }
                     if (need <= have) continue;
                     // stajnia na czesc awansow: przytnij liczbe do stanu koni
                     var ctor = boxed.GetType().GetConstructor(new[]
@@ -292,6 +400,7 @@ namespace Armoury
                         typeof(int), typeof(int), typeof(int), typeof(float)
                     });
                     if (ctor == null) continue;
+                    trimmed += need - have;
                     list[i] = ctor.Invoke(new object[]
                     {
                         tr.Field("Target").GetValue<CharacterObject>(), target, have,
@@ -300,14 +409,19 @@ namespace Armoury
                         tr.Field("UpgradeChance").GetValue<float>()
                     });
                 }
+                // 175.0: proba odrzucona = "skret w inna droge", gdy lista celow zostala niepusta, inaczej "czeka"
+                if (refused + trimmed > 0) HorseCensus.OnFiltered(party, refused, list.Count == 0, trimmed);
             }
             catch (Exception e) { Log.Error("Stables.Filter", e); }
         }
 
         /// <summary>
-        /// AI, krok 2 (sam awans): konie znikaja z taboru, sztuka za czlowieka.
-        /// Gdyby w miedzyczasie stajnia oprozniala (inny oddzial tej samej
-        /// druzyny zdazyl wybrac konie) - awans w ogole nie zachodzi.
+        /// AI, krok 2 (sam awans): kon za czlowieka. Gdyby w miedzyczasie stajnia
+        /// oprozniala (inny oddzial tej samej druzyny zdazyl wybrac konie) - awans
+        /// w ogole nie zachodzi.
+        /// 175.1 (AiUpgradeHorseToArmory): najpierw wolne konie zbrojowni (kon zostaje na miejscu - nic sie nie przesuwa,
+        /// nowy jezdziec po prostu go ma), potem tabor; kon z taboru idzie do zbrojowni partii (AiGear.AddToArmory), nie
+        /// znika. Wylacznik wylaczony - jak dotad (tylko tabor, kon przepada).
         /// </summary>
         public static bool PayInHorses(PartyBase party, object upgradeArgs)
         {
@@ -328,8 +442,17 @@ namespace Armoury
                 if (cat == null) return true;
                 int need = tr.Field("PossibleUpgradeCount").GetValue<int>();
                 if (need <= 0) return true;
-                if (CountInRoster(party, cat) < need) return false;   // konie wybrane - czekaja (XP zostaje)
-                Consume(party, cat, need);
+                bool fix = AiFix(party);
+                int free = fix ? FreeArmory(party.MobileParty, cat) : 0;
+                int inRoster = CountInRoster(party, cat);
+                if (inRoster + free < need) { HorseCensus.OnPayRefused(party, need); return false; }   // konie wybrane - czekaja (XP zostaje)
+                int fromFree = Math.Min(need, free);
+                int fromRoster = need - fromFree;
+                var taken = new System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<EquipmentElement, int>>();
+                if (fromRoster > 0) Consume(party, cat, fromRoster, taken);
+                int lost, modNeg, modPos;
+                int banked = BankToArmory(party.MobileParty, taken, fix, out lost, out modNeg, out modPos);
+                HorseCensus.OnUpgradePaid(party, cat, need, fromFree, banked, lost, modNeg, modPos);
                 return true;
             }
             catch (Exception e) { Log.Error("Stables.Pay", e); return true; }
@@ -382,8 +505,10 @@ namespace Armoury
                 // czeka na awans - nikt nie kupuje ani jednego konia.
                 int want = NeedForUpgrades(party.Party);
                 if (want <= 0) return;
+                HorseCensus.OnLordVisit(party);                  // 175.0: wizyta z potrzeba (pomiar)
                 want += Math.Max(0, c.AiMountSpareBuffer);      // kilka luzem na straty
-                int have = CountAnyMounts(party.Party);
+                // 175.1: wolne konie zbrojowni (po poleglych jezdzcach) tez sa koniami partii - bez nich lord kupowalby drugi raz
+                int have = CountAnyMounts(party.Party) + (AiFix(party.Party) ? FreeArmory(party, null) : 0);
                 int need = want - have;
                 if (need <= 0) return;
                 int cap = Math.Max(1, c.AiMountMaxPerVisit);
@@ -391,9 +516,9 @@ namespace Armoury
 
                 int purse = lord.Gold;
                 int budget = (int)(purse * MBMath.ClampFloat(c.AiMountPurseShare, 0f, 1f));
-                if (budget < 50) return;
+                if (budget < 50) { HorseCensus.OnLordBuyFailed(party, true); return; }
 
-                int bought = 0, paid = 0;
+                int bought = 0, paid = 0, boughtMarket = 0;
                 string what = null;   // id kupionych ras do logu (diagnoza "skad kamele")
                 // TARG NIE JEST STAJNIA LORDA (Jeff 15.09: "praktycznie nigdzie nie ma
                 // koni do kupienia"). Log 14.09: 676 koni w 235 zakupach w JEDNEJ
@@ -439,7 +564,7 @@ namespace Armoury
                     if (take <= 0) break;
                     shelf.AddToCounts(chosen.EquipmentElement, -take);
                     party.ItemRoster.AddToCounts(chosen.EquipmentElement, take);
-                    paid += take * bestPrice; bought += take; need -= take; needMarket -= take;
+                    paid += take * bestPrice; bought += take; need -= take; needMarket -= take; boughtMarket += take;
                     var cid = chosen.EquipmentElement.Item != null ? chosen.EquipmentElement.Item.StringId : "?";
                     if (what == null) what = cid; else if (!what.Contains(cid)) what += "," + cid;
                 }
@@ -477,8 +602,9 @@ namespace Armoury
                     }
                 }
 
-                if (bought <= 0) return;
+                if (bought <= 0) { HorseCensus.OnLordBuyFailed(party, false); return; }   // 175.0: polka i wsie puste albo za drogie
                 _lastBuy[pid] = today;
+                HorseCensus.OnLordBought(party, bought, paid + toVillages, boughtMarket, bought - boughtMarket);
                 if (paid > 0) TaleWorlds.CampaignSystem.Actions.GiveGoldAction.ApplyForCharacterToSettlement(lord, settlement, paid);
                 Log.Info("Stajnia AI: " + lord.Name + " kupil " + bought + " koni ["
                          + (what ?? "?") + "] w " + settlement.Name
@@ -494,7 +620,7 @@ namespace Armoury
         /// szczebla, przyciecie przez zebrane doswiadczenie (Xp / koszt awansu),
         /// i tylko te sciezki awansu, ktore wymagaja konia.
         /// </summary>
-        private static int NeedForUpgrades(PartyBase party)
+        internal static int NeedForUpgrades(PartyBase party)
         {
             int need = 0;
             try
@@ -562,7 +688,7 @@ namespace Armoury
             catch { return false; }
         }
 
-        private static int CountAnyMounts(PartyBase party)
+        internal static int CountAnyMounts(PartyBase party)
         {
             int n = 0;
             try

@@ -288,7 +288,7 @@ namespace Armoury
         public bool AutoParryMirrorSides = true;           // side swings block mirror-wise (his left = your right) - flip if blocks feel wrong-sided
 
         // --- A knight needs a horse ---
-        public bool CavalryNeedsMounts = true;             // upgrading a man into a MOUNTED troop takes a mount from the party inventory - yours and the AI's alike, one horse per man, gone on upgrade
+        public bool CavalryNeedsMounts = true;             // upgrading a man into a MOUNTED troop takes a mount from the party inventory - yours and the AI's alike, one horse per man; the horse goes into the new rider's armoury, for the AI just as for you (AI Upgrade Horse To Armory)
         public int WarHorseFromTier = 4;                   // from this tier the upgrade demands a proper WAR horse
         public int NobleHorseFromTier = 6;                 // from this tier nothing but a noble steed will do
         public bool AiBuysMounts = true;                   // lords restock their stables when they ride into a settlement - the AI keeps its cavalry instead of slowly losing it
@@ -305,6 +305,7 @@ namespace Armoury
         public float MountedWageFactor = 1.5f;             // how much more a mounted soldier is paid than a footman of the same tier: 1.5 puts a tier 4 rider at 12 pence a day like a man-at-arms and a tier 6 knight at 26 like a knight's 24 (2.0 = the 1346 ratio of mounted to foot archer, 1.0 = no premium)
         public int AiMountMarketSharePercent = 25;        // a lord may take at most this share of the horses on a town's shelf in one visit - the rest he orders from the breeder, so markets are not stripped bare (Jeff 15.09: no horses to buy anywhere)
         public int AiMountShelfFloor = 4;                  // and never buys the last few: this many head always stay on the shelf for other buyers
+        public bool AiUpgradeHorseToArmory = true;         // the horse an AI lord or garrison pays for a man's upgrade to a mounted troop goes into that party's armoury for the new rider, just as yours does, instead of vanishing; and at the next upgrade a horse lying free in the armoury (more horses there than mounted men) is used first, before one is taken from the baggage or bought. Takes effect at once (off = the AI horse is gone on upgrade as before)
 
         // --- The turning year ---
         public bool LongYearEnabled = true;                // stretch the year so the world stops racing: children grow, lords age and seasons turn at a pace a long campaign can live with
@@ -806,6 +807,25 @@ namespace Armoury
         public int BanditCheerRelation = 2;                // relation gained with each notable of those villages
 
         public bool LogEnabled = true;                     // write a log file in the module folder
+
+        // --- Armies of the realms (175) ---
+        // paczka 175 (decyzje Jeffa 09.10): klucze czyta CrashScribe (Mends.ArmouryFloat - sprzet wedlug tieru, sklad, NorthHardy, DothrakiRiders)
+        // i Armoury (pomiar, kon za awans AI, straz konia Dothrakow, NorthHomeEdge, GoldenBows w SkillsDecide); false = propozycje bez slowa Jeffa
+        public bool Army175Measure = true;                 // measurement only, nothing in the game changes: a daily log line of AI horse upgrades (made, refused or cut for lack of a horse, horses into armouries, purchases, where riders come from) and a line per battle and per day on the balance of the kingdoms (battles won against the odds, assaults, fortresses taken and lost, men in the field), with csv files in the session's log folder. Takes effect at once
+        public int NorthHomeEdgePercent = 10;              // the North is hardier at home: in auto-resolved field battles on snow (anywhere) and in the forests of the North, Northern infantry of tier 3 to 6 (village, noble and house lines) in parties of Northern houses fights this many percent stronger - it strikes harder and is struck less. Never at sieges; it only tips battles that are almost even. 0 = off. Takes effect at once
+        public int NorthHardySkillBonus = 25;              // Northern infantry of tier 3 to 6 (village, noble and house lines, 43 troop types) gets this many points of its main weapon skill and of Athletics on top of what its own gear demands - the men of the North are built sterner. 0 = off. Applied by CrashScribe, takes effect on the next load
+        public bool Army175TierGear = true;                // every soldier type - all cultures, village and noble lines, house troops, militia, mercenaries and garrisons, never lords, companions or you - carries and wears in its pattern only weapons, shields, ammunition and armour up to its own tier: a piece above it is replaced by the same kind of piece of that tier. A man still uses only the gear his skills allow. Applied by CrashScribe, takes effect on the next load
+        public bool Army175LoreArmor = true;               // Pentos and Qarth hire their wars: their infantry of tier 2 to 4 wears armour one step lighter, within its tier. Applied by CrashScribe, takes effect on the next load
+        public bool Army175LoreArmorExtra = false;         // proposal, not yet decided: heavier Qohor infantry of tier 4 and 5 and a lighter Dornish spear line of tier 3 and 4, within their tier. Applied by CrashScribe, takes effect on the next load
+        public bool Army175Composition = true;             // master switch for the troop mix of the realms below (Dothraki, Iron Islands, the North and the proposals): party templates and upgrade trees as the books have them. Applied by CrashScribe, takes effect on the next load
+        public bool Army175DothrakiRide = true;            // the Dothraki fight on horseback: a village recruit still starts on foot, but his only way up is the riding line; Dothraki on foot stay in the militia and those already serving keep their place. Their parties cost more in pay, riders are paid more - this is the switch if the khalasars go bankrupt. Applied by CrashScribe, takes effect on the next load
+        public bool Army175DothrakiHorseGuard = true;      // when Realm of Thrones swaps a man in a Dothraki party for a rider, he becomes a rider only if a horse is found for him - a free one in the armoury or one from the baggage; with none he becomes a Dothraki on foot of the same tier. Only with Army 175 Dothraki Ride on. Takes effect at once
+        public int DothrakiRidingBonus = 30;               // Dothraki riders of tier 2 to 5 of the village line get this many points of Riding - they ride better than any knight. 0 = off. Applied by CrashScribe, takes effect on the next load
+        public bool Army175IronbornFoot = true;            // the Iron Islands fight on foot and at sea: the Harlaw riders remain their only horse, other Ironborn riders give way to infantry of the same tier in lord parties, patrols and the vassal reward. Applied by CrashScribe, takes effect on the next load
+        public bool Army175NorthFoot = true;               // the North raises more foot, fewer archers and a little more horse; the Mormonts keep their huntresses and stay archers. Applied by CrashScribe, takes effect on the next load
+        public bool Army175VolantisNorvos = false;         // proposal, not yet decided: Volantis (the tiger cloaks are foot) and Norvos field more infantry and fewer archers and riders; the Volantene elephants stay either way. Applied by CrashScribe, takes effect on the next load
+        public bool Army175MinorLore = false;              // proposal, not yet decided: the Free Folk with fewer horsemen, and Dragonstone, Velaryon and Celtigar with horse at about a tenth of their men. Applied by CrashScribe, takes effect on the next load
+        public bool Army175GoldenBows = false;             // waits for the armoury restocking package: Golden Company crossbowmen split into thirds - crossbows, recurve bows and yew longbows - and in battle each man takes the missile weapon of his drawn kit. Applied by CrashScribe and the Armoury, takes effect on the next load
 
         // --- Map villages ---
         public bool MapVillagesEnabled = true;             // named villages on the campaign map between the game's own villages, castles and towns - each one a cluster of its district's settlements, standing where a village had reason to stand (bridge, ford, crossroads, road, river, coast); off = none drawn. Nothing is written to the save

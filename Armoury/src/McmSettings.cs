@@ -952,7 +952,7 @@ namespace Armoury
         [SettingPropertyGroup("The master's parry")]
         public bool AutoParryMirrorSides { get; set; } = true;
 
-        [SettingPropertyBool("Cavalry Needs Mounts", HintText = "upgrading a man into a MOUNTED troop takes a mount from the party inventory - yours and the AI's alike, one horse per man, gone on upgrade")]
+        [SettingPropertyBool("Cavalry Needs Mounts", HintText = "upgrading a man into a MOUNTED troop takes a mount from the party inventory - yours and the AI's alike, one horse per man; the horse goes into the new rider's armoury, for the AI just as for you (AI Upgrade Horse To Armory)")]
         [SettingPropertyGroup("A knight needs a horse")]
         public bool CavalryNeedsMounts { get; set; } = true;
 
@@ -1019,6 +1019,10 @@ namespace Armoury
         [SettingPropertyInteger("Ai Mount Shelf Floor", 0, 16, "0", HintText = "and never buys the last few: this many head always stay on the shelf for other buyers")]
         [SettingPropertyGroup("A knight needs a horse")]
         public int AiMountShelfFloor { get; set; } = 4;
+
+        [SettingPropertyBool("Ai Upgrade Horse To Armory", HintText = "the horse an AI lord or garrison pays for a man's upgrade to a mounted troop goes into that party's armoury for the new rider, just as yours does, instead of vanishing; and at the next upgrade a horse lying free in the armoury (more horses there than mounted men) is used first, before one is taken from the baggage or bought. Takes effect at once (off = the AI horse is gone on upgrade as before)")]
+        [SettingPropertyGroup("A knight needs a horse")]
+        public bool AiUpgradeHorseToArmory { get; set; } = true;
 
         [SettingPropertyBool("Long Year Enabled", HintText = "stretch the year so the world stops racing: children grow, lords age and seasons turn at a pace a long campaign can live with")]
         [SettingPropertyGroup("The turning year")]
@@ -2808,6 +2812,66 @@ namespace Armoury
         [SettingPropertyGroup("Grateful villages")]
         public bool LogEnabled { get; set; } = true;
 
+        [SettingPropertyBool("Army175 Measure", HintText = "measurement only, nothing in the game changes: a daily log line of AI horse upgrades (made, refused or cut for lack of a horse, horses into armouries, purchases, where riders come from) and a line per battle and per day on the balance of the kingdoms (battles won against the odds, assaults, fortresses taken and lost, men in the field), with csv files in the session's log folder. Takes effect at once")]
+        [SettingPropertyGroup("Armies of the realms (175)")]
+        public bool Army175Measure { get; set; } = true;
+
+        [SettingPropertyInteger("North Home Edge Percent", 0, 25, "0", HintText = "the North is hardier at home: in auto-resolved field battles on snow (anywhere) and in the forests of the North, Northern infantry of tier 3 to 6 (village, noble and house lines) in parties of Northern houses fights this many percent stronger - it strikes harder and is struck less. Never at sieges; it only tips battles that are almost even. 0 = off. Takes effect at once")]
+        [SettingPropertyGroup("Armies of the realms (175)")]
+        public int NorthHomeEdgePercent { get; set; } = 10;
+
+        [SettingPropertyInteger("North Hardy Skill Bonus", 0, 50, "0", HintText = "Northern infantry of tier 3 to 6 (village, noble and house lines, 43 troop types) gets this many points of its main weapon skill and of Athletics on top of what its own gear demands - the men of the North are built sterner. 0 = off. Applied by CrashScribe, takes effect on the next load")]
+        [SettingPropertyGroup("Armies of the realms (175)")]
+        public int NorthHardySkillBonus { get; set; } = 25;
+
+        [SettingPropertyBool("Army175 Tier Gear", HintText = "every soldier type - all cultures, village and noble lines, house troops, militia, mercenaries and garrisons, never lords, companions or you - carries and wears in its pattern only weapons, shields, ammunition and armour up to its own tier: a piece above it is replaced by the same kind of piece of that tier. A man still uses only the gear his skills allow. Applied by CrashScribe, takes effect on the next load")]
+        [SettingPropertyGroup("Armies of the realms (175)")]
+        public bool Army175TierGear { get; set; } = true;
+
+        [SettingPropertyBool("Army175 Lore Armor", HintText = "Pentos and Qarth hire their wars: their infantry of tier 2 to 4 wears armour one step lighter, within its tier. Applied by CrashScribe, takes effect on the next load")]
+        [SettingPropertyGroup("Armies of the realms (175)")]
+        public bool Army175LoreArmor { get; set; } = true;
+
+        [SettingPropertyBool("Army175 Lore Armor Extra", HintText = "proposal, not yet decided: heavier Qohor infantry of tier 4 and 5 and a lighter Dornish spear line of tier 3 and 4, within their tier. Applied by CrashScribe, takes effect on the next load")]
+        [SettingPropertyGroup("Armies of the realms (175)")]
+        public bool Army175LoreArmorExtra { get; set; } = false;
+
+        [SettingPropertyBool("Army175 Composition", HintText = "master switch for the troop mix of the realms below (Dothraki, Iron Islands, the North and the proposals): party templates and upgrade trees as the books have them. Applied by CrashScribe, takes effect on the next load")]
+        [SettingPropertyGroup("Armies of the realms (175)")]
+        public bool Army175Composition { get; set; } = true;
+
+        [SettingPropertyBool("Army175 Dothraki Ride", HintText = "the Dothraki fight on horseback: a village recruit still starts on foot, but his only way up is the riding line; Dothraki on foot stay in the militia and those already serving keep their place. Their parties cost more in pay, riders are paid more - this is the switch if the khalasars go bankrupt. Applied by CrashScribe, takes effect on the next load")]
+        [SettingPropertyGroup("Armies of the realms (175)")]
+        public bool Army175DothrakiRide { get; set; } = true;
+
+        [SettingPropertyBool("Army175 Dothraki Horse Guard", HintText = "when Realm of Thrones swaps a man in a Dothraki party for a rider, he becomes a rider only if a horse is found for him - a free one in the armoury or one from the baggage; with none he becomes a Dothraki on foot of the same tier. Only with Army 175 Dothraki Ride on. Takes effect at once")]
+        [SettingPropertyGroup("Armies of the realms (175)")]
+        public bool Army175DothrakiHorseGuard { get; set; } = true;
+
+        [SettingPropertyInteger("Dothraki Riding Bonus", 0, 50, "0", HintText = "Dothraki riders of tier 2 to 5 of the village line get this many points of Riding - they ride better than any knight. 0 = off. Applied by CrashScribe, takes effect on the next load")]
+        [SettingPropertyGroup("Armies of the realms (175)")]
+        public int DothrakiRidingBonus { get; set; } = 30;
+
+        [SettingPropertyBool("Army175 Ironborn Foot", HintText = "the Iron Islands fight on foot and at sea: the Harlaw riders remain their only horse, other Ironborn riders give way to infantry of the same tier in lord parties, patrols and the vassal reward. Applied by CrashScribe, takes effect on the next load")]
+        [SettingPropertyGroup("Armies of the realms (175)")]
+        public bool Army175IronbornFoot { get; set; } = true;
+
+        [SettingPropertyBool("Army175 North Foot", HintText = "the North raises more foot, fewer archers and a little more horse; the Mormonts keep their huntresses and stay archers. Applied by CrashScribe, takes effect on the next load")]
+        [SettingPropertyGroup("Armies of the realms (175)")]
+        public bool Army175NorthFoot { get; set; } = true;
+
+        [SettingPropertyBool("Army175 Volantis Norvos", HintText = "proposal, not yet decided: Volantis (the tiger cloaks are foot) and Norvos field more infantry and fewer archers and riders; the Volantene elephants stay either way. Applied by CrashScribe, takes effect on the next load")]
+        [SettingPropertyGroup("Armies of the realms (175)")]
+        public bool Army175VolantisNorvos { get; set; } = false;
+
+        [SettingPropertyBool("Army175 Minor Lore", HintText = "proposal, not yet decided: the Free Folk with fewer horsemen, and Dragonstone, Velaryon and Celtigar with horse at about a tenth of their men. Applied by CrashScribe, takes effect on the next load")]
+        [SettingPropertyGroup("Armies of the realms (175)")]
+        public bool Army175MinorLore { get; set; } = false;
+
+        [SettingPropertyBool("Army175 Golden Bows", HintText = "waits for the armoury restocking package: Golden Company crossbowmen split into thirds - crossbows, recurve bows and yew longbows - and in battle each man takes the missile weapon of his drawn kit. Applied by CrashScribe and the Armoury, takes effect on the next load")]
+        [SettingPropertyGroup("Armies of the realms (175)")]
+        public bool Army175GoldenBows { get; set; } = false;
+
         [SettingPropertyBool("Map Villages Enabled", HintText = "named villages on the campaign map between the game's own villages, castles and towns - each one a cluster of its district's settlements, standing where a village had reason to stand (bridge, ford, crossroads, road, river, coast); off = none drawn. Nothing is written to the save")]
         [SettingPropertyGroup("Map villages")]
         public bool MapVillagesEnabled { get; set; } = true;
@@ -3082,6 +3146,7 @@ namespace Armoury
             s.MountedWageFactor = MountedWageFactor;
             s.AiMountMarketSharePercent = AiMountMarketSharePercent;
             s.AiMountShelfFloor = AiMountShelfFloor;
+            s.AiUpgradeHorseToArmory = AiUpgradeHorseToArmory;
             s.LongYearEnabled = LongYearEnabled;
             s.WeeksPerSeason = WeeksPerSeason;
             s.MarchPaceEnabled = MarchPaceEnabled;
@@ -3529,6 +3594,21 @@ namespace Armoury
             s.BanditCheerRadius = BanditCheerRadius;
             s.BanditCheerRelation = BanditCheerRelation;
             s.LogEnabled = LogEnabled;
+            s.Army175Measure = Army175Measure;
+            s.NorthHomeEdgePercent = NorthHomeEdgePercent;
+            s.NorthHardySkillBonus = NorthHardySkillBonus;
+            s.Army175TierGear = Army175TierGear;
+            s.Army175LoreArmor = Army175LoreArmor;
+            s.Army175LoreArmorExtra = Army175LoreArmorExtra;
+            s.Army175Composition = Army175Composition;
+            s.Army175DothrakiRide = Army175DothrakiRide;
+            s.Army175DothrakiHorseGuard = Army175DothrakiHorseGuard;
+            s.DothrakiRidingBonus = DothrakiRidingBonus;
+            s.Army175IronbornFoot = Army175IronbornFoot;
+            s.Army175NorthFoot = Army175NorthFoot;
+            s.Army175VolantisNorvos = Army175VolantisNorvos;
+            s.Army175MinorLore = Army175MinorLore;
+            s.Army175GoldenBows = Army175GoldenBows;
             s.MapVillagesEnabled = MapVillagesEnabled;
             s.MapVillagesHideAboveCameraHeight = MapVillagesHideAboveCameraHeight;
             s.MapVillageNamesOnHover = MapVillageNamesOnHover;
