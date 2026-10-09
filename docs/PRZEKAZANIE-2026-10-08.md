@@ -198,3 +198,8 @@ dana faze od nowa, korzystajac z zapisanych wynikow:
   (15.7 s/dobe - wolny start kampanii), test zapisu S4 w toku tylko jako informacja.
 - H3 gotowe (galaz w-toku/n9-przegrani-uchodza 9a793f0, GitHub); KIESA LUDU projekt: docs/PROJEKT-KIESA-LUDU-2026-10-09.md (numer paczki 173 - 172 zajety przez strzaly).
 - Plan: H3 sam 40 dob -> sklad4 = sklad2 + H3 + 169b + T2c -> test -> wgranie 4.
+- 21:17 test zapisu S4 (z 171+172): OK, 23.5 s/dobe (S3: 25.7) - wolniejszy tylko start nowej kampanii (zapas startowy 171).
+- 169b gotowe (galaz w-toku/169-ksiega-obiegu 30cd07d, GitHub): trybut = odszkodowania Diplomacy (KingdomWalletCost.ApplyCost - odbiorca 1/3 z niczego +
+  reszta do skarbca bez zdarzenia; platnik skarbiec ponad 2 mln bez zdarzenia + dlug TributeWallet splacany przez rody); BEE karawany placa eskorte w nicosc
+  przy kazdym wjezdzie do miasta (klucz 8 skryptu BEE to zamyka); "inne" z niczego = najpewniej dochod majatkow BK do notabli. Koszt budzetu rodow < 10 ms (cel).
+- 21:18 scalenie H3 + 169b do noc/sklad4 (od sklad2) - agent; autotest H3 sam w toku. T2c (Mur) + badanie trybutu w toku (wf_f5c29c01-5a9).
