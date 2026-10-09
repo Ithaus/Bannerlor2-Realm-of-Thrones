@@ -93,6 +93,9 @@ namespace Armoury
     ///     odchodza), tabor wroga i pozostalosci pola (lista zyje tylko do "Done" / "Leave" w menu: _baggageSearched nie pozwala wrocic do taboru,
     ///     FinishCollection i OnRemnantDoneConsequence zeruja liste, a zadna podpowiedz o tym nie mowi - pytanie gry to jedyna przestroga),
     ///     zwykly ekwipunek i ekrany innych modow.
+    /// 14. MUSZTRA (PROJEKT-MUSZTRA rozdz. 3, Drill.StockOn = DrillStock przy DrillLaw i DonationXpOff): przy "Leave" po trofeach bron i zbroje z
+    ///     _lootScreenRoster ida do zapasu cwiczebnego ludzi (Drill.AcceptTrophies, do limitu; zdjete z listy) PRZED pozostalosciami pola i resztkami;
+    ///     menu i podpowiedz "Leave" mowia o zapasie tylko przy Drill.LeaveOn (zapas czynny i ten prefiks wpiety - DrillLeaveWired).
     /// Martwe w 1.8.4: zloto pozostalosci pola (BattlefieldRemnantsTemporarilyDisabled = true; i tak bralo z monet z cial).
     /// Bez zmian (to nie zloto z niczego): najem kwatermistrza, zalozenie / odnowienie / nowe druzyny klanu (zloto gracza
     /// czesciowo do nikad - ujscie), dary dla zalogi / milicji / zywnosc dla miasta (towar na wskazniki miasta), dzienny dochod
@@ -119,6 +122,10 @@ namespace Armoury
         private static MethodInfo _mIsLooted, _mLootedMod, _mLogMessage, _mDonationGold;
         private static readonly List<string> _wired = new List<string>(), _missing = new List<string>();
         private static bool _present, _saleWired, _repWired, _repCostWired, _repBudWired;
+        internal static bool Present { get { return _present; } }
+        // musztra (PROJEKT-MUSZTRA rozdz. 3, ekran 3): trofea zostawione przy "Leave" - bron i zbroje do zapasu cwiczebnego ludzi
+        private const string DrillLeaveLabel = "trofea zostawione - zapas cwiczebny (musztra)";
+        internal static bool DrillLeaveWired;
 
         internal static bool NoAutoSale { get { var s = Settings.Current; return s != null && s.SpoilsNoAutoSale; } }
         internal static bool NoFreeGold { get { var s = Settings.Current; return s != null && s.SpoilsNoFreeGold; } }
@@ -1166,18 +1173,43 @@ namespace Armoury
             catch (Exception e) { Stumble("SpoilsSeal.GiftSkillXp", e); }
         }
 
-        /// <summary>Wstawiane za stala napisu menu po zbieraniu trofeow: bez zdania o treningu.</summary>
+        private const string DrillSentence = "\nArms you leave behind go to your men's drill stock while there is room; the rest stay on the field.";
+
+        /// <summary>Wstawiane za stala napisu menu po zbieraniu trofeow: bez zdania o treningu; przy zapasie cwiczebnym (Drill.LeaveOn: DrillStock, DrillLaw,
+        /// DonationXpOff i wpiety prefiks Leave) - zdanie o zapasie. Przy wylaczonym Z1 zapas nic nie przyjmuje, wiec zostaje oryginal Spoils (XP z resztek).</summary>
         public static string MenuText(string s)
         {
-            try { return DonationXpLaw.On && s != null ? s.Replace(TrainSentence, "") : s; }
+            try
+            {
+                if (s == null) return s;
+                if (Drill.LeaveOn) return s.Replace(TrainSentence, DrillSentence);   // zapas czynny (musztra, Z1) i prefiks Leave wpiety - inaczej bez obietnicy
+                return DonationXpLaw.On ? s.Replace(TrainSentence, "") : s;
+            }
             catch { return s; }
         }
 
-        /// <summary>Wstawiane za stala podpowiedzi "Leave": resztki zostaja na polu.</summary>
+        /// <summary>Wstawiane za stala podpowiedzi "Leave": resztki zostaja na polu; przy zapasie cwiczebnym - ile sztuk ludzie jeszcze przyjma.</summary>
         public static string TipText(string s)
         {
-            try { return DonationXpLaw.On ? LeftBehindTip : s; }
+            try
+            {
+                if (Drill.LeaveOn) return Drill.TrophyTip();
+                return DonationXpLaw.On ? LeftBehindTip : s;
+            }
             catch { return s; }
+        }
+
+        /// <summary>Musztra: prefiks LootCollectionBehavior.OnCompleteLeaveConsequence - bron i zbroje z trofeow zostawionych na polu do zapasu
+        /// cwiczebnego (zdjete z listy) PRZED pozostalosciami pola (TryCreateBattlefieldRemnant) i resztkami (GiveLeftoverXpToTroops / LeftoverPrefix).</summary>
+        public static void DrillLeavePrefix(object __instance)
+        {
+            try
+            {
+                if (!Drill.StockOn || _fLootScreen == null) return;
+                var rest = _fLootScreen.GetValue(__instance) as ItemRoster;
+                if (rest != null && rest.Count > 0) Drill.AcceptTrophies(rest);
+            }
+            catch (Exception e) { Stumble("SpoilsSeal.DrillLeave", e); }
         }
 
         private static bool IsCall(CodeInstruction c, MethodInfo m)
@@ -1452,6 +1484,7 @@ namespace Armoury
                 if (label == "naprawa: wykonanie") _repWired = true;
                 if (label == "naprawa: wycena") _repCostWired = true;
                 if (label == "naprawa w budzecie") _repBudWired = true;
+                if (label == DrillLeaveLabel) DrillLeaveWired = true;
             }
             catch (Exception e)
             {
@@ -1620,6 +1653,7 @@ namespace Armoury
                     WireT(h, _tDon, "OnDonateScreenClosed", nameof(GiftXpTranspiler), "dar dla miasta bez XP", _mAddSkillXp != null);
                     WireT(h, _tQm, "OnFoodScreenClosed", nameof(GiftXpTranspiler), "dar jedzenia bez XP", _mAddSkillXp != null);
                     Wire(h, _tLoot, "GiveLeftoverXpToTroops", "LeftoverPrefix", null, "resztki trofeow bez XP", true);
+                    Wire(h, _tLoot, "OnCompleteLeaveConsequence", "DrillLeavePrefix", null, DrillLeaveLabel, _fLootScreen != null);   // musztra: trofea do zapasu
                     WireT(h, _tLoot, "UpdateCompleteText", nameof(MenuTextTranspiler), "menu trofeow bez obietnicy treningu", true);
                     WireT(h, _tLoot, "OnCompleteLeaveCondition", nameof(TipTextTranspiler), "podpowiedz Leave bez obietnicy treningu", true);
                     WireT(h, _tSub, "OnSessionLaunched", nameof(SubClanTextTranspiler), "opcja Equip the leader bez obietnicy treningu", true);
