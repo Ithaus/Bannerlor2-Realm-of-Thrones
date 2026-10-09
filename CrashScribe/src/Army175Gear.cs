@@ -74,7 +74,7 @@ namespace CrashScribe
         private static HashSet<MBEquipmentRoster> _newRosters;
         private static int _rostersInstalled;
         private static bool _qohorDone;
-        private static float _kgPerAth = 0.25f, _armStep = 35f, _wpnStep = 35f;   // parametry praw (wymog skuteczny jak po prawach)
+        private static float _kgPerAth = 0.333f, _armStep = 0f, _wpnStep = 35f;   // parametry praw (wymog skuteczny jak po prawach)
 
         /// <summary>Stan sesji - wolane z SubModuleMain.OnGameStart (przed AfterRegister).</summary>
         internal static void Reset()
@@ -456,7 +456,7 @@ namespace CrashScribe
                 if (IsArmorLawType(ty))
                 {
                     int w = (int)Math.Round(c.Weight / _kgPerAth);
-                    if (w > d) d = w;
+                    d = w;   // 09.10: wymog pancerza = waga (WeightLaw ustawia dokladnie, takze w dol)
                     if (_armStep > 0f && c.HasArmorComponent) { int t = (int)Math.Round((g - 1) * _armStep); if (t > d) d = t; }
                 }
                 else if (_wpnStep > 0f && c.HasWeaponComponent && ty != ItemObject.ItemTypeEnum.Banner
@@ -473,10 +473,10 @@ namespace CrashScribe
         /// <summary>Parametry praw jak w Mends.WeightLaw/ArmorTierLaw/WeaponTierLaw (te same klucze, granice i zapasy).</summary>
         private static void ReadLawParams()
         {
-            float kg = Mends.ArmouryFloat("KgPerAthleticsPoint", 0.25f);
-            if (kg < 0.05f || kg > 2f) kg = 0.25f;
+            float kg = Mends.ArmouryFloat("ArmourKgPerAthletics", 0.333f);
+            if (kg < 0.05f || kg > 2f) kg = 0.333f;
             _kgPerAth = kg;
-            float a = Mends.ArmouryFloat("ArmorAthleticsPerTier", 35f);
+            float a = Mends.ArmouryFloat("ArmourTierAthletics", 0f);
             _armStep = a < 0.5f ? 0f : (a > 100f ? 100f : a);
             float w = Mends.ArmouryFloat("WeaponSkillPerTier", 35f);
             _wpnStep = w < 0.5f ? 0f : (w > 100f ? 100f : w);

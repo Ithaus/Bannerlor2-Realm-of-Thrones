@@ -1079,6 +1079,7 @@ namespace CrashScribe
             if (rs != null) return rs;
             if (it.ItemType == ItemObject.ItemTypeEnum.Arrows) return DefaultSkills.Bow;       // RBM: 105/140/175
             if (it.ItemType == ItemObject.ItemTypeEnum.Bolts) return DefaultSkills.Crossbow;
+            if (it.ItemType == ItemObject.ItemTypeEnum.HorseHarness) return DefaultSkills.Riding;   // ladry konskie - Jazda (Jeff 09.10)
             if (it.HasArmorComponent) return DefaultSkills.Athletics;                           // Prawo Wagi
             return null;
         }
@@ -2073,7 +2074,7 @@ namespace CrashScribe
                 if (setter == null) { Scribe.Line("Mends: ItemObject.Difficulty bez settera - prawo wagi spi."); return; }
                 // wspolczynnik z suwaka MCM Armoury (KgPerAthleticsPoint,
                 // dom. 0.25) - Jeff stroi bez rebuildu; dziala od startu sesji
-                float kg = 0.25f;
+                float kg = 0.333f;   // 09.10 (Jeff: wszystko wedlug wagi): 50 kg plyty = 150 Atletyki
                 try
                 {
                     foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
@@ -2082,14 +2083,14 @@ namespace CrashScribe
                         var ts = asm.GetType("Armoury.Settings");
                         var cur = ts != null ? ts.GetField("Current", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static) : null;
                         var so = cur != null ? cur.GetValue(null) : null;
-                        var fld = so != null ? so.GetType().GetField("KgPerAthleticsPoint") : null;
+                        var fld = so != null ? so.GetType().GetField("ArmourKgPerAthletics") : null;
                         if (fld != null) kg = (float)fld.GetValue(so);
                         break;
                     }
                 }
                 catch { }
-                if (kg < 0.05f || kg > 2f) kg = 0.25f;
-                int raised = 0;
+                if (kg < 0.05f || kg > 2f) kg = 0.333f;
+                int raised = 0, lowered = 0;
                 foreach (var it in TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
                 {
                     if (it == null) continue;
@@ -2098,11 +2099,13 @@ namespace CrashScribe
                         && ty != ItemObject.ItemTypeEnum.LegArmor && ty != ItemObject.ItemTypeEnum.HandArmor
                         && ty != ItemObject.ItemTypeEnum.Cape) continue;
                     int want = (int)Math.Round(it.Weight / kg);
-                    if (want <= it.Difficulty) continue;
+                    // 09.10 (Jeff: "wszystko wedlug wagi"): wymog pancerza = DOKLADNIE waga / kg - takze w dol (ROT wpisuje
+                    // helmom 140, sukniom 175-200 bez zwiazku z waga); rekawice, peleryny, czapki i suknie prawie nic
+                    if (want == it.Difficulty) continue;
+                    if (want > it.Difficulty) raised++; else lowered++;
                     setter.Invoke(it, new object[] { want });
-                    raised++;
                 }
-                Scribe.Line("Mends: prawo wagi - Atletyka niesie 0.25 kg/pkt; wymagania podniesione " + raised + " pancerzom (" + kg.ToString("0.##") + " kg na punkt Atletyki).");
+                Scribe.Line("Mends: prawo wagi (jedyny wymog pancerza od 09.10) - " + kg.ToString("0.###") + " kg na punkt Atletyki; wymagania ustawione z wagi: podniesione " + raised + ", obnizone " + lowered + " pancerzom.");
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.WeightLaw", null); } catch { } }
         }
@@ -2350,8 +2353,8 @@ namespace CrashScribe
             {
                 var setter = AccessTools.PropertySetter(typeof(ItemObject), "Difficulty");
                 if (setter == null) { Scribe.Line("Mends: ItemObject.Difficulty bez settera - prawo tieru pancerza spi."); return; }
-                float step = ArmouryFloat("ArmorAthleticsPerTier", 35f);
-                if (step < 0.5f) { Scribe.Line("Mends: prawo tieru pancerza wylaczone (ArmorAthleticsPerTier 0)."); return; }
+                float step = ArmouryFloat("ArmourTierAthletics", 0f);
+                if (step < 0.5f) { Scribe.Line("Mends: prawo tieru pancerza wylaczone (ArmourTierAthletics 0 - od 09.10 pancerz tylko wedlug wagi)."); return; }
                 if (step > 100f) step = 100f;
 
                 int raised = 0;

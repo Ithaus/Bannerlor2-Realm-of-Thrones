@@ -270,7 +270,7 @@ namespace CrashScribe
                                 + "%; przy +25 bylo to +46%/+52% zamiast +28%, projekt 3.2).");
                     return;
                 }
-                float wStep = Mends.ArmouryFloat("WeaponSkillPerTier", 35f), aStep = Mends.ArmouryFloat("ArmorAthleticsPerTier", 35f);
+                float wStep = Mends.ArmouryFloat("WeaponSkillPerTier", 35f), aStep = Mends.ArmouryFloat("ArmourTierAthletics", 0f);
                 wStep = wStep < 0.5f ? 0f : (wStep > 100f ? 100f : wStep);
                 aStep = aStep < 0.5f ? 0f : (aStep > 100f ? 100f : aStep);
                 var set = NorthSet();
