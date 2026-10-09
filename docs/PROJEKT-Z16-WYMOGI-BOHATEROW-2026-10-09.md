@@ -39,6 +39,40 @@ DynamicReinforcements, BirthAndDeath) przeszukane: nie zakladaja sprzetu bohater
 
 ---
 
+## ERRATA PO RECENZJI (09.10, Z16-1c CS 623549c / Z16-5 Armoury c2c4f46) - czytac PRZED reszta
+
+Recenzja wykonania Z16: 17 uwag, wszystkie sprawdzone w kodzie gry 1.4.8 i modow - prawdziwe. Ponizej, co w tym projekcie bylo nieprawda
+albo sie zmienilo (szczegoly: wpisy CHANGELOG Z16-1c i Z16-5):
+
+1. **Perki (rozdz. 0 pkt 4-5, 3.1).** "Bez perkow" - nieprawda. `SetInitialSkillLevel` sam perkow nie daje, ale gra co dobe dobiera je
+   bohaterom spoza klanu gracza (`CharacterDevelopmentCampaignBehavior.DailyTickHero` -> `HeroDeveloper.DevelopCharacterStats` ->
+   `SelectPerks`, `HeroDeveloper.cs:441-453`). Podniesienie Atletyki 77 -> 175 to 4 nowe perki (Powerful/Sprint, Surging Blow/Braced,
+   Walk It Off/A Good Days Rest, Durable/Energetic); przejscie przez Atletyke 75 (Imposing Stature) i Luk 100 (Merry Men) daje dowodcy
+   +5 rozmiaru partii. Towarzysze i rodzina gracza dostaja wybory perkow. Pomiar: linia "Mends: Z16 perki" w 2. dobie po wczytaniu.
+   Do pkt 5 dla Jeffa dochodzi: wiecej perkow i u czesci dowodcow +5/+10 ludzi w partii.
+2. **Luk i Kusza u AI (rozdz. 0 pkt 4).** Lordom AI zadna droga nie zdejmuje strzal ani beltow, wiec ich podniesienie nikogo nie chroni -
+   to czysta premia (z perkami). Decyzja Jeffa, kod bez zmian.
+3. **Amunicja (tabela 1.1, rozdz. 2.1, plan testu recznego pkt 2).** Strzaly i belty MAJA w grze RelevantSkill (Bow/Crossbow z klasy broni,
+   `WeaponComponentData.GetRelevantSkillFromWeaponClass`) - gra juz je pilnuje na ekranie. W tabeli 1.1 wiersze "strzaly"/"belty" powinny
+   miec "gra, tylko ekran". Z16 dodaje u bohaterow tylko wiersz pancerza; test "strzaly t4 - Bow" sprawdza gre, nie Z16.
+4. **Wylacznik (rozdz. 3.3).** Podnoszenie dziala tylko przy wlaczonym `HeroGearRequirements` (bez sita nie ma po co - inaczej plyta t6
+   zalozona towarzyszowi dawala mu Atletyke 175 "z niczego").
+5. **Zaciag ROT (E8, rozdz. 2.4).** Wydana sztuka ponad umiejetnosc -> wlasna TEGO SAMEGO typu, inaczej najlepsza w granicy umiejetnosci
+   (TopArmor/PatternFor), inaczej zostaje wydana; nigdy goly slot. Takze walka w sali lorda (warunek ROT). Regula sceny 14.09 przy
+   wlaczonym sicie pomija wlasne sztuki bohatera (decyzja 3 - takze lot smokiem i pojedynki ROT).
+6. **Zwyczaj wojenny (U1).** Zwyciezca bez partii, ofiara ginie: tabor glowy klanu, w ostatecznosci zaklada jak przed Z16 (wczesniej
+   unikat ginal z martwym). Tabor AI to nie koniec drogi: lord sprzedaje go w miescie (gra), a od Z16-1c czystka polek CS nie zjada
+   unikatow sledzonych przez Armoury - lezy na polce. ALE `UniqueLaw.SweepRoster` przy wczytaniu zamienia unikaty z listy UniqueGear
+   w taborach AI na zwykle zamienniki - decyzja Jeffa, kod bez zmian.
+7. **Plan testu (rozdz. 6).** Pkt 2 ("suma slotow przed = po") byl tautologia - zamiast niej puste sloty pancerza i "bez broni" w linii
+   wczytania, do porownania miedzy wczytaniami. Pkt 5 ("unikaty w obiegu - ta sama liczba") - moze spasc o sztuki z listy UniqueGear,
+   ktore przy zapisie leza w taborach AI (pkt 6 wyzej).
+8. **Stroj cywilny (rozdz. 7.2).** Opis MCM mowi teraz wprost: suknie i szaty ROT oraz czapka 'Noble Default' to pancerz t6 - Atletyka 175,
+   takze w stroju cywilnym. Zostawic czy zwolnic sztuki cywilne/lekkie - pytanie do Jeffa.
+9. **Jeniec (R1).** Zamiennik broni losowany jak w ROT (waga 1/(cena+100)), tylko wsrod broni, ktore jeniec udzwignie - nie "najlepsza".
+
+---
+
 ## 0. Dla Jeffa - prostym jezykiem
 
 1. Od Z16 Ty i Twoi towarzysze nie zalozycie na ekranie ekwipunku zbroi, do ktorej brakuje Wam Atletyki, ani strzal i beltow ponad Luk i Kusze:
