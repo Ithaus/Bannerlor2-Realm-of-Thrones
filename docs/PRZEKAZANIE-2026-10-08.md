@@ -302,3 +302,17 @@ KOLEJKA:
 - (11:35) STRZALY (sklad8-s) GOTOWE: noc/sklad8 6e225f8 (S0 log powodow, S1 kuznia gracza: amunicja z wagi metalu, S2 receptura strzal (Iron2/3, mniej rudy), S3 strzelarzy x3 (0.3 -> 0.9), S4 K1 amunicja tylko w gore i tylko z nadwyzki; XP za amunicje x0.05), DLL SCRATCH test\Armoury-sklad8s.dll (e4cbbe84). AUTOTEST 40 dob w toku (SCRATCH test\at-sklad8s-nowa.out.txt); progi: miast bez strzal <= 24 (cel 15 z S5a), mnoznik ceny <= 1.4, snop <= 17 d, p174b_progi --baza sklad8 (P2 <= 38, P5, P6 -1.5 pp). Jesli OK + zapis -> WGRANIE 10.
 - (12:05) AUTOTEST sklad8-s (strzelarze 0.9): 40/40, 13.8 s/dobe, 0 bledow; P3 miast bez strzal 9.0 (!), P4 97.2%, P5/P6 OK, P11 OK; ALE P2 miast bez rudy 43 (prog <= 38). Wedlug reguly cofniecia: strzelarze 0.6 -> noc/sklad8 2ca2f2b, DLL SCRATCH test\Armoury-sklad8s2.dll (2aec1a1b). Autotest 40 dob w toku (at-sklad8s2-nowa.out.txt).
 - (12:25) **WGRANIE 10: Armoury 2aec1a1b (noc/sklad8 2ca2f2b)**, CS e8d460c5 bez zmian. Kopie: .bak-2026-10-09-przed-noc10 + D:\Backup-Bannerlord\wgrane\2026-10-09-noc10-przed. Nastepne: WGRANIE 11 = sklad9 (sklad8 + w-toku/175-armie-arm + w-toku/177-stal-valyrianska) + CS w-toku/175-armie-cs (od e1-pokoj) -> autotest 40 + zapis + progi 175 -> wgranie. Potem etap 2 (kod 4 krokow rownolegle wedlug projektu, bez nowego rozpoznania).
+
+## 19. STAN NA 09.10 ok. 13:30 (zegar komp.) - dla nowego konta / po kompakcji
+
+W GRZE: Armoury 2aec1a1b (noc/sklad8 2ca2f2b, WGRANIE 10), CrashScribe e8d460c5 (w-toku/e1-pokoj 5b4e551, WGRANIE 8). Zasady pracy: STAN-PRAC koniec pliku (decyzje
+09.10), pamiec: jeff-stala-zgoda-wgrywaj-po-tescie (wgrywac samemu po autotescie), jeff-zasada-doboru-glebokosci-pracy (tory S/M/L), jeff-gra-dopiero-po-projekcie.
+W TOKU: WGRANIE 11 - workflow wf_06eea4b7-5d2: noc/sklad9 (SCRATCH noc2\sklad9) = sklad8 + w-toku/175-armie-arm ffb6cef + w-toku/177-stal-valyrianska 148cf35; CS
+w-toku/175-armie-cs d85b519 (SCRATCH noc2\a175cs; 175/175b/c/d + Z16 + Z16b pancerz z wagi) -> DLL SCRATCH test\Armoury-sklad9.dll, CrashScribe-at-sklad9.dll (autotest),
+CrashScribe-sklad9.dll (do wgrania) -> autotest 40 dob + zapis (tools\autotest.ps1, patrz rozdz. 18) -> progi 175 (bitwy lordow wedlug krolestw, Dothrakowie bankructwa,
+konie, NorthHardy 130/135, Inni) -> WGRANIE 11 OBU DLL (Armoury + CrashScribe; kopie .bak-...-przed-noc11 + D:).
+DALEJ: ETAP 2 wedlug docs/PROJEKT-ETAP2-BANKRUCTWA-2026-10-09.md (BEZ nowego rozpoznania; tor L przy wykonaniu, 1 recenzja na paczke): krok A (169c pomiary, 2.6 powinnosci,
+E1b pokoj z biedy (CS), 2.14 okup gracza do porywacza) -> bieg bazowy 120 dob -> krok B (110+112+114 kasy zamkow i wsi) -> C1 (165 korona, 166 budzet + 162m, 185 najemnicy,
+182 dary) -> C2 (180 renty) -> C3 (179 rycerze bez lenna, 183 dezercja AI) -> D (168 dlug/kredyt wojenny, 178 okupy/wielcy jency; okup krola ze skarbca - odpowiedz Jeffa
+11:05) -> test 2 lata + bieg z wymuszonym pokojem. ETAP 3 (szczelnosc) dopiero po etapie 2 (decyzja Jeffa 11:15).
+LIMITY 13:30: 5h 32%, TYDZIEN 82% (reset 15.10) - przy 100% tygodnia przejsc na inne konto (Jeff: limit tygodnia nie jest powodem do oszczedzania).
