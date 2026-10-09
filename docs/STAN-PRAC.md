@@ -924,3 +924,7 @@ udzwignie rekawice - ten system nie ma sensu; jak najszybciej naprawic, zeby nie
 helm i nogawice polowa korpusu (t6 75) albo z wagi, gdy wiecej; rekawice i peleryny tylko z wagi; ubrania/suknie z wagi; ladry konskie - Jazda (nie Atletyka). Lordowie: BEZ
 wyrownywania do 175 (Jeff: "nie kazdy lord lordowi rowny") - zostaja ze swoimi umiejetnosciami; kto dalej nie udzwignie korpusu - na starcie kampanii zbroja na miare (ten sam
 rodzaj z tieru, ktory udzwignie); podnoszenie Luku/Kuszy - nie. Na galeziach 175 (CS Mends prawa tieru + Z16).
+**DECYZJA JEFFA 09.10 ok. 12:40: "wszystko wedlug wagi"** -> wymog Atletyki pancerza WYLACZNIE z wagi: waga / 0.333 kg (50 kg plyty = 150), ustawiany dokladnie (takze w dol wobec
+XML ROT: helmy 140, suknie 175-200 znikaja); prawo tieru pancerza wylaczone (0); ladry - Jazda; bohaterowie bez podnoszenia (HeroSkillToOwnGear OFF) - lordowie zostaja soba.
+Zrobione szybko (bez workflow - Jeff: "nie mozesz tego szybciej sprawdzic"): CS d85b519, Armoury ffb6cef na galeziach 175 (nowe klucze ArmourKgPerAthletics/ArmourTierAthletics,
+bo Armoury.json Jeffa ma stare 0.25/35). DLL SCRATCH test\Armoury-z16b.dll, CrashScribe-at-z16b.dll. Wejdzie w WGRANIE 11 (sklad9).
