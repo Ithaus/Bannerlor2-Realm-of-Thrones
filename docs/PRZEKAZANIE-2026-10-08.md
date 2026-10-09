@@ -176,3 +176,8 @@ dana faze od nowa, korzystajac z zapisanych wynikow:
 - Zablokowane przez zabezpieczenia Claude Code (do Jeffa): skrypt BEE na pliku ustawien gry; probna zima (zmiana domyslnych w probnej kopii).
 - 19:33 **WGRANIE 2 W GRZE**: Armoury 3bf72dfd + CrashScribe cfb33950 (= wgranie 1 + T8 z poprawka + T2b); galaz paczki/noc-wgranie-2; kopie przed: *.bak-2026-10-09-przed-noc2.
   Testy: S2 40 dob OK, S2 zapis doby 362 OK. W toku: 172 STRZALY (na 171, wf_13aea1a6-b50), scalenie 169 do noc/sklad2 (agent), H3/kiesa/drogi (wf_03018328-39c).
+- 19:45 **AUTOTEST 169 SAMA** (analiza: SCRATCH nowej sesji kopia169\, a169\): gra niezmieniona (zloto, wojsko, Bank, tempo w normie), ARYTMETYKA OK 39/39, 0 bledow;
+  reszta niewyjasniona swiata -38 tys./d (bylo -215 tys.; 82% nazwane: zold karawan notabli -202 tys., kapital nowych karawan +136 tys., ...). Skrypt obieg169_sprawdz.py
+  kod 1 (T8, T16 - precyzja pomiaru, nie gra). Braki pomiaru: trybut (+1.12 mln w dobie 34 bez okna), nowe karawany -1.2 tys./karawana, "inne" z niczego ok. 290 tys./d
+  (notable), koszt budzetu rodow 34 ms/dobe -> paczka 169b (wf_f774ccb1-f44, drzewo obieg169).
+- 19:58 **AUTOTEST S3 OK** (noc/sklad2 1254cd7 = wgranie 2 + 169; Armoury 04d1cc99): 40/40, 13.1 s/dobe, 0 bledow; reszta w dobie 40 -38 tys. Test zapisu S3 w toku.
