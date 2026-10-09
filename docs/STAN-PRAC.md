@@ -828,3 +828,7 @@ rosnie z marszu pieszo) -> Z16 bez +10/dobe. (15) obciazenie wsi docelowo 30-50%
 kary jak gracz" -> T10: nocny marsz AI tylko z powodu (poscig/przechwycenie, obrona wlasnej wsi przed rabunkiem, ucieczka przed silniejszym), z tymi samymi karami co gracz.
 (2) tempo musztry z tabeli (t1->t6 na postoju ok. 1 rok przy Przywodztwie 255+, ok. 2,6 roku przy 100) - TAK. (24a) Jeff: "czyli nie wykuje valyrianskiego miecza?" - wyjasnione,
 czeka (propozycja: przekuwanie istniejacej stali valyrianskiej u mistrza w Qohorze jako jedyna droga).
+**DECYZJA JEFFA 09.10 ok. 04:05 (24a STAL VALYRIANSKA) - TAK -> paczka 177:** material kuzni 6. poziomu (ironIngot6, w ROT "Valyrian steel") = "castle-forged steel" ze zwyklego
+lancucha (tier 6 zostaje); prawdziwa stal valyrianska tylko w istniejacych legendarnych mieczach/zbrojach ROT; nikt nie wytapia nowej; jedyna droga do nowego miecza
+valyrianskiego = PRZEKUCIE istniejacej stali u mistrza w Qohorze (za oplata dla kowala/miasta, kilka dni; wielki miecz -> dwa mniejsze jak Lod). Sztaby "valyrianskie" z niczego
+(wedrowcy BK ok. 45/dobe) - zamknac (to tez czesc 164). Numeracja: 176 = werbunek gracza jak AI, 177 = stal valyrianska.
