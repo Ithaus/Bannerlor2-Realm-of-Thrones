@@ -1184,7 +1184,7 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public int WagesDesertMaxDays { get; set; } = 8;
 
-        [SettingPropertyBool("War Ledger To Outlaws", HintText = "men who walk off over unpaid wages join the outlaw pool of the region (and the people ledger) instead of vanishing")]
+        [SettingPropertyBool("War Ledger To Outlaws", HintText = "men who walk off over unpaid wages join the outlaw pool of the region (and the people ledger) instead of vanishing - needs Outlaw Law enabled, without it they still vanish")]
         [SettingPropertyGroup("The marching column")]
         public bool WarLedgerToOutlaws { get; set; } = true;
 

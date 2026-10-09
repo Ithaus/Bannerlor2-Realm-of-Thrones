@@ -61,6 +61,9 @@ namespace Armoury
         private static int _fights, _wounded, _routed;
         private static int _rNotableParty, _rNotableOther, _rTavern, _rNoPlace, _rPlayer, _rLed, _desLord, _desOther;
         private static int _stumbles;              // potkniecia nasluchow - liczymy, nie gasimy
+        // T4: odczyt dla WarLedger (pomiar przed/po, tylko czyta)
+        internal static int DesertedLordToday { get { return _desLord; } }
+        internal static int StumblesToday { get { return _stumbles; } }
 
         internal static void Reset()
         {
