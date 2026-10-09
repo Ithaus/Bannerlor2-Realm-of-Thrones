@@ -1,5 +1,31 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-09 (sklad8-s, Jeff 10:35 "wykucie strzal to powinno byc grosze, strzal bylo mega duzo") - STRZALY TANIE W KUZNI I DUZO STRZAL W SWIECIE (S0-S4, osobne commity)
+**Mod:** Armoury | **Galaz:** `noc/sklad8` (na 0e17915). **Projekt:** `docs/paczki/sklad8-s-strzaly.md` (rachunki: scratchpad `strzaly/projekt-skrypty/model2.py` - ta sama arytmetyka co `ArmsPricing.Compute`, `WorkshopLaw.Needs`, `HistoricalPrices.HistCost`). Kazdy krok osobnym commitem: S0 (tylko log), S1 (kuznia gracza), S2 (receptura strzal), S3 (liczba strzelarzy), S4 (dozbrajanie K1 a amunicja). Bez nowych kluczy zapisu i bez nowych napisow w `SyncData` (S0 i S4 to liczniki sesji).
+
+**Problem (log sklad8, `kopia-sklad8/Armoury-2026-10-09_09-56-41.log`, doby 1-40; porownanie z 174b, grupa11, 172b):**
+- d31-40 srednio **35 miast z 97 bez strzal** (174b: 24.2, 172b: 24, grupa11: 22.7); mediana mnoznika ceny strzal na polce 2.51; lordowie placa 30.7 d za kolczan 30 strzal (w d1-10 14.1 d); pokrycie strzal lordow AI w d40 50%.
+- Strzelarzy 0.034 roboczodnia na 1000 ludzi (1 831 roboczodni dziennie na swiat), robia 280 kolczanow strzal + 93 beltow dziennie; polowa rak stoi (w 30 miastach brak rudy, w 14 drewna); w d31-40 2.65 roboczodnia i 5.3-6.4 kg rudy na kolczan.
+- Kuznia gracza: 3 kolczany hardened_125_gr_arrows (t6) = 21 sztabek Iron6 (stal valyrianska, 2 100 d) za towar wart ok. 75 d; default_arrows 6 x Iron2 (cala masa kolczana liczona jako zelazo).
+- Dozbrajanie K1: 41% wymian amunicji schodzi o tier w dol (`Arrows t3->t1 vlandic_arrows->GRE_range_arrows`), stary kolczan idzie do kupca za 1 zl.
+
+**Przyczyna (kod 0e17915):**
+- `Recipes.BuildRecipe` (galaz amunicji): sztabek = floor(waga strzaly x stos / 0.5 kg) x seria, gatunek `IronForTier` (t6 = Iron6) - drzewca i piora liczone jako metal, inna regula niz strzelarze miasta i wartosc sztuki (`ArmsPricing.CostOf`).
+- `ArmsPricing.Compute` (Arrows/Bolts): gatunek grotu jak bron i zbroja (t3 Iron3, t4 Iron4, t5-6 Iron5 - stal szlachetna), strata kucia 1.4 jak blacha, `DaysAmmo` 0.30-0.50 i jakosc q do 1.8 - wysokie tiery biora 2x rudy i 1.5-3x roboty; historycznie groty masowe byly z zelaza (Towton 1461), a stalowany snop kosztowal +17% (14 d wobec 12 d, 1341).
+- `TownFletcherHandsPerArmsHand` 0.3 - ok. 3x mniej strzelarzy niz w Anglii XIV w. (1359: 850 tys. strzal do Tower).
+- `MenUpgrade.Pick`: dla amunicji "sila" = `Effectiveness`, wiec `SwapMath.UpgradeVerdict` przepuszcza nizszy tier; zakup bez wzgledu na brak na polce.
+
+**Zmiana:**
+- **S0 (tylko log) - `TownFletchers`**: `Work` zapamietuje na dobe dla miasta powod konca pracy strzelarzy (zysk / surowiec z maska ruda-drewno-skora-len / rece / bezpiecznik petli / brak kandydatow / bunt), rece dnia, zrobione snopy strzal i beltow, rude i drewno na polce po pracy (`NoteTownDay`, slownik `_dTown` czyszczony w `ClearDay`). `Flush` dopisuje co dobe linie **"Miasta bez strzal - powod (172): dzien N - X z 97 miast; powod konca pracy strzelarzy: zysk a, surowiec b (ruda, drewno, skora, len), rece c, bezpiecznik d, brak kandydatow e, bunt f, brak danych g; [Astapor (drewno, rece 14.2, zrobiono 0, ruda 157, drewno 0), ...]"** (najwyzej 40 nazw, alfabetycznie). Stan tylko w pamieci sesji.
+
+**Ryzyko / co sprawdzic:**
+- S0: tylko odczyt i log; `GetItemNumber` rudy i drewna raz na miasto na dobe (97 wywolan). "Brak danych" = miasto bez doby strzelarzy (nieczynne albo wyjatek - wtedy potkniecie w linii "Strzelarze (172)").
+
+**Progi testu (autotest 40 dob, jeden bieg = szum ok. +-5 miast):**
+- S0: linia "Miasta bez strzal - powod (172)" co dobe; potkniecia 0.
+
+**Status:** NIEWGRANE - DO SPRAWDZENIA (build Release kod 0; gra nie uruchamiana, autotest nie robiony).
+
 ## 2026-10-09 (sklad8-p, poprawki po przegladzie sklad8 - 13 uwag) - DOZBRAJANIE ZA SWOJE ZOSTAWIA OSTATNIA ZBROJE NA STRAGANIE I LICZY SIE JAK ZAKUPY BRAKOW; REZERWA KRAMU WLACZONA (decyzja Jeffa 07:45); KUPCY WYWOZACY NADMIAR PLACA CENE STRAGANU SZTUKA PO SZTUCE (bez rabatu 50%); LUDZIE GRACZA SPRZEDAJA NADWYZKI SZTUKA PO SZTUCE JAK LUDZIE LORDOW; MUSZTRA NIE GUBI BRAMKI BRONI PRZY BLEDZIE PLANU K1
 **Mod:** Armoury | **Galaz:** `noc/sklad8` (na 64cd32a). **Pliki:** `MenUpgrade.cs` (`Run`, `Pick`, `Stale`, NOWE `BuyerOf`, licznik linii "Dozbrajanie: dzien"), `ShopReserve.cs` (naglowek), `Settings.cs` + `McmSettings.cs` (`python tools/gen_mcm.py`: 794 ustawien - `ShopKeepsLastArmour` = true, `SupplyDemandTradePricePercent` usuniete), `SupplyDemand.cs` (`DailyTrade`), `ShelfBuy.cs` (`Take` - parametr `tally`), `MenPurse.cs` (`SellPlayerSurplus`), `Drill.cs` (`CtxOf`). Bez nowych kluczy zapisu i bez nowych napisow w `SyncData`.
 

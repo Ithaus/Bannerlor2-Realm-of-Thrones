@@ -79,6 +79,13 @@ namespace Armoury
         private static readonly int[] _dNotable = new int[2], _dNotableRevert = new int[2];   // recenzja 172: kolczany ochotnikow (VolunteerKit)
         private static int _dOffers, _dHeldCycles, _dHeldTowns, _dTookHeld; private static float _dOfferSum;   // 174b.3: oferty za rude, zatrzymane cykle platnerzy, wziete ladunki
 
+        // sklad8-s S0 (tylko log, stan sesji - bez zapisu): doba strzelarzy kazdego miasta - powod konca pracy, rece, zrobione snopy, ruda i drewno
+        // na polce po pracy; linia "Miasta bez strzal - powod (172)" wypisuje to dla miast, ktore koncza dobe bez strzal na polce
+        private const int RProfit = 1, RInput = 2, RHands = 3, RGuard = 4, RNoCands = 5, RRebel = 6;
+        private sealed class TownDay { public int Reason, Miss, MadeA, MadeB, Ore, Wood; public float Hands; }
+        private static readonly Dictionary<string, TownDay> _dTown = new Dictionary<string, TownDay>();
+        private const int EmptyListMax = 40;           // najwyzej tyle miast z nazwy w linii S0
+
         internal static bool Enabled { get { var s = Settings.Current; return s != null && s.TownFletchersEnabled && s.TownFletcherHandsPerArmsHand > 0f; } }
 
         /// <summary>Strzelarze czynni: wlaczeni, ceny w nowej monecie, sa kandydaci. Wtedy linie arrows warsztatow notabli, budzet mieszczan
@@ -112,6 +119,40 @@ namespace Armoury
             _dClosedCycles = _dClosedUnits = _dProbeCycles = _dProbeUnits = _dHouse = _dBkCalls = _dBkReset = 0;
             _dClosedCastle = _dProbeCastle = _dBkBuyReset = 0;
             _dOffers = _dHeldCycles = _dHeldTowns = _dTookHeld = 0; _dOfferSum = 0f;
+            _dTown.Clear();
+        }
+
+        /// <summary>sklad8-s S0: zapamietaj dobe strzelarzy miasta (tylko log).</summary>
+        private static void NoteTownDay(Town town, int reason, int miss, float hands, int madeA, int madeB, ItemRoster shelf)
+        {
+            try
+            {
+                if (town == null || town.Settlement == null) return;
+                var d = new TownDay { Reason = reason, Miss = miss, Hands = hands, MadeA = madeA, MadeB = madeB };
+                if (shelf != null) { d.Ore = _ore != null ? shelf.GetItemNumber(_ore) : 0; d.Wood = _wood != null ? shelf.GetItemNumber(_wood) : 0; }
+                _dTown[town.Settlement.StringId] = d;
+            }
+            catch (Exception e) { Stumble("NoteTownDay", e); }
+        }
+
+        private static string ReasonName(TownDay d)
+        {
+            switch (d.Reason)
+            {
+                case RProfit: return "zysk";
+                case RInput:
+                    {
+                        var p = new List<string>();
+                        if ((d.Miss & 1) != 0) p.Add("ruda"); if ((d.Miss & 2) != 0) p.Add("drewno");
+                        if ((d.Miss & 4) != 0) p.Add("skora"); if ((d.Miss & 8) != 0) p.Add("len");
+                        return p.Count > 0 ? string.Join("+", p.ToArray()) : "surowiec";
+                    }
+                case RHands: return "rece";
+                case RGuard: return "bezpiecznik";
+                case RNoCands: return "brak kandydatow";
+                case RRebel: return "bunt";
+                default: return "brak danych";
+            }
         }
 
         /// <summary>174b.3: wczorajsza (albo dzisiejsza - zapasowy sluchacz przed warsztatami) oferta strzelarzy miasta za ladunek rudy. false = brak oferty,
@@ -405,7 +446,7 @@ namespace Armoury
                 if (town == null || !town.IsTown || Campaign.Current == null || !Campaign.Current.GameStarted) return;
                 Roll();
                 if (!Active) return;
-                if (town.InRebelliousState) { _dRebel++; return; }   // jak warsztaty gry: miasto w buncie nie pracuje
+                if (town.InRebelliousState) { _dRebel++; Resolve(); NoteTownDay(town, RRebel, 0, 0f, 0, 0, town.Owner != null ? town.Owner.ItemRoster : null); return; }   // jak warsztaty gry: miasto w buncie nie pracuje
                 var gf = GoodsLedger.Begin(GoodsLedger.FFletch, town);   // ksiega towarow: ruda i drewno strzelarzy jako osobne ujscie (tylko licznik)
                 long tc = Cost174.Begin(Cost174.SFletch);                 // 174b.5 F6 (probka 1/16, tylko log)
                 try { Work(town); }
@@ -425,7 +466,7 @@ namespace Armoury
                 var tc = CandidatesOf(town);
                 var items = tc.Items;
                 int n = items.Count;
-                if (n == 0) return;
+                if (n == 0) { NoteTownDay(town, RNoCands, 0, 0f, 0, 0, town.Owner != null ? town.Owner.ItemRoster : null); return; }
                 var sett = town.Settlement;
                 var shelf = town.Owner.ItemRoster;
                 St st;
@@ -512,6 +553,7 @@ namespace Armoury
                     fac.Remove(bk); fac.Remove(bk - 1);                    // polka koszyka +1; substytucja koszyka t-1 patrzy na t
                 }
                 if (steps >= MaxSteps) _dGuard++;
+                int why0 = reason != 0 ? reason : (steps >= MaxSteps ? RGuard : RHands);   // S0: powod dla linii miast bez strzal (bezpiecznik osobno)
                 if (reason == 0) reason = 3;                                // skonczyly sie rece (albo bezpiecznik)
                 if (reason == 1) _dNoProfit++;
                 else if (reason == 2) { _dNoInput++; for (int m = 0; m < 4; m++) if ((miss & (1 << m)) != 0) _dMissBy[m]++; MaterialOrders.NoteMissMask(town, miss); }   // 174.2: sygnal zamowienia surowca
@@ -532,6 +574,9 @@ namespace Armoury
                 }
                 st.Labor = Math.Max(0f, -hands);                          // rece bez roboty nie odkladaja sie; zaczety snop ponad dzisiejsze rece - dlug na jutro
                 _dIdle += idle; _dUsedHands += today - idle; _dDebt += st.Labor;
+                int madeA = 0, madeB = 0;
+                foreach (var kv in made) { if (Kind(kv.Key.ItemType) == 0) madeA += kv.Value; else madeB += kv.Value; }
+                NoteTownDay(town, why0, why0 == RInput ? miss : 0, today, madeA, madeB, shelf);   // S0 (tylko log)
                 foreach (var kv in made)
                 {
                     try { CampaignEventDispatcher.Instance.OnItemProduced(kv.Key, sett, kv.Value); }   // jak warsztaty zbrojne (wyrob dopisany osadzie)
@@ -630,6 +675,8 @@ namespace Armoury
                 if (_dayStamp < 0) return;
                 int[] stock = new int[2], empty = new int[2]; int towns = 0;
                 var idx = new[] { new List<float>(), new List<float>() };
+                // sklad8-s S0: miasta bez strzal z powodem konca pracy strzelarzy tej doby
+                var emptyNames = new List<KeyValuePair<string, string>>(); var byReason = new int[RRebel + 1]; var missBy = new int[4];
                 foreach (var t in Town.AllTowns)
                 {
                     if (t == null || !t.IsTown) continue;
@@ -645,6 +692,16 @@ namespace Armoury
                             if (el.Amount > 0 && IsAmmo(it)) here[Kind(it.ItemType)] += el.Amount;
                         }
                         for (int k = 0; k < 2; k++) { stock[k] += here[k]; if (here[k] <= 0) empty[k]++; }
+                        if (here[0] <= 0)
+                        {
+                            TownDay d;
+                            if (!_dTown.TryGetValue(t.Settlement.StringId, out d)) d = new TownDay();   // Reason 0 = brak danych (miasto nie pracowalo tej doby)
+                            byReason[Math.Max(0, Math.Min(RRebel, d.Reason))]++;
+                            if (d.Reason == RInput) for (int m = 0; m < 4; m++) if ((d.Miss & (1 << m)) != 0) missBy[m]++;
+                            string nm = t.Name != null ? t.Name.ToString() : t.Settlement.StringId;
+                            emptyNames.Add(new KeyValuePair<string, string>(nm, nm + " (" + ReasonName(d) + ", rece " + F1(d.Hands) + ", zrobiono " + d.MadeA
+                                + (d.MadeB > 0 ? " (belty " + d.MadeB + ")" : "") + ", ruda " + d.Ore + ", drewno " + d.Wood + ")"));
+                        }
                         TownCands tc;
                         if (Active && SupplyDemand.Active && _town.TryGetValue(t.Settlement.StringId, out tc))
                         {
@@ -719,6 +776,14 @@ namespace Armoury
                 sb.Append("; w taborach karawan: strzaly ").Append(caravan[0]).Append(", belty ").Append(caravan[1]).Append(" (").Append(caravans).Append(" karawan)");
                 sb.Append("; potkniecia ").Append(_dStumbles).Append(" (od startu ").Append(_stumblesAll).Append(").");
                 Log.Info(sb.ToString());
+                // sklad8-s S0 (tylko log): czemu te miasta sa bez strzal - powod konca pracy strzelarzy tej doby, ich rece, zrobione snopy, ruda i drewno na polce po pracy
+                emptyNames.Sort((a, b) => string.CompareOrdinal(a.Key, b.Key));
+                var names = new List<string>();
+                for (int i = 0; i < emptyNames.Count && i < EmptyListMax; i++) names.Add(emptyNames[i].Value);
+                Log.Info("Miasta bez strzal - powod (172): dzien " + _dayStamp + " - " + emptyNames.Count + " z " + towns + " miast; powod konca pracy strzelarzy: zysk " + byReason[RProfit]
+                         + ", surowiec " + byReason[RInput] + " (ruda " + missBy[0] + ", drewno " + missBy[1] + ", skora " + missBy[2] + ", len " + missBy[3] + "), rece " + byReason[RHands]
+                         + ", bezpiecznik " + byReason[RGuard] + ", brak kandydatow " + byReason[RNoCands] + ", bunt " + byReason[RRebel] + ", brak danych " + byReason[0]
+                         + "; [" + string.Join(", ", names.ToArray()) + (emptyNames.Count > names.Count ? ", ... +" + (emptyNames.Count - names.Count) : "") + "].");
             }
             catch (Exception e) { Stumble("Flush", e); }
             finally { ClearDay(); }
