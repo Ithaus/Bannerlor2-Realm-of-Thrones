@@ -798,3 +798,19 @@ przy zolnierzach - bohater zalozy kazda zbroje. Wypowiedz Jeffa z 02:50 + jego z
 u bohaterow (postfiks CanUseItem przez ItemReq.Meets dla pancerza i amunicji); lordom i towarzyszom Atletyka do wlasnego sprzetu (SkillSinew dla bohaterow, nigdy
 w dol), gracz bez podnoszenia; zalozona juz zbroja nie jest zdejmowana na sile. Trening Atletyki w zbroi na postoju (+10 dziennie) - pytanie do Jeffa.
 Paczka Z16 PO 175 (te same miejsca w Mends.cs) - na galeziach 175.
+**DECYZJE JEFFA 09.10 ok. 03:45 (lista 24 pytan z czatu = ESENCJA + trening Atletyki + Qarth):**
+1 MUSZTRA: a TAK (tempo zalezy od umiejetnosci Jeffa - Przywodztwo), b TAK (wedlug broni ludzi), c TAK (potem AI); pyta o czas awansu t1->t6 przy pelnym sprzecie (odpowiedz:
+  BK TroopUpgradeXp = 3.0 w BannerKings.json -> koszty 900/1650/2700/3900/5100 = 14 250 XP; musztra Z14a (10+2xtier) x Przyw./170 [0.5-1.5] x postoj 1.5: Przyw. 100 ok. 945 dob,
+  170 ok. 556, 255+ ok. 369; marsz x1.67 dluzej; bitwy osobno). 2 PERKI kwatermistrza: Jeff - "wywalic albo: przekazana bron i pancerz = szybsza nauka (bonus czasowy do XP,
+  bo maja wiecej broni i pancerzy do treningu)" -> wariant ZAPAS DO CWICZEN (oddany sprzet trafia do zapasu cwiczebnego druzyny, daje mnoznik musztry, zuzywa sie - nic
+  z niczego; perki wzmacniaja bonus), jedna regula dla AI. 3 rzemieslnicy tam, gdzie ludzie - TAK (chcial tabelke - dana w czacie z PROJEKT-174 4.x).
+  4 (174 Q2a/Q2b/Q3) a, b, c TAK - "ale sprawdzimy to" (wlaczyc, ocenic w tescie). 5 zlom = przetapianie - potwierdzone wyjasnieniem (wlaczyc Q4). 6 zaopatrzenie BK
+  gracza jedna regula - TAK (Q5). 7 dorobek startowy zostaje - TAK. 8 trening Atletyki w zbroi - "nie rozumiem" (wyjasnione, czeka). 9 rycerze bez lenna bez oddzialow - TAK.
+  10 renty korony dla gracza - TAK, jesli ma lenno (wyjasnione). 11 statki rozbitych sprzedawane portowi - TAK. 12 biedne krolestwa slabsze - TAK. 13 bez minimow okupu - TAK.
+  14 miasto bez wojska ubozeje - TAK (wyjasnione). 15 obciazenie wsi: Jeff "bierze 30-50%, a nie 2/3" -> CEL 30-50% (pan + sept razem); 2/3 tylko przejsciowo do 166.
+  16 zloty smok = 36-80 zl (a). 17 okup glowy rodu pol roku dochodu - zostaje (a). 18 korona bierze 1/9 lupu i okupow wasali. 19 Qarth z niewola - TAK.
+  20 zima: a (dluzsza noc obozu zima) NIE; b lagodniejsza zima poludnia, c Wyspy Letnie bez zimy, d Skagos owce i kozy, e konie jedza zima - TAK (po probie zimy).
+  21 drogi: "pokaz mi najpierw; ma wygladac rozsadnie - gdzie wioska, tam droga, a nie przez pole" (proba z drogami do wiosek). 22 "nie", 23 "tak" - NIEJASNE przypisanie
+  (samotne kolumny / Inni w 1. roku / myto) - zapytane. 24 kanon: a stal valyrianska - pyta, czy wtedy nie bedzie tieru 6 (wyjasnione: material 6 w ROT nazywa sie
+  "Valyrian steel" - propozycja: material 6 = "castle-forged steel" z normalnego lancucha, prawdziwa valyrianska tylko istniejace miecze + przekuwanie w Qohorze),
+  b Qohor i Lorath bez niewoli TAK (UWAGA: Qohor w kanonie kupowal Nieskalanych - sprawdzic przed wdrozeniem), c smoki jedza owce TAK, d zloto Casterly Rock - wyjasnione, czeka.
