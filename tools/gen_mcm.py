@@ -15,7 +15,9 @@ def gen(module_dir, ns, display):
     for line in src.splitlines():
         g = re.match(r'\s*//\s*---\s*(.+?)\s*---', line)
         if g:
-            group = g.group(1).strip().capitalize()
+            # 175c po recenzji: tylko pierwsza litera wielka - capitalize() psul nazwy wlasne ("The others and valyrian steel", "Iron bank")
+            g1 = g.group(1).strip()
+            group = g1[:1].upper() + g1[1:]
             continue
         m = re.match(r'\s*public\s+(bool|int|float)\s+(\w+)\s*=\s*([^;]+);\s*(?://\s*(.*))?', line)
         if not m: continue
