@@ -156,3 +156,8 @@ dana faze od nowa, korzystajac z zapisanych wynikow:
 - 18:20 workflow `wf_03018328-39c`: (A) H3 PRZEGRANI UCHODZA (decyzja Jeffa 07.10) - pelny cykl w drzewie `noc\n9-h3` (galaz w-toku/n9-przegrani-uchodza);
   (B) projekt KIESA LUDU z symulacja 4 lat -> docs/PROJEKT-KIESA-LUDU-2026-10-09.md (tylko projekt; wdrozenie z grupa C i nowa kampania);
   (C) PROBA DROG P2 (nie do wgrania) w drzewie `noc\p2-drogi-proba` + dane lore wiosek przeliczone na uklad z gry (SCRATCH nowej sesji `drogi`).
+- 18:23 **AUTOTEST T1 OK** (Armoury probny f59c6852; log Armoury-2026-10-08_18-13-16 + Logs\2026-10-08_18-13-16\noc.log): "oboz swiata 0:00-6:00", AiNightCamp tylko
+  godziny 0-5 (po 40 nocy), spi ok. 788 (lordow 405, karawan 383, wodzow armii 14 - bylo ok. 7), zjazd obudzonych sr. 0.34-0.42 / maks. 0.51-0.55 (prog 0.97),
+  stoper < 1 ms, potkniec 0, bledow 0.
+- 18:24 scalenie 170 + T1-T8 = galaz noc/sklad dfc8786 (drzewo SCRATCH nowej sesji `sklad`; Armoury 1a4cd01c, CrashScribe 0c1e92a6 bez trybu autotestu;
+  MCM 693 ustawienia). Autotest S1 (stos + CrashScribe at1+T2 + zdjecia mlynow) w toku.
