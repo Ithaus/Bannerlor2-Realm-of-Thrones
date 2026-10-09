@@ -1,5 +1,9 @@
 import re, sys, os
 
+# T1: zakresy suwakow int, ktorych regula ogolna [0, max(10, 4 x domyslna)] nie obejmuje
+# (godzina obozu 0 dawala suwak 0..10 - nie dalo sie ustawic 22)
+RANGES = {"CampStartHour": (0, 23), "CampEndHour": (0, 23)}
+
 def gen(module_dir, ns, display):
     src = open(os.path.join(module_dir,'src','Settings.cs'), encoding='utf-8').read()
     group = "General"
@@ -39,6 +43,7 @@ def gen(module_dir, ns, display):
             d = int(float(default))
             lo = min(0, d*3) if d < 0 else 0
             hi = max(10, abs(d)*4) if d >= 0 else 0
+            if name in RANGES: lo, hi = RANGES[name]
             attr = '        [SettingPropertyInteger("%s", %d, %d, "0", HintText = "%s")]' % (label, lo, hi, hint_txt)
         else:
             d = float(default.rstrip('f'))
