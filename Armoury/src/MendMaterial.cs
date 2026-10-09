@@ -85,9 +85,11 @@ namespace Armoury
         /// null - to nie robota kowala (ArmsPricing nie zna receptury: kon, towar, sztandar).</summary>
         internal static float[] Needs(EquipmentElement el)
         {
-            float pm = el.ItemModifier != null ? el.ItemModifier.PriceMultiplier : 1f;
-            if (pm < 0f) pm = 0f; if (pm > 1f) pm = 1f;
-            return NeedsShare(el.Item, Share(el), 1f - pm);
+            // T3 (poprawka po recenzji): strata do tabeli metalu ze STANU sztuki (ConditionScaling.ConditionOf: Spoils 0.55/0.40/0.25 niezaleznie
+            // od LootPriceFollowsCondition), nie z ceny; Share (robocizna, drewno, skora, plotno) bez zmian - z ceny jak dotad
+            float cond = ConditionScaling.ConditionOf(el.ItemModifier);
+            if (cond < 0f) cond = 0f; if (cond > 1f) cond = 1f;
+            return NeedsShare(el.Item, Share(el), 1f - cond);
         }
 
         /// <summary>To samo dla stanu z ksiegi zuzycia (uprzaz na grzbiecie: brak 0..1, modyfikator zostaje oryginalny).</summary>
@@ -255,7 +257,7 @@ namespace Armoury
 
         internal const int Done = 1, Waits = 0, Wreck = -2, NoRecipe = -3;   // wynik Quote (NoRecipe: nie robota kowala)
 
-        internal sealed class Job { public EquipmentElement El; public int N, Labor; public float Mat; }
+        internal sealed class Job { public EquipmentElement El; public int N, Labor; public float Mat, MetalKg; }   // MetalKg: T3 - kg metalu (surowki) z need, do logu AiWear
 
         internal sealed class Order
         {
@@ -297,7 +299,7 @@ namespace Armoury
                     }
                     if (r < 0) { Poor += amount - k; break; }
                     if (job == null) { job = new Job { El = ee }; Jobs.Add(job); }
-                    job.N++; job.Labor += labor; job.Mat += cost;
+                    job.N++; job.Labor += labor; job.Mat += cost; job.MetalKg += need[Metal];
                     Pieces++; Labor += labor; Mat += cost;
                 }
                 return job != null ? job.N : 0;
