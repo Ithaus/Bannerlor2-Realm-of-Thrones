@@ -2884,6 +2884,42 @@ namespace Armoury
         [SettingPropertyGroup("Arms production")]
         public float SeaFreightShare { get; set; } = 0.25f;
 
+        [SettingPropertyBool("Workshop Hands By People", HintText = "a town's arms craftsmen are counted from the people of its market - the town and the villages that sell there, as the realm tables give them - and a richer town keeps more masters; no town has fewer than under the old rule. Off: the old rule only")]
+        [SettingPropertyGroup("Arms production")]
+        public bool WorkshopHandsByPeople { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Workshop Hands Per1000 People", 0.00f, 1.00f, "0.00", HintText = "man-days of arms work a day for each 1000 people of a town's market (fletchers come on top). Estimate from history: 0.3 to 0.6 armourers, weaponsmiths, bowyers, fletchers and saddlers per 1000 people of the realm; raised in steps together with ore and timber")]
+        [SettingPropertyGroup("Arms production")]
+        public float WorkshopHandsPer1000People { get; set; } = 0.10f;
+
+        [SettingPropertyFloatingInteger("Workshop Hands Max Per Town", 0.00f, 4000.00f, "0.00", HintText = "safety ceiling on one town's arms craftsmen under the population rule")]
+        [SettingPropertyGroup("Arms production")]
+        public float WorkshopHandsMaxPerTown { get; set; } = 1000f;
+
+        [SettingPropertyBool("Cold Start Legacy Hands", HintText = "the merchants' starting stock of a new campaign is counted from the old number of craftsmen - more craftsmen do not mean more free stock at the start")]
+        [SettingPropertyGroup("Arms production")]
+        public bool ColdStartLegacyHands { get; set; } = true;
+
+        [SettingPropertyBool("Caravan Bulk Legacy Hands", HintText = "the stock of ore, timber, leather and cloth a town keeps before it sells to caravans is counted from the old number of craftsmen, so towns with many craftsmen do not stop selling their surplus")]
+        [SettingPropertyGroup("Arms production")]
+        public bool CaravanBulkLegacyHands { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Mine Output Step", 0.00f, 6.00f, "0.00", HintText = "further step of iron ore digging on top of Mine Output Multiplier - more ore together with more craftsmen; still several times less iron for arms than medieval Europe")]
+        [SettingPropertyGroup("Arms production")]
+        public float MineOutputStep { get; set; } = 1.5f;
+
+        [SettingPropertyFloatingInteger("Woodlot Step", 0.00f, 6.40f, "0.00", HintText = "further step of timber from village woods on top of Village Woodlot Loads - for the charcoal of the smiths (about six loads of wood for every load of ore); one of the steps 1.3 / 1.6 / 1.9, chosen by the smiths' need")]
+        [SettingPropertyGroup("Arms production")]
+        public float WoodlotStep { get; set; } = 1.6f;
+
+        [SettingPropertyBool("Bk Raw No Rot", HintText = "Banner Kings no longer deletes 2% a day of large stocks of ore, metal, tools, leather and cloth in towns and castles; large stocks of timber, flax and wool lose 0.2% a day instead of 2% (stores without a roof)")]
+        [SettingPropertyGroup("Arms production")]
+        public bool BkRawNoRot { get; set; } = true;
+
+        [SettingPropertyInteger("Workshop Pieces Per Cycle Max", 0, 256, "0", HintText = "most pieces one workshop line may finish in one cycle of the game (was 8) - a big town's spear-makers are not held back by the counter")]
+        [SettingPropertyGroup("Arms production")]
+        public int WorkshopPiecesPerCycleMax { get; set; } = 64;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -3604,6 +3640,15 @@ namespace Armoury
             s.TownMaterialOrderDays = TownMaterialOrderDays;
             s.CarterPencePerKgPer100 = CarterPencePerKgPer100;
             s.SeaFreightShare = SeaFreightShare;
+            s.WorkshopHandsByPeople = WorkshopHandsByPeople;
+            s.WorkshopHandsPer1000People = WorkshopHandsPer1000People;
+            s.WorkshopHandsMaxPerTown = WorkshopHandsMaxPerTown;
+            s.ColdStartLegacyHands = ColdStartLegacyHands;
+            s.CaravanBulkLegacyHands = CaravanBulkLegacyHands;
+            s.MineOutputStep = MineOutputStep;
+            s.WoodlotStep = WoodlotStep;
+            s.BkRawNoRot = BkRawNoRot;
+            s.WorkshopPiecesPerCycleMax = WorkshopPiecesPerCycleMax;
         }
 
         internal static void Apply()

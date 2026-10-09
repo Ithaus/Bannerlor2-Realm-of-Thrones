@@ -220,7 +220,8 @@ namespace Armoury
             // paczka 148: przy czynnym rzemiosle miasta (TownCrafts) garbowania i tkania 1:1 nie ma - zamiast jego stalej (PerCycle x sztuk na
             // cykl) prawdziwy przerob rzemiosla w tym miescie (srednia z ok. 14 dob, sztuki wsadu na dobe; takze welna)
             float crafts = TownCrafts.Active ? TownCrafts.UseOf(town, g.Item) : g.PerCycle * Math.Max(0, s.ArtisanTanWeavePerCycle);
-            return WorkshopLaw.TownHands(town) * g.PerHand + g.Fixed + crafts + ShopUse(town, g);
+            float hands = s.CaravanBulkLegacyHands ? WorkshopLaw.LegacyTownHands(town) : WorkshopLaw.TownHands(town);   // 174.3: cel zapasu i prog nadwyzki na dawnych rekach (zrodla kontraktow 174.2 nie znikaja)
+            return hands * g.PerHand + g.Fixed + crafts + ShopUse(town, g);
         }
 
         /// <summary>Dla ceny surowcow (RawPrice): to samo zuzycie dobowe, z ktorego karawany licza zapas docelowy miasta - przedmiot
@@ -247,6 +248,17 @@ namespace Armoury
             if (s == null || town == null || item == null || !town.IsTown || !Ready()) return 0f;
             foreach (var g in _goods) if (g.Item == item) return Use(town, g, s);
             return 0f;
+        }
+
+        /// <summary>174.3: suma zapasow docelowych i progow nadwyzki miast dla surowca (linia startowa "Rece (174)").</summary>
+        internal static void SumsFor(string id, out int target, out int keep)
+        {
+            target = 0; keep = 0;
+            var s = Settings.Current;
+            if (s == null || !Ready()) return;
+            Good g = null; foreach (var x in _goods) if (x.Id == id) { g = x; break; }
+            if (g == null) return;
+            foreach (var t in Town.AllTowns) { if (t == null || !t.IsTown) continue; int tg = Target(t, g, s); target += tg; keep += KeepOf(g, s, tg); }
         }
 
         /// <summary>174.2: prog nadwyzki miasta (ponizej niego nie sprzedaje karawanom) - prog zrodla kontraktow surowca; 0 = spoza tabeli albo zamek.</summary>

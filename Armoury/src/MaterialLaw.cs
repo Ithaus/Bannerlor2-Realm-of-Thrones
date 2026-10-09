@@ -169,7 +169,7 @@ namespace Armoury
                 var s = Settings.Current;
                 string id = item.StringId ?? "";
                 float m = 1f;
-                if (On && id == "iron") m = s.MineOutputMultiplier;
+                if (On && id == "iron") m = s.MineOutputMultiplier * (s.MineOutputStep > 0f ? s.MineOutputStep : 1f);   // 174.3: krok wariantu B Jeffa - ruda razem z rekami
                 else if (On && id == "hardwood") m = s.LumberOutputMultiplier;
                 // wpis 87 (audyt pkt 13): dzielenie przez ladunek zawsze, gdy waga jest x10 - inaczej wylaczenie MaterialLaw = 10x kg rudy
                 m /= HistoricalPrices.BulkScale(item);      // wpis 50: ladunek 100 kg - tyle samo kg co dotad

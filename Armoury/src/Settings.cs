@@ -828,6 +828,15 @@ namespace Armoury
         public int TownMaterialOrderDays = 3;              // a town orders the same raw material at most once in this many days
         public float CarterPencePerKgPer100 = 0.0375f;     // cost of carrying one kilogram 100 leagues by road, which the caravan must earn before it takes the order (about 1.5 pence a ton a mile in 14th-century England)
         public float SeaFreightShare = 0.25f;              // cost of a sea leg as a share of the same distance by road
+        public bool WorkshopHandsByPeople = true;          // a town's arms craftsmen are counted from the people of its market - the town and the villages that sell there, as the realm tables give them - and a richer town keeps more masters; no town has fewer than under the old rule. Off: the old rule only
+        public float WorkshopHandsPer1000People = 0.10f;   // man-days of arms work a day for each 1000 people of a town's market (fletchers come on top). Estimate from history: 0.3 to 0.6 armourers, weaponsmiths, bowyers, fletchers and saddlers per 1000 people of the realm; raised in steps together with ore and timber
+        public float WorkshopHandsMaxPerTown = 1000f;      // safety ceiling on one town's arms craftsmen under the population rule
+        public bool ColdStartLegacyHands = true;           // the merchants' starting stock of a new campaign is counted from the old number of craftsmen - more craftsmen do not mean more free stock at the start
+        public bool CaravanBulkLegacyHands = true;         // the stock of ore, timber, leather and cloth a town keeps before it sells to caravans is counted from the old number of craftsmen, so towns with many craftsmen do not stop selling their surplus
+        public float MineOutputStep = 1.5f;                // further step of iron ore digging on top of Mine Output Multiplier - more ore together with more craftsmen; still several times less iron for arms than medieval Europe
+        public float WoodlotStep = 1.6f;                   // further step of timber from village woods on top of Village Woodlot Loads - for the charcoal of the smiths (about six loads of wood for every load of ore); one of the steps 1.3 / 1.6 / 1.9, chosen by the smiths' need
+        public bool BkRawNoRot = true;                     // Banner Kings no longer deletes 2% a day of large stocks of ore, metal, tools, leather and cloth in towns and castles; large stocks of timber, flax and wool lose 0.2% a day instead of 2% (stores without a roof)
+        public int WorkshopPiecesPerCycleMax = 64;         // most pieces one workshop line may finish in one cycle of the game (was 8) - a big town's spear-makers are not held back by the counter
 
         public static void Load(string moduleDataDir)
         {

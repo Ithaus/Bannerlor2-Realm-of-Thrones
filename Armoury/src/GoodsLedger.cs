@@ -470,7 +470,7 @@ namespace Armoury
                     foreach (var i in f.Touched) Book(i, GSupply, null, f.Net[i]);
                     return;
                 case FBkSettle:
-                    foreach (var i in f.Touched) { long n = f.Net[i]; Book(i, GBkSettle, n > 0 ? "dokup z nadwyzki rak i zywnosci" : "gnicie i nadprodukcja", n); }
+                    foreach (var i in f.Touched) { long n = f.Net[i]; Book(i, GBkSettle, n > 0 ? "dokup z nadwyzki rak i zywnosci" : (RawNoRot.On ? "gnicie (174.3: drewno, len, welna 0.2%)" : "gnicie i nadprodukcja"), n); }
                     return;
                 case FBkParty:
                     foreach (var i in f.Touched) Book(i, GBkParty, null, f.Net[i]);

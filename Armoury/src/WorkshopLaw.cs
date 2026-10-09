@@ -42,7 +42,7 @@ namespace Armoury
     internal static class WorkshopLaw
     {
         /// <summary>Nowa gra/wczytanie: stare przedmioty i pule z poprzedniej kampanii (audyt 04.10 - ryzyko zepsucia save).</summary>
-        internal static void Reset() { _pending = null; _ore = _wood = _leather = _linen = _wool = null; _owed.Clear(); _labor.Clear(); _rank.Clear(); _wip.Clear(); _plans.Clear(); _wipBasket.Clear(); NewDay174(); _soldierItems = null; _madeByType.Clear(); _dayStamp = -1; _made = _skipLoss = _skipMat = _skipLabor = _skipGold = 0; _dayRevenue = _dayCost = 0; Array.Clear(_skipMatBy, 0, _skipMatBy.Length);
+        internal static void Reset() { _pending = null; _market.Clear(); _marketDay = -1; _handsStart = -1f; _handsDay = -1; _ore = _wood = _leather = _linen = _wool = null; _owed.Clear(); _labor.Clear(); _rank.Clear(); _wip.Clear(); _plans.Clear(); _wipBasket.Clear(); NewDay174(); _soldierItems = null; _madeByType.Clear(); _dayStamp = -1; _made = _skipLoss = _skipMat = _skipLabor = _skipGold = 0; _dayRevenue = _dayCost = 0; Array.Clear(_skipMatBy, 0, _skipMatBy.Length);
             WorkshopTrade.Reset();   // warsztaty towarowe w nowej monecie: stan czyszczony razem z warsztatami zbrojnymi (ta metoda idzie z konstruktora ArmouryBehavior)
             TownCrafts.Reset();      // paczka 148: rzemioslo miasta - dlugi wsadu i rak, srednie zuzycia (przed SyncData wczytania)
             TownFletchers.Reset();   // paczka 172: strzelarze miasta - dlugi surowca i rak, kandydaci, liczniki (przed SyncData wczytania)
@@ -256,7 +256,8 @@ namespace Armoury
                 bool any = false;
                 float minProfit = 1f + Math.Max(0f, s.WorkshopMinProfitPercent) / 100f;
                 bool planOn = FollowMaterial;
-                for (int guard = 0; guard < 8; guard++)
+                int guardMax = PiecesPerCycleMax;   // 174.3: dotad stala 8 - przy rekach x2 szybkie linie duzych miast staly na liczniku
+                for (int guard = 0; guard < guardMax; guard++)
                 {
                     if (w.Item == null)
                     {
@@ -640,20 +641,132 @@ namespace Armoury
             return Math.Max(1, n);
         }
 
-        internal static float TownHands(Town town)
+        /// <summary>Dawny wzor rak rzemieslnikow miasta: dobrobyt / WorkshopProsperityPerHand w granicach WorkshopArtisansMin..Max. 174.3: ColdStart i cel
+        /// zapasu karawan licza dalej nim (ColdStartLegacyHands, CaravanBulkLegacyHands); TownHands nigdy nie daje mniej.</summary>
+        internal static float LegacyTownHands(Town town)
         {
             var s = Settings.Current;
             float per = Math.Max(50f, s.WorkshopProsperityPerHand);
             return MBMath.ClampFloat(town.Prosperity / per, Math.Max(0.1f, s.WorkshopArtisansMin), Math.Max(s.WorkshopArtisansMin, s.WorkshopArtisansMax));
         }
 
+        /// <summary>
+        /// Rece rzemieslnikow broni, zbroi i amunicji miasta (roboczodni dziennie). 174.3 (WorkshopHandsByPeople): od ludnosci RYNKU miasta z tabeli
+        /// krain (miasto + wsie, ktore w nim handluja - TradeBound gry; PopulationLaw.TablePeopleOf, suma swiata stala) x poziom placy (TownWage.Index -
+        /// bogate miasto ma wiecej mistrzow; osrodki eksportowe 3-5 na 1000 mieszczan wobec 1-3 w zwyklych):
+        ///   rece = max(dawny wzor, min(WorkshopHandsMaxPerTown, WorkshopHandsPer1000People x ludzie rynku / 1000 x indeks placy)).
+        /// Nikt nie traci rak (max) - Zelazne Wyspy, Castle Black, Dragonstone zostaja przy dawnych. Historia [S z H]: 0.3-0.6 rzemieslnika broni, zbroi
+        /// i amunicji na 1000 mieszkancow kraju; 0.10 (ze strzelarzami ok. 0.15) to krok 1 - polowa minimum, razem z kopalniami x1.5 i lasem wsi x1.6.
+        /// </summary>
+        internal static float TownHands(Town town)
+        {
+            float old = LegacyTownHands(town);
+            var s = Settings.Current;
+            if (s == null || !s.WorkshopHandsByPeople || town == null) return old;
+            float byPeople = Math.Min(Math.Max(1f, s.WorkshopHandsMaxPerTown), Math.Max(0f, s.WorkshopHandsPer1000People) * MarketPeople(town) / 1000f * TownWage.Index(town));
+            return Math.Max(old, byPeople);
+        }
+
         internal static float Hands(Workshop workshop, Town town)
         {
             var s = Settings.Current;
             if (!workshop.WorkshopType.IsHidden) return Math.Max(0.1f, s.WorkshopWorkers);
-            float per = Math.Max(50f, s.WorkshopProsperityPerHand);
-            return MBMath.ClampFloat(town.Prosperity / per, Math.Max(0.1f, s.WorkshopArtisansMin), Math.Max(s.WorkshopArtisansMin, s.WorkshopArtisansMax));
+            return TownHands(town);
         }
+
+        // 174.3: ludzie rynku miasta z tabeli krain - pamiec dnia (jeden przebieg osad na dobe)
+        private static readonly Dictionary<Town, float> _market = new Dictionary<Town, float>();
+        private static int _marketDay = -1;
+        private static float _marketOut;
+        internal static float MarketPeople(Town town)
+        {
+            if (town == null) return 0f;
+            int day = (int)CampaignTime.Now.ToDays;
+            if (day != _marketDay || _market.Count == 0)
+            {
+                _market.Clear(); _marketOut = 0f; _marketDay = day;
+                try
+                {
+                    foreach (var st in Settlement.All)
+                    {
+                        if (st == null) continue;
+                        Town t = null;
+                        if (st.IsTown) t = st.Town;
+                        else if (st.IsVillage && st.Village != null) { var tb = st.Village.TradeBound; t = tb != null ? tb.Town : null; }
+                        else continue;
+                        float p = PopulationLaw.TablePeopleOf(st);
+                        if (p <= 0f) continue;
+                        if (t == null || !t.IsTown) { _marketOut += p; continue; }
+                        float v; _market.TryGetValue(t, out v); _market[t] = v + p;
+                    }
+                }
+                catch (Exception e) { Log.Error("WorkshopLaw.MarketPeople", e); }
+            }
+            float r; return _market.TryGetValue(town, out r) ? r : 0f;
+        }
+
+        // 174.3: rece swiata - pierwszy pomiar sesji i dzisiejszy (linia "Warsztaty: dzien" - tabela stala, wiec zmiana tylko z dobrobytu i placy)
+        private static float _handsStart = -1f;
+        private static int _handsDay = -1; private static float _handsToday;
+        private static float WorldHands()
+        {
+            int day = (int)CampaignTime.Now.ToDays;
+            if (day == _handsDay) return _handsToday;
+            float w = 0f;
+            try { foreach (var t in Town.AllTowns) if (t != null && t.IsTown) w += TownHands(t); } catch { }
+            _handsDay = day; _handsToday = w;
+            if (_handsStart < 0f) _handsStart = w;
+            return w;
+        }
+
+        /// <summary>174.3: linia startowa "Rece (174)" (OnSessionLaunched, po ColdStart).</summary>
+        internal static void HandsStartLine()
+        {
+            try
+            {
+                var s = Settings.Current;
+                var inv = CultureInfo.InvariantCulture;
+                float world = 0f, legacy = 0f, west = 0f, essos = 0f; int onLegacy = 0, towns = 0;
+                var list = new List<float>();
+                var byKingdom = new Dictionary<string, float[]>();
+                float people = 0f;
+                foreach (var t in Town.AllTowns)
+                {
+                    if (t == null || !t.IsTown) continue;
+                    float h = TownHands(t), o = LegacyTownHands(t);
+                    world += h; legacy += o; towns++; list.Add(h);
+                    if (h <= o + 1e-3f) onLegacy++;
+                    people += MarketPeople(t);
+                    string c = t.Settlement.Culture != null ? t.Settlement.Culture.StringId : "";
+                    if (PopulationLaw.WesterosCultures.Contains(c)) west += h; else essos += h;
+                    string k = t.Settlement.MapFaction != null ? t.Settlement.MapFaction.Name.ToString() : "-";
+                    float[] a; if (!byKingdom.TryGetValue(k, out a)) { a = new float[2]; byKingdom[k] = a; }
+                    a[0] += o; a[1] += h;
+                }
+                list.Sort();
+                var kl = new List<KeyValuePair<string, float[]>>(byKingdom);
+                kl.Sort((x, y) => y.Value[1].CompareTo(x.Value[1]));
+                var kp = new List<string>();
+                foreach (var kv in kl) kp.Add(kv.Key + " " + kv.Value[0].ToString("0", inv) + " -> " + kv.Value[1].ToString("0", inv));
+                int oreT = 0, oreK = 0;
+                try { CaravanBulk.SumsFor("iron", out oreT, out oreK); } catch { }
+                float total = PopulationLaw.TableTotal();
+                _handsStart = world; _handsDay = (int)CampaignTime.Now.ToDays; _handsToday = world;
+                Log.Info("Rece (174): " + (s.WorkshopHandsByPeople ? "wzor ludnosc rynku (tabela krain) x poziom placy, nie mniej niz dawny wzor" : "WYLACZONE - dawny wzor (dobrobyt)")
+                         + " - swiat " + world.ToString("0", inv) + " roboczodni (Westeros " + west.ToString("0", inv) + ", Essos " + essos.ToString("0", inv) + "; dawny wzor " + legacy.ToString("0", inv) + "); "
+                         + s.WorkshopHandsPer1000People.ToString("0.###", inv) + " na 1000 ludzi rynku (ludnosc z tabeli " + (people / 1e6f).ToString("0.00", inv) + " mln w rynkach miast, poza rynkiem "
+                         + (_marketOut / 1e6f).ToString("0.00", inv) + " mln, tabela razem " + (total / 1e6f).ToString("0.00", inv) + " mln); miasto min/mediana/max "
+                         + (list.Count > 0 ? list[0].ToString("0", inv) + "/" + list[list.Count / 2].ToString("0", inv) + "/" + list[list.Count - 1].ToString("0", inv) : "-") + "; na dawnym wzorze " + onLegacy + " z " + towns + " miast"
+                         + "; wedlug krolestw (dawne -> nowe) [" + string.Join(", ", kp.ToArray()) + "]; ColdStart " + (s.ColdStartLegacyHands ? "na dawnych rekach" : "NA NOWYCH rekach")
+                         + ", cel karawan " + (s.CaravanBulkLegacyHands ? "na dawnych rekach" : "NA NOWYCH rekach") + "; suma celow rudy " + oreT + ", Keep " + oreK
+                         + "; kopalnie x" + Math.Max(0f, s.MineOutputStep).ToString("0.##", inv) + ", las wsi x" + Math.Max(0f, s.WoodlotStep).ToString("0.##", inv)
+                         + ", BK gnicie surowcow trwalych " + (s.BkRawNoRot ? (RawNoRot.Hooked ? "wylaczone (drewno, len, welna 0.2%)" : "BRAK latki") : "jak w BK (MCM)")
+                         + "; petla cyklu do " + PiecesPerCycleMax + " szt.");
+            }
+            catch (Exception e) { Log.Error("WorkshopLaw.HandsStartLine", e); }
+        }
+
+        private static int PiecesPerCycleMax { get { var s = Settings.Current; return s == null ? 8 : Math.Max(1, Math.Min(1000, s.WorkshopPiecesPerCycleMax)); } }
 
         // ------------------------------------------------------------ 174.1: RECE IDA DO SUROWCA, WYROB WEDLUG BRAKU (te same rece, zero nowego surowca)
         internal static bool FollowMaterial { get { var s = Settings.Current; return s != null && s.WorkshopHandsFollowMaterial; } }
@@ -916,6 +1029,12 @@ namespace Armoury
             sb.Append("]), kandydatow odrzuconych \"nie skonczy w planie\" ").Append(_rejPlan).Append(" (cykli bez startu z tego powodu ").Append(_skipPlan).Append(", linii nieczynnych przez plan ").Append(_planIdleLines)
               .Append("); zrobiono t5-6: ").Append(_madeT56).Append(" szt.; cywilnych pominietych ").Append(_civSkipped).Append(" (pozycji rankingu)");
             if (_planStumbles > 0) sb.Append("; potkniecia planu ").Append(_planStumbles);
+            try
+            {
+                float wh = WorldHands();   // 174.3: rece swiata (tabela stala - zmiana tylko z dobrobytu i placy)
+                sb.Append("; rece swiata ").Append(wh.ToString("0", inv)).Append(" (zmiana od startu ").Append(_handsStart > 0f ? ((wh / _handsStart - 1f) * 100f).ToString("+0.0;-0.0", inv) : "0").Append("%)");
+            }
+            catch { }
             return sb.ToString();
         }
 

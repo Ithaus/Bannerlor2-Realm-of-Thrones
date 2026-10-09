@@ -73,7 +73,7 @@ namespace Armoury
 
         internal static void Reset()
         {
-            _k.Clear(); RentToday.Clear();
+            _k.Clear(); RentToday.Clear(); _kTab.Clear(); _kTabDay = -1;
             // wpis 87 (audyt pkt 4): BK tworzy nowe PopulationManager/PolicyManager przy kazdej grze - stare referencje dawaly
             // dekret podatkowy zawsze Standard i pomijaly autonomie po wczytaniu drugiego save'a bez restartu
             _bkResolved = false; _popMgr = null; _popData = null; _polResolved = false; _policyMgr = null; _getPolicy = null;
@@ -107,6 +107,58 @@ namespace Armoury
                 parts.Add(kv.Key + " " + (pop / 1e6f).ToString("0.00", CultureInfo.InvariantCulture) + "M (wies " + (int)kv0 + "/hearth, miasto " + (int)kv1 + "/dobrobyt)");
             }
             Log.Info("PopulationLaw: kalibracja ludnosci - " + string.Join("; ", parts.ToArray()) + ".");
+        }
+
+        // ------------------------------------------------------------ 174.3: ludnosc z tabeli krain (suma swiata stala)
+        // PeopleOf liczy ludzi z hearth wsi i dobrobytu przez wspolczynnik z pierwszej kalibracji (_k, w zapisie) - rosnie z hearth i dobrobytem:
+        // w A171 swiat 52.5 -> 59.0 mln w 39 dob, Lotus Bay 0.75 -> 2.2 mln (audyt 09.10: "nowego modelu nie wolno na niej oprzec").
+        // TablePeopleOf: ten sam wzor, ale wspolczynnik liczony co dobe z dzisiejszych sum hearth i dobrobytu kultury - suma swiata = tabela krain
+        // x PopulationScale zawsze; zmienia sie tylko podzial miedzy osady. _k i PeopleOf bez zmian (renty, ksiega ludzi).
+        private static readonly Dictionary<string, float[]> _kTab = new Dictionary<string, float[]>();
+        private static int _kTabDay = -1;
+        internal static readonly HashSet<string> WesterosCultures = new HashSet<string> { "battania", "river", "reach", "aserai", "vlandia", "vale", "stormlands", "sturgia", "crownlands", "dragonstone", "freefolk", "nightswatch", "skagosi" };
+
+        internal static float TablePeopleOf(Settlement s)
+        {
+            if (s == null || s.Culture == null) return 0f;
+            int day = (int)CampaignTime.Now.ToDays;
+            if (day != _kTabDay || _kTab.Count == 0)
+            {
+                _kTab.Clear();
+                float scale = Math.Max(0f, Settings.Current.PopulationScale);
+                var hearth = new Dictionary<string, float>(); var prosp = new Dictionary<string, float>();
+                foreach (var x in Settlement.All)
+                {
+                    if (x == null || x.Culture == null) continue;
+                    string c = x.Culture.StringId;
+                    if (!Table.ContainsKey(c)) continue;
+                    if (x.IsVillage && x.Village != null) { float v; hearth.TryGetValue(c, out v); hearth[c] = v + Math.Max(1f, x.Village.Hearth); }
+                    else if (x.IsTown && x.Town != null) { float v; prosp.TryGetValue(c, out v); prosp[c] = v + Math.Max(1f, x.Town.Prosperity); }
+                }
+                foreach (var kv in Table)
+                {
+                    float h, p;
+                    hearth.TryGetValue(kv.Key, out h); prosp.TryGetValue(kv.Key, out p);
+                    float pop = kv.Value.Pop * scale;
+                    float urban = p > 0f ? kv.Value.Urban : 0f;
+                    if (h <= 0f) urban = p > 0f ? 1f : 0f;
+                    _kTab[kv.Key] = new[] { h > 0f ? pop * (1f - urban) / h : 0f, p > 0f ? pop * urban / p : 0f };
+                }
+                _kTabDay = day;
+            }
+            float[] k;
+            if (!_kTab.TryGetValue(s.Culture.StringId, out k)) return 0f;
+            if (s.IsVillage && s.Village != null) return Math.Max(1f, s.Village.Hearth) * k[0];
+            if (s.IsTown && s.Town != null) return Math.Max(1f, s.Town.Prosperity) * k[1];
+            return 0f;
+        }
+
+        /// <summary>174.3: ludnosc z tabeli krain razem (kontrola linii "Rece (174)").</summary>
+        internal static float TableTotal()
+        {
+            float scale = Math.Max(0f, Settings.Current.PopulationScale), sum = 0f;
+            foreach (var kv in Table) sum += kv.Value.Pop * scale;
+            return sum;
         }
 
         /// <summary>Czy ludnosc jest juz skalibrowana (ksiega "Ludzie:" czyta PeopleOf tylko wtedy - sama kalibracji nie wywoluje).</summary>

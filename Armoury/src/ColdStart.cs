@@ -159,7 +159,7 @@ namespace Armoury
             foreach (var st in Settlement.All)
             {
                 if (st == null || !st.IsTown || st.Town == null || st.ItemRoster == null) continue;
-                float hands = WorkshopLaw.TownHands(st.Town);
+                float hands = Settings.Current.ColdStartLegacyHands ? WorkshopLaw.LegacyTownHands(st.Town) : WorkshopLaw.TownHands(st.Town);   // 174.3: wiecej rzemieslnikow to nie wiecej zapasu z niczego
                 string cul = st.Culture != null ? st.Culture.StringId : "";
                 int made = 0;
                 foreach (var g in guilds)
