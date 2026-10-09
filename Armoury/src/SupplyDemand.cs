@@ -415,6 +415,8 @@ namespace Armoury
                 foreach (var kv in sample)
                 {
                     int key = kv.Key; var probe = kv.Value;
+                    // recenzja 171: tylko bron i zbroje - konie i rzedy kupcy woza do zamkow jak dotad (zaloga ich nie zamawia, gracz kupuje je na polce zamku)
+                    bool noCastlesHere = noCastles && !MenPurse.HorseKind(probe);
                     foreach (var src in places)
                     {
                         int have; stock[src].TryGetValue(key, out have);
@@ -439,7 +441,7 @@ namespace Armoury
                             foreach (var dst in places)
                             {
                                 if (dst == src || poor.Contains(dst)) continue;
-                                if (noCastles && dst.IsCastle) continue;
+                                if (noCastlesHere && dst.IsCastle) continue;
                                 float dist = srcPos.Distance(dst.GetPosition2D);
                                 if (dist > range) continue;
                                 int dh; stock[dst].TryGetValue(key, out dh);

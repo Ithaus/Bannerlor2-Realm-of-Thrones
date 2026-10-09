@@ -1712,9 +1712,9 @@ namespace Armoury
         [SettingPropertyGroup("Iron bank")]
         public bool ColdStartEnabled { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Cold Start Market Days", 0.00f, 56.00f, "0.00", HintText = "new campaign only: how many days of the town craftsmen's work lie on the stalls at the start (mostly common gear of the town's culture)")]
+        [SettingPropertyFloatingInteger("Cold Start Market Days", 0.00f, 240.00f, "0.00", HintText = "new campaign only: how many days of the town craftsmen's work lie on the stalls at the start (mostly common gear of the town's culture); two months of stock, because recruits no longer bring a second kit from thin air")]
         [SettingPropertyGroup("Iron bank")]
-        public float ColdStartMarketDays { get; set; } = 14f;
+        public float ColdStartMarketDays { get; set; } = 60f;
 
         [SettingPropertyBool("Historical Prices Enabled", HintText = "the whole world in historical prices (1 coin = 1 medieval penny): arms and armour priced from their real making cost, smithing materials at medieval prices - wages and incomes already sit at this scale")]
         [SettingPropertyGroup("Iron bank")]
@@ -2756,7 +2756,7 @@ namespace Armoury
         [SettingPropertyGroup("Arming the garrisons")]
         public bool GarrisonRecruitKeepsKit { get; set; } = true;
 
-        [SettingPropertyBool("Garrison Gear From Town", HintText = "a castle's garrison buys what its men lack in the town its villages trade with: the lord of the castle pays that town, the goods leave its stalls and reach the castle by cart in the days the road takes; arms are no longer shipped to castles by traders and lords buy arms only in towns (off = as before: the garrison buys from the castle's own stall)")]
+        [SettingPropertyBool("Garrison Gear From Town", HintText = "a castle's garrison buys what its men lack in the town its villages trade with: the lord of the castle pays that town, the goods leave its stalls and reach the castle by cart in the days the road takes; arms are no longer shipped to castles by traders (horses still are) and lords buy arms only in towns (off = as before: the garrison buys from the castle's own stall)")]
         [SettingPropertyGroup("Arming the garrisons")]
         public bool GarrisonGearFromTown { get; set; } = true;
 
@@ -2780,11 +2780,11 @@ namespace Armoury
         [SettingPropertyGroup("Arming the garrisons")]
         public bool GarrisonSellsSurplus { get; set; } = true;
 
-        [SettingPropertyBool("Garrison Drill Needs Arms", HintText = "a garrison's daily drill (training fields, drills) teaches only the men who have a weapon of their kind in the armoury - the experience is scaled by the share of armed men (AI garrisons; yours only with Garrison Buys Gear Player)")]
+        [SettingPropertyBool("Garrison Drill Needs Arms", HintText = "a garrison's daily drill (training fields, drills) teaches only the men who have a weapon of their kind and grade in the armoury - the experience is scaled by the share of armed men (AI garrisons; yours only with Garrison Buys Gear Player; only while AI lords and garrisons buy their gear)")]
         [SettingPropertyGroup("Arming the garrisons")]
         public bool GarrisonDrillNeedsArms { get; set; } = true;
 
-        [SettingPropertyBool("Party Drill Needs Arms", HintText = "an AI lord's daily training of his men needs weapons: the experience is scaled by the share of his men who have a weapon of their kind in the armoury - with arms short, promotions slow down")]
+        [SettingPropertyBool("Party Drill Needs Arms", HintText = "an AI lord's daily training of his men needs weapons: each troop's experience is scaled by the share of its men who have a weapon of their kind and grade in the armoury - men with nothing fit for their rank promote slower (only while AI lords buy their gear)")]
         [SettingPropertyGroup("Arming the garrisons")]
         public bool PartyDrillNeedsArms { get; set; } = true;
 

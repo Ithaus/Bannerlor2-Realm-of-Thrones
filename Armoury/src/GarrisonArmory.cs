@@ -24,6 +24,9 @@ namespace Armoury
     ///    DTE (gra przenosi samych ludzi); ludzie rozwiazanej partii, ktorzy odchodza, biora swoje komplety, a tabor ponad nie sprzedaje sie dla rodu.
     ///  - C10 (Z9): raz w tygodniu zaloga AI sprzedaje to, co ma ponad potrzebe swoich ludzi (i ludzi na patrolach BK) oraz zapas, na polke
     ///    wlasnej osady po cenie skupu; zloto dostaje pan (ta sama regula co nadwyzki partii lorda - MenPurse).
+    /// Recenzja kodu 171: (1) zbrojownie partii lordow bez wodza / rozwiazywanych chroni AiGear.KeepGarrisonArmory (DTE kasowal je w dobie czekania na
+    /// rozwiazanie, wiec A7 pkt 2 przenosil 0 szt.) i zapisuje Export (rekord "@partia" - DTE ich nie zapisuje); (2) stan sztuk (zapis obitych AiWear) idzie
+    /// z ludzmi takze do i z zalog, C10 sprzedaje ze stanem; (3) lord zabierajacy ludzi zostawia sprzet ludzi zalogi na patrolach BK.
     /// Flagi wpiecia latek na caly proces (Reset jest raz na kampanie).
     /// </summary>
     internal static class GarrisonArmory
@@ -42,12 +45,19 @@ namespace Armoury
         {
             _loaded = false; _restored = false; _pending = null;
             ClearDay(); _stumbles = 0; _errDay = -1; _errWhere.Clear();
+            _patrols = null; _patrolsDay = -1;
         }
+
+        private static int _dKeptLeaderless;   // recenzja 171: partie lordow bez wodza / rozwiazywane, ktorych zbrojowni DTE nie skasowal (wywolania GC - raz na partie na dobe)
+
+        /// <summary>Z AiGear.KeepGarrisonArmory - tylko licznik.</summary>
+        internal static void NoteKeptLeaderless() { _dKeptLeaderless++; }
 
         private static void ClearDay()
         {
             _dLeftMen = _dLeftPcs = _dTakenMen = _dTakenPcs = _dDisbandIn = _dDisbandInPcs = _dDisbandGone = _dDisbandGoneKit = _dDisbandSold = _dDisbandGold = 0;
             _dQueue = _dSoldGarrisons = _dSoldPcs = _dSoldGold = _dPatrolCounted = 0;
+            _dKeptLeaderless = 0;
         }
 
         private static void Stumble(string where, Exception e)
@@ -122,7 +132,7 @@ namespace Armoury
         /// ktorym ludziom brakuje), potem ktore sztuki (od najwyzszego tieru: przedmiot ze wzorca, ten sam tier, wyzsze rosnaco, nizsze malejaco).
         /// Zapas ponad komplety zostaje u dawcy (lord sprzeda w miescie, zaloga w C10).
         /// </summary>
-        internal static int MoveKits(MobileParty from, MobileParty to, Dictionary<CharacterObject, int> moved, string why)
+        internal static int MoveKits(MobileParty from, MobileParty to, Dictionary<CharacterObject, int> moved, string why, Dictionary<int, int> extraLeft = null)
         {
             if (from == null || to == null || moved == null || moved.Count == 0) return 0;
             var arm = ArmoryOf(from);
@@ -130,6 +140,8 @@ namespace Armoury
             var needMoved = new Dictionary<int, int>();
             foreach (var kv in moved) AddNeed(needMoved, kv.Key, kv.Value);
             var needLeft = NeedByType(from);   // roster dawcy PO przeniesieniu
+            // recenzja 171: ludzie zalogi na patrolu BK - ich sprzet lezy w zbrojowni zalogi i zostaje dla nich (jak w C10)
+            if (extraLeft != null) foreach (var kv in extraLeft) { int v; needLeft.TryGetValue(kv.Key, out v); needLeft[kv.Key] = v + kv.Value; }
             var have = new Dictionary<int, int>();
             var byType = new Dictionary<int, List<ItemObject>>();
             var avail = new Dictionary<ItemObject, int>();
@@ -182,12 +194,15 @@ namespace Armoury
                 }
             }
             int pcs = 0;
+            bool synced = false;
             foreach (var kv in taken)
             {
                 if (kv.Value <= 0 || !AiGear.AddToArmory(to, kv.Key, kv.Value)) continue;
-                int c; arm.TryGetValue(kv.Key, out c); c -= kv.Value;
+                int c; arm.TryGetValue(kv.Key, out c);
+                // recenzja 171: stan sztuk idzie z nimi (zapis obitych - takze zalog), przed zdjeciem ze zbrojowni dawcy; spis dawcy raz na przeniesienie
+                try { AiWear.MoveWorn(from, to, kv.Key, kv.Value, c, !synced); synced = true; } catch (Exception e) { Stumble("MoveWorn", e); }
+                c -= kv.Value;
                 if (c > 0) arm[kv.Key] = c; else arm.Remove(kv.Key);
-                if (to.IsLordParty) AiWear.NoteSound(to, kv.Key, kv.Value);   // sztuki z zalogi wchodza jako sprawne (zalogi nie maja zapisu zuzycia)
                 pcs += kv.Value;
             }
             return pcs;
@@ -221,10 +236,15 @@ namespace Armoury
             var arm = ArmoryOf(from);
             if (arm == null || arm.Count == 0 || to == null) return 0;
             int pcs = 0;
+            bool synced = false;
             foreach (var kv in arm.ToList())
             {
                 if (kv.Key == null || kv.Value <= 0) continue;
-                if (AiGear.AddToArmory(to, kv.Key, kv.Value)) { pcs += kv.Value; arm.Remove(kv.Key); }
+                if (AiGear.AddToArmory(to, kv.Key, kv.Value))
+                {
+                    try { AiWear.MoveWorn(from, to, kv.Key, kv.Value, kv.Value, !synced); synced = true; } catch (Exception e) { Stumble("MoveWorn", e); }   // recenzja 171: caly zapis obitych
+                    pcs += kv.Value; arm.Remove(kv.Key);
+                }
             }
             arm.Clear();
             return pcs;
@@ -232,8 +252,8 @@ namespace Armoury
 
         /// <summary>
         /// Nadwyzka ponad potrzebe (po typach) i zapas keepPercent na polke targu po cenie skupu, najwyzej tyle, ile kasa udzwignie; zloto do payee.
-        /// Najgorsze sztuki najpierw (tier, potem wartosc), bez koni i rzedow (Stajnia) i bez unikatow. Partia lorda (rozwiazana) - sztuka w stanie
-        /// z ksiegi AiWear; zaloga - sprawna (zalogi nie maja zapisu zuzycia, jak przy zakupach).
+        /// Najgorsze sztuki najpierw (tier, potem wartosc), bez koni i rzedow (Stajnia) i bez unikatow. Sztuka w stanie z ksiegi AiWear (partia lorda
+        /// i - recenzja 171 - zaloga: zakupy, dostawy wozem, przeniesienia i autowerbunek zapisuja jej obite); zaloga przy wylaczonym AiWear - sprawna.
         /// </summary>
         internal static int SellSurplus(MobileParty mp, Dictionary<int, int> needByType, Settlement market, Hero payee, float keepPercent, string why, out int gold)
         {
@@ -248,7 +268,8 @@ namespace Armoury
                 int t = (int)kv.Key.ItemType; int v; have.TryGetValue(t, out v); have[t] = v + kv.Value;
             }
             int sold = 0;
-            bool wornBook = mp.IsLordParty;
+            bool wornBook = mp.IsLordParty || (mp.IsGarrison && AiWear.BookOn);   // recenzja 171: zaloga tez sprzedaje ze stanem z zapisu (obita nie idzie jako sprawna)
+            bool synced = false;
             foreach (var hk in have.ToList())
             {
                 int nd = 0; if (needByType != null) needByType.TryGetValue(hk.Key, out nd);
@@ -263,9 +284,14 @@ namespace Armoury
                     int cnt; if (!arm.TryGetValue(it, out cnt)) continue;
                     while (cnt > 0 && extra > 0)
                     {
-                        var el = wornBook ? new EquipmentElement(it, AiWear.TakeCondition(mp, it)) : new EquipmentElement(it);
+                        var el = wornBook ? new EquipmentElement(it, AiWear.TakeCondition(mp, it, !synced)) : new EquipmentElement(it);
+                        synced = true;   // spis zbrojowni raz na sprzedaz (nie przy kazdej sztuce)
                         int unit = Math.Max(1, market.Town.MarketData.GetPrice(el, mp, true, market.Party));
-                        if (market.Town.Gold < unit) { broke = true; break; }
+                        if (market.Town.Gold < unit)
+                        {
+                            if (wornBook) { try { AiWear.NoteBought(mp, el, 1); } catch { } }   // sztuka zostaje - jej stan wraca do zapisu
+                            broke = true; break;
+                        }
                         cnt--; extra--;
                         market.ItemRoster.AddToCounts(el, 1);
                         market.Town.ChangeGold(-unit);
@@ -324,7 +350,7 @@ namespace Armoury
                 if (g == null) return;
                 var moved = Gone(__state, g.MemberRoster);
                 if (moved.Count == 0) return;
-                int pcs = MoveKits(g, mobileParty, moved, "take");
+                int pcs = MoveKits(g, mobileParty, moved, "take", PatrolNeed(settlement));
                 foreach (var v in moved.Values) _dTakenMen += v;
                 _dTakenPcs += pcs;
             }
@@ -402,7 +428,7 @@ namespace Armoury
                          + _dTakenMen + " ludzi (" + _dTakenPcs + " szt.), rozwiazane partie do zalog " + _dDisbandIn + " (" + _dDisbandInPcs + " szt.), rozwiazane - ludzie odeszli "
                          + _dDisbandGone + " (komplety z ludzmi " + _dDisbandGoneKit + " szt., tabor sprzedany " + _dDisbandSold + " szt. za " + _dDisbandGold + " zl); nadwyzki zalog: sprzedalo "
                          + _dSoldGarrisons + " z " + _dQueue + " zalog w kolejce, " + _dSoldPcs + " szt. za " + _dSoldGold + " zl (kasy osad -> panowie; w tym ludzie na patrolach BK policzeni "
-                         + _dPatrolCounted + " zalogi); potkniecia " + _stumbles + ".");
+                         + _dPatrolCounted + " zalogi); partie lordow bez wodza albo rozwiazywane - zbrojownia zachowana " + _dKeptLeaderless + "; potkniecia " + _stumbles + ".");
             ClearDay(); _stumbles = 0;
         }
 
@@ -427,7 +453,7 @@ namespace Armoury
                     _dQueue++;
                     var need = NeedByType(g);
                     // ludzie zalogi na patrolu BK - sprzet zostal w twierdzy (GarrisonPartyComponent.CreateParty), nie sprzedajemy go
-                    if (patrols == null) patrols = Patrols();
+                    if (patrols == null) patrols = PatrolsToday();
                     List<MobileParty> pl;
                     if (patrols.TryGetValue(st, out pl) && pl.Count > 0)
                     {
@@ -440,6 +466,28 @@ namespace Armoury
                 }
                 catch (Exception e) { Stumble("SellWeek(" + st.StringId + ")", e); }
             }
+        }
+
+        /// <summary>Recenzja 171: potrzeba (po typach) ludzi zalogi tej osady na patrolach BK - dla A7 (lord zabiera ludzi); mapa patroli raz na dobe.</summary>
+        private static Dictionary<int, int> PatrolNeed(Settlement st)
+        {
+            if (st == null || _bkPatrolType == null) return null;
+            List<MobileParty> pl;
+            if (!PatrolsToday().TryGetValue(st, out pl) || pl.Count == 0) return null;
+            var need = new Dictionary<int, int>();
+            foreach (var p in pl) { var pn = NeedByType(p); foreach (var kv in pn) { int v; need.TryGetValue(kv.Key, out v); need[kv.Key] = v + kv.Value; } }
+            return need;
+        }
+
+        private static Dictionary<Settlement, List<MobileParty>> _patrols;
+        private static int _patrolsDay = -1;
+
+        /// <summary>Mapa patroli BK (osada -> patrole) liczona leniwie raz na dobe (jeden przeglad MobileParty.All) - wspolna dla C10 i A7.</summary>
+        private static Dictionary<Settlement, List<MobileParty>> PatrolsToday()
+        {
+            int d = (int)CampaignTime.Now.ToDays;
+            if (_patrols == null || _patrolsDay != d) { _patrols = Patrols(); _patrolsDay = d; }
+            return _patrols;
         }
 
         private static Dictionary<Settlement, List<MobileParty>> Patrols()
@@ -488,8 +536,40 @@ namespace Armoury
                 }
                 catch (Exception e) { Stumble("Export", e); }
             }
-            Log.Info("Zbrojownie zalog (171): zapis - " + garrisons + " zalog, " + pcs + " szt.");
+            // recenzja 171: partie lordow, ktorych DTE nie zapisuje (bez wodza, rozwiazywane - ShouldPersistParty), a ktore zyja dalej (czekaja na
+            // rozwiazanie albo na nowego wodza) - rekord "@StringId partii>..."; bez tego ich sprzet ginal przy wczytaniu jak zbrojownie zalog
+            int parties = 0, ppcs = 0;
+            foreach (var mp in MobileParty.AllLordParties)
+            {
+                try
+                {
+                    if (mp == null || !mp.IsActive || mp.IsMainParty || mp.StringId == null || DteSaves(mp)) continue;
+                    Dictionary<ItemObject, int> arm;
+                    if (!dict.TryGetValue(mp.Id, out arm) || arm == null || arm.Count == 0) continue;
+                    bool first = true;
+                    foreach (var kv in arm)
+                    {
+                        if (kv.Key == null || kv.Value <= 0 || kv.Key.StringId == null) continue;
+                        sb.Append(first ? "@" + mp.StringId + ">" : ",").Append(kv.Key.StringId).Append(':').Append(kv.Value);
+                        first = false; ppcs += kv.Value;
+                    }
+                    if (!first) { sb.Append('~'); parties++; }
+                }
+                catch (Exception e) { Stumble("Export(partia)", e); }
+            }
+            Log.Info("Zbrojownie zalog (171): zapis - " + garrisons + " zalog, " + pcs + " szt.; partie lordow bez wodza albo rozwiazywane (DTE ich nie zapisuje) " + parties + ", " + ppcs + " szt.");
             return sb.ToString();
+        }
+
+        /// <summary>Warunek DTE ShouldPersistParty (EveryoneCampaignBehavior): partia z zywym, czynnym wodzem-bohaterem (nie graczem), wlascicielem, ludzmi i nie rozwiazywana.</summary>
+        private static bool DteSaves(MobileParty mp)
+        {
+            var l = mp.LeaderHero;
+            if (l == null || l.CharacterObject == null || !l.CharacterObject.IsHero || l.CharacterObject.IsPlayerCharacter || l.IsHumanPlayerCharacter || !l.IsPartyLeader || !l.IsAlive || !l.IsActive) return false;
+            var o = mp.Owner;
+            if (o == null || o.CharacterObject == null || !o.CharacterObject.IsHero || o.CharacterObject.IsPlayerCharacter || o.IsHumanPlayerCharacter || !o.IsActive || !o.IsAlive) return false;
+            var r = mp.MemberRoster;
+            return r != null && r.TotalHeroes > 0 && r.TotalManCount > 0 && !mp.IsDisbanding;
         }
 
         /// <summary>Z SyncData (wczytanie): tylko zapamietanie; null = brak klucza (zapis sprzed 171).</summary>
@@ -509,16 +589,32 @@ namespace Armoury
             if (p == null || !p.StartsWith("v1|", StringComparison.Ordinal)) { OldSave(why); return; }
             if (s == null || !s.GarrisonArmorySurvivesSave) { Log.Info("Zbrojownie zalog (171): zapis ma zbrojownie zalog, ale Garrison Armory Survives Save wylaczone - nie ustawiam (" + why + ")."); return; }
             var om = MBObjectManager.Instance;
-            int garrisons = 0, pcs = 0, noGarrison = 0, replaced = 0, unknown = 0;
+            int garrisons = 0, pcs = 0, noGarrison = 0, replaced = 0, unknown = 0, parties = 0, ppcs = 0, noParty = 0;
+            Dictionary<string, MobileParty> lordParties = null;   // recenzja 171: rekordy "@partia" (bez wodza / rozwiazywane) - mapa raz, tylko gdy sa
             foreach (var rec in p.Substring(3).Split('~'))
             {
                 if (rec.Length == 0) continue;
                 try
                 {
                     int gt = rec.IndexOf('>'); if (gt <= 0) continue;
-                    Settlement st = null; try { st = om.GetObject<Settlement>(rec.Substring(0, gt)); } catch { }
-                    var g = st != null && st.Town != null ? st.Town.GarrisonParty : null;
-                    if (g == null) { noGarrison++; continue; }
+                    bool party = rec[0] == '@';
+                    MobileParty g = null;
+                    if (party)
+                    {
+                        if (lordParties == null)
+                        {
+                            lordParties = new Dictionary<string, MobileParty>();
+                            foreach (var lp in MobileParty.AllLordParties) if (lp != null && lp.StringId != null && !lordParties.ContainsKey(lp.StringId)) lordParties[lp.StringId] = lp;
+                        }
+                        lordParties.TryGetValue(rec.Substring(1, gt - 1), out g);
+                        if (g == null || !g.IsActive) { noParty++; continue; }
+                    }
+                    else
+                    {
+                        Settlement st = null; try { st = om.GetObject<Settlement>(rec.Substring(0, gt)); } catch { }
+                        g = st != null && st.Town != null ? st.Town.GarrisonParty : null;
+                        if (g == null) { noGarrison++; continue; }
+                    }
                     Dictionary<ItemObject, int> arm;
                     if (dict.TryGetValue(g.Id, out arm) && arm != null && arm.Count > 0) { foreach (var v in arm.Values) if (v > 0) replaced += v; arm.Clear(); }
                     int got = 0;
@@ -530,12 +626,12 @@ namespace Armoury
                         if (it == null) { unknown += n; continue; }
                         if (AiGear.AddToArmory(g, it, n)) got += n;
                     }
-                    if (got > 0) { garrisons++; pcs += got; }
+                    if (got > 0) { if (party) { parties++; ppcs += got; } else { garrisons++; pcs += got; } }
                 }
                 catch (Exception e) { Stumble("Restore", e); }
             }
             Log.Info("Zbrojownie zalog (171): po wczytaniu przywrocone " + garrisons + " zalog, " + pcs + " szt. (bez zalogi " + noGarrison + ", zastapione z DTE " + replaced
-                     + " szt., nieznane przedmioty " + unknown + ").");
+                     + " szt., nieznane przedmioty " + unknown + "); partie lordow bez wodza albo rozwiazywane " + parties + ", " + ppcs + " szt. (partii juz nie ma " + noParty + ").");
         }
 
         /// <summary>C9a: zapis sprzed 171 - zalogi AI raz uzupelnione do wzorca swoich ludzi (zalogi gracza i Innych bez zmian).</summary>

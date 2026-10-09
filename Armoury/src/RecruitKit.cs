@@ -42,6 +42,9 @@ namespace Armoury
         private static int _dOwnNotable, _dOwnMerc, _dOwnNoSource, _dPrisoner, _dEcho, _dRecPcs, _dOwnPcs, _dMercHorsePcs, _dMountedNoHorse;
         private static int _dFreshBought, _dFreshOwn, _dFreshPcs, _dSwap, _dSwapNoKit;
         private static int _dGarMen, _dGarRec, _dGarOwn, _dGarT1, _dGarPcs, _dGarT1Pcs, _dGarPlayer, _stumbles, _errDay = -1;
+        // recenzja 171: pan zalogi placi notablowi za kupione rzeczy (A5); rzeczy na targ bez zaplaty (kasa pusta); brak Y wobec X przy echu ROT
+        private static int _dGarPaid, _dGarPaidGold, _dGarUnpaid, _daySoldFree, _dEchoKnown;
+        private static long _dEchoGap;
         private static readonly HashSet<Settlement> _dGarTowns = new HashSet<Settlement>();
         private static readonly HashSet<string> _errWhere = new HashSet<string>();
         private static readonly int[] _tRec = new int[7], _tOwn = new int[7], _tPrisoner = new int[7], _tEcho = new int[7];
@@ -57,7 +60,7 @@ namespace Armoury
         {
             _kits.Clear(); _pending = null; _dayKits = _dayLegacy = _dayTier1 = _daySold = 0; _dayStamp = -1;
             ClearDay171(); _stumbles = 0; _errDay = -1; _errWhere.Clear();
-            _parents = null; _root.Clear(); SeedConverted = 0;
+            _parents = null; _root.Clear(); SeedConverted = 0; _gap.Clear(); _paidItems.Clear();
         }
 
         private static void ClearDay171()
@@ -65,6 +68,7 @@ namespace Armoury
             _dOwnNotable = _dOwnMerc = _dOwnNoSource = _dPrisoner = _dEcho = _dRecPcs = _dOwnPcs = _dMercHorsePcs = _dMountedNoHorse = 0;
             _dFreshBought = _dFreshOwn = _dFreshPcs = _dSwap = _dSwapNoKit = 0;
             _dGarMen = _dGarRec = _dGarOwn = _dGarT1 = _dGarPcs = _dGarT1Pcs = _dGarPlayer = 0;
+            _dGarPaid = _dGarPaidGold = _dGarUnpaid = _daySoldFree = _dEchoKnown = 0; _dEchoGap = 0;
             _dGarTowns.Clear();
             Array.Clear(_tRec, 0, 7); Array.Clear(_tOwn, 0, 7); Array.Clear(_tPrisoner, 0, 7); Array.Clear(_tEcho, 0, 7);
         }
@@ -260,33 +264,119 @@ namespace Armoury
             else
             {
                 var k = Pop(n, x);
-                if (k != null) { items = Materialize(k); _dGarRec++; }
+                if (k != null)
+                {
+                    _dGarRec++;
+                    // recenzja 171: rzeczy, ktore notabl KUPIL, nie przechodza do zalogi za darmo - pan zalogi placi za nie notablowi cene skupu jego targu
+                    // (tyle, ile notabl dostawal dotad, gdy sprzedawal je przy odejsciu ochotnika); czego pan nie oplaci - notabl sprzedaje na targu jak dotad
+                    var unpaid = PayForBought(n, k.Items, owner != null ? owner.Leader : null);
+                    k.Items = new List<EquipmentElement>();
+                    items = Materialize(k);   // dobytek i dorobek stuleci - rzeczy czlowieka
+                    items.AddRange(_paidItems);
+                    if (unpaid.Count > 0) SellOff(n, new Kit { Troop = x, Items = unpaid }, MarketOfNotable(n));
+                }
                 else { items = OwnOf(x); _dGarOwn++; }
             }
-            foreach (var e in items) if (e.Item != null && AiGear.AddToArmory(garrison, e.Item, 1)) _dGarPcs++;
+            foreach (var e in items)
+                if (e.Item != null && AiGear.AddToArmory(garrison, e.Item, 1))
+                {
+                    _dGarPcs++;
+                    try { AiWear.NoteBought(garrison, e, 1); } catch { }   // recenzja 171: obita kupiona przez notabla zostaje obita w zalodze
+                }
             _dGarMen++;
             if (place != null) _dGarTowns.Add(place);
         }
 
-        /// <summary>171 A1: echo werbunku ROT pominiete (ten sam czlowiek, bez drugiego kompletu) - tylko licznik.</summary>
-        internal static void NoteEcho(CharacterObject troop, int amount)
+        private static readonly List<EquipmentElement> _paidItems = new List<EquipmentElement>();
+
+        /// <summary>
+        /// Recenzja 171 (A5): pan zalogi kupuje od notabla rzeczy, ktore ten kupil ochotnikowi - cena skupu targu notabla (MenPurse.SellPrice), sztuka po sztuce,
+        /// dopoki starcza mu zlota. Oplacone -> _paidItems, reszta (zwracana) - notabl sprzeda na targu. Przelew pan -> notabl (nic nie powstaje).
+        /// </summary>
+        private static List<EquipmentElement> PayForBought(Hero notable, List<EquipmentElement> bought, Hero payer)
+        {
+            _paidItems.Clear();
+            var unpaid = new List<EquipmentElement>();
+            if (bought == null || bought.Count == 0) return unpaid;
+            var market = MarketOfNotable(notable);
+            foreach (var e in bought)
+            {
+                if (e.Item == null) continue;
+                int price = MenPurse.SellPrice(e, market, null);
+                if (payer == null || !payer.IsAlive || payer.Gold < price || notable == null) { unpaid.Add(e); continue; }
+                payer.ChangeHeroGold(-price);
+                notable.ChangeHeroGold(price);
+                _paidItems.Add(e);
+                _dGarPaid++; _dGarPaidGold += price;
+            }
+            _dGarUnpaid += unpaid.Count;
+            return unpaid;
+        }
+
+        /// <summary>
+        /// 171 A1: echo werbunku ROT pominiete (ten sam czlowiek, bez drugiego kompletu). Recenzja 171: x = oddzial, ktory czlowiek mial przed zamiana
+        /// (ROT ExchangeClanTroops, parametr troop); liczymy, ile sztuk wzorca Y nie pokrywa wzorzec X (te same koszyki i zastepstwo tierow co AiGear.Deficit) -
+        /// to nowy popyt na targu (pan dokupuje), ktory dotad dostawal Y z niczego. Tylko licznik, pamiec na pare X-Y.
+        /// </summary>
+        internal static void NoteEcho(CharacterObject x, CharacterObject troop, int amount)
         {
             if (amount <= 0) return;
             try { Day(); } catch { }
             _dEcho += amount; _tEcho[TierIdx(troop)] += amount;
+            try { if (x != null && troop != null) { if (x != troop) _dEchoGap += (long)GapOf(x, troop) * amount; _dEchoKnown += amount; } } catch (Exception e) { Stumble("NoteEcho", e); }
         }
 
-        /// <summary>Kupione rzeczy kompletu na targ: notabl dostaje cene skupu, nie wiecej niz kasa miasta (dobytek odchodzi z czlowiekiem).</summary>
+        private static readonly Dictionary<CharacterObject, Dictionary<CharacterObject, int>> _gap = new Dictionary<CharacterObject, Dictionary<CharacterObject, int>>();
+
+        /// <summary>Sztuki wzorca y (sl. 0-9, bez koni - jak AiGear.Deficit) niepokryte wzorcem x: koszyk typ x tier, zastepstwo - wyzsze tiery, potem t-1.</summary>
+        private static int GapOf(CharacterObject x, CharacterObject y)
+        {
+            Dictionary<CharacterObject, int> byY; int g;
+            if (_gap.TryGetValue(x, out byY) && byY.TryGetValue(y, out g)) return g;
+            var need = Buckets(y); var spare = Buckets(x);
+            foreach (var k in new List<int>(need.Keys)) { int s; if (spare.TryGetValue(k, out s) && s > 0) { int c = Math.Min(s, need[k]); need[k] -= c; spare[k] = s - c; } }
+            g = 0;
+            foreach (var k in new List<int>(need.Keys))
+            {
+                int d = need[k]; if (d <= 0) continue;
+                int type = k / 10, t = k % 10;
+                var order = new List<int>(); for (int tt = t + 1; tt <= 6; tt++) order.Add(tt); if (t > 1) order.Add(t - 1);
+                foreach (var tt in order) { int sk = type * 10 + tt, sp; if (!spare.TryGetValue(sk, out sp) || sp <= 0) continue; int c = Math.Min(d, sp); d -= c; spare[sk] = sp - c; if (d <= 0) break; }
+                g += d;
+            }
+            if (byY == null) _gap[x] = byY = new Dictionary<CharacterObject, int>();
+            byY[y] = g;
+            return g;
+        }
+
+        private static Dictionary<int, int> Buckets(CharacterObject c)
+        {
+            var b = new Dictionary<int, int>();
+            Equipment eq = null; try { eq = c != null ? c.Equipment : null; } catch { }
+            if (eq == null) return b;
+            for (int sl = 0; sl < 10; sl++)
+            {
+                var it = eq[(EquipmentIndex)sl].Item;
+                if (it == null || !SupplyDemand.Equipmentish(it)) continue;
+                int k = AiGear.Bucket(it); int v; b.TryGetValue(k, out v); b[k] = v + 1;
+            }
+            return b;
+        }
+
+        /// <summary>
+        /// Kupione rzeczy kompletu na targ: notabl dostaje cene skupu, dopoki kasa miasta ma zloto (dobytek odchodzi z czlowiekiem). Recenzja 171: czego kasa
+        /// nie oplaci, i tak trafia na polke targu (bez zaplaty - jak rzeczy zmarlego notabla w Reconcile); dotad przepadalo, bo komplet byl juz zdjety z zapisu.
+        /// </summary>
         private static int SellOff(Hero n, Kit k, Settlement market)
         {
-            if (k == null || k.Items.Count == 0 || market == null || market.Town == null) return 0;
+            if (k == null || k.Items.Count == 0 || market == null || market.Town == null || market.ItemRoster == null) return 0;
             int sold = 0;
             foreach (var e in k.Items)
             {
                 if (e.Item == null) continue;
                 int price = MenPurse.SellPrice(e, market, null);
-                if (market.Town.Gold < price) break;
                 market.ItemRoster.AddToCounts(e, 1);
+                if (n == null || market.Town.Gold < price) { _daySoldFree++; continue; }
                 market.Town.ChangeGold(-price);
                 n.ChangeHeroGold(price);
                 _daySold++;
@@ -300,7 +390,10 @@ namespace Armoury
         {
             Settlement st = null;
             try { st = n.HomeSettlement ?? n.CurrentSettlement; } catch { }
-            return st != null ? VolunteerKit.MarketOf(st) : null;
+            if (st == null) return null;
+            // recenzja 171: notabl zamku sprzedaje tam, gdzie kupuje (A4) - miasto handlowe wsi zamku, bez miast wroga; inaczej linia prosta jak dotad
+            if (st.IsCastle) { Settlement m = null; try { m = ArmyClothing.MarketTown(st); } catch { } if (m != null) return m; }
+            return VolunteerKit.MarketOf(st);
         }
 
         /// <summary>
@@ -463,7 +556,7 @@ namespace Armoury
             bool what = s == null || s.RecruitBringsWhatHeHas;
             int own = _dOwnNotable + _dOwnMerc + _dOwnNoSource;
             int st = _stumbles + RecruitSources.TakeStumbles(); _stumbles = 0;
-            if ((_dayKits + _dayLegacy + _dayTier1 + _daySold + own + _dPrisoner + _dEcho) > 0)
+            if ((_dayKits + _dayLegacy + _dayTier1 + _daySold + _daySoldFree + own + _dPrisoner + _dEcho) > 0)
             {
                 // 1. linia dnia (zastepuje "Komplet rekruta: dzien ..." sprzed 171)
                 var sb = new StringBuilder();
@@ -473,11 +566,12 @@ namespace Armoury
                       .Append(", bez zrodla ").Append(_dOwnNoSource).Append("), jeniec bez niczego ").Append(_dPrisoner);
                 if (!what || _dayLegacy > 0) sb.Append(", bez zapisu (wzorzec) ").Append(_dayLegacy);
                 sb.Append(", tier 1 z wlasnym dobytkiem ").Append(_dayTier1)
-                  .Append("; duplikat ROT pominiety ").Append(_dEcho).Append(" (ten sam czlowiek, bez drugiego kompletu)")
+                  .Append("; duplikat ROT pominiety ").Append(_dEcho).Append(" (ten sam czlowiek, bez drugiego kompletu; echo: brak Y wobec X ").Append(_dEchoGap)
+                  .Append(" szt. u ").Append(_dEchoKnown).Append(" ludzi - pan dokupuje)")
                   .Append("; do zbrojowni szt.: z zapisu ").Append(_dRecPcs).Append(", z tym co ma ").Append(_dOwnPcs)
                   .Append(", konie i rzedy najemnikow z wzorca (160) ").Append(_dMercHorsePcs)
                   .Append("; konni bez konia (do 167) ").Append(_dMountedNoHorse)
-                  .Append("; rzeczy ochotnikow, ktorzy odeszli, sprzedane ").Append(_daySold).Append(" szt.");
+                  .Append("; rzeczy ochotnikow, ktorzy odeszli, sprzedane ").Append(_daySold).Append(" szt. (na polke bez zaplaty - kasa miasta pusta ").Append(_daySoldFree).Append(")");
                 Log.Info(sb.ToString());
                 // 2. tiery
                 Log.Info("Komplet rekruta (tiery): dzien " + _dayStamp + " - z zapisu " + Tiers(_tRec, 2) + " | z tym co ma " + Tiers(_tOwn, 2)
@@ -489,7 +583,8 @@ namespace Armoury
                 Log.Info("Pule ochotnikow (171): dzien " + _dayStamp + " - swiezi ochotnicy t2+ " + (_dFreshBought + _dFreshOwn) + " (notabl kupil " + _dFreshBought
                          + ", z tym co ma " + _dFreshOwn + "; szt. " + _dFreshPcs + "); HouseLevies: komplet przeniesiony " + _dSwap + ", bez zapisu " + _dSwapNoKit
                          + "; autowerbunek zalog: ludzi " + _dGarMen + " w " + _dGarTowns.Count + " twierdzach (z zapisu " + _dGarRec + ", z tym co ma " + _dGarOwn
-                         + ", tier 1 " + _dGarT1 + "), do zbrojowni zalog " + _dGarPcs + " szt. (w tym dobytek tieru 1 " + _dGarT1Pcs + "); zalogi gracza poza systemem "
+                         + ", tier 1 " + _dGarT1 + "), do zbrojowni zalog " + _dGarPcs + " szt. (w tym dobytek tieru 1 " + _dGarT1Pcs + "; kupione przez notabla oplacone przez pana "
+                         + _dGarPaid + " szt. za " + _dGarPaidGold + " zl, bez zaplaty - na targ " + _dGarUnpaid + "); zalogi gracza poza systemem "
                          + _dGarPlayer + "; potkniecia " + st + ".");
             }
         }

@@ -67,9 +67,21 @@ namespace Armoury
         // ------------------------------------------------------------ latki DTE
         public static bool SkipWhenBuying() { return !On; }
 
+        /// <summary>
+        /// Prefiks DTE GarbageCollectParties (co dobe na partie): zbrojownia zostaje dla zalogi (wpis 89) i - 171, poprawka po recenzji - dla kazdej aktywnej
+        /// partii lorda (poza gracza): DTE kasowal zbrojownie partii bez wodza albo rozwiazywanej w pierwszej dobie czekania (DisbandPartyCampaignBehavior:
+        /// doba czekania, potem droga do twierdzy; TeleportHeroAction z opoznieniem), zanim gra scalila ja z zaloga (A7) albo dala jej nowego wodza -
+        /// ludzie wchodzili do zalogi nadzy, a nowy wodz kupowal wszystko od nowa. Zbrojownie i tak kasuje DTE OnMobilePartyDestroyed (zniszczenie partii).
+        /// </summary>
         public static bool KeepGarrisonArmory(MobileParty mobileParty, ref bool __result)
         {
-            if (On && mobileParty != null && mobileParty.IsGarrison && mobileParty.IsActive) { __result = false; return false; }
+            if (!On || mobileParty == null || !mobileParty.IsActive) return true;
+            if (mobileParty.IsGarrison) { __result = false; return false; }
+            if (mobileParty.IsLordParty && !mobileParty.IsMainParty)
+            {
+                try { if (mobileParty.LeaderHero == null || mobileParty.IsDisbanding) GarrisonArmory.NoteKeptLeaderless(); } catch { }
+                __result = false; return false;
+            }
             return true;
         }
 
@@ -85,7 +97,7 @@ namespace Armoury
             if (recruiterHero == null) return true;
             if (recruiterHero == Hero.MainHero) { try { if (RecruitKit.On) RecruitKit.OnRecruited(recruiterHero, recruitmentSettlement, recruitmentSource, troop, amount); } catch { } return true; }
             // 171 A1: echo werbunku ROT - ten sam czlowiek (zamiana oznaki X -> Y), komplet dostal w zdarzeniu pierwszym; DTE nic nie doklada
-            try { if (RecruitSources.IsRotEcho(recruitmentSettlement, recruitmentSource)) { RecruitKit.NoteEcho(troop, amount); return false; } }
+            try { if (RecruitSources.IsRotEcho(recruitmentSettlement, recruitmentSource)) { RecruitKit.NoteEcho(RecruitSources.EchoFrom, troop, amount); return false; } }
             catch (Exception e) { RecruitSources.Stumble("echo", e); }
             if (!s.AiRecruitsBringKit) return false;
             // wpis 92: AI - tylko to, co notabl naprawde kupil (tier 1: wlasny dobytek); 171 B2: bez zapisu - "z tym, co ma"
@@ -355,7 +367,7 @@ namespace Armoury
                 int spent = BuyLoop(st, mp, need, budget, maxPieces, ref pieces, bought, (el, n, k, unit) =>
                 {
                     _add.Invoke(null, new object[] { mp.Id, el.Item, n });
-                    if (!garrison) AiWear.NoteBought(mp, el, n);   // wpis 89: zuzyta z polki zostaje zuzyta
+                    AiWear.NoteBought(mp, el, n);   // wpis 89: zuzyta z polki zostaje zuzyta; 171 (recenzja): takze w zalodze - inaczej obita sztuka wychodzila z zalogi jako sprawna
                     int cost = unit * n, fromPurse = garrison ? 0 : MenPurse.Take(mp, cost);
                     lord.ChangeHeroGold(-(cost - fromPurse));
                     st.Town.ChangeGold(unit * n);
@@ -375,17 +387,29 @@ namespace Armoury
                         {
                             var lines = new List<GarrisonCarts.Line>();
                             int paid = 0;
-                            int spent2 = budget - spent > 0 ? BuyLoop(market, mp, need, budget - spent, maxPieces, ref pieces, bought, (el, n, k, unit) =>
+                            bool budgetStop = true;
+                            // recenzja 171: zamowienie powstaje takze, gdy BuyLoop rzuci wyjatek po kilku zakupach (np. cena z modelu innego moda) -
+                            // oplacone sztuki zdjete z polki nie moga zniknac; wydane = suma oplaconych linii (to samo, co zwraca BuyLoop)
+                            try
                             {
-                                lord.ChangeHeroGold(-unit * n);
-                                market.Town.ChangeGold(unit * n);
-                                MoneyLedger.Note(MoneyLedger.NGear, market, unit * n);
-                                lines.Add(new GarrisonCarts.Line { El = el, N = n, Bucket = k });
-                                paid += unit * n;
-                            }) : 0;
-                            bool budgetStop = budget - spent > 0 ? _lastBudgetStop : true;
-                            spent += spent2;
-                            if (lines.Count > 0) GarrisonCarts.Place(st, market, st.OwnerClan, lines, paid, dist, pieces >= maxPieces, budgetStop);
+                                if (budget - spent > 0)
+                                {
+                                    BuyLoop(market, mp, need, budget - spent, maxPieces, ref pieces, bought, (el, n, k, unit) =>
+                                    {
+                                        lord.ChangeHeroGold(-unit * n);
+                                        market.Town.ChangeGold(unit * n);
+                                        MoneyLedger.Note(MoneyLedger.NGear, market, unit * n);
+                                        lines.Add(new GarrisonCarts.Line { El = el, N = n, Bucket = k });
+                                        paid += unit * n;
+                                    });
+                                    budgetStop = _lastBudgetStop;
+                                }
+                            }
+                            finally
+                            {
+                                spent += paid;
+                                if (lines.Count > 0) GarrisonCarts.Place(st, market, st.OwnerClan, lines, paid, dist, pieces >= maxPieces, budgetStop);
+                            }
                             int unmet = 0;
                             foreach (var kv in need)
                             {

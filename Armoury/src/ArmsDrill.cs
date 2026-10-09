@@ -25,6 +25,8 @@ namespace Armoury
     /// singletony BK, a Harmony kompiluje metode juz przy zakladaniu latki (pulapka z SoldierPay/MountedWage). Licznik zagniezdzenia: NavalDLC
     /// tylko przekazuje do modelu BK - liczymy raz, na zewnatrz. Gracz, jego rod i Inni - bez zmian (zalogi gracza tylko przy GarrisonBuysGearPlayer).
     /// Linia "Pokrycie zbrojowni AI (171)" - pelny przeglad raz na 5 dob (krytyka 17), tylko log.
+    /// Recenzja kodu 171: udzial uzbrojonych liczony wedlug SZCZEBLA broni (sztuka typu glownej broni o tierze >= t-1, jak AiGear.Deficit), dla partii na oddzial
+    /// (element rosteru); cwiczenia wedlug broni tylko przy zakupach AI (AiGear.On, zaloga - takze GarrisonBuysGear); "Pokrycie" - takze strzaly, belty i przedmioty t3+.
     /// </summary>
     internal static class ArmsDrill
     {
@@ -32,8 +34,11 @@ namespace Armoury
         private static readonly HashSet<Type> _trainHooked = new HashSet<Type>(), _xpHooked = new HashSet<Type>();
         [ThreadStatic] private static int _tDepth;
         [ThreadStatic] private static int _gDepth;
-        private static readonly Dictionary<MobileParty, float> _share = new Dictionary<MobileParty, float>();
-        private static readonly Dictionary<CharacterObject, ItemObject.ItemTypeEnum> _mainType = new Dictionary<CharacterObject, ItemObject.ItemTypeEnum>();
+        // recenzja 171: udzial uzbrojonych wedlug SZCZEBLA broni (koszyk typ x tier glownej broni wzorca; pokrywa sztuka tego typu o tierze >= t-1, jak w
+        // AiGear.Deficit) - All dla calej partii/zalogi, ByKey dla oddzialow (cwiczenia druzyny licza sie na element rosteru)
+        private sealed class Share { internal float All = 1f; internal Dictionary<int, float> ByKey; }
+        private static readonly Dictionary<MobileParty, Share> _share = new Dictionary<MobileParty, Share>();
+        private static readonly Dictionary<CharacterObject, int> _mainKey = new Dictionary<CharacterObject, int>();
         private static readonly HashSet<MobileParty> _counted = new HashSet<MobileParty>();
         private static int _shareDay = -1;
         // liczniki doby (linia "Cwiczenia (171)")
@@ -43,7 +48,7 @@ namespace Armoury
 
         internal static void Reset()
         {
-            _share.Clear(); _mainType.Clear(); _counted.Clear(); _shareDay = -1;
+            _share.Clear(); _mainKey.Clear(); _counted.Clear(); _shareDay = -1;
             ClearDay(); _stumbles = 0; _errDay = -1; _errWhere.Clear();
         }
 
@@ -62,35 +67,42 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ D4: udzial uzbrojonych
-        /// <summary>Glowna bron oddzialu: strzelec - luk/kusza w sl. 0-3; inaczej pierwsza bron biala; inaczej bron rzucana; Invalid - bez broni.</summary>
-        private static ItemObject.ItemTypeEnum MainWeaponType(CharacterObject ch)
+        /// <summary>Glowna bron oddzialu: strzelec - luk/kusza w sl. 0-3; inaczej pierwsza bron biala; inaczej bron rzucana; null - bez broni.</summary>
+        private static ItemObject MainWeapon(CharacterObject ch)
         {
-            ItemObject.ItemTypeEnum r;
-            if (_mainType.TryGetValue(ch, out r)) return r;
-            r = ItemObject.ItemTypeEnum.Invalid;
             Equipment eq = null; try { eq = ch.Equipment; } catch { }
-            if (eq != null)
+            if (eq == null) return null;
+            if (ch.IsRanged)
+                for (int sl = 0; sl < 4; sl++)
+                {
+                    var it = eq[(EquipmentIndex)sl].Item;
+                    if (it != null && (it.ItemType == ItemObject.ItemTypeEnum.Bow || it.ItemType == ItemObject.ItemTypeEnum.Crossbow)) return it;
+                }
+            for (int sl = 0; sl < 4; sl++)
             {
-                if (ch.IsRanged)
-                    for (int sl = 0; sl < 4 && r == ItemObject.ItemTypeEnum.Invalid; sl++)
-                    {
-                        var it = eq[(EquipmentIndex)sl].Item;
-                        if (it != null && (it.ItemType == ItemObject.ItemTypeEnum.Bow || it.ItemType == ItemObject.ItemTypeEnum.Crossbow)) r = it.ItemType;
-                    }
-                for (int sl = 0; sl < 4 && r == ItemObject.ItemTypeEnum.Invalid; sl++)
-                {
-                    var it = eq[(EquipmentIndex)sl].Item;
-                    if (it != null && (it.ItemType == ItemObject.ItemTypeEnum.OneHandedWeapon || it.ItemType == ItemObject.ItemTypeEnum.TwoHandedWeapon || it.ItemType == ItemObject.ItemTypeEnum.Polearm)) r = it.ItemType;
-                }
-                for (int sl = 0; sl < 4 && r == ItemObject.ItemTypeEnum.Invalid; sl++)
-                {
-                    var it = eq[(EquipmentIndex)sl].Item;
-                    if (it != null && it.ItemType == ItemObject.ItemTypeEnum.Thrown) r = it.ItemType;
-                }
+                var it = eq[(EquipmentIndex)sl].Item;
+                if (it != null && (it.ItemType == ItemObject.ItemTypeEnum.OneHandedWeapon || it.ItemType == ItemObject.ItemTypeEnum.TwoHandedWeapon || it.ItemType == ItemObject.ItemTypeEnum.Polearm)) return it;
             }
-            _mainType[ch] = r;
-            return r;
+            for (int sl = 0; sl < 4; sl++)
+            {
+                var it = eq[(EquipmentIndex)sl].Item;
+                if (it != null && it.ItemType == ItemObject.ItemTypeEnum.Thrown) return it;
+            }
+            return null;
         }
+
+        /// <summary>Koszyk glownej broni oddzialu (typ*10 + tier, jak AiGear.Bucket); -1 - bez broni. Pamiec na CharacterObject.</summary>
+        private static int MainKey(CharacterObject ch)
+        {
+            int k;
+            if (_mainKey.TryGetValue(ch, out k)) return k;
+            var it = MainWeapon(ch);
+            k = it != null ? AiGear.Bucket(it) : -1;
+            _mainKey[ch] = k;
+            return k;
+        }
+
+        private static int TierOf(ItemObject it) { try { return Math.Max(1, Math.Min(6, (int)it.Tier + 1)); } catch { return 1; } }
 
         private static void DayCheck()
         {
@@ -98,55 +110,89 @@ namespace Armoury
             if (d != _shareDay) { _shareDay = d; _share.Clear(); }
         }
 
-        /// <summary>Udzial ludzi (bez bohaterow), ktorzy maja w zbrojowni DTE bron swojego rodzaju (dowolny tier); 1.0 - DTE brak albo bez ludzi. Pamiec na dobe.</summary>
-        internal static float ArmedShare(MobileParty mp)
+        /// <summary>
+        /// Udzial ludzi (bez bohaterow), ktorzy maja w zbrojowni DTE glowna bron swojego rodzaju I SZCZEBLA: sztuka tego typu o tierze >= t-1 (t = tier glownej
+        /// broni wzorca) - te same sztuki, ktore AiGear.Deficit uznaje za pokrycie. Recenzja 171: dotad liczyla sie kazda sztuka typu, wiec wlocznia t1 z rekrutacji
+        /// "uzbrajala" czlowieka t5 i hamulec awansow (D3) prawie nigdy nie dzialal. Przydzial: najpierw potrzeby najwyzszego szczebla (ich sztuki nadaja sie
+        /// tez nizszym - wybor nie psuje pokrycia nizszych). 1.0 - DTE brak albo bez ludzi. Pamiec na dobe.
+        /// </summary>
+        internal static float ArmedShare(MobileParty mp) { var sh = ShareOf(mp); return sh != null ? sh.All : 1f; }
+
+        /// <summary>Udzial uzbrojonych dla oddzialu ch w partii mp (jego koszyk glownej broni); oddzial bez broni albo bohater - udzial calej partii.</summary>
+        private static float ShareFor(MobileParty mp, CharacterObject ch)
         {
-            if (mp == null) return 1f;
-            DayCheck();
+            var sh = ShareOf(mp);
+            if (sh == null) return 1f;
             float v;
-            if (_share.TryGetValue(mp, out v)) return v;
-            v = 1f;
+            if (ch != null && !ch.IsHero && sh.ByKey != null && sh.ByKey.TryGetValue(MainKey(ch), out v)) return v;
+            return sh.All;
+        }
+
+        private static Share ShareOf(MobileParty mp)
+        {
+            if (mp == null) return null;
+            DayCheck();
+            Share sh;
+            if (_share.TryGetValue(mp, out sh)) return sh;
+            sh = new Share();
             var dict = AiGear.Armories();
             var roster = mp.MemberRoster;
             if (dict != null && roster != null)
             {
-                var need = new Dictionary<ItemObject.ItemTypeEnum, int>();
+                var need = new Dictionary<int, int>();
                 int total = 0;
                 for (int i = 0; i < roster.Count; i++)
                 {
                     var el = roster.GetElementCopyAtIndex(i);
                     if (el.Character == null || el.Character.IsHero || el.Number <= 0) continue;
-                    var t = MainWeaponType(el.Character);
-                    if (t == ItemObject.ItemTypeEnum.Invalid) continue;
-                    int n; need.TryGetValue(t, out n); need[t] = n + el.Number; total += el.Number;
+                    int k = MainKey(el.Character);
+                    if (k < 0) continue;
+                    int n; need.TryGetValue(k, out n); need[k] = n + el.Number; total += el.Number;
                 }
                 if (total > 0)
                 {
-                    var have = new Dictionary<ItemObject.ItemTypeEnum, int>();
+                    // sztuki zbrojowni: typ -> liczba wedlug tieru 1..6 (tylko typy potrzebne)
+                    var avail = new Dictionary<int, int[]>();
+                    foreach (var k in need.Keys) if (!avail.ContainsKey(k / 10)) avail[k / 10] = new int[7];
                     Dictionary<ItemObject, int> arm;
                     if (dict.TryGetValue(mp.Id, out arm) && arm != null)
                         foreach (var kv in arm)
                         {
-                            if (kv.Key == null || kv.Value <= 0 || !need.ContainsKey(kv.Key.ItemType)) continue;
-                            int n; have.TryGetValue(kv.Key.ItemType, out n); have[kv.Key.ItemType] = n + kv.Value;
+                            int[] a;
+                            if (kv.Key == null || kv.Value <= 0 || !avail.TryGetValue((int)kv.Key.ItemType, out a)) continue;
+                            a[TierOf(kv.Key)] += kv.Value;
                         }
+                    var keys = new List<int>(need.Keys);
+                    keys.Sort((x, y) => (y % 10).CompareTo(x % 10));   // najwyzszy szczebel najpierw
+                    sh.ByKey = new Dictionary<int, float>();
                     long armed = 0;
-                    foreach (var kv in need) { int h; have.TryGetValue(kv.Key, out h); armed += Math.Min(kv.Value, h); }
-                    v = (float)armed / total;
+                    foreach (var k in keys)
+                    {
+                        int want = need[k], left = want, t = k % 10;
+                        var a = avail[k / 10];
+                        for (int s = Math.Max(1, t - 1); s <= 6 && left > 0; s++) { int c = Math.Min(left, a[s]); a[s] -= c; left -= c; }
+                        sh.ByKey[k] = (float)(want - left) / want;
+                        armed += want - left;
+                    }
+                    sh.All = (float)armed / total;
                 }
             }
-            _share[mp] = v;
-            return v;
+            _share[mp] = sh;
+            return sh;
         }
 
-        /// <summary>Kto cwiczy wedlug broni: zaloga - nie Innych, nie gracza (chyba ze GarrisonBuysGearPlayer); partia - rod AI (nie gracz, nie Inni).</summary>
+        /// <summary>
+        /// Kto cwiczy wedlug broni: zaloga - nie Innych, nie gracza (chyba ze GarrisonBuysGearPlayer); partia - rod AI (nie gracz, nie Inni). Recenzja 171: tylko gdy
+        /// AI kupuje bron (AiGear.On; zaloga - takze GarrisonBuysGear) - bez zakupow zbrojownie zalog kasuje co dobe DTE, a zalogi nie maja skad uzupelnic broni,
+        /// wiec "cwiczenia wlasna bronia" zatrzymalyby szkolenie wszystkich zalog AI.
+        /// </summary>
         private static bool Gated(MobileParty mp)
         {
             var s = Settings.Current;
-            if (mp == null || s == null || Undead.Party(mp)) return false;
+            if (mp == null || s == null || Undead.Party(mp) || !AiGear.On) return false;
             if (mp.IsGarrison)
             {
-                if (!s.GarrisonDrillNeedsArms) return false;
+                if (!s.GarrisonDrillNeedsArms || !s.GarrisonBuysGear) return false;
                 var st = mp.CurrentSettlement ?? mp.HomeSettlement;
                 return st == null || st.OwnerClan != Clan.PlayerClan || s.GarrisonBuysGearPlayer;
             }
@@ -179,8 +225,9 @@ namespace Armoury
             try
             {
                 if (__result.ResultNumber <= 0f || __0 == null || !Gated(__0)) return;
-                float share = ArmedShare(__0);
-                if (!__0.IsGarrison && _counted.Add(__0)) { _pParties++; _pSum += share; if (share <= 0f) _pZero++; else if (share >= 1f) _pFull++; }
+                if (!__0.IsGarrison && _counted.Add(__0)) { float all = ArmedShare(__0); _pParties++; _pSum += all; if (all <= 0f) _pZero++; else if (all >= 1f) _pFull++; }
+                // recenzja 171: udzial oddzialu (jego glowna bron i szczebel) - cwiczy wolniej ten, kogo nie ma czym uzbroic na jego szczeblu, nie cala druzyna
+                float share = ShareFor(__0, __1.Character);
                 if (share >= 1f) return;
                 if (!__0.IsGarrison && __1.Character != null && !__1.Character.IsHero) _pLost += __result.ResultNumber * (1f - share) * __1.Number;
                 __result = new ExplainedNumber(__result.ResultNumber * share);   // opisy gubimy swiadomie - partii AI nikt nie oglada
@@ -267,13 +314,19 @@ namespace Armoury
         private static readonly ItemObject.ItemTypeEnum[] CovTypes =
         {
             ItemObject.ItemTypeEnum.BodyArmor, ItemObject.ItemTypeEnum.HeadArmor, ItemObject.ItemTypeEnum.Shield,
-            ItemObject.ItemTypeEnum.LegArmor, ItemObject.ItemTypeEnum.HandArmor
+            ItemObject.ItemTypeEnum.LegArmor, ItemObject.ItemTypeEnum.HandArmor, ItemObject.ItemTypeEnum.Arrows, ItemObject.ItemTypeEnum.Bolts
         };
-        private static readonly string[] CovNames = { "korpus", "helm", "tarcza", "nogi", "rece" };
+        private static readonly string[] CovNames = { "korpus", "helm", "tarcza", "nogi", "rece", "strzaly", "belty" };   // recenzja 171: + strzaly i belty
 
         private sealed class Cov
         {
-            internal long Men, Armed; internal readonly long[] Need = new long[5], Lack = new long[5]; internal long LackAll, LackBody, LackWeapon;
+            internal long Men, Armed; internal readonly long[] Need = new long[7], Lack = new long[7]; internal long LackAll, LackBody, LackWeapon;
+            internal long NeedBody3, LackBody3, NeedWeap3, LackWeap3;   // recenzja 171: przedmioty tieru 3+ (sprzet wyzszych szczebli)
+            private static bool Weapon(ItemObject.ItemTypeEnum ty)
+            {
+                return ty == ItemObject.ItemTypeEnum.OneHandedWeapon || ty == ItemObject.ItemTypeEnum.TwoHandedWeapon || ty == ItemObject.ItemTypeEnum.Polearm
+                       || ty == ItemObject.ItemTypeEnum.Bow || ty == ItemObject.ItemTypeEnum.Crossbow;
+            }
             internal void Add(MobileParty mp)
             {
                 var dict = AiGear.Armories(); Dictionary<ItemObject, int> arm = null;
@@ -282,7 +335,12 @@ namespace Armoury
                 var lack = AiGear.Deficit(mp, arm, needOut);
                 int men = mp.MemberRoster.TotalManCount - mp.MemberRoster.TotalHeroes;
                 Men += men; Armed += (long)Math.Round(ArmedShare(mp) * men);
-                foreach (var kv in needOut) { int i = Array.IndexOf(CovTypes, (ItemObject.ItemTypeEnum)(kv.Key / 10)); if (i >= 0) Need[i] += kv.Value; }
+                foreach (var kv in needOut)
+                {
+                    var ty0 = (ItemObject.ItemTypeEnum)(kv.Key / 10);
+                    int i = Array.IndexOf(CovTypes, ty0); if (i >= 0) Need[i] += kv.Value;
+                    if (kv.Key % 10 >= 3) { if (ty0 == ItemObject.ItemTypeEnum.BodyArmor) NeedBody3 += kv.Value; else if (Weapon(ty0)) NeedWeap3 += kv.Value; }
+                }
                 foreach (var kv in lack)
                 {
                     if (kv.Value <= 0) continue;
@@ -290,16 +348,17 @@ namespace Armoury
                     LackAll += kv.Value;
                     int i = Array.IndexOf(CovTypes, ty); if (i >= 0) Lack[i] += kv.Value;
                     if (ty == ItemObject.ItemTypeEnum.BodyArmor) LackBody += kv.Value;
-                    if (ty == ItemObject.ItemTypeEnum.OneHandedWeapon || ty == ItemObject.ItemTypeEnum.TwoHandedWeapon || ty == ItemObject.ItemTypeEnum.Polearm
-                        || ty == ItemObject.ItemTypeEnum.Bow || ty == ItemObject.ItemTypeEnum.Crossbow) LackWeapon += kv.Value;
+                    if (Weapon(ty)) LackWeapon += kv.Value;
+                    if (kv.Key % 10 >= 3) { if (ty == ItemObject.ItemTypeEnum.BodyArmor) LackBody3 += kv.Value; else if (Weapon(ty)) LackWeap3 += kv.Value; }
                 }
             }
             internal string Text(string name)
             {
                 var sb = new System.Text.StringBuilder();
                 sb.Append(name).Append(" (").Append(Men).Append(" ludzi): ").Append(CovNames[0]).Append(' ').Append(Pct(Need[0], Lack[0]))
-                  .Append(", glowna bron ").Append(Men > 0 ? (100 * Armed / Men) + "%" : "-");
-                for (int i = 1; i < 5; i++) sb.Append(", ").Append(CovNames[i]).Append(' ').Append(Pct(Need[i], Lack[i]));
+                  .Append(", glowna bron (wedlug szczebla) ").Append(Men > 0 ? (100 * Armed / Men) + "%" : "-");
+                for (int i = 1; i < CovTypes.Length; i++) sb.Append(", ").Append(CovNames[i]).Append(' ').Append(Pct(Need[i], Lack[i]));
+                sb.Append(" | przedmioty t3+: korpus ").Append(Pct(NeedBody3, LackBody3)).Append(", bron ").Append(Pct(NeedWeap3, LackWeap3));
                 return sb.ToString();
             }
             private static string Pct(long need, long lack) { return need > 0 ? (100 * (need - lack) / need) + "%" : "-"; }
@@ -336,7 +395,7 @@ namespace Armoury
             }
             sw.Stop();
             Log.Info("Pokrycie zbrojowni AI (171): dzien " + today + " - " + lords.Text("partie rodow AI") + "; " + gar.Text("zalogi AI") + "; zamki z pokryciem glownej broni < 50%: "
-                     + castlesLow + " z " + castles + "; brakuje razem " + (lords.LackAll + gar.LackAll) + " szt. (korpus " + (lords.LackBody + gar.LackBody) + ", glowna bron "
+                     + castlesLow + " z " + castles + "; brakuje razem " + (lords.LackAll + gar.LackAll) + " szt. (korpus " + (lords.LackBody + gar.LackBody) + ", bron "
                      + (lords.LackWeapon + gar.LackWeapon) + "); w drodze do zamkow " + GarrisonCarts.InTransitPieces() + " szt.; czas przegladu " + sw.ElapsedMilliseconds + " ms.");
         }
     }

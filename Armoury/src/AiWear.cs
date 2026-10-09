@@ -152,6 +152,42 @@ namespace Armoury
             string p = mp.StringId; _worn.Remove(p); _known.Remove(p); _battleSince.Remove(p); _lastMend.Remove(p);
         }
 
+        /// <summary>171 (recenzja): czy zapis zuzycia jest prowadzony - zalogi sprzedaja nadwyzke ze stanem z zapisu tylko wtedy.</summary>
+        internal static bool BookOn { get { return On; } }
+
+        /// <summary>
+        /// 171 (recenzja, jedna regula zuzycia dla zalog): n sztuk przedmiotu przechodzi z from do to (partia lorda <-> zaloga, rozwiazana partia) - razem
+        /// z nimi czesc zapisu obitych: udzial proporcjonalny (nie wiemy, ktorzy ludzie maja obite), ale nie mniej niz trzeba, zeby u dawcy obitych nie bylo
+        /// wiecej niz sztuk, i nie wiecej niz n. Wolac PRZED zdjeciem sztuk ze zbrojowni dawcy (countBefore = ile mial). Dotad sztuki z zalogi wchodzily
+        /// jako sprawne, a obite lorda w zalodze stawaly sie sprawne (naprawa bez kowala i materialu).
+        /// </summary>
+        internal static void MoveWorn(MobileParty from, MobileParty to, ItemObject it, int n, int countBefore, bool sync = true)
+        {
+            if (!On || from == null || to == null || it == null || n <= 0) return;
+            if (sync) Sync(from);   // sync = false: spis dawcy zrobiony juz w tym samym przeniesieniu (Known trzyma go w zgodzie)
+            NoteSound(to, it, n);   // przybytek u odbiorcy to nie lup (spis od razu, gdy odbiorca ma spis)
+            if (ArmouryBehavior.NoWear(it) || MenPurse.HorseKind(it)) return;
+            string pf = from.StringId, id = it.StringId;
+            int w = WornOf(pf, id);
+            if (w > 0)
+            {
+                int c = Math.Max(1, countBefore);
+                int k = (int)Math.Round(w * (double)n / c);
+                k = Math.Max(k, w - Math.Max(0, countBefore - n));
+                k = Math.Min(k, Math.Min(w, n));
+                Dictionary<string, Dictionary<string, int>> byItem; Dictionary<string, int> byMod;
+                if (k > 0 && _worn.TryGetValue(pf, out byItem) && byItem.TryGetValue(id, out byMod))
+                    foreach (var m in byMod.Keys.ToList())
+                    {
+                        if (k <= 0) break;
+                        int t = Math.Min(k, byMod[m]);
+                        AddWorn(pf, id, m, -t); AddWorn(to.StringId, id, m, t);
+                        k -= t;
+                    }
+            }
+            Known(from, it, -n);
+        }
+
         /// <summary>AiGear dolozyl kupione sztuki - sprawne, spis od razu.</summary>
         internal static void NoteSound(MobileParty mp, ItemObject it, int n)
         {
@@ -208,10 +244,13 @@ namespace Armoury
 
         // ------------------------------------------------------------ stan przy sprzedazy nadwyzek
         /// <summary>Sztuka idzie do kupca: najgorsza obita, jesli jest; inaczej sprawna (null).</summary>
-        internal static ItemModifier TakeCondition(MobileParty mp, ItemObject it)
+        internal static ItemModifier TakeCondition(MobileParty mp, ItemObject it) { return TakeCondition(mp, it, true); }
+
+        /// <summary>171: sync = false - spis zrobiony juz w tej samej sprzedazy (seria sztuk z jednej zbrojowni; Known trzyma spis w zgodzie).</summary>
+        internal static ItemModifier TakeCondition(MobileParty mp, ItemObject it, bool sync)
         {
             if (!On || mp == null || it == null) return ArmouryBehavior.PickWornModifier(it);
-            Sync(mp);
+            if (sync) Sync(mp);
             Dictionary<string, Dictionary<string, int>> byItem; Dictionary<string, int> byMod;
             if (!_worn.TryGetValue(mp.StringId, out byItem) || !byItem.TryGetValue(it.StringId, out byMod) || byMod.Count == 0) { Known(mp, it, -1); return null; }
             string worst = null; float wm = float.MaxValue;

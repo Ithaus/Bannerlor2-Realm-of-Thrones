@@ -41,7 +41,7 @@ namespace Armoury
         // liczniki doby (linia "Zaopatrzenie zamkow (171)")
         private static int _dOrders, _dPieces, _dGold, _dPieceLimit, _dBudgetLimit, _dOwnPieces, _dOwnGold;
         private static int _dArrived, _dArrivedPieces, _dArrivedDays, _dWaitSiege, _dWaitNoGarrison;
-        private static int _dBack, _dBackPieces, _dRefund, _dBackHostile, _dBackForeign, _dBack30, _dBackNoRefund;
+        private static int _dBack, _dBackPieces, _dRefund, _dBackHostile, _dBackForeign, _dBack30, _dBackNoRefund, _dBackPeace;
         private static int _dNoTown, _dNoRoad, _dTooFar, _dSiegeWar, _dPause, _dUnmet, _stumbles, _errDay = -1;
         private static readonly HashSet<Settlement> _dTowns = new HashSet<Settlement>();
         private static readonly HashSet<string> _errWhere = new HashSet<string>();
@@ -56,7 +56,7 @@ namespace Armoury
         {
             _dOrders = _dPieces = _dGold = _dPieceLimit = _dBudgetLimit = _dOwnPieces = _dOwnGold = 0;
             _dArrived = _dArrivedPieces = _dArrivedDays = _dWaitSiege = _dWaitNoGarrison = 0;
-            _dBack = _dBackPieces = _dRefund = _dBackHostile = _dBackForeign = _dBack30 = _dBackNoRefund = 0;
+            _dBack = _dBackPieces = _dRefund = _dBackHostile = _dBackForeign = _dBack30 = _dBackNoRefund = _dBackPeace = 0;
             _dNoTown = _dNoRoad = _dTooFar = _dSiegeWar = _dPause = _dUnmet = 0;
             _dTowns.Clear();
         }
@@ -79,9 +79,12 @@ namespace Armoury
         internal static bool CanOrderToday(Settlement castle)
         {
             if (castle == null) return false;
-            int d; if (!_lastOrder.TryGetValue(castle, out d)) return true;
             var s = Settings.Current;
-            return Today() - d >= Math.Max(1, s != null ? s.GarrisonOrderDays : 3);
+            int D = Math.Max(1, s != null ? s.GarrisonOrderDays : 3);
+            // recenzja 171: pierwsze zamowienie (nowa kampania, po wczytaniu - stempli nie zapisujemy) rozlozone po dobach wedlug Id zamku,
+            // inaczej ok. 130 zamkow zamawia tego samego dnia i zawsze w tej samej kolejnosci (pierwszy zamek co raz bierze wspolna polke miasta)
+            int d; if (!_lastOrder.TryGetValue(castle, out d)) return (long)Today() % D == (long)(castle.Id.InternalValue % (uint)D);
+            return Today() - d >= D;
         }
 
         /// <summary>Stempel proby zamowienia - takze nieudanej (bez miasta, bez drogi, brak towaru): przeglad polki miasta raz na D dob.</summary>
@@ -181,12 +184,20 @@ namespace Armoury
                     { Back(o, true); _dBackHostile++; done.Add(o); continue; }   // zamek padl - towaru nie oddaje sie wrogowi
                     if (!payerAlive && o.Castle.MapFaction != o.FactionAtOrder)
                     { Back(o, false); _dBackForeign++; done.Add(o); continue; }  // nie ma kogo zapytac o wojne, a zamek zmienil strone
+                    // recenzja 171: zamek przeszedl do obcych (zdobyty, a potem pokoj, albo oddany w traktacie) - towar nie jedzie do obcego pana; zwrot jak przy wojnie
+                    if (payerAlive && o.Castle.MapFaction != o.FactionAtOrder && o.Castle.MapFaction != o.PayerClan.MapFaction)
+                    { Back(o, true); _dBackPeace++; done.Add(o); continue; }
                     if (o.Castle.IsUnderSiege) { _dWaitSiege++; continue; }
                     var g = o.Castle.Town != null ? o.Castle.Town.GarrisonParty : null;
                     if (g == null) { _dWaitNoGarrison++; continue; }
                     // dostawa (zmiana pana w tym samym krolestwie / pan zginal - towar jest dla ludzi zalogi, przechodzi z zamkiem)
                     int pcs = 0;
-                    foreach (var l in o.Lines) if (l.El.Item != null && l.N > 0 && AiGear.AddToArmory(g, l.El.Item, l.N)) pcs += l.N;
+                    foreach (var l in o.Lines)
+                        if (l.El.Item != null && l.N > 0 && AiGear.AddToArmory(g, l.El.Item, l.N))
+                        {
+                            pcs += l.N;
+                            try { AiWear.NoteBought(g, l.El, l.N); } catch { }   // recenzja 171: obita z polki miasta dojezdza obita (zapis zuzycia zalogi)
+                        }
                     _dArrived++; _dArrivedPieces += pcs; _dArrivedDays += today - o.DayOrdered;
                     done.Add(o);
                 }
@@ -228,7 +239,7 @@ namespace Armoury
               .Append(_dArrivedPieces).Append(" szt., srednio ").Append(_dArrived > 0 ? ((double)_dArrivedDays / _dArrived).ToString("0.0", inv) : "0")
               .Append(" doby drogi); czeka: oblezenie ").Append(_dWaitSiege).Append(", brak zalogi ").Append(_dWaitNoGarrison)
               .Append("; zawrocone ").Append(_dBack).Append(" (").Append(_dBackPieces).Append(" szt., zwrot ").Append(_dRefund).Append(" zl; zamek wrogi ").Append(_dBackHostile)
-              .Append(", rod wymarly i zamek u obcych ").Append(_dBackForeign).Append(", 30 dob ").Append(_dBack30).Append(", bez odbiorcy zwrotu ").Append(_dBackNoRefund)
+              .Append(", zamek u obcych po pokoju ").Append(_dBackPeace).Append(", rod wymarly i zamek u obcych ").Append(_dBackForeign).Append(", 30 dob ").Append(_dBack30).Append(", bez odbiorcy zwrotu ").Append(_dBackNoRefund)
               .Append("); bez zamowienia: bez miasta ").Append(_dNoTown).Append(", oblezenie albo wojna ").Append(_dSiegeWar).Append(", bez drogi ").Append(_dNoRoad)
               .Append(", za daleko ").Append(_dTooFar).Append(", przerwa (co ").Append(Math.Max(1, Settings.Current.GarrisonOrderDays)).Append(" doby) ").Append(_dPause)
               .Append("; brak towaru w miescie: ").Append(_dUnmet).Append(" koszykow (zamowienia dla warsztatow); potkniecia ").Append(_stumbles).Append('.');

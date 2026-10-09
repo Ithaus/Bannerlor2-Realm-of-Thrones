@@ -42,10 +42,14 @@ Scalanie: po kolei 169 -> 170 -> 171. Dlatego: wszystko nowe w NOWYCH plikach; w
 4. **Zamek kupuje w miescie:** zaloga zamku zamawia w miescie, z ktorym handluja wsie zamku; pan placi miastu, towar schodzi z polki i jedzie wozem
    (1-4 dni drogi). Zamek przestaje byc targiem broni (kupcy juz nie przerzucaja tam broni natychmiast, bez drogi).
 5. **Cwiczenia wlasna bronia:** zaloga i druzyna lorda AI cwicza tyle, ile maja broni - bez broni nie ma musztry, wiec awanse zwalniaja, gdy brakuje sprzetu.
+   Po recenzji kodu: liczy sie bron na szczebel czlowieka (wlocznia rekruta nie "uzbraja" weterana), a wolniej cwiczy ten oddzial, ktoremu brakuje, nie cala druzyna.
 6. **Uczciwy bilans (rozdz. 7):** dzis polki miast po roku maja ponad 1 mln sztuk broni, a kowale robia 500-700 sztuk dziennie - ten stos to sprzet z niczego.
    Po 171 w NOWEJ kampanii przez pierwszy miesiac lub dwa armie AI beda gorzej uzbrojone niz ich wzorzec (to jest prawda o swiecie, w ktorym nikt nie dosypuje),
    ale nie "stana": bitwy AI z AI liczy gra bez patrzenia w zbrojownie, a w Twoich bitwach brakujacy zolnierz dostaje sprzet chlopa swojej kultury
-   na czas bitwy i kare morale. W Twojej trwajacej kampanii zapas na polkach starczy na lata.
+   na czas bitwy i kare morale. W Twojej trwajacej kampanii zapas na polkach starczy na lata. Po recenzji kodu nowa kampania zaczyna sie z zapasem
+   2 miesiecy pracy rzemieslnikow na polkach (dotad 2 tygodnie), bo 171 zabiera drugi komplet z niczego, ktory dotad zapychal te luke.
+7. **Strzaly i belty:** zaden warsztat ich dzis nie robi (0 sztuk dziennie we wszystkich logach), a 171 sprawia, ze lucznicy AI kupuja je z polek. W Twojej
+   kampanii polki maja ok. 2 900 strzal i 820 beltow i ubywa ich ok. 60 dziennie - to sprawa paczki produkcji (rozdz. 16), pytanie 9.
 
 ---
 
@@ -657,6 +661,12 @@ need[typ] += el.Number     // typ = MainWeaponType(ch): strzelec (ch.IsRanged) -
 have[typ] = suma sztuk zbrojowni DTE (AiGear.Armories()[mp.Id]) o tym ItemType (dowolny tier - cwiczy sie kazdym mieczem)
 share = suma_typ min(need, have) / suma_typ need
 ```
+**Zmiana po recenzji kodu (uwaga 13 w rozdz. 18):** "dowolny tier" sprawial, ze wlocznia t1, ktora rekrut zawsze przynosi, "uzbrajala" czlowieka t5 - hamulec
+z 7.3 pkt 3 prawie nigdy nie dzialal. Teraz koszyk glownej broni = typ x tier przedmiotu ze wzorca (`AiGear.Bucket`), a pokrywa go sztuka tego typu o tierze
+>= t-1 (te same sztuki, ktore `AiGear.Deficit` uznaje za pokrycie). Przydzial od najwyzszego szczebla (sztuki nadajace sie wyzszym nadaja sie tez nizszym, wiec
+kolejnosc nie psuje pokrycia nizszych). `ArmedShare` = udzial calej partii (zaloga - mnoznik D2, linia "Pokrycie"); w D3 udzial **oddzialu** (element rosteru):
+wolniej cwiczy ten, kogo nie ma czym uzbroic na jego szczeblu, a nie cala druzyna. Cwiczenia wedlug broni dzialaja tylko przy zakupach AI (`AiGear.On`;
+zaloga - takze `GarrisonBuysGear`; uwaga 9): bez zakupow DTE kasuje zbrojownie zalog co dobe i mnoznik zatrzymalby szkolenie wszystkich zalog.
 `MainWeaponType` z `ch.Equipment` (to samo co `AiGear.NeedBuckets`), wynik w pamieci na `CharacterObject` (czyszczona w Reset). Ta sama "glowna bron" co
 `VolunteerKit.IsKey` (wpis 76/78).
 
@@ -714,8 +724,15 @@ zapas starczy na lata.
 
 ### 7.4 Waskie gardlo poza 171 (do projektu produkcji)
 Warsztaty: "odpuszczone z braku surowca 406-1 119 cykli dziennie, glownie ruda" (start). Po 171 to ruda, nie zalew, bedzie ograniczac zbroje i bron.
-Jesli test 40 dob pokaze pokrycie glownej broni partii lordow ponizej 70% w dobie 40 (rozdz. 13), nastepny krok (osobna zmiana, nie w 171):
-`ColdStartMarketDays` 14 -> 60 (dorobek stuleci = 2 miesiace pracy rzemieslnikow na polkach, tylko nowa kampania) - parametr, decyzja projektu.
+~~Jesli test 40 dob pokaze pokrycie ponizej 70%, nastepny krok: `ColdStartMarketDays` 14 -> 60.~~ **Decyzja po recenzji kodu (uwaga 15): 60 juz w 171, przed testem.**
+Dlaczego: log 17-44-34 (40 dob nowej kampanii BEZ 171) pokazuje, ze polki tarcz, lukow i helmow juz leza na dnie (minima 40 dob: tarcze 1 259 -> 236, luki 1 460 -> 324, helmy 737 -> 522; w dobie 40 tarcze 481, luki 376,
+helmy 1 051) mimo zalewu dubli; po 171 popyt rekrutow t2+ "z tym co ma" (ok. 330-760 ludzi dziennie na starcie) oproznilby polki korpusu w kilka dob.
+Dorobek stuleci 2 miesiecy pracy rzemieslnikow (14 dni = ok. 10.7 tys. szt. na 97 miast, 60 dni = ok. 46 tys.: korpus ok. 15 tys., bron 1H ok. 10 tys., helmy
+ok. 3.5 tys., strzaly ok. 2.4 tys.) to 2-5 tygodni popytu t2+ na korpus i bron biala - czas, w ktorym ceny rosna i kowale przestawiaja sie na zbroje.
+To prawdopodobny stan miasta ze stuletnia historia (zapas kupcow i warsztatow), nie dosypka: tylko nowa kampania, raz. Kampanii Jeffa nie dotyczy.
+**Nie rozwiazuje tarcz, lukow i strzal** (cechy tarczownikow i lucznikow maja male udzialy: +0.4 tys. tarcz, +0.6 tys. lukow): tarcze robi sie 27-53 dziennie
+wobec 150-350 popytu, strzal i beltow - 0. To paczka produkcji (rozdz. 16) - przed wgraniem 171 albo razem z nim (pytanie 9).
+Pulapka MCM: jesli `ColdStartMarketDays` siedzi w `Armoury.json` Jeffa z wartoscia 14, nowa domyslna nie zadziala - sprawdzic przed testem (CLAUDE.md rozdz. 7).
 
 ---
 
@@ -726,6 +743,8 @@ Jesli test 40 dob pokaze pokrycie glownej broni partii lordow ponizej 70% w dobi
    Komplet rekruta: dzien 108837 - werbunek AI: z zapisu notabla 68, z tym co ma 412 (notabl bez zapisu 37, najemnik z karczmy 371, bez zrodla 4), jeniec bez niczego 12, tier 1 z wlasnym dobytkiem 2020; duplikat ROT pominiety 2975 (ten sam czlowiek, bez drugiego kompletu); do zbrojowni szt.: z zapisu 306, z tym co ma 118, konie i rzedy najemnikow z wzorca (160) 41; konni bez konia (do 167) 3; rzeczy ochotnikow, ktorzy odeszli, sprzedane 120 szt.
    ```
    Przy `RecruitBringsWhatHeHas` = false zamiast "z tym co ma ..." i "jeniec ...": `bez zapisu (wzorzec) N` (jak dzis).
+   Po recenzji kodu: w nawiasie duplikatu ROT `; echo: brak Y wobec X N szt. u M ludzi - pan dokupuje` (uwaga 17), a na koncu `(na polke bez zaplaty - kasa
+   miasta pusta N)` (uwaga 6).
 2. Zaraz po niej:
    ```
    Komplet rekruta (tiery): dzien 108837 - z zapisu t2 40, t3 20, t4 8, t5 0, t6 0 | z tym co ma t2 300, t3 90, t4 20, t5 2, t6 0 | jeniec t1 5, t2 5, t3 2, t4 0, t5 0, t6 0 | duplikat ROT t1 2020, t2 700, t3 200, t4 50, t5 5, t6 0.
@@ -735,6 +754,7 @@ Jesli test 40 dob pokaze pokrycie glownej broni partii lordow ponizej 70% w dobi
    Pule ochotnikow (171): dzien 108837 - swiezi ochotnicy t2+ 270 (notabl kupil 60, z tym co ma 210; szt. 140); HouseLevies: komplet przeniesiony 640, bez zapisu 12; autowerbunek zalog: ludzi 61 w 61 twierdzach (z zapisu 9, z tym co ma 4, tier 1 48), do zbrojowni zalog 236 szt. (w tym dobytek tieru 1 205); zalogi gracza poza systemem 1; potkniecia 0.
    ```
    (Autowerbunek: najwyzej 1 czlowiek na twierdze na dobe - liczba ludzi nigdy nie przekracza liczby twierdz z zaloga, ok. 227; krytyka 6.)
+   Po recenzji kodu w nawiasie "do zbrojowni zalog": `; kupione przez notabla oplacone przez pana N szt. za Z zl, bez zaplaty - na targ M` (uwaga 5).
 4. "Ochotnicy: dzien ..." (VolunteerKit) - dopisek: `; w tym zamki BK: awanse 12, cofniete 30, swiezi t2+ 5`.
 5. "Ludzie: dzien ..." (PeopleLedger) - dopisek po "gracz N": `, duplikaty ROT (ten sam czlowiek, nie liczeni) 2975`.
 6. `GarrisonCarts.Daily()`:
@@ -749,7 +769,9 @@ Jesli test 40 dob pokaze pokrycie glownej broni partii lordow ponizej 70% w dobi
    ```
    Pokrycie zbrojowni AI (171): dzien 108835 - partie rodow AI (41200 ludzi): korpus 88%, glowna bron 93%, helm 71%, tarcza 64%, nogi 90%, rece 55%; zalogi AI (45800 ludzi): korpus 80%, glowna bron 85%, helm 60%, tarcza 52%, nogi 81%, rece 40%; zamki z pokryciem glownej broni < 50%: 9 z 130; brakuje razem 61200 szt. (korpus 9100, glowna bron 4300); w drodze do zamkow 2650 szt.; czas przegladu 3 ms.
    ```
-   Pokrycie typu = (potrzeba - brak po zastepstwie tierow, `AiGear.Deficit`) / potrzeba; "glowna bron" = `ArmedShare` wazone ludzmi. Partie: `MobileParty.AllLordParties`
+   Pokrycie typu = (potrzeba - brak po zastepstwie tierow, `AiGear.Deficit`) / potrzeba; "glowna bron" = `ArmedShare` wazone ludzmi.
+   Po recenzji kodu (uwaga 13): "glowna bron (wedlug szczebla)" - `ArmedShare` liczy sztuki o tierze >= t-1 (D4); dochodza "strzaly", "belty" i blok
+   `| przedmioty t3+: korpus X%, bron Y%` (koszyki przedmiotow tieru 3+ - sprzet wyzszych szczebli); "brakuje razem ... bron" = wszystkie sztuki broni wzorcow. Partie: `MobileParty.AllLordParties`
    z wodzem, bez rodu gracza i Innych; zalogi: twierdze z `Town.GarrisonParty`, bez gracza (chyba ze `GarrisonBuysGearPlayer`) i Innych.
    **Dlaczego co 5 dob:** codzienny przeglad ok. 650 partii i 227 zalog tylko dla logu dokladalby kosztu (Jeff: "nie dokladac kosztu"); trend w tescie 40 dob
    widac i przy 8 pomiarach. Czas przegladu (Stopwatch) w linii - pomiar do testu D.
@@ -758,8 +780,10 @@ Jesli test 40 dob pokaze pokrycie glownej broni partii lordow ponizej 70% w dobi
    `Zbrojownie zalog (171): ...` (C9/C9a).
 10. `GarrisonArmory.Daily()` (A7 i C10, liczniki doby):
    ```
-   Zbrojownie zalog (171): dzien 108837 - komplet z ludzmi: lordowie zostawili w zalogach 340 ludzi (1210 szt.), zabrali z zalog 220 ludzi (760 szt.), rozwiazane partie do zalog 3 (1450 szt.), rozwiazane - ludzie odeszli 2 (komplety z ludzmi 300 szt., tabor sprzedany 120 szt. za 5400 zl); nadwyzki zalog: sprzedalo 31 z 32 zalog w kolejce, 640 szt. za 21000 zl (kasy osad -> panowie; w tym ludzie na patrolach BK policzeni 2 zalogi); potkniecia 0.
+   Zbrojownie zalog (171): dzien 108837 - komplet z ludzmi: lordowie zostawili w zalogach 340 ludzi (1210 szt.), zabrali z zalog 220 ludzi (760 szt.), rozwiazane partie do zalog 3 (1450 szt.), rozwiazane - ludzie odeszli 2 (komplety z ludzmi 300 szt., tabor sprzedany 120 szt. za 5400 zl); nadwyzki zalog: sprzedalo 31 z 32 zalog w kolejce, 640 szt. za 21000 zl (kasy osad -> panowie; w tym ludzie na patrolach BK policzeni 2 zalogi); partie lordow bez wodza albo rozwiazywane - zbrojownia zachowana 12; potkniecia 0.
    ```
+   Po recenzji kodu: `partie lordow bez wodza albo rozwiazywane - zbrojownia zachowana N` (uwaga 1); w linii zapisu/wczytania `partie lordow bez wodza albo
+   rozwiazywane N, M szt.`; w linii 6 "zawrocone" - `zamek u obcych po pokoju N` (uwaga 4).
 
 Kazda nowa klasa: `catch` per obiekt -> licznik potkniec w swojej linii + `Log.Error` najwyzej raz na dobe (nie gasimy funkcji - CLAUDE.md rozdz. 7).
 
@@ -857,8 +881,18 @@ ZMIENIANE:
   idzie z ludzmi do zalogi (A7 pkt 2; dzis przepadal).
 - **Jego druzyna:** cwiczenia bez zmian (BK i tak nie daje podstawowego doswiadczenia rodowi gracza; D3 omija rod gracza).
 - **Partie towarzyszy jego rodu:** ida sciezka AI RecruitKit juz dzis (KitFromNotable) - dostana regule "z tym, co ma" i dozbroja sie z kiesy towarzysza (pytanie 3).
-- **Co zobaczy na mapie:** zamki przestana miec bron na polkach (po splynieciu zapasu do miast); w NOWEJ kampanii przez pierwsze tygodnie przeciwnicy AI w jego bitwach
-  czesciej w sprzecie chlopa na brakujacych miejscach i z kara morale (DTE); pule ochotnikow takie same jak dzis (wariant lagodny A3).
+- **Co zobaczy na mapie:** zamki przestana miec bron na polkach (po splynieciu zapasu do miast); konie i rzedy kupcy woza do zamkow jak dotad (po recenzji
+  kodu, uwaga 10); w NOWEJ kampanii przez pierwsze tygodnie przeciwnicy AI w jego bitwach czesciej w sprzecie chlopa na brakujacych miejscach i z kara morale (DTE);
+  pule ochotnikow w miastach i wsiach takie same jak dzis (wariant lagodny A3).
+- **Po recenzji kodu - co jeszcze zmienia jego gre (uwagi 11, 13-16, 18):**
+  - **Pule zamkow BK** (A4, `VolunteerKitCastles`): ta sama regula co w miastach i wsiach - ochotnik zamku awansuje tylko ze sprzetem kupionym przez notabla;
+    gdy notabl nie ma zlota albo miasto handlowe nie ma towaru, awans sie cofa. Gracz werbuje w zamkach BK z tych samych pul, wiec w nowej kampanii przy pustych
+    polkach zobaczy tam mniej wyzszych tierow niz dzis (pytanie 7).
+  - **Nowa kampania:** polki miast na starcie z zapasem 60 dni pracy rzemieslnikow zamiast 14 (bron i zbroje tansze i latwiej dostepne takze dla niego).
+  - **Przeciwnicy AI awansuja wolniej, gdy brakuje broni na ich szczebel** (D3 wedlug szczebla) - w nowej kampanii mniej t4-t5 u AI przez pierwsze miesiace (pytanie 4).
+  - **Lucznicy AI moga zostac bez strzal**, gdy strzaly na polkach sie skoncza (warsztaty ich nie robia) - w jego bitwach DTE da im sprzet chlopa bez kolczana (pytanie 9).
+  - **Jego werbunek zostaje przy pelnym komplecie DTE** (najemnik i szlachcic t2+), a lord AI za tego samego czlowieka dostaje tylko dobytek i dokupuje reszte -
+    nierownosc na korzysc gracza (pytanie 8). Bez zmian w kodzie, dopoki Jeff nie zdecyduje.
 
 ---
 
@@ -884,8 +918,11 @@ A. **Autotest 40 dob, nowa kampania** (probny DLL):
 | "PodazPopyt: kupcy wywiezli" | bez transakcji DO zamkow |
 | "Sakiewka ludzi: nadwyzki sprzedane" | wyraznie mniej niz 1.1-5 tys./dobe (koniec drugiego kompletu) |
 | "Rynek broni": polki | nie rosna jak w T3 (+1.2 tys./dobe w 1. miesiacu); zaden typ sposrod BodyArmor, OneHandedWeapon, Polearm, Bow, Shield nie spada do 0 w skali swiata |
-| "Pokrycie zbrojowni AI (171)", doba 40 (linia co 5 dob) | glowna bron partii rodow >= 70%, zbroja korpusu >= 60% (ponizej - rozdz. 7.4, raport dla Jeffa przed "wgraj"); "zamki z pokryciem glownej broni < 50%" najwyzej 15% zamkow; trend z doby 20 do 40 nie spadajacy |
-| "Cwiczenia (171)" | mnozniki 0.5-1.0; liczba "zero" mala; partie nadal awansuja (sklad tierow w "Zold konnych (160)"/"Ludzie" nie zamarza na tierze 1) |
+| "Pokrycie zbrojowni AI (171)", doba 40 (linia co 5 dob) | po recenzji kodu: "glowna bron (wedlug szczebla)" partii rodow >= 70%, korpus >= 60%, tarcza >= 50%, strzaly i belty >= 70%, "przedmioty t3+: korpus" >= 50%, "bron" >= 60% (ponizej - raport dla Jeffa przed "wgraj"); "zamki z pokryciem glownej broni < 50%" najwyzej 15% zamkow; trend z doby 20 do 40 nie spadajacy |
+| "Rynek broni: na polkach" (po recenzji kodu, uwaga 15) | minima swiata z 40 dob bez 171 (17-44-34): tarcze >= 236, luki >= 324, strzaly >= 819, helmy >= 522; nizej = 171 pogorszylo stan wyjsciowy - raport przed "wgraj" (start z `ColdStartMarketDays` 60 - w linii "ColdStart: zapas kupiecki" ok. 40-50 tys. szt. "60 dni pracy") |
+| "Komplet rekruta": "echo: brak Y wobec X" (uwaga 17) | zapisac srednia dob 20-40; (brak Y wobec X + "z tym co ma" x 3.9) ponizej 2x "Warsztaty: wykonano" tych dob; wyzej - niedobor rosnie szybciej niz produkcja, raport przed "wgraj" |
+| "Zbrojownie zalog (171): dzien" - rozwiazane partie (uwaga 1) | "rozwiazane partie do zalog N (M szt.)": M/N rzedu setek (cala zbrojownia partii), nie ~0; "zbrojownia zachowana" > 0 w dniach z rozwiazaniami |
+| "Cwiczenia (171)" | mnozniki 0.5-1.0 (po recenzji - wedlug szczebla, wiec nizsze niz w pierwszej wersji); liczba "zero" mala; partie nadal awansuja (sklad tierow w "Zold konnych (160)"/"Ludzie" nie zamarza na tierze 1; dopuszczalne skupienie na t2-t3 przy braku sprzetu t4+) |
 | "Pieniadz swiata (bilans)" | zmiana sumy bez nowej pozycji 171 (wszystkie przeplywy 171 sa przelewami) |
 | Bledy | 0 linii `Error` z nowych klas; potkniecia 0 |
 
@@ -945,6 +982,14 @@ D. **Wydajnosc** (`-Profile`, ten sam zapis co C): `AiGear.OnDailyTickParty` i d
     im sprzet awaryjny. C10 liczy ich potrzebe do zalogi, wiec nie sprzedaje ich rzeczy. Sprzet patroli - poza 171 (BK).
 16. **Rozwiazana partia, ludzie odchodza** (A7 pkt 2): ich komplety znikaja razem z nimi (tak jak sami ludzie - pozycja dla 108); sprzedaje sie tylko tabor ponad
     komplety. Zadna sztuka nie powstaje i nie trafia na targ za darmo.
+17. **(recenzja kodu) Zbrojownie partii lordow bez wodza** zyja do zniszczenia partii (DTE `OnMobilePartyDestroyed`) i sa w zapisie (rekord `@partia`); gdyby
+    jakis mod trzymal partie bez wodza latami, jej zbrojownia lezy tyle samo (pamiec: kilkadziesiat partii, nie tysiace) - miara: licznik "zbrojownia zachowana".
+18. **(recenzja kodu) Zapis zuzycia zalog** (AiWear): zalogi kupuja tanio sztuki obite (najlepsza skutecznosc do ceny) i ich nie naprawiaja (naprawy tylko u lordow
+    w miescie) - obite czekaja w zalodze, az lord je zabierze z ludzmi (naprawi w miescie) albo C10 sprzeda je jako obite. Klucz `arm_aiwear` rosnie o wpisy zalog
+    (szacunek do ok. 0.3 MB, SaveText w kawalkach). Lup zalog po obronie i zuzycie walki zalog - jak dotad (tylko lordowie), poza 171.
+19. **(recenzja kodu) Pan zalogi placi notablowi** za rzeczy kupione ochotnikowi (A5) - przelew; czego nie oplaci, notabl sprzedaje na targu. Zalogi gracza tylko
+    przy `GarrisonBuysGearPlayer` (wtedy placi gracz).
+20. **(recenzja kodu) `ColdStartMarketDays` 60** - tylko nowa kampania; jesli klucz jest w `Armoury.json` Jeffa, obowiazuje stara wartosc (pulapka MCM).
 
 ---
 
@@ -959,12 +1004,25 @@ D. **Wydajnosc** (`-Profile`, ten sam zapis co C): `AiGear.OnDailyTickParty` i d
 3. **Partie Twoich towarzyszy:** werbuja jak lordowie AI - najemnik i ochotnik bez zapisu przyjda do nich "z tym, co maja", a towarzysz dokupi reszte ze swojej kiesy.
    Rekomendacja: tak (tak dzialaja juz od wpisu 92).
 4. **Wolniejsze awanse AI, gdy brakuje broni** (`PartyDrillNeedsArms`): w nowej kampanii przez pierwsze miesiace przeciwnicy beda mieli mniej wysokich tierow.
+   Po recenzji kodu liczy sie bron na szczebel czlowieka (wlocznia rekruta nie wystarcza weteranowi) i hamuje tylko oddzial, ktoremu brakuje - hamulec dziala
+   naprawde, wiec skutek bedzie wyrazniejszy niz w pierwszej wersji (AI skupi sie na t2-t3, dopoki nie ma sprzetu t4+).
    Rekomendacja: wlaczone.
 5. (Na pozniej, nie w 171) Czy Twoja wlasna druzyna tez ma cwiczyc tylko tyle, ile ma broni w Twojej zbrojowni?
 6. **Twoja obecna kampania przy pierwszym wczytaniu po wgraniu 171** (C9a, `GarrisonArmoryRestoreOldSave`): zalogi AI dostana raz z powrotem sprzet, ktory
    DTE zgubil przy zapisie (do wzorca ich ludzi). Skutek dla Ciebie: obroncy zamkow AI w Twoich oblezeniach od razu w pelnym sprzecie, a panowie AI nie wydaja
    ok. 7.8 mln zl w dwa tygodnie (bez fali bankructw i upadku Banku jak w logu 10-54-00). Alternatywa (wylaczone): zalogi puste, panowie kupuja od nowa.
    Rekomendacja: wlaczone. Twoich wlasnych zalog to nie dotyczy.
+7. **(po recenzji kodu) Ochotnicy w zamkach BK** (`VolunteerKitCastles`): ta sama regula co w miastach i wsiach - awans tylko ze sprzetem kupionym przez notabla.
+   Gdy notabl nie ma zlota albo miasto handlowe zamku nie ma towaru, ochotnik zostaje na nizszym szczeblu - w nowej kampanii przy pustych polkach zobaczysz
+   w zamkach BK mniej wyzszych tierow do werbunku. Rekomendacja: wlaczone (jedna regula dla wszystkich pul; inaczej zamki BK bylyby jedynym miejscem, gdzie
+   awans i sprzet powstaja z niczego).
+8. **(po recenzji kodu) Twoj werbunek najemnikow i szlachty t2+:** dzis dostajesz pelny komplet z niczego (DTE), a lord AI za tego samego czlowieka tylko jego
+   dobytek i dokupuje reszte. Po zwolnieniu ludzi komplet zostaje u kwatermistrza jako nadwyzka do sprzedania. Czy Twoj rekrut tez ma przychodzic "z tym, co ma"
+   (dokupujesz reszte)? Rekomendacja: tak - ta sama regula co dla AI (osobna mala paczka); minimum: komplet z Twojego werbunku nie liczy sie jako nadwyzka
+   do wyjecia u kwatermistrza. Do decyzji 171 tego nie zmienia.
+9. **(po recenzji kodu) Strzaly i belty:** zaden warsztat ich nie robi. Po 171 lucznik AI t2+ przychodzi zwykle bez lukow i strzal, a pan kupuje je z polek -
+   w Twojej kampanii strzaly skoncza sie szybciej niz w ok. 50 dob, a potem lucznicy AI w Twoich bitwach beda bez kolczana. Rekomendacja: wgrac 171 razem
+   z produkcja strzal i beltow (luczarze i grotnicy w paczce produkcji) albo po niej; do tego czasu 171 tylko w tescie.
 
 ---
 
@@ -984,6 +1042,11 @@ D. **Wydajnosc** (`-Profile`, ten sam zapis co C): `AiGear.OnDailyTickParty` i d
   wies - tylko polowa staje sie milicja, :382-383; wies zlupiona albo osada null - wszyscy) - ich komplety znikaja z nimi (A7); powinni wrocic do ludnosci.
   Patrole BK (`GarrisonPartyComponent.CreateParty`) wychodza z zalogi bez sprzetu.
 - **Produkcja (plan K13 / ruda):** warsztaty ograniczone ruda (rozdz. 7.4); po 171 to ruda, nie zalew polek, bedzie wyznaczac ilosc zbroi i broni.
+  NOWE po recenzji kodu: (a) **strzaly i belty - 0 sztuk dziennie** w logach 17-44-34 (40 dob) i 11-32-39 (kampania Jeffa: 2 960 -> 2 900 strzal w dobe) -
+  warsztaty (Forge/WorkshopLaw) ich nie robia; potrzebni luczarze i grotnicy (drewno + zelazo/ruda), przed wgraniem 171 albo razem z nim (pytanie 9);
+  (b) **tarcze** 27-53 dziennie wobec 150-350 popytu po 171 - udzial cechu tarczownikow (0.05) za maly wobec potrzeb kompletow AI; (c) luki - jak tarcze.
+- **164c (szczelnosc pieniadza):** do czasu przekierowania `AutoRecruitmentExpenses` do notabla - pan zalogi placi notablowi za rzeczy kupione ochotnikowi (171, recenzja kodu, uwaga 5).
+- **Gracz - werbunek t2+ "z tym, co ma"** (pytanie 8) - osobna mala paczka po decyzji Jeffa.
 - **Ekonomia - do zmierzenia:** dobytek tieru 1 (DTE, przyjety 05.10; od 171 takze przy autowerbunku zalog, A5) zostaje jedynym duzym doplywem sztuk do armii;
   ile z niego wraca na targ jako nadwyzka (MenPurse, C10) - osobny licznik w przyszlej paczce, jesli 169 tego nie pokaze.
 
@@ -1013,3 +1076,32 @@ czesciowo, z inna liczba albo inna droga), 1 przyjeta swiadomie jako zachowanie 
 | 15 | drobne | `onShelf` zamowien dla warsztatow na polce zamku zamiast miasta | **PRZYJETE** | W galezi zamku `onShelf` na `market.ItemRoster`, tylko w dzien zamowienia; bez miasta - nic (C2.4). |
 | 16 | drobne | Konny bez konia (przypadki 6 i 8) placony jak konny | **PRZYJETE** (licznik) | Potwierdzone: MountedWage sprawdza `IsMounted` wzorca (MountedWage.cs:60). W 171 licznik "konni bez konia" w linii 1 (takze jency - przypadek 2) i pozycja dla 167; kon z wzorca odrzucony (kon z niczego, wbrew 160) (B6, rozdz. 16). |
 | 17 | drobne | Linia "Pokrycie" - pelny przeglad co dobe tylko dla logu | **PRZYJETE** | Pelny przeglad raz na 5 dob, czas przegladu w linii, pomiar w tescie D (rozdz. 8 pkt 8, rozdz. 9 opis `ArmsCoverageLog`). |
+
+---
+
+## 18. Recenzja kodu (commit ebf0047, 08.10 noc) - werdykty i poprawki
+
+Kazda uwage sprawdzilem w kodzie i dekompilacji (DTE `EveryoneCampaignBehavior`, gra `DisbandPartyCampaignBehavior`, ROT `ROTTroopRecruiter`) albo w logach
+(17-44-34, 11-32-39). Wynik: 19 uwag (1 i 8 to ta sama dziura) - 17 przyjetych z poprawka w kodzie, 2 przyjete jako opis/pytanie bez zmiany kodu (11, 18),
+0 odrzuconych. Build kod 0.
+
+| Nr | Waga | Uwaga (skrot) | Werdykt | Co zmienione |
+|---|---|---|---|---|
+| 1, 8 | krytyczne | DTE `GarbageCollectParties` kasuje zbrojownie partii bez wodza / `IsDisbanding` w dobie czekania na rozwiazanie, wiec A7 pkt 2 przenosi 0 szt.; DTE ich tez nie zapisuje | **PRZYJETE** | Potwierdzone: GC (EveryoneCampaignBehavior :338-360) zostawia zbrojownie tylko partii z czynnym wodzem i `!IsDisbanding`; `OnPartyDisbandStarted` - doba czekania (`DaysFromNow(1)`) albo `ApplyDelayedTeleportToPartyAsPartyLeader`. `AiGear.KeepGarrisonArmory` chroni teraz kazda aktywna partie lorda (poza gracza) - z dzialajacym wodzem DTE i tak zwraca false, wiec zmiana dotyczy tylko partii bez wodza / rozwiazywanych / z nieczynnym wlascicielem; licznik "zbrojownia zachowana". `GarrisonArmory.Export/Restore`: rekord `@StringId` dla partii lordow, ktorych DTE nie zapisuje (warunek `ShouldPersistParty` przepisany 1:1 - `DteSaves`). |
+| 2 | wazne | Zalogi pierza zuzycie (obita sztuka wychodzi z zalogi jako sprawna) | **PRZYJETE**, droga "zapis zuzycia dla zalog" | Zakup zalogi (`AiGear`), dostawa wozem (`GarrisonCarts`), autowerbunek (`RecruitKit.OnGarrisonTook`) - `AiWear.NoteBought` z modyfikatorem; przeniesienie ludzi (`MoveKits`, `MoveAll`) - `AiWear.MoveWorn`: udzial obitych proporcjonalny, nie mniej niz trzeba (u dawcy obitych <= sztuk) i nie wiecej niz n; C10 sprzedaje ze stanem z zapisu (`TakeCondition`, spis raz na sprzedaz). Przy okazji: sprzedaz przerwana brakiem zlota kasy oddaje stan sztuki do zapisu (dotad gubila jeden stan). Wariant "zaloga kupuje tylko sprawne" odrzucony - nie zamyka przeniesien lord -> zaloga. |
+| 3 | drobne | Zamowienie zamku nieatomowe przy wyjatku w BuyLoop | **PRZYJETE** | `GarrisonCarts.Place` w `finally` (gdy sa linie); wydane = suma oplaconych linii. |
+| 4 | drobne | Woz dojezdza do zamku, ktory po zdobyciu i pokoju nalezy do obcych | **PRZYJETE** | Zywy rod placacy: zamek innej frakcji niz przy zamowieniu i innej niz rod placacy - zawrot ze zwrotem; licznik "zamek u obcych po pokoju". |
+| 5 | drobne | A5: notabl traci kupione rzeczy bez zaplaty | **PRZYJETE** | Pan zalogi placi notablowi cene skupu jego targu za kazda kupiona sztuke (tyle, ile notabl dostawal dotad ze sprzedazy); czego nie oplaci - notabl sprzedaje na targu. Liczniki w linii 3. |
+| 6 | drobne | `SellOff` przerywa przy pustej kasie, reszta przepada | **PRZYJETE** | Niesprzedane sztuki ida na polke targu bez zaplaty (jak rzeczy zmarlego notabla); licznik "na polke bez zaplaty". |
+| 7 | drobne | `MoveKits` nie liczy ludzi zalogi na patrolach BK | **PRZYJETE** | `TakePostfix` dolicza do potrzeby zostajacych potrzebe patroli BK osady; mapa patroli raz na dobe (wspolna z C10). |
+| 9 | wazne | `ArmsDrill.Gated` nie sprawdza zakupow AI | **PRZYJETE** | Zaloga: `AiGear.On && GarrisonBuysGear`; partia: `AiGear.On`; opisy MCM uzupelnione. |
+| 10 | drobne | C8 wycina z wywozu do zamkow takze konie i rzedy | **PRZYJETE** (wariant kodu) | C8 tylko dla broni i zbroi - konie i rzedy kupcy woza do zamkow jak dotad (gracz bez zmian); opis MCM `GarrisonGearFromTown`. |
+| 11 | drobne | A4 zmienia pule zamkow BK, a rozdz. 12 mowi "pule bez zmian" | **PRZYJETE** (opis) | Rozdz. 12 i pytanie 7; kod bez zmian (wylacznik `VolunteerKitCastles`). |
+| 12 | drobne | `MarketOfNotable` dla notabla zamku - linia prosta zamiast miasta handlowego | **PRZYJETE** | Zamek: `ArmyClothing.MarketTown` (bez miast wroga), inaczej `MarketOf` jak dotad. |
+| 13 | wazne | Brama testu "glowna bron >= 70%" nie wykrywa braku na szczeblu; brak strzal i beltow w linii | **PRZYJETE** | "glowna bron (wedlug szczebla)" (D4 po zmianie), "strzaly", "belty", blok "przedmioty t3+: korpus, bron"; progi 13A. Odchylenie: wiersz t3+ liczony wedlug tieru PRZEDMIOTOW (koszyki Deficit), nie ludzi - tanio i bez drugiego przebiegu Deficit. |
+| 14 | wazne | Hamulec awansow D3 liczy kazda sztuke typu (wlocznia t1 uzbraja t5) | **PRZYJETE**, droga kodu | `ArmedShare` wedlug szczebla (sztuka typu o tierze >= t-1, przydzial od najwyzszego szczebla); w D3 udzial oddzialu (element rosteru), nie calej druzyny. Pamiec na dobe, koszt bez zmian. |
+| 15 | wazne | Nowa kampania: tarcze, luki, strzaly, helmy na dnie; plan B (60 dni) decydowac przed testem | **PRZYJETE** | `ColdStartMarketDays` 14 -> 60 juz teraz (7.4, uzasadnienie tam); minima polek swiata w 13A (zmierzone w 17-44-34: tarcze 236, luki 324, strzaly 819, helmy 522 - recenzja podala 265 i 971); tarcze/luki/strzaly - paczka produkcji (rozdz. 16). |
+| 16 | wazne | Strzaly i belty nie powstaja wcale; 171 przyspiesza ich znikanie | **PRZYJETE** (czesciowo w 171) | Potwierdzone: 0 w "Warsztaty" w obu logach, 2 960 -> 2 900 strzal w kampanii Jeffa. W 171: strzaly i belty w "Pokryciu", prog w 13A (alarm - linia "Rynek broni" juz podaje stan swiata codziennie, bez nowego przegladu). Produkcja - rozdz. 16, pytanie 9 (wgranie 171 razem z produkcja albo po niej). |
+| 17 | wazne | Popyt z zamiany ROT X -> Y niemierzony | **PRZYJETE** | Prefiks `ExchangeClanTroops` zapamietuje X (stos); `RecruitKit.NoteEcho` liczy sztuki wzorca Y niepokryte wzorcem X (koszyki i zastepstwo jak Deficit, pamiec na pare); linia 1 "echo: brak Y wobec X N szt. u M ludzi"; prog w 13A. |
+| 18 | wazne | Werbunek gracza (pelny komplet DTE) wobec AI ("z tym, co ma") - nierownosc | **PRZYJETE** (pytanie) | Pytanie 8 z rekomendacja; rozdz. 12 i 16. Kod gracza bez zmian (CLAUDE.md: gracz osobno, bez zmian bez potrzeby). |
+| 19 | drobne | Zamki zamawiaja wszystkie tego samego dnia | **PRZYJETE** | Brak stempla = zamowienie w dobie `dzien % D == Id % D` (rozlozenie bez zapisu i bez kosztu). |

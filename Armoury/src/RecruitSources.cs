@@ -29,7 +29,7 @@ namespace Armoury
         private static int _stumbles, _errDay = -1;
         private static readonly HashSet<string> _errWhere = new HashSet<string>();
 
-        internal static void Reset() { _rotDepth = 0; _prisonerDepth = 0; _stumbles = 0; _errDay = -1; _errWhere.Clear(); }
+        internal static void Reset() { _rotDepth = 0; _prisonerDepth = 0; _stumbles = 0; _errDay = -1; _errWhere.Clear(); _rotFrom.Clear(); }
 
         /// <summary>Potkniecia doby (do linii "Pule ochotnikow (171)") - zerowane przy odczycie.</summary>
         internal static int TakeStumbles() { int n = _stumbles; _stumbles = 0; return n; }
@@ -56,8 +56,28 @@ namespace Armoury
         internal static bool InPrisonerRecruit { get { return _prisonerDepth > 0; } }
 
         // ------------------------------------------------------------ A1: ROT ExchangeClanTroops
-        public static void RotExchangePrefix(bool fireEvent, out bool __state) { __state = fireEvent; if (fireEvent) _rotDepth++; }
-        public static Exception RotExchangeFinalizer(Exception __exception, bool __state) { if (__state && _rotDepth > 0) _rotDepth--; return __exception; }
+        // recenzja 171: oddzial X (parametr troop), z ktorego ROT zamienia - do licznika "brak Y wobec X" (nowy popyt pana); stos, bo glebokosc moze byc > 1
+        private static readonly List<CharacterObject> _rotFrom = new List<CharacterObject>();
+
+        /// <summary>Oddzial X biezacej zamiany ROT (null poza zamiana).</summary>
+        internal static CharacterObject EchoFrom { get { return _rotFrom.Count > 0 ? _rotFrom[_rotFrom.Count - 1] : null; } }
+
+        public static void RotExchangePrefix(bool fireEvent, CharacterObject troop, out bool __state)
+        {
+            __state = fireEvent;
+            if (!fireEvent) return;
+            _rotDepth++;
+            _rotFrom.Add(troop);
+        }
+        public static Exception RotExchangeFinalizer(Exception __exception, bool __state)
+        {
+            if (__state)
+            {
+                if (_rotDepth > 0) _rotDepth--;
+                if (_rotFrom.Count > 0) _rotFrom.RemoveAt(_rotFrom.Count - 1);
+            }
+            return __exception;
+        }
 
         // ------------------------------------------------------------ B2: jency
         public static void PrisonPrefix() { _prisonerDepth++; }
