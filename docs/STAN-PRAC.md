@@ -946,3 +946,6 @@ pancerz wedlug wagi (0.333 kg/pkt, ladry - Jazda, bez podnoszenia bohaterow) + 1
 Testy: nowa kampania 40 dob OK (14.0 s/dobe, 0 bledow Armoury, CS 8 startowych), zapis 362 8 dob OK (26.4 s/dobe). Polnoc w grze 138/134 wobec swiata 129/119 (+7%/+13% jak w
 planie; bezwzgledne wyzej niz rachunek) - OSTRZEZENIE kontroli w logu CS; do sprawdzenia (tor S): czesc jednostek Polnocy t3 ma Drzewce 140 (np. cerwyn_soldier, glover_footman)
 - zamiana broni wedlug tieru moze nie objac drzewc. ZATWIERDZONE OD TERAZ: Armoury 799a877d, CrashScribe 891503f6. Bazy: Armoury noc/sklad9, CS w-toku/175-armie-cs.
+**DECYZJA JEFFA 09.10 ok. 13:50 (bron wedlug tieru, tor S):** TAK - wymog broni bialej, tarcz i broni rzucanej DOKLADNIE (tier-1) x 35, takze w dol (koniec wymogow ROT
+bez zwiazku z tierem, np. drzewce t3 = 140); luki, kusze, proce i amunicja - tylko w gore jak dotad. CS w-toku/175-armie-cs (W1). Do nastepnego wgrania (z krokiem A etapu 2);
+po tescie sprawdzic srednie Polnocy (cel 130/135) i balans kultur.
