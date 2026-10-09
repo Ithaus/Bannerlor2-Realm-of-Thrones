@@ -714,6 +714,9 @@ cos, czego VolunteerKit nie widzi (do zbadania razem z projektem ekonomii).
   ArmouryBehavior.OnDailyTick (1.5 s naraz raz na dobe - rozlozyc albo przyspieszyc), AiGear.OnDailyTickParty (4 ms), tik godzinny Armoury (2.6 ms),
   smieci (sprzatania gen0: warsztaty gry 29%, MenPurse 8%, dzienny tik 6%); cudze: AI lordow (gra) x44, ROT malzenstwa NPC, warsztaty gry; kafelki druzyn pod
   tabliczka miasta po druzynach usunietych w srodku (UI). Narzedzia: autotest -LoadSave autotest-rok-360 -Profile -Census (repo autotestu at1-autotest c5c25ce).
+  Dopisane 09.10 (recenzja grupa11, uwaga 8): jeden odczyt pozycji lordow na godzine, wspolny dla musztry (`Drill.Hourly`, `_tr`), ksiegi snu AI
+  (`NightMarch.AiSleepLedger`, `_ai.Pos`) i `WorldMeasure.Hourly` (`_t`) - dzis trzy osobne petle po `AllLordParties` + czwarta po wszystkich partiach
+  (`SnapshotPositions`), kazda z wlasnym slownikiem "krok godziny" tej samej partii; ulamek ms na godzine, wiec dopiero na koniec.
 
 ## PRZEKAZANIE 08.10 ok. 12:10 (limit konta 98%)
 Pelny stan do podjecia: **docs/PRZEKAZANIE-2026-10-08.md** (co w grze, praca w toku 169 + workflow, co czeka na Jeffa: BEE wariant zbrojowni a/b, narzedzia).
