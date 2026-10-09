@@ -807,6 +807,13 @@ namespace Armoury
         public bool PartyDrillNeedsArms = true;            // an AI lord's daily training of his men needs weapons: each troop's experience is scaled by the share of its men who have a weapon of their kind and grade in the armoury - men with nothing fit for their rank promote slower (only while AI lords buy their gear)
         public bool ArmsCoverageLog = true;                // every fifth day write a line to the log: how much of the arms and armour AI parties and garrisons need is in their armouries
 
+        // --- Arms production ---
+        public bool ArmsNotHouseholdGoods = true;          // townsfolk do not use up arms, armour, shields and harness: these lie on the stalls until a soldier, a notable or a trader buys them (everyday clothing is still worn out by the townsfolk)
+        public bool ArmsNoStallDecay = true;               // the game no longer deletes a piece of arms or armour with a quality modifier from town stalls each day: armour does not rot on a stall - its wear is counted by its condition. Horses keep the game's rule; pieces forged by the player are still cleared from stalls (they are unique save objects)
+        public float ArmsStallUpkeepManDaysPerPiece = 0.02f; // man-days a year a town's smiths spend cleaning and oiling each piece of arms on its stalls (the Tower, 1340s: 11 men oiled 3,200 bows in 5 days) - keeping stock is work, not free
+        public bool BkSuppliesNoArms = true;               // Banner Kings supplies of AI parties no longer buy and use up weapons and shields: the wear of an AI army's weapons is counted by Armoury (battle wear and repairs) - one rule, not two
+        public bool BkSuppliesNoArmsPlayer = false;        // the same for your own party: weapons, shields and arrows wear out by Armoury's rules only, not also by Banner Kings supplies (off until you decide - question 5 of package 174)
+
         public static void Load(string moduleDataDir)
         {
             var file = Path.Combine(moduleDataDir, "Armoury.settings.xml");

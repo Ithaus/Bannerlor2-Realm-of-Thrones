@@ -304,7 +304,15 @@ namespace Armoury
             return false;
         }
 
+        /// <summary>174.0: zakupy w ramce ksiegi towarow "zakupy uzbrojenia Armoury" - w ticku dobowym partii nie licza sie jako "inne ticki" (tylko licznik).</summary>
         private static void TryBuy(MobileParty mp, Settlement st)
+        {
+            var gf = GoodsLedger.Begin(GoodsLedger.FArmsBuy, mp);
+            try { TryBuyCore(mp, st); }
+            finally { GoodsLedger.End(gf); }
+        }
+
+        private static void TryBuyCore(MobileParty mp, Settlement st)
         {
             try
             {

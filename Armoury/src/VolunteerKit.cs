@@ -195,6 +195,13 @@ namespace Armoury
         /// <summary>countWhy = false (171 A3, swiezy ochotnik): brak nie liczy sie w "powodach cofniec" (nic nie cofamy); zamowienie dla warsztatow zostaje.</summary>
         private static bool Buy(Hero notable, Settlement market, CharacterObject x, CharacterObject y, bool countWhy = true)
         {
+            var gf = GoodsLedger.Begin(GoodsLedger.FArmsBuy, notable);   // 174.0: ramka ksiegi "zakupy uzbrojenia Armoury" (tylko licznik)
+            try { return BuyCore(notable, market, x, y, countWhy); }
+            finally { GoodsLedger.End(gf); }
+        }
+
+        private static bool BuyCore(Hero notable, Settlement market, CharacterObject x, CharacterObject y, bool countWhy)
+        {
             _lastBought.Clear();
             var all = Missing(x, y);
             if (all.Count == 0) return true;

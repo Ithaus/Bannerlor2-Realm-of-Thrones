@@ -2804,6 +2804,26 @@ namespace Armoury
         [SettingPropertyGroup("Arming the garrisons")]
         public bool ArmsCoverageLog { get; set; } = true;
 
+        [SettingPropertyBool("Arms Not Household Goods", HintText = "townsfolk do not use up arms, armour, shields and harness: these lie on the stalls until a soldier, a notable or a trader buys them (everyday clothing is still worn out by the townsfolk)")]
+        [SettingPropertyGroup("Arms production")]
+        public bool ArmsNotHouseholdGoods { get; set; } = true;
+
+        [SettingPropertyBool("Arms No Stall Decay", HintText = "the game no longer deletes a piece of arms or armour with a quality modifier from town stalls each day: armour does not rot on a stall - its wear is counted by its condition. Horses keep the game's rule; pieces forged by the player are still cleared from stalls (they are unique save objects)")]
+        [SettingPropertyGroup("Arms production")]
+        public bool ArmsNoStallDecay { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Arms Stall Upkeep Man Days Per Piece", 0.00f, 1.00f, "0.00", HintText = "man-days a year a town's smiths spend cleaning and oiling each piece of arms on its stalls (the Tower, 1340s: 11 men oiled 3,200 bows in 5 days) - keeping stock is work, not free")]
+        [SettingPropertyGroup("Arms production")]
+        public float ArmsStallUpkeepManDaysPerPiece { get; set; } = 0.02f;
+
+        [SettingPropertyBool("Bk Supplies No Arms", HintText = "Banner Kings supplies of AI parties no longer buy and use up weapons and shields: the wear of an AI army's weapons is counted by Armoury (battle wear and repairs) - one rule, not two")]
+        [SettingPropertyGroup("Arms production")]
+        public bool BkSuppliesNoArms { get; set; } = true;
+
+        [SettingPropertyBool("Bk Supplies No Arms Player", HintText = "the same for your own party: weapons, shields and arrows wear out by Armoury's rules only, not also by Banner Kings supplies (off until you decide - question 5 of package 174)")]
+        [SettingPropertyGroup("Arms production")]
+        public bool BkSuppliesNoArmsPlayer { get; set; } = false;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -3504,6 +3524,11 @@ namespace Armoury
             s.GarrisonDrillNeedsArms = GarrisonDrillNeedsArms;
             s.PartyDrillNeedsArms = PartyDrillNeedsArms;
             s.ArmsCoverageLog = ArmsCoverageLog;
+            s.ArmsNotHouseholdGoods = ArmsNotHouseholdGoods;
+            s.ArmsNoStallDecay = ArmsNoStallDecay;
+            s.ArmsStallUpkeepManDaysPerPiece = ArmsStallUpkeepManDaysPerPiece;
+            s.BkSuppliesNoArms = BkSuppliesNoArms;
+            s.BkSuppliesNoArmsPlayer = BkSuppliesNoArmsPlayer;
         }
 
         internal static void Apply()

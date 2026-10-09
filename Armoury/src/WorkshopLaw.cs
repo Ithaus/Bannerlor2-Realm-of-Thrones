@@ -544,7 +544,8 @@ namespace Armoury
             if (workshop.WorkshopType.IsHidden && (gu == "platnerz" || gu == "miecznik"))
             {
                 float smithW = GuildWeight("platnerz") + GuildWeight("miecznik");
-                if (smithW > 0f) h = Math.Max(0f, h - SmithHours.ManDaysYesterday(town) * GuildWeight(gu) / smithW / Math.Max(1, ActiveSmithWorkshops(town)));
+                // paczka 174.0 (e): sklad nie jest darmowy - czyszczenie i oliwienie uzbrojenia na polce miasta (ArmsStallUpkeepManDaysPerPiece na sztuke na rok)
+                if (smithW > 0f) h = Math.Max(0f, h - (SmithHours.ManDaysYesterday(town) + ArmsLeaks.UpkeepManDays(town)) * GuildWeight(gu) / smithW / Math.Max(1, ActiveSmithWorkshops(town)));
             }
             return h / lines;
         }

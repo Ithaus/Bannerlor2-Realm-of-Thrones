@@ -322,6 +322,16 @@ namespace Armoury
         {
             internal long Men, Armed; internal readonly long[] Need = new long[7], Lack = new long[7]; internal long LackAll, LackBody, LackWeapon;
             internal long NeedBody3, LackBody3, NeedWeap3, LackWeap3;   // recenzja 171: przedmioty tieru 3+ (sprzet wyzszych szczebli)
+            // 174.0 (f): miara "dowolny szczebel" - potrzeba wedlug TYPU (suma tierow wzorcow) wobec sztuk tego typu w zbrojowni w dowolnym tierze;
+            // na partie min(potrzeba, sztuki), suma po partiach - odsetek ludzi z czymkolwiek na tym miejscu (to zalozy DTE w bitwie: tier <= t+2 bez dolnej granicy).
+            // Kolejnosc: korpus, glowna bron, helm, tarcza, rekawice, nogi. Miara szczebla (wyzej) bez zmian - na nia patrza cwiczenia i awanse.
+            internal readonly long[] AnyNeed = new long[6], AnyHave = new long[6];
+            private static readonly ItemObject.ItemTypeEnum[] AnyTypes =
+            {
+                ItemObject.ItemTypeEnum.BodyArmor, ItemObject.ItemTypeEnum.Invalid, ItemObject.ItemTypeEnum.HeadArmor,
+                ItemObject.ItemTypeEnum.Shield, ItemObject.ItemTypeEnum.HandArmor, ItemObject.ItemTypeEnum.LegArmor
+            };
+            private static readonly string[] AnyNames = { "korpus", "glowna bron", "helm", "tarcza", "rekawice", "nogi" };
             private static bool Weapon(ItemObject.ItemTypeEnum ty)
             {
                 return ty == ItemObject.ItemTypeEnum.OneHandedWeapon || ty == ItemObject.ItemTypeEnum.TwoHandedWeapon || ty == ItemObject.ItemTypeEnum.Polearm
@@ -335,6 +345,7 @@ namespace Armoury
                 var lack = AiGear.Deficit(mp, arm, needOut);
                 int men = mp.MemberRoster.TotalManCount - mp.MemberRoster.TotalHeroes;
                 Men += men; Armed += (long)Math.Round(ArmedShare(mp) * men);
+                try { AddAny(mp, arm, needOut); } catch (Exception e) { Stumble("Coverage(dowolny szczebel)", e); }
                 foreach (var kv in needOut)
                 {
                     var ty0 = (ItemObject.ItemTypeEnum)(kv.Key / 10);
@@ -352,6 +363,42 @@ namespace Armoury
                     if (kv.Key % 10 >= 3) { if (ty == ItemObject.ItemTypeEnum.BodyArmor) LackBody3 += kv.Value; else if (Weapon(ty)) LackWeap3 += kv.Value; }
                 }
             }
+            /// <summary>174.0 (f): dowolny szczebel dla jednej partii (sztuki zbrojowni wedlug typu w dowolnym tierze).</summary>
+            private void AddAny(MobileParty mp, Dictionary<ItemObject, int> arm, Dictionary<int, int> needOut)
+            {
+                var have = new Dictionary<int, long>();
+                if (arm != null) foreach (var kv in arm) { if (kv.Key == null || kv.Value <= 0) continue; int ty = (int)kv.Key.ItemType; long h; have.TryGetValue(ty, out h); have[ty] = h + kv.Value; }
+                var need = new Dictionary<int, long>();
+                foreach (var kv in needOut) { int ty = kv.Key / 10; long n; need.TryGetValue(ty, out n); need[ty] = n + kv.Value; }
+                for (int i = 0; i < AnyTypes.Length; i++)
+                {
+                    if (i == 1) continue;   // glowna bron - nizej, wedlug oddzialow
+                    int ty = (int)AnyTypes[i];
+                    long n, h; need.TryGetValue(ty, out n); have.TryGetValue(ty, out h);
+                    if (n <= 0) continue;
+                    AnyNeed[i] += n; AnyHave[i] += Math.Min(n, h);
+                }
+                // glowna bron: ludzie wedlug typu glownej broni wzorca (MainWeapon) wobec sztuk tego typu w zbrojowni w dowolnym tierze
+                var mainNeed = new Dictionary<int, long>();
+                var roster = mp.MemberRoster;
+                for (int i = 0; i < roster.Count; i++)
+                {
+                    var el = roster.GetElementCopyAtIndex(i);
+                    if (el.Character == null || el.Character.IsHero || el.Number <= 0) continue;
+                    int key = MainKey(el.Character);
+                    if (key < 0) continue;
+                    int ty = key / 10; long n; mainNeed.TryGetValue(ty, out n); mainNeed[ty] = n + el.Number;
+                }
+                foreach (var kv in mainNeed) { long h; have.TryGetValue(kv.Key, out h); AnyNeed[1] += kv.Value; AnyHave[1] += Math.Min(kv.Value, h); }
+            }
+
+            internal string AnyText()
+            {
+                var sb = new System.Text.StringBuilder(" | dowolny szczebel: ");
+                for (int i = 0; i < AnyNames.Length; i++) { if (i > 0) sb.Append(", "); sb.Append(AnyNames[i]).Append(' ').Append(AnyNeed[i] > 0 ? (100 * AnyHave[i] / AnyNeed[i]) + "%" : "-"); }
+                return sb.Append(" (ludzi z czymkolwiek)").ToString();
+            }
+
             internal string Text(string name)
             {
                 var sb = new System.Text.StringBuilder();
@@ -359,6 +406,7 @@ namespace Armoury
                   .Append(", glowna bron (wedlug szczebla) ").Append(Men > 0 ? (100 * Armed / Men) + "%" : "-");
                 for (int i = 1; i < CovTypes.Length; i++) sb.Append(", ").Append(CovNames[i]).Append(' ').Append(Pct(Need[i], Lack[i]));
                 sb.Append(" | przedmioty t3+: korpus ").Append(Pct(NeedBody3, LackBody3)).Append(", bron ").Append(Pct(NeedWeap3, LackWeap3));
+                sb.Append(AnyText());   // 174.0 (f)
                 return sb.ToString();
             }
             private static string Pct(long need, long lack) { return need > 0 ? (100 * (need - lack) / need) + "%" : "-"; }
