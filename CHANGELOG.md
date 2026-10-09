@@ -1,5 +1,13 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-09 (noc) WGRANIE 1: 170 + T1..T7 - Armoury 28a7456e, CrashScribe aff275de
+
+**Status:** WGRANE 2026-10-09 ok. 19:07 (zegar komputera) na zgode Jeffa na te noc ("Tak, wgraj sam" - tylko po udanym autotescie). Galaz noc/wgranie-1 = 1805521 (scalenia 170, n1-n7 na 2e235ea).
+Poprzednie: Armoury c01a54ba, CrashScribe 11fa0214 - obok plikow jako *.bak-2026-10-09-przed-noc1 i D:\Backup-Bannerlord\wgrane6-10-09-noc1-przed.
+Autotesty: 170 sam (17-44), T2 sam (17-59), T1 sam (18-13), stos S1 z T8 (18-24) + zapis doby 362 (18-38), ta binarka (18-54): 40/40, 13.0 s/dobe, 0 bledow.
+Wpisy ponizej (170, T1-T7) maja od teraz status WGRANE. T8 (krainy) NIE wgrany - poprawka bawelny w toku. Skrypt BEE -ListaZFundamentu NIE nalozony (zablokowany przez zabezpieczenia - do zrobienia przez Jeffa).
+Armoury.json Jeffa bez zmian (nowe klucze dzialaja z domyslnych). CrashScribe.settings.xml w grze bez zmian (klucze kalendarza dzialaja z domyslnych kodu).
+
 ## 2026-10-09 (T7 noc 08/09.10) - WIOSKI: MLYN WODNY NA BRZEGU, NIE W KORYCIE (kolo na samym brzegu, obrazek mlyna przy rzece pol jedn. ku ladowi, licznik "budynek mlyna nad woda") + W DYMKU KTO TRZYMA ZIEMIE ("A village of the Tumbledown lands, held by House Stark of Winterfell", na zywo z gry)
 **Mod:** Armoury | **Pliki:** `MapVillagesView.cs` (`AnchorOutW`, `Create` krok 4 - `MillLandBack`, `WaterNote` - rogi budynku mlyna, `SummaryText`, NOWE `HeldLine` / `HeldLineSafe` / `LandsText` / `HouseName` / `LogHeldSamples`, `District.TipClan` / `TipText`, `Visual.OnHover`), `VillageTexts.cs` (NOWE `arm_vil_tip_held`, `arm_vil_tip_held_own`, `arm_vil_lands`, `arm_vil_lands_of` - dopisane recznie, `VillageTexts.xml` / `teksty_cs.py` nie ma w repo), `Settings.cs` + `McmSettings.cs` (NOWE `MillOnBank` = true, `VillageTipHeldBy` = true w grupie "Map villages"; 680 -> 682 ustawien). Bez zapisu w grze. W `Armoury.json` Jeffa nie ma kluczy `MillOnBank`, `VillageTipHeldBy` ani `MapVillage*` - dzialaja domyslne z kodu.
 
