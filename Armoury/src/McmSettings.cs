@@ -2644,6 +2644,10 @@ namespace Armoury
         [SettingPropertyGroup("Time at the forge")]
         public bool WrecksToScrap { get; set; } = true;
 
+        [SettingPropertyBool("Mend Metal By Kind", HintText = "town smiths mending a piece take only the new iron that mending really needs, not a fixed share of a new piece: rivets and a few plates for plate (1% of its iron Plundered, 2% Damaged, 4% Battered), buckles and studs for leather and cloth (2/3/6%), almost none for blades (0/0.5/1.5%) and spear heads (0/0.5/2%), more for shield rims and bosses (4/8/12%) and crossbow locks (3/6/11%); the forge fuel follows the iron; mail keeps the old rule (badly cut mail needs many new rings); the work, the wood, leather and cloth are paid as before (off = iron and forge fuel at Mend Material Max Share of the recipe, as before)")]
+        [SettingPropertyGroup("Time at the forge")]
+        public bool MendMetalByKind { get; set; } = true;
+
         [SettingPropertyBool("Mend Material Men And Lords", HintText = "with Smith Mend From Market on: the repairs your men pay for from their own purse each hour in a town, and the repairs the lords' men pay for, also take the materials from this market at its prices - the same rule and the same price as the mending bench (iron, wood, leather, linen or wool, more the worse the piece); a piece the market has no material for waits, the next goes ahead; off = your men's and the lords' repairs are the work only, as before")]
         [SettingPropertyGroup("Time at the forge")]
         public bool MendMaterialMenAndLords { get; set; } = true;
@@ -3392,6 +3396,7 @@ namespace Armoury
             s.MendMaterialMaxShare = MendMaterialMaxShare;
             s.SmithMendFromMarket = SmithMendFromMarket;
             s.WrecksToScrap = WrecksToScrap;
+            s.MendMetalByKind = MendMetalByKind;
             s.MendMaterialMenAndLords = MendMaterialMenAndLords;
             s.TakeApartEnabled = TakeApartEnabled;
             s.TakeApartBaseChance = TakeApartBaseChance;

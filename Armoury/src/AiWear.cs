@@ -35,6 +35,7 @@ namespace Armoury
         private static int _dayLoot, _dayWorn, _dayMended, _dayPaid, _dayStamp = -1;
         // poprawka po audycie TOWARY 3 (krok 139 planu K13): material napraw AI z polek miast - liczniki doby (tylko log)
         private static int _dayMat, _dayWait, _dayWaitMask, _dayNoSmith, _dayTowns;
+        private static int _dayByKind;   // T3 (noc 08/09.10): naprawione sztuki z metalem wedlug rodzaju (reszta - stara regula: kolczuga, nieznane)
         private static readonly float[] _dayKg = new float[MendMaterial.Kinds];
         private static readonly int[] _dayWaitBy = new int[MendMaterial.Kinds];
 
@@ -46,7 +47,7 @@ namespace Armoury
 
         private static void ClearMatDay()
         {
-            _dayMat = _dayWait = _dayWaitMask = _dayNoSmith = _dayTowns = 0;
+            _dayMat = _dayWait = _dayWaitMask = _dayNoSmith = _dayTowns = 0; _dayByKind = 0;
             Array.Clear(_dayKg, 0, _dayKg.Length); Array.Clear(_dayWaitBy, 0, _dayWaitBy.Length);
         }
 
@@ -333,7 +334,7 @@ namespace Armoury
             if (o.Pieces > 0)
             {
                 o.Bench.Commit();
-                foreach (var job in o.Jobs) { AddWorn(mp.StringId, job.El.Item.StringId, job.El.ItemModifier.StringId, -job.N); done += job.N; }
+                foreach (var job in o.Jobs) { AddWorn(mp.StringId, job.El.Item.StringId, job.El.ItemModifier.StringId, -job.N); done += job.N; if (MendMaterial.MetalByKind(job.El.Item)) _dayByKind += job.N; }
                 paid = MenPurse.Take(mp, o.Total);
                 st.Town.ChangeGold(paid);
                 _dayMat += o.MatGold; _dayTowns++;
@@ -368,7 +369,16 @@ namespace Armoury
                    + ", drewno " + _dayKg[MendMaterial.Wood].ToString("0.0", ci) + ", skora " + _dayKg[MendMaterial.Leather].ToString("0.0", ci)
                    + ", plotno " + _dayKg[MendMaterial.Cloth].ToString("0.0", ci) + "; czeka na material " + _dayWait + " szt. (metal " + _dayWaitBy[MendMaterial.Metal]
                    + ", drewno " + _dayWaitBy[MendMaterial.Wood] + ", skora " + _dayWaitBy[MendMaterial.Leather] + ", plotno " + _dayWaitBy[MendMaterial.Cloth]
-                   + "), nie robota kowala " + _dayNoSmith + "; " + MendMaterial.Describe() + ".";
+                   + "), nie robota kowala " + _dayNoSmith + "; " + MetalPerPiece(ci) + "; " + MendMaterial.Describe() + ".";
+        }
+
+        /// <summary>T3 (noc 08/09.10): metal (kg surowki wedlug receptury) na naprawiona sztuke - do porownania w autotescie (odniesienie 0.18 kg, doby 1-40).</summary>
+        private static string MetalPerPiece(System.Globalization.CultureInfo ci)
+        {
+            var s = Settings.Current;
+            float per = _dayMended > 0 ? _dayKg[MendMaterial.Metal] / _dayMended : 0f;
+            return "metal na naprawiona sztuke " + per.ToString("0.000", ci) + " kg (T3 metal wedlug rodzaju " + (s != null && s.MendMetalByKind ? "WL" : "WYL")
+                   + ": wedlug rodzaju " + _dayByKind + " szt., stara regula " + Math.Max(0, _dayMended - _dayByKind) + " szt.)";
         }
     }
 }
