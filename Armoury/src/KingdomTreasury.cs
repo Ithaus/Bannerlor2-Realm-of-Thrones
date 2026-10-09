@@ -60,7 +60,7 @@ namespace Armoury
                     try
                     {
                         income = model.CalculateClanIncome(c, false, false, false).ResultNumber;
-                        ClanIncomeBook.NoteModelIncome(c, income);   // paczka 169b: (a) dla D rodu - ta sama liczba, bez drugiego wyliczenia (tylko zapis; wlasny try)
+                        ClanIncomeBook.NoteModelIncome(c, income);   // paczka 169b: tylko do porownania z (a) w D (inna chwila - D jej nie bierze); tylko zapis, wlasny try
                     }
                     catch { }
                     int rent; PopulationLaw.RentToday.TryGetValue(c, out rent);

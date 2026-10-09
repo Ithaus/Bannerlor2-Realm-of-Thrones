@@ -89,6 +89,9 @@ namespace Armoury
         internal static int LastToLordN, LastFromLordN, LastDupLordN, LastOutLordN;
         private static long _dToLordGold, _dFromLordGold, _dDupLordGold, _dOutLordGold;
         private static int _dToLordN, _dFromLordN, _dDupLordN, _dOutLordN;
+        // 169b, poprawka po recenzji (tylko log): naliczenia zerowe i ujemne (ksiega liczy kazdy wynik, my tylko > 0)
+        internal static long LastNonPosLordGold; internal static int LastNonPosLordN;
+        private static long _dNonPosLordGold; private static int _dNonPosLordN;
 
         internal static void ZeroLast()
         {
@@ -96,6 +99,7 @@ namespace Armoury
             LastWatching = false;
             LastLordN = LastGarN = LastToLordGold = LastFromLordGold = LastDupLordGold = LastOutLordGold = 0;
             LastToLordN = LastFromLordN = LastDupLordN = LastOutLordN = 0;
+            LastNonPosLordGold = 0; LastNonPosLordN = 0;
         }
 
         /// <summary>169b: partia rodu wedlug ksiegi pieniadza (MoneyLedger.WagePostfix: zaloga, karawana, partia lorda, inne - w tej kolejnosci).</summary>
@@ -127,6 +131,7 @@ namespace Armoury
             _dLordN = _dGarN = _dToPurseN = _dToTownsN = _dToCastlesN = _dCutClans = _dBlind = _dDupes = _stumbles = _dDebtClans = 0;
             _dShielded = 0; _dShieldTicks = 0;
             _dToLordGold = _dFromLordGold = _dDupLordGold = _dOutLordGold = 0; _dToLordN = _dFromLordN = _dDupLordN = _dOutLordN = 0;   // 169b
+            _dNonPosLordGold = 0; _dNonPosLordN = 0;
         }
 
         /// <summary>Czy ktorakolwiek czesc mechanizmu jest wlaczona (bez tego latki tylko wracaja).</summary>
@@ -227,7 +232,15 @@ namespace Armoury
             try
             {
                 var clan = _clan;
-                if (!__2 || __0 == null || __result <= 0) return;
+                if (!__2 || __0 == null) return;
+                if (__result <= 0)
+                {
+                    // 169b (tylko log): naliczenie zerowe albo UJEMNE - gra (AddPartyExpense) daje partii z wodzem i kiesa < 500 budzet
+                    // min(kiesa rodu + saldo, 250), gdy rod ma < 4000; przy ujemnej sumie wynik < 0 (i gra dopisuje partii zloto).
+                    // Ksiega pieniadza liczy kazdy wynik, my rekord tylko dla > 0 - do uzgodnienia w linii "Obieg"
+                    try { if (Live && LedgerLordParty(__0)) { _dNonPosLordN++; _dNonPosLordGold += __result; } } catch { }
+                    return;
+                }
                 if (clan == null)
                 {
                     // 169b (tylko log): wyplata poza naszym oknem rozliczenia (rod bez glowy, banda, mechanizm wylaczony) - ksiega pieniadza ja liczy
@@ -588,6 +601,7 @@ namespace Armoury
                 LastLordN = _dLordN; LastGarN = _dGarN;                                                                    // 169b
                 LastToLordN = _dToLordN; LastToLordGold = _dToLordGold; LastFromLordN = _dFromLordN; LastFromLordGold = _dFromLordGold;
                 LastDupLordN = _dDupLordN; LastDupLordGold = _dDupLordGold; LastOutLordN = _dOutLordN; LastOutLordGold = _dOutLordGold;
+                LastNonPosLordN = _dNonPosLordN; LastNonPosLordGold = _dNonPosLordGold;
                 try { LastWatching = Watching; } catch { LastWatching = false; }
                 ClearDay();
             }

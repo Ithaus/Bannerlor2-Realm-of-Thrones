@@ -392,7 +392,8 @@ namespace Armoury
             var sb = new StringBuilder(1024);
             sb.Append("Pieniadz swiata (rody - przyczyny): dzien ").Append(day)
               .Append(" | rozliczenia rodow zmienily zloto swiata o ").Append(S(change)).Append(" [P] w ").Append(settled).Append(" rozliczeniach")
-              .Append(" | w tym naliczone w modelu finansow (odczytane ").Append(ml ? M[CW.MClansRead].ToString(Inv) : "-").Append(" rozliczen): zold partii -").Append(_wage[WLord])
+              .Append(" | w tym naliczone w modelu finansow (odczytane ").Append(ml ? M[CW.MClansRead].ToString(Inv) : "-")
+              .Append(" rozliczen): zold partii wedlug ksiegi (kazde wywolanie modelu, takze naliczenia <= 0; zbior linii Zold i uzgodnienie - linia Obieg) -").Append(_wage[WLord])
               .Append(", zalog -").Append(_wage[WGarrison]).Append(", karawan lordow -").Append(_wage[WCaravan])
               .Append(", trybut zaplacony ").Append(ml ? S(M[CW.MTributeOut]) : "-").Append(", trybut przyjety ").Append(ml ? S(M[CW.MTributeIn]) : "-")
               .Append(" (trybut zaplacony to splata dlugu trybutu krolestwa - takze odszkodowan wojennych Diplomacy, ktore odbiorca dostal z gory w chwili pokoju:")
@@ -507,7 +508,8 @@ namespace Armoury
             // rodu, rodzaj partii przy rozdziale); licznik ksiegi pieniadza (kazde wywolanie modelu, rodzaj w chwili naliczenia) obok, z uzgodnieniem
             long lordAcc = watch ? SoldierPay.LastLordAcc : _wage[WLord], garAcc = watch ? SoldierPay.LastGarAcc : _wage[WGarrison];
             long lordN = watch ? SoldierPay.LastLordN : _wageN[WLord], garN = watch ? SoldierPay.LastGarN : _wageN[WGarrison];
-            long ledgerFromSp = SoldierPay.LastLordAcc - SoldierPay.LastToLordGold + SoldierPay.LastFromLordGold + SoldierPay.LastDupLordGold + SoldierPay.LastOutLordGold;
+            long ledgerFromSp = SoldierPay.LastLordAcc - SoldierPay.LastToLordGold + SoldierPay.LastFromLordGold + SoldierPay.LastDupLordGold + SoldierPay.LastOutLordGold
+                                + SoldierPay.LastNonPosLordGold;   // 169b po recenzji: ksiega liczy tez naliczenia <= 0 (ujemne - budzet partii z kiesa < 500 przy ubogim rodzie)
             var sb = new StringBuilder(3072);
             sb.Append("Obieg: dzien ").Append(day)
               .Append(" | rody wydaly [P]: zold partii ").Append(lordAcc).Append(" (").Append(lordN).Append(" partii; z kies zeszlo ").Append(watch ? SoldierPay.LastLordTaken.ToString(Inv) : "-")
@@ -518,7 +520,8 @@ namespace Armoury
                   .Append(" - uzgodnienie partii: ").Append(SoldierPay.LastLordAcc).Append(" - zmienily rodzaj na partie rodu w trakcie rozliczenia ").Append(SoldierPay.LastToLordGold)
                   .Append(" (").Append(SoldierPay.LastToLordN).Append(") + z partii rodu na inny ").Append(SoldierPay.LastFromLordGold).Append(" (").Append(SoldierPay.LastFromLordN)
                   .Append(") + powtorzone wyplaty ").Append(SoldierPay.LastDupLordGold).Append(" (").Append(SoldierPay.LastDupLordN).Append(") + poza oknem rozliczenia ")
-                  .Append(SoldierPay.LastOutLordGold).Append(" (").Append(SoldierPay.LastOutLordN).Append(") = ").Append(ledgerFromSp)
+                  .Append(SoldierPay.LastOutLordGold).Append(" (").Append(SoldierPay.LastOutLordN).Append(") + naliczenia <= 0: ").Append(SoldierPay.LastNonPosLordGold)
+                  .Append(" (").Append(SoldierPay.LastNonPosLordN).Append(") = ").Append(ledgerFromSp)
                   .Append(ledgerFromSp == _wage[WLord] ? " - zgodne" : " - roznica " + S(_wage[WLord] - ledgerFromSp)).Append(']');
             sb.Append(", zold karawan lordow ").Append(_wage[WCaravan]).Append(", powinnosci do korony ").Append(KingdomTreasury.LastDues)
               .Append(", budowy do kas osad ").Append(build).Append(", dwor -, sprzet i werbunek -")
@@ -691,8 +694,9 @@ namespace Armoury
             string perScan = CW.ProbeScans > 0 ? (CW.ProbeTicks * 1000.0 / Stopwatch.Frequency / CW.ProbeScans).ToString("0.00", Inv) : "-";
             double goldTicks = CW.GoldSampled > 0 ? (double)CW.GoldTicks * CW.GoldCalls / CW.GoldSampled : 0.0;
             sb.Append(" | koszt [P]: przeliczenie doby ").Append(Ms(dayTicks)).Append(" ms (same nowe linie, budzet rodow i odcinki RB; w tym budzet rodow ").Append(Ms(ClanIncomeBook.LastTicks))
-              .Append(" ms: dochod modelu ").Append(Ms(ClanIncomeBook.LastTicksModel)).Append(" ms - wlasne wyliczenia ").Append(ClanIncomeBook.LastOwnCalls)
-              .Append(", wziete z KingdomTreasury ").Append(ClanIncomeBook.LastReused).Append(", probka kontrolna ").Append(ClanIncomeBook.LastSampleN)
+              .Append(" ms: dochod modelu ").Append(Ms(ClanIncomeBook.LastTicksModel)).Append(" ms - wyliczen ").Append(ClanIncomeBook.LastOwnCalls)
+              .Append(", u ").Append(ClanIncomeBook.LastCmpN).Append(" rodow liczba z chwili powinnosci byla juz w KingdomTreasury - jej wziecie oszczedziloby ok. ")
+              .Append(Ms(ClanIncomeBook.LastTicksCmp)).Append(" ms, ale zmienia D (rozna u ").Append(ClanIncomeBook.LastCmpNe).Append(" rodow)")
               .Append("; raport ").Append(Ms(ClanIncomeBook.LastTicksReport)).Append(" ms, plik CSV ").Append(Ms(ClanIncomeBook.LastTicksCsv))
               .Append(" ms; odcinki RB ").Append(Ms(SegTicks)).Append(" ms), okna ok. ").Append((winTicks * 1000.0 / Stopwatch.Frequency).ToString("0.0", Inv))
               .Append(" ms (same nasze latki - bez metod gry i cudzych latek; probka 1/16), nasluch zdarzen zlota ok. ")

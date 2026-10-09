@@ -53,13 +53,13 @@ namespace Armoury
         internal static long DayRefund, DayCrown, DayEvtNone, DayEvtSettl, DayEvtOther, DayThird;
         internal static long LastRefund, LastCrown, LastEvtNone, LastEvtSettl, LastEvtOther, LastThird, LastModelIncomeSum, LastRentSum;
         internal static long LastTicks;                     // koszt ostatniego Daily (kontrolka 6.8)
-        // 169b: rozbicie kosztu i dochod modelu brany z KingdomTreasury (ten sam model, te same argumenty, ten sam blok - raz na rod na dobe, D21)
-        internal static long LastTicksModel, LastTicksReport, LastTicksCsv, LastSampleDiff, LastSampleAbs;
-        internal static int LastOwnCalls, LastReused, LastSampleN;
+        // 169b: rozbicie kosztu; dochod modelu liczony TU jak w 169 (po recenzji: liczba z KingdomTreasury jest z innej chwili - zmienialaby D),
+        // obok porownanie z liczba KingdomTreasury tej doby (za darmo, bez dodatkowych wyliczen) - dane do decyzji o przyspieszeniu
+        internal static long LastTicksModel, LastTicksReport, LastTicksCsv, LastTicksCmp, LastCmpDiff, LastCmpAbs;
+        internal static int LastOwnCalls, LastCmpN, LastCmpNe;
         private static long _ticksCsv;
         private static readonly Dictionary<Clan, float> _modelSeen = new Dictionary<Clan, float>();   // dochod modelu policzony dzis przez KingdomTreasury.Daily
         private static int _modelSeenDay = -1;
-        private const int SampleMax = 8, SampleEvery = 37;  // probka kontrolna: ok. 8 rodow na dobe liczonych drugi raz w chwili Daily
 
         private static readonly Dictionary<Clan, float> IncomeToday = new Dictionary<Clan, float>();   // (a) raz na rod na dobe (D21)
         private static int _importN = -1, _importBad;
@@ -81,7 +81,7 @@ namespace Armoury
             DayRefund = DayCrown = DayEvtNone = DayEvtSettl = DayEvtOther = DayThird = 0;
             LastRefund = LastCrown = LastEvtNone = LastEvtSettl = LastEvtOther = LastThird = LastModelIncomeSum = LastRentSum = 0;
             LastTicks = 0; IncomeToday.Clear(); _importN = -1; _importBad = 0; _csvPath = null; _stumbles = 0; _errSites.Clear();
-            LastTicksModel = LastTicksReport = LastTicksCsv = LastSampleDiff = LastSampleAbs = 0; LastOwnCalls = LastReused = LastSampleN = 0;   // 169b
+            LastTicksModel = LastTicksReport = LastTicksCsv = LastTicksCmp = LastCmpDiff = LastCmpAbs = 0; LastOwnCalls = LastCmpN = LastCmpNe = 0;   // 169b
             _modelSeen.Clear(); _modelSeenDay = -1; _ticksCsv = 0;
         }
 
@@ -143,8 +143,10 @@ namespace Armoury
         }
 
         /// <summary>
-        /// 169b: KingdomTreasury.Daily policzyl dochod brutto czynnego modelu (CalculateClanIncome(rod, false, false, false)) - ta sama
-        /// definicja co (a) w D (D19, D21: raz na rod na dobe). Daily bierze te liczbe zamiast liczyc drugi raz (koszt). Tylko zapis liczby.
+        /// 169b: KingdomTreasury.Daily policzyl dochod brutto czynnego modelu (CalculateClanIncome(rod, false, false, false)) - te same
+        /// argumenty co (a) w D, ale w INNEJ chwili: przed powinnosciami tego i wczesniejszych rodow, clem (licznik cel miast), zwrotem zoldu
+        /// i Bankiem, ktore zmieniaja to, co model czyta (kiesa glowy, skarbiec, TradeTaxAccumulated). Daily NIE bierze jej do D (zmienialaby
+        /// wynik - recenzja 169b), tylko porownuje z wlasnym wyliczeniem (dane do decyzji, czy przyjac "D(a) z chwili powinnosci"). Tylko zapis liczby.
         /// </summary>
         internal static void NoteModelIncome(Clan c, float income)
         {
@@ -267,10 +269,11 @@ namespace Armoury
                 var model = Campaign.Current.Models.ClanFinanceModel;
                 IncomeToday.Clear(); _seen.Clear(); _byId.Clear(); _today.Clear();
                 long modelSum = 0, rentSum = 0;
-                // 169b: dochod modelu z KingdomTreasury.Daily tej doby (ten sam model i argumenty, ten sam blok), inaczej liczony tu jak dotad
+                // 169b (po recenzji): dochod modelu (a) liczony TU dla kazdego rodu - ta sama chwila co w 169 (po powinnosciach, clach, zwrocie
+                // zoldu i Banku tej doby), wiec ten sam wynik; liczba z KingdomTreasury.Daily tylko do porownania (koszt i roznica - do decyzji)
                 int gameDay = (int)CampaignTime.Now.ToDays;
                 bool seenToday = gameDay == _modelSeenDay && _modelSeen.Count > 0;
-                long tModel = 0, sDiff = 0, sAbs = 0; int own = 0, reused = 0, sampleN = 0;
+                long tModel = 0, tCmp = 0, cDiff = 0, cAbs = 0; int own = 0, cmpN = 0, cmpNe = 0;
                 foreach (var c in Clan.All)
                 {
                     try
@@ -283,24 +286,15 @@ namespace Armoury
                         long g = FamilyGold(c);
                         if (r.Seed < 0) r.Seed = (int)Math.Min(int.MaxValue, g / 60);
                         float a = 0f, seen;
+                        long ts = Stopwatch.GetTimestamp();
+                        try { a = Math.Max(0f, model.CalculateClanIncome(c, false, false, false).ResultNumber); } catch { }
+                        long dt = Stopwatch.GetTimestamp() - ts;
+                        tModel += dt; own++;
                         if (seenToday && _modelSeen.TryGetValue(c, out seen))
                         {
-                            a = Math.Max(0f, seen); reused++;
-                            // probka kontrolna: ten rod liczony drugi raz teraz - roznica pokazuje, ile zmienil moment (clo, zwrot zoldu, Bank tej doby)
-                            if (sampleN < SampleMax && (reused + gameDay) % SampleEvery == 0)
-                            {
-                                long ts = Stopwatch.GetTimestamp();
-                                float bNow = 0f;
-                                try { bNow = Math.Max(0f, model.CalculateClanIncome(c, false, false, false).ResultNumber); } catch { }
-                                tModel += Stopwatch.GetTimestamp() - ts;
-                                long dd = (long)a - (long)bNow; sDiff += dd; sAbs += Math.Abs(dd); sampleN++;
-                            }
-                        }
-                        else
-                        {
-                            long ts = Stopwatch.GetTimestamp();
-                            try { a = Math.Max(0f, model.CalculateClanIncome(c, false, false, false).ResultNumber); } catch { }
-                            tModel += Stopwatch.GetTimestamp() - ts; own++;
+                            // porownanie (tylko log): liczba z chwili powinnosci minus liczba D; dt - koszt, ktorego by nie bylo przy jej wzieciu
+                            long dd = (long)Math.Max(0f, seen) - (long)a;
+                            cDiff += dd; cAbs += Math.Abs(dd); cmpN++; if (dd != 0) cmpNe++; tCmp += dt;
                         }
                         IncomeToday[c] = a;
                         int b; PopulationLaw.RentToday.TryGetValue(c, out b);
@@ -328,7 +322,7 @@ namespace Armoury
                     for (int i = 0; i < stale.Count; i++) _byClan.Remove(stale[i]);
                 }
                 LastModelIncomeSum = modelSum; LastRentSum = rentSum;
-                LastTicksModel = tModel; LastOwnCalls = own; LastReused = reused; LastSampleN = sampleN; LastSampleDiff = sDiff; LastSampleAbs = sAbs;   // 169b
+                LastTicksModel = tModel; LastOwnCalls = own; LastTicksCmp = tCmp; LastCmpN = cmpN; LastCmpNe = cmpNe; LastCmpDiff = cDiff; LastCmpAbs = cAbs;   // 169b
                 _modelSeen.Clear(); _modelSeenDay = -1;     // liczby tej doby zuzyte
                 LastTicksReport = 0; LastTicksCsv = 0;
                 var s = Settings.Current;
@@ -603,9 +597,9 @@ namespace Armoury
               .Append(", ujemne u ").Append(saldoMinusN).Append(", razem ").Append(saldoMinus)
               .Append("; pierscien: pelny u ").Append(ringFull).Append(" rodow, srednio ").Append(ai > 0 ? Math.Round((double)ringDays / ai).ToString("0", inv) : "0")
               .Append(" zmierzonych dob z 28 (brakujace doby = G/60)")
-              .Append("; dochod modelu: wziety z KingdomTreasury (ten sam model, ta sama doba) u ").Append(LastReused).Append(" rodow, liczony tu u ").Append(LastOwnCalls)
-              .Append(", probka kontrolna ").Append(LastSampleN).Append(" rodow liczonych drugi raz teraz: roznica ").Append(LastSampleDiff >= 0 ? "+" : "").Append(LastSampleDiff)
-              .Append(" (bezwzgl. ").Append(LastSampleAbs).Append(')')
+              .Append("; dochod modelu liczony tu u ").Append(LastOwnCalls).Append(" rodow (po powinnosciach, clach, zwrocie zoldu i Banku tej doby - jak w 169)")
+              .Append(", porownanie z liczba z chwili powinnosci (KingdomTreasury) u ").Append(LastCmpN).Append(" rodow: rozna u ").Append(LastCmpNe)
+              .Append(", roznica ").Append(LastCmpDiff >= 0 ? "+" : "").Append(LastCmpDiff).Append(" (bezwzgl. ").Append(LastCmpAbs).Append(')')
               .Append(" | pulap zoldu wg planu budzetu razem ").Append(N0(ceilSum)).Append(" a zold naliczony (partie + zalogi) ").Append(wageSum)
               .Append(" (").Append(ceilSum > 0 ? (100.0 * wageSum / ceilSum).ToString("0", inv) + "%" : "-").Append(')')
               .Append(" | ponad pulapem ").Append(overN).Append(" rodow (ponad 1.10 x: ").Append(over110).Append(", od 3 dob: ").Append(over3).Append("), nadwyzka zoldu ")

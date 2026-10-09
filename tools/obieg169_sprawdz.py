@@ -339,9 +339,11 @@ def main(argv):
         z = (b.mod.get("Zold: dzien") or [""])[-1]
         pl = find(r"zold partii (\d+)", o)
         zl = find(r"partie rodow: naliczony (\d+)", z)
+        # 169b: przy dzialajacym SoldierPay (jest "uzgodnienie partii") "zold partii" i liczba partii w Obieg pochodza z SoldierPay - rownosc
+        # z linia Zold jest z budowy (sprawdza tylko, czy Obieg bierze ten zbior); PRAWDZIWY sprawdzian to uzgodnienie z licznikiem ksiegi
+        # (zmiana rodzaju, powtorzenia, poza oknem, naliczenia <= 0) - "roznica" = blad pomiaru
         if pl is not None and zl is not None and pl != zl:
             bad.append("%s: zold partii %d != Zold %d" % (b.day, pl, zl))
-        # 169b: ten sam zbior partii - liczba partii jak w linii Zold; licznik ksiegi uzgodniony (roznica = blad pomiaru)
         pn = find(r"zold partii \d+ \((\d+) partii", o)
         zn = find(r"partie rodow: naliczony \d+, z kies zeszlo \d+ \((\d+) partii\)", z)
         if pn is not None and zn is not None and pn != zn:
@@ -349,6 +351,8 @@ def main(argv):
         rr = find(r"uzgodnienie partii: [^\]]* - roznica ([-+]?\d+)\]", o)
         if rr is not None:
             bad.append("%s: licznik ksiegi a SoldierPay - roznica %d" % (b.day, rr))
+        if z and "uzgodnienie partii" not in o:
+            bad.append("%s: linia Zold jest, a Obieg bez uzgodnienia z licznikiem ksiegi" % b.day)
         lud = (b.mod.get("Ludnosc: dzien") or [""])[-1]
         rz = find(r"renty zaplacone (\d+)", lud)
         rv = find(r"renta wsi (\d+)", o); rt = find(r"zawor miast (\d+)", o)
@@ -467,6 +471,8 @@ def main(argv):
 
     # T13 wydajnosc
     bad = []
+    cmp_ms = []
+    cmp_d = []
     for b in full:
         o = b.lines.get("okna", "")
         okn = find(r"okna ok\. ([\d.]+) ms", o, float); day_ = find(r"przeliczenie doby ([\d.]+) ms", o, float); pr = find(r"probki swiata ([\d.]+) ms \(", o, float)
@@ -476,8 +482,23 @@ def main(argv):
         if day_ is not None and day_ >= 30: bad.append("%s: doba %.1f ms" % (b.day, day_))
         if pr is not None and pr >= 20: bad.append("%s: probki %.1f ms" % (b.day, pr))
         bud = find(r"w tym budzet rodow ([\d.]+) ms", o, float)
-        if bud is not None and bud >= 10 and in_range(b, 2, hi, first): bad.append("%s: budzet rodow %.1f ms (cel 169b < 10)" % (b.day, bud))
-    results.append(res("T13", "OK" if not bad else "CZESCIOWO", "koszt%s (dlugosc doby gry - porownanie z T3 recznie)" % (("; " + "; ".join(bad[:6])) if bad else "")))
+        if bud is not None and bud >= 10 and in_range(b, 2, hi, first): bad.append("%s: budzet rodow %.1f ms (cel < 10)" % (b.day, bud))
+        # 169b po recenzji: przyspieszenie przez liczbe z KingdomTreasury wycofane (zmienialo D) - dane do decyzji zlecajacego
+        sv = find(r"oszczedziloby ok\. ([\d.]+) ms", o, float)
+        if sv is not None and in_range(b, 2, hi, first):
+            cmp_ms.append(sv)
+        t = (b.mod.get("Budzet rodow (na sucho)") or [""])[-1]
+        m = re.search(r"porownanie z liczba z chwili powinnosci \(KingdomTreasury\) u (\d+) rodow: rozna u (\d+), roznica ([-+]?\d+) \(bezwzgl\. (\d+)\)", t)
+        if m and in_range(b, 2, hi, first):
+            cmp_d.append(tuple(int(x) for x in m.groups()))
+    dec = ""
+    if cmp_ms or cmp_d:
+        dec = "; do decyzji (D(a) z chwili powinnosci zamiast z chwili budzetu): oszczednosc srednio %.1f ms/dobe" % (sum(cmp_ms) / len(cmp_ms) if cmp_ms else 0.0)
+        if cmp_d:
+            dec += ", rozne u %.0f z %.0f rodow, |roznica| %.0f zl/dobe (netto %+.0f)" % (
+                sum(x[1] for x in cmp_d) / float(len(cmp_d)), sum(x[0] for x in cmp_d) / float(len(cmp_d)),
+                sum(x[3] for x in cmp_d) / float(len(cmp_d)), sum(x[2] for x in cmp_d) / float(len(cmp_d)))
+    results.append(res("T13", "OK" if not bad else "CZESCIOWO", "koszt%s (dlugosc doby gry - porownanie z T3 recznie)%s" % (("; " + "; ".join(bad[:6])) if bad else "", dec)))
 
     # T14 wylacznik
     gaps = [b.day for b in blocks if "bilans" in b.lines and "przyczyny" not in b.lines]
@@ -534,20 +555,28 @@ def main(argv):
 
     # T18 (169b) skok reszty: odszkodowania wojenne Diplomacy (dzien 34 autotestu 169: +1.1 mln do skarbcow bez nazwy)
     bad = []
+    part = []
     rep_days = []
     for b in full:
         k = kv(b.lines["przyczyny"])
         if k.get("R") is not None and abs(k["R"]) > 250000 and b.day not in aborted_days:
-            bad.append("%s: R %d (N8 %s)" % (b.day, k["R"], k.get("N8")))
+            # po recenzji 169b: skok bez nazwanych odszkodowan tej doby (N8 = 0) = FAIL (jak doba 34 w 169); przy N8 != 0 odszkodowania sa
+            # nazwane, a skok zostal - CZESCIOWO z opisem (okno zlapalo czesc albo inna przyczyna tej samej doby: bitwy, upadek krolestwa)
+            if not k.get("N8"):
+                bad.append("%s: R %d (N8 0)" % (b.day, k["R"]))
+            else:
+                part.append("%s: R %d przy N8 %d - reszta poza odszkodowaniami" % (b.day, k["R"], k["N8"]))
         if k.get("N8"):
             rep_days.append("%s: N8 %d" % (b.day, k["N8"]))
-    tr = 0
+    tr = None
     for b in full:
-        m = find(r"trybut zaplacony w rozliczeniach (\d+)\)", b.lines.get("rodyp", ""))
+        m = find(r"trybut zaplacony w rozliczeniach ([-+]?\d+)\)", b.lines.get("rodyp", ""))
         if m is not None:
             tr = m
-    results.append(res("T18", "OK" if not bad else "FAIL", "skok reszty |R| <= 250000 kazdej doby%s; odszkodowania: %s; trybut zaplacony od startu %d" % (
-        ("; " + "; ".join(bad[:5])) if bad else "", ", ".join(rep_days[:5]) if rep_days else "brak pokoju z odszkodowaniem", tr)))
+    st = "FAIL" if bad else ("CZESCIOWO" if part else "OK")
+    results.append(res("T18", st, "skok reszty |R| <= 250000 kazdej doby%s; odszkodowania: %s; trybut zaplacony od startu %s" % (
+        ("; " + "; ".join((bad + part)[:5])) if (bad or part) else "", ", ".join(rep_days[:5]) if rep_days else "brak pokoju z odszkodowaniem",
+        str(tr) if tr is not None else "- (brak linii)")))
 
     # T19 (169b) "inne" zrodel z niczego (bylo ok. 285 tys./dobe) - majatki BK i BEE, wyplaty skarbcow BEE nazwane
     vals = []
