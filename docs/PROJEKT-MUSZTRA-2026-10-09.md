@@ -345,6 +345,21 @@ dlug ze switu - `AiSleep.DawnDebt`, dla Ciebie trzeba dodac takie samo pole przy
 Twojego rodu i lordowie w Twojej armii (Z14a) maja pierwsza dobe liczona jak marsz (x0.9 zamiast x1.5) - czeste wczytywanie troche obniza ich musztre. Naprawa:
 zapis masek partii Z14a (`NoGameBase`) w `arm_drill` przez `SaveText.Sync` (nowy format napisu). NIE maska 0 po wczytaniu - to dawaloby darmowy postoj po
 kazdym wczytaniu (wbrew "wczytanie nie daje postoju").
+**[MUSZTRA-jp - ZROBIONE szerzej: od Z14b domyslnie TAK ten sam blad zabieral prawdziwe XP wszystkim partiom AI (zapis 362, doba 109199: postoj 3%, "dzien x0.91"
+wobec 11-23%, x0.96-1.01 w kolejnych dobach). Maski WSZYSTKICH partii lordow poza graczem ida do `arm_drill` (segment `T=id,maska,wiek`), odtwarzane przy
+wczytaniu jak maska gracza; godziny spoza zapisu dalej = ruch. Rozdz. 14.7, uwaga 1.]**
+
+**[MUSZTRA-jp, pytanie] Dlug, ktory zostaje po przespanej nocy.** Dzien cwiczen zabiera swit z dlugiem snu - tym samym, ktory zabiera predkosc i morale. Kto po
+zarwanej nocy przespi tylko zwykle 6 godzin, ma dalej dlug (jedna zarwana noc odsypia sie 9 godzinami), wiec traci tez nastepny dzien cwiczen - i kolejny, az
+raz odespi do konca. Zostawic tak (jedna prawda: niewyspany = wolniejszy, mniej morale, bez cwiczen), czy zabierac tylko dzien po samej nocy bez snu, a dlug
+niech dalej boli tylko predkosc i morale?
+*Moja rada: zostawic - komunikat switu mowi to teraz wprost ("No drill today - sleep the debt off before the next dawn, or tomorrow's drill is lost too."). W kodzie:
+dlug o swicie (bez zmian do Twojego slowa).*
+
+**[MUSZTRA-jp, pytanie] Czy chcesz widziec musztre w grze codziennie.** Dzis gra pokazuje tylko dzien bez cwiczen (swit z dlugiem snu, glod). Ile Twoi ludzie
+nauczyli sie danego dnia i dlaczego tyle (Przywodztwo, postoj albo marsz, zapas, bron, perki), widac tylko w logu. Dodac jedna linie dziennie, np. "Drill today:
+1240 XP (12 per man) - Leadership x1.12, at rest x1.5, drill kit x1.10, armed 84%, perks +3 per man" (z wylacznikiem w MCM)?
+*Moja rada: tak, z wylacznikiem (domyslnie wlaczona) - wtedy wzor jest widoczny tam, gdzie grasz. W kodzie: nic (nowy komunikat dopiero po Twoim slowie).*
 
 ## 12. Krytyka i odpowiedzi
 
@@ -406,16 +421,23 @@ wspolczynnik wielkosci z doby 40), `w.py <log40> <log362>` (okna 21-40 i 36-40),
    cwiczen i jakie perki ma dowodca.
 2. Glowy rodow AI traca premie gry "z samego tytulu" (ich ludzie cwiczyli o polowe szybciej niz u pozostalych lordow). Glowa rodu z dobrym Przywodztwem,
    ktora stoi w miescie albo obozie, dalej szkoli szybko; slaba, w ciaglym marszu - wolno.
-3. Skutek dla AI (z testu 40 dob nowej kampanii i 8 dob zapisu 362): w nowej kampanii armie AI szkola sie z musztry srednio ok. 12% wolniej niz dzis w grze,
-   w starym swiecie (zapis 362) tyle samo co dzis, bo maja tam duzo zapasowej broni do cwiczen. Druzyny glow rodow 20-30% wolniej, pozostali lordowie
-   ok. 8% szybciej (w starym swiecie, z zapasem, wiecej). Najwiecej traca wolne miasta Essos (Braavos, Lorath, Qarth, Tyrosh, Lys, Ibben, Myr) i Zelazne
-   Wyspy - slabi dowodcy i ciagly marsz (25-35% wolniej); prawie bez zmian Stormlands, Reach, Dorne i Nocna Straz.
-4. Rekrut AI do t6 z samej musztry: srednio ok. 2.1 roku zamiast ok. 1.9 roku przy pelnej broni; przy dzisiejszych brakach broni (171) ok. 3 lat zamiast
-   ok. 2.7 roku. Do tego dochodzi doswiadczenie z bitew - bez zmian.
-5. Twoja druzyna - bez zmian (juz cwiczyla od bazy 10 + 2 x tier, czyli tak, jak w tabeli, ktora zatwierdziles).
+3. Skutek dla AI (z testu 40 dob nowej kampanii i 8 dob zapisu 362) zmienia sie w czasie. W pierwszym miesiacu nowej kampanii armie AI szkola sie z musztry
+   ok. 20% wolniej niz dzis w grze (doby 2-10: -22%, 11-20: -20%, 21-30: -18%), bo na starcie ROT wystawia prawie same druzyny glow rodow (ok. 80% bazy);
+   potem ok. 12% wolniej (doby 31-40, glowy rodow juz ok. 45%), a w starym swiecie (zapis 362) tyle samo co dzis (+1..2%), bo maja tam duzo zapasowej broni
+   do cwiczen. Druzyny glow rodow 20-30% wolniej, pozostali lordowie ok. 8% szybciej (w starym swiecie, z zapasem, wiecej).
+4. Najwiecej traca krolestwa ze slabymi dowodcami (Przywodztwo ich lordow wychodzi na 0.82-0.97 wzoru wobec 1.07 swiata) - nie przez marsz: Braavos stoi
+   20% dob, wiecej niz swiat (14%). Czas, w jakim rekrut dochodzi do t6 z samej musztry, rosnie tam: Braavos 1.6 -> 2.6 roku (x1.57), Ibben x1.44,
+   Tyrosh x1.42, Lorath, Qarth i Lys x1.40, Riverlands x1.39, Myr x1.30, Zelazne Wyspy x1.29; prawie bez zmian Stormlands, Reach, Dorne i Nocna Straz.
+   Srednio w swiecie rekrut AI do t6: ok. 2.1 roku zamiast ok. 1.9 przy pelnej broni, przy dzisiejszych brakach broni (171) ok. 3 lat zamiast ok. 2.7.
+   Do tego dochodzi doswiadczenie z bitew - bez zmian. To liczby z 40 dob jednej kampanii; dokladne udzialy glow rodow na krolestwo poda nowa linia (14.6).
+5. Twoja druzyna - bez zmian (juz cwiczyla od bazy 10 + 2 x tier, czyli tak, jak w tabeli, ktora zatwierdziles). Zmienia sie tylko u lordow AI, ktorzy sa
+   glowami swoich rodow i ida w Twojej armii: ich ludzie cwicza teraz od 10 + 2 x tier zamiast 15 + 3 x tier (o 1/3 wolniej, jak wszystkie glowy rodow).
+   Wyjatki od wzoru: Inni (umarli nie spia i nie znaja zmeczenia - cwicza jak w grze) oraz partia poza mapa (niewola, rejs, sluzba ROT) - nie cwiczy wcale,
+   jak dotad Twoje partie, teraz takze lordowie AI.
 6. Noc bez snu = nastepny dzien bez cwiczen, liczony od switu do switu - niezaleznie od tego, o ktorej godzinie Twoi ludzie cwicza; u AI tak samo. Jesli do
    nastepnego switu nie odespicie dlugu (ten sam dlug, ktory zabiera predkosc i morale; jedna zarwana noc odsypia sie 9 godzinami snu), nastepny dzien
-   tez przepada.
+   tez przepada. Mowi to komunikat switu ("No drill today - sleep the debt off before the next dawn, or tomorrow's drill is lost too."), a po odespaniu
+   w ciagu dnia - "Drill resumes at the next dawn." (MUSZTRA-jp; pytanie, czy tak zostawic - rozdz. 11).
 
 ### 14.1 Wzor i skad kto bierze dane
 
@@ -474,6 +496,20 @@ partie pozostalych lordow; stan ustalony to okno 36-40 i zapis 362 (40-46%). Dla
 to co najwyzej glowy rodow; ich druzyny sa wieksze - limit druzyny glowy rodu +25 na szczebel rodu zamiast +15, `DefaultPartySizeLimitModel.cs:45-47`).
 Zapas (S) w starym swiecie x1.16 (duza nadwyzka zbrojowni) - dlatego tam wzor wobec gry wychodzi na zero.
 
+**Przebieg w czasie** [MUSZTRA-jp, uwaga 9 recenzji; ta sama metoda, `SCR\jedenwzor2\okna.py <log40> <log362>`, `python -I`]:
+
+| Okno | r | glowy rodow (m) | L x D x S "razem" | grupa11 / gra | **wzor / gra** | wzor / grupa11 |
+|---|---|---|---|---|---|---|
+| nowa kampania, doby 2-10 | 0.712 | 81% | x1.089 | x1.016 | **x0.78** | x0.76 |
+| nowa kampania, doby 11-20 | 0.746 | 68% | x1.068 | x1.017 | **x0.80** | x0.78 |
+| nowa kampania, doby 21-30 | 0.788 | 54% | x1.045 | x1.013 | **x0.82** | x0.81 |
+| nowa kampania, doby 31-40 | 0.809 | 47% | x1.072 | x1.016 | **x0.87** | x0.85 |
+| zapis 362, doby 3-8 (bez pierwszej doby po wczytaniu) | 0.831 | 41% | x1.227 | x1.137 | **x1.02** | x0.90 |
+
+Pierwszy miesiac nowej kampanii: -18..-22% wobec gry (nie -12% - to stan po ok. 35 dobach). Pierwsza doba po wczytaniu zapisu 362 (109199) miala postoj 3%
+i "razem x1.14" wobec x1.19-1.26 w kolejnych dobach - maski godzin ruchu AI nie szly do zapisu (cala doba jako marsz); od MUSZTRA-jp ida (uwaga 1), wiec
+"x1.01" z tabeli wyzej to x1.02 bez tej doby.
+
 **Tempo awansu t1 -> t6** (14 250 XP; doby kalendarza 364-dniowego; tylko musztra, bez bitew i perkow; przed udzialem broni A - z A dzielic przez 0.70 w nowej
 kampanii, 0.85 w starym swiecie):
 
@@ -529,6 +565,13 @@ Baratheon 1.16/1.16 (~0.97-1.07); The North 1.09/1.12, Dorne 1.07/1.21, The Reac
 25-35%; wielkie domy Westeros z dobrymi dowodcami (Stormlands, Dragonstone, Targaryen) - prawie nic albo zyskuja. Wieksze straty tam, gdzie prawie kazda partia
 to glowa rodu (Riverlands w nowej kampanii: 14 rodow, 14 partii; Braavos: 15 rodow, 23 partie) - te liczby to szacunek [S], dokladne poda nowa linia krolestw.
 
+**Przyczyna i czas do t6 jako mnoznik** [MUSZTRA-jp, uwaga 9; `SCR\jedenwzor2\krolL.py <log40> 108846`: D z godzin ruchu (postoj = 0 i 1-3 h), L = (L x D) / D,
+szacunek [S]]: najslabsze krolestwa maja slabych dowodcow, nie wiecej marszu - Braavos L ~0.82 przy postoju 20% dob (swiat 14%), Lorath 0.86 (17%), Tyrosh 0.87
+(17%), Iron Islands 0.92 (12%), Qarth 0.93 (3%), Ibben 0.93 (7%), Myr 0.96 (7%), Lys 0.97 (4%); mocne - Stormlands 1.21, The Reach 1.18, The Vale 1.17. Czas t1 -> t6
+z samej musztry (kolumna "gra -> wzor" wyzej) jako mnoznik: Braavos x1.57 (597 -> 939 dob, 1.6 -> 2.6 roku), Ibben x1.44, Tyrosh x1.42, Lorath x1.40, Qarth x1.40,
+Lys x1.40, Riverlands x1.39, Myr x1.30, Iron Islands x1.29; Stormlands x0.95, The Reach x1.05, Dorne x1.01. Lista krolestw ponizej x0.75 i prawdziwy udzial glow
+rodow - po biegu A1 (prog J2, 14.6).
+
 **Sen od switu (AI)** [P, `swit.py`]: o swicie z dlugiem jest srednio 1.3% partii lordow AI (nowa kampania doby 11-40: 225 partio-dni na ok. 17 000; zapis 362:
 1.3%); z tych 225 w ciagu dnia odespalo 93 (41%) - dzis czesc z nich jeszcze cwiczyla (gdy ich trening wypadl po splacie), od switu - nie. Gorna granica
 dodatkowej straty: 93 / 17 000 = 0.55% partio-dni, realnie ok. 0.3% XP AI - pomijalne. Przypadki "dlug 1 dalej 1" (przespali baze, nie splacili odsetek; 37
@@ -577,10 +620,23 @@ partio-dni) traca drugi dzien tak samo jak dzis (dlug trwa caly dzien).
 - **Krawedzie:** (a) kto po nocy bez snu nie odespi dlugu przed nastepnym switem (dlug 1 = 9 h odpoczynku, `NightRest.cs:79`; AI-dluznicy obozuja od 20:00),
   traci tez nastepny dzien - to ten sam dlug, ktory dalej zabiera predkosc i morale; przy odespaniu przed switem Jeffowe "noc bez snu = nastepny dzien"
   spelnia sie dokladnie. Wariant "znacznik nocy" (dzien przepada tylko po nocy bez snu, nawet przy niesplaconym dlugu) odrzucony: musztra rozjechalaby sie
-  z kara predkosci i morale (dwie prawdy o jednej partii). (b) Tick treningu przesuniety przez gre przez swit (`CampaignPeriodicEventManager`) moze dac 0 albo 2
+  z kara predkosci i morale (dwie prawdy o jednej partii). MUSZTRA-jp: komunikat switu mowi to wprost, a wybor wariantu jest pytaniem do Jeffa (rozdz. 11). (b) Tick treningu przesuniety przez gre przez swit (`CampaignPeriodicEventManager`) moze dac 0 albo 2
   treningi w jednym oknie swit-swit - rzadkie i tak samo jak dzis. (c) Wczytanie nie zdejmuje dlugu o swicie (pole w zapisie) - jak "wczytanie nie daje postoju".
-- **Gra:** armie AI srednio wolniej (-12% w nowej kampanii po 40 dobach, 0% w starym swiecie), Essos i Zelazne Wyspy -25..-35% - skutek decyzji Jeffa, pokazany,
-  nie bramka; autotest B pokaze go w tierach.
+- **Gra:** armie AI srednio wolniej (pierwszy miesiac nowej kampanii -18..-22%, po ok. 35 dobach -12%, w starym swiecie 0..+2%), krolestwa ze slabymi dowodcami
+  (wolne miasta Essos, Zelazne Wyspy, Riverlands) czas do t6 x1.29-1.57 - skutek decyzji Jeffa, pokazany, nie bramka; autotest B pokaze go w tierach.
+- **Wyjatki od wzoru (MUSZTRA-jp, nazwane):** (1) Inni (umarli) - trening gry, z premia glowy rodu (nie spia i nie znaja zmeczenia, `Undead.cs`; wzor ma
+  czynniki snu i glodu). (2) Partia nieaktywna (poza mapa: niewola, rejs BK, sluzba ROT) przy wzorze - nie cwiczy (Z14a jak dotad; AI przy Z14b od MUSZTRA-jp,
+  wczesniej caly wzor z zamrozonej maski); gra daje perki tylko partii aktywnej (`DefaultPartyTrainingModel.cs:31-87`). [S] najwyzej ok. 2-4% partii lordow AI
+  w danej chwili. (3) No Rest for the Wicked (`DefaultPartyTrainingModel.cs:88-91`: +20% dla oddzialow kultury bandyckiej, `Culture.IsBandit`) - mnoznik
+  wyniku modelu, wiec P = wynik - baza gry = 1.2 x perki + 0.2 x baza gry: u glowy rodu AI zostaje okruch jej premii (0.2 x (15 + 3 x tier)), a +20% nie
+  mnozy B x L x D x S; u Ciebie (baza gry 0) dziala tylko na perki - jak w grze. Znikome (perk Roguery u dowodcy
+  i bandyccy zolnierze); poprawka (P / (1 + f), wynik x (1 + f)) tylko na slowo Jeffa. (4) Zalogi, bandy, karawany - poza musztra (jak dotad).
+- **Skutek drugiego rzedu (niezmierzony):** wolniejsze awanse AI = mniej zlota znikajacego na koszt awansu (`PartyUpgraderCampaignBehavior.cs:144-149`:
+  `GiveGoldAction` do nikogo) - lordowie zatrzymuja wiecej zlota, mniejszy popyt AiGear na bron wyzszych tierow. "Nic z niczego" nie lamie (zloto znika jak dotad,
+  tylko mniej); pomiar w biegu B (14.6).
+- **Zuzycie zapasu AI x D:** w zapisie 362 grupa11 zuzycie AI roslo w 6 dob do 247 szt./dobe (109203; prog T7 <= 300) przy dw = 1; teraz dw = D (1.5 postoj /
+  0.9 marsz), a partie z zapasem moga czesciej stac w miastach - T7 sprawdzic w A3 (linia "zuzyto", doby 4-8, wobec `kopia-grupa11`). Powyzej 300 - opisac
+  Jeffowi jako skutek jednego wzoru (wiecej cwiczen = wiecej zuzycia), bez zmiany "przy okazji".
 
 ### 14.6 Plan testu (po wykonaniu MUSZTRA-j; teraz nic nie uruchamiane)
 
@@ -590,7 +646,7 @@ Porownanie "przed / po" w tej samej linii (gra -> wzor) - dwie nowe kampanie roz
 
 Linie logu (format; liczby przykladowe z doby 40 `kopia-grupa11`, przeliczone recznie):
 - `Musztra: start - ...; jeden wzor: baza 10 + 2 x tier dla wszystkich (baza glowy rodu gry/BK 15 + 3 x tier wylaczona), Z14b (Drill Law Ai) TAK; niewyspanie: dlug o swicie (gracz NightRest TAK, AI ksiega T10 TAK); ...`
-- `Musztra AI: dzien N - partii 687, ludzi 103654; baza gry 1842012 XP (glowy rodow 46%), baza wzoru 1532000 (x0.83), perki P ...; dowodca x1.07 (...), dzien x0.98 (postoj 16%, marsz 82%, glod 0%, sen od switu 2%), ...; XP po broni (171): gra 1290000 -> wzor 1135000 (x0.88), na glowe na dobe gra 12.4 -> wzor 10.9; model bez bazy 0; sen od switu: partii 13 (w tym splacone przed treningiem 3 - dawniej moglyby cwiczyc), dlug teraz > dlug o swicie 0; PROG Z14b ... (bez zmian); ...`
+- `Musztra AI: dzien N - partii 687, ludzi 103654; baza gry 1842012 XP (glowy rodow 46%), baza wzoru 1532000 (x0.83), perki P ...; dowodca x1.07 (...), dzien x0.98 (postoj 16%, marsz 82%, glod 0%, sen 2% - etykieta bez zmian, MUSZTRA-jp), ...; XP po broni (171): gra 1290000 -> wzor 1135000 (x0.88), na glowe na dobe gra 12.4 -> wzor 10.9; model bez bazy 0; sen od switu: partii 13 (w tym splacone przed treningiem 3 - dawniej moglyby cwiczyc), dlug teraz > dlug o swicie 0; PROG Z14b ... (bez zmian); ...`
 - co 5 dob, na krolestwo: `The North: partii 56, ludzi 10666, ..., XP na glowe na dobe (po broni) gra 12.5 -> wzor 11.5 (x0.92), glowy rodow 48% bazy gry, t1->t6 przy tym tempie gra 961 -> wzor 1044 dob, sredni tier 2.21, t3+ 31%, konni 4%`
 - gracz: `Musztra (gracz): dzien N - ... x dzien 0.00 (DLUG SNU O SWICIE 1, teraz 0 - bez cwiczen) ...` oraz `NocnyMarsz: gracz o swicie - ... dlug przed 0, po 1 - wzor ...: zgodny; dlug o swicie (musztra) 1.`
 - wczytanie: `NocnyMarsz: wczytano ksiege snu AI - wpisow N (z dlugiem 1/2/3 ..., z dlugiem o swicie M; stary zapis bez pola: dlug o swicie = dlug) ...`
@@ -603,7 +659,35 @@ Linie logu (format; liczby przykladowe z doby 40 `kopia-grupa11`, przeliczone re
 | J4 sen od switu - AI | A1, A3 | "sen od switu: partii N" = suma "z dlugiem teraz 1/2/3" z linii "NocnyMarsz: swit dnia" tej doby (+- partie bez treningu: bitwa, nieaktywne); "dlug teraz > dlug o swicie" = 0 w kazdej dobie; "splacone przed treningiem" <= "dlug 1 z poprzedniego switu: splacony" nastepnego switu; udzial dni kary snu 1-3% wagi (dzis 0-3%) |
 | J5 sen od switu - gracz | A5 + proba reczna R5 | doba po nocnym marszu: "DLUG SNU O SWICIE 1", XP 0 (z perkami) i komunikat w grze, niezaleznie od godziny treningu, takze gdy rano dlug splacony ("teraz 0"); po odespaniu przed nastepnym switem - zwykly trening; "dlug o swicie (musztra)" w linii NocnyMarsz = dlug "po" |
 | J6 zapis | A2, A3 | A3 (stary zapis, bez nowych pol): 0 bledow, dlug o swicie = dlug; A2: dlug o swicie gracza i AI po wczytaniu = przed zapisem (linia wczytania) |
-| T1, T3, T7 | jak rozdz. 10 | 0 bledow i potkniec; T3 (mnoznik 171) bez zmian; T7 - zuzycie AI (teraz x D) <= 300 szt./dobe |
+| T1, T3, T7 | jak rozdz. 10 | 0 bledow i potkniec; T3 (mnoznik 171) bez zmian; T7 - zuzycie AI (teraz x D) <= 300 szt./dobe (A3: linia "zuzyto", doby 4-8, wobec `kopia-grupa11` - tam do 247) |
+| J7 maski ruchu AI w zapisie (MUSZTRA-jp) | A1 -> A2 | linia zapisu "maski godzin ruchu partii lordow AI N (z K obserwowanych)", N ~ 600-700; po wczytaniu linia startowa "odtworzone N z N" (roznica = partie zniszczone); "Musztra AI" pierwszej pelnej doby po wczytaniu A2: postoj i "dzien" jak w dobach przed zapisem (nie 0-3% / x0.91). A3 (zapis 362 bez segmentu): "brak w zapisie" i pierwsza doba jak dotad - J1/J2 w A3 liczyc bez pierwszej doby |
+| J8 komunikaty (MUSZTRA-jp) | R5 Jeffa (autotest nie czyta ekranu) | swit z dlugiem: komunikat predkosci/morale + "No drill today - sleep the debt off before the next dawn, or tomorrow's drill is lost too."; splata w dzien: "... wake fresh again. Drill resumes at the next dawn."; glod: jeden komunikat przy treningu (glod i sen - oba powody); "Musztra (gracz)" w dzien kary snu - XP 0 |
+| J9 kontrola po zmianie MCM | reczna (opcjonalnie) | wylacz Ai Sleep Debt w trakcie gry - w "Musztra AI" tej doby "dlug teraz > dlug o swicie 0" (bez falszywego BLAD); "model bez bazy (elementy)" = 0 w kazdej dobie (> 0 = partia bez ActualClan albo inny wyjatek BK - wyjasnic) |
+| J10 skutek drugiego rzedu | B (2 x 120 dob) | raport, nie bramka: zloto AI wydane na awanse na dobe i zakupy AiGear wedlug tierow - przy DrillLawAi tak / nie (pomiar do dopisania przed biegiem B; dzis nie ma takiej linii) |
 
 Proba reczna dla Jeffa (R5 na nowo): przejdz noc w marszu bez snu -> od switu do nastepnego switu Twoi ludzie nie cwicza (jedno zdanie w grze), nawet jesli
 rano odespisz; poloz sie wieczorem na 9 h (dlug 1) - nastepnego dnia cwicza normalnie.
+
+### 14.7 Recenzja kodu MUSZTRA-j (17 uwag) i odpowiedzi - poprawki "MUSZTRA-jp"
+
+Drzewo `G11\` (galaz `noc/grupa11`): MUSZTRA-j afeb7cb, poprawki MUSZTRA-jp 1f52d56, osobno NightRest-reset 4463a82 (uwagi 6, 13). Zbudowane (kod 0), nie uruchomione.
+
+| # | Waga | Uwaga (skrot) | Werdykt | Co zmienione |
+|---|---|---|---|---|
+| 1 | wazne | Maska ruchu w zapisie tylko u gracza - po wczytaniu partie AI ok. doby jako marsz; przy Z14b TAK to prawdziwe XP | PRZYJETA | Sprawdzone w logu zapisu 362 (doba 109199: postoj 3%, "dzien x0.91", "razem x1.14"; potem 11-23%, x0.96-1.01, x1.19-1.26). Segment `T=id,maska,wiek` w `arm_drill` (juz `SaveText.Sync`), `Drill.RestoreMasks` w `SessionStart` (Stamp = teraz - wiek); stary DLL segment pomija; linie startowa i zapisu. Zakres rozdz. 11 poszerzony na wszystkie partie lordow |
+| 2 | drobne | Etykieta "sen od switu" psuje regexy `parse.py`, `swit.py`; zdanie w CHANGELOG falszywe | PRZYJETA | Sprawdzone (`sen (\d+)%\)`). Etykieta "sen " wraca; regexy `parse.py`, `swit.py`, `w.py` sprawdzone na linii wzorcowej; zdanie MUSZTRA-j poprawione |
+| 3 | drobne | Po wylaczeniu dlugu AI w MCM `DebtOf` czyta stary slownik kar do 1 h - falszywy "BLAD" | PRZYJETA | Sprawdzone (`NightMarch.cs:747-764, 921-935`). `SleepDebtNow`: AI za bramka `AiDebtLive` (jak `DawnDebtOf`) |
+| 4 | drobne | (a) nieaktywna Z14a 0, AI caly wzor z zamrozonej maski; (b) Inni na treningu gry z premia glowy rodu - niewidoczne | PRZYJETA | (a) jedna regula: partia nieaktywna przy wzorze (Z14a, AI przy Z14b) nie cwiczy - gra i tak daje perki tylko aktywnej, D bez obserwacji nie ma; wylaczony Z14b jak dotad. (b) swiadomy wyjatek (umarli nie spia, nie znaja zmeczenia) - opis w kodzie, 14.5, "Dla Jeffa", CHANGELOG |
+| 5 | drobne | Dlug o swicie = caly niesplacony dlug; komunikat sugerowal jedna dobe | PRZYJETA | Komunikat switu "No drill today - sleep the debt off before the next dawn, or tomorrow's drill is lost too."; pytanie do Jeffa (rozdz. 11); zachowanie bez zmian do jego slowa |
+| 6 | drobne | Nowa kampania dziedziczy `Debt`/`DawnDebt` gracza (ResetWorld) | PRZYJETA - osobny commit | `NightRest.ResetWorld` zeruje `Debt`, `DawnDebt`, `_restTonight`, `_credited` (wolany tylko w konstruktorze, przed `Import`) |
+| 7 | wazne | Gracz nie widzi w grze, ile cwiczyl i dlaczego | DO DECYZJI JEFFA | Nowy komunikat = CLAUDE.md 8.3; pytanie w rozdz. 11 (linia dzienna z wylacznikiem MCM); bez kodu |
+| 8 | wazne | O dniu bez musztry gracz dowiaduje sie przy treningu; "wake fresh" kontra "no drill"; "old weariness" bez slowa o musztrze | PRZYJETA | `NightRest.DrillNote` w kazdym komunikacie switu z dlugiem (przy Drill Law), "Drill resumes at the next dawn." przy splacie; komunikat przy treningu tylko dla glodu |
+| 9 | wazne | Skutek dla AI zanizony: pierwszy miesiac -18..-22%, Braavos x0.64 (t6 +57%), przyczyna slabe Przywodztwo | PRZYJETA | Sprawdzone (`okna.py`, `krolL.py`): doby 2-10 x0.78, 11-20 x0.80, 21-30 x0.82, 31-40 x0.87; L Braavos ~0.82 przy postoju 20% (swiat 14%). "Dla Jeffa" pkt 3-4, 14.3 (tabela w czasie, mnoznik czasu t6), 14.5 |
+| 10 | wazne | (= 2) | PRZYJETA | jak 2 |
+| 11 | drobne | Zuzycie zapasu AI x D - prog T7 | PRZYJETA bez kodu | 14.5 i T7 w 14.6 (A3, doby 4-8, wobec 247 szt./dobe w `kopia-grupa11`) |
+| 12 | drobne | Komentarz "nic z niczego" przy `noModel` mowi tylko o P | PRZYJETA | Komentarz: perki 0, baza ze wzoru (przy law) albo to, co dal model; J9: "model bez bazy" = 0 |
+| 13 | drobne | (= 6) | PRZYJETA - osobny commit | jak 6 |
+| 14 | drobne | Po wczytaniu AI doba jako marsz - zostawic i opisac ("dotyczy tez gracza") | ODRZUCONA CZESCIOWO | Przeslanka falszywa: maska gracza jest w zapisie (`M=`), gracz tego nie traci. Asymetrie usuwa poprawka 1; A3 (stary zapis) - J1/J2 bez pierwszej doby (14.6 J7) |
+| 15 | drobne | No Rest for the Wicked: +20% trafia do P (okruch premii glowy rodu), nie mnozy wzoru | PRZYJETA bez kodu | Sprawdzone (`DefaultPartyTrainingModel.cs:88-91`). Znany wyjatek w 14.5; poprawka tylko na slowo Jeffa |
+| 16 | drobne | Wolniejsze awanse AI = mniej zlota znikajacego na koszt awansu | PRZYJETA bez kodu | Sprawdzone (`PartyUpgraderCampaignBehavior.cs:144-149`). Skutek w 14.5, pomiar J10 w biegu B |
+| 17 | drobne | (a) glod i sen - komunikat tylko o glodzie; (b) "Twoja druzyna bez zmian" bez glow rodow AI w armii gracza | PRZYJETA | (a) jedno zdanie z oboma powodami; (b) "Dla Jeffa" pkt 5 |
