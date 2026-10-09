@@ -2357,7 +2357,7 @@ namespace CrashScribe
                 if (step < 0.5f) { Scribe.Line("Mends: prawo tieru pancerza wylaczone (ArmourTierAthletics 0 - od 09.10 pancerz tylko wedlug wagi)."); return; }
                 if (step > 100f) step = 100f;
 
-                int raised = 0, lowered = 0;
+                int raised = 0;
                 var perTier = new int[7];
                 var perTierAll = new int[7];
                 var worst = new System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<int, string>>();
@@ -2373,15 +2373,7 @@ namespace CrashScribe
                     if (grade > 6) grade = 6;
                     perTierAll[grade]++;
                     int want = (int)Math.Round((grade - 1) * step);
-                    // 09.10 (Jeff "tak" - jak przy pancerzu: wymog z danych ROT bez zwiazku z tierem to bzdura; drzewce t3 z wymogiem 140
-                    // pompowaly zolnierzom umiejetnosc przez SkillSinew): bron biala, tarcze i bron rzucana - wymog DOKLADNIE z tieru,
-                    // takze w dol; luki, kusze, proce i amunicja - jak dotad tylko w gore (naciag / Twoja zasada 02.09 o strzalach)
-                    if (ExactTierWeapon(ty))
-                    {
-                        if (want == it.Difficulty) continue;
-                        if (want < it.Difficulty) { setter.Invoke(it, new object[] { want }); lowered++; continue; }
-                    }
-                    else if (want <= it.Difficulty) continue;
+                    if (want <= it.Difficulty) continue;
                     worst.Add(new System.Collections.Generic.KeyValuePair<int, string>(
                         want - it.Difficulty, it.StringId + " t" + grade + " " + it.Difficulty + "->" + want));
                     setter.Invoke(it, new object[] { want });
@@ -2392,7 +2384,7 @@ namespace CrashScribe
                 sb.Append("Mends: prawo tieru pancerza - ").Append(step.ToString("0.#")).Append(" Atletyki na tier; wymog podniesiony ")
                   .Append(raised).Append(" sztukom (per tier: ");
                 for (int t = 2; t <= 6; t++) sb.Append("t").Append(t).Append(" ").Append(perTier[t]).Append("/").Append(perTierAll[t]).Append(t < 6 ? ", " : "");
-                sb.Append("); obnizony do tieru (bron biala, tarcze, rzucana - od 09.10) ").Append(lowered).Append(".");
+                sb.Append(").");
                 Scribe.Line(sb.ToString());
                 if (worst.Count > 0)
                 {
@@ -2416,7 +2408,7 @@ namespace CrashScribe
                 if (step < 0.5f) { Scribe.Line("Mends: prawo tieru broni wylaczone (WeaponSkillPerTier 0)."); return; }
                 if (step > 100f) step = 100f;
 
-                int raised = 0;
+                int raised = 0, lowered = 0;
                 var perTier = new int[7];
                 var perTierAll = new int[7];
                 var worst = new System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<int, string>>();
@@ -2434,7 +2426,15 @@ namespace CrashScribe
                     if (grade > 6) grade = 6;
                     perTierAll[grade]++;
                     int want = (int)Math.Round((grade - 1) * step);
-                    if (want <= it.Difficulty) continue;
+                    // 09.10 (Jeff "tak" - jak przy pancerzu: wymog z danych ROT bez zwiazku z tierem to bzdura; drzewce t3 z wymogiem 140
+                    // pompowaly zolnierzom umiejetnosc przez SkillSinew): bron biala, tarcze i bron rzucana - wymog DOKLADNIE z tieru,
+                    // takze w dol; luki, kusze, proce i amunicja - jak dotad tylko w gore (naciag / Twoja zasada 02.09 o strzalach)
+                    if (ExactTierWeapon(ty))
+                    {
+                        if (want == it.Difficulty) continue;
+                        if (want < it.Difficulty) { setter.Invoke(it, new object[] { want }); lowered++; continue; }
+                    }
+                    else if (want <= it.Difficulty) continue;
                     worst.Add(new System.Collections.Generic.KeyValuePair<int, string>(
                         want - it.Difficulty, it.StringId + " t" + grade + " " + it.Difficulty + "->" + want));
                     setter.Invoke(it, new object[] { want });
@@ -2445,7 +2445,7 @@ namespace CrashScribe
                 sb.Append("Mends: prawo tieru broni - ").Append(step.ToString("0.#")).Append(" skilla na tier; wymog podniesiony ")
                   .Append(raised).Append(" broniom (per tier: ");
                 for (int t = 2; t <= 6; t++) sb.Append("t").Append(t).Append(" ").Append(perTier[t]).Append("/").Append(perTierAll[t]).Append(t < 6 ? ", " : "");
-                sb.Append(").");
+                sb.Append("); obnizony do tieru (bron biala, tarcze, rzucana - od 09.10) ").Append(lowered).Append(".");
                 Scribe.Line(sb.ToString());
                 if (worst.Count > 0)
                 {
