@@ -882,3 +882,6 @@ zamkowa) np. 50%, reszta 15% (jak w ksiazkach; Inni silniejsi - zmierzyc ich poc
 kiedy startuje). (174b) hurtownicy zostawiaja ostatnia sztuke kazdego rodzaju zbroi na straganie dla kupujacych osobiscie - TAK (ShopKeepsLastArmour = true).
 Pytanie Jeffa: "czy jak kupuje hurtowo, ma lepsze ceny, czy ceny zaleza od popytu i podazy?" -> odpowiedz w czacie (cena z popytu i podazy; AI dzis placi cene
 z chwili zakupu za cala partie - do wyrownania: kazda sztuka jak u gracza).
+**DECYZJA JEFFA 09.10 ok. 08:00 (ceny hurtu):** wyrownac - jedna zasada dla wszystkich: kazda kupowana sztuka po swojej cenie z popytu i podazy (cena rosnie, gdy ubywa
+towaru), bez ukrytego rabatu hurtowego AI (dzis AiGear placi cene pierwszej sztuki za cala partie). Dotyczy wszystkich zakupow AI/zalog/notabli/sakiewek z gotowego
+straganu (AiGear, BuySubstitutes, RecruitKit, GarrisonArmory, MenUpgrade K1 itd.). Po sklad7b (to samo drzewo).
