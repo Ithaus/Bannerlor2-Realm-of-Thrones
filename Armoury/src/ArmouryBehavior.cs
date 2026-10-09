@@ -386,7 +386,7 @@ namespace Armoury
         }
         private Dictionary<string,int> _prisonerBaseline;
 
-        public ArmouryBehavior() { Instance = this; HistoricalPrices.Reset(); MaterialLaw.Reset(); WesterosClimate.Reset(); OutlawLaw.Reset(); PopulationLaw.Reset(); WorkshopLaw.Reset(); IronBank.Reset(); MarketGlut.Reset(); ArmsPricing.Reset(); StartKit.Reset(); AiGear.Reset(); Levy.Reset(); VolunteerKit.Reset(); LevyGold.Reset(); WearKeep.Reset(); UniqueSpoils.Reset(); BuildDiary.Reset(); BuildFunding.Reset(); KingdomLedger.Reset(); ColdStart.Reset(); MenPurse.Reset(); ArmyClothing.Reset(); AiWear.Reset(); SmithHours.Reset(); RecruitKit.Reset(); OreLedger.Reset(); GoodsLedger.Reset(); FreeSupplies.Reset(); VillageWoodlot.Reset(); SpoilsSeal.Reset(); MarketRoad.Reset(); MarketCarts.Reset(); VillageClogDiag.Reset(); CartTownExit.Reset(); MoneyLedger.Reset(); PeopleLedger.Reset(); CaravanBulk.Reset(); StartStock.Reset(); MineralOnce.Reset(); SoldierPay.Reset(); KingdomTreasury.Reset(); RecruitCost.Reset(); NightRest.ResetWorld(); WorldMeasure.Reset(); CirculationWindows.Reset(); ClanIncomeBook.Reset(); LosersFlee.Reset(); PrisonerLaw.Reset(); RecruitSources.Reset(); GarrisonCarts.Reset(); GarrisonArmory.Reset(); ArmsDrill.Reset(); CaravanAmmo.Reset(); ArmsLeaks.Reset(); SupplyDemand.ResetOrders(); MaterialOrders.Reset(); RawNoRot.Reset(); ArmsScrap.Reset(); CastleSteel.Reset(); }   // stan jednej kampanii nie przecieka do drugiej (audyt 04.10)
+        public ArmouryBehavior() { Instance = this; HistoricalPrices.Reset(); MaterialLaw.Reset(); WesterosClimate.Reset(); OutlawLaw.Reset(); PopulationLaw.Reset(); WorkshopLaw.Reset(); IronBank.Reset(); MarketGlut.Reset(); ArmsPricing.Reset(); StartKit.Reset(); AiGear.Reset(); Levy.Reset(); VolunteerKit.Reset(); LevyGold.Reset(); WearKeep.Reset(); UniqueSpoils.Reset(); BuildDiary.Reset(); BuildFunding.Reset(); KingdomLedger.Reset(); ColdStart.Reset(); MenPurse.Reset(); ArmyClothing.Reset(); AiWear.Reset(); SmithHours.Reset(); RecruitKit.Reset(); OreLedger.Reset(); GoodsLedger.Reset(); FreeSupplies.Reset(); VillageWoodlot.Reset(); SpoilsSeal.Reset(); MarketRoad.Reset(); MarketCarts.Reset(); VillageClogDiag.Reset(); CartTownExit.Reset(); MoneyLedger.Reset(); PeopleLedger.Reset(); CaravanBulk.Reset(); StartStock.Reset(); MineralOnce.Reset(); SoldierPay.Reset(); KingdomTreasury.Reset(); RecruitCost.Reset(); NightRest.ResetWorld(); WorldMeasure.Reset(); CirculationWindows.Reset(); ClanIncomeBook.Reset(); LosersFlee.Reset(); PrisonerLaw.Reset(); RecruitSources.Reset(); GarrisonCarts.Reset(); GarrisonArmory.Reset(); ArmsDrill.Reset(); CaravanAmmo.Reset(); ArmsLeaks.Reset(); SupplyDemand.ResetOrders(); MaterialOrders.Reset(); RawNoRot.Reset(); ArmsScrap.Reset(); CastleSteel.Reset(); ValyrianBlades.Reset(); }   // stan jednej kampanii nie przecieka do drugiej (audyt 04.10)
 
         public override void SyncData(IDataStore dataStore)
         {
@@ -400,6 +400,21 @@ namespace Armoury
                 if (dataStore.IsLoading) StartStock.Import(startStock);
             }
             catch (Exception e) { Log.Error("SyncData.StartStock", e); }
+            // unikaty ROT: kopie startowe zdjete raz na kampanie (wpis 62) - 177-2: we wlasnym try (krytyka 177 pkt 6: zgubiona flaga = druga
+            // czystka startowa; od 177 omija ona stal valyrianska, ale inne unikaty sprzedane na polke zdjelaby znowu)
+            try
+            {
+                string uniq = UniqueSpoils.Export();
+                SaveText.Sync(dataStore, "arm_uniq_init", ref uniq);
+                if (dataStore.IsLoading) UniqueSpoils.Import(uniq);
+            }
+            catch (Exception e) { Log.Error("SyncData.arm_uniq_init", e); }
+            // 177-2: stal valyrianska - znacznik (zapis z 177) i rejestr (ile sztuk kazdego wzoru jest w swiecie), kazdy klucz we wlasnym try;
+            // znacznik bez rejestru = bezpieczny domysl przy starcie sesji (nic nie zamieniane)
+            try { string vm = dataStore.IsSaving ? ValyrianBlades.ExportMark() : null; SaveText.Sync(dataStore, "arm_vs_mark", ref vm); if (dataStore.IsLoading) ValyrianBlades.ImportMark(vm); }
+            catch (Exception e) { Log.Error("SyncData.arm_vs_mark", e); }
+            try { string vr = dataStore.IsSaving ? ValyrianBlades.Export() : null; SaveText.Sync(dataStore, "arm_vs_registry", ref vr); if (dataStore.IsLoading) ValyrianBlades.Import(vr); }
+            catch (Exception e) { Log.Error("SyncData.arm_vs_registry", e); }
             try
             {
                 dataStore.SyncData("arm_condition", ref _condition);
@@ -455,9 +470,6 @@ namespace Armoury
                 string cold = ColdStart.Export();
                 SaveText.Sync(dataStore, "arm_coldstart", ref cold);
                 if (dataStore.IsLoading) ColdStart.Import(cold);
-                string uniq = UniqueSpoils.Export();
-                SaveText.Sync(dataStore, "arm_uniq_init", ref uniq);
-                if (dataStore.IsLoading) UniqueSpoils.Import(uniq);
                 string climate = WesterosClimate.Export();
                 SaveText.Sync(dataStore, "arm_climate", ref climate);
                 if (dataStore.IsLoading) WesterosClimate.Import(climate);
@@ -557,6 +569,7 @@ namespace Armoury
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, BattleChronicle.OnMapEventEnded);
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, AiWear.OnMapEventEnded);   // wpis 85
             CampaignEvents.VillageLooted.AddNonSerializedListener(this, OutlawLaw.OnVillageLooted);
+            CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, UniqueSpoils.OnPartyDestroyed);   // 177-2: unikaty i stal valyrianska z taboru znikajacej partii - zwyciezcy, wlascicielowi albo na polke (ksiega towarow liczy tylko towary - kolejnosc bez znaczenia)
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, GoodsLedger.OnPartyDestroyed);  // paczka 146: towar, ktory przepada z partia (tylko log)
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, MaterialOrders.OnPartyDestroyed);   // 174.2: kontrakt przepada z rozbita karawana (ladunek - jak w grze)
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, OutlawLaw.OnPartyDestroyed);
@@ -594,6 +607,7 @@ namespace Armoury
             CampaignEvents.OnPrisonerTakenEvent.AddNonSerializedListener(this, OnPrisonerTaken);
             CampaignEvents.HeroPrisonerTaken.AddNonSerializedListener(this, UniqueSpoils.OnPrisonerTaken);
             CampaignEvents.HeroKilledEvent.AddNonSerializedListener(this, UniqueSpoils.OnHeroKilled);
+            CampaignEvents.OnBeforePlayerCharacterChangedEvent.AddNonSerializedListener(this, UniqueSpoils.OnBeforePlayerChanged);   // 177-2: nastepca gracza bez cywilnego duplikatu klingi
             // DIAGNOSTYKA (Jeff 29.08: "awans wycina sprzet z magazynu?") -
             // ani DTE, ani my nie sluchamy awansow, wiec logujemy sume
             // magazynu przy kazdym awansie: jak suma spada miedzy wpisami,
@@ -792,7 +806,9 @@ namespace Armoury
                         }
                         // legendy zalegajace z dawnych lupow w NASZYM magazynie
                         // (screen Jeffa: [STORES] Lady Forlorn) - precz
-                        if (LegendaryLaw.IsLegend(it))
+                        // 177-2 (krytyka 177 pkt 1): NIE unikaty ROT i stal valyrianska - ta czystka idzie przy KAZDYM menu, wiec klinga zdjeta
+                        // do taboru (np. Lod niesiony do Qohoru), zdobyta (Take) albo odziedziczona znikala w nicosc; kopie lapie spis ValyrianBlades
+                        if (LegendaryLaw.IsLegend(it) && !ValyrianBlades.Is(it) && !UniqueSpoils.Is(it))
                         {
                             roster.AddToCounts(el.EquipmentElement, -el.Amount);
                             cut += el.Amount;

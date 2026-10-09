@@ -61,7 +61,13 @@ namespace Armoury
         {
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this, OnSession);
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this,
-                delegate { try { SweepAiArmories("dzien"); } catch { } try { SweepMarkets("dzien"); } catch { } });
+                delegate
+                {
+                    try { SweepAiArmories("dzien"); } catch { } try { SweepMarkets("dzien"); } catch { }
+                    // 177-2: spis stali valyrianskiej (straznik wedlug stanu startowego) - zaraz po czystce magazynow AI, jedno przejscie na dobe
+                    try { ValyrianBlades.Daily(); } catch (Exception e) { Log.Error("ValyrianBlades.Daily", e); }
+                    try { ValyrianBlades.DailyPatches(); } catch { }
+                });
         }
 
         public override void SyncData(IDataStore dataStore)
@@ -72,12 +78,16 @@ namespace Armoury
         private void OnSession(CampaignGameStarter starter)
         {
             try { BuildLegendSet(); } catch (Exception e) { Log.Error("LegendaryLaw.BuildLegendSet", e); }
+            // 177-2: stan startowy stali valyrianskiej z szablonow postaci - PRZED SweepTemplates (ta podmienia klingi w szablonach w pamieci sesji)
+            try { ValyrianBlades.CaptureTemplates(); } catch (Exception e) { Log.Error("ValyrianBlades.CaptureTemplates", e); }
             try { SweepTemplates(); } catch (Exception e) { Log.Error("LegendaryLaw.SweepTemplates", e); }
             try { if (!_playerCulledAll) { CullPlayerAll(); _playerCulledAll = true; } }
             catch (Exception e) { Log.Error("LegendaryLaw.Cull", e); }
             try { SweepAiArmories("wczytanie"); } catch (Exception e) { Log.Error("LegendaryLaw.SweepAiArmories", e); }
             try { SweepWorld(); } catch (Exception e) { Log.Error("LegendaryLaw.SweepWorld", e); }
             try { LockLegendPieces(); } catch (Exception e) { Log.Error("LegendaryLaw.LockLegendPieces", e); }
+            // 177-2: rejestr i spis stali valyrianskiej - na koncu, po wszystkich czystkach (krytyka 177 pkt 6: kolejnosc nie zalezy od sluchaczy)
+            try { ValyrianBlades.OnSession(); } catch (Exception e) { Log.Error("ValyrianBlades.OnSession", e); }
             // wyrownanie skilli jednostek MUSI isc PO sweepie legend - inaczej
             // policzyloby wymogi z klingi, ktora za chwile znika z szablonu
             try { TroopFit.Run(); } catch (Exception e) { Log.Error("TroopFit.Run", e); }
@@ -152,6 +162,7 @@ namespace Armoury
                     {
                         var el = roster.GetElementCopyAtIndex(i);
                         if (!IsLegend(el.EquipmentElement.Item) || el.Amount <= 0) continue;
+                        if (ValyrianBlades.Is(el.EquipmentElement.Item)) continue;   // 177-2: stal valyrianska - spis (kopia -> zwykla stal), prawdziwa klinga zostaje na polce
                         roster.AddToCounts(el.EquipmentElement, -el.Amount);
                         offShelves += el.Amount;
                     }
@@ -176,6 +187,7 @@ namespace Armoury
                         bool elephant = it2.StringId != null
                             && (it2.StringId == "elephant" || it2.StringId.StartsWith("rot_elephant"));
                         if (!elephant && !IsLegend(it2)) continue;
+                        if (ValyrianBlades.Is(it2)) continue;   // 177-2: jak wyzej - stal valyrianska w taborze AI jest prawdziwa (odlozona), kopie lapie spis
                         roster.AddToCounts(el.EquipmentElement, -el.Amount);
                         offBags += el.Amount;
                     }
@@ -265,6 +277,9 @@ namespace Armoury
                             continue;
                         }
                         if (!IsLegend(it)) continue;
+                        // 177-2: stal valyrianska nie przepada w nicosc - spis ValyrianBlades (zaraz po tej czystce): nadwyzka -> zwykla stal,
+                        // reszta -> wodz partii (UniqueLaw.FindParty - MBObjectManager.GetObject(MBGUID) nie zna partii kampanii, krytyka pkt 4)
+                        if (ValyrianBlades.Is(it)) continue;
                         if (kill == null) kill = new List<object>();
                         kill.Add(kv.Key);
                         try { cut += Convert.ToInt32(kv.Value); } catch { cut++; }
@@ -301,7 +316,7 @@ namespace Armoury
                 foreach (var it in MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
                 {
                     if (it == null || !it.HasWeaponComponent || it.StringId == null) continue;
-                    if (LegendIds.Contains(it.StringId) || HasLegendPrefix(it.StringId)) { set.Add(it); continue; }
+                    if (LegendIds.Contains(it.StringId) || HasLegendPrefix(it.StringId) || ValyrianBlades.IsId(it.StringId)) { set.Add(it); continue; }   // 177-2: + spis VS (celtigar_axe poza progiem 100k)
                     if (floor > 0 && HistoricalPrices.Orig(it) >= floor && it.NotMerchandise) set.Add(it);   // prog legendy od wartosci SPRZED cen historycznych
                 }
                 Log.Info("LegendaryLaw: zbior legend zbudowany - " + set.Count
@@ -315,7 +330,7 @@ namespace Armoury
         {
             if (it == null || !it.HasWeaponComponent || it.StringId == null) return false;
             if (_legendSet != null) return _legendSet.Contains(it);
-            if (LegendIds.Contains(it.StringId) || HasLegendPrefix(it.StringId)) return true;
+            if (LegendIds.Contains(it.StringId) || HasLegendPrefix(it.StringId) || ValyrianBlades.IsId(it.StringId)) return true;
             var floor = Settings.Current.LegendaryLootValueFloor;
             return floor > 0 && HistoricalPrices.Orig(it) >= floor && it.NotMerchandise;
         }
@@ -356,12 +371,16 @@ namespace Armoury
         {
             var all = MBObjectManager.Instance.GetObjectTypeList<CharacterObject>();
             if (all == null) return;
-            int swapped = 0, troops = 0;
+            int swapped = 0, troops = 0, civ = 0;
             foreach (var ch in all)
             {
                 if (ch == null || ch.IsHero) continue;
                 bool touched = false;
-                foreach (var eq in ch.BattleEquipments)
+                // 177-2 (krytyka pkt 17): takze zestawy CYWILNE - szablon wedrowca "valyrian_thief" (Maegor, notablesROT.xml) ma Despair w Item0
+                // bojowym I cywilnym; gra zabija nienajetych wedrowcow i odradza ich z wolnego szablonu (CompanionsCampaignBehavior), wiec
+                // cywilna klinga w szablonie = nowa Despair z niczego przy kazdym odrodzeniu
+                for (int pass = 0; pass < 2; pass++)
+                foreach (var eq in pass == 0 ? ch.BattleEquipments : ch.CivilianEquipments)
                 {
                     if (eq == null) continue;
                     for (int slot = 0; slot < 4; slot++)
@@ -372,12 +391,13 @@ namespace Armoury
                         eq[(EquipmentIndex)slot] = repl != null
                             ? new EquipmentElement(repl) : new EquipmentElement(null);
                         swapped++; touched = true;
+                        if (pass == 1) civ++;
                     }
                 }
                 if (touched) troops++;
             }
             if (swapped > 0)
-                Log.Info("LegendaryLaw: " + swapped + " legendarnych klng zdjetych z szablonow " + troops + " jednostek.");
+                Log.Info("LegendaryLaw: " + swapped + " legendarnych klng zdjetych z szablonow " + troops + " jednostek (w tym z zestawow cywilnych " + civ + ").");
 
             // ZRODLO mnozenia: ROT-owe szablony WLADCOW (vla_bat_template_tywin
             // z brightroar) maja culture=neutral_culture + IsLordTemplate, wiec
@@ -433,6 +453,7 @@ namespace Armoury
                 var el = roster.GetElementCopyAtIndex(i);
                 var it = el.EquipmentElement.Item;
                 if (!IsLegend(it) || el.Amount <= 0) continue;
+                if (ValyrianBlades.Is(it)) continue;   // 177-2: stal valyrianska gracza - spis (kopia -> zwykla stal), prawdziwa zostaje
                 roster.AddToCounts(el.EquipmentElement, -el.Amount);
                 cut += el.Amount;
             }

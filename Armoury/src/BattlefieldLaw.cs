@@ -275,6 +275,10 @@ namespace Armoury
             try
             {
                 if (!Settings.Current.BattlefieldLawEnabled) return;
+                // 177-2 (krytyka pkt 2): loteria Spoils losuje z PRAWDZIWEGO zestawu pokonanego bohatera (GetRandomBattleEquipment) i dodaje KOPIE -
+                // legenda i stal valyrianska z loterii to zawsze kopia (klinge bohatera bierze, jesli w ogole, zwyczaj wojenny - UniqueSpoils.Take);
+                // w bitwie stoczonej osobiscie to samo robi CleanseTrash nizej, w symulacji dotad nic
+                if (__result != null && Settings.Current.NoConjuredLegends) StripLegendCopies(__result);
                 if (RotEnlisted()) { ShareQueue.Clear(); Wrecks.Clear(); return; }
                 if (!RealFoughtBattle()) return;         // symulacje: zostaje loteria Spoils (odbramkowana)
                 if (__result == null) __result = new ItemRoster();
@@ -297,6 +301,21 @@ namespace Armoury
                          + (wrecks > 0 ? " (w tym " + wrecks + " wrakow przed przesianiem)" : "") + ".");
             }
             catch (Exception e) { Log.Error("AfterGenerateLoot", e); }
+        }
+
+        private static void StripLegendCopies(ItemRoster roster)
+        {
+            int n = 0;
+            var ids = new List<string>();
+            for (int i = roster.Count - 1; i >= 0; i--)
+            {
+                var el = roster.GetElementCopyAtIndex(i);
+                var it = el.EquipmentElement.Item;
+                if (it == null || el.Amount <= 0 || !(LegendaryLaw.IsLegend(it) || ValyrianBlades.Is(it))) continue;
+                roster.AddToCounts(el.EquipmentElement, -el.Amount);
+                n += el.Amount; ids.Add(it.StringId);
+            }
+            if (n > 0) Log.Info("BattlefieldLaw: lup Spoils bez kopii legend - " + n + " szt. (" + string.Join(", ", ids.ToArray()) + ") - klinga zostaje przy bohaterze albo idzie zwyczajem wojennym.");
         }
 
         /// <summary>

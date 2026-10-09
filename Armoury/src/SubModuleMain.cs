@@ -125,6 +125,8 @@ namespace Armoury
                 SmeltTab.ApplyAll(_harmony);
                 DressCode.ApplyAll(_harmony);
                 UniqueLaw.ApplyAll(_harmony);        // unikaty imienne: nabor do magazynow DTE zamienia kopie na zamienniki
+                try { UniqueSpoils.ApplyAll(_harmony); } catch (Exception e) { Log.Error("UniqueSpoils.ApplyAll", e); }     // 177-2: przebranie bohatera przez gre zostawia unikaty i stal valyrianska w rekach
+                try { ValyrianBlades.ApplyAll(_harmony); } catch (Exception e) { Log.Error("ValyrianBlades.ApplyAll", e); } // 177-2: przetop VS zablokowany, karawana DTE i nagroda turniejowa bez legend z niczego
                 MountMeshGuard.ApplyAll(_harmony);   // uprzaz z cudzej rodziny = natywny crash w AddMountMesh
                 CaptiveRags.ApplyAll(_harmony);
                 SightRange.ApplyAll(_harmony);
