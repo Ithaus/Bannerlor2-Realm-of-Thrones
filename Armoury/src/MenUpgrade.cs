@@ -74,13 +74,32 @@ namespace Armoury
                         }
                     }
                     catch { }
+                    // pomiar rynku do autotestu (C5): ile miast nie ma na polce ani jednej zbroi korpusu t3+ (tylko log)
+                    int towns = 0, bare = 0;
+                    try
+                    {
+                        foreach (var t in Town.AllTowns)
+                        {
+                            if (t == null || !t.IsTown || t.Settlement == null || t.Settlement.ItemRoster == null) continue;
+                            towns++;
+                            var r = t.Settlement.ItemRoster; bool has = false;
+                            for (int i = 0; i < r.Count && !has; i++)
+                            {
+                                var el = r.GetElementCopyAtIndex(i); var it = el.EquipmentElement.Item;
+                                has = el.Amount > 0 && it != null && it.ItemType == ItemObject.ItemTypeEnum.BodyArmor && AiGear.TierOf(it) >= 3;
+                            }
+                            if (!has) bare++;
+                        }
+                    }
+                    catch { }
                     Log.Info("Dozbrajanie: dzien " + _dStamp + " - gracz " + _dPlayerN + "/" + _dPlayerGold + ", lordowie " + _dLordN + "/" + _dLordGold
                              + ", zalogi " + _dGarN + "/" + _dGarGold + " (szt./zloto); stare sprzedane " + _dSold + " za " + _dSoldGold + " (do zbrojowni " + _dKept + ")"
                              + "; pominiete koszyki: brak lepszej na polce " + _dNoBetter + ", za malo w sakiewce " + _dNoMoney + ", nikt nie udzwignie " + _dNoLift
                              + "; odlozone przy wyjazdach " + _dSaved + ", ponad limit na zycie " + _dOverCap
                              + "; zold zalog do sakiewek " + _dGarWage + " (" + _dGarWageN + " zalog), w sakiewkach zalog " + garPurses + " (" + garN + " zalog)"
                              + "; braki zalog z ich sakiewek " + _dGarGapGold + " (" + _dGarGapN + " zakupow), sakiewki pustych zalog do kas osad " + _dGarEmptyGold + " (" + _dGarEmptyN + ")"
-                             + "; zalogi w bitwie ze zbrojowni " + _dBattleArmory + " / we wzorcu " + _dBattleTemplate + ".");
+                             + "; zalogi w bitwie ze zbrojowni " + _dBattleArmory + " / we wzorcu " + _dBattleTemplate
+                             + "; miasta bez zbroi korpusu t3+ na polce " + bare + " z " + towns + ".");
                 }
                 ClearDay();
                 _dStamp = d;
