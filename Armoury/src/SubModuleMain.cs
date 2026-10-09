@@ -80,6 +80,11 @@ namespace Armoury
                 try { WorkshopTrade.ApplyAll(_harmony); } catch (Exception e) { Log.Error("WorkshopTrade.ApplyAll", e); }   // warsztaty towarowe w nowej monecie: utrzymanie i place do kas miast, cena z zarobku
                 try { TownFletchers.ApplyAll(_harmony); } catch (Exception e) { Log.Error("TownFletchers.ApplyAll", e); }   // paczka 172: strzelarze miasta po warsztatach (postfiks doby miasta) i sonda linii arrows
                 Stables.ApplyAll(_harmony);
+                // paczka 175: spis koni AI i straz konia Dothrakow (zamiany ROT), przewaga Polnocy w autobitwie, miara balansu krolestw;
+                // wpinane zawsze - wylaczniki (Army175Measure, AiUpgradeHorseToArmory, Army175DothrakiHorseGuard, NorthHomeEdgePercent) czytane na zywo
+                try { HorseCensus.ApplyAll(_harmony); } catch (Exception e) { Log.Error("HorseCensus.ApplyAll", e); }
+                try { NorthHomeEdge.ApplyAll(_harmony); } catch (Exception e) { Log.Error("NorthHomeEdge.ApplyAll", e); }
+                try { KingdomBalance.ApplyAll(_harmony); } catch (Exception e) { Log.Error("KingdomBalance.ApplyAll", e); }
                 ShieldGuard.ApplyAll(_harmony);  // strzaly przestaja lupic tarcze (RBM liczy je x1.5)
                 SpeedDepth.ApplyAll(_harmony);   // licznik zagniezdzenia - PRZED wszystkimi latkami predkosci/morale
                 WorldPace.ApplyAll(_harmony);
@@ -108,6 +113,7 @@ namespace Armoury
                 try { Drill.ApplyAll(_harmony); } catch (Exception e) { Log.Error("Drill.ApplyAll", e); }                     // musztra: tick treningu partii (zuzycie, kontrola gracza), ekrany zapasu cwiczebnego
                 try { MountedWage.ApplyAll(_harmony); } catch (Exception e) { Log.Error("MountedWage.ApplyAll", e); }   // paczka 160: konny bierze wiekszy zold (zold jednostki, kontekst werbunku AI)
                 StartKit.ApplyAll(_harmony);
+                HeroGear.ApplyAll(_harmony);     // Z16: ekran ekwipunku - pancerz (Atletyka), strzaly (Luk), belty (Kusza) u bohaterow; linia Requires w opisie
                 BuildFunding.ApplyAll(_harmony);
                 FreeSupplies.ApplyAll(_harmony); // paczka 125: koniec dosypki drewna i narzedzi z niczego (RealisticBannerlord)
                 try { RawNoRot.ApplyAll(_harmony); } catch (Exception e) { Log.Error("RawNoRot.ApplyAll", e); }   // 174.3: BK nie kasuje stosow rudy, metali, narzedzi, skory i plotna; drewno, len, welna 0.2%
@@ -238,6 +244,7 @@ namespace Armoury
                 starter.AddBehavior(new WorkshopTradeBehavior());   // warsztaty towarowe: linia dnia, rozmowa kupna, srednie zysku w zapisie
                 starter.AddBehavior(new TownCraftsBehavior());      // paczka 148: rzemioslo miasta wedle wartosci (doba miasta, stan w zapisie)
                 starter.AddBehavior(new TownFletchersBehavior());   // paczka 172: strzelarze miasta - stan w zapisie (doba miasta przez latke po warsztatach)
+                starter.AddBehavior(new HeroGearBehavior());        // Z16: samotest ekranu przy wczytaniu (tylko log, bez zapisu)
                 Log.Info("Behavior dodany do kampanii.");
             }
             catch (Exception e) { Log.Error("OnGameStart", e); }

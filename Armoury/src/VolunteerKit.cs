@@ -94,12 +94,17 @@ namespace Armoury
                                 bool ok = basic != null && basic != y && Buy(n, market, basic, y, false);
                                 try { RecruitKit.OnFresh(n, y, ok ? new List<EquipmentElement>(_lastBought) : null); } catch (Exception e) { RecruitKit.Stumble("OnFresh", e); }
                                 if (castle) _castleFresh++;
+                                // sklad9 (175 pkt 19): swiezy konny ochotnik t2+ - kon kupiony przez notabla albo bez konia (ochotnik zostaje, wariant lagodny 171)
+                                if (y.IsMounted) HorseCensus.OnVolunteerRider(settlement, n, ok);
                             }
                             continue;                                     // tier 1 - wlasny dobytek
                         }
                         gone.Remove(x);
-                        if (!Buy(n, market, x, y)) { after[i] = x; _reverted++; if (castle) _castleReverted++; }
+                        bool okUp = Buy(n, market, x, y);
+                        if (!okUp) { after[i] = x; _reverted++; if (castle) _castleReverted++; }
                         else { _bought++; if (castle) _castleBought++; RecruitKit.OnUpgrade(n, x, y, new List<EquipmentElement>(_lastBought)); }
+                        // 175.0 (pomiar, Army175Measure): ochotnik awansowany na konnego - z koniem kupionym przez notabla albo cofniety
+                        if (y.IsMounted && !x.IsMounted) HorseCensus.OnVolunteerRider(settlement, n, okUp);
                     }
                     // wpis 92: ochotnik zniknal z puli bez awansu (gra go podmienila) - jego kupione rzeczy wracaja na targ
                     foreach (var g in gone) if (g != null && g.Tier >= 2) RecruitKit.OnVanished(n, g, market);

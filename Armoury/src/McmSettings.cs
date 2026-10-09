@@ -652,6 +652,14 @@ namespace Armoury
         [SettingPropertyGroup("Skills rule the gear")]
         public bool SkillsDecideEnabled { get; set; } = true;
 
+        [SettingPropertyBool("Hero Gear Requirements", HintText = "you, your companions and the lords cannot put on armour above their Athletics - the same rule as for soldiers (arrows above Bow and bolts above Crossbow the game itself already refuses). On the inventory screen the card turns red, the game says 'You don't have enough Athletics skill to equip this item' and the description shows 'Requires: Athletics 175'. Armour asks Athletics by its weight only (Kg Per Athletics Point), so gowns, robes, hats and gloves ask almost nothing. The same holds for Spoils' auto-equip of companions, for a lord buying or taking a renowned piece by the custom of war (what he cannot carry goes to his baggage), for the plain piece that replaces a renowned one, for the troop kit you and your companions are handed when enlisted in a lord's service (a piece you cannot carry is swapped for your own of the same kind, or for the best one you can carry) and for the weapon a captive gets when you take his famed one. What anyone already wears stays on him, in battle too. Horse barding is not checked. Off = only the game's own check of weapons, shields, arrows, bolts and horses")]
+        [SettingPropertyGroup("Skills rule the gear")]
+        public bool HeroGearRequirements { get; set; } = true;
+
+        [SettingPropertyBool("Hero Skill To Own Gear", HintText = "AI lords, companions and your grown family get the Athletics, Bow and Crossbow their own battle gear demands (armour, arrows, bolts) - raised, never lowered - so that nobody loses his armour to Hero Gear Requirements: on load, whenever the game dresses a hero from a template, and in a daily check. Works only while Hero Gear Requirements is on. You are never raised. Raised skills open their perks too: the game picks them for AI lords (Imposing Stature and Merry Men give a commander 5 more men), your companions and family get them as perk picks. Applied by CrashScribe; turning it off does not lower skills already raised")]
+        [SettingPropertyGroup("Skills rule the gear")]
+        public bool HeroSkillToOwnGear { get; set; } = false;
+
         [SettingPropertyInteger("Weapon Skill Per Tier", 0, 140, "0", HintText = "Weapon Tier Law: a weapon or shield needs at least (tier - 1) x this in its skill, whatever the data says - a tier 6 blade wants 175, so a One Handed 30 bandit never 'qualifies' for it; 0 turns the law off. Applied at session start")]
         [SettingPropertyGroup("Skills rule the gear")]
         public int WeaponSkillPerTier { get; set; } = 35;
@@ -1020,7 +1028,7 @@ namespace Armoury
         [SettingPropertyGroup("The master's parry")]
         public bool AutoParryMirrorSides { get; set; } = true;
 
-        [SettingPropertyBool("Cavalry Needs Mounts", HintText = "upgrading a man into a MOUNTED troop takes a mount from the party inventory - yours and the AI's alike, one horse per man; it goes into the troop armoury where the new rider finds it (the AI's too with Troops Fight With Own Kit Only)")]
+        [SettingPropertyBool("Cavalry Needs Mounts", HintText = "upgrading a man into a MOUNTED troop takes a mount from the party inventory - yours and the AI's alike, one horse per man; the horse goes into the new rider's armoury, for the AI just as for you (AI Upgrade Horse To Armory; always with Troops Fight With Own Kit Only)")]
         [SettingPropertyGroup("A knight needs a horse")]
         public bool CavalryNeedsMounts { get; set; } = true;
 
@@ -1087,6 +1095,14 @@ namespace Armoury
         [SettingPropertyInteger("Ai Mount Shelf Floor", 0, 16, "0", HintText = "and never buys the last few: this many head always stay on the shelf for other buyers")]
         [SettingPropertyGroup("A knight needs a horse")]
         public int AiMountShelfFloor { get; set; } = 4;
+
+        [SettingPropertyBool("Ai Upgrade Horse To Armory", HintText = "the horse an AI lord or garrison pays for a man's upgrade to a mounted troop goes into that party's armoury for the new rider, just as yours does, instead of vanishing. Always on while Troops Fight With Own Kit Only is on - a rider there rides only a horse from the stores. Takes effect at once (off, with own kit only also off = the AI horse is gone on upgrade as before)")]
+        [SettingPropertyGroup("A knight needs a horse")]
+        public bool AiUpgradeHorseToArmory { get; set; } = true;
+
+        [SettingPropertyBool("Ai Free Armory Horses First", HintText = "at an AI upgrade to a mounted troop (and when Realm of Thrones hands a Dothraki party a rider) a horse lying free in the party's armoury - more horses of that kind there than riders entitled to them - is used first, before one is taken from the baggage or bought. Off by default: with Troops Fight With Own Kit Only lords already move spare armoury horses back to the baggage at every stop, where upgrades use them. Takes effect at once")]
+        [SettingPropertyGroup("A knight needs a horse")]
+        public bool AiFreeArmoryHorsesFirst { get; set; } = false;
 
         [SettingPropertyBool("Long Year Enabled", HintText = "stretch the year so the world stops racing: children grow, lords age and seasons turn at a pace a long campaign can live with")]
         [SettingPropertyGroup("The turning year")]
@@ -1777,635 +1793,635 @@ namespace Armoury
         public bool CaravansNoAmmoTrade { get; set; } = true;
 
         [SettingPropertyBool("Levy Enabled", HintText = "volunteers come forward only where there are men to spare: hands the fields do not need, and men who want to leave a poor, burnt or warring land")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public bool LevyEnabled { get; set; } = true;
 
         [SettingPropertyFloatingInteger("Recruit Base Willing", 0.00f, 1.00f, "0.00", HintText = "younger sons and restless lads: the small chance of a volunteer even in a land that needs every hand (against Banner Kings' daily chance)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float RecruitBaseWilling { get; set; } = 0.05f;
 
         [SettingPropertyFloatingInteger("Recruit Excess Weight", 0.00f, 4.00f, "0.00", HintText = "how strongly hands without work on the land (Banner Kings workforce surplus) bring volunteers forward")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float RecruitExcessWeight { get; set; } = 1f;
 
         [SettingPropertyFloatingInteger("Recruit Misery Weight", 0.00f, 1.00f, "0.00", HintText = "how strongly poverty, war, burnt villages and hunger push men to leave and take service")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float RecruitMiseryWeight { get; set; } = 0.2f;
 
         [SettingPropertyFloatingInteger("Recruit Willing Max", 0.00f, 6.00f, "0.00", HintText = "ceiling on the willingness multiplier")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float RecruitWillingMax { get; set; } = 1.5f;
 
         [SettingPropertyBool("Recruit Gold To Seller", HintText = "the gold an AI lord pays for a recruit goes to the notable who raised him (tavern hirelings: to the town), as it already does for you - not into thin air")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public bool RecruitGoldToSeller { get; set; } = true;
 
         [SettingPropertyBool("No Free Kit For New Parties", HintText = "a new AI warband no longer gets a full free kit for all its men (Dynamic Troop Equipment) after the campaign has begun - its lord buys gear at market")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public bool NoFreeKitForNewParties { get; set; } = true;
 
         [SettingPropertyBool("Volunteer Kit Enabled", HintText = "a volunteer rises to a better troop only when his notable buys the missing gear for it on the town market (paid to the town, taken off the stall) - no gear from thin air")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public bool VolunteerKitEnabled { get; set; } = true;
 
         [SettingPropertyBool("Volunteer Kit Key Only", HintText = "the volunteer rises once his notable buys the key pieces (body armour, main weapon - bow or crossbow plus one quiver for archers - and horse with harness for riders); helmet, shield, boots and the rest are bought if on the stall, otherwise they become orders for the workshops")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public bool VolunteerKitKeyOnly { get; set; } = true;
 
         [SettingPropertyBool("Cold Start Enabled", HintText = "new campaign only: the world does not start empty - lords and garrisons have the kit their men already wear in their armouries, and town stalls hold the craftsmen's stock")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public bool ColdStartEnabled { get; set; } = true;
 
         [SettingPropertyFloatingInteger("Cold Start Market Days", 0.00f, 240.00f, "0.00", HintText = "new campaign only: how many days of the town craftsmen's work lie on the stalls at the start (mostly common gear of the town's culture); two months of stock, because recruits no longer bring a second kit from thin air")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float ColdStartMarketDays { get; set; } = 60f;
 
         [SettingPropertyBool("Historical Prices Enabled", HintText = "the whole world in historical prices (1 coin = 1 medieval penny): arms and armour priced from their real making cost, smithing materials at medieval prices - wages and incomes already sit at this scale")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public bool HistoricalPricesEnabled { get; set; } = true;
 
         [SettingPropertyFloatingInteger("Hist Iron Ore Per Kg", 0.00f, 1.00f, "0.00", HintText = "iron ore, pence per kg (England c.1300, estimate)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float HistIronOrePerKg { get; set; } = 0.075f;
 
         [SettingPropertyFloatingInteger("Hist Wood Per Kg", 0.00f, 1.00f, "0.00", HintText = "timber and firewood, pence per kg (Clark/Rogers)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float HistWoodPerKg { get; set; } = 0.035f;
 
         [SettingPropertyFloatingInteger("Hist Charcoal Per Kg", 0.00f, 1.00f, "0.00", HintText = "charcoal, pence per kg (Clark/Rogers)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float HistCharcoalPerKg { get; set; } = 0.07f;
 
         [SettingPropertyFloatingInteger("Hist Crude Iron Per Kg", 0.00f, 5.60f, "0.00", HintText = "crude bloom iron, pence per kg (Tudeley bloom 3s 4d)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float HistCrudeIronPerKg { get; set; } = 1.4f;
 
         [SettingPropertyFloatingInteger("Hist Wrought Iron Per Kg", 0.00f, 10.00f, "0.00", HintText = "wrought bar iron, pence per kg (Clark/Rogers 1300-49: 1.15 d a pound)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float HistWroughtIronPerKg { get; set; } = 2.5f;
 
         [SettingPropertyFloatingInteger("Hist Iron Per Kg", 0.00f, 14.00f, "0.00", HintText = "refined iron, pence per kg")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float HistIronPerKg { get; set; } = 3.5f;
 
         [SettingPropertyFloatingInteger("Hist Steel Per Kg", 0.00f, 24.00f, "0.00", HintText = "steel, pence per kg (estimate)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float HistSteelPerKg { get; set; } = 6f;
 
         [SettingPropertyFloatingInteger("Hist Fine Steel Per Kg", 0.00f, 32.00f, "0.00", HintText = "fine steel, pence per kg (estimate)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float HistFineSteelPerKg { get; set; } = 8f;
 
         [SettingPropertyFloatingInteger("Hist Valyrian Per Kg", 0.00f, 800.00f, "0.00", HintText = "Valyrian steel, pence per kg - a lost art, priced as a rare treasure")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float HistValyrianPerKg { get; set; } = 200f;
 
         [SettingPropertyFloatingInteger("Hist Leather Per Kg", 0.00f, 16.00f, "0.00", HintText = "tanned leather, pence per kg")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float HistLeatherPerKg { get; set; } = 4f;
 
         [SettingPropertyFloatingInteger("Hist Linen Per Kg", 0.00f, 40.00f, "0.00", HintText = "linen and canvas for padding, pence per kg")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float HistLinenPerKg { get; set; } = 10f;
 
         [SettingPropertyFloatingInteger("Hist Special Factor", 0.00f, 1.00f, "0.00", HintText = "horn, sinew and glue of bows, against the old game-scale bill")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float HistSpecialFactor { get; set; } = 0.1f;
 
         [SettingPropertyFloatingInteger("Hist Master Wage T1", 0.00f, 12.00f, "0.00", HintText = "a smith's day of work on plain gear, pence (a craftsman earned about 3 d a day)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float HistMasterWageT1 { get; set; } = 3f;
 
         [SettingPropertyFloatingInteger("Hist Master Wage Per Tier", 0.00f, 6.00f, "0.00", HintText = "each tier above the first adds this to the master's day (a master armourer of fine harness about 10 d)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float HistMasterWagePerTier { get; set; } = 1.5f;
 
         [SettingPropertyFloatingInteger("Hist Profit Percent", 0.00f, 100.00f, "0.00", HintText = "the maker's profit on top of material and labour")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float HistProfitPercent { get; set; } = 25f;
 
         [SettingPropertyFloatingInteger("Town Wage Ref Prosperity", 0.00f, 19200.00f, "0.00", HintText = "a town this prosperous pays its craftsmen exactly the historical day wage (the middle town of Westeros and Essos); a richer town pays more, up to half again (London paid about half again the provinces), a poorer less, down to half (0 = the same everywhere)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float TownWageRefProsperity { get; set; } = 4800f;
 
         [SettingPropertyFloatingInteger("Hist Ammo Labor Multiplier", 0.00f, 32.00f, "0.00", HintText = "fletcher and arrowsmith work on a stack of arrows or bolts (a sheaf of 24 cost about 15 d)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float HistAmmoLaborMultiplier { get; set; } = 8f;
 
         [SettingPropertyFloatingInteger("Hist Tournament Scale", 0.00f, 16.00f, "0.00", HintText = "the game seeks tournament prizes worth 1600-5000; with historical prices the range is divided by this (400-1250 pence: a fine sword, a good harness piece)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float HistTournamentScale { get; set; } = 4f;
 
         [SettingPropertyFloatingInteger("Hist Unique Prestige", 0.00f, 16.00f, "0.00", HintText = "named pieces of the great houses cost this many times their making")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float HistUniquePrestige { get; set; } = 4f;
 
         [SettingPropertyFloatingInteger("Hist Bulk Unit Factor", 0.00f, 40.00f, "0.00", HintText = "ore and timber are sold by the load: one unit weighs this many times the game's 10 kg, so a unit costs whole pence (ore 100 kg = about 8 d, timber 100 kg = about 4 d) instead of a fraction of a penny rounded up to 1-2; village output, town use and every recipe are counted by weight, so nothing else changes")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float HistBulkUnitFactor { get; set; } = 10f;
 
         [SettingPropertyBool("Hist Trade Goods", HintText = "trade goods at historical prices too (grain, wine, tools, wool, silk, velvet, spices, ore of silver and gold...) - England c.1300 by the kilogram")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public bool HistTradeGoods { get; set; } = true;
 
         [SettingPropertyBool("Hist Livestock Prices", HintText = "farm animals at historical prices too (England mid-14th century, by the head): ox 157, cow 113, hog 30, sheep 17, goose 4, chicken 1 penny, where the game asked 300, 200, 60, 80, 50 and 50. Horses, mules and camels keep their worth, which is already about right. Town demand for these animals is counted in the new coin like every other repriced good, so towns buy as many head as before (needs Historical Prices Enabled; off = the game's worth; a change takes effect when a game is next loaded)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public bool HistLivestockPrices { get; set; } = true;
 
         [SettingPropertyFloatingInteger("Hist Hides Per Kg", 0.00f, 4.00f, "0.00", HintText = "raw hides, pence per kg (an ox hide of 25-30 kg sold for 1-3 shillings)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float HistHidesPerKg { get; set; } = 1f;
 
         [SettingPropertyFloatingInteger("Hist Flax Per Kg", 0.00f, 8.00f, "0.00", HintText = "raw flax and hemp, pence per kg (estimate)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float HistFlaxPerKg { get; set; } = 2f;
 
         [SettingPropertyFloatingInteger("Hist Bow Labor Multiplier", 0.00f, 4.00f, "0.00", HintText = "a bowyer's days on a bow, against the smith's model (a war longbow cost 12-18 d)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float HistBowLaborMultiplier { get; set; } = 1.0f;
 
         [SettingPropertyBool("Town Household Use", HintText = "townsfolk buy only their household share of raw goods - flax, wool, hides and ore went to weavers, tanners and smiths, not into homes (England c.1300)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public bool TownHouseholdUse { get; set; } = true;
 
         [SettingPropertyFloatingInteger("Town Use Flax", 0.00f, 1.00f, "0.00", HintText = "share of the townsfolk's old appetite for raw flax they keep (home spinning)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float TownUseFlax { get; set; } = 0.02f;
 
         [SettingPropertyFloatingInteger("Town Use Wool", 0.00f, 1.00f, "0.00", HintText = "share kept for raw wool")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float TownUseWool { get; set; } = 0.02f;
 
         [SettingPropertyFloatingInteger("Town Use Hides", 0.00f, 1.00f, "0.00", HintText = "share kept for raw hides")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float TownUseHides { get; set; } = 0.02f;
 
         [SettingPropertyFloatingInteger("Town Use Iron", 0.00f, 1.00f, "0.00", HintText = "share kept for iron ore - households bought nails and tools, never ore")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float TownUseIron { get; set; } = 0f;
 
         [SettingPropertyFloatingInteger("Town Use Leather", 0.00f, 2.00f, "0.00", HintText = "share kept for leather (shoes, belts, straps)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float TownUseLeather { get; set; } = 0.5f;
 
         [SettingPropertyFloatingInteger("Town Use Linen", 0.00f, 1.60f, "0.00", HintText = "share kept for linen cloth (shirts, bedding)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float TownUseLinen { get; set; } = 0.4f;
 
         [SettingPropertyFloatingInteger("Town Use Hardwood", 0.00f, 4.00f, "0.00", HintText = "share kept for timber and firewood (hearths, bakers, brewers, building)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float TownUseHardwood { get; set; } = 1f;
 
         [SettingPropertyBool("Hist Demand Scaling", HintText = "town demand for each repriced kind of goods is counted in the new coin too - otherwise townsfolk with the old purse buy up tens of times more cheap swords, ore and cloth and the stalls run dry")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public bool HistDemandScaling { get; set; } = true;
 
         [SettingPropertyBool("Hist Demand From Definition", HintText = "the new-coin town demand of each kind of goods is reckoned from the worth its goods were defined with. A Realm of Thrones patch to Banner Kings divides the worth of every Banner Kings good by 100 (bread 20 becomes 0, honey 28 becomes 0, mead 120 becomes 1, fur 125 becomes 1), so bread, pies, fruit, honey, eggs, garum, papyrus and limestone kept their town demand in the old coin (bread up to 10 times its worth in big towns) and mead, fur, gold, ink and dyes got it many times too high. On: reckoned from the defined worth, like every other good; off = as before (a change takes effect when a game is next loaded)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public bool HistDemandFromDefinition { get; set; } = true;
 
         [SettingPropertyBool("Hist Mixed Category Shelf", HintText = "goods that share one town market but were repriced in opposite directions weigh on the stall by the share their makers gave them, not by their new worth. Gold ore became 8 times cheaper and the gold ingot nearly 5 times dearer than Banner Kings set them, so one ingot on a stall (worth 4750) counted like a hundred days of the whole town demand for gold: the first sold for about 2 in 5 parts of its worth, the next for less, and ore fetched 4.6 times its worth on a bare stall. On: an ingot weighs on the stall like 2.5 sacks of ore, as Banner Kings designed, so a bare stall pays about 1.2 times worth for an ingot and about 2 times for ore; the same rule evens apples, carrots and oranges, meat and whale meat, iron ingots beside ore. Prices are still paid in the new worth; kinds of goods with a single good do not change (needs Hist Demand Scaling; off = as before; a change takes effect when a game is next loaded)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public bool HistMixedCategoryShelf { get; set; } = true;
 
         [SettingPropertyBool("Price Formula In New Coin", HintText = "the game's price formula keeps a fixed 2 coins beside the worth of the goods on the stall; in the new coin that weighs like a quarter load of ore or a whole measure of salt, so a bare stall of a cheap good never grew dear (ore 1.5 times its worth at most, timber 0.8). On: every trade good the new coin made cheaper is priced as the unmodded game prices it - a bare stall up to 10 times worth, a glutted one down to a tenth; goods the new coin made dearer (fur, wool, raw silk, velvet) keep the fixed 2 coins, which weigh little beside them; and a new campaign opens with the towns' memory of supply and demand for every repriced trade good already in the new coin instead of drifting out of the old one for weeks (needs Hist Demand Scaling; off = prices as before)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public bool PriceFormulaInNewCoin { get; set; } = true;
 
         [SettingPropertyBool("Raw Price By Use", HintText = "a town prices the seven bulk raw goods (iron ore, timber, raw hides, leather, flax, linen, wool) by what it really uses each day: the share of the townsfolk's old appetite that households truly buy, plus what its craftsmen and workshops work up - the same daily use the caravans stock it by. A town with a smithy and no ore pays many times its worth, a town sitting on a hundred days of use pays a fraction, and wool is dear only where someone weaves it. Arms workshops then pay the market price for ore and timber too (needs Hist Demand Scaling; off = demand and workshop prices as before)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public bool RawPriceByUse { get; set; } = true;
 
         [SettingPropertyBool("Population Rent Enabled", HintText = "a fief pays by the people it stands for: each village and town on the map is a symbol of a whole land, and its lord's rents follow that land's population (the Reach richest, the Iron Islands poor)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public bool PopulationRentEnabled { get; set; } = true;
 
         [SettingPropertyFloatingInteger("Population Rent Per Head", 0.00f, 160.00f, "0.00", HintText = "rents and dues a lord draws from each subject a year, in coins (about 40 pence a head in the medieval estimate)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float PopulationRentPerHead { get; set; } = 40f;
 
         [SettingPropertyFloatingInteger("Population Scale", 0.00f, 4.00f, "0.00", HintText = "scale on every land's population (Westeros ~30 million, Essos with its hinterlands ~30 million)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float PopulationScale { get; set; } = 1f;
 
         [SettingPropertyFloatingInteger("Population Rent Max Share", 0.00f, 1.00f, "0.00", HintText = "a village pays its lord at most this share of its purse each day (0.5 emptied the villages in a few days)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float PopulationRentMaxShare { get; set; } = 0.2f;
 
         [SettingPropertyFloatingInteger("Rent Tax Low", 0.00f, 2.80f, "0.00", HintText = "the fief's tax decree (Banner Kings) sets the rent: Low takes this share of the usual rent")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float RentTaxLow { get; set; } = 0.7f;
 
         [SettingPropertyFloatingInteger("Rent Tax High", 0.00f, 5.20f, "0.00", HintText = "High tax takes this much of the usual rent (and Banner Kings costs loyalty for it)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float RentTaxHigh { get; set; } = 1.3f;
 
         [SettingPropertyFloatingInteger("Rent Tax Exemption", 0.00f, 1.00f, "0.00", HintText = "Exemption: no rent at all")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float RentTaxExemption { get; set; } = 0f;
 
         [SettingPropertyBool("Rent Replaces Town Tax", HintText = "one source of land income: Banner Kings' town population tax (paid from nothing) is replaced by rent from the town purse")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public bool RentReplacesTownTax { get; set; } = true;
 
         [SettingPropertyFloatingInteger("Town Rent Share", 0.00f, 1.00f, "0.00", HintText = "share of the town purse above the merchants' floor its lord draws each day as rents, tolls and farms")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float TownRentShare { get; set; } = 0.07f;
 
         [SettingPropertyFloatingInteger("Town Rent Floor Gold", 0.00f, 80000.00f, "0.00", HintText = "a town keeps this much for its merchants - below 20 000 Banner Kings takes prosperity away")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float TownRentFloorGold { get; set; } = 20000f;
 
         [SettingPropertyBool("Workshop No Free Raw", HintText = "nothing from thin air: the hidden town artisans no longer make timber, ore, hides, meat, leather and linen without any input, and a workshop roll never yields charcoal or ingots (those only come from smelting) - raw goods come from the villages")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public bool WorkshopNoFreeRaw { get; set; } = true;
 
         [SettingPropertyBool("Historical Recruit Cost", HintText = "a recruit costs his prest money - some days of his pay (mercenaries twice that) - instead of the game's flat table by level")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public bool HistoricalRecruitCost { get; set; } = true;
 
         [SettingPropertyFloatingInteger("Recruit Cost Days", 0.00f, 40.00f, "0.00", HintText = "days of a troop's daily pay paid to take him on (historical prest/advance: a few to a dozen days of wages)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float RecruitCostDays { get; set; } = 10f;
 
         [SettingPropertyBool("Ammo Recovery Enabled", HintText = "arrows and bolts are spent: of those shot, the side holding the field gathers some back, some are mended, the rest are lost; the beaten side loses all it shot")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public bool AmmoRecoveryEnabled { get; set; } = true;
 
         [SettingPropertyFloatingInteger("Ammo Recover Percent", 0.00f, 180.00f, "0.00", HintText = "share of shot arrows the winner picks up whole (estimate from Poitiers, Towton and the 1343 Breton shipment)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float AmmoRecoverPercent { get; set; } = 45f;
 
         [SettingPropertyFloatingInteger("Ammo Repair Percent", 0.00f, 80.00f, "0.00", HintText = "share of shot arrows mended by the army's fletchers (new fletching, heads) - the rest are broken or lost")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float AmmoRepairPercent { get; set; } = 20f;
 
         [SettingPropertyBool("Keep Wear Through Battle", HintText = "gear your men take into battle comes back in the state it went out (and worse after the fight) - worn mail no longer returns as new; damage piles up and must be repaired")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public bool KeepWearThroughBattle { get; set; } = true;
 
         [SettingPropertyBool("Start Kit Enabled", HintText = "starting gear you cannot wear (heavy armour your Athletics cannot carry) is swapped once, after character creation, for the best piece of the same kind you can wear - never dearer than the original")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public bool StartKitEnabled { get; set; } = true;
 
         [SettingPropertyInteger("Start Gold Adventurer", 0, 400, "0", HintText = "coins an Adventurer starts with in the Banner Kings start (Banner Kings gives 1000 - over a year of a labourer's pay); -1 leaves Banner Kings as it is")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public int StartGoldAdventurer { get; set; } = 100;
 
         [SettingPropertyBool("Outlaw Law Enabled", HintText = "outlaws are real men: deserters, unpaid soldiers, men routed from battle, villagers driven off by raids, hunger and war; bands form only where such men exist and wear only what they brought, looted or bought")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public bool OutlawLawEnabled { get; set; } = true;
 
         [SettingPropertyFloatingInteger("Outlaw Seed Per Hearth", 0.00f, 1.00f, "0.00", HintText = "outlaws already in the woods when the campaign begins, per hearth of each region's villages (taken from those villages)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float OutlawSeedPerHearth { get; set; } = 0.03f;
 
         [SettingPropertyFloatingInteger("Outlaw Daily Per Thousand Hearth", 0.00f, 1.00f, "0.00", HintText = "men a region loses to the woods each day per 1000 hearths, times its misery (poverty, war, burnt villages, hunger, lawlessness)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float OutlawDailyPerThousandHearth { get; set; } = 0.1f;
 
         [SettingPropertyFloatingInteger("Outlaw War Misery", 0.00f, 2.00f, "0.00", HintText = "misery added while the region's realm is at war - no order, easy plunder")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float OutlawWarMisery { get; set; } = 0.5f;
 
         [SettingPropertyFloatingInteger("Outlaw Looted Misery", 0.00f, 8.00f, "0.00", HintText = "misery added when all of a region's villages lie burnt (scaled by the share burnt)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float OutlawLootedMisery { get; set; } = 2f;
 
         [SettingPropertyFloatingInteger("Outlaw Starving Misery", 0.00f, 6.00f, "0.00", HintText = "misery added while the region's town or castle is starving")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float OutlawStarvingMisery { get; set; } = 1.5f;
 
         [SettingPropertyInteger("Outlaw Prosperity Good", 0, 20000, "0", HintText = "prosperity at which a town counts as fully well-off (no misery from poverty)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public int OutlawProsperityGood { get; set; } = 5000;
 
         [SettingPropertyFloatingInteger("Outlaw Return Base Percent", 0.00f, 2.00f, "0.00", HintText = "percent of a region's outlaws who go home each day in any times")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float OutlawReturnBasePercent { get; set; } = 0.5f;
 
         [SettingPropertyFloatingInteger("Outlaw Return Peace Percent", 0.00f, 8.00f, "0.00", HintText = "extra percent going home each day in peace, scaled by prosperity")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float OutlawReturnPeacePercent { get; set; } = 2f;
 
         [SettingPropertyFloatingInteger("Outlaw Routed Share", 0.00f, 2.00f, "0.00", HintText = "share of soldiers routed or fleeing a lost battle who take to the woods instead of going home (outlaws follow their own share, villagers always go home)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float OutlawRoutedShare { get; set; } = 0.5f;
 
         [SettingPropertyBool("Losers Flee Enabled", HintText = "battles fought without you: the beaten side mostly flees instead of dying - the slain follow the situation (horse to pursue, river or marsh behind, odds, seasoned men against levies), 5-65%; a few are taken; the rest go home or to the woods. The winner loses at most a few slain - the rest of his fallen are wounded. Your own battles fought on the field are not touched (auto-resolved ones: Losers Flee Player Auto)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public bool LosersFleeEnabled { get; set; } = true;
 
         [SettingPropertyBool("Losers Flee Player Auto", HintText = "your own battles decided without you on the field (send troops / auto-resolve) follow the same rule as battles fought without you: the beaten side - theirs or yours - mostly flees, a few are taken, the slain follow the situation; the winner, you too, loses at most a few slain. Battles you fight on the field yourself, even in part, are not touched (needs Losers Flee Enabled)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public bool LosersFleePlayerAuto { get; set; } = true;
 
         [SettingPropertyFloatingInteger("Winner Death Cap Percent", 0.00f, 20.00f, "0.00", HintText = "the winner of a battle fought without you loses at most this share of his men slain; the rest of his fallen live, wounded (history: 1-5%)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float WinnerDeathCapPercent { get; set; } = 5f;
 
         [SettingPropertyFloatingInteger("Loser Captive Veteran Percent", 0.00f, 120.00f, "0.00", HintText = "of the beaten men who live, this share of seasoned troops (tier 4 and up) is taken - they were worth a ransom")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float LoserCaptiveVeteranPercent { get; set; } = 30f;
 
         [SettingPropertyFloatingInteger("Loser Captive Common Percent", 0.00f, 20.00f, "0.00", HintText = "of the beaten men who live, this share of the rest is taken")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float LoserCaptiveCommonPercent { get; set; } = 5f;
 
         [SettingPropertyFloatingInteger("Non Combatant Death Percent", 0.00f, 20.00f, "0.00", HintText = "villagers and fishermen beaten on the road: share slain; the rest run back to their own village (a few are taken only by peoples who keep slaves). Caravan guards fight and are judged like soldiers")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float NonCombatantDeathPercent { get; set; } = 5f;
 
         [SettingPropertyBool("Prisoner Law Enabled", HintText = "captives sold in a town or castle, or set free, in a land that keeps no slaves no longer become slaves: common men and soldiers go back to their own land, and in Westeros bandits and outlaws are sent to the Wall to take the black. Westeros but the Iron Islands, and Braavos, Pentos, Lorath and the other free lands, keep no slaves; Slaver's Bay, Qarth (with New Ghys, Qarkash and the City of Bones), Volantis, Lys, Myr, Tyrosh, Qohor, Norvos, Valyria, the Dothraki and the Iron Islands (thralls) do: there captives sold, by the lords or by you at the ransom broker, become slaves of that town or castle, and captives you set free or leave behind after your battles go home. A land follows the present culture of its town or castle. In every land the criminal policy of the town or castle (yours to choose in your own fiefs) rules alike for the lords' sales and yours: Execution - the captives are put to death, Forgiveness - none are enslaved and they go home")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public bool PrisonerLawEnabled { get; set; } = true;
 
         [SettingPropertyFloatingInteger("Outlaw Band Routed Share", 0.00f, 2.00f, "0.00", HintText = "share of outlaws fleeing a lost fight who go back to the woods; the rest - mostly villagers driven out by want - go home to the villages")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float OutlawBandRoutedShare { get; set; } = 0.5f;
 
         [SettingPropertyFloatingInteger("Outlaw Raid Flee Percent", 0.00f, 12.00f, "0.00", HintText = "percent of a village's hearths that flee to the woods when it is burnt")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float OutlawRaidFleePercent { get; set; } = 3f;
 
         [SettingPropertyFloatingInteger("Outlaw Hearth Per Man", 0.00f, 2.00f, "0.00", HintText = "hearths a village loses for each man who becomes an outlaw (and regains when he returns)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float OutlawHearthPerMan { get; set; } = 0.5f;
 
         [SettingPropertyInteger("Outlaw Min Band", 0, 24, "0", HintText = "fewest men needed nearby before a new band can form")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public int OutlawMinBand { get; set; } = 6;
 
         [SettingPropertyInteger("Outlaw Neighbour Regions", 0, 16, "0", HintText = "a new band gathers men from its own region and this many nearest ones")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public int OutlawNeighbourRegions { get; set; } = 4;
 
         [SettingPropertyFloatingInteger("Outlaw Band Size Scale", 0.00f, 4.00f, "0.00", HintText = "size of a new band against the game's usual size (still only as many as there are men)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float OutlawBandSizeScale { get; set; } = 1f;
 
         [SettingPropertyInteger("Outlaw Daily Recruit", 0, 10, "0", HintText = "men a band can take in each day from the outlaws of the region it roams")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public int OutlawDailyRecruit { get; set; } = 2;
 
         [SettingPropertyFloatingInteger("Outlaw Prisoner Join Percent", 0.00f, 40.00f, "0.00", HintText = "percent of a band's healthy prisoners who join it each day (green men sooner than veterans)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float OutlawPrisonerJoinPercent { get; set; } = 10f;
 
         [SettingPropertyFloatingInteger("Outlaw Commoner Max Armor Kg", 0.00f, 32.00f, "0.00", HintText = "a commoner joins a band as its clan's lowest bandit only if that troop wears body armour this light; otherwise as a looter")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float OutlawCommonerMaxArmorKg { get; set; } = 8f;
 
         [SettingPropertyBool("Outlaw Gear Upgrades", HintText = "a bandit rises in rank only with gear for it: armour and horse from the band's loot, or bought from a fence in a town within reach")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public bool OutlawGearUpgrades { get; set; } = true;
 
         [SettingPropertyFloatingInteger("Outlaw Fence Radius", 0.00f, 800.00f, "0.00", HintText = "reach of the fences: a band deals with every unbesieged town this near and takes the best bargain; a band with no town this near still reaches the nearest one, on the far-edge terms")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float OutlawFenceRadius { get; set; } = 200f;
 
         [SettingPropertyFloatingInteger("Outlaw Fence Markup", 0.00f, 6.00f, "0.00", HintText = "what the fence asks over an item's value when the band stands at the town's gates")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float OutlawFenceMarkup { get; set; } = 1.5f;
 
         [SettingPropertyFloatingInteger("Outlaw Fence Markup Far", 0.00f, 8.00f, "0.00", HintText = "what the fence asks over an item's value at the edge of his reach - the price rises evenly with the road he must ride (armour and horses are light for their worth, so less steeply than plunder loses value)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float OutlawFenceMarkupFar { get; set; } = 2f;
 
         [SettingPropertyBool("Outlaw No Free Gold", HintText = "bands get no gold from nowhere: only what they plunder (no daily top-up, no purse at birth beyond a few coins a man)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public bool OutlawNoFreeGold { get; set; } = true;
 
         [SettingPropertyInteger("Outlaw Coins Per Man", 0, 10, "0", HintText = "coins each man of a new band is handed from what its home hideout holds above the kept hoard, as far as that goes (no surplus or no hideout - the band starts with none)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public int OutlawCoinsPerMan { get; set; } = 2;
 
         [SettingPropertyBool("Outlaw Fence Buys Loot", HintText = "bands sell their plunder to the fences of the towns within reach, each piece where it pays the band best: trade goods, livestock and food go back on the town's shelves, and the town pays from its purse above the merchants' floor")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public bool OutlawFenceBuysLoot { get; set; } = true;
 
         [SettingPropertyFloatingInteger("Outlaw Fence Loot Share", 0.00f, 2.00f, "0.00", HintText = "share of the town's buying price the fence hands a band standing at the town's gates - the rest is the fence's cut and stays in the town's purse")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float OutlawFenceLootShare { get; set; } = 0.5f;
 
         [SettingPropertyFloatingInteger("Outlaw Fence Loot Share Far", 0.00f, 1.00f, "0.00", HintText = "share of the town's buying price the fence hands a band at the edge of his reach - it falls evenly with the road and the risk of carting stolen goods")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float OutlawFenceLootShareFar { get; set; } = 0.25f;
 
         [SettingPropertyBool("Outlaw Fence Buys Spare Animals", HintText = "bands also sell the animals they have no use for: pack beasts beyond what their remaining packs weigh, and riding horses beyond one for every man on foot")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public bool OutlawFenceBuysSpareAnimals { get; set; } = true;
 
         [SettingPropertyBool("Outlaw No Free Food", HintText = "bands get no food from nowhere (they do not eat in this game - what they carry is plunder), and so the fence takes their food too; off = the game hands every new band food again and the fence leaves food alone")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public bool OutlawNoFreeFood { get; set; } = true;
 
         [SettingPropertyBool("Outlaw No Hideout Gold", HintText = "a band coming home no longer gets a quarter of the worth of its packs as gold from nowhere, and neither does its hideout")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public bool OutlawNoHideoutGold { get; set; } = true;
 
         [SettingPropertyFloatingInteger("Outlaw Hideout Stash Share", 0.00f, 1.00f, "0.00", HintText = "share of its own purse a band leaves in the hideout's hoard each time it comes home - real coin, found by whoever clears and searches the hideout (0 = nothing is put by)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float OutlawHideoutStashShare { get; set; } = 0.25f;
 
         [SettingPropertyBool("Outlaw Hoard Circulates", HintText = "a hideout's hoard is spent, not only heaped: whatever lies above the kept hoard hands new bands their first coins, tops up its bands when they are short at the fence, and goes on their living in town")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public bool OutlawHoardCirculates { get; set; } = true;
 
         [SettingPropertyFloatingInteger("Outlaw Life Spend Share", 0.00f, 1.00f, "0.00", HintText = "share of its purse a band spends each day on food, drink and company in the nearest open town - and the share of a hoard's surplus its hideout spends the same way (0 = nothing is spent)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float OutlawLifeSpendShare { get; set; } = 0.1f;
 
         [SettingPropertyBool("Climate Enabled", HintText = "the seasons of Westeros: one season at a time lasting for years, its end proclaimed by a white raven from the Citadel; dates read 'Day N of Summer, 299 AC'")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public bool ClimateEnabled { get; set; } = true;
 
         [SettingPropertyBool("Climate Drives Economy", HintText = "food, harvests, sickness, travel and the AI's winter caution (RealisticBannerlord, BetterEconomy, StrategicCampaignAI) follow the long seasons too - a winter of years is a hungry one")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public bool ClimateDrivesEconomy { get; set; } = true;
 
         [SettingPropertyInteger("Climate Summer Days So Far", 0, 14560, "0", HintText = "how long the summer has already lasted when the campaign begins (the summer that lasted ten years)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public int ClimateSummerDaysSoFar { get; set; } = 3640;
 
         [SettingPropertyInteger("Climate Summer Days Left Min", 0, 480, "0", HintText = "fewest days the long summer still lasts after the campaign begins")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public int ClimateSummerDaysLeftMin { get; set; } = 120;
 
         [SettingPropertyInteger("Climate Summer Days Left Max", 0, 1080, "0", HintText = "most days the long summer still lasts after the campaign begins")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public int ClimateSummerDaysLeftMax { get; set; } = 270;
 
         [SettingPropertyInteger("Climate First Autumn Days Min", 0, 1200, "0", HintText = "the first autumn lasts at least this many days")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public int ClimateFirstAutumnDaysMin { get; set; } = 300;
 
         [SettingPropertyInteger("Climate First Autumn Days Max", 0, 1800, "0", HintText = "the first autumn lasts at most this many days")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public int ClimateFirstAutumnDaysMax { get; set; } = 450;
 
         [SettingPropertyFloatingInteger("Climate First Winter Years Min", 0.00f, 12.00f, "0.00", HintText = "the first winter lasts at least this many years")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float ClimateFirstWinterYearsMin { get; set; } = 3f;
 
         [SettingPropertyFloatingInteger("Climate First Winter Years Max", 0.00f, 20.00f, "0.00", HintText = "the first winter lasts at most this many years")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float ClimateFirstWinterYearsMax { get; set; } = 5f;
 
         [SettingPropertyFloatingInteger("Climate Spring Years Min", 0.00f, 4.00f, "0.00", HintText = "later springs last at least this many years")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float ClimateSpringYearsMin { get; set; } = 1f;
 
         [SettingPropertyFloatingInteger("Climate Spring Years Max", 0.00f, 12.00f, "0.00", HintText = "later springs last at most this many years")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float ClimateSpringYearsMax { get; set; } = 3f;
 
         [SettingPropertyFloatingInteger("Climate Summer Years Min", 0.00f, 8.00f, "0.00", HintText = "later summers last at least this many years")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float ClimateSummerYearsMin { get; set; } = 2f;
 
         [SettingPropertyFloatingInteger("Climate Summer Years Max", 0.00f, 32.00f, "0.00", HintText = "later summers last at most this many years")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float ClimateSummerYearsMax { get; set; } = 8f;
 
         [SettingPropertyFloatingInteger("Climate Autumn Years Min", 0.00f, 4.00f, "0.00", HintText = "later autumns last at least this many years")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float ClimateAutumnYearsMin { get; set; } = 1f;
 
         [SettingPropertyFloatingInteger("Climate Autumn Years Max", 0.00f, 8.00f, "0.00", HintText = "later autumns last at most this many years")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float ClimateAutumnYearsMax { get; set; } = 2f;
 
         [SettingPropertyFloatingInteger("Climate Winter Years Min", 0.00f, 8.00f, "0.00", HintText = "later winters last at least this many years")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float ClimateWinterYearsMin { get; set; } = 2f;
 
         [SettingPropertyFloatingInteger("Climate Winter Years Max", 0.00f, 24.00f, "0.00", HintText = "later winters last at most this many years")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float ClimateWinterYearsMax { get; set; } = 6f;
 
         [SettingPropertyBool("Crown Dues Enabled", HintText = "vassals owe the crown a share of their daily income (fief income and rents), paid into the kingdom treasury - small in peace, heavy in war as with medieval war taxes")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public bool CrownDuesEnabled { get; set; } = true;
 
         [SettingPropertyFloatingInteger("Crown Dues Peace Percent", 0.00f, 8.00f, "0.00", HintText = "share of a vassal house's daily income owed to the crown in peace (aids and dues)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float CrownDuesPeacePercent { get; set; } = 2f;
 
         [SettingPropertyFloatingInteger("Crown Dues War Percent", 0.00f, 12.00f, "0.00", HintText = "share owed while the realm is at war (aids, scutage in place of service) - the war tax itself is paid by the subjects (lay subsidy below)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float CrownDuesWarPercent { get; set; } = 3f;
 
         [SettingPropertyBool("Lay Subsidy Enabled", HintText = "in war the realm's towns and villages pay a war subsidy (the fifteenth and tenth) from their purses into the kingdom treasury")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public bool LaySubsidyEnabled { get; set; } = true;
 
         [SettingPropertyFloatingInteger("Lay Subsidy Town Share", 0.00f, 1.00f, "0.00", HintText = "share of a town's purse above the merchants' floor paid each day of war")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float LaySubsidyTownShare { get; set; } = 0.01f;
 
         [SettingPropertyFloatingInteger("Lay Subsidy Village Share", 0.00f, 1.00f, "0.00", HintText = "share of a village purse paid each day of war")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float LaySubsidyVillageShare { get; set; } = 0.015f;
 
         [SettingPropertyFloatingInteger("Lay Subsidy War Tax Multiplier", 0.00f, 8.00f, "0.00", HintText = "with the War Tax policy the subsidy is this many times heavier")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float LaySubsidyWarTaxMultiplier { get; set; } = 2f;
 
         [SettingPropertyBool("Crown Customs Enabled", HintText = "every crown takes customs on trade: a share of each town's toll counter goes to the kingdom treasury (the wool custom of 1275)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public bool CrownCustomsEnabled { get; set; } = true;
 
         [SettingPropertyFloatingInteger("Crown Customs Share", 0.00f, 1.00f, "0.00", HintText = "share of a town's daily toll counter taken as customs")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float CrownCustomsShare { get; set; } = 0.1f;
 
         [SettingPropertyFloatingInteger("Crown Customs Duty Multiplier", 0.00f, 8.00f, "0.00", HintText = "with the Crown Duty policy the customs are this many times heavier")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float CrownCustomsDutyMultiplier { get; set; } = 2f;
 
         [SettingPropertyBool("Policy Income Conserved", HintText = "Debasement and State Monopolies no longer make gold from nothing: the mint's profit comes out of the realm's town purses, monopoly dues out of workshop capital; foreign caravans no longer bring 500 from nothing under trade agreements; Banner Kings' village tax office is replaced by the rent")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public bool PolicyIncomeConserved { get; set; } = true;
 
         [SettingPropertyFloatingInteger("Debasement Share", 0.00f, 1.00f, "0.00", HintText = "share of each town purse above the merchants' floor the crown takes each day while it debases the coin")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float DebasementShare { get; set; } = 0.005f;
 
         [SettingPropertyBool("No Rot Clan Bailout", HintText = "Realm of Thrones no longer hands every poor AI house Tier x 5000 gold a day from thin air - a house short of money borrows from the Iron Bank or goes bankrupt")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public bool NoRotClanBailout { get; set; } = true;
 
         [SettingPropertyBool("No Free Kingdom Gold", HintText = "the kingdom treasury no longer refills from thin air (vanilla +1000 a day and random windfalls of 100-400 thousand); it lives on what the houses pay in - change needs a game restart")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public bool NoFreeKingdomGold { get; set; } = true;
 
         [SettingPropertyInteger("Iron Bank Min Days To Lend", 0, 120, "0", HintText = "the Bank lends no more to a house whose running debt falls due within this many days - pay first")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public int IronBankMinDaysToLend { get; set; } = 30;
 
         [SettingPropertyFloatingInteger("Iron Bank Loan Fee Percent", 0.00f, 8.00f, "0.00", HintText = "fee the Iron Bank adds to every loan, owed with the debt - no free same-day borrowing")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float IronBankLoanFeePercent { get; set; } = 2f;
 
         [SettingPropertyFloatingInteger("Iron Bank Default Seize Share", 0.00f, 2.00f, "0.00", HintText = "share of a defaulter's purse the Bank seizes at once when he defaults (then 25% a day as before)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float IronBankDefaultSeizeShare { get; set; } = 0.5f;
 
         [SettingPropertyBool("Iron Bank Enabled", HintText = "the Iron Bank of Braavos lends to lords (AI and you): wages and war chests on credit, repaid daily with interest and from the spoils of war - and woe to those who do not pay")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public bool IronBankEnabled { get; set; } = true;
 
         [SettingPropertyInteger("Iron Bank Capital", 0, 20000000, "0", HintText = "gold the Bank starts with; loans draw it down, repayments with interest fill it up - an empty Bank lends nothing")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public int IronBankCapital { get; set; } = 5000000;
 
         [SettingPropertyFloatingInteger("Iron Bank Income Days", 0.00f, 240.00f, "0.00", HintText = "a house may borrow this many days of its income, plus its fiefs as surety")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float IronBankIncomeDays { get; set; } = 60f;
 
         [SettingPropertyInteger("Iron Bank Per Town", 0, 40000, "0", HintText = "surety the Bank counts for every town a house holds")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public int IronBankPerTown { get; set; } = 10000;
 
         [SettingPropertyInteger("Iron Bank Per Castle", 0, 20000, "0", HintText = "surety the Bank counts for every castle a house holds")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public int IronBankPerCastle { get; set; } = 5000;
 
         [SettingPropertyInteger("Iron Bank Wage Days", 0, 40, "0", HintText = "an AI lord borrows when his gold will not cover this many days of his armies' wages (twice that at war)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public int IronBankWageDays { get; set; } = 10;
 
         [SettingPropertyFloatingInteger("Iron Bank Rate King", 0.00f, 80.00f, "0.00", HintText = "yearly interest for a king (percent)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float IronBankRateKing { get; set; } = 20f;
 
         [SettingPropertyFloatingInteger("Iron Bank Rate Landed", 0.00f, 120.00f, "0.00", HintText = "yearly interest for a house with fiefs (percent)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float IronBankRateLanded { get; set; } = 30f;
 
         [SettingPropertyFloatingInteger("Iron Bank Rate Landless", 0.00f, 180.00f, "0.00", HintText = "yearly interest for a house without fiefs (percent)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float IronBankRateLandless { get; set; } = 45f;
 
         [SettingPropertyFloatingInteger("Iron Bank Rate Per Loan", 0.00f, 40.00f, "0.00", HintText = "extra yearly interest when a debt is already running (percentage points)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float IronBankRatePerLoan { get; set; } = 10f;
 
         [SettingPropertyFloatingInteger("Iron Bank Rate After Default", 0.00f, 60.00f, "0.00", HintText = "extra yearly interest for a house that has defaulted before (percentage points)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float IronBankRateAfterDefault { get; set; } = 15f;
 
         [SettingPropertyFloatingInteger("Iron Bank Player Default Renown", 0.00f, 400.00f, "0.00", HintText = "renown you lose when the Bank writes your name among those who did not pay")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public float IronBankPlayerDefaultRenown { get; set; } = 100f;
 
         [SettingPropertyInteger("Iron Bank Log Per Day", 0, 60, "0", HintText = "how many loans and repayments are written to the log each day (the daily total always is)")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public int IronBankLogPerDay { get; set; } = 15;
 
         [SettingPropertyBool("Iron Bank Family Pays", HintText = "AI houses only: before the Iron Bank marks an instalment as missed or lends anew, the grown members of the house hand their head what is lacking - only what each holds above 5000 gold or Iron Bank Wage Days (default 10) of his own party's wages, whichever is more")]
-        [SettingPropertyGroup("Iron bank")]
+        [SettingPropertyGroup("Iron Bank")]
         public bool IronBankFamilyPays { get; set; } = true;
 
         [SettingPropertyBool("Soldier Pay To Purse", HintText = "the wages a party is actually paid no longer vanish: they go to the purse of its men, who spend them in the towns (mending, missing kit, food and drink) - your own men too; needs Men Purse Enabled")]
@@ -2652,13 +2668,13 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public bool WorkshopNightRest { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Kg Per Athletics Point", 0.00f, 1.00f, "0.00", HintText = "Weight Law: kilograms of armour one Athletics point can carry (difficulty = weight / this); applied at session start")]
+        [SettingPropertyFloatingInteger("Armour Kg Per Athletics", 0.00f, 1.33f, "0.00", HintText = "Weight Law: kilograms of armour one Athletics point can carry - the ONLY Athletics requirement of armour (Jeff 09.10: everything from weight): difficulty = weight / this, set exactly (also lowered below the Realm of Thrones values), so gloves, capes, hats and gowns ask almost nothing and the heaviest 50 kg plate asks 150; applied at session start")]
         [SettingPropertyGroup("A night's rest")]
-        public float KgPerAthleticsPoint { get; set; } = 0.25f;
+        public float ArmourKgPerAthletics { get; set; } = 0.333f;
 
-        [SettingPropertyInteger("Armor Athletics Per Tier", 0, 140, "0", HintText = "Armour Tier Law: any piece of armour (helmet, body, boots, gloves, cape) needs at least (tier - 1) x this Athletics, whatever its weight says - tier 4 boots want 105, so a low-Athletics bandit never 'qualifies' for them; 0 turns the law off. Applied at session start, after the Weight Law (the higher of the two wins)")]
+        [SettingPropertyInteger("Armour Tier Athletics", 0, 10, "0", HintText = "Armour Tier Law: any piece of armour (helmet, body, boots, gloves, cape) needs at least (tier - 1) x this Athletics, whatever its weight says - tier 4 boots want 105, so a low-Athletics bandit never 'qualifies' for them; 0 turns the law off (default since 09.10 - Jeff: armour by weight only). Applied at session start, after the Weight Law (the higher of the two wins)")]
         [SettingPropertyGroup("A night's rest")]
-        public int ArmorAthleticsPerTier { get; set; } = 35;
+        public int ArmourTierAthletics { get; set; } = 0;
 
         [SettingPropertyBool("Hit Scribe Enabled", HintText = "battle log: every missile hit written to Armoury.log (weapon, victim, body part, damage, armor absorbed) - capped per mission")]
         [SettingPropertyGroup("A night's rest")]
@@ -2895,6 +2911,82 @@ namespace Armoury
         [SettingPropertyBool("Log Enabled", HintText = "write a log file in the module folder")]
         [SettingPropertyGroup("Grateful villages")]
         public bool LogEnabled { get; set; } = true;
+
+        [SettingPropertyBool("Army175 Measure", HintText = "measurement only, nothing in the game changes: a daily log line of AI horse upgrades (made, refused or cut for lack of a horse, horses into armouries, purchases, where riders come from) and a line per battle and per day on the balance of the kingdoms (battles won against the odds, assaults, fortresses taken and lost, men in the field), with csv files in the session's log folder. Takes effect at once")]
+        [SettingPropertyGroup("Armies of the realms (175)")]
+        public bool Army175Measure { get; set; } = true;
+
+        [SettingPropertyInteger("North Home Edge Percent", 0, 25, "0", HintText = "the North is hardier at home: in auto-resolved field battles on snow (anywhere) and in the forests of the North, Northern infantry of tier 3 to 6 (village, noble and house lines) in parties of Northern houses fights this many percent stronger - it strikes harder and is struck less. Never at sieges; it only tips battles that are almost even. 0 = off. Takes effect at once")]
+        [SettingPropertyGroup("Armies of the realms (175)")]
+        public int NorthHomeEdgePercent { get; set; } = 10;
+
+        [SettingPropertyInteger("North Hardy Weapon Bonus", 0, 50, "0", HintText = "Northern infantry of tier 3 to 6 (village, noble and house lines, 43 troop types) gets this many points of its main weapon skill on top of what its own gear demands. 0 = none: after the tier gear fix their main weapon already averages about 131, against about 122 for the infantry of tier 3 and up of the rest of the world (+7%); +10 makes it about +16%, +25 about +28%. Each man is capped one point below the next tier's requirement, so he never outgrows his tier. Works only while Army 175 Tier Gear is at work. Applied by CrashScribe, takes effect on the next load")]
+        [SettingPropertyGroup("Armies of the realms (175)")]
+        public int NorthHardyWeaponBonus { get; set; } = 0;
+
+        [SettingPropertyInteger("North Hardy Athletics Bonus", 0, 50, "0", HintText = "the same Northern infantry of tier 3 to 6 gets this many points of Athletics on top of what its own gear demands - the men of the North are built sterner and march harder. 5 brings their average Athletics from about 130 to about 135 (the rest of the world about 121: +12% instead of +8%). Each man is capped one point below the next tier's requirement. Works only while Army 175 Tier Gear is at work. 0 = off. Applied by CrashScribe, takes effect on the next load")]
+        [SettingPropertyGroup("Armies of the realms (175)")]
+        public int NorthHardyAthleticsBonus { get; set; } = 5;
+
+        [SettingPropertyBool("Army175 Tier Gear", HintText = "every soldier type - all cultures, village and noble lines, house troops, militia, mercenaries and garrisons, never lords, companions or you - carries and wears in its pattern only weapons, shields, ammunition and armour up to its own tier: a piece above it is replaced by the same kind of piece of that tier. A man still uses only the gear his skills allow. Applied by CrashScribe, takes effect on the next load; from then on the Armoury also keeps the battle pattern of your fights within the soldier's tier")]
+        [SettingPropertyGroup("Armies of the realms (175)")]
+        public bool Army175TierGear { get; set; } = true;
+
+        [SettingPropertyBool("Army175 Lore Armor", HintText = "Pentos and Qarth hire their wars: their infantry of tier 2 to 4 wears armour one step lighter, within its tier. Applied by CrashScribe, takes effect on the next load")]
+        [SettingPropertyGroup("Armies of the realms (175)")]
+        public bool Army175LoreArmor { get; set; } = true;
+
+        [SettingPropertyBool("Army175 Lore Armor Extra", HintText = "Qohor, the city of armourers, gives its infantry of tier 4 and 5 the heaviest body armour of their tier, while the Dornish footmen, spearmen and guards of tier 3 and 4 wear body armour one step lighter, within their tier. Applied by CrashScribe, takes effect on the next load")]
+        [SettingPropertyGroup("Armies of the realms (175)")]
+        public bool Army175LoreArmorExtra { get; set; } = true;
+
+        [SettingPropertyBool("Army175 Simple Javelins", HintText = "the simplest javelin of the game - the Pine Javelin, a wrought iron head on a pine shaft and the cheapest of them all - counts as tier 2 gear instead of tier 4: it needs only 35 Throwing and is priced as tier 2, so javelin men of tier 2 and 3 (Dornish, Braavosi, Sarnori, sellswords, Ironborn, Northern woodsmen and others) carry javelins in their pattern instead of throwing axes. Works only together with Army 175 Tier Gear. Applied by CrashScribe, takes effect on the next load")]
+        [SettingPropertyGroup("Armies of the realms (175)")]
+        public bool Army175SimpleJavelins { get; set; } = true;
+
+        [SettingPropertyBool("Army175 Composition", HintText = "master switch for the troop mix of the realms below (Dothraki, Iron Islands, the North, Volantis and Norvos, the Free Folk and Dragonstone): party templates and upgrade trees as the books have them. Applied by CrashScribe, takes effect on the next load")]
+        [SettingPropertyGroup("Armies of the realms (175)")]
+        public bool Army175Composition { get; set; } = true;
+
+        [SettingPropertyBool("Army175 Dothraki Ride", HintText = "the Dothraki fight on horseback: a village recruit still starts on foot, but his only way up is the riding line; Dothraki on foot stay in the militia and those already serving keep their place. Their parties cost more in pay, riders are paid more - this is the switch if the khalasars go bankrupt. Applied by CrashScribe, takes effect on the next load")]
+        [SettingPropertyGroup("Armies of the realms (175)")]
+        public bool Army175DothrakiRide { get; set; } = true;
+
+        [SettingPropertyBool("Army175 Dothraki Horse Guard", HintText = "when Realm of Thrones swaps a man in a Dothraki party for a rider, he becomes a rider only if a horse is found for him - one from the baggage (or a free one in the armoury, with Ai Free Armory Horses First); with none he becomes a Dothraki on foot of the same tier (if Realm of Thrones keeps that foot troop in the house's pool). Works only while CrashScribe has the Dothraki riding since the last load (Army 175 Dothraki Ride), so switching that off ends the guard at the next load together with the riding change. Takes effect at once")]
+        [SettingPropertyGroup("Armies of the realms (175)")]
+        public bool Army175DothrakiHorseGuard { get; set; } = true;
+
+        [SettingPropertyInteger("Dothraki Riding Bonus", 0, 50, "0", HintText = "Dothraki riders of tier 2 to 5 of the village line get this many points of Riding - they ride better than any knight. 0 = off. Applied by CrashScribe, takes effect on the next load")]
+        [SettingPropertyGroup("Armies of the realms (175)")]
+        public int DothrakiRidingBonus { get; set; } = 30;
+
+        [SettingPropertyBool("Army175 Ironborn Foot", HintText = "the Iron Islands fight on foot and at sea: the Harlaw riders remain their only horse, other Ironborn riders give way to infantry of the same tier in lord parties, patrols and the vassal reward. Applied by CrashScribe, takes effect on the next load")]
+        [SettingPropertyGroup("Armies of the realms (175)")]
+        public bool Army175IronbornFoot { get; set; } = true;
+
+        [SettingPropertyBool("Army175 North Foot", HintText = "the North raises more foot, fewer archers and a little more horse; the Mormonts keep their huntresses and stay archers. Applied by CrashScribe, takes effect on the next load")]
+        [SettingPropertyGroup("Armies of the realms (175)")]
+        public bool Army175NorthFoot { get; set; } = true;
+
+        [SettingPropertyBool("Army175 Volantis Norvos", HintText = "As in the books: Volantis fields more foot and fewer archers (the tiger cloaks are foot), Norvos more axemen and fewer riders; the Volantene riders and elephants stay as they are. Applied by CrashScribe, takes effect on the next load")]
+        [SettingPropertyGroup("Armies of the realms (175)")]
+        public bool Army175VolantisNorvos { get; set; } = true;
+
+        [SettingPropertyBool("Army175 Minor Lore", HintText = "the Free Folk with fewer horsemen, and Dragonstone, Velaryon and Celtigar with horse at about a tenth of their men. Applied by CrashScribe, takes effect on the next load")]
+        [SettingPropertyGroup("Armies of the realms (175)")]
+        public bool Army175MinorLore { get; set; } = true;
+
+        [SettingPropertyBool("Army175 Golden Bows", HintText = "waits for the armoury restocking package: Golden Company crossbowmen split into thirds - crossbows, recurve bows and yew longbows - and in battle each man takes the missile weapon of his drawn kit. The kits are made by CrashScribe on the next load; the Armoury part (the drawn kit decides, only for the three Golden Company crossbow troops) acts at once")]
+        [SettingPropertyGroup("Armies of the realms (175)")]
+        public bool Army175GoldenBows { get; set; } = false;
+
+        [SettingPropertyBool("Others Steel Rule", HintText = "As in the books: the Others - the White Walkers and the Night King - take full damage only from Valyrian steel, dragonglass and dragonfire; castle-forged steel of tier 6 (the best any smith can make) deals Others Castle Steel Percent of its damage, everything else 15%. A thrown weapon counts by itself, an arrow or bolt by its own tier (the bow or crossbow does not matter); sling stones, thrown stones, boulders, fire pots, shield bashes and anything shot by a siege engine always deal 15%. Common wights still fall to anything. Works in your battles and in auto-resolved ones, both by the gear the troops carry after the Army175 Tier Gear fix (in auto-resolve a troop type counts by its best weapon, or by its best arrows or bolts if it has the bow or crossbow for them). The first time in a battle you or your men strike one of them with steel that only bites, a message says so. Nobody in the world carries dragonglass yet (the only piece, the Dragonglass Axe, has no owner). Off = the old rule on the same gear: any tier 6 weapon deals full damage (in auto-resolve tier 6 ammunition too), the rest 15% - auto-resolve still uses the gear after the Army175 Tier Gear fix, so turning this off does not bring back the old auto-resolve strength against the Others. Dragonfire burns them fully either way. Applied by CrashScribe, takes effect the next day or in the next battle")]
+        [SettingPropertyGroup("The Others and Valyrian steel (175c)")]
+        public bool OthersSteelRule { get; set; } = true;
+
+        [SettingPropertyInteger("Others Castle Steel Percent", 15, 100, "0", HintText = "share of its damage that castle-forged steel of tier 6 - a tier 6 weapon, or a tier 6 arrow or bolt - deals to the White Walkers and the Night King while Others Steel Rule is on (Valyrian steel, dragonglass and dragonfire always deal full damage; any lesser weapon, stones and siege engines 15%). 100 = tier 6 counts as Valyrian steel, as before. Applied by CrashScribe, takes effect the next day or in the next battle")]
+        [SettingPropertyGroup("The Others and Valyrian steel (175c)")]
+        public int OthersCastleSteelPercent { get; set; } = 50;
 
         [SettingPropertyBool("Map Villages Enabled", HintText = "named villages on the campaign map between the game's own villages, castles and towns - each one a cluster of its district's settlements, standing where a village had reason to stand (bridge, ford, crossroads, road, river, coast); off = none drawn. Nothing is written to the save")]
         [SettingPropertyGroup("Map villages")]
@@ -3354,6 +3446,8 @@ namespace Armoury
             s.TroopSelfMendPercentPerDay = TroopSelfMendPercentPerDay;
             s.TroopSkillAutoFit = TroopSkillAutoFit;
             s.SkillsDecideEnabled = SkillsDecideEnabled;
+            s.HeroGearRequirements = HeroGearRequirements;
+            s.HeroSkillToOwnGear = HeroSkillToOwnGear;
             s.WeaponSkillPerTier = WeaponSkillPerTier;
             s.ElephantQuarantineEnabled = ElephantQuarantineEnabled;
             s.HideoutPurgeEnabled = HideoutPurgeEnabled;
@@ -3463,6 +3557,8 @@ namespace Armoury
             s.MountedWageFactor = MountedWageFactor;
             s.AiMountMarketSharePercent = AiMountMarketSharePercent;
             s.AiMountShelfFloor = AiMountShelfFloor;
+            s.AiUpgradeHorseToArmory = AiUpgradeHorseToArmory;
+            s.AiFreeArmoryHorsesFirst = AiFreeArmoryHorsesFirst;
             s.LongYearEnabled = LongYearEnabled;
             s.WeeksPerSeason = WeeksPerSeason;
             s.MarchPaceEnabled = MarchPaceEnabled;
@@ -3854,8 +3950,8 @@ namespace Armoury
             s.AnvilShiftEnabled = AnvilShiftEnabled;
             s.AnvilShiftHours = AnvilShiftHours;
             s.WorkshopNightRest = WorkshopNightRest;
-            s.KgPerAthleticsPoint = KgPerAthleticsPoint;
-            s.ArmorAthleticsPerTier = ArmorAthleticsPerTier;
+            s.ArmourKgPerAthletics = ArmourKgPerAthletics;
+            s.ArmourTierAthletics = ArmourTierAthletics;
             s.HitScribeEnabled = HitScribeEnabled;
             s.ArmorSanityEnabled = ArmorSanityEnabled;
             s.ArmorOutlierPercentile = ArmorOutlierPercentile;
@@ -3915,6 +4011,25 @@ namespace Armoury
             s.BanditCheerRadius = BanditCheerRadius;
             s.BanditCheerRelation = BanditCheerRelation;
             s.LogEnabled = LogEnabled;
+            s.Army175Measure = Army175Measure;
+            s.NorthHomeEdgePercent = NorthHomeEdgePercent;
+            s.NorthHardyWeaponBonus = NorthHardyWeaponBonus;
+            s.NorthHardyAthleticsBonus = NorthHardyAthleticsBonus;
+            s.Army175TierGear = Army175TierGear;
+            s.Army175LoreArmor = Army175LoreArmor;
+            s.Army175LoreArmorExtra = Army175LoreArmorExtra;
+            s.Army175SimpleJavelins = Army175SimpleJavelins;
+            s.Army175Composition = Army175Composition;
+            s.Army175DothrakiRide = Army175DothrakiRide;
+            s.Army175DothrakiHorseGuard = Army175DothrakiHorseGuard;
+            s.DothrakiRidingBonus = DothrakiRidingBonus;
+            s.Army175IronbornFoot = Army175IronbornFoot;
+            s.Army175NorthFoot = Army175NorthFoot;
+            s.Army175VolantisNorvos = Army175VolantisNorvos;
+            s.Army175MinorLore = Army175MinorLore;
+            s.Army175GoldenBows = Army175GoldenBows;
+            s.OthersSteelRule = OthersSteelRule;
+            s.OthersCastleSteelPercent = OthersCastleSteelPercent;
             s.MapVillagesEnabled = MapVillagesEnabled;
             s.MapVillagesHideAboveCameraHeight = MapVillagesHideAboveCameraHeight;
             s.MapVillageNamesOnHover = MapVillageNamesOnHover;

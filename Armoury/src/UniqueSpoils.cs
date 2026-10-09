@@ -18,7 +18,8 @@ namespace Armoury
     /// znikaly; jak sprzedam, moze pojawia sie gdzies indziej, bo ktos sprzeda albo jakis lord kupi"; AI pojmujace: "tak").
     ///  1. Spis unikatow ROT (RotUniques, docs/ROT-UNIKATY.md) dostaje NotMerchandise - sklepy ich nie zaopatruja i warsztaty
     ///     ich nie robia. RAZ na kampanie (flaga w save) zdejmujemy kopie z zaopatrzenia startowego: z polek i bagazy AI -
-    ///     oryginal nosi postac. Potem NIC nie znika: unikat sprzedany na targu lezy na polce.
+    ///     oryginal nosi postac. Potem NIC nie znika: unikat sprzedany na targu lezy na polce (do Z16-1c CS czystka polek
+    ///     Mends.UniqueWares zjadala przy kazdym wczytaniu sztuki z listy UniqueGear - od Z16-1c pomija te, ktore liczy Is).
     ///  2. Zwyczaj wojenny XIV w. (zbroja i kon jenca dla pojmujacego): kto bierze w niewole albo zabija w walce postac, ktora
     ///     NOSI unikat - gracz albo lord AI - dostaje go (gracz do taboru, lord zaklada; jego stara sztuka do taboru partii).
     ///     Pojmany dostaje zwykly zamiennik swojej kultury.
@@ -113,7 +114,7 @@ namespace Armoury
         // ------------------------------------------------------------ zdobycz (pojmanie, smierc w walce)
         internal static void OnPrisonerTaken(PartyBase capturer, Hero prisoner)
         {
-            try { if (capturer != null) Take(prisoner, capturer.LeaderHero, capturer == PartyBase.MainParty, "pojmanie"); }
+            try { if (capturer != null) Take(prisoner, capturer.LeaderHero, capturer == PartyBase.MainParty, "pojmanie", false); }
             catch (Exception e) { Log.Error("UniqueSpoils.Prisoner", e); }
         }
 
@@ -123,36 +124,93 @@ namespace Armoury
             {
                 if (victim == null || killer == null || detail != KillCharacterAction.KillCharacterActionDetail.DiedInBattle) return;
                 bool player = killer == Hero.MainHero || killer.PartyBelongedTo == MobileParty.MainParty;
-                Take(victim, player ? Hero.MainHero : (killer.PartyBelongedTo != null && killer.PartyBelongedTo.LeaderHero != null ? killer.PartyBelongedTo.LeaderHero : killer), player, "smierc w walce");
+                Take(victim, player ? Hero.MainHero : (killer.PartyBelongedTo != null && killer.PartyBelongedTo.LeaderHero != null ? killer.PartyBelongedTo.LeaderHero : killer), player, "smierc w walce", true);
             }
             catch (Exception e) { Log.Error("UniqueSpoils.Killed", e); }
         }
 
-        private static void Take(Hero from, Hero to, bool toPlayer, string how)
+        /// <summary>victimDies: ofiara ginie (HeroKilledEvent idzie PRZED ChangeState(Dead) - gra 1.4.8 KillCharacterAction.cs:144
+        /// vs :227 - wiec from.IsDead jest tu jeszcze false; dlatego flaga z wywolania, nie ze stanu bohatera).</summary>
+        private static void Take(Hero from, Hero to, bool toPlayer, string how, bool victimDies)
         {
             if (from == null || to == null || from == to) return;
             if (from == Hero.MainHero && !Settings.Current.UniqueSpoilsFromPlayer) return;
             var eq = from.BattleEquipment;
             if (eq == null) return;
             var got = new List<string>();
+            var toBag = new List<string>();
+            var toClanBag = new List<string>();
+            var overSkill = new List<string>();
+            var kept = new List<string>();
+            bool req = Settings.Current != null && Settings.Current.HeroGearRequirements;
             for (int i = 0; i < (int)EquipmentIndex.NumEquipmentSetSlots; i++)
             {
                 var slot = (EquipmentIndex)i;
                 var el = eq[slot];
                 if (el.IsEmpty || !Is(el.Item)) continue;
+                // Z16 (Jeff 09.10): lord AI ZAKLADA unikat tylko, gdy go udzwignie (ItemReq.MeetsHero); inaczej sztuka idzie
+                // do taboru jego partii. Tabor AI to nie koniec drogi (POPRAWKA Z16-5, recenzja): lord sprzedaje w miescie
+                // wszystko poza jedzeniem (gra, PartiesSellLootCampaignBehavior) - na polce sztuka lezy dalej (od Z16-1c CS
+                // czystka polek przy wczytaniu jej nie zjada); a przy nastepnym wczytaniu UniqueLaw.SweepRoster zamienia unikaty
+                // z listy UniqueGear lezace w taborach AI na zwykle zamienniki (prawo unikatow 16.09) - taka sztuka, jesli jest
+                // w taborze AI w chwili zapisu, przestaje byc unikatem (czy ma przetrwac - osobna decyzja Jeffa).
+                // Zwyciezca bez partii (rzadkie, np. bohater w osadzie bez partii): przy POJMANIU sztuka zostaje na jencu
+                // (zyje - nic nie znika); przy SMIERCI ofiary zmarly wypada ze swiata, a z nim sztuka, wiec (POPRAWKA Z16-5):
+                // tabor partii glowy klanu zwyciezcy, a gdy i tego brak - zwyciezca zaklada jak przed Z16 (kronika mowi to
+                // wprost; dzienny przeglad CS podniesie mu umiejetnosc do wlasnego zestawu).
+                ItemRoster bag = null;
+                bool wear = true;
+                if (!toPlayer && req && !ItemReq.MeetsHero(to.CharacterObject, el.Item))
+                {
+                    wear = false;
+                    bag = to.PartyBelongedTo != null ? to.PartyBelongedTo.ItemRoster : null;
+                    if (bag == null && victimDies)
+                    {
+                        bag = ClanBag(to);
+                        if (bag != null) toClanBag.Add(el.Item.StringId);
+                        else { wear = true; overSkill.Add(el.Item.StringId); }
+                    }
+                    if (bag == null && !wear) { kept.Add(el.Item.StringId); continue; }
+                }
                 ItemObject stand = null;
-                try { stand = UniqueLaw.StandInFor(el.Item, from.Culture); } catch { }
+                try { stand = UniqueLaw.StandInFor(el.Item, from.Culture, from); } catch { }   // Z16: zamiennik w granicy umiejetnosci ofiary
                 eq[slot] = stand != null ? new EquipmentElement(stand) : EquipmentElement.Invalid;
                 if (toPlayer) MobileParty.MainParty.ItemRoster.AddToCounts(el, 1);
-                else Wear(to, el);
+                else if (wear) Wear(to, el);
+                else
+                {
+                    bag.AddToCounts(el, 1);
+                    if (!toClanBag.Contains(el.Item.StringId)) toBag.Add(el.Item.StringId);
+                }
                 got.Add(el.Item.Name.ToString());
             }
+            if (kept.Count > 0)
+                Log.Info("Kronika unikatow: " + to.Name + " nie udzwignie i nie ma taboru - zostaje na jencu " + from.Name + " (" + how + "): "
+                         + string.Join(", ", kept.ToArray()) + ".");
             if (got.Count == 0) return;
             string list = string.Join(", ", got.ToArray());
-            Log.Info("Kronika unikatow: " + from.Name + " -> " + to.Name + " (" + how + "): " + list + ".");
+            string lead = "?";
+            try { if (to.Clan != null && to.Clan.Leader != null) lead = to.Clan.Leader.Name.ToString(); } catch { }
+            Log.Info("Kronika unikatow: " + from.Name + " -> " + to.Name + " (" + how + "): " + list
+                     + (toBag.Count > 0 ? " (ponad umiejetnosc - do taboru: " + string.Join(", ", toBag.ToArray()) + ")" : "")
+                     + (toClanBag.Count > 0 ? " (ponad umiejetnosc, zwyciezca bez partii - do taboru glowy klanu " + lead + ": "
+                        + string.Join(", ", toClanBag.ToArray()) + ")" : "")
+                     + (overSkill.Count > 0 ? " (ponad umiejetnosc, ale w klanie brak taboru - zaklada jak przed Z16: "
+                        + string.Join(", ", overSkill.ToArray()) + ")" : "") + ".");
             if (toPlayer) Log.Player("By the custom of war, the arms of " + from.Name + " are yours: " + list + ".");
             else if (from == Hero.MainHero) Log.Player(to.Name + " takes your arms by the custom of war: " + list + ".", true);
             // cudze zdobycze tylko w kronice (Jeff: za duzo smieci)
+        }
+
+        /// <summary>Z16-5: tabor partii glowy klanu (zwyciezca bez wlasnej partii, ofiara ginie) albo null.</summary>
+        private static ItemRoster ClanBag(Hero h)
+        {
+            try
+            {
+                var lead = h != null && h.Clan != null ? h.Clan.Leader : null;
+                return lead != null && lead.PartyBelongedTo != null ? lead.PartyBelongedTo.ItemRoster : null;
+            }
+            catch { return null; }
         }
 
         /// <summary>Lord AI zaklada sztuke w jej miejsce; to, co nosil, idzie do taboru jego partii (nic nie znika).</summary>
@@ -201,7 +259,10 @@ namespace Armoury
                     var el = shelf.GetElementCopyAtIndex(i);
                     var it = el.EquipmentElement.Item;
                     if (el.Amount <= 0 || !Is(it)) continue;
-                    if (it.Difficulty > 0 && it.RelevantSkill != null && lord.GetSkillValue(it.RelevantSkill) < it.Difficulty) continue;
+                    // Z16 (Jeff 09.10): kupuje tylko to, co udzwignie - CALY ekwipunek (pancerz: Atletyka), nie tylko RelevantSkill
+                    if (Settings.Current != null && Settings.Current.HeroGearRequirements)
+                    { if (!ItemReq.MeetsHero(lord.CharacterObject, it)) continue; }
+                    else if (it.Difficulty > 0 && it.RelevantSkill != null && lord.GetSkillValue(it.RelevantSkill) < it.Difficulty) continue;
                     var cur = lord.BattleEquipment[SlotFor(lord.BattleEquipment, it)];
                     if (!cur.IsEmpty && (Is(cur.Item) || cur.Item.Effectiveness >= it.Effectiveness)) continue;
                     int price = st.Town.MarketData.GetPrice(el.EquipmentElement, mp, false, st.Party);

@@ -24,6 +24,13 @@ RANGES = {
     'ShopKeepPieces': (0, 3, "0"),
     # T10 poprawka recenzji: prog dlugu snu w calych nocach (kod porownuje dlug calkowity) - suwak bez ulamkow w opisie
     'AiNightsAwakeInChase': (0.0, 4.0, "0"),
+    # paczka 175: suwaki z projektu (rozdz. 5)
+    'NorthHardyWeaponBonus': (0, 50, "0"),
+    'NorthHardyAthleticsBonus': (0, 50, "0"),
+    'NorthHomeEdgePercent': (0, 25, "0"),
+    'DothrakiRidingBonus': (0, 50, "0"),
+    # 175c: zasada stali Innych
+    'OthersCastleSteelPercent': (15, 100, "0"),
 }
 
 def gen(module_dir, ns, display):
@@ -33,7 +40,9 @@ def gen(module_dir, ns, display):
     for line in src.splitlines():
         g = re.match(r'\s*//\s*---\s*(.+?)\s*---', line)
         if g:
-            group = g.group(1).strip().capitalize()
+            # 175c po recenzji: tylko pierwsza litera wielka - capitalize() psul nazwy wlasne ("The others and valyrian steel", "Iron bank")
+            g1 = g.group(1).strip()
+            group = g1[:1].upper() + g1[1:]
             continue
         m = re.match(r'\s*public\s+(bool|int|float)\s+(\w+)\s*=\s*([^;]+);\s*(?://\s*(.*))?', line)
         if not m: continue

@@ -74,6 +74,13 @@ namespace Armoury
                 var ch = Traverse.Create(__instance).Property("Character").GetValue() as CharacterObject;
                 var reference = Traverse.Create(__instance).Property("ReferenceEquipment").GetValue() as Equipment;
                 if (ch == null || reference == null || ch.IsHero) return;
+                // PRZEGLAD 175 (decyzja Jeffa 8b: "kazda jednostka ... bron, tarcze, amunicje i pancerz najwyzej swojego tieru"): wzorzec
+                // bitwy DTE (referencja) to "najlepsza sztuka, ktorej wymog jednostka spelnia" - bez sufitu tieru jednostka z umiejetnoscia
+                // >= progu tieru wyzej (35 x tier: milicje, Polnoc t3 po +25, lucznicy z Lukiem 175 ponizej t6) dostawala w bitwie z graczem
+                // bron, strzaly i pancerz tieru wyzej. Sufit = tier jednostki (t0 jak t1), tylko gdy CrashScribe zamienil przy tym wczytaniu
+                // wzorce wedlug tieru (CsMarks.TierGearApplied - bez CS 175 jak dotad). Konie (slot 10) poza decyzja 8b; reczne rozkazy gracza
+                // (MusterBook) bez zmian. Zasada "umiejetnosc do wlasnego sprzetu" i wymogi przedmiotow zostaja.
+                int capT = CsMarks.TierGearApplied ? Math.Max(1, ch.Tier) : 0;   // 0 = bez sufitu
 
                 // skille klas broni
                 int sOne = ch.GetSkillValue(DefaultSkills.OneHanded);
@@ -105,6 +112,16 @@ namespace Armoury
                     if (mainRanged && candRanged) continue;   // luk + kusza to nie zapas
                     second = r.Key; break;
                 }
+                // 175.G (Army175GoldenBows, dom. NIE - czeka na K1 i na zgode Jeffa na wyjatek od zasady 28.08): gdy zestawy jednostki
+                // maja ROZNE klasy dystansowe (CS GoldenBows: Zlota Kompania - kusza / luk dwukrzywy / luk cisowy), glowna bron
+                // dystansowa = klasa z WYLOSOWANEGO zestawu (referencja DTE), nie najwyzsza umiejetnosc - inaczej wszyscy dostaliby
+                // kusze (Kusza 110 > Luk 105). Zapas (bron reczna) bez zmian - po glownej strzeleckiej i tak nie moze byc dystansowy.
+                // przeglad 175: tylko trzy jednostki kusznikow Zlotej Kompanii, ktorym CS GoldenBows daje trzy zestawy (Army175Gear.GoldenXbow)
+                if ((main == "bow" || main == "xbow") && Settings.Current.Army175GoldenBows && Array.IndexOf(GoldenXbow, ch.StringId) >= 0)
+                {
+                    string drawn = RangedClassOf(reference);
+                    if (drawn != null && drawn != main && MixedRanged(ch)) main = drawn;
+                }
 
                 // tarcza z szablonu zostaje (charakter jednostki), jesli glowna nie dwureczna
                 ItemObject shield = null;
@@ -115,20 +132,20 @@ namespace Armoury
                 }
 
                 var slots = new List<ItemObject>();
-                AddWeaponFor(slots, main, SkillFor(ch, main));
+                AddWeaponFor(slots, main, SkillFor(ch, main), capT);
                 // AMUNICJA WEDLE SKILLA (Jeff 02.09: "strzal t6 bandyci nie moga
                 // miec"): Prawo Tieru daje strzalom/beltom wymog Bow/Crossbow,
                 // wiec wzorzec amunicji dobieramy po skillu strzelca, nie po zerze
                 // (zero = "najlepsza w grze", stad t6 u kazdego lucznika)
-                if (main == "bow") { AddPattern(slots, ItemObject.ItemTypeEnum.Arrows, SkillFor(ch, "bow")); AddPattern(slots, ItemObject.ItemTypeEnum.Arrows, SkillFor(ch, "bow")); }
-                else if (main == "xbow") { AddPattern(slots, ItemObject.ItemTypeEnum.Bolts, SkillFor(ch, "xbow")); AddPattern(slots, ItemObject.ItemTypeEnum.Bolts, SkillFor(ch, "xbow")); }
-                else if (main == "thr") AddWeaponFor(slots, "thr", sThr);   // drugi pek oszczepow
+                if (main == "bow") { AddPattern(slots, ItemObject.ItemTypeEnum.Arrows, SkillFor(ch, "bow"), capT); AddPattern(slots, ItemObject.ItemTypeEnum.Arrows, SkillFor(ch, "bow"), capT); }
+                else if (main == "xbow") { AddPattern(slots, ItemObject.ItemTypeEnum.Bolts, SkillFor(ch, "xbow"), capT); AddPattern(slots, ItemObject.ItemTypeEnum.Bolts, SkillFor(ch, "xbow"), capT); }
+                else if (main == "thr") AddWeaponFor(slots, "thr", sThr, capT);   // drugi pek oszczepow
                 if (shield != null && main != "two" && main != "pole" && slots.Count < 4) slots.Add(shield);
                 if (second != null && slots.Count < 4)
                 {
-                    AddWeaponFor(slots, second, SkillFor(ch, second));
-                    if (second == "bow" && slots.Count < 4) AddPattern(slots, ItemObject.ItemTypeEnum.Arrows, SkillFor(ch, "bow"));
-                    else if (second == "xbow" && slots.Count < 4) AddPattern(slots, ItemObject.ItemTypeEnum.Bolts, SkillFor(ch, "xbow"));
+                    AddWeaponFor(slots, second, SkillFor(ch, second), capT);
+                    if (second == "bow" && slots.Count < 4) AddPattern(slots, ItemObject.ItemTypeEnum.Arrows, SkillFor(ch, "bow"), capT);
+                    else if (second == "xbow" && slots.Count < 4) AddPattern(slots, ItemObject.ItemTypeEnum.Bolts, SkillFor(ch, "xbow"), capT);
                 }
 
                 // KSIEGA MUSZTRY: reczne przypisania gracza maja pierwszenstwo
@@ -183,8 +200,8 @@ namespace Armoury
                     else if (it0.ItemType == ItemObject.ItemTypeEnum.Bolts) nBolts++;
                 }
                 int wantAmmo = anyPin ? 2 : 1;
-                for (int k = nArrows; hasBow && k < wantAmmo; k++) FillFree(slots, ItemObject.ItemTypeEnum.Arrows, SkillFor(ch, "bow"));
-                for (int k = nBolts; hasXbow && k < wantAmmo; k++) FillFree(slots, ItemObject.ItemTypeEnum.Bolts, SkillFor(ch, "xbow"));
+                for (int k = nArrows; hasBow && k < wantAmmo; k++) FillFree(slots, ItemObject.ItemTypeEnum.Arrows, SkillFor(ch, "bow"), capT);
+                for (int k = nBolts; hasXbow && k < wantAmmo; k++) FillFree(slots, ItemObject.ItemTypeEnum.Bolts, SkillFor(ch, "xbow"), capT);
                 // wolny slot po rozkazie: bron boczna wzorca (miecz lucznika), gdy zadnej nie ma
                 if (anyPin && second != null && slots.Contains(null))
                 {
@@ -196,7 +213,7 @@ namespace Armoury
                     if (!melee)
                     {
                         var tmp = new List<ItemObject>();
-                        AddWeaponFor(tmp, second, SkillFor(ch, second));
+                        AddWeaponFor(tmp, second, SkillFor(ch, second), capT);
                         int free = slots.IndexOf(null);
                         if (tmp.Count > 0 && tmp[0] != null && free >= 0) slots[free] = tmp[0];
                     }
@@ -218,7 +235,7 @@ namespace Armoury
                     if (pin != null && ItemReq.Meets(ch, pin))
                     { reference[(EquipmentIndex)s] = new EquipmentElement(pin); continue; }
                     if (reference[(EquipmentIndex)s].Item == null) continue;   // szablon nie ubiera slotu - nie my
-                    var top = TopArmor(SlotArmorType(s), athletics, ch.Culture);
+                    var top = TopArmor(SlotArmorType(s), athletics, ch.Culture, capT);
                     if (top != null) reference[(EquipmentIndex)s] = new EquipmentElement(top);
                 }
                 // KON I RZAD (Jeff: "konie i pancerze tez, CALY ekwipunek!"):
@@ -238,6 +255,42 @@ namespace Armoury
             catch (Exception e) { Log.Error("SkillsDecide.RearmBySkill", e); }
         }
 
+        /// <summary>175.G: kusznicy Zlotej Kompanii - te same id co CS Army175Gear.GoldenXbow (punkt styku z drzewem a175cs).</summary>
+        private static readonly string[] GoldenXbow = { "golden_crossbowman", "golden_veteran_crossbowman", "golden_master_crossbowman" };
+
+        /// <summary>175.G: klasa dystansowa zestawu (sloty broni 0-3): "bow", "xbow" albo null.</summary>
+        private static string RangedClassOf(Equipment eq)
+        {
+            if (eq == null) return null;
+            for (int i = 0; i < 4; i++)
+            {
+                var it = eq[(EquipmentIndex)i].Item;
+                if (it == null) continue;
+                if (it.ItemType == ItemObject.ItemTypeEnum.Bow) return "bow";
+                if (it.ItemType == ItemObject.ItemTypeEnum.Crossbow) return "xbow";
+            }
+            return null;
+        }
+
+        /// <summary>175.G: czy zestawy bojowe jednostki maja rozne klasy dystansowe (luk w jednym, kusza w drugim). Bez pamieci
+        /// podrecznej: wolane tylko przy wlaczonym Army175GoldenBows, gdy wylosowany zestaw nie zgadza sie z najwyzsza umiejetnoscia,
+        /// a zestawy zmienia latka CS przy wczytaniu.</summary>
+        private static bool MixedRanged(CharacterObject ch)
+        {
+            string first = null;
+            try
+            {
+                foreach (var eq in ch.BattleEquipments)
+                {
+                    var c = RangedClassOf(eq);
+                    if (c == null) continue;
+                    if (first == null) first = c; else if (c != first) return true;
+                }
+            }
+            catch { }
+            return false;
+        }
+
         private static int SkillFor(CharacterObject ch, string cls)
         {
             switch (cls)
@@ -251,7 +304,7 @@ namespace Armoury
             }
         }
 
-        private static void AddWeaponFor(List<ItemObject> slots, string cls, int skill)
+        private static void AddWeaponFor(List<ItemObject> slots, string cls, int skill, int maxTier = 0)
         {
             ItemObject.ItemTypeEnum type;
             switch (cls)
@@ -263,7 +316,7 @@ namespace Armoury
                 case "xbow": type = ItemObject.ItemTypeEnum.Crossbow; break;
                 default: type = ItemObject.ItemTypeEnum.Thrown; break;
             }
-            AddPattern(slots, type, skill);
+            AddPattern(slots, type, skill, maxTier);
         }
 
         /// <summary>Najlepsza bron danego typu W RAMACH skilla - do podmian
@@ -275,13 +328,13 @@ namespace Armoury
             return tmp.Count > 0 ? tmp[0] : null;
         }
 
-        private static void FillFree(List<ItemObject> slots, ItemObject.ItemTypeEnum ammo, int skill)
+        private static void FillFree(List<ItemObject> slots, ItemObject.ItemTypeEnum ammo, int skill, int maxTier = 0)
         {
             for (int i = 0; i < 4 && i < slots.Count; i++)
                 if (slots[i] == null)
                 {
                     var tmp = new List<ItemObject>();
-                    AddPattern(tmp, ammo, skill);
+                    AddPattern(tmp, ammo, skill, maxTier);
                     if (tmp.Count > 0) slots[i] = tmp[0];
                     return;
                 }
@@ -305,7 +358,7 @@ namespace Armoury
         /// <summary>Najlepsza sztuka pancerza danego typu, ktorej WYMOG ATLETYKI
         /// (ItemReq: difficulty) jednostka udzwignie - cel przydzialu
         /// ("closest" = najlepsze dozwolone na stanie). Kubelki co 25 pkt.</summary>
-        internal static ItemObject TopArmor(ItemObject.ItemTypeEnum type, int athletics, TaleWorlds.CampaignSystem.CultureObject culture = null)
+        internal static ItemObject TopArmor(ItemObject.ItemTypeEnum type, int athletics, TaleWorlds.CampaignSystem.CultureObject culture = null, int maxTier = 0)
         {
             // PROG DOKLADNY, nie kubelek co 25 (audyt 31.08): stare
             // cap = bucket*25+24 oddawalo jednostce sztuke do 24 pkt PONAD jej
@@ -314,7 +367,7 @@ namespace Armoury
             // z cache wpis wygrzany przez Atletyke 24.
             if (athletics < 0) athletics = 0;
             var cult = culture;
-            string key = type + "|" + athletics + "|" + (cult != null ? cult.StringId : "-");
+            string key = type + "|" + athletics + "|" + (cult != null ? cult.StringId : "-") + "|" + maxTier;   // przeglad 175: sufit tieru w kluczu
             // ROZNORODNOSC W RAMACH TIERU (Jeff 01.09: "wszyscy biegaja 1:1,
             // glupio wyglada... losowo rozne ubrania, ten sam poziom pancerza").
             // Jeden najlepszy item klonowal wyglad calych hord - teraz cache
@@ -336,6 +389,7 @@ namespace Armoury
                     {
                         if (it == null || it.ItemType != type || !it.HasArmorComponent) continue;
                         if (it.Difficulty > athletics) continue;                               // atletyka rzadzi
+                        if (maxTier > 0 && Recipes.Grade(it) > maxTier) continue;              // przeglad 175: nie ponad tier jednostki (8b)
                         if (it.NotMerchandise) continue;                                       // unikaty imienne i itemy testowe (dummy_armor_*)
                         if (GiantGear.Is(it)) continue;                                        // pancerz olbrzymow nie jest wzorcem (Jeff 14.09)
                         if (it.StringId != null && it.StringId.EndsWith("_crown")) continue;   // korony to regalia
@@ -402,11 +456,11 @@ namespace Armoury
         /// <summary>Wzorzec klasy: najlepsza bron (Effectiveness), ktorej
         /// WYMAGANIA jednostka spelnia (Difficulty <= skill; kubelki co 25 pkt,
         /// zeby cache nie pecznial). Legendy poza wzorcami.</summary>
-        private static void AddPattern(List<ItemObject> slots, ItemObject.ItemTypeEnum type, int skill)
+        private static void AddPattern(List<ItemObject> slots, ItemObject.ItemTypeEnum type, int skill, int maxTier = 0)
         {
             if (slots.Count >= 4) return;
             if (skill < 0) skill = 0;
-            string key = type + "|" + skill;          // prog dokladny, jak przy pancerzu
+            string key = type + "|" + skill + "|" + maxTier;   // prog dokladny, jak przy pancerzu; przeglad 175: sufit tieru (0 = bez)
             ItemObject best;
             if (!Pattern.TryGetValue(key, out best))
             {
@@ -418,6 +472,7 @@ namespace Armoury
                     {
                         if (it == null || it.ItemType != type || !it.HasWeaponComponent) continue;
                         if (it.Difficulty > skill) continue;                     // statystyki rzadza
+                        if (maxTier > 0 && Recipes.Grade(it) > maxTier) continue; // przeglad 175: nie ponad tier jednostki (8b)
                         // OGNISTA AMUNICJA NIE JEST WZORCEM (Jeff 02.09: "lucznicy
                         // biegaja z plonacymi strzalami, daj im normalne strzaly
                         // ich tieru") - burning/flaming to specjal okretowy, nie

@@ -38,19 +38,44 @@ namespace Armoury
         }
 
         /// <summary>
+        /// Z16 (Jeff 09.10): SITO BOHATEROW - gracz, towarzysze, lordowie AI. To samo co Meets, z jednym wyjatkiem:
+        /// ladry konskie (HorseHarness) przechodza. SkillFor liczy dzis kazda sztuke z ArmorComponent jako Atletyke,
+        /// takze ladry, a prawo tieru pancerza zaklada dla nich Jazde - to osobna decyzja (projekt Z16, uwaga 7.1),
+        /// wiec bohaterom ladr nie blokujemy. Jedna metoda dla wszystkich drog zakladania u bohaterow: ekran
+        /// (HeroGear), Spoils auto-equip, unikaty (UniqueSpoils, UniqueLaw.StandInFor), zaciag ROT (DragonUnmount),
+        /// zamiennik broni zabranej jencowi (ROT gank). Lustro w CrashScribe: Mends.CanUseHero.
+        /// </summary>
+        internal static bool MeetsHero(CharacterObject ch, ItemObject it, out string why)
+        {
+            why = null;
+            try { if (it != null && it.ItemType == ItemObject.ItemTypeEnum.HorseHarness) return true; }
+            catch { return true; }
+            return Meets(ch, it, out why);
+        }
+
+        internal static bool MeetsHero(CharacterObject ch, ItemObject it)
+        {
+            string why; return MeetsHero(ch, it, out why);
+        }
+
+        /// <summary>
         /// JEDNO ZRODLO PRAWDY o tym, ktory skill pilnuje przedmiotu: bron
         /// i kon maja RelevantSkill z danych; pancerz - Atletyka (Prawo Wagi
-        /// i Prawo Tieru wpisuja mu Difficulty); AMUNICJA nie ma skilla
-        /// w danych, a Prawo Tieru daje jej wymog - wiec strzaly pilnuje
-        /// Bow, belty Crossbow (Jeff 02.09: "strzal t6 bandyci nie moga
-        /// miec"). Wszystkie miejsca doboru (ItemReq, TroopFit, kwatermistrz,
-        /// DragonUnmount, warta DTE w CrashScribe) maja uzywac tego.
+        /// i Prawo Tieru wpisuja mu Difficulty); AMUNICJA: Prawo Tieru daje jej
+        /// wymog, a strzaly pilnuje Bow, belty Crossbow (Jeff 02.09: "strzal t6
+        /// bandyci nie moga miec"). Uwaga (Z16-5, sprawdzone na DLL 1.4.8):
+        /// strzaly i belty MAJA w grze RelevantSkill - z klasy broni
+        /// (WeaponComponentData.GetRelevantSkillFromWeaponClass: Arrow -> Bow,
+        /// Bolt -> Crossbow), wiec zwraca je juz pierwszy warunek; dwa ostatnie
+        /// wiersze to tylko zapas. Wszystkie miejsca doboru (ItemReq, TroopFit,
+        /// kwatermistrz, DragonUnmount, warta DTE w CrashScribe) maja uzywac tego.
         /// </summary>
         internal static SkillObject SkillFor(ItemObject it)
         {
             if (it == null) return null;
             var skill = it.RelevantSkill;
             if (skill != null) return skill;
+            if (it.ItemType == ItemObject.ItemTypeEnum.HorseHarness) return DefaultSkills.Riding;   // ladry konskie - Jazda (Jeff 09.10), nie Atletyka
             if (it.HasArmorComponent) return DefaultSkills.Athletics;
             if (it.ItemType == ItemObject.ItemTypeEnum.Arrows) return DefaultSkills.Bow;
             if (it.ItemType == ItemObject.ItemTypeEnum.Bolts) return DefaultSkills.Crossbow;
