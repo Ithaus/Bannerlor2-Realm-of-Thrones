@@ -1073,6 +1073,7 @@ namespace Armoury
             try { ArmsLeaks.SessionStart(); } catch (Exception e) { Log.Error("ArmsLeaks.SessionStart", e); }   // paczka 174.0: linia startowa (ujscia uzbrojenia zamkniete, BK bron i tarcze, konserwacja zapasu)
             try { WorkshopLaw.HandsStartLine(); } catch (Exception e) { Log.Error("WorkshopLaw.HandsStartLine", e); }   // 174.3: linia "Rece (174)" - po ColdStart (ten liczy dawnymi rekami)
             try { TownFletchers.SessionStart(); } catch (Exception e) { Log.Error("TownFletchers.SessionStart", e); }   // paczka 172: kandydaci strzelarzy, koszyki wzorcow, linia startowa - PO HistoricalPrices.Apply i ColdStart
+            try { Recipes.AmmoStartLine(); } catch (Exception e) { Log.Error("Recipes.AmmoStartLine", e); }   // sklad8-s S1: kwity amunicji kuzni gracza (tylko log) - PO HistoricalPrices.Apply (wartosci sztabek w pensach)
             // 124: kapital startowy warsztatow w nowej monecie - TU, po HistoricalPrices.Apply. Gra wola sluchaczy zdarzenia od ostatnio
             // dopisanego (MbEvent: lista z wstawianiem na poczatek), wiec WorkshopTradeBehavior (dodany po nas) szedl PRZED przeliczeniem cen
             try { var seed = WorkshopTrade.SeedNewCampaign(); if (seed != null) Log.Info("WorkshopTrade: " + seed); } catch (Exception e) { Log.Error("WorkshopTrade.SeedNewCampaign", e); }
