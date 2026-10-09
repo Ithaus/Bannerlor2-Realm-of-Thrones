@@ -223,6 +223,14 @@ namespace Armoury
             return Mod(worst);
         }
 
+        /// <summary>K1: sztuka wzieta przez TakeCondition nie poszla do kupca (kasa miasta pusta) - wraca do zbrojowni ze swoim stanem.</summary>
+        internal static void PutBack(MobileParty mp, ItemObject it, ItemModifier mod)
+        {
+            if (!On || mp == null || it == null) return;
+            if (mod != null && mod.PriceMultiplier < 1f && !MenPurse.HorseKind(it) && !ArmouryBehavior.NoWear(it)) AddWorn(mp.StringId, it.StringId, mod.StringId, 1);
+            Known(mp, it, 1);
+        }
+
         private static void Known(MobileParty mp, ItemObject it, int d)
         {
             Dictionary<string, int> known;

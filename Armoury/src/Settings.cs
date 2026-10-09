@@ -171,6 +171,16 @@ namespace Armoury
         public bool MenPurseEnabled = true;                // the men's share of the spoils is theirs: in a town they sell the spare kit to the merchants, mend their gear at the smiths, buy what they lack and spend the rest there; you buy from them what you take from the stores
         public float SurplusKeepPercent = 10f;             // spare kit the stores keep above what the men wear before the rest goes to the merchants
         public float LordLootThirdPercent = 33f;           // an AI lord's cut (the captain's third) when his men sell their spare kit in a town
+        public bool MenUpgradeGear = true;                 // the men buy better kit with their own coin (pay and their share of the spoils): in a town they swap their worst piece for a clearly better one of their own grade and sell the old one to the merchant - your men, AI lords' men and garrisons alike
+        public int MenGearSavePercent = 50;                // share of what the men have left on leaving a town that they put by for better kit (the rest they spend there); garrisons put this share of their pay into their own purse
+        public int MenGearSaveDays = 30;                   // the men never hoard more than this many days of their pay - anything above goes on food and drink in town
+        public int MenUpgradeMinGainPercent = 10;          // a new piece must be at least this much stronger than the old one (or of a higher tier) before the men pay for it
+        public int MenUpgradeMaxPerVisit = 20;             // at most this many better pieces per party per day in town
+        public bool GarrisonPurseEnabled = true;           // garrisons keep a purse from their own pay: they buy what they lack and better kit at their own market (a castle buys in the nearest town) and sell their spare kit there
+        public bool QuartermasterSwapOneForOne = true;     // swap in the stores: for every piece of yours that pushed out one of theirs the men hand you their worst piece of that kind; pieces that filled empty hands go free; the men's spare is theirs - take it and you pay them the merchant's price
+        public bool GarrisonKitMenu = true;                // 'Hand kit to the garrison' in the menu of your towns and castles: drop better kit on the garrison and get their worse pieces back
+        public bool GarrisonArmoryInBattle = true;         // garrisons in your battles fight with the kit in their stores (Dynamic Troop Equipment) instead of their full template for free
+        public int GarrisonArmoryMinFillPercent = 75;      // below this share of filled template slots a garrison still fights in its template (old saves had their garrison stores wiped)
         public bool AiWearEnabled = true;                  // AI lords' kit wears too: battle wear on pieces in use, loot comes in battered, town smiths mend it day by day from the men's purse
         public bool MineWagesStayInTown = true;            // when a town buys a Banner Kings mine's ore, half the price is the lord's due and half the miners' wages - spent in that same town (before, that half vanished)
         public float WorkHoursPerManDay = 16f;             // hours a town smith works in a day when there are orders - dawn to dusk with journeymen at the bench; the town's smiths share them between mending (your men and AI lords alike) and new work in the workshops
@@ -403,7 +413,7 @@ namespace Armoury
         // --- Army purchases ---
         public bool AiBuysGear = true;                     // AI lords buy their soldiers' arms and armour on the market with their own gold - no more free gear from the quartermaster's hat, no more gold for sweeping the baggage into the armoury
         public bool GarrisonBuysGear = true;               // a garrison buys the gear its men lack at the market of its own town, paid by the lord of the place - the coin goes to the town
-        public bool GarrisonBuysGearPlayer = false;        // your own garrisons buy gear the same way, from your purse
+        public bool GarrisonBuysGearPlayer = false;        // your own garrisons may top up from YOUR purse what their own pay does not cover when they buy missing kit
         public bool UniqueSpoilsFromPlayer = true;         // the custom of war binds you too: whoever takes you captive takes the renowned arms you wear
         public int BattleRealMinSide = 50;                 // a clash counts as a real battle for the chronicle's averages only if both sides had at least this many men and neither outnumbered the other more than 4 to 1
         public int UniqueMaxWearers = 3;                   // an item worn by more than this many characters is ordinary attire, not a unique (kept out of the chronicle and the spoils of capture)

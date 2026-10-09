@@ -2,7 +2,9 @@ import re, sys, os
 
 # T1: zakresy suwakow int, ktorych regula ogolna [0, max(10, 4 x domyslna)] nie obejmuje
 # (godzina obozu 0 dawala suwak 0..10 - nie dalo sie ustawic 22)
-RANGES = {"CampStartHour": (0, 23), "CampEndHour": (0, 23)}
+RANGES = {"CampStartHour": (0, 23), "CampEndHour": (0, 23),
+          # K1: odsetki 0..100 (regula ogolna dawala 0..200 i 0..300)
+          "MenGearSavePercent": (0, 100), "GarrisonArmoryMinFillPercent": (0, 100)}
 
 def gen(module_dir, ns, display):
     src = open(os.path.join(module_dir,'src','Settings.cs'), encoding='utf-8').read()

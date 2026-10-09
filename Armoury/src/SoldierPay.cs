@@ -76,6 +76,7 @@ namespace Armoury
         // ------------------------------------------------------------ liczniki doby (linia "Zold:")
         private static long _dLordAcc, _dLordTaken, _dGarAcc, _dGarTaken, _dToPurse, _dPlayer, _dToTowns, _dToCastles;
         private static long _dUndead, _dNoTown, _dOff, _dOther, _dCut, _dBlindGold, _dDebtCut;
+        private static long _dGarToPurse; private static int _dGarToPurseN;   // K1 (A2): zold zalog do ich sakiewek
         private static int _dLordN, _dGarN, _dToPurseN, _dToTownsN, _dToCastlesN, _dCutClans, _dBlind, _dDupes, _stumbles, _dDebtClans;
         private static bool _errLogged;
 
@@ -128,6 +129,7 @@ namespace Armoury
         {
             _dLordAcc = _dLordTaken = _dGarAcc = _dGarTaken = _dToPurse = _dPlayer = _dToTowns = _dToCastles = 0;
             _dUndead = _dNoTown = _dOff = _dOther = _dCut = _dBlindGold = _dDebtCut = 0;
+            _dGarToPurse = 0; _dGarToPurseN = 0;
             _dLordN = _dGarN = _dToPurseN = _dToTownsN = _dToCastlesN = _dCutClans = _dBlind = _dDupes = _stumbles = _dDebtClans = 0;
             _dShielded = 0; _dShieldTicks = 0;
             _dToLordGold = _dFromLordGold = _dDupLordGold = _dOutLordGold = 0; _dToLordN = _dFromLordN = _dDupLordN = _dOutLordN = 0;   // 169b
@@ -380,11 +382,29 @@ namespace Armoury
                 var st = mp.CurrentSettlement ?? mp.HomeSettlement;
                 var town = st != null ? st.Town : null;
                 if (town == null) { _dNoTown += amt; return; }
-                town.ChangeGold(amt);                                   // zaloga wydaje zold na miejscu - kasa jej miasta albo zamku
-                if (st.IsTown) { _dToTowns += amt; _dToTownsN++; Hold(st, amt); } else { _dToCastles += amt; _dToCastlesN++; }
-                MoneyLedger.Note(MoneyLedger.NWage, st, amt);           // ksiega przeplywow osad (tylko licznik)
-                MoneyLedger.NoteWageRouted(false, amt);
-                ArmyClothing.OnGarrisonPaid(mp, st, amt, r.Wage);       // 150: zaloga na zoldzie (juz w kasie osady) zdziera odziez - miasto z polki bez zlota, zamek placi miastu
+                // K1 (A2, Jeff 09.10 "za swoje sami sie zbroja z lupow i zoldu"): MenGearSavePercent zaplaconego zoldu do sakiewki zalogi
+                // (braki i lepszy sprzet z targu swojej osady), najwyzej do MenGearSaveDays dni zoldu - ponad limit caly zold do kasy osady.
+                // Pieniadze i tak koncza w tej samej kasie, tylko pozniej i jako zakup sprzetu (decyzja z 05.10 "zold garnizonu do kasy
+                // jego osady" w mocy co do miejsca)
+                int toPurse = GarrisonShare(mp, amt, r.Wage, s), coffers = amt - toPurse;
+                if (toPurse > 0)
+                {
+                    MenPurse.NoteWage(toPurse);                         // licznik linii "Sakiewka ludzi:"
+                    MenPurse.Add(mp, toPurse);
+                    MoneyLedger.NoteWageRouted(true, toPurse);
+                    _dGarToPurse += toPurse; _dGarToPurseN++;
+                    MenUpgrade.NoteGarrisonWage(toPurse);
+                }
+                if (coffers > 0)
+                {
+                    town.ChangeGold(coffers);                           // zaloga wydaje zold na miejscu - kasa jej miasta albo zamku
+                    if (st.IsTown) { _dToTowns += coffers; _dToTownsN++; Hold(st, coffers); } else { _dToCastles += coffers; _dToCastlesN++; }
+                    MoneyLedger.Note(MoneyLedger.NWage, st, coffers);   // ksiega przeplywow osad (tylko licznik)
+                    MoneyLedger.NoteWageRouted(false, coffers);
+                }
+                // 150: zaloga na zoldzie zdziera odziez - miasto z polki bez zlota, zamek placi miastu. K1: `paid` sluzy tu tylko jako czesc
+                // zaplaconej doby (zuzycie odziezy), nie jako pieniadze - dostaje caly zaplacony zold (inaczej zuzycie odziezy spadloby o polowe)
+                ArmyClothing.OnGarrisonPaid(mp, st, amt, r.Wage);
             }
             else if (mp.IsLordParty)
             {
@@ -403,6 +423,19 @@ namespace Armoury
                 MoneyLedger.NoteWageRouted(true, amt);
             }
             else _dOther += amt;                                        // karawany i inne partie: bez zmian
+        }
+
+        /// <summary>K1 (A2): czesc zaplaconego zoldu zalogi do jej sakiewki - MenGearSavePercent, do limitu MenGearSaveDays dni zoldu; trup nie wyda.</summary>
+        private static int GarrisonShare(MobileParty mp, int amt, int wage, Settings s)
+        {
+            try
+            {
+                if (amt <= 0 || !MenUpgrade.GarrisonPurseOn || Undead.Party(mp)) return 0;
+                long want = (long)amt * Math.Max(0, Math.Min(100, s.MenGearSavePercent)) / 100;
+                long room = (long)Math.Max(0, s.MenGearSaveDays) * Math.Max(0, wage) - MenPurse.Get(mp);
+                return (int)Math.Max(0L, Math.Min(want, room));
+            }
+            catch { return 0; }
         }
 
         private static void AddPaid(Hero payer, int amt, Settings s)
@@ -579,7 +612,7 @@ namespace Armoury
                              + " | partie rodow: naliczony " + _dLordAcc + ", z kies zeszlo " + _dLordTaken + " (" + _dLordN + " partii) -> do sakiewek ludzi " + _dToPurse
                              + " (" + _dToPurseN + " partii, w tym ludzie gracza " + _dPlayer + ")"
                              + " | garnizony: naliczony " + _dGarAcc + ", z kies zeszlo " + _dGarTaken + " (" + _dGarN + " zalog) -> do kas miast " + _dToTowns + " (" + _dToTownsN
-                             + "), do kas zamkow " + _dToCastles + " (" + _dToCastlesN + ")"
+                             + "), do kas zamkow " + _dToCastles + " (" + _dToCastlesN + "), zalogi do sakiewek " + _dGarToPurse + " (" + _dGarToPurseN + ")"
                              + " | nie przekazano: nieumarli " + _dUndead + ", zaloga bez osady " + _dNoTown + ", wylaczone w ustawieniach " + _dOff
                              + "; karawany i inne partie (bez zmian) " + _dOther
                              + " | przyciete, bo saldo rodu nie zmiescilo sie w kiesie glowy: " + _dCut + " w " + _dCutClans + " rodach (w tym brak zapisany przez gre jako dlug wobec korony: "
@@ -597,7 +630,7 @@ namespace Armoury
             {
                 // paczka 169: liczby doby dla linii "Obieg" - przed zerowaniem (bez zmian logiki)
                 LastLordAcc = _dLordAcc; LastLordTaken = _dLordTaken; LastGarAcc = _dGarAcc; LastGarTaken = _dGarTaken;
-                LastToPurse = _dToPurse; LastToTowns = _dToTowns; LastToCastles = _dToCastles; LastOther = _dOther;
+                LastToPurse = _dToPurse + _dGarToPurse; LastToTowns = _dToTowns;   // K1: sakiewki ludzi - takze zalog LastToCastles = _dToCastles; LastOther = _dOther;
                 LastLordN = _dLordN; LastGarN = _dGarN;                                                                    // 169b
                 LastToLordN = _dToLordN; LastToLordGold = _dToLordGold; LastFromLordN = _dFromLordN; LastFromLordGold = _dFromLordGold;
                 LastDupLordN = _dDupLordN; LastDupLordGold = _dDupLordGold; LastOutLordN = _dOutLordN; LastOutLordGold = _dOutLordGold;

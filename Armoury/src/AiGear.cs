@@ -115,14 +115,36 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ zakupy
-        internal static void OnSettlementEntered(MobileParty mp, Settlement st, Hero hero) { TryBuy(mp, st); }
+        internal static void OnSettlementEntered(MobileParty mp, Settlement st, Hero hero)
+        {
+            // K1 (A5): lord AI w MIESCIE - nadwyzki, naprawy, braki i lepsze w JEDNYM zdarzeniu i w tej kolejnosci (MenPurse.OnEntered
+            // wola TryBuy po sprzedazy nadwyzek i naprawach). Gra wola sluchaczy od ostatnio dopisanego (MbEvent), wiec ten sluchacz
+            // biegl dotad PRZED MenPurse.OnEntered - braki kupowane przed sprzedaza nadwyzek, wbrew opisowi "nadwyzki PRZED zakupami".
+            if (MenPurse.On && mp != null && st != null && st.IsTown && mp.IsLordParty && !mp.IsMainParty) return;
+            TryBuy(mp, st);
+        }
 
         internal static void OnDailyTickParty(MobileParty mp)
         {
-            try { if (mp != null && mp.CurrentSettlement != null) { AiWear.MendInTown(mp, mp.CurrentSettlement); TryBuy(mp, mp.CurrentSettlement); } } catch { }
+            try
+            {
+                if (mp == null || mp.CurrentSettlement == null) return;
+                var st = mp.CurrentSettlement;
+                if (mp.IsGarrison) MenPurse.GarrisonDay(mp, st);   // K1 (A9, A11): nadwyzki zalogi do kupca; zaloga bez ludzi - sakiewka do kasy osady
+                AiWear.MendInTown(mp, st);
+                TryBuy(mp, st);
+            }
+            catch { }
         }
 
-        private static readonly ItemObject.ItemTypeEnum[] Order =
+        /// <summary>K1 (A5): najpierw braki (A6), potem lepsze za swoje (A7, MenUpgrade - wlasna bramka raz na dobe).</summary>
+        internal static void TryBuy(MobileParty mp, Settlement st)
+        {
+            BuyGaps(mp, st);
+            MenUpgrade.ForAi(mp, st);
+        }
+
+        internal static readonly ItemObject.ItemTypeEnum[] Order =
         {
             ItemObject.ItemTypeEnum.BodyArmor, ItemObject.ItemTypeEnum.OneHandedWeapon, ItemObject.ItemTypeEnum.TwoHandedWeapon,
             ItemObject.ItemTypeEnum.Polearm, ItemObject.ItemTypeEnum.Bow, ItemObject.ItemTypeEnum.Crossbow,
@@ -162,22 +184,26 @@ namespace Armoury
             return need;
         }
 
-        private static int TierOf(ItemObject it)
+        internal static int TierOf(ItemObject it)
         {
             try { return Math.Max(1, Math.Min(6, (int)it.Tier + 1)); } catch { return 1; }
         }
 
-        private static void TryBuy(MobileParty mp, Settlement st)
+        private static void BuyGaps(MobileParty mp, Settlement st)
         {
             try
             {
                 if (!On || mp == null || st == null || !Look()) return;
                 // wpis 57 (Jeff 04.10: "a co z garnizonem, skad oni maja miec bron?"): garnizon kupuje brakujacy sprzet na targu
-                // SWOJEJ osady, placi pan osady ze swojej kiesy, zloto idzie do kasy miasta (jak u partii lorda)
+                // SWOJEJ osady, zloto idzie do kasy miasta (jak u partii lorda)
+                // K1 (A6): placi NAJPIERW sakiewka zalogi (jej zold), potem kiesa pana osady; Twoja kiesa doplaca do Twoich zalog tylko
+                // przy GarrisonBuysGearPlayer (dotad ten wylacznik zatrzymywal zakupy Twoich zalog w ogole)
                 var s0 = Settings.Current;
                 bool garrison = mp.IsGarrison && mp.CurrentSettlement == st && s0.GarrisonBuysGear;
                 Hero payer = garrison ? (st.OwnerClan != null ? st.OwnerClan.Leader : null) : mp.LeaderHero;
-                if (garrison && payer == Hero.MainHero && !s0.GarrisonBuysGearPlayer) return;
+                bool gPurse = garrison && MenUpgrade.GarrisonPurseOn;
+                bool lordPays = !(garrison && payer == Hero.MainHero && !s0.GarrisonBuysGearPlayer);
+                if (garrison && !lordPays && !gPurse) return;
                 if (mp.IsMainParty || (!mp.IsLordParty && !garrison) || payer == null || !payer.IsAlive || !mp.IsActive || mp.MapEvent != null) return;
                 if ((!st.IsTown && !st.IsCastle) || st.ItemRoster == null || st.Town == null) return;
                 if (FactionManager.IsAtWarAgainstFaction(mp.MapFaction, st.MapFaction)) return;
@@ -190,9 +216,9 @@ namespace Armoury
                 var s = Settings.Current;
                 var lord = payer;
                 int reserve = Math.Max(0, s.AiGearGoldReserve);
-                int budget = (int)((lord.Gold - reserve) * Math.Max(0f, Math.Min(100f, s.AiGearBudgetPercent)) / 100f);
-                // wpis 84: ludzie dokupuja braki ze swojej sakiewki (lup), dopiero potem kiesa lorda
-                int purse = garrison ? 0 : Math.Max(0, MenPurse.Get(mp) - AiWear.OutstandingCost(mp, st));   // wpis 89: naprawy maja pierwszenstwo (z materialem - szacunek z polki miasta)
+                int budget = lordPays ? (int)((lord.Gold - reserve) * Math.Max(0f, Math.Min(100f, s.AiGearBudgetPercent)) / 100f) : 0;
+                // wpis 84: ludzie dokupuja braki ze swojej sakiewki (lup), dopiero potem kiesa lorda; K1: zaloga - ze swojej sakiewki (zold)
+                int purse = (!garrison || gPurse) ? Math.Max(0, MenPurse.Get(mp) - AiWear.OutstandingCost(mp, st)) : 0;   // wpis 89: naprawy maja pierwszenstwo (z materialem - szacunek z polki miasta)
                 budget = Math.Max(0, budget) + purse;
                 if (budget <= 0) return;
 
@@ -247,51 +273,22 @@ namespace Armoury
                 int spent = 0, pieces = 0;
                 int maxPieces = Math.Max(1, s.AiGearMaxPiecesPerVisit);
                 var bought = new List<string>();
-                var shelf = st.ItemRoster;
-                foreach (var type in Order)
+                var shop = st;
+                BuyLoop(mp, shop, need, budget, maxPieces, garrison, gPurse, lord, ref spent, ref pieces, bought);
+                // K1 (A4): zaloga zamku - polki zamkow sa puste; czego nie bylo na polce zamku, kupuje w najblizszym miescie handlowym
+                // (ta sama regula co odziez wojska, ArmyClothing.MarketTown) - zloto do kasy tego miasta, sztuke przywozi woz pana
+                if (garrison && st.IsCastle && pieces < maxPieces && spent < budget)
                 {
-                    for (int t = 6; t >= 1; t--)
+                    bool left = false; foreach (var kv in need) if (kv.Value > 0) { left = true; break; }
+                    var market = left ? ArmyClothing.MarketTown(st) : null;
+                    if (market != null && market.Town != null && market.ItemRoster != null && !market.IsUnderSiege
+                        && !FactionManager.IsAtWarAgainstFaction(mp.MapFaction, market.MapFaction))
                     {
-                        int k = (int)type * 10 + t;
-                        int deficit;
-                        if (!need.TryGetValue(k, out deficit) || deficit <= 0) continue;
-                        // kandydaci: ten sam typ, tier t albo t-1, bez unikatow; najlepsza skutecznosc do ceny
-                        while (deficit > 0 && pieces < maxPieces && spent < budget)
-                        {
-                            int bestI = -1; float bestScore = 0f; int bestPrice = 0;
-                            for (int i = 0; i < shelf.Count; i++)
-                            {
-                                var el = shelf.GetElementCopyAtIndex(i);
-                                var it = el.EquipmentElement.Item;
-                                if (el.Amount <= 0 || it == null || it.ItemType != type) continue;
-                                int ti = TierOf(it);
-                                if (ti != t && ti != t - 1) continue;
-                                if (ArmsPricing.IsUnique(it)) continue;
-                                int price = st.Town.MarketData.GetPrice(el.EquipmentElement, mp, false, st.Party);
-                                if (price <= 0 || price > budget - spent) continue;
-                                float eff = it.Effectiveness > 0f ? it.Effectiveness : 1f;
-                                float score = eff / price;
-                                if (score > bestScore) { bestScore = score; bestI = i; bestPrice = price; }
-                            }
-                            if (bestI < 0) break;
-                            var pick = shelf.GetElementCopyAtIndex(bestI);
-                            int n = Math.Min(deficit, pick.Amount);
-                            n = Math.Min(n, maxPieces - pieces);
-                            n = Math.Min(n, (budget - spent) / bestPrice);
-                            if (n <= 0) break;
-                            shelf.AddToCounts(pick.EquipmentElement, -n);
-                            _add.Invoke(null, new object[] { mp.Id, pick.EquipmentElement.Item, n });
-                            if (!garrison) AiWear.NoteBought(mp, pick.EquipmentElement, n);   // wpis 89: zuzyta z polki zostaje zuzyta
-                            int cost = bestPrice * n, fromPurse = garrison ? 0 : MenPurse.Take(mp, cost);
-                            lord.ChangeHeroGold(-(cost - fromPurse));
-                            st.Town.ChangeGold(bestPrice * n);
-                            MoneyLedger.Note(MoneyLedger.NGear, st, bestPrice * n);   // ksiega przeplywow osad (tylko licznik)
-                            spent += bestPrice * n; pieces += n; deficit -= n;
-                            if (bought.Count < 6) bought.Add(pick.EquipmentElement.Item.StringId + " " + bestPrice);
-                        }
-                        need[k] = deficit;   // wpis 67: co zostalo niezaspokojone
+                        shop = market;
+                        BuyLoop(mp, shop, need, budget, maxPieces, garrison, gPurse, lord, ref spent, ref pieces, bought);
                     }
                 }
+                var shelf = shop.ItemRoster;
                 // wpis 67: czego nie bylo na polce - zamowienie w tym miescie (najwyzej po 10 na rodzaj z jednej wizyty)
                 // wpis 81: tylko gdy na polce NIE MA zadnej sztuki tego typu i tieru (t albo t-1) - "za drogie" to nie brak
                 // towaru, tylko brak zlota kupca; i jeden kupiec raz na SupplyDemandOrderRepeatDays (garnizon liczy co dzien)
@@ -304,19 +301,71 @@ namespace Armoury
                         var el = shelf.GetElementCopyAtIndex(i); var it = el.EquipmentElement.Item;
                         if (el.Amount > 0 && it != null && it.ItemType == ty && !ArmsPricing.IsUnique(it)) { int ti = TierOf(it); onShelf = ti == tr || ti == tr - 1; }
                     }
-                    if (!onShelf) SupplyDemand.NoteUnmetOnce(mp, st, ty, tr, Math.Min(10, kv.Value));
+                    if (!onShelf) SupplyDemand.NoteUnmetOnce(mp, shop, ty, tr, Math.Min(10, kv.Value));
                 }
                 if (pieces <= 0) return;
                 _dayPieces += pieces; _dayGold += spent; _dayVisits++; if (garrison) { _dayGarrison++; _dayGarrisonGold += spent; }
                 if (_dayLogged < Math.Max(0, s.AiGearLogPerDay))
                 {
                     _dayLogged++;
-                    Log.Info("ZakupyAI: " + (garrison ? "garnizon " + st.Name + " (placi " + lord.Name + ")" : lord.Name.ToString()) + " (" + mp.MemberRoster.TotalManCount + " ludzi) w " + st.Name + ": " + pieces
-                             + " szt. za " + spent + " (budzet " + budget + ", zloto " + (lord.Gold + spent) + " -> " + lord.Gold + "); np. "
+                    Log.Info("ZakupyAI: " + (garrison ? "garnizon " + st.Name + " (placi " + lord.Name + (gPurse ? " i sakiewka zalogi" : "") + ")" : lord.Name.ToString()) + " (" + mp.MemberRoster.TotalManCount + " ludzi) w " + shop.Name + ": " + pieces
+                             + " szt. za " + spent + " (budzet " + budget + ", zloto " + lord.Gold + ", sakiewka " + MenPurse.Get(mp) + "); np. "
                              + string.Join(", ", bought.ToArray()) + ".");
                 }
             }
             catch (Exception e) { Log.Error("AiGear.TryBuy", e); }
+        }
+
+        /// <summary>Zakupy brakow z polki jednego miasta albo zamku (kandydaci: ten sam typ, tier t albo t-1, bez unikatow; najlepsza
+        /// skutecznosc do ceny). Placi najpierw sakiewka ludzi (lord AI zawsze, zaloga przy GarrisonPurseEnabled), reszte kiesa pana.</summary>
+        private static void BuyLoop(MobileParty mp, Settlement shop, Dictionary<int, int> need, int budget, int maxPieces, bool garrison, bool gPurse, Hero lord,
+                                    ref int spent, ref int pieces, List<string> bought)
+        {
+            var shelf = shop.ItemRoster;
+            foreach (var type in Order)
+            {
+                for (int t = 6; t >= 1; t--)
+                {
+                    int k = (int)type * 10 + t;
+                    int deficit;
+                    if (!need.TryGetValue(k, out deficit) || deficit <= 0) continue;
+                    while (deficit > 0 && pieces < maxPieces && spent < budget)
+                    {
+                        int bestI = -1; float bestScore = 0f; int bestPrice = 0;
+                        for (int i = 0; i < shelf.Count; i++)
+                        {
+                            var el = shelf.GetElementCopyAtIndex(i);
+                            var it = el.EquipmentElement.Item;
+                            if (el.Amount <= 0 || it == null || it.ItemType != type) continue;
+                            int ti = TierOf(it);
+                            if (ti != t && ti != t - 1) continue;
+                            if (ArmsPricing.IsUnique(it)) continue;
+                            int price = shop.Town.MarketData.GetPrice(el.EquipmentElement, mp, false, shop.Party);
+                            if (price <= 0 || price > budget - spent) continue;
+                            float eff = it.Effectiveness > 0f ? it.Effectiveness : 1f;
+                            float score = eff / price;
+                            if (score > bestScore) { bestScore = score; bestI = i; bestPrice = price; }
+                        }
+                        if (bestI < 0) break;
+                        var pick = shelf.GetElementCopyAtIndex(bestI);
+                        int n = Math.Min(deficit, pick.Amount);
+                        n = Math.Min(n, maxPieces - pieces);
+                        n = Math.Min(n, (budget - spent) / bestPrice);
+                        if (n <= 0) break;
+                        shelf.AddToCounts(pick.EquipmentElement, -n);
+                        _add.Invoke(null, new object[] { mp.Id, pick.EquipmentElement.Item, n });
+                        if (!garrison) AiWear.NoteBought(mp, pick.EquipmentElement, n);   // wpis 89: zuzyta z polki zostaje zuzyta
+                        int cost = bestPrice * n, fromPurse = (!garrison || gPurse) ? MenPurse.Take(mp, cost) : 0;
+                        lord.ChangeHeroGold(-(cost - fromPurse));
+                        shop.Town.ChangeGold(cost);
+                        MoneyLedger.Note(MoneyLedger.NGear, shop, cost);   // ksiega przeplywow osad (tylko licznik)
+                        if (garrison) MenUpgrade.NoteGarrisonGap(fromPurse);
+                        spent += cost; pieces += n; deficit -= n;
+                        if (bought.Count < 6) bought.Add(pick.EquipmentElement.Item.StringId + " " + bestPrice);
+                    }
+                    need[k] = deficit;   // wpis 67: co zostalo niezaspokojone
+                }
+            }
         }
 
         private static int _dayGarrison, _dayGarrisonGold;

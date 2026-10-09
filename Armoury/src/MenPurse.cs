@@ -24,6 +24,9 @@ namespace Armoury
     ///  - Ludzie wydaja: naprawy (godzinowo u kowali miasta, TroopSelfMend) -> braki w kompletach -> reszta na zycie w miescie
     ///    przy wyjezdzie (kasa miasta). Zostaje tylko tyle, ile potrzeba na zalegle naprawy.
     ///  - Gracz bierze cos z nadwyzek zbrojowni = KUPUJE od ludzi po cenie skupu (rozliczenie przy zamknieciu ekranu).
+    /// K1 (Jeff 09.10, docs/paczki/K1-dozbrajanie.md): przy wyjezdzie czesc odkladaja na lepszy sprzet (A3, limit dni zoldu); w miescie
+    /// nadwyzki -> naprawy -> braki -> lepsze (MenUpgrade); nadwyzki i braki liczone po DOPASOWANIU (skill), nie po liczbie sztuk;
+    /// zalogi maja wlasna sakiewke (czesc zoldu - SoldierPay) w tym samym slowniku i tym samym zapisie "arm_menpurse".
     /// </summary>
     internal static class MenPurse
     {
@@ -31,12 +34,13 @@ namespace Armoury
 
         private static readonly Dictionary<string, int> _purse = new Dictionary<string, int>();
         private static int _daySold, _dayGold, _dayLord, _dayLife, _dayGear, _dayStamp = -1;
+        private static int _daySaved, _dayGarSold, _dayGarGold;   // K1: odlozone na lepszy sprzet przy wyjazdach (A3), nadwyzki zalog (A9)
         private static long _dayCloth;         // 150: odziez wojska kupiona z sakiewek przy wyjezdzie z miasta (ArmyClothing.BuyForParty)
         private static long _dayWage;          // zold wplacony do sakiewek (SoldierPay)
         private static int _dayWageN;
         private static long _dayIn, _dayOut;   // ruch wszystkich sakiewek w dobie: kazda wplata i kazdy wydatek ida przez Add
 
-        internal static void Reset() { _purse.Clear(); _pending.Clear(); _daySold = _dayGold = _dayLord = _dayLife = _dayGear = 0; _dayCloth = 0; _dayWage = 0; _dayWageN = 0; _dayIn = _dayOut = 0; _dayStamp = -1; }
+        internal static void Reset() { _purse.Clear(); _pending.Clear(); _daySold = _dayGold = _dayLord = _dayLife = _dayGear = 0; _daySaved = _dayGarSold = _dayGarGold = 0; _dayCloth = 0; _dayWage = 0; _dayWageN = 0; _dayIn = _dayOut = 0; _dayStamp = -1; }
 
         internal static string Export()
         {
@@ -65,7 +69,7 @@ namespace Armoury
             try
             {
                 if (mp == null) return;
-                AiWear.Forget(mp); AiGear.Forget(mp);
+                AiWear.Forget(mp); AiGear.Forget(mp); MenUpgrade.Forget(mp);
                 int purse = Get(mp);
                 if (purse <= 0) return;
                 Take(mp, purse);
@@ -132,12 +136,12 @@ namespace Armoury
         {
             int d = (int)CampaignTime.Now.ToDays;
             if (_dayStamp == d) return;
-            if (_dayStamp >= 0 && (_daySold + _dayLife + _dayGear + _dayCloth + _dayWage + _dayIn + _dayOut) > 0)
-                Log.Info("Sakiewka ludzi: dzien " + _dayStamp + " - nadwyzki sprzedane " + _daySold + " szt. za " + _dayGold + " (trzecia lordow AI " + _dayLord
+            if (_dayStamp >= 0 && (_daySold + _dayLife + _dayGear + _dayCloth + _dayWage + _dayIn + _dayOut + _daySaved) > 0)
+                Log.Info("Sakiewka ludzi: dzien " + _dayStamp + " - nadwyzki sprzedane " + _daySold + " szt. za " + _dayGold + " (w tym zalogi " + _dayGarSold + " za " + _dayGarGold + "; trzecia lordow AI i panow osad " + _dayLord
                          + "), ludzie wydali na sprzet " + _dayGear + ", na zycie w miastach " + _dayLife + ", na odziez wojska (150) " + _dayCloth
                          + "; zold wplacony do sakiewek " + _dayWage + " (" + _dayWageN + " wyplat); ruch sakiewek: wplynelo " + _dayIn + " (zold, lup, przejete sakiewki), wyszlo " + _dayOut
-                         + " (sprzet, naprawy, odziez, zycie w miastach, utracone sakiewki), w sakiewkach razem " + TotalNow() + ".");
-            _daySold = _dayGold = _dayLord = _dayLife = _dayGear = 0; _dayCloth = 0; _dayWage = 0; _dayWageN = 0; _dayIn = _dayOut = 0; _dayStamp = d;
+                         + " (sprzet, naprawy, odziez, zycie w miastach, utracone sakiewki), w sakiewkach razem " + TotalNow() + "; odlozone na sprzet " + _daySaved + ".");
+            _daySold = _dayGold = _dayLord = _dayLife = _dayGear = 0; _daySaved = _dayGarSold = _dayGarGold = 0; _dayCloth = 0; _dayWage = 0; _dayWageN = 0; _dayIn = _dayOut = 0; _dayStamp = d;
         }
 
         /// <summary>Cena skupu sztuki (w tym stanie) w miescie; poza miastem - najblizsze miasto.</summary>
@@ -170,16 +174,53 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ wejscie / wyjscie z miasta
+        // K1 (A5): w jednym zdarzeniu - sprzedaz nadwyzek -> naprawy -> braki -> lepsze (Jeff 14.09: "najpierw braki, potem wymiana";
+        // naprawy maja pierwszenstwo od wpisu 84)
         internal static void OnEntered(MobileParty mp, Settlement st, Hero h)
         {
             try
             {
                 if (!On || mp == null || st == null || !st.IsTown || st.Town == null) return;
                 Day();
-                if (mp.IsMainParty) { SellPlayerSurplus(st); BuyPlayerGaps(st); }
-                else if (mp.IsLordParty && mp.LeaderHero != null && mp.LeaderHero.IsAlive && mp.MapEvent == null) { SellAiSurplus(mp, st); AiWear.MendInTown(mp, st); }
+                if (mp.IsMainParty) { SettlePlayerBook(); SellPlayerSurplus(st); BuyPlayerGaps(st); MenUpgrade.ForPlayer(st); }
+                else if (mp.IsLordParty && mp.LeaderHero != null && mp.LeaderHero.IsAlive && mp.MapEvent == null)
+                {
+                    SellArmorySurplus(mp, st, mp.LeaderHero, false);
+                    AiWear.MendInTown(mp, st);
+                    AiGear.TryBuy(mp, st);   // K1: braki i lepsze PO nadwyzkach i naprawach (AiGear.OnSettlementEntered oddaje miasta tutaj)
+                }
             }
             catch (Exception e) { Log.Error("MenPurse.OnEntered", e); }
+        }
+
+        /// <summary>K1 (A4): doba postoju druzyny gracza w miescie - braki, potem lepsze (nadwyzki tylko przy wjezdzie).</summary>
+        internal static void OnDailyTickParty(MobileParty mp)
+        {
+            try
+            {
+                if (!On || mp == null || !mp.IsMainParty) return;
+                var st = mp.CurrentSettlement;
+                if (st == null || !st.IsTown || st.Town == null || QuartermasterEscrow.Active) return;
+                Day();
+                SettlePlayerBook(); BuyPlayerGaps(st); MenUpgrade.ForPlayer(st);
+            }
+            catch (Exception e) { Log.Error("MenPurse.OnDailyTickParty", e); }
+        }
+
+        /// <summary>K1 (B4): zanim ludzie gracza pojda na targ, kwatermistrz rozlicza wklady gracza (wymiana 1:1, jak przy ekranie
+        /// zbrojowni) - zamowienie od kowala czy wklad sprzed wjazdu nie jest wtedy ani "brakiem", ani "zapasem ludzi".</summary>
+        private static void SettlePlayerBook()
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || !s.QuartermasterSwapOneForOne || !s.ArmouryProtectUsed || QuartermasterEscrow.Active) return;
+                var armory = QuartermasterLaw.DteArmory();
+                if (armory == null) return;
+                ArmouryBehavior.ReconcileStock("miasto");
+                QuartermasterLaw.PurgeUnusable(armory);
+            }
+            catch (Exception e) { Log.Error("MenPurse.SettlePlayerBook", e); }
         }
 
         internal static void OnLeft(MobileParty mp, Settlement st)
@@ -196,78 +237,77 @@ namespace Armoury
                 // (to samo zloto: mniej idzie "na zycie"); rezerwa na zalegle naprawy nietknieta, jak przy brakach w kompletach
                 int cloth = ArmyClothing.BuyForParty(mp, st, purse - reserve);
                 if (cloth > 0) { _dayCloth += cloth; purse = Get(mp); }
-                int life = Math.Max(0, purse - reserve);
-                if (life <= 0) return;
+                int avail = Math.Max(0, purse - reserve);
+                // K1 (A3): z tego, co zostaje, MenGearSavePercent ludzie odkladaja na lepszy sprzet - nie wiecej niz MenGearSaveDays dni
+                // zoldu partii (z rezerwa na naprawy); reszta i nadwyzka ponad limit - "na zycie" w miescie, jak dotad
+                int saved = 0, over = 0;
+                if (MenUpgrade.On && avail > 0)
+                {
+                    var s = Settings.Current;
+                    int want = (int)((long)avail * Math.Max(0, Math.Min(100, s.MenGearSavePercent)) / 100);
+                    long cap = (long)Math.Max(0, s.MenGearSaveDays) * Math.Max(0, Wage(mp));
+                    int room = (int)Math.Max(0L, Math.Min(int.MaxValue, cap - reserve));
+                    saved = Math.Min(want, room); over = want - saved;
+                    MenUpgrade.NoteSaved(saved, over);
+                    _daySaved += saved;
+                }
+                int life = avail - saved;
+                if (life <= 0)
+                {
+                    if (mp.IsMainParty && saved > 0) Log.Player("Your men put by " + saved + " for better kit (purse " + Get(mp) + ").");
+                    return;
+                }
                 Take(mp, life);
                 st.Town.ChangeGold(life);           // karczma, jedzenie, gra, kobiety - pieniadze zostaja w miescie
                 MoneyLedger.Note(MoneyLedger.NLife, st, life);   // ksiega przeplywow osad (tylko licznik)
                 SoldierPay.Hold(st, life);          // tarcza zoldu (gdy wlaczona): regulator kasy nie skasuje tych pieniedzy, zanim zawor renty odda je panu
                 _dayLife += life;
                 if (mp.IsMainParty)
-                    Log.Player("Your men spent " + life + " denars in " + st.Name + " - food, drink, dice and company." + (reserve > 0 ? " They kept " + Math.Min(purse, reserve) + " for mending their kit." : ""));
+                    Log.Player("Your men spent " + life + " denars in " + st.Name + " - food, drink, dice and company." + (reserve > 0 ? " They kept " + Math.Min(purse, reserve) + " for mending their kit." : "")
+                               + (saved > 0 ? " They put by " + saved + " for better kit (purse " + Get(mp) + ")." : ""));
             }
             catch (Exception e) { Log.Error("MenPurse.OnLeft", e); }
         }
 
+        private static int Wage(MobileParty mp) { try { return mp.TotalWage; } catch { return 0; } }
+
         // ------------------------------------------------------------ gracz: nadwyzki na targ
+        // K1 (A9): po DOPASOWANIU, nie po liczbie sztuk - najpierw sztuki LUDZI, ktorych nikt nie udzwignie, potem najgorsze uzyteczne
+        // ponad komplet + SurplusKeepPercent; w zapasie zostaja najlepsze wolne uzyteczne. Dotad liczenie po typie trzymalo T6, ktorej
+        // nikt nie naciagnie, a sprzedawalo uzyteczne T3. Czesc gracza (ksiega, NAJGORSZE egzemplarze id) nietknieta - dotad
+        // pomijane bylo cale id, gdy gracz mial w nim choc jedna sztuke.
         private static void SellPlayerSurplus(Settlement st)
         {
             var armory = QuartermasterLaw.DteArmory();
-            if (armory == null) return;
+            if (armory == null || QuartermasterEscrow.Active) return;
             var s = Settings.Current;
             var main = MobileParty.MainParty;
             int sold = 0, gold = 0;
             foreach (var type in QuartermasterLaw.KitTypes)
             {
                 if (type == ItemObject.ItemTypeEnum.Horse) continue;   // konie - Stajnia
-                int need = QuartermasterLaw.NeedForType(type);
-                int have = QuartermasterLaw.HaveFor(armory, type);
-                // Twoje wklady to nie zapas ludzi - odliczamy je od stanu
-                var ownIds = new Dictionary<string, int>();
-                for (int i = 0; i < armory.Count; i++)
+                var pieces = QuartermasterLaw.KitPieces(armory, type, true);
+                if (pieces.Count == 0) continue;
+                List<CharacterObject> troops; int[] men; SkillObject skill;
+                QuartermasterLaw.MenOf(main.MemberRoster, type, pieces, out troops, out men, out skill);
+                var meets = QuartermasterLaw.MeetsOf(troops);
+                SwapMath.Fit(men, troops.Count, meets, pieces);
+                if (SwapMath.SurplusPlan(pieces, men.Length, s.SurplusKeepPercent, p => SwapMath.Usable(men, meets, p)) <= 0) continue;
+                pieces.Sort(SwapMath.WorseFirst);
+                foreach (var p in pieces)
                 {
-                    var el0 = armory.GetElementCopyAtIndex(i);
-                    var it0 = el0.EquipmentElement.Item;
-                    if (el0.Amount <= 0 || !QuartermasterLaw.CountsAsKit(it0, type)) continue;
-                    int c0; ownIds.TryGetValue(it0.StringId, out c0); ownIds[it0.StringId] = c0 + el0.Amount;
-                }
-                foreach (var kv in ownIds) have -= Math.Min(kv.Value, Math.Max(0, ArmouryBehavior.StockOf(kv.Key)));
-                int keep = (int)Math.Ceiling(need * (1f + Math.Max(0f, s.SurplusKeepPercent) / 100f));
-                int extra = have - keep;
-                if (extra <= 0) continue;
-                // najgorsze najpierw: tier, potem stan; wklady gracza nietkniete
-                var cand = new List<ItemRosterElement>();
-                for (int i = 0; i < armory.Count; i++)
-                {
-                    var el = armory.GetElementCopyAtIndex(i);
-                    var it = el.EquipmentElement.Item;
-                    if (el.Amount <= 0 || !QuartermasterLaw.CountsAsKit(it, type)) continue;
-                    if (ArmouryBehavior.StockOf(it.StringId) > 0) continue;
-                    if (ArmsPricing.IsUnique(it)) continue;   // unikat nie idzie do kupca hurtem
-                    cand.Add(el);
-                }
-                cand.Sort((a, b) =>
-                {
-                    int c = a.EquipmentElement.Item.Tier.CompareTo(b.EquipmentElement.Item.Tier);
-                    if (c != 0) return c;
-                    float ma = a.EquipmentElement.ItemModifier != null ? a.EquipmentElement.ItemModifier.PriceMultiplier : 1f;
-                    float mb = b.EquipmentElement.ItemModifier != null ? b.EquipmentElement.ItemModifier.PriceMultiplier : 1f;
-                    return ma.CompareTo(mb);
-                });
-                foreach (var el in cand)
-                {
-                    if (extra <= 0) break;
-                    int unit = SellPrice(el.EquipmentElement, st, main);
-                    int n = Math.Min(extra, el.Amount);
-                    n = Math.Min(n, Math.Max(0, st.Town.Gold) / Math.Max(1, unit));
+                    if (p.Sell <= 0) continue;
+                    var el = QuartermasterLaw.ElOf(p);
+                    int unit = SellPrice(el, st, main);
+                    int n = Math.Min(p.Sell, Math.Max(0, st.Town.Gold) / Math.Max(1, unit));
                     if (n <= 0) continue;
-                    armory.AddToCounts(el.EquipmentElement, -n);
-                    st.ItemRoster.AddToCounts(el.EquipmentElement, n);
+                    armory.AddToCounts(el, -n);
+                    st.ItemRoster.AddToCounts(el, n);
                     st.Town.ChangeGold(-unit * n);
                     MoneyLedger.Note169(MoneyLedger.N169Surplus, st, -unit * n);   // paczka 169: linia kas (tylko licznik)
                     Add(main, unit * n);
-                    sold += n; gold += unit * n; extra -= n;
-                    SellByCondition.NoteSale(SellByCondition.Men, el.EquipmentElement, n, unit);   // ksiega skupu sprzetu (tylko log)
+                    sold += n; gold += unit * n;
+                    SellByCondition.NoteSale(SellByCondition.Men, el, n, unit);   // ksiega skupu sprzetu (tylko log)
                 }
             }
             if (sold > 0)
@@ -280,11 +320,13 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ gracz: braki w kompletach za pieniadze ludzi
+        // K1 (A6): brak = ludzie bez UZYTECZNEJ sztuki (FitFor.UnfitMen); kupiona sztuka ma wymog <= UnfitMinSkill typu (to samo
+        // "bring <= N", co pokazuje kwatermistrz). Dotad NeedForType - HaveFor liczylo jako "ma" takze sztuki ponad umiejetnosc.
         private static void BuyPlayerGaps(Settlement st)
         {
             var armory = QuartermasterLaw.DteArmory();
             var main = MobileParty.MainParty;
-            if (armory == null) return;
+            if (armory == null || QuartermasterEscrow.Active) return;
             int budget = Get(main) - TroopSelfMend.OutstandingCost(st);   // naprawy maja pierwszenstwo (z materialem - szacunek z tej polki)
             if (budget <= 0) return;
             int spent = 0, pieces = 0, maxPieces = Math.Max(1, Settings.Current.AiGearMaxPiecesPerVisit);
@@ -292,7 +334,9 @@ namespace Armoury
             foreach (var type in QuartermasterLaw.KitTypes)
             {
                 if (type == ItemObject.ItemTypeEnum.Horse) continue;
-                int gap = QuartermasterLaw.NeedForType(type) - QuartermasterLaw.HaveFor(armory, type);
+                var fit = QuartermasterLaw.FitFor(armory, type);
+                int gap = fit.UnfitMen;
+                int maxReq = fit.UnfitMinSkill;
                 while (gap > 0 && pieces < maxPieces && spent < budget)
                 {
                     int best = -1, bestPrice = 0; float bestScore = 0f;
@@ -301,6 +345,7 @@ namespace Armoury
                         var el = shelf.GetElementCopyAtIndex(i);
                         var it = el.EquipmentElement.Item;
                         if (el.Amount <= 0 || !QuartermasterLaw.CountsAsKit(it, type) || ArmsPricing.IsUnique(it)) continue;
+                        if (it.Difficulty > 0 && ItemReq.SkillFor(it) != null && it.Difficulty > maxReq) continue;   // najslabszy bez sztuki ja udzwignie
                         int price = st.Town.MarketData.GetPrice(el.EquipmentElement, main, false, st.Party);
                         if (price <= 0 || price > budget - spent) continue;
                         float score = (it.Effectiveness > 0f ? it.Effectiveness : 1f) / price;
@@ -324,53 +369,87 @@ namespace Armoury
             }
         }
 
-        // ------------------------------------------------------------ AI: nadwyzki na targ, trzecia dla lorda
-        private static void SellAiSurplus(MobileParty mp, Settlement st)
+        // ------------------------------------------------------------ AI i zalogi: nadwyzki na targ, trzecia dla pana
+        // K1 (A9): ta sama regula co u gracza (po dopasowaniu); zbrojownia AI bez stanu - do kupca idzie najgorsza obita (AiWear).
+        // Lord AI: trzecia (LordLootThirdPercent) do kiesy lorda; zaloga: trzecia do pana osady; reszta do sakiewki ludzi.
+        private static void SellArmorySurplus(MobileParty mp, Settlement st, Hero third, bool garrison)
         {
             var dict = AiGear.Armories();
             Dictionary<ItemObject, int> arm;
             if (dict == null || !dict.TryGetValue(mp.Id, out arm) || arm == null || arm.Count == 0) return;
             var s = Settings.Current;
-            var need = AiGear.NeedBuckets(mp);
-            var have = new Dictionary<int, int>();
-            // wpis 89 (audyt): po TYPIE - sztuka innego tieru pokrywa potrzebe (AiGear tez tak liczy); konie i rzedy - Stajnia,
-            // NeedBuckets ich nie widzi, wiec dotad kazdy kon szedl do kupca jako "nadwyzka"
-            foreach (var kv in arm) { if (kv.Key == null || kv.Value <= 0 || !SupplyDemand.Equipmentish(kv.Key) || HorseKind(kv.Key)) continue; int k = (int)kv.Key.ItemType; int n; have.TryGetValue(k, out n); have[k] = n + kv.Value; }
-            var needT = new Dictionary<int, int>();
-            foreach (var nk in need) { int ty = nk.Key / 10; int v; needT.TryGetValue(ty, out v); needT[ty] = v + nk.Value; }
             int sold = 0, gold = 0;
-            foreach (var hk in have.ToList())
+            bool stop = false;
+            foreach (var type in QuartermasterLaw.KitTypes)
             {
-                int nd; needT.TryGetValue(hk.Key, out nd);
-                int keep = (int)Math.Ceiling(nd * (1f + Math.Max(0f, s.SurplusKeepPercent) / 100f));
-                int extra = hk.Value - keep;
-                if (extra <= 0) continue;
-                var items = arm.Where(kv => kv.Key != null && kv.Value > 0 && SupplyDemand.Equipmentish(kv.Key) && !HorseKind(kv.Key) && (int)kv.Key.ItemType == hk.Key && !ArmsPricing.IsUnique(kv.Key))
-                               .OrderBy(kv => kv.Key.Tier).ThenBy(kv => kv.Key.Value).Select(kv => kv.Key).ToList();
-                foreach (var it in items)
+                if (stop) break;
+                if (type == ItemObject.ItemTypeEnum.Horse || type == ItemObject.ItemTypeEnum.HorseHarness) continue;   // konie i rzedy - Stajnia
+                var pieces = MenUpgrade.AiPieces(arm, type);
+                if (pieces.Count == 0) continue;
+                List<CharacterObject> troops; int[] men; SkillObject skill;
+                QuartermasterLaw.MenOf(mp.MemberRoster, type, pieces, out troops, out men, out skill);
+                var meets = QuartermasterLaw.MeetsOf(troops);
+                SwapMath.Fit(men, troops.Count, meets, pieces);
+                if (SwapMath.SurplusPlan(pieces, men.Length, s.SurplusKeepPercent, p => SwapMath.Usable(men, meets, p)) <= 0) continue;
+                pieces.Sort(SwapMath.WorseFirst);
+                foreach (var p in pieces)
                 {
-                    int cnt; if (!arm.TryGetValue(it, out cnt)) continue;
-                    while (cnt > 0 && extra > 0)
+                    var it = QuartermasterLaw.ElOf(p).Item;
+                    for (int k = 0; k < p.Sell && !stop; k++)
                     {
+                        int cnt;
+                        if (it == null || !arm.TryGetValue(it, out cnt) || cnt <= 0) break;
                         var el = new EquipmentElement(it, AiWear.TakeCondition(mp, it));
                         int unit = SellPrice(el, st, mp);
-                        if (st.Town.Gold < unit) { extra = 0; break; }
-                        cnt--; extra--;
+                        if (st.Town.Gold < unit) { AiWear.PutBack(mp, it, el.ItemModifier); stop = true; break; }   // kasa pusta - koniec na dzis (stan wraca)
+                        if (cnt > 1) arm[it] = cnt - 1; else arm.Remove(it);
                         st.ItemRoster.AddToCounts(el, 1);
                         st.Town.ChangeGold(-unit);
                         MoneyLedger.Note169(MoneyLedger.N169Surplus, st, -unit);   // paczka 169: linia kas (tylko licznik)
-                        int third = (int)Math.Round(unit * MBMath.ClampFloat(s.LordLootThirdPercent, 0f, 100f) / 100f);
-                        mp.LeaderHero.ChangeHeroGold(third);
-                        ClanIncomeBook.NoteInflow(mp.LeaderHero, third, ClanIncomeBook.KThird);   // paczka 169: D rodu (tylko licznik)
-                        Add(mp, unit - third);
-                        sold++; gold += unit; _dayLord += third;
+                        int cut = third != null && third.IsAlive ? (int)Math.Round(unit * MBMath.ClampFloat(s.LordLootThirdPercent, 0f, 100f) / 100f) : 0;
+                        if (cut > 0)
+                        {
+                            third.ChangeHeroGold(cut);
+                            if (third != Hero.MainHero) ClanIncomeBook.NoteInflow(third, cut, ClanIncomeBook.KThird);   // paczka 169: D rodu (tylko licznik)
+                        }
+                        Add(mp, unit - cut);
+                        sold++; gold += unit; _dayLord += cut;
                         SellByCondition.NoteSale(SellByCondition.Men, el, 1, unit);   // ksiega skupu sprzetu (tylko log)
                     }
-                    if (cnt > 0) arm[it] = cnt; else arm.Remove(it);
-                    if (extra <= 0) break;
                 }
             }
-            if (sold > 0) { _daySold += sold; _dayGold += gold; }
+            if (sold > 0) { _daySold += sold; _dayGold += gold; if (garrison) { _dayGarSold += sold; _dayGarGold += gold; } }
+        }
+
+        /// <summary>K1 (A9, A11): doba zalogi - zaloga bez ludzi oddaje sakiewke do kasy osady; inaczej nadwyzki zbrojowni do kupca
+        /// (miasto - jego targ, zamek - najblizsze miasto handlowe); trzecia dla pana osady, reszta do sakiewki zalogi.</summary>
+        internal static void GarrisonDay(MobileParty mp, Settlement st)
+        {
+            try
+            {
+                if (!MenUpgrade.GarrisonPurseOn || mp == null || st == null || st.Town == null || !mp.IsGarrison) return;
+                Day();
+                int men = mp.MemberRoster != null ? mp.MemberRoster.TotalManCount : 0;
+                if (men <= 0)
+                {
+                    int purse = Get(mp);
+                    if (purse > 0)
+                    {
+                        Take(mp, purse);
+                        st.Town.ChangeGold(purse);
+                        MoneyLedger.NotePurseGone(purse, true);                         // paczka 169: linia "Obieg" (tylko licznik)
+                        MoneyLedger.Note169(MoneyLedger.N169PurseGone, st, purse);
+                        MenUpgrade.NoteGarrisonEmpty(purse);
+                    }
+                    return;
+                }
+                if (st.IsUnderSiege) return;
+                var market = st.IsTown ? st : ArmyClothing.MarketTown(st);
+                if (market == null || market.Town == null || market.ItemRoster == null || market.IsUnderSiege) return;
+                if (FactionManager.IsAtWarAgainstFaction(mp.MapFaction, market.MapFaction)) return;
+                SellArmorySurplus(mp, market, st.OwnerClan != null ? st.OwnerClan.Leader : null, true);
+            }
+            catch (Exception e) { Log.Error("MenPurse.GarrisonDay", e); }
         }
 
         // ------------------------------------------------------------ gracz kupuje od ludzi (ekran zbrojowni)
@@ -383,13 +462,14 @@ namespace Armoury
         }
 
         /// <summary>Gracz odklada z powrotem to, co w tej sesji wzial od ludzi: kasujemy zakup (zwraca ile).</summary>
-        internal static int CancelBuy(ItemObject item, int n)
+        internal static int CancelBuy(EquipmentElement el, int n)
         {
             int cut = 0;
             for (int i = _pending.Count - 1; i >= 0 && n > 0; i--)
             {
                 var kv = _pending[i];
-                if (kv.Key.Item != item) continue;
+                // K1: ten sam egzemplarz (przedmiot i stan) - dotad sam przedmiot, wiec odlozenie WLASNEJ sprawnej sztuki kasowalo zakup obitej od ludzi
+                if (kv.Key.Item != el.Item || kv.Key.ItemModifier != el.ItemModifier) continue;
                 int c = Math.Min(kv.Value, n); n -= c; cut += c;
                 if (kv.Value - c <= 0) _pending.RemoveAt(i); else _pending[i] = new KeyValuePair<EquipmentElement, int>(kv.Key, kv.Value - c);
             }
@@ -397,6 +477,9 @@ namespace Armoury
         }
 
         internal static void ClearBuys() { _pending.Clear(); }
+
+        /// <summary>K1: gracz wzial w tej sesji ekranu cos z zapasu ludzi - zamkniecie musi to rozliczyc.</summary>
+        internal static bool PendingBuys { get { return _pending.Count > 0; } }
 
         /// <summary>Zamkniecie ekranu zbrojowni: placisz ludziom za wziete nadwyzki; czego nie stac - wraca do zbrojowni.</summary>
         internal static void SettleBuys()
