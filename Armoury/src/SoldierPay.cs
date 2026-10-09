@@ -77,6 +77,7 @@ namespace Armoury
         private static long _dLordAcc, _dLordTaken, _dGarAcc, _dGarTaken, _dToPurse, _dPlayer, _dToTowns, _dToCastles;
         private static long _dUndead, _dNoTown, _dOff, _dOther, _dCut, _dBlindGold, _dDebtCut;
         private static long _dGarToPurse; private static int _dGarToPurseN;   // K1 (A2): zold zalog do ich sakiewek
+        private static long _dGarHome; private static int _dGarHomeN;         // 114-p (Z8): zold zalog zamkow ponad zapas kasy - bez zwrotu korony
         private static int _dLordN, _dGarN, _dToPurseN, _dToTownsN, _dToCastlesN, _dCutClans, _dBlind, _dDupes, _stumbles, _dDebtClans;
         private static bool _errLogged;
 
@@ -130,6 +131,7 @@ namespace Armoury
             _dLordAcc = _dLordTaken = _dGarAcc = _dGarTaken = _dToPurse = _dPlayer = _dToTowns = _dToCastles = 0;
             _dUndead = _dNoTown = _dOff = _dOther = _dCut = _dBlindGold = _dDebtCut = 0;
             _dGarToPurse = 0; _dGarToPurseN = 0;
+            _dGarHome = 0; _dGarHomeN = 0;
             _dLordN = _dGarN = _dToPurseN = _dToTownsN = _dToCastlesN = _dCutClans = _dBlind = _dDupes = _stumbles = _dDebtClans = 0;
             _dShielded = 0; _dShieldTicks = 0;
             _dToLordGold = _dFromLordGold = _dDupLordGold = _dOutLordGold = 0; _dToLordN = _dFromLordN = _dDupLordN = _dOutLordN = 0;   // 169b
@@ -378,16 +380,24 @@ namespace Armoury
             {
                 _dGarAcc += r.Wage; _dGarTaken += amt; _dGarN++;
                 if (amt <= 0) return;
-                if (s.CrownWageRefundGarrisons) AddPaid(clan.Leader, amt, s);   // kiese zalogi wyrownuje rod z salda - placi glowa
-                if (!s.GarrisonPayToCoffers) { _dOff += amt; return; }
                 var st = mp.CurrentSettlement ?? mp.HomeSettlement;
                 var town = st != null ? st.Town : null;
-                if (town == null) { _dNoTown += amt; return; }
+                bool toCoffers = s.GarrisonPayToCoffers && town != null;
                 // K1 (A2, Jeff 09.10 "za swoje sami sie zbroja z lupow i zoldu"): MenGearSavePercent zaplaconego zoldu do sakiewki zalogi
                 // (braki i lepszy sprzet z targu swojej osady), najwyzej do MenGearSaveDays dni zoldu - ponad limit caly zold do kasy osady.
                 // Pieniadze i tak koncza w tej samej kasie, tylko pozniej i jako zakup sprzetu (decyzja z 05.10 "zold garnizonu do kasy
-                // jego osady" w mocy co do miejsca)
-                int toPurse = GarrisonShare(mp, amt, r.Wage, s), coffers = amt - toPurse;
+                // jego osady" w mocy co do miejsca). GarrisonShare tylko czyta (sakiewke i ustawienia) - liczone przed zwrotem korony
+                int toPurse = toCoffers ? GarrisonShare(mp, amt, r.Wage, s) : 0, coffers = amt - toPurse;
+                // 114-p (Z8, 2.0b): czesc zoldu, ktora wyladuje w kasie ZAMKU ponad zapasem, wraca panu zaworem - nie jest podstawa zwrotu
+                // korony (CastlePurse.HomePart liczy przed wplata; miasta, wylaczniki i blad = 0 - caly zold jak dotad)
+                int home = toCoffers ? CastlePurse.HomePart(st, coffers) : 0;
+                if (s.CrownWageRefundGarrisons)
+                {
+                    if (amt > home) AddPaid(clan.Leader, amt - home, s);   // kiese zalogi wyrownuje rod z salda - placi glowa
+                    if (home > 0 && s.CrownWageRefundEnabled) { _dGarHome += home; _dGarHomeN++; }
+                }
+                if (!s.GarrisonPayToCoffers) { _dOff += amt; return; }
+                if (town == null) { _dNoTown += amt; return; }
                 if (toPurse > 0)
                 {
                     MenPurse.NoteWage(toPurse);                         // licznik linii "Sakiewka ludzi:"
@@ -621,6 +631,7 @@ namespace Armoury
                              + " (" + _dToPurseN + " partii, w tym ludzie gracza " + _dPlayer + ")"
                              + " | garnizony: naliczony " + _dGarAcc + ", z kies zeszlo " + _dGarTaken + " (" + _dGarN + " zalog) -> do kas miast " + _dToTowns + " (" + _dToTownsN
                              + "), do kas zamkow " + _dToCastles + " (" + _dToCastlesN + "), zalogi do sakiewek " + _dGarToPurse + " (" + _dGarToPurseN + ")"
+                             + ", zold zalog zamkow ponad zapas kasy - wraca zaworem, bez zwrotu korony (114-p) " + _dGarHome + " (" + _dGarHomeN + ")"
                              + " | nie przekazano: nieumarli " + _dUndead + ", zaloga bez osady " + _dNoTown + ", wylaczone w ustawieniach " + _dOff
                              + "; karawany i inne partie (bez zmian) " + _dOther
                              + " | przyciete, bo saldo rodu nie zmiescilo sie w kiesie glowy: " + _dCut + " w " + _dCutClans + " rodach (w tym brak zapisany przez gre jako dlug wobec korony: "

@@ -38,10 +38,15 @@ namespace Armoury
     ///     zapas + doplyw / 7%) ani nie wysycha (zapas jest poza zaworem). Hak kiesy ludu (KL, etap 5): CastleDuesSuburbShare -
     ///     czesc zaworu dla podzamcza, dzis 0 (podzamcze nie ma jeszcze wlasnej kiesy - ta czesc zostaje w kasie zamku).
     ///     KLUCZ 114 (projekt etapu 2, Z15-1; galaz `paczki/114-porzadki` a14efe8 - tylko klucz i poprawki ksiegi, podzial przez wspolny
-    ///     pomocnik ValveSplit.Split zamiast TownPurse.Split - S15): zawor dzielony z korona jak zawor miasta (K6) - pan CastleDuesLordShare
-    ///     (2/3), reszta do skarbca jego krolestwa (bez zdarzenia gry, jak udzial korony z zaworu miasta; korona oddaje to rodom zwrotem
-    ///     zoldu w wojnie); zamek rodu bez krolestwa i wylaczony podzial (CastleDuesSplitWithCrown) - calosc dla pana. Bez podzialu pan
-    ///     odzyskiwal caly zold zalogi wlasnego zamku; z podzialem zaloga "u siebie" kosztuje go trzecia czesc zoldu - w zamku jak w miescie.
+    ///     pomocnik ValveSplit.Split zamiast TownPurse.Split - S15): zawor dzielony z korona - pan CastleDuesLordShare (2/3), reszta do
+    ///     skarbca jego krolestwa (bez zdarzenia gry, jak danina wojenna KingdomTreasury; korona oddaje to rodom zwrotem zoldu w wojnie);
+    ///     zamek rodu bez krolestwa i wylaczony podzial (CastleDuesSplitWithCrown) - calosc dla pana. Bez podzialu pan odzyskiwal caly zold
+    ///     zalogi wlasnego zamku; z podzialem zaloga "u siebie" kosztuje go co najmniej trzecia czesc zoldu. 114-p: renta i zawor MIASTA ida
+    ///     dzis w 100% do pana (PopulationLaw, TownRentShare) - ten sam podzial 2/3 : 1/3 dla miast przyjdzie dopiero z 111' (etap 5, K6 OB);
+    ///     do tego czasu zamek i miasto maja rozne udzialy korony (przejsciowa niespojnosc, wpisana w CHANGELOG 114-p).
+    ///     114-p (Z8, 2.0b): w wojnie korona zwraca 50% zoldu zalog (CrownWageRefundGarrisons); zold zalogi zamku, ktory laduje w kasie
+    ///     PONAD zapasem, wraca panu zaworem - ta czesc nie jest podstawa zwrotu (HomePart, CastleGarrisonPayComesHome), inaczej z 1 zl
+    ///     zoldu wracalo ok. 1.16 zl (gracz2.py: 0.5 zwrotu + ok. 0.66 zaworu). Do 165 (zwrot bez zalog) - tylko zamki.
     ///  4. Tabory: wies, ktorej targ lezy za MarketMaxDistance, dalej wozi do zamku pana - ale tylko wtedy, gdy zamek ma ponad
     ///     zapasem dosc na caly ladunek; inaczej tabor jedzie na daleki targ (MarketRoad pyta CanPayCart). Pusty zamek nie kupuje.
     ///  5. Start nowej kampanii: dar startowy w kasach zamkow (gra 20 000 + BK 40 x dobrobyt) jest raz, w pierwszej dobie, przycinany
@@ -191,8 +196,8 @@ namespace Armoury
         }
 
         /// <summary>
-        /// 114: udzial pana w zaworze zamku nalezacego do rodu w krolestwie: CastleDuesLordShare (obciete do 0..1, NaN = 0 - jak udzial pana
-        /// w zaworze miasta), a przy wylaczonym podziale z korona 1 (pan bierze calosc - stan sprzed 114).
+        /// 114: udzial pana w zaworze zamku nalezacego do rodu w krolestwie: CastleDuesLordShare (obciete do 0..1, NaN = 0), a przy
+        /// wylaczonym podziale z korona 1 (pan bierze calosc - stan sprzed 114).
         /// </summary>
         internal static float LordShare(Settings s)
         {
@@ -320,6 +325,34 @@ namespace Armoury
                      + ", dar startowy przycinany w pierwszej dobie nowej kampanii: " + (s != null && s.CastlePurseTrimAtStart ? "tak" : "nie")
                      + ", tabor do zamku tylko gdy zamek ma czym zaplacic: " + (s != null && s.CastleCartsNeedCoin ? "tak" : "nie")
                      + "; hak kiesy ludu (etap 5) CastleDuesSuburbShare " + CastleDuesSuburbShare.ToString("0.##", CultureInfo.InvariantCulture) + ".");
+        }
+
+        // ------------------------------------------------------------ zwrot zoldu z korony a zaloga "u siebie" (114-p, Z8)
+        /// <summary>
+        /// 114-p (Z8 z 2.0b; z galezi 114 TownPurse.HomePart/PayComesHome, tylko dla zamkow): ile z zoldu zalogi, ktory ZARAZ wplynie do kasy
+        /// jej zamku, wyladuje ponad zapasem kupcow. Tylko ta czesc wraca panu zaworem - i tylko ona nie jest podstawa zwrotu zoldu z korony
+        /// (inaczej zaloga dawalaby panu w wojnie wiecej, niz kosztuje: 0.5 zwrotu + do 2/3 zaworu). Czesc dopelniajaca kase do zapasu nie wraca
+        /// nigdy (zastepuje dosypke regulatora) - za nia zwrot zostaje jak dotad. Warunki: zawor czynny (CastlePurseEnabled, CastleDuesShare > 0),
+        /// pan ma w nim udzial > 0 (bez krolestwa - calosc; w krolestwie CastleDuesLordShare przy podziale), CastleGarrisonPayComesHome.
+        /// Miasta - nie (renta miasta: TownWageShield; zwrot bez zalog wprowadza 165). Wolac PRZED wplata zoldu. Wyjatek albo wylacznik = 0.
+        /// </summary>
+        internal static int HomePart(Settlement st, int amount)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (amount <= 0 || s == null || st == null || !st.IsCastle || st.Town == null) return 0;
+                if (!s.CastlePurseEnabled || !s.CastleGarrisonPayComesHome) return 0;
+                if (float.IsNaN(s.CastleDuesShare) || s.CastleDuesShare <= 0f) return 0;
+                var clan = st.OwnerClan;
+                if (clan == null) return 0;
+                var k = clan.Kingdom;
+                float lordShare = s.CastleDuesSplitWithCrown && k != null && !k.IsEliminated ? LordShare(s) : 1f;
+                if (lordShare <= 0f) return 0;                   // calosc zaworu bierze korona - do pana nic nie wraca, zwrot jak dotad
+                long above = (long)st.Town.Gold + amount - Reserve(st.Town);
+                return above <= 0 ? 0 : (above >= amount ? amount : (int)above);
+            }
+            catch (Exception e) { Stumble("CastlePurse.HomePart", e); return 0; }
         }
 
         // ------------------------------------------------------------ tabory wsi bez bliskiego targu
@@ -459,7 +492,7 @@ namespace Armoury
             if (on) { try { TrimStartGift(s); } catch (Exception e) { Stumble("CastlePurse.TrimStartGift", e); } }
             float share = float.IsNaN(s.CastleDuesShare) ? 0f : Math.Max(0f, Math.Min(1f, s.CastleDuesShare));
             float suburbShare = ValveSplit.Unit(CastleDuesSuburbShare);
-            bool split = s.CastleDuesSplitWithCrown;             // 114: zawor dzielony z korona jak zawor miasta
+            bool split = s.CastleDuesSplitWithCrown;             // 114: zawor dzielony z korona (miasta - dopiero z 111', etap 5)
             float lordShare = LordShare(s);
             long gold = 0, reserveSum = 0, spareSum = 0, shortSum = 0, paid = 0, playerPaid = 0, suburbKept = 0, crownPaid = 0, playerCrown = 0;
             int castles = 0, payers = 0, below = 0, siege = 0, noLord = 0, overBk = 0, maxSpare = 0, crownPayers = 0, noCrown = 0; string maxName = null;
@@ -488,7 +521,7 @@ namespace Armoury
                                 // hak KL: czesc podzamcza zostaje w kasie zamku (dzis 0)
                                 int suburb = suburbShare > 0f ? (int)Math.Min(pay, (long)(pay * (double)suburbShare)) : 0;
                                 suburbKept += suburb;
-                                // 114: podzial jak w zaworze miasta - korona (1 - udzial pana) w dol, pan reszte; suma = pay - suburb.
+                                // 114: podzial ValveSplit - korona (1 - udzial pana) w dol, pan reszte; suma = pay - suburb.
                                 // Zamek rodu bez krolestwa i wylaczony podzial: calosc dla pana
                                 var k = clan.Kingdom;
                                 bool crownTakes = split && k != null && !k.IsEliminated;
@@ -508,8 +541,8 @@ namespace Armoury
                                 }
                                 if (crown > 0)
                                 {
-                                    // najpierw kasa, potem skarbiec: skarbiec dostaje dokladnie tyle, ile zeszlo z kasy (bez zdarzenia gry, jak udzial
-                                    // korony z zaworu miasta i danina wojenna KingdomTreasury); po wyjatku przy przelewie pana tu nie dochodzimy
+                                    // najpierw kasa, potem skarbiec: skarbiec dostaje dokladnie tyle, ile zeszlo z kasy (bez zdarzenia gry, jak
+                                    // danina wojenna KingdomTreasury); po wyjatku przy przelewie pana tu nie dochodzimy
                                     int had = town.Gold;
                                     town.ChangeGold(-crown);
                                     int taken = had - town.Gold;

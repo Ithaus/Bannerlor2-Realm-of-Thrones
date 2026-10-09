@@ -2552,13 +2552,17 @@ namespace Armoury
         [SettingPropertyGroup("The castle's purse")]
         public float CastleDuesShare { get; set; } = 0.07f;
 
-        [SettingPropertyBool("Castle Dues Split With Crown", HintText = "the castle's daily dues are shared with the crown as a town's rents are: the lord keeps Castle Dues Lord Share of them and the rest goes to the treasury of his kingdom, which pays it back to the houses as wage refunds in war. A castle held outside any kingdom pays everything to its lord. Off = the lord takes all of it, and in the long run a garrison in his own castle costs him almost nothing")]
+        [SettingPropertyBool("Castle Dues Split With Crown", HintText = "the castle's daily dues are shared with the crown: the lord keeps Castle Dues Lord Share of them (two thirds) and the rest goes to the treasury of his kingdom, which pays it back to the houses as wage refunds in war. A castle held outside any kingdom pays everything to its lord. Towns do not share their rents with the crown yet - they follow the same split with the town purse package (stage 5). Off = the lord takes all of it")]
         [SettingPropertyGroup("The castle's purse")]
         public bool CastleDuesSplitWithCrown { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Castle Dues Lord Share", 0.00f, 1.00f, "0.00", HintText = "of what the castle purse gives up each day its lord keeps this share and the kingdom treasury takes the rest (needs Castle Dues Split With Crown; 1 = all to the lord, 0 = all to the crown). Two thirds, as in a town: a garrison kept at home then costs its lord a third of its pay, in a castle as in a town - you and the AI lords alike")]
+        [SettingPropertyFloatingInteger("Castle Dues Lord Share", 0.00f, 1.00f, "0.00", HintText = "of what the castle purse gives up each day its lord keeps this share and the kingdom treasury takes the rest (needs Castle Dues Split With Crown; 1 = all to the lord, 0 = all to the crown). Two thirds to the lord, one third to the kingdom treasury - you and the AI lords alike: a garrison's pay spent in its own castle comes back to its lord at most at two thirds of a coin")]
         [SettingPropertyGroup("The castle's purse")]
         public float CastleDuesLordShare { get; set; } = 0.67f;
+
+        [SettingPropertyBool("Castle Garrison Pay Comes Home", HintText = "in war the crown no longer repays the part of a castle garrison's pay that lands in the castle purse above its working coin: that part comes back to the castle's lord through the dues, and repaid by the crown as well it would earn him more than the garrison costs - you and the AI lords alike. Pay that only fills the purse up to its working coin, and the part the men keep for their own kit, are repaid as before. Town garrisons are left as they are until the crown's refund is reworked (stage 2, step C). Off = the crown repays castle garrison pay in full, as before")]
+        [SettingPropertyGroup("The castle's purse")]
+        public bool CastleGarrisonPayComesHome { get; set; } = true;
 
         [SettingPropertyBool("Castle Purse Trim At Start", HintText = "once per campaign, on its first day: the starting gift in every castle purse (20 000 plus Banner Kings' 40 a point of prosperity) is cut down to the working coin. The game's regulator deleted that gold within two weeks anyway; left in, the castle lords would draw about five million from nowhere. A save a few days old loses only what the regulator had not yet deleted; an old save loses nothing. Turned on later in a campaign that ran the castle purse without it, it removes only what the dues have not yet drawn from the gift (they draw Castle Dues Share of it a day, most of it within a month)")]
         [SettingPropertyGroup("The castle's purse")]
@@ -4043,6 +4047,7 @@ namespace Armoury
             s.CastleDuesShare = CastleDuesShare;
             s.CastleDuesSplitWithCrown = CastleDuesSplitWithCrown;
             s.CastleDuesLordShare = CastleDuesLordShare;
+            s.CastleGarrisonPayComesHome = CastleGarrisonPayComesHome;
             s.CastlePurseTrimAtStart = CastlePurseTrimAtStart;
             s.CastleCartsNeedCoin = CastleCartsNeedCoin;
             s.ArmyClothingEnabled = ArmyClothingEnabled;
