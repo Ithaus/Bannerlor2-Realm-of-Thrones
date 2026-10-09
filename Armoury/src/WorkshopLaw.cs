@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Reflection;
+using System.Text;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -40,7 +42,7 @@ namespace Armoury
     internal static class WorkshopLaw
     {
         /// <summary>Nowa gra/wczytanie: stare przedmioty i pule z poprzedniej kampanii (audyt 04.10 - ryzyko zepsucia save).</summary>
-        internal static void Reset() { _ore = _wood = _leather = _linen = _wool = null; _owed.Clear(); _labor.Clear(); _rank.Clear(); _wip.Clear(); _guildCache.Clear(); _madeByType.Clear(); _dayStamp = -1; _made = _skipLoss = _skipMat = _skipLabor = _skipGold = 0; _dayRevenue = _dayCost = 0; Array.Clear(_skipMatBy, 0, _skipMatBy.Length);
+        internal static void Reset() { _pending = null; _ore = _wood = _leather = _linen = _wool = null; _owed.Clear(); _labor.Clear(); _rank.Clear(); _wip.Clear(); _guildCache.Clear(); _madeByType.Clear(); _dayStamp = -1; _made = _skipLoss = _skipMat = _skipLabor = _skipGold = 0; _dayRevenue = _dayCost = 0; Array.Clear(_skipMatBy, 0, _skipMatBy.Length);
             WorkshopTrade.Reset();   // warsztaty towarowe w nowej monecie: stan czyszczony razem z warsztatami zbrojnymi (ta metoda idzie z konstruktora ArmouryBehavior)
             TownCrafts.Reset();      // paczka 148: rzemioslo miasta - dlugi wsadu i rak, srednie zuzycia (przed SyncData wczytania)
             TownFletchers.Reset();   // paczka 172: strzelarze miasta - dlugi surowca i rak, kandydaci, liczniki (przed SyncData wczytania)
@@ -569,6 +571,151 @@ namespace Armoury
         }
 
         private static int InProgress() { int n = 0; foreach (var w in _wip.Values) if (w.Item != null) n++; return n; }
+
+        // ------------------------------------------------------------ 174.0b: robota w toku w zapisie gry (audyt 05.10 W7)
+        // Dotad _wip (sztuki w robocie - surowiec juz zdjety z polki i zaplacony), _owed (dlug ulamkowy surowca) i zamowienia SupplyDemand._unmet
+        // zyly tylko w pamieci sesji: kazde wczytanie kasowalo zaczete zbroje razem z kupiona ruda (ujscie w nicosc), dlug ulamkowy dawal kazdemu
+        // warsztatowi znowu do 1 jednostki surowca za darmo, a zamowienia startowaly od zera. Teraz klucz "arm_workshops" (SaveText.Sync, kawalki),
+        // rozwiazanie na obiekty gry w OnSessionLaunched (w SyncData osad jeszcze nie ma do znalezienia). Warsztat, ktorego nie ma albo ktory zmienil
+        // typ, i przedmiot, ktorego nie ma - pominiete (surowiec tej sztuki przepada - jawnie w linii po wczytaniu). Stary zapis: pusto, jak dotad.
+        // Rekordy (~): W|osada|indeks warsztatu|typ warsztatu|linia|przedmiot|dni|praca|koszt surowca|dzien  oraz  O|osada|indeks|typ|ruda|drewno|skora|len
+        private static string _pending;
+        internal static bool SaveOn { get { var s = Settings.Current; return s != null && s.WorkshopStateInSave; } }
+
+        private static string F(float v) { return v.ToString("R", CultureInfo.InvariantCulture); }
+        private static float PF(string t) { float v; return float.TryParse(t, NumberStyles.Float, CultureInfo.InvariantCulture, out v) ? v : 0f; }
+
+        private static bool WorkshopRef(Workshop w, out string sid, out int ix, out string type)
+        {
+            sid = null; ix = -1; type = null;
+            try
+            {
+                var st = w != null ? w.Settlement : null;
+                var town = st != null ? st.Town : null;
+                if (town == null || town.Workshops == null || w.WorkshopType == null) return false;
+                ix = Array.IndexOf(town.Workshops, w);
+                if (ix < 0) return false;
+                sid = st.StringId; type = w.WorkshopType.StringId;
+                return !string.IsNullOrEmpty(sid) && !string.IsNullOrEmpty(type);
+            }
+            catch { return false; }
+        }
+
+        internal static string Export()
+        {
+            try
+            {
+                if (_pending != null) ResolvePending("zapis przed startem sesji");
+                if (!SaveOn) return "";
+                var sb = new StringBuilder();
+                int nW = 0, nO = 0, nSkip = 0;
+                foreach (var kv in _wip)
+                {
+                    string sid, type; int ix;
+                    var w = kv.Value;
+                    if (w == null || !WorkshopRef(kv.Key.Key, out sid, out ix, out type) || (kv.Key.Value ?? "").IndexOf('|') >= 0) { nSkip++; continue; }
+                    if (w.Item != null) nW++;
+                    sb.Append("W|").Append(sid).Append('|').Append(ix).Append('|').Append(type).Append('|').Append(kv.Key.Value ?? "").Append('|')
+                      .Append(w.Item != null ? w.Item.StringId : "").Append('|').Append(F(w.Days)).Append('|').Append(F(w.Labor)).Append('|')
+                      .Append(w.MatCost).Append('|').Append(w.Day).Append('~');
+                }
+                foreach (var kv in _owed)
+                {
+                    string sid, type; int ix;
+                    var o = kv.Value;
+                    if (o == null || o.Length < 4 || (o[0] == 0f && o[1] == 0f && o[2] == 0f && o[3] == 0f) || !WorkshopRef(kv.Key, out sid, out ix, out type)) continue;
+                    sb.Append("O|").Append(sid).Append('|').Append(ix).Append('|').Append(type).Append('|').Append(F(o[0])).Append('|').Append(F(o[1]))
+                      .Append('|').Append(F(o[2])).Append('|').Append(F(o[3])).Append('~');
+                    nO++;
+                }
+                Log.Info("Warsztaty (zapis 174): zapis gry - sztuk w toku " + nW + " (w pamieci " + InProgress() + "), dlugow surowca " + nO + " warsztatow, pozycji bez osady/warsztatu pominietych " + nSkip
+                         + ", zamowien " + SupplyDemand.OrdersCount() + "; " + sb.Length + " znakow.");
+                return sb.ToString();
+            }
+            catch (Exception e) { Log.Error("WorkshopLaw.Export", e); return ""; }
+        }
+
+        /// <summary>Z SyncData: tylko zapamietanie - rozwiazanie w ResolvePending (OnSessionLaunched).</summary>
+        internal static void Import(string s)
+        {
+            _wip.Clear(); _owed.Clear();
+            _pending = string.IsNullOrEmpty(s) ? null : s;
+        }
+
+        private static Workshop FindWorkshop(string sid, string ixs, string type)
+        {
+            Settlement st = null;
+            try { st = TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObject<Settlement>(sid); } catch { }
+            var town = st != null ? st.Town : null;
+            int ix;
+            if (town == null || town.Workshops == null || !int.TryParse(ixs, NumberStyles.Integer, CultureInfo.InvariantCulture, out ix) || ix < 0 || ix >= town.Workshops.Length) return null;
+            var w = town.Workshops[ix];
+            return w != null && w.WorkshopType != null && w.WorkshopType.StringId == type ? w : null;
+        }
+
+        /// <summary>174.0b: robota w toku z zapisu na obiekty gry (OnSessionLaunched; awaryjnie z Export) i linia "Warsztaty (zapis 174)".</summary>
+        internal static void ResolvePending(string why)
+        {
+            var s = _pending;
+            _pending = null;
+            string unmet = SupplyDemand.ImportReport();
+            if (string.IsNullOrEmpty(s))
+            {
+                if (unmet != null) Log.Info("Warsztaty (zapis 174): " + why + " - sztuk w toku w zapisie brak (stary zapis albo pusty stan); " + unmet + ".");
+                return;
+            }
+            if (!SaveOn)
+            {
+                Log.Info("Warsztaty (zapis 174): " + why + " - zapis ma robote w toku, ale Workshop State In Save = off - pominieta (jak dotad: surowiec zaczetych sztuk przepada).");
+                return;
+            }
+            Resolve();
+            int pieces = 0, banks = 0, skipped = 0, owedN = 0, owedSkip = 0;
+            var mat = new float[4]; var lost = new float[4];
+            var om = TaleWorlds.ObjectSystem.MBObjectManager.Instance;
+            foreach (var rec in s.Split('~'))
+            {
+                if (rec.Length == 0) continue;
+                try
+                {
+                    var a = rec.Split('|');
+                    if (a.Length == 10 && a[0] == "W")
+                    {
+                        ItemObject it = null;
+                        if (a[5].Length > 0) { try { it = om.GetObject<ItemObject>(a[5]); } catch { } }
+                        float days = PF(a[6]), labor = PF(a[7]);
+                        int mc, day;
+                        int.TryParse(a[8], NumberStyles.Integer, CultureInfo.InvariantCulture, out mc);
+                        int.TryParse(a[9], NumberStyles.Integer, CultureInfo.InvariantCulture, out day);
+                        var w = FindWorkshop(a[1], a[2], a[3]);
+                        if (w == null || (a[5].Length > 0 && it == null))
+                        {
+                            skipped++;
+                            if (it != null) { float d0; var nd = Needs(it, out d0); if (nd != null) for (int m = 0; m < 4; m++) lost[m] += nd[m]; }
+                            continue;
+                        }
+                        var wip = new Wip { Item = it, Days = it != null ? days : 0f, Labor = Math.Max(0f, labor), MatCost = it != null ? mc : 0, Day = day };
+                        _wip[new KeyValuePair<Workshop, string>(w, a[4])] = wip;
+                        if (it != null) { pieces++; float d1; var nd = Needs(it, out d1); if (nd != null) for (int m = 0; m < 4; m++) mat[m] += nd[m]; }
+                        else banks++;
+                    }
+                    else if (a.Length == 8 && a[0] == "O")
+                    {
+                        var w = FindWorkshop(a[1], a[2], a[3]);
+                        if (w == null) { owedSkip++; continue; }
+                        _owed[w] = new[] { PF(a[4]), PF(a[5]), PF(a[6]), PF(a[7]) };
+                        owedN++;
+                    }
+                }
+                catch (Exception e) { Log.Error("WorkshopLaw.ResolvePending", e); skipped++; }
+            }
+            var inv = CultureInfo.InvariantCulture;
+            Log.Info("Warsztaty (zapis 174): " + why + " - wczytano sztuk w toku " + pieces + " (surowca: ruda " + mat[0].ToString("0.0", inv) + ", drewno " + mat[1].ToString("0.0", inv)
+                     + ", skora " + mat[2].ToString("0.0", inv) + ", len " + mat[3].ToString("0.0", inv) + " jednostek rynku), linii z odlozona praca bez sztuki " + banks
+                     + ", pominieto " + skipped + " (warsztatu albo przedmiotu juz nie ma - surowiec przepadl: ruda " + lost[0].ToString("0.0", inv) + ", drewno " + lost[1].ToString("0.0", inv)
+                     + ", skora " + lost[2].ToString("0.0", inv) + ", len " + lost[3].ToString("0.0", inv) + "), dlugow surowca " + owedN + " warsztatow (pominieto " + owedSkip + "); "
+                     + (unmet ?? "zamowien w zapisie brak") + ".");
+        }
 
         private static void Flush()
         {

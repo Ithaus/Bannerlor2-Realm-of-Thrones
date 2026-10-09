@@ -2820,6 +2820,10 @@ namespace Armoury
         [SettingPropertyGroup("Arms production")]
         public bool BkSuppliesNoArms { get; set; } = true;
 
+        [SettingPropertyBool("Workshop State In Save", HintText = "work in progress at town workshops (pieces begun, raw material already bought, unmet orders) is kept in the save, so a long piece of armour survives saving and loading")]
+        [SettingPropertyGroup("Arms production")]
+        public bool WorkshopStateInSave { get; set; } = true;
+
         [SettingPropertyBool("Bk Supplies No Arms Player", HintText = "the same for your own party: weapons, shields and arrows wear out by Armoury's rules only, not also by Banner Kings supplies (off until you decide - question 5 of package 174)")]
         [SettingPropertyGroup("Arms production")]
         public bool BkSuppliesNoArmsPlayer { get; set; } = false;
@@ -3528,6 +3532,7 @@ namespace Armoury
             s.ArmsNoStallDecay = ArmsNoStallDecay;
             s.ArmsStallUpkeepManDaysPerPiece = ArmsStallUpkeepManDaysPerPiece;
             s.BkSuppliesNoArms = BkSuppliesNoArms;
+            s.WorkshopStateInSave = WorkshopStateInSave;
             s.BkSuppliesNoArmsPlayer = BkSuppliesNoArmsPlayer;
         }
 

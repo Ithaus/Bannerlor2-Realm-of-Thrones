@@ -812,6 +812,7 @@ namespace Armoury
         public bool ArmsNoStallDecay = true;               // the game no longer deletes a piece of arms or armour with a quality modifier from town stalls each day: armour does not rot on a stall - its wear is counted by its condition. Horses keep the game's rule; pieces forged by the player are still cleared from stalls (they are unique save objects)
         public float ArmsStallUpkeepManDaysPerPiece = 0.02f; // man-days a year a town's smiths spend cleaning and oiling each piece of arms on its stalls (the Tower, 1340s: 11 men oiled 3,200 bows in 5 days) - keeping stock is work, not free
         public bool BkSuppliesNoArms = true;               // Banner Kings supplies of AI parties no longer buy and use up weapons and shields: the wear of an AI army's weapons is counted by Armoury (battle wear and repairs) - one rule, not two
+        public bool WorkshopStateInSave = true;            // work in progress at town workshops (pieces begun, raw material already bought, unmet orders) is kept in the save, so a long piece of armour survives saving and loading
         public bool BkSuppliesNoArmsPlayer = false;        // the same for your own party: weapons, shields and arrows wear out by Armoury's rules only, not also by Banner Kings supplies (off until you decide - question 5 of package 174)
 
         public static void Load(string moduleDataDir)

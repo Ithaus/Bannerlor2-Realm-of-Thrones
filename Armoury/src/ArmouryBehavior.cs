@@ -386,7 +386,7 @@ namespace Armoury
         }
         private Dictionary<string,int> _prisonerBaseline;
 
-        public ArmouryBehavior() { Instance = this; HistoricalPrices.Reset(); MaterialLaw.Reset(); WesterosClimate.Reset(); OutlawLaw.Reset(); PopulationLaw.Reset(); WorkshopLaw.Reset(); IronBank.Reset(); MarketGlut.Reset(); ArmsPricing.Reset(); StartKit.Reset(); AiGear.Reset(); Levy.Reset(); VolunteerKit.Reset(); LevyGold.Reset(); WearKeep.Reset(); UniqueSpoils.Reset(); BuildDiary.Reset(); BuildFunding.Reset(); KingdomLedger.Reset(); ColdStart.Reset(); MenPurse.Reset(); ArmyClothing.Reset(); AiWear.Reset(); SmithHours.Reset(); RecruitKit.Reset(); OreLedger.Reset(); GoodsLedger.Reset(); FreeSupplies.Reset(); VillageWoodlot.Reset(); SpoilsSeal.Reset(); MarketRoad.Reset(); MarketCarts.Reset(); VillageClogDiag.Reset(); CartTownExit.Reset(); MoneyLedger.Reset(); PeopleLedger.Reset(); CaravanBulk.Reset(); StartStock.Reset(); MineralOnce.Reset(); SoldierPay.Reset(); KingdomTreasury.Reset(); RecruitCost.Reset(); RecruitSources.Reset(); GarrisonCarts.Reset(); GarrisonArmory.Reset(); ArmsDrill.Reset(); CaravanAmmo.Reset(); ArmsLeaks.Reset(); }   // stan jednej kampanii nie przecieka do drugiej (audyt 04.10)
+        public ArmouryBehavior() { Instance = this; HistoricalPrices.Reset(); MaterialLaw.Reset(); WesterosClimate.Reset(); OutlawLaw.Reset(); PopulationLaw.Reset(); WorkshopLaw.Reset(); IronBank.Reset(); MarketGlut.Reset(); ArmsPricing.Reset(); StartKit.Reset(); AiGear.Reset(); Levy.Reset(); VolunteerKit.Reset(); LevyGold.Reset(); WearKeep.Reset(); UniqueSpoils.Reset(); BuildDiary.Reset(); BuildFunding.Reset(); KingdomLedger.Reset(); ColdStart.Reset(); MenPurse.Reset(); ArmyClothing.Reset(); AiWear.Reset(); SmithHours.Reset(); RecruitKit.Reset(); OreLedger.Reset(); GoodsLedger.Reset(); FreeSupplies.Reset(); VillageWoodlot.Reset(); SpoilsSeal.Reset(); MarketRoad.Reset(); MarketCarts.Reset(); VillageClogDiag.Reset(); CartTownExit.Reset(); MoneyLedger.Reset(); PeopleLedger.Reset(); CaravanBulk.Reset(); StartStock.Reset(); MineralOnce.Reset(); SoldierPay.Reset(); KingdomTreasury.Reset(); RecruitCost.Reset(); RecruitSources.Reset(); GarrisonCarts.Reset(); GarrisonArmory.Reset(); ArmsDrill.Reset(); CaravanAmmo.Reset(); ArmsLeaks.Reset(); SupplyDemand.ResetOrders(); }   // stan jednej kampanii nie przecieka do drugiej (audyt 04.10)
 
         public override void SyncData(IDataStore dataStore)
         {
@@ -500,6 +500,11 @@ namespace Armoury
             catch (Exception e) { Log.Error("SyncData.arm_garrisoncarts", e); }
             try { string ga = dataStore.IsSaving ? GarrisonArmory.Export() : null; SaveText.Sync(dataStore, "arm_garrisonarmory", ref ga); if (dataStore.IsLoading) GarrisonArmory.Import(ga); }
             catch (Exception e) { Log.Error("SyncData.arm_garrisonarmory", e); }
+            // 174.0b: robota w toku warsztatow zbrojnych (sztuki zaczete, dlug ulamkowy surowca) i zamowienia - kazdy klucz we wlasnym try; brak klucza = stary zapis (pusto)
+            try { string ws = dataStore.IsSaving ? WorkshopLaw.Export() : null; SaveText.Sync(dataStore, "arm_workshops", ref ws); if (dataStore.IsLoading) WorkshopLaw.Import(ws); }
+            catch (Exception e) { Log.Error("SyncData.arm_workshops", e); }
+            try { string un = dataStore.IsSaving ? SupplyDemand.ExportOrders() : null; SaveText.Sync(dataStore, "arm_unmet", ref un); if (dataStore.IsLoading) SupplyDemand.ImportOrders(un); }
+            catch (Exception e) { Log.Error("SyncData.arm_unmet", e); }
         }
 
         public override void RegisterEvents()
@@ -990,6 +995,7 @@ namespace Armoury
             // 171: zamowienia zamkow w drodze; zbrojownie zalog z zapisu (DTE skonczyl OnGameLoaded) albo jednorazowe odtworzenie po starym zapisie - PRZED ColdStart.Run;
             // echo ROT, gdy typu nie bylo przy starcie; cwiczenia wlasna bronia - latki modeli w kampanii (modele BK czytaja singletony BK)
             try { GarrisonCarts.ResolvePending("wczytanie"); } catch (Exception e) { Log.Error("GarrisonCarts.ResolvePending", e); }
+            try { WorkshopLaw.ResolvePending("wczytanie"); } catch (Exception e) { Log.Error("WorkshopLaw.ResolvePending", e); }   // 174.0b: robota w toku warsztatow z zapisu (przed pierwszym cyklem)
             try { GarrisonArmory.Restore("wczytanie"); } catch (Exception e) { Log.Error("GarrisonArmory.Restore", e); }
             try { RecruitSources.ApplyLate(); } catch (Exception e) { Log.Error("RecruitSources.ApplyLate", e); }
             try { ArmsDrill.EnsureHooks(); } catch (Exception e) { Log.Error("ArmsDrill.EnsureHooks", e); }
