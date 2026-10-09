@@ -804,6 +804,7 @@ namespace Armoury
                 // paczka 172: strzaly i belty (kategoria "arrows" - BK ma ja za towar z popytem 10/10) mieszczanie zjadali z polek w nicosc;
                 // przy czynnych strzelarzach miasta budzet 0 - takze przy wylaczonym TownHouseholdUse (mysliwskie strzaly sa poza skala)
                 else if (category.StringId == "arrows") __result *= TownFletchers.HouseUse();
+                if (category.StringId == "arrows") TownFletchers.NoteHouse();   // licznik linii 172 tylko tu (TownUse/HouseShare bez efektu ubocznego)
             }
             catch { }
         }

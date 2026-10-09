@@ -96,7 +96,7 @@ namespace Armoury
         // BuyItems kupuje kategorie "arrows" z polki osady za zloto lorda (zloto w nicosc), ConsumeItems(ArrowsNeed x 2) niszczy z jukow.
         // Amunicje partii AI liczy Armoury: zakupy AiGear wedlug wzorcow, zuzycie w bitwie i odzysk. Przy czynnych strzelarzach (TownFletchers)
         // i zakupach AI wynik = 0 i zapisana potrzeba zerowana (jak tekstylia 150); partia gracza - bez zmian (BK jak dotad).
-        internal static bool ArrowsHooked, ArrowsResetReady;
+        internal static bool ArrowsHooked, ArrowsResetReady, ArrowsBuyHooked;
         private static System.Reflection.MethodInfo _arrowsGet, _arrowsSet, _partyGet;
 
         public static void ArrowsZeroPostfix(object __0, ref TaleWorlds.CampaignSystem.ExplainedNumber __result)
@@ -116,7 +116,25 @@ namespace Armoury
                 }
                 TownFletchers.NoteBk(reset);
             }
-            catch { }
+            catch (Exception e) { TownFletchers.Stumble("BkSupplyTemper.ArrowsZeroPostfix", e); }
+        }
+
+        /// <summary>Recenzja 172: prefiks PartySupplies.BuyItems() (Tick i wejscie do osady). Partie z ludzmi ponizej MinimumSoldiersThreshold
+        /// nie wolaja CalculateArrowsNeed, a po wczytaniu BuyItems przy wejsciu do osady moze isc przed pierwszym Tick - stara ArrowsNeed
+        /// (zapis sprzed 172) kupilaby strzaly za zloto lorda w nicosc. Zerowana tu, przed zakupem, dla partii AI przy czynnych strzelarzach.</summary>
+        public static void ArrowsBuyPrefix(object __instance)
+        {
+            try
+            {
+                if (__instance == null || !ArrowsResetReady || _partyGet == null || !TownFletchers.BkArrowsClosed) return;
+                var party = _partyGet.Invoke(__instance, null) as TaleWorlds.CampaignSystem.Party.MobileParty;
+                if (party == null || party == TaleWorlds.CampaignSystem.Party.MobileParty.MainParty) return;
+                float v = (float)_arrowsGet.Invoke(__instance, null);
+                if (v == 0f) return;
+                _arrowsSet.Invoke(__instance, new object[] { 0f });
+                TownFletchers.NoteBkBuyReset();
+            }
+            catch (Exception e) { TownFletchers.Stumble("BkSupplyTemper.ArrowsBuyPrefix", e); }
         }
 
         internal static void ApplyAll(HarmonyLib.Harmony h)
@@ -168,13 +186,20 @@ namespace Armoury
                         _arrowsGet = HarmonyLib.AccessTools.PropertyGetter(t, "ArrowsNeed");
                         _arrowsSet = HarmonyLib.AccessTools.PropertySetter(t, "ArrowsNeed");
                         ArrowsResetReady = _arrowsGet != null && _arrowsSet != null && _arrowsGet.ReturnType == typeof(float);
+                        // recenzja 172: zerowanie zapisanej ArrowsNeed takze przed zakupem (BuyItems() bez parametrow - wola go Tick i wejscie do osady)
+                        var buy = HarmonyLib.AccessTools.Method(t, "BuyItems", Type.EmptyTypes);
+                        if (buy != null && ArrowsResetReady && _partyGet != null)
+                        {
+                            h.Patch(buy, prefix: new HarmonyLib.HarmonyMethod(typeof(BkSupplyTemper), "ArrowsBuyPrefix"));
+                            ArrowsBuyHooked = true;
+                        }
                     }
                     catch (Exception e) { Log.Error("BkSupplyTemper.ApplyAll(CalculateArrowsNeed)", e); }
                 }
                 Log.Info("BkSupplyTemper: tekstylia zaopatrzenia BK (CalculateClothNeed) = 0 przy odziezy wojska (150, MCM Army Clothing Enabled) - "
                          + (ClothHooked ? "wpiete" : "BRAK latki (BK kupi tekstylia jak dotad)") + ", zerowanie zapisanej potrzeby ClothNeed " + (ClothResetReady ? "wpiete" : "BRAK") + ".");
                 Log.Info("BkSupplyTemper: strzaly zaopatrzenia BK (CalculateArrowsNeed) = 0 dla partii AI przy czynnych strzelarzach (172) - "
-                         + (ArrowsHooked ? "wpiete" : "BRAK latki (BK kupi i zuzyje strzaly jak dotad)") + ", zerowanie zapisanej potrzeby ArrowsNeed " + (ArrowsResetReady ? "wpiete" : "BRAK") + ".");
+                         + (ArrowsHooked ? "wpiete" : "BRAK latki (BK kupi i zuzyje strzaly jak dotad)") + ", zerowanie zapisanej potrzeby ArrowsNeed " + (ArrowsResetReady ? "wpiete" : "BRAK") + " (przed zakupem BuyItems " + (ArrowsBuyHooked ? "wpiete" : "BRAK") + ").");
                 Log.Info("BkSupplyTemper: sakwy AI ograniczone (dni=" + (Settings.Current != null ? Settings.Current.BkSupplyDaysCap : 4)
                          + ", sufit sztuk=" + (Settings.Current != null ? Settings.Current.BkSupplyMaxPieces : 15)
                          + ", czapka w " + capped + " modelach potrzeb).");

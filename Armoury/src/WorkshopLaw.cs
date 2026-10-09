@@ -204,7 +204,7 @@ namespace Armoury
                 // paczka 172: linia "arrows" (strzaly i belty) - BK robi z niej towar handlowy (BKItemCategories :122), wiec szla droga gry
                 // BEZ wsadu (artisans x4, fletcher x1) i z mnoznikiem BK - snopy z niczego. Przy czynnych strzelarzach miasta (TownFletchers)
                 // zamknieta w warsztatach notabli: jedna droga amunicji - z rudy i drewna. Warsztat gracza tu nie przychodzi (ForPlayerWorkshop).
-                if (TownFletchers.ClosesLine(production, workshop)) { TownFletchers.NoteClosed(production); __result = false; return false; }
+                if (TownFletchers.ClosesLine(production, workshop)) { TownFletchers.NoteClosed(production, workshop); __result = false; return false; }
                 // KONIEC SUROWCOW Z NICZEGO (Jeff 04.10, docs/AUDYT-TOWARY.md 6.2): ukryty warsztat BK
                 // "artisans" w kazdym miescie mial linie BEZ wsadu, ktore robily drewno, rude, skory surowe,
                 // mieso, skore i plotno z powietrza. Surowce maja przychodzic ze wsi (wiesniacy, karawany).

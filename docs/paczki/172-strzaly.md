@@ -53,7 +53,9 @@
 - Linie "arrows" WSZYSTKICH warsztatow notabli (ukryty artisans i "fletcher") przy czynnym 172 zamkniete w `WorkshopLaw.CyclePrefix` PRZED `FreeRawLine`
   i `AllOutputsArms` (`__result = false; return false` + licznik cykli i snopow z receptury) - jedna droga amunicji. Warsztat "fletcher" GRACZA
   (`TickOneProductionCycleForPlayerWorkshop`) zostaje wedlug gry (decyzja Jeffa: funkcje gracza bez zmian) - jedyna pozostala droga z niczego, mala
-  (gracz ma najwyzej kilka warsztatow), do decyzji (rozdz. 12). `WorkshopTrade`: szybkosc linii towarowych warsztatu notabla bez zamknietej linii strzal
+  (gracz ma najwyzej kilka warsztatow), do decyzji (rozdz. 12). Zamki BK (`BKSettlementBehavior.TickCastle` wola `RunTownWorkshop` dla warsztatow
+  zamku): ich linia arrows tez zamknieta (ta sama latka) - strzelarze pracuja tylko w miastach, zaloga zamku kupuje amunicje w miescie (171, C1-C8);
+  liczniki zamkniec i sondy zamkow osobno w linii dnia. `WorkshopTrade`: szybkosc linii towarowych warsztatu notabla bez zamknietej linii strzal
   (place cyklu pozostalych linii fletchera nie dziela sie z linia, ktora nie dziala); `Expected` tez bez niej.
 - Start nowej gry (`RunTownShopsAtGameStart`, przed `OnSessionLaunched`): 172 jeszcze nieczynne (kandydaci budowani w SessionStart) - gra wypelnia
   rynki jak dotad; to dorobek startowy swiata, jak `StartStock` i ColdStart.
@@ -135,7 +137,8 @@ Ksiega rudy i drewna (`Ruda:` / `Drewno:`): nowa pozycja zuzycia "strzelarze (17
 
 ### 9. Wylacznik, ustawienia, zapis
 - `TownFletchersEnabled = true` (MCM, domyslnie wlaczony), `TownFletcherHandsPerArmsHand = 0.3f` (0 = wylaczone), `TownFletcherSkipIds` (tekst, poza MCM).
-  Opisy po angielsku, `python tools/gen_mcm.py`. `Active` = wlaczony && rece > 0 && `HistoricalPrices.Applied` && kandydaci > 0.
+  Opisy po angielsku, `python tools/gen_mcm.py`. `Active` = wlaczony && rece > 0 && `HistoricalPrices.Applied` && `SupplyDemand.Active` && kandydaci > 0
+  (recenzja: bez prawa podazy i popytu `Factor` = 1 i nic nie hamuje strzelarzy przy pelnej polce - wtedy 172 nieczynne, strzaly jak w grze).
   Wylaczone: zadnych zamkniec (linie arrows warsztatow, mieszczanie, BK jak dzis), sonda i linia NIECZYNNE dzialaja.
 - Stan miasta: dlug rak + 4 dlugi materialu -> `SaveText.Sync(dataStore, "arm_fletchers", ref data)` w `TownFletchersBehavior.SyncData`,
   format "1|miasto~rece~ruda:drewno:skora:len|..." (kultura niezmienna). `TownFletchers.Reset()` w `WorkshopLaw.Reset()` obok `TownCrafts.Reset()`
@@ -150,7 +153,8 @@ Ksiega rudy i drewna (`Ruda:` / `Drewno:`): nowa pozycja zuzycia "strzelarze (17
 `Enabled`, `Active`, `Reset()`, `ApplyAll(Harmony)` (postfiks doby miasta, sonda), `SessionStart()` (kandydaci, koszyki wzorcow, linia startowa),
 `TickPostfix(Town)` / `OnDailyTickTown(Town)` (Flush przy nowej dobie, ramka GoodsLedger, `Work`), `Work(Town)` (rozdz. 5), `CandidatesOf(Town)`,
 `ClosesLine(Production, Workshop)` + `NoteClosed(Production)` (dla WorkshopLaw i WorkshopTrade), `ProbePrefix/ProbePostfix` (krok 0),
-`NoteBought`, `NoteUnmet`, `HouseUse()` (TownUse), `ZeroBkArrows(object)` (BkSupplyTemper), `Flush()`, `Export()`/`Import(string)`.
+`NoteBought`, `NoteUnmet`, `NoteNotable`/`NoteNotableRevert` (VolunteerKit), `Roll()` (przejscie doby przed licznikiem), `HouseUse()` (TownUse, bez
+efektu ubocznego) + `NoteHouse()` (BudgetPostfix), `BkSupplyTemper.ArrowsBuyPrefix` (zerowanie `ArrowsNeed` przed zakupem), `ZeroBkArrows(object)` (BkSupplyTemper), `Flush()`, `Export()`/`Import(string)`.
 
 ### 11. Test (autotest; zgoda Jeffa 07.10 na autotest)
 **Krok 0 (1 doba, `TownFletchersEnabled = false`, stos z 171):** linia "Strzelarze (172): NIECZYNNE ... z niczego X snopow w Y cyklach" - dzisiejszy
@@ -161,6 +165,8 @@ doplyw gry. Jesli X (doba) > 2x pojemnosci strzelarzy (ok. 280) - suwak rak do d
 |---|---|---|
 | Zamkniecia | linia 172 "zamkniete z niczego", "sonda", "mieszczanie", "BK" | linie warsztatow > 0 cykli dziennie; sonda 0 snopow kazdego dnia; budzet mieszczan - wywolania > 0; |
 | Amunicja na polkach | "Rynek broni: na polkach" Arrows / Bolts, linia 172 "na polkach" | doby 1-10: zapis liczb (oczekiwany spadek - rozdz. 12); doba 40 >= 30% doby 1; "miast bez strzal" w dobie 40 <= 30% |
+| Awanse strzelcow u notabli | linia 172 "notable dla ochotnikow N (awanse cofniete z braku M)"; "Ochotnicy (diagnoza): powody cofniec" Arrows/Bolts | doby 1-40: suma M / (N + M) <= 20% dla strzal i beltow; powyzej - polki za puste dla 171, decyzja (rece strzelarzy) |
+| Karawany | linia 172 "w taborach karawan" | zapis liczb; jesli > 30% amunicji z polek miast - decyzja (rozdz. 12) |
 | Zakupy AI amunicji | linia 172 "kupione przez AI" | > 0 w kazdym 5-dobowym oknie od doby 5; suma 40 dob > 0 dla strzal i beltow |
 | Pokrycie zbrojowni (171) | "Pokrycie zbrojowni AI (171)" doba 40 | strzaly i belty >= 70% (brama 171) |
 | Produkcja | linia 172 "zrobiono" | > 0 od doby 2; po dobie 20 rece nie zawsze 100% albo "brak surowca" wyjasnia (bramka dziala) |
@@ -176,6 +182,13 @@ doplyw gry. Jesli X (doba) > 2x pojemnosci strzelarzy (ok. 280) - suwak rak do d
   ruda na dlugu starczy na ok. 38 snopow), ok. 40 miast x 3 snopy = ok. 100-120/d; doby 30-40 ok. 85-90 miast z drewnem - ok. 250/d; razem ok. 5 000.
   Mieszczanie i BK juz nie zjadaja. Wynik: przy niskim popycie polki rosna, przy srodku schodza blisko zera ok. dob 25-30, przy wysokim ok. doby 12.
   Strzelarze tego nie zmienia - wiaze drewno (sprawa drwali 126 i karawan 103, nie 172) i tempo przezbrojenia 171.
+- **Notable i ochotnicy (recenzja 2):** notabl kupuje kluczowy kolczan z tej samej polki przy awansie strzelca (VolunteerKit, `VolunteerKitKeyOnly`)
+  - popyt poza bilansem 130-450/d powyzej. Przy pustych polkach (doby 12-30 w wariancie srednim/wysokim) awanse strzelcow sa cofane, wiec swiat traci
+  lucznikow niezaleznie od zakupow lordow. Mierzone w linii 172 ("notable dla ochotnikow", "awanse cofniete z braku") - brama w rozdz. 11.
+- **Karawany (recenzja 7):** kategoria "arrows" jest dla gry towarem handlowym, karawany kupuja snopy z polek (placac miastu - nie z niczego) i wywoza je;
+  snopy w taborach sa poza AiGear i poza ksiegami, przy rozbitej karawanie moga przepasc. Pomiar w linii dnia ("w taborach karawan"); decyzja po tescie:
+  zdjac flage towaru z kategorii arrows albo wylaczyc ja z koszyka karawan.
+- **Stara `ArrowsNeed` (recenzja 4):** zerowana przy przeliczeniu BK i przed kazdym `BuyItems()` partii AI - po wczytaniu nie kupuje juz za zloto w nicosc.
 - Drewno: strzelarze ok. 50-80 ladunkow dziennie przy pelnej pracy wobec nadwyzki +109/d; jako ostatni w dobie miasta (po warsztatach) biora resztke -
   przy niedoborze stoja oni, nie kowale.
 - Kolejnosc zakupow AI (amunicja 9.) i budzet wizyty - patrz 7.
@@ -206,3 +219,15 @@ Kod wedlug rozdz. 3-10. Odchylenia od wersji 1: (1) zamkniecie w `CyclePrefix` p
 warunek w `Candidates` i uwaga o `LineShare` usuniete (linia arrows tam nie trafia). (2) Sluchacz doby miasta zastapiony postfiksem na
 `WorkshopsCampaignBehavior.DailyTickTown` (po warsztatach), sluchacz tylko zapasowo. (3) Rece 0.3 zamiast 0.2. (4) Trzy zamkniecia ujsc (rozdz. 6)
 i sonda (rozdz. 2). (5) `WorkshopLaw.Revenue` zostaje prywatna, wzor wydzielony do `internal RevenueOf` (jeden wzor dla obu).
+
+### 15. Recenzja kodu (08.10 noc) - 8 uwag, kazda sprawdzona w kodzie lub dekompilacji
+| # | Waga | Uwaga | Sprawdzenie | Decyzja |
+|---|---|---|---|---|
+| 1 | wazne | Przy wylaczonym SupplyDemand bramka zysku nie hamuje (Factor 1, przychod ok. 1.125 kosztu > 1.05) | `Fac` :449, `RevenueOf` | Przyjete: `Active` wymaga `SupplyDemand.Active`; powod w linii NIECZYNNE i startowej |
+| 2 | wazne | Kolczan notabla dla ochotnika (VolunteerKit) poza licznikiem; cofniete awanse strzelcow przy pustych polkach | `VolunteerKit.Buy` (AddToCounts -1, `Why`) | Przyjete: `NoteNotable` / `NoteNotableRevert`, linia dnia, brama testu i ryzyko (rozdz. 11-12) |
+| 3 | drobne | Liczniki pierwszego miasta doby N w linii doby N-1 | `OnDailyTickTown` (postfiks) po cyklach `ProbePrefix`/`NoteClosed` | Przyjete: `Roll()` przed kazdym licznikiem |
+| 4 | drobne | Pusty `catch` w `ArrowsZeroPostfix`; stara `ArrowsNeed` partii ponizej progu ludzi i przed pierwszym Tick | BK `PartySupplies.Tick` :233, `BuyItems()` :318, `BKPartyNeedsBehavior` :168 | Przyjete: `TownFletchers.Stumble`; prefiks `BuyItems()` zeruje `ArrowsNeed` partii AI |
+| 5 | drobne | Zamki BK (TickCastle -> RunTownWorkshop) tez traca linie arrows; liczniki mieszaja | BK `BKSettlementBehavior.TickCastle` :673-697 | Przyjete: rozdz. 3 (zamki), liczniki zamkow osobno |
+| 6 | drobne | `fac.Remove(bk - 1)` zbedne; mediana w Flush liczy Factor drugi raz | `SupplyDemand.Substitution` :167-190 | ODRZUCONE: substytucja patrzy na polke tieru t+1 (`higher > 0` -> 0), wiec snop tieru t zmienia Factor koszyka t-1; mediana w Flush ma byc stanem po zakupach AI (koniec doby), a nie stanem z pracy strzelarzy - raz na dobe, tanio |
+| 7 | drobne | Karawany wywoza snopy (kategoria arrows = towar handlowy), poza ksiegami | gra `CaravansCampaignBehavior` (`IsTradeGood`) | Przyjete jako pomiar: linia dnia "w taborach karawan"; decyzja w rozdz. 12 |
+| 8 | drobne | `HouseUse()` z efektem ubocznym (licznik) dostepne przez `HouseShare` | `HistoricalPrices` :768-823 | Przyjete: `HouseUse()` czyste, licznik `NoteHouse()` tylko w `BudgetPostfix` |

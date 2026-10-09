@@ -182,6 +182,8 @@ namespace Armoury
 
         private static readonly List<EquipmentElement> _lastBought = new List<EquipmentElement>();   // wpis 92: dla kompletu rekruta
 
+        private static bool IsAmmoType(ItemObject.ItemTypeEnum t) { return t == ItemObject.ItemTypeEnum.Arrows || t == ItemObject.ItemTypeEnum.Bolts; }
+
         /// <summary>171 A3: oddzial, z ktorego "awansuje" swiezy ochotnik tieru 2+ - podstawowy rekrut jego kultury (albo kultury notabla).</summary>
         private static CharacterObject BasicOf(CharacterObject y, Hero n)
         {
@@ -224,13 +226,22 @@ namespace Armoury
                     try { price = market.Town.MarketData.GetPrice(el.EquipmentElement, null, false, market.Party); } catch { price = cand.Value; }
                     if (price < bestPrice) { bestPrice = price; best = i; }
                 }
-                if (best < 0) { SupplyDemand.NoteUnmetOnce(notable, market, it.ItemType, (int)it.Tier + 1, 1f); if (countWhy) Why(it.ItemType + " t" + ((int)it.Tier + 1)); return false; }   // nie ma czego kupic - zamowienie (wpis 67)
+                if (best < 0)
+                {
+                    SupplyDemand.NoteUnmetOnce(notable, market, it.ItemType, (int)it.Tier + 1, 1f);   // nie ma czego kupic - zamowienie (wpis 67)
+                    if (countWhy) { Why(it.ItemType + " t" + ((int)it.Tier + 1)); if (IsAmmoType(it.ItemType)) TownFletchers.NoteNotableRevert(it.ItemType); }   // 172: awans cofniety z braku amunicji
+                    return false;
+                }
                 int u; taken.TryGetValue(best, out u); taken[best] = u + 1;
                 picks.Add(roster.GetElementCopyAtIndex(best).EquipmentElement);
                 total += bestPrice;
             }
             if (notable.Gold < total) { if (countWhy) Why("zloto notabla (" + notable.Gold + " < " + total + ")"); return false; }   // nie stac go
-            foreach (var e in picks) roster.AddToCounts(e, -1);
+            foreach (var e in picks)
+            {
+                roster.AddToCounts(e, -1);
+                if (e.Item != null && IsAmmoType(e.Item.ItemType)) TownFletchers.NoteNotable(e.Item.ItemType, 1);   // 172: kolczan z polki miasta (tylko licznik)
+            }
             _lastBought.AddRange(picks);
             if (total > 0) GiveGoldAction.ApplyForCharacterToSettlement(notable, market, total, true);
             _gold += total; _pieces += picks.Count;
@@ -258,6 +269,7 @@ namespace Armoury
                 }
                 var pe = roster.GetElementCopyAtIndex(best).EquipmentElement;
                 roster.AddToCounts(pe, -1);
+                if (pe.Item != null && IsAmmoType(pe.Item.ItemType)) TownFletchers.NoteNotable(pe.Item.ItemType, 1);   // 172: licznik
                 _lastBought.Add(pe);
                 GiveGoldAction.ApplyForCharacterToSettlement(notable, market, bestPrice, true);
                 _gold += bestPrice; _pieces++;

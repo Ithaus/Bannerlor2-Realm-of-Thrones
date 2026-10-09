@@ -68,13 +68,23 @@ namespace Armoury
         private static readonly int[,] _dMade = new int[2, 7];       // [0 strzaly, 1 belty][tier]
         private static readonly int[] _dBought = new int[2], _dUnmet = new int[2];
         private static int _dClosedCycles, _dClosedUnits, _dProbeCycles, _dProbeUnits, _dHouse, _dBkCalls, _dBkReset;
+        private static int _dClosedCastle, _dProbeCastle, _dBkBuyReset;                // recenzja 172: zamki osobno; zerowanie ArrowsNeed przed BuyItems
+        private static readonly int[] _dNotable = new int[2], _dNotableRevert = new int[2];   // recenzja 172: kolczany ochotnikow (VolunteerKit)
 
         internal static bool Enabled { get { var s = Settings.Current; return s != null && s.TownFletchersEnabled && s.TownFletcherHandsPerArmsHand > 0f; } }
 
         /// <summary>Strzelarze czynni: wlaczeni, ceny w nowej monecie, sa kandydaci. Wtedy linie arrows warsztatow notabli, budzet mieszczan
         /// na strzaly i potrzeba strzal BK partii AI sa zamkniete. Kandydaci szukani przy pierwszym pytaniu po przeliczeniu cen (potem z pamieci) -
-        /// przed HistoricalPrices.Apply (start nowej gry: gra wypelnia rynki) zawsze nieczynne; wlaczenie w MCM w trakcie sesji dziala od razu.</summary>
-        internal static bool Active { get { return Enabled && HistoricalPrices.Applied && All().Count > 0; } }
+        /// przed HistoricalPrices.Apply (start nowej gry: gra wypelnia rynki) zawsze nieczynne; wlaczenie w MCM w trakcie sesji dziala od razu.
+        /// Recenzja 172: takze prawo podazy i popytu (SupplyDemand) - jedyny hamulec przy pelnej polce (Factor koszyka w bramce zysku); bez niego
+        /// strzelarze pracowaliby pelnymi rekami bez wzgledu na zapas, wiec przy wylaczonym SupplyDemand 172 nieczynne (strzaly jak w grze).</summary>
+        internal static bool Active { get { return Enabled && HistoricalPrices.Applied && SupplyDemand.Active && All().Count > 0; } }
+
+        private static string WhyOff()
+        {
+            return !Enabled ? "wylaczone w MCM" : !HistoricalPrices.Applied ? "brak cen historycznych"
+                 : !SupplyDemand.Active ? "wylaczone prawo podazy i popytu (SupplyDemandEnabled)" : "brak kandydatow";
+        }
 
         /// <summary>Nowa gra / wczytanie (z WorkshopLaw.Reset, czyli z konstruktora ArmouryBehavior - przed SyncData).</summary>
         internal static void Reset()
@@ -90,11 +100,25 @@ namespace Armoury
             _dTowns = _dRebel = _dStumbles = _dGuard = _dNoProfit = _dNoInput = _dNoHands = _dForeignTowns = _dForeignBaskets = 0;
             _dHands = _dUsedHands = _dIdle = _dDebt = 0f;
             Array.Clear(_dMissBy, 0, 4); Array.Clear(_dTaken, 0, 4); Array.Clear(_dWanted, 0, 4); Array.Clear(_dMade, 0, _dMade.Length);
-            Array.Clear(_dBought, 0, 2); Array.Clear(_dUnmet, 0, 2);
+            Array.Clear(_dBought, 0, 2); Array.Clear(_dUnmet, 0, 2); Array.Clear(_dNotable, 0, 2); Array.Clear(_dNotableRevert, 0, 2);
             _dClosedCycles = _dClosedUnits = _dProbeCycles = _dProbeUnits = _dHouse = _dBkCalls = _dBkReset = 0;
+            _dClosedCastle = _dProbeCastle = _dBkBuyReset = 0;
         }
 
-        private static void Stumble(string where, Exception e)
+        /// <summary>Recenzja 172: przejscie doby przed kazdym licznikiem (cykle warsztatow pierwszego miasta biegna PRZED postfiksem jego
+        /// DailyTickTown - bez tego trafialy do linii doby poprzedniej). Tylko w trwajacej grze.</summary>
+        private static void Roll()
+        {
+            try
+            {
+                if (Campaign.Current == null || !Campaign.Current.GameStarted) return;
+                int day = (int)CampaignTime.Now.ToDays;
+                if (_dayStamp != day) { Flush(); _dayStamp = day; }
+            }
+            catch (Exception e) { Stumble("Roll", e); }
+        }
+
+        internal static void Stumble(string where, Exception e)
         {
             _dStumbles++; _stumblesAll++;
             if (_errOnce.Add(where)) Log.Error("TownFletchers." + where, e);
@@ -134,26 +158,34 @@ namespace Armoury
             return w != null && IsArrowsLine(p) && w.Owner != Hero.MainHero && Active;
         }
 
-        /// <summary>Licznik zamknietego cyklu (WorkshopLaw.CyclePrefix): cykle i snopy z receptury (przed mnoznikiem BK).</summary>
-        internal static void NoteClosed(WorkshopType.Production p)
+        /// <summary>Licznik zamknietego cyklu (WorkshopLaw.CyclePrefix): cykle i snopy z receptury (przed mnoznikiem BK). Zamki BK (TickCastle wola
+        /// RunTownWorkshop) liczone osobno - ich linia tez zamknieta, zaloga kupuje amunicje w miescie (171).</summary>
+        internal static void NoteClosed(WorkshopType.Production p, Workshop w)
         {
-            try { _dClosedCycles++; foreach (var o in p.Outputs) _dClosedUnits += Math.Max(0, o.Item2); } catch { }
+            Roll();
+            try
+            {
+                if (w != null && w.Settlement != null && w.Settlement.IsCastle) { _dClosedCastle++; return; }
+                _dClosedCycles++; foreach (var o in p.Outputs) _dClosedUnits += Math.Max(0, o.Item2);
+            }
+            catch (Exception e) { Stumble("NoteClosed", e); }
         }
 
-        /// <summary>Mnoznik budzetu mieszczan dla kategorii strzal (HistoricalPrices.BudgetPostfix): 0 przy czynnych strzelarzach.</summary>
-        internal static float HouseUse()
-        {
-            if (!Active) return 1f;
-            _dHouse++;
-            return 0f;
-        }
+        /// <summary>Mnoznik budzetu mieszczan dla kategorii strzal (TownUse / HistoricalPrices.BudgetPostfix): 0 przy czynnych strzelarzach.
+        /// Bez efektu ubocznego - licznik tylko NoteHouse z BudgetPostfix.</summary>
+        internal static float HouseUse() { return Active ? 0f : 1f; }
+        internal static void NoteHouse() { if (Active) _dHouse++; }
 
         /// <summary>Potrzeba strzal BK partii AI ma byc 0 (BkSupplyTemper): czynni strzelarze i zakupy AI (AiGear liczy amunicje wedlug wzorcow).</summary>
         internal static bool BkArrowsClosed { get { return Active && AiGear.On; } }
-        internal static void NoteBk(bool reset) { _dBkCalls++; if (reset) _dBkReset++; }
+        internal static void NoteBk(bool reset) { Roll(); _dBkCalls++; if (reset) _dBkReset++; }
+        internal static void NoteBkBuyReset() { Roll(); _dBkBuyReset++; }
 
-        internal static void NoteBought(ItemObject.ItemTypeEnum t, int n) { if (n > 0) _dBought[Kind(t)] += n; }
-        internal static void NoteUnmet(ItemObject.ItemTypeEnum t) { _dUnmet[Kind(t)]++; }
+        internal static void NoteBought(ItemObject.ItemTypeEnum t, int n) { if (n > 0) { Roll(); _dBought[Kind(t)] += n; } }
+        internal static void NoteUnmet(ItemObject.ItemTypeEnum t) { Roll(); _dUnmet[Kind(t)]++; }
+        /// <summary>Recenzja 172: kolczan zdjety z polki przez notabla przy awansie ochotnika (VolunteerKit) i awans cofniety z braku amunicji.</summary>
+        internal static void NoteNotable(ItemObject.ItemTypeEnum t, int n) { if (n > 0) { Roll(); _dNotable[Kind(t)] += n; } }
+        internal static void NoteNotableRevert(ItemObject.ItemTypeEnum t) { Roll(); _dNotableRevert[Kind(t)]++; }
 
         // ------------------------------------------------------------ sonda (krok 0): ile linia arrows warsztatu robi z niczego
         private static int AmmoOn(ItemRoster r)
@@ -176,6 +208,7 @@ namespace Armoury
             try
             {
                 if (__1 == null || __1.Settlement == null || __1.Settlement.Town == null || !IsArrowsLine(__0)) return;
+                Roll();
                 __state = AmmoOn(__1.Settlement.Town.Owner.ItemRoster) + 1;
             }
             catch (Exception e) { Stumble("ProbePrefix", e); }
@@ -187,7 +220,7 @@ namespace Armoury
             {
                 if (__state <= 0 || __1 == null || __1.Settlement == null || __1.Settlement.Town == null) return;
                 int d = AmmoOn(__1.Settlement.Town.Owner.ItemRoster) - (__state - 1);
-                if (d > 0) { _dProbeCycles++; _dProbeUnits += d; }
+                if (d > 0) { if (__1.Settlement.IsCastle) _dProbeCastle += d; else { _dProbeCycles++; _dProbeUnits += d; } }
             }
             catch (Exception e) { Stumble("ProbePostfix", e); }
         }
@@ -323,8 +356,7 @@ namespace Armoury
             try
             {
                 if (town == null || !town.IsTown || Campaign.Current == null || !Campaign.Current.GameStarted) return;
-                int day = (int)CampaignTime.Now.ToDays;
-                if (_dayStamp != day) { Flush(); _dayStamp = day; }
+                Roll();
                 if (!Active) return;
                 if (town.InRebelliousState) { _dRebel++; return; }   // jak warsztaty gry: miasto w buncie nie pracuje
                 var gf = GoodsLedger.Begin(GoodsLedger.FFletch, town);   // ksiega towarow: ruda i drewno strzelarzy jako osobne ujscie (tylko licznik)
@@ -467,6 +499,7 @@ namespace Armoury
                     return;
                 }
                 if (!HistoricalPrices.Applied) { Log.Info("Strzelarze (172): NIECZYNNE - brak cen historycznych (receptura i bramka zysku sa w nowej monecie); strzaly jak w grze."); return; }
+                if (!SupplyDemand.Active) { Log.Info("Strzelarze (172): NIECZYNNE - wylaczone prawo podazy i popytu (SupplyDemandEnabled) - bez niego nic nie hamuje strzelarzy przy pelnej polce; strzaly jak w grze."); return; }
                 var all = All();
                 if (all.Count == 0) { Log.Info("Strzelarze (172): NIECZYNNE - brak kandydatow (Arrows/Bolts na sprzedaz z receptura); strzaly jak w grze."); return; }
                 var byType = new SortedDictionary<int, int>();
@@ -550,13 +583,34 @@ namespace Armoury
                     }
                     catch (Exception e) { Stumble("Flush(miasto)", e); }
                 }
+                // recenzja 172 (ryzyko rozdz. 12): kategoria "arrows" jest dla gry towarem handlowym - karawany kupuja snopy z polek (placac miastu)
+                // i wywoza je; tu tylko pomiar, ile amunicji jedzie w taborach (raz na dobe)
+                int[] caravan = new int[2]; int caravans = 0;
+                try
+                {
+                    foreach (var mp in MobileParty.AllCaravanParties)
+                    {
+                        if (mp == null || mp.ItemRoster == null) continue;
+                        caravans++;
+                        var r = mp.ItemRoster;
+                        for (int i = 0; i < r.Count; i++)
+                        {
+                            var el = r.GetElementCopyAtIndex(i);
+                            var it = el.EquipmentElement.Item;
+                            if (el.Amount > 0 && IsAmmo(it)) caravan[Kind(it.ItemType)] += el.Amount;
+                        }
+                    }
+                }
+                catch (Exception e) { Stumble("Flush(karawany)", e); }
                 var sb = new StringBuilder();
                 if (!Active)
                 {
-                    sb.Append("Strzelarze (172): NIECZYNNE (").Append(!Enabled ? "wylaczone w MCM" : !HistoricalPrices.Applied ? "brak cen historycznych" : "brak kandydatow")
+                    sb.Append("Strzelarze (172): NIECZYNNE (").Append(WhyOff())
                       .Append(") - dzien ").Append(_dayStamp).Append(": warsztaty gry zrobily z niczego ").Append(_dProbeUnits).Append(" snopow w ").Append(_dProbeCycles)
                       .Append(" cyklach linii arrows (sonda, po mnozniku BK); na polkach: strzaly ").Append(stock[0]).Append(", belty ").Append(stock[1])
-                      .Append("; kupione przez AI: strzaly ").Append(_dBought[0]).Append(", belty ").Append(_dBought[1]).Append("; potkniecia ").Append(_dStumbles).Append(".");
+                      .Append("; kupione przez AI: strzaly ").Append(_dBought[0]).Append(", belty ").Append(_dBought[1])
+                      .Append("; notable dla ochotnikow: strzaly ").Append(_dNotable[0]).Append(", belty ").Append(_dNotable[1])
+                      .Append("; w taborach karawan: strzaly ").Append(caravan[0]).Append(", belty ").Append(caravan[1]).Append("; potkniecia ").Append(_dStumbles).Append(".");
                     Log.Info(sb.ToString());
                     return;
                 }
@@ -567,7 +621,8 @@ namespace Armoury
                     int sum = 0; var tiers = new List<string>();
                     for (int t = 1; t <= 6; t++) if (_dMade[k, t] > 0) { sum += _dMade[k, t]; tiers.Add("t" + t + " " + _dMade[k, t]); }
                     sb.Append("; ").Append(k == 0 ? "strzaly" : "belty").Append(": zrobiono ").Append(sum).Append(" snopow [").Append(string.Join(", ", tiers.ToArray()))
-                      .Append("], kupione przez AI ").Append(_dBought[k]).Append(", AI bez towaru ").Append(_dUnmet[k]).Append(" razy");
+                      .Append("], kupione przez AI ").Append(_dBought[k]).Append(", AI bez towaru ").Append(_dUnmet[k]).Append(" razy")
+                      .Append(", notable dla ochotnikow ").Append(_dNotable[k]).Append(" (awanse cofniete z braku ").Append(_dNotableRevert[k]).Append(")");
                 }
                 sb.Append("; koniec pracy w miastach (bez zysku / brak surowca / rece) ").Append(_dNoProfit).Append("/").Append(_dNoInput).Append("/").Append(_dNoHands)
                   .Append(" [brak: ruda ").Append(_dMissBy[0]).Append(", drewno ").Append(_dMissBy[1]).Append("]");
@@ -583,8 +638,10 @@ namespace Armoury
                   .Append(" (miast bez beltow ").Append(empty[1]).Append(")");
                 sb.Append("; mediana indeksu ceny strzal ").Append(F2(Median(idx[0]))).Append(", beltow ").Append(F2(Median(idx[1])));
                 sb.Append("; zamkniete z niczego: linie strzal warsztatow ").Append(_dClosedCycles).Append(" cykli (").Append(_dClosedUnits).Append(" snopow z receptury, przed mnoznikiem BK), sonda: warsztaty gry zrobily ")
-                  .Append(_dProbeUnits).Append(" snopow w ").Append(_dProbeCycles).Append(" cyklach; mieszczanie: budzet strzal 0 (").Append(_dHouse).Append(" wywolan); BK: zuzycie strzal partii AI ")
-                  .Append(BkArrowsClosed ? "0" : "jak w BK").Append(" (").Append(_dBkCalls).Append(" przeliczen, zerowan zapisu ").Append(_dBkReset).Append(")");
+                  .Append(_dProbeUnits).Append(" snopow w ").Append(_dProbeCycles).Append(" cyklach; zamki BK: linie strzal ").Append(_dClosedCastle).Append(" cykli, sonda ").Append(_dProbeCastle)
+                  .Append(" snopow; mieszczanie: budzet strzal 0 (").Append(_dHouse).Append(" wywolan); BK: zuzycie strzal partii AI ")
+                  .Append(BkArrowsClosed ? "0" : "jak w BK").Append(" (").Append(_dBkCalls).Append(" przeliczen, zerowan zapisu ").Append(_dBkReset).Append(" + przed zakupem ").Append(_dBkBuyReset).Append(")");
+                sb.Append("; w taborach karawan: strzaly ").Append(caravan[0]).Append(", belty ").Append(caravan[1]).Append(" (").Append(caravans).Append(" karawan)");
                 sb.Append("; potkniecia ").Append(_dStumbles).Append(" (od startu ").Append(_stumblesAll).Append(").");
                 Log.Info(sb.ToString());
             }
