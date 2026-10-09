@@ -859,3 +859,5 @@ nie z toporkami) - OK. (1) Polnoc: Jeff chcial widziec, co znaczy +15 w statysty
 srednio ok. +20% wobec swiata) - bez wyraznego wyboru; ustawiam domyslnie +15 (rada Claude, suwak NorthHardySkillBonus 0-50), do zmiany na slowo Jeffa.
 **DECYZJA JEFFA 09.10 ok. 05:55 (Polnoc):** "131/130 jest wystarczajace po naprawie sprzetu" -> NorthHardySkillBonus = 0 (bez dodatku umiejetnosci; Polnoc ok. +7.5% wobec
 swiata po samej naprawie sprzetu wedlug tieru). Zostaje: sklad z przewaga piechoty i +10% w autobitwie na sniegu i w lasach Polnocy. (175b liczy z 15 - po nim ustawic 0.)
+**DECYZJA JEFFA 09.10 ok. 06:00 (Polnoc, ostatecznie):** "zrob 130/135 piechota Polnocy srednio" -> srednia piechoty t3+ Polnocy: bron glowna ok. 130 (po naprawie sprzetu
+jest 131 - bez dodatku), Atletyka 135 (po naprawie 130 -> +5 Atletyki). Dwa osobne suwaki: dodatek do broni 0, do Atletyki 5 (zamiast jednego "+X do obu"). Po 175b.
