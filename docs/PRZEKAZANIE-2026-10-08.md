@@ -203,3 +203,6 @@ dana faze od nowa, korzystajac z zapisanych wynikow:
   reszta do skarbca bez zdarzenia; platnik skarbiec ponad 2 mln bez zdarzenia + dlug TributeWallet splacany przez rody); BEE karawany placa eskorte w nicosc
   przy kazdym wjezdzie do miasta (klucz 8 skryptu BEE to zamyka); "inne" z niczego = najpewniej dochod majatkow BK do notabli. Koszt budzetu rodow < 10 ms (cel).
 - 21:18 scalenie H3 + 169b do noc/sklad4 (od sklad2) - agent; autotest H3 sam w toku. T2c (Mur) + badanie trybutu w toku (wf_f5c29c01-5a9).
+- 21:30 **AUTOTEST H3 SAM OK** (Armoury e9b567ab; kopia SCRATCH nowej sesji kopiaH3\): 13.2 s/dobe, 0 bledow; doba 40: bitew objetych 28, przegrani zabici 19.4%
+  (gra dalaby 50.2%), jency 5.7%, rozbici 74.9% (do puli/wsi/BK); zwyciezcy zabici 2.3% (gra 6.7%). noc/sklad4 0ced2cd (= sklad2 + 169b + H3; Armoury 0f8a80b0,
+  MCM 702). Autotest S5 (sklad4) w toku.
