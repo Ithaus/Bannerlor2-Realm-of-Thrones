@@ -885,3 +885,6 @@ z chwili zakupu za cala partie - do wyrownania: kazda sztuka jak u gracza).
 **DECYZJA JEFFA 09.10 ok. 08:00 (ceny hurtu):** wyrownac - jedna zasada dla wszystkich: kazda kupowana sztuka po swojej cenie z popytu i podazy (cena rosnie, gdy ubywa
 towaru), bez ukrytego rabatu hurtowego AI (dzis AiGear placi cene pierwszej sztuki za cala partie). Dotyczy wszystkich zakupow AI/zalog/notabli/sakiewek z gotowego
 straganu (AiGear, BuySubstitutes, RecruitKit, GarrisonArmory, MenUpgrade K1 itd.). Po sklad7b (to samo drzewo).
+**DECYZJA JEFFA 09.10 ok. 08:05:** "bede gral, jak skonczymy projekt" -> Jeff NIE gra do konca projektu; po skonczeniu zaczyna NOWA kampanie. Paczki projektujemy pod nowa
+kampanie (zgodnosc ze starym zapisem drugorzedna; test na zapisie autotest-161-kawalki zostaje jako test dlugiej kampanii). Rzeczy "tylko w nowej kampanii" (kiesa ludu, ksiega
+ludzi, wytop przy kopalni itd.) mozna wlaczac domyslnie bez ochrony starego zapisu.
