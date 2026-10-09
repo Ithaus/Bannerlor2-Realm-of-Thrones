@@ -146,3 +146,9 @@ dana faze od nowa, korzystajac z zapisanych wynikow:
   UWAGA: skrypt BEE (zamknij-ujscia-bee.ps1 -ListaZFundamentu) ZABLOKOWANY przez zabezpieczenia Claude Code ("Production Deploy") - test bez kluczy
   (klucze 6/19, B4 wstrzymana zgodnie z projektem). Skrypt do nalozenia przez Jeffa (gra zamknieta): powershell -NoProfile -ExecutionPolicy Bypass -File
   tools\bee\zamknij-ujscia-bee.ps1 -ListaZFundamentu (kopia ustawien: D:\Backup-Bannerlord\bee-2026-10-08\better_economy_settings.xml.przed-testem-170, SHA 1f963cfa).
+- 18:05 **T1-T8 GOTOWE** (wf_afd15a92-ceb: 32 agentow, 0 bledow, buildy OK, 0 uwag krytycznych): galezie w-toku/n1-obozy b30d701, n2-inni-kalendarz cd720d3,
+  n3-naprawy-metal 9c79f9d, n4-dezerterzy 68dc53c, n5-rodzina-bank a9e3a5d, n6-miara-marsz 7daab4a, n7-wioski 0aad47c, n8-krainy 30cee30 (GitHub).
+  Plany testow / notatki do wgrania / opisy dla Jeffa: SCRATCH nowej sesji noc\T-wyniki.md (kopia D:\Backup-Bannerlord\noc-0809\T-wyniki.md).
+- 18:11 **AUTOTEST T2 OK** (CrashScribe probny = at1-autotest + T2, 7455006c; Armoury zatwierdzony): kalendarz czynny, Zew spi do 728, 0 "RUSZA NA",
+  0 osad, 0 oblezen przed terminem, 0 bledow. Trupy w dobie 40: 2049 (przed: 1535 - nie gina w szturmach; przyrost z niczego +2/d/banda zostaje do R2/R4).
+- 18:10 scalanie 170 + T1-T8 w drzewie SCRATCH nowej sesji `sklad` (galaz noc/sklad) - agent w tle.
