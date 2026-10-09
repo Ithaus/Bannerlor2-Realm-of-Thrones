@@ -1,5 +1,44 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-09 (112-p, poprawki po przegladzie kroku B - uwagi do 112: 2, 5) - ZAPLATA LORDA ZA TOWAR KUPIONY WE WSI W CALOSCI DO KIESY WSI (JAK ZAKUP GRACZA); SAKWA TABORU BEZ WSI MACIERZYSTEJ DO ZAPASOWEGO ODBIORCY; "BEZ ODBIORCY" Z PROGIEM 0 W NARZEDZIU I PRZEPLYWY 112 W "OBIEG: DZIEN"
+**Mod:** Armoury | **Galaz:** `w-toku/e2b` (po 110-p) | **Projekt:** `docs/PROJEKT-ETAP2-BANKRUCTWA-2026-10-09.md` rozdz. "110 + 112 + klucz 114" ("zaplata lorda za zywnosc kupiona we wsi zostaje"), 2.0b (jedna regula gracz/AI, Z8, zapasowy odbiorca i licznik "bez odbiorcy" z progiem 0). **Pliki:** `VillageTakings.cs` (zwrot ceny, zapasowy odbiorca, liczniki, linia), `MoneyLedger.Obieg.cs` ("Obieg: dzien" - kiesy wsi), `CirculationWindows.cs` (komentarz), `Settings.cs` + `McmSettings.cs` (`python tools/gen_mcm.py`: Armoury 848, bez nowych kluczy - opisy `VillageFoodSalesKept`, `VillagerPurseSurvives`), `tools/sprawdz_logi.py` (3 progi "bez odbiorcy"). Bez nowych kluczy zapisu.
+
+**Co zobaczysz w grze (prosto):** gdy lord kupuje we wsi jedzenie, cala zaplata zostaje w kiesie wsi - tak samo jak wtedy, gdy Ty kupujesz we wsi. Pan dostaje swoje pozniej z renty wsi. Sakwa rozwiazanego wozu, ktory nie ma swojej wsi, trafia do kasy jego miasta albo najblizszego miasta, a nie znika.
+
+**Problem (przeglad kroku B):**
+1. **(wazne, uwaga 2) Dwie reguly dla jednego zjawiska (2.0b).** Lord AI kupujacy we wsi (`SellItemsAction`): po 112 ok. 70% ceny (dekret BK) szlo na licznik podatku pana, 30% do kiesy wsi (`VillageTakings.SalePostfix` -> `Split`). Gracz kupujacy we wsi przez ekran handlu: gra wplaca 100% ceny do kiesy wsi (`InventoryLogic.DoneLogic` -> `InventoryListener.SetGold`, sprawdzone w dekompilacji `InventoryLogic.cs:584-586`), bez udzialu pana; Armoury tego nie lata (`grep` - tylko `DonationXpLaw` i `Drill` czytaja ekran). Projekt mowi: "zaplata lorda za zywnosc kupiona we wsi zostaje". Do tego lord kupujacy we WLASNEJ wsi odzyskiwal ok. 70% wlasnego wydatku przez swoj licznik (Z8), a D staly liczyl to jako "ziemia".
+2. **(drobne, uwaga 5)** Sakwa taboru bez wsi macierzystej znikala (`_cLost`) - bez zapasowego odbiorcy z 2.0b. "Zniklo" i "nieprzypisane" byly tylko w linii "Utarg wsi (112)", narzedzie ich nie sprawdzalo; "Obieg: dzien" nie mial przeplywow 112 (do kies, na liczniki, do zwyciezcow, do band).
+
+**Przyczyna:** galaz 112 traktowala zakup przy plocie jak utarg (ta sama regula co powrot taboru); zapasowego odbiorcy i progu 0 nie przeniesiono z 2.0b.
+
+**Zmiana:**
+- `VillageTakings.SalePostfix`: cena skasowana przez gre wraca w CALOSCI do kiesy wsi (`v.ChangeGold(gone)`), bez `Split` na licznik pana; usuniete `_fAddTax` / `FoodToTax` (nieuzywane poza linia). Linia "Utarg wsi (112)": "towar kupiony we wsiach ... oddane w calosci kiesom wsi (jak zakup gracza) X, zniklo Y".
+- `VillageTakings.OnPartyDestroyed`: tabor bez wsi macierzystej - zapasowy odbiorca: kasa osady macierzystej (miasto, zamek), a bez niej kasa najblizszego miasta (ta sama regula co sakiewki rozbitych partii w `MenPurse`); licznik ksiegi `N169CartPurse`; w linii "zapasowemu odbiorcy X (N taborow)". `_cLost` zostaje tylko dla: zwrot wylaczony w MCM, `GiveGoldAction` przeniosl mniej, nie ma zadnego miasta.
+- Linia "Utarg wsi (112)": "bez odbiorcy razem (nieprzypisane + towar zniklo + sakwy zniklo; prog 0) X"; "zamkniete ujscia razem" liczy tez zapasowego odbiorce.
+- "Obieg: dzien", sekcja "kiesy wsi [P]": "112: utarg do kies X i na liczniki panow Y, towar kupiony we wsi do kies Z, sakwy taborow: wsiom A, wodzom zwyciezcow B, bandom C, zapasowemu odbiorcy D, bez odbiorcy (prog 0) E".
+- `tools/sprawdz_logi.py`: "112: nieprzypisane (utarg)", "112: zniklo (towar kupiony we wsi)", "112: zniklo (sakwy zniszczonych taborow)" - suma wszystkich dob linii 112 = 0 (NIE przy > 0).
+- Opisy MCM: `VillageFoodSalesKept` ("stays in the village purse in full, just as the price does when you buy there yourself"), `VillagerPurseSurvives` (zapasowy odbiorca).
+
+**Kontrola calosci (CLAUDE.md 8.0):**
+- Regresje / kolizje: okno "prowizja" ksiegi obiegu (`CirculationWindows.SellFin`) widzi teraz zwrot w kiesie wsi, licznik podatku wsi bez zmian (czytany dalej - na wypadek cudzej latki); "prowizja od zakupow we wsi (w nicosc X)" ok. 0. Od paczki 112 licznik podatku wsi dostaje teraz tylko czesc pana z utargu przy powrocie taboru i z sakw rozwiazanych taborow (jak dotad). `Split` uzywany dalej przez sakwy wracajace do wsi. Nasluch `MobilePartyDestroyed` przed ksiega obiegu (bez zmian) - ksiega widzi sakwe 0 i wplate do kasy miasta jako `N169CartPurse`.
+- Zamknieta ekonomia: platnik (kiesa lorda) -> odbiorca (kiesa wsi) w calosci; sakwa taboru zawsze ma odbiorce, dopoki istnieje jakiekolwiek miasto.
+- Jedna regula gracz/AI: zakup we wsi - 100% do kiesy wsi u gracza i u AI. Z8: lord kupujacy we wlasnej wsi odzyskuje teraz tylko to, co wezmie renta wsi (20% kiesy dziennie, z pulapem naleznej) - jak gracz; "wlasne" D stalego nie obejmuje wsi (2.0b wymienia zamek i miasto).
+- Skala: "prowizja od sprzedazy partiom (wsie)" w biegu bazowym ok. 6.7 tys./dobe w calym swiecie (ostatnie 28 dob `kopia-baza120`) - liczniki panow tracia ok. 4.7 tys./dobe na rzecz kies wsi (wrocia czesciowo renta).
+
+**Odrzucone:** nic.
+
+**Ryzyko / co sprawdzic:**
+- Dochod panow z wsi: licznik podatku wsi bez zaplat lordow (ok. -4.7 tys./dobe w swiecie), kiesy wsi + tyle samo; renta wsi oddaje czesc. W linii "D staly (169c)" czesc "wsie (podatek)" moze byc nieco nizsza, a "renta wsi" nieco wyzsza.
+- Zapasowy odbiorca sakwy: tabory bez wsi macierzystej sa rzadkie - "zapasowemu odbiorcy" zwykle 0.
+
+**Linie logu do testu (autotest 40 dob + zapis 362; potem 120 dob; progi wobec biegu bazowego 120 dob `kopia-baza120`):**
+- "Utarg wsi (112): dzien N": "towar kupiony we wsiach ... oddane w calosci kiesom wsi (jak zakup gracza) X, zniklo 0"; "tabory zniszczone ... zapasowemu odbiorcy ... zniklo 0"; "nieprzypisane 0"; "bez odbiorcy razem ... 0".
+- `sprawdz_logi.py --grupa etap2`: **"112: nieprzypisane (utarg)", "112: zniklo (towar kupiony we wsi)", "112: zniklo (sakwy zniszczonych taborow)" - suma wszystkich dob 0** (2.0b); bandy x5 **<= baza + 20%** (baza: kiesy band 128 855, awanse u pasera 5.9/dobe, zloto u pasera 1 998/dobe, tabory rozbite przez bandy 13.9/dobe - ostatnie 28 dob `kopia-baza120`).
+- "Obieg: dzien": "kiesy wsi [P]: ... 112: ... towar kupiony we wsi do kies Z" = X z linii 112 tej doby; "bez odbiorcy (prog 0) 0".
+- "Pieniadz swiata (bilans - przyczyny)": "prowizja od sprzedazy partiom ... (wsie X" ok. 0 (baza ok. 6.7 tys./dobe).
+
+**Status:** NIEWGRANE - DO SPRAWDZENIA (build Release kod 0; gra nie uruchamiana, autotest nie robiony; nic nie wgrane do gry).
+
 ## 2026-10-09 (110-p, poprawki po przegladzie kroku B - uwagi do 110: 1, 6, 7, 8, 9) - DOSYPKA DO ZAPASU ZAMKOW Z PROGIEM ZAMIAST INFO; LICZBY PROJEKTU DLA ZAMKOW PRZELICZONE Z BIEGU BAZOWEGO 120 DOB (NIE POTWIERDZAJA SIE); ZAPAS KUPCOW NIE PONIZEJ CELU GRY; PRZYCIECIE DARU PO ZAWORZE BEZ PRZYCIECIA; "WLASNE" Z PLAC BUDOWY; NUMER DOBY W LINII 110
 **Mod:** Armoury | **Galaz:** `w-toku/e2b` (po 110, 112, 114) | **Projekt:** `docs/PROJEKT-ETAP2-BANKRUCTWA-2026-10-09.md` rozdz. "110 + 112 + klucz 114" (liczby i test), 2.0b (Z8, K8), OB Z9. **Pliki:** `CastlePurse.cs` (zapas, przyciecie, numer doby, opis), `BuildFunding.cs` (licznik "wlasne"), `Measure169c.cs` (adnotacja), `Settings.cs` + `McmSettings.cs` (`python tools/gen_mcm.py`: Armoury 848, bez nowych kluczy - tylko opisy), `tools/sprawdz_logi.py` (prog dosypki). Klucz zapisu bez zmian (`arm_castlepurse` przez `SaveText.Sync`), nowa wartosc `"on:<wiek>"` obok `"done"`.
 

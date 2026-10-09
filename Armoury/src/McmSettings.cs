@@ -1808,11 +1808,11 @@ namespace Armoury
         [SettingPropertyGroup("The road to market")]
         public bool VillageTakingsWhole { get; set; } = true;
 
-        [SettingPropertyBool("Village Food Sales Kept", HintText = "coin a lord's party pays a village for what it buys there (food above all) no longer vanishes (the game took the whole price back out of the village purse as a tax nobody received): it is shared like the carts' takings - the lord's share by his tax decree goes to the village tax counter he draws from, the rest stays in the village purse. Off = the price vanishes as before")]
+        [SettingPropertyBool("Village Food Sales Kept", HintText = "coin a lord's party pays a village for what it buys there (food above all) no longer vanishes (the game took the whole price back out of the village purse as a tax nobody received): it stays in the village purse in full, just as the price does when you buy there yourself, and the lord gets his part later through the village rents. Off = the price vanishes as before")]
         [SettingPropertyGroup("The road to market")]
         public bool VillageFoodSalesKept { get; set; } = true;
 
-        [SettingPropertyBool("Villager Purse Survives", HintText = "the purse of a village cart party that is wiped off the map no longer vanishes with it: beaten in battle, what the game left after the victors' tenth goes to the victor as well - to the winning party's leader (to you, if you beat them) or into a bandit band's purse - just as villagers who surrender hand you the whole purse; disbanded, or with no victor able to take it, the purse goes home and is shared like takings. Off = the purse vanishes as before")]
+        [SettingPropertyBool("Villager Purse Survives", HintText = "the purse of a village cart party that is wiped off the map no longer vanishes with it: beaten in battle, what the game left after the victors' tenth goes to the victor as well - to the winning party's leader (to you, if you beat them) or into a bandit band's purse - just as villagers who surrender hand you the whole purse; disbanded, or with no victor able to take it, the purse goes home and is shared like takings (a cart with no home village leaves it in the purse of its home town or castle, or else of the nearest town). Off = the purse vanishes as before")]
         [SettingPropertyGroup("The road to market")]
         public bool VillagerPurseSurvives { get; set; } = true;
 

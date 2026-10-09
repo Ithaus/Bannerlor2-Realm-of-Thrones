@@ -730,7 +730,8 @@ namespace Armoury
                 if (_sellSt != null) { Nested++; return; }      // okno juz otwarte - wewnetrzne sie NIE otwiera i niczego nie zmienia
                 if (__0 == null || !__0.IsSettlement || __0.Settlement == null || __0.Settlement.SettlementComponent == null) return;
                 var st = __0.Settlement;
-                // 112: we wsi takze licznik podatku wsi - VillageTakings oddaje tam czesc pana z ceny skasowanej przez gre (postfiks przed tym finalizerem)
+                // 112: we wsi takze licznik podatku wsi (112-p: VillageTakings oddaje skasowana cene w calosci do kiesy wsi, licznik zwykle bez zmian;
+                // zostaje na wypadek cudzej latki, ktora cos na nim dopisze w tym oknie)
                 __state.St = st; __state.S0 = st.SettlementComponent.Gold; __state.Tax0 = st.Town != null ? st.Town.TradeTaxAccumulated : (st.Village != null ? st.Village.TradeTaxAccumulated : 0);
                 _sellSt = st; _sellIn = 0; __state.On = true;
                 __state.T0 = CostStart(WSell);

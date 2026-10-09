@@ -31,13 +31,18 @@ namespace Armoury
     /// 2. TOWAR KUPIONY WE WSI (VillageFoodSalesKept). SellItemsAction.ApplyInternal dopisuje wsi cene, po czym zdejmuje
     ///    cena x GetVillageTaxRatio (1.0; 0.95 z polityka) i - inaczej niz w miescie - nie dopisuje tego do zadnego licznika.
     ///    Kupcy to partie lordow (vanilla PartiesBuyFoodCampaignBehavior i BK BKPartyBehavior - glownie zywnosc). Para na tej
-    ///    metodzie mierzy, ile zaplacil kupiec i ile zostalo wsi; to, co zniklo, dzielimy ta sama regula co utarg: podatek z modelu
-    ///    (od zaplaconej kwoty) na licznik pana, reszta do kiesy wsi. To ten sam utarg - sprzedany przy plocie, nie na targu.
+    ///    metodzie mierzy, ile zaplacil kupiec i ile zostalo wsi; to, co zniklo, wraca w CALOSCI do kiesy wsi (112-p, jedna regula
+    ///    gracz/AI - 2.0b): gdy gracz kupuje we wsi przez ekran handlu, gra wplaca cala cene do kiesy wsi (InventoryLogic.DoneLogic ->
+    ///    InventoryListener.SetGold), bez udzialu pana; tak samo teraz lord AI. Pan dostaje swoje pozniej renta wsi (PopulationLaw,
+    ///    20% kiesy dziennie). Dotad czesc pana wedle dekretu szla na licznik podatku wsi - lord kupujacy we wlasnej wsi odzyskiwal tak
+    ///    ok. 70% wlasnego wydatku (Z8), a gracz nie (dwie reguly).
     /// 3. SAKWA ZNISZCZONEGO TABORU (VillagerPurseSurvives; decyzja D - Jeff 09.10 04:25). Rozbitemu w bitwie gra zdejmuje 10% sakwy
     ///    dla zwyciezcow (CalculatePlunderedGoldAmountFromDefeatedParty), reszta ginie razem z partia; rozwiazanemu ginie wszystko.
     ///    Reszta idzie do zwyciezcy (jak przy poddaniu sie taboru graczowi gra oddaje cala sakwe): wodzowi partii albo kiesie bandy;
     ///    tabor rozwiazany albo bez zwyciezcy, ktory moglby ja wziac (martwy wodz, partia bez kiesy handlowej, nieumarli) - sakwa
     ///    wraca do wsi i jest dzielona jak utarg. Korona 1/9 z tej sakwy dopiero z paczka 178 (z licznikow doby - CartToLords).
+    ///    112-p (2.0b, zapasowy odbiorca): tabor bez wsi macierzystej - kasa jego osady macierzystej (miasto, zamek), a bez niej kasa
+    ///    najblizszego miasta (jak sakiewki rozbitych partii w MenPurse); w linii "zapasowemu odbiorcy".
     ///
     /// Majatki BK dostaja udzial tylko z podatku liczonego przez BK przy powrocie taboru (pkt 1) - z pkt 2 i z sakwy
     /// rozwiazanego taboru nie (dzis tez nic z nich nie maja).
@@ -78,19 +83,22 @@ namespace Armoury
         private static long _tHanded, _tKept, _tTax, _tEstates, _tGone, _tAddPurse, _tAddTax, _tLeft;
         private static readonly List<string> _tNoBk = new List<string>();
         private static int _fN, _fShort;
-        private static long _fPaid, _fGone, _fAddTax, _fAddPurse;
-        private static int _cFoughtN, _cDisbandN, _cToHeroN, _cToBandN;
-        private static long _cFought, _cDisband, _cToHero, _cToBand, _cToPlayer, _cHomeTax, _cHomePurse, _cLost;
+        private static long _fPaid, _fGone, _fAddPurse;
+        private static int _cFoughtN, _cDisbandN, _cToHeroN, _cToBandN, _cSpareN;
+        private static long _cFought, _cDisband, _cToHero, _cToBand, _cToPlayer, _cHomeTax, _cHomePurse, _cSpare, _cLost;
         private static int _stumbles;
 
         // odczyt dla ksiegi pieniadza (MoneyLedger.Daily biegnie tuz przed naszym Daily - te same granice doby)
         internal static long TakingsToPurse { get { return _tAddPurse; } }
         internal static long TakingsToTax { get { return _tAddTax; } }
         internal static long FoodToPurse { get { return _fAddPurse; } }
-        internal static long FoodToTax { get { return _fAddTax; } }
         internal static long CartToLords { get { return _cToHero; } }
         internal static long CartToBands { get { return _cToBand; } }
         internal static long CartToVillages { get { return _cHomePurse + _cHomeTax; } }
+        /// <summary>112-p: sakwy taborow bez wsi macierzystej oddane zapasowemu odbiorcy (kasa osady macierzystej albo najblizszego miasta).</summary>
+        internal static long CartToSpare { get { return _cSpare; } }
+        /// <summary>112-p: "bez odbiorcy" doby - utarg nieprzypisany, towar kupiony we wsi i sakwy, ktore zniknely (Obieg, prog 0).</summary>
+        internal static long Unrouted { get { return _tLeft + Math.Max(0L, _fGone - _fAddPurse) + _cLost; } }
 
         internal static void Reset()
         {
@@ -103,9 +111,9 @@ namespace Armoury
             _tReturns = _tNoLoss = _tOver = _tStale = _tAddTaxN = 0;
             _tHanded = _tKept = _tTax = _tEstates = _tGone = _tAddPurse = _tAddTax = _tLeft = 0;
             _tNoBk.Clear();
-            _fN = _fShort = 0; _fPaid = _fGone = _fAddTax = _fAddPurse = 0;
-            _cFoughtN = _cDisbandN = _cToHeroN = _cToBandN = 0;
-            _cFought = _cDisband = _cToHero = _cToBand = _cToPlayer = _cHomeTax = _cHomePurse = _cLost = 0;
+            _fN = _fShort = 0; _fPaid = _fGone = _fAddPurse = 0;
+            _cFoughtN = _cDisbandN = _cToHeroN = _cToBandN = _cSpareN = 0;
+            _cFought = _cDisband = _cToHero = _cToBand = _cToPlayer = _cHomeTax = _cHomePurse = _cSpare = _cLost = 0;
             _stumbles = 0;
         }
 
@@ -276,9 +284,9 @@ namespace Armoury
         }
 
         /// <summary>
-        /// Po sprzedazy: zaplacone minus to, co zostalo wsi = skasowane przez gre. Pomiar zawsze; zwrot przy wlaczonym ustawieniu.
-        /// Postfiks (Last) biegnie PRZED finalizerem okna "prowizja" ksiegi obiegu (CirculationWindows.SellFin) - ksiega widzi zmiane
-        /// kiesy i licznika wsi po zwrocie (w nicosc tylko to, czego nie oddalismy).
+        /// Po sprzedazy: zaplacone minus to, co zostalo wsi = skasowane przez gre. Pomiar zawsze; zwrot (calosc do kiesy wsi - 112-p)
+        /// przy wlaczonym ustawieniu. Postfiks (Last) biegnie PRZED finalizerem okna "prowizja" ksiegi obiegu (CirculationWindows.SellFin)
+        /// - ksiega widzi zmiane kiesy wsi po zwrocie (w nicosc tylko to, czego nie oddalismy).
         /// </summary>
         public static void SalePostfix(Sale __state)
         {
@@ -298,9 +306,9 @@ namespace Armoury
                 _fGone += gone;
                 var s = Settings.Current;
                 if (s == null || !s.VillageFoodSalesKept) return;
-                int tax, purse;
-                Split(v, (int)Math.Min(paid, int.MaxValue), (int)gone, out tax, out purse);
-                _fAddTax += tax; _fAddPurse += purse;
+                // 112-p: cala skasowana cena do kiesy wsi - jak przy zakupie gracza z ekranu handlu (gra: 100% ceny do kiesy wsi)
+                v.ChangeGold((int)gone);
+                _fAddPurse += gone;
             }
             catch (Exception e) { Stumble("VillageTakings.SalePostfix", e); }
         }
@@ -345,7 +353,17 @@ namespace Armoury
                 // rozwiazany albo bez zwyciezcy, ktory moglby wziac sakwe: gotowka wraca do wsi i dzieli sie jak utarg
                 var hs = party.HomeSettlement;
                 var home = hs != null ? hs.Village : null;
-                if (home == null) { _cLost += g; return; }
+                if (home == null)
+                {
+                    // 112-p (2.0b): zapasowy odbiorca - kasa osady macierzystej (miasto, zamek), a bez niej kasa najblizszego miasta
+                    var spare = hs != null && hs.Town != null ? hs : NearestTown(party);
+                    if (spare == null || spare.Town == null) { _cLost += g; return; }
+                    party.PartyTradeGold = 0;
+                    spare.Town.ChangeGold(g);
+                    _cSpare += g; _cSpareN++;
+                    MoneyLedger.Note169(MoneyLedger.N169CartPurse, spare, g);   // kasa osady poza oknami ksiegi (tylko licznik)
+                    return;
+                }
                 party.PartyTradeGold = 0;
                 int tax, purse;
                 Split(home, g, g, out tax, out purse);
@@ -353,6 +371,25 @@ namespace Armoury
                 if (purse > 0) MoneyLedger.Note169(MoneyLedger.N169CartPurse, home.Settlement, purse);   // kiesa wsi poza oknami ksiegi (tylko licznik)
             }
             catch (Exception e) { Stumble("VillageTakings.OnPartyDestroyed", e); }
+        }
+
+        /// <summary>112-p: najblizsze miasto do pozycji partii (zapasowy odbiorca sakwy - ta sama regula co sakiewki rozbitych partii w MenPurse).</summary>
+        private static Settlement NearestTown(MobileParty mp)
+        {
+            Settlement best = null; float bd = float.MaxValue;
+            try
+            {
+                if (mp == null) return null;
+                var p = mp.GetPosition2D;
+                foreach (var t in Settlement.All)
+                {
+                    if (t == null || !t.IsTown || t.Town == null) continue;
+                    float d = p.DistanceSquared(t.GetPosition2D);
+                    if (d < bd) { bd = d; best = t; }
+                }
+            }
+            catch (Exception e) { Stumble("VillageTakings.NearestTown", e); }
+            return best;
         }
 
         // ------------------------------------------------------------ latki
@@ -497,7 +534,7 @@ namespace Armoury
                 {
                     sb.Append(_fN).Append(" zakupow: kupcy zaplacili ").Append(_fPaid).Append(", gra skasowala ").Append(_fGone).Append(" (").Append(Pct(_fGone, _fPaid))
                       .Append("; w tym ").Append(_fShort).Append(" zakupow, w ktorych zdjela wiecej, niz zaplacono)");
-                    if (s.VillageFoodSalesKept) sb.Append("; oddane: licznikom panow ").Append(_fAddTax).Append(", kiesom wsi ").Append(_fAddPurse).Append(", zniklo ").Append(_fGone - _fAddTax - _fAddPurse);
+                    if (s.VillageFoodSalesKept) sb.Append("; oddane w calosci kiesom wsi (jak zakup gracza) ").Append(_fAddPurse).Append(", zniklo ").Append(_fGone - _fAddPurse);
                     else sb.Append("; zwrot WYLACZONY w ustawieniach - zniklo ").Append(_fGone);
                 }
                 sb.Append(" | tabory zniszczone z gotowka: w bitwie ").Append(_cFoughtN).Append(" (").Append(_cFought).Append(" po dzialce zwyciezcow), rozwiazane ")
@@ -505,10 +542,12 @@ namespace Armoury
                 if (s.VillagerPurseSurvives)
                     sb.Append("; oddane: wodzom zwyciezcow ").Append(_cToHero).Append(" (").Append(_cToHeroN).Append(" taborow").Append(_cToPlayer > 0 ? "; w tym graczowi " + _cToPlayer : "")
                       .Append("), kiesom band ").Append(_cToBand).Append(" (").Append(_cToBandN).Append(" taborow), wsiom macierzystym ").Append(_cHomePurse)
-                      .Append(" do kies i ").Append(_cHomeTax).Append(" na liczniki panow, zniklo ").Append(_cLost);
+                      .Append(" do kies i ").Append(_cHomeTax).Append(" na liczniki panow, zapasowemu odbiorcy (bez wsi macierzystej - kasa osady macierzystej albo najblizszego miasta) ")
+                      .Append(_cSpare).Append(" (").Append(_cSpareN).Append(" taborow), zniklo ").Append(_cLost);
                 else sb.Append("; zwrot WYLACZONY w ustawieniach - zniklo ").Append(_cLost);
                 sb.Append(" | zamkniete ujscia razem (dopisane wsiom, panom i zwyciezcom): ")
-                  .Append(_tAddPurse + _tAddTax + _fAddPurse + _fAddTax + _cToHero + _cToBand + _cHomePurse + _cHomeTax);
+                  .Append(_tAddPurse + _tAddTax + _fAddPurse + _cToHero + _cToBand + _cHomePurse + _cHomeTax + _cSpare)
+                  .Append("; bez odbiorcy razem (nieprzypisane + towar zniklo + sakwy zniklo; prog 0) ").Append(Unrouted);
                 sb.Append(BandsSegment());
                 if (_stumbles > 0) sb.Append(" | wyjatki zlapane ").Append(_stumbles).Append(" (pierwszy z kazdego miejsca w logu jako ERROR)");
                 sb.Append('.');

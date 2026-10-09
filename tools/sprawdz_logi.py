@@ -541,6 +541,25 @@ def main(argv):
     # 112: utarg wsi, towar kupiony we wsi, sakwy taborow; bandy najwyzej +20% wobec bazy (S16)
     ut = by_day(lines, "Utarg wsi (112): dzien")
     rep.add("112: linia Utarg wsi (112)", f"{len(ut)} dob" if ut else "brak (przed 112)", "obecna po wgraniu B", True if ut else None)
+    # 112-p (2.0b: licznik "bez odbiorcy" z progiem 0): kazda doba linii 112 - utarg nieprzypisany, towar kupiony we wsi i sakwy taborow, ktore zniknely
+    def seg_of(line, head):
+        for part in line.split(" | "):
+            if part.startswith(head):
+                return part
+        return ""
+    for name, head, pat in (("nieprzypisane (utarg)", "powroty taborow z utargiem", r"nieprzypisane (-?\d+)"),
+                            ("zniklo (towar kupiony we wsi)", "towar kupiony we wsiach", r"zniklo (-?\d+)"),
+                            ("zniklo (sakwy zniszczonych taborow)", "tabory zniszczone", r"zniklo (-?\d+)")):
+        vals = []
+        for k in sorted(ut):
+            m = re.findall(pat, seg_of(ut[k], head))
+            if m:
+                vals.append(int(m[-1]))
+        if not vals:
+            rep.add(f"112: {name} - suma wszystkich dob", "brak linii", "0 (2.0b: bez odbiorcy - prog 0)", None)
+            continue
+        tot, bad = sum(vals), sum(1 for v in vals if v != 0)
+        rep.add(f"112: {name} - suma wszystkich dob", f"{tot} ({bad} z {len(vals)} dob ponad 0)", "0 (2.0b: bez odbiorcy - prog 0)", tot == 0 and bad == 0)
     zn = [num(r"z utargu wsi zniklo (-?\d+)", s2) for s2 in by_day(lines, "Pieniadz swiata (bilans): dzien").values()]
     zn = [x for x in zn if x is not None]
     rep.add("112: z utargu wsi zniklo (srednio na dobe)", f"{st.mean(zn):.0f}" + (f" (baza {bw['wsie_utarg_zniklo']:.0f})" if bw.get("wsie_utarg_zniklo") is not None else "") if zn else "brak linii",
