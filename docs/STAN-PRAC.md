@@ -909,3 +909,6 @@ zelaza; korona 1341-1359 1.23 mln strzal). sklad8 mial 35 miast bez strzal -> di
 (2) "4% mniej wojska - NIE; to ma byc dynamiczne wedlug tego, czy stac na taka armie, i wedlug logiki AI, ze na czas wojny moga byc na minusie i splacac sie z lupow wojennych,
 tak jak to bylo na wojnach" -> budzet rodu 166: w wojnie lord moze isc ponad dochod na kredyt/dlug wojenny (z limitem zdolnosci splaty - lup, okupy, zastaw dochodu),
 po wojnie splaca z lupu i okupow i zwalnia nadwyzke; w pokoju wojsko wedlug dochodu. Bez stalego "-4%".
+**DECYZJA JEFFA 09.10 ok. 10:50 (wielcy jency):** "pasuje" -> pojmanego KROLA albo NASTEPCE TRONU przejmuje korona zdobywcy (caly okup do skarbca korony), zdobywca dostaje
+od razu nagrode ok. 1/10 okupu ze skarbca korony; wszyscy inni jency (takze wodz armii spoza rodu krolewskiego): okup dla zdobywcy, korona 1/9. Jedna regula dla gracza i AI
+(gracz oddaje pojmanego krola swojemu krolowi i dostaje nagrode).
