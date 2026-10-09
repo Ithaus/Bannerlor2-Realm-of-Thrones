@@ -37,7 +37,7 @@ namespace Armoury
     /// </summary>
     internal static class IronBank
     {
-        internal static void Reset() { _debts.Clear(); _capital = -1; _lastDay = -1; _logged = 0; }
+        internal static void Reset() { _debts.Clear(); _capital = -1; _lastDay = -1; _logged = 0; _famRates = 0; _famNoLoan = 0; _famSum = 0; _famRateSum = 0; _famRatesViaLoan = 0; _famToday.Clear(); }
         internal sealed class Debt
         {
             public double Principal;      // dlug glowny + doliczone odsetki niesplacone
@@ -179,6 +179,65 @@ namespace Armoury
             catch (Exception e) { Log.Error("IronBank.Lend", e); return 0; }
         }
 
+        // ------------------------------------------------------------ T5 noc 08/09.10: rodzina pomaga glowie (tylko rody AI)
+        // Raport 05 A1 (most do 166 - po 166 wylaczyc): zanim Bank uzna rate za niezaplacona albo udzieli nowej pozyczki,
+        // dorosli zywi czlonkowie rodu (bez glowy) oddaja glowie brakujaca kwote z tego, co maja ponad prog
+        // max(5 000; IronBankWageDays dni zoldu wlasnej partii). Przelew miedzy bohaterami (GiveGoldAction) - nic z niczego.
+        private const int FamilyFloor = 5000;               // prog czlonka bez partii (FamilyPurseFloor z projektu 6.4)
+        private static int _famRates, _famNoLoan;           // licznik doby: raty pokryte przez rodzine, pozyczki niepotrzebne
+        private static long _famSum, _famRateSum;           // licznik doby: zloto od rodziny razem i w tym na raty
+        private static int _famRatesViaLoan;                // licznik doby: raty oplacone dzieki przelewowi z kroku pozyczki (w _famRates)
+        private static readonly Dictionary<string, int> _famToday = new Dictionary<string, int>();   // doba: rod -> zloto od rodziny w kroku pozyczki
+
+        internal static bool FamilyOn { get { var s = Settings.Current; return s != null && s.IronBankFamilyPays; } }
+
+        /// <summary>Dorosli czlonkowie rodu AI oddaja glowie do 'need' z nadwyzki ponad prog. allOrNothing: przelew tylko,
+        /// gdy rodzina pokryje caly brak (rata - czesciowa pomoc i tak nie ratuje przed spoznieniem). Zwraca przelana kwote.</summary>
+        private static int FamilyCover(Clan c, int need, bool allOrNothing)
+        {
+            if (need <= 0 || c == null || c == Clan.PlayerClan || !FamilyOn) return 0;
+            int got = 0, donors = 0, minLeft = int.MaxValue;
+            try
+            {
+                var head = c.Leader;
+                if (head == null || head == Hero.MainHero) return 0;
+                int days = Math.Max(1, Settings.Current.IronBankWageDays);
+                for (int pass = allOrNothing ? 0 : 1; pass < 2; pass++)
+                {
+                    int sum = 0;
+                    foreach (var h in c.Heroes)
+                    {
+                        if (sum >= need) break;
+                        if (h == null || h == head || h == Hero.MainHero || !h.IsAlive || h.IsChild) continue;
+                        int floor = FamilyFloor;
+                        try { var mp = h.PartyBelongedTo; if (mp != null && mp.LeaderHero == h) floor = Math.Max(floor, mp.TotalWage * days); } catch { }
+                        int spare = h.Gold - floor;
+                        if (spare <= 0) continue;
+                        int give = Math.Min(spare, need - sum);
+                        if (pass == 1)
+                        {
+                            int before = head.Gold;
+                            TaleWorlds.CampaignSystem.Actions.GiveGoldAction.ApplyBetweenCharacters(h, head, give, true);
+                            give = Math.Max(0, head.Gold - before);
+                            got += give;   // na biezaco - wyjatek w polowie przelewow nie gubi juz przelanego zlota z licznikow
+                            if (give > 0) { donors++; minLeft = Math.Min(minLeft, h.Gold - floor); }
+                        }
+                        sum += give;
+                    }
+                    if (pass == 0 && sum < need) return 0;   // rodzina nie pokryje calej raty - nic nie ruszamy
+                }
+            }
+            catch (Exception e) { Log.Error("IronBank.FamilyCover", e); }
+            if (got > 0)
+            {
+                _famSum += got;
+                // poprawka po recenzji: slad na rod (limit IronBankLogPerDay) - kto, ile, ilu dawcow, czy dawcy zostali na progu (nadwyzka >= 0)
+                Note("IronBank: rodzina " + c.Name + " oddaje glowie " + got + " (" + (allOrNothing ? "rata" : "przed pozyczka") + "), dawcow " + donors
+                     + ", najnizsza nadwyzka dawcy ponad jego prog po przelewie " + (minLeft == int.MaxValue ? 0 : minLeft) + " (prog min. " + FamilyFloor + ").");
+            }
+            return got;
+        }
+
         private static void Note(string line)
         {
             var s = Settings.Current;
@@ -197,6 +256,7 @@ namespace Armoury
                 if (_lastDay == today) return;
                 _lastDay = today;
                 _logged = 0;
+                _famRates = 0; _famNoLoan = 0; _famSum = 0; _famRateSum = 0; _famRatesViaLoan = 0; _famToday.Clear();   // T5: liczniki doby
                 int lent = 0, paid = 0, missed = 0, defaults = 0; long lentSum = 0, paidSum = 0;
 
                 // 1. lordowie AI pozyczaja, gdy brakuje na zold (i sprzet w wojnie)
@@ -208,6 +268,27 @@ namespace Armoury
                     int target = AtWar(c) ? need * 2 : need;
                     int gold = c.Leader.Gold;
                     if (gold >= target) continue;
+                    // T5: najpierw rodzina (do wysokosci target); bankrutowi nie - Bank i tak nie pozycza, a sciaga 25% kiesy glowy.
+                    // Poprawka po recenzji: tez nie rodom zagrozonym (spoznienie w toku albo termin blizej niz IronBankMinDaysToLend -
+                    // Bank wtedy nie dobiera) - czesciowa pomoc trafilaby do kiesy glowy, z ktorej Bank przy 3. spoznieniu zajmuje
+                    // polowe; dla nich rodzina placi tylko przy racie, w trybie "calosc albo nic".
+                    var dl = Of(c, false);
+                    bool risky = dl != null && (dl.Defaulted || dl.Missed > 0
+                                 || (dl.Principal > 1 && dl.DueDay - today < Math.Max(1, s.IronBankMinDaysToLend)));
+                    if (!risky)
+                    {
+                        try
+                        {
+                            int fam = FamilyCover(c, target - gold, false);
+                            gold = c.Leader.Gold;   // zawsze odswiez - takze po wyjatku w polowie przelewow
+                            if (fam > 0)
+                            {
+                                int prev; _famToday.TryGetValue(c.StringId, out prev); _famToday[c.StringId] = prev + fam;
+                                if (gold >= target) { _famNoLoan++; continue; }
+                            }
+                        }
+                        catch (Exception e) { Log.Error("IronBank.FamilyBeforeLoan", e); }
+                    }
                     int got = Lend(c, (int)((target - gold) * 1.5f), AtWar(c) ? "zold i sprzet na wojne" : "zold");
                     if (got > 0) { lent++; lentSum += got; }
                 }
@@ -233,6 +314,22 @@ namespace Armoury
                     {
                         int daysLeft = Math.Max(1, d.DueDay - today);
                         pay = (int)Math.Ceiling(Math.Min(d.Principal, d.Principal / daysLeft));
+                        // T5: zanim rata bedzie spoznieniem - rodzina rodu AI oddaje glowie brak (tylko gdy pokryje calosc)
+                        if (hero.Gold < pay && c != Clan.PlayerClan)
+                        {
+                            try
+                            {
+                                int fam = FamilyCover(c, pay - hero.Gold, true);
+                                if (fam > 0) { _famRateSum += fam; if (hero.Gold >= pay) _famRates++; }
+                            }
+                            catch (Exception e) { Log.Error("IronBank.FamilyBeforeMiss", e); }
+                        }
+                        else if (_famToday.Count > 0 && c != Clan.PlayerClan)
+                        {
+                            // poprawka po recenzji: rata oplacona tylko dzieki zlotu rodziny z kroku pozyczki (kiesa bez tego przelewu < rata)
+                            int fromLoanStep;
+                            if (_famToday.TryGetValue(kv.Key, out fromLoanStep) && hero.Gold - fromLoanStep < pay) { _famRates++; _famRatesViaLoan++; }
+                        }
                         if (hero.Gold < pay)
                         {
                             d.Missed++; missed++;
@@ -282,7 +379,11 @@ namespace Armoury
                 long total = 0; int debtors = 0, bankrupt = 0;
                 foreach (var kv in _debts) { if (kv.Value.Principal >= 1) { total += (long)kv.Value.Principal; debtors++; if (kv.Value.Defaulted) bankrupt++; } }
                 Log.Info("IronBank: dzien " + today + " - nowe pozyczki " + lent + " (" + lentSum + "), splaty " + paid + " (" + paidSum + "), spoznienia " + missed
-                         + ", bankructwa dzis " + defaults + "; dluznikow " + debtors + " (bankrutow " + bankrupt + "), dlug razem " + total + ", kapital Banku " + (long)_capital + ".");
+                         + ", bankructwa dzis " + defaults + "; dluznikow " + debtors + " (bankrutow " + bankrupt + "), dlug razem " + total + ", kapital Banku " + (long)_capital
+                         + (FamilyOn ? "; z kies rodziny: " + _famRates + " rat, " + _famSum + " zl (na raty " + _famRateSum + ", przed pozyczka " + (_famSum - _famRateSum)
+                                       + "); pozyczek mniej o " + _famNoLoan + ", w tym rat z przelewu przed pozyczka " + _famRatesViaLoan
+                                       : "; z kies rodziny: wylaczone")
+                         + ".");
             }
             catch (Exception e) { Log.Error("IronBank.Daily", e); }
         }
