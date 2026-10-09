@@ -57,7 +57,7 @@ namespace Armoury
             public MobileParty Car; public string CarId; public Settlement Dest, Src; public int Mat, Qty, Day, Paid, Retarget, HoldStreak, PackStart = -1; public float Dist; public bool Naval, Packs;
         }
         private const int MaxRetarget = 2;   // recenzja 174: cel zmieniony przez innych (BK Shipping, porty) - po 2 przywroceniach zwolnienie, bez ping-pongu
-        // 174b.1 (krytyka 14): karawana z kontraktem stawiana na postoj co godzine przez cudzy kod - po tylu kolejnych godzinach ruszania z postoju
+        // 174b.1 (krytyka 15): karawana z kontraktem stawiana na postoj co godzine przez cudzy kod - po tylu kolejnych godzinach ruszania z postoju
         // zwolnienie "postoj wymuszany" (jedna linia z nazwa). Postoj po bitwie albo po oblezeniu to 1 godzina; nocny oboz nie liczy sie wcale.
         private const int MaxHoldStreak = 6;
         internal static bool ShipHooked;     // 174b.1: prefiks BK BKShippingBehavior.RouteCaravanHopByHop wpiety
@@ -78,7 +78,7 @@ namespace Armoury
         private static int _dRelSiege, _dRelRetarget, _dRelDisband, _dShortPack, _dSmall, _dHoldMoved;   // recenzja 174
         private static int _dCampHours, _dShipBlocked, _dRelForcedHold;   // 174b.1: godziny kontraktow w obozie, BK Shipping zablokowany, zwolnienia "postoj wymuszany"
         // 174b.2: bez drogi wedlug powodu (wyspa / inna czesc ladu bez portu, droga ladem > zasieg, morze poza zasiegiem albo dlugoscia, brak konwoju w porcie zrodla),
-        // kontrakty morzem i z jukow (zawarte, dojechaly), z wyprzedzeniem (punkt zamowienia), audyt ilosci (krytyka 19)
+        // kontrakty morzem i z jukow (zawarte, dojechaly), z wyprzedzeniem (punkt zamowienia), audyt ilosci (krytyka 20)
         private static readonly int[] _dNoRoadBy = new int[4];
         private static int _dSea, _dSeaQty, _dPacks, _dPacksQty, _dAhead, _dDoneSea, _dDonePacks, _dAudit, _auditAll;
         private static readonly Dictionary<Town, float[]> _trip = new Dictionary<Town, float[]>();   // dni drogi 3 ostatnich dostaw (miasto x surowiec)
@@ -91,6 +91,7 @@ namespace Armoury
         // i ruda wywieziona kontraktami wedlug zrodla od ostatniej linii; liczniki tylko do logu
         private static readonly Dictionary<Town, int> _missOreSince = new Dictionary<Town, int>();
         private static readonly Dictionary<Settlement, int> _srcOreSince = new Dictionary<Settlement, int>();
+        private static readonly Dictionary<Town, int> _dstOreSince = new Dictionary<Town, int>();   // 174b.2: ruda dostarczona kontraktami wedlug miasta (prog P2 na zapisie)
         private static int _namesSince = -1;
         private static int _dCampSeen;   // 174b.0: przeglad doby zastal karawane z kontraktem w nocnym obozie (stara regula Keep liczy to jako cudzy cel)
 
@@ -99,7 +100,7 @@ namespace Armoury
         internal static void Reset()
         {
             _items = null; _ix.Clear(); _contracts.Clear(); _byCar.Clear(); _miss.Clear(); _useToday.Clear(); _useAvg.Clear(); _last.Clear(); _pending = null;
-            _missOreSince.Clear(); _srcOreSince.Clear(); _namesSince = -1; _trip.Clear(); _auditAll = 0;
+            _missOreSince.Clear(); _srcOreSince.Clear(); _dstOreSince.Clear(); _namesSince = -1; _trip.Clear(); _auditAll = 0;
             NewDay(); _stumblesAll = 0; _errSites.Clear();
         }
 
@@ -213,7 +214,7 @@ namespace Armoury
                     foreach (var kv in new List<KeyValuePair<Town, int[]>>(_miss))
                         for (int m = 0; m < M; m++)
                             if (kv.Value[m] > 0 && _items[m] != null) OrderTimed(kv.Key, m, day, false);
-                    // 174b.2 (krytyka 15): punkt zamowienia - miasto, ktore surowca uzywa, zamawia, zanim zapas zejdzie do zera: zapas + w drodze < (D + 2) x zuzycie
+                    // 174b.2 (krytyka 16): punkt zamowienia - miasto, ktore surowca uzywa, zamawia, zanim zapas zejdzie do zera: zapas + w drodze < (D + 2) x zuzycie
                     // (D - srednia dob drogi 3 ostatnich dostaw, domyslnie 4); rachunek marzy bez zmian (Order), przerwa TownMaterialOrderDays jak dotad
                     if (Settings.Current.TownMaterialOrderAhead)
                         foreach (var t in Town.AllTowns)
@@ -271,7 +272,7 @@ namespace Armoury
         {
             var ore = _items[Ore];
             var noOre = new List<string>(); var noArrows = new List<string>(); var both = new List<string>(); int noBolts = 0, towns = 0;
-            var stock = new List<KeyValuePair<string, int>>(); var miss = new List<KeyValuePair<string, int>>();
+            var stock = new List<KeyValuePair<string, int>>(); var miss = new List<KeyValuePair<string, int>>(); var got = new List<KeyValuePair<string, int>>();
             var srcs = new List<KeyValuePair<int, string>>();
             foreach (var t in Town.AllTowns)
             {
@@ -289,6 +290,7 @@ namespace Armoury
                     if (have <= 0 && a0) both.Add(nm);
                     if (have > 0) stock.Add(new KeyValuePair<string, int>(nm, have));
                     int mo; if (_missOreSince.TryGetValue(t, out mo) && mo > 0) miss.Add(new KeyValuePair<string, int>(nm, mo));
+                    int dq; if (_dstOreSince.TryGetValue(t, out dq) && dq > 0) got.Add(new KeyValuePair<string, int>(nm, dq));
                     int keep = SourceKeep(t, Ore);
                     int surplus = have - keep;
                     if (surplus > 0)
@@ -307,9 +309,10 @@ namespace Armoury
             Log.Info("Miasta bez rudy i strzal (174b): dzien " + day + " - miast " + towns + "; bez rudy " + noOre.Count + " [" + string.Join(", ", noOre.ToArray()) + "]; bez strzal "
                      + noArrows.Count + " [" + string.Join(", ", noArrows.ToArray()) + "]; bez beltow " + noBolts + "; bez rudy i bez strzal " + both.Count + " [" + string.Join(", ", both.ToArray())
                      + "]; najwiecej cykli \"brak rudy\" (warsztaty i strzelarze) od " + (_namesSince < 0 ? "startu sesji" : "dnia " + _namesSince) + ": " + Top(miss, 10)
-                     + "; najwiekszy zapas rudy: " + Top(stock, 10) + "; zrodla rudy z nadwyzka (" + srcs.Count + "; zapas/nadwyzka, ruda wywieziona kontraktami od ostatniej linii, konwoje w porcie): "
+                     + "; najwiekszy zapas rudy: " + Top(stock, 10) + "; ruda dostarczona kontraktami od " + (_namesSince < 0 ? "startu sesji" : "dnia " + _namesSince) + " (" + got.Count + " miast): " + Top(got, 200)
+                     + "; zrodla rudy z nadwyzka (" + srcs.Count + "; zapas/nadwyzka, ruda wywieziona kontraktami od ostatniej linii, konwoje w porcie): "
                      + (sp.Count > 0 ? string.Join("; ", sp.ToArray()) : "-") + ".");
-            _missOreSince.Clear(); _srcOreSince.Clear(); _namesSince = day;
+            _missOreSince.Clear(); _srcOreSince.Clear(); _dstOreSince.Clear(); _namesSince = day;
         }
 
         /// <summary>174b.1: przeglad doby - tylko limit 30 dob i wylacznik (logika celu jest w takcie godzinowym Hourly); zniszczona karawana - jak dotad.</summary>
@@ -391,7 +394,7 @@ namespace Armoury
         }
 
         /// <summary>
-        /// 174b.2 DOWOZ: NAJPIERW TRASA, POTEM KARAWANA, KTORA NIA POJEDZIE (docs/PROJEKT-174B rozdz. 3.2 i "Krytyka i odpowiedzi" uwagi 8 i 15). Regula
+        /// 174b.2 DOWOZ: NAJPIERW TRASA, POTEM KARAWANA, KTORA NIA POJEDZIE (docs/PROJEKT-174B rozdz. 3.2 i "Krytyka i odpowiedzi" uwagi 8 i 16). Regula
         /// "kontrakt tylko z zyskiem ponad koszt drogi" i wzor oplaty bez zmian. Zrodla z Town.AllTowns (zrodlem i tak moze byc tylko miasto). Dla kazdego
         /// zrodla w zasiegu: droga LADEM (pamiec drog gry, Default; koszt = droga) i MORZEM (oba miasta z portem, wylacznik TownMaterialOrderBySea; pamiec
         /// drog Naval; rejs <= TownMaterialOrderSeaMaxRoute, koszt = rejs x SeaFreightShare <= zasieg). Przewoznik dobrany do trasy: lad - karawana z ladem,
@@ -399,7 +402,7 @@ namespace Armoury
         /// z polki zrodla ponad prog nadwyzki (jak dotad) albo (TownMaterialOrderFromPacks) surowiec, ktory karawana stojaca w zrodle JUZ wiezie - bez zakupu,
         /// marza wobec sprzedazy na miejscu. Ilosc wedlug zysku: q0, a gdy marza q0 <= 0 - q0/2, q0/4, ... dopoki ladunek >= TownMaterialOrderMinLoadKg.
         /// Wygrywa najwieksza marza na kg. Ile zamowic: zapas na max(10, D + 4) dob zuzycia (D - srednia dob drogi 3 ostatnich dostaw do miasta, domyslnie 4;
-        /// zuzycie z obecnych rak - krytyka 15) minus polka minus w drodze.
+        /// zuzycie z obecnych rak - krytyka 16) minus polka minus w drodze.
         /// </summary>
         private static void Order(Town town, int m, int day, bool ahead)
         {
@@ -537,7 +540,7 @@ namespace Armoury
             Place(bestCar, bestSrc, dest, m, bestQ, bestDist, bestNaval, bestMargin, day, bestPacks);
         }
 
-        /// <summary>174b.2 (krytyka 15): zuzycie dobowe miasta-CELU - wieksze z zmierzonego (srednia ok. 14 dob) i szacunku z OBECNYCH rak (CaravanBulk.UseNow);
+        /// <summary>174b.2 (krytyka 16): zuzycie dobowe miasta-CELU - wieksze z zmierzonego (srednia ok. 14 dob) i szacunku z OBECNYCH rak (CaravanBulk.UseNow);
         /// prog nadwyzki zrodla liczy dalej UseOf (dawne rece - zrodla kontraktow nie znikaja).</summary>
         private static float UseDest(Town town, int m)
         {
@@ -581,7 +584,7 @@ namespace Armoury
             if (p == null || !p.IsCaravan || !p.IsActive || p.IsDisbanding || p.MapEvent != null || p.Army != null || !p.IsPartyTradeActive || p.ItemRoster == null || p.Party == null) return false;
             if (p.IsCurrentlyUsedByAQuest || p.Ai == null || p.Ai.DoNotMakeNewDecisions || _byCar.ContainsKey(p)) return false;
             if (p == MobileParty.MainParty) return false;
-            // 174b.2 (krytyka 28, pytanie 2 do Jeffa): karawany rodu gracza (prowadzi je AI gry/BK, jak karawany AI) - jedna regula, zysk do ich kiesy;
+            // 174b.2 (krytyka 26, pytanie 2 do Jeffa): karawany rodu gracza (prowadzi je AI gry/BK, jak karawany AI) - jedna regula, zysk do ich kiesy;
             // wylacznik TownMaterialOrderPlayerCaravans = false - jak dotad (nigdy)
             if (!Settings.Current.TownMaterialOrderPlayerCaravans && (p.ActualClan == Clan.PlayerClan || (p.Party.Owner != null && p.Party.Owner == Hero.MainHero))) return false;
             // recenzja 174: karawana trzeciej frakcji w wojnie z zamawiajacym nie jedzie do wrogiego miasta
@@ -631,7 +634,7 @@ namespace Armoury
                 try { SellItemsAction.Apply(src.Town.Owner, car.Party, el, n, src); }
                 catch (Exception e) { Stumble("Place(zakup)", e); break; }
                 int moved = pack.GetItemNumber(item) - had;
-                if (moved != shelfHad - srcRoster.GetItemNumber(item)) { _dAudit++; _auditAll++; }   // 174b.2 audyt (krytyka 19): przyrost jukow == ubytek polki zrodla
+                if (moved != shelfHad - srcRoster.GetItemNumber(item)) { _dAudit++; _auditAll++; }   // 174b.2 audyt (krytyka 20): przyrost jukow == ubytek polki zrodla
                 if (moved <= 0) break;
                 got += moved; paid += Math.Max(0, purse - car.PartyTradeGold);
             }
@@ -752,6 +755,7 @@ namespace Armoury
             if (c.PackStart >= 0 && sold > c.PackStart) { _dAudit++; _auditAll++; }   // 174b.2 audyt: z jukow dostarczono nie wiecej, niz bylo w jukach przy zawarciu
             if (c.Naval) _dDoneSea++;
             if (c.Packs) _dDonePacks++;
+            if (c.Mat == Ore && sold > 0 && town != null) { int dq; _dstOreSince.TryGetValue(town, out dq); _dstOreSince[town] = dq + sold; }
             NoteTrip(town, c.Mat, (float)(CampaignTime.Now.ToDays - c.Day));
             if (sold < carried) _dKeptTarget += carried - sold;
             Release(c);

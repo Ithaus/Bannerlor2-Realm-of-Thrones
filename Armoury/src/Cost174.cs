@@ -7,9 +7,9 @@ using TaleWorlds.CampaignSystem;
 namespace Armoury
 {
     /// <summary>
-    /// PACZKA 174b.5 F6 - LINIA "Koszt 171-174 (doba)" (docs/PROJEKT-174B-DOWOZ-2026-10-09.md rozdz. 3.5 i "Krytyka i odpowiedzi" uwaga 16). Twarde ms na
+    /// PACZKA 174b.5 F6 - LINIA "Koszt 171-174 (doba)" (docs/PROJEKT-174B-DOWOZ-2026-10-09.md rozdz. 3.5 i "Krytyka i odpowiedzi" uwaga 17). Twarde ms na
     /// dobe petli dodanych w 171-174b zamiast szacunkow: wzor CirculationWindows - Stopwatch.GetTimestamp() przy co 16. wywolaniu, czas mnozony przez
-    /// (wywolan / probek), liczniki wywolan pelne. BEZ Thread.Suspend. Prog P13 (krytyka 16): suma "nasze 171-174b" <= 1% czasu doby z zegara (nowa
+    /// (wywolan / probek), liczniki wywolan pelne. BEZ Thread.Suspend. Prog P13 (krytyka 17): suma "nasze 171-174b" <= 1% czasu doby z zegara (nowa
     /// kampania ok. 0.13 s/d, zapis Jeffa ok. 0.22 s/d - ponizej szumu biegu). Pozycje zagniezdzone (BuyLoop lorda, zakup zastepczy, rezerwa) maja
     /// osobne wiersze; do sumy ida tylko rozlaczne: BuySubstitutes, zamowienia zamkow, VolunteerKit.BuyCore, WorkshopLaw.CyclePrefix (z TryStart i
     /// Quickest), TownFletchers.Work, CaravanAmmo, MaterialOrders (godzina i zamowienia), GarrisonArmory. Ceny (SupplyDemand.PricePostfix) - osobno, poza

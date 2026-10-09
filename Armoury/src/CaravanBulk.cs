@@ -250,7 +250,7 @@ namespace Armoury
             return 0f;
         }
 
-        /// <summary>174b.2 (krytyka 15): zuzycie dobowe surowca w miescie z OBECNYCH rak (WorkshopLaw.TownHands) - ilosc zamowienia miasta-celu;
+        /// <summary>174b.2 (krytyka 16): zuzycie dobowe surowca w miescie z OBECNYCH rak (WorkshopLaw.TownHands) - ilosc zamowienia miasta-celu;
         /// prog nadwyzki zrodla i cel zapasu karawan liczy dalej Use (dawne rece przy CaravanBulkLegacyHands). 0 = spoza tabeli albo zamek.</summary>
         internal static float UseNow(Town town, ItemObject item)
         {
