@@ -562,7 +562,14 @@ namespace Armoury
         public int OutlawProsperityGood = 5000;            // prosperity at which a town counts as fully well-off (no misery from poverty)
         public float OutlawReturnBasePercent = 0.5f;       // percent of a region's outlaws who go home each day in any times
         public float OutlawReturnPeacePercent = 2f;        // extra percent going home each day in peace, scaled by prosperity
-        public float OutlawRoutedShare = 0.5f;             // share of men routed from a battle who take to the woods instead of going home
+        public float OutlawRoutedShare = 0.5f;             // share of soldiers routed or fleeing a lost battle who take to the woods instead of going home (outlaws follow their own share, villagers always go home)
+        // H3 (n9): przegrani uchodza zamiast ginac - LosersFlee.cs, docs/paczki/n9-przegrani-uchodza.md
+        public bool LosersFleeEnabled = true;              // battles fought without you: the beaten side mostly flees instead of dying - the slain follow the situation (horse to pursue, river or marsh behind, odds, seasoned men against levies), 5-65%; a few are taken; the rest go home or to the woods. The winner loses at most a few slain - the rest of his fallen are wounded. Your own battles are not touched
+        public float WinnerDeathCapPercent = 5f;           // the winner of a battle fought without you loses at most this share of his men slain; the rest of his fallen live, wounded (history: 1-5%)
+        public float LoserCaptiveVeteranPercent = 30f;     // of the beaten men who live, this share of seasoned troops (tier 4 and up) is taken - they were worth a ransom
+        public float LoserCaptiveCommonPercent = 5f;       // of the beaten men who live, this share of the rest is taken
+        public float NonCombatantDeathPercent = 5f;        // villagers and fishermen beaten on the road: share slain; the rest run back to their own village (a few are taken only by peoples who keep slaves). Caravan guards fight and are judged like soldiers
+        public float OutlawBandRoutedShare = 0.5f;         // share of outlaws fleeing a lost fight who go back to the woods; the rest - mostly villagers driven out by want - go home to the villages
         public float OutlawRaidFleePercent = 3f;           // percent of a village's hearths that flee to the woods when it is burnt
         public float OutlawHearthPerMan = 0.5f;            // hearths a village loses for each man who becomes an outlaw (and regains when he returns)
         public int OutlawMinBand = 6;                      // fewest men needed nearby before a new band can form

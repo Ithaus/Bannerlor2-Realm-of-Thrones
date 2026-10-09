@@ -1984,9 +1984,33 @@ namespace Armoury
         [SettingPropertyGroup("Iron bank")]
         public float OutlawReturnPeacePercent { get; set; } = 2f;
 
-        [SettingPropertyFloatingInteger("Outlaw Routed Share", 0.00f, 2.00f, "0.00", HintText = "share of men routed from a battle who take to the woods instead of going home")]
+        [SettingPropertyFloatingInteger("Outlaw Routed Share", 0.00f, 2.00f, "0.00", HintText = "share of soldiers routed or fleeing a lost battle who take to the woods instead of going home (outlaws follow their own share, villagers always go home)")]
         [SettingPropertyGroup("Iron bank")]
         public float OutlawRoutedShare { get; set; } = 0.5f;
+
+        [SettingPropertyBool("Losers Flee Enabled", HintText = "battles fought without you: the beaten side mostly flees instead of dying - the slain follow the situation (horse to pursue, river or marsh behind, odds, seasoned men against levies), 5-65%; a few are taken; the rest go home or to the woods. The winner loses at most a few slain - the rest of his fallen are wounded. Your own battles are not touched")]
+        [SettingPropertyGroup("Iron bank")]
+        public bool LosersFleeEnabled { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Winner Death Cap Percent", 0.00f, 20.00f, "0.00", HintText = "the winner of a battle fought without you loses at most this share of his men slain; the rest of his fallen live, wounded (history: 1-5%)")]
+        [SettingPropertyGroup("Iron bank")]
+        public float WinnerDeathCapPercent { get; set; } = 5f;
+
+        [SettingPropertyFloatingInteger("Loser Captive Veteran Percent", 0.00f, 120.00f, "0.00", HintText = "of the beaten men who live, this share of seasoned troops (tier 4 and up) is taken - they were worth a ransom")]
+        [SettingPropertyGroup("Iron bank")]
+        public float LoserCaptiveVeteranPercent { get; set; } = 30f;
+
+        [SettingPropertyFloatingInteger("Loser Captive Common Percent", 0.00f, 20.00f, "0.00", HintText = "of the beaten men who live, this share of the rest is taken")]
+        [SettingPropertyGroup("Iron bank")]
+        public float LoserCaptiveCommonPercent { get; set; } = 5f;
+
+        [SettingPropertyFloatingInteger("Non Combatant Death Percent", 0.00f, 20.00f, "0.00", HintText = "villagers and fishermen beaten on the road: share slain; the rest run back to their own village (a few are taken only by peoples who keep slaves). Caravan guards fight and are judged like soldiers")]
+        [SettingPropertyGroup("Iron bank")]
+        public float NonCombatantDeathPercent { get; set; } = 5f;
+
+        [SettingPropertyFloatingInteger("Outlaw Band Routed Share", 0.00f, 2.00f, "0.00", HintText = "share of outlaws fleeing a lost fight who go back to the woods; the rest - mostly villagers driven out by want - go home to the villages")]
+        [SettingPropertyGroup("Iron bank")]
+        public float OutlawBandRoutedShare { get; set; } = 0.5f;
 
         [SettingPropertyFloatingInteger("Outlaw Raid Flee Percent", 0.00f, 12.00f, "0.00", HintText = "percent of a village's hearths that flee to the woods when it is burnt")]
         [SettingPropertyGroup("Iron bank")]
@@ -3228,6 +3252,12 @@ namespace Armoury
             s.OutlawReturnBasePercent = OutlawReturnBasePercent;
             s.OutlawReturnPeacePercent = OutlawReturnPeacePercent;
             s.OutlawRoutedShare = OutlawRoutedShare;
+            s.LosersFleeEnabled = LosersFleeEnabled;
+            s.WinnerDeathCapPercent = WinnerDeathCapPercent;
+            s.LoserCaptiveVeteranPercent = LoserCaptiveVeteranPercent;
+            s.LoserCaptiveCommonPercent = LoserCaptiveCommonPercent;
+            s.NonCombatantDeathPercent = NonCombatantDeathPercent;
+            s.OutlawBandRoutedShare = OutlawBandRoutedShare;
             s.OutlawRaidFleePercent = OutlawRaidFleePercent;
             s.OutlawHearthPerMan = OutlawHearthPerMan;
             s.OutlawMinBand = OutlawMinBand;

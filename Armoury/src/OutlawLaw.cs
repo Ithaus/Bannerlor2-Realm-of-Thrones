@@ -112,6 +112,7 @@ namespace Armoury
             FenceNewDay(); _hoardSeen.Clear(); _hoardKeep.Clear(); _errSell = false; _errHide = false; _errFenceLog = false; _errLife = false; _errStart = false; _errFood = false; _errUpgrade = false;
             _gold.Clear(); _goldTick = false; _foodSnap.Clear();      // migawki dziennego ticku gry nie przechodza do nastepnej kampanii
             _upLoot = _upFence = _upBlocked = _fenceGold = 0;         // liczniki zakupow u pasera ida do linii "Paser:" - nie moga przejsc z poprzedniej kampanii
+            _hearthRegion.Clear(); H3NewDay(); _errH3 = false;        // H3: liczniki rozbitych i powrotow z puli tylko z tej kampanii
         }
 
         private static void FenceNewDay()
@@ -239,7 +240,7 @@ namespace Armoury
             return taken;
         }
 
-        private static void ReturnHome(Settlement region, float men)
+        internal static void ReturnHome(Settlement region, float men)      // H3: internal - LosersFlee.SendHome oddaje tu bandytow i prostych
         {
             if (region == null || men <= 0f) return;
             var vs = region.BoundVillages;
@@ -341,7 +342,9 @@ namespace Armoury
         {
             try
             {
-                if (!On || me == null) return;
+                if (me == null) return;
+                if (LosersFlee.On) { RoutedH3(me); return; }      // H3: jeden podzial rozbitych - las albo dom, nikt w nicosc
+                if (!On) return;
                 float share = Settings.Current.OutlawRoutedShare;
                 if (share <= 0f) return;
                 var region = NearestNode(me.Position.ToVec2());
@@ -356,6 +359,116 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Log.Error("OutlawLaw.MapEventEnded", e); }
+        }
+
+        // ------------------------------------------------------------ H3: rozbici z kazdej bitwy (LosersFlee, docs/paczki/n9-przegrani-uchodza.md 3.2)
+        // licznik dnia do linii "Wyrzutki:" (przy wlaczonym H3)
+        private static int _h3Routed, _h3Pool, _h3PoolArmy, _h3PoolBand, _h3PoolGarr, _h3HomeBk, _h3HomeVillage, _h3HomeTemplate, _h3Homeless, _h3Vanished, _h3Stumbles;
+        private static int _h3BackBk;
+        private static float _h3BackCommon, _h3BackBandit, _h3BackTemplate;
+        private static bool _errH3;
+        private static readonly Dictionary<string, Settlement> _hearthRegion = new Dictionary<string, Settlement>();
+
+        private static void H3NewDay()
+        {
+            _h3Routed = _h3Pool = _h3PoolArmy = _h3PoolBand = _h3PoolGarr = _h3HomeBk = _h3HomeVillage = _h3HomeTemplate = _h3Homeless = _h3Vanished = _h3Stumbles = 0;
+            _h3BackBk = 0; _h3BackCommon = _h3BackBandit = _h3BackTemplate = 0f;
+        }
+
+        /// <summary>H3: n ludzi do puli regionu w swoim typie (liczby calkowite; "bez domu" i uwolnieni jency bez odbiorcy).</summary>
+        internal static void PoolAdd(Settlement region, CharacterObject troop, int n)
+        {
+            if (region == null || troop == null || troop.IsHero || n <= 0) return;
+            Add(region, troop.StringId, n);
+        }
+
+        /// <summary>H3: region puli dla punktu na mapie (najblizsza warownia - ta sama geografia co rozbici).</summary>
+        internal static Settlement PoolRegionAt(Vec2 p) { return NearestNode(p); }
+
+        /// <summary>H3: region z wsiami dla powrotu do hearth (bandyci, prosci). Warownia bez wsi - najblizsza warownia, ktora je ma
+        /// (inaczej ReturnHome nic by nie dopisal i ludzie by znikneli).</summary>
+        internal static Settlement HearthRegionAt(Vec2 p)
+        {
+            var r = NearestNode(p);
+            if (r == null) return null;
+            if (r.BoundVillages != null && r.BoundVillages.Count > 0) return r;
+            Settlement c;
+            if (_hearthRegion.TryGetValue(r.StringId, out c)) return c;
+            var rp = r.GetPosition2D; float bd = float.MaxValue;
+            foreach (var s in Nodes())
+            {
+                if (s.BoundVillages == null || s.BoundVillages.Count == 0) continue;
+                float d = rp.DistanceSquared(s.GetPosition2D);
+                if (d < bd) { bd = d; c = s; }
+            }
+            _hearthRegion[r.StringId] = c;
+            return c;
+        }
+
+        /// <summary>H3: rozbici (RoutedInBattle) KAZDEJ bitwy - takze gracza i rabunkow. Banda: OutlawBandRoutedShare w las, reszta do domu
+        /// wedlug zawodu; tabor wsi i rybacy: wszyscy do swojej wsi; karawana: "z szablonu"; zaloga, milicja, patrol: OutlawRoutedShare w las,
+        /// reszta "z szablonu"; partie rodow i inne: OutlawRoutedShare w las, reszta do domu wedlug zawodu. Czego dom nie przyjal - do puli
+        /// ("bez domu"); przy wylaczonym prawie wyrzutkow nikt do puli (licznik "znikneli").</summary>
+        private static void RoutedH3(MapEvent me)
+        {
+            var s = Settings.Current;
+            bool law = On;
+            float share = law ? MBMath.ClampFloat(s.OutlawRoutedShare, 0f, 1f) : 0f;
+            float bandShare = law ? MBMath.ClampFloat(s.OutlawBandRoutedShare, 0f, 1f) : 0f;
+            var pos = me.Position.ToVec2();
+            var region = NearestNode(pos);
+            LosersFlee.BeginBattle();
+            int pool = 0, bk = 0, village = 0, template = 0, homeless = 0, routed = 0;
+            foreach (var side in new[] { me.AttackerSide, me.DefenderSide })
+            {
+                if (side == null) continue;
+                foreach (var mep in side.Parties)
+                {
+                    try
+                    {
+                        if (mep == null || mep.RoutedInBattle == null || mep.RoutedInBattle.TotalRegulars <= 0) continue;
+                        var mp = mep.Party != null ? mep.Party.MobileParty : null;
+                        int kind = LosersFlee.KindOf(mp);
+                        IFaction fac = null;
+                        try { fac = mp != null ? mp.MapFaction : (mep.Party != null ? mep.Party.MapFaction : null); } catch { }
+                        float sh = kind == LosersFlee.KBand ? bandShare : (kind == LosersFlee.KVillager || kind == LosersFlee.KCaravan) ? 0f : share;
+                        var roster = mep.RoutedInBattle;
+                        for (int i = 0; i < roster.Count; i++)
+                        {
+                            var e = roster.GetElementCopyAtIndex(i);
+                            if (e.Character == null || e.Character.IsHero || e.Number <= 0) continue;
+                            int n = e.Number;
+                            routed += n;
+                            int toPool = sh > 0f && region != null ? Math.Min(n, MBRandom.RoundRandomized(n * sh)) : 0;
+                            if (toPool > 0)
+                            {
+                                Add(region, e.Character.StringId, toPool);
+                                pool += toPool;
+                                if (kind == LosersFlee.KBand) _h3PoolBand += toPool; else if (kind == LosersFlee.KGarrison) _h3PoolGarr += toPool; else _h3PoolArmy += toPool;
+                                LosersFlee.NoteWoods(region, toPool);
+                            }
+                            int rest = n - Math.Max(0, toPool);
+                            if (rest <= 0) continue;
+                            int cat;
+                            int got = LosersFlee.SendHome(mp, e.Character, rest, pos, fac, LosersFlee.SrcRouted, out cat);
+                            if (got > 0)
+                            {
+                                if (cat == LosersFlee.CatBk) bk += got; else if (cat == LosersFlee.CatTemplate) template += got; else village += got;
+                            }
+                            int left = rest - got;
+                            if (left <= 0) continue;
+                            homeless += left;
+                            if (law && region != null) { Add(region, e.Character.StringId, left); LosersFlee.NoteWoods(region, left); }
+                            else _h3Vanished += left;
+                        }
+                    }
+                    catch (Exception ex) { _h3Stumbles++; if (!_errH3) { _errH3 = true; Log.Error("OutlawLaw.RoutedH3", ex); } }
+                }
+            }
+            _h3Routed += routed; _h3Pool += pool; _h3HomeBk += bk; _h3HomeVillage += village; _h3HomeTemplate += template; _h3Homeless += homeless;
+            _inRouted += pool + (law && region != null ? homeless : 0);
+            LosersFlee.NoteHomeless(homeless, law && region != null);
+            if (LosersFlee.PlayerIn(me)) LosersFlee.PlayerLine(me, pool, bk, village, template, homeless, law && region != null);
         }
 
         internal static void OnVillageLooted(Village v)
@@ -415,7 +528,7 @@ namespace Armoury
             }
         }
 
-        private static bool IsOutlawParty(MobileParty p)
+        internal static bool IsOutlawParty(MobileParty p)      // H3: internal - LosersFlee rozpoznaje nim bande
         {
             if (p == null) return false;
             if (p.IsBandit) return true;
@@ -472,10 +585,11 @@ namespace Armoury
 
         internal static void Daily()
         {
-            if (!On) return;
+            if (!On) { H3NewDay(); return; }      // H3 przy wylaczonym prawie wyrzutkow: linii "Wyrzutki:" nie ma - liczniki nie rosna miedzy dobami
             try
             {
                 var s = Settings.Current;
+                bool h3 = LosersFlee.On;
                 Seed();
                 _war.Clear();
                 // 1. bieda i chaos -> ludzie w las; pokoj i dobrobyt -> do domu
@@ -513,6 +627,31 @@ namespace Armoury
                             foreach (var key in d.Keys.ToList())
                             {
                                 float m = d[key] * rate;
+                                if (h3)
+                                {
+                                    // H3 (3.3): powrot wedlug zawodu klucza - zolnierz do ludnosci BK (z puli schodzi tyle, ile BK przyjal),
+                                    // straz karawan "z szablonu", bandyci i prosci do hearth jak dotad (stamtad ich wzieto)
+                                    int kk = key == Commoner ? LosersFlee.KeyCommon : LosersFlee.KeyKind(key);
+                                    if (kk == LosersFlee.KeySoldier)
+                                    {
+                                        int n = Math.Min(MBRandom.RoundRandomized(m), (int)Math.Floor(d[key]));
+                                        if (n > 0)
+                                        {
+                                            int cat;
+                                            int got = LosersFlee.SendHome(null, LosersFlee.TroopOf(key), n, r.GetPosition2D, null, LosersFlee.SrcPool, out cat);
+                                            if (got > 0) { d[key] -= got; _h3BackBk += got; }
+                                        }
+                                        if (d[key] < 0.01f) d.Remove(key);
+                                        continue;
+                                    }
+                                    if (kk == LosersFlee.KeyGuard)
+                                    {
+                                        d[key] -= m; _h3BackTemplate += m; LosersFlee.NoteTemplateFloat(m);
+                                        if (d[key] < 0.01f) d.Remove(key);
+                                        continue;
+                                    }
+                                    if (kk == LosersFlee.KeyBandit) _h3BackBandit += m; else _h3BackCommon += m;
+                                }
                                 d[key] -= m; back += m;
                                 if (d[key] < 0.01f) d.Remove(key);
                             }
@@ -615,12 +754,43 @@ namespace Armoury
                          + " | bandy nowe " + _bornBands + " (" + _bornMen + " ludzi), odmowione " + _refused + ", puste usuniete " + _emptyRemoved
                          + " | werbunek: z puli " + _bandRecruit + ", jency " + _prisonerJoin
                          + " | awanse: z lupu " + _upLoot + ", od pasera " + _upFence + " (" + _fenceGold + " zl), bez sprzetu " + _upBlocked
-                         + " | band " + bands + ", ludzi " + men + ".");
+                         + " | band " + bands + ", ludzi " + men + "."
+                         + (h3 ? H3Segment() : ""));
                 FenceLog(s, _upFence, _fenceGold);
+                H3NewDay();
                 _inDesert = _inRouted = _inRaid = _inMisery = _inDisband = _outReturn = 0f;
                 _bornBands = _bornMen = _refused = _emptyRemoved = _bandRecruit = _prisonerJoin = _upLoot = _upFence = _upBlocked = _fenceGold = 0;
             }
             catch (Exception e) { Log.Error("OutlawLaw.Daily", e); }
+        }
+
+        /// <summary>H3: dopisek do linii "Wyrzutki:" (na koncu, zeby parsery czytajace dotychczasowe pola nic nie zgubily): sklad puli
+        /// wedlug zawodu, rozbici z bitew rozpisani na las / dom / bez domu z kontrola sumy, powrot z puli wedlug zawodu.</summary>
+        private static string H3Segment()
+        {
+            try
+            {
+                float sold = 0f, band = 0f, plain = 0f, guard = 0f;
+                foreach (var d in _pool.Values)
+                    foreach (var kv in d)
+                    {
+                        int kk = kv.Key == Commoner ? LosersFlee.KeyCommon : LosersFlee.KeyKind(kv.Key);
+                        if (kk == LosersFlee.KeySoldier) sold += kv.Value;
+                        else if (kk == LosersFlee.KeyBandit) band += kv.Value;
+                        else if (kk == LosersFlee.KeyGuard) guard += kv.Value;
+                        else plain += kv.Value;
+                    }
+                int diff = _h3Routed - (_h3Pool + _h3HomeBk + _h3HomeVillage + _h3HomeTemplate + _h3Homeless);
+                var ci = CultureInfo.InvariantCulture;
+                return " H3 (przegrani uchodza): sklad puli wedlug zawodu - zolnierze " + (int)sold + ", bandyci " + (int)band + ", prosci " + (int)plain + ", straz karawan " + (int)guard
+                       + " | rozbici z bitew dzis " + _h3Routed + " = w las " + _h3Pool + " (wojsko " + _h3PoolArmy + ", bandy " + _h3PoolBand + ", zalogi " + _h3PoolGarr + ")"
+                       + " + do domu " + (_h3HomeBk + _h3HomeVillage + _h3HomeTemplate) + " (ludnosc BK " + _h3HomeBk + ", do wsi " + _h3HomeVillage + ", z szablonu " + _h3HomeTemplate + ")"
+                       + " + bez domu (do puli) " + (_h3Homeless - _h3Vanished) + (_h3Vanished > 0 ? ", znikneli " + _h3Vanished : "") + "; roznica " + diff
+                       + " | powrot z puli: do hearth " + (_h3BackCommon + _h3BackBandit).ToString("0.0", ci) + " (prosci " + _h3BackCommon.ToString("0.0", ci) + ", bandyci " + _h3BackBandit.ToString("0.0", ci) + ")"
+                       + ", do ludnosci BK " + _h3BackBk + ", z szablonu " + _h3BackTemplate.ToString("0.0", ci)
+                       + (_h3Stumbles > 0 ? " | potkniecia rozbitych " + _h3Stumbles : "") + ".";
+            }
+            catch { return " H3: blad dopisku."; }
         }
 
         /// <summary>Werbunek z jednego regionu (bez sasiadow).</summary>
@@ -730,7 +900,9 @@ namespace Armoury
         public static bool GateFill(Clan faction) { return GateGlobal(); }
         public static bool GateBkInfest(Hideout hideout) { return GateHideout(hideout); }
         public static bool GateBkHero(Clan clan) { return GateGlobal(); }
-        public static bool SkipVanillaDeserters() { return !On; }
+        // H3: przy wlaczonym H3 vanilla dezerterzy zablokowani takze przy wylaczonym prawie wyrzutkow - gra skladalaby ich
+        // z RoutedInBattle + DiedInBattle, czyli z tych samych ludzi, ktorych H3 odsyla do domu (podwojnie)
+        public static bool SkipVanillaDeserters() { return !On && !LosersFlee.On; }
         public static bool SkipBkUpgrade() { return !On; }      // BK dosypywal 2-6 ludzi dziennie - teraz werbunek z puli
 
         // ------------------------------------------------------------ zloto band

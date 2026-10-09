@@ -81,6 +81,7 @@ namespace Armoury
                 WinterBite.ApplyAll(_harmony);
                 WesterosClimate.ApplyAll(_harmony);
                 OutlawLaw.ApplyAll(_harmony);
+                try { LosersFlee.ApplyAll(_harmony); } catch (Exception e) { Log.Error("LosersFlee.ApplyAll", e); }   // H3: przegrani uchodza zamiast ginac (wynik bitwy AI w polu) + licznik wcielonych jencow AI
                 PopulationLaw.ApplyAll(_harmony);
                 MapClock.ApplyAll(_harmony);
                 Levy.ApplyAll(_harmony);
