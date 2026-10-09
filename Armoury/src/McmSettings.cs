@@ -720,7 +720,7 @@ namespace Armoury
         [SettingPropertyGroup("The law of the battlefield")]
         public bool SpoilsQuartermasterRepair { get; set; } = true;
 
-        [SettingPropertyBool("Donation Xp Off", HintText = "gear you give away no longer trains anyone: no troop experience for weapons and armour you leave or discard on any screen (the quartermaster perks Giving Hands and Paid in Promise keep only their other half), no skill experience for gear handed to a Spoils of War company leader (horses too), for trophies left on the field or for gear and food given to a town (its security, militia, prosperity and relations still rise); trade skill counts only what you sold at that stall, not what you gave away since your last market visit (off = as before)")]
+        [SettingPropertyBool("Donation Xp Off", HintText = "gear you give away no longer trains anyone: no troop experience for weapons and armour you leave or discard on any screen (the quartermaster perks Giving Hands and Paid in Promise keep only their other half), no skill experience for gear handed to a Spoils of War company leader (horses too), for trophies left on the field or for gear and food given to a town (its security, militia, prosperity and relations still rise), and the Spoils menus no longer promise training; trade skill counts only what you actually sold at that stall, not what you gave away since your last market visit, put on a companion or slaughtered during the trade (off = as before)")]
         [SettingPropertyGroup("The law of the battlefield")]
         public bool DonationXpOff { get; set; } = true;
 

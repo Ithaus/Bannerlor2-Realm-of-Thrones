@@ -70,6 +70,12 @@ namespace Armoury
     ///       milicja, dobrobyt, lojalnosc i relacje bez zmian.
     ///     - napisy: menu po zbieraniu trofeow ("Items you leave behind will be used to train your soldiers.") i podpowiedz "Leave"
     ///       ("Remaining N items will be used to train soldiers.") -> transpiler na stalej napisu (po angielsku gra bierze napis z kodu).
+    ///     - napisy pod-klanu (SubClanBehavior): opcja menu "Equip and train the leader" (rejestracja w OnSessionLaunched - napis ustalany
+    ///       przy wczytaniu gry, zmiana wylacznika dziala po ponownym wczytaniu), podpowiedz opcji ("... The hero also gains combat skill XP
+    ///       based on item type.", OnEquipLeaderCondition) i okno wyboru bohatera ("Select which clan hero to equip and train.",
+    ///       OnEquipLeaderConsequence) -> ten sam transpiler na stalych: "Equip the leader", podpowiedz bez zdania o XP, "Select which clan
+    ///       hero to equip.". Komunikat po oddaniu "Training XP: 0" zostaje - mowi prawde.
+    /// Wpinanie: kazda latka osobno (Wire / WireT z try) - wyjatek jednej trafia do "BRAK ... (wyjatek)" w linii startowej, reszta wchodzi.
     /// 12. CANCEL NIC NIE ODDAJE (audyt 13 Z5/Z5b; wylacznik SpoilsCancelKeeps): na 7 ekranach "take back what you want to keep" Spoils
     ///     zdejmuje rzeczy z taboru na lewa strone, a Cancel = InventoryLogic.Reset (stan z otwarcia: wszystko po lewej) i potem i tak
     ///     funkcja zamkniecia Spoils - Cancel oddawal WSZYSTKO. Postfiks na InventoryLogic.Reset(fromCancel): gdy lewa strona to lista
@@ -1212,6 +1218,45 @@ namespace Armoury
             }
         }
 
+        /// <summary>Napisy pod-klanu z obietnica treningu: { poczatek stalej (id napisu), slowo obietnicy, napis bez obietnicy }.</summary>
+        private static readonly string[][] SubClanTexts =
+        {
+            new[] { "{=RL_SC_EquipLeader}", "train", "{=RL_SC_EquipLeader}Equip the leader" },
+            new[] { "{=RL_SC_EquipLeaderTip}", "XP", "{=RL_SC_EquipLeaderTip}Give equipment to a clan hero's party. Items go to their inventory (AI equips best)." },
+            new[] { "{=RL_SC_PickHeroDesc}", "train", "{=RL_SC_PickHeroDesc}Select which clan hero to equip." },
+        };
+
+        private static string[] SubClanEntry(string s)
+        {
+            if (s == null) return null;
+            foreach (var p in SubClanTexts) if (s.StartsWith(p[0], StringComparison.Ordinal) && s.Contains(p[1])) return p;
+            return null;
+        }
+
+        /// <summary>Wstawiane za stala napisu pod-klanu (opcja, podpowiedz, okno wyboru): przy DonationXpOff bez obietnicy treningu.</summary>
+        public static string SubClanText(string s)
+        {
+            try
+            {
+                if (!DonationXpLaw.On) return s;
+                var p = SubClanEntry(s);
+                return p != null ? p[2] : s;
+            }
+            catch { return s; }
+        }
+
+        public static IEnumerable<CodeInstruction> SubClanTextTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            var gate = AccessTools.Method(typeof(SpoilsSeal), nameof(SubClanText));
+            foreach (var c in instructions)
+            {
+                yield return c;
+                var s = c.opcode == OpCodes.Ldstr ? c.operand as string : null;
+                if (gate != null && SubClanEntry(s) != null)
+                { _tpCount++; yield return new CodeInstruction(OpCodes.Call, gate); }
+            }
+        }
+
         /// <summary>Prefiks LootCollectionBehavior.GiveLeftoverXpToTroops (metoda robi tylko XP wojska i komunikat): przy DonationXpOff nic.</summary>
         public static bool LeftoverPrefix(object __instance)
         {
@@ -1309,32 +1354,73 @@ namespace Armoury
 
         private static Type Find(string name) { return QuartermasterLaw.FindType(name); }
 
+        /// <summary>Prefiks / postfiks. Wyjatek (Harmony odrzuci metode, niejednoznaczna nazwa po zmianie Spoils) gasi tylko te latke:
+        /// blad w logu, "BRAK ... (wyjatek)" w linii startowej, reszta wpina sie dalej.</summary>
         private static void Wire(Harmony h, Type t, string method, string prefix, string postfix, string label, bool ready)
         {
-            var m = t != null ? AccessTools.Method(t, method) : null;
-            if (m == null) { _missing.Add(label + " (brak metody " + (t != null ? t.Name : "?") + "." + method + ")"); return; }
-            if (!ready) { _missing.Add(label + " (brak pol " + t.Name + ")"); return; }
-            h.Patch(m, prefix: prefix != null ? new HarmonyMethod(typeof(SpoilsSeal), prefix) : null,
-                       postfix: postfix != null ? new HarmonyMethod(typeof(SpoilsSeal), postfix) : null);
-            _wired.Add(label);
-            if (label == "sprzedaz automatyczna") _saleWired = true;
-            if (label == "naprawa: wykonanie") _repWired = true;
-            if (label == "naprawa: wycena") _repCostWired = true;
-            if (label == "naprawa w budzecie") _repBudWired = true;
+            MethodInfo m = null;
+            try
+            {
+                m = t != null ? AccessTools.Method(t, method) : null;
+                if (m == null) { _missing.Add(label + " (brak metody " + (t != null ? t.Name : "?") + "." + method + ")"); return; }
+                if (!ready) { _missing.Add(label + " (brak pol " + t.Name + ")"); return; }
+                h.Patch(m, prefix: prefix != null ? new HarmonyMethod(typeof(SpoilsSeal), prefix) : null,
+                           postfix: postfix != null ? new HarmonyMethod(typeof(SpoilsSeal), postfix) : null);
+                _wired.Add(label);
+                if (label == "sprzedaz automatyczna") _saleWired = true;
+                if (label == "naprawa: wykonanie") _repWired = true;
+                if (label == "naprawa: wycena") _repCostWired = true;
+                if (label == "naprawa w budzecie") _repBudWired = true;
+            }
+            catch (Exception e)
+            {
+                Log.Error("SpoilsSeal.Wire: " + label, e);
+                _missing.Add(label + " (wyjatek)");
+                Undo(h, m, prefix);
+                Undo(h, m, postfix);
+            }
         }
 
-        /// <summary>Transpiler: wpiety tylko, gdy znalazl swoje miejsce w kodzie Spoils (licznik zamian); inaczej zdjety i "BRAK" w linii startowej.</summary>
+        /// <summary>Po wyjatku przy wpinaniu: zdejmij nasza latke, jesli Harmony zdazyl ja zapisac przy metodzie (inaczej nic - Unpatch na
+        /// czystej metodzie zalozylby pusta otoczke).</summary>
+        private static void Undo(Harmony h, MethodBase m, string patch)
+        {
+            try
+            {
+                var pm = m != null && patch != null ? AccessTools.Method(typeof(SpoilsSeal), patch) : null;
+                var info = pm != null ? Harmony.GetPatchInfo(m) : null;
+                if (info == null) return;
+                bool ours = false;
+                foreach (var list in new[] { info.Prefixes, info.Postfixes, info.Transpilers, info.Finalizers })
+                    if (list != null) foreach (var p in list) if (p != null && Equals(p.PatchMethod, pm)) ours = true;
+                if (ours) h.Unpatch(m, pm);
+            }
+            catch { }
+        }
+
+        /// <summary>Transpiler: wpiety tylko, gdy znalazl swoje miejsce w kodzie Spoils (licznik zamian); inaczej zdjety i "BRAK" w linii startowej.
+        /// Wyjatek gasi tylko ten transpiler (jak w Wire).</summary>
         private static void WireT(Harmony h, Type t, string method, string transpiler, string label, bool ready)
         {
-            var m = t != null ? AccessTools.Method(t, method) : null;
-            if (m == null) { _missing.Add(label + " (brak metody " + (t != null ? t.Name : "?") + "." + method + ")"); return; }
-            if (!ready) { _missing.Add(label + " (brak skladowych " + t.Name + ")"); return; }
-            var tm = AccessTools.Method(typeof(SpoilsSeal), transpiler);
-            _tpCount = 0;
-            h.Patch(m, transpiler: new HarmonyMethod(tm));
-            if (_tpCount > 0) { _wired.Add(label); return; }
-            try { h.Unpatch(m, tm); } catch { }
-            _missing.Add(label + " (nie znaleziono miejsca w " + t.Name + "." + method + ")");
+            MethodInfo m = null, tm = null;
+            try
+            {
+                m = t != null ? AccessTools.Method(t, method) : null;
+                if (m == null) { _missing.Add(label + " (brak metody " + (t != null ? t.Name : "?") + "." + method + ")"); return; }
+                if (!ready) { _missing.Add(label + " (brak skladowych " + t.Name + ")"); return; }
+                tm = AccessTools.Method(typeof(SpoilsSeal), transpiler);
+                _tpCount = 0;
+                h.Patch(m, transpiler: new HarmonyMethod(tm));
+                if (_tpCount > 0) { _wired.Add(label); return; }
+                try { h.Unpatch(m, tm); } catch { }
+                _missing.Add(label + " (nie znaleziono miejsca w " + t.Name + "." + method + ")");
+            }
+            catch (Exception e)
+            {
+                Log.Error("SpoilsSeal.WireT: " + label, e);
+                _missing.Add(label + " (wyjatek)");
+                Undo(h, m, transpiler);
+            }
         }
 
         internal static void ApplyAll(Harmony h)
@@ -1440,21 +1526,29 @@ namespace Armoury
                 Wire(h, _tQm, "OnRepairMenuInit", null, "RepairMenuPostfix", "naprawa: opis w menu", rep);
                 Wire(h, _tQm, "OnRepairCondition", null, "RepairOptionPostfix", "naprawa: podpowiedz opcji", rep);
 
-                // 11-12 we wlasnym try: wywrotka nowych latek nie moze zgasic linii startowej ani latek 1-10 (juz wpietych)
+                // 11 i 12 kazda we wlasnym try, a Wire / WireT lapia wyjatek kazdej latki: wywrotka jednej nie gasi pozostalych,
+                // linii startowej ani latek 1-10 (juz wpietych)
                 try
                 {
                     // 11. oddany sprzet nie uczy (Z2, Z3 - DonationXpOff): uzbrojenie dowodcy, dar dla miasta, dar jedzenia, resztki trofeow, napisy
                     _tDon = Find("RealisticLoot.Behaviors.DonateEquipmentBehavior");
-                    _mSkillForType = _tSub != null ? AccessTools.Method(_tSub, "GetSkillObjectForItemType") : null;
-                    _mAddSkillXp = AccessTools.Method(typeof(Hero), "AddSkillXp", new[] { typeof(SkillObject), typeof(float) });
-                    _fLootScreen = _tLoot != null ? AccessTools.Field(_tLoot, "_lootScreenRoster") : null;
+                    try { _mSkillForType = _tSub != null ? AccessTools.Method(_tSub, "GetSkillObjectForItemType") : null; } catch (Exception e) { _mSkillForType = null; Log.Error("SpoilsSeal: GetSkillObjectForItemType", e); }
+                    try { _mAddSkillXp = AccessTools.Method(typeof(Hero), "AddSkillXp", new[] { typeof(SkillObject), typeof(float) }); } catch (Exception e) { _mAddSkillXp = null; Log.Error("SpoilsSeal: Hero.AddSkillXp", e); }
+                    try { _fLootScreen = _tLoot != null ? AccessTools.Field(_tLoot, "_lootScreenRoster") : null; } catch (Exception e) { _fLootScreen = null; Log.Error("SpoilsSeal: _lootScreenRoster", e); }
                     WireT(h, _tSub, "OnEquipLeaderScreenClosed", nameof(LeaderSkillTranspiler), "uzbrojenie dowodcy bez XP", _mSkillForType != null && _mSkillForType.IsStatic);
                     WireT(h, _tDon, "OnDonateScreenClosed", nameof(GiftXpTranspiler), "dar dla miasta bez XP", _mAddSkillXp != null);
                     WireT(h, _tQm, "OnFoodScreenClosed", nameof(GiftXpTranspiler), "dar jedzenia bez XP", _mAddSkillXp != null);
                     Wire(h, _tLoot, "GiveLeftoverXpToTroops", "LeftoverPrefix", null, "resztki trofeow bez XP", true);
                     WireT(h, _tLoot, "UpdateCompleteText", nameof(MenuTextTranspiler), "menu trofeow bez obietnicy treningu", true);
                     WireT(h, _tLoot, "OnCompleteLeaveCondition", nameof(TipTextTranspiler), "podpowiedz Leave bez obietnicy treningu", true);
+                    WireT(h, _tSub, "OnSessionLaunched", nameof(SubClanTextTranspiler), "opcja Equip the leader bez obietnicy treningu", true);
+                    WireT(h, _tSub, "OnEquipLeaderCondition", nameof(SubClanTextTranspiler), "podpowiedz Equip the leader bez XP", true);
+                    WireT(h, _tSub, "OnEquipLeaderConsequence", nameof(SubClanTextTranspiler), "wybor bohatera bez obietnicy treningu", true);
+                }
+                catch (Exception e) { Log.Error("SpoilsSeal.ApplyAll (11)", e); _missing.Add("11: wyjatek przy wpinaniu - patrz blad wyzej"); }
 
+                try
+                {
                     // 12. Cancel nic nie oddaje (Z5b) i rzeczy dowodcy bez partii wracaja (Z5) - SpoilsCancelKeeps
                     _keep.Clear();
                     var screens = new[]
@@ -1470,23 +1564,31 @@ namespace Armoury
                     var keepMissing = new List<string>();
                     foreach (var sc in screens)
                     {
-                        var t = Find("RealisticLoot.Behaviors." + sc[0]);
-                        var close = t != null ? AccessTools.Method(t, sc[1]) : null;
-                        var list = t != null ? AccessTools.Field(t, sc[2]) : null;
-                        if (close == null || list == null || list.IsStatic || list.FieldType != typeof(ItemRoster)) { keepMissing.Add(sc[3]); continue; }
-                        _keep[close.DeclaringType.FullName + "." + close.Name] = new KeepScreen { List = list, Name = sc[3] };
+                        try
+                        {
+                            var t = Find("RealisticLoot.Behaviors." + sc[0]);
+                            var close = t != null ? AccessTools.Method(t, sc[1]) : null;
+                            var list = t != null ? AccessTools.Field(t, sc[2]) : null;
+                            if (close == null || list == null || list.IsStatic || list.FieldType != typeof(ItemRoster)) { keepMissing.Add(sc[3]); continue; }
+                            _keep[close.DeclaringType.FullName + "." + close.Name] = new KeepScreen { List = list, Name = sc[3] };
+                        }
+                        catch (Exception e) { Log.Error("SpoilsSeal: ekran Cancel " + sc[3], e); keepMissing.Add(sc[3] + " (wyjatek)"); }
                     }
                     _fInvRosters = AccessTools.Field(typeof(InventoryLogic), "_rosters");
                     Wire(h, typeof(InventoryLogic), "Reset", null, "CancelPostfix", "Cancel nic nie oddaje (ekranow " + _keep.Count + "/7)", _keep.Count > 0 && _fInvRosters != null);
                     if (keepMissing.Count > 0) _missing.Add("Cancel - nierozpoznane ekrany: " + string.Join(", ", keepMissing.ToArray()));
-                    if (_tSub != null)
+                    try
                     {
-                        _fScEquip = AccessTools.Field(_tSub, "_equipLeaderScreenRoster"); _fScTarget = AccessTools.Field(_tSub, "_equipTargetHero");
-                        _mScFindParty = AccessTools.Method(_tSub, "FindHeroParty");
+                        if (_tSub != null)
+                        {
+                            _fScEquip = AccessTools.Field(_tSub, "_equipLeaderScreenRoster"); _fScTarget = AccessTools.Field(_tSub, "_equipTargetHero");
+                            _mScFindParty = AccessTools.Method(_tSub, "FindHeroParty");
+                        }
                     }
+                    catch (Exception e) { _mScFindParty = null; Log.Error("SpoilsSeal: skladowe Equip the leader", e); }
                     Wire(h, _tSub, "OnEquipLeaderScreenClosed", "EquipLeaderPrefix", null, "rzeczy dowodcy bez partii wracaja", _fScEquip != null && _fScTarget != null && _mScFindParty != null);
                 }
-                catch (Exception e) { Log.Error("SpoilsSeal.ApplyAll (11-12)", e); _missing.Add("11-12: wyjatek przy wpinaniu - patrz blad wyzej"); }
+                catch (Exception e) { Log.Error("SpoilsSeal.ApplyAll (12)", e); _missing.Add("12: wyjatek przy wpinaniu - patrz blad wyzej"); }
 
                 string ver = "?";
                 try { var sm = Find("RealisticLoot.RealisticLootSubModule"); var f = sm != null ? sm.GetField("Version") : null; if (f != null) ver = f.GetRawConstantValue() as string; } catch { }
