@@ -592,13 +592,13 @@ namespace Armoury
         [SettingPropertyGroup("Skills rule the gear")]
         public bool SkillsDecideEnabled { get; set; } = true;
 
-        [SettingPropertyBool("Hero Gear Requirements", HintText = "you, your companions and the lords cannot put on armour above their Athletics - the same rule as for soldiers (arrows above Bow and bolts above Crossbow the game itself already refuses). On the inventory screen the card turns red, the game says 'You don't have enough Athletics skill to equip this item' and the description shows 'Requires: Athletics 175'. Mind: Realm of Thrones noble gowns and robes and the lords' 'Noble Default' cap count as tier 6 armour - Athletics 175, also in civilian clothes. The same holds for Spoils' auto-equip of companions, for a lord buying or taking a renowned piece by the custom of war (what he cannot carry goes to his baggage), for the plain piece that replaces a renowned one, for the troop kit you and your companions are handed when enlisted in a lord's service (a piece you cannot carry is swapped for your own of the same kind, or for the best one you can carry) and for the weapon a captive gets when you take his famed one. What anyone already wears stays on him, in battle too. Horse barding is not checked. Off = only the game's own check of weapons, shields, arrows, bolts and horses")]
+        [SettingPropertyBool("Hero Gear Requirements", HintText = "you, your companions and the lords cannot put on armour above their Athletics - the same rule as for soldiers (arrows above Bow and bolts above Crossbow the game itself already refuses). On the inventory screen the card turns red, the game says 'You don't have enough Athletics skill to equip this item' and the description shows 'Requires: Athletics 175'. Armour asks Athletics by its weight only (Kg Per Athletics Point), so gowns, robes, hats and gloves ask almost nothing. The same holds for Spoils' auto-equip of companions, for a lord buying or taking a renowned piece by the custom of war (what he cannot carry goes to his baggage), for the plain piece that replaces a renowned one, for the troop kit you and your companions are handed when enlisted in a lord's service (a piece you cannot carry is swapped for your own of the same kind, or for the best one you can carry) and for the weapon a captive gets when you take his famed one. What anyone already wears stays on him, in battle too. Horse barding is not checked. Off = only the game's own check of weapons, shields, arrows, bolts and horses")]
         [SettingPropertyGroup("Skills rule the gear")]
         public bool HeroGearRequirements { get; set; } = true;
 
         [SettingPropertyBool("Hero Skill To Own Gear", HintText = "AI lords, companions and your grown family get the Athletics, Bow and Crossbow their own battle gear demands (armour, arrows, bolts) - raised, never lowered - so that nobody loses his armour to Hero Gear Requirements: on load, whenever the game dresses a hero from a template, and in a daily check. Works only while Hero Gear Requirements is on. You are never raised. Raised skills open their perks too: the game picks them for AI lords (Imposing Stature and Merry Men give a commander 5 more men), your companions and family get them as perk picks. Applied by CrashScribe; turning it off does not lower skills already raised")]
         [SettingPropertyGroup("Skills rule the gear")]
-        public bool HeroSkillToOwnGear { get; set; } = true;
+        public bool HeroSkillToOwnGear { get; set; } = false;
 
         [SettingPropertyInteger("Weapon Skill Per Tier", 0, 140, "0", HintText = "Weapon Tier Law: a weapon or shield needs at least (tier - 1) x this in its skill, whatever the data says - a tier 6 blade wants 175, so a One Handed 30 bandit never 'qualifies' for it; 0 turns the law off. Applied at session start")]
         [SettingPropertyGroup("Skills rule the gear")]
@@ -2580,13 +2580,13 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public bool WorkshopNightRest { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Kg Per Athletics Point", 0.00f, 1.00f, "0.00", HintText = "Weight Law: kilograms of armour one Athletics point can carry (difficulty = weight / this); applied at session start")]
+        [SettingPropertyFloatingInteger("Armour Kg Per Athletics", 0.00f, 1.33f, "0.00", HintText = "Weight Law: kilograms of armour one Athletics point can carry - the ONLY Athletics requirement of armour (Jeff 09.10: everything from weight): difficulty = weight / this, set exactly (also lowered below the Realm of Thrones values), so gloves, capes, hats and gowns ask almost nothing and the heaviest 50 kg plate asks 150; applied at session start")]
         [SettingPropertyGroup("A night's rest")]
-        public float KgPerAthleticsPoint { get; set; } = 0.25f;
+        public float ArmourKgPerAthletics { get; set; } = 0.333f;
 
-        [SettingPropertyInteger("Armor Athletics Per Tier", 0, 140, "0", HintText = "Armour Tier Law: any piece of armour (helmet, body, boots, gloves, cape) needs at least (tier - 1) x this Athletics, whatever its weight says - tier 4 boots want 105, so a low-Athletics bandit never 'qualifies' for them; 0 turns the law off. Applied at session start, after the Weight Law (the higher of the two wins)")]
+        [SettingPropertyInteger("Armour Tier Athletics", 0, 10, "0", HintText = "Armour Tier Law: any piece of armour (helmet, body, boots, gloves, cape) needs at least (tier - 1) x this Athletics, whatever its weight says - tier 4 boots want 105, so a low-Athletics bandit never 'qualifies' for them; 0 turns the law off (default since 09.10 - Jeff: armour by weight only). Applied at session start, after the Weight Law (the higher of the two wins)")]
         [SettingPropertyGroup("A night's rest")]
-        public int ArmorAthleticsPerTier { get; set; } = 35;
+        public int ArmourTierAthletics { get; set; } = 0;
 
         [SettingPropertyBool("Hit Scribe Enabled", HintText = "battle log: every missile hit written to Armoury.log (weapon, victim, body part, damage, armor absorbed) - capped per mission")]
         [SettingPropertyGroup("A night's rest")]
@@ -3564,8 +3564,8 @@ namespace Armoury
             s.AnvilShiftEnabled = AnvilShiftEnabled;
             s.AnvilShiftHours = AnvilShiftHours;
             s.WorkshopNightRest = WorkshopNightRest;
-            s.KgPerAthleticsPoint = KgPerAthleticsPoint;
-            s.ArmorAthleticsPerTier = ArmorAthleticsPerTier;
+            s.ArmourKgPerAthletics = ArmourKgPerAthletics;
+            s.ArmourTierAthletics = ArmourTierAthletics;
             s.HitScribeEnabled = HitScribeEnabled;
             s.ArmorSanityEnabled = ArmorSanityEnabled;
             s.ArmorOutlierPercentile = ArmorOutlierPercentile;

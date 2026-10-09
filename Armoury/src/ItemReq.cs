@@ -75,6 +75,7 @@ namespace Armoury
             if (it == null) return null;
             var skill = it.RelevantSkill;
             if (skill != null) return skill;
+            if (it.ItemType == ItemObject.ItemTypeEnum.HorseHarness) return DefaultSkills.Riding;   // ladry konskie - Jazda (Jeff 09.10), nie Atletyka
             if (it.HasArmorComponent) return DefaultSkills.Athletics;
             if (it.ItemType == ItemObject.ItemTypeEnum.Arrows) return DefaultSkills.Bow;
             if (it.ItemType == ItemObject.ItemTypeEnum.Bolts) return DefaultSkills.Crossbow;
