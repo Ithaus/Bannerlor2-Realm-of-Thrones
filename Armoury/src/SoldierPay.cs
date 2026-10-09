@@ -352,7 +352,7 @@ namespace Armoury
                     }
                     if (shortfall > 0) { _dCutClans++; _dCut += Math.Min(shortfall, owed); }
                 }
-                if (shortfall > 0) ClanIncomeBook.NoteWageCut(clan, Math.Min(shortfall, owed));   // 169c: miara bankructwa K39 (tylko licznik, wlasny try)
+                if (shortfall > 0) ClanIncomeBook.NoteWageCut(clan, Math.Min(shortfall, owed), blind);   // 169c: miara bankructwa K39 (tylko licznik, wlasny try); blind - saldo nieznane, liczone osobno
             }
             // takze gdy nic nie zeszlo z kies: Route dolicza zold naliczony (linia "Zold:" ma sie zgadzac z licznikiem ksiegi pieniadza)
             for (int i = 0; i < _recs.Count; i++)

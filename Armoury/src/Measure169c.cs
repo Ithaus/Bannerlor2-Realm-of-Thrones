@@ -104,8 +104,12 @@ namespace Armoury
                 var rot = AccessTools.TypeByName("ROT.CampaignBehaviors.ROTOthersCampaignBehavior");
                 Wire("Inni: nekromancja ROT", rot != null ? AccessTools.Method(rot, "OnMapEventEnded") : null, nameof(OthersPre), nameof(OthersFin));
             }
+            // przeglad 169c: doba startu kampanii w logu - narzedzie progow liczy doby 120/364/728 i rok 1/2 od niej, takze w logu kontynuacji z zapisu
+            string start = "-";
+            try { var ctm = Campaign.Current != null ? Campaign.Current.Models.CampaignTimeModel : null; if (ctm != null) start = ((int)ctm.CampaignStartTime.ToDays).ToString(Inv); } catch { start = "-"; }
             Log.Info("Pomiary 169c: okna " + (_wired.Count > 0 ? string.Join(", ", _wired.ToArray()) : "-") + "; BRAK: " + (_missing.Count > 0 ? string.Join(", ", _missing.ToArray()) : "-")
-                     + "; " + RansomFlows.Wired + ". Linie raz na dobe przy wlaczonych Clan Income Book + Stable D (teraz: " + (On ? "TAK" : "NIE") + ").");
+                     + "; " + RansomFlows.Wired + ". Linie raz na dobe przy wlaczonych Clan Income Book + Stable D (teraz: " + (On ? "TAK" : "NIE") + ")"
+                     + "; start kampanii dzien " + start + " (dzis " + ((int)CampaignTime.Now.ToDays - 1).ToString(Inv) + ").");
         }
 
         /// <summary>Z ArmouryBehavior.RegisterEvents - nasluchy gry (same liczniki).</summary>
@@ -219,7 +223,10 @@ namespace Armoury
             _sessDays++;
             double perClanYear = aiClans > 0 && _sessDays > 0 ? (double)_capSess / aiClans / _sessDays * 364.0 : 0;
             long dPlayer = ClanIncomeBook.InflowOf(Clan.PlayerClan);
-            double pd = ClanIncomeBook.StableIncome(Clan.PlayerClan);
+            // przeglad 169c: D gracza = D staly (W-1, projekt rozdz. "169c"); bez pomiaru czesci (-1) - D169 z dopiskiem
+            double pd = ClanIncomeBook.StableD(Clan.PlayerClan);
+            string pdKind = "D staly";
+            if (pd < 0) { pd = ClanIncomeBook.StableIncome(Clan.PlayerClan); pdKind = "D169 - brak D stalego"; }
             var ml = CirculationWindows.In;
             var sb = new StringBuilder(1200);
             sb.Append("Niewola lordow i okupy (169c): dzien ").Append(day)
@@ -236,8 +243,8 @@ namespace Armoury
               .Append(" | okupy AI-AI (barter gry) dzis ").Append(_aiRansomN).Append(" na ").Append(_aiRansomSum).Append(" zl (najwiekszy: ").Append(_aiRansomMaxTxt ?? "-").Append("), od startu sesji ")
               .Append(_aiRansomSessN).Append(" na ").Append(_aiRansomSessSum).Append(" zl")
               .Append(" | okup gracza z menu niewoli dzis ").Append(RansomFlows.DayPlayerN).Append(" na ").Append(RansomFlows.DayPlayerPaid).Append(" zl (w nicosc ").Append(RansomFlows.DayPlayerToNothing)
-              .Append("), od startu sesji ").Append(RansomFlows.SessPlayerPaid).Append(" zl = ").Append(pd > 0 ? (RansomFlows.SessPlayerPaid / pd).ToString("0.0", Inv) : "-").Append(" dni D gracza (D ")
-              .Append(pd > 0 ? pd.ToString("0", Inv) : "-").Append(", wplyw doby ").Append(dPlayer).Append(')')
+              .Append("), od startu sesji ").Append(RansomFlows.SessPlayerPaid).Append(" zl = ").Append(pd > 0 ? (RansomFlows.SessPlayerPaid / pd).ToString("0.0", Inv) : "-").Append(" dni D gracza (")
+              .Append(pdKind).Append(' ').Append(pd > 0 ? pd.ToString("0", Inv) : "-").Append(", wplyw doby ").Append(dPlayer).Append(')')
               .Append(" | kurier okupu dzis ").Append(RansomFlows.DayCourierN).Append(": gracz dostal ").Append(RansomFlows.DayCourierIn).Append(", gracz zaplacil ").Append(RansomFlows.DayCourierOut)
               .Append("; dosypka gry placacemu AI (z niczego) ").Append(RansomFlows.DayTopUp).Append(" w ").Append(RansomFlows.DayTopUpN).Append(" ofertach (sesja ").Append(RansomFlows.SessTopUp).Append(')')
               .Append(" | posrednik jencow z niczego (ksiega obiegu): jency sprzedani przez partie ").Append(CirculationWindows.On ? ml[CirculationWindows.KPrisonersParty].ToString(Inv) : "-")
@@ -451,16 +458,18 @@ namespace Armoury
             string[] g = { "partie lordow AI", "zalogi AI", "gracz i jego rod", "karawany i inne" };
             var sb = new StringBuilder(700);
             sb.Append("Dezercja AI wedlug przyczyny (169c): dzien ").Append(day);
-            long aiTotal = 0;
+            long aiTotal = 0, aiMoraleUnpaid = 0;
             for (int i = 0; i < 4; i++)
             {
                 long m = _des[i * 3], h = _des[i * 3 + 1], w = _des[i * 3 + 2];
                 long unpaid = i == 0 ? WarLedger.LastGoneAi : i == 2 ? WarLedger.LastGoneClan : 0;
-                if (i < 2) aiTotal += m + h + w + unpaid;
+                if (i < 2) { aiTotal += m + h + w + unpaid; aiMoraleUnpaid += m + h + unpaid; }
                 sb.Append(" | ").Append(g[i]).Append(": morale ").Append(m).Append(", morale w glodzie ").Append(h).Append(", limit zoldu i wielkosci partii (gra) ").Append(w);
                 if (i == 0 || i == 2) sb.Append(", zalegly zold (WarLedger) ").Append(unpaid);
             }
-            sb.Append(" | AI razem ").Append(aiTotal).Append(" (prog 183: najwyzej bieg bazowy + 50%) | prawo dezercji dla AI (DesertionLaw): ")
+            // przeglad 169c: prog 183 (projekt rozdz. 1) liczy "z morale i z zaleglego zoldu razem" - bez limitu zoldu gry, ktory 166 wylacza
+            sb.Append(" | AI razem ").Append(aiTotal).Append(" | AI morale i zalegly zold (baza progu 183: najwyzej bieg bazowy + 50%) ").Append(aiMoraleUnpaid)
+              .Append(" | prawo dezercji dla AI (DesertionLaw): ")
               .Append(Settings.Current != null && Settings.Current.DesertionLawForAi ? "tak" : "nie - gra (morale ponizej 10)").Append('.');
             Array.Clear(_des, 0, _des.Length);
             if (_wageDesert.Count > 2000) _wageDesert.Clear();
@@ -469,7 +478,7 @@ namespace Armoury
 
         // ============================================================ LUDNOSC BK (KL pomiar A) i MIARA HISTORYCZNA cz. 2
         private static readonly Dictionary<Town, long> _budget = new Dictionary<Town, long>();
-        private static PropertyInfo _pCfg, _pPopMgr; private static MethodInfo _mGetPop, _mTypeCount; private static Type _popType; private static PropertyInfo _pTotal, _pEcon, _pConsumed;
+        private static PropertyInfo _pCfg, _pPopMgr; private static MethodInfo _mGetPop, _mTypeCount, _mPopulated; private static Type _popType; private static PropertyInfo _pTotal, _pEcon, _pConsumed;
         private static bool _popDone; private static string _popNote = "-";
         private static long _lastBkPop, _lastConsumed; private static double _lastTablePop, _ratioStart = -1;
 
@@ -495,13 +504,15 @@ namespace Armoury
                 _pPopMgr = cfgT != null ? AccessTools.Property(cfgT, "PopulationManager") : null;
                 var pmT = _pPopMgr != null ? _pPopMgr.PropertyType : null;
                 _mGetPop = pmT != null ? AccessTools.Method(pmT, "GetPopData", new[] { typeof(Settlement) }) : null;
+                // przeglad 169c: GetPopData dla osady bez danych wola InitializeSettlementPops (losowanie + zapis w BK) - najpierw czysty odczyt
+                _mPopulated = pmT != null ? AccessTools.Method(pmT, "IsSettlementPopulated", new[] { typeof(Settlement) }) : null;
                 var pdT = _mGetPop != null ? _mGetPop.ReturnType : null;
                 _mTypeCount = pdT != null ? AccessTools.Method(pdT, "GetTypeCount") : null;
                 _popType = _mTypeCount != null && _mTypeCount.GetParameters().Length == 1 ? _mTypeCount.GetParameters()[0].ParameterType : null;
                 _pTotal = pdT != null ? AccessTools.Property(pdT, "TotalPop") : null;
                 _pEcon = pdT != null ? AccessTools.Property(pdT, "EconomicData") : null;
                 _pConsumed = _pEcon != null ? AccessTools.Property(_pEcon.PropertyType, "ConsumedValue") : null;
-                _popNote = _mGetPop != null && _mTypeCount != null && _popType != null ? "BK PopulationData" : "BRAK BK PopulationData";
+                _popNote = _mGetPop != null && _mTypeCount != null && _popType != null && _mPopulated != null ? "BK PopulationData" : "BRAK BK PopulationData";
             }
             catch (Exception e) { Stumble("ResolvePop", e); _popNote = "BRAK (blad)"; }
         }
@@ -528,7 +539,10 @@ namespace Armoury
                     table += tp;
                     long[] c = new long[6]; long tot = 0, cons = 0;
                     object pd = null;
-                    if (pm != null && _mGetPop != null) { try { pd = _mGetPop.Invoke(pm, new object[] { st }); } catch { pd = null; } }
+                    if (pm != null && _mGetPop != null && _mPopulated != null)
+                    {
+                        try { pd = (bool)_mPopulated.Invoke(pm, new object[] { st }) ? _mGetPop.Invoke(pm, new object[] { st }) : null; } catch { pd = null; }
+                    }
                     if (pd == null) { miss++; }
                     else
                     {
@@ -731,6 +745,7 @@ namespace Armoury
         internal static void Daily()
         {
             if (!On || Campaign.Current == null) { RansomFlows.ZeroDay(); return; }
+            long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
             int gameDay = (int)CampaignTime.Now.ToDays, day = gameDay - 1;
             var ai = new List<Clan>();
             try
@@ -755,6 +770,18 @@ namespace Armoury
             try { Log.Info(OthersLine(day)); } catch (Exception e) { Stumble("OthersLine", e); }
             try { Log.Info(HistoryLine(day, ai)); } catch (Exception e) { Stumble("HistoryLine", e); }
             if (_stumbles > 0) { try { Log.Info("Pomiary 169c: potkniecia " + _stumbles + " (pierwszy blad kazdego miejsca w logu)."); } catch { } }
+            // przeglad 169c: koszt pomiaru (prog projektu: najwyzej +3% czasu doby; 13.1 s/dobe -> ok. 390 ms). Okna Harmony (prefiksy i finalizery
+            // w ciagu doby) tu nie wchodza - ich koszt widac tylko w czasie doby calego biegu wobec sklad8
+            try
+            {
+                double ms = (System.Diagnostics.Stopwatch.GetTimestamp() - t0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+                double f = 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+                double sb = ClanIncomeBook.LastTicksStableBegin * f, sc = ClanIncomeBook.LastTicksStableClans * f, sl = ClanIncomeBook.LastTicksStableLine * f;
+                Log.Info("Pomiary 169c: czas dzien " + day + " | linie pomiaru " + ms.ToString("0", Inv) + " ms | D staly w ksiedze rodow " + (sb + sc + sl).ToString("0", Inv)
+                         + " ms (poczatek doby " + sb.ToString("0", Inv) + ", rozbicie rodow " + sc.ToString("0", Inv) + ", linia " + sl.ToString("0", Inv)
+                         + ") | razem " + (ms + sb + sc + sl).ToString("0", Inv) + " ms na dobe (prog: <= 3% czasu doby, ok. 390 ms przy 13.1 s; dochod modelu z opisami - linia \"D staly\" i \"Obieg\").");
+            }
+            catch { }
         }
     }
 }

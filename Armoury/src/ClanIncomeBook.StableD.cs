@@ -63,33 +63,50 @@ namespace Armoury
         private static readonly Dictionary<Clan, long> _vTaxOf = new Dictionary<Clan, long>();                // dzis: suma podatku wsi posiadacza (do porownania z linia modelu)
         private static readonly Dictionary<Clan, int> _cutToday = new Dictionary<Clan, int>();               // zold przyciety z braku w kiesie (SoldierPay) od ostatniego Daily
         private static readonly Dictionary<Clan, int> _bankrupt = new Dictionary<Clan, int>();               // doby z rzedu: kiesa glowy 0 i zold przyciety (K39)
-        private static readonly Dictionary<string, long> _unknown = new Dictionary<string, long>();          // linie modelu spoza rozpoznanych (sama informacja)
+        private static readonly HashSet<Clan> _cutBlind = new HashSet<Clan>();                                // dzis: zold przyciety "na slepo" (saldo nieznane, kiesa glowy 0 - SoldierPay)
+        private static readonly Dictionary<Clan, int> _bankruptBlind = new Dictionary<Clan, int>();          // doby "na slepo" w biezacej serii bankruta (K39)
+        private static readonly Dictionary<string, long> _unknown = new Dictionary<string, long>();          // linie modelu NIEROZPOZNANE (ani D, ani znane "inne")
         private static readonly long[] _t = new long[Q];
 
         // sumy swiata doby (linia)
         private static long _dVd, _dWd, _dRentV, _dRentT, _dOwn, _dPol, _dSup, _dRefund, _dMint, _dMerc, _dShop, _dCarPar, _dFamily, _dOther, _dOnce, _dDouble, _dInflow, _dVdCalc;
         private static int _dVdOff, _dLooseN, _dClans;
+        // "inne z modelu" rozbite (przeglad 169c): znane linie spoza D, wplyw bez opisu (m.in. "za tier" gry - Add bez nazwy), nierozpoznane (modul)
+        private static long _dKnown, _dUnlisted, _dUnrec, _dUnrecAbs;
+        // wsie bez danych BK (pominiete, zeby nie wolac GetPopData -> InitializeSettlementPops); podatek wsi do posiadacza de iure innego niz glowa rodu
+        private static int _dVNoPop, _dDeJureN, _dDeJureOtherN;
+        private static long _dDeJureGold, _dDeJureOtherGold;
+        // koszt D stalego w tej dobie (Stopwatch; prog projektu: +3% czasu doby)
+        private static long _ticksStableBegin, _ticksStableClans;
+        internal static long LastTicksStableBegin, LastTicksStableClans, LastTicksStableLine;
         internal static long DayEstates;   // dla podwojnych: wyplaty majatkow BK widziane jako zdarzenie (suma doby)
 
         private static string _nVillage, _nWalled, _nSettle, _nMerc, _nCarPar, _nShop, _nPolicies, _nCrownDues, _nSupport;
+        private static string _nEstates, _nCouncillor, _nTribute, _nCallToWar, _nSpring, _nAlley;
+        private static string[] _tVassal, _tRetainer, _tTrade;
         private static bool _namesDone;
         private static bool _bkDone;
-        private static MethodInfo _mActual, _mVTax;
-        private static PropertyInfo _pCfgInstance, _pTaxModel;
+        private static MethodInfo _mActual, _mVTax, _mPopulated, _mGetTitle;
+        private static PropertyInfo _pCfgInstance, _pTaxModel, _pPopMgr, _pTitleMgr, _pDeJure;
         private static string _bkNote = "-";
 
         internal static void ResetStable()
         {
             _parts.Clear(); _rVTax.Clear(); _rRent.Clear(); _rTown.Clear(); _rLoose.Clear(); _ownPaid.Clear(); _ownByClan.Clear();
-            _villagesOf.Clear(); _vTaxOf.Clear(); _cutToday.Clear(); _bankrupt.Clear(); _unknown.Clear(); DayEstates = 0;
+            _villagesOf.Clear(); _vTaxOf.Clear(); _cutToday.Clear(); _cutBlind.Clear(); _bankrupt.Clear(); _bankruptBlind.Clear(); _unknown.Clear(); DayEstates = 0;
             ZeroStableDay();
-            _namesDone = false; _bkDone = false; _mActual = null; _mVTax = null; _pCfgInstance = null; _pTaxModel = null; _bkNote = "-";
+            LastTicksStableBegin = LastTicksStableClans = LastTicksStableLine = 0;
+            _namesDone = false; _bkDone = false; _mActual = null; _mVTax = null; _mPopulated = null; _mGetTitle = null;
+            _pCfgInstance = null; _pTaxModel = null; _pPopMgr = null; _pTitleMgr = null; _pDeJure = null; _bkNote = "-";
         }
 
         private static void ZeroStableDay()
         {
             _dVd = _dWd = _dRentV = _dRentT = _dOwn = _dPol = _dSup = _dRefund = _dMint = _dMerc = _dShop = _dCarPar = _dFamily = _dOther = _dOnce = _dDouble = _dInflow = _dVdCalc = 0;
             _dVdOff = _dLooseN = _dClans = 0;
+            _dKnown = _dUnlisted = _dUnrec = _dUnrecAbs = 0;
+            _dVNoPop = _dDeJureN = _dDeJureOtherN = 0; _dDeJureGold = _dDeJureOtherGold = 0;
+            _ticksStableBegin = _ticksStableClans = 0;
         }
 
         // ------------------------------------------------------------ liczniki z innych modulow (kazdy we wlasnym try)
@@ -106,14 +123,16 @@ namespace Armoury
             catch (Exception e) { Stumble("NoteOwnPaid", e); }
         }
 
-        /// <summary>SoldierPay: zold rodu przyciety, bo saldo nie zmiescilo sie w kiesie glowy (K39 - miara bankructwa).</summary>
-        internal static void NoteWageCut(Clan c, long cut)
+        /// <summary>SoldierPay: zold rodu przyciety, bo saldo nie zmiescilo sie w kiesie glowy (K39 - miara bankructwa). blind - saldo nieznane
+        /// (model finansow spoza naszych latek) przy pustej kiesie glowy: przyciecie prawdopodobne, ale niepewne - liczone osobno w linii "D staly".</summary>
+        internal static void NoteWageCut(Clan c, long cut, bool blind = false)
         {
             try
             {
                 if (c == null || cut <= 0 || !On) return;
                 int v; _cutToday.TryGetValue(c, out v);
                 _cutToday[c] = (int)Math.Min(int.MaxValue, v + cut);
+                if (blind) _cutBlind.Add(c);
             }
             catch (Exception e) { Stumble("NoteWageCut", e); }
         }
@@ -151,6 +170,37 @@ namespace Armoury
             _nPolicies = Txt(() => GameTexts.FindText("str_policies").ToString());
             _nCrownDues = Txt(() => KingdomTreasury.TxtPolicy.ToString());
             _nSupport = Txt(() => GameTexts.FindText("str_finance_kingdom_support").ToString());
+            // znane linie "inne z modelu" (poza D, rozpoznane): BK `BKClanFinanceModel.AddIncomes` (majatki, rada, podatki od wasali, sluzba u lorda)
+            // i gra `DefaultClanFinanceModel.CalculateClanIncomeInternal` (trybut, wezwanie do wojny, umowy handlowe, perk, zaulki gracza)
+            _nEstates = Txt(() => new TextObject("{=QEy4Ddar}Estate properties").ToString());
+            _nCouncillor = Txt(() => new TextObject("{=WvhXhUFS}Councillor role").ToString());
+            _nTribute = Txt(() => GameTexts.FindText("str_finance_tribute_incomes").ToString());
+            _nCallToWar = Txt(() => GameTexts.FindText("str_finance_call_to_war_incomes").ToString());
+            _nSpring = Txt(() => TaleWorlds.CampaignSystem.CharacterDevelopment.DefaultPerks.Trade.SpringOfGold.Name.ToString());
+            _nAlley = Txt(() => GameTexts.FindText("str_finance_alley").ToString());
+            _tVassal = Tpl(() => new TextObject("{=6keRYbQa}Taxes from {CLAN}").SetTextVariable("CLAN", TplMark));
+            _tRetainer = Tpl(() => new TextObject("{=cYac1rMJ}Retainer service for {HERO}").SetTextVariable("HERO", TplMark));
+            _tTrade = Tpl(() => GameTexts.FindText("str_finance_trade_agreement_income").CopyTextObject().SetTextVariable("KINGDOM", TplMark));
+        }
+
+        // linia z nazwa zmienna (rod, lord, krolestwo): wzor = tekst przed i po znaczniku; bez stalego poczatku nie dopasowujemy
+        private const string TplMark = "ZQ169CQZ";
+        private static string[] Tpl(Func<TextObject> f)
+        {
+            try
+            {
+                var t = f(); if (t == null) return null;
+                string s = t.ToString(); int i = s.IndexOf(TplMark, StringComparison.Ordinal);
+                return i > 0 ? new[] { s.Substring(0, i), s.Substring(i + TplMark.Length) } : null;
+            }
+            catch { return null; }
+        }
+        private static bool Like(string n, string[] t) { return t != null && n.Length >= t[0].Length + t[1].Length && n.StartsWith(t[0], StringComparison.Ordinal) && n.EndsWith(t[1], StringComparison.Ordinal); }
+
+        private static bool KnownOther(string n)
+        {
+            return Eq(n, _nEstates) || Eq(n, _nCouncillor) || Eq(n, _nTribute) || Eq(n, _nCallToWar) || Eq(n, _nSpring) || Eq(n, _nAlley)
+                   || Like(n, _tVassal) || Like(n, _tRetainer) || Like(n, _tTrade);
         }
 
         private static void ResolveBk()
@@ -166,7 +216,16 @@ namespace Armoury
                 _pTaxModel = cfgT != null ? AccessTools.Property(cfgT, "TaxModel") : null;
                 var tmT = _pTaxModel != null ? _pTaxModel.PropertyType : null;
                 _mVTax = tmT != null ? AccessTools.Method(tmT, "CalculateVillageTaxFromIncome", new[] { typeof(Village), typeof(bool), typeof(bool) }) : null;
-                _bkNote = (_mActual != null ? "wsie BK wedlug tytulu" : "BRAK GetActualVillages") + ", " + (_mVTax != null ? "podatek wsi BK" : "BRAK podatku wsi BK");
+                // przeglad 169c: GetPopData (wolany przez podatek wsi BK) dla osady bez danych BK wola InitializeSettlementPops (losowanie + zapis) -
+                // najpierw czysty odczyt IsSettlementPopulated; tytul wsi (posiadacz de iure) - TitleManager.GetTitle (odczyt pamieci podrecznej)
+                _pPopMgr = cfgT != null ? AccessTools.Property(cfgT, "PopulationManager") : null;
+                _mPopulated = _pPopMgr != null ? AccessTools.Method(_pPopMgr.PropertyType, "IsSettlementPopulated", new[] { typeof(Settlement) }) : null;
+                _pTitleMgr = cfgT != null ? AccessTools.Property(cfgT, "TitleManager") : null;
+                _mGetTitle = _pTitleMgr != null ? AccessTools.Method(_pTitleMgr.PropertyType, "GetTitle", new[] { typeof(Settlement) }) : null;
+                _pDeJure = _mGetTitle != null ? AccessTools.Property(_mGetTitle.ReturnType, "deJure") : null;
+                _bkNote = (_mActual != null ? "wsie BK wedlug tytulu" : "BRAK GetActualVillages") + ", " + (_mVTax != null ? "podatek wsi BK" : "BRAK podatku wsi BK")
+                          + ", " + (_mPopulated != null ? "sprawdzenie danych BK" : "BRAK IsSettlementPopulated (podatek wsi BK pominiety)")
+                          + ", " + (_pDeJure != null ? "tytul de iure" : "BRAK tytulu de iure");
             }
             catch (Exception e) { Stumble("ResolveBk", e); _bkNote = "BRAK (blad)"; }
         }
@@ -177,12 +236,26 @@ namespace Armoury
         private static void StableBegin()
         {
             ZeroStableDay();
+            long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
+            try { StableBeginBody(); }
+            finally { _ticksStableBegin = System.Diagnostics.Stopwatch.GetTimestamp() - t0; LastTicksStableBegin = _ticksStableBegin; }
+        }
+
+        private static void StableBeginBody()
+        {
             _unknown.Clear(); _ownByClan.Clear(); _villagesOf.Clear(); _vTaxOf.Clear();
             ResolveNames();
             ResolveBk();
             // posiadacze wsi (BK: tytul) i podatek kazdej wsi - ta sama funkcja, ktora BK liczy linie "Village Demesnes"
-            object tax = null;
-            try { var cfg = _pCfgInstance != null ? _pCfgInstance.GetValue(null, null) : null; tax = cfg != null && _pTaxModel != null ? _pTaxModel.GetValue(cfg, null) : null; } catch { tax = null; }
+            object tax = null, popMgr = null, titleMgr = null;
+            try
+            {
+                var cfg = _pCfgInstance != null ? _pCfgInstance.GetValue(null, null) : null;
+                tax = cfg != null && _pTaxModel != null ? _pTaxModel.GetValue(cfg, null) : null;
+                popMgr = cfg != null && _pPopMgr != null ? _pPopMgr.GetValue(cfg, null) : null;
+                titleMgr = cfg != null && _pTitleMgr != null ? _pTitleMgr.GetValue(cfg, null) : null;
+            }
+            catch { tax = null; popMgr = null; titleMgr = null; }
             var holder = new Dictionary<Village, Clan>();
             if (_mActual != null)
                 foreach (var c in Clan.All)
@@ -204,13 +277,38 @@ namespace Armoury
                     long t = 0;
                     if (tax != null && _mVTax != null)
                     {
-                        var en = (ExplainedNumber)_mVTax.Invoke(tax, new object[] { v, false, false });
-                        t = (long)en.ResultNumber;
+                        // przeglad 169c: tylko osada z danymi BK (GetPopData w podatku BK inicjuje brakujace dane - zmiana stanu gry)
+                        bool pop = false;
+                        try { pop = popMgr != null && _mPopulated != null && (bool)_mPopulated.Invoke(popMgr, new object[] { v.Settlement }); } catch { pop = false; }
+                        if (pop)
+                        {
+                            var en = (ExplainedNumber)_mVTax.Invoke(tax, new object[] { v, false, false });
+                            t = (long)en.ResultNumber;
+                        }
+                        else _dVNoPop++;
                     }
                     Clan h;
-                    if (!holder.TryGetValue(v, out h)) h = v.Settlement.OwnerClan;
+                    bool actual = holder.TryGetValue(v, out h);
+                    if (!actual) h = v.Settlement.OwnerClan;
                     RingOf(_rVTax, v.Settlement).Push(h != null ? t : 0);
                     if (h == null) continue;
+                    // przeglad 169c (tylko pomiar): przy prawdziwej wyplacie BK oddaje podatek wsi posiadaczowi de iure, gdy nie jest nim glowa rodu
+                    // (BK `ClanFinancesPatches.VillageIncomePrefix`: title.deJure != clan.Leader -> ApplyWithdrawal(..., deJure)); linia modelu
+                    // (applyWithdrawals = false), D169 i "ziemia" licza go posiadaczowi faktycznemu - 166 wezmie rod posiadacza de iure
+                    if (actual && titleMgr != null && _mGetTitle != null && _pDeJure != null)
+                    {
+                        try
+                        {
+                            var title = _mGetTitle.Invoke(titleMgr, new object[] { v.Settlement });
+                            var dj = title != null ? _pDeJure.GetValue(title, null) as Hero : null;
+                            if (dj != null && dj != h.Leader)
+                            {
+                                _dDeJureN++; _dDeJureGold += t;
+                                if (dj.Clan != h) { _dDeJureOtherN++; _dDeJureOtherGold += t; }
+                            }
+                        }
+                        catch (Exception e) { Stumble("StableBegin(tytul wsi)", e); }
+                    }
                     List<Settlement> l;
                     if (!_villagesOf.TryGetValue(h, out l)) { l = new List<Settlement>(); _villagesOf[h] = l; }
                     l.Add(v.Settlement);
@@ -266,7 +364,17 @@ namespace Armoury
         // ------------------------------------------------------------ rod w petli Daily (przed zerowaniem licznikow Today*)
         private static void StableClan(Clan c, Rec r, ExplainedNumber en, bool haveEn, long a, int b)
         {
+            long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
+            try { StableClanBody(c, r, en, haveEn, a, b); }
+            finally { _ticksStableClans += System.Diagnostics.Stopwatch.GetTimestamp() - t0; LastTicksStableClans = _ticksStableClans; }
+        }
+
+        private static void StableClanBody(Clan c, Rec r, ExplainedNumber en, bool haveEn, long a, int b)
+        {
             long vd = 0, wd = 0, pol = 0, sup = 0, merc = 0, shop = 0, carpar = 0;
+            // przeglad 169c: "inne z modelu" (reszta a) = znane linie spoza D + wplyw bez opisu ("za tier" gry i inne Add bez nazwy, przyciecie a do 0)
+            // + linie NIEROZPOZNANE; tylko te ostatnie moga byc linia D o zmienionej nazwie - ich modul jest progiem testu (zamkniecie sumy jest z budowy)
+            long known = 0, unrec = 0, unrecAbs = 0, lineSum = 0;
             if (haveEn)
             {
                 var lines = en.GetLines();
@@ -276,6 +384,7 @@ namespace Armoury
                     if (n == null) continue;
                     long v = (long)Math.Round(lines[i].number);
                     if (v == 0) continue;
+                    lineSum += v;
                     if (Eq(n, _nVillage)) vd += v;
                     else if (Eq(n, _nWalled) || Eq(n, _nSettle)) wd += v;
                     else if (Eq(n, _nPolicies) || Eq(n, _nCrownDues)) pol += v;
@@ -283,9 +392,11 @@ namespace Armoury
                     else if (Eq(n, _nMerc)) merc += v;
                     else if (Eq(n, _nShop)) shop += v;
                     else if (Eq(n, _nCarPar)) carpar += v;
-                    else { long u; _unknown.TryGetValue(n, out u); _unknown[n] = u + v; }
+                    else if (KnownOther(n)) known += v;
+                    else { unrec += v; unrecAbs += Math.Abs(v); long u; _unknown.TryGetValue(n, out u); _unknown[n] = u + v; }
                 }
             }
+            _dKnown += known; _dUnrec += unrec; _dUnrecAbs += unrecAbs; _dUnlisted += a - lineSum;
             long family = Math.Max(0L, Math.Min(FamilyTransfers(c), Math.Max(0L, carpar)));
             long rent = Math.Max(0, b);
             int rentV; PopulationLaw.RentVillageToday.TryGetValue(c, out rentV);
@@ -391,6 +502,9 @@ namespace Armoury
             int streak; _bankrupt.TryGetValue(c, out streak);
             streak = leaderGold <= 0 && cut > 0 ? streak + 1 : 0;
             _bankrupt[c] = streak;
+            int blindDays; _bankruptBlind.TryGetValue(c, out blindDays);
+            blindDays = streak == 0 ? 0 : blindDays + (_cutBlind.Contains(c) ? 1 : 0);   // doby serii z przycieciem "na slepo" (saldo nieznane)
+            _bankruptBlind[c] = blindDays;
             StableParts p;
             if (sd && TryStable(c, out p))
                 csv.Append(';').Append(N0(p.D)).Append(';').Append(N0(p.Land)).Append(';').Append(N0(p.Crown)).Append(';').Append(N0(p.Contract)).Append(';').Append(N0(p.Assets))
@@ -402,16 +516,32 @@ namespace Armoury
 
         private static string StableLine(int day, List<Clan> aiClans)
         {
+            long tl = System.Diagnostics.Stopwatch.GetTimestamp();
+            try { return StableLineBody(day, aiClans); }
+            finally { LastTicksStableLine = System.Diagnostics.Stopwatch.GetTimestamp() - tl; }
+        }
+
+        private static string Ms(long ticks) { return (ticks * 1000.0 / System.Diagnostics.Stopwatch.Frequency).ToString("0", CultureInfo.InvariantCulture); }
+
+        private static string StableLineBody(int day, List<Clan> aiClans)
+        {
             var inv = CultureInfo.InvariantCulture;
             var dl = new List<double>(); var castleD = new List<double>(); var castleD169 = new List<double>();
             double sD = 0, sLand = 0, sVt = 0, sRent = 0, sTown = 0, sLoose = 0, sCrown = 0, sContr = 0, sAssets = 0, sOwn = 0, sOnce = 0, sDouble = 0, sOther = 0, sFam = 0, sInflow = 0, sParts = 0, sD169 = 0;
-            int n = 0, bankrupt = 0, shortDays = 0;
+            int n = 0, bankrupt = 0, shortDays = 0, bankBlind = 0, bankIb = 0, bankBoth = 0, bankAny = 0;
             for (int i = 0; i < aiClans.Count; i++)
             {
                 var c = aiClans[i];
                 try
                 {
-                    int bs; if (_bankrupt.TryGetValue(c, out bs) && bs >= 7) bankrupt++;
+                    // bankructwo do wgrania 168 (projekt rozdz. 1): K39 albo bankrut Banku (IronBank: dlug >= 1 i Defaulted - jak "bankrutow" w linii IronBank)
+                    int bs; bool k39 = _bankrupt.TryGetValue(c, out bs) && bs >= 7;
+                    if (k39) { bankrupt++; int bb; if (_bankruptBlind.TryGetValue(c, out bb) && bb > 0) bankBlind++; }
+                    bool ib = false;
+                    try { double pr; int ms, due; bool dfl; ib = IronBank.TryGetDebt(c, out pr, out ms, out dfl, out due) && dfl; } catch { ib = false; }
+                    if (ib) bankIb++;
+                    if (k39 && ib) bankBoth++;
+                    if (k39 || ib) bankAny++;
                     StableParts p;
                     if (!TryStable(c, out p)) continue;
                     n++; if (p.Days < Days) shortDays++;
@@ -431,6 +561,7 @@ namespace Armoury
             var unk = new List<string>();
             for (int i = 0; i < top.Count && i < 4; i++) unk.Add(Clean(top[i].Key) + " " + top[i].Value);
             double closure = sInflow != 0 ? 100.0 * (sParts - sInflow) / Math.Abs(sInflow) : 0;
+            double unrecPct = _dInflow != 0 ? 100.0 * _dUnrecAbs / Math.Abs((double)_dInflow) : 0;
             var sb = new StringBuilder(1600);
             sb.Append("D staly (169c): dzien ").Append(day)
               .Append(" | rody AI ").Append(aiClans.Count).Append(" (bez Innych i dworzan BK), z pomiarem czesci ").Append(n).Append(" (krocej niz 28 dob: ").Append(shortDays).Append(')')
@@ -444,14 +575,24 @@ namespace Armoury
               .Append(", majatek ").Append(N0(sAssets))
               .Append(" | poza D: wlasne ").Append(N0(sOwn)).Append(", jednorazowe ").Append(N0(sOnce)).Append(" (w tym podwojne - majatki BK ").Append(N0(sDouble)).Append("), inne z modelu ").Append(N0(sOther))
               .Append(", przelewy w rodzie ").Append(N0(sFam)).Append(", zajete w D3 - (168)")
-              .Append(" | kontrola zamkniecia (ziemia jak wplynela + wlasne + korona + kontrakt + majatek + jednorazowe + inne + przelewy wobec wplywu D169 w tych samych dobach): ")
+              .Append(" | kontrola zamkniecia (z budowy - inne z modelu to reszta; tylko blad ksiegowania): ")
               .Append(N0(sParts)).Append(" wobec ").Append(N0(sInflow)).Append(" - roznica ").Append(closure.ToString("0.00", inv)).Append("%")
               .Append(" | dzis (swiat): linie modelu - podatek wsi ").Append(_dVd).Append(" (wedlug wsi BK ").Append(_dVdCalc).Append(", roznica u ").Append(_dVdOff).Append(" rodow), cla i podatek miast ").Append(_dWd)
               .Append(", polityki krolow ").Append(_dPol).Append(", zapomoga ").Append(_dSup).Append(", kontrakt ").Append(_dMerc).Append(", warsztaty ").Append(_dShop).Append(", karawany i partie ").Append(_dCarPar)
               .Append(" (w tym przelewy w rodzie ").Append(_dFamily).Append("), inne ").Append(_dOther).Append("; renta wsi ").Append(_dRentV).Append(", zawor miast ").Append(_dRentT).Append(" (wlasne ").Append(_dOwn).Append(')')
               .Append(", zwrot korony ").Append(_dRefund).Append(", mennica i monopole ").Append(_dMint).Append(", jednorazowe ").Append(_dOnce).Append(" (podwojne ").Append(_dDouble).Append("), ziemia bez osady u ").Append(_dLooseN).Append(" rodow")
-              .Append(" | linie modelu nierozpoznane (do inne): ").Append(unk.Count > 0 ? string.Join(", ", unk.ToArray()) : "-")
-              .Append(" | bankruci (K39: kiesa glowy 0 i zold przyciety >= 7 dob z rzedu): ").Append(bankrupt)
+              .Append(" | inne z modelu dzis: znane linie (majatki BK, rada BK, podatki od wasali BK, sluzba u lorda BK, trybut, wezwanie do wojny, umowy handlowe, perk, zaulki) ").Append(_dKnown)
+              .Append(", wplyw bez opisu (m.in. 'za tier' gry) ").Append(_dUnlisted)
+              .Append(", nierozpoznane: modul ").Append(_dUnrecAbs).Append(" zl = ").Append(unrecPct.ToString("0.00", inv)).Append("% wplywu D169 doby (prog testu <= 2%; suma ").Append(_dUnrec).Append(")")
+              .Append(" - najwieksze: ").Append(unk.Count > 0 ? string.Join(", ", unk.ToArray()) : "-")
+              .Append(" | bankruci do 168 (K39 lub bankrut Banku, rody AI): ").Append(bankAny)
+              .Append(" (K39 - kiesa glowy 0 i zold przyciety >= 7 dob z rzedu: ").Append(bankrupt).Append(", w tym z doba bez znanego salda ").Append(bankBlind)
+              .Append("; bankruci Banku: ").Append(bankIb).Append("; oba: ").Append(bankBoth).Append(')')
+              .Append(" | podatek wsi BK przy wyplacie do posiadacza de iure innego niz glowa rodu: ").Append(_dDeJureN).Append(" wsi, ").Append(_dDeJureGold)
+              .Append(" zl dzis (z innego rodu ").Append(_dDeJureOtherN).Append(" wsi, ").Append(_dDeJureOtherGold).Append(" zl) - w D169 i ziemi u posiadacza faktycznego")
+              .Append(" | wsie bez danych BK (podatek pominiety): ").Append(_dVNoPop)
+              .Append(" | czas D stalego (ms na dobe): poczatek doby ").Append(Ms(_ticksStableBegin)).Append(", rozbicie rodow ").Append(Ms(_ticksStableClans))
+              .Append(", linia poprzedniej doby ").Append(Ms(LastTicksStableLine)).Append("; dochod modelu z opisami (caly) ").Append(Ms(LastTicksModel))
               .Append(" | BK: ").Append(_bkNote)
               .Append(_stumbles > 0 ? " | potkniecia ksiegi " + _stumbles : "").Append('.');
             return sb.ToString();

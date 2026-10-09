@@ -357,7 +357,7 @@ namespace Armoury
                     LastRefund = LastCrown = LastEvtNone = LastEvtSettl = LastEvtOther = LastThird = LastModelIncomeSum = LastRentSum = -1;
                 }
                 DayRefund = DayCrown = DayEvtNone = DayEvtSettl = DayEvtOther = DayThird = 0;
-                DayEstates = 0; _cutToday.Clear();   // 169c
+                DayEstates = 0; _cutToday.Clear(); _cutBlind.Clear();   // 169c
                 LastTicks = Stopwatch.GetTimestamp() - t0;
             }
         }
