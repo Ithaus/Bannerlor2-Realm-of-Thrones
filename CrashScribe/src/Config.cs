@@ -42,6 +42,13 @@ namespace CrashScribe
         public static bool NightKingMarchRespectCooldown = true;  // szanujemy 5-dniowa przerwe ROT po kazdym oblezeniu
         public static bool NightKingMarchVerbose = true;          // raz na dzien wypisz tabelke osad za Murem z garnizonami i stanem wojny
 
+        // --- Kalendarz Innych (T2 noc 08/09.10; patrz NightKingCall.OpenDay) ---
+        public static bool NightKingCalendarEnabled = true;  // wylacznik calosci: Pochod i Zew czekaja na dzien celu
+        public static int NightKingSiegeFromDay = 728;       // Piesc, Craster i minimum dla kazdego celu (poczatek 3. roku)
+        public static bool NightKingRespectShackles = true;  // kajdany ROT 300/400/500 x FabulaTimeScale takze dla Pochodu
+        public static int NightKingWallFromDay = 2184;       // Mur od 7. roku (serial s7 ok. 304 AC)
+        public static int NightKingCallFromDay = 728;        // Zew spi do pierwszego terminu
+
         // --- Oboz obleniczy (patrz Mends.RbSiegeCampFed) ---
         public static bool RbSiegeAttritionOnlyStarving = true; // straty obozu z RealisticBannerlord (2-5 dziennie, rosnace) tylko gdy oboz GLODUJE; garnizon - tylko gdy miasto bez zapasow // najsilniejsza banda pelna w tylu procentach limitu (ROT: oblezenie przy >= 0.8)
 
@@ -85,6 +92,11 @@ namespace CrashScribe
                         case "NightKingMarchOdds": NightKingMarchOdds = F(v, NightKingMarchOdds); break;
                         case "NightKingMarchRespectCooldown": NightKingMarchRespectCooldown = B(v); break;
                         case "NightKingMarchVerbose": NightKingMarchVerbose = B(v); break;
+                        case "NightKingCalendarEnabled": NightKingCalendarEnabled = B(v); break;
+                        case "NightKingSiegeFromDay": NightKingSiegeFromDay = I(v, NightKingSiegeFromDay); break;
+                        case "NightKingRespectShackles": NightKingRespectShackles = B(v); break;
+                        case "NightKingWallFromDay": NightKingWallFromDay = I(v, NightKingWallFromDay); break;
+                        case "NightKingCallFromDay": NightKingCallFromDay = I(v, NightKingCallFromDay); break;
                         case "RbSiegeAttritionOnlyStarving": RbSiegeAttritionOnlyStarving = B(v); break;
                     }
                 }
