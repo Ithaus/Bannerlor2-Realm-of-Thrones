@@ -576,6 +576,8 @@ namespace Armoury
         public float LoserCaptiveVeteranPercent = 30f;     // of the beaten men who live, this share of seasoned troops (tier 4 and up) is taken - they were worth a ransom
         public float LoserCaptiveCommonPercent = 5f;       // of the beaten men who live, this share of the rest is taken
         public float NonCombatantDeathPercent = 5f;        // villagers and fishermen beaten on the road: share slain; the rest run back to their own village (a few are taken only by peoples who keep slaves). Caravan guards fight and are judged like soldiers
+        // I1 (noc 09/10.10): prawo jenca wedlug krainy - PrisonerLaw.cs
+        public bool PrisonerLawEnabled = true;             // captives sold in a town or castle, or set free, in a land that keeps no slaves no longer become slaves: common men and soldiers go back to their own land, and in Westeros bandits and outlaws are sent to the Wall to take the black. Westeros but the Iron Islands, and Braavos, Pentos, Lorath and the other free lands, keep no slaves; Slaver's Bay, Volantis, Lys, Myr, Tyrosh, Qohor, Norvos, Valyria, the Dothraki and the Iron Islands (thralls) do, as before
         public float OutlawBandRoutedShare = 0.5f;         // share of outlaws fleeing a lost fight who go back to the woods; the rest - mostly villagers driven out by want - go home to the villages
         public float OutlawRaidFleePercent = 3f;           // percent of a village's hearths that flee to the woods when it is burnt
         public float OutlawHearthPerMan = 0.5f;            // hearths a village loses for each man who becomes an outlaw (and regains when he returns)

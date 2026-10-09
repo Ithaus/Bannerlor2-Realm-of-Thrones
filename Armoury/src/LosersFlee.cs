@@ -44,8 +44,9 @@ namespace Armoury
         // rodzaje partii
         internal const int KArmy = 0, KBand = 1, KVillager = 2, KCaravan = 3, KGarrison = 4, Kinds = 5;
         private static readonly string[] KName = { "wojsko", "bandy", "tabory wsi", "karawany", "zalogi/milicje/patrole" };
-        // skad czlowiek wraca do domu: rozbici z bitwy, uwolnieni jency bez odbiorcy, powrot z puli wyrzutkow
-        internal const int SrcRouted = 0, SrcFreed = 1, SrcPool = 2;
+        // skad czlowiek wraca do domu: rozbici z bitwy, uwolnieni jency bez odbiorcy, powrot z puli wyrzutkow,
+        // I1 prawo jenca (jency sprzedani albo wypuszczeni w krainie bez niewoli - PrisonerLaw; dom = osada kultury jenca, nie miejsce sprzedazy)
+        internal const int SrcRouted = 0, SrcFreed = 1, SrcPool = 2, SrcLaw = 3, Srcs = 4;
         // dokad trafil: ludnosc BK, hearth wsi, "z szablonu"
         internal const int CatBk = 0, CatVillage = 1, CatTemplate = 2;
         // zawod klucza puli wyrzutkow (KeyUndead - wighty Innych: z niczego, wracaja do niczego, nigdy do ludnosci BK)
@@ -87,8 +88,8 @@ namespace Armoury
         private static int _freed, _freedOutside;
         private static int _toBk, _asSerfs, _asNobles, _toVillageMen, _toCommon, _template, _templateGarr, _templateBandit, _homeless, _vanished, _bkOddCalls, _bkOddDiff;
         private static float _toVillageHearth, _toCommonHearth, _templateFloat;
-        // domy wedlug zrodla (SrcRouted / SrcFreed / SrcPool): ludnosc BK, wies (tabory + prosci + bandyci), z szablonu
-        private static readonly int[] _bkBy = new int[3], _hearthBy = new int[3], _tplBy = new int[3];
+        // domy wedlug zrodla (SrcRouted / SrcFreed / SrcPool / SrcLaw): ludnosc BK, wies (tabory + prosci + bandyci), z szablonu
+        private static readonly int[] _bkBy = new int[Srcs], _hearthBy = new int[Srcs], _tplBy = new int[Srcs];
         // Inni (wighty): rozbici pominieci w RoutedH3 i wighty, ktore doszly do SendHome inna droga - z niczego, do niczego
         private static int _undeadRouted, _undeadHome;
         // dziura werbunku (uwaga 1 przegladu): ludzie, ktorzy weszli do partii lordow AI bez werbunku u notabli - gorna granica tego,
@@ -111,11 +112,18 @@ namespace Armoury
         private static readonly Dictionary<string, CharacterObject> _keyTroop = new Dictionary<string, CharacterObject>();
         private static readonly Dictionary<string, Home> _battleHome = new Dictionary<string, Home>(), _poolHome = new Dictionary<string, Home>();
         private static int _poolHomeDay = -1;
+        // I1: dom jenca wedlug kultury (pamiec na dobe, klucz = punkt + kultura) i warownie Muru w rekach Strazy (lista na dobe)
+        private static readonly Dictionary<string, Home> _lawHome = new Dictionary<string, Home>();
+        private static int _lawHomeDay = -1;
+        private static List<Home> _wallHomes;
+        private static int _wallDay = -1;
+        private const string WatchId = "nightswatch";
 
         internal static void Reset()
         {
             ClearDay();
             _keyKind.Clear(); _keyTroop.Clear(); _battleHome.Clear(); _poolHome.Clear(); _poolHomeDay = -1;
+            _lawHome.Clear(); _lawHomeDay = -1; _wallHomes = null; _wallDay = -1;
             _homes = null; _homeOf = null; _homesDay = -1;
             _bkTried = false; _popMgr = null; _getPopData = null; _fromSoldiers = null; _updateType = null; _typeCount = null; _isRetinue = null; _totalPop = null; _serfs = null; _nobles = null;
             _lastWorldPop = -1; _ownersLogged = false; _csvPath = null; _cur = null;
@@ -135,7 +143,7 @@ namespace Armoury
             _freed = _freedOutside = 0;
             _toBk = _asSerfs = _asNobles = _toVillageMen = _toCommon = _template = _templateGarr = _templateBandit = _homeless = _vanished = _bkOddCalls = _bkOddDiff = 0;
             _toVillageHearth = _toCommonHearth = _templateFloat = 0f;
-            Array.Clear(_bkBy, 0, 3); Array.Clear(_hearthBy, 0, 3); Array.Clear(_tplBy, 0, 3);
+            Array.Clear(_bkBy, 0, Srcs); Array.Clear(_hearthBy, 0, Srcs); Array.Clear(_tplBy, 0, Srcs);
             _undeadRouted = _undeadHome = 0;
             _tplLordParties = _tplLordMen = _garrToLord = _lordToGarr = 0;
             _recruitedPrisoners = 0;
@@ -312,14 +320,14 @@ namespace Armoury
         internal static void AddTicks(int which, long t) { if (which >= 0 && which < _ticksH3.Length && t > 0) _ticksH3[which] += t; }
 
         /// <summary>
-        /// Jedna funkcja pochodzenia (2.4, 3.4): rozbici z bitwy, uwolnieni jency bez odbiorcy, powrot z puli. Zwraca, ilu przyjeto;
-        /// reszte wolajacy oddaje do puli ("bez domu"). cat - dokad trafili (BK, wies, z szablonu).
+        /// Jedna funkcja pochodzenia (2.4, 3.4): rozbici z bitwy, uwolnieni jency bez odbiorcy, powrot z puli, I1 prawo jenca. Zwraca,
+        /// ilu przyjeto; reszte wolajacy oddaje do puli ("bez domu"). cat - dokad trafili (BK, wies, z szablonu).
         /// </summary>
         internal static int SendHome(MobileParty party, CharacterObject troop, int n, Vec2 pos, IFaction fac, int src, out int cat)
         {
             cat = CatVillage;
             if (troop == null || troop.IsHero || n <= 0) return 0;
-            if (src < 0 || src > SrcPool) src = SrcRouted;
+            if (src < 0 || src > SrcLaw) src = SrcRouted;
             try
             {
                 // 0. wight Innych (ROT: occupation="Soldier", kultura whitewalker) - z niczego, wraca do niczego; nigdy ludnosc BK ani hearth
@@ -330,6 +338,9 @@ namespace Armoury
                     _undeadHome += n;
                     return n;
                 }
+                // I1: jeniec sprzedany / wypuszczony daleko od domu wraca do SWOJEJ krainy - punkt = najblizsza miejscu osada z danymi BK
+                // jego kultury (brak takiej osady, np. kultura bandycka - region miejsca); dalej te same reguly co dla rozbitych
+                if (src == SrcLaw && troop.Culture != null) pos = LawHomePos(pos, troop.Culture);
                 // 1. tabor wsi i rybacy -> hearth wlasnej wsi (dokladna odwrotnosc zdjecia przy wysylaniu taboru); ludnosci BK nie dopisujemy
                 if (party != null && party.IsVillager)
                 {
@@ -402,8 +413,20 @@ namespace Armoury
                 var reg = OutlawLaw.RegionAt(pos);
                 where = reg != null ? reg.StringId : ((int)pos.x + ":" + (int)pos.y);
             }
+            else if (src == SrcLaw)
+            {
+                cache = LawCache();                  // I1: pos to juz osada domowa (LawHomePos) - pamiec na punkt, nie na bitwe
+                fac = null;
+                where = PosKey(pos);
+            }
             var home = FindHome(pos, fac, troop.Culture, cache, where);
             if (home == null) return 0;
+            return AddBk(home, troop, n, src);
+        }
+
+        /// <summary>n ludzi typu troop do ludnosci BK osady home (werbunek BK na odwrot; zastepczo chlopi) - wspolne dla ToBk i ToWall.</summary>
+        private static int AddBk(Home home, CharacterObject troop, int n, int src)
+        {
             int before = TotalPop(home.Pd);
             bool retinue = IsRetinue(troop);
             int nob0 = retinue ? 0 : TypeCount(home.Pd, _nobles);
@@ -429,6 +452,66 @@ namespace Armoury
             _toBk += got; _bkBy[src] += got;
             if (got > 0) Row(OutlawLaw.RegionFor(home.St)).Bk += got;
             return got;
+        }
+
+        // ------------------------------------------------------------ I1: prawo jenca (PrisonerLaw)
+        private static string PosKey(Vec2 p) { return (int)p.x + ":" + (int)p.y; }
+
+        private static Dictionary<string, Home> LawCache()
+        {
+            int day = (int)CampaignTime.Now.ToDays;
+            if (_lawHomeDay != day) { _lawHome.Clear(); _lawHomeDay = day; }
+            return _lawHome;
+        }
+
+        /// <summary>I1: punkt domu jenca - najblizsza miejscu (pos) osada z danymi BK jego kultury; brak - warownia regionu miejsca; nic - pos.</summary>
+        private static Vec2 LawHomePos(Vec2 pos, CultureObject cul)
+        {
+            var h = FindHome(pos, null, cul, LawCache(), PosKey(pos));
+            return h != null && h.St != null ? h.St.GetPosition2D : pos;
+        }
+
+        /// <summary>
+        /// I1 "na Mur" (jak Yoren): n przestepcow do ludnosci BK najblizszej miejscu (pos) warowni, ktora Nocna Straz jeszcze trzyma
+        /// (frakcja wlasciciela z kultura nightswatch - nie Inni, nie zdobywca). Stamtad Straz werbuje jak z kazdej
+        /// osady BK. Zwraca, ilu przyjeto (0 = Muru nie ma albo BK nie przyjal - wolajacy odsyla ich do domu); wall - ktora warownia.
+        /// </summary>
+        internal static int ToWall(CharacterObject troop, int n, Vec2 pos, out Settlement wall)
+        {
+            wall = null;
+            if (troop == null || troop.IsHero || n <= 0) return 0;
+            try
+            {
+                int day = (int)CampaignTime.Now.ToDays;
+                if (_wallHomes == null || _wallDay != day)
+                {
+                    _wallDay = day;
+                    _wallHomes = new List<Home>();
+                    foreach (var x in Homes())
+                    {
+                        var st = x.St;
+                        if (!(st.IsTown || st.IsCastle)) continue;
+                        var mf = st.MapFaction;                  // warownia w rekach Strazy (kultura krolestwa ROT "nightswatch") - kultura osady moze sie zmienic w BK
+                        if (mf == null || mf.Culture == null || mf.Culture.StringId != WatchId) continue;
+                        _wallHomes.Add(x);
+                    }
+                }
+                Home best = null; float bd = float.MaxValue;
+                foreach (var x in _wallHomes)
+                {
+                    float d = pos.DistanceSquared(x.St.GetPosition2D);
+                    if (d < bd) { bd = d; best = x; }
+                }
+                if (best == null) return 0;
+                wall = best.St;
+                return AddBk(best, troop, n, SrcLaw);
+            }
+            catch (Exception e)
+            {
+                _stumbleHome++;
+                if (!_errHome) { _errHome = true; Log.Error("LosersFlee.ToWall", e); }
+                return 0;
+            }
         }
 
         // ------------------------------------------------------------ plan bitwy
@@ -1198,7 +1281,9 @@ namespace Armoury
                 // z szablonu); "z puli" pochodzi z powrotu w OutlawLaw.Daily, ktory biegnie PO tej linii - to liczba z linii "Wyrzutki:" doby wczesniej
                 sb.Append(" | domy wedlug zrodla: rozbici z bitew - BK ").Append(_bkBy[SrcRouted]).Append(", wies ").Append(_hearthBy[SrcRouted]).Append(", z szablonu ").Append(_tplBy[SrcRouted])
                   .Append("; uwolnieni jency - BK ").Append(_bkBy[SrcFreed]).Append(", wies ").Append(_hearthBy[SrcFreed]).Append(", z szablonu ").Append(_tplBy[SrcFreed])
-                  .Append("; z puli (linia \"Wyrzutki:\" doby ").Append(day - 1).Append(") - BK ").Append(_bkBy[SrcPool]);
+                  .Append("; z puli (linia \"Wyrzutki:\" doby ").Append(day - 1).Append(") - BK ").Append(_bkBy[SrcPool])
+                  .Append("; prawo jenca I1 (sprzedani i wypuszczeni, linia \"Prawo jenca (I1):\") - BK z Murem ").Append(_bkBy[SrcLaw]).Append(", wies ").Append(_hearthBy[SrcLaw])
+                  .Append(", z szablonu ").Append(_tplBy[SrcLaw]);
                 sb.Append(" | Inni (wighty - z niczego, do niczego, nigdy do BK ani wsi): rozbici ").Append(_undeadRouted).Append(", inna droga ").Append(_undeadHome);
                 sb.Append(HoleText());
                 sb.Append(" | ludnosc BK swiata ").Append(worldTxt).Append(" | wcieleni jency AI (partie rodow) ").Append(_recruitedPrisoners);
