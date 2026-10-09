@@ -77,8 +77,10 @@ namespace Armoury
 
         /// <summary>
         /// I1b: tekst linii startowej "Prawo jenca (I1b):" - warownie (miasta i zamki) kultur z listy wedlug kultury osady (prawo jenca I1)
-        /// i krolestwa, ktorych kultura jest na liscie (H3: zwyciezca z taka kultura frakcji bierze w niewole takze czesc taborow wsi).
-        /// Id z listy bez zadnej warowni = literowka - wypisane zamiast "-". Tylko log, jeden przebieg po osadach i krolestwach.
+        /// i frakcje, ktorych kultura jest na liscie - krolestwa oraz rody bez krolestwa (H3: zwyciezca z taka kultura frakcji bierze w niewole
+        /// takze czesc taborow wsi). Kultura osady to kultura biezaca (BK zmienia ja po asymilacji i przy wczytaniu - w zapisie liczby moga
+        /// sie roznic od nowej kampanii). Id z listy bez zadnej warowni = literowka albo zmiana kultury przez BK - wypisane zamiast "-".
+        /// Tylko log, jeden przebieg po osadach, krolestwach i rodach.
         /// </summary>
         internal static string SlaveListText()
         {
@@ -110,6 +112,15 @@ namespace Armoury
                 ks.Add((k.Name != null ? k.Name.ToString() : "?") + " (" + k.StringId + "/" + k.Culture.StringId + (k.IsEliminated ? ", rozbite" : "") + ")");
             }
             sb.Append(" | krolestwa z niewola (H3, kultura krolestwa - zwyciezca bierze tez tabory wsi): ").Append(ks.Count == 0 ? "-" : string.Join(", ", ks.ToArray()));
+            // H3 patrzy na kulture FRAKCJI zwyciezcy (win.MapFaction); rod bez krolestwa jest wlasna frakcja (ROT: np. bright_banners,
+            // sons_of_the_harpy - ghiscari, is_minor_faction) - te tez biora w niewole tabory wsi
+            var cs = new List<string>();
+            foreach (var cl in Clan.All)
+            {
+                if (cl == null || cl.Kingdom != null || cl.IsEliminated || !SlaveCulture(cl.Culture)) continue;
+                cs.Add((cl.Name != null ? cl.Name.ToString() : "?") + " (" + cl.StringId + "/" + cl.Culture.StringId + ")");
+            }
+            sb.Append(" | rody bez krolestwa z niewola (H3, kultura rodu - tez biora tabory wsi): ").Append(cs.Count == 0 ? "-" : string.Join(", ", cs.ToArray()));
             return sb.ToString();
         }
 
