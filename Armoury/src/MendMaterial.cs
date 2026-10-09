@@ -85,24 +85,102 @@ namespace Armoury
         /// null - to nie robota kowala (ArmsPricing nie zna receptury: kon, towar, sztandar).</summary>
         internal static float[] Needs(EquipmentElement el)
         {
-            return NeedsShare(el.Item, Share(el));
+            // T3 (poprawka po recenzji): strata do tabeli metalu ze STANU sztuki (ConditionScaling.ConditionOf: Spoils 0.55/0.40/0.25 niezaleznie
+            // od LootPriceFollowsCondition), nie z ceny; Share (robocizna, drewno, skora, plotno) bez zmian - z ceny jak dotad
+            float cond = ConditionScaling.ConditionOf(el.ItemModifier);
+            if (cond < 0f) cond = 0f; if (cond > 1f) cond = 1f;
+            return NeedsShare(el.Item, Share(el), 1f - cond);
         }
 
         /// <summary>To samo dla stanu z ksiegi zuzycia (uprzaz na grzbiecie: brak 0..1, modyfikator zostaje oryginalny).</summary>
         internal static float[] NeedsFor(ItemObject it, float missing)
         {
             var s = Settings.Current;
-            return NeedsShare(it, Math.Max(0f, s != null ? s.MendMaterialMaxShare : 0.2f) * Math.Max(0f, Math.Min(1f, missing)));
+            float loss = Math.Max(0f, Math.Min(1f, missing));
+            return NeedsShare(it, Math.Max(0f, s != null ? s.MendMaterialMaxShare : 0.2f) * loss, loss);
         }
 
-        private static float[] NeedsShare(ItemObject it, float share)
+        private static float[] NeedsShare(ItemObject it, float share, float loss)
         {
             var c = it != null ? ArmsPricing.CostOf(it) : null;
             if (c == null) return null;
             var s = Settings.Current;
+            // T3 (noc 08/09.10): metal i opal kuzni wedlug rodzaju sztuki i szkody; ms < 0 = stara regula (kolczuga, nieznane, wylacznik)
+            float ms = MetalShare(it, loss);
+            if (ms < 0f) ms = share; else ms = Math.Min(ms, share);   // tylko obnizki - nigdy wiecej niz stara regula
             float crude = c.MetalKg * (float)Math.Pow(1.25, WorkshopLaw.StepsOf(c.Grade));
-            float wood = c.WoodKg + c.MetalKg * Math.Max(0f, s.WorkshopForgeWoodPerMetalKg);
-            return new[] { crude * share, wood * share, c.LeatherKg * share, c.LinenKg * share };
+            float forge = c.MetalKg * Math.Max(0f, s.WorkshopForgeWoodPerMetalKg);
+            return new[] { crude * ms, c.WoodKg * share + forge * ms, c.LeatherKg * share, c.LinenKg * share };
+        }
+
+        // ------------------------------------------------------------ T3 (noc 08/09.10): metal naprawy wedlug rodzaju sztuki
+        // Jeff: "jesli sa naprawy zbroi i mieczy, to ilosc surowcow ma byc minimalna do naprawy". Audyt 09.10 (raport 03 P0-A, synteza T3 po
+        // krytyce R3 / S23): udzial METALU receptury na prawdziwych stanach gry - strata 0.45 / 0.6 / 0.75 (Plundered / Damaged / Battered),
+        // ponizej 0.45 liniowo od 0, powyzej 0.75 stale (wrakow kowale nie naprawiaja, paczka 158). Kolczuga i nieznane rodzaje - stara regula
+        // (ciezko pocieta kolczuga = wymiana ok. 1/4 kolek). Drewno sztuki, skora, plotno i ROBOCIZNA (Share, LaborF) bez zmian (Jeff 07.10).
+        // Historia (HISTORIA-KOSZT-NAPRAWY par. 7): rdza - piasek i ocet, wgniecenia - mlot, nity i kilka plytek; ostrze - szlif i olej.
+        private const int KPlate = 0, KSoft = 1, KBlade = 2, KPole = 3, KShield = 4, KXbow = 5;
+        private static readonly float[][] MetalPts =
+        {
+            new[] { 0.01f, 0.02f, 0.04f },     // plyta: zbroja, helm, rekawice, nagolenniki, kropierz plytowy
+            new[] { 0.02f, 0.03f, 0.06f },     // skorzana i tkanina (okucia, sprzaczki, cwieki)
+            new[] { 0f, 0.005f, 0.015f },      // ostrza: miecz, topor, buzdygan, dwureczne
+            new[] { 0f, 0.005f, 0.02f },       // drzewcowa i miotana (grot)
+            new[] { 0.04f, 0.08f, 0.12f },     // tarcza (umbo, okucia brzegu)
+            new[] { 0.03f, 0.06f, 0.11f },     // kusza (zamek, strzemie)
+        };
+
+        /// <summary>Rodzaj sztuki dla tabeli metalu (jak ArmsPricing.Compute: ItemType + ArmorComponent.MaterialType); -1 = stara regula.</summary>
+        private static int MetalKind(ItemObject it)
+        {
+            if (it == null) return -1;
+            switch (it.ItemType)
+            {
+                case ItemObject.ItemTypeEnum.HeadArmor:
+                case ItemObject.ItemTypeEnum.BodyArmor:
+                case ItemObject.ItemTypeEnum.LegArmor:
+                case ItemObject.ItemTypeEnum.HandArmor:
+                case ItemObject.ItemTypeEnum.HorseHarness:
+                    {
+                        var mat = it.ArmorComponent != null ? it.ArmorComponent.MaterialType : ArmorComponent.ArmorMaterialTypes.None;
+                        if (mat == ArmorComponent.ArmorMaterialTypes.Plate) return KPlate;
+                        if (mat == ArmorComponent.ArmorMaterialTypes.Chainmail) return -1;   // S23: kolczuga na starej regule
+                        return KSoft;                                                       // skora, tkanina, brak materialu (receptura: len)
+                    }
+                case ItemObject.ItemTypeEnum.OneHandedWeapon:
+                case ItemObject.ItemTypeEnum.TwoHandedWeapon: return KBlade;
+                case ItemObject.ItemTypeEnum.Polearm:
+                case ItemObject.ItemTypeEnum.Thrown: return KPole;
+                case ItemObject.ItemTypeEnum.Shield: return KShield;
+                case ItemObject.ItemTypeEnum.Crossbow: return KXbow;
+                default: return -1;                                                         // luk, amunicja, plaszcz - stara regula
+            }
+        }
+
+        /// <summary>Wlacznik MendMetalByKind i sztuka z tabeli metalu (do logu AiWear: ile naprawionych sztuk idzie nowa regula).</summary>
+        internal static bool MetalByKind(ItemObject it)
+        {
+            var s = Settings.Current;
+            return s != null && s.MendMetalByKind && MetalKind(it) >= 0;
+        }
+
+        /// <summary>Udzial metalu receptury przy stracie loss (0..1); -1 = stara regula (wylacznik, kolczuga, nieznany rodzaj).</summary>
+        internal static float MetalShare(ItemObject it, float loss)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || !s.MendMetalByKind) return -1f;
+                int k = MetalKind(it);
+                if (k < 0) return -1f;
+                var p = MetalPts[k];
+                if (loss <= 0f) return 0f;
+                if (loss < 0.45f) return p[0] * loss / 0.45f;
+                if (loss < 0.6f) return p[0] + (p[1] - p[0]) * (loss - 0.45f) / 0.15f;
+                if (loss < 0.75f) return p[1] + (p[2] - p[1]) * (loss - 0.6f) / 0.15f;
+                return p[2];
+            }
+            catch (Exception e) { Log.Error("MendMaterial.MetalShare", e); return -1f; }
         }
 
         // ------------------------------------------------------------ robota kowali miasta: dniowka historyczna x dobrobyt miasta
@@ -179,7 +257,7 @@ namespace Armoury
 
         internal const int Done = 1, Waits = 0, Wreck = -2, NoRecipe = -3;   // wynik Quote (NoRecipe: nie robota kowala)
 
-        internal sealed class Job { public EquipmentElement El; public int N, Labor; public float Mat; }
+        internal sealed class Job { public EquipmentElement El; public int N, Labor; public float Mat, MetalKg; }   // MetalKg: T3 - kg metalu (surowki) z need, do logu AiWear
 
         internal sealed class Order
         {
@@ -221,7 +299,7 @@ namespace Armoury
                     }
                     if (r < 0) { Poor += amount - k; break; }
                     if (job == null) { job = new Job { El = ee }; Jobs.Add(job); }
-                    job.N++; job.Labor += labor; job.Mat += cost;
+                    job.N++; job.Labor += labor; job.Mat += cost; job.MetalKg += need[Metal];
                     Pieces++; Labor += labor; Mat += cost;
                 }
                 return job != null ? job.N : 0;

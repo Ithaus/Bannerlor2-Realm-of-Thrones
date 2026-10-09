@@ -35,6 +35,8 @@ namespace Armoury
         private static int _dayLoot, _dayWorn, _dayMended, _dayPaid, _dayStamp = -1;
         // poprawka po audycie TOWARY 3 (krok 139 planu K13): material napraw AI z polek miast - liczniki doby (tylko log)
         private static int _dayMat, _dayWait, _dayWaitMask, _dayNoSmith, _dayTowns;
+        private static int _dayByKind, _dayOldRule;    // T3 (noc 08/09.10): naprawione sztuki z metalem w recepturze - wedlug rodzaju / stara regula (kolczuga, nieznane, wylacznik)
+        private static float _dayKgByKind, _dayKgOldRule;   // T3: kg metalu (surowki) tych sztuk - osobno, zeby sklad napraw nie mylil testu
         private static readonly float[] _dayKg = new float[MendMaterial.Kinds];
         private static readonly int[] _dayWaitBy = new int[MendMaterial.Kinds];
 
@@ -46,7 +48,7 @@ namespace Armoury
 
         private static void ClearMatDay()
         {
-            _dayMat = _dayWait = _dayWaitMask = _dayNoSmith = _dayTowns = 0;
+            _dayMat = _dayWait = _dayWaitMask = _dayNoSmith = _dayTowns = 0; _dayByKind = _dayOldRule = 0; _dayKgByKind = _dayKgOldRule = 0f;
             Array.Clear(_dayKg, 0, _dayKg.Length); Array.Clear(_dayWaitBy, 0, _dayWaitBy.Length);
         }
 
@@ -333,7 +335,7 @@ namespace Armoury
             if (o.Pieces > 0)
             {
                 o.Bench.Commit();
-                foreach (var job in o.Jobs) { AddWorn(mp.StringId, job.El.Item.StringId, job.El.ItemModifier.StringId, -job.N); done += job.N; }
+                foreach (var job in o.Jobs) { AddWorn(mp.StringId, job.El.Item.StringId, job.El.ItemModifier.StringId, -job.N); done += job.N; MetalTally(job); }
                 paid = MenPurse.Take(mp, o.Total);
                 st.Town.ChangeGold(paid);
                 _dayMat += o.MatGold; _dayTowns++;
@@ -368,7 +370,30 @@ namespace Armoury
                    + ", drewno " + _dayKg[MendMaterial.Wood].ToString("0.0", ci) + ", skora " + _dayKg[MendMaterial.Leather].ToString("0.0", ci)
                    + ", plotno " + _dayKg[MendMaterial.Cloth].ToString("0.0", ci) + "; czeka na material " + _dayWait + " szt. (metal " + _dayWaitBy[MendMaterial.Metal]
                    + ", drewno " + _dayWaitBy[MendMaterial.Wood] + ", skora " + _dayWaitBy[MendMaterial.Leather] + ", plotno " + _dayWaitBy[MendMaterial.Cloth]
-                   + "), nie robota kowala " + _dayNoSmith + "; " + MendMaterial.Describe() + ".";
+                   + "), nie robota kowala " + _dayNoSmith + "; " + MetalPerPiece(ci) + "; " + MendMaterial.Describe() + ".";
+        }
+
+        /// <summary>T3 (noc 08/09.10): metal (kg surowki wedlug receptury) na naprawiona sztuke - do porownania w autotescie (odniesienie 0.18 kg, doby 1-40).</summary>
+        private static string MetalPerPiece(System.Globalization.CultureInfo ci)
+        {
+            var s = Settings.Current;
+            string per = _dayMended > 0 ? (_dayKg[MendMaterial.Metal] / _dayMended).ToString("0.000", ci) : "-";
+            return "metal na naprawiona sztuke " + per + " kg (T3 metal wedlug rodzaju " + (s != null && s.MendMetalByKind ? "WL" : "WYL")
+                   + ": wedlug rodzaju " + _dayKgByKind.ToString("0.00", ci) + " kg / " + _dayByKind + " szt., stara regula " + _dayKgOldRule.ToString("0.00", ci)
+                   + " kg / " + _dayOldRule + " szt., bez metalu w recepturze " + Math.Max(0, _dayMended - _dayByKind - _dayOldRule) + " szt.)";
+        }
+
+        /// <summary>T3 (poprawka po recenzji): kg metalu i sztuki osobno dla nowej i starej reguly; tylko sztuki z metalem w recepturze. O(1) na stos.</summary>
+        private static void MetalTally(MendMaterial.Job job)
+        {
+            try
+            {
+                var c = ArmsPricing.CostOf(job.El.Item);
+                if (c == null || c.MetalKg <= 0.001f) return;
+                if (MendMaterial.MetalByKind(job.El.Item)) { _dayByKind += job.N; _dayKgByKind += job.MetalKg; }
+                else { _dayOldRule += job.N; _dayKgOldRule += job.MetalKg; }
+            }
+            catch (Exception e) { Log.Error("AiWear.MetalTally", e); }
         }
     }
 }
