@@ -1488,6 +1488,14 @@ namespace Armoury
         [SettingPropertyGroup("Workshops")]
         public float TownCraftHandsPerArmsHand { get; set; } = 2f;
 
+        [SettingPropertyBool("Town Fletchers Enabled", HintText = "the town's own fletchers and arrowsmiths, in every town: arrows and bolts made from the ore and wood on their own town's stalls (the same recipe arms workshops use - the iron heads, the shafts, the charcoal of the bloomery and the forge; feathers, glue and thread are counted in the work), one quiver at a time, after the town's workshops have taken their share, whenever the quiver fetches enough to pay for its material, the work and a master's profit (Workshop Min Profit Percent) at today's prices; no coin changes hands - from stall to stall of the same town; lords buy them there. While on, workshops no longer make arrows out of thin air, townsfolk no longer eat them off the stalls and Banner Kings' party supplies no longer buy and burn them for AI parties (the player's own workshops and party as before). Needs Historical Prices")]
+        [SettingPropertyGroup("Workshops")]
+        public bool TownFletchersEnabled { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Town Fletcher Hands Per Arms Hand", 0.00f, 1.20f, "0.00", HintText = "hands of a town's fletchers and arrowsmiths for each hand of its arms craftsmen (Workshop Prosperity Per Hand) - about 850 man-days a day for the world, some 280 quivers of 30 at full work; enough for the rearming of the first months, later many stand idle when the stalls are full (England 1340-1360: the crown alone bought 65,000 arrows a year); 0 = off, arrows as before")]
+        [SettingPropertyGroup("Workshops")]
+        public float TownFletcherHandsPerArmsHand { get; set; } = 0.3f;
+
         [SettingPropertyFloatingInteger("Workshop Sell Share", 0.00f, 3.60f, "0.00", HintText = "a craftsman sells his wares at the market price buyers pay, less this merchant's cut (0.9 = he keeps 90%); with the maker's profit of 25% built into worth, at a normal price he earns 1.125x his cost")]
         [SettingPropertyGroup("Workshops")]
         public float WorkshopSellShare { get; set; } = 0.9f;
@@ -3163,6 +3171,8 @@ namespace Armoury
             s.ArtisanTanWeavePerCycle = ArtisanTanWeavePerCycle;
             s.TownCraftsEnabled = TownCraftsEnabled;
             s.TownCraftHandsPerArmsHand = TownCraftHandsPerArmsHand;
+            s.TownFletchersEnabled = TownFletchersEnabled;
+            s.TownFletcherHandsPerArmsHand = TownFletcherHandsPerArmsHand;
             s.WorkshopSellShare = WorkshopSellShare;
             s.GuildShareTailor = GuildShareTailor;
             s.GuildShareArmourer = GuildShareArmourer;

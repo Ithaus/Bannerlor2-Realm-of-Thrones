@@ -56,10 +56,10 @@ namespace Armoury
         // ------------------------------------------------------------ rodzaje ramek
         internal const int FVillage = 0, FVillageFood = 1, FCycle = 2, FCons = 3, FFood = 4, FSupplyUse = 5, FSupplyBuy = 6, FBkSettle = 7,
                            FBkParty = 8, FWagon = 9, FSell = 10, FCaravanLeave = 11, FBuild = 12, FForage = 13, FBee = 14,
-                           FTickParty = 15, FTickSettle = 16, FTickTown = 17, FTownCraft = 18, FArmyCloth = 19, FMend = 20, Kinds = 21;   // FTownCraft: paczka 148 (rzemioslo miasta), FArmyCloth: paczka 150 (odziez wojska), FMend: material napraw kowali miasta (135, poprawka po audycie TOWARY 3)
+                           FTickParty = 15, FTickSettle = 16, FTickTown = 17, FTownCraft = 18, FArmyCloth = 19, FMend = 20, FFletch = 21, Kinds = 22;   // FFletch: paczka 172 (strzelarze miasta - ruda i drewno); FTownCraft: paczka 148 (rzemioslo miasta), FArmyCloth: paczka 150 (odziez wojska), FMend: material napraw kowali miasta (135, poprawka po audycie TOWARY 3)
         private static readonly string[] KindName = { "produkcja wsi", "zywnosc wsi", "cykle warsztatow", "konsumpcja osad", "jedzenie partii",
             "zaopatrzenie BK (zuzycie)", "zaopatrzenie BK (zakupy)", "tick osady BK", "tick partii BK", "sprzedaz wozow", "handel partii",
-            "wyjazd karawany (BK)", "budowy", "furaz", "BetterEconomy", "tick partii", "tick osady", "tick miasta", "rzemioslo miasta (148)", "odziez wojska (150)", "naprawy kowali miasta" };
+            "wyjazd karawany (BK)", "budowy", "furaz", "BetterEconomy", "tick partii", "tick osady", "tick miasta", "rzemioslo miasta (148)", "odziez wojska (150)", "naprawy kowali miasta", "strzelarze (172)" };
 
         // ------------------------------------------------------------ posiadacze zapasu
         private const int HTown = 0, HCastle = 1, HVillage = 2, HStash = 3, HOtherSettl = 4, HWagon = 5, HCaravan = 6, HLord = 7, HPlayer = 8, HOtherParty = 9, Holders = 10;
@@ -73,9 +73,9 @@ namespace Armoury
                              GShopIn = "linie warsztatow", GArms = "warsztaty zbrojne", GBuild = "budowy", GTown = "mieszczanie", GCastle = "zamki",
                              GFood = "zywnosc partii", GSlaughter = "uboj w partiach", GSupply = "zaopatrzenie BK", GBkSettle = "BK osady", GBkParty = "BK partie",
                              GBee = "BetterEconomy", GForage = "furaz armii (Armoury)", GLost = "przepadlo z rozbitymi partiami", GNoBuyer = "sprzedane bez kupca",
-                             GTick = "inne ticki dobowe", GRest = "handel (reszta)", GArmyCloth = "odziez wojska (150)", GMend = "naprawy kowali miasta (135)";
+                             GTick = "inne ticki dobowe", GRest = "handel (reszta)", GArmyCloth = "odziez wojska (150)", GMend = "naprawy kowali miasta (135)", GFletch = "strzelarze (172)";
         private static readonly string[] SrcOrder = { GVil, GWoodlot, GShop, GArt, GTanW, GCraft, GSlaughter, GBkParty, GBkSettle, GBee, GForage, GTick };
-        private static readonly string[] SinkOrder = { GShopIn, GArt, GTanW, GCraft, GArms, GBuild, GTown, GCastle, GArmyCloth, GMend, GFood, GSupply, GBkSettle, GBkParty, GBee, GLost, GNoBuyer, GTick };
+        private static readonly string[] SinkOrder = { GShopIn, GArt, GTanW, GCraft, GArms, GBuild, GTown, GCastle, GArmyCloth, GMend, GFletch, GFood, GSupply, GBkSettle, GBkParty, GBee, GLost, GNoBuyer, GTick };
 
         // ------------------------------------------------------------ ramka
         internal sealed class Frame
@@ -484,6 +484,9 @@ namespace Armoury
                     return;
                 case FMend:        // 135 (poprawka po audycie TOWARY 3): ruda, drewno, skora, len i welna zdjete z polki przez kowali miasta na naprawy (MendMaterial.Bench.Commit)
                     foreach (var i in f.Touched) Book(i, GMend, null, f.Net[i]);
+                    return;
+                case FFletch:      // 172: ruda i drewno zdjete z polki przez strzelarzy miasta (TownFletchers.Work); amunicja nie jest towarem ksiegi
+                    foreach (var i in f.Touched) Book(i, GFletch, null, f.Net[i]);
                     return;
                 case FBee:
                     {

@@ -133,6 +133,7 @@ namespace Armoury
             _onceSeen[k] = day;
             if (_onceSeen.Count > 20000) _onceSeen.Clear();
             NoteUnmet(market, type, tier, n);
+            if (type == ItemObject.ItemTypeEnum.Arrows || type == ItemObject.ItemTypeEnum.Bolts) TownFletchers.NoteUnmet(type);   // 172: "AI bez towaru" (tylko licznik)
         }
 
         internal static float Demand(Settlement st, ItemObject it)

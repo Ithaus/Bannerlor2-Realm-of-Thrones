@@ -999,6 +999,7 @@ namespace Armoury
             try { MountedWage.EnsureContextHooks(); } catch (Exception e) { Log.Error("MountedWage.EnsureContextHooks", e); }   // paczka 160: zold partii - karawany bez premii konnego (latka w kampanii)
             try { RawPrice.SeedNewCampaign(); } catch (Exception e) { Log.Error("RawPrice.SeedNewCampaign", e); }   // cena surowcow: w nowej kampanii pamiec rynku z tickow startowych na nowa monete - PO HistoricalPrices.Apply i StartStock.Run
             try { TownCrafts.SessionStart(); } catch (Exception e) { Log.Error("TownCrafts.SessionStart", e); }   // paczka 148: proporcje rzemiosla miasta z wartosci - PO HistoricalPrices.Apply (linia startowa)
+            try { TownFletchers.SessionStart(); } catch (Exception e) { Log.Error("TownFletchers.SessionStart", e); }   // paczka 172: kandydaci strzelarzy, koszyki wzorcow, linia startowa - PO HistoricalPrices.Apply i ColdStart
             // 124: kapital startowy warsztatow w nowej monecie - TU, po HistoricalPrices.Apply. Gra wola sluchaczy zdarzenia od ostatnio
             // dopisanego (MbEvent: lista z wstawianiem na poczatek), wiec WorkshopTradeBehavior (dodany po nas) szedl PRZED przeliczeniem cen
             try { var seed = WorkshopTrade.SeedNewCampaign(); if (seed != null) Log.Info("WorkshopTrade: " + seed); } catch (Exception e) { Log.Error("WorkshopTrade.SeedNewCampaign", e); }

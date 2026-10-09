@@ -801,6 +801,9 @@ namespace Armoury
                 if (s.HistDemandScaling && _catRatio.TryGetValue(category, out r) && r > 1f)
                     __result = __result - extra + extra / r;
                 if (s.TownHouseholdUse) __result *= TownUse(category.StringId);
+                // paczka 172: strzaly i belty (kategoria "arrows" - BK ma ja za towar z popytem 10/10) mieszczanie zjadali z polek w nicosc;
+                // przy czynnych strzelarzach miasta budzet 0 - takze przy wylaczonym TownHouseholdUse (mysliwskie strzaly sa poza skala)
+                else if (category.StringId == "arrows") __result *= TownFletchers.HouseUse();
             }
             catch { }
         }
@@ -817,6 +820,7 @@ namespace Armoury
                 case "leather": return Math.Max(0f, s.TownUseLeather);
                 case "linen": return Math.Max(0f, s.TownUseLinen);
                 case "hardwood": return Math.Max(0f, s.TownUseHardwood);
+                case "arrows": return TownFletchers.HouseUse();   // paczka 172: mieszczanin nie zuzywa wojennych grotow - 0 przy czynnych strzelarzach (inaczej 1, jak dotad)
                 default: return 1f;
             }
         }

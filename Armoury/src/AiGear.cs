@@ -283,6 +283,7 @@ namespace Armoury
                         if (n <= 0) break;
                         shelf.AddToCounts(pick.EquipmentElement, -n);
                         deliver(pick.EquipmentElement, n, k, bestPrice);
+                        if (type == ItemObject.ItemTypeEnum.Arrows || type == ItemObject.ItemTypeEnum.Bolts) TownFletchers.NoteBought(type, n);   // 172: linia strzelarzy (tylko licznik)
                         spent += bestPrice * n; pieces += n; deficit -= n;
                         if (bought.Count < 6) bought.Add(pick.EquipmentElement.Item.StringId + " " + bestPrice);
                     }

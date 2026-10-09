@@ -43,6 +43,7 @@ namespace Armoury
         internal static void Reset() { _ore = _wood = _leather = _linen = _wool = null; _owed.Clear(); _labor.Clear(); _rank.Clear(); _wip.Clear(); _guildCache.Clear(); _madeByType.Clear(); _dayStamp = -1; _made = _skipLoss = _skipMat = _skipLabor = _skipGold = 0; _dayRevenue = _dayCost = 0; Array.Clear(_skipMatBy, 0, _skipMatBy.Length);
             WorkshopTrade.Reset();   // warsztaty towarowe w nowej monecie: stan czyszczony razem z warsztatami zbrojnymi (ta metoda idzie z konstruktora ArmouryBehavior)
             TownCrafts.Reset();      // paczka 148: rzemioslo miasta - dlugi wsadu i rak, srednie zuzycia (przed SyncData wczytania)
+            TownFletchers.Reset();   // paczka 172: strzelarze miasta - dlugi surowca i rak, kandydaci, liczniki (przed SyncData wczytania)
         }
         private static ItemObject _ore, _wood, _leather, _linen, _wool;
         private static readonly int[] _skipMatBy = new int[4];      // "brak surowca" wedlug surowca: ruda, drewno, skora, len albo welna (tylko licznik)
@@ -200,6 +201,10 @@ namespace Armoury
         {
             try
             {
+                // paczka 172: linia "arrows" (strzaly i belty) - BK robi z niej towar handlowy (BKItemCategories :122), wiec szla droga gry
+                // BEZ wsadu (artisans x4, fletcher x1) i z mnoznikiem BK - snopy z niczego. Przy czynnych strzelarzach miasta (TownFletchers)
+                // zamknieta w warsztatach notabli: jedna droga amunicji - z rudy i drewna. Warsztat gracza tu nie przychodzi (ForPlayerWorkshop).
+                if (TownFletchers.ClosesLine(production, workshop)) { TownFletchers.NoteClosed(production); __result = false; return false; }
                 // KONIEC SUROWCOW Z NICZEGO (Jeff 04.10, docs/AUDYT-TOWARY.md 6.2): ukryty warsztat BK
                 // "artisans" w kazdym miescie mial linie BEZ wsadu, ktore robily drewno, rude, skory surowe,
                 // mieso, skore i plotno z powietrza. Surowce maja przychodzic ze wsi (wiesniacy, karawany).
@@ -462,7 +467,15 @@ namespace Armoury
             try { float d; int sh; if (SupplyDemand.Active) f = SupplyDemand.Factor(town.Settlement, it, false, out d, out sh); } catch { }
             float arms = 1f;   // wpis 88 (audyt pkt 9): drozejaca skora/ruda podnosi cene w sklepie - i zarobek warsztatu
             try { arms = ArmsPricing.Multiplier(town.Settlement, it); } catch { }
-            return Math.Max(0.01f, it.Value * f * arms * MBMath.ClampFloat(Settings.Current.WorkshopSellShare, 0.05f, 1f));
+            return RevenueOf(it, f, arms);
+        }
+
+        /// <summary>Paczka 172: wzor przychodu rzemieslnika (wartosc x mnoznik podazy i popytu koszyka x mnoznik wyceny x udzial rzemieslnika) -
+        /// jeden dla warsztatow zbrojnych i strzelarzy miasta (TownFletchers liczy Factor raz na koszyk).</summary>
+        internal static float RevenueOf(ItemObject it, float factor, float arms)
+        {
+            if (it == null) return 0f;
+            return Math.Max(0.01f, it.Value * factor * arms * MBMath.ClampFloat(Settings.Current.WorkshopSellShare, 0.05f, 1f));
         }
 
         internal static float GuildWeight(string g)
