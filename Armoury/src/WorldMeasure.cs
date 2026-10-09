@@ -46,6 +46,7 @@ namespace Armoury
             public bool WasMoving;                           // czy przy ostatnim odczycie partia byla w ruchu (nie w osadzie, nie na morzu ...)
             public float Sum;                                // suma przesuniec w godzinach ruchu tej doby (jedn. mapy)
             public int MoveH, LeadH, MountH, Men;            // godziny ruchu, w tym jako wodz armii i czysto konno; najwiecej ludzi w ruchu
+            public int CampH;                                // T10: godziny ruchu w oknie obozu swiata jako samotny lord (nie wodz armii), kazda wielkosc
         }
 
         private static readonly Dictionary<MobileParty, Track> _t = new Dictionary<MobileParty, Track>();
@@ -68,6 +69,8 @@ namespace Armoury
                 var all = MobileParty.AllLordParties;
                 if (all == null) return;
                 var main = MobileParty.MainParty;
+                // T10 (uwaga krytyki 4): godzina, ktora wlasnie minela, byla godzina obozu swiata - ruch samotnych lordow kazdej wielkosci
+                bool campHour = NightRest.InCamp(CampaignTime.Now.GetHourOfDay - 1);
                 for (int i = 0; i < all.Count; i++)
                 {
                     try
@@ -90,6 +93,7 @@ namespace Armoury
                                 int men = mp.MemberRoster != null ? mp.MemberRoster.TotalManCount : 0;
                                 if (men > t.Men) t.Men = men;
                                 if (men > 0 && mp.Party != null && mp.Party.NumberOfMenWithoutHorse == 0) t.MountH++;
+                                if (campHour && !(mp.Army != null && mp.Army.LeaderParty == mp)) t.CampH++;
                             }
                         }
                         t.Pos = pos; t.Stamp = _stamp; t.WasMoving = moving;
@@ -139,6 +143,7 @@ namespace Armoury
                 var big = new List<float>(); var lead = new List<float>(); var mounted = new List<float>();
                 var bigMen = new List<int>(); var leadMen = new List<int>(); var mountedMen = new List<int>();
                 int tracked = 0, few = 0; long hoursBig = 0;
+                int campH = 0, campParties = 0;   // T10: ruch samotnych lordow w oknie obozu (kazda wielkosc, takze < 12 h ruchu)
                 var dead = new List<MobileParty>();
                 foreach (var kv in _t)
                 {
@@ -147,6 +152,7 @@ namespace Armoury
                     {
                         if (mp == null || !mp.IsActive || t.Stamp < _stamp) { dead.Add(mp); continue; }   // martwa albo zniknela z listy lordow
                         tracked++;
+                        if (t.CampH > 0) { campH += t.CampH; campParties++; }
                         if (t.MoveH >= MinMoveHours)
                         {
                             float km = t.Sum * Wayfinder.KmPerUnit;
@@ -158,7 +164,7 @@ namespace Armoury
                         else if (t.MoveH > 0) few++;
                     }
                     catch { _stumbles++; }
-                    t.Sum = 0f; t.MoveH = 0; t.LeadH = 0; t.MountH = 0; t.Men = 0;   // pozycja i numer godziny zostaja - ciaglosc przez polnoc
+                    t.Sum = 0f; t.MoveH = 0; t.LeadH = 0; t.MountH = 0; t.Men = 0; t.CampH = 0;   // pozycja i numer godziny zostaja - ciaglosc przez polnoc
                 }
                 foreach (var mp in dead) _t.Remove(mp);
 
@@ -174,7 +180,9 @@ namespace Armoury
                 sb.Append(" | wodzowie armii: ").Append(Stats(lead)).Append(MenMed(leadMen))
                   .Append(" | czysto konne (kazda wielkosc): ").Append(Stats(mounted)).Append(MenMed(mountedMen))
                   .Append(" | sledzonych ").Append(tracked).Append(", w ruchu ponizej ").Append(MinMoveHours).Append(" h: ").Append(few)
-                  .Append("; skoki > ").Append(F(MaxStep)).Append(" jedn./h pominiete: ").Append(_jumps).Append('.');
+                  .Append("; skoki > ").Append(F(MaxStep)).Append(" jedn./h pominiete: ").Append(_jumps)
+                  .Append(" | okno obozu ").Append(NightRest.CampStart).Append(":00-").Append(NightRest.CampEnd).Append(":00 (samotni lordowie, kazda wielkosc): ")
+                  .Append(campH).Append(" h ruchu, partii ").Append(campParties).Append('.');
                 if (_stumbles > 0) sb.Append(" Potkniecia miary: ").Append(_stumbles).Append('.');
                 sb.Append(" Koszt: godzinne razem ").Append(Ms(_hourTicks)).Append(" ms (maks ").Append(Ms(_hourMax))
                   .Append(" ms), dobowe ").Append(Ms(Stopwatch.GetTimestamp() - t0)).Append(" ms.");

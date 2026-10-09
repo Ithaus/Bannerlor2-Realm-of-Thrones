@@ -17,6 +17,12 @@
     <SandBoxLibs Condition="'$(SandBoxLibs)' == '' And Exists('$(GameLibs)/SandBox.View.dll')">$(GameLibs)</SandBoxLibs>
     <SandBoxLibs Condition="'$(SandBoxLibs)' == ''">C:/Program Files (x86)/Steam/steamapps/common/Mount &amp; Blade II Bannerlord/Modules/SandBox/bin/Win64_Shipping_Client</SandBoxLibs>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(T10Dry)' == 'true'">
+    <!-- T10 (uwaga krytyki 6): DLL "na sucho" do pierwszego autotestu - ksiega snu AI i powody nocnego marszu tylko w logu,
+         zachowanie i kary jak w T1 (stala T10_DRY w NightMarch.cs). Budowanie: -p:T10Dry=true (najlepiej z osobnym
+         -p:OutDir=... i potem zwykly build z -t:Rebuild, zeby obj nie zostal z wersja na sucho). -->
+    <DefineConstants>$(DefineConstants);T10_DRY</DefineConstants>
+  </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
   </ItemGroup>

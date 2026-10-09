@@ -423,6 +423,10 @@ namespace Armoury
                 string nightrest = NightRest.Export();
                 SaveText.Sync(dataStore, "arm_nightrest", ref nightrest);
                 if (dataStore.IsLoading) NightRest.Import(nightrest);
+                // T10: ksiega snu partii AI (dlugi, odpoczynek doby, sen ciagly) - stary zapis bez klucza = AI bez dlugu
+                string nightAi = NightRest.ExportAi(dataStore.IsSaving);
+                SaveText.Sync(dataStore, "arm_nightrest_ai", ref nightAi);
+                if (dataStore.IsLoading) NightRest.ImportAi(nightAi);
                 // ludnosc krain: ludzi na punkt hearth/dobrobytu (Jeff 04.10)
                 string popk = PopulationLaw.Export();
                 SaveText.Sync(dataStore, "arm_population", ref popk);
