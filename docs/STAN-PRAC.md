@@ -846,3 +846,6 @@ rodzaju zbroi jak przy broni czy filtr ForgeView) - "nie rozumiem" (wyjasnione, 
 **DECYZJA JEFFA 09.10 ok. 04:40 (K1 WYMIANA, doprecyzowanie):** "jesli dasz cos taniego, ale gorszego od tego, co maja - oni tego tez nie biora, zostaje po prostu w okienku
 DTE, co oznacza, ze maja wszyscy lepszy sprzet albo wymagania byly za duze i nie spelniaja np. atletyki" -> sztuka gracza wypiera sztuke ludzi TYLKO, gdy jest lepsza i czlowiek
 spelnia wymog; gorsza/rowna/za trudna zostaje w oknie DTE jako sztuka gracza, ludzie zatrzymuja swoja lepsza (koniec "pushed out better kit"). K1b = A + B + C (wf_013d4f17-3c8).
+**DECYZJE JEFFA 09.10 ok. 04:55 (pytania audytu 15):** Q2 woz wsi zamkowej najpierw sprzedaje swojemu zamkowi jedzenie dla podzamcza na 10 dni, reszta do miasta - TAK
+(razem z kiesa ludu, etap 5). Q3b rozbita karawana - "jak rozbije karawane, to zabiera wszystko zwyciezca" -> CALA kiesa karawany dla zwyciezcy (nie 10%), jedna regula
+(gracz, AI, bandyci); korona bierze 1/9 lupu wasali; autotest pilnuje, czy bandy sie nie wzmacniaja (zloto band ma platnika i ujscie). Etap 3 (zloto taboru/band/karawan).
