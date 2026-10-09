@@ -40,8 +40,11 @@ namespace Armoury
     ///    odjazd i odbior pozniej; "Take back your blade" zwraca te sama sztuke.
     ///  - AI (krytyka pkt 21 - ta sama regula, kanon: Tywin przekul cudzy Lod): lord, ktorego partia stoi w Qohorze i ktory nosi wielki
     ///    miecz 2 miar zdobyty od INNEGO rodu (wlasciciel ze stanu startowego z innego rodu), majacy w kiesie co najmniej 2 x oplata, zleca
-    ///    rozdzielenie na dwa miecze - ta sama oplata do kasy Qohoru, te same dni i rece; odbior tez tylko w Qohorze (miecz dla niego,
-    ///    drugi dla dziedzica / glowy rodu).
+    ///    rozdzielenie na dwa miecze - ta sama oplata do kasy Qohoru, te same dni i rece. Recenzja 177: gotowe miecze mistrzowie odsylaja
+    ///    w dniu ukonczenia (lord AI nie wraca do Qohoru sam - zlecenie wisialoby na zawsze): miecz dla niego, drugi dla dziedzica / glowy
+    ///    rodu; zmarly - jego dziedzic; bez nikogo - polka Qohoru. Partie rodu gracza (towarzysze) nie zlecaja - o rzeczach rodu decyduje gracz.
+    ///  - PRZYJECIE (recenzja 177): przed przyjeciem klingi straznik stali valyrianskiej sprawdza jej wzor (ValyrianBlades.GuardNow) - kopia
+    ///    z niczego zamienia sie w zwykla stal, zanim wejdzie do Qohoru (tam jest nie do zmiany, a przekucie przesuwa rejestr).
     ///  - SPIS: klingi u mistrzow licza sie w spisie stali valyrianskiej jako "u mistrzow Qohoru" (wejscie) az do wydania; przy wydaniu
     ///    rejestr zamienia wejscie na wynik (ValyrianBlades.RegistryMove).
     ///  - ZAPIS: arm_qohor_orders (SaveText, wlasny try). Przed cofnieciem DLL odebrac zlecenia (inaczej klingi zostaja tylko w napisie).
@@ -113,8 +116,11 @@ namespace Armoury
             var s = Settings.Current;
             float wage = HistoricalPrices.WageFor(6) * TownWage.Index(Qohor());
             int labor = (int)Math.Round(Math.Max(1, s.QohorDays) * Math.Max(1, s.QohorCrew) * wage);
+            // recenzja 177: stawka z ustawien (Qohor Toll Percent), "szesnasta czesc" tylko przy 6.25
+            float pct = Math.Max(0f, s.QohorTollPercent);
+            string part = Math.Abs(pct - 6.25f) < 0.01f ? "a sixteenth part" : pct.ToString("0.##", CultureInfo.InvariantCulture) + "%";
             return Fee(measures) + " gold (" + Math.Max(1, s.QohorDays) + " days of " + Math.Max(1, s.QohorCrew) + " masters: " + labor
-                   + "; the guild's toll of a sixteenth part of the steel's worth: " + (Fee(measures) - labor) + ")";
+                   + "; the guild's toll of " + part + " of the steel's worth: " + (Fee(measures) - labor) + ")";
         }
 
         // ------------------------------------------------------------ menu gracza
@@ -299,8 +305,15 @@ namespace Armoury
             {
                 var q = Qohor();
                 var r = MobileParty.MainParty.ItemRoster;
+                // recenzja 177: straznik dla tego wzoru przed przyjeciem - kopia z niczego staje sie zwykla stala (komunikat w ValyrianBlades.Forge)
+                bool forged = q != null && ValyrianBlades.GuardNow(blade.Item.StringId);
                 int idx = r.FindIndexOfElement(blade);
-                if (q == null || idx < 0 || r.GetElementNumber(idx) <= 0) { Log.Player("The blade is no longer in your baggage.", true); return; }
+                if (q == null || idx < 0 || r.GetElementNumber(idx) <= 0)
+                {
+                    if (!forged) Log.Player("The blade is no longer in your baggage.", true);
+                    else Log.Player("The masters of Qohor will not put a forgery into their fire.", true);
+                    return;
+                }
                 if (Hero.MainHero.Gold < fee) { Log.Player("You cannot pay the masters' fee.", true); return; }
                 GiveGoldAction.ApplyForCharacterToSettlement(Hero.MainHero, q, fee, true);
                 r.AddToCounts(blade, -1);   // dokladna sztuka (z modyfikatorem) - zwrot przy "Take back" w tym samym stanie (krytyka pkt 12)
@@ -323,54 +336,93 @@ namespace Armoury
             try
             {
                 var ready = PlayerOrders().Where(o => o.Ready).ToList();
-                foreach (var o in ready) Deliver(o, null);
+                foreach (var o in ready) Deliver(o);
             }
             catch (Exception e) { Log.Error("QohorMasters.Collect", e); }
         }
 
-        /// <summary>Wydanie: rejestr wejscie -> wynik, wynik do gracza (tabor) albo lorda AI (zaklada / dziedzic). Brak przedmiotu wyniku po
-        /// aktualizacji ROT - mistrzowie oddaja wejscie.</summary>
-        private static void Deliver(Order o, Hero ai)
+        /// <summary>Wydanie: wynik do gracza (tabor) albo do wlasciciela AI (zaklada; drugi miecz - dziedzic / glowa rodu; zmarly - dziedzic; nikt -
+        /// polka Qohoru), DOPIERO POTEM zlecenie znika, a rejestr zamienia wejscie na wynik (recenzja 177: wyjatek w srodku nie gubi klingi -
+        /// kazda sztuka wydawana osobno, przy bledzie na polke Qohoru). Brak przedmiotu wyniku po aktualizacji ROT - mistrzowie oddaja wejscie.</summary>
+        private static void Deliver(Order o)
         {
             var outs = o.OutIds.Select(ValyrianBlades.Item).ToList();
-            _orders.Remove(o);
             if (outs.Any(x => x == null))
             {
                 Log.Info("QohorMasters: wzor wyniku zniknal z gry (" + string.Join(", ", o.OutIds.ToArray()) + ") - mistrzowie oddaja " + string.Join(", ", o.InIds.ToArray()) + ".");
-                ReturnInputs(o, ai);
+                ReturnInputs(o);
+                _orders.Remove(o);
                 return;
             }
-            ValyrianBlades.RegistryMove(o.InIds, o.OutIds);
             int inM = o.InIds.Sum(id => ValyrianBlades.Measures(ValyrianBlades.Item(id))), outM = outs.Sum(x => ValyrianBlades.Measures(x));
-            if (ai == null)
+            string to;
+            if (o.IsPlayer)
             {
                 foreach (var it in outs) MobileParty.MainParty.ItemRoster.AddToCounts(new EquipmentElement(it), 1);
-                try { CraftPopup.Show(outs[0], null, outs.Count); } catch { }
+                // recenzja 177: licznik w okienku tylko przy jednym wzorze (dwa rozne - okienko pierwszego bez "2x"; oba w komunikacie)
+                try { CraftPopup.Show(outs[0], null, outs.All(x => x == outs[0]) ? outs.Count : 1); } catch { }
                 Log.Player("The masters of Qohor lay " + string.Join(" and ", outs.Select(x => x.Name.ToString()).ToArray()) + " before you. The ripples of the old steel run through the new blade.");
+                to = "gracz";
             }
             else
             {
-                UniqueSpoils.Wear(ai, new EquipmentElement(outs[0]), null, "Qohor");
-                var heir = UniqueSpoils.HeirOf(ai);
-                for (int i = 1; i < outs.Count; i++) UniqueSpoils.Give(heir ?? ai, new EquipmentElement(outs[i]), ai, null, "Qohor (" + ai.Name + ")");
+                var els = outs.Select(x => new EquipmentElement(x)).ToList();
+                to = GiveAi(o, els, "przekuty");
                 _dAiDelivered++;
             }
+            _orders.Remove(o);
+            ValyrianBlades.RegistryMove(o.InIds, o.OutIds);
             Log.Info("Kronika unikatow: Qohor - " + string.Join(" + ", o.InIds.ToArray()) + " przekuty na " + string.Join(" + ", o.OutIds.ToArray())
-                     + " (miary " + inM + " -> " + outM + "), odbiera " + (ai != null ? ai.Name.ToString() : "gracz") + ".");
+                     + " (miary " + inM + " -> " + outM + "), odbiera " + to + ".");
         }
 
-        private static void ReturnInputs(Order o, Hero ai)
+        /// <summary>Wlasciciel zlecenia AI: zywy - on; zmarly albo wylaczony - jego dziedzic; brak - null (polka Qohoru).</summary>
+        private static Hero AiOwner(Order o)
         {
+            var owner = ValyrianBlades.FindHero(o.Owner);
+            if (UniqueSpoils.Usable(owner)) return owner;
+            return owner != null ? UniqueSpoils.HeirOf(owner) : null;
+        }
+
+        /// <summary>Sztuki zlecenia AI: pierwsza wlascicielowi (albo dziedzicowi zmarlego), reszta jego dziedzicowi / glowie rodu; nikt - polka
+        /// Qohoru. Kazda sztuka osobno, blad = polka Qohoru (sztuka nie ginie). Zwraca opis do kroniki.</summary>
+        private static string GiveAi(Order o, List<EquipmentElement> els, string what)
+        {
+            var to = AiOwner(o);
+            Hero second = to != null ? (UniqueSpoils.HeirOf(to) ?? to) : null;
+            for (int i = 0; i < els.Count; i++)
+            {
+                var t = i == 0 ? to : second;
+                try
+                {
+                    if (t == null) UniqueSpoils.Shelve(els[i], Shelf(), "Qohor - " + what + ", wlasciciel " + o.Owner + " bez dziedzica");
+                    else UniqueSpoils.Give(t, els[i], t, null, "Qohor - " + what + " (zlecenie " + o.Owner + ")", "from the masters of Qohor");
+                }
+                catch (Exception e)
+                {
+                    Log.Error("QohorMasters.GiveAi", e);
+                    try { UniqueSpoils.Shelve(els[i], Shelf(), "Qohor - blad wydania"); } catch { }
+                }
+            }
+            return to != null ? to.Name + (second != null && second != to && els.Count > 1 ? " i " + second.Name : "") : "polka Qohoru";
+        }
+
+        /// <summary>Polka dla klingi bez odbiorcy: targ Qohoru (bez Qohoru na mapie - pierwsze miasto, zeby sztuka nie zginela).</summary>
+        private static Settlement Shelf() { return Qohor() ?? UniqueSpoils.TownFor(null, null); }
+
+        private static void ReturnInputs(Order o)
+        {
+            var els = new List<EquipmentElement>();
             for (int i = 0; i < o.InIds.Count; i++)
             {
                 var it = ValyrianBlades.Item(o.InIds[i]);
                 if (it == null) continue;
                 ItemModifier mod = null;
                 try { if (i < o.InMods.Count && o.InMods[i].Length > 0) mod = MBObjectManager.Instance.GetObject<ItemModifier>(o.InMods[i]); } catch { }
-                var el = new EquipmentElement(it, mod);
-                if (ai == null) MobileParty.MainParty.ItemRoster.AddToCounts(el, 1);
-                else UniqueSpoils.Wear(ai, el, null, "Qohor - zwrot");
+                els.Add(new EquipmentElement(it, mod));
             }
+            if (o.IsPlayer) foreach (var el in els) MobileParty.MainParty.ItemRoster.AddToCounts(el, 1);
+            else GiveAi(o, els, "zwrot");
         }
 
         private static void TakeBack()
@@ -387,8 +439,8 @@ namespace Armoury
                     {
                         var o = sel != null && sel.Count > 0 ? sel[0].Identifier as Order : null;
                         if (o == null || !_orders.Contains(o) || o.Ready) return;
+                        ReturnInputs(o);
                         _orders.Remove(o);
-                        ReturnInputs(o, null);
                         Log.Info("QohorMasters: gracz odbiera przed czasem " + string.Join(", ", o.InIds.ToArray()) + " (oplata " + o.Fee + " d zostaje w kasie Qohoru).");
                         Log.Player("The masters hand back " + string.Join(" and ", o.InIds.Select(NameOf).ToArray()) + " as it was.");
                         GameMenu.SwitchToMenu(Menu);
@@ -443,7 +495,7 @@ namespace Armoury
             try
             {
                 var q = Qohor();
-                if (q == null || _orders.Count == 0) { Line(0, 0, 0); return; }
+                if (q == null || _orders.Count == 0) { Line(0, 0, 0); return; }   // bez Qohoru (inna mapa) zlecen nie ma - menu i AI spia
                 var town = q.Town;
                 var s = Settings.Current;
                 float need = Math.Max(1, s.QohorCrew) * Math.Max(1f, s.WorkHoursPerManDay);
@@ -468,6 +520,13 @@ namespace Armoury
                         Log.Info("QohorMasters: gotowe - " + Describe(o) + " (" + (o.IsPlayer ? "gracz" : o.Owner) + ").");
                         if (o.IsPlayer) Log.Player("The masters of Qohor have finished " + string.Join(" and ", o.OutIds.Select(NameOf).ToArray()) + ".");
                     }
+                }
+                // recenzja 177: gotowe zlecenia AI mistrzowie odsylaja od razu (wlasciciel, dziedzic albo polka Qohoru) - lord AI do Qohoru sam nie
+                // wraca, a zlecenie zamrazaloby skonczony zasob na zawsze
+                foreach (var o in _orders.Where(x => !x.IsPlayer && x.Ready).ToList())
+                {
+                    try { Deliver(o); }
+                    catch (Exception e) { if (_stumbles++ < 3) Log.Error("QohorMasters.Deliver(AI)", e); }
                 }
                 Line(worked, noHands, noCoal);
             }
@@ -508,16 +567,12 @@ namespace Armoury
             {
                 var s = Settings.Current;
                 if (mp == null || mp.IsMainParty || !mp.IsLordParty || mp.LeaderHero == null || mp.CurrentSettlement == null) return;
+                // recenzja 177: partia rodu gracza (towarzysz) nie zleca sama - o rzeczach rodu gracza decyduje gracz
+                if (mp.ActualClan != null && mp.ActualClan == Clan.PlayerClan) return;
                 var q = Qohor();
                 if (q == null || mp.CurrentSettlement != q) return;
                 var lord = mp.LeaderHero;
-                // odbior gotowych (wlasne albo po zmarlym, ktorego jest dziedzicem)
-                foreach (var o in _orders.Where(x => !x.IsPlayer && x.Ready).ToList())
-                {
-                    var owner = ValyrianBlades.FindHero(o.Owner);
-                    if (owner != null && !owner.IsAlive) owner = UniqueSpoils.HeirOf(owner);
-                    if (owner == lord) Deliver(o, lord);
-                }
+                // odbior gotowych - w Daily (mistrzowie odsylaja od razu)
                 if (!s.QohorReworkEnabled || !s.QohorAiRework || _orders.Any(x => x.Owner == lord.StringId)) return;
                 var eq = lord.BattleEquipment;
                 for (int i = 0; i < 4; i++)
@@ -530,9 +585,15 @@ namespace Armoury
                     if (lord.Gold < fee * 2) continue;
                     var pats = ResultPatterns();
                     if (pats.Count == 0) return;
+                    // recenzja 177: straznik dla tego wzoru przed przyjeciem (jak u gracza) - kopia z niczego staje sie zwykla stala i nie wchodzi
+                    if (ValyrianBlades.GuardNow(el.Item.StringId))
+                    {
+                        var now = eq[(EquipmentIndex)i];
+                        if (now.IsEmpty || now.Item != el.Item) return;
+                    }
                     GiveGoldAction.ApplyForCharacterToSettlement(lord, q, fee, false);
                     eq[(EquipmentIndex)i] = EquipmentElement.Invalid;
-                    UniqueSpoils.ClearCivilian(lord, el.Item.StringId);
+                    UniqueSpoils.ClearTwin(lord, el.Item.StringId);
                     var o = new Order { Owner = lord.StringId, Fee = fee, DaysLeft = Math.Max(1, s.QohorDays), DaysTotal = Math.Max(1, s.QohorDays), Town = q.StringId, Placed = (int)CampaignTime.Now.ToDays };
                     o.InIds.Add(el.Item.StringId); o.InMods.Add(el.ItemModifier != null ? el.ItemModifier.StringId : "");
                     o.OutIds.Add(pats[MBRandom.RandomInt(pats.Count)].StringId); o.OutIds.Add(pats[MBRandom.RandomInt(pats.Count)].StringId);

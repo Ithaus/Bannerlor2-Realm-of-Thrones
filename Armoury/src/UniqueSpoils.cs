@@ -36,21 +36,25 @@ namespace Armoury
     ///     !NotMerchandise - MapEvent.LootDefeatedPartyItems - a reszta ginela z partia); (d) przebranie wladcy przy zmianie
     ///     rodu panujacego (NPCEquipmentsCampaignBehavior -> EquipmentHelper.AssignHeroEquipmentFromEquipment nadpisuje 12
     ///     slotow) zostawia unikaty i stal valyrianska w rekach (stad "Truth nigdzie" u zywego Tregara w tescie 120 dob);
-    ///     (e) smierc gracza: gra sama przekazuje ekwipunek nastepcy (HeirSelectionCampaignBehavior) - my tylko usuwamy
-    ///     cywilny duplikat tej samej klingi, zeby nastepca nie dostal dwoch.
+    ///     (e) smierc gracza: gra sama przekazuje nastepcy zestaw bojowy i cywilny (HeirSelectionCampaignBehavior) - my dokladamy tylko
+    ///     stal valyrianska z zestawu ukrycia, ktorego gra nie przekazuje.
+    ///  Recenzja 177: sztuki na bohaterze wedlug ValyrianBlades.Pieces - w rodzie gracza kazdy slot to osobna sztuka (cywilny miecz gracza
+    ///     to drugi miecz, nie duplikat), u bohatera spoza rodu gracza zestaw cywilny szablonu ROT powtarza bojowy (jedna sztuka); powody dla
+    ///     gracza po angielsku osobno od powodow do logu.
     /// </summary>
     internal static class UniqueSpoils
     {
         private static bool _initDone;
         private static Dictionary<string, string> _last = new Dictionary<string, string>();
         // liczniki doby (177-2) - linia "Unikaty (177)"
-        private static int _dInherit, _dDestroyed, _dRestored, _dParked, _dShelved, _dStandRoster, _dStandNothing, _dStandNone, _stumbles;
+        private static int _dInherit, _dDestroyed, _dRestored, _dParked, _dShelved, _dStandRoster, _dStandNothing, _dStandNone, _dStandDead, _stumbles;
+        private static readonly List<EquipmentElement> _heirStealth = new List<EquipmentElement>();   // smierc gracza: VS z zestawu ukrycia do nastepcy
 
-        internal static void Reset() { _initDone = false; _last = new Dictionary<string, string>(); _common = null; ClearDay(); _stumbles = 0; }
+        internal static void Reset() { _initDone = false; _last = new Dictionary<string, string>(); _common = null; ClearDay(); _stumbles = 0; _heirStealth.Clear(); }
         internal static string Export() { return _initDone ? "init" : ""; }
         internal static void Import(string s) { _initDone = s == "init"; }
 
-        private static void ClearDay() { _dInherit = _dDestroyed = _dRestored = _dParked = _dShelved = _dStandRoster = _dStandNothing = _dStandNone = 0; }
+        private static void ClearDay() { _dInherit = _dDestroyed = _dRestored = _dParked = _dShelved = _dStandRoster = _dStandNothing = _dStandNone = _dStandDead = 0; }
 
         // wpis 66 (test 16:53): "noble_default" (domyslne nakrycie glowy szlachty, poza handlem w ROT) nosza setki postaci -
         // zasmiecal kronike (218 KB) i byl "zdobywany" przy kazdym pojmaniu. Co nosi wiecej niz UniqueMaxWearers postaci,
@@ -135,7 +139,7 @@ namespace Armoury
         // ------------------------------------------------------------ zdobycz (pojmanie, smierc w walce)
         internal static void OnPrisonerTaken(PartyBase capturer, Hero prisoner)
         {
-            try { if (capturer != null) Take(prisoner, capturer.LeaderHero, capturer == PartyBase.MainParty, "pojmanie"); }
+            try { if (capturer != null) Take(prisoner, capturer.LeaderHero, capturer == PartyBase.MainParty, "pojmanie", false); }
             catch (Exception e) { Log.Error("UniqueSpoils.Prisoner", e); }
         }
 
@@ -146,7 +150,7 @@ namespace Armoury
                 if (victim != null && killer != null && detail == KillCharacterAction.KillCharacterActionDetail.DiedInBattle)
                 {
                     bool player = killer == Hero.MainHero || killer.PartyBelongedTo == MobileParty.MainParty;
-                    Take(victim, player ? Hero.MainHero : (killer.PartyBelongedTo != null && killer.PartyBelongedTo.LeaderHero != null ? killer.PartyBelongedTo.LeaderHero : killer), player, "smierc w walce");
+                    Take(victim, player ? Hero.MainHero : (killer.PartyBelongedTo != null && killer.PartyBelongedTo.LeaderHero != null ? killer.PartyBelongedTo.LeaderHero : killer), player, "smierc w walce", true);
                 }
             }
             catch (Exception e) { Log.Error("UniqueSpoils.Killed", e); }
@@ -154,7 +158,7 @@ namespace Armoury
             catch (Exception e) { Log.Error("UniqueSpoils.Inherit", e); }
         }
 
-        private static void Take(Hero from, Hero to, bool toPlayer, string how)
+        private static void Take(Hero from, Hero to, bool toPlayer, string how, bool death)
         {
             if (from == null || to == null || from == to) return;
             if (from == Hero.MainHero && !Settings.Current.UniqueSpoilsFromPlayer) return;
@@ -166,8 +170,8 @@ namespace Armoury
                 var slot = (EquipmentIndex)i;
                 var el = eq[slot];
                 if (el.IsEmpty || !Is(el.Item)) continue;
-                eq[slot] = StandIn(from, el.Item);
-                if (ValyrianBlades.Is(el.Item)) ClearCivilian(from, el.Item.StringId);   // ta sama klinga - bez cywilnego duplikatu
+                eq[slot] = StandIn(from, el.Item, death);
+                if (ValyrianBlades.Is(el.Item)) ClearTwin(from, el.Item.StringId);   // bohater spoza rodu gracza: blizniak w zestawie cywilnym to ta sama klinga
                 if (toPlayer) MobileParty.MainParty.ItemRoster.AddToCounts(el, 1);
                 else Wear(to, el, null, how);
                 got.Add(el.Item.Name.ToString());
@@ -183,9 +187,11 @@ namespace Armoury
         /// <summary>Zamiennik w slocie pojmanego/zabitego (krytyka 177 pkt 28): najpierw najlepsza zwykla sztuka tego samego typu (dla broni
         /// tej samej klasy) z taboru jego wlasnej partii - zdejmowana z taboru; dopiero gdy jej nie ma - zwykly zamiennik kultury
         /// (UniqueLaw.StandInFor, z niczego - jak dotad; pusty slot rozbroilby lorda AI na stale, bo nic go nie dozbraja - liczone
-        /// w linii doby, decyzja do Jeffa).</summary>
-        private static EquipmentElement StandIn(Hero from, ItemObject uniq)
+        /// w linii doby, decyzja do Jeffa). Recenzja 177: zabity w walce - pusty slot (martwy nic nie nosi; zwykla sztuka z taboru jego partii
+        /// poszlaby na zwloki, czyli w nicosc, a zamiennik z niczego trafilby przy smierci gracza do nastepcy).</summary>
+        private static EquipmentElement StandIn(Hero from, ItemObject uniq, bool death)
         {
+            if (death) { _dStandDead++; return EquipmentElement.Invalid; }
             try
             {
                 var party = from.PartyBelongedTo;
@@ -219,17 +225,22 @@ namespace Armoury
             return EquipmentElement.Invalid;
         }
 
-        /// <summary>Cywilny zestaw bohatera: sloty broni z ta sama klinga (dane ROT wpisuja ja w oba zestawy) - pusto. To jeden miecz.</summary>
-        internal static void ClearCivilian(Hero h, string id)
+        /// <summary>Zdjeto z zestawu bojowego jedna sztuke klingi: u bohatera spoza rodu gracza znika jej blizniak - jeden slot z tym id w zestawie
+        /// cywilnym i jeden w zestawie ukrycia (szablon ROT wpisuje te sama klinge w kilka zestawow; to jedna sztuka - ValyrianBlades.Pieces).
+        /// Rod gracza: kazdy slot to osobna sztuka (recenzja 177: dawniej kasowalo cywilny miecz gracza) - nic.</summary>
+        internal static void ClearTwin(Hero h, string id)
         {
             try
             {
-                var civ = h != null ? h.CivilianEquipment : null;
-                if (civ == null || id == null) return;
-                for (int s = 0; s <= (int)EquipmentIndex.ExtraWeaponSlot; s++)
+                if (h == null || id == null || ValyrianBlades.Physical(h)) return;
+                foreach (var eq in ValyrianBlades.Sets(h))
                 {
-                    var it = civ[(EquipmentIndex)s].Item;
-                    if (it != null && it.StringId == id) civ[(EquipmentIndex)s] = EquipmentElement.Invalid;
+                    if (ReferenceEquals(eq, h.BattleEquipment)) continue;
+                    for (int s = 0; s <= (int)EquipmentIndex.ExtraWeaponSlot; s++)
+                    {
+                        var it = eq[(EquipmentIndex)s].Item;
+                        if (it != null && it.StringId == id) { eq[(EquipmentIndex)s] = EquipmentElement.Invalid; break; }
+                    }
                 }
             }
             catch { }
@@ -325,7 +336,7 @@ namespace Armoury
             catch { return null; }
         }
 
-        private static bool Usable(Hero h) { return h != null && h.IsAlive && !h.IsDisabled; }
+        internal static bool Usable(Hero h) { return h != null && h.IsAlive && !h.IsDisabled; }
 
         /// <summary>Dziedzic (Jeff 31.08 "nie zyja - spadkobiercom"): glowa rodu (gra zmienia ja PRZED zdarzeniem smierci), potem dorosle
         /// dzieci, dzieci, malzonek, rodzenstwo, inny czlonek rodu. Null - nikogo.</summary>
@@ -352,18 +363,22 @@ namespace Armoury
         }
 
         /// <summary>Przekazanie sztuki bohaterowi: rod gracza (gracz, towarzysze, rodzina) - do taboru gracza z komunikatem; lord AI - zaklada;
-        /// nikt - polka miasta.</summary>
-        internal static void Give(Hero to, EquipmentElement el, Hero near, MobileParty avoid, string why)
+        /// nikt - polka miasta (siedziba rodu "near", inaczej miasto najblizsze jego partii albo partii "at"). Recenzja 177: why - powod do logu
+        /// (po polsku), playerWhy - powod w komunikacie dla gracza (po angielsku). Zwraca miasto, gdy sztuka poszla na polke.</summary>
+        internal static Settlement Give(Hero to, EquipmentElement el, Hero near, MobileParty avoid, string why, string playerWhy, MobileParty at = null)
         {
-            if (el.IsEmpty) return;
+            if (el.IsEmpty) return null;
             if (Usable(to) && (to == Hero.MainHero || to.Clan == Clan.PlayerClan) && MobileParty.MainParty != null)
             {
                 MobileParty.MainParty.ItemRoster.AddToCounts(el, 1);
-                Log.Player(el.Item.Name + " comes to you (" + why + ").");
-                return;
+                Log.Player(el.Item.Name + " comes to you" + (string.IsNullOrEmpty(playerWhy) ? "." : " (" + playerWhy + ")."));
+                Log.Info("Kronika unikatow: " + el.Item.StringId + " do taboru gracza (" + why + ").");
+                return null;
             }
-            if (Usable(to)) { Wear(to, el, avoid, why); return; }
-            Shelve(el, TownFor(near, near != null ? near.PartyBelongedTo : null), why);
+            if (Usable(to)) { Wear(to, el, avoid, why); return null; }
+            var town = TownFor(near, near != null && near.PartyBelongedTo != null ? near.PartyBelongedTo : at);
+            Shelve(el, town, why);
+            return town;
         }
 
         /// <summary>177-2 DZIEDZICZENIE stali valyrianskiej (krytyka pkt 7 - tylko VS: unikatowa zbroja na dziedzicu zeszlaby przy wczytaniu
@@ -372,34 +387,30 @@ namespace Armoury
         private static void Inherit(Hero victim, Hero killer, KillCharacterAction.KillCharacterActionDetail detail)
         {
             if (victim == null || victim == Hero.MainHero || !Settings.Current.UniqueInheritance) return;
-            var ids = new List<EquipmentElement>();
-            var seen = new HashSet<string>();
-            foreach (var eq in new[] { victim.BattleEquipment, victim.CivilianEquipment })
-            {
-                if (eq == null) continue;
-                for (int s = 0; s <= (int)EquipmentIndex.ExtraWeaponSlot; s++)
-                {
-                    var el = eq[(EquipmentIndex)s];
-                    if (el.IsEmpty || !ValyrianBlades.Is(el.Item)) continue;
-                    if (seen.Add(el.Item.StringId)) ids.Add(el);
-                    eq[(EquipmentIndex)s] = EquipmentElement.Invalid;
-                }
-            }
+            // recenzja 177: kazda sztuka (zestaw bojowy, cywilny, ukrycia - ValyrianBlades.Pieces); dawniej druga taka sama klinga szla w nicosc
+            var ids = ValyrianBlades.TakePieces(victim, null, int.MaxValue);
             if (ids.Count == 0) return;
             bool execution = detail == KillCharacterAction.KillCharacterActionDetail.Executed || detail == KillCharacterAction.KillCharacterActionDetail.ExecutionAfterMapEvent;
-            var to = execution && Usable(killer) ? killer : HeirOf(victim);
-            string how = execution && Usable(killer) ? "egzekucja" : "dziedzictwo";
+            bool byAxe = execution && Usable(killer);
+            var to = byAxe ? killer : HeirOf(victim);
+            string how = byAxe ? "egzekucja" : "dziedzictwo";
+            string playerWhy = byAxe ? "by the executioner's right over " + victim.Name : "as heir of " + victim.Name;
+            Settlement town = null;
             foreach (var el in ids)
             {
-                Give(to, el, victim, null, how + " po " + victim.Name);
+                var t = Give(to, el, victim, null, how + " po " + victim.Name, playerWhy);
+                if (t != null) town = t;
                 _dInherit++;
             }
             string list = string.Join(", ", ids.Select(x => x.Item.StringId).ToArray());
-            Log.Info("Kronika unikatow: " + how + " " + victim.Name + " -> " + (to != null ? to.Name.ToString() : "polka miasta") + ": " + list + ".");
+            Log.Info("Kronika unikatow: " + how + " " + victim.Name + " -> " + (to != null ? to.Name.ToString() : "polka " + (town != null ? town.Name.ToString() : "miasta")) + ": " + list + ".");
             try
             {
-                if (victim.Clan == Clan.PlayerClan || (to != null && to.Clan == Clan.PlayerClan))
-                    Log.Player(string.Join(", ", ids.Select(x => x.Item.Name.ToString()).ToArray()) + " of " + victim.Name + " passes to " + (to != null ? to.Name.ToString() : "the market of a town") + ".");
+                // gracz i jego rod dostaja komunikat w Give ("comes to you"); tu tylko klinga zmarlego z rodu gracza, ktora idzie poza rod
+                bool toPlayerClan = to != null && Usable(to) && (to == Hero.MainHero || to.Clan == Clan.PlayerClan);
+                if (victim.Clan == Clan.PlayerClan && !toPlayerClan)
+                    Log.Player(string.Join(", ", ids.Select(x => x.Item.Name.ToString()).ToArray()) + " of " + victim.Name + " passes to "
+                               + (to != null && Usable(to) ? to.Name.ToString() : "the market of " + (town != null ? town.Name.ToString() : "a town")) + ".");
             }
             catch { }
         }
@@ -428,7 +439,7 @@ namespace Armoury
                 if (destroyer == PartyBase.MainParty)
                 {
                     foreach (var el in got) MobileParty.MainParty.ItemRoster.AddToCounts(el, 1);
-                    Log.Player("Among the baggage of " + mp.Name + ": " + string.Join(", ", got.Select(x => x.Item.Name.ToString()).ToArray()) + ".");
+                    Log.Player("You find " + string.Join(", ", got.Select(x => x.Item.Name.ToString()).ToArray()) + " among the baggage of " + mp.Name + ".");
                     to = "gracz";
                 }
                 else
@@ -441,7 +452,8 @@ namespace Armoury
                     to = lead != null ? lead.Name.ToString() : "polka miasta";
                     foreach (var el in got)
                     {
-                        if (ValyrianBlades.Is(el.Item)) Give(lead, el, lead ?? mp.LeaderHero, mp, "tabor rozbitej partii " + mp.Name);
+                        // recenzja 177: bez nikogo (lead == null) - miasto najblizsze miejsca, gdzie partia znika (at = mp), nie pierwsze miasto swiata
+                        if (ValyrianBlades.Is(el.Item)) Give(lead, el, lead, mp, "tabor rozbitej partii " + mp.Name, "from the baggage of " + mp.Name, mp);
                         else if (dmp != null && dmp != mp && dmp.ItemRoster != null && !dmp.IsMainParty) dmp.ItemRoster.AddToCounts(el, 1);
                         else if (Usable(lead) && lead.PartyBelongedTo != null && lead.PartyBelongedTo != mp && lead.PartyBelongedTo.ItemRoster != null) lead.PartyBelongedTo.ItemRoster.AddToCounts(el, 1);
                         else Shelve(el, TownFor(lead, mp), "tabor rozbitej partii " + mp.Name);
@@ -455,21 +467,48 @@ namespace Armoury
         }
 
         /// <summary>Smierc gracza (krytyka pkt 24 - SPRAWDZONE: gra NIE zostawia ekwipunku na martwym): HeirSelectionCampaignBehavior.
-        /// OnBeforePlayerCharacterChanged kopiuje zestaw bojowy I cywilny starego gracza do taboru nastepcy. Ta sama klinga w obu
-        /// zestawach dalaby nastepcy dwie - cywilny duplikat stali valyrianskiej znika tu (sluchacz nasz moze isc przed albo po grze;
-        /// po - duplikat zlapie spis ValyrianBlades jako nadwyzke).</summary>
+        /// OnBeforePlayerCharacterChanged kopiuje zestaw bojowy I cywilny starego gracza do taboru nastepcy (OnPlayerCharacterChanged dodaje
+        /// je do taboru nowej partii gracza), zestawu ukrycia - nie. Recenzja 177: cywilny miecz gracza to osobna sztuka (dawniej kasowany
+        /// jako "duplikat" - prawdziwa klinga w nicosc), wiec go nie ruszamy; stal valyrianska z zestawu ukrycia zdejmujemy tu i dajemy
+        /// nastepcy po zmianie gracza (OnPlayerChanged) - inaczej zostalaby na zmarlym, poza swiatem.</summary>
         internal static void OnBeforePlayerChanged(Hero oldPlayer, Hero newPlayer)
         {
             try
             {
-                if (oldPlayer == null || oldPlayer.BattleEquipment == null) return;
-                for (int s = 0; s <= (int)EquipmentIndex.ExtraWeaponSlot; s++)
+                _heirStealth.Clear();
+                if (oldPlayer == null) return;
+                foreach (var eq in ValyrianBlades.Sets(oldPlayer))
                 {
-                    var it = oldPlayer.BattleEquipment[(EquipmentIndex)s].Item;
-                    if (ValyrianBlades.Is(it)) ClearCivilian(oldPlayer, it.StringId);
+                    if (ReferenceEquals(eq, oldPlayer.BattleEquipment) || ReferenceEquals(eq, oldPlayer.CivilianEquipment)) continue;
+                    for (int s = 0; s <= (int)EquipmentIndex.ExtraWeaponSlot; s++)
+                    {
+                        var el = eq[(EquipmentIndex)s];
+                        if (el.IsEmpty || !ValyrianBlades.Is(el.Item)) continue;
+                        _heirStealth.Add(el);
+                        eq[(EquipmentIndex)s] = EquipmentElement.Invalid;
+                    }
                 }
             }
             catch (Exception e) { Log.Error("UniqueSpoils.OnBeforePlayerChanged", e); }
+        }
+
+        /// <summary>Po zmianie gracza: stal valyrianska z zestawu ukrycia poprzednika - do taboru nowej partii gracza (jak reszta spadku w grze).</summary>
+        internal static void OnPlayerChanged(Hero oldPlayer, Hero newPlayer, MobileParty newMainParty, bool isMainPartyChanged)
+        {
+            if (_heirStealth.Count == 0) return;
+            try
+            {
+                var mp = newMainParty ?? MobileParty.MainParty;
+                foreach (var el in _heirStealth)
+                {
+                    if (mp != null && mp.ItemRoster != null) mp.ItemRoster.AddToCounts(el, 1);
+                    else Shelve(el, TownFor(newPlayer, null), "spadek po graczu (zestaw ukrycia)");
+                }
+                Log.Info("Kronika unikatow: spadek po " + (oldPlayer != null ? oldPlayer.Name.ToString() : "graczu") + " - z zestawu ukrycia do taboru nastepcy: "
+                         + string.Join(", ", _heirStealth.Select(x => x.Item.StringId).ToArray()) + ".");
+            }
+            catch (Exception e) { Log.Error("UniqueSpoils.OnPlayerChanged", e); }
+            _heirStealth.Clear();
         }
 
         // ------------------------------------------------------------ przebranie bohatera (zmiana rodu panujacego, dorosniecie)
@@ -486,15 +525,21 @@ namespace Armoury
             catch (Exception e) { Log.Error("UniqueSpoils.ApplyAll", e); }
         }
 
-        /// <summary>Prefiks: zapamietaj unikaty i stal valyrianska z nadpisywanego zestawu (bojowy albo cywilny; ukrycie - nie). Priority.Last -
+        /// <summary>Zestaw, ktory gra nadpisuje (jak EquipmentHelper.AssignHeroEquipmentFromEquipment: ukrycia, cywilny albo bojowy).</summary>
+        private static Equipment AssignTarget(Hero h, Equipment from)
+        {
+            return from.IsStealth ? h.StealthEquipment : from.IsCivilian ? h.CivilianEquipment : h.BattleEquipment;
+        }
+
+        /// <summary>Prefiks: zapamietaj unikaty i stal valyrianska z nadpisywanego zestawu (bojowy, cywilny albo - recenzja 177 - ukrycia). Priority.Last -
         /// po straznikach innych (CrashScribe DressedOrNot zwraca false przy braku zestawu - wtedy nic sie nie zmienia i postfiks nic nie robi).</summary>
         public static void AssignPrefix(Hero __0, Equipment __1, out List<KeyValuePair<int, EquipmentElement>> __state)
         {
             __state = null;
             try
             {
-                if (__0 == null || __1 == null || __1.IsStealth || !Settings.Current.UniqueNeverLost) return;
-                var target = __1.IsCivilian ? __0.CivilianEquipment : __0.BattleEquipment;
+                if (__0 == null || __1 == null || !Settings.Current.UniqueNeverLost) return;
+                var target = AssignTarget(__0, __1);
                 if (target == null) return;
                 for (int i = 0; i < 12; i++)
                 {
@@ -513,7 +558,7 @@ namespace Armoury
             if (__state == null) return;
             try
             {
-                var target = __1.IsCivilian ? __0.CivilianEquipment : __0.BattleEquipment;
+                var target = AssignTarget(__0, __1);
                 int n = 0;
                 foreach (var kv in __state)
                 {
@@ -525,7 +570,7 @@ namespace Armoury
                 if (n > 0)
                 {
                     _dRestored += n;
-                    Log.Info("Kronika unikatow: " + __0.Name + " przebrany przez gre (" + (__1.IsCivilian ? "cywilny" : "bojowy") + ") - zostaje przy "
+                    Log.Info("Kronika unikatow: " + __0.Name + " przebrany przez gre (" + (__1.IsStealth ? "ukrycia" : __1.IsCivilian ? "cywilny" : "bojowy") + ") - zostaje przy "
                              + string.Join(", ", __state.Select(x => x.Value.Item.StringId).ToArray()) + ".");
                 }
             }
@@ -548,6 +593,7 @@ namespace Armoury
                     var it = el.EquipmentElement.Item;
                     if (el.Amount <= 0 || !Is(it)) continue;
                     if (it.Difficulty > 0 && it.RelevantSkill != null && lord.GetSkillValue(it.RelevantSkill) < it.Difficulty) continue;
+                    if (ValyrianBlades.Is(it) && ValyrianBlades.Holds(lord, it.StringId)) continue;   // recenzja 177: drugiej takiej samej klingi nie kupuje
                     int slot = SlotFor(lord.BattleEquipment, it);
                     if (slot < 0) continue;                                    // kazdy pasujacy slot trzyma unikat
                     var cur = lord.BattleEquipment[(EquipmentIndex)slot];
@@ -623,10 +669,10 @@ namespace Armoury
                 _last = now;
                 if (changes.Count > 0)
                     Log.Info("Kronika unikatow: dzien " + (int)CampaignTime.Now.ToDays + (first ? " - stan swiata (" + now.Count + " unikatow w obiegu): " : " - zmiany: ") + string.Join(" | ", changes.ToArray()) + ".");
-                if (_dInherit + _dDestroyed + _dRestored + _dParked + _dShelved + _dStandRoster + _dStandNothing + _dStandNone > 0)
+                if (_dInherit + _dDestroyed + _dRestored + _dParked + _dShelved + _dStandRoster + _dStandNothing + _dStandNone + _dStandDead > 0)
                     Log.Info("Unikaty (177): dzien " + (int)CampaignTime.Now.ToDays + " - dziedziczenie stali valyrianskiej " + _dInherit + ", unikaty z taborow znikajacych partii " + _dDestroyed
                              + ", zostawione w rekach przy przebraniu przez gre " + _dRestored + ", odlozone do taboru " + _dParked + ", na polke miasta " + _dShelved
-                             + "; zamiennik pojmanego/zabitego: z jego taboru " + _dStandRoster + ", z niczego (zwykly zamiennik kultury) " + _dStandNothing + ", brak (pusty slot) " + _dStandNone + ".");
+                             + "; zamiennik pojmanego/zabitego: z jego taboru " + _dStandRoster + ", z niczego (zwykly zamiennik kultury) " + _dStandNothing + ", brak (pusty slot) " + _dStandNone + "; zabity w walce - pusty slot " + _dStandDead + ".");
             }
             catch (Exception e) { Log.Error("UniqueSpoils.Daily", e); }
             ClearDay();

@@ -30,19 +30,22 @@ namespace Armoury
     ///     (Vigilance: ROT dal jeden szablon trzem Hightowerom - Jeff 30.08 "jedna na swiecie"; krytyka pkt 19). Odczyt PRZED
     ///     LegendaryLaw.SweepTemplates (ta podmienia klingi w szablonach w pamieci sesji). Rejestr w zapisie (SaveText, klucz
     ///     arm_vs_registry, wlasny try); zmienia go tylko przekucie w Qohorze (177-3).
-    ///  3. STRAZNIK (codziennie, po czystce magazynow AI): kazda sztuka w swiecie - bohaterowie (zestaw bojowy i cywilny; ta sama klinga
-    ///     w obu = jedna sztuka), tabory, targi, schowki gracza, magazyny DTE (gracza i AI), magazyn wojenny Spoils, u mistrzow Qohoru.
+    ///  3. STRAZNIK (codziennie, po czystce magazynow AI): kazda sztuka w swiecie - bohaterowie (zestaw bojowy, cywilny i ukrycia; recenzja 177:
+    ///     rod gracza - kazdy slot to osobna sztuka, bohater spoza rodu gracza - najwiecej w jednym zestawie, bo szablon ROT powtarza klinge
+    ///     w zestawie cywilnym; Pieces), tabory, targi, schowki gracza, magazyny DTE (gracza i AI), magazyn wojenny Spoils, u mistrzow Qohoru.
     ///     Ponad rejestr = kopia z niczego (dowolne zrodlo) -> zwykly odpowiednik (LegendaryLaw.ReplacementFor: liczba sztuk ta sama, stal
-    ///     zwykla), linia "Z NICZEGO"; zostaja najpierw: wlasciciel ze stanu startowego, inni bohaterowie, rzeczy gracza, tabory, magazyny,
-    ///     polki. Ponizej rejestru = UBYTEK -> ERROR w logu (bramka testu; krytyka pkt 20). Klinga w magazynie DTE partii AI idzie do
-    ///     wodza partii (zaklada), bez wodza - na polke miasta (krytyka pkt 3-4: wlasciciela szukamy przez UniqueLaw.FindParty).
+    ///     zwykla), linia "Z NICZEGO"; zostaja najpierw: u mistrzow Qohoru (przyjete po straznika - GuardNow), wlasciciel ze stanu startowego,
+    ///     inni bohaterowie, rzeczy gracza (z magazynem wojennym), tabory, polki, magazyny DTE AI. Ponizej rejestru = UBYTEK -> ERROR w logu
+    ///     (bramka testu; krytyka pkt 20). Klinga w magazynie DTE partii AI idzie do wodza partii (zaklada), bez wodza - na polke miasta
+    ///     najblizszego partii (krytyka pkt 3-4: wlasciciela szukamy przez UniqueLaw.FindParty).
     ///  4. PIERWSZE WCZYTANIE Z 177 (nowa kampania albo zapis Jeffa; znacznik arm_vs_mark): przy pierwszym spisie dobowym (magazyn DTE
     ///     gracza DTE odtwarza dopiero po sesji) klingi brakujace wobec stanu startowego wracaja: najpierw z poleglych (do dziedzica), potem
     ///     odtworzone u wlasciciela ze stanu startowego albo jego dziedzica (klingi zgubione przez dawne bledy - Truth u zywego Tregara,
     ///     Longclaw u Jona; krytyka pkt 16 i 19). Zgubiony klucz rejestru przy obecnym znaczniku = bezpieczny domysl: rejestr = wiecej
     ///     z (stan startowy, obecny stan) - niczego nie zamieniamy (krytyka pkt 6).
     ///  5. Przetop VS zablokowany w zwyklej kuzni (ValyrianNoSmelt): lista Smelt bez VS, prefiks DoSmelting (Priority.First) "Only the
-    ///     masters of Qohor can work Valyrian steel."; SmeltTab.DoSmeltingPostfix nie odkrywa czesci VS (krytyka pkt 5).
+    ///     masters of Qohor can work Valyrian steel."; SmeltTab.DoSmeltingPostfix nie odkrywa czesci VS (krytyka pkt 5). Wylaczone - przetop
+    ///     niszczy klinge i rejestr maleje (recenzja 177; postfiks DoSmelting liczy sztuki w taborze przed i po).
     ///  6. Kopie z niczego zamkniete u zrodla: karawana posilkow DTE (GetRandomGearItems -> zamienniki), nagroda turniejowa (postfiks
     ///     FightTournamentGame.GetTournamentPrize - TournamentsXPanded bierze nagrode bez filtra NotMerchandise; krytyka pkt 2 i 23).
     /// </summary>
@@ -104,7 +107,7 @@ namespace Armoury
         // ------------------------------------------------------------ rejestr i zapis
         private static Dictionary<string, int> _reg;                                         // null = brak (pierwsze wczytanie z 177 / zgubiony klucz)
         private static Dictionary<string, string> _owner = new Dictionary<string, string>();  // id -> StringId wlasciciela ze stanu startowego
-        private static bool _markLoaded, _recoverPending;
+        private static bool _markLoaded, _recoverPending, _guardOffLogged;
         private static Dictionary<string, int> _tplCount;                                    // sesja: szablony z klinga (przed SweepTemplates)
         private static Dictionary<string, List<Hero>> _tplHeroes;
         private static Dictionary<string, string> _where = new Dictionary<string, string>();  // ostatni spis: id -> gdzie
@@ -115,7 +118,7 @@ namespace Armoury
 
         internal static void Reset()
         {
-            _reg = null; _owner = new Dictionary<string, string>(); _markLoaded = false; _recoverPending = false;
+            _reg = null; _owner = new Dictionary<string, string>(); _markLoaded = false; _recoverPending = false; _guardOffLogged = false; _smeltId = null;
             _tplCount = null; _tplHeroes = null; _where = new Dictionary<string, string>(); _lastCount = new Dictionary<string, int>();
             _lossLogged.Clear(); _lastSummary = ""; _stumbles = 0; _measure.Clear(); _dteGone = 0; _dteWeapon = 0; _dteOther = 0; _prizeSwaps = 0; _smeltBlocked = 0;
         }
@@ -221,23 +224,28 @@ namespace Armoury
                     }
                     var ro = h.CharacterObject != null ? FRoster.GetValue(h.CharacterObject) as MBEquipmentRoster : null;
                     if (ro == null) continue;
-                    var ids = new HashSet<string>();
+                    // poprawka recenzji 177: sztuk na szablon = najwiecej w JEDNYM zestawie (ta sama regula co spis bohatera spoza rodu gracza -
+                    // zestaw cywilny i ukrycia powtarza bojowy; dwie klingi w dwoch slotach jednego zestawu to dwie sztuki)
+                    var ids = new Dictionary<string, int>();
                     foreach (var eq in ro.AllEquipments)
                     {
                         if (eq == null) continue;
+                        var inSet = new Dictionary<string, int>();
                         for (int s = 0; s <= (int)EquipmentIndex.ExtraWeaponSlot; s++)
                         {
                             var it = eq[(EquipmentIndex)s].Item;
-                            if (Is(it)) ids.Add(it.StringId);
+                            if (!Is(it)) continue;
+                            int c; inSet.TryGetValue(it.StringId, out c); inSet[it.StringId] = c + 1;
                         }
+                        foreach (var kv in inSet) { int was; if (!ids.TryGetValue(kv.Key, out was) || kv.Value > was) ids[kv.Key] = kv.Value; }
                     }
                     if (ids.Count == 0) continue;
                     bool firstRoster = seenRoster.Add(ro);
-                    foreach (var id in ids)
+                    foreach (var kv in ids)
                     {
-                        List<Hero> l; if (!_tplHeroes.TryGetValue(id, out l)) _tplHeroes[id] = l = new List<Hero>();
+                        List<Hero> l; if (!_tplHeroes.TryGetValue(kv.Key, out l)) _tplHeroes[kv.Key] = l = new List<Hero>();
                         l.Add(h);
-                        if (firstRoster) { int n; _tplCount.TryGetValue(id, out n); _tplCount[id] = n + 1; }
+                        if (firstRoster) { int n; _tplCount.TryGetValue(kv.Key, out n); _tplCount[kv.Key] = n + kv.Value; }
                     }
                 }
             }
@@ -270,15 +278,114 @@ namespace Armoury
             return pick != null ? pick.StringId : "";
         }
 
-        private static bool Holds(Hero h, string id)
+        internal static bool Holds(Hero h, string id)
         {
             if (h == null) return false;
-            foreach (var eq in new[] { h.BattleEquipment, h.CivilianEquipment })
-            {
-                if (eq == null) continue;
+            foreach (var eq in Sets(h))
                 for (int s = 0; s <= (int)EquipmentIndex.ExtraWeaponSlot; s++) { var it = eq[(EquipmentIndex)s].Item; if (it != null && it.StringId == id) return true; }
-            }
             return false;
+        }
+
+        // ------------------------------------------------------------ sztuki na bohaterze (poprawka recenzji 177)
+        /// <summary>Zestawy bohatera z bronia: bojowy, cywilny i ukrycia (Hero.StealthEquipment, gra 1.4.8; bez wspolnego zestawu domyslnego
+        /// Campaign.DefaultStealthEquipment - bohater bez wlasnego dostaje ten jeden obiekt dla wszystkich, zmiana w nim zmienilaby kazdego).</summary>
+        internal static List<Equipment> Sets(Hero h)
+        {
+            var l = new List<Equipment>(3);
+            if (h == null) return l;
+            if (h.BattleEquipment != null) l.Add(h.BattleEquipment);
+            if (h.CivilianEquipment != null && !ReferenceEquals(h.CivilianEquipment, h.BattleEquipment)) l.Add(h.CivilianEquipment);
+            try
+            {
+                var st = h.StealthEquipment;
+                Equipment def = null;
+                try { def = Campaign.Current != null ? Campaign.Current.DefaultStealthEquipment : null; } catch { }
+                if (st != null && !ReferenceEquals(st, def) && !l.Any(x => ReferenceEquals(x, st))) l.Add(st);
+            }
+            catch { }
+            return l;
+        }
+
+        /// <summary>Rod gracza (gracz, towarzysze, rodzina): kazdy slot to osobna sztuka - gracz zaklada je z ekwipunku, zestaw cywilny i ukrycia biora
+        /// przedmiot z taboru jak bojowy. Bohater spoza rodu gracza: zestawy z szablonu ROT - ta sama klinga w bojowym i cywilnym to JEDNA sztuka
+        /// (Despair; recenzja 177 sprawdzila XML), wiec sztuk tyle, ile najwiecej w jednym zestawie.</summary>
+        internal static bool Physical(Hero h)
+        {
+            return h != null && (h == Hero.MainHero || (h.Clan != null && h.Clan == Clan.PlayerClan));
+        }
+
+        /// <summary>Jedna sztuka stali valyrianskiej na bohaterze: sloty, w ktorych ja widac (u bohatera spoza rodu gracza - k-ta w bojowym, k-ta
+        /// w cywilnym i k-ta w ukryciu to ta sama sztuka).</summary>
+        internal sealed class Piece
+        {
+            public string Id; public EquipmentElement El; public bool Battle;
+            public readonly List<KeyValuePair<Equipment, int>> Slots = new List<KeyValuePair<Equipment, int>>();
+        }
+
+        internal static List<Piece> Pieces(Hero h, string onlyId)
+        {
+            var res = new List<Piece>();
+            if (h == null) return res;
+            var sets = Sets(h);
+            bool phys = Physical(h);
+            var perId = new Dictionary<string, List<KeyValuePair<Equipment, int>>[]>();
+            var order = new List<string>();
+            for (int k = 0; k < sets.Count; k++)
+            {
+                var eq = sets[k];
+                for (int s = 0; s <= (int)EquipmentIndex.ExtraWeaponSlot; s++)
+                {
+                    var el = eq[(EquipmentIndex)s];
+                    if (el.IsEmpty || !Is(el.Item) || (onlyId != null && el.Item.StringId != onlyId)) continue;
+                    if (phys)
+                    {
+                        var p = new Piece { Id = el.Item.StringId, El = el, Battle = ReferenceEquals(eq, h.BattleEquipment) };
+                        p.Slots.Add(new KeyValuePair<Equipment, int>(eq, s));
+                        res.Add(p);
+                        continue;
+                    }
+                    List<KeyValuePair<Equipment, int>>[] lists;
+                    if (!perId.TryGetValue(el.Item.StringId, out lists))
+                    {
+                        perId[el.Item.StringId] = lists = new List<KeyValuePair<Equipment, int>>[sets.Count];
+                        for (int j = 0; j < sets.Count; j++) lists[j] = new List<KeyValuePair<Equipment, int>>();
+                        order.Add(el.Item.StringId);
+                    }
+                    lists[k].Add(new KeyValuePair<Equipment, int>(eq, s));
+                }
+            }
+            foreach (var id in order)
+            {
+                var lists = perId[id];
+                int n = lists.Max(x => x.Count);
+                for (int j = 0; j < n; j++)
+                {
+                    var p = new Piece { Id = id };
+                    for (int k = 0; k < lists.Length; k++)
+                    {
+                        if (j >= lists[k].Count) continue;
+                        var sl = lists[k][j];
+                        if (p.Slots.Count == 0) p.El = sl.Key[(EquipmentIndex)sl.Value];
+                        if (ReferenceEquals(sl.Key, h.BattleEquipment)) p.Battle = true;
+                        p.Slots.Add(sl);
+                    }
+                    res.Add(p);
+                }
+            }
+            return res;
+        }
+
+        /// <summary>Zdejmuje z bohatera sztuki stali valyrianskiej (wszystkie albo tylko id, najwyzej max) i zwraca kazda raz - z modyfikatorem.</summary>
+        internal static List<EquipmentElement> TakePieces(Hero h, string onlyId, int max)
+        {
+            var got = new List<EquipmentElement>();
+            foreach (var p in Pieces(h, onlyId))
+            {
+                if (got.Count >= max) break;
+                foreach (var sl in p.Slots) sl.Key[(EquipmentIndex)sl.Value] = EquipmentElement.Invalid;
+                got.Add(p.El);
+            }
+            return got;
         }
 
         // ------------------------------------------------------------ start sesji (koniec LegendaryLaw.OnSession)
@@ -327,11 +434,11 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ spis
-        private enum K { Hero, Roster, Armory, Fixed }
+        private enum K { Hero, Roster, Armory, Stock, Fixed }
         private sealed class Copy
         {
-            public string Id; public K Kind; public int Pri; public string Where;
-            public Hero Hero; public ItemRoster Roster; public EquipmentElement El; public IDictionary Armory; public object ArmoryKey; public bool Player;
+            public string Id; public K Kind; public int Pri; public string Where; public string PlayerWhere;
+            public Hero Hero; public ItemRoster Roster; public EquipmentElement El; public IDictionary Armory; public object ArmoryKey; public object Stock; public bool Player;
         }
 
         private static Dictionary<string, List<Copy>> Gather()
@@ -345,54 +452,53 @@ namespace Armoury
             {
                 if (mp == null || mp.ItemRoster == null) continue;
                 bool pl = mp == MobileParty.MainParty;
-                RosterCopies(mp.ItemRoster, pl ? 3 : 5, pl ? "tabor gracza" : "tabor " + mp.Name, pl, add);   // tabor AI: tylko prawdziwe (gra nie lupi NotMerchandise; tam odklada Wear)
+                // tabor AI: tylko prawdziwe (gra nie lupi NotMerchandise; tam odklada Wear)
+                RosterCopies(mp.ItemRoster, pl ? 3 : 5, pl ? "tabor gracza" : "tabor " + mp.Name, pl ? "in your baggage" : null, add);
             }
             foreach (var st in Settlement.All)
             {
                 if (st == null) continue;
-                if (st.ItemRoster != null) RosterCopies(st.ItemRoster, 6, "targ " + st.Name, false, add);
-                if (st.Stash != null) RosterCopies(st.Stash, 3, "schowek gracza " + st.Name, true, add);
+                if (st.ItemRoster != null) RosterCopies(st.ItemRoster, 6, "targ " + st.Name, null, add);
+                if (st.Stash != null) RosterCopies(st.Stash, 3, "schowek gracza " + st.Name, "in your stash at " + st.Name, add);
             }
             var dte = QuartermasterLaw.DteArmory();
-            if (dte != null) RosterCopies(dte, 3, "magazyn DTE gracza", true, add);
+            if (dte != null) RosterCopies(dte, 3, "magazyn DTE gracza", "in your armoury", add);
             ArmoryCopies(add);
             StockpileCopies(add);
-            QohorMasters.AddCensus((id, where) => add(new Copy { Id = id, Kind = K.Fixed, Pri = 4, Where = where }));   // 177-3: klingi u mistrzow (wejscie do wydania)
+            // 177-3: klingi u mistrzow (wejscie do wydania) - nie do zmiany; przyjete dopiero po straznika dla tego wzoru (GuardNow)
+            QohorMasters.AddCensus((id, where) => add(new Copy { Id = id, Kind = K.Fixed, Pri = 4, Where = where }));
             return map;
         }
 
+        /// <summary>Sztuki na bohaterze (poprawka recenzji 177 - dawniej jeden wpis na id): kazda sztuka osobno wedlug Pieces - rod gracza kazdy
+        /// slot (bojowy, cywilny, ukrycia), reszta najwiecej w jednym zestawie (zestaw cywilny szablonu ROT powtarza bojowy).</summary>
         private static void HeroCopies(Hero h, Action<Copy> add, HashSet<Hero> seen)
         {
             if (h == null || !seen.Add(h)) return;
-            HashSet<string> ids = null;
-            foreach (var eq in new[] { h.BattleEquipment, h.CivilianEquipment })
+            var pieces = Pieces(h, null);
+            if (pieces.Count == 0) return;
+            bool player = Physical(h);
+            foreach (var p in pieces)
             {
-                if (eq == null) continue;
-                for (int s = 0; s <= (int)EquipmentIndex.ExtraWeaponSlot; s++)
-                {
-                    var it = eq[(EquipmentIndex)s].Item;
-                    if (!Is(it)) continue;
-                    if (ids == null) ids = new HashSet<string>();
-                    ids.Add(it.StringId);
-                }
-            }
-            if (ids == null) return;
-            foreach (var id in ids)
-            {
-                string o; _owner.TryGetValue(id, out o);
+                string o; _owner.TryGetValue(p.Id, out o);
                 int pri = o == h.StringId ? 0 : (h == Hero.MainHero || (h.Clan != null && h.Clan.Leader == h)) ? 1 : 2;
-                add(new Copy { Id = id, Kind = K.Hero, Pri = pri, Hero = h, Player = h == Hero.MainHero || h.Clan == Clan.PlayerClan, Where = (h.IsDisabled ? "nieaktywny " : "nosi ") + h.Name });
+                add(new Copy
+                {
+                    Id = p.Id, Kind = K.Hero, Pri = pri, Hero = h, Player = player,
+                    Where = (h.IsDisabled ? "nieaktywny " : "nosi ") + h.Name + (p.Battle ? "" : " (zestaw cywilny/ukrycia)"),
+                    PlayerWhere = h == Hero.MainHero ? "you carry" : "carried by " + h.Name
+                });
             }
         }
 
-        private static void RosterCopies(ItemRoster r, int pri, string where, bool player, Action<Copy> add)
+        private static void RosterCopies(ItemRoster r, int pri, string where, string playerWhere, Action<Copy> add)
         {
             for (int i = 0; i < r.Count; i++)
             {
                 var el = r.GetElementCopyAtIndex(i);
                 if (el.Amount <= 0 || !Is(el.EquipmentElement.Item)) continue;
                 for (int n = 0; n < el.Amount; n++)
-                    add(new Copy { Id = el.EquipmentElement.Item.StringId, Kind = K.Roster, Pri = pri, Roster = r, El = el.EquipmentElement, Player = player, Where = where });
+                    add(new Copy { Id = el.EquipmentElement.Item.StringId, Kind = K.Roster, Pri = pri, Roster = r, El = el.EquipmentElement, Player = playerWhere != null, PlayerWhere = playerWhere, Where = where });
             }
         }
 
@@ -426,7 +532,9 @@ namespace Armoury
             }
         }
 
-        // magazyn wojenny Spoils of War (gracz): QuartermasterBehavior._stockpileManager._stockpiles -> WarStockpile.ItemIds / ItemCounts (krytyka pkt 12)
+        // magazyn wojenny Spoils of War (gracz): QuartermasterBehavior._stockpileManager._stockpiles -> WarStockpile.ItemIds / ItemCounts /
+        // ItemIsLooted (zwykle listy, rownolegle - krytyka pkt 12). Recenzja 177: to RZECZY GRACZA (Pri 3, do zamiany jak tabor), nie miejsce
+        // "nie do zmiany" - przed 177 loteria Spoils w symulacji kopiowala tu klingi pokonanych bohaterow; kopia nie moze wypierac prawdziwej klingi.
         private static Type _tQm;
         private static void StockpileCopies(Action<Copy> add)
         {
@@ -446,11 +554,48 @@ namespace Armoury
                     var ids = AccessTools.Property(sp.GetType(), "ItemIds").GetValue(sp, null) as List<string>;
                     var counts = AccessTools.Property(sp.GetType(), "ItemCounts").GetValue(sp, null) as List<int>;
                     if (ids == null || counts == null) continue;
+                    string town = null;
+                    try { var st = MBObjectManager.Instance.GetObject<Settlement>(e.Key as string); if (st != null) town = st.Name.ToString(); } catch { }
                     for (int i = 0; i < ids.Count && i < counts.Count; i++)
-                        if (IsId(ids[i])) for (int k = 0; k < counts[i]; k++) add(new Copy { Id = ids[i], Kind = K.Fixed, Pri = 4, Player = true, Where = "magazyn wojenny Spoils " + e.Key });
+                        if (IsId(ids[i]))
+                            for (int k = 0; k < counts[i]; k++)
+                                add(new Copy { Id = ids[i], Kind = K.Stock, Pri = 3, Player = true, Stock = sp, Where = "magazyn wojenny Spoils " + e.Key,
+                                               PlayerWhere = "in your war stockpile" + (town != null ? " at " + town : "") });
                 }
             }
             catch (Exception ex) { if (_stumbles++ < 2) Log.Error("ValyrianBlades.Stockpile", ex); }
+        }
+
+        /// <summary>Magazyn wojenny: jedna sztuka id -> zamiennik (ta sama pozycja "z lupu" albo nie; listy rownolegle jak WarStockpile.AddItem
+        /// i sprzedaz automatyczna Spoils - pusta pozycja znika ze wszystkich trzech list).</summary>
+        private static void StockSwap(object sp, string id, ItemObject repl)
+        {
+            try
+            {
+                if (sp == null) return;
+                var t = sp.GetType();
+                var ids = AccessTools.Property(t, "ItemIds").GetValue(sp, null) as List<string>;
+                var counts = AccessTools.Property(t, "ItemCounts").GetValue(sp, null) as List<int>;
+                var pLoot = AccessTools.Property(t, "ItemIsLooted");
+                var looted = pLoot != null ? pLoot.GetValue(sp, null) as List<bool> : null;
+                if (ids == null || counts == null) return;
+                int i = -1;
+                for (int j = 0; j < ids.Count && j < counts.Count; j++) if (ids[j] == id && counts[j] > 0) { i = j; break; }
+                if (i < 0) return;
+                bool lo = looted != null && i < looted.Count && looted[i];
+                counts[i]--;
+                if (counts[i] <= 0)
+                {
+                    ids.RemoveAt(i); counts.RemoveAt(i);
+                    if (looted != null && i < looted.Count) looted.RemoveAt(i);
+                }
+                if (repl == null) return;
+                for (int j = 0; j < ids.Count && j < counts.Count; j++)
+                    if (ids[j] == repl.StringId && (looted == null || j >= looted.Count || looted[j] == lo)) { counts[j]++; return; }
+                ids.Add(repl.StringId); counts.Add(1);
+                if (looted != null) { while (looted.Count < ids.Count - 1) looted.Add(false); looted.Add(lo); }
+            }
+            catch (Exception e) { if (_stumbles++ < 3) Log.Error("ValyrianBlades.StockSwap", e); }
         }
 
         // ------------------------------------------------------------ straznik dobowy
@@ -462,69 +607,111 @@ namespace Armoury
             {
                 var s = Settings.Current;
                 var copies = Gather();
-                int fromNothing = 0, recovered = 0, fromDead = 0, moved = 0;
+                int fromNothing = 0, recovered = 0, fromDead = 0, moved = 0, smelted = 0;
                 var notes = new List<string>();
+                // recenzja 177: wylaczony straznik tylko liczy - pierwszy spis z 177 (zamiana kopii, odzysk brakujacych) czeka na wlaczenie
+                bool recover = _recoverPending && s.ValyrianGuard;
                 foreach (var id in AllIds)
                 {
                     List<Copy> l; copies.TryGetValue(id, out l);
                     if (l == null) l = new List<Copy>();
                     int allowed = Registered(id);
-                    if (l.Count > allowed && s.ValyrianGuard)
-                    {
-                        var order = l.OrderBy(c => c.Kind == K.Fixed ? 0 : 1).ThenBy(c => c.Pri).ToList();
-                        for (int i = allowed; i < order.Count; i++)
-                        {
-                            var c = order[i];
-                            if (c.Kind == K.Fixed) { notes.Add(id + " nadwyzka w miejscu nie do zmiany (" + c.Where + ")"); continue; }
-                            var repl = Forge(id, c);
-                            fromNothing++;
-                            notes.Add("Z NICZEGO +1 " + id + " " + c.Where + " -> " + (repl != null ? repl.StringId : "nic"));
-                            l.Remove(c);
-                        }
-                    }
-                    else if (l.Count < allowed && _recoverPending)
+                    if (l.Count > allowed && s.ValyrianGuard) fromNothing += Surplus(id, l, notes);
+                    else if (l.Count < allowed && recover)
                     {
                         int need = allowed - l.Count;
                         fromDead += FromDead(id, ref need, notes);
-                        recovered += Restore(id, need, notes);
+                        if (need > 0 && SmeltedByPlayer(Item(id)))
+                        {
+                            // recenzja 177: przed 177 przetop VS byl dozwolony, a SmeltTab odkrywal wtedy WSZYSTKIE czesci klingi (jedyna droga do
+                            // nich - SmeltTab.DoSmeltingPostfix); czesci odkryte w kuzni gracza = klinga przetopiona, jej stal jest juz sztabami -
+                            // nie odtwarzamy (nic z niczego), rejestr w dol jak przy przetopie z ValyrianNoSmelt wylaczonym
+                            int was = Registered(id);
+                            _reg[id] = Math.Max(0, was - need);
+                            notes.Add(id + " przetopiona przez gracza przed 177 (czesci klingi odkryte w kuzni) - nie odtwarzam, rejestr " + was + " -> " + _reg[id]);
+                            smelted += need;
+                        }
+                        else recovered += Restore(id, need, notes);
                     }
                     // klinga w magazynie DTE partii AI - do wodza tej partii (zaklada), bez wodza - na polke
                     foreach (var c in l.Where(x => x.Kind == K.Armory).ToList()) { if (MoveFromArmory(c, notes)) moved++; }
                 }
-                if (_recoverPending)
+                if (recover)
                 {
                     _recoverPending = false;
                     Log.Info("Stal valyrianska: pierwszy spis z 177 - kopii ponad stan startowy zamienionych na zwykla stal " + fromNothing + ", odzysk z poleglych " + fromDead
-                             + ", odtworzone u wlasciciela ze stanu startowego albo dziedzica " + recovered + ".");
+                             + ", odtworzone u wlasciciela ze stanu startowego albo dziedzica " + recovered + ", przetopione przez gracza przed 177 (bez odtwarzania, rejestr w dol) " + smelted + ".");
+                }
+                else if (_recoverPending && !_guardOffLogged)
+                {
+                    _guardOffLogged = true;
+                    Log.Info("Stal valyrianska: straznik wylaczony (Valyrian Guard) - tylko spis; pierwszy spis z 177 (kopie -> zwykla stal, brakujace -> wlasciciel) czeka na wlaczenie.");
                 }
                 if (notes.Count > 0) Log.Info("Stal valyrianska: dzien " + (int)CampaignTime.Now.ToDays + " - " + string.Join(" | ", notes.ToArray()) + ".");
-                Summary(fromNothing + recovered + fromDead + moved > 0 ? Gather() : copies, false);
+                Summary(fromNothing + recovered + fromDead + moved + smelted > 0 ? Gather() : copies, false);
             }
             catch (Exception e) { Log.Error("ValyrianBlades.Daily", e); }
         }
 
-        /// <summary>Kopia ponad rejestr: w tym miejscu zostaje zwykly odpowiednik (liczba sztuk ta sama, stal zwykla).</summary>
+        /// <summary>Nadwyzka ponad rejestr -> zwykly odpowiednik w tym samym miejscu. Kolejnosc zostawiania: u mistrzow Qohoru (nie do zmiany - klinga
+        /// wchodzi tam dopiero po straznika dla swojego wzoru, GuardNow, wiec to prawdziwa stal), potem wedlug Pri: wlasciciel startowy 0, gracz i glowy
+        /// rodow 1, inni bohaterowie 2, rzeczy gracza 3 (tabor, schowki, magazyn DTE gracza, magazyn wojenny Spoils), tabory AI 5, targi 6, magazyny
+        /// DTE AI 7. Zamienione sztuki schodza z listy l.</summary>
+        private static int Surplus(string id, List<Copy> l, List<string> notes)
+        {
+            int allowed = Registered(id);
+            if (l == null || l.Count <= allowed) return 0;
+            var order = l.OrderBy(c => c.Kind == K.Fixed ? 0 : 1).ThenBy(c => c.Pri).ToList();
+            int n = 0;
+            for (int i = allowed; i < order.Count; i++)
+            {
+                var c = order[i];
+                if (c.Kind == K.Fixed) { notes.Add(id + " nadwyzka w miejscu nie do zmiany (" + c.Where + ")"); continue; }
+                var repl = Forge(id, c);
+                n++;
+                notes.Add("Z NICZEGO +1 " + id + " " + c.Where + " -> " + (repl != null ? repl.StringId : "nic"));
+                l.Remove(c);
+            }
+            return n;
+        }
+
+        /// <summary>Straznik dla jednego wzoru, teraz (recenzja 177): przed przyjeciem klingi przez mistrzow Qohoru - kopia z niczego nie przechodzi
+        /// przez Qohor jako "prawdziwa" (tam jest nie do zmiany, a przekucie przesuwa rejestr). True - cos zamienione na zwykla stal.</summary>
+        internal static bool GuardNow(string id)
+        {
+            if (_reg == null || !IsId(id) || Settings.Current == null || !Settings.Current.ValyrianGuard) return false;
+            try
+            {
+                var copies = Gather();
+                List<Copy> l; copies.TryGetValue(id, out l);
+                var notes = new List<string>();
+                int n = Surplus(id, l, notes);
+                if (notes.Count > 0) Log.Info("Stal valyrianska: dzien " + (int)CampaignTime.Now.ToDays + " (przed przyjeciem w Qohorze) - " + string.Join(" | ", notes.ToArray()) + ".");
+                return n > 0;
+            }
+            catch (Exception e) { Log.Error("ValyrianBlades.GuardNow", e); return false; }
+        }
+
+        /// <summary>Kopia ponad rejestr: w tym miejscu zostaje zwykly odpowiednik (liczba sztuk ta sama, stal zwykla). Jedna kopia = jedna sztuka.</summary>
         private static ItemObject Forge(string id, Copy c)
         {
             var it = Item(id);
             ItemObject repl = null;
             try { repl = LegendaryLaw.ReplacementFor(it); } catch { }
+            var replEl = repl != null ? new EquipmentElement(repl) : EquipmentElement.Invalid;
             switch (c.Kind)
             {
                 case K.Hero:
-                    foreach (var eq in new[] { c.Hero.BattleEquipment, c.Hero.CivilianEquipment })
                     {
-                        if (eq == null) continue;
-                        for (int s = 0; s <= (int)EquipmentIndex.ExtraWeaponSlot; s++)
-                        {
-                            var x = eq[(EquipmentIndex)s].Item;
-                            if (x != null && x.StringId == id) eq[(EquipmentIndex)s] = repl != null ? new EquipmentElement(repl) : EquipmentElement.Invalid;
-                        }
+                        // recenzja 177: JEDNA sztuka (dawniej kazdy slot z tym id - dwie klingi za jedna nadwyzke); najpierw sztuka spoza zestawu
+                        // bojowego (cywilny/ukrycia), zeby bohater zostal z bronia w reku; sztuka bohatera spoza rodu gracza - wraz z blizniakiem
+                        var p = Pieces(c.Hero, id).OrderBy(x => x.Battle ? 1 : 0).FirstOrDefault();
+                        if (p != null) foreach (var sl in p.Slots) sl.Key[(EquipmentIndex)sl.Value] = replEl;
                     }
                     break;
                 case K.Roster:
                     c.Roster.AddToCounts(c.El, -1);
-                    if (repl != null) c.Roster.AddToCounts(new EquipmentElement(repl), 1);
+                    if (repl != null) c.Roster.AddToCounts(replEl, 1);
                     break;
                 case K.Armory:
                     {
@@ -533,13 +720,18 @@ namespace Armoury
                         if (repl != null) { int r = 0; try { if (c.Armory.Contains(repl)) r = Convert.ToInt32(c.Armory[repl]); } catch { } c.Armory[repl] = r + 1; }
                     }
                     break;
+                case K.Stock:
+                    StockSwap(c.Stock, id, repl);
+                    break;
             }
+            // recenzja 177: nazwa posiadacza i miejsca (dawniej "you hold" - takze o klindze towarzysza albo w magazynie)
             if (c.Player && it != null)
-                Log.Player("The " + it.Name + " you hold is no Valyrian steel - a fine forgery." + (repl != null ? " It is only " + repl.Name + "." : ""), true);
+                Log.Player("There is more " + it.Name + " in the world than was ever forged: the one " + (c.PlayerWhere ?? "you keep") + " is a fine forgery"
+                           + (repl != null ? " - only " + repl.Name + "." : ", worth nothing."), true);
             return repl;
         }
 
-        /// <summary>Odzysk z poleglych (pierwsze wczytanie): klinga na bohaterze zmarlym PO starcie kampanii idzie do jego dziedzica.</summary>
+        /// <summary>Odzysk z poleglych (pierwsze wczytanie): klinga na bohaterze zmarlym PO starcie kampanii idzie do jego dziedzica - kazda sztuka.</summary>
         private static int FromDead(string id, ref int need, List<string> notes)
         {
             int n = 0;
@@ -551,23 +743,15 @@ namespace Armoury
                 {
                     if (need <= 0) break;
                     if (h == null || !h.IsDead || h.DeathDay.ToDays < start - 0.5 || !Holds(h, id)) continue;
-                    EquipmentElement el = EquipmentElement.Invalid;
-                    foreach (var eq in new[] { h.BattleEquipment, h.CivilianEquipment })
-                    {
-                        if (eq == null) continue;
-                        for (int s = 0; s <= (int)EquipmentIndex.ExtraWeaponSlot; s++)
-                        {
-                            var x = eq[(EquipmentIndex)s];
-                            if (x.IsEmpty || x.Item.StringId != id) continue;
-                            if (el.IsEmpty) el = x;
-                            eq[(EquipmentIndex)s] = EquipmentElement.Invalid;
-                        }
-                    }
-                    if (el.IsEmpty) continue;
+                    var got = TakePieces(h, id, need);
+                    if (got.Count == 0) continue;
                     var heir = UniqueSpoils.HeirOf(h);
-                    UniqueSpoils.Give(heir, el, h, null, "odzysk z poleglego " + h.Name);
-                    notes.Add("odzysk " + id + " z poleglego " + h.Name + " -> " + (heir != null ? heir.Name.ToString() : "polka miasta"));
-                    need--; n++;
+                    foreach (var el in got)
+                    {
+                        UniqueSpoils.Give(heir, el, h, null, "odzysk z poleglego " + h.Name, "recovered from the fallen " + h.Name);
+                        need--; n++;
+                    }
+                    notes.Add("odzysk " + id + (got.Count > 1 ? " x" + got.Count : "") + " z poleglego " + h.Name + " -> " + (heir != null ? heir.Name.ToString() : "polka miasta"));
                 }
             }
             catch (Exception e) { Log.Error("ValyrianBlades.FromDead", e); }
@@ -592,12 +776,38 @@ namespace Armoury
                 if (h == null || Holds(h, id)) continue;
                 Hero to = h.IsAlive && !h.IsDisabled ? h : UniqueSpoils.HeirOf(h);
                 if (to != null && Holds(to, id)) continue;
-                UniqueSpoils.Give(to, new EquipmentElement(it), h, null, "stan startowy (" + h.Name + ")");
+                UniqueSpoils.Give(to, new EquipmentElement(it), h, null, "stan startowy (" + h.Name + ")", "returned to its rightful line");
                 notes.Add("odtworzona " + id + " -> " + (to != null ? to.Name.ToString() : "polka miasta") + " (wlasciciel startowy " + h.Name + ")");
                 need--; n++;
             }
             if (need > 0) notes.Add("UWAGA: " + id + " brakuje " + need + " - nikt ze stanu startowego (rejestr bez zmian)");
             return n;
+        }
+
+        private static readonly FieldInfo FTemplate = AccessTools.Field(typeof(WeaponDesign), "Template");
+
+        /// <summary>Czy gracz rozebral ten wzor w kuzni przed 177: wszystkie czesci projektu klingi (poza danymi z gory) odkryte u gracza. Czesci
+        /// stali valyrianskiej sa ukryte w projektancie (losowe odkrycie gry ich nie bierze - CraftingCampaignBehavior.OpenNewPart pomija
+        /// IsHiddenOnDesigner); odkrywal je tylko SmeltTab.DoSmeltingPostfix przy przetopie legendy (do 177 takze VS).</summary>
+        private static bool SmeltedByPlayer(ItemObject it)
+        {
+            try
+            {
+                var d = it != null ? it.WeaponDesign : null;
+                var beh = Campaign.Current != null ? Campaign.Current.GetCampaignBehavior<CraftingCampaignBehavior>() : null;
+                var tpl = d != null && FTemplate != null ? FTemplate.GetValue(d) as CraftingTemplate : null;
+                if (beh == null || tpl == null || d.UsedPieces == null) return false;
+                int n = 0;
+                foreach (var el in d.UsedPieces)
+                {
+                    var piece = el != null ? el.CraftingPiece : null;
+                    if (piece == null || piece.IsEmptyPiece || piece.IsGivenByDefault) continue;
+                    if (!beh.IsOpened(piece, tpl)) return false;
+                    n++;
+                }
+                return n > 0;
+            }
+            catch { return false; }
         }
 
         private static bool MoveFromArmory(Copy c, List<string> notes)
@@ -612,8 +822,10 @@ namespace Armoury
                 try { if (c.ArmoryKey is MBGUID) mp = UniqueLaw.FindParty((MBGUID)c.ArmoryKey); } catch { }
                 Hero lead = mp != null ? mp.LeaderHero : null;
                 if (lead == null && mp != null && mp.Party != null) lead = mp.Party.Owner;
-                UniqueSpoils.Give(lead, new EquipmentElement(it), lead, null, "magazyn DTE " + (mp != null ? mp.Name.ToString() : "partii"));
-                notes.Add(it.StringId + " z magazynu DTE " + (mp != null ? mp.Name.ToString() : "nieznanej partii") + " -> " + (lead != null ? lead.Name.ToString() : "polka miasta"));
+                string name = mp != null ? mp.Name.ToString() : null;
+                // recenzja 177: bez wodza i wlasciciela - miasto najblizsze partii (at = mp), nie pierwsze miasto swiata
+                UniqueSpoils.Give(lead, new EquipmentElement(it), lead, null, "magazyn DTE " + (name ?? "partii"), name != null ? "from the stores of " + name : "from a war band's stores", mp);
+                notes.Add(it.StringId + " z magazynu DTE " + (name ?? "nieznanej partii") + " -> " + (lead != null ? lead.Name.ToString() : "polka miasta"));
                 return true;
             }
             catch (Exception e) { if (_stumbles++ < 3) Log.Error("ValyrianBlades.MoveFromArmory", e); return false; }
@@ -678,7 +890,12 @@ namespace Armoury
             try
             {
                 var mDo = AccessTools.Method(typeof(CraftingCampaignBehavior), "DoSmelting");
-                if (mDo != null) { h.Patch(mDo, prefix: new HarmonyMethod(typeof(ValyrianBlades), nameof(SmeltPrefix)) { priority = Priority.First }); got.Add("przetop"); }
+                if (mDo != null)
+                {
+                    h.Patch(mDo, prefix: new HarmonyMethod(typeof(ValyrianBlades), nameof(SmeltPrefix)) { priority = Priority.First },
+                                 postfix: new HarmonyMethod(typeof(ValyrianBlades), nameof(SmeltPostfix)) { priority = Priority.Last });
+                    got.Add("przetop");
+                }
                 var tVm = QuartermasterLaw.FindType("TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting.Smelting.SmeltingVM");
                 var mRefresh = tVm != null ? AccessTools.Method(tVm, "RefreshList") : null;
                 if (mRefresh != null) { h.Patch(mRefresh, postfix: new HarmonyMethod(typeof(ValyrianBlades), nameof(SmeltListPostfix)) { priority = Priority.Last }); got.Add("lista Smelt"); }
@@ -700,18 +917,49 @@ namespace Armoury
             Log.Info("ValyrianBlades: latki wpiete - " + (got.Count > 0 ? string.Join(", ", got.ToArray()) : "ZADNA") + ".");
         }
 
+        // przetop dozwolony (ValyrianNoSmelt wylaczone): ile sztuk tej klingi bylo w taborze przed przetopem (recenzja 177)
+        private static string _smeltId;
+        private static int _smeltBefore;
+
         /// <summary>Zwykla kuznia nie rusza stali valyrianskiej (kanon: przekuwac umie tylko Qohor) - niezaleznie od CraftingEnabled.</summary>
         public static bool SmeltPrefix(EquipmentElement equipmentElement)
         {
+            _smeltId = null;
             try
             {
-                if (!Settings.Current.ValyrianNoSmelt || !Is(equipmentElement.Item)) return true;
+                if (!Is(equipmentElement.Item)) return true;
+                if (!Settings.Current.ValyrianNoSmelt)
+                {
+                    var r = MobileParty.MainParty != null ? MobileParty.MainParty.ItemRoster : null;
+                    if (r != null && _reg != null) { _smeltId = equipmentElement.Item.StringId; _smeltBefore = r.GetItemNumber(equipmentElement.Item); }
+                    return true;
+                }
                 _smeltBlocked++;
                 Log.Player("Only the masters of Qohor can work Valyrian steel.", true);
                 Log.Info("ValyrianBlades: przetop " + equipmentElement.Item.StringId + " zablokowany (zwykla kuznia).");
                 return false;
             }
             catch { return true; }
+        }
+
+        /// <summary>Recenzja 177: przetop dozwolony (ValyrianNoSmelt wylaczone) niszczy klinge - gra daje sztaby, a stal valyrianska ginie; rejestr
+        /// maleje o tyle sztuk, ile ubylo z taboru (niezaleznie od tego, ktory prefiks wykonal przetop), inaczej codzienny falszywy UBYTEK.</summary>
+        public static void SmeltPostfix(EquipmentElement equipmentElement)
+        {
+            var id = _smeltId;
+            _smeltId = null;
+            if (id == null) return;
+            try
+            {
+                var r = MobileParty.MainParty != null ? MobileParty.MainParty.ItemRoster : null;
+                if (r == null || equipmentElement.Item == null || equipmentElement.Item.StringId != id) return;
+                int gone = _smeltBefore - r.GetItemNumber(equipmentElement.Item);
+                if (gone <= 0) return;
+                int was = Registered(id);
+                for (int i = 0; i < gone; i++) RegistryMove(new[] { id }, new string[0]);
+                Log.Info("Kronika unikatow: " + id + " przetopiona w kuzni gracza (Valyrian No Smelt wylaczone) - stal valyrianska stracona, rejestr " + was + " -> " + Registered(id) + ".");
+            }
+            catch (Exception e) { if (_stumbles++ < 3) Log.Error("ValyrianBlades.SmeltPostfix", e); }
         }
 
         /// <summary>Lista Smelt bez klng valyrianskich (tylko odejmuje).</summary>

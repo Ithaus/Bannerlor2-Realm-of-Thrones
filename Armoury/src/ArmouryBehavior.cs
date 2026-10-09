@@ -552,7 +552,7 @@ namespace Armoury
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, delegate { try { TroopSelfMend.Hourly(); } catch { } });
             CampaignEvents.DailyTickPartyEvent.AddNonSerializedListener(this, AiGear.OnDailyTickParty);
             CampaignEvents.DailyTickPartyEvent.AddNonSerializedListener(this, UniqueSpoils.OnDailyTickParty);
-            CampaignEvents.DailyTickPartyEvent.AddNonSerializedListener(this, QohorMasters.OnDailyTickParty);   // 177-3: lord AI w Qohorze - ta sama regula przekucia, odbior gotowych
+            CampaignEvents.DailyTickPartyEvent.AddNonSerializedListener(this, QohorMasters.OnDailyTickParty);   // 177-3: lord AI w Qohorze - ta sama regula przekucia (gotowe odsyla QohorMasters.Daily)
             CampaignEvents.SettlementEntered.AddNonSerializedListener(this, QohorMasters.OnEntered);           // 177-3: "Your Valyrian steel is ready" przy wejsciu do Qohoru
             CampaignEvents.DailyTickPartyEvent.AddNonSerializedListener(this, ArmyClothing.OnDailyTickParty);   // 150: zuzycie odziezy w partiach rodow
             // SUWAKI MCM NA ZYWO (Jeff 03.09: "nadal 1 predkosc, o co chodzi" -
@@ -612,7 +612,8 @@ namespace Armoury
             CampaignEvents.OnPrisonerTakenEvent.AddNonSerializedListener(this, OnPrisonerTaken);
             CampaignEvents.HeroPrisonerTaken.AddNonSerializedListener(this, UniqueSpoils.OnPrisonerTaken);
             CampaignEvents.HeroKilledEvent.AddNonSerializedListener(this, UniqueSpoils.OnHeroKilled);
-            CampaignEvents.OnBeforePlayerCharacterChangedEvent.AddNonSerializedListener(this, UniqueSpoils.OnBeforePlayerChanged);   // 177-2: nastepca gracza bez cywilnego duplikatu klingi
+            CampaignEvents.OnBeforePlayerCharacterChangedEvent.AddNonSerializedListener(this, UniqueSpoils.OnBeforePlayerChanged);   // recenzja 177: stal valyrianska z zestawu ukrycia gracza (gra go nie przekazuje) ...
+            CampaignEvents.OnPlayerCharacterChangedEvent.AddNonSerializedListener(this, UniqueSpoils.OnPlayerChanged);               // ... trafia do taboru nastepcy
             // DIAGNOSTYKA (Jeff 29.08: "awans wycina sprzet z magazynu?") -
             // ani DTE, ani my nie sluchamy awansow, wiec logujemy sume
             // magazynu przy kazdym awansie: jak suma spada miedzy wpisami,

@@ -1396,56 +1396,56 @@ namespace Armoury
         [SettingPropertyGroup("Army purchases")]
         public bool UniqueSpoilsFromPlayer { get; set; } = true;
 
-        [SettingPropertyBool("Valyrian Guard", HintText = "Valyrian steel is a finite store - no smith alive can make more: every blade in the world is counted each day against the blades the world began with (and those reworked in Qohor); a copy beyond that, from any source, is only a fine forgery and becomes ordinary steel of the same kind; a blade that goes missing is reported in the log (off = only counted)")]
-        [SettingPropertyGroup("Army purchases")]
+        [SettingPropertyBool("Valyrian Guard", HintText = "Valyrian steel is a finite store - no smith alive can make more: every blade in the world is counted each day against the blades the world began with (and those reworked in Qohor); a copy beyond that, from any source, is only a fine forgery and becomes ordinary steel of the same kind; a blade that goes missing is reported in the log (off = only counted; the first count after this version - forgeries made ordinary, lost blades returned to their line - waits until it is on)")]
+        [SettingPropertyGroup("Valyrian steel")]
         public bool ValyrianGuard { get; set; } = true;
 
-        [SettingPropertyBool("Valyrian No Smelt", HintText = "no forge but the masters of Qohor can work Valyrian steel: Valyrian blades are not on the smelting list and cannot be melted down (other legendary pieces as before)")]
-        [SettingPropertyGroup("Army purchases")]
+        [SettingPropertyBool("Valyrian No Smelt", HintText = "no forge but the masters of Qohor can work Valyrian steel: Valyrian blades are not on the smelting list and cannot be melted down (other legendary pieces as before); off = a Valyrian blade melts like any other and its steel is lost to the world for good")]
+        [SettingPropertyGroup("Valyrian steel")]
         public bool ValyrianNoSmelt { get; set; } = true;
 
         [SettingPropertyBool("Unique Inheritance", HintText = "a Valyrian blade does not die with its bearer: the executioner takes it, otherwise the heir (clan leader, children, spouse, siblings, kin); with no heir it lies on the market of his clan's town; blades of your own clan come to your baggage")]
-        [SettingPropertyGroup("Army purchases")]
+        [SettingPropertyGroup("Valyrian steel")]
         public bool UniqueInheritance { get; set; } = true;
 
         [SettingPropertyBool("Unique Never Lost", HintText = "named pieces and Valyrian steel never vanish with a beaten or disbanded party (they go to the victor, the owner or a town market) nor when the game re-dresses a lord (a new ruler keeps his blade)")]
-        [SettingPropertyGroup("Army purchases")]
+        [SettingPropertyGroup("Valyrian steel")]
         public bool UniqueNeverLost { get; set; } = true;
 
         [SettingPropertyBool("No Conjured Legends", HintText = "reinforcement caravans of Dynamic Troop Equipment and tournament prizes (also Tournaments XPanded) no longer conjure legendary or named pieces: each becomes an ordinary piece of the same kind")]
-        [SettingPropertyGroup("Army purchases")]
+        [SettingPropertyGroup("Valyrian steel")]
         public bool NoConjuredLegends { get; set; } = true;
 
         [SettingPropertyFloatingInteger("Hist Valyrian Per Measure", 0.00f, 240000.00f, "0.00", HintText = "worth of one measure of Valyrian steel (a one-handed blade; a greatsword such as Ice is two), pence - about what a typical lord keeps in his purse, so no lord parts with one and only the richest can buy one; on a market stall it weighs only its making cost (needs Historical Prices; takes effect after reloading the game)")]
-        [SettingPropertyGroup("Army purchases")]
+        [SettingPropertyGroup("Valyrian steel")]
         public float HistValyrianPerMeasure { get; set; } = 60000f;
 
         [SettingPropertyBool("Qohor Rework Enabled", HintText = "the masters of Qohor rework Valyrian steel - the only way to a new Valyrian sword: bring a blade from your baggage to Qohor, pay the guild and wait; a blade of one measure becomes one sword of a new shape, a greatsword of two measures (such as Ice) becomes two swords; nothing is added and nothing is lost (off = no new orders; collecting and taking back still work)")]
-        [SettingPropertyGroup("Army purchases")]
+        [SettingPropertyGroup("Valyrian steel")]
         public bool QohorReworkEnabled { get; set; } = true;
 
-        [SettingPropertyBool("Qohor Ai Rework", HintText = "a lord whose party stands in Qohor and who bears a Valyrian greatsword won from another house may have it reforged into two swords by the same rule - the same fee to Qohor's treasury, the same days (as Tywin Lannister did with Ice)")]
-        [SettingPropertyGroup("Army purchases")]
+        [SettingPropertyBool("Qohor Ai Rework", HintText = "a lord whose party stands in Qohor and who bears a Valyrian greatsword won from another house may have it reforged into two swords by the same rule - the same fee to Qohor's treasury, the same days (as Tywin Lannister did with Ice); the masters send the finished swords to him, or to his heir; lords of your own house never order it on their own")]
+        [SettingPropertyGroup("Valyrian steel")]
         public bool QohorAiRework { get; set; } = true;
 
         [SettingPropertyInteger("Qohor Days", 0, 28, "0", HintText = "days of the masters' work on one order - shortened for the game; in the books it took months")]
-        [SettingPropertyGroup("Army purchases")]
+        [SettingPropertyGroup("Valyrian steel")]
         public int QohorDays { get; set; } = 7;
 
         [SettingPropertyInteger("Qohor Crew", 0, 16, "0", HintText = "masters of the guild at one order - each day takes their hours from the town's smiths (the same hands that mend and make arms in Qohor)")]
-        [SettingPropertyGroup("Army purchases")]
+        [SettingPropertyGroup("Valyrian steel")]
         public int QohorCrew { get; set; } = 4;
 
         [SettingPropertyFloatingInteger("Qohor Toll Percent", 0.00f, 25.00f, "0.00", HintText = "the guild's toll, percent of the worth of the steel that goes into the fire - the only guild in the world that knows the art takes its share as a lord's mill took its multure (a sixteenth); paid with the masters' wages to Qohor's treasury")]
-        [SettingPropertyGroup("Army purchases")]
+        [SettingPropertyGroup("Valyrian steel")]
         public float QohorTollPercent { get; set; } = 6.25f;
 
         [SettingPropertyInteger("Qohor Charcoal Per Measure", 0, 10, "0", HintText = "charcoal the masters take from Qohor's stalls for each measure of steel; with none on the stalls the order waits")]
-        [SettingPropertyGroup("Army purchases")]
+        [SettingPropertyGroup("Valyrian steel")]
         public int QohorCharcoalPerMeasure { get; set; } = 2;
 
         [SettingPropertyFloatingInteger("Valyrian Greatsword Min Cm", 0.00f, 420.00f, "0.00", HintText = "a two-handed Valyrian blade at least this long (cm) is a greatsword of two measures - steel enough for two swords, as Ice gave Oathkeeper and Widow's Wail (Ice 140, Heartsbane 114, Blackfyre 111, Brightroar 108); shorter blades are one measure (takes effect after reloading the game)")]
-        [SettingPropertyGroup("Army purchases")]
+        [SettingPropertyGroup("Valyrian steel")]
         public float ValyrianGreatswordMinCm { get; set; } = 105f;
 
         [SettingPropertyInteger("Battle Real Min Side", 0, 200, "0", HintText = "a clash counts as a real battle for the chronicle's averages only if both sides had at least this many men and neither outnumbered the other more than 4 to 1")]
