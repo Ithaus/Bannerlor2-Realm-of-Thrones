@@ -12,6 +12,8 @@ Szczegoly krok po kroku: docs/PRZEKAZANIE-2026-10-08.md rozdz. 15-16; stan: docs
 | 2 | 19:33 | 3bf72dfd | cfb33950 | T8 krainy (papirus i las wedlug klimatu; 23 wsie z uprawa niezgodna z klimatem; bawelna 14 wsi tylko w cieplych krainach); T2b Inni bez dosypki z niczego |
 | 3 | 20:08 | 04d1cc99 | cfb33950 | 169 KSIEGA OBIEGU (sam log) |
 | 4 | 21:50 | 0f8a80b0 | cfb33950 | 169b poprawki pomiaru; H3 PRZEGRANI UCHODZA (decyzja Jeffa 07.10) |
+| 5 | 22:13 | 0f8a80b0 | 4552ceaf | T2c Inni nie obleagaja (ani nie rabuja) zamknietych celow przed terminem; trwajace oblezenia przerywane bez strat |
+| 6 | 23:00 | **0f8a80b0** | **269cc980** | T9 bez reparacji Diplomacy za wojny fabularne ROT (ROT wznawia je tej samej doby) - KONCOWO W GRZE |
 
 Kopie kazdej poprzedniej wersji: obok plikow (*.bak-2026-10-09-przed-nocN) i D:\Backup-Bannerlord\wgrane\2026-10-09-nocN-przed.
 Armoury.json, CrashScribe.settings.xml i ustawienia BetterEconomy Jeffa bez zmian (nowe ustawienia dzialaja z wartosci domyslnych kodu).
@@ -34,7 +36,20 @@ Galezie (GitHub): paczki/noc-wgranie-1, paczki/noc-wgranie-2, noc/sklad2 (wgrani
 ## 3. Testy (autotest; zapis Jeffa nigdy nie ruszany)
 
 Kazde wgranie: nowa kampania 40 dob + wczytanie zapisu z doby 362 (8-10 dob) dokladnie tej binarki. Wszystkie: 0 bledow Armoury, 0 potkniec, 6-8 znanych bledow startowych
-CrashScribe (cudze mody). Tempo: 13.0-13.3 s/dobe (nowa kampania), 22.8-25.7 s/dobe (zapis z roku gry). Do tego test 120 dob wgrania 3: 0 bledow, ok. 18 s/dobe bez narastania.
+CrashScribe (cudze mody). Tempo: 13.0-13.3 s/dobe (nowa kampania), 22.8-25.7 s/dobe (zapis z roku gry).
+Dwa testy 120 dob (nowa kampania):
+
+| doba 120 | wgranie 3 (przed H3/T2c/T9) | koncowa wersja (wgranie 6) |
+|---|---|---|
+| bledy naszych modow | 0 | 0 |
+| tempo doby | 18.6 s | 15.5 s |
+| bankruci Banku (teraz) | 23 | 15 |
+| glowy rodow < 5000 zl | 40 | 32 |
+| kapital Banku | 1.75 mln | 1.88 mln |
+| reparacje za wojny fabularne | ok. 11 mln zaplacone w nicosc | 0 (21 pokojow, 14.1 mln nie naliczono; ROT wznowil wszystkie 21 wojen) |
+| Inni: osady / oblezenia Muru przed terminem | 0 / 44 doby | 0 / 0 |
+
+Lepiej, ale fala bankructw dalej rusza - zatrzymaja ja dopiero paczki 165/166/168 (pkt 7).
 
 ## 4. NIE wgrane - i dlaczego
 
@@ -63,7 +78,8 @@ CrashScribe (cudze mody). Tempo: 13.0-13.3 s/dobe (nowa kampania), 22.8-25.7 s/d
 
 1. Uruchomic skrypt BetterEconomy (gra zamknieta): `powershell -NoProfile -ExecutionPolicy Bypass -File tools\bee\zamknij-ujscia-bee.ps1 -ListaZFundamentu`
    (kopia ustawien: D:\Backup-Bannerlord\bee-2026-10-08\). Zamyka m.in. eskorte karawan BEE placona w nicosc (ok. 665 zl przy kazdym wjezdzie do miasta).
-2. MCM Diplomacy: "Scaling War Reparations Gold Cost Multiplier" 50 -> 10 (reparacje 5x mniejsze: lord placi ok. 3 dni dochodu zamiast 17). Rekomendacja: tak.
+2. MCM Diplomacy: "Scaling War Reparations Gold Cost Multiplier" 50 -> 10 - dotyczy juz tylko wojen NIEfabularnych (fabularne zalatwia T9): reparacje 5x mniejsze,
+   lord placi ok. 3 dni dochodu zamiast 17. Rekomendacja: tak (Twoje ustawienie, nie ruszalem).
 3. 171/172: czy karawany moga handlowac strzalami (rada: nie); zgoda na 171 przy pustoszejacym rynku nowej kampanii (alternatywa: najpierw skala produkcji zbroi).
 4. Tempo swiata (realne odleglosci): "jak w ksiazkach" (armia Winterfell-KP ok. 77 dni) czy "twarda historia" (129) - rekomendacja: ksiazkowy, po naprawach ekonomii.
 5. Okupy wedlug majatku (jedna regula dla Ciebie i AI) i "prawo trzecich" (korona bierze 1/3 okupow i lupu wasali) - rekomendacja: tak.
