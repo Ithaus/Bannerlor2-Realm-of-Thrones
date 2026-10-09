@@ -786,7 +786,7 @@ namespace Armoury
         public float MapVillagesHideAboveCameraHeight = 160f; // map villages vanish when the camera rises above this height - from afar only the game's villages, castles and towns remain
         public bool MapVillageNamesOnHover = true;         // Map Village Names - hover only: point at a map village to see its name, its district, its settlements and people. Labels over burning villages come in a later update
         // T7 (noc 08/09.10): mlyn wodny na brzegu, linia pana w dymku
-        public bool MillOnBank = true;                     // water mills stand on the river bank, not in the stream: the wheel sits at the water's edge and the mill village is set half a step back towards land. Off = the wheel a little out in the water, as before
+        public bool MillOnBank = true;                     // water mills on rivers stand on the bank, not in the stream: the whole mill village, mill and wheel included, is set half a step back from the river's edge. Mills on the sea coast are unchanged. Off = as before, the wheel a little out in the water
         public bool VillageTipHeldBy = true;               // the map village tooltip names who holds the land, live from the game: 'A village of the Tumbledown lands, held by House Stark of Winterfell' ('your fief' for your own). Off = 'A village of the X district', as before
 
         public static void Load(string moduleDataDir)
