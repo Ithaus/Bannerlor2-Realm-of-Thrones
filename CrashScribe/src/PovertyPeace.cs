@@ -73,25 +73,42 @@ namespace CrashScribe
     ///     Odtworzenie bez skutkow ubocznych (BK trzyma wynik wojny w pamieci doby; nasz glos bez licznikow - _quiet).
     ///     Zrodlo kazdego wniosku o pokoj wrzuconego do glosowania (KingdomDecisionAdded): gra (ConsiderPeace), BK
     ///     ForceProposePeaceFromLosingSide (prefiks/finalizer ustawia znacznik), z biedy (nasz), inne.
-    ///  2. WNIOSEK Z BIEDY: raz na dobe, krolestwo z bieda skarbca T >= 0.5, nie czesciej niz raz na 7 dob, sklada wniosek o pokoj
-    ///     z tym wrogiem (krolestwem), z ktorym ma najgorszy wynik wojny (gra GetWarProgressScore: swoj - wroga; remis - starsza
-    ///     wojna), sposrod wojen, w ktorych gra dopuszcza wniosek: niefabularna (ROT IsWarForced = nie), zgody gry
-    ///     (KingdomDecisionPermissionModel - wojna stala, wezwanie sojusznika, a przy Diplomacy jej MakePeaceConditions) i
-    ///     zgody Diplomacy (jak jej prefiks na ConsiderPeace), IsPeaceSuitable gry (inaczej gra daje glosom 0/200 i nasz czlon
-    ///     glosu nie dziala). Wnioskodawca: rod AI krolestwa "za pokojem z biedy" (T + P > 1) z wplywem ponad koszt wniosku
-    ///     (jak gra), najbiedniejszy; jak w ConsiderPeace - glos wnioskodawcy > 0 (pytamy do 3 rodow). Danina dzienna 0 (jak wniosek
+    ///  2. WNIOSEK Z BIEDY: raz na dobe, krolestwo z bieda skarbca T >= 0.5 (najbiedniejsze najpierw), w swoim stalym dniu tygodnia
+    ///     (dzien bezwzgledny + skrot StringId krolestwa, modulo 7 - "raz na 7 dob" przetrwa wczytanie bez zapisu w grze), sklada
+    ///     wniosek o pokoj z tym wrogiem (krolestwem), z ktorym ma najgorszy wynik wojny (gra GetWarProgressScore: swoj - wroga;
+    ///     remis - starsza wojna), sposrod wojen, w ktorych gra dopuszcza wniosek: niefabularna (ROT IsWarForced = nie),
+    ///     IsPeaceSuitable gry (inaczej gra daje glosom 0/200 i nasz czlon glosu nie dziala; sprawdzane PRZED zgodami - model zgod
+    ///     gry tez je sprawdza i schowalby powod), zgody gry (KingdomDecisionPermissionModel - wojna stala, wezwanie sojusznika,
+    ///     a przy Diplomacy jej MakePeaceConditions) i zgody Diplomacy (jak jej prefiks na ConsiderPeace); pokoj nie niszczy
+    ///     krolestwa (Diplomacy EnableKingdomElimination: strona bez lenn z innym wrogiem znika przy pokoju - KingdomPeaceAction.
+    ///     ShouldKingdomBeDestroyed; sprawdzamy ostroznie, bez patrzenia na ustawienie); tej samej pary (wnioskodawca, wrog) nie bylo
+    ///     we wniosku z zadnego zrodla od 5 dob (jak lista gry KingdomDecisionProposalBehavior), a przy krolestwie gracza takze
+    ///     odwrotnej od 2 dob (gra: 48 h). Wnioskodawca: rod AI krolestwa "za pokojem z biedy" (T + P > 1) z wplywem ponad koszt
+    ///     wniosku (jak gra), najbiedniejszy (pytamy do 3 rodow); jak w ConsiderPeace glos za > 0, a ponadto glos za > glos przeciw
+    ///     i KingdomDecision.ShouldBeCancelled() == false: po AddDecision gra (StartElection) anuluje wniosek, gdy najlepsza opcja
+    ///     wnioskodawcy nie jest TAK albo stoi z boku - nacisk BK +-240 x p przy p < 0 (swieza, popierana wojna) przewaza czlon E1.
+    ///     Gdy w najgorszej wojnie zaden z 3 rodow sie nie nadaje - nastepna wojna w kolejnosci wyniku. Danina dzienna 0 (jak wniosek
     ///     BK): trybut gry to strumien rody -> nicosc i nic -> odbiorca, glos gry patrzy tylko na danine < 0.
     ///     Wniosek przez Kingdom.AddDecision (wnioskodawca placi wplyw jak w grze); glosuja rody jak dzis (czlon E1 w glosie
     ///     zostaje). Pomijamy TYLKO prog BK (wynik pokoju >= 0) - to on zatrzymywal wnioski. Jeden czlon na jedno zjawisko:
     ///     wniosek z biedy, glos z biedy (wynik pokoju BK, IsPeaceSuitable i nacisk BK bez zmian).
+    ///     Wrog = krolestwo gracza (gracz nie najemnik): gra nie glosuje, tylko wysyla graczowi oferte pokoju bez wzgledu na wynik
+    ///     glosu (KingdomElection.ReadyToAiChoose -> MakePeaceKingdomDecision.OnShowDecision). Zeby glos rodow znaczyl tyle samo co
+    ///     miedzy krolestwami AI, oferte wysylamy tylko, gdy symulacja glosu bez gracza (KingdomElection.SetupResultWithoutPlayerSupport)
+    ///     daje TAK wiecej punktow niz NIE; inaczej bez wniosku (wplyw nie placony).
     ///     Dlaczego krok dobowy, a nie postfiks (projekt zostawil miejsce otwarte): ConsiderPeace dostaje losowego wroga z losowego
     ///     rzutu rodu - "raz na 7 dob" i "najgorszy wynik" bylyby niewykonalne; postfiks na wynik pokoju BK wszedlby takze do
     ///     IsPeaceSuitable i do glosu (ta sama funkcja). BK robi to samo w ForceProposePeaceFromLosingSide (AddDecision raz na dobe).
+    ///     Wnioski tylko przy wpietym glosie E1 (bez niego gra glosuje 0/200) i rozpoznanym ROT (bez niego wojny fabularne
+    ///     nieodroznialne, a model zgod ROT zwalnia krolestwo gracza jako wnioskodawce).
     ///  3. MIARA T Z NIEDOPLATY KORONY (po paczce 165, wylacznik PovertyPeaceArrearsMeasure, domyslnie false): n = 1 - zwrot dany /
     ///     nalezny z 28 dob (Armoury KingdomTreasury._refund, wiersz dobowy Due/Given), T = (n - max(25%; n swiata)) / 15%,
-    ///     przyciete do 0-1; krolestwo bez naleznego zwrotu w oknie - T = 0. Brak danych Armoury - miara skarbca (log mowi).
+    ///     przyciete do 0-1; n swiata = srednia n krolestw z naleznym zwrotem w oknie (kazde krolestwo liczy sie raz - "wyraznie
+    ///     biedniejsze od reszty", nie od kilku duzych); krolestwo bez naleznego zwrotu w oknie - T = 0. Brak danych Armoury - miara
+    ///     skarbca (log mowi).
     /// Wylaczniki E1b: PovertyPeaceProposals (wniosek), PovertyPeaceArrearsMeasure (miara); diagnoza z PovertyPeace.
-    /// Bez zapisu w grze: przerwa 7 dob liczona od wczytania (po wczytaniu krolestwo w biedzie moze zlozyc wniosek od razu).
+    /// Bez zapisu w grze: staly dzien tygodnia krolestwa liczony z dnia kampanii i StringId (wczytanie go nie przesuwa); pamiec
+    /// par "wniosek < 5 dob" od wczytania (wnioskow sprzed wczytania nie widzimy; gra widzi - jej lista jest w zapisie i ma tez nasze).
     /// </summary>
     internal static class PovertyPeace
     {
@@ -127,14 +144,22 @@ namespace CrashScribe
 
         // ------------------------------------------------------------------ E1b
         private const float ProposeT = 0.5f;          // wniosek z biedy od biedy skarbca 0.5 (zapas <= ok. 60 dob; projekt E1b pkt 2)
-        private const int ProposeEveryDays = 7;       // raz na 7 dob na krolestwo
+        private const int ProposeEveryDays = 7;       // raz na 7 dob na krolestwo (staly dzien tygodnia - Weekday)
         private const int ProposerTries = 3;          // ilu najbiedniejszych rodow pytamy o glos wnioskodawcy (gra: > 0)
         private const int MineKeepDays = 10;          // nasz wniosek w krolestwie gracza czeka na glos gracza - potem zapominamy
+        private const int PairGapDays = 5;            // gra: ta sama para (krolestwo wnioskodawcy, wrog) nie wraca na liste przez 5 dob
+        private const int PlayerGapDays = 2;          // gra: oferta pokoju z krolestwem gracza w ktorakolwiek strone - 48 h
+        private const float BkPush = 240f;            // BK: glos o pokoj +-240 x nacisk pokoju (DiplomacyPatches) - tylko do logu
         private const int ArrearsDays = 28;           // okno niedoplaty korony
         private const float ArrearsFloor = 0.25f;     // prog etapu 2: niedoplata 25%
         private const float ArrearsSpan = 0.15f;      // od progu (albo sredniej swiata) do T = 1: +15 pp
         private const string WhyUnsuit = "gra: pokoj nieodpowiedni (IsPeaceSuitable)";
         private const string WhyBk = "prog BK (wynik pokoju < prog decyzji)";
+        private const string WhyElim = "Diplomacy zniszczylaby krolestwo bez lenn (EnableKingdomElimination)";
+        private const string WhyRecent = "ten sam wniosek < 5 dob (gra/BK/z biedy)";
+        private const string WhyPrefers = "wnioskodawca woli wojne (nacisk BK) - gra anulowalaby wniosek";
+        private const string WhyCancel = "gra anulowalaby wniosek (ShouldBeCancelled: wnioskodawca stoi z boku)";
+        private const string WhyOffer = "oferta dla gracza: rody krolestwa przeciw pokojowi (symulacja glosu bez gracza)";
 
         private static bool _diagOn, _propOn, _bkOn;
         private static MethodInfo _mConsider, _mBkForce;
@@ -142,7 +167,8 @@ namespace CrashScribe
         private static MethodInfo _mDipExc;     // AbstractConditionEvaluator<MakePeaceConditions>.CanApplyExceptions(Kingdom, Kingdom, bool, bool)
         private static bool _inBk;
         private static MakePeaceKingdomDecision _adding;   // nasz wniosek w trakcie Kingdom.AddDecision (zrodlo "z biedy")
-        [ThreadStatic] private static bool _quiet;   // odtworzenie warunkow / pytanie wnioskodawcy: glos bez licznikow E1
+        [ThreadStatic] private static bool _quiet;   // odtworzenie warunkow / pytanie wnioskodawcy / symulacja glosu: bez licznikow E1
+        [ThreadStatic] private static float _qOrig;  // pod _quiet: glos przed czlonem E1 (gra + latki przed nami, tj. nacisk BK) - tylko do logu
         private static MakePeaceKingdomDecision _lastGame;   // ostatni wniosek, ktory przeszedl ConsiderPeace (zrodlo "gra")
 
         private sealed class Ctr { public int D, T; public void Inc() { D++; T++; } }
@@ -161,11 +187,12 @@ namespace CrashScribe
         private static double _cpScoreSum; private static int _cpScoreN;   // dzis: wynik pokoju BK w odrzuceniach progiem
         private static readonly Ctr _addGame = new Ctr(), _addBk = new Ctr(), _addMine = new Ctr(), _addOther = new Ctr();
         private static readonly Ctr _ppElig = new Ctr(), _ppWait = new Ctr(), _ppMade = new Ctr(), _ppVote = new Ctr(), _ppYes = new Ctr(), _ppCancel = new Ctr(), _ppOffer = new Ctr();
+        private static readonly Ctr _ppElim = new Ctr();   // wojny pominiete: pokoj zniszczylby krolestwo bez lenn (Diplomacy)
         private static readonly Why _ppWhy = new Why();
-        private static readonly Ctr[] _ctrs = { _cpCall, _cpPoor, _cpOk, _addGame, _addBk, _addMine, _addOther, _ppElig, _ppWait, _ppMade, _ppVote, _ppYes, _ppCancel, _ppOffer };
+        private static readonly Ctr[] _ctrs = { _cpCall, _cpPoor, _cpOk, _addGame, _addBk, _addMine, _addOther, _ppElig, _ppWait, _ppMade, _ppVote, _ppYes, _ppCancel, _ppOffer, _ppElim };
         private static readonly Dictionary<Kingdom, int> _ppByK = new Dictionary<Kingdom, int>();     // wnioski z biedy od wczytania
-        private static readonly Dictionary<Kingdom, int> _ppLast = new Dictionary<Kingdom, int>();    // doba (bezwzgledna) ostatniego wniosku z biedy
-        private static readonly Dictionary<KingdomDecision, int> _mine = new Dictionary<KingdomDecision, int>();   // nasze wnioski -> doba
+        private static readonly Dictionary<(Kingdom, Kingdom), int> _pairLast = new Dictionary<(Kingdom, Kingdom), int>();   // (krolestwo wniosku, wrog) -> doba ostatniego wniosku o pokoj z dowolnego zrodla
+        private static readonly Dictionary<KingdomDecision, int> _mine = new Dictionary<KingdomDecision, int>();   // nasze wnioski (takze oferty dla gracza do konca AddDecision) -> doba
 
         // miara niedoplaty korony (E1b pkt 3)
         private sealed class ArrRow { public int Day; public long Due, Given; }
@@ -300,9 +327,15 @@ namespace CrashScribe
                 catch { _dipConds = null; _mDipExc = null; }
                 if (_mDipExc == null) miss.Add("Diplomacy MakePeaceConditions.CanApplyExceptions (zgody Diplomacy tylko przez model zgod gry)");
 
-                _propOn = Config.PovertyPeaceProposals;
+                // bez glosu E1 gra glosuje 0/200 (wniosek = zaplacony wplyw bez pokoju); bez ROT wojny fabularne nieodroznialne,
+                // a model zgod ROT zwalnia krolestwo gracza jako wnioskodawce (projekt: 0 pokojow w wojnach fabularnych)
+                _propOn = Config.PovertyPeaceProposals && _voteOn && _rotOn;
+                string propOff = !Config.PovertyPeaceProposals ? "WYLACZONY (PovertyPeaceProposals = false)"
+                               : !_voteOn ? "WYLACZONY (glos E1 niewpiety - bez czlonu glosu gra glosuje 0/200)"
+                               : "WYLACZONY (ROT nierozpoznany - wojny fabularne nieodroznialne)";
                 Scribe.Line("Pokoj z biedy (E1b): wniosek z biedy " + (_propOn ? "WLACZONY (bieda skarbca >= " + ProposeT.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)
-                                + ", raz na " + ProposeEveryDays + " dob, wrog z najgorszym wynikiem wojny sposrod wojen niefabularnych dopuszczonych przez gre i Diplomacy; pomija tylko prog wyniku pokoju BK)" : "WYLACZONY (PovertyPeaceProposals = false)")
+                                + ", raz na " + ProposeEveryDays + " dob w stalym dniu tygodnia krolestwa, wrog z najgorszym wynikiem wojny sposrod wojen niefabularnych dopuszczonych przez gre i Diplomacy"
+                                + " (bez pokoju niszczacego krolestwo bez lenn, bez pary z wnioskiem < " + PairGapDays + " dob); wnioskodawca za TAK ponad NIE (inaczej gra anuluje wniosek); oferta dla gracza tylko przy wiekszosci rodow za TAK; pomija tylko prog wyniku pokoju BK)" : propOff)
                             + "; miara biedy " + (Config.PovertyPeaceArrearsMeasure ? "NIEDOPLATA KORONY z " + ArrearsDays + " dob (PovertyPeaceArrearsMeasure)" : "zapas skarbca (E1)")
                             + "; diagnoza: ConsiderPeace gry " + (_diagOn ? "wpieta" : "NIE") + ", ForceProposePeaceFromLosingSide BK " + (_bkOn ? "wpieta" : "NIE")
                             + ", zgody Diplomacy " + (_mDipExc != null ? "odczyt MakePeaceConditions" : "NIE")
@@ -335,7 +368,9 @@ namespace CrashScribe
                 if (_warText == null) _warText = new TextObject("{=!}The royal treasury cannot pay for a war");
                 __result.Add(term, _warText);
                 bool sign = s > 0f && s + term <= 0f;   // czlon zmienil znak oceny (tylko slabe wojny: s < 450 x T)
-                lock (_lock) { _dWar++; _tWar++; _dWarSum += term; _tWarSum += term; if (sign) { _dWarSign++; _tWarSign++; } }
+                // E1b: pytanie wnioskodawcy / odtworzenie ConsiderWhy / symulacja glosu dochodza tu przez nacisk BK (GetWarSupport ->
+                // KingdomElection(BKDeclareWarDecision)) - czlon zostaje (glos jak w prawdziwym glosowaniu), liczniki nie
+                if (!_quiet) lock (_lock) { _dWar++; _tWar++; _dWarSum += term; _tWarSum += term; if (sign) { _dWarSign++; _tWarSign++; } }
             }
             catch (Exception e) { Stumble("PovertyPeace.WarScorePostfix", e); }
         }
@@ -346,6 +381,7 @@ namespace CrashScribe
             if (!_voteOn || !Config.PovertyPeace) return;
             try
             {
+                if (_quiet) _qOrig = __result;   // E1b: glos przed czlonem E1 (do linii wniosku - nacisk BK)
                 var clan = __0;
                 var o = __1 as MakePeaceKingdomDecision.MakePeaceDecisionOutcome;
                 if (__instance == null || clan == null || o == null || clan == Clan.PlayerClan || clan.IsUnderMercenaryService || clan.Leader == null) return;
@@ -465,13 +501,17 @@ namespace CrashScribe
                     if (!_arr.TryGetValue(r.Key, out l)) { l = new List<ArrRow>(); _arr[r.Key] = l; }
                     l.Add(r.Value);
                 }
-            long wDue = 0, wGiv = 0;
+            // n swiata = srednia krolestw (kazde z naleznym zwrotem w oknie liczy sie raz), nie suma swiata wazona zwrotem:
+            // projekt "wyraznie biedniejsze od reszty" - przy wazeniu kilka duzych koron ustawialoby prog wszystkim
+            double sumN = 0; int nK = 0;
             foreach (var kv in _arr)
             {
                 kv.Value.RemoveAll(x => x.Day <= absDay - ArrearsDays);
-                foreach (var x in kv.Value) { wDue += x.Due; wGiv += x.Given; }
+                long due = 0, giv = 0;
+                foreach (var x in kv.Value) { due += x.Due; giv += x.Given; }
+                if (due > 0 && kv.Key != null && !kv.Key.IsEliminated) { sumN += 1.0 - (double)giv / due; nK++; }
             }
-            _nWorld = wDue > 0 ? 1f - (float)wGiv / wDue : -1f;
+            _nWorld = nK > 0 ? (float)(sumN / nK) : -1f;
         }
 
         /// <summary>T = (n - max(25%; n swiata)) / 15%, przyciete do 0-1; bez naleznego zwrotu w oknie - 0 (n = -1). Pod _lock.</summary>
@@ -634,7 +674,7 @@ namespace CrashScribe
         private static string Desc(KState s)
         {
             return "bieda skarbca " + s.T.ToString("0.00") + " (skarbiec " + s.W + ", ubytek " + (int)s.Drain + "/d, zapas " + (s.Runway > 9999f ? ">9999" : ((int)s.Runway).ToString())
-                   + " dob" + (Config.PovertyPeaceArrearsMeasure && _fRefund != null ? ", niedoplata korony " + Pct(s.N) + " (swiat " + Pct(_nWorld) + ")" : "")
+                   + " dob" + (Config.PovertyPeaceArrearsMeasure && _fRefund != null ? ", niedoplata korony " + Pct(s.N) + " (srednia krolestw " + Pct(_nWorld) + ")" : "")
                    + ", wrogow " + s.Enemies + "; glow < " + (int)HeadPoor + ": " + s.Poor + "/" + s.Clans + ", rodow za pokojem z biedy " + s.ForPeace + "/" + s.Clans + ")";
         }
 
@@ -735,7 +775,7 @@ namespace CrashScribe
                                + (_stumblesDay > 0 ? "; potkniecia dzis " + _stumblesDay + " (razem " + _stumbles + ", pierwsze w raporcie; przy potknieciu wynik gry bez zmian)" : "");
                     }
                     Scribe.Line("Pokoj z biedy (E1): dzien " + Day() + " - krolestwa w biedzie ("
-                                + (ArrearsOn ? "niedoplata korony z " + ArrearsDays + " dob ponad max(" + (int)(ArrearsFloor * 100f) + "%, swiat " + Pct(_nWorld) + ")" : "zapas skarbca < " + (int)RunwayFull + " dob")
+                                + (ArrearsOn ? "niedoplata korony z " + ArrearsDays + " dob ponad max(" + (int)(ArrearsFloor * 100f) + "%, srednia krolestw " + Pct(_nWorld) + ")" : "zapas skarbca < " + (int)RunwayFull + " dob")
                                 + ") " + poor.Count + " z " + list.Count
                                 + (parts.Count > 0 ? ": " + string.Join("; ", parts.ToArray()) + (poor.Count > parts.Count ? "; i " + (poor.Count - parts.Count) + " innych" : "") : "")
                                 + " | glowy rodow (bez najemnikow): " + heads + ", < " + (int)HeadPoor + ": " + headsPoor + ", za pokojem z biedy: " + forPeace + " | " + sumW + ".");
@@ -756,6 +796,7 @@ namespace CrashScribe
                 // nasz wniosek w krolestwie gracza, ktory zniknal bez rozstrzygniecia i anulowania - zapominamy
                 int today = (int)CampaignTime.Now.ToDays;
                 foreach (var old in _mine.Where(p => today - p.Value > MineKeepDays).Select(p => p.Key).ToList()) _mine.Remove(old);
+                foreach (var old in _pairLast.Where(p => today - p.Value >= PairGapDays).Select(p => p.Key).ToList()) _pairLast.Remove(old);
             }
         }
 
@@ -771,11 +812,13 @@ namespace CrashScribe
                        + (_cpScoreN > 0 ? " (sredni wynik pokoju BK przy odrzuceniu progiem " + (int)(_cpScoreSum / _cpScoreN) + ")" : "")
                        + "; do glosowania: gra " + _addGame.D + ", BK ForceProposePeaceFromLosingSide " + _addBk.D + ", z biedy " + _addMine.D + ", inne " + _addOther.D
                        + "; z biedy: krolestw z bieda skarbca >= " + ProposeT.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " w wojnie z krolestwem " + _ppElig.D
-                       + " (na przerwie " + ProposeEveryDays + " dob " + _ppWait.D + "), wnioskow z biedy " + _ppMade.D + ", bez wniosku: " + _ppWhy.Fmt(true)
+                       + " (nie ich dzien tygodnia " + _ppWait.D + "), wnioskow z biedy " + _ppMade.D + ", bez wniosku: " + _ppWhy.Fmt(true)
+                       + (_ppElim.D > 0 ? "; wojen pominietych (" + WhyElim + ") " + _ppElim.D : "")
                        + "; glosowan nad wnioskami z biedy " + _ppVote.D + " (POKOJ " + _ppYes.D + ", anulowane " + _ppCancel.D + ")" + (_ppOffer.D > 0 ? ", ofert pokoju dla gracza " + _ppOffer.D : "")
                        + " | od wczytania: ConsiderPeace wolane " + _cpCall.T + " (z krolestw w biedzie " + _cpPoor.T + "), przeszlo " + _cpOk.T + ", odrzucone: " + _cpWhy.Fmt(false)
                        + "; do glosowania: gra " + _addGame.T + ", BK " + _addBk.T + ", z biedy " + _addMine.T + ", inne " + _addOther.T
                        + "; WNIOSKOW Z BIEDY " + _ppMade.T + " (na krolestwo: " + byK + "), bez wniosku: " + _ppWhy.Fmt(false)
+                       + ", wojen pominietych (zniszczenie bez lenn) " + _ppElim.T
                        + "; GLOSOWAN NAD WNIOSKAMI Z BIEDY " + _ppVote.T + ", POKOJ " + _ppYes.T + ", anulowane " + _ppCancel.T + ", ofert pokoju dla gracza " + _ppOffer.T + ".";
             }
         }
@@ -845,6 +888,11 @@ namespace CrashScribe
             return d.DetermineInitialCandidates().First(x => x is MakePeaceKingdomDecision.MakePeaceDecisionOutcome o && o.ShouldPeaceBeDeclared);
         }
 
+        private static DecisionOutcome NoOf(MakePeaceKingdomDecision d)
+        {
+            return d.DetermineInitialCandidates().First(x => x is MakePeaceKingdomDecision.MakePeaceDecisionOutcome o && !o.ShouldPeaceBeDeclared);
+        }
+
         /// <summary>Zgody Diplomacy - te same, co jej prefiks na ConsiderPeace (MakePeaceConditions.CanApply(k, e, false, bypassCosts: true));
         /// null = dopuszczone (albo brak Diplomacy), inaczej krotki opis pierwszego niespelnionego warunku.</summary>
         private static string DipBlock(Kingdom k, Kingdom e)
@@ -882,31 +930,166 @@ namespace CrashScribe
         public static void BkForcePrefix() { _inBk = true; }
         public static Exception BkForceFinalizer(Exception __exception) { _inBk = false; return __exception; }
 
-        /// <summary>Zdarzenie gry KingdomDecisionAdded: zrodlo wniosku o pokoj w glosowaniu.</summary>
+        /// <summary>Zdarzenie gry KingdomDecisionAdded: zrodlo wniosku o pokoj w glosowaniu; para (krolestwo wniosku, wrog) do przerwy 5 dob.</summary>
         internal static void OnDecisionAdded(KingdomDecision d, bool isPlayerInvolved)
         {
-            if (!On || !(d is MakePeaceKingdomDecision)) return;
+            var mp = d as MakePeaceKingdomDecision;
+            if (!On || mp == null) return;
             try
             {
+                var k = mp.Kingdom;
+                var e = mp.FactionToMakePeaceWith as Kingdom;
+                int day = (int)CampaignTime.Now.ToDays;
                 lock (_lock)
                 {
                     if (_adding != null && ReferenceEquals(d, _adding)) _addMine.Inc();
                     else if (_inBk) _addBk.Inc();
                     else if (_lastGame != null && ReferenceEquals(d, _lastGame)) { _addGame.Inc(); _lastGame = null; }
                     else _addOther.Inc();
+                    // jak lista gry KingdomDecisionProposalBehavior._kingdomDecisionsList: wniosek z kazdego zrodla
+                    if (k != null && e != null) _pairLast[(k, e)] = day;
                 }
             }
-            catch (Exception e) { Stumble("PovertyPeace.OnDecisionAdded", e); }
+            catch (Exception ex) { Stumble("PovertyPeace.OnDecisionAdded", ex); }
         }
 
-        /// <summary>Zdarzenie gry KingdomDecisionCancelled: nasz wniosek anulowany (np. pokoj zawarty inna droga przed glosem gracza).</summary>
+        /// <summary>Zdarzenie gry KingdomDecisionCancelled: nasz wniosek anulowany (KingdomElection.StartElection -> ShouldBeCancelled
+        /// zaraz po AddDecision, albo np. pokoj zawarty inna droga przed glosem gracza).</summary>
         internal static void OnDecisionCancelled(KingdomDecision d, bool isPlayerInvolved)
         {
             if (!On || d == null) return;
-            lock (_lock) { if (_mine.Remove(d)) _ppCancel.Inc(); }
+            bool mine;
+            lock (_lock) { mine = _mine.Remove(d); if (mine) _ppCancel.Inc(); }
+            if (!mine) return;
+            try
+            {
+                var mp = d as MakePeaceKingdomDecision;
+                var who = d.ProposerClan;
+                Scribe.Line("Pokoj z biedy (E1b): dzien " + Day() + " - WNIOSEK Z BIEDY ANULOWANY przez gre " + N(d.Kingdom) + " z " + (mp != null ? N(mp.FactionToMakePeaceWith as Kingdom) : "?")
+                            + " (wnioskodawca " + N(who) + ", wplyw po oplacie " + (who != null ? (int)who.Influence : 0) + "; wplyw nie wraca).");
+            }
+            catch (Exception e) { Stumble("PovertyPeace.OnDecisionCancelled", e); }
         }
 
         // ------------------------------------------------------------------ E1b: wniosek z biedy
+
+        /// <summary>Wniosek wybrany do zlozenia albo pierwszy odrzucony (do logu).</summary>
+        private sealed class Pick
+        {
+            public MakePeaceKingdomDecision Dec; public Clan Who; public Kingdom E;
+            public float Res, W, Yes, No, OYes, ONo; public int Rank;
+        }
+
+        /// <summary>Symulacja glosu bez gracza (jak KingdomElection.GetElectionOutcomeSupport): glosujacy (BK: tylko rody z prawem
+        /// glosu - DetermineSupportersPatch), rody i punkty za TAK / za NIE.</summary>
+        private sealed class Sim { public int Voters, Yes, No; public float YesPts, NoPts; public bool ProposerVotes, Ok; }
+
+        /// <summary>Staly dzien tygodnia krolestwa (0-6) ze StringId - FNV-1a, nie string.GetHashCode (ten nie musi byc staly miedzy uruchomieniami).</summary>
+        private static int Weekday(Kingdom k)
+        {
+            unchecked
+            {
+                uint h = 2166136261u;
+                string id = k.StringId ?? "";
+                for (int i = 0; i < id.Length; i++) { h ^= id[i]; h *= 16777619u; }
+                return (int)(h % (uint)ProposeEveryDays);
+            }
+        }
+
+        /// <summary>Diplomacy KingdomPeaceAction.ShouldKingdomBeDestroyed (przy EnableKingdomElimination, u Jeffa true): strona bez lenn,
+        /// ktora ma jeszcze innego wroga, znika przy pokoju. Ostroznie - bez patrzenia na ustawienie i na scalanie buntownikow.</summary>
+        private static bool Destroys(Kingdom k, Kingdom e)
+        {
+            return (k.Fiefs.Count == 0 && FactionHelper.GetEnemyKingdoms(k).Any(x => x != null && x != e && !x.IsEliminated))
+                || (e.Fiefs.Count == 0 && FactionHelper.GetEnemyKingdoms(e).Any(x => x != null && x != k && !x.IsEliminated));
+        }
+
+        /// <summary>Jak lista gry (KingdomDecisionProposalBehavior): ta sama para (krolestwo wniosku, wrog) we wniosku o pokoj z dowolnego
+        /// zrodla mniej niz 5 dob temu; przy krolestwie gracza takze para odwrotna mniej niz 2 doby temu (gra: oferta 48 h).</summary>
+        private static bool Recent(Kingdom k, Kingdom e, int absDay, bool toPlayer)
+        {
+            lock (_lock)
+            {
+                int d;
+                if (_pairLast.TryGetValue((k, e), out d) && absDay - d < PairGapDays) return true;
+                if (toPlayer && _pairLast.TryGetValue((e, k), out d) && absDay - d < PlayerGapDays) return true;
+            }
+            return false;
+        }
+
+        /// <summary>Glos gry przed latkami (0 albo 200) dla wniosku z biedy: danina 0, pokoj odpowiedni, wniosek nie od wroga
+        /// (MakePeaceKingdomDecision.DetermineSupport gry 1.4.8). Tylko do logu: nacisk BK = (glos przed czlonem E1 - gra) / 240.</summary>
+        private static float GameYes(Kingdom k, Kingdom e, Clan c)
+        {
+            bool q = _quiet; _quiet = true;
+            try
+            {
+                var dm = Campaign.Current.Models.DiplomacyModel;
+                TextObject r;
+                float cs = dm.GetScoreOfDeclaringPeaceForClan(k, e, c, out r);
+                float s = dm.GetScoreOfDeclaringPeace(k, e);
+                float thr = dm.GetDecisionMakingThreshold(k);
+                s *= s > 0f ? 0.95f : 1.05f;
+                return s > thr && cs > s ? VoteFull : 0f;
+            }
+            catch { return float.NaN; }
+            finally { _quiet = q; }
+        }
+
+        /// <summary>Symulacja glosu bez gracza (bez skutkow: wlasne obiekty wyniku, wplyw nie ruszany; glos E1 bez licznikow).</summary>
+        private static Sim Simulate(MakePeaceKingdomDecision d, Clan who)
+        {
+            var r = new Sim();
+            bool q = _quiet; _quiet = true;
+            try
+            {
+                var sup = d.DetermineSupporters().ToList();
+                r.Voters = sup.Count;
+                r.ProposerVotes = sup.Any(x => x != null && x.Clan == who);
+                var el = new KingdomElection(d);
+                el.SetupResultWithoutPlayerSupport();
+                foreach (var o in el.PossibleOutcomes)
+                {
+                    var po = o as MakePeaceKingdomDecision.MakePeaceDecisionOutcome;
+                    if (po == null) continue;
+                    if (po.ShouldPeaceBeDeclared) { r.Yes += o.SupporterList.Count; r.YesPts += o.TotalSupportPoints; }
+                    else { r.No += o.SupporterList.Count; r.NoPts += o.TotalSupportPoints; }
+                }
+                r.Ok = true;
+            }
+            catch (Exception ex) { Stumble("PovertyPeace.Simulate", ex); r.Ok = false; }
+            finally { _quiet = q; }
+            return r;
+        }
+
+        private static string SimDesc(Sim m)
+        {
+            if (m == null || !m.Ok) return "symulacja glosu nieudana";
+            return "glosujacych " + m.Voters + " (wnioskodawca " + (m.ProposerVotes ? "glosuje" : "bez prawa glosu") + "), symulacja bez gracza: za TAK "
+                   + m.Yes + " rodow (" + (int)m.YesPts + " pkt), za NIE " + m.No + " (" + (int)m.NoPts + " pkt)";
+        }
+
+        /// <summary>Glos wnioskodawcy do logu: za/przeciw po wszystkich latkach, przed czlonem E1, glos gry i nacisk BK.</summary>
+        private static string VoteDesc(Kingdom k, Pick x)
+        {
+            float g = GameYes(k, x.E, x.Who);
+            string push = float.IsNaN(g) || float.IsNaN(x.OYes) ? "?" : ((x.OYes - g) / BkPush).ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
+            return "wrog " + N(x.E) + " (wynik wojny " + (int)x.Res + "), rod " + N(x.Who) + " (wplyw " + (int)x.Who.Influence + "): glos za " + (int)x.Yes + " / przeciw " + (int)x.No
+                   + " (przed czlonem E1 " + (float.IsNaN(x.OYes) ? "?" : ((int)x.OYes).ToString()) + " / " + (float.IsNaN(x.ONo) ? "?" : ((int)x.ONo).ToString())
+                   + "; gra " + (float.IsNaN(g) ? "?" : ((int)g).ToString()) + "/" + (float.IsNaN(g) ? "?" : ((int)(VoteFull - g)).ToString()) + ", nacisk BK " + push + ")";
+        }
+
+        private static string WhyNone(int fab, int unsuit, int blocked, string firstBlock, int elim, int recent)
+        {
+            var parts = new List<string>();
+            if (fab > 0) parts.Add("fabularne ROT");
+            if (unsuit > 0) parts.Add("pokoj nieodpowiedni");
+            if (blocked > 0) parts.Add("bez zgody");
+            if (elim > 0) parts.Add("zniszczenie bez lenn");
+            if (recent > 0) parts.Add("wniosek < " + PairGapDays + " dob");
+            if (parts.Count != 1) return "rozne powody w roznych wojnach: " + string.Join(" + ", parts.ToArray());
+            return fab > 0 ? "tylko wojny fabularne ROT" : unsuit > 0 ? WhyUnsuit : blocked > 0 ? firstBlock : elim > 0 ? WhyElim : WhyRecent;
+        }
 
         /// <summary>Raz na dobe (po odswiezeniu biedy): krolestwa z T >= 0.5 skladaja wniosek o pokoj z biedy (patrz opis klasy).</summary>
         private static void Propose(List<KeyValuePair<Kingdom, KState>> list)
@@ -914,7 +1097,10 @@ namespace CrashScribe
             if (!_propOn || !Config.PovertyPeaceProposals || Campaign.Current == null) return;
             int absDay = (int)CampaignTime.Now.ToDays;
             var dm = Campaign.Current.Models.DiplomacyModel;
-            foreach (var p in list)
+            var pk = Clan.PlayerClan.Kingdom;
+            bool pMerc = Clan.PlayerClan.IsUnderMercenaryService;
+            // najbiedniejsze najpierw: pokoj zawarty przez biedniejsze zmienia liste wrogow nastepnych
+            foreach (var p in list.OrderByDescending(x => x.Value.T).ThenBy(x => x.Value.Runway).ToList())
             {
                 var k = p.Key; var s = p.Value;
                 try
@@ -922,35 +1108,33 @@ namespace CrashScribe
                     if (k == null || k.IsEliminated || s.T < ProposeT) continue;
                     var enemies = FactionHelper.GetEnemyKingdoms(k).Where(x => x != null && x != k && !x.IsEliminated).ToList();
                     if (enemies.Count == 0) continue;
-                    int last; bool wait;
-                    lock (_lock) { _ppElig.Inc(); wait = _ppLast.TryGetValue(k, out last) && absDay - last < ProposeEveryDays; if (wait) _ppWait.Inc(); }
+                    // staly dzien tygodnia: "raz na 7 dob" bez zapisu w grze i bez nowej rundy wnioskow po kazdym wczytaniu
+                    bool wait = (absDay + Weekday(k)) % ProposeEveryDays != 0;
+                    lock (_lock) { _ppElig.Inc(); if (wait) _ppWait.Inc(); }
                     if (wait) continue;
                     // jak gra (GetRandomPeaceDecision): jeden wniosek o pokoj naraz (lista nierozstrzygnietych ma tylko krolestwo gracza)
                     if (k.UnresolvedDecisions.Any(x => x is MakePeaceKingdomDecision)) { NoProposal("czeka juz wniosek o pokoj"); continue; }
 
-                    int fab = 0, blocked = 0, unsuit = 0, ok = 0; string firstBlock = null;
-                    Kingdom best = null; float bestRes = 0f; double bestStart = 0;
+                    int fab = 0, unsuit = 0, blocked = 0, elim = 0, recent = 0; string firstBlock = null;
+                    var wars = new List<KeyValuePair<Kingdom, float>>();   // dopuszczone wojny: (wrog, wynik wojny swoj - wroga)
+                    var starts = new Dictionary<Kingdom, double>();
                     foreach (var e in enemies)
                     {
                         if (Forced(k, e)) { fab++; continue; }
-                        string b = PeaceBlock(k, e);
-                        if (b != null) { blocked++; if (firstBlock == null) firstBlock = b; continue; }
+                        // przed zgodami: model zgod gry (DefaultKingdomDecisionPermissionModel) tez sprawdza IsPeaceSuitable i schowalby powod
                         if (!dm.IsPeaceSuitable(k, e)) { unsuit++; continue; }
-                        ok++;
-                        float res = dm.GetWarProgressScore(k, e).ResultNumber - dm.GetWarProgressScore(e, k).ResultNumber;
-                        double start = k.GetStanceWith(e).WarStartDate.ToDays;
-                        if (best == null || res < bestRes || (res == bestRes && start < bestStart)) { best = e; bestRes = res; bestStart = start; }
+                        string b = PeaceBlock(k, e);
+                        if (b == null && e.RulingClan == null) b = "wrog bez rodu panujacego";
+                        if (b != null) { blocked++; if (firstBlock == null) firstBlock = b; continue; }
+                        if (Destroys(k, e)) { elim++; continue; }
+                        if (Recent(k, e, absDay, e == pk && !pMerc)) { recent++; continue; }
+                        wars.Add(new KeyValuePair<Kingdom, float>(e, dm.GetWarProgressScore(k, e).ResultNumber - dm.GetWarProgressScore(e, k).ResultNumber));
+                        starts[e] = k.GetStanceWith(e).WarStartDate.ToDays;
                     }
-                    if (best == null)
-                    {
-                        NoProposal(fab == enemies.Count ? "tylko wojny fabularne ROT"
-                                   : blocked > 0 && unsuit == 0 ? firstBlock
-                                   : unsuit > 0 && blocked == 0 ? WhyUnsuit
-                                   : "zgody i pokoj nieodpowiedni (rozne wojny)");
-                        continue;
-                    }
-                    var er = best.RulingClan;
-                    if (er == null) { NoProposal("wrog bez rodu panujacego"); continue; }
+                    if (elim > 0) lock (_lock) { _ppElim.D += elim; _ppElim.T += elim; }
+                    if (wars.Count == 0) { NoProposal(WhyNone(fab, unsuit, blocked, firstBlock, elim, recent)); continue; }
+                    // najgorszy wynik wojny najpierw; remis - starsza wojna
+                    wars = wars.OrderBy(x => x.Value).ThenBy(x => starts[x.Key]).ToList();
 
                     // wnioskodawca: rod AI "za pokojem z biedy" (T + P > 1), z wplywem ponad koszt wniosku (jak gra), najbiedniejszy
                     var cands = k.Clans.Where(c => c != null && !c.IsEliminated && c != Clan.PlayerClan && !c.IsUnderMercenaryService && c.Leader != null && c.Leader.IsAlive)
@@ -962,40 +1146,72 @@ namespace CrashScribe
                     // danina dzienna 0 (jak wniosek BK ForceProposePeaceFromLosingSide): trybut gry placa rody w nicosc, a odbiorca
                     // dostaje go z niczego (DefaultClanFinanceModel), Diplomacy rozciaga go na lata - E1b nie dokleja nowego strumienia;
                     // glos gry patrzy tylko na danine < 0, wiec glosy bez zmian. Reparacje Diplomacy jak przy kazdym pokoju.
-                    MakePeaceKingdomDecision dec = null; Clan who = null; float sup = 0f, w = 0f;
+                    Pick pick = null, rej = null; int pref = 0, canc = 0, rank = 0;
                     _quiet = true;
                     try
                     {
-                        foreach (var c in cands)
+                        foreach (var war in wars)
                         {
-                            var d = new MakePeaceKingdomDecision(c.Key, best, 0, 0);
-                            float v = d.DetermineSupport(c.Key, YesOf(d));
-                            if (v > 0f) { dec = d; who = c.Key; sup = v; w = c.Value; break; }
+                            rank++;
+                            foreach (var c in cands)
+                            {
+                                var d = new MakePeaceKingdomDecision(c.Key, war.Key, 0, 0);
+                                _qOrig = float.NaN; float v = d.DetermineSupport(c.Key, YesOf(d)); float ov = _qOrig;
+                                _qOrig = float.NaN; float no = d.DetermineSupport(c.Key, NoOf(d)); float on = _qOrig;
+                                var x = new Pick { Dec = d, Who = c.Key, E = war.Key, Res = war.Value, W = c.Value, Yes = v, No = no, OYes = ov, ONo = on, Rank = rank };
+                                // jak ConsiderPeace: glos za > 0; ponadto jak gra zaraz po AddDecision (KingdomElection.StartElection ->
+                                // KingdomDecision.ShouldBeCancelled): najlepsza opcja wnioskodawcy TAK i nie "z boku" - inaczej wniosek
+                                // anulowany, wplyw zaplacony, glosowania nie ma (nacisk BK +-240 x p przy p < 0 przewaza czlon E1)
+                                if (!(v > 0f && v > no)) { pref++; if (rej == null) rej = x; continue; }
+                                if (d.ShouldBeCancelled()) { canc++; if (rej == null) rej = x; continue; }
+                                pick = x; break;
+                            }
+                            if (pick != null) break;
                         }
                     }
                     finally { _quiet = false; }
-                    if (dec == null) { NoProposal("glos wnioskodawcy <= 0"); continue; }
+                    if (pick == null)
+                    {
+                        string why = pref > 0 ? WhyPrefers : WhyCancel;
+                        NoProposal(why);
+                        Scribe.Line("Pokoj z biedy (E1b): dzien " + Day() + " - BEZ WNIOSKU Z BIEDY " + N(k) + ": " + why + " (wojen dopuszczonych " + wars.Count + ", rodow pytanych " + cands.Count
+                                    + "; prob: woli wojne " + pref + ", z boku " + canc + ")" + (rej != null ? "; pierwsza proba - " + VoteDesc(k, rej) : "") + "; " + N(k) + ": " + Desc(s) + ".");
+                        continue;
+                    }
 
+                    var dec = pick.Dec; var best = pick.E; var who = pick.Who;
+                    // wrog = krolestwo gracza (gracz nie najemnik): gra nie glosuje, tylko wysyla graczowi oferte pokoju bez wzgledu na
+                    // wynik glosu (KingdomElection.ReadyToAiChoose -> MakePeaceKingdomDecision.OnShowDecision -> PeaceOfferMapNotification,
+                    // bez KingdomDecisionConcluded) - oferta tylko, gdy glos rodow (symulacja bez gracza) jest za pokojem, jak miedzy krolestwami AI
+                    bool toPlayer = best == pk && !pMerc;
+                    var sim = Simulate(dec, who);
+                    if (toPlayer && !(sim.Ok && sim.YesPts > sim.NoPts))
+                    {
+                        NoProposal(WhyOffer);
+                        Scribe.Line("Pokoj z biedy (E1b): dzien " + Day() + " - BEZ OFERTY POKOJU DLA GRACZA od " + N(k) + ": " + WhyOffer + " - " + SimDesc(sim) + "; " + VoteDesc(k, pick) + "; " + N(k) + ": " + Desc(s) + ".");
+                        continue;
+                    }
                     float bk = dm.GetScoreOfDeclaringPeace(k, best), thr = dm.GetDecisionMakingThreshold(k);
                     int cost = dm.GetInfluenceCostOfProposingPeace(who);
-                    // wrog = krolestwo gracza (gracz nie najemnik): gra nie glosuje, tylko wysyla graczowi oferte pokoju
-                    // (MakePeaceKingdomDecision.OnShowDecision -> PeaceOfferMapNotification, bez KingdomDecisionConcluded) - jak przy wniosku gry
-                    bool toPlayer = best == Clan.PlayerClan.Kingdom && !Clan.PlayerClan.IsUnderMercenaryService;
                     lock (_lock)
                     {
-                        if (toPlayer) _ppOffer.Inc(); else _mine[dec] = absDay;
-                        _ppLast[k] = absDay; _ppMade.Inc();
+                        _mine[dec] = absDay;   // takze oferta dla gracza: anulowanie w StartElection liczone jak przy innych wnioskach
+                        _ppMade.Inc();
                         int n; _ppByK.TryGetValue(k, out n); _ppByK[k] = n + 1;
                     }
                     Scribe.Line("Pokoj z biedy (E1b): dzien " + Day() + " - WNIOSEK Z BIEDY " + N(k) + " z " + N(best) + ": wnioskodawca " + N(who) + " (wplyw " + (int)who.Influence
-                                + ", koszt wniosku " + cost + ", bieda skarbca + rodu " + w.ToString("0.00") + ", glos za " + (int)sup + "); " + N(k) + ": " + Desc(s)
-                                + "; wynik wojny (gra, swoj - wroga) " + (int)bestRes + " - najgorszy z " + ok + " dopuszczonych (wrogow " + enemies.Count + ", fabularnych " + fab
-                                + ", bez zgody " + blocked + ", pokoj nieodpowiedni " + unsuit + "); wynik pokoju BK " + (int)bk + " (prog " + (int)thr + (bk < thr ? " - gra by wniosku nie zlozyla" : "")
-                                + "); danina dzienna 0" + (k == Clan.PlayerClan.Kingdom ? "; krolestwo gracza - wniosek czeka na liscie decyzji" : "")
-                                + (toPlayer ? "; wrog to krolestwo gracza - gra wysyla graczowi oferte pokoju (bez glosowania)" : "") + ".");
+                                + ", koszt wniosku " + cost + ", bieda skarbca + rodu " + pick.W.ToString("0.00") + "); " + VoteDesc(k, pick) + "; " + SimDesc(sim) + "; " + N(k) + ": " + Desc(s)
+                                + "; wynik wojny (gra, swoj - wroga) " + (int)pick.Res + " - " + (pick.Rank == 1 ? "najgorszy" : pick.Rank + ". od najgorszego") + " z " + wars.Count + " dopuszczonych (wrogow " + enemies.Count
+                                + ", fabularnych " + fab + ", pokoj nieodpowiedni " + unsuit + ", bez zgody " + blocked + ", zniszczenie bez lenn " + elim + ", wniosek < " + PairGapDays + " dob " + recent
+                                + "); wynik pokoju BK " + (int)bk + " (prog " + (int)thr + (bk < thr ? " - gra by wniosku nie zlozyla" : "")
+                                + "); danina dzienna 0" + (k == pk ? "; krolestwo gracza - wniosek czeka na liscie decyzji" : "")
+                                + (toPlayer ? "; wrog to krolestwo gracza - gra wysyla graczowi oferte pokoju (glos rodow w symulacji za pokojem)" : "") + ".");
                     _adding = dec;
                     try { k.AddDecision(dec, false); }   // wnioskodawca placi wplyw jak w grze; krolestwo AI glosuje od razu
                     finally { _adding = null; }
+                    // oferta dla gracza: liczona dopiero, gdy StartElection jej nie anulowal (anulowanie zdjelo juz wniosek z _mine
+                    // i policzylo "anulowane"); glosowanie sie nie konczy, wiec zdejmujemy go sami
+                    if (toPlayer) lock (_lock) { if (_mine.Remove(dec)) _ppOffer.Inc(); }
                 }
                 catch (Exception ex) { Stumble("PovertyPeace.Propose", ex); }
             }
@@ -1017,7 +1233,7 @@ namespace CrashScribe
                 foreach (var c in _ctrs) { c.D = 0; c.T = 0; }
                 _cpWhy.D.Clear(); _cpWhy.T.Clear(); _ppWhy.D.Clear(); _ppWhy.T.Clear();
                 _cpScoreSum = 0; _cpScoreN = 0;
-                _ppByK.Clear(); _ppLast.Clear(); _mine.Clear();
+                _ppByK.Clear(); _pairLast.Clear(); _mine.Clear();
                 _lastGame = null; _inBk = false; _adding = null;
                 _arr.Clear(); _nWorld = -1f; _arrLastDay = -1; _arrLastSum = -1;
             }
