@@ -900,3 +900,5 @@ pociski: tier liczony z AMUNICJI - strzaly i belty tieru 6 jak stal t6 (50%), ni
 **175d (09.10 ok. 09:30):** CS w-toku/175-armie-cs 537e93f, Armoury w-toku/175-armie-arm 1402107 (DLL SCRATCH test\Armoury-175d.dll aa0ff2c6, CrashScribe-at-175d.dll 34656904).
 Uwaga: wylaczenie OthersSteelRule NIE przywraca autobitwy sprzed 175 (AI zawsze liczy bron po naprawie - decyzja Jeffa 1); jedyna dzwignia na Innych w autobitwie = minimum
 obrazen (decyzja 5, po tescie T-B1). Uderzenie tarcza/glowica w Innego = 15% bez komunikatu; komunikat tylko dla ciosow gracza i jego ludzi.
+**DECYZJA JEFFA 09.10 ok. 10:20 (rycerze bez lenna - potwierdzenie po wyjasnieniu):** TAK - 85 rodow BK "gentry" nie prowadzi wlasnych druzyn; na wojne jada w druzynie swojego
+pana (w jego pulapie wojska, pan placi jak rycerzowi swity) albo w armii krolestwa; w pokoju siedza w majatku; ta sama regula dla wasali-rycerzy gracza. Etap 2.
