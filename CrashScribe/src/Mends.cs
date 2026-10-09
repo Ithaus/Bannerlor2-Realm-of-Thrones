@@ -83,6 +83,9 @@ namespace CrashScribe
         /// Recenzja 175c: pocisk przy wlaczonej zasadzie - bron rzucana wedlug siebie, amunicja
         /// wedlug swojej wyrzutni (zmiana broni w locie bez wplywu), kamien/machina = reszta;
         /// cios wlasny (wlasciciel = ofiara: odbicie wlasnego ciosu) poza licznikami bitwy.
+        /// 175d (Jeff 09.10 ok. 08:40): pocisk wedlug tieru AMUNICJI (strzaly, belty; luk i kusza sie
+        /// nie licza), kamienie, glazy, garnki i pociski machin zawsze 15%, bron rzucana wedlug siebie;
+        /// pierwszy cios gracza albo jego ludzi bronia, ktora tnie - komunikat raz na misje (OthersSteel.Warn).
         /// </summary>
         public static void ValyrianWard(TaleWorlds.MountAndBlade.Agent __instance,
                                         ref TaleWorlds.MountAndBlade.Blow blow)
@@ -102,7 +105,11 @@ namespace CrashScribe
                 int post = OthersSteel.Apply(k, pre);
                 blow.InflictedDamage = post;
                 if (att != null && ReferenceEquals(att, v)) OthersSteel.CountSelf();   // odbicie wlasnego ciosu - nie bitwa
-                else OthersSteel.CountField(k, pre, post, v, note);
+                else
+                {
+                    OthersSteel.CountField(k, pre, post, v, note);
+                    OthersSteel.Warn(att, v, k);                 // 175d: komunikat dla gracza, raz na misje
+                }
             }
             catch { }                                            // per-cios: zadnego raportowania
         }
@@ -1742,6 +1749,8 @@ namespace CrashScribe
         /// 175c, jak pole; przy wylaczonej PreTierBest jak dotad); smok liczony jako ogien
         /// i nie ciety (ROT i tak nadpisuje); __3 = partia trafionego (rundy z samym
         /// Wedrowcem), __5 = MapEvent (liczniki bitwy).
+        /// 175d (Jeff 09.10 ok. 08:40): zolnierz wedlug wzorca PO zamianie 175 (jak pole, oba tryby
+        /// zasady); przy wlaczonej zasadzie strzaly/belty wedlug wlasnego tieru, wyrzutnie i kamienie nie.
         /// </summary>
         public static void ValyrianWardSim(CharacterObject __0, CharacterObject __1, ref ExplainedNumber __result,
                                            TaleWorlds.CampaignSystem.Party.PartyBase __3,
@@ -1752,8 +1761,8 @@ namespace CrashScribe
                 float pre = __result.ResultNumber;
                 if (pre <= 1f) return;
                 if (!WalkerBlood(__1)) return;                   // __1 = trafiany
-                // 175: bron z MIGAWKI wzorca sprzed zamiany sprzetu wedlug tieru - 175 nie zmienia
-                // walki z Innymi (projekt 1.7 [a2], 1.9); 175c zmienia, ile bije t6, i (przy zasadzie) tier bez amunicji
+                // 175d: bron z wzorca PO zamianie sprzetu wedlug tieru (decyzja Jeffa 09.10 ok. 08:40 pkt 1 - jedna
+                // zasada z polem; dotad migawka sprzed zamiany); 175c zmienia, ile bije t6, 175d - tier pocisku z amunicji
                 int note;
                 int k = OthersSteel.SimClass(__0, out note);     // __0 = bijacy
                 float post = OthersSteel.ApplyF(k, pre);

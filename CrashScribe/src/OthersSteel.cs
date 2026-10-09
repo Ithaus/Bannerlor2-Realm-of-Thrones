@@ -31,20 +31,21 @@ namespace CrashScribe
     ///     Mission._missilesDictionary - gra czyta go zaraz po victim.RegisterBlow, Mission.RegisterBlow 1.4.8) - pelne.
     ///     Tylko przy wlaczonej zasadzie (OthersSteelRule); wylaczona = stara regula wedlug tieru.
     ///  3. TIER NARZEDZIA >= 6 (stal zamkowa) - OthersCastleSteelPercent (dom. 50) przy wlaczonej zasadzie, 100% przy wylaczonej.
-    ///     Narzedzie: melee - przedmiot ze slotu ciosu; pocisk (wlaczona zasada, recenzja 175c) - bron rzucana (oszczep, topor, noz)
-    ///     wedlug WLASNEGO przedmiotu pocisku, strzala/belt/kamien z procy wedlug wyrzutni tej amunicji (luk/kusza/proca - decyzja
-    ///     02.09; najpierw ta w rece, gdy pasuje do amunicji, potem najlepsza pasujaca w slotach 0-3 - zmiana broni w locie nie
-    ///     zmienia tieru), kamien/glaz/garnek (klasy Stone, Boulder, Ballista*) i beret balisty bez luku u obslugi - reszta.
+    ///     Narzedzie: melee - przedmiot ze slotu ciosu; pocisk (wlaczona zasada) - 175d (decyzja Jeffa 09.10 ok. 08:40 pkt 2: "tier 6
+    ///     strzaly rania normalnie, czy belty, ale nie kamienie"): strzala, belt (i kula) wedlug tieru WLASNEJ AMUNICJI (luk, kusza
+    ///     sie nie licza), bron rzucana (oszczep, topor, noz) wedlug wlasnego przedmiotu jak dotad; kamien do procy, kamien rzucany,
+    ///     glaz, garnek (typ SlingStones, klasy Stone, Boulder, Ballista*) i KAZDY pocisk machiny (Mission.Missile.MissionObjectToIgnore
+    ///     != null - tak strzela RangedSiegeWeapon gry, RBM i NavalDLC; beret balisty ma w RBM t6) - zawsze reszta.
     ///     Wylaczona zasada: pocisk wedlug broni w rece, jak dotad.
     ///  4. RESZTA (bron ponizej t6) i GOLE RECE (piesc, kopyto, brak przedmiotu) - 15%, min 1. Ciosy do 1 punktu i upadek
     ///     (IsFallDamage) Mends.ValyrianWard przepuszcza bez zmian, jak dotad (stad tez ladowanie smoka ROT, 1 punkt, nie wchodzi
     ///     w liczniki). Cios wlasny (odbicie wlasnego ciosu) - obrazenia jak dotad, osobny licznik dobowy.
-    /// SYMULACJA (autobitwa), wlaczona zasada: bijacy-bohater - jego zestaw bojowy (sloty 0-3); zolnierz - bron z migawki 175 sprzed
-    /// zamiany (Army175.PreWeapons); tier = najlepsza bron BEZ AMUNICJI i tarcz (luk/kusza/proca wedlug wlasnego tieru - jak pole;
-    /// recenzja 175c: dotad liczyla tez amunicje, wiec np. kusznicy Nocnej Strazy t3-t5 byli "t6" przez bolt_a w autobitwie, a w polu
-    /// nie). Army175.PreTierBest bez zmian (definicja 175, linie migawki) - liczy go tylko wylaczona zasada (stara regula).
-    /// Rozjazd, ktory zostaje (do decyzji Jeffa): autobitwa bierze bron sprzed zamiany 175.2, pole - po; licznik "tylko we wzorcu
-    /// sprzed 175" pokazuje jego skale.
+    /// SYMULACJA (autobitwa): 175d (decyzja Jeffa 09.10 ok. 08:40 pkt 1: "autobitwa liczy bron PO naprawie 175, jedna zasada z polem")
+    /// - bijacy-bohater - jego zestaw bojowy (sloty 0-3), zolnierz - WZORZEC NA ZYWO (po zamianie 175.2, tak jak wychodzi w pole), w obu
+    /// trybach zasady. Wlaczona zasada: tier = najlepsza bron wrecz albo rzucana (bez kamieni) i najlepsze strzaly/belty, do ktorych
+    /// jednostka ma pasujaca wyrzutnie (pkt 2: "najlepsza amunicja jednostki"); wyrzutnie, tarcze i kamienie do procy sie nie licza.
+    /// Wylaczona zasada: stara regula na tym samym wzorcu - Mends.BestWeaponTier (najwyzszy tier w slotach 0-3 z amunicja i wyrzutnia,
+    /// jak przed 175). Migawka 175 sprzed zamiany (Army175.PreWeapons) - juz tylko do porownania w logu ("dawniej t6").
     ///
     /// LISTY: stal valyrianska - 29 wzorow z rejestru 177 (kopia ponizej, "AKTUALIZUJ OBIE RAZEM"); gdy Armoury ma juz
     /// ValyrianBlades (177 scalone) - lista Armoury, w logu startu zgodnosc z kopia (wzor Army175.EssosCheck). Smocze szklo - id
@@ -55,6 +56,9 @@ namespace CrashScribe
     /// USTAWIENIA (Armoury, Mends.ArmouryFloat): OthersSteelRule (dom. TAK), OthersCastleSteelPercent (15-100, dom. 50). Czytane przy
     /// starcie sesji, raz na dobe i przy pierwszym ciosie w Wedrowca w nowej misji - nigdy per cios (ArmouryFloat przeglada assembly).
     /// Bez Armoury: wlaczone, 50.
+    ///
+    /// KOMUNIKAT W GRZE (175d, decyzja pkt 4): pierwszy cios gracza albo jego ludzi (druzyna gracza) w Wedrowca wroga bronia, ktora
+    /// tnie (t6 ponizej 100% albo reszta), raz na misje - po angielsku, plus linia w logu. Tylko przy wlaczonej zasadzie.
     ///
     /// POMIAR (tylko log): linia "Inni (175c): bitwa ..." po kazdej bitwie z Innymi (strona z partia Innych - jak NightKingGate - albo
     /// z ciosami w Wedrowcow) i linia dobowa "Inni (175c) dzien N". Liczniki per MapEvent: pole - kubelek bitwy mapy gracza z chwili
@@ -67,8 +71,9 @@ namespace CrashScribe
     internal static class OthersSteel
     {
         internal const int KVs = 0, KGlass = 1, KFire = 2, KT6 = 3, KRest = 4, KBare = 5, KN = 6;
-        // uwagi do klasy - tylko liczniki, obrazen nie zmieniaja
-        internal const int NLauncher = 1, NOldOnly = 2, NAmmoOnly = 4, NSiege = 8;
+        // uwagi do klasy - tylko liczniki, obrazen nie zmieniaja (175d): NAmmo - t6 dzieki strzalom/beltom, NPreT6 - reszta, choc
+        // migawka sprzed 175 dalaby t6 (skutek decyzji pkt 1), NStone - kamien, glaz, garnek albo pocisk machiny
+        internal const int NAmmo = 1, NPreT6 = 2, NStone = 8;
         private const int RestPct = 15;
 
         internal static bool RuleOn = true;
@@ -90,7 +95,7 @@ namespace CrashScribe
 
         private static readonly object _gate = new object();
         private static readonly Dictionary<ItemObject, int> _itemCls = new Dictionary<ItemObject, int>(new RefEq<ItemObject>());       // 0 zwykla, 1 VS, 2 szklo
-        private static readonly Dictionary<CharacterObject, UnitInfo> _units = new Dictionary<CharacterObject, UnitInfo>(new RefEq<CharacterObject>()); // zolnierze (migawka)
+        private static readonly Dictionary<CharacterObject, UnitInfo> _units = new Dictionary<CharacterObject, UnitInfo>(new RefEq<CharacterObject>()); // zolnierze (175d: wzorzec na zywo, doba)
         private static FieldInfo _fMissiles;
         private static bool _fMissilesTried;
 
@@ -100,37 +105,37 @@ namespace CrashScribe
             public int GetHashCode(T o) { return RuntimeHelpers.GetHashCode(o); }
         }
 
-        /// <summary>Bijacy w symulacji: klasa VS/szkla, tier stali bez amunicji, stary tier (PreTierBest), skad t6.</summary>
+        /// <summary>Bijacy w symulacji (175d - wzorzec na zywo): klasa VS/szkla, tier stali (wlaczona zasada), tier starej regule
+        /// (wylaczona), skad t6, tier tej samej definicji na migawce sprzed 175 (-1 brak migawki), czy ma jakakolwiek bron.</summary>
         private sealed class UnitInfo
         {
-            internal int Cls, Tier, OldTier;
-            internal bool Launcher, OldOnly;
+            internal int Cls, Tier, OldTier, PreTier = -1;
+            internal bool AmmoOnly, Armed;
         }
 
         private sealed class Tally
         {
             internal readonly int[] N = new int[KN];
             internal readonly double[] Pre = new double[KN], Post = new double[KN];
-            internal int Launcher, OldOnly, AmmoOnly, Siege;
+            internal int Ammo, PreT6, Stone;
             internal int Hits { get { int s = 0; for (int i = 0; i < KN; i++) s += N[i]; return s; } }
             internal void Add(int k, double pre, double post, int note)
             {
                 N[k]++; Pre[k] += pre; Post[k] += post;
-                if ((note & NLauncher) != 0) Launcher++;
-                if ((note & NOldOnly) != 0) OldOnly++;
-                if ((note & NAmmoOnly) != 0) AmmoOnly++;
-                if ((note & NSiege) != 0) Siege++;
+                if ((note & NAmmo) != 0) Ammo++;
+                if ((note & NPreT6) != 0) PreT6++;
+                if ((note & NStone) != 0) Stone++;
             }
             internal void AddAll(Tally o)
             {
                 if (o == null) return;
                 for (int i = 0; i < KN; i++) { N[i] += o.N[i]; Pre[i] += o.Pre[i]; Post[i] += o.Post[i]; }
-                Launcher += o.Launcher; OldOnly += o.OldOnly; AmmoOnly += o.AmmoOnly; Siege += o.Siege;
+                Ammo += o.Ammo; PreT6 += o.PreT6; Stone += o.Stone;
             }
             internal void Clear()
             {
                 for (int i = 0; i < KN; i++) { N[i] = 0; Pre[i] = 0; Post[i] = 0; }
-                Launcher = OldOnly = AmmoOnly = Siege = 0;
+                Ammo = PreT6 = Stone = 0;
             }
             internal double PostSum { get { double s = 0; for (int i = 0; i < KN; i++) s += Post[i]; return s; } }
         }
@@ -148,6 +153,7 @@ namespace CrashScribe
         // pole: kubelek bitwy mapy gracza z chwili pierwszego ciosu w Wedrowca w biezacej misji (null = misja bez bitwy mapy)
         private static Battle _curField;
         private static WeakReference _lastMission;
+        private static bool _warned;          // 175d: komunikat dla gracza juz pokazany w tej misji
         // doba
         private static readonly Tally _dayField = new Tally(), _daySim = new Tally();
         private static int _dayBattles, _dayPlayer, _dayOthersWins, _dayOthersLosses, _dayWalkers, _dayWounded, _dayDead, _dayCaptured,
@@ -157,7 +163,7 @@ namespace CrashScribe
         // ------------------------------------------------------------ ustawienia
 
         /// <summary>Odczyt suwakow z Armoury (raz: start sesji, doba, nowa misja). full = tez czysci pamiec jednostek
-        /// (migawka 175 moze dojsc w dobie DailyCatchUp).</summary>
+        /// (zamiana 175.2 moze dojsc w dobie DailyCatchUp - wzorce sie zmieniaja).</summary>
         internal static void Refresh(bool full)
         {
             try
@@ -171,13 +177,13 @@ namespace CrashScribe
         }
 
         /// <summary>Opis dzialania tieru 6 do linii 175 (migawka valyrianska, kontrola) - wolane raz przy wczytaniu, wiec suwaki
-        /// czytane na swiezo (linia kontroli idzie przed OnSession). Przy wlaczonej zasadzie liczy jednostki t6 wedlug definicji
-        /// autobitwy 175c (migawka bez amunicji) - bez pamieci jednostek (przed zamiana 175.2 wzorzec na zywo jest jeszcze stary).</summary>
+        /// czytane na swiezo (linia kontroli idzie przed OnSession). Liczy jednostki zolnierskie z migawka wedlug definicji autobitwy
+        /// 175d: wzorzec NA ZYWO (przed zamiana 175.2 jeszcze stary - linia migawki; po zamianie - linia kontroli) i dla porownania
+        /// ta sama definicja na migawce sprzed zamiany. Bez pamieci jednostek.</summary>
         internal static string T6Text()
         {
             Refresh(false);
-            if (!RuleOn) return "t6 = pelne obrazenia (zasada stali Innych 175c wylaczona; autobitwa liczy t6 razem z amunicja, jak dotad)";
-            int n = 0, nl = 0;
+            int n = 0, na = 0, np = 0, units = 0;
             try
             {
                 foreach (var co in MBObjectManager.Instance.GetObjectTypeList<CharacterObject>())
@@ -187,16 +193,28 @@ namespace CrashScribe
                         if (co == null || co.IsHero) continue;
                         var pre = Army175.PreWeapons(co);
                         if (pre == null) continue;
-                        bool lo;
-                        if (SteelTier(pre, out lo) >= 6) { n++; if (lo) nl++; }
+                        units++;
+                        if (!RuleOn)
+                        {
+                            if (Mends.BestWeaponTier(co) >= 6) n++;
+                            if (Army175.PreTierBest(co) >= 6) np++;
+                            continue;
+                        }
+                        bool ao, arm;
+                        if (SteelTier(new List<ItemObject>(WeaponsOf(co.BattleEquipments)), out ao, out arm) >= 6) { n++; if (ao) na++; }
+                        if (SteelTier(pre, out ao, out arm) >= 6) np++;
                     }
                     catch { }
                 }
             }
             catch { }
+            if (!RuleOn)
+                return "t6 = pelne obrazenia (zasada stali Innych 175c wylaczona - stara regula: autobitwa liczy t6 z wzorca po zamianie 175 razem z"
+                       + " amunicja i wyrzutnia, 175d): " + n + " z " + units + " jednostek (na migawce sprzed zamiany " + np + ")";
             return "t6 = " + CastlePct + "% przy zasadzie stali Innych 175c, pelne tylko stal valyrianska / smocze szklo / ogien smoka; autobitwa"
-                   + " przy zasadzie liczy t6 BEZ amunicji (luk, kusza, proca wedlug wlasnego tieru): " + n + " jednostek, z tego tylko przez"
-                   + " luk/kusze/proce " + nl;
+                   + " (175d) liczy wzorzec po zamianie 175 - bron wrecz i rzucana wedlug siebie, strzaly i belty wedlug wlasnego tieru (z pasujaca"
+                   + " wyrzutnia), luk/kusza/proca i kamienie sie nie licza: " + n + " z " + units + " jednostek t6, z tego tylko przez strzaly/belty "
+                   + na + " (ta sama definicja na migawce sprzed zamiany: " + np + ")";
         }
 
         private static string RuleText()
@@ -260,12 +278,11 @@ namespace CrashScribe
             return c;
         }
 
-        /// <summary>Amunicja (strzaly, belty, kamienie do procy, kule) - nie stal; tier strzalu daje wyrzutnia.</summary>
-        private static bool IsAmmo(ItemObject it)
+        /// <summary>175d: amunicja liczona wedlug WLASNEGO tieru (strzaly, belty, kule) - decyzja pkt 2.</summary>
+        private static bool IsTieredAmmo(ItemObject it)
         {
             var t = it.ItemType;
-            return t == ItemObject.ItemTypeEnum.Arrows || t == ItemObject.ItemTypeEnum.Bolts
-                || t == ItemObject.ItemTypeEnum.SlingStones || t == ItemObject.ItemTypeEnum.Bullets;
+            return t == ItemObject.ItemTypeEnum.Arrows || t == ItemObject.ItemTypeEnum.Bolts || t == ItemObject.ItemTypeEnum.Bullets;
         }
 
         /// <summary>Wyrzutnia (luk, kusza, proca, bron palna).</summary>
@@ -283,16 +300,18 @@ namespace CrashScribe
             return pw != null && pw.IsShield;
         }
 
-        /// <summary>Kamien, glaz, garnek (reczny albo z machiny) i kamien balisty - nie stal, zawsze reszta.</summary>
+        /// <summary>Kamien do procy, kamien rzucany, glaz, garnek (reczny albo z machiny) i kamien balisty - nie stal, zawsze reszta.</summary>
         private static bool IsRock(ItemObject it)
         {
+            if (it.ItemType == ItemObject.ItemTypeEnum.SlingStones) return true;
             var wc = it.WeaponComponent;
             if (wc == null || wc.Weapons == null) return false;
             foreach (var w in wc.Weapons)
             {
                 if (w == null) continue;
                 var c = w.WeaponClass;
-                if (c == WeaponClass.Stone || c == WeaponClass.Boulder || c == WeaponClass.BallistaStone || c == WeaponClass.BallistaBoulder) return true;
+                if (c == WeaponClass.Stone || c == WeaponClass.Boulder || c == WeaponClass.BallistaStone || c == WeaponClass.BallistaBoulder
+                    || c == WeaponClass.SlingStone) return true;
             }
             return false;
         }
@@ -307,42 +326,55 @@ namespace CrashScribe
             return false;
         }
 
-        /// <summary>Wyrzutnia amunicji: ta w rece, gdy pasuje; inaczej najlepsza pasujaca w slotach 0-3 (zmiana broni w locie);
-        /// null - zadnej (beret balisty od obslugi bez luku).</summary>
-        private static ItemObject LauncherFor(Agent att, ItemObject ammo, ItemObject held)
+        /// <summary>175d, zapas na brak slownika pociskow: najlepsza amunicja w slotach 0-3, ktora strzela wyrzutnia z reki; null - brak.</summary>
+        private static ItemObject AmmoFor(Agent att, ItemObject launcher)
         {
-            var apw = ammo.PrimaryWeapon;
-            if (apw == null) return null;
-            var ac = apw.WeaponClass;
-            if (held != null && Shoots(held, ac)) return held;
             ItemObject best = null;
             for (int s = 0; s < 4; s++)
             {
                 var mw = att.Equipment[(EquipmentIndex)s];
                 if (mw.IsEmpty) continue;
                 var it = mw.Item;
-                if (it != null && Shoots(it, ac) && (best == null || it.Tier > best.Tier)) best = it;
+                var pw = it != null ? it.PrimaryWeapon : null;
+                if (pw != null && IsTieredAmmo(it) && Shoots(launcher, pw.WeaponClass) && (best == null || it.Tier > best.Tier)) best = it;
             }
             return best;
         }
 
-        /// <summary>Tier stali: najwyzsza bron bez tarcz i amunicji (wyrzutnia wedlug wlasnego tieru). launcherOnly = t6 tylko z wyrzutni.</summary>
-        private static int SteelTier(IEnumerable<ItemObject> items, out bool launcherOnly)
+        /// <summary>Tier stali 175d (autobitwa przy wlaczonej zasadzie): bron wrecz i rzucana wedlug wlasnego tieru (bez kamieni),
+        /// strzaly/belty/kule wedlug wlasnego tieru, gdy w tej samej liscie jest wyrzutnia, ktora je strzela (decyzja pkt 2: "najlepsza
+        /// amunicja jednostki"); wyrzutnie, tarcze, kamienie do procy i rzucane - nie. ammoOnly = t6 tylko dzieki strzalom/beltom;
+        /// armed = jest jakakolwiek bron (lucznik z amunicja ponizej t6 to reszta, nie gole rece).</summary>
+        private static int SteelTier(IList<ItemObject> items, out bool ammoOnly, out bool armed)
         {
-            int melee = 0, launch = 0;
-            foreach (var it in items)
+            int melee = 0, ammo = 0;
+            armed = false;
+            for (int i = 0; i < items.Count; i++)
             {
-                if (it == null || it.WeaponComponent == null || IsShield(it) || IsAmmo(it)) continue;
+                var it = items[i];
+                if (it == null || it.WeaponComponent == null || IsShield(it)) continue;
+                armed = true;
+                if (IsLauncher(it) || IsRock(it)) continue;
                 int t = (int)it.Tier + 1;                              // PULAPKA: ItemTiers.Tier1 == 0
-                if (IsLauncher(it)) { if (t > launch) launch = t; }
+                if (IsTieredAmmo(it))
+                {
+                    if (t <= ammo) continue;
+                    var pw = it.PrimaryWeapon;
+                    if (pw == null) continue;
+                    for (int j = 0; j < items.Count; j++)
+                    {
+                        var l = items[j];
+                        if (l != null && IsLauncher(l) && Shoots(l, pw.WeaponClass)) { ammo = t; break; }
+                    }
+                }
                 else if (t > melee) melee = t;
             }
-            launcherOnly = launch >= 6 && melee < 6;
-            return melee > launch ? melee : launch;
+            ammoOnly = ammo >= 6 && melee < 6;
+            return melee > ammo ? melee : ammo;
         }
 
-        /// <summary>Przedmiot pocisku (strzala, belt, bron rzucana) z prywatnego slownika misji; null - brak.</summary>
-        internal static ItemObject MissileItem(Mission mission, int index)
+        /// <summary>Pocisk (strzala, belt, bron rzucana, pocisk machiny) z prywatnego slownika misji; null - brak.</summary>
+        internal static Mission.Missile MissileOf(Mission mission, int index)
         {
             try
             {
@@ -350,7 +382,7 @@ namespace CrashScribe
                 if (!_fMissilesTried) { _fMissilesTried = true; _fMissiles = AccessTools.Field(typeof(Mission), "_missilesDictionary"); }
                 var dict = _fMissiles != null ? _fMissiles.GetValue(mission) as Dictionary<int, Mission.Missile> : null;
                 Mission.Missile m;
-                if (dict != null && dict.TryGetValue(index, out m) && m != null && !m.Weapon.IsEmpty) return m.Weapon.Item;
+                if (dict != null && dict.TryGetValue(index, out m) && m != null && !m.Weapon.IsEmpty) return m;
             }
             catch { }
             return null;
@@ -364,6 +396,7 @@ namespace CrashScribe
             if (IsDragonFire(att, rec)) return KFire;
             if (!rec.HasWeapon()) return KBare;
             ItemObject tool = null;
+            bool ammo = false;
             if (!rec.IsMissile)
             {
                 int slot = rec.AffectorWeaponSlotOrMissileIndex;
@@ -386,27 +419,37 @@ namespace CrashScribe
                 if (!RuleOn) tool = held;                              // stara zasada (02.09): tier tego, co w rece
                 else
                 {
-                    var mi = MissileItem(mission, rec.AffectorWeaponSlotOrMissileIndex);
-                    if (mi == null) tool = held;                       // brak slownika pociskow: jak dotad, bez VS/szkla (nie zgadujemy po rece)
+                    var ms = MissileOf(mission, rec.AffectorWeaponSlotOrMissileIndex);
+                    var mi = ms != null ? ms.Weapon.Item : null;
+                    if (mi == null)
+                    {
+                        // brak slownika pociskow: bez VS/szkla (nie zgadujemy po rece); z wyrzutnia w rece - jej najlepsza amunicja w slotach
+                        tool = held;
+                        if (tool != null && IsLauncher(tool))
+                        {
+                            tool = AmmoFor(att, tool);
+                            if (tool == null) return KRest;
+                            ammo = true;
+                        }
+                    }
                     else
                     {
                         int c = ItemClass(mi);
                         if (c == 1) return KVs;
                         if (c == 2) return KGlass;
-                        if (IsAmmo(mi))
-                        {
-                            tool = LauncherFor(att, mi, held);
-                            if (tool == null) { note |= NSiege; return KRest; }      // beret balisty, obsluga bez luku
-                        }
-                        else if (IsRock(mi)) { note |= NSiege; return KRest; }      // kamien, glaz, garnek
-                        else tool = mi;                                // bron rzucana: tier z niej samej, nie z reki po rzucie
+                        // 175d: pocisk machiny (balista, katapulta, trebusz, bron okretu - gra, RBM i NavalDLC strzelaja przez
+                        // AddCustomMissile z machina jako MissionObjectToIgnore; reka nigdy) - reszta, takze beret balisty (RBM t6)
+                        if (ms.MissionObjectToIgnore != null) { note |= NStone; return KRest; }
+                        if (IsRock(mi)) { note |= NStone; return KRest; }            // kamien do procy, kamien, glaz, garnek
+                        tool = mi;                                     // 175d: strzala/belt wedlug siebie; bron rzucana wedlug siebie jak dotad
+                        ammo = IsTieredAmmo(mi);
                     }
                 }
             }
             if (tool == null) return KBare;
             if ((int)tool.Tier + 1 >= 6)                               // PULAPKA: ItemTiers.Tier1 == 0
             {
-                if (IsLauncher(tool)) note |= NLauncher;
+                if (ammo) note |= NAmmo;
                 return KT6;
             }
             return KRest;
@@ -437,21 +480,22 @@ namespace CrashScribe
             }
         }
 
-        /// <summary>Bijacy w symulacji: bohater - jego zestaw bojowy (liczony na zywo); zolnierz - migawka 175 (albo wzorzec na zywo),
-        /// pamietany do konca doby. OldOnly - t6 jest tylko w migawce, we wzorcu po zamianie 175.2 juz nie.</summary>
+        /// <summary>Bijacy w symulacji: bohater - jego zestaw bojowy (liczony na zywo); zolnierz - 175d: wzorzec NA ZYWO (po zamianie
+        /// 175.2, jak w polu - decyzja pkt 1), pamietany do konca doby (Daily czysci po DailyCatchUp). PreTier - ta sama definicja
+        /// na migawce sprzed zamiany (tylko licznik "dawniej t6").</summary>
         private static UnitInfo Info(CharacterObject c)
         {
             UnitInfo u;
             if (!c.IsHero) lock (_gate) { if (_units.TryGetValue(c, out u)) return u; }
             u = new UnitInfo();
+            var live = new List<ItemObject>(WeaponsOf(c.BattleEquipments));
+            u.Cls = BestClassOf(live);
+            bool ao, arm;
+            u.Tier = SteelTier(live, out ao, out arm);
+            u.AmmoOnly = ao; u.Armed = arm;
+            u.OldTier = Mends.BestWeaponTier(c);                      // stara regula (wylaczona zasada): z amunicja i wyrzutnia, jak przed 175
             var pre = c.IsHero ? null : Army175.PreWeapons(c);
-            var src = pre != null ? (IEnumerable<ItemObject>)pre : new List<ItemObject>(WeaponsOf(c.BattleEquipments));
-            u.Cls = BestClassOf(src);
-            bool lo;
-            u.Tier = SteelTier(src, out lo);
-            u.Launcher = lo;
-            u.OldTier = Army175.PreTierBest(c);
-            if (pre != null && u.Tier >= 6) { bool l2; u.OldOnly = SteelTier(WeaponsOf(c.BattleEquipments), out l2) < 6; }
+            if (pre != null) u.PreTier = SteelTier(pre, out ao, out arm);
             if (!c.IsHero) lock (_gate) _units[c] = u;
             return u;
         }
@@ -467,23 +511,22 @@ namespace CrashScribe
                 if (h != null && h.HorseComponent != null && IsDragonUsage(h.HorseComponent.Monster)) return KFire;
             }
             catch { }
+            var u = Info(striker);
             if (!RuleOn)
             {
-                int t = Army175.PreTierBest(striker);                    // stara zasada: definicja 175 (z amunicja), jak dotad
-                if (t >= 6) return KT6;
-                return t <= 0 ? KBare : KRest;
+                // stara zasada (z amunicja i wyrzutnia) - 175d: na wzorcu po zamianie 175, jak pole (decyzja pkt 1, oba tryby)
+                if (u.OldTier >= 6) return KT6;
+                return u.OldTier <= 0 ? KBare : KRest;
             }
-            var u = Info(striker);
             if (u.Cls == 1) return KVs;
             if (u.Cls == 2) return KGlass;
             if (u.Tier >= 6)
             {
-                if (u.Launcher) note |= NLauncher;
-                if (u.OldOnly) note |= NOldOnly;
+                if (u.AmmoOnly) note |= NAmmo;
                 return KT6;
             }
-            if (u.OldTier >= 6) note |= NAmmoOnly;                      // stara definicja dalaby t6 tylko przez amunicje
-            return u.Tier <= 0 ? KBare : KRest;
+            if (u.PreTier >= 6) note |= NPreT6;                          // migawka sprzed zamiany 175 dalaby t6 (skutek decyzji pkt 1)
+            return u.Armed ? KRest : KBare;
         }
 
         internal static int Apply(int k, int pre)
@@ -521,10 +564,37 @@ namespace CrashScribe
                 object last = _lastMission != null ? _lastMission.Target : null;
                 if (ReferenceEquals(last, mission)) return;
                 _lastMission = new WeakReference(mission);
+                _warned = false;
                 Refresh(false);
                 MapEvent pe = null;
                 try { if (Campaign.Current != null) pe = MapEvent.PlayerMapEvent; } catch { }
                 lock (_gate) _curField = pe != null ? BattleOf(pe) : null;
+            }
+            catch { }
+        }
+
+        /// <summary>175d (decyzja Jeffa 09.10 ok. 08:40 pkt 4): pierwszy w tej misji cios gracza albo jego ludzi (druzyna gracza) we wrogiego
+        /// Wedrowca bronia, ktora tnie obrazenia (t6 ponizej 100% albo reszta - VS, szklo i ogien bija w pelni, gole rece to nie bron)
+        /// - komunikat po angielsku na ekranie i linia w logu. Raz na misje (MissionCheck zeruje), tylko przy wlaczonej zasadzie.</summary>
+        internal static void Warn(Agent att, Agent victim, int k)
+        {
+            try
+            {
+                if (_warned || !RuleOn) return;
+                if (k != KRest && !(k == KT6 && CastlePct < 100)) return;
+                if (att == null || victim == null || ReferenceEquals(att, victim)) return;
+                var at = att.Team;
+                var vt = victim.Team;
+                if (at == null || vt == null || !at.IsPlayerTeam || !at.IsEnemyOf(vt)) return;
+                _warned = true;
+                string text = k == KT6
+                    ? "Castle-forged steel barely bites the Others - only Valyrian steel cuts them true."
+                    : "Common weapons barely scratch the Others - only Valyrian steel cuts them true.";
+                TaleWorlds.Library.InformationManager.DisplayMessage(new TaleWorlds.Library.InformationMessage(text, TaleWorlds.Library.Color.FromUint(0xFFA8D8F0)));
+                string who = "?";
+                try { who = victim.Name ?? "?"; } catch { }
+                Scribe.Line("Inni (175d): komunikat dla gracza - pierwszy cios " + (att.IsMainAgent ? "gracza" : "jego ludzi") + " w '" + who + "' klasa "
+                            + (k == KT6 ? "stal t6 (" + CastlePct + "%)" : "reszta (15%)") + ": \"" + text + "\"");
             }
             catch { }
         }
@@ -668,11 +738,10 @@ namespace CrashScribe
             double pre = 0, post = 0;
             for (int i = 0; i < KN; i++) { pre += t.Pre[i]; post += t.Post[i]; }
             return "VS " + t.N[KVs] + ", szklo " + t.N[KGlass] + ", ogien " + t.N[KFire] + ", stal t6 " + t.N[KT6] + " (" + t6
-                   + (t.Launcher > 0 ? "; z luku/kuszy/procy " + t.Launcher : "")
-                   + (t.OldOnly > 0 ? "; t6 tylko we wzorcu sprzed 175 " + t.OldOnly : "")
+                   + (t.Ammo > 0 ? "; strzaly/belty t6 " + t.Ammo : "")
                    + "), reszta " + t.N[KRest] + " (15%"
-                   + (t.AmmoOnly > 0 ? "; dawniej t6 tylko przez amunicje " + t.AmmoOnly : "")
-                   + (t.Siege > 0 ? "; kamienie i pociski machin " + t.Siege : "")
+                   + (t.PreT6 > 0 ? "; dawniej t6 - wzorzec sprzed 175 " + t.PreT6 : "")
+                   + (t.Stone > 0 ? "; kamienie i pociski machin " + t.Stone : "")
                    + "), gole rece " + t.N[KBare] + " (15%); obrazenia " + pre.ToString("0") + "->" + post.ToString("0");
         }
 
@@ -934,13 +1003,17 @@ namespace CrashScribe
                 Scribe.Line("Mends: zasada stali Innych (175c) - " + (RuleOn
                                 ? "WLACZONA: pelne obrazenia tylko stal valyrianska (" + _vs.Count + " wzorow, w grze " + vsFound + "; " + _vsSource
                                   + "), smocze szklo (" + glassTxt + ")"
-                                  + " i ogien smoka (smok i jezdziec smoka bez broni); stal t6 " + CastlePct + "% (pocisk: wyrzutnia albo sama bron rzucana;"
-                                  + " autobitwa: bron z migawki 175 bez amunicji), reszta 15% (min 1; 0 zostaje 0)"
-                                : "WYLACZONA (OthersSteelRule): stara zasada - bron t6 pelne, reszta 15%; ogien smoka pelne (poprawka 175c dziala w obu trybach)")
+                                  + " i ogien smoka (smok i jezdziec smoka bez broni); stal t6 " + CastlePct + "% (175d - pocisk: strzala i belt wedlug"
+                                  + " wlasnego tieru, bron rzucana wedlug siebie, kamienie i pociski machin zawsze 15%; autobitwa: wzorzec po zamianie 175,"
+                                  + " najlepsza bron albo strzaly/belty z pasujaca wyrzutnia), reszta 15% (min 1; 0 zostaje 0); komunikat dla gracza przy"
+                                  + " pierwszym cieciu w misji"
+                                : "WYLACZONA (OthersSteelRule): stara zasada - bron t6 pelne, reszta 15% (autobitwa: wzorzec po zamianie 175 z amunicja,"
+                                  + " 175d); ogien smoka pelne (poprawka 175c dziala w obu trybach)")
                             + "; dotyczy " + fighters + " walczacych Wedrowcow (lordowie Innych, Nocny Krol, wskrzeszeni, gracz-Inny; w partiach teraz " + inParty + "): "
                             + (who.Count > 0 ? string.Join(", ", who.ToArray()) : "brak") + (fighters > who.Count ? ", ..." : "")
                             + "; chronionych, ale niewalczacych (notable, dzieci) " + idle
-                            + " - wighty bez zmian. Pole: Agent.RegisterBlow; autobitwa: SimulateHit (zolnierze wedlug migawki 175, bohaterowie wedlug zestawu).");
+                            + " - wighty bez zmian. Pole: Agent.RegisterBlow; autobitwa: SimulateHit (zolnierze wedlug wzorca po zamianie 175,"
+                            + " bohaterowie wedlug zestawu).");
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "OthersSteel.OnSession", null); } catch { } }
         }

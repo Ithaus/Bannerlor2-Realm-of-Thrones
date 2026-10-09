@@ -674,8 +674,9 @@ namespace CrashScribe
 
         // ---------------- [a2] migawka valyrianska ----------------
 
-        /// <summary>Bron (sloty 0-3, bez tarcz) kazdej jednostki zolnierskiej SPRZED zamiany. ValyrianWardSim
-        /// czyta ja zamiast wzorca na zywo, zeby 175 nie zmienialo walki z Innymi (1.7 [a2], 1.9).</summary>
+        /// <summary>Bron (sloty 0-3, bez tarcz) kazdej jednostki zolnierskiej SPRZED zamiany. Do 175c ValyrianWardSim
+        /// czytal ja zamiast wzorca na zywo, zeby 175 nie zmienialo walki z Innymi (1.7 [a2], 1.9); od 175d (decyzja Jeffa 09.10
+        /// ok. 08:40 pkt 1) autobitwa liczy wzorzec po zamianie, a migawka sluzy juz tylko porownaniu w logu ("dawniej t6").</summary>
         private static void ValyrianSnapshot()
         {
             if (_preWeapons == null) _preWeapons = new Dictionary<CharacterObject, ItemObject[]>();
@@ -693,7 +694,7 @@ namespace CrashScribe
             _snapshotOk = sets > 0;
             _valyrianT6 = t6;
             Scribe.Line("Mends: sprzet wedlug tieru (175) - migawka valyrianska: " + t6 + " jednostek z bronia t6 we wzorcu sprzed zamiany (z " + units
-                        + " jednostek z zestawami bojowymi; zasada Innych w autobitwie liczy tier z tej migawki - 175 jej nie zmienia; "
+                        + " jednostek z zestawami bojowymi; od 175d autobitwa z Innymi liczy wzorzec PO zamianie, migawka tylko do porownania; "
                         + OthersSteel.T6Text() + ")"
                         + (sets == 0 ? " - zestawy jeszcze puste, migawka powtorzona przed zamiana" : "") + ".");
         }
@@ -749,9 +750,9 @@ namespace CrashScribe
             return Mends.BestWeaponTier(c);
         }
 
-        /// <summary>175c: bron z migawki (sloty 0-3 bez tarcz) sprzed zamiany - OthersSteel.SimClass szuka w niej stali valyrianskiej
-        /// i smoczego szkla, a przy wlaczonej zasadzie stali Innych liczy z niej tier BEZ amunicji (recenzja 175c; PreTierBest - z amunicja -
-        /// tylko przy wylaczonej). null = brak wpisu (bohater, nowa postac) - wzorzec na zywo.</summary>
+        /// <summary>Bron z migawki (sloty 0-3 bez tarcz) sprzed zamiany. 175d: OthersSteel liczy z niej juz tylko porownanie w logu
+        /// ("dawniej t6 - wzorzec sprzed 175", linie T6Text) - klasa ciosu w autobitwie idzie z wzorca po zamianie (decyzja Jeffa 09.10
+        /// ok. 08:40 pkt 1). null = brak wpisu (bohater, nowa postac).</summary>
         internal static ItemObject[] PreWeapons(CharacterObject c)
         {
             try
@@ -909,7 +910,7 @@ namespace CrashScribe
                         if (!armorOk) wights++;
                         var u = MakeUnit(co, armorOk);
                         int snapSets = 0;
-                        try { SnapUnit(co, ref snapSets); } catch { }   // bron sprzed zamiany dla ValyrianWardSim (gdy migawka jeszcze jej nie ma)
+                        try { SnapUnit(co, ref snapSets); } catch { }   // bron sprzed zamiany do porownania w logu OthersSteel (gdy migawka jeszcze jej nie ma)
                         bool any = Rewrite(co, eq =>
                         {
                             Equipment clone = null;
@@ -1096,7 +1097,7 @@ namespace CrashScribe
         }
 
         /// <summary>Linia kontroli (bramki 6.1 pkt 2 i 10): sloty ponad tier, q (z PIERWSZEGO przebiegu), klucze bez
-        /// zamiennika, migawka valyrianska liczona po rozsadku tak jak ValyrianWardSim przy wylaczonej zasadzie stali Innych, bohaterowie z nowym rosterem,
+        /// zamiennika, migawka valyrianska liczona po rozsadku (z amunicja, jak stara regula; od 175d tylko porownanie), bohaterowie z nowym rosterem,
         /// rostery, zgodnosc listy Essos z Armoury.</summary>
         private static void ControlLine(string when, int over, string sample, int q, int noReplFirst)
         {
@@ -1122,7 +1123,7 @@ namespace CrashScribe
                         + (over > 0 ? " (" + sample + ")" : "")
                         + "; zamienionych na zapas, choc po rozsadku by sie miescily (q, pierwszy przebieg): " + (q >= 0 ? q.ToString() : "n/d")
                         + "; kluczy bez zamiennika: " + (noReplFirst >= 0 ? "pierwszy przebieg " + noReplFirst + ", " : "") + "teraz " + (_noRepl != null ? _noRepl.Count : 0)
-                        + "; migawka valyrianska po rozsadku: " + vPost + " jednostek z bronia t6 (tak liczy autobitwa przy WYLACZONEJ zasadzie stali Innych; dzis ok. 223; " + OthersSteel.T6Text() + ")"
+                        + "; migawka valyrianska po rozsadku: " + vPost + " jednostek z bronia t6 liczac z amunicja (wzorzec sprzed zamiany - od 175d tylko porownanie, autobitwa liczy wzorzec po zamianie w obu trybach zasady stali Innych; dzis ok. 223; " + OthersSteel.T6Text() + ")"
                         + "; bohaterowie z nowym rosterem " + heroesNew + (hex.Count > 0 ? " (np. " + string.Join(", ", hex.ToArray()) + ")" : "")
                         + " (tylko wzorzec po InitializeHeroBasicCharacterOnAfterLoad, nie ich ekwipunek); nowych rosterow w sesji " + _rostersInstalled
                         + "; lista Essos: " + EssosCheck() + ".");
