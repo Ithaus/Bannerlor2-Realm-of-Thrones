@@ -2552,23 +2552,23 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public bool BanditsRestByDay { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Ai Nights Awake In Chase", 0.00f, 4.00f, "0.00", HintText = "sleepless nights owed after which a lord no longer chases or rides to relief at night - the loss would outweigh the gain; fleeing is always allowed. 0 = only flight by night, 3 or more = only the collapse stops them")]
+        [SettingPropertyFloatingInteger("Ai Nights Awake In Chase", 0.00f, 4.00f, "0", HintText = "whole sleepless nights owed after which a lord no longer chases or rides to relief at night - the loss would outweigh the gain; fleeing is always allowed. 0 = only flight by night, 3 or more = only the collapse stops them")]
         [SettingPropertyGroup("A night's rest")]
         public float AiNightsAwakeInChase { get; set; } = 1f;
 
-        [SettingPropertyFloatingInteger("Ai Camp Danger Radius", 0.00f, 24.00f, "0.00", HintText = "alarm radius: a STRONGER hostile party this close that is awake and coming at a camp rouses it - the lord flees or beds down again (with Ai Night March By Reason off: any hostile party this close keeps them marching)")]
+        [SettingPropertyFloatingInteger("Ai Camp Danger Radius", 0.00f, 24.00f, "0.00", HintText = "alarm radius: a STRONGER hostile party this close that is awake and coming at a camp (or at a lord resting in a village) rouses it - the lord flees or beds down again; 0 = no alarm at all (with Ai Night March By Reason off: any hostile party this close keeps them marching)")]
         [SettingPropertyGroup("A night's rest")]
         public float AiCampDangerRadius { get; set; } = 6f;
 
-        [SettingPropertyBool("Ai Night March By Reason", HintText = "lone lords and army leaders march through the camp hours only for a reason: a chase they can finish tonight, the relief of their own village while it is being raided, or flight from a stronger foe - everyone else sleeps, and a lord in a town stays under its roof till dawn; off = the old rules (a share of lone lords skips the camp, any enemy near keeps them marching) and the log only counts what would have happened")]
+        [SettingPropertyBool("Ai Night March By Reason", HintText = "lone lords and army leaders march through the camp hours only for a reason: a chase after an enemy lord, host or a band in a fight that they can finish tonight, the relief of their own village while it is being raided, or flight from a stronger foe - everyone else sleeps, and a lord in a town, castle or village stays under its roof till dawn (in a village a stronger foe coming at him wakes him); off = the old rules (a share of lone lords skips the camp, any enemy near keeps them marching) and the log only counts what would have happened")]
         [SettingPropertyGroup("A night's rest")]
         public bool AiNightMarchByReason { get; set; } = true;
 
-        [SettingPropertyBool("Ai Sleep Debt", HintText = "AI lord parties keep the same sleep ledger as you: a day without 6 hours of rest costs speed and morale (-25/-40/-90% and -25/-40/-95%) until slept off; one night owed means camp from 20:00, two or more means sleeping where they stand until paid; off = the ledger is only counted in the log")]
+        [SettingPropertyBool("Ai Sleep Debt", HintText = "AI lord parties keep the same sleep ledger as you: a day without the base hours of rest (Sleep Hours Needed) costs speed and morale (-25/-40/-90% and -25/-40/-95%) until slept off; one night owed means making camp at 20:00 until the world breaks camp, two or more means sleeping where they stand until paid; off = the ledger is only counted in the log")]
         [SettingPropertyGroup("A night's rest")]
         public bool AiSleepDebt { get; set; } = true;
 
-        [SettingPropertyBool("Ai Night Relief Wider", HintText = "WAITING FOR YOUR WORD: also march through the night to relieve a BESIEGED town or castle, and let army leaders ride to relief too (off: only a lone lord, only to stop a raid in progress)")]
+        [SettingPropertyBool("Ai Night Relief Wider", HintText = "on: lords also march through the night to relieve a BESIEGED town or castle of their realm, and army leaders ride to relief too; off: only a lone lord, and only to stop a raid in progress")]
         [SettingPropertyGroup("A night's rest")]
         public bool AiNightReliefWider { get; set; } = false;
 

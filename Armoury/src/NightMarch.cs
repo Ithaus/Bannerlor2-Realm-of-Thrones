@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
+using System.Reflection;
 using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
@@ -62,6 +63,8 @@ namespace Armoury
             public byte State; public long StateStamp = -1;
             public byte AlarmEnd;            // wynik alarmu: 1 ucieczka, 2 spi dalej, 3 inny marsz
             public int NightFlags;           // bity NReason marszu w godzinach obozu tej doby (8 = alarm -> ucieczka)
+            public int DawnDebt;             // poprawka recenzji (P5): dlug zaraz po poprzednim swicie - losy dlugu 1 do nastepnego switu
+            public bool PaidSinceDawn;       // splata od reki od poprzedniego switu
         }
 
         private sealed class DebtSleeper { public NightOrder Order; public Vec2 Bed; public int Kind; }
@@ -84,15 +87,27 @@ namespace Armoury
         private static double _debtDhMax, _alarmDhMax;
         private static int _exampleN, _aiStumbles;
         private static int _alarmFled, _alarmSlept, _alarmOther, _alarmResets, _alarmBattle, _debtWokenHour;
+        // poprawka recenzji: liczniki alarmow i straznika snu dlugu zamykane CO GODZINE (AiHourly) - linia nocna pokazuje wartosci tej godziny,
+        // a zdarzenia dzienne nie trafiaja do linii 0:00
+        private static int _hFled, _hSlept, _hOther, _hResets, _hBattle, _hDebtWoken;
         private static double _ledgerMsSum, _ledgerMsMax; private static int _ledgerCalls;
+        private static bool _nrWasOn;                // przelacznik glowny NightRestEnabled byl wlaczony (zmiana na wylaczony = jednorazowe sprzatanie)
+        private static PropertyInfo _enableAtProp; private static bool _enableAtTried;
 
         private sealed class DayCounters
         {
             public int Paid, NoFullDay, Marched, MarchedNoDebt, Collapses, EveningCamps, ContSleeps, Released, DebtReason, DebtAlarm;
             public readonly int[] NewDebt = new int[4];
+            public readonly int[] PaidBy = new int[4];        // splacone od reki wedlug poziomu dlugu
+            public int StillCollapsed;                         // dlug 3 bez snu kolejna doba - zapasc trwa (nie nowa)
+            public int C1Paid, C1Up, C1Stay;                   // dlug 1 z poprzedniego switu: splacony / wzrosl do 2 / dalej 1
+            public int DebtForeign, VillageAlarm, Gone, GoneDebt, SeaMove;
             public int HFlee, HChase, HRelief, HAlarm, HAlarmFled, HAlarmSlept, HAlarmOther, HTownHeld, HTownOut;
             public int MoveHours, MoveLone, MoveNoReason, MoveExit, MoveWoken, MoveAlarmStay, MoveDebtWoken, MoveOther, MoveLead, MoveLeadNoReason;
             public int DebtWoken;
+            // stopery (P7): petla obozu swiata, oboz splaty, straznicy T10 - ms na wywolanie
+            public double CampMsSum, CampMsMax, DebtMsSum, DebtMsMax, GuardMsSum, GuardMsMax;
+            public int CampCalls, DebtCalls, GuardCalls;
         }
         private static DayCounters _day = new DayCounters();
 
@@ -100,7 +115,7 @@ namespace Armoury
         {
             public int LoneField, LoneSleep, LoneFlee, LoneChase, LoneRelief, LoneAlarm;
             public int LeadField, LeadSleep, LeadFlee, LeadChase, LeadRelief, LeadAlarm;
-            public int TownHeld, TownOut, TownForeign, Sea, DebtSleepers, AlarmPending, CaravansLot;
+            public int TownHeld, TownOut, TownForeign, TownAlarm, Sea, DebtField, DebtTown, AlarmPending, CaravansLot;
             // na sucho (stare reguly T1 dzialaja, T10 tylko liczy)
             public int DLoneField, DLoneMarch, DLeadField, DLeadMarch, DFlee, DChase, DRelief, DAlarm;
             public int DNoReason, DNoLot, DNoGather, DNoChase, DNoEnemy, DLeadNoReason;
@@ -121,6 +136,7 @@ namespace Armoury
         private sealed class MoveTally
         {
             public int Lone, Reason, AlarmFled, AlarmStay, Woken, DebtWoken, Exit, OldLot, OldOther, Other, NoEntry, Lead, LeadReason;
+            public int Sea;   // poprawka recenzji: zeglujacy (wyjatek W2, legalny) osobno - nie wchodza do "BEZ WPISU POWODU" (P2)
             public int NoReason { get { return Lone - Reason - AlarmFled; } }
 
             public void Add(AiSleep e, bool leader, long prevStamp)
@@ -172,9 +188,54 @@ namespace Armoury
         internal static int AiDebtOf(MobileParty mp)
         {
             if (mp == null) return 0;
+            var s = Settings.Current;
+            if (s == null || !s.NightRestEnabled) return 0;   // poprawka recenzji: przelacznik glowny wylaczony = kary nie dzialaja, dlugu nie ma
             var pen = _aiPenalty;
             int d;
             return pen != null && pen.TryGetValue(mp, out d) ? d : 0;
+        }
+
+        /// <summary>
+        /// AI partii trzyma INNY mod dluzej niz nasza godzina: DisableAi (uczta / statek BK - "nigdy") albo DisableForHours z dluzszym
+        /// terminem (gentry BK 72 h). Nasze DisableForHours(1) daje termin <= 1 h, wiec > 1.5 h = cudza blokada, ktorej nie wolno skracac
+        /// (MobilePartyAi.DisableForHours nadpisuje _enableAgainAtHour, EnableAi ja zdejmuje). Odczyt prywatnej wlasciwosci gry przez odbicie.
+        /// </summary>
+        private static bool ForeignHold(MobileParty mp)
+        {
+            try
+            {
+                if (mp == null || mp.Ai == null || !mp.Ai.IsDisabled) return false;
+                if (!_enableAtTried)
+                {
+                    _enableAtTried = true;
+                    _enableAtProp = typeof(MobilePartyAi).GetProperty("_enableAgainAtHour", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+                    if (_enableAtProp == null) Log.Info("NocnyMarsz: brak MobilePartyAi._enableAgainAtHour - cudza blokade AI rozpoznaje tylko przy wejsciu w sen dlugu.");
+                }
+                if (_enableAtProp == null) return false;
+                var at = (CampaignTime)_enableAtProp.GetValue(mp.Ai, null);
+                return (at - CampaignTime.Now).ToHours > 1.5;
+            }
+            catch (Exception ex) { AiStumble("ForeignHold", mp, ex); return false; }
+        }
+
+        /// <summary>Doczepiony do wodza, ktory spi snem ciaglym (sen dlugu, dlug 2-3) - spi razem z nim (poprawka recenzji: ten sam licznik).</summary>
+        private static bool SleepsWithLeader(MobileParty mp)
+        {
+            DebtSleeper ds;
+            var lead = mp != null ? mp.AttachedTo : null;
+            return lead != null && _debtSleep.TryGetValue(lead, out ds) && ds.Kind == 2;
+        }
+
+        /// <summary>
+        /// Cel poscigu, dla ktorego warto zarwac noc (poprawka recenzji, slowa Jeffa "gdy trzeba"): partia lorda albo armia (takze gracz)
+        /// i banda, ktora wlasnie walczy (napada kogos). Karawana, wiesniacy i banda w marszu - to lup, nie potrzeba: noca nie.
+        /// </summary>
+        private static bool ChaseWorthy(MobileParty tgt)
+        {
+            if (tgt == MobileParty.MainParty) return true;
+            if (tgt.IsCaravan || tgt.IsVillager) return false;
+            if (tgt.IsLordParty) return true;
+            return tgt.IsBandit && tgt.MapEvent != null;
         }
 
         private static NightOrder Capture(MobileParty mp)
@@ -283,9 +344,10 @@ namespace Armoury
                     }
                 }
             }
-            // POSCIG / PRZECHWYCENIE: wrogi cel, ktory dogoni jeszcze tej nocy (linia prosta x 1.1 jak trasa w A07 1.4)
+            // POSCIG / PRZECHWYCENIE: wrogi lord / armia albo banda w walce, ktorych dogoni jeszcze tej nocy (linia prosta x 1.1 jak trasa
+            // w A07 1.4); karawana i wiesniacy to lup, nie potrzeba - noca nie (poprawka recenzji)
             MobileParty tgt = stB == AiBehavior.EngageParty ? stP : (defB == AiBehavior.EngageParty ? defP : null);
-            if (tgt != null && tgt.IsActive && Hostile(mp, tgt))
+            if (tgt != null && tgt.IsActive && Hostile(mp, tgt) && ChaseWorthy(tgt))
             {
                 float d = mp.GetPosition2D.Distance(tgt.GetPosition2D);
                 float hr = d * 1.1f / UnitsPerHour(mp);
@@ -345,7 +407,7 @@ namespace Armoury
                     ts = st; how = t.Name + " (sila " + F0(st) + " > " + F0(ms) + ", " + F1(dist) + " jedn., " + why + ")";
                     return t;
                 }
-                catch { }
+                catch (Exception ex) { AiStumble("AlarmThreat", t, ex); }   // poprawka recenzji: liczone i w logu, nie polykane
             }
             return null;
         }
@@ -367,11 +429,34 @@ namespace Armoury
         // ------------------------------------------------------------ godzina AI (z OnHourly, przed wyjsciami gracza)
         private static void AiHourly(Settings s, int h)
         {
+            FlushHourCounters();
             try { AiSleepLedger(s, h); } catch (Exception e) { Log.Error("NightRest.AiSleepLedger", e); }
+            long t0 = Stopwatch.GetTimestamp();
             try { AiDebtCamp(s, h); } catch (Exception e) { Log.Error("NightRest.AiDebtCamp", e); }
+            long t1 = Stopwatch.GetTimestamp();
             AiNightCamp(s, h);
+            long t2 = Stopwatch.GetTimestamp();
+            // stopery P7 (poprawka recenzji): oboz splaty i petla obozu swiata - do linii switu
+            double dms = (t1 - t0) * 1000.0 / Stopwatch.Frequency, cms = (t2 - t1) * 1000.0 / Stopwatch.Frequency;
+            _day.DebtCalls++; _day.DebtMsSum += dms; if (dms > _day.DebtMsMax) _day.DebtMsMax = dms;
+            _day.CampCalls++; _day.CampMsSum += cms; if (cms > _day.CampMsMax) _day.CampMsMax = cms;
             AiBanditRest(s, h);
             try { SnapshotPositions(s); } catch (Exception e) { Log.Error("NightRest.SnapshotPositions", e); }
+        }
+
+        /// <summary>Liczniki alarmow i straznika snu dlugu z minionej godziny: do doby i do linii nocnej tej godziny, potem od zera.</summary>
+        private static void FlushHourCounters()
+        {
+            _hFled = _alarmFled; _hSlept = _alarmSlept; _hOther = _alarmOther; _hResets = _alarmResets; _hBattle = _alarmBattle; _hDebtWoken = _debtWokenHour;
+            _day.HAlarmFled += _alarmFled; _day.HAlarmSlept += _alarmSlept; _day.HAlarmOther += _alarmOther; _day.DebtWoken += _debtWokenHour;
+            _alarmFled = 0; _alarmSlept = 0; _alarmOther = 0; _alarmResets = 0; _alarmBattle = 0; _debtWokenHour = 0;
+        }
+
+        /// <summary>Stoper straznikow T10 (OnTick) - do linii switu.</summary>
+        private static void GuardTime(long t0)
+        {
+            double ms = MsSince(t0);
+            _day.GuardCalls++; _day.GuardMsSum += ms; if (ms > _day.GuardMsMax) _day.GuardMsMax = ms;
         }
 
         /// <summary>Nowa gra albo wczytanie: ksiega AI od zera (zapis wczytuje ImportAi po tym).</summary>
@@ -382,8 +467,51 @@ namespace Armoury
             _aiPending = null; _aiImportFresh = false; _debtWasOn = null; _ledgerStamp = -1;
             _lastDebtSweep = CampaignTime.Zero; _lastAlarmSweep = CampaignTime.Zero; _debtDhMax = 0; _alarmDhMax = 0;
             _alarmFled = 0; _alarmSlept = 0; _alarmOther = 0; _alarmResets = 0; _alarmBattle = 0; _debtWokenHour = 0;
+            _hFled = 0; _hSlept = 0; _hOther = 0; _hResets = 0; _hBattle = 0; _hDebtWoken = 0;
             _ledgerMsSum = 0; _ledgerMsMax = 0; _ledgerCalls = 0;
+            _nrWasOn = false;
             _day = new DayCounters();
+        }
+
+        /// <summary>
+        /// Przelacznik glowny NightRestEnabled wylaczony w trakcie gry (poprawka recenzji): OnHourly konczy sie wtedy przed AiHourly,
+        /// wiec nikt by nie zwolnil spiacych. Jednorazowo wszystko wraca do starego zachowania: spiacy obozu swiata i alarmowani wstaja
+        /// z rozkazem sprzed snu, sen dlugu i wstrzymani w osadach zwolnieni, namioty zdjete, ksiega AI wyczyszczona, kary AI zdjete.
+        /// Wolane z OnTick i OnHourly; ponowne wlaczenie = ksiega od zera.
+        /// </summary>
+        internal static void MasterSwitch(Settings s)
+        {
+            if (s == null) return;   // brak ustawien (chwila ladowania) - nic nie zmieniamy
+            bool on = s.NightRestEnabled;
+            if (on) { _nrWasOn = true; return; }
+            if (!_nrWasOn) return;
+            _nrWasOn = false;
+            try
+            {
+                ReleaseAllDebt();
+                foreach (var kv in new List<KeyValuePair<MobileParty, AlarmInfo>>(_alarmed))
+                {
+                    try { if (kv.Key != null && kv.Value.DebtPath) ApplyOrder(kv.Key, kv.Value.Order, false); }
+                    catch (Exception ex) { AiStumble("MasterSwitch", kv.Key, ex); }
+                }
+                _alarmed.Clear();
+                foreach (var mp in _townHold) EnableAi(mp);
+                _townHold.Clear();
+                foreach (var mp in _camping) if (mp != null && mp.IsActive) EnableAi(mp);
+                foreach (var mp in _tented) Tent(mp, false);
+                _tented.Clear(); _tentPos.Clear();
+                foreach (var mp in new List<MobileParty>(_orders.Keys)) GiveOrderBack(mp);
+                _orders.Clear();
+                int sleeping = _camping.Count;
+                _camping.Clear(); _bedPos.Clear();
+                _ai.Clear();
+                RebuildPenalties(false);
+                _debtWasOn = null; _ledgerStamp = -1;
+                _prevPos = new Dictionary<MobileParty, Vec2>();
+                Log.Info("NocnyMarsz: NightRestEnabled wylaczony - spiacy obozu swiata (" + sleeping + ") i alarmowani wstali z rozkazem sprzed snu, "
+                         + "sen dlugu zwolniony, ksiega snu AI wyczyszczona, kary AI zdjete (stare zachowanie).");
+            }
+            catch (Exception e) { Log.Error("NightRest.MasterSwitch", e); }
         }
 
         /// <summary>Pozycje lordow, band i gracza z konca ticku - ALARM w nastepnej godzinie sprawdza, czy wrog sie zbliza.</summary>
@@ -407,8 +535,10 @@ namespace Armoury
         /// gra nie wypuszcza z osady partii z wylaczonym AI (MobileParty.CheckExitingSettlementParallel: Ai.IsDisabled -> zostaje),
         /// a rozkaz lorda zostaje nietkniety (bez Hold i bez zapamietywania - o swicie po prostu jedzie dalej). Lorda, ktoremu AI
         /// wylaczyl kto inny (uczta / gentry BK - DisableAi), nie ruszamy: i tak nie wyjedzie, a krotszy zamek zepsulby rozkaz BK.
+        /// Poprawka recenzji: wies nie jest obronna - lord we wsi, na ktorego idzie silniejszy, czuwajacy wrog (ALARM), dostaje wolne AI
+        /// (gra ocenia ucieczke), zamiast czekac do rana; w miescie i zamku mury chronia.
         /// </summary>
-        private static void TownNight(MobileParty mp, Settings s, AiSleep e, bool debtOn, NightTally t)
+        private static void TownNight(MobileParty mp, Settings s, AiSleep e, bool debtOn, HashSet<MobileParty> campSet, NightTally t)
         {
             var st = mp.CurrentSettlement;
             bool held = _townHold.Contains(mp);
@@ -418,8 +548,10 @@ namespace Armoury
                 Mark(e, StSkip);
                 return;
             }
-            if (_debtSleep.ContainsKey(mp)) { t.DebtSleepers++; Mark(e, StDebt); return; }
+            if (_debtSleep.ContainsKey(mp)) { t.DebtTown++; Mark(e, StDebt); return; }
             if (!held && mp.Ai != null && mp.Ai.IsDisabled) { t.TownForeign++; Mark(e, StSkip); return; }   // AI trzyma kto inny (np. BK)
+            // inny mod przejal AI w nocy (dluzsza blokada niz nasza godzina) - jego blokada zostaje, nie skracamy jej
+            if (held && ForeignHold(mp)) { _townHold.Remove(mp); t.TownForeign++; Mark(e, StSkip); return; }
             bool leader = IsLeader(mp);
             int debt = debtOn && e != null ? e.Debt : 0;
             string det;
@@ -431,6 +563,18 @@ namespace Armoury
                 Mark(e, StReason, r);
                 Example(mp, det + " - wyjezdza z " + st.Name, debt, leader);
                 return;
+            }
+            if (!st.IsFortification)
+            {
+                float ts, ms; string how;
+                if (AlarmThreat(mp, s, campSet, out ts, out ms, out how) != null)
+                {
+                    if (held) { _townHold.Remove(mp); EnableAi(mp); }
+                    t.TownAlarm++; _day.VillageAlarm++;
+                    Mark(e, StSkip);
+                    Example(mp, "ALARM we wsi " + st.Name + " - " + how + " - AI wolne (ocena ucieczki)", debt, leader);
+                    return;
+                }
             }
             mp.Ai.DisableForHours(1);
             _townHold.Add(mp);
@@ -517,7 +661,9 @@ namespace Armoury
             NightOrder mine = null;
             if (asleep) _orders.TryGetValue(mp, out mine);
             string det;
-            r = Classify(mp, s, e != null ? e.Debt : 0, leader, asleep ? (mine ?? EmptyOrder) : null, out det);
+            // poprawka recenzji: na sucho dlug nie ma splaty (bez obozu od 20:00 i snu ciaglego), wiec rosnie sztucznie do 3 - klasyfikacja
+            // z dlugiem 0, inaczej poscig i odsiecz bylyby odciete i P0 zanizalby "szloby z powodem"
+            r = Classify(mp, s, 0, leader, asleep ? (mine ?? EmptyOrder) : null, out det);
             if (r == NReason.None)
             {
                 float a, b; string how;
@@ -559,10 +705,16 @@ namespace Armoury
                   .Append(" (ucieczka ").Append(t.LeadFlee).Append(", poscig ").Append(t.LeadChase).Append(", odsiecz ").Append(t.LeadRelief)
                   .Append("), alarm ").Append(t.LeadAlarm)
                   .Append("; w osadach: zostaja na noc ").Append(t.TownHeld).Append(", wyjechali z powodem ").Append(t.TownOut)
-                  .Append(", AI trzyma inny mod (np. uczta BK) ").Append(t.TownForeign)
-                  .Append("; na morzu ").Append(t.Sea).Append("; dluznicy w snie dlugu ").Append(t.DebtSleepers)
+                  .Append(", AI trzyma inny mod (np. uczta BK) ").Append(t.TownForeign).Append(", alarm we wsi - AI wolne ").Append(t.TownAlarm)
+                  .Append("; na morzu ").Append(t.Sea).Append("; dluznicy w snie dlugu: w polu ").Append(t.DebtField).Append(", w osadach ").Append(t.DebtTown)
                   .Append(" (razem w snie dlugu ").Append(_debtSleep.Count).Append(", alarm dluznika w tym ticku ").Append(t.AlarmPending).Append(")")
-                  .Append("; karawany z losowania ").Append(t.CaravansLot)
+                  .Append("; karawany z losowania ").Append(t.CaravansLot);
+                // P4 (poprawka recenzji): ta sama populacja co w T1 - lordowie spiacy W POLU (oboz swiata + sen dlugu w polu); w osadach osobno
+                int campLords = 0;
+                foreach (var mp in _camping) if (mp != null && mp.IsLordParty) campLords++;
+                sb.Append(". P4: lordow spiacych w polu ").Append(campLords + t.DebtField).Append(" (oboz swiata ").Append(campLords)
+                  .Append(" + sen dlugu w polu ").Append(t.DebtField).Append("), w osadach na noc ").Append(t.TownHeld + t.DebtTown)
+                  .Append(", udzial spiacych samotnych w polu ").Append(t.LoneField > 0 ? (100f * t.LoneSleep / t.LoneField).ToString("0", CultureInfo.InvariantCulture) : "-").Append('%')
                   .Append(". BEZ POWODU 0 z konstrukcji - kto naprawde szedl, mowi linia 'AiNightCamp: ruch'.");
             }
             else
@@ -576,16 +728,15 @@ namespace Armoury
                   .Append("; BEZ POWODU wedlug T10 samotnych ").Append(t.DNoReason).Append(" (los ").Append(t.DNoLot).Append(", w drodze na zbiorke ")
                   .Append(t.DNoGather).Append(", poscig daleko / cel nie wrog / dlug ").Append(t.DNoChase).Append(", wrog blisko slabszy albo spiacy ")
                   .Append(t.DNoEnemy).Append("), wodzow ").Append(t.DLeadNoReason)
-                  .Append("; dluznicy w snie dlugu ").Append(t.DebtSleepers).Append("; na morzu ").Append(t.Sea)
+                  .Append("; dluznicy w snie dlugu ").Append(t.DebtField + t.DebtTown).Append("; na morzu ").Append(t.Sea)
                   .Append("; karawany z losowania ").Append(t.CaravansLot).Append('.');
             }
-            sb.Append(" Alarmy od poprzedniej godziny: ucieczka ").Append(_alarmFled).Append(", spi dalej ").Append(_alarmSlept)
-              .Append(", inny marsz ").Append(_alarmOther).Append(" (cel AI cofniety ").Append(_alarmResets).Append(", bitwa/osada ").Append(_alarmBattle)
-              .Append("); dluznicy obudzeni cudza reka ").Append(_debtWokenHour).Append('.');
+            // wartosci minionej godziny (FlushHourCounters na poczatku AiHourly) - dzienne zdarzenia sa w swoich godzinach, nie tutaj
+            sb.Append(" Alarmy od poprzedniej godziny: ucieczka ").Append(_hFled).Append(", spi dalej ").Append(_hSlept)
+              .Append(", inny marsz ").Append(_hOther).Append(" (cel AI cofniety ").Append(_hResets).Append(", bitwa/osada ").Append(_hBattle)
+              .Append("); dluznicy obudzeni cudza reka ").Append(_hDebtWoken).Append('.');
             Log.Info(sb.ToString());
-            _day.HAlarmFled += _alarmFled; _day.HAlarmSlept += _alarmSlept; _day.HAlarmOther += _alarmOther;
-            _day.HTownHeld += t.TownHeld; _day.HTownOut += t.TownOut; _day.DebtWoken += _debtWokenHour;
-            _alarmFled = 0; _alarmSlept = 0; _alarmOther = 0; _alarmResets = 0; _alarmBattle = 0; _debtWokenHour = 0;
+            _day.HTownHeld += t.TownHeld; _day.HTownOut += t.TownOut;
         }
 
         // ------------------------------------------------------------ R2: ksiega snu AI
@@ -621,6 +772,7 @@ namespace Armoury
             bool changed = imported;   // wczytane dlugi - kary od pierwszego ticku
             var lords = MobileParty.AllLordParties;
             var main = MobileParty.MainParty;
+            var seen = isDawn ? new HashSet<MobileParty>() : null;   // partie, ktore jeszcze istnieja (lista lordow gry)
             if (lords != null)
             {
                 for (int i = 0; i < lords.Count; i++)
@@ -628,7 +780,10 @@ namespace Armoury
                     var mp = lords[i];
                     try
                     {
-                        if (mp == null || mp == main || !mp.IsActive) continue;
+                        // poprawka recenzji: partia chwilowo nieaktywna (rejs statkiem BK: IsActive=false na czas podrozy) zostaje w ksiedze
+                        // i liczy sie jak gracz w tym samym rejsie (stoi w miejscu = odpoczynek, swit jak kazdemu) - rejs nie kasuje dlugu
+                        if (mp == null || mp == main) continue;
+                        if (seen != null) seen.Add(mp);
                         if (Undead.Party(mp)) { if (_ai.Remove(mp)) changed = true; continue; }   // umarli nie znaja dlugu snu
                         AiSleep e;
                         if (!_ai.TryGetValue(mp, out e))
@@ -639,19 +794,23 @@ namespace Armoury
                         }
                         var pos = mp.GetPosition2D;
                         bool known = e.Stamp == stamp - 1;
+                        // poprawka recenzji (krytyczne): jak gracz (OnHourly: moved = _hadPos && ...) - bez poprzedniego odczytu (nowa partia,
+                        // pierwszy tick po wczytaniu) godzina liczy sie jako postoj; known zostaje tylko dla pomiaru ruchu
                         bool moved = known && pos.Distance(e.Pos) > RestMoveLimit;
-                        if (known)
+                        // doczepiony do wodza we snie ciaglym spi razem z nim - ten sam licznik (swit go nie zeruje)
+                        if (e.Acc < 0f && SleepsWithLeader(mp)) e.Acc = e.Rest;
+                        bool resting = mp.CurrentSettlement != null || !moved || (s.SleepAtSeaFree && mp.IsCurrentlyAtSea)
+                                       || _bedPos.ContainsKey(mp) || _debtSleep.ContainsKey(mp);
+                        if (resting)
                         {
-                            bool resting = mp.CurrentSettlement != null || !moved || (s.SleepAtSeaFree && mp.IsCurrentlyAtSea)
-                                           || _bedPos.ContainsKey(mp) || _debtSleep.ContainsKey(mp);
-                            if (resting)
-                            {
-                                float inc = night ? 1f : dayF;
-                                e.Rest += inc;
-                                if (e.Acc >= 0f) e.Acc += inc;
-                            }
-                            if (mt != null && moved && mp.AttachedTo == null && mp.CurrentSettlement == null && mp.MapEvent == null)
-                                mt.Add(e, IsLeader(mp), stamp - 1);
+                            float inc = night ? 1f : dayF;
+                            e.Rest += inc;
+                            if (e.Acc >= 0f) e.Acc += inc;
+                        }
+                        if (mt != null && known && moved && mp.IsActive && mp.AttachedTo == null && mp.CurrentSettlement == null && mp.MapEvent == null)
+                        {
+                            if (mp.IsCurrentlyAtSea) mt.Sea++;   // zeglujacy (W2) - osobno, poza "bez wpisu powodu"
+                            else mt.Add(e, IsLeader(mp), stamp - 1);
                         }
                         e.Pos = pos; e.Stamp = stamp;
                         // splata od reki (jak CreditRest gracza): cala suma -> dlug 0
@@ -659,22 +818,27 @@ namespace Armoury
                         if (!e.Credited && eff >= NeededAi(baza, e.Debt))
                         {
                             e.Credited = true;
-                            if (e.Debt > 0) { e.Debt = 0; _day.Paid++; changed = true; }
+                            if (e.Debt > 0) { _day.PaidBy[Math.Min(3, e.Debt)]++; e.Debt = 0; e.PaidSinceDawn = true; _day.Paid++; changed = true; }
                         }
                         if (isDawn && SettleAi(e, baza, nowH)) changed = true;
                     }
                     catch (Exception ex) { AiStumble("AiSleepLedger", mp, ex); }
                 }
             }
-            if (isDawn)
+            if (isDawn && seen != null)
             {
+                // z ksiegi wypada tylko partia zniszczona (zniknela z listy lordow gry), nie chwilowo nieaktywna
                 var dead = new List<MobileParty>();
                 foreach (var kv in _ai)
-                    if (kv.Key == null || !kv.Key.IsActive || kv.Value.Stamp != stamp) dead.Add(kv.Key);
+                    if (kv.Key == null || !seen.Contains(kv.Key)) dead.Add(kv.Key);
                 foreach (var m in dead)
                 {
+                    AiSleep g;
+                    if (_ai.TryGetValue(m, out g) && g.Debt > 0) _day.GoneDebt++;
+                    _day.Gone++;
+                    _ai.Remove(m);
                     if (m == null) continue;
-                    _ai.Remove(m); _debtSleep.Remove(m); _alarmed.Remove(m); _townHold.Remove(m);
+                    _debtSleep.Remove(m); _alarmed.Remove(m); _townHold.Remove(m);
                     changed = true;
                 }
             }
@@ -702,11 +866,25 @@ namespace Armoury
             if (!full) _day.NoFullDay++;
             else if (!sleptBase)
             {
+                int before = e.Debt;
                 e.Debt = Math.Min(3, e.Debt + 1);
-                _day.NewDebt[e.Debt]++;
-                if (e.Debt == 3) _day.Collapses++;   // zapasc: sen ciagly od reki (AiDebtCamp w tym samym ticku)
-                ch = true;
+                // poprawka recenzji (P5): nowy dlug i zapasc tylko przy faktycznym wzroscie - dlug 3 bez snu kolejna doba to zapasc trwajaca
+                if (e.Debt > before)
+                {
+                    _day.NewDebt[e.Debt]++;
+                    if (e.Debt == 3) _day.Collapses++;   // zapasc: sen ciagly od reki (AiDebtCamp w tym samym ticku)
+                    ch = true;
+                }
+                else _day.StillCollapsed++;
             }
+            // losy dlugu 1 z poprzedniego switu (P5: ile splaconych do nastepnego switu)
+            if (e.DawnDebt == 1)
+            {
+                if (e.PaidSinceDawn) _day.C1Paid++;
+                else if (e.Debt >= 2) _day.C1Up++;
+                else _day.C1Stay++;
+            }
+            e.DawnDebt = e.Debt; e.PaidSinceDawn = false;
             e.Rest = 0f; e.Credited = false; e.NightFlags = 0;
             return ch;
         }
@@ -717,8 +895,8 @@ namespace Armoury
             var old = _aiPenalty;
             var neu = new Dictionary<MobileParty, int>();
             if (on)
-                foreach (var kv in _ai)
-                    if (kv.Value.Debt > 0 && kv.Key != null && kv.Key.IsActive) neu[kv.Key] = kv.Value.Debt;
+                foreach (var kv in _ai)   // takze partia chwilowo nieaktywna (rejs BK) - kara czeka na nia po powrocie
+                    if (kv.Value.Debt > 0 && kv.Key != null) neu[kv.Key] = kv.Value.Debt;
             _aiPenalty = neu;
             foreach (var kv in neu)
             {
@@ -734,7 +912,7 @@ namespace Armoury
         private static void ResetDebts(string why)
         {
             ReleaseAllDebt();
-            foreach (var e in _ai.Values) { e.Debt = 0; e.Acc = -1f; }
+            foreach (var e in _ai.Values) { e.Debt = 0; e.Acc = -1f; e.DawnDebt = 0; e.PaidSinceDawn = false; }
             RebuildPenalties(false);
             Log.Info("NocnyMarsz: " + why + ".");
         }
@@ -755,8 +933,10 @@ namespace Armoury
                      + " jedn. w godzinie obozu, poza osada i bitwa) - samotni lordowie w ruchu " + m.Lone + ": z powodem " + m.Reason
                      + ", alarm -> ucieczka " + m.AlarmFled + " | BEZ WPISU POWODU " + m.NoReason + ": alarm bez ucieczki " + m.AlarmStay
                      + ", obudzeni cudza reka " + m.Woken + ", dluznicy obudzeni " + m.DebtWoken + ", wyjazd z osady / po bitwie " + m.Exit
-                     + ", los (stare reguly) " + m.OldLot + ", stare wyjatki T1 " + m.OldOther + ", morze/Inni/doczepieni " + m.Other
-                     + ", bez wpisu " + m.NoEntry + "; wodzowie armii w ruchu " + m.Lead + " (z powodem " + m.LeadReason + ").");
+                     + ", los (stare reguly) " + m.OldLot + ", stare wyjatki T1 " + m.OldOther + ", Inni/doczepieni " + m.Other
+                     + ", bez wpisu " + m.NoEntry + "; wodzowie armii w ruchu " + m.Lead + " (z powodem " + m.LeadReason + ")"
+                     + "; na morzu (W2, poza progiem P2) " + m.Sea + ".");
+            _day.SeaMove += m.Sea;
             _day.MoveHours++; _day.MoveLone += m.Lone; _day.MoveNoReason += m.NoReason; _day.MoveExit += m.Exit;
             _day.MoveWoken += m.Woken; _day.MoveAlarmStay += m.AlarmStay; _day.MoveDebtWoken += m.DebtWoken;
             _day.MoveOther += m.OldLot + m.OldOther + m.Other + m.NoEntry; _day.MoveLead += m.Lead; _day.MoveLeadNoReason += m.Lead - m.LeadReason;
@@ -772,8 +952,15 @@ namespace Armoury
             sb.Append("NocnyMarsz: swit dnia ").Append((int)CampaignTime.Now.ToDays).Append(on ? "" : " [NA SUCHO - bez kar i bez obozu splaty]")
               .Append(" - partii lordow AI w ksiedze ").Append(total).Append(" (bez pelnej doby ").Append(d.NoFullDay).Append(")")
               .Append("; nowy dlug 1/2/3: ").Append(d.NewDebt[1]).Append('/').Append(d.NewDebt[2]).Append('/').Append(d.NewDebt[3])
-              .Append("; splacone od reki ").Append(d.Paid)
+              .Append(" (zapasc trwa - dlug 3 bez snu kolejna doba ").Append(d.StillCollapsed).Append(")")
+              .Append("; splacone od reki ").Append(d.Paid).Append(" (wedlug poziomu 1/2/3: ").Append(d.PaidBy[1]).Append('/').Append(d.PaidBy[2])
+              .Append('/').Append(d.PaidBy[3]).Append(")")
+              .Append("; dlug 1 z poprzedniego switu: splacony ").Append(d.C1Paid).Append(", wzrosl do 2 ").Append(d.C1Up).Append(", dalej 1 ").Append(d.C1Stay)
+              .Append(" (splaconych ").Append(d.C1Paid + d.C1Up + d.C1Stay > 0 ? (100f * d.C1Paid / (d.C1Paid + d.C1Up + d.C1Stay)).ToString("0", ci) : "-").Append("%)")
               .Append("; z dlugiem teraz 1/2/3: ").Append(now[1]).Append('/').Append(now[2]).Append('/').Append(now[3])
+              .Append("; wypadly z ksiegi (partia zniszczona) ").Append(d.Gone).Append(" (z dlugiem ").Append(d.GoneDebt).Append(")")
+              .Append("; sen dlugu pominiety / przerwany, bo AI trzyma inny mod (partio-godziny) ").Append(d.DebtForeign)
+              .Append("; alarm we wsi - AI wolne ").Append(d.VillageAlarm)
               .Append("; szly noca z powodem partii ").Append(d.Marched).Append(" (z nich odpoczely mimo to >= baza ").Append(d.MarchedNoDebt).Append(")")
               .Append("; partio-godziny nocnego marszu: ucieczka ").Append(d.HFlee).Append(", poscig ").Append(d.HChase).Append(", odsiecz ").Append(d.HRelief)
               .Append("; alarmy ").Append(d.HAlarm).Append(" (ucieczka ").Append(d.HAlarmFled).Append(", spi dalej ").Append(d.HAlarmSlept)
@@ -788,9 +975,14 @@ namespace Armoury
               .Append(" (sr. ").Append((d.MoveHours > 0 ? d.MoveNoReason / (float)d.MoveHours : 0f).ToString("0.0", ci)).Append(" na godzine; wyjazd z osady / po bitwie ")
               .Append(d.MoveExit).Append(", obudzeni cudza reka ").Append(d.MoveWoken).Append(", alarm bez ucieczki ").Append(d.MoveAlarmStay)
               .Append(", dluznicy obudzeni ").Append(d.MoveDebtWoken).Append(", inne ").Append(d.MoveOther).Append("); wodzowie armii ")
-              .Append(d.MoveLead).Append(" (bez powodu ").Append(d.MoveLeadNoReason).Append(")")
+              .Append(d.MoveLead).Append(" (bez powodu ").Append(d.MoveLeadNoReason).Append("); na morzu (W2, poza P2) ").Append(d.SeaMove)
               .Append(" | stoper ksiegi: sr. ").Append((_ledgerCalls > 0 ? _ledgerMsSum / _ledgerCalls : 0).ToString("0.000", ci))
               .Append(" ms, maks. ").Append(_ledgerMsMax.ToString("0.000", ci)).Append(" ms (").Append(_ledgerCalls).Append(" tikow)")
+              .Append("; oboz swiata (petla AiNightCamp): sr. ").Append((d.CampCalls > 0 ? d.CampMsSum / d.CampCalls : 0).ToString("0.000", ci))
+              .Append(" ms, maks. ").Append(d.CampMsMax.ToString("0.000", ci)).Append(" ms; oboz splaty (AiDebtCamp): sr. ")
+              .Append((d.DebtCalls > 0 ? d.DebtMsSum / d.DebtCalls : 0).ToString("0.000", ci)).Append(" ms, maks. ").Append(d.DebtMsMax.ToString("0.000", ci))
+              .Append(" ms; straznicy T10: ").Append(d.GuardCalls).Append(" x, sr. ").Append((d.GuardCalls > 0 ? d.GuardMsSum / d.GuardCalls : 0).ToString("0.000", ci))
+              .Append(" ms, maks. ").Append(d.GuardMsMax.ToString("0.000", ci)).Append(" ms")
               .Append("; straznik snu dlugu - maks. odstep ").Append(_debtDhMax.ToString("0.000", ci)).Append(" h, alarmow ")
               .Append(_alarmDhMax.ToString("0.000", ci)).Append(" h gry; potkniecia T10 w sesji ").Append(_aiStumbles).Append('.');
             Log.Info(sb.ToString());
@@ -828,8 +1020,10 @@ namespace Armoury
                 bool floor = en.LimitMinValue > -1e30f && B <= en.LimitMinValue + 0.001f;
                 float sp = A > 0.01f ? (A - B) / A * 100f : 0f;
                 var me = Campaign.Current.Models.PartyMoraleModel.GetEffectivePartyMorale(mp, true);
-                float D = me.ResultNumber, Fm = me.SumOfFactors, fl = 0f; bool hasM = false;
-                foreach (var l in me.GetLines()) if (l.Item1 == name) { fl += l.Item2 / 100f; hasM = true; }
+                float D = me.ResultNumber, Fm = me.SumOfFactors, fl = 0f, mb = me.BaseNumber; bool hasM = false;
+                // poprawka recenzji: linia typu Multiply z GetLines() to PUNKTY (BaseNumber x wspolczynnik - ExplainedNumber.GetLines),
+                // nie procent - wspolczynnik = punkty / BaseNumber (dawne "/ 100" bylo dobre tylko przy bazie 100)
+                foreach (var l in me.GetLines()) if (l.Item1 == name) { fl += Math.Abs(mb) > 0.001f ? l.Item2 / mb : 0f; hasM = true; }
                 float C = (1f + Fm) > 0.001f ? D / (1f + Fm) * (1f + Fm - fl) : D;
                 bool mfloor = me.LimitMinValue > -1e30f && D <= me.LimitMinValue + 0.001f;
                 float mp2 = C > 0.01f ? (C - D) / C * 100f : 0f;
@@ -877,7 +1071,15 @@ namespace Armoury
             List<MobileParty> gone = null;
             foreach (var kv in _debtSleep)
                 if (kv.Key == null || !kv.Key.IsActive || !_ai.ContainsKey(kv.Key)) (gone ?? (gone = new List<MobileParty>())).Add(kv.Key);
-            if (gone != null) foreach (var m in gone) if (m != null) _debtSleep.Remove(m);
+            if (gone != null)
+                foreach (var m in gone)
+                {
+                    if (m == null) continue;
+                    // nieaktywna (rejs BK - AI trzyma BK) albo poza ksiega: bez EnableAi; koniec licznika snu jak LeaveSleep gracza
+                    _debtSleep.Remove(m);
+                    AiSleep ge;
+                    if (_ai.TryGetValue(m, out ge)) LeaveAcc(ge);
+                }
             bool evening = InDebtEvening(h);
             HashSet<MobileParty> campSet = null;
             foreach (var kv in _ai)
@@ -888,7 +1090,24 @@ namespace Armoury
                     if (mp == null || !mp.IsActive) continue;
                     DebtSleeper ds;
                     bool inDebt = _debtSleep.TryGetValue(mp, out ds);
+                    // sen ciagly bez snu dlugu (wczytany zapis, splata w trakcie, doczepiony po zwolnieniu wodza) - koniec licznika
+                    // jak LeaveSleep gracza; inaczej Acc >= 0 zwalnialby partie z dlugu o kazdym swicie (SettleAi)
+                    if (!inDebt && e.Acc >= 0f && !SleepsWithLeader(mp)) LeaveAcc(e);
                     if (e.Debt < 1 && !inDebt) continue;
+                    // poprawka recenzji (R1b): AI trzyma INNY mod (uczta / gentry / statek BK) - nie kladziemy spac i nie skracamy cudzej
+                    // blokady (DisableForHours(1) nadpisalby DisableAi, a ReleaseDebt -> EnableAi wypuscilby goscia z uczty)
+                    if (inDebt && ForeignHold(mp))
+                    {
+                        _debtSleep.Remove(mp); LeaveAcc(e);
+                        _day.DebtForeign++;
+                        Mark(e, StSkip);
+                        continue;
+                    }
+                    if (!inDebt && mp.Ai != null && mp.Ai.IsDisabled && !_townHold.Contains(mp) && !_camping.Contains(mp))
+                    {
+                        _day.DebtForeign++;
+                        continue;
+                    }
                     bool want = e.Debt >= 2 || (e.Debt == 1 && evening);
                     var st = mp.CurrentSettlement;
                     bool can = mp.AttachedTo == null && mp.MapEvent == null && mp.BesiegerCamp == null && !mp.IsCurrentlyAtSea
@@ -1022,6 +1241,15 @@ namespace Armoury
                     float drift = mp.GetPosition2D.Distance(ds.Bed);
                     bool ordered = mp.DefaultBehavior != AiBehavior.Hold || mp.TargetSettlement != null || mp.TargetParty != null;
                     if (!ordered && drift <= 0.3f) continue;
+                    // poprawka recenzji: rozkaz z dluzsza cudza blokada AI (uczta / gentry BK) - nie nasza sprawa, sen dlugu konczy sie bez EnableAi
+                    if (ForeignHold(mp))
+                    {
+                        _debtSleep.Remove(mp);
+                        AiSleep fe;
+                        if (_ai.TryGetValue(mp, out fe)) LeaveAcc(fe);
+                        _day.DebtForeign++;
+                        continue;
+                    }
                     mp.Ai.DisableForHours(1);
                     mp.SetMoveModeHold();
                     ds.Bed = mp.GetPosition2D;
@@ -1054,14 +1282,23 @@ namespace Armoury
                     if (mp.IsFleeing())
                     {
                         _alarmed.Remove(mp); _alarmFled++;
+                        // poprawka recenzji: lord, ktory uciekal, jest na nogach i mysli sam - rozkaz sprzed polnocy nie wraca o swicie
+                        if (!a.DebtPath) _orders.Remove(mp);
                         if (e != null) { e.AlarmEnd = 1; if (InCamp(hNow)) e.NightFlags |= 8; }
                         continue;
                     }
-                    if (mp.DefaultBehavior != AiBehavior.Hold) { mp.SetMoveModeHold(); _alarmResets++; }   // nowy cel strategiczny - bez powodu nie idzie
-                    if (now - a.AtH < AlarmGraceHours) continue;
+                    // poprawka recenzji: alarm obozu swiata, a oboz juz sie skonczyl (alarm 5:30-6:00) - galaz switu oddala rozkaz sprzed snu,
+                    // nie cofamy go i rozstrzygamy od reki (inaczej lord zostawal w Hold bez rozkazu do ok. 6:30)
+                    bool campOver = !a.DebtPath && !InCamp(hNow);
+                    if (!campOver)
+                    {
+                        if (mp.DefaultBehavior != AiBehavior.Hold) { mp.SetMoveModeHold(); _alarmResets++; }   // nowy cel strategiczny - bez powodu nie idzie
+                        if (now - a.AtH < AlarmGraceHours) continue;
+                    }
                     _alarmed.Remove(mp);
                     float drift = mp.GetPosition2D.Distance(a.Pos);
-                    if (drift > RestMoveLimit) { _alarmOther++; if (e != null) e.AlarmEnd = 3; }
+                    // po switie ruch to juz rozkaz oddany przez galaz switu, nie "inny marsz" po alarmie
+                    if (drift > RestMoveLimit && !campOver) { _alarmOther++; if (e != null) e.AlarmEnd = 3; }
                     else { _alarmSlept++; if (e != null) e.AlarmEnd = 2; }
                     SleepAgain(mp, a, e);
                 }
@@ -1110,7 +1347,7 @@ namespace Armoury
                 foreach (var kv in _ai)
                 {
                     var e = kv.Value;
-                    if (kv.Key == null || !kv.Key.IsActive) continue;
+                    if (kv.Key == null) continue;   // poprawka recenzji: partia chwilowo nieaktywna (rejs BK) tez idzie do zapisu
                     if (e.Debt > 0 || e.Rest > 0.05f || e.Acc >= 0f || e.Credited) list.Add(kv);
                 }
                 list.Sort((a, b) => a.Value.Debt != b.Value.Debt ? b.Value.Debt.CompareTo(a.Value.Debt) : b.Value.Rest.CompareTo(a.Value.Rest));
@@ -1175,11 +1412,13 @@ namespace Armoury
                     var f = part.Split(':');
                     if (f.Length < 5) { bad++; continue; }
                     MobileParty mp;
-                    if (!byId.TryGetValue(f[0], out mp) || !mp.IsActive) { missing++; continue; }
+                    if (!byId.TryGetValue(f[0], out mp)) { missing++; continue; }   // nieaktywna (rejs BK) zostaje - jest na liscie lordow
                     int d; float r, a;
                     if (!int.TryParse(f[1], NumberStyles.Integer, ci, out d) || !float.TryParse(f[2], NumberStyles.Float, ci, out r)
                         || !float.TryParse(f[4], NumberStyles.Float, ci, out a)) { bad++; continue; }
+                    // Stamp = -1: pierwsza godzina po wczytaniu liczy sie jako postoj (jak gracz po wczytaniu - _hadPos zerowane w ResetWorld)
                     var e = new AiSleep { Debt = Math.Max(0, Math.Min(3, d)), Rest = Math.Max(0f, r), Credited = f[3] == "1", Acc = a >= 0f ? a : -1f, SinceH = nowH - 48.0 };
+                    e.DawnDebt = e.Debt;
                     _ai[mp] = e;
                     n++; debts[e.Debt]++; if (e.Acc >= 0f) sleeps++;
                 }

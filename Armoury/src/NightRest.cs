@@ -85,6 +85,7 @@ namespace Armoury
             try
             {
                 var s = Settings.Current;
+                MasterSwitch(s);   // T10 poprawka recenzji: przelacznik glowny wylaczony w trakcie gry - jednorazowo wszystko na stare
                 if (s == null || !s.NightRestEnabled) return;
                 // T10 (uwaga krytyki 9, A07 3.10): swiat AI nie zalezy od stanu gracza - ksiega snu AI, oboz splaty
                 // dlugu, oboz swiata i bandy biegna PRZED wyjsciami gracza (martwy gracz, gracz-Nieumarly);
@@ -241,6 +242,9 @@ namespace Armoury
                 _camping.Clear(); _tented.Clear(); _bedPos.Clear(); _stillPos.Clear(); _tentPos.Clear(); _orders.Clear();
                 _lastHoldSweep = CampaignTime.Zero; _lastTentDrop = CampaignTime.Zero; _lastTentRefresh = DateTime.MinValue;
                 _cfgSig = -1;
+                // T10 poprawka recenzji: pozycja gracza z poprzedniej kampanii nie liczy sie jako ruch - pierwsza godzina po wczytaniu
+                // to postoj, tak samo dla gracza i dla partii AI (ksiega AI: brak poprzedniego odczytu = postoj)
+                _hadPos = false;
                 ResetHourCounters();
                 ResetAi();   // T10: ksiega snu AI, snu dluznikow, alarmy, wstrzymani w osadach
             }
@@ -599,20 +603,25 @@ namespace Armoury
                 if (!mp.IsActive || mp.MapEvent != null || (mp.CurrentSettlement != null && !inSettlement)) return;
                 var nav = MobileParty.NavigationType.Default;
                 var st = o.Settlement; var tp = o.Party;
+                // T10 poprawka recenzji: rozkaz sprzed snu (do ok. 29 h przy snie dlugu) moze byc juz niewazny - pokoj, osada przeszla na nasza
+                // strone, cel juz nie wrog. Gra nie sprawdza wojny przy wejsciu w oblezenie (EncounterManager.StartSettlementEncounter), wiec
+                // niewazny rozkaz nie wraca - AI decyduje od nowa
+                var mf = mp.MapFaction;
+                bool stWar = st != null && mf != null && st.MapFaction != null && st.MapFaction != mf && mf.IsAtWarWith(st.MapFaction);
                 switch (o.Behavior)
                 {
                     case TaleWorlds.CampaignSystem.Party.AiBehavior.GoToSettlement:
                         if (st != null) mp.SetMoveGoToSettlement(st, nav, false); break;
                     case TaleWorlds.CampaignSystem.Party.AiBehavior.BesiegeSettlement:
-                        if (st != null) mp.SetMoveBesiegeSettlement(st, nav); break;
+                        if (st != null && stWar) mp.SetMoveBesiegeSettlement(st, nav); break;
                     case TaleWorlds.CampaignSystem.Party.AiBehavior.RaidSettlement:
-                        if (st != null) mp.SetMoveRaidSettlement(st, nav, false); break;
+                        if (st != null && stWar) mp.SetMoveRaidSettlement(st, nav, false); break;
                     case TaleWorlds.CampaignSystem.Party.AiBehavior.DefendSettlement:
-                        if (st != null) mp.SetMoveDefendSettlement(st, false, nav); break;
+                        if (st != null && st.MapFaction == mf) mp.SetMoveDefendSettlement(st, false, nav); break;
                     case TaleWorlds.CampaignSystem.Party.AiBehavior.PatrolAroundPoint:
                         if (st != null) mp.SetMovePatrolAroundSettlement(st, nav, false); break;
                     case TaleWorlds.CampaignSystem.Party.AiBehavior.EngageParty:
-                        if (tp != null && tp.IsActive) mp.SetMoveEngageParty(tp, nav); break;
+                        if (tp != null && tp.IsActive && Hostile(mp, tp)) mp.SetMoveEngageParty(tp, nav); break;
                     case TaleWorlds.CampaignSystem.Party.AiBehavior.EscortParty:
                         if (tp != null && tp.IsActive) mp.SetMoveEscortParty(tp, nav, false); break;
                     case TaleWorlds.CampaignSystem.Party.AiBehavior.GoAroundParty:
@@ -620,7 +629,7 @@ namespace Armoury
                     default: break;   // Hold/None i reszta - niech AI zdecyduje na swiezo
                 }
             }
-            catch { }
+            catch (Exception e) { AiStumble("ApplyOrder", mp, e); }   // T10 poprawka recenzji: liczone, nie polykane
         }
 
         /// <summary>
@@ -691,7 +700,7 @@ namespace Armoury
                     // T10: lord w osadzie w godzinie obozu bez powodu nie wyjezdza (spi pod dachem - jak gracz, ktory nie rusza noca)
                     if (mp.IsLordParty && byReason && mp.CurrentSettlement != null && mp.MapEvent == null)
                     {
-                        TownNight(mp, s, e, debtOn, tally);
+                        TownNight(mp, s, e, debtOn, campSet, tally);
                         continue;
                     }
                     if (mp.CurrentSettlement != null || mp.MapEvent != null || mp.BesiegerCamp != null)
@@ -703,7 +712,7 @@ namespace Armoury
                     // T10: dluznik spi pod ksiega dlugu (AiDebtCamp) - oboz swiata go nie rusza
                     if (mp.IsLordParty && _debtSleep.ContainsKey(mp))
                     {
-                        tally.DebtSleepers++;
+                        tally.DebtField++;
                         if (e != null) Mark(e, StDebt);
                         continue;
                     }
@@ -723,7 +732,7 @@ namespace Armoury
                     bool armyLeader = s.ArmyLeadersAlwaysCamp && mp.Army != null && mp.Army.LeaderParty == mp;
                     // T10 na sucho: co powiedzialaby regula powodow - liczone PRZED skutkami starej sciezki (rozkaz spiacego jeszcze w _orders)
                     NReason dryR = NReason.None; bool dryAlarm = false, dryApplies = false;
-                    if (mp.IsLordParty) { try { dryApplies = DryClassify(mp, s, e, campSet, out dryR, out dryAlarm); } catch { dryApplies = false; } }
+                    if (mp.IsLordParty) { try { dryApplies = DryClassify(mp, s, e, campSet, out dryR, out dryAlarm); } catch (Exception ex) { dryApplies = false; AiStumble("DryClassify", mp, ex); } }
                     string cause = null;
                     if (!armyLeader && s.AiCampSkipPercent > 0 &&
                         (mp.Id.InternalValue + (uint)CampaignTime.Now.ToDays) % 100u
@@ -1111,8 +1120,9 @@ namespace Armoury
                 // T10 (uwaga krytyki 5): Add() doklada do BAZY, ktora gra mnozy potem przez (1 + suma wspolczynnikow) -
                 // wpis "-cut" zdejmowal cut x (1 + suma), np. -28.5% zamiast -25% przy +14%. Dzielimy jak MarchPace,
                 // wiec kara jest dokladnie z tablicy (gracz i AI).
+                // poprawka recenzji: DLL na sucho (T10_DRY) zostawia stary wzor - P0 porownuje sie z baza T1 bez innej kary gracza
                 float cut = __result.ResultNumber * SpdPenalty[Math.Min(3, d)] / 100f;
-                float f = 1f + __result.SumOfFactors;
+                float f = DryBuild ? 1f : 1f + __result.SumOfFactors;
                 if (cut > 0f) __result.Add(f > 0.01f ? -cut / f : -cut, _txtSleepless);
             }
             catch { }
@@ -1131,7 +1141,7 @@ namespace Armoury
                 // z bazowego ~50 zostaje ~2-3, ponizej progu dezercji: spiacego
                 // wojska pilnowac trzeba jak ognia
                 // T10: wspolczynnik razy (1 + suma wspolczynnikow) - kara rowno z tablicy takze przy innych mnoznikach (jak Rations)
-                float f = 1f + __result.SumOfFactors;
+                float f = DryBuild ? 1f : 1f + __result.SumOfFactors;   // na sucho stary wzor (jak wyzej)
                 float pct = MorPenalty[Math.Min(3, d)] / 100f;
                 __result.AddFactor(f > 0.01f ? -pct * f : -pct, _txtSleepless);
             }
@@ -1152,6 +1162,7 @@ namespace Armoury
             {
                 var s = Settings.Current;
                 if (s == null) return;
+                if (Campaign.Current != null) MasterSwitch(s);   // T10 poprawka recenzji: NightRestEnabled wylaczony w trakcie gry
 
                 // straznik co klatke: namiot nie jezdzi po mapie - gracz ruszyl,
                 // wizerunek schodzi od reki (tick godzinowy bywal o godzine za pozno)
@@ -1191,10 +1202,19 @@ namespace Armoury
 
                 // T10: straznik snu dluznikow (o kazdej godzinie - oboz splaty od 20:00, sen ciagly przez dzien)
                 // i rozstrzygniecie alarmow (ucieczka albo z powrotem spac) - co 0.1 h GRY
-                if (Campaign.Current != null && _debtSleep.Count > 0 && GuardDue(ref _lastDebtSweep, ref _debtDhMax))
+                // poprawka recenzji: tylko przy wlaczonym przelaczniku glownym (wylaczony = MasterSwitch zwolnil wszystkich); stoper do linii switu
+                if (s.NightRestEnabled && Campaign.Current != null && _debtSleep.Count > 0 && GuardDue(ref _lastDebtSweep, ref _debtDhMax))
+                {
+                    long tg = System.Diagnostics.Stopwatch.GetTimestamp();
                     HoldDebtSleepers();
-                if (Campaign.Current != null && _alarmed.Count > 0 && GuardDue(ref _lastAlarmSweep, ref _alarmDhMax))
+                    GuardTime(tg);
+                }
+                if (s.NightRestEnabled && Campaign.Current != null && _alarmed.Count > 0 && GuardDue(ref _lastAlarmSweep, ref _alarmDhMax))
+                {
+                    long tg = System.Diagnostics.Stopwatch.GetTimestamp();
                     GuardAlarmed();
+                    GuardTime(tg);
+                }
 
                 if (!s.QuickCampKey || _askOpen) return;
                 bool down = Input.IsKeyDown(InputKey.O);
