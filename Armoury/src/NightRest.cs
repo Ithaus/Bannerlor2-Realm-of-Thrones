@@ -541,6 +541,21 @@ namespace Armoury
         private static readonly System.Collections.Generic.Dictionary<MobileParty, NightOrder> _orders =
             new System.Collections.Generic.Dictionary<MobileParty, NightOrder>();
 
+        /// <summary>174b: partia spi w nocnym obozie swiata (rozkaz zapamietany przed snem, swit go odda). Odczyt slownika O(1).
+        /// Krytyka 174b (5): _orders czysci tylko galaz switu w AiNightCamp, a OnHourly wychodzi wczesniej przy NightRestEnabled = false
+        /// albo martwym bohaterze gracza - stary wpis nie moze wtedy udawac snu, wiec sprawdzamy tez wylaczniki i godzine obozu.</summary>
+        internal static bool IsCamping(MobileParty mp)
+        {
+            try
+            {
+                if (mp == null || _orders.Count == 0) return false;
+                var s = Settings.Current;
+                if (s == null || !s.NightRestEnabled || !s.AiCampsAtNight || !InCamp(CampaignTime.Now.GetHourOfDay)) return false;
+                return _orders.ContainsKey(mp);
+            }
+            catch { return false; }
+        }
+
         private static void RememberOrder(MobileParty mp)
         {
             try

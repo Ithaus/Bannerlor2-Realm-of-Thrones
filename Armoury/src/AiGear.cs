@@ -471,9 +471,11 @@ namespace Armoury
                 int pieces = 0;
                 var bought = new List<string>();
                 // polka tej osady (zaloga zamku: wlasnego zamku - to, co tam lezy, oplacila juz kasa zamku i jest na miejscu)
+                int who = garrison ? (st.IsTown ? Measure174b.BTownGarrison : Measure174b.BCastleOwn) : Measure174b.BLord;   // 174b.0 M2: kupujacy (tylko licznik)
                 int spent = BuyLoop(st, mp, need, budget, maxPieces, ref pieces, bought, (el, n, k, unit) =>
                 {
                     _add.Invoke(null, new object[] { mp.Id, el.Item, n });
+                    Measure174b.NoteBuy(who, el.Item, n, unit);
                     AiWear.NoteBought(mp, el, n);   // wpis 89: zuzyta z polki zostaje zuzyta; 171 (recenzja): takze w zalodze - inaczej obita sztuka wychodzila z zalogi jako sprawna
                     int cost = unit * n, fromPurse = garrison ? 0 : MenPurse.Take(mp, cost);
                     lord.ChangeHeroGold(-(cost - fromPurse));
@@ -488,6 +490,7 @@ namespace Armoury
                     spent += BuySubstitutes(st, mp, armNow, needOut, need, budget - spent, maxPieces, ref pieces, bought, (el, n, k, unit) =>
                     {
                         _add.Invoke(null, new object[] { mp.Id, el.Item, n });
+                        Measure174b.NoteBuy(who, el.Item, n, unit);
                         AiWear.NoteBought(mp, el, n);
                         int cost = unit * n, fromPurse = garrison ? 0 : MenPurse.Take(mp, cost);
                         lord.ChangeHeroGold(-(cost - fromPurse));
@@ -518,6 +521,7 @@ namespace Armoury
                                 {
                                     BuyLoop(market, mp, need, budget - spent, maxPieces, ref pieces, bought, (el, n, k, unit) =>
                                     {
+                                        Measure174b.NoteBuy(Measure174b.BCastleOrder, el.Item, n, unit);   // 174b.0 M2 (tylko licznik)
                                         lord.ChangeHeroGold(-unit * n);
                                         market.Town.ChangeGold(unit * n);
                                         MoneyLedger.Note(MoneyLedger.NGear, market, unit * n);

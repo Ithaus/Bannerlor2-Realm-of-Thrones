@@ -1,5 +1,28 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-09 (174b.0) - POMIARY DOWOZU I RYNKU ZBROI: nazwy miast bez rudy i strzal, zrodla rudy z konwojami w porcie, zbroja na polkach w pasmach z "nowa sztuka w 7 dob", zakupy AI wedlug kupujacego, "razem" pokrycia wazone liczba ludzi (sam log)
+**Mod:** Armoury | **Pliki:** NOWY `Measure174b.cs` (M1, M2, M3), NOWY `ShopReserve.cs` (zaslepka - rezerwa kramu w 174b.4), `MaterialOrders.cs` (linia nazw co 5 dob, liczniki), `NightRest.cs` (`IsCamping`), `ArmsDrill.cs` ("razem" w linii pokrycia), liczniki w `AiGear.cs`, `VolunteerKit.cs`, `MenPurse.cs`, `SupplyDemand.cs`, `WorkshopLaw.cs`, `GarrisonArmory.cs`, `GarrisonCarts.cs`, `ArmouryBehavior.cs` (wywolanie i Reset). Bez nowych ustawien, bez kluczy zapisu, bez zmiany rozgrywki.
+
+**Co zobaczysz w grze (prosto):** nic - to tylko nowe linie w logu, zeby nastepny test pokazal po nazwach, ktore miasta nie maja rudy i strzal, skad ruda moglaby przyplynac i kto wykupuje zbroje.
+
+**Problem:** test sklad6 (`kopia-sklad6/ANALIZA.md`): log podaje tylko liczby miast bez rudy (36) i bez strzal (31), bez nazw; polki zbroi tylko jako sume; zakupy AI bez podzialu na kupujacych; prog "cokolwiek na tulowiu razem" liczony recznie. Projekt 174b (`docs/PROJEKT-174B-DOWOZ-2026-10-09.md` rozdz. 3.0 i "Krytyka i odpowiedzi" uwagi 13, 15, 17, 18) potrzebuje tych miar do progow P2-P6.
+
+**Zmiana (tylko log):**
+- "Miasta bez rudy i strzal (174b)" - pierwsza doba sesji i co 5 dob: nazwy miast bez rudy, bez strzal, czesc wspolna (sprawdza zalozenie diagnozy B, ze to te same miasta), liczba bez beltow, 10 miast z najwiecej cyklami "brak rudy" (warsztaty i strzelarze) od ostatniej linii, 10 z najwiekszym zapasem rudy, zrodla rudy z nadwyzka: zapas/nadwyzka, ruda wywieziona kontraktami od ostatniej linii, konwoje (karawany ze statkami) stojace w porcie.
+- "Zbroja na polkach (174b)" codziennie: tulow, glowa, nogi, rece w pasmach t1-2 / t3-4 / t5-6 na polkach miast (bez unikatow) - sztuk, miast z >= 1 sztuka i miast, do ktorych w 7 dobach trafila NOWA sztuka pasma (wyrob warsztatu, dostawa kupcow DailyTrade, odsprzedaz z sakiewek, nadwyzka albo zawrocony towar zalogi, kazdy przyrost polki pasma miedzy spisami - np. lup sprzedany przez gre); nowe sztuki wedlug zrodla.
+- "ZakupyAI wedlug kupujacego (174b)" codziennie: sztuki i zloto wedlug kupujacego (lordowie, zalogi miast, zalogi zamkow z wlasnej polki, zamowienia zamkow w miescie, notable dla ochotnikow, ludzie gracza) x grupa (korpus, helm, reszta zbroi, tarcza, bron biala, bron strzelecka, amunicja, konie i rzedy, inne) oraz nadwyzki sprzedane z sakiewek ludzi wedlug grup (M3).
+- "Pokrycie zbrojowni AI (171)": dopisek "razem (partie i zalogi wazone liczba ludzi): cokolwiek na tulowiu X%, korpus szczebla Y%" (wzor progu P6).
+- "Kontrakty surowca (174)": "w obozie przy przegladzie doby N" - ile razy przeglad doby zastal karawane z kontraktem w nocnym obozie (`NightRest.IsCamping`: wpis rozkazu przed snem + wlaczony oboz + godzina obozu - krytyka 174b uwaga 5).
+
+**Ryzyko / co sprawdzic (kontrola calosci):**
+- Same liczniki i odczyty; jedyny nowy koszt: spis M1 raz na dobe (97 miast, ok. 300 stosow) i linia nazw co 5 dob - kilka ms na dobe.
+- Liczniki M2 biegna miedzy taktami doby gry (`DailyTickEvent`), linia gry "ZakupyAI: dzien" zamyka sie przy pierwszym zakupie nastepnej doby - roznica kilku godzin gry, sumy wielodniowe te same.
+- "Nowa sztuka w 7 dob" startuje od zera w kazdej sesji (stan tylko w pamieci) - na zapisie 362 prog P5 dopiero od 8. doby.
+- `ShopReserve` to zaslepka (0 = rezerwa wylaczona) do 174b.4.
+- Kod tylko zbudowany (kod 0) - NIE uruchomiony w grze.
+
+**Status:** NIEWGRANE - DO SPRAWDZENIA (linie "Miasta bez rudy i strzal (174b)", "Zbroja na polkach (174b)", "ZakupyAI wedlug kupujacego (174b)", "razem" w "Pokrycie zbrojowni AI (171)"; 0 potkniec Measure174b).
+
 ## 2026-10-09 (Z1b, poprawka do Z1) - DONE BEZ PYTANIA "YOU ARE DISCARDING ITEMS" TAM, GDZIE DONE NICZEGO NIE WYRZUCA: Spoils "War stockpile" i "Inspect trophies" zamykaja sie bez okna; na ekranach, gdzie rzeczy po lewej naprawde odchodza (takze tabor wroga "Take supplies"), okno zostaje
 **Mod:** Armoury | **Pliki:** `SpoilsSeal.cs` (NOWA sekcja 13: transpiler na `SPInventoryVM.HandleDone`, bramka `DiscardAskCount`, rozpoznanie ekranu `KeptLeftScreen`; NOWY wspolny `LoadScreens` - sekcja 12 korzysta z niego bez zmiany dzialania), `DonationXpLaw.cs` (sam komentarz), `Settings.cs` + `McmSettings.cs` (sam opis `DonationXpOff`, gen_mcm: 706 ustawien). Bez nowych ustawien, bez kluczy zapisu, bez stanu.
 

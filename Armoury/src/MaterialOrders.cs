@@ -71,12 +71,19 @@ namespace Armoury
         private static double _dDays;
         private static readonly List<string> _dEx = new List<string>();
         private static readonly HashSet<string> _errSites = new HashSet<string>();
+        // 174b.0: linia "Miasta bez rudy i strzal (174b)" (pierwsza doba sesji i co 5 dob) - cykle "brak rudy" wedlug miasta (warsztaty i strzelarze)
+        // i ruda wywieziona kontraktami wedlug zrodla od ostatniej linii; liczniki tylko do logu
+        private static readonly Dictionary<Town, int> _missOreSince = new Dictionary<Town, int>();
+        private static readonly Dictionary<Settlement, int> _srcOreSince = new Dictionary<Settlement, int>();
+        private static int _namesSince = -1;
+        private static int _dCampSeen;   // 174b.0: przeglad doby zastal karawane z kontraktem w nocnym obozie (stara regula Keep liczy to jako cudzy cel)
 
         internal static bool On { get { var s = Settings.Current; return s != null && s.TownMaterialOrders; } }
 
         internal static void Reset()
         {
             _items = null; _ix.Clear(); _contracts.Clear(); _byCar.Clear(); _miss.Clear(); _useToday.Clear(); _useAvg.Clear(); _last.Clear(); _pending = null;
+            _missOreSince.Clear(); _srcOreSince.Clear(); _namesSince = -1;
             NewDay(); _stumblesAll = 0; _errSites.Clear();
         }
 
@@ -84,7 +91,7 @@ namespace Armoury
         {
             Array.Clear(_dMade, 0, M); Array.Clear(_dMadeQty, 0, M);
             _dDone = _dLost = _dLostQty = _dRelHost = _dRel30 = _dRelOther = _dNoCar = _dNoSrc = _dNoGain = _dNoRoad = _dRejected = _dPause = _dEnough = _dRetarget = _dKeptTarget = _stumbles = 0;
-            _dRelSiege = _dRelRetarget = _dRelDisband = _dShortPack = _dSmall = _dHoldMoved = 0;
+            _dRelSiege = _dRelRetarget = _dRelDisband = _dShortPack = _dSmall = _dHoldMoved = 0; _dCampSeen = 0;
             _dGold = _dMargin = _dPaidDest = 0; _dDays = 0; _dEx.Clear();
         }
 
@@ -115,7 +122,11 @@ namespace Armoury
         internal static void NoteMissMask(Town town, int mask)
         {
             if (town == null || mask == 0) return;
-            try { for (int m = 0; m < 4; m++) if ((mask & (1 << m)) != 0) Bump(_miss, town, m); }
+            try
+            {
+                for (int m = 0; m < 4; m++) if ((mask & (1 << m)) != 0) Bump(_miss, town, m);
+                if ((mask & 1) != 0) { int n; _missOreSince.TryGetValue(town, out n); _missOreSince[town] = n + 1; }   // 174b.0: tylko do linii nazw
+            }
             catch (Exception e) { Stumble("NoteMissMask", e); }
         }
 
@@ -188,6 +199,76 @@ namespace Armoury
             }
             catch (Exception e) { Stumble("Daily", e); }
             Line(day);
+            try { if (_items != null && (_namesSince < 0 || day % 5 == 0)) NamesLine(day); } catch (Exception e) { Stumble("NamesLine", e); }
+        }
+
+        // ------------------------------------------------------------ 174b.0: nazwy miast bez rudy i strzal
+        private static int AmmoOn(ItemRoster r, ItemObject.ItemTypeEnum t)
+        {
+            int n = 0;
+            for (int i = 0; i < r.Count; i++)
+            {
+                var el = r.GetElementCopyAtIndex(i);
+                var it = el.EquipmentElement.Item;
+                if (el.Amount > 0 && it != null && it.ItemType == t) n += el.Amount;
+            }
+            return n;
+        }
+
+        private static string Top(List<KeyValuePair<string, int>> l, int k)
+        {
+            l.Sort((a, b) => b.Value != a.Value ? b.Value.CompareTo(a.Value) : string.CompareOrdinal(a.Key, b.Key));
+            var parts = new List<string>();
+            for (int i = 0; i < l.Count && i < k; i++) parts.Add(l[i].Key + " " + l[i].Value);
+            return parts.Count > 0 ? string.Join(", ", parts.ToArray()) : "-";
+        }
+
+        /// <summary>Linia "Miasta bez rudy i strzal (174b)" - pierwsza doba sesji i co 5 dob: nazwy miast bez rudy, bez strzal (i bez beltow - liczba),
+        /// czesc wspolna, 10 miast z najwiecej cyklami "brak rudy" od ostatniej linii, 10 z najwiekszym zapasem rudy, zrodla rudy z nadwyzka (zapas /
+        /// nadwyzka, ruda wywieziona kontraktami od ostatniej linii, konwoje - karawany ze statkami - stojace w porcie). Jedno przejscie 97 miast.</summary>
+        private static void NamesLine(int day)
+        {
+            var ore = _items[Ore];
+            var noOre = new List<string>(); var noArrows = new List<string>(); var both = new List<string>(); int noBolts = 0, towns = 0;
+            var stock = new List<KeyValuePair<string, int>>(); var miss = new List<KeyValuePair<string, int>>();
+            var srcs = new List<KeyValuePair<int, string>>();
+            foreach (var t in Town.AllTowns)
+            {
+                try
+                {
+                    if (t == null || !t.IsTown || t.Owner == null || t.Owner.ItemRoster == null || t.Settlement == null) continue;
+                    towns++;
+                    var r = t.Owner.ItemRoster;
+                    string nm = t.Name != null ? t.Name.ToString() : t.Settlement.StringId;
+                    int have = ore != null ? r.GetItemNumber(ore) : 0;
+                    bool a0 = AmmoOn(r, ItemObject.ItemTypeEnum.Arrows) <= 0;
+                    if (AmmoOn(r, ItemObject.ItemTypeEnum.Bolts) <= 0) noBolts++;
+                    if (have <= 0) noOre.Add(nm);
+                    if (a0) noArrows.Add(nm);
+                    if (have <= 0 && a0) both.Add(nm);
+                    if (have > 0) stock.Add(new KeyValuePair<string, int>(nm, have));
+                    int mo; if (_missOreSince.TryGetValue(t, out mo) && mo > 0) miss.Add(new KeyValuePair<string, int>(nm, mo));
+                    int keep = Math.Max(SafeKeep(t, ore), (int)Math.Ceiling(10f * UseOf(t, Ore)));
+                    int surplus = have - keep;
+                    if (surplus > 0)
+                    {
+                        int convoys = 0;
+                        foreach (var p in t.Settlement.Parties) if (p != null && p.IsCaravan && p.IsActive && !p.HasLandNavigationCapability) convoys++;
+                        int outQ; _srcOreSince.TryGetValue(t.Settlement, out outQ);
+                        srcs.Add(new KeyValuePair<int, string>(surplus, nm + " " + have + "/" + surplus + ", kontraktami " + outQ + ", konwojow w porcie " + convoys));
+                    }
+                }
+                catch (Exception e) { Stumble("NamesLine(miasto)", e); }
+            }
+            noOre.Sort(string.CompareOrdinal); noArrows.Sort(string.CompareOrdinal); both.Sort(string.CompareOrdinal);
+            srcs.Sort((a, b) => b.Key.CompareTo(a.Key));
+            var sp = new List<string>(); for (int i = 0; i < srcs.Count && i < 15; i++) sp.Add(srcs[i].Value);
+            Log.Info("Miasta bez rudy i strzal (174b): dzien " + day + " - miast " + towns + "; bez rudy " + noOre.Count + " [" + string.Join(", ", noOre.ToArray()) + "]; bez strzal "
+                     + noArrows.Count + " [" + string.Join(", ", noArrows.ToArray()) + "]; bez beltow " + noBolts + "; bez rudy i bez strzal " + both.Count + " [" + string.Join(", ", both.ToArray())
+                     + "]; najwiecej cykli \"brak rudy\" (warsztaty i strzelarze) od " + (_namesSince < 0 ? "startu sesji" : "dnia " + _namesSince) + ": " + Top(miss, 10)
+                     + "; najwiekszy zapas rudy: " + Top(stock, 10) + "; zrodla rudy z nadwyzka (" + srcs.Count + "; zapas/nadwyzka, ruda wywieziona kontraktami od ostatniej linii, konwoje w porcie): "
+                     + (sp.Count > 0 ? string.Join("; ", sp.ToArray()) : "-") + ".");
+            _missOreSince.Clear(); _srcOreSince.Clear(); _namesSince = day;
         }
 
         /// <summary>Kontrakty w drodze: zniszczone, rozwiazywana, wrogosc, oblezenie celu, 30 dob, cel zmieniony (przywrocony najwyzej MaxRetarget razy).</summary>
@@ -209,6 +290,7 @@ namespace Armoury
                     if (car.CurrentSettlement == c.Dest) { Deliver(car, c.Dest); continue; }   // stoi w celu (wjazd przed zapisem / bez zdarzenia)
                     if (car.TargetSettlement != c.Dest)
                     {
+                        if (NightRest.IsCamping(car)) _dCampSeen++;   // 174b.0: pomiar - ile "cudzych celow" to nasz nocny oboz
                         if (car.CurrentSettlement != null && car.CurrentSettlement.IsUnderSiege) continue;   // nie wyprowadzamy jej z obleganego miasta prosto do obozu oblegajacych
                         if (c.Retarget >= MaxRetarget) { Release(c); _dRelRetarget++; continue; }   // cel zmieniaja inni (BK Shipping, porty) - karawana zostaje z towarem
                         try { if (car.CurrentSettlement != null) LeaveSettlementAction.ApplyForParty(car); } catch (Exception e) { Stumble("Keep(wyjazd)", e); }   // jak posilki DTE
@@ -358,6 +440,7 @@ namespace Armoury
             _contracts.Add(c); _byCar[car] = c;
             if (!Move(car, dest, naval)) { Release(c); _dRejected++; return; }   // rozkaz odrzucony (straznik drog) - karawana handluje dalej sama, z ladunkiem
             _dMade[m]++; _dMadeQty[m] += got; _dGold += paid; _dMargin += (long)margin;
+            if (m == Ore) { int so; _srcOreSince.TryGetValue(src, out so); _srcOreSince[src] = so + got; }   // 174b.0: linia nazw (tylko licznik)
             if (_dEx.Count < 3) _dEx.Add(dest.Name + " - " + src.Name + " " + (int)dist + (naval ? " (morzem)" : "") + " " + Names[m] + " " + got);
         }
 
@@ -532,6 +615,7 @@ namespace Armoury
                   .Append(" (sztuk ").Append(_dLostQty).Append("), zwolnione ").Append(rel).Append(" (wrogosc ").Append(_dRelHost).Append(", oblezenie celu ").Append(_dRelSiege)
                   .Append(", cel zmieniany przez innych ").Append(_dRelRetarget).Append(", rozwiazana ").Append(_dRelDisband).Append(", 30 dob ").Append(_dRel30)
                   .Append(", rozkaz odrzucony ").Append(_dRejected).Append(", inne ").Append(_dRelOther).Append("); cel przywrocony ").Append(_dRetarget).Append(", ruszona z postoju ").Append(_dHoldMoved)
+                  .Append(", w obozie przy przegladzie doby ").Append(_dCampSeen)
                   .Append(HourlyHooked ? " (AI gry czynne - ucieczka jak kazda karawana)" : " (AI wstrzymane - wzor DTE, bez latki HourlyTickParty)")
                   .Append("; bez kontraktu: brak karawany w zrodle ").Append(_dNoCar).Append(", brak zrodla w zasiegu ").Append(_dNoSrc).Append(", bez drogi ").Append(_dNoRoad)
                   .Append(", ladunek ponizej ").Append(Math.Max(0f, s.TownMaterialOrderMinLoadKg).ToString("0", CultureInfo.InvariantCulture)).Append(" kg ").Append(_dSmall)

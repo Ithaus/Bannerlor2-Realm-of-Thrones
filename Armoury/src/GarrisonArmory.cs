@@ -298,6 +298,7 @@ namespace Armoury
                         }
                         cnt--; extra--;
                         market.ItemRoster.AddToCounts(el, 1);
+                        Measure174b.NoteArrival(market, it, 1, Measure174b.ArrGarrison);   // 174b.0 M1: nowa sztuka na polce (tylko licznik)
                         market.Town.ChangeGold(-unit);
                         payee.ChangeHeroGold(unit);
                         sold++; gold += unit;

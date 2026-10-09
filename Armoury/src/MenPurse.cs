@@ -263,6 +263,8 @@ namespace Armoury
                     if (n <= 0) continue;
                     armory.AddToCounts(el.EquipmentElement, -n);
                     st.ItemRoster.AddToCounts(el.EquipmentElement, n);
+                    Measure174b.NoteSurplusSale(el.EquipmentElement.Item, n, unit);                          // 174b.0 M3 (tylko licznik)
+                    Measure174b.NoteArrival(st, el.EquipmentElement.Item, n, Measure174b.ArrPurse);          // 174b.0 M1: nowa sztuka na polce
                     st.Town.ChangeGold(-unit * n);
                     MoneyLedger.Note169(MoneyLedger.N169Surplus, st, -unit * n);   // paczka 169: linia kas (tylko licznik)
                     Add(main, unit * n);
@@ -310,6 +312,7 @@ namespace Armoury
                     var pick = shelf.GetElementCopyAtIndex(best).EquipmentElement;
                     shelf.AddToCounts(pick, -1);
                     armory.AddToCounts(pick, 1);
+                    Measure174b.NoteBuy(Measure174b.BPlayerMen, pick.Item, 1, bestPrice);   // 174b.0 M2 (tylko licznik)
                     Take(main, bestPrice);
                     st.Town.ChangeGold(bestPrice);
                     MoneyLedger.Note169(MoneyLedger.N169Kit, st, bestPrice);   // paczka 169: linia kas (tylko licznik)
@@ -361,6 +364,8 @@ namespace Armoury
                         if (st.Town.Gold < unit) { extra = 0; break; }
                         cnt--; extra--;
                         st.ItemRoster.AddToCounts(el, 1);
+                        Measure174b.NoteSurplusSale(it, 1, unit);                          // 174b.0 M3 (tylko licznik)
+                        Measure174b.NoteArrival(st, it, 1, Measure174b.ArrPurse);          // 174b.0 M1: nowa sztuka na polce
                         st.Town.ChangeGold(-unit);
                         MoneyLedger.Note169(MoneyLedger.N169Surplus, st, -unit);   // paczka 169: linia kas (tylko licznik)
                         int third = (int)Math.Round(unit * MBMath.ClampFloat(s.LordLootThirdPercent, 0f, 100f) / 100f);

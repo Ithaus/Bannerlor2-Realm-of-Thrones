@@ -215,6 +215,7 @@ namespace Armoury
             if (market == null || market.Town == null || market.ItemRoster == null) return need.Count == 0;   // bez targu: tylko gdy nic kluczowego nie trzeba
             var roster = market.ItemRoster;
             var picks = new List<EquipmentElement>();
+            var pickPrices = new List<int>();   // 174b.0 M2: cena kazdej sztuki (tylko licznik)
             var taken = new Dictionary<int, int>();
             int total = 0;
             foreach (var it in need)
@@ -241,12 +242,15 @@ namespace Armoury
                 }
                 int u; taken.TryGetValue(best, out u); taken[best] = u + 1;
                 picks.Add(roster.GetElementCopyAtIndex(best).EquipmentElement);
+                pickPrices.Add(bestPrice);
                 total += bestPrice;
             }
             if (notable.Gold < total) { if (countWhy) Why("zloto notabla (" + notable.Gold + " < " + total + ")"); return false; }   // nie stac go
-            foreach (var e in picks)
+            for (int pi = 0; pi < picks.Count; pi++)
             {
+                var e = picks[pi];
                 roster.AddToCounts(e, -1);
+                Measure174b.NoteBuy(Measure174b.BNotable, e.Item, 1, pickPrices[pi]);   // 174b.0 M2 (tylko licznik)
                 ArmsScrap.NoteBuy(market, e.Item, 1);   // 174 pytanie 4: popyt koszyka w miescie (tylko licznik)
                 if (e.Item != null && IsAmmoType(e.Item.ItemType)) TownFletchers.NoteNotable(e.Item.ItemType, 1);   // 172: kolczan z polki miasta (tylko licznik)
             }
@@ -277,6 +281,7 @@ namespace Armoury
                 }
                 var pe = roster.GetElementCopyAtIndex(best).EquipmentElement;
                 roster.AddToCounts(pe, -1);
+                Measure174b.NoteBuy(Measure174b.BNotable, pe.Item, 1, bestPrice);   // 174b.0 M2 (tylko licznik)
                 ArmsScrap.NoteBuy(market, pe.Item, 1);   // 174 pytanie 4: popyt koszyka w miescie (tylko licznik)
                 if (pe.Item != null && IsAmmoType(pe.Item.ItemType)) TownFletchers.NoteNotable(pe.Item.ItemType, 1);   // 172: licznik
                 _lastBought.Add(pe);

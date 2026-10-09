@@ -515,6 +515,7 @@ namespace Armoury
                                 if (n > afford) n = afford;
                                 shelf.AddToCounts(el.EquipmentElement, -n);
                                 best.ItemRoster.AddToCounts(el.EquipmentElement, n);
+                                Measure174b.NoteArrival(best, it, n, Measure174b.ArrTrade);   // 174b.0 M1: nowa sztuka na polce (tylko licznik)
                                 best.Town.ChangeGold(-unit * n);
                                 src.Town.ChangeGold(unit * n);
                                 got += n; paid += (long)unit * n;

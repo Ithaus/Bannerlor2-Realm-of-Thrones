@@ -212,7 +212,7 @@ namespace Armoury
         {
             int pcs = 0;
             if (o.Market != null && o.Market.ItemRoster != null)
-                foreach (var l in o.Lines) if (l.El.Item != null && l.N > 0) { o.Market.ItemRoster.AddToCounts(l.El, l.N); pcs += l.N; }
+                foreach (var l in o.Lines) if (l.El.Item != null && l.N > 0) { o.Market.ItemRoster.AddToCounts(l.El, l.N); pcs += l.N; Measure174b.NoteArrival(o.Market, l.El.Item, l.N, Measure174b.ArrGarrison); }   // 174b.0 M1 (tylko licznik)
             _dBack++; _dBackPieces += pcs;
             if (!refund) return;
             var leader = o.PayerClan != null && !o.PayerClan.IsEliminated ? o.PayerClan.Leader : null;

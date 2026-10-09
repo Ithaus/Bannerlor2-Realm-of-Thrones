@@ -410,6 +410,20 @@ namespace Armoury
                 return sb.ToString();
             }
             private static string Pct(long need, long lack) { return need > 0 ? (100 * (need - lack) / need) + "%" : "-"; }
+
+            /// <summary>174b.0 (krytyka P6): odsetek ludzi z czymkolwiek na tulowiu (dowolny szczebel) i z korpusem szczebla - ulamki bez zaokraglenia (-1 = brak ludzi).</summary>
+            internal double AnyBodyShare { get { return AnyNeed[0] > 0 ? (double)AnyHave[0] / AnyNeed[0] : -1.0; } }
+            internal double BodyShare { get { return Need[0] > 0 ? (double)(Need[0] - Lack[0]) / Need[0] : -1.0; } }
+        }
+
+        /// <summary>174b.0: srednia partii i zalog wazona liczba ludzi (wzor "razem" progu P6 w docs/PROJEKT-174B rozdz. 6).</summary>
+        private static string Together(Cov a, Cov b, bool any)
+        {
+            double sa = any ? a.AnyBodyShare : a.BodyShare, sb = any ? b.AnyBodyShare : b.BodyShare;
+            double w = 0, v = 0;
+            if (sa >= 0 && a.Men > 0) { w += a.Men; v += sa * a.Men; }
+            if (sb >= 0 && b.Men > 0) { w += b.Men; v += sb * b.Men; }
+            return w > 0 ? (100.0 * v / w).ToString("0.0", CultureInfo.InvariantCulture) + "%" : "-";
         }
 
         /// <summary>Linia "Pokrycie zbrojowni AI (171)" - pelny przeglad partii rodow AI i zalog AI (tylko log, raz na 5 dob).</summary>
@@ -444,7 +458,8 @@ namespace Armoury
             sw.Stop();
             Log.Info("Pokrycie zbrojowni AI (171): dzien " + today + " - " + lords.Text("partie rodow AI") + "; " + gar.Text("zalogi AI") + "; zamki z pokryciem glownej broni < 50%: "
                      + castlesLow + " z " + castles + "; brakuje razem " + (lords.LackAll + gar.LackAll) + " szt. (korpus " + (lords.LackBody + gar.LackBody) + ", bron "
-                     + (lords.LackWeapon + gar.LackWeapon) + "); w drodze do zamkow " + GarrisonCarts.InTransitPieces() + " szt.; czas przegladu " + sw.ElapsedMilliseconds + " ms.");
+                     + (lords.LackWeapon + gar.LackWeapon) + "); w drodze do zamkow " + GarrisonCarts.InTransitPieces() + " szt.; razem (partie i zalogi wazone liczba ludzi): cokolwiek na tulowiu "
+                     + Together(lords, gar, true) + ", korpus szczebla " + Together(lords, gar, false) + "; czas przegladu " + sw.ElapsedMilliseconds + " ms.");
         }
     }
 }

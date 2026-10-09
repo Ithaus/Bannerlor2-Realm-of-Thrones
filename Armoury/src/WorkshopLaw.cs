@@ -315,6 +315,7 @@ namespace Armoury
                     MoneyLedger.Note(MoneyLedger.NShop, workshop.Settlement, -rev);
                     shelf.AddToCounts(new EquipmentElement(w.Item, mod, null, false), 1);
                     CampaignEventDispatcher.Instance.OnItemProduced(w.Item, workshop.Settlement, 1);
+                    Measure174b.NoteArrival(workshop.Settlement, w.Item, 1, Measure174b.ArrWorkshop);   // 174b.0 M1: nowa sztuka na polce (tylko licznik)
                     any = true;
                     int cost = w.MatCost + wagesI;
                     _made++; _dayRevenue += rev; _dayCost += cost; Note(w.Item, rev, cost);
