@@ -912,3 +912,6 @@ po wojnie splaca z lupu i okupow i zwalnia nadwyzke; w pokoju wojsko wedlug doch
 **DECYZJA JEFFA 09.10 ok. 10:50 (wielcy jency):** "pasuje" -> pojmanego KROLA albo NASTEPCE TRONU przejmuje korona zdobywcy (caly okup do skarbca korony), zdobywca dostaje
 od razu nagrode ok. 1/10 okupu ze skarbca korony; wszyscy inni jency (takze wodz armii spoza rodu krolewskiego): okup dla zdobywcy, korona 1/9. Jedna regula dla gracza i AI
 (gracz oddaje pojmanego krola swojemu krolowi i dostaje nagrode).
+**DECYZJE JEFFA 09.10 ok. 11:05 (pytania projektu etapu 2):** (1) podloga 30 ludzi w druzynie (przy niezaplaconym zoldzie) takze dla gracza - TAK (jedna regula); (2) pulap dlugu
+z okupow = rok dochodu rodu, kolejny okup ponad pulap mniejszy - TAK; (3) okup za KROLA placi SKARBIEC KROLESTWA (b), jak w historii (Ryszard I - podatek z calej Anglii), wiekszy
+(ok. 2-2.5 mln zl u duzego krolestwa) - wpisac do projektu etapu 2 (krok dlugi i okupy).
