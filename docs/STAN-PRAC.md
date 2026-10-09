@@ -757,3 +757,6 @@ gotowka z nadwyzki, reszta na raty) + PRAWO TRZECICH - TAK (korona, ktora placi 
 (4) ODBUDOWA SPALONEJ WIOSKI: 1 ROK (nie 2-3) - dotyczy wiosek pobocznych (kazda ma swoich ludzi i swoja czesc plonu okregu) i glownej -> do 108/113.
 Wczesniej tej nocy: suwak reparacji Diplomacy 10 (tak), karawany bez strzal ("nie"), tempo swiata ksiazkowe po naprawach ekonomii ("tak"), skrypt BEE ("tak" - nalozony).
 Audyt w PDF: docs/audyt-2026-10-09/AUDYT-SWIATA-2026-10-09-SKROT.pdf (39 str.) i -PELNY.pdf (126 str.).
+**DECYZJE JEFFA 09.10 (KIESA LUDU, paczka 173):** (A) glod ma skutki - TAK (tydzien bez stac na jedzenie -> spada zadowolenie BK, za nim dobrobyt; nie w pierwszych
+120 dniach kampanii; osobny wylacznik); (B) dziesiecina dla septow - TAK (5% utargu wsi, 1-3% dochodu ludzi; polowa jalmuzna, polowa budowa septow);
+(C) ok. 5% mniej wojska AI - Jeff pyta "czemu?" (wyjasnione w czacie; czeka na decyzje).
