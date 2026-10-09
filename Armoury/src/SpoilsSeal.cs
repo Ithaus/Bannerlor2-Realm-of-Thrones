@@ -82,6 +82,15 @@ namespace Armoury
     ///     jednego z 7 ekranow (rozpoznany po funkcji zamkniecia ekranu i po referencji listy), cala lewa strona wraca do taboru - funkcje
     ///     Spoils dostaja pusta liste i nic nie robia. War stockpile i trofea poza lista celowo (tam Cancel niczego nie oddaje).
     ///     Uzbrojenie dowodcy bez partii (Spoils: rzeczy przepadaly) -> prefiks: rzeczy wracaja do taboru.
+    /// 13. DONE BEZ PYTANIA O WYRZUCANIE TAM, GDZIE NIC NIE GINIE (wylacznik DonationXpOff - skutek uboczny Z1): gra (SPInventoryVM.HandleDone)
+    ///     pyta "You are discarding items. Are you sure?" przy Done na kazdym ekranie w trybie Default z rzeczami po lewej, gdy XP z oddania
+    ///     = 0 (XpGainFromDonations rosnie tylko przy przekladaniu broni / zbroi w lewo z perkiem; po Z1 zawsze 0). Spoils otwiera 11 ekranow
+    ///     w tym trybie; na 4 lewa strona to zrodlo, ktore zostaje: magazyn wojenny (QuartermasterBehavior.OnStockpileScreenClosed zapisuje
+    ///     lewa strone z powrotem do magazynu), trofea, tabor wroga i pozostalosci pola (lista zostaje w LootCollectionBehavior - "Inspect
+    ///     trophies" / "Take supplies" otwiera ja znowu; to, co zostanie przy "Leave", menu opisuje osobno). Tam nic sie nie wyrzuca, a pytanie
+    ///     widzial dotad kazdy gracz bez perku i gracz z perkiem, ktory nic w lewo nie wlozyl. -> transpiler na HandleDone: liczba rzeczy po
+    ///     lewej (InventoryLogic.GetElementCountOnSide) przez bramke - na tych 4 ekranach 0, wiec Done zamyka bez pytania. Na 7 ekranach "take
+    ///     back" (rzeczy po lewej naprawde odchodza), w zwyklym ekwipunku i na ekranach innych modow pytanie zostaje.
     /// Martwe w 1.8.4: zloto pozostalosci pola (BattlefieldRemnantsTemporarilyDisabled = true; i tak bralo z monet z cial).
     /// Bez zmian (to nie zloto z niczego): najem kwatermistrza, zalozenie / odnowienie / nowe druzyny klanu (zloto gracza
     /// czesciowo do nikad - ujscie), dary dla zalogi / milicji / zywnosc dla miasta (towar na wskazniki miasta), dzienny dochod
@@ -1350,6 +1359,76 @@ namespace Armoury
             catch (Exception e) { Stumble("SpoilsSeal.EquipLeader", e); }
         }
 
+        // ------------------------------------------------------------ 13. Done bez pytania o wyrzucanie tam, gdzie nic nie ginie (DonationXpOff)
+
+        private static readonly Dictionary<string, KeepScreen> _kept = new Dictionary<string, KeepScreen>();   // "Typ.FunkcjaZamkniecia" -> ekran z trwala lewa strona
+        private static MethodInfo _mCountOnSide;   // InventoryLogic.GetElementCountOnSide
+
+        /// <summary>Ekran Spoils z trwala lewa strona (magazyn wojenny, trofea, tabor wroga, pozostalosci pola), na ktorym jest ten InventoryLogic -
+        /// nazwa do logu; inaczej null. Rozpoznanie jak w CancelPostfix: funkcja zamkniecia ekranu (InventoryState.DoneLogicExtrasDelegate) i referencja
+        /// listy lewej strony - cudzy ekran z ta sama funkcja, ale inna lista, nie przejdzie.</summary>
+        private static string KeptLeftScreen(InventoryLogic logic)
+        {
+            if (logic == null || _fInvRosters == null || _kept.Count == 0) return null;
+            var gsm = Game.Current != null ? Game.Current.GameStateManager : null;
+            var state = gsm != null ? gsm.ActiveState as InventoryState : null;
+            if (state == null || state.InventoryLogic != logic) return null;
+            var d = state.DoneLogicExtrasDelegate;
+            if (d == null || d.Target == null || d.Method == null || d.Method.DeclaringType == null) return null;
+            KeepScreen ks;
+            if (!_kept.TryGetValue(d.Method.DeclaringType.FullName + "." + d.Method.Name, out ks)) return null;
+            var rosters = _fInvRosters.GetValue(logic) as ItemRoster[];
+            if (rosters == null || rosters.Length < 1 || rosters[0] == null) return null;
+            return ReferenceEquals(ks.List.GetValue(d.Target), rosters[0]) ? ks.Name : null;
+        }
+
+        /// <summary>Wstawiane przez transpiler w SPInventoryVM.HandleDone w miejsce InventoryLogic.GetElementCountOnSide(OtherInventory) - liczby rzeczy
+        /// po lewej, od ktorej gra pyta "You are discarding items. Are you sure?" (tylko tryb Default i XP z oddania = 0). Na ekranie Spoils z trwala
+        /// lewa strona 0 - Done zamyka bez pytania (nic nie ginie). Wszedzie indziej i przy wylaczonym DonationXpOff - liczba z gry.</summary>
+        public static int DiscardAskCount(InventoryLogic logic, InventoryLogic.InventorySide side)
+        {
+            int n = logic.GetElementCountOnSide(side);   // oryginal (logic == null - wyjatek jak w grze)
+            try
+            {
+                if (n <= 0 || side != InventoryLogic.InventorySide.OtherInventory || !DonationXpLaw.On) return n;
+                string name = KeptLeftScreen(logic);
+                if (name == null) return n;
+                Log.Info("SpoilsSeal: Done na ekranie Spoils \"" + name + "\" bez pytania \"You are discarding items\" - " + n
+                         + " rodzajow po lewej zostaje w zrodle, nic nie ginie (Donation Xp Off).");
+                return 0;
+            }
+            catch (Exception e) { Stumble("SpoilsSeal.DiscardAsk", e); return n; }
+        }
+
+        public static IEnumerable<CodeInstruction> DiscardAskTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            var gate = AccessTools.Method(typeof(SpoilsSeal), nameof(DiscardAskCount));
+            foreach (var c in instructions)
+            {
+                if (gate != null && IsCall(c, _mCountOnSide)) { c.opcode = OpCodes.Call; c.operand = gate; _tpCount++; }   // stos: InventoryLogic, strona - ten sam
+                yield return c;
+            }
+        }
+
+        /// <summary>Ekrany Spoils { typ zachowania, funkcja zamkniecia, pole listy lewej strony, nazwa } -> slownik "Typ.FunkcjaZamkniecia";
+        /// nierozpoznane do listy brakow (12: Cancel, 13: Done bez pytania).</summary>
+        private static void LoadScreens(string[][] screens, Dictionary<string, KeepScreen> into, List<string> missing, string what)
+        {
+            into.Clear();
+            foreach (var sc in screens)
+            {
+                try
+                {
+                    var t = Find("RealisticLoot.Behaviors." + sc[0]);
+                    var close = t != null ? AccessTools.Method(t, sc[1]) : null;
+                    var list = t != null ? AccessTools.Field(t, sc[2]) : null;
+                    if (close == null || list == null || list.IsStatic || list.FieldType != typeof(ItemRoster)) { missing.Add(sc[3]); continue; }
+                    into[close.DeclaringType.FullName + "." + close.Name] = new KeepScreen { List = list, Name = sc[3] };
+                }
+                catch (Exception e) { Log.Error("SpoilsSeal: ekran " + what + " " + sc[3], e); missing.Add(sc[3] + " (wyjatek)"); }
+            }
+        }
+
         // ------------------------------------------------------------ wpiecie
 
         private static Type Find(string name) { return QuartermasterLaw.FindType(name); }
@@ -1550,7 +1629,6 @@ namespace Armoury
                 try
                 {
                     // 12. Cancel nic nie oddaje (Z5b) i rzeczy dowodcy bez partii wracaja (Z5) - SpoilsCancelKeeps
-                    _keep.Clear();
                     var screens = new[]
                     {
                         new[] { "QuartermasterBehavior", "OnGarrisonScreenClosed", "_garrisonScreenRoster", "Equip garrison" },
@@ -1562,18 +1640,7 @@ namespace Armoury
                         new[] { "DonateEquipmentBehavior", "OnDonateScreenClosed", "_donateScreenRoster", "Donate to town" },
                     };
                     var keepMissing = new List<string>();
-                    foreach (var sc in screens)
-                    {
-                        try
-                        {
-                            var t = Find("RealisticLoot.Behaviors." + sc[0]);
-                            var close = t != null ? AccessTools.Method(t, sc[1]) : null;
-                            var list = t != null ? AccessTools.Field(t, sc[2]) : null;
-                            if (close == null || list == null || list.IsStatic || list.FieldType != typeof(ItemRoster)) { keepMissing.Add(sc[3]); continue; }
-                            _keep[close.DeclaringType.FullName + "." + close.Name] = new KeepScreen { List = list, Name = sc[3] };
-                        }
-                        catch (Exception e) { Log.Error("SpoilsSeal: ekran Cancel " + sc[3], e); keepMissing.Add(sc[3] + " (wyjatek)"); }
-                    }
+                    LoadScreens(screens, _keep, keepMissing, "Cancel");
                     _fInvRosters = AccessTools.Field(typeof(InventoryLogic), "_rosters");
                     Wire(h, typeof(InventoryLogic), "Reset", null, "CancelPostfix", "Cancel nic nie oddaje (ekranow " + _keep.Count + "/7)", _keep.Count > 0 && _fInvRosters != null);
                     if (keepMissing.Count > 0) _missing.Add("Cancel - nierozpoznane ekrany: " + string.Join(", ", keepMissing.ToArray()));
@@ -1590,13 +1657,34 @@ namespace Armoury
                 }
                 catch (Exception e) { Log.Error("SpoilsSeal.ApplyAll (12)", e); _missing.Add("12: wyjatek przy wpinaniu - patrz blad wyzej"); }
 
+                try
+                {
+                    // 13. Done bez pytania "You are discarding items" na ekranach Spoils z trwala lewa strona (DonationXpOff - skutek uboczny Z1)
+                    var kept = new[]
+                    {
+                        new[] { "QuartermasterBehavior", "OnStockpileScreenClosed", "_stockpileScreenRoster", "War stockpile" },
+                        new[] { "LootCollectionBehavior", "OnLootScreenClosed", "_lootScreenRoster", "Inspect trophies" },
+                        new[] { "LootCollectionBehavior", "OnBaggageLootScreenClosed", "_baggageScreenRoster", "Enemy baggage train" },
+                        new[] { "LootCollectionBehavior", "OnRemnantLootScreenClosed", "_remnantLootRoster", "Battlefield remnants" },
+                    };
+                    var keptMissing = new List<string>();
+                    LoadScreens(kept, _kept, keptMissing, "Done");
+                    if (_fInvRosters == null) _fInvRosters = AccessTools.Field(typeof(InventoryLogic), "_rosters");
+                    _mCountOnSide = AccessTools.Method(typeof(InventoryLogic), "GetElementCountOnSide", new[] { typeof(InventoryLogic.InventorySide) });
+                    WireT(h, typeof(TaleWorlds.CampaignSystem.ViewModelCollection.Inventory.SPInventoryVM), "HandleDone", nameof(DiscardAskTranspiler),
+                          "Done bez pytania o wyrzucanie (ekranow " + _kept.Count + "/" + kept.Length + ")", _kept.Count > 0 && _fInvRosters != null && _mCountOnSide != null);
+                    if (keptMissing.Count > 0) _missing.Add("Done bez pytania - nierozpoznane ekrany: " + string.Join(", ", keptMissing.ToArray()));
+                }
+                catch (Exception e) { Log.Error("SpoilsSeal.ApplyAll (13)", e); _missing.Add("13: wyjatek przy wpinaniu - patrz blad wyzej"); }
+
                 string ver = "?";
                 try { var sm = Find("RealisticLoot.RealisticLootSubModule"); var f = sm != null ? sm.GetField("Version") : null; if (f != null) ver = f.GetRawConstantValue() as string; } catch { }
                 Log.Info("SpoilsSeal: Spoils of War (RealisticLoot " + ver + ") - wpiete: " + string.Join(", ", _wired.ToArray())
                          + (_missing.Count > 0 ? " | BRAK (te sciezki Spoils BEZ ZMIAN - sprawdzic dekompilacje): " + string.Join(", ", _missing.ToArray()) : " | wszystkie sciezki wpiete")
                          + " - sprzedaz automatyczna magazynu wojennego blokowana wedle wlacznika Spoils No Auto Sale, reszta zlota z niczego wedle Spoils No Free Gold,"
                          + " naprawa u kwatermistrza przez kowali miasta z materialem z targu wedle Spoils Quartermaster Repair,"
-                         + " XP za oddany sprzet (dowodca, resztki, dary, napisy) wedle Donation Xp Off, Cancel na ekranach \"take back\" wedle Spoils Cancel Keeps"
+                         + " XP za oddany sprzet (dowodca, resztki, dary, napisy) i Done bez pytania o wyrzucanie na ekranach z trwala lewa strona wedle Donation Xp Off,"
+                         + " Cancel na ekranach \"take back\" wedle Spoils Cancel Keeps"
                          + " (wszystkie domyslnie wlaczone; reszta Spoils bez zmian); liczby - linie dnia \"Spoils of War (128)\" i \"Spoils - naprawa u kwatermistrza\".");
             }
             catch (Exception e) { Log.Error("SpoilsSeal.ApplyAll", e); }

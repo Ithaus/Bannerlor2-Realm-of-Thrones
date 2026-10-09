@@ -21,7 +21,8 @@ namespace Armoury
     ///    Druga polowa perkow (clo gubernatora, pensje towarzyszy) zostaje. Opisy perkow bez zmian - nowe dzialanie to pytanie (a) do Jeffa.
     ///    QuartermasterLaw.XpDonationsPostfix (zbrojownia DTE) staje sie zbedny - zostaje, nic nie psuje.
     ///    Skutek uboczny w grze (SPInventoryVM.HandleDone): przy XP = 0 gra pyta "You are discarding items. Are you sure?" przy Done na ekranie
-    ///    w trybie Default z rzeczami po lewej - tak jak gracza bez perku (takze na War stockpile i trofeach, gdzie nic sie nie wyrzuca).
+    ///    w trybie Default z rzeczami po lewej - tak jak gracza bez perku. Na ekranach Spoils z trwala lewa strona (War stockpile, trofea, tabor
+    ///    wroga, pozostalosci pola), gdzie nic sie nie wyrzuca, pytanie zdejmuje SpoilsSeal 13 (ten sam wylacznik); gdzie rzeczy odchodza - zostaje.
     /// 2. Handel BK (BKTradeGoodsFixesBehavior.OnProfitMade): XP Handlu za "sprzedane" = roznica taboru wzgledem migawki BK zrobionej TYLKO po
     ///    kliknieciu targu miasta. Wszystko, co ubylo z taboru inaczej niz sprzedaza, uczylo handlu jak sprzedaz: (a) po targu - zbrojownia DTE,
     ///    magazyn i dary Spoils, zjedzone jedzenie, zuzyte strzaly (przy nastepnym handlu we wsi albo w zamku BK, a prawdziwa sprzedaz z targu
