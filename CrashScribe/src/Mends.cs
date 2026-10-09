@@ -48,8 +48,9 @@ namespace CrashScribe
 
         /// <summary>Bialy Wedrowiec albo Nocny Krol - NIE zwykly wight.
         /// Wedrowcy to jednostki whitewalker2/3/4 i szablon ROTuniqueleader_whitewalker;
-        /// NK w bitwie to bohater kultury whitewalker (tak samo bohater-Other gracza).</summary>
-        private static bool WalkerBlood(BasicCharacterObject c)
+        /// NK w bitwie to bohater kultury whitewalker (tak samo bohater-Other gracza).
+        /// 175c: takze OthersSteel (liczniki bitew z Innymi) - stad internal.</summary>
+        internal static bool WalkerBlood(BasicCharacterObject c)
         {
             try
             {
@@ -74,6 +75,11 @@ namespace CrashScribe
         /// narzedzie). Piesc, kopyto konia i upadek NIE przebijaja lodu: tier 0.
         /// Bron T6+ bije normalnie; reszta zadaje 15% (min 1). PULAPKA TIEROW:
         /// ItemTiers.Tier1 == 0, wiec wyswietlany tier = (int)Tier + 1.
+        /// 175c (Jeff 09.10 ok. 07:45, "jak w ksiazkach"): pelne obrazenia tylko stal
+        /// valyrianska, smocze szklo i ogien smoka; t6 (stal zamkowa) OthersCastleSteelPercent
+        /// (dom. 50), reszta 15% - klasa ciosu i liczniki w OthersSteel. Wylacznik
+        /// OthersSteelRule = stara zasada wyzej. Ogien jezdzca smoka (cios ROT bez broni,
+        /// atakujacy = czlowiek) dotad wpadal w 15% - teraz pelne w obu trybach.
         /// </summary>
         public static void ValyrianWard(TaleWorlds.MountAndBlade.Agent __instance,
                                         ref TaleWorlds.MountAndBlade.Blow blow)
@@ -84,45 +90,14 @@ namespace CrashScribe
                 var v = __instance;
                 if (v == null || !v.IsHuman || !WalkerBlood(v.Character)) return;
 
-                int tier = 0;                                    // gole rece / kopyto = zadna stal
-                var rec = blow.WeaponRecord;
                 var mission = TaleWorlds.MountAndBlade.Mission.Current;
+                OthersSteel.MissionCheck(mission);               // raz na misje: suwaki z Armoury, kubelek licznikow pola
                 var att = mission != null ? mission.FindAgentWithIndex(blow.OwnerId) : null;
-                // SMOCZY OGIEN pali Innych pelnia takze w polu (Jeff 31.08) -
-                // cios od agenta-smoka nie podlega cieciu T6
-                if (att != null && !att.IsHuman)
-                {
-                    try
-                    {
-                        var mu = att.Monster != null ? (att.Monster.MonsterUsage ?? "") : "";
-                        if (mu.IndexOf("dragon", StringComparison.OrdinalIgnoreCase) >= 0) return;
-                    }
-                    catch { }
-                }
-                if (rec.HasWeapon() && att != null)
-                {
-                    ItemObject it = null;
-                    if (!rec.IsMissile)
-                    {
-                        int slot = rec.AffectorWeaponSlotOrMissileIndex;
-                        if (slot >= 0 && slot < 5)
-                        {
-                            var mw = att.Equipment[(EquipmentIndex)slot];
-                            if (!mw.IsEmpty) it = mw.Item;
-                        }
-                    }
-                    else
-                    {
-                        var mw = att.WieldedWeapon;
-                        if (!mw.IsEmpty) it = mw.Item;
-                    }
-                    if (it != null) tier = (int)it.Tier + 1;
-                }
-                if (tier >= 6) return;                           // rownowaznik valyrianskiej stali
-
-                int cut = blow.InflictedDamage * 15 / 100;
-                if (cut < 1) cut = 1;
-                blow.InflictedDamage = cut;
+                int k = OthersSteel.FieldClass(att, blow.WeaponRecord, mission);
+                int pre = blow.InflictedDamage;
+                int post = OthersSteel.Apply(k, pre);
+                blow.InflictedDamage = post;
+                OthersSteel.CountField(k, pre, post, v);
             }
             catch { }                                            // per-cios: zadnego raportowania
         }
@@ -1751,19 +1726,24 @@ namespace CrashScribe
         /// Cios jednostki bez broni T6+ w Wedrowca/Nocnego Krola tnie sie do
         /// 15% jak w polu. Smoki celowo NIE sa ciete: ROT nadpisuje ich wynik
         /// PO nas (DragonDamageScaling) - smoczy ogien pali Innych, jak w lore.
+        /// 175c: klasa trafienia z OthersSteel.SimClass (bohater - jego zestaw bojowy,
+        /// zolnierz - migawka 175 i PreTierBest bez zmiany definicji); smok liczony jako
+        /// ogien i nie ciety (ROT i tak nadpisuje); __5 = MapEvent (liczniki bitwy).
         /// </summary>
-        public static void ValyrianWardSim(CharacterObject __0, CharacterObject __1, ref ExplainedNumber __result)
+        public static void ValyrianWardSim(CharacterObject __0, CharacterObject __1, ref ExplainedNumber __result,
+                                           TaleWorlds.CampaignSystem.MapEvents.MapEvent __5)
         {
             try
             {
-                if (__result.ResultNumber <= 1f) return;
+                float pre = __result.ResultNumber;
+                if (pre <= 1f) return;
                 if (!WalkerBlood(__1)) return;                   // __1 = trafiany
                 // 175: tier z MIGAWKI wzorca sprzed zamiany sprzetu wedlug tieru (Army175.PreTierBest) -
-                // walka z Innymi zostaje dokladnie jak przed 175 (projekt 1.7 [a2], 1.9)
-                if (Army175.PreTierBest(__0) >= 6) return;       // __0 = bijacy
-                float cut = __result.ResultNumber * 0.15f;
-                if (cut < 1f) cut = 1f;
-                __result = new ExplainedNumber(cut);
+                // 175 nie zmienia walki z Innymi (projekt 1.7 [a2], 1.9); 175c zmienia tylko, ile bije t6
+                int k = OthersSteel.SimClass(__0);               // __0 = bijacy
+                float post = OthersSteel.ApplyF(k, pre);
+                if (post != pre) __result = new ExplainedNumber(post);
+                OthersSteel.CountSim(__5, k, pre, post, __1);
             }
             catch { }
         }
@@ -2618,16 +2598,17 @@ namespace CrashScribe
 
             try
             {
-                // ===== VALYRIANSKA ZASADA T6 =====
-                // Bron ponizej T6 ledwie drasnie Wedrowca i Nocnego Krola
-                // (patrz ValyrianWard). Zwykle wighty padaja od wszystkiego.
+                // ===== VALYRIANSKA ZASADA T6 (od 175c: ZASADA STALI INNYCH) =====
+                // Pelne obrazenia Wedrowcom i Nocnemu Krolowi tylko stal valyrianska,
+                // smocze szklo i ogien smoka; t6 OthersCastleSteelPercent, reszta 15%
+                // (patrz ValyrianWard, OthersSteel). Zwykle wighty padaja od wszystkiego.
                 var mBlow = AccessTools.Method(typeof(TaleWorlds.MountAndBlade.Agent), "RegisterBlow");
                 if (mBlow != null)
                 {
                     harmony.Patch(mBlow, prefix: new HarmonyMethod(typeof(Mends), "ValyrianWard") { priority = Priority.High });
-                    Scribe.Line("Mends: valyrianska zasada T6 - bron ponizej tieru 6 zadaje Bialym Wedrowcom i Nocnemu Krolowi 15% obrazen.");
+                    Scribe.Line("Mends: zasada stali Innych (175c) wpieta w Agent.RegisterBlow - Bialym Wedrowcom i Nocnemu Krolowi pelne obrazenia tylko stal valyrianska, smocze szklo i ogien smoka, t6 wedlug suwaka, reszta 15% (ustawienia i listy w linii przy starcie sesji).");
                 }
-                else Scribe.Line("Mends: Agent.RegisterBlow nieznaleziony - valyrianska zasada spi.");
+                else Scribe.Line("Mends: Agent.RegisterBlow nieznaleziony - zasada stali Innych spi.");
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.Install(valyrian)", null); } catch { } }
 
@@ -2647,9 +2628,9 @@ namespace CrashScribe
                 if (mSim != null)
                 {
                     harmony.Patch(mSim, postfix: new HarmonyMethod(typeof(Mends), "ValyrianWardSim") { priority = Priority.Last });
-                    Scribe.Line("Mends: valyrianska zasada T6 dziala tez w autokalkulacji bitew (symulacja tnie do 15% jak pole).");
+                    Scribe.Line("Mends: zasada stali Innych (175c) dziala tez w autokalkulacji bitew (SimulateHit: te same klasy co pole, liczniki per bitwa).");
                 }
-                else Scribe.Line("Mends: DefaultCombatSimulationModel.SimulateHit nieznaleziony - symulacja bez zasady T6.");
+                else Scribe.Line("Mends: DefaultCombatSimulationModel.SimulateHit nieznaleziony - symulacja bez zasady stali Innych.");
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.Install(valyrianSim)", null); } catch { } }
 
@@ -4697,9 +4678,12 @@ namespace CrashScribe
                 delegate (CampaignGameStarter s)
                 { Mends.ArmorSanity(); Mends.AmmoSanity(); Army175.TierGearCheck(); Mends.WeightLaw(); Mends.ArmorTierLaw(); Mends.WeaponTierLaw(); Mends.SkillSinew(); Army175.NorthHardy(); Army175.DothrakiRiders(); Army175.OldArmouries(); Mends.UniqueWares(); Mends.LoreForgeGate(); Mends.DressTheNamesakes(); Mends.NorthernFare(); Mends.ItemDump(); Mends.ReligionAudit(); Mends.RulerRobesAudit(); });
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this,
-                delegate (TaleWorlds.CampaignSystem.MapEvents.MapEvent m) { Mends.MeltDeadLoot(m); Mends.WardReport(); });
+                delegate (TaleWorlds.CampaignSystem.MapEvents.MapEvent m) { Mends.MeltDeadLoot(m); Mends.WardReport(); OthersSteel.OnMapEventEnded(m); });
+            // 175c: Wedrowcy obecni od poczatku bitwy (do linii "Inni (175c): bitwa")
+            CampaignEvents.MapEventStarted.AddNonSerializedListener(this,
+                delegate (TaleWorlds.CampaignSystem.MapEvents.MapEvent m, PartyBase a, PartyBase d) { OthersSteel.OnMapEventStarted(m); });
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this,
-                delegate (CampaignGameStarter s) { Mends.DragonPurge(true); Mends.MeltDeadArmory("po wczytaniu"); });
+                delegate (CampaignGameStarter s) { Mends.DragonPurge(true); Mends.MeltDeadArmory("po wczytaniu"); OthersSteel.OnSession(); });
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this,
                 delegate
                 {
@@ -4709,6 +4693,7 @@ namespace CrashScribe
                     if (Mends.SinewApplied) { Army175.NorthHardy(); Army175.DothrakiRiders(); Army175.OldArmouries(); }   // raz (znacznik), potem nic
                     Army175.PoolDaily();      // 175: stan postfiksu puli ROT (Dothrakowie), gdy cos sie dzialo
                     Army175.RespawnDaily();   // 175: partie lordow AI z szablonu (konni bez konia z odrodzenia)
+                    OthersSteel.Daily();      // 175c: suwaki zasady stali Innych, linia dobowa bitew z Innymi
                 });
             CampaignEvents.MobilePartyCreated.AddNonSerializedListener(this,
                 delegate (TaleWorlds.CampaignSystem.Party.MobileParty mp) { Army175.OnPartyCreated(mp); });

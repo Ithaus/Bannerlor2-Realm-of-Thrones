@@ -693,7 +693,8 @@ namespace CrashScribe
             _snapshotOk = sets > 0;
             _valyrianT6 = t6;
             Scribe.Line("Mends: sprzet wedlug tieru (175) - migawka valyrianska: " + t6 + " jednostek z bronia t6 we wzorcu sprzed zamiany (z " + units
-                        + " jednostek z zestawami bojowymi; zasada Innych w autobitwie bez zmian)"
+                        + " jednostek z zestawami bojowymi; zasada Innych w autobitwie liczy tier z tej migawki - 175 jej nie zmienia; "
+                        + OthersSteel.T6Text() + ")"
                         + (sets == 0 ? " - zestawy jeszcze puste, migawka powtorzona przed zamiana" : "") + ".");
         }
 
@@ -746,6 +747,19 @@ namespace CrashScribe
             }
             catch { }
             return Mends.BestWeaponTier(c);
+        }
+
+        /// <summary>175c: bron z migawki (sloty 0-3 bez tarcz) sprzed zamiany - OthersSteel.SimClass szuka w niej stali valyrianskiej
+        /// i smoczego szkla (tier dalej z PreTierBest). null = brak wpisu (bohater, nowa postac) - wzorzec na zywo.</summary>
+        internal static ItemObject[] PreWeapons(CharacterObject c)
+        {
+            try
+            {
+                ItemObject[] l;
+                if (c != null && _preWeapons != null && _preWeapons.TryGetValue(c, out l)) return l;
+            }
+            catch { }
+            return null;
         }
 
         // ---------------- [b0] najprostszy oszczep tier 2 (175b) ----------------
@@ -1107,7 +1121,7 @@ namespace CrashScribe
                         + (over > 0 ? " (" + sample + ")" : "")
                         + "; zamienionych na zapas, choc po rozsadku by sie miescily (q, pierwszy przebieg): " + (q >= 0 ? q.ToString() : "n/d")
                         + "; kluczy bez zamiennika: " + (noReplFirst >= 0 ? "pierwszy przebieg " + noReplFirst + ", " : "") + "teraz " + (_noRepl != null ? _noRepl.Count : 0)
-                        + "; migawka valyrianska po rozsadku: " + vPost + " jednostek z bronia t6 (tak liczy ValyrianWardSim; dzis ok. 223)"
+                        + "; migawka valyrianska po rozsadku: " + vPost + " jednostek z bronia t6 (tak liczy ValyrianWardSim; dzis ok. 223; " + OthersSteel.T6Text() + ")"
                         + "; bohaterowie z nowym rosterem " + heroesNew + (hex.Count > 0 ? " (np. " + string.Join(", ", hex.ToArray()) + ")" : "")
                         + " (tylko wzorzec po InitializeHeroBasicCharacterOnAfterLoad, nie ich ekwipunek); nowych rosterow w sesji " + _rostersInstalled
                         + "; lista Essos: " + EssosCheck() + ".");
