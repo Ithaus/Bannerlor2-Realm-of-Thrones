@@ -2124,6 +2124,18 @@ namespace Armoury
         [SettingPropertyGroup("Iron bank")]
         public bool PrisonerLawEnabled { get; set; } = true;
 
+        [SettingPropertyBool("Player Ransom To Captor", HintText = "the ransom you pay from the captivity menu goes to your captor: the leader of the party that holds you, the head of its house if it has no leader, a bandit gang's hideout purse, or the lord of the town or castle whose dungeon holds you (failing them the head of the captor's house, then the purse of the nearest town) - off = the game's way, the money simply disappears")]
+        [SettingPropertyGroup("Iron bank")]
+        public bool PlayerRansomToCaptor { get; set; } = true;
+
+        [SettingPropertyBool("Ransom Courier No Top Up", HintText = "when you accept a courier's ransom offer for a prisoner you hold, the paying house pays out of its own purse - the game no longer hands it the missing gold out of nothing; if it cannot raise the price the offer lapses and the prisoner stays with you (off = the game tops the payer up)")]
+        [SettingPropertyGroup("Iron bank")]
+        public bool RansomCourierNoTopUp { get; set; } = true;
+
+        [SettingPropertyBool("Ransom Harness In Autotest", HintText = "during the automatic test only: check the ransom rules once without putting you in captivity - a small real ransom from your purse to an AI lord on the 5th day of the session, the courier rules on the 8th - log only, does nothing outside the automatic test")]
+        [SettingPropertyGroup("Iron bank")]
+        public bool RansomHarnessInAutotest { get; set; } = true;
+
         [SettingPropertyFloatingInteger("Outlaw Band Routed Share", 0.00f, 2.00f, "0.00", HintText = "share of outlaws fleeing a lost fight who go back to the woods; the rest - mostly villagers driven out by want - go home to the villages")]
         [SettingPropertyGroup("Iron bank")]
         public float OutlawBandRoutedShare { get; set; } = 0.5f;
@@ -3726,6 +3738,9 @@ namespace Armoury
             s.LoserCaptiveCommonPercent = LoserCaptiveCommonPercent;
             s.NonCombatantDeathPercent = NonCombatantDeathPercent;
             s.PrisonerLawEnabled = PrisonerLawEnabled;
+            s.PlayerRansomToCaptor = PlayerRansomToCaptor;
+            s.RansomCourierNoTopUp = RansomCourierNoTopUp;
+            s.RansomHarnessInAutotest = RansomHarnessInAutotest;
             s.OutlawBandRoutedShare = OutlawBandRoutedShare;
             s.OutlawRaidFleePercent = OutlawRaidFleePercent;
             s.OutlawHearthPerMan = OutlawHearthPerMan;

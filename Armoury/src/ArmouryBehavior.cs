@@ -1360,6 +1360,7 @@ namespace Armoury
             try { IronBank.Daily(); } catch (Exception e) { Log.Error("IronBank.Daily", e); }   // Bank Zelazny: pozyczki AI, raty, bankructwa
             try { ClanIncomeBook.Daily(); } catch (Exception e) { Log.Error("ClanIncomeBook.Daily", e); }   // paczka 169: D rodow, budzet i dlugi na sucho (tylko log) - po rentach, zwrocie, mennicy i Banku dnia
             try { Measure169c.Daily(); } catch (Exception e) { Log.Error("Measure169c.Daily", e); }         // 169c: linie pomiarow etapu 2 (tylko log) - po ksiedze rodow (D staly, wplyw doby), przed ksiega pieniadza
+            try { RansomFlows.Daily(); } catch (Exception e) { Log.Error("RansomFlows.Daily", e); }         // 2.14: linia "Okupy (2.14)" i harness niewoli w autotescie (doby sesji 5 i 8)
             // 171: zawrocony towar i nadwyzki zalog na polkach PRZED handlem kupcow (kupcy wywioza nadwyzke zamkow tego samego dnia)
             try { GarrisonCarts.Daily(); } catch (Exception e) { Log.Error("GarrisonCarts.Daily", e); }     // zamowienia zamkow w drodze: dostawy, zawrocenia, linia "Zaopatrzenie zamkow (171)"
             try { GarrisonArmory.Daily(); } catch (Exception e) { Log.Error("GarrisonArmory.Daily", e); }   // nadwyzki zalog raz w tygodniu, linia "Zbrojownie zalog (171): dzien"
