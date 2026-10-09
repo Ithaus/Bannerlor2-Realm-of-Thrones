@@ -173,6 +173,7 @@ namespace Armoury
                     // wiecej niz lord ma - ChangeHeroGold obcina kiese do 0, a kasy dostawaly pelne kwoty (zloto z niczego); robota najwyzej z reszty kiesy
                     labourI = Math.Min(labourI, Math.Max(0, lord.Gold - matSpent));
                     lord.ChangeHeroGold(-(matSpent + labourI));
+                    CirculationWindows.NoteHeroGold(lord, -(matSpent + labourI));   // paczka 169b: glowa poza swiatem - zloto weszlo do swiata (tylko licznik)
                     if (market != null && market.Town != null) market.Town.ChangeGold(matSpent);
                     st.Town.ChangeGold(labourI);                 // place murarzy, robotnikow, woznic - do kasy osady
                     float pts = PointsFor(matSpent, labourI, ppp, market);

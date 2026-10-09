@@ -44,6 +44,7 @@ namespace Armoury
         private static readonly long[] _tmRing = new long[28];    // reszta kas miast po nowym pomiarze (TM1) - cel 4.2 to tez srednia 28 dob
         private static int _tmHead, _tmFilled;
         private static readonly HashSet<string> _err169 = new HashSet<string>();
+        private static long _repGotSess, _repDebtSess, _tribPaidSess;   // 169b: odszkodowania Diplomacy i trybut od startu sesji (linia rodow)
 
         private static void Stumble169(string where, Exception e)
         {
@@ -59,6 +60,7 @@ namespace Armoury
                 Array.Clear(_restRing, 0, _restRing.Length); _restHead = 0; _restFilled = 0;
                 Array.Clear(_tmRing, 0, _tmRing.Length); _tmHead = 0; _tmFilled = 0;
                 _clanKingdom = null; _err169.Clear();
+                _repGotSess = _repDebtSess = _tribPaidSess = 0;
                 ClearDay169();
             }
             catch { }
@@ -88,10 +90,38 @@ namespace Armoury
             try { PopulationLaw.ZeroDay169(); } catch (Exception e) { Stumble169("ClearLast169(PopulationLaw)", e); }
         }
 
+        // ------------------------------------------------------------ 169b: RB wedlug odcinkow naszego ticku (granice: Mark renty, budowy, korona, paser band)
+        // Zloto swiata i pozycje nazwane w bloku na granicy modulow - RB rozbity na odcinki pokazuje, ktory modul gubi zloto bez nazwy.
+        // Koszt: 4 przeglady posiadaczy na dobe (migawka kas juz jest z Mark), tylko przy wlaczonej ksiedze obiegu.
+        private static readonly int[] SegMarks = { MRent, MBuild, MCrown, MFence };
+        private static readonly string[] SegName = { "renty", "budowy", "od budow do korony wlacznie", "od korony do pasera band", "po paserze (Bank, budzet rodow, handel bronia)" };
+        private static readonly long[] _segW = new long[4], _segN = new long[4];
+        private static readonly bool[] _segOk = new bool[4];
+        internal static long SegTicks;
+
+        private static void MarkWorld169(int kind, long[] snap)
+        {
+            try
+            {
+                if (_blockWorld0 == long.MinValue || snap == null || !CW.On) return;
+                int i = -1;
+                for (int k = 0; k < SegMarks.Length; k++) if (SegMarks[k] == kind) { i = k; break; }
+                if (i < 0 || _segOk[i]) return;
+                long t0 = Stopwatch.GetTimestamp();
+                var h = ReadHolders(snap);
+                long t = 0;
+                for (int k = 0; k < Holders; k++) t += h[k];
+                _segW[i] = t; _segN[i] = CW.BlockNamed; _segOk[i] = true;
+                SegTicks += Stopwatch.GetTimestamp() - t0;
+            }
+            catch (Exception e) { Stumble169("MarkWorld169", e); }
+        }
+
         /// <summary>D10: zloto swiata przy otwarciu naszego ticku (ta sama migawka kas co _blockSnap - jeden przeglad posiadaczy).</summary>
         private static void BlockWorld169()
         {
             _blockWorld0 = long.MinValue;
+            try { Array.Clear(_segOk, 0, _segOk.Length); SegTicks = 0; } catch { }
             try
             {
                 if (!CW.On || !_inBlock || _blockSnap == null) return;
@@ -180,7 +210,8 @@ namespace Armoury
         private static string Ms(long ticks) { return (ticks * 1000.0 / Stopwatch.Frequency).ToString("0.0", Inv); }
 
         private static readonly int[] InOrder = { CW.KNotableBand, CW.KNotableNew, CW.KNotableIncome, CW.KPrisonersParty, CW.KPrisonersFort, CW.KSiege,
-                                                  CW.KTournament, CW.KRaidCapture, CW.KShips, CW.KShipsOther, CW.KBattle };
+                                                  CW.KTournament, CW.KRaidCapture, CW.KShips, CW.KShipsOther, CW.KBattle,
+                                                  CW.KBkEstates, CW.KBeeEstateRent, CW.KBeePayout, CW.KReparations };   // 169b: majatki BK, BEE, odszkodowania
         private static readonly int[] OutOrder = { CW.KNotableBand, CW.KUpgrade, CW.KRecruitTavern, CW.KRecruitNotable, CW.KRecruitMap, CW.KShips, CW.KBattle };
         private static readonly int[] BeeKinds = { CW.KBeeContribute, CW.KBeeCamp, CW.KBeeInvest, CW.KBeeMarket };
         private static readonly int[] LordItems = { CW.ULordClaim, CW.ULordCreate, CW.ULordRevoke, CW.ULordUsurp, CW.ULordKnightClan, CW.ULordCourt, CW.ULordDilemma,
@@ -215,11 +246,14 @@ namespace Armoury
             long u8c = Sm[CW.UPartyCaravan], u8v = Sm[CW.UPartyVillager], u8b = Sm[CW.UPartyBandit], u8g = Sm[CW.UPartyGarrison], u8o = Sm[CW.UPartyOther];
             long u8 = u8c + u8v + u8b + u8g + u8o;
             long u9 = KingdomTreasury.LastCustomsTaken;
+            // 169b: karawany BetterEconomy - eskorta, awanse zalogi, straty na drogach (kasa karawany bez zdarzenia i bez odbiorcy)
+            long u10e = Sm[CW.UBeeEscort], u10p = Sm[CW.UBeePromote], u10d = Sm[CW.UBeeDanger], u10 = u10e + u10p + u10d;
             long n1 = Sm[CW.NMarketKasa] + Sm[CW.NMarketNotables], n2 = Sm[CW.NVillageMarketVillage] + Sm[CW.NVillageMarketTown];
             long n3 = Sm[CW.NWorkshopOutKasa] + Sm[CW.NWorkshopOutCap] + Sm[CW.NWorkshopInKasa] + Sm[CW.NWorkshopInCap];
             long n4 = Sm[CW.NBattleNoEvent], n5 = Sm[CW.NDeadTransfers], n6 = Sm[CW.NKingdomGone], n7 = Sm[CW.NWorkshopBuyCap];
-            long zs = z1 + z2 + z3 + z4 + z5, us = u1 + u2 + u3 + u4 + u5 + u6 + u7 + u8 + u9;
-            long sTot = s0 - k1 + zs, uTot = u0 + us, nTot = n1 + n2 + n3 + n4 + n5 + n6 + n7;
+            long n8 = Sm[CW.NReparations], n9 = Sm[CW.NBeeDeliver];   // 169b: odszkodowania Diplomacy (skarbce), dostawy kontraktow karawan BEE
+            long zs = z1 + z2 + z3 + z4 + z5, us = u1 + u2 + u3 + u4 + u5 + u6 + u7 + u8 + u9 + u10;
+            long sTot = s0 - k1 + zs, uTot = u0 + us, nTot = n1 + n2 + n3 + n4 + n5 + n6 + n7 + n8 + n9;
             long R = z - sTot + uTot - nTot;
             long ar1 = z - sTot + uTot - nTot - R, ar2 = (r0 - R) - (zs - us + nTot - k1);
             // reszta w naszym ticku (RB): dwa odczyty calego swiata wokol bloku minus pozycje nazwane w bloku (clo z licznika cel - w bloku)
@@ -227,6 +261,26 @@ namespace Armoury
             long holdSum = 0; for (int i = 0; i < Holders; i++) holdSum += now[i];
             long rb = haveRb ? (holdSum - _blockWorld0) - (CW.BlockNamed - u9) : 0;
             long rp = R - rb;
+            // 169b: RB wedlug odcinkow (granice Mark); odcinek bez granicy laczy sie z nastepnym; clo z licznika cel (u9) - w odcinku z korona
+            var segTxt = new StringBuilder(256); var segKeys = new StringBuilder(64);
+            long segSum = 0;
+            if (haveRb)
+            {
+                long pw = _blockWorld0, pn = 0; bool u9Done = false; string merged = null;
+                for (int i = 0; i <= SegMarks.Length; i++)
+                {
+                    bool atEnd = i == SegMarks.Length;
+                    if (!atEnd && !_segOk[i]) { merged = merged == null ? SegName[i] : merged + " + " + SegName[i]; segKeys.Append(" RB").Append(i + 1).Append("=-"); continue; }
+                    long w = atEnd ? holdSum : _segW[i], n = atEnd ? CW.BlockNamed : _segN[i];
+                    long seg = (w - pw) - (n - pn);
+                    if (!u9Done && i >= 2) { seg += u9; u9Done = true; }
+                    segSum += seg;
+                    if (segTxt.Length > 0) segTxt.Append(", ");
+                    segTxt.Append(merged != null ? merged + " + " : "").Append(SegName[i]).Append(' ').Append(S(seg));
+                    segKeys.Append(" RB").Append(i + 1).Append('=').Append(seg);
+                    merged = null; pw = w; pn = n;
+                }
+            }
             // pierscien reszty 28 dob
             _restRing[_restHead] = R; _restHead = (_restHead + 1) % _restRing.Length; if (_restFilled < _restRing.Length) _restFilled++;
             long ringSum = 0; for (int i = 0; i < _restFilled; i++) ringSum += _restRing[i];
@@ -279,16 +333,26 @@ namespace Armoury
               .Append(" - zloto przekazane przed smiercia; inni, w tym Disabled, ").Append(Sm[CW.IHeroesLeftOtherN]).Append(": ").Append(Sm[CW.IHeroesLeftOtherGold]).Append(')')
               .Append(", kiesy partii bez wodza, ktore zniknely z mapy ").Append(u8).Append(" (karawany ").Append(u8c).Append(", tabory ").Append(u8v).Append(", bandy ").Append(u8b)
               .Append(", garnizony ").Append(u8g).Append(", inne ").Append(u8o).Append(')')
-              .Append(", clo zdjete z licznika cel ").Append(u9).Append(" (cala kwota; skarbce dostaly ").Append(KingdomTreasury.LastCustoms).Append(" z kas miast - to przelew)");
+              .Append(", clo zdjete z licznika cel ").Append(u9).Append(" (cala kwota; skarbce dostaly ").Append(KingdomTreasury.LastCustoms).Append(" z kas miast - to przelew)")
+              .Append(", karawany BetterEconomy (kasa karawany bez odbiorcy) ").Append(CW.Wired[CW.WBeeEscort] || CW.Wired[CW.WBeeDanger] ? u10.ToString(Inv) : "-")
+              .Append(" (najem eskorty ").Append(u10e).Append(" w ").Append(Sm[CW.IBeeEscortN]).Append(" karawanach, awanse zalogi ").Append(u10p)
+              .Append(", straty na niebezpiecznych drogach ").Append(u10d).Append(" w ").Append(Sm[CW.IBeeDangerN]).Append(" karawanach)");
             // NETTO
             sb.Append(" | NETTO (zmiana swiata) ").Append(S(nTot)).Append(" [P]: BK rynek osady ").Append(WvS(n1, CW.WMarket)).Append(", BK rynek wsi ").Append(WvS(n2, CW.WVillageMarket))
               .Append(", warsztaty BK bez pokrycia w kasie ").Append(Wired2(n3, CW.WWorkshopOut, CW.WWorkshopIn))
               .Append(", bitwy - zloto partii bez wodza ").Append(WvS(n4, CW.WBattle))
-              .Append(", przelewy od i do bohaterow poza swiatem ").Append(S(n5))
+              .Append(", przelewy od i do bohaterow poza swiatem ").Append(S(n5)).Append(" (w tym nasze moduly bez zdarzenia - korona, Bank, budowy - ")
+              .Append(S(Sm[CW.IDeadDirect])).Append(" w ").Append(Sm[CW.IDeadDirectN]).Append(" przelewach)")
               .Append(", skarbce upadlych krolestw ").Append(WvS(n6, CW.WKingdomGone))
-              .Append(", warsztaty kupione przez lordow BK (kapital od nowa) ").Append(WvS(n7, CW.WLordBuy));
+              .Append(", warsztaty kupione przez lordow BK (kapital od nowa) ").Append(WvS(n7, CW.WLordBuy))
+              .Append(", odszkodowania wojenne Diplomacy - skarbce krolestw bez zdarzenia ").Append(WvS(n8, CW.WReparations))
+              .Append(" (do skarbcow odbiorcow +").Append(Sm[CW.IReparationsIn]).Append(", ze skarbcow placacych -").Append(Sm[CW.IReparationsOut])
+              .Append("; placacym dopisany dlug trybutu ").Append(Sm[CW.IReparationsDebt]).Append(" - rody splacaja go potem w rozliczeniach jako \"trybut zaplacony\")")
+              .Append(", dostawy kontraktow karawan BetterEconomy (zloto ze skarbcow BEE) ").Append(WvS(n9, CW.WBeeDeliver)).Append(" (").Append(Sm[CW.IBeeDeliverN]).Append(" dostaw)");
             // RESZTA
-            sb.Append(" | RESZTA ").Append(S(R)).Append(" [R] (w naszym ticku dobowym ").Append(haveRb ? S(rb) : "-").Append(", poza nim ").Append(haveRb ? S(rp) : "-")
+            sb.Append(" | RESZTA ").Append(S(R)).Append(" [R] (w naszym ticku dobowym ").Append(haveRb ? S(rb) : "-")
+              .Append(segTxt.Length > 0 ? " - wedlug odcinkow: " + segTxt.ToString() : "")
+              .Append(", poza nim ").Append(haveRb ? S(rp) : "-")
               .Append("); bez nowego pomiaru byloby ").Append(S(r0)).Append("; srednia 28 dob ").Append(S(avg)).Append(_restFilled < _restRing.Length ? " (z " + _restFilled + " dob)" : "")
               .Append(" - prog 10000: ").Append(Math.Abs(avg) < 10000 ? "OK" : "PONAD");
             // nazwy z kodu (dla nas, nie dla gracza) - przed kontrola
@@ -299,8 +363,10 @@ namespace Armoury
               .Append(" S0=").Append(s0).Append(" U0=").Append(u0).Append(" K1=").Append(k1)
               .Append(" Z1=").Append(z1).Append(" Z2=").Append(z2).Append(" Z3=").Append(z3).Append(" Z4=").Append(z4).Append(" Z5=").Append(z5)
               .Append(" U1=").Append(u1).Append(" U2=").Append(u2).Append(" U3=").Append(u3).Append(" U4=").Append(u4).Append(" U5=").Append(u5).Append(" U6=").Append(u6)
-              .Append(" U7=").Append(u7).Append(" U8=").Append(u8).Append(" U9=").Append(u9)
+              .Append(" U7=").Append(u7).Append(" U8=").Append(u8).Append(" U9=").Append(u9).Append(" U10=").Append(u10)
               .Append(" N1=").Append(n1).Append(" N2=").Append(n2).Append(" N3=").Append(n3).Append(" N4=").Append(n4).Append(" N5=").Append(n5).Append(" N6=").Append(n6).Append(" N7=").Append(n7)
+              .Append(" N8=").Append(n8).Append(" N9=").Append(n9)
+              .Append(segKeys.ToString()).Append(haveRb && segSum != rb ? " RBSUMA=" + segSum : "")
               .Append(ar1 == 0 && ar2 == 0 ? " ARYTMETYKA OK." : " ARYTMETYKA BLAD " + (ar1 != 0 ? ar1 : ar2) + ".");
             return sb.ToString();
         }
@@ -319,12 +385,21 @@ namespace Armoury
             long debtAll = 0; int debtClans = 0;
             foreach (var c in Clan.All)
                 if (c != null && !c.IsEliminated && c.DebtToKingdom > 0) { debtAll += c.DebtToKingdom; debtClans++; }
+            // 169b: odszkodowania Diplomacy i trybut od startu sesji (raz na dobe - ta linia biegnie raz)
+            _repGotSess += CW.Sum[CW.IReparationsIn] + CW.In[CW.KReparations];
+            _repDebtSess += CW.Sum[CW.IReparationsDebt];
+            if (ml) _tribPaidSess += -M[CW.MTributeOut];
             var sb = new StringBuilder(1024);
             sb.Append("Pieniadz swiata (rody - przyczyny): dzien ").Append(day)
               .Append(" | rozliczenia rodow zmienily zloto swiata o ").Append(S(change)).Append(" [P] w ").Append(settled).Append(" rozliczeniach")
-              .Append(" | w tym naliczone w modelu finansow (odczytane ").Append(ml ? M[CW.MClansRead].ToString(Inv) : "-").Append(" rozliczen): zold partii -").Append(_wage[WLord])
+              .Append(" | w tym naliczone w modelu finansow (odczytane ").Append(ml ? M[CW.MClansRead].ToString(Inv) : "-")
+              .Append(" rozliczen): zold partii wedlug ksiegi (kazde wywolanie modelu, takze naliczenia <= 0; zbior linii Zold i uzgodnienie - linia Obieg) -").Append(_wage[WLord])
               .Append(", zalog -").Append(_wage[WGarrison]).Append(", karawan lordow -").Append(_wage[WCaravan])
               .Append(", trybut zaplacony ").Append(ml ? S(M[CW.MTributeOut]) : "-").Append(", trybut przyjety ").Append(ml ? S(M[CW.MTributeIn]) : "-")
+              .Append(" (trybut zaplacony to splata dlugu trybutu krolestwa - takze odszkodowan wojennych Diplomacy, ktore odbiorca dostal z gory w chwili pokoju:")
+              .Append(" dzis do skarbcow +").Append(CW.Sum[CW.IReparationsIn]).Append(" i do glow krolestw i najemnikow +").Append(CW.In[CW.KReparations])
+              .Append(", placacym dopisany dlug ").Append(CW.Sum[CW.IReparationsDebt]).Append("; od startu sesji: odszkodowania przyjete ").Append(_repGotSess)
+              .Append(", dlug trybutu z odszkodowan ").Append(_repDebtSess).Append(", trybut zaplacony w rozliczeniach ").Append(_tribPaidSess).Append(')')
               .Append(", udzial w kosztach najemnikow krolestwa ").Append(ml ? S(M[CW.MMercOut]) : "-").Append(", kontrakty najemnikow ").Append(ml ? S(M[CW.MMercIn]) : "-")
               .Append(", wezwanie do wojny zaplacone ").Append(ml ? S(M[CW.MCallWarOut]) : "-").Append(", przyjete ").Append(ml ? S(M[CW.MCallWarIn]) : "-")
               .Append(", splata dlugu wobec korony ").Append(ml ? S(M[CW.MDebt]) : "-")
@@ -429,11 +504,26 @@ namespace Armoury
             bool watch = SoldierPay.LastWatching;
             long evt = ClanIncomeBook.LastEvtNone + ClanIncomeBook.LastEvtSettl + ClanIncomeBook.LastEvtOther;
             bool cib = ClanIncomeBook.LastModelIncomeSum >= 0;
+            // 169b: zold partii i zalog z JEDNEGO zbioru partii - tego samego co linia "Zold:" (SoldierPay: rekord na partie w oknie rozliczenia
+            // rodu, rodzaj partii przy rozdziale); licznik ksiegi pieniadza (kazde wywolanie modelu, rodzaj w chwili naliczenia) obok, z uzgodnieniem
+            long lordAcc = watch ? SoldierPay.LastLordAcc : _wage[WLord], garAcc = watch ? SoldierPay.LastGarAcc : _wage[WGarrison];
+            long lordN = watch ? SoldierPay.LastLordN : _wageN[WLord], garN = watch ? SoldierPay.LastGarN : _wageN[WGarrison];
+            long ledgerFromSp = SoldierPay.LastLordAcc - SoldierPay.LastToLordGold + SoldierPay.LastFromLordGold + SoldierPay.LastDupLordGold + SoldierPay.LastOutLordGold
+                                + SoldierPay.LastNonPosLordGold;   // 169b po recenzji: ksiega liczy tez naliczenia <= 0 (ujemne - budzet partii z kiesa < 500 przy ubogim rodzie)
             var sb = new StringBuilder(3072);
             sb.Append("Obieg: dzien ").Append(day)
-              .Append(" | rody wydaly [P]: zold partii ").Append(_wage[WLord]).Append(" (z kies zeszlo ").Append(watch ? SoldierPay.LastLordTaken.ToString(Inv) : "-")
-              .Append("), zold zalog ").Append(_wage[WGarrison]).Append(" (zeszlo ").Append(watch ? SoldierPay.LastGarTaken.ToString(Inv) : "-")
-              .Append("), zold karawan lordow ").Append(_wage[WCaravan]).Append(", powinnosci do korony ").Append(KingdomTreasury.LastDues)
+              .Append(" | rody wydaly [P]: zold partii ").Append(lordAcc).Append(" (").Append(lordN).Append(" partii; z kies zeszlo ").Append(watch ? SoldierPay.LastLordTaken.ToString(Inv) : "-")
+              .Append("), zold zalog ").Append(garAcc).Append(" (").Append(garN).Append(" zalog; zeszlo ").Append(watch ? SoldierPay.LastGarTaken.ToString(Inv) : "-")
+              .Append(")");
+            if (watch)
+                sb.Append(" [zbior partii jak linia Zold; licznik ksiegi pieniadza: partie ").Append(_wage[WLord]).Append(", zalogi ").Append(_wage[WGarrison])
+                  .Append(" - uzgodnienie partii: ").Append(SoldierPay.LastLordAcc).Append(" - zmienily rodzaj na partie rodu w trakcie rozliczenia ").Append(SoldierPay.LastToLordGold)
+                  .Append(" (").Append(SoldierPay.LastToLordN).Append(") + z partii rodu na inny ").Append(SoldierPay.LastFromLordGold).Append(" (").Append(SoldierPay.LastFromLordN)
+                  .Append(") + powtorzone wyplaty ").Append(SoldierPay.LastDupLordGold).Append(" (").Append(SoldierPay.LastDupLordN).Append(") + poza oknem rozliczenia ")
+                  .Append(SoldierPay.LastOutLordGold).Append(" (").Append(SoldierPay.LastOutLordN).Append(") + naliczenia <= 0: ").Append(SoldierPay.LastNonPosLordGold)
+                  .Append(" (").Append(SoldierPay.LastNonPosLordN).Append(") = ").Append(ledgerFromSp)
+                  .Append(ledgerFromSp == _wage[WLord] ? " - zgodne" : " - roznica " + S(_wage[WLord] - ledgerFromSp)).Append(']');
+            sb.Append(", zold karawan lordow ").Append(_wage[WCaravan]).Append(", powinnosci do korony ").Append(KingdomTreasury.LastDues)
               .Append(", budowy do kas osad ").Append(build).Append(", dwor -, sprzet i werbunek -")
               .Append(" | rody dostaly [P]: renta wsi ").Append(PopulationLaw.DayVillageRent).Append(", zawor miast ").Append(PopulationLaw.DayTownRent).Append(", zawor zamkow -")
               .Append(", zwrot zoldu od korony ").Append(KingdomTreasury.LastRefundGiven).Append(" (nalezny ").Append(KingdomTreasury.LastRefundDue).Append(')')
@@ -459,6 +549,9 @@ namespace Armoury
               .Append(", clo: z licznika cel zdjeto ").Append(KingdomTreasury.LastCustomsTaken).Append(" (w nicosc w calosci - licznik jest posiadaczem), skarbce dostaly ")
               .Append(KingdomTreasury.LastCustoms).Append(" z kas miast (przelew), podatek BK ").Append(ml ? (-M[CW.MBkTax]).ToString(Inv) : "-")
               .Append(", trybut przyjety ").Append(ml ? M[CW.MTributeIn].ToString(Inv) : "-")
+              .Append(", odszkodowania wojenne Diplomacy przyjete ").Append(CW.Wired[CW.WReparations] ? (CW.Sum[CW.IReparationsIn] + CW.In[CW.KReparations]).ToString(Inv) : "-")
+              .Append(" (do skarbcow ").Append(CW.Sum[CW.IReparationsIn]).Append(", do glow krolestw, najemnikow i gracza ").Append(CW.In[CW.KReparations])
+              .Append("; ze skarbcow placacych ").Append(CW.Sum[CW.IReparationsOut]).Append(", dlug trybutu placacych +").Append(CW.Sum[CW.IReparationsDebt]).Append(')')
               .Append("; wyplaty - zwrot zoldu ").Append(KingdomTreasury.LastRefundGiven).Append(" (").Append(pct).Append("% z ").Append(KingdomTreasury.LastRefundPaid)
               .Append(" zaplaconego zoldu), zapomoga ").Append(ml ? M[CW.MSupport].ToString(Inv) : "-")
               .Append(", dochod za tier najemnikow (dzis z niczego) ").Append(ml ? M[CW.MTierMerc].ToString(Inv) : "-").Append(", renty wedlug lenn -")
@@ -484,6 +577,9 @@ namespace Armoury
               .Append(" | pasmo 4500-10500: nadwyzka w nicosc ").Append(WvNeg(bandOut, CW.WNotableBand)).Append(", dosypka z niczego ").Append(WvS(bandIn, CW.WNotableBand))
               .Append(" (okien ").Append(CW.Calls[CW.WNotableBand]).Append(')')
               .Append(" | nowi notable ").Append(WvS(fresh, CW.WNotableNew))
+              .Append(" | majatki z niczego (do wlascicieli - notabli i lordow): BK dochod z produkcji ").Append(WvS(CW.In[CW.KBkEstates], CW.WBkEstates))
+              .Append(" (w tym do notabli ").Append(WvS(Sm[CW.IEstatesNotBk], CW.WBkEstates)).Append("), BetterEconomy renta majatkow ").Append(WvS(CW.In[CW.KBeeEstateRent], CW.WBeeEstates))
+              .Append(" (w tym do notabli ").Append(WvS(Sm[CW.IEstatesNotBee], CW.WBeeEstates)).Append(')')
               .Append(" | dochod z aktywow: wyplata zgloszona jako z niczego ").Append(WvS(inc, CW.WNotableIncome)).Append(" (").Append(Sm[CW.INotableIncomeN]).Append(" notabli)")
               .Append(", z kapitalu warsztatow i kas karawan zeszlo ").Append(WvNeg(k1, CW.WNotableIncome))
               .Append(", zloto z niczego netto (zaulki, majatki BK, minus podatek warsztatow BK) ").Append(WvS(inc - k1, CW.WNotableIncome))
@@ -494,7 +590,8 @@ namespace Armoury
               .Append(" | karawany lordow: zold naliczony ").Append(Neg(_wage[WCaravan])).Append(" (").Append(_wageN[WCaravan]).Append(" karawan)")
               .Append(" | nowe karawany: ").Append(newN).Append(" (notable ").Append(newNot).Append(", lordowie ").Append(newN - newNot).Append(", w tym kupione przez lordow BK ")
               .Append(Sm[CW.ICaravanBuyN]).Append("), kapital nadany z niczego ").Append(Both(z2, CW.WCaravanCap, CW.WCaravanNew, true)).Append(CW.Wired[CW.WCaravanCap] && CW.Wired[CW.WCaravanNew] ? " zl" : "").Append(" (w kasach zaraz po wejsciu do osady ")
-              .Append(Sm[CW.ICaravanCapAfter]).Append(" - reszta to przelewy tej samej chwili: dochod BK do wlasciciela, oplaty BK do licznika cel, werbunek)")
+              .Append(Sm[CW.ICaravanCapAfter]).Append(" - reszta to przelewy tej samej chwili: dochod BK do wlasciciela, oplaty BK do licznika cel, werbunek,")
+              .Append(" oraz najem eskorty i awanse zalogi BetterEconomy - te znikaja, pozycja ujsc)")
               .Append(" | karawany, ktore zniknely z mapy: ").Append(Sm[CW.IPartyGoneCaravanN]).Append(", ich kiesy przepadly ").Append(Neg(Sm[CW.UPartyCaravan]))
               .Append(" | zmarli notable: ").Append(Sm[CW.IHeroesLeftNotableN]).Append(", zloto przepadlo ").Append(Neg(Sm[CW.IHeroesLeftNotableGold]))
               .Append(" (zmarli lordowie ").Append(Sm[CW.IHeroesLeftLordN]).Append(": zloto oddane nastepcom przed smiercia, przy zgonie ").Append(Sm[CW.IHeroesLeftLordGold]).Append(").");
@@ -532,6 +629,12 @@ namespace Armoury
               .Append(" | BetterEconomy [P] (w nicosc): skarbce zamkow ").Append(Wv(CW.Out[CW.KBeeContribute], CW.WBee)).Append(", obozy ").Append(Wv(CW.Out[CW.KBeeCamp], CW.WBee))
               .Append(", inwestycje we wsie ").Append(Wv(CW.Out[CW.KBeeInvest], CW.WBee)).Append(", dostep wsi do targu ").Append(Wv(CW.Out[CW.KBeeMarket], CW.WBee))
               .Append("; skarbce zamkow BEE poza swiatem")
+              .Append(" | BetterEconomy karawany [P] (kasa karawany bez zdarzenia): najem eskorty ").Append(Wv(Sm[CW.UBeeEscort], CW.WBeeEscort)).Append(" (").Append(Sm[CW.IBeeEscortN])
+              .Append(" karawan), awanse zalogi ").Append(Wv(Sm[CW.UBeePromote], CW.WBeePromote)).Append(", straty na niebezpiecznych drogach ").Append(Wv(Sm[CW.UBeeDanger], CW.WBeeDanger))
+              .Append(" (").Append(Sm[CW.IBeeDangerN]).Append(" karawan) - w nicosc; dostawy kontraktow netto ").Append(WvS(Sm[CW.NBeeDeliver], CW.WBeeDeliver)).Append(" (")
+              .Append(Sm[CW.IBeeDeliverN]).Append(" dostaw, zysk ze skarbcow BEE)")
+              .Append(" | BetterEconomy z niczego [P]: renta majatkow ").Append(Wv(CW.In[CW.KBeeEstateRent], CW.WBeeEstates)).Append(", wyplaty ze skarbcow miast i umow handlowych ")
+              .Append(Wv(CW.In[CW.KBeePayout], CW.WBeePayout)).Append(" | BK majatki z niczego [P]: dochod z produkcji ").Append(Wv(CW.In[CW.KBkEstates], CW.WBkEstates))
               .Append(" | nieczynne w tym zestawie modow: rzemieslnicy BK (stary kod), turnieje BK, nadwyzka zywnosci BK (czynny jest inny model zywnosci - nazwa w tech), zaopatrzenie majatkow BK (bez Economy Overhaul)")
               .Append(" | tech: WorkshopData.DoProduction, BKTournamentManager, czynny model zywnosci ").Append(food).Append('.');
             return sb.ToString();
@@ -587,11 +690,15 @@ namespace Armoury
                 for (int i = 0; i < list.Count; i++) { var h = list[i]; if (h != null && h.HeroState == Hero.CharacterStates.Disabled) { dis++; disGold += h.Gold; } }
             }
             catch { dis = -1; }
-            long dayTicks = t169 + (Stopwatch.GetTimestamp() - tSelf) + ClanIncomeBook.LastTicks;
+            long dayTicks = t169 + (Stopwatch.GetTimestamp() - tSelf) + ClanIncomeBook.LastTicks + SegTicks;
             string perScan = CW.ProbeScans > 0 ? (CW.ProbeTicks * 1000.0 / Stopwatch.Frequency / CW.ProbeScans).ToString("0.00", Inv) : "-";
             double goldTicks = CW.GoldSampled > 0 ? (double)CW.GoldTicks * CW.GoldCalls / CW.GoldSampled : 0.0;
-            sb.Append(" | koszt [P]: przeliczenie doby ").Append(Ms(dayTicks)).Append(" ms (same nowe linie i budzet rodow; w tym budzet rodow ").Append(Ms(ClanIncomeBook.LastTicks))
-              .Append(" ms), okna ok. ").Append((winTicks * 1000.0 / Stopwatch.Frequency).ToString("0.0", Inv))
+            sb.Append(" | koszt [P]: przeliczenie doby ").Append(Ms(dayTicks)).Append(" ms (same nowe linie, budzet rodow i odcinki RB; w tym budzet rodow ").Append(Ms(ClanIncomeBook.LastTicks))
+              .Append(" ms: dochod modelu ").Append(Ms(ClanIncomeBook.LastTicksModel)).Append(" ms - wyliczen ").Append(ClanIncomeBook.LastOwnCalls)
+              .Append(", u ").Append(ClanIncomeBook.LastCmpN).Append(" rodow liczba z chwili powinnosci byla juz w KingdomTreasury - jej wziecie oszczedziloby ok. ")
+              .Append(Ms(ClanIncomeBook.LastTicksCmp)).Append(" ms, ale zmienia D (rozna u ").Append(ClanIncomeBook.LastCmpNe).Append(" rodow)")
+              .Append("; raport ").Append(Ms(ClanIncomeBook.LastTicksReport)).Append(" ms, plik CSV ").Append(Ms(ClanIncomeBook.LastTicksCsv))
+              .Append(" ms; odcinki RB ").Append(Ms(SegTicks)).Append(" ms), okna ok. ").Append((winTicks * 1000.0 / Stopwatch.Frequency).ToString("0.0", Inv))
               .Append(" ms (same nasze latki - bez metod gry i cudzych latek; probka 1/16), nasluch zdarzen zlota ok. ")
               .Append((goldTicks * 1000.0 / Stopwatch.Frequency).ToString("0.0", Inv)).Append(" ms (").Append(CW.GoldCalls).Append(" zdarzen; probka 1/256), probki swiata ")
               .Append(Ms(CW.ProbeTicks)).Append(" ms (").Append(CW.ProbeScans).Append(" przegladow, ").Append(perScan).Append(" ms na przeglad)")

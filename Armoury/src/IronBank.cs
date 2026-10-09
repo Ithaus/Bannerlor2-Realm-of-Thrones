@@ -209,6 +209,7 @@ namespace Armoury
                 if (!running) d.DueDay = today + Math.Max(7, DaysPerYear() / 2);
                 c.Leader.ChangeHeroGold(amount);
                 _capital -= amount;
+                CirculationWindows.NoteHeroGold(c.Leader, amount);   // paczka 169b: glowa poza swiatem - zloto wyszlo ze swiata (tylko licznik)
                 Note("IronBank: " + c.Name + " pozycza " + amount + " (" + why + ") na " + (d.Rate * 100).ToString("0") + "% rocznie, dlug " + (int)d.Principal
                      + ", termin dzien " + d.DueDay + ", limit " + Limit(c) + ", kapital Banku " + (long)_capital + ".");
                 return amount;
@@ -378,6 +379,7 @@ namespace Armoury
                                 // zajecie od razu: polowa skarbca na poczet dlugu (wczesniej tylko 25% dziennie - do wydania przed sciagnieciem)
                                 int seize = (int)Math.Min(d.Principal, hero.Gold * Math.Max(0f, Math.Min(1f, s.IronBankDefaultSeizeShare)));
                                 if (seize > 0) { hero.ChangeHeroGold(-seize); d.Principal -= seize; _capital += seize; paidSum += seize; }
+                                if (seize > 0) CirculationWindows.NoteHeroGold(hero, -seize);   // paczka 169b (tylko licznik)
                                 Log.Info("IronBank: BANKRUCTWO " + c.Name + " - dlug " + (int)d.Principal + ", Bank odcina kredyt, sciaga zloto i pozycza wrogom.");
                                 if (c == Clan.PlayerClan)
                                 {
@@ -398,6 +400,7 @@ namespace Armoury
                     hero.ChangeHeroGold(-pay);
                     d.Principal -= pay;
                     _capital += pay;
+                    CirculationWindows.NoteHeroGold(hero, -pay);   // paczka 169b (tylko licznik)
                     paid++; paidSum += pay;
                     if (d.Principal < 1)
                     {
