@@ -89,6 +89,7 @@ namespace CrashScribe
                 Quiet.Install(_harmony);
                 Mends.Install(_harmony);
                 Fabula.Install(_harmony);
+                OthersGrowth.Install(_harmony);   // T2b: Inni bez dosypki z niczego (Jeff 07.10 H2)
                 Scribe.Line("Net ready.");
                 Watchdog.Start();
                 // Sampler WYLACZONY 29.08: Suspend+StackTrace co 0.5 s na FF potrafi
@@ -125,6 +126,7 @@ namespace CrashScribe
                 if (cgs != null) cgs.AddBehavior(new MendsBehavior());
                 if (cgs != null) cgs.AddBehavior(new DialogEscape());
                 if (cgs != null) cgs.AddBehavior(new NightKingCall());   // Zew Nocnego Krola (Jeff 16.09)
+                if (cgs != null) cgs.AddBehavior(new OthersGrowthBehavior());   // T2b: linia dobowa "Inni bez dosypki"
                 if (cgs != null) cgs.AddBehavior(new EconomyAudit());    // audyt ekonomii rodow (Jeff 04.10), tylko odczyt
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "OnGameStart.WarReport", null); } catch { } }
