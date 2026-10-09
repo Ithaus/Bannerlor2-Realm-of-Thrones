@@ -864,3 +864,8 @@ srednio ok. +20% wobec swiata) - bez wyraznego wyboru; ustawiam domyslnie +15 (r
 swiata po samej naprawie sprzetu wedlug tieru). Zostaje: sklad z przewaga piechoty i +10% w autobitwie na sniegu i w lasach Polnocy. (175b liczy z 15 - po nim ustawic 0.)
 **DECYZJA JEFFA 09.10 ok. 06:00 (Polnoc, ostatecznie):** "zrob 130/135 piechota Polnocy srednio" -> srednia piechoty t3+ Polnocy: bron glowna ok. 130 (po naprawie sprzetu
 jest 131 - bez dodatku), Atletyka 135 (po naprawie 130 -> +5 Atletyki). Dwa osobne suwaki: dodatek do broni 0, do Atletyki 5 (zamiast jednego "+X do obu"). Po 175b.
+**SKLAD7 (09.10 ok. 06:45):** noc/sklad7 48047f3 = sklad6 + K1/K1b/K1c (jeden system zbrojowni zalog 171+K1; sprzet idzie z ludzmi przy przenoszeniu druzyna <-> zaloga;
+sakiewka zalogi placi za zakupy notabla; dorobek startowy zbrojowni zalog przy pierwszym wczytaniu starego zapisu - takze zalog gracza, z komunikatem w grze = swiadome
+rozszerzenie decyzji 7). Zapisy zrobione na sklad6 (tylko testowe) nie sa wspierane. DLL SCRATCH test\Armoury-sklad7.dll (b7d7c2b9). Pytania do Jeffa: (1) zolnierz gracza bez
+sztuki - DTE daje sprzet chlopa z niczego na bitwe (+kara morale) czy walczy tym, co ma; (2) ludzie lordow AI w bitwach gracza - DTE dopelnia wzorzec z niczego (zostaje u lorda
+i w lupach): a) tak jak jest, b) tylko pozyczony na bitwe (LordBattleKitIsLent, gotowe, OFF), c) tylko to, co maja; (3) przenoszenie sprzetu z ludzmi takze dla partii towarzyszy.
