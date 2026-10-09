@@ -771,3 +771,6 @@ H proba drog TAK + po drodze szybciej (+15%) TAK; I jency w Westeros: DO DOMU, p
 "zostaja poza systemem" - wyjasnione w czacie); L TEJ NOCY (09.10) WGRYWAC SAMEMU to, co przejdzie autotest (z kopia) - TAK.
 NOWE ZADANIA 09.10: (1) audyt umiejetnosci - zwlaszcza: przekazywanie broni/mieczy daje doswiadczenie (do zmiany) + calosciowy audyt umiejetnosci wobec naszych zmian;
 (2) audyt armii kazdego krolestwa - tabele wojsk, balans, zgodnosc z lore (np. Polnoc swietna piechota).
+**WGRANIE 7 (09.10 ok. 01:30 zegara komp.; zgoda Jeffa na noc 09/10):** Armoury 63640cb3 (= 0f8a80b0 + D1 za Murem mysliwi i rybacy + I1 jency w Westeros do domu / na Mur
++ F1 H3 przy autobitwie gracza; galaz noc/sklad5 d486813), CrashScribe bez zmian 269cc980. Poprzedni: Armoury.dll.bak-2026-10-09-przed-noc7 + D:\Backup-Bannerlord\wgrane\
+2026-10-09-noc7-przed. Testy: nowa kampania 40 dob OK (13.1 s/dobe, 0 bledow), zapis doby 362 8 dob OK. ZATWIERDZONE OD TERAZ: Armoury 63640cb3, CrashScribe 269cc980.
