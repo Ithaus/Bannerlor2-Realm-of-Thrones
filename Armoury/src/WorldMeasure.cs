@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 using TaleWorlds.CampaignSystem;
@@ -25,6 +26,12 @@ namespace Armoury
     ///
     /// Koszt: godzinny tik - jedna petla po partiach lordow (O(1) na partie: pozycja i slownik), dobowy - sortowanie probki.
     /// Kazda partia w try, licznik potkniec (CLAUDE.md: nie gasic funkcji).
+    ///
+    /// Poprawki po recenzji T6: godzina liczy sie jako marsz tylko, gdy partia byla w ruchu na OBU koncach godziny (Track.WasMoving) -
+    /// odpada godzina po zejsciu na lad (odcinek po morzu), godzina wyjscia z osady i godzina wejscia do osady / bitwy / oblezenia;
+    /// km/dobe to wiec dolna granica (kilka procent), ale kazda policzona godzina to czysty marsz. Numer godziny rosnie takze przy
+    /// wylaczonym przelaczniku (ciaglosc pek, stara pozycja nie wejdzie jako jedna godzina). W linii: mediana ludzi w kazdej grupie
+    /// (porownanie wodzow z konnymi przy roznej wielkosci) i koszt (Stopwatch: godzinne razem i maks, dobowe).
     /// </summary>
     internal static class WorldMeasure
     {
@@ -36,6 +43,7 @@ namespace Armoury
         private sealed class Track
         {
             public Vec2 Pos; public int Stamp = -1;          // pozycja i numer godziny ostatniego odczytu
+            public bool WasMoving;                           // czy przy ostatnim odczycie partia byla w ruchu (nie w osadzie, nie na morzu ...)
             public float Sum;                                // suma przesuniec w godzinach ruchu tej doby (jedn. mapy)
             public int MoveH, LeadH, MountH, Men;            // godziny ruchu, w tym jako wodz armii i czysto konno; najwiecej ludzi w ruchu
         }
@@ -43,17 +51,20 @@ namespace Armoury
         private static readonly Dictionary<MobileParty, Track> _t = new Dictionary<MobileParty, Track>();
         private static int _stamp;                 // numer godziny (od startu sesji)
         private static int _jumps, _stumbles;      // liczniki doby
+        private static long _hourTicks, _hourMax;  // koszt godzinnych tikow doby (Stopwatch: suma i maksimum)
 
-        internal static void Reset() { _t.Clear(); _stamp = 0; _jumps = 0; _stumbles = 0; }
+        internal static void Reset() { _t.Clear(); _stamp = 0; _jumps = 0; _stumbles = 0; _hourTicks = 0; _hourMax = 0; }
 
         private static bool On() { var s = Settings.Current; return s != null && s.WorldMeasureLog; }
 
         internal static void Hourly()
         {
+            long t0 = 0;
             try
             {
+                _stamp++;                                   // takze przy wylaczonym przelaczniku - ciaglosc godzin pek po wylaczeniu
                 if (!On() || Campaign.Current == null) return;
-                _stamp++;
+                t0 = Stopwatch.GetTimestamp();
                 var all = MobileParty.AllLordParties;
                 if (all == null) return;
                 var main = MobileParty.MainParty;
@@ -68,7 +79,7 @@ namespace Armoury
                         if (!_t.TryGetValue(mp, out t)) { t = new Track(); _t[mp] = t; }
                         bool moving = mp.CurrentSettlement == null && mp.MapEvent == null && mp.BesiegerCamp == null && mp.AttachedTo == null
                                       && !mp.IsCurrentlyAtSea && !mp.IsTransitionInProgress && !mp.IsInRaftState;
-                        if (moving && t.Stamp == _stamp - 1)
+                        if (moving && t.WasMoving && t.Stamp == _stamp - 1)   // ruch na obu koncach godziny
                         {
                             float d = pos.Distance(t.Pos);
                             if (d > MaxStep) _jumps++;
@@ -81,12 +92,28 @@ namespace Armoury
                                 if (men > 0 && mp.Party != null && mp.Party.NumberOfMenWithoutHorse == 0) t.MountH++;
                             }
                         }
-                        t.Pos = pos; t.Stamp = _stamp;
+                        t.Pos = pos; t.Stamp = _stamp; t.WasMoving = moving;
                     }
                     catch { _stumbles++; }
                 }
             }
             catch (Exception e) { Log.Error("WorldMeasure.Hourly", e); }
+            finally
+            {
+                if (t0 != 0) { long dt = Stopwatch.GetTimestamp() - t0; _hourTicks += dt; if (dt > _hourMax) _hourMax = dt; }
+            }
+        }
+
+        private static string Ms(long ticks) { return (ticks * 1000.0 / Stopwatch.Frequency).ToString("0.00", CultureInfo.InvariantCulture); }
+
+        // mediana liczby ludzi (najwiecej w godzinach ruchu) w grupie
+        private static string MenMed(List<int> men)
+        {
+            if (men.Count == 0) return "";
+            men.Sort();
+            int n = men.Count;
+            float med = (n % 2 == 1) ? men[n / 2] : 0.5f * (men[n / 2 - 1] + men[n / 2]);
+            return ", ludzie mediana " + F(med);
         }
 
         private static string F(float v) { return v.ToString("0", CultureInfo.InvariantCulture); }
@@ -104,11 +131,13 @@ namespace Armoury
 
         internal static void Daily()
         {
+            long t0 = Stopwatch.GetTimestamp();
             try
             {
-                if (!On() || Campaign.Current == null) { _t.Clear(); _jumps = 0; _stumbles = 0; return; }
+                if (!On() || Campaign.Current == null) { _t.Clear(); _jumps = 0; _stumbles = 0; _hourTicks = 0; _hourMax = 0; return; }
                 int day = (int)CampaignTime.Now.ToDays - 1;      // doba, ktora sie skonczyla (jak "Ludzie:")
                 var big = new List<float>(); var lead = new List<float>(); var mounted = new List<float>();
+                var bigMen = new List<int>(); var leadMen = new List<int>(); var mountedMen = new List<int>();
                 int tracked = 0, few = 0; long hoursBig = 0;
                 var dead = new List<MobileParty>();
                 foreach (var kv in _t)
@@ -122,9 +151,9 @@ namespace Armoury
                         {
                             float km = t.Sum * Wayfinder.KmPerUnit;
                             bool isLead = t.LeadH * 2 >= t.MoveH;
-                            if (t.Men > BigParty || isLead) { big.Add(km); hoursBig += t.MoveH; }
-                            if (isLead) lead.Add(km);
-                            if (t.MountH * 2 >= t.MoveH) mounted.Add(km);
+                            if (t.Men > BigParty || isLead) { big.Add(km); bigMen.Add(t.Men); hoursBig += t.MoveH; }
+                            if (isLead) { lead.Add(km); leadMen.Add(t.Men); }
+                            if (t.MountH * 2 >= t.MoveH) { mounted.Add(km); mountedMen.Add(t.Men); }
                         }
                         else if (t.MoveH > 0) few++;
                     }
@@ -137,20 +166,22 @@ namespace Armoury
                 int pace = s != null ? s.WorldPacePercent : 100;
                 var sb = new StringBuilder();
                 sb.Append("Miara: marsz dzien ").Append(day)
-                  .Append(" | WorldPace czynne ").Append(pace).Append('%').Append(pace >= 100 || pace < 5 ? " (suwak poza 5-99 - bez zmiany predkosci)" : "")
-                  .Append(" | partie lordow AI z >= ").Append(MinMoveHours).Append(" h ruchu (suma przesuniec godzinowych tylko w ruchu x ")
+                  .Append(" | WorldPace z MCM ").Append(pace).Append('%').Append(pace >= 100 || pace < 5 ? " (suwak poza 5-99 - bez zmiany predkosci)" : "")
+                  .Append(" | partie lordow AI z >= ").Append(MinMoveHours).Append(" h ruchu (suma przesuniec godzinowych tylko w pelnych godzinach ruchu x ")
                   .Append(Wayfinder.KmPerUnit.ToString("0.00", CultureInfo.InvariantCulture)).Append(" km/jedn.)")
-                  .Append(" | ponad ").Append(BigParty).Append(" ludzi albo wodzowie armii: ").Append(Stats(big));
+                  .Append(" | ponad ").Append(BigParty).Append(" ludzi albo wodzowie armii: ").Append(Stats(big)).Append(MenMed(bigMen));
                 if (big.Count > 0) sb.Append(", srednio ").Append((hoursBig / (float)big.Count).ToString("0.0", CultureInfo.InvariantCulture)).Append(" h ruchu");
-                sb.Append(" | wodzowie armii: ").Append(Stats(lead))
-                  .Append(" | czysto konne (kazda wielkosc): ").Append(Stats(mounted))
+                sb.Append(" | wodzowie armii: ").Append(Stats(lead)).Append(MenMed(leadMen))
+                  .Append(" | czysto konne (kazda wielkosc): ").Append(Stats(mounted)).Append(MenMed(mountedMen))
                   .Append(" | sledzonych ").Append(tracked).Append(", w ruchu ponizej ").Append(MinMoveHours).Append(" h: ").Append(few)
                   .Append("; skoki > ").Append(F(MaxStep)).Append(" jedn./h pominiete: ").Append(_jumps).Append('.');
                 if (_stumbles > 0) sb.Append(" Potkniecia miary: ").Append(_stumbles).Append('.');
+                sb.Append(" Koszt: godzinne razem ").Append(Ms(_hourTicks)).Append(" ms (maks ").Append(Ms(_hourMax))
+                  .Append(" ms), dobowe ").Append(Ms(Stopwatch.GetTimestamp() - t0)).Append(" ms.");
                 Log.Info(sb.ToString());
             }
             catch (Exception e) { Log.Error("WorldMeasure.Daily", e); }
-            finally { _jumps = 0; _stumbles = 0; }
+            finally { _jumps = 0; _stumbles = 0; _hourTicks = 0; _hourMax = 0; }
         }
     }
 }

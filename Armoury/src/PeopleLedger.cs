@@ -223,6 +223,9 @@ namespace Armoury
                 int before = _stumbles;
                 string s = " | Zapasy warowni (T6): swiat " + StockPart(rows, false) + "; Polnoc (" + NorthCulture + ") " + StockPart(rows, true);
                 if (_stumbles > before) s += ", potkniecia zapasow " + (_stumbles - before);   // wypisane tu - licznik ksiegi juz poszedl w linii
+                int noRead = 0;
+                foreach (var r in rows) { try { if (!r.HasFood && r.St.Town != null) noRead++; } catch { noRead++; } }
+                if (noRead > 0) s += ", warownie bez odczytu zywnosci " + noRead;            // model zywnosci rzucil (licznik w "Potkniecia ksiegi")
                 return s + ".";
             }
             catch { return " | Zapasy warowni (T6): wyjatek."; }
@@ -316,7 +319,7 @@ namespace Armoury
                             if (r.FoodChange < 0f) foodMinus++;
                         }
                     }
-                    catch { }
+                    catch { _stumbles++; }                                          // T6 po recenzji: model zywnosci rzucil - liczymy (warownia bez odczytu)
                 }
                 ranked.Sort((a, b) => b.Burden.CompareTo(a.Burden));
                 double menWorld = people * MenShare;

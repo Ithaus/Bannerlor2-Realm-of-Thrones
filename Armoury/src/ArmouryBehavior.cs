@@ -592,10 +592,10 @@ namespace Armoury
             // menu kucia otwarte JAKAKOLWIEK droga (takze wznowione z save'a,
             // z pominieciem StartCraftingMenu) - dniowka kupuje sie od razu
             CampaignEvents.GameMenuOpened.AddNonSerializedListener(this, OnGameMenuOpened);
-            // pas bezpieczenstwa depozytu kwatermistrza: czas plynie = ekran
-            // zbrojowni zamkniety; gdyby domkniecie nie oddalo sprzetu, oddajemy tu
             // T6 (noc 08/09.10): miara marszu - pozycje partii lordow co godzine (tylko log, wylacznik WorldMeasureLog)
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, delegate { try { WorldMeasure.Hourly(); } catch (Exception e) { Log.Error("WorldMeasure.Hourly", e); } });
+            // pas bezpieczenstwa depozytu kwatermistrza: czas plynie = ekran
+            // zbrojowni zamkniety; gdyby domkniecie nie oddalo sprzetu, oddajemy tu
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this,
                 delegate
                 {
