@@ -376,3 +376,9 @@ LIMITY 13:30: 5h 32%, TYDZIEN 82% (reset 15.10) - przy 100% tygodnia przejsc na 
   (pokoj = ok. 1/3 wojska i polowa zalog; Jeff: "dynamiczne, wedlug tego, czy stac"), nie blad kodu. Progi 40 dob "wojsko wobec bazy" nie pasuja do kampanii,
   ktora zaczyna sie pokojem - rozstrzyga test 120 dob (okno 31-120, prawie cala wojna). Jesli tam zalogi w wojnie < 95% bazy: rozwazyc szybszy odrost w wojnie
   (np. przy wypowiedzeniu wojny zniesienie hamulca nowych partii / zalogi do celu wojennego z kasy wojennej) - to bylaby zmiana do zgloszenia Jeffowi.
+- (00:45) **RECENZJA C1 (wf_a018ac0c-77c, 7 agentow)**: 10 uwag potwierdzonych przez sceptyka (2 wysokie: C1-G1 Bank pozyczal mimo pieniedzy rodziny - T5
+  przywrocone, odstepstwo od "IronBankFamilyPays -> false"; C1-G2 przeglad najemnika poza polem) -> commit 4b7b11b na w-toku/e2c (md5 29a46fbb), szczegoly
+  w docs/C1-POSTEP.md drzewa e2c ("Recenzja C1 (workflow)"). Zaliczka gry z niczego (portfel najemnikow/trybutu/wezwania uznany w calosci) przy splacie
+  wraca w nicosc - zrodlo zamyka 168. Nowe progi testu C1 (W1): zalogi tylko twierdze rodow w wojnie >= 28 dob w obu biegach; wojsko >= 96% bazy tej samej doby
+  w tym samym zbiorze rodow (w wojnie >= 18 dob). **TEST 120 dob w toku**: test\Armoury-e2c-c1r.dll -> test\at-c1r-120.out.txt; potem sprawdz_logi --grupa etap2
+  --baza e2b-p\baza-B4.json + porownanie z kopia-e2b2-120 (budzet-rodow.csv, balans-krolestw.csv); jesli OK -> WGRANIE 16.
