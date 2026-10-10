@@ -88,6 +88,7 @@ namespace CrashScribe
                 Net.WrapHotspots(_harmony);
                 Quiet.Install(_harmony);
                 Mends.Install(_harmony);
+                NameplateGhosts.Install(_harmony);   // 10.10: ikony-duchy partii nad osadami
                 Fabula.Install(_harmony);
                 OthersGrowth.Install(_harmony);   // T2b: Inni bez dosypki z niczego (Jeff 07.10 H2)
                 NightKingGate.Install(_harmony);  // T2c: Inni bez oblezen zamknietych celow przed dniem z kalendarza
