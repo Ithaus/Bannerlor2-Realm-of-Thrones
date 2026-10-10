@@ -214,6 +214,8 @@ namespace Armoury
         private static int _dSpawnBlock, _dSummon, _dSummonLord, _dSummonLead, _dSummonSkip, _dFinish, _dFinishMen, _dFinishLost, _dFinishPris, _dFinishShips;
         private static int _dEstateBlock; private static long _dEstateSpent;
         private static int _dArmies, _dArmiesWithKnight, _dFree, _dFreeNoArmy;
+        private static int _dUnavail, _dUnPrisoner, _dUnParty, _dUnState, _dUnSiege, _dUnOther, _dNonComb;   // C3 po tescie: czemu rycerz nie jest wolny
+        private static int _dWoke;   // wyjazdy z NotSpawned (od poprzedniej linii - takze wezwania BK miedzy tickami)
         private static int _stumbles;
         private static readonly HashSet<string> _err = new HashSet<string>();
         private static long _weekSum; private static int _weekStart = -1;
@@ -221,7 +223,7 @@ namespace Armoury
         internal static void Reset()
         {
             _bkTried = false; _beh = null; _isGentry = null; _t1 = _t2 = null; _estData = _estSettlement = _estOwner = null;
-            _knights.Clear(); _knightsDay = int.MinValue; ZeroLast(); ClearDay(); _stumbles = 0; _err.Clear(); _weekSum = 0; _weekStart = -1;
+            _knights.Clear(); _knightsDay = int.MinValue; ZeroLast(); ClearDay(); _dWoke = 0; _stumbles = 0; _err.Clear(); _weekSum = 0; _weekStart = -1;
         }
 
         internal static void ZeroLast() { LastPaid = 0; }
@@ -231,6 +233,7 @@ namespace Armoury
             _dDue = _dPaid = _dPlayerPaid = 0;
             _dClans = _dServing = _dAtLord = _dAtArmy = _dAtPlayer = _dCalledLord = _dCalledArmy = _dHome = _dWait = _dUnpaidN = _dWatch = _dOwnParties = _dOwnMen = 0;
             _dArmies = _dArmiesWithKnight = _dFree = _dFreeNoArmy = 0;
+            _dUnavail = _dUnPrisoner = _dUnParty = _dUnState = _dUnSiege = _dUnOther = _dNonComb = 0;
         }
 
         private static void Stumble(string where, Exception e)
@@ -240,11 +243,36 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ rycerz wolny, cel wezwania, wyjazd, powrot
+        /// <summary>Stan gry, z ktorego rycerz moze wyjechac: czynny albo jeszcze "nie wystawiony" (NotSpawned).
+        /// C3 po tescie 120 dob: BK tworzy rody rycerzy (CreateGentryClan -> HeroCreator.CreateSpecialHero) PO aktywacji bohaterow gry
+        /// (HeroSpawnCampaignBehavior przy tworzeniu swiata) i sadza je w majatku przez EnterSettlementAction, ktora stanu nie zmienia -
+        /// glowy rodow rycerzy zostaja w NotSpawned. Dotad aktywowala je dopiero wlasna partia BK (SummonGentry) i jej rozwiazanie;
+        /// po 179 (bez partii) nie aktywuje ich nic, a warunek IsActive wykluczal wszystkie 92 rody: 0 wolnych, 0 w sluzbie w 120 dobach.
+        /// Ucieczka, podroz, uwolnienie z niewoli, wylaczenie - czekamy, az gra przywroci bohatera (OnHeroDailyTick).</summary>
+        private static bool CanRide(Hero h)
+        {
+            return h.IsActive || h.IsNotSpawned;
+        }
+
+        /// <summary>Rycerz wolny: zywy, dorosly, w stanie do wyjazdu (CanRide), nie w niewoli, nie w partii, nie namiestnik, nie w oblezonej osadzie.
+        /// Bez warunku "walczacy" (gra: IsNoncombatant = zadna umiejetnosc broni >= 100): projekt 179 - jedzie glowa rodu rycerza; BK przy wezwaniu
+        /// AI (CallBannersGoal.DoAiDecision) tez go nie sprawdza. Licznik "niewalczacy w sluzbie" w linii.</summary>
         private static bool Free(Hero h)
         {
-            return h != null && h.IsAlive && h.IsActive && !h.IsChild && !h.IsPrisoner && h.PartyBelongedTo == null && h.PartyBelongedToAsPrisoner == null
-                   && h.GovernorOf == null && h != Hero.MainHero && !h.IsNoncombatant
+            return h != null && h.IsAlive && CanRide(h) && !h.IsChild && !h.IsPrisoner && h.PartyBelongedTo == null && h.PartyBelongedToAsPrisoner == null
+                   && h.GovernorOf == null && h != Hero.MainHero
                    && (h.CurrentSettlement == null || !h.CurrentSettlement.IsUnderSiege);   // z oblezonej osady nikt nie wyjezdza przez linie oblezenia
+        }
+
+        /// <summary>Linia 179: czemu rycerz w krolestwie w wojnie nie jest wolny (pierwszy pasujacy powod).</summary>
+        private static void NoteUnavailable(Hero h)
+        {
+            _dUnavail++;
+            if (h.IsPrisoner || h.PartyBelongedToAsPrisoner != null) _dUnPrisoner++;
+            else if (h.PartyBelongedTo != null) _dUnParty++;
+            else if (!h.IsAlive || !CanRide(h)) _dUnState++;
+            else if (h.CurrentSettlement != null && h.CurrentSettlement.IsUnderSiege) _dUnSiege++;
+            else _dUnOther++;
         }
 
         /// <summary>Druzyna, do ktorej rycerz moze dolaczyc: czynna, AI (nie gracz ani jego rod - tylko na wezwanie gracza), nie w bitwie, nie rozwiazywana,
@@ -257,6 +285,8 @@ namespace Armoury
 
         private static bool Join(Hero h, MobileParty target)
         {
+            // rycerz BK jeszcze "nie wystawiony" (NotSpawned) - czynny jak kazdy lord w druzynie; powrot do majatku (TeleportHeroAction) i tak go aktywuje
+            if (h.IsNotSpawned) { h.ChangeState(Hero.CharacterStates.Active); _dWoke++; }
             if (h.CurrentSettlement != null && h.PartyBelongedTo == null) LeaveSettlementAction.ApplyForCharacterOnly(h);
             AddHeroToPartyAction.Apply(h, target, false);
             return h.PartyBelongedTo == target;
@@ -354,13 +384,20 @@ namespace Armoury
                             if (stay)
                             {
                                 _dServing++;
+                                if (h.IsNoncombatant) _dNonComb++;
                                 var lc = estate != null ? estate.OwnerClan : null;
                                 if (mp.IsMainParty) _dAtPlayer++; else if (lc != null && mp.ActualClan == lc) _dAtLord++; else _dAtArmy++;
                             }
                             else Home(h, estate, mp);
                             continue;
                         }
-                        if (on && Free(h)) free.Add(kv);
+                        if (!on) continue;
+                        if (Free(h)) { free.Add(kv); continue; }
+                        // niedostepny w krolestwie w wojnie - powod do linii (test: "wolni" + "niedostepni" = rody w krolestwach w wojnie poza sluzba)
+                        var kk = c.Kingdom;
+                        bool ww = false;
+                        if (kk != null && !war.TryGetValue(kk, out ww)) { ww = KingdomTreasury.AtWar(kk); war[kk] = ww; }
+                        if (ww) NoteUnavailable(h);
                     }
                     catch (Exception e) { Stumble("Daily(rod)", e); }
                 }
@@ -401,6 +438,7 @@ namespace Armoury
                             if (!Join(h, target)) continue;
                             if (atLord) _dCalledLord++; else _dCalledArmy++;
                             _dServing++; if (atLord) _dAtLord++; else _dAtArmy++;
+                            if (h.IsNoncombatant) _dNonComb++;
                         }
                         catch (Exception e) { Stumble("Daily(wezwanie)", e); }
                     }
@@ -625,7 +663,7 @@ namespace Armoury
             try { if (s.LogEnabled && (on || _dHome > 0 || _dWait > 0)) Log.Info(Line(s, today, on)); }   // wylaczone: linia tylko, gdy ktos wracal do domu
             finally
             {
-                _dSpawnBlock = _dSummon = _dSummonLord = _dSummonLead = _dSummonSkip = 0;
+                _dSpawnBlock = _dSummon = _dSummonLord = _dSummonLead = _dSummonSkip = _dWoke = 0;
                 _dFinish = _dFinishMen = _dFinishLost = _dFinishPris = _dFinishShips = 0; _dEstateBlock = 0; _dEstateSpent = 0;
             }
         }
@@ -637,7 +675,11 @@ namespace Armoury
               .Append(" | rody rycerzy (BK gentry bez lenna) ").Append(_dClans)
               .Append(", w sluzbie ").Append(_dServing).Append(" (w druzynie pana ").Append(_dAtLord).Append(", u wodza armii ").Append(_dAtArmy).Append(", u gracza ").Append(_dAtPlayer).Append(')')
               .Append(", wolni w krolestwach w wojnie ").Append(_dFree).Append(" (bez armii w krolestwie ").Append(_dFreeNoArmy).Append(')')
+              .Append(", niedostepni w krolestwach w wojnie ").Append(_dUnavail).Append(" (niewola ").Append(_dUnPrisoner).Append(", wlasna partia ").Append(_dUnParty)
+              .Append(", stan gry - ucieczka, podroz, wylaczony ").Append(_dUnState).Append(", oblezona osada ").Append(_dUnSiege).Append(", inne ").Append(_dUnOther).Append(')')
+              .Append(", niewalczacy w sluzbie ").Append(_dNonComb)
               .Append(" | wezwani dzis: pan w armii ").Append(_dCalledLord).Append(", wodz armii ").Append(_dCalledArmy)
+              .Append("; pierwszy wyjazd (BK NotSpawned -> czynny, od wczoraj) ").Append(_dWoke)
               .Append("; wezwania BK (od wczoraj) ").Append(_dSummon).Append(" (do pana ").Append(_dSummonLord).Append(", do wzywajacego ").Append(_dSummonLead).Append(", rycerz niedostepny ").Append(_dSummonSkip).Append(')')
               .Append(" | wrocili do majatku ").Append(_dHome).Append(", czeka (bitwa) ").Append(_dWait)
               .Append(" | armie ").Append(_dArmies).Append(", z rycerzem ").Append(_dArmiesWithKnight)
