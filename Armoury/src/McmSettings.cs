@@ -2828,6 +2828,14 @@ namespace Armoury
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool CrownRentGarrisonNormKingdom { get; set; } = true;
 
+        [SettingPropertyBool("Crown Rent Service Whole Day", HintText = "service is seen over the whole day: a battle, raid or assault against the enemy counts whenever it happens, not only if it is going on at the day's tick, and so do chasing an enemy party and riding to relieve a besieged or raided settlement of the realm (defending your own land). Off = only what a party is doing at the moment of the day's tick, as before")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public bool CrownRentServiceWholeDay { get; set; } = true;
+
+        [SettingPropertyBool("Crown Rent War Day Needs Contact", HintText = "a day of war counts towards the service only when the realm really waged the war that day - an army of the realm in the field, a siege, raid or pressing of a village between the realm and its enemy, or a battle with lords on both sides; a war with a realm nobody can reach (across the sea) asks no service while it stays out of reach. Off = every day of a declared war counts, as before")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public bool CrownRentWarDayNeedsContact { get; set; } = true;
+
         [SettingPropertyBool("Gentry No Parties", HintText = "Banner Kings gentry - knights who hold one estate and no town or castle - no longer lead parties of their own. When the banners are called, the knight rides in his lord's party (the lord who holds the village of his estate) as a member of it; if the lord has no party or is not in an army, in the party of the realm's nearest army leader. AI knights answer when their realm is at war and an army of the realm is in the field; your own knights ride only when you call your banners. The men of the estate stay at home - the knight comes alone. When the army breaks up, in peace or if the party changes sides, he goes back to his estate. A knight's party left from before is not reinforced and Banner Kings disbands it at the estate (its men return to the estate village). Off = Banner Kings raises the knight's own party, as before")]
         [SettingPropertyGroup("Knights without fiefs (stage 2)")]
         public bool GentryNoParties { get; set; } = true;
@@ -4382,6 +4390,8 @@ namespace Armoury
             s.CrownRentServiceDays = CrownRentServiceDays;
             s.CrownRentGarrisonShare = CrownRentGarrisonShare;
             s.CrownRentGarrisonNormKingdom = CrownRentGarrisonNormKingdom;
+            s.CrownRentServiceWholeDay = CrownRentServiceWholeDay;
+            s.CrownRentWarDayNeedsContact = CrownRentWarDayNeedsContact;
             s.GentryNoParties = GentryNoParties;
             s.GentryKnightWage = GentryKnightWage;
             s.GentryEstateSpendCap = GentryEstateSpendCap;

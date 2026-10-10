@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 
@@ -25,6 +26,12 @@ namespace Armoury
     ///       wojny - warunek sluzby nie obowiazuje (nie bylo wojny, w ktorej mozna sluzyc).
     ///    Udzial rodu bez warunku zostaje w skarbcu (zapas); reszta z zaokraglen tez.
     ///  - D: renta w czesci "korona" D stalego (ClanIncomeBook.KRent) - budzet 166 widzi ja od nastepnej doby; poza "jednorazowymi" (nie liczona dwa razy).
+    ///  - POMIAR SLUZBY po tescie C1+C2 120 dob (C3, 94 z 215 rodow z lennem bez warunku): (a) CrownRentServiceWholeDay - bitwy, rabunki i szturmy z wrogiem
+    ///    licza sie o kazdej porze doby (zdarzenia MapEventStarted/Ended, nie tylko chwila ticku), a w chwili ticku takze poscig za partia wroga i jazda na
+    ///    odsiecz oblezonej albo rabowanej osady krolestwa; (b) CrownRentWarDayNeedsContact - doba wojny liczy sie do maski tylko, gdy krolestwo mialo
+    ///    tego dnia styk z wrogiem (armia krolestwa w polu, oblezenie, rabunek albo wymuszenie we wsi miedzy krolestwem a wrogiem, bitwa z lordami obu stron)
+    ///    - nie sama potyczka z karawana; wojna wypowiedziana
+    ///    krolestwu za morzem, ktorego nikt nie dosiegnie, nie wymaga sluzby (Zelazne Wyspy i Dolina: wszystkie rody 0/20 dob od wspolnej doby wojny).
     /// Kolejnosc (2.0b): po zwrocie zoldu (KingdomTreasury.WageRefund), przed CrownIncome.End; kazde krolestwo i kazdy rod we wlasnym try.
     /// Platnik -> odbiorca: skarbiec (reszta wplywow dnia) -> glowa rodu (GiveGold w parze: skarbiec - x, glowa + x). Zapis: SaveText "arm_rent180"
     /// (sluzba rodow, normy zalog, doby przejecia twierdz).
@@ -64,14 +71,19 @@ namespace Armoury
         internal static long LastPool, LastPaid, LastHeld, LastHeldFail, LastRound;
         internal static int LastClans, LastOk, LastFailGar, LastFailSvc, LastFailBoth, LastKingdoms, LastNoPool;
         private static int _stumbles, _importN = -1, _importBad;
+        private static bool _importOld;   // zapis v1 (C2) - sluzba rodow od zera
         private static readonly HashSet<string> _err = new HashSet<string>();
         private static string _playerNote;     // ostatni powod wstrzymania renty gracza (komunikat tylko przy zmianie)
+        // pomiar sluzby z calej doby (C3): rody, ktorych partie walczyly z wrogiem od ostatniego ticku; krolestwa ze stykiem z wrogiem (zdarzenia)
+        private static readonly HashSet<Clan> _battleClans = new HashSet<Clan>();
+        private static readonly HashSet<Kingdom> _contact = new HashSet<Kingdom>();
+        private static int _evtN;
         private static long _playerWeekSum; private static int _playerWeekStart = -1;   // renta gracza zbiorczo co 7 dob
 
         internal static void Reset()
         {
             ClearState(); _rows.Clear();
-            ZeroLast(); _stumbles = 0; _err.Clear(); _importN = -1; _importBad = 0; _playerNote = null; _playerWeekSum = 0; _playerWeekStart = -1;
+            ZeroLast(); _stumbles = 0; _err.Clear(); _importN = -1; _importBad = 0; _importOld = false; _playerNote = null; _playerWeekSum = 0; _playerWeekStart = -1;
         }
 
         /// <summary>Stan sluzby, norm i przejec twierdz (wylaczone 180 = stan sprzed paczki: nic nie liczymy i nic nie zapisujemy).</summary>
@@ -79,6 +91,73 @@ namespace Armoury
         {
             _svc.Clear(); _norm.Clear(); _since.Clear(); _owner.Clear();
             _pts = new Settlement[0]; _px = new float[0]; _py = new float[0];
+            _battleClans.Clear(); _contact.Clear(); _evtN = 0;
+        }
+
+        // ------------------------------------------------------------ C3: bitwy, rabunki i szturmy z wrogiem o kazdej porze doby (zdarzenia gry)
+        internal static void RegisterEvents(CampaignBehaviorBase owner)
+        {
+            CampaignEvents.MapEventStarted.AddNonSerializedListener(owner, (me, a, d) => OnMapEvent(me));
+            CampaignEvents.MapEventEnded.AddNonSerializedListener(owner, OnMapEvent);
+        }
+
+        private static void OnMapEvent(MapEvent me)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (me == null || s == null || !On || !(s.CrownRentServiceWholeDay || s.CrownRentWarDayNeedsContact)) return;
+                var a = me.AttackerSide; var d = me.DefenderSide;
+                IFaction fa = Fac(a), fd = Fac(d);
+                bool x = Side(a, fd); bool y = Side(d, fa);
+                if (!x && !y) return;   // bez krolestw w wojnie po obu stronach (bandyci, Inni, piraci)
+                _evtN++;
+                // doba wojny krolestwa (CrownRentWarDayNeedsContact): rabunek, wymuszenie we wsi, oblezenie (szturm, wypad, blokada) albo bitwa lordow
+                // obu stron - nie sama potyczka z karawana czy chlopami
+                bool war = me.IsRaid || me.IsForcingVolunteers || me.IsForcingSupplies || me.IsSiegeAssault || me.IsSiegeOutside || me.IsSallyOut
+                           || me.IsBlockade || me.IsBlockadeSallyOut || (HasLord(a) && HasLord(d));
+                if (!war) return;
+                var ka = fa as Kingdom; var kd = fd as Kingdom;
+                if (ka != null && kd != null && Enemy(ka, kd)) { _contact.Add(ka); _contact.Add(kd); }
+            }
+            catch (Exception e) { Stumble("OnMapEvent", e); }
+        }
+
+        private static IFaction Fac(MapEventSide x) { try { return x != null ? x.MapFaction : null; } catch { return null; } }   // strona bez wodza - bez frakcji
+
+        private static bool HasLord(MapEventSide side)
+        {
+            var ps = side != null ? side.Parties : null;
+            if (ps == null) return false;
+            for (int i = 0; i < ps.Count; i++) { var mp = ps[i] != null && ps[i].Party != null ? ps[i].Party.MobileParty : null; if (mp != null && (mp.IsLordParty || mp.IsMainParty)) return true; }
+            return false;
+        }
+
+        /// <summary>Strona bitwy: styk jej krolestwa z wrogiem i rody jej druzyn (z czlonkami w druzynach innych rodow); true - strona walczy z krolestwem w wojnie.</summary>
+        private static bool Side(MapEventSide side, IFaction of)
+        {
+            if (side == null || of == null) return false;
+            var k = Fac(side) as Kingdom;
+            bool enemy = k != null && Enemy(k, of);
+            var ps = side.Parties;
+            if (ps == null) return enemy;
+            for (int i = 0; i < ps.Count; i++)
+            {
+                var mp = ps[i] != null && ps[i].Party != null ? ps[i].Party.MobileParty : null;
+                if (mp == null || !(mp.IsLordParty || mp.IsMainParty)) continue;
+                var c = mp.ActualClan;
+                if (c != null && c.Kingdom != null && Enemy(c.Kingdom, of)) _battleClans.Add(c);
+                var r = mp.MemberRoster;
+                if (r == null || r.TotalHeroes <= 1) continue;
+                for (int j = 0; j < r.Count; j++)   // czlonek rodu w druzynie innego rodu (rycerz 179, krewny) - sluzy z ta druzyna
+                {
+                    var ch = r.GetCharacterAtIndex(j);
+                    var h = ch != null && ch.IsHero ? ch.HeroObject : null;
+                    var hc = h != null ? h.Clan : null;
+                    if (hc != null && hc != c && hc.Kingdom != null && !h.IsChild && Enemy(hc.Kingdom, of)) _battleClans.Add(hc);
+                }
+            }
+            return enemy;
         }
 
         internal static void ZeroLast()
@@ -180,8 +259,17 @@ namespace Armoury
             }
             var st = Nearest(mp);
             if (st != null && Enemy(k, st.MapFaction)) return 4;
+            if (_whole)
+            {
+                // C3: poscig za partia wroga i odsiecz oblezonej albo rabowanej osady krolestwa - obrona wlasnej ziemi przed wrogiem w poblizu
+                var tp = mp.ShortTermTargetParty;
+                if (tp != null && mp.ShortTermBehavior == AiBehavior.EngageParty && Enemy(k, tp.MapFaction)) return 6;
+                var ts = mp.TargetSettlement;
+                if (ts != null && mp.DefaultBehavior == AiBehavior.DefendSettlement && ts.MapFaction == k && (ts.IsUnderSiege || ts.IsUnderRaid)) return 6;
+            }
             return 0;
         }
+        private static bool _whole;   // CrownRentServiceWholeDay w biezacym Daily
 
         private static int Popcount(long v) { int n = 0; while (v != 0) { v &= v - 1; n++; } return n; }
 
@@ -232,11 +320,17 @@ namespace Armoury
                 var oldSince = new List<string>();
                 foreach (var kv in _since) if (today - kv.Value >= GraceDays) oldSince.Add(kv.Key);
                 foreach (var id in oldSince) _since.Remove(id);
-                // 2. sluzba rodow w krolestwach w wojnie (doba wojny: maska przesuwa sie o 1)
+                // 2. sluzba rodow w krolestwach w wojnie (doba wojny: maska przesuwa sie o 1). C3: najpierw sluzba dzis wszystkich rodow, potem maska - doba
+                //    wojny bez styku z wrogiem (CrownRentWarDayNeedsContact) nie przesuwa maski (jak doba pokoju)
                 BuildPoints();
+                _whole = s.CrownRentServiceWholeDay;
+                bool needContact = s.CrownRentWarDayNeedsContact;
                 var warK = new Dictionary<Kingdom, bool>();
-                int warClans = 0, srvArmy = 0, srvSiege = 0, srvBattle = 0, srvLand = 0, srvCaptive = 0;
+                int warClans = 0, srvArmy = 0, srvSiege = 0, srvBattle = 0, srvLand = 0, srvCaptive = 0, srvBattleEvt = 0, srvGuard = 0, noContactClans = 0;
+                var active = new HashSet<Kingdom>(_contact);   // styk z wrogiem od ostatniego ticku (zdarzenia: bitwy, rabunki, szturmy)
+                var noContactK = new HashSet<Kingdom>();
                 var seen = new HashSet<string>();
+                var pend = new List<KeyValuePair<Svc, int>>(); var pendK = new List<Kingdom>();
                 foreach (var c in Clan.All)
                 {
                     try
@@ -264,15 +358,41 @@ namespace Armoury
                                     if (h == null || h.IsChild) continue;
                                     if (h.IsPrisoner) { var cap = h.PartyBelongedToAsPrisoner; if (cap != null && Enemy(k, cap.MapFaction)) how = 5; continue; }   // niewola na wojnie
                                     var mp = h.PartyBelongedTo;
-                                    if (mp != null && mp.ActualClan != c) how = Serving(mp, k);   // czlonek rodu w partii innego rodu (np. w druzynie krewnego)
+                                    if (mp != null && mp.ActualClan != c) how = Serving(mp, k);   // czlonek rodu w partii innego rodu (krewny, rycerz 179 w druzynie pana)
                                 }
                         }
-                        v.Mask = ((v.Mask << 1) | (how > 0 ? 1L : 0L)) & MaskAll;
-                        if (v.Seen < Window) v.Seen++;
-                        if (how == 1) srvArmy++; else if (how == 2) srvSiege++; else if (how == 3) srvBattle++; else if (how == 4) srvLand++; else if (how == 5) srvCaptive++;
+                        if (how == 0 && _whole && _battleClans.Contains(c)) how = 7;   // C3: bitwa, rabunek albo szturm z wrogiem w ciagu doby (zdarzenie)
+                        pend.Add(new KeyValuePair<Svc, int>(v, how)); pendK.Add(k);
                     }
                     catch (Exception e) { Stumble("Daily(sluzba)", e); }
                 }
+                // doba wojny krolestwa (styk z wrogiem): zdarzenia od wczoraj (wyzej) + w chwili ticku armia krolestwa w polu albo oblezenie miedzy krolestwami
+                // w wojnie (oblezenie trwa dobami - szturm bywa rzadki)
+                if (needContact)
+                    foreach (var kk in warK)
+                        if (kk.Value && kk.Key.Armies != null && kk.Key.Armies.Count > 0) active.Add(kk.Key);
+                if (needContact)
+                    foreach (var st in Settlement.All)
+                    {
+                        try
+                        {
+                            if (st == null || !st.IsUnderSiege || st.SiegeEvent == null || st.SiegeEvent.BesiegerCamp == null) continue;
+                            var bk = st.MapFaction as Kingdom; var lp = st.SiegeEvent.BesiegerCamp.LeaderParty;
+                            var ak = lp != null ? lp.MapFaction as Kingdom : null;
+                            if (bk != null && ak != null && Enemy(bk, ak)) { active.Add(bk); active.Add(ak); }
+                        }
+                        catch (Exception e) { Stumble("Daily(oblezenia)", e); }
+                    }
+                for (int i = 0; i < pend.Count; i++)
+                {
+                    var v = pend[i].Key; int how = pend[i].Value; var k = pendK[i];
+                    if (needContact && !active.Contains(k)) { noContactClans++; noContactK.Add(k); continue; }   // doba wojny bez styku z wrogiem - jak doba pokoju
+                    v.Mask = ((v.Mask << 1) | (how > 0 ? 1L : 0L)) & MaskAll;
+                    if (v.Seen < Window) v.Seen++;
+                    if (how == 1) srvArmy++; else if (how == 2) srvSiege++; else if (how == 3) srvBattle++; else if (how == 4) srvLand++; else if (how == 5) srvCaptive++;
+                    else if (how == 6) srvGuard++; else if (how == 7) srvBattleEvt++;
+                }
+                int evtN = _evtN; _battleClans.Clear(); _contact.Clear(); _evtN = 0;
                 var gone = new List<string>();
                 foreach (var kv in _svc) if (!seen.Contains(kv.Key)) gone.Add(kv.Key);
                 foreach (var id in gone) _svc.Remove(id);
@@ -422,9 +542,11 @@ namespace Armoury
                       .Append(", wies ").Append(s.CrownRentWeightVillage.ToString("0.##", Inv))
                       .Append("; warunek: zaloga >= ").Append((garShare * 100f).ToString("0", Inv)).Append("% normy ").Append(s.CrownRentGarrisonNormKingdom ? "krolestwa" : "swiata")
                       .Append(" (28 dob), sluzba >= ").Append(svcDays).Append(" z ostatnich ").Append(Window).Append(" dob wojny (rod, ktory widzial mniej dob wojny - ta sama czesc)")
-                      .Append(" | sluzba dzis: rody w wojnie ").Append(warClans).Append(", sluzylo ").Append(srvArmy + srvSiege + srvBattle + srvLand + srvCaptive)
+                      .Append(" | sluzba dzis: rody w wojnie ").Append(warClans).Append(", sluzylo ").Append(srvArmy + srvSiege + srvBattle + srvLand + srvCaptive + srvGuard + srvBattleEvt)
                       .Append(" (armia ").Append(srvArmy).Append(", oblezenie ").Append(srvSiege).Append(", bitwa ").Append(srvBattle).Append(", ziemia wroga ").Append(srvLand)
-                      .Append(", niewola ").Append(srvCaptive).Append(')')
+                      .Append(", niewola ").Append(srvCaptive).Append(", poscig i odsiecz ").Append(srvGuard).Append(", bitwa w ciagu doby (zdarzenie) ").Append(srvBattleEvt).Append(')')
+                      .Append("; pomiar z calej doby ").Append(_whole ? "TAK" : "NIE").Append(" (zdarzen bitew z wrogiem od wczoraj ").Append(evtN).Append(')')
+                      .Append("; doba wojny bez styku z wrogiem (nie liczy sie) ").Append(needContact ? noContactK.Count + " krolestw, " + noContactClans + " rodow" : "wylaczone")
                       .Append(" | normy zalog (srednio na krolestwo, 28 dob): miasto ").Append(kT > 0 ? (nT28 / kT).ToString("0", Inv) : "-")
                       .Append(", zamek ").Append(kC > 0 ? (nC28 / kC).ToString("0", Inv) : "-")
                       .Append("; twierdze pominiete w warunku zalogi: w oblezeniu ").Append(sieged).Append("; twierdze swiata w rekach obecnego pana krocej niz ").Append(GraceDays).Append(" dob (pomijane) ").Append(_since.Count)
@@ -432,7 +554,7 @@ namespace Armoury
                       .Append(", sluzba ").Append(pSvc)
                       .Append(" | na krolestwo (renty/reszta): ").Append(txt.Count > 0 ? string.Join(", ", txt.ToArray()) : "-")
                       .Append(_stumbles > 0 ? " | potkniecia " + _stumbles : "")
-                      .Append(_importN >= 0 ? " | wczytano: sluzba " + _importN + " rodow (bledne " + _importBad + ")" : "").Append('.');
+                      .Append(_importN >= 0 ? " | wczytano: sluzba " + _importN + " rodow (bledne " + _importBad + ")" + (_importOld ? " - zapis C2 (v1): sluzba od zera, nowy pomiar" : "") : "").Append('.');
                     Log.Info(sb.ToString());
                     _importN = -1;
                 }
@@ -454,13 +576,14 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ zapis (SaveText, "arm_rent180")
-        /// <summary>"v1|idRodu:idKrolestwa:maska(hex):doby;...|klucz normy>srednia>doby;...|idOsady=doba przejecia;..."</summary>
+        /// <summary>"v2|idRodu:idKrolestwa:maska(hex):doby;...|klucz normy>srednia>doby;...|idOsady=doba przejecia;..." (v2 - pomiar sluzby C3; v1 z C2 wczytywany
+        /// bez sluzby rodow: maski v1 maja doby wojny bez styku z wrogiem jako niesluzbe - przy CrownRentWarDayNeedsContact nie wysunelyby sie nigdy)</summary>
         internal static string Export()
         {
             try
             {
                 var sb = new StringBuilder(64 + _svc.Count * 40 + _norm.Count * 24 + _since.Count * 24);
-                sb.Append("v1|");
+                sb.Append("v2|");
                 bool first = true;
                 foreach (var kv in _svc)
                 {
@@ -494,13 +617,14 @@ namespace Armoury
 
         internal static void Import(string data)
         {
-            _svc.Clear(); _norm.Clear(); _since.Clear(); _owner.Clear(); _importN = 0; _importBad = 0;
+            _svc.Clear(); _norm.Clear(); _since.Clear(); _owner.Clear(); _importN = 0; _importBad = 0; _importOld = false;
             try
             {
                 if (string.IsNullOrEmpty(data)) return;   // stary zapis (bez klucza) - sluzba od zera (rod bez dob wojny - warunek sluzby nie obowiazuje)
                 var f = data.Split('|');
-                if (f.Length < 4 || f[0] != "v1") { _importBad++; return; }
-                if (f[1].Length > 0)
+                if (f.Length < 4 || (f[0] != "v1" && f[0] != "v2")) { _importBad++; return; }
+                if (f[0] == "v1") _importOld = true;   // C2: sluzba od zera (normy zalog i przejecia twierdz zostaja)
+                if (f[1].Length > 0 && !_importOld)
                     foreach (var p in f[1].Split(';'))
                     {
                         var x = p.Split(':'); long mask; int seen;

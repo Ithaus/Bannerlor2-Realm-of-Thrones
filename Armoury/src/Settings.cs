@@ -799,6 +799,9 @@ namespace Armoury
         public int CrownRentServiceDays = 20;              // days of service the crown asks of a house out of the realm's last 60 days of war (in an army of the realm, at a siege, in battle with the enemy, on enemy land or in captivity) - half of the old forty days of service
         public float CrownRentGarrisonShare = 0.5f;        // every stronghold of a house must keep at least this share of the realm's usual garrison for its kind (town or castle) for the house to get its rent
         public bool CrownRentGarrisonNormKingdom = true;   // the usual garrison is the average of the realm's own towns or castles over the last 28 days; off = the average of all towns or castles in the world
+        // 180 pomiar sluzby (C3, test C1+C2 120 dob: 94 z 215 rodow z lennem bez warunku - Zelazne Wyspy i Dolina 0/20 od wspolnej doby wojny, bitwy poza chwila ticku)
+        public bool CrownRentServiceWholeDay = true;       // service is seen over the whole day: a battle, raid or assault against the enemy counts whenever it happens, not only if it is going on at the day's tick, and so do chasing an enemy party and riding to relieve a besieged or raided settlement of the realm (defending your own land). Off = only what a party is doing at the moment of the day's tick, as before
+        public bool CrownRentWarDayNeedsContact = true;    // a day of war counts towards the service only when the realm really waged the war that day - an army of the realm in the field, a siege, raid or pressing of a village between the realm and its enemy, or a battle with lords on both sides; a war with a realm nobody can reach (across the sea) asks no service while it stays out of reach. Off = every day of a declared war counts, as before
 
         // --- Knights without fiefs (stage 2) ---
         // 179 (projekt etapu 2, krok C3): rycerze BK bez lenna nie prowadza wlasnych druzyn - jada w druzynie pana za 24 zl dziennie
