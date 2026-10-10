@@ -389,3 +389,9 @@ LIMITY 13:30: 5h 32%, TYDZIEN 82% (reset 15.10) - przy 100% tygodnia przejsc na 
   NIE wiaze (zold 47-51% pulapu). **C1 NIE WGRANY.** Diagnoza + poprawka: jeden pomocnik w tle (porownanie rod po rodzie budzet-rodow.csv obu biegow 120 dob,
   mechanizm w ClanBudget/dwor/AiGear/hamulec partii, korekta 182: dar Wolnych Miast 0.10 -> 0.15) -> commit na w-toku/e2c + sekcja w C1-POSTEP.md;
   potem znow test 120 dob i wgranie 16, jesli wojsko w wojnie >= ok. 96% bazy.
+- (01:30) **POPRAWKI WOJSKA C1**: (a) pomocnik - commit 385e7ec (diagnoza z budzet-rodow.csv: 65 rodow na pulapie = 73% braku; zwrot korony w D 38 tys.
+  wobec 112 tys., dwor 0.20 D szedl do kas siedzib takze przy rodzie na pulapie, sztywny podzial limitow partii 1.5:1). Zmiany: WarCourtYieldsToWages (w wojnie
+  dwor ustepuje zoldowi), PartyLimitsShareFreeRoom (limit partii = jej zold + czesc wolnego miejsca rodu), dar Wolnych Miast -> Dothrakowie 0.15 (regula korekty 182).
+  (b) ja - commit 4e4e627 C1-m: umowa najemnika przy najmie >= MercHireFloorShare 0.5 pelnej wielkosci kompanii (kompania najeta po bitwie odrasta; bylo -79%).
+  DLL test\Armoury-e2c-c1w.dll (d9a127bc). **TEST 120 dob w toku** -> test\at-c1w-120.out.txt. Ocena: sprawdz_logi --grupa etap2 --baza e2b-p\baza-B4.json;
+  wojsko lordow w wojnie (doby 94-121) cel ok. 95+ tys. (baza 111.5, C1-r 89.7); jesli >= ok. 96% bazy albo luka wyraznie do zamkniecia kredytem 168 -> WGRANIE 16.
