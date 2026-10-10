@@ -738,6 +738,11 @@ namespace Armoury
         public bool CrownCustomsSingleTake = true;         // with Crown Current Income: the crown's customs come from the town's toll counter alone - no second take from the town purse for the same customs
         public bool CrownDuesFromLand = true;              // with Crown Current Income: the vassal dues are reckoned on the land part of a house's steady income (its villages, towns and castles), not on the money it gets from the crown itself (refunds, rents) - the crown takes no dues from its own payments. Needs Clan Income Book Stable D; without a measured steady income the old base is used
         public bool ClanBudgetEnabled = false;             // AI houses keep only as many men as their steady income allows (house budget, stage 2) - needed by Crown Current Income
+        // 182 (projekt etapu 2, krok C1): dary miedzy koronami i Straz bez zoldu
+        public bool CrownGifts = true;                     // with Crown Current Income: the North feeds the Night's Watch and the Free Cities pay the Dothraki - each day a share of the giver's daily income goes through the receiving crown to its houses the same day, by fixed weights (the Watch: a stronghold 1, a village a quarter, a house without a fief half; the Dothraki: equal for every house of the khalasar) - never by the number of men. It counts towards their steady income. Off = no gifts
+        public float GiftNorthToWatchShare = 0.25f;        // share of the North's daily income given to the Night's Watch
+        public float GiftFreeCitiesToDothrakiShare = 0.1f; // share of each Free City's daily income given to the Dothraki (Braavos, Volantis, Pentos, Myr, Lys, Tyrosh, Norvos, Qohor, Lorath); raise to 0.15 if the Dothraki still starve
+        public bool WatchUnpaid = true;                    // the brothers of the Night's Watch take no wages: troops in the parties and garrisons of the Watch cost nothing a day; food and kit come from the gifts and the Watch's own villages, and the Watch's numbers are held by the house budget in men instead of gold (needs Clan Budget Enabled). Off = the Watch is paid like everyone else
 
         // --- The soldier's clothes ---
         // 150 (plan K13): kazdy zolnierz na zoldzie zdziera odziez; stawki w kg na czlowieka na rok (sztuka skory, filcu i plotna w grze = 10 kg),

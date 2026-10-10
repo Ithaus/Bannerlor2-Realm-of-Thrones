@@ -42,6 +42,7 @@ namespace Armoury
         [ThreadStatic] private static int _depth;
         [ThreadStatic] private static MobileParty _party;   // partia, ktorej zold (GetTotalWage) albo werbunek (CheckRecruiting) liczymy; null = poza nimi
         [ThreadStatic] private static bool _raw;            // linia dnia: stawka jednostki bez premii
+        [ThreadStatic] private static bool _total;          // 182: liczymy zold partii (GetTotalWage) - nie cene werbunku (CheckRecruiting)
 
         private static Harmony _harmony;
         private static readonly HashSet<Type> _totalHooked = new HashSet<Type>();
@@ -71,13 +72,36 @@ namespace Armoury
         public static void WagePostfix(CharacterObject __0, ref int __result)
         {
             if (_depth > 1 || _raw) return;
-            try { __result = Apply(__result, __0, _party); }
+            try
+            {
+                // 182 (WatchUnpaid, [D] 07.10): bracia Strazy nie biora zoldu - w partiach i zalogach Strazy zold jednostki 0 (tylko zold partii; cena
+                // werbunku i stawka nominalna - jak dotad); liczebnosc trzyma pulap 166 w ludziach (ClanBudget), dlatego tylko z ClanBudgetEnabled
+                if (_total && _party != null && __0 != null && !__0.IsHero && __result > 0 && CrownGifts.WatchUnpaidOn && CrownGifts.IsWatchParty(_party)) { __result = 0; return; }
+                __result = Apply(__result, __0, _party);
+            }
             catch { }
         }
 
+        /// <summary>182: stawka nominalna jednostki (premia konnego, bez Strazy bez zoldu) - pulap Strazy w ludziach (166).</summary>
+        internal static int Nominal(CharacterObject c, MobileParty p)
+        {
+            try
+            {
+                var m = Campaign.Current != null ? Campaign.Current.Models.PartyWageModel : null;
+                if (m == null || c == null) return 0;
+                return Apply(Raw(m, c), c, p);
+            }
+            catch { return 0; }
+        }
+
         // ------------------------------------------------------------ kontekst partii: GetTotalWage (zold partii) i CheckRecruiting (werbunek AI)
-        public static void PartyPrefix(MobileParty __0, out MobileParty __state) { __state = _party; _party = __0; }
-        public static Exception PartyFinalizer(Exception __exception, MobileParty __state) { _party = __state; return __exception; }
+        public static void PartyPrefix(MobileParty __0, out TotalCtx __state) { __state = new TotalCtx { P = _party, T = _total }; _party = __0; _total = false; }   // werbunek AI: cena, nie zold partii
+        public static Exception PartyFinalizer(Exception __exception, TotalCtx __state) { _party = __state.P; _total = __state.T; return __exception; }
+
+        // 182: kontekst zoldu partii (GetTotalWage) - partia i znacznik "zold partii" (CheckRecruiting wolany wewnatrz zostaje bez znacznika po finalizerze)
+        internal struct TotalCtx { public MobileParty P; public bool T; }
+        public static void TotalPrefix(MobileParty __0, out TotalCtx __state) { __state = new TotalCtx { P = _party, T = _total }; _party = __0; _total = true; }
+        public static Exception TotalFinalizer(Exception __exception, TotalCtx __state) { _party = __state.P; _total = __state.T; return __exception; }
 
         /// <summary>Zold jednostki z modelu gry bez premii (linia dnia).</summary>
         private static int Raw(PartyWageModel m, CharacterObject c)
@@ -148,8 +172,8 @@ namespace Armoury
                                             new[] { typeof(MobileParty), typeof(TroopRoster), typeof(bool) }, null);
                         if (m == null || m.IsAbstract) continue;
                         _totalHooked.Add(t);
-                        h.Patch(m, prefix: new HarmonyMethod(typeof(MountedWage), nameof(PartyPrefix)) { priority = Priority.First },
-                                   finalizer: new HarmonyMethod(typeof(MountedWage), nameof(PartyFinalizer)));
+                        h.Patch(m, prefix: new HarmonyMethod(typeof(MountedWage), nameof(TotalPrefix)) { priority = Priority.First },
+                                   finalizer: new HarmonyMethod(typeof(MountedWage), nameof(TotalFinalizer)));
                         now++;
                     }
                     catch (Exception e) { Log.Error("MountedWage.EnsureContextHooks(" + (t != null ? t.FullName : "?") + ")", e); }

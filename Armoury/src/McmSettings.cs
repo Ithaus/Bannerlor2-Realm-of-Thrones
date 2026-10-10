@@ -2612,6 +2612,22 @@ namespace Armoury
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool ClanBudgetEnabled { get; set; } = false;
 
+        [SettingPropertyBool("Crown Gifts", HintText = "with Crown Current Income: the North feeds the Night's Watch and the Free Cities pay the Dothraki - each day a share of the giver's daily income goes through the receiving crown to its houses the same day, by fixed weights (the Watch: a stronghold 1, a village a quarter, a house without a fief half; the Dothraki: equal for every house of the khalasar) - never by the number of men. It counts towards their steady income. Off = no gifts")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public bool CrownGifts { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Gift North To Watch Share", 0.00f, 1.00f, "0.00", HintText = "share of the North's daily income given to the Night's Watch")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public float GiftNorthToWatchShare { get; set; } = 0.25f;
+
+        [SettingPropertyFloatingInteger("Gift Free Cities To Dothraki Share", 0.00f, 1.00f, "0.00", HintText = "share of each Free City's daily income given to the Dothraki (Braavos, Volantis, Pentos, Myr, Lys, Tyrosh, Norvos, Qohor, Lorath); raise to 0.15 if the Dothraki still starve")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public float GiftFreeCitiesToDothrakiShare { get; set; } = 0.1f;
+
+        [SettingPropertyBool("Watch Unpaid", HintText = "the brothers of the Night's Watch take no wages: troops in the parties and garrisons of the Watch cost nothing a day; food and kit come from the gifts and the Watch's own villages, and the Watch's numbers are held by the house budget in men instead of gold (needs Clan Budget Enabled). Off = the Watch is paid like everyone else")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public bool WatchUnpaid { get; set; } = true;
+
         [SettingPropertyBool("Army Clothing Enabled", HintText = "every soldier on pay wears out his shoes, clothes and linen: men in a lord's party (yours too) buy leather, felt (woollen cloth) and linen in the towns they leave - piece by piece at the market price, out of their own purse, before they spend the rest on food and drink; a town garrison takes them from its own town's market without paying, for its pay already went into that town's purse; a castle garrison has the castle purse buy them in the town its villages trade with. What cannot be had waits (Army Clothing Max Wait Days), then is only noted in the log. Banner Kings party supplies no longer buy or use up wool, linen or flax for the troops, and their 'Textiles supplies' morale penalty is gone - one rule for clothing, rags carry no penalty (off = no wear, Banner Kings textiles and their morale penalty as before)")]
         [SettingPropertyGroup("The soldier's clothes")]
         public bool ArmyClothingEnabled { get; set; } = true;
@@ -4100,6 +4116,10 @@ namespace Armoury
             s.CrownCustomsSingleTake = CrownCustomsSingleTake;
             s.CrownDuesFromLand = CrownDuesFromLand;
             s.ClanBudgetEnabled = ClanBudgetEnabled;
+            s.CrownGifts = CrownGifts;
+            s.GiftNorthToWatchShare = GiftNorthToWatchShare;
+            s.GiftFreeCitiesToDothrakiShare = GiftFreeCitiesToDothrakiShare;
+            s.WatchUnpaid = WatchUnpaid;
             s.ArmyClothingEnabled = ArmyClothingEnabled;
             s.ArmyClothingFieldLeatherKg = ArmyClothingFieldLeatherKg;
             s.ArmyClothingFieldClothKg = ArmyClothingFieldClothKg;
