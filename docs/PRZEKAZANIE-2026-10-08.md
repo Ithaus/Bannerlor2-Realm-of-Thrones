@@ -483,3 +483,7 @@ LIMITY 13:30: 5h 32%, TYDZIEN 82% (reset 15.10) - przy 100% tygodnia przejsc na 
   koniec etapu 2 (bieg 2-letni + wymuszony pokoj), etap 3 krok po kroku (3.2 -> 3.3 -> 3.1 -> 3.4-3.7 -> 3.8 -> 3.9/3.10).
 - (08:45) **Paczka 186 korona pozycza w Banku - START** (pomocnik w tle, drzewo noc2\e2c od 432e8e9; projekt jako sekcja "186 - korona pozycza" w C1-POSTEP.md drzewa,
   potem kod, recenzja wlasna). Potem: test 120 dob -> zapis -> WGRANIE 20. Limit tygodnia 96% - przy 99% pelne przekazanie.
+- (09:20) **186 GOTOWE** (pomocnik; e2c 57fbf30 + 037c406 recenzja; CrownBorrow.cs; projekt w C1-POSTEP.md "186"): korona w wojnie pozycza brak do pelnego zwrotu zoldu
+  z kapitalu Banku ponad 2 mln (pula 1/60 nadwyzki dziennie), limit 180 dni sredniego podatku, cena jak krol w Banku (20% + 10 pp przy dlugu), rata pierwszy wydatek dnia
+  (1/182 najwiekszego dlugu, max 30% podatku); zaleglosc (< 50% rat w 28 dobach) -> Bank nie pozycza jej ani jej rodom, wrogom limit x1.5. Klucze CrownBorrows i 6 innych,
+  zapis arm_crown186, linia "Kredyt korony (186): dzien". DLL test\Armoury-e2c-186.dll (9dc69ff6). **TEST 120 dob w toku** -> test\at-186-120.out.txt.
