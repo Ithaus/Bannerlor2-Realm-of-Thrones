@@ -31,6 +31,13 @@ namespace Armoury
         internal static bool On { get { var s = Settings.Current; return s != null && s.MercContractEnabled && CrownIncome.On; } }
         private static bool GameOff { get { var s = Settings.Current; return s != null && s.MercGameContractAiOff && On; } }
 
+        /// <summary>Przeglad C1 (uwaga 2): gra przestaje placic kompanii dopiero, gdy ma ona umowe z obecna korona (bez umowy - jak dotad).</summary>
+        private static bool HasDeal(Clan c)
+        {
+            Deal d;
+            return c != null && c.StringId != null && c.Kingdom != null && _deals.TryGetValue(c.StringId, out d) && d.Kingdom == c.Kingdom.StringId;
+        }
+
         private sealed class Deal { public string Kingdom; public long K, Wage; public int Men, Day, Review, Unpaid; }
         private static readonly Dictionary<string, Deal> _deals = new Dictionary<string, Deal>();   // id rodu -> umowa
 
@@ -64,8 +71,16 @@ namespace Armoury
             {
                 var mp = wps[i] != null ? wps[i].MobileParty : null;
                 if (mp == null || !mp.IsActive) continue;
-                wage += Math.Max(0, mp.TotalWage);
-                if (mp.MemberRoster != null) men += mp.MemberRoster.TotalRegulars;
+                int w = Math.Max(0, mp.TotalWage);
+                var r = mp.MemberRoster;
+                if (w == 0 && r != null && r.TotalRegulars > 0)
+                    for (int j = 0; j < r.Count; j++)   // przeglad C1 (uwaga 2): kompania w sluzbie Strazy (zold 0) - umowa od stawki nominalnej
+                    {
+                        var el = r.GetElementCopyAtIndex(j);
+                        if (el.Character != null && !el.Character.IsHero && el.Number > 0) w += MountedWage.Nominal(el.Character, mp) * el.Number;
+                    }
+                wage += w;
+                if (r != null) men += r.TotalRegulars;
             }
         }
 
@@ -103,9 +118,13 @@ namespace Armoury
                         if (!AiMerc(c)) continue;
                         seen.Add(c.StringId);
                         long wage; int men; Company(c, out wage, out men);
+                        bool war = KingdomTreasury.AtWar(c.Kingdom);
                         Deal d;
                         if (!_deals.TryGetValue(c.StringId, out d) || d.Kingdom != c.Kingdom.StringId)
                         {
+                            // przeglad C1 (uwaga 2): bez ludzi albo bez zoldu nie ma z czego liczyc umowy - czekamy na doba z kompania w polu
+                            // (do tego czasu gra placi jak dotad: MercIncomePrefix/TierPostfix dzialaja tylko dla rodow z umowa)
+                            if (men <= 0 || wage <= 0) { if (d != null) _deals.Remove(c.StringId); continue; }
                             // dzien najmu: kontrakt z dzisiejszego zoldu kompanii (zold + jedzenie + sprzet)
                             d = new Deal { Kingdom = c.Kingdom.StringId, Wage = wage, K = (long)Math.Round(factor * wage), Men = men, Day = today, Review = today };
                             _deals[c.StringId] = d; LastNew++;
@@ -115,13 +134,15 @@ namespace Armoury
                         else if (today - d.Review >= reviewDays)
                         {
                             d.Review = today;
-                            if (d.Men > 0 && men < floor * d.Men)
+                            // przeglad C1 (uwaga 1): w pokoju kompania czeka na polowie ludzi - porownanie z ludzmi wymaganymi dzis, nie z pelna umowa
+                            double want = war ? d.Men : d.Men * peace;
+                            if (d.Men > 0 && men < floor * want)
                             {
                                 // przeglad tylko w dol: kontrakt i ludzie do stanu faktycznego
-                                d.K = (long)Math.Round((double)d.K * men / d.Men); d.Wage = (long)Math.Round((double)d.Wage * men / d.Men); d.Men = men; LastCut++;
+                                double k = Math.Max(0.0, (double)men / Math.Max(1.0, want));   // umowa do stanu faktycznego (wobec ludzi wymaganych dzis)
+                                d.K = (long)Math.Round(d.K * k); d.Wage = (long)Math.Round(d.Wage * k); d.Men = (int)Math.Round(d.Men * k); LastCut++;
                             }
                         }
-                        bool war = KingdomTreasury.AtWar(c.Kingdom);
                         long due = war ? d.K : (long)(d.K * peace);
                         menNow += men; menDeal += war ? d.Men : (long)(d.Men * peace);
                         if (due <= 0) continue;
@@ -206,7 +227,7 @@ namespace Armoury
         {
             try
             {
-                if (__0 == null || __0 == Clan.PlayerClan || !__0.IsUnderMercenaryService || !GameOff) return true;
+                if (__0 == null || __0 == Clan.PlayerClan || !__0.IsUnderMercenaryService || !GameOff || !HasDeal(__0)) return true;
                 if (__2 && __0.Kingdom != null && __0.Leader != null)
                 {
                     try { _dGameOff += (long)Math.Ceiling(__0.Influence * (1f / Campaign.Current.Models.ClanFinanceModel.RevenueSmoothenFraction())) * __0.MercenaryAwardMultiplier; } catch { }
@@ -219,7 +240,7 @@ namespace Armoury
         /// <summary>Czy "za tier" tego rodu jest dzis zdejmowany (ksiega obiegu nie liczy go wtedy jako zrodla z niczego) - ten sam warunek co TierPostfix.</summary>
         internal static bool CancelsTier(Clan c)
         {
-            try { return _tierWired && c != null && c != Clan.PlayerClan && !c.IsEliminated && c.IsUnderMercenaryService && GameOff && c.Fiefs != null && c.Fiefs.Count == 0; }
+            try { return _tierWired && c != null && c != Clan.PlayerClan && !c.IsEliminated && c.IsUnderMercenaryService && GameOff && HasDeal(c) && c.Fiefs != null && c.Fiefs.Count == 0; }
             catch { return false; }
         }
         private static bool _tierWired;
@@ -230,7 +251,7 @@ namespace Armoury
             try
             {
                 var c = __0;
-                if (c == null || c == Clan.PlayerClan || c.IsEliminated || !c.IsUnderMercenaryService || !GameOff) return;
+                if (c == null || c == Clan.PlayerClan || c.IsEliminated || !c.IsUnderMercenaryService || !GameOff || !HasDeal(c)) return;
                 if (c.Fiefs == null || c.Fiefs.Count != 0) return;   // ten sam warunek co w grze (rod bez lenn)
                 int x = c.Tier * (80 + 40);
                 if (x == 0) return;

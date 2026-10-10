@@ -324,6 +324,7 @@ namespace Armoury
             var clan = _clan;
             _clan = null;
             if (clan == null) return;
+            try { CrownIncome.ClanTickEnd(clan, _haveNet, _goldMid, _net); } catch (Exception e) { Stumble("SoldierPay.ClanTickEnd", e); }   // 165: splata dlugu wobec korony do skarbca
             try { Settle(clan); }
             catch (Exception e) { Stumble("SoldierPay.Settle", e); }
             finally { _recs.Clear(); _haveNet = false; }

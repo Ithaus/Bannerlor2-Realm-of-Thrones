@@ -267,7 +267,7 @@ namespace Armoury
                       .Append(" | zostalo z wplywow dnia w skarbcach ").Append(left)
                       .Append(" | dlugi reparacji: ").Append(_debts.Count).Append(" na ").Append(debtSum).Append(" zl, nowe dzis ").Append(LastNewDebtN).Append(" na ").Append(LastNewDebt)
                       .Append(", przepadly (krolestwa nie ma) ").Append(_dDroppedN).Append(" na ").Append(_dDropped)
-                      .Append(" | splata dlugu wobec korony do skarbcow (stary zapis) ").Append(LastDebtRepaid)
+                      .Append(" | splata dlugu wobec korony do skarbcow (stary zapis) ").Append(LastDebtRepaid).Append(" (niezaplacone mimo wpisu w saldzie - nie do skarbca ").Append(_dDebtUnpaid).Append(')')
                       .Append(" | krolestwa bez wczorajszej migawki (tylko nasze liczniki) ").Append(noSnap)
                       .Append(" | reparacje Diplomacy przechwycone: ").Append(_repWired ? "TAK" : "BRAK").Append(", splata dlugu wobec korony: ").Append(_debtWired ? "TAK" : "BRAK")
                       .Append(" | na krolestwo (wplywy+zapas, wydatki): ").Append(txt.Count > 0 ? string.Join(", ", txt.ToArray()) : "-")
@@ -275,7 +275,7 @@ namespace Armoury
                     if (_importN >= 0) { sb.Append(" Wczytano z zapisu: dlugow reparacji ").Append(_importN).Append(" (bledne ").Append(_importBad).Append(")."); _importN = -1; }
                     Log.Info(sb.ToString());
                 }
-                _dDropped = 0; _dDroppedN = 0;
+                _dDropped = 0; _dDroppedN = 0; _dDebtUnpaid = 0;
             }
             catch (Exception e) { Stumble("End", e); }
             finally { _open = false; }
@@ -317,10 +317,17 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ splata DebtToKingdom do skarbca (gra: AddPaymentForDebts - dotad w nicosc)
+        // przeglad C1 (uwaga 3): splata w AddPaymentForDebts to wpis w saldzie rodu, a saldo dopisuje gra na koncu rozliczenia (DailyTickClan) - kiesa
+        // glowy nie schodzi ponizej 0, a BK dopisuje wydatki PO tym kroku. Skarbiec dostaje wiec dopiero na koncu rozliczenia rodu (SoldierPay.ClanTickPostfix)
+        // i tylko czesc, ktora glowa naprawde zaplacila: splata minus brak salda (saldo, ktore nie zmiescilo sie w kiesie). Ujemna "splata" gry (gra dopisuje
+        // rodowi brak jako dlug) - nic.
+        private static Clan _debtClan; private static int _debtPaid;
+        private static long _dDebtUnpaid;
+
         public static void DebtPrefix(Clan __0, bool __2, out int __state)
         {
             __state = -1;
-            try { if (__2 && __0 != null && On) __state = __0.DebtToKingdom; } catch { __state = -1; }
+            try { if (__2 && __0 != null && On) { __state = __0.DebtToKingdom; if (!ReferenceEquals(_debtClan, __0)) { _debtClan = null; _debtPaid = 0; } } } catch { __state = -1; }
         }
 
         public static void DebtPostfix(Clan __0, int __state)
@@ -330,10 +337,29 @@ namespace Armoury
                 if (__state < 0 || __0 == null || __0.Kingdom == null) return;
                 int paid = __state - __0.DebtToKingdom;
                 if (paid <= 0) return;
-                __0.Kingdom.KingdomBudgetWallet += paid;   // saldo rodu niesie -paid (gra zdejmuje to z kiesy glowy) - teraz do skarbca, nie w nicosc
-                _dDebtRepaid += paid;
+                _debtClan = __0; _debtPaid += paid;                // do zaplaty skarbcowi na koncu rozliczenia rodu (ClanTickEnd)
             }
             catch (Exception e) { Stumble("DebtPostfix", e); }
+        }
+
+        /// <summary>SoldierPay.ClanTickPostfix (koniec rozliczenia rodu): splata dlugu wobec korony do skarbca - najwyzej to, co glowa naprawde zaplacila.
+        /// haveNet - znane saldo i kiesa glowy przed jego dopisaniem; bez nich - nic (nie wiemy, czy zaplacono).</summary>
+        internal static void ClanTickEnd(Clan c, bool haveNet, int goldMid, int net)
+        {
+            try
+            {
+                if (_debtClan == null || !ReferenceEquals(_debtClan, c)) { _debtClan = null; _debtPaid = 0; return; }
+                int paid = _debtPaid;
+                _debtClan = null; _debtPaid = 0;
+                if (paid <= 0 || c.Kingdom == null || !On) return;
+                long gap = haveNet ? Math.Max(0L, -((long)goldMid + net)) : paid;   // brak salda - najpierw obciaza splate dlugu
+                long real = Math.Max(0L, paid - gap);
+                _dDebtUnpaid += paid - real;
+                if (real <= 0) return;
+                c.Kingdom.KingdomBudgetWallet += (int)real;      // glowa zaplacila w saldzie - do skarbca, nie w nicosc
+                _dDebtRepaid += real;
+            }
+            catch (Exception e) { Stumble("ClanTickEnd", e); }
         }
 
         private static Harmony _harmony;

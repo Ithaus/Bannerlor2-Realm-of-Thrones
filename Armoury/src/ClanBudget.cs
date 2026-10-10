@@ -481,7 +481,7 @@ namespace Armoury
                     if (left <= 0) break;
                     var st = f != null ? f.Settlement : null; var gp = f != null ? f.GarrisonParty : null;
                     int t;
-                    if (st == null || gp == null || !gp.IsActive || !_garTarget.TryGetValue(st, out t)) continue;
+                    if (st == null || gp == null || !gp.IsActive || gp.MapEvent != null || st.IsUnderSiege || !_garTarget.TryGetValue(st, out t)) continue;   // przeglad C1 (uwaga 5): nie w bitwie ani oblezeniu
                     double above = gp.TotalWage - t;
                     if (above <= 0) continue;
                     double take = Math.Min(left, above);
@@ -650,8 +650,8 @@ namespace Armoury
             var b = Of(c); share = b != null ? (float)Math.Max(0, b.Build) : 0f; return b != null;
         }
 
-        /// <summary>IronBank: kiesa rodziny w budzecie zastepuje "rodzina placi" Banku (jedna regula).</summary>
-        internal static bool FamilyRuleOn { get { var s = Settings.Current; return s != null && s.ClanBudgetEnabled && s.FamilyTopsUpHead; } }
+        /// <summary>IronBank: kiesa rodziny w budzecie zastepuje "rodzina placi" Banku (jedna regula) - tylko u rodow z budzetem dzis.</summary>
+        internal static bool FamilyRuleFor(Clan c) { var s = Settings.Current; return s != null && s.FamilyTopsUpHead && Of(c) != null; }
 
         // ------------------------------------------------------------ latki gry (w kampanii, raz na proces - pulapka konstruktorow statycznych modeli)
         private static Harmony _harmony;
@@ -666,7 +666,7 @@ namespace Armoury
             Wire("limit partii (MakeClanFinancialEvaluation)", AccessTools.Method(typeof(ClanVariablesCampaignBehavior), "MakeClanFinancialEvaluation", new[] { typeof(Clan) }), null, nameof(EvalPostfix), null);
             Wire("limit zalog (UpdateClanSettlementsPaymentLimit)", AccessTools.Method(typeof(ClanVariablesCampaignBehavior), "UpdateClanSettlementsPaymentLimit", new[] { typeof(Clan) }), null, nameof(GarLimitPostfix), null);
             Wire("dezercja z limitu zoldu (GetTroopsToDesertDueToWageAndPartySize)", AccessTools.Method(typeof(DefaultPartyDesertionModel), "GetTroopsToDesertDueToWageAndPartySize", new[] { typeof(MobileParty), typeof(TroopRoster) }), nameof(DesertPrefix), null, nameof(DesertFinalizer));
-            Wire("nowa partia (ConsiderSpawningLordParties)", AccessTools.Method(typeof(HeroSpawnCampaignBehavior), "ConsiderSpawningLordParties", new[] { typeof(Clan), typeof(bool) }), nameof(SpawnPrefix), null, null);
+            Wire("nowa partia (SpawnLordParty)", AccessTools.Method(typeof(HeroSpawnCampaignBehavior), "SpawnLordParty", new[] { typeof(Hero), typeof(bool) }), nameof(SpawnPrefix), nameof(SpawnPostfix), null);
             Wire("werbunek Strazy (CheckRecruiting)", AccessTools.Method(typeof(RecruitmentCampaignBehavior), "CheckRecruiting", new[] { typeof(MobileParty), typeof(Settlement) }), nameof(RecruitPrefix), null, null);
             Wire("zaloga Strazy: werbunek (TickAutoRecruitmentGarrisonChange)", AccessTools.Method(typeof(GarrisonRecruitmentCampaignBehavior), "TickAutoRecruitmentGarrisonChange", new[] { typeof(Town) }), nameof(GarRecruitPrefix), null, null);
             Wire("zaloga Strazy: przyrost (TickGarrisonChangeForTown)", AccessTools.Method(typeof(GarrisonRecruitmentCampaignBehavior), "TickGarrisonChangeForTown", new[] { typeof(Town) }), nameof(GarRecruitPrefix), null, null);
@@ -723,26 +723,55 @@ namespace Armoury
             return __exception;
         }
 
-        /// <summary>Nowa partia rodu tylko, gdy w pulapie partii jest miejsce na MinNewPartyMen ludzi (rod bez partii - zawsze; nowa kampania - zawsze).</summary>
-        public static bool SpawnPrefix(Clan __0, bool __1)
+        // przeglad C1 (uwaga 7): gra w jednym wywolaniu ConsiderSpawningLordParties moze wystawic kilka partii - sprawdzamy kazda (SpawnLordParty),
+        // z miejscem zajetym przez wczesniejsze nowe partie tej doby; nowa partia dostaje limit zoldu od razu (nie dopiero w rozliczeniu nastepnego dnia)
+        private static readonly Dictionary<Clan, double> _spawnUsed = new Dictionary<Clan, double>();
+        private static int _spawnDay = -1;
+
+        /// <summary>Nowa partia rodu tylko, gdy w pulapie partii jest miejsce na MinNewPartyMen ludzi (glowa rodu, rod bez partii, nowa kampania - zawsze).</summary>
+        public static bool SpawnPrefix(Hero __0, bool __1, ref MobileParty __result)
         {
             try
             {
                 var s = Settings.Current;
-                var b = Of(__0);
-                if (__1 || b == null || s == null || __0.WarPartyComponents == null || __0.WarPartyComponents.Count == 0) return true;
+                var c = __0 != null ? __0.Clan : null;
+                var b = Of(c);
+                if (__1 || b == null || s == null || __0 == c.Leader || c.WarPartyComponents == null || c.WarPartyComponents.Count == 0) return true;
+                int day = (int)CampaignTime.Now.ToDays;
+                if (day != _spawnDay) { _spawnUsed.Clear(); _spawnDay = day; }
+                double used; _spawnUsed.TryGetValue(c, out used);
                 int need = Math.Max(0, s.MinNewPartyMen);
+                double cost;
                 bool room;
-                if (b.Zero) room = b.MenCap < 0 || b.MenCap - (b.MenPar + b.MenGar) >= need;
+                if (b.Zero) { cost = need; room = b.MenCap < 0 || b.MenCap - LiveMen(c) - used >= need; }
                 else
                 {
                     double avg = b.MenPar > 0 ? (double)b.WPar / b.MenPar : Math.Max(1f, Campaign.Current.AverageWage);
-                    room = b.PartyCap - b.WPar >= need * avg;
+                    cost = need * avg;
+                    room = b.PartyCap - b.WPar - used >= cost;
                 }
-                if (!room) _dSpawnBlock++;
-                return room;
+                if (!room) { _dSpawnBlock++; __result = null; return false; }   // ConsiderSpawningLordParties sprawdza null - partia nie powstaje
+                _spawnUsed[c] = used + cost;
+                return true;
             }
             catch (Exception e) { Stumble("SpawnPrefix", e); return true; }
+        }
+
+        public static void SpawnPostfix(Hero __0, MobileParty __result)
+        {
+            try { var c = __0 != null ? __0.Clan : null; var b = Of(c); if (b != null && __result != null) ApplyPartyLimits(c, b); }
+            catch (Exception e) { Stumble("SpawnPostfix", e); }
+        }
+
+        /// <summary>Przeglad C1 (uwaga 6): ludzie rodu teraz (partie i zalogi) - pulap Strazy w ludziach liczony od biezacego stanu, nie od porannego.</summary>
+        private static int LiveMen(Clan c)
+        {
+            int n = 0;
+            var wps = c.WarPartyComponents;
+            if (wps != null) for (int i = 0; i < wps.Count; i++) { var mp = wps[i] != null ? wps[i].MobileParty : null; if (mp != null && mp.IsActive && mp.MemberRoster != null) n += mp.MemberRoster.TotalRegulars; }
+            var fiefs = c.Fiefs;
+            if (fiefs != null) for (int i = 0; i < fiefs.Count; i++) { var gp = fiefs[i] != null ? fiefs[i].GarrisonParty : null; if (gp != null && gp.IsActive && gp.MemberRoster != null) n += gp.MemberRoster.TotalRegulars; }
+            return n;
         }
 
         /// <summary>Straz bez zoldu: werbunek partii staje na pulapie w ludziach (limit w zlocie przy zoldzie 0 nie wiaze).</summary>
@@ -751,9 +780,10 @@ namespace Armoury
             try
             {
                 if (__0 == null || !CrownGifts.IsWatchParty(__0)) return true;
-                var b = Of(OwnerOf(__0));
+                var c = OwnerOf(__0);
+                var b = Of(c);
                 if (b == null || !b.Zero || b.MenCap < 0) return true;
-                if (b.MenPar + b.MenGar < b.MenCap) return true;
+                if (LiveMen(c) < b.MenCap) return true;
                 _dRecruitBlock++;
                 return false;
             }
@@ -768,7 +798,7 @@ namespace Armoury
                 if (st == null || !CrownGifts.IsWatch(st.MapFaction)) return true;
                 var b = Of(st.OwnerClan);
                 if (b == null || !b.Zero || b.MenCap < 0) return true;
-                if (b.MenPar + b.MenGar < b.MenCap) return true;
+                if (LiveMen(st.OwnerClan) < b.MenCap) return true;
                 _dGarBlock++;
                 return false;
             }
