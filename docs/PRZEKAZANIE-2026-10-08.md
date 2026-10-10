@@ -429,3 +429,7 @@ LIMITY 13:30: 5h 32%, TYDZIEN 82% (reset 15.10) - przy 100% tygodnia przejsc na 
   bitwy -2.2; 183 dezercja -2.4 (zrodlo: DLUG SNU T10 = 3, morale -95%, u 11-15 partii AI przez ok. 2 tygodnie, doby 66-82, Dorne/Oberyn) - prawo to samo co gracza;
   179 -0.4. **DO ZROBIENIA POZNIEJ (poza C3): AI na dlugu snu ma odpoczywac** (T10 - AI nie wie, ze trzeba rozbic oboz; to logika AI, nie nowa regula).
   DLL test\Armoury-e2c-c3b.dll (3e0a3d12). **TEST 120 dob w toku** -> test\at-c3b-120.out.txt; cel: rycerze w sluzbie > 0, 0 bledow (R7: bohater obcego rodu w partii AI).
+- (04:30) **TEST C3b 120 dob (DLL 3e0a3d12; kopia SCRATCH(7016) kopia-c3b-120\):** 120/120, 0 bledow Armoury; rycerze JADA (w sluzbie 33-41, armie z rycerzem 3 z 13-16,
+  zold rycerzy 744-984 zl/d). ALE glowy < 5000 = 33 - wszystkie to rody gentry (w C3 bez poprawki mialy 30-50 tys.): po NotSpawned -> Active rod rycerza placi zold
+  cudzej partii (Astrethides: zold_partii 1389-1435/d przy 0 ludzi, kiesa 39.6 tys. -> 0 do doby ~80) + jednorazowo ok. -19 tys. Wojsko lordow w wojnie 92.3 tys.
+  C3 NIE WGRANY. Ten sam pomocnik naprawia (rod rycerza nie placi za partie pana) -> commit na e2c, potem znowu test 120 dob i wgranie 17 (C3).
