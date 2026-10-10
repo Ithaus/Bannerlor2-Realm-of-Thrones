@@ -420,3 +420,7 @@ LIMITY 13:30: 5h 32%, TYDZIEN 82% (reset 15.10) - przy 100% tygodnia przejsc na 
   183: DesertionLawForAi true (AI, zalogi, karawany - te same progi morale co gracz; Inni bez zmian), WarLedger AI pelna stawka, podloga 30 ludzi przy zaleglym zoldzie
   (gracz tez). 180m: sluzba liczona przez cala dobe (bitwy, najazdy, szturmy, poscig, odsiecz) i dzien wojny tylko z prawdziwym kontaktem; zapis rent v2.
   Nowe linie: "Rycerze (179): dzien", "Dezercja AI (183): dzien". DLL test\Armoury-e2c-c3.dll (64900093). **TEST 120 dob w toku** -> test\at-c3-120.out.txt.
+- (03:30) **TEST C3 120 dob (DLL 64900093; kopia SCRATCH(7016) kopia-c3-120\):** 120/120, 16.5 s/d, 0 bledow Armoury. TAK: glowy < 5000 = 1, bankruci 0, dezercja AI
+  23/d (baza 49), renty - bez warunku 20.9% (bylo 43.7%), zalogi na twierdze -4.3%. **ZLE: (1) rycerze 179 NIE JADA** ("Rycerze (179)": rody 92, w sluzbie 0, armie 19 z
+  rycerzem 0, "rycerz niedostepny 7") - blad filtra kandydatow; (2) wojsko lordow w wojnie 90.7 tys. (C2 101.8) - przyczyna nieznana (179 wg projektu tylko ok. 0.4 tys.;
+  183? 180m? los kampanii?). C3 NIE WGRANY. Pomocnik w tle: naprawa 179 + rozklad roznicy C2->C3 na danych -> commit na e2c + sekcja "C3 po tescie 120 dob" w C1-POSTEP.md.
