@@ -1559,7 +1559,8 @@ namespace Armoury
                 }
                 // dochod za tier (linia bez opisu - wzor gry DefaultClanFinanceModel: rody poza krolestwem albo najemnicy, bez lenn)
                 var mf = __0.MapFaction;
-                if (__0 != Clan.PlayerClan && mf != null && (!mf.IsKingdomFaction || __0.IsUnderMercenaryService) && __0.Fiefs.Count == 0)
+                // 185: "za tier" AI w sluzbie zdjety wpisem bez opisu (MercContract.TierPostfix) - w saldzie go nie ma, wiec nie jest zrodlem z niczego
+                if (__0 != Clan.PlayerClan && mf != null && (!mf.IsKingdomFaction || __0.IsUnderMercenaryService) && __0.Fiefs.Count == 0 && !MercContract.CancelsTier(__0))
                 {
                     long t = __0.Tier * (80 + (__0.IsUnderMercenaryService ? 40 : 0));
                     Model[MTier] += t; Model[MTierN]++;

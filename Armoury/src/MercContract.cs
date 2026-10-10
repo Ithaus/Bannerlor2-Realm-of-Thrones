@@ -216,6 +216,14 @@ namespace Armoury
             catch (Exception e) { Stumble("MercIncomePrefix", e); return true; }
         }
 
+        /// <summary>Czy "za tier" tego rodu jest dzis zdejmowany (ksiega obiegu nie liczy go wtedy jako zrodla z niczego) - ten sam warunek co TierPostfix.</summary>
+        internal static bool CancelsTier(Clan c)
+        {
+            try { return _tierWired && c != null && c != Clan.PlayerClan && !c.IsEliminated && c.IsUnderMercenaryService && GameOff && c.Fiefs != null && c.Fiefs.Count == 0; }
+            catch { return false; }
+        }
+        private static bool _tierWired;
+
         /// <summary>Postfiks DefaultClanFinanceModel.CalculateClanIncomeInternal: "za tier" AI w sluzbie bez lenn (Tier x (80 + 40)) zdjete tym samym wpisem bez opisu.</summary>
         public static void TierPostfix(Clan __0, ref ExplainedNumber __1, bool __2)
         {
@@ -250,7 +258,7 @@ namespace Armoury
             try
             {
                 var m = AccessTools.Method(typeof(DefaultClanFinanceModel), "CalculateClanIncomeInternal");
-                if (m != null) { _harmony.Patch(m, postfix: new HarmonyMethod(typeof(MercContract), nameof(TierPostfix))); b = "wpiety"; }
+                if (m != null) { _harmony.Patch(m, postfix: new HarmonyMethod(typeof(MercContract), nameof(TierPostfix))); b = "wpiety"; _tierWired = true; }
             }
             catch (Exception e) { Log.Error("MercContract.EnsureHooks(CalculateClanIncomeInternal)", e); }
             Log.Info("Kontrakty najemnikow (185): kontrakt gry dla AI (AddMercenaryIncome) " + a + ", \"za tier\" AI (CalculateClanIncomeInternal) " + b
