@@ -554,3 +554,6 @@ do 54/d) i limitu zoldu/przepelnienia gry u partii bez budzetu (do 162/d) - do z
   +SettlementEntered / -OnSettlementLeft / MapEventEnded - brak nasluchu zniszczenia partii, wiec partia rozwiazana/zniszczona W MIESCIE zostaje jako ikona-duch. Prawdziwa
   liczba partii w The Eyrie 5-11 (CS GAME STATE "Parties in it" w raportach hang). Gracz autotestu siedzi w The Eyrie 2 lata -> ok. 200 duchow. Wplyw na gre: zaden.
   Poprawka (CS, niska waga): nasluch MobilePartyDestroyed -> usuniecie znacznika z SettlementNameplatePartyMarkersVM osady (albo odswiezenie listy raz na dobe).
+- (14:40) Jeff: "trzeba naprawic ten wizualny glitch" -> CS commit (NameplateGhosts.cs, w-toku/175-armie-cs): postfiksy na SettlementNameplatePartyMarkersVM.RegisterEvents/
+  UnloadEvents - nasluch MobilePartyDestroyed (usuwa ikone) + DailyTick (PopulatePartyList). DLL do gry test\CrashScribe-bk2.dll (BK + ikony). Po biegu 728 dob: zbudowac wersje
+  autotestowa z obiema poprawkami (worktree + at1-cs.diff), test 40 dob, WGRANIE CS.
