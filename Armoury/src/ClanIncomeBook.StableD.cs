@@ -520,6 +520,27 @@ namespace Armoury
             catch { return -1; }
         }
 
+        /// <summary>165 (2.6): czesc "ziemia" D stalego (wsie, renty i zawory osad z dzisiejszych lenn, bez "wlasnych") albo -1 - podstawa powinnosci.</summary>
+        internal static double StableLand(Clan c)
+        {
+            try { StableParts p; return StableDOn && TryStable(c, out p) ? Math.Max(0, p.Land) : -1; }
+            catch { return -1; }
+        }
+
+        /// <summary>166: D staly i liczba zmierzonych dob (do mieszania z D z zapisu, gdy pomiar krotszy niz 28 dob); false - brak pomiaru.</summary>
+        internal static bool StableDWithDays(Clan c, out double d, out int days)
+        {
+            d = -1; days = 0;
+            try
+            {
+                StableParts p;
+                if (!StableDOn || !TryStable(c, out p)) return false;
+                d = Math.Max(0, p.D); days = p.Days;
+                return true;
+            }
+            catch { return false; }
+        }
+
         // ------------------------------------------------------------ raport: kolumny CSV i linia "D staly (169c)"
         private const string CsvHeaderStable = ";d_staly;d_ziemia;d_korona;d_kontrakt;d_majatek;sr_wlasne;sr_jednorazowe;sr_podwojne;sr_inne_z_modelu;sr_przelewy_w_rodzie;sr_wplyw_doby;dni_czesci;zold_przyciety;dni_bankruta";
 

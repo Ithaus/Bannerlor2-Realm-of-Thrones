@@ -54,13 +54,22 @@ namespace Armoury
             try { if (_duesErrLogged.Add(site)) Log.Error("KingdomTreasury.Daily(" + site + ", rod " + (c != null && c.Name != null ? c.Name.ToString() : "?") + ")", e); } catch { }
         }
 
+        /// <summary>165: wplywy skarbca tej doby z naszych krokow, na krolestwo (powinnosci; danina wojenna i clo) - "wplywy dnia" CrownIncome.</summary>
+        internal static readonly Dictionary<Kingdom, long> DuesToday = new Dictionary<Kingdom, long>(), LeviesToday = new Dictionary<Kingdom, long>();
+        /// <summary>162m: danina wojenna zdjeta dzis z kasy miasta (tarcza dworu schodzi, gdy zloto wychodzi z kasy).</summary>
+        internal static readonly Dictionary<TaleWorlds.CampaignSystem.Settlements.Settlement, int> TownLevyToday = new Dictionary<TaleWorlds.CampaignSystem.Settlements.Settlement, int>();
+        private static int _duesLand, _duesOld;   // 165: rody z podstawa "ziemia" D stalego / ze stara podstawa (brak pomiaru)
+
         internal static void Daily()
         {
+            DuesToday.Clear();
             var s = Settings.Current;
             if (s == null || !s.CrownDuesEnabled || TaleWorlds.CampaignSystem.Campaign.Current == null) return;
             try
             {
                 long total = 0; int payers = 0; int playerPaid = 0, skipped = 0, modelErr = 0;
+                _duesLand = _duesOld = 0;
+                bool land = CrownIncome.On && s.CrownDuesFromLand;   // 165 (2.6): podstawa powinnosci = czesc "ziemia" D stalego (korona nie bierze 3% z wlasnych wyplat)
                 var model = TaleWorlds.CampaignSystem.Campaign.Current.Models.ClanFinanceModel;
                 foreach (var c in TaleWorlds.CampaignSystem.Clan.All)
                 {
@@ -77,6 +86,11 @@ namespace Armoury
                         catch (Exception e) { income = 0f; modelErr++; DuesError("model", c, e); }   // jak dotad: podstawa bez dochodu modelu (same renty) - teraz liczone
                         int rent; PopulationLaw.RentToday.TryGetValue(c, out rent);
                         income += rent;
+                        if (land)
+                        {
+                            double l = ClanIncomeBook.StableLand(c);
+                            if (l >= 0) { income = (float)l; _duesLand++; } else _duesOld++;   // brak pomiaru D stalego - stara podstawa
+                        }
                         if (income <= 0f) continue;
                         bool war = false;
                         try { foreach (var k in TaleWorlds.CampaignSystem.Kingdom.All) if (k != c.Kingdom && !k.IsEliminated && c.Kingdom.IsAtWarWith(k)) { war = true; break; } } catch { }
@@ -86,6 +100,7 @@ namespace Armoury
                         c.Leader.ChangeHeroGold(-pay);
                         c.Kingdom.KingdomBudgetWallet += pay;
                         CirculationWindows.NoteHeroGold(c.Leader, -pay);   // paczka 169b: glowa poza swiatem (Disabled) - zloto weszlo do swiata (tylko licznik)
+                        long dk; DuesToday.TryGetValue(c.Kingdom, out dk); DuesToday[c.Kingdom] = dk + pay;   // 165: wplyw dnia krolestwa
                         total += pay; payers++;
                         if (c == TaleWorlds.CampaignSystem.Clan.PlayerClan) playerPaid = pay;
                     }
@@ -96,7 +111,8 @@ namespace Armoury
                 Log.Info("Korona: dzien " + (int)TaleWorlds.CampaignSystem.CampaignTime.Now.ToDays + " - powinnosci wasali " + total + " zl od " + payers + " rodow do skarbcow krolestw"
                          + (playerPaid > 0 ? " (rod gracza " + playerPaid + ")" : "")
                          + "; potkniecia " + (skipped + modelErr) + " (rodow pominietych przez blad " + skipped + ", blad modelu dochodu - podstawa z samych rent " + modelErr
-                         + "; od startu sesji " + (_duesSkippedSess + _duesModelErrSess) + ").");
+                         + "; od startu sesji " + (_duesSkippedSess + _duesModelErrSess) + ")"
+                         + (land ? "; podstawa (165): czesc ziemia D stalego u " + _duesLand + " rodow, stara (dochod modelu + renty - brak pomiaru D stalego) u " + _duesOld : "") + ".");
             }
             catch (Exception e) { Log.Error("KingdomTreasury.Daily", e); }
         }
@@ -112,7 +128,7 @@ namespace Armoury
         internal struct RefundRow { public long Paid, Due, Given; public int Clans; }
         private static readonly Dictionary<Kingdom, RefundRow> _refund = new Dictionary<Kingdom, RefundRow>();
 
-        internal static void Reset() { _refund.Clear(); _refundErr = false; ZeroLast(); _arrear.Clear(); _duesSkippedSess = 0; _duesModelErrSess = 0; _duesErrLogged.Clear(); }
+        internal static void Reset() { _refund.Clear(); _refundErr = false; ZeroLast(); _arrear.Clear(); _duesSkippedSess = 0; _duesModelErrSess = 0; _duesErrLogged.Clear(); DuesToday.Clear(); LeviesToday.Clear(); TownLevyToday.Clear(); }
 
         // 169c (tylko log): niedoplata korony na krolestwo z 28 dob (1 - zwrot dany / nalezny) - miara progu etapu 2 i wejscia E1b; tylko pamiec sesji
         private sealed class ArrearRing { public readonly long[] Due = new long[28], Given = new long[28]; public int Head, Filled; }
@@ -149,10 +165,12 @@ namespace Armoury
 
         // paczka 169 (tylko log): liczby doby dla linii "Obieg" - zerowane w Reset i przez MoneyLedger.ClearLast169() na poczatku bloku (D20)
         internal static long LastDues, LastRefundGiven, LastRefundDue, LastRefundPaid, LastSubsidy, LastCustoms, LastCustomsTaken, LastMint, LastMonopoly;
+        internal static long LastCustomsSingle, LastOwnCut;   // 165: clo jednym poborem; zwrot przyciety o wydatki ludzi we wlasnych miastach (K3)
 
         internal static void ZeroLast()
         {
             LastDues = LastRefundGiven = LastRefundDue = LastRefundPaid = LastSubsidy = LastCustoms = LastCustomsTaken = LastMint = LastMonopoly = 0;
+            LastCustomsSingle = LastOwnCut = 0;
         }
 
         internal static bool AtWar(Kingdom k)   // B-4: takze SoldierPay.TakePaid (ciecie Z8 tylko dla rodow, ktorym korona zwraca zold)
@@ -204,8 +222,13 @@ namespace Armoury
             try
             {
                 var paid = SoldierPay.TakePaid();           // zawsze oproznia licznik doby
+                // 165: zwrot z wplywow dnia (CrownIncome.Begin) - bez zalog (SoldierPay ich nie zapisuje), minus wydatki ludzi partii we wlasnych miastach rodu (K3)
+                bool cur = CrownIncome.On;
+                var ownSpend = CrownIncome.TakeOwnSpend();  // zawsze oproznia licznik (poza 165 pusty)
                 if (!s.CrownWageRefundEnabled) return;
                 float pct = Math.Max(0f, Math.Min(100f, s.CrownWageRefundPercent)) / 100f;
+                float cutShare = Math.Max(0f, Math.Min(1f, s.CrownRefundOwnTownsCut));
+                long ownCut = 0;
                 var byKingdom = new Dictionary<Kingdom, List<KeyValuePair<Hero, int>>>();
                 long peace = 0, noKingdom = 0, merc = 0;
                 foreach (var kv in paid)
@@ -218,10 +241,21 @@ namespace Armoury
                     var k = c.Kingdom;
                     if (k == null || k.IsEliminated) { noKingdom += kv.Value; continue; }
                     if (c.IsUnderMercenaryService) { merc += kv.Value; continue; }
+                    int v = kv.Value;
+                    long own;
+                    if (cur && cutShare > 0f && ownSpend.TryGetValue(c, out own) && own > 0)
+                    {
+                        // K3 (Z8): zold, ktory ludzie partii wydali we wlasnym miescie rodu, wrocil rodowi zaworem miasta - nie jest podstawa zwrotu
+                        long cut = Math.Min((long)v, (long)(own * cutShare));
+                        v -= (int)cut; ownCut += cut;
+                        ownSpend[c] = own - (long)Math.Ceiling(cut / Math.Max(0.0001, (double)cutShare));
+                        if (v <= 0) continue;
+                    }
                     List<KeyValuePair<Hero, int>> list;
                     if (!byKingdom.TryGetValue(k, out list)) { list = new List<KeyValuePair<Hero, int>>(); byKingdom[k] = list; }
-                    list.Add(new KeyValuePair<Hero, int>(h, kv.Value));
+                    list.Add(new KeyValuePair<Hero, int>(h, v));
                 }
+                LastOwnCut = ownCut;
                 long totalGiven = 0, totalDue = 0, totalPaid = 0, left = 0, toDebtors = 0; int kingdoms = 0, shortK = 0, emptyK = 0, playerGot = 0, stumbles = 0;
                 var allClans = new HashSet<Clan>(); var debtors = new HashSet<Clan>();
                 foreach (var kk in byKingdom)
@@ -239,6 +273,7 @@ namespace Armoury
                         if (want <= 0) continue;
                         counted = true;
                         have = Math.Max(0, k.KingdomBudgetWallet);      // Diplomacy potrafi zostawic skarbiec na minusie - wtedy nic nie placimy
+                        if (cur) have = CrownIncome.LeftFor(k);         // 165: z tego, co zostalo z wplywow dnia (i 1/360 zapasu) po darach, ratach i kontraktach
                         var give = Split(due, have);
                         for (int i = 0; i < list.Count; i++)
                         {
@@ -262,14 +297,20 @@ namespace Armoury
                         if (!_refundErr) { _refundErr = true; Log.Error("KingdomTreasury.WageRefund(" + (k != null && k.Name != null ? k.Name.ToString() : "?") + ")", e); }
                     }
                     if (!counted) continue;
+                    if (cur)
+                    {
+                        CrownIncome.Spent(k, given);                    // 165: zwrot schodzi z reszty wplywow dnia; niedoplata przepada
+                        var cd = CrownIncome.DayOf(k);
+                        if (cd != null) { cd.RefundDue += want; cd.RefundGiven += given; }
+                    }
                     _refund[k] = new RefundRow { Paid = paidSum, Due = want, Given = given, Clans = clans.Count };
                     kingdoms++; totalGiven += given; totalDue += want; totalPaid += paidSum; left += k.KingdomBudgetWallet;
                     if (given < want) { shortK++; if (have <= 0) emptyK++; }
                 }
                 LastRefundGiven = totalGiven; LastRefundDue = totalDue; LastRefundPaid = totalPaid;   // paczka 169: linia "Obieg" (tylko log)
-                Log.Info("Korona: dzien " + (int)CampaignTime.Now.ToDays + " - zwrot zoldu ze skarbcow krolestw w wojnie: " + totalGiven + " zl dla " + allClans.Count + " rodow w "
+                Log.Info("Korona: dzien " + (int)CampaignTime.Now.ToDays + " - zwrot zoldu ze skarbcow krolestw w wojnie" + (cur ? " (165: z wplywow dnia i 1/360 zapasu, partie w polu bez zalog, minus wydatki ludzi we wlasnych miastach rodu " + ownCut + ")" : "") + ": " + totalGiven + " zl dla " + allClans.Count + " rodow w "
                          + kingdoms + " krolestwach (" + (pct * 100f).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + "% z " + totalPaid
-                         + " zaplaconego zoldu = nalezne " + totalDue + "); skarbiec nie mial dosc w " + shortK + " krolestwach (w tym pusty: " + emptyK + "), niedoplata "
+                         + " zaplaconego zoldu = nalezne " + totalDue + "); " + (cur ? "wplywow dnia nie starczylo" : "skarbiec nie mial dosc") + " w " + shortK + " krolestwach (w tym " + (cur ? "bez reszty wplywow" : "pusty") + ": " + emptyK + "), niedoplata "
                          + (totalDue - totalGiven) + "; w skarbcach tych krolestw zostalo " + left
                          + (playerGot > 0 ? "; rod gracza dostal " + playerGot : "")
                          + (toDebtors > 0 ? "; z tego " + toDebtors + " dla " + debtors.Count + " rodow dluznych koronie (gra zabierze im to na splate dlugu, ktora nie wraca do skarbca)" : "")
@@ -289,13 +330,16 @@ namespace Armoury
         // dzierzaw. Wszystko z kiesy kogos - zadnego zlota z powietrza.
         internal static void Levies()
         {
+            LeviesToday.Clear(); TownLevyToday.Clear();
             var s = Settings.Current;
             if (s == null || Campaign.Current == null) return;
             try
             {
-                long sub = 0, cus = 0, deb = 0, mon = 0;
+                long sub = 0, cus = 0, deb = 0, mon = 0, single1 = 0;
                 long taken = 0;                             // paczka 169: CALA kwota zdjeta z licznikow cel (O43, tylko log)
                 float floor = Math.Max(0f, s.TownRentFloorGold);
+                // 165 (D-7): clo raz - z licznika cel do skarbca, bez drugiego zdjecia z kasy miasta (licznik jest posiadaczem swiata w ksiedze)
+                bool single = CrownIncome.On && s.CrownCustomsSingleTake;
                 foreach (var k in Kingdom.All)
                 {
                     if (k == null || k.IsEliminated) continue;
@@ -319,7 +363,12 @@ namespace Armoury
                         {
                             float share = (town ? s.LaySubsidyTownShare : s.LaySubsidyVillageShare) * (warTax ? Math.Max(1f, s.LaySubsidyWarTaxMultiplier) : 1f);
                             int x = (int)Math.Min(spare, spare * Math.Max(0f, share));
-                            if (x > 0) { st.SettlementComponent.ChangeGold(-x); k.KingdomBudgetWallet += x; sub += x; spare -= x; }
+                            if (x > 0)
+                            {
+                                st.SettlementComponent.ChangeGold(-x); k.KingdomBudgetWallet += x; sub += x; spare -= x;
+                                long lk; LeviesToday.TryGetValue(k, out lk); LeviesToday[k] = lk + x;   // 165: wplyw dnia krolestwa
+                                if (town) TownLevyToday[st] = x;                                       // 162m: zloto wyszlo z kasy miasta (tarcza dworu)
+                            }
                         }
                         if (!town) continue;
                         // clo od handlu - z licznika cel miasta
@@ -331,8 +380,17 @@ namespace Armoury
                             // do skarbca idzie tyle, ile realnie odda kasa miasta ponad prog
                             int paid = Math.Min(x, spare);
                             if (x > 0) st.Town.TradeTaxAccumulated -= x;
-                            if (x > 0) taken += x;          // paczka 169: licznik cel jest posiadaczem swiata - tyle zniklo (tylko licznik)
-                            if (paid > 0) { st.SettlementComponent.ChangeGold(-paid); k.KingdomBudgetWallet += paid; cus += paid; spare -= paid; }
+                            if (x > 0 && !single) taken += x;   // paczka 169: licznik cel jest posiadaczem swiata - tyle zniklo (tylko licznik); 165 D-7: przy jednym poborze nic nie znika (licznik -> skarbiec)
+                            if (single)
+                            {
+                                // 165 (D-7): to, co zeszlo z licznika cel, idzie do skarbca w calosci - kasa miasta nie placi drugi raz
+                                if (x > 0) { k.KingdomBudgetWallet += x; cus += x; single1 += x; long lk; LeviesToday.TryGetValue(k, out lk); LeviesToday[k] = lk + x; }
+                            }
+                            else if (paid > 0)
+                            {
+                                st.SettlementComponent.ChangeGold(-paid); k.KingdomBudgetWallet += paid; cus += paid; spare -= paid;
+                                long lk; LeviesToday.TryGetValue(k, out lk); LeviesToday[k] = lk + paid;   // 165: wplyw dnia (gdy 165 wylaczone - tylko licznik)
+                            }
                         }
                         if (!s.PolicyIncomeConserved || ruler == null) continue;
                         // mennica: oplata z kasy miasta do krola (zamiast 100 d na lenno z niczego)
@@ -356,8 +414,9 @@ namespace Armoury
                     }
                 }
                 LastSubsidy = sub; LastCustoms = cus; LastCustomsTaken = taken; LastMint = deb; LastMonopoly = mon;   // paczka 169: linia "Obieg" (tylko log)
+                LastCustomsSingle = single1;                // 165 (D-7): clo z licznika cel prosto do skarbcow (w LastCustoms; w LastCustomsTaken 0 - nic nie zniklo)
                 Log.Info("Korona: dzien " + (int)CampaignTime.Now.ToDays + " - danina wojenna z kas osad " + sub + ", clo od handlu miast " + cus
-                         + " (do skarbcow krolestw); mennica " + deb + ", monopole " + mon + " (do krolow, z kas miast i kapitalu warsztatow).");
+                         + " (do skarbcow krolestw" + (single ? "; 165: clo raz - z licznika cel prosto do skarbca " + single1 + ", kasy miast nie placa drugi raz" : "") + "); mennica " + deb + ", monopole " + mon + " (do krolow, z kas miast i kapitalu warsztatow).");
             }
             catch (Exception e) { Log.Error("KingdomTreasury.Levies", e); }
         }

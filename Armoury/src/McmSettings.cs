@@ -2576,6 +2576,42 @@ namespace Armoury
         [SettingPropertyGroup("The castle's purse")]
         public bool CastlePaysFromSurplus { get; set; } = true;
 
+        [SettingPropertyBool("Crown Current Income", HintText = "the crown pays out of what comes in each day: the vassals' dues, the war subsidy, customs, its share of the castle dues and whatever else reaches the treasury that day, plus a slow release of the old hoard above Crown Reserve Gold (one part in Crown Reserve Release Days a day). Wage refunds, gifts to other crowns, reparation instalments and mercenary contracts come out of that, in this order; what is not there is not paid (no debt). The refund counts only the parties in the field, not garrisons (their pay comes back through the dues), less what the party's men spent in their own house's towns. Works only together with Clan Budget Enabled (a crown paying from its income without the houses keeping their armies within their means would ruin them). Off = the refund comes out of whatever lies in the treasury, as before")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public bool CrownCurrentIncome { get; set; } = true;
+
+        [SettingPropertyInteger("Crown Reserve Gold", 0, 2000000, "0", HintText = "gold the treasury keeps untouched as its reserve; only the hoard above it is released, slowly, to pay the crown's dues (about two months of refunds for a common realm)")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public int CrownReserveGold { get; set; } = 500000;
+
+        [SettingPropertyFloatingInteger("Crown Reserve Release Days", 30.00f, 1440.00f, "0", HintText = "the hoard above the reserve is released over this many days: each day one part in this many of it is added to the day's income (360 = it lasts about two years)")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public float CrownReserveReleaseDays { get; set; } = 360f;
+
+        [SettingPropertyFloatingInteger("Crown Refund Own Towns Cut", 0.00f, 1.00f, "0.00", HintText = "with Crown Current Income: the share of what a party's men spent in the towns of their own house that is taken off the wages the crown repays (1 = all of it - the coin came back to the house through its town's dues; 0 = nothing taken off)")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public float CrownRefundOwnTownsCut { get; set; } = 1f;
+
+        [SettingPropertyBool("Crown Reparations Realm", HintText = "with Crown Current Income: war reparations agreed at peace (Diplomacy) become a debt of the paying crown to the receiving crown, paid in daily instalments out of the payer's daily income; the receiving treasury gets exactly the instalment. The houses pay nothing and no house falls into debt to the crown over it; no gold is handed out from nothing to the king and the mercenaries. Off = Diplomacy's own reparations, as before")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public bool CrownReparationsRealm { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Crown Reparation Share", 0.00f, 1.00f, "0.00", HintText = "the largest share of the paying crown's daily income that goes to reparation instalments each day")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public float CrownReparationShare { get; set; } = 0.5f;
+
+        [SettingPropertyBool("Crown Customs Single Take", HintText = "with Crown Current Income: the crown's customs come from the town's toll counter alone - no second take from the town purse for the same customs")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public bool CrownCustomsSingleTake { get; set; } = true;
+
+        [SettingPropertyBool("Crown Dues From Land", HintText = "with Crown Current Income: the vassal dues are reckoned on the land part of a house's steady income (its villages, towns and castles), not on the money it gets from the crown itself (refunds, rents) - the crown takes no dues from its own payments. Needs Clan Income Book Stable D; without a measured steady income the old base is used")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public bool CrownDuesFromLand { get; set; } = true;
+
+        [SettingPropertyBool("Clan Budget Enabled", HintText = "AI houses keep only as many men as their steady income allows (house budget, stage 2) - needed by Crown Current Income")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public bool ClanBudgetEnabled { get; set; } = false;
+
         [SettingPropertyBool("Army Clothing Enabled", HintText = "every soldier on pay wears out his shoes, clothes and linen: men in a lord's party (yours too) buy leather, felt (woollen cloth) and linen in the towns they leave - piece by piece at the market price, out of their own purse, before they spend the rest on food and drink; a town garrison takes them from its own town's market without paying, for its pay already went into that town's purse; a castle garrison has the castle purse buy them in the town its villages trade with. What cannot be had waits (Army Clothing Max Wait Days), then is only noted in the log. Banner Kings party supplies no longer buy or use up wool, linen or flax for the troops, and their 'Textiles supplies' morale penalty is gone - one rule for clothing, rags carry no penalty (off = no wear, Banner Kings textiles and their morale penalty as before)")]
         [SettingPropertyGroup("The soldier's clothes")]
         public bool ArmyClothingEnabled { get; set; } = true;
@@ -4055,6 +4091,15 @@ namespace Armoury
             s.CastlePurseTrimAtStart = CastlePurseTrimAtStart;
             s.CastleCartsNeedCoin = CastleCartsNeedCoin;
             s.CastlePaysFromSurplus = CastlePaysFromSurplus;
+            s.CrownCurrentIncome = CrownCurrentIncome;
+            s.CrownReserveGold = CrownReserveGold;
+            s.CrownReserveReleaseDays = CrownReserveReleaseDays;
+            s.CrownRefundOwnTownsCut = CrownRefundOwnTownsCut;
+            s.CrownReparationsRealm = CrownReparationsRealm;
+            s.CrownReparationShare = CrownReparationShare;
+            s.CrownCustomsSingleTake = CrownCustomsSingleTake;
+            s.CrownDuesFromLand = CrownDuesFromLand;
+            s.ClanBudgetEnabled = ClanBudgetEnabled;
             s.ArmyClothingEnabled = ArmyClothingEnabled;
             s.ArmyClothingFieldLeatherKg = ArmyClothingFieldLeatherKg;
             s.ArmyClothingFieldClothKg = ArmyClothingFieldClothKg;

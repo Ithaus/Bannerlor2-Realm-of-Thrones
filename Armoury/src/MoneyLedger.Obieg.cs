@@ -90,6 +90,7 @@ namespace Armoury
             try { SoldierPay.ZeroLast(); } catch (Exception e) { Stumble169("ClearLast169(SoldierPay)", e); }
             try { PopulationLaw.ZeroDay169(); } catch (Exception e) { Stumble169("ClearLast169(PopulationLaw)", e); }
             try { CastlePurse.ZeroLast(); } catch (Exception e) { Stumble169("ClearLast169(CastlePurse)", e); }   // 110: zawor kas zamkow (Last*)
+            try { CrownIncome.ZeroLast(); } catch (Exception e) { Stumble169("ClearLast169(CrownIncome)", e); }   // 165: wplywy dnia korony (Last*)
         }
 
         // ------------------------------------------------------------ 169b: RB wedlug odcinkow naszego ticku (granice: Mark renty, budowy, korona, paser band)
@@ -570,6 +571,12 @@ namespace Armoury
               .Append(", odszkodowania wojenne Diplomacy przyjete ").Append(CW.Wired[CW.WReparations] ? (CW.Sum[CW.IReparationsIn] + CW.In[CW.KReparations]).ToString(Inv) : "-")
               .Append(" (do skarbcow ").Append(CW.Sum[CW.IReparationsIn]).Append(", do glow krolestw, najemnikow i gracza ").Append(CW.In[CW.KReparations])
               .Append("; ze skarbcow placacych ").Append(CW.Sum[CW.IReparationsOut]).Append(", dlug trybutu placacych +").Append(CW.Sum[CW.IReparationsDebt]).Append(')')
+              // 165: korona z biezacych wplywow - wplywy dnia, 1/360 zapasu i wydatki w kolejnosci (przelewy skarbiec -> skarbiec / glowy rodow; licznik CrownIncome)
+              .Append("; 165: wplywy dnia ").Append(CrownIncome.LastMeasured).Append(" + 1/360 zapasu ").Append(CrownIncome.LastRelease).Append(" = do wydania ").Append(CrownIncome.LastSpend)
+              .Append(", raty reparacji skarbiec -> skarbiec ").Append(CrownIncome.LastRepOut).Append(" (przyjete ").Append(CrownIncome.LastRepIn).Append(")")
+              .Append(", splata dlugu wobec korony z kies rodow do skarbcow ").Append(CrownIncome.LastDebtRepaid)
+              .Append(", clo jednym poborem (licznik cel -> skarbiec) ").Append(KingdomTreasury.LastCustomsSingle)
+              .Append(", zwrot przyciety o wydatki ludzi we wlasnych miastach (K3) ").Append(KingdomTreasury.LastOwnCut)
               .Append("; wyplaty - zwrot zoldu ").Append(KingdomTreasury.LastRefundGiven).Append(" (").Append(pct).Append("% z ").Append(KingdomTreasury.LastRefundPaid)
               .Append(" zaplaconego zoldu), zapomoga ").Append(ml ? M[CW.MSupport].ToString(Inv) : "-")
               .Append(", dochod za tier najemnikow (dzis z niczego) ").Append(ml ? M[CW.MTierMerc].ToString(Inv) : "-").Append(", renty wedlug lenn -")

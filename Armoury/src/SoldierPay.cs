@@ -397,7 +397,9 @@ namespace Armoury
                 // 114-p / B-2 (Z8, 2.0b): zold zalogi ZAMKU, ktory wraca panu zaworem, nie jest podstawa zwrotu korony. B-2: "wraca" liczone przy
                 // zwrocie (TakePaid) z tego, co pan naprawde dostal z zaworu swoich zamkow, najwyzej ten zold - nie przewidywane tu przy wplacie
                 // (114-p HomePart odliczal cala czesc ponad zapasem kasy, a kupcy podzamcza wydaja ja na towar, zanim zawor ja wezmie)
-                if (s.CrownWageRefundGarrisons)
+                // 165 (regula 3, D-5, S7): przy koronie z biezacych wplywow zaloga nie jest podstawa zwrotu - to koszt pana, wraca mu zaworem;
+                // CrownWageRefundGarrisons dziala tylko przy wylaczonym 165 (wtedy jak dotad)
+                if (s.CrownWageRefundGarrisons && !CrownIncome.On)
                 {
                     AddPaid(clan.Leader, amt, s);                       // kiese zalogi wyrownuje rod z salda - placi glowa
                     if (toCoffers && coffers > 0 && s.CrownWageRefundEnabled && clan.Leader != null && CastlePurse.ComesHome(st))

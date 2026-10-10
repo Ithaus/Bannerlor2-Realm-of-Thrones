@@ -105,6 +105,7 @@ namespace Armoury
                 LevyGold.ApplyAll(_harmony);
                 WinterSource.ApplyAll(_harmony);
                 KingdomTreasury.ApplyAll(_harmony);
+                try { CrownIncome.ApplyAll(_harmony); } catch (Exception e) { Log.Error("CrownIncome.ApplyAll", e); }   // 165: reparacje Diplomacy jako dlug korona-korona, splata dlugu wobec korony do skarbca
                 try { SoldierPay.ApplyAll(_harmony); } catch (Exception e) { Log.Error("SoldierPay.ApplyAll", e); }   // zold do obiegu: sakiewki ludzi, kasy osad, zwrot ze skarbca
                 WearKeep.ApplyAll(_harmony);
                 HistoricalPrices.ApplyAll(_harmony);
