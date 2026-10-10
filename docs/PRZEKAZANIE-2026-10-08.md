@@ -369,3 +369,10 @@ LIMITY 13:30: 5h 32%, TYDZIEN 82% (reset 15.10) - przy 100% tygodnia przejsc na 
   zalogi 39.4 tys. wobec 81.8 tys. (-52%), krolestwa -29..-46%. A zold naliczony to tylko 49% pulapu 166 (1.14 mln) - czyli NIE brak pieniedzy, tylko mechanika
   (podejrzenia: limit zoldu partii/zalog ustawiany przez postfiks 166 - np. zalogi "pierwsze" zjadaja pulap partii albo SetGarrisonWagePaymentLimit w wojnie
   nie = wartosc gry; brak zwrotu za zalogi (165) obniza limit zalog liczony przez gre z kiesy; hamulec nowych partii). Do diagnozy po recenzji (wf_a018ac0c-77c).
+- (23:55) **DIAGNOZA WOJSKA C1 (z balans-krolestw.csv i linii "Budzet rodow (166)"):** nowa kampania ROT = pokoj w dobach 1-23 (doba 1: pokoj 289 rodow,
+  wojna 15; doba 24: wojna 294). W pokoju pulap 0.28 D (310 tys. przy zoldzie 285 tys.) -> od 3. doby zwolnienia 15%/dobe (doba 3: 3 788 ludzi, w tym 3 582 z zalog
+  do celu pokojowego 50% stanu z 1. doby). Zalogi 47 -> 33 tys. (doby 1-16), partie stoja ok. 40-44 tys.; bez C1 w tym czasie rosly (zalogi 48->54, partie 30->70).
+  Od wojny pulap 1.05 mln, zold 44-49% pulapu (pulap nie hamuje), odrost ok. 2 tys. ludzi/dobe - jak w bazie, tylko od nizszego stanu. Czyli to regula projektu
+  (pokoj = ok. 1/3 wojska i polowa zalog; Jeff: "dynamiczne, wedlug tego, czy stac"), nie blad kodu. Progi 40 dob "wojsko wobec bazy" nie pasuja do kampanii,
+  ktora zaczyna sie pokojem - rozstrzyga test 120 dob (okno 31-120, prawie cala wojna). Jesli tam zalogi w wojnie < 95% bazy: rozwazyc szybszy odrost w wojnie
+  (np. przy wypowiedzeniu wojny zniesienie hamulca nowych partii / zalogi do celu wojennego z kasy wojennej) - to bylaby zmiana do zgloszenia Jeffowi.
