@@ -130,7 +130,7 @@ namespace Armoury
             {
                 byCrown = true;
                 D = CrownAvg(k);
-                return (long)(head * D);
+                return (long)(Math.Max(0f, s.RansomKingDays) * D);   // Jeff 10.10 (wariant 1): krol 20 dni wplywow korony, osobno od glowy rodu
             }
             D = DebtLadder.DebtD(captive.Clan);
             double w = captive.Clan.Leader == captive ? head : Math.Max(0f, s.RansomLordDays);

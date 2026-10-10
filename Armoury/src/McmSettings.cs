@@ -2976,13 +2976,17 @@ namespace Armoury
         [SettingPropertyGroup("Ransoms by wealth (stage 2)")]
         public bool LordRansomByIncome { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Ransom Head Years", 0.00f, 3.00f, "0.00", HintText = "the ransom of the head of a house, in years of its steady income (about 60 days; Jeff 10.10 option B - in the game lords are taken captive several times a year, far more often than in history, so the ransom is a third of the historical year)")]
+        [SettingPropertyFloatingInteger("Ransom Head Years", 0.00f, 3.00f, "0.00", HintText = "the ransom of the head of a house, in years of its steady income (about 30 days; Jeff 10.10 option 1 - lords are taken captive several times a year in the game, far more often than in history)")]
         [SettingPropertyGroup("Ransoms by wealth (stage 2)")]
-        public float RansomHeadYears { get; set; } = 0.165f;
+        public float RansomHeadYears { get; set; } = 0.0824f;
 
-        [SettingPropertyFloatingInteger("Ransom Lord Days", 0.00f, 80.00f, "0.00", HintText = "the ransom of any other lord or lady, in days of the house's steady income (Jeff 10.10 option B)")]
+        [SettingPropertyFloatingInteger("Ransom Lord Days", 0.00f, 40.00f, "0.00", HintText = "the ransom of any other lord or lady, in days of the house's steady income (Jeff 10.10 option 1)")]
         [SettingPropertyGroup("Ransoms by wealth (stage 2)")]
-        public float RansomLordDays { get; set; } = 20f;
+        public float RansomLordDays { get; set; } = 10f;
+
+        [SettingPropertyFloatingInteger("Ransom King Days", 0.00f, 80.00f, "0.00", HintText = "a captive king's ransom, in days of his crown's income, paid by the realm's treasury (Jeff 10.10 option 1)")]
+        [SettingPropertyGroup("Ransoms by wealth (stage 2)")]
+        public float RansomKingDays { get; set; } = 20f;
 
         [SettingPropertyFloatingInteger("Ransom Cash Share", 0.00f, 1.00f, "0.00", HintText = "the house pays at once at most this share of its family's gold above 5000; the rest becomes a ransom debt")]
         [SettingPropertyGroup("Ransoms by wealth (stage 2)")]
@@ -4621,6 +4625,7 @@ namespace Armoury
             s.LordRansomByIncome = LordRansomByIncome;
             s.RansomHeadYears = RansomHeadYears;
             s.RansomLordDays = RansomLordDays;
+            s.RansomKingDays = RansomKingDays;
             s.RansomCashShare = RansomCashShare;
             s.RansomQueueNoBlock = RansomQueueNoBlock;
             s.RansomDebtCapDays = RansomDebtCapDays;
