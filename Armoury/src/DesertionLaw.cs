@@ -140,7 +140,13 @@ namespace Armoury
 
         public override TroopRoster GetTroopsToDesert(MobileParty mobileParty)
         {
-            if (!Governs(mobileParty)) return base.GetTroopsToDesert(mobileParty);
+            if (!Governs(mobileParty))
+            {
+                var vr = base.GetTroopsToDesert(mobileParty);
+                // W4a: Inni (poza prawem dezercji - gra, glod) liczeni osobno do linii 183; poza progiem 183 (to nie ludzie)
+                try { if (vr != null && vr.TotalManCount > 0 && Undead.Party(mobileParty)) { DesertionAi.UndeadParties++; DesertionAi.UndeadMen += vr.TotalManCount; } } catch { }
+                return vr;
+            }
             var roster = TroopRoster.CreateDummyTroopRoster();
             try
             {
@@ -205,6 +211,8 @@ namespace Armoury
         internal static readonly Dictionary<string, float> MoraleLines = new Dictionary<string, float>();
         internal static readonly Dictionary<string, int> MoraleLinesN = new Dictionary<string, int>();
         internal static int MoraleParties, MoraleMen;
+        // W4a: dezercja Innych (model gry - poza prawem dezercji), tylko do linii 183
+        internal static int UndeadParties, UndeadMen;
         internal static void NoteMoraleLines(MobileParty mp, int men)
         {
             try
@@ -227,6 +235,7 @@ namespace Armoury
             Array.Clear(Parties, 0, 3); Array.Clear(Morale, 0, 3); Array.Clear(Wage, 0, 3);
             T12 = T34 = T5 = Hungry = 0; MinMorale = float.MaxValue;
             MoraleLines.Clear(); MoraleLinesN.Clear(); MoraleParties = MoraleMen = 0;
+            UndeadParties = UndeadMen = 0;
         }
     }
 

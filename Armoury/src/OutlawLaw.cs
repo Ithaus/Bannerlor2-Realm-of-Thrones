@@ -81,6 +81,7 @@ namespace Armoury
         // licznik dnia
         private static float _inDesert, _inRouted, _inRaid, _inMisery, _inDisband, _outReturn;
         private static int _bornBands, _bornMen, _refused, _emptyRemoved, _bandRecruit, _prisonerJoin, _upLoot, _upFence, _upBlocked, _fenceGold;
+        private static int _desUndead;      // W4b: dezerterzy Innych (partia Innych albo wight) - do niczego, nie do puli
 
         // paser - skup lupu band (licznik dnia)
         private static int _sellBands, _sellFenced, _sellBeyond, _sellSellers, _sellSpareBands, _sellUnits, _sellIron, _sellWood, _sellFood, _sellAnimals, _sellStumbles;
@@ -113,6 +114,7 @@ namespace Armoury
             _gold.Clear(); _goldTick = false; _foodSnap.Clear();      // migawki dziennego ticku gry nie przechodza do nastepnej kampanii
             _upLoot = _upFence = _upBlocked = _fenceGold = 0;         // liczniki zakupow u pasera ida do linii "Paser:" - nie moga przejsc z poprzedniej kampanii
             _hearthRegion.Clear(); H3NewDay(); _errH3 = false;        // H3: liczniki rozbitych i powrotow z puli tylko z tej kampanii
+            _desUndead = 0; OverflowHome.Reset();                      // W4b/W4c: liczniki dopisku linii "Wyrzutki:" i notatki przepelnienia tylko z tej kampanii
         }
 
         private static void FenceNewDay()
@@ -304,7 +306,7 @@ namespace Armoury
                 if (got >= want) break;
                 Dictionary<string, float> d;
                 if (!_pool.TryGetValue(r.StringId, out d)) continue;
-                foreach (var key in d.Keys.Where(k => k != Commoner).OrderByDescending(k => d[k]).ToList())
+                foreach (var key in d.Keys.Where(k => k != Commoner && !SkipUndeadKey(k)).OrderByDescending(k => d[k]).ToList())   // W4b: bez starych wightow
                 {
                     if (got >= want) break;
                     int n = Math.Min(want - got, (int)Math.Floor(d[key]));
@@ -326,14 +328,41 @@ namespace Armoury
             return roster;
         }
 
+        /// <summary>W4b: klucz puli z wightem Innych (stare zapisy - dezerterzy Innych szli tu do W4b) - bandy go nie biora; wygasa w puli jak dotad.</summary>
+        private static bool SkipUndeadKey(string key)
+        {
+            if (key == null || key == Commoner) return false;
+            var s = Settings.Current;
+            return s != null && s.OutlawNoUndead && LosersFlee.KeyKind(key) == LosersFlee.KeyUndead;
+        }
+
         // ------------------------------------------------------------ zdarzenia
+        /// <summary>Dezerterzy (CampaignEvents.OnTroopsDeserted; WarLedger wola wprost dla zaleglego zoldu). W4b: Inni (partia Innych albo wight
+        /// w innej partii) - z niczego, do niczego, jak rozbici w RoutedH3. W4c: przepelnienie partii lordow i zalog (notatka OverflowHome dla
+        /// TEGO rosteru) - do ludnosci BK wsi, takze przy wylaczonym prawie wyrzutkow. Reszta - do puli regionu jak dotad (przy wylaczonym
+        /// prawie wyrzutkow znika, jak dotad).</summary>
         internal static void OnTroopsDeserted(MobileParty party, TroopRoster roster)
         {
             try
             {
-                if (!On || party == null || roster == null) return;
-                var region = NearestNode(party.Position.ToVec2());
-                AddRoster(region, roster, 1f, ref _inDesert);
+                if (party == null || roster == null) return;
+                var s = Settings.Current;
+                bool noUndead = s != null && s.OutlawNoUndead;
+                bool undeadParty = noUndead && Undead.Party(party);
+                var home = OverflowHome.SendHome(party, roster);     // Inni: OverflowHome nie robi im notatki i nie wysyla wightow do wsi
+                var region = On ? NearestNode(party.Position.ToVec2()) : null;
+                for (int i = 0; i < roster.Count; i++)
+                {
+                    var e = roster.GetElementCopyAtIndex(i);
+                    if (e.Character == null || e.Character.IsHero || e.Number <= 0) continue;
+                    int n = e.Number;
+                    if (undeadParty || (noUndead && Undead.Character(e.Character))) { _desUndead += n; continue; }
+                    int h;
+                    if (home != null && home.TryGetValue(e.Character, out h) && h > 0) { int k = Math.Min(h, n); n -= k; home[e.Character] = h - k; }
+                    if (n <= 0 || region == null) continue;
+                    Add(region, e.Character.StringId, n);
+                    _inDesert += n;
+                }
             }
             catch (Exception e) { Log.Error("OutlawLaw.Deserted", e); }
         }
@@ -601,7 +630,14 @@ namespace Armoury
 
         internal static void Daily()
         {
-            if (!On) { H3NewDay(); return; }      // H3 przy wylaczonym prawie wyrzutkow: linii "Wyrzutki:" nie ma - liczniki nie rosna miedzy dobami
+            if (!On)
+            {
+                H3NewDay();      // H3 przy wylaczonym prawie wyrzutkow: linii "Wyrzutki:" nie ma - liczniki nie rosna miedzy dobami
+                // W4b/W4c dzialaja i bez prawa wyrzutkow (Inni do niczego, przepelnienie do domu) - wlasna linia zamiast dopisku
+                try { Log.Info("Dezercja poza pula (W4, prawo wyrzutkow wylaczone): dzien " + (int)CampaignTime.Now.ToDays + " | Inni dezerterzy - do niczego " + _desUndead + ", " + OverflowHome.Segment() + "."); } catch { }
+                _desUndead = 0; OverflowHome.NewDay();
+                return;
+            }
             try
             {
                 var s = Settings.Current;
@@ -800,10 +836,12 @@ namespace Armoury
                          + " | bandy nowe " + _bornBands + " (" + _bornMen + " ludzi), odmowione " + _refused + ", puste usuniete " + _emptyRemoved
                          + " | werbunek: z puli " + _bandRecruit + ", jency " + _prisonerJoin
                          + " | awanse: z lupu " + _upLoot + ", od pasera " + _upFence + " (" + _fenceGold + " zl), bez sprzetu " + _upBlocked
-                         + " | band " + bands + ", ludzi " + men + "."
+                         + " | band " + bands + ", ludzi " + men
+                         + " | dezercja poza pula (W4): Inni dezerterzy - do niczego " + _desUndead + ", " + OverflowHome.Segment() + "."
                          + (h3 ? H3Segment() : ""));
                 FenceLog(s, _upFence, _fenceGold);
                 H3NewDay();
+                _desUndead = 0; OverflowHome.NewDay();
                 _inDesert = _inRouted = _inRaid = _inMisery = _inDisband = _outReturn = 0f;
                 _bornBands = _bornMen = _refused = _emptyRemoved = _bandRecruit = _prisonerJoin = _upLoot = _upFence = _upBlocked = _fenceGold = 0;
             }
@@ -854,6 +892,7 @@ namespace Armoury
             foreach (var key in d.Keys.ToList())
             {
                 if (got >= want) break;
+                if (SkipUndeadKey(key)) continue;      // W4b: bez starych wightow z puli
                 int n = Math.Min(want - got, (int)Math.Floor(d[key]));
                 if (n <= 0) continue;
                 var ch = key == Commoner ? CommonerFor(clan) : MBObjectManager.Instance.GetObject<CharacterObject>(key);

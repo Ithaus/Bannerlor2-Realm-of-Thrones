@@ -500,6 +500,10 @@ namespace Armoury
         [SettingPropertyGroup("The lean quartermasters")]
         public int BkSupplyMaxPieces { get; set; } = 12;
 
+        [SettingPropertyBool("Bk Supply Morale By Days", HintText = "the Banner Kings morale penalty for missing alcohol, animal products, wood and textiles counts DAYS of shortage, for every party alike (yours too): the shortfall over the party's true daily need from its men, never more than Banner Kings' own maximum (20 alcohol, 30 wood, 20 animal products at supplies factor 0.5) - no longer the whole shortfall at once inside a town or castle, in a small party or in a party shrunk since; a party's stored shortfall is also kept within Banner Kings' own bounds for its present men every day. Purchases and consumption of supplies are not changed (off = Banner Kings as before)")]
+        [SettingPropertyGroup("The lean quartermasters")]
+        public bool BkSupplyMoraleByDays { get; set; } = true;
+
         [SettingPropertyBool("Ai Starving Buys Any Price", HintText = "a STARVING AI party buys the cheapest food it can afford at ANY price - hunger does not haggle (vanilla and Banner Kings refuse anything above 120 denars, so lords starve on a full market in wartime)")]
         [SettingPropertyGroup("The lean quartermasters")]
         public bool AiStarvingBuysAnyPrice { get; set; } = true;
@@ -835,6 +839,10 @@ namespace Armoury
         [SettingPropertyBool("Desertion Law For Ai", HintText = "apply the tiered thresholds to AI parties as well - lords, garrisons and caravans, one rule with yours (183); the Others keep the game's rule. Off = AI keeps vanilla desertion below morale 10")]
         [SettingPropertyGroup("Desertion")]
         public bool DesertionLawForAi { get; set; } = true;
+
+        [SettingPropertyBool("Overflow Goes Home", HintText = "men who leave a lord's party or a garrison only because there is no room for them (more men than the party size limit - the game sends a quarter of the excess away each day) go home to the Banner Kings population of a village, the same way as men released by the house budget: a garrison to the villages of its own castle or town, a party to the nearest village of its house, then of its realm; only when no such village exists do they join the outlaw pool as before. Yours too. Men leaving over pay or unpaid wages still go to the woods (off = everyone to the outlaw pool as before)")]
+        [SettingPropertyGroup("Desertion")]
+        public bool OverflowGoesHome { get; set; } = true;
 
         [SettingPropertyBool("Unique Gear Law Enabled", HintText = "named heroes' gear (Ramsay, the Hound, the Mountain, Brienne, Renly...) belongs to its owner alone: copies in armouries, packs and on other heroes become same-tier gear of the wearer's own culture, and DTE swaps them on the way into any armoury. A renowned piece taken by the custom of war stays itself in a baggage train (yours or a lord's); worn by anyone but its owner it is still swapped on load")]
         [SettingPropertyGroup("The law of the battlefield")]
@@ -2195,6 +2203,10 @@ namespace Armoury
         [SettingPropertyFloatingInteger("Outlaw Routed Share", 0.00f, 2.00f, "0.00", HintText = "share of soldiers routed or fleeing a lost battle who take to the woods instead of going home (outlaws follow their own share, villagers always go home)")]
         [SettingPropertyGroup("Iron Bank")]
         public float OutlawRoutedShare { get; set; } = 0.5f;
+
+        [SettingPropertyBool("Outlaw No Undead", HintText = "wights of the Others who fall away from their host (desertion) return to nothing instead of joining the outlaw pool of the region, and new and recruiting bands no longer draw the old wights still waiting in the pool (they fade away there as before) - the dead do not turn bandit (off = as before)")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool OutlawNoUndead { get; set; } = true;
 
         [SettingPropertyBool("Losers Flee Enabled", HintText = "battles fought without you: the beaten side mostly flees instead of dying - the slain follow the situation (horse to pursue, river or marsh behind, odds, seasoned men against levies), 5-65%; a few are taken; the rest go home or to the woods. The winner loses at most a few slain - the rest of his fallen are wounded. Your own battles fought on the field are not touched (auto-resolved ones: Losers Flee Player Auto)")]
         [SettingPropertyGroup("Iron Bank")]
@@ -4004,6 +4016,7 @@ namespace Armoury
             s.UniqueCrownHeadArmor = UniqueCrownHeadArmor;
             s.BkSupplyDaysCap = BkSupplyDaysCap;
             s.BkSupplyMaxPieces = BkSupplyMaxPieces;
+            s.BkSupplyMoraleByDays = BkSupplyMoraleByDays;
             s.AiStarvingBuysAnyPrice = AiStarvingBuysAnyPrice;
             s.FoodConsumptionCutPercent = FoodConsumptionCutPercent;
             s.CrossingLawEnabled = CrossingLawEnabled;
@@ -4088,6 +4101,7 @@ namespace Armoury
             s.DesertionPercentPerMoralePoint = DesertionPercentPerMoralePoint;
             s.DesertionDailyCapPercent = DesertionDailyCapPercent;
             s.DesertionLawForAi = DesertionLawForAi;
+            s.OverflowGoesHome = OverflowGoesHome;
             s.UniqueGearLawEnabled = UniqueGearLawEnabled;
             s.MinSellPercentOfValue = MinSellPercentOfValue;
             s.OneScrapFloor = OneScrapFloor;
@@ -4428,6 +4442,7 @@ namespace Armoury
             s.OutlawReturnBasePercent = OutlawReturnBasePercent;
             s.OutlawReturnPeacePercent = OutlawReturnPeacePercent;
             s.OutlawRoutedShare = OutlawRoutedShare;
+            s.OutlawNoUndead = OutlawNoUndead;
             s.LosersFleeEnabled = LosersFleeEnabled;
             s.LosersFleePlayerAuto = LosersFleePlayerAuto;
             s.WinnerDeathCapPercent = WinnerDeathCapPercent;

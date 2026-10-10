@@ -27,6 +27,10 @@ namespace Armoury
         internal static bool OutermostBase { get { return _base <= 1; } }
         internal static bool OutermostMorale { get { return _morale <= 1; } }
         internal static bool OutermostSiege { get { return _siege <= 1; } }
+        // W1: "jestesmy wewnatrz liczenia morale" (dowolny poziom lancucha) - BkSupplyTemper podmienia dzielnik kary zaopatrzenia BK tylko tu
+        internal static bool InMorale { get { return _morale > 0; } }
+        // W1: licznik wpiety na DefaultPartyMoraleModel.GetEffectivePartyMorale (tam biegnie postfiks kary BK) - sprawdzane przy starcie
+        internal static bool MoraleOnDefault;
 
         public static void FinalPrefix() { _final++; }
         public static Exception FinalFinalizer(Exception __exception) { if (_final > 0) _final--; return __exception; }
@@ -42,6 +46,13 @@ namespace Armoury
             int a = Patch(h, typeof(PartySpeedModel), "CalculateFinalSpeed", "FinalPrefix", "FinalFinalizer");
             int b = Patch(h, typeof(PartySpeedModel), "CalculateBaseSpeed", "BasePrefix", "BaseFinalizer");
             int c = Patch(h, typeof(PartyMoraleModel), "GetEffectivePartyMorale", "MoralePrefix", "MoraleFinalizer");
+            try
+            {
+                var dm = AccessTools.Method(typeof(TaleWorlds.CampaignSystem.GameComponents.DefaultPartyMoraleModel), "GetEffectivePartyMorale");
+                var pi = dm != null ? Harmony.GetPatchInfo(dm) : null;
+                if (pi != null) foreach (var p in pi.Prefixes) if (p.PatchMethod != null && p.PatchMethod.DeclaringType == typeof(SpeedDepth)) { MoraleOnDefault = true; break; }
+            }
+            catch { MoraleOnDefault = false; }
             // 17.09 (Jeff: "strasznie wolno trwa oblezenie"): budowa machin to tez lancuch -
             // RealisticSiegeEventModel wola bazowy DefaultSiegeEventModel, a WorldPace latal
             // oba, wiec suwak 50% wchodzil DWA razy (x0.25) - patrz WorldPace.SiegePostfix

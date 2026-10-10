@@ -805,6 +805,19 @@ namespace Armoury
             catch (Exception e) { Stumble("ToVillage", e); return false; }
         }
 
+        /// <summary>W4c (OverflowHome): wies domowa ludzi, ktorzy odchodza z przepelnionej partii albo zalogi - ta sama regula co zwolnieni 166
+        /// (VillageFor: zaloga - wsie jej twierdzy, partia - najblizsza wies rodu, potem krolestwa; tylko z danymi BK). null - brak takiej wsi.</summary>
+        internal static Settlement OverflowVillage(MobileParty mp)
+        {
+            if (mp == null) return null;
+            try
+            {
+                Settlement fortress = mp.IsGarrison ? (mp.CurrentSettlement ?? mp.HomeSettlement) : null;
+                return VillageFor(mp, fortress, OwnerOf(mp));
+            }
+            catch (Exception e) { Stumble("OverflowVillage", e); return null; }
+        }
+
         /// <summary>Wies, do ktorej wracaja zwolnieni: zaloga - wsie tej twierdzy; partia - najblizsza wies rodu; potem najblizsza wies krolestwa. Tylko z danymi BK.</summary>
         private static Settlement VillageFor(MobileParty mp, Settlement fortress, Clan c)
         {
@@ -821,7 +834,7 @@ namespace Armoury
                     if (d < bd) { bd = d; best = st; }
                 }
             if (best != null) return best;
-            if (c.Settlements != null)
+            if (c != null && c.Settlements != null)   // W4c: OverflowVillage moze podac zaloge bez wlasciciela
                 foreach (var st in c.Settlements)
                 {
                     if (st == null || !st.IsVillage || !HasPop(st)) continue;
@@ -829,7 +842,7 @@ namespace Armoury
                     if (d < bd) { bd = d; best = st; }
                 }
             if (best != null) return best;
-            var k = c.Kingdom;
+            var k = c != null ? c.Kingdom : null;
             if (k != null)
                 foreach (var st in k.Settlements)
                 {

@@ -418,8 +418,9 @@ namespace Armoury
 
         // ============================================================ DEZERCJA AI WEDLUG PRZYCZYNY
         private static readonly Dictionary<MobileParty, int> _wageDesert = new Dictionary<MobileParty, int>();
-        // [grupa, przyczyna]: grupa 0 lordowie AI, 1 zalogi AI, 2 gracz i jego rod, 3 karawany i inne; przyczyna 0 morale, 1 morale w glodzie, 2 limit zoldu/partii
-        private static readonly long[] _des = new long[12];
+        // [grupa, przyczyna]: grupa 0 lordowie AI, 1 zalogi AI, 2 gracz i jego rod, 3 karawany i inne, 4 Inni (W4a: partie Innych - dotad w grupie 0,
+        // a to nie ludzie: model gry, glod; poza "AI razem" i poza baza progu 183); przyczyna 0 morale, 1 morale w glodzie, 2 limit zoldu/partii
+        private static readonly long[] _des = new long[15];
 
         public static void WagePre(TroopRoster __1, out int __state) { __state = 0; try { __state = __1 != null ? __1.TotalManCount : 0; } catch { } }
         public static Exception WageFin(Exception __exception, MobileParty __0, TroopRoster __1, int __state)
@@ -445,7 +446,7 @@ namespace Armoury
                 int wage; _wageDesert.TryGetValue(mp, out wage); _wageDesert.Remove(mp);
                 wage = Math.Max(0, Math.Min(wage, total));
                 int morale = total - wage;
-                int grp = mp.ActualClan == Clan.PlayerClan || mp.IsMainParty ? 2 : mp.IsGarrison ? 1 : mp.IsLordParty ? 0 : 3;
+                int grp = mp.ActualClan == Clan.PlayerClan || mp.IsMainParty ? 2 : IsOthers(mp) ? 4 : mp.IsGarrison ? 1 : mp.IsLordParty ? 0 : 3;
                 bool hungry = mp.Party != null && mp.Party.IsStarving;
                 _des[grp * 3 + (hungry ? 1 : 0)] += morale;
                 _des[grp * 3 + 2] += wage;
@@ -470,7 +471,9 @@ namespace Armoury
             // przeglad 169c: prog 183 (projekt rozdz. 1) liczy "z morale i z zaleglego zoldu razem" - bez limitu zoldu gry, ktory 166 wylacza
             sb.Append(" | AI razem ").Append(aiTotal).Append(" | AI morale i zalegly zold (baza progu 183: najwyzej bieg bazowy + 50%) ").Append(aiMoraleUnpaid)
               .Append(" | prawo dezercji dla AI (DesertionLaw): ")
-              .Append(Settings.Current != null && Settings.Current.DesertionLawForAi ? "tak" : "nie - gra (morale ponizej 10)").Append('.');
+              .Append(Settings.Current != null && Settings.Current.DesertionLawForAi ? "tak" : "nie - gra (morale ponizej 10)");
+            // W4a: Inni osobno, na koncu linii (parsery czytajace dotychczasowe pola nic nie gubia) - poza "AI razem" i baza progu 183
+            sb.Append(" | Inni (gra, glod): morale ").Append(_des[12]).Append(", morale w glodzie ").Append(_des[13]).Append(", limit zoldu i wielkosci partii (gra) ").Append(_des[14]).Append('.');
             Array.Clear(_des, 0, _des.Length);
             if (_wageDesert.Count > 2000) _wageDesert.Clear();
             return sb.ToString();

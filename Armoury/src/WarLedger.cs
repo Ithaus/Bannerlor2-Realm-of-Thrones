@@ -195,8 +195,10 @@ namespace Armoury
                      + " | zalegly zold (WarLedger): AI " + LastGoneAi + " ludzi w " + _goneAiN + " partiach, stawka AI " + (s.WarLedgerAiHalf ? "polowa" : "pelna")
                      + ", podloga " + Math.Max(0, s.WarLedgerMinMen) + " ludzi zatrzymala: AI " + _floorAiMen + " w " + _floorAiN + " partiach, gracz i jego rod "
                      + _floorClanMen + " w " + _floorClanN + (s.WarLedgerMinMenPlayer ? "" : " (podloga gracza wylaczona)")
-                     + " | prog 183: dezercja AI z morale i zaleglego zoldu (linia 169c 'AI morale i zalegly zold') <= bieg bazowy + 50%.");
+                     + " | prog 183: dezercja AI z morale i zaleglego zoldu (linia 169c 'AI morale i zalegly zold', bez Innych) <= bieg bazowy + 50%"
+                     + " | Inni (gra, glod; poza prawem dezercji i poza progiem 183): " + DesertionAi.UndeadMen + " w " + DesertionAi.UndeadParties + " partiach.");   // W4a
             try { Line183d(inv); } catch (Exception e) { Log.Error("WarLedger.Line183d", e); }
+            try { Log.Info(BkSupplyTemper.MoraleDigest()); } catch (Exception e) { Log.Error("WarLedger.BkSupplyMorale", e); }   // W1: kara zaopatrzenia BK (tylko log)
             DesertionAi.Clear();
         }
 

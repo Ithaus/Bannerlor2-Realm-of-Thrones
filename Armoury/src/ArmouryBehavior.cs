@@ -1156,6 +1156,7 @@ namespace Armoury
             try { Measure169c.EnsureHooks(); } catch (Exception e) { Log.Error("Measure169c.EnsureHooks", e); }
             try { CrownIncome.EnsureHooks(); } catch (Exception e) { Log.Error("CrownIncome.EnsureHooks", e); }
             try { ClanBudget.EnsureHooks(); } catch (Exception e) { Log.Error("ClanBudget.EnsureHooks", e); }
+            try { OverflowHome.EnsureHooks(); } catch (Exception e) { Log.Error("OverflowHome.EnsureHooks", e); }   // W4c: przepelnienie partii i zalog do domu (okno dezercji gry w kampanii)
             try { GentryService.EnsureHooks(); } catch (Exception e) { Log.Error("GentryService.EnsureHooks", e); }   // 179: wezwanie rycerza i rozwiazanie jego partii (BK), zakupy majatkow BK w przydziale sprzetu 166
             try { Ransom178.EnsureHooks(); } catch (Exception e) { Log.Error("Ransom178.EnsureHooks", e); }   // 178: okupy wedlug majatku, kurier, posrednik, 1/9 lupu - latki w kampanii
             try { CrownCallToWar.EnsureHooks(); } catch (Exception e) { Log.Error("CrownCallToWar.EnsureHooks", e); }   // 168 dodatek: wezwanie do wojny placi korona - latki modelu finansow i sojuszy w kampanii

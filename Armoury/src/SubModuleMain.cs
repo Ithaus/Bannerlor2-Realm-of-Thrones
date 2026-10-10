@@ -164,6 +164,7 @@ namespace Armoury
                 try { CirculationWindows.ApplyAll(_harmony); } catch (Exception e) { Log.Error("CirculationWindows.ApplyAll", e); }
                 Measure169c.SetHarmony(_harmony);
                 ClanBudget.SetHarmony(_harmony);    // 166: tylko zapamietanie - latki gry wpina EnsureHooks w kampanii
+                OverflowHome.SetHarmony(_harmony);  // W4c: tylko zapamietanie - okno dezercji gry wpina EnsureHooks w kampanii
                 GentryService.SetHarmony(_harmony); // 179: tylko zapamietanie - latki BK (wezwanie rycerza, partia rycerza, majatki) w kampanii
                 Ransom178.SetHarmony(_harmony);      // 178: tylko zapamietanie - latki okupow i 1/9 w kampanii
                 CrownCallToWar.SetHarmony(_harmony); // 168 dodatek: tylko zapamietanie - latki w kampanii
