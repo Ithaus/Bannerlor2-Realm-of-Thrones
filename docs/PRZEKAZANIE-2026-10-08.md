@@ -494,3 +494,29 @@ LIMITY 13:30: 5h 32%, TYDZIEN 82% (reset 15.10) - przy 100% tygodnia przejsc na 
 - (10:30) **WGRANIE 20: Armoury d7222bfb (noc/wgranie-20 = e2c bcb5fe1 = 186 + okupy B)**. Dalej: KONIEC ETAPU 2 - bieg 2-letni (autotest -Days 728, nowa kampania;
   ok. 3.5 h) + bieg z wymuszonym pokojem (warunki konca etapu z projektu rozdz. 1: pokoj - zalogi pokojowe 45-50% wojennych, zold / D panow zamkow <= 0.3, wojsko 35-40%
   wojennego). Potem etap 3 krok po kroku.
+
+## 20. START TUTAJ (stan 10.10 ok. 10:40 zegara komp.; limit tygodnia 97% - przekazanie na drugie konto)
+
+**W grze (ZATWIERDZONE):** Armoury d7222bfb (galaz noc/wgranie-20 = w-toku/e2c bcb5fe1), RealisticCaptivity 5f98df70 (wgranie 18), CrashScribe 6507c842 (wgranie 13).
+Wgrania 15-20 z 10.10: 15 miecz valyrianski (Park -> krewny / polka), 16 etap 2 C1+C2, 17 C3, 18 D (168+178, z RC), 19 odpoczynek AI + rasy, 20 korona pozycza (186) + okupy B.
+**Drzewo pracy:** SCRATCH(7016)\noc2\e2c (git worktree klonu lancuch, galaz w-toku/e2c; origin = repo Jeffa C:\Users\GAME\Bannerlor2-Realm-of-Thrones -> GitHub).
+Opis calego etapu 2 (kazda paczka, odstepstwa, klucze, linie logu, diagnozy): **docs/C1-POSTEP.md w drzewie e2c** (nie w repo glownym - przeniesc przy scalaniu).
+**Autotest:** cd SCRATCH(3cf3e0ac)\dzien-6\autotest\repo; powershell -NoProfile -ExecutionPolicy Bypass -File tools\autotest.ps1 -CrashScribeDll
+SCRATCH(7016)\test\CrashScribe-at-w2.dll -ArmouryDll <dll> [-ExtraDll <...\RealisticCaptivity.dll>] -Days 120 [-LoadSave autotest-161-kawalki -Days 9] (gra zamknieta!).
+Progi: python -I + runpy na SCRATCH(7016)\noc2\e2c\tools\sprawdz_logi.py --grupa etap2 <Armoury-*.log> --baza SCRATCH(7016)\e2b-p\baza-B4.json (logi kopiowac do SCRATCH\kopia-*).
+Wgranie: kopia *.bak-<data>-przed-nocNN obok + D:\Backup-Bannerlord\wgrane\<data>-nocNN-przed, md5 przed/po, galaz noc/wgranie-NN, wpis w STAN-PRAC i tu.
+
+**W TOKU:** bieg 2-letni konca etapu 2 (Armoury d7222bfb = test\Armoury-e2c-186b.dll, -Days 728, start ok. 10:35, ok. 3.5 h) -> test\at-etap2-728.out.txt.
+Ocena: sprawdz_logi --grupa etap2 (+ --koniec-etapu), glowy < 5000 w dobach 364/728 <= 10, bankruci 0, wojsko lordow w wojnie 95-115 tys., reszta ksiegi +-10 tys./d,
+dlug okupow i kredyt koron (186) nie rosna bez konca, skarbce >= 500 tys. Bieg z wymuszonym pokojem - autotest nie ma takiej opcji (do dorobienia w CS autotest albo pominac
+za zgoda Jeffa).
+
+**KOLEJKA (decyzje Jeffa w STAN-PRAC "DECYZJE JEFFA 10.10"):**
+1. Zamkniecie etapu 2 po biegu 2-letnim (raport dla Jeffa prostym jezykiem, tabele).
+2. ETAP 3 krok po kroku (PLAN-DO-KONCA-MODA "Etap 3"): 3.2 cale zloto taboru/bandy dla zwyciezcy -> 3.3 statki rozbitych do portu (181 w PROJEKT-ETAP2) -> 3.1 szczelnosc 164a
+   -> 3.4-3.7 (BK niewolnicy/rada/wedrowcy, ROT inwazje/rebelie/zadania) -> 3.8 ceny historyczne -> 3.9/3.10 drobne. Koniec: reszta niewyjasniona ksiegi < 10 tys./d.
+3. Przy powrocie do budow: AI w wojnie przestawia kolejke na budowe wojskowa; krolestwa w wiecznej wojnie (Straz) buduja tez cywilne; Straz najmuje robotnikow z okolicy.
+4. Otwarte drobne: pan samych zamkow z zaworu ok. 130-180 zl/d wobec celu 200-350 (DECYZJA z kroku B - konie zjadane w zamkach P1/P2 albo nowy cel); regulator kas miast
+   kasuje +25-38 tys./d tego, co zatrzymal B (zamyka 111' w etapie 5); renty 180 - ok. 20% rodow bez warunku sluzby (OK).
+**Zasady pracy (pamiec):** jedna rzecz naraz; pomocnik (Agent) na kod, ja test + wgranie; tor S/M/L; po polsku prostym jezykiem; Jeff gra dopiero po projekcie (NOWA kampania);
+nie dotykac zapisow Jeffa i Armoury.json; zadnego spawn_task; przy 99% tygodnia - pelne przekazanie.
