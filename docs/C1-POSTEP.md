@@ -760,3 +760,121 @@ dwureczna, drzewcowa, rzucana, kusza, luk) >= 100; szablony BK "bannerkings_gent
 **Czego sie spodziewac w kolejnym tescie 120 dob:** `budzet-rodow.csv` - `zold_partii` rodow gentry 0 (rod bez partii); `Wydatki rycerzy (169c)` "zold" 0;
 linia 179 "zold druzyny pana zdjety" ok. 30-70 tys. zl/dobe w wojnie (suma zoldow druzyn z rycerzem, liczona raz na rod rycerza); glowy gentry < 5000
 w dobie 120: 0 (poza krolestwami z wezwaniem do wojny - tam tyle co inne rody bez lenna); kiesy rycerzy w sluzbie rosna o 24 zl/dobe.
+
+---
+
+## D - 168 dlug, kredyt wojenny i zajecie zamiast bankructwa (+ dodatek: wezwanie do wojny placi korona)
+
+Projekt: rozdz. "168" (krok D; 2.12), 2.0b, 166 ("Dluznik", B5), odpowiedzi Jeffa; decyzja Jeffa 10.10 "tak, korona" (wezwanie sojusznika do wojny). Build Release
+kod 0, `python -I tools/gen_mcm.py`, gra nie uruchamiana.
+
+**Pliki:** nowe `Armoury/src/DebtLadder.cs` (ksiega i drabina, KW, zajecie, wyprzedaz, wymarli, portfele gry, B5, zapis `arm_debt168`, linia "Dlugi (168)"),
+`Armoury/src/CrownCallToWar.cs` (wezwanie do wojny ze skarbca, zapis `arm_ctw168`, linia "Wezwania do wojny (168)"); zmienione `IronBank.cs` (limit i petle przy drabinie,
+`LendKw`, menu gracza), `ClanBudget.cs` (KW w pulapie i wyplata, dluznik, D w zajeciu, B5 `PropertyBlocked`, linia 166), `SoldierPay.cs` (DebtToKingdom do ksiegi),
+`CrownIncome.cs` (`TakeAdvanceAll`, pozycja wezwan w KDay i linii 165), `ClanIncomeBook.cs` (`OnceToday`, rodzaj wplywu `KRansom`, linia "Dlugi (na sucho)" i kolumna
+`kandydat_pozyczki` z drabiny), `ClanIncomeBook.StableD.cs` (`VillageIncomeOf`), `MoneyLedger.Obieg.cs`, `ArmouryBehavior.cs`, `SubModuleMain.cs`, `Settings.cs` + `McmSettings.cs`, `tools/gen_mcm.py`.
+
+**Co dziala (DebtLadderEnabled; czynne tylko z IronBankEnabled i ClanBudgetEnabled):**
+- **Ksiega rodu:** dlug Banku (`IronBank.Debt`: kapital z odsetkami, oprocentowanie, wiarygodnosc) + roszczenia innych wierzycieli (`DebtLadder.Claim`): dlug zoldu
+  (wierzyciel - ludzie partii, StringId partii), dlug wobec korony (stary zapis - do skarbca krolestwa), zaliczka gry (OBIEG-1 - splata w nicosc), okupy (178).
+  Szczeble: kredyt (D1), zaleglosc (D2), zajecie (D3), wyprzedaz (D4).
+- **Kredyt wojenny (KW) - jedyna pozyczka AI** (stara petla "pozycza, gdy brak na 10/20 dni zoldu" wylaczona): w `ClanBudget.Daily` po pulapie bez KW (z udzialem
+  dworu w wojnie) - `DebtLadder.WarCreditRoom`: rod AI w wojnie (nie najemnik, nie Straz bez zoldu, nie gracz), G < R, D > 0, bez zaleglosci i zajecia, nie w 182 dobach po
+  zajeciu, D pokrywa dwor + 3% powinnosci, wolny kapital Banku ponad `BankFreeCapitalFloor`, limit niewyczerpany. Miejsce = min(0.40 D, limit - dlug, kapital - prog)
+  dochodzi do pulapu (limity partii rosna - werbunek). Wyplata dnia: zold naliczony (partie + zalogi + karawany) ponad pulap bez KW, najwyzej miejsce KW -
+  `IronBank.LendKw` (kapital Banku -> kiesa glowy, oplata 2% i oprocentowanie jak kazda pozyczka, bez progu dni do terminu). Czesc KW w ksiedze (`L.Kw`).
+- **Limit** (`IronBank.Limit` przy drabinie): `DebtLimitLandDays` (15) x czesc "ziemia" D stalego + 10 000 za miasto + 5 000 za zamek + `WarCreditLootDays` (30) x srednie
+  jednorazowe od prawdziwego platnika z 84 dob (sprzedaz osadom, od innych bohaterow i partii, trzecia, okupy 178; bez zdarzen z niczego - statki, majatki BK), x wiarygodnosc.
+  Srednia 84 dob: pierwsze 84 doby srednia zwykla, potem kroczaca (zapisana w `arm_debt168`).
+- **Splata** (krok Banku, przed budzetem): odsetki (poza zajeciem); u AI z dlugiem Banku najpierw jednorazowe doby (`ClanIncomeBook.OnceToday`: lup, okupy, sakwy, trzecia,
+  statki; bez zwrotu, korony, kontraktu, renty, podwojnych) - w wojnie 50%, w pokoju 100% - z kiesy glowy ponad max(5 000; 3 dni zoldu), potem dorosli czlonkowie ponad
+  5 000; poza limitem rat; najpierw gasi KW. Raty z D (D budzetu wczoraj, inaczej D staly, inaczej D169): Bank najwyzej 10% D (KW w wojnie AI - bez raty z D; stary dlug
+  wedlug terminu), wszystkie raty najwyzej 15% D - Bank, potem dlug zoldu, dlug wobec korony, zaliczka gry, okupy wedlug wieku (kolejka bez blokowania).
+  Przed zaleglosc - pomoc rodziny T5 (`FamilyCoverAll`).
+- **D2 zaleglosc:** glowa nie ma na raty -> placi, ile ma ponad 3 dni zoldu (Bank pierwszy), wiarygodnosc x0.8 (min 0.5), +2 pp, KW wstrzymany. **D3 zajecie** po 3 zaleglosciach
+  z rzedu (zamiast bankructwa): codziennie dochod wsi rodu (`VillageIncomeOf`: srednia 28 dob podatku wsi BK i renty wsi z dzisiejszych wsi) + kiesa glowy ponad
+  `SeizeFloorGold` (38 000) -> wierzyciele (Bank, potem roszczenia); odsetki zamrozone; budzet 166 liczy D bez dochodu wsi (poczet sam maleje - zwolnienia). Splacone ->
+  koniec zajecia, KW po 182 dobach. **D4 wyprzedaz** co 7 dni tylko przy 14 dobach zerowego zajecia albo prognozie (dlug / srednia zajecia) > 728 dni: nadwyzki zbrojowni
+  partii AI w miescie (`GarrisonArmory.SellSurplus`, zapas 0%) na targ (kasa miasta placi), karawany bez bohatera i warsztaty do najbogatszego notabla (placi z kiesy, ile ma;
+  karawana tylko gdy notabl ma choc jej gotowke) - do kwoty dlugu, przychod do wierzycieli; lenno zostaje. Bankruci Banku ze starego zapisu -> zajecie pierwszego dnia.
+- **Bez umorzenia:** rod wyeliminowany - dlug (Bank + roszczenia) na nowych panow jego wsi (wsie zapamietane codziennie), proporcjonalnie do liczby wsi, takze gracz
+  (komunikat); bez wsi - "dlug bez platnika" (ksiega, zapis). Glowa zmarla, rod zyje - doba przerwy.
+- **Dlug zoldu (`WageDebtToMen`):** `SoldierPay.ClanTickPrefix` przenosi caly `DebtToKingdom` rodu do ksiegi przed rozliczeniem (zaliczka gry z `CrownIncome` - roszczenie
+  "zaliczka gry", reszta - "dlug wobec korony" do skarbca krolestwa rodu); gra (`AddPaymentForDebts`) nie oproznia juz kiesy glowy jednym pobraniem. W `Settle` nowy dlug
+  tego rozliczenia: czesc rownowazona obcietym zoldem (brak ukryty w dlugu) -> roszczenia ludzi kazdej partii wedlug jej obciecia; reszta -> zaliczka gry; `DebtToKingdom` = 0.
+  Splata: partia lorda -> `MenPurse.Add`, zaloga -> kasa jej osady; partii nie ma - inna partia lorda rodu, potem kasa najblizszego miasta (pod tarcza dworu).
+- **Portfele gry bez zaliczki (`GameWalletsNoAdvance`, OBIEG-1):** prefiks/postfiks `AddExpensesForHiredMercenaries`, `AddExpensesForTributes`, `AddExpensesForCallToWarAgreements`:
+  gdy gra uznala portfel w calosci, a niezaplacony udzial dopisala rodowi do dlugu - ta czesc wraca do portfela krolestwa (jutro dzielona na rody), dlug rodu maleje.
+  Brak zoldu ukryty w dlugu zostaje (dlug zoldu). Zrodlo zaliczki gry zamkniete; stare zaliczki splacane z ksiegi w nicosc (OBIEG-1).
+- **Dluznik (166):** dlug w Banku, dlug zoldu albo wobec korony, zaleglosc albo zajecie (sam dlug okupu - nie): dwor -50%, budowy 0. "Sprzet tylko braki" - juz jest:
+  pan placi tylko braki (`AiGear.TryBuyCore`), lepsze tylko z sakiewki ludzi (`MenUpgrade.ForAi`). **B5:** prefiksy BK `BKLordPropertyBehavior.ShouldHaveCaravan` /
+  `ShouldHaveWorkshop` - rod AI z budzetem kupuje karawane i warsztat tylko przy G >= 60 D i bez dlugu.
+- **Kapital:** pozyczki z kapitalu (posiadacz w "Pieniadz swiata"); zysk ponad `IronBankCapital` (5 mln) -> kasa Braavos po 1/180 dziennie (pod tarcza dworu).
+- **Gracz (`PlayerSameLadder`):** ta sama ksiega, limit, raty, zaleglosc, zajecie (wsie i kiesa ponad 38 000) i wyprzedaz (karawany, warsztaty - nigdy ekwipunek); pozycza
+  recznie w Braavos (w wojnie - KW), menu pokazuje szczebel i zasady; komunikaty po angielsku przy zaleglosci, zajeciu, wyprzedazy, koncu zajecia, dlugu po wymarlym rodzie.
+- **Dodatek - wezwanie do wojny placi korona (`CrownPaysCallToWar`, decyzja Jeffa 10.10):** prefiks `AddExpensesForCallToWarAgreements` - rody (AI i gracz) nie placa nic;
+  postfiks `AllianceCampaignBehavior.StartCallToWarAgreement` - wezwany nie dostaje ceny z gory (cofniety plus portfela; portfel wzywajacego zostaje dlugiem korony); w kroku
+  korony 165 po kontraktach 185, przed zwrotem: skarbiec wzywajacego placi z reszty wplywow dnia czesc dnia = cena / 42 (doby sluzby gry) do portfela wezwanego (gra rozdziela
+  go na jego rody - prawdziwy platnik). Gdy wplywow dnia nie starcza na czesc dnia: `EndCallToWarAgreement` gry i `MakePeaceAction` miedzy wezwanym a wrogiem (gdy nie trzyma
+  go w wojnie inne wezwanie), reszta ceny skreslona. Koniec porozumienia przez gre (termin, pokoj) - reszta skreslona. Dlug portfela wezwania sprzed paczki (bez naszego wpisu) -
+  skreslony pierwszego dnia (wezwany dostal go juz od gry z niczego, rody juz go nie placa). Bez zachowania sojuszy gry - zaplata proporcjonalna, licznik "niedoplata".
+
+**Nowe klucze (grupa "Debts and the war credit (stage 2)"):** `DebtLadderEnabled` true, `WarCredit` true, `WarCreditMaxShareD` 0.40, `WarCreditLootRepayShare` 0.5,
+`WarCreditLootDays` 30, `DebtLimitLandDays` 15, `BankFreeCapitalFloor` 1 000 000, `IronBankMaxInstalmentShare` 0.10, `AllInstalmentsMaxShare` 0.15, `SeizeFloorGold` 38 000,
+`SaleForecastDays` 728, `SaleAfterZeroSeizeDays` 14, `CreditAfterSeizureDays` 182, `BankProfitToBraavosDays` 180, `WageDebtToMen` true, `GameWalletsNoAdvance` true,
+`PlayerSameLadder` true. Grupa "The crown's income (stage 2)": `CrownPaysCallToWar` true.
+
+**Nowe / zmienione linie logu:**
+- NOWA (kampania) `Dlugi (168): latki - portfel najemnikow (AddExpensesForHiredMercenaries), portfel trybutu (...), portfel wezwania do wojny (...), B5 karawana BK (ShouldHaveCaravan), B5 warsztat BK (ShouldHaveWorkshop); BRAK: -.`
+- NOWA (kampania) `Wezwania do wojny (168): latki - rody nie placa wezwania (...), porozumienie bez ceny z gory (StartCallToWarAgreement), koniec porozumienia (EndCallToWarAgreement); BRAK: -.`
+- NOWA (po "Budzet rodow (166)") `Dlugi (168): dzien N | dluznicy: kredyt a (w tym kredyt wojenny b), zaleglosc c, zajecie d, wyprzedaz e, sam dlug okupu f; nowe dzis: zaleglosci, zajecia (z bankructw starego zapisu), wyjscia z zajecia | dlug: Bank X (kredyt wojenny Y), dlug zoldu, wobec korony, okupy | KW (166, dzis): miejsce w pulapie u N rodow (X zl), wyplacone Y zl u M rodow; bez KW: na limicie, zaleglosc/zajecie, po zajeciu, D nie pokrywa kosztow stalych, Bank ponizej progu wolnego kapitalu | splaty (Bank przed budzetem): z jednorazowych X (wojna 50%, pokoj 100%), raty z D: Bank, pozostali, w zaleglosci (ponad 3 dni zoldu); odsetki narosle; rod-raty, zaleglosci dzis; suma rat ponad 15% D: 0 rodow (kontrola - 0) | zajecie: dochod wsi, kiesy ponad 38000; wyprzedaz N: zbrojownie, karawany, warsztaty | do wierzycieli: ..., zaliczka gry w nicosc (OBIEG-1), okupy, ..., bez odbiorcy 0 (prog 0) | z gry do ksiegi (od wczoraj): dlug wobec korony + zaliczka gry, dlug zoldu (partii), nowa zaliczka gry; portfele gry ponownie otwarte X zl w N | wymarli: ..., dlug bez platnika razem | Bank: kapital, prog, zysk do kasy Braavos | latki: ...`
+- NOWE (zdarzenia) `Dlugi (168): <rod> - ZAJECIE dochodu (D3) po 3 zaleglosciach z rzedu; ...`, `Dlugi (168): <rod> - zajecie zakonczone, ...`, `Dlugi (168): <rod> - WYPRZEDAZ (D4): ...`,
+  `Dlugi (168): rod <X> wymarl - dlug ... przechodzi na nowych panow jego wsi: ...` / `... wymarl bez wsi - ... dlug bez platnika`.
+- NOWA `Wezwania do wojny (168): dzien N | porozumien w toku N (nowe dzis), reszta cen do zaplaty przez korony X | zaplacone dzis ze skarbcow wzywajacych do portfeli wezwanych Y | zerwane z braku wplywow dnia N (reszta ceny skreslona, pokoj sojusznika), niedoplata | skreslone: koniec porozumienia przez gre, dlug portfela sprzed paczki | ...` (tylko gdy cos sie dzieje) i zdarzenia `Wezwania do wojny (168): <A> wzywa <B> przeciw <C> - cena ...`, `... porozumienie z ... zerwane ...`.
+- ZMIENIONA `IronBank: dzien N (drabina dlugu 168: kredyt wojenny wyplaca budzet 166 po Banku - linia 'Dlugi (168)'; splaty i spoznienia z drabiny) - nowe pozyczki 0 ...` ("bankructwa dzis" zawsze 0).
+- ZMIENIONA `Budzet rodow (166): dzien N` - po "dwor ustepuje zoldowi": `| kredyt wojenny (168): miejsce w pulapie X u N rodow, wyplacone dzis Y u M rodow; dluznicy (dwor -50%, budowy 0) K, w zajeciu (D bez dochodu wsi) J (dochod wsi Z)`.
+- ZMIENIONA `Dlugi (na sucho)`: szczebel z drabiny (`StageOf`: kredyt / zaleglosc / zajecie / wyprzedaz, takze rody z samymi roszczeniami); "pozyczyliby wg planu: na wojne N" = rody
+  z miejscem KW dzis (limit = limit drabiny - dlug); "na okup glowy" 0. Kolumna CSV `kandydat_pozyczki` = `KW`, `szczebel` z drabiny.
+- ZMIENIONA `Korona: wplywy dnia (165)`: po kontraktach `, wezwania sojusznikow do wojny (168) X (porozumien zerwanych z braku wplywow N, niedoplata Y)`; na krolestwo `wezw. X`.
+- ZMIENIONA `Obieg: dzien N` - korona: `, wezwania do wojny (168) skarbce wzywajacych -> portfele wezwanych X (...)`; Bank: `; 168: kredyt wojenny kapital -> glowy X (rodow N), splata z jednorazowych, raty, zajete (dochod wsi i kiesy ponad podloge), wyprzedaz, do sakiewek ludzi (dlug zoldu), do skarbcow (stary dlug wobec korony), zaliczka gry w nicosc (OBIEG-1), okupy do porywaczy, portfele gry ponownie otwarte (bez zaliczki), zysk Banku do kasy Braavos`.
+
+**Odstepstwa / rozstrzygniecia (z powodem):**
+1. `IronBankIncomeDays` zostaje 60 (stary wzor bez drabiny), limit drabiny ma nowy klucz `DebtLimitLandDays` 15 - "wylacznik = stan sprzed paczki" (zmiana domyslnej zmienialaby
+   Bank takze przy wylaczonej drabinie).
+2. Wyplata KW liczona w kroku budzetu 166 (po Banku), nie w kroku Banku: KW jest czescia pulapu, a brak do zoldu naliczonego wymaga dzisiejszego pulapu bez KW. Raty, splata
+   z lupow, zaleglosci i zajecie - w kroku Banku (kolejnosc 2.0b). Linia "Dlugi (168)" po budzecie.
+3. Miejsce KW w pulapie u kazdego rodu spelniajacego warunek (wojna, G < R, ...), a wyplata tylko przy zoldzie ponad pulap bez KW - inaczej rod nigdy nie przekroczylby pulapu,
+   wiec warunek "zold > pulap bez kredytu" nie dalby sie spelnic (gra nie werbuje ponad limit partii).
+4. Splata z jednorazowych liczona raz na dobe z licznikow ksiegi (nie od kazdego wplywu) i zbierana z kiesy glowy, potem z kies doroslych czlonkow (lup trafia do wodzow partii);
+   po pokoju 100% jednorazowych takze dla starego dlugu Banku (nie tylko KW).
+5. Gracz: bez automatycznej splaty z jednorazowych (ksiega liczy u gracza przychod z handlu jako jednorazowy) - raty z D takze w wojnie (10% D).
+6. Kolejnosc roszczen po Banku: dlug zoldu, dlug wobec korony, zaliczka gry, okupy wedlug wieku (projekt: "najpierw Bank, potem okupy w kolejnosci powstania"; dlug zoldu
+   nie mial miejsca - ludzie wlasnej partii przed obcym wierzycielem).
+7. Zajety "dochod wsi u zrodla" = srednia 28 dob dochodu wsi z dzisiejszych wsi (podatek wsi BK + renta wsi), zdejmowana z kiesy glowy w kroku Banku (gdzie trafia renta
+   i podatek wsi); budzet liczy D bez niego, wiec go nie planuje. Bez D stalego - renta wsi tej doby.
+8. D4: nadwyzki zbrojowni tylko partii AI stojacych w miescie (sprzedaz na targ wymaga targu), konie - nie (konie i rzedy prowadzi Stajnia - poza nadwyzka zbrojowni);
+   karawany z bohaterem na czele i karawany gracza z towarzyszem - nie (`TransferCaravanOwnership` przenioslby towarzysza); u gracza bez zbrojowni.
+9. Dlug wymarlego rodu na nowych panow wsi wedlug liczby wsi; dlug zoldu wymarlego rodu idzie do partii dziedzica (zapasowy odbiorca).
+10. Zapasowy odbiorca dla okupu (178) i dlugu wobec korony: glowa rodu porywacza, potem kasa najblizszego miasta (pod tarcza dworu) - bez kroku "nowy pan wsi wierzyciela".
+11. Wylaczenie drabiny w trakcie kampanii: ksiega drabiny zostaje (zapis), ale nie jest obslugiwana (bez rat, zajec i KW); Bank wraca do starych zasad. Wylaczenie
+    `CrownPaysCallToWar`: porozumienia w toku wracaja do gry (wezwany dostaje niezaplacona reszte, rody wzywajacego placa jak dotad).
+12. Wezwanie do wojny: "oplata dnia" = cena gry / 42 doby sluzby (gra placi cala cene z gory) - porozumienie zrywa sie, gdy wplywow dnia nie starcza na czesc dnia;
+    sojusznik wychodzi z wojny przez `MakePeaceAction` (gra przy koncu porozumienia sama pokoju nie zawiera).
+
+**Czego sie spodziewac w tescie 120 dob:**
+- `IronBank: dzien`: "nowe pozyczki 0", "bankructwa dzis 0" przez caly bieg. Bank: kapital >= 1 mln w kazdej dobie.
+- `Dlugi (168)`: KW "miejsce w pulapie" u ok. 40-70 rodow w wojnie (w C3c rodow w wojnie z G < R: 66-69 w dobach 94-120, ich 0.40 D razem 14-22 tys. zl/dobe), "wyplacone"
+  kilka tys. zl/dobe u rodow na pulapie (w C3c tylko 4-9 takich rodow); dluznikow ok. 10-40; "suma rat ponad 15% D: 0"; nowe zajecia <= 1 w 120 dobach; "bez odbiorcy 0".
+- **Wojsko lordow w wojnie: tylko ok. +1-3 tys.** wobec C3c (ok. 93 tys. -> ok. 94-96 tys.): w C3c pulap 166 byl uzyty w 42-46% i wiazal tylko u kilku rodow z G < R;
+  rody z G >= R maja skrzynie wojenna, a KW ich nie dotyczy (projekt). Cel 95-115 tys. - dolna krawedz; reszta luki to nie pieniadz (diagnoza C3: smierc w bitwach, dezercja
+  183 z dlugu snu T10, sklad wojen).
+- `Pieniadz swiata`: bez zmiany tempa poza splata starych zaliczek gry w nicosc (nowych 0) i brakiem zlota z niczego dla wezwanych do wojny (portfel wezwanego dostaje tylko
+  zaplacone przez skarbiec).
+- `Korona: wplywy dnia (165)`: "wezwania sojusznikow do wojny (168)" > 0 tylko przy porozumieniach; "zerwanych z braku wplywow" - przy biednych koronach.
+- Glowy < 5000: rody gentry Pentos nie placa juz udzialu w wezwaniu do wojny (spadek ok. 21 tys. z C3b znika).
+
+**Ryzyka:** (a) `MakePeaceAction` przy zerwaniu wezwania - pokoj bez daniny miedzy wezwanym a wrogiem (Diplomacy moze reagowac na zdarzenie pokoju); (b) KW przy G tuz
+pod R: wyplata podnosi G ponad R, nastepnego dnia KW znika (skrzynia wojenna), pulap spada - mozliwe kolysanie limitow partii (zwolnienia dopiero po 3 dobach ponad 1.10 x pulap);
+(c) D4 przenosi karawany i warsztaty do notabli - rzadkie, do obejrzenia w autotescie (0 bledow); (d) `MercenaryWallet` ma setter internal - ponowne otwarcie portfela
+najemnikow przez refleksje (portfel najemnikow zmienia tylko kontrakt gracza); (e) dlug wobec korony przeniesiony z gry: `ChangeKingdomAction` juz go nie kasuje
+(bez umorzenia), a warunek gry "najemnicy odchodza od krola z dlugiem > 10 000" nie zachodzi.

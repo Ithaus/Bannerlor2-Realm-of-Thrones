@@ -87,6 +87,7 @@ namespace Armoury
         {
             try { KingdomTreasury.ZeroLast(); } catch (Exception e) { Stumble169("ClearLast169(KingdomTreasury)", e); }
             try { IronBank.ZeroLast(); } catch (Exception e) { Stumble169("ClearLast169(IronBank)", e); }
+            try { DebtLadder.ZeroLast(); } catch (Exception e) { Stumble169("ClearLast169(DebtLadder)", e); }   // 168: liczniki doby drabiny (Bank przed ksiega)
             try { SoldierPay.ZeroLast(); } catch (Exception e) { Stumble169("ClearLast169(SoldierPay)", e); }
             try { PopulationLaw.ZeroDay169(); } catch (Exception e) { Stumble169("ClearLast169(PopulationLaw)", e); }
             try { CastlePurse.ZeroLast(); } catch (Exception e) { Stumble169("ClearLast169(CastlePurse)", e); }   // 110: zawor kas zamkow (Last*)
@@ -584,6 +585,8 @@ namespace Armoury
               .Append(", raty reparacji skarbiec -> skarbiec ").Append(CrownIncome.LastRepOut).Append(" (przyjete ").Append(CrownIncome.LastRepIn).Append(")")
               .Append(", kontrakty najemnikow AI (185) skarbce -> glowy kompanii ").Append(MercContract.LastPaid).Append(" (nalezne ").Append(MercContract.LastDue)
               .Append("; gra dla AI: za tier wylaczone ").Append(MercContract.LastTierOff).Append(", kontrakt gry wylaczony ").Append(MercContract.LastGameOff).Append(")")
+              .Append(", wezwania do wojny (168) skarbce wzywajacych -> portfele wezwanych ").Append(CrownCallToWar.LastPaid).Append(" (zerwane z braku wplywow ").Append(CrownCallToWar.LastEndedN)
+              .Append(", reszta cen skreslona ").Append(CrownCallToWar.LastEnded).Append(")")
               .Append(", splata dlugu wobec korony z kies rodow do skarbcow ").Append(CrownIncome.LastDebtRepaid)
               .Append(" (splata zaliczki gry - portfel uznany z niczego - w nicosc ").Append(CrownIncome.LastAdvanceRepaid).Append(")")   // recenzja C1 (OBIEG-1)
               .Append(", clo jednym poborem (licznik cel -> skarbiec) ").Append(KingdomTreasury.LastCustomsSingle)
@@ -596,7 +599,14 @@ namespace Armoury
               .Append("; skarbce razem ").Append(Dl(now, last, HKingdoms)).Append(", ponizej 0.5 mln: ").Append(kPoor).Append(" z ").Append(kAll)
               .Append(" | Bank [P]: pozyczki ").Append(IronBank.LastLent).Append(" na ").Append(IronBank.LastLentSum).Append(" zl, splaty ").Append(IronBank.LastPaidN)
               .Append(" na ").Append(IronBank.LastPaidSum).Append(" zl, spoznienia ").Append(IronBank.LastMissed).Append(", bankructwa ").Append(IronBank.LastDefaults)
-              .Append(", kapital ").Append(IronBank.CapitalNow).Append(" zl.");
+              .Append(", kapital ").Append(IronBank.CapitalNow).Append(" zl")
+              // 168: drabina dlugu - kredyt wojenny (kapital -> glowy), splaty (glowy, rodziny, zajete wsie i wyprzedaze -> Bank i wierzyciele), zysk Banku -> kasa Braavos
+              .Append("; 168: kredyt wojenny kapital -> glowy ").Append(ClanBudget.LastKwLent).Append(" (rodow ").Append(ClanBudget.LastKwLentN).Append(")")
+              .Append(", splata z jednorazowych ").Append(DebtLadder.LastLootRepaid).Append(", raty ").Append(DebtLadder.LastInstalments)
+              .Append(", zajete (dochod wsi i kiesy ponad podloge) ").Append(DebtLadder.LastSeized).Append(", wyprzedaz ").Append(DebtLadder.LastSold)
+              .Append(", do sakiewek ludzi (dlug zoldu) ").Append(DebtLadder.LastMenPaid).Append(", do skarbcow (stary dlug wobec korony) ").Append(DebtLadder.LastCrownPaid)
+              .Append(", zaliczka gry w nicosc (OBIEG-1) ").Append(DebtLadder.LastAdvNothing).Append(", okupy do porywaczy ").Append(DebtLadder.LastRansomPaid)
+              .Append(", portfele gry ponownie otwarte (bez zaliczki) ").Append(DebtLadder.LastReopened).Append(", zysk Banku do kasy Braavos ").Append(DebtLadder.LastProfit).Append('.');
             return sb.ToString();
         }
 

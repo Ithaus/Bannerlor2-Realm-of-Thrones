@@ -529,6 +529,28 @@ namespace Armoury
             catch { return -1; }
         }
 
+        /// <summary>168: dochod wsi rodu dziennie (srednia 28 dob z dzisiejszych wsi: podatek wsi BK wedlug posiadacza tytulu i renta wsi wedlug wlasciciela) -
+        /// to bierze wierzyciel przy zajeciu (D3) i to D budzetu 166 traci w zajeciu. Bez D stalego - renta wsi tej doby (PopulationLaw).</summary>
+        internal static long VillageIncomeOf(Clan c)
+        {
+            try
+            {
+                if (c == null) return 0;
+                if (StableDOn)
+                {
+                    double v = 0;
+                    List<Settlement> vs;
+                    if (_villagesOf.TryGetValue(c, out vs)) for (int i = 0; i < vs.Count; i++) { Ring r; if (vs[i] != null && _rVTax.TryGetValue(vs[i], out r)) v += r.Avg(); }
+                    var sts = c.Settlements;
+                    if (sts != null) for (int i = 0; i < sts.Count; i++) { var st = sts[i]; Ring r; if (st != null && st.IsVillage && _rRent.TryGetValue(st, out r)) v += r.Avg(); }
+                    return (long)Math.Max(0, v);
+                }
+                int rv; PopulationLaw.RentVillageToday.TryGetValue(c, out rv);
+                return Math.Max(0, rv);
+            }
+            catch { return 0; }
+        }
+
         /// <summary>166: D staly, liczba zmierzonych dob (do mieszania z D z zapisu, gdy pomiar krotszy niz 28 dob) i srednia "jednorazowych" bez
         /// podwojnych (lup najezdzcow liczy sie do D - wyjatek lore W-1); false - brak pomiaru.</summary>
         internal static bool StableDWithDays(Clan c, out double d, out int days, out double once)

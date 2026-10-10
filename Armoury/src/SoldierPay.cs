@@ -184,6 +184,9 @@ namespace Armoury
             try
             {
                 _clan = null; _recs.Clear(); _haveNet = false;
+                // 168 (WageDebtToMen): dlug wobec korony z gry przechodzi do ksiegi drabiny PRZED rozliczeniem - gra (AddPaymentForDebts) nie oproznia
+                // kiesy glowy jednym pobraniem; nowy dlug tego rozliczenia (brak zoldu ukryty w dlugu) wejdzie do ksiegi w Settle
+                if (__0 != null && !__0.IsBanditFaction && Live) { try { DebtLadder.TakeOverCrownDebt(__0); } catch (Exception e) { Stumble("SoldierPay.TakeOverCrownDebt", e); } }
                 if (__0 == null || __0.IsBanditFaction || __0.Leader == null || !Watching || !Live) return;
                 EnsureHooks();
                 _debtBefore = __0.DebtToKingdom;
@@ -340,7 +343,13 @@ namespace Armoury
             long debtDelta = (long)clan.DebtToKingdom - _debtBefore;
             long newDebt = Math.Max(0L, debtDelta + Math.Max(0, debtPaid));
             long cutByDebt = 0;
-            if (_recs.Count == 0) { if (newDebt > 0) CrownIncome.NoteAdvance(clan, newDebt); return; }
+            bool ladder = DebtLadder.TakesCrownDebtFor(clan);   // 168: dlug z tego rozliczenia do ksiegi drabiny (dlug zoldu - ludzie partii, reszta - zaliczka gry)
+            if (_recs.Count == 0)
+            {
+                if (ladder) { try { DebtLadder.TakeTickDebt(clan, null, null, 0); } catch (Exception e) { Stumble("SoldierPay.TakeTickDebt", e); } }
+                else if (newDebt > 0) CrownIncome.NoteAdvance(clan, newDebt);
+                return;
+            }
             var s = Settings.Current;
             if (s == null) return;
             long owed = 0;
@@ -371,7 +380,27 @@ namespace Armoury
                 }
                 if (shortfall > 0) ClanIncomeBook.NoteWageCut(clan, Math.Min(shortfall, owed), blind);   // 169c: miara bankructwa K39 (tylko licznik, wlasny try); blind - saldo nieznane, liczone osobno
             }
-            if (newDebt > cutByDebt) CrownIncome.NoteAdvance(clan, newDebt - cutByDebt);   // OBIEG-1: zaliczka gry (wlasny try)
+            if (ladder)
+            {
+                // 168 (WageDebtToMen): czesc dlugu rownowazona obcietym zoldem to dlug wobec ludzi partii - wierzyciel kazdej partii wedlug jej obciecia
+                try
+                {
+                    List<MobileParty> who = null; List<long> cuts = null;
+                    if (cutByDebt > 0 && owed > 0)
+                    {
+                        who = new List<MobileParty>(); cuts = new List<long>();
+                        for (int i = 0; i < _recs.Count; i++)
+                        {
+                            var r = _recs[i];
+                            long cut = r.Paid - Share(r.Paid, owed, shortfall);
+                            if (cut > 0 && r.Party != null) { who.Add(r.Party); cuts.Add(cut); }
+                        }
+                    }
+                    DebtLadder.TakeTickDebt(clan, who, cuts, cutByDebt);
+                }
+                catch (Exception e) { Stumble("SoldierPay.TakeTickDebt", e); }
+            }
+            else if (newDebt > cutByDebt) CrownIncome.NoteAdvance(clan, newDebt - cutByDebt);   // OBIEG-1: zaliczka gry (wlasny try)
             // takze gdy nic nie zeszlo z kies: Route dolicza zold naliczony (linia "Zold:" ma sie zgadzac z licznikiem ksiegi pieniadza)
             for (int i = 0; i < _recs.Count; i++)
             {

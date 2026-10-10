@@ -114,6 +114,48 @@ namespace Armoury
             return d;
         }
 
+        // ------------------------------------------------------------ 168: dostep dla drabiny dlugu (DebtLadder)
+        internal static Debt DebtOf(Clan c, bool create) { return Of(c, create); }
+        internal static Debt DebtById(string id) { Debt d; return id != null && _debts.TryGetValue(id, out d) ? d : null; }
+        internal static Debt DebtByIdCreate(string id) { Debt d; if (id == null) return null; if (!_debts.TryGetValue(id, out d)) { d = new Debt(); _debts[id] = d; } return d; }
+        internal static void RemoveDebt(string id) { if (id != null) _debts.Remove(id); }
+        internal static List<string> DebtIds() { return new List<string>(_debts.Keys); }
+        internal static int DaysPerYearNow() { return DaysPerYear(); }
+        internal static double RateNow(Clan c) { return RateFor(c, Of(c, false)); }
+        internal static double FreeCapital { get { EnsureCapital(); return _capital; } }
+        /// <summary>168: wplata do kapitalu Banku (splata, zajecie, wyprzedaz) albo wyplata z niego (ujemna - zysk do Braavos). Zloto rusza wolajacy.</summary>
+        internal static void CapitalAdd(double amount) { EnsureCapital(); _capital += amount; }
+        internal static int FamilyCoverAll(Clan c, int need) { return FamilyCover(c, need, true); }
+        internal static void NoteLadderLine(string line) { Note(line); }
+
+        /// <summary>
+        /// 168: kredyt wojenny - wyplata dzienna z kapitalu Banku do kiesy glowy (wola ClanBudget po pulapie). Bez progu dni do terminu (kredyt biezacy,
+        /// splata z lupow, po pokoju raty z D); oplata za udzielenie i oprocentowanie jak kazda pozyczka (+10 pp przy biegnacym dlugu).
+        /// </summary>
+        internal static int LendKw(Clan c, int amount)
+        {
+            try
+            {
+                EnsureCapital();
+                if (c == null || c.Leader == null || amount <= 0) return 0;
+                var d = Of(c, true);
+                if (d.Defaulted) return 0;
+                amount = Math.Min(amount, Math.Max(0, (int)Math.Min(int.MaxValue, _capital)));
+                if (amount <= 0) return 0;
+                double rate = RateFor(c, d);
+                double fee = amount * Math.Max(0f, Settings.Current.IronBankLoanFeePercent) / 100.0;
+                bool running = d.Principal > 1;
+                d.Rate = running ? (d.Rate * d.Principal + rate * amount) / (d.Principal + amount) : rate;
+                d.Principal += amount + fee;
+                if (!running) { d.Loans++; d.DueDay = (int)CampaignTime.Now.ToDays + Math.Max(7, DaysPerYear() / 2); }
+                c.Leader.ChangeHeroGold(amount);
+                _capital -= amount;
+                CirculationWindows.NoteHeroGold(c.Leader, amount);
+                return amount;
+            }
+            catch (Exception e) { Log.Error("IronBank.LendKw", e); return 0; }
+        }
+
         // ------------------------------------------------------------ limit i oprocentowanie
         private static int Wages(Clan c)
         {
@@ -139,6 +181,7 @@ namespace Armoury
         {
             try
             {
+                if (DebtLadder.On) return DebtLadder.Limit(c);   // 168: limit ze zdolnosci splaty (ziemia D stalego + lenna + 30 dni lupow) x wiarygodnosc
                 var s = Settings.Current;
                 var d = Of(c, false);
                 float trust = d != null ? (d.Defaulted ? 0f : d.Trust) : 1f;
@@ -201,7 +244,7 @@ namespace Armoury
                 int today0 = (int)CampaignTime.Now.ToDays;
                 // audyt ponowny W6: tuz przed terminem Bank nie dobiera - inaczej rata skacze (np. 1/3 dlugu dziennie)
                 // audyt pelny K3: takze W dniu terminu i PO nim - wczesniej wtedy termin calego dlugu przesuwal sie o pol roku
-                if (running && d.DueDay - today0 < Math.Max(1, Settings.Current.IronBankMinDaysToLend)) return 0;
+                if (running && !DebtLadder.On && d.DueDay - today0 < Math.Max(1, Settings.Current.IronBankMinDaysToLend)) return 0;   // 168: raty z D, nie termin - bez progu dni
                 d.Rate = running ? (d.Rate * d.Principal + rate * amount) / (d.Principal + amount) : rate;
                 d.Principal += amount + fee;
                 d.Loans++;
@@ -300,8 +343,18 @@ namespace Armoury
                 _logged = 0;
                 _famRates = 0; _famNoLoan = 0; _famSum = 0; _famRateSum = 0; _famRatesViaLoan = 0; _famToday.Clear();   // T5: liczniki doby
                 int lent = 0, paid = 0, missed = 0, defaults = 0; long lentSum = 0, paidSum = 0;
+                // 168: drabina dlugu - pozyczka AI tylko jako kredyt wojenny (ClanBudget, w pulapie 166), raty, zaleglosci, zajecie i wyprzedaz w DebtLadder;
+                // gracz poza drabina (PlayerSameLadder wylaczone) - jego dlug jak dotad ponizej
+                bool ladder = DebtLadder.On;
+                string outside = ladder && !s.PlayerSameLadder && Clan.PlayerClan != null ? Clan.PlayerClan.StringId : null;
+                if (ladder)
+                {
+                    try { DebtLadder.Daily(today, ref paid, ref paidSum, ref missed); }
+                    catch (Exception e) { Log.Error("DebtLadder.Daily", e); }
+                }
 
-                // 1. lordowie AI pozyczaja, gdy brakuje na zold (i sprzet w wojnie)
+                // 1. lordowie AI pozyczaja, gdy brakuje na zold (i sprzet w wojnie) - bez drabiny dlugu
+                if (!ladder)
                 foreach (var c in Clan.All)
                 {
                     if (c == null || c == Clan.PlayerClan || c.IsEliminated || c.IsBanditFaction || c.IsMinorFaction || c.Kingdom == null || c.Leader == null) continue;
@@ -341,6 +394,7 @@ namespace Armoury
                 {
                     var d = kv.Value;
                     if (d.Principal < 1) continue;
+                    if (ladder && kv.Key != outside) continue;   // 168: raty, zaleglosci, zajecie i dlug wymarlego rodu - DebtLadder (wyzej)
                     var c = Clan.FindFirst(x => x.StringId == kv.Key);
                     if (c == null || c.IsEliminated || c.Leader == null) { dead.Add(kv.Key); continue; }
                     double interest = d.Principal * d.Rate / DaysPerYear();
@@ -423,7 +477,7 @@ namespace Armoury
                 long total = 0; int debtors = 0, bankrupt = 0;
                 foreach (var kv in _debts) { if (kv.Value.Principal >= 1) { total += (long)kv.Value.Principal; debtors++; if (kv.Value.Defaulted) bankrupt++; } }
                 LastLent = lent; LastPaidN = paid; LastMissed = missed; LastDefaults = defaults; LastLentSum = lentSum; LastPaidSum = paidSum;   // paczka 169 (tylko log)
-                Log.Info("IronBank: dzien " + today + " - nowe pozyczki " + lent + " (" + lentSum + "), splaty " + paid + " (" + paidSum + "), spoznienia " + missed
+                Log.Info("IronBank: dzien " + today + (ladder ? " (drabina dlugu 168: kredyt wojenny wyplaca budzet 166 po Banku - linia 'Dlugi (168)'; splaty i spoznienia z drabiny)" : "") + " - nowe pozyczki " + lent + " (" + lentSum + "), splaty " + paid + " (" + paidSum + "), spoznienia " + missed
                          + ", bankructwa dzis " + defaults + "; dluznikow " + debtors + " (bankrutow " + bankrupt + "), dlug razem " + total + ", kapital Banku " + (long)_capital
                          + (FamilyOn ? "; z kies rodziny: " + _famRates + " rat, " + _famSum + " zl (na raty " + _famRateSum + ", przed pozyczka " + (_famSum - _famRateSum)
                                        + "); pozyczek mniej o " + _famNoLoan + ", w tym rat z przelewu przed pozyczka " + _famRatesViaLoan
@@ -466,6 +520,19 @@ namespace Armoury
             var d = Of(c, false);
             var sb = new StringBuilder("The keyholders of the Iron Bank receive you in a cold stone hall. ");
             int lim = Limit(c);
+            if (DebtLadder.PlayerOnLadder)
+            {
+                // 168: ta sama drabina co AI - limit ze zdolnosci splaty, raty z dochodu stalego, zajecie zamiast bankructwa
+                string why;
+                if (!DebtLadder.CanBorrow(c, out why)) sb.Append(why);
+                else
+                {
+                    sb.Append("They will lend up to " + Math.Max(0, lim - (int)(d != null ? d.Principal : 0)) + " gold");
+                    sb.Append(" at " + (RateFor(c, d) * 100).ToString("0") + "% a year - against what your lands bring in and the spoils your wars have brought. ");
+                }
+                sb.Append(DebtLadder.PlayerStatus());
+                return sb.ToString();
+            }
             if (d != null && d.Defaulted) sb.Append("Your name is written in the book of those who did not pay. There will be no more loans.");
             else
             {
@@ -482,6 +549,8 @@ namespace Armoury
         {
             var c = Clan.PlayerClan;
             var d = Of(c, false);
+            string no;
+            if (DebtLadder.PlayerOnLadder && !DebtLadder.CanBorrow(c, out no)) { InformationManager.DisplayMessage(new InformationMessage(no, Colors.Red)); return; }
             int room = Math.Max(0, Limit(c) - (int)(d != null ? d.Principal : 0));
             if (room <= 0) { InformationManager.DisplayMessage(new InformationMessage("The Iron Bank will not lend you more.", Colors.Red)); return; }
             var opts = new List<InquiryElement>();
@@ -495,7 +564,15 @@ namespace Armoury
                 delegate (List<InquiryElement> sel)
                 {
                     if (sel == null || sel.Count == 0) return;
-                    int got = Lend(c, (int)sel[0].Identifier, "gracz");
+                    int got;
+                    if (DebtLadder.PlayerOnLadder)
+                    {
+                        // 168: w wojnie pozyczka gracza jest kredytem wojennym (splata z lupow po pokoju i ratami z D - ta sama ksiega co AI)
+                        int want = Math.Min((int)sel[0].Identifier, Math.Max(0, Limit(c) - (int)(d != null ? d.Principal : 0)));
+                        got = Lend(c, want, "gracz");
+                        if (got > 0) DebtLadder.NotePlayerLoan(c, got);
+                    }
+                    else got = Lend(c, (int)sel[0].Identifier, "gracz");
                     if (got > 0) InformationManager.DisplayMessage(new InformationMessage("The Iron Bank lends you " + got + " gold.", Colors.Green));
                     GameMenu.SwitchToMenu(Menu);
                 },
@@ -525,6 +602,7 @@ namespace Armoury
                     EnsureCapital();
                     Hero.MainHero.ChangeHeroGold(-pay);
                     d.Principal -= pay; _capital += pay;
+                    DebtLadder.OnBankRepaid(c, pay);   // 168: splata reczna najpierw gasi kredyt wojenny
                     if (d.Principal < 1) { d.Principal = 0; d.Missed = 0; d.Defaulted = false; d.Trust = Math.Min(1f, d.Trust + 0.25f); }
                     InformationManager.DisplayMessage(new InformationMessage("You repay " + pay + " gold to the Iron Bank.", Colors.Green));
                     Log.Info("IronBank: gracz splaca " + pay + ", dlug " + (int)d.Principal + ".");

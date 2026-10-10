@@ -2836,6 +2836,78 @@ namespace Armoury
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool CrownRentWarDayNeedsContact { get; set; } = true;
 
+        [SettingPropertyBool("Crown Pays Call To War", HintText = "with Crown Current Income: the price of calling an ally into a war is paid by the calling crown out of its daily income, a day's part at a time over the ally's term of service (after the gifts, reparations and mercenary contracts, before the wage refunds) - the houses of the realm pay nothing towards it, you neither. The ally's houses get only what the crown has really paid. When the crown cannot pay a day's part, the agreement ends and the ally leaves that war (peace between the ally and the enemy). Off = the game's way: the houses pay their share and the ally is paid in full at once")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public bool CrownPaysCallToWar { get; set; } = true;
+
+        [SettingPropertyBool("Debt Ladder Enabled", HintText = "with Iron Bank Enabled and Clan Budget Enabled: the Bank lends only to those who can repay, and instead of bankruptcy the creditor takes income. An AI house borrows only for war (War Credit). All instalments of a house come out of its steady income: the Bank at most Iron Bank Max Instalment Share of it a day, all debts together (Bank, unpaid wages, ransoms) at most All Instalments Max Share - the Bank first, then the rest by age. A missed instalment is an arrear (the house pays what it holds above three days of wages, its credit is stopped); after three arrears in a row the creditors seize the income of the house's villages and every coin above Seize Floor Gold in its head's purse, interest frozen, until the debt is paid; only when the seizure brings nothing for Sale After Zero Seize Days or would take longer than Sale Forecast Days are the surplus arms, caravans and workshops sold, once a week. No house ever loses a fief, and no debt is forgiven: the debt of a house that dies passes to the new lords of its villages. Debtors build nothing and keep half a court. Off = the Iron Bank as before (loans for wages, bankruptcy)")]
+        [SettingPropertyGroup("Debts and the war credit (stage 2)")]
+        public bool DebtLadderEnabled { get; set; } = true;
+
+        [SettingPropertyBool("War Credit", HintText = "at war, an AI house whose family gold is below its war reserve may spend beyond its wage ceiling on credit from the Iron Bank: its ceiling grows by up to War Credit Max Share D of its steady income a day, within the credit limit, and each day the Bank pays its head what its wages exceed the ceiling without credit. At war half of every windfall of the house (loot, ransoms, purses, its third) goes to the debt first; after the peace the house pays Iron Bank Max Instalment Share of its steady income a day and all its windfalls until the debt is cleared, and its budget sends the surplus men home. No credit to a house in arrears, to a house within Credit After Seizure Days of a seizure, or while the Bank holds less than Bank Free Capital Floor")]
+        [SettingPropertyGroup("Debts and the war credit (stage 2)")]
+        public bool WarCredit { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("War Credit Max Share D", 0.00f, 1.00f, "0.00", HintText = "the most a house may draw on war credit a day, as a share of its steady income")]
+        [SettingPropertyGroup("Debts and the war credit (stage 2)")]
+        public float WarCreditMaxShareD { get; set; } = 0.4f;
+
+        [SettingPropertyFloatingInteger("War Credit Loot Repay Share", 0.00f, 1.00f, "0.00", HintText = "at war, this share of every windfall of an indebted house goes to the Bank first (after the peace all of it)")]
+        [SettingPropertyGroup("Debts and the war credit (stage 2)")]
+        public float WarCreditLootRepayShare { get; set; } = 0.5f;
+
+        [SettingPropertyFloatingInteger("War Credit Loot Days", 0.00f, 120.00f, "0.00", HintText = "the credit limit counts this many days of the house's average windfalls from real payers over the last 84 days (loot sold, ransoms, purses, its third - not ships or other gold from nowhere)")]
+        [SettingPropertyGroup("Debts and the war credit (stage 2)")]
+        public float WarCreditLootDays { get; set; } = 30f;
+
+        [SettingPropertyFloatingInteger("Debt Limit Land Days", 0.00f, 60.00f, "0.00", HintText = "the credit limit counts this many days of the land part of the house's steady income (its villages, towns and castles), plus Iron Bank Per Town and Per Castle, times the house's credit; the old Iron Bank Income Days stays for the Bank without the debt ladder")]
+        [SettingPropertyGroup("Debts and the war credit (stage 2)")]
+        public float DebtLimitLandDays { get; set; } = 15f;
+
+        [SettingPropertyInteger("Bank Free Capital Floor", 0, 4000000, "0", HintText = "the Bank gives no war credit while its free capital is below this (armies fall back to their budgets)")]
+        [SettingPropertyGroup("Debts and the war credit (stage 2)")]
+        public int BankFreeCapitalFloor { get; set; } = 1000000;
+
+        [SettingPropertyFloatingInteger("Iron Bank Max Instalment Share", 0.00f, 0.50f, "0.00", HintText = "the Bank's instalment a day is at most this share of the debtor's steady income")]
+        [SettingPropertyGroup("Debts and the war credit (stage 2)")]
+        public float IronBankMaxInstalmentShare { get; set; } = 0.1f;
+
+        [SettingPropertyFloatingInteger("All Instalments Max Share", 0.00f, 0.50f, "0.00", HintText = "all instalments of a house together (Bank, unpaid wages, ransoms) are at most this share of its steady income a day - the Bank first, then the others by age")]
+        [SettingPropertyGroup("Debts and the war credit (stage 2)")]
+        public float AllInstalmentsMaxShare { get; set; } = 0.15f;
+
+        [SettingPropertyInteger("Seize Floor Gold", 0, 152000, "0", HintText = "under seizure the creditors take every coin above this in the head's purse (about ten days of wages of a retinue of 135 men), besides all the income of the house's villages")]
+        [SettingPropertyGroup("Debts and the war credit (stage 2)")]
+        public int SeizeFloorGold { get; set; } = 38000;
+
+        [SettingPropertyInteger("Sale Forecast Days", 0, 2912, "0", HintText = "under seizure, the surplus arms, caravans and workshops are sold once a week only if the seizure would take longer than this many days to clear the debt")]
+        [SettingPropertyGroup("Debts and the war credit (stage 2)")]
+        public int SaleForecastDays { get; set; } = 728;
+
+        [SettingPropertyInteger("Sale After Zero Seize Days", 0, 56, "0", HintText = "... or if the seizure has brought nothing for this many days in a row")]
+        [SettingPropertyGroup("Debts and the war credit (stage 2)")]
+        public int SaleAfterZeroSeizeDays { get; set; } = 14;
+
+        [SettingPropertyInteger("Credit After Seizure Days", 0, 728, "0", HintText = "a house that has cleared a seizure gets no war credit for this many days")]
+        [SettingPropertyGroup("Debts and the war credit (stage 2)")]
+        public int CreditAfterSeizureDays { get; set; } = 182;
+
+        [SettingPropertyFloatingInteger("Bank Profit To Braavos Days", 0.00f, 720.00f, "0.00", HintText = "the Bank's capital above Iron Bank Capital flows into the purse of Braavos, one part in this many a day")]
+        [SettingPropertyGroup("Debts and the war credit (stage 2)")]
+        public float BankProfitToBraavosDays { get; set; } = 180f;
+
+        [SettingPropertyBool("Wage Debt To Men", HintText = "the debt the game writes to a house for wages it could not pay (debt to the crown) becomes a debt to the men of the parties whose pay was cut: it is paid off by the same instalments into their purses (a party gone - another party of the house, then the nearest town); the game no longer drains the head's purse to pay it in one go. Old crown debts are taken into the same ledger")]
+        [SettingPropertyGroup("Debts and the war credit (stage 2)")]
+        public bool WageDebtToMen { get; set; } = true;
+
+        [SettingPropertyBool("Game Wallets No Advance", HintText = "when a house cannot pay its share of the realm's mercenary, tribute or call-to-war purse, the share stays owed by the realm (shared out again among its houses the next day) instead of the game counting it as paid and writing it to the house as a debt - no advance from nowhere")]
+        [SettingPropertyGroup("Debts and the war credit (stage 2)")]
+        public bool GameWalletsNoAdvance { get; set; } = true;
+
+        [SettingPropertyBool("Player Same Ladder", HintText = "you borrow, repay and fall into arrears, seizure and sale by the same rules as the AI houses (your loans are taken by hand in Braavos; at war they count as war credit; your instalments come out of your steady income in war and peace); never your own equipment or your companions'. Off = your loans run as before the debt ladder")]
+        [SettingPropertyGroup("Debts and the war credit (stage 2)")]
+        public bool PlayerSameLadder { get; set; } = true;
+
         [SettingPropertyBool("Gentry No Parties", HintText = "Banner Kings gentry - knights who hold one estate and no town or castle - no longer lead parties of their own. When the banners are called, the knight rides in his lord's party (the lord who holds the village of his estate) as a member of it; if the lord has no party or is not in an army, in the party of the realm's nearest army leader. AI knights answer when their realm is at war and an army of the realm is in the field; your own knights ride only when you call your banners. The men of the estate stay at home - the knight comes alone. When the army breaks up, in peace or if the party changes sides, he goes back to his estate. A knight's party left from before is not reinforced and Banner Kings disbands it at the estate (its men return to the estate village). Off = Banner Kings raises the knight's own party, as before")]
         [SettingPropertyGroup("Knights without fiefs (stage 2)")]
         public bool GentryNoParties { get; set; } = true;
@@ -4392,6 +4464,24 @@ namespace Armoury
             s.CrownRentGarrisonNormKingdom = CrownRentGarrisonNormKingdom;
             s.CrownRentServiceWholeDay = CrownRentServiceWholeDay;
             s.CrownRentWarDayNeedsContact = CrownRentWarDayNeedsContact;
+            s.CrownPaysCallToWar = CrownPaysCallToWar;
+            s.DebtLadderEnabled = DebtLadderEnabled;
+            s.WarCredit = WarCredit;
+            s.WarCreditMaxShareD = WarCreditMaxShareD;
+            s.WarCreditLootRepayShare = WarCreditLootRepayShare;
+            s.WarCreditLootDays = WarCreditLootDays;
+            s.DebtLimitLandDays = DebtLimitLandDays;
+            s.BankFreeCapitalFloor = BankFreeCapitalFloor;
+            s.IronBankMaxInstalmentShare = IronBankMaxInstalmentShare;
+            s.AllInstalmentsMaxShare = AllInstalmentsMaxShare;
+            s.SeizeFloorGold = SeizeFloorGold;
+            s.SaleForecastDays = SaleForecastDays;
+            s.SaleAfterZeroSeizeDays = SaleAfterZeroSeizeDays;
+            s.CreditAfterSeizureDays = CreditAfterSeizureDays;
+            s.BankProfitToBraavosDays = BankProfitToBraavosDays;
+            s.WageDebtToMen = WageDebtToMen;
+            s.GameWalletsNoAdvance = GameWalletsNoAdvance;
+            s.PlayerSameLadder = PlayerSameLadder;
             s.GentryNoParties = GentryNoParties;
             s.GentryKnightWage = GentryKnightWage;
             s.GentryEstateSpendCap = GentryEstateSpendCap;

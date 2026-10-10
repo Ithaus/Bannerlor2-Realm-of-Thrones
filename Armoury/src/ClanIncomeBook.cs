@@ -22,6 +22,7 @@ namespace Armoury
     {
         internal const int KRefund = 0, KCrownLevies = 1, KThird = 2, KContract = 3;   // 185: kontrakt najemnika od korony (czesc "kontrakt" D stalego)
         internal const int KRent = 4;                                                  // 180: renta korony wedlug lenn (czesc "korona" D stalego, nie jednorazowe)
+        internal const int KRansom = 5;                                                // 178: okup otrzymany (gotowka i raty) - jednorazowe od prawdziwego platnika
         private const int Days = 28;
 
         // 6.4 projektu, przebieg na sucho - 166: udzialy pulapu przeszly do Settings (ClanBudget.Ceiling - jedna formula dla logu i gry); tu zostaje reszta przebiegu na sucho
@@ -39,6 +40,7 @@ namespace Armoury
             public long TodayEstates;                                  // 169c: w tym wyplaty majatkow BK widziane jako zdarzenie (podwojne) - tylko pamiec
             public long TodayContract;                                 // 185: kontrakt najemnika od korony (w Today; czesc "kontrakt" D stalego, nie jednorazowe)
             public long TodayRent;                                     // 180: renta korony (w Today; czesc "korona" D stalego, nie jednorazowe)
+            public long TodayRansom;                                   // 178: okupy otrzymane (w Today; jednorazowe od prawdziwego platnika - 168 limit i splata kredytu)
             public long WageAccLord, WageAccGar, WageAccCar;          // w biezacym rozliczeniu rodu
             public int WageLastLord, WageLastGar, WageLastCar;        // z ostatniego pelnego rozliczenia rodu
             public bool HadTick;                                       // bylo choc jedno zmierzone rozliczenie
@@ -126,8 +128,26 @@ namespace Armoury
                 else if (kind == KThird) { r.TodayThird += amount; DayThird += amount; }
                 else if (kind == KContract) { r.TodayContract += amount; }
                 else if (kind == KRent) { r.TodayRent += amount; DayCrownRent += amount; }
+                else if (kind == KRansom) { r.TodayRansom += amount; }
             }
             catch (Exception e) { Stumble("NoteInflow", e); }
+        }
+
+        /// <summary>168: jednorazowe wplywy rodu od ostatniej doby ksiegi (Bank biegnie przed ksiega - to wplywy jednej doby): all - wszystkie (lup, okupy,
+        /// sakwy, trzecia, statki; bez zwrotu, korony, kontraktu, renty i podwojnych majatkow BK), real - od prawdziwego platnika (sprzedaz osadom, od innych
+        /// bohaterow i partii, trzecia, okupy 178; bez zrodel z niczego). false - rod bez wpisu albo ksiega wylaczona.</summary>
+        internal static bool OnceToday(Clan c, out long all, out long real)
+        {
+            all = 0; real = 0;
+            try
+            {
+                Rec r;
+                if (!On || c == null || c.StringId == null || !_book.TryGetValue(c.StringId, out r)) return false;
+                all = Math.Max(0L, r.Today - r.TodayRefund - r.TodayCrown - r.TodayContract - r.TodayRent - r.TodayEstates);
+                real = Math.Max(0L, Math.Min(all, r.TodayEvtSettl + r.TodayEvtOther + r.TodayThird + r.TodayRansom));
+                return true;
+            }
+            catch { return false; }
         }
 
         /// <summary>MoneyLedger.OnGoldTraded: zdarzenie gry do zywego czlonka rodu od platnika spoza rodu, poza rozliczeniem rodu i naszym tickiem.</summary>
@@ -323,6 +343,7 @@ namespace Armoury
                         r.Evt = r.TodayEvtNone + r.TodayEvtSettl + r.TodayEvtOther;
                         if (sd) { try { StableClan(c, r, en, haveEn, (long)a, b); } catch (Exception e) { Stumble("StableClan", e); } }   // 169c: przed zerowaniem Today*
                         r.Today = r.TodayRefund = r.TodayCrown = r.TodayEvtNone = r.TodayEvtSettl = r.TodayEvtOther = r.TodayThird = r.TodayEstates = r.TodayContract = r.TodayRent = 0;
+                        r.TodayRansom = 0;   // 178
                         r.D = DOf(r); r.G = g;
                         modelSum += (long)a; rentSum += b;
                         _today.Add(c);
@@ -504,6 +525,8 @@ namespace Armoury
                         else if (missed >= 1) tier = "zaleglosc";
                         else tier = "kredyt";
                     }
+                    bool ladder = DebtLadder.On;   // 168: szczebel z drabiny (Bank i inni wierzyciele - dlug zoldu, korona, okupy), jeden warunek z gra
+                    if (ladder) { try { tier = DebtLadder.StageOf(c); } catch { } }
                     int debtCrown = c.DebtToKingdom;
                     if (debtCrown > 0) { crownDebt += debtCrown; crownN++; }
                     string cand = "";
@@ -540,7 +563,7 @@ namespace Armoury
                         if (leaderGold < 5000) { poorHeads++; if (towns > 0) poorTown++; else if (castles > 0) poorCastle++; else poorNone++; }
                         if (G < 5000) poorFam++;
                         // dlugi (8.2-8.3) - tylko rody AI
-                        if (hasDebt)
+                        if (hasDebt || tier != "-")
                         {
                             if (tier == "kredyt") tCredit++;
                             else if (tier == "zaleglosc") tArrear++;
@@ -555,13 +578,19 @@ namespace Armoury
                                 payDays.Add(pd);
                                 if (pd > payMax) { payMax = pd; payMaxName = cname ?? c.StringId; }
                             }
-                            if (principal > IronBankIncomeDays82 * D) { over15N++; over15Sum += principal - IronBankIncomeDays82 * D; }
+                            if (hasDebt && principal > IronBankIncomeDays82 * D) { over15N++; over15Sum += principal - IronBankIncomeDays82 * D; }
                         }
                         bool blocked = false;
                         if (hasDebt && (missed > 0 || defaulted)) { blkArrear++; blocked = true; }
                         if (debtCrown > 0) { blkCrown++; blocked = true; }
                         if (r.HadTick && D <= wage) { blkNoSurplus++; blocked = true; }
-                        if (!blocked)
+                        if (ladder)
+                        {
+                            // 168: kandydat = rod z miejscem kredytu wojennego w dzisiejszym pulapie 166 (ten sam warunek co gra); pozyczek "na okup" nie ma
+                            double kwr = ClanBudget.KwRoomOf(c);
+                            if (kwr > 0) { candWar++; candWarLimit += Math.Max(0, IronBank.Limit(c) - principal); cand = "KW"; }
+                        }
+                        else if (!blocked)
                         {
                             if (atWar && G < R && r.HadTick && wage > ceiling) { candWar++; candWarLimit += lim82; cand = "wojna"; }
                             if (c.Leader != null && c.Leader.IsPrisoner) { candRansom++; cand = cand.Length > 0 ? cand + "+okup" : "okup"; }

@@ -58,6 +58,8 @@ namespace Armoury
             public long WPar, WGar, WCar; public int MenPar, MenGar, Adults, Streak, MenCap = -1;
             // test 120 dob (wojsko w wojnie): pulap bez udzialu dworu, udzial dworu dostepny dla zoldu w wojnie, siedziba i jedzenie partii (szacunek) dnia
             public double CapBase, CourtRoom, Food; public Settlement Seat;
+            // 168: pulap bez kredytu wojennego, miejsce KW w pulapie i wyplata dnia; dluznik (dwor -50%, budowy 0); zajecie (D bez dochodu wsi)
+            public double CapNoKw, KwRoom, SeizedLand; public long KwLent; public bool Debtor, Seized;
         }
 
         private static readonly Dictionary<Clan, B> _b = new Dictionary<Clan, B>();
@@ -74,6 +76,9 @@ namespace Armoury
         private static int _dDesertOff, _dSpawnBlock, _dRecruitBlock, _dGarBlock, _dGarLimited, _dPartyLimited, _dWatchMen, _dWatchCap = -1;
         // test 120 dob (wojsko w wojnie): dwor ustepuje zoldowi (udzial dostepny, zold go zajal, u ilu rodow); limity partii z wolnego miejsca rodu
         private static long _dCourtRoom, _dCourtYield; private static int _dCourtRoomN, _dCourtYieldN, _dPartyOverCap;
+        // 168: kredyt wojenny w pulapie (miejsce i wyplata), dluznicy, zajete wsie
+        private static long _dKwRoom, _dKwLent, _dSeizedLand; private static int _dKwRoomN, _dKwLentN, _dDebtorN, _dSeizedN;
+        internal static long LastKwLent, LastKwRoom; internal static int LastKwLentN, LastKwRoomN;
         private static int _stumbles;
         private static readonly HashSet<string> _err = new HashSet<string>();
         private static int _importN = -1, _importBad;
@@ -94,6 +99,7 @@ namespace Armoury
         {
             LastCourt = LastCourtTown = LastFood = LastFamily = LastReleasedPurse = LastBuildShare = LastGearShare = 0;
             LastReleasedMen = LastReleasedPar = LastReleasedGar = LastNoVillage = LastFamilyN = 0;
+            LastKwLent = LastKwRoom = 0; LastKwLentN = LastKwRoomN = 0;
         }
 
         private static void ClearDay()
@@ -102,6 +108,7 @@ namespace Armoury
             _dRelMen = _dRelPar = _dRelGar = _dNoVillage = _dFamilyN = _dOver = _dStreak = _dPeace = _dWar = _dClans = _dPoor = _dVanished = 0;
             _dGarLimited = _dPartyLimited = 0; _dWatchMen = 0; _dWatchCap = -1;
             _dCourtRoom = _dCourtYield = 0; _dCourtRoomN = _dCourtYieldN = _dPartyOverCap = 0;
+            _dKwRoom = _dKwLent = _dSeizedLand = 0; _dKwRoomN = _dKwLentN = _dDebtorN = _dSeizedN = 0;
         }
 
         private static void Stumble(string where, Exception e)
@@ -256,6 +263,18 @@ namespace Armoury
                         long G = ClanIncomeBook.FamilyGoldOf(c);
                         b.G = G; b.Adults = AdultsOf(c); b.War = AtWar(c);
                         b.D = Math.Max(0, DOf(c, b, G, s));
+                        // 168: rod w zajeciu (D3/D4) - dochod wsi bierze wierzyciel, wiec D budzetu liczy ziemie bez niego (poczet sam maleje - zwolnienia);
+                        // dluznik (dlug w Banku, dlug zoldu, zaleglosc albo zajecie) - dwor -50%, budowy 0 (nizej)
+                        b.Seized = false; b.SeizedLand = 0; b.Debtor = false;
+                        if (DebtLadder.On)
+                        {
+                            try
+                            {
+                                if (DebtLadder.IsSeized(c)) { b.Seized = true; b.SeizedLand = Math.Min(b.D, ClanIncomeBook.VillageIncomeOf(c)); b.D = Math.Max(0, b.D - b.SeizedLand); _dSeizedN++; _dSeizedLand += (long)b.SeizedLand; }
+                                b.Debtor = DebtLadder.IsDebtor(c);
+                            }
+                            catch (Exception e) { Stumble("Ladder", e); }
+                        }
                         double R, f, chest;
                         b.Cap = Ceiling(b.D, G, b.War, b.Adults, out R, out f, out chest);
                         b.R = R; b.F = f;
@@ -275,6 +294,8 @@ namespace Armoury
                             double cap = Math.Max(0f, s.ReserveCapDays) * b.D + 50000;
                             if (G > cap) { double x = (G - cap) / 180.0; b.Household += x / 2; b.Build += x / 2; }
                         }
+                        // 168 (166 "Dluznik"): rod w dlugu - budowy 0, dwor -50%; sprzet i tak tylko braki (pan placi tylko TryBuyCore - braki, lepsze tylko z sakiewki ludzi)
+                        if (b.Debtor && !merc) { b.Household *= 0.5; b.Build = 0; _dDebtorN++; }
                         // test 120 dob C1 (wojsko w wojnie -20%): pulap wiazal u ok. 97 rodow w wojnie (zold >= 0.9 pulapu; 73% braku ludzi), a dwor 0.20 D
                         // szedl do kasy siedziby mimo to (ok. 40 tys./dobe u tych rodow) - w wojnie DWOR USTEPUJE ZOLDOWI: udzial dworu bez jedzenia partii
                         // dochodzi do pulapu, a dwor dostaje tylko to, czego zold z niego nie zajal (Court). Rod z luzem placi dwor w calosci jak dotad.
@@ -309,6 +330,27 @@ namespace Armoury
                             _dWatchMen += men; _dWatchCap = Math.Max(0, _dWatchCap) + b.MenCap;
                         }
                         else b.MenCap = -1;
+                        // 168: KREDYT WOJENNY wpiety w pulap - w wojnie rod z G < R (bez zaleglosci, zajecia, z wolnym kapitalem Banku) moze isc ponad pulap o najwyzej
+                        // 0.40 D dziennie w granicy limitu; Bank wyplaca dzis do kiesy glowy brak do zoldu naliczonego ponad pulap bez kredytu (kapital Banku -> glowa)
+                        b.CapNoKw = b.Cap; b.KwRoom = 0; b.KwLent = 0;
+                        if (DebtLadder.On && !merc && !b.Zero)
+                        {
+                            try
+                            {
+                                double kw = DebtLadder.WarCreditRoom(c, b.D, b.G, b.R, b.War, b.Household);
+                                if (kw > 0)
+                                {
+                                    b.KwRoom = kw; b.Cap += kw; _dKwRoom += (long)kw; _dKwRoomN++;
+                                    double gap = (b.WPar + b.WGar + b.WCar) - b.CapNoKw;
+                                    if (gap >= 1)
+                                    {
+                                        int lent = DebtLadder.LendWar(c, (int)Math.Min(gap, kw));
+                                        if (lent > 0) { b.KwLent = lent; _dKwLent += lent; _dKwLentN++; }
+                                    }
+                                }
+                            }
+                            catch (Exception e) { Stumble("WarCredit", e); }
+                        }
                         Garrisons(c, b, s);
                         b.PartyCap = Math.Max(0, b.Cap - (GarFull(b, s) ? b.WGar : Math.Min(b.WGar, b.GarTarget)) - b.WCar);
                         if (!b.Zero && b.WPar > b.PartyCap) _dPartyOverCap++;   // rody ponad pulapem partii (limity proporcjonalnie do zoldu)
@@ -338,6 +380,7 @@ namespace Armoury
                 LastCourt = _dCourt; LastCourtTown = _dCourtTown; LastFood = _dFood; LastFamily = _dFamily; LastReleasedPurse = _dRelPurse;
                 LastBuildShare = _dBuild; LastGearShare = _dGear; LastReleasedMen = _dRelMen; LastReleasedPar = _dRelPar; LastReleasedGar = _dRelGar;
                 LastNoVillage = _dNoVillage; LastFamilyN = _dFamilyN;
+                LastKwLent = _dKwLent; LastKwLentN = _dKwLentN; LastKwRoom = _dKwRoom; LastKwRoomN = _dKwRoomN;
             }
         }
 
@@ -761,6 +804,22 @@ namespace Armoury
             b.GearLeft = Math.Max(0, b.GearLeft - amount); _dGearSpent += amount;
         }
 
+        /// <summary>168: D rodu z ostatniego budzetu (Bank biegnie przed budzetem - to D wczoraj); -1 - rod bez budzetu.</summary>
+        internal static double DLast(Clan c)
+        {
+            B b; return c != null && On && _b.TryGetValue(c, out b) && b.D0 >= 0 ? b.D : -1;
+        }
+
+        /// <summary>168: miejsce kredytu wojennego w dzisiejszym pulapie rodu (0 - bez KW albo bez budzetu) - kolumna kandydat_pozyczki.</summary>
+        internal static double KwRoomOf(Clan c) { var b = Of(c); return b != null ? b.KwRoom : 0; }
+
+        /// <summary>168 (B5): zakup karawany i warsztatu BK tylko przy G >= 60 D i bez dlugu - true = zablokowany (rod z budzetem).</summary>
+        internal static bool PropertyBlocked(Clan c)
+        {
+            B b; if (c == null || !On || !_b.TryGetValue(c, out b) || b.D0 < 0) return false;
+            return b.G < 60.0 * b.D || DebtLadder.IsDebtor(c);
+        }
+
         /// <summary>BuildFunding: dzienny przydzial budow rodu (0.10 D; w wojnie BuildFunding finansuje nim tylko budowy wojskowe - W5); false - rod bez budzetu (stara podstawa).</summary>
         internal static bool BuildShare(Clan c, out float share)
         {
@@ -934,6 +993,9 @@ namespace Armoury
               .Append(" | w wojnie dwor ustepuje zoldowi: udzial dworu w pulapie ").Append(_dCourtRoom).Append(" u ").Append(_dCourtRoomN)
               .Append(" rodow, zold go zajal (dwor nie dostal) ").Append(_dCourtYield).Append(" u ").Append(_dCourtYieldN).Append(" rodow")
               .Append(s.WarCourtYieldsToWages ? "" : " (wylaczone)")
+              .Append(" | kredyt wojenny (168): miejsce w pulapie ").Append(_dKwRoom).Append(" u ").Append(_dKwRoomN).Append(" rodow, wyplacone dzis ").Append(_dKwLent).Append(" u ").Append(_dKwLentN)
+              .Append(" rodow; dluznicy (dwor -50%, budowy 0) ").Append(_dDebtorN).Append(", w zajeciu (D bez dochodu wsi) ").Append(_dSeizedN).Append(" (dochod wsi ").Append(_dSeizedLand).Append(')')
+              .Append(DebtLadder.On ? "" : " (drabina dlugu wylaczona)")
               .Append(" | limity partii ").Append(s.PartyLimitsShareFreeRoom ? "z wolnego miejsca rodu" : "staly podzial 1.5 : 1")
               .Append(", rody ponad pulapem partii ").Append(_dPartyOverCap)
               .Append(" | ponad 1.10 x pulap ").Append(_dOver).Append(" rodow, od 3 dob (zwalniaja) ").Append(_dStreak)
