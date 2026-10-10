@@ -462,3 +462,7 @@ LIMITY 13:30: 5h 32%, TYDZIEN 82% (reset 15.10) - przy 100% tygodnia przejsc na 
 - (07:10) Jeff: korona ma pozyczac (STAN-PRAC "DECYZJE JEFFA 10.10") - nowa paczka po D. Dar dla Strazy - Jeff jeszcze wybiera A (cale Westeros 8/8/3%) albo B (jak w
   ksiazkach: Polnoc 12%, krol 5%, reszta 1.5%); Straz ma ok. 1.8 mln w sakiewkach, wlasne lenna ok. 2.9 tys./d.
 - (07:40) Jeff podal procenty daru dla Strazy (STAN-PRAC): Polnoc 5, Zelazny Tron 4, Dorne 3, Reach 3, Vale 2, Stormlands 2, Riverlands 2, Dragonstone 1. Do kodu po D.
+- (08:00) **KROK D GOTOWY** (pomocnik: 64405d5 168 + Call to War z korony, 8d620e3 178 + RealisticCaptivity, 97b8dfe recenzja wlasna; opis "D - 168/178" w C1-POSTEP.md
+  drzewa e2c) + ja: 182-W dar Strazy z Westeros wedlug potrzeby (procenty Jeffa, GiftWatch* + GiftWatchNeedDays 60). DLL: test\Armoury-e2c-d.dll (aebd0e94) +
+  test\d\RealisticCaptivity.dll (5f98df70) - WGRYWAC RAZEM. **TEST 120 dob w toku** (-ExtraDll RC) -> test\at-d-120.out.txt. Potem zapis 9 dob -> WGRANIE 18
+  (Armoury + RealisticCaptivity, kopie obu). Limit tygodnia 96%.
