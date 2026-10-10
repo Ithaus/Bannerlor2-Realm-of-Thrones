@@ -404,3 +404,9 @@ LIMITY 13:30: 5h 32%, TYDZIEN 82% (reset 15.10) - przy 100% tygodnia przejsc na 
   (po WageRefund, przed CrownIncome.End): pula = reszta wplywow dnia po zwrocie, wagi miasto 3 / zamek 1 / wies 0.25, warunek zalogi >= 50% normy krolestwa (28 dob)
   i sluzby >= 20 z ostatnich 60 dob wojny; renta w D (czesc "korona", KRent); zapis arm_rent180; nowa linia "Renty korony (180): dzien"; CSV budzet-rodow +renta_180;warunek_180.
   Opis i odstepstwa: docs/C1-POSTEP.md w drzewie e2c, sekcja "C2 - 180 renty". DLL test\Armoury-e2c-c2.dll (b43f65cf). **TEST 120 dob C1+C2 w toku** -> test\at-c2-120.out.txt.
+- (03:00) **TEST C1+C2 120 dob (DLL b43f65cf; kopia SCRATCH(7016) kopia-c2-120\):** 120/120, 16.6 s/dobe, 0 bledow Armoury (CS: szum + Harrenhal ROT + HANG po wyjsciu).
+  Progi (baza-B4): TAK - glowy < 5000 = 4, bankruci 0, **wojsko lordow w wojnie 101.8 tys. (pas 95-115; C1-w 91.5)**, zalogi na twierdze +1.1%, reszta ksiegi -2.9 tys.
+  NIE (2): wojsko swiata -12.6% (pas +-10%; z pokojem na starcie), krolestwa: Iron Islands -61%, Dothraki -39% (dar juz 15% - regula 182 wyczerpana, reszta "biedni
+  slabsi" + kredyt 168), Ibben -32%. DECYZJA (stare): pan zamkow z zaworu 134 zl/d, regulator miast +24 tys./d. Renty 180: pula 53.9 tys./d = renty 33.6 + wstrzymane
+  20.3 (94 z 215 rodow bez warunku SLUZBY - 43.7%, wiecej niz zakladane 20% - do obserwacji, ew. poprawka warunku w C3); zwrot 81.5% naleznego.
+  Dalej: test zapisu 9 dob (autotest-161-kawalki) -> test\at-c2-zapis.out.txt -> jesli OK: **WGRANIE 16 = C1+C2** (Armoury b43f65cf, w-toku/e2c 1220510).
