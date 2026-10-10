@@ -481,3 +481,5 @@ LIMITY 13:30: 5h 32%, TYDZIEN 82% (reset 15.10) - przy 100% tygodnia przejsc na 
   DLL test\Armoury-e2c-t10r.dll (aeb2ba51). **TEST 120 dob w toku** -> test\at-t10r-120.out.txt; potem zapis 9 dob -> WGRANIE 19 (sam Armoury; RC bez zmian 5f98df70).
 - (08:40) **WGRANIE 19: Armoury aeb2ba51 (noc/wgranie-19 = e2c 432e8e9 = T10-R + rasy)**. Czeka na Jeffa: okupy 178 (A/B/C). Kolejka: korona pozycza w Banku (nowa paczka),
   koniec etapu 2 (bieg 2-letni + wymuszony pokoj), etap 3 krok po kroku (3.2 -> 3.3 -> 3.1 -> 3.4-3.7 -> 3.8 -> 3.9/3.10).
+- (08:45) **Paczka 186 korona pozycza w Banku - START** (pomocnik w tle, drzewo noc2\e2c od 432e8e9; projekt jako sekcja "186 - korona pozycza" w C1-POSTEP.md drzewa,
+  potem kod, recenzja wlasna). Potem: test 120 dob -> zapis -> WGRANIE 20. Limit tygodnia 96% - przy 99% pelne przekazanie.
