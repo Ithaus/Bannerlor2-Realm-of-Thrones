@@ -1007,3 +1007,7 @@ ZATWIERDZONE: Armoury c38bd62f, CrashScribe 6507c842. Baza Armoury: w-toku/e2c.
   Dorne 3%, Reach 3%, Vale 2%, Stormlands 2%, Riverlands 2%, Dragonstone 1% wplywow dnia korony; reszta 0. Razem ok. 2.35 tys./dobe (test c3c: Straz zarabia
   ok. 9 tys./dobe ponad wydatki - 1.32 -> 2.41 mln w 120 dob, wydaje glownie zold najemnikow ok. 3.9 tys./d; Polnoc +3.2 tys./d na zwrot). Do zrobienia po kroku D
   (CrownGifts.cs + klucze). Pytanie otwarte: dar tylko wtedy, gdy oszczednosci Strazy < zapas np. 60 dob wydatkow (moja propozycja) - czeka na slowo Jeffa.
+- **Dar dla Strazy WEDLUG POTRZEBY - TAK (Jeff 10.10):** krolestwa placa swoje procenty (Polnoc 5, Zelazny Tron 4, Dorne 3, Reach 3, Vale 2, Stormlands 2, Riverlands 2,
+  Dragonstone 1) tylko wtedy, gdy oszczednosci rodow Strazy spadna ponizej zapasu na 60 dob jej wydatkow (zold + dwor + zakupy, srednia 28 dob); powyzej - dar 0.
+  Test c3c: budowy Strazy (Castle Black, Shadow Tower, Eastwatch) stoja 119 dob - moc budowy 0 (brak ludzi przy Murze). Pytanie otwarte: Straz placi za budowy
+  swoim zlotem (robotnicy z najblizszych wsi/miast, zloto do ich kies) - czeka na slowo Jeffa.
