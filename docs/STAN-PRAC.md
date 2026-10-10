@@ -994,3 +994,5 @@ ZATWIERDZONE: Armoury c38bd62f, CrashScribe 6507c842. Baza Armoury: w-toku/e2c.
   (te same kary co gracz zostaja). Test 120 dob C3 pokazal 11-15 partii AI na dlugu snu 3 (morale -95%) przez ok. 2 tygodnie -> dezercja.
 - **Olbrzymy:** "olbrzymy moga tylko z olbrzymami, ludzie z ludzmi; nie ma zadnej ciazy ani malzenstwa olbrzyma z czlowiekiem". Czyli: zakaz slubow i ciaz miedzy
   roznymi rasami (human / giant / wight / whitewalker), takze istniejace ciaze roznych ras - bez porodu (porod roznych ras zawiesil silnik w tescie C3c, doba 43).
+- **Wezwanie sojusznika do wojny (Call to War):** "tak, korona" - oplate dla wezwanego sojusznika placi skarbiec korony z wplywow dnia (w kolejnosci wydatkow
+  165), rody nic; gdy skarbca nie stac - sojusznik wychodzi z wojny (bez zlota z niczego i bez dlugu rodow wobec korony). Zamyka tez czesc "zaliczki gry" (OBIEG-1).

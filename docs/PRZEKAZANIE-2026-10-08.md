@@ -455,3 +455,5 @@ LIMITY 13:30: 5h 32%, TYDZIEN 82% (reset 15.10) - przy 100% tygodnia przejsc na 
   zapis 9 dob, WGRANIE 18; potem bieg z wymuszonym pokojem + 2 lata = koniec etapu 2.
 - (06:00) Jeff: AI musi odpoczywac (forsowny marsz max 2 doby, tylko wyjatkowo) i zakaz slubow/ciaz miedzy rasami - wpisane do STAN-PRAC "DECYZJE JEFFA 10.10".
   Kolejka po kroku D: (1) T10 odpoczynek AI (Armoury, NocnyMarsz/AiNightCamp), (2) zakaz slubow i ciaz roznych ras (CrashScribe Mends albo Armoury), potem etap 3.
+- (06:10) Jeff: "tak, korona" - oplata za wezwanie sojusznika do wojny ze skarbca, rody nic, brak srodkow = sojusznik wychodzi. Kolejka po D: (1) T10 odpoczynek AI,
+  (2) zakaz slubow/ciaz roznych ras, (3) Call to War z korony (165/168 - jesli pomocnik D tego nie zrobil przy zrodle zaliczki gry).
