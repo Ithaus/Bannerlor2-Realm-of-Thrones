@@ -371,3 +371,81 @@ najemnicy i gentry zostaja; dar +50% idzie glownie do rodow gentry bez partii). 
 (b) Rody na pulapie wydaja prawie caly D na zold - glowy < 5 000 i "zold przyciety" moga wzrosnac u biednych (bieda x0.5 tnie tez udzial dworu).
 (c) Limity z wolnego miejsca zmieniaja sie codziennie - "limity: partie zmienione" wzrosnie (koszt `SetWagePaymentLimit` maly). (d) Wojna -> pokoj: pulap
 spada o skrzynie i dwor naraz - zwolnienia po wojnie wieksze niz w C1 (regula projektu 15%/dobe od 3. doby). (e) Najemnicy dalej maleja (185, wyzej).
+
+---
+
+## C2 - 180 renty korony wedlug lenn - ZROBIONE (commit 7c15a3a)
+
+Projekt: rozdz. "180" (C2), 2.0b, 165 pkt 2 ("Do C2 reszta zostaje w skarbcu"), K10, K41. Build Release kod 0, `python -I tools/gen_mcm.py`, gra nie uruchamiana.
+
+**Pliki:** nowy `Armoury/src/CrownRents.cs`; `CrownIncome.cs` (`KDay.Rent`/`RentHeld`, linia 165), `ClanIncomeBook.cs` + `ClanIncomeBook.StableD.cs` (nowy rodzaj
+wplywu `KRent` - czesc "korona" D stalego, kolumny CSV), `ArmouryBehavior.cs` (krok po `WageRefund`, przed `CrownIncome.End`; `Reset`; zapis `arm_rent180`),
+`MoneyLedger.Obieg.cs` (pozycje "renty" zamiast "-"), `Settings.cs` + `McmSettings.cs`, `tools/gen_mcm.py` (zakresy dwoch suwakow).
+
+**Co dziala (CrownRents i 165 czynne; wylaczone = reszta zostaje w skarbcu jak w C1):**
+- Kolejnosc dobowa (2.0b): powinnosci -> danina/clo -> `CrownIncome.Begin` -> dary 182 -> raty reparacji -> kontrakty 185 -> zwrot 165 -> **renty 180** ->
+  `CrownIncome.End` (migawka skarbcow PO rentach - jutrzejsze "wplywy dnia" ich nie widza). Kazde krolestwo, kazdy rod i kazda wyplata we wlasnym `try`.
+- Pula krolestwa = `CrownIncome.LeftFor` (reszta wplywow dnia z 1/360 zapasu, najwyzej skarbiec). Dzielona na rody krolestwa wedlug stalych wag lenn z
+  `Clan.Settlements`: miasto 3, zamek 1, wies 0.25 (wsie wedlug wlasnosci gry - jak dar 182). Rod krola i gracz tak samo; bez najemnikow (185), dworzan BK, Innych
+  i rodow bez zywej glowy. Udzial = floor(pula x waga / suma wag); rod z warunkiem dostaje go do kiesy glowy (skarbiec - x, glowa + x; nieudana wyplata
+  oddaje x skarbcowi), udzial rodu bez warunku i zaokraglenia zostaja w skarbcu (zapas - jutro nie sa "wplywem dnia", wracaja tylko przez 1/360).
+- **Warunek zalogi:** kazda twierdza rodu ma >= `CrownRentGarrisonShare` (0.5) stalej normy = sredniej zalogi (ludzie bez bohaterow) twierdz tego rodzaju
+  (miasto / zamek) w krolestwie, srednia z 28 dob (pierscien na krolestwo i rodzaj; twierdze oblezone poza norma). Pomijane: twierdza oblezona i twierdza
+  w rekach obecnego pana krocej niz 28 dob. Brak normy (pierwsza doba) - zaloga nie blokuje.
+- **Warunek sluzby:** maska ostatnich 60 dob WOJNY krolestwa na rod (przesuwana tylko w dobach, gdy krolestwo jest w wojnie z innym krolestwem). Doba sluzby:
+  partia rodu (lorda, `IsLordParty`/gracz) albo partia, w ktorej jest dorosly czlonek rodu: w armii swojego krolestwa, oblega albo broni oblezonej osady,
+  w bitwie z krolestwem w wojnie, albo najblizsza osada (miasto, zamek, wies; partia w osadzie - ta osada) nalezy do krolestwa w wojnie; albo czlonek rodu
+  w niewoli u krolestwa w wojnie. Wymog: >= `CrownRentServiceDays` (20) dob sluzby; rod, ktory widzial mniej niz 60 dob wojny tej korony - ceil(20 x widziane / 60);
+  0 dob wojny - warunek nie obowiazuje. Zmiana krolestwa rodu - licznik od zera.
+- D: wyplata `ClanIncomeBook.NoteInflow(glowa, x, KRent)` -> `Today` i `TodayRent`; w D stalym w czesci "korona" (`QCrown`), odjeta od "jednorazowych" - jeden raz.
+  Budzet 166 liczy na D z wczoraj, wiec renta dnia dziala od nastepnej doby (pierscien 28 dob). D169 (gdy D staly wylaczony) tez ja widzi (przez `Today`).
+  Powinnosci (`CrownDuesFromLand`) licza od "ziemi" - korona nie bierze 2-3% z wlasnych rent.
+- Gracz: te same wagi i warunki; komunikat "The crown paid your house N denars in rents for its fiefs." w dniu renty i "The crown withholds your house's rent: ..."
+  (zaloga albo sluzba S z N dob) tylko przy zmianie powodu.
+
+**Nowe klucze (grupa "The crown's income (stage 2)"):** `CrownRents` true, `CrownRentWeightTown` 3, `CrownRentWeightCastle` 1, `CrownRentWeightVillage` 0.25,
+`CrownRentServiceDays` 20 (suwak 0-60), `CrownRentGarrisonShare` 0.5 (suwak 0-1), `CrownRentGarrisonNormKingdom` true (false = norma swiata).
+
+**Nowe / zmienione linie logu:**
+- NOWA `Renty korony (180): dzien N | krolestwa z renta K, reszta wplywow dnia po zwrocie P = renty R + wstrzymane w skarbcach W (udzialy rodow bez warunku A, zaokraglenia B) | rody z lennem N: z renta a, bez warunku b (x%) - zaloga c, sluzba d, oba e | renta na udzial (zl/dobe): mediana krolestw M, najwyzsza H | wagi: miasto 3, zamek 1, wies 0.25; warunek: ... | sluzba dzis: rody w wojnie n, sluzylo m (armia, oblezenie, bitwa, ziemia wroga, niewola) | normy zalog (srednio na krolestwo, 28 dob): miasto ..., zamek ...; twierdze pominiete w warunku zalogi: w oblezeniu ...; twierdze swiata w rekach obecnego pana krocej niz 28 dob (pomijane) ... | gracz: renta ... (udzialy ...; zaloga TAK/NIE, sluzba S/N TAK/NIE)|bez lenna w krolestwie, sluzba S z N dob wojny | na krolestwo (renty/reszta): <krolestwo> R/P (udzial U), ...` (+ `| wczytano: sluzba N rodow (bledne M)` w pierwszej dobie po wczytaniu).
+- ZMIENIONA `Korona: wplywy dnia (165)`: po "zwrot zoldu ... )" - `, renty (180) R (wstrzymane w skarbcach - rody bez warunku i zaokraglenia W)`; na krolestwo ` renty R wstrz. W`.
+  "zostalo z wplywow dnia w skarbcach" to teraz glownie wstrzymane udzialy.
+- ZMIENIONA `Obieg: dzien N`: w "rody dostaly" `renty od korony (180) R` (bylo "-"); w "korona ... wyplaty" `renty wedlug lenn (180) skarbce -> glowy rodow R (z reszty wplywow dnia P; wstrzymane w skarbcach W)` (bylo "-").
+- ZMIENIONA `D staly (169c)`: w "dzis (swiat)" po "zwrot korony X" - `, renty korony (180) R`.
+- CSV `budzet-rodow.csv`: dwie nowe kolumny na koncu `renta_180;warunek_180` (warunek: `tak|zaloga|sluzba|zaloga+sluzba S/N`; puste - rod bez renty dzis:
+  bez lenna, najemnik, krolestwo bez reszty). Narzedzia czytaja CSV po nazwach kolumn.
+
+**Odstepstwa / rozstrzygniecia (z powodem):**
+1. "Ostatnia wojna albo biezaca z ostatnich 60 dob" = ostatnie 60 dob WOJNY krolestwa (maska nie przesuwa sie w pokoju). W wojnie to biezaca wojna z 60 dob,
+   w pokoju koncowka ostatniej wojny (gdy byla krotsza niz 60 dob - takze koncowka poprzedniej). Jeden licznik na rod, maly zapis.
+2. Projekt nie mowi, co przed pierwsza wojna: rod, ktory widzial k < 60 dob wojny tej korony, potrzebuje ceil(20 k / 60) dob; k = 0 - warunek sluzby nie obowiazuje
+   (nie bylo wojny, w ktorej mozna sluzyc). Bez tego w nowej kampanii przez pierwsze 20 dob kazdej pierwszej wojny nikt nie mialby renty, a stary zapis (licznik
+   od zera) wstrzymalby renty wszystkim na 20 dob wojny. Nowy wasal (zmiana krolestwa) liczy od zera - sluzba innej koronie sie nie liczy.
+3. Twierdza w rekach obecnego pana krocej niz 28 dob (zdobyta, nadana) i twierdza oblezona - pomijane w warunku zalogi (stala 28 dob, bez klucza). Powod:
+   swiezo zdobyta twierdza ma zaloge bliska 0 - zdobywca, czyli wzor sluzby, tracilby cala rente. Twierdze oblezone tez poza norma krolestwa.
+4. `CrownRentGarrisonNormKingdom` = false -> norma swiata dla rodzaju twierdzy (nie wlasna srednia rodu - K10 to odrzucil).
+5. Sluzba: "bitwa z wrogiem" i "obrona oblezonej osady" dopisane obok armii/oblezenia/ziemi wroga (rod broniacy swojej twierdzy albo bijacy najezdzce na
+   wlasnej ziemi sluzy). Armia krolestwa liczy sie takze, gdy stoi na wlasnej ziemi (projekt: "w armii krolestwa").
+6. Wagi wedlug wlasnosci gry (`Clan.Settlements`), nie tytulow BK - jak dar 182.
+7. Renta z calej reszty po zwrocie, takze z 1/360 zapasu (projekt: "renty roku 1 placi w duzej czesci zapas koron").
+
+**Test do odczytu (C2: 40 dob + zapis 362; 120 dob po C3):**
+- `Renty korony (180)`: co dobe P = R + W (co do 1 zl) i W = A + B; "bez warunku" < 20% (K41/projekt). Te same R i W w `Korona: wplywy dnia (165)` (renty, wstrzymane)
+  i w `Obieg` (renty od korony = renty wedlug lenn = R).
+- "zostalo z wplywow dnia w skarbcach" (165) spada do okolo W.
+- `Pieniadz swiata`: bez zmiany tempa (renty to przelew skarbiec -> glowa; +-50 tys./dobe wobec C1).
+- `D staly (169c)`: "korona" rosnie o ok. R; "renty korony (180)" = R tej doby; zamkniecie sumy bez zmian.
+- Z8 gracza < 1 (`Obieg`) - renta nie zalezy od zalogi ani zoldu.
+- Zapis/wczytanie: pierwsza doba po wczytaniu - "wczytano: sluzba N rodow (bledne 0)"; stary zapis (C1) - sluzba od zera, renty od pierwszej doby (warunek proporcjonalny).
+
+**Czego sie spodziewac (z biegu C1-w, `kopia-c1w-120`, linia 165: "zostalo z wplywow dnia"):** reszta po zwrocie doby 1-30 ok. 143 tys./dobe (glownie
+krolestwa w pokoju), 31-60 ok. 81 tys., 61-93 ok. 61 tys., 94-120 ok. 76 tys. (z tego ok. 24 tys. z 4 krolestw w pokoju, reszta z ok. 17 krolestw w wojnie,
+ktore zwracaja zold w calosci). Renty = ta reszta minus wstrzymane (szacunek 10-25%): w dobach 94-120 ok. 55-70 tys./dobe, na starcie kampanii ok. 110-130 tys.
+D rodow z lennem w tych krolestwach rosnie o rente (czesc "korona"); u rodow na pulapie 166 w wojnie +0.6 x renta pulapu (+ udzial dworu przy WarCourtYieldsToWages),
+z opoznieniem pierscienia 28 dob; renty w pokoju podnosza G, a z nim skrzynie wojenna na start wojny. Szacunek: wojsko lordow w wojnie +3..+6 tys. wobec C1-w
+(doby 94-120), glownie w krolestwach z nadwyzka (bogate); krolestwa, ktore nie zwracaja zoldu w calosci (ok. 8 z 25 w wojnie), renty nie dostana.
+
+**Ryzyka:** (a) "bez warunku" > 20%: male zalogi zamkow wobec normy krolestwa (zamki z mala zaloga wojenna, w pokoju po cieciu 166 do 50%) i rody, ktorych
+partie stoja we wlasnych osadach; (b) sprzezenie biedy: biedny rod -> mniejsza zaloga -> bez renty; (c) zapas korony rosnie wolniej (dotad niewydana reszta
+szla do zapasu i wracala po 1/360) - "do wydania" w dobie 120 nizsze o ok. 20-30 tys./dobe, glownie w krolestwach z nadwyzka; (d) koszt: szukanie najblizszej osady
+dla partii w wojnie (ok. 0.5 mln odleglosci na dobe, kilka ms) - nie mierzone w linii; (e) gracz: komunikat o rencie codziennie.
