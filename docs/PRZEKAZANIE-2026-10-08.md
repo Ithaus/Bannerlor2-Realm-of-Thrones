@@ -442,3 +442,6 @@ LIMITY 13:30: 5h 32%, TYDZIEN 82% (reset 15.10) - przy 100% tygodnia przejsc na 
   HeroCreator.DeliverOffSpring: "mother.Race == father.Race" - porod dziecka rodzicow roznych ras; pierwszy raz w historii testow). Hipoteza: po 179 glowy BK gentry
   sa czynne (NotSpawned -> Active), wiec biora sluby/ciaze; szablon BK gentry moze miec inna Race niz ROT. Bieg C3b (tez z aktywacja) przeszedl 120 dob bez tego.
   Powtorka testu w toku -> test\at-c3c2-120.out.txt. Jesli powtorzy sie: latka (prefiks DeliverOffSpring albo wyrownanie Race rycerza przy aktywacji w Join()).
+- (05:10) Rasy w danych modow: human (domyslna), wight 117, giant 6, whitewalker 4 (ROT). Rycerze BK - ludzie, wiec porod "roznych ras" to raczej olbrzym ROT (Wolni Ludzie)
+  z ludzkim malzonkiem - tresc ROT, nie C3. **DO ZROBIENIA (CrashScribe Mends, przed gra Jeffa):** brak ciazy przy roznych rasach (prefiks MakePregnantAction)
+  i istniejaca ciaza roznych ras konczy sie bez porodu (prefiks PregnancyCampaignBehavior.CheckOffspringToDeliver) - inaczej mozliwe zawieszenie gry w silniku.
