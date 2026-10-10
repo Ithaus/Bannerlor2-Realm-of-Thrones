@@ -2876,6 +2876,34 @@ namespace Armoury
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool CrownPaysCallToWar { get; set; } = true;
 
+        [SettingPropertyBool("Crown Borrows", HintText = "with Crown Current Income and Iron Bank Enabled: a crown at war whose day's income cannot cover the wage refunds it owes its houses borrows the missing part from the Iron Bank - only for the refunds, never for gifts or rents; no new loans in peace. The crown owes at most Crown Loan Limit Days of its average taxes and pays the Bank first each day, before any other expense: one part in Crown Loan Repay Days of its largest debt, at most Crown Loan Max Income Share of its taxes, at the Bank's usual interest (like a king: 20% a year, 30% on a running debt, 2% fee). A crown that pays less than half of its instalments over 28 days falls into arrears: the Bank lends nothing more to it or to its houses and lends more to the houses of the realms at war with it, until it has paid in full for 28 days. The debt of a realm that is destroyed is lost to the Bank. You as king borrow by the same rule. Off = no crown borrows, as before")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public bool CrownBorrows { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Crown Loan Limit Days", 0.00f, 728.00f, "0", HintText = "a crown owes the Bank at most this many days of its average taxes (the dues, war subsidy, customs, castle share and ninths of the last 84 days - not the hoard)")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public float CrownLoanLimitDays { get; set; } = 180f;
+
+        [SettingPropertyFloatingInteger("Crown Loan Repay Days", 30.00f, 728.00f, "0", HintText = "each day the crown repays one part in this many of the largest debt of its loan (half a year, the Bank's usual term), at most Crown Loan Max Income Share of its taxes")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public float CrownLoanRepayDays { get; set; } = 182f;
+
+        [SettingPropertyFloatingInteger("Crown Loan Max Income Share", 0.00f, 1.00f, "0.00", HintText = "the crown's instalment to the Bank is at most this share of its average daily taxes")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public float CrownLoanMaxIncomeShare { get; set; } = 0.3f;
+
+        [SettingPropertyInteger("Crown Loan Bank Floor", 0, 8000000, "0", HintText = "the Bank lends to crowns only from the capital it holds above this (the rest stays for the houses' war credit)")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public int CrownLoanBankFloor { get; set; } = 2000000;
+
+        [SettingPropertyFloatingInteger("Crown Loan Pool Days", 1.00f, 360.00f, "0", HintText = "each day the Bank lends to all crowns together at most one part in this many of its capital above Crown Loan Bank Floor - shared out by need when they ask for more (no sudden end of credit)")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public float CrownLoanPoolDays { get; set; } = 60f;
+
+        [SettingPropertyFloatingInteger("Crown Arrears Enemy Credit", 1.00f, 3.00f, "0.00", HintText = "the credit limit of houses whose realm is at war with a crown in arrears to the Bank is multiplied by this (the Bank funds the enemies of those who do not pay)")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public float CrownArrearsEnemyCredit { get; set; } = 1.5f;
+
         [SettingPropertyBool("Debt Ladder Enabled", HintText = "with Iron Bank Enabled and Clan Budget Enabled: the Bank lends only to those who can repay, and instead of bankruptcy the creditor takes income. An AI house borrows only for war (War Credit). All instalments of a house come out of its steady income: the Bank at most Iron Bank Max Instalment Share of it a day, all debts together (Bank, unpaid wages, ransoms) at most All Instalments Max Share - the Bank first, then the rest by age. A missed instalment is an arrear (the house pays what it holds above three days of wages, its credit is stopped); after three arrears in a row the creditors seize the income of the house's villages and every coin above Seize Floor Gold in its head's purse, interest frozen, until the debt is paid; only when the seizure brings nothing for Sale After Zero Seize Days or would take longer than Sale Forecast Days are the surplus arms, caravans and workshops sold, once a week. No house ever loses a fief, and no debt is forgiven: the debt of a house that dies passes to the new lords of its villages. Debtors build nothing and keep half a court. Off = the Iron Bank as before (loans for wages, bankruptcy)")]
         [SettingPropertyGroup("Debts and the war credit (stage 2)")]
         public bool DebtLadderEnabled { get; set; } = true;
@@ -4566,6 +4594,13 @@ namespace Armoury
             s.CrownRentServiceWholeDay = CrownRentServiceWholeDay;
             s.CrownRentWarDayNeedsContact = CrownRentWarDayNeedsContact;
             s.CrownPaysCallToWar = CrownPaysCallToWar;
+            s.CrownBorrows = CrownBorrows;
+            s.CrownLoanLimitDays = CrownLoanLimitDays;
+            s.CrownLoanRepayDays = CrownLoanRepayDays;
+            s.CrownLoanMaxIncomeShare = CrownLoanMaxIncomeShare;
+            s.CrownLoanBankFloor = CrownLoanBankFloor;
+            s.CrownLoanPoolDays = CrownLoanPoolDays;
+            s.CrownArrearsEnemyCredit = CrownArrearsEnemyCredit;
             s.DebtLadderEnabled = DebtLadderEnabled;
             s.WarCredit = WarCredit;
             s.WarCreditMaxShareD = WarCreditMaxShareD;

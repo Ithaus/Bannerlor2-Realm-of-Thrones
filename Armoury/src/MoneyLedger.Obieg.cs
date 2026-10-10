@@ -97,6 +97,7 @@ namespace Armoury
             try { MercContract.ZeroLast(); } catch (Exception e) { Stumble169("ClearLast169(MercContract)", e); } // 185: kontrakty najemnikow (Last*)
             try { CrownRents.ZeroLast(); } catch (Exception e) { Stumble169("ClearLast169(CrownRents)", e); }     // 180: renty korony (Last*)
             try { GentryService.ZeroLast(); } catch (Exception e) { Stumble169("ClearLast169(GentryService)", e); } // 179: zold rycerzy (Last*)
+            try { CrownBorrow.ZeroLast(); } catch (Exception e) { Stumble169("ClearLast169(CrownBorrow)", e); }   // 186: kredyt koron w Banku (Last*)
         }
 
         // ------------------------------------------------------------ 169b: RB wedlug odcinkow naszego ticku (granice: Mark renty, budowy, korona, paser band)
@@ -593,6 +594,7 @@ namespace Armoury
               .Append(", zwrot przyciety o wydatki ludzi we wlasnych miastach (K3) ").Append(KingdomTreasury.LastOwnCut)
               .Append(", 1/9 (178) z kies odbiorcow okupow i lupu do skarbcow ").Append(Ransom178.LastThirds).Append(", okupy wielkich jencow do skarbcow zdobywcow ").Append(Ransom178.LastToCrown)
               .Append(", raty okupu krola skarbiec -> porywacz ").Append(CrownIncome.LastKingRansomPaid).Append(", nagrody za wielkich jencow skarbiec -> zdobywca ").Append(Ransom178.LastRewards)
+              .Append(", 186: rata kredytu korony skarbce -> Bank ").Append(CrownIncome.LastLoanOut).Append(", kredyt Banku -> skarbce (na zwrot zoldu) ").Append(CrownIncome.LastLoanIn)
               .Append("; wyplaty - zwrot zoldu ").Append(KingdomTreasury.LastRefundGiven).Append(" (").Append(pct).Append("% z ").Append(KingdomTreasury.LastRefundPaid)
               .Append(" zaplaconego zoldu), zapomoga ").Append(ml ? M[CW.MSupport].ToString(Inv) : "-")
               .Append(", dochod za tier najemnikow (dzis z niczego) ").Append(ml ? M[CW.MTierMerc].ToString(Inv) : "-")
@@ -608,7 +610,10 @@ namespace Armoury
               .Append(", zajete (dochod wsi i kiesy ponad podloge) ").Append(DebtLadder.LastSeized).Append(", wyprzedaz ").Append(DebtLadder.LastSold)
               .Append(", do sakiewek ludzi (dlug zoldu) ").Append(DebtLadder.LastMenPaid).Append(", do skarbcow (stary dlug wobec korony) ").Append(DebtLadder.LastCrownPaid)
               .Append(", zaliczka gry w nicosc (OBIEG-1) ").Append(DebtLadder.LastAdvNothing).Append(", okupy do porywaczy ").Append(DebtLadder.LastRansomPaid)
-              .Append(", portfele gry ponownie otwarte (bez zaliczki) ").Append(DebtLadder.LastReopened).Append(", zysk Banku do kasy Braavos ").Append(DebtLadder.LastProfit).Append('.');
+              .Append(", portfele gry ponownie otwarte (bez zaliczki) ").Append(DebtLadder.LastReopened).Append(", zysk Banku do kasy Braavos ").Append(DebtLadder.LastProfit)
+              // 186: kredyt koron (kapital -> skarbce, raty skarbce -> kapital); dlug zniszczonego krolestwa przepada (zloto nie rusza - tylko licznik)
+              .Append("; 186: kredyt koron kapital -> skarbce ").Append(CrownBorrow.LastLent).Append(" (krolestw ").Append(CrownBorrow.LastLentN).Append("), raty skarbce -> kapital ")
+              .Append(CrownBorrow.LastRepaid).Append(", Bank stracil dzis (krolestwa zniszczone, zloto nie rusza) ").Append(CrownBorrow.LastLost).Append('.');
             return sb.ToString();
         }
 

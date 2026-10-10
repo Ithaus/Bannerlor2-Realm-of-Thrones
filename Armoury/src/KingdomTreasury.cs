@@ -126,6 +126,8 @@ namespace Armoury
         // Rod krola i rod gracza na tych samych zasadach; najemnicy, rody bez krolestwa i krolestwa w pokoju - nic.
         // Zloto: skarbiec krolestwa -> kiesa platnika (glowa rodu albo rycerz, ktory sam oplacil swoja partie).
         internal struct RefundRow { public long Paid, Due, Given; public int Clans; }
+        // 186: zwrot krolestwa w wojnie przed wyplata (nalezny, reszta wplywow dnia, kredyt Banku) - kredyt dzielony miedzy korony przed wyplata
+        private sealed class RefundCalc { public Kingdom K; public List<KeyValuePair<Hero, int>> List; public int[] Due; public long PaidSum, Want, Have, Lent; }
         private static readonly Dictionary<Kingdom, RefundRow> _refund = new Dictionary<Kingdom, RefundRow>();
 
         internal static void Reset() { _refund.Clear(); _refundErr = false; ZeroLast(); _arrear.Clear(); _duesSkippedSess = 0; _duesModelErrSess = 0; _duesErrLogged.Clear(); DuesToday.Clear(); LeviesToday.Clear(); TownLevyToday.Clear(); }
@@ -256,25 +258,54 @@ namespace Armoury
                     list.Add(new KeyValuePair<Hero, int>(h, v));
                 }
                 LastOwnCut = ownCut;
-                long totalGiven = 0, totalDue = 0, totalPaid = 0, left = 0, toDebtors = 0; int kingdoms = 0, shortK = 0, emptyK = 0, playerGot = 0, stumbles = 0;
+                long totalGiven = 0, totalDue = 0, totalPaid = 0, left = 0, toDebtors = 0, loanAll = 0; int kingdoms = 0, shortK = 0, emptyK = 0, playerGot = 0, stumbles = 0, loanK = 0;
                 var allClans = new HashSet<Clan>(); var debtors = new HashSet<Clan>();
+                // 186: najpierw nalezny zwrot i reszta wplywow dnia kazdego krolestwa w wojnie, potem kredyt Banku na brak (podzial puli Banku miedzy korony),
+                // dopiero potem wyplata - kazde krolestwo we wlasnym try (wyjatek przy jednym nie zatrzymuje zwrotu w pozostalych; pierwszy do pliku, kolejne liczone)
+                var rows = new List<RefundCalc>();
                 foreach (var kk in byKingdom)
                 {
                     var k = kk.Key; var list = kk.Value;
-                    long paidSum = 0, want = 0, given = 0, have = 0; var clans = new HashSet<Clan>();
-                    bool counted = false;
-                    // wyjatek przy jednym krolestwie nie zatrzymuje zwrotu w pozostalych (pierwszy do pliku, kolejne liczone)
+                    var rc = new RefundCalc { K = k, List = list };
                     try
                     {
-                        foreach (var kv in list) paidSum += kv.Value;
-                        if (!AtWar(k)) { peace += paidSum; continue; }
-                        var due = new int[list.Count];
-                        for (int i = 0; i < list.Count; i++) { due[i] = (int)(list[i].Value * pct); want += due[i]; }
-                        if (want <= 0) continue;
-                        counted = true;
-                        have = Math.Max(0, k.KingdomBudgetWallet);      // Diplomacy potrafi zostawic skarbiec na minusie - wtedy nic nie placimy
-                        if (cur) have = CrownIncome.LeftFor(k);         // 165: z tego, co zostalo z wplywow dnia (i 1/360 zapasu) po darach, ratach i kontraktach
-                        var give = Split(due, have);
+                        foreach (var kv in list) rc.PaidSum += kv.Value;
+                        if (!AtWar(k)) { peace += rc.PaidSum; continue; }
+                        rc.Due = new int[list.Count];
+                        for (int i = 0; i < list.Count; i++) { rc.Due[i] = (int)(list[i].Value * pct); rc.Want += rc.Due[i]; }
+                        if (rc.Want <= 0) continue;
+                        rows.Add(rc);
+                        rc.Have = Math.Max(0, k.KingdomBudgetWallet);   // Diplomacy potrafi zostawic skarbiec na minusie - wtedy nic nie placimy
+                        if (cur) rc.Have = CrownIncome.LeftFor(k);      // 165: z tego, co zostalo z wplywow dnia (i 1/360 zapasu) po racie 186, darach, ratach i kontraktach
+                    }
+                    catch (Exception e)
+                    {
+                        stumbles++;
+                        if (!_refundErr) { _refundErr = true; Log.Error("KingdomTreasury.WageRefund(" + (k != null && k.Name != null ? k.Name.ToString() : "?") + ")", e); }
+                    }
+                }
+                // 186: korona w wojnie bez reszty wplywow na caly zwrot pozycza brak w Banku (kapital -> skarbiec); pieniadz idzie tylko na ten zwrot
+                if (cur && CrownBorrow.On && rows.Count > 0)
+                {
+                    try
+                    {
+                        var need = new Dictionary<Kingdom, long>();
+                        foreach (var rc in rows) if (rc.Due != null && rc.Want > rc.Have) need[rc.K] = rc.Want - rc.Have;
+                        if (need.Count > 0)
+                        {
+                            var lent = CrownBorrow.Lend(need);
+                            foreach (var rc in rows) { long x; if (lent.TryGetValue(rc.K, out x) && x > 0) { rc.Have += x; rc.Lent = x; loanAll += x; loanK++; } }
+                        }
+                    }
+                    catch (Exception e) { Log.Error("KingdomTreasury.WageRefund(186)", e); }
+                }
+                foreach (var rc in rows)
+                {
+                    var k = rc.K; var list = rc.List;
+                    long paidSum = rc.PaidSum, want = rc.Want, given = 0, have = rc.Have; var clans = new HashSet<Clan>();
+                    try
+                    {
+                        var give = Split(rc.Due, have);
                         for (int i = 0; i < list.Count; i++)
                         {
                             if (give[i] <= 0) continue;
@@ -296,7 +327,6 @@ namespace Armoury
                         stumbles++;
                         if (!_refundErr) { _refundErr = true; Log.Error("KingdomTreasury.WageRefund(" + (k != null && k.Name != null ? k.Name.ToString() : "?") + ")", e); }
                     }
-                    if (!counted) continue;
                     if (cur)
                     {
                         CrownIncome.Spent(k, given);                    // 165: zwrot schodzi z reszty wplywow dnia; niedoplata przepada
@@ -312,6 +342,7 @@ namespace Armoury
                          + kingdoms + " krolestwach (" + (pct * 100f).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + "% z " + totalPaid
                          + " zaplaconego zoldu = nalezne " + totalDue + "); " + (cur ? "wplywow dnia nie starczylo" : "skarbiec nie mial dosc") + " w " + shortK + " krolestwach (w tym " + (cur ? "bez reszty wplywow" : "pusty") + ": " + emptyK + "), niedoplata "
                          + (totalDue - totalGiven) + "; w skarbcach tych krolestw zostalo " + left
+                         + (cur && (loanAll > 0 || CrownBorrow.On) ? "; z kredytu Banku (186, brak zwrotu - kapital -> skarbiec -> rody) " + loanAll + " w " + loanK + " krolestwach" : "")
                          + (playerGot > 0 ? "; rod gracza dostal " + playerGot : "")
                          + (toDebtors > 0 ? "; z tego " + toDebtors + " dla " + debtors.Count + " rodow dluznych koronie (gra zabierze im to na splate dlugu, ktora nie wraca do skarbca)" : "")
                          + ". Bez zwrotu: zold krolestw w pokoju " + peace + ", rodow bez krolestwa " + noKingdom + ", najemnikow " + merc + "."

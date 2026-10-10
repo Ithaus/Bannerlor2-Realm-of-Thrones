@@ -59,7 +59,7 @@ namespace Armoury
                     int rg = ruler != null ? ruler.Gold : 0, rb = 0;
                     if (ruler != null) bal.TryGetValue(ruler, out rb);
                     Log.Info("Skarbce: dzien " + day + " - " + k.Name + (war ? " (WOJNA)" : "") + ": skarbiec " + wallet + (hadW ? " (" + Sign(wallet - lastW) + ")" : "")
-                             + KingdomTreasury.RefundNote(k)
+                             + KingdomTreasury.RefundNote(k) + CrownBorrow.LedgerNote(k)
                              + ", krol " + (ruler != null ? ruler.Name.ToString() : "-") + " kiesa " + rg + " bilans " + Sign(rb) + "/dzien"
                              + "; rodow " + clans + ", kiesy razem " + sumGold + ", biednych (<" + s.FinanceLedgerPoor + ") " + poor + ", na minusie " + minus
                              + "; wojsko rodow " + men + " ludzi.");

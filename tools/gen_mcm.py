@@ -52,6 +52,12 @@ RANGES = {
     'CrownGreatCaptiveReward': (0.0, 1.0, "0.00"),
     'CrownThirdsShare': (0.0, 0.5, "0.000"),
     'RansomHeadYears': (0.0, 3.0, "0.00"),
+    # 186: korona pozycza w Banku - udzial przycinany w kodzie do 0..1, mnoznik >= 1, doby >= 1
+    'CrownLoanMaxIncomeShare': (0.0, 1.0, "0.00"),
+    'CrownArrearsEnemyCredit': (1.0, 3.0, "0.00"),
+    'CrownLoanLimitDays': (0.0, 728.0, "0"),
+    'CrownLoanRepayDays': (30.0, 728.0, "0"),
+    'CrownLoanPoolDays': (1.0, 360.0, "0"),
 }
 
 def gen(module_dir, ns, display):

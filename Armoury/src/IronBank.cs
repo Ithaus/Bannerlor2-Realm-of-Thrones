@@ -191,6 +191,7 @@ namespace Armoury
                 int towns = 0, castles = 0;
                 foreach (var f in c.Fiefs) { if (f == null) continue; if (f.IsCastle) castles++; else if (f.IsTown) towns++; }
                 float lim = income * Math.Max(0f, s.IronBankIncomeDays) + towns * s.IronBankPerTown + castles * s.IronBankPerCastle;
+                lim *= CrownBorrow.LimitFactor(c);   // 186: rody korony w zaleglosci wobec Banku - 0; w wojnie z taka korona - x1.5
                 // Bank pozycza wrogom bankrutow
                 if (c.Kingdom != null)
                     foreach (var kv in _debts)

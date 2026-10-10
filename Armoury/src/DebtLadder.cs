@@ -76,7 +76,7 @@ namespace Armoury
         private static int _dMissed, _dNewArrears, _dNewSeize, _dSeizeEnded, _dSales, _dSoldCarN, _dSoldWsN, _dOver15, _dFromDefault, _dWageDebtParties, _dNoRecipient,
                            _dInheritN, _dOrphanN, _dReopenedN, _dPaidN;
         // z budzetu 166 (po Banku): dlaczego KW nie dostal miejsca
-        private static int _dKwBlockArrear, _dKwBlockSeize, _dKwBlockD, _dKwBlockBank, _dKwAtLimit;
+        private static int _dKwBlockArrear, _dKwBlockSeize, _dKwBlockD, _dKwBlockBank, _dKwAtLimit, _dKwBlockCrown;
 
         internal static void Reset()
         {
@@ -101,7 +101,7 @@ namespace Armoury
         // liczniki zbierane miedzy dobami (rozliczenia rodow gry i budzet) - zerowane po linii
         private static void ZeroBudgetDay()
         {
-            _dKwBlockArrear = _dKwBlockSeize = _dKwBlockD = _dKwBlockBank = _dKwAtLimit = 0;
+            _dKwBlockArrear = _dKwBlockSeize = _dKwBlockD = _dKwBlockBank = _dKwAtLimit = _dKwBlockCrown = 0;
             _dTakenOld = _dTakenAdv = _dWageDebtNew = _dAdvNew = _dReopened = 0; _dWageDebtParties = _dReopenedN = 0;
         }
 
@@ -185,7 +185,7 @@ namespace Armoury
         private static double LootAvg(Clan c) { Loot x; return c != null && c.StringId != null && _loot.TryGetValue(c.StringId, out x) ? Math.Max(0, x.Ema) : 0; }
 
         /// <summary>Limit Banku przy drabinie (IronBank.Limit): 15 x ziemia D stalego + 10 000 za miasto + 5 000 za zamek + 30 x srednie jednorazowe od prawdziwego
-        /// platnika z 84 dob, x wiarygodnosc (bankrut 0).</summary>
+        /// platnika z 84 dob, x wiarygodnosc (bankrut 0); 186: x 0, gdy korona rodu jest w zaleglosci wobec Banku, x 1.5 w wojnie z taka korona.</summary>
         internal static int Limit(Clan c)
         {
             try
@@ -202,7 +202,7 @@ namespace Armoury
                 if (fiefs != null) for (int i = 0; i < fiefs.Count; i++) { var f = fiefs[i]; if (f == null) continue; if (f.IsCastle) castles++; else if (f.IsTown) towns++; }
                 double lim = Math.Max(0f, s.DebtLimitLandDays) * land + towns * Math.Max(0, s.IronBankPerTown) + castles * Math.Max(0, s.IronBankPerCastle)
                              + Math.Max(0f, s.WarCreditLootDays) * LootAvg(c);
-                return (int)Math.Min(int.MaxValue, lim * trust);
+                return (int)Math.Min(int.MaxValue, lim * trust * CrownBorrow.LimitFactor(c));
             }
             catch { return 0; }
         }
@@ -233,6 +233,7 @@ namespace Armoury
             if (l != null && l.FreeDay >= 0 && today - l.FreeDay < Math.Max(0, s.CreditAfterSeizureDays)) { _dKwBlockSeize++; return 0; }
             var d = IronBank.DebtOf(c, false);
             if (d != null && (d.Defaulted || d.Trust <= 0f)) { _dKwBlockArrear++; return 0; }
+            if (CrownBorrow.CrownInArrears(c)) { _dKwBlockCrown++; return 0; }   // 186: Bank nie pozycza rodom korony w zaleglosci
             // rod, ktorego D nie pokrywa kosztow stalych (dwor + powinnosci 3% w wojnie) - bez kredytu
             if (D <= Math.Max(0, household) + 0.03 * D) { _dKwBlockD++; return 0; }
             double free = IronBank.FreeCapital - Math.Max(0, s.BankFreeCapitalFloor);
@@ -275,6 +276,7 @@ namespace Armoury
             if (l != null && l.FreeDay >= 0 && today - l.FreeDay < Math.Max(0, s.CreditAfterSeizureDays))
             { why = "Your lands were in the hands of your creditors not long ago. The Bank will lend to you again after day " + (l.FreeDay + s.CreditAfterSeizureDays) + ". "; return false; }
             if (d != null && d.Defaulted) { why = "Your name is written in the book of those who did not pay. "; return false; }
+            if (CrownBorrow.CrownInArrears(c)) { why = "Your crown has not paid what it owes the Bank. The Bank lends nothing to the crown or to its houses until it does. "; return false; }   // 186
             if (IronBank.FreeCapital < Math.Max(0, s.BankFreeCapitalFloor)) { why = "The Bank's vaults run low and it lends to no one now. "; return false; }
             return true;
         }
@@ -1000,6 +1002,7 @@ namespace Armoury
                   .Append(" | KW (166, dzis): miejsce w pulapie u ").Append(ClanBudgetKwN()).Append(", wyplacone ").Append(ClanBudget.LastKwLent).Append(" zl u ").Append(ClanBudget.LastKwLentN)
                   .Append(" rodow; bez KW: na limicie ").Append(_dKwAtLimit).Append(", zaleglosc/zajecie ").Append(_dKwBlockArrear).Append(", po zajeciu ").Append(_dKwBlockSeize)
                   .Append(", D nie pokrywa kosztow stalych ").Append(_dKwBlockD).Append(", Bank ponizej progu wolnego kapitalu ").Append(_dKwBlockBank)
+                  .Append(", korona w zaleglosci w Banku (186) ").Append(_dKwBlockCrown)
                   .Append(" | splaty (Bank przed budzetem): z jednorazowych ").Append(_dLootRepaid).Append(" (wojna ").Append((Math.Max(0f, Math.Min(1f, s.WarCreditLootRepayShare)) * 100).ToString("0", Inv))
                   .Append("%, pokoj 100%), raty z D: Bank ").Append(_dBankInst).Append(", pozostali ").Append(_dClaimInst).Append(", w zaleglosci (ponad 3 dni zoldu) ").Append(_dArrearPaid)
                   .Append("; odsetki narosle ").Append(_dInterest).Append("; rod-raty ").Append(_dPaidN).Append(", zaleglosci dzis ").Append(_dMissed)
