@@ -475,3 +475,7 @@ LIMITY 13:30: 5h 32%, TYDZIEN 82% (reset 15.10) - przy 100% tygodnia przejsc na 
 - (07:25) **WGRANIE 18: Armoury aebd0e94 + RealisticCaptivity 5f98df70 (noc/wgranie-18 = e2c baff3f2 = krok D + dar Strazy)**, CS 6507c842. KROKI ETAPU 2 SKONCZONE
   (A, B, C1, C2, C3, D). Do zamkniecia etapu 2: decyzja Jeffa o okupach (A/B/C), potem bieg 2-letni + bieg z wymuszonym pokojem (warunki konca etapu z projektu).
   Kolejka: T10 odpoczynek AI (max 2 doby forsownego marszu), zakaz slubow/ciaz roznych ras, korona pozycza w Banku (nowa paczka), etap 3 krok po kroku.
+- (08:20) **T10-R + RASY GOTOWE** (pomocnik; e2c a94b135 T10-R NightMarch.cs: max 2 noce forsownego marszu, potem obowiazkowy odpoczynek do dlugu 0, wyjatek tylko
+  ucieczka przed 2x silniejszym; wodz armii decyduje wedlug najgorszego dlugu armii; naprawiony blad ksiegi snu (gubione ticki godzinowe -> masowe dlugi 1);
+  ea606c7 RaceLaw.cs: sluby i ciaze tylko w tej samej rasie, ciaza roznych ras konczy sie bez porodu; klucze MaxForcedNights 2, SameRaceOnly true; opis w C1-POSTEP.md).
+  DLL test\Armoury-e2c-t10r.dll (aeb2ba51). **TEST 120 dob w toku** -> test\at-t10r-120.out.txt; potem zapis 9 dob -> WGRANIE 19 (sam Armoury; RC bez zmian 5f98df70).
