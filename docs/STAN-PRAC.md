@@ -970,4 +970,4 @@ wojsko w wojnie 115.4 tys.; 1 ERROR ValyrianBlades.Census (177, nie krok B - do 
 **WGRANIE 15 (09.10 ok. 21:35 zegara komp.):** Armoury ddf01297 (galaz noc/wgranie-15 = w-toku/e2c ae01f8e = WGRANIE 14 + 177-fix: stal valyrianska nigdy
 do taboru partii AI - krewny z rodu, ktory ja udzwignie (glowa pierwsza), inaczej polka miasta rodu; przyczyna: Truth odlozony przy pojmaniu Tregara Ormollena do
 taboru Leona Staegone znikal sekunde pozniej). CrashScribe bez zmian 6507c842. Autotest 40 dob nowej kampanii: 40/40, 14.0 s/dobe, Armoury 0 bledow (CS 8 = staly
-szum startowy innych modow, jak w kazdym tescie), spis stali 17/17 klng. Kopie: Armoury.dll.bak-2026-10-09-przed-noc15 + D:\Backup-Bannerlord\wgrane6-10-09-noc15-przed.
+szum startowy innych modow, jak w kazdym tescie), spis stali 17/17 klng. Kopie: Armoury.dll.bak-2026-10-09-przed-noc15 + D:\Backup-Bannerlord\wgrane\2026-10-09-noc15-przed.
