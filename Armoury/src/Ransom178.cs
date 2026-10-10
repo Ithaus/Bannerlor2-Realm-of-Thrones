@@ -210,6 +210,9 @@ namespace Armoury
             return h.Clan != null && h.Clan == k.RulingClan && HeirOf(k) == h;
         }
 
+        /// <summary>Recenzja D (harness 2.14/178): krol albo nastepca tronu przy czynnych wielkich jencach.</summary>
+        internal static bool IsGreatCaptive(Hero h) { try { return GreatOn && h != null && IsGreat(h); } catch { return false; } }
+
         private static Clan CaptorClan(PartyBase p)
         {
             if (p == null) return null;

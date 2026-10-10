@@ -33,8 +33,8 @@ namespace Armoury
         private sealed class Agr { public string Calling = "", Called = "", Against = ""; public long Total, Daily, Left; public int Day; }
         private static readonly List<Agr> _agr = new List<Agr>();
 
-        internal static long LastPaid, LastEnded, LastUnpaid; internal static int LastEndedN;
-        private static long _dPaid, _dEnded, _dUnpaid, _dCancelled, _dLegacy, _dUndone; private static int _dEndedN, _dPaidN, _dPeaceN, _dNewN;
+        internal static long LastPaid, LastEnded, LastUnpaid, LastLegacyPaid; internal static int LastEndedN;
+        private static long _dPaid, _dEnded, _dUnpaid, _dCancelled, _dLegacy, _dLegacyPaid, _dUndone; private static int _dEndedN, _dPaidN, _dPeaceN, _dNewN;
         private static int _stumbles, _importN = -1, _importBad;
         private static readonly HashSet<string> _err = new HashSet<string>();
         private static bool _ending;   // nasze EndCallToWarAgreement - postfiks nie liczy drugi raz
@@ -42,7 +42,7 @@ namespace Armoury
         internal static bool On { get { var s = Settings.Current; return s != null && s.CrownPaysCallToWar && CrownIncome.On; } }
 
         internal static void Reset() { _agr.Clear(); ZeroDay(); LastPaid = LastEnded = LastUnpaid = 0; LastEndedN = 0; _stumbles = 0; _err.Clear(); _importN = -1; _importBad = 0; _ending = false; }
-        private static void ZeroDay() { _dPaid = _dEnded = _dUnpaid = _dCancelled = _dLegacy = _dUndone = 0; _dEndedN = _dPaidN = _dPeaceN = _dNewN = 0; }
+        private static void ZeroDay() { _dPaid = _dEnded = _dUnpaid = _dCancelled = _dLegacy = _dLegacyPaid = _dUndone = 0; _dEndedN = _dPaidN = _dPeaceN = _dNewN = 0; }
 
         private static void Stumble(string where, Exception e)
         {
@@ -127,7 +127,7 @@ namespace Armoury
                 {
                     var a = _agr[i];
                     if (a.Calling != __0.StringId || a.Called != __1.StringId || a.Against != __2.StringId) continue;
-                    if (a.Left > 0) { __0.CallToWarWallet = (int)Math.Min(0L, (long)__0.CallToWarWallet + a.Left); if (!_ending) _dCancelled += a.Left; }
+                    if (a.Left > 0) { __0.CallToWarWallet += (int)Math.Min(int.MaxValue, a.Left); if (!_ending) _dCancelled += a.Left; }   // recenzja D: bez przycinania do 0 (portfel moze miec plus wezwanego)
                     _agr.RemoveAt(i);
                     break;
                 }
@@ -149,24 +149,47 @@ namespace Armoury
             }
             try
             {
-                // portfel wzywajacego ponizej dlugu z naszych porozumien = dlug rodow sprzed paczki (wezwany dostal go juz z niczego) - skreslony, nikt go nie placi
+                // portfel wzywajacego ponizej dlugu z naszych porozumien = dlug rodow sprzed paczki: wezwany dostal go juz od gry z niczego, a rody splacalyby
+                // go w nicosc (to rownowazylo zloto gry). Recenzja D: nie skreslany (zostaloby zloto z niczego) - placi skarbiec wzywajacego czesciami dnia w nicosc
                 var owed = new Dictionary<string, long>();
                 foreach (var a in _agr) { long v; owed.TryGetValue(a.Calling, out v); owed[a.Calling] = v + a.Left; }
+                int today = (int)CampaignTime.Now.ToDays;
                 foreach (var k in Kingdom.All)
                 {
                     if (k == null || k.IsEliminated || k.StringId == null) continue;
                     long o; owed.TryGetValue(k.StringId, out o);
-                    if (k.CallToWarWallet < -o) { long x = -o - k.CallToWarWallet; k.CallToWarWallet += (int)x; _dLegacy += x; }
+                    if (k.CallToWarWallet < -o)
+                    {
+                        long x = -o - k.CallToWarWallet;
+                        _agr.Add(new Agr { Calling = k.StringId, Called = "", Against = "", Total = x, Daily = Math.Max(1, (long)Math.Ceiling(x / Days())), Left = x, Day = today });
+                        _dLegacy += x;
+                    }
                 }
                 var beh = Campaign.Current.GetCampaignBehavior<AllianceCampaignBehavior>();
                 foreach (var a in _agr.ToArray())
                 {
                     try
                     {
-                        var calling = KingdomById(a.Calling); var called = KingdomById(a.Called); var against = KingdomById(a.Against);
+                        var calling = KingdomById(a.Calling);
+                        if (a.Called.Length == 0)
+                        {
+                            // dlug portfela sprzed paczki: skarbiec placi czesc dnia z reszty wplywow dnia w nicosc (wezwany juz dostal); bez wplywow - czeka
+                            if (calling == null || calling.IsEliminated) { _agr.Remove(a); continue; }
+                            var kl = CrownIncome.DayOf(calling);
+                            if (kl == null) continue;
+                            long pay = Math.Min(Math.Min(a.Left, a.Daily), Math.Min(CrownIncome.LeftFor(calling), (long)Math.Max(0, calling.KingdomBudgetWallet)));
+                            if (pay > 0)
+                            {
+                                calling.KingdomBudgetWallet -= (int)pay; calling.CallToWarWallet += (int)pay; a.Left -= pay;
+                                CrownIncome.Spent(calling, pay); kl.CallToWar += pay; _dLegacyPaid += pay;
+                            }
+                            if (a.Left <= 0) _agr.Remove(a);
+                            continue;
+                        }
+                        var called = KingdomById(a.Called); var against = KingdomById(a.Against);
                         if (calling == null || called == null || against == null || calling.IsEliminated || called.IsEliminated || against.IsEliminated)
                         {
-                            if (calling != null && a.Left > 0) { calling.CallToWarWallet = (int)Math.Min(0L, (long)calling.CallToWarWallet + a.Left); _dCancelled += a.Left; }
+                            if (calling != null && a.Left > 0) { calling.CallToWarWallet += (int)Math.Min(int.MaxValue, a.Left); _dCancelled += a.Left; }
                             _agr.Remove(a);
                             continue;
                         }
@@ -215,7 +238,7 @@ namespace Armoury
             catch (Exception e) { Stumble("Daily", e); }
             finally
             {
-                LastPaid = _dPaid; LastEnded = _dEnded; LastEndedN = _dEndedN; LastUnpaid = _dUnpaid;
+                LastPaid = _dPaid; LastEnded = _dEnded; LastEndedN = _dEndedN; LastUnpaid = _dUnpaid; LastLegacyPaid = _dLegacyPaid;
                 try { Line(); } catch (Exception e) { Stumble("Line", e); }
             }
         }
@@ -237,7 +260,7 @@ namespace Armoury
         {
             var s = Settings.Current;
             if (s == null || !s.LogEnabled || !On) return;
-            if (_agr.Count == 0 && _dPaid + _dEnded + _dCancelled + _dLegacy + _dUndone == 0 && _dNewN == 0 && _importN < 0) return;
+            if (_agr.Count == 0 && _dPaid + _dEnded + _dCancelled + _dLegacy + _dLegacyPaid + _dUndone == 0 && _dNewN == 0 && _importN < 0) return;
             long left = 0; foreach (var a in _agr) left += a.Left;
             var sb = new StringBuilder(400);
             sb.Append("Wezwania do wojny (168): dzien ").Append((int)CampaignTime.Now.ToDays)
@@ -245,7 +268,8 @@ namespace Armoury
               .Append(" | zaplacone dzis ze skarbcow wzywajacych do portfeli wezwanych ").Append(_dPaid).Append(" (").Append(_dPaidN).Append(" czesci dnia)")
               .Append(" | zerwane z braku wplywow dnia ").Append(_dEndedN).Append(" (reszta ceny skreslona ").Append(_dEnded).Append(", pokoj sojusznika ").Append(_dPeaceN).Append(")")
               .Append(", niedoplata (bez zachowania gry) ").Append(_dUnpaid)
-              .Append(" | skreslone: koniec porozumienia przez gre ").Append(_dCancelled).Append(", dlug portfela sprzed paczki ").Append(_dLegacy)
+              .Append(" | skreslone: koniec porozumienia przez gre ").Append(_dCancelled)
+              .Append(" | dlug portfela sprzed paczki (wezwany dostal od gry z niczego): nowy ").Append(_dLegacy).Append(", splacone dzis ze skarbcow w nicosc (rownowazy) ").Append(_dLegacyPaid)
               .Append(" | rody nic nie placa (latki: ").Append(_wired.Count > 0 ? string.Join(", ", _wired.ToArray()) : "-").Append("; BRAK: ").Append(_missing.Count > 0 ? string.Join(", ", _missing.ToArray()) : "-").Append(')')
               .Append(_stumbles > 0 ? " | potkniecia " + _stumbles : "").Append('.');
             if (_importN >= 0) { sb.Append(" Wczytano z zapisu: porozumien ").Append(_importN).Append(" (bledne ").Append(_importBad).Append(")."); _importN = -1; }

@@ -807,7 +807,7 @@ namespace Armoury
                         if (mp.IsGarrison)
                         {
                             var st = mp.CurrentSettlement ?? mp.HomeSettlement;
-                            if (st != null && st.Town != null) { st.Town.ChangeGold(ix); _dMenPaid += x; return; }
+                            if (st != null && st.Town != null) { st.Town.ChangeGold(ix); if (st.IsTown) SoldierPay.Hold(st, ix); _dMenPaid += x; return; }   // jak zold zalogi (tarcza zoldu)
                         }
                         else if (mp.IsLordParty) { MenPurse.Add(mp, ix); _dMenPaid += x; return; }
                     }
@@ -887,7 +887,9 @@ namespace Armoury
             {
                 if (got >= want) break;
                 if (h == null || h == head || h == Hero.MainHero || !h.IsAlive || h.IsChild || h.Clan != c) continue;
-                long x = Math.Min(want - got, Math.Max(0, (long)h.Gold - floorMember));
+                long fl = floorMember;
+                try { var mp = h.PartyBelongedTo; if (mp != null && mp.LeaderHero == h) fl = Math.Max(fl, 3L * Math.Max(0, mp.TotalWage)); } catch { }   // recenzja D: wodz partii placi z kiesy jej zold
+                long x = Math.Min(want - got, Math.Max(0, (long)h.Gold - fl));
                 if (x > 0) { h.ChangeHeroGold(-(int)x); CirculationWindows.NoteHeroGold(h, -x); got += x; }
             }
             return got;
@@ -920,6 +922,7 @@ namespace Armoury
             else
             {
                 int all = heirs.Values.Sum();
+                var orig = l != null ? l.Claims.Select(x => x.Left).ToList() : new List<long>();
                 var list = heirs.ToList();
                 long bGiven = 0;
                 var parts = new List<string>();
@@ -940,12 +943,13 @@ namespace Armoury
                     var hl = Of(heir, true);
                     long cGiven = 0;
                     if (l != null)
-                        foreach (var x in l.Claims)
+                        for (int j = 0; j < l.Claims.Count; j++)
                         {
+                            var x = l.Claims[j];
                             if (x.Left <= 0) continue;
-                            long part = last ? x.Left : x.Left * list[i].Value / all;
-                            if (!last) x.Left -= part;
-                            if (last) x.Left = 0;
+                            // recenzja D: udzial od stanu sprzed podzialu (dotad od reszty - trzeci i dalsi dziedzice dostawali mniej, ostatni wiecej)
+                            long part = last ? x.Left : Math.Min(x.Left, orig[j] * list[i].Value / all);
+                            x.Left -= part;
                             if (part > 0) { hl.Claims.Add(new Claim { Kind = x.Kind, Creditor = x.Creditor, Crown = x.Crown, Left = part, Total = part, Day = x.Day }); cGiven += part; }
                         }
                     parts.Add(heir.Name + " " + (b + cGiven));

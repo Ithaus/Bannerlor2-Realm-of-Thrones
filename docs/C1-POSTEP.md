@@ -964,3 +964,30 @@ zmienione `CrownIncome.cs` (dlug korony za okup krola - raty jak reparacje, odbi
 przekroczy prog - "gotowka 60% zamiast 50%" (jedna liczba, `RansomCashShare`) albo mniejsza szansa; (b) kurier przy 178 nie sprawdza kiesy placacego - oferty czestsze;
 (c) RC i Armoury musza byc wgrane razem (bez Armoury RC liczy po staremu - spojnie, bez dubla); (d) `ExplainedNumber`/sygnatury latek sprawdzone w dekompilacji 1.4.8,
 ale `IsAffirmativeOptionEnabled` zwraca krotke `(bool, string)` - pierwszy realny test w autotescie (linia latek: BRAK = nic sie nie zmienia w dialogu).
+
+---
+
+## D - recenzja wlasna (diff 0175e8d..8d620e3; poprawki w osobnym commicie)
+
+Sprawdzone jak sceptyczny recenzent: zloto (kredyt wojenny z kapitalu Banku; kazda rata, zajecie i wyprzedaz zdjete z dluznika i oddane wierzycielowi w tej samej
+chwili - nadwyzka wraca do dluznika; jedyne "w nicosc" - splata zaliczki gry OBIEG-1, licznik), okupy (cena = gotowka + dlug co do 1 zl w kazdej linii zdarzenia i w linii
+dnia; posrednik netto 0 - gra wyplaca graczowi z niczego dokladnie gotowke, ktora rodzina jenca oddaje), 1/9 (podstawa doby na bohatera, rozliczenie z kiesy odbiorcy,
+zaleglosc w zapisie), gracz (te same wzory; poza drabina - RC jak dotad), wyjatki (kazdy rod, roszczenie, porozumienie, okup i latka we wlasnym try), zapis (trzy nowe
+klucze przez SaveText, stare zapisy bez kluczy - puste), wylaczniki (DebtLadderEnabled, CrownPaysCallToWar, LordRansomByIncome - stan sprzed paczek; CrownThirds osobno),
+wydajnosc (petle raz na dobe; mapa partii raz na dobe tylko przy dlugu zoldu; Hero.Find/Kingdom.All tylko przy wplatach).
+
+**Poprawione:**
+1. **Wezwanie do wojny - dlug portfela sprzed paczki nie jest juz skreslany:** wezwany dostal go od gry z niczego, a rody splacalyby go w nicosc (to go rownowazylo);
+   skreslenie zostawialo zloto z niczego. Teraz wpis "sprzed paczki" placi skarbiec wzywajacego czesciami dnia (cena / 42) z reszty wplywow dnia w nicosc; bez wplywow -
+   czeka (nie ma porozumienia do zerwania). Linia "Wezwania do wojny (168)": `dlug portfela sprzed paczki (...): nowy X, splacone dzis ze skarbcow w nicosc (rownowazy) Y`;
+   "Obieg" (korona): `; dlug portfela wezwania sprzed paczki ze skarbcow w nicosc - rownowazy zloto gry Y`.
+2. **Wezwanie do wojny - bez przycinania portfela do 0** przy koncu porozumienia (krolestwo moze byc naraz wzywajacym i wezwanym - plus wezwanego by przepadl).
+3. **Dlug wymarlego rodu:** udzial dziedzica w roszczeniach liczony od stanu sprzed podzialu (dotad od reszty - przy 3+ dziedzicach ostatni dostawal za duzo).
+4. **Splata kredytu z lupow:** dorosly czlonek prowadzacy partie oddaje tylko zloto ponad max(5 000; 3 dni zoldu jego partii) - z jego kiesy gra placi zold tej partii.
+5. **B5:** "bez dlugu" obejmuje takze dlug okupu (karawana i warsztat BK tylko przy G >= 60 D i bez zadnego dlugu).
+6. **Harness 178:** kandydat na jenca harnessu nie moze byc wielkim jencem (nastepca tronu przeszedlby na korone gracza z nagroda).
+7. **Dlug zoldu zalogi miasta:** splata do kasy miasta pod tarcza zoldu (`SoldierPay.Hold`, jak zold zalogi) - regulator gry jej nie skasuje.
+
+**Uwagi bez zmian w kodzie:** (a) zysk Banku i zapasowy odbiorca w kasie miasta stoja pod tarcza dworu (`HoldCourt`) - przy wylaczonym `HouseholdShield` regulator moze
+skasowac nadwyzke (ryzyko "w nicosc", licznik w "Kasy miast"); (b) 1/9 od trzeciej lorda liczy sie tylko przy wlaczonej ksiedze rodow (`NoteInflow`); (c) liczba okupow
+AI-AI wzrosnie kilkukrotnie (10% dziennie od kazdego jenca zamiast barteru gry z warunkiem wartosci) - do obejrzenia kula sniezna (rozdz. 1).

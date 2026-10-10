@@ -817,7 +817,7 @@ namespace Armoury
         internal static bool PropertyBlocked(Clan c)
         {
             B b; if (c == null || !On || !_b.TryGetValue(c, out b) || b.D0 < 0) return false;
-            return b.G < 60.0 * b.D || DebtLadder.IsDebtor(c);
+            return b.G < 60.0 * b.D || DebtLadder.IsDebtor(c) || DebtLadder.RansomDebtOf(c) > 0;   // recenzja D: "bez dlugu" - takze dlug okupu
         }
 
         /// <summary>BuildFunding: dzienny przydzial budow rodu (0.10 D; w wojnie BuildFunding finansuje nim tylko budowy wojskowe - W5); false - rod bez budzetu (stara podstawa).</summary>

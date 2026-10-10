@@ -420,6 +420,7 @@ namespace Armoury
         private static bool HarnessCandidate(Hero h, bool already)
         {
             if (h == null || !h.IsAlive || h == Hero.MainHero || !h.IsLord || h.IsChild) return false;
+            if (Ransom178.IsGreatCaptive(h)) return false;   // recenzja D: nastepca tronu przeszedlby na korone gracza (nagroda, okup do skarbca) - nie w harnessie
             var c = h.Clan;
             if (c == null || c == Clan.PlayerClan || c.IsBanditFaction || c.IsEliminated || ClanIncomeBook.IsUndeadClan(c)) return false;
             var lead = c.Leader;

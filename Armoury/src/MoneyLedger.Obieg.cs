@@ -586,7 +586,7 @@ namespace Armoury
               .Append(", kontrakty najemnikow AI (185) skarbce -> glowy kompanii ").Append(MercContract.LastPaid).Append(" (nalezne ").Append(MercContract.LastDue)
               .Append("; gra dla AI: za tier wylaczone ").Append(MercContract.LastTierOff).Append(", kontrakt gry wylaczony ").Append(MercContract.LastGameOff).Append(")")
               .Append(", wezwania do wojny (168) skarbce wzywajacych -> portfele wezwanych ").Append(CrownCallToWar.LastPaid).Append(" (zerwane z braku wplywow ").Append(CrownCallToWar.LastEndedN)
-              .Append(", reszta cen skreslona ").Append(CrownCallToWar.LastEnded).Append(")")
+              .Append(", reszta cen skreslona ").Append(CrownCallToWar.LastEnded).Append("; dlug portfela wezwania sprzed paczki ze skarbcow w nicosc - rownowazy zloto gry ").Append(CrownCallToWar.LastLegacyPaid).Append(")")
               .Append(", splata dlugu wobec korony z kies rodow do skarbcow ").Append(CrownIncome.LastDebtRepaid)
               .Append(" (splata zaliczki gry - portfel uznany z niczego - w nicosc ").Append(CrownIncome.LastAdvanceRepaid).Append(")")   // recenzja C1 (OBIEG-1)
               .Append(", clo jednym poborem (licznik cel -> skarbiec) ").Append(KingdomTreasury.LastCustomsSingle)
