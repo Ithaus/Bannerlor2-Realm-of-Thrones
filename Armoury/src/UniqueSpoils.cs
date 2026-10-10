@@ -48,14 +48,14 @@ namespace Armoury
         private static bool _initDone;
         private static Dictionary<string, string> _last = new Dictionary<string, string>();
         // liczniki doby (177-2) - linia "Unikaty (177)"
-        private static int _dInherit, _dDestroyed, _dRestored, _dParked, _dShelved, _dStandRoster, _dStandNothing, _dStandNone, _dStandDead, _stumbles;
+        private static int _dInherit, _dDestroyed, _dRestored, _dParked, _dKin, _dShelved, _dStandRoster, _dStandNothing, _dStandNone, _dStandDead, _stumbles;
         private static readonly List<EquipmentElement> _heirStealth = new List<EquipmentElement>();   // smierc gracza: VS z zestawu ukrycia do nastepcy
 
         internal static void Reset() { _initDone = false; _last = new Dictionary<string, string>(); _common = null; ClearDay(); _stumbles = 0; _heirStealth.Clear(); }
         internal static string Export() { return _initDone ? "init" : ""; }
         internal static void Import(string s) { _initDone = s == "init"; }
 
-        private static void ClearDay() { _dInherit = _dDestroyed = _dRestored = _dParked = _dShelved = _dStandRoster = _dStandNothing = _dStandNone = _dStandDead = 0; }
+        private static void ClearDay() { _dInherit = _dDestroyed = _dRestored = _dParked = _dKin = _dShelved = _dStandRoster = _dStandNothing = _dStandNone = _dStandDead = 0; }
 
         // wpis 66 (test 16:53): "noble_default" (domyslne nakrycie glowy szlachty, poza handlem w ROT) nosza setki postaci -
         // zasmiecal kronike (218 KB) i byl "zdobywany" przy kazdym pojmaniu. Co nosi wiecej niz UniqueMaxWearers postaci,
@@ -317,8 +317,49 @@ namespace Armoury
             if (el.IsEmpty) return;
             var mp = h != null ? h.PartyBelongedTo : null;
             if (h == Hero.MainHero) mp = MobileParty.MainParty;
+            // 177-fix (09.10, test 120 dob kroku B): stal valyrianska nie lezy w taborze partii AI - tabor AI to nie skarbiec (Truth odlozony do taboru
+            // Leona Staegone przy pojmaniu Tregara Ormollena zniknal sekunde pozniej, spis: "nigdzie"). Najpierw ktos z rodu, kto ja udzwignie (Z16)
+            // i ma slot bez unikatu (glowa rodu pierwsza), potem polka miasta rodu. Gracz i jego rod - jak dotad (tabor gracza / partii rodu gracza).
+            if (ValyrianBlades.Is(el.Item) && mp != MobileParty.MainParty && (h == null || h.Clan == null || h.Clan != Clan.PlayerClan))
+            {
+                if (KinWear(h, el, why)) return;
+                Shelve(el, TownFor(h, mp), why + " (" + (h != null ? h.Name.ToString() : "?") + " - stal valyrianska nie do taboru AI)");
+                return;
+            }
             if (mp != null && mp != avoid && mp.ItemRoster != null) { mp.ItemRoster.AddToCounts(el, 1); _dParked++; return; }
             Shelve(el, TownFor(h, mp), why + " (" + (h != null ? h.Name.ToString() : "?") + " bez partii)");
+        }
+
+        /// <summary>177-fix: stal valyrianska bez miejsca w rekach bohatera AI - zaklada ja ktos z jego rodu (zywy, wolny, dorosly, Z16 - udzwignie,
+        /// slot bez unikatu), glowa rodu pierwsza. Zdjeta zwykla sztuka idzie przez Park (tabor partii krewnego albo polka). false - nikt.</summary>
+        private static bool KinWear(Hero h, EquipmentElement el, string why)
+        {
+            try
+            {
+                if (h == null || h.Clan == null || el.Item == null) return false;
+                bool req = Settings.Current != null && Settings.Current.HeroGearRequirements;
+                Hero best = null; int bestSlot = -1;
+                foreach (var k in h.Clan.Heroes)
+                {
+                    if (k == null || k == h || !k.IsAlive || !k.IsActive || k.IsPrisoner || k.IsChild || k == Hero.MainHero || k.CharacterObject == null) continue;
+                    if (req && !ItemReq.MeetsHero(k.CharacterObject, el.Item)) continue;
+                    var eq = k.BattleEquipment;
+                    if (eq == null) continue;
+                    int slot = SlotFor(eq, el.Item);
+                    if (slot < 0) continue;
+                    if (best == null || k == h.Clan.Leader) { best = k; bestSlot = slot; }
+                    if (k == h.Clan.Leader) break;
+                }
+                if (best == null) return false;
+                var beq = best.BattleEquipment;
+                var old = beq[(EquipmentIndex)bestSlot];
+                beq[(EquipmentIndex)bestSlot] = el;
+                _dKin++;
+                Log.Info("Kronika unikatow: " + el.Item.StringId + " -> " + best.Name + " (rod " + h.Clan.Name + "; " + why + " - " + h.Name + " jej nie udzwignie).");
+                if (!old.IsEmpty) Park(best, old, null, why);
+                return true;
+            }
+            catch (Exception e) { if (_stumbles++ < 3) Log.Error("UniqueSpoils.KinWear", e); return false; }
         }
 
         /// <summary>Na polke targu miasta (unikat sprzedany albo bez wlasciciela lezy na polce - Jeff 04.10). Bez miasta - nic (log).</summary>
@@ -701,7 +742,7 @@ namespace Armoury
                     Log.Info("Kronika unikatow: dzien " + (int)CampaignTime.Now.ToDays + (first ? " - stan swiata (" + now.Count + " unikatow w obiegu): " : " - zmiany: ") + string.Join(" | ", changes.ToArray()) + ".");
                 if (_dInherit + _dDestroyed + _dRestored + _dParked + _dShelved + _dStandRoster + _dStandNothing + _dStandNone + _dStandDead > 0)
                     Log.Info("Unikaty (177): dzien " + (int)CampaignTime.Now.ToDays + " - dziedziczenie stali valyrianskiej " + _dInherit + ", unikaty z taborow znikajacych partii " + _dDestroyed
-                             + ", zostawione w rekach przy przebraniu przez gre " + _dRestored + ", odlozone do taboru " + _dParked + ", na polke miasta " + _dShelved
+                             + ", zostawione w rekach przy przebraniu przez gre " + _dRestored + ", odlozone do taboru " + _dParked + ", stal valyrianska do krewnego " + _dKin + ", na polke miasta " + _dShelved
                              + "; zamiennik pojmanego/zabitego: z jego taboru " + _dStandRoster + ", z niczego (zwykly zamiennik kultury) " + _dStandNothing + ", brak (pusty slot) " + _dStandNone + "; zabity w walce - pusty slot " + _dStandDead + ".");
             }
             catch (Exception e) { Log.Error("UniqueSpoils.Daily", e); }
