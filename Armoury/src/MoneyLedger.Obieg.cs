@@ -94,6 +94,7 @@ namespace Armoury
             try { CrownGifts.ZeroLast(); } catch (Exception e) { Stumble169("ClearLast169(CrownGifts)", e); }     // 182: dary koron (Last*)
             try { ClanBudget.ZeroLast(); } catch (Exception e) { Stumble169("ClearLast169(ClanBudget)", e); }     // 166: budzet rodow (Last*)
             try { MercContract.ZeroLast(); } catch (Exception e) { Stumble169("ClearLast169(MercContract)", e); } // 185: kontrakty najemnikow (Last*)
+            try { CrownRents.ZeroLast(); } catch (Exception e) { Stumble169("ClearLast169(CrownRents)", e); }     // 180: renty korony (Last*)
         }
 
         // ------------------------------------------------------------ 169b: RB wedlug odcinkow naszego ticku (granice: Mark renty, budowy, korona, paser band)
@@ -545,7 +546,7 @@ namespace Armoury
               .Append(", wplywy spoza rodu poza rozliczeniem ").Append(cib ? evt.ToString(Inv) : "-")
               .Append(" (z niczego ").Append(cib ? ClanIncomeBook.LastEvtNone.ToString(Inv) : "-").Append(", od osad ").Append(cib ? ClanIncomeBook.LastEvtSettl.ToString(Inv) : "-")
               .Append(", od innych ").Append(cib ? ClanIncomeBook.LastEvtOther.ToString(Inv) : "-").Append(')')
-              .Append(", renty od korony -, zapomoga ").Append(ml ? M[CW.MSupport].ToString(Inv) : "-")
+              .Append(", renty od korony (180) ").Append(CrownRents.LastPaid).Append(", zapomoga ").Append(ml ? M[CW.MSupport].ToString(Inv) : "-")
               .Append(", dochod modelu gry (naliczony, do D) ").Append(Opt(ClanIncomeBook.LastModelIncomeSum))
               .Append(" | sakiewki ludzi [P]: stan ").Append(Dl(now, last, HPurses)).Append(", zold wplynal ").Append(SoldierPay.LastToPurse)
               .Append(", wydaly w miastach na zycie ").Append(life).Append(", naprawy ").Append(repair)
@@ -588,7 +589,9 @@ namespace Armoury
               .Append(", zwrot przyciety o wydatki ludzi we wlasnych miastach (K3) ").Append(KingdomTreasury.LastOwnCut)
               .Append("; wyplaty - zwrot zoldu ").Append(KingdomTreasury.LastRefundGiven).Append(" (").Append(pct).Append("% z ").Append(KingdomTreasury.LastRefundPaid)
               .Append(" zaplaconego zoldu), zapomoga ").Append(ml ? M[CW.MSupport].ToString(Inv) : "-")
-              .Append(", dochod za tier najemnikow (dzis z niczego) ").Append(ml ? M[CW.MTierMerc].ToString(Inv) : "-").Append(", renty wedlug lenn -")
+              .Append(", dochod za tier najemnikow (dzis z niczego) ").Append(ml ? M[CW.MTierMerc].ToString(Inv) : "-")
+              .Append(", renty wedlug lenn (180) skarbce -> glowy rodow ").Append(CrownRents.LastPaid).Append(" (z reszty wplywow dnia ").Append(CrownRents.LastPool)
+              .Append("; wstrzymane w skarbcach ").Append(CrownRents.LastHeld).Append(")")
               .Append("; skarbce razem ").Append(Dl(now, last, HKingdoms)).Append(", ponizej 0.5 mln: ").Append(kPoor).Append(" z ").Append(kAll)
               .Append(" | Bank [P]: pozyczki ").Append(IronBank.LastLent).Append(" na ").Append(IronBank.LastLentSum).Append(" zl, splaty ").Append(IronBank.LastPaidN)
               .Append(" na ").Append(IronBank.LastPaidSum).Append(" zl, spoznienia ").Append(IronBank.LastMissed).Append(", bankructwa ").Append(IronBank.LastDefaults)

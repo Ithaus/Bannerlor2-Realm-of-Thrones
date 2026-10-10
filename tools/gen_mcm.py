@@ -37,6 +37,9 @@ RANGES = {
     'CrownReparationShare': (0.0, 1.0, "0.00"),
     'CrownRefundOwnTownsCut': (0.0, 1.0, "0.00"),
     'CrownReserveReleaseDays': (30.0, 1440.0, "0"),
+    # 180 (C2): udzial normy zalogi przycinany w kodzie do 0..1; doby sluzby najwyzej 60 (okno dob wojny)
+    'CrownRentGarrisonShare': (0.0, 1.0, "0.00"),
+    'CrownRentServiceDays': (0, 60, "0"),
 }
 
 def gen(module_dir, ns, display):

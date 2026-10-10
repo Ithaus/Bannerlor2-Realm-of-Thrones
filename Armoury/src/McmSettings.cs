@@ -2788,6 +2788,34 @@ namespace Armoury
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool WatchUnpaid { get; set; } = true;
 
+        [SettingPropertyBool("Crown Rents", HintText = "with Crown Current Income: what is left of the crown's daily income after the gifts, reparations, mercenary contracts and wage refunds is shared out the same day among the houses of the realm by fixed weights of their fiefs (Crown Rent Weight Town, Castle and Village) - the king's house too, and yours - never by the size of their garrisons. A house gets its share only while it serves: every stronghold it holds keeps at least Crown Rent Garrison Share of the realm's usual garrison for its kind (the average of the last 28 days; a stronghold under siege or held for less than 28 days is not counted), and its lords spent at least Crown Rent Service Days of the realm's last 60 days of war in an army of the realm, at a siege, in battle with the enemy or on enemy land (the nearest settlement belongs to a realm at war with yours) - captivity in the war counts; a house that has seen fewer days of the realm's war needs the same share of the days it has seen. The share of a house that does not serve stays in the treasury. Rents count towards the steady income of the house (its crown part). Off = what is left stays in the treasury, as before")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public bool CrownRents { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Crown Rent Weight Town", 0.00f, 12.00f, "0.00", HintText = "rent weight of a town (a castle 1, a village a quarter by default)")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public float CrownRentWeightTown { get; set; } = 3f;
+
+        [SettingPropertyFloatingInteger("Crown Rent Weight Castle", 0.00f, 4.00f, "0.00", HintText = "rent weight of a castle")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public float CrownRentWeightCastle { get; set; } = 1f;
+
+        [SettingPropertyFloatingInteger("Crown Rent Weight Village", 0.00f, 1.00f, "0.00", HintText = "rent weight of a village")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public float CrownRentWeightVillage { get; set; } = 0.25f;
+
+        [SettingPropertyInteger("Crown Rent Service Days", 0, 60, "0", HintText = "days of service the crown asks of a house out of the realm's last 60 days of war (in an army of the realm, at a siege, in battle with the enemy, on enemy land or in captivity) - half of the old forty days of service")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public int CrownRentServiceDays { get; set; } = 20;
+
+        [SettingPropertyFloatingInteger("Crown Rent Garrison Share", 0.00f, 1.00f, "0.00", HintText = "every stronghold of a house must keep at least this share of the realm's usual garrison for its kind (town or castle) for the house to get its rent")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public float CrownRentGarrisonShare { get; set; } = 0.5f;
+
+        [SettingPropertyBool("Crown Rent Garrison Norm Kingdom", HintText = "the usual garrison is the average of the realm's own towns or castles over the last 28 days; off = the average of all towns or castles in the world")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public bool CrownRentGarrisonNormKingdom { get; set; } = true;
+
         [SettingPropertyBool("Army Clothing Enabled", HintText = "every soldier on pay wears out his shoes, clothes and linen: men in a lord's party (yours too) buy leather, felt (woollen cloth) and linen in the towns they leave - piece by piece at the market price, out of their own purse, before they spend the rest on food and drink; a town garrison takes them from its own town's market without paying, for its pay already went into that town's purse; a castle garrison has the castle purse buy them in the town its villages trade with. What cannot be had waits (Army Clothing Max Wait Days), then is only noted in the log. Banner Kings party supplies no longer buy or use up wool, linen or flax for the troops, and their 'Textiles supplies' morale penalty is gone - one rule for clothing, rags carry no penalty (off = no wear, Banner Kings textiles and their morale penalty as before)")]
         [SettingPropertyGroup("The soldier's clothes")]
         public bool ArmyClothingEnabled { get; set; } = true;
@@ -4320,6 +4348,13 @@ namespace Armoury
             s.GiftNorthToWatchShare = GiftNorthToWatchShare;
             s.GiftFreeCitiesToDothrakiShare = GiftFreeCitiesToDothrakiShare;
             s.WatchUnpaid = WatchUnpaid;
+            s.CrownRents = CrownRents;
+            s.CrownRentWeightTown = CrownRentWeightTown;
+            s.CrownRentWeightCastle = CrownRentWeightCastle;
+            s.CrownRentWeightVillage = CrownRentWeightVillage;
+            s.CrownRentServiceDays = CrownRentServiceDays;
+            s.CrownRentGarrisonShare = CrownRentGarrisonShare;
+            s.CrownRentGarrisonNormKingdom = CrownRentGarrisonNormKingdom;
             s.ArmyClothingEnabled = ArmyClothingEnabled;
             s.ArmyClothingFieldLeatherKg = ArmyClothingFieldLeatherKg;
             s.ArmyClothingFieldClothKg = ArmyClothingFieldClothKg;

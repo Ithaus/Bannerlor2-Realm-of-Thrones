@@ -72,6 +72,7 @@ namespace Armoury
 
         // sumy swiata doby (linia)
         private static long _dRentC, _dOwnC;   // 110: zawor zamkow i jego "wlasne" (swiat, dzis)
+        private static long _dCrownRent;        // 180: renty korony (swiat, dzis)
         private static long _dVd, _dWd, _dRentV, _dRentT, _dOwn, _dPol, _dSup, _dRefund, _dMint, _dMerc, _dShop, _dCarPar, _dFamily, _dOther, _dOnce, _dDouble, _dInflow, _dVdCalc;
         private static int _dVdOff, _dLooseN, _dClans;
         // "inne z modelu" rozbite (przeglad 169c): znane linie spoza D, wplyw bez opisu (m.in. "za tier" gry - Add bez nazwy), nierozpoznane (modul)
@@ -105,7 +106,7 @@ namespace Armoury
 
         private static void ZeroStableDay()
         {
-            _dRentC = _dOwnC = 0;
+            _dRentC = _dOwnC = 0; _dCrownRent = 0;
             _dVd = _dWd = _dRentV = _dRentT = _dOwn = _dPol = _dSup = _dRefund = _dMint = _dMerc = _dShop = _dCarPar = _dFamily = _dOther = _dOnce = _dDouble = _dInflow = _dVdCalc = 0;
             _dVdOff = _dLooseN = _dClans = 0;
             _dKnown = _dUnlisted = _dUnrec = _dUnrecAbs = 0;
@@ -425,11 +426,11 @@ namespace Armoury
             long ownC; _ownCastleByClan.TryGetValue(c, out ownC);
             ownC = Math.Max(0L, Math.Min(ownC, rentC));
             long own = ownT + ownC;
-            long once = r.Today - r.TodayRefund - r.TodayCrown - r.TodayContract;     // trzecia + zdarzenia (+ reszta Today z zapisu); 185: bez kontraktu od korony
+            long once = r.Today - r.TodayRefund - r.TodayCrown - r.TodayContract - r.TodayRent;   // trzecia + zdarzenia (+ reszta Today z zapisu); 185: bez kontraktu od korony; 180: bez renty korony
             long other = a - (vd + wd + pol + sup + merc + shop + carpar);
             _t[QLand] = vd + wd + rent - own;
             _t[QOwn] = own;
-            _t[QCrown] = pol + sup + r.TodayRefund + r.TodayCrown;
+            _t[QCrown] = pol + sup + r.TodayRefund + r.TodayCrown + r.TodayRent;   // 180: renta korony w czesci "korona" (raz - poza jednorazowymi)
             _t[QContract] = merc + r.TodayContract;   // 185: kontrakt najemnika od korony (gra dla AI - 0)
             _t[QAssets] = shop + carpar - family;
             _t[QOnce] = once;
@@ -476,6 +477,7 @@ namespace Armoury
             if (loose != 0) _dLooseN++;
             // sumy swiata (linia)
             _dVd += vd; _dWd += wd; _dRentV += Math.Max(0, rentV); _dRentT += rentT; _dOwn += ownT; _dRentC += rentC; _dOwnC += ownC; _dPol += pol; _dSup += sup; _dRefund += r.TodayRefund; _dMint += r.TodayCrown;
+            _dCrownRent += r.TodayRent;   // 180
             _dMerc += merc; _dShop += shop; _dCarPar += carpar; _dFamily += family; _dOther += other; _dOnce += once; _dDouble += _t[QDouble]; _dInflow += _t[QInflow]; _dClans++;
         }
 
@@ -632,7 +634,7 @@ namespace Armoury
               .Append(", polityki krolow ").Append(_dPol).Append(", zapomoga ").Append(_dSup).Append(", kontrakt ").Append(_dMerc).Append(", warsztaty ").Append(_dShop).Append(", karawany i partie ").Append(_dCarPar)
               .Append(" (w tym przelewy w rodzie ").Append(_dFamily).Append("), inne ").Append(_dOther).Append("; renta wsi ").Append(_dRentV).Append(", zawor miast ").Append(_dRentT).Append(" (wlasne ").Append(_dOwn).Append(')')
               .Append(", zawor zamkow ").Append(_dRentC).Append(" (wlasne ").Append(_dOwnC).Append(')')
-              .Append(", zwrot korony ").Append(_dRefund).Append(", mennica i monopole ").Append(_dMint).Append(", jednorazowe ").Append(_dOnce).Append(" (podwojne ").Append(_dDouble).Append("), ziemia bez osady u ").Append(_dLooseN).Append(" rodow")
+              .Append(", zwrot korony ").Append(_dRefund).Append(", renty korony (180) ").Append(_dCrownRent).Append(", mennica i monopole ").Append(_dMint).Append(", jednorazowe ").Append(_dOnce).Append(" (podwojne ").Append(_dDouble).Append("), ziemia bez osady u ").Append(_dLooseN).Append(" rodow")
               .Append(" | inne z modelu dzis: znane linie (majatki BK, rada BK, podatki od wasali BK, sluzba u lorda BK, trybut, wezwanie do wojny, umowy handlowe, perk, zaulki) ").Append(_dKnown)
               .Append(", wplyw bez opisu (m.in. 'za tier' gry) ").Append(_dUnlisted)
               .Append(", nierozpoznane: modul ").Append(_dUnrecAbs).Append(" zl = ").Append(unrecPct.ToString("0.00", inv)).Append("% wplywu D169 doby (prog testu <= 2%; suma ").Append(_dUnrec).Append(")")

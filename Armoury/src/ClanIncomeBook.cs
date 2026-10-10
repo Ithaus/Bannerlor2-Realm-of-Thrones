@@ -21,6 +21,7 @@ namespace Armoury
     internal static partial class ClanIncomeBook
     {
         internal const int KRefund = 0, KCrownLevies = 1, KThird = 2, KContract = 3;   // 185: kontrakt najemnika od korony (czesc "kontrakt" D stalego)
+        internal const int KRent = 4;                                                  // 180: renta korony wedlug lenn (czesc "korona" D stalego, nie jednorazowe)
         private const int Days = 28;
 
         // 6.4 projektu, przebieg na sucho - 166: udzialy pulapu przeszly do Settings (ClanBudget.Ceiling - jedna formula dla logu i gry); tu zostaje reszta przebiegu na sucho
@@ -37,6 +38,7 @@ namespace Armoury
             public long Today, TodayRefund, TodayCrown, TodayEvtNone, TodayEvtSettl, TodayEvtOther, TodayThird;   // od ostatniego Daily
             public long TodayEstates;                                  // 169c: w tym wyplaty majatkow BK widziane jako zdarzenie (podwojne) - tylko pamiec
             public long TodayContract;                                 // 185: kontrakt najemnika od korony (w Today; czesc "kontrakt" D stalego, nie jednorazowe)
+            public long TodayRent;                                     // 180: renta korony (w Today; czesc "korona" D stalego, nie jednorazowe)
             public long WageAccLord, WageAccGar, WageAccCar;          // w biezacym rozliczeniu rodu
             public int WageLastLord, WageLastGar, WageLastCar;        // z ostatniego pelnego rozliczenia rodu
             public bool HadTick;                                       // bylo choc jedno zmierzone rozliczenie
@@ -52,6 +54,7 @@ namespace Armoury
 
         // sumy dnia (linia "Obieg") - Day* rosna razem z Today*, na koncu Daily kopiowane do Last* i zerowane
         internal static long DayRefund, DayCrown, DayEvtNone, DayEvtSettl, DayEvtOther, DayThird;
+        internal static long DayCrownRent;   // 180: renty korony tej doby (suma swiata - linia "D staly (169c)")
         internal static long LastRefund, LastCrown, LastEvtNone, LastEvtSettl, LastEvtOther, LastThird, LastModelIncomeSum, LastRentSum;
         internal static long LastTicks;                     // koszt ostatniego Daily (kontrolka 6.8)
         // 169b: rozbicie kosztu; dochod modelu liczony TU jak w 169 (po recenzji: liczba z KingdomTreasury jest z innej chwili - zmienialaby D),
@@ -79,7 +82,7 @@ namespace Armoury
         internal static void Reset()
         {
             _book.Clear(); _byClan.Clear(); _open = null; _openClan = null;
-            DayRefund = DayCrown = DayEvtNone = DayEvtSettl = DayEvtOther = DayThird = 0;
+            DayRefund = DayCrown = DayEvtNone = DayEvtSettl = DayEvtOther = DayThird = 0; DayCrownRent = 0;
             LastRefund = LastCrown = LastEvtNone = LastEvtSettl = LastEvtOther = LastThird = LastModelIncomeSum = LastRentSum = 0;
             LastTicks = 0; IncomeToday.Clear(); _importN = -1; _importBad = 0; _csvPath = null; _stumbles = 0; _errSites.Clear();
             LastTicksModel = LastTicksReport = LastTicksCsv = LastTicksCmp = LastCmpDiff = LastCmpAbs = 0; LastOwnCalls = LastCmpN = LastCmpNe = 0;   // 169b
@@ -122,6 +125,7 @@ namespace Armoury
                 else if (kind == KCrownLevies) { r.TodayCrown += amount; DayCrown += amount; }
                 else if (kind == KThird) { r.TodayThird += amount; DayThird += amount; }
                 else if (kind == KContract) { r.TodayContract += amount; }
+                else if (kind == KRent) { r.TodayRent += amount; DayCrownRent += amount; }
             }
             catch (Exception e) { Stumble("NoteInflow", e); }
         }
@@ -318,7 +322,7 @@ namespace Armoury
                         r.Inflow = inflow; r.A = (long)a; r.B = b; r.Refund = r.TodayRefund; r.Crown = r.TodayCrown; r.Third = r.TodayThird;
                         r.Evt = r.TodayEvtNone + r.TodayEvtSettl + r.TodayEvtOther;
                         if (sd) { try { StableClan(c, r, en, haveEn, (long)a, b); } catch (Exception e) { Stumble("StableClan", e); } }   // 169c: przed zerowaniem Today*
-                        r.Today = r.TodayRefund = r.TodayCrown = r.TodayEvtNone = r.TodayEvtSettl = r.TodayEvtOther = r.TodayThird = r.TodayEstates = r.TodayContract = 0;
+                        r.Today = r.TodayRefund = r.TodayCrown = r.TodayEvtNone = r.TodayEvtSettl = r.TodayEvtOther = r.TodayThird = r.TodayEstates = r.TodayContract = r.TodayRent = 0;
                         r.D = DOf(r); r.G = g;
                         modelSum += (long)a; rentSum += b;
                         _today.Add(c);
@@ -357,7 +361,7 @@ namespace Armoury
                 {
                     LastRefund = LastCrown = LastEvtNone = LastEvtSettl = LastEvtOther = LastThird = LastModelIncomeSum = LastRentSum = -1;
                 }
-                DayRefund = DayCrown = DayEvtNone = DayEvtSettl = DayEvtOther = DayThird = 0;
+                DayRefund = DayCrown = DayEvtNone = DayEvtSettl = DayEvtOther = DayThird = 0; DayCrownRent = 0;
                 DayEstates = 0; _cutToday.Clear(); _cutBlind.Clear();   // 169c
                 LastTicks = Stopwatch.GetTimestamp() - t0;
             }
@@ -591,6 +595,7 @@ namespace Armoury
                        .Append(hasDebt ? N0(principal) : "").Append(';').Append(hasDebt ? missed.ToString(inv) : "").Append(';').Append(hasDebt ? (defaulted ? "1" : "0") : "").Append(';')
                        .Append(debtCrown).Append(';').Append(tier).Append(';').Append(cand).Append(';').Append(isAi ? N0(lim82) : "");
                     StableCsv(csv, c, leaderGold, sdOn);   // 169c: kolumny D stalego, zold przyciety, doby bankruta
+                    csv.Append(CrownRents.CsvCols(c));     // 180: renta dnia i warunek sluzby (ostatnie kolumny - czytniki CSV po nazwach kolumn)
                     csv.Append(Environment.NewLine);
                 }
                 catch (Exception e) { csv.Length = rowStart; Stumble("Report(rod)", e); }
@@ -601,7 +606,7 @@ namespace Armoury
             for (int i = 0; i < tops.Count && i < 3; i++) topTxt.Add(tops[i].Name + " " + N0(tops[i].V));
             string path = null;
             long tcsv = Stopwatch.GetTimestamp();
-            try { path = Log.Csv("budzet-rodow.csv", CsvHeader + CsvHeaderStable, csv.ToString()); } catch (Exception e) { Stumble("Report(csv)", e); }
+            try { path = Log.Csv("budzet-rodow.csv", CsvHeader + CsvHeaderStable + ";renta_180;warunek_180", csv.ToString()); } catch (Exception e) { Stumble("Report(csv)", e); }
             _ticksCsv = Stopwatch.GetTimestamp() - tcsv;
             if (path != null && path != _csvPath) { _csvPath = path; Log.Info("Budzet rodow: plik CSV " + path + "."); }
             var sb = new StringBuilder(2048);
