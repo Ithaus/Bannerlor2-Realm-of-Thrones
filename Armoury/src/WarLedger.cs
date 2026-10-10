@@ -16,8 +16,11 @@ namespace Armoury
     ///    zold (HasUnpaidWages) - my dokladamy druga polowe prawdy: po okresie
     ///    laski (2 dni) armia zaczyna sie ROZCHODZIC, dziennie 0.5% ludzi za
     ///    kazdy dzien zwloki, ELITY PIERWSZE (najwyzszy tier odchodzi
-    ///    najszybciej - najemnik zna swoja cene). AI placi te sama cene, ale
-    ///    o polowe lagodniej (biedni lordowie BK nie moga stopniec globalnie).
+    ///    najszybciej - najemnik zna swoja cene). Do 183 AI placilo o polowe
+    ///    lagodniej; od 183 (projekt etapu 2, krok C3) jedna regula (WarLedgerAiHalf
+    ///    false - z budzetem 166 zaleglosc u AI jest rzadka) i PODLOGA: partia nie
+    ///    schodzi przez zalegly zold ponizej WarLedgerMinMen (30 - swita banneretu),
+    ///    takze druzyna gracza (WarLedgerMinMenPlayer; Jeff 09.10 11:05 pkt 1).
     ///    Garnizony i umarli poza prawem (osada placi; trup zoldu nie bierze).
     /// 2) SZTURM ZOSTAWIA KRATER. Miasto/zamek wziete obleczeniem traci
     ///    prosperity (dom. -15%) i lojalnosc (-15) - zdobycz jest zdobycza
@@ -29,14 +32,17 @@ namespace Armoury
         private static int _leftStumbles;      // T4: ludzie zdjeci, ktorych nie dalo sie wpisac do rosteru odchodzacych (doba)
         private static bool _errLeft;          // T4: ten blad tylko raz do logu
         internal static int LastGoneAi, LastGoneClan;   // 169c (tylko log): zdjeci dzis za zalegly zold - partie AI / gracza i jego rodu
+        private static int _floorAiN, _floorAiMen, _floorClanN, _floorClanMen, _goneAiN;   // 183: podloga 30 ludzi - partie i ludzie zatrzymani (doba)
 
         internal static void OnDaily()
         {
             LastGoneAi = 0; LastGoneClan = 0;
+            _floorAiN = _floorAiMen = _floorClanN = _floorClanMen = _goneAiN = 0;
             try
             {
                 var s = Settings.Current;
-                if (s == null || !s.WagesDueEnabled) return;
+                if (s == null) return;
+                if (!s.WagesDueEnabled) { try { Line183(s); } catch (Exception e) { Log.Error("WarLedger.Line183", e); } return; }   // 183: linia prawa dezercji AI takze bez zaleglego zoldu
 
                 var seen = new List<MobileParty>();
                 // T4: liczniki doby (wszystkie dezercje WarLedger zachodza w tym jednym wywolaniu)
@@ -86,11 +92,23 @@ namespace Armoury
                     }
 
                     float pct = Math.Max(0f, s.WagesDesertPercentPerDay) / 100f * over;
-                    if (mp != MobileParty.MainParty) pct *= 0.5f;      // AI lagodniej - swiat nie moze stopniec
+                    if (s.WarLedgerAiHalf && mp != MobileParty.MainParty) pct *= 0.5f;   // stara regula: AI lagodniej (183: wylaczone - jedna regula)
                     int men = mp.MemberRoster.TotalManCount;
                     float exp = men * pct;
                     int leave = (int)exp;
                     if (MBRandom.RandomFloat < exp - leave) leave++;
+                    // 183: podloga - zalegly zold nie zabiera partii ponizej WarLedgerMinMen ludzi (AI; gracz i jego rod przy WarLedgerMinMenPlayer)
+                    bool clan = mp == MobileParty.MainParty || mp.ActualClan == Clan.PlayerClan;
+                    int floor = Math.Max(0, s.WarLedgerMinMen);
+                    if (floor > 0 && leave > 0 && (!clan || s.WarLedgerMinMenPlayer))
+                    {
+                        int room = Math.Max(0, men - floor);
+                        if (leave > room)
+                        {
+                            if (clan) { _floorClanN++; _floorClanMen += leave - room; } else { _floorAiN++; _floorAiMen += leave - room; }
+                            leave = room;
+                        }
+                    }
                     if (leave <= 0) continue;
 
                     // T4 (noc 08/09.10): odchodzacy zbierani do rosteru, zeby nie znikali w nicosc
@@ -129,7 +147,7 @@ namespace Armoury
                             : "; prawo wyrzutkow wylaczone - " + gone + " ludzi znika (tylko ksiega ludzi " + toPeople + ")";
                     }
                     dayParties++; dayGone += gone;
-                    if (mp.ActualClan == Clan.PlayerClan) LastGoneClan += gone; else LastGoneAi += gone;   // 169c (tylko licznik)
+                    if (mp.ActualClan == Clan.PlayerClan) LastGoneClan += gone; else { LastGoneAi += gone; _goneAiN++; }   // 169c (tylko licznik)
                     // KAZDY ubytek do PLIKU, takze u gracza. Do 19.09 strata gracza szla wylacznie
                     // przez Log.Player, ktory pokazuje komunikat w grze i NIC nie zapisuje - przez to
                     // w logu nie bylo po niej ani sladu i szukanie winnego trwalo dwa dni.
@@ -148,6 +166,7 @@ namespace Armoury
                              + dayPool.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)
                              + (OutlawLaw.On ? "" : " (prawo wyrzutkow wylaczone)") + ", do ksiegi ludzi " + dayPeople
                              + ", potkniecia " + (_leftStumbles + Math.Max(0, PeopleLedger.StumblesToday - peopleStumbles0)) + ".");
+                try { Line183(s); } catch (Exception e) { Log.Error("WarLedger.Line183", e); }
                 if (_unpaidDays.Count > seen.Count + 50)
                 {
                     var drop = new List<MobileParty>();
@@ -157,6 +176,27 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Log.Error("WarLedger.OnDaily", e); }
+        }
+
+        /// <summary>183: linia doby - prawo dezercji wedlug poziomu u AI (liczniki modelu od wczoraj) i zalegly zold z podloga.</summary>
+        private static void Line183(Settings s)
+        {
+            if (!s.LogEnabled) return;
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
+            var p = DesertionAi.Parties; var m = DesertionAi.Morale; var w = DesertionAi.Wage;
+            Log.Info("Dezercja AI (183): dzien " + (int)CampaignTime.Now.ToDays
+                     + " | prawo dezercji wedlug poziomu dla AI: " + (s.DesertionLawEnabled && s.DesertionLawForAi ? "TAK" : "NIE - gra (morale ponizej 10)")
+                     + " (progi " + TierDesertionModel.Table() + ", " + s.DesertionPercentPerMoralePoint.ToString("0.0", inv) + "%/pkt, sufit " + s.DesertionDailyCapPercent + "%)"
+                     + " | z morale (prawo): partie lordow " + m[0] + ", zalogi " + m[1] + ", karawany i inne " + m[2] + " ludzi"
+                     + " (tier 1-2 " + DesertionAi.T12 + ", 3-4 " + DesertionAi.T34 + ", 5+ " + DesertionAi.T5 + "; w glodzie " + DesertionAi.Hungry
+                     + "; najnizsze morale partii z dezercja " + (DesertionAi.MinMorale < float.MaxValue ? DesertionAi.MinMorale.ToString("0", inv) : "-") + ")"
+                     + ", partii z dezercja: lordow " + p[0] + ", zalog " + p[1] + ", innych " + p[2]
+                     + " | limit zoldu i przepelnienie (gra, w tych partiach): " + (w[0] + w[1] + w[2])
+                     + " | zalegly zold (WarLedger): AI " + LastGoneAi + " ludzi w " + _goneAiN + " partiach, stawka AI " + (s.WarLedgerAiHalf ? "polowa" : "pelna")
+                     + ", podloga " + Math.Max(0, s.WarLedgerMinMen) + " ludzi zatrzymala: AI " + _floorAiMen + " w " + _floorAiN + " partiach, gracz i jego rod "
+                     + _floorClanMen + " w " + _floorClanN + (s.WarLedgerMinMenPlayer ? "" : " (podloga gracza wylaczona)")
+                     + " | prog 183: dezercja AI z morale i zaleglego zoldu (linia 169c 'AI morale i zalegly zold') <= bieg bazowy + 50%.");
+            DesertionAi.Clear();
         }
 
         /// <summary>Najemnik zna swoja cene: dezerteruja od najwyzszego tieru.</summary>

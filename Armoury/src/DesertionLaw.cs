@@ -33,9 +33,14 @@ namespace Armoury
     /// zoldu dzialaja jak w vanilla: obnizaja morale (kary z DefaultPartyMoraleModel)
     /// i po progach robia swoje; zold ponad limit wyplat i przepelnienie partii -
     /// bez zmian, wprost z vanilla (prywatna metoda bazowa przez refleksje).
-    /// Bohaterowie nie dezerteruja. Domyslnie prawo obejmuje partie gracza i jego
-    /// klanu; AI zostaje przy vanilla (DesertionLawForAi = false) - lordowie AI
-    /// chodza z morale 50-70 i przy tych progach wykrwawialiby sie z rekrutow.
+    /// Bohaterowie nie dezerteruja. Prawo obejmuje partie gracza i jego klanu, a od
+    /// paczki 183 (projekt etapu 2, krok C3; [D] 04:25 C "dezercja wedlug poziomu takze
+    /// u AI - TAK") takze AI - partie lordow, zalogi i karawany, jedna regula
+    /// (DesertionLawForAi; wylaczone - AI przy vanilla). Inni (Undead) zostaja przy
+    /// grze. Prog projektu: dezercja AI z morale i zaleglego zoldu najwyzej bieg
+    /// bazowy + 50% (linia 169c) - wiecej znaczy, ze morale AI jest za niskie (naprawiamy
+    /// morale, nie dezercje). AI: bez linii na partie - liczniki doby w linii
+    /// "Dezercja AI (183)" (WarLedger.OnDaily).
     /// GetMoraleThresholdForTroopDesertion zostaje 10 (vanilla): czyta je bazowa
     /// formula dla AI i podpowiedz morale - podniesienie go rozpedziloby dezercje AI.
     /// </summary>
@@ -87,7 +92,7 @@ namespace Armoury
                 var s = Settings.Current;
                 if (mp.LeaderHero != null && mp.LeaderHero.Clan != null && mp.LeaderHero.Clan == Clan.PlayerClan) return true;
                 if (mp.ActualClan != null && mp.ActualClan == Clan.PlayerClan) return true;
-                return s != null && s.DesertionLawForAi;
+                return s != null && s.DesertionLawForAi && !Undead.Party(mp);   // 183: AI jak gracz; Inni (trup nie ucieka) - gra
             }
             catch { return false; }
         }
@@ -106,6 +111,26 @@ namespace Armoury
             return c;
         }
 
+        /// <summary>183: partia AI pod prawem dezercji (nie gracz i nie jego rod) - bez linii na partie, liczniki doby.</summary>
+        private static bool IsAi(MobileParty mp)
+        {
+            try { return mp != null && !mp.IsMainParty && (mp.ActualClan == null || mp.ActualClan != Clan.PlayerClan) && (mp.LeaderHero == null || mp.LeaderHero.Clan != Clan.PlayerClan); }
+            catch { return false; }
+        }
+
+        private static void NoteAi(MobileParty mp, TroopRoster roster, int byMorale, float morale)
+        {
+            int total = roster.TotalManCount;
+            if (total <= 0) return;
+            int kind = mp.IsLordParty ? 0 : mp.IsGarrison ? 1 : 2;
+            DesertionAi.Parties[kind]++;
+            DesertionAi.Morale[kind] += byMorale; DesertionAi.Wage[kind] += total - byMorale;
+            if (byMorale <= 0) return;
+            if (morale < DesertionAi.MinMorale) DesertionAi.MinMorale = morale;
+            bool hungry = false; try { hungry = mp.Party != null && mp.Party.IsStarving; } catch { }
+            if (hungry) DesertionAi.Hungry += byMorale;
+        }
+
         public override float GetDesertionChanceForTroop(MobileParty mobileParty, in TroopRosterElement troopRosterElement)
         {
             if (!Governs(mobileParty)) return base.GetDesertionChanceForTroop(mobileParty, in troopRosterElement);
@@ -119,6 +144,7 @@ namespace Armoury
             try
             {
                 float morale = mobileParty.Morale;
+                bool ai = IsAi(mobileParty);                 // 183: AI - liczniki doby wedlug tieru zamiast opisu partii
                 var detail = new List<string>();
                 var members = mobileParty.MemberRoster;
                 for (int i = 0; i < members.Count; i++)
@@ -136,7 +162,8 @@ namespace Armoury
                     if (wounded > el.WoundedNumber) wounded = el.WoundedNumber;
                     if (wounded > n) wounded = n;
                     roster.AddToCounts(ch, n, false, wounded);
-                    detail.Add(ch.Name + " x" + n + " (t" + ch.Tier + ", prog " + ThresholdFor(ch.Tier) + ")");
+                    if (ai) { int t = ch.Tier; if (t <= 2) DesertionAi.T12 += n; else if (t <= 4) DesertionAi.T34 += n; else DesertionAi.T5 += n; }
+                    else detail.Add(ch.Name + " x" + n + " (t" + ch.Tier + ", prog " + ThresholdFor(ch.Tier) + ")");
                 }
                 int byMorale = roster.TotalManCount;
 
@@ -146,7 +173,8 @@ namespace Armoury
                 else if (!_wageMissingLogged) { _wageMissingLogged = true; Log.Info("DesertionLaw: brak GetTroopsToDesertDueToWageAndPartySize - zold/limit partii nie licza sie do dezercji."); }
                 int byWage = roster.TotalManCount - byMorale;
 
-                if (roster.TotalManCount > 0)
+                if (ai) { try { NoteAi(mobileParty, roster, byMorale, morale); } catch { } }   // 183: AI - tylko liczniki doby (bez linii na partie)
+                else if (roster.TotalManCount > 0)
                 {
                     Log.Info("DesertionLaw: " + mobileParty.Name + " morale " + morale.ToString("0") + " - dezercja " + roster.TotalManCount
                              + " (morale " + byMorale + (byWage > 0 ? ", zold/limit partii " + byWage : "") + ")"
@@ -163,6 +191,19 @@ namespace Armoury
             }
             catch (Exception e) { Log.Error("DesertionLaw.GetTroopsToDesert", e); }
             return roster;
+        }
+    }
+
+    /// <summary>183: liczniki doby dezercji AI wedlug prawa dezercji (linia "Dezercja AI (183)" w WarLedger.OnDaily).</summary>
+    internal static class DesertionAi
+    {
+        // [rodzaj]: 0 partie lordow, 1 zalogi, 2 karawany i inne
+        internal static readonly int[] Parties = new int[3], Morale = new int[3], Wage = new int[3];
+        internal static int T12, T34, T5, Hungry; internal static float MinMorale = float.MaxValue;
+        internal static void Clear()
+        {
+            Array.Clear(Parties, 0, 3); Array.Clear(Morale, 0, 3); Array.Clear(Wage, 0, 3);
+            T12 = T34 = T5 = Hungry = 0; MinMorale = float.MaxValue;
         }
     }
 

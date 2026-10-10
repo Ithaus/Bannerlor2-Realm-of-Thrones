@@ -252,7 +252,7 @@ namespace Armoury
         public int DesertionMoraleFloor = 10;              // no threshold drops below this - even the elite leave once morale is broken
         public float DesertionPercentPerMoralePoint = 1.0f; // share of a stack (percent) that deserts per day for every morale point below its threshold
         public int DesertionDailyCapPercent = 25;          // at most this share of a stack deserts in one day
-        public bool DesertionLawForAi = false;             // apply the tiered thresholds to AI lords as well (off: AI keeps vanilla desertion below morale 10)
+        public bool DesertionLawForAi = true;              // apply the tiered thresholds to AI parties as well - lords, garrisons and caravans, one rule with yours (183); the Others keep the game's rule. Off = AI keeps vanilla desertion below morale 10
 
         // --- The law of the battlefield ---
         public bool UniqueGearLawEnabled = true;           // named heroes' gear (Ramsay, the Hound, the Mountain, Brienne, Renly...) belongs to its owner alone: copies in armouries, packs and on other heroes become same-tier gear of the wearer's own culture, and DTE swaps them on the way into any armoury. A renowned piece taken by the custom of war stays itself in a baggage train (yours or a lord's); worn by anyone but its owner it is still swapped on load
@@ -373,8 +373,12 @@ namespace Armoury
         public int RefugeeFloorHearth = 40;                // below this the refugees trickle home (+0.5/day flat) - regions never die for good
         public bool WagesDueEnabled = true;                // unpaid wages: vanilla already cuts morale - we add desertion, the best-paid men first
         public int WagesGraceDays = 2;                     // days of unpaid wages the men will stomach before walking
-        public float WagesDesertPercentPerDay = 0.5f;      // share of the party deserting per day past grace, growing with every unpaid day (AI suffers half)
+        public float WagesDesertPercentPerDay = 0.5f;      // share of the party deserting per day past grace, growing with every unpaid day (AI the same since 183 - War Ledger Ai Half)
         public int WagesDesertMaxDays = 8;                 // ceiling on that growth - without it a debt left unpaid for weeks bleeds a tenth of the army every single day
+        // 183 (projekt etapu 2, krok C3): zalegly zold - jedna regula dla AI i gracza, podloga 30 ludzi (OTWARTE nr 2; Jeff 09.10 11:05 pkt 1 - takze druzyna gracza)
+        public bool WarLedgerAiHalf = false;               // AI parties lose men over unpaid wages at half the rate (the old rule); off = the same rate as yours (183 - with the house budget unpaid wages are rare among the AI)
+        public int WarLedgerMinMen = 30;                   // unpaid wages never take a party below this many men (a banneret's retinue) - it still loses the men above it; 0 = no floor
+        public bool WarLedgerMinMenPlayer = true;          // the floor of War Ledger Min Men holds for your own party and your house's parties too (one rule); off = only for the AI
         public bool WarLedgerToOutlaws = true;             // men who walk off over unpaid wages join the outlaw pool of the region (and the people ledger) instead of vanishing - needs Outlaw Law enabled, without it they still vanish
         public bool SackScarEnabled = true;                // a settlement taken by siege loses prosperity and loyalty - conquest is a ruin you must rebuild
         public int SackProsperityCutPercent = 15;          // prosperity lost when a settlement falls to siege

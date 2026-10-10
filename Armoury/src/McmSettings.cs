@@ -832,9 +832,9 @@ namespace Armoury
         [SettingPropertyGroup("Desertion")]
         public int DesertionDailyCapPercent { get; set; } = 25;
 
-        [SettingPropertyBool("Desertion Law For Ai", HintText = "apply the tiered thresholds to AI lords as well (off: AI keeps vanilla desertion below morale 10)")]
+        [SettingPropertyBool("Desertion Law For Ai", HintText = "apply the tiered thresholds to AI parties as well - lords, garrisons and caravans, one rule with yours (183); the Others keep the game's rule. Off = AI keeps vanilla desertion below morale 10")]
         [SettingPropertyGroup("Desertion")]
-        public bool DesertionLawForAi { get; set; } = false;
+        public bool DesertionLawForAi { get; set; } = true;
 
         [SettingPropertyBool("Unique Gear Law Enabled", HintText = "named heroes' gear (Ramsay, the Hound, the Mountain, Brienne, Renly...) belongs to its owner alone: copies in armouries, packs and on other heroes become same-tier gear of the wearer's own culture, and DTE swaps them on the way into any armoury. A renowned piece taken by the custom of war stays itself in a baggage train (yours or a lord's); worn by anyone but its owner it is still swapped on load")]
         [SettingPropertyGroup("The law of the battlefield")]
@@ -1268,13 +1268,25 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public int WagesGraceDays { get; set; } = 2;
 
-        [SettingPropertyFloatingInteger("Wages Desert Percent Per Day", 0.00f, 2.00f, "0.00", HintText = "share of the party deserting per day past grace, growing with every unpaid day (AI suffers half)")]
+        [SettingPropertyFloatingInteger("Wages Desert Percent Per Day", 0.00f, 2.00f, "0.00", HintText = "share of the party deserting per day past grace, growing with every unpaid day (AI the same since 183 - War Ledger Ai Half)")]
         [SettingPropertyGroup("The marching column")]
         public float WagesDesertPercentPerDay { get; set; } = 0.5f;
 
         [SettingPropertyInteger("Wages Desert Max Days", 0, 32, "0", HintText = "ceiling on that growth - without it a debt left unpaid for weeks bleeds a tenth of the army every single day")]
         [SettingPropertyGroup("The marching column")]
         public int WagesDesertMaxDays { get; set; } = 8;
+
+        [SettingPropertyBool("War Ledger Ai Half", HintText = "AI parties lose men over unpaid wages at half the rate (the old rule); off = the same rate as yours (183 - with the house budget unpaid wages are rare among the AI)")]
+        [SettingPropertyGroup("The marching column")]
+        public bool WarLedgerAiHalf { get; set; } = false;
+
+        [SettingPropertyInteger("War Ledger Min Men", 0, 120, "0", HintText = "unpaid wages never take a party below this many men (a banneret's retinue) - it still loses the men above it; 0 = no floor")]
+        [SettingPropertyGroup("The marching column")]
+        public int WarLedgerMinMen { get; set; } = 30;
+
+        [SettingPropertyBool("War Ledger Min Men Player", HintText = "the floor of War Ledger Min Men holds for your own party and your house's parties too (one rule); off = only for the AI")]
+        [SettingPropertyGroup("The marching column")]
+        public bool WarLedgerMinMenPlayer { get; set; } = true;
 
         [SettingPropertyBool("War Ledger To Outlaws", HintText = "men who walk off over unpaid wages join the outlaw pool of the region (and the people ledger) instead of vanishing - needs Outlaw Law enabled, without it they still vanish")]
         [SettingPropertyGroup("The marching column")]
@@ -3982,6 +3994,9 @@ namespace Armoury
             s.WagesGraceDays = WagesGraceDays;
             s.WagesDesertPercentPerDay = WagesDesertPercentPerDay;
             s.WagesDesertMaxDays = WagesDesertMaxDays;
+            s.WarLedgerAiHalf = WarLedgerAiHalf;
+            s.WarLedgerMinMen = WarLedgerMinMen;
+            s.WarLedgerMinMenPlayer = WarLedgerMinMenPlayer;
             s.WarLedgerToOutlaws = WarLedgerToOutlaws;
             s.SackScarEnabled = SackScarEnabled;
             s.SackProsperityCutPercent = SackProsperityCutPercent;
