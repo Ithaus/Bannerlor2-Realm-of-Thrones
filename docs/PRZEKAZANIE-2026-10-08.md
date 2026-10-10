@@ -461,3 +461,4 @@ LIMITY 13:30: 5h 32%, TYDZIEN 82% (reset 15.10) - przy 100% tygodnia przejsc na 
   Kolejka po D: (0) dar Strazy z Westeros (S, CrownGifts.cs - przed testem D, zeby test objal oba), (1) T10 odpoczynek AI, (2) zakaz slubow/ciaz roznych ras.
 - (07:10) Jeff: korona ma pozyczac (STAN-PRAC "DECYZJE JEFFA 10.10") - nowa paczka po D. Dar dla Strazy - Jeff jeszcze wybiera A (cale Westeros 8/8/3%) albo B (jak w
   ksiazkach: Polnoc 12%, krol 5%, reszta 1.5%); Straz ma ok. 1.8 mln w sakiewkach, wlasne lenna ok. 2.9 tys./d.
+- (07:40) Jeff podal procenty daru dla Strazy (STAN-PRAC): Polnoc 5, Zelazny Tron 4, Dorne 3, Reach 3, Vale 2, Stormlands 2, Riverlands 2, Dragonstone 1. Do kodu po D.

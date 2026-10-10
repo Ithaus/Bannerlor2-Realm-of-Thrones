@@ -1003,3 +1003,7 @@ ZATWIERDZONE: Armoury c38bd62f, CrashScribe 6507c842. Baza Armoury: w-toku/e2c.
 - **Korona pozycza** (Jeff 10.10: "oczywiscie, ze korona powinna pozyczac"): nowa paczka po kroku D - skarbiec krolestwa moze pozyczyc w Zelaznym Banku na wojne
   (limit wedlug zdolnosci splaty z wplywow dnia, np. do rocznych wplywow), raty z wplywow dnia w kolejnosci wydatkow 165; przy zaleglosci Bank przestaje pozyczac
   i finansuje wrogow dluznika (lore: Stannis po niesplacaniu przez Cersei). Projekt paczki do napisania (nr wolny, np. 186), test 120 dob.
+- **Dar dla Strazy - PROCENTY JEFFA (10.10, wiazace; zastepuja moje 8/8/3 i warianty A/B):** Polnoc 5%, Zelazny Tron (House Baratheon of King's Landing) 4%,
+  Dorne 3%, Reach 3%, Vale 2%, Stormlands 2%, Riverlands 2%, Dragonstone 1% wplywow dnia korony; reszta 0. Razem ok. 2.35 tys./dobe (test c3c: Straz zarabia
+  ok. 9 tys./dobe ponad wydatki - 1.32 -> 2.41 mln w 120 dob, wydaje glownie zold najemnikow ok. 3.9 tys./d; Polnoc +3.2 tys./d na zwrot). Do zrobienia po kroku D
+  (CrownGifts.cs + klucze). Pytanie otwarte: dar tylko wtedy, gdy oszczednosci Strazy < zapas np. 60 dob wydatkow (moja propozycja) - czeka na slowo Jeffa.
