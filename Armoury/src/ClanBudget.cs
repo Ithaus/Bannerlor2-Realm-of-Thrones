@@ -74,6 +74,12 @@ namespace Armoury
         private static long _dCourt, _dCourtTown, _dFood, _dFamily, _dRelPurse, _dBuild, _dGear, _dGearSpent, _dCapSum, _dWageSum, _dD;
         private static int _dRelMen, _dRelPar, _dRelGar, _dNoVillage, _dFamilyN, _dOver, _dStreak, _dPeace, _dWar, _dClans, _dPoor, _dVanished;
         private static int _dDesertOff, _dSpawnBlock, _dRecruitBlock, _dGarBlock, _dGarLimited, _dPartyLimited, _dWatchMen, _dWatchCap = -1;
+        // 2 (werbunek Strazy, 10.10): JEDEN pulap w ludziach dla calej Strazy (jeden zakon, jedna kiesa). Dotad pulap liczony osobno na rod: rody Strazy
+        // bez dochodu mialy pulap ok. 0 i ich druzyny nie werbowaly (werbunek wstrzymany 50-200/d przy Strazy 1.5-2 tys. wobec pulapu calosci 3-5 tys.),
+        // a rod ponad wlasnym pulapem zwalnial ludzi mimo luzu calej Strazy. Pula = suma pulapow rodow Strazy z rozliczenia doby (ta sama liczba co w linii 166).
+        private static readonly List<Clan> _watchClans = new List<Clan>();
+        private static int _watchPoolCap = -1, _watchPoolMen;
+        private static string _watchDetail = "";
         // test 120 dob (wojsko w wojnie): dwor ustepuje zoldowi (udzial dostepny, zold go zajal, u ilu rodow); limity partii z wolnego miejsca rodu
         private static long _dCourtRoom, _dCourtYield; private static int _dCourtRoomN, _dCourtYieldN, _dPartyOverCap;
         // 168: kredyt wojenny w pulapie (miejsce i wyplata), dluznicy, zajete wsie
@@ -93,6 +99,7 @@ namespace Armoury
             // Latki Harmony (_hooksTried, _harmony, _wired, _missing) zyja przez caly proces - zostaja.
             _bkTried = false; _popMgr = null; _getPopData = null; _fromSoldiers = null; _populated = null;
             _grain = null; _grainTried = false; _spawnUsed.Clear(); _spawnDay = -1;
+            _watchClans.Clear(); _watchPoolCap = -1; _watchPoolMen = 0; _watchDetail = "";   // 2: pula Strazy
         }
 
         internal static void ZeroLast()
@@ -253,6 +260,7 @@ namespace Armoury
                     catch (Exception e) { Stumble("Daily(partia)", e); }
                 }
                 var drop = new List<Clan>();
+                var watchToday = new List<Clan>();   // 2: rody Strazy rozliczone dzis (pula)
                 foreach (var c in Clan.All)
                 {
                     try
@@ -365,11 +373,28 @@ namespace Armoury
                         try { Court(c, b, s); } catch (Exception e) { Stumble("Court", e); }
                         // recenzja C1 (W3): limity przed zwolnieniami - zwolnienia dziela kwote wedlug nadwyzki partii ponad jej dzisiejszy limit
                         try { ApplyPartyLimits(c, b); ApplyGarrisonLimits(c, b); } catch (Exception e) { Stumble("Limits", e); }
-                        try { Releases(c, b, s); } catch (Exception e) { Stumble("Releases", e); }
+                        if (b.Zero) watchToday.Add(c);   // 2: Straz - zwolnienia po petli, wedlug puli calej Strazy
+                        else { try { Releases(c, b, s); } catch (Exception e) { Stumble("Releases", e); } }
                         if (c.Leader.Gold < 5000) _dPoor++;
                     }
                     catch (Exception e) { Stumble("Daily(rod)", e); }
                 }
+                // 2: pula Strazy (suma pulapow i ludzi rodow Strazy z dzisiejszego rozliczenia), potem zwolnienia rodow Strazy wedlug puli
+                try
+                {
+                    _watchClans.Clear(); _watchClans.AddRange(watchToday);
+                    _watchPoolCap = watchToday.Count > 0 ? Math.Max(0, _dWatchCap) : -1; _watchPoolMen = _dWatchMen;
+                    var wd = new System.Text.StringBuilder();
+                    foreach (var wc in watchToday)
+                    {
+                        B wb; if (!_b.TryGetValue(wc, out wb)) continue;
+                        if (wd.Length > 0) wd.Append(", ");
+                        wd.Append(wc.Name).Append(' ').Append(wb.MenPar + wb.MenGar).Append('/').Append(wb.MenCap);
+                        try { Releases(wc, wb, s); } catch (Exception e) { Stumble("Releases", e); }
+                    }
+                    _watchDetail = wd.ToString();
+                }
+                catch (Exception e) { Stumble("WatchPool", e); }
                 foreach (var kv in _b) if (!kv.Value.Today && (kv.Key == null || kv.Key.IsEliminated)) drop.Add(kv.Key);
                 foreach (var c in drop) _b.Remove(c);
                 Report(s, today);
@@ -582,14 +607,15 @@ namespace Armoury
             double hyst = Math.Max(1f, s.BudgetHysteresis);
             long wage = b.WPar + b.WGar + b.WCar;
             int men = b.MenPar + b.MenGar;
-            bool over = b.Zero ? b.MenCap >= 0 && men > hyst * b.MenCap : wage > hyst * b.Cap;
+            // 2: Straz - ponad pulapem jest CALA Straz (pula), nie rod; nadwyzka puli dzielona miedzy rody wedlug ich ludzi
+            bool over = b.Zero ? _watchPoolCap >= 0 && _watchPoolMen > hyst * _watchPoolCap : wage > hyst * b.Cap;
             b.Streak = over ? b.Streak + 1 : 0;
             if (over) _dOver++;
             if (b.Streak < Math.Max(1, s.BudgetHysteresisDays)) return;
             _dStreak++;
             double share = Math.Max(0f, Math.Min(1f, s.ReleasePerDay));
             // do zwolnienia: w zlocie (zold dzienny) albo - Straz bez zoldu - w ludziach
-            double left = b.Zero ? Math.Ceiling(share * (men - b.MenCap)) : share * (wage - b.Cap);
+            double left = b.Zero ? (_watchPoolMen > 0 ? Math.Ceiling(share * (_watchPoolMen - _watchPoolCap) * men / (double)_watchPoolMen) : 0) : share * (wage - b.Cap);
             if (left <= 0) return;
             // 1. w pokoju zalogi ponad cel pokojowy (Straz bez zoldu - zalogi na Murze nie sa ciete; od partii)
             if (!GarFull(b, s) && c.Fiefs != null)
@@ -919,7 +945,7 @@ namespace Armoury
                 int need = Math.Max(0, s.MinNewPartyMen);
                 double cost;
                 bool room;
-                if (b.Zero) { cost = need; room = b.MenCap < 0 || b.MenCap - LiveMen(c) - used >= need; }
+                if (b.Zero) { cost = need; room = _watchPoolCap < 0 || _watchPoolCap - WatchLiveMen() - WatchUsed() >= need; }   // 2: pula calej Strazy
                 else
                 {
                     double avg = b.MenPar > 0 ? (double)b.WPar / b.MenPar : Math.Max(1f, Campaign.Current.AverageWage);
@@ -950,6 +976,22 @@ namespace Armoury
             return n;
         }
 
+        /// <summary>2: ludzie calej Strazy teraz (partie i zalogi rodow Strazy z dzisiejszej puli).</summary>
+        private static int WatchLiveMen()
+        {
+            int n = 0;
+            for (int i = 0; i < _watchClans.Count; i++) { var c = _watchClans[i]; if (c != null && !c.IsEliminated) n += LiveMen(c); }
+            return n;
+        }
+
+        /// <summary>2: miejsce w puli Strazy zajete dzis przez nowe partie (SpawnPrefix liczy je osobno, zanim partia zwerbuje).</summary>
+        private static double WatchUsed()
+        {
+            double u = 0;
+            for (int i = 0; i < _watchClans.Count; i++) { double v; if (_watchClans[i] != null && _spawnUsed.TryGetValue(_watchClans[i], out v)) u += v; }
+            return u;
+        }
+
         /// <summary>Straz bez zoldu: werbunek partii staje na pulapie w ludziach (limit w zlocie przy zoldzie 0 nie wiaze).</summary>
         public static bool RecruitPrefix(MobileParty __0)
         {
@@ -958,8 +1000,8 @@ namespace Armoury
                 if (__0 == null || !CrownGifts.IsWatchParty(__0)) return true;
                 var c = OwnerOf(__0);
                 var b = Of(c);
-                if (b == null || !b.Zero || b.MenCap < 0) return true;
-                if (LiveMen(c) < b.MenCap) return true;
+                if (b == null || !b.Zero || _watchPoolCap < 0) return true;
+                if (WatchLiveMen() < _watchPoolCap) return true;   // 2: pula calej Strazy
                 _dRecruitBlock++;
                 return false;
             }
@@ -973,8 +1015,8 @@ namespace Armoury
                 var st = __0 != null ? __0.Settlement : null;
                 if (st == null || !CrownGifts.IsWatch(st.MapFaction)) return true;
                 var b = Of(st.OwnerClan);
-                if (b == null || !b.Zero || b.MenCap < 0) return true;
-                if (LiveMen(st.OwnerClan) < b.MenCap) return true;
+                if (b == null || !b.Zero || _watchPoolCap < 0) return true;
+                if (WatchLiveMen() < _watchPoolCap) return true;   // 2: pula calej Strazy
                 _dGarBlock++;
                 return false;
             }
@@ -1010,7 +1052,8 @@ namespace Armoury
               .Append(" | sprzet: przydzial dnia ").Append(_dGear).Append(", wydane przez panow od wczoraj ").Append(_dGearSpent)
               .Append(" | budowy: przydzial dnia ").Append(_dBuild)
               .Append(" | Straz w ludziach ").Append(_dWatchMen).Append(" / pulap w ludziach ").Append(_dWatchCap < 0 ? "-" : _dWatchCap.ToString(Inv))
-              .Append(" (werbunek wstrzymany ").Append(_dRecruitBlock).Append(", przyrost zalog wstrzymany ").Append(_dGarBlock).Append(")")
+              .Append(" (werbunek wstrzymany ").Append(_dRecruitBlock).Append(", przyrost zalog wstrzymany ").Append(_dGarBlock)
+              .Append("; jeden pulap calej Strazy (2), rody ludzie/udzial w pulapie: ").Append(_watchDetail.Length > 0 ? _watchDetail : "-").Append(")")
               .Append(_stumbles > 0 ? " | potkniecia " + _stumbles : "").Append('.');
             if (_importN >= 0) { sb.Append(" Wczytano z zapisu: rodow ").Append(_importN).Append(" (bledne ").Append(_importBad).Append(")."); _importN = -1; }
             Log.Info(sb.ToString());
