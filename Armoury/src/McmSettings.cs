@@ -744,6 +744,10 @@ namespace Armoury
         [SettingPropertyGroup("Loot from the field")]
         public bool CaptiveRagsPreview { get; set; } = true;
 
+        [SettingPropertyBool("Beaten Purse To Victor", HintText = "the victors take the whole purse of a beaten caravan, village cart party or bandit band that has no hero at its head - you, the lords and the bandits alike (until now the game gave the victors only a tenth of a caravan's or villagers' coin and half of a band's, and the rest vanished with the beaten party). The purse is shared among the victors by their part in the battle, just as the game shares its plunder; what no victor can carry (a militia, a patrol, the Others) stays in the beaten purse and, once the beaten party is gone, goes to the party that beat it, else to the coffers of that party's town, castle or village, else of the nearest town (a village cart party's purse goes on by Villager Purse Survives). With Crown Thirds, a realm at war takes a ninth of what its lords - and you, as a vassal - take this way. Off = the game's tenth and half, the rest vanishes as before")]
+        [SettingPropertyGroup("Loot from the field")]
+        public bool BeatenPurseToVictor { get; set; } = true;
+
         [SettingPropertyBool("Battlefield Law Enabled", HintText = "battles you fight yourself: the dead drop their real gear (DTE), Spoils of War steps aside")]
         [SettingPropertyGroup("The law of the battlefield")]
         public bool BattlefieldLawEnabled { get; set; } = true;
@@ -3012,7 +3016,7 @@ namespace Armoury
         [SettingPropertyGroup("Ransoms by wealth (stage 2)")]
         public float CrownGreatCaptiveReward { get; set; } = 0.1f;
 
-        [SettingPropertyBool("Crown Thirds", HintText = "the crown of a realm at war takes its third of a third from what its houses win: a ninth of every ransom they receive (cash and instalments, not for a king or heir), a third of a lord's third of the loot his men sold, a ninth of the loot a lord sells in town, and from you a ninth of the purses your men take; settled once a day out of the purse of who received it, like the dues")]
+        [SettingPropertyBool("Crown Thirds", HintText = "the crown of a realm at war takes its third of a third from what its houses win: a ninth of every ransom they receive (cash and instalments, not for a king or heir), a third of a lord's third of the loot his men sold, a ninth of the loot a lord sells in town, a ninth of the coin a lord - or you - takes from the purse of a beaten caravan, village cart party or bandit band, and from you a ninth of the purses your men take; settled once a day out of the purse of who received it, like the dues")]
         [SettingPropertyGroup("Ransoms by wealth (stage 2)")]
         public bool CrownThirds { get; set; } = true;
 
@@ -4065,6 +4069,7 @@ namespace Armoury
             s.CaptiveSpoilsEnabled = CaptiveSpoilsEnabled;
             s.CaptiveSpoilsIncludeMounts = CaptiveSpoilsIncludeMounts;
             s.CaptiveRagsPreview = CaptiveRagsPreview;
+            s.BeatenPurseToVictor = BeatenPurseToVictor;
             s.BattlefieldLawEnabled = BattlefieldLawEnabled;
             s.LootArrivesBattleWorn = LootArrivesBattleWorn;
             s.SimBattleFullDrop = SimBattleFullDrop;

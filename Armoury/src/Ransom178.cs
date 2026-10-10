@@ -38,6 +38,7 @@ namespace Armoury
     ///  - PRAWO TRZECICH: korona krolestwa w wojnie (placi zwrot - bez najemnikow) bierze raz na dobe 1/9 okupow otrzymanych przez swoje rody (gotowka i raty; nie
     ///    wielcy jency), 1/3 trzeciej lorda AI ze sprzedazy nadwyzek ludzi i sakw (KThird), 1/9 sprzedazy lupu lorda AI przez gre (PartiesSellLoot), od gracza-wasala 1/9
     ///    sakw zdobytych przez jego ludzi (z ich sakiewki) i 1/9 wartosci lupu z ekranu po bitwie (z kiesy). Z kiesy odbiorcy; czego brak - jutro.
+    ///    3.2: takze 1/9 zlota z kies rozbitych partii bez wodza (tabor wsi, banda, karawana), ktore wzial wodz-wasal albo gracz (NoteBeatenGold - BeatenPurse, VillageTakings).
     /// Platnik -> odbiorca: rodzina jenca -> glowa rodu porywacza / skarbiec korony zdobywcy; skarbiec krola -> porywacz; skarbiec zdobywcy -> zdobywca (nagroda);
     /// odbiorcy okupow i lupu -> skarbiec (1/9). Zadnego zlota z niczego (posrednik - zloto gry zrownowazone). Zapis: "arm_rans178".
     /// </summary>
@@ -65,7 +66,7 @@ namespace Armoury
         // liczniki doby (linia "Okupy (178)")
         private static int _dAiN, _dCourierN, _dBrokerN, _dPlayerN, _dZeroN, _dBlockedN, _dCapN, _dKingN, _dGreatTakenN, _dDungeonN, _dBrokerShortN;
         private static long _dPrice, _dCash, _dDebt, _dCapCut, _dKingCash, _dKingDebt, _dRewardQueued, _dRewardPaid, _dBaseThird, _dBaseLoot, _dBaseRansom, _dBasePurse,
-                            _dBaseScreen, _dThirdsGot, _dThirdsPurse, _dThirdsCarry, _dToCrown, _dBrokerShort;
+                            _dBaseScreen, _dThirdsGot, _dThirdsPurse, _dThirdsCarry, _dToCrown, _dBrokerShort, _dBaseGold;
         private static string _dMax;
         private static long _dMaxV;
         internal static long LastThirds, LastRewards, LastRansomCash, LastToCrown;
@@ -80,7 +81,7 @@ namespace Armoury
         {
             _dAiN = _dCourierN = _dBrokerN = _dPlayerN = _dZeroN = _dBlockedN = _dCapN = _dKingN = _dGreatTakenN = _dDungeonN = _dBrokerShortN = 0;
             _dPrice = _dCash = _dDebt = _dCapCut = _dKingCash = _dKingDebt = _dRewardQueued = _dRewardPaid = _dBaseThird = _dBaseLoot = _dBaseRansom = _dBasePurse = 0;
-            _dBaseScreen = _dThirdsGot = _dThirdsPurse = _dThirdsCarry = _dToCrown = _dBrokerShort = 0;
+            _dBaseScreen = _dThirdsGot = _dThirdsPurse = _dThirdsCarry = _dToCrown = _dBrokerShort = _dBaseGold = 0;
             _dMax = null; _dMaxV = 0;
         }
 
@@ -625,6 +626,10 @@ namespace Armoury
         /// <summary>Okup otrzymany (gotowka i raty; nie wielcy jency) - korona 1/9.</summary>
         internal static void NoteRansomIn(Hero h, long x) { try { if (x > 0 && Taxed(h)) { AccOf(h).Ninth += x; _dBaseRansom += x; } } catch (Exception e) { Stumble("NoteRansomIn", e); } }
 
+        /// <summary>3.2 (BeatenPurse) i 112 (VillageTakings): zloto z kiesy rozbitej partii bez wodza (tabor wsi, banda, karawana), ktore wzial wodz zwyciezcow
+        /// (takze gracz) - korona 1/9 (decyzja Jeffa 09.10 04:55, Q3b: "korona bierze 1/9 lupu wasali").</summary>
+        internal static void NoteBeatenGold(Hero h, long x) { try { if (x > 0 && Taxed(h)) { AccOf(h).Ninth += x; _dBaseGold += x; } } catch (Exception e) { Stumble("NoteBeatenGold", e); } }
+
         /// <summary>MenPurse.OnPartyDestroyed: sakwa rozbitej partii do sakiewki ludzi gracza - korona 1/9 z tej sakiewki.</summary>
         internal static void NotePlayerPurse(long x) { try { if (x > 0 && Taxed(Hero.MainHero)) { AccOf(Hero.MainHero).Purse += x; _dBasePurse += x; } } catch (Exception e) { Stumble("NotePlayerPurse", e); } }
 
@@ -779,7 +784,7 @@ namespace Armoury
                 if (!On && !ThirdsOn) return;
                 long pend = 0; foreach (var r in _rewards) pend += r.Left;
                 double sh = Math.Max(0f, Math.Min(1f, s.CrownThirdsShare));
-                double due = (_dBaseThird * 3.0 + _dBaseLoot + _dBaseRansom + _dBasePurse + _dBaseScreen) * sh;
+                double due = (_dBaseThird * 3.0 + _dBaseLoot + _dBaseRansom + _dBasePurse + _dBaseScreen + _dBaseGold) * sh;
                 var sb = new StringBuilder(1200);
                 sb.Append("Okupy (178): dzien ").Append((int)CampaignTime.Now.ToDays)
                   .Append(" | okupy dzis: AI-AI ").Append(_dAiN).Append(", kurier ").Append(_dCourierN).Append(", posrednik i ekran druzyny ").Append(_dBrokerN).Append(", okup gracza ").Append(_dPlayerN)
@@ -792,7 +797,7 @@ namespace Armoury
                   .Append(" | wielcy jency: pojmani dzis ").Append(_dGreatTakenN).Append(", u koron zdobywcow ").Append(_crownCaptive.Count).Append(", okup do skarbcow zdobywcow ").Append(_dToCrown)
                   .Append("; nagrody zdobywcow: nowe ").Append(_dRewardQueued).Append(", wyplacone ").Append(_dRewardPaid).Append(", czeka ").Append(pend)
                   .Append(" | prawo trzecich (1/9): podstawa - trzecie lordow ").Append(_dBaseThird).Append(" (korona 1/3), sprzedaz lupu lordow AI ").Append(_dBaseLoot)
-                  .Append(", okupy otrzymane ").Append(_dBaseRansom).Append(", sakwy ludzi gracza ").Append(_dBasePurse).Append(", lup gracza z ekranu ").Append(_dBaseScreen)
+                  .Append(", okupy otrzymane ").Append(_dBaseRansom).Append(", sakwy ludzi gracza ").Append(_dBasePurse).Append(", lup gracza z ekranu ").Append(_dBaseScreen).Append(", zloto z kies rozbitych (3.2/112) ").Append(_dBaseGold)
                   .Append("; nalezne z dzisiejszej podstawy ").Append(Math.Round(due)).Append(" | sciagniete do skarbcow (rozliczenie dzis rano, podstawa wczoraj) ").Append(_dThirdsGot + _dThirdsPurse)
                   .Append(" (z sakiewki ludzi gracza ").Append(_dThirdsPurse).Append("), zaleglosc odbiorcow ").Append(_dThirdsCarry)
                   .Append(" | lochy: gracz sprzedal lorda do lochu osady (zloto gry jak dotad) ").Append(_dDungeonN).Append(", posrednik - gotowki nie zebrano od rodziny ").Append(_dBrokerShort)

@@ -355,6 +355,9 @@ namespace Armoury
             sb.Append(" | NETTO (zmiana swiata) ").Append(S(nTot)).Append(" [P]: BK rynek osady ").Append(WvS(n1, CW.WMarket)).Append(", BK rynek wsi ").Append(WvS(n2, CW.WVillageMarket))
               .Append(", warsztaty BK bez pokrycia w kasie ").Append(Wired2(n3, CW.WWorkshopOut, CW.WWorkshopIn))
               .Append(", bitwy - zloto partii bez wodza ").Append(WvS(n4, CW.WBattle))
+              // 3.2: kiesy rozbitych do zwyciezcow (liczniki BeatenPurse tej doby - jego Daily biegnie po nas); tylko opis, poza suma
+              .Append(" (w tym 3.2 - kiesy rozbitych do zwyciezcow: zdjete z pokonanych -").Append(BeatenPurse.DayTaken).Append(", do kies partii bez wodza +").Append(BeatenPurse.DayToParties)
+              .Append("; wodzom +").Append(BeatenPurse.DayToLords).Append(" w ZRODLACH \"bitwy\" - przelew)")
               .Append(", przelewy od i do bohaterow poza swiatem ").Append(S(n5)).Append(" (w tym nasze moduly bez zdarzenia - korona, Bank, budowy - ")
               .Append(S(Sm[CW.IDeadDirect])).Append(" w ").Append(Sm[CW.IDeadDirectN]).Append(" przelewach)")
               .Append(", skarbce upadlych krolestw ").Append(WvS(n6, CW.WKingdomGone))

@@ -40,7 +40,9 @@ namespace Armoury
     ///    dla zwyciezcow (CalculatePlunderedGoldAmountFromDefeatedParty), reszta ginie razem z partia; rozwiazanemu ginie wszystko.
     ///    Reszta idzie do zwyciezcy (jak przy poddaniu sie taboru graczowi gra oddaje cala sakwe): wodzowi partii albo kiesie bandy;
     ///    tabor rozwiazany albo bez zwyciezcy, ktory moglby ja wziac (martwy wodz, partia bez kiesy handlowej, nieumarli) - sakwa
-    ///    wraca do wsi i jest dzielona jak utarg. Korona 1/9 z tej sakwy dopiero z paczka 178 (z licznikow doby - CartToLords).
+    ///    wraca do wsi i jest dzielona jak utarg. Korona 1/9 z sakwy wzietej przez wodza-wasala (prawo trzecich 178 - Ransom178.NoteBeatenGold; z 3.2).
+    ///    3.2 (BeatenPurse, wylacznik BeatenPurseToVictor): w bitwie zwyciezcy biora cala sakwe od razu (model lupu gry, podzial wedlug wkladu); tu przy
+    ///    zniszczeniu zostaje tylko to, czego zaden zwyciezca nie mogl wziac (milicja, patrol, Inni) - dalej ta sama droga: niszczyciel albo wies.
     ///    112-p (2.0b, zapasowy odbiorca): tabor bez wsi macierzystej - kasa jego osady macierzystej (miasto, zamek), a bez niej kasa
     ///    najblizszego miasta (jak sakiewki rozbitych partii w MenPurse); w linii "zapasowemu odbiorcy".
     ///
@@ -342,6 +344,7 @@ namespace Armoury
                         int moved = g - party.PartyTradeGold;
                         _cToHero += moved; _cToHeroN++; _cLost += g - moved;
                         if (hero == Hero.MainHero) _cToPlayer += moved;
+                        if (BeatenPurse.On) Ransom178.NoteBeatenGold(hero, moved);   // 3.2: korona 1/9 od wodza-wasala (prawo trzecich 178); wylaczone 3.2 = jak dotad
                         return;
                     }
                     if (hero == null && win.IsPartyTradeActive)
@@ -375,8 +378,8 @@ namespace Armoury
             catch (Exception e) { Stumble("VillageTakings.OnPartyDestroyed", e); }
         }
 
-        /// <summary>112-p: najblizsze miasto do pozycji partii (zapasowy odbiorca sakwy - ta sama regula co sakiewki rozbitych partii w MenPurse).</summary>
-        private static Settlement NearestTown(MobileParty mp)
+        /// <summary>112-p: najblizsze miasto do pozycji partii (zapasowy odbiorca sakwy - ta sama regula co sakiewki rozbitych partii w MenPurse; 3.2 - BeatenPurse).</summary>
+        internal static Settlement NearestTown(MobileParty mp)
         {
             Settlement best = null; float bd = float.MaxValue;
             try
