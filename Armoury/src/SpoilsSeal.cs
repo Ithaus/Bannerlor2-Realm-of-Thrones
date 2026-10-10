@@ -38,7 +38,7 @@ namespace Armoury
     ///  4. LootCollectionBehavior.TryTriggerRandomEvent - "ukryta skrzynia" 50-200 zl, "okup od rannego" 30-120 zl i "dodatkowy
     ///     sprzet" (+1 sztuka z niczego). -> te trzy BLOKADA; "bandyci ukradli" (sztuka mniej) zostaje jak u Spoils.
     ///  5. LootCollectionBehavior.ExecuteFenceSale - paser w zaulku placi graczowi z niczego, lup znika. -> PLATNIK: kasa miasta
-    ///     ponad rezerwe na renty (TownRentFloorGold), za sztuke najwyzej cena skupu targu (OutlawLaw.FencePrice - ta sama co dla
+    ///     ponad rezerwe na renty (TownRentFloorGold; B-4: zamek ponad zapas kupcow - CastlePurse.PayFloor), za sztuke najwyzej cena skupu targu (OutlawLaw.FencePrice - ta sama co dla
     ///     band), sztuka na polke miasta; czego miasto nie kupi - zostaje w sakwach. Limit pasera (CalculateGoldLimit) przyciety
     ///     do kasy miasta ponad rezerwe.
     ///  6. QuartermasterBehavior.OnSalvageScreenClosed - przetop za 15% wartosci z niczego, lup znika. -> PLATNIK jak w 5.
@@ -407,7 +407,8 @@ namespace Armoury
         private static int SellToTown(Settlement st, ItemRoster source, List<Lot> lots, Hero payee, int limit, Tally t)
         {
             var town = st != null ? st.Town : null;
-            int reserve = Reserve, due = 0;
+            // B-4: zamek placi tylko ponad zapas kupcow (CastlePurse.PayFloor) - ta sama regula co skup lupu zalog AI (MenPurse, Spendable)
+            int reserve = town != null ? CastlePurse.PayFloor(town, Reserve) : Reserve, due = 0;
             bool poor = false;
             try
             {
@@ -470,7 +471,7 @@ namespace Armoury
             try
             {
                 var st = Settlement.CurrentSettlement;
-                int spare = st != null && st.Town != null ? Math.Max(0, st.Town.Gold - Reserve) : 0;
+                int spare = st != null && st.Town != null ? Math.Max(0, st.Town.Gold - CastlePurse.PayFloor(st.Town, Reserve)) : 0;   // B-4: zamek ponad zapas kupcow
                 if (spare < __result) __result = spare;
             }
             catch (Exception e) { Stumble("SpoilsSeal.FenceLimit", e); }

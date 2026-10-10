@@ -155,7 +155,7 @@ namespace Armoury
             LastDues = LastRefundGiven = LastRefundDue = LastRefundPaid = LastSubsidy = LastCustoms = LastCustomsTaken = LastMint = LastMonopoly = 0;
         }
 
-        private static bool AtWar(Kingdom k)
+        internal static bool AtWar(Kingdom k)   // B-4: takze SoldierPay.TakePaid (ciecie Z8 tylko dla rodow, ktorym korona zwraca zold)
         {
             try { foreach (var o in Kingdom.All) if (o != k && !o.IsEliminated && k.IsAtWarWith(o)) return true; } catch { }
             return false;
@@ -390,7 +390,8 @@ namespace Armoury
                         // po zdjeciu przez gre licznik ma 95% dawnej wartosci: dawna x 5% = obecna x 5/95
                         int due = applyWithdrawals ? (int)(f.TradeTaxAccumulated * 5f / 95f) : (int)(f.TradeTaxAccumulated * 0.05f);
                         vanilla += due;
-                        int x = Math.Min(due, Math.Max(0, f.Gold - (int)floorG));
+                        // B-4: zamek placi tylko ponad zapas kupcow (CastlePurse.PayFloor - ta sama regula co Spendable); miasto ponad prog jak dotad
+                        int x = Math.Min(due, Math.Max(0, f.Gold - CastlePurse.PayFloor(f, (int)floorG)));
                         if (applyWithdrawals && x > 0) f.ChangeGold(-x);
                         real += x;
                     }
@@ -417,7 +418,7 @@ namespace Armoury
                     {
                         if (f == null) continue;
                         float t = 0f; try { t = Campaign.Current.Models.SettlementTaxModel.CalculateTownTax(f).ResultNumber; } catch { }
-                        int x = Math.Min((int)(t * 0.05f), Math.Max(0, f.Gold - (int)floorG));   // wpis 90: prog kasy miasta
+                        int x = Math.Min((int)(t * 0.05f), Math.Max(0, f.Gold - CastlePurse.PayFloor(f, (int)floorG)));   // wpis 90: prog kasy miasta; B-4: zamek ponad zapas kupcow
                         if (x <= 0) continue;
                         if (applyWithdrawals) f.ChangeGold(-x);
                         real += x;

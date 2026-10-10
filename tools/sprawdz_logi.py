@@ -12,12 +12,16 @@ Uzycie (Python 3, tylko odczyt):
 --koniec-etapu    : test konca etapu 2 (rozdz. E): warunki etapu (glowy < 5 000, bankruci, wojsko 95-115 tys., krolestwa i zalogi na
                     krolestwo, skarbce buntow) wiazace bez wyjatkow. Bez tej flagi (test kroku: B, C1-C3, D) warunek etapu, ktorego bieg
                     nie spelnia, ale nie jest w nim gorszy niz bieg bazowy (regula w kolumnie progu), dostaje werdykt ETAP - liczy sie osobno od NIE.
-Wynik: tabela TAK / NIE / ETAP / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek.
+Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
+niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
 B-3 (krok B po tescie 120 dob): pomiary wobec bazy, ktore mieszaly skutek paczki z losem jednej kampanii, liczone uczciwiej - pieniadz swiata
 w oknie dob 31+ bez wojennych zrodel z niczego i z reszta ksiegi wobec bazy, wojsko jako srednia 28 dob, bunty razem z krolestwem macierzystym,
 zalogi na twierdze (balans-krolestw.csv), sila band zamiast samego zlota (decyzja D), dochod pana zamku z zaworu jako INFO (opis przy wierszu).
 Plik bazowy zapisany przed B-3 nie ma nowych kluczy - zapisac go jeszcze raz z logu biegu bazowego (--zapisz-baze); bez nich wiersze B-3 = brak bazy.
+B-4 (przeglad B-3): ETAP tylko, gdy bieg nie jest gorszy niz baza (wojsko w wojnie wobec bazy w tych samych dobach; zmiana krolestwa o tym samym
+znaku we wszystkich oknach 28 dob = DECYZJA); regulator kas miast rozdzielony na dosypke i kasowanie (plik bazowy sprzed B-4 - zapisac jeszcze raz);
+reszta ksiegi wiaze na kazdej dlugosci biegu; Z8 jako gorna granica z 1 zl (licznik linii "Zold:" od B-4); pan zamku z zaworu - prog projektu.
 """
 import csv
 import os
@@ -64,18 +68,22 @@ class Report:
     def __init__(self):
         self.rows = []
 
-    def add(self, name, value, rule, ok, etap=False):
+    def add(self, name, value, rule, ok, etap=False, decide=False):
         # etap=True: warunek etapu 2, ktorego bieg nie spelnia, ale nie jest gorszy niz bieg bazowy (regula w progu) - werdykt ETAP zamiast NIE
-        verdict = "INFO" if ok is None else ("TAK" if ok else ("ETAP" if etap else "NIE"))
+        # decide=True (B-4): prog projektu niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - werdykt DECYZJA zamiast NIE;
+        # nigdy TAK ani INFO - liczony osobno, zeby nie zginal
+        verdict = "INFO" if ok is None else ("TAK" if ok else ("ETAP" if etap else ("DECYZJA" if decide else "NIE")))
         self.rows.append((name, value, rule, verdict))
 
     def show(self):
         w = max([len(r[0]) for r in self.rows] + [10])
         for name, value, rule, verdict in self.rows:
-            print(f"{name.ljust(w)} | {verdict:4} | {value} | prog: {rule}")
+            print(f"{name.ljust(w)} | {verdict:7} | {value} | prog: {rule}")
         n_no = sum(1 for r in self.rows if r[3] == "NIE")
         n_et = sum(1 for r in self.rows if r[3] == "ETAP")
-        print(f"-- razem progow {len(self.rows)}, NIE: {n_no}, ETAP (warunek etapu niespelniony, nie gorzej niz baza): {n_et}")
+        n_de = sum(1 for r in self.rows if r[3] == "DECYZJA")
+        print(f"-- razem progow {len(self.rows)}, NIE: {n_no}, ETAP (warunek etapu niespelniony, nie gorzej niz baza): {n_et}"
+              f", DECYZJA (prog projektu niespelniony - przyczyna poza krokiem, do decyzji): {n_de}")
 
 
 def run_day(day, start):
@@ -190,6 +198,8 @@ def money_days(lines, start):
             m = re.search(r"regulator kasy [+-]?\d+ \[P\] \(dosypal (\d+), skasowal (\d+)", t)
             if m:
                 x["miasta_reg"] = int(m.group(1)) - int(m.group(2))
+                # B-4: osobno dosypka (zloto z niczego) i kasowanie (zloto w nicosc) - mniej dosypki to zamkniete zrodlo, wiecej kasowania to nowe ujscie
+                x["miasta_dos"], x["miasta_kas"] = int(m.group(1)), int(m.group(2))
         u = ut.get(d)
         if u:
             seg = ""
@@ -439,7 +449,9 @@ def main(argv):
     b_on = bool(by_day(lines, "Zawor zamkow (110): dzien"))   # krok B w biegu (linia 110)
     etap_rule = "" if final else "; ETAP, gdy nie gorzej niz baza"
 
-    # 1. glowy < 5 000 (doba kampanii 120, 364, 728; i ostatnia). B-3: bez --koniec-etapu ETAP, gdy nie wiecej niz baza +20% (min. +2) w dobie 120
+    # 1. glowy < 5 000 (doba kampanii 120, 364, 728; i ostatnia). B-3: bez --koniec-etapu ETAP, gdy nie wiecej niz baza +20% (min. +2) w dobie 120.
+    # B-4 (przeglad B-3): +20% za luzne dla kroku, ktory tylko doklada panom - ETAP tylko do bazy + 2 glowy (rozrzut kampanii jeszcze niezmierzony;
+    # druga para biegow przed C1)
     heads = {run_day(d, start): num(r"glowy < 5000: (\d+)", s) for d, s in budget.items()}
     for n in (120, 364, 728):
         if n in heads:
@@ -447,9 +459,9 @@ def main(argv):
             ok = v is not None and v <= 10
             gb, et, note = bw.get("glowy_120") if n == 120 else None, False, ""
             if not ok and not final and v is not None and gb is not None:
-                lim = max(gb + 2, gb * 1.2)
+                lim = gb + 2
                 et, note = v <= lim, f" (baza {gb}; nie gorzej niz baza: <= {lim:.0f})"
-            rep.add(f"glowy < 5000 (doba {n})", f"{v}{note}", "<= 10 (warunek etapu 2 - C/D)" + ("" if final else "; ETAP, gdy nie wiecej niz baza +20% (min. +2)"), ok, et)
+            rep.add(f"glowy < 5000 (doba {n})", f"{v}{note}", "<= 10 (warunek etapu 2 - C/D)" + ("" if final else "; ETAP, gdy nie wiecej niz baza + 2"), ok, et)
     if heads:
         lastn = max(heads)
         rep.add("glowy < 5000 (ostatnia doba)", f"{heads[lastn]} (doba {lastn})", "<= 10 w dobach 120/364/728", None)
@@ -553,8 +565,10 @@ def main(argv):
 
     # 8. wojsko w druzynach lordow W WOJNIE - cel 95-115 tys., twarda podloga 85 tys. B-3: srednia 28 dob (dotad ostatnia doba - jedna doba
     # wojny wiecej albo mniej przesuwala wynik o kilka tysiecy: bieg 120 dob kroku B 125.4 tys. w dobie 120 przy 118.0 tys. sredniej 28 dob).
-    # Bez --koniec-etapu ETAP, gdy wojsko swiata (wszystkie krolestwa, 28 dob) w pasmie -25%..+20% bazy (wiersz obok) - wojsko idzie za dochodem
-    # do budzetu 166 (projekt 2.0a pkt 6), a liczba krolestw w wojnie to los kampanii (krok B: 27.3 wobec 25.0 srednio)
+    # B-4 (przeglad B-3): ETAP tylko, gdy bieg NIE JEST GORSZY niz baza w tych samych dobach - nie dalej od pasma 95-115 tys. niz baza, albo
+    # (los kampanii: inne krolestwa w wojnie) wojsko tych samych krolestw w tych samych dobach wojny obu biegow, przeniesione na wojsko w wojnie
+    # bazy (baza x bieg/baza na wspolnych dobach wojny), nie dalej od pasma niz baza - i wojsko swiata w pasmie bazy (+-10%). Dotad sam
+    # warunek swiata: baza 111.5 tys. w pasmie, bieg 118.0 tys. poza - dostawal ETAP.
     tot, totall, nwar = {}, {}, {}
     for k, ser in ks.items():
         for d, war, wallet, men in ser:
@@ -572,6 +586,7 @@ def main(argv):
         # wobec bazy w TYCH SAMYCH dobach kampanii (wojsko rosnie przez kampanie - bieg 40 dob nie porownuje sie z dobami 93-120 bazy);
         # plik bazowy sprzed B-3 (bez szeregow dobowych) - ostatnie 28 dob bazy
         bwa, bwv, allm_c, bwin = bw.get("wojsko_swiat"), bw.get("wojsko_wojna_swiat"), allm, "ostatnie 28 dob bazy"
+        vwc, like, nkn, nkb = None, None, None, None
         kn0, kb0 = now.get("krolestwa_dni") or {}, (base or {}).get("krolestwa_dni") or {}
         if kn0 and kb0:
             hi0 = min(max(d for x in kn0.values() for d in x), max(d for x in kb0.values() for d in x))
@@ -580,12 +595,24 @@ def main(argv):
             def sums(T, war_only):
                 return {d: sum(x[d][1] for x in T.values() if d in x and (x[d][0] or not war_only)) for d in cw}
             allm_c, bwa, bwv = mean_days(sums(kn0, False), cw), mean_days(sums(kb0, False), cw), mean_days(sums(kb0, True), cw)
+            vwc = mean_days(sums(kn0, True), cw)
             bwin = f"doby {cw[0]}-{cw[-1]} obu biegow"
+            # B-4: te same krolestwa w tych samych dobach wojny obu biegow (bunty z macierzystym) - bieg / baza; liczba krolestw w wojnie (srednio)
+            cr = cb = 0
+            for d in cw:
+                for k in set(kn0) & set(kb0):
+                    a, c = kn0[k].get(d), kb0[k].get(d)
+                    if a and c and a[0] and c[0]:
+                        cr += a[1]; cb += c[1]
+            like = cr / cb if cb > 0 else None
+            nkn = mean_days({d: sum(1 for x in kn0.values() if d in x and x[d][0]) for d in cw}, cw)
+            nkb = mean_days({d: sum(1 for x in kb0.values() if d in x and x[d][0]) for d in cw}, cw)
         if bwa and allm_c:
             ch = allm_c / bwa - 1
-            world_ok = -0.25 <= ch <= 0.20
+            # B-4 (przeglad B-3): +-10% - suma ok. 30 krolestw usrednia los pojedynczych (pasmo -25%..+20% jest na krolestwo)
+            world_ok = -0.10 <= ch <= 0.10
             rep.add("wojsko swiata wobec bazy (wszystkie krolestwa, srednia 28 dob)", f"{allm_c:.0f} wobec bazy {bwa:.0f} ({100 * ch:+.1f}%; {bwin})",
-                    "-25%..+20% (pasmo projektu 'wobec dzis'; krok paczki nie zmienia wojska ponad to)", world_ok)
+                    "+-10% (krok paczki nie zmienia wojska swiata ponad to; rozrzut kampanii do zmierzenia druga para biegow)", world_ok)
         if v == 0:
             rep.add("wojsko w druzynach lordow (krolestwa w wojnie, srednia 28 dob)", f"0 (zadne krolestwo w wojnie; wszystkie {allm:.0f})", "95-115 tys. w wojnie", None)
         else:
@@ -596,10 +623,23 @@ def main(argv):
             else:
                 ok, note = False, (" - ponizej podlogi 85 tys." if v < 85000 else " - powyzej 115 tys.")
             # bwv - wojsko w wojnie bazy w tych samych dobach (wyzej); bez szeregow w bazie - ostatnie 28 dob bazy
-            et = (not final) and (world_ok is True)              # wojsko swiata w pasmie bazy w tych samych dobach (bieg 40 dob: baza w dobach 14-41 tez ponizej podlogi)
+            def gap(x):
+                return 0.0 if 95000 <= x <= 115000 else (95000 - x if x < 95000 else x - 115000)
+            et, etxt = False, ""
+            if not final and world_ok is True and bwv:
+                vv = vwc if vwc is not None else v
+                if gap(vv) <= gap(bwv):
+                    et, etxt = True, f"; nie dalej od pasma niz baza ({vv:.0f} wobec {bwv:.0f})"
+                elif like is not None and gap(bwv * like) <= gap(bwv):
+                    et, etxt = True, (f"; te same krolestwa w tych samych dobach wojny: {100 * (like - 1):+.1f}% wobec bazy -> {bwv * like:.0f}"
+                                      f" (reszta z krolestw w wojnie tylko w biegu; krolestw w wojnie srednio {nkn:.1f} wobec {nkb:.1f}, bunty z macierzystym)")
+                else:
+                    etxt = f"; gorzej niz baza: {vv:.0f} wobec {bwv:.0f}" + (f", te same krolestwa i doby wojny {100 * (like - 1):+.1f}% -> {bwv * like:.0f}" if like is not None else "")
             rep.add("wojsko w druzynach lordow (krolestwa w wojnie, srednia 28 dob)",
-                    f"{v:.0f} (srednio {nw:.1f} krolestw w wojnie; wszystkie {allm:.0f}; ostatnia doba {tot.get(lastd, 0)})" + (f"; baza w wojnie {bwv:.0f}" if bwv else "") + note,
-                    "95-115 tys. w wojnie; twarda podloga 85 tys. (warunek etapu 2 - budzet 166)" + ("" if final else "; ETAP, gdy wojsko swiata w pasmie bazy w tych samych dobach"), ok, et)
+                    f"{v:.0f} (srednio {nw:.1f} krolestw w wojnie; wszystkie {allm:.0f}; ostatnia doba {tot.get(lastd, 0)})" + (f"; baza w wojnie {bwv:.0f}" if bwv else "") + note + etxt,
+                    "95-115 tys. w wojnie; twarda podloga 85 tys. (warunek etapu 2 - budzet 166)"
+                    + ("" if final else "; ETAP, gdy wojsko swiata w pasmie bazy i bieg nie dalej od pasma niz baza (te same doby albo te same krolestwa w tych samych dobach wojny)"),
+                    ok, et)
 
     # 9. zalogi, dezercja, okupy, pieniadz swiata - wobec bazy (plik bazowy i liczby biegu - na poczatku main)
     def vs(name, key, rule, test, info=False):
@@ -613,8 +653,12 @@ def main(argv):
 
     vs("zalogi swiata (28 dob)", "zalogi", "INFO - prog na twierdze i na krolestwo (wiersze nizej)", None, info=True)
     # B-3: zalogi NA TWIERDZE (balans-krolestw.csv) - spadek zalog krolestwa, ktore stracilo twierdze, to nie mniejsza zaloga (krok B: Pentos 2 twierdze
-    # wobec 6, The Reach 15 wobec 17 - na twierdze -2..+5%); doby wojny z linii "Skarbce". Swiat wiazacy; na krolestwo - warunek etapu (166), przy
-    # jednej parze biegow ETAP, z oknami 28 dob, gdy spadek trwa we wszystkich (los jednej kampanii odwraca znak miedzy oknami)
+    # wobec 6, The Reach 15 wobec 17 - na twierdze -2..+5%); doby wojny z linii "Skarbce". Swiat wiazacy; na krolestwo - warunek etapu (166).
+    # B-4 (przeglad B-3): los jednej kampanii odwraca znak zmiany miedzy oknami 28 dob - spadek, ktory we WSZYSTKICH oknach ma ten sam znak, to
+    # znak skutku, nie losu: DECYZJA (dotad tylko opis przy ETAP - Qohor -11/-16/-7%, Tyrosh -11/-12/-13% dostaly ETAP). Nie NIE wprost: trzy
+    # okna jednej pary biegow daja ten sam znak tez z losu (krolestwo, ktore wczesnie stracilo twierdze, zostaje slabsze) - rozstrzyga druga para
+    # biegow (rozrzut kampanii) przed C1. ETAP tylko dla zmian, ktore zmieniaja znak miedzy oknami, i przy jednym oknie (bieg < 58 dob - nie da sie
+    # odroznic; wiaze bieg 120 dob), gdy swiat w normie; swiat poza norma albo --koniec-etapu - NIE
     tn, tb = now.get("twierdze_dni") or {}, (base or {}).get("twierdze_dni") or {}
     garr_ok = None
     if tn and tb:
@@ -644,11 +688,15 @@ def main(argv):
                 pn, pb = per_fort(tn, [k], range(a, b + 1)), per_fort(tb, [k], range(a, b + 1))
                 r.append(pn / pb - 1 if pn and pb else None)
             if r and r[-1] is not None and r[-1] < -0.05:
-                low.append((k, r, len(r) >= 2 and all(x is not None and x < -0.05 for x in r)))
-        txt = ", ".join(f"{k} {100 * r[-1]:+.0f}%" + (" (trwa we wszystkich oknach " + "/".join(f"{100 * x:+.0f}" for x in r) + ")" if pers else "") for k, r, pers in low)
-        rep.add("zalogi na twierdze w wojnie na krolestwo (28 dob)", txt if low else f"wszystkie w normie ({len(ids)} krolestw)",
-                ">= 95% bazy (warunek etapu 2 - 166)" + ("" if final else "; ETAP, gdy swiat (wiersz wyzej) w normie - jedna para biegow"),
-                not low, (not final) and garr_ok is True)
+                low.append((k, r, len(r) >= 2 and all(x is not None and x < 0 for x in r)))
+        pers_n = sum(1 for _, _, pers in low if pers)
+        txt = ", ".join(f"{k} {100 * r[-1]:+.0f}%" + ((" (ten sam znak we wszystkich oknach " if pers else " (okna ") + "/".join("-" if x is None else f"{100 * x:+.0f}" for x in r) + ")"
+                                                      if len(r) >= 2 else "") for k, r, pers in low)
+        one = "; jedno okno 28 dob (bieg < 58 dob) - skutku od losu nie da sie odroznic" if len(ws) < 2 else ""
+        rep.add("zalogi na twierdze w wojnie na krolestwo (28 dob)", (txt + (f" - ten sam znak we wszystkich oknach: {pers_n}" if pers_n else "") + one) if low else f"wszystkie w normie ({len(ids)} krolestw)",
+                ">= 95% bazy (warunek etapu 2 - 166)" + ("" if final else "; swiat (wiersz wyzej) w normie: spadek o tym samym znaku we wszystkich oknach 28 dob - DECYZJA"
+                                                       " (skutek albo trwaly los - druga para biegow), znak zmienia sie miedzy oknami (albo jedno okno - bieg < 58 dob) - ETAP"),
+                not low, (not final) and garr_ok is True and pers_n == 0, decide=(not final) and garr_ok is True and pers_n > 0)
     elif base:
         low, have = [], 0
         for k, cur in now["krolestwa"].items():
@@ -681,7 +729,9 @@ def main(argv):
 
     # 10. krolestwa w wojnie wobec bazy (-25% / +20%; biedne z lore -35%). B-3: bunty razem z krolestwem macierzystym (Braavos + Volentin League),
     # okna 28 dob od doby 37; bez --koniec-etapu ETAP, gdy wojsko swiata w pasmie bazy - z jedna para biegow znak zmiany krolestwa odwraca sie
-    # miedzy oknami (krok B: Lys +29/-10/-34%, Tyrosh -17/-12/+44%), a wojsko idzie za dochodem rodow do budzetu 166 (projekt 2.0a pkt 6)
+    # miedzy oknami (krok B: Lys +29/-10/-34%, Tyrosh -17/-12/+44%), a wojsko idzie za dochodem rodow do budzetu 166 (projekt 2.0a pkt 6).
+    # B-4 (przeglad B-3): krolestwo poza pasmem w ostatnim oknie, ktorego zmiana ma ten sam znak we WSZYSTKICH oknach - DECYZJA (znak skutku albo
+    # trwalego losu - druga para biegow; jak zalogi wyzej); ETAP tylko dla zmian zmieniajacych znak (i przy jednym oknie - bieg < 58 dob)
     kn, kb = now.get("krolestwa_dni") or {}, (base or {}).get("krolestwa_dni") or {}
     if kn and kb:
         hi = min(max(d for x in kn.values() for d in x), max(d for x in kb.values() for d in x))
@@ -703,12 +753,17 @@ def main(argv):
                 continue
             if r[-1] < low or r[-1] > 0.20:
                 up = r[-1] > 0.20
-                pers = len(r) >= 2 and all(x is not None and ((x > 0.20) if up else (x < low)) for x in r)
-                worse.append(f"{k} {100 * r[-1]:+.0f}%" + (" (trwa we wszystkich oknach " + "/".join(f"{100 * x:+.0f}" for x in r) + ")" if pers else ""))
+                pers = len(r) >= 2 and all(x is not None and ((x > 0) if up else (x < 0)) for x in r)
+                worse.append((f"{k} {100 * r[-1]:+.0f}%" + ((" (ten sam znak we wszystkich oknach " if pers else " (okna ") + "/".join("-" if x is None else f"{100 * x:+.0f}" for x in r) + ")"
+                                                            if len(r) >= 2 else ""), pers))
+        pers_n = sum(1 for _, pers in worse if pers)
         rep.add("krolestwa w wojnie: wojsko wobec bazy (bunty z macierzystym, 28 dob)",
-                (", ".join(worse) if worse else "wszystkie w normie") + (f"; w wojnie tylko w jednym biegu: {other}" if other else ""),
-                "-25%..+20% (lore -35%; warunek etapu 2 - 166)" + ("" if final else "; ETAP, gdy wojsko swiata w pasmie bazy - jedna para biegow"),
-                not worse, (not final) and world_ok is True)
+                (", ".join(w for w, _ in worse) + (f" - ten sam znak we wszystkich oknach: {pers_n}" if pers_n else "")
+                 + ("; jedno okno 28 dob (bieg < 58 dob) - skutku od losu nie da sie odroznic" if len(ws) < 2 else "") if worse else "wszystkie w normie")
+                + (f"; w wojnie tylko w jednym biegu: {other}" if other else ""),
+                "-25%..+20% (lore -35%; warunek etapu 2 - 166)" + ("" if final else "; wojsko swiata w pasmie bazy: zmiana o tym samym znaku we wszystkich oknach 28 dob - DECYZJA"
+                                                                  " (skutek albo trwaly los - druga para biegow), znak zmienia sie miedzy oknami (albo jedno okno - bieg < 58 dob) - ETAP"),
+                not worse, (not final) and world_ok is True and pers_n == 0, decide=(not final) and world_ok is True and pers_n > 0)
     elif base:
         worse = []
         for k, cur in now["krolestwa"].items():
@@ -734,9 +789,10 @@ def main(argv):
         b40 = bw.get("d_staly_zamki_d40")
         if b_on and b40 is not None and v is not None:
             # B-3: 400-1300 to sprawdzenie miary 169c bez paczek; krok B z projektu tylko DOKLADA panom zamkow (wies ok. +130, zamek do +310 zl/dobe),
-            # wiec po B prog wobec bazy: nie mniej niz baza - 10% (szum mediany) i nie wiecej niz baza + 440
-            rep.add("D staly pana samych zamkow (doba 40) wobec bazy", f"{v} wobec bazy {b40} ({v - b40:+d})", "baza -10% .. baza +440 (krok B tylko doklada panom zamkow)",
-                    0.9 * b40 <= v <= b40 + 440)
+            # wiec po B prog wobec bazy: nie mniej niz baza i nie wiecej niz baza + 440. B-4 (przeglad B-3): dolna granica baza (dotad baza -10% - spadek
+            # o kilkanascie procent przechodzil jako TAK; rozrzut mediany do zmierzenia druga para biegow)
+            rep.add("D staly pana samych zamkow (doba 40) wobec bazy", f"{v} wobec bazy {b40} ({v - b40:+d})", "baza .. baza +440 (krok B tylko doklada panom zamkow)",
+                    b40 <= v <= b40 + 440)
             rep.add("D staly pana samych zamkow (doba 40)", v, "INFO po kroku B (169c bez paczek: 400-1300)", None)
         else:
             rep.add("D staly pana samych zamkow (doba 40)", v, "400-1300", (400 <= v <= 1300) if v is not None else None)
@@ -832,43 +888,76 @@ def main(argv):
         rep.add("110: dosypka regulatora do zapasu zamkow (tryb 1, 28 dob)", "brak linii", "<= 10 tys./dobe (Z9) albo z niczego netto w kasach zamkow <= baza", None)
     pz = [num(r"z zaworu srednio (\d+)", zz[k]) for k in last_window(zz)]
     pz = [x for x in pz if x is not None]
-    # B-3: INFO. 200-350 zl/dobe projekt liczyl z kasowania regulatora ok. 105 tys./dobe (stare logi: zold zalog 60 tys., sprzet AI 23 tys.); bieg bazowy
+    # 200-350 zl/dobe projekt liczyl z kasowania regulatora ok. 105 tys./dobe (stare logi: zold zalog 60 tys., sprzet AI 23 tys.); bieg bazowy
     # (kopia-baza120) ma w kasach zamkow kasowanie 34 tys., zold zalog 35-38 tys., sprzet AI ok. 0 (171 C8 - zamek nie jest targiem broni) i prawdziwe
     # przeplywy netto -30 tys./dobe: kupcy przywoza do zamkow konie i uprzaz (BK: ludnosc zamku je zuzywa, popyt kategorii koni 0.14 x dobrobyt).
-    # Nadwyzki, z ktorej zawor mialby dawac 200-350, w tej ekonomii nie ma; po B-2 zamek kupuje tylko z nadwyzki, wiec zawor bierze 7% doplywu doby.
-    # Wiazace: zamki bez zlota z niczego (dosypka wyzej), pan zamku nie biedniejszy (D staly wobec bazy, wiersz nizej "zawor minus utracony zwrot")
-    rep.add("110: pan samych zamkow - wplyw z zaworu (srednio, 28 dob)", f"{st.mean(pz):.0f} zl/dobe" if pz else "brak linii",
-            "INFO (projekt 200-350 z kasowania 105 tys./dobe ze starych logow - w biegu bazowym kasy zamkow nie maja nadwyzki; dochod panow zamkow: renta wsi 112, w C renty 180)",
-            None)
-    # B-3 (Z8): to, co pan dostaje z zaworu, minus polowa zoldu zalog zamkow, ktorego korona mu nie zwraca, bo "wraca zaworem" (gorna granica - zwrot
-    # tylko w wojnie). Bieg 120 dob kroku B (114-p HomePart z przewidywania): zawor panom 5.9 tys., bez zwrotu 17.7 tys. -> -3 tys./dobe; po B-2
-    # bez zwrotu jest najwyzej to, co naprawde wrocilo zaworem
+    # Po B-2 zamek kupuje tylko z nadwyzki, wiec zawor bierze 7% doplywu doby (szacunek B-2: 15-25 zl/dobe na pana samych zamkow).
+    # B-4 (przeglad B-3): B-3 zrobil z progu INFO bez decyzji, a zaden inny prog nie pilnuje tego dochodu (D staly pomija zawor z wlasnego zoldu -
+    # "wlasne" 169c; wiersz Z8 nizej byl prawdziwy z definicji). Prog projektu zostaje: TAK w 200-350, ponizej - DECYZJA (przyczyna poza krokiem B:
+    # konie zjadane przez ludnosc zamkow wbrew "kon ginie jak ginie" - paczka koni P1/P2; albo nowy cel z rachunku E2 przeliczonego z zaworem
+    # zmierzonym po B-2 - poprawka projektu przed C1), powyzej - NIE
+    if pz:
+        pm = st.mean(pz)
+        rep.add("110: pan samych zamkow - wplyw z zaworu (srednio, 28 dob)", f"{pm:.0f} zl/dobe",
+                "200-350 (projekt, test kroku B); ponizej - DECYZJA: konie zjadane w zamkach (paczka koni P1/P2) albo nowy cel z E2 po biegu B-2 (poprawka projektu przed C1)",
+                (200 <= pm <= 350) if b_on else None, decide=pm < 200)
+    else:
+        rep.add("110: pan samych zamkow - wplyw z zaworu (srednio, 28 dob)", "brak linii", "200-350 (projekt, test kroku B)", None)
+    # B-3 (Z8): to, co pan dostaje z zaworu, minus polowa zoldu zalog zamkow, ktorego korona mu nie zwraca, bo "wraca zaworem". Bieg 120 dob kroku B
+    # (114-p HomePart z przewidywania): zawor panom 5.9 tys., bez zwrotu 17.7 tys. -> -3 tys./dobe. B-4 (przeglad B-3): po B-2 ciecie rodu to
+    # min(zold zalog zamkow, zawor rodu dzis, zold rodu) - suma ciec nie przekracza zaworu panom z tej samej doby, wiec wiersz jest prawdziwy z
+    # definicji: INFO (kontrola zgodnosci - ciecie <= zawor). Wiazacy Z8 - wiersz nizej (gorna granica z 1 zl, rody w wojnie)
     zo = by_day(lines, "Zold: dzien")
-    hv, lv = [], []
+    hv, lv, hv_b2 = [], [], False
     for k in last_window(zo):
-        h = num(r"bez zwrotu korony \((?:114-p|Z8, B-2)\) (\d+)", zo[k])
+        h = num(r"bez zwrotu korony \((?:114-p|Z8, B-2[^)]*)\) (\d+)", zo[k])
         if h is not None:
             hv.append(h)
+            hv_b2 = hv_b2 or "bez zwrotu korony (Z8, B-2" in zo[k]
     for k in last_window(zz):
         a1 = num(r"zawor: (\d+) do panow", zz[k])
         if a1 is not None:
             lv.append(a1)
     if hv and lv:
         net = st.mean(lv) - 0.5 * st.mean(hv)
-        rep.add("110/Z8: zawor zamkow do panow minus utracony zwrot korony (28 dob)", f"{net:+.0f} na dobe (zawor panom {st.mean(lv):.0f}, zold bez zwrotu {st.mean(hv):.0f} x 50%)",
-                ">= 0 (zaloga we wlasnym zamku nie zabiera panu zwrotu za pieniadze, ktore do niego nie wracaja)", (net >= 0) if b_on else None)
+        rep.add("110/Z8: zawor zamkow do panow minus utracony zwrot korony (28 dob)", f"{net:+.0f} na dobe (zawor panom {st.mean(lv):.0f}, zold bez zwrotu {st.mean(hv):.0f} x 50%)"
+                + (("; ciecie <= zawor: " + ("tak" if st.mean(hv) <= st.mean(lv) else "NIE - blad TakePaid")) if hv_b2
+                   else "; log sprzed B-2 (114-p: ciecie z przewidywania - bez kontroli zgodnosci)"),
+                "po B-2 INFO - kontrola zgodnosci (ciecie <= zawor z definicji), wiazacy Z8 - wiersz nizej; log sprzed B-2 (114-p) >= 0",
+                (net >= 0) if (b_on and not hv_b2) else None)
     else:
-        rep.add("110/Z8: zawor zamkow do panow minus utracony zwrot korony (28 dob)", "brak linii", ">= 0", None)
+        rep.add("110/Z8: zawor zamkow do panow minus utracony zwrot korony (28 dob)", "brak linii", "INFO - kontrola zgodnosci", None)
+    # B-4 (Z8 2.0b, gorna granica): rody, ktorym korona zwraca zold (krolestwo w wojnie, nie najemnik), z zoldem zalog wplaconym do kas WLASNYCH zamkow -
+    # z 1 zl tego zoldu wraca do rodu nalezny zwrot korony od reszty zoldu (po cieciu) + zawor panom tych rodow < 1. Moze pasc: ciecie ma gorna granice
+    # w zoldzie zalog, a zawor rodu bierze tez inne wplaty do kasy zamku (place budow, zakupy na targu zamku). Licznik z linii "Zold:" (od B-4)
+    z8p = z8d = z8r = 0
+    z8n = 0
+    for k in last_window(zo):
+        m8 = re.search(r"Z8 rody w wojnie z zoldem zalog we wlasnych zamkach: zold do kas zamkow (\d+), zawor panom (\d+), nalezny zwrot korony od reszty (\d+)", zo[k])
+        if m8:
+            z8p += int(m8.group(1)); z8d += int(m8.group(2)); z8r += int(m8.group(3)); z8n += 1
+    if z8n and z8p > 0:
+        back = (z8d + z8r) / z8p
+        rep.add("Z8: z 1 zl zoldu zalog we wlasnych zamkach wraca (rody w wojnie, 28 dob)", f"{back:.3f} (zawor {z8d / z8p:.3f} + nalezny zwrot korony {z8r / z8p:.3f}; zold {z8p / z8n:.0f} na dobe)",
+                "< 1 (Z8 2.0b - nikt nie zarabia na wlasnym wydatku; gorna granica: zwrot nalezny, nie wyplacony)", (back < 1.0) if b_on else None)
+    else:
+        rep.add("Z8: z 1 zl zoldu zalog we wlasnych zamkach wraca (rody w wojnie, 28 dob)", "brak licznika (log sprzed B-4)" if not z8n else "0 zoldu", "< 1", None)
     # B-3: pieniadz swiata - zmiana tempa wobec bazy minus zamkniete ujscia, uczciwiej (diagnoza biegu 120 dob kroku B):
     #  (a) okno dob 31+ obu biegow (przy biegu >= 58 dob), nie ostatnie 28 dob - w dobach 1-30 przyciecie daru startowego zamkow (110) przesuwa
     #      w czasie to, co w bazie kasowal regulator (ok. 170 tys./dobe), a ostatnie 28 dob to los wojny (krok B: +212 tys. w 93-120, -50 tys. w 61-92);
     #  (b) bez wojennych zrodel z niczego, ktorych B nie dotyka (statki NavalDLC, bitwy, jency, lup z oblezen, minus lup z cial): krok B +41.5 tys.;
     #  (c) zamkniete ujscie taborow: baza "U8 tabory" minus sakwy, ktore naprawde zniknely (linia 112), nie U8 biegu B - do B-1 ksiega liczyla
     #      sakwe oddana przez 112 jako zniknieta (U8 = sakwy 112 w 119 z 119 dob);
-    #  (d) oczekiwane = zamkniete ujscia minus to, co z zatrzymanego pieniadza zjada regulator kas miast (istniejace ujscie - zamyka je 111'
-    #      w etapie 5; kasy miast wyzsze o 0.3-0.5 mln - regulator kasuje wiecej, dosypuje mniej).
+    #  (d) B-4 (przeglad B-3): regulator kas miast ROZDZIELONY - dotad odejmowana byla zmiana netto (dosypal - skasowal), ktora laczyla dwie
+    #      przeciwne rzeczy: mniej dosypki (zamkniete zrodlo z niczego - oczekiwane) i wiecej kasowania (zloto, ktore B zatrzymal we wsiach, regulator
+    #      miast kasuje w nicosc - nowe ujscie). Teraz: spadek dosypki odejmowany jako oczekiwany, wzrost dosypki NIGDY (zostaje w wyniku - zloto
+    #      z niczego); zmiana kasowania wylaczona z wyniku, ale jej wzrost ma WLASNY wiersz z progiem <= 10 tys./dobe (powyzej - DECYZJA: zamyka to
+    #      dopiero 111' w etapie 5, a czesc kasowania to odpowiedz regulatora na wojenne zloto z niczego z (b) - jedna para biegow tego nie rozdziela).
+    #      Bez rozbicia w bazie (plik sprzed B-4) - wynik jak dotad, ale INFO.
     # Do tego reszta ksiegi (niezmierzone) wobec bazy: paczka, ktora tworzy albo kasuje zloto bez nazwy, przesuwa reszte. Reszta B poprawiona o ten
-    # sam blad ksiegi (U8 tabory minus sakwy zniklo z linii 112; po B-1 = 0).
+    # sam blad ksiegi (U8 tabory minus sakwy zniklo z linii 112; po B-1 = 0). B-4: reszta wiaze na kazdej dlugosci biegu (ostatnie 28 wspolnych dob,
+    # od doby 31 przy biegu >= 58 dob) - nie zalezy od przyciecia daru w dobach 1-30 (osobna pozycja ksiegi), wiec zloto bez nazwy wykryje juz
+    # autotest 40 dob; wiersz "bez wojny" przy biegu < 58 dob - INFO (wiaze bieg 120 dob).
     dn, db = now.get("dni") or {}, (base or {}).get("dni") or {}
     if dn and db and b_on:
         hi = min(max(dn), max(db))
@@ -892,18 +981,34 @@ def main(argv):
         e_cas = cas_nothing(dn) - cas_nothing(db)
         e_vil = (m(db, "utarg_zniklo") - m(dn, "utarg_zniklo")) + (m(db, "prow_wsie") - m(dn, "prow_wsie")) + (m(db, "u8_tabory") - lost_now)
         dreg = m(dn, "miasta_reg") - m(db, "miasta_reg")
-        res = dz - dwar - e_cas - e_vil - dreg
+        split_reg = mean_days(dn, days, "miasta_dos") is not None and mean_days(db, days, "miasta_dos") is not None
         wtxt = f"doby {days[0]}-{days[-1]}"
-        rep.add("B: pieniadz swiata bez wojny - zmiana tempa wobec bazy minus zamkniete ujscia i regulator miast",
+        if split_reg:
+            d_dos = m(dn, "miasta_dos") - m(db, "miasta_dos")
+            d_kas = m(dn, "miasta_kas") - m(db, "miasta_kas")
+            exp_dos = min(d_dos, 0.0)                     # tylko spadek dosypki (zamkniete zrodlo z niczego) jest oczekiwany
+            res = dz - dwar - e_cas - e_vil - exp_dos + d_kas
+            rtxt = (f"regulator kas miast: dosypka {d_dos:+.0f} (odjete {exp_dos:+.0f} - tylko spadek), kasowanie {d_kas:+.0f} (poza wynikiem - wiersz nizej)")
+        else:
+            res = dz - dwar - e_cas - e_vil - dreg
+            rtxt = f"regulator kas miast netto {dreg:+.0f} - baza bez rozbicia dosypka/kasowanie (zapisz baze jeszcze raz), wiersz INFO"
+        rep.add("B: pieniadz swiata bez wojny - zmiana tempa wobec bazy minus zamkniete ujscia i spadek dosypki miast",
                 f"{res:+.0f} ({wtxt}: zmiana tempa {dz:+.0f}, wojenne zrodla z niczego {dwar:+.0f}, zamki - zloto z niczego netto {e_cas:+.0f}, "
-                f"wsie i tabory - zamkniete ujscia {e_vil:+.0f}, regulator kas miast {dreg:+.0f})",
-                "+-30 tys./dobe" + ("" if binding else " (INFO - wiazace na biegu >= 58 dob, okno dob 31+)"), (abs(res) <= 30000) if binding else None)
+                f"wsie i tabory - zamkniete ujscia {e_vil:+.0f}, {rtxt})",
+                "+-30 tys./dobe" + ("" if binding else " (INFO - wiaze bieg 120 dob: okno dob 31+ przy biegu >= 58 dob)"),
+                (abs(res) <= 30000) if (binding and split_reg) else None)
+        if split_reg:
+            rep.add("B: ujscie w nicosc przeniesione do regulatora kas miast (wzrost kasowania wobec bazy)",
+                    f"{d_kas:+.0f} na dobe ({wtxt}: skasowal {m(dn, 'miasta_kas'):.0f} wobec bazy {m(db, 'miasta_kas'):.0f}; zatrzymane przez B we wsiach i tabory {e_vil:+.0f})",
+                    "<= 10 tys./dobe; powyzej - DECYZJA: regulator miast kasuje zloto, ktore B zatrzymal (zamyka 111' w etapie 5 - wczesniej?; czesc to wojenne zloto"
+                    " z niczego, ktore regulator tez kasuje - rozrzut druga para biegow)" + ("" if binding else " (INFO - wiaze bieg 120 dob)"),
+                    (d_kas <= 10000) if binding else None, decide=True)
         rn, rb = m(dn, "R") - fix_r, m(db, "R")
         rep.add("B: reszta ksiegi pieniadza (niezmierzone) wobec bazy", f"{rn - rb:+.0f} ({wtxt}: bieg {rn:+.0f}" + (f" po poprawce sakw 112 {-fix_r:+.0f}" if fix_r else "")
-                + f", baza {rb:+.0f})", "+-10 tys./dobe (paczka nie tworzy ani nie kasuje zlota bez nazwy)" + ("" if binding else " (INFO - wiazace na biegu >= 58 dob)"),
-                (abs(rn - rb) <= 10000) if binding else None)
+                + f", baza {rb:+.0f})", "+-10 tys./dobe (paczka nie tworzy ani nie kasuje zlota bez nazwy; te same doby obu biegow - wiaze tez autotest 40 dob)",
+                abs(rn - rb) <= 10000)
     elif b_on:
-        rep.add("B: pieniadz swiata bez wojny - zmiana tempa wobec bazy minus zamkniete ujscia i regulator miast", "brak bazy albo szeregow dobowych w bazie (zapisz baze jeszcze raz z logu biegu bazowego)",
+        rep.add("B: pieniadz swiata bez wojny - zmiana tempa wobec bazy minus zamkniete ujscia i spadek dosypki miast", "brak bazy albo szeregow dobowych w bazie (zapisz baze jeszcze raz z logu biegu bazowego)",
                 "+-30 tys./dobe", None)
     # dawny wiersz (28 dob, bez wojny i bez regulatora miast) - INFO dla porownania z wczesniejszymi raportami
     keys = ("zamki_zakupy", "zamki_dosypal", "zamki_skasowal", "wsie_utarg_zniklo", "wsie_prowizja", "tabory_kiesy_zniknely")

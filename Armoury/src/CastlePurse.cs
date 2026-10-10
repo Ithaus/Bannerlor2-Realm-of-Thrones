@@ -391,6 +391,25 @@ namespace Armoury
             catch (Exception e) { Stumble("CastlePurse.Spendable", e); return gold; }
         }
 
+        /// <summary>
+        /// B-4 (przeglad B-2, uwaga 7): prog kasy dla platnikow, ktorzy licza "ponad prog" sami (clo i podatek wojenny korony w
+        /// KingdomTreasury.RulingIncomePostfix, sprzedaz lupu gracza w SpoilsSeal). Dla ZAMKU przy tej samej regule co Spendable
+        /// (CastlePurseEnabled i CastlePaysFromSurplus) - nie nizej niz zapas kupcow (Reserve, 22-34 tys.), bo wplata ponizej zapasu
+        /// wraca dosypka regulatora z niczego; dotad prog miasta (TownRentFloorGold, 20 000). Miasto, wylaczniki i blad - `townFloor`
+        /// jak dotad. Sam odczyt, bez licznika linii 110 (RulingIncomePostfix pyta tez z ekranu rodu).
+        /// </summary>
+        internal static int PayFloor(Town town, int townFloor)
+        {
+            try
+            {
+                if (town == null || !town.IsCastle) return townFloor;
+                var s = Settings.Current;
+                if (s == null || !s.CastlePurseEnabled || !s.CastlePaysFromSurplus) return townFloor;
+                return Math.Max(townFloor, Reserve(town));
+            }
+            catch (Exception e) { Stumble("CastlePurse.PayFloor", e); return townFloor; }
+        }
+
         // ------------------------------------------------------------ tabory wsi bez bliskiego targu
         /// <summary>
         /// Czy zamek ma z czego zaplacic za CALY ladunek taboru: nadwyzka kasy ponad zapas kupcow >= wartosc ladunku po cenach skupu
@@ -557,7 +576,7 @@ namespace Armoury
                                 // hak KL: czesc podzamcza zostaje w kasie zamku (dzis 0)
                                 int suburb = suburbShare > 0f ? (int)Math.Min(pay, (long)(pay * (double)suburbShare)) : 0;
                                 suburbKept += suburb;
-                                // 114: podzial ValveSplit - korona (1 - udzial pana) w dol, pan reszte; suma = pay - suburb.
+                                // 114: podzial ValveSplit - korona (1 - udzial pana) do najblizszej zlotowki (B-4; dotad w dol), pan reszte; suma = pay - suburb.
                                 // Zamek rodu bez krolestwa i wylaczony podzial: calosc dla pana
                                 var k = clan.Kingdom;
                                 bool crownTakes = split && k != null && !k.IsEliminated;

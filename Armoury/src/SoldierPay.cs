@@ -81,6 +81,8 @@ namespace Armoury
         private static long _dUndead, _dNoTown, _dOff, _dOther, _dCut, _dBlindGold, _dDebtCut;
         private static long _dGarToPurse; private static int _dGarToPurseN;   // K1 (A2): zold zalog do ich sakiewek
         private static long _dGarHome; private static int _dGarHomeN;         // 114-p / B-2 (Z8): zold zalog zamkow, ktory wrocil panu zaworem - bez zwrotu korony (rody)
+        // B-4 (Z8): rody z krolestwem w wojnie (zwrot korony) i zoldem zalog we wlasnych zamkach - zold do kas tych zamkow, zawor panom, nalezny zwrot od reszty
+        private static long _dZ8Pay, _dZ8Dues, _dZ8Refund; private static int _dZ8N;
         private static int _dLordN, _dGarN, _dToPurseN, _dToTownsN, _dToCastlesN, _dCutClans, _dBlind, _dDupes, _stumbles, _dDebtClans;
         private static bool _errLogged;
 
@@ -135,6 +137,7 @@ namespace Armoury
             _dUndead = _dNoTown = _dOff = _dOther = _dCut = _dBlindGold = _dDebtCut = 0;
             _dGarToPurse = 0; _dGarToPurseN = 0;
             _dGarHome = 0; _dGarHomeN = 0;
+            _dZ8Pay = _dZ8Dues = _dZ8Refund = 0; _dZ8N = 0;
             _dLordN = _dGarN = _dToPurseN = _dToTownsN = _dToCastlesN = _dCutClans = _dBlind = _dDupes = _stumbles = _dDebtClans = 0;
             _dShielded = 0; _dShieldTicks = 0;
             _dToLordGold = _dFromLordGold = _dDupLordGold = _dOutLordGold = 0; _dToLordN = _dFromLordN = _dDupLordN = _dOutLordN = 0;   // 169b
@@ -467,10 +470,17 @@ namespace Armoury
         /// Zold partii i garnizonow naprawde zaplacony od poprzedniego rozliczenia korony, wedlug platnika; czysci licznik. B-2 (Z8): glowie rodu
         /// odejmujemy to, co dzis wrocilo jej z zaworu zamkow rodu (CastlePurse.LordDuesToday - CastlePurse.Daily biegnie w tym samym ticku przed
         /// zwrotem korony), najwyzej zold zalog tych zamkow od poprzedniego rozliczenia (_castlePay) - ta czesc nie jest podstawa zwrotu.
+        /// Ciecie to GORNA granica: LordDuesToday obejmuje tez zawor z innych wplat do kasy zamku (np. place budow BuildFunding), a nie
+        /// tylko z zoldu zalogi - dlatego najwyzej _castlePay. B-4: ciecie i liczniki tylko dla rodow, ktorym korona zwraca zold (krolestwo
+        /// w wojnie, nie najemnik - te same warunki co KingdomTreasury.WageRefund); rody w pokoju, bez krolestwa i najemnicy zwrotu nie maja,
+        /// wiec ich zold nie zawyza licznika "bez zwrotu korony". Licznik Z8 (linia "Zold:"): z 1 zl zoldu zalog wplaconego do kas wlasnych
+        /// zamkow takich rodow wraca nalezny zwrot korony od reszty zoldu + zawor panom - prog < 1 (sprawdz_logi, Z8 2.0b).
         /// </summary>
         internal static List<KeyValuePair<Hero, int>> TakePaid()
         {
             var list = new List<KeyValuePair<Hero, int>>(_paidToday.Count);
+            var s = Settings.Current;
+            double pct = s != null ? Math.Max(0f, Math.Min(100f, s.CrownWageRefundPercent)) / 100.0 : 0.0;
             foreach (var kv in _paidToday)
             {
                 int v = kv.Value;
@@ -479,11 +489,12 @@ namespace Armoury
                     var h = kv.Key;
                     var c = h != null ? h.Clan : null;
                     long pay;
-                    if (c != null && h == c.Leader && v > 0 && _castlePay.TryGetValue(c, out pay) && pay > 0)
+                    if (c != null && h == c.Leader && v > 0 && _castlePay.TryGetValue(c, out pay) && pay > 0 && RefundedClan(c))
                     {
                         int dues; CastlePurse.LordDuesToday.TryGetValue(c, out dues);
                         long cut = Math.Min(Math.Min(pay, (long)Math.Max(0, dues)), v);
                         if (cut > 0) { v -= (int)cut; _dGarHome += cut; _dGarHomeN++; }
+                        _dZ8Pay += pay; _dZ8Dues += Math.Max(0, dues); _dZ8Refund += (long)((pay - Math.Max(0L, cut)) * pct); _dZ8N++;
                     }
                 }
                 catch (Exception e) { Stumble("SoldierPay.TakePaid", e); }
@@ -491,6 +502,14 @@ namespace Armoury
             }
             _paidToday.Clear(); _castlePay.Clear();
             return list;
+        }
+
+        /// <summary>B-4: rod, ktoremu korona zwraca dzis zold - krolestwo w wojnie, nie najemnik (warunki KingdomTreasury.WageRefund).</summary>
+        private static bool RefundedClan(Clan c)
+        {
+            if (c == null || c.IsEliminated || c.IsUnderMercenaryService) return false;
+            var k = c.Kingdom;
+            return k != null && !k.IsEliminated && KingdomTreasury.AtWar(k);
         }
 
         // ------------------------------------------------------------ zabezpieczenie: tarcza zoldu w kasie miasta (TownWageShield, domyslnie WLACZONA - decyzja Jeffa 06.10; bez niej regulator kas kasuje ok. 81% zoldu wplaconego miastom)
@@ -659,7 +678,8 @@ namespace Armoury
                              + " (" + _dToPurseN + " partii, w tym ludzie gracza " + _dPlayer + ")"
                              + " | garnizony: naliczony " + _dGarAcc + ", z kies zeszlo " + _dGarTaken + " (" + _dGarN + " zalog) -> do kas miast " + _dToTowns + " (" + _dToTownsN
                              + "), do kas zamkow " + _dToCastles + " (" + _dToCastlesN + "), zalogi do sakiewek " + _dGarToPurse + " (" + _dGarToPurseN + ")"
-                             + ", zold zalog zamkow, ktory wrocil panom zaworem - bez zwrotu korony (Z8, B-2) " + _dGarHome + " (" + _dGarHomeN + " rodow)"
+                             + ", zold zalog zamkow, ktory wrocil panom zaworem - bez zwrotu korony (Z8, B-2; B-4: tylko rody w wojnie) " + _dGarHome + " (" + _dGarHomeN + " rodow)"
+                             + ", Z8 rody w wojnie z zoldem zalog we wlasnych zamkach: zold do kas zamkow " + _dZ8Pay + ", zawor panom " + _dZ8Dues + ", nalezny zwrot korony od reszty " + _dZ8Refund + " (" + _dZ8N + " rodow)"
                              + " | nie przekazano: nieumarli " + _dUndead + ", zaloga bez osady " + _dNoTown + ", wylaczone w ustawieniach " + _dOff
                              + "; karawany i inne partie (bez zmian) " + _dOther
                              + " | przyciete, bo saldo rodu nie zmiescilo sie w kiesie glowy: " + _dCut + " w " + _dCutClans + " rodach (w tym brak zapisany przez gre jako dlug wobec korony: "

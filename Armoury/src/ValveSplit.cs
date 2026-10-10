@@ -16,12 +16,14 @@ namespace Armoury
             return v >= 1f ? 1f : v;
         }
 
-        /// <summary>Podzial zdjetej kwoty: korona dostaje (1 - udzial pana) w dol, pan reszte; suma zawsze rowna `draw` (jak TownPurse.Split z 114).</summary>
+        /// <summary>Podzial zdjetej kwoty: korona dostaje (1 - udzial pana) zaokraglone do najblizszej zlotowki, pan reszte; suma zawsze rowna
+        /// `draw` (jak TownPurse.Split z 114). B-4: dotad korona w dol - przy malym poborze (po B-2 kilkanascie zl z zamku dziennie) obciecie
+        /// przesuwalo udzial na korzysc pana (pobor 3 zl: korona 0; 12 zl: 3 zamiast 4); zaokraglenie nie ma kierunku.</summary>
         internal static void Split(int draw, float lordShare, out int lord, out int crown)
         {
             if (draw <= 0) { lord = 0; crown = 0; return; }
             double c = draw * (1.0 - Unit(lordShare));
-            crown = c <= 0.0 ? 0 : (c >= draw ? draw : (int)c);
+            crown = c <= 0.0 ? 0 : (c >= draw ? draw : (int)Math.Round(c, MidpointRounding.AwayFromZero));
             lord = draw - crown;
         }
     }

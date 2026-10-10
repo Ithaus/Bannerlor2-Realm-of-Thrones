@@ -2572,7 +2572,7 @@ namespace Armoury
         [SettingPropertyGroup("The castle's purse")]
         public bool CastleCartsNeedCoin { get; set; } = true;
 
-        [SettingPropertyBool("Castle Pays From Surplus", HintText = "a castle purse pays for its other purchases too only with the coin it holds above the working coin, as it does for cartloads: merchants bringing horses and harness to the castle, cloth and shoes for its garrison, the garrison's spare kit and the old pieces it sells when it buys better. Below the working coin the game tops the purse up from nowhere, so whatever was spent from it was in truth paid from nowhere. Needs Castle Purse Enabled. Off = the castle spends its whole purse, as before")]
+        [SettingPropertyBool("Castle Pays From Surplus", HintText = "a castle purse pays for its other purchases too only with the coin it holds above the working coin, as it does for cartloads: merchants bringing horses and harness to the castle, cloth and shoes for its garrison, the garrison's spare kit and the old pieces it sells when it buys better, the loot you sell there, and the crown's customs and war tax taken from it. Below the working coin the game tops the purse up from nowhere, so whatever was spent from it was in truth paid from nowhere. Needs Castle Purse Enabled. Off = the castle spends its whole purse, as before")]
         [SettingPropertyGroup("The castle's purse")]
         public bool CastlePaysFromSurplus { get; set; } = true;
 
