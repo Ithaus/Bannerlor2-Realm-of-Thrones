@@ -725,3 +725,38 @@ i przepelnienia 249 wobec 350 w C2), nie 180m (zold zalog 192 wobec 199 tys./dob
 - 0 bledow - pierwszy prawdziwy test R7 (bohater obcego rodu w partii AI: smierc pana, rozbicie i niewola druzyny z rycerzem, ekran druzyny gracza).
 - Wojsko lordow: 179 -0.4 tys. jak w projekcie; 183 zalezy od epizodow dlugu snu 3 (T10); 180m ok. 0. Wskaznik "w wojnie" zalezy od skladu wojen -
   jedno krolestwo jak Dorzecze to +-6 tys.
+
+### Test 120 dob z a5063af (kopia-c3b-120, 2026-10-10_03-42-12) - rod rycerza placil zold druzyny pana - POPRAWIONE (5ce5faf)
+
+**Wynik:** rycerze jada (w sluzbie do 50, srednio 23 na dobe, 0 bledow), ale glowy < 5000 = 33 i wszystkie to rody gentry (Dorne 18, Baratheon 6, Pentos 9); w biegu C3
+(bez a5063af) 0. Przyklad Astrethides (Pentos): od doby 65 (108901) `zold_partii` 1 389-1 452 zl/dobe przy `ludzi_partie` 0, kiesa 13 860 -> 56
+w 16 dob, potem 0.
+
+**Przyczyna:** gra (`DefaultClanFinanceModel.AddExpenseFromLeaderParty`) i BK (`EconomyPatches.ClanFinancesPatches.PartyExpensesPrefix`, zastepuje cialo
+`AddExpensesFromPartiesAndGarrisons`) obciazaja rod zoldem partii, w ktorej JEST jego glowa (`clan.Leader.PartyBelongedTo`), a nie tej, ktora prowadzi.
+Rycerz w druzynie pana albo wodza armii placil caly zold tej druzyny (`CalculatePartyWage(druzyna pana, kiesa rycerza)`); pan placil go tez w swoim
+rozliczeniu. Rody gentry w biegu: `zold_partii` 1.93 mln zl w 2 895 rod-dobach, zwrot korony 50% tylko 0.61 mln (`Wydatki rycerzy (169c)` "zold": 11.5 tys.
+/dobe w dobie 35, 37 tys./dobe w dobie 74). Bez tego (+zold - zwrot) wszystkie 33 glowy mialyby >= 5 000. Skutek uboczny: przy kiesie rycerza < 2 000
+gra liczyla zold druzyny pana jako niezaplacony i nakladala na nia kare morale (`ApplyMoraleEffect`); zaplacone kwoty szly do sakiewek ludzi pana
+(SoldierPay) - drugi raz.
+
+**Poprawka (`GentryService.cs`):** okno "ktory rod jest teraz obciazany" - prefiks `Priority.First` (przed prefiksem BK) i finalizer na
+`DefaultClanFinanceModel.AddExpensesFromPartiesAndGarrisons`; prefiks `CalculatePartyWage`: partia, w ktorej jest glowa obciazanego rodu, ale prowadzi
+ja ktos inny i nalezy do innego rodu -> 0 dla tego rodu (bez kary morale, przekazania do sakiewek i zwrotu korony). Pan placi zold swojej druzyny
+jak dotad i 24 zl rycerzowi (`Pay`). Wylaczone 179 - gra jak dotad. Linia `Rycerze (179)`: po "Straz bez zoldu" - `; zold druzyny pana zdjety
+z rozliczen rodow rycerzy (gra liczy partie, w ktorej jest glowa rodu; od wczoraj) X zl w N`. Linia startowa 179: nowa latka
+"zold druzyny pana nie z kiesy rycerza (AddExpensesFromPartiesAndGarrisons + CalculatePartyWage)".
+
+**Jednorazowy spadek ok. 21 tys. w Pentos (doby 36-60, Astrethides 35 160 -> 13 800) - nie 179:** udzial w kosztach "wezwania do wojny" krolestwa
+(gra `AddExpensesForCallToWarAgreements`: kazdy rod placi (-CallToWarWallet) x udzial; rod bez lenna 1 / (wagi lenn + 1 + rody) - tyle co pan bez lenna).
+`Pieniadz swiata (rody - przyczyny)`: "wezwanie do wojny zaplacone" -57 459, -39 793, -27 557 ... (ok. x0.69 na dobe). To samo w biegu C3 bez poprawki
+(doby 105-107, 10 rodow gentry Pentos). Zostawione (dyplomacja krolestwa, jedna regula dla wszystkich rodow); do rozwazenia w 165 (koszt wezwania
+z korony, nie z kies).
+
+**"Niewalczacy w sluzbie" = wszyscy:** to nie stan bohatera (NotSpawned/Active), tylko umiejetnosci: gra `IsNoncombatant` = zadna z broni (jednoreczna,
+dwureczna, drzewcowa, rzucana, kusza, luk) >= 100; szablony BK "bannerkings_gentry_*" maja slabe umiejetnosci. Gra nie uzywa `IsNoncombatant` w bitwie
+(tylko rozmowy, turnieje, teleport AI, dyplomacja, ocena dowodcy partii) - rycerz walczy w bitwie jak kazdy bohater w druzynie, tylko slabo. Bez zmian.
+
+**Czego sie spodziewac w kolejnym tescie 120 dob:** `budzet-rodow.csv` - `zold_partii` rodow gentry 0 (rod bez partii); `Wydatki rycerzy (169c)` "zold" 0;
+linia 179 "zold druzyny pana zdjety" ok. 30-70 tys. zl/dobe w wojnie (suma zoldow druzyn z rycerzem, liczona raz na rod rycerza); glowy gentry < 5000
+w dobie 120: 0 (poza krolestwami z wezwaniem do wojny - tam tyle co inne rody bez lenna); kiesy rycerzy w sluzbie rosna o 24 zl/dobe.
