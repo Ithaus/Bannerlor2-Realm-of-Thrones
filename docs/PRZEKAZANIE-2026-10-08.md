@@ -410,3 +410,6 @@ LIMITY 13:30: 5h 32%, TYDZIEN 82% (reset 15.10) - przy 100% tygodnia przejsc na 
   slabsi" + kredyt 168), Ibben -32%. DECYZJA (stare): pan zamkow z zaworu 134 zl/d, regulator miast +24 tys./d. Renty 180: pula 53.9 tys./d = renty 33.6 + wstrzymane
   20.3 (94 z 215 rodow bez warunku SLUZBY - 43.7%, wiecej niz zakladane 20% - do obserwacji, ew. poprawka warunku w C3); zwrot 81.5% naleznego.
   Dalej: test zapisu 9 dob (autotest-161-kawalki) -> test\at-c2-zapis.out.txt -> jesli OK: **WGRANIE 16 = C1+C2** (Armoury b43f65cf, w-toku/e2c 1220510).
+- (02:05) **WGRANIE 16: Armoury b43f65cf (noc/wgranie-16 = w-toku/e2c 1220510 = C1+C2)**, CS 6507c842. Zapis 9 dob OK (0 bledow). Dalej: **C3** (179 rycerze bez lenna
+  bez wlasnych partii - jada w druzynie pana; 183 dezercja AI wedlug poziomu, podloga 30 ludzi przy zaleglym zoldzie) wedlug PROJEKT-ETAP2 rozdz. 179 (ok. 548) i 183
+  (ok. 585), na galezi w-toku/e2c; do obserwacji: warunek sluzby rent 180 (44% rodow bez renty). Potem D (168 + 178), potem etap 3.

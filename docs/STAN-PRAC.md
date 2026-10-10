@@ -971,3 +971,11 @@ wojsko w wojnie 115.4 tys.; 1 ERROR ValyrianBlades.Census (177, nie krok B - do 
 do taboru partii AI - krewny z rodu, ktory ja udzwignie (glowa pierwsza), inaczej polka miasta rodu; przyczyna: Truth odlozony przy pojmaniu Tregara Ormollena do
 taboru Leona Staegone znikal sekunde pozniej). CrashScribe bez zmian 6507c842. Autotest 40 dob nowej kampanii: 40/40, 14.0 s/dobe, Armoury 0 bledow (CS 8 = staly
 szum startowy innych modow, jak w kazdym tescie), spis stali 17/17 klng. Kopie: Armoury.dll.bak-2026-10-09-przed-noc15 + D:\Backup-Bannerlord\wgrane\2026-10-09-noc15-przed.
+
+**WGRANIE 16 (10.10 ok. 02:05 zegara komp.):** Armoury b43f65cf (galaz noc/wgranie-16 = w-toku/e2c 1220510 = WGRANIE 15 + ETAP 2 KROK C1 (165 korona z biezacych
+wplywow, 182 dary Polnoc->Straz 25% i Wolne Miasta->Dothrakowie 15% + Straz bez zoldu, 166+162m budzet rodu AI + dwor z tarcza, 185 kontrakt najemnika AI) + poprawki
+recenzji (4b7b11b) i wojska (385e7ec dwor ustepuje zoldowi w wojnie, limity partii z wolnego miejsca; 4e4e627 umowa najemnika >= polowa kompanii) + KROK C2 (180 renty
+korony wedlug lenn z warunkiem zalogi i sluzby; 1220510 komunikat renty gracza raz na 7 dob)). CrashScribe bez zmian 6507c842. Testy: 120 dob nowej kampanii -
+glowy < 5000 = 4, bankruci 0, wojsko lordow w wojnie 101.8 tys. (pas 95-115), zalogi +1%, reszta ksiegi -2.9 tys./d, 0 bledow; zapis 9 dob OK (31 s/d, 0 bledow).
+Slabsze: Iron Islands -61%, Dothraki -39%, Ibben -32% (biedni z lore; dalej kredyt 168). Opis: docs/C1-POSTEP.md w galezi w-toku/e2c. Kopie: Armoury.dll.bak-2026-10-10-przed-noc16
++ D:\Backup-Bannerlord\wgrane\2026-10-10-noc16-przed. ZATWIERDZONE: Armoury b43f65cf, CrashScribe 6507c842. Baza Armoury: w-toku/e2c.
