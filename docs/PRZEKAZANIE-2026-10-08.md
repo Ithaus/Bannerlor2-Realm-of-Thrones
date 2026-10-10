@@ -382,3 +382,10 @@ LIMITY 13:30: 5h 32%, TYDZIEN 82% (reset 15.10) - przy 100% tygodnia przejsc na 
   wraca w nicosc - zrodlo zamyka 168. Nowe progi testu C1 (W1): zalogi tylko twierdze rodow w wojnie >= 28 dob w obu biegach; wojsko >= 96% bazy tej samej doby
   w tym samym zbiorze rodow (w wojnie >= 18 dob). **TEST 120 dob w toku**: test\Armoury-e2c-c1r.dll -> test\at-c1r-120.out.txt; potem sprawdz_logi --grupa etap2
   --baza e2b-p\baza-B4.json + porownanie z kopia-e2b2-120 (budzet-rodow.csv, balans-krolestw.csv); jesli OK -> WGRANIE 16.
+- (00:50) **TEST C1 120 dob (DLL 29a46fbb; kopia SCRATCH(7016) kopia-c1r-120\):** 120/120, 16.5 s/dobe, 0 bledow Armoury (CS 9 = 8 szumu + polkniety wyjatek
+  ROT HarrenhalSiegeEvent - Mends odlozyl oblezenie, "Polnoc nie utworzyla armii dla Roose Bolton"). Progi (baza-B4): glowy < 5000 = 7 (TAK; baza 19),
+  bankruci Banku 3 (ETAP), zalogi na twierdze w wojnie -4.3% (TAK), reszta ksiegi -2.3 tys. (TAK), zwrot 88.5% naleznego. **NIE: wojsko** - druzyny lordow
+  w wojnie 89.7 tys. wobec 111.5 tys. (-20%; projekt zakladal ok. -4% do kroku D), Iron Islands -69%, Dothraki -47%, Pentos -33%, Norvos -29%; a pulap 166
+  NIE wiaze (zold 47-51% pulapu). **C1 NIE WGRANY.** Diagnoza + poprawka: jeden pomocnik w tle (porownanie rod po rodzie budzet-rodow.csv obu biegow 120 dob,
+  mechanizm w ClanBudget/dwor/AiGear/hamulec partii, korekta 182: dar Wolnych Miast 0.10 -> 0.15) -> commit na w-toku/e2c + sekcja w C1-POSTEP.md;
+  potem znow test 120 dob i wgranie 16, jesli wojsko w wojnie >= ok. 96% bazy.
