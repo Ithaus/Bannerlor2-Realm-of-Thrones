@@ -1105,7 +1105,7 @@ beda mialy dzieci - rody z takim malzenstwem moga wymrzec szybciej (zamierzone).
 
 ---
 
-## 186 - korona pozycza w Zelaznym Banku (decyzja Jeffa 10.10)
+## 186 - korona pozycza w Zelaznym Banku (decyzja Jeffa 10.10) - ZROBIONE (commit 57fbf30, recenzja wlasna w nastepnym)
 
 Jeff 10.10: "oczywiscie, ze korona powinna pozyczac" (projekt etapu 2, rozdz. 3: Q4b "korona pozycza w Banku" - dotad pomysl na slowo Jeffa; dlug korony wobec
 rodow z 165 pkt 3 - dalej nie). Lore (uzasadnienie): Zelazny Tron byl winien Bankowi i Lannisterom ok. 6 mln za Roberta; gdy Cersei wstrzymala splaty, Bank zaczal
@@ -1117,8 +1117,8 @@ pozyczac Stannisowi - Bank zawsze dostaje swoje. Zamknieta ekonomia: Bank pozycz
    renty 180 biora wylacznie reszte wplywow dnia, ktora przy pozyczce jest 0; dary i inne wydatki sa przed zwrotem i z kredytu nie rosna. W pokoju - zadnej nowej pozyczki.
 2. **Ile:** dlug korony (z odsetkami i oplatami) najwyzej `CrownLoanLimitDays` (180) x sredni podatek krolestwa. Sredni podatek = srednia 84 dob "naszych" wplywow dnia
    165 (powinnosci, danina wojenna, clo, 1/3 zaworu zamkow, 1/9) - bez 1/360 zapasu i bez jednorazowych przelewow do skarbca (Diplomacy, gra), ktore nie sa podatkiem
-   (w t10r jeden dzien buntownikow Pentos przyniosl 583 tys. z niczego - taki dzien podnioslby limit o ok. 1.25 mln). Pierwsze 7 dob pomiaru (stary zapis, nowe krolestwo) -
-   bez kredytu. Bank daje koronom tylko z kapitalu ponad `CrownLoanBankFloor` (2 mln) i dziennie najwyzej 1/`CrownLoanPoolDays` (60) tej nadwyzki; gdy chetnych jest
+   (w t10r jeden dzien buntownikow Pentos przyniosl 583 tys. z niczego - taki dzien podnioslby limit o ok. 1.25 mln). Kredyt dopiero od 7. doby pomiaru (stary zapis, nowe krolestwo).
+   Bank daje koronom tylko z kapitalu ponad `CrownLoanBankFloor` (2 mln) i dziennie najwyzej 1/`CrownLoanPoolDays` (60) tej nadwyzki; gdy chetnych jest
    wiecej - dzieli proporcjonalnie do potrzeby.
 3. **Cena:** jak kazda pozyczka Banku (`IronBank.RateFor`/`LendKw`): krol 20% rocznie (rok 364 dni), +10 pp, gdy dlug juz biegnie (srednia wazona - przy kredycie
    dobieranym codziennie ok. 30%), +15 pp dla korony po zaleglosci; oplata 2% od kazdej wyplaty (dopisana do dlugu). Odsetki narastaja codziennie, takze w pokoju.
@@ -1171,7 +1171,7 @@ KW i pozyczka gracza w Braavos zablokowane przy koronie w zaleglosci + licznik w
 
 **Nowe klucze (grupa "The crown's income (stage 2)"):** `CrownBorrows` true, `CrownLoanLimitDays` 180, `CrownLoanRepayDays` 182, `CrownLoanMaxIncomeShare` 0.30,
 `CrownLoanBankFloor` 2 000 000, `CrownLoanPoolDays` 60, `CrownArrearsEnemyCredit` 1.5. Stale w kodzie: okno zaleglosci 28 dob, prog 50%, srednia podatku 84 doby,
-7 dob pomiaru przed pierwszym kredytem. Oprocentowanie i oplata - klucze Banku (`IronBankRateKing` 20, `IronBankRatePerLoan` 10, `IronBankRateAfterDefault` 15,
+kredyt od 7. doby pomiaru podatku. Oprocentowanie i oplata - klucze Banku (`IronBankRateKing` 20, `IronBankRatePerLoan` 10, `IronBankRateAfterDefault` 15,
 `IronBankLoanFeePercent` 2).
 
 **Nowe / zmienione linie logu:**
@@ -1205,9 +1205,9 @@ KW i pozyczka gracza w Braavos zablokowane przy koronie w zaleglosci + licznik w
 7. Brak komunikatu dla gracza-wasala przy pierwszej pozyczce jego korony (tylko krol); przy zaleglosci - kazdy gracz w krolestwie dluznika (blokuje i jego kredyt).
 
 **Czego sie spodziewac w tescie 120 dob (start z zapisu t10r - Bank ok. 4.9 mln):**
-- Doby 1-7: `Kredyt korony (186)` - "pomiar podatku < 7 dob" u ok. 10-13 krolestw, pozyczono 0. Od doby 8: pozyczono ok. 35-45 tys./dobe u 8-13 krolestw
+- Doby 1-6: `Kredyt korony (186)` - "pomiar podatku < 7 dob" u ok. 10-13 krolestw, pozyczono 0. Od doby 7: pozyczono ok. 35-45 tys./dobe u 8-13 krolestw
   (Krolewska Przystan, Polnoc, Volantis, Smocza Skala, Dorne, Norvos, ...), pula Banku ok. 45 tys.; potem pula maleje (d60 ok. 24 tys., d120 ok. 15 tys.) - "przycieta" > 0.
-- `Korona: wplywy dnia (165)` "wyplacone": doby 8-20 ok. 97-100%, d40 ok. 94%, d80 ok. 88%, d120 ok. 85% (t10r bez 186: ok. 81-82%); "w tym z kredytu Banku" = "pozyczono dzis".
+- `Korona: wplywy dnia (165)` "wyplacone": doby 7-20 ok. 97-100%, d40 ok. 94%, d80 ok. 88%, d120 ok. 85% (t10r bez 186: ok. 81-82%); "w tym z kredytu Banku" = "pozyczono dzis".
   `Korona: niedoplata 28 dob (169c)`: Polnoc i Krolewska Przystan wyraznie nizej w dobach 20-50; Volantis i Pentos - wedlug limitu (maly podatek).
 - Bank: kapital z ok. 4.9 mln do ok. 2.9-3.2 mln w d120 (nigdy ponizej 2 mln), dlug koron ok. 2-2.3 mln; zysk do kasy Braavos 0. Kontrola co do 1 zl:
   "pozyczono dzis" = "kredyt koron kapital -> skarbce" (Obieg) = suma "kredyt186 +" w 165; "splacono" = "raty skarbce -> kapital" = suma "rata186 -".
@@ -1220,3 +1220,23 @@ KW i pozyczka gracza w Braavos zablokowane przy koronie w zaleglosci + licznik w
 prawdziwa splata dopiero w pokoju (ok. 230 dob dla dlugu ok. 60 dni podatku); (b) kolysanie pulapu 166 w krolestwach z brakiem (zwrot jest w D) - lagodzi pula 1/60;
 (c) w pokoju rata do 30% podatku zmniejsza renty 180 zadluzonych koron (renty z reszty wplywow) - zamierzone (obsluga dlugu); (d) korona zniszczona z dlugiem - Bank traci
 (licznik); (e) gracz-krol nie ma przycisku "nie pozyczaj" - jedyna droga to wylacznik `CrownBorrows` (jak u AI).
+
+**Recenzja wlasna (diff 432e8e9..57fbf30; poprawki w osobnym commicie).** Sprawdzone: zloto (kredyt: dlug zapisany, kapital Banku -> skarbiec tym samym przelewem;
+rata: skarbiec -> kapital; odsetki, oplata i "Bank stracil" - tylko zapis; pieniadz kredytu lezy w skarbcu tylko wewnatrz `WageRefund` - nagroda za wielkiego jenca,
+kontrakty i wezwania biegna wczesniej, renty pozniej biora `LeftFor` = min(reszta wplywow, skarbiec), a reszta po zwrocie z kredytem jest 0), podwojne liczenie
+(migawka skarbcow 165 przy `End` obejmuje rate i kredyt - jutrzejsze "inne do skarbcow" ich nie widza; w "Obieg" ten sam przelew w sekcji korony i Banku - jak KW),
+wyjatki (kazde krolestwo i kredyt we wlasnym try; dwuprzebiegowy `WageRefund` przy braku kredytu zachowuje sie jak dotad - wyplata krolestwa A nie zmienia
+reszty wplywow krolestwa B), zapis (12 pol na kredyt, stary zapis bez klucza - pusto, kredyt od 7. doby pomiaru; starszy DLL klucz pomija - Bank traci pozyczone, zlota nie przybywa),
+wylacznik (`CrownBorrows` / 165 / Bank wylaczone: bez rat, odsetek, kredytu i skutkow zaleglosci - `LimitFactor` 1; jedyna zmiana bez wylacznika - kolejnosc
+obliczen w `WageRefund`, wynik ten sam).
+
+**Poprawione:**
+1. Krolestwo bez dnia 165 (wyjatek w `CrownIncome.Begin`) nie pozycza: jego reszta wplywow to 0, wiec kredyt wzialby caly nalezny zwrot (przed 186 - zwrot 0).
+2. Ten sam przypadek przy racie: bez raty i bez wpisu w oknie 28 dob (brak pomiaru nie jest zaleglosci); odsetki narastaja.
+3. Skarbiec nie przyjal wyplaty kredytu (wyjatek setera) - zloto wraca do kapitalu Banku, dlug cofniety (jak `CrownRents` przy kiesie glowy).
+4. Srednie podatku krolestw, ktorych juz nie ma (bez dlugu), usuwane - nie rosna w zapisie.
+5. "Pula Banku dzis" w linii liczona przed sprawdzeniem chetnych.
+
+**Uwagi bez zmian w kodzie:** (a) korona z zapasem ponad rezerwe 500 000 tez pozycza - zapas schodzi tylko 1/360 dziennie (regula 165); zadanie: "wplywy dnia nie
+starcza" - bez warunku na zapas; (b) "wyplacone" w 165 i niedoplata 28 dob (169c) licza zwrot z kredytem - prog etapu 2 "zadne krolestwo w wojnie > 50% niedoplaty"
+jest teraz czesciowo spelniany dlugiem (linia 186 mowi ile); (c) zwrot z kredytu wchodzi do D rodu (`KRefund`) jak kazdy zwrot - pulap 166 rosnie razem z kredytem.

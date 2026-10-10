@@ -13,7 +13,7 @@ namespace Armoury
     ///  - KIEDY: krolestwo w wojnie, a reszta wplywow dnia nie starcza na nalezny zwrot zoldu (KingdomTreasury.WageRefund wola Lend) - skarbiec pozycza
     ///    brakujaca czesc zwrotu z kapitalu Banku i tego samego dnia oddaje ja rodom. Tylko zwrot (renty 180 biora tylko reszte wplywow dnia). Pokoj - nic nowego.
     ///  - ILE: dlug najwyzej CrownLoanLimitDays (180) x sredni podatek (srednia 84 dob naszych wplywow dnia 165 - powinnosci, danina, clo, 1/3 zaworu
-    ///    zamkow, 1/9; bez 1/360 zapasu i bez jednorazowych przelewow); pierwsze 7 dob pomiaru - bez kredytu. Bank daje koronom tylko z kapitalu ponad
+    ///    zamkow, 1/9; bez 1/360 zapasu i bez jednorazowych przelewow); kredyt od 7. doby pomiaru. Bank daje koronom tylko z kapitalu ponad
     ///    CrownLoanBankFloor (2 mln), dziennie najwyzej 1/CrownLoanPoolDays (60) tej nadwyzki; przy niedoborze - proporcjonalnie do potrzeby.
     ///  - CENA jak kazda pozyczka Banku: krol 20% rocznie, +10 pp przy biegnacym dlugu, +15 pp po zaleglosci (srednia wazona); oplata 2% od wyplaty.
     ///  - RATA - pierwszy wydatek z wplywow dnia (krok zaraz po CrownIncome.Begin, przed darami 182): 1/CrownLoanRepayDays (182) najwiekszego dlugu tego
@@ -187,6 +187,14 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Stumble("Instalments(podatek)", e); }
+            try
+            {
+                // recenzja 186: srednie krolestw, ktorych juz nie ma (bez dlugu) - poza zapisem
+                var gone = new List<string>();
+                foreach (var kv in _tax) { if (_loans.ContainsKey(kv.Key)) continue; var k = FindKingdom(kv.Key); if (k == null || k.IsEliminated) gone.Add(kv.Key); }
+                foreach (var id in gone) _tax.Remove(id);
+            }
+            catch (Exception e) { Stumble("Instalments(porzadki)", e); }
             double year = Math.Max(1, IronBank.DaysPerYearNow());
             float share = Math.Max(0f, Math.Min(1f, s.CrownLoanMaxIncomeShare));
             double days = Math.Max(1f, s.CrownLoanRepayDays);
@@ -212,11 +220,12 @@ namespace Armoury
                     if (l.Principal < 1) { if (!l.EverArrears) drop.Add(kv.Key); continue; }
                     double interest = l.Principal * l.Rate / year;
                     l.Principal += interest; _dInterest += (long)Math.Round(interest);
+                    var cd = CrownIncome.DayOf(k);
+                    if (cd == null) continue;   // recenzja 186: krolestwo bez dnia 165 (wyjatek w Begin) - dzis bez raty i bez wpisu w oknie zaleglosci
                     double want = Math.Min(Math.Min(l.Peak / days, share * TaxAvg(kv.Key)), l.Principal);
                     long due = (long)Math.Ceiling(Math.Max(0, want));
                     long pay = 0;
-                    var cd = CrownIncome.DayOf(k);
-                    if (due > 0 && cd != null)
+                    if (due > 0)
                     {
                         pay = Math.Min(due, Math.Min(CrownIncome.LeftFor(k), (long)Math.Max(0, k.KingdomBudgetWallet)));
                         if (pay > 0)
@@ -283,6 +292,7 @@ namespace Armoury
                     {
                         var k = kv.Key; long n = kv.Value;
                         if (k == null || k.IsEliminated || k.StringId == null || n <= 0) continue;
+                        if (CrownIncome.DayOf(k) == null) continue;   // recenzja 186: bez dnia 165 reszta wplywow to 0 - kredyt wzialby caly zwrot
                         _dNeed += n; _dNeedN++;
                         Loan l; _loans.TryGetValue(k.StringId, out l);
                         if (l != null && l.Arrears) { _dNoArrears++; continue; }
@@ -296,10 +306,10 @@ namespace Armoury
                     }
                     catch (Exception e) { Stumble("Lend(krolestwo)", e); }
                 }
-                if (askSum <= 0) return got;
                 double free = IronBank.FreeCapital - Math.Max(0, s.CrownLoanBankFloor);
                 double pool = Math.Floor(Math.Max(0, free) / Math.Max(1f, s.CrownLoanPoolDays));
-                _dPool = (long)pool;
+                _dPool = (long)pool;   // recenzja 186: pula dnia w linii takze bez chetnych
+                if (askSum <= 0) return got;
                 if (pool < 1) { _dNoBank += ask.Count; _dBankCut += askSum; return got; }
                 double f = askSum <= pool ? 1.0 : pool / askSum;
                 if (f < 1.0) _dBankCut += askSum - (long)pool;
@@ -322,7 +332,8 @@ namespace Armoury
                         l.Principal += iy + fe; l.Peak = Math.Max(l.Peak, l.Principal);
                         l.Borrowed += iy; l.DLent += iy;
                         IronBank.CapitalAdd(-iy);
-                        k.KingdomBudgetWallet += iy;
+                        try { k.KingdomBudgetWallet += iy; }
+                        catch { IronBank.CapitalAdd(iy); l.Principal -= iy + fe; l.Borrowed -= iy; l.DLent -= iy; throw; }   // recenzja 186: zloto wraca do Banku, dlug cofniety
                         got[k] = iy;
                         _dLent += iy; _dLentN++; _dFees += (long)Math.Round(fe);
                         var cd = CrownIncome.DayOf(k);
