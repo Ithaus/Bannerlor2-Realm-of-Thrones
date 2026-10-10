@@ -1054,3 +1054,51 @@ until Max Forced Nights orders a rest"). Stala w kodzie: `CrushRatio` = 2 (wrog 
 odpoczynku nie ucieka przed wrogiem 1-2 razy silniejszym - wiecej bitew przegranych przez wyczerpanych (zamierzone: wyczerpana kolumna nie ucieknie); (c) R6 zmienia
 splate w oblezeniu/armii - dlug 3 schodzi tam w ok. 1-1.5 doby zamiast nigdy; (d) R7: po poprawce baza 6 h przy obozie 0-6 to rowno 6 tikow - kazdy tick sie liczy;
 gdyby gra kiedys nie wolala ticku (pauza, wczytanie), pierwsza godzina po wczytaniu liczy sie jak dotad jako postoj; (e) partie w armii gracza - bez zmian (decyduje gracz).
+
+---
+
+## Rasy - olbrzymy tylko z olbrzymami (decyzja Jeffa 10.10) - ZROBIONE (commit ea606c7)
+
+Jeff 10.10: "olbrzymy moga tylko z olbrzymami, ludzie z ludzmi; nie ma zadnej ciazy ani malzenstwa olbrzyma z czlowiekiem". Kod: `Armoury/src/RaceLaw.cs`
+(wpiecie w `SubModuleMain`, start sesji i doba w `ArmouryBehavior`).
+
+**Dowod:** test C3c (CrashScribe `session-2026-10-10_04-30-07.log`) - w dobie 43 SilentAssert w `HeroCreator.DeliverOffSpring`
+("mother.CharacterObject.Race == father.CharacterObject.Race"), stos: `PregnancyCampaignBehavior.CheckOffspringToDeliver` <- `DailyTickHero_Patch1`, potem
+"GAME HANG ... main thread silent for 61 s" w kodzie silnika.
+
+**Sprawdzone w dekompilacji (1.4.8, BK, ROT):** model slubu, ktorego gra uzywa, to `ROTMarriageModel` (dekorator: wlasne warunki ROT, potem `_previousModel`);
+pod nim `BKMarriageModel`, ktory `IsCoupleSuitableForMarriage` dziedziczy z `DefaultMarriageModel`. Z modelu korzystaja: sluby NPC gry (`RomanceCampaignBehavior` przez
+`NpcCoupleMarriageChance`), ROT (`ROTRelationshipsBehavior`), oferty slubu gry, dialogi i kontrakty BK (`BKMarriageBehavior`); sama akcja `MarriageAction.ApplyInternal`
+pyta model i przy false nic nie robi. Ciaza: `MakePregnantAction.Apply(matka)` (gra i BK) -> `ChildConceived` dopisuje (matka, matka.Spouse) do `_heroPregnancies`;
+porod: `CheckOffspringToDeliver` -> `DeliverOffSpring`. Rasy liczone numerem `CharacterObject.Race` (human, giant, wight, whitewalker - nazwy z `FaceGen.GetRaceNames`).
+
+**Co zrobione:**
+- (a) postfiks `DefaultMarriageModel.IsCoupleSuitableForMarriage` -> false dla roznych ras; przy starcie sesji postfiks takze na kazdym wlasnym nadpisaniu w lancuchu
+  typu modelu, ktorego gra naprawde uzywa (ROT) - para liczona raz. Bez osobnej latki na `MarriageAction` (akcja pyta model).
+- (b) prefiks `MakePregnantAction.Apply` i `ApplyInternal`: matka i jej malzonek roznych ras - ciaza sie nie zaczyna (nic sie nie dzieje, bez komunikatu).
+- (c) prefiks `PregnancyCampaignBehavior.CheckOffspringToDeliver`: ciaza roznych ras (stary zapis) konczy sie bez porodu - wpis zdjety z `_heroPregnancies`,
+  `IsPregnant = false` (tak jak gra przy smierci matki i ROT przy przemianie w Innego), `DeliverOffSpring` nie jest wolany. Gra sprawdza ciezarne co dobe -
+  koniec przy pierwszym ticku dnia po wczytaniu.
+- Malzenstwa roznych ras ze startu ROT zostaja - tylko bez ciaz.
+
+**Nowy klucz:** `SameRaceOnly` = true (MCM "Blood and race"; wylaczony = gra jak dotad).
+
+**Linie logu (Armoury-*.log):**
+- `Rasy: latki wpiete - model slubu gry, MakePregnantAction, porod (CheckOffspringToDeliver).` - przy ladowaniu moda (BRAK ... = cel nie znaleziony).
+- `Rasy: start sesji - SameRaceOnly=True; model malzenstwa ROT.Models.ROTMarriageModel (postfiks takze na: ROT.Models.ROTMarriageModel); zywi bohaterowie wedlug rasy:
+  human N, giant M, ...; malzenstwa roznych ras (zostaja, bez ciaz) K (w tym w ciazy L); ciaze roznych ras na liscie gry P[ - skoncza sie bez porodu ...].`
+- `Rasy: dzien N | slubow roznych ras zablokowano X, ciaz Y, porodow roznych ras przerwano Z` - raz na dobe, tylko gdy cos zablokowano (X = rozne pary,
+  ktore model uznalby za dobre, a odrzucila je rasa; model pytany wiele razy dziennie o te same pary, wiec X to kandydaci, nie odbyte sluby).
+- `Rasy: ciaza <matka> (rasa) z <ojciec> (rasa) zakonczona bez porodu (rozne rasy) [n w sesji].` - 5 pierwszych w sesji.
+
+**Co czytac w tescie 120 dob:**
+- `Rasy: latki wpiete` bez "BRAK"; `Rasy: start sesji` - ile olbrzymow i ile malzenstw roznych ras, czy model to ROT z postfiksem.
+- `Rasy: dzien N` - X pojawia sie w dobach, gdy ROT/gra szuka par (kilka-kilkadziesiat), Y > 0 tylko przy malzenstwach roznych ras ze startu, Z > 0 tylko przy
+  starym zapisie z taka ciaza (po pierwszej dobie 0).
+- Brak SilentAssert `DeliverOffSpring` w CrashScribe i brak zawieszenia w dobie ok. 43 (C3c).
+- Kronika urodzin (jesli jest w logach) - dzieci olbrzymow tylko od dwojga olbrzymow.
+
+**Ryzyka:** (a) model slubu zwraca false dla par roznych ras takze tam, gdzie gra tylko sprawdza (np. oferta slubu gracza z olbrzymka - nie pojawi sie; wojna
+anuluje oferte jak przy kazdej innej nieodpowiedniej parze); (b) gdyby inny mod wolal `HeroCreator.DeliverOffSpring` z wlasnej listy ciaz (nie z gry) - straznik (c)
+go nie obejmie (w dekompilacji BK/ROT takiego miejsca nie ma; BK gentry tworzy dzieci z szablonu malzonka tej samej kultury); (c) mieszane malzenstwa ze startu nie
+beda mialy dzieci - rody z takim malzenstwem moga wymrzec szybciej (zamierzone).
