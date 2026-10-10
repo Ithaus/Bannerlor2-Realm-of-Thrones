@@ -1,4 +1,5 @@
 using System;
+using System.Reflection;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -326,6 +327,36 @@ namespace CrashScribe
                 {
                     _harrenhalSwallowLog = now;
                     Scribe.Line("Mends: oblezenie Harrenhal - wyjatek ROT (" + __exception.GetType().Name + ") polkniety; od nastepnej godziny rozstawiamy sami.");
+                }
+            }
+            catch { }
+            return null;
+        }
+
+        // ===== BK ZADANIE PRETENDENTA = CRASH (bieg 2-letni 10.10, doba 457) =====
+        // BannerKings ClaimantDemand.SetTexts (:220) rzuca NullReferenceException (pretendent albo jego krolestwo juz nie istnieje), wolane z
+        // Demand.Fulfill <- Demand.DoAiChoice <- RadicalGroup.Tick <- KingdomDiplomacy.Update <- BKDiplomacyBehavior.OnDailyTick; BLSE pokazuje okno
+        // ButterLib i gra stoi. Finalizery: SetTexts, Fulfill i DoAiChoice - wyjatek polkniety (zadanie nie spelnione tego dnia), log raz na dzien.
+        private static bool _bkDemandSaved;
+        private static double _bkDemandLog = -1;
+        private static int _bkDemandSwallowed;
+        public static Exception BkDemandSafe(Exception __exception, MethodBase __originalMethod)
+        {
+            if (__exception == null) return null;
+            try
+            {
+                _bkDemandSwallowed++;
+                string where = __originalMethod != null ? __originalMethod.DeclaringType.Name + "." + __originalMethod.Name : "BK Demand";
+                if (!_bkDemandSaved)
+                {
+                    _bkDemandSaved = true;
+                    Scribe.Report("BannerKings " + where + " wywrocil sie - wyjatek polkniety, gra zyje", __exception, where, null);
+                }
+                double now = CampaignTime.Now.ToDays;
+                if (_bkDemandLog < 0 || now - _bkDemandLog >= 1.0)
+                {
+                    _bkDemandLog = now;
+                    Scribe.Line("Mends: zadanie BK (" + where + ") - wyjatek " + __exception.GetType().Name + " polkniety (razem " + _bkDemandSwallowed + "); zadanie bez skutku tego dnia.");
                 }
             }
             catch { }
@@ -3261,6 +3292,22 @@ namespace CrashScribe
                 else Scribe.Line("Mends: ROT HarrenhalSiegeEvent.SetupSiegeAttackers nieznaleziony - oblezenie Harrenhal bez straznika.");
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.Install(harrenhal)", null); } catch { } }
+
+            try
+            {
+                // ===== BK ZADANIE PRETENDENTA (10.10) - patrz BkDemandSafe =====
+                var fin = new HarmonyMethod(typeof(Mends), "BkDemandSafe");
+                int n = 0;
+                var tClaim = AccessTools.TypeByName("BannerKings.Behaviours.Diplomacy.Groups.Demands.ClaimantDemand");
+                var tDem = AccessTools.TypeByName("BannerKings.Behaviours.Diplomacy.Groups.Demands.Demand");
+                var m1 = tClaim != null ? AccessTools.Method(tClaim, "SetTexts") : null;
+                var m2 = tDem != null ? AccessTools.Method(tDem, "Fulfill") : null;
+                var m3 = tDem != null ? AccessTools.Method(tDem, "DoAiChoice") : null;
+                foreach (var m in new[] { m1, m2, m3 })
+                    if (m != null && !m.IsAbstract) { harmony.Patch(m, finalizer: fin); n++; }
+                Scribe.Line("Mends: zadania BK (pretendent, spelnienie, wybor AI) zabezpieczone - " + n + " z 3 metod; wyjatek nie wywala gry.");
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.Install(bk-demand)", null); } catch { } }
 
             try
             {
