@@ -358,3 +358,7 @@ LIMITY 13:30: 5h 32%, TYDZIEN 82% (reset 15.10) - przy 100% tygodnia przejsc na 
   3.2 (cale zloto taboru/bandy dla zwyciezcy - Jeff juz zdecydowal 09.10: "jak rozbije karawane, to zabiera sie wszystko zwyciezca") -> 3.3 statki do portu
   (181 zaprojektowany w PROJEKT-ETAP2 rozdz. 181) -> 3.1 szczelnosc 164a -> 3.4-3.7 (BK, rada, wedrowcy, ROT) -> 3.8 ceny historyczne -> 3.9/3.10 drobne.
   Koniec etapu 3: reszta niewyjasniona ksiegi obiegu < 10 tys./dobe (sr. 28 dob). Kazdy krok osobno: wykonanie, recenzja, test 40 dob (+120 dla obiegu), wgranie.
+- (23:05) **C1 KOD GOTOWY** (pomocnik, w-toku/e2c do d514c52; 165 50bc17b, 182 d4d9c0b, 166+162m 6dff51b, 185 1aa1580, ksiega 57cbc1b, poprawki a660030; opis i
+  odstepstwa: docs/C1-POSTEP.md W DRZEWIE e2c). Klucze M13: zadnego nowego klucza nie ma w Armoury.json Jeffa - dzialaja domyslne. DLL probny test\Armoury-e2c-c1.dll
+  (ff325b37). W toku rownolegle: (a) autotest 40 dob nowej kampanii -> test\at-c1-40.out.txt; (b) recenzja C1 workflow wf_a018ac0c-77c (3 soczewki: zloto, gra,
+  wojsko -> sceptyk -> poprawki z commitem na e2c). Potem: test 120 dob na DLL po poprawkach z --baza e2b-p\baza-B4.json, wgranie 16.
