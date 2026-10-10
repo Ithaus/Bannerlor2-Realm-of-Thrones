@@ -1372,6 +1372,10 @@ namespace Armoury
         [SettingPropertyGroup("Smithing materials")]
         public bool TravellersNoIngots { get; set; } = true;
 
+        [SettingPropertyBool("Travellers No Goods", HintText = "Banner Kings travellers (serfs, craftsmen, nobles on the road) no longer set out with trade goods, ore or timber out of thin air - Banner Kings handed each new party a load from nowhere and it vanished with the party at its town; now they carry only their road food and pack animals (off = Banner Kings as before)")]
+        [SettingPropertyGroup("Smithing materials")]
+        public bool TravellersNoGoods { get; set; } = true;
+
         [SettingPropertyBool("Tier6 Castle Steel", HintText = "tier 6 arms and armour count castle-forged steel as their metal everywhere - your forge, town workshops, repairs and their worth (one rule for tier 6; off = workshops and prices count fine steel for tier 6 as before; takes effect after reloading the game)")]
         [SettingPropertyGroup("Smithing materials")]
         public bool Tier6CastleSteel { get; set; } = true;
@@ -4222,6 +4226,7 @@ namespace Armoury
             s.FineSteelValue = FineSteelValue;
             s.CastleSteelValue = CastleSteelValue;
             s.TravellersNoIngots = TravellersNoIngots;
+            s.TravellersNoGoods = TravellersNoGoods;
             s.Tier6CastleSteel = Tier6CastleSteel;
             s.MineralsCountedOnce = MineralsCountedOnce;
             s.MineOutputMultiplier = MineOutputMultiplier;
