@@ -459,3 +459,5 @@ LIMITY 13:30: 5h 32%, TYDZIEN 82% (reset 15.10) - przy 100% tygodnia przejsc na 
   (2) zakaz slubow/ciaz roznych ras, (3) Call to War z korony (165/168 - jesli pomocnik D tego nie zrobil przy zrodle zaliczki gry).
 - (06:40) Jeff: dar dla Strazy z calego Westeros (STAN-PRAC "DECYZJE JEFFA 10.10"): Zelazny Tron 8%, Polnoc 8%, Dorne/Reach/Vale/Stormlands/Riverlands/Dragonstone 3%.
   Kolejka po D: (0) dar Strazy z Westeros (S, CrownGifts.cs - przed testem D, zeby test objal oba), (1) T10 odpoczynek AI, (2) zakaz slubow/ciaz roznych ras.
+- (07:10) Jeff: korona ma pozyczac (STAN-PRAC "DECYZJE JEFFA 10.10") - nowa paczka po D. Dar dla Strazy - Jeff jeszcze wybiera A (cale Westeros 8/8/3%) albo B (jak w
+  ksiazkach: Polnoc 12%, krol 5%, reszta 1.5%); Straz ma ok. 1.8 mln w sakiewkach, wlasne lenna ok. 2.9 tys./d.

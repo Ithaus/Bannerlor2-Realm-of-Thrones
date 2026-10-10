@@ -1000,3 +1000,6 @@ ZATWIERDZONE: Armoury c38bd62f, CrashScribe 6507c842. Baza Armoury: w-toku/e2c.
   Parametry (dobrane przeze mnie): Zelazny Tron (House Baratheon of King's Landing) 8%, Polnoc 8%, Dorne / Reach / Vale / Stormlands / Riverlands / Dragonstone po 3%
   wplywow dnia; Iron Islands, Free Folk i Essos 0. Razem ok. 3.6 tys./dobe (dzis 3.7 tys. z samej Polnocy 25%); Polnoc +ok. 2.7 tys./dobe na wlasny zwrot. Do zrobienia
   zaraz po kroku D (CrownGifts.cs + klucze udzialow w Settings), test razem z D.
+- **Korona pozycza** (Jeff 10.10: "oczywiscie, ze korona powinna pozyczac"): nowa paczka po kroku D - skarbiec krolestwa moze pozyczyc w Zelaznym Banku na wojne
+  (limit wedlug zdolnosci splaty z wplywow dnia, np. do rocznych wplywow), raty z wplywow dnia w kolejnosci wydatkow 165; przy zaleglosci Bank przestaje pozyczac
+  i finansuje wrogow dluznika (lore: Stannis po niesplacaniu przez Cersei). Projekt paczki do napisania (nr wolny, np. 186), test 120 dob.
