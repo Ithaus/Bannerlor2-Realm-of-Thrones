@@ -592,3 +592,63 @@ gra ok. 8%) - ok. 30-60 ludzi/dobe, glownie tier 1-2 i partie w glodzie; zalogi 
 
 **Ryzyka:** (a) przekroczenie progu wobec C2 (31/dobe) - wtedy wedlug projektu "naprawiamy morale, nie dezercje" (np. niewyspani T10, glod); test: linia 183
 "najnizsze morale partii z dezercja" i "w glodzie"; (b) zalogi AI w oblezeniu z glodem traca ludzi szybciej niz dotad (gra: ponizej 10).
+
+---
+
+## C3 - 180m pomiar sluzby rent (obserwacja z testu C1+C2) - ZROBIONE (commit fdb9d43, poprawka 1238127)
+
+**Dane (`kopia-c2-120`, `budzet-rodow.csv` kolumna `warunek_180`, d120):** 94 z 215 rodow z lennem bez warunku - wszystkie przez sluzbe (zaloga 0).
+Wedlug krolestw: **Zelazne Wyspy 10/10 rodow 0/20, Dolina 12/12 rodow 0/20** - oba krolestwa w wojnie od tej samej doby 108858 (98 dob wojny), w `bitwy.log`
+zadnej bitwy lordow miedzy nimi (Dolina bije bandytow Ksiezycowych Braci, Zelazne Wyspy - piratow; jedyny styk: Lysa Arryn rozbija karawane Zelaznych Wysp
+w d108858) - wojna z krolestwem za morzem, w ktorej nikt nie moze sluzyc. Dorzecze 14 rodow: 0/16 przez ok. 45 dob wojny mimo potyczek lordow z karawanami
+Krain Burzy (d108929, 108932, 108942, 108949) - tick widzi tylko chwile doby, bitwa trwa godziny; sluzba pojawila sie dopiero z armia (8-10/19 w ostatnich
+9 dobach). Krolestwa z prawdziwym frontem (Reach, Stormlands, Dorne, Braavos, Norvos) - prawie wszystkie rody z warunkiem.
+
+**Poprawka pomiaru (regula 20 z 60 dob wojny bez zmian):**
+1. `CrownRentServiceWholeDay` (true): bitwa, rabunek albo szturm z krolestwem w wojnie liczy sie o kazdej porze doby (`MapEventStarted`/`MapEventEnded` -
+   rody druzyn lordow i ich czlonkow w druzynach innych rodow, np. rycerzy 179); w chwili ticku takze poscig za partia wroga (`EngageParty`) i odsiecz
+   oblezonej albo rabowanej osady krolestwa (`DefendSettlement`) - "obrona wlasnej ziemi przed wrogiem w poblizu".
+2. `CrownRentWarDayNeedsContact` (true): doba wojny przesuwa maske sluzby (i "widziane doby wojny") tylko, gdy krolestwo naprawde prowadzilo wojne:
+   armia krolestwa w polu (tick), oblezenie miedzy krolestwem a wrogiem (tick), albo zdarzenie od wczoraj: rabunek, wymuszenie we wsi, szturm/wypad/blokada,
+   bitwa z lordami po obu stronach. Sama potyczka z karawana albo chlopami nie czyni doby wojny (Dolina/Zelazne Wyspy). Doba bez styku = jak doba pokoju.
+3. Zapis `arm_rent180` v2; zapis v1 (C2) przy wlaczonym 2. - sluzba rodow od zera (maski v1 maja doby bez styku jako niesluzbe i nie wysunelyby sie nigdy);
+   normy zalog i przejecia twierdz zostaja.
+Armia/oblezenie po stronie sojusznika - nie zmienione: armia gry sklada sie tylko z partii jednego krolestwa, a oblezenie (`BesiegerCamp`) liczylo sie
+juz dla kazdej partii.
+
+**Nowe klucze (grupa "The crown's income (stage 2)"):** `CrownRentServiceWholeDay` true, `CrownRentWarDayNeedsContact` true (oba false = pomiar C2).
+
+**Zmieniona linia `Renty korony (180)`:** w "sluzba dzis" - `..., niewola n, poscig i odsiecz g, bitwa w ciagu doby (zdarzenie) e); pomiar z calej doby TAK (zdarzen bitew z wrogiem od wczoraj E); doba wojny bez styku z wrogiem (nie liczy sie) K krolestw, R rodow`;
+przy wczytaniu zapisu C2: `| wczytano: sluzba 0 rodow (bledne 0) - zapis C2 (v1): sluzba od zera, nowy pomiar`.
+
+**Czego sie spodziewac (test 120 dob):** "bez warunku" ponizej 20% (projekt/K41): Zelazne Wyspy i Dolina bez wymogu sluzby, dopoki ich wojna nie ma styku
+(rody 0 widzianych dob - warunek nie obowiazuje); krolestwa z frontem - wiecej dob sluzby (bitwy poza tickiem), rody siedzace w domu nadal bez renty.
+Renty rosna (mniej udzialow wstrzymanych w skarbcach) - "wstrzymane w skarbcach" spada, `Pieniadz swiata` bez zmiany tempa (przelew skarbiec -> glowa).
+
+---
+
+## C3 - recenzja wlasna (diff 1220510..1238127; poprawki w 1238127)
+
+Sprawdzone: zloto (zold rycerza `GiveGoldAction` w parze, najwyzej kiesa platnika; zwrot 50% przez `AddPaid` - WageRefund filtruje wojne i najemnikow;
+majatek - tylko blokada zakupu), ludzie (rycerz bez zolnierzy i sprzetu - "nic z kosmosu"; stare partie: ludzie do wsi majatku, sakiewka - jak dotad
+do kasy miasta, jency i statki - licznik, jak dotad w BK), dezerterzy 183 - pula wyrzutkow i ksiega ludzi gry (bez zmian), wyjatki (kazdy rod, wezwanie,
+wyplata, zdarzenie i latka we wlasnym try; blad w prefiksie BK - BK jak dotad), ROT/BK (Inni poza 179/183; Straz - rycerz bez zoldu, dezercja jak u wszystkich;
+rycerze Dothrakow i Wolnych Ludzi - ta sama regula; rody BK z pelnym parostwem od gracza - nie rycerze), gracz (rycerze gracza tylko na jego wezwanie,
+gracz placi 24 zl, komunikat co 7 dob; podloga 30 ludzi takze dla niego), zapis (179/183 bez stanu, 180 v2 przez SaveText), wylaczniki (179: rycerze
+wracaja do domu, latki przepuszczaja; 183: `DesertionLawForAi` false, `WarLedgerAiHalf` true, `WarLedgerMinMen` 0 = stan sprzed; 180m: oba false =
+pomiar C2), wydajnosc (pamiec rodow rycerzy raz na dobe; skan rosteru tylko przy > 1 bohaterze w partii; zdarzenia bitew - petla po partiach stron).
+
+**Poprawione (1238127):**
+1. **Przepelnienie przez rycerza** - pelna druzyna + rycerz = 1 ponad limit, a gra (`GetTroopsToDesertDueToWageAndPartySize`) wypedza wtedy co dobe zolnierza
+   (do 30-60 ludzi/dobe w swiecie). Postfiks na `GetPartyMemberSizeLimit` czynnego modelu: limit +1 na rycerza w sluzbie ("Knights of the banner").
+   Linia startowa 179: dodatkowa latka `miejsce rycerza w druzynie (GetPartyMemberSizeLimit)`.
+2. **BK z cudzej petli** - `IsGentryClan` (BK `GetCouncil`) nie jest juz wolany z latek gry (limit wielkosci partii, ocena finansow, dezercja) - pamiec rodow
+   rycerzy odswiezana tylko w ticku dobowym i przy starcie sesji. Bezposrednio (bez pamieci) tylko w `SpawnLordParty` i BK `SummonGentry`.
+3. **Gracz:** partie rodu gracza nie sa celem wezwania AI; przy wezwaniu AI krola rycerz gracza jedzie u wzywajacego (gracz nie placi za cudze wezwanie).
+4. **Oblezenie:** rycerz nie wyjezdza z oblezonej osady; z druzyny w bitwie albo w oblezeniu nie wraca do domu (czeka do konca - placony za dobe).
+5. Liczniki linii 179 zerowane takze przy wylaczonym logu; zapis C2 zeruje sluzbe tylko przy `CrownRentWarDayNeedsContact`.
+
+**Uwagi bez zmian w kodzie:** (a) D staly - zold rycerza w czesci "kontrakt" (obok kontraktu najemnika 185); linia `D staly (169c)` "kontrakt" obejmuje teraz
+oba. (b) Ryzyko 183: zalogi AI maja morale gry 50 +/- (glod w oblezeniu, zima) - przy progu t1 < 25 glodne zalogi w oblezeniu traca ludzi szybciej niz
+w grze; linia `Dezercja AI (183)` liczy zalogi osobno. (c) Ryzyko R7 (179) - bohater obcego rodu w partii AI: wymaga autotestu (0 bledow), szczegolnie
+smierc pana, rozbicie i niewola druzyny z rycerzem, ekran druzyny gracza z rycerzem.
