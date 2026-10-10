@@ -344,3 +344,10 @@ LIMITY 13:30: 5h 32%, TYDZIEN 82% (reset 15.10) - przy 100% tygodnia przejsc na 
   stali valyrianskiej przy pojmaniu w MapEvent -> tabor glowy rodu zwyciezcy po zakonczeniu bitwy (odroczone o 1 tick). Logi: SCRATCH(7016) kopia-e2b2-120\
   (Armoury-2026-10-09_18-54-52.log linia 23491, unikaty.log 84, start.log 255).
 - (21:30) ETAP 2 KROK C1 - START: drzewo SCRATCH(7016) noc2\e2c, galaz w-toku/e2c (od w-toku/e2b b422a5f). Zakres wedlug projektu (rozdz. 165, 166+162m, 185, 182).
+- (21:45) Jeff: "napraw ten miecz od razu i c1 rob, aby to zakonczyc". **177-FIX** (commit ae01f8e na w-toku/e2c, UniqueSpoils.Park): stal valyrianska nigdy do taboru
+  partii AI - KinWear (ktos z rodu, kto udzwignie i ma slot bez unikatu, glowa pierwsza), inaczej polka miasta rodu (Shelve); licznik "stal valyrianska do
+  krewnego" w linii "Unikaty (177)". DLL probny SCRATCH(7016)\test\Armoury-e2c-miecz.dll (md5 ddf01297). AUTOTEST 40 dob w toku -> wynik test\at-miecz-nowa.out.txt;
+  jesli 0 bledow -> WGRANIE 15 (sam miecz, Armoury) przed C1.
+- (21:50) **C1 WYKONANIE** - jeden pomocnik w tle w drzewie noc2\e2c (galaz w-toku/e2c), kawalki po kolei 165 -> 182 -> 166+162m -> 185, commit + push po kazdym
+  i stan w docs/C1-POSTEP.md W DRZEWIE e2c (tam patrz, jesli konto sie skonczy). Potem: jedna recenzja (kod + skutki), poprawki, test 120 dob z
+  --baza SCRATCH(7016)\e2b-p\baza-B4.json (tools/sprawdz_logi.py --grupa etap2), wgranie.
