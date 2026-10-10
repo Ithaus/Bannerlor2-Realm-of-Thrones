@@ -62,21 +62,28 @@ namespace Armoury
 
         // liczniki doby (linia, "Korona", "Obieg")
         internal static long LastPool, LastPaid, LastHeld, LastHeldFail, LastRound;
-        internal static int LastClans, LastOk, LastFailGar, LastFailSvc, LastFailBoth, LastKingdoms;
+        internal static int LastClans, LastOk, LastFailGar, LastFailSvc, LastFailBoth, LastKingdoms, LastNoPool;
         private static int _stumbles, _importN = -1, _importBad;
         private static readonly HashSet<string> _err = new HashSet<string>();
         private static string _playerNote;     // ostatni powod wstrzymania renty gracza (komunikat tylko przy zmianie)
 
         internal static void Reset()
         {
-            _svc.Clear(); _norm.Clear(); _since.Clear(); _owner.Clear(); _rows.Clear();
+            ClearState(); _rows.Clear();
             ZeroLast(); _stumbles = 0; _err.Clear(); _importN = -1; _importBad = 0; _playerNote = null;
+        }
+
+        /// <summary>Stan sluzby, norm i przejec twierdz (wylaczone 180 = stan sprzed paczki: nic nie liczymy i nic nie zapisujemy).</summary>
+        private static void ClearState()
+        {
+            _svc.Clear(); _norm.Clear(); _since.Clear(); _owner.Clear();
+            _pts = new Settlement[0]; _px = new float[0]; _py = new float[0];
         }
 
         internal static void ZeroLast()
         {
             LastPool = LastPaid = LastHeld = LastHeldFail = LastRound = 0;
-            LastClans = LastOk = LastFailGar = LastFailSvc = LastFailBoth = LastKingdoms = 0;
+            LastClans = LastOk = LastFailGar = LastFailSvc = LastFailBoth = LastKingdoms = LastNoPool = 0;
         }
 
         private static void Stumble(string where, Exception e)
@@ -154,6 +161,12 @@ namespace Armoury
         // sluzba partii dzis: 1 armia krolestwa, 2 oblezenie (oblega albo broni oblezonej osady), 3 bitwa z wrogiem, 4 ziemia wroga; 0 - nie
         private static int Serving(MobileParty mp, Kingdom k)
         {
+            try { return ServingBody(mp, k); }
+            catch (Exception e) { Stumble("Serving", e); return 0; }   // recenzja C2: blad przy jednej partii nie zabiera rodowi doby wojny (maska przesuwa sie dalej)
+        }
+
+        private static int ServingBody(MobileParty mp, Kingdom k)
+        {
             if (mp == null || !mp.IsActive || !(mp.IsLordParty || mp.IsMainParty)) return 0;
             if (mp.Army != null && mp.Army.Kingdom == k) return 1;
             if (mp.BesiegerCamp != null) return 2;
@@ -176,7 +189,8 @@ namespace Armoury
         {
             ZeroLast(); _rows.Clear();
             var s = Settings.Current;
-            if (s == null || Campaign.Current == null || !On) return;
+            if (s == null || Campaign.Current == null) return;
+            if (!On) { if (_svc.Count > 0 || _norm.Count > 0 || _since.Count > 0 || _owner.Count > 0) ClearState(); return; }   // recenzja C2: wylacznik = stan sprzed paczki (bez starej sluzby po wlaczeniu)
             try
             {
                 int today = (int)CampaignTime.Now.ToDays;
@@ -263,7 +277,7 @@ namespace Armoury
                 foreach (var id in gone) _svc.Remove(id);
                 // 3. renty: reszta wplywow dnia -> glowy rodow wedlug wag; udzial rodu bez warunku zostaje w skarbcu
                 var perShare = new List<double>(); var det = new List<KeyValuePair<long, string>>();
-                long playerPaid = 0; string playerWhy = null; double playerW = 0; int playerServed = 0, playerNeed = 0;
+                long playerPaid = 0; string playerWhy = null; double playerW = 0; int playerServed = 0, playerNeed = 0; bool playerRow = false;
                 foreach (var k in Kingdom.All)
                 {
                     try
@@ -280,8 +294,11 @@ namespace Armoury
                             if (w <= 0) continue;
                             list.Add(c); wts.Add(w); sum += w;
                         }
-                        if (list.Count == 0 || sum <= 0 || pool <= 0) continue;   // nie ma komu dac albo nie ma z czego - reszta zostaje w skarbcu (jak przed 180)
-                        LastKingdoms++;
+                        if (list.Count == 0 || sum <= 0) continue;               // nie ma komu dac - reszta zostaje w skarbcu (jak przed 180)
+                        // recenzja C2: warunki liczone u wszystkich rodow z lennem, takze gdy krolestwo nie ma dzis reszty po zwrocie (zwykle w wojnie) - miara
+                        // "bez warunku" nie zalezy od tego, czy korona ma z czego placic, a gracz widzi powod wstrzymania renty takze w takie doby
+                        bool pay = pool > 0;
+                        if (pay) LastKingdoms++; else LastNoPool += list.Count;
                         string normKey = s.CrownRentGarrisonNormKingdom ? k.StringId : "*";
                         double normT = -1, normC = -1; Norm nn;
                         if (_norm.TryGetValue(normKey + "/T", out nn)) normT = nn.Avg();
@@ -290,7 +307,7 @@ namespace Armoury
                         for (int i = 0; i < list.Count; i++)
                         {
                             var c = list[i];
-                            long share = (long)(pool * wts[i] / sum);
+                            long share = pay ? (long)(pool * wts[i] / sum) : 0;
                             var row = new Row { Counted = true };
                             try
                             {
@@ -341,10 +358,11 @@ namespace Armoury
                             _rows[c] = row;
                             if (c == Clan.PlayerClan)
                             {
-                                playerW = wts[i]; playerServed = row.Served; playerNeed = row.Need;
+                                playerW = wts[i]; playerServed = row.Served; playerNeed = row.Need; playerRow = true;
                                 playerWhy = !row.GarOk ? "garrison" : !row.SvcOk ? "service" : null;
                             }
                         }
+                        if (!pay) continue;
                         CrownIncome.Spent(k, paidK);                           // renty schodza z reszty wplywow dnia; reszta (wstrzymane, zaokraglenia) zostaje w skarbcu
                         long round = pool - paidK - heldK;
                         day.Rent += paidK; day.RentHeld += pool - paidK;
@@ -364,7 +382,7 @@ namespace Armoury
                             ? "The crown withholds your house's rent: one of your strongholds is garrisoned below " + (garShare * 100f).ToString("0", Inv) + "% of the realm's usual garrison for its kind."
                             : "The crown withholds your house's rent: your lords served " + playerServed + " of the " + playerNeed + " war days the crown asks (in an army of the realm, at a siege, in battle with the enemy or on enemy land).", true);
                     }
-                    _playerNote = playerWhy;
+                    if (playerRow) _playerNote = playerWhy;   // recenzja C2: doba bez wpisu gracza nie kasuje powodu (bez powtarzania komunikatu)
                 }
                 catch (Exception e) { Stumble("Daily(gracz)", e); }
                 if (s.LogEnabled)
@@ -386,7 +404,7 @@ namespace Armoury
                       .Append(" | krolestwa z renta ").Append(LastKingdoms).Append(", reszta wplywow dnia po zwrocie ").Append(LastPool)
                       .Append(" = renty ").Append(LastPaid).Append(" + wstrzymane w skarbcach ").Append(LastHeld)
                       .Append(" (udzialy rodow bez warunku ").Append(LastHeldFail).Append(", zaokraglenia ").Append(LastRound).Append(')')
-                      .Append(" | rody z lennem ").Append(LastClans).Append(": z renta ").Append(LastOk).Append(", bez warunku ").Append(LastClans - LastOk)
+                      .Append(" | rody z lennem ").Append(LastClans).Append(" (w krolestwach bez reszty po zwrocie - renta 0: ").Append(LastNoPool).Append("): z warunkiem ").Append(LastOk).Append(", bez warunku ").Append(LastClans - LastOk)
                       .Append(LastClans > 0 ? " (" + (100.0 * (LastClans - LastOk) / LastClans).ToString("0.0", Inv) + "%)" : "")
                       .Append(" - zaloga ").Append(LastFailGar).Append(", sluzba ").Append(LastFailSvc).Append(", oba ").Append(LastFailBoth)
                       .Append(" | renta na udzial (zl/dobe): mediana krolestw ").Append(perShare.Count > 0 ? perShare[perShare.Count / 2].ToString("0", Inv) : "-")
@@ -401,7 +419,7 @@ namespace Armoury
                       .Append(" | normy zalog (srednio na krolestwo, 28 dob): miasto ").Append(kT > 0 ? (nT28 / kT).ToString("0", Inv) : "-")
                       .Append(", zamek ").Append(kC > 0 ? (nC28 / kC).ToString("0", Inv) : "-")
                       .Append("; twierdze pominiete w warunku zalogi: w oblezeniu ").Append(sieged).Append("; twierdze swiata w rekach obecnego pana krocej niz ").Append(GraceDays).Append(" dob (pomijane) ").Append(_since.Count)
-                      .Append(" | gracz: ").Append(pRow ? ("renta " + pr.Paid + " (udzialy " + playerW.ToString("0.##", Inv) + "; zaloga " + (pr.GarOk ? "TAK" : "NIE") + ", sluzba " + pr.Served + "/" + pr.Need + " " + (pr.SvcOk ? "TAK" : "NIE") + ")") : "bez lenna w krolestwie")
+                      .Append(" | gracz: ").Append(pRow ? ("renta " + pr.Paid + " (udzialy " + playerW.ToString("0.##", Inv) + "; zaloga " + (pr.GarOk ? "TAK" : "NIE") + ", sluzba " + pr.Served + "/" + pr.Need + " " + (pr.SvcOk ? "TAK" : "NIE") + ")") : "bez lenna w krolestwie (albo najemnik)")
                       .Append(", sluzba ").Append(pSvc)
                       .Append(" | na krolestwo (renty/reszta): ").Append(txt.Count > 0 ? string.Join(", ", txt.ToArray()) : "-")
                       .Append(_stumbles > 0 ? " | potkniecia " + _stumbles : "")
@@ -413,7 +431,7 @@ namespace Armoury
             catch (Exception e) { Stumble("Daily", e); }
         }
 
-        /// <summary>Ksiega 169 (CSV budzet-rodow): renta dnia i warunek rodu - ";renta;warunek" (puste, gdy rod bez renty dzis).</summary>
+        /// <summary>Ksiega 169 (CSV budzet-rodow): renta dnia i warunek rodu - ";renta;warunek" (puste - rod bez lenna, najemnik, 165/180 wylaczone).</summary>
         internal static string CsvCols(Clan c)
         {
             try

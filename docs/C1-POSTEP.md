@@ -407,13 +407,13 @@ wplywu `KRent` - czesc "korona" D stalego, kolumny CSV), `ArmouryBehavior.cs` (k
 `CrownRentServiceDays` 20 (suwak 0-60), `CrownRentGarrisonShare` 0.5 (suwak 0-1), `CrownRentGarrisonNormKingdom` true (false = norma swiata).
 
 **Nowe / zmienione linie logu:**
-- NOWA `Renty korony (180): dzien N | krolestwa z renta K, reszta wplywow dnia po zwrocie P = renty R + wstrzymane w skarbcach W (udzialy rodow bez warunku A, zaokraglenia B) | rody z lennem N: z renta a, bez warunku b (x%) - zaloga c, sluzba d, oba e | renta na udzial (zl/dobe): mediana krolestw M, najwyzsza H | wagi: miasto 3, zamek 1, wies 0.25; warunek: ... | sluzba dzis: rody w wojnie n, sluzylo m (armia, oblezenie, bitwa, ziemia wroga, niewola) | normy zalog (srednio na krolestwo, 28 dob): miasto ..., zamek ...; twierdze pominiete w warunku zalogi: w oblezeniu ...; twierdze swiata w rekach obecnego pana krocej niz 28 dob (pomijane) ... | gracz: renta ... (udzialy ...; zaloga TAK/NIE, sluzba S/N TAK/NIE)|bez lenna w krolestwie, sluzba S z N dob wojny | na krolestwo (renty/reszta): <krolestwo> R/P (udzial U), ...` (+ `| wczytano: sluzba N rodow (bledne M)` w pierwszej dobie po wczytaniu).
+- NOWA `Renty korony (180): dzien N | krolestwa z renta K, reszta wplywow dnia po zwrocie P = renty R + wstrzymane w skarbcach W (udzialy rodow bez warunku A, zaokraglenia B) | rody z lennem N (w krolestwach bez reszty po zwrocie - renta 0: n): z warunkiem a, bez warunku b (x%) - zaloga c, sluzba d, oba e | renta na udzial (zl/dobe): mediana krolestw M, najwyzsza H | wagi: miasto 3, zamek 1, wies 0.25; warunek: ... | sluzba dzis: rody w wojnie n, sluzylo m (armia, oblezenie, bitwa, ziemia wroga, niewola) | normy zalog (srednio na krolestwo, 28 dob): miasto ..., zamek ...; twierdze pominiete w warunku zalogi: w oblezeniu ...; twierdze swiata w rekach obecnego pana krocej niz 28 dob (pomijane) ... | gracz: renta ... (udzialy ...; zaloga TAK/NIE, sluzba S/N TAK/NIE)|bez lenna w krolestwie (albo najemnik), sluzba S z N dob wojny | na krolestwo (renty/reszta): <krolestwo> R/P (udzial U), ...` (+ `| wczytano: sluzba N rodow (bledne M)` w pierwszej dobie po wczytaniu).
 - ZMIENIONA `Korona: wplywy dnia (165)`: po "zwrot zoldu ... )" - `, renty (180) R (wstrzymane w skarbcach - rody bez warunku i zaokraglenia W)`; na krolestwo ` renty R wstrz. W`.
   "zostalo z wplywow dnia w skarbcach" to teraz glownie wstrzymane udzialy.
 - ZMIENIONA `Obieg: dzien N`: w "rody dostaly" `renty od korony (180) R` (bylo "-"); w "korona ... wyplaty" `renty wedlug lenn (180) skarbce -> glowy rodow R (z reszty wplywow dnia P; wstrzymane w skarbcach W)` (bylo "-").
 - ZMIENIONA `D staly (169c)`: w "dzis (swiat)" po "zwrot korony X" - `, renty korony (180) R`.
-- CSV `budzet-rodow.csv`: dwie nowe kolumny na koncu `renta_180;warunek_180` (warunek: `tak|zaloga|sluzba|zaloga+sluzba S/N`; puste - rod bez renty dzis:
-  bez lenna, najemnik, krolestwo bez reszty). Narzedzia czytaja CSV po nazwach kolumn.
+- CSV `budzet-rodow.csv`: dwie nowe kolumny na koncu `renta_180;warunek_180` (warunek: `tak|zaloga|sluzba|zaloga+sluzba S/N`, liczony codziennie u kazdego
+  rodu z lennem, takze gdy krolestwo nie ma dzis reszty - renta 0; puste - rod bez lenna, najemnik, 165/180 wylaczone). Narzedzia czytaja CSV po nazwach kolumn.
 
 **Odstepstwa / rozstrzygniecia (z powodem):**
 1. "Ostatnia wojna albo biezaca z ostatnich 60 dob" = ostatnie 60 dob WOJNY krolestwa (maska nie przesuwa sie w pokoju). W wojnie to biezaca wojna z 60 dob,
@@ -449,3 +449,21 @@ z opoznieniem pierscienia 28 dob; renty w pokoju podnosza G, a z nim skrzynie wo
 partie stoja we wlasnych osadach; (b) sprzezenie biedy: biedny rod -> mniejsza zaloga -> bez renty; (c) zapas korony rosnie wolniej (dotad niewydana reszta
 szla do zapasu i wracala po 1/360) - "do wydania" w dobie 120 nizsze o ok. 20-30 tys./dobe, glownie w krolestwach z nadwyzka; (d) koszt: szukanie najblizszej osady
 dla partii w wojnie (ok. 0.5 mln odleglosci na dobe, kilka ms) - nie mierzone w linii; (e) gracz: komunikat o rencie codziennie.
+
+**Recenzja C2 (wlasna, diff 4e4e627..b649bbe; poprawki w osobnym commicie):** sprawdzone - zloto (kazda wyplata w parze, nieudana oddaje skarbcowi, pula <=
+skarbiec, udzialy floor - zaokraglenia w skarbcu), D (renta raz: `TodayRent` w "korona", odjeta od "jednorazowych"; wyplata w bloku dobowym - `MoneyLedger`
+nie liczy jej drugi raz jako zdarzenia, `ChangeHeroGold` nie odpala zdarzen gry), powinnosci (od "ziemi" - bez rent), zapis (napis przez `SaveText.Sync`, stary
+zapis bez klucza), gracz (te same warunki, `MainParty`). Poprawione:
+1. **Warunki liczone u wszystkich rodow z lennem codziennie**, takze w krolestwach bez reszty po zwrocie (renta 0): dotad linia i CSV liczyly "bez warunku"
+   tylko tam, gdzie korona miala z czego placic - miara testu ("bez warunku < 20%") zalezala od puli, a w wojnie (pula zwykle 0) prawie znikala. Nowy licznik
+   w linii: "w krolestwach bez reszty po zwrocie - renta 0: n".
+2. **Wylacznik = stan sprzed paczki takze dla stanu:** przy wylaczonym 180 (albo 165) sluzba, normy i przejecia twierdz sa czyszczone (nie zapisywane, bez
+   starej maski po ponownym wlaczeniu - wlaczenie zaczyna jak nowa kampania: warunek proporcjonalny).
+3. **Blad przy jednej partii** (`Serving` we wlasnym `try`) nie zabiera rodowi doby wojny - dotad wyjatek przerywal aktualizacje maski i licznika dob rodu.
+4. **Komunikat gracza:** doba bez wpisu gracza nie kasuje ostatniego powodu (bez powtarzania "withholds your house's rent" przy pulach 0/>0 na przemian).
+5. Opis "gracz: bez lenna w krolestwie (albo najemnik)"; tablice pozycji osad czyszczone w `Reset`.
+
+**Uwaga do oczekiwanego skutku (D i R):** renta podnosi D, a z nim rezerwe wojny R = max(20 000; 20 D) + 5 000 x doroslych - u rodu z G > R skrzynia wojenna
+0.8 (G - R)/45 maleje o ok. 0.36 zl na 1 zl renty dziennie; pulap +0.6 i (przy WarCourtYieldsToWages) udzial dworu +0.2. Netto ok. +0.45..0.65 zl zoldu na 1 zl
+renty u rodow na pulapie; reszta renty zostaje w kiesach (skrzynia na nastepna wojne, dwor i budowy w pokoju). Szacunek wojska w wojnie (+3..+6 tys. wobec C1-w)
+- dolna polowa widelek bardziej prawdopodobna.
