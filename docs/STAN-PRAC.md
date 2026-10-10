@@ -1017,3 +1017,13 @@ ZATWIERDZONE: Armoury c38bd62f, CrashScribe 6507c842. Baza Armoury: w-toku/e2c.
 - **SPROSTOWANIE (10.10, kod BuildFunding.cs):** budowy Strazy stoja nie z braku ludzi, tylko przez regule "w wojnie tylko budowy wojskowe" (BuildFunding :140-141,
   warNow && !IsMilitaryProject -> pomin) - Straz jest stale w wojnie, a w kolejce ma same cywilne (drogi, kwartal rzemieslnikow, spichlerz). Do zrobienia przy powrocie
   do budow: AI w wojnie przestawia kolejke na budowe wojskowa (jesli jest), krolestwa w wiecznej wojnie (Straz) buduja tez cywilne, Straz najmuje robotnikow z okolicy.
+
+**WGRANIE 18 (10.10 ok. 07:25 zegara komp.):** Armoury aebd0e94 + **RealisticCaptivity 5f98df70** (galaz noc/wgranie-18 = w-toku/e2c baff3f2 = WGRANIE 17 + ETAP 2 KROK D:
+168 drabina dlugu (kredyt / zaleglosc / zajecie / wyprzedaz zamiast bankructwa, kredyt wojenny KW w pulapie 166, DebtLadder.cs), wezwanie sojusznika do wojny placi
+korona (CrownCallToWar.cs), 178 okupy wedlug majatku (Ransom178.cs + most w RealisticCaptivity; glowa 0.5 roku D, lord 60 D, krol 0.5 roku wplywow korony ze skarbca,
+gotowka do 50% (G-5000), reszta dlug do 364 D, wielki jeniec - korona zdobywcy, 1/10 nagrody, prawo trzecich 1/9) + 182-W dar Strazy z Westeros wedlug potrzeby
+(procenty Jeffa)). CrashScribe bez zmian 6507c842. Testy: 120 dob nowej kampanii - 0 bledow Armoury, glowy < 5000 = 1, bankruci 0, wojsko lordow w wojnie 96.1 tys.
+(pas 95-115), zalogi -2.9%, reszta ksiegi -1.6 tys./d; zapis 9 dob OK (0 bledow; stary zapis: 55 rodow w zajeciu, 12 w wyprzedazy - stare dlugi Banku).
+**Do decyzji Jeffa: wielkosc okupow 178** (65.5 mln w 120 dobach, dlug okupow 32 mln u 54 rodow, rosnie ok. 270 tys./d) - propozycja B: glowa 60 D, lord 20 D.
+Kopie: *.bak-2026-10-10-przed-noc18 (Armoury i RealisticCaptivity) + D:\Backup-Bannerlord\wgrane\2026-10-10-noc18-przed.
+ZATWIERDZONE: Armoury aebd0e94, RealisticCaptivity 5f98df70, CrashScribe 6507c842. Baza Armoury/RC: w-toku/e2c.

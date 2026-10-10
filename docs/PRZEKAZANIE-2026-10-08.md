@@ -472,3 +472,6 @@ LIMITY 13:30: 5h 32%, TYDZIEN 82% (reset 15.10) - przy 100% tygodnia przejsc na 
   Ibben -30%; "2.14 kurier 2b/2c brak linii" = narzedzie (harness 178 ma nowa linie "Harness niewoli (178): krok 2 - kurier prawdziwy ... z niczego 0" - OK).
   **DO DECYZJI JEFFA - OKUPY 178:** suma cen okupow w 120 dobach ok. 65.5 mln (dzis 775 tys.: Stormcrows -> Ko Jhago 442 tys. za Sallora), dlug okupow rosnie
   liniowo ok. 270 tys./dobe -> 32.3 mln u 54 rodow; swiat ma D ok. 0.9 mln/dobe. Ryzyko kuli snieznej w biegu 2-letnim. Test zapisu 9 dob w toku -> WGRANIE 18.
+- (07:25) **WGRANIE 18: Armoury aebd0e94 + RealisticCaptivity 5f98df70 (noc/wgranie-18 = e2c baff3f2 = krok D + dar Strazy)**, CS 6507c842. KROKI ETAPU 2 SKONCZONE
+  (A, B, C1, C2, C3, D). Do zamkniecia etapu 2: decyzja Jeffa o okupach (A/B/C), potem bieg 2-letni + bieg z wymuszonym pokojem (warunki konca etapu z projektu).
+  Kolejka: T10 odpoczynek AI (max 2 doby forsownego marszu), zakaz slubow/ciaz roznych ras, korona pozycza w Banku (nowa paczka), etap 3 krok po kroku.
