@@ -11,7 +11,7 @@ namespace Armoury
     /// PACZKA 182 - DARY MIEDZY KORONAMI I STRAZ BEZ ZOLDU (projekt etapu 2, krok C1; PLAN 2.4, 2.5). Wylaczniki CrownGifts i WatchUnpaid.
     ///
     ///  - POLNOC -> NOCNA STRAZ: GiftNorthToWatchShare (25%) wplywow dnia skarbca Polnocy (165: wplywy dnia z 1/360 zapasu).
-    ///  - WOLNE MIASTA -> DOTHRAKOWIE: kazde Wolne Miasto GiftFreeCitiesToDothrakiShare (10%) swoich wplywow dnia ([D] 03:45 nr 12 = Q4a).
+    ///  - WOLNE MIASTA -> DOTHRAKOWIE: kazde Wolne Miasto GiftFreeCitiesToDothrakiShare (15% - regula korekty 182 po tescie 120 dob; bylo 10%) swoich wplywow dnia ([D] 03:45 nr 12 = Q4a).
     ///  - Dar idzie przez skarbiec odbiorcy TEGO SAMEGO DNIA do glow rodow odbiorcy wedlug STALYCH wag (Z8 - nigdy wedlug liczby ludzi):
     ///    Straz - twierdza (miasto albo zamek) 1, wies 0.25, rod bez lenna 0.5; Dothrakowie - rowno na kazdy rod khalasaru. Liczy sie do ich D
     ///    (czesc "korona" D stalego). Reszta z zaokraglen zostaje w skarbcu odbiorcy (nic nie znika).

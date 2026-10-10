@@ -2732,6 +2732,14 @@ namespace Armoury
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool HouseholdShield { get; set; } = true;
 
+        [SettingPropertyBool("War Court Yields To Wages", HintText = "at war the court gives way to the army: a house may also spend its court share (less the parties' own food) on wages, and its court gets only what the wages leave of that share. A house with room under its ceiling pays its court in full, as before. Needs Household Minimal. Off = the court takes its full share at war too")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public bool WarCourtYieldsToWages { get; set; } = true;
+
+        [SettingPropertyBool("Party Limits Share Free Room", HintText = "the party wage limits of a budgeted house share out what the house has not yet spent: each party may grow by its share of the free room (the head's party 1.5, the others 1) on top of its own wages, so no party is held back while the house has room; a house over its party ceiling has every party limit cut in proportion to its wages. Off = the ceiling is split once, head 1.5 : others 1")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public bool PartyLimitsShareFreeRoom { get; set; } = true;
+
         [SettingPropertyBool("Merc Contract Enabled", HintText = "with Crown Current Income: an AI mercenary company is hired on a fixed contract - on the day it enters a realm's service the crown agrees to pay it Merc Contract Factor times its daily wages (wages, food and kit) for the men it brings; in peace it waits on half the money and half the men; every Merc Review Days the contract is cut (never raised) to the wages of the men it still has if those fall below Merc Review Floor of the contracted wages (half of them in peace and in the first review days of a war after peace); no review while the company is not in the field. The crown pays it out of its daily income before the wage refunds; a company left unpaid by more than half for Merc Unpaid Leave Days in a row leaves the service. The house budget holds the company to the wages of the men of its contract. Your own mercenary contract is the game's, as before. Off = the game's mercenary pay for the AI, as before")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool MercContractEnabled { get; set; } = true;
@@ -2768,9 +2776,9 @@ namespace Armoury
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public float GiftNorthToWatchShare { get; set; } = 0.25f;
 
-        [SettingPropertyFloatingInteger("Gift Free Cities To Dothraki Share", 0.00f, 1.00f, "0.00", HintText = "share of each Free City's daily income given to the Dothraki (Braavos, Volantis, Pentos, Myr, Lys, Tyrosh, Norvos, Qohor, Lorath); raise to 0.15 if the Dothraki still starve")]
+        [SettingPropertyFloatingInteger("Gift Free Cities To Dothraki Share", 0.00f, 1.00f, "0.00", HintText = "share of each Free City's daily income given to the Dothraki (Braavos, Volantis, Pentos, Myr, Lys, Tyrosh, Norvos, Qohor, Lorath); 0.15 since the 120-day test, where the Dothraki at war fell more than a quarter below their old numbers (0.10 before)")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
-        public float GiftFreeCitiesToDothrakiShare { get; set; } = 0.1f;
+        public float GiftFreeCitiesToDothrakiShare { get; set; } = 0.15f;
 
         [SettingPropertyBool("Watch Unpaid", HintText = "the brothers of the Night's Watch take no wages: troops in the parties and garrisons of the Watch cost nothing a day; food and kit come from the gifts and the Watch's own villages, and the Watch's numbers are held by the house budget in men instead of gold (needs Clan Budget Enabled). Off = the Watch is paid like everyone else")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
@@ -4294,6 +4302,8 @@ namespace Armoury
             s.UnpaidTroopsCapInMen = UnpaidTroopsCapInMen;
             s.HouseholdMinimal = HouseholdMinimal;
             s.HouseholdShield = HouseholdShield;
+            s.WarCourtYieldsToWages = WarCourtYieldsToWages;
+            s.PartyLimitsShareFreeRoom = PartyLimitsShareFreeRoom;
             s.MercContractEnabled = MercContractEnabled;
             s.MercContractFactor = MercContractFactor;
             s.MercPeaceShare = MercPeaceShare;

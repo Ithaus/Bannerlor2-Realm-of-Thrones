@@ -56,6 +56,8 @@ namespace Armoury
             public double D, D0 = -1, G, R, F, Cap, PartyCap, Household, Gear, Build, GarTarget, GearLeft, Nominal;
             public bool War, Zero, Today;
             public long WPar, WGar, WCar; public int MenPar, MenGar, Adults, Streak, MenCap = -1;
+            // test 120 dob (wojsko w wojnie): pulap bez udzialu dworu, udzial dworu dostepny dla zoldu w wojnie, siedziba i jedzenie partii (szacunek) dnia
+            public double CapBase, CourtRoom, Food; public Settlement Seat;
         }
 
         private static readonly Dictionary<Clan, B> _b = new Dictionary<Clan, B>();
@@ -70,6 +72,8 @@ namespace Armoury
         private static long _dCourt, _dCourtTown, _dFood, _dFamily, _dRelPurse, _dBuild, _dGear, _dGearSpent, _dCapSum, _dWageSum, _dD;
         private static int _dRelMen, _dRelPar, _dRelGar, _dNoVillage, _dFamilyN, _dOver, _dStreak, _dPeace, _dWar, _dClans, _dPoor, _dVanished;
         private static int _dDesertOff, _dSpawnBlock, _dRecruitBlock, _dGarBlock, _dGarLimited, _dPartyLimited, _dWatchMen, _dWatchCap = -1;
+        // test 120 dob (wojsko w wojnie): dwor ustepuje zoldowi (udzial dostepny, zold go zajal, u ilu rodow); limity partii z wolnego miejsca rodu
+        private static long _dCourtRoom, _dCourtYield; private static int _dCourtRoomN, _dCourtYieldN, _dPartyOverCap;
         private static int _stumbles;
         private static readonly HashSet<string> _err = new HashSet<string>();
         private static int _importN = -1, _importBad;
@@ -97,6 +101,7 @@ namespace Armoury
             _dCourt = _dCourtTown = _dFood = _dFamily = _dRelPurse = _dBuild = _dGear = _dCapSum = _dWageSum = _dD = 0;
             _dRelMen = _dRelPar = _dRelGar = _dNoVillage = _dFamilyN = _dOver = _dStreak = _dPeace = _dWar = _dClans = _dPoor = _dVanished = 0;
             _dGarLimited = _dPartyLimited = 0; _dWatchMen = 0; _dWatchCap = -1;
+            _dCourtRoom = _dCourtYield = 0; _dCourtRoomN = _dCourtYieldN = _dPartyOverCap = 0;
         }
 
         private static void Stumble(string where, Exception e)
@@ -269,6 +274,26 @@ namespace Armoury
                             double cap = Math.Max(0f, s.ReserveCapDays) * b.D + 50000;
                             if (G > cap) { double x = (G - cap) / 180.0; b.Household += x / 2; b.Build += x / 2; }
                         }
+                        // test 120 dob C1 (wojsko w wojnie -20%): pulap wiazal u ok. 97 rodow w wojnie (zold >= 0.9 pulapu; 73% braku ludzi), a dwor 0.20 D
+                        // szedl do kasy siedziby mimo to (ok. 40 tys./dobe u tych rodow) - w wojnie DWOR USTEPUJE ZOLDOWI: udzial dworu bez jedzenia partii
+                        // dochodzi do pulapu, a dwor dostaje tylko to, czego zold z niego nie zajal (Court). Rod z luzem placi dwor w calosci jak dotad.
+                        // Zloto nie powstaje: zostaje w kiesie glowy i idzie na zold (licznik "dwor ustapil zoldowi"). Jedzenie i siedziba - raz na dobe tutaj.
+                        b.CapBase = b.Cap; b.CourtRoom = 0; b.Food = 0; b.Seat = null;
+                        if (s.HouseholdMinimal)
+                        {
+                            try
+                            {
+                                var seat = Seat(c);
+                                if (seat != null && seat.Town != null) { b.Seat = seat; b.Food = PartyFood(c, seat); }
+                            }
+                            catch (Exception e) { b.Seat = null; b.Food = 0; Stumble("Seat", e); }
+                            if (b.War && !merc && s.WarCourtYieldsToWages && b.Seat != null)
+                            {
+                                b.CourtRoom = Math.Max(0, b.Household - b.Food);
+                                b.Cap += b.CourtRoom;
+                                if (b.CourtRoom > 0) { _dCourtRoom += (long)b.CourtRoom; _dCourtRoomN++; }
+                            }
+                        }
                         long v;
                         wPar.TryGetValue(c, out v); b.WPar = v; wGar.TryGetValue(c, out v); b.WGar = v; wCar.TryGetValue(c, out v); b.WCar = v;
                         int m; mPar.TryGetValue(c, out m); b.MenPar = m; mGar.TryGetValue(c, out m); b.MenGar = m;
@@ -285,6 +310,7 @@ namespace Armoury
                         else b.MenCap = -1;
                         Garrisons(c, b, s);
                         b.PartyCap = Math.Max(0, b.Cap - (GarFull(b, s) ? b.WGar : Math.Min(b.WGar, b.GarTarget)) - b.WCar);
+                        if (!b.Zero && b.WPar > b.PartyCap) _dPartyOverCap++;   // rody ponad pulapem partii (limity proporcjonalnie do zoldu)
                         b.Today = true;
                         // przydzial sprzetu: niewydany z dni od ostatnich zakupow, najwyzej AiGearDaysCap dni
                         b.GearLeft = Math.Min(b.GearLeft + b.Gear, Math.Max(1f, s.AiGearDaysCap) * b.Gear);
@@ -352,9 +378,22 @@ namespace Armoury
             var wps = c.WarPartyComponents;
             if (wps == null || wps.Count == 0) return;
             int max = Campaign.Current.Models.PartyWageModel.MaxWagePaymentLimit;
-            double wsum = 0;
-            for (int i = 0; i < wps.Count; i++) { var mp = wps[i] != null ? wps[i].MobileParty : null; if (mp == null || !mp.IsLordParty) continue; wsum += mp.LeaderHero == c.Leader ? 1.5 : 1.0; }
+            double wsum = 0, wage = 0;
+            for (int i = 0; i < wps.Count; i++)
+            {
+                var mp = wps[i] != null ? wps[i].MobileParty : null;
+                if (mp == null || !mp.IsLordParty) continue;
+                wsum += mp.LeaderHero == c.Leader ? 1.5 : 1.0;
+                wage += Math.Max(0, mp.TotalWage);
+            }
             if (wsum <= 0) return;
+            // test 120 dob (wojsko w wojnie): staly podzial 1.5 : 1 zostawial luz rodu niewykorzystany - partia ponad swoja czescia (zwykle druzyna glowy,
+            // najwieksza i najdrozsza) nie werbowala i nie awansowala, a gra uznawala ja za "pelna" (PaymentLimit / AverageWage) i zostawiala ludzi w zalodze,
+            // choc rod mial miejsce w pulapie. Teraz: rod ponizej pulapu partii - kazda partia ma swoj zold + swoja czesc wolnego miejsca (glowa 1.5, inni 1),
+            // suma limitow = pulap partii; rod ponad pulapem - limity proporcjonalnie do zoldu (zwolnienia W3 rozkladaja sie wtedy wedlug zoldu partii).
+            var s = Settings.Current;
+            bool free = s != null && s.PartyLimitsShareFreeRoom;
+            double room = b.PartyCap - wage;
             for (int i = 0; i < wps.Count; i++)
             {
                 var mp = wps[i] != null ? wps[i].MobileParty : null;
@@ -363,7 +402,11 @@ namespace Armoury
                 if (b.Zero) lim = max;   // Straz bez zoldu: limit w zlocie nic nie znaczy - pulap w ludziach (werbunek)
                 else
                 {
-                    double x = b.PartyCap * (mp.LeaderHero == c.Leader ? 1.5 : 1.0) / wsum;
+                    double w = mp.LeaderHero == c.Leader ? 1.5 : 1.0;
+                    double x;
+                    if (!free) x = b.PartyCap * w / wsum;                                                     // stary podzial (wylacznik)
+                    else if (room >= 0) x = Math.Max(0, mp.TotalWage) + room * w / wsum;                     // swoj zold + czesc wolnego miejsca rodu
+                    else x = wage > 0 ? b.PartyCap * Math.Max(0, mp.TotalWage) / wage : b.PartyCap * w / wsum; // rod ponad pulapem partii
                     lim = x >= max ? max : (int)Math.Max(0, x);
                 }
                 if (mp.PaymentLimit != lim) { mp.SetWagePaymentLimit(lim); _dPartyLimited++; }
@@ -436,13 +479,9 @@ namespace Armoury
             return best;
         }
 
-        private static void Court(Clan c, B b, Settings s)
+        /// <summary>Jedzenie partii rodu (szacunek): zuzycie dnia x cena zboza w siedzibie - partie kupuja je same, wiec odejmujemy je od udzialu dworu.</summary>
+        private static double PartyFood(Clan c, Settlement seat)
         {
-            if (!s.HouseholdMinimal) return;
-            var head = c.Leader;
-            var seat = Seat(c);
-            if (seat == null || seat.Town == null) return;
-            // jedzenie partii (szacunek): zuzycie dnia x cena zboza w siedzibie - partie kupuja je same, wiec odejmujemy od udzialu dworu
             if (!_grainTried) { _grainTried = true; try { _grain = TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObject<ItemObject>("grain"); } catch { _grain = null; } }
             double food = 0;
             var wps = c.WarPartyComponents;
@@ -457,7 +496,26 @@ namespace Armoury
                     try { food += Math.Max(0f, -mp.FoodChange) * price; } catch { }
                 }
             }
-            long x = (long)Math.Max(0, b.Household - food);
+            return food;
+        }
+
+        private static void Court(Clan c, B b, Settings s)
+        {
+            if (!s.HouseholdMinimal) return;
+            var head = c.Leader;
+            var seat = b.Seat;   // siedziba i jedzenie partii policzone raz na dobe w Daily (przed pulapem - dwor ustepujacy zoldowi)
+            if (seat == null || seat.Town == null) return;
+            double food = b.Food;
+            double share = Math.Max(0, b.Household - food);
+            // test 120 dob (wojsko w wojnie): w wojnie udzial dworu jest czescia pulapu (CourtRoom) - dwor dostaje tylko to, czego zold rodu ponad pulap bez
+            // dworu (CapBase) nie zajal; Straz bez zoldu - zold nominalny (ten sam, ktorym liczony jest pulap w ludziach)
+            if (b.CourtRoom > 0 && share > 0)
+            {
+                double wageNow = b.Zero ? b.Nominal * (b.MenPar + b.MenGar) + b.WCar : b.WPar + b.WGar + b.WCar;
+                double used = Math.Min(share, Math.Max(0, wageNow - b.CapBase));
+                if (used > 0) { share -= used; _dCourtYield += (long)used; _dCourtYieldN++; }
+            }
+            long x = (long)share;
             x = Math.Min(x, Math.Max(0, head.Gold - Math.Max(0, s.FamilyPurseFloor)));   // dwor nie oproznia kiesy glowy ponizej podlogi rodziny
             _dFood += (long)food;
             if (x <= 0) return;
@@ -859,6 +917,11 @@ namespace Armoury
               .Append(" | rody AI z budzetem ").Append(_dClans).Append(" (pokoj ").Append(_dPeace).Append(", wojna ").Append(_dWar).Append("; najemnicy - 185, gracz - bez budzetu)")
               .Append(" | D razem ").Append(_dD).Append(", pulap zoldu razem ").Append(_dCapSum).Append(", zold naliczony (partie + zalogi + karawany) ").Append(_dWageSum)
               .Append(" (").Append(_dCapSum > 0 ? (100.0 * _dWageSum / _dCapSum).ToString("0", Inv) + "%" : "-").Append(")")
+              .Append(" | w wojnie dwor ustepuje zoldowi: udzial dworu w pulapie ").Append(_dCourtRoom).Append(" u ").Append(_dCourtRoomN)
+              .Append(" rodow, zold go zajal (dwor nie dostal) ").Append(_dCourtYield).Append(" u ").Append(_dCourtYieldN).Append(" rodow")
+              .Append(s.WarCourtYieldsToWages ? "" : " (wylaczone)")
+              .Append(" | limity partii ").Append(s.PartyLimitsShareFreeRoom ? "z wolnego miejsca rodu" : "staly podzial 1.5 : 1")
+              .Append(", rody ponad pulapem partii ").Append(_dPartyOverCap)
               .Append(" | ponad 1.10 x pulap ").Append(_dOver).Append(" rodow, od 3 dob (zwalniaja) ").Append(_dStreak)
               .Append(" | zwolnieni: do wsi ").Append(_dRelMen).Append(" ludzi (z partii ").Append(_dRelPar).Append(", z zalog ").Append(_dRelGar).Append("), zniklo ").Append(_dVanished)
               .Append(", nie zwolniono - brak wsi z danymi BK ").Append(_dNoVillage).Append(", sakiewki zwolnionych do kies wsi ").Append(_dRelPurse).Append(" zl")

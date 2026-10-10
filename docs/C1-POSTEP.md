@@ -297,3 +297,77 @@ nie uruchamiana. Kazda poprawka ma w kodzie komentarz "recenzja C1 (id)".
 
 **Nie zmienione:** `tools/sprawdz_logi.py` (grupa etap2 ma progi bezwzgledne wojska dla etapu po C3 - progi C1 z pkt 9 czytac recznie z `budzet-rodow.csv`
 obu biegow); projekt `PROJEKT-ETAP2-BANKRUCTWA-2026-10-09.md` (repo glowne) - odstepstwa opisane tutaj.
+
+---
+
+## Wojsko w wojnie po tescie 120 dob
+
+Bieg C1 (C1-r, `kopia-c1r-120`, 2026-10-09_23-06-12) wobec bazy bez C1 (`kopia-e2b2-120`, 2026-10-09_18-54-52), `budzet-rodow.csv` obu biegow, doby 94-120
+(rody krolestw w wojnie): ludzie w partiach **88.9 tys. wobec 114.9 tys. (-23%)**, zalogi 75.9 / 78.1 tys. (-3%). Skrypty: scratchpad sesji 7016f733, `diag-wojsko/`.
+
+**Diagnoza (najpierw dane).**
+1. **Pulap 166 wiaze - u rodow, ktore traca ludzi.** Suma "zold 47-51% pulapu" myli: pulap jest skupiony u ok. 190 bogatych rodow z duza skrzynia
+   wojenna (pulap 1.22 mln/dobe, z tego skrzynia 0.67 mln, zold 0.49 mln, ludzie 71.3 tys.) - te sa blisko bazy. Rody w wojnie w obu biegach (>= 90% dob
+   90-120), wedlug zuzycia pulapu w C1: **zold >= 0.9 pulapu - 65 rodow, partie 15.6 / 33.4 tys. (-53%, 73% calego braku)**; 0.6-0.9 - 40 rodow,
+   20.0 / 24.1 tys. (-17%); < 0.6 - 162 rody, 52.1 / 54.7 tys. (-5%); najemnicy 0.25 / 0.50 tys. Wedlug rodzaju: panowie miast -23% (-14.4 tys.), zamkow
+   -18% (-8.4 tys., prog R19 "panowie zamkow >= 90%" niespelniony), bez lenna -47%, najemnicy -79%.
+2. **Dlaczego pulap jest nizszy niz dawny zold** (rody "na pulapie", ok. 97 na dobe w dobach 94-120): D 202 tys. (w tym korona 40 tys.), pulap 177 tys. =
+   0.60 D x bieda 120 tys. + skrzynia 41 tys. (+ reszta); zold partie 116 + zalogi 66 (37% pulapu, finansowane pierwsze) + karawany 7 = 189 tys. W bazie te
+   rody wydawaly ok. 1.1 D: zwrot korony w D 112 tys. (w C1 38 tys. - 165 placi tylko partie w polu, z wplywow dnia), lup 75 tys. (w C1 45 tys. - mniej
+   ludzi), Bank 479 tys. dlugu (w C1 6 tys.), kiesy rodzin 12.5 mln (w C1 7.9 mln). **Dwor 0.20 D** (ok. 40 tys./dobe u tych rodow, ok. 165-175 tys./dobe
+   w swiecie) szedl do kas siedzib takze wtedy, gdy rod byl na pulapie - to najwiekszy wydatek poza zoldem, ktory rod moze przesunac.
+3. **Zwolnienia w wojnie:** doby 24-120 - 21.1 tys. ludzi z partii i 4.6 tys. z zalog (pokoj 1-23: 8.8 / 20.3 tys. - regula projektu). Rod-doby
+   zwalniajace w wojnie: bez lenna 848, zamki 181, miasta 106; powod - spadek pulapu (skrzynia wojenna sie wyczerpuje, G < R w 58% przypadkow), zaloga
+   pierwsza. Zwolnienia od najnizszego tieru, a wolne miejsce zajmuja awanse: zold na czlowieka u rodow na pulapie 6.75 wobec 5.37 w bazie (+26%).
+4. **Limit pojedynczej partii:** staly podzial reszty pulapu 1.5 : 1 - partia ponad swoja czescia (zwykle druzyna glowy, najwieksza) nie werbuje ani nie
+   awansuje, a gra (`CalculateMobilePartySizeLimitWithFoodAndWage`, `FindPartySizeNormalLimit` - PaymentLimit / AverageWage) uznaje ja za pelna, choc rod
+   ma luz. Grupa 0.6-0.9 (luz 27% pulapu partii) ma -17% ludzi, grupa < 0.6 (limity = 10 000 = bez limitu) -5%. Pomiaru na partie w CSV nie ma.
+5. Inne sprawdzone, **nie** przyczyna: kiesa glowy (rody na pulapie - glowa srednio ok. 100 tys.; warunek gry `StartRecruitingMoneyLimit` 50-3 050);
+   kiesa rodziny do glow - 0-2 tys./dobe; nowe partie wstrzymane - 3-11/dobe w wojnie; Straz - 3.5 tys. ludzi przy pulapie w ludziach 6.6 tys.; sprzet
+   (AiGear) - wydane 12-36 tys. z 0.4 mln przydzialu (nie hamuje ludzi); przeplyw partia -> zaloga gry netto do partii (+321 / -343 w d100).
+6. **Zelazne Wyspy (-72%)** - ten sam mechanizm, mocniej: 20 z 25 rodow na pulapie; pulap 28.9 tys., zalogi 12.2 tys. (42%), partie 15.1 tys.; D 24.3 tys.
+   + lup 9.4 tys. wobec 37.7 + 6.0 tys. w bazie (korona w D 7.0 wobec 24.6 tys. - baza zwracala 50% zoldu takze zalogom, ze skarbca). Baza zyla ponad stan:
+   zold 54.5 tys./dobe przy D z lupem 43.7 tys. (kiesy -1.0 mln w 120 dob, Bank 209 tys.). W C1 zalogi rosly w wojnie 1.3 -> 4.1 tys. ludzi, partie
+   3.1 -> 2.1 tys. (pulap staly, zaloga pierwsza).
+7. **Dothrakowie (-57%)**: na pulapie tylko 2.6 z 18 rodow (pulap 33.5 tys., zold 18.0 tys.). Brak ok. 2.1 tys.: rody z lennem ok. -1.1 tys. (Pono, Jhago -
+   zaloga 2 298 przy pulapie 2 349), najemnicy w sluzbie Dothrakow ok. -0.85 tys., rody gentry bez lenna ok. -0.85 tys. (partie BK pojawiaja sie seriami -
+   w bazie seria w d80-100; szum). Dar 182 dzielony rowno na rod - 13 z 19 rodow to gentry bez partii.
+8. **Najemnicy (-79%, 0.43 / 2.07 tys.)** - osobny mechanizm 185: umowa powstaje z dzisiejszych ludzi kompanii, przeglad tylko w dol - kompania najeta
+   po pokoju albo po bitwie nie odrasta (Moon Brothers: umowa d61 z 31 ludzi = pulap 320; w bazie 350 ludzi). **Nie zmienione** (decyzja 185) - ponizej.
+
+**Poprawka (build Release kod 0, `python tools/gen_mcm.py`).** Pliki: `ClanBudget.cs`, `Settings.cs` + `McmSettings.cs`, `CrownGifts.cs` (komentarz).
+1. **`WarCourtYieldsToWages` (true) - w wojnie dwor ustepuje zoldowi.** Udzial dworu bez jedzenia partii (0.20 D x bieda - szacunek jedzenia) dochodzi do
+   pulapu rodu w wojnie (`CourtRoom`); dwor dostaje tylko to, czego zold rodu ponad pulap bez dworu (`CapBase`) z niego nie zajal (Straz - zold nominalny).
+   Rod z luzem placi dwor w calosci jak dotad; w pokoju bez zmian. Zloto nie powstaje: zostaje w kiesie glowy i idzie na zold. Siedziba i jedzenie partii
+   liczone raz na dobe w `Daily` (nowa funkcja `PartyFood`, `Court` uzywa ich).
+2. **`PartyLimitsShareFreeRoom` (true) - limity partii z wolnego miejsca rodu.** Rod ponizej pulapu partii: limit partii = jej zold + jej czesc wolnego
+   miejsca (glowa 1.5, inni 1), suma limitow = pulap partii, zadna partia nie stoi, gdy rod ma luz. Rod ponad pulapem partii: limity proporcjonalnie do
+   zoldu (zwolnienia W3 rozkladaja sie wtedy wedlug zoldu partii, nie uderzaja w druzyne glowy).
+3. **Regula korekty 182:** `GiftFreeCitiesToDothrakiShare` 0.10 -> **0.15** (Dothrakowie w wojnie -57% < -25%).
+
+Wylaczniki: oba nowe klucze false = zachowanie C1-r; `ClanBudgetEnabled` false = stan sprzed paczek (nic z tego nie biegnie). Gracz bez budzetu jak dotad.
+
+**Odstepstwa od projektu.**
+- Tabela 166 "dwor i wyzywienie w wojnie 0.20 D": teraz 0.20 D tylko u rodow z luzem; u rodu na pulapie dwor jest rezerwa zoldu (do 0.80 D x bieda + skrzynia).
+  Liczby: w dobach 94-120 udzial dworu u rodow na pulapie ok. 40 tys./dobe, natychmiastowe miejsce w pulapie ok. 29 tys./dobe (ok. 4-5 tys. ludzi przy
+  dzisiejszym zoldzie na czlowieka); rod-doby z zoldem > 1.10 pulapu w wojnie: 1 938 -> 971 (miasta i zamki zwalniajace: 287 -> 50; zwalniany zold panow
+  miast i zamkow -71%), reszta to rody bez lenna (179 w C3). Kasy siedzib dostana w wojnie mniej dworu (ok. 40 tys./dobe z ok. 170 tys.).
+- Podzial limitow partii: projekt mowil tylko "partie dostaja reszte pulapu"; staly podzial 1.5 : 1 byl wzorem z gry - teraz reszta jest wspolna.
+- **Nie zrobione:** R19 (zaloga w wojnie <= 70% pulapu) - nadwyzka zalog ponad 70% to tylko ok. 2.4 tys./dobe zoldu (37 rodow/dobe), a cielaby zalogi
+  wbrew [D] 08.10 "w wojnie pelne" (Zelazne Wyspy juz -13% zalog); kredyt wojenny (168, krok D); najemnicy 185 - umowa z ludzi z dnia najmu (propozycja do
+  decyzji: umowa przy nowym najmie co najmniej z polowy pulapu wielkosci kompanii albo z umowy u poprzedniej korony).
+
+**Nowe w logu:** linia `Budzet rodow (166): dzien N` - "w wojnie dwor ustepuje zoldowi: udzial dworu w pulapie X u N rodow, zold go zajal (dwor nie dostal) Y
+u M rodow | limity partii z wolnego miejsca rodu, rody ponad pulapem partii K". Kolumna `pulap` w `budzet-rodow.csv` w wojnie zawiera udzial dworu
+(0.60 D x bieda + skrzynia + dwor bez jedzenia); "pulap zoldu razem" tak samo. Bez nowych napisow w zapisie.
+
+**Oczekiwany skutek (nastepny test 120 dob, doby 94-120, ten sam zbior):** wojsko lordow w wojnie ok. 95-105 tys. (bylo 88.9, baza 114.9); zwalniany zold
+w wojnie ok. -40% (panowie miast i zamkow ok. -70%; zostaja glownie rody bez lenna); rody "na pulapie" maja dwor bliski 0 i zold ok. 0.95 D + lup; zalogi
+bez zmian (-3%); "dwor ustepuje zoldowi: zold go zajal" ok. 30-45 tys./dobe.
+Zelazne Wyspy ok. -55..-60% (bylo -72%; reszta to bieda z lore i luka kredytu wojennego - baza zyla z kies i Banku); Dothrakowie ok. -45..-50% (bylo -57%;
+najemnicy i gentry zostaja; dar +50% idzie glownie do rodow gentry bez partii). Reszte luki do progu 95-115 tys. zamyka kredyt wojenny 168 (krok D).
+
+**Ryzyka.** (a) Kasy miast-siedzib: mniej dworu w wojnie - sprawdzic linie "Przeplywy osad" i "dwor (162m): wplacone" (spadek ok. 20-25% w wojnie).
+(b) Rody na pulapie wydaja prawie caly D na zold - glowy < 5 000 i "zold przyciety" moga wzrosnac u biednych (bieda x0.5 tnie tez udzial dworu).
+(c) Limity z wolnego miejsca zmieniaja sie codziennie - "limity: partie zmienione" wzrosnie (koszt `SetWagePaymentLimit` maly). (d) Wojna -> pokoj: pulap
+spada o skrzynie i dwor naraz - zwolnienia po wojnie wieksze niz w C1 (regula projektu 15%/dobe od 3. doby). (e) Najemnicy dalej maleja (185, wyzej).
