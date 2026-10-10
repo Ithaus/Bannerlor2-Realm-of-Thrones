@@ -453,3 +453,5 @@ LIMITY 13:30: 5h 32%, TYDZIEN 82% (reset 15.10) - przy 100% tygodnia przejsc na 
   zamiast bankructwa, dluznik w budzecie, zrodlo zaliczki gry) -> 178 (okupy wedlug majatku, wielcy jency 1/10, okup krola ze skarbca, dlug okupu najwyzej rok),
   commit + push po kazdym + sekcje "D - 168" / "D - 178" w docs/C1-POSTEP.md drzewa e2c (TAM patrz po przejeciu konta). Potem: test 120 dob (--baza baza-B4),
   zapis 9 dob, WGRANIE 18; potem bieg z wymuszonym pokojem + 2 lata = koniec etapu 2.
+- (06:00) Jeff: AI musi odpoczywac (forsowny marsz max 2 doby, tylko wyjatkowo) i zakaz slubow/ciaz miedzy rasami - wpisane do STAN-PRAC "DECYZJE JEFFA 10.10".
+  Kolejka po kroku D: (1) T10 odpoczynek AI (Armoury, NocnyMarsz/AiNightCamp), (2) zakaz slubow i ciaz roznych ras (CrashScribe Mends albo Armoury), potem etap 3.

@@ -987,3 +987,10 @@ dobe). CrashScribe bez zmian 6507c842. Testy: 120 dob nowej kampanii (powtorka p
 do Mends) - 0 bledow Armoury, glowy < 5000 = 3, bankruci 0, wojsko lordow w wojnie 93.0 tys. (cel 95, podloga 85), zalogi -3.4%, dezercja AI 27/d (baza 49), reszta ksiegi
 -1.3 tys./d; zapis 9 dob OK (0 bledow). Kopie: Armoury.dll.bak-2026-10-10-przed-noc17 + D:\Backup-Bannerlord\wgrane\2026-10-10-noc17-przed.
 ZATWIERDZONE: Armoury c38bd62f, CrashScribe 6507c842. Baza Armoury: w-toku/e2c.
+
+**DECYZJE JEFFA 10.10 (ok. 06:00):**
+- **Odpoczynek AI (T10, dlug snu):** "musza odpoczywac; forsowny marsz najwyzej 2 dni i tylko w sytuacjach wyjatkowych". Czyli AI: nocny marsz tylko w wyjatkowych
+  sytuacjach (ucieczka przed armia, przerwanie rabunku, poscig, odsiecz), najwyzej 2 doby z rzedu; potem obowiazkowy odpoczynek, az dlug snu zejdzie do 0
+  (te same kary co gracz zostaja). Test 120 dob C3 pokazal 11-15 partii AI na dlugu snu 3 (morale -95%) przez ok. 2 tygodnie -> dezercja.
+- **Olbrzymy:** "olbrzymy moga tylko z olbrzymami, ludzie z ludzmi; nie ma zadnej ciazy ani malzenstwa olbrzyma z czlowiekiem". Czyli: zakaz slubow i ciaz miedzy
+  roznymi rasami (human / giant / wight / whitewalker), takze istniejace ciaze roznych ras - bez porodu (porod roznych ras zawiesil silnik w tescie C3c, doba 43).
