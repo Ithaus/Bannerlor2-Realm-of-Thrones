@@ -562,3 +562,27 @@ do 54/d) i limitu zoldu/przepelnienia gry u partii bez budzetu (do 162/d) - do z
   **Straz - werbunek:** "werbunek wstrzymany 33-96/d" przy Straz 1.7 tys. / pulap 3.5-5 tys. - podejrzenie: pulap w ludziach (UnpaidTroopsCapInMen) liczony na partie
   (limit partii = jej zold + czesc wolnego miejsca; zold Strazy 0) blokuje werbunek mimo luzu rodu - sprawdzic w ClanBudget/RecruitCost. Kolejnosc po biegu 728: wynik ->
   CS (BK + ikony) test 40 dob -> WGRANIE CS -> (3) dezercja AI rok 2 + Tent + werbunek Strazy -> (4) etap 3.
+
+## 22. START TUTAJ - PRACA NOCNA (10.10 ok. 15:15; limit tygodnia 98% - przekazanie na drugie konto; Jeff: "test 2-letni zrobisz po etapie 3")
+
+**W grze (ZATWIERDZONE):** Armoury 87b03e2b (noc/wgranie-21 = w-toku/e2c d341e7b), RealisticCaptivity 5f98df70, CrashScribe 77b11df5 (noc/wgranie-22-cs = w-toku/175-armie-cs 37535a7).
+**Drzewa:** Armoury + RC: SCRATCH(7016)\noc2\e2c (w-toku/e2c). CrashScribe: SCRATCH(7016)\noc2\a175cs (w-toku/175-armie-cs). Klon: SCRATCH(3cf3e0ac)\lancuch (origin = repo Jeffa).
+**Autotest:** jak w rozdz. 20, ale CS autotestowy = SCRATCH(7016)\test\CrashScribe-at-w22.dll (nowy CS w grze + tryb autotestu). Nowa wersja CS do testu: worktree z commita CS +
+`git apply -3 SCRATCH(7016)\test\at1-cs.diff` + build (przyklad: noc2\cs-at-bk2). Opis calego etapu 2: docs/etap2/C1-POSTEP-kopia-2026-10-10.md (oryginal w drzewie e2c docs/C1-POSTEP.md).
+**ETAP 2 - stan:** wszystkie kroki wgrane (A, B, C1, C2, C3, D, 186 korona pozycza, okupy wariant 1, dar Strazy wedlug potrzeby, T10-R, rasy). Bieg 2-letni - wedlug Jeffa
+PO ETAPIE 3. Dotad: bieg 457 dob (kopia-okup1-457) i 218 dob (kopia-bk-218): glowy < 5000 0-4, bankruci 0-2, wojsko lordow w wojnie 99-104 tys., zalogi -1..-3%, Bank min 2.6 mln.
+
+**WNIOSKI Z TESTOW (do naprawy, w kolejnosci):**
+1. **Dezercja AI w drugiej polowie roku: 160-200 ludzi/dobe (baza 49)** w oknach dob 190-218 i 430-458; skladniki z linii "Dezercja AI (183)": glod ("w glodzie" do 54/d) oraz
+   "limit zoldu i przepelnienie (gra, w tych partiach)" do 162/d - partie POZA budzetem 166 (bez pulapu? najemnicy? Inni? bunty?) i przepelnienie (party size). Skutek: **bandy +29%**
+   (20.2 tys. ludzi wobec 15.6 tys.) - zbiegli zasilaja bandy. Zbadac: ktore partie dezerteruja z limitu gry, czemu glod (zywnosc AI w zimie/oblezenia?), naprawic.
+2. **Werbunek Strazy blokowany** ("werbunek wstrzymany 33-96/d" przy Straz 1.5-1.7 tys. / pulap 3.5-5 tys.) - podejrzenie: UnpaidTroopsCapInMen liczone na partie (limit partii
+   z PartyLimitsShareFreeRoom przy zoldzie 0). Straz spadla z 3.2 tys. (d60) do 1.5-1.7 tys. Sprawdzic ClanBudget / RecruitCost.
+3. **Reszta ksiegi pieniadza** -17..-22 tys./d w dobach 31-120 (baza -11.6) - zloto znika bez nazwy; to jest ETAP 3 (szczelnosc), cel < 10 tys./d.
+4. **Tent:** ERROR in Tent (1 na 457 dob) - NightRest.Tent wola refleksja metode innego moda, KeyNotFound w jego slowniku - sprawdzic klucz przed wywolaniem.
+5. Slabsze z lore: Iron Islands -40..-55%, Ibben -30..-33% (bez akcji, chyba ze Jeff zdecyduje).
+6. Kredyt koron (186) rosnie 1.7 -> 2.6 mln w roku bez zaleglosci - obserwowac w biegu 2-letnim.
+**POTEM ETAP 3 krok po kroku** (PLAN-DO-KONCA-MODA "Etap 3"): 3.2 cale zloto rozbitego taboru/bandy dla zwyciezcy (Jeff zdecydowal) -> 3.3 statki rozbitych do portu
+(181 w PROJEKT-ETAP2) -> 3.1 szczelnosc 164a -> 3.4-3.7 BK/ROT -> 3.8 ceny historyczne -> 3.9/3.10 drobne. Kazdy krok: kod (pomocnik), recenzja, test 120 dob + zapis 9 dob,
+wgranie. Na koniec etapu 3: bieg 2-letni (728 dob, -TimeoutMin 480) = zamkniecie etapow 2 i 3.
+**Na pozniej (decyzje Jeffa w STAN-PRAC 10.10):** budowy Strazy (najmuje robotnikow; AI w wojnie przestawia kolejke na budowe wojskowa; wieczna wojna buduje tez cywilne).

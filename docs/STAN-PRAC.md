@@ -1050,3 +1050,9 @@ krol 20 dni wplywow korony - RansomKingDays). RealisticCaptivity 5f98df70, Crash
 ClaimantDemand.SetTexts NullReference w BKDiplomacyBehavior.OnDailyTick - nie nasz kod; okno ButterLib zawiesilo gre), w 457 dobach 1 potkniecie Armoury (Tent KeyNotFound,
 obsluzone); zapis 9 dob OK. Kopie: Armoury.dll.bak-2026-10-10-przed-noc21 + D:\Backup-Bannerlord\wgrane\2026-10-10-noc21-przed.
 ZATWIERDZONE: Armoury 87b03e2b, RealisticCaptivity 5f98df70, CrashScribe 6507c842.
+
+**WGRANIE 22 (10.10 ok. 15:15 zegara komp.):** CrashScribe 77b11df5 (galaz noc/wgranie-22-cs = w-toku/175-armie-cs 37535a7 = CS 6507c842 + BkDemandSafe (finalizery na BK
+ClaimantDemand.SetTexts, Demand.Fulfill, Demand.DoAiChoice - wywrotka biegu 2-letniego w dobie 457) + NameplateGhosts (ikony-duchy partii nad osadami)). Armoury 87b03e2b
+i RealisticCaptivity 5f98df70 bez zmian. Test: 10 dob (latki wpiete 3/3 + ikony), bieg 218 dob z poprawka BK - 0 bledow Armoury. Wersja autotestowa CS:
+SCRATCH(7016)\test\CrashScribe-at-w22.dll (= at-bk2, e90f192a). Kopie: CrashScribe.dll.bak-2026-10-10-przed-noc22 + D:\Backup-Bannerlord\wgrane\2026-10-10-noc22-przed.
+ZATWIERDZONE: Armoury 87b03e2b, RealisticCaptivity 5f98df70, CrashScribe 77b11df5.
