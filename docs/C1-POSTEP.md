@@ -545,3 +545,50 @@ limitu zdjeta z partii rycerzy, `ToVillagePop`), `SoldierPay.cs` (`AddKnightPaid
 **Ryzyka:** (a) R7 - bohater obcego rodu w partii AI (ekran druzyny gracza, smierc pana, rozbicie partii z rycerzem) - test: 0 bledow, "czeka (bitwa)" nie
 rosnie bez konca; (b) rycerz teleportuje sie do armii i z niej (jak BK sadzajacy rodzine w majatku) - bez drogi po mapie; (c) zakupy majatkow wolniejsze
 (niewolnicy BK = dochod majatku w przyszlosci); (d) gdy BK nie da sie rozpoznac (`IsGentryClan` BRAK) - rozpoznanie tylko po id i braku lenna.
+
+---
+
+## C3 - 183 dezercja AI wedlug poziomu - ZROBIONE (commit 6273048)
+
+Projekt: rozdz. "183" (C3), 2.0b, OTWARTE nr 2, odpowiedz Jeffa 09.10 11:05 pkt 1 (podloga 30 ludzi takze dla druzyny gracza). Build Release kod 0,
+`python -I tools/gen_mcm.py`, gra nie uruchamiana.
+
+**Pliki:** `DesertionLaw.cs` (AI pod prawem dezercji, liczniki AI `DesertionAi`), `WarLedger.cs` (stawka AI, podloga, linia doby), `Settings.cs` + `McmSettings.cs`.
+
+**Co dziala:**
+- `DesertionLawForAi` -> **true**: progi morale wedlug tieru (t1 < 25, -3 na tier, podloga 10; 1%/pkt ponizej progu, sufit 25%/dzien) dla wszystkich partii
+  AI, ktore gra przepuszcza przez model dezercji (`DesertionCampaignBehavior`: partie lordow, zalogi, karawany) - jak u gracza i jego rodu. Inni (`Undead.Party`)
+  zostaja przy grze. Limit zoldu i przepelnienie - wprost z gry (166 dalej zdejmuje limit zoldu u rodow z budzetem - `DesertPrefix`, bez zmian).
+- `WarLedger`: stawka zaleglego zoldu dla AI pelna (`WarLedgerAiHalf` false; dotad x0.5 dla kazdej partii poza druzyna gracza), sufit 8 dni bez zmian;
+  **podloga** `WarLedgerMinMen` (30): przez zalegly zold partia nie schodzi ponizej 30 ludzi (`TotalManCount`, z bohaterami) - odchodzi najwyzej nadwyzka
+  ponad 30; dla druzyny gracza i partii jego rodu przy `WarLedgerMinMenPlayer` (true). Dezerterzy dalej do puli wyrzutkow i ksiegi ludzi (T4, bez zmian).
+- AI bez linii "DesertionLaw: <partia> ..." na partie (byloby kilkadziesiat linii na dobe) - liczniki doby w nowej linii; gracz i jego rod - jak dotad.
+- Wylaczniki = stan sprzed paczki: `DesertionLawForAi` false, `WarLedgerAiHalf` true, `WarLedgerMinMen` 0.
+
+**Nowe klucze:** grupa "Desertion": `DesertionLawForAi` true (byl false); grupa wojny (obok `WarLedgerToOutlaws`): `WarLedgerAiHalf` false, `WarLedgerMinMen` 30
+(suwak 0-120), `WarLedgerMinMenPlayer` true. Opis `WagesDesertPercentPerDay` poprawiony (AI juz nie "polowa").
+
+**Nowe / zmienione linie logu:**
+- NOWA (raz na dobe, z `WarLedger.OnDaily`) `Dezercja AI (183): dzien N | prawo dezercji wedlug poziomu dla AI: TAK (progi t1<25 t2<22 ..., 1.0%/pkt, sufit 25%) | z morale (prawo): partie lordow a, zalogi b, karawany i inne c ludzi (tier 1-2 x, 3-4 y, 5+ z; w glodzie g; najnizsze morale partii z dezercja M), partii z dezercja: lordow p, zalog q, innych r | limit zoldu i przepelnienie (gra, w tych partiach) L | zalegly zold (WarLedger): AI W ludzi w K partiach, stawka AI pelna, podloga 30 ludzi zatrzymala: AI F w n partiach, gracz i jego rod G w m | prog 183: dezercja AI z morale i zaleglego zoldu (linia 169c 'AI morale i zalegly zold') <= bieg bazowy + 50%.`
+  Liczniki modelu - od poprzedniej linii (dezercja gry biegnie w dobowym ticku partii).
+- ZMIENIONA w tresci (kod bez zmian): `Dezercja AI wedlug przyczyny (169c)` - "morale" u AI to teraz prawo dezercji (wczesniej gra ponizej 10); koncowka
+  "prawo dezercji dla AI (DesertionLaw): tak". To jest miara progu 183 ("AI morale i zalegly zold").
+- ZMIENIONA przy starcie: `DesertionLaw: model dodany - ..., AI: tak.`
+- Znika: linie `DesertionLaw: <partia AI> morale ...` (zostaja dla gracza i jego rodu).
+
+**Odstepstwa / rozstrzygniecia:**
+1. Prawo obejmuje tez zalogi i karawany AI (model gry pyta o nie tym samym wywolaniem; u gracza obejmowalo je od zawsze - jedna regula). Projekt mowi "AI
+   jak dla gracza" bez rozroznienia rodzajow partii.
+2. Podloga liczona od `TotalManCount` (ludzie z bohaterami, jak "ludzi" w linii WarLedger) - partia 30 ludzi z lordem traci przez zalegly zold najwyzej do 30.
+3. Podloga dotyczy tylko zaleglego zoldu (WarLedger) - projekt; dezercja z morale, przepelnienie i zwolnienia 166 jej nie maja.
+
+**Baza progu (linia 169c "AI morale i zalegly zold", srednia dobowa 120 dob):** bieg bazowy `kopia-baza120` 41.7/dobe (partie lordow: morale 32.0, morale
+w glodzie 7.4, WarLedger 1.8), `kopia-e2b2-120` 37.8/dobe, C1+C2 (`kopia-c2-120`) 20.7/dobe (lordowie: morale 14.0, w glodzie 6.7, WarLedger 0.01).
+Prog projektu "baza + 50%": od biegu bazowego ok. 62/dobe, od C2 ok. 31/dobe (srednia 28 dob). WarLedger AI <= 1 000 ludzi w 120 dobach (C2: 1).
+
+**Czego sie spodziewac:** dezercja AI z morale ok. 1.5-3 x C2 (prog nizszy od gry: 25 zamiast 10 dla t1, wyzsza stawka ponizej 10: t1 przy morale 5 - 20%/dobe,
+gra ok. 8%) - ok. 30-60 ludzi/dobe, glownie tier 1-2 i partie w glodzie; zalogi AI moga dezerterowac w oblezeniu (glod). WarLedger AI bez zmian w praktyce
+(z budzetem 166 zaleglosc AI prawie nie wystepuje), podloga zatrzyma pojedyncze partie.
+
+**Ryzyka:** (a) przekroczenie progu wobec C2 (31/dobe) - wtedy wedlug projektu "naprawiamy morale, nie dezercje" (np. niewyspani T10, glod); test: linia 183
+"najnizsze morale partii z dezercja" i "w glodzie"; (b) zalogi AI w oblezeniu z glodem traca ludzi szybciej niz dotad (gra: ponizej 10).
