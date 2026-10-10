@@ -614,3 +614,8 @@ SCRATCH(ae222cb7)\e3\32 (galaz w-toku/e3-32 od 0e21ea1). SCRATCH(ae222cb7) = C:\
   do domu, Inni osobno w 169c/183) - workflow wf_9a3923d2-0f9 w drzewie e2c -> test\Armoury-p1.dll -> test 120 + zapis + bieg z zapisu d180 (test\autotest-dlugi-d180.sav.bak).
   **ETAP 3:** 3.2 kod gotowy (w-toku/e3-32 5f42f63, BeatenPurse.cs; recenzja w toku wf_d55d323d-3e3); projekt 3.1+3.3 w toku (wf_e10501af-c14 ->
   SCRATCH(ae222cb7)\e3\projekt31\PROJEKT-ETAP3-SZCZELNOSC-STATKI-2026-10-10.md).
+- (16:45) Bieg bazowy z zapisu d180 (wgrana wersja, 40 dob, SCRATCH(ae222cb7)\kopia-d180-baza40): dezercja d180-207 127/d (lordowie morale 37, w glodzie 58, zalogi
+  przepelnienie 13), d208-219 56/d; pula wyrzutkow 7.2 -> 11.0 tys., bandy 19.1 -> 20.3 tys. ludzi. Zapis d180 w grze pod nazwa autotest-d180 (kopia w test\). Na koniec
+  biegu wywrotka silnika przy wyjsciu (0xC0000005, znana, bez kodu modow).
+- (16:45) **ETAP 3.4-3.10 W TOKU** (workflow wf_bc43cd76-2ea): kazdy krok osobna galaz od 10db68d, drzewa SCRATCH(ae222cb7)\e3\34 ... e3\310 (w-toku/e3-34, -35, -36, -37,
+  -38, -39, -310) - rozpoznanie + kod + recenzja + poprawki. Plan testow: grupy (3.2) -> (3.1+3.3) -> (3.4-3.7) -> (3.8) -> (3.9+3.10), kazda grupa test 120 + zapis 9.
