@@ -598,3 +598,12 @@ Kolejnosc: (1) dezercja AI w 2. polowie roku + bandy, (2) werbunek Strazy, (4) T
 - okno 5h: odczyt get_usage miedzy krokami, przy 85% nie startowac nowych watkow, przy 90% pauza do resetu; jedna gra naraz; w czasie dlugiego testu kod nastepnej pozycji;
 - tydzien 99% -> STAN-PRAC + PRZEKAZANIE + push; prompty pomocnikow: "nie uzywaj spawn_task".
 Pamiec tego repo (laduje sie sama): tory-pracy-i-limity.md, stala-zgoda-wgrywaj-po-tescie.md.
+**Drzewa tej nocy:** Armoury e2c jak wyzej (w-toku/e2c: fd5f8ae 183d diagnoza morale, 022c9f7 namioty (4), 0e21ea1 pula Strazy (2)); etap 3.2 - worktree
+SCRATCH(ae222cb7)\e3\32 (galaz w-toku/e3-32 od 0e21ea1). SCRATCH(ae222cb7) = C:\Users\GAME\AppData\Local\Temp\claude\C--Users-GAME-Bannerlor2-Realm-of-Thrones\ae222cb7-a7c2-473a-8fc1-1dc1d6f688e3\scratchpad
+(test\ = probne DLL i wyjscia autotestow, d1\ = skrypty). Autotest jak w rozdz. 22 (CS autotestowy test\CrashScribe-at-w22.dll ze SCRATCH(7016)).
+- (15:35) **(1) DEZERCJA - PRZYCZYNA (dowod):** linia "Morale AI (183d)" (nowa) na zapisie autotest-dlugi (doba 180 biegu 218; kopia SCRATCH(ae222cb7)\test\autotest-dlugi-d180.sav.bak):
+  model morale = BKROTPatch BKROTPartyMoraleModel; partie lordow z dezercja maja kary ZAOPATRZENIA BK ("Alcohol supplies -35", "Wood supplies -34"), glod ("No Food -30" +
+  "Recent Events" do -53 od dziennej kary glodu), "Sleepless nights -23", "Unpaid Wages -7". Ramki ksiegi towarow: zaopatrzenie BK zuzywa ok. 6 000 szt./dobe, dokupuje
+  ok. 1 400. Zbiegli -> pula wyrzutkow -> bandy. Rozpoznanie BK PartySupplies + propozycje: workflow wf_d3375bb6-728 (notatki SCRATCH(ae222cb7)\wf1\rozpoznanie-1.md).
+- (15:35) **(4) NAMIOTY:** przyczyna w kodzie gry - GetPartyVisual czyta slownik bez sprawdzenia; poprawka VisualOf (GetVisualOfEntity). **(2) STRAZ:** pulap w ludziach liczony
+  na rod (rody bez dochodu ~0) -> jeden pulap calego zakonu. Test 120 dob 2+4 razem (Armoury-24.dll 377af1a2) w toku -> potem zapis 9 dob -> WGRANIE 23.
