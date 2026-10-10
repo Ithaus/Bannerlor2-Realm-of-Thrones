@@ -623,7 +623,8 @@ namespace Armoury
                 if (string.IsNullOrEmpty(data)) return;   // stary zapis (bez klucza) - sluzba od zera (rod bez dob wojny - warunek sluzby nie obowiazuje)
                 var f = data.Split('|');
                 if (f.Length < 4 || (f[0] != "v1" && f[0] != "v2")) { _importBad++; return; }
-                if (f[0] == "v1") _importOld = true;   // C2: sluzba od zera (normy zalog i przejecia twierdz zostaja)
+                var st = Settings.Current;
+                if (f[0] == "v1" && st != null && st.CrownRentWarDayNeedsContact) _importOld = true;   // C2: sluzba od zera (normy zalog i przejecia twierdz zostaja)
                 if (f[1].Length > 0 && !_importOld)
                     foreach (var p in f[1].Split(';'))
                     {

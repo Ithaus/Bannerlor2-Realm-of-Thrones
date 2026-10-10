@@ -10,6 +10,7 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Library;
+using TaleWorlds.Localization;
 
 namespace Armoury
 {
@@ -114,6 +115,8 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ rody rycerzy na dzis (pamiec doby: rod -> osada majatku)
+        // przeglad C3: odswiezana TYLKO w naszym ticku dobowym i przy starcie sesji (BK IsGentryClan wola GetCouncil - nie z wnetrza cudzych petli,
+        // np. limitu wielkosci partii liczonego w ticku BK); latki gry czytaja pamiec z ostatniego odswiezenia
         private static readonly Dictionary<Clan, Settlement> _knights = new Dictionary<Clan, Settlement>();
         private static int _knightsDay = int.MinValue;
 
@@ -134,11 +137,10 @@ namespace Armoury
             }
         }
 
-        /// <summary>Rod rycerza (pamiec doby; wylaczone 179 - nie).</summary>
+        /// <summary>Rod rycerza (pamiec z ostatniego odswiezenia; wylaczone 179 - nie).</summary>
         internal static bool IsKnightClan(Clan c)
         {
             if (!On || c == null || c.StringId == null || !c.StringId.StartsWith(GentryPrefix, StringComparison.Ordinal)) return false;
-            Refresh();
             return _knights.ContainsKey(c);
         }
 
@@ -146,6 +148,15 @@ namespace Armoury
         private static bool IsServingKnight(Hero h, MobileParty mp)
         {
             return h != null && mp != null && h != mp.LeaderHero && h.Clan != null && h == h.Clan.Leader && h.Clan != mp.ActualClan && _knights.ContainsKey(h.Clan);
+        }
+
+        /// <summary>Rycerze w sluzbie w tej partii (glowy rodow rycerzy w druzynie innego rodu).</summary>
+        private static int KnightCount(MobileParty mp)
+        {
+            if (mp == null || mp.MemberRoster == null || mp.MemberRoster.TotalHeroes <= 1 || _knights.Count == 0) return 0;
+            int n = 0; var r = mp.MemberRoster;
+            for (int i = 0; i < r.Count; i++) { var ch = r.GetCharacterAtIndex(i); if (ch != null && ch.IsHero && IsServingKnight(ch.HeroObject, mp)) n++; }
+            return n;
         }
 
         /// <summary>166: zold rycerzy w sluzbie w tej partii (24 zl kazdy; Straz bez zoldu) - czesc zoldu partii w pulapie pana.</summary>
@@ -156,14 +167,7 @@ namespace Armoury
                 var s = Settings.Current;
                 if (!On || s == null || mp == null || !mp.IsLordParty || mp.MemberRoster == null || mp.MemberRoster.TotalHeroes <= 1) return 0;
                 if (CrownGifts.WatchUnpaidOn && CrownGifts.IsWatchParty(mp)) return 0;
-                Refresh();
-                int n = 0; var r = mp.MemberRoster;
-                for (int i = 0; i < r.Count; i++)
-                {
-                    var ch = r.GetCharacterAtIndex(i);
-                    if (ch != null && ch.IsHero && IsServingKnight(ch.HeroObject, mp)) n++;
-                }
-                return n * Math.Max(0, s.GentryKnightWage);
+                return KnightCount(mp) * Math.Max(0, s.GentryKnightWage);
             }
             catch (Exception e) { Stumble("KnightWage", e); return 0; }
         }
@@ -239,14 +243,16 @@ namespace Armoury
         private static bool Free(Hero h)
         {
             return h != null && h.IsAlive && h.IsActive && !h.IsChild && !h.IsPrisoner && h.PartyBelongedTo == null && h.PartyBelongedToAsPrisoner == null
-                   && h.GovernorOf == null && h != Hero.MainHero && !h.IsNoncombatant;
+                   && h.GovernorOf == null && h != Hero.MainHero && !h.IsNoncombatant
+                   && (h.CurrentSettlement == null || !h.CurrentSettlement.IsUnderSiege);   // z oblezonej osady nikt nie wyjezdza przez linie oblezenia
         }
 
-        /// <summary>Druzyna, do ktorej rycerz moze dolaczyc: czynna, AI (nie gracz), nie w bitwie, nie rozwiazywana, strona krolestwa rycerza, inny rod.</summary>
+        /// <summary>Druzyna, do ktorej rycerz moze dolaczyc: czynna, AI (nie gracz ani jego rod - tylko na wezwanie gracza), nie w bitwie, nie rozwiazywana,
+        /// strona krolestwa rycerza, inny rod.</summary>
         private static bool Fit(MobileParty mp, Kingdom k, Clan knight)
         {
             return mp != null && mp.IsActive && mp.IsLordParty && !mp.IsMainParty && !mp.IsDisbanding && mp.MapEvent == null && mp.LeaderHero != null
-                   && mp.ActualClan != null && mp.ActualClan != knight && mp.MapFaction == k && !Undead.Party(mp);
+                   && mp.ActualClan != null && mp.ActualClan != knight && mp.ActualClan != Clan.PlayerClan && mp.MapFaction == k && !Undead.Party(mp);
         }
 
         private static bool Join(Hero h, MobileParty target)
@@ -259,6 +265,9 @@ namespace Armoury
         /// <summary>Powrot do majatku (gdy wies w rekach wroga - najblizsza twierdza wlasnego krolestwa); TeleportHeroAction nie rusza rycerza w bitwie.</summary>
         private static void Home(Hero h, Settlement estate, MobileParty mp)
         {
+            // druzyna w bitwie albo w oblezeniu (oblega albo jest zamknieta w oblezonej osadzie) - rycerz zostaje z nia, powrot po oblezeniu
+            if (mp != null && mp.IsActive && (mp.MapEvent != null || mp.SiegeEvent != null || mp.BesiegedSettlement != null
+                || (mp.CurrentSettlement != null && mp.CurrentSettlement.IsUnderSiege))) { _dWait++; return; }
             Settlement home = estate != null && estate.MapFaction == h.MapFaction ? estate : null;
             if (home == null)
             {
@@ -442,11 +451,15 @@ namespace Armoury
 
         internal static void EnsureHooks()
         {
+            try { if (Campaign.Current != null) Refresh(); } catch (Exception e) { Stumble("Refresh(sesja)", e); }   // pamiec rodow rycerzy od startu sesji (po wczytaniu)
             if (_hooksTried || _harmony == null || Campaign.Current == null) return;
             _hooksTried = true;
             var g = AccessTools.TypeByName("BannerKings.Behaviours.BKGentryBehavior");
             Wire("wezwanie rycerza (BK SummonGentry)", g != null ? AccessTools.Method(g, "SummonGentry") : null, nameof(SummonPrefix), null);
             Wire("rozwiazanie partii rycerza (BK FinishParty)", g != null ? AccessTools.Method(g, "FinishParty") : null, nameof(FinishPrefix), null);
+            // rycerz nie zajmuje miejsca zolnierza: bez tego partia pelna + rycerz = przepelnienie i gra wypedza co dobe zolnierza (dezercja z wielkosci partii)
+            var psm = Campaign.Current.Models != null ? Campaign.Current.Models.PartySizeLimitModel : null;
+            WirePost("miejsce rycerza w druzynie (GetPartyMemberSizeLimit)", psm != null ? AccessTools.Method(psm.GetType(), "GetPartyMemberSizeLimit", new[] { typeof(PartyBase), typeof(bool) }) : null, nameof(SizePostfix));
             var sl = AccessTools.TypeByName("BannerKings.Behaviours.BKEstateAutoSlavePurchaseBehavior");
             Wire("majatek: niewolnicy (BK TryAutoBuyForEstate)", sl != null ? AccessTools.Method(sl, "TryAutoBuyForEstate") : null, nameof(SlavesPrefix), nameof(SlavesFinalizer));
             var sup = AccessTools.TypeByName("BannerKings.Behaviours.Estates.BKVillageSupplyAutoBehavior");
@@ -467,6 +480,35 @@ namespace Armoury
             catch (Exception e) { _missing.Add(label + " (blad: " + e.Message + ")"); }
         }
 
+        private static void WirePost(string label, MethodBase m, string post)
+        {
+            try
+            {
+                if (m == null) { _missing.Add(label); return; }
+                _harmony.Patch(m, postfix: new HarmonyMethod(typeof(GentryService), post) { priority = Priority.Last });
+                _wired.Add(label);
+            }
+            catch (Exception e) { _missing.Add(label + " (blad: " + e.Message + ")"); }
+        }
+
+        private static TextObject _knightsText;   // leniwie - bez TextObject w konstruktorze statycznym (klasa ladowana przy starcie gry, SetHarmony)
+
+        /// <summary>Limit wielkosci partii +1 na rycerza w sluzbie (rycerz jedzie obok zolnierzy, nie zamiast nich).</summary>
+        public static void SizePostfix(PartyBase __0, ref ExplainedNumber __result)
+        {
+            try
+            {
+                if (!On || __0 == null) return;
+                var mp = __0.MobileParty;
+                if (mp == null || !mp.IsLordParty) return;
+                int n = KnightCount(mp);
+                if (n <= 0) return;
+                if (_knightsText == null) _knightsText = new TextObject("{=!}Knights of the banner");
+                __result.Add(n, _knightsText);
+            }
+            catch (Exception e) { Stumble("SizePostfix", e); }
+        }
+
         /// <summary>BK wezwanie choragwi: rycerz zamiast wystawiac partie z ludzi majatku jedzie w druzynie pana (w tej armii) albo wzywajacego.</summary>
         public static bool SummonPrefix(Clan __0, Army __1)
         {
@@ -482,7 +524,8 @@ namespace Armoury
                 var lc = estate != null ? estate.OwnerClan : null;
                 var lord = lc != null && lc != __0 ? lc.Leader : null;
                 var lp = lord != null ? lord.PartyBelongedTo : null;
-                if (lp != null && lp.LeaderHero == lord && lp.IsActive && lp.Army == __1 && lp.MapEvent == null && !lp.IsDisbanding) { target = lp; _dSummonLord++; }
+                // druzyna gracza tylko na jego wlasne wezwanie (wezwanie AI krola - rycerz gracza jedzie u wzywajacego, gracz nie placi za cudze wezwanie)
+                if (lp != null && lp.LeaderHero == lord && lp.IsActive && lp.Army == __1 && lp.MapEvent == null && !lp.IsDisbanding && (!lp.IsMainParty || lead.IsMainParty)) { target = lp; _dSummonLord++; }
                 else { target = lead; _dSummonLead++; }
                 if (!Join(h, target)) { _dSummonSkip++; return false; }
                 if (target.IsMainParty)
@@ -579,7 +622,16 @@ namespace Armoury
         // ------------------------------------------------------------ linia "Rycerze (179)"
         private static void Report(Settings s, int today, bool on)
         {
-            if (!s.LogEnabled || (!on && _dHome == 0 && _dWait == 0)) return;   // wylaczone: linia tylko, gdy ktos wracal do domu
+            try { if (s.LogEnabled && (on || _dHome > 0 || _dWait > 0)) Log.Info(Line(s, today, on)); }   // wylaczone: linia tylko, gdy ktos wracal do domu
+            finally
+            {
+                _dSpawnBlock = _dSummon = _dSummonLord = _dSummonLead = _dSummonSkip = 0;
+                _dFinish = _dFinishMen = _dFinishLost = _dFinishPris = _dFinishShips = 0; _dEstateBlock = 0; _dEstateSpent = 0;
+            }
+        }
+
+        private static string Line(Settings s, int today, bool on)
+        {
             var sb = new StringBuilder(900);
             sb.Append("Rycerze (179): dzien ").Append(today).Append(on ? "" : " (WYLACZONE - rycerze w sluzbie wracaja do domu)")
               .Append(" | rody rycerzy (BK gentry bez lenna) ").Append(_dClans)
@@ -596,9 +648,7 @@ namespace Armoury
               .Append(", jency w rozwiazanych ").Append(_dFinishPris).Append(", statki ").Append(_dFinishShips).Append(')')
               .Append(" | majatki BK (przydzial sprzetu 166").Append(s.GentryEstateSpendCap ? "" : " - WYLACZONE").Append("): zakupy wstrzymane ").Append(_dEstateBlock).Append(", wydane ").Append(_dEstateSpent)
               .Append(_stumbles > 0 ? " | potkniecia " + _stumbles : "").Append('.');
-            Log.Info(sb.ToString());
-            _dSpawnBlock = _dSummon = _dSummonLord = _dSummonLead = _dSummonSkip = 0;
-            _dFinish = _dFinishMen = _dFinishLost = _dFinishPris = _dFinishShips = 0; _dEstateBlock = 0; _dEstateSpent = 0;
+            return sb.ToString();
         }
     }
 }
