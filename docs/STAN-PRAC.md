@@ -1056,3 +1056,12 @@ ClaimantDemand.SetTexts, Demand.Fulfill, Demand.DoAiChoice - wywrotka biegu 2-le
 i RealisticCaptivity 5f98df70 bez zmian. Test: 10 dob (latki wpiete 3/3 + ikony), bieg 218 dob z poprawka BK - 0 bledow Armoury. Wersja autotestowa CS:
 SCRATCH(7016)\test\CrashScribe-at-w22.dll (= at-bk2, e90f192a). Kopie: CrashScribe.dll.bak-2026-10-10-przed-noc22 + D:\Backup-Bannerlord\wgrane\2026-10-10-noc22-przed.
 ZATWIERDZONE: Armoury 87b03e2b, RealisticCaptivity 5f98df70, CrashScribe 77b11df5.
+
+**WGRANIE 23 (10.10 ok. 16:20 zegara komp.; nowe konto, sesja ae222cb7):** Armoury ba2e13e8 (galaz noc/wgranie-23 = w-toku/e2c 10db68d = WGRANIE 21 + 183d diagnoza
+morale AI (linia "Morale AI (183d)", tylko log) + (4) namioty bez KeyNotFound (VisualOf = GetVisualOfEntity gry) + (2) jeden pulap w ludziach calej Nocnej Strazy (werbunek,
+nowe partie i zwolnienia wedlug puli; poprawki recenzji 2-r)). RealisticCaptivity 5f98df70 i CrashScribe 77b11df5 bez zmian. Testy: 120 dob nowej kampanii (na 0e21ea1, przed
+poprawkami recenzji, ktore dotykaja tylko zwolnien i pulapu rodow Strazy) - 0 bledow Armoury, progi etapu 2: 54 TAK / 2 NIE (stale: harness kuriera 2b/2c, "pieniadz swiata bez
+wojny") / 3 DECYZJA (te same co w WGRANIU 20: Dothraki/Iron Islands biedni z lore, pan samych zamkow 166 zl/d, regulator kas miast); wgrana wersja WGRANIE 20 w tym samym
+narzedziu miala 5 NIE. Straz 1.9 -> 5.0-5.4 tys. (pulap 5-6.8 tys., werbunek wstrzymany 0; dotad 1.5-2 tys.), glowy < 5000 = 1, bankruci 0, wojsko lordow w wojnie 104 tys.,
+dezercja AI 23/d (baza 49); zapis 9 dob na wersji po recenzji (ba2e13e8) OK - 0 bledow, 29.1 s/dobe. Kopie: Armoury.dll.bak-2026-10-10-przed-noc23 +
+D:\Backup-Bannerlord\wgrane\2026-10-10-noc23-przed. ZATWIERDZONE: Armoury ba2e13e8, RealisticCaptivity 5f98df70, CrashScribe 77b11df5.

@@ -607,3 +607,10 @@ SCRATCH(ae222cb7)\e3\32 (galaz w-toku/e3-32 od 0e21ea1). SCRATCH(ae222cb7) = C:\
   ok. 1 400. Zbiegli -> pula wyrzutkow -> bandy. Rozpoznanie BK PartySupplies + propozycje: workflow wf_d3375bb6-728 (notatki SCRATCH(ae222cb7)\wf1\rozpoznanie-1.md).
 - (15:35) **(4) NAMIOTY:** przyczyna w kodzie gry - GetPartyVisual czyta slownik bez sprawdzenia; poprawka VisualOf (GetVisualOfEntity). **(2) STRAZ:** pulap w ludziach liczony
   na rod (rody bez dochodu ~0) -> jeden pulap calego zakonu. Test 120 dob 2+4 razem (Armoury-24.dll 377af1a2) w toku -> potem zapis 9 dob -> WGRANIE 23.
+- (16:20) **WGRANIE 23: Armoury ba2e13e8** (noc/wgranie-23 = w-toku/e2c 10db68d: 183d + namioty (4) + pula Strazy (2) z poprawkami recenzji). Opis i testy w STAN-PRAC.
+  **(1) DEZERCJA - rozpoznanie (SCRATCH(ae222cb7)\wf1\rozpoznanie-1.md):** Inni (wighty) liczeni jako lordowie i wpadaja do puli wyrzutkow (-> bandy; 23% calosci, w oknie
+  420-447 polowa); blad wzoru kary zaopatrzenia BK (w osadzie i w malej partii kara = cala narosla potrzeba; nasza czapka 3/d zawyza u duzych); przepelnienie zalog po powrocie
+  patroli BK -> pula wyrzutkow; fale po wielkich bitwach (vanilla -3/runde) i glod - kary zamierzone. W TOKU kod W1 (kara BK = dni braku) + W4 (Inni do niczego, przepelnienie
+  do domu, Inni osobno w 169c/183) - workflow wf_9a3923d2-0f9 w drzewie e2c -> test\Armoury-p1.dll -> test 120 + zapis + bieg z zapisu d180 (test\autotest-dlugi-d180.sav.bak).
+  **ETAP 3:** 3.2 kod gotowy (w-toku/e3-32 5f42f63, BeatenPurse.cs; recenzja w toku wf_d55d323d-3e3); projekt 3.1+3.3 w toku (wf_e10501af-c14 ->
+  SCRATCH(ae222cb7)\e3\projekt31\PROJEKT-ETAP3-SZCZELNOSC-STATKI-2026-10-10.md).
