@@ -1,5 +1,28 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-10 (noc 10/11.10, nowe konto) - 4: NAMIOTY BEZ "KeyNotFound"; 2: JEDEN PULAP CALEJ NOCNEJ STRAZY; 183d: DIAGNOZA MORALE AI
+**Mod:** Armoury | **Galaz:** `w-toku/e2c` (od d341e7b = WGRANIE 21) | **Pliki:** `NightRest.cs`, `ClanBudget.cs`, `DesertionLaw.cs`, `WarLedger.cs`
+
+**Co zobaczysz w grze (prosto):** Nocna Straz znow werbuje do pulapu calego zakonu (dotad stala na ok. 1.5-2 tys. ludzi przy pulapie 3-5 tys.); znika rzadki blad namiotu w logu.
+
+**Problem:**
+- 4 (namioty): 1 raz na 457 dob "ERROR in Tent: KeyNotFoundException" (log biegu okup1-457, 13:15:46) - `NightRest.Tent` wolal przez refleksje `MobilePartyVisualManager.GetPartyVisual`, ktory czyta slownik gry wprost (`_partiesAndVisuals[party]`, dekompilacja SandBox.View) i wywraca sie, gdy partia nie ma wizerunku (dopiero powstala, zniknela, na morzu).
+- 2 (Straz): bieg 457 dob - Straz 3.5 tys. (d26) -> 1.6 tys. (d76) i stoi 1.5-2 tys. przy pulapie calej Strazy 3.2-5 tys.; "werbunek wstrzymany" 50-200 wywolan/dobe. Przyczyna w kodzie: pulap w ludziach (Straz bez zoldu, `MenCap`) liczony i sprawdzany NA ROD (`RecruitPrefix`, `GarRecruitPrefix`, `SpawnPrefix`, `Releases`): rody Strazy bez dochodu maja pulap ok. 0 i nie werbuja, a rod ponad wlasnym pulapem zwalnia ludzi mimo luzu calej Strazy.
+- 183d: dezercja AI w 2. polowie roku 150-310 ludzi/dobe (baza 49) - linia 169c mowi tylko "morale"; brak skladnikow morale.
+
+**Zmiana:**
+- 4: nowa `VisualOf(mgr, party)` - `GetVisualOfEntity` gry (TryGetValue, null = brak wizerunku), awaryjnie prywatny slownik z `Contains`; 3 miejsca (`Tent`, straz namiotu gracza, petla `_tented`).
+- 2: pula Strazy = suma pulapow i ludzi rodow Strazy z rozliczenia doby (te same liczby co w linii 166); werbunek partii i zalog Strazy oraz nowe partie Strazy patrza na pule (`WatchLiveMen` < pula), zwolnienia Strazy dopiero po petli doby: ponad pulapem jest cala Straz, nadwyzka dzielona miedzy rody wedlug ich ludzi. Linia 166: "rody ludzie/udzial w pulapie".
+- 183d (tylko log): linia "Morale AI (183d)" - skladniki morale (opis modelu morale gry) partii lordow AI z dezercja z morale + przeglad morale wszystkich partii lordow AI.
+
+**Ryzyko / co sprawdzic (kontrola calosci, CLAUDE.md 8.0):**
+- Regresje: rody spoza Strazy bez zmian (`b.Zero` tylko Straz przy `WatchUnpaid` + `UnpaidTroopsCapInMen`); przed pierwszym rozliczeniem po wczytaniu pula -1 = jak dotad przy `MenCap < 0` (werbunek wolny). `Reset` czysci pule.
+- Kolizje: `_dWatchCap` liczony jak dotad (ClearDay -1), pula kopiowana po petli; zwolnienia Strazy po petli (ta sama doba, po dworze i limitach wszystkich rodow) - kolejnosc dla reszty rodow bez zmian.
+- Spojnosc: Straz to jeden zakon z jedna kiesa (dar koron idzie do rodow Strazy wedlug potrzeby calej Strazy, 182-W) - jedna miara pulapu. Test: Straz w ludziach rosnie do pulapu i nie przekracza 1.10 x pula; "werbunek wstrzymany" tylko przy pelnej puli.
+- 183d: tylko odczyt modelu morale (BKROTPartyMoraleModel) przy partiach z dezercja - koszt znikomy.
+
+**Status:** DO SPRAWDZENIA (build Release kod 0; test 120 dob + zapis 9 dob w toku).
+
 ## 2026-10-09 (C1, etap 2 krok C1: 165 + 182 + 166/162m + 185) - KORONA Z BIEZACYCH WPLYWOW, DARY KORON I STRAZ BEZ ZOLDU, BUDZET RODU AI Z DWOREM, KONTRAKT NAJEMNIKA AI
 **Mod:** Armoury | **Galaz:** `w-toku/e2c` (od `w-toku/e2b` + 177-fix ae01f8e) | **Projekt:** `PROJEKT-ETAP2-BANKRUCTWA-2026-10-09.md` rozdz. 2.0b, 165, 166 + 162m, 185, 182, "Odpowiedzi Jeffa (09.10 ok. 11:05)". **Szczegoly, klucze, linie logu, odstepstwa:** `docs/C1-POSTEP.md`. **Pliki:** nowe `CrownIncome.cs`, `CrownGifts.cs`, `ClanBudget.cs`, `MercContract.cs`; zmienione `KingdomTreasury.cs`, `SoldierPay.cs`, `MenPurse.cs`, `MountedWage.cs`, `AiGear.cs`, `BuildFunding.cs`, `IronBank.cs`, `ClanIncomeBook.cs`, `ClanIncomeBook.StableD.cs`, `MoneyLedger.cs`, `MoneyLedger.Obieg.cs`, `ArmouryBehavior.cs`, `SubModuleMain.cs`, `Settings.cs`, `McmSettings.cs`, `tools/gen_mcm.py`.
 

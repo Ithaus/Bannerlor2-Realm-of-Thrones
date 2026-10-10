@@ -921,6 +921,18 @@ namespace Armoury
         /// <summary>Gracz stoi obozem TERAZ - dla bitwy w obozie (CampScene). Stan niezalezny od ikony.</summary>
         internal static bool PlayerCamped;
 
+        /// <summary>4 (namioty): wizerunek partii bez KeyNotFound. GetPartyVisual gry czyta slownik wprost ([party]) i wywraca sie,
+        /// gdy partia nie ma wizerunku (dopiero powstala, zniknela, na morzu); GetVisualOfEntity robi TryGetValue (null = brak).</summary>
+        private static object VisualOf(object mgr, PartyBase party)
+        {
+            if (mgr == null || party == null) return null;
+            var safe = mgr.GetType().GetMethod("GetVisualOfEntity", BindingFlags.Public | BindingFlags.Instance);
+            if (safe != null) return safe.Invoke(mgr, new object[] { party });
+            var dict = mgr.GetType().GetField("_partiesAndVisuals", BindingFlags.NonPublic | BindingFlags.Instance);
+            var d = dict != null ? dict.GetValue(mgr) as System.Collections.IDictionary : null;
+            return d != null && d.Contains(party) ? d[party] : null;
+        }
+
         internal static void Tent(MobileParty mp, bool on)
         {
             try
@@ -942,8 +954,7 @@ namespace Armoury
                     BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static) : null;
                 object mgr = cur != null ? cur.GetValue(null, null) : null;
                 if (mgr == null) return;
-                var getVis = mgr.GetType().GetMethod("GetPartyVisual");
-                object vis = getVis != null ? getVis.Invoke(mgr, new object[] { mp.Party }) : null;
+                object vis = VisualOf(mgr, mp.Party);
                 var pStrat = vis != null ? vis.GetType().GetProperty("StrategicEntity") : null;
                 object strat = pStrat != null ? pStrat.GetValue(vis, null) : null;
                 if (strat == null) return;
@@ -1027,8 +1038,7 @@ namespace Armoury
                     BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static) : null;
                 object mgr = cur != null ? cur.GetValue(null, null) : null;
                 if (mgr == null) return;
-                var getVis = mgr.GetType().GetMethod("GetPartyVisual");
-                object vis = getVis != null ? getVis.Invoke(mgr, new object[] { MobileParty.MainParty.Party }) : null;
+                object vis = VisualOf(mgr, MobileParty.MainParty.Party);
                 var pStrat = vis != null ? vis.GetType().GetProperty("StrategicEntity") : null;
                 object strat = pStrat != null ? pStrat.GetValue(vis, null) : null;
                 if (strat == null) return;
@@ -1075,7 +1085,6 @@ namespace Armoury
                     BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static) : null;
                 object mgr = cur != null ? cur.GetValue(null, null) : null;
                 if (mgr == null) return;
-                var getVis = mgr.GetType().GetMethod("GetPartyVisual");
 
 
                 foreach (var mp in _tented)
@@ -1083,7 +1092,7 @@ namespace Armoury
                     try
                     {
                         if (mp == null || !mp.IsActive) continue;
-                        object vis = getVis != null ? getVis.Invoke(mgr, new object[] { mp.Party }) : null;
+                        object vis = VisualOf(mgr, mp.Party);
                         if (vis != null) ShowAgentFigures(vis, false);
                     }
                     catch { }
