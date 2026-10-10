@@ -457,3 +457,5 @@ LIMITY 13:30: 5h 32%, TYDZIEN 82% (reset 15.10) - przy 100% tygodnia przejsc na 
   Kolejka po kroku D: (1) T10 odpoczynek AI (Armoury, NocnyMarsz/AiNightCamp), (2) zakaz slubow i ciaz roznych ras (CrashScribe Mends albo Armoury), potem etap 3.
 - (06:10) Jeff: "tak, korona" - oplata za wezwanie sojusznika do wojny ze skarbca, rody nic, brak srodkow = sojusznik wychodzi. Kolejka po D: (1) T10 odpoczynek AI,
   (2) zakaz slubow/ciaz roznych ras, (3) Call to War z korony (165/168 - jesli pomocnik D tego nie zrobil przy zrodle zaliczki gry).
+- (06:40) Jeff: dar dla Strazy z calego Westeros (STAN-PRAC "DECYZJE JEFFA 10.10"): Zelazny Tron 8%, Polnoc 8%, Dorne/Reach/Vale/Stormlands/Riverlands/Dragonstone 3%.
+  Kolejka po D: (0) dar Strazy z Westeros (S, CrownGifts.cs - przed testem D, zeby test objal oba), (1) T10 odpoczynek AI, (2) zakaz slubow/ciaz roznych ras.

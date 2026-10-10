@@ -996,3 +996,7 @@ ZATWIERDZONE: Armoury c38bd62f, CrashScribe 6507c842. Baza Armoury: w-toku/e2c.
   roznymi rasami (human / giant / wight / whitewalker), takze istniejace ciaze roznych ras - bez porodu (porod roznych ras zawiesil silnik w tescie C3c, doba 43).
 - **Wezwanie sojusznika do wojny (Call to War):** "tak, korona" - oplate dla wezwanego sojusznika placi skarbiec korony z wplywow dnia (w kolejnosci wydatkow
   165), rody nic; gdy skarbca nie stac - sojusznik wychodzi z wojny (bez zlota z niczego i bez dlugu rodow wobec korony). Zamyka tez czesc "zaliczki gry" (OBIEG-1).
+- **Dar dla Nocnej Strazy (182) - z calego Westeros** (Jeff 10.10: "na Nocna Straz zrzuca sie cale krolestwo, nie tylko Polnoc; w ksiazce utrzymuje ja krol i inne rody").
+  Parametry (dobrane przeze mnie): Zelazny Tron (House Baratheon of King's Landing) 8%, Polnoc 8%, Dorne / Reach / Vale / Stormlands / Riverlands / Dragonstone po 3%
+  wplywow dnia; Iron Islands, Free Folk i Essos 0. Razem ok. 3.6 tys./dobe (dzis 3.7 tys. z samej Polnocy 25%); Polnoc +ok. 2.7 tys./dobe na wlasny zwrot. Do zrobienia
+  zaraz po kroku D (CrownGifts.cs + klucze udzialow w Settings), test razem z D.
