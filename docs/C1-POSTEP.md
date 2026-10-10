@@ -991,3 +991,66 @@ wydajnosc (petle raz na dobe; mapa partii raz na dobe tylko przy dlugu zoldu; He
 **Uwagi bez zmian w kodzie:** (a) zysk Banku i zapasowy odbiorca w kasie miasta stoja pod tarcza dworu (`HoldCourt`) - przy wylaczonym `HouseholdShield` regulator moze
 skasowac nadwyzke (ryzyko "w nicosc", licznik w "Kasy miast"); (b) 1/9 od trzeciej lorda liczy sie tylko przy wlaczonej ksiedze rodow (`NoteInflow`); (c) liczba okupow
 AI-AI wzrosnie kilkukrotnie (10% dziennie od kazdego jenca zamiast barteru gry z warunkiem wartosci) - do obejrzenia kula sniezna (rozdz. 1).
+
+---
+
+## T10-R - AI musi odpoczywac (decyzja Jeffa 10.10) - ZROBIONE (commit a94b135)
+
+Jeff 10.10: "musza odpoczywac; takie marsze i najwyzej 2 dni forsownego marszu, tylko w sytuacjach wyjatkowych" (do decyzji 09.10: noca tylko gdy trzeba,
+kary jak gracz). Kod: `Armoury/src/NightMarch.cs` (ksiega snu AI, powody nocnego marszu), linia ustawien w `NightRest.cs` (LogCampConfig).
+
+**Diagnoza z testu 120 dob (kopia-c3-120):** 11 partii na dlugu 3 od doby 68 do 82, potem 15 (probka kary: Oberyn Martell, Obara Sand, Nymeria Sand - morale -95%).
+Dorne walczylo armia Dorana Martella ("Doran Martell (Dorne, partii 3)"): (1) czlonek armii nie mogl wejsc w sen dlugu (doczepiony - `can` w AiDebtCamp = false),
+a wodz decydowal wedlug WLASNEGO dlugu: po splacie dlugu 1 (oboz od 20:00) wodz z dlugiem 0 znow gonil noca, czlonkowie szli 1 -> 2 -> 3 i na 3 utkneli
+(splata dlugu 3 wymaga 21 h snu ciaglego, a w armii doba daje najwyzej ok. 18 h); (2) to samo w obozie oblezenia, w oblezonej osadzie i na morzu; (3) ksiega AI
+gubila 1-5 tikow na dobe ("stoper ksiegi ... (19-23 tikow)") - numer godziny z `Math.Round(czas)`, a tick godzinowy gry ma dowolna faze; zgubiona godzina obozu 0-6
+dawala 5 h zamiast bazy 6 i dlug 1 dla 237-375 partii naraz (doby 24, 27, 68, 104, 112, 114, 117, 119), a pomiar ruchu sklejal dwie godziny (420+ "obudzonych
+cudza reka" w jednej godzinie 0-1 albo 5-6).
+
+**Co zrobione:**
+- **R4 obowiazkowy odpoczynek:** seria nocy bez snu (pelne doby bez bazy z rzedu) >= `MaxForcedNights` albo dlug >= `MaxForcedNights` -> partia nie idzie noca ani
+  w poscigu, ani na odsiecz, ani w ucieczce; spi snem dlugu (dlug 2-3 sen ciagly tam, gdzie stoi; dlug 1 oboz od 20:00) az dlug zejdzie do 0. Jedyny wyjatek:
+  ucieczka przed wrogiem co najmniej 2 razy silniejszym (sila armii albo partii, jak w grze przy ucieczce) - partia ucieka dalej, licznik "wyjatki" w linii switu.
+  Alarm (wrog idzie na spiacych) przy obowiazkowym odpoczynku budzi tylko taki wrog. Zwykla podroz, patrol, zakupy - noca nie (bez zmian: tylko ucieczka / poscig /
+  odsiecz z istniejacych powodow; poscig i odsiecz jak dotad tylko przy dlugu < `AiNightsAwakeInChase`).
+- **R5 armia odpoczywa razem:** wodz decyduje wedlug najgorszego dlugu i odpoczynku obowiazkowego z siebie i doczepionych - oboz splaty od 20:00 albo sen ciagly
+  calej armii; doczepieni spia z wodzem (licznik snu ciaglego, jak dotad `SleepsWithLeader`). Gra nie zmusza wodza do ruchu - cudze rozkazy (np. zbiorka armii)
+  wraca na Hold straznik snu dluznikow (co 0.1 h gry), jak dotad.
+- **R6 sen ciagly na miejscu:** partia z dlugiem >= 2, ktora w tej godzinie odpoczywa, a snem dlugu polozyc jej nie wolno (oboz oblezenia, oblezona osada, morze,
+  czlonek armii, AI trzyma inny mod - np. uczta BK), dostaje licznik snu ciaglego jak w snie dlugu (sen na zmiany); ruch go konczy. Doczepieni do gracza - jak dotad.
+- **R7 kazdy tick godzinowy to jedna godzina** (jak ksiega gracza): numer godziny ksiegi z licznika wywolan; tick nadrabiany w tej samej klatce (dwie godziny naraz)
+  powtarza stan odpoczynku poprzedniej godziny, swit rozlicza sie raz.
+- Zapis: seria nocy bez snu i doby na dlugu 3 jako 7. i 8. pole wpisu ksiegi `arm_nightrest_ai` (SaveText.Sync jak dotad; stary DLL je pomija, stary zapis = 0).
+
+**Nowy klucz:** `MaxForcedNights` = 2 (MCM "A night's rest", 0-5; 0 = bez limitu, stare reguly). Opis `AiNightsAwakeInChase` poprawiony ("fleeing stays allowed
+until Max Forced Nights orders a rest"). Stala w kodzie: `CrushRatio` = 2 (wrog "by ja zniszczyl").
+
+**Linie logu (Armoury-*.log):**
+- `NocnyMarsz: swit dnia N - ...` - nowy segment przed "| ruch w oknie obozu":
+  `| ODPOCZYNEK T10-R (najwyzej 2 noce marszu z rzedu, potem oboz do dlugu 0): na dlugu 1/2/3: a/b/c; obowiazkowy odpoczynek teraz N (nowe dzis M);
+  najdluzsza seria nocy bez snu X (nazwa), serii dluzszych niz 2: Y; dlug 3 dluzej niz 2 doby z rzedu Z (w tym z ucieczka-wyjatkiem W) [do 3 nazw: "imie D dob,
+  gdzie"]; wymuszone odpoczynki dzis: partii P (zablokowany marsz, partio-godziny: ucieczka f, poscig c, odsiecz r, alarm a); wyjatki dzis - ucieczka przed wrogiem
+  >= 2.0 x silniejszym: partii Q (partio-godzin H); wodzowie armii spia za zmeczonych czlonkow (partio-godziny) L; sen ciagly na miejscu bez snu dlugu (...) S,
+  splacone tak T; ticki nadrabiane w jednej klatce U`.
+  "gdzie" = `w armii <wodz>` / `wodz armii, sen dlugu` / `oboz oblezenia` / `oblezona osada X` / `na morzu` / `w osadzie X (AI trzyma inny mod)` / `w polu (ucieka)`.
+- `NocnyMarsz: odpoczynek - <partia>: marsz zablokowany - <powod> - odpoczywa (dlug D, seria nocy bez snu S) [przyklad N w sesji]`,
+  `... : WYJATEK - ucieczka przed X (...) - obowiazkowy odpoczynek, ale X (sila A >= 2.0 x B) zniszczylby ja: ucieka dalej ...`,
+  `... : alarm zablokowany (wrog silniejszy, ale nie zniszczylby jej): ... - spi dalej ...` - przyklady: 5 pierwszych, potem co 25.
+- `NightRest: oboz swiata ...` (linia ustawien) - dopisek `; T10-R: MaxForcedNights=2 (potem obowiazkowy odpoczynek do dlugu 0, ucieczka tylko przed wrogiem >= 2 x
+  silniejszym; armia wedlug najbardziej zmeczonej partii)`.
+- Zmiana pomiaru: `stoper ksiegi: ... (N tikow)` w linii switu - teraz 24 (bylo 17-23); linie `AiNightCamp: ruch H:00-H+1:00` - 6 na noc (bylo 5-6), bez
+  skokow 400+ "obudzonych cudza reka" w godzinie 0-1 / 5-6 (byly sklejone godziny).
+
+**Co czytac w tescie 120 dob:**
+- Cel: `dlug 3 dluzej niz 2 doby z rzedu 0` w kazdej dobie (dopuszczalne tylko z "ucieczka-wyjatkiem"); jesli > 0 - nawias z nazwami mowi gdzie (armia / oblezenie /
+  inny mod) - to wskazuje, ktora sciezka nie odpoczywa.
+- `nowy dlug 1/2/3` bez dob masowych (200+ naraz) - zostaje kilka-kilkanascie dziennie; `z dlugiem teraz 1/2/3` - trzecia liczba zwykle 0-2, krotko.
+- `najdluzsza seria nocy bez snu` zwykle <= 2; `serii dluzszych niz 2` - tylko partie z wyjatkiem (ucieczka) albo pod blokada innego moda.
+- `wymuszone odpoczynki dzis` > 0 (regula dziala), `wyjatki dzis` male; `wodzowie armii spia za zmeczonych czlonkow` > 0 w dobach wojny.
+- `NocnyMarsz: kara - probka` - dlug 3 rzadko i u roznych partii (nie te same przez tydzien).
+- Dezercja (183) w Dorne / armiach - mniej odejsc z powodu morale -95%.
+
+**Ryzyka:** (a) armia z jednym wyczerpanym czlonkiem stoi do ok. doby (sen ciagly 15-21 h) - wolniejsze zbiorki i marsze armii w wojnie; (b) partia w obowiazkowym
+odpoczynku nie ucieka przed wrogiem 1-2 razy silniejszym - wiecej bitew przegranych przez wyczerpanych (zamierzone: wyczerpana kolumna nie ucieknie); (c) R6 zmienia
+splate w oblezeniu/armii - dlug 3 schodzi tam w ok. 1-1.5 doby zamiast nigdy; (d) R7: po poprawce baza 6 h przy obozie 0-6 to rowno 6 tikow - kazdy tick sie liczy;
+gdyby gra kiedys nie wolala ticku (pauza, wczytanie), pierwsza godzina po wczytaniu liczy sie jak dotad jako postoj; (e) partie w armii gracza - bez zmian (decyduje gracz).
