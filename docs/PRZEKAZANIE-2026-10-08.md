@@ -546,3 +546,7 @@ do 54/d) i limitu zoldu/przepelnienia gry u partii bez budzetu (do 162/d) - do z
 2. **The Eyrie ok. 200 partii** (zrzut Jeffa): dzienna linia "osady z najwieksza liczba partii wg rodzaju" + przyczyna (wozy 130/171? wiesniacy? straznik drog BK?).
 3. Dezercja AI pod koniec roku 2 (glod + limit zoldu gry u partii bez budzetu 166) i potkniecie "ERROR in Tent" (KeyNotFound, 13:15:46 w logu 457).
 4. ETAP 3 krok po kroku (rozdz. 20 kolejka). Budowy Strazy przy powrocie do budow.
+- (14:00) Jeff: "dokoncz to jeszcze na tym koncie" (punkty 1-4 rozdz. 21). **(1) BK ClaimantDemand:** CS commit e44c7ba na w-toku/175-armie-cs (drzewo noc2\a175cs) -
+  finalizer BkDemandSafe na ClaimantDemand.SetTexts, Demand.Fulfill, Demand.DoAiChoice. DLL do gry test\CrashScribe-bk.dll (b66e9aed), autotestowa test\CrashScribe-at-bk.dll
+  (c423e6f0; worktree noc2\cs-at-bk = e44c7ba + at1-cs.diff). **BIEG 728 dob w toku** (Armoury 87b03e2b + CS-at-bk) -> test\at-bk-728.out.txt. Jesli dojdzie: WGRANIE 22 = CS b66e9aed,
+  zamkniecie etapu 2. W tym czasie (2) linia diagnostyczna partii w osadach (Armoury e2c).
