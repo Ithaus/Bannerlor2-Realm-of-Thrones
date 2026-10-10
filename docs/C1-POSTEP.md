@@ -467,3 +467,81 @@ zapis bez klucza), gracz (te same warunki, `MainParty`). Poprawione:
 0.8 (G - R)/45 maleje o ok. 0.36 zl na 1 zl renty dziennie; pulap +0.6 i (przy WarCourtYieldsToWages) udzial dworu +0.2. Netto ok. +0.45..0.65 zl zoldu na 1 zl
 renty u rodow na pulapie; reszta renty zostaje w kiesach (skrzynia na nastepna wojne, dwor i budowy w pokoju). Szacunek wojska w wojnie (+3..+6 tys. wobec C1-w)
 - dolna polowa widelek bardziej prawdopodobna.
+
+---
+
+## C3 - 179 rycerze bez lenna bez oddzialow - ZROBIONE (commit b159d70)
+
+Projekt: rozdz. "179" (C3), 2.0b, 166 (pulap, hamulec nowych partii), decyzje Jeffa 09.10 ("rycerze bez lenna jezdza przy panu", "nic z kosmosu").
+Build Release kod 0, `python -I tools/gen_mcm.py`, gra nie uruchamiana.
+
+**Pliki:** nowy `Armoury/src/GentryService.cs`; `ClanBudget.cs` (zold rycerzy w pulapie partii, limit 0 partii rycerzy, blokada nowej partii, dezercja z
+limitu zdjeta z partii rycerzy, `ToVillagePop`), `SoldierPay.cs` (`AddKnightPaid` - podstawa zwrotu), `ArmouryBehavior.cs` (krok dobowy przed korona, `Reset`,
+`EnsureHooks`), `SubModuleMain.cs`, `MoneyLedger.Obieg.cs`, `Settings.cs` + `McmSettings.cs`.
+
+**Co dziala (GentryNoParties = true):**
+- Rod rycerza = rod BK gentry: id `gentryClan_`, bez miasta i zamku, BK `IsGentryClan` = mniejsze parostwo (gracz moze nadac pelne - wtedy rod pana jak dotad);
+  osada majatku z BK (`Estate.EstatesData.Settlement`). Gracz nigdy, Inni nigdy.
+- **Bez wlasnych druzyn:** latka nowej partii 166 (`SpawnLordParty`) - rod rycerza zawsze `null` (takze glowa, takze rod bez partii, takze nowa kampania);
+  prefiks BK `SummonGentry` - BK nie wystawia partii z ludzi majatku (`TakeRetinue` - "nic z kosmosu", ludzie zostaja w ludnosci BK).
+- **Wezwanie:** (a) BK wezwanie choragwi (AI i gracz): glowa rodu rycerza do druzyny pana (wlasciciel wsi majatku), gdy ta jest w tej armii, inaczej do
+  druzyny wzywajacego (wodza armii); (b) AI codziennie: krolestwo w wojnie z krolestwem, pan prowadzi druzyne w armii krolestwa - do pana; pan bez partii
+  albo poza armia - do wodza najblizszej (od majatku) armii krolestwa. Druzyna gracza tylko na wezwanie gracza; rycerze, ktorych panem jest gracz, tylko na
+  wezwanie gracza. Dolaczenie: `AddHeroToPartyAction` (rycerz jedzie sam, ze swoim ekwipunkiem). Rycerz musi byc wolny: zywy, dorosly, nie w niewoli, nie
+  w partii, walczacy, nie namiestnik. Druzyna celu: AI, czynna, nie w bitwie, nie rozwiazywana, strona krolestwa rycerza, nie Inni.
+- **Powrot:** codziennie, gdy druzyna nie jest w armii, krolestwo nie jest w wojnie, druzyna zmienila strone, jest rozwiazywana albo zniknela -
+  `TeleportHeroAction.ApplyImmediateTeleportToSettlement` do wsi majatku (wies w rekach wroga - najblizsza twierdza krolestwa); druzyna w bitwie - jutro.
+- **Zold:** `GentryKnightWage` (24) dziennie za dobe w druzynie: glowa rodu druzyny (gracz - jego kiesa) -> glowa rodu rycerza, `GiveGoldAction` w parze,
+  najwyzej tyle, ile platnik ma (reszta: "pan bez zlota"). Straz (`WatchUnpaid`) - 0. W pulapie zoldu partii 166 platnika (`KnightWage`: zold partii w
+  `WPar`, limit gry partii = jej czesc minus zold rycerzy), w podstawie zwrotu 50% korony (`SoldierPay.AddKnightPaid` - WageRefund filtruje wojne i najemnikow),
+  u rycerza `NoteInflow(KContract)` (D: czesc "kontrakt"). Krok dobowy przed `KingdomTreasury.Daily` - zold dnia jest w dzisiejszej podstawie zwrotu.
+- **Stare partie rycerzy** (zapis sprzed 179): limit zoldu 0 (Daily, `ApplyPartyLimits`, postfiks oceny finansow takze bez budzetu) - bez rekrutow, awansow
+  i dosypki BK z majatku (BK `OnSettlementEntered`: `TotalWage < PaymentLimit`); dezercja gry z limitu zoldu zdjeta (`DesertPrefix`), zwolnienia 166 jak
+  dotad (do wsi). BK odsyla je do majatku i rozwiazuje (`FinishParty`) - prefiks: zolnierze do ludnosci BK wsi majatku (`ClanBudget.ToVillagePop`);
+  sakiewka partii - jak dotad (`MenPurse.OnPartyDestroyed` do kasy miasta), jency i statki - liczone w linii (gra: bohaterowie wolni, reszta przepada).
+- **Majatek (GentryEstateSpendCap):** prefiksy BK `TryAutoBuyForEstate` (niewolnicy) i `RefillFromTownMarket` (zaopatrzenie wsi): zakup tylko przy niewydanym
+  przydziale sprzetu 166 rodu wlasciciela (`ClanBudget.GearCap`) i kiesie > `FamilyPurseFloor` (5000); wydane schodzi z przydzialu (`GearSpent`).
+  Rod bez budzetu - jak dotad.
+- **180 (sluzba):** rycerz w druzynie pana sluzy razem z nia - `CrownRents` liczy doroslych czlonkow rodu w partii innego rodu (`AliveLords`, `mp.ActualClan != c`
+  -> `Serving(mp)`), wiec rycerz w armii = doba sluzby jego rodu. Bez zmian w 180 (rody rycerzy i tak zwykle bez wag lenn - renta 0).
+- **Wylaczone:** rycerze w sluzbie wracaja do domu (bez zoldu, bez wezwan), latki BK przepuszczaja (BK jak dotad); linia tylko, gdy ktos wracal.
+  Stan pochodny ze swiata (rycerz w partii innego rodu) - bez zapisu w SyncData.
+
+**Nowe klucze (grupa "Knights without fiefs (stage 2)"):** `GentryNoParties` true, `GentryKnightWage` 24 (suwak 0-96), `GentryEstateSpendCap` true.
+
+**Nowe / zmienione linie logu:**
+- NOWA (kampania) `Rycerze (179): latki BK - wezwanie rycerza (BK SummonGentry), rozwiazanie partii rycerza (BK FinishParty), majatek: niewolnicy (BK TryAutoBuyForEstate), majatek: zaopatrzenie wsi (BK RefillFromTownMarket); BRAK: -; rozpoznanie rodow rycerzy: BK IsGentryClan TAK.`
+- NOWA `Rycerze (179): dzien N | rody rycerzy (BK gentry bez lenna) N, w sluzbie M (w druzynie pana a, u wodza armii b, u gracza c), wolni w krolestwach w wojnie F (bez armii w krolestwie G) | wezwani dzis: pan w armii x, wodz armii y; wezwania BK (od wczoraj) S (do pana s1, do wzywajacego s2, rycerz niedostepny s3) | wrocili do majatku H, czeka (bitwa) W | armie A, z rycerzem B | zold rycerzy 24 zl: nalezny X, zaplacony Y (gracz P), pan bez zlota U, Straz bez zoldu Z | wlasne partie rycerzy O (ludzi L, limit zoldu 0), nowe partie zablokowane Q, rozwiazane przez BK R (ludzie do wsi majatku r1, bez wsi z danymi BK r2, jency w rozwiazanych r3, statki r4) | majatki BK (przydzial sprzetu 166): zakupy wstrzymane E, wydane V.`
+- ZMIENIONA `Obieg: dzien N` (rody wydaly): po "kiesa rodziny czlonek -> glowa" - `, zold rycerzy (179) pan -> rycerz X` (= "zaplacony" z linii 179).
+- Bez zmian, potrzebne do testu: `Wydatki rycerzy (169c)` (rody gentry, bez ludzi, glowy < 5000, niewolnicy majatku), `Budzet rodow (166)`, `Korona: dzien N - zwrot zoldu`.
+- Gracz (po angielsku): przy wezwaniu "<rycerz> of <rod> rides with you as a knight of your banner - 24 denars a day while your army is in the field.";
+  co 7 dob "Your knights' wages this past week: N denars (24 a day for each knight riding in your party)."
+
+**Odstepstwa / rozstrzygniecia (z powodem):**
+1. Wezwanie AI codziennie (pan w armii krolestwa albo wodz najblizszej armii), nie tylko przez BK `SummonGentry`: BK wola wezwanie tylko dla wodza z >= 2
+   choragwiami i zapasem wplywow - bez tego rycerze prawie nigdy by nie jechali, a test projektu wymaga "rycerzy w druzynach panow > 0 przy kazdej armii".
+   Armie gry (AI krolestwa) to wezwanie choragwi krolestwa.
+2. Zold placi glowa rodu druzyny, w ktorej rycerz jedzie (pan albo wodz armii) - projekt: "pan placi"; u wodza armii panem rycerza na czas wyprawy jest wodz.
+3. Wariant zapasowy projektu (rycerz-zolnierz t5 z majatku) - nie uzyty: gra i BK licza bohatera obcego rodu w partii jak towarzysza (BK `BKPartyWageModel`:
+   glowa rodu bez zoldu gry - zold tylko nasz, bez dubla; `HeroSpawnCampaignBehavior` nie rusza bohatera w partii; BK sadza w majatku tylko bohaterow bez
+   partii; smierc i niewola - jak kazdego bohatera w partii). Ryzyko R7 zostaje do testu (0 bledow).
+4. Wezwanie samych rycerzy przez BK nie tworzy armii (rycerz nie jest partia - BK liczy `army.Parties < 2`): gracz musi wezwac tez pana z druzyna; rycerz
+   dolaczony do niedoszlej armii wraca nastepnego dnia.
+5. Zakupy majatkow BK w przydziale sprzetu 166 dla wszystkich rodow z budzetem (jedna regula, tabela 166 "zaopatrzenie majatkow BK w pulapie sprzetu") -
+   w tescie C2 placili tylko rycerze (`Wydatki rycerzy`: niewolnicy 3 536/dobe = "wszyscy"), wiec skutek ten sam. Osobny pulap "majatek" 0.10 D - nie dodany
+   (przydzial sprzetu rycerza 0.17 D jest wolny - rycerz nie ma druzyny).
+6. Jency i statki starych partii rycerzy przy rozwiazaniu przez BK - jak dotad (gra: bohaterowie wolni, szeregowi i statki przepadaja), tylko licznik w linii;
+   dotyczy jednorazowo partii z zapisu sprzed 179 (nowe nie powstaja).
+
+**Czego sie spodziewac w tescie (40 dob / 120 dob):**
+- `Rycerze (179)`: "wlasne partie rycerzy" maleja do 0 w ok. 10 dob (stare partie wracaja do majatku po armii); "nowe partie zablokowane" > 0 codziennie
+  (gra probuje co dobe); `Wydatki rycerzy (169c)`: "bez ludzi" = "rody gentry" od ok. doby 10.
+- W wojnie (ok. 300 z 312 rodow w d120): "w sluzbie" ok. 30-60 rycerzy (rycerze wolni w krolestwach z armia), "armie z rycerzem" bliskie "armie";
+  zold rycerzy ok. 0.7-1.5 tys./dobe w swiecie (projekt: 0.4-0.7 tys. - wiecej, bo wezwanie AI codziennie).
+- Ludzie w druzynach lordow: minus ludzie dawnych partii rycerzy (w C2 d120 10 partii, w bazie 12-18 partii ok. 24 ludzi = ok. 0.3-0.5 tys.).
+- `Wydatki rycerzy (169c)`: "BK niewolnicy majatku" spada (przydzial 0.17 D), "glowy < 5000" -> 0 (cel testu 120 dob: 0); kiesy rodzin rycerzy rosna.
+- `Renty korony (180)`: rody z lennem bez zmian (rycerz sluzy razem z druzyna pana - dzien sluzby jego rodu; rody rycerzy zwykle bez wag).
+
+**Ryzyka:** (a) R7 - bohater obcego rodu w partii AI (ekran druzyny gracza, smierc pana, rozbicie partii z rycerzem) - test: 0 bledow, "czeka (bitwa)" nie
+rosnie bez konca; (b) rycerz teleportuje sie do armii i z niej (jak BK sadzajacy rodzine w majatku) - bez drogi po mapie; (c) zakupy majatkow wolniejsze
+(niewolnicy BK = dochod majatku w przyszlosci); (d) gdy BK nie da sie rozpoznac (`IsGentryClan` BRAK) - rozpoznanie tylko po id i braku lenna.
