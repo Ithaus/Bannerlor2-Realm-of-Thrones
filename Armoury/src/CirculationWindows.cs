@@ -1497,7 +1497,8 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ O38/O39 - nasluchy zdarzen gry (ArmouryBehavior.RegisterEvents)
-        /// <summary>Partia znika z mapy (zdarzenie idzie PRZED RemoveParty): kiesa partii bez wodza przepada.</summary>
+        /// <summary>Partia znika z mapy (zdarzenie idzie PRZED RemoveParty): kiesa partii bez wodza przepada. B-1: ostatni z naszych nasluchow tego
+        /// zdarzenia (dopisany pierwszy - gra wola od ostatnio dopisanego), zeby liczyc kiese PO przelewach 112 (sakwa taboru do zwyciezcy albo wsi).</summary>
         internal static void OnPartyDestroyed(MobileParty mp, PartyBase destroyer)
         {
             try

@@ -317,7 +317,9 @@ namespace Armoury
         /// <summary>
         /// MobilePartyDestroyed: tabor wsi znika z mapy z gotowka w sakwie. Rozbitemu w bitwie gra zdjela juz dzialke zwyciezcow
         /// (MapEventParty.CommitGoldChanges biegnie przed zniszczeniem partii) - tu widzimy sama reszte, ktora przepadala.
-        /// Nasluch wpiety PRZED ksiega obiegu (CirculationWindows.OnPartyDestroyed liczy kiesy partii, ktore znikaja) - widzi ona sakwe po nas.
+        /// Biegnie PRZED ksiega obiegu (CirculationWindows.OnPartyDestroyed liczy kiesy partii, ktore znikaja) - widzi ona sakwe po nas. B-1: gra wola
+        /// nasluchy od ostatnio dopisanego (MbEvent), wiec nasluch ksiegi jest dopisany PIERWSZY (poczatek ArmouryBehavior.RegisterEvents); dotad stal
+        /// po nas w kodzie i biegl przed nami - sakwe oddana zwyciezcy albo wsi liczyl jeszcze jako zloto, ktore zniknelo.
         /// </summary>
         internal static void OnPartyDestroyed(MobileParty party, PartyBase destroyer)
         {

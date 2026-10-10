@@ -1,5 +1,25 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-09 (B-1, krok B po tescie 120 dob - ksiega) - KSIEGA OBIEGU LICZY KIESY ZNIKAJACYCH PARTII PO PRZELEWACH 112 (NASLUCH DOPISANY PIERWSZY - GRA WOLA NASLUCHY OD OSTATNIEGO); ROZGRYWKA BEZ ZMIAN
+**Mod:** Armoury | **Galaz:** `w-toku/e2b` (po 114-p) | **Projekt:** `PROJEKT-ETAP2-BANKRUCTWA-2026-10-09.md` rozdz. "110 + 112 + klucz 114" (prog "Pieniadz swiata"), 2.0b (licznik "bez odbiorcy"). **Pliki:** `ArmouryBehavior.cs` (kolejnosc nasluchow `MobilePartyDestroyed`), komentarze `VillageTakings.cs`, `CirculationWindows.cs`, `MoneyLedger.cs`. Bez nowych kluczy MCM i zapisu.
+
+**Co zobaczysz w grze (prosto):** nic - poprawka samego dziennika pieniedzy w logu.
+
+**Problem (test 120 dob kroku B, `kopia-e2b120` wobec `kopia-baza120`):** w 119 z 119 dob pozycja ksiegi "kiesy partii bez wodza, ktore zniknely z mapy - tabory" (U8) rowna sie DOKLADNIE sakwom, ktore 112 oddalo zwyciezcom i wsiom (linia "Utarg wsi (112)": "tabory zniszczone ... X po dzialce zwyciezcow" = U8 "tabory X"; np. doba 108950: 40080 = 40080). Ksiega liczyla sakwe oddana bandzie jako zloto, ktore zniknelo: ujscie w nicosc zawyzone o 15.2 tys./dobe (doby 31-120; 17.6 tys. w 93-120), "reszta" bilansu B przesunieta z -11.6 tys. (baza) na +3.2 tys., a `sprawdz_logi.py` liczyl zamkniete ujscie taborow jako 9.6 zamiast 27.2 tys./dobe.
+
+**Przyczyna:** gra wola nasluchy zdarzenia od OSTATNIO dopisanego - `MbEvent<T>.AddNonSerializedListener` wstawia nowy na poczatek listy, `InvokeList` idzie od poczatku (dekompilacja `TaleWorlds.CampaignSystem/MbEvent.cs`, sprawdzone). Nasluch ksiegi (`CirculationWindows.OnPartyDestroyed`, `ArmouryBehavior.cs:643`) byl dopisany PO nasluchu 112 (`VillageTakings.OnPartyDestroyed`, `:636`), wiec biegl PRZED nim. Komentarze (`VillageTakings.cs:318-321`, `ArmouryBehavior.cs:635`, `MoneyLedger.cs:61-64`) zakladaly odwrotna kolejnosc.
+
+**Zmiana:** nasluch ksiegi dopisany PIERWSZY na poczatku `RegisterEvents` (biegnie ostatni - widzi kiese po wszystkich naszych przelewach przy zniszczeniu partii); stare miejsce - komentarz. Komentarze poprawione (kolejnosc LIFO).
+
+**Kontrola calosci (CLAUDE.md 8.0):**
+- Inne nasluchy `MobilePartyDestroyed` (Drill, UniqueSpoils, GoodsLedger, MaterialOrders, OutlawLaw, MenPurse, ArmyClothing, MarketRoad, VillageTakings, VillageClogDiag) - tylko `VillageTakings` rusza `PartyTradeGold`; reszta liczy albo przenosi przedmioty / sakiewki ludzi (`MenPurse` - osobny slownik, ksiega liczy go w "sakiewki ludzi"). OutlawLaw tylko liczy kiese bandy, ktora przepada (bez przelewu) - kolejnosc wobec ksiegi bez znaczenia. Innych nasluchow tego zdarzenia w Armoury nie ma (inne zachowania Armoury go nie uzywaja).
+- Nasluchy gry zostaja po naszych (rejestrowane wczesniej) - bez zmian.
+- Rozgrywka bez zmian: tylko kolejnosc odczytu w tym samym zdarzeniu.
+
+**Ryzyko / co sprawdzic:** w nastepnym biegu U8 "tabory" = "zniklo" z segmentu "tabory zniszczone" linii 112 (po 112 ok. 0), "reszta" bilansu jak w bazie (ok. -12 tys./dobe w dobach 31+). `sprawdz_logi.py` (B-3) liczy zamkniete ujscie taborow z linii 112 i poprawia reszte o ten blad takze w starych logach (po B-1 poprawka = 0).
+
+**Status:** NIEWGRANE - DO SPRAWDZENIA (build Release kod 0; gra nie uruchamiana, autotest nie robiony; nic nie wgrane do gry).
+
 ## 2026-10-09 (114-p, poprawki po przegladzie kroku B - uwagi do 114: 3, 4) - OPISY PODZIALU ZAWORU ZAMKU BEZ "JAK W MIESCIE" (MIASTA DZIELA SIE Z KORONA DOPIERO OD 111'); Z8: KORONA NIE ZWRACA ZOLDU ZALOGI ZAMKU, KTORY WRACA ZAWOREM (TYLKO CZESC PONAD ZAPASEM KASY; MIASTA - 165)
 **Mod:** Armoury | **Galaz:** `w-toku/e2b` (po 112-p) | **Projekt:** `docs/PROJEKT-ETAP2-BANKRUCTWA-2026-10-09.md` 2.0b (Z8 "nikt nie zarabia na wlasnym wydatku", jedna regula gracz/AI), rozdz. 6 (poprawki dokumentow), 165 pkt 3 ("zwrot bez zalog"); galaz `paczki/114-porzadki` a14efe8 (`TownPurse.PayComesHome` / `HomePart` - wziete tylko dla zamkow). **Pliki:** `CastlePurse.cs` (`HomePart`, komentarze), `SoldierPay.cs` (podstawa zwrotu zalog, licznik, linia "Zold:"), `Settings.cs` + `McmSettings.cs` (`python tools/gen_mcm.py`: Armoury 849 - NOWY klucz `CastleGarrisonPayComesHome`; opisy `CastleDuesSplitWithCrown`, `CastleDuesLordShare`), `CHANGELOG.md` (wpis 114 poprawiony: "Problem", "Co zobaczysz", Z8, ryzyka). Bez nowych kluczy zapisu.
 

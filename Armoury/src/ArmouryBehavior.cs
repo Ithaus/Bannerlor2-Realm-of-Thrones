@@ -575,6 +575,12 @@ namespace Armoury
 
         public override void RegisterEvents()
         {
+            // B-1 (krok B po tescie 120 dob): KOLEJNOSC NASLUCHOW. Gra wola nasluchy zdarzenia od OSTATNIO dopisanego (MbEvent.AddNonSerializedListener
+            // wstawia na poczatek listy - dekompilacja TaleWorlds.CampaignSystem/MbEvent.cs, AddNonSerializedListener/InvokeList). Ksiega obiegu
+            // (paczka 169: kiesy partii bez wodza, ktore znikaja z mapy) ma zobaczyc kiese PO wszystkich naszych przelewach przy zniszczeniu partii
+            // (112: sakwa taboru do zwyciezcy albo do wsi - VillageTakings.OnPartyDestroyed), wiec jej nasluch dopisujemy PIERWSZY - biegnie ostatni.
+            // Dotad byl dopisany po VillageTakings i biegl przed nim: kazda sakwe oddana przez 112 liczyl jeszcze jako zloto, ktore zniknelo (tylko log).
+            CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, CirculationWindows.OnPartyDestroyed);    // paczka 169: kiesy partii bez wodza, ktore znikaja z mapy (tylko log) - MUSI byc pierwszym nasluchem MobilePartyDestroyed
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this, OnSessionLaunched);
             CampaignEvents.OnNewGameCreatedEvent.AddNonSerializedListener(this, _ => DayPass.Clear());   // przeglad 07.10: doby kuzni z poprzedniej gry
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, OnDailyTick);
@@ -632,7 +638,8 @@ namespace Armoury
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, MenPurse.OnPartyDestroyed);   // wpis 89
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, ArmyClothing.OnPartyDestroyed);   // 150
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, MarketRoad.OnPartyDestroyed);   // wpis 100: rozbite tabory wiesniakow (log)
-            // 112: sakwa zniszczonego taboru wsi nie ginie z partia - PRZED nasluchem ksiegi obiegu (CirculationWindows.OnPartyDestroyed nizej liczy kiesy, ktore znikaja)
+            // 112: sakwa zniszczonego taboru wsi nie ginie z partia. B-1: biegnie PRZED ksiega obiegu, bo nasluch ksiegi (CirculationWindows.OnPartyDestroyed)
+            // jest dopisany pierwszy na poczatku RegisterEvents, a gra wola nasluchy od ostatnio dopisanego
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, VillageTakings.OnPartyDestroyed);
             CampaignEvents.HeroOrPartyTradedGold.AddNonSerializedListener(this, VillageTakings.OnGoldTraded);       // 112: wyplaty majatkow BK w oknie powrotu taboru (tylko odczyt)
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, VillageClogDiag.OnPartyDestroyed);   // diagnoza zatkanych wsi: kiedy wies stracila woz (tylko log)
@@ -640,7 +647,7 @@ namespace Armoury
             CampaignEvents.BeforeSettlementEnteredEvent.AddNonSerializedListener(this, MoneyLedger.OnBeforeEntered);   // tabor wsi: stan PRZED sprzedaza / podzialem utargu
             CampaignEvents.AfterSettlementEntered.AddNonSerializedListener(this, MoneyLedger.OnAfterEntered);          // ... i PO
             CampaignEvents.HeroOrPartyTradedGold.AddNonSerializedListener(this, MoneyLedger.OnGoldTraded);             // kazdy GiveGoldAction gry
-            CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, CirculationWindows.OnPartyDestroyed);    // paczka 169: kiesy partii bez wodza, ktore znikaja z mapy (tylko log)
+            // paczka 169: nasluch kies partii, ktore znikaja z mapy (CirculationWindows.OnPartyDestroyed) - B-1: przeniesiony na poczatek RegisterEvents
             CampaignEvents.KingdomDestroyedEvent.AddNonSerializedListener(this, CirculationWindows.OnKingdomDestroyed); // paczka 169: skarbce krolestw, ktore upadly (tylko log)
             CampaignEvents.PlayerInventoryExchangeEvent.AddNonSerializedListener(this, SellByCondition.OnPlayerExchange);   // cena sprzedazy sprzetu: kazda sprzedaz gracza do handel.log (tylko log)
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, PeopleLedger.OnMapEventEnded);

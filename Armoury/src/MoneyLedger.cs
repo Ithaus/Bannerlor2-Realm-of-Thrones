@@ -60,8 +60,10 @@ namespace Armoury
     ///  przez SplitCastleMark).
     ///  Paczka 112 (VillageTakings): to, co paczka dopisala wsiom przy powrocie taboru, siedzi juz w oknie powrotu (kiesa wsi i licznik
     ///  podatku rosna przed AfterSettlementEntered) - "z utargu wsi zniklo" spada do zera samo; cene towaru kupionego we wsi oddana wsi
-    ///  widzi okno "prowizja" ksiegi obiegu (finalizer po postfiksie paczki), a sakwy zniszczonych taborow - nasluch ksiegi obiegu, wpiety
-    ///  po nasluchu paczki (widzi sakwe juz oddana).
+    ///  widzi okno "prowizja" ksiegi obiegu (finalizer po postfiksie paczki), a sakwy zniszczonych taborow - nasluch ksiegi obiegu, ktory
+    ///  biegnie po nasluchu paczki (widzi sakwe juz oddana). B-1: gra wola nasluchy od ostatnio dopisanego, wiec nasluch ksiegi jest dopisany
+    ///  pierwszy (poczatek ArmouryBehavior.RegisterEvents); w biegu 120 dob kroku B stal po paczce w kodzie i biegl przed nia - U8 "tabory"
+    ///  bylo rowne sakwom oddanym przez 112 (119 z 119 dob), a "reszta" bilansu zawyzona o tyle samo.
     /// </summary>
     internal static partial class MoneyLedger
     {
