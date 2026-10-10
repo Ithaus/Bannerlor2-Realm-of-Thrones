@@ -445,3 +445,7 @@ LIMITY 13:30: 5h 32%, TYDZIEN 82% (reset 15.10) - przy 100% tygodnia przejsc na 
 - (05:10) Rasy w danych modow: human (domyslna), wight 117, giant 6, whitewalker 4 (ROT). Rycerze BK - ludzie, wiec porod "roznych ras" to raczej olbrzym ROT (Wolni Ludzie)
   z ludzkim malzonkiem - tresc ROT, nie C3. **DO ZROBIENIA (CrashScribe Mends, przed gra Jeffa):** brak ciazy przy roznych rasach (prefiks MakePregnantAction)
   i istniejaca ciaza roznych ras konczy sie bez porodu (prefiks PregnancyCampaignBehavior.CheckOffspringToDeliver) - inaczej mozliwe zawieszenie gry w silniku.
+- (05:40) **WGRANIE 17: Armoury c38bd62f (noc/wgranie-17 = e2c 0175e8d = C1+C2+C3)**, CS 6507c842. Dalej: **KROK D** (168 dlug, kredyt wojenny KW i zajecie zamiast
+  bankructwa; 178 okupy wedlug majatku, wielcy jency 1/10, okup krola ze skarbca, dlug okupu najwyzej rok) wedlug PROJEKT-ETAP2 rozdz. 168 (ok. 614) i 178 (ok. 684);
+  potem test 120 dob + bieg z wymuszonym pokojem + 2 lata (koniec etapu 2). Potem etap 3. Odlozone: AI ma odpoczywac na dlugu snu (T10); Mends - porod roznych ras;
+  pytanie do Jeffa - koszt wezwania sojusznika z korony zamiast z kies.

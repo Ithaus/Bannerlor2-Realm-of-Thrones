@@ -979,3 +979,11 @@ korony wedlug lenn z warunkiem zalogi i sluzby; 1220510 komunikat renty gracza r
 glowy < 5000 = 4, bankruci 0, wojsko lordow w wojnie 101.8 tys. (pas 95-115), zalogi +1%, reszta ksiegi -2.9 tys./d, 0 bledow; zapis 9 dob OK (31 s/d, 0 bledow).
 Slabsze: Iron Islands -61%, Dothraki -39%, Ibben -32% (biedni z lore; dalej kredyt 168). Opis: docs/C1-POSTEP.md w galezi w-toku/e2c. Kopie: Armoury.dll.bak-2026-10-10-przed-noc16
 + D:\Backup-Bannerlord\wgrane\2026-10-10-noc16-przed. ZATWIERDZONE: Armoury b43f65cf, CrashScribe 6507c842. Baza Armoury: w-toku/e2c.
+
+**WGRANIE 17 (10.10 ok. 05:40 zegara komp.):** Armoury c38bd62f (galaz noc/wgranie-17 = w-toku/e2c 0175e8d = WGRANIE 16 + ETAP 2 KROK C3: 179 rycerze bez lenna bez
+wlasnych partii - glowa rodu gentry jedzie w druzynie pana/wodza armii, pan placi 24 zl/d (GentryService.cs; poprawki a5063af NotSpawned -> Active, 5ce5faf rod rycerza
+nie placi zoldu cudzej partii), 183 dezercja AI wedlug poziomu (DesertionLawForAi, podloga 30 ludzi przy zaleglym zoldzie, takze gracz), 180m pomiar sluzby rent przez cala
+dobe). CrashScribe bez zmian 6507c842. Testy: 120 dob nowej kampanii (powtorka po jednorazowym zawieszeniu silnika w dobie 43 przy porodzie roznych ras - tresc ROT,
+do Mends) - 0 bledow Armoury, glowy < 5000 = 3, bankruci 0, wojsko lordow w wojnie 93.0 tys. (cel 95, podloga 85), zalogi -3.4%, dezercja AI 27/d (baza 49), reszta ksiegi
+-1.3 tys./d; zapis 9 dob OK (0 bledow). Kopie: Armoury.dll.bak-2026-10-10-przed-noc17 + D:\Backup-Bannerlord\wgrane\2026-10-10-noc17-przed.
+ZATWIERDZONE: Armoury c38bd62f, CrashScribe 6507c842. Baza Armoury: w-toku/e2c.
