@@ -9,8 +9,15 @@ Uzycie (Python 3, tylko odczyt):
 --csv P           : budzet-rodow.csv tego biegu (zalogi na krolestwo); domyslnie <katalog logu>/<znacznik czasu logu>/budzet-rodow.csv.
 --start-kampanii N: doba gry startu kampanii (dzien z linii); domyslnie z linii "Pomiary 169c: ... start kampanii dzien N", a bez niej
                     pierwsza doba w logu (wtedy log kontynuacji z zapisu liczy doby od siebie - podaj N).
-Wynik: tabela TAK / NIE / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek.
+--koniec-etapu    : test konca etapu 2 (rozdz. E): warunki etapu (glowy < 5 000, bankruci, wojsko 95-115 tys., krolestwa i zalogi na
+                    krolestwo, skarbce buntow) wiazace bez wyjatkow. Bez tej flagi (test kroku: B, C1-C3, D) warunek etapu, ktorego bieg
+                    nie spelnia, ale nie jest w nim gorszy niz bieg bazowy (regula w kolumnie progu), dostaje werdykt ETAP - liczy sie osobno od NIE.
+Wynik: tabela TAK / NIE / ETAP / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
+B-3 (krok B po tescie 120 dob): pomiary wobec bazy, ktore mieszaly skutek paczki z losem jednej kampanii, liczone uczciwiej - pieniadz swiata
+w oknie dob 31+ bez wojennych zrodel z niczego i z reszta ksiegi wobec bazy, wojsko jako srednia 28 dob, bunty razem z krolestwem macierzystym,
+zalogi na twierdze (balans-krolestw.csv), sila band zamiast samego zlota (decyzja D), dochod pana zamku z zaworu jako INFO (opis przy wierszu).
+Plik bazowy zapisany przed B-3 nie ma nowych kluczy - zapisac go jeszcze raz z logu biegu bazowego (--zapisz-baze); bez nich wiersze B-3 = brak bazy.
 """
 import csv
 import os
@@ -57,8 +64,9 @@ class Report:
     def __init__(self):
         self.rows = []
 
-    def add(self, name, value, rule, ok):
-        verdict = "INFO" if ok is None else ("TAK" if ok else "NIE")
+    def add(self, name, value, rule, ok, etap=False):
+        # etap=True: warunek etapu 2, ktorego bieg nie spelnia, ale nie jest gorszy niz bieg bazowy (regula w progu) - werdykt ETAP zamiast NIE
+        verdict = "INFO" if ok is None else ("TAK" if ok else ("ETAP" if etap else "NIE"))
         self.rows.append((name, value, rule, verdict))
 
     def show(self):
@@ -66,7 +74,8 @@ class Report:
         for name, value, rule, verdict in self.rows:
             print(f"{name.ljust(w)} | {verdict:4} | {value} | prog: {rule}")
         n_no = sum(1 for r in self.rows if r[3] == "NIE")
-        print(f"-- razem progow {len(self.rows)}, NIE: {n_no}")
+        n_et = sum(1 for r in self.rows if r[3] == "ETAP")
+        print(f"-- razem progow {len(self.rows)}, NIE: {n_no}, ETAP (warunek etapu niespelniony, nie gorzej niz baza): {n_et}")
 
 
 def run_day(day, start):
@@ -136,6 +145,141 @@ def last_window(days, n=28):
     return ds[-n:] if ds else []
 
 
+# ------------------------------------------------------------ B-3: pomiary wobec bazy oddzielone od losu jednej kampanii
+REB = re.compile(r"^.*\((.+?) Rebels\)$")
+
+
+def merge_rebels(k):
+    """Krolestwo buntownikow ("Volentin League (Braavos Rebels)") liczone razem z krolestwem macierzystym ("Braavos") - bunt dzieli wojsko
+    i twierdze jednego krolestwa, a w drugim biegu buntu moze nie byc."""
+    m = REB.match(k or "")
+    return m.group(1) if m else k
+
+
+# wojenne zrodla zlota z niczego, ktorych kroki etapu 2 nie dotykaja (statki NavalDLC, bitwy, jency, lupy) - ich roznica miedzy dwiema
+# kampaniami to inne wojny (bieg 120 dob kroku B: statki +158 tys./dobe w dobach 93-120 z trzech dob bitew morskich, -75 tys. w dobach 61-92)
+WAR_KEYS = ("statki_inne", "statki_sprz", "bitwy", "jency", "jency_tw", "lup_obl")
+
+
+def money_days(lines, start):
+    """Na dobe kampanii: zmiana sumy i reszta ksiegi (kontrola linii przyczyn), wojenne zrodla z niczego, ujscia zamykane przez B, regulator
+    kas miast i zamkow, sakwy taborow, ktore naprawde zniknely (linia 112)."""
+    cau = by_day(lines, "Pieniadz swiata (bilans - przyczyny): dzien")
+    cas = by_day(lines, "Przeplywy osad (kasy zamkow): dzien")
+    town = by_day(lines, "Przeplywy osad (kasy miast): dzien")
+    ut = by_day(lines, "Utarg wsi (112): dzien")
+    out = {}
+    for d, s in cau.items():
+        kv = dict((a, int(b)) for a, b in re.findall(r"\b([A-Z]+\d*)=(-?\d+)", s.split("kontrola:", 1)[-1]))
+        if "Z" not in kv or "R" not in kv:
+            continue
+        g = lambda p: num(p, s, int, 0) or 0
+        x = {"Z": kv["Z"], "R": kv["R"], "lup_cial": kv.get("Z1", 0),
+             "statki_inne": g(r"statki NavalDLC inne (\d+)"), "statki_sprz": g(r"statki: sprzedaz osadom i premie zarzadcow (\d+)"),
+             "bitwy": g(r", bitwy (\d+), majatki"), "jency": g(r"jency sprzedani przez partie (\d+)"), "jency_tw": g(r"jency do kas twierdz (\d+)"),
+             "lup_obl": g(r"lup z oblezen (\d+)"),
+             "utarg_zniklo": g(r"z utargu wsi zniklo (\d+)"), "prow_wsie": g(r"prowizja od sprzedazy partiom (?:-?\d+|-) \(wsie (-?\d+)"),
+             "u8_tabory": g(r"zniknely z mapy -?\d+ \(karawany -?\d+, tabory (-?\d+)")}
+        c = cas.get(d)
+        if c:
+            x["zamki_zakupy"] = num(r'"zakupy" mieszkancow ([+-]?\d+)', c, int, 0) or 0
+            x["zamki_dosypal"] = num(r"dosypal (\d+), skasowal", c, int, 0) or 0
+            x["zamki_skasowal"] = num(r"skasowal (\d+);", c, int, 0) or 0
+        t = town.get(d)
+        if t:
+            m = re.search(r"regulator kasy [+-]?\d+ \[P\] \(dosypal (\d+), skasowal (\d+)", t)
+            if m:
+                x["miasta_reg"] = int(m.group(1)) - int(m.group(2))
+        u = ut.get(d)
+        if u:
+            seg = ""
+            for part in u.split(" | "):
+                if part.startswith("tabory zniszczone"):
+                    seg = part
+            z = re.findall(r"zniklo (-?\d+)", seg)
+            if z:
+                x["sakwy_zniklo_112"] = int(z[-1])
+        out[run_day(d, start)] = x
+    return out
+
+
+def kingdom_days(lines, start):
+    """Skarbce na dobe kampanii, bunty razem z krolestwem macierzystym: {krolestwo: {doba: [w wojnie 0/1, wojsko rodow]}}."""
+    out = {}
+    for k, ser in kingdom_war_series(lines).items():
+        mk = merge_rebels(k)
+        for d, war, wallet, men in ser:
+            x = out.setdefault(mk, {}).setdefault(run_day(d, start), [0, 0])
+            x[0] = 1 if (x[0] or war) else 0
+            x[1] += men
+    return out
+
+
+def fortress_days(path, start, lines):
+    """balans-krolestw.csv (175.0): twierdze i ludzie zalog na krolestwo (id) i dobe kampanii (kolumna dzien - ta sama numeracja co linie logu)
+    -> {id: {doba: [twierdze, ludzie zalog, w wojnie 1/0/-1]}}. Wojna z linii "Skarbce" tej doby: krolestwo, ktorego "wojsko rodow" rowna sie
+    "ludzie_partie" z CSV (jedno dopasowanie; inaczej -1 = nie wiadomo). Bez buntow (new_kingdom*) i bez "bez_krolestwa" - na twierdze
+    liczymy krolestwa, ktore sa w obu biegach; twierdze stracone na rzecz buntu i tak wypadaja z mianownika."""
+    out = {}
+    if not path or not os.path.isfile(path):
+        return out
+    army = {}   # (dzien, wojsko) -> [w wojnie, ...]
+    for k, ser in kingdom_war_series(lines).items():
+        for d, war, wallet, men in ser:
+            army.setdefault((d, men), []).append(1 if war else 0)
+    with open(path, encoding="utf-8", errors="replace", newline="") as f:
+        for r in csv.DictReader(f, delimiter=";"):
+            k = (r.get("krolestwo") or "").strip()
+            if not k or k == "bez_krolestwa" or k.startswith("new_kingdom"):
+                continue
+            try:
+                day = int(r.get("dzien") or 0)
+                tw, men, lp = int(r.get("twierdze") or 0), int(r.get("ludzie_zalogi") or 0), int(r.get("ludzie_partie") or 0)
+            except ValueError:
+                continue
+            w = army.get((day, lp))
+            out.setdefault(k, {})[run_day(day, start)] = [tw, men, w[0] if w and len(w) == 1 else -1]
+    return out
+
+
+def wins28(hi, lo=31):
+    """Kolejne pelne okna 28 dob konczace sie na dobie hi, nie wczesniej niz od doby lo (120 dob: 37-64, 65-92, 93-120)."""
+    w = []
+    e = hi
+    while e - 27 >= lo:
+        w.insert(0, (e - 27, e))
+        e -= 28
+    return w
+
+
+def mean_days(series, days, key=None):
+    """Srednia wartosci z dob `days` (series: {doba: liczba} albo {doba: {klucz: liczba}}); None, gdy brak."""
+    vals = []
+    for d in days:
+        v = series.get(d)
+        if v is None:
+            continue
+        if key is not None:
+            v = v.get(key)
+            if v is None:
+                continue
+        vals.append(v)
+    return st.mean(vals) if vals else None
+
+
+def intkeys(d):
+    """JSON ma klucze-napisy - doby z powrotem na liczby (takze w slownikach zagniezdzonych o jeden poziom)."""
+    if not isinstance(d, dict):
+        return d
+    out = {}
+    for k, v in d.items():
+        try:
+            out[int(k)] = v
+        except (TypeError, ValueError):
+            out[k] = intkeys(v) if isinstance(v, dict) else v
+    return out
+
+
 def desertion_morale_unpaid(s):
     """Dezercja AI z morale i z zaleglego zoldu (prog 183, projekt rozdz. 1) - bez limitu zoldu gry. Linia po przegladzie 169c ma sume;
     starsza - z czesci: lordowie AI (morale, morale w glodzie, zalegly zold) + zalogi AI (morale, morale w glodzie)."""
@@ -153,7 +297,7 @@ def desertion_morale_unpaid(s):
     return tot if ok else None
 
 
-def baseline_of(lines, rows=None):
+def baseline_of(lines, rows=None, start=None, balp=None):
     """Srednie ostatnich 28 dob: wojsko rodow na krolestwo (doby w wojnie i w pokoju), zalogi (swiat i na krolestwo w wojnie - CSV),
     dezercja AI (morale + zalegly zold; i razem z limitem gry - INFO), lordowie > 60 dni, pieniadz swiata."""
     base = {"krolestwa": {}, "swiat": {}}
@@ -206,15 +350,45 @@ def baseline_of(lines, rows=None):
     base["swiat"]["bandy_zloto"] = mean_of(money, r", bandy (\d+)")
     utw = by_day(lines, "Utarg wsi (112): dzien")
     base["swiat"]["bandy_tier"] = mean_of(utw, r"sredni tier ([\d.]+)", float)
+    # B-3: sila band (liczba i ludzie - linia "Wyrzutki") i ujscie ich zlota (wydatki w miastach - linia "Paser", wobec kies band)
+    base["swiat"]["bandy_liczba"] = mean_of(wyr, r"\| band (\d+), ludzi \d+")
+    base["swiat"]["bandy_ludzie"] = mean_of(wyr, r"\| band \d+, ludzi (\d+)")
+    pas = by_day(lines, "Paser: dzien")
+    base["swiat"]["bandy_wydaly"] = mean_of(pas, r"bandy wydaly (\d+) zl")
+    if start is not None:
+        # B-3: szeregi dobowe (doba kampanii) do okien wobec bazy: pieniadz swiata, wojsko krolestw (bunty z macierzystym), zalogi na twierdze
+        base["dni"] = money_days(lines, start)
+        base["krolestwa_dni"] = kingdom_days(lines, start)
+        base["twierdze_dni"] = fortress_days(balp, start, lines)
+        bud = by_day(lines, "Budzet rodow (na sucho): dzien")
+        heads = {run_day(d, start): num(r"glowy < 5000: (\d+)", s) for d, s in bud.items()}
+        base["swiat"]["glowy_120"] = heads.get(120)
+        sd = by_day(lines, "D staly (169c)")
+        bank = [num(r"bankruci do 168 \(K39 lub bankrut Banku, rody AI\): (\d+)", s) for s in sd.values()]
+        bank = [b for b in bank if b is not None]
+        base["swiat"]["bankruci_max"] = max(bank) if bank else None
+        d40 = [s for d, s in sd.items() if run_day(d, start) == 40]
+        base["swiat"]["d_staly_zamki_d40"] = num(r"panowie samych zamkow \(\d+\): D staly mediana (-?\d+)", d40[0]) if d40 else None
+        # wojsko wszystkich krolestw i krolestw w wojnie - srednia ostatnich 28 dob (dzienne sumy)
+        kd = base["krolestwa_dni"]
+        days = sorted({d for s in kd.values() for d in s})
+        tot = {d: sum(s[d][1] for s in kd.values() if d in s) for d in days}
+        war = {d: sum(s[d][1] for s in kd.values() if d in s and s[d][0]) for d in days}
+        lw = last_window(days)
+        base["swiat"]["wojsko_swiat"] = mean_days(tot, lw)
+        base["swiat"]["wojsko_wojna_swiat"] = mean_days(war, lw)
     return base
 
 
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
+    final = False
     i = 0
     while i < len(args):
         a = args[i]
+        if a == "--koniec-etapu":
+            final = True; i += 1; continue
         if a == "--grupa":
             group = args[i + 1]; i += 2; continue
         if a == "--baza":
@@ -249,14 +423,33 @@ def main(argv):
     if csvp is None:
         csvp = csv_path_of(logp)
     rows = read_csv(csvp)
+    balp = os.path.join(os.path.dirname(csvp), "balans-krolestw.csv")
     print(f"plik: {logp} | doby gry {first}-{last} ({len(alld)} dob) | start kampanii {start} ({how}): doby kampanii {run_day(first, start)}-{run_day(last, start)}"
-          f" | CSV: {csvp if rows else 'brak (' + csvp + ')'}")
+          f" | CSV: {csvp if rows else 'brak (' + csvp + ')'}" + (" | TEST KONCA ETAPU (--koniec-etapu)" if final else ""))
+    # plik bazowy i liczby tego biegu (B-3: na poczatku - wiersze warunkow etapu porownuja sie z baza)
+    base = None
+    if base_in:
+        with open(base_in, encoding="utf-8") as f:
+            base = json.load(f)
+        for k in ("dni", "krolestwa_dni", "twierdze_dni"):
+            if k in base:
+                base[k] = intkeys(base[k])
+    now = baseline_of(lines, rows, start, balp)
+    sw, bw = now["swiat"], (base or {}).get("swiat", {})
+    b_on = bool(by_day(lines, "Zawor zamkow (110): dzien"))   # krok B w biegu (linia 110)
+    etap_rule = "" if final else "; ETAP, gdy nie gorzej niz baza"
 
-    # 1. glowy < 5 000 (doba kampanii 120, 364, 728; i ostatnia)
+    # 1. glowy < 5 000 (doba kampanii 120, 364, 728; i ostatnia). B-3: bez --koniec-etapu ETAP, gdy nie wiecej niz baza +20% (min. +2) w dobie 120
     heads = {run_day(d, start): num(r"glowy < 5000: (\d+)", s) for d, s in budget.items()}
     for n in (120, 364, 728):
         if n in heads:
-            rep.add(f"glowy < 5000 (doba {n})", heads[n], "<= 10", heads[n] is not None and heads[n] <= 10)
+            v = heads[n]
+            ok = v is not None and v <= 10
+            gb, et, note = bw.get("glowy_120") if n == 120 else None, False, ""
+            if not ok and not final and v is not None and gb is not None:
+                lim = max(gb + 2, gb * 1.2)
+                et, note = v <= lim, f" (baza {gb}; nie gorzej niz baza: <= {lim:.0f})"
+            rep.add(f"glowy < 5000 (doba {n})", f"{v}{note}", "<= 10 (warunek etapu 2 - C/D)" + ("" if final else "; ETAP, gdy nie wiecej niz baza +20% (min. +2)"), ok, et)
     if heads:
         lastn = max(heads)
         rep.add("glowy < 5000 (ostatnia doba)", f"{heads[lastn]} (doba {lastn})", "<= 10 w dobach 120/364/728", None)
@@ -281,8 +474,11 @@ def main(argv):
         bank_rows.append((d, (k39 or 0) + (b or 0), k39 or 0, 0, b or 0, "K39 + IronBank (suma)"))
     if bank_rows:
         worst = max(bank_rows, key=lambda x: x[1])
-        rep.add("bankruci do 168 (K39 lub bankrut Banku)", f"{worst[1]} (doba {run_day(worst[0], start)}: K39 {worst[2]}, w tym bez znanego salda {worst[3]}; Bank {worst[4]}; {worst[5]})",
-                "0 w kazdej dobie", worst[1] == 0)
+        bb = bw.get("bankruci_max")
+        et = (not final) and bb is not None and worst[1] <= bb
+        rep.add("bankruci do 168 (K39 lub bankrut Banku)", f"{worst[1]} (doba {run_day(worst[0], start)}: K39 {worst[2]}, w tym bez znanego salda {worst[3]}; Bank {worst[4]}; {worst[5]})"
+                + (f" (baza najwiecej {bb})" if bb is not None else ""),
+                "0 w kazdej dobie (warunek etapu 2 - 168)" + ("" if final else "; ETAP, gdy najwiecej nie wiecej niz w bazie"), worst[1] == 0, et)
     else:
         rep.add("bankruci do 168 (K39 lub bankrut Banku)", "brak linii", "0 w kazdej dobie", None)
 
@@ -290,16 +486,29 @@ def main(argv):
     rep.add("zajecie dochodu (D3)", "brak (168 niewgrane)", "<= 1 w 120 dobach, <= 5 w roku", None)
 
     # 4. skarbiec w wojnie < 0.25 mln dluzej niz 28 dob
+    # B-3: krolestwa, ktore powstaly w trakcie biegu (bunty - "X (Y Rebels)", a takze kazde krolestwo bez linii w pierwszej dobie "Skarbce"),
+    # rodza sie z pustym skarbcem - osobny wiersz (INFO; wiazacy z --koniec-etapu). Bieg 120 dob kroku B: Volentin League (Braavos Rebels)
+    # od doby 62 i Moharis League (Pentos Rebels) od doby 79 - skarbiec 1 zl od narodzin; w bazie buntow nie bylo
     ks = kingdom_war_series(lines)
-    worst, worstk = 0, "-"
+    d0 = min((d for ser in ks.values() for d, _, _, _ in ser), default=None)
+    worst, worstk, nworst, nworstk = 0, "-", 0, "-"
     for k, ser in ks.items():
         run = best = 0
         for d, war, wallet, men in sorted(ser):
             run = run + 1 if (war and wallet < 250000) else 0
             best = max(best, run)
-        if best > worst:
+        born = REB.match(k) is not None or (d0 is not None and min(d for d, _, _, _ in ser) > d0)
+        if born:
+            if best > nworst:
+                nworst, nworstk = best, k
+        elif best > worst:
             worst, worstk = best, k
-    rep.add("skarbiec w wojnie < 0.25 mln (najdluzsza seria)", f"{worst} dob ({worstk})" if ks else "brak linii", "0 serii > 28 dob", (worst <= 28) if ks else None)
+    rep.add("skarbiec w wojnie < 0.25 mln (najdluzsza seria, krolestwa z poczatku biegu)", f"{worst} dob ({worstk})" if ks else "brak linii", "0 serii > 28 dob",
+            (worst <= 28) if ks else None)
+    if ks:
+        rep.add("skarbiec w wojnie < 0.25 mln (krolestwa powstale w biegu - bunty)", f"{nworst} dob ({nworstk})",
+                "0 serii > 28 dob" + (" (koniec etapu)" if final else " - INFO: bunt rodzi sie z pustym skarbcem (wiazace z --koniec-etapu)"),
+                (nworst <= 28) if final else None)
 
     # 5. niedoplata korony (169c) - swiat i krolestwa w wojnie; rok 1 / rok 2 wedlug doby kampanii
     ar = by_day(lines, "Korona: niedoplata 28 dob (169c)")
@@ -342,19 +551,43 @@ def main(argv):
             parts.append(100.0 * int(m.group(1)) / int(m.group(2)))
     rep.add("zalegly zold w partiach (28 dob)", f"{st.mean(parts):.2f}%" if parts else "brak linii", "<= 2%", (st.mean(parts) <= 2.0) if parts else None)
 
-    # 8. wojsko w druzynach lordow W WOJNIE - suma krolestw z (WOJNA) ostatniej doby; cel 95-115 tys., twarda podloga 85 tys.
-    tot, totall = {}, {}
+    # 8. wojsko w druzynach lordow W WOJNIE - cel 95-115 tys., twarda podloga 85 tys. B-3: srednia 28 dob (dotad ostatnia doba - jedna doba
+    # wojny wiecej albo mniej przesuwala wynik o kilka tysiecy: bieg 120 dob kroku B 125.4 tys. w dobie 120 przy 118.0 tys. sredniej 28 dob).
+    # Bez --koniec-etapu ETAP, gdy wojsko swiata (wszystkie krolestwa, 28 dob) w pasmie -25%..+20% bazy (wiersz obok) - wojsko idzie za dochodem
+    # do budzetu 166 (projekt 2.0a pkt 6), a liczba krolestw w wojnie to los kampanii (krok B: 27.3 wobec 25.0 srednio)
+    tot, totall, nwar = {}, {}, {}
     for k, ser in ks.items():
         for d, war, wallet, men in ser:
             totall[d] = totall.get(d, 0) + men
             if war:
                 tot[d] = tot.get(d, 0) + men
+                nwar[d] = nwar.get(d, 0) + 1
+    world_ok = None
     if totall:
+        lw = last_window(totall)
+        v = mean_days(tot, lw) or 0
+        allm = mean_days(totall, lw)
+        nw = mean_days(nwar, lw) or 0
         lastd = max(totall)
-        v = tot.get(lastd, 0)
-        nwar = sum(1 for k, ser in ks.items() for d, war, _, _ in ser if d == lastd and war)
+        # wobec bazy w TYCH SAMYCH dobach kampanii (wojsko rosnie przez kampanie - bieg 40 dob nie porownuje sie z dobami 93-120 bazy);
+        # plik bazowy sprzed B-3 (bez szeregow dobowych) - ostatnie 28 dob bazy
+        bwa, bwv, allm_c, bwin = bw.get("wojsko_swiat"), bw.get("wojsko_wojna_swiat"), allm, "ostatnie 28 dob bazy"
+        kn0, kb0 = now.get("krolestwa_dni") or {}, (base or {}).get("krolestwa_dni") or {}
+        if kn0 and kb0:
+            hi0 = min(max(d for x in kn0.values() for d in x), max(d for x in kb0.values() for d in x))
+            cw = list(range(max(1, hi0 - 27), hi0 + 1))
+
+            def sums(T, war_only):
+                return {d: sum(x[d][1] for x in T.values() if d in x and (x[d][0] or not war_only)) for d in cw}
+            allm_c, bwa, bwv = mean_days(sums(kn0, False), cw), mean_days(sums(kb0, False), cw), mean_days(sums(kb0, True), cw)
+            bwin = f"doby {cw[0]}-{cw[-1]} obu biegow"
+        if bwa and allm_c:
+            ch = allm_c / bwa - 1
+            world_ok = -0.25 <= ch <= 0.20
+            rep.add("wojsko swiata wobec bazy (wszystkie krolestwa, srednia 28 dob)", f"{allm_c:.0f} wobec bazy {bwa:.0f} ({100 * ch:+.1f}%; {bwin})",
+                    "-25%..+20% (pasmo projektu 'wobec dzis'; krok paczki nie zmienia wojska ponad to)", world_ok)
         if v == 0:
-            rep.add("wojsko w druzynach lordow (krolestwa w wojnie, ostatnia doba)", f"0 (zadne krolestwo w wojnie; wszystkie {totall[lastd]})", "95-115 tys. w wojnie", None)
+            rep.add("wojsko w druzynach lordow (krolestwa w wojnie, srednia 28 dob)", f"0 (zadne krolestwo w wojnie; wszystkie {allm:.0f})", "95-115 tys. w wojnie", None)
         else:
             if 95000 <= v <= 115000:
                 ok, note = True, ""
@@ -362,17 +595,13 @@ def main(argv):
                 ok, note = False, " - ponizej celu 95 tys. (nad podloga 85 tys.)"
             else:
                 ok, note = False, (" - ponizej podlogi 85 tys." if v < 85000 else " - powyzej 115 tys.")
-            rep.add("wojsko w druzynach lordow (krolestwa w wojnie, ostatnia doba)", f"{v} ({nwar} krolestw w wojnie; wszystkie {totall[lastd]}){note}",
-                    "95-115 tys. w wojnie; twarda podloga 85 tys.", ok)
+            # bwv - wojsko w wojnie bazy w tych samych dobach (wyzej); bez szeregow w bazie - ostatnie 28 dob bazy
+            et = (not final) and (world_ok is True)              # wojsko swiata w pasmie bazy w tych samych dobach (bieg 40 dob: baza w dobach 14-41 tez ponizej podlogi)
+            rep.add("wojsko w druzynach lordow (krolestwa w wojnie, srednia 28 dob)",
+                    f"{v:.0f} (srednio {nw:.1f} krolestw w wojnie; wszystkie {allm:.0f}; ostatnia doba {tot.get(lastd, 0)})" + (f"; baza w wojnie {bwv:.0f}" if bwv else "") + note,
+                    "95-115 tys. w wojnie; twarda podloga 85 tys. (warunek etapu 2 - budzet 166)" + ("" if final else "; ETAP, gdy wojsko swiata w pasmie bazy w tych samych dobach"), ok, et)
 
-    # 9. zalogi, dezercja, okupy, pieniadz swiata - wobec bazy
-    base = None
-    if base_in:
-        with open(base_in, encoding="utf-8") as f:
-            base = json.load(f)
-    now = baseline_of(lines, rows)
-    sw, bw = now["swiat"], (base or {}).get("swiat", {})
-
+    # 9. zalogi, dezercja, okupy, pieniadz swiata - wobec bazy (plik bazowy i liczby biegu - na poczatku main)
     def vs(name, key, rule, test, info=False):
         v, b = sw.get(key), bw.get(key)
         if v is None:
@@ -382,8 +611,45 @@ def main(argv):
         else:
             rep.add(name, f"{v:.0f} wobec bazy {b:.0f} ({100.0 * v / b - 100:+.0f}%)", rule, None if info else test(v, b))
 
-    vs("zalogi swiata (28 dob)", "zalogi", "INFO - prog na krolestwo (wiersz nizej)", None, info=True)
-    if base:
+    vs("zalogi swiata (28 dob)", "zalogi", "INFO - prog na twierdze i na krolestwo (wiersze nizej)", None, info=True)
+    # B-3: zalogi NA TWIERDZE (balans-krolestw.csv) - spadek zalog krolestwa, ktore stracilo twierdze, to nie mniejsza zaloga (krok B: Pentos 2 twierdze
+    # wobec 6, The Reach 15 wobec 17 - na twierdze -2..+5%); doby wojny z linii "Skarbce". Swiat wiazacy; na krolestwo - warunek etapu (166), przy
+    # jednej parze biegow ETAP, z oknami 28 dob, gdy spadek trwa we wszystkich (los jednej kampanii odwraca znak miedzy oknami)
+    tn, tb = now.get("twierdze_dni") or {}, (base or {}).get("twierdze_dni") or {}
+    garr_ok = None
+    if tn and tb:
+        hi = min(max(d for x in tn.values() for d in x), max(d for x in tb.values() for d in x))
+        lw = list(range(hi - 27, hi + 1))
+        ids = sorted(set(tn) & set(tb))
+
+        def per_fort(T, keys, days):
+            men = tw = 0
+            for k in keys:
+                for d in days:
+                    x = T.get(k, {}).get(d)
+                    if not x or x[0] <= 0 or x[2] == 0:   # bez twierdz albo w pokoju (wojna nieznana -1 liczona jak wojna)
+                        continue
+                    men += x[1]; tw += x[0]
+            return men / tw if tw > 0 else None
+        wn, wb = per_fort(tn, ids, lw), per_fort(tb, ids, lw)
+        if wn and wb:
+            garr_ok = wn >= 0.95 * wb
+            rep.add("zalogi swiata na twierdze w wojnie (28 dob, balans-krolestw.csv)", f"{wn:.0f} wobec bazy {wb:.0f} ({100 * (wn / wb - 1):+.1f}%; {len(ids)} krolestw w obu biegach)",
+                    ">= 95% bazy", garr_ok)
+        ws = wins28(hi) or [(max(1, hi - 27), hi)]          # bieg krotszy niz 58 dob - jedno okno (ostatnie 28 dob)
+        low = []
+        for k in ids:
+            r = []
+            for a, b in ws:
+                pn, pb = per_fort(tn, [k], range(a, b + 1)), per_fort(tb, [k], range(a, b + 1))
+                r.append(pn / pb - 1 if pn and pb else None)
+            if r and r[-1] is not None and r[-1] < -0.05:
+                low.append((k, r, len(r) >= 2 and all(x is not None and x < -0.05 for x in r)))
+        txt = ", ".join(f"{k} {100 * r[-1]:+.0f}%" + (" (trwa we wszystkich oknach " + "/".join(f"{100 * x:+.0f}" for x in r) + ")" if pers else "") for k, r, pers in low)
+        rep.add("zalogi na twierdze w wojnie na krolestwo (28 dob)", txt if low else f"wszystkie w normie ({len(ids)} krolestw)",
+                ">= 95% bazy (warunek etapu 2 - 166)" + ("" if final else "; ETAP, gdy swiat (wiersz wyzej) w normie - jedna para biegow"),
+                not low, (not final) and garr_ok is True)
+    elif base:
         low, have = [], 0
         for k, cur in now["krolestwa"].items():
             cg, bg = cur.get("zalogi_wojna"), base["krolestwa"].get(k, {}).get("zalogi_wojna")
@@ -393,7 +659,7 @@ def main(argv):
             if cg < 0.95 * bg:
                 low.append(f"{k} {100.0 * cg / bg:.0f}%")
         rep.add("zalogi w wojnie na krolestwo (28 dob, CSV)", (", ".join(low) if low else f"wszystkie w normie ({have} krolestw)") if have else "brak danych (CSV albo baza bez zalog)",
-                ">= 95% bazy w wojnie", (not low) if have else None)
+                ">= 95% bazy w wojnie (baza bez twierdz - zapisac baze jeszcze raz)", (not low) if have else None)
     else:
         ng = sum(1 for k in now["krolestwa"].values() if k.get("zalogi_wojna"))
         rep.add("zalogi w wojnie na krolestwo (28 dob, CSV)", f"{ng} krolestw (bez bazy)" if rows else "brak CSV", ">= 95% bazy w wojnie", None)
@@ -401,11 +667,49 @@ def main(argv):
     vs("dezercja AI razem z limitem zoldu gry (28 dob)", "dezercja_ai", "INFO (166 wylacza limit gry)", None, info=True)
     vs("lordowie w niewoli > 60 dni (28 dob)", "lordowie_ponad_60", "<= baza + 20%", lambda v, b: v <= 1.2 * b)
     v, b = sw.get("pieniadz_zmiana"), bw.get("pieniadz_zmiana")
+    dn0, db0 = now.get("dni") or {}, (base or {}).get("dni") or {}
+    if dn0 and db0:
+        # B-3: te same doby kampanii obu biegow (ostatnie 28 wspolnych dob) - bieg 40 dob nie porownuje sie z dobami 93-120 bazy
+        hi0 = min(max(dn0), max(db0))
+        cw = list(range(max(1, hi0 - 27), hi0 + 1))
+        v0, b0 = mean_days(dn0, cw, "Z"), mean_days(db0, cw, "Z")
+        if v0 is not None and b0 is not None:
+            v, b = v0, b0
     rep.add("pieniadz swiata - zmiana na dobe (28 dob)", f"{v:+.0f}" + (f" wobec bazy {b:+.0f} (roznica {v - b:+.0f})" if b is not None and v is not None else "") if v is not None else "brak linii",
-            "B: +-30 tys./dobe wobec biegu bez paczki; C/D: +-50 tys.", None if (v is None or b is None) else abs(v - b) <= 50000)
+            "C/D: +-50 tys./dobe wobec biegu bez paczki" + (" - w kroku B INFO: wiazace wiersze 'B: pieniadz swiata' nizej (okno dob 31+, bez wojny)" if b_on else ""),
+            None if (v is None or b is None or b_on) else abs(v - b) <= 50000)
 
-    # 10. krolestwa w wojnie wobec bazy (-25% / +20%; biedne z lore -35%)
-    if base:
+    # 10. krolestwa w wojnie wobec bazy (-25% / +20%; biedne z lore -35%). B-3: bunty razem z krolestwem macierzystym (Braavos + Volentin League),
+    # okna 28 dob od doby 37; bez --koniec-etapu ETAP, gdy wojsko swiata w pasmie bazy - z jedna para biegow znak zmiany krolestwa odwraca sie
+    # miedzy oknami (krok B: Lys +29/-10/-34%, Tyrosh -17/-12/+44%), a wojsko idzie za dochodem rodow do budzetu 166 (projekt 2.0a pkt 6)
+    kn, kb = now.get("krolestwa_dni") or {}, (base or {}).get("krolestwa_dni") or {}
+    if kn and kb:
+        hi = min(max(d for x in kn.values() for d in x), max(d for x in kb.values() for d in x))
+        ws = wins28(hi) or [(max(1, hi - 27), hi)]
+
+        def war_mean(T, k, a, b):
+            v = [T[k][d][1] for d in range(a, b + 1) if d in T.get(k, {}) and T[k][d][0]]
+            return st.mean(v) if v else None
+        worse, other = [], 0
+        for k in sorted(set(kn) & set(kb)):
+            low = -0.35 if any(p in k.lower() for p in LORE_POOR) else -0.25
+            r = []
+            for a, b in ws:
+                cn, cb = war_mean(kn, k, a, b), war_mean(kb, k, a, b)
+                r.append(cn / cb - 1 if cn and cb else None)
+            if r[-1] is None:
+                if war_mean(kn, k, *ws[-1]) or war_mean(kb, k, *ws[-1]):
+                    other += 1                                    # w wojnie tylko w jednym biegu (krok B: Riverlands)
+                continue
+            if r[-1] < low or r[-1] > 0.20:
+                up = r[-1] > 0.20
+                pers = len(r) >= 2 and all(x is not None and ((x > 0.20) if up else (x < low)) for x in r)
+                worse.append(f"{k} {100 * r[-1]:+.0f}%" + (" (trwa we wszystkich oknach " + "/".join(f"{100 * x:+.0f}" for x in r) + ")" if pers else ""))
+        rep.add("krolestwa w wojnie: wojsko wobec bazy (bunty z macierzystym, 28 dob)",
+                (", ".join(worse) if worse else "wszystkie w normie") + (f"; w wojnie tylko w jednym biegu: {other}" if other else ""),
+                "-25%..+20% (lore -35%; warunek etapu 2 - 166)" + ("" if final else "; ETAP, gdy wojsko swiata w pasmie bazy - jedna para biegow"),
+                not worse, (not final) and world_ok is True)
+    elif base:
         worse = []
         for k, cur in now["krolestwa"].items():
             bk = base["krolestwa"].get(k, {})
@@ -427,7 +731,15 @@ def main(argv):
     sdr = {run_day(d, start): s for d, s in sd.items()}
     if 40 in sdr:
         v = num(r"panowie samych zamkow \(\d+\): D staly mediana (-?\d+)", sdr[40])
-        rep.add("D staly pana samych zamkow (doba 40)", v, "400-1300", (400 <= v <= 1300) if v is not None else None)
+        b40 = bw.get("d_staly_zamki_d40")
+        if b_on and b40 is not None and v is not None:
+            # B-3: 400-1300 to sprawdzenie miary 169c bez paczek; krok B z projektu tylko DOKLADA panom zamkow (wies ok. +130, zamek do +310 zl/dobe),
+            # wiec po B prog wobec bazy: nie mniej niz baza - 10% (szum mediany) i nie wiecej niz baza + 440
+            rep.add("D staly pana samych zamkow (doba 40) wobec bazy", f"{v} wobec bazy {b40} ({v - b40:+d})", "baza -10% .. baza +440 (krok B tylko doklada panom zamkow)",
+                    0.9 * b40 <= v <= b40 + 440)
+            rep.add("D staly pana samych zamkow (doba 40)", v, "INFO po kroku B (169c bez paczek: 400-1300)", None)
+        else:
+            rep.add("D staly pana samych zamkow (doba 40)", v, "400-1300", (400 <= v <= 1300) if v is not None else None)
     unr = [(d, num(r"nierozpoznane: modul \d+ zl = ([\d.]+)% wplywu", s, float)) for d, s in sd.items()]
     unr = [(d, x) for d, x in unr if x is not None]
     if unr:
@@ -520,11 +832,80 @@ def main(argv):
         rep.add("110: dosypka regulatora do zapasu zamkow (tryb 1, 28 dob)", "brak linii", "<= 10 tys./dobe (Z9) albo z niczego netto w kasach zamkow <= baza", None)
     pz = [num(r"z zaworu srednio (\d+)", zz[k]) for k in last_window(zz)]
     pz = [x for x in pz if x is not None]
-    rep.add("110: pan samych zamkow - wplyw z zaworu (srednio, 28 dob)", f"{st.mean(pz):.0f} zl/dobe" if pz else "brak linii", "200-350 zl/dobe",
-            (200 <= st.mean(pz) <= 350) if pz else None)
-    # pieniadz swiata: zmiana tempa wobec biegu bazowego = zamkniete ujscia minus zamkniete zrodla (z logow obu biegow, srednie 28 dob):
-    # zamki - zloto z niczego netto ("zakupy" + dosypka - kasowanie) teraz wobec bazy (po 110: "zakupy" 0, kasowanie 0, zostaje dosypka trybu 1);
-    # wsie - to, co w biegu bazowym znikalo (utarg wsi, cena towaru kupionego we wsi, kiesy taborow, ktore zniknely z mapy), minus to, co znika dalej
+    # B-3: INFO. 200-350 zl/dobe projekt liczyl z kasowania regulatora ok. 105 tys./dobe (stare logi: zold zalog 60 tys., sprzet AI 23 tys.); bieg bazowy
+    # (kopia-baza120) ma w kasach zamkow kasowanie 34 tys., zold zalog 35-38 tys., sprzet AI ok. 0 (171 C8 - zamek nie jest targiem broni) i prawdziwe
+    # przeplywy netto -30 tys./dobe: kupcy przywoza do zamkow konie i uprzaz (BK: ludnosc zamku je zuzywa, popyt kategorii koni 0.14 x dobrobyt).
+    # Nadwyzki, z ktorej zawor mialby dawac 200-350, w tej ekonomii nie ma; po B-2 zamek kupuje tylko z nadwyzki, wiec zawor bierze 7% doplywu doby.
+    # Wiazace: zamki bez zlota z niczego (dosypka wyzej), pan zamku nie biedniejszy (D staly wobec bazy, wiersz nizej "zawor minus utracony zwrot")
+    rep.add("110: pan samych zamkow - wplyw z zaworu (srednio, 28 dob)", f"{st.mean(pz):.0f} zl/dobe" if pz else "brak linii",
+            "INFO (projekt 200-350 z kasowania 105 tys./dobe ze starych logow - w biegu bazowym kasy zamkow nie maja nadwyzki; dochod panow zamkow: renta wsi 112, w C renty 180)",
+            None)
+    # B-3 (Z8): to, co pan dostaje z zaworu, minus polowa zoldu zalog zamkow, ktorego korona mu nie zwraca, bo "wraca zaworem" (gorna granica - zwrot
+    # tylko w wojnie). Bieg 120 dob kroku B (114-p HomePart z przewidywania): zawor panom 5.9 tys., bez zwrotu 17.7 tys. -> -3 tys./dobe; po B-2
+    # bez zwrotu jest najwyzej to, co naprawde wrocilo zaworem
+    zo = by_day(lines, "Zold: dzien")
+    hv, lv = [], []
+    for k in last_window(zo):
+        h = num(r"bez zwrotu korony \((?:114-p|Z8, B-2)\) (\d+)", zo[k])
+        if h is not None:
+            hv.append(h)
+    for k in last_window(zz):
+        a1 = num(r"zawor: (\d+) do panow", zz[k])
+        if a1 is not None:
+            lv.append(a1)
+    if hv and lv:
+        net = st.mean(lv) - 0.5 * st.mean(hv)
+        rep.add("110/Z8: zawor zamkow do panow minus utracony zwrot korony (28 dob)", f"{net:+.0f} na dobe (zawor panom {st.mean(lv):.0f}, zold bez zwrotu {st.mean(hv):.0f} x 50%)",
+                ">= 0 (zaloga we wlasnym zamku nie zabiera panu zwrotu za pieniadze, ktore do niego nie wracaja)", (net >= 0) if b_on else None)
+    else:
+        rep.add("110/Z8: zawor zamkow do panow minus utracony zwrot korony (28 dob)", "brak linii", ">= 0", None)
+    # B-3: pieniadz swiata - zmiana tempa wobec bazy minus zamkniete ujscia, uczciwiej (diagnoza biegu 120 dob kroku B):
+    #  (a) okno dob 31+ obu biegow (przy biegu >= 58 dob), nie ostatnie 28 dob - w dobach 1-30 przyciecie daru startowego zamkow (110) przesuwa
+    #      w czasie to, co w bazie kasowal regulator (ok. 170 tys./dobe), a ostatnie 28 dob to los wojny (krok B: +212 tys. w 93-120, -50 tys. w 61-92);
+    #  (b) bez wojennych zrodel z niczego, ktorych B nie dotyka (statki NavalDLC, bitwy, jency, lup z oblezen, minus lup z cial): krok B +41.5 tys.;
+    #  (c) zamkniete ujscie taborow: baza "U8 tabory" minus sakwy, ktore naprawde zniknely (linia 112), nie U8 biegu B - do B-1 ksiega liczyla
+    #      sakwe oddana przez 112 jako zniknieta (U8 = sakwy 112 w 119 z 119 dob);
+    #  (d) oczekiwane = zamkniete ujscia minus to, co z zatrzymanego pieniadza zjada regulator kas miast (istniejace ujscie - zamyka je 111'
+    #      w etapie 5; kasy miast wyzsze o 0.3-0.5 mln - regulator kasuje wiecej, dosypuje mniej).
+    # Do tego reszta ksiegi (niezmierzone) wobec bazy: paczka, ktora tworzy albo kasuje zloto bez nazwy, przesuwa reszte. Reszta B poprawiona o ten
+    # sam blad ksiegi (U8 tabory minus sakwy zniklo z linii 112; po B-1 = 0).
+    dn, db = now.get("dni") or {}, (base or {}).get("dni") or {}
+    if dn and db and b_on:
+        hi = min(max(dn), max(db))
+        binding = hi >= 58
+        days = list(range(31, hi + 1)) if binding else list(range(max(1, hi - 27), hi + 1))
+
+        def m(T, key, dflt=0.0):
+            v = mean_days(T, days, key)
+            return dflt if v is None else v
+
+        def war(T):
+            return sum(m(T, k) for k in WAR_KEYS) - m(T, "lup_cial")
+
+        def cas_nothing(T):
+            return m(T, "zamki_zakupy") + m(T, "zamki_dosypal") - m(T, "zamki_skasowal")
+        has112 = mean_days(dn, days, "sakwy_zniklo_112") is not None
+        lost_now = m(dn, "sakwy_zniklo_112") if has112 else m(dn, "u8_tabory")
+        fix_r = (m(dn, "u8_tabory") - lost_now) if has112 else 0.0          # B-1: sakwy 112 liczone jako znikniete (stary log) - po B-1 ok. 0
+        dz = m(dn, "Z") - m(db, "Z")
+        dwar = war(dn) - war(db)
+        e_cas = cas_nothing(dn) - cas_nothing(db)
+        e_vil = (m(db, "utarg_zniklo") - m(dn, "utarg_zniklo")) + (m(db, "prow_wsie") - m(dn, "prow_wsie")) + (m(db, "u8_tabory") - lost_now)
+        dreg = m(dn, "miasta_reg") - m(db, "miasta_reg")
+        res = dz - dwar - e_cas - e_vil - dreg
+        wtxt = f"doby {days[0]}-{days[-1]}"
+        rep.add("B: pieniadz swiata bez wojny - zmiana tempa wobec bazy minus zamkniete ujscia i regulator miast",
+                f"{res:+.0f} ({wtxt}: zmiana tempa {dz:+.0f}, wojenne zrodla z niczego {dwar:+.0f}, zamki - zloto z niczego netto {e_cas:+.0f}, "
+                f"wsie i tabory - zamkniete ujscia {e_vil:+.0f}, regulator kas miast {dreg:+.0f})",
+                "+-30 tys./dobe" + ("" if binding else " (INFO - wiazace na biegu >= 58 dob, okno dob 31+)"), (abs(res) <= 30000) if binding else None)
+        rn, rb = m(dn, "R") - fix_r, m(db, "R")
+        rep.add("B: reszta ksiegi pieniadza (niezmierzone) wobec bazy", f"{rn - rb:+.0f} ({wtxt}: bieg {rn:+.0f}" + (f" po poprawce sakw 112 {-fix_r:+.0f}" if fix_r else "")
+                + f", baza {rb:+.0f})", "+-10 tys./dobe (paczka nie tworzy ani nie kasuje zlota bez nazwy)" + ("" if binding else " (INFO - wiazace na biegu >= 58 dob)"),
+                (abs(rn - rb) <= 10000) if binding else None)
+    elif b_on:
+        rep.add("B: pieniadz swiata bez wojny - zmiana tempa wobec bazy minus zamkniete ujscia i regulator miast", "brak bazy albo szeregow dobowych w bazie (zapisz baze jeszcze raz z logu biegu bazowego)",
+                "+-30 tys./dobe", None)
+    # dawny wiersz (28 dob, bez wojny i bez regulatora miast) - INFO dla porownania z wczesniejszymi raportami
     keys = ("zamki_zakupy", "zamki_dosypal", "zamki_skasowal", "wsie_utarg_zniklo", "wsie_prowizja", "tabory_kiesy_zniknely")
     if base and all(bw.get(k) is not None for k in keys) and all(sw.get(k) is not None for k in keys) and sw.get("pieniadz_zmiana") is not None \
             and bw.get("pieniadz_zmiana") is not None:
@@ -532,12 +913,9 @@ def main(argv):
         e_vil = (bw["wsie_utarg_zniklo"] - sw["wsie_utarg_zniklo"]) + (bw["wsie_prowizja"] - sw["wsie_prowizja"]) \
                 + (bw["tabory_kiesy_zniknely"] - sw["tabory_kiesy_zniknely"])
         dv = sw["pieniadz_zmiana"] - bw["pieniadz_zmiana"]
-        rep.add("B: pieniadz swiata - zmiana tempa wobec bazy minus zamkniete ujscia (28 dob)",
+        rep.add("B: pieniadz swiata - zmiana tempa wobec bazy minus zamkniete ujscia (ostatnie 28 dob, z wojna)",
                 f"{dv - e_cas - e_vil:+.0f} (zmiana tempa {dv:+.0f}; zamkniete: zamki {e_cas:+.0f}, wsie i tabory {e_vil:+.0f})",
-                "+-30 tys./dobe (wiazace na biegu 120 dob)", (abs(dv - e_cas - e_vil) <= 30000) if b_on else None)
-    else:
-        rep.add("B: pieniadz swiata - zmiana tempa wobec bazy minus zamkniete ujscia (28 dob)", "brak bazy albo kluczy B w bazie (zapisz baze jeszcze raz z logu biegu bazowego)",
-                "+-30 tys./dobe", None)
+                "INFO - wiersz sprzed B-3 (los wojny ostatnich 28 dob, U8 z bledem kolejnosci ksiegi); wiazacy wiersz wyzej", None)
     # 112: utarg wsi, towar kupiony we wsi, sakwy taborow; bandy najwyzej +20% wobec bazy (S16)
     ut = by_day(lines, "Utarg wsi (112): dzien")
     rep.add("112: linia Utarg wsi (112)", f"{len(ut)} dob" if ut else "brak (przed 112)", "obecna po wgraniu B", True if ut else None)
@@ -568,16 +946,33 @@ def main(argv):
     zam = [x for x in zam if x is not None]
     rep.add("112: zamkniete ujscia (oddane wsiom, panom i zwyciezcom, 28 dob)", f"{st.mean(zam):.0f} na dobe" if zam else "brak linii",
             "INFO - projekt: ok. +47 tys./dobe do kies wsi + zywnosc i sakwy", None)
-    for key, name in (("bandy_tier", "sredni tier ludzi band"), ("bandy_zloto", "kiesy band"), ("bandy_awanse_paser", "awanse band u pasera"),
-                      ("bandy_paser_zl", "zloto band u pasera"), ("tabory_rozbite_bandy", "tabory rozbite przez bandy na dobe")):
+    # B-3: S16 pilnuje, czy bandy sie nie wzmacniaja (Jeff 09.10 04:55, Q3b: "autotest pilnuje, czy bandy sie nie wzmacniaja; zloto band ma platnika
+    # i ujscie"). Samo zloto band nie jest miara sily: decyzja D (04:25 - zwyciezca bierze cala sakwe taboru) daje bandom doplyw (krok B: 0 -> 17 tys./dobe,
+    # 99.5% sakw), a zapas ustala sie na doplyw / tempo wydatkow (ok. 10% kiesy dziennie w miastach) - kazde wykonanie D to ok. +100% zlota band.
+    # Kiesy band - INFO; wiazace: sila (tier, liczba band, ludzie, awanse i zloto u pasera, tabory rozbite) <= baza +20% i ujscie zlota (wydatki
+    # w miastach na dobe / kiesy band) nie mniej niz 80% bazy
+    for key, name in (("bandy_tier", "sredni tier ludzi band"), ("bandy_liczba", "liczba band"), ("bandy_ludzie", "ludzie band"),
+                      ("bandy_awanse_paser", "awanse band u pasera"), ("bandy_paser_zl", "zloto band u pasera"), ("tabory_rozbite_bandy", "tabory rozbite przez bandy na dobe"),
+                      ("bandy_zloto", "kiesy band")):
         v, b = sw.get(key), bw.get(key)
+        info = key == "bandy_zloto"
+        rule = "INFO - decyzja D (zwyciezca bierze cala sakwe): zapas = doplyw / tempo wydatkow; wiazace sila i ujscie" if info else "<= baza + 20% (S16 - bandy sie nie wzmacniaja)"
         if v is None:
-            rep.add(f"112: bandy - {name} (28 dob)", "brak linii", "<= baza + 20% (S16)", None)
+            rep.add(f"112: bandy - {name} (28 dob)", "brak linii", rule, None)
         elif b is None or b == 0:
-            rep.add(f"112: bandy - {name} (28 dob)", f"{v:.3f}" if key == "bandy_tier" else f"{v:.0f}", "<= baza + 20% (S16); brak w bazie - porownac z biegiem z Villager Purse Survives wylaczonym", None)
+            rep.add(f"112: bandy - {name} (28 dob)", f"{v:.3f}" if key == "bandy_tier" else f"{v:.0f}", rule + "; brak w bazie - porownac z biegiem z Villager Purse Survives wylaczonym", None)
         else:
             rep.add(f"112: bandy - {name} (28 dob)", (f"{v:.3f}" if key == "bandy_tier" else f"{v:.0f}") + f" wobec bazy " + (f"{b:.3f}" if key == "bandy_tier" else f"{b:.0f}")
-                    + f" ({100.0 * v / b - 100:+.0f}%)", "<= baza + 20% (S16)", (v <= 1.2 * b) if b_on else None)
+                    + f" ({100.0 * v / b - 100:+.0f}%)", rule, None if info else ((v <= 1.2 * b) if b_on else None))
+    sn, sb = sw.get("bandy_wydaly"), bw.get("bandy_wydaly")
+    gn, gb = sw.get("bandy_zloto"), bw.get("bandy_zloto")
+    if sn is not None and gn:
+        qn = 100.0 * sn / gn
+        qb = (100.0 * sb / gb) if (sb is not None and gb) else None
+        rep.add("112: bandy - ujscie zlota (wydatki w miastach / kiesy band na dobe, 28 dob)", f"{qn:.1f}%" + (f" wobec bazy {qb:.1f}%" if qb is not None else " (bez bazy)"),
+                ">= 80% bazy (zloto band ma ujscie - Q3b)", (qn >= 0.8 * qb) if (qb is not None and b_on) else None)
+    else:
+        rep.add("112: bandy - ujscie zlota (wydatki w miastach / kiesy band na dobe, 28 dob)", "brak linii", ">= 80% bazy", None)
     # klucz 114: udzial korony w zaworze zamkow = 1 - CastleDuesLordShare (domyslnie 0.33) - suma 28 dob z linii 110
     lp = cp = 0
     for k in last_window(zz):
