@@ -433,3 +433,8 @@ LIMITY 13:30: 5h 32%, TYDZIEN 82% (reset 15.10) - przy 100% tygodnia przejsc na 
   zold rycerzy 744-984 zl/d). ALE glowy < 5000 = 33 - wszystkie to rody gentry (w C3 bez poprawki mialy 30-50 tys.): po NotSpawned -> Active rod rycerza placi zold
   cudzej partii (Astrethides: zold_partii 1389-1435/d przy 0 ludzi, kiesa 39.6 tys. -> 0 do doby ~80) + jednorazowo ok. -19 tys. Wojsko lordow w wojnie 92.3 tys.
   C3 NIE WGRANY. Ten sam pomocnik naprawia (rod rycerza nie placi za partie pana) -> commit na e2c, potem znowu test 120 dob i wgranie 17 (C3).
+- (04:50) **C3c**: 5ce5faf - gra (AddExpenseFromLeaderParty) i BK (PartyExpensesPrefix) obciazaja rod zoldem partii, w ktorej JEST jego glowa -> rycerz placil caly
+  zold druzyny pana (rody gentry 1.93 mln zl w 120 dobach przy 0 ludzi), pan placil drugi raz. Poprawka: prefiks CalculatePartyWage (+ znacznik rozliczanego rodu) -
+  dla rodu rycerza w cudzej partii zold 0. DLL test\Armoury-e2c-c3c.dll (c38bd62f). **TEST 120 dob w toku** -> test\at-c3c-120.out.txt.
+  **DO DECYZJI JEFFA (pozniej):** koszt "wezwania sojusznika do wojny" (gra AddExpensesForCallToWarAgreements) placa kiesy rodow, takze rycerzy bez lenna
+  (Pentos: -57 tys., -40 tys. ... w kilka dob) - propozycja: z korony (skarbca) zamiast z kies; zmienia wszystkie rody, wiec pytanie do Jeffa.
