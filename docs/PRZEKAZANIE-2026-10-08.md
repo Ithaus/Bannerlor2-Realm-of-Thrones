@@ -550,3 +550,7 @@ do 54/d) i limitu zoldu/przepelnienia gry u partii bez budzetu (do 162/d) - do z
   finalizer BkDemandSafe na ClaimantDemand.SetTexts, Demand.Fulfill, Demand.DoAiChoice. DLL do gry test\CrashScribe-bk.dll (b66e9aed), autotestowa test\CrashScribe-at-bk.dll
   (c423e6f0; worktree noc2\cs-at-bk = e44c7ba + at1-cs.diff). **BIEG 728 dob w toku** (Armoury 87b03e2b + CS-at-bk) -> test\at-bk-728.out.txt. Jesli dojdzie: WGRANIE 22 = CS b66e9aed,
   zamkniecie etapu 2. W tym czasie (2) linia diagnostyczna partii w osadach (Armoury e2c).
+- (14:20) **(2) ORLE GNIAZDO - WYJASNIONE:** to blad wyswietlania gry (SandBox SettlementNameplatePartyMarkersVM): lista ikon budowana raz z settlement.Parties, potem tylko
+  +SettlementEntered / -OnSettlementLeft / MapEventEnded - brak nasluchu zniszczenia partii, wiec partia rozwiazana/zniszczona W MIESCIE zostaje jako ikona-duch. Prawdziwa
+  liczba partii w The Eyrie 5-11 (CS GAME STATE "Parties in it" w raportach hang). Gracz autotestu siedzi w The Eyrie 2 lata -> ok. 200 duchow. Wplyw na gre: zaden.
+  Poprawka (CS, niska waga): nasluch MobilePartyDestroyed -> usuniecie znacznika z SettlementNameplatePartyMarkersVM osady (albo odswiezenie listy raz na dobe).
