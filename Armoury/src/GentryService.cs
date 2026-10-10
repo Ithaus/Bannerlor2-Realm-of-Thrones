@@ -216,6 +216,7 @@ namespace Armoury
         private static int _dArmies, _dArmiesWithKnight, _dFree, _dFreeNoArmy;
         private static int _dUnavail, _dUnPrisoner, _dUnParty, _dUnState, _dUnSiege, _dUnOther, _dNonComb;   // C3 po tescie: czemu rycerz nie jest wolny
         private static int _dWoke;   // wyjazdy z NotSpawned (od poprzedniej linii - takze wezwania BK miedzy tickami)
+        private static long _dLeadWageSkip; private static int _dLeadWageSkipN;   // zold druzyny pana zdjety z rozliczen rodow rycerzy (od poprzedniej linii)
         private static int _stumbles;
         private static readonly HashSet<string> _err = new HashSet<string>();
         private static long _weekSum; private static int _weekStart = -1;
@@ -502,6 +503,24 @@ namespace Armoury
             Wire("majatek: niewolnicy (BK TryAutoBuyForEstate)", sl != null ? AccessTools.Method(sl, "TryAutoBuyForEstate") : null, nameof(SlavesPrefix), nameof(SlavesFinalizer));
             var sup = AccessTools.TypeByName("BannerKings.Behaviours.Estates.BKVillageSupplyAutoBehavior");
             Wire("majatek: zaopatrzenie wsi (BK RefillFromTownMarket)", sup != null ? AccessTools.Method(sup, "RefillFromTownMarket") : null, nameof(SupplyPrefix), nameof(SupplyFinalizer));
+            // C3 po tescie 120 dob (kopia-c3b-120): gra (AddExpenseFromLeaderParty) i BK (PartyExpensesPrefix) obciazaja rod zoldem partii, w ktorej
+            // JEST jego glowa (clan.Leader.PartyBelongedTo), nie tej, ktora prowadzi - rycerz w druzynie pana placil caly zold tej druzyny.
+            // Para latek: okno "ktory rod jest teraz obciazany" (prefiks Priority.First przed prefiksem BK + finalizer) i prefiks CalculatePartyWage.
+            try
+            {
+                var exp = AccessTools.Method(typeof(TaleWorlds.CampaignSystem.GameComponents.DefaultClanFinanceModel), "AddExpensesFromPartiesAndGarrisons");
+                var cpw = AccessTools.Method(typeof(TaleWorlds.CampaignSystem.GameComponents.DefaultClanFinanceModel), "CalculatePartyWage");
+                const string lab = "zold druzyny pana nie z kiesy rycerza (AddExpensesFromPartiesAndGarrisons + CalculatePartyWage)";
+                if (exp == null || cpw == null) _missing.Add(lab);
+                else
+                {
+                    _harmony.Patch(exp, prefix: new HarmonyMethod(typeof(GentryService), nameof(ExpensesPrefix)) { priority = Priority.First },
+                                        finalizer: new HarmonyMethod(typeof(GentryService), nameof(ExpensesFinalizer)));
+                    _harmony.Patch(cpw, prefix: new HarmonyMethod(typeof(GentryService), nameof(PartyWagePrefix)) { priority = Priority.First });
+                    _wired.Add(lab);
+                }
+            }
+            catch (Exception e) { _missing.Add("zold druzyny pana (blad: " + e.Message + ")"); }
             Log.Info("Rycerze (179): latki BK - " + (_wired.Count > 0 ? string.Join(", ", _wired.ToArray()) : "-") + "; BRAK: " + (_missing.Count > 0 ? string.Join(", ", _missing.ToArray()) : "-")
                      + "; rozpoznanie rodow rycerzy: BK IsGentryClan " + (BkResolve() ? "TAK" : "BRAK (tylko id \"gentryClan_\" bez lenna)") + ".");
         }
@@ -527,6 +546,41 @@ namespace Armoury
                 _wired.Add(label);
             }
             catch (Exception e) { _missing.Add(label + " (blad: " + e.Message + ")"); }
+        }
+
+        // ---- zold druzyny pana: rod rycerza go nie placi
+        [ThreadStatic] private static Clan _charged;   // rod, ktorego wydatki na partie gra (albo BK) wlasnie liczy
+
+        /// <summary>Okno rodu: AddExpensesFromPartiesAndGarrisons (gra; BK zastepuje jej cialo swoim prefiksem, ale nasz idzie pierwszy).</summary>
+        public static void ExpensesPrefix(Clan __0, out Clan __state)
+        {
+            __state = _charged;
+            _charged = __0;
+        }
+
+        public static Exception ExpensesFinalizer(Exception __exception, Clan __state)
+        {
+            _charged = __state;
+            return __exception;
+        }
+
+        /// <summary>CalculatePartyWage w oknie rodu: partia, w ktorej jedzie glowa tego rodu, ale prowadzi ja ktos inny i nalezy do innego rodu
+        /// (rycerz w druzynie pana albo wodza armii) - dla TEGO rodu zold 0. Pan placi zold swojej druzyny w swoim rozliczeniu jak dotad, a rycerzowi
+        /// 24 zl (Pay). Bez tego rod rycerza placil caly zold druzyny pana (w tescie C3b do ok. 1.4 tys. na dobe na rod, 33 glowy rycerzy < 5000),
+        /// a przy pustej kiesie gra nakladala na druzyne pana kare morale za niezaplacony zold (ApplyMoraleEffect).</summary>
+        public static bool PartyWagePrefix(MobileParty __0, bool __2, ref int __result)
+        {
+            try
+            {
+                var c = _charged;
+                if (c == null || __0 == null || !On) return true;
+                var lead = c.Leader;
+                if (lead == null || lead.PartyBelongedTo != __0 || __0.LeaderHero == lead || __0.ActualClan == c) return true;
+                if (__2) { _dLeadWageSkip += Math.Max(0, __0.TotalWage); _dLeadWageSkipN++; }
+                __result = 0;
+                return false;
+            }
+            catch (Exception e) { Stumble("PartyWagePrefix", e); return true; }
         }
 
         private static TextObject _knightsText;   // leniwie - bez TextObject w konstruktorze statycznym (klasa ladowana przy starcie gry, SetHarmony)
@@ -663,7 +717,7 @@ namespace Armoury
             try { if (s.LogEnabled && (on || _dHome > 0 || _dWait > 0)) Log.Info(Line(s, today, on)); }   // wylaczone: linia tylko, gdy ktos wracal do domu
             finally
             {
-                _dSpawnBlock = _dSummon = _dSummonLord = _dSummonLead = _dSummonSkip = _dWoke = 0;
+                _dSpawnBlock = _dSummon = _dSummonLord = _dSummonLead = _dSummonSkip = _dWoke = 0; _dLeadWageSkip = 0; _dLeadWageSkipN = 0;
                 _dFinish = _dFinishMen = _dFinishLost = _dFinishPris = _dFinishShips = 0; _dEstateBlock = 0; _dEstateSpent = 0;
             }
         }
@@ -685,6 +739,8 @@ namespace Armoury
               .Append(" | armie ").Append(_dArmies).Append(", z rycerzem ").Append(_dArmiesWithKnight)
               .Append(" | zold rycerzy ").Append(Math.Max(0, s.GentryKnightWage)).Append(" zl: nalezny ").Append(_dDue).Append(", zaplacony ").Append(_dPaid)
               .Append(" (gracz ").Append(_dPlayerPaid).Append("), pan bez zlota ").Append(_dUnpaidN).Append(", Straz bez zoldu ").Append(_dWatch)
+              .Append("; zold druzyny pana zdjety z rozliczen rodow rycerzy (gra liczy partie, w ktorej jest glowa rodu; od wczoraj) ").Append(_dLeadWageSkip)
+              .Append(" zl w ").Append(_dLeadWageSkipN)
               .Append(" | wlasne partie rycerzy ").Append(_dOwnParties).Append(" (ludzi ").Append(_dOwnMen).Append(", limit zoldu 0), nowe partie zablokowane ").Append(_dSpawnBlock)
               .Append(", rozwiazane przez BK ").Append(_dFinish).Append(" (ludzie do wsi majatku ").Append(_dFinishMen).Append(", bez wsi z danymi BK ").Append(_dFinishLost)
               .Append(", jency w rozwiazanych ").Append(_dFinishPris).Append(", statki ").Append(_dFinishShips).Append(')')
