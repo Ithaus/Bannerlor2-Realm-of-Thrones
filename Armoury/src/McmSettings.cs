@@ -2732,6 +2732,34 @@ namespace Armoury
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool HouseholdShield { get; set; } = true;
 
+        [SettingPropertyBool("Merc Contract Enabled", HintText = "with Crown Current Income: an AI mercenary company is hired on a fixed contract - on the day it enters a realm's service the crown agrees to pay it Merc Contract Factor times its daily wages (wages, food and kit) for the men it brings; in peace it waits on half the money and half the men; every Merc Review Days the contract is cut (never raised) to the men it still has if it falls below Merc Review Floor of them. The crown pays it out of its daily income before the wage refunds; a company left unpaid by more than half for Merc Unpaid Leave Days in a row leaves the service. The house budget holds the company to the men of its contract. Your own mercenary contract is the game's, as before. Off = the game's mercenary pay for the AI, as before")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public bool MercContractEnabled { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Merc Contract Factor", 0.00f, 5.20f, "0.00", HintText = "the contract a day as a multiple of the company's daily wages on the day it is hired (wages 1.0, food about 0.15, kit about 0.15)")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public float MercContractFactor { get; set; } = 1.3f;
+
+        [SettingPropertyFloatingInteger("Merc Peace Share", 0.00f, 2.00f, "0.00", HintText = "in peace a hired company waits on this share of its contract and of its men")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public float MercPeaceShare { get; set; } = 0.5f;
+
+        [SettingPropertyInteger("Merc Review Days", 0, 112, "0", HintText = "the contract is reviewed this often - only downwards")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public int MercReviewDays { get; set; } = 28;
+
+        [SettingPropertyFloatingInteger("Merc Review Floor", 0.00f, 3.00f, "0.00", HintText = "at a review, a company with fewer than this share of its contracted men has its contract cut to the men it has")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public float MercReviewFloor { get; set; } = 0.75f;
+
+        [SettingPropertyInteger("Merc Unpaid Leave Days", 0, 112, "0", HintText = "a company paid less than half its contract for this many days in a row leaves the service")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public int MercUnpaidLeaveDays { get; set; } = 28;
+
+        [SettingPropertyBool("Merc Game Contract Ai Off", HintText = "with Merc Contract Enabled: AI companies in service get nothing from the game itself - no gold 'for their tier' from nowhere and no game contract drawn on the realm's mercenary purse (so the vassals no longer pay for the AI companies a second time); your own contract is unchanged")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public bool MercGameContractAiOff { get; set; } = true;
+
         [SettingPropertyBool("Crown Gifts", HintText = "with Crown Current Income: the North feeds the Night's Watch and the Free Cities pay the Dothraki - each day a share of the giver's daily income goes through the receiving crown to its houses the same day, by fixed weights (the Watch: a stronghold 1, a village a quarter, a house without a fief half; the Dothraki: equal for every house of the khalasar) - never by the number of men. It counts towards their steady income. Off = no gifts")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool CrownGifts { get; set; } = true;
@@ -4266,6 +4294,13 @@ namespace Armoury
             s.UnpaidTroopsCapInMen = UnpaidTroopsCapInMen;
             s.HouseholdMinimal = HouseholdMinimal;
             s.HouseholdShield = HouseholdShield;
+            s.MercContractEnabled = MercContractEnabled;
+            s.MercContractFactor = MercContractFactor;
+            s.MercPeaceShare = MercPeaceShare;
+            s.MercReviewDays = MercReviewDays;
+            s.MercReviewFloor = MercReviewFloor;
+            s.MercUnpaidLeaveDays = MercUnpaidLeaveDays;
+            s.MercGameContractAiOff = MercGameContractAiOff;
             s.CrownGifts = CrownGifts;
             s.GiftNorthToWatchShare = GiftNorthToWatchShare;
             s.GiftFreeCitiesToDothrakiShare = GiftFreeCitiesToDothrakiShare;

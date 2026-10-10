@@ -425,12 +425,12 @@ namespace Armoury
             long ownC; _ownCastleByClan.TryGetValue(c, out ownC);
             ownC = Math.Max(0L, Math.Min(ownC, rentC));
             long own = ownT + ownC;
-            long once = r.Today - r.TodayRefund - r.TodayCrown;     // trzecia + zdarzenia (+ reszta Today z zapisu)
+            long once = r.Today - r.TodayRefund - r.TodayCrown - r.TodayContract;     // trzecia + zdarzenia (+ reszta Today z zapisu); 185: bez kontraktu od korony
             long other = a - (vd + wd + pol + sup + merc + shop + carpar);
             _t[QLand] = vd + wd + rent - own;
             _t[QOwn] = own;
             _t[QCrown] = pol + sup + r.TodayRefund + r.TodayCrown;
-            _t[QContract] = merc;
+            _t[QContract] = merc + r.TodayContract;   // 185: kontrakt najemnika od korony (gra dla AI - 0)
             _t[QAssets] = shop + carpar - family;
             _t[QOnce] = once;
             _t[QOther] = other;

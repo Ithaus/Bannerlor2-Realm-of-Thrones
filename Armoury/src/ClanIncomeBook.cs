@@ -20,7 +20,7 @@ namespace Armoury
     /// </summary>
     internal static partial class ClanIncomeBook
     {
-        internal const int KRefund = 0, KCrownLevies = 1, KThird = 2;
+        internal const int KRefund = 0, KCrownLevies = 1, KThird = 2, KContract = 3;   // 185: kontrakt najemnika od korony (czesc "kontrakt" D stalego)
         private const int Days = 28;
 
         // 6.4 projektu, przebieg na sucho - 166: udzialy pulapu przeszly do Settings (ClanBudget.Ceiling - jedna formula dla logu i gry); tu zostaje reszta przebiegu na sucho
@@ -36,6 +36,7 @@ namespace Armoury
             public int Head, Filled, Seed = -1, Streak;     // Seed = G/60 przy pierwszym zobaczeniu rodu; Streak = doby z zoldem > 1.10 x pulap
             public long Today, TodayRefund, TodayCrown, TodayEvtNone, TodayEvtSettl, TodayEvtOther, TodayThird;   // od ostatniego Daily
             public long TodayEstates;                                  // 169c: w tym wyplaty majatkow BK widziane jako zdarzenie (podwojne) - tylko pamiec
+            public long TodayContract;                                 // 185: kontrakt najemnika od korony (w Today; czesc "kontrakt" D stalego, nie jednorazowe)
             public long WageAccLord, WageAccGar, WageAccCar;          // w biezacym rozliczeniu rodu
             public int WageLastLord, WageLastGar, WageLastCar;        // z ostatniego pelnego rozliczenia rodu
             public bool HadTick;                                       // bylo choc jedno zmierzone rozliczenie
@@ -120,6 +121,7 @@ namespace Armoury
                 if (kind == KRefund) { r.TodayRefund += amount; DayRefund += amount; }
                 else if (kind == KCrownLevies) { r.TodayCrown += amount; DayCrown += amount; }
                 else if (kind == KThird) { r.TodayThird += amount; DayThird += amount; }
+                else if (kind == KContract) { r.TodayContract += amount; }
             }
             catch (Exception e) { Stumble("NoteInflow", e); }
         }
@@ -316,7 +318,7 @@ namespace Armoury
                         r.Inflow = inflow; r.A = (long)a; r.B = b; r.Refund = r.TodayRefund; r.Crown = r.TodayCrown; r.Third = r.TodayThird;
                         r.Evt = r.TodayEvtNone + r.TodayEvtSettl + r.TodayEvtOther;
                         if (sd) { try { StableClan(c, r, en, haveEn, (long)a, b); } catch (Exception e) { Stumble("StableClan", e); } }   // 169c: przed zerowaniem Today*
-                        r.Today = r.TodayRefund = r.TodayCrown = r.TodayEvtNone = r.TodayEvtSettl = r.TodayEvtOther = r.TodayThird = r.TodayEstates = 0;
+                        r.Today = r.TodayRefund = r.TodayCrown = r.TodayEvtNone = r.TodayEvtSettl = r.TodayEvtOther = r.TodayThird = r.TodayEstates = r.TodayContract = 0;
                         r.D = DOf(r); r.G = g;
                         modelSum += (long)a; rentSum += b;
                         _today.Add(c);

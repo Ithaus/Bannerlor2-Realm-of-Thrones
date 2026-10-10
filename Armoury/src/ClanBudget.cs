@@ -101,7 +101,7 @@ namespace Armoury
         private static bool Eligible(Clan c)
         {
             return c != null && c != Clan.PlayerClan && !c.IsEliminated && !c.IsBanditFaction && c.Leader != null && c.Leader.IsAlive && c.Kingdom != null
-                   && !c.IsUnderMercenaryService && c.StringId != null && !c.StringId.StartsWith("bk_courtiers_", StringComparison.Ordinal)
+                   && (!c.IsUnderMercenaryService || MercContract.On) && c.StringId != null && !c.StringId.StartsWith("bk_courtiers_", StringComparison.Ordinal)
                    && !ClanIncomeBook.IsUndeadClan(c);
         }
 
@@ -245,11 +245,15 @@ namespace Armoury
                         double R, f, chest;
                         b.Cap = Ceiling(b.D, G, b.War, b.Adults, out R, out f, out chest);
                         b.R = R; b.F = f;
+                        bool merc = c.IsUnderMercenaryService;
+                        double mcap = 0;
+                        if (merc && !MercContract.CapOf(c, b.War, out mcap)) { b.Today = false; continue; }   // najemnik bez umowy (185) - bez budzetu
                         double shareF = f;   // te same mnozniki biedy dla wszystkich udzialow
                         b.Household = (b.War ? s.HouseholdShareWar : s.HouseholdSharePeace) * b.D * shareF;
                         b.Gear = (b.War ? s.GearShareWar : s.GearSharePeace) * b.D * shareF + (b.War && G > R ? 0.2 * (G - R) / Math.Max(1f, s.WarChestDays) : 0);
                         b.Build = b.War ? 0 : Math.Max(0f, s.BuildIncomeShare) * b.D * shareF;
-                        if (!b.War)
+                        if (merc) { b.Cap = mcap; b.Household = 0; b.Build = 0; f = 1; }   // 185: pulap najemnika = zold ludzi z umowy (nie udzial D), bez dworu
+                        else if (!b.War)
                         {
                             // reszta ponad 120 D + 50 000 po 1/180 na dwor i budowy (polowa na polowe)
                             double cap = Math.Max(0f, s.ReserveCapDays) * b.D + 50000;

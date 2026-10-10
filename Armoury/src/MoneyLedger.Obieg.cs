@@ -93,6 +93,7 @@ namespace Armoury
             try { CrownIncome.ZeroLast(); } catch (Exception e) { Stumble169("ClearLast169(CrownIncome)", e); }   // 165: wplywy dnia korony (Last*)
             try { CrownGifts.ZeroLast(); } catch (Exception e) { Stumble169("ClearLast169(CrownGifts)", e); }     // 182: dary koron (Last*)
             try { ClanBudget.ZeroLast(); } catch (Exception e) { Stumble169("ClearLast169(ClanBudget)", e); }     // 166: budzet rodow (Last*)
+            try { MercContract.ZeroLast(); } catch (Exception e) { Stumble169("ClearLast169(MercContract)", e); } // 185: kontrakty najemnikow (Last*)
         }
 
         // ------------------------------------------------------------ 169b: RB wedlug odcinkow naszego ticku (granice: Mark renty, budowy, korona, paser band)
@@ -579,6 +580,8 @@ namespace Armoury
               .Append(", dary (182) skarbce dawcow -> glowy rodow Strazy ").Append(CrownGifts.LastToWatch).Append(" i Dothrakow ").Append(CrownGifts.LastToDothraki)
               .Append(" (ze skarbcow dawcow ").Append(CrownGifts.LastNorth + CrownGifts.LastFree).Append(", reszta w skarbcach odbiorcow ").Append(CrownGifts.LastKept).Append(")")
               .Append(", raty reparacji skarbiec -> skarbiec ").Append(CrownIncome.LastRepOut).Append(" (przyjete ").Append(CrownIncome.LastRepIn).Append(")")
+              .Append(", kontrakty najemnikow AI (185) skarbce -> glowy kompanii ").Append(MercContract.LastPaid).Append(" (nalezne ").Append(MercContract.LastDue)
+              .Append("; gra dla AI: za tier wylaczone ").Append(MercContract.LastTierOff).Append(", kontrakt gry wylaczony ").Append(MercContract.LastGameOff).Append(")")
               .Append(", splata dlugu wobec korony z kies rodow do skarbcow ").Append(CrownIncome.LastDebtRepaid)
               .Append(", clo jednym poborem (licznik cel -> skarbiec) ").Append(KingdomTreasury.LastCustomsSingle)
               .Append(", zwrot przyciety o wydatki ludzi we wlasnych miastach (K3) ").Append(KingdomTreasury.LastOwnCut)
