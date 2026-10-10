@@ -557,3 +557,8 @@ do 54/d) i limitu zoldu/przepelnienia gry u partii bez budzetu (do 162/d) - do z
 - (14:40) Jeff: "trzeba naprawic ten wizualny glitch" -> CS commit (NameplateGhosts.cs, w-toku/175-armie-cs): postfiksy na SettlementNameplatePartyMarkersVM.RegisterEvents/
   UnloadEvents - nasluch MobilePartyDestroyed (usuwa ikone) + DailyTick (PopulatePartyList). DLL do gry test\CrashScribe-bk2.dll (BK + ikony). Po biegu 728 dob: zbudowac wersje
   autotestowa z obiema poprawkami (worktree + at1-cs.diff), test 40 dob, WGRANIE CS.
+- (14:50) Limit tygodnia 98%. **Tent:** ERROR in Tent (1 raz w 457 dobach, potkniecie 1/3) = Armoury.NightRest.Tent -> refleksja do metody innego moda (namiot/oboz) -> KeyNotFound
+  w jego slowniku (partia nie zarejestrowana); niegrozne, obsluzone. Poprawka: sprawdzic w NightRest.Tent, co wolamy, i przed wywolaniem sprawdzic klucz (albo try per partia).
+  **Straz - werbunek:** "werbunek wstrzymany 33-96/d" przy Straz 1.7 tys. / pulap 3.5-5 tys. - podejrzenie: pulap w ludziach (UnpaidTroopsCapInMen) liczony na partie
+  (limit partii = jej zold + czesc wolnego miejsca; zold Strazy 0) blokuje werbunek mimo luzu rodu - sprawdzic w ClanBudget/RecruitCost. Kolejnosc po biegu 728: wynik ->
+  CS (BK + ikony) test 40 dob -> WGRANIE CS -> (3) dezercja AI rok 2 + Tent + werbunek Strazy -> (4) etap 3.
