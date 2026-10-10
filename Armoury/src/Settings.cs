@@ -787,7 +787,17 @@ namespace Armoury
         public bool MercGameContractAiOff = true;          // with Merc Contract Enabled: AI companies in service get nothing from the game itself - no gold 'for their tier' from nowhere and no game contract drawn on the realm's mercenary purse (so the vassals no longer pay for the AI companies a second time); your own contract is unchanged
         // 182 (projekt etapu 2, krok C1): dary miedzy koronami i Straz bez zoldu
         public bool CrownGifts = true;                     // with Crown Current Income: the North feeds the Night's Watch and the Free Cities pay the Dothraki - each day a share of the giver's daily income goes through the receiving crown to its houses the same day, by fixed weights (the Watch: a stronghold 1, a village a quarter, a house without a fief half; the Dothraki: equal for every house of the khalasar) - never by the number of men. It counts towards their steady income. Off = no gifts
-        public float GiftNorthToWatchShare = 0.25f;        // share of the North's daily income given to the Night's Watch
+        // Jeff 10.10: na Straz zrzuca sie cale Westeros (krol i rody), procenty Jeffa; dar tylko wedlug potrzeby
+        public float GiftWatchNorth = 0.05f;               // share of the North's daily income given to the Night's Watch when the Watch needs it
+        public float GiftWatchIronThrone = 0.04f;          // share of the Iron Throne's (King's Landing) daily income given to the Night's Watch when the Watch needs it
+        public float GiftWatchDorne = 0.03f;               // share of Dorne's daily income given to the Night's Watch when the Watch needs it
+        public float GiftWatchReach = 0.03f;               // share of the Reach's daily income given to the Night's Watch when the Watch needs it
+        public float GiftWatchVale = 0.02f;                // share of the Vale's daily income given to the Night's Watch when the Watch needs it
+        public float GiftWatchStormlands = 0.02f;          // share of the Stormlands' daily income given to the Night's Watch when the Watch needs it
+        public float GiftWatchRiverlands = 0.02f;          // share of the Riverlands' daily income given to the Night's Watch when the Watch needs it
+        public float GiftWatchDragonstone = 0.01f;         // share of Dragonstone's daily income given to the Night's Watch when the Watch needs it
+        public int GiftWatchNeedDays = 60;                 // the realms send their gifts only while the Watch's houses hold less gold than this many days of the Watch's costs (wages and food); 0 = always
+        public float GiftWatchFoodPerMan = 1.0f;           // the food of one brother a day, counted into the Watch's costs for the need test
         // regula korekty 182: test 120 dob C1 - Dothrakowie w wojnie -57% wobec bazy (< -25%) -> udzial 0.10 -> 0.15 (gora lore "dar za spokoj")
         public float GiftFreeCitiesToDothrakiShare = 0.15f; // share of each Free City's daily income given to the Dothraki (Braavos, Volantis, Pentos, Myr, Lys, Tyrosh, Norvos, Qohor, Lorath); 0.15 since the 120-day test, where the Dothraki at war fell more than a quarter below their old numbers (0.10 before)
         public bool WatchUnpaid = true;                    // the brothers of the Night's Watch take no wages: troops in the parties and garrisons of the Watch cost nothing a day; food and kit come from the gifts and the Watch's own villages, and the Watch's numbers are held by the house budget in men instead of gold (needs Clan Budget Enabled). Off = the Watch is paid like everyone else

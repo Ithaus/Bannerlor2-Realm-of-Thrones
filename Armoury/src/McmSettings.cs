@@ -2788,9 +2788,45 @@ namespace Armoury
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool CrownGifts { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Gift North To Watch Share", 0.00f, 1.00f, "0.00", HintText = "share of the North's daily income given to the Night's Watch")]
+        [SettingPropertyFloatingInteger("Gift Watch North", 0.00f, 1.00f, "0.00", HintText = "share of the North's daily income given to the Night's Watch when the Watch needs it")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
-        public float GiftNorthToWatchShare { get; set; } = 0.25f;
+        public float GiftWatchNorth { get; set; } = 0.05f;
+
+        [SettingPropertyFloatingInteger("Gift Watch Iron Throne", 0.00f, 1.00f, "0.00", HintText = "share of the Iron Throne's (King's Landing) daily income given to the Night's Watch when the Watch needs it")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public float GiftWatchIronThrone { get; set; } = 0.04f;
+
+        [SettingPropertyFloatingInteger("Gift Watch Dorne", 0.00f, 1.00f, "0.00", HintText = "share of Dorne's daily income given to the Night's Watch when the Watch needs it")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public float GiftWatchDorne { get; set; } = 0.03f;
+
+        [SettingPropertyFloatingInteger("Gift Watch Reach", 0.00f, 1.00f, "0.00", HintText = "share of the Reach's daily income given to the Night's Watch when the Watch needs it")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public float GiftWatchReach { get; set; } = 0.03f;
+
+        [SettingPropertyFloatingInteger("Gift Watch Vale", 0.00f, 1.00f, "0.00", HintText = "share of the Vale's daily income given to the Night's Watch when the Watch needs it")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public float GiftWatchVale { get; set; } = 0.02f;
+
+        [SettingPropertyFloatingInteger("Gift Watch Stormlands", 0.00f, 1.00f, "0.00", HintText = "share of the Stormlands' daily income given to the Night's Watch when the Watch needs it")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public float GiftWatchStormlands { get; set; } = 0.02f;
+
+        [SettingPropertyFloatingInteger("Gift Watch Riverlands", 0.00f, 1.00f, "0.00", HintText = "share of the Riverlands' daily income given to the Night's Watch when the Watch needs it")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public float GiftWatchRiverlands { get; set; } = 0.02f;
+
+        [SettingPropertyFloatingInteger("Gift Watch Dragonstone", 0.00f, 1.00f, "0.00", HintText = "share of Dragonstone's daily income given to the Night's Watch when the Watch needs it")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public float GiftWatchDragonstone { get; set; } = 0.01f;
+
+        [SettingPropertyInteger("Gift Watch Need Days", 0, 240, "0", HintText = "the realms send their gifts only while the Watch's houses hold less gold than this many days of the Watch's costs (wages and food); 0 = always")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public int GiftWatchNeedDays { get; set; } = 60;
+
+        [SettingPropertyFloatingInteger("Gift Watch Food Per Man", 0.00f, 4.00f, "0.00", HintText = "the food of one brother a day, counted into the Watch's costs for the need test")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public float GiftWatchFoodPerMan { get; set; } = 1.0f;
 
         [SettingPropertyFloatingInteger("Gift Free Cities To Dothraki Share", 0.00f, 1.00f, "0.00", HintText = "share of each Free City's daily income given to the Dothraki (Braavos, Volantis, Pentos, Myr, Lys, Tyrosh, Norvos, Qohor, Lorath); 0.15 since the 120-day test, where the Dothraki at war fell more than a quarter below their old numbers (0.10 before)")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
@@ -4500,7 +4536,16 @@ namespace Armoury
             s.MercUnpaidLeaveDays = MercUnpaidLeaveDays;
             s.MercGameContractAiOff = MercGameContractAiOff;
             s.CrownGifts = CrownGifts;
-            s.GiftNorthToWatchShare = GiftNorthToWatchShare;
+            s.GiftWatchNorth = GiftWatchNorth;
+            s.GiftWatchIronThrone = GiftWatchIronThrone;
+            s.GiftWatchDorne = GiftWatchDorne;
+            s.GiftWatchReach = GiftWatchReach;
+            s.GiftWatchVale = GiftWatchVale;
+            s.GiftWatchStormlands = GiftWatchStormlands;
+            s.GiftWatchRiverlands = GiftWatchRiverlands;
+            s.GiftWatchDragonstone = GiftWatchDragonstone;
+            s.GiftWatchNeedDays = GiftWatchNeedDays;
+            s.GiftWatchFoodPerMan = GiftWatchFoodPerMan;
             s.GiftFreeCitiesToDothrakiShare = GiftFreeCitiesToDothrakiShare;
             s.WatchUnpaid = WatchUnpaid;
             s.CrownRents = CrownRents;

@@ -34,6 +34,39 @@ namespace Armoury
         internal static bool WatchUnpaidOn { get { var s = Settings.Current; return s != null && s.WatchUnpaid && s.ClanBudgetEnabled; } }
 
         internal static bool IsWatch(IFaction f) { return f != null && f.StringId == WatchId; }
+        // Jeff 10.10: dawcy Strazy - id krolestw ROT (linia "KingdomBalance (175.0): krolestwa id=nazwa"): battania The North, vlandia House Baratheon
+        // of King's Landing (Zelazny Tron), aserai Dorne, empire_w The Reach, empire The Vale, stormlands, riverlands, dragonstone
+        internal static readonly string[] WatchDonorIds = { "battania", "vlandia", "aserai", "empire_w", "empire", "stormlands", "riverlands", "dragonstone" };
+        private static float WatchDonorShare(Settings s, int i)
+        {
+            switch (i)
+            {
+                case 0: return s.GiftWatchNorth; case 1: return s.GiftWatchIronThrone; case 2: return s.GiftWatchDorne; case 3: return s.GiftWatchReach;
+                case 4: return s.GiftWatchVale; case 5: return s.GiftWatchStormlands; case 6: return s.GiftWatchRiverlands; case 7: return s.GiftWatchDragonstone;
+            }
+            return 0f;
+        }
+        internal static long LastWatchHave, LastWatchCostDay; internal static bool LastWatchNeeds;
+        /// <summary>Oszczednosci rodow Strazy (zloto zywych doroslych bohaterow rodow uprawnionych) i koszt dnia Strazy: zold jej partii i zalog
+        /// + jedzenie braci (ludzie x GiftWatchFoodPerMan).</summary>
+        private static void WatchNeed(Kingdom watch, Settings s, out long have, out long cost)
+        {
+            have = 0; cost = 0; long men = 0;
+            foreach (var c in watch.Clans)
+            {
+                if (!Eligible(c)) continue;
+                foreach (var h in c.Heroes) if (h != null && h.IsAlive && !h.IsChild) have += Math.Max(0, h.Gold);
+            }
+            foreach (var mp in MobileParty.All)
+            {
+                if (mp == null || !mp.IsActive || mp.MapFaction != watch || !(mp.IsLordParty || mp.IsGarrison)) continue;
+                cost += Math.Max(0, mp.TotalWage);
+                if (mp.MemberRoster != null) men += mp.MemberRoster.TotalManCount;
+            }
+            cost += (long)(men * Math.Max(0f, s.GiftWatchFoodPerMan));
+            if (cost < 1) cost = 1;
+        }
+
 
         /// <summary>Partia Strazy (partia lorda rodu Strazy, zaloga osady Strazy, takze gracz w Strazy).</summary>
         internal static bool IsWatchParty(MobileParty mp)
@@ -50,7 +83,7 @@ namespace Armoury
         private static bool _errLogged, _idsLogged;
 
         internal static void Reset() { ZeroLast(); _stumbles = 0; _errLogged = false; _idsLogged = false; _lastDetail = "-"; }
-        internal static void ZeroLast() { LastNorth = LastFree = LastToWatch = LastToDothraki = LastKept = 0; LastWatchClans = LastDothrakiClans = 0; }
+        internal static void ZeroLast() { LastNorth = LastFree = LastToWatch = LastToDothraki = LastKept = 0; LastWatchNeeds = false; LastWatchHave = LastWatchCostDay = 0; LastWatchClans = LastDothrakiClans = 0; }
 
         private static void Stumble(string where, Exception e)
         {
@@ -140,26 +173,35 @@ namespace Armoury
                              + ", Wolne Miasta " + found.Count + " z " + FreeCityIds.Length + " (" + string.Join(", ", found.ToArray()) + ").");
                 }
                 var det = new List<string>();
-                float nShare = Math.Max(0f, Math.Min(1f, s.GiftNorthToWatchShare)), fShare = Math.Max(0f, Math.Min(1f, s.GiftFreeCitiesToDothrakiShare));
-                if (north != null && watch != null && nShare > 0f)
+                float fShare = Math.Max(0f, Math.Min(1f, s.GiftFreeCitiesToDothrakiShare));
+                // Jeff 10.10: na Straz zrzuca sie cale Westeros (procenty Jeffa), i tylko wtedy, gdy Straz potrzebuje - oszczednosci jej rodow ponizej
+                // GiftWatchNeedDays (60) dob jej kosztow (zold partii i zalog + jedzenie braci); test c3c: Straz 1.32 -> 2.41 mln w 120 dob przy darze samej Polnocy 25%
+                if (watch != null)
                 {
-                    try
-                    {
-                        var d = CrownIncome.DayOf(north);
-                        if (d != null)
+                    long have, cost; WatchNeed(watch, s, out have, out cost);
+                    LastWatchHave = have; LastWatchCostDay = cost;
+                    int needDays = Math.Max(0, s.GiftWatchNeedDays);
+                    LastWatchNeeds = needDays == 0 || have < cost * (long)needDays;
+                    if (LastWatchNeeds)
+                        for (int i = 0; i < WatchDonorIds.Length; i++)
                         {
-                            long gift = Math.Min((long)(nShare * d.Spend), CrownIncome.LeftFor(north));
-                            int n; long got; long out1 = Give(north, watch, gift, true, out got, out n);
-                            if (out1 > 0)
+                            try
                             {
-                                CrownIncome.Spent(north, out1); d.GiftOut += out1;
+                                var donor = Find(WatchDonorIds[i]);
+                                float share = Math.Max(0f, Math.Min(1f, WatchDonorShare(s, i)));
+                                if (donor == null || donor == watch || share <= 0f) continue;
+                                var d = CrownIncome.DayOf(donor);
+                                if (d == null) continue;
+                                long gift = Math.Min((long)(share * d.Spend), CrownIncome.LeftFor(donor));
+                                int n; long got; long out1 = Give(donor, watch, gift, true, out got, out n);
+                                if (out1 <= 0) continue;
+                                CrownIncome.Spent(donor, out1); d.GiftOut += out1;
                                 var dw = CrownIncome.DayOf(watch); if (dw != null) dw.GiftIn += got;
-                                LastNorth = out1; LastToWatch = got; LastWatchClans = n;
-                                det.Add(north.Name + " -> " + watch.Name + " " + got + " (" + (nShare * 100f).ToString("0", Inv) + "% z " + d.Spend + ", rodow " + n + ")");
+                                LastNorth += out1; LastToWatch += got; LastWatchClans = n;
+                                det.Add(donor.Name + " -> " + watch.Name + " " + got + " (" + (share * 100f).ToString("0", Inv) + "% z " + d.Spend + ")");
                             }
+                            catch (Exception e) { Stumble("Daily(" + WatchDonorIds[i] + ")", e); }
                         }
-                    }
-                    catch (Exception e) { Stumble("Daily(Polnoc)", e); }
                 }
                 if (dothraki != null && fShare > 0f)
                     foreach (var id in FreeCityIds)
@@ -183,7 +225,7 @@ namespace Armoury
                 _lastDetail = det.Count > 0 ? string.Join(", ", det.ToArray()) : "-";
                 if (s.LogEnabled)
                     Log.Info("Dary koron (182): dzien " + (int)CampaignTime.Now.ToDays
-                             + " | Polnoc -> Straz " + LastToWatch + " zl do " + LastWatchClans + " rodow (wagi stale: twierdza 1, wies 0.25, rod bez lenna 0.5)"
+                             + " | Westeros -> Straz " + LastToWatch + " zl do " + LastWatchClans + " rodow (wagi stale: twierdza 1, wies 0.25, rod bez lenna 0.5; wedlug potrzeby: oszczednosci Strazy " + LastWatchHave + " wobec " + Math.Max(0, s.GiftWatchNeedDays) + " dob kosztow po " + LastWatchCostDay + " - dar " + (LastWatchNeeds ? "TAK" : "NIE") + ")"
                              + " | Wolne Miasta -> Dothrakowie " + LastToDothraki + " zl do " + LastDothrakiClans + " rodow (rowno na rod)"
                              + " | ze skarbcow dawcow zeszlo " + (LastNorth + LastFree) + ", do rodow doszlo " + (LastToWatch + LastToDothraki) + ", w skarbcach odbiorcow zostalo (zaokraglenia) " + LastKept
                              + " | szczegoly: " + _lastDetail
