@@ -21,6 +21,8 @@
 - Spojnosc: Straz to jeden zakon z jedna kiesa (dar koron idzie do rodow Strazy wedlug potrzeby calej Strazy, 182-W) - jedna miara pulapu. Test: Straz w ludziach rosnie do pulapu i nie przekracza 1.10 x pula; "werbunek wstrzymany" tylko przy pelnej puli.
 - 183d: tylko odczyt modelu morale (BKROTPartyMoraleModel) przy partiach z dezercja - koszt znikomy.
 
+**Poprawki po recenzji (2):** (R1, wazne) nadwyzka puli Strazy dzielona miedzy rody wedlug ludzi, ktorych zwolnienia moga ruszyc (partie lordow poza bitwa i oblezeniem - `ReleasableMen`), a nie wedlug wszystkich ludzi z zalogami (rod z twierdza na Murze tracil druzyne za nadmiar zalogi, czesc nadwyzki nie byla zwalniana nigdzie); (R2a) rod Strazy bez ludzi - sredni nominal calej Strazy zamiast sredniej gry; (R2b) pulap w ludziach bez udzialu dworu w wojnie (Straz bez zoldu placi dwor w calosci - ta sama kwota nie moze byc miejscem dla ludzi). Odrzucone/odlozone: rezerwa nowej partii Strazy 30 wobec ok. 51 ludzi z szablonu (liczenie w bezpieczna strone - blokuje kolejne partie tej doby); szablon nowej partii i przyrost zalogi z modelu gry to ludzie z niczego dla WSZYSTKICH krolestw - etap 4 (ksiega ludzi, 4.7).
+
 **Status:** DO SPRAWDZENIA (build Release kod 0; test 120 dob + zapis 9 dob w toku).
 
 ## 2026-10-09 (C1, etap 2 krok C1: 165 + 182 + 166/162m + 185) - KORONA Z BIEZACYCH WPLYWOW, DARY KORON I STRAZ BEZ ZOLDU, BUDZET RODU AI Z DWOREM, KONTRAKT NAJEMNIKA AI

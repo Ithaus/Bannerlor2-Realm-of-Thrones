@@ -78,6 +78,9 @@ namespace Armoury
         // bez dochodu mialy pulap ok. 0 i ich druzyny nie werbowaly (werbunek wstrzymany 50-200/d przy Strazy 1.5-2 tys. wobec pulapu calosci 3-5 tys.),
         // a rod ponad wlasnym pulapem zwalnial ludzi mimo luzu calej Strazy. Pula = suma pulapow rodow Strazy z rozliczenia doby (ta sama liczba co w linii 166).
         private static readonly List<Clan> _watchClans = new List<Clan>();
+        // recenzja 2 (R1): ludzie Strazy, ktorych zwolnienia moga ruszyc (partie lordow poza bitwa/oblezeniem; zalog na Murze nie tniemy) - podzial nadwyzki puli
+        private static readonly Dictionary<Clan, int> _watchRel = new Dictionary<Clan, int>();
+        private static int _watchRelSum;
         private static int _watchPoolCap = -1, _watchPoolMen;
         private static string _watchDetail = "";
         // test 120 dob (wojsko w wojnie): dwor ustepuje zoldowi (udzial dostepny, zold go zajal, u ilu rodow); limity partii z wolnego miejsca rodu
@@ -99,7 +102,7 @@ namespace Armoury
             // Latki Harmony (_hooksTried, _harmony, _wired, _missing) zyja przez caly proces - zostaja.
             _bkTried = false; _popMgr = null; _getPopData = null; _fromSoldiers = null; _populated = null;
             _grain = null; _grainTried = false; _spawnUsed.Clear(); _spawnDay = -1;
-            _watchClans.Clear(); _watchPoolCap = -1; _watchPoolMen = 0; _watchDetail = "";   // 2: pula Strazy
+            _watchClans.Clear(); _watchPoolCap = -1; _watchPoolMen = 0; _watchDetail = ""; _watchRel.Clear(); _watchRelSum = 0;   // 2: pula Strazy
         }
 
         internal static void ZeroLast()
@@ -261,6 +264,7 @@ namespace Armoury
                 }
                 var drop = new List<Clan>();
                 var watchToday = new List<Clan>();   // 2: rody Strazy rozliczone dzis (pula)
+                double watchNomAvg = -1;             // recenzja 2 (R2a): sredni nominal calej Strazy, liczony raz, gdy potrzebny
                 foreach (var c in Clan.All)
                 {
                     try
@@ -333,8 +337,25 @@ namespace Armoury
                         {
                             long ns; nomSum.TryGetValue(c, out ns);
                             int men = b.MenPar + b.MenGar;
-                            b.Nominal = men > 0 && ns > 0 ? (double)ns / men : Math.Max(1f, Campaign.Current.AverageWage);
-                            b.MenCap = (int)(b.Cap / Math.Max(0.5, b.Nominal));
+                            // recenzja 2 (R2a): rod Strazy bez ludzi - sredni nominal calej Strazy (nie srednia gry), bo jego miejsce w puli wypelniaja ludzie innych rodow
+                            if (men > 0 && ns > 0) b.Nominal = (double)ns / men;
+                            else
+                            {
+                                if (watchNomAvg < 0)
+                                {
+                                    long nsAll = 0; int menAll = 0;
+                                    foreach (var kv in nomSum)
+                                    {
+                                        if (kv.Key == null || kv.Value <= 0) continue;
+                                        nsAll += kv.Value; int m1; mPar.TryGetValue(kv.Key, out m1); int m2; mGar.TryGetValue(kv.Key, out m2); menAll += m1 + m2;
+                                    }
+                                    watchNomAvg = menAll > 0 && nsAll > 0 ? (double)nsAll / menAll : 0;
+                                }
+                                b.Nominal = watchNomAvg > 0 ? watchNomAvg : Math.Max(1f, Campaign.Current.AverageWage);
+                            }
+                            // recenzja 2 (R2b): bez udzialu dworu w wojnie - Straz nie ma zoldu, wiec "dwor ustepuje zoldowi" nigdy nie zachodzi i rod placi dwor w calosci;
+                            // ta sama kwota nie moze byc jeszcze miejscem dla ludzi w puli
+                            b.MenCap = (int)(Math.Max(0, b.Cap - b.CourtRoom) / Math.Max(0.5, b.Nominal));
                             _dWatchMen += men; _dWatchCap = Math.Max(0, _dWatchCap) + b.MenCap;
                         }
                         else b.MenCap = -1;
@@ -384,6 +405,8 @@ namespace Armoury
                 {
                     _watchClans.Clear(); _watchClans.AddRange(watchToday);
                     _watchPoolCap = watchToday.Count > 0 ? Math.Max(0, _dWatchCap) : -1; _watchPoolMen = _dWatchMen;
+                    _watchRel.Clear(); _watchRelSum = 0;
+                    foreach (var wc in watchToday) { int r = ReleasableMen(wc); _watchRel[wc] = r; _watchRelSum += r; }
                     var wd = new System.Text.StringBuilder();
                     foreach (var wc in watchToday)
                     {
@@ -615,7 +638,9 @@ namespace Armoury
             _dStreak++;
             double share = Math.Max(0f, Math.Min(1f, s.ReleasePerDay));
             // do zwolnienia: w zlocie (zold dzienny) albo - Straz bez zoldu - w ludziach
-            double left = b.Zero ? (_watchPoolMen > 0 ? Math.Ceiling(share * (_watchPoolMen - _watchPoolCap) * men / (double)_watchPoolMen) : 0) : share * (wage - b.Cap);
+            // recenzja 2 (R1): Straz - nadwyzka calej puli dzielona wedlug ludzi rodu, ktorych da sie zwolnic (partie), nie wedlug zalog
+            int rel = 0; if (b.Zero) _watchRel.TryGetValue(c, out rel);
+            double left = b.Zero ? (_watchRelSum > 0 ? Math.Ceiling(share * (_watchPoolMen - _watchPoolCap) * rel / (double)_watchRelSum) : 0) : share * (wage - b.Cap);
             if (left <= 0) return;
             // 1. w pokoju zalogi ponad cel pokojowy (Straz bez zoldu - zalogi na Murze nie sa ciete; od partii)
             if (!GarFull(b, s) && c.Fiefs != null)
@@ -976,6 +1001,22 @@ namespace Armoury
             return n;
         }
 
+        /// <summary>Recenzja 2 (R1): ludzie rodu w partiach lordow, ktore Releases moze ruszyc (ten sam filtr co lista partii w Releases).</summary>
+        private static int ReleasableMen(Clan c)
+        {
+            int n = 0;
+            var wps = c != null ? c.WarPartyComponents : null;
+            if (wps == null) return 0;
+            for (int i = 0; i < wps.Count; i++)
+            {
+                var mp = wps[i] != null ? wps[i].MobileParty : null;
+                if (mp == null || !mp.IsActive || !mp.IsLordParty || mp.MapEvent != null || mp.SiegeEvent != null || mp.BesiegedSettlement != null
+                    || (mp.CurrentSettlement != null && mp.CurrentSettlement.IsUnderSiege) || mp.MemberRoster == null) continue;
+                n += mp.MemberRoster.TotalRegulars;
+            }
+            return n;
+        }
+
         /// <summary>2: ludzie calej Strazy teraz (partie i zalogi rodow Strazy z dzisiejszej puli).</summary>
         private static int WatchLiveMen()
         {
@@ -984,7 +1025,8 @@ namespace Armoury
             return n;
         }
 
-        /// <summary>2: miejsce w puli Strazy zajete dzis przez nowe partie (SpawnPrefix liczy je osobno, zanim partia zwerbuje).</summary>
+        /// <summary>2: miejsce w puli Strazy zajete dzis przez nowe partie tej doby (zabezpieczenie: gra moze wystawic kilka partii w jednym wywolaniu;
+        /// sklad z szablonu nowej partii jest juz w WatchLiveMen, wiec liczenie dziala w bezpieczna strone - blokuje kolejne partie tej doby).</summary>
         private static double WatchUsed()
         {
             double u = 0;
