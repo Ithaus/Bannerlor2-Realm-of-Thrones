@@ -400,3 +400,7 @@ LIMITY 13:30: 5h 32%, TYDZIEN 82% (reset 15.10) - przy 100% tygodnia przejsc na 
   w wojnie 91.5 tys. (C1-r 89.7, baza 111.5) - poprawki 385e7ec/4e4e627 daly malo; Dothraki -29% (bylo -47), zalogi na twierdze -7.8%. **Wniosek:** w skarbcach
   zostaje ok. 90 tys. zl/dobe niewydanych wplywow (linia "Korona: wplywy dnia (165)": "zostalo z wplywow dnia w skarbcach") = ok. 15 tys. ludzi zoldu - to luka;
   rozdaje ja C2 (180 renty wedlug lenn). **C1 NIE WGRYWAM OSOBNO** - dalej C2 na tej samej galezi w-toku/e2c, test 120 dob C1+C2, wgranie razem (WGRANIE 16).
+- (02:40) **C2 = 180 RENTY GOTOWE** (pomocnik: 7c15a3a kod, b649bbe opis, 7579b39 wlasna recenzja; ja: 1220510 komunikat renty gracza raz na 7 dob). CrownRents.cs
+  (po WageRefund, przed CrownIncome.End): pula = reszta wplywow dnia po zwrocie, wagi miasto 3 / zamek 1 / wies 0.25, warunek zalogi >= 50% normy krolestwa (28 dob)
+  i sluzby >= 20 z ostatnich 60 dob wojny; renta w D (czesc "korona", KRent); zapis arm_rent180; nowa linia "Renty korony (180): dzien"; CSV budzet-rodow +renta_180;warunek_180.
+  Opis i odstepstwa: docs/C1-POSTEP.md w drzewie e2c, sekcja "C2 - 180 renty". DLL test\Armoury-e2c-c2.dll (b43f65cf). **TEST 120 dob C1+C2 w toku** -> test\at-c2-120.out.txt.
